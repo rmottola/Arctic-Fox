@@ -782,26 +782,6 @@ const DownloadsView = {
   },
 
   /**
-   * Called when the downloads database becomes unavailable (for example,
-   * entering Private Browsing Mode).  References to existing data should be
-   * discarded.
-   */
-  onDataInvalidated: function DV_onDataInvalidated()
-  {
-    DownloadsCommon.log("Downloads data has been invalidated. Cleaning up",
-                        "DownloadsView.");
-
-    DownloadsPanel.terminate();
-
-    // Clear the list by replacing with a shallow copy.
-    let emptyView = this.richListBox.cloneNode(false);
-    this.richListBox.parentNode.replaceChild(emptyView, this.richListBox);
-    this.richListBox = emptyView;
-    this._viewItems = {};
-    this._dataItems = [];
-  },
-
-  /**
    * Called when a new download data item is available, either during the
    * asynchronous data load or when a new download is started.
    *
@@ -1487,7 +1467,8 @@ DownloadsViewItemController.prototype = {
 
     downloadsCmd_open: function DVIC_downloadsCmd_open()
     {
-      this.dataItem.openLocalFile(window);
+      this.dataItem.openLocalFile();
+
       // We explicitly close the panel here to give the user the feedback that
       // their click has been received, and we're handling the action.
       // Otherwise, we'd have to wait for the file-type handler to execute
