@@ -1182,6 +1182,9 @@ var WalkerActor = protocol.ActorClass({
       type: "pickerNodeHovered",
       node: Arg(0, "disconnectedNode")
     },
+    "picker-node-canceled" : {
+      type: "pickerNodeCanceled"
+    },
     "highlighter-ready" : {
       type: "highlighter-ready"
     },
