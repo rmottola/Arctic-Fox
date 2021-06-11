@@ -1359,6 +1359,12 @@ nsContextMenu.prototype = {
     clipboard.copyString(addresses, document);
   },
 
+  copyLink: function() {
+    var clipboard = Cc["@mozilla.org/widget/clipboardhelper;1"].
+                    getService(Ci.nsIClipboardHelper);
+    clipboard.copyString(this.linkURL, document);
+  },
+
   ///////////////
   // Utilities //
   ///////////////
