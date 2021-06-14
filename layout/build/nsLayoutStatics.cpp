@@ -95,10 +95,6 @@
 #include "AndroidMediaPluginHost.h"
 #endif
 
-#ifdef MOZ_WMF
-#include "WMFDecoder.h"
-#endif
-
 #ifdef MOZ_FFMPEG
 #include "FFmpegRuntimeLinker.h"
 #endif
@@ -393,10 +389,6 @@ nsLayoutStatics::Shutdown()
   CubebUtils::ShutdownLibrary();
   AsyncLatencyLogger::ShutdownLogger();
   WebAudioUtils::Shutdown();
-
-#ifdef MOZ_WMF
-  WMFDecoder::UnloadDLLs();
-#endif
 
 #ifdef MOZ_WIDGET_GONK
   nsVolumeService::Shutdown();
