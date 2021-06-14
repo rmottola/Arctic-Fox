@@ -18,6 +18,7 @@
 #include "nsThreadUtils.h"
 #include "mozilla/Logging.h"
 #include "VideoUtils.h"
+#include "gfxPlatform.h"
 
 PRLogModuleInfo* GetAppleMediaLog();
 #define LOG(...) MOZ_LOG(GetAppleMediaLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
@@ -374,7 +375,13 @@ AppleVTDecoder::CreateDecoderSpecification()
   }
 
   const void* specKeys[] = { AppleVTLinker::skPropEnableHWAccel };
-  const void* specValues[] = { kCFBooleanTrue };
+  const void* specValues[1];
+  if (gfxPlatform::CanUseHardwareVideoDecoding()) {
+    specValues[0] = kCFBooleanTrue;
+  } else {
+    // This GPU is blacklisted for hardware decoding.
+    specValues[0] = kCFBooleanFalse;
+  }
   static_assert(ArrayLength(specKeys) == ArrayLength(specValues),
                 "Non matching keys/values array size");
 
