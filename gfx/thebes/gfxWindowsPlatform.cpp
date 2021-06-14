@@ -1728,9 +1728,11 @@ bool DoesD3D11DeviceWork(ID3D11Device *device)
     gfxWindowsPlatform::GetDLLVersion(L"dlumd32.dll", displayLinkModuleVersionString);
     uint64_t displayLinkModuleVersion;
     if (!ParseDriverVersion(displayLinkModuleVersionString, &displayLinkModuleVersion)) {
+      gANGLESupportsD3D11 = false;
       return false;
     }
     if (displayLinkModuleVersion <= V(8,6,1,36484)) {
+      gANGLESupportsD3D11 = false;
       return false;
     }
   }
