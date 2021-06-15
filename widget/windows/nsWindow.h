@@ -244,6 +244,7 @@ public:
    * Misc.
    */
   virtual bool            AutoErase(HDC dc);
+  bool ComputeShouldAccelerate() override;
 
   static void             ClearCompositor(nsWindow* aWindow);
 
@@ -281,8 +282,6 @@ public:
   void                    PickerClosed();
 
   bool                    const DestroyCalled() { return mDestroyCalled; }
-
-  virtual void GetPreferredCompositorBackends(nsTArray<mozilla::layers::LayersBackend>& aHints);
 
   bool IsPopup();
   virtual bool ShouldUseOffMainThreadCompositing();
