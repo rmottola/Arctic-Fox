@@ -2030,6 +2030,7 @@ gfxWindowsPlatform::InitD3D11Devices()
     MOZ_ASSERT(!mD3D11Device);
     MOZ_ASSERT(!adapter);
 
+    ScopedGfxFeatureReporter reporterWARP("D3D11-WARP", gfxPrefs::LayersD3D11ForceWARP());
     MOZ_SEH_TRY {
       hr = d3d11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr,
                              // Use
