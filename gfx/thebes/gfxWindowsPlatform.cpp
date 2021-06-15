@@ -407,6 +407,9 @@ gfxWindowsPlatform::gfxWindowsPlatform()
 gfxWindowsPlatform::~gfxWindowsPlatform()
 {
     mDeviceManager = nullptr;
+    mD3D11Device = nullptr;
+    mD3D11ContentDevice = nullptr;
+    mD3D11ImageBridgeDevice = nullptr;
 
     // not calling FT_Done_FreeType because cairo may still hold references to
     // these FT_Faces.  See bug 458169.
@@ -417,6 +420,8 @@ gfxWindowsPlatform::~gfxWindowsPlatform()
 #endif
 
     mozilla::gfx::Factory::D2DCleanup();
+
+    mAdapter = nullptr;
 
     /* 
      * Uninitialize COM 
