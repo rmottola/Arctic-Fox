@@ -32,6 +32,7 @@
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/Logging.h"
+#include "gfxPrefs.h"
 
 using namespace mozilla::widget;
 using namespace mozilla;
@@ -161,7 +162,7 @@ GetPrefValueForFeature(int32_t aFeature, int32_t& aValue)
   if (!prefname)
     return false;
 
-  aValue = false;
+  aValue = nsIGfxInfo::FEATURE_STATUS_UNKNOWN;
   return NS_SUCCEEDED(Preferences::GetInt(prefname, &aValue));
 }
 
@@ -649,6 +650,17 @@ GfxInfoBase::Init()
 NS_IMETHODIMP
 GfxInfoBase::GetFeatureStatus(int32_t aFeature, int32_t* aStatus)
 {
+  int32_t blocklistAll = gfxPrefs::BlocklistAll();
+  if (blocklistAll > 0) {
+    gfxCriticalErrorOnce(gfxCriticalError::DefaultOptions(false)) << "Forcing blocklisting all features";
+    *aStatus = FEATURE_BLOCKED_DEVICE;
+    return NS_OK;
+  } else if (blocklistAll < 0) {
+    gfxCriticalErrorOnce(gfxCriticalError::DefaultOptions(false)) << "Ignoring any feature blocklisting.";
+    *aStatus = FEATURE_STATUS_OK;
+    return NS_OK;
+  }
+
   if (GetPrefValueForFeature(aFeature, *aStatus))
     return NS_OK;
 
