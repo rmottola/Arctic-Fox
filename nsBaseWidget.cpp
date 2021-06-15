@@ -52,7 +52,6 @@
 #include "mozilla/layers/InputAPZContext.h"
 #include "mozilla/layers/APZCCallbackHelper.h"
 #include "mozilla/dom/TabParent.h"
-#include "mozilla/Services.h"
 #include "mozilla/Snprintf.h"
 #include "nsRefPtrHashtable.h"
 #include "TouchEvents.h"
@@ -147,7 +146,6 @@ NS_IMPL_ISUPPORTS(nsBaseWidget, nsIWidget, nsISupportsWeakReference)
 nsBaseWidget::nsBaseWidget()
 : mWidgetListener(nullptr)
 , mAttachedWidgetListener(nullptr)
-, mPreviouslyAttachedWidgetListener(nullptr)
 , mLayerManager(nullptr)
 , mCompositorVsyncDispatcher(nullptr)
 , mCursor(eCursor_standard)
@@ -220,6 +218,7 @@ void
 WidgetShutdownObserver::Unregister()
 {
   if (mRegistered) {
+    mWidget = nullptr;
     nsContentUtils::UnregisterShutdownObserver(this);
     mRegistered = false;
   }
@@ -398,16 +397,6 @@ nsBaseWidget::AttachViewToTopLevel(bool aUseAttachedEvents)
 nsIWidgetListener* nsBaseWidget::GetAttachedWidgetListener()
  {
    return mAttachedWidgetListener;
- }
-
-nsIWidgetListener* nsBaseWidget::GetPreviouslyAttachedWidgetListener()
- {
-   return mPreviouslyAttachedWidgetListener;
- }
-
-void nsBaseWidget::SetPreviouslyAttachedWidgetListener(nsIWidgetListener* aListener)
- {
-   mPreviouslyAttachedWidgetListener = aListener;
  }
 
 void nsBaseWidget::SetAttachedWidgetListener(nsIWidgetListener* aListener)
@@ -870,7 +859,7 @@ nsBaseWidget::ComputeShouldAccelerate(bool aDefault)
   // enough not to:
   bool whitelisted = false;
 
-  nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
+  nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
   if (gfxInfo) {
     // bug 655578: on X11 at least, we must always call GetData (even if we don't need that information)
     // as that's what causes GfxInfo initialization which kills the zombie 'glxtest' process.
@@ -1209,10 +1198,6 @@ void nsBaseWidget::CreateCompositor(int aWidth, int aHeight)
   if (!success || !lf) {
     NS_WARNING("Failed to create an OMT compositor.");
     DestroyCompositor();
-    mLayerManager = nullptr;
-    mCompositorChild = nullptr;
-    mCompositorParent = nullptr;
-    mCompositorVsyncDispatcher = nullptr;
     return;
   }
 

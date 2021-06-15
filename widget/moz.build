@@ -6,7 +6,7 @@
 
 toolkit = CONFIG['MOZ_WIDGET_TOOLKIT']
 
-if toolkit in ('cocoa', 'qt', 'gonk'):
+if toolkit in ('cocoa', 'qt', 'gonk', 'uikit'):
     DIRS += [toolkit]
 if toolkit in ('qt', 'gonk', 'gtk2', 'gtk3'):
     EXPORTS += ['nsIPrintDialogService.h']
@@ -202,7 +202,7 @@ if toolkit in ('cocoa', 'windows'):
         'nsBaseClipboard.cpp',
     ]
 
-if toolkit in ('qt', 'gtk2', 'gtk3', 'cocoa', 'windows', 'gonk'):
+if toolkit in ('qt', 'gtk2', 'gtk3', 'cocoa', 'windows', 'gonk', 'uikit'):
     UNIFIED_SOURCES += [
         'nsBaseFilePicker.cpp',
     ]
