@@ -161,7 +161,6 @@ elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'qt':
 
 elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
     EXPORTS += [
-        'gfxD2DSurface.h',
         'gfxDWriteFonts.h',
         'gfxGDIFont.h',
         'gfxGDIFontList.h',
@@ -184,7 +183,6 @@ elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
             'gfxDWriteFontList.cpp',
         ]
         SOURCES += [
-            'gfxD2DSurface.cpp',
             'gfxDWriteCommon.cpp',
             'gfxDWriteFonts.cpp',
         ]
