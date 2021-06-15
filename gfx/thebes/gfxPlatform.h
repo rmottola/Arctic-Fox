@@ -188,6 +188,12 @@ public:
      */
     static gfxPlatform *GetPlatform();
 
+    /**
+     * Returns whether or not graphics has been initialized yet. This is
+     * intended for Telemetry where we don't necessarily want to initialize
+     * graphics just to observe its state.
+     */
+    static bool Initialized();
 
     /**
      * Shut down Thebes.
@@ -662,6 +668,11 @@ public:
      */
     static bool PerfWarnings();
 
+    void NotifyCompositorCreated(mozilla::layers::LayersBackend aBackend);
+    mozilla::layers::LayersBackend GetCompositorBackend() const {
+      return mCompositorBackend;
+    }
+
 protected:
     gfxPlatform();
     virtual ~gfxPlatform();
@@ -782,6 +793,10 @@ private:
 
     mozilla::RefPtr<mozilla::gfx::DrawEventRecorder> mRecorder;
     mozilla::RefPtr<mozilla::gl::SkiaGLGlue> mSkiaGlue;
+
+    // Backend that we are compositing with. NONE, if no compositor has been
+    // created yet.
+    mozilla::layers::LayersBackend mCompositorBackend;
 };
 
 #endif /* GFX_PLATFORM_H */
