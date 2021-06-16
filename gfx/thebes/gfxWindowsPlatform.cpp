@@ -1918,6 +1918,7 @@ bool DoesD3D11AlphaTextureSharingWork(ID3D11Device *device)
   return DoesD3D11TextureSharingWorkInternal(device, DXGI_FORMAT_R8_UNORM, D3D11_BIND_SHADER_RESOURCE);
 }
 
+auto
 gfxWindowsPlatform::CheckD3D11Support() -> D3D11Status
 {
   if (gfxPrefs::LayersD3D11ForceWARP()) {
