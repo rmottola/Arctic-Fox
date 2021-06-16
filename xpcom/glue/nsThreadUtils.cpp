@@ -159,11 +159,6 @@ NS_DispatchToCurrentThread(nsIRunnable* aEvent)
   return thread->Dispatch(aEvent, NS_DISPATCH_NORMAL);
 }
 
-// In the case of failure with a newly allocated runnable with a
-// refcount of zero, we intentionally leak the runnable, because it is
-// likely that the runnable is being dispatched to the main thread
-// because it owns main thread only objects, so it is not safe to
-// release them here.
 NS_METHOD
 NS_DispatchToMainThread(already_AddRefed<nsIRunnable>&& aEvent, uint32_t aDispatchFlags)
 {
@@ -171,6 +166,7 @@ NS_DispatchToMainThread(already_AddRefed<nsIRunnable>&& aEvent, uint32_t aDispat
   nsCOMPtr<nsIThread> thread;
   nsresult rv = NS_GetMainThread(getter_AddRefs(thread));
   if (NS_WARN_IF(NS_FAILED(rv))) {
+    NS_ASSERTION(false, "Failed NS_DispatchToMainThread() in shutdown; leaking");
     // NOTE: if you stop leaking here, adjust Promise::MaybeReportRejected(),
     // which assumes a leak here, or split into leaks and no-leaks versions
     nsIRunnable* temp = event.forget().take(); // leak without using "unused <<" due to Windows (boo)
@@ -179,6 +175,11 @@ NS_DispatchToMainThread(already_AddRefed<nsIRunnable>&& aEvent, uint32_t aDispat
   return thread->Dispatch(event.forget(), aDispatchFlags);
 }
 
+// In the case of failure with a newly allocated runnable with a
+// refcount of zero, we intentionally leak the runnable, because it is
+// likely that the runnable is being dispatched to the main thread
+// because it owns main thread only objects, so it is not safe to
+// release them here.
 NS_METHOD
 NS_DispatchToMainThread(nsIRunnable* aEvent, uint32_t aDispatchFlags)
 {
@@ -382,4 +383,3 @@ nsAutoLowPriorityIO::~nsAutoLowPriorityIO()
   }
 #endif
 }
-

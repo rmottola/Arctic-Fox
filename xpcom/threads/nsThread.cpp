@@ -513,6 +513,7 @@ nsThread::DispatchInternal(already_AddRefed<nsIRunnable>&& aEvent, uint32_t aFla
   }
 
   if (gXPCOMThreadsShutDown && MAIN_THREAD != mIsMainThread && !aTarget) {
+    NS_ASSERTION(false, "Failed Dispatch after xpcom-shutdown-threads");
     return NS_ERROR_ILLEGAL_DURING_SHUTDOWN;
   }
 
