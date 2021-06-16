@@ -31,6 +31,8 @@
 #include "gfxUtils.h"
 #include "gfx2DGlue.h"
 
+#include "gfxCrashReporterUtils.h"
+
 #ifdef MOZ_WIDGET_GTK
 #include "gfxPlatformGtk.h"
 #endif

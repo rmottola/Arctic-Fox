@@ -30,6 +30,8 @@
 #include "nsIGfxInfo.h"
 #include "GfxDriverInfo.h"
 
+#include "gfxCrashReporterUtils.h"
+
 #include "gfxGDIFontList.h"
 #include "gfxGDIFont.h"
 
@@ -662,6 +664,9 @@ gfxWindowsPlatform::VerifyD2DDevice(bool aAttemptForce)
         SurfaceCache::DiscardAll();
     }
 
+
+    mozilla::ScopedGfxFeatureReporter reporter("D2D", aAttemptForce);
+
     int supportedFeatureLevelsCount = ArrayLength(kSupportedFeatureLevels);
 
     nsRefPtr<IDXGIAdapter1> adapter1 = GetDXGIAdapter();
@@ -706,6 +711,9 @@ gfxWindowsPlatform::VerifyD2DDevice(bool aAttemptForce)
 
     if (Factory::SupportsD2D1()) {
     }
+
+    if (mD2DDevice)
+        reporter.SetSuccessful();
 #endif
 }
 
