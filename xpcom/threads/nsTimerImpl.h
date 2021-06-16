@@ -59,10 +59,8 @@ public:
   }
 
 #ifdef MOZ_TASK_TRACER
-  void DispatchTracedTask()
-  {
-    mTracedTask = mozilla::tasktracer::CreateFakeTracedTask(*(int**)(this));
-  }
+  void GetTLSTraceInfo();
+  mozilla::tasktracer::TracedTaskCommon GetTracedTask();
 #endif
 
   virtual size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const override;
@@ -149,7 +147,7 @@ private:
   TimeStamp             mTimeout;
 
 #ifdef MOZ_TASK_TRACER
-  nsRefPtr<mozilla::tasktracer::FakeTracedTask> mTracedTask;
+  mozilla::tasktracer::TracedTaskCommon mTracedTask;
 #endif
 
   TimeStamp             mStart, mStart2;
