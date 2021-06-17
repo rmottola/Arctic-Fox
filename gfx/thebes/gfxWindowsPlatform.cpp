@@ -709,11 +709,11 @@ gfxWindowsPlatform::VerifyD2DDevice(bool aAttemptForce)
         mozilla::gfx::Factory::SetDirect3D10Device(mD3D10Device);
     }
 
-    if (Factory::SupportsD2D1()) {
-    }
+    ScopedGfxFeatureReporter reporter1_1("D2D1.1");
 
-    if (mD2DDevice)
-        reporter.SetSuccessful();
+    if (Factory::SupportsD2D1()) {
+      reporter1_1.SetSuccessful();
+    }
 #endif
 }
 
