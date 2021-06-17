@@ -2350,7 +2350,7 @@ gfxPlatform::ShouldUseLayersAcceleration()
   if (gfxPrefs::LayersAccelerationForceEnabled()) {
     return true;
   }
-  if (gfxPlatform::GetPlatform()->AccelerateLayersByDefault()) {
+  if (AccelerateLayersByDefault()) {
     return true;
   }
   if (acceleratedEnv && *acceleratedEnv != '0') {
