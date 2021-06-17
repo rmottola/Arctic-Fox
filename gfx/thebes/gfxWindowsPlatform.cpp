@@ -1670,8 +1670,8 @@ gfxWindowsPlatform::GetDXGIAdapter()
 
 bool DoesD3D11DeviceWork(ID3D11Device *device)
 {
-  static bool checked;
-  static bool result;
+  static bool checked = false;
+  static bool result = false;
 
   if (checked)
       return result;
