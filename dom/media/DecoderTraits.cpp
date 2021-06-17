@@ -415,6 +415,7 @@ CanPlayStatus
 DecoderTraits::CanHandleCodecsType(const char* aMIMEType,
                                    const nsAString& aRequestedCodecs)
 {
+  MOZ_ASSERT(NS_IsMainThread());
   char const* const* codecList = nullptr;
 #ifdef MOZ_RAW
   if (IsRawType(nsDependentCString(aMIMEType))) {
@@ -470,7 +471,7 @@ DecoderTraits::CanHandleCodecsType(const char* aMIMEType,
 #endif
 #ifdef MOZ_ANDROID_OMX
   if (MediaDecoder::IsAndroidMediaEnabled()) {
-    GetAndroidMediaPluginHost()->FindDecoder(nsDependentCString(aMIMEType), &codecList);
+      EnsureAndroidMediaPluginHost()->FindDecoder(nsDependentCString(aMIMEType), &codecList))
   }
 #endif
   if (!codecList) {
@@ -580,6 +581,7 @@ static
 already_AddRefed<MediaDecoder>
 InstantiateDecoder(const nsACString& aType, MediaDecoderOwner* aOwner)
 {
+  MOZ_ASSERT(NS_IsMainThread());
   nsRefPtr<MediaDecoder> decoder;
 
 #ifdef MOZ_FMP4
@@ -649,7 +651,7 @@ if (IsMP3SupportedType(aType)) {
 #endif
 #ifdef MOZ_ANDROID_OMX
   if (MediaDecoder::IsAndroidMediaEnabled() &&
-      GetAndroidMediaPluginHost()->FindDecoder(aType, nullptr)) {
+      EnsureAndroidMediaPluginHost()->FindDecoder(aType, nullptr)) {
     decoder = new AndroidMediaDecoder(aType);
     return decoder.forget();
   }
@@ -688,6 +690,7 @@ if (IsMP3SupportedType(aType)) {
 already_AddRefed<MediaDecoder>
 DecoderTraits::CreateDecoder(const nsACString& aType, MediaDecoderOwner* aOwner)
 {
+  MOZ_ASSERT(NS_IsMainThread());
   nsRefPtr<MediaDecoder> decoder(InstantiateDecoder(aType, aOwner));
   NS_ENSURE_TRUE(decoder != nullptr, nullptr);
   NS_ENSURE_TRUE(decoder->Init(aOwner), nullptr);
@@ -698,6 +701,7 @@ DecoderTraits::CreateDecoder(const nsACString& aType, MediaDecoderOwner* aOwner)
 /* static */
 MediaDecoderReader* DecoderTraits::CreateReader(const nsACString& aType, AbstractMediaDecoder* aDecoder)
 {
+  MOZ_ASSERT(NS_IsMainThread());
   MediaDecoderReader* decoderReader = nullptr;
 
   if (!aDecoder) {
@@ -739,7 +743,7 @@ if (IsMP3SupportedType(aType)) {
 #endif
 #ifdef MOZ_ANDROID_OMX
   if (MediaDecoder::IsAndroidMediaEnabled() &&
-      GetAndroidMediaPluginHost()->FindDecoder(aType, nullptr)) {
+      EnsureAndroidMediaPluginHost()->FindDecoder(aType, nullptr)) {
     decoderReader = new AndroidMediaReader(aDecoder, aType);
   } else
 #endif

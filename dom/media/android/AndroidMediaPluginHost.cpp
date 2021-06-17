@@ -207,6 +207,7 @@ static const char* GetOmxLibraryName()
 
 AndroidMediaPluginHost::AndroidMediaPluginHost() {
   MOZ_COUNT_CTOR(AndroidMediaPluginHost);
+  MOZ_ASSERT(NS_IsMainThread());
 
   mResourceServer = AndroidMediaResourceServer::Start();
 
@@ -305,11 +306,18 @@ void AndroidMediaPluginHost::DestroyDecoder(Decoder *aDecoder)
 }
 
 AndroidMediaPluginHost *sAndroidMediaPluginHost = nullptr;
-AndroidMediaPluginHost *GetAndroidMediaPluginHost()
+AndroidMediaPluginHost *EnsureAndroidMediaPluginHost()
 {
+  MOZ_DIAGNOSTIC_ASSERT(NS_IsMainThread());
   if (!sAndroidMediaPluginHost) {
     sAndroidMediaPluginHost = new AndroidMediaPluginHost();
   }
+  return sAndroidMediaPluginHost;
+}
+
+AndroidMediaPluginHost *GetAndroidMediaPluginHost()
+{
+  MOZ_ASSERT(sAndroidMediaPluginHost);
   return sAndroidMediaPluginHost;
 }
 
