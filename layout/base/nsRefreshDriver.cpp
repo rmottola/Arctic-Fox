@@ -860,7 +860,7 @@ CreateVsyncRefreshTimer()
     return;
   }
 
-  NS_WARNING("Enabling vsync refresh driver\n");
+  NS_WARNING("Enabling vsync refresh driver");
 
   if (XRE_IsParentProcess()) {
     // Make sure all vsync systems are ready.
