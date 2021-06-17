@@ -52,10 +52,6 @@
 #include "RtspOmxDecoder.h"
 #include "RtspOmxReader.h"
 #endif
-#ifdef MOZ_WMF
-#include "WMFDecoder.h"
-#include "WMFReader.h"
-#endif
 #ifdef MOZ_DIRECTSHOW
 #include "DirectShowDecoder.h"
 #include "DirectShowReader.h"
@@ -314,14 +310,6 @@ IsAndroidMediaType(const nsACString& aType)
 }
 #endif
 
-#ifdef MOZ_WMF
-static bool
-IsWMFSupportedType(const nsACString& aType)
-{
-  return WMFDecoder::CanPlayType(aType, NS_LITERAL_STRING(""));
-}
-#endif
-
 #ifdef MOZ_DIRECTSHOW
 static bool
 IsDirectShowSupportedType(const nsACString& aType)
@@ -547,16 +535,6 @@ DecoderTraits::CanHandleMediaType(const char* aMIMEType,
     return CANPLAY_MAYBE;
   }
 #endif
-#ifdef MOZ_WMF
-  if (IsWMFSupportedType(nsDependentCString(aMIMEType))) {
-    if (!aHaveRequestedCodecs) {
-      return CANPLAY_MAYBE;
-    }
-    return WMFDecoder::CanPlayType(nsDependentCString(aMIMEType),
-                                   aRequestedCodecs)
-           ? CANPLAY_YES : CANPLAY_NO;
-  }
-#endif
 #ifdef MOZ_APPLEMEDIA
   if (IsAppleMediaSupportedType(nsDependentCString(aMIMEType), nullptr)) {
     return CANPLAY_MAYBE;
@@ -668,12 +646,6 @@ if (IsMP3SupportedType(aType)) {
     return decoder.forget();
   }
 #endif
-#ifdef MOZ_WMF
-  if (IsWMFSupportedType(aType)) {
-    decoder = new WMFDecoder();
-    return decoder.forget();
-  }
-#endif
 #ifdef MOZ_APPLEMEDIA
   if (IsAppleMediaSupportedType(aType)) {
     decoder = new AppleDecoder();
@@ -751,15 +723,8 @@ if (IsMP3SupportedType(aType)) {
     decoderReader = new WebMReader(aDecoder);
   } else
 #ifdef MOZ_DIRECTSHOW
-  // Note: DirectShowReader is preferred for MP3, but if it's disabled we
-  // fallback to the WMFReader.
   if (IsDirectShowSupportedType(aType)) {
     decoderReader = new DirectShowReader(aDecoder);
-  } else
-#endif
-#ifdef MOZ_WMF
-  if (IsWMFSupportedType(aType)) {
-    decoderReader = new WMFReader(aDecoder);
   } else
 #endif
 #ifdef MOZ_APPLEMEDIA
@@ -800,9 +765,6 @@ bool DecoderTraits::IsSupportedInVideoDocument(const nsACString& aType)
     IsMP4SupportedType(aType) ||
 #endif
     IsMP3SupportedType(aType) ||
-#ifdef MOZ_WMF
-    IsWMFSupportedType(aType) ||
-#endif
 #ifdef MOZ_DIRECTSHOW
     IsDirectShowSupportedType(aType) ||
 #endif
