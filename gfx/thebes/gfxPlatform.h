@@ -673,6 +673,10 @@ public:
       return mCompositorBackend;
     }
 
+    // Trigger a test-driven graphics device reset.
+    virtual void TestDeviceReset(DeviceResetReason aReason)
+    {}
+
 protected:
     gfxPlatform();
     virtual ~gfxPlatform();
