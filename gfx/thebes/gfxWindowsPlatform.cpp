@@ -625,7 +625,6 @@ gfxWindowsPlatform::VerifyD2DDevice(bool aAttemptForce)
         SurfaceCache::DiscardAll();
     }
 
-
     mozilla::ScopedGfxFeatureReporter reporter("D2D", aAttemptForce);
 
     int supportedFeatureLevelsCount = ArrayLength(kSupportedFeatureLevels);
@@ -667,6 +666,7 @@ gfxWindowsPlatform::VerifyD2DDevice(bool aAttemptForce)
     }
 
     if (mD3D10Device) {
+        reporter.SetSuccessful();
         mozilla::gfx::Factory::SetDirect3D10Device(mD3D10Device);
     }
 
@@ -2073,7 +2073,6 @@ gfxWindowsPlatform::AttemptD3D11ImageBridgeDeviceCreation()
   }
 
   mD3D11ImageBridgeDevice->SetExceptionMode(0);
-
   if (!DoesD3D11AlphaTextureSharingWork(mD3D11ImageBridgeDevice)) {
     mD3D11ImageBridgeDevice = nullptr;
     return false;
