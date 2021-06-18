@@ -32,12 +32,12 @@ gfxXlibSurface::gfxXlibSurface(Display *dpy, Drawable drawable, Visual *visual)
     , mGLXPixmap(None)
 #endif
 {
-    const gfxIntSize size = DoSizeQuery();
+    const gfx::IntSize size = DoSizeQuery();
     cairo_surface_t *surf = cairo_xlib_surface_create(dpy, drawable, visual, size.width, size.height);
     Init(surf);
 }
 
-gfxXlibSurface::gfxXlibSurface(Display *dpy, Drawable drawable, Visual *visual, const gfxIntSize& size)
+gfxXlibSurface::gfxXlibSurface(Display *dpy, Drawable drawable, Visual *visual, const gfx::IntSize& size)
     : mPixmapTaken(false), mDisplay(dpy), mDrawable(drawable)
 #if defined(GL_PROVIDER_GLX)
     , mGLXPixmap(None)
@@ -51,7 +51,7 @@ gfxXlibSurface::gfxXlibSurface(Display *dpy, Drawable drawable, Visual *visual, 
 }
 
 gfxXlibSurface::gfxXlibSurface(Screen *screen, Drawable drawable, XRenderPictFormat *format,
-                               const gfxIntSize& size)
+                               const gfx::IntSize& size)
     : mPixmapTaken(false), mDisplay(DisplayOfScreen(screen)),
       mDrawable(drawable)
 #if defined(GL_PROVIDER_GLX)
@@ -97,7 +97,7 @@ gfxXlibSurface::~gfxXlibSurface()
 }
 
 static Drawable
-CreatePixmap(Screen *screen, const gfxIntSize& size, unsigned int depth,
+CreatePixmap(Screen *screen, const gfx::IntSize& size, unsigned int depth,
              Drawable relatedDrawable)
 {
     if (!gfxASurface::CheckSurfaceSize(size, XLIB_IMAGE_SIDE_SIZE_LIMIT))
@@ -127,7 +127,7 @@ gfxXlibSurface::TakePixmap()
 
     // Divide by 8 because surface_get_depth gives us the number of *bits* per
     // pixel.
-    gfxIntSize size = GetSize();
+    gfx::IntSize size = GetSize();
     CheckedInt32 totalBytes = CheckedInt32(size.width) * CheckedInt32(size.height) * (bitDepth/8);
 
     // Don't do anything in the "else" case.  We could add INT32_MAX, but that
@@ -166,7 +166,7 @@ DestroyPixmap(void *data)
 /* static */
 cairo_surface_t *
 gfxXlibSurface::CreateCairoSurface(Screen *screen, Visual *visual,
-                                   const gfxIntSize& size, Drawable relatedDrawable)
+                                   const gfx::IntSize& size, Drawable relatedDrawable)
 {
     Drawable drawable =
         CreatePixmap(screen, size, DepthOfVisual(screen, visual),
@@ -192,7 +192,7 @@ gfxXlibSurface::CreateCairoSurface(Screen *screen, Visual *visual,
 /* static */
 already_AddRefed<gfxXlibSurface>
 gfxXlibSurface::Create(Screen *screen, Visual *visual,
-                       const gfxIntSize& size, Drawable relatedDrawable)
+                       const gfx::IntSize& size, Drawable relatedDrawable)
 {
     Drawable drawable =
         CreatePixmap(screen, size, DepthOfVisual(screen, visual),
@@ -213,7 +213,7 @@ gfxXlibSurface::Create(Screen *screen, Visual *visual,
 /* static */
 already_AddRefed<gfxXlibSurface>
 gfxXlibSurface::Create(Screen *screen, XRenderPictFormat *format,
-                       const gfxIntSize& size, Drawable relatedDrawable)
+                       const gfx::IntSize& size, Drawable relatedDrawable)
 {
     Drawable drawable =
         CreatePixmap(screen, size, format->depth, relatedDrawable);
@@ -237,7 +237,7 @@ static bool GetForce24bppPref()
 
 already_AddRefed<gfxASurface>
 gfxXlibSurface::CreateSimilarSurface(gfxContentType aContent,
-                                     const gfxIntSize& aSize)
+                                     const gfx::IntSize& aSize)
 {
     if (!mSurface || !mSurfaceValid) {
       return nullptr;
@@ -261,7 +261,7 @@ gfxXlibSurface::CreateSimilarSurface(gfxContentType aContent,
                 Screen* screen = cairo_xlib_surface_get_screen(CairoSurface());
                 nsRefPtr<gfxXlibSurface> depth24reference =
                     gfxXlibSurface::Create(screen, format,
-                                           gfxIntSize(1, 1), mDrawable);
+                                           gfx::IntSize(1, 1), mDrawable);
                 if (depth24reference)
                     return depth24reference->
                         gfxASurface::CreateSimilarSurface(aContent, aSize);
@@ -284,17 +284,17 @@ gfxXlibSurface::Finish()
     gfxASurface::Finish();
 }
 
-const gfxIntSize
+const gfx::IntSize
 gfxXlibSurface::GetSize() const
 {
     if (!mSurfaceValid)
-        return gfxIntSize(0,0);
+        return gfx::IntSize(0,0);
 
-    return gfxIntSize(cairo_xlib_surface_get_width(mSurface),
+    return gfx::IntSize(cairo_xlib_surface_get_width(mSurface),
                       cairo_xlib_surface_get_height(mSurface));
 }
 
-const gfxIntSize
+const gfx::IntSize
 gfxXlibSurface::DoSizeQuery()
 {
     // figure out width/height/depth
@@ -308,7 +308,7 @@ gfxXlibSurface::DoSizeQuery()
                  &width, &height,
                  &bwidth_ignore, &depth);
 
-    return gfxIntSize(width, height);
+    return gfx::IntSize(width, height);
 }
 
 class DisplayTable {
