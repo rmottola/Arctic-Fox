@@ -192,6 +192,7 @@
 #include "mozilla/RemoteSpellCheckEngineChild.h"
 #include "GMPServiceChild.h"
 #include "gfxPlatform.h"
+#include "nscore.h" // for NS_FREE_PERMANENT_DATA
 
 using namespace mozilla;
 using namespace mozilla::docshell;
@@ -1904,7 +1905,7 @@ ContentChild::ActorDestroy(ActorDestroyReason why)
         QuickExit();
     }
 
-#if !defined(DEBUG) && !defined(MOZ_ASAN)
+#ifndef NS_FREE_PERMANENT_DATA
     // In release builds, there's no point in the content process
     // going through the full XPCOM shutdown path, because it doesn't
     // keep persistent state.
