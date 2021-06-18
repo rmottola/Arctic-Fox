@@ -4344,6 +4344,7 @@ pref("gl.require-hardware", false);
 #ifdef XP_WIN
 pref("webgl.angle.try-d3d11", true);
 pref("webgl.angle.force-d3d11", false);
+pref("webgl.angle.force-warp", false);
 #endif
 
 #ifdef MOZ_WIDGET_GONK
