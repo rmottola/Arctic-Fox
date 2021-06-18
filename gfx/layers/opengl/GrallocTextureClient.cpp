@@ -67,7 +67,7 @@ GrallocTextureClientOGL::ToSurfaceDescriptor(SurfaceDescriptor& aOutDescriptor)
     return false;
   }
 
-  aOutDescriptor = NewSurfaceDescriptorGralloc(mGrallocHandle, mSize, mIsOpaque);
+  aOutDescriptor = NewSurfaceDescriptorGralloc(mGrallocHandle, mIsOpaque);
   return true;
 }
 
