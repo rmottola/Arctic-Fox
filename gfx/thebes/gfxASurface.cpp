@@ -315,7 +315,7 @@ gfxASurface::Finish()
 
 already_AddRefed<gfxASurface>
 gfxASurface::CreateSimilarSurface(gfxContentType aContent,
-                                  const nsIntSize& aSize)
+                                  const IntSize& aSize)
 {
     if (!mSurface || !mSurfaceValid) {
       return nullptr;
@@ -351,7 +351,7 @@ gfxASurface::CopyToARGB32ImageSurface()
       return nullptr;
     }
 
-    const nsIntSize size = GetSize();
+    const IntSize size = GetSize();
     nsRefPtr<gfxImageSurface> imgSurface =
         new gfxImageSurface(size, gfxImageFormat::ARGB32);
 
@@ -374,7 +374,7 @@ gfxASurface::CairoStatus()
 
 /* static */
 bool
-gfxASurface::CheckSurfaceSize(const nsIntSize& sz, int32_t limit)
+gfxASurface::CheckSurfaceSize(const IntSize& sz, int32_t limit)
 {
     if (sz.width < 0 || sz.height < 0) {
         NS_WARNING("Surface width or height < 0!");
@@ -689,10 +689,10 @@ gfxASurface::GetEmptyOpaqueRect()
   return empty;
 }
 
-const nsIntSize
+const IntSize
 gfxASurface::GetSize() const
 {
-  return nsIntSize(-1, -1);
+  return IntSize(-1, -1);
 }
 
 already_AddRefed<gfxImageSurface>
