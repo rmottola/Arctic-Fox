@@ -2297,6 +2297,8 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 %include ../shared/badcontent-doorhanger.inc.css
 %include ../shared/login-doorhanger.inc.css
 
+%include downloads/indicator.css
+
 %ifdef MOZ_DEVTOOLS
 /* Error counter */
 
