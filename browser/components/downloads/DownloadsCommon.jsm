@@ -1175,21 +1175,6 @@ DownloadsDataItem.prototype = {
   },
 
   /**
-   * Support function that deletes the local file for a download. This is
-   * used in cases where the Download Manager service doesn't delete the file
-   * from disk when cancelling. See bug 732924.
-   */
-  _ensureLocalFileRemoved: function DDI__ensureLocalFileRemoved()
-  {
-    try {
-      let localFile = this.localFile;
-      if (localFile.exists()) {
-        localFile.remove(false);
-      }
-    } catch (ex) { }
-  },
-
-  /**
    * Cancels the download.
    * @throws if the download is already done.
    */
