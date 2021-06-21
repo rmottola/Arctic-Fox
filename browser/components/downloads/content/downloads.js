@@ -138,7 +138,6 @@ const DownloadsPanel = {
     // active downloads if required.  If there are downloads to be shown in the
     // panel, starting the service will make us load their data asynchronously.
     DownloadsCommon.initializeAllDataLinks();
-    
 
     // Now that data loading has eventually started, load the required XUL
     // elements and initialize our views.
