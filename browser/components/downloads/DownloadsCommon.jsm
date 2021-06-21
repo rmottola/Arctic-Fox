@@ -59,6 +59,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "DownloadUtils",
                                   "resource://gre/modules/DownloadUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "OS",
                                   "resource://gre/modules/osfile.jsm")
+XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
+                                  "resource://gre/modules/PlacesUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
                                   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RecentWindow",
@@ -442,7 +444,7 @@ this.DownloadsCommon = {
       // of the new value if lower, and 10% if higher (exponential smoothing).
       let diff = aSeconds - aLastSeconds;
       aSeconds = aLastSeconds + (diff < 0 ? .3 : .1) * diff;
-      
+
       // If the new time is similar, reuse something close to the last time
       // left, but subtract a little to provide forward progress.
       diff = aSeconds - aLastSeconds;
@@ -800,11 +802,10 @@ DownloadsDataCtor.prototype = {
             downloadMetaData.fileSize = aDataItem.maxBytes;
           }
 
-          // RRR: Annotation service throws here. commented out for now.
-          /*PlacesUtils.annotations.setPageAnnotation(
+          PlacesUtils.annotations.setPageAnnotation(
                         NetUtil.newURI(aDataItem.uri), "downloads/metaData",
                         JSON.stringify(downloadMetaData), 0,
-                        PlacesUtils.annotations.EXPIRE_WITH_HISTORY);*/
+                        PlacesUtils.annotations.EXPIRE_WITH_HISTORY);
         } catch (ex) {
           Cu.reportError(ex);
         }
