@@ -296,6 +296,19 @@ const DownloadsIndicatorView = {
   _notificationTimeout: null,
 
   /**
+   * Check if the panel containing aNode is open.
+   * @param aNode
+   *        the node whose panel we're interested in.
+   */
+  _isAncestorPanelOpen: function DIV_isAncestorPanelOpen(aNode)
+  {
+    while (aNode && aNode.localName != "panel") {
+      aNode = aNode.parentNode;
+    }
+    return aNode && aNode.state == "open";
+  },
+
+  /**
    * If the status indicator is visible in its assigned position, shows for a
    * brief time a visual notification of a relevant event, like a new download.
    *
