@@ -464,7 +464,13 @@ const DownloadsIndicatorView = {
   },
 
   onCommand(aEvent) {
-    DownloadsPanel.showPanel();
+    // If the downloads button is in the menu panel, open the Library
+    let widgetGroup = CustomizableUI.getWidget("downloads-button");
+    if (widgetGroup.areaType == CustomizableUI.TYPE_MENU_PANEL) {
+      DownloadsPanel.showDownloadsHistory();
+    } else {
+      DownloadsPanel.showPanel();
+    }
     aEvent.stopPropagation();
   },
 
@@ -493,7 +499,6 @@ const DownloadsIndicatorView = {
   },
 
   _indicator: null,
-  _indicatorAnchor: null,
   __indicatorCounter: null,
   __indicatorProgress: null,
 
@@ -515,8 +520,12 @@ const DownloadsIndicatorView = {
   },
 
   get indicatorAnchor() {
-    return this._indicatorAnchor ||
-      (this._indicatorAnchor = document.getElementById("downloads-indicator-anchor"));
+    let widget = CustomizableUI.getWidget("downloads-button")
+                               .forWindow(window);
+    if (widget.overflowed) {
+      return widget.anchor;
+    }
+    return document.getElementById("downloads-indicator-anchor");
   },
 
   get _indicatorCounter() {
