@@ -1212,7 +1212,7 @@ DONE_CREATING_PIXMAP:
 }
 
 already_AddRefed<GLContext>
-GLContextProviderGLX::CreateHeadless(bool)
+GLContextProviderGLX::CreateHeadless(bool requireCompatProfile, bool forceEnabled)
 {
     IntSize dummySize = IntSize(16, 16);
     nsRefPtr<GLContext> glContext = CreateOffscreenPixmapContext(dummySize);
