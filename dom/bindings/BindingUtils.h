@@ -118,10 +118,6 @@ ThrowMethodFailedWithDetails(JSContext* cx, ErrorResult& rv,
     rv.ReportJSException(cx);
     return false;
   }
-  if (rv.IsNotEnoughArgsError()) {
-    rv.ReportNotEnoughArgsError(cx, ifaceName, memberName);
-    return false;
-  }
   rv.ReportGenericError(cx);
   return false;
 }
