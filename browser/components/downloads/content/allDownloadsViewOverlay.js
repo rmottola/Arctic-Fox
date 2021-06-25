@@ -55,9 +55,8 @@ const NOT_AVAILABLE = Number.MAX_VALUE;
  *
  * The caller is also responsible for "passing over" notification from both the
  * download-view and the places-result-observer, in the following manner:
- *  - The DownloadsPlacesView object implements getViewItem of the download-view
- *    pseudo interface.  It returns this object (therefore we implement
- *    onStateChangea and onProgressChange here).
+ *  - The DownloadsPlacesView object implements onDataItemStateChanged and
+ *    onDataItemChanged of the DownloadsView pseudo interface.
  *  - The DownloadsPlacesView object adds itself as a places result observer and
  *    calls this object's placesNodeIconChanged, placesNodeTitleChanged and
  *    placeNodeAnnotationChanged from its callbacks.
@@ -577,8 +576,7 @@ DownloadElementShell.prototype = {
     }
   },
 
-  /* DownloadView */
-  onStateChange(aOldState) {
+  onStateChanged(aOldState) {
     let metaData = this.getDownloadMetaData();
     metaData.state = this.dataItem.state;
     if (aOldState != nsIDM.DOWNLOAD_FINISHED && aOldState != metaData.state) {
@@ -592,6 +590,7 @@ DownloadElementShell.prototype = {
     }
 
     this._updateDownloadStatusUI();
+
     if (this._element.selected) {
       goUpdateDownloadCommands();
     } else {
@@ -599,8 +598,7 @@ DownloadElementShell.prototype = {
     }
   },
 
-  /* DownloadView */
-  onProgressChange() {
+  onChanged() {
     this._updateDownloadStatusUI();
   },
 
@@ -946,7 +944,7 @@ DownloadsPlacesView.prototype = {
     // data item. Thus, we also check that we make sure we don't have a view item
     // already.
     if (!shouldCreateShell &&
-        aDataItem && this.getViewItem(aDataItem) == null) {
+        aDataItem && !this._viewItemsForDataItems.has(aDataItem)) {
       // If there's a past-download-only shell for this download-uri with no
       // associated data item, use it for the new data item. Otherwise, go ahead
       // and create another shell.
@@ -1063,7 +1061,7 @@ DownloadsPlacesView.prototype = {
       throw new Error("Should have had at leaat one shell for this uri");
     }
 
-    let shell = this.getViewItem(aDataItem);
+    let shell = this._viewItemsForDataItems.get(aDataItem);
     if (!shells.has(shell)) {
       throw new Error("Missing download element shell in shells list for url");
     }
@@ -1374,8 +1372,14 @@ DownloadsPlacesView.prototype = {
     this._removeSessionDownloadFromView(aDataItem);
   },
 
-  getViewItem(aDataItem) {
-    return this._viewItemsForDataItems.get(aDataItem, null);
+  // DownloadsView
+  onDataItemStateChanged(aDataItem, aOldState) {
+    this._viewItemsForDataItems.get(aDataItem).onStateChanged(aOldState);
+  },
+
+  // DownloadsView
+  onDataItemChanged(aDataItem) {
+    this._viewItemsForDataItems.get(aDataItem).onChanged();
   },
 
   supportsCommand(aCommand) {

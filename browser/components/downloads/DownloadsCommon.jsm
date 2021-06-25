@@ -768,7 +768,7 @@ DownloadsDataCtor.prototype = {
     if (oldState != aDataItem.state) {
       for (let view of this._views) {
         try {
-          view.getViewItem(aDataItem).onStateChange(oldState);
+          view.onDataItemStateChanged(aDataItem, oldState);
         } catch (ex) {
           Cu.reportError(ex);
         }
@@ -806,7 +806,7 @@ DownloadsDataCtor.prototype = {
     }
 
     for (let view of this._views) {
-      view.getViewItem(aDataItem).onProgressChange();
+      view.onDataItemChanged(aDataItem);
     }
   },
 
@@ -1301,16 +1301,26 @@ const DownloadsViewPrototype = {
   },
 
   /**
-   * Returns the view item associated with the provided data item for this view.
+   * Called when the "state" property of a DownloadsDataItem has changed.
    *
-   * @param aDataItem
-   *        DownloadsDataItem object for which the view item is requested.
-   *
-   * @return Object that can be used to notify item status events.
+   * The onDataItemChanged notification will be sent afterwards.
    *
    * @note Subclasses should override this.
    */
-  getViewItem(aDataItem) {
+  onDataItemStateChanged(aDataItem) {
+    throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+  },
+
+  /**
+   * Called every time any state property of a DownloadsDataItem may have
+   * changed, including progress properties and the "state" property.
+   *
+   * Note that progress notification changes are throttled at the Downloads.jsm
+   * API level, and there is no throttling mechanism in the front-end.
+   *
+   * @note Subclasses should override this.
+   */
+  onDataItemChanged(aDataItem) {
     throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
   },
 
@@ -1409,34 +1419,21 @@ DownloadsIndicatorDataCtor.prototype = {
     this._updateViews();
   },
 
-  /**
-   * Returns the view item associated with the provided data item for this view.
-   *
-   * @param aDataItem
-   *        DownloadsDataItem object for which the view item is requested.
-   *
-   * @return Object that can be used to notify item status events.
-   */
-  getViewItem(aDataItem) {
-    let data = this._isPrivate ? PrivateDownloadsIndicatorData
-                               : DownloadsIndicatorData;
-    return Object.freeze({
-      onStateChange(aOldState) {
-        if (aDataItem.state == nsIDM.DOWNLOAD_FINISHED ||
-            aDataItem.state == nsIDM.DOWNLOAD_FAILED) {
-          data.attention = true;
-        }
+  // DownloadsView
+  onDataItemStateChanged(aDataItem, aOldState) {
+    if (aDataItem.state == nsIDM.DOWNLOAD_FINISHED ||
+        aDataItem.state == nsIDM.DOWNLOAD_FAILED) {
+      this.attention = true;
+    }
 
-        // Since the state of a download changed, reset the estimated time left.
-        data._lastRawTimeLeft = -1;
-        data._lastTimeLeft = -1;
+    // Since the state of a download changed, reset the estimated time left.
+    this._lastRawTimeLeft = -1;
+    this._lastTimeLeft = -1;
+  },
 
-        data._updateViews();
-      },
-      onProgressChange() {
-        data._updateViews();
-      }
-    });
+  // DownloadsView
+  onDataItemChanged() {
+    this._updateViews();
   },
 
   //////////////////////////////////////////////////////////////////////////////
@@ -1675,19 +1672,16 @@ DownloadsSummaryData.prototype = {
     this._updateViews();
   },
 
-  getViewItem(aDataItem) {
-    let self = this;
-    return Object.freeze({
-      onStateChange(aOldState) {
-        // Since the state of a download changed, reset the estimated time left.
-        self._lastRawTimeLeft = -1;
-        self._lastTimeLeft = -1;
-        self._updateViews();
-      },
-      onProgressChange() {
-        self._updateViews();
-      }
-    });
+  // DownloadsView
+  onDataItemStateChanged(aOldState) {
+    // Since the state of a download changed, reset the estimated time left.
+    this._lastRawTimeLeft = -1;
+    this._lastTimeLeft = -1;
+  },
+
+  // DownloadsView
+  onDataItemChanged() {
+    this._updateViews();
   },
 
   //////////////////////////////////////////////////////////////////////////////
