@@ -1700,7 +1700,7 @@ class CGConstructNavigatorObject(CGAbstractMethod):
               nsRefPtr<mozilla::dom::${descriptorName}> result = ConstructNavigatorObjectHelper(aCx, global, rv);
               rv.WouldReportJSException();
               if (rv.Failed()) {
-                ThrowMethodFailedWithDetails(aCx, rv, "${descriptorName}", "navigatorConstructor");
+                ThrowMethodFailed(aCx, rv);
                 return nullptr;
               }
               if (!GetOrCreateDOMReflector(aCx, result, &v)) {
@@ -7014,9 +7014,7 @@ class CGPerSignatureCall(CGThing):
         return wrapCode
 
     def getErrorReport(self):
-        return CGGeneric('return ThrowMethodFailedWithDetails(cx, rv, "%s", "%s");\n'
-                         % (self.descriptor.interface.identifier.name,
-                            self.idlNode.identifier.name))
+        return CGGeneric('return ThrowMethodFailed(cx, rv);\n')
 
     def define(self):
         return (self.cgRoot.define() + self.wrap_return_value())
@@ -7971,7 +7969,7 @@ class CGEnumerateHook(CGAbstractBindingMethod):
             self->GetOwnPropertyNames(cx, names, rv);
             rv.WouldReportJSException();
             if (rv.Failed()) {
-              return ThrowMethodFailedWithDetails(cx, rv, "%s", "enumerate");
+              return ThrowMethodFailed(cx, rv);
             }
             bool dummy;
             for (uint32_t i = 0; i < names.Length(); ++i) {
@@ -10028,7 +10026,7 @@ class CGEnumerateOwnPropertiesViaGetOwnPropertyNames(CGAbstractBindingMethod):
             self->GetOwnPropertyNames(cx, names, rv);
             rv.WouldReportJSException();
             if (rv.Failed()) {
-              return ThrowMethodFailedWithDetails(cx, rv, "%s", "enumerate");
+              return ThrowMethodFailed(cx, rv);
             }
             // OK to pass null as "proxy" because it's ignored if
             // shadowPrototypeProperties is true
