@@ -293,6 +293,12 @@ ImageWrapper::SetAnimationStartTime(const TimeStamp& aTime)
   mInnerImage->SetAnimationStartTime(aTime);
 }
 
+void
+ImageWrapper::PropagateUseCounters(nsIDocument* aParentDocument)
+{
+  mInnerImage->PropagateUseCounters(aParentDocument);
+}
+
 nsIntSize
 ImageWrapper::OptimalImageSizeForDest(const gfxSize& aDest,
                                       uint32_t aWhichFrame,
