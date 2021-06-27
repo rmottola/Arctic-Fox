@@ -108,8 +108,6 @@
 #include "imgIContainer.h"
 #include "nsComputedDOMStyle.h"
 
-#include "mozilla/net/ReferrerPolicy.h"
-
 using namespace mozilla;
 using namespace mozilla::dom;
 

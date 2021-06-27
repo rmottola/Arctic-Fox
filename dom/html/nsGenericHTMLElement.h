@@ -243,17 +243,6 @@ public:
   void GetInnerText(mozilla::dom::DOMString& aValue, mozilla::ErrorResult& aError);
   void SetInnerText(const nsAString& aValue);
 
-  mozilla::net::ReferrerPolicy
-  GetReferrerPolicy()
-  {
-    nsAutoString aPolicyString;
-    GetEnumAttr(nsGkAtoms::referrer, nullptr, aPolicyString);
-    if (aPolicyString.IsEmpty()) {
-      return mozilla::net::RP_Unset;
-    }
-    return mozilla::net::ReferrerPolicyFromString(aPolicyString);
-  }
-
   /**
    * Determine whether an attribute is an event (onclick, etc.)
    * @param aName the attribute
