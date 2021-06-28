@@ -2469,3 +2469,15 @@ nsStyleSet::InitialStyleRule()
   }
   return mInitialStyleRule;
 }
+
+bool
+nsStyleSet::HasRuleProcessorUsedByMultipleStyleSets(sheetType aSheetType)
+{
+  MOZ_ASSERT(size_t(aSheetType) < ArrayLength(mRuleProcessors));
+  if (!IsCSSSheetType(aSheetType) || !mRuleProcessors[aSheetType]) {
+    return false;
+  }
+  nsCSSRuleProcessor* rp =
+    static_cast<nsCSSRuleProcessor*>(mRuleProcessors[aSheetType].get());
+  return rp->IsUsedByMultipleStyleSets();
+}
