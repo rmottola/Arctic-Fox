@@ -13,14 +13,18 @@ from __future__ import absolute_import, print_function
 import argparse
 import hashlib
 import os
+import shutil
 import sys
+import zipfile
 
 from mozbuild import util
 from mozpack.copier import Jarrer
 from mozpack.files import (
     File,
     FileFinder,
+    JarFinder,
 )
+from mozpack.mozjar import JarReader
 
 MAVEN_POM_TEMPLATE = r'''
 <?xml version="1.0" encoding="UTF-8"?>
@@ -31,7 +35,19 @@ MAVEN_POM_TEMPLATE = r'''
   <artifactId>{artifactId}</artifactId>
   <version>{version}</version>
   <packaging>{packaging}</packaging>
+  <dependencies>
+    {dependencies}
+  </dependencies>
 </project>
+'''.lstrip()
+
+MAVEN_POM_DEPENDENCY_TEMPLATE = r'''
+  <dependency>
+     <groupId>{groupId}</groupId>
+     <artifactId>{artifactId}</artifactId>
+     <version>{version}</version>
+     <type>{packaging}</type>
+  </dependency>
 '''.lstrip()
 
 IVY_XML_TEMPLATE = r'''
