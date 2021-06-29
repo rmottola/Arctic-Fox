@@ -1296,6 +1296,13 @@ public:
   }
 
   bool
+  OpaqueInterceptionEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_INTERCEPTION_OPAQUE_ENABLED];
+  }
+
+  bool
   DOMWorkerNotificationEnabled() const
   {
     AssertIsOnWorkerThread();
