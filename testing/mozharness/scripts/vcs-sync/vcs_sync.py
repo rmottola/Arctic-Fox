@@ -6,7 +6,7 @@
 # ***** END LICENSE BLOCK *****
 """vcs_sync.py
 
-hg<->git conversions.  Needs to support both the monolithic beagle/goanna.git
+hg<->git conversions.  Needs to support both the monolithic beagle/gecko.git
 type conversions, as well as many-to-many (l10n, build repos, etc.)
 """
 
@@ -48,7 +48,7 @@ class HgGitScript(VirtualenvMixin, TooltoolMixin, TransferMixin, VCSSyncScript):
         Beagle is a git repo of mozilla-central, with full cvs history,
         and a number of developer-oriented repositories and branches added.
 
-        The partner-oriented goanna.git could also be incorporated into this
+        The partner-oriented gecko.git could also be incorporated into this
         script with some changes.
         """
 
@@ -177,7 +177,7 @@ intree=1
             self.write_to_file(hgrc, hgrc_update, open_mode='a')
 
     def _process_locale(self, locale, type, config, l10n_remote_targets, name, l10n_repos):
-        """ This contains the common processing that we do on both goanna_config
+        """ This contains the common processing that we do on both gecko_config
             and gaia_config for a given locale.
             """
         replace_dict = {'locale': locale}
@@ -227,16 +227,16 @@ intree=1
         l10n_repos = []
         l10n_remote_targets = deepcopy(self.config['remote_targets'])
         dirs = self.query_abs_dirs()
-        goanna_dict = deepcopy(self.config['l10n_config'].get('goanna_config', {}))
-        for name, goanna_config in goanna_dict.items():
-            file_name = self.download_file(goanna_config['locales_file_url'],
+        gecko_dict = deepcopy(self.config['l10n_config'].get('gecko_config', {}))
+        for name, gecko_config in gecko_dict.items():
+            file_name = self.download_file(gecko_config['locales_file_url'],
                                            parent_dir=dirs['abs_work_dir'])
             if not os.path.exists(file_name):
-                self.error("Can't download locales from %s; skipping!" % goanna_config['locales_file_url'])
+                self.error("Can't download locales from %s; skipping!" % gecko_config['locales_file_url'])
                 continue
             contents = self.read_from_file(file_name)
             for locale in contents.splitlines():
-                self._process_locale(locale, 'goanna', goanna_config, l10n_remote_targets, name, l10n_repos)
+                self._process_locale(locale, 'gecko', gecko_config, l10n_remote_targets, name, l10n_repos)
 
         gaia_dict = deepcopy(self.config['l10n_config'].get('gaia_config', {}))
         for name, gaia_config in gaia_dict.items():
@@ -884,7 +884,7 @@ intree=1
             generated_mapfile = os.path.join(dest, '.hg', 'git-mapfile')
             self.copy_to_upload_dir(
                 generated_mapfile,
-                dest=repo_config.get('mapfile_name', self.config.get('mapfile_name', "goanna-mapfile")),
+                dest=repo_config.get('mapfile_name', self.config.get('mapfile_name', "gecko-mapfile")),
                 log_level=INFO
             )
             for (branch, target_branch) in branch_map.items():
@@ -1020,7 +1020,7 @@ intree=1
                 if repo_config.get("mapfile_name"):
                     mapfiles.append(repo_config['mapfile_name'])
         else:
-            mapfiles.append(self.config.get('mapfile_name', 'goanna-mapfile'))
+            mapfiles.append(self.config.get('mapfile_name', 'gecko-mapfile'))
         if self.config.get('external_mapfile_urls'):
             for url in self.config['external_mapfile_urls']:
                 file_name = self.download_file(

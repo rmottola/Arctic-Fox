@@ -113,7 +113,7 @@ nsWebHandlerApp.prototype = {
                         .browserDOMWindow;
 
     // if we got an exception, there are several possible reasons why:
-    // a) this goanna embedding doesn't provide an nsIBrowserDOMWindow
+    // a) this gecko embedding doesn't provide an nsIBrowserDOMWindow
     //    implementation (i.e. doesn't support browser-style functionality),
     //    so we need to kick the URL out to the OS default browser.  This is
     //    the subject of bug 394479.

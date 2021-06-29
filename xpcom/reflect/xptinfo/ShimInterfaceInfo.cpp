@@ -280,13 +280,13 @@
 using namespace mozilla;
 
 struct ComponentsInterfaceShimEntry {
-  const char *goannaName;
+  const char *geckoName;
   nsIID iid;
   const mozilla::dom::NativePropertyHooks* nativePropHooks;
 };
 
-#define DEFINE_SHIM_WITH_CUSTOM_INTERFACE(goannaName, domName) \
-  { #goannaName, NS_GET_IID(goannaName), \
+#define DEFINE_SHIM_WITH_CUSTOM_INTERFACE(geckoName, domName) \
+  { #geckoName, NS_GET_IID(geckoName), \
      mozilla::dom::domName ## Binding::sNativePropertyHooks }
 #define DEFINE_SHIM(name) \
   DEFINE_SHIM_WITH_CUSTOM_INTERFACE(nsIDOM ## name, name)
@@ -473,11 +473,11 @@ ShimInterfaceInfo::MaybeConstruct(const char* aName, JSContext* cx)
 {
     nsRefPtr<ShimInterfaceInfo> info;
     for (uint32_t i = 0; i < ArrayLength(kComponentsInterfaceShimMap); ++i) {
-        if (!strcmp(aName, kComponentsInterfaceShimMap[i].goannaName)) {
+        if (!strcmp(aName, kComponentsInterfaceShimMap[i].geckoName)) {
             const ComponentsInterfaceShimEntry& shimEntry =
                 kComponentsInterfaceShimMap[i];
             info = new ShimInterfaceInfo(shimEntry.iid,
-                                         shimEntry.goannaName,
+                                         shimEntry.geckoName,
                                          shimEntry.nativePropHooks);
             break;
         }

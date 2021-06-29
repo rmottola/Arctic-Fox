@@ -80,7 +80,7 @@ TableTicker* Sampler::sActiveSampler;
 static mozilla::StaticAutoPtr<mozilla::ProfilerIOInterposeObserver>
                                                             sInterposeObserver;
 
-// The name that identifies the goanna thread for calls to
+// The name that identifies the gecko thread for calls to
 // profiler_register_thread.
 static const char * gGeckoThreadName = "GeckoMain";
 

@@ -1,4 +1,4 @@
-# This is for goanna.git, which is a partner-oriented repo with
+# This is for gecko.git, which is a partner-oriented repo with
 # B2G release branches + tags.
 
 import os
@@ -14,24 +14,24 @@ CVS_MANIFEST = """[{
 """
 
 config = {
-    "log_name": "goanna-git",
+    "log_name": "gecko-git",
     "log_max_rotate": 99,
     "repos": [{
         "repo": "https://hg.mozilla.org/users/hwine_mozilla.com/repo-sync-tools",
         "vcs": "hg",
     }],
-    "job_name": "goanna-git",
-    "conversion_dir": "goanna-git",
+    "job_name": "gecko-git",
+    "conversion_dir": "gecko-git",
     "initial_repo": {
         "repo": "https://hg.mozilla.org/mozilla-central",
         "revision": "default",
         "repo_name": "mozilla-central",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -51,11 +51,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g37_v2_2",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -73,11 +73,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g34_v2_1",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -95,11 +95,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g32_v2_0",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -117,11 +117,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g30_v1_4",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -139,11 +139,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g28_v1_3",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -161,11 +161,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g26_v1_2",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -183,11 +183,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g26_v1_2f",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -205,11 +205,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g28_v1_3t",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -227,11 +227,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g30_v1_4",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -249,11 +249,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g18",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
             "tag_config": {
                 "tag_regexes": [
                     "^B2G_",
@@ -263,7 +263,7 @@ config = {
         "vcs": "hg",
         "branch_config": {
             "branches": {
-                "default": "goanna-18",
+                "default": "gecko-18",
             },
         },
         "tag_config": {
@@ -276,11 +276,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g18_v1_1_0_hd",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -298,11 +298,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g18_v1_0_1",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -320,11 +320,11 @@ config = {
         "revision": "default",
         "repo_name": "mozilla-b2g18_v1_0_0",
         "targets": [{
-            "target_dest": "goanna-git/.git",
+            "target_dest": "gecko-git/.git",
             "vcs": "git",
             "test_push": True,
         }, {
-            "target_dest": "github-goanna-git",
+            "target_dest": "github-gecko-git",
         }],
         "vcs": "hg",
         "branch_config": {
@@ -339,8 +339,8 @@ config = {
         },
     }],
     "remote_targets": {
-        "github-goanna-git": {
-            "repo": "git@github.com:escapewindow/test-goanna-git.git",
+        "github-gecko-git": {
+            "repo": "git@github.com:escapewindow/test-gecko-git.git",
             "ssh_key": "~/.ssh/escapewindow_github_rsa",
             "vcs": "git",
         },
@@ -377,7 +377,7 @@ config = {
         "ssh_key": "~/.ssh/id_rsa",
         "ssh_user": "pmoore",
         "remote_host": "github-sync2",
-        "remote_path": "/home/pmoore/upload/goanna-git-upload",
+        "remote_path": "/home/pmoore/upload/gecko-git-upload",
     }],
 
     "default_notify_from": "developer-services+%s@mozilla.org" % hostname,

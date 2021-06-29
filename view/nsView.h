@@ -255,7 +255,7 @@ public:
   /**
    * Attach/detach a top level widget from this view. When attached, the view
    * updates the widget's device context and allows the view to begin receiving
-   * goanna events. The underlying base window associated with the widget will
+   * gecko events. The underlying base window associated with the widget will
    * continues to receive events it expects.
    *
    * An attached widget will not be destroyed when the view is destroyed,

@@ -156,7 +156,7 @@ to test in Chrome:
 1. Download the chromedriver binary and place it somewhere sensible
    e.g. `~/bin`
 
-2. In your goanna source tree activate the virtualenv created by mach,
+2. In your gecko source tree activate the virtualenv created by mach,
    since this has most dependencies already installed. This is typically
    in objdir/_virtualenv and is activated via e.g.
 

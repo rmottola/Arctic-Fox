@@ -67,7 +67,7 @@ public:
   {
   }
   // Lists of observers for I/O events.
-  // These are implemented as vectors since they are allowed to survive goanna,
+  // These are implemented as vectors since they are allowed to survive gecko,
   // without reporting leaks. This is necessary for the IOInterposer to be used
   // for late-write checks.
   std::vector<IOInterposeObserver*>  mCreateObservers;

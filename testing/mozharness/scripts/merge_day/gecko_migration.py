@@ -5,9 +5,9 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 # ***** END LICENSE BLOCK *****
-""" goanna_migration.py
+""" gecko_migration.py
 
-Merge day script for goanna (mozilla-central -> mozilla-aurora,
+Merge day script for gecko (mozilla-central -> mozilla-aurora,
 mozilla-aurora -> mozilla-beta, mozilla-beta -> mozilla-release).
 
 Ported largely from
@@ -67,7 +67,7 @@ class GeckoMigration(MercurialScript, BalrogMixin, VirtualenvMixin, SelfServeMix
             "help": "Comma separated list of locales to remove from the 'to' repo.",
         }],
     ]
-    goanna_repos = None
+    gecko_repos = None
 
     def __init__(self, require_config_file=True):
         super(GeckoMigration, self).__init__(
@@ -130,24 +130,24 @@ class GeckoMigration(MercurialScript, BalrogMixin, VirtualenvMixin, SelfServeMix
             )
         return self.abs_dirs
 
-    def query_goanna_repos(self):
+    def query_gecko_repos(self):
         """ Build a list of repos to clone.
             """
-        if self.goanna_repos:
-            return self.goanna_repos
-        self.info("Building goanna_repos list...")
+        if self.gecko_repos:
+            return self.gecko_repos
+        self.info("Building gecko_repos list...")
         dirs = self.query_abs_dirs()
-        self.goanna_repos = []
+        self.gecko_repos = []
         for k in ('from', 'to'):
             url = self.config["%s_repo_url" % k]
-            self.goanna_repos.append({
+            self.gecko_repos.append({
                 "repo": url,
                 "revision": self.config.get("%s_repo_revision", "default"),
                 "dest": dirs['abs_%s_dir' % k],
                 "vcs": "hg",
             })
-        self.info(pprint.pformat(self.goanna_repos))
-        return self.goanna_repos
+        self.info(pprint.pformat(self.gecko_repos))
+        return self.gecko_repos
 
     def query_hg_revision(self, path):
         """ Avoid making 'pull' a required action every run, by being able
@@ -480,7 +480,7 @@ class GeckoMigration(MercurialScript, BalrogMixin, VirtualenvMixin, SelfServeMix
             """
         dirs = self.query_abs_dirs()
         hg = self.query_exe("hg", return_type="list")
-        hg_repos = self.query_goanna_repos()
+        hg_repos = self.query_gecko_repos()
         hg_strip_error_list = [{
             'substr': r'''abort: empty revision set''', 'level': INFO,
             'explanation': "Nothing to clean up; we're good!",
@@ -520,14 +520,14 @@ class GeckoMigration(MercurialScript, BalrogMixin, VirtualenvMixin, SelfServeMix
                 )
 
     def pull(self):
-        """ Pull tools first, then use hgtool for the goanna repos
+        """ Pull tools first, then use hgtool for the gecko repos
             """
         repos = [{
             "repo": self.config["tools_repo_url"],
             "revision": self.config["tools_repo_revision"],
             "dest": "tools",
             "vcs": "hg",
-        }] + self.query_goanna_repos()
+        }] + self.query_gecko_repos()
         super(GeckoMigration, self).pull(repos=repos)
 
     def lock_update_paths(self):
@@ -626,7 +626,7 @@ The second run will be faster."""
         There are two different types of things we trigger:
         1) Nightly builds ("post_merge_nightly_branches" in the config).
            These are triggered with buildapi's nightly build endpoint to avoid
-           duplicating all of the nightly builder names into the goanna
+           duplicating all of the nightly builder names into the gecko
            migration mozharness configs. (Which would surely get out of date
            very quickly).
         2) Arbitrary builders ("post_merge_builders"). These are additional
@@ -649,5 +649,5 @@ The second run will be faster."""
 
 # __main__ {{{1
 if __name__ == '__main__':
-    goanna_migration = GeckoMigration()
-    goanna_migration.run_and_exit()
+    gecko_migration = GeckoMigration()
+    gecko_migration.run_and_exit()

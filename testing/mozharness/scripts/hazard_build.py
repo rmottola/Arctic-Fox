@@ -76,7 +76,7 @@ class B2GHazardBuild(PurgeMixin, B2GBuildBaseScript):
             config={
                 'default_vcs': 'hgtool',
                 'ccache': False,
-                'mozilla_dir': 'build/goanna',
+                'mozilla_dir': 'build/gecko',
 
                 'upload_ssh_server': None,
                 'upload_remote_basepath': None,
@@ -126,7 +126,7 @@ class B2GHazardBuild(PurgeMixin, B2GBuildBaseScript):
             'abs_analyzed_objdir':
                 os.path.join(abs_work_dir, self.config['srcdir'], self.config['analysis-objdir']),
             'analysis_scriptdir':
-                os.path.join(abs_dirs['goanna_src'], self.config['analysis-scriptdir'])
+                os.path.join(abs_dirs['gecko_src'], self.config['analysis-scriptdir'])
         }
 
         abs_dirs.update(dirs)
@@ -250,10 +250,10 @@ class B2GHazardBuild(PurgeMixin, B2GBuildBaseScript):
         if not os.path.exists(dest):
             self.mkdir_p(dest)
 
-    # The goanna config is required before enabling mock, because it determines
+    # The gecko config is required before enabling mock, because it determines
     # what mock target to use.
     def enable_mock(self):
-        self.load_goanna_config()
+        self.load_gecko_config()
         super(B2GHazardBuild, self).enable_mock()
 
     # Actions {{{2
@@ -292,7 +292,7 @@ class B2GHazardBuild(PurgeMixin, B2GBuildBaseScript):
         if not os.path.exists(dirs['shell_objdir']):
             self.mkdir_p(dirs['shell_objdir'])
 
-        js_src_dir = os.path.join(dirs['goanna_src'], 'js', 'src')
+        js_src_dir = os.path.join(dirs['gecko_src'], 'js', 'src')
         rc = self.run_command(['autoconf-2.13'],
                               cwd=js_src_dir,
                               env=self.env,
@@ -378,7 +378,7 @@ jobs = 2
         mozconfig = os.path.join(gonk_misc, 'hazard-analysis-config')
         mozconfig_text = ''
         mozconfig_text += 'CXXFLAGS="-Wno-attributes"\n'
-        mozconfig_text += '. "%s/default-goanna-config"\n' % gonk_misc
+        mozconfig_text += '. "%s/default-gecko-config"\n' % gonk_misc
         basecc = os.path.join(dirs['abs_work_dir'], self.config['sixgill'], 'scripts', 'wrap_gcc', 'basecc')
         mozconfig_text += "ac_add_options --with-compiler-wrapper=" + basecc + "\n"
         mozconfig_text += "ac_add_options --without-ccache\n"
@@ -387,7 +387,7 @@ jobs = 2
         # Stuff I set in my .userconfig for manual builds
         env['B2G_SOURCE'] = dirs['b2g_src']
         env['MOZCONFIG_PATH'] = mozconfig
-        env['GECKO_PATH'] = dirs['goanna_src']
+        env['GECKO_PATH'] = dirs['gecko_src']
         env['TARGET_TOOLS_PREFIX'] = os.path.join(dirs['abs_work_dir'], self.config['b2g_target_compiler_prefix'])
 
         try:

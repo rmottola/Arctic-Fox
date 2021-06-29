@@ -178,8 +178,8 @@ class CppEclipseBackend(CommonBackend):
         exe_path = os.path.join(exe_path, self._appname + self._bin_suffix)
 
         if self.environment.substs['MOZ_WIDGET_TOOLKIT'] != 'gonk':
-            main_goanna_launch = os.path.join(launch_dir, 'goanna.launch')
-            with open(main_goanna_launch, 'wb') as fh:
+            main_gecko_launch = os.path.join(launch_dir, 'gecko.launch')
+            with open(main_gecko_launch, 'wb') as fh:
                 launch = GECKO_LAUNCH_CONFIG_TEMPLATE
                 launch = launch.replace('@LAUNCH_PROGRAM@', exe_path)
                 launch = launch.replace('@LAUNCH_ARGS@', '-P -no-remote')
@@ -461,7 +461,7 @@ GECKO_LAUNCH_CONFIG_TEMPLATE = """<?xml version="1.0" encoding="UTF-8" standalon
 <stringAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_ID_ATTR" value=""/>
 <booleanAttribute key="org.eclipse.cdt.launch.use_terminal" value="true"/>
 <listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
-<listEntry value="/goanna"/>
+<listEntry value="/gecko"/>
 </listAttribute>
 <listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
 <listEntry value="4"/>
@@ -497,7 +497,7 @@ B2GFLASH_LAUNCH_CONFIG_TEMPLATE = """<?xml version="1.0" encoding="UTF-8" standa
 <stringAttribute key="org.eclipse.cdt.launch.WORKING_DIRECTORY" value="@OBJDIR@"/>
 <booleanAttribute key="org.eclipse.cdt.launch.use_terminal" value="true"/>
 <listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
-<listEntry value="/goanna"/>
+<listEntry value="/gecko"/>
 </listAttribute>
 <listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
 <listEntry value="4"/>

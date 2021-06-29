@@ -200,7 +200,7 @@ HandlerService.prototype = {
     // get handler service pref branch
     var prefSvc = Cc["@mozilla.org/preferences-service;1"].
                   getService(Ci.nsIPrefService);
-    var handlerSvcBranch = prefSvc.getBranch("goanna.handlerService.");
+    var handlerSvcBranch = prefSvc.getBranch("gecko.handlerService.");
 
     // get the version of the preferences for this locale
     return Number(handlerSvcBranch.
@@ -213,7 +213,7 @@ HandlerService.prototype = {
     var prefSvc = Cc["@mozilla.org/preferences-service;1"].
                   getService(Ci.nsIPrefService);
 
-    let schemesPrefBranch = prefSvc.getBranch("goanna.handlerService.schemes.");
+    let schemesPrefBranch = prefSvc.getBranch("gecko.handlerService.schemes.");
     let schemePrefList = schemesPrefBranch.getChildList("");
 
     var schemes = {};
