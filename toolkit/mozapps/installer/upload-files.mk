@@ -366,6 +366,7 @@ endif
 # Create Android ARchives and metadata for download by local
 # developers using Gradle.
 ifdef MOZ_ANDROID_GECKOLIBS_AAR
+ifndef MOZ_DISABLE_GECKOVIEW
 geckoaar-revision := $(BUILDID)
 
 UPLOAD_EXTRA_FILES += \
@@ -391,8 +392,11 @@ INNER_MAKE_GECKOLIBS_AAR= \
     --distdir '$(_ABS_DIST)' \
     '$(_ABS_DIST)'
 else
+INNER_MAKE_GECKOLIBS_AAR=echo 'Android geckolibs.aar packaging requires packaging geckoview'
+endif # MOZ_DISABLE_GECKOVIEW
+else
 INNER_MAKE_GECKOLIBS_AAR=echo 'Android geckolibs.aar packaging is disabled'
-endif
+endif # MOZ_ANDROID_GECKOLIBS_AAR
 
 ifdef MOZ_OMX_PLUGIN
 DIST_FILES += libomxplugin.so libomxplugingb.so libomxplugingb235.so \
