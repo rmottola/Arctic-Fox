@@ -62,10 +62,10 @@ IVY_XML_TEMPLATE = r'''
 </ivy-module>
 '''.lstrip()
 
-def package_goannalibs_aar(topsrcdir, distdir, output_file):
+def package_geckolibs_aar(topsrcdir, distdir, output_file):
     jarrer = Jarrer(optimize=False)
 
-    srcdir = os.path.join(topsrcdir, 'mobile', 'android', 'goannaview_library', 'goannalibs')
+    srcdir = os.path.join(topsrcdir, 'mobile', 'android', 'geckoview_library', 'geckolibs')
     jarrer.add('AndroidManifest.xml', File(os.path.join(srcdir, 'AndroidManifest.xml')))
     jarrer.add('classes.jar', File(os.path.join(srcdir, 'classes.jar')))
 
@@ -92,7 +92,7 @@ def main(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(dest='dir',
                         metavar='DIR',
-                        help='Path to write goannalibs Android ARchive and metadata to.')
+                        help='Path to write geckolibs Android ARchive and metadata to.')
     parser.add_argument('--verbose', '-v', default=False, action='store_true',
                         help='be verbose')
     parser.add_argument('--revision',
@@ -105,29 +105,29 @@ def main(args):
 
     paths_to_hash = []
 
-    aar = os.path.join(args.dir, 'goannalibs-{revision}.aar').format(revision=args.revision)
+    aar = os.path.join(args.dir, 'geckolibs-{revision}.aar').format(revision=args.revision)
     paths_to_hash.append(aar)
-    package_goannalibs_aar(args.topsrcdir, args.distdir, aar)
+    package_geckolibs_aar(args.topsrcdir, args.distdir, aar)
 
-    pom = os.path.join(args.dir, 'goannalibs-{revision}.pom').format(revision=args.revision)
+    pom = os.path.join(args.dir, 'geckolibs-{revision}.pom').format(revision=args.revision)
     paths_to_hash.append(pom)
     with open(pom, 'wt') as f:
         f.write(MAVEN_POM_TEMPLATE.format(
             groupId='org.mozilla',
-            artifactId='goannalibs',
+            artifactId='geckolibs',
             version=args.revision,
             packaging='aar',
         ))
 
-    ivy = os.path.join(args.dir, 'ivy-goannalibs-{revision}.xml').format(revision=args.revision)
+    ivy = os.path.join(args.dir, 'ivy-geckolibs-{revision}.xml').format(revision=args.revision)
     paths_to_hash.append(ivy)
     with open(ivy, 'wt') as f:
         f.write(IVY_XML_TEMPLATE.format(
             organisation='org.mozilla',
-            module='goannalibs',
+            module='geckolibs',
             revision=args.revision,
             publication=args.revision, # A white lie.
-            name='goannalibs',
+            name='geckolibs',
             type='aar',
             ext='aar',
         ))
