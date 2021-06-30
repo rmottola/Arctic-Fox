@@ -1,9 +1,9 @@
 # Backlog of Mozilla patches:
 (grossly ordered in dependency order, not always correct, oldest to work on at the bottom)
 
+- Bug 1633339 - Fix infinite loop when network changes and e10s is disabled.
 - Bug 1533969 - Fix build error with newer glibc. (gettid)
--  Bug 1530958 (CVE-2019-9791) Spidermonkey: IonMonkey's type inference is incorrect for constructors entered via OSR
- 
+- Bug 1530958 (CVE-2019-9791) Spidermonkey: IonMonkey's type inference is incorrect for constructors entered via OSR
 - Bug 1499277 - Remove unnecessary SCInput::readNativeEndian; fix SCInput::readPtr on big endian systems. r=sfink
 - 1499861 - issues when backporting on other collections
 - 1477632 - Always inline PLDHashTable::SearchTable(
