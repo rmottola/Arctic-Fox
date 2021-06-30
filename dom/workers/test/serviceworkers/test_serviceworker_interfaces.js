@@ -152,6 +152,8 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Notification",
 // IMPORTANT: Do not change this list without review from a DOM peer!
+    "NotificationEvent",
+// IMPORTANT: Do not change this list without review from a DOM peer!
     "Performance",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "PerformanceEntry",
