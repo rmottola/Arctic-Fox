@@ -2205,16 +2205,15 @@ public:
 #endif /* ! MOZ_SIMPLEPUSH */
 
 NS_IMETHODIMP
-ServiceWorkerManager::SendPushEvent(JS::Handle<JS::Value> aOriginAttributes,
+ServiceWorkerManager::SendPushEvent(const nsACString& aOriginAttributes,
                                     const nsACString& aScope,
-                                    const nsAString& aData,
-                                    JSContext* aCx)
+                                    const nsAString& aData)
 {
 #ifdef MOZ_SIMPLEPUSH
   return NS_ERROR_NOT_AVAILABLE;
 #else
   OriginAttributes attrs;
-  if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
+  if (!attrs.PopulateFromSuffix(aOriginAttributes)) {
     return NS_ERROR_INVALID_ARG;
   }
 
@@ -2231,7 +2230,9 @@ ServiceWorkerManager::SendPushEvent(JS::Handle<JS::Value> aOriginAttributes,
     new SendPushEventRunnable(serviceWorker->GetWorkerPrivate(), aData,
                               serviceWorkerHandle);
 
-  if (NS_WARN_IF(!r->Dispatch(aCx))) {
+  AutoJSAPI jsapi;
+  jsapi.Init();
+  if (NS_WARN_IF(!r->Dispatch(jsapi.cx()))) {
     return NS_ERROR_FAILURE;
   }
 
@@ -2240,15 +2241,14 @@ ServiceWorkerManager::SendPushEvent(JS::Handle<JS::Value> aOriginAttributes,
 }
 
 NS_IMETHODIMP
-ServiceWorkerManager::SendPushSubscriptionChangeEvent(JS::Handle<JS::Value> aOriginAttributes,
-                                                      const nsACString& aScope,
-                                                      JSContext* aCx)
+ServiceWorkerManager::SendPushSubscriptionChangeEvent(const nsACString& aOriginAttributes,
+                                                      const nsACString& aScope)
 {
 #ifdef MOZ_SIMPLEPUSH
   return NS_ERROR_NOT_AVAILABLE;
 #else
   OriginAttributes attrs;
-  if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
+  if (!attrs.PopulateFromSuffix(aOriginAttributes)) {
     return NS_ERROR_INVALID_ARG;
   }
 
@@ -2264,7 +2264,9 @@ ServiceWorkerManager::SendPushSubscriptionChangeEvent(JS::Handle<JS::Value> aOri
     new SendPushSubscriptionChangeEventRunnable(
       serviceWorker->GetWorkerPrivate(), serviceWorkerHandle);
 
-  if (NS_WARN_IF(!r->Dispatch(aCx))) {
+  AutoJSAPI jsapi;
+  jsapi.Init();
+  if (NS_WARN_IF(!r->Dispatch(jsapi.cx()))) {
     return NS_ERROR_FAILURE;
   }
 
