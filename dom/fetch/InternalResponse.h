@@ -113,6 +113,17 @@ public:
   }
 
   void
+  GetInternalBody(nsIInputStream** aStream)
+  {
+    if (mWrappedResponse) {
+      MOZ_ASSERT(!mBody);
+      return mWrappedResponse->GetBody(aStream);
+    }
+    nsCOMPtr<nsIInputStream> stream = mBody;
+    stream.forget(aStream);
+  }
+
+  void
   GetBody(nsIInputStream** aStream)
   {
     if (Type() == ResponseType::Opaque) {
@@ -120,12 +131,7 @@ public:
       return;
     }
 
-    if (mWrappedResponse) {
-      MOZ_ASSERT(!mBody);
-      return mWrappedResponse->GetBody(aStream);
-    }
-    nsCOMPtr<nsIInputStream> stream = mBody;
-    stream.forget(aStream);
+    return GetInternalBody(aStream);
   }
 
   void
