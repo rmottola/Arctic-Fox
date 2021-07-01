@@ -1736,7 +1736,7 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
   list-style-image: url("chrome://mozapps/skin/places/defaultFavicon.png");
 }
 
-.alltabs-item[selected="true"] {
+.alltabs-item[visuallyselected="true"] {
   font-weight: bold;
 }
 

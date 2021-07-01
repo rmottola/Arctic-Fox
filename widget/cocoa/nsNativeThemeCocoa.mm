@@ -3524,6 +3524,7 @@ nsNativeThemeCocoa::WidgetStateChanged(nsIFrame* aFrame, uint8_t aWidgetType,
     if (aAttribute == nsGkAtoms::disabled ||
         aAttribute == nsGkAtoms::checked ||
         aAttribute == nsGkAtoms::selected ||
+        aAttribute == nsGkAtoms::visuallyselected ||
         aAttribute == nsGkAtoms::menuactive ||
         aAttribute == nsGkAtoms::sortDirection ||
         aAttribute == nsGkAtoms::focused ||
