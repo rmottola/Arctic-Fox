@@ -1537,6 +1537,11 @@ protected:
   // show, in that case we show a separate dialog to ask this question.
   bool ConfirmDialogIfNeeded();
 
+private:
+  // Fire the JS engine's onNewGlobalObject hook.  Only used on inner windows.
+  void FireOnNewGlobalObject();
+
+protected:
   // This member is also used on both inner and outer windows, but
   // for slightly different purposes. On inner windows it means the
   // inner window is held onto by session history and should not
