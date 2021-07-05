@@ -3754,7 +3754,7 @@ void
 nsPIDOMWindow::RefreshMediaElements()
 {
   nsRefPtr<AudioChannelService> service = AudioChannelService::GetOrCreate();
-  service->RefreshAgentsVolume(GetCurrentInnerWindow());
+  service->RefreshAgentsVolume(GetOuterWindow());
 }
 
 // nsISpeechSynthesisGetter
