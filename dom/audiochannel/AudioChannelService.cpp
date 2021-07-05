@@ -585,6 +585,7 @@ void
 AudioChannelService::RefreshAgentsVolume(nsPIDOMWindow* aWindow)
 {
   MOZ_ASSERT(aWindow);
+  MOZ_ASSERT(aWindow->IsOuterWindow());
 
   AudioChannelWindow* winData = GetWindowData(aWindow->WindowID());
   if (!winData) {
