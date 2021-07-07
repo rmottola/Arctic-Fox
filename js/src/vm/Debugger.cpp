@@ -363,11 +363,15 @@ Debugger::Debugger(JSContext* cx, NativeObject* dbg)
     uncaughtExceptionHook(nullptr),
     enabled(true),
     observedGCs(cx),
+    trackingTenurePromotions(false),
+    tenurePromotionsLogLength(0),
+    maxTenurePromotionsLogLength(DEFAULT_MAX_LOG_LENGTH),
+    tenurePromotionsLogOverflowed(false),
     allowUnobservedAsmJS(false),
     trackingAllocationSites(false),
     allocationSamplingProbability(1.0),
     allocationsLogLength(0),
-    maxAllocationsLogLength(DEFAULT_MAX_ALLOCATIONS_LOG_LENGTH),
+    maxAllocationsLogLength(DEFAULT_MAX_LOG_LENGTH),
     allocationsLogOverflowed(false),
     frames(cx->runtime()),
     scripts(cx),
@@ -392,6 +396,7 @@ Debugger::~Debugger()
 {
     MOZ_ASSERT_IF(debuggees.initialized(), debuggees.empty());
     emptyAllocationsLog();
+    emptyTenurePromotionsLog();
 
     /*
      * Since the inactive state for this link is a singleton cycle, it's always
@@ -407,6 +412,7 @@ bool
 Debugger::init(JSContext* cx)
 {
     bool ok = debuggees.init() &&
+              debuggeeZones.init() &&
               frames.init() &&
               scripts.init() &&
               sources.init() &&
@@ -1697,6 +1703,22 @@ Debugger::isDebuggee(const JSCompartment* compartment) const
     return compartment->isDebuggee() && debuggees.has(compartment->maybeGlobal());
 }
 
+void
+Debugger::logTenurePromotion(JSObject& obj, double when)
+{
+    auto* entry = js_new<TenurePromotionsEntry>(obj, when);
+    if (!entry)
+        CrashAtUnhandlableOOM("Debugger::logTenurePromotion");
+
+    tenurePromotionsLog.insertBack(entry);
+    if (tenurePromotionsLogLength >= maxTenurePromotionsLogLength) {
+        js_delete(tenurePromotionsLog.popFirst());
+        tenurePromotionsLogOverflowed = true;
+    } else {
+        tenurePromotionsLogLength++;
+    }
+}
+
 /* static */ Debugger::AllocationSite*
 Debugger::AllocationSite::create(JSContext* cx, HandleObject frame, double when, HandleObject obj)
 {
@@ -1739,7 +1761,7 @@ Debugger::appendAllocationSite(JSContext* cx, HandleObject obj, HandleSavedFrame
     allocationsLog.insertBack(allocSite);
 
     if (allocationsLogLength >= maxAllocationsLogLength) {
-        js_delete(allocationsLog.getFirst());
+        js_delete(allocationsLog.popFirst());
         allocationsLogOverflowed = true;
     } else {
         allocationsLogLength++;
@@ -1752,8 +1774,16 @@ void
 Debugger::emptyAllocationsLog()
 {
     while (!allocationsLog.isEmpty())
-        js_delete(allocationsLog.getFirst());
+        js_delete(allocationsLog.popFirst());
     allocationsLogLength = 0;
+}
+
+void
+Debugger::emptyTenurePromotionsLog()
+{
+    while (!tenurePromotionsLog.isEmpty())
+        js_delete(tenurePromotionsLog.popFirst());
+    tenurePromotionsLogLength = 0;
 }
 
 JSTrapStatus
@@ -2500,6 +2530,14 @@ Debugger::trace(JSTracer* trc)
             TraceEdge(trc, &s->frame, "allocation log SavedFrame");
         if (s->ctorName)
             TraceEdge(trc, &s->ctorName, "allocation log constructor name");
+    }
+
+    /*
+     * Mark every entry in the promoted to tenured heap log.
+     */
+    for (TenurePromotionsEntry* e = tenurePromotionsLog.getFirst(); e; e = e->getNext()) {
+        if (e->frame)
+            TraceEdge(trc, &e->frame, "tenure promotions log SavedFrame");
     }
 
     /* Trace the weak map from JSScript instances to Debugger.Script objects. */
@@ -6942,24 +6980,30 @@ null(CallArgs& args)
     return true;
 }
 
+/* static */ JSObject*
+Debugger::getObjectAllocationSite(JSObject& obj)
+{
+    JSObject* metadata = GetObjectMetadata(&obj);
+    if (!metadata)
+        return nullptr;
+
+    MOZ_ASSERT(!metadata->is<WrapperObject>());
+    if (!SavedFrame::isSavedFrameAndNotProto(*metadata))
+        return nullptr;
+    return metadata;
+}
+
 static bool
 DebuggerObject_getAllocationSite(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_DEBUGOBJECT_REFERENT(cx, argc, vp, "get allocationSite", args, obj);
 
-    RootedObject metadata(cx, GetObjectMetadata(obj));
-    if (!metadata)
+    RootedObject allocSite(cx, Debugger::getObjectAllocationSite(*obj));
+    if (!allocSite)
         return null(args);
-
-    MOZ_ASSERT(!metadata->is<WrapperObject>());
-
-    if (!SavedFrame::isSavedFrameAndNotProto(*metadata))
-        return null(args);
-
-    if (!cx->compartment()->wrap(cx, &metadata))
+    if (!cx->compartment()->wrap(cx, &allocSite))
         return false;
-
-    args.rval().setObject(*metadata);
+    args.rval().setObject(*allocSite);
     return true;
 }
 
