@@ -301,35 +301,6 @@ this.DownloadsCommon = {
   _privateSummary: null,
 
   /**
-   * Returns the legacy state integer value for the provided Download object.
-   */
-  stateOfDownload(download) {
-    // Collapse state using the correct priority.
-    if (!download.stopped) {
-      return nsIDM.DOWNLOAD_DOWNLOADING;
-    }
-    if (download.succeeded) {
-      return nsIDM.DOWNLOAD_FINISHED;
-    }
-    if (download.error) {
-      if (download.error.becauseBlockedByParentalControls) {
-        return nsIDM.DOWNLOAD_BLOCKED_PARENTAL;
-      }
-      if (download.error.becauseBlockedByReputationCheck) {
-        return nsIDM.DOWNLOAD_DIRTY;
-      }
-      return nsIDM.DOWNLOAD_FAILED;
-    }
-    if (download.canceled) {
-      if (download.hasPartialData) {
-        return nsIDM.DOWNLOAD_PAUSED;
-      }
-      return nsIDM.DOWNLOAD_CANCELED;
-    }
-    return nsIDM.DOWNLOAD_NOTSTARTED;
-  },
-
-  /**
    * Given an iterable collection of DownloadDataItems, generates and returns
    * statistics about that collection.
    *
@@ -466,63 +437,43 @@ this.DownloadsCommon = {
       throw new Error("aOwnerWindow must be a dom-window object");
     }
 
-#ifdef XP_WIN
-    // On Windows, the system will provide a native confirmation prompt
-    // for .exe files. Exclude this from our prompt, but prompt on other
-    // executable types.
-    let isWindowsExe = aFile.leafName.toLowerCase().endsWith(".exe");
-#else
-    let isWindowsExe = false;
-#endif
-
-    // Confirm opening executable files if required.
-    if (aFile.isExecutable() && !isWindowsExe) {
-      let showAlert = true;
-      try {
-        showAlert = Services.prefs.getBoolPref(kPrefBdmAlertOnExeOpen);
-      } catch (ex) { }
-
-
-      if (showAlert) {
-        let name = aFile.leafName;
-        let message =
-          DownloadsCommon.strings.fileExecutableSecurityWarning(name, name);
-        let title =
-          DownloadsCommon.strings.fileExecutableSecurityWarningTitle;
-        let dontAsk =
-          DownloadsCommon.strings.fileExecutableSecurityWarningDontAsk;
-
-        let checkbox = { value: false };
-        let open = Services.prompt.confirmCheck(aOwnerWindow, title, message,
-                                                dontAsk, checkbox);
-        if (!open) {
-          return;
-        }
-
-        Services.prefs.setBoolPref(kPrefBdmAlertOnExeOpen,
-                                   !checkbox.value);
-      }
+    let promiseShouldLaunch;
+    if (aFile.isExecutable()) {
+      // We get a prompter for the provided window here, even though anchoring
+      // to the most recently active window should work as well.
+      promiseShouldLaunch =
+        DownloadUIHelper.getPrompter(aOwnerWindow)
+                        .confirmLaunchExecutable(aFile.path);
+    } else {
+      promiseShouldLaunch = Promise.resolve(true);
     }
 
-    // Actually open the file.
-    try {
-      if (aMimeInfo && aMimeInfo.preferredAction == aMimeInfo.useHelperApp) {
-        aMimeInfo.launchWithFile(aFile);
+    promiseShouldLaunch.then(shouldLaunch => {
+      if (!shouldLaunch) {
         return;
       }
-    } catch(ex) { }
 
-    // If either we don't have the mime info, or the preferred action failed,
-    // attempt to launch the file directly.
-    try {
-      aFile.launch();
-    } catch(ex) {
-      // If launch fails, try sending it through the system's external "file:"
-      // URL handler.
-      Cc["@mozilla.org/uriloader/external-protocol-service;1"]
-        .getService(Ci.nsIExternalProtocolService)
-        .loadUrl(NetUtil.newURI(aFile));
-    }
+      // Actually open the file.
+      try {
+        if (aMimeInfo && aMimeInfo.preferredAction == aMimeInfo.useHelperApp) {
+          aMimeInfo.launchWithFile(aFile);
+          return;
+          return;
+        }
+      } catch (ex) { }
+
+      // If either we don't have the mime info, or the preferred action failed,
+      // attempt to launch the file directly.
+      try {
+        aFile.launch();
+      } catch(ex) {
+        // If launch fails, try sending it through the system's external "file:"
+        // URL handler.
+        Cc["@mozilla.org/uriloader/external-protocol-service;1"]
+          .getService(Ci.nsIExternalProtocolService)
+          .loadUrl(NetUtil.newURI(aFile));
+      }
+    }).then(null, Cu.reportError);
   },
 
   /**
