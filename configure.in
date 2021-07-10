@@ -5061,7 +5061,6 @@ fi;
 dnl ========================================================
 dnl = Apple platform decoder support
 dnl ========================================================
-MOZ_APPLEMEDIA=1
 MOZ_ARG_DISABLE_BOOL(applemedia,
 [  --disable-applemedia    Disable support for AppleMedia (Cocoa only)],
     MOZ_APPLEMEDIA=,
