@@ -73,7 +73,7 @@ const Observer = Class({
     });
 
 
-    // Currently goanna does not dispatches "TabSelect" events when different
+    // Currently gecko does not dispatches "TabSelect" events when different
     // window gets activated. To work around this limitation we emulate "select"
     // event for this case.
     windowObserver.on("activate", chromeWindow => {

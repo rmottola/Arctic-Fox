@@ -88,8 +88,7 @@ ClientCanvasLayer::Initialize(const Data& aData)
         factory = MakeUnique<SurfaceFactory_Gralloc>(mGLContext, caps, forwarder, mFlags);
 #else
         if (mGLContext->GetContextType() == GLContextType::EGL) {
-          bool isCrossProcess = (XRE_GetProcessType() != GeckoProcessType_Default);
-          if (!isCrossProcess) {
+          if (XRE_IsParentProcess()) {
             factory = SurfaceFactory_EGLImage::Create(mGLContext, caps, forwarder,
                                                       mFlags);
           }
@@ -99,8 +98,11 @@ ClientCanvasLayer::Initialize(const Data& aData)
       }
       case mozilla::layers::LayersBackend::LAYERS_D3D11: {
 #ifdef XP_WIN
+        // Enable surface sharing only if ANGLE and compositing devices
+        // are both WARP or both not WARP
         if (mGLContext->IsANGLE() &&
-            DoesD3D11TextureSharingWork(gfxWindowsPlatform::GetPlatform()->GetD3D11Device()))
+            (mGLContext->IsWARP() == gfxWindowsPlatform::GetPlatform()->IsWARP()) &&
+            gfxWindowsPlatform::GetPlatform()->DoesD3D11TextureSharingWork())
         {
           factory = SurfaceFactory_ANGLEShareHandle::Create(mGLContext, caps, forwarder,
                                                             mFlags);
@@ -174,7 +176,6 @@ ClientCanvasLayer::RenderLayer()
 
   ClientManager()->Hold(this);
   mCanvasClient->Updated();
-  mCanvasClient->OnTransaction();
 }
 
 CanvasClient::CanvasClientType

@@ -27,14 +27,14 @@ NS_INTERFACE_MAP_END_INHERITING(AudioNode)
 NS_IMPL_ADDREF_INHERITED(StereoPannerNode, AudioNode)
 NS_IMPL_RELEASE_INHERITED(StereoPannerNode, AudioNode)
 
-class StereoPannerNodeEngine : public AudioNodeEngine
+class StereoPannerNodeEngine final : public AudioNodeEngine
 {
 public:
   StereoPannerNodeEngine(AudioNode* aNode,
                          AudioDestinationNode* aDestination)
     : AudioNodeEngine(aNode)
     , mSource(nullptr)
-    , mDestination(static_cast<AudioNodeStream*>(aDestination->Stream()))
+    , mDestination(aDestination->Stream())
     // Keep the default value in sync with the default value in
     // StereoPannerNode::StereoPannerNode.
     , mPan(0.f)
@@ -176,12 +176,12 @@ StereoPannerNode::StereoPannerNode(AudioContext* aContext)
               2,
               ChannelCountMode::Clamped_max,
               ChannelInterpretation::Speakers)
-  , mPan(new AudioParam(this, SendPanToStream, 0.f))
+  , mPan(new AudioParam(this, SendPanToStream, 0.f, "pan"))
 {
   StereoPannerNodeEngine* engine = new StereoPannerNodeEngine(this, aContext->Destination());
   mStream = aContext->Graph()->CreateAudioNodeStream(engine,
                                                      MediaStreamGraph::INTERNAL_STREAM);
-  engine->SetSourceStream(static_cast<AudioNodeStream*>(mStream.get()));
+  engine->SetSourceStream(mStream);
 }
 
 StereoPannerNode::~StereoPannerNode()

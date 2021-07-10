@@ -12,7 +12,6 @@
 #include "nsProxyRelease.h"
 #include "nsThreadUtils.h"
 #include "nsIClassInfoImpl.h"
-#include "nsIProgrammingLanguage.h"
 #include "Variant.h"
 
 #include "mozIStorageError.h"
@@ -56,15 +55,10 @@ public:
   }
 
   NS_IMETHODIMP
-  GetHelperForLanguage(uint32_t aLanguage, nsISupports **_helper) override
+  GetScriptableHelper(nsIXPCScriptable **_helper) override
   {
-    if (aLanguage == nsIProgrammingLanguage::JAVASCRIPT) {
-      static AsyncStatementJSHelper sJSHelper;
-      *_helper = &sJSHelper;
-      return NS_OK;
-    }
-
-    *_helper = nullptr;
+    static AsyncStatementJSHelper sJSHelper;
+    *_helper = &sJSHelper;
     return NS_OK;
   }
 
@@ -86,13 +80,6 @@ public:
   GetClassID(nsCID **_id) override
   {
     *_id = nullptr;
-    return NS_OK;
-  }
-
-  NS_IMETHODIMP
-  GetImplementationLanguage(uint32_t *_language) override
-  {
-    *_language = nsIProgrammingLanguage::CPLUSPLUS;
     return NS_OK;
   }
 
@@ -138,7 +125,7 @@ AsyncStatement::initialize(Connection *aDBConnection,
   mNativeConnection = aNativeConnection;
   mSQLString = aSQLStatement;
 
-  PR_LOG(gStorageLog, PR_LOG_NOTICE, ("Inited async statement '%s' (0x%p)",
+  MOZ_LOG(gStorageLog, LogLevel::Debug, ("Inited async statement '%s' (0x%p)",
                                       mSQLString.get()));
 
 #ifdef DEBUG
@@ -283,15 +270,15 @@ AsyncStatement::getAsyncStatement(sqlite3_stmt **_stmt)
     int rc = mDBConnection->prepareStatement(mNativeConnection, mSQLString,
                                              &mAsyncStatement);
     if (rc != SQLITE_OK) {
-      PR_LOG(gStorageLog, PR_LOG_ERROR,
+      MOZ_LOG(gStorageLog, LogLevel::Error,
              ("Sqlite statement prepare error: %d '%s'", rc,
               ::sqlite3_errmsg(mNativeConnection)));
-      PR_LOG(gStorageLog, PR_LOG_ERROR,
+      MOZ_LOG(gStorageLog, LogLevel::Error,
              ("Statement was: '%s'", mSQLString.get()));
       *_stmt = nullptr;
       return rc;
     }
-    PR_LOG(gStorageLog, PR_LOG_NOTICE, ("Initialized statement '%s' (0x%p)",
+    MOZ_LOG(gStorageLog, LogLevel::Debug, ("Initialized statement '%s' (0x%p)",
                                         mSQLString.get(),
                                         mAsyncStatement));
   }
@@ -345,7 +332,7 @@ AsyncStatement::Finalize()
 
   mFinalized = true;
 
-  PR_LOG(gStorageLog, PR_LOG_NOTICE, ("Finalizing statement '%s'",
+  MOZ_LOG(gStorageLog, LogLevel::Debug, ("Finalizing statement '%s'",
                                       mSQLString.get()));
 
   asyncFinalize();

@@ -24,8 +24,7 @@ self.addEventListener("fetch", function(event) {
       event.respondWith(fetch("realaudio.ogg"));
     }
   } else if (event.request.url.indexOf("video.ogg") >= 0) {
-    // FIXME: Bug 1147668: This should be "video".
-    if (event.request.context == "audio") {
+    if (event.request.context == "video") {
       event.respondWith(fetch("realaudio.ogg"));
     }
   } else if (event.request.url.indexOf("beacon.sjs") >= 0) {
@@ -71,6 +70,22 @@ self.addEventListener("fetch", function(event) {
     }
   } else if (event.request.url.indexOf("xslt") >= 0) {
     respondToServiceWorker(event, "xslt");
+   } else if (event.request.url.indexOf("myworker") >= 0) {
+     if (event.request.context == "worker") {
+       event.respondWith(fetch("worker.js"));
+     }
+   } else if (event.request.url.indexOf("myparentworker") >= 0) {
+     if (event.request.context == "worker") {
+       event.respondWith(fetch("parentworker.js"));
+     }
+   } else if (event.request.url.indexOf("mysharedworker") >= 0) {
+     if (event.request.context == "sharedworker") {
+       event.respondWith(fetch("sharedworker.js"));
+     }
+   } else if (event.request.url.indexOf("myparentsharedworker") >= 0) {
+     if (event.request.context == "sharedworker") {
+       event.respondWith(fetch("parentsharedworker.js"));
+     }
   } else if (event.request.url.indexOf("cache") >= 0) {
     var cache;
     var origContext = event.request.context;

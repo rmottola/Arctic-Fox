@@ -186,6 +186,12 @@ ImageWrapper::IsOpaque()
   return mInnerImage->IsOpaque();
 }
 
+NS_IMETHODIMP_(bool)
+ImageWrapper::IsImageContainerAvailable(LayerManager* aManager, uint32_t aFlags)
+{
+  return mInnerImage->IsImageContainerAvailable(aManager, aFlags);
+}
+
 NS_IMETHODIMP_(already_AddRefed<ImageContainer>)
 ImageWrapper::GetImageContainer(LayerManager* aManager, uint32_t aFlags)
 {
@@ -285,6 +291,12 @@ NS_IMETHODIMP_(void)
 ImageWrapper::SetAnimationStartTime(const TimeStamp& aTime)
 {
   mInnerImage->SetAnimationStartTime(aTime);
+}
+
+void
+ImageWrapper::PropagateUseCounters(nsIDocument* aParentDocument)
+{
+  mInnerImage->PropagateUseCounters(aParentDocument);
 }
 
 nsIntSize

@@ -15,24 +15,17 @@ let ToolbarView = {
     this._onFilterPopupHiding = this._onFilterPopupHiding.bind(this);
     this._onHiddenMarkersChanged = this._onHiddenMarkersChanged.bind(this);
     this._onPrefChanged = this._onPrefChanged.bind(this);
+    this._popup = $("#performance-options-menupopup");
 
     this.optionsView = new OptionsView({
       branchName: BRANCH_NAME,
-      menupopup: $("#performance-options-menupopup")
+      menupopup: this._popup
     });
 
-    // TODO bug 1160313 get rid of retro mode checks
-    // hide option buttons here, and any other buttons in the toolbar
-    // (details.js takes care of view buttons)
-    if (PerformanceController.getOption("retro-mode")) {
-      let RETRO_ELEMENTS = [
-        "#option-flatten-tree-recursion", "#option-enable-memory", "#option-invert-flame-graph",
-        "#option-show-jit-optimizations", "#filter-button"
-      ];
-      for (let selector of RETRO_ELEMENTS) {
-        $(selector).hidden = true;
-      }
-    }
+    // Set the visibility of experimental UI options on load
+    // based off of `devtools.performance.ui.experimental` preference
+    let experimentalEnabled = PerformanceController.getOption("experimental");
+    this._toggleExperimentalUI(experimentalEnabled);
 
     yield this.optionsView.initialize();
     this.optionsView.on("pref-changed", this._onPrefChanged);
@@ -49,6 +42,7 @@ let ToolbarView = {
   destroy: function () {
     $("#performance-filter-menupopup").removeEventListener("popupshowing", this._onFilterPopupShowing);
     $("#performance-filter-menupopup").removeEventListener("popuphiding",  this._onFilterPopupHiding);
+    this._popup = null
 
     this.optionsView.off("pref-changed", this._onPrefChanged);
     this.optionsView.destroy();
@@ -64,9 +58,9 @@ let ToolbarView = {
       menuitem.setAttribute("type", "checkbox");
       menuitem.setAttribute("align", "center");
       menuitem.setAttribute("flex", "1");
-      menuitem.setAttribute("label", markerDetails.label);
+      menuitem.setAttribute("label", MarkerUtils.getMarkerClassName(markerName));
       menuitem.setAttribute("marker-type", markerName);
-      menuitem.className = markerDetails.colorName;
+      menuitem.className = `marker-color-${markerDetails.colorName}`;
 
       menuitem.addEventListener("command", this._onHiddenMarkersChanged);
 
@@ -87,6 +81,29 @@ let ToolbarView = {
       } else {
         menuitem.setAttribute("checked", "true");
       }
+    }
+  },
+
+  /**
+   * Fired when `devtools.performance.ui.experimental` is changed, or
+   * during init. Toggles the visibility of experimental performance tool options
+   * in the UI options.
+   *
+   * Sets or removes "experimental-enabled" on the menu and main elements,
+   * hiding or showing all elements with class "experimental-option".
+   *
+   * TODO re-enable "#option-enable-memory" permanently once stable in bug 1163350
+   * TODO re-enable "#option-show-jit-optimizations" permanently once stable in bug 1163351
+   *
+   * @param {boolean} isEnabled
+   */
+  _toggleExperimentalUI: function (isEnabled) {
+    if (isEnabled) {
+      $(".theme-body").classList.add("experimental-enabled");
+      this._popup.classList.add("experimental-enabled");
+    } else {
+      $(".theme-body").classList.remove("experimental-enabled");
+      this._popup.classList.remove("experimental-enabled");
     }
   },
 
@@ -118,7 +135,12 @@ let ToolbarView = {
    * Propogated by the PerformanceController.
    */
   _onPrefChanged: function (_, prefName) {
-    let value = Services.prefs.getBoolPref(BRANCH_NAME + prefName);
+    let value = PerformanceController.getOption(prefName);
+
+    if (prefName === "experimental") {
+      this._toggleExperimentalUI(value);
+    }
+
     this.emit(EVENTS.PREF_CHANGED, prefName, value);
   },
 

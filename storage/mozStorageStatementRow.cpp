@@ -44,7 +44,7 @@ StatementRow::GetProperty(nsIXPConnectWrappedNative *aWrapper,
                           JSContext *aCtx,
                           JSObject *aScopeObj,
                           jsid aId,
-                          jsval *_vp,
+                          JS::Value *_vp,
                           bool *_retval)
 {
   NS_ENSURE_TRUE(mStatement, NS_ERROR_NOT_INITIALIZED);
@@ -102,7 +102,7 @@ StatementRow::GetProperty(nsIXPConnectWrappedNative *aWrapper,
       }
     }
     else if (type == mozIStorageValueArray::VALUE_TYPE_NULL) {
-      *_vp = JSVAL_NULL;
+      _vp->setNull();
     }
     else {
       NS_ERROR("unknown column type returned, what's going on?");

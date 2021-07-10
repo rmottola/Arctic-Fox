@@ -125,11 +125,14 @@ nsHtml5TreeBuilder::createElement(int32_t aNamespace, nsIAtom* aName,
             aAttributes->getValue(nsHtml5AttributeName::ATTR_SRCSET);
           nsString* crossOrigin =
             aAttributes->getValue(nsHtml5AttributeName::ATTR_CROSSORIGIN);
+          nsString* referrerPolicy =
+            aAttributes->getValue(nsHtml5AttributeName::ATTR_REFERRER);
           nsString* sizes =
             aAttributes->getValue(nsHtml5AttributeName::ATTR_SIZES);
           mSpeculativeLoadQueue.AppendElement()->
             InitImage(url ? *url : NullString(),
                       crossOrigin ? *crossOrigin : NullString(),
+                      referrerPolicy ? *referrerPolicy : NullString(),
                       srcset ? *srcset : NullString(),
                       sizes ? *sizes : NullString());
         } else if (nsHtml5Atoms::source == aName) {
@@ -176,22 +179,33 @@ nsHtml5TreeBuilder::createElement(int32_t aNamespace, nsIAtom* aName,
           nsString* rel = aAttributes->getValue(nsHtml5AttributeName::ATTR_REL);
           // Not splitting on space here is bogus but the old parser didn't even
           // do a case-insensitive check.
-          if (rel && rel->LowerCaseEqualsASCII("stylesheet")) {
-            nsString* url = aAttributes->getValue(nsHtml5AttributeName::ATTR_HREF);
-            if (url) {
-              nsString* charset = aAttributes->getValue(nsHtml5AttributeName::ATTR_CHARSET);
-              nsString* crossOrigin =
-                aAttributes->getValue(nsHtml5AttributeName::ATTR_CROSSORIGIN);
-              mSpeculativeLoadQueue.AppendElement()->
-                InitStyle(*url,
-                          (charset) ? *charset : EmptyString(),
-                          (crossOrigin) ? *crossOrigin : NullString());
+          if (rel) {
+            if (rel->LowerCaseEqualsASCII("stylesheet")) {
+              nsString* url = aAttributes->getValue(nsHtml5AttributeName::ATTR_HREF);
+              if (url) {
+                nsString* charset = aAttributes->getValue(nsHtml5AttributeName::ATTR_CHARSET);
+                nsString* crossOrigin =
+                  aAttributes->getValue(nsHtml5AttributeName::ATTR_CROSSORIGIN);
+                mSpeculativeLoadQueue.AppendElement()->
+                  InitStyle(*url,
+                            (charset) ? *charset : EmptyString(),
+                            (crossOrigin) ? *crossOrigin : NullString());
+              }
+            } else if (rel->LowerCaseEqualsASCII("preconnect")) {
+              nsString* url = aAttributes->getValue(nsHtml5AttributeName::ATTR_HREF);
+              if (url) {
+                nsString* crossOrigin =
+                  aAttributes->getValue(nsHtml5AttributeName::ATTR_CROSSORIGIN);
+                mSpeculativeLoadQueue.AppendElement()->
+                  InitPreconnect(*url, (crossOrigin) ? *crossOrigin : NullString());
+              }
             }
           }
         } else if (nsHtml5Atoms::video == aName) {
           nsString* url = aAttributes->getValue(nsHtml5AttributeName::ATTR_POSTER);
           if (url) {
             mSpeculativeLoadQueue.AppendElement()->InitImage(*url, NullString(),
+                                                             NullString(),
                                                              NullString(),
                                                              NullString());
           }
@@ -228,6 +242,7 @@ nsHtml5TreeBuilder::createElement(int32_t aNamespace, nsIAtom* aName,
           nsString* url = aAttributes->getValue(nsHtml5AttributeName::ATTR_XLINK_HREF);
           if (url) {
             mSpeculativeLoadQueue.AppendElement()->InitImage(*url, NullString(),
+                                                             NullString(),
                                                              NullString(),
                                                              NullString());
           }

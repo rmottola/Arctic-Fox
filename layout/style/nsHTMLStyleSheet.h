@@ -69,7 +69,7 @@ private:
   nsHTMLStyleSheet(const nsHTMLStyleSheet& aCopy) = delete;
   nsHTMLStyleSheet& operator=(const nsHTMLStyleSheet& aCopy) = delete;
 
-  ~nsHTMLStyleSheet();
+  ~nsHTMLStyleSheet() {}
 
   class HTMLColorRule;
   friend class HTMLColorRule;

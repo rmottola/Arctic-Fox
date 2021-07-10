@@ -17,12 +17,11 @@ namespace mozilla {
 JSObject*
 WebGLVertexArray::WrapObject(JSContext* cx, JS::Handle<JSObject*> aGivenProto)
 {
-    return dom::WebGLVertexArrayBinding::Wrap(cx, this, aGivenProto);
+    return dom::WebGLVertexArrayObjectOESBinding::Wrap(cx, this, aGivenProto);
 }
 
 WebGLVertexArray::WebGLVertexArray(WebGLContext* webgl)
-    : WebGLBindable<VAOBinding>()
-    , WebGLContextBoundObject(webgl)
+    : WebGLContextBoundObject(webgl)
     , mGLName(0)
 {
     mContext->mVertexArrays.insertBack(this);
@@ -48,6 +47,12 @@ WebGLVertexArray::Delete()
     LinkedListElement<WebGLVertexArray>::removeFrom(mContext->mVertexArrays);
     mElementArrayBuffer = nullptr;
     mAttribs.Clear();
+}
+
+bool
+WebGLVertexArray::IsVertexArray()
+{
+    return IsVertexArrayImpl();
 }
 
 void

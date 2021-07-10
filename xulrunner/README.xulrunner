@@ -1,5 +1,5 @@
 XULRunner is a package which can be used to run applications written in HTML
-or XUL. It can also be used to embed the goanna rendering engine into
+or XUL. It can also be used to embed the gecko rendering engine into
 binary applications.
 
 XULRunner is not a product; it is a tool which can be used to create products.

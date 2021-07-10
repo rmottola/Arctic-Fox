@@ -7,8 +7,8 @@
  */
 
 function spawnTest () {
-  let { ThreadNode } = devtools.require("devtools/shared/profiler/tree-model");
-  let { CallView } = devtools.require("devtools/shared/profiler/tree-view");
+  let { ThreadNode } = devtools.require("devtools/performance/tree-model");
+  let { CallView } = devtools.require("devtools/performance/tree-view");
 
   let threadNode = new ThreadNode(gThread);
   // Don't display the synthesized (root) and the real (root) node twice.
@@ -28,11 +28,6 @@ function spawnTest () {
   let eventItem = yield receivedLinkEvent;
   is(eventItem, D, "The 'link' event target is correct.");
 
-  let receivedZoomEvent = treeRoot.once("zoom");
-  EventUtils.sendMouseEvent({ type: "mousedown" }, D.target.querySelector(".call-tree-zoom"));
-
-  eventItem = yield receivedZoomEvent;
-  is(eventItem, D, "The 'zoom' event target is correct.");
   finish();
 }
 

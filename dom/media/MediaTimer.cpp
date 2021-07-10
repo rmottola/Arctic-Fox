@@ -10,6 +10,7 @@
 
 #include "nsComponentManagerUtils.h"
 #include "nsThreadUtils.h"
+#include "mozilla/DebugOnly.h"
 #include "mozilla/RefPtr.h"
 #include "SharedThreadPool.h"
 
@@ -21,8 +22,11 @@ NS_IMPL_RELEASE_WITH_DESTROY(MediaTimer, DispatchDestroy())
 MediaTimer::MediaTimer()
   : mMonitor("MediaTimer Monitor")
   , mTimer(do_CreateInstance("@mozilla.org/timer;1"))
+  , mCreationTimeStamp(TimeStamp::Now())
   , mUpdateScheduled(false)
 {
+  TIMER_LOG("MediaTimer::MediaTimer");
+
   // Use the SharedThreadPool to create an nsIThreadPool with a maximum of one
   // thread, which is equivalent to an nsIThread for our purposes.
   RefPtr<SharedThreadPool> threadPool(
@@ -48,6 +52,7 @@ void
 MediaTimer::Destroy()
 {
   MOZ_ASSERT(OnMediaTimerThread());
+  TIMER_LOG("MediaTimer::Destroy");
 
   // Reject any outstanding entries. There's no need to acquire the monitor
   // here, because we're on the timer thread and all other references to us
@@ -75,6 +80,7 @@ nsRefPtr<MediaTimerPromise>
 MediaTimer::WaitUntil(const TimeStamp& aTimeStamp, const char* aCallSite)
 {
   MonitorAutoLock mon(mMonitor);
+  TIMER_LOG("MediaTimer::WaitUntil %lld", RelativeMicroseconds(aTimeStamp));
   Entry e(aTimeStamp, aCallSite);
   nsRefPtr<MediaTimerPromise> p = e.mPromise.get();
   mEntries.push(e);
@@ -110,6 +116,8 @@ MediaTimer::UpdateLocked()
   MOZ_ASSERT(OnMediaTimerThread());
   mMonitor.AssertCurrentThreadOwns();
   mUpdateScheduled = false;
+
+  TIMER_LOG("MediaTimer::UpdateLocked");
 
   // Resolve all the promises whose time is up.
   TimeStamp now = TimeStamp::Now();
@@ -164,6 +172,7 @@ MediaTimer::ArmTimer(const TimeStamp& aTarget, const TimeStamp& aNow)
   // XPCOM timer resolution is in milliseconds. It's important to never resolve
   // a timer when mTarget might compare < now (even if very close), so round up.
   unsigned long delay = std::ceil((aTarget - aNow).ToMilliseconds());
+  TIMER_LOG("MediaTimer::ArmTimer delay=%lu", delay);
   mCurrentTimerTarget = aTarget;
   nsresult rv = mTimer->InitWithFuncCallback(&TimerCallback, this, delay, nsITimer::TYPE_ONE_SHOT);
   MOZ_DIAGNOSTIC_ASSERT(NS_SUCCEEDED(rv));

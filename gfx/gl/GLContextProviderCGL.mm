@@ -255,7 +255,7 @@ GLContextProviderCGL::CreateForWindow(nsIWidget *aWidget)
 }
 
 static already_AddRefed<GLContextCGL>
-CreateOffscreenFBOContext(bool requireCompatProfile)
+CreateOffscreenFBOContext(CreateContextFlags flags)
 {
     if (!sCGLLibrary.EnsureInitialized()) {
         return nullptr;
@@ -264,7 +264,7 @@ CreateOffscreenFBOContext(bool requireCompatProfile)
     ContextProfile profile;
     NSOpenGLContext* context = nullptr;
 
-    if (!requireCompatProfile) {
+    if (!(flags & CreateContextFlags::REQUIRE_COMPAT_PROFILE)) {
         profile = ContextProfile::OpenGLCore;
         context = CreateWithFormat(kAttribs_offscreen_coreProfile);
     }
@@ -289,10 +289,10 @@ CreateOffscreenFBOContext(bool requireCompatProfile)
 }
 
 already_AddRefed<GLContext>
-GLContextProviderCGL::CreateHeadless(bool requireCompatProfile)
+GLContextProviderCGL::CreateHeadless(CreateContextFlags flags)
 {
     nsRefPtr<GLContextCGL> gl;
-    gl = CreateOffscreenFBOContext(requireCompatProfile);
+    gl = CreateOffscreenFBOContext(flags);
     if (!gl)
         return nullptr;
 
@@ -305,13 +305,15 @@ GLContextProviderCGL::CreateHeadless(bool requireCompatProfile)
 }
 
 already_AddRefed<GLContext>
-GLContextProviderCGL::CreateOffscreen(const gfxIntSize& size,
+GLContextProviderCGL::CreateOffscreen(const IntSize& size,
                                       const SurfaceCaps& caps,
-                                      bool requireCompatProfile)
+                                      CreateContextFlags flags)
 {
-    nsRefPtr<GLContext> glContext = CreateHeadless(requireCompatProfile);
-    if (!glContext->InitOffscreen(size, caps))
+    nsRefPtr<GLContext> glContext = CreateHeadless(flags);
+    if (!glContext->InitOffscreen(size, caps)) {
+        NS_WARNING("Failed during InitOffscreen.");
         return nullptr;
+    }
 
     return glContext.forget();
 }
@@ -330,7 +332,7 @@ GLContextProviderCGL::GetGlobalContext()
         // than 16x16 in size; also 16x16 is POT so that we can do
         // a FBO with it on older video cards.  A FBO context for
         // sharing is preferred since it has no associated target.
-        gGlobalContext = CreateOffscreenFBOContext(false);
+        gGlobalContext = CreateOffscreenFBOContext(CreateContextFlags::NONE);
         if (!gGlobalContext || !static_cast<GLContextCGL*>(gGlobalContext.get())->Init()) {
             NS_WARNING("Couldn't init gGlobalContext.");
             gGlobalContext = nullptr;

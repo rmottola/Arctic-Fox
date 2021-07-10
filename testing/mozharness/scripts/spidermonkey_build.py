@@ -49,11 +49,11 @@ class SpidermonkeyBuild(MockMixin,
     config_options = [
         [["--repo"], {
             "dest": "repo",
-            "help": "which goanna repo to get spidermonkey from",
+            "help": "which gecko repo to get spidermonkey from",
         }],
         [["--source"], {
             "dest": "source",
-            "help": "directory containing goanna source tree (instead of --repo)",
+            "help": "directory containing gecko source tree (instead of --repo)",
         }],
         [["--revision"], {
             "dest": "revision",
@@ -191,7 +191,7 @@ class SpidermonkeyBuild(MockMixin,
                 os.path.join(self.config['srcdir'], self.config['analysis-scriptdir']),
             'abs_tools_dir':
                 os.path.join(abs_dirs['base_work_dir'], 'tools'),
-            'goanna_src':
+            'gecko_src':
                 os.path.join(abs_work_dir, self.config['srcdir']),
             'abs_blob_upload_dir':
                 os.path.join(abs_work_dir, 'blobber_upload_dir'),
@@ -362,7 +362,7 @@ class SpidermonkeyBuild(MockMixin,
             return
 
         dirs = self.query_abs_dirs()
-        dest = dirs['goanna_src']
+        dest = dirs['gecko_src']
 
         # Pre-create the directory to appease the share extension
         if not os.path.exists(dest):

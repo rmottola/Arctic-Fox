@@ -29,7 +29,7 @@ NS_IMPL_CI_INTERFACE_GETTER(XPCVariant, XPCVariant, nsIVariant)
 NS_IMPL_CYCLE_COLLECTING_ADDREF(XPCVariant)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(XPCVariant)
 
-XPCVariant::XPCVariant(JSContext* cx, jsval aJSVal)
+XPCVariant::XPCVariant(JSContext* cx, Value aJSVal)
     : mJSVal(aJSVal), mCCGeneration(0)
 {
     if (!mJSVal.isPrimitive()) {
@@ -54,7 +54,7 @@ XPCVariant::XPCVariant(JSContext* cx, jsval aJSVal)
 
 XPCTraceableVariant::~XPCTraceableVariant()
 {
-    jsval val = GetJSValPreserveColor();
+    Value val = GetJSValPreserveColor();
 
     MOZ_ASSERT(val.isGCThing(), "Must be traceable or unlinked");
 
@@ -96,7 +96,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 // static
 already_AddRefed<XPCVariant>
-XPCVariant::newVariant(JSContext* cx, jsval aJSVal)
+XPCVariant::newVariant(JSContext* cx, Value aJSVal)
 {
     nsRefPtr<XPCVariant> variant;
 

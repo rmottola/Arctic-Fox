@@ -11,15 +11,19 @@ UNIFIED_SOURCES += [
     'TestEncoding.cpp',
     'TestExpirationTracker.cpp',
     'TestPipes.cpp',
+    'TestPLDHash.cpp',
     'TestPriorityQueue.cpp',
     'TestSnappyStreams.cpp',
     'TestStorageStream.cpp',
     'TestStrings.cpp',
     'TestStringStream.cpp',
     'TestSynchronization.cpp',
+    'TestTArray.cpp',
     'TestThreadPool.cpp',
+    'TestThreads.cpp',
     'TestTimeStamp.cpp',
     'TestUTF.cpp',
+    'TestXPIDLString.cpp',
 ]
 
 FINAL_LIBRARY = 'xul-gtest'

@@ -100,7 +100,7 @@ class CheckoutBranch(Step):
 
 
 class GetLastSyncCommit(Step):
-    """Find the goanna commit at which we last performed a sync with upstream."""
+    """Find the gecko commit at which we last performed a sync with upstream."""
 
     provides = ["last_sync_path", "last_sync_commit"]
 
@@ -131,7 +131,7 @@ class GetBaseCommit(Step):
 
 
 class LoadCommits(Step):
-    """Get a list of commits in the goanna tree that need to be upstreamed"""
+    """Get a list of commits in the gecko tree that need to be upstreamed"""
 
     provides = ["source_commits"]
 
@@ -159,7 +159,7 @@ class LoadCommits(Step):
         self.logger.debug("Source commits: %s" % state.source_commits)
 
 class MovePatches(Step):
-    """Convert goanna commits into patches against upstream and commit these to the sync tree."""
+    """Convert gecko commits into patches against upstream and commit these to the sync tree."""
 
     provides = ["commits_loaded"]
 
@@ -244,7 +244,7 @@ class MergeUpstream(Step):
             state.merge_index += 1
 
 class UpdateLastSyncCommit(Step):
-    """Update the goanna commit at which we last performed a sync with upstream."""
+    """Update the gecko commit at which we last performed a sync with upstream."""
 
     provides = []
 

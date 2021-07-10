@@ -11,8 +11,14 @@
 #include "nsISupportsImpl.h"
 
 #include "mozilla/dom/ResponseBinding.h"
+#include "mozilla/dom/ChannelInfo.h"
+#include "mozilla/UniquePtr.h"
 
 namespace mozilla {
+namespace ipc {
+class PrincipalInfo;
+}
+
 namespace dom {
 
 class InternalHeaders;
@@ -40,18 +46,7 @@ public:
   }
 
   already_AddRefed<InternalResponse>
-  OpaqueResponse()
-  {
-    MOZ_ASSERT(!mWrappedResponse, "Can't OpaqueResponse a already wrapped response");
-    nsRefPtr<InternalResponse> response = new InternalResponse(0, EmptyCString());
-    response->mType = ResponseType::Opaque;
-    response->mTerminationReason = mTerminationReason;
-    response->mURL = mURL;
-    response->mFinalURL = mFinalURL;
-    response->mSecurityInfo = mSecurityInfo;
-    response->mWrappedResponse = this;
-    return response.forget();
-  }
+  OpaqueResponse();
 
   already_AddRefed<InternalResponse>
   BasicResponse();
@@ -89,18 +84,6 @@ public:
     mURL.Assign(aURL);
   }
 
-  bool
-  FinalURL() const
-  {
-    return mFinalURL;
-  }
-
-  void
-  SetFinalURL(bool aFinalURL)
-  {
-    mFinalURL = aFinalURL;
-  }
-
   uint16_t
   GetStatus() const
   {
@@ -130,6 +113,17 @@ public:
   }
 
   void
+  GetInternalBody(nsIInputStream** aStream)
+  {
+    if (mWrappedResponse) {
+      MOZ_ASSERT(!mBody);
+      return mWrappedResponse->GetBody(aStream);
+    }
+    nsCOMPtr<nsIInputStream> stream = mBody;
+    stream.forget(aStream);
+  }
+
+  void
   GetBody(nsIInputStream** aStream)
   {
     if (Type() == ResponseType::Opaque) {
@@ -137,12 +131,7 @@ public:
       return;
     }
 
-    if (mWrappedResponse) {
-      MOZ_ASSERT(!mBody);
-      return mWrappedResponse->GetBody(aStream);
-    }
-    nsCOMPtr<nsIInputStream> stream = mBody;
-    stream.forget(aStream);
+    return GetInternalBody(aStream);
   }
 
   void
@@ -156,21 +145,42 @@ public:
     mBody = aBody;
   }
 
-  const nsCString&
-  GetSecurityInfo() const
+  void
+  InitChannelInfo(nsIChannel* aChannel)
   {
-    return mSecurityInfo;
+    mChannelInfo.InitFromChannel(aChannel);
   }
 
   void
-  SetSecurityInfo(nsISupports* aSecurityInfo);
+  InitChannelInfo(const mozilla::ipc::IPCChannelInfo& aChannelInfo)
+  {
+    mChannelInfo.InitFromIPCChannelInfo(aChannelInfo);
+  }
 
   void
-  SetSecurityInfo(const nsCString& aSecurityInfo);
+  InitChannelInfo(const ChannelInfo& aChannelInfo)
+  {
+    mChannelInfo = aChannelInfo;
+  }
+
+  const ChannelInfo&
+  GetChannelInfo() const
+  {
+    return mChannelInfo;
+  }
+
+  const UniquePtr<mozilla::ipc::PrincipalInfo>&
+  GetPrincipalInfo() const
+  {
+    return mPrincipalInfo;
+  }
+
+  // Takes ownership of the principal info.
+  void
+  SetPrincipalInfo(UniquePtr<mozilla::ipc::PrincipalInfo> aPrincipalInfo);
 
 private:
-  ~InternalResponse()
-  { }
+  ~InternalResponse();
 
   explicit InternalResponse(const InternalResponse& aOther) = delete;
   InternalResponse& operator=(const InternalResponse&) = delete;
@@ -178,26 +188,17 @@ private:
   // Returns an instance of InternalResponse which is a copy of this
   // InternalResponse, except headers, body and wrapped response (if any) which
   // are left uninitialized. Used for cloning and filtering.
-  already_AddRefed<InternalResponse> CreateIncompleteCopy()
-  {
-    nsRefPtr<InternalResponse> copy = new InternalResponse(mStatus, mStatusText);
-    copy->mType = mType;
-    copy->mTerminationReason = mTerminationReason;
-    copy->mURL = mURL;
-    copy->mFinalURL = mFinalURL;
-    copy->mSecurityInfo = mSecurityInfo;
-    return copy.forget();
-  }
+  already_AddRefed<InternalResponse> CreateIncompleteCopy();
 
   ResponseType mType;
   nsCString mTerminationReason;
   nsCString mURL;
-  bool mFinalURL;
   const uint16_t mStatus;
   const nsCString mStatusText;
   nsRefPtr<InternalHeaders> mHeaders;
   nsCOMPtr<nsIInputStream> mBody;
-  nsCString mSecurityInfo;
+  ChannelInfo mChannelInfo;
+  UniquePtr<mozilla::ipc::PrincipalInfo> mPrincipalInfo;
 
   // For filtered responses.
   // Cache, and SW interception should always serialize/access the underlying

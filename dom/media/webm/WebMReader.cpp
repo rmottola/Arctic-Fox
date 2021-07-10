@@ -32,9 +32,9 @@
 #undef LOG
 
 #include "prprf.h"
-#define LOG(type, msg) PR_LOG(gMediaDecoderLog, type, msg)
+#define LOG(type, msg) MOZ_LOG(gMediaDecoderLog, type, msg)
 #ifdef SEEK_LOGGING
-#define SEEK_LOG(type, msg) PR_LOG(gMediaDecoderLog, type, msg)
+#define SEEK_LOG(type, msg) MOZ_LOG(gMediaDecoderLog, type, msg)
 #else
 #define SEEK_LOG(type, msg)
 #endif
@@ -102,7 +102,7 @@ static void webm_log(nestegg * context,
                      unsigned int severity,
                      char const * format, ...)
 {
-  if (!PR_LOG_TEST(gNesteggLog, PR_LOG_DEBUG)) {
+  if (!MOZ_LOG_TEST(gNesteggLog, LogLevel::Debug)) {
     return;
   }
 
@@ -135,7 +135,7 @@ static void webm_log(nestegg * context,
 
   PR_snprintf(msg, sizeof(msg), "%p [Nestegg-%s] ", context, sevStr);
   PR_vsnprintf(msg+strlen(msg), sizeof(msg)-strlen(msg), format, args);
-  PR_LOG(gNesteggLog, PR_LOG_DEBUG, (msg));
+  MOZ_LOG(gNesteggLog, LogLevel::Debug, (msg));
 
   va_end(args);
 }
@@ -144,8 +144,8 @@ static void webm_log(nestegg * context,
 static bool sIsIntelDecoderEnabled = false;
 #endif
 
-WebMReader::WebMReader(AbstractMediaDecoder* aDecoder)
-  : MediaDecoderReader(aDecoder)
+WebMReader::WebMReader(AbstractMediaDecoder* aDecoder, MediaTaskQueue* aBorrowedTaskQueue)
+  : MediaDecoderReader(aDecoder, aBorrowedTaskQueue)
   , mContext(nullptr)
   , mVideoTrack(0)
   , mAudioTrack(0)
@@ -508,7 +508,7 @@ bool WebMReader::DecodeAudioPacket(NesteggPacketHolder* aHolder)
 #ifdef DEBUG
     int64_t gap_frames = tstamp_frames.value() - decoded_frames.value();
     CheckedInt64 usecs = FramesToUsecs(gap_frames, mInfo.mAudio.mRate);
-    LOG(PR_LOG_DEBUG, ("WebMReader detected gap of %lld, %lld frames, in audio",
+    LOG(LogLevel::Debug, ("WebMReader detected gap of %lld, %lld frames, in audio",
                        usecs.isValid() ? usecs.value() : -1,
                        gap_frames));
 #endif
@@ -711,7 +711,7 @@ bool WebMReader::ShouldSkipVideoFrame(int64_t aTimeThreshold)
 bool WebMReader::DecodeVideoFrame(bool &aKeyframeSkip, int64_t aTimeThreshold)
 {
   if (!(aKeyframeSkip && ShouldSkipVideoFrame(aTimeThreshold))) {
-    LOG(PR_LOG_DEBUG+1, ("Reader [%p]: set the aKeyframeSkip to false.",this));
+    LOG(LogLevel::Verbose, ("Reader [%p]: set the aKeyframeSkip to false.",this));
     aKeyframeSkip = false;
   }
   return mVideoDecoder->DecodeVideoFrame(aKeyframeSkip, aTimeThreshold);
@@ -741,7 +741,7 @@ nsresult WebMReader::SeekInternal(int64_t aTarget)
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
-  LOG(PR_LOG_DEBUG, ("Reader [%p] for Decoder [%p]: About to seek to %fs",
+  LOG(LogLevel::Debug, ("Reader [%p] for Decoder [%p]: About to seek to %fs",
                      this, mDecoder, double(aTarget) / USECS_PER_S));
   if (NS_FAILED(ResetDecode())) {
     return NS_ERROR_FAILURE;
@@ -755,7 +755,7 @@ nsresult WebMReader::SeekInternal(int64_t aTarget)
   }
   int r = nestegg_track_seek(mContext, trackToSeek, target);
   if (r != 0) {
-    LOG(PR_LOG_DEBUG, ("Reader [%p]: track_seek for track %u failed, r=%d",
+    LOG(LogLevel::Debug, ("Reader [%p]: track_seek for track %u failed, r=%d",
                        this, trackToSeek, r));
 
     // Try seeking directly based on cluster information in memory.
@@ -766,7 +766,7 @@ nsresult WebMReader::SeekInternal(int64_t aTarget)
     }
 
     r = nestegg_offset_seek(mContext, offset);
-    LOG(PR_LOG_DEBUG, ("Reader [%p]: attempted offset_seek to %lld r=%d",
+    LOG(LogLevel::Debug, ("Reader [%p]: attempted offset_seek to %lld r=%d",
                        this, offset, r));
     if (r != 0) {
       return NS_ERROR_FAILURE;
@@ -777,7 +777,8 @@ nsresult WebMReader::SeekInternal(int64_t aTarget)
 
 media::TimeIntervals WebMReader::GetBuffered()
 {
-  MOZ_ASSERT(mStartTime != -1, "Need to finish metadata decode first");
+  MOZ_ASSERT(OnTaskQueue());
+  NS_ENSURE_TRUE(mStartTime >= 0, media::TimeIntervals());
   AutoPinned<MediaResource> resource(mDecoder->GetResource());
 
   media::TimeIntervals buffered;
@@ -830,10 +831,12 @@ media::TimeIntervals WebMReader::GetBuffered()
   return buffered;
 }
 
-void WebMReader::NotifyDataArrived(const char* aBuffer, uint32_t aLength,
-                                   int64_t aOffset)
+void WebMReader::NotifyDataArrivedInternal(uint32_t aLength, int64_t aOffset)
 {
-  mBufferedState->NotifyDataArrived(aBuffer, aLength, aOffset);
+  MOZ_ASSERT(OnTaskQueue());
+  nsRefPtr<MediaByteBuffer> bytes = mDecoder->GetResource()->SilentReadAt(aOffset, aLength);
+  NS_ENSURE_TRUE_VOID(bytes);
+  mBufferedState->NotifyDataArrived(bytes->Elements(), aLength, aOffset);
 }
 
 int64_t WebMReader::GetEvictionOffset(double aTime)

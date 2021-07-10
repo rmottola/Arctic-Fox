@@ -31,6 +31,8 @@
 #include "gfxUtils.h"
 #include "gfx2DGlue.h"
 
+#include "gfxCrashReporterUtils.h"
+
 #ifdef MOZ_WIDGET_GTK
 #include "gfxPlatformGtk.h"
 #endif
@@ -1094,7 +1096,7 @@ GLContextProviderGLX::CreateForWindow(nsIWidget *aWidget)
 }
 
 static already_AddRefed<GLContextGLX>
-CreateOffscreenPixmapContext(const gfxIntSize& size)
+CreateOffscreenPixmapContext(const IntSize& size)
 {
     GLXLibrary& glx = sGLXLibrary;
     if (!glx.EnsureInitialized()) {
@@ -1157,7 +1159,7 @@ CreateOffscreenPixmapContext(const gfxIntSize& size)
     GLXPixmap glxpixmap = 0;
     bool error = false;
 
-    gfxIntSize dummySize(16, 16);
+    IntSize dummySize(16, 16);
     nsRefPtr<gfxXlibSurface> xsurface = gfxXlibSurface::Create(DefaultScreenOfDisplay(display),
                                                                visual,
                                                                dummySize);
@@ -1210,9 +1212,9 @@ DONE_CREATING_PIXMAP:
 }
 
 already_AddRefed<GLContext>
-GLContextProviderGLX::CreateHeadless(bool)
+GLContextProviderGLX::CreateHeadless(CreateContextFlags)
 {
-    gfxIntSize dummySize = gfxIntSize(16, 16);
+    IntSize dummySize = IntSize(16, 16);
     nsRefPtr<GLContext> glContext = CreateOffscreenPixmapContext(dummySize);
     if (!glContext)
         return nullptr;
@@ -1221,11 +1223,11 @@ GLContextProviderGLX::CreateHeadless(bool)
 }
 
 already_AddRefed<GLContext>
-GLContextProviderGLX::CreateOffscreen(const gfxIntSize& size,
+GLContextProviderGLX::CreateOffscreen(const IntSize& size,
                                       const SurfaceCaps& caps,
-                                      bool requireCompatProfile)
+                                      CreateContextFlags flags)
 {
-    nsRefPtr<GLContext> glContext = CreateHeadless(requireCompatProfile);
+    nsRefPtr<GLContext> glContext = CreateHeadless(flags);
     if (!glContext)
         return nullptr;
 
@@ -1255,7 +1257,7 @@ GLContextProviderGLX::GetGlobalContext()
     if (!triedToCreateContext && !gGlobalContext) {
         triedToCreateContext = true;
 
-        gfxIntSize dummySize = gfxIntSize(16, 16);
+        IntSize dummySize = IntSize(16, 16);
         // StaticPtr doesn't support assignments from already_AddRefed,
         // so use a temporary nsRefPtr to make the reference counting
         // fall out correctly.

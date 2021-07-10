@@ -31,7 +31,6 @@
 }
 
 class imgINotificationObserver;
-class imgRequestNotifyRunnable;
 class imgStatusNotifyRunnable;
 class ProxyBehaviour;
 
@@ -136,7 +135,6 @@ public:
 protected:
   friend class mozilla::image::ProgressTracker;
   friend class imgStatusNotifyRunnable;
-  friend class imgRequestNotifyRunnable;
 
   class imgCancelRunnable;
   friend class imgCancelRunnable;
@@ -176,9 +174,10 @@ protected:
 
   nsITimedChannel* TimedChannel()
   {
-    if (!GetOwner())
+    if (!GetOwner()) {
       return nullptr;
-    return GetOwner()->mTimedChannel;
+    }
+    return GetOwner()->GetTimedChannel();
   }
 
   already_AddRefed<Image> GetImage() const;

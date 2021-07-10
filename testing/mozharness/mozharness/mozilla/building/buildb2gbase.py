@@ -50,7 +50,7 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
     default_config_options = [
         [["--repo"], {
             "dest": "repo",
-            "help": "which goanna repo to check out",
+            "help": "which gecko repo to check out",
         }],
         [["--target"], {
             "dest": "target",
@@ -60,9 +60,9 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
             "dest": "b2g_config_dir",
             "help": "specify which in-tree config directory to use, relative to b2g/config/ (defaults to --target)",
         }],
-        [["--goanna-config"], {
-            "dest": "goanna_config",
-            "help": "specfiy alternate location for goanna config",
+        [["--gecko-config"], {
+            "dest": "gecko_config",
+            "help": "specfiy alternate location for gecko config",
         }],
         [["--disable-ccache"], {
             "dest": "ccache",
@@ -71,11 +71,11 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
         }],
         [["--variant"], {
             "dest": "variant",
-            "help": "b2g build variant. overrides goanna config's value",
+            "help": "b2g build variant. overrides gecko config's value",
         }],
         [["--checkout-revision"], {
             "dest": "checkout_revision",
-            "help": "checkout a specific goanna revision.",
+            "help": "checkout a specific gecko revision.",
         }],
         [["--repotool-repo"], {
             "dest": "repo_repo",
@@ -88,7 +88,7 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
         [["--disable-mock"], {
             "dest": "disable_mock",
             "action": "store_true",
-            "help": "do not run under mock despite what goanna-config says",
+            "help": "do not run under mock despite what gecko-config says",
         }],
     ]
 
@@ -117,7 +117,7 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
             all_actions=all_actions,
             default_actions=default_actions)
 
-        self.goanna_config = None
+        self.gecko_config = None
 
     def _pre_config_lock(self, rw_config):
         super(B2GBuildBaseScript, self)._pre_config_lock(rw_config)
@@ -155,7 +155,7 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
         abs_dirs = BaseScript.query_abs_dirs(self)
 
         dirs = {
-            'goanna_src': os.path.join(abs_dirs['abs_work_dir'], 'goanna'),
+            'gecko_src': os.path.join(abs_dirs['abs_work_dir'], 'gecko'),
             'work_dir': abs_dirs['abs_work_dir'],
             'b2g_src': abs_dirs['abs_work_dir'],
             'abs_tools_dir': os.path.join(abs_dirs['abs_work_dir'], 'build-tools'),
@@ -178,7 +178,7 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
             revision = self.buildbot_config['sourcestamp']['revision']
         else:
             dirs = self.query_abs_dirs()
-            repo = dirs['goanna_src']
+            repo = dirs['gecko_src']
             repo_type = detect_local(repo)
             # Look at what we have checked out
             if repo_type == 'hg':
@@ -195,8 +195,8 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
                 return None
         return revision[0:12] if revision else None
 
-    def query_goanna_config_path(self):
-        conf_file = self.config.get('goanna_config')
+    def query_gecko_config_path(self):
+        conf_file = self.config.get('gecko_config')
         if conf_file is None:
             conf_file = os.path.join(
                 'b2g', 'config',
@@ -205,10 +205,10 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
             )
         return conf_file
 
-    def query_remote_goanna_config(self):
+    def query_remote_gecko_config(self):
         repo = self.query_repo()
         if os.path.exists(repo):
-            config_path = self.query_goanna_config_path()
+            config_path = self.query_gecko_config_path()
             config_path = "{repo}/{config_path}".format(repo=repo, config_path=config_path)
             return json.load(open(config_path, "r"))
         elif detect_hg(repo):
@@ -216,7 +216,7 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
             if rev is None:
                 rev = 'default'
 
-            config_path = self.query_goanna_config_path()
+            config_path = self.query_gecko_config_path()
             # Handle local files vs. in-repo files
             url = self.query_hgweb_url(repo, rev, config_path)
             return self.retry(self.load_json_from_url, args=(url,))
@@ -225,53 +225,53 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
             if rev is None:
                 rev = 'HEAD'
 
-            config_path = self.query_goanna_config_path()
+            config_path = self.query_gecko_config_path()
             url = self.query_gitweb_url(repo, rev, config_path)
             return self.retry(self.load_json_from_url, args=(url,))
 
-    def load_goanna_config(self):
-        if self.goanna_config:
-            return self.goanna_config
+    def load_gecko_config(self):
+        if self.gecko_config:
+            return self.gecko_config
 
-        goanna_config = self._load_goanna_config()
+        gecko_config = self._load_gecko_config()
 
         # Set up mock immediately so any later run_command_m doesn't end up
         # calling setup_mock with the wrong config.
-        self.setup_mock(goanna_config['mock_target'],
-                        goanna_config['mock_packages'],
-                        goanna_config.get('mock_files'))
+        self.setup_mock(gecko_config['mock_target'],
+                        gecko_config['mock_packages'],
+                        gecko_config.get('mock_files'))
 
-        return goanna_config
+        return gecko_config
 
-    def _load_goanna_config(self):
-        if 'goanna_config' not in self.config:
+    def _load_gecko_config(self):
+        if 'gecko_config' not in self.config:
             # Grab from the remote if we're not overriding on the cmdline
-            self.goanna_config = self.query_remote_goanna_config()
-            return self.goanna_config
+            self.gecko_config = self.query_remote_gecko_config()
+            return self.gecko_config
 
         dirs = self.query_abs_dirs()
-        conf_file = self.query_goanna_config_path()
+        conf_file = self.query_gecko_config_path()
         if not os.path.isabs(conf_file):
-            conf_file = os.path.abspath(os.path.join(dirs['goanna_src'], conf_file))
+            conf_file = os.path.abspath(os.path.join(dirs['gecko_src'], conf_file))
 
         if os.path.exists(conf_file):
-            self.info("goanna_config file: %s" % conf_file)
+            self.info("gecko_config file: %s" % conf_file)
             self.run_command(['cat', conf_file])
-            self.goanna_config = json.load(open(conf_file))
-            return self.goanna_config
+            self.gecko_config = json.load(open(conf_file))
+            return self.gecko_config
 
         # The file doesn't exist; let's try loading it remotely
-        self.goanna_config = self.query_remote_goanna_config()
-        return self.goanna_config
+        self.gecko_config = self.query_remote_gecko_config()
+        return self.gecko_config
 
     def query_build_env(self):
         """Retrieves the environment for building"""
         dirs = self.query_abs_dirs()
-        goanna_config = self.load_goanna_config()
+        gecko_config = self.load_gecko_config()
         env = self.query_env()
-        for k, v in goanna_config.get('env', {}).items():
+        for k, v in gecko_config.get('env', {}).items():
             v = v.format(workdir=dirs['abs_work_dir'],
-                         srcdir=os.path.abspath(dirs['goanna_src']))
+                         srcdir=os.path.abspath(dirs['gecko_src']))
             env[k] = v
         if self.config.get('env', {}).get('B2G_UPDATE_CHANNEL'):
             v = str(self.config['env']['B2G_UPDATE_CHANNEL'])
@@ -364,10 +364,10 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
 
     def checkout_sources(self):
         dirs = self.query_abs_dirs()
-        goanna_config = self.load_goanna_config()
-        b2g_manifest_intree = goanna_config.get('b2g_manifest_intree')
+        gecko_config = self.load_gecko_config()
+        b2g_manifest_intree = gecko_config.get('b2g_manifest_intree')
 
-        if goanna_config.get('config_version') >= 2:
+        if gecko_config.get('config_version') >= 2:
             repos = [
                 {'vcs': 'gittool', 'repo': 'https://git.mozilla.org/b2g/B2G.git', 'dest': dirs['work_dir']},
             ]
@@ -382,25 +382,25 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
                 # for now, just redo it.
                 self.checkout_tools()
 
-                # Now checkout goanna inside the build directory
-                self.checkout_goanna()
-                conf_dir = os.path.join(dirs['goanna_src'], os.path.dirname(self.query_goanna_config_path()))
+                # Now checkout gecko inside the build directory
+                self.checkout_gecko()
+                conf_dir = os.path.join(dirs['gecko_src'], os.path.dirname(self.query_gecko_config_path()))
                 manifest_filename = os.path.join(conf_dir, 'sources.xml')
                 self.info("Using manifest at %s" % manifest_filename)
-                have_goanna = True
+                have_gecko = True
             else:
-                # Checkout B2G and b2g-manifests. We'll do goanna later
-                b2g_manifest_branch = goanna_config.get('b2g_manifest_branch', 'master')
+                # Checkout B2G and b2g-manifests. We'll do gecko later
+                b2g_manifest_branch = gecko_config.get('b2g_manifest_branch', 'master')
                 repos.append(
                     {'vcs': 'gittool',
                      'repo': 'https://git.mozilla.org/b2g/b2g-manifest.git',
                      'dest': os.path.join(dirs['work_dir'], 'b2g-manifest'),
                      'branch': b2g_manifest_branch},
                 )
-                manifest_filename = goanna_config.get('b2g_manifest', self.config['target'] + '.xml')
+                manifest_filename = gecko_config.get('b2g_manifest', self.config['target'] + '.xml')
                 manifest_filename = os.path.join(dirs['work_dir'], 'b2g-manifest', manifest_filename)
                 self.vcs_checkout_repos(repos)
-                have_goanna = False
+                have_gecko = False
 
             manifest = load_manifest(manifest_filename)
 
@@ -409,10 +409,10 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
                 mapping_func = functools.partial(map_remote, mappings=self.config['repo_remote_mappings'])
 
                 rewrite_remotes(manifest, mapping_func)
-                # Remove goanna, since we'll be checking that out ourselves
-                goanna_node = remove_project(manifest, path='goanna')
-                if not goanna_node:
-                    self.fatal("couldn't remove goanna from manifest")
+                # Remove gecko, since we'll be checking that out ourselves
+                gecko_node = remove_project(manifest, path='gecko')
+                if not gecko_node:
+                    self.fatal("couldn't remove gecko from manifest")
 
             # Write out our manifest locally
             manifest_dir = os.path.join(dirs['work_dir'], 'tmp_manifest')
@@ -519,43 +519,43 @@ class B2GBuildBaseScript(BuildbotMixin, MockMixin,
             self.set_buildbot_property("gaia_revision", gaia_rev, write_to_file=True)
             self.info("TinderboxPrint: gaia_revlink: %s" % gaia_url)
 
-            # Now we can checkout goanna and other stuff
-            if not have_goanna:
-                self.checkout_goanna()
+            # Now we can checkout gecko and other stuff
+            if not have_gecko:
+                self.checkout_gecko()
             return
 
         # Old behaviour
-        self.checkout_goanna()
+        self.checkout_gecko()
         self.checkout_gaia()
 
-    def checkout_goanna(self):
+    def checkout_gecko(self):
         '''
-        If you want a different revision of goanna to be used you can use the
+        If you want a different revision of gecko to be used you can use the
         --checkout-revision flag. This is necessary for trees that are not
-        triggered by a goanna commit but by an external tree (like gaia).
+        triggered by a gecko commit but by an external tree (like gaia).
         '''
         dirs = self.query_abs_dirs()
 
-        # Make sure the parent directory to goanna exists so that 'hg share ...
-        # build/goanna' works
-        self.mkdir_p(os.path.dirname(dirs['goanna_src']))
+        # Make sure the parent directory to gecko exists so that 'hg share ...
+        # build/gecko' works
+        self.mkdir_p(os.path.dirname(dirs['gecko_src']))
 
         repo = self.query_repo()
         if "checkout_revision" in self.config:
-            rev = self.vcs_checkout(repo=repo, dest=dirs['goanna_src'], revision=self.config["checkout_revision"])
+            rev = self.vcs_checkout(repo=repo, dest=dirs['gecko_src'], revision=self.config["checkout_revision"])
             # in this case, self.query_revision() will be returning the "revision" that triggered the job
-            # we know that it is not a goanna revision that did so
+            # we know that it is not a gecko revision that did so
             self.set_buildbot_property('revision', self.query_revision(), write_to_file=True)
         else:
-            # a goanna revision triggered this job; self.query_revision() will return it
-            rev = self.vcs_checkout(repo=repo, dest=dirs['goanna_src'], revision=self.query_revision())
+            # a gecko revision triggered this job; self.query_revision() will return it
+            rev = self.vcs_checkout(repo=repo, dest=dirs['gecko_src'], revision=self.query_revision())
             self.set_buildbot_property('revision', rev, write_to_file=True)
-        self.set_buildbot_property('goanna_revision', rev, write_to_file=True)
+        self.set_buildbot_property('gecko_revision', rev, write_to_file=True)
 
     def checkout_gaia(self):
         dirs = self.query_abs_dirs()
-        goanna_config = self.load_goanna_config()
-        gaia_config = goanna_config.get('gaia')
+        gecko_config = self.load_gecko_config()
+        gaia_config = gecko_config.get('gaia')
         if gaia_config:
             dest = os.path.join(dirs['abs_work_dir'], 'gaia')
             repo = gaia_config['repo']

@@ -222,19 +222,25 @@ js::DeleteElement(JSContext* cx, HandleObject obj, uint32_t index, ObjectOpResul
 /* * */
 
 inline bool
-JSObject::isQualifiedVarObj()
+JSObject::isQualifiedVarObj() const
 {
     if (is<js::DebugScopeObject>())
         return as<js::DebugScopeObject>().scope().isQualifiedVarObj();
-    return hasAllFlags(js::BaseShape::QUALIFIED_VAROBJ);
+    bool rv = hasAllFlags(js::BaseShape::QUALIFIED_VAROBJ);
+    MOZ_ASSERT_IF(rv,
+                  is<js::GlobalObject>() ||
+                  is<js::CallObject>() ||
+                  is<js::NonSyntacticVariablesObject>() ||
+                  (is<js::DynamicWithObject>() && !as<js::DynamicWithObject>().isSyntactic()));
+    return rv;
 }
 
 inline bool
-JSObject::isUnqualifiedVarObj()
+JSObject::isUnqualifiedVarObj() const
 {
     if (is<js::DebugScopeObject>())
         return as<js::DebugScopeObject>().scope().isUnqualifiedVarObj();
-    return hasAllFlags(js::BaseShape::UNQUALIFIED_VAROBJ);
+    return is<js::GlobalObject>() || is<js::NonSyntacticVariablesObject>();
 }
 
 namespace js {
@@ -615,8 +621,6 @@ IsInternalFunctionObject(JSObject* funobj)
                   fun->isInterpreted() || fun->isAsmJSNative());
     return fun->isLambda() && fun->isInterpreted() && !fun->environment();
 }
-
-typedef AutoVectorRooter<PropertyDescriptor> AutoPropertyDescriptorVector;
 
 /*
  * Make an object with the specified prototype. If parent is null, it will

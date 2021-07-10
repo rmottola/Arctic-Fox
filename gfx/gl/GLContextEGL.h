@@ -70,6 +70,10 @@ public:
         return sEGLLibrary.IsANGLE();
     }
 
+    virtual bool IsWARP() const override {
+        return sEGLLibrary.IsWARP();
+    }
+
     virtual bool BindTexImage() override;
 
     virtual bool ReleaseTexImage() override;
@@ -109,10 +113,10 @@ public:
     void BindOffscreenFramebuffer();
 
     static already_AddRefed<GLContextEGL>
-    CreateEGLPixmapOffscreenContext(const gfxIntSize& size);
+    CreateEGLPixmapOffscreenContext(const gfx::IntSize& size);
 
     static already_AddRefed<GLContextEGL>
-    CreateEGLPBufferOffscreenContext(const gfxIntSize& size);
+    CreateEGLPBufferOffscreenContext(const gfx::IntSize& size);
 
 protected:
     friend class GLContextProviderEGL;
@@ -135,7 +139,7 @@ protected:
 
     static EGLSurface CreatePBufferSurfaceTryingPowerOfTwo(EGLConfig config,
                                                            EGLenum bindToTextureFormat,
-                                                           gfxIntSize& pbsize);
+                                                           gfx::IntSize& pbsize);
 };
 
 } // namespace gl

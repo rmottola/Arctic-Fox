@@ -51,6 +51,18 @@ class BlobImpl;
 class File;
 class OwningArrayBufferOrArrayBufferViewOrBlobOrString;
 
+/**
+ * Used to indicate when a Blob/BlobImpl that was created from an nsIFile
+ * (when IsFile() will return true) was from an nsIFile for which
+ * nsIFile::IsDirectory() returned true. This is a tri-state to enable us to
+ * assert that the state is always set when callers request it.
+ */
+enum BlobDirState : uint32_t {
+  eIsDir,
+  eIsNotDir,
+  eUnknownIfDir
+};
+
 class Blob : public nsIDOMBlob
            , public nsIXHRSendable
            , public nsIMutable
@@ -95,12 +107,21 @@ public:
 
   bool IsFile() const;
 
+  /**
+   * This may return true if the Blob was created from an nsIFile that is a
+   * directory.
+   */
+  bool IsDirectory() const;
+
   const nsTArray<nsRefPtr<BlobImpl>>* GetSubBlobImpls() const;
 
   // This method returns null if this Blob is not a File; it returns
   // the same object in case this Blob already implements the File interface;
   // otherwise it returns a new File object with the same BlobImpl.
   already_AddRefed<File> ToFile();
+
+  // XXXjwatt Consider having a ToDirectory() method. The need for a FileSystem
+  // object complicates that though.
 
   // This method creates a new File object with the given name and the same
   // BlobImpl.
@@ -110,11 +131,26 @@ public:
   CreateSlice(uint64_t aStart, uint64_t aLength, const nsAString& aContentType,
               ErrorResult& aRv);
 
+  void
+  GetInternalStream(nsIInputStream** aStream, ErrorResult& aRv);
+
+  int64_t
+  GetFileId();
+
+  indexedDB::FileInfo*
+  GetFileInfo(indexedDB::FileManager* aFileManager);
+
+  void
+  AddFileInfo(indexedDB::FileInfo* aFileInfo);
+
   // WebIDL methods
   nsISupports* GetParentObject() const
   {
     return mParent;
   }
+
+  bool
+  IsMemoryFile() const;
 
   // Blob constructor
   static already_AddRefed<Blob>
@@ -132,7 +168,7 @@ public:
 
   uint64_t GetSize(ErrorResult& aRv);
 
-  // XPCOM GetType is OK
+  void GetType(nsAString& aType);
 
   already_AddRefed<Blob> Slice(const Optional<int64_t>& aStart,
                                const Optional<int64_t>& aEnd,
@@ -169,7 +205,7 @@ public:
   static already_AddRefed<File>
   Create(nsISupports* aParent, const nsAString& aName,
          const nsAString& aContentType, uint64_t aLength,
-         int64_t aLastModifiedDate);
+         int64_t aLastModifiedDate, BlobDirState aDirState);
 
   static already_AddRefed<File>
   Create(nsISupports* aParent, const nsAString& aName,
@@ -297,7 +333,8 @@ public:
   virtual const nsTArray<nsRefPtr<BlobImpl>>*
   GetSubBlobImpls() const = 0;
 
-  virtual nsresult GetInternalStream(nsIInputStream** aStream) = 0;
+  virtual void GetInternalStream(nsIInputStream** aStream,
+                                 ErrorResult& aRv) = 0;
 
   virtual int64_t GetFileId() = 0;
 
@@ -318,7 +355,8 @@ public:
   virtual void SetLazyData(const nsAString& aName,
                            const nsAString& aContentType,
                            uint64_t aLength,
-                           int64_t aLastModifiedDate) = 0;
+                           int64_t aLastModifiedDate,
+                           BlobDirState aDirState) = 0;
 
   virtual bool IsMemoryFile() const = 0;
 
@@ -327,6 +365,27 @@ public:
   virtual bool IsDateUnknown() const = 0;
 
   virtual bool IsFile() const = 0;
+
+  /**
+   * Called when this BlobImpl was created from an nsIFile in order to call
+   * nsIFile::IsDirectory() and cache the result so that when the BlobImpl is
+   * copied to another process that informaton is available.
+   * nsIFile::IsDirectory() does synchronous I/O, and BlobImpl objects may be
+   * created on the main thread or in a non-chrome process (where I/O is not
+   * allowed). Do not call this on a non-chrome process, and preferably do not
+   * call it on the main thread.
+   *
+   * Not all creators of BlobImplFile will call this method, in which case
+   * calling IsDirectory will MOZ_ASSERT.
+   */
+  virtual void LookupAndCacheIsDirectory() = 0;
+  virtual bool IsDirectory() const = 0;
+
+  /**
+   * Prefer IsDirectory(). This exists to help consumer code pass on state from
+   * one BlobImpl when creating another.
+   */
+  virtual BlobDirState GetDirState() const = 0;
 
   // True if this implementation can be sent to other threads.
   virtual bool MayBeClonedToOtherThreads() const
@@ -344,9 +403,11 @@ class BlobImplBase : public BlobImpl
 {
 public:
   BlobImplBase(const nsAString& aName, const nsAString& aContentType,
-               uint64_t aLength, int64_t aLastModifiedDate)
+               uint64_t aLength, int64_t aLastModifiedDate,
+               BlobDirState aDirState = BlobDirState::eUnknownIfDir)
     : mIsFile(true)
     , mImmutable(false)
+    , mDirState(aDirState)
     , mContentType(aContentType)
     , mName(aName)
     , mStart(0)
@@ -361,6 +422,7 @@ public:
                uint64_t aLength)
     : mIsFile(true)
     , mImmutable(false)
+    , mDirState(BlobDirState::eUnknownIfDir)
     , mContentType(aContentType)
     , mName(aName)
     , mStart(0)
@@ -374,6 +436,7 @@ public:
   BlobImplBase(const nsAString& aContentType, uint64_t aLength)
     : mIsFile(false)
     , mImmutable(false)
+    , mDirState(BlobDirState::eUnknownIfDir)
     , mContentType(aContentType)
     , mStart(0)
     , mLength(aLength)
@@ -387,6 +450,7 @@ public:
                uint64_t aLength)
     : mIsFile(false)
     , mImmutable(false)
+    , mDirState(BlobDirState::eUnknownIfDir)
     , mContentType(aContentType)
     , mStart(aStart)
     , mLength(aLength)
@@ -431,9 +495,10 @@ public:
     return nullptr;
   }
 
-  virtual nsresult GetInternalStream(nsIInputStream** aStream) override
+  virtual void GetInternalStream(nsIInputStream** aStream,
+                                 ErrorResult& aRv) override
   {
-    return NS_ERROR_NOT_IMPLEMENTED;
+    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
   }
 
   virtual int64_t GetFileId() override;
@@ -454,7 +519,8 @@ public:
 
   virtual void
   SetLazyData(const nsAString& aName, const nsAString& aContentType,
-              uint64_t aLength, int64_t aLastModifiedDate) override
+              uint64_t aLength, int64_t aLastModifiedDate,
+              BlobDirState aDirState) override
   {
     NS_ASSERTION(aLength, "must have length");
 
@@ -478,6 +544,27 @@ public:
   virtual bool IsFile() const override
   {
     return mIsFile;
+  }
+
+  virtual void LookupAndCacheIsDirectory() override
+  {
+    MOZ_ASSERT(false, "Why is this being called on a non-BlobImplFile?");
+  }
+
+  /**
+   * Returns true if the nsIFile that this object wraps is a directory.
+   */
+  virtual bool IsDirectory() const override
+  {
+    MOZ_ASSERT(mDirState != BlobDirState::eUnknownIfDir,
+               "Must only be used by callers for whom the code paths are "
+               "know to call LookupAndCacheIsDirectory()");
+    return mDirState == BlobDirState::eIsDir;
+  }
+
+  virtual BlobDirState GetDirState() const override
+  {
+    return mDirState;
   }
 
   virtual bool IsStoredFile() const
@@ -514,6 +601,7 @@ protected:
 
   bool mIsFile;
   bool mImmutable;
+  BlobDirState mDirState;
 
   nsString mContentType;
   nsString mName;
@@ -539,7 +627,8 @@ public:
 
   BlobImplMemory(void* aMemoryBuffer, uint64_t aLength, const nsAString& aName,
                  const nsAString& aContentType, int64_t aLastModifiedDate)
-    : BlobImplBase(aName, aContentType, aLength, aLastModifiedDate)
+    : BlobImplBase(aName, aContentType, aLength, aLastModifiedDate,
+                   BlobDirState::eIsNotDir)
     , mDataOwner(new DataOwner(aMemoryBuffer, aLength))
   {
     NS_ASSERTION(mDataOwner && mDataOwner->mData, "must have data");
@@ -553,7 +642,8 @@ public:
     NS_ASSERTION(mDataOwner && mDataOwner->mData, "must have data");
   }
 
-  virtual nsresult GetInternalStream(nsIInputStream** aStream) override;
+  virtual void GetInternalStream(nsIInputStream** aStream,
+                                 ErrorResult& aRv) override;
 
   virtual already_AddRefed<BlobImpl>
   CreateSlice(uint64_t aStart, uint64_t aLength,
@@ -639,7 +729,8 @@ public:
     mFileDescOwner = new nsTemporaryFileInputStream::FileDescOwner(aFD);
   }
 
-  virtual nsresult GetInternalStream(nsIInputStream** aStream) override;
+  virtual void GetInternalStream(nsIInputStream** aStream,
+                                 ErrorResult& aRv) override;
 
   virtual already_AddRefed<BlobImpl>
   CreateSlice(uint64_t aStart, uint64_t aLength,
@@ -781,9 +872,12 @@ public:
   virtual void SetLastModified(int64_t aLastModified) override;
   virtual void GetMozFullPathInternal(nsAString& aFullPath,
                                       ErrorResult& aRv) override;
-  virtual nsresult GetInternalStream(nsIInputStream**) override;
+  virtual void GetInternalStream(nsIInputStream** aInputStream,
+                                 ErrorResult& aRv) override;
 
   void SetPath(const nsAString& aFullPath);
+
+  virtual void LookupAndCacheIsDirectory() override;
 
 protected:
   virtual ~BlobImplFile() {

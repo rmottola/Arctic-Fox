@@ -26,6 +26,10 @@ test-pref(dom.meta-viewport.enabled,true) test-pref(font.size.inflation.emPerLin
 == justification-2.html justification-2-ref.html
 == line-breaking-1.html line-breaking-1-ref.html
 == line-breaking-2.html line-breaking-2-ref.html
+== line-break-suppression-1.html line-break-suppression-1-ref.html
+== line-break-suppression-2.html line-break-suppression-2-ref.html
+== line-break-suppression-3.html line-break-suppression-3-ref.html
+== line-break-suppression-4.html line-break-suppression-4-ref.html
 == line-height-1.html line-height-1-ref.html
 == line-height-2.html line-height-2-ref.html
 == line-height-3.html line-height-3-ref.html
@@ -46,3 +50,5 @@ pref(layout.css.vertical-text.enabled,true) fails == ruby-position-vertical-rl.h
 == ruby-span-1.html ruby-span-1-ref.html
 == ruby-whitespace-1.html ruby-whitespace-1-ref.html
 == ruby-whitespace-2.html ruby-whitespace-2-ref.html
+== bug1181890.html bug1181890-ref.html
+!= bug1181890.html bug1181890-notref.html

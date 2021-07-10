@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -7,9 +8,20 @@
 #include "Helpers.h"
 #include "mozilla/unused.h"
 #include "nsICloneableInputStream.h"
+#include "nsIMultiplexInputStream.h"
 #include "nsNetUtil.h"
 #include "nsStreamUtils.h"
 #include "nsStringStream.h"
+#include "nsComponentManagerUtils.h"
+#include "nsAutoPtr.h"
+
+TEST(CloneInputStream, InvalidInput)
+{
+  nsCOMPtr<nsIInputStream> clone;
+  nsresult rv = NS_CloneInputStream(nullptr, getter_AddRefs(clone));
+  ASSERT_TRUE(NS_FAILED(rv));
+  ASSERT_FALSE(clone);
+}
 
 TEST(CloneInputStream, CloneableInput)
 {
@@ -101,4 +113,89 @@ TEST(CloneInputStream, NonCloneableInput_Fallback)
 
   testing::ConsumeAndValidateStream(stream, inputString);
   testing::ConsumeAndValidateStream(clone, inputString);
+}
+
+TEST(CloneInputStream, CloneMultiplexStream)
+{
+  nsCOMPtr<nsIMultiplexInputStream> stream =
+    do_CreateInstance("@mozilla.org/io/multiplex-input-stream;1");
+  ASSERT_TRUE(stream);
+
+  nsTArray<char> inputData;
+  testing::CreateData(1024, inputData);
+  for (uint32_t i = 0; i < 2; ++i) {
+    nsCString inputString(inputData.Elements(), inputData.Length());
+
+    nsCOMPtr<nsIInputStream> base;
+    nsresult rv = NS_NewCStringInputStream(getter_AddRefs(base), inputString);
+    ASSERT_TRUE(NS_SUCCEEDED(rv));
+
+    rv = stream->AppendStream(base);
+    ASSERT_TRUE(NS_SUCCEEDED(rv));
+  }
+
+  // Unread stream should clone successfully.
+  nsTArray<char> doubled;
+  doubled.AppendElements(inputData);
+  doubled.AppendElements(inputData);
+
+  nsCOMPtr<nsIInputStream> clone;
+  nsresult rv = NS_CloneInputStream(stream, getter_AddRefs(clone));
+  ASSERT_TRUE(NS_SUCCEEDED(rv));
+  testing::ConsumeAndValidateStream(clone, doubled);
+
+  // Stream that has been read should fail.
+  nsAutoPtr<char> buffer(new char[512]);
+  uint32_t read;
+  rv = stream->Read(buffer, 512, &read);
+  ASSERT_TRUE(NS_SUCCEEDED(rv));
+
+  nsCOMPtr<nsIInputStream> clone2;
+  rv = NS_CloneInputStream(stream, getter_AddRefs(clone2));
+  ASSERT_TRUE(NS_FAILED(rv));
+}
+
+TEST(CloneInputStream, CloneMultiplexStreamPartial)
+{
+  nsCOMPtr<nsIMultiplexInputStream> stream =
+    do_CreateInstance("@mozilla.org/io/multiplex-input-stream;1");
+  ASSERT_TRUE(stream);
+
+  nsTArray<char> inputData;
+  testing::CreateData(1024, inputData);
+  for (uint32_t i = 0; i < 2; ++i) {
+    nsCString inputString(inputData.Elements(), inputData.Length());
+
+    nsCOMPtr<nsIInputStream> base;
+    nsresult rv = NS_NewCStringInputStream(getter_AddRefs(base), inputString);
+    ASSERT_TRUE(NS_SUCCEEDED(rv));
+
+    rv = stream->AppendStream(base);
+    ASSERT_TRUE(NS_SUCCEEDED(rv));
+  }
+
+  // Fail when first stream read, but second hasn't been started.
+  nsAutoPtr<char> buffer(new char[1024]);
+  uint32_t read;
+  nsresult rv = stream->Read(buffer, 1024, &read);
+  ASSERT_TRUE(NS_SUCCEEDED(rv));
+
+  nsCOMPtr<nsIInputStream> clone;
+  rv = NS_CloneInputStream(stream, getter_AddRefs(clone));
+  ASSERT_TRUE(NS_FAILED(rv));
+
+  // Fail after beginning read of second stream.
+  rv = stream->Read(buffer, 512, &read);
+  ASSERT_TRUE(NS_SUCCEEDED(rv) && read == 512);
+
+  rv = NS_CloneInputStream(stream, getter_AddRefs(clone));
+  ASSERT_TRUE(NS_FAILED(rv));
+
+  // Fail at the end.
+  nsAutoCString consumed;
+  rv = NS_ConsumeStream(stream, UINT32_MAX, consumed);
+  ASSERT_TRUE(NS_SUCCEEDED(rv));
+
+  rv = NS_CloneInputStream(stream, getter_AddRefs(clone));
+  ASSERT_TRUE(NS_FAILED(rv));
 }

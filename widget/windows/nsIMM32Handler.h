@@ -14,6 +14,7 @@
 #include "nsIWidget.h"
 #include "mozilla/EventForwards.h"
 #include "nsRect.h"
+#include "WritingModes.h"
 
 class nsWindow;
 
@@ -142,7 +143,11 @@ public:
   // the composition on uexpected window.
   static void CommitComposition(nsWindow* aWindow, bool aForce = false);
   static void CancelComposition(nsWindow* aWindow, bool aForce = false);
+  static void OnFocusChange(bool aFocus, nsWindow* aWindow);
   static void OnUpdateComposition(nsWindow* aWindow);
+  static void OnSelectionChange(nsWindow* aWindow,
+                                const IMENotification& aIMENotification,
+                                bool aIsIMMActive);
 
   static nsIMEUpdatePreference GetIMEUpdatePreference();
 
@@ -158,8 +163,13 @@ protected:
   static bool IsComposingOnPlugin();
   static bool IsComposingWindow(nsWindow* aWindow);
 
+  static bool IsJapanist2003Active();
+  static bool IsGoogleJapaneseInputActive();
+
   static bool ShouldDrawCompositionStringOurselves();
-  static void InitKeyboardLayout(HKL aKeyboardLayout);
+  static bool IsVerticalWritingSupported();
+  // aWindow can be nullptr if it's called without receiving WM_INPUTLANGCHANGE.
+  static void InitKeyboardLayout(nsWindow* aWindow, HKL aKeyboardLayout);
   static UINT GetKeyboardCodePage();
 
   /**
@@ -275,13 +285,37 @@ protected:
                                const nsIMEContext& aIMEContext);
   void SetIMERelatedWindowsPosOnPlugin(nsWindow* aWindow,
                                        const nsIMEContext& aIMEContext);
-  bool GetCharacterRectOfSelectedTextAt(nsWindow* aWindow,
-                                          uint32_t aOffset,
-                                          nsIntRect &aCharRect);
-  bool GetCaretRect(nsWindow* aWindow, nsIntRect &aCaretRect);
+  bool GetCharacterRectOfSelectedTextAt(
+         nsWindow* aWindow,
+         uint32_t aOffset,
+         nsIntRect& aCharRect,
+         mozilla::WritingMode* aWritingMode = nullptr);
+  bool GetCaretRect(nsWindow* aWindow,
+                    nsIntRect& aCaretRect,
+                    mozilla::WritingMode* aWritingMode = nullptr);
   void GetCompositionString(const nsIMEContext &aIMEContext,
                             DWORD aIndex,
                             nsAString& aCompositionString) const;
+
+  /**
+   * AdjustCompositionFont() makes IME vertical writing mode if it's supported.
+   * If aForceUpdate is true, it will update composition font even if writing
+   * mode isn't being changed.
+   */
+  void AdjustCompositionFont(const nsIMEContext& aIMEContext,
+                             const mozilla::WritingMode& aWritingMode,
+                             bool aForceUpdate = false);
+
+  /**
+   * MaybeAdjustCompositionFont() calls AdjustCompositionFont() when the
+   * locale of active IME is CJK.  Note that this creates an instance even
+   * when there is no composition but the locale is CJK.
+   */
+  static void MaybeAdjustCompositionFont(
+                nsWindow* aWindow,
+                const mozilla::WritingMode& aWritingMode,
+                bool aForceUpdate = false);
+
   /**
    *  Get the current target clause of composition string.
    *  If there are one or more characters whose attribute is ATTR_TARGET_*,
@@ -355,12 +389,47 @@ protected:
   int32_t mCursorPosition;
   uint32_t mCompositionStart;
 
+  struct Selection
+  {
+    nsString mString;
+    uint32_t mOffset;
+    mozilla::WritingMode mWritingMode;
+    bool mIsValid;
+
+    Selection()
+      : mOffset(UINT32_MAX)
+      , mIsValid(false)
+    {
+    }
+
+    void Clear()
+    {
+      mOffset = UINT32_MAX;
+      mIsValid = false;
+    }
+    uint32_t Length() const { return mString.Length(); }
+
+    bool IsValid() const;
+    bool Update(const IMENotification& aIMENotification);
+    bool Init(nsWindow* aWindow);
+    bool EnsureValidSelection(nsWindow* aWindow);
+  };
+  Selection mSelection;
+  // mSelection stores the latest selection data only when sHasFocus it true.
+  // Therefore, if sHasFocus is false, temporary instance should be used.
+  Selection GetSelection() { return sHasFocus ? mSelection : Selection(); }
+
   bool mIsComposing;
   bool mIsComposingOnPlugin;
   bool mNativeCaretIsCreated;
 
+  static mozilla::WritingMode sWritingModeOfCompositionFont;
+  static nsString sIMEName;
   static UINT sCodePage;
   static DWORD sIMEProperty;
+  static DWORD sIMEUIProperty;
+  static bool sAssumeVerticalWritingModeNotSupported;
+  static bool sHasFocus;
 };
 
 #endif // nsIMM32Handler_h__

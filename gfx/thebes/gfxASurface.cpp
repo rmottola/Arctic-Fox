@@ -26,9 +26,6 @@
 #ifdef CAIRO_HAS_WIN32_SURFACE
 #include "gfxWindowsSurface.h"
 #endif
-#ifdef CAIRO_HAS_D2D_SURFACE
-#include "gfxD2DSurface.h"
-#endif
 
 #ifdef MOZ_X11
 #include "gfxXlibSurface.h"
@@ -155,7 +152,7 @@ gfxASurface::SetSurfaceWrapper(cairo_surface_t *csurf, gfxASurface *asurf)
 }
 
 already_AddRefed<gfxASurface>
-gfxASurface::Wrap (cairo_surface_t *csurf, const gfxIntSize& aSize)
+gfxASurface::Wrap (cairo_surface_t *csurf, const IntSize& aSize)
 {
     nsRefPtr<gfxASurface> result;
 
@@ -176,11 +173,6 @@ gfxASurface::Wrap (cairo_surface_t *csurf, const gfxIntSize& aSize)
     else if (stype == CAIRO_SURFACE_TYPE_WIN32 ||
              stype == CAIRO_SURFACE_TYPE_WIN32_PRINTING) {
         result = new gfxWindowsSurface(csurf);
-    }
-#endif
-#ifdef CAIRO_HAS_D2D_SURFACE
-    else if (stype == CAIRO_SURFACE_TYPE_D2D) {
-        result = new gfxD2DSurface(csurf);
     }
 #endif
 #ifdef MOZ_X11
@@ -323,7 +315,7 @@ gfxASurface::Finish()
 
 already_AddRefed<gfxASurface>
 gfxASurface::CreateSimilarSurface(gfxContentType aContent,
-                                  const nsIntSize& aSize)
+                                  const IntSize& aSize)
 {
     if (!mSurface || !mSurfaceValid) {
       return nullptr;
@@ -359,7 +351,7 @@ gfxASurface::CopyToARGB32ImageSurface()
       return nullptr;
     }
 
-    const nsIntSize size = GetSize();
+    const IntSize size = GetSize();
     nsRefPtr<gfxImageSurface> imgSurface =
         new gfxImageSurface(size, gfxImageFormat::ARGB32);
 
@@ -382,7 +374,7 @@ gfxASurface::CairoStatus()
 
 /* static */
 bool
-gfxASurface::CheckSurfaceSize(const nsIntSize& sz, int32_t limit)
+gfxASurface::CheckSurfaceSize(const IntSize& sz, int32_t limit)
 {
     if (sz.width < 0 || sz.height < 0) {
         NS_WARNING("Surface width or height < 0!");
@@ -564,15 +556,10 @@ static const SurfaceMemoryReporterAttrs sSurfaceMemoryReporterAttrs[] = {
     {"gfx-surface-xml", nullptr},
     {"gfx-surface-skia", nullptr},
     {"gfx-surface-subsurface", nullptr},
-    {"gfx-surface-d2d", nullptr},
 };
 
 PR_STATIC_ASSERT(MOZ_ARRAY_LENGTH(sSurfaceMemoryReporterAttrs) ==
                  size_t(gfxSurfaceType::Max));
-#ifdef CAIRO_HAS_D2D_SURFACE
-PR_STATIC_ASSERT(uint32_t(CAIRO_SURFACE_TYPE_D2D) ==
-                 uint32_t(gfxSurfaceType::D2D));
-#endif
 PR_STATIC_ASSERT(uint32_t(CAIRO_SURFACE_TYPE_SKIA) ==
                  uint32_t(gfxSurfaceType::Skia));
 
@@ -702,10 +689,10 @@ gfxASurface::GetEmptyOpaqueRect()
   return empty;
 }
 
-const nsIntSize
+const IntSize
 gfxASurface::GetSize() const
 {
-  return nsIntSize(-1, -1);
+  return IntSize(-1, -1);
 }
 
 already_AddRefed<gfxImageSurface>

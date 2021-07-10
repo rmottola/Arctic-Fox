@@ -215,7 +215,6 @@
 @RESPATH@/components/dom_alarm.xpt
 @RESPATH@/components/dom_core.xpt
 @RESPATH@/components/dom_css.xpt
-@RESPATH@/components/dom_devicestorage.xpt
 @RESPATH@/components/dom_events.xpt
 @RESPATH@/components/dom_geolocation.xpt
 @RESPATH@/components/dom_media.xpt
@@ -299,6 +298,7 @@
 @RESPATH@/components/necko_file.xpt
 @RESPATH@/components/necko_ftp.xpt
 @RESPATH@/components/necko_http.xpt
+@RESPATH@/components/necko_mdns.xpt
 @RESPATH@/components/necko_res.xpt
 @RESPATH@/components/necko_socket.xpt
 @RESPATH@/components/necko_strconv.xpt
@@ -324,9 +324,7 @@
 @RESPATH@/components/saxparser.xpt
 @RESPATH@/browser/components/sessionstore.xpt
 @RESPATH@/components/services-crypto-component.xpt
-#ifdef MOZ_CAPTIVEDETECT
 @RESPATH@/components/captivedetect.xpt
-#endif
 @RESPATH@/browser/components/shellservice.xpt
 #ifdef MOZ_BROWSER_STATUSBAR
 @RESPATH@/browser/components/status4evar.xpt
@@ -448,7 +446,9 @@
 @RESPATH@/components/nsUpdateTimerManager.js
 @RESPATH@/components/addoncompat.manifest
 @RESPATH@/components/multiprocessShims.js
-@RESPATH@/components/remoteTagService.js
+@RESPATH@/components/defaultShims.js
+@RESPATH@/components/utils.manifest
+@RESPATH@/components/simpleServices.js
 @RESPATH@/components/pluginGlue.manifest
 @RESPATH@/components/ProcessSingleton.manifest
 @RESPATH@/components/MainProcessSingleton.js
@@ -535,10 +535,8 @@
 @RESPATH@/components/SyncComponents.manifest
 @RESPATH@/components/Weave.js
 #endif
-#ifdef MOZ_CAPTIVEDETECT
 @RESPATH@/components/CaptivePortalDetectComponents.manifest
 @RESPATH@/components/captivedetect.js
-#endif
 @RESPATH@/components/servicesComponents.manifest
 @RESPATH@/components/cryptoComponents.manifest
 @RESPATH@/components/TelemetryStartup.js
@@ -639,6 +637,7 @@
 #if defined(ENABLE_TESTS) && defined(MOZ_DEBUG)
 @RESPATH@/components/TestInterfaceJS.js
 @RESPATH@/components/TestInterfaceJS.manifest
+@RESPATH@/components/TestInterfaceJSMaplike.js
 #endif
 
 @RESPATH@/components/PACGenerator.js
@@ -799,7 +798,6 @@
 #endif
 @RESPATH@/chrome/pippki@JAREXT@
 @RESPATH@/chrome/pippki.manifest
-@RESPATH@/components/pipboot.xpt
 @RESPATH@/components/pipnss.xpt
 @RESPATH@/components/pippki.xpt
 
@@ -833,6 +831,8 @@ bin/libfreebl_32int64_3.so
 @RESPATH@/components/DataStore.manifest
 @RESPATH@/components/DataStoreImpl.js
 @RESPATH@/components/dom_datastore.xpt
+
+@RESPATH@/components/dom_audiochannel.xpt
 
 ; Shutdown Terminator
 @RESPATH@/components/nsTerminatorTelemetry.js

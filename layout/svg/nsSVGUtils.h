@@ -21,6 +21,7 @@
 #include "nsColor.h"
 #include "nsCOMPtr.h"
 #include "nsID.h"
+#include "nsIFrame.h"
 #include "nsISupportsBase.h"
 #include "nsMathUtils.h"
 #include "nsStyleStruct.h"
@@ -179,11 +180,20 @@ class nsSVGUtils
 {
 public:
   typedef mozilla::dom::Element Element;
+  typedef mozilla::FramePropertyDescriptor FramePropertyDescriptor;
   typedef mozilla::gfx::AntialiasMode AntialiasMode;
   typedef mozilla::gfx::FillRule FillRule;
   typedef mozilla::gfx::GeneralPattern GeneralPattern;
+  typedef mozilla::gfx::Size Size;
 
   static void Init();
+
+  static void DestroyObjectBoundingBoxProperty(void* aPropertyValue) {
+    delete static_cast<gfxRect*>(aPropertyValue);
+  }
+
+  NS_DECLARE_FRAME_PROPERTY(ObjectBoundingBoxProperty,
+                            DestroyObjectBoundingBoxProperty);
 
   /**
    * Gets the nearest nsSVGInnerSVGFrame or nsSVGOuterSVGFrame frame. aFrame
@@ -240,6 +250,14 @@ public:
    * Update the filter invalidation region for ancestor frames, if relevant.
    */
   static void NotifyAncestorsOfFilterRegionChange(nsIFrame *aFrame);
+
+  /**
+   * Percentage lengths in SVG are resolved against the width/height of the
+   * nearest viewport (or its viewBox, if set). This helper returns the size
+   * of this "context" for the given frame so that percentage values can be
+   * resolved.
+   */
+  static Size GetContextSize(const nsIFrame* aFrame);
 
   /* Computes the input length in terms of object space coordinates.
      Input: rect - bounding box
@@ -394,6 +412,8 @@ public:
    * aFrame's userspace.
    */
   static gfxRect GetBBox(nsIFrame *aFrame,
+                         // If the default arg changes, update the handling for
+                         // ObjectBoundingBoxProperty() in the implementation.
                          uint32_t aFlags = eBBoxIncludeFillGeometry);
 
   /*

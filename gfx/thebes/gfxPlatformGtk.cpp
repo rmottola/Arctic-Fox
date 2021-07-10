@@ -14,7 +14,7 @@
 #include "gfx2DGlue.h"
 #include "gfxFcPlatformFontList.h"
 #include "gfxFontconfigUtils.h"
-#include "gfxPangoFonts.h"
+#include "gfxFontconfigFonts.h"
 #include "gfxContext.h"
 #include "gfxUserFontSet.h"
 #include "gfxUtils.h"
@@ -70,7 +70,8 @@ gfxPlatformGtk::gfxPlatformGtk()
     }
 
 #ifdef MOZ_X11
-    sUseXRender = mozilla::Preferences::GetBool("gfx.xrender.enabled");
+    sUseXRender = (GDK_IS_X11_DISPLAY(gdk_display_get_default())) ? 
+                    mozilla::Preferences::GetBool("gfx.xrender.enabled") : false;
 #endif
 
     uint32_t canvasMask = BackendTypeBit(BackendType::CAIRO) | BackendTypeBit(BackendType::SKIA);
@@ -97,12 +98,11 @@ gfxPlatformGtk::FlushContentDrawing()
 }
 
 already_AddRefed<gfxASurface>
-gfxPlatformGtk::CreateOffscreenSurface(const IntSize& size,
-                                       gfxContentType contentType)
+gfxPlatformGtk::CreateOffscreenSurface(const IntSize& aSize,
+                                       gfxImageFormat aFormat)
 {
     nsRefPtr<gfxASurface> newSurface;
     bool needsClear = true;
-    gfxImageFormat imageFormat = OptimalFormatForContent(contentType);
 #ifdef MOZ_X11
     // XXX we really need a different interface here, something that passes
     // in more context, including the display and/or target surface type that
@@ -115,16 +115,16 @@ gfxPlatformGtk::CreateOffscreenSurface(const IntSize& size,
             Screen *screen = gdk_x11_screen_get_xscreen(gdkScreen);
             XRenderPictFormat* xrenderFormat =
                 gfxXlibSurface::FindRenderFormat(DisplayOfScreen(screen),
-                                                 imageFormat);
+                                                 aFormat);
 
             if (xrenderFormat) {
                 newSurface = gfxXlibSurface::Create(screen, xrenderFormat,
-                                                    size);
+                                                    aSize);
             }
         } else {
             // We're not going to use XRender, so we don't need to
             // search for a render format
-            newSurface = new gfxImageSurface(size, imageFormat);
+            newSurface = new gfxImageSurface(aSize, aFormat);
             // The gfxImageSurface ctor zeroes this for us, no need to
             // waste time clearing again
             needsClear = false;
@@ -136,7 +136,7 @@ gfxPlatformGtk::CreateOffscreenSurface(const IntSize& size,
         // We couldn't create a native surface for whatever reason;
         // e.g., no display, no RENDER, bad size, etc.
         // Fall back to image surface for the data.
-        newSurface = new gfxImageSurface(size, imageFormat);
+        newSurface = new gfxImageSurface(aSize, aFormat);
     }
 
     if (newSurface->CairoStatus()) {
@@ -372,11 +372,15 @@ gfxPlatformGtk::GetPlatformCMSOutputProfile(void *&mem, size_t &size)
     size = 0;
 
 #ifdef MOZ_X11
+    GdkDisplay *display = gdk_display_get_default();
+    if (!GDK_IS_X11_DISPLAY(display))
+        return;
+
     const char EDID1_ATOM_NAME[] = "XFree86_DDC_EDID1_RAWDATA";
     const char ICC_PROFILE_ATOM_NAME[] = "_ICC_PROFILE";
 
     Atom edidAtom, iccAtom;
-    Display *dpy = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+    Display *dpy = GDK_DISPLAY_XDISPLAY(display);
     // In xpcshell tests, we never initialize X and hence don't have a Display.
     // In this case, there's no output colour management to be done, so we just
     // return with nullptr.

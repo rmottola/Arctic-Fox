@@ -212,6 +212,11 @@ struct TileClient
   TileDescriptor GetTileDescriptor();
 
   /**
+   * For debugging.
+   */
+  void Dump(std::stringstream& aStream);
+
+  /**
   * Swaps the front and back buffers.
   */
   void Flip();
@@ -264,6 +269,7 @@ struct TileClient
   RefPtr<gfxSharedReadLock> mBackLock;
   RefPtr<gfxSharedReadLock> mFrontLock;
   RefPtr<ClientLayerManager> mManager;
+  gfx::IntRect mUpdateRect;
   CompositableClient* mCompositableClient;
 #ifdef GFX_TILEDLAYER_DEBUG_OVERLAY
   TimeStamp        mLastUpdate;
@@ -410,7 +416,7 @@ public:
                    LayerManager::DrawPaintedLayerCallback aCallback,
                    void* aCallbackData);
 
-  void ReadUnlock();
+  void Update(const nsIntRegion& aNewValidRegion, const nsIntRegion& aPaintRegion);
 
   void ReadLock();
 
@@ -437,6 +443,28 @@ public:
 
   SurfaceDescriptorTiles GetSurfaceDescriptorTiles();
 
+  void SetResolution(float aResolution) {
+    if (mResolution == aResolution) {
+      return;
+    }
+
+    Update(nsIntRegion(), nsIntRegion());
+    mResolution = aResolution;
+  }
+
+  void ResetPaintedAndValidState() {
+    mPaintedRegion.SetEmpty();
+    mValidRegion.SetEmpty();
+    mTiles.mSize.width = 0;
+    mTiles.mSize.height = 0;
+    for (size_t i = 0; i < mRetainedTiles.Length(); i++) {
+      if (!mRetainedTiles[i].IsPlaceholderTile()) {
+        mRetainedTiles[i].Release();
+      }
+    }
+    mRetainedTiles.Clear();
+  }
+
 protected:
   TileClient ValidateTile(TileClient aTile,
                           const nsIntPoint& aTileRect,
@@ -445,10 +473,6 @@ protected:
   void PostValidate(const nsIntRegion& aPaintRegion);
 
   void UnlockTile(TileClient aTile);
-
-  void ReleaseTile(TileClient aTile) { aTile.Release(); }
-
-  void SwapTiles(TileClient& aTileA, TileClient& aTileB) { std::swap(aTileA, aTileB); }
 
   TileClient GetPlaceholderTile() const { return TileClient(); }
 

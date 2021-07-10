@@ -29,11 +29,10 @@
 #define PLUGIN_LOG_NAME "Plugin"
 
 // Levels                <level>
-#define PLUGIN_LOG_ALWAYS 1
-#define PLUGIN_LOG_BASIC  3
-#define PLUGIN_LOG_NORMAL 5
-#define PLUGIN_LOG_NOISY  7
-#define PLUGIN_LOG_MAX    9
+#define PLUGIN_LOG_ALWAYS mozilla::LogLevel::Error
+#define PLUGIN_LOG_BASIC  mozilla::LogLevel::Info
+#define PLUGIN_LOG_NORMAL mozilla::LogLevel::Debug
+#define PLUGIN_LOG_NOISY  mozilla::LogLevel::Verbose
 
 // 2. You can combine logs and levels by separating them with a comma:
 //    My favorite Win32 Example: SET NSPR_LOG_MODULES=Plugin:5,PluginNPP:5,PluginNPN:5
@@ -64,7 +63,7 @@ public:
 #ifdef PLUGIN_LOGGING
  #define NPN_PLUGIN_LOG(a, b)                              \
    PR_BEGIN_MACRO                                        \
-   PR_LOG(nsPluginLogging::gNPNLog, a, b); \
+   MOZ_LOG(nsPluginLogging::gNPNLog, a, b); \
    PR_LogFlush();                                                    \
    PR_END_MACRO
 #else
@@ -74,7 +73,7 @@ public:
 #ifdef PLUGIN_LOGGING
  #define NPP_PLUGIN_LOG(a, b)                              \
    PR_BEGIN_MACRO                                         \
-   PR_LOG(nsPluginLogging::gNPPLog, a, b); \
+   MOZ_LOG(nsPluginLogging::gNPPLog, a, b); \
    PR_LogFlush();                                                    \
    PR_END_MACRO
 #else
@@ -84,7 +83,7 @@ public:
 #ifdef PLUGIN_LOGGING
  #define PLUGIN_LOG(a, b)                              \
    PR_BEGIN_MACRO                                         \
-   PR_LOG(nsPluginLogging::gPluginLog, a, b); \
+   MOZ_LOG(nsPluginLogging::gPluginLog, a, b); \
    PR_LogFlush();                                                    \
    PR_END_MACRO
 #else

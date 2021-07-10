@@ -183,7 +183,7 @@ TextureImageTextureSourceOGL::Update(gfx::DataSourceSurface* aSurface,
 }
 
 void
-TextureImageTextureSourceOGL::EnsureBuffer(const nsIntSize& aSize,
+TextureImageTextureSourceOGL::EnsureBuffer(const IntSize& aSize,
                                            gfxContentType aContentType)
 {
   if (!mTexImage ||

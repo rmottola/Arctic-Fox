@@ -121,4 +121,11 @@ pref("browser.sessionstore.interval",60000); //every minute instead of every 10 
 // Make sure we shortcut out of a11y to save walking unnecessary code
 pref("accessibility.force_disabled", 1);
 
+// Enable webm by default to enable playback of youtube/vevo etc out of the box
+pref("media.mediasource.enabled", true);
+pref("media.mediasource.webm.enabled", true);
+pref("media.mediasource.format-reader", false);
+pref("media.mediasource.mp4.enabled", true);
+pref("media.ffmpeg.skip_loop_filter", true);
+
 // ============================================================================

@@ -11,13 +11,6 @@
 #include "js/TypeDecls.h"
 class nsPresContext;
 class nsIPresShell;
-
-namespace mozilla {
-namespace dom {
-class URLSearchParams;
-}
-}
-
 %}
 
 /**
@@ -26,7 +19,6 @@ class URLSearchParams;
 
 [ptr] native nsPresContext(nsPresContext);
 [ptr] native nsIPresShell(nsIPresShell);
-[ptr] native URLSearchParams(mozilla::dom::URLSearchParams);
 
 interface nsIURI;
 interface nsIChannel;
@@ -54,7 +46,7 @@ interface nsITabParent;
  
 typedef unsigned long nsLoadFlags;
 
-[scriptable, builtinclass, uuid(f84b1ae4-2f78-4bad-b36a-6a8516ee6e40)]
+[scriptable, builtinclass, uuid(97471054-0BC8-4A57-BBFE-6C255BCBBB67)]
 interface nsIDocShell : nsIDocShellTreeItem
 {
   /**
@@ -367,9 +359,12 @@ interface nsIDocShell : nsIDocShellTreeItem
   /*
    * Tells the docshell to offer focus to its tree owner.
    * This is currently only necessary for embedding chrome.
+   * If forDocumentNavigation is true, then document navigation should be
+   * performed, where only the root of documents are selected. Otherwise, the
+   * next element in the parent should be returned. Returns true if focus was
+   * successfully taken by the tree owner.
    */
-  void tabToTreeOwner(in boolean forward,
-                      out boolean tookFocus);
+  bool tabToTreeOwner(in boolean forward, in boolean forDocumentNavigation);
 
   /**
    * Current busy state for DocShell
@@ -1042,9 +1037,6 @@ interface nsIDocShell : nsIDocShellTreeItem
    */
   [noscript,notxpcom,nostdcall] void setOpener(in nsITabParent aOpener);
   [noscript,notxpcom,nostdcall] nsITabParent getOpener();
-
-  // URLSearchParams for the window.location is owned by the docShell.
-  [noscript,notxpcom] URLSearchParams getURLSearchParams();
 
   /**
    * Notify DocShell when the browser is about to start executing JS, and after

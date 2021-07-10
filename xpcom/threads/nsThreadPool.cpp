@@ -27,7 +27,7 @@ GetThreadPoolLog()
 #ifdef LOG
 #undef LOG
 #endif
-#define LOG(args) PR_LOG(GetThreadPoolLog(), PR_LOG_DEBUG, args)
+#define LOG(args) MOZ_LOG(GetThreadPoolLog(), mozilla::LogLevel::Debug, args)
 
 // DESIGN:
 //  o  Allocate anonymous threads.
@@ -67,6 +67,13 @@ nsThreadPool::~nsThreadPool()
 nsresult
 nsThreadPool::PutEvent(nsIRunnable* aEvent)
 {
+  nsCOMPtr<nsIRunnable> event(aEvent);
+  return PutEvent(event.forget());
+}
+
+nsresult
+nsThreadPool::PutEvent(already_AddRefed<nsIRunnable>&& aEvent)
+{
   // Avoid spawning a new thread while holding the event queue lock...
 
   bool spawnThread = false;
@@ -89,7 +96,7 @@ nsThreadPool::PutEvent(nsIRunnable* aEvent)
       spawnThread = true;
     }
 
-    mEvents.PutEvent(aEvent);
+    mEvents.PutEvent(Move(aEvent));
     stackSize = mStackSize;
   }
 
@@ -151,6 +158,7 @@ NS_IMETHODIMP
 nsThreadPool::Run()
 {
   LOG(("THRD-P(%p) enter\n", this));
+
   mThreadNaming.SetThreadPoolName(mName);
 
   nsCOMPtr<nsIThread> current;
@@ -208,9 +216,6 @@ nsThreadPool::Run()
         } else {
           PRIntervalTime delta = timeout - (now - idleSince);
           LOG(("THRD-P(%p) waiting [%d]\n", this, delta));
-#ifdef MOZ_NUWA_PROCESS
-          nsThreadManager::get()->SetThreadIdle(nullptr);
-#endif // MOZ_NUWA_PROCESS
           mon.Wait(delta);
         }
       } else if (wasIdle) {
@@ -220,9 +225,6 @@ nsThreadPool::Run()
     }
     if (event) {
       LOG(("THRD-P(%p) running [%p]\n", this, event.get()));
-#ifdef MOZ_NUWA_PROCESS
-      nsThreadManager::get()->SetThreadWorking();
-#endif // MOZ_NUWA_PROCESS
       event->Run();
     }
   } while (!exitThread);
@@ -240,9 +242,16 @@ nsThreadPool::Run()
 }
 
 NS_IMETHODIMP
-nsThreadPool::Dispatch(nsIRunnable* aEvent, uint32_t aFlags)
+nsThreadPool::DispatchFromScript(nsIRunnable* aEvent, uint32_t aFlags)
 {
-  LOG(("THRD-P(%p) dispatch [%p %x]\n", this, aEvent, aFlags));
+  nsCOMPtr<nsIRunnable> event(aEvent);
+  return Dispatch(event.forget(), aFlags);
+}
+
+NS_IMETHODIMP
+nsThreadPool::Dispatch(already_AddRefed<nsIRunnable>&& aEvent, uint32_t aFlags)
+{
+  LOG(("THRD-P(%p) dispatch [%p %x]\n", this, /* XXX aEvent*/ nullptr, aFlags));
 
   if (NS_WARN_IF(mShutdown)) {
     return NS_ERROR_NOT_AVAILABLE;
@@ -256,7 +265,7 @@ nsThreadPool::Dispatch(nsIRunnable* aEvent, uint32_t aFlags)
     }
 
     nsRefPtr<nsThreadSyncDispatch> wrapper =
-      new nsThreadSyncDispatch(thread, aEvent);
+      new nsThreadSyncDispatch(thread, Move(aEvent));
     PutEvent(wrapper);
 
     while (wrapper->IsPending()) {
@@ -264,7 +273,7 @@ nsThreadPool::Dispatch(nsIRunnable* aEvent, uint32_t aFlags)
     }
   } else {
     NS_ASSERTION(aFlags == NS_DISPATCH_NORMAL, "unexpected dispatch flags");
-    PutEvent(aEvent);
+    PutEvent(Move(aEvent));
   }
   return NS_OK;
 }

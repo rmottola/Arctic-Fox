@@ -29,7 +29,6 @@
 #include "nsCOMPtr.h"
 #include "nsNetCID.h"
 #include "prprf.h"
-#include "nsNetUtil.h"
 #include "nsAsyncRedirectVerifyHelper.h"
 #include "nsSocketTransportService2.h"
 #include "nsAlgorithm.h"
@@ -48,6 +47,9 @@
 #include "nsIMemoryReporter.h"
 #include "nsIParentalControlsService.h"
 #include "nsINetworkLinkService.h"
+#include "nsHttpChannelAuthProvider.h"
+#include "nsServiceManagerUtils.h"
+#include "nsComponentManagerUtils.h"
 
 #include "mozilla/net/NeckoChild.h"
 #include "mozilla/ipc/URIUtils.h"
@@ -169,7 +171,7 @@ nsHttpHandler::nsHttpHandler()
     , mSessionStartTime(0)
     , mLegacyAppName("Mozilla")
     , mLegacyAppVersion("5.0")
-    , mProduct("Goanna")
+    , mProduct("Gecko")
     , mUserAgentIsDirty(true)
     , mUseCache(true)
     , mPromptTempRedirect(true)
@@ -282,6 +284,8 @@ nsHttpHandler::Init()
         PrefsChanged(prefBranch, nullptr);
     }
 
+    nsHttpChannelAuthProvider::InitializePrefs();
+
     if (mCompatFirefoxEnabled) {
       mMisc.AssignLiteral("rv:" MOZILLA_COMPATVERSION);
     } else {
@@ -367,6 +371,7 @@ nsHttpHandler::Init()
         mObserverService->AddObserver(this, "net:prune-dead-connections", true);
         mObserverService->AddObserver(this, "net:failed-to-process-uri-content", true);
         mObserverService->AddObserver(this, "last-pb-context-exited", true);
+        mObserverService->AddObserver(this, "webapps-clear-data", true);
         mObserverService->AddObserver(this, "browser:purge-session-history", true);
         mObserverService->AddObserver(this, NS_NETWORK_LINK_TOPIC, true);
     }
@@ -2039,6 +2044,10 @@ nsHttpHandler::Observe(nsISupports *subject,
         if (mConnMgr) {
             mConnMgr->ClearAltServiceMappings();
         }
+    } else if (!strcmp(topic, "webapps-clear-data")) {
+        if (mConnMgr) {
+            mConnMgr->ClearAltServiceMappings();
+        }
     } else if (!strcmp(topic, "browser:purge-session-history")) {
         if (mConnMgr) {
             if (gSocketTransportService) {
@@ -2064,14 +2073,15 @@ nsHttpHandler::Observe(nsISupports *subject,
 
 // nsISpeculativeConnect
 
-NS_IMETHODIMP
-nsHttpHandler::SpeculativeConnect(nsIURI *aURI,
-                                  nsIInterfaceRequestor *aCallbacks)
+nsresult
+nsHttpHandler::SpeculativeConnectInternal(nsIURI *aURI,
+                                          nsIInterfaceRequestor *aCallbacks,
+                                          bool anonymous)
 {
     if (IsNeckoChild()) {
         ipc::URIParams params;
         SerializeURI(aURI, params);
-        gNeckoChild->SendSpeculativeConnect(params);
+        gNeckoChild->SendSpeculativeConnect(params, anonymous);
         return NS_OK;
     }
 
@@ -2134,8 +2144,23 @@ nsHttpHandler::SpeculativeConnect(nsIURI *aURI,
 
     nsHttpConnectionInfo *ci =
         new nsHttpConnectionInfo(host, port, EmptyCString(), username, nullptr, usingSSL);
+    ci->SetAnonymous(anonymous);
 
     return SpeculativeConnect(ci, aCallbacks);
+}
+
+NS_IMETHODIMP
+nsHttpHandler::SpeculativeConnect(nsIURI *aURI,
+                                  nsIInterfaceRequestor *aCallbacks)
+{
+    return SpeculativeConnectInternal(aURI, aCallbacks, false);
+}
+
+NS_IMETHODIMP
+nsHttpHandler::SpeculativeAnonymousConnect(nsIURI *aURI,
+                                           nsIInterfaceRequestor *aCallbacks)
+{
+    return SpeculativeConnectInternal(aURI, aCallbacks, true);
 }
 
 void

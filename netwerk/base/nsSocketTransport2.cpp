@@ -27,7 +27,6 @@
 #include "nsISocketProvider.h"
 #include "nsISSLSocketControl.h"
 #include "nsIPipe.h"
-#include "nsIProgrammingLanguage.h"
 #include "nsIClassInfoImpl.h"
 #include "nsURLHelper.h"
 #include "nsIDNSService.h"
@@ -727,6 +726,7 @@ nsSocketTransport::nsSocketTransport()
     , mTypeCount(0)
     , mPort(0)
     , mProxyPort(0)
+    , mOriginPort(0)
     , mProxyTransparent(false)
     , mProxyTransparentResolvesHost(false)
     , mHttpsProxy(false)
@@ -780,6 +780,7 @@ nsSocketTransport::CleanupTypes()
 nsresult
 nsSocketTransport::Init(const char **types, uint32_t typeCount,
                         const nsACString &host, uint16_t port,
+                        const nsACString &hostRoute, uint16_t portRoute,
                         nsIProxyInfo *givenProxyInfo)
 {
     nsCOMPtr<nsProxyInfo> proxyInfo;
@@ -790,8 +791,15 @@ nsSocketTransport::Init(const char **types, uint32_t typeCount,
 
     // init socket type info
 
-    mPort = port;
-    mHost = host;
+    mOriginHost = host;
+    mOriginPort = port;
+    if (!hostRoute.IsEmpty()) {
+        mHost = hostRoute;
+        mPort = portRoute;
+    } else {
+        mHost = host;
+        mPort = port;
+    }
 
     if (proxyInfo) {
         mHttpsProxy = proxyInfo->IsHTTPS();
@@ -811,8 +819,9 @@ nsSocketTransport::Init(const char **types, uint32_t typeCount,
         }
     }
 
-    SOCKET_LOG(("nsSocketTransport::Init [this=%p host=%s:%hu proxy=%s:%hu]\n",
-        this, mHost.get(), mPort, mProxyHost.get(), mProxyPort));
+    SOCKET_LOG(("nsSocketTransport::Init [this=%p host=%s:%hu origin=%s:%d proxy=%s:%hu]\n",
+                this, mHost.get(), mPort, mOriginHost.get(), mOriginPort,
+                mProxyHost.get(), mProxyPort));
 
     // include proxy type as a socket type if proxy type is not "http"
     mTypeCount = typeCount + (proxyType != nullptr);
@@ -1044,6 +1053,11 @@ nsSocketTransport::ResolveHost()
                  "Setting both RESOLVE_DISABLE_IPV6 and RESOLVE_DISABLE_IPV4");
 
     SendStatus(NS_NET_STATUS_RESOLVING_HOST);
+
+    if (!SocketHost().Equals(mOriginHost)) {
+        SOCKET_LOG(("nsSocketTransport %p origin %s doing dns for %s\n",
+                    this, mOriginHost.get(), SocketHost().get()));
+    }
     rv = dns->AsyncResolveExtended(SocketHost(), dnsFlags, mNetworkInterfaceId, this,
                                    nullptr, getter_AddRefs(mDNSRequest));
     if (NS_SUCCEEDED(rv)) {
@@ -1079,11 +1093,14 @@ nsSocketTransport::BuildSocket(PRFileDesc *&fd, bool &proxyTransparent, bool &us
             do_GetService(kSocketProviderServiceCID, &rv);
         if (NS_FAILED(rv)) return rv;
 
-        const char *host       = mHost.get();
-        int32_t     port       = (int32_t) mPort;
+        // by setting host to mOriginHost, instead of mHost we send the
+        // SocketProvider (e.g. PSM) the origin hostname but can still do DNS
+        // on an explicit alternate service host name
+        const char *host       = mOriginHost.get();
+        int32_t     port       = (int32_t) mOriginPort;
         const char *proxyHost  = mProxyHost.IsEmpty() ? nullptr : mProxyHost.get();
         int32_t     proxyPort  = (int32_t) mProxyPort;
-        uint32_t    proxyFlags = 0;
+        uint32_t    controlFlags = 0;
 
         uint32_t i;
         for (i=0; i<mTypeCount; ++i) {
@@ -1096,13 +1113,16 @@ nsSocketTransport::BuildSocket(PRFileDesc *&fd, bool &proxyTransparent, bool &us
                 break;
 
             if (mProxyTransparentResolvesHost)
-                proxyFlags |= nsISocketProvider::PROXY_RESOLVES_HOST;
+                controlFlags |= nsISocketProvider::PROXY_RESOLVES_HOST;
             
             if (mConnectionFlags & nsISocketTransport::ANONYMOUS_CONNECT)
-                proxyFlags |= nsISocketProvider::ANONYMOUS_CONNECT;
+                controlFlags |= nsISocketProvider::ANONYMOUS_CONNECT;
 
             if (mConnectionFlags & nsISocketTransport::NO_PERMANENT_STORAGE)
-                proxyFlags |= nsISocketProvider::NO_PERMANENT_STORAGE;
+                controlFlags |= nsISocketProvider::NO_PERMANENT_STORAGE;
+
+            if (mConnectionFlags & nsISocketTransport::MITM_OK)
+                controlFlags |= nsISocketProvider::MITM_OK;
 
             nsCOMPtr<nsISupports> secinfo;
             if (i == 0) {
@@ -1116,7 +1136,7 @@ nsSocketTransport::BuildSocket(PRFileDesc *&fd, bool &proxyTransparent, bool &us
                                          mHttpsProxy ? proxyHost : host,
                                          mHttpsProxy ? proxyPort : port,
                                          proxyHost, proxyPort,
-                                         proxyFlags, &fd,
+                                         controlFlags, &fd,
                                          getter_AddRefs(secinfo));
 
                 if (NS_SUCCEEDED(rv) && !fd) {
@@ -1130,10 +1150,10 @@ nsSocketTransport::BuildSocket(PRFileDesc *&fd, bool &proxyTransparent, bool &us
                 // to the stack (such as pushing an io layer)
                 rv = provider->AddToSocket(mNetAddr.raw.family,
                                            host, port, proxyHost, proxyPort,
-                                           proxyFlags, fd,
+                                           controlFlags, fd,
                                            getter_AddRefs(secinfo));
             }
-            // proxyFlags = 0; not used below this point...
+            // controlFlags = 0; not used below this point...
             if (NS_FAILED(rv))
                 break;
 
@@ -2444,7 +2464,7 @@ nsSocketTransport::GetInterfaces(uint32_t *count, nsIID * **array)
 }
 
 NS_IMETHODIMP
-nsSocketTransport::GetHelperForLanguage(uint32_t language, nsISupports **_retval)
+nsSocketTransport::GetScriptableHelper(nsIXPCScriptable **_retval)
 {
     *_retval = nullptr;
     return NS_OK;
@@ -2468,13 +2488,6 @@ NS_IMETHODIMP
 nsSocketTransport::GetClassID(nsCID * *aClassID)
 {
     *aClassID = nullptr;
-    return NS_OK;
-}
-
-NS_IMETHODIMP
-nsSocketTransport::GetImplementationLanguage(uint32_t *aImplementationLanguage)
-{
-    *aImplementationLanguage = nsIProgrammingLanguage::CPLUSPLUS;
     return NS_OK;
 }
 

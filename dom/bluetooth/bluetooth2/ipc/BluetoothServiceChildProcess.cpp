@@ -147,20 +147,34 @@ BluetoothServiceChildProcess::FetchUuidsInternal(
   return NS_OK;
 }
 
-nsresult
+void
 BluetoothServiceChildProcess::StopDiscoveryInternal(
-                                              BluetoothReplyRunnable* aRunnable)
+   BluetoothReplyRunnable* aRunnable)
 {
   SendRequest(aRunnable, StopDiscoveryRequest());
-  return NS_OK;
 }
 
-nsresult
+void
 BluetoothServiceChildProcess::StartDiscoveryInternal(
-                                              BluetoothReplyRunnable* aRunnable)
+  BluetoothReplyRunnable* aRunnable)
 {
   SendRequest(aRunnable, StartDiscoveryRequest());
-  return NS_OK;
+}
+
+void
+BluetoothServiceChildProcess::StopLeScanInternal(
+  const nsAString& aScanUuid,
+  BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable, StopLeScanRequest(nsString(aScanUuid)));
+}
+
+void
+BluetoothServiceChildProcess::StartLeScanInternal(
+  const nsTArray<nsString>& aServiceUuids,
+  BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable, StartLeScanRequest(aServiceUuids));
 }
 
 nsresult
@@ -329,7 +343,7 @@ BluetoothServiceChildProcess::ConfirmReceivingFile(
                 ConfirmReceivingFileRequest(nsString(aDeviceAddress)));
     return;
   }
-  
+
   SendRequest(aRunnable,
               DenyReceivingFileRequest(nsString(aDeviceAddress)));
 }
@@ -490,6 +504,38 @@ BluetoothServiceChildProcess::GattClientWriteCharacteristicValueInternal(
                                               aCharacteristicId,
                                               aWriteType,
                                               aValue));
+}
+
+void
+BluetoothServiceChildProcess::GattClientReadDescriptorValueInternal(
+  const nsAString& aAppUuid,
+  const BluetoothGattServiceId& aServiceId,
+  const BluetoothGattId& aCharacteristicId,
+  const BluetoothGattId& aDescriptorId,
+  BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable,
+    GattClientReadDescriptorValueRequest(nsString(aAppUuid),
+                                         aServiceId,
+                                         aCharacteristicId,
+                                         aDescriptorId));
+}
+
+void
+BluetoothServiceChildProcess::GattClientWriteDescriptorValueInternal(
+  const nsAString& aAppUuid,
+  const BluetoothGattServiceId& aServiceId,
+  const BluetoothGattId& aCharacteristicId,
+  const BluetoothGattId& aDescriptorId,
+  const nsTArray<uint8_t>& aValue,
+  BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable,
+    GattClientWriteDescriptorValueRequest(nsString(aAppUuid),
+                                          aServiceId,
+                                          aCharacteristicId,
+                                          aDescriptorId,
+                                          aValue));
 }
 
 nsresult

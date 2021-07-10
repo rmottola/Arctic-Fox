@@ -9,18 +9,14 @@
 
 #include "mozilla/dom/AudioChannelBinding.h"
 #include "AudioNode.h"
-#include "nsIDOMEventListener.h"
 #include "nsIAudioChannelAgent.h"
-#include "AudioChannelCommon.h"
 
 namespace mozilla {
 namespace dom {
 
 class AudioContext;
-class EventProxyHandler;
 
 class AudioDestinationNode final : public AudioNode
-                                 , public nsIDOMEventListener
                                  , public nsIAudioChannelAgentCallback
                                  , public MainThreadMediaStreamListener
 {
@@ -58,12 +54,9 @@ public:
 
   void OfflineShutdown();
 
-  // nsIDOMEventListener - by proxy
-  NS_IMETHOD HandleEvent(nsIDOMEvent* aEvent) override;
-
   AudioChannel MozAudioChannelType() const;
 
-  virtual void NotifyMainThreadStateChanged() override;
+  virtual void NotifyMainThreadStreamFinished() override;
   void FireOfflineCompletionEvent();
 
   // An amount that should be added to the MediaStream's current time to
@@ -93,7 +86,7 @@ private:
   void SetMozAudioChannelType(AudioChannel aValue, ErrorResult& aRv);
   bool CheckAudioChannelPermissions(AudioChannel aValue);
 
-  void SetCanPlay(bool aCanPlay);
+  void SetCanPlay(float aVolume, bool aMuted);
 
   void NotifyStableState();
   void ScheduleStableStateNotification();
@@ -103,13 +96,11 @@ private:
 
   nsCOMPtr<nsIAudioChannelAgent> mAudioChannelAgent;
 
-  nsRefPtr<EventProxyHandler> mEventProxyHelper;
   nsRefPtr<Promise> mOfflineRenderingPromise;
 
   // Audio Channel Type.
   AudioChannel mAudioChannel;
   bool mIsOffline;
-  bool mHasFinished;
   bool mAudioChannelAgentPlaying;
 
   TimeStamp mStartedBlockingDueToBeingOnlyNode;

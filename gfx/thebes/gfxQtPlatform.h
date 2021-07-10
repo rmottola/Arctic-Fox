@@ -27,8 +27,8 @@ public:
     }
 
     virtual already_AddRefed<gfxASurface>
-      CreateOffscreenSurface(const IntSize& size,
-                             gfxContentType contentType) override;
+      CreateOffscreenSurface(const IntSize& aSize,
+                             gfxImageFormat aFormat) override;
 
     virtual already_AddRefed<mozilla::gfx::ScaledFont>
       GetScaledFontForFont(mozilla::gfx::DrawTarget* aTarget, gfxFont *aFont) override;
@@ -81,6 +81,10 @@ public:
 #endif
 
     virtual int GetScreenDepth() const override;
+
+    bool AccelerateLayersByDefault() override {
+      return true;
+    }
 
 protected:
     static gfxFontconfigUtils *sFontconfigUtils;

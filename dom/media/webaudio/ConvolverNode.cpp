@@ -22,7 +22,7 @@ NS_INTERFACE_MAP_END_INHERITING(AudioNode)
 NS_IMPL_ADDREF_INHERITED(ConvolverNode, AudioNode)
 NS_IMPL_RELEASE_INHERITED(ConvolverNode, AudioNode)
 
-class ConvolverNodeEngine : public AudioNodeEngine
+class ConvolverNodeEngine final : public AudioNodeEngine
 {
   typedef PlayingRefChangeHandler PlayingRefChanged;
 public:
@@ -241,7 +241,7 @@ ConvolverNode::SetBuffer(JSContext* aCx, AudioBuffer* aBuffer, ErrorResult& aRv)
   mBuffer = aBuffer;
 
   // Send the buffer to the stream
-  AudioNodeStream* ns = static_cast<AudioNodeStream*>(mStream.get());
+  AudioNodeStream* ns = mStream;
   MOZ_ASSERT(ns, "Why don't we have a stream here?");
   if (mBuffer) {
     uint32_t length = mBuffer->Length();

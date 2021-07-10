@@ -79,6 +79,7 @@
     start()
       .then(testAuxiliaryWindow)
       .then(testNestedWindow)
+      .then(unregister)
       .catch(function(e) {
         ok(false, "Some test failed with error " + e);
       }).then(SimpleTest.finish);
@@ -86,6 +87,8 @@
 
   SimpleTest.waitForExplicitFinish();
   SpecialPowers.pushPrefEnv({"set": [
+    ["dom.serviceWorkers.exemptFromPerDomainMax", true],
+    ["dom.serviceWorkers.interception.enabled", true],
     ["dom.serviceWorkers.enabled", true],
     ["dom.serviceWorkers.testing.enabled", true]
   ]}, runTest);

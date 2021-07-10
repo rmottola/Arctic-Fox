@@ -48,7 +48,6 @@ public:
 
   static const int MAX_PACKET_LENGTH = 0xFFFE;
 
-  virtual ~BluetoothOppManager();
   static BluetoothOppManager* Get();
   void ClientDataHandler(mozilla::ipc::UnixSocketBuffer* aMessage);
   void ServerDataHandler(mozilla::ipc::UnixSocketBuffer* aMessage);
@@ -70,10 +69,19 @@ public:
   bool ExtractBlobHeaders();
   void CheckPutFinal(uint32_t aNumRead);
 
+protected:
+  virtual ~BluetoothOppManager();
+
 private:
   BluetoothOppManager();
   bool Init();
   void HandleShutdown();
+
+#ifdef MOZ_B2G_BT_API_V2
+  // Removed in bluetooth2
+#else
+  void HandleVolumeStateChanged(nsISupports* aSubject);
+#endif
 
   void StartFileTransfer();
   void StartSendingNextFile();

@@ -6,10 +6,10 @@
  * OptimizationSites methods work as expected.
  */
 
-const { RecordingUtils } = devtools.require("devtools/performance/recording-utils");
+const RecordingUtils = devtools.require("devtools/performance/recording-utils");
 
 function test() {
-  let { JITOptimizations, OptimizationSite } = devtools.require("devtools/shared/profiler/jit");
+  let { JITOptimizations, OptimizationSite } = devtools.require("devtools/performance/jit");
 
   let rawSites = [];
   rawSites.push(gRawSite2);

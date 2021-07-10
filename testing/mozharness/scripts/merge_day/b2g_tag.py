@@ -31,11 +31,11 @@ from mozharness.base.vcs.vcsbase import MercurialScript
 # B2GTag {{{1
 class B2GTag(TransferMixin, MercurialScript):
     config_options = [
-        [['--goanna-repo', ], {
+        [['--gecko-repo', ], {
             "action": "extend",
-            "dest": "goanna_repos",
+            "dest": "gecko_repos",
             "type": "string",
-            "help": "Specify which goanna repo(s) to tag, along with gaia."
+            "help": "Specify which gecko repo(s) to tag, along with gaia."
         }],
         [['--date-string', ], {
             "action": "store",
@@ -45,7 +45,7 @@ class B2GTag(TransferMixin, MercurialScript):
             "help": "Specify the date string to use in the tag name."
         }],
     ]
-    goanna_repos = None
+    gecko_repos = None
 
     def __init__(self, require_config_file=True):
         super(B2GTag, self).__init__(
@@ -72,7 +72,7 @@ class B2GTag(TransferMixin, MercurialScript):
         """ Make sure we're set up correctly before we start cloning or tagging
             anything.
 
-            First, verify any specified goanna_repos exist in the b2g_branches
+            First, verify any specified gecko_repos exist in the b2g_branches
             dict.
 
             Next, make sure we can reach mapper and it's working.
@@ -80,9 +80,9 @@ class B2GTag(TransferMixin, MercurialScript):
             If there are any errors, compile the list and fatal().
             """
         sanity_message = ""
-        if self.config.get("goanna_repos"):
+        if self.config.get("gecko_repos"):
             bad_branch_names = []
-            for repo_name in self.query_goanna_repos():
+            for repo_name in self.query_gecko_repos():
                 if repo_name not in self.config["b2g_branches"].keys():
                     bad_branch_names.append(repo_name)
             if bad_branch_names:
@@ -99,17 +99,17 @@ class B2GTag(TransferMixin, MercurialScript):
         if sanity_message:
             self.fatal(sanity_message)
 
-    def query_goanna_repos(self):
-        """ Which goanna repos + gaia are we converting?
+    def query_gecko_repos(self):
+        """ Which gecko repos + gaia are we converting?
             By default everything in self.config['b2g_branches'],
-            but we can override that list with --goanna-repos.
+            but we can override that list with --gecko-repos.
             """
-        if self.goanna_repos:
-            return self.goanna_repos
-        self.goanna_repos = list(self.config.get("goanna_repos",
+        if self.gecko_repos:
+            return self.gecko_repos
+        self.gecko_repos = list(self.config.get("gecko_repos",
                                 self.config['b2g_branches'].keys()))
-        self.goanna_repos.sort()
-        return self.goanna_repos
+        self.gecko_repos.sort()
+        return self.gecko_repos
 
     def query_repo_pull_config(self, repo_name, b2g_branch_config):
         """ Build the repo pull url for a repo. This is for convenience.
@@ -182,7 +182,7 @@ class B2GTag(TransferMixin, MercurialScript):
         return b2g_branch_config["tag_name"].split("_%")[0]
 
     def hg_tag(self, repo_name, b2g_branch_config):
-        """ Attempt to tag and push goanna.  This assumes the trees are open.
+        """ Attempt to tag and push gecko.  This assumes the trees are open.
 
             On failure, throw a VCSException.
             """
@@ -257,7 +257,7 @@ class B2GTag(TransferMixin, MercurialScript):
         dirs = self.query_abs_dirs()
         hg = self.query_exe("hg", return_type="list")
         git = self.query_exe("git", return_type="list")
-        hg_repos = self.query_goanna_repos()
+        hg_repos = self.query_gecko_repos()
         hg_strip_error_list = [{
             'substr': r'''abort: empty revision set''', 'level': INFO,
             'explanation': "Nothing to clean up; we're good!",
@@ -322,7 +322,7 @@ class B2GTag(TransferMixin, MercurialScript):
         dirs = self.query_abs_dirs()
         git = self.query_exe("git", return_type="list")
         hg_repos = []
-        for repo_name in self.query_goanna_repos():
+        for repo_name in self.query_gecko_repos():
             b2g_branch_config = self.config['b2g_branches'][repo_name]
             hg_repos.append(self.query_repo_pull_config(repo_name, b2g_branch_config))
         self.debug("HG repos: %s" % pprint.pformat(hg_repos))
@@ -343,10 +343,10 @@ class B2GTag(TransferMixin, MercurialScript):
             )
 
     def push_loop(self):
-        """ Create the tag and push for each goanna+gaia pair.
+        """ Create the tag and push for each gecko+gaia pair.
             This sometimes requires a pull+rebase, hence the loop.
             """
-        for repo_name in self.query_goanna_repos():
+        for repo_name in self.query_gecko_repos():
             b2g_branch_config = self.config['b2g_branches'][repo_name]
             repo_config = self.query_repo_pull_config(repo_name, b2g_branch_config)
             super(B2GTag, self).pull(repos=[repo_config])

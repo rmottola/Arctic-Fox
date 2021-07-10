@@ -117,6 +117,7 @@ nsTArray_base<Alloc, Copy>::ExtendCapacity(size_type aLength,
 {
   mozilla::CheckedInt<size_type> newLength = aLength;
   newLength += aCount;
+
   if (!newLength.isValid()) {
     return ActualAlloc::FailureResult();
   }
@@ -298,7 +299,7 @@ nsTArray_base<Alloc, Copy>::InsertSlotsAt(index_type aIndex, size_type aCount,
   MOZ_ASSERT(aIndex <= Length(), "Bogus insertion index");
 
 
-  if (!Alloc::Successful(this->ExtendCapacity<ActualAlloc>(Length(), aCount, aElemSize))) {
+  if (!ActualAlloc::Successful(this->ExtendCapacity<ActualAlloc>(Length(), aCount, aElemSize))) {
     return ActualAlloc::FailureResult();
   }
 

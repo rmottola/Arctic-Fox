@@ -18,7 +18,6 @@
 #include "mozilla/unused.h"
 #include "nsIAppsService.h"
 #include "nsIObserverService.h"
-#include "nsIDOMDeviceStorage.h"
 #include "nsIDOMEventListener.h"
 #include "nsIScriptSecurityManager.h"
 #include "Navigator.h"
@@ -202,6 +201,7 @@ nsDOMCameraControl::nsDOMCameraControl(uint32_t aCameraId,
   , mGetCameraPromise(aPromise)
   , mWindow(aWindow)
   , mPreviewState(CameraControlListener::kPreviewStopped)
+  , mRecording(false)
   , mSetInitialConfig(false)
 {
   DOM_CAMERA_LOGT("%s:%d : this=%p\n", __func__, __LINE__, this);
@@ -743,40 +743,39 @@ nsDOMCameraControl::StartRecording(const CameraStartRecordingOptions& aOptions,
     return nullptr;
   }
 
-  if (mStartRecordingPromise) {
+  if (mStartRecordingPromise || mRecording) {
     promise->MaybeReject(NS_ERROR_IN_PROGRESS);
     return promise.forget();
   }
 
-  NotifyRecordingStatusChange(NS_LITERAL_STRING("starting"));
-
-#ifdef MOZ_B2G
-  if (!mAudioChannelAgent) {
-    mAudioChannelAgent = do_CreateInstance("@mozilla.org/audiochannelagent;1");
-    if (mAudioChannelAgent) {
-      // Camera app will stop recording when it falls to the background, so no callback is necessary.
-      mAudioChannelAgent->Init(mWindow, (int32_t)AudioChannel::Content, nullptr);
-      // Video recording doesn't output any sound, so it's not necessary to check canPlay.
-      int32_t canPlay;
-      mAudioChannelAgent->StartPlaying(&canPlay);
-    }
-  }
-#endif
-
-  nsCOMPtr<nsIDOMDOMRequest> request;
-  mDSFileDescriptor = new DeviceStorageFileDescriptor();
-  aRv = aStorageArea.CreateFileDescriptor(aFilename, mDSFileDescriptor.get(),
-                                          getter_AddRefs(request));
+  aRv = NotifyRecordingStatusChange(NS_LITERAL_STRING("starting"));
   if (aRv.Failed()) {
+    return nullptr;
+  }
+
+  mDSFileDescriptor = new DeviceStorageFileDescriptor();
+  nsRefPtr<DOMRequest> request = aStorageArea.CreateFileDescriptor(aFilename,
+                                                                   mDSFileDescriptor.get(),
+                                                                   aRv);
+  if (aRv.Failed()) {
+    NotifyRecordingStatusChange(NS_LITERAL_STRING("shutdown"));
     return nullptr;
   }
 
   mStartRecordingPromise = promise;
   mOptions = aOptions;
 
+  EventListenerManager* elm = request->GetOrCreateListenerManager();
+  if (!elm) {
+    NotifyRecordingStatusChange(NS_LITERAL_STRING("shutdown"));
+    aRv.Throw(NS_ERROR_UNEXPECTED);
+    return nullptr;
+  }
+
+  mRecording = true;
   nsCOMPtr<nsIDOMEventListener> listener = new StartRecordingHelper(this);
-  request->AddEventListener(NS_LITERAL_STRING("success"), listener, false);
-  request->AddEventListener(NS_LITERAL_STRING("error"), listener, false);
+  elm->AddEventListener(NS_LITERAL_STRING("success"), listener, false, false);
+  elm->AddEventListener(NS_LITERAL_STRING("error"), listener, false, false);
   return promise.forget();
 }
 
@@ -787,6 +786,10 @@ nsDOMCameraControl::OnCreatedFileDescriptor(bool aSucceeded)
 
   if (!mCameraControl) {
     rv = NS_ERROR_NOT_AVAILABLE;
+  } else if (!mRecording) {
+    // Race condition where StopRecording comes in before we issue
+    // the start recording request to Gonk
+    rv = NS_ERROR_ABORT;
   } else if (aSucceeded && mDSFileDescriptor->mFileDescriptor.IsValid()) {
     ICameraControl::StartRecordingOptions o;
 
@@ -818,13 +821,8 @@ nsDOMCameraControl::StopRecording(ErrorResult& aRv)
   DOM_CAMERA_LOGT("%s:%d : this=%p\n", __func__, __LINE__, this);
   THROW_IF_NO_CAMERACONTROL();
 
-#ifdef MOZ_B2G
-  if (mAudioChannelAgent) {
-    mAudioChannelAgent->StopPlaying();
-    mAudioChannelAgent = nullptr;
-  }
-#endif
-
+  ReleaseAudioChannelAgent();
+  mRecording = false;
   aRv = mCameraControl->StopRecording();
 }
 
@@ -958,8 +956,10 @@ nsDOMCameraControl::TakePicture(const CameraPictureOptions& aOptions,
     if (s.width && s.height) {
       mCameraControl->Set(CAMERA_PARAM_PICTURE_SIZE, s);
     }
+    if (!aOptions.mFileFormat.IsEmpty()) {
+      mCameraControl->Set(CAMERA_PARAM_PICTURE_FILEFORMAT, aOptions.mFileFormat);
+    }
     mCameraControl->Set(CAMERA_PARAM_PICTURE_ROTATION, aOptions.mRotation);
-    mCameraControl->Set(CAMERA_PARAM_PICTURE_FILEFORMAT, aOptions.mFileFormat);
     mCameraControl->Set(CAMERA_PARAM_PICTURE_DATETIME, aOptions.mDateTime);
     mCameraControl->SetLocation(p);
   }
@@ -1032,15 +1032,54 @@ nsDOMCameraControl::Shutdown()
   }
 }
 
+void
+nsDOMCameraControl::ReleaseAudioChannelAgent()
+{
+#ifdef MOZ_B2G
+  if (mAudioChannelAgent) {
+    mAudioChannelAgent->StopPlaying();
+    mAudioChannelAgent = nullptr;
+  }
+#endif
+}
+
 nsresult
 nsDOMCameraControl::NotifyRecordingStatusChange(const nsString& aMsg)
 {
   NS_ENSURE_TRUE(mWindow, NS_ERROR_FAILURE);
 
-  return MediaManager::NotifyRecordingStatusChange(mWindow,
-                                                   aMsg,
-                                                   true /* aIsAudio */,
-                                                   true /* aIsVideo */);
+  if (aMsg.EqualsLiteral("shutdown")) {
+    ReleaseAudioChannelAgent();
+  }
+
+  nsresult rv = MediaManager::NotifyRecordingStatusChange(mWindow,
+                                                          aMsg,
+                                                          true /* aIsAudio */,
+                                                          true /* aIsVideo */);
+
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+#ifdef MOZ_B2G
+  if (aMsg.EqualsLiteral("starting") && !mAudioChannelAgent) {
+    mAudioChannelAgent = do_CreateInstance("@mozilla.org/audiochannelagent;1");
+    if (!mAudioChannelAgent) {
+      return NS_ERROR_UNEXPECTED;
+    }
+
+    // Camera app will stop recording when it falls to the background, so no callback is necessary.
+    mAudioChannelAgent->Init(mWindow, (int32_t)AudioChannel::Content, nullptr);
+    // Video recording doesn't output any sound, so it's not necessary to check canPlay.
+    float volume = 0.0;
+    bool muted = true;
+    rv = mAudioChannelAgent->StartPlaying(&volume, &muted);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+#endif
+  return rv;
 }
 
 already_AddRefed<Promise>
@@ -1224,7 +1263,7 @@ nsDOMCameraControl::OnRecorderStateChange(CameraControlListener::RecorderState a
                                           int32_t aArg, int32_t aTrackNum)
 {
   // For now, we do nothing with 'aStatus' and 'aTrackNum'.
-  DOM_CAMERA_LOGT("%s:%d : this=%p\n", __func__, __LINE__, this);
+  DOM_CAMERA_LOGT("%s:%d : this=%p, state=%u\n", __func__, __LINE__, this, aState);
   MOZ_ASSERT(NS_IsMainThread());
 
   ErrorResult ignored;
@@ -1374,7 +1413,7 @@ nsDOMCameraControl::OnFacesDetected(const nsTArray<ICameraControl::Face>& aFaces
 
   if (faces.SetCapacity(len, fallible)) {
     for (uint32_t i = 0; i < len; ++i) {
-      *faces.AppendElement() =
+      *faces.AppendElement(fallible) =
         new DOMCameraDetectedFace(static_cast<DOMMediaStream*>(this), aFaces[i]);
     }
   }
@@ -1417,7 +1456,7 @@ nsDOMCameraControl::OnTakePictureComplete(nsIDOMBlob* aPicture)
 void
 nsDOMCameraControl::OnUserError(CameraControlListener::UserContext aContext, nsresult aError)
 {
-  DOM_CAMERA_LOGI("DOM OnUserError : this=%paContext=%u, aError=0x%x\n",
+  DOM_CAMERA_LOGI("DOM OnUserError : this=%p, aContext=%u, aError=0x%x\n",
     this, aContext, aError);
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -1470,6 +1509,8 @@ nsDOMCameraControl::OnUserError(CameraControlListener::UserContext aContext, nsr
 
     case CameraControlListener::kInStartRecording:
       promise = mStartRecordingPromise.forget();
+      mRecording = false;
+      NotifyRecordingStatusChange(NS_LITERAL_STRING("shutdown"));
       break;
 
     case CameraControlListener::kInStartFaceDetection:

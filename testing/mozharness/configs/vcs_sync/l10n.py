@@ -12,17 +12,17 @@ GECKO_CONFIG_TEMPLATE = {
     'mozilla-release': {
         'generate_git_notes': False, # we can change this when bug 1034725 is resolved
         'mapper': {
-            'project': 'gitmo-goanna-l10n',
+            'project': 'gitmo-gecko-l10n',
             'url': 'https://api.pub.build.mozilla.org/mapper'
         },
         'locales_file_url': 'https://hg.mozilla.org/releases/mozilla-release/raw-file/default/b2g/locales/all-locales',
         'hg_url': 'https://hg.mozilla.org/releases/l10n/mozilla-release/%(locale)s',
         'targets': [{
-            'target_dest': 'releases-l10n-%(locale)s-goanna/.git',
+            'target_dest': 'releases-l10n-%(locale)s-gecko/.git',
             'test_push': True,
             'vcs': 'git'
         }, {
-            'target_dest': 'gitmo-goanna-l10n-%(locale)s',
+            'target_dest': 'gitmo-gecko-l10n-%(locale)s',
         }],
         'tag_config': {
             'tag_regexes': [
@@ -34,17 +34,17 @@ GECKO_CONFIG_TEMPLATE = {
     'mozilla-beta': {
         'generate_git_notes': False, # we can change this when bug 1034725 is resolved
         'mapper': {
-            'project': 'gitmo-goanna-l10n',
+            'project': 'gitmo-gecko-l10n',
             'url': 'https://api.pub.build.mozilla.org/mapper'
         },
         'locales_file_url': 'https://hg.mozilla.org/releases/mozilla-beta/raw-file/default/b2g/locales/all-locales',
         'hg_url': 'https://hg.mozilla.org/releases/l10n/mozilla-beta/%(locale)s',
         'targets': [{
-            'target_dest': 'releases-l10n-%(locale)s-goanna/.git',
+            'target_dest': 'releases-l10n-%(locale)s-gecko/.git',
             'test_push': True,
             'vcs': 'git'
         }, {
-            'target_dest': 'gitmo-goanna-l10n-%(locale)s',
+            'target_dest': 'gitmo-gecko-l10n-%(locale)s',
         }],
         'tag_config': {
             'tag_regexes': [
@@ -56,17 +56,17 @@ GECKO_CONFIG_TEMPLATE = {
     'mozilla-aurora': {
         'generate_git_notes': False, # we can change this when bug 1034725 is resolved
         'mapper': {
-            'project': 'gitmo-goanna-l10n',
+            'project': 'gitmo-gecko-l10n',
             'url': 'https://api.pub.build.mozilla.org/mapper'
         },
         'locales_file_url': 'https://hg.mozilla.org/releases/mozilla-aurora/raw-file/default/b2g/locales/all-locales',
         'hg_url': 'https://hg.mozilla.org/releases/l10n/mozilla-aurora/%(locale)s',
         'targets': [{
-            'target_dest': 'releases-l10n-%(locale)s-goanna/.git',
+            'target_dest': 'releases-l10n-%(locale)s-gecko/.git',
             'test_push': True,
             'vcs': 'git'
         }, {
-            'target_dest': 'gitmo-goanna-l10n-%(locale)s',
+            'target_dest': 'gitmo-gecko-l10n-%(locale)s',
         }],
         'tag_config': {
             'tag_regexes': [
@@ -78,17 +78,17 @@ GECKO_CONFIG_TEMPLATE = {
     'mozilla-central': {
         'generate_git_notes': False, # we can change this when bug 1034725 is resolved
         'mapper': {
-            'project': 'gitmo-goanna-l10n',
+            'project': 'gitmo-gecko-l10n',
             'url': 'https://api.pub.build.mozilla.org/mapper'
         },
         'locales_file_url': 'https://hg.mozilla.org/mozilla-central/raw-file/default/b2g/locales/all-locales',
         'hg_url': 'https://hg.mozilla.org/l10n-central/%(locale)s',
         'targets': [{
-            'target_dest': 'releases-l10n-%(locale)s-goanna/.git',
+            'target_dest': 'releases-l10n-%(locale)s-gecko/.git',
             'test_push': True,
             'vcs': 'git'
         }, {
-            'target_dest': 'gitmo-goanna-l10n-%(locale)s',
+            'target_dest': 'gitmo-gecko-l10n-%(locale)s',
         }],
         'tag_config': {
             'tag_regexes': [
@@ -98,7 +98,7 @@ GECKO_CONFIG_TEMPLATE = {
     },
 }
 
-# Build goanna_config
+# Build gecko_config
 GECKO_CONFIG = {}
 for version, branch in GECKO_BRANCHES.items():
     GECKO_CONFIG[branch] = deepcopy(GECKO_CONFIG_TEMPLATE[branch])
@@ -114,7 +114,7 @@ config = {
     "conversion_type": "b2g-l10n",
     "combined_mapfile": "l10n-mapfile",
     "l10n_config": {
-        "goanna_config": GECKO_CONFIG,
+        "gecko_config": GECKO_CONFIG,
         "gaia_config": {
             'v2_1': {
                 'generate_git_notes': False, # we can change this when bug 1034725 is resolved
@@ -252,8 +252,8 @@ config = {
     },
 
     "remote_targets": {
-        "gitmo-goanna-l10n-%(locale)s": {
-            "repo": 'gitolite3@git.mozilla.org:releases/l10n/%(locale)s/goanna.git',
+        "gitmo-gecko-l10n-%(locale)s": {
+            "repo": 'gitolite3@git.mozilla.org:releases/l10n/%(locale)s/gecko.git',
             "ssh_key": "~/.ssh/vcs-sync_rsa",
             "vcs": "git",
         },

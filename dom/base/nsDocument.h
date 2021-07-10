@@ -18,7 +18,6 @@
 #include "nsCRT.h"
 #include "nsWeakReference.h"
 #include "nsWeakPtr.h"
-#include "nsVoidArray.h"
 #include "nsTArray.h"
 #include "nsIDOMXMLDocument.h"
 #include "nsIDOMDocumentXBL.h"
@@ -68,6 +67,7 @@
 #include "nsIDOMXPathEvaluator.h"
 #include "jsfriendapi.h"
 #include "ImportManager.h"
+#include "mozilla/LinkedList.h"
 
 #define XML_DECLARATION_BITS_DECLARATION_EXISTS   (1 << 0)
 #define XML_DECLARATION_BITS_ENCODING_EXISTS      (1 << 1)
@@ -86,7 +86,6 @@ class nsDOMNavigationTiming;
 class nsWindowSizes;
 class nsHtml5TreeOpExecutor;
 class nsDocumentOnStack;
-class nsPointerLockPermissionRequest;
 class nsISecurityConsoleMessage;
 class nsPIBoxObject;
 
@@ -97,8 +96,34 @@ class BoxObject;
 class UndoManager;
 struct LifecycleCallbacks;
 class CallbackFunction;
-}
-}
+
+struct FullscreenRequest : public LinkedListElement<FullscreenRequest>
+{
+  explicit FullscreenRequest(Element* aElement);
+  ~FullscreenRequest();
+
+  Element* GetElement() const { return mElement; }
+  nsDocument* GetDocument() const { return mDocument; }
+
+private:
+  nsRefPtr<Element> mElement;
+  nsRefPtr<nsDocument> mDocument;
+
+public:
+  nsRefPtr<gfx::VRHMDInfo> mVRHMDDevice;
+  // This value should be true if the fullscreen request is
+  // originated from chrome code.
+  bool mIsCallerChrome = false;
+  // This value denotes whether we should trigger a NewOrigin event if
+  // requesting fullscreen in its document causes the origin which is
+  // fullscreen to change. We may want *not* to trigger that event if
+  // we're calling RequestFullScreen() as part of a continuation of a
+  // request in a subdocument in different process, whereupon the caller
+  // need to send some notification itself with the real origin.
+  bool mShouldNotifyNewOrigin = true;
+};
+} // namespace dom
+} // namespace mozilla
 
 /**
  * Right now our identifier map entries contain information for 'name'
@@ -151,8 +176,8 @@ public:
   /**
    * Returns the list of all elements associated with this id.
    */
-  const nsSmallVoidArray* GetIdElements() const {
-    return &mIdContentList;
+  const nsTArray<Element*>& GetIdElements() const {
+    return mIdContentList;
   }
   /**
    * If this entry has a non-null image element set (using SetImageElement),
@@ -228,7 +253,7 @@ private:
 
   // empty if there are no elements with this ID.
   // The elements are stored as weak pointers.
-  nsSmallVoidArray mIdContentList;
+  nsTArray<Element*> mIdContentList;
   nsRefPtr<nsBaseContentList> mNameContentList;
   nsAutoPtr<nsTHashtable<ChangeCallbackEntry> > mChangeCallbacks;
   nsRefPtr<Element> mImageElement;
@@ -404,7 +429,8 @@ protected:
     CandidateMap;
 
   // Hashtable for custom element definitions in web components.
-  // Custom prototypes are in the document's compartment.
+  // Custom prototypes are stored in the compartment where
+  // registerElement was called.
   DefinitionMap mCustomDefinitions;
 
   // The "upgrade candidates map" from the web components spec. Maps from a
@@ -945,6 +971,8 @@ public:
    */
   void OnAppThemeChanged();
 
+  void ReportUseCounters();
+
 private:
   void AddOnDemandBuiltInUASheet(mozilla::CSSStyleSheet* aSheet);
   nsRadioGroupStruct* GetRadioGroupInternal(const nsAString& aName) const;
@@ -1115,6 +1143,9 @@ public:
                                  ReferrerPolicy aReferrerPolicy) override;
   virtual void ForgetImagePreload(nsIURI* aURI) override;
 
+  virtual void MaybePreconnect(nsIURI* uri,
+                               mozilla::CORSMode aCORSMode) override;
+
   virtual void PreloadStyle(nsIURI* uri, const nsAString& charset,
                             const nsAString& aCrossOriginAttr,
                             ReferrerPolicy aReferrerPolicy) override;
@@ -1135,7 +1166,7 @@ public:
   virtual void SetChangeScrollPosWhenScrollingToRef(bool aValue) override;
 
   virtual Element *GetElementById(const nsAString& aElementId) override;
-  virtual const nsSmallVoidArray* GetAllElementsForId(const nsAString& aElementId) const override;
+  virtual const nsTArray<Element*>* GetAllElementsForId(const nsAString& aElementId) const override;
 
   virtual Element *LookupImageElement(const nsAString& aElementId) override;
   virtual void MozSetImageElement(const nsAString& aImageElementId,
@@ -1155,6 +1186,16 @@ public:
   // the frame and any subframes.
   virtual void GetPlugins(nsTArray<nsIObjectLoadingContent*>& aPlugins) override;
 
+  // Adds an element to mResponsiveContent when the element is
+  // added to the tree.
+  virtual nsresult AddResponsiveContent(nsIContent* aContent) override;
+  // Removes an element from mResponsiveContent when the element is
+  // removed from the tree.
+  virtual void RemoveResponsiveContent(nsIContent* aContent) override;
+  // Notifies any responsive content added by AddResponsiveContent upon media
+  // features values changing.
+  virtual void NotifyMediaFeatureValuesChanged() override;
+
   virtual nsresult GetStateObject(nsIVariant** aResult) override;
 
   virtual nsDOMNavigationTiming* GetNavigationTiming() const override;
@@ -1163,8 +1204,8 @@ public:
   virtual Element* FindImageMap(const nsAString& aNormalizedMapName) override;
 
   virtual Element* GetFullScreenElement() override;
-  virtual void AsyncRequestFullScreen(Element* aElement,
-                                      mozilla::dom::FullScreenOptions& aOptions) override;
+  virtual void AsyncRequestFullScreen(
+    mozilla::UniquePtr<FullscreenRequest>&& aRequest) override;
   virtual void RestorePreviousFullScreenState() override;
   virtual bool IsFullscreenLeaf() override;
   virtual bool IsFullScreenDoc() override;
@@ -1202,22 +1243,13 @@ public:
   //
   already_AddRefed<nsSimpleContentList> BlockedTrackingNodes() const;
 
-  static void ExitFullscreen(nsIDocument* aDoc);
+  // Do the "fullscreen element ready check" from the fullscreen spec.
+  // It returns true if the given element is allowed to go into fullscreen.
+  bool FullscreenElementReadyCheck(Element* aElement, bool aWasCallerChrome);
 
   // This is called asynchronously by nsIDocument::AsyncRequestFullScreen()
-  // to move this document into full-screen mode if allowed. aWasCallerChrome
-  // should be true when nsIDocument::AsyncRequestFullScreen() was called
-  // by chrome code. aNotifyOnOriginChange denotes whether we should trigger
-  // a MozFullscreenOriginChanged event if requesting fullscreen in this
-  // document causes the origin which is fullscreen to change. We may want to
-  // *not* send this notification if we're calling RequestFullScreen() as part
-  // of a continuation of a request in a subdocument, whereupon the caller will
-  // need to send some notification itself with the origin of the document
-  // which originally requested fullscreen, not *this* document's origin.
-  void RequestFullScreen(Element* aElement,
-                         mozilla::dom::FullScreenOptions& aOptions,
-                         bool aWasCallerChrome,
-                         bool aNotifyOnOriginChange);
+  // to move this document into full-screen mode if allowed.
+  void RequestFullScreen(mozilla::UniquePtr<FullscreenRequest>&& aRequest);
 
   // Removes all elements from the full-screen stack, removing full-scren
   // styles from the top element in the stack.
@@ -1454,11 +1486,14 @@ public:
 
   static void XPCOMShutdown();
 
-  bool mIsTopLevelContentDocument:1;
+  bool mIsTopLevelContentDocument: 1;
+  bool mIsContentDocument: 1;
 
   bool IsTopLevelContentDocument();
-
   void SetIsTopLevelContentDocument(bool aIsTopLevelContentDocument);
+
+  bool IsContentDocument() const;
+  void SetIsContentDocument(bool aIsContentDocument);
 
   js::ExpandoAndGeneration mExpandoAndGeneration;
 
@@ -1501,6 +1536,9 @@ protected:
   void EnsureOnloadBlocker();
 
   void NotifyStyleSheetApplicableStateChanged();
+
+  // Apply the fullscreen state to the document, and trigger related events.
+  void ApplyFullscreen(const FullscreenRequest& aRequest);
 
   nsTArray<nsIObserver*> mCharSetObservers;
 
@@ -1649,8 +1687,6 @@ public:
   // user.
   bool mAllowRelocking:1;
 
-  bool mAsyncFullscreenPending:1;
-
   // Whether we're observing the "app-theme-changed" observer service
   // notification.  We need to keep track of this because we might get multiple
   // OnPageShow notifications in a row without an OnPageHide in between, if
@@ -1664,6 +1700,16 @@ public:
   // The number of pointer lock requests which are cancelled by the user.
   // The value is saturated to kPointerLockRequestLimit+1 = 3.
   uint8_t mCancelledPointerLockRequests:2;
+
+  // Whether we have reported use counters for this document with Telemetry yet.
+  // Normally this is only done at document destruction time, but for image
+  // documents (SVG documents) that are not guaranteed to be destroyed, we
+  // report use counters when the image cache no longer has any imgRequestProxys
+  // pointing to them.  We track whether we ever reported use counters so
+  // that we only report them once for the document.
+  bool mReportedUseCounters:1;
+
+  uint8_t mPendingFullscreenRequests;
 
   uint8_t mXMLDeclarationBits;
 
@@ -1721,10 +1767,10 @@ private:
   void EnableStyleSheetsForSetInternal(const nsAString& aSheetSet,
                                        bool aUpdateCSSLoader);
 
-  // Revoke any pending notifications due to mozRequestAnimationFrame calls
+  // Revoke any pending notifications due to requestAnimationFrame calls
   void RevokeAnimationFrameNotifications();
   // Reschedule any notifications we need to handle
-  // mozRequestAnimationFrame, if it's OK to do so.
+  // requestAnimationFrame, if it's OK to do so.
   void MaybeRescheduleAnimationFrameNotifications();
 
   // These are not implemented and not supported.
@@ -1752,6 +1798,9 @@ private:
   bool mStyledLinksCleared;
 #endif
 
+  // A set of responsive images keyed by address pointer.
+  nsTHashtable< nsPtrHashKey<nsIContent> > mResponsiveContent;
+
   // Member to store out last-selected stylesheet set.
   nsString mLastStyleSheetSet;
 
@@ -1769,6 +1818,11 @@ private:
   // make sure to not keep the image load going when no one cares
   // about it anymore.
   nsRefPtrHashtable<nsURIHashKey, imgIRequest> mPreloadingImages;
+
+  // A list of preconnects initiated by the preloader. This prevents
+  // the same uri from being used more than once, and allows the dom
+  // builder to not repeat the work of the preloader.
+  nsDataHashtable< nsURIHashKey, bool> mPreloadedPreconnects;
 
   // Current depth of picture elements from parser
   int32_t mPreloadPictureDepth;

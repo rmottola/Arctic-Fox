@@ -20,33 +20,33 @@
 namespace mozilla {
 namespace net {
 
-nsHttpConnectionInfo::nsHttpConnectionInfo(const nsACString &physicalHost,
-                                           int32_t physicalPort,
+nsHttpConnectionInfo::nsHttpConnectionInfo(const nsACString &originHost,
+                                           int32_t originPort,
                                            const nsACString &npnToken,
                                            const nsACString &username,
                                            nsProxyInfo *proxyInfo,
                                            bool endToEndSSL)
-    : mAuthenticationPort(443)
+    : mRoutedPort(443)
 {
-    Init(physicalHost, physicalPort, npnToken, username, proxyInfo, endToEndSSL);
+    Init(originHost, originPort, npnToken, username, proxyInfo, endToEndSSL);
 }
 
-nsHttpConnectionInfo::nsHttpConnectionInfo(const nsACString &physicalHost,
-                                           int32_t physicalPort,
+nsHttpConnectionInfo::nsHttpConnectionInfo(const nsACString &originHost,
+                                           int32_t originPort,
                                            const nsACString &npnToken,
                                            const nsACString &username,
                                            nsProxyInfo *proxyInfo,
-                                           const nsACString &logicalHost,
-                                           int32_t logicalPort)
+                                           const nsACString &routedHost,
+                                           int32_t routedPort)
 
 {
     mEndToEndSSL = true; // so DefaultPort() works
-    mAuthenticationPort = logicalPort == -1 ? DefaultPort() : logicalPort;
+    mRoutedPort = routedPort == -1 ? DefaultPort() : routedPort;
 
-    if (!physicalHost.Equals(logicalHost) || (physicalPort != logicalPort)) {
-        mAuthenticationHost = logicalHost;
+    if (!originHost.Equals(routedHost) || (originPort != routedPort)) {
+        mRoutedHost = routedHost;
     }
-    Init(physicalHost, physicalPort, npnToken, username, proxyInfo, true);
+    Init(originHost, originPort, npnToken, username, proxyInfo, true);
 }
 
 void
@@ -105,8 +105,8 @@ void nsHttpConnectionInfo::BuildHashKey()
         keyHost = ProxyHost();
         keyPort = ProxyPort();
     } else {
-        keyHost = Host();
-        keyPort = Port();
+        keyHost = Origin();
+        keyPort = OriginPort();
     }
 
     // The hashkey has 4 fields followed by host connection info
@@ -114,7 +114,7 @@ void nsHttpConnectionInfo::BuildHashKey()
     // byte 1 is S/. S is for end to end ssl such as https:// uris
     // byte 2 is A/. A is for an anonymous channel (no cookies, etc..)
     // byte 3 is P/. P is for a private browising channel
-    // byte 4 is R/. R is for 'relaxed' unauthed TLS for http:// uris
+    // byte 4 is I/. I is for insecure scheme on TLS for http:// uris
     // byte 5 is X/. X is for disallow_spdy flag
 
     mHashKey.AssignLiteral("......");
@@ -162,11 +162,11 @@ void nsHttpConnectionInfo::BuildHashKey()
         mHashKey.Append(')');
     }
 
-    if(!mAuthenticationHost.IsEmpty()) {
-        mHashKey.AppendLiteral(" <TLS-LOGIC ");
-        mHashKey.Append(mAuthenticationHost);
+    if(!mRoutedHost.IsEmpty()) {
+        mHashKey.AppendLiteral(" <ROUTE-via ");
+        mHashKey.Append(mRoutedHost);
         mHashKey.Append(':');
-        mHashKey.AppendInt(mAuthenticationPort);
+        mHashKey.AppendInt(mRoutedPort);
         mHashKey.Append('>');
     }
 
@@ -180,8 +180,8 @@ void nsHttpConnectionInfo::BuildHashKey()
 void
 nsHttpConnectionInfo::SetOriginServer(const nsACString &host, int32_t port)
 {
-    mHost = host;
-    mPort = port == -1 ? DefaultPort() : port;
+    mOrigin = host;
+    mOriginPort = port == -1 ? DefaultPort() : port;
     BuildHashKey();
 }
 
@@ -189,23 +189,22 @@ nsHttpConnectionInfo*
 nsHttpConnectionInfo::Clone() const
 {
     nsHttpConnectionInfo *clone;
-    if (mAuthenticationHost.IsEmpty()) {
-        clone = new nsHttpConnectionInfo(mHost, mPort, mNPNToken, mUsername, mProxyInfo, mEndToEndSSL);
+    if (mRoutedHost.IsEmpty()) {
+        clone = new nsHttpConnectionInfo(mOrigin, mOriginPort, mNPNToken, mUsername, mProxyInfo, mEndToEndSSL);
     } else {
         MOZ_ASSERT(mEndToEndSSL);
-        clone = new nsHttpConnectionInfo(mHost, mPort, mNPNToken, mUsername, mProxyInfo,
-                                         mAuthenticationHost,
-                                         mAuthenticationPort);
+        clone = new nsHttpConnectionInfo(mOrigin, mOriginPort, mNPNToken, mUsername, mProxyInfo,
+                                         mRoutedHost, mRoutedPort);
     }
 
     if (!mNetworkInterfaceId.IsEmpty()) {
         clone->SetNetworkInterfaceId(mNetworkInterfaceId);
     }
 
-    // Make sure the anonymous, relaxed, and private flags are transferred
+    // Make sure the anonymous, insecure-scheme, and private flags are transferred
     clone->SetAnonymous(GetAnonymous());
     clone->SetPrivate(GetPrivate());
-    clone->SetRelaxed(GetRelaxed());
+    clone->SetInsecureScheme(GetInsecureScheme());
     clone->SetNoSpdy(GetNoSpdy());
     MOZ_ASSERT(clone->Equals(this));
 
@@ -215,18 +214,18 @@ nsHttpConnectionInfo::Clone() const
 void
 nsHttpConnectionInfo::CloneAsDirectRoute(nsHttpConnectionInfo **outCI)
 {
-    if (mAuthenticationHost.IsEmpty()) {
+    if (mRoutedHost.IsEmpty()) {
         *outCI = Clone();
         return;
     }
 
     nsRefPtr<nsHttpConnectionInfo> clone =
-        new nsHttpConnectionInfo(mAuthenticationHost, mAuthenticationPort,
+        new nsHttpConnectionInfo(mOrigin, mOriginPort,
                                  EmptyCString(), mUsername, mProxyInfo, mEndToEndSSL);
-    // Make sure the anonymous, relaxed, and private flags are transferred
+    // Make sure the anonymous, insecure-scheme, and private flags are transferred
     clone->SetAnonymous(GetAnonymous());
     clone->SetPrivate(GetPrivate());
-    clone->SetRelaxed(GetRelaxed());
+    clone->SetInsecureScheme(GetInsecureScheme());
     clone->SetNoSpdy(GetNoSpdy());
     if (!mNetworkInterfaceId.IsEmpty()) {
         clone->SetNetworkInterfaceId(mNetworkInterfaceId);
@@ -272,7 +271,7 @@ nsHttpConnectionInfo::HostIsLocalIPLiteral() const
         if (PR_StringToNetAddr(ProxyHost(), &prAddr) != PR_SUCCESS) {
           return false;
         }
-    } else if (PR_StringToNetAddr(Host(), &prAddr) != PR_SUCCESS) {
+    } else if (PR_StringToNetAddr(Origin(), &prAddr) != PR_SUCCESS) {
         return false;
     }
     NetAddr netAddr;

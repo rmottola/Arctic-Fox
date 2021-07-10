@@ -42,7 +42,7 @@ FontFaceBufferSource::TakeBuffer(uint8_t*& aBuffer, uint32_t& aLength)
   mFontFace->TakeBuffer(aBuffer, aLength);
 }
 
-// -- FontFaceInitializer ----------------------------------------------------
+// -- Utility functions ------------------------------------------------------
 
 template<typename T>
 static void
@@ -61,120 +61,6 @@ GetDataFrom(const T& aObject, uint8_t*& aBuffer, uint32_t& aLength)
   aLength = aObject.Length();
 }
 
-/**
- * A task that is dispatched to the event queue to call Initialize() on a
- * FontFace object with the source information that was passed to the JS
- * constructor.
- */
-class FontFaceInitializer : public nsIRunnable
-{
-public:
-  NS_DECL_ISUPPORTS
-
-  explicit FontFaceInitializer(FontFace* aFontFace)
-    : mFontFace(aFontFace)
-    , mSourceBuffer(nullptr)
-    , mSourceBufferLength(0) {}
-
-  void SetSource(const nsAString& aString);
-  void SetSource(const ArrayBuffer& aArrayBuffer);
-  void SetSource(const ArrayBufferView& aArrayBufferView);
-
-  NS_IMETHOD Run() override;
-  void TakeBuffer(uint8_t*& aBuffer, uint32_t& aLength);
-
-  nsRefPtr<FontFace> mFontFace;
-  FontFace::SourceType mSourceType;
-  nsString mSourceString;
-  uint8_t* mSourceBuffer;  // allocated with NS_Alloc
-  uint32_t mSourceBufferLength;
-
-protected:
-  virtual ~FontFaceInitializer();
-};
-
-NS_IMPL_ISUPPORTS(FontFaceInitializer, nsIRunnable)
-
-FontFaceInitializer::~FontFaceInitializer()
-{
-  if (mSourceBuffer) {
-    NS_Free(mSourceBuffer);
-  }
-}
-
-void
-FontFaceInitializer::SetSource(const nsAString& aString)
-{
-  mSourceType = FontFace::eSourceType_URLs;
-  mSourceString = aString;
-}
-
-void
-FontFaceInitializer::SetSource(const ArrayBuffer& aArrayBuffer)
-{
-  mSourceType = FontFace::eSourceType_Buffer;
-  GetDataFrom(aArrayBuffer, mSourceBuffer, mSourceBufferLength);
-}
-
-void
-FontFaceInitializer::SetSource(const ArrayBufferView& aArrayBufferView)
-{
-  mSourceType = FontFace::eSourceType_Buffer;
-  GetDataFrom(aArrayBufferView, mSourceBuffer, mSourceBufferLength);
-}
-
-NS_IMETHODIMP
-FontFaceInitializer::Run()
-{
-  mFontFace->Initialize(this);
-  return NS_OK;
-}
-
-void
-FontFaceInitializer::TakeBuffer(uint8_t*& aBuffer, uint32_t& aLength)
-{
-  aBuffer = mSourceBuffer;
-  aLength = mSourceBufferLength;
-
-  mSourceBuffer = nullptr;
-  mSourceBufferLength = 0;
-}
-
-// -- FontFaceStatusSetter ---------------------------------------------------
-
-/**
- * A task that is dispatched to the event queue to asynchronously call
- * SetStatus() on a FontFace object.
- */
-class FontFaceStatusSetter : public nsIRunnable
-{
-public:
-  NS_DECL_ISUPPORTS
-
-  FontFaceStatusSetter(FontFace* aFontFace,
-                       FontFaceLoadStatus aStatus)
-    : mFontFace(aFontFace)
-    , mStatus(aStatus) {}
-
-  NS_IMETHOD Run() override;
-
-protected:
-  virtual ~FontFaceStatusSetter() {}
-
-private:
-  nsRefPtr<FontFace> mFontFace;
-  FontFaceLoadStatus mStatus;
-};
-
-NS_IMPL_ISUPPORTS(FontFaceStatusSetter, nsIRunnable)
-
-NS_IMETHODIMP
-FontFaceStatusSetter::Run()
-{
-  mFontFace->SetStatus(mStatus);
-  return NS_OK;
-}
-
 // -- FontFace ---------------------------------------------------------------
 
 NS_IMPL_CYCLE_COLLECTION_CLASS(FontFace)
@@ -188,9 +74,6 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(FontFace)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(FontFace)
-  if (!tmp->IsInFontFaceSet()) {
-    tmp->mFontFaceSet->RemoveUnavailableFontFace(tmp);
-  }
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mParent)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mLoaded)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mRule)
@@ -210,17 +93,14 @@ NS_INTERFACE_MAP_END
 NS_IMPL_CYCLE_COLLECTING_ADDREF(FontFace)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(FontFace)
 
-FontFace::FontFace(nsISupports* aParent, nsPresContext* aPresContext)
+FontFace::FontFace(nsISupports* aParent, FontFaceSet* aFontFaceSet)
   : mParent(aParent)
-  , mPresContext(aPresContext)
   , mStatus(FontFaceLoadStatus::Unloaded)
   , mSourceType(SourceType(0))
   , mSourceBuffer(nullptr)
   , mSourceBufferLength(0)
-  , mFontFaceSet(aPresContext->Fonts())
+  , mFontFaceSet(aFontFaceSet)
   , mInFontFaceSet(false)
-  , mInitialized(false)
-  , mLoadWhenInitialized(false)
 {
   MOZ_COUNT_CTOR(FontFace);
 
@@ -240,10 +120,6 @@ FontFace::~FontFace()
   MOZ_COUNT_DTOR(FontFace);
 
   SetUserFontEntry(nullptr);
-
-  if (mFontFaceSet && !IsInFontFaceSet()) {
-    mFontFaceSet->RemoveUnavailableFontFace(this);
-  }
 
   if (mSourceBuffer) {
     free(mSourceBuffer);
@@ -275,13 +151,12 @@ LoadStateToStatus(gfxUserFontEntry::UserFontLoadState aLoadState)
 
 already_AddRefed<FontFace>
 FontFace::CreateForRule(nsISupports* aGlobal,
-                        nsPresContext* aPresContext,
+                        FontFaceSet* aFontFaceSet,
                         nsCSSFontFaceRule* aRule)
 {
   nsCOMPtr<nsIGlobalObject> globalObject = do_QueryInterface(aGlobal);
 
-  nsRefPtr<FontFace> obj = new FontFace(aGlobal, aPresContext);
-  obj->mInitialized = true;
+  nsRefPtr<FontFace> obj = new FontFace(aGlobal, aFontFaceSet);
   obj->mRule = aRule;
   obj->mSourceType = eSourceType_FontFaceRule;
   obj->mInFontFaceSet = true;
@@ -303,104 +178,68 @@ FontFace::Constructor(const GlobalObject& aGlobal,
     return nullptr;
   }
 
-  nsIPresShell* shell = doc->GetShell();
-  if (!shell) {
-    aRv.Throw(NS_ERROR_FAILURE);
-    return nullptr;
-  }
-
-  nsPresContext* presContext = shell->GetPresContext();
-  if (!presContext) {
-    aRv.Throw(NS_ERROR_FAILURE);
-    return nullptr;
-  }
-
-  nsRefPtr<FontFace> obj = new FontFace(global, presContext);
-  obj->mFontFaceSet->AddUnavailableFontFace(obj);
+  nsRefPtr<FontFace> obj = new FontFace(global, doc->Fonts());
   if (!obj->SetDescriptors(aFamily, aDescriptors)) {
     return obj.forget();
   }
 
-  nsRefPtr<FontFaceInitializer> task = new FontFaceInitializer(obj);
-
-  if (aSource.IsArrayBuffer()) {
-    task->SetSource(aSource.GetAsArrayBuffer());
-  } else if (aSource.IsArrayBufferView()) {
-    task->SetSource(aSource.GetAsArrayBufferView());
-  } else {
-    MOZ_ASSERT(aSource.IsString());
-    task->SetSource(aSource.GetAsString());
-  }
-
-  NS_DispatchToMainThread(task);
-
+  obj->InitializeSource(aSource);
   return obj.forget();
 }
 
 void
-FontFace::Initialize(FontFaceInitializer* aInitializer)
+FontFace::InitializeSource(const StringOrArrayBufferOrArrayBufferView& aSource)
 {
-  MOZ_ASSERT(!HasRule());
-  MOZ_ASSERT(mSourceType == SourceType(0));
-
-  if (aInitializer->mSourceType == eSourceType_URLs) {
+  if (aSource.IsString()) {
     if (!ParseDescriptor(eCSSFontDesc_Src,
-                         aInitializer->mSourceString,
+                         aSource.GetAsString(),
                          mDescriptors->mSrc)) {
       if (mLoaded) {
-        // The asynchronous SetStatus call we are about to do assumes that for
+        // The SetStatus call we are about to do assumes that for
         // FontFace objects with sources other than ArrayBuffer(View)s, that the
         // mLoaded Promise is rejected with a network error.  We get
         // in here beforehand to set it to the required syntax error.
         mLoaded->MaybeReject(NS_ERROR_DOM_SYNTAX_ERR);
       }
 
-      // Queue a task to set the status to "error".
-      nsCOMPtr<nsIRunnable> statusSetterTask =
-        new FontFaceStatusSetter(this, FontFaceLoadStatus::Error);
-      NS_DispatchToMainThread(statusSetterTask);
+      SetStatus(FontFaceLoadStatus::Error);
       return;
     }
 
     mSourceType = eSourceType_URLs;
-
-    // Now that we have parsed the src descriptor, we are initialized.
-    OnInitialized();
     return;
   }
 
-  // We've been given an ArrayBuffer or ArrayBufferView as the source.
-  MOZ_ASSERT(aInitializer->mSourceType == eSourceType_Buffer);
+  mSourceType = FontFace::eSourceType_Buffer;
 
-  mSourceType = aInitializer->mSourceType;
-  aInitializer->TakeBuffer(mSourceBuffer, mSourceBufferLength);
+  if (aSource.IsArrayBuffer()) {
+    GetDataFrom(aSource.GetAsArrayBuffer(),
+                mSourceBuffer, mSourceBufferLength);
+  } else {
+    MOZ_ASSERT(aSource.IsArrayBufferView());
+    GetDataFrom(aSource.GetAsArrayBufferView(),
+                mSourceBuffer, mSourceBufferLength);
+  }
 
-  // Queue a task to set the status to "loading".
-  nsCOMPtr<nsIRunnable> statusSetterTask =
-    new FontFaceStatusSetter(this, FontFaceLoadStatus::Loading);
-  NS_DispatchToMainThread(statusSetterTask);
-
-  // We are initialized.
-  OnInitialized();
-
-  // ArrayBuffer(View)-backed FontFace objects are loaded on construction,
-  // but we need to do this after going through the event loop so that the
-  // FontFaceStatusSetter runs before us.
-  nsCOMPtr<nsIRunnable> loaderTask =
-    NS_NewRunnableMethod(this, &FontFace::DoLoad);
-  NS_DispatchToMainThread(loaderTask);
+  SetStatus(FontFaceLoadStatus::Loading);
+  DoLoad();
 }
 
 void
 FontFace::GetFamily(nsString& aResult)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
 
   // Serialize the same way as in nsCSSFontFaceStyleDecl::GetPropertyValue.
   nsCSSValue value;
   GetDesc(eCSSFontDesc_Family, value);
 
   aResult.Truncate();
+
+  if (value.GetUnit() == eCSSUnit_Null) {
+    return;
+  }
+
   nsDependentString family(value.GetStringBufferValue());
   if (!family.IsEmpty()) {
     // The string length can be zero when the author passed an invalid
@@ -412,75 +251,74 @@ FontFace::GetFamily(nsString& aResult)
 void
 FontFace::SetFamily(const nsAString& aValue, ErrorResult& aRv)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
   SetDescriptor(eCSSFontDesc_Family, aValue, aRv);
 }
 
 void
 FontFace::GetStyle(nsString& aResult)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
   GetDesc(eCSSFontDesc_Style, eCSSProperty_font_style, aResult);
 }
 
 void
 FontFace::SetStyle(const nsAString& aValue, ErrorResult& aRv)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
   SetDescriptor(eCSSFontDesc_Style, aValue, aRv);
 }
 
 void
 FontFace::GetWeight(nsString& aResult)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
   GetDesc(eCSSFontDesc_Weight, eCSSProperty_font_weight, aResult);
 }
 
 void
 FontFace::SetWeight(const nsAString& aValue, ErrorResult& aRv)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
   SetDescriptor(eCSSFontDesc_Weight, aValue, aRv);
 }
 
 void
 FontFace::GetStretch(nsString& aResult)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
   GetDesc(eCSSFontDesc_Stretch, eCSSProperty_font_stretch, aResult);
 }
 
 void
 FontFace::SetStretch(const nsAString& aValue, ErrorResult& aRv)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
   SetDescriptor(eCSSFontDesc_Stretch, aValue, aRv);
 }
 
 void
 FontFace::GetUnicodeRange(nsString& aResult)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
 
-  nsCSSValue value;
-  GetDesc(eCSSFontDesc_UnicodeRange, value);
-
-  aResult.Truncate();
-  nsStyleUtil::AppendUnicodeRange(value, aResult);
+  // There is no eCSSProperty_unicode_range for us to pass in to GetDesc
+  // to get a serialized (possibly defaulted) value, but that function
+  // doesn't use the property ID for this descriptor anyway.
+  GetDesc(eCSSFontDesc_UnicodeRange, eCSSProperty_UNKNOWN, aResult);
 }
 
 void
 FontFace::SetUnicodeRange(const nsAString& aValue, ErrorResult& aRv)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
   SetDescriptor(eCSSFontDesc_UnicodeRange, aValue, aRv);
 }
 
 void
 FontFace::GetVariant(nsString& aResult)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
 
   // XXX Just expose the font-variant descriptor as "normal" until we
   // support it properly (bug 1055385).
@@ -490,7 +328,7 @@ FontFace::GetVariant(nsString& aResult)
 void
 FontFace::SetVariant(const nsAString& aValue, ErrorResult& aRv)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
 
   // XXX Ignore assignments to variant until we support font-variant
   // descriptors (bug 1055385).
@@ -499,19 +337,15 @@ FontFace::SetVariant(const nsAString& aValue, ErrorResult& aRv)
 void
 FontFace::GetFeatureSettings(nsString& aResult)
 {
-  mPresContext->FlushUserFontSet();
-
-  nsCSSValue value;
-  GetDesc(eCSSFontDesc_FontFeatureSettings, value);
-
-  aResult.Truncate();
-  nsStyleUtil::AppendFontFeatureSettings(value, aResult);
+  mFontFaceSet->FlushUserFontSet();
+  GetDesc(eCSSFontDesc_FontFeatureSettings, eCSSProperty_font_feature_settings,
+          aResult);
 }
 
 void
 FontFace::SetFeatureSettings(const nsAString& aValue, ErrorResult& aRv)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
   SetDescriptor(eCSSFontDesc_FontFeatureSettings, aValue, aRv);
 }
 
@@ -524,7 +358,7 @@ FontFace::Status()
 Promise*
 FontFace::Load(ErrorResult& aRv)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
 
   if (!mLoaded) {
     aRv.Throw(NS_ERROR_FAILURE);
@@ -544,22 +378,14 @@ FontFace::Load(ErrorResult& aRv)
   // here.
   SetStatus(FontFaceLoadStatus::Loading);
 
-  if (mInitialized) {
-    DoLoad();
-  } else {
-    // We can only load an initialized font; this will cause the font to be
-    // loaded once it has been initialized.
-    mLoadWhenInitialized = true;
-  }
+  DoLoad();
 
   return mLoaded;
 }
 
-void
-FontFace::DoLoad()
+gfxUserFontEntry*
+FontFace::CreateUserFontEntry()
 {
-  MOZ_ASSERT(mInitialized);
-
   if (!mUserFontEntry) {
     MOZ_ASSERT(!HasRule(),
                "Rule backed FontFace objects should already have a user font "
@@ -567,20 +393,27 @@ FontFace::DoLoad()
 
     nsRefPtr<gfxUserFontEntry> newEntry =
       mFontFaceSet->FindOrCreateUserFontEntryFromFontFace(this);
-    if (!newEntry) {
-      return;
+    if (newEntry) {
+      SetUserFontEntry(newEntry);
     }
-
-    SetUserFontEntry(newEntry);
   }
 
+  return mUserFontEntry;
+}
+
+void
+FontFace::DoLoad()
+{
+  if (!CreateUserFontEntry()) {
+    return;
+  }
   mUserFontEntry->Load();
 }
 
 Promise*
 FontFace::GetLoaded(ErrorResult& aRv)
 {
-  mPresContext->FlushUserFontSet();
+  mFontFaceSet->FlushUserFontSet();
 
   if (!mLoaded) {
     aRv.Throw(NS_ERROR_FAILURE);
@@ -723,25 +556,6 @@ FontFace::SetDescriptors(const nsAString& aFamily,
 }
 
 void
-FontFace::OnInitialized()
-{
-  MOZ_ASSERT(!mInitialized);
-
-  mInitialized = true;
-
-  // For a FontFace that was created and immediately had Load() called on
-  // it, before it had a chance to be initialized, we kick off its load now.
-  if (mLoadWhenInitialized) {
-    mLoadWhenInitialized = false;
-    DoLoad();
-  }
-
-  if (mInFontFaceSet) {
-    mFontFaceSet->OnFontFaceInitialized(this);
-  }
-}
-
-void
 FontFace::GetDesc(nsCSSFontDesc aDescID, nsCSSValue& aResult) const
 {
   if (HasRule()) {
@@ -758,6 +572,10 @@ FontFace::GetDesc(nsCSSFontDesc aDescID,
                   nsCSSProperty aPropID,
                   nsString& aResult) const
 {
+  MOZ_ASSERT(aDescID == eCSSFontDesc_UnicodeRange ||
+             aPropID != eCSSProperty_UNKNOWN,
+             "only pass eCSSProperty_UNKNOWN for eCSSFontDesc_UnicodeRange");
+
   nsCSSValue value;
   GetDesc(aDescID, value);
 
@@ -771,6 +589,13 @@ FontFace::GetDesc(nsCSSFontDesc aDescID,
                aDescID != eCSSFontDesc_Src) {
       aResult.AssignLiteral("normal");
     }
+    return;
+  }
+
+  if (aDescID == eCSSFontDesc_UnicodeRange) {
+    // Since there's no unicode-range property, we can't use
+    // nsCSSValue::AppendToString to serialize this descriptor.
+    nsStyleUtil::AppendUnicodeRange(value, aResult);
   } else {
     value.AppendToString(aPropID, aResult, nsCSSValue::eNormalized);
   }

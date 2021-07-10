@@ -144,11 +144,10 @@ this.XPCOMUtils = {
         countRef.value = _interfaces.length;
         return _interfaces;
       },
-      getHelperForLanguage: function XPCU_getHelperForLanguage(language) null,
+      getScriptableHelper: function XPCU_getScriptableHelper() null,
       contractID: classInfo.contractID,
       classDescription: classInfo.classDescription,
       classID: classInfo.classID,
-      implementationLanguage: Ci.nsIProgrammingLanguage.JAVASCRIPT,
       flags: classInfo.flags,
       QueryInterface: this.generateQI([Ci.nsIClassInfo])
     };

@@ -77,6 +77,7 @@
 // input type=file
 #include "mozilla/dom/File.h"
 #include "nsIFile.h"
+#include "nsNetCID.h"
 #include "nsNetUtil.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsIContentPrefService.h"
@@ -1058,7 +1059,7 @@ UploadLastDir::FetchDirectoryAndDisplayPicker(nsIDocument* aDoc,
     new UploadLastDir::ContentPrefCallback(aFilePicker, aFpCallback);
 
 #ifdef MOZ_B2G
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     prefCallback->HandleCompletion(nsIContentPrefCallback2::COMPLETE_ERROR);
     return NS_OK;
   }
@@ -1089,7 +1090,7 @@ UploadLastDir::StoreLastUsedDirectory(nsIDocument* aDoc, nsIFile* aDir)
   }
 
 #ifdef MOZ_B2G
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     return NS_OK;
   }
 #endif
@@ -1330,7 +1331,7 @@ HTMLInputElement::Clone(mozilla::dom::NodeInfo* aNodeInfo, nsINode** aResult) co
 
 nsresult
 HTMLInputElement::BeforeSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
-                                const nsAttrValueOrString* aValue,
+                                nsAttrValueOrString* aValue,
                                 bool aNotify)
 {
   if (aNameSpaceID == kNameSpaceID_None) {
@@ -1860,7 +1861,7 @@ HTMLInputElement::SetValue(const nsAString& aValue, ErrorResult& aRv)
         return;
       }
       Sequence<nsString> list;
-      if (!list.AppendElement(aValue)) {
+      if (!list.AppendElement(aValue, fallible)) {
         aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
         return;
       }
@@ -2405,7 +2406,7 @@ HTMLInputElement::MozSetFileArray(const Sequence<OwningNonNull<File>>& aFiles)
 void
 HTMLInputElement::MozSetFileNameArray(const Sequence< nsString >& aFileNames, ErrorResult& aRv)
 {
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
     return;
   }
@@ -2450,7 +2451,7 @@ HTMLInputElement::MozSetFileNameArray(const char16_t** aFileNames, uint32_t aLen
 
   Sequence<nsString> list;
   for (uint32_t i = 0; i < aLength; ++i) {
-    if (!list.AppendElement(nsDependentString(aFileNames[i]))) {
+    if (!list.AppendElement(nsDependentString(aFileNames[i]), fallible)) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
   }
@@ -2503,7 +2504,7 @@ HTMLInputElement::SetUserInput(const nsAString& aValue)
   if (mType == NS_FORM_INPUT_FILE)
   {
     Sequence<nsString> list;
-    if (!list.AppendElement(aValue)) {
+    if (!list.AppendElement(aValue, fallible)) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
 

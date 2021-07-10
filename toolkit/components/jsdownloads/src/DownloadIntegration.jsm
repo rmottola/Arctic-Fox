@@ -703,21 +703,7 @@ this.DownloadIntegration = {
     let deferred = Task.spawn(function DI_launchDownload_task() {
       let file = new FileUtils.File(aDownload.target.path);
 
-      // In case of a double extension, like ".tar.gz", we only
-      // consider the last one, because the MIME service cannot
-      // handle multiple extensions.
-      let fileExtension = null, mimeInfo = null;
-      let match = file.leafName.match(/\.([^.]+)$/);
-      if (match) {
-        fileExtension = match[1];
-      }
-
-#ifdef XP_WIN
-      let isWindowsExe = fileExtension.toLowerCase() == "exe";
-#else
-      let isWindowsExe = false;
-#endif
-
+#ifndef XP_WIN
       // Ask for confirmation if the file is executable, except on Windows where
       // the operating system will show the prompt based on the security zone.
       // We do this here, instead of letting the caller handle the prompt
@@ -725,7 +711,7 @@ this.DownloadIntegration = {
       // because of its security nature, so that add-ons cannot forget to do
       // this check.  The second is that the system-level security prompt would
       // be displayed at launch time in any case.
-      if (file.isExecutable() && !isWindowsExe && !this.dontOpenFileAndFolder) {
+      if (file.isExecutable() && !this.dontOpenFileAndFolder) {
         // We don't anchor the prompt to a specific window intentionally, not
         // only because this is the same behavior as the system-level prompt,
         // but also because the most recently active window is the right choice
@@ -735,6 +721,16 @@ this.DownloadIntegration = {
         if (!shouldLaunch) {
           return;
         }
+      }
+#endif
+
+      // In case of a double extension, like ".tar.gz", we only
+      // consider the last one, because the MIME service cannot
+      // handle multiple extensions.
+      let fileExtension = null, mimeInfo = null;
+      let match = file.leafName.match(/\.([^.]+)$/);
+      if (match) {
+        fileExtension = match[1];
       }
 
       try {

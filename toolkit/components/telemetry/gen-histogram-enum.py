@@ -59,6 +59,8 @@ def main(argv):
     if seen_use_counters:
         print "  HistogramUseCounterCount = HistogramLastUseCounter - HistogramFirstUseCounter + 1"
     else:
+        print "  HistogramFirstUseCounter = 0,"
+        print "  HistogramLastUseCounter = 0,"
         print "  HistogramUseCounterCount = 0"
     print "};"
 

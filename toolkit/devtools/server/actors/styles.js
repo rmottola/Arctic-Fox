@@ -128,7 +128,9 @@ var PageStyleActor = protocol.ActorClass({
     events.on(this.inspector.tabActor, "will-navigate", this.onFrameUnload);
   },
 
-  get conn() this.inspector.conn,
+  get conn() {
+    return this.inspector.conn;
+  },
 
   form: function(detail) {
     if (detail === "actorid") {
@@ -958,16 +960,20 @@ var StyleRuleActor = protocol.ActorClass({
       this.rawNode = item;
       this.rawRule = {
         style: item.style,
-        toString: function() "[element rule " + this.style + "]"
+        toString: function() { return "[element rule " + this.style + "]"; }
       }
     }
   },
 
-  get conn() this.pageStyle.conn,
+  get conn() {
+    return this.pageStyle.conn;
+  },
 
   // Objects returned by this actor are owned by the PageStyleActor
   // to which this rule belongs.
-  get marshallPool() this.pageStyle,
+  get marshallPool() {
+    return this.pageStyle;
+  },
 
   getDocument: function(sheet) {
     let document;
@@ -981,7 +987,7 @@ var StyleRuleActor = protocol.ActorClass({
     return document;
   },
 
-  toString: function() "[StyleRuleActor for " + this.rawRule + "]",
+  toString: function() { return "[StyleRuleActor for " + this.rawRule + "]" },
 
   form: function(detail) {
     if (detail === "actorid") {
@@ -1011,7 +1017,8 @@ var StyleRuleActor = protocol.ActorClass({
         // Elements don't have a parent stylesheet, and therefore
         // don't have an associated URI.  Provide a URI for
         // those.
-        form.href = this.rawNode.ownerDocument.location.href;
+        let doc = this.rawNode.ownerDocument;
+        form.href = doc.location ? doc.location.href : "";
         form.cssText = this.rawStyle.cssText || "";
         break;
       case Ci.nsIDOMCSSRule.CHARSET_RULE:
@@ -1182,9 +1189,15 @@ var StyleRuleFront = protocol.FrontClass(StyleRuleActor, {
     return new RuleModificationList(this);
   },
 
-  get type() this._form.type,
-  get line() this._form.line || -1,
-  get column() this._form.column || -1,
+  get type() {
+    return this._form.type;
+  },
+  get line() {
+    return this._form.line || -1;
+  },
+  get column() {
+    return this._form.column || -1;
+  },
   get cssText() {
     return this._form.cssText;
   },
@@ -1228,7 +1241,7 @@ var StyleRuleFront = protocol.FrontClass(StyleRuleActor, {
       return this._form.href;
     }
     let sheet = this.parentStyleSheet;
-    return sheet.href;
+    return sheet ? sheet.href : "";
   },
 
   get nodeHref() {

@@ -137,12 +137,26 @@ let handleContentContextMenu = function (event) {
                                           .getInterface(Ci.nsIDOMWindowUtils)
                                           .outerWindowID;
 
+  // get referrer attribute from clicked link and parse it
+  // if per element referrer is enabled, the element referrer overrules
+  // the document wide referrer
+  if (Services.prefs.getBoolPref("network.http.enablePerElementReferrer")) {
+    let referrerAttrValue = Services.netUtils.parseAttributePolicyString(event.target.
+                            getAttribute("referrer"));
+    if (referrerAttrValue !== Ci.nsIHttpChannel.REFERRER_POLICY_DEFAULT) {
+      referrerPolicy = referrerAttrValue;
+    }
+  }
+
+  let disableSetDesktopBg = null;
   // Media related cache info parent needs for saving
   let contentType = null;
   let contentDisposition = null;
   if (event.target.nodeType == Ci.nsIDOMNode.ELEMENT_NODE &&
       event.target instanceof Ci.nsIImageLoadingContent &&
       event.target.currentURI) {
+    disableSetDesktopBg = disableSetDesktopBackground(event.target);
+
     try {
       let imageCache = 
         Cc["@mozilla.org/image/tools;1"].getService(Ci.imgITools)
@@ -179,12 +193,12 @@ let handleContentContextMenu = function (event) {
 
     let customMenuItems = PageMenuChild.build(event.target);
     let principal = doc.nodePrincipal;
-    sendSyncMessage("contextmenu",
-                    { editFlags, spellInfo, customMenuItems, addonInfo,
-                      principal, docLocation, charSet, baseURI, referrer,
-                      referrerPolicy, contentType, contentDisposition,
-                      frameOuterWindowID, selectionInfo },
-                    { event, popupNode: event.target });
+    sendRpcMessage("contextmenu",
+                   { editFlags, spellInfo, customMenuItems, addonInfo,
+                     principal, docLocation, charSet, baseURI, referrer,
+                     referrerPolicy, contentType, contentDisposition,
+                     frameOuterWindowID, selectionInfo, disableSetDesktopBg },
+                   { event, popupNode: event.target });
   }
   else {
     // Break out to the parent window and pass the add-on info along
@@ -204,6 +218,7 @@ let handleContentContextMenu = function (event) {
       contentType: contentType,
       contentDisposition: contentDisposition,
       selectionInfo: selectionInfo,
+      disableSetDesktopBackground: disableSetDesktopBg,
     };
   }
 }
@@ -356,12 +371,31 @@ let ClickEventHandler = {
 
     let [href, node] = this._hrefAndLinkNodeForClickEvent(event);
 
+    // get referrer attribute from clicked link and parse it
+    // if per element referrer is enabled, the element referrer overrules
+    // the document wide referrer
+    let referrerPolicy = ownerDoc.referrerPolicy;
+    if (Services.prefs.getBoolPref("network.http.enablePerElementReferrer") &&
+        node) {
+      let referrerAttrValue = Services.netUtils.parseAttributePolicyString(node.
+                              getAttribute("referrer"));
+      if (referrerAttrValue !== Ci.nsIHttpChannel.REFERRER_POLICY_DEFAULT) {
+        referrerPolicy = referrerAttrValue;
+      }
+    }
+
     let json = { button: event.button, shiftKey: event.shiftKey,
                  ctrlKey: event.ctrlKey, metaKey: event.metaKey,
                  altKey: event.altKey, href: null, title: null,
-                 bookmark: false, referrerPolicy: ownerDoc.referrerPolicy };
+                 bookmark: false, referrerPolicy: referrerPolicy };
 
     if (href) {
+      try {
+        BrowserUtils.urlSecurityCheck(href, node.ownerDocument.nodePrincipal);
+      } catch (e) {
+        return;
+      }
+
       json.href = href;
       if (node) {
         json.title = node.getAttribute("title");
@@ -665,4 +699,53 @@ addMessageListener("ContextMenu:BookmarkFrame", (message) => {
   sendAsyncMessage("ContextMenu:BookmarkFrame:Result",
                    { title: frame.title,
                      description: PlacesUIUtils.getDescriptionFromDocument(frame) });
+});
+
+function disableSetDesktopBackground(aTarget) {
+  // Disable the Set as Desktop Background menu item if we're still trying
+  // to load the image or the load failed.
+  if (!(aTarget instanceof Ci.nsIImageLoadingContent))
+    return true;
+
+  if (("complete" in aTarget) && !aTarget.complete)
+    return true;
+
+  if (aTarget.currentURI.schemeIs("javascript"))
+    return true;
+
+  let request = aTarget.QueryInterface(Ci.nsIImageLoadingContent)
+                       .getRequest(Ci.nsIImageLoadingContent.CURRENT_REQUEST);
+  if (!request)
+    return true;
+
+  return false;
+}
+
+addMessageListener("ContextMenu:SetAsDesktopBackground", (message) => {
+  let target = message.objects.target;
+
+  // Paranoia: check disableSetDesktopBackground again, in case the
+  // image changed since the context menu was initiated.
+  let disable = disableSetDesktopBackground(target);
+
+  if (!disable) {
+    try {
+      BrowserUtils.urlSecurityCheck(target.currentURI.spec, target.ownerDocument.nodePrincipal);
+      let canvas = content.document.createElement("canvas");
+      canvas.width = target.naturalWidth;
+      canvas.height = target.naturalHeight;
+      let ctx = canvas.getContext("2d");
+      ctx.drawImage(target, 0, 0);
+      let dataUrl = canvas.toDataURL();
+      sendAsyncMessage("ContextMenu:SetAsDesktopBackground:Result",
+                       { dataUrl });
+    }
+    catch (e) {
+      Cu.reportError(e);
+      disable = true;
+    }
+  }
+
+  if (disable)
+    sendAsyncMessage("ContextMenu:SetAsDesktopBackground:Result", { disable });
 });

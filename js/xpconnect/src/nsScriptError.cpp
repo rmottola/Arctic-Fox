@@ -89,8 +89,13 @@ nsScriptError::GetMessageMoz(char16_t** result) {
 NS_IMETHODIMP
 nsScriptError::GetLogLevel(uint32_t* aLogLevel)
 {
-  *aLogLevel = mFlags & (uint32_t)nsIScriptError::errorFlag ?
-               nsIConsoleMessage::error : nsIConsoleMessage::warn;
+  if (mFlags & (uint32_t)nsIScriptError::infoFlag) {
+    *aLogLevel = nsIConsoleMessage::info;
+  } else if (mFlags & (uint32_t)nsIScriptError::warningFlag) {
+    *aLogLevel = nsIConsoleMessage::warn;
+  } else {
+    *aLogLevel = nsIConsoleMessage::error;
+  }
   return NS_OK;
 }
 
@@ -134,6 +139,17 @@ nsScriptError::GetFlags(uint32_t* result) {
 NS_IMETHODIMP
 nsScriptError::GetCategory(char** result) {
     *result = ToNewCString(mCategory);
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsScriptError::GetStack(JS::MutableHandleValue aStack) {
+    aStack.setUndefined();
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsScriptError::SetStack(JS::HandleValue aStack) {
     return NS_OK;
 }
 

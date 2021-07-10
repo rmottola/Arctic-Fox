@@ -6,21 +6,26 @@
 
 #include "ServiceWorkerRegistration.h"
 
+#include "mozilla/dom/Notification.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/PromiseWorkerProxy.h"
 #include "mozilla/dom/ServiceWorkerRegistrationBinding.h"
+#include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsNetUtil.h"
 #include "nsServiceManagerUtils.h"
 #include "ServiceWorker.h"
+#include "ServiceWorkerManager.h"
 
 #include "nsIDocument.h"
 #include "nsIServiceWorkerManager.h"
 #include "nsISupportsPrimitives.h"
 #include "nsPIDOMWindow.h"
 
+#include "WorkerPrivate.h"
 #include "Workers.h"
+#include "WorkerScope.h"
 
 #ifndef MOZ_SIMPLEPUSH
 #include "mozilla/dom/PushManagerBinding.h"
@@ -236,35 +241,103 @@ ServiceWorkerRegistrationMainThread::InvalidateWorkers(WhichServiceWorker aWhich
 namespace {
 
 void
-UpdateInternal(const nsAString& aScope)
+UpdateInternal(nsIPrincipal* aPrincipal, const nsAString& aScope)
 {
   AssertIsOnMainThread();
-  nsCOMPtr<nsIServiceWorkerManager> swm =
-    mozilla::services::GetServiceWorkerManager();
+  MOZ_ASSERT(aPrincipal);
+
+  nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
   MOZ_ASSERT(swm);
+
   // The spec defines ServiceWorkerRegistration.update() exactly as Soft Update.
-  swm->SoftUpdate(aScope);
+  swm->SoftUpdate(aPrincipal, NS_ConvertUTF16toUTF8(aScope));
 }
 
+// This Runnable needs to have a valid WorkerPrivate. For this reason it is also
+// a WorkerFeature that is registered before dispatching itself to the
+// main-thread and it's removed with ReleaseRunnable when the operation is
+// completed. This will keep the worker alive as long as necessary.
 class UpdateRunnable final : public nsRunnable
+                           , public WorkerFeature
 {
 public:
-  explicit UpdateRunnable(const nsAString& aScope)
-    : mScope(aScope)
+  UpdateRunnable(WorkerPrivate* aWorkerPrivate, const nsAString& aScope)
+    : mWorkerPrivate(aWorkerPrivate)
+    , mScope(aScope)
   {}
 
   NS_IMETHOD
   Run() override
   {
     AssertIsOnMainThread();
-    UpdateInternal(mScope);
+    UpdateInternal(mWorkerPrivate->GetPrincipal(), mScope);
+
+    class ReleaseRunnable final : public MainThreadWorkerControlRunnable
+    {
+      nsRefPtr<UpdateRunnable> mFeature;
+
+    public:
+      ReleaseRunnable(WorkerPrivate* aWorkerPrivate,
+                      UpdateRunnable* aFeature)
+        : MainThreadWorkerControlRunnable(aWorkerPrivate)
+        , mFeature(aFeature)
+      {
+        MOZ_ASSERT(aFeature);
+      }
+
+      virtual bool
+      WorkerRun(JSContext* aCx,
+                workers::WorkerPrivate* aWorkerPrivate) override
+      {
+        MOZ_ASSERT(aWorkerPrivate);
+        aWorkerPrivate->AssertIsOnWorkerThread();
+
+        aWorkerPrivate->RemoveFeature(aCx, mFeature);
+        return true;
+      }
+
+    private:
+      ~ReleaseRunnable()
+      {}
+    };
+
+    nsRefPtr<WorkerControlRunnable> runnable =
+      new ReleaseRunnable(mWorkerPrivate, this);
+    runnable->Dispatch(nullptr);
+
     return NS_OK;
+  }
+
+  virtual bool Notify(JSContext* aCx, workers::Status aStatus) override
+  {
+    // We don't care about the notification. We just want to keep the
+    // mWorkerPrivate alive.
+    return true;
+  }
+
+  bool
+  Dispatch()
+  {
+    mWorkerPrivate->AssertIsOnWorkerThread();
+
+    JSContext* cx = mWorkerPrivate->GetJSContext();
+
+    if (NS_WARN_IF(!mWorkerPrivate->AddFeature(cx, this))) {
+      return false;
+    }
+
+    nsCOMPtr<nsIRunnable> that(this);
+    if (NS_WARN_IF(NS_FAILED(NS_DispatchToMainThread(this)))) {
+      NS_ASSERTION(false, "Failed to dispatch update back to MainThread in ServiceWorker");
+    }
+    return true;
   }
 
 private:
   ~UpdateRunnable()
   {}
 
+  WorkerPrivate* mWorkerPrivate;
   const nsString mScope;
 };
 
@@ -457,7 +530,10 @@ public:
 void
 ServiceWorkerRegistrationMainThread::Update()
 {
-  UpdateInternal(mScope);
+  nsCOMPtr<nsIDocument> doc = GetOwner()->GetExtantDoc();
+  MOZ_ASSERT(doc);
+
+  UpdateInternal(doc->NodePrincipal(), mScope);
 }
 
 already_AddRefed<Promise>
@@ -521,6 +597,51 @@ ServiceWorkerRegistrationMainThread::Unregister(ErrorResult& aRv)
   }
 
   return promise.forget();
+}
+
+// Notification API extension.
+already_AddRefed<Promise>
+ServiceWorkerRegistrationMainThread::ShowNotification(JSContext* aCx,
+                                                      const nsAString& aTitle,
+                                                      const NotificationOptions& aOptions,
+                                                      ErrorResult& aRv)
+{
+  AssertIsOnMainThread();
+  MOZ_ASSERT(GetOwner());
+  nsCOMPtr<nsPIDOMWindow> window = GetOwner();
+  if (NS_WARN_IF(!window)) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
+  if (NS_WARN_IF(!doc)) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
+  nsRefPtr<workers::ServiceWorker> worker = GetActive();
+  if (!worker) {
+    aRv.ThrowTypeError(MSG_NO_ACTIVE_WORKER);
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(window);
+  nsRefPtr<Promise> p =
+    Notification::ShowPersistentNotification(global,
+                                             mScope, aTitle, aOptions, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  return p.forget();
+}
+
+already_AddRefed<Promise>
+ServiceWorkerRegistrationMainThread::GetNotifications(const GetNotificationOptions& aOptions, ErrorResult& aRv)
+{
+  MOZ_ASSERT(false);
+  return nullptr;
 }
 
 already_AddRefed<PushManager>
@@ -739,13 +860,14 @@ ServiceWorkerRegistrationWorkerThread::GetActive()
 void
 ServiceWorkerRegistrationWorkerThread::Update()
 {
-#ifdef DEBUG
   WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
   MOZ_ASSERT(worker);
   worker->AssertIsOnWorkerThread();
-#endif
-  nsCOMPtr<nsIRunnable> r = new UpdateRunnable(mScope);
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(r)));
+
+  // XXX: this pattern guarantees we won't know which thread UpdateRunnable
+  // will die on (here or MainThread)
+  nsRefPtr<UpdateRunnable> r = new UpdateRunnable(worker, mScope);
+  r->Dispatch();
 }
 
 already_AddRefed<Promise>
@@ -927,5 +1049,34 @@ WorkerListener::UpdateFound()
     }
   }
 }
+
+// Notification API extension.
+already_AddRefed<Promise>
+ServiceWorkerRegistrationWorkerThread::ShowNotification(JSContext* aCx,
+                                                        const nsAString& aTitle,
+                                                        const NotificationOptions& aOptions,
+                                                        ErrorResult& aRv)
+{
+  // Until Bug 1131324 exposes ServiceWorkerContainer on workers,
+  // ShowPersistentNotification() checks for valid active worker while it is
+  // also verifying scope so that we block the worker on the main thread only
+  // once.
+  nsRefPtr<Promise> p =
+    Notification::ShowPersistentNotification(mWorkerPrivate->GlobalScope(),
+                                             mScope, aTitle, aOptions, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  return p.forget();
+}
+
+already_AddRefed<Promise>
+ServiceWorkerRegistrationWorkerThread::GetNotifications(const GetNotificationOptions& aOptions, ErrorResult& aRv)
+{
+  MOZ_ASSERT(false);
+  return nullptr;
+}
+
 } // dom namespace
 } // mozilla namespace

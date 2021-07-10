@@ -274,6 +274,7 @@ void qcms_transform_data_rgba_out_lut_sse1(qcms_transform *transform,
                                           unsigned char *dest,
                                           size_t length);
 
+#ifdef HAVE_ALTIVEC
 void qcms_transform_data_rgb_out_lut_altivec(qcms_transform *transform,
                                              unsigned char *src,
                                              unsigned char *dest,
@@ -282,6 +283,7 @@ void qcms_transform_data_rgba_out_lut_altivec(qcms_transform *transform,
                                               unsigned char *src,
                                               unsigned char *dest,
                                               size_t length);
+#endif
 
 extern qcms_bool qcms_supports_iccv4;
 

@@ -93,8 +93,8 @@ sub compareProperties
             if ($path !~ /chrome\/browser-region\/region\.properties$/ or
                 ($entity !~ /browser\.search\.order\.[1-9]/ and
                  $entity !~ /browser\.contentHandlers\.types\.[0-5]/ and
-                 $entity !~ /goanna\.handlerService\.schemes\./ and
-                 $entity !~ /goanna\.handlerService\.defaultHandlersVersion/)) {
+                 $entity !~ /gecko\.handlerService\.schemes\./ and
+                 $entity !~ /gecko\.handlerService\.defaultHandlersVersion/)) {
                 push @extra1, $entity;
             }
         }
@@ -104,8 +104,8 @@ sub compareProperties
         foreach $entity (keys(%entities2)) {
             if ($entity =~ /browser\.search\.order\.[1-9]/ ||
                 $entity =~ /browser\.contentHandlers\.types\.[0-5]/ ||
-                $entity =~ /goanna\.handlerService\.schemes\./ ||
-                $entity =~ /goanna\.handlerService\.defaultHandlersVersion/) {
+                $entity =~ /gecko\.handlerService\.schemes\./ ||
+                $entity =~ /gecko\.handlerService\.defaultHandlersVersion/) {
                 delete $entities2{$entity};
             }
         }

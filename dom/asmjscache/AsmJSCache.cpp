@@ -17,7 +17,6 @@
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/PermissionMessageUtils.h"
 #include "mozilla/dom/quota/Client.h"
-#include "mozilla/dom/quota/OriginOrPatternString.h"
 #include "mozilla/dom/quota/QuotaManager.h"
 #include "mozilla/dom/quota/QuotaObject.h"
 #include "mozilla/dom/quota/UsageInfo.h"
@@ -42,7 +41,6 @@
 #define ASMJSCACHE_ENTRY_FILE_NAME_BASE "module"
 
 using mozilla::dom::quota::AssertIsOnIOThread;
-using mozilla::dom::quota::OriginOrPatternString;
 using mozilla::dom::quota::PersistenceType;
 using mozilla::dom::quota::QuotaManager;
 using mozilla::dom::quota::QuotaObject;
@@ -58,12 +56,6 @@ namespace dom {
 namespace asmjscache {
 
 namespace {
-
-bool
-IsMainProcess()
-{
-  return XRE_GetProcessType() == GeckoProcessType_Default;
-}
 
 // Anything smaller should compile fast enough that caching will just add
 // overhead.
@@ -298,8 +290,8 @@ public:
   }
 
 protected:
-  // This method must be called before AllowNextSynchronizedOp (which releases
-  // the lock protecting these resources). It is idempotent, so it is ok to call
+  // This method must be called before the directory lock is released (the lock
+  // is protecting these resources). It is idempotent, so it is ok to call
   // multiple times (or before the file has been fully opened).
   void
   Finish()
@@ -482,8 +474,12 @@ private:
 // MainProcessRunnable is a base class shared by (Single|Parent)ProcessRunnable
 // that factors out the runnable state machine required to open a cache entry
 // that runs in the main process.
-class MainProcessRunnable : public virtual FileDescriptorHolder
+class MainProcessRunnable
+  : public virtual FileDescriptorHolder
+  , public quota::OpenDirectoryListener
 {
+  typedef mozilla::dom::quota::DirectoryLock DirectoryLock;
+
 public:
   NS_DECL_NSIRUNNABLE
 
@@ -496,20 +492,19 @@ public:
   : mPrincipal(aPrincipal),
     mOpenMode(aOpenMode),
     mWriteParams(aWriteParams),
-    mNeedAllowNextSynchronizedOp(false),
     mPersistence(quota::PERSISTENCE_TYPE_INVALID),
     mState(eInitial),
     mResult(JS::AsmJSCache_InternalError),
     mIsApp(false),
     mEnforcingQuota(true)
   {
-    MOZ_ASSERT(IsMainProcess());
+    MOZ_ASSERT(XRE_IsParentProcess());
   }
 
   virtual ~MainProcessRunnable()
   {
     MOZ_ASSERT(mState == eFinished);
-    MOZ_ASSERT(!mNeedAllowNextSynchronizedOp);
+    MOZ_ASSERT(!mDirectoryLock);
   }
 
 protected:
@@ -637,16 +632,22 @@ private:
     }
   }
 
+  // OpenDirectoryListener overrides.
+  virtual void
+  DirectoryLockAcquired(DirectoryLock* aLock) override;
+
+  virtual void
+  DirectoryLockFailed() override;
+
   nsIPrincipal* const mPrincipal;
   const OpenMode mOpenMode;
   const WriteParams mWriteParams;
 
   // State initialized during eInitial:
-  bool mNeedAllowNextSynchronizedOp;
   quota::PersistenceType mPersistence;
   nsCString mGroup;
   nsCString mOrigin;
-  nsCString mStorageId;
+  nsRefPtr<DirectoryLock> mDirectoryLock;
 
   // State initialized during eReadyToReadMetadata
   nsCOMPtr<nsIFile> mDirectory;
@@ -740,9 +741,6 @@ MainProcessRunnable::InitOnMainThread()
 
   mEnforcingQuota =
     QuotaManager::IsQuotaEnforced(mPersistence, mOrigin, mIsApp);
-
-  QuotaManager::GetStorageId(mPersistence, mOrigin, quota::Client::ASMJS,
-                             NS_LITERAL_STRING("asmjs"), mStorageId);
 
   return NS_OK;
 }
@@ -918,18 +916,10 @@ MainProcessRunnable::FinishOnMainThread()
   MOZ_ASSERT(NS_IsMainThread());
 
   // Per FileDescriptorHolder::Finish()'s comment, call before
-  // AllowNextSynchronizedOp.
+  // releasing the directory lock.
   FileDescriptorHolder::Finish();
 
-  if (mNeedAllowNextSynchronizedOp) {
-    mNeedAllowNextSynchronizedOp = false;
-    QuotaManager* qm = QuotaManager::Get();
-    if (qm) {
-      qm->AllowNextSynchronizedOp(OriginOrPatternString::FromOrigin(mOrigin),
-                                  Nullable<PersistenceType>(mPersistence),
-                                  mStorageId);
-    }
-  }
+  mDirectoryLock = nullptr;
 }
 
 NS_IMETHODIMP
@@ -950,24 +940,16 @@ MainProcessRunnable::Run()
       }
 
       mState = eWaitingToOpenMetadata;
-      rv = QuotaManager::Get()->WaitForOpenAllowed(
-                                     OriginOrPatternString::FromOrigin(mOrigin),
-                                     Nullable<PersistenceType>(mPersistence),
-                                     mStorageId, this);
-      if (NS_FAILED(rv)) {
-        Fail();
-        return NS_OK;
-      }
 
-      mNeedAllowNextSynchronizedOp = true;
-      return NS_OK;
-    }
+      // XXX The exclusive lock shouldn't be needed for read operations.
+      QuotaManager::Get()->OpenDirectory(mPersistence,
+                                         mGroup,
+                                         mOrigin,
+                                         mIsApp,
+                                         quota::Client::ASMJS,
+                                         /* aExclusive */ true,
+                                         this);
 
-    case eWaitingToOpenMetadata: {
-      MOZ_ASSERT(NS_IsMainThread());
-
-      mState = eReadyToReadMetadata;
-      DispatchToIOThread();
       return NS_OK;
     }
 
@@ -1053,6 +1035,7 @@ MainProcessRunnable::Run()
       return NS_OK;
     }
 
+    case eWaitingToOpenMetadata:
     case eWaitingToOpenCacheFileForRead:
     case eOpened:
     case eFinished: {
@@ -1062,6 +1045,29 @@ MainProcessRunnable::Run()
 
   MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE("Corrupt state");
   return NS_OK;
+}
+
+void
+MainProcessRunnable::DirectoryLockAcquired(DirectoryLock* aLock)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mState == eWaitingToOpenMetadata);
+  MOZ_ASSERT(!mDirectoryLock);
+
+  mDirectoryLock = aLock;
+
+  mState = eReadyToReadMetadata;
+  DispatchToIOThread();
+}
+
+void
+MainProcessRunnable::DirectoryLockFailed()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mState == eWaitingToOpenMetadata);
+  MOZ_ASSERT(!mDirectoryLock);
+
+  Fail();
 }
 
 bool
@@ -1113,6 +1119,8 @@ class SingleProcessRunnable final : public File,
                                     private MainProcessRunnable
 {
 public:
+  NS_DECL_ISUPPORTS_INHERITED
+
   // In the single-process case, the calling JS compilation thread holds the
   // nsIPrincipal alive indirectly (via the global object -> compartment ->
   // principal) so we don't have to ref-count it here. This is fortunate since
@@ -1125,7 +1133,7 @@ public:
   : MainProcessRunnable(aPrincipal, aOpenMode, aWriteParams),
     mReadParams(aReadParams)
   {
-    MOZ_ASSERT(IsMainProcess());
+    MOZ_ASSERT(XRE_IsParentProcess());
     MOZ_ASSERT(!NS_IsMainThread());
     MOZ_COUNT_CTOR(SingleProcessRunnable);
   }
@@ -1184,6 +1192,8 @@ private:
   ReadParams mReadParams;
 };
 
+NS_IMPL_ISUPPORTS_INHERITED0(SingleProcessRunnable, File)
+
 // A runnable that executes in a parent process for a cache access originating
 // in the content process. This runnable gets registered as an IPDL subprotocol
 // actor so that it can communicate with the corresponding ChildProcessRunnable.
@@ -1191,6 +1201,8 @@ class ParentProcessRunnable final : public PAsmJSCacheEntryParent,
                                     public MainProcessRunnable
 {
 public:
+  NS_DECL_ISUPPORTS_INHERITED
+
   // The given principal comes from an IPC::Principal which will be dec-refed
   // at the end of the message, so we must ref-count it here. Fortunately, we
   // are on the main thread (where PContent messages are delivered).
@@ -1203,7 +1215,7 @@ public:
     mOpened(false),
     mFinished(false)
   {
-    MOZ_ASSERT(IsMainProcess());
+    MOZ_ASSERT(XRE_IsParentProcess());
     MOZ_ASSERT(NS_IsMainThread());
     MOZ_COUNT_CTOR(ParentProcessRunnable);
   }
@@ -1331,6 +1343,8 @@ private:
   bool mFinished;
 };
 
+NS_IMPL_ISUPPORTS_INHERITED0(ParentProcessRunnable, FileDescriptorHolder)
+
 } // unnamed namespace
 
 PAsmJSCacheEntryParent*
@@ -1380,7 +1394,7 @@ public:
     mActorDestroyed(false),
     mState(eInitial)
   {
-    MOZ_ASSERT(!IsMainProcess());
+    MOZ_ASSERT(!XRE_IsParentProcess());
     MOZ_ASSERT(!NS_IsMainThread());
     MOZ_COUNT_CTOR(ChildProcessRunnable);
   }
@@ -1512,8 +1526,8 @@ ChildProcessRunnable::Run()
       MOZ_ASSERT(NS_IsMainThread());
 
       // Per FileDescriptorHolder::Finish()'s comment, call before
-      // AllowNextSynchronizedOp (which happens in the parent upon receipt of
-      // the Send__delete__ message).
+      // releasing the directory lock (which happens in the parent upon receipt
+      // of the Send__delete__ message).
       File::OnClose();
 
       if (!mActorDestroyed) {
@@ -1576,7 +1590,7 @@ OpenFile(nsIPrincipal* aPrincipal,
   // parent process to open the file and interact with the QuotaManager. The
   // child can then map the file into its address space to perform I/O.
   nsRefPtr<File> file;
-  if (IsMainProcess()) {
+  if (XRE_IsParentProcess()) {
     file = new SingleProcessRunnable(aPrincipal, aOpenMode, aWriteParams,
                                      aReadParams);
   } else {
@@ -1835,27 +1849,20 @@ public:
   ReleaseIOThreadObjects() override
   { }
 
-  virtual bool
-  IsFileServiceUtilized() override
-  {
-    return false;
-  }
-
-  virtual bool
-  IsTransactionServiceActivated() override
-  {
-    return false;
-  }
+  virtual void
+  AbortOperations(const nsACString& aOrigin) override
+  { }
 
   virtual void
-  WaitForStoragesToComplete(nsTArray<nsIOfflineStorage*>& aStorages,
-                            nsIRunnable* aCallback) override
-  {
-    MOZ_ASSERT_UNREACHABLE("There are no storages");
-  }
+  AbortOperationsForProcess(ContentParentId aContentParentId) override
+  { }
 
   virtual void
-  ShutdownTransactionService() override
+  PerformIdleMaintenance() override
+  { }
+
+  virtual void
+  ShutdownWorkThreads() override
   { }
 
 private:

@@ -8,12 +8,12 @@
 #define mozilla_ipc_connectionorientedsocket_h
 
 #include <sys/socket.h>
-#include "nsError.h"
+#include "DataSocket.h"
 
 namespace mozilla {
 namespace ipc {
 
-union sockaddr_any;
+class UnixSocketConnector;
 
 /*
  * |ConnectionOrientedSocketIO| and |ConnectionOrientedSocket| define
@@ -21,21 +21,30 @@ union sockaddr_any;
  * |ListenSocket| uses these classes to handle accepted sockets.
  */
 
-class ConnectionOrientedSocketIO
+class ConnectionOrientedSocketIO : public DataSocketIO
 {
 public:
-  virtual nsresult Accept(int aFd,
-                          const union sockaddr_any* aAddr,
-                          socklen_t aAddrLen) = 0;
-
-protected:
   virtual ~ConnectionOrientedSocketIO();
+
+  virtual nsresult Accept(int aFd,
+                          const struct sockaddr* aAddress,
+                          socklen_t aAddressLength) = 0;
 };
 
-class ConnectionOrientedSocket
+class ConnectionOrientedSocket : public DataSocket
 {
 public:
-  virtual ConnectionOrientedSocketIO* GetIO() = 0;
+  /**
+   * Prepares an instance of |ConnectionOrientedSocket| in DISCONNECTED
+   * state for accepting a connection. Main-thread only.
+   *
+   * @param aConnector The new connector object, owned by the
+   *                   connection-oriented socket.
+   * @param[out] aIO, Returns an instance of |ConnectionOrientedSocketIO|.
+   * @return NS_OK on success, or an XPCOM error code otherwise.
+   */
+  virtual nsresult PrepareAccept(UnixSocketConnector* aConnector,
+                                 ConnectionOrientedSocketIO*& aIO) = 0;
 
 protected:
   virtual ~ConnectionOrientedSocket();

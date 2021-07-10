@@ -63,6 +63,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "nsServiceManagerUtils.h"
 #include "ScopedNSSTypes.h"
 #include "runnable_utils.h"
+#include "nsIPrefService.h"
+#include "nsIPrefBranch.h"
 
 // nICEr includes
 extern "C" {
@@ -436,8 +438,29 @@ RefPtr<NrIceCtx> NrIceCtx::Create(const std::string& name,
       NR_reg_set_uchar((char *)"ice.pref.interface.wlan0", 232);
     }
 
-    NR_reg_set_uint4((char *)"stun.client.maximum_transmits",7);
-    NR_reg_set_uint4((char *)NR_ICE_REG_TRICKLE_GRACE_PERIOD, 5000);
+    int32_t stun_client_maximum_transmits = 7;
+    int32_t ice_trickle_grace_period = 5000;
+#ifndef MOZILLA_XPCOMRT_API
+    nsresult res;
+    nsCOMPtr<nsIPrefService> prefs =
+      do_GetService("@mozilla.org/preferences-service;1", &res);
+
+    if (NS_SUCCEEDED(res)) {
+      nsCOMPtr<nsIPrefBranch> branch = do_QueryInterface(prefs);
+      if (branch) {
+        branch->GetIntPref(
+            "media.peerconnection.ice.stun_client_maximum_transmits",
+            &stun_client_maximum_transmits);
+        branch->GetIntPref(
+            "media.peerconnection.ice.trickle_grace_period",
+            &ice_trickle_grace_period);
+      }
+    }
+#endif
+    NR_reg_set_uint4((char *)"stun.client.maximum_transmits",
+                     stun_client_maximum_transmits);
+    NR_reg_set_uint4((char *)NR_ICE_REG_TRICKLE_GRACE_PERIOD,
+                     ice_trickle_grace_period);
 
     if (allow_loopback) {
       NR_reg_set_char((char *)NR_STUN_REG_PREF_ALLOW_LOOPBACK_ADDRS, 1);
@@ -461,13 +484,13 @@ RefPtr<NrIceCtx> NrIceCtx::Create(const std::string& name,
 #ifdef USE_INTERFACE_PRIORITIZER
   nr_interface_prioritizer *prioritizer = CreateInterfacePrioritizer();
   if (!prioritizer) {
-    MOZ_MTLOG(PR_LOG_ERROR, "Couldn't create interface prioritizer.");
+    MOZ_MTLOG(LogLevel::Error, "Couldn't create interface prioritizer.");
     return nullptr;
   }
 
   r = nr_ice_ctx_set_interface_prioritizer(ctx->ctx_, prioritizer);
   if (r) {
-    MOZ_MTLOG(PR_LOG_ERROR, "Couldn't set interface prioritizer.");
+    MOZ_MTLOG(LogLevel::Error, "Couldn't set interface prioritizer.");
     return nullptr;
   }
 #endif  // USE_INTERFACE_PRIORITIZER
@@ -661,7 +684,7 @@ nsresult NrIceCtx::SetProxyServer(const NrIceProxyServer& proxy_server) {
   }
 
   if ((r = nr_socket_wrapper_factory_proxy_tunnel_create(config, &wrapper))) {
-    MOZ_MTLOG(PR_LOG_ERROR, "Couldn't create proxy tunnel wrapper.");
+    MOZ_MTLOG(LogLevel::Error, "Couldn't create proxy tunnel wrapper.");
     ABORT(r);
   }
 

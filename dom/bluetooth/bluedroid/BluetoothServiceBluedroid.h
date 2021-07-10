@@ -7,7 +7,7 @@
 #ifndef mozilla_dom_bluetooth_bluetoothservicebluedroid_h__
 #define mozilla_dom_bluetooth_bluetoothservicebluedroid_h__
 
-#ifdef MOZ_B2G_BT_API_V2
+#ifndef MOZ_B2G_BT_API_V1
 
 #include "BluetoothCommon.h"
 #include "BluetoothInterface.h"
@@ -56,8 +56,8 @@ public:
   FetchUuidsInternal(const nsAString& aDeviceAddress,
                      BluetoothReplyRunnable* aRunnable) override;
 
-  virtual nsresult StartDiscoveryInternal(BluetoothReplyRunnable* aRunnable);
-  virtual nsresult StopDiscoveryInternal(BluetoothReplyRunnable* aRunnable);
+  virtual void StartDiscoveryInternal(BluetoothReplyRunnable* aRunnable);
+  virtual void StopDiscoveryInternal(BluetoothReplyRunnable* aRunnable);
 
   virtual nsresult
   SetProperty(BluetoothObjectType aType,
@@ -191,6 +191,12 @@ public:
   // GATT Client
   //
 
+  virtual void StartLeScanInternal(const nsTArray<nsString>& aServiceUuids,
+                                   BluetoothReplyRunnable* aRunnable);
+
+  virtual void StopLeScanInternal(const nsAString& aScanUuid,
+                                  BluetoothReplyRunnable* aRunnable);
+
   virtual void
   ConnectGattClientInternal(const nsAString& aAppUuid,
                             const nsAString& aDeviceAddress,
@@ -244,6 +250,23 @@ public:
     const nsTArray<uint8_t>& aValue,
     BluetoothReplyRunnable* aRunnable) override;
 
+  virtual void
+  GattClientReadDescriptorValueInternal(
+    const nsAString& aAppUuid,
+    const BluetoothGattServiceId& aServiceId,
+    const BluetoothGattId& aCharacteristicId,
+    const BluetoothGattId& aDescriptorId,
+    BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
+  GattClientWriteDescriptorValueInternal(
+    const nsAString& aAppUuid,
+    const BluetoothGattServiceId& aServiceId,
+    const BluetoothGattId& aCharacteristicId,
+    const BluetoothGattId& aDescriptorId,
+    const nsTArray<uint8_t>& aValue,
+    BluetoothReplyRunnable* aRunnable) override;
+
   //
   // Bluetooth notifications
   //
@@ -283,6 +306,13 @@ public:
                                        uint8_t aLen) override;
   virtual void LeTestModeNotification(BluetoothStatus aStatus,
                                       uint16_t aNumPackets) override;
+
+  virtual void EnergyInfoNotification(
+    const BluetoothActivityEnergyInfo& aInfo) override;
+
+  virtual void BackendErrorNotification(bool aCrashed) override;
+
+  virtual void CompleteToggleBt(bool aEnabled) override;
 
 protected:
   static nsresult StartGonkBluetooth();
@@ -343,8 +373,8 @@ public:
                                      const nsTArray<nsString>& aDeviceAddress,
                                      BluetoothReplyRunnable* aRunnable);
 
-  virtual nsresult StartDiscoveryInternal(BluetoothReplyRunnable* aRunnable);
-  virtual nsresult StopDiscoveryInternal(BluetoothReplyRunnable* aRunnable);
+  virtual void StartDiscoveryInternal(BluetoothReplyRunnable* aRunnable);
+  virtual void StopDiscoveryInternal(BluetoothReplyRunnable* aRunnable);
 
   virtual nsresult
   SetProperty(BluetoothObjectType aType,
@@ -509,6 +539,9 @@ public:
 
   virtual void EnergyInfoNotification(
     const BluetoothActivityEnergyInfo& aInfo) override;
+
+  virtual void BackendErrorNotification(bool aCrashed) override;
+  virtual void CompleteToggleBt(bool aEnabled) override;
 
 protected:
   static nsresult StartGonkBluetooth();

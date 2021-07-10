@@ -34,11 +34,9 @@ static bool IsMoveto(uint16_t aSegType)
 nsresult
 SVGPathData::CopyFrom(const SVGPathData& rhs)
 {
-  if (!mData.SetCapacity(rhs.mData.Length(), fallible)) {
-    // Yes, we do want fallible alloc here
+  if (!mData.Assign(rhs.mData, fallible)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
-  mData = rhs.mData;
   return NS_OK;
 }
 
@@ -175,7 +173,7 @@ SVGPathData::GetDistancesFromOriginToEndsOfVisibleSegments(FallibleTArray<double
 
     if (i == 0 || (segType != PATHSEG_MOVETO_ABS &&
                    segType != PATHSEG_MOVETO_REL)) {
-      if (!aOutput->AppendElement(state.length)) {
+      if (!aOutput->AppendElement(state.length, fallible)) {
         return false;
       }
     }
@@ -863,7 +861,7 @@ SVGPathData::GetMarkerPositioningData(nsTArray<nsSVGMark> *aMarks) const
 size_t
 SVGPathData::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
 {
-  return mData.SizeOfExcludingThis(aMallocSizeOf);
+  return mData.ShallowSizeOfExcludingThis(aMallocSizeOf);
 }
 
 size_t

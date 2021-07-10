@@ -42,7 +42,6 @@
 using namespace mozilla;
 using namespace mozilla::image;
 
-#if defined(PR_LOGGING)
 PRLogModuleInfo*
 GetImgLog()
 {
@@ -52,10 +51,7 @@ GetImgLog()
   }
   return sImgLog;
 }
-#define LOG_TEST(level) (GetImgLog() && PR_LOG_TEST(GetImgLog(), (level)))
-#else
-#define LOG_TEST(level) false
-#endif
+#define LOG_TEST(level) (GetImgLog() && MOZ_LOG_TEST(GetImgLog(), (level)))
 
 NS_IMPL_ISUPPORTS(imgRequest,
                   nsIStreamListener, nsIRequestObserver,
@@ -64,8 +60,10 @@ NS_IMPL_ISUPPORTS(imgRequest,
                   nsIInterfaceRequestor,
                   nsIAsyncVerifyRedirectCallback)
 
-imgRequest::imgRequest(imgLoader* aLoader)
+imgRequest::imgRequest(imgLoader* aLoader, const ImageCacheKey& aCacheKey)
  : mLoader(aLoader)
+ , mCacheKey(aCacheKey)
+ , mLoadId(nullptr)
  , mValidator(nullptr)
  , mInnerWindowId(0)
  , mCORSMode(imgIRequest::CORS_NONE)
@@ -178,7 +176,7 @@ imgRequest::ClearLoader() {
 }
 
 already_AddRefed<ProgressTracker>
-imgRequest::GetProgressTracker()
+imgRequest::GetProgressTracker() const
 {
   MutexAutoLock lock(mMutex);
 
@@ -262,16 +260,13 @@ imgRequest::RemoveProxy(imgRequestProxy* proxy, nsresult aStatus)
       if (mLoader) {
         mLoader->SetHasNoProxies(this, mCacheEntry);
       }
-    }
-#if defined(PR_LOGGING)
-    else {
+    } else if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
       nsAutoCString spec;
       mURI->GetSpec(spec);
       LOG_MSG_WITH_PARAM(GetImgLog(),
                          "imgRequest::RemoveProxy no cache entry",
                          "uri", spec.get());
     }
-#endif
 
     /* If |aStatus| is a failure code, then cancel the load if it is still in
        progress.  Otherwise, let the load continue, keeping 'this' in the cache
@@ -454,6 +449,16 @@ imgRequest::GetCurrentURI(nsIURI** aURI)
   return NS_ERROR_FAILURE;
 }
 
+bool
+imgRequest::IsChrome() const
+{
+  bool isChrome = false;
+  if (NS_WARN_IF(NS_FAILED(mURI->SchemeIs("chrome", &isChrome)))) {
+    return false;
+  }
+  return isChrome;
+}
+
 nsresult
 imgRequest::GetImageErrorCode()
 {
@@ -488,14 +493,15 @@ imgRequest::RemoveFromCache()
     if (mCacheEntry) {
       mLoader->RemoveFromCache(mCacheEntry);
     } else {
-      mLoader->RemoveFromCache(mURI);
+      mLoader->RemoveFromCache(ImageCacheKey(mURI));
     }
   }
 
   mCacheEntry = nullptr;
 }
 
-bool imgRequest::HasConsumers()
+bool
+imgRequest::HasConsumers() const
 {
   nsRefPtr<ProgressTracker> progressTracker = GetProgressTracker();
   return progressTracker && progressTracker->ObserverCount() > 0;
@@ -788,7 +794,7 @@ imgRequest::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
         DecodePool::Singleton()->GetIOEventTarget();
       rv = retargetable->RetargetDeliveryTo(target);
     }
-    PR_LOG(GetImgLog(), PR_LOG_WARNING,
+    MOZ_LOG(GetImgLog(), LogLevel::Warning,
            ("[this=%p] imgRequest::OnStartRequest -- "
             "RetargetDeliveryTo rv %d=%s\n",
             this, rv, NS_SUCCEEDED(rv) ? "succeeded" : "failed"));
@@ -944,14 +950,14 @@ PrepareForNewPart(nsIRequest* aRequest, nsIInputStream* aInStr, uint32_t aCount,
     }
 
     if (NS_FAILED(rv)) {
-      PR_LOG(GetImgLog(),
-             PR_LOG_ERROR, ("imgRequest::PrepareForNewPart "
+      MOZ_LOG(GetImgLog(),
+             LogLevel::Error, ("imgRequest::PrepareForNewPart "
                             "-- Content type unavailable from the channel\n"));
       return result;
     }
   }
 
-  PR_LOG(GetImgLog(), PR_LOG_DEBUG,
+  MOZ_LOG(GetImgLog(), LogLevel::Debug,
          ("imgRequest::PrepareForNewPart -- Got content type %s\n",
           result.mContentType.get()));
 
@@ -1109,7 +1115,7 @@ imgRequest::OnDataAvailable(nsIRequest* aRequest, nsISupports* aContext,
     image->OnImageDataAvailable(aRequest, aContext, aInStr, aOffset, aCount);
 
   if (NS_FAILED(rv)) {
-    PR_LOG(GetImgLog(), PR_LOG_WARNING,
+    MOZ_LOG(GetImgLog(), LogLevel::Warning,
            ("[this=%p] imgRequest::OnDataAvailable -- "
             "copy to RasterImage failed\n", this));
     Cancel(NS_IMAGELIB_ERROR_FAILURE);
@@ -1227,7 +1233,7 @@ imgRequest::OnRedirectVerifyCallback(nsresult result)
   mTimedChannel = do_QueryInterface(mChannel);
   mNewRedirectChannel = nullptr;
 
-  if (LOG_TEST(PR_LOG_DEBUG)) {
+  if (LOG_TEST(LogLevel::Debug)) {
     nsAutoCString spec;
     if (mCurrentURI) {
       mCurrentURI->GetSpec(spec);
@@ -1254,7 +1260,7 @@ imgRequest::OnRedirectVerifyCallback(nsresult result)
   // Update the current URI.
   mChannel->GetURI(getter_AddRefs(mCurrentURI));
 
-  if (LOG_TEST(PR_LOG_DEBUG)) {
+  if (LOG_TEST(LogLevel::Debug)) {
     nsAutoCString spec;
     if (mCurrentURI) {
       mCurrentURI->GetSpec(spec);

@@ -28,10 +28,10 @@ nsHtml5SpeculativeLoad::Perform(nsHtml5TreeOpExecutor* aExecutor)
       aExecutor->SetSpeculationBase(mUrl);
       break;
     case eSpeculativeLoadMetaReferrer:
-      aExecutor->SetSpeculationReferrerPolicy(mMetaReferrerPolicy);
+      aExecutor->SetSpeculationReferrerPolicy(mReferrerPolicy);
       break;
     case eSpeculativeLoadImage:
-      aExecutor->PreloadImage(mUrl, mCrossOrigin, mSrcset, mSizes);
+      aExecutor->PreloadImage(mUrl, mCrossOrigin, mSrcset, mSizes, mReferrerPolicy);
       break;
     case eSpeculativeLoadOpenPicture:
       aExecutor->PreloadOpenPicture();
@@ -66,6 +66,9 @@ nsHtml5SpeculativeLoad::Perform(nsHtml5TreeOpExecutor* aExecutor)
         aExecutor->SetDocumentCharsetAndSource(narrowName,
                                                intSource);
       }
+      break;
+    case eSpeculativeLoadPreconnect:
+      aExecutor->Preconnect(mUrl, mCrossOrigin);
       break;
     default:
       NS_NOTREACHED("Bogus speculative load.");

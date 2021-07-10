@@ -12,9 +12,12 @@
 #include "base/task.h"                  // for CancelableTask, DeleteTask, etc
 #include "base/tracked.h"               // for FROM_HERE
 #include "mozilla/gfx/Point.h"                   // for IntSize
+#include "mozilla/Hal.h"                // for hal::SetCurrentThreadPriority()
+#include "mozilla/HalTypes.h"           // for hal::THREAD_PRIORITY_COMPOSITOR
 #include "mozilla/ipc/MessageChannel.h" // for MessageChannel, etc
 #include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/ipc/Transport.h"      // for Transport
+#include "mozilla/media/MediaSystemResourceManagerParent.h" // for MediaSystemResourceManagerParent
 #include "mozilla/layers/CompositableTransactionParent.h"
 #include "mozilla/layers/CompositorParent.h"  // for CompositorParent
 #include "mozilla/layers/LayerManagerComposite.h"
@@ -40,6 +43,7 @@ namespace layers {
 
 using namespace mozilla::ipc;
 using namespace mozilla::gfx;
+using namespace mozilla::media;
 
 std::map<base::ProcessId, ImageBridgeParent*> ImageBridgeParent::sImageBridges;
 
@@ -53,6 +57,7 @@ ImageBridgeParent::ImageBridgeParent(MessageLoop* aLoop,
                                      ProcessId aChildProcessId)
   : mMessageLoop(aLoop)
   , mTransport(aTransport)
+  , mSetChildThreadPriority(false)
   , mCompositorThreadHolder(GetCompositorThreadHolder())
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -78,6 +83,12 @@ ImageBridgeParent::~ImageBridgeParent()
                                      new DeleteTask<Transport>(mTransport));
   }
 
+  nsTArray<PImageContainerParent*> parents;
+  ManagedPImageContainerParent(parents);
+  for (PImageContainerParent* p : parents) {
+    delete p;
+  }
+
   sImageBridges.erase(OtherPid());
 }
 
@@ -93,6 +104,20 @@ ImageBridgeParent::ActorDestroy(ActorDestroyReason aWhy)
   MessageLoop::current()->PostTask(
     FROM_HERE,
     NewRunnableMethod(this, &ImageBridgeParent::DeferredDestroy));
+}
+
+bool
+ImageBridgeParent::RecvImageBridgeThreadId(const PlatformThreadId& aThreadId)
+{
+  MOZ_ASSERT(!mSetChildThreadPriority);
+  if (mSetChildThreadPriority) {
+    return false;
+  }
+  mSetChildThreadPriority = true;
+#ifdef MOZ_WIDGET_GONK
+  hal::SetThreadPriority(aThreadId, hal::THREAD_PRIORITY_COMPOSITOR);
+#endif
+  return true;
 }
 
 class MOZ_STACK_CLASS AutoImageBridgeParentAsyncMessageSender
@@ -217,11 +242,12 @@ static  uint64_t GenImageContainerID() {
 
 PCompositableParent*
 ImageBridgeParent::AllocPCompositableParent(const TextureInfo& aInfo,
+                                            PImageContainerParent* aImageContainer,
                                             uint64_t* aID)
 {
   uint64_t id = GenImageContainerID();
   *aID = id;
-  return CompositableHost::CreateIPDLActor(this, aInfo, id);
+  return CompositableHost::CreateIPDLActor(this, aInfo, id, aImageContainer);
 }
 
 bool ImageBridgeParent::DeallocPCompositableParent(PCompositableParent* aActor)
@@ -242,6 +268,33 @@ ImageBridgeParent::DeallocPTextureParent(PTextureParent* actor)
   return TextureHost::DestroyIPDLActor(actor);
 }
 
+PMediaSystemResourceManagerParent*
+ImageBridgeParent::AllocPMediaSystemResourceManagerParent()
+{
+  return new mozilla::media::MediaSystemResourceManagerParent();
+}
+
+bool
+ImageBridgeParent::DeallocPMediaSystemResourceManagerParent(PMediaSystemResourceManagerParent* aActor)
+{
+  MOZ_ASSERT(aActor);
+  delete static_cast<mozilla::media::MediaSystemResourceManagerParent*>(aActor);
+  return true;
+}
+
+PImageContainerParent*
+ImageBridgeParent::AllocPImageContainerParent()
+{
+  return new ImageContainerParent();
+}
+
+bool
+ImageBridgeParent::DeallocPImageContainerParent(PImageContainerParent* actor)
+{
+  delete actor;
+  return true;
+}
+
 void
 ImageBridgeParent::SendAsyncMessage(const InfallibleTArray<AsyncParentMessageData>& aMessage)
 {
@@ -252,6 +305,47 @@ bool
 ImageBridgeParent::RecvChildAsyncMessages(InfallibleTArray<AsyncChildMessageData>&& aMessages)
 {
   return true;
+}
+
+class ProcessIdComparator
+{
+public:
+  bool Equals(const ImageCompositeNotification& aA,
+              const ImageCompositeNotification& aB) const
+  {
+    return aA.imageContainerParent()->OtherPid() == aB.imageContainerParent()->OtherPid();
+  }
+  bool LessThan(const ImageCompositeNotification& aA,
+                const ImageCompositeNotification& aB) const
+  {
+    return aA.imageContainerParent()->OtherPid() < aB.imageContainerParent()->OtherPid();
+  }
+};
+
+/* static */ bool
+ImageBridgeParent::NotifyImageComposites(nsTArray<ImageCompositeNotification>& aNotifications)
+{
+  // Group the notifications by destination process ID and then send the
+  // notifications in one message per group.
+  aNotifications.Sort(ProcessIdComparator());
+  uint32_t i = 0;
+  bool ok = true;
+  while (i < aNotifications.Length()) {
+    nsAutoTArray<ImageCompositeNotification,1> notifications;
+    notifications.AppendElement(aNotifications[i]);
+    uint32_t end = i + 1;
+    ProcessId pid = aNotifications[i].imageContainerParent()->OtherPid();
+    while (end < aNotifications.Length() &&
+           aNotifications[end].imageContainerParent()->OtherPid() == pid) {
+      notifications.AppendElement(aNotifications[end]);
+      ++end;
+    }
+    if (!GetInstance(pid)->SendDidComposite(notifications)) {
+      ok = false;
+    }
+    i = end;
+  }
+  return ok;
 }
 
 MessageLoop * ImageBridgeParent::GetMessageLoop() const {

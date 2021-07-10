@@ -26,8 +26,8 @@
 #include "plbase64.h"
 #include "mozilla/Logging.h"
 
-#define LOG(log, args) PR_LOG(gfxPlatform::GetLog(log), \
-                               PR_LOG_DEBUG, args)
+#define LOG(log, args) MOZ_LOG(gfxPlatform::GetLog(log), \
+                               LogLevel::Debug, args)
 
 #define UNICODE_BMP_LIMIT 0x10000
 

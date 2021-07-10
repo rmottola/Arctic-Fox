@@ -21,9 +21,10 @@
 #include "mozilla/Logging.h"
 #include "VideoUtils.h"
 #include <algorithm>
+#include "gfxPlatform.h"
 
 PRLogModuleInfo* GetAppleMediaLog();
-#define LOG(...) PR_LOG(GetAppleMediaLog(), PR_LOG_DEBUG, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(GetAppleMediaLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 //#define LOG_MEDIA_SHA1
 
 namespace mozilla {
@@ -74,6 +75,11 @@ AppleVDADecoder::~AppleVDADecoder()
 nsresult
 AppleVDADecoder::Init()
 {
+  if (!gfxPlatform::GetPlatform()->CanUseHardwareVideoDecoding()) {
+    // This GPU is blacklisted for hardware decoding.
+    return NS_ERROR_FAILURE;
+  }
+
   if (mDecoder) {
     return NS_OK;
   }

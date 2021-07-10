@@ -52,6 +52,7 @@ class MediaCodecReader : public MediaOmxCommonReader
 {
   typedef mozilla::layers::TextureClient TextureClient;
   typedef mozilla::layers::FenceHandle FenceHandle;
+  typedef MediaOmxCommonReader::MediaResourcePromise MediaResourcePromise;
 
 public:
   MediaCodecReader(AbstractMediaDecoder* aDecoder);
@@ -61,12 +62,6 @@ public:
   // on failure.
   virtual nsresult Init(MediaDecoderReader* aCloneDonor);
 
-  // True if this reader is waiting media resource allocation
-  virtual bool IsWaitingMediaResources();
-
-  // True when this reader need to become dormant state
-  virtual bool IsDormantNeeded() { return true;}
-
   // Release media resources they should be released in dormant state
   virtual void ReleaseMediaResources();
 
@@ -75,10 +70,12 @@ public:
   // irreversible, whereas ReleaseMediaResources() is reversible.
   virtual nsRefPtr<ShutdownPromise> Shutdown();
 
+protected:
   // Used to retrieve some special information that can only be retrieved after
   // all contents have been continuously parsed. (ex. total duration of some
   // variable-bit-rate MP3 files.)
-  virtual void NotifyDataArrived(const char* aBuffer, uint32_t aLength, int64_t aOffset);
+  virtual void NotifyDataArrivedInternal(uint32_t aLength, int64_t aOffset) override;
+public:
 
   // Flush the MediaTaskQueue, flush MediaCodec and raise the mDiscontinuity.
   virtual nsresult ResetDecode() override;
@@ -94,13 +91,7 @@ public:
   virtual bool HasAudio();
   virtual bool HasVideo();
 
-  virtual void PreReadMetadata() override;
-  // Read header data for all bitstreams in the file. Fills aInfo with
-  // the data required to present the media, and optionally fills *aTags
-  // with tag metadata from the file.
-  // Returns NS_OK on success, or NS_ERROR_FAILURE on failure.
-  virtual nsresult ReadMetadata(MediaInfo* aInfo,
-                                MetadataTags** aTags);
+  virtual nsRefPtr<MediaDecoderReader::MetadataPromise> AsyncReadMetadata() override;
 
   // Moves the decode head to aTime microseconds. aStartTime and aEndTime
   // denote the start and end times of the media in usecs, and aCurrentTime
@@ -184,16 +175,17 @@ protected:
 
   virtual bool CreateExtractor();
 
-  // Check the underlying HW resource is available and store the result in
-  // mIsWaitingResources.
-  void UpdateIsWaitingMediaResources();
+  virtual void HandleResourceAllocated();
 
   android::sp<android::MediaExtractor> mExtractor;
-  // A cache value updated by UpdateIsWaitingMediaResources(), makes the
-  // "waiting resources state" is synchronous to StateMachine.
-  bool mIsWaitingResources;
+
+  MediaPromiseHolder<MediaDecoderReader::MetadataPromise> mMetadataPromise;
+  // XXX Remove after bug 1168008 land.
+  MediaPromiseRequestHolder<MediaResourcePromise> mMediaResourceRequest;
+  MediaPromiseHolder<MediaResourcePromise> mMediaResourcePromise;
 
 private:
+
   // An intermediary class that can be managed by android::sp<T>.
   // Redirect codecReserved() and codecCanceled() to MediaCodecReader.
   class VideoResourceListener : public android::MediaCodecProxy::CodecResourceListener
@@ -336,7 +328,7 @@ private:
   MediaCodecReader() = delete;
   const MediaCodecReader& operator=(const MediaCodecReader& rhs) = delete;
 
-  bool ReallocateResources();
+  bool ReallocateExtractorResources();
   void ReleaseCriticalResources();
   void ReleaseResources();
 
@@ -348,10 +340,11 @@ private:
   bool CreateMediaSources();
   void DestroyMediaSources();
 
-  bool CreateMediaCodecs();
+  nsRefPtr<MediaResourcePromise> CreateMediaCodecs();
   static bool CreateMediaCodec(android::sp<android::ALooper>& aLooper,
                                Track& aTrack,
                                bool aAsync,
+                               bool& aIsWaiting,
                                android::wp<android::MediaCodecProxy::CodecResourceListener> aListener);
   static bool ConfigureMediaCodec(Track& aTrack);
   void DestroyMediaCodecs();

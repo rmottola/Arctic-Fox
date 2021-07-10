@@ -22,6 +22,8 @@
 #include "nsWeakReference.h"
 #include "TimingStruct.h"
 #include "AutoClose.h"
+#include "nsIStreamListener.h"
+#include "nsISupportsPrimitives.h"
 
 class nsDNSPrefetch;
 class nsICancelable;
@@ -38,40 +40,6 @@ class HttpChannelSecurityWarningReporter
 public:
   virtual nsresult ReportSecurityMessage(const nsAString& aMessageTag,
                                          const nsAString& aMessageCategory) = 0;
-};
-
-//-----------------------------------------------------------------------------
-// nsHttpChannelCacheKey
-//-----------------------------------------------------------------------------
-
-class nsHttpChannelCacheKey final : public nsISupportsPRUint32,
-                                    public nsISupportsCString
-{
-    NS_DECL_ISUPPORTS
-
-    NS_DECL_NSISUPPORTSPRIMITIVE
-    NS_FORWARD_NSISUPPORTSPRUINT32(mSupportsPRUint32->)
-
-    // Both interfaces declares toString method with the same signature.
-    // Thus we have to delegate only to nsISupportsPRUint32 implementation.
-    NS_IMETHOD GetData(nsACString & aData) override
-    {
-        return mSupportsCString->GetData(aData);
-    }
-    NS_IMETHOD SetData(const nsACString & aData) override
-    {
-        return mSupportsCString->SetData(aData);
-    }
-
-public:
-    nsresult SetData(uint32_t aPostID, const nsACString& aKey);
-    nsresult GetData(uint32_t *aPostID, nsACString& aKey);
-
-protected:
-    ~nsHttpChannelCacheKey() {}
-
-    nsCOMPtr<nsISupportsPRUint32> mSupportsPRUint32;
-    nsCOMPtr<nsISupportsCString> mSupportsCString;
 };
 
 //-----------------------------------------------------------------------------

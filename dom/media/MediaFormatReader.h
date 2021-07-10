@@ -9,19 +9,12 @@
 
 #include "mozilla/Atomics.h"
 #include "mozilla/Maybe.h"
-#include "mozilla/Monitor.h"
 #include "MediaDataDemuxer.h"
 #include "MediaDecoderReader.h"
 #include "MediaTaskQueue.h"
 #include "PlatformDecoderModule.h"
 
 namespace mozilla {
-
-#if defined(MOZ_GONK_MEDIACODEC) || defined(XP_WIN) || defined(MOZ_APPLEMEDIA) || defined(MOZ_FFMPEG)
-#define READER_DORMANT_HEURISTIC
-#else
-#undef READER_DORMANT_HEURISTIC
-#endif
 
 class MediaFormatReader final : public MediaDecoderReader
 {
@@ -30,19 +23,20 @@ class MediaFormatReader final : public MediaDecoderReader
 
 public:
   explicit MediaFormatReader(AbstractMediaDecoder* aDecoder,
-                               MediaDataDemuxer* aDemuxer);
+                             MediaDataDemuxer* aDemuxer,
+                             MediaTaskQueue* aBorrowedTaskQueue = nullptr);
 
   virtual ~MediaFormatReader();
 
-  virtual nsresult Init(MediaDecoderReader* aCloneDonor) override;
+  nsresult Init(MediaDecoderReader* aCloneDonor) override;
 
-  virtual size_t SizeOfVideoQueueInFrames() override;
-  virtual size_t SizeOfAudioQueueInFrames() override;
+  size_t SizeOfVideoQueueInFrames() override;
+  size_t SizeOfAudioQueueInFrames() override;
 
-  virtual nsRefPtr<VideoDataPromise>
+  nsRefPtr<VideoDataPromise>
   RequestVideoData(bool aSkipToNextKeyframe, int64_t aTimeThreshold) override;
 
-  virtual nsRefPtr<AudioDataPromise> RequestAudioData() override;
+  nsRefPtr<AudioDataPromise> RequestAudioData() override;
 
   bool HasVideo() override
   {
@@ -54,55 +48,46 @@ public:
     return mAudio.mTrackDemuxer;
   }
 
-  virtual nsRefPtr<MetadataPromise> AsyncReadMetadata() override;
-  virtual nsresult ReadMetadata(MediaInfo* aInfo,
-                                MetadataTags** aTags) override
-  {
-    // Unused as we provide AsyncReadMetadataAPI.
-    // However we must implement it as it's pure virtual.
-    return NS_OK;
-  }
+  nsRefPtr<MetadataPromise> AsyncReadMetadata() override;
 
-  virtual void ReadUpdatedMetadata(MediaInfo* aInfo) override;
+  void ReadUpdatedMetadata(MediaInfo* aInfo) override;
 
-  virtual nsRefPtr<SeekPromise>
+  nsRefPtr<SeekPromise>
   Seek(int64_t aTime, int64_t aUnused) override;
 
-  virtual bool IsMediaSeekable() override
+  bool IsMediaSeekable() override
   {
     return mSeekable;
   }
 
-  virtual int64_t GetEvictionOffset(double aTime) override;
-  virtual void NotifyDataArrived(const char* aBuffer,
-                                 uint32_t aLength,
-                                 int64_t aOffset) override;
-  virtual void NotifyDataRemoved() override;
+  int64_t GetEvictionOffset(double aTime) override;
+protected:
+  void NotifyDataArrivedInternal(uint32_t aLength, int64_t aOffset) override;
+public:
+  void NotifyDataRemoved() override;
 
-  virtual media::TimeIntervals GetBuffered() override;
+  media::TimeIntervals GetBuffered() override;
+
+  bool ForceZeroStartTime() const override;
 
   // For Media Resource Management
-  virtual void SetIdle() override;
-  virtual bool IsWaitingMediaResources() override;
-  virtual bool IsDormantNeeded() override;
-  virtual void ReleaseMediaResources() override;
-  virtual void SetSharedDecoderManager(SharedDecoderManager* aManager)
+  void SetIdle() override;
+  void ReleaseMediaResources() override;
+  void SetSharedDecoderManager(SharedDecoderManager* aManager)
     override;
 
-  virtual nsresult ResetDecode() override;
+  nsresult ResetDecode() override;
 
-  virtual nsRefPtr<ShutdownPromise> Shutdown() override;
+  nsRefPtr<ShutdownPromise> Shutdown() override;
 
-  virtual bool IsAsync() const override { return true; }
+  bool IsAsync() const override { return true; }
 
-  virtual void DisableHardwareAcceleration() override;
+  void DisableHardwareAcceleration() override;
 
-  virtual bool IsWaitForDataSupported() override { return true; }
-  virtual nsRefPtr<WaitForDataPromise> WaitForData(MediaData::Type aType) override;
+  bool IsWaitForDataSupported() override { return true; }
+  nsRefPtr<WaitForDataPromise> WaitForData(MediaData::Type aType) override;
 
-  virtual bool IsWaitingOnCDMResource() override;
-
-  int64_t ComputeStartTime(const VideoData* aVideo, const AudioData* aAudio) override;
+  bool IsWaitingOnCDMResource() override;
 
   bool UseBufferingHeuristics() override
   {
@@ -170,19 +155,19 @@ private:
       , mType(aType)
     {
     }
-    virtual void Output(MediaData* aSample) override {
+    void Output(MediaData* aSample) override {
       mReader->Output(mType, aSample);
     }
-    virtual void InputExhausted() override {
+    void InputExhausted() override {
       mReader->InputExhausted(mType);
     }
-    virtual void Error() override {
+    void Error() override {
       mReader->Error(mType);
     }
-    virtual void DrainComplete() override {
+    void DrainComplete() override {
       mReader->DrainComplete(mType);
     }
-    virtual void ReleaseMediaResources() override {
+    void ReleaseMediaResources() override {
       mReader->ReleaseMediaResources();
     }
   private:
@@ -212,8 +197,6 @@ private:
       , mNumSamplesOutput(0)
       , mSizeOfQueue(0)
       , mLastStreamSourceID(UINT32_MAX)
-      , mMonitor(aType == MediaData::AUDIO_DATA ? "audio decoder data"
-                                                : "video decoder data")
     {}
 
     MediaFormatReader* mOwner;
@@ -305,9 +288,6 @@ private:
     // Sample format monitoring.
     uint32_t mLastStreamSourceID;
     Maybe<uint32_t> mNextStreamSourceID;
-    // Monitor that protects all non-threadsafe state; the primitives
-    // that follow.
-    Monitor mMonitor;
     media::TimeIntervals mTimeRanges;
     nsRefPtr<SharedTrackInfo> mInfo;
   };
@@ -426,9 +406,6 @@ private:
   nsRefPtr<MediaDataDemuxer> mMainThreadDemuxer;
   nsRefPtr<MediaTrackDemuxer> mAudioTrackDemuxer;
   nsRefPtr<MediaTrackDemuxer> mVideoTrackDemuxer;
-  ByteInterval mDataRange;
-  media::TimeIntervals mCachedTimeRanges;
-  bool mCachedTimeRangesStale;
 
 #if defined(READER_DORMANT_HEURISTIC)
   const bool mDormantEnabled;

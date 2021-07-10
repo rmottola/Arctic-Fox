@@ -9,6 +9,7 @@ Cu.import("resource://gre/modules/FxAccounts.jsm");
 Cu.import("resource://gre/modules/FxAccountsCommon.js");
 Cu.import("resource://gre/modules/FxAccountsManager.jsm");
 Cu.import("resource://gre/modules/Promise.jsm");
+Cu.import("resource://testing-common/MockRegistrar.jsm");
 
 // === Mocks ===
 
@@ -20,22 +21,16 @@ let deletedOnServer = false;
 let certExpired = false;
 
 // Mock RP
-let principal = {origin: 'app://settings.gaiamobile.org', appId: 27}
+function makePrincipal(origin, appId) {
+  let secMan = Cc["@mozilla.org/scriptsecuritymanager;1"]
+                 .getService(Ci.nsIScriptSecurityManager);
+  let uri = Services.io.newURI(origin, null, null);
+  return secMan.getAppCodebasePrincipal(uri, appId, false);
+}
+let principal = makePrincipal('app://settings.gaiamobile.org', 27, false);
 
-// Override FxAccountsUIGlue.
-const kFxAccountsUIGlueUUID = "{8f6d5d87-41ed-4bb5-aa28-625de57564c5}";
-const kFxAccountsUIGlueContractID =
-  "@mozilla.org/fxaccounts/fxaccounts-ui-glue;1";
-
-// Save original FxAccountsUIGlue factory.
-const kFxAccountsUIGlueFactory =
-  Cm.getClassObject(Cc[kFxAccountsUIGlueContractID], Ci.nsIFactory);
-
-let fakeFxAccountsUIGlueFactory = {
-  createInstance: function(aOuter, aIid) {
-    return FxAccountsUIGlue.QueryInterface(aIid);
-  }
-};
+// For override FxAccountsUIGlue.
+let fakeFxAccountsUIGlueCID;
 
 // FxAccountsUIGlue fake component.
 let FxAccountsUIGlue = {
@@ -91,11 +86,9 @@ let FxAccountsUIGlue = {
 };
 
 (function registerFakeFxAccountsUIGlue() {
-  Cm.QueryInterface(Ci.nsIComponentRegistrar)
-    .registerFactory(Components.ID(kFxAccountsUIGlueUUID),
-                     "FxAccountsUIGlue",
-                     kFxAccountsUIGlueContractID,
-                     fakeFxAccountsUIGlueFactory);
+  fakeFxAccountsUIGlueCID =
+    MockRegistrar.register("@mozilla.org/fxaccounts/fxaccounts-ui-glue;1",
+                           FxAccountsUIGlue);
 })();
 
 // Save original fxAccounts instance
@@ -246,16 +239,7 @@ FxAccountsManager._getFxAccountsClient = function() {
 // Unregister mocks and restore original code.
 do_register_cleanup(function() {
   // Unregister the factory so we do not leak
-  Cm.QueryInterface(Ci.nsIComponentRegistrar)
-    .unregisterFactory(Components.ID(kFxAccountsUIGlueUUID),
-                       fakeFxAccountsUIGlueFactory);
-
-  // Restore the original factory.
-  Cm.QueryInterface(Ci.nsIComponentRegistrar)
-    .registerFactory(Components.ID(kFxAccountsUIGlueUUID),
-                     "FxAccountsUIGlue",
-                     kFxAccountsUIGlueContractID,
-                     kFxAccountsUIGlueFactory);
+  MockRegistrar.unregister(fakeFxAccountsUIGlueCID);
 
   // Restore the original FxAccounts instance from FxAccountsManager.
   FxAccountsManager._fxAccounts = kFxAccounts;
@@ -465,15 +449,10 @@ add_test(function(test_getAssertion_refreshAuth) {
 add_test(function(test_getAssertion_no_permissions) {
   do_print("= getAssertion no permissions =");
 
-  let noPermissionsPrincipal = {origin: 'app://dummy', appId: 28};
-  let secMan = Cc["@mozilla.org/scriptsecuritymanager;1"]
-                 .getService(Ci.nsIScriptSecurityManager);
-  let uri = Services.io.newURI(noPermissionsPrincipal.origin, null, null);
-  let _principal = secMan.getAppCodebasePrincipal(uri,
-    noPermissionsPrincipal.appId, false);
+  let noPermissionsPrincipal = makePrincipal('app://dummy', 28);
   let permMan = Cc["@mozilla.org/permissionmanager;1"]
                   .getService(Ci.nsIPermissionManager);
-  permMan.addFromPrincipal(_principal, FXACCOUNTS_PERMISSION,
+  permMan.addFromPrincipal(noPermissionsPrincipal, FXACCOUNTS_PERMISSION,
                            Ci.nsIPermissionManager.DENY_ACTION);
 
   FxAccountsUIGlue._activeSession = {
@@ -499,15 +478,10 @@ add_test(function(test_getAssertion_no_permissions) {
 add_test(function(test_getAssertion_permission_prompt_action) {
   do_print("= getAssertion PROMPT_ACTION permission =");
 
-  let promptPermissionsPrincipal = {origin: 'app://dummy-prompt', appId: 29};
-  let secMan = Cc["@mozilla.org/scriptsecuritymanager;1"]
-                 .getService(Ci.nsIScriptSecurityManager);
-  let uri = Services.io.newURI(promptPermissionsPrincipal.origin, null, null);
-  let _principal = secMan.getAppCodebasePrincipal(uri,
-    promptPermissionsPrincipal.appId, false);
+  let promptPermissionsPrincipal = makePrincipal('app://dummy-prompt', 29);
   let permMan = Cc["@mozilla.org/permissionmanager;1"]
                   .getService(Ci.nsIPermissionManager);
-  permMan.addFromPrincipal(_principal, FXACCOUNTS_PERMISSION,
+  permMan.addFromPrincipal(promptPermissionsPrincipal, FXACCOUNTS_PERMISSION,
                            Ci.nsIPermissionManager.PROMPT_ACTION);
 
   FxAccountsUIGlue._activeSession = {
@@ -523,7 +497,7 @@ add_test(function(test_getAssertion_permission_prompt_action) {
       do_check_eq(result, "assertion");
 
       let permission = permMan.testPermissionFromPrincipal(
-        _principal,
+        promptPermissionsPrincipal,
         FXACCOUNTS_PERMISSION
       );
       do_check_eq(permission, Ci.nsIPermissionManager.ALLOW_ACTION);
@@ -540,15 +514,10 @@ add_test(function(test_getAssertion_permission_prompt_action) {
 add_test(function(test_getAssertion_permission_prompt_action_refreshing) {
   do_print("= getAssertion PROMPT_ACTION permission already refreshing =");
 
-  let promptPermissionsPrincipal = {origin: 'app://dummy-prompt-2', appId: 30};
-  let secMan = Cc["@mozilla.org/scriptsecuritymanager;1"]
-                 .getService(Ci.nsIScriptSecurityManager);
-  let uri = Services.io.newURI(promptPermissionsPrincipal.origin, null, null);
-  let _principal = secMan.getAppCodebasePrincipal(uri,
-    promptPermissionsPrincipal.appId, false);
+  let promptPermissionsPrincipal = makePrincipal('app://dummy-prompt-2', 30);
   let permMan = Cc["@mozilla.org/permissionmanager;1"]
                   .getService(Ci.nsIPermissionManager);
-  permMan.addFromPrincipal(_principal, FXACCOUNTS_PERMISSION,
+  permMan.addFromPrincipal(promptPermissionsPrincipal, FXACCOUNTS_PERMISSION,
                            Ci.nsIPermissionManager.PROMPT_ACTION);
 
   FxAccountsUIGlue._activeSession = {
@@ -566,7 +535,7 @@ add_test(function(test_getAssertion_permission_prompt_action_refreshing) {
       do_check_null(result);
 
       let permission = permMan.testPermissionFromPrincipal(
-        _principal,
+        promptPermissionsPrincipal,
         FXACCOUNTS_PERMISSION
       );
       do_check_eq(permission, Ci.nsIPermissionManager.PROMPT_ACTION);

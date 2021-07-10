@@ -13,9 +13,13 @@
 #include "nsHttpChannel.h"
 #include "HttpChannelChild.h"
 #include "nsHttpResponseHead.h"
+#include "mozilla/dom/ChannelInfo.h"
 
 namespace mozilla {
 namespace net {
+
+extern bool
+WillRedirect(const nsHttpResponseHead * response);
 
 extern nsresult
 DoAddCacheEntryHeaders(nsHttpChannel *self,
@@ -183,6 +187,13 @@ InterceptedChannelChrome::FinishSynthesizedResponse()
 
   EnsureSynthesizedResponse();
 
+  // If the synthesized response is a redirect, then we want to respect
+  // the encoding of whatever is loaded as a result.
+  if (WillRedirect(mSynthesizedResponseHead.ref())) {
+    nsresult rv = mChannel->SetApplyConversion(mOldApplyConversion);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
   mChannel->MarkIntercepted();
 
   // First we ensure the appropriate metadata is set on the synthesized cache entry
@@ -233,9 +244,13 @@ InterceptedChannelChrome::Cancel()
 }
 
 NS_IMETHODIMP
-InterceptedChannelChrome::SetSecurityInfo(nsISupports* aSecurityInfo)
+InterceptedChannelChrome::SetChannelInfo(dom::ChannelInfo* aChannelInfo)
 {
-  return mChannel->OverrideSecurityInfo(aSecurityInfo);
+  if (!mChannel) {
+    return NS_ERROR_FAILURE;
+  }
+
+  return aChannelInfo->ResurrectInfoOnChannel(mChannel);
 }
 
 InterceptedChannelContent::InterceptedChannelContent(HttpChannelChild* aChannel,
@@ -336,9 +351,13 @@ InterceptedChannelContent::Cancel()
 }
 
 NS_IMETHODIMP
-InterceptedChannelContent::SetSecurityInfo(nsISupports* aSecurityInfo)
+InterceptedChannelContent::SetChannelInfo(dom::ChannelInfo* aChannelInfo)
 {
-  return mChannel->OverrideSecurityInfo(aSecurityInfo);
+  if (!mChannel) {
+    return NS_ERROR_FAILURE;
+  }
+
+  return aChannelInfo->ResurrectInfoOnChannel(mChannel);
 }
 
 } // namespace net

@@ -13,6 +13,7 @@
 #include "nsCSSPropertySet.h"
 #include "nsCSSValue.h"
 #include "nsCycleCollectionParticipant.h"
+#include "nsDOMMutationObserver.h"
 #include "nsStyleContext.h"
 #include "nsIFrame.h"
 #include "nsLayoutUtils.h"
@@ -134,15 +135,28 @@ CommonAnimationManager::NeedsRefresh() const
 }
 
 AnimationCollection*
-CommonAnimationManager::GetAnimationsForCompositor(nsIContent* aContent,
-                                                   nsIAtom* aElementProperty,
+CommonAnimationManager::GetAnimationsForCompositor(const nsIFrame* aFrame,
                                                    nsCSSProperty aProperty)
 {
-  if (!aContent->MayHaveAnimations())
+  nsIContent *content;
+  nsCSSPseudoElements::Type pseudoType;
+  if (!nsLayoutUtils::GetAnimationContent(aFrame, content, pseudoType)) {
     return nullptr;
+  }
+
+  nsIAtom *animProp;
+  if (pseudoType == nsCSSPseudoElements::ePseudo_NotPseudoElement) {
+    animProp = GetAnimationsAtom();
+  } else if (pseudoType == nsCSSPseudoElements::ePseudo_before) {
+    animProp = GetAnimationsBeforeAtom();
+  } else if (pseudoType == nsCSSPseudoElements::ePseudo_after) {
+    animProp = GetAnimationsAfterAtom();
+  } else {
+    return nullptr;
+  }
 
   AnimationCollection* collection =
-    static_cast<AnimationCollection*>(aContent->GetProperty(aElementProperty));
+    static_cast<AnimationCollection*>(content->GetProperty(animProp));
   if (!collection ||
       !collection->HasAnimationOfProperty(aProperty) ||
       !collection->CanPerformOnCompositorThread(
@@ -341,11 +355,12 @@ CommonAnimationManager::GetAnimations(dom::Element *aElement,
                             &AnimationCollection::PropertyDtor, false);
     if (NS_FAILED(rv)) {
       NS_WARNING("SetProperty failed");
-      delete collection;
+      // The collection must be destroyed via PropertyDtor, otherwise
+      // mCalledPropertyDtor assertion is triggered in destructor.
+      AnimationCollection::PropertyDtor(aElement, propName, collection, nullptr);
       return nullptr;
     }
-    if (propName == nsGkAtoms::animationsProperty ||
-        propName == nsGkAtoms::transitionsProperty) {
+    if (aPseudoType == nsCSSPseudoElements::ePseudo_NotPseudoElement) {
       aElement->SetMayHaveAnimations();
     }
 
@@ -585,21 +600,12 @@ bool
 AnimationCollection::CanPerformOnCompositorThread(
   CanAnimateFlags aFlags) const
 {
-  nsIFrame* frame = nsLayoutUtils::GetStyleFrame(mElement);
-  if (!frame) {
+  dom::Element* element = GetElementToRestyle();
+  if (!element) {
     return false;
   }
-
-  if (mElementProperty != nsGkAtoms::transitionsProperty &&
-      mElementProperty != nsGkAtoms::animationsProperty) {
-    if (nsLayoutUtils::IsAnimationLoggingEnabled()) {
-      nsCString message;
-      message.AppendLiteral("Gecko bug: Async animation of pseudoelements"
-                            " not supported.  See bug 771367 (");
-      message.Append(nsAtomCString(mElementProperty));
-      message.Append(")");
-      LogAsyncAnimationFailure(message, mElement);
-    }
+  nsIFrame* frame = nsLayoutUtils::GetStyleFrame(element);
+  if (!frame) {
     return false;
   }
 
@@ -636,7 +642,7 @@ AnimationCollection::CanPerformOnCompositorThread(
     for (size_t propIdx = 0, propEnd = effect->Properties().Length();
          propIdx != propEnd; ++propIdx) {
       const AnimationProperty& prop = effect->Properties()[propIdx];
-      if (!CanAnimatePropertyOnCompositor(mElement,
+      if (!CanAnimatePropertyOnCompositor(element,
                                           prop.mProperty,
                                           aFlags) ||
           IsCompositorAnimationDisabledForFrame(frame)) {
@@ -756,6 +762,13 @@ AnimationCollection::PropertyDtor(void *aObject, nsIAtom *aPropertyName,
   MOZ_ASSERT(!collection->mCalledPropertyDtor, "can't call dtor twice");
   collection->mCalledPropertyDtor = true;
 #endif
+  {
+    nsAutoAnimationMutationBatch mb(collection->mElement);
+
+    for (size_t animIdx = collection->mAnimations.Length(); animIdx-- != 0; ) {
+      collection->mAnimations[animIdx]->CancelFromStyle();
+    }
+  }
   delete collection;
 }
 
@@ -847,10 +860,15 @@ AnimationCollection::CanThrottleTransformChanges(TimeStamp aTime)
     return true;
   }
 
+  dom::Element* element = GetElementToRestyle();
+  if (!element) {
+    return false;
+  }
+
   // If the nearest scrollable ancestor has overflow:hidden,
   // we don't care about overflow.
   nsIScrollableFrame* scrollable = nsLayoutUtils::GetNearestScrollableFrame(
-                                     nsLayoutUtils::GetStyleFrame(mElement));
+                                     nsLayoutUtils::GetStyleFrame(element));
   if (!scrollable) {
     return true;
   }
@@ -868,7 +886,11 @@ AnimationCollection::CanThrottleTransformChanges(TimeStamp aTime)
 bool
 AnimationCollection::CanThrottleAnimation(TimeStamp aTime)
 {
-  nsIFrame* frame = nsLayoutUtils::GetStyleFrame(mElement);
+  dom::Element* element = GetElementToRestyle();
+  if (!element) {
+    return false;
+  }
+  nsIFrame* frame = nsLayoutUtils::GetStyleFrame(element);
   if (!frame) {
     return false;
   }

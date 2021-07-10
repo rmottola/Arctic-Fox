@@ -19,7 +19,6 @@
 #include "jsprf.h"
 #include "jsscript.h"
 #include "jsstr.h"
-#include "prmjtime.h"
 
 #include "gc/Marking.h"
 #include "jit/BaselineJIT.h"
@@ -32,6 +31,7 @@
 #include "vm/HelperThreads.h"
 #include "vm/Opcodes.h"
 #include "vm/Shape.h"
+#include "vm/Time.h"
 #include "vm/UnboxedObject.h"
 
 #include "jsatominlines.h"
@@ -2836,9 +2836,6 @@ ObjectGroup::markUnknown(ExclusiveContext* cx)
     clearNewScript(cx);
     ObjectStateChange(cx, this, true);
 
-    if (ObjectGroup* unboxedGroup = maybeOriginalUnboxedGroup())
-        unboxedGroup->markUnknown(cx);
-
     /*
      * Existing constraints may have already been added to this object, which we need
      * to do the right thing for. We can't ensure that we will mark all unknown
@@ -2857,6 +2854,8 @@ ObjectGroup::markUnknown(ExclusiveContext* cx)
         }
     }
 
+    if (ObjectGroup* unboxedGroup = maybeOriginalUnboxedGroup())
+        MarkObjectGroupUnknownProperties(cx, unboxedGroup);
     if (maybeUnboxedLayout() && maybeUnboxedLayout()->nativeGroup())
         MarkObjectGroupUnknownProperties(cx, maybeUnboxedLayout()->nativeGroup());
     if (ObjectGroup* unboxedGroup = maybeOriginalUnboxedGroup())
@@ -3314,6 +3313,19 @@ PreliminaryObjectArray::registerNewObject(JSObject* res)
     }
 
     MOZ_CRASH("There should be room for registering the new object");
+}
+
+void
+PreliminaryObjectArray::unregisterObject(JSObject* obj)
+{
+    for (size_t i = 0; i < COUNT; i++) {
+        if (objects[i] == obj) {
+            objects[i] = nullptr;
+            return;
+        }
+    }
+
+    MOZ_CRASH("The object should be in the array");
 }
 
 bool

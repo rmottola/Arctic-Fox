@@ -57,6 +57,8 @@ HttpChannelParent::HttpChannelParent(const PBrowserOrId& iframeEmbedding,
   , mDivertingFromChild(false)
   , mDivertedOnStartRequest(false)
   , mSuspendedForDiversion(false)
+  , mShouldIntercept(false)
+  , mShouldSuspendIntercept(false)
   , mNestedFrameId(0)
 {
   LOG(("Creating HttpChannelParent [this=%p]\n", this));
@@ -92,6 +94,13 @@ HttpChannelParent::ActorDestroy(ActorDestroyReason why)
   // yet, but child process has crashed.  We must not try to send any more msgs
   // to child, or IPDL will kill chrome process, too.
   mIPCClosed = true;
+
+  // If this is an intercepted channel, we need to make sure that any resources are
+  // cleaned up to avoid leaks.
+  if (mInterceptedChannel) {
+    mInterceptedChannel->Cancel();
+    mInterceptedChannel = nullptr;
+  }
 }
 
 bool
@@ -111,15 +120,13 @@ HttpChannelParent::Init(const HttpChannelCreationArgs& aArgs)
                        a.thirdPartyFlags(), a.resumeAt(), a.startPos(),
                        a.entityID(), a.chooseApplicationCache(),
                        a.appCacheClientID(), a.allowSpdy(), a.allowAltSvc(), a.fds(),
-                       a.requestingPrincipalInfo(), a.triggeringPrincipalInfo(),
-                       a.securityFlags(), a.contentPolicyType(), a.innerWindowID(),
-                       a.synthesizedResponseHead(), a.cacheKey(),
+                       a.loadInfo(), a.synthesizedResponseHead(), a.cacheKey(),
                        a.allowStaleCacheContent());
   }
   case HttpChannelCreationArgs::THttpChannelConnectArgs:
   {
     const HttpChannelConnectArgs& cArgs = aArgs.get_HttpChannelConnectArgs();
-    return ConnectChannel(cArgs.channelId());
+    return ConnectChannel(cArgs.channelId(), cArgs.shouldIntercept());
   }
   default:
     NS_NOTREACHED("unknown open type");
@@ -144,7 +151,7 @@ NS_IMPL_ISUPPORTS(HttpChannelParent,
 NS_IMETHODIMP
 HttpChannelParent::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNavigate, bool* aShouldIntercept)
 {
-  *aShouldIntercept = !!mSynthesizedResponseHead;
+  *aShouldIntercept = mShouldIntercept;
   return NS_OK;
 }
 
@@ -189,6 +196,11 @@ public:
 NS_IMETHODIMP
 HttpChannelParent::ChannelIntercepted(nsIInterceptedChannel* aChannel)
 {
+  if (mShouldSuspendIntercept) {
+    mInterceptedChannel = aChannel;
+    return NS_OK;
+  }
+
   aChannel->SynthesizeStatus(mSynthesizedResponseHead->Status(),
                              mSynthesizedResponseHead->StatusText());
   nsCOMPtr<nsIHttpHeaderVisitor> visitor = new HeaderVisitor(aChannel);
@@ -216,7 +228,7 @@ HttpChannelParent::GetInterface(const nsIID& aIID, void **result)
   }
 
   // Only support nsIAuthPromptProvider in Content process
-  if (XRE_GetProcessType() == GeckoProcessType_Default &&
+  if (XRE_IsParentProcess() &&
       aIID.Equals(NS_GET_IID(nsIAuthPromptProvider))) {
     *result = nullptr;
     return NS_OK;
@@ -224,8 +236,8 @@ HttpChannelParent::GetInterface(const nsIID& aIID, void **result)
 
   // Only support nsILoadContext if child channel's callbacks did too
   if (aIID.Equals(NS_GET_IID(nsILoadContext)) && mLoadContext) {
-    NS_ADDREF(mLoadContext);
-    *result = static_cast<nsILoadContext*>(mLoadContext);
+    nsCOMPtr<nsILoadContext> copy = mLoadContext;
+    copy.forget(result);
     return NS_OK;
   }
 
@@ -263,13 +275,9 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
                                  const bool&                allowSpdy,
                                  const bool&                allowAltSvc,
                                  const OptionalFileDescriptorSet& aFds,
-                                 const ipc::PrincipalInfo&  aRequestingPrincipalInfo,
-                                 const ipc::PrincipalInfo&  aTriggeringPrincipalInfo,
-                                 const uint32_t&            aSecurityFlags,
-                                 const uint32_t&            aContentPolicyType,
-                                 const uint32_t&            aInnerWindowID,
+                                 const LoadInfoArgs&        aLoadInfoArgs,
                                  const OptionalHttpResponseHead& aSynthesizedResponseHead,
-                                 const OptionalHttpChannelCacheKey& aCacheKey,
+                                 const uint32_t&            aCacheKey,
                                  const bool&                aAllowStaleCacheContent)
 {
   nsCOMPtr<nsIURI> uri = DeserializeURI(aURI);
@@ -295,17 +303,6 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
   if (NS_FAILED(rv))
     return SendFailedAsyncOpen(rv);
 
-  nsCOMPtr<nsIPrincipal> requestingPrincipal =
-    mozilla::ipc::PrincipalInfoToPrincipal(aRequestingPrincipalInfo, &rv);
-  if (NS_FAILED(rv)) {
-    return SendFailedAsyncOpen(rv);
-  }
-  nsCOMPtr<nsIPrincipal> triggeringPrincipal =
-    mozilla::ipc::PrincipalInfoToPrincipal(aTriggeringPrincipalInfo, &rv);
-  if (NS_FAILED(rv)) {
-    return SendFailedAsyncOpen(rv);
-  }
-
   bool appOffline = false;
   uint32_t appId = GetAppId();
   if (appId != NECKO_UNKNOWN_APP_ID &&
@@ -320,10 +317,12 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
     loadFlags |= nsICachingChannel::LOAD_NO_NETWORK_IO;
   }
 
-  nsCOMPtr<nsILoadInfo> loadInfo =
-    new mozilla::LoadInfo(requestingPrincipal, triggeringPrincipal,
-                          aSecurityFlags, aContentPolicyType,
-                          aInnerWindowID);
+  nsCOMPtr<nsILoadInfo> loadInfo;
+  rv = mozilla::ipc::LoadInfoArgsToLoadInfo(aLoadInfoArgs,
+                                            getter_AddRefs(loadInfo));
+  if (NS_FAILED(rv)) {
+    return SendFailedAsyncOpen(rv);
+  }
 
   nsCOMPtr<nsIChannel> channel;
   rv = NS_NewChannelInternal(getter_AddRefs(channel), uri, loadInfo,
@@ -392,16 +391,23 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
 
   if (aSynthesizedResponseHead.type() == OptionalHttpResponseHead::TnsHttpResponseHead) {
     mSynthesizedResponseHead = new nsHttpResponseHead(aSynthesizedResponseHead.get_nsHttpResponseHead());
+    mShouldIntercept = true;
+  } else {
+    mChannel->ForceNoIntercept();
   }
 
-  if (aCacheKey.type() == OptionalHttpChannelCacheKey::THttpChannelCacheKey) {
-    nsRefPtr<nsHttpChannelCacheKey> cacheKey = new nsHttpChannelCacheKey();
-    cacheKey->SetData(aCacheKey.get_HttpChannelCacheKey().postId(),
-                      aCacheKey.get_HttpChannelCacheKey().key());
-    nsCOMPtr<nsISupports> cacheKeySupp;
-    CallQueryInterface(cacheKey.get(), getter_AddRefs(cacheKeySupp));
-    mChannel->SetCacheKey(cacheKeySupp);
+  nsCOMPtr<nsISupportsPRUint32> cacheKey =
+    do_CreateInstance(NS_SUPPORTS_PRUINT32_CONTRACTID, &rv);
+  if (NS_FAILED(rv)) {
+    return SendFailedAsyncOpen(rv);
   }
+
+  rv = cacheKey->SetData(aCacheKey);
+  if (NS_FAILED(rv)) {
+    return SendFailedAsyncOpen(rv);
+  }
+
+  mChannel->SetCacheKey(cacheKey);
 
   if (priority != nsISupportsPriority::PRIORITY_NORMAL) {
     mChannel->SetPriority(priority);
@@ -467,7 +473,7 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
 }
 
 bool
-HttpChannelParent::ConnectChannel(const uint32_t& channelId)
+HttpChannelParent::ConnectChannel(const uint32_t& channelId, const bool& shouldIntercept)
 {
   nsresult rv;
 
@@ -477,6 +483,13 @@ HttpChannelParent::ConnectChannel(const uint32_t& channelId)
   rv = NS_LinkRedirectChannels(channelId, this, getter_AddRefs(channel));
   mChannel = static_cast<nsHttpChannel*>(channel.get());
   LOG(("  found channel %p, rv=%08x", mChannel.get(), rv));
+
+  mShouldIntercept = shouldIntercept;
+  if (mShouldIntercept) {
+    // When an interception occurs, this channel should suspend all further activity.
+    // It will be torn down and recreated if necessary.
+    mShouldSuspendIntercept = true;
+  }
 
   if (mPBOverride != kPBOverride_Unset) {
     // redirected-to channel may not support PB
@@ -819,19 +832,20 @@ HttpChannelParent::OnStartRequest(nsIRequest *aRequest, nsISupports *aContext)
   uint16_t redirectCount = 0;
   mChannel->GetRedirectCount(&redirectCount);
 
-  nsCOMPtr<nsISupports> cacheKeySupp;
-  mChannel->GetCacheKey(getter_AddRefs(cacheKeySupp));
-  uint32_t postId = 0;
-  nsAutoCString key;
-  if (cacheKeySupp) {
-    nsresult rv = static_cast<nsHttpChannelCacheKey *>(
-      static_cast<nsISupportsPRUint32 *>(cacheKeySupp.get()))->GetData(&postId,
-                                                                       key);
+  nsCOMPtr<nsISupports> cacheKey;
+  mChannel->GetCacheKey(getter_AddRefs(cacheKey));
+  uint32_t cacheKeyValue = 0;
+  if (cacheKey) {
+    nsCOMPtr<nsISupportsPRUint32> container = do_QueryInterface(cacheKey);
+    if (!container) {
+      return NS_ERROR_ILLEGAL_VALUE;
+    }
+
+    nsresult rv = container->GetData(&cacheKeyValue);
     if (NS_FAILED(rv)) {
       return rv;
     }
   }
-  HttpChannelCacheKey cacheKey = HttpChannelCacheKey(postId, key);
 
   if (mIPCClosed ||
       !SendOnStartRequest(channelStatus,
@@ -843,7 +857,7 @@ HttpChannelParent::OnStartRequest(nsIRequest *aRequest, nsISupports *aContext)
                           expirationTime, cachedCharset, secInfoSerialization,
                           mChannel->GetSelfAddr(), mChannel->GetPeerAddr(),
                           redirectCount,
-                          cacheKey))
+                          cacheKeyValue))
   {
     return NS_ERROR_UNEXPECTED;
   }

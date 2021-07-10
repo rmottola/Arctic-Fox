@@ -18,6 +18,7 @@ const events = require("sdk/event/core");
 const protocol = require("devtools/server/protocol");
 const {Arg, Option, method, RetVal, types} = protocol;
 const {LongStringActor, ShortLongString} = require("devtools/server/actors/string");
+const {fetch} = require("devtools/toolkit/DevToolsUtils");
 
 loader.lazyGetter(this, "CssLogic", () => require("devtools/styleinspector/css-logic").CssLogic);
 
@@ -48,12 +49,16 @@ let StyleSheetsActor = exports.StyleSheetsActor = protocol.ActorClass({
   /**
    * The window we work with, taken from the parent actor.
    */
-  get window() this.parentActor.window,
+  get window() {
+    return this.parentActor.window;
+  },
 
   /**
    * The current content document of the window we work with.
    */
-  get document() this.window.document,
+  get document() {
+    return this.window.document;
+  },
 
   form: function()
   {
@@ -237,9 +242,13 @@ let MediaRuleActor = protocol.ActorClass({
     }
   },
 
-  get window() this.parentActor.window,
+  get window() {
+    return this.parentActor.window;
+  },
 
-  get document() this.window.document,
+  get document() {
+    return this.window.document;
+  },
 
   get matches() {
     return this.mql ? this.mql.matches : null;
@@ -323,11 +332,21 @@ let MediaRuleFront = protocol.FrontClass(MediaRuleActor, {
     this._form = form;
   },
 
-  get mediaText() this._form.mediaText,
-  get conditionText() this._form.conditionText,
-  get matches() this._form.matches,
-  get line() this._form.line || -1,
-  get column() this._form.column || -1,
+  get mediaText() {
+    return this._form.mediaText;
+  },
+  get conditionText() {
+    return this._form.conditionText;
+  },
+  get matches() {
+    return this._form.matches;
+  },
+  get line() {
+    return this._form.line || -1;
+  },
+  get column() {
+    return this._form.column || -1;
+  },
   get parentStyleSheet() {
     return this.conn.getActor(this._form.parentStyleSheet);
   }
@@ -364,19 +383,27 @@ let StyleSheetActor = protocol.ActorClass({
   /**
    * Window of target
    */
-  get window() this._window || this.parentActor.window,
+  get window() {
+    return this._window || this.parentActor.window;
+  },
 
   /**
    * Document of target.
    */
-  get document() this.window.document,
+  get document() {
+    return this.window.document;
+  },
 
-  get ownerNode() this.rawSheet.ownerNode,
+  get ownerNode() {
+    return this.rawSheet.ownerNode;
+  },
 
   /**
    * URL of underlying stylesheet.
    */
-  get href() this.rawSheet.href,
+  get href() {
+    return this.rawSheet.href;
+  },
 
   /**
    * Retrieve the index (order) of stylesheet in the document.
@@ -558,8 +585,9 @@ let StyleSheetActor = protocol.ActorClass({
     }
 
     let options = {
-      window: this.window,
       loadFromCache: true,
+      policy: Ci.nsIContentPolicy.TYPE_STYLESHEET,
+      window: this.window,
       charset: this._getCSSCharset()
     };
 
@@ -642,8 +670,12 @@ let StyleSheetActor = protocol.ActorClass({
       };
 
       url = normalize(url, this.href);
-
-      let map = fetch(url, { loadFromCache: false, window: this.window })
+      let options = {
+        loadFromCache: false,
+        policy: Ci.nsIContentPolicy.TYPE_STYLESHEET,
+        window: this.window
+      };
+      let map = fetch(url, options)
         .then(({content}) => {
           let map = new SourceMapConsumer(content, url);
           this._setSourceMapRoot(map, url, this.href);
@@ -956,13 +988,27 @@ var StyleSheetFront = protocol.FrontClass(StyleSheetActor, {
     this._form = form;
   },
 
-  get href() this._form.href,
-  get nodeHref() this._form.nodeHref,
-  get disabled() !!this._form.disabled,
-  get title() this._form.title,
-  get isSystem() this._form.system,
-  get styleSheetIndex() this._form.styleSheetIndex,
-  get ruleCount() this._form.ruleCount
+  get href() {
+    return this._form.href;
+  },
+  get nodeHref() {
+    return this._form.nodeHref;
+  },
+  get disabled() {
+    return !!this._form.disabled;
+  },
+  get title() {
+    return this._form.title;
+  },
+  get isSystem() {
+    return this._form.system;
+  },
+  get styleSheetIndex() {
+    return this._form.styleSheetIndex;
+  },
+  get ruleCount() {
+    return this._form.ruleCount;
+  }
 });
 
 /**
@@ -1000,7 +1046,11 @@ let OriginalSourceActor = protocol.ActorClass({
       this.text = content;
       return promise.resolve(content);
     }
-    return fetch(this.url, { window: this.window }).then(({content}) => {
+    let options = {
+      policy: Ci.nsIContentPolicy.TYPE_STYLESHEET,
+      window: this.window
+    };
+    return fetch(this.url, options).then(({content}) => {
       this.text = content;
       return content;
     });
@@ -1039,8 +1089,12 @@ let OriginalSourceFront = protocol.FrontClass(OriginalSourceActor, {
     this._form = form;
   },
 
-  get href() this._form.url,
-  get url() this._form.url
+  get href() {
+    return this._form.url;
+  },
+  get url() {
+    return this._form.url;
+  }
 });
 
 
@@ -1054,157 +1108,6 @@ exports.StyleSheetsFront = StyleSheetsFront;
 exports.StyleSheetActor = StyleSheetActor;
 exports.StyleSheetFront = StyleSheetFront;
 
-
-/**
- * Performs a request to load the desired URL and returns a promise.
- *
- * @param aURL String
- *        The URL we will request.
- * @returns Promise
- *        A promise of the document at that URL, as a string.
- */
-function fetch(aURL, aOptions={ loadFromCache: true, window: null,
-                                charset: null}) {
-  let deferred = promise.defer();
-  let scheme;
-  let url = aURL.split(" -> ").pop();
-  let charset;
-  let contentType;
-
-  try {
-    scheme = Services.io.extractScheme(url);
-  } catch (e) {
-    // In the xpcshell tests, the script url is the absolute path of the test
-    // file, which will make a malformed URI error be thrown. Add the file
-    // scheme prefix ourselves.
-    url = "file://" + url;
-    scheme = Services.io.extractScheme(url);
-  }
-
-  switch (scheme) {
-    case "file":
-    case "chrome":
-    case "resource":
-      try {
-        NetUtil.asyncFetch2(
-          url,
-          function onFetch(aStream, aStatus, aRequest) {
-            if (!components.isSuccessCode(aStatus)) {
-              deferred.reject(new Error("Request failed with status code = "
-                                        + aStatus
-                                        + " after NetUtil.asyncFetch2 for url = "
-                                        + url));
-              return;
-            }
-
-            let source = NetUtil.readInputStreamToString(aStream, aStream.available());
-            contentType = aRequest.contentType;
-            deferred.resolve(source);
-            aStream.close();
-          },
-          null,      // aLoadingNode
-          Services.scriptSecurityManager.getSystemPrincipal(),
-          null,      // aTriggeringPrincipal
-          Ci.nsILoadInfo.SEC_NORMAL,
-          Ci.nsIContentPolicy.TYPE_STYLESHEET);
-      } catch (ex) {
-        deferred.reject(ex);
-      }
-      break;
-
-    default:
-      let channel;
-      try {
-        channel = Services.io.newChannel2(url,
-                                          null,
-                                          null,
-                                          null,      // aLoadingNode
-                                          Services.scriptSecurityManager.getSystemPrincipal(),
-                                          null,      // aTriggeringPrincipal
-                                          Ci.nsILoadInfo.SEC_NORMAL,
-                                          Ci.nsIContentPolicy.TYPE_STYLESHEET);
-      } catch (e if e.name == "NS_ERROR_UNKNOWN_PROTOCOL") {
-        // On Windows xpcshell tests, c:/foo/bar can pass as a valid URL, but
-        // newChannel won't be able to handle it.
-        url = "file:///" + url;
-        channel = Services.io.newChannel2(url,
-                                          null,
-                                          null,
-                                          null,      // aLoadingNode
-                                          Services.scriptSecurityManager.getSystemPrincipal(),
-                                          null,      // aTriggeringPrincipal
-                                          Ci.nsILoadInfo.SEC_NORMAL,
-                                          Ci.nsIContentPolicy.TYPE_STYLESHEET);
-      }
-      let chunks = [];
-      let streamListener = {
-        onStartRequest: function(aRequest, aContext, aStatusCode) {
-          if (!components.isSuccessCode(aStatusCode)) {
-            deferred.reject(new Error("Request failed with status code = "
-                                      + aStatusCode
-                                      + " in onStartRequest handler for url = "
-                                      + url));
-          }
-        },
-        onDataAvailable: function(aRequest, aContext, aStream, aOffset, aCount) {
-          chunks.push(NetUtil.readInputStreamToString(aStream, aCount));
-        },
-        onStopRequest: function(aRequest, aContext, aStatusCode) {
-          if (!components.isSuccessCode(aStatusCode)) {
-            deferred.reject(new Error("Request failed with status code = "
-                                      + aStatusCode
-                                      + " in onStopRequest handler for url = "
-                                      + url));
-            return;
-          }
-
-          charset = channel.contentCharset || charset;
-          contentType = channel.contentType;
-          deferred.resolve(chunks.join(""));
-        }
-      };
-
-      if (aOptions.window) {
-        // respect private browsing
-        channel.loadGroup = aOptions.window.QueryInterface(Ci.nsIInterfaceRequestor)
-                              .getInterface(Ci.nsIWebNavigation)
-                              .QueryInterface(Ci.nsIDocumentLoader)
-                              .loadGroup;
-      }
-      channel.loadFlags = aOptions.loadFromCache
-        ? channel.LOAD_FROM_CACHE
-        : channel.LOAD_BYPASS_CACHE;
-      channel.asyncOpen(streamListener, null);
-      break;
-  }
-
-  return deferred.promise.then(source => {
-    return {
-      content: convertToUnicode(source, charset),
-      contentType: contentType
-    };
-  });
-}
-
-/**
- * Convert a given string, encoded in a given character set, to unicode.
- *
- * @param string aString
- *        A string.
- * @param string aCharset
- *        A character set.
- */
-function convertToUnicode(aString, aCharset=null) {
-  // Decoding primitives.
-  let converter = Cc["@mozilla.org/intl/scriptableunicodeconverter"]
-    .createInstance(Ci.nsIScriptableUnicodeConverter);
-  try {
-    converter.charset = aCharset || "UTF-8";
-    return converter.ConvertToUnicode(aString);
-  } catch(e) {
-    return aString;
-  }
-}
 
 /**
  * Normalize multiple relative paths towards the base paths on the right.

@@ -13,6 +13,10 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/BrowserElementPromptService.jsm");
 
+XPCOMUtils.defineLazyServiceGetter(this, "acs",
+                                   "@mozilla.org/audiochannel/service;1",
+                                   "nsIAudioChannelService");
+
 let kLongestReturnedString = 128;
 
 function debug(msg) {
@@ -50,8 +54,6 @@ function sendSyncMsg(msg, data) {
 let CERTIFICATE_ERROR_PAGE_PREF = 'security.alternate_certificate_error_page';
 
 const OBSERVED_EVENTS = [
-  'ask-parent-to-exit-fullscreen',
-  'ask-parent-to-rollback-fullscreen',
   'xpcom-shutdown',
   'activity-done'
 ];
@@ -147,13 +149,18 @@ BrowserElementChild.prototype = {
                      /* useCapture = */ true,
                      /* wantsUntrusted = */ false);
 
-    addEventListener("MozDOMFullscreen:Entered",
-                     this._mozEnteredDomFullscreen.bind(this),
+    addEventListener("MozDOMFullscreen:Request",
+                     this._mozRequestedDOMFullscreen.bind(this),
                      /* useCapture = */ true,
                      /* wantsUntrusted = */ false);
 
     addEventListener("MozDOMFullscreen:NewOrigin",
                      this._mozFullscreenOriginChange.bind(this),
+                     /* useCapture = */ true,
+                     /* wantsUntrusted = */ false);
+
+    addEventListener("MozDOMFullscreen:Exit",
+                     this._mozExitDomFullscreen.bind(this),
                      /* useCapture = */ true,
                      /* wantsUntrusted = */ false);
 
@@ -180,6 +187,11 @@ BrowserElementChild.prototype = {
     addEventListener('scrollviewchange',
                      this._ScrollViewChangeHandler.bind(this),
                      /* useCapture = */ true,
+                     /* wantsUntrusted = */ false);
+
+    addEventListener('click',
+                     this._ClickHandler.bind(this),
+                     /* useCapture = */ false,
                      /* wantsUntrusted = */ false);
 
     // This listens to unload events from our message manager, but /not/ from
@@ -217,11 +229,21 @@ BrowserElementChild.prototype = {
       "unblock-modal-prompt": this._recvStopWaiting,
       "fire-ctx-callback": this._recvFireCtxCallback,
       "owner-visibility-change": this._recvOwnerVisibilityChange,
+      "entered-fullscreen": this._recvEnteredFullscreen,
       "exit-fullscreen": this._recvExitFullscreen.bind(this),
       "activate-next-paint-listener": this._activateNextPaintListener.bind(this),
       "set-input-method-active": this._recvSetInputMethodActive.bind(this),
       "deactivate-next-paint-listener": this._deactivateNextPaintListener.bind(this),
-      "do-command": this._recvDoCommand
+      "do-command": this._recvDoCommand,
+      "find-all": this._recvFindAll.bind(this),
+      "find-next": this._recvFindNext.bind(this),
+      "clear-match": this._recvClearMatch.bind(this),
+      "execute-script": this._recvExecuteScript,
+      "get-audio-channel-volume": this._recvGetAudioChannelVolume,
+      "set-audio-channel-volume": this._recvSetAudioChannelVolume,
+      "get-audio-channel-muted": this._recvGetAudioChannelMuted,
+      "set-audio-channel-muted": this._recvSetAudioChannelMuted,
+      "get-is-audio-channel-active": this._recvIsAudioChannelActive
     }
 
     addMessageListener("browser-element-api:call", function(aMessage) {
@@ -264,12 +286,6 @@ BrowserElementChild.prototype = {
     if (topic == 'activity-done' && docShell !== subject)
       return;
     switch (topic) {
-      case 'ask-parent-to-exit-fullscreen':
-        sendAsyncMsg('exit-fullscreen');
-        break;
-      case 'ask-parent-to-rollback-fullscreen':
-        sendAsyncMsg('rollback-fullscreen');
-        break;
       case 'activity-done':
         sendAsyncMsg('activitydone', { success: (data == 'activity-success') });
         break;
@@ -288,6 +304,12 @@ BrowserElementChild.prototype = {
     OBSERVED_EVENTS.forEach((aTopic) => {
       Services.obs.removeObserver(this, aTopic);
     });
+  },
+
+  get _windowUtils() {
+    return content.document.defaultView
+                  .QueryInterface(Ci.nsIInterfaceRequestor)
+                  .getInterface(Ci.nsIDOMWindowUtils);
   },
 
   _tryGetInnerWindowID: function(win) {
@@ -433,11 +455,18 @@ BrowserElementChild.prototype = {
     win.modalDepth--;
   },
 
+  _recvEnteredFullscreen: function() {
+    if (!this._windowUtils.handleFullscreenRequests() &&
+        !content.document.mozFullScreen) {
+      // If we don't actually have any pending fullscreen request
+      // to handle, neither we have been in fullscreen, tell the
+      // parent to just exit.
+      sendAsyncMsg("exit-dom-fullscreen");
+    }
+  },
+
   _recvExitFullscreen: function() {
-    var utils = content.document.defaultView
-                       .QueryInterface(Ci.nsIInterfaceRequestor)
-                       .getInterface(Ci.nsIDOMWindowUtils);
-    utils.exitFullscreen();
+    this._windowUtils.exitFullscreen();
   },
 
   _titleChangedHandler: function(e) {
@@ -529,6 +558,7 @@ BrowserElementChild.prototype = {
     debug('Got metaChanged: (' + e.target.name + ') ' + e.target.content);
 
     let handlers = {
+      'viewmode': this._viewmodeChangedHandler,
       'theme-color': this._themeColorChangedHandler,
       'application-name': this._applicationNameChangedHandler
     };
@@ -584,6 +614,18 @@ BrowserElementChild.prototype = {
       state: e.state,
     };
     sendAsyncMsg('scrollviewchange', detail);
+  },
+
+  _ClickHandler: function(e) {
+    let elem = e.target;
+    if (elem instanceof Ci.nsIDOMHTMLAnchorElement && elem.href) {
+      // Open in a new tab if middle click or ctrl/cmd-click.
+      if ((Services.appinfo.OS == 'Darwin' && e.metaKey) ||
+          (Services.appinfo.OS != 'Darwin' && e.ctrlKey) ||
+           e.button == 1) {
+        sendAsyncMsg('opentab', {url: elem.href});
+      }
+    }
   },
 
   _selectionStateChangedHandler: function(e) {
@@ -675,6 +717,16 @@ BrowserElementChild.prototype = {
     }
 
     sendAsyncMsg('selectionstatechanged', detail);
+  },
+
+
+  _viewmodeChangedHandler: function(eventType, target) {
+    let meta = {
+      name: 'viewmode',
+      content: target.content,
+      type: eventType.replace('DOMMeta', '').toLowerCase()
+    };
+    sendAsyncMsg('metachange', meta);
   },
 
   _themeColorChangedHandler: function(eventType, target) {
@@ -820,21 +872,26 @@ BrowserElementChild.prototype = {
   },
 
   _getSystemCtxMenuData: function(elem) {
+    let documentURI = 
+      docShell.QueryInterface(Ci.nsIWebNavigation).currentURI.spec;
     if ((elem instanceof Ci.nsIDOMHTMLAnchorElement && elem.href) ||
         (elem instanceof Ci.nsIDOMHTMLAreaElement && elem.href)) {
       return {uri: elem.href,
+              documentURI: documentURI,
               text: elem.textContent.substring(0, kLongestReturnedString)};
     }
     if (elem instanceof Ci.nsIImageLoadingContent && elem.currentURI) {
-      return {uri: elem.currentURI.spec};
+      return {uri: elem.currentURI.spec, documentURI: documentURI};
     }
     if (elem instanceof Ci.nsIDOMHTMLImageElement) {
-      return {uri: elem.src};
+      return {uri: elem.src, documentURI: documentURI};
     }
     if (elem instanceof Ci.nsIDOMHTMLMediaElement) {
       let hasVideo = !(elem.readyState >= elem.HAVE_METADATA &&
                        (elem.videoWidth == 0 || elem.videoHeight == 0));
-      return {uri: elem.currentSrc || elem.src, hasVideo: hasVideo};
+      return {uri: elem.currentSrc || elem.src,
+              hasVideo: hasVideo,
+              documentURI: documentURI};
     }
     if (elem instanceof Ci.nsIDOMHTMLInputElement &&
         elem.hasAttribute("name")) {
@@ -851,6 +908,7 @@ BrowserElementChild.prototype = {
             ? parent.getAttribute("method").toLowerCase()
             : "get";
           return {
+            documentURI: documentURI,
             action: actionHref,
             method: method,
             name: elem.getAttribute("name"),
@@ -912,6 +970,90 @@ BrowserElementChild.prototype = {
       takeScreenshotClosure, maxDelayMS);
   },
 
+  _recvExecuteScript: function(data) {
+    debug("Received executeScript message: (" + data.json.id + ")");
+
+    let domRequestID = data.json.id;
+
+    let sendError = errorMsg => sendAsyncMsg("execute-script-done", {
+      errorMsg,
+      id: domRequestID
+    });
+
+    let sendSuccess = successRv => sendAsyncMsg("execute-script-done", {
+      successRv,
+      id: domRequestID
+    });
+
+    let isJSON = obj => {
+      try {
+        JSON.stringify(obj);
+      } catch(e) {
+        return false;
+      }
+      return true;
+    }
+
+    let expectedOrigin = data.json.args.options.origin;
+    let expectedUrl = data.json.args.options.url;
+
+    if (expectedOrigin) {
+      if (expectedOrigin != content.location.origin) {
+        sendError("Origin mismatches");
+        return;
+      }
+    }
+
+    if (expectedUrl) {
+      let expectedURI
+      try {
+       expectedURI = Services.io.newURI(expectedUrl, null, null);
+      } catch(e) {
+        sendError("Malformed URL");
+        return;
+      }
+      let currentURI = docShell.QueryInterface(Ci.nsIWebNavigation).currentURI;
+      if (!currentURI.equalsExceptRef(expectedURI)) {
+        sendError("URL mismatches");
+        return;
+      }
+    }
+
+    let sandbox = new Cu.Sandbox([content], {
+      sandboxPrototype: content,
+      sandboxName: "browser-api-execute-script",
+      allowWaivers: false,
+      sameZoneAs: content
+    });
+
+    try {
+      let sandboxRv = Cu.evalInSandbox(data.json.args.script, sandbox, "1.8");
+      if (sandboxRv instanceof Promise) {
+        sandboxRv.then(rv => {
+          if (isJSON(rv)) {
+            sendSuccess(rv);
+          } else {
+            sendError("Value returned (resolve) by promise is not a valid JSON object");
+          }
+        }, error => {
+          if (isJSON(error)) {
+            sendError(error);
+          } else {
+            sendError("Value returned (reject) by promise is not a valid JSON object");
+          }
+        });
+      } else {
+        if (isJSON(sandboxRv)) {
+          sendSuccess(sandboxRv);
+        } else {
+          sendError("Script last expression must be a promise or a JSON object");
+        }
+      }
+    } catch(e) {
+      sendError(e.toString());
+    }
+  },
+
   _recvGetContentDimensions: function(data) {
     debug("Received getContentDimensions message: (" + data.json.id + ")");
     sendAsyncMsg('got-contentdimensions', {
@@ -928,14 +1070,18 @@ BrowserElementChild.prototype = {
     });
   },
 
-  _mozEnteredDomFullscreen: function(e) {
-    sendAsyncMsg("entered-dom-fullscreen");
+  _mozRequestedDOMFullscreen: function(e) {
+    sendAsyncMsg("requested-dom-fullscreen");
   },
 
   _mozFullscreenOriginChange: function(e) {
     sendAsyncMsg("fullscreen-origin-change", {
-      origin: e.target.nodePrincipal.origin
+      originNoSuffix: e.target.nodePrincipal.originNoSuffix
     });
+  },
+
+  _mozExitDomFullscreen: function(e) {
+    sendAsyncMsg("exit-dom-fullscreen");
   },
 
   _getContentDimensions: function() {
@@ -1096,7 +1242,7 @@ BrowserElementChild.prototype = {
 
   _updateVisibility: function() {
     var visible = this._forcedVisible && this._ownerVisible;
-    if (docShell.isActive !== visible) {
+    if (docShell && docShell.isActive !== visible) {
       docShell.isActive = visible;
       sendAsyncMsg('visibilitychange', {visible: visible});
     }
@@ -1178,6 +1324,106 @@ BrowserElementChild.prototype = {
       this._selectionStateChangedTarget = null;
       docShell.doCommand(COMMAND_MAP[data.json.command]);
     }
+  },
+
+  _recvGetAudioChannelVolume: function(data) {
+    debug("Received getAudioChannelVolume message: (" + data.json.id + ")");
+
+    let volume = acs.getAudioChannelVolume(content,
+                                           data.json.args.audioChannel);
+    sendAsyncMsg('got-audio-channel-volume', {
+      id: data.json.id, successRv: volume
+    });
+  },
+
+  _recvSetAudioChannelVolume: function(data) {
+    debug("Received setAudioChannelVolume message: (" + data.json.id + ")");
+
+    acs.setAudioChannelVolume(content,
+                              data.json.args.audioChannel,
+                              data.json.args.volume);
+    sendAsyncMsg('got-set-audio-channel-volume', {
+      id: data.json.id, successRv: true
+    });
+  },
+
+  _recvGetAudioChannelMuted: function(data) {
+    debug("Received getAudioChannelMuted message: (" + data.json.id + ")");
+
+    let muted = acs.getAudioChannelMuted(content, data.json.args.audioChannel);
+    sendAsyncMsg('got-audio-channel-muted', {
+      id: data.json.id, successRv: muted
+    });
+  },
+
+  _recvSetAudioChannelMuted: function(data) {
+    debug("Received setAudioChannelMuted message: (" + data.json.id + ")");
+
+    acs.setAudioChannelMuted(content, data.json.args.audioChannel,
+                             data.json.args.muted);
+    sendAsyncMsg('got-set-audio-channel-muted', {
+      id: data.json.id, successRv: true
+    });
+  },
+
+  _recvIsAudioChannelActive: function(data) {
+    debug("Received isAudioChannelActive message: (" + data.json.id + ")");
+
+    let active = acs.isAudioChannelActive(content, data.json.args.audioChannel);
+    sendAsyncMsg('got-is-audio-channel-active', {
+      id: data.json.id, successRv: active
+    });
+  },
+
+  _initFinder: function() {
+    if (!this._finder) {
+      try {
+        this._findLimit = Services.prefs.getIntPref("accessibility.typeaheadfind.matchesCountLimit");
+      } catch (e) {
+        // Pref not available, assume 0, no match counting.
+        this._findLimit = 0;
+      }
+
+      let {Finder} = Components.utils.import("resource://gre/modules/Finder.jsm", {});
+      this._finder = new Finder(docShell);
+      this._finder.addResultListener({
+        onMatchesCountResult: (data) => {
+          sendAsyncMsg('findchange', {
+            active: true,
+            searchString: this._finder.searchString,
+            searchLimit: this._findLimit,
+            activeMatchOrdinal: data.current,
+            numberOfMatches: data.total
+          });
+        }
+      });
+    }
+  },
+
+  _recvFindAll: function(data) {
+    this._initFinder();
+    let searchString = data.json.searchString;
+    this._finder.caseSensitive = data.json.caseSensitive;
+    this._finder.fastFind(searchString, false, false);
+    this._finder.requestMatchesCount(searchString, this._findLimit, false);
+  },
+
+  _recvFindNext: function(data) {
+    if (!this._finder) {
+      debug("findNext() called before findAll()");
+      return;
+    }
+    this._finder.findAgain(data.json.backward, false, false);
+    this._finder.requestMatchesCount(this._finder.searchString, this._findLimit, false);
+  },
+
+  _recvClearMatch: function(data) {
+    if (!this._finder) {
+      debug("clearMach() called before findAll()");
+      return;
+    }
+    this._finder.removeSelection();
+    sendAsyncMsg('findchange', {active: false});
   },
 
   _recvSetInputMethodActive: function(data) {

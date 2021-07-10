@@ -11,6 +11,7 @@ Cu.import("resource://gre/modules/Services.jsm");
 let promise = require("resource://gre/modules/Promise.jsm").Promise;
 let EventEmitter = require("devtools/toolkit/event-emitter");
 let clipboard = require("sdk/clipboard");
+let {HostType} = require("devtools/framework/toolbox").Toolbox;
 
 loader.lazyGetter(this, "MarkupView", () => require("devtools/markupview/markup-view").MarkupView);
 loader.lazyGetter(this, "HTMLBreadcrumbs", () => require("devtools/inspector/breadcrumbs").HTMLBreadcrumbs);
@@ -143,6 +144,9 @@ InspectorPanel.prototype = {
     this.selection.on("detached-front", this.onDetached);
 
     this.breadcrumbs = new HTMLBreadcrumbs(this);
+
+    this.onToolboxHostChanged = this.onToolboxHostChanged.bind(this);
+    this._toolbox.on("host-changed", this.onToolboxHostChanged);
 
     if (this.target.isLocalTab) {
       this.browser = this.target.tab.linkedBrowser;
@@ -343,6 +347,19 @@ InspectorPanel.prototype = {
     }
 
     this.sidebar.show();
+
+    this.setupSidebarToggle();
+  },
+
+  /**
+   * Add the expand/collapse behavior for the sidebar panel.
+   */
+  setupSidebarToggle: function() {
+    this._paneToggleButton = this.panelDoc.getElementById("inspector-pane-toggle");
+    this.onPaneToggleButtonClicked = this.onPaneToggleButtonClicked.bind(this);
+    this._paneToggleButton.addEventListener("mousedown",
+      this.onPaneToggleButtonClicked);
+    this.updatePaneToggleButton();
   },
 
   /**
@@ -385,6 +402,10 @@ InspectorPanel.prototype = {
    * reload
    */
   set selectionCssSelector(cssSelector = null) {
+    if (this._panelDestroyer) {
+      return;
+    }
+
     this._selectionCssSelector = {
       selector: cssSelector,
       url: this._target.url
@@ -546,6 +567,7 @@ InspectorPanel.prototype = {
     this.target.off("thread-paused", this.updateDebuggerPausedWarning);
     this.target.off("thread-resumed", this.updateDebuggerPausedWarning);
     this._toolbox.off("select", this.updateDebuggerPausedWarning);
+    this._toolbox.off("host-changed", this.onToolboxHostChanged);
 
     this.sidebar.off("select", this._setDefaultSidebar);
     let sidebarDestroyer = this.sidebar.destroy();
@@ -554,6 +576,9 @@ InspectorPanel.prototype = {
     this.nodemenu.removeEventListener("popupshowing", this._setupNodeMenu, true);
     this.nodemenu.removeEventListener("popuphiding", this._resetNodeMenu, true);
     this.breadcrumbs.destroy();
+    this._paneToggleButton.removeEventListener("mousedown",
+      this.onPaneToggleButtonClicked);
+    this._paneToggleButton = null;
     this.searchSuggestions.destroy();
     this.searchBox = null;
     this.selection.off("new-node-front", this.onNewSelection);
@@ -641,23 +666,34 @@ InspectorPanel.prototype = {
       deleteNode.setAttribute("disabled", "true");
     }
 
-    // Disable / enable "Copy Unique Selector", "Copy inner HTML" &
-    // "Copy outer HTML" as appropriate
+    // Disable / enable "Copy Unique Selector", "Copy inner HTML",
+    // "Copy outer HTML" & "Scroll Into View" as appropriate
     let unique = this.panelDoc.getElementById("node-menu-copyuniqueselector");
     let copyInnerHTML = this.panelDoc.getElementById("node-menu-copyinner");
     let copyOuterHTML = this.panelDoc.getElementById("node-menu-copyouter");
+    let scrollIntoView = this.panelDoc.getElementById("node-menu-scrollnodeintoview");
+
+    this._target.actorHasMethod("domnode", "scrollIntoView").then(value => {
+      scrollIntoView.hidden = !value;
+    });
+
     if (isSelectionElement) {
       unique.removeAttribute("disabled");
       copyInnerHTML.removeAttribute("disabled");
       copyOuterHTML.removeAttribute("disabled");
+      scrollIntoView.removeAttribute("disabled");
     } else {
       unique.setAttribute("disabled", "true");
       copyInnerHTML.setAttribute("disabled", "true");
       copyOuterHTML.setAttribute("disabled", "true");
+      scrollIntoView.setAttribute("disabled", "true");
     }
     if (!this.canGetUniqueSelector) {
       unique.hidden = true;
     }
+
+    // Enable/Disable the link open/copy items.
+    this._setupNodeLinkMenu();
 
     // Enable the "edit HTML" item if the selection is an element and the root
     // actor has the appropriate trait (isOuterHTMLEditable)
@@ -714,6 +750,56 @@ InspectorPanel.prototype = {
     while (this.lastNodemenuItem.nextSibling) {
       let toDelete = this.lastNodemenuItem.nextSibling;
       toDelete.parentNode.removeChild(toDelete);
+    }
+  },
+
+  /**
+   * Link menu items can be shown or hidden depending on the context and
+   * selected node, and their labels can vary.
+   */
+  _setupNodeLinkMenu: function InspectorPanel_setupNodeLinkMenu() {
+    let linkSeparator = this.panelDoc.getElementById("node-menu-link-separator");
+    let linkFollow = this.panelDoc.getElementById("node-menu-link-follow");
+    let linkCopy = this.panelDoc.getElementById("node-menu-link-copy");
+
+    // Hide all by default.
+    linkSeparator.setAttribute("hidden", "true");
+    linkFollow.setAttribute("hidden", "true");
+    linkCopy.setAttribute("hidden", "true");
+
+    // Get information about the right-clicked node.
+    let popupNode = this.panelDoc.popupNode;
+    if (!popupNode || !popupNode.classList.contains("link")) {
+      return;
+    }
+
+    let type = popupNode.dataset.type;
+    // Bug 1158822 will make "resource" type URLs open in devtools, but for now
+    // they're considered like "uri".
+    if (type === "uri" || type === "resource") {
+      // First make sure the target can resolve relative URLs.
+      this.target.actorHasMethod("inspector", "resolveRelativeURL").then(canResolve => {
+        if (!canResolve) {
+          return;
+        }
+
+        linkSeparator.removeAttribute("hidden");
+
+        // Links can't be opened in new tabs in the browser toolbox.
+        if (!this.target.chrome) {
+          linkFollow.removeAttribute("hidden");
+          linkFollow.setAttribute("label", this.strings.GetStringFromName(
+            "inspector.menu.openUrlInNewTab.label"));
+        }
+        linkCopy.removeAttribute("hidden");
+        linkCopy.setAttribute("label", this.strings.GetStringFromName(
+          "inspector.menu.copyUrlToClipboard.label"));
+      }, console.error);
+    } else if (type === "idref") {
+      linkSeparator.removeAttribute("hidden");
+      linkFollow.removeAttribute("hidden");
+      linkFollow.setAttribute("label", this.strings.formatStringFromName(
+        "inspector.menu.selectElement.label", [popupNode.dataset.link], 1));
     }
   },
 
@@ -775,6 +861,47 @@ InspectorPanel.prototype = {
     this._markupBox = null;
 
     return destroyPromise;
+  },
+
+  /**
+   * When the type of toolbox host changes.
+   */
+  onToolboxHostChanged: function() {
+    this.updatePaneToggleButton();
+  },
+
+  /**
+   * When the pane toggle button is clicked, toggle the pane, change the button
+   * state and tooltip.
+   */
+  onPaneToggleButtonClicked: function(e) {
+    let sidePane = this.panelDoc.querySelector("#inspector-sidebar");
+    let button = this._paneToggleButton;
+    let isVisible = !button.hasAttribute("pane-collapsed");
+
+    ViewHelpers.togglePane({
+      visible: !isVisible,
+      animated: true,
+      delayed: true
+    }, sidePane);
+
+    if (isVisible) {
+      button.setAttribute("pane-collapsed", "");
+      button.setAttribute("tooltiptext",
+        this.strings.GetStringFromName("inspector.expandPane"));
+    } else {
+      button.removeAttribute("pane-collapsed");
+      button.setAttribute("tooltiptext",
+        this.strings.GetStringFromName("inspector.collapsePane"));
+    }
+  },
+
+  /**
+   * Update the pane toggle button visibility depending on the toolbox host type.
+   */
+  updatePaneToggleButton: function() {
+    this._paneToggleButton.setAttribute("hidden",
+      this._toolbox.hostType === HostType.SIDE);
   },
 
   /**
@@ -927,6 +1054,18 @@ InspectorPanel.prototype = {
   },
 
   /**
+   * Scroll the node into view.
+   */
+  scrollNodeIntoView: function InspectorPanel_scrollNodeIntoView()
+  {
+    if (!this.selection.isNode()) {
+      return;
+    }
+
+    this.selection.nodeFront.scrollIntoView();
+  },
+
+  /**
    * Delete the selected node.
    */
   deleteNode: function IUI_deleteNode() {
@@ -943,6 +1082,52 @@ InspectorPanel.prototype = {
       // remove the node from content
       this.walker.removeNode(this.selection.nodeFront);
     }
+  },
+
+  /**
+   * This method is here for the benefit of the node-menu-link-follow menu item
+   * in the inspector contextual-menu. It's behavior depends on which node was
+   * right-clicked when the menu was opened.
+   */
+  followAttributeLink: function InspectorPanel_followLink(e) {
+    let type = this.panelDoc.popupNode.dataset.type;
+    let link = this.panelDoc.popupNode.dataset.link;
+
+    // "resource" type links should open appropriate tool instead (bug 1158822).
+    if (type === "uri" || type === "resource") {
+      // Open link in a new tab.
+      // When the inspector menu was setup on click (see _setupNodeLinkMenu), we
+      // already checked that resolveRelativeURL existed.
+      this.inspector.resolveRelativeURL(link, this.selection.nodeFront).then(url => {
+        let browserWin = this.target.tab.ownerDocument.defaultView;
+        browserWin.openUILinkIn(url, "tab");
+      }, console.error);
+    } else if (type == "idref") {
+      // Select the node in the same document.
+      this.walker.document(this.selection.nodeFront).then(doc => {
+        this.walker.querySelector(doc, "#" + CSS.escape(link)).then(node => {
+          if (!node) {
+            this.emit("idref-attribute-link-failed");
+            return;
+          }
+          this.selection.setNodeFront(node);
+        }, console.error);
+      }, console.error);
+    }
+  },
+
+  /**
+   * This method is here for the benefit of the node-menu-link-copy menu item
+   * in the inspector contextual-menu. It's behavior depends on which node was
+   * right-clicked when the menu was opened.
+   */
+  copyAttributeLink: function InspectorPanel_copyLink(e) {
+    let link = this.panelDoc.popupNode.dataset.link;
+    // When the inspector menu was setup on click (see _setupNodeLinkMenu), we
+    // already checked that resolveRelativeURL existed.
+    this.inspector.resolveRelativeURL(link, this.selection.nodeFront).then(url => {
+      clipboardHelper.copyString(url);
+    }, console.error);
   },
 
   /**

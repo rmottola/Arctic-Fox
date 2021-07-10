@@ -35,6 +35,8 @@
 #include "PeriodicWave.h"
 #include "ConvolverNode.h"
 #include "OscillatorNode.h"
+#include "nsNetCID.h"
+#include "blink/PeriodicWave.h"
 #include "nsNetUtil.h"
 #include "AudioStream.h"
 #include "mozilla/dom/Promise.h"
@@ -761,12 +763,20 @@ private:
   nsRefPtr<AudioContext> mAudioContext;
 };
 
-
-
 void
 AudioContext::OnStateChanged(void* aPromise, AudioContextState aNewState)
 {
   MOZ_ASSERT(NS_IsMainThread());
+
+  // This can happen if close() was called right after creating the
+  // AudioContext, before the context has switched to "running".
+  if (mAudioContextState == AudioContextState::Closed &&
+      aNewState == AudioContextState::Running &&
+      !aPromise) {
+    return;
+  }
+
+#ifndef WIN32 // Bug 1170547
 
   MOZ_ASSERT((mAudioContextState == AudioContextState::Suspended &&
               aNewState == AudioContextState::Running)   ||
@@ -778,6 +788,8 @@ AudioContext::OnStateChanged(void* aPromise, AudioContextState aNewState)
               aNewState == AudioContextState::Closed)    ||
              (mAudioContextState == aNewState),
              "Invalid AudioContextState transition");
+
+#endif // WIN32
 
   MOZ_ASSERT(
     mIsOffline || aPromise || aNewState == AudioContextState::Running,
@@ -997,7 +1009,7 @@ AudioContext::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
   if (mListener) {
     amount += mListener->SizeOfIncludingThis(aMallocSizeOf);
   }
-  amount += mDecodeJobs.SizeOfExcludingThis(aMallocSizeOf);
+  amount += mDecodeJobs.ShallowSizeOfExcludingThis(aMallocSizeOf);
   for (uint32_t i = 0; i < mDecodeJobs.Length(); ++i) {
     amount += mDecodeJobs[i]->SizeOfIncludingThis(aMallocSizeOf);
   }
@@ -1019,6 +1031,49 @@ double
 AudioContext::ExtraCurrentTime() const
 {
   return mDestination->ExtraCurrentTime();
+}
+
+BasicWaveFormCache*
+AudioContext::GetBasicWaveFormCache()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!mBasicWaveFormCache) {
+    mBasicWaveFormCache = new BasicWaveFormCache(SampleRate());
+  }
+  return mBasicWaveFormCache;
+}
+
+BasicWaveFormCache::BasicWaveFormCache(uint32_t aSampleRate)
+  : mSampleRate(aSampleRate)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+}
+BasicWaveFormCache::~BasicWaveFormCache()
+{ }
+
+WebCore::PeriodicWave*
+BasicWaveFormCache::GetBasicWaveForm(OscillatorType aType)
+{
+  MOZ_ASSERT(!NS_IsMainThread());
+  if (aType == OscillatorType::Sawtooth) {
+    if (!mSawtooth) {
+      mSawtooth = WebCore::PeriodicWave::createSawtooth(mSampleRate);
+    }
+    return mSawtooth;
+  } else if (aType == OscillatorType::Square) {
+    if (!mSquare) {
+      mSquare = WebCore::PeriodicWave::createSquare(mSampleRate);
+    }
+    return mSquare;
+  } else if (aType == OscillatorType::Triangle) {
+    if (!mTriangle) {
+      mTriangle = WebCore::PeriodicWave::createTriangle(mSampleRate);
+    }
+    return mTriangle;
+  } else {
+    MOZ_ASSERT(false, "Not reached");
+    return nullptr;
+  }
 }
 
 } // namespace dom

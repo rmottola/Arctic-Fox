@@ -1487,6 +1487,18 @@ CSS_PROP_COLUMN(
     kBorderWidthKTable,
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_Custom)
+CSS_PROP_DISPLAY(
+    contain,
+    contain,
+    Contain,
+    CSS_PROPERTY_PARSE_VALUE |
+        CSS_PROPERTY_VALUE_PARSER_FUNCTION,
+    "layout.css.contain.enabled",
+    // Does not affect parsing, but is needed for tab completion in devtools:
+    VARIANT_HK | VARIANT_NONE,
+    kContainKTable,
+    CSS_PROP_NO_OFFSET,
+    eStyleAnimType_None)
 CSS_PROP_CONTENT(
     content,
     content,
@@ -1813,7 +1825,7 @@ CSS_PROP_FONT(
 CSS_PROP_FONT(
     -moz-osx-font-smoothing,
     osx_font_smoothing,
-    CSS_PROP_DOMPROP_PREFIXED(OSXFontSmoothing),
+    CSS_PROP_DOMPROP_PREFIXED(OsxFontSmoothing),
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER_AND_FIRST_LINE |
         CSS_PROPERTY_APPLIES_TO_PLACEHOLDER,
@@ -3318,6 +3330,16 @@ CSS_PROP_DISPLAY(
     nullptr,
     offsetof(nsStyleDisplay, mSpecifiedTransform),
     eStyleAnimType_Custom)
+CSS_PROP_DISPLAY(
+    transform-box,
+    transform_box,
+    TransformBox,
+    CSS_PROPERTY_PARSE_VALUE,
+    "svg.transform-box.enabled",
+    VARIANT_HK,
+    kTransformBoxKTable,
+    CSS_PROP_NO_OFFSET,
+    eStyleAnimType_None)
 CSS_PROP_DISPLAY(
     transform-origin,
     transform_origin,

@@ -18,6 +18,7 @@
 #include "mozilla/dom/TabParent.h"
 #include "mozilla/HoldDropJSObjects.h"
 #include "nsIScriptSecurityManager.h"
+#include "nsNetUtil.h"
 
 namespace IPC {
 
@@ -311,7 +312,7 @@ TCPSocketParent::SendEvent(const nsAString& aType, JS::Handle<JS::Value> aDataVa
               errLine = __LINE__;
               break;
           }
-          if (!fallibleArr.InsertElementsAt(0, buffer, nbytes)) {
+          if (!fallibleArr.InsertElementsAt(0, buffer, nbytes, fallible)) {
               errLine = __LINE__;
               break;
           }

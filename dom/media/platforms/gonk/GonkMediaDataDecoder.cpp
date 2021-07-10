@@ -14,14 +14,13 @@
 #define GMDD_LOG(...) __android_log_print(ANDROID_LOG_DEBUG, "GonkMediaDataDecoder", __VA_ARGS__)
 
 PRLogModuleInfo* GetDemuxerLog();
-#define LOG(...) PR_LOG(GetDemuxerLog(), PR_LOG_DEBUG, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(GetDemuxerLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 using namespace android;
 
 namespace mozilla {
 
 GonkDecoderManager::GonkDecoderManager(MediaTaskQueue* aTaskQueue)
-  : mTaskQueue(aTaskQueue)
 {
 }
 
@@ -259,14 +258,6 @@ GonkMediaDataDecoder::Drain()
     NS_NewRunnableMethod(this, &GonkMediaDataDecoder::ProcessDrain);
   mTaskQueue->Dispatch(runnable.forget());
   return NS_OK;
-}
-
-bool
-GonkMediaDataDecoder::IsWaitingMediaResources() {
-  if (!mDecoder.get()) {
-    return true;
-  }
-  return false;
 }
 
 } // namespace mozilla

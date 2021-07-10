@@ -26,8 +26,8 @@ pref("@GUAO_PREF@.google.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/20010101 @
 pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/52.0 @PM_SLICE@");
 pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/52.0 @PM_SLICE@");
 
-// now YouTube needs to be fooled too
-pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/20010101 Firefox/52.0 @PM_SLICE@");
+// Switch to mobile youtube to bypass CPU/JS hungry slow as molasses new polyfill interface
+pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (Android 7.0; Mobile; rv:52.0) Gecko/52 @PM_SLICE@");
 
 // Trick these sites in to thinking we are using IE11
 pref("@GUAO_PREF@.dropbox.com","Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko");
@@ -41,7 +41,7 @@ pref("@GUAO_PREF@.fonts.googleapis.com","Mozilla/5.0 (@OS_SLICE@ rv:43.0) Gecko/
 
 // UA-Sniffing domains below have indicated no interest in supporting Arctic Fox (BOO!)
 pref("@GUAO_PREF@.bing.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
-pref("@GUAO_PREF@.github.com","Mozilla/5.0 (Linux; U; Android 4.4; Mobile) @GK_SLICE@ Firefox/48.0");
+pref("@GUAO_PREF@.github.com","Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)");
 
 // yahoo is nasty too
 pref("@GUAO_PREF@.yahoo.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.0");

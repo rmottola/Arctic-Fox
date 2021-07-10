@@ -1469,14 +1469,20 @@ AsyncPanZoomController::CanScroll(const ScrollWheelInput& aEvent) const
     return false;
   }
 
-  return CanScroll(delta.x, delta.y);
+  return CanScrollWithWheel(delta);
 }
 
 bool
-AsyncPanZoomController::CanScroll(double aDeltaX, double aDeltaY) const
+AsyncPanZoomController::CanScrollWithWheel(const LayoutDevicePoint& aDelta) const
 {
   ReentrantMonitorAutoEnter lock(mMonitor);
-  return mX.CanScroll(aDeltaX) || mY.CanScroll(aDeltaY);
+  if (mX.CanScroll(aDelta.x)) {
+    return true;
+  }
+  if (mY.CanScroll(aDelta.y) && mFrameMetrics.AllowVerticalScrollWithWheel()) {
+    return true;
+  }
+  return false;
 }
 
 bool
@@ -1489,9 +1495,10 @@ AsyncPanZoomController::AllowScrollHandoffInWheelTransaction() const
 nsEventStatus AsyncPanZoomController::OnScrollWheel(const ScrollWheelInput& aEvent)
 {
   LayoutDevicePoint delta = GetScrollWheelDelta(aEvent);
+  APZC_LOG("%p got a scroll-wheel with delta %s\n", this, Stringify(delta).c_str());
 
   if ((delta.x || delta.y) &&
-      !CanScroll(delta.x, delta.y) &&
+      !CanScrollWithWheel(delta) &&
       mInputQueue->GetCurrentWheelTransaction())
   {
     // We can't scroll this apz anymore, so we simply drop the event.
@@ -2426,9 +2433,18 @@ void AsyncPanZoomController::FlushRepaintForNewInputBlock() {
   UpdateSharedCompositorFrameMetrics();
 }
 
+void AsyncPanZoomController::FlushRepaintIfPending() {
+  // Just tell the paint throttler to send the pending repaint request if
+  // there is one.
+  ReentrantMonitorAutoEnter lock(mMonitor);
+  mPaintThrottler.TaskComplete(GetFrameTime());
+}
+
 bool AsyncPanZoomController::SnapBackIfOverscrolled() {
   ReentrantMonitorAutoEnter lock(mMonitor);
-  if (IsOverscrolled()) {
+  // It's possible that we're already in the middle of an overscroll
+  // animation - if so, don't start a new one.
+  if (IsOverscrolled() && mState != OVERSCROLL_ANIMATION) {
     APZC_LOG("%p is overscrolled, starting snap-back\n", this);
     StartOverscrollAnimation(ParentLayerPoint(0, 0));
     return true;

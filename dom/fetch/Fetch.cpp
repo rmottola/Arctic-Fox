@@ -217,30 +217,36 @@ FetchRequest(nsIGlobalObject* aGlobal, const RequestOrUSVString& aInput,
 
   nsRefPtr<InternalRequest> r = request->GetInternalRequest();
 
-  aRv = UpdateRequestReferrer(aGlobal, r);
-  if (NS_WARN_IF(aRv.Failed())) {
-    return nullptr;
-  }
-
   if (NS_IsMainThread()) {
     nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aGlobal);
-    if (!window) {
-      aRv.Throw(NS_ERROR_FAILURE);
-      return nullptr;
-    }
-
-    nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
-    if (!doc) {
-      aRv.Throw(NS_ERROR_FAILURE);
-      return nullptr;
+    nsCOMPtr<nsIDocument> doc;
+    nsCOMPtr<nsILoadGroup> loadGroup;
+    nsIPrincipal* principal;
+    if (window) {
+      doc = window->GetExtantDoc();
+      if (!doc) {
+        aRv.Throw(NS_ERROR_FAILURE);
+        return nullptr;
+      }
+      principal = doc->NodePrincipal();
+      loadGroup = doc->GetDocumentLoadGroup();
+    } else {
+      principal = aGlobal->PrincipalOrNull();
+      if (NS_WARN_IF(!principal)) {
+        aRv.Throw(NS_ERROR_FAILURE);
+        return nullptr;
+      }
+      nsresult rv = NS_NewLoadGroup(getter_AddRefs(loadGroup), principal);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        aRv.Throw(rv);
+        return nullptr;
+      }
     }
 
     Telemetry::Accumulate(Telemetry::FETCH_IS_MAINTHREAD, 1);
 
     nsRefPtr<MainThreadFetchResolver> resolver = new MainThreadFetchResolver(p);
-    nsCOMPtr<nsILoadGroup> loadGroup = doc->GetDocumentLoadGroup();
-    nsRefPtr<FetchDriver> fetch =
-      new FetchDriver(r, doc->NodePrincipal(), loadGroup);
+    nsRefPtr<FetchDriver> fetch = new FetchDriver(r, principal, loadGroup);
     fetch->SetDocument(doc);
     aRv = fetch->Fetch(resolver);
     if (NS_WARN_IF(aRv.Failed())) {
@@ -387,41 +393,6 @@ WorkerFetchResolver::OnResponseEnd()
   }
 }
 
-// This method sets the request's referrerURL, as specified by the "determine
-// request's referrer" steps from Referrer Policy [1].
-// The actual referrer policy and stripping is dealt with by HttpBaseChannel,
-// this always sets the full API referrer URL of the relevant global if it is
-// not already a url or no-referrer.
-// [1]: https://w3c.github.io/webappsec/specs/referrer-policy/#determine-requests-referrer
-nsresult
-UpdateRequestReferrer(nsIGlobalObject* aGlobal, InternalRequest* aRequest)
-{
-  nsAutoString originalReferrer;
-  aRequest->GetReferrer(originalReferrer);
-  // If it is no-referrer ("") or a URL, don't modify.
-  if (!originalReferrer.EqualsLiteral(kFETCH_CLIENT_REFERRER_STR)) {
-    return NS_OK;
-  }
-
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aGlobal);
-  if (window) {
-    nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
-    if (doc) {
-      nsAutoString referrer;
-      doc->GetReferrer(referrer);
-      aRequest->SetReferrer(referrer);
-    }
-  } else {
-    WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
-    MOZ_ASSERT(worker);
-    worker->AssertIsOnWorkerThread();
-    WorkerPrivate::LocationInfo& info = worker->GetLocationInfo();
-    aRequest->SetReferrer(NS_ConvertUTF8toUTF16(info.mHref));
-  }
-
-  return NS_OK;
-}
-
 namespace {
 nsresult
 ExtractFromArrayBuffer(const ArrayBuffer& aBuffer,
@@ -450,9 +421,10 @@ ExtractFromBlob(const Blob& aBlob, nsIInputStream** aStream,
                 nsCString& aContentType)
 {
   nsRefPtr<BlobImpl> impl = aBlob.Impl();
-  nsresult rv = impl->GetInternalStream(aStream);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return rv;
+  ErrorResult rv;
+  impl->GetInternalStream(aStream, rv);
+  if (NS_WARN_IF(rv.Failed())) {
+    return rv.StealNSResult();
   }
 
   nsAutoString type;
@@ -519,13 +491,26 @@ ExtractFromURLSearchParams(const URLSearchParams& aParams,
   return NS_NewStringInputStream(aStream, serialized);
 }
 
-void
-FillFormData(const nsString& aName, const nsString& aValue, void* aFormData)
+class MOZ_STACK_CLASS FillFormIterator final
+  : public URLSearchParams::ForEachIterator
 {
-  MOZ_ASSERT(aFormData);
-  nsFormData* fd = static_cast<nsFormData*>(aFormData);
-  fd->Append(aName, aValue);
-}
+public:
+  explicit FillFormIterator(nsFormData* aFormData)
+    : mFormData(aFormData)
+  {
+    MOZ_ASSERT(aFormData);
+  }
+
+  bool URLParamsIterator(const nsString& aName,
+                         const nsString& aValue) override
+  {
+    mFormData->Append(aName, aValue);
+    return true;
+  }
+
+private:
+  nsFormData* mFormData;
+};
 
 /**
  * A simple multipart/form-data parser as defined in RFC 2388 and RFC 2046.
@@ -1527,7 +1512,17 @@ FetchBody<Derived>::ContinueConsumeBody(nsresult aStatus, uint32_t aResultLength
       data.Adopt(reinterpret_cast<char*>(aResult), aResultLength);
       autoFree.Reset();
 
-      if (StringBeginsWith(mMimeType, NS_LITERAL_CSTRING("multipart/form-data"))) {
+      NS_NAMED_LITERAL_CSTRING(formDataMimeType, "multipart/form-data");
+
+      // Allow semicolon separated boundary/encoding suffix like multipart/form-data; boundary=
+      // but disallow multipart/form-datafoobar.
+      bool isValidFormDataMimeType = StringBeginsWith(mMimeType, formDataMimeType);
+
+      if (isValidFormDataMimeType && mMimeType.Length() > formDataMimeType.Length()) {
+        isValidFormDataMimeType = mMimeType[formDataMimeType.Length()] == ';';
+      }
+
+      if (isValidFormDataMimeType) {
         FormDataParser parser(mMimeType, data, DerivedClass()->GetParentObject());
         if (!parser.Parse()) {
           ErrorResult result;
@@ -1539,18 +1534,29 @@ FetchBody<Derived>::ContinueConsumeBody(nsresult aStatus, uint32_t aResultLength
         nsRefPtr<nsFormData> fd = parser.FormData();
         MOZ_ASSERT(fd);
         localPromise->MaybeResolve(fd);
-      } else if (StringBeginsWith(mMimeType,
-                                  NS_LITERAL_CSTRING("application/x-www-form-urlencoded"))) {
-        nsRefPtr<URLSearchParams> params = new URLSearchParams();
-        params->ParseInput(data, /* aObserver */ nullptr);
-
-        nsRefPtr<nsFormData> fd = new nsFormData(DerivedClass()->GetParentObject());
-        params->ForEach(FillFormData, static_cast<void*>(fd));
-        localPromise->MaybeResolve(fd);
       } else {
-        ErrorResult result;
-        result.ThrowTypeError(MSG_BAD_FORMDATA);
-        localPromise->MaybeReject(result);
+        NS_NAMED_LITERAL_CSTRING(urlDataMimeType, "application/x-www-form-urlencoded");
+        bool isValidUrlEncodedMimeType = StringBeginsWith(mMimeType, urlDataMimeType);
+
+        if (isValidUrlEncodedMimeType && mMimeType.Length() > urlDataMimeType.Length()) {
+          isValidUrlEncodedMimeType = mMimeType[urlDataMimeType.Length()] == ';';
+        }
+
+        if (isValidUrlEncodedMimeType) {
+          nsRefPtr<URLSearchParams> params = new URLSearchParams(nullptr);
+          params->ParseInput(data);
+
+          nsRefPtr<nsFormData> fd = new nsFormData(DerivedClass()->GetParentObject());
+          FillFormIterator iterator(fd);
+          DebugOnly<bool> status = params->ForEach(iterator);
+          MOZ_ASSERT(status);
+
+          localPromise->MaybeResolve(fd);
+        } else {
+          ErrorResult result;
+          result.ThrowTypeError(MSG_BAD_FORMDATA);
+          localPromise->MaybeReject(result);
+        }
       }
       return;
     }
@@ -1628,15 +1634,15 @@ FetchBody<Response>::ConsumeBody(ConsumeType aType, ErrorResult& aRv);
 
 template <class Derived>
 void
-FetchBody<Derived>::SetMimeType(ErrorResult& aRv)
+FetchBody<Derived>::SetMimeType()
 {
   // Extract mime type.
+  ErrorResult result;
   nsTArray<nsCString> contentTypeValues;
   MOZ_ASSERT(DerivedClass()->GetInternalHeaders());
-  DerivedClass()->GetInternalHeaders()->GetAll(NS_LITERAL_CSTRING("Content-Type"), contentTypeValues, aRv);
-  if (NS_WARN_IF(aRv.Failed())) {
-    return;
-  }
+  DerivedClass()->GetInternalHeaders()->GetAll(NS_LITERAL_CSTRING("Content-Type"),
+                                               contentTypeValues, result);
+  MOZ_ALWAYS_TRUE(!result.Failed());
 
   // HTTP ABNF states Content-Type may have only one value.
   // This is from the "parse a header value" of the fetch spec.
@@ -1648,10 +1654,10 @@ FetchBody<Derived>::SetMimeType(ErrorResult& aRv)
 
 template
 void
-FetchBody<Request>::SetMimeType(ErrorResult& aRv);
+FetchBody<Request>::SetMimeType();
 
 template
 void
-FetchBody<Response>::SetMimeType(ErrorResult& aRv);
+FetchBody<Response>::SetMimeType();
 } // namespace dom
 } // namespace mozilla

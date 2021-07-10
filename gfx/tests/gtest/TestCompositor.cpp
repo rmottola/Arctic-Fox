@@ -45,7 +45,8 @@ public:
       caps.preserve = false;
       caps.bpp16 = false;
       nsRefPtr<GLContext> context = GLContextProvider::CreateOffscreen(
-        gfxIntSize(gCompWidth, gCompHeight), caps, true);
+        IntSize(gCompWidth, gCompHeight), caps,
+        CreateContextFlags::REQUIRE_COMPAT_PROFILE);
       return context.forget().take();
     }
     return nullptr;
@@ -181,7 +182,7 @@ static bool CompositeAndCompare(nsRefPtr<LayerManagerComposite> layerManager, Dr
   RefPtr<DrawTarget> drawTarget = CreateDT();
 
   layerManager->BeginTransactionWithDrawTarget(drawTarget, IntRect(0, 0, gCompWidth, gCompHeight));
-  layerManager->EndEmptyTransaction();
+  layerManager->EndTransaction(TimeStamp::Now());
 
   RefPtr<SourceSurface> ss = drawTarget->Snapshot();
   RefPtr<DataSourceSurface> dss = ss->GetDataSurface();

@@ -322,6 +322,8 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
                                      HitTestingTreeNode* aNextSibling,
                                      TreeBuildingState& aState)
 {
+  mTreeLock.AssertCurrentThreadOwns();
+
   bool needsApzc = true;
   if (!aMetrics.IsScrollable()) {
     needsApzc = false;
@@ -461,21 +463,18 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
     }
 
     if (newApzc) {
-      if (apzc->HasNoParentWithSameLayersId()) {
-        // If we just created a new apzc that is the root for its layers ID, then
-        // we need to update its zoom constraints which might have arrived before this
-        // was created
-        ZoomConstraints constraints;
-        if (state->mController->GetRootZoomConstraints(&constraints)) {
-          apzc->UpdateZoomConstraints(constraints);
-        }
-      } else {
-        // For an apzc that is not the root for its layers ID, we give it the
-        // same zoom constraints as its parent. This ensures that if e.g.
-        // user-scalable=no was specified, none of the APZCs allow double-tap
-        // to zoom.
+      auto it = mZoomConstraints.find(guid);
+      if (it != mZoomConstraints.end()) {
+        // We have a zoomconstraints for this guid, apply it.
+        apzc->UpdateZoomConstraints(it->second);
+      } else if (!apzc->HasNoParentWithSameLayersId()) {
+        // This is a sub-APZC, so inherit the zoom constraints from its parent.
+        // This ensures that if e.g. user-scalable=no was specified, none of the
+        // APZCs for that subtree allow double-tap to zoom.
         apzc->UpdateZoomConstraints(apzc->GetParent()->GetZoomConstraints());
       }
+      // Otherwise, this is the root of a layers id, but we didn't have a saved
+      // zoom constraints. Leave it empty for now.
     }
 
     // Add a guid -> APZC mapping for the newly created APZC.
@@ -552,6 +551,20 @@ APZCTreeManager::UpdateHitTestingTree(TreeBuildingState& aState,
   return node;
 }
 
+void
+APZCTreeManager::FlushApzRepaints(uint64_t aLayersId)
+{
+  APZCTM_LOG("Flushing repaints for layers id %" PRIu64, aLayersId);
+  { // scope lock
+    MonitorAutoLock lock(mTreeLock);
+    FlushPendingRepaintRecursively(mRootNode, aLayersId);
+  }
+  const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(aLayersId);
+  MOZ_ASSERT(state && state->mController);
+  NS_DispatchToMainThread(NS_NewRunnableMethod(
+    state->mController.get(), &GeckoContentController::NotifyFlushComplete));
+}
+
 nsEventStatus
 APZCTreeManager::ReceiveInputEvent(InputData& aEvent,
                                    ScrollableLayerGuid* aOutTargetGuid,
@@ -572,11 +585,25 @@ APZCTreeManager::ReceiveInputEvent(InputData& aEvent,
       result = ProcessTouchInput(touchInput, aOutTargetGuid, aOutInputBlockId);
       break;
     } case SCROLLWHEEL_INPUT: {
+      FlushRepaintsToClearScreenToGeckoTransform();
+
       ScrollWheelInput& wheelInput = aEvent.AsScrollWheelInput();
       nsRefPtr<AsyncPanZoomController> apzc = GetTargetAPZC(wheelInput.mOrigin,
                                                             &hitResult);
       if (apzc) {
         MOZ_ASSERT(hitResult == HitLayer || hitResult == HitDispatchToContentRegion);
+
+        // For wheel events, the call to ReceiveInputEvent below may result in
+        // scrolling, which changes the async transform. However, the event we
+        // want to pass to gecko should be the pre-scroll event coordinates,
+        // transformed into the gecko space. (pre-scroll because the mouse
+        // cursor is stationary during wheel scrolling, unlike touchmove
+        // events). Also, since we just flushed the pending repaints the
+        // transform to gecko space is a no-op so we can just skip it.
+        MOZ_ASSERT(
+          (GetScreenToApzcTransform(apzc) * GetApzcToGeckoTransform(apzc))
+          .NudgeToIntegersFixedEpsilon()
+          .IsIdentity());
 
         result = mInputQueue->ReceiveInputEvent(
           apzc,
@@ -585,10 +612,6 @@ APZCTreeManager::ReceiveInputEvent(InputData& aEvent,
 
         // Update the out-parameters so they are what the caller expects.
         apzc->GetGuid(aOutTargetGuid);
-        Matrix4x4 transformToGecko = GetScreenToApzcTransform(apzc)
-                                   * GetApzcToGeckoTransform(apzc);
-        wheelInput.mOrigin =
-          TransformTo<ScreenPixel>(transformToGecko, wheelInput.mOrigin);
       }
       break;
     } case PANGESTURE_INPUT: {
@@ -666,17 +689,7 @@ APZCTreeManager::GetTouchInputBlockAPZC(const MultiTouchInput& aEvent,
     return apzc.forget();
   }
 
-  { // In this block we flush repaint requests for the entire APZ tree. We need to do this
-    // at the start of an input block for a number of reasons. One of the reasons is so that
-    // after we untransform the event into gecko space, it doesn't end up under something
-    // else. Another reason is that if we hit-test this event and end up on a layer's
-    // dispatch-to-content region we cannot be sure we actually got the correct layer. We
-    // have to fall back to the gecko hit-test to handle this case, but we can't untransform
-    // the event we send to gecko because we don't know the layer to untransform with
-    // respect to.
-    MonitorAutoLock lock(mTreeLock);
-    FlushRepaintsRecursively(mRootNode);
-  }
+  FlushRepaintsToClearScreenToGeckoTransform();
 
   apzc = GetTargetAPZC(aEvent.mTouches[0].mScreenPoint, aOutHitResult);
   for (size_t i = 1; i < aEvent.mTouches.Length(); i++) {
@@ -768,6 +781,12 @@ APZCTreeManager::ProcessTouchInput(MultiTouchInput& aInput,
     Matrix4x4 transformToApzc = GetScreenToApzcTransform(mApzcForInputBlock);
     Matrix4x4 transformToGecko = GetApzcToGeckoTransform(mApzcForInputBlock);
     Matrix4x4 outTransform = transformToApzc * transformToGecko;
+    if (aInput.mType == MultiTouchInput::MULTITOUCH_START) {
+      // For touch-start events we should have flushed all pending repaints
+      // above as part of the GetTouchInputBlockAPZC call, and so we expect
+      // the apzc-to-gecko transform to be empty.
+      MOZ_ASSERT(outTransform.NudgeToIntegersFixedEpsilon().IsIdentity());
+    }
     for (size_t i = 0; i < aInput.mTouches.Length(); i++) {
       SingleTouchData& touchData = aInput.mTouches[i];
       touchData.mScreenPoint = TransformTo<ScreenPixel>(
@@ -1015,16 +1034,24 @@ APZCTreeManager::SetTargetAPZC(uint64_t aInputBlockId, const ScrollableLayerGuid
 
 void
 APZCTreeManager::UpdateZoomConstraints(const ScrollableLayerGuid& aGuid,
-                                       const ZoomConstraints& aConstraints)
+                                       const Maybe<ZoomConstraints>& aConstraints)
 {
   MonitorAutoLock lock(mTreeLock);
   nsRefPtr<HitTestingTreeNode> node = GetTargetNode(aGuid, nullptr);
   MOZ_ASSERT(!node || node->GetApzc()); // any node returned must have an APZC
 
-  // For a given layers id, non-root APZCs inherit the zoom constraints
-  // of their root.
-  if (node && node->GetApzc()->HasNoParentWithSameLayersId()) {
-    UpdateZoomConstraintsRecursively(node.get(), aConstraints);
+  // Propagate the zoom constraints down to the subtree, stopping at APZCs
+  // which have their own zoom constraints or are in a different layers id.
+  if (aConstraints) {
+    APZCTM_LOG("Recording constraints %s for guid %s\n",
+      Stringify(aConstraints.value()).c_str(), Stringify(aGuid).c_str());
+    mZoomConstraints[aGuid] = aConstraints.ref();
+  } else {
+    APZCTM_LOG("Removing constraints for guid %s\n", Stringify(aGuid).c_str());
+    mZoomConstraints.erase(aGuid);
+  }
+  if (node && aConstraints) {
+    UpdateZoomConstraintsRecursively(node.get(), aConstraints.ref());
   }
 }
 
@@ -1039,12 +1066,42 @@ APZCTreeManager::UpdateZoomConstraintsRecursively(HitTestingTreeNode* aNode,
     aNode->GetApzc()->UpdateZoomConstraints(aConstraints);
   }
   for (HitTestingTreeNode* child = aNode->GetLastChild(); child; child = child->GetPrevSibling()) {
-    // We can have subtrees with their own layers id - leave those alone.
-    if (child->GetApzc() && child->GetApzc()->HasNoParentWithSameLayersId()) {
-      continue;
+    if (AsyncPanZoomController* childApzc = child->GetApzc()) {
+      // We can have subtrees with their own zoom constraints or separate layers
+      // id - leave those alone.
+      if (childApzc->HasNoParentWithSameLayersId() ||
+          mZoomConstraints.find(childApzc->GetGuid()) != mZoomConstraints.end()) {
+        continue;
+      }
     }
     UpdateZoomConstraintsRecursively(child, aConstraints);
   }
+}
+
+void
+APZCTreeManager::FlushRepaintsToClearScreenToGeckoTransform()
+{
+  // As the name implies, we flush repaint requests for the entire APZ tree in
+  // order to clear the screen-to-gecko transform (aka the "untransform" applied
+  // to incoming input events before they can be passed on to Gecko).
+  //
+  // The primary reason we do this is to avoid the problem where input events,
+  // after being untransformed, end up hit-testing differently in Gecko. This
+  // might happen in cases where the input event lands on content that is async-
+  // scrolled into view, but Gecko still thinks it is out of view given the
+  // visible area of a scrollframe.
+  //
+  // Another reason we want to clear the untransform is that if our APZ hit-test
+  // hits a dispatch-to-content region then that's an ambiguous result and we
+  // need to ask Gecko what actually got hit. In order to do this we need to
+  // untransform the input event into Gecko space - but to do that we need to
+  // know which APZC got hit! This leads to a circular dependency; the only way
+  // to get out of it is to make sure that the untransform for all the possible
+  // matched APZCs is the same. It is simplest to ensure that by flushing the
+  // pending repaint requests, which makes all of the untransforms empty (and
+  // therefore equal).
+  MonitorAutoLock lock(mTreeLock);
+  FlushRepaintsRecursively(mRootNode);
 }
 
 void
@@ -1058,6 +1115,23 @@ APZCTreeManager::FlushRepaintsRecursively(HitTestingTreeNode* aNode)
       node->GetApzc()->FlushRepaintForNewInputBlock();
     }
     FlushRepaintsRecursively(node->GetLastChild());
+  }
+}
+
+void
+APZCTreeManager::FlushPendingRepaintRecursively(HitTestingTreeNode* aNode, uint64_t aLayersId)
+{
+  mTreeLock.AssertCurrentThreadOwns();
+
+  for (HitTestingTreeNode* node = aNode; node; node = node->GetPrevSibling()) {
+    if (node->IsPrimaryHolder()) {
+      AsyncPanZoomController* apzc = node->GetApzc();
+      MOZ_ASSERT(apzc);
+      if (apzc->GetGuid().mLayersId == aLayersId) {
+        apzc->FlushRepaintIfPending();
+      }
+    }
+    FlushPendingRepaintRecursively(node->GetLastChild(), aLayersId);
   }
 }
 

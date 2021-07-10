@@ -239,15 +239,11 @@ static void EnsureClassObjectsInitialized()
     }
 }
 
-NS_METHOD GetSharedScriptableHelperForJSIID(uint32_t language,
-                                            nsISupports** helper)
+NS_METHOD GetSharedScriptableHelperForJSIID(nsIXPCScriptable** helper)
 {
     EnsureClassObjectsInitialized();
-    if (language == nsIProgrammingLanguage::JAVASCRIPT) {
-        nsCOMPtr<nsIXPCScriptable> temp = gSharedScriptableHelperForJSIID.get();
-        temp.forget(helper);
-    } else
-        *helper = nullptr;
+    nsCOMPtr<nsIXPCScriptable> temp = gSharedScriptableHelperForJSIID.get();
+    temp.forget(helper);
     return NS_OK;
 }
 
@@ -770,14 +766,8 @@ xpc_NewIDObject(JSContext* cx, HandleObject jsobj, const nsID& aID)
     if (iid) {
         nsXPConnect* xpc = nsXPConnect::XPConnect();
         if (xpc) {
-            nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
-            nsresult rv = xpc->WrapNative(cx, jsobj,
-                                          static_cast<nsISupports*>(iid),
-                                          NS_GET_IID(nsIJSID),
-                                          getter_AddRefs(holder));
-            if (NS_SUCCEEDED(rv) && holder) {
-                obj = holder->GetJSObject();
-            }
+            xpc->WrapNative(cx, jsobj, static_cast<nsISupports*>(iid),
+                            NS_GET_IID(nsIJSID), obj.address());
         }
     }
     return obj;

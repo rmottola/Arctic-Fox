@@ -20,6 +20,7 @@ include protocol PDNSRequest;
 include protocol PChannelDiverter;
 include protocol PBlob; //FIXME: bug #792908
 include protocol PFileDescriptorSet;
+include protocol PDataChannel;
 
 include protocol PRtspController;
 include protocol PRtspChannel;
@@ -49,6 +50,7 @@ prio(normal upto urgent) sync protocol PNecko
   manages PUDPSocket;
   manages PDNSRequest;
   manages PRemoteOpenFile;
+  manages PDataChannel;
   manages PRtspController;
   manages PRtspChannel;
   manages PChannelDiverter;
@@ -70,13 +72,29 @@ parent:
 
   PDNSRequest(nsCString hostName, uint32_t flags, nsCString networkInterface);
 
+
+  /* Predictor Methods */
+  PredPredict(OptionalURIParams targetURI, OptionalURIParams sourceURI,
+              uint32_t reason, SerializedLoadContext loadContext,
+              bool hasVerifier);
+  PredLearn(URIParams targetURI, OptionalURIParams sourceURI,
+            uint32_t reason, SerializedLoadContext loadContext);
+  PredReset();
+
   PRemoteOpenFile(SerializedLoadContext loadContext,
                   URIParams fileuri,
                   OptionalURIParams appuri);
 
-  SpeculativeConnect(URIParams uri);
+  SpeculativeConnect(URIParams uri, bool anonymous);
   HTMLDNSPrefetch(nsString hostname, uint16_t flags);
   CancelHTMLDNSPrefetch(nsString hostname, uint16_t flags, nsresult reason);
+
+  /**
+   * channelId is used to establish a connection between redirect channels in
+   * the parent and the child when we're redirecting to a data: URI.
+   */
+  PDataChannel(uint32_t channelId);
+
   PRtspController();
   PRtspChannel(RtspChannelConnectArgs args);
   PChannelDiverter(ChannelDiverterArgs channel);
@@ -100,6 +118,10 @@ child:
                                 nsString realm, uint64_t callbackId);
   // Notifies child that a given app is now offline (or online)
   AppOfflineStatus(uint32_t appId, bool offline);
+
+  /* Predictor Methods */
+  PredOnPredictPreconnect(URIParams uri);
+  PredOnPredictDNS(URIParams uri);
 
 both:
   // Actually we need PTCPSocket() for parent. But ipdl disallows us having different

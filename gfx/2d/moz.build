@@ -24,6 +24,7 @@ EXPORTS.mozilla.gfx += [
     'DrawTargetTiled.h',
     'Filters.h',
     'Helpers.h',
+    'HelpersCairo.h',
     'Logging.h',
     'Matrix.h',
     'NumericTools.h',
@@ -106,6 +107,12 @@ elif CONFIG['CPU_ARCH'].startswith('mips'):
         SOURCES += [
             'convolverLS3.cpp',
         ]
+
+if CONFIG['HAVE_ALTIVEC']:
+    SOURCES += [
+        'BlurVMX.cpp',
+    ]
+    DEFINES['USE_VMX'] = True
 
 UNIFIED_SOURCES += [
     'Blur.cpp',

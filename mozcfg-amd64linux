@@ -2,8 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-export CC="gcc-6.5.0"
-export CXX="g++-6.5.0"
+#export CC="gcc-6.5.0"
+#export CXX="g++-6.5.0"
 
 mk_add_options MOZ_MAKE_FLAGS="-s -j4"
 
@@ -26,6 +26,6 @@ ac_add_options --enable-strip
 ac_add_options --enable-install-strip
 ac_add_options --enable-application=browser
 ac_add_options --with-branding=browser/branding/arcticfox
-ac_add_options --enable-optimize="-O2 -march=westmere -fno-schedule-insns2 -fno-lifetime-dse -fno-delete-null-pointer-checks"
+ac_add_options --enable-optimize="-O2 -march=westmere"
 
 

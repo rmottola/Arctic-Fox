@@ -8,9 +8,10 @@
 #define js_TracingAPI_h
 
 #include "jsalloc.h"
-#include "jspubtd.h"
 
 #include "js/HashTable.h"
+#include "js/HeapAPI.h"
+#include "js/TraceKind.h"
 
 class JS_PUBLIC_API(JSTracer);
 
@@ -19,66 +20,11 @@ class JS_PUBLIC_API(CallbackTracer);
 template <typename T> class Heap;
 template <typename T> class TenuredHeap;
 
-// When tracing a thing, the GC needs to know about the layout of the object it
-// is looking at. There are a fixed number of different layouts that the GC
-// knows about. The "trace kind" is a static map which tells which layout a GC
-// thing has.
-//
-// Although this map is public, the details are completely hidden. Not all of
-// the matching C++ types are exposed, and those that are, are opaque.
-//
-// See Value::gcKind() and JSTraceCallback in Tracer.h for more details.
-enum class TraceKind
-{
-    // These trace kinds have a publicly exposed, although opaque, C++ type.
-    // Note: The order here is determined by our Value packing. Other users
-    //       should sort alphabetically, for consistency.
-    Object = 0x00,
-    String = 0x01,
-    Symbol = 0x02,
-    Script = 0x03,
-
-    // Shape details are exposed through JS_TraceShapeCycleCollectorChildren.
-    Shape = 0x04,
-
-    // ObjectGroup details are exposed through JS_TraceObjectGroupCycleCollectorChildren.
-    ObjectGroup = 0x05,
-
-    // The kind associated with a nullptr.
-    Null = 0x06,
-
-    // The following kinds do not have an exposed C++ idiom.
-    BaseShape = 0x0F,
-    JitCode = 0x1F,
-    LazyScript = 0x2F
-};
-const static uintptr_t OutOfLineTraceKindMask = 0x07;
-static_assert(uintptr_t(JS::TraceKind::BaseShape) & OutOfLineTraceKindMask, "mask bits are set");
-static_assert(uintptr_t(JS::TraceKind::JitCode) & OutOfLineTraceKindMask, "mask bits are set");
-static_assert(uintptr_t(JS::TraceKind::LazyScript) & OutOfLineTraceKindMask, "mask bits are set");
-
 // Returns a static string equivalent of |kind|.
 JS_FRIEND_API(const char*)
 GCTraceKindToAscii(JS::TraceKind kind);
 
 } // namespace JS
-
-// Tracer callback, called for each traceable thing directly referenced by a
-// particular object or runtime structure. It is the callback responsibility
-// to ensure the traversal of the full object graph via calling eventually
-// JS_TraceChildren on the passed thing. In this case the callback must be
-// prepared to deal with cycles in the traversal graph.
-//
-// kind argument is one of JS::TraceKind::Object, JS::TraceKind::String or a
-// tag denoting internal implementation-specific traversal kind. In the latter
-// case the only operations on thing that the callback can do is to call
-// JS_TraceChildren or JS_GetTraceThingInfo.
-//
-// If eagerlyTraceWeakMaps is true, when we trace a WeakMap visit all
-// of its mappings. This should be used in cases where the tracer
-// wants to use the existing liveness of entries.
-typedef void
-(* JSTraceCallback)(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind);
 
 enum WeakMapTraceKind {
     DoNotTraceWeakMaps = 0,
@@ -127,21 +73,39 @@ class AutoTracingCallback;
 class JS_PUBLIC_API(CallbackTracer) : public JSTracer
 {
   public:
-    CallbackTracer(JSRuntime* rt, JSTraceCallback traceCallback,
-                   WeakMapTraceKind weakTraceKind = TraceWeakMapValues)
-      : JSTracer(rt, JSTracer::TracerKindTag::Callback, weakTraceKind), callback(traceCallback),
+    CallbackTracer(JSRuntime* rt, WeakMapTraceKind weakTraceKind = TraceWeakMapValues)
+      : JSTracer(rt, JSTracer::TracerKindTag::Callback, weakTraceKind),
         contextName_(nullptr), contextIndex_(InvalidIndex), contextFunctor_(nullptr)
     {}
 
-    // Test if the given callback is the same as our callback.
-    bool hasCallback(JSTraceCallback maybeCallback) const {
-        return maybeCallback == callback;
+    // Override these methods to receive notification when an edge is visited
+    // with the type contained in the callback. The default implementation
+    // dispatches to the fully-generic onChild implementation, so for cases that
+    // do not care about boxing overhead and do not need the actual edges,
+    // just override the generic onChild.
+    virtual void onObjectEdge(JSObject** objp) { onChild(JS::GCCellPtr(*objp)); }
+    virtual void onStringEdge(JSString** strp) { onChild(JS::GCCellPtr(*strp)); }
+    virtual void onSymbolEdge(JS::Symbol** symp) { onChild(JS::GCCellPtr(*symp)); }
+    virtual void onScriptEdge(JSScript** scriptp) { onChild(JS::GCCellPtr(*scriptp)); }
+    virtual void onShapeEdge(js::Shape** shapep) {
+        onChild(JS::GCCellPtr(*shapep, JS::TraceKind::Shape));
+    }
+    virtual void onObjectGroupEdge(js::ObjectGroup** groupp) {
+        onChild(JS::GCCellPtr(*groupp, JS::TraceKind::ObjectGroup));
+    }
+    virtual void onBaseShapeEdge(js::BaseShape** basep) {
+        onChild(JS::GCCellPtr(*basep, JS::TraceKind::BaseShape));
+    }
+    virtual void onJitCodeEdge(js::jit::JitCode** codep) {
+        onChild(JS::GCCellPtr(*codep, JS::TraceKind::JitCode));
+    }
+    virtual void onLazyScriptEdge(js::LazyScript** lazyp) {
+        onChild(JS::GCCellPtr(*lazyp, JS::TraceKind::LazyScript));
     }
 
-    // Call the callback.
-    void invoke(void** thing, JS::TraceKind kind) {
-        callback(this, thing, kind);
-    }
+    // Override this method to receive notification when a node in the GC
+    // heap graph is visited.
+    virtual void onChild(const JS::GCCellPtr& thing) = 0;
 
     // Access to the tracing context:
     // When tracing with a JS::CallbackTracer, we invoke the callback with the
@@ -188,11 +152,27 @@ class JS_PUBLIC_API(CallbackTracer) : public JSTracer
         virtual void operator()(CallbackTracer* trc, char* buf, size_t bufsize) = 0;
     };
 
-  private:
-    // Exposed publicly for several callers that need to check if the tracer
-    // calling them is of the right type.
-    JSTraceCallback callback;
+#ifdef DEBUG
+    enum class TracerKind { DoNotCare, Moving, GrayBuffering, VerifyTraceProtoAndIface };
+    virtual TracerKind getTracerKind() const { return TracerKind::DoNotCare; }
+#endif
 
+    // In C++, overriding a method hides all methods in the base class with
+    // that name, not just methods with that signature. Thus, the typed edge
+    // methods have to have distinct names to allow us to override them
+    // individually, which is freqently useful if, for example, we only want to
+    // process only one type of edge.
+    void dispatchToOnEdge(JSObject** objp) { onObjectEdge(objp); }
+    void dispatchToOnEdge(JSString** strp) { onStringEdge(strp); }
+    void dispatchToOnEdge(JS::Symbol** symp) { onSymbolEdge(symp); }
+    void dispatchToOnEdge(JSScript** scriptp) { onScriptEdge(scriptp); }
+    void dispatchToOnEdge(js::Shape** shapep) { onShapeEdge(shapep); }
+    void dispatchToOnEdge(js::ObjectGroup** groupp) { onObjectGroupEdge(groupp); }
+    void dispatchToOnEdge(js::BaseShape** basep) { onBaseShapeEdge(basep); }
+    void dispatchToOnEdge(js::jit::JitCode** codep) { onJitCodeEdge(codep); }
+    void dispatchToOnEdge(js::LazyScript** lazyp) { onLazyScriptEdge(lazyp); }
+
+  private:
     friend class AutoTracingName;
     const char* contextName_;
 
@@ -278,6 +258,31 @@ JSTracer::asCallbackTracer()
     MOZ_ASSERT(isCallbackTracer());
     return static_cast<JS::CallbackTracer*>(this);
 }
+
+namespace js {
+
+// Automates static dispatch for tracing for TraceableContainers.
+template <typename, typename=void> struct DefaultTracer;
+
+// The default for POD, non-pointer types is to do nothing.
+template <typename T>
+struct DefaultTracer<T, typename mozilla::EnableIf<!mozilla::IsPointer<T>::value &&
+                                                   mozilla::IsPod<T>::value>::Type> {
+    static void trace(JSTracer* trc, T* t, const char* name) {
+        MOZ_ASSERT(mozilla::IsPod<T>::value);
+        MOZ_ASSERT(!mozilla::IsPointer<T>::value);
+    }
+};
+
+// The default for non-pod (e.g. struct) types is to call the trace method.
+template <typename T>
+struct DefaultTracer<T, typename mozilla::EnableIf<!mozilla::IsPod<T>::value>::Type> {
+    static void trace(JSTracer* trc, T* t, const char* name) {
+        t->trace(trc);
+    }
+};
+
+} // namespace js
 
 // The JS_Call*Tracer family of functions traces the given GC thing reference.
 // This performs the tracing action configured on the given JSTracer:

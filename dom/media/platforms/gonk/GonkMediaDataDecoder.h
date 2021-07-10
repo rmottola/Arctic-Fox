@@ -67,7 +67,6 @@ protected:
   // any sample be queued after EOS.
   nsTArray<nsRefPtr<MediaRawData>> mQueueSample;
 
-  RefPtr<MediaTaskQueue> mTaskQueue;
 };
 
 // Samples are decoded using the GonkDecoder (MediaCodec)
@@ -92,8 +91,6 @@ public:
   virtual nsresult Drain() override;
 
   virtual nsresult Shutdown() override;
-
-  virtual bool IsWaitingMediaResources() override;
 
 private:
 

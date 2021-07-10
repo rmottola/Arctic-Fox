@@ -40,6 +40,8 @@
 #include "mozilla/dom/IccManager.h"
 #include "mozilla/dom/InputPortManager.h"
 #include "mozilla/dom/MobileMessageManager.h"
+#include "mozilla/dom/Permissions.h"
+#include "mozilla/dom/Presentation.h"
 #include "mozilla/dom/ServiceWorkerContainer.h"
 #include "mozilla/dom/Telephony.h"
 #include "mozilla/dom/Voicemail.h"
@@ -62,6 +64,9 @@
 #include "nsIPermissionManager.h"
 #include "nsMimeTypes.h"
 #include "nsNetUtil.h"
+#include "nsStringStream.h"
+#include "nsComponentManagerUtils.h"
+#include "nsIStringStream.h"
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "TimeManager.h"
@@ -169,8 +174,9 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(Navigator)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Navigator)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPlugins)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMimeTypes)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPlugins)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPermissions)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mGeolocation)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mNotification)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mBatteryManager)
@@ -193,6 +199,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Navigator)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mAudioChannelManager)
 #endif
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCameraManager)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMediaDevices)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMessagesManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDeviceStorageStores)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTimeManager)
@@ -201,6 +208,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Navigator)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWindow)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCachedResolveResults)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDeviceStorageAreaListener)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPresentation)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
@@ -212,12 +220,14 @@ Navigator::Invalidate()
   // Don't clear mWindow here so we know we've got a non-null mWindow
   // until we're unlinked.
 
+  mMimeTypes = nullptr;
+
   if (mPlugins) {
     mPlugins->Invalidate();
     mPlugins = nullptr;
   }
 
-  mMimeTypes = nullptr;
+  mPermissions = nullptr;
 
   // If there is a page transition, make sure delete the geolocation object.
   if (mGeolocation) {
@@ -296,6 +306,7 @@ Navigator::Invalidate()
 #endif
 
   mCameraManager = nullptr;
+  mMediaDevices = nullptr;
 
   if (mMessagesManager) {
     mMessagesManager = nullptr;
@@ -315,6 +326,10 @@ Navigator::Invalidate()
 
   if (mTimeManager) {
     mTimeManager = nullptr;
+  }
+
+  if (mPresentation) {
+    mPresentation = nullptr;
   }
 
   mServiceWorkerContainer = nullptr;
@@ -551,6 +566,21 @@ Navigator::GetPlugins(ErrorResult& aRv)
   }
 
   return mPlugins;
+}
+
+Permissions*
+Navigator::GetPermissions(ErrorResult& aRv)
+{
+  if (!mWindow) {
+    aRv.Throw(NS_ERROR_UNEXPECTED);
+    return nullptr;
+  }
+
+  if (!mPermissions) {
+    mPermissions = new Permissions(mWindow);
+  }
+
+  return mPermissions;
 }
 
 // Values for the network.cookie.cookieBehavior pref are documented in
@@ -1196,17 +1226,13 @@ Navigator::SendBeacon(const nsAString& aUrl,
 
     } else if (aData.Value().IsBlob()) {
       Blob& blob = aData.Value().GetAsBlob();
-      rv = blob.GetInternalStream(getter_AddRefs(in));
-      if (NS_FAILED(rv)) {
-        aRv.Throw(NS_ERROR_FAILURE);
+      blob.GetInternalStream(getter_AddRefs(in), aRv);
+      if (NS_WARN_IF(aRv.Failed())) {
         return false;
       }
+
       nsAutoString type;
-      rv = blob.GetType(type);
-      if (NS_FAILED(rv)) {
-        aRv.Throw(NS_ERROR_FAILURE);
-        return false;
-      }
+      blob.GetType(type);
       mimeType = NS_ConvertUTF16toUTF8(type);
 
     } else if (aData.Value().IsFormData()) {
@@ -1464,7 +1490,7 @@ Navigator::GetFeature(const nsAString& aName, ErrorResult& aRv)
 #if defined(XP_LINUX)
   if (aName.EqualsLiteral("hardware.memory")) {
     // with seccomp enabled, fopen() should be in a non-sandboxed process
-    if (XRE_GetProcessType() == GeckoProcessType_Default) {
+    if (XRE_IsParentProcess()) {
       uint32_t memLevel = mozilla::hal::GetTotalSystemMemoryLevel();
       if (memLevel == 0) {
         p->MaybeReject(NS_ERROR_NOT_AVAILABLE);
@@ -2274,35 +2300,6 @@ Navigator::MayResolve(jsid aId)
   return nameSpaceManager->LookupNavigatorName(name);
 }
 
-struct NavigatorNameEnumeratorClosure
-{
-  NavigatorNameEnumeratorClosure(JSContext* aCx, JSObject* aWrapper,
-                                 nsTArray<nsString>& aNames)
-    : mCx(aCx),
-      mWrapper(aCx, aWrapper),
-      mNames(aNames)
-  {
-  }
-
-  JSContext* mCx;
-  JS::Rooted<JSObject*> mWrapper;
-  nsTArray<nsString>& mNames;
-};
-
-static PLDHashOperator
-SaveNavigatorName(const nsAString& aName,
-                  const nsGlobalNameStruct& aNameStruct,
-                  void* aClosure)
-{
-  NavigatorNameEnumeratorClosure* closure =
-    static_cast<NavigatorNameEnumeratorClosure*>(aClosure);
-  if (!aNameStruct.mConstructorEnabled ||
-      aNameStruct.mConstructorEnabled(closure->mCx, closure->mWrapper)) {
-    closure->mNames.AppendElement(aName);
-  }
-  return PL_DHASH_NEXT;
-}
-
 void
 Navigator::GetOwnPropertyNames(JSContext* aCx, nsTArray<nsString>& aNames,
                                ErrorResult& aRv)
@@ -2314,8 +2311,14 @@ Navigator::GetOwnPropertyNames(JSContext* aCx, nsTArray<nsString>& aNames,
     return;
   }
 
-  NavigatorNameEnumeratorClosure closure(aCx, GetWrapper(), aNames);
-  nameSpaceManager->EnumerateNavigatorNames(SaveNavigatorName, &closure);
+  JS::Rooted<JSObject*> wrapper(aCx, GetWrapper());
+  for (auto i = nameSpaceManager->NavigatorNameIter(); !i.Done(); i.Next()) {
+    const GlobalNameMapEntry* entry = i.Get();
+    if (!entry->mGlobalName.mConstructorEnabled ||
+        entry->mGlobalName.mConstructorEnabled(aCx, wrapper)) {
+      aNames.AppendElement(entry->mKey);
+    }
+  }
 }
 
 JSObject*
@@ -2538,7 +2541,7 @@ Navigator::HasTVSupport(JSContext* aCx, JSObject* aGlobal)
 bool
 Navigator::IsE10sEnabled(JSContext* aCx, JSObject* aGlobal)
 {
-  return XRE_GetProcessType() == GeckoProcessType_Content;
+  return XRE_IsContentProcess();
 }
 
 bool
@@ -2693,6 +2696,20 @@ Navigator::GetUserAgent(nsPIDOMWindow* aWindow, nsIURI* aURI,
   }
 
   return siteSpecificUA->GetUserAgentForURIAndWindow(aURI, aWindow, aUserAgent);
+}
+
+Presentation*
+Navigator::GetPresentation(ErrorResult& aRv)
+{
+  if (!mPresentation) {
+    if (!mWindow) {
+      aRv.Throw(NS_ERROR_UNEXPECTED);
+      return nullptr;
+    }
+    mPresentation = Presentation::Create(mWindow);
+  }
+
+  return mPresentation;
 }
 
 } // namespace dom

@@ -14,16 +14,17 @@ namespace mozilla {
 namespace ipc {
 
 class ConnectionOrientedSocket;
+class ListenSocketConsumer;
 class ListenSocketIO;
 class UnixSocketConnector;
 
-class ListenSocket : public SocketBase
+class ListenSocket final : public SocketBase
 {
 protected:
   virtual ~ListenSocket();
 
 public:
-  ListenSocket();
+  ListenSocket(ListenSocketConsumer* aConsumer, int aIndex);
 
   /**
    * Starts a task on the socket that will try to accept a new connection
@@ -32,11 +33,10 @@ public:
    * @param aConnector Connector object for socket-type-specific functions
    * @param aCOSocket The connection-oriented socket for handling the
    *                  accepted connection.
-   *
-   * @return true on listen started, false otherwise
+   * @return NS_OK on success, or an XPCOM error code otherwise.
    */
-  bool Listen(UnixSocketConnector* aConnector,
-              ConnectionOrientedSocket* aCOSocket);
+  nsresult Listen(UnixSocketConnector* aConnector,
+                  ConnectionOrientedSocket* aCOSocket);
 
   /**
    * Starts a task on the socket that will try to accept a new connection
@@ -45,30 +45,21 @@ public:
    *
    * @param aCOSocket The connection-oriented socket for handling the
    *                  accepted connection.
-   *
-   * @return true on listen started, false otherwise
+   * @return NS_OK on success, or an XPCOM error code otherwise.
    */
-  bool Listen(ConnectionOrientedSocket* aCOSocket);
+  nsresult Listen(ConnectionOrientedSocket* aCOSocket);
 
-  /**
-   * Queues the internal representation of socket for deletion. Can be called
-   * from main thread.
-   */
-  void Close();
+  // Methods for |SocketBase|
+  //
 
-  /**
-   * Get the current sockaddr for the socket
-   */
-  void GetSocketAddr(nsAString& aAddrStr);
+  void Close() override;
+  void OnConnectSuccess() override;
+  void OnConnectError() override;
+  void OnDisconnect() override;
 
 private:
-
-  // Legacy interface from |SocketBase|; should be replaced by |Close|.
-  void CloseSocket() override
-  {
-    Close();
-  }
-
+  ListenSocketConsumer* mConsumer;
+  int mIndex;
   ListenSocketIO* mIO;
 };
 

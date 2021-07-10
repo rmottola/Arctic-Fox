@@ -22,6 +22,7 @@
 
 #include "mozilla/EventForwards.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/StaticPtr.h"
 #include "mozilla/WeakPtr.h"
 #include "gfxPoint.h"
 #include "nsTHashtable.h"
@@ -135,13 +136,13 @@ typedef struct CapturingContentInfo {
   bool mPointerLock;
   bool mRetargetToElement;
   bool mPreventDrag;
-  nsIContent* mContent;
+  mozilla::StaticRefPtr<nsIContent> mContent;
 } CapturingContentInfo;
 
-// d910f009-d209-74c1-6b04-30c83c051c78
+// 7f0ae6b1-5fa1-4ba7-885e-a93e17d72cd2
 #define NS_IPRESSHELL_IID \
-  { 0xd910f009, 0xd209, 0x74c1, \
-    { 0x6b, 0x04, 0x30, 0xc8, 0x3c, 0x05, 0x1c, 0x78 } }
+{ 0x7f0ae6b1, 0x5fa1, 0x4ba7, \
+  { 0x88, 0x5e, 0xa9, 0x3e, 0x17, 0xd7, 0x2c, 0xd2 } }
 
 // debug VerifyReflow flags
 #define VERIFY_REFLOW_ON                    0x01
@@ -354,15 +355,11 @@ public:
   void ReconstructStyleData() { ReconstructStyleDataExternal(); }
 #endif
 
-  /** Setup all style rules required to implement preferences
-   * - used for background/text/link colors and link underlining
-   *    may be extended for any prefs that are implemented via style rules
-   * - aForceReflow argument is used to force a full reframe to make the rules show
-   *   (only used when the current page needs to reflect changed pref rules)
-   *
-   * - initially created for bugs 31816, 20760, 22963
+  /**
+   * Update the style set somehow to take into account changed prefs which
+   * affect document styling.
    */
-  virtual nsresult SetPreferenceStyleRules(bool aForceReflow) = 0;
+  virtual void UpdatePreferenceStyles() = 0;
 
   /**
    * FrameSelection will return the Frame based selection API.
@@ -1562,6 +1559,15 @@ public:
   virtual bool AssumeAllImagesVisible() = 0;
 
   /**
+   * Returns whether the document's style set's rule processor for the
+   * specified level of the cascade is shared by multiple style sets.
+   *
+   * @param aSheetType One of the nsIStyleSheetService.*_SHEET constants.
+   */
+  nsresult HasRuleProcessorUsedByMultipleStyleSets(uint32_t aSheetType,
+                                                   bool* aRetVal);
+
+  /**
    * Refresh observer management.
    */
 protected:
@@ -1672,6 +1678,8 @@ public:
   bool HasPendingReflow() const
     { return mReflowScheduled || mReflowContinueTimer; }
 
+  void SyncWindowProperties(nsView* aView);
+
 protected:
   friend class nsRefreshDriver;
 
@@ -1681,18 +1689,21 @@ protected:
 
   // These are the same Document and PresContext owned by the DocViewer.
   // we must share ownership.
-  nsIDocument*              mDocument;      // [STRONG]
-  nsPresContext*            mPresContext;   // [STRONG]
+  nsCOMPtr<nsIDocument>     mDocument;
+  nsRefPtr<nsPresContext>   mPresContext;
   nsStyleSet*               mStyleSet;      // [OWNS]
   nsCSSFrameConstructor*    mFrameConstructor; // [OWNS]
   nsViewManager*           mViewManager;   // [WEAK] docViewer owns it so I don't have to
   nsPresArena               mFrameArena;
-  nsFrameSelection*         mSelection;
+  nsRefPtr<nsFrameSelection> mSelection;
   // Pointer into mFrameConstructor - this is purely so that FrameManager() and
   // GetRootFrame() can be inlined:
   nsFrameManagerBase*       mFrameManager;
   mozilla::WeakPtr<nsDocShell>                 mForwardingContainer;
-  nsRefreshDriver*          mHiddenInvalidationObserverRefreshDriver;
+  nsRefreshDriver* MOZ_UNSAFE_REF("These two objects hold weak references "
+                                  "to each other, and the validity of this "
+                                  "member is ensured by the logic in nsIPresShell.")
+                            mHiddenInvalidationObserverRefreshDriver;
 #ifdef ACCESSIBILITY
   mozilla::a11y::DocAccessible* mDocAccessible;
 #endif

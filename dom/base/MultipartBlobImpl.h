@@ -14,6 +14,7 @@
 #include "mozilla/dom/BlobBinding.h"
 #include "mozilla/dom/FileBinding.h"
 #include <algorithm>
+#include "nsPIDOMWindow.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -92,7 +93,8 @@ public:
     return mLength;
   }
 
-  virtual nsresult GetInternalStream(nsIInputStream** aInputStream) override;
+  virtual void GetInternalStream(nsIInputStream** aInputStream,
+                                 ErrorResult& aRv) override;
 
   virtual const nsTArray<nsRefPtr<BlobImpl>>* GetSubBlobImpls() const override
   {

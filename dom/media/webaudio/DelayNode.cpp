@@ -25,7 +25,7 @@ NS_INTERFACE_MAP_END_INHERITING(AudioNode)
 NS_IMPL_ADDREF_INHERITED(DelayNode, AudioNode)
 NS_IMPL_RELEASE_INHERITED(DelayNode, AudioNode)
 
-class DelayNodeEngine : public AudioNodeEngine
+class DelayNodeEngine final : public AudioNodeEngine
 {
   typedef PlayingRefChangeHandler PlayingRefChanged;
 public:
@@ -33,7 +33,7 @@ public:
                   double aMaxDelayTicks)
     : AudioNodeEngine(aNode)
     , mSource(nullptr)
-    , mDestination(static_cast<AudioNodeStream*> (aDestination->Stream()))
+    , mDestination(aDestination->Stream())
     // Keep the default value in sync with the default value in DelayNode::DelayNode.
     , mDelay(0.f)
     // Use a smoothing range of 20ms
@@ -190,13 +190,13 @@ DelayNode::DelayNode(AudioContext* aContext, double aMaxDelay)
               2,
               ChannelCountMode::Max,
               ChannelInterpretation::Speakers)
-  , mDelay(new AudioParam(this, SendDelayToStream, 0.0f))
+  , mDelay(new AudioParam(this, SendDelayToStream, 0.0f, "delayTime"))
 {
   DelayNodeEngine* engine =
     new DelayNodeEngine(this, aContext->Destination(),
                         aContext->SampleRate() * aMaxDelay);
   mStream = aContext->Graph()->CreateAudioNodeStream(engine, MediaStreamGraph::INTERNAL_STREAM);
-  engine->SetSourceStream(static_cast<AudioNodeStream*> (mStream.get()));
+  engine->SetSourceStream(mStream);
 }
 
 DelayNode::~DelayNode()

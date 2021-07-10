@@ -38,6 +38,9 @@
 #endif
 #include "nsISeekableStream.h"
 #include "nsNetUtil.h"
+#include "nsIFileStreams.h"
+#include "nsISimpleEnumerator.h"
+#include "nsIStringStream.h"
 #include "nsIProgressEventSink.h"
 #include "nsIDocument.h"
 #include "nsPluginLogging.h"
@@ -249,7 +252,7 @@ nsPluginHost::nsPluginHost()
   // good plugin list the first time it requests it. Normally we'd just
   // init this to 1, but due to the unique nature of our ctor we need to do
   // this manually.
-  if (XRE_GetProcessType() == GeckoProcessType_Default) {
+  if (XRE_IsParentProcess()) {
     IncrementChromeEpoch();
   }
 
@@ -280,9 +283,9 @@ nsPluginHost::nsPluginHost()
   nsPluginLogging::gNPPLog = PR_NewLogModule(NPP_LOG_NAME);
   nsPluginLogging::gPluginLog = PR_NewLogModule(PLUGIN_LOG_NAME);
 
-  PR_LOG(nsPluginLogging::gNPNLog, PLUGIN_LOG_ALWAYS,("NPN Logging Active!\n"));
-  PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_ALWAYS,("General Plugin Logging Active! (nsPluginHost::ctor)\n"));
-  PR_LOG(nsPluginLogging::gNPPLog, PLUGIN_LOG_ALWAYS,("NPP Logging Active!\n"));
+  MOZ_LOG(nsPluginLogging::gNPNLog, PLUGIN_LOG_ALWAYS,("NPN Logging Active!\n"));
+  MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_ALWAYS,("General Plugin Logging Active! (nsPluginHost::ctor)\n"));
+  MOZ_LOG(nsPluginLogging::gNPPLog, PLUGIN_LOG_ALWAYS,("NPP Logging Active!\n"));
 
   PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("nsPluginHost::ctor\n"));
   PR_LogFlush();
@@ -785,7 +788,7 @@ nsPluginHost::InstantiatePluginInstance(const nsACString& aMimeType, nsIURI* aUR
   if (aURL)
     aURL->GetAsciiSpec(urlSpec);
 
-  PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
+  MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
         ("nsPluginHost::InstantiatePlugin Begin mime=%s, url=%s\n",
          PromiseFlatCString(aMimeType).get(), urlSpec.get()));
 
@@ -848,7 +851,7 @@ nsPluginHost::InstantiatePluginInstance(const nsACString& aMimeType, nsIURI* aUR
   nsAutoCString urlSpec2;
   if (aURL != nullptr) aURL->GetAsciiSpec(urlSpec2);
 
-  PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
+  MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
         ("nsPluginHost::InstantiatePlugin Finished mime=%s, rv=%d, url=%s\n",
          PromiseFlatCString(aMimeType).get(), rv, urlSpec2.get()));
 
@@ -926,7 +929,7 @@ nsPluginHost::TrySetUpPluginInstance(const nsACString &aMimeType,
   nsAutoCString urlSpec;
   if (aURL != nullptr) aURL->GetSpec(urlSpec);
 
-  PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
+  MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_NORMAL,
         ("nsPluginHost::TrySetupPluginInstance Begin mime=%s, owner=%p, url=%s\n",
          PromiseFlatCString(aMimeType).get(), aOwner, urlSpec.get()));
 
@@ -983,7 +986,7 @@ nsPluginHost::TrySetUpPluginInstance(const nsACString &aMimeType,
   if (aURL)
     aURL->GetSpec(urlSpec2);
 
-  PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_BASIC,
+  MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_BASIC,
         ("nsPluginHost::TrySetupPluginInstance Finished mime=%s, rv=%d, owner=%p, url=%s\n",
          PromiseFlatCString(aMimeType).get(), rv, aOwner, urlSpec2.get()));
 
@@ -1259,7 +1262,7 @@ nsresult nsPluginHost::EnsurePluginLoaded(nsPluginTag* aPluginTag)
 nsresult
 nsPluginHost::GetPluginForContentProcess(uint32_t aPluginId, nsNPAPIPlugin** aPlugin)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   // If plugins haven't been scanned yet, do so now
   LoadPlugins();
@@ -1317,7 +1320,7 @@ protected:
 void
 nsPluginHost::NotifyContentModuleDestroyed(uint32_t aPluginId)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   // This is called in response to a message from the plugin. Don't unload the
   // plugin until the message handler is off the stack.
@@ -1823,7 +1826,7 @@ nsresult nsPluginHost::ScanPluginsDirectory(nsIFile *pluginsDir,
                                             bool aCreatePluginList,
                                             bool *aPluginsChanged)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   NS_ENSURE_ARG_POINTER(aPluginsChanged);
   nsresult rv;
@@ -2030,7 +2033,7 @@ nsresult nsPluginHost::ScanPluginsDirectoryList(nsISimpleEnumerator *dirEnum,
                                                 bool aCreatePluginList,
                                                 bool *aPluginsChanged)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
     bool hasMore;
     while (NS_SUCCEEDED(dirEnum->HasMoreElements(&hasMore)) && hasMore) {
@@ -2059,28 +2062,28 @@ nsresult nsPluginHost::ScanPluginsDirectoryList(nsISimpleEnumerator *dirEnum,
 void
 nsPluginHost::IncrementChromeEpoch()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
   mPluginEpoch++;
 }
 
 uint32_t
 nsPluginHost::ChromeEpoch()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
   return mPluginEpoch;
 }
 
 uint32_t
 nsPluginHost::ChromeEpochForContent()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Content);
+  MOZ_ASSERT(XRE_IsContentProcess());
   return mPluginEpoch;
 }
 
 void
 nsPluginHost::SetChromeEpochForContent(uint32_t aEpoch)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Content);
+  MOZ_ASSERT(XRE_IsContentProcess());
   mPluginEpoch = aEpoch;
 }
 
@@ -2110,7 +2113,7 @@ WatchRegKey(uint32_t aRoot, nsCOMPtr<nsIWindowsRegKey>& aKey)
 nsresult nsPluginHost::LoadPlugins()
 {
 #ifdef ANDROID
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     return NS_OK;
   }
 #endif
@@ -2134,7 +2137,7 @@ nsresult nsPluginHost::LoadPlugins()
 
   // only if plugins have changed will we notify plugin-change observers
   if (pluginschanged) {
-    if (XRE_GetProcessType() == GeckoProcessType_Default) {
+    if (XRE_IsParentProcess()) {
       IncrementChromeEpoch();
     }
 
@@ -2150,7 +2153,7 @@ nsresult nsPluginHost::LoadPlugins()
 nsresult
 nsPluginHost::FindPluginsInContent(bool aCreatePluginList, bool* aPluginsChanged)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Content);
+  MOZ_ASSERT(XRE_IsContentProcess());
 
   dom::ContentChild* cp = dom::ContentChild::GetSingleton();
   nsTArray<PluginTag> plugins;
@@ -2206,7 +2209,7 @@ nsresult nsPluginHost::FindPlugins(bool aCreatePluginList, bool * aPluginsChange
 
   *aPluginsChanged = false;
 
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     return FindPluginsInContent(aCreatePluginList, aPluginsChanged);
   }
 
@@ -2373,7 +2376,7 @@ mozilla::plugins::FindPluginsForContent(uint32_t aPluginEpoch,
                                         nsTArray<PluginTag>* aPlugins,
                                         uint32_t* aNewPluginEpoch)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   nsRefPtr<nsPluginHost> host = nsPluginHost::GetInst();
   host->FindPluginsForContent(aPluginEpoch, aPlugins, aNewPluginEpoch);
@@ -2385,7 +2388,7 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
                                     nsTArray<PluginTag>* aPlugins,
                                     uint32_t* aNewPluginEpoch)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   // Load plugins so that the epoch is correct.
   LoadPlugins();
@@ -2425,7 +2428,7 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
 void
 nsPluginHost::UpdatePluginInfo(nsPluginTag* aPluginTag)
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   ReadPluginInfo();
   WritePluginInfo();
@@ -2511,7 +2514,7 @@ nsPluginHost::RegisterWithCategoryManager(nsCString &aMimeType,
 nsresult
 nsPluginHost::WritePluginInfo()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   nsresult rv = NS_OK;
   nsCOMPtr<nsIProperties> directoryService(do_GetService(NS_DIRECTORY_SERVICE_CONTRACTID,&rv));
@@ -2656,7 +2659,7 @@ nsPluginHost::WritePluginInfo()
 nsresult
 nsPluginHost::ReadPluginInfo()
 {
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   const long PLUGIN_REG_MIMETYPES_ARRAY_SIZE = 12;
   const long PLUGIN_REG_MAX_MIMETYPES = 1000;
@@ -2954,7 +2957,7 @@ nsPluginHost::ReadPluginInfo()
       tag->ImportFlagsToPrefs(tagflag);
     }
 
-    PR_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_BASIC,
+    MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_BASIC,
       ("LoadCachedPluginsInfo : Loading Cached plugininfo for %s\n", tag->mFileName.get()));
     tag->mNext = mCachedPlugins;
     mCachedPlugins = tag;

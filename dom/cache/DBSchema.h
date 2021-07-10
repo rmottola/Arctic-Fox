@@ -32,6 +32,7 @@ namespace db {
 nsresult
 CreateSchema(mozIStorageConnection* aConn);
 
+// Note, this cannot be executed within a transaction.
 nsresult
 InitializeConnection(mozIStorageConnection* aConn);
 
@@ -46,6 +47,13 @@ DeleteCacheId(mozIStorageConnection* aConn, CacheId aCacheId,
 nsresult
 IsCacheOrphaned(mozIStorageConnection* aConn, CacheId aCacheId,
                 bool* aOrphanedOut);
+
+nsresult
+FindOrphanedCacheIds(mozIStorageConnection* aConn,
+                     nsTArray<CacheId>& aOrphanedListOut);
+
+nsresult
+GetKnownBodyIds(mozIStorageConnection* aConn, nsTArray<nsID>& aBodyIdListOut);
 
 nsresult
 CacheMatch(mozIStorageConnection* aConn, CacheId aCacheId,
@@ -103,6 +111,10 @@ StorageForgetCache(mozIStorageConnection* aConn, Namespace aNamespace,
 nsresult
 StorageGetKeys(mozIStorageConnection* aConn, Namespace aNamespace,
                nsTArray<nsString>& aKeysOut);
+
+// Note, this works best when its NOT executed within a transaction.
+nsresult
+IncrementalVacuum(mozIStorageConnection* aConn);
 
 // We will wipe out databases with a schema versions less than this.
 extern const int32_t kMaxWipeSchemaVersion;

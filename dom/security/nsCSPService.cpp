@@ -27,18 +27,14 @@ using namespace mozilla;
 /* Keeps track of whether or not CSP is enabled */
 bool CSPService::sCSPEnabled = true;
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gCspPRLog;
-#endif
 
 CSPService::CSPService()
 {
   Preferences::AddBoolVarCache(&sCSPEnabled, "security.csp.enable");
 
-#ifdef PR_LOGGING
   if (!gCspPRLog)
     gCspPRLog = PR_NewLogModule("CSP");
-#endif
 }
 
 CSPService::~CSPService()
@@ -113,14 +109,12 @@ CSPService::ShouldLoad(uint32_t aContentType,
     return NS_ERROR_FAILURE;
   }
 
-#ifdef PR_LOGGING
-  {
+  if (MOZ_LOG_TEST(gCspPRLog, LogLevel::Debug)) {
     nsAutoCString location;
     aContentLocation->GetSpec(location);
-    PR_LOG(gCspPRLog, PR_LOG_DEBUG,
+    MOZ_LOG(gCspPRLog, LogLevel::Debug,
            ("CSPService::ShouldLoad called for %s", location.get()));
   }
-#endif
 
   // default decision, CSP can revise it if there's a policy to enforce
   *aDecision = nsIContentPolicy::ACCEPT;
@@ -158,7 +152,7 @@ CSPService::ShouldLoad(uint32_t aContentType,
 
   if (status == nsIPrincipal::APP_STATUS_CERTIFIED) {
     // The CSP for certified apps is :
-    // "default-src *; script-src 'self'; object-src 'none'; style-src 'self' app://theme.gaiamobile.org:*"
+    // "default-src * data: blob:; script-src 'self'; object-src 'none'; style-src 'self' app://theme.gaiamobile.org:*"
     // That means we can optimize for this case by:
     // - loading same origin scripts and stylesheets, and stylesheets from the
     //   theme url space.
@@ -208,21 +202,19 @@ CSPService::ShouldLoad(uint32_t aContentType,
     principal->GetCsp(getter_AddRefs(csp));
 
     if (csp) {
-#ifdef PR_LOGGING
-      {
+      if (MOZ_LOG_TEST(gCspPRLog, LogLevel::Debug)) {
         uint32_t numPolicies = 0;
         nsresult rv = csp->GetPolicyCount(&numPolicies);
         if (NS_SUCCEEDED(rv)) {
           for (uint32_t i=0; i<numPolicies; i++) {
             nsAutoString policy;
             csp->GetPolicy(i, policy);
-            PR_LOG(gCspPRLog, PR_LOG_DEBUG,
+            MOZ_LOG(gCspPRLog, LogLevel::Debug,
                    ("Document has CSP[%d]: %s", i,
                    NS_ConvertUTF16toUTF8(policy).get()));
           }
         }
       }
-#endif
       // obtain the enforcement decision
       // (don't pass aExtra, we use that slot for redirects)
       csp->ShouldLoad(aContentType,
@@ -234,14 +226,12 @@ CSPService::ShouldLoad(uint32_t aContentType,
                       aDecision);
     }
   }
-#ifdef PR_LOGGING
-  else {
+  else if (MOZ_LOG_TEST(gCspPRLog, LogLevel::Debug)) {
     nsAutoCString uriSpec;
     aContentLocation->GetSpec(uriSpec);
-    PR_LOG(gCspPRLog, PR_LOG_DEBUG,
+    MOZ_LOG(gCspPRLog, LogLevel::Debug,
            ("COULD NOT get nsINode for location: %s", uriSpec.get()));
   }
-#endif
 
   return NS_OK;
 }
@@ -324,23 +314,21 @@ CSPService::AsyncOnChannelRedirect(nsIChannel *oldChannel,
                   originalUri,    // aMimeTypeGuess
                   &aDecision);
 
-#ifdef PR_LOGGING
-  if (newUri) {
+  if (newUri && MOZ_LOG_TEST(gCspPRLog, LogLevel::Debug)) {
     nsAutoCString newUriSpec("None");
     newUri->GetSpec(newUriSpec);
-    PR_LOG(gCspPRLog, PR_LOG_DEBUG,
+    MOZ_LOG(gCspPRLog, LogLevel::Debug,
            ("CSPService::AsyncOnChannelRedirect called for %s",
             newUriSpec.get()));
   }
   if (aDecision == 1) {
-    PR_LOG(gCspPRLog, PR_LOG_DEBUG,
+    MOZ_LOG(gCspPRLog, LogLevel::Debug,
            ("CSPService::AsyncOnChannelRedirect ALLOWING request."));
   }
   else {
-    PR_LOG(gCspPRLog, PR_LOG_DEBUG,
+    MOZ_LOG(gCspPRLog, LogLevel::Debug,
            ("CSPService::AsyncOnChannelRedirect CANCELLING request."));
   }
-#endif
 
   // if ShouldLoad doesn't accept the load, cancel the request
   if (!NS_CP_ACCEPTED(aDecision)) {

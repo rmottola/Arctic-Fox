@@ -115,7 +115,18 @@ mozilla::plugins::SetupBridge(uint32_t aPluginId,
         // We'll handle the bridging asynchronously
         return true;
     }
-    return PPluginModule::Bridge(aContentParent, chromeParent);
+    *rv = PPluginModule::Bridge(aContentParent, chromeParent);
+    if (NS_FAILED(*rv)) {
+#if defined(MOZ_CRASHREPORTER)
+        // We are going to abort due to the failure, lets note the cause
+        // in the report for diagnosing.
+        nsAutoCString error;
+        error.AppendPrintf("%X", *rv);
+        CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("BridgePluginError"), error);
+#endif
+      return false;
+    }
+    return true;
 }
 
 #ifdef MOZ_CRASHREPORTER_INJECTOR
@@ -338,7 +349,7 @@ bool PluginModuleMapping::sIsLoadModuleOnStack = false;
 void
 mozilla::plugins::TerminatePlugin(uint32_t aPluginId, const nsString& aBrowserDumpId)
 {
-    MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+    MOZ_ASSERT(XRE_IsParentProcess());
 
     nsRefPtr<nsPluginHost> host = nsPluginHost::GetInst();
     nsPluginTag* pluginTag = host->PluginWithId(aPluginId);
@@ -356,7 +367,7 @@ PluginModuleContentParent::LoadModule(uint32_t aPluginId)
     PluginModuleMapping::NotifyLoadingModule loadingModule;
     nsAutoPtr<PluginModuleMapping> mapping(new PluginModuleMapping(aPluginId));
 
-    MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Content);
+    MOZ_ASSERT(XRE_IsContentProcess());
 
     /*
      * We send a LoadPlugin message to the chrome process using an intr
@@ -2095,7 +2106,7 @@ nsresult
 PluginModuleParent::NP_GetValue(void *future, NPPVariable aVariable,
                                    void *aValue, NPError* error)
 {
-    PR_LOG(GetPluginLog(), PR_LOG_WARNING, ("%s Not implemented, requested variable %i", __FUNCTION__,
+    MOZ_LOG(GetPluginLog(), LogLevel::Warning, ("%s Not implemented, requested variable %i", __FUNCTION__,
                                         (int) aVariable));
 
     //TODO: implement this correctly

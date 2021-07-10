@@ -1438,7 +1438,7 @@ FilterSupport::PostFilterExtentsForPrimitive(const FilterPrimitiveDescription& a
   switch (aDescription.Type()) {
 
     case PrimitiveType::Empty:
-      return nsIntRect();
+      return IntRect();
 
     case PrimitiveType::Composite:
     {
@@ -1475,7 +1475,7 @@ FilterSupport::PostFilterExtentsForPrimitive(const FilterPrimitiveDescription& a
     case PrimitiveType::Flood:
     {
       if (atts.GetColor(eFloodColor).a == 0.0f) {
-        return nsIntRect();
+        return IntRect();
       }
       return aDescription.PrimitiveSubregion();
     }
@@ -1586,7 +1586,7 @@ SourceNeededRegionForPrimitive(const FilterPrimitiveDescription& aDescription,
     }
 
     case PrimitiveType::Tile:
-      return nsIntRect(INT32_MIN/2, INT32_MIN/2, INT32_MAX, INT32_MAX);
+      return IntRect(INT32_MIN/2, INT32_MIN/2, INT32_MAX, INT32_MAX);
 
     case PrimitiveType::ConvolveMatrix:
     {

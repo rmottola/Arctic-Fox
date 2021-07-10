@@ -7,6 +7,7 @@
 
 #include "mozilla/net/FTPChannelParent.h"
 #include "nsFTPChannel.h"
+#include "nsNetCID.h"
 #include "nsNetUtil.h"
 #include "nsFtpProtocolHandler.h"
 #include "nsIEncodedChannel.h"
@@ -24,7 +25,7 @@
 using namespace mozilla::ipc;
 
 #undef LOG
-#define LOG(args) PR_LOG(gFTPLog, PR_LOG_DEBUG, args)
+#define LOG(args) MOZ_LOG(gFTPLog, mozilla::LogLevel::Debug, args)
 
 namespace mozilla {
 namespace net {
@@ -88,8 +89,7 @@ FTPChannelParent::Init(const FTPChannelCreationArgs& aArgs)
   {
     const FTPChannelOpenArgs& a = aArgs.get_FTPChannelOpenArgs();
     return DoAsyncOpen(a.uri(), a.startPos(), a.entityID(), a.uploadStream(),
-                       a.requestingPrincipalInfo(), a.triggeringPrincipalInfo(),
-                       a.securityFlags(), a.contentPolicyType(), a.innerWindowID());
+                       a.loadInfo());
   }
   case FTPChannelCreationArgs::TFTPChannelConnectArgs:
   {
@@ -107,11 +107,7 @@ FTPChannelParent::DoAsyncOpen(const URIParams& aURI,
                               const uint64_t& aStartPos,
                               const nsCString& aEntityID,
                               const OptionalInputStreamParams& aUploadStream,
-                              const ipc::PrincipalInfo& aRequestingPrincipalInfo,
-                              const ipc::PrincipalInfo& aTriggeringPrincipalInfo,
-                              const uint32_t& aSecurityFlags,
-                              const uint32_t& aContentPolicyType,
-                              const uint32_t& aInnerWindowID)
+                              const LoadInfoArgs& aLoadInfoArgs)
 {
   nsCOMPtr<nsIURI> uri = DeserializeURI(aURI);
   if (!uri)
@@ -140,21 +136,12 @@ FTPChannelParent::DoAsyncOpen(const URIParams& aURI,
   if (NS_FAILED(rv))
     return SendFailedAsyncOpen(rv);
 
-  nsCOMPtr<nsIPrincipal> requestingPrincipal =
-    mozilla::ipc::PrincipalInfoToPrincipal(aRequestingPrincipalInfo, &rv);
+  nsCOMPtr<nsILoadInfo> loadInfo;
+  rv = mozilla::ipc::LoadInfoArgsToLoadInfo(aLoadInfoArgs,
+                                            getter_AddRefs(loadInfo));
   if (NS_FAILED(rv)) {
     return SendFailedAsyncOpen(rv);
   }
-  nsCOMPtr<nsIPrincipal> triggeringPrincipal =
-    mozilla::ipc::PrincipalInfoToPrincipal(aTriggeringPrincipalInfo, &rv);
-  if (NS_FAILED(rv)) {
-    return SendFailedAsyncOpen(rv);
-  }
-
-  nsCOMPtr<nsILoadInfo> loadInfo =
-    new mozilla::LoadInfo(requestingPrincipal, triggeringPrincipal,
-                          aSecurityFlags, aContentPolicyType,
-                          aInnerWindowID);
 
   nsCOMPtr<nsIChannel> chan;
   rv = NS_NewChannelInternal(getter_AddRefs(chan), uri, loadInfo,
@@ -465,8 +452,8 @@ FTPChannelParent::GetInterface(const nsIID& uuid, void** result)
 {
   // Only support nsILoadContext if child channel's callbacks did too
   if (uuid.Equals(NS_GET_IID(nsILoadContext)) && mLoadContext) {
-    NS_ADDREF(mLoadContext);
-    *result = static_cast<nsILoadContext*>(mLoadContext);
+    nsCOMPtr<nsILoadContext> copy = mLoadContext;
+    copy.forget(result);
     return NS_OK;
   }
 

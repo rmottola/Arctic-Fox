@@ -78,7 +78,7 @@ SourceBuffer::AppendChunk(Maybe<Chunk>&& aChunk)
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
-  if (MOZ_UNLIKELY(!mChunks.AppendElement(Move(*aChunk)))) {
+  if (MOZ_UNLIKELY(!mChunks.AppendElement(Move(*aChunk), fallible))) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
@@ -397,7 +397,7 @@ SourceBuffer::SizeOfIncludingThisWithComputedFallback(MallocSizeOf
   MutexAutoLock lock(mMutex);
 
   size_t n = aMallocSizeOf(this);
-  n += mChunks.SizeOfExcludingThis(aMallocSizeOf);
+  n += mChunks.ShallowSizeOfExcludingThis(aMallocSizeOf);
 
   for (uint32_t i = 0 ; i < mChunks.Length() ; ++i) {
     size_t chunkSize = aMallocSizeOf(mChunks[i].Data());

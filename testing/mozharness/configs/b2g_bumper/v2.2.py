@@ -6,9 +6,9 @@ config = {
         "hgtool.py": ["/usr/local/bin/hgtool.py"],
         "gittool.py": ["/usr/local/bin/gittool.py"],
     },
-    'goanna_pull_url': 'https://hg.mozilla.org/releases/mozilla-b2g37_v2_2/',
-    'goanna_push_url': 'ssh://hg.mozilla.org/releases/mozilla-b2g37_v2_2/',
-    'goanna_local_dir': 'mozilla-b2g37_v2_2',
+    'gecko_pull_url': 'https://hg.mozilla.org/releases/mozilla-b2g37_v2_2/',
+    'gecko_push_url': 'ssh://hg.mozilla.org/releases/mozilla-b2g37_v2_2/',
+    'gecko_local_dir': 'mozilla-b2g37_v2_2',
     'git_ref_cache': '/builds/b2g_bumper/git_ref_cache.json',
 
     'manifests_repo': 'https://git.mozilla.org/b2g/b2g-manifest.git',
@@ -31,43 +31,43 @@ config = {
 
     'devices': {
         'dolphin': {
-            'ignore_projects': ['goanna'],
+            'ignore_projects': ['gecko'],
             'ignore_groups': ['darwin'],
         },
         'emulator-l': {
-            'ignore_projects': ['goanna'],
+            'ignore_projects': ['gecko'],
             'ignore_groups': ['darwin'],
         },
         'emulator-kk': {
-            'ignore_projects': ['goanna'],
+            'ignore_projects': ['gecko'],
             'ignore_groups': ['darwin'],
         },
         'emulator-jb': {
-            'ignore_projects': ['goanna'],
+            'ignore_projects': ['gecko'],
             'ignore_groups': ['darwin'],
         },
         'emulator-ics': {
-            'ignore_projects': ['goanna'],
+            'ignore_projects': ['gecko'],
             'ignore_groups': ['darwin'],
             'manifest_file': 'emulator.xml',
         },
         # Equivalent to emulator-ics - see bug 916134
         # Remove once the above bug resolved
         'emulator': {
-            'ignore_projects': ['goanna'],
+            'ignore_projects': ['gecko'],
             'ignore_groups': ['darwin'],
             'manifest_file': 'emulator.xml',
         },
         'flame-kk': {
-            'ignore_projects': ['goanna'],
+            'ignore_projects': ['gecko'],
             'ignore_groups': ['darwin'],
         },
         'nexus-4': {
-            'ignore_projects': ['goanna'],
+            'ignore_projects': ['gecko'],
             'ignore_groups': ['darwin'],
         },
         'nexus-5-l': {
-            'ignore_projects': ['goanna'],
+            'ignore_projects': ['gecko'],
             'ignore_groups': ['darwin'],
         },
     },

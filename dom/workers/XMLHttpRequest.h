@@ -28,6 +28,7 @@ BEGIN_WORKERS_NAMESPACE
 class Proxy;
 class XMLHttpRequestUpload;
 class WorkerPrivate;
+class WorkerStructuredCloneClosure;
 
 class XMLHttpRequest final: public nsXHREventTarget,
                             public WorkerFeature
@@ -250,7 +251,7 @@ public:
   NullResponseText()
   {
     mStateData.mResponseText.SetIsVoid(true);
-    mStateData.mResponse = JSVAL_NULL;
+    mStateData.mResponse.setNull();
   }
 
   bool MozAnon() const
@@ -292,7 +293,7 @@ private:
   void
   SendInternal(const nsAString& aStringBody,
                JSAutoStructuredCloneBuffer&& aBody,
-               nsTArray<nsCOMPtr<nsISupports> >& aClonedObjects,
+               WorkerStructuredCloneClosure& aClosure,
                ErrorResult& aRv);
 };
 

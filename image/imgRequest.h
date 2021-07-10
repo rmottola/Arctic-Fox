@@ -21,13 +21,12 @@
 #include "nsIAsyncVerifyRedirectCallback.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/net/ReferrerPolicy.h"
+#include "ImageCacheKey.h"
 
 class imgCacheValidator;
 class imgLoader;
 class imgRequestProxy;
 class imgCacheEntry;
-class imgMemoryReporter;
-class imgRequestNotifyRunnable;
 class nsIApplicationCache;
 class nsIProperties;
 class nsIRequest;
@@ -50,17 +49,22 @@ class imgRequest final : public nsIStreamListener,
                              public nsIInterfaceRequestor,
                              public nsIAsyncVerifyRedirectCallback
 {
-  virtual ~imgRequest();
-
-public:
   typedef mozilla::image::Image Image;
+  typedef mozilla::image::ImageCacheKey ImageCacheKey;
   typedef mozilla::image::ImageURL ImageURL;
   typedef mozilla::image::ProgressTracker ProgressTracker;
   typedef mozilla::net::ReferrerPolicy ReferrerPolicy;
 
-  explicit imgRequest(imgLoader* aLoader);
+public:
+  imgRequest(imgLoader* aLoader, const ImageCacheKey& aCacheKey);
 
   NS_DECL_THREADSAFE_ISUPPORTS
+  NS_DECL_NSISTREAMLISTENER
+  NS_DECL_NSITHREADRETARGETABLESTREAMLISTENER
+  NS_DECL_NSIREQUESTOBSERVER
+  NS_DECL_NSICHANNELEVENTSINK
+  NS_DECL_NSIINTERFACEREQUESTOR
+  NS_DECL_NSIASYNCVERIFYREDIRECTCALLBACK
 
   nsresult Init(nsIURI* aURI,
                 nsIURI* aCurrentURI,
@@ -133,10 +137,16 @@ public:
   // Return the ProgressTracker associated with this imgRequest. It may live
   // in |mProgressTracker| or in |mImage.mProgressTracker|, depending on whether
   // mImage has been instantiated yet.
-  already_AddRefed<ProgressTracker> GetProgressTracker();
+  already_AddRefed<ProgressTracker> GetProgressTracker() const;
+
+  /// Returns the Image associated with this imgRequest, if it's ready.
+  already_AddRefed<Image> GetImage() const;
 
   // Get the current principal of the image. No AddRefing.
   inline nsIPrincipal* GetPrincipal() const { return mPrincipal.get(); }
+
+  /// Get the ImageCacheKey associated with this request.
+  const ImageCacheKey& CacheKey() const { return mCacheKey; }
 
   // Resize the cache entry to 0 if it exists
   void ResetCacheEntry();
@@ -144,87 +154,75 @@ public:
   // OK to use on any thread.
   nsresult GetURI(ImageURL** aURI);
   nsresult GetCurrentURI(nsIURI** aURI);
+  bool IsChrome() const;
 
   nsresult GetImageErrorCode(void);
 
-private:
-  friend class imgCacheEntry;
-  friend class imgRequestProxy;
-  friend class imgLoader;
-  friend class imgCacheValidator;
-  friend class imgCacheExpirationTracker;
-  friend class imgRequestNotifyRunnable;
-  friend class mozilla::image::ProgressTracker;
-
-  inline void SetLoadId(void *aLoadId) {
-    mLoadId = aLoadId;
-  }
-  void Cancel(nsresult aStatus);
-  void EvictFromCache();
-  void RemoveFromCache();
-
-  nsresult GetSecurityInfo(nsISupports **aSecurityInfo);
-
-  imgCacheValidator* GetValidator() const { return mValidator; }
-
-  inline const char *GetMimeType() const {
-    return mContentType.get();
-  }
-  inline nsIProperties *Properties() {
-    return mProperties;
-  }
-
-  // Reset the cache entry after we've dropped our reference to it. Used by the
-  // imgLoader when our cache entry is re-requested after we've dropped our
-  // reference to it.
-  void SetCacheEntry(imgCacheEntry *entry);
-
-  // Returns whether we've got a reference to the cache entry.
-  bool HasCacheEntry() const;
-
-  // Update the cache entry size based on the image container.
-  void UpdateCacheEntrySize();
-
-  // Return the priority of the underlying network request, or return
-  // PRIORITY_NORMAL if it doesn't support nsISupportsPriority.
-  int32_t Priority() const;
-
-  // Adjust the priority of the underlying network request by the given delta
-  // on behalf of the given proxy.
-  void AdjustPriority(imgRequestProxy *aProxy, int32_t aDelta);
-
-  // Return whether we've seen some data at this point
+  /// Returns true if we've received any data.
   bool HasTransferredData() const;
 
-  // Set whether this request is stored in the cache. If it isn't, regardless
-  // of whether this request has a non-null mCacheEntry, this imgRequest won't
-  // try to update or modify the image cache.
-  void SetIsInCache(bool cacheable);
+  /// Returns a non-owning pointer to this imgRequest's MIME type.
+  const char* GetMimeType() const { return mContentType.get(); }
 
-  bool HasConsumers();
+  /// @return the priority of the underlying network request, or
+  /// PRIORITY_NORMAL if it doesn't support nsISupportsPriority.
+  int32_t Priority() const;
 
-  /// Returns true if RequestDecode() was called.
-  bool IsDecodeRequested() const;
+  /// Adjust the priority of the underlying network request by @aDelta on behalf
+  /// of @aProxy.
+  void AdjustPriority(imgRequestProxy* aProxy, int32_t aDelta);
 
-public:
-  NS_DECL_NSISTREAMLISTENER
-  NS_DECL_NSITHREADRETARGETABLESTREAMLISTENER
-  NS_DECL_NSIREQUESTOBSERVER
-  NS_DECL_NSICHANNELEVENTSINK
-  NS_DECL_NSIINTERFACEREQUESTOR
-  NS_DECL_NSIASYNCVERIFYREDIRECTCALLBACK
+  /// Returns a weak pointer to the underlying request.
+  nsIRequest* GetRequest() const { return mRequest; }
+
+  nsITimedChannel* GetTimedChannel() const { return mTimedChannel; }
+
+  nsresult GetSecurityInfo(nsISupports** aSecurityInfoOut);
+
+  imgCacheValidator* GetValidator() const { return mValidator; }
+  void SetValidator(imgCacheValidator* aValidator) { mValidator = aValidator; }
+
+  void* LoadId() const { return mLoadId; }
+  void SetLoadId(void* aLoadId) { mLoadId = aLoadId; }
+
+  /// Reset the cache entry after we've dropped our reference to it. Used by
+  /// imgLoader when our cache entry is re-requested after we've dropped our
+  /// reference to it.
+  void SetCacheEntry(imgCacheEntry* aEntry);
+
+  /// Returns whether we've got a reference to the cache entry.
+  bool HasCacheEntry() const;
+
+  /// Set whether this request is stored in the cache. If it isn't, regardless
+  /// of whether this request has a non-null mCacheEntry, this imgRequest won't
+  /// try to update or modify the image cache.
+  void SetIsInCache(bool aCacheable);
+
+  void EvictFromCache();
+  void RemoveFromCache();
 
   // Sets properties for this image; will dispatch to main thread if needed.
   void SetProperties(const nsACString& aContentType,
                      const nsACString& aContentDisposition);
 
+  nsIProperties* Properties() const { return mProperties; }
+
+  bool HasConsumers() const;
+
 private:
-  friend class imgMemoryReporter;
   friend class FinishPreparingForNewPartRunnable;
 
-  already_AddRefed<Image> GetImage() const;
+  virtual ~imgRequest();
 
   void FinishPreparingForNewPart(const NewPartResult& aResult);
+
+  void Cancel(nsresult aStatus);
+
+  // Update the cache entry size based on the image container.
+  void UpdateCacheEntrySize();
+
+  /// Returns true if RequestDecode() was called.
+  bool IsDecodeRequested() const;
 
   // Weak reference to parent loader; this request cannot outlive its owner.
   imgLoader* mLoader;
@@ -252,6 +250,9 @@ private:
 
   /* we hold on to this to this so long as we have observers */
   nsRefPtr<imgCacheEntry> mCacheEntry;
+
+  /// The key under which this imgRequest is stored in the image cache.
+  ImageCacheKey mCacheKey;
 
   void* mLoadId;
 

@@ -11,6 +11,7 @@
 
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/XPTInterfaceInfoManager.h"
+#include "nsPrintfCString.h"
 
 using namespace JS;
 using namespace mozilla;
@@ -26,7 +27,7 @@ XPCNativeMember::GetCallInfo(JSObject* funobj,
                              XPCNativeMember**    pMember)
 {
     funobj = js::UncheckedUnwrap(funobj);
-    jsval memberVal =
+    Value memberVal =
         js::GetFunctionNativeReserved(funobj,
                                       XPC_FUNCTION_NATIVE_MEMBER_SLOT);
 
@@ -39,7 +40,7 @@ XPCNativeMember::GetCallInfo(JSObject* funobj,
 bool
 XPCNativeMember::NewFunctionObject(XPCCallContext& ccx,
                                    XPCNativeInterface* iface, HandleObject parent,
-                                   jsval* pval)
+                                   Value* pval)
 {
     MOZ_ASSERT(!IsConstant(), "Only call this if you're sure this is not a constant!");
 
@@ -48,7 +49,7 @@ XPCNativeMember::NewFunctionObject(XPCCallContext& ccx,
 
 bool
 XPCNativeMember::Resolve(XPCCallContext& ccx, XPCNativeInterface* iface,
-                         HandleObject parent, jsval* vp)
+                         HandleObject parent, Value* vp)
 {
     MOZ_ASSERT(iface == GetInterface());
     if (IsConstant()) {
@@ -232,6 +233,27 @@ XPCNativeInterface::NewInstance(nsIInterfaceInfo* aInfo)
     if (NS_FAILED(aInfo->IsScriptable(&canScript)) || !canScript)
         return nullptr;
 
+    bool mainProcessScriptableOnly;
+    if (NS_FAILED(aInfo->IsMainProcessScriptableOnly(&mainProcessScriptableOnly)))
+        return nullptr;
+    if (mainProcessScriptableOnly && !XRE_IsParentProcess()) {
+        nsCOMPtr<nsIConsoleService> console(do_GetService(NS_CONSOLESERVICE_CONTRACTID));
+        if (console) {
+            char* intfNameChars;
+            aInfo->GetName(&intfNameChars);
+            nsPrintfCString errorMsg("Use of %s in content process is deprecated.", intfNameChars);
+
+            nsAutoString filename;
+            uint32_t lineno = 0;
+            nsJSUtils::GetCallingLocation(cx, filename, &lineno);
+            nsCOMPtr<nsIScriptError> error(do_CreateInstance(NS_SCRIPTERROR_CONTRACTID));
+            error->Init(NS_ConvertUTF8toUTF16(errorMsg),
+                        filename, EmptyString(),
+                        lineno, 0, nsIScriptError::warningFlag, "chrome javascript");
+            console->LogMessage(error);
+        }
+    }
+
     if (NS_FAILED(aInfo->GetMethodCount(&methodCount)) ||
         NS_FAILED(aInfo->GetConstantCount(&constCount)))
         return nullptr;
@@ -271,7 +293,7 @@ XPCNativeInterface::NewInstance(nsIInterfaceInfo* aInfo)
         if (!XPCConvert::IsMethodReflectable(*info))
             continue;
 
-        str = JS_InternString(cx, info->GetName());
+        str = JS_AtomizeAndPinString(cx, info->GetName());
         if (!str) {
             NS_ERROR("bad method name");
             failed = true;
@@ -316,7 +338,7 @@ XPCNativeInterface::NewInstance(nsIInterfaceInfo* aInfo)
                 break;
             }
 
-            str = JS_InternString(cx, namestr);
+            str = JS_AtomizeAndPinString(cx, namestr);
             if (!str) {
                 NS_ERROR("bad constant name");
                 failed = true;
@@ -342,7 +364,7 @@ XPCNativeInterface::NewInstance(nsIInterfaceInfo* aInfo)
     if (!failed) {
         const char* bytes;
         if (NS_FAILED(aInfo->GetNameShared(&bytes)) || !bytes ||
-            nullptr == (str = JS_InternString(cx, bytes))) {
+            nullptr == (str = JS_AtomizeAndPinString(cx, bytes))) {
             failed = true;
         }
         interfaceName = INTERNED_STRING_TO_JSID(cx, str);

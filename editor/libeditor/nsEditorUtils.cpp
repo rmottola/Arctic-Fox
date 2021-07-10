@@ -33,7 +33,7 @@ using namespace mozilla::dom;
 
 nsAutoSelectionReset::nsAutoSelectionReset(Selection* aSel, nsEditor* aEd)
   : mSel(nullptr), mEd(nullptr)
-{ 
+{
   if (!aSel || !aEd) return;    // not much we can do, bail.
   if (aEd->ArePreservingSelection()) return;   // we already have initted mSavedSel, so this must be nested call.
   mSel = aSel;
@@ -66,19 +66,18 @@ nsAutoSelectionReset::Abort()
  * some helper classes for iterating the dom tree
  *****************************************************************************/
 
-nsDOMIterator::nsDOMIterator(nsRange& aRange)
-{
-  MOZ_ASSERT(aRange.GetStartParent(), "Invalid range");
-  mIter = NS_NewContentIterator();
-  DebugOnly<nsresult> res = mIter->Init(&aRange);
-  MOZ_ASSERT(NS_SUCCEEDED(res));
-}
-
 nsDOMIterator::nsDOMIterator(nsINode& aNode)
 {
   mIter = NS_NewContentIterator();
   DebugOnly<nsresult> res = mIter->Init(&aNode);
   MOZ_ASSERT(NS_SUCCEEDED(res));
+}
+
+nsresult
+nsDOMIterator::Init(nsRange& aRange)
+{
+  mIter = NS_NewContentIterator();
+  return mIter->Init(&aRange);
 }
 
 nsDOMIterator::nsDOMIterator()
@@ -103,11 +102,15 @@ nsDOMIterator::AppendList(const nsBoolDomIterFunctor& functor,
   }
 }
 
-nsDOMSubtreeIterator::nsDOMSubtreeIterator(nsRange& aRange)
+nsDOMSubtreeIterator::nsDOMSubtreeIterator()
+{
+}
+
+nsresult
+nsDOMSubtreeIterator::Init(nsRange& aRange)
 {
   mIter = NS_NewContentSubtreeIterator();
-  DebugOnly<nsresult> res = mIter->Init(&aRange);
-  MOZ_ASSERT(NS_SUCCEEDED(res));
+  return mIter->Init(&aRange);
 }
 
 nsDOMSubtreeIterator::~nsDOMSubtreeIterator()
@@ -175,7 +178,7 @@ nsEditorHookUtils::GetHookEnumeratorFromDocument(nsIDOMDocument *aDoc,
 }
 
 bool
-nsEditorHookUtils::DoInsertionHook(nsIDOMDocument *aDoc, nsIDOMEvent *aDropEvent,  
+nsEditorHookUtils::DoInsertionHook(nsIDOMDocument *aDoc, nsIDOMEvent *aDropEvent,
                                    nsITransferable *aTrans)
 {
   nsCOMPtr<nsISimpleEnumerator> enumerator;

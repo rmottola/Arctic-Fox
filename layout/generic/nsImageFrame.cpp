@@ -38,6 +38,7 @@
 #include "nsILoadGroup.h"
 #include "nsISupportsPriority.h"
 #include "nsNetUtil.h"
+#include "nsNetCID.h"
 #include "nsCSSRendering.h"
 #include "nsIDOMHTMLAnchorElement.h"
 #include "nsNameSpaceManager.h"
@@ -148,7 +149,8 @@ nsImageFrame::nsImageFrame(nsStyleContext* aContext) :
   mIntrinsicRatio(0, 0),
   mDisplayingIcon(false),
   mFirstFrameComplete(false),
-  mReflowCallbackPosted(false)
+  mReflowCallbackPosted(false),
+  mForceSyncDecoding(false)
 {
   // We assume our size is not constrained and we haven't gotten an
   // initial reflow yet, so don't touch those flags.
@@ -585,6 +587,10 @@ nsImageFrame::OnSizeAvailable(imgIRequest* aRequest, imgIContainer* aImage)
         presShell->FrameNeedsReflow(this, nsIPresShell::eStyleChange,
                                     NS_FRAME_IS_DIRTY);
       }
+    } else {
+      // We've already gotten the initial reflow, and our size hasn't changed,
+      // so we're ready to request a decode.
+      MaybeDecodeForPredictedSize();
     }
   }
 
@@ -684,16 +690,99 @@ nsImageFrame::NotifyNewCurrentRequest(imgIRequest *aRequest,
   }
 
   if (mState & IMAGE_GOTINITIALREFLOW) { // do nothing if we haven't gotten the initial reflow yet
-    if (!(mState & IMAGE_SIZECONSTRAINED) && intrinsicSizeChanged) {
-      nsIPresShell *presShell = PresContext()->GetPresShell();
-      if (presShell) { 
-        presShell->FrameNeedsReflow(this, nsIPresShell::eStyleChange,
-                                    NS_FRAME_IS_DIRTY);
+    if (intrinsicSizeChanged) {
+      if (!(mState & IMAGE_SIZECONSTRAINED)) {
+        nsIPresShell *presShell = PresContext()->GetPresShell();
+        if (presShell) {
+          presShell->FrameNeedsReflow(this, nsIPresShell::eStyleChange,
+                                      NS_FRAME_IS_DIRTY);
+        }
+      } else {
+        // We've already gotten the initial reflow, and our size hasn't changed,
+        // so we're ready to request a decode.
+        MaybeDecodeForPredictedSize();
       }
     }
     // Update border+content to account for image change
     InvalidateFrame();
   }
+}
+
+void
+nsImageFrame::MaybeDecodeForPredictedSize()
+{
+  // Check that we're ready to decode.
+  if (!mImage) {
+    return;  // Nothing to do yet.
+  }
+
+  if (mComputedSize.IsEmpty()) {
+    return;  // We won't draw anything, so no point in decoding.
+  }
+
+  nsCOMPtr<nsIImageLoadingContent> imageLoader = do_QueryInterface(mContent);
+  MOZ_ASSERT(imageLoader);
+  if (imageLoader->GetVisibleCount() == 0) {
+    return;  // We're not visible, so don't decode.
+  }
+
+  // OK, we're ready to decode. Compute the scale to the screen...
+  nsIPresShell* presShell = PresContext()->GetPresShell();
+  LayoutDeviceToScreenScale2D resolutionToScreen(
+      presShell->GetCumulativeResolution()
+    * nsLayoutUtils::GetTransformToAncestorScaleExcludingAnimated(this));
+
+  // ...and this frame's content box...
+  const nsPoint offset =
+    GetOffsetToCrossDoc(nsLayoutUtils::GetReferenceFrame(this));
+  const nsRect frameContentBox = GetInnerArea() + offset;
+
+  // ...and our predicted dest rect...
+  const int32_t factor = PresContext()->AppUnitsPerDevPixel();
+  const LayoutDeviceRect destRect =
+    LayoutDeviceRect::FromAppUnits(PredictedDestRect(frameContentBox), factor);
+
+  // ...and use them to compute our predicted size in screen pixels.
+  const ScreenSize predictedScreenSize = destRect.Size() * resolutionToScreen;
+  const ScreenIntSize predictedScreenIntSize = RoundedToInt(predictedScreenSize);
+  if (predictedScreenIntSize.IsEmpty()) {
+    return;
+  }
+
+  // Determine the optimal image size to use.
+  uint32_t flags = imgIContainer::FLAG_HIGH_QUALITY_SCALING
+                 | imgIContainer::FLAG_ASYNC_NOTIFY;
+  GraphicsFilter filter = nsLayoutUtils::GetGraphicsFilterForFrame(this);
+  gfxSize gfxPredictedScreenSize = gfxSize(predictedScreenIntSize.width,
+                                           predictedScreenIntSize.height);
+  nsIntSize predictedImageSize =
+    mImage->OptimalImageSizeForDest(gfxPredictedScreenSize,
+                                    imgIContainer::FRAME_CURRENT,
+                                    filter, flags);
+
+  // Request a decode.
+  mImage->RequestDecodeForSize(predictedImageSize, flags);
+}
+
+nsRect
+nsImageFrame::PredictedDestRect(const nsRect& aFrameContentBox)
+{
+  // What is the rect painted by the image?  It's the image's "dest rect" (the
+  // rect where a full copy of the image is mapped), clipped to the container's
+  // content box.  So, we intersect those rects.
+
+  // Note: To get the "dest rect", we have to provide the "constraint rect"
+  // (which is the content-box, with the effects of fragmentation undone).
+  nsRect constraintRect(aFrameContentBox.TopLeft(), mComputedSize);
+  constraintRect.y -= GetContinuationOffset();
+
+  const nsRect destRect =
+    nsLayoutUtils::ComputeObjectDestRect(constraintRect,
+                                         mIntrinsicSize,
+                                         mIntrinsicRatio,
+                                         StylePosition());
+
+  return destRect.Intersect(aFrameContentBox);
 }
 
 void
@@ -943,6 +1032,10 @@ nsImageFrame::Reflow(nsPresContext*          aPresContext,
     static_assert(eOverflowType_LENGTH == 2, "Unknown overflow types?");
     nsRect& visualOverflow = aMetrics.VisualOverflow();
     visualOverflow.UnionRect(visualOverflow, altFeedbackSize);
+  } else {
+    // We've just reflowed and we should have an accurate size, so we're ready
+    // to request a decode.
+    MaybeDecodeForPredictedSize();
   }
   FinishAndStoreOverflow(&aMetrics);
 
@@ -1393,6 +1486,45 @@ nsDisplayImage::ComputeInvalidationRegion(nsDisplayListBuilder* aBuilder,
   nsDisplayImageContainer::ComputeInvalidationRegion(aBuilder, aGeometry, aInvalidRegion);
 }
 
+bool
+nsDisplayImage::CanOptimizeToImageLayer(LayerManager* aManager,
+                                        nsDisplayListBuilder* aBuilder)
+{
+  uint32_t flags = aBuilder->ShouldSyncDecodeImages()
+                 ? imgIContainer::FLAG_SYNC_DECODE
+                 : imgIContainer::FLAG_NONE;
+
+  if (!mImage->IsImageContainerAvailable(aManager, flags)) {
+    return false;
+  }
+
+  int32_t imageWidth;
+  int32_t imageHeight;
+  mImage->GetWidth(&imageWidth);
+  mImage->GetHeight(&imageHeight);
+
+  if (imageWidth == 0 || imageHeight == 0) {
+    NS_ASSERTION(false, "invalid image size");
+    return false;
+  }
+
+  const int32_t factor = mFrame->PresContext()->AppUnitsPerDevPixel();
+  const LayoutDeviceRect destRect =
+    LayoutDeviceRect::FromAppUnits(GetDestRect(), factor);
+
+  // Calculate the scaling factor for the frame.
+  const gfxSize scale = gfxSize(destRect.width / imageWidth,
+                                destRect.height / imageHeight);
+
+  if (scale.width < 0.2 || scale.height < 0.2) {
+    // This would look awful as long as we can't use high-quality downscaling
+    // for image layers (bug 803703), so don't turn this into an image layer.
+    return false;
+  }
+
+  return true;
+}
+
 already_AddRefed<ImageContainer>
 nsDisplayImage::GetContainer(LayerManager* aManager,
                              nsDisplayListBuilder* aBuilder)
@@ -1405,14 +1537,16 @@ nsDisplayImage::GetContainer(LayerManager* aManager,
 }
 
 nsRect
-nsDisplayImage::GetDestRect()
+nsDisplayImage::GetDestRect(bool* aSnap)
 {
-  // XXX(seth): This method will do something more interesting once the patch in
-  // bug 1150704 lands.
-  bool snap;
-  nsRect dest = GetBounds(&snap);
+  bool snap = true;
+  const nsRect frameContentBox = GetBounds(&snap);
+  if (aSnap) {
+    *aSnap = snap;
+  }
 
-  return dest;
+  nsImageFrame* imageFrame = static_cast<nsImageFrame*>(mFrame);
+  return imageFrame->PredictedDestRect(frameContentBox);
 }
 
 LayerState
@@ -1463,9 +1597,7 @@ nsDisplayImage::GetLayerState(nsDisplayListBuilder* aBuilder,
                  ? imgIContainer::FLAG_SYNC_DECODE
                  : imgIContainer::FLAG_NONE;
 
-  nsRefPtr<ImageContainer> container =
-    mImage->GetImageContainer(aManager, flags);
-  if (!container) {
+  if (!mImage->IsImageContainerAvailable(aManager, flags)) {
     return LAYER_NONE;
   }
 
@@ -1477,28 +1609,8 @@ nsDisplayImage::GetLayerState(nsDisplayListBuilder* aBuilder,
 nsDisplayImage::GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
                                 bool* aSnap)
 {
-  *aSnap = true;
   if (mImage && mImage->IsOpaque()) {
-    // OK, the entire region painted by the image is opaque. But what is that
-    // region? It's the image's "dest rect" (the rect where a full copy of
-    // the image is mapped), clipped to the container's content box (which is
-    // what GetBounds() returns). So, we grab those rects and intersect them.
-    const nsRect frameContentBox = GetBounds(aSnap);
-
-    // Note: To get the "dest rect", we have to provide the "constraint rect"
-    // (which is the content-box, with the effects of fragmentation undone).
-    nsImageFrame* imageFrame = static_cast<nsImageFrame*>(mFrame);
-    nsRect constraintRect(frameContentBox.TopLeft(),
-                          imageFrame->mComputedSize);
-    constraintRect.y -= imageFrame->GetContinuationOffset();
-
-    const nsRect destRect =
-      nsLayoutUtils::ComputeObjectDestRect(constraintRect,
-                                           imageFrame->mIntrinsicSize,
-                                           imageFrame->mIntrinsicRatio,
-                                           imageFrame->StylePosition());
-
-    return nsRegion(destRect.Intersect(frameContentBox));
+    return nsRegion(GetDestRect(aSnap));
   }
   return nsRegion();
 }
@@ -1591,11 +1703,16 @@ nsImageFrame::PaintImage(nsRenderingContext& aRenderingContext, nsPoint aPt,
                                                      StylePosition(),
                                                      &anchorPoint);
 
+  uint32_t flags = aFlags;
+  if (mForceSyncDecoding) {
+    flags |= imgIContainer::FLAG_SYNC_DECODE;
+  }
+
   DrawResult result =
     nsLayoutUtils::DrawSingleImage(*aRenderingContext.ThebesContext(),
       PresContext(), aImage,
       nsLayoutUtils::GetGraphicsFilterForFrame(this), dest, aDirtyRect,
-      nullptr, aFlags, &anchorPoint);
+      nullptr, flags, &anchorPoint);
 
   nsImageMap* map = GetImageMap();
   if (map) {

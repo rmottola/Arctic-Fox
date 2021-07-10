@@ -19,12 +19,15 @@
 #include "mozilla/Likely.h"
 #include "mozilla/Poison.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/Services.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/MemoryChecking.h"
 
 #include "nsAppRunner.h"
 #include "mozilla/AppData.h"
+#if defined(MOZ_UPDATER) && !defined(MOZ_WIDGET_ANDROID)
 #include "nsUpdateDriver.h"
+#endif
 #include "ProfileReset.h"
 
 #ifdef MOZ_INSTRUMENT_EVENT_LOOP
@@ -74,6 +77,7 @@
 #include "nsIToolkitProfile.h"
 #include "nsIToolkitProfileService.h"
 #include "nsIURI.h"
+#include "nsIURL.h"
 #include "nsIWindowCreator.h"
 #include "nsIWindowMediator.h"
 #include "nsIWindowWatcher.h"
@@ -578,7 +582,7 @@ bool gSafeMode = false;
  * singleton.
  */
 class nsXULAppInfo : public nsIXULAppInfo,
-#ifdef NIGHTLY_BUILD
+#ifdef E10S_TESTING_ONLY
                      public nsIObserver,
 #endif
 #ifdef XP_WIN
@@ -592,7 +596,7 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_NSIXULAPPINFO
   NS_DECL_NSIXULRUNTIME
-#ifdef NIGHTLY_BUILD
+#ifdef E10S_TESTING_ONLY
   NS_DECL_NSIOBSERVER
 #endif
 #ifdef XP_WIN
@@ -603,14 +607,18 @@ public:
 NS_INTERFACE_MAP_BEGIN(nsXULAppInfo)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIXULRuntime)
   NS_INTERFACE_MAP_ENTRY(nsIXULRuntime)
-#ifdef NIGHTLY_BUILD
+#ifdef E10S_TESTING_ONLY
   NS_INTERFACE_MAP_ENTRY(nsIObserver)
 #endif
 #ifdef XP_WIN
   NS_INTERFACE_MAP_ENTRY(nsIWinAppHelper)
 #endif
+#ifdef MOZ_CRASHREPORTER
+  NS_INTERFACE_MAP_ENTRY(nsICrashReporter)
+  NS_INTERFACE_MAP_ENTRY(nsIFinishDumpingCallback)
+#endif
   NS_INTERFACE_MAP_ENTRY_CONDITIONAL(nsIXULAppInfo, gAppData ||
-                                     XRE_GetProcessType() == GeckoProcessType_Content)
+                                     XRE_IsContentProcess())
 NS_INTERFACE_MAP_END
 
 NS_IMETHODIMP_(MozExternalRefCountType)
@@ -628,7 +636,7 @@ nsXULAppInfo::Release()
 NS_IMETHODIMP
 nsXULAppInfo::GetVendor(nsACString& aResult)
 {
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     ContentChild* cc = ContentChild::GetSingleton();
     aResult = cc->GetAppInfo().vendor;
     return NS_OK;
@@ -641,7 +649,7 @@ nsXULAppInfo::GetVendor(nsACString& aResult)
 NS_IMETHODIMP
 nsXULAppInfo::GetName(nsACString& aResult)
 {
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     ContentChild* cc = ContentChild::GetSingleton();
     aResult = cc->GetAppInfo().name;
     return NS_OK;
@@ -654,7 +662,7 @@ nsXULAppInfo::GetName(nsACString& aResult)
 NS_IMETHODIMP
 nsXULAppInfo::GetID(nsACString& aResult)
 {
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     ContentChild* cc = ContentChild::GetSingleton();
     aResult = cc->GetAppInfo().ID;
     return NS_OK;
@@ -667,7 +675,7 @@ nsXULAppInfo::GetID(nsACString& aResult)
 NS_IMETHODIMP
 nsXULAppInfo::GetVersion(nsACString& aResult)
 {
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     ContentChild* cc = ContentChild::GetSingleton();
     aResult = cc->GetAppInfo().version;
     return NS_OK;
@@ -688,7 +696,7 @@ nsXULAppInfo::GetPlatformVersion(nsACString& aResult)
 NS_IMETHODIMP
 nsXULAppInfo::GetAppBuildID(nsACString& aResult)
 {
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     ContentChild* cc = ContentChild::GetSingleton();
     aResult = cc->GetAppInfo().buildID;
     return NS_OK;
@@ -709,7 +717,7 @@ nsXULAppInfo::GetPlatformBuildID(nsACString& aResult)
 NS_IMETHODIMP
 nsXULAppInfo::GetUAName(nsACString& aResult)
 {
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     ContentChild* cc = ContentChild::GetSingleton();
     aResult = cc->GetAppInfo().UAName;
     return NS_OK;
@@ -805,7 +813,7 @@ static bool gBrowserTabsRemoteAutostart = false;
 static nsString gBrowserTabsRemoteDisabledReason;
 static bool gBrowserTabsRemoteAutostartInitialized = false;
 
-#ifdef NIGHTLY_BUILD
+#ifdef E10S_TESTING_ONLY
 NS_IMETHODIMP
 nsXULAppInfo::Observe(nsISupports *aSubject, const char *aTopic, const char16_t *aData) {
   if (!nsCRT::strcmp(aTopic, "getE10SBlocked")) {
@@ -868,7 +876,7 @@ nsXULAppInfo::GetIs64Bit(bool* aResult)
 NS_IMETHODIMP
 nsXULAppInfo::EnsureContentProcess()
 {
-  if (XRE_GetProcessType() != GeckoProcessType_Default)
+  if (!XRE_IsParentProcess())
     return NS_ERROR_NOT_AVAILABLE;
 
   nsRefPtr<ContentParent> unused = ContentParent::GetNewOrUsedBrowserProcess();
@@ -2750,7 +2758,17 @@ XREMain::XRE_mainInit(bool* aExitFlag)
 
   StartupTimeline::Record(StartupTimeline::MAIN);
 
-  if (ChaosMode::isActive(ChaosMode::Any)) {
+  if (PR_GetEnv("MOZ_CHAOSMODE")) {
+    ChaosFeature feature = ChaosFeature::Any;
+    long featureInt = strtol(PR_GetEnv("MOZ_CHAOSMODE"), nullptr, 16);
+    if (featureInt) {
+      // NOTE: MOZ_CHAOSMODE=0 or a non-hex value maps to Any feature.
+      feature = static_cast<ChaosFeature>(featureInt);
+    }
+    ChaosMode::SetChaosFeature(feature);
+  }
+
+  if (ChaosMode::isActive(ChaosFeature::Any)) {
     printf_stderr("*** You are running in chaos test mode. See ChaosMode.h. ***\n");
   }
 
@@ -3188,13 +3206,30 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
     }
   }
 #endif /* MOZ_WIDGET_GTK */
-
+#ifdef MOZ_X11
+  // Init X11 in thread-safe mode. Must be called prior to the first call to XOpenDisplay
+  // (called inside gdk_display_open). This is a requirement for off main tread compositing.
+  XInitThreads();
+#endif
+#if defined(MOZ_WIDGET_GTK)
+  {
+    mGdkDisplay = gdk_display_open(display_name);
+    if (!mGdkDisplay) {
+      PR_fprintf(PR_STDERR, "Error: cannot open display: %s\n", display_name);
+      return 1;
+    }
+    gdk_display_manager_set_default_display (gdk_display_manager_get(),
+                                             mGdkDisplay);
+    if (!GDK_IS_X11_DISPLAY(mGdkDisplay))
+      mDisableRemote = true;
+  }
+#endif
 #ifdef MOZ_ENABLE_XREMOTE
   // handle --remote now that xpcom is fired up
   bool newInstance;
   {
     char *e = PR_GetEnv("MOZ_NO_REMOTE");
-    mDisableRemote = (e && *e);
+    mDisableRemote = (mDisableRemote || (e && *e));
     if (mDisableRemote) {
       newInstance = true;
     } else {
@@ -3227,36 +3262,7 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
       return 1;
   }
 #endif
-#ifdef MOZ_X11
-  // Init X11 in thread-safe mode. Must be called prior to the first call to XOpenDisplay
-  // (called inside gdk_display_open). This is a requirement for off main tread compositing.
-  // This is done only on X11 platforms if the environment variable MOZ_USE_OMTC is set so
-  // as to avoid overhead when omtc is not used.
-  //
-  // On nightly builds, we call this by default to enable OMTC for Electrolysis testing. On
-  // aurora, beta, and release builds, there is a small tpaint regression from enabling this
-  // call, so it sits behind an environment variable.
-  //
-  // An environment variable is used instead of a pref on X11 platforms because we start having
-  // access to prefs long after the first call to XOpenDisplay which is hard to change due to
-  // interdependencies in the initialization.
-# ifndef NIGHTLY_BUILD
-  if (PR_GetEnv("MOZ_USE_OMTC") ||
-      PR_GetEnv("MOZ_OMTC_ENABLED"))
-# endif
-  {
-    XInitThreads();
-  }
-#endif
 #if defined(MOZ_WIDGET_GTK)
-  mGdkDisplay = gdk_display_open(display_name);
-  if (!mGdkDisplay) {
-    PR_fprintf(PR_STDERR, "Error: cannot open display: %s\n", display_name);
-    return 1;
-  }
-  gdk_display_manager_set_default_display (gdk_display_manager_get(),
-                                           mGdkDisplay);
-
   // g_set_application_name () is only defined in glib2.2 and higher.
   _g_set_application_name_fn _g_set_application_name =
     (_g_set_application_name_fn)FindFunction("g_set_application_name");
@@ -3305,7 +3311,7 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
   }
 #endif
 
-#if defined(USE_MOZ_UPDATER)
+#if defined(MOZ_UPDATER) && !defined(MOZ_WIDGET_ANDROID)
   // Check for and process any available updates
   nsCOMPtr<nsIFile> updRoot;
   bool persistent;
@@ -4016,7 +4022,13 @@ XRE_IsParentProcess()
   return XRE_GetProcessType() == GeckoProcessType_Default;
 }
 
-#ifdef NIGHTLY_BUILD
+bool
+XRE_IsContentProcess()
+{
+  return XRE_GetProcessType() == GeckoProcessType_Content;
+}
+
+#ifdef E10S_TESTING_ONLY
 static void
 LogE10sBlockedReason(const char *reason) {
   gBrowserTabsRemoteDisabledReason.Assign(NS_ConvertASCIItoUTF16(reason));
@@ -4031,6 +4043,15 @@ LogE10sBlockedReason(const char *reason) {
 }
 #endif
 
+enum {
+  kE10sEnabledByUser = 0,
+  kE10sEnabledByDefault = 1,
+  kE10sDisabledByUser = 2,
+  kE10sDisabledInSafeMode = 3,
+  kE10sDisabledForAccessibility = 4,
+  kE10sDisabledForMacGfx = 5,
+};
+
 bool
 mozilla::BrowserTabsRemoteAutostart()
 {
@@ -4039,9 +4060,17 @@ mozilla::BrowserTabsRemoteAutostart()
   }
   gBrowserTabsRemoteAutostartInitialized = true;
   bool optInPref = Preferences::GetBool("browser.tabs.remote.autostart", false);
-  bool trialPref = Preferences::GetBool("browser.tabs.remote.autostart.1", false);
+  bool trialPref = Preferences::GetBool("browser.tabs.remote.autostart.2", false);
   bool prefEnabled = optInPref || trialPref;
-#if !defined(NIGHTLY_BUILD)
+  int status;
+  if (optInPref) {
+    status = kE10sEnabledByUser;
+  } else if (trialPref) {
+    status = kE10sEnabledByDefault;
+  } else {
+    status = kE10sDisabledByUser;
+  }
+#if !defined(E10S_TESTING_ONLY)
   // When running tests with 'layers.offmainthreadcomposition.testing.enabled' and
   // autostart set to true, return enabled.  These tests must be allowed to run
   // remotely. Otherwise remote isn't allowed in non-nightly builds.
@@ -4056,8 +4085,10 @@ mozilla::BrowserTabsRemoteAutostart()
 
   if (prefEnabled) {
     if (gSafeMode) {
+      status = kE10sDisabledInSafeMode;
       LogE10sBlockedReason("Safe mode");
     } else if (disabledForA11y) {
+      status = kE10sDisabledForAccessibility;
       LogE10sBlockedReason("An accessibility tool is active");
     } else {
       gBrowserTabsRemoteAutostart = true;
@@ -4077,7 +4108,7 @@ mozilla::BrowserTabsRemoteAutostart()
 
     // Check for blocked drivers
     if (!accelDisabled) {
-      nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+      nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
       if (gfxInfo) {
         int32_t status;
         if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_OPENGL_LAYERS, &status)) &&
@@ -4098,7 +4129,8 @@ mozilla::BrowserTabsRemoteAutostart()
     if (accelDisabled) {
       gBrowserTabsRemoteAutostart = false;
 
-#ifdef NIGHTLY_BUILD
+      status = kE10sDisabledForMacGfx;
+#ifdef E10S_TESTING_ONLY
       LogE10sBlockedReason("Hardware acceleration is disabled");
 #endif
     }
@@ -4106,6 +4138,7 @@ mozilla::BrowserTabsRemoteAutostart()
 #endif // defined(XP_MACOSX)
 
   mozilla::Telemetry::Accumulate(mozilla::Telemetry::E10S_AUTOSTART, gBrowserTabsRemoteAutostart);
+  mozilla::Telemetry::Accumulate(mozilla::Telemetry::E10S_AUTOSTART_STATUS, status);
   if (Preferences::GetBool("browser.enabledE10SFromPrompt", false)) {
     mozilla::Telemetry::Accumulate(mozilla::Telemetry::E10S_STILL_ACCEPTED_FROM_PROMPT,
                                     gBrowserTabsRemoteAutostart);

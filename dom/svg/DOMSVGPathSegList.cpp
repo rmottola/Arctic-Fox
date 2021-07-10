@@ -221,7 +221,7 @@ DOMSVGPathSegList::InternalListWillChangeTo(const SVGPathData& aNewValue)
         // have FEWER items than it does.
         return;
       }
-      if (!mItems.AppendElement(ItemProxy(nullptr, dataIndex))) {
+      if (!mItems.AppendElement(ItemProxy(nullptr, dataIndex), fallible)) {
         // OOM
         ErrorResult rv;
         Clear(rv);
@@ -383,8 +383,14 @@ DOMSVGPathSegList::InsertItemBefore(DOMSVGPathSeg& aNewItem,
   float segAsRaw[1 + NS_SVG_PATH_SEG_MAX_ARGS];
   domItem->ToSVGPathSegEncodedData(segAsRaw);
 
-  InternalList().mData.InsertElementsAt(internalIndex, segAsRaw, 1 + argCount);
-  mItems.InsertElementAt(aIndex, ItemProxy(domItem.get(), internalIndex));
+  MOZ_ALWAYS_TRUE(InternalList().mData.InsertElementsAt(internalIndex,
+                                                        segAsRaw,
+                                                        1 + argCount,
+                                                        fallible));
+  MOZ_ALWAYS_TRUE(mItems.InsertElementAt(aIndex,
+                                         ItemProxy(domItem.get(),
+                                                   internalIndex),
+                                         fallible));
 
   // This MUST come after the insertion into InternalList(), or else under the
   // insertion into InternalList() the values read from domItem would be bad
@@ -437,10 +443,9 @@ DOMSVGPathSegList::ReplaceItem(DOMSVGPathSeg& aNewItem,
   float segAsRaw[1 + NS_SVG_PATH_SEG_MAX_ARGS];
   domItem->ToSVGPathSegEncodedData(segAsRaw);
 
-  bool ok = !!InternalList().mData.ReplaceElementsAt(
-                  internalIndex, 1 + oldArgCount,
-                  segAsRaw, 1 + newArgCount);
-  if (!ok) {
+  if (!InternalList().mData.ReplaceElementsAt(internalIndex, 1 + oldArgCount,
+                                              segAsRaw, 1 + newArgCount,
+                                              fallible)) {
     aError.Throw(NS_ERROR_OUT_OF_MEMORY);
     return nullptr;
   }
@@ -537,7 +542,10 @@ DOMSVGPathSegList::
   MOZ_ASSERT(animVal->mItems.Length() == mItems.Length(),
              "animVal list not in sync!");
 
-  animVal->mItems.InsertElementAt(aIndex, ItemProxy(nullptr, aInternalIndex));
+  MOZ_ALWAYS_TRUE(animVal->mItems.InsertElementAt(aIndex,
+                                                  ItemProxy(nullptr,
+                                                            aInternalIndex),
+                                                  fallible));
 
   animVal->UpdateListIndicesFromIndex(aIndex + 1, 1 + aArgCountForItem);
 }

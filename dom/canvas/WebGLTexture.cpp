@@ -23,8 +23,9 @@ WebGLTexture::WrapObject(JSContext* cx, JS::Handle<JSObject*> aGivenProto) {
 }
 
 WebGLTexture::WebGLTexture(WebGLContext* webgl, GLuint tex)
-    : WebGLBindableName<TexTarget>(tex)
-    , WebGLContextBoundObject(webgl)
+    : WebGLContextBoundObject(webgl)
+    , mGLName(tex)
+    , mTarget(LOCAL_GL_NONE)
     , mMinFilter(LOCAL_GL_NEAREST_MIPMAP_LINEAR)
     , mMagFilter(LOCAL_GL_LINEAR)
     , mWrapS(LOCAL_GL_REPEAT)
@@ -141,7 +142,7 @@ WebGLTexture::Bind(TexTarget texTarget)
     bool firstTimeThisTextureIsBound = !HasEverBeenBound();
 
     if (firstTimeThisTextureIsBound) {
-        BindTo(texTarget);
+        mTarget = texTarget.get();
     } else if (texTarget != Target()) {
         mContext->ErrorInvalidOperation("bindTexture: This texture has already"
                                         " been bound to a different target.");
@@ -151,9 +152,7 @@ WebGLTexture::Bind(TexTarget texTarget)
         return;
     }
 
-    GLuint name = GLName();
-
-    mContext->gl->fBindTexture(texTarget.get(), name);
+    mContext->gl->fBindTexture(texTarget.get(), mGLName);
 
     if (firstTimeThisTextureIsBound) {
         mFacesCount = (texTarget == LOCAL_GL_TEXTURE_CUBE_MAP) ? 6 : 1;
@@ -228,7 +227,7 @@ WebGLTexture::SetCustomMipmap()
             imageInfo.mWidth = std::max(imageInfo.mWidth / 2, 1);
             imageInfo.mHeight = std::max(imageInfo.mHeight / 2, 1);
             imageInfo.mDepth = std::max(imageInfo.mDepth / 2, 1);
-            for(size_t face = 0; face < mFacesCount; ++face) {
+            for (size_t face = 0; face < mFacesCount; ++face) {
                 ImageInfoAtFace(face, level) = imageInfo;
             }
         }
@@ -275,8 +274,8 @@ WebGLTexture::IsMipmapCubeComplete() const
         return false;
 
     for (int i = 0; i < 6; i++) {
-        const TexImageTarget face = TexImageTargetForTargetAndFace(LOCAL_GL_TEXTURE_CUBE_MAP,
-                                                                   i);
+        const TexImageTarget face =
+            TexImageTargetForTargetAndFace(LOCAL_GL_TEXTURE_CUBE_MAP, i);
         if (!DoesMipmapHaveAllLevelsConsistentlyDefined(face))
             return false;
     }
@@ -625,7 +624,7 @@ WebGLTexture::EnsureNoUninitializedImageData(TexImageTarget imageTarget,
 
     // Try to clear with glClear.
     if (imageTarget == LOCAL_GL_TEXTURE_2D) {
-        bool cleared = ClearWithTempFB(mContext, GLName(), imageTarget, level,
+        bool cleared = ClearWithTempFB(mContext, mGLName, imageTarget, level,
                                        imageInfo.mEffectiveInternalFormat,
                                        imageInfo.mHeight, imageInfo.mWidth);
         if (cleared) {
@@ -636,7 +635,7 @@ WebGLTexture::EnsureNoUninitializedImageData(TexImageTarget imageTarget,
     }
 
     // That didn't work. Try uploading zeros then.
-    gl::ScopedBindTexture autoBindTex(mContext->gl, GLName(), mTarget.get());
+    gl::ScopedBindTexture autoBindTex(mContext->gl, mGLName, mTarget);
 
     size_t bitspertexel = GetBitsPerTexel(imageInfo.mEffectiveInternalFormat);
     MOZ_ASSERT((bitspertexel % 8) == 0); // That would only happen for

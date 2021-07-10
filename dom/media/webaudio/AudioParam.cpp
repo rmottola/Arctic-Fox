@@ -45,11 +45,13 @@ NS_IMPL_CYCLE_COLLECTION_UNROOT_NATIVE(AudioParam, Release)
 
 AudioParam::AudioParam(AudioNode* aNode,
                        AudioParam::CallbackType aCallback,
-                       float aDefaultValue)
+                       float aDefaultValue,
+                       const char* aName)
   : AudioParamTimeline(aDefaultValue)
   , mNode(aNode)
   , mCallback(aCallback)
   , mDefaultValue(aDefaultValue)
+  , mName(aName)
 {
 }
 
@@ -111,10 +113,11 @@ AudioParam::Stream()
   mStream = stream.forget();
 
   // Setup the AudioParam's stream as an input to the owner AudioNode's stream
-  MediaStream* nodeStream = mNode->Stream();
-  MOZ_ASSERT(nodeStream->AsProcessedStream());
-  ProcessedMediaStream* ps = static_cast<ProcessedMediaStream*>(nodeStream);
-  mNodeStreamPort = ps->AllocateInputPort(mStream, MediaInputPort::FLAG_BLOCK_INPUT);
+  AudioNodeStream* nodeStream = mNode->Stream();
+  if (nodeStream) {
+    mNodeStreamPort =
+      nodeStream->AllocateInputPort(mStream, MediaInputPort::FLAG_BLOCK_INPUT);
+  }
 
   // Let the MSG's copy of AudioParamTimeline know about the change in the stream
   mCallback(mNode);

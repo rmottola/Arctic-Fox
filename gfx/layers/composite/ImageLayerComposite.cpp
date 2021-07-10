@@ -6,7 +6,7 @@
 #include "ImageLayerComposite.h"
 #include "CompositableHost.h"           // for CompositableHost
 #include "Layers.h"                     // for WriteSnapshotToDumpFile, etc
-#include "gfx2DGlue.h"                  // for ToFilter, ToMatrix4x4
+#include "gfx2DGlue.h"                  // for ToFilter
 #include "gfxRect.h"                    // for gfxRect
 #include "gfxUtils.h"                   // for gfxUtils, etc
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc
@@ -95,17 +95,15 @@ ImageLayerComposite::RenderLayer(const IntRect& aClipRect)
 
   mCompositor->MakeCurrent();
 
-  EffectChain effectChain(this);
-  LayerManagerComposite::AutoAddMaskEffect autoMaskEffect(mMaskLayer, effectChain);
-  AddBlendModeEffect(effectChain);
-
-  gfx::Rect clipRect(aClipRect.x, aClipRect.y, aClipRect.width, aClipRect.height);
-  mImageHost->SetCompositor(mCompositor);
-  mImageHost->Composite(effectChain,
-                        GetEffectiveOpacity(),
-                        GetEffectiveTransformForBuffer(),
-                        GetEffectFilter(),
-                        clipRect);
+  RenderWithAllMasks(this, mCompositor, aClipRect,
+                     [&](EffectChain& effectChain, const Rect& clipRect) {
+    mImageHost->SetCompositor(mCompositor);
+    mImageHost->Composite(this, effectChain,
+                          GetEffectiveOpacity(),
+                          GetEffectiveTransformForBuffer(),
+                          GetEffectFilter(),
+                          clipRect);
+  });
   mImageHost->BumpFlashCounter();
 }
 

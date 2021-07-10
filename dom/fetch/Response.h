@@ -13,13 +13,17 @@
 #include "mozilla/dom/Fetch.h"
 #include "mozilla/dom/ResponseBinding.h"
 
+#include "InternalHeaders.h"
 #include "InternalResponse.h"
 
 namespace mozilla {
+namespace ipc {
+class PrincipalInfo;
+}
+
 namespace dom {
 
 class Headers;
-class InternalHeaders;
 
 class Response final : public nsISupports
                      , public FetchBody<Response>
@@ -76,6 +80,24 @@ public:
   GetInternalHeaders() const
   {
     return mInternalResponse->Headers();
+  }
+
+  void
+  InitChannelInfo(nsIChannel* aChannel)
+  {
+    mInternalResponse->InitChannelInfo(aChannel);
+  }
+
+  const ChannelInfo&
+  GetChannelInfo() const
+  {
+    return mInternalResponse->GetChannelInfo();
+  }
+
+  const UniquePtr<mozilla::ipc::PrincipalInfo>&
+  GetPrincipalInfo() const
+  {
+    return mInternalResponse->GetPrincipalInfo();
   }
 
   Headers* Headers_();

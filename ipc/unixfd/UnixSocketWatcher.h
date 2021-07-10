@@ -8,32 +8,10 @@
 #define mozilla_ipc_UnixSocketWatcher_h
 
 #include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#ifdef MOZ_B2G_BT_BLUEZ
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/sco.h>
-#include <bluetooth/l2cap.h>
-#include <bluetooth/rfcomm.h>
-#endif
 #include "UnixFdWatcher.h"
 
 namespace mozilla {
 namespace ipc {
-
-union sockaddr_any {
-  sockaddr_storage storage; // address-family only
-  sockaddr_un un;
-  sockaddr_in in;
-  sockaddr_in6 in6;
-#ifdef MOZ_B2G_BT_BLUEZ
-  sockaddr_sco sco;
-  sockaddr_rc rc;
-  sockaddr_l2 l2;
-#endif
-  // ... others
-};
 
 class UnixSocketWatcher : public UnixFdWatcher
 {
@@ -60,15 +38,14 @@ public:
   // Listen on socket for incoming connection requests
   nsresult Listen(const struct sockaddr* aAddr, socklen_t aAddrLen);
 
-  // Callback method for accepted connections
-  virtual void OnAccepted(int aFd, const sockaddr_any* aAddr,
-                          socklen_t aAddrLen) {};
-
   // Callback method for successful connection requests
   virtual void OnConnected() {};
 
   // Callback method for successful listen requests
   virtual void OnListening() {};
+
+  // Callback method for accepting from a listening socket
+  virtual void OnSocketCanAcceptWithoutBlocking() {};
 
   // Callback method for receiving from socket
   virtual void OnSocketCanReceiveWithoutBlocking() {};

@@ -6,6 +6,7 @@
 
 #include "nsGenericHTMLFrameElement.h"
 
+#include "mozilla/dom/BrowserElementAudioChannel.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/ErrorResult.h"
@@ -34,7 +35,19 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(nsGenericHTMLFrameElement,
                                                   nsGenericHTMLElement)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFrameLoader)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mBrowserElementAPI)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mBrowserElementAudioChannels)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
+
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(nsGenericHTMLFrameElement,
+                                                nsGenericHTMLElement)
+  if (tmp->mFrameLoader) {
+    tmp->mFrameLoader->Destroy();
+  }
+
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mFrameLoader)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mBrowserElementAPI)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mBrowserElementAudioChannels)
+NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_ADDREF_INHERITED(nsGenericHTMLFrameElement, nsGenericHTMLElement)
 NS_IMPL_RELEASE_INHERITED(nsGenericHTMLFrameElement, nsGenericHTMLElement)
@@ -478,6 +491,20 @@ bool WidgetsEnabled()
   return sMozWidgetsEnabled;
 }
 
+bool NestedEnabled()
+{
+  static bool sMozNestedEnabled = false;
+  static bool sBoolVarCacheInitialized = false;
+
+  if (!sBoolVarCacheInitialized) {
+    sBoolVarCacheInitialized = true;
+    Preferences::AddBoolVarCache(&sMozNestedEnabled,
+                                 "dom.ipc.tabs.nested.enabled");
+  }
+
+  return sMozNestedEnabled;
+}
+
 } // namespace
 
 /* [infallible] */ NS_IMETHODIMP
@@ -580,8 +607,12 @@ nsGenericHTMLFrameElement::GetAppManifestURL(nsAString& aOut)
     return NS_OK;
   }
 
-  if (XRE_GetProcessType() != GeckoProcessType_Default) {
-    NS_WARNING("Can't embed-apps. Embed-apps is restricted to in-proc apps, see bug 1059662");
+  // Only allow content process to embed an app when nested content
+  // process is enabled.
+  if (!XRE_IsParentProcess() &&
+      !(GetBoolAttr(nsGkAtoms::Remote) && NestedEnabled())){
+    NS_WARNING("Can't embed-apps. Embed-apps is restricted to in-proc apps "
+               "or content processes with nested pref enabled, see bug 1097479");
     return NS_OK;
   }
 

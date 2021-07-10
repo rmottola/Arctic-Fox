@@ -1776,7 +1776,7 @@ class Mochitest(MochitestUtilsMixin):
                 # Allow callers to specify an onLaunch callback to be fired after the
                 # app is launched.
                 # We call onLaunch for b2g desktop mochitests so that we can
-                # run a Marionette script after goanna has completed startup.
+                # run a Marionette script after gecko has completed startup.
                 onLaunch()
 
             # wait until app is finished

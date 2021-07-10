@@ -17,12 +17,13 @@
 #include "nsString.h"
 #include "nscore.h"
 #include "TimeUnits.h"
+#include <map>
 
 namespace mozilla {
 
 class ContainerParser;
 class MediaSourceDecoder;
-class MediaLargeByteBuffer;
+class MediaByteBuffer;
 
 class TrackBuffer final : public SourceBufferContentManager {
 public:
@@ -30,7 +31,7 @@ public:
 
   nsRefPtr<ShutdownPromise> Shutdown();
 
-  bool AppendData(MediaLargeByteBuffer* aData, TimeUnit aTimestampOffset) override;
+  bool AppendData(MediaByteBuffer* aData, TimeUnit aTimestampOffset) override;
 
   // Append data to the current decoder.  Also responsible for calling
   // NotifyDataArrived on the decoder to keep buffered range computation up
@@ -102,9 +103,14 @@ public:
   // currently not playable.
   bool HasOnlyIncompleteMedia();
 
+  // Return the buffered ranges for given decoder.
+  media::TimeIntervals GetBuffered(SourceBufferDecoder* aDecoder);
+
 #if defined(DEBUG)
   void Dump(const char* aPath) override;
 #endif
+
+  typedef std::map<SourceBufferDecoder*, media::TimeIntervals> DecoderBufferedMap;
 
 private:
   friend class DecodersToInitialize;
@@ -116,14 +122,19 @@ private:
   // for initialization.
   // The decoder is not considered initialized until it is added to
   // mInitializedDecoders.
-  already_AddRefed<SourceBufferDecoder> NewDecoder(TimeUnit aTimestampOffset);
+  already_AddRefed<SourceBufferDecoder> NewDecoder(media::TimeUnit aTimestampOffset);
 
   // Helper for AppendData, ensures NotifyDataArrived is called whenever
   // data is appended to the current decoder's SourceBufferResource.
-  bool AppendDataToCurrentResource(MediaLargeByteBuffer* aData,
+  int64_t AppendDataToCurrentResource(MediaByteBuffer* aData,
                                    uint32_t aDuration /* microseconds */);
   // Queue on the parent's decoder task queue a call to NotifyTimeRangesChanged.
   void NotifyTimeRangesChanged();
+  // Queue on the parent's decoder task queue a call to NotifyDataRemoved.
+  void NotifyReaderDataRemoved(MediaDecoderReader* aReader);
+
+  typedef MediaPromise<bool, nsresult, /* IsExclusive = */ true> BufferedRangesUpdatedPromise;
+  nsRefPtr<BufferedRangesUpdatedPromise> UpdateBufferedRanges(Interval<int64_t> aByteRange, bool aNotifyParent);
 
   // Queue execution of InitializeDecoder on mTaskQueue.
   bool QueueInitializeDecoder(SourceBufferDecoder* aDecoder);
@@ -154,7 +165,7 @@ private:
   void RemoveDecoder(SourceBufferDecoder* aDecoder);
 
   // Remove all empty decoders from the provided list;
-  void RemoveEmptyDecoders(nsTArray<SourceBufferDecoder*>& aDecoders);
+  void RemoveEmptyDecoders(const nsTArray<nsRefPtr<SourceBufferDecoder>>& aDecoders);
 
   void OnMetadataRead(MetadataHolder* aMetadata,
                       SourceBufferDecoder* aDecoder,
@@ -164,7 +175,7 @@ private:
                          SourceBufferDecoder* aDecoder);
 
   nsAutoPtr<ContainerParser> mParser;
-  nsRefPtr<MediaLargeByteBuffer> mInputBuffer;
+  nsRefPtr<MediaByteBuffer> mInputBuffer;
 
   // A task queue using the shared media thread pool.  Used exclusively to
   // initialize (i.e. call ReadMetadata on) decoders as they are created via
@@ -198,9 +209,9 @@ private:
   void AdjustDecodersTimestampOffset(TimeUnit aOffset);
 
   // The timestamp offset used by our current decoder.
-  TimeUnit mLastTimestampOffset;
-  TimeUnit mTimestampOffset;
-  TimeUnit mAdjustedTimestamp;
+  media::TimeUnit mLastTimestampOffset;
+  media::TimeUnit mTimestampOffset;
+  media::TimeUnit mAdjustedTimestamp;
 
   // True if at least one of our decoders has encrypted content.
   bool mIsWaitingOnCDM;
@@ -217,6 +228,15 @@ private:
   MediaPromiseHolder<AppendPromise> mInitializationPromise;
   // Track our request for metadata from the reader.
   MediaPromiseRequestHolder<MediaDecoderReader::MetadataPromise> mMetadataRequest;
+
+  MediaPromiseHolder<RangeRemovalPromise> mRangeRemovalPromise;
+
+  Interval<int64_t> mLastAppendRange;
+
+  // Protected by Parent's decoder Monitor.
+  media::TimeIntervals mBufferedRanges;
+
+  DecoderBufferedMap mReadersBuffered;
 };
 
 } // namespace mozilla

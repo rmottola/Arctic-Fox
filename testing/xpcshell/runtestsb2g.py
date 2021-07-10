@@ -123,11 +123,11 @@ class B2GOptions(RemoteXPCShellOptions):
                         dest='use_device_libs',
                         help="Don't push .so's")
         defaults['use_device_libs'] = False
-        self.add_option("--goanna-path", action="store",
-                        type="string", dest="goannaPath",
-                        help="the path to a goanna distribution that should "
+        self.add_option("--gecko-path", action="store",
+                        type="string", dest="geckoPath",
+                        help="the path to a gecko distribution that should "
                         "be installed on the emulator prior to test")
-        defaults["goannaPath"] = None
+        defaults["geckoPath"] = None
         self.add_option("--logdir", action="store",
                         type="string", dest="logdir",
                         help="directory to store log files")
@@ -148,8 +148,8 @@ class B2GOptions(RemoteXPCShellOptions):
         if options.b2g_path is None:
             self.error("Need to specify a --b2gpath")
 
-        if options.goannaPath and not options.emulator:
-            self.error("You must specify --emulator if you specify --goanna-path")
+        if options.geckoPath and not options.emulator:
+            self.error("You must specify --emulator if you specify --gecko-path")
 
         if options.logdir and not options.emulator:
             self.error("You must specify --emulator if you specify --logdir")
@@ -164,8 +164,8 @@ def run_remote_xpcshell(parser, options, args, log):
         kwargs['emulator'] = options.emulator
         if options.no_window:
             kwargs['noWindow'] = True
-        if options.goannaPath:
-            kwargs['goanna_path'] = options.goannaPath
+        if options.geckoPath:
+            kwargs['gecko_path'] = options.geckoPath
         if options.logdir:
             kwargs['logdir'] = options.logdir
         if options.busybox:

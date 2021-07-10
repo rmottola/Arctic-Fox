@@ -54,7 +54,6 @@ public:
   virtual size_t SizeOfVideoQueueInFrames() override;
   virtual size_t SizeOfAudioQueueInFrames() override;
 
-  virtual bool IsDormantNeeded() override;
   virtual void ReleaseMediaResources() override;
 
   void OnAudioDecoded(AudioData* aSample);
@@ -94,7 +93,7 @@ public:
   // We can't compute a proper start time since we won't necessarily
   // have the first frame of the resource available. This does the same
   // as chrome/blink and assumes that we always start at t=0.
-  virtual int64_t ComputeStartTime(const VideoData* aVideo, const AudioData* aAudio) override { return 0; }
+  virtual bool ForceZeroStartTime() const override { return true; }
 
   // Buffering heuristics don't make sense for MSE, because the arrival of data
   // is at least partly controlled by javascript, and javascript does not expect
@@ -125,12 +124,6 @@ public:
 
   virtual void BreakCycles() override;
 
-  bool IsShutdown()
-  {
-    ReentrantMonitorAutoEnter decoderMon(mDecoder->GetReentrantMonitor());
-    return mDecoder->IsShutdown();
-  }
-
   // Return true if all of the active tracks contain data for the specified time.
   bool TrackBuffersContainTime(int64_t aTime);
 
@@ -145,8 +138,15 @@ public:
   void SetMediaSourceDuration(double aDuration /* seconds */);
 
   virtual bool IsAsync() const override {
+    ReentrantMonitorAutoEnter decoderMon(mDecoder->GetReentrantMonitor());
     return (!GetAudioReader() || GetAudioReader()->IsAsync()) &&
            (!GetVideoReader() || GetVideoReader()->IsAsync());
+  }
+
+
+  virtual bool VideoIsHardwareAccelerated() const override {
+    ReentrantMonitorAutoEnter decoderMon(mDecoder->GetReentrantMonitor());
+    return GetVideoReader() && GetVideoReader()->VideoIsHardwareAccelerated();
   }
 
   // Returns true if aReader is a currently active audio or video
@@ -209,9 +209,10 @@ private:
 
   // Return a decoder from the set available in aTrackDecoders that has data
   // available in the range requested by aTarget.
+  friend class TrackBuffer;
   already_AddRefed<SourceBufferDecoder> SelectDecoder(int64_t aTarget /* microseconds */,
                                                       int64_t aTolerance /* microseconds */,
-                                                      const nsTArray<nsRefPtr<SourceBufferDecoder>>& aTrackDecoders);
+                                                      TrackBuffer* aTrackBuffer);
   bool HaveData(int64_t aTarget, MediaData::Type aType);
   already_AddRefed<SourceBufferDecoder> FirstDecoder(MediaData::Type aType);
 

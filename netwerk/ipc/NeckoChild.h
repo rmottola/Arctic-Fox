@@ -63,6 +63,8 @@ protected:
                               const URIParams&,
                               const OptionalURIParams&) override;
   virtual bool DeallocPRemoteOpenFileChild(PRemoteOpenFileChild*) override;
+  virtual PDataChannelChild* AllocPDataChannelChild(const uint32_t& channelId) override;
+  virtual bool DeallocPDataChannelChild(PDataChannelChild* child) override;
   virtual PRtspControllerChild* AllocPRtspControllerChild() override;
   virtual bool DeallocPRtspControllerChild(PRtspControllerChild*) override;
   virtual PRtspChannelChild*
@@ -78,6 +80,10 @@ protected:
                                                  const nsString& aRealm,
                                                  const uint64_t& aCallbackId) override;
   virtual bool RecvAppOfflineStatus(const uint32_t& aId, const bool& aOffline) override;
+
+  /* Predictor Messsages */
+  virtual bool RecvPredOnPredictPreconnect(const URIParams& aURI) override;
+  virtual bool RecvPredOnPredictDNS(const URIParams& aURI) override;
 };
 
 /**

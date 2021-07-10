@@ -3,7 +3,7 @@
 
 'use strict';
 
-const {PushDB, PushService} = serviceExports;
+const {PushDB, PushService, PushServiceWebSocket} = serviceExports;
 
 function run_test() {
   do_get_profile();
@@ -17,22 +17,23 @@ function run_test() {
 
 // Should acknowledge duplicate notifications, but not notify apps.
 add_task(function* test_notification_duplicate() {
-  let db = new PushDB();
-  let promiseDB = promisifyDatabase(db);
-  do_register_cleanup(() => cleanupDatabase(db));
+  let db = PushServiceWebSocket.newPushDB();
+  do_register_cleanup(() => {return db.drop().then(_ => db.close());});
   let records = [{
     channelID: '8d2d9400-3597-4c5a-8a38-c546b0043bcc',
     pushEndpoint: 'https://example.org/update/1',
     scope: 'https://example.com/1',
+    originAttributes: "",
     version: 2
   }, {
     channelID: '27d1e393-03ef-4c72-a5e6-9e890dfccad0',
     pushEndpoint: 'https://example.org/update/2',
     scope: 'https://example.com/2',
+    originAttributes: "",
     version: 2
   }];
   for (let record of records) {
-    yield promiseDB.put(record);
+    yield db.put(record);
   }
 
   let notifyPromise = promiseObserverNotification('push-notification');
@@ -41,6 +42,7 @@ add_task(function* test_notification_duplicate() {
   let ackDefer = Promise.defer();
   let ackDone = after(2, ackDefer.resolve);
   PushService.init({
+    serverURI: "wss://push.example.org/",
     networkInfo: new MockDesktopNetworkInfo(),
     db,
     makeWebSocket(uri) {
@@ -72,11 +74,11 @@ add_task(function* test_notification_duplicate() {
   yield waitForPromise(ackDefer.promise, DEFAULT_TIMEOUT,
     'Timed out waiting for stale acknowledgement');
 
-  let staleRecord = yield promiseDB.getByChannelID(
+  let staleRecord = yield db.getByKeyID(
     '8d2d9400-3597-4c5a-8a38-c546b0043bcc');
   strictEqual(staleRecord.version, 2, 'Wrong stale record version');
 
-  let updatedRecord = yield promiseDB.getByChannelID(
+  let updatedRecord = yield db.getByKeyID(
     '27d1e393-03ef-4c72-a5e6-9e890dfccad0');
   strictEqual(updatedRecord.version, 3, 'Wrong updated record version');
 });

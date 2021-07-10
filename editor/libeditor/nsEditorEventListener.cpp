@@ -59,6 +59,8 @@
 #include "nsIBidiKeyboard.h"            // for nsIBidiKeyboard
 #endif
 
+#include "mozilla/dom/TabParent.h"
+
 class nsPresContext;
 
 using namespace mozilla;
@@ -106,7 +108,7 @@ nsEditorEventListener::nsEditorEventListener()
 {
 }
 
-nsEditorEventListener::~nsEditorEventListener() 
+nsEditorEventListener::~nsEditorEventListener()
 {
   if (mEditor) {
     NS_WARNING("We're not uninstalled");
@@ -685,7 +687,7 @@ nsEditorEventListener::MouseClick(nsIDOMMouseEvent* aMouseEvent)
     return rv;
   }
 
-  // If we got a mouse down inside the editing area, we should force the 
+  // If we got a mouse down inside the editing area, we should force the
   // IME to commit before we change the cursor position
   mEditor->ForceCompositionEnd();
 
@@ -721,7 +723,7 @@ nsEditorEventListener::HandleMiddleClickPaste(nsIDOMMouseEvent* aMouseEvent)
   }
 
   // If the ctrl key is pressed, we'll do paste as quotation.
-  // Would've used the alt key, but the kde wmgr treats alt-middle specially. 
+  // Would've used the alt key, but the kde wmgr treats alt-middle specially.
   bool ctrlKey = false;
   aMouseEvent->GetCtrlKey(&ctrlKey);
 
@@ -923,8 +925,8 @@ nsEditorEventListener::Drop(nsIDOMDragEvent* aDragEvent)
     if ((mEditor->IsReadonly() || mEditor->IsDisabled()) &&
         !IsFileControlTextBox()) {
       // it was decided to "eat" the event as this is the "least surprise"
-      // since someone else handling it might be unintentional and the 
-      // user could probably re-drag to be not over the disabled/readonly 
+      // since someone else handling it might be unintentional and the
+      // user could probably re-drag to be not over the disabled/readonly
       // editfields if that is what is desired.
       return aDragEvent->StopPropagation();
     }
@@ -982,6 +984,14 @@ nsEditorEventListener::CanDrop(nsIDOMDragEvent* aEvent)
 
   // If the source and the dest are not same document, allow to drop it always.
   if (domdoc != sourceDoc) {
+    return true;
+  }
+
+  // If the source node is a remote browser, treat this as coming from a
+  // different document and allow the drop.
+  nsCOMPtr<nsIContent> sourceContent = do_QueryInterface(sourceNode);
+  TabParent* tp = TabParent::GetFrom(sourceContent);
+  if (tp) {
     return true;
   }
 

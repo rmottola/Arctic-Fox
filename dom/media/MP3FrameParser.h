@@ -29,6 +29,8 @@ public:
 
 private:
   uint32_t mCurrentChar;
+  uint8_t mVersion;
+  uint8_t mFlags;
   uint32_t mHeaderLength;
 };
 
@@ -110,7 +112,7 @@ public:
     return mIsMP3 != NOT_MP3;
   }
 
-  void Parse(const char* aBuffer, uint32_t aLength, uint64_t aStreamOffset);
+  void Parse(const uint8_t* aBuffer, uint32_t aLength, uint64_t aStreamOffset);
 
   // Returns the duration, in microseconds. If the entire stream has not
   // been parsed yet, this is an estimate based on the bitrate of the

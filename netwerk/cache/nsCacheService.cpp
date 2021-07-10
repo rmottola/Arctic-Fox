@@ -383,7 +383,7 @@ nsCacheProfilePrefObserver::Observe(nsISupports *     subject,
 {
     nsresult rv;
     NS_ConvertUTF16toUTF8 data(data_unicode);
-    CACHE_LOG_ALWAYS(("Observe [topic=%s data=%s]\n", topic, data.get()));
+    CACHE_LOG_INFO(("Observe [topic=%s data=%s]\n", topic, data.get()));
 
     if (!nsCacheService::IsInitialized()) {
         if (!strcmp("resume_process_notification", topic)) {
@@ -1148,8 +1148,7 @@ nsCacheService::Init()
     }
 
     // initialize hashtable for active cache entries
-    rv = mActiveEntries.Init();
-    if (NS_FAILED(rv)) return rv;
+    mActiveEntries.Init();
 
     // create profile/preference observer
     if (!mObserver) {
@@ -1738,7 +1737,7 @@ nsCacheService::GetCustomOfflineDevice(nsIFile *aProfileDir,
 nsresult
 nsCacheService::CreateOfflineDevice()
 {
-    CACHE_LOG_ALWAYS(("Creating default offline device"));
+    CACHE_LOG_INFO(("Creating default offline device"));
 
     if (mOfflineDevice)        return NS_OK;
     if (!nsCacheService::IsInitialized()) {
@@ -1761,10 +1760,10 @@ nsCacheService::CreateCustomOfflineDevice(nsIFile *aProfileDir,
 {
     NS_ENSURE_ARG(aProfileDir);
 
-    if (PR_LOG_TEST(gCacheLog, PR_LOG_ALWAYS)) {
+    if (MOZ_LOG_TEST(gCacheLog, LogLevel::Info)) {
       nsAutoCString profilePath;
       aProfileDir->GetNativePath(profilePath);
-      CACHE_LOG_ALWAYS(("Creating custom offline device, %s, %d",
+      CACHE_LOG_INFO(("Creating custom offline device, %s, %d",
                         profilePath.BeginReading(), aQuota));
     }
 
@@ -2914,57 +2913,31 @@ nsCacheService::ClearDoomList()
     }
 }
 
-PLDHashOperator
-nsCacheService::GetActiveEntries(PLDHashTable *    table,
-                                 PLDHashEntryHdr * hdr,
-                                 uint32_t          number,
-                                 void *            arg)
-{
-    static_cast<nsTArray<nsCacheEntry*>*>(arg)->AppendElement(
-        ((nsCacheEntryHashTableEntry *)hdr)->cacheEntry);
-    return PL_DHASH_NEXT;
-}
-
-struct ActiveEntryArgs
-{
-    nsTArray<nsCacheEntry*>* mActiveArray;
-    nsCacheService::DoomCheckFn mCheckFn;
-};
-
 void
 nsCacheService::DoomActiveEntries(DoomCheckFn check)
 {
     nsAutoTArray<nsCacheEntry*, 8> array;
-    ActiveEntryArgs args = { &array, check };
 
-    mActiveEntries.VisitEntries(RemoveActiveEntry, &args);
+    for (auto iter = mActiveEntries.Iter(); !iter.Done(); iter.Next()) {
+        nsCacheEntry* entry =
+            static_cast<nsCacheEntryHashTableEntry*>(iter.Get())->cacheEntry;
+
+        if (check && !check(entry)) {
+            continue;
+        }
+
+        array.AppendElement(entry);
+
+        // entry is being removed from the active entry list
+        entry->MarkInactive();
+        iter.Remove();
+    }
 
     uint32_t count = array.Length();
-    for (uint32_t i=0; i < count; ++i)
+    for (uint32_t i = 0; i < count; ++i) {
         DoomEntry_Internal(array[i], true);
+    }
 }
-
-PLDHashOperator
-nsCacheService::RemoveActiveEntry(PLDHashTable *    table,
-                                  PLDHashEntryHdr * hdr,
-                                  uint32_t          number,
-                                  void *            arg)
-{
-    nsCacheEntry * entry = ((nsCacheEntryHashTableEntry *)hdr)->cacheEntry;
-    NS_ASSERTION(entry, "### active entry = nullptr!");
-
-    ActiveEntryArgs* args = static_cast<ActiveEntryArgs*>(arg);
-    if (args->mCheckFn && !args->mCheckFn(entry))
-        return PL_DHASH_NEXT;
-
-    NS_ASSERTION(args->mActiveArray, "### array = nullptr!");
-    args->mActiveArray->AppendElement(entry);
-
-    // entry is being removed from the active entry list
-    entry->MarkInactive();
-    return PL_DHASH_REMOVE; // and continue enumerating
-}
-
 
 void
 nsCacheService::CloseAllStreams()
@@ -2979,7 +2952,10 @@ nsCacheService::CloseAllStreams()
 
 #if DEBUG
         // make sure there is no active entry
-        mActiveEntries.VisitEntries(GetActiveEntries, &entries);
+        for (auto iter = mActiveEntries.Iter(); !iter.Done(); iter.Next()) {
+            auto entry = static_cast<nsCacheEntryHashTableEntry*>(iter.Get());
+            entries.AppendElement(entry->cacheEntry);
+        }
         NS_ASSERTION(entries.IsEmpty(), "Bad state");
 #endif
 
@@ -3075,18 +3051,18 @@ nsCacheService::LogCacheStatistics()
 {
     uint32_t hitPercentage = (uint32_t)((((double)mCacheHits) /
         ((double)(mCacheHits + mCacheMisses))) * 100);
-    CACHE_LOG_ALWAYS(("\nCache Service Statistics:\n\n"));
-    CACHE_LOG_ALWAYS(("    TotalEntries   = %d\n", mTotalEntries));
-    CACHE_LOG_ALWAYS(("    Cache Hits     = %d\n", mCacheHits));
-    CACHE_LOG_ALWAYS(("    Cache Misses   = %d\n", mCacheMisses));
-    CACHE_LOG_ALWAYS(("    Cache Hit %%    = %d%%\n", hitPercentage));
-    CACHE_LOG_ALWAYS(("    Max Key Length = %d\n", mMaxKeyLength));
-    CACHE_LOG_ALWAYS(("    Max Meta Size  = %d\n", mMaxMetaSize));
-    CACHE_LOG_ALWAYS(("    Max Data Size  = %d\n", mMaxDataSize));
-    CACHE_LOG_ALWAYS(("\n"));
-    CACHE_LOG_ALWAYS(("    Deactivate Failures         = %d\n",
+    CACHE_LOG_INFO(("\nCache Service Statistics:\n\n"));
+    CACHE_LOG_INFO(("    TotalEntries   = %d\n", mTotalEntries));
+    CACHE_LOG_INFO(("    Cache Hits     = %d\n", mCacheHits));
+    CACHE_LOG_INFO(("    Cache Misses   = %d\n", mCacheMisses));
+    CACHE_LOG_INFO(("    Cache Hit %%    = %d%%\n", hitPercentage));
+    CACHE_LOG_INFO(("    Max Key Length = %d\n", mMaxKeyLength));
+    CACHE_LOG_INFO(("    Max Meta Size  = %d\n", mMaxMetaSize));
+    CACHE_LOG_INFO(("    Max Data Size  = %d\n", mMaxDataSize));
+    CACHE_LOG_INFO(("\n"));
+    CACHE_LOG_INFO(("    Deactivate Failures         = %d\n",
                       mDeactivateFailures));
-    CACHE_LOG_ALWAYS(("    Deactivated Unbound Entries = %d\n",
+    CACHE_LOG_INFO(("    Deactivated Unbound Entries = %d\n",
                       mDeactivatedUnboundEntries));
 }
 

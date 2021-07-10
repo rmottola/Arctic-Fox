@@ -20,7 +20,7 @@
 namespace mozilla {
 
 class ContainerParser;
-class MediaLargeByteBuffer;
+class MediaByteBuffer;
 class MediaRawData;
 class MediaSourceDemuxer;
 class SourceBufferResource;
@@ -45,7 +45,7 @@ public:
                       MediaSourceDecoder* aParentDecoder,
                       const nsACString& aType);
 
-  bool AppendData(MediaLargeByteBuffer* aData,
+  bool AppendData(MediaByteBuffer* aData,
                   TimeUnit aTimestampOffset) override;
 
   nsRefPtr<AppendPromise> BufferAppend() override;
@@ -136,12 +136,12 @@ private:
     return mAudioTracks.mNumTracks > 0;
   }
 
-  typedef Pair<nsRefPtr<MediaLargeByteBuffer>, TimeUnit> IncomingBuffer;
+  typedef Pair<nsRefPtr<MediaByteBuffer>, TimeUnit> IncomingBuffer;
   void AppendIncomingBuffer(IncomingBuffer aData);
   nsTArray<IncomingBuffer> mIncomingBuffers;
 
   // The input buffer as per http://w3c.github.io/media-source/index.html#sourcebuffer-input-buffer
-  nsRefPtr<MediaLargeByteBuffer> mInputBuffer;
+  nsRefPtr<MediaByteBuffer> mInputBuffer;
   // The current append state as per https://w3c.github.io/media-source/#sourcebuffer-append-state
   // Accessed on both the main thread and the task queue.
   Atomic<AppendState> mAppendState;
@@ -164,8 +164,8 @@ private:
   nsAutoPtr<ContainerParser> mParser;
 
   // Demuxer objects and methods.
-  void AppendDataToCurrentInputBuffer(MediaLargeByteBuffer* aData);
-  nsRefPtr<MediaLargeByteBuffer> mInitData;
+  void AppendDataToCurrentInputBuffer(MediaByteBuffer* aData);
+  nsRefPtr<MediaByteBuffer> mInitData;
   nsRefPtr<SourceBufferResource> mCurrentInputBuffer;
   nsRefPtr<MediaDataDemuxer> mInputDemuxer;
   // Length already processed in current media segment.

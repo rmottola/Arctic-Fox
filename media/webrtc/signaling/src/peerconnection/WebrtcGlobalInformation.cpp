@@ -261,7 +261,7 @@ OnStatsReport_m(WebrtcGlobalChild* aThisChild,
   }
 
   // This is the last stats report to be collected. (Must be the gecko process).
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   StatsRequest* request = StatsRequest::Get(aRequestId);
 
@@ -271,14 +271,14 @@ OnStatsReport_m(WebrtcGlobalChild* aThisChild,
   }
 
   for (auto&& query : *aQueryList) {
-    request->mResult.mReports.Value().AppendElement(*(query->report));
+    request->mResult.mReports.Value().AppendElement(*(query->report), fallible);
   }
 
   // Reports saved for closed/destroyed PeerConnections
   auto ctx = PeerConnectionCtx::GetInstance();
   if (ctx) {
     for (auto&& pc : ctx->mStatsForClosedPeerConnections) {
-      request->mResult.mReports.Value().AppendElement(pc);
+      request->mResult.mReports.Value().AppendElement(pc, fallible);
     }
   }
 
@@ -322,9 +322,9 @@ static void OnGetLogging_m(WebrtcGlobalChild* aThisChild,
 
     if (!aLogList->empty()) {
       for (auto& line : *aLogList) {
-        nsLogs.AppendElement(NS_ConvertUTF8toUTF16(line.c_str()));
+        nsLogs.AppendElement(NS_ConvertUTF8toUTF16(line.c_str()), fallible);
       }
-      nsLogs.AppendElement(NS_LITERAL_STRING("+++++++ END ++++++++"));
+      nsLogs.AppendElement(NS_LITERAL_STRING("+++++++ END ++++++++"), fallible);
     }
 
     unused << aThisChild->SendGetLogResult(aRequestId, nsLogs);
@@ -332,7 +332,7 @@ static void OnGetLogging_m(WebrtcGlobalChild* aThisChild,
   }
 
   // This is the last log to be collected. (Must be the gecko process).
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   LogRequest* request = LogRequest::Get(aRequestId);
 
@@ -343,9 +343,11 @@ static void OnGetLogging_m(WebrtcGlobalChild* aThisChild,
 
   if (!aLogList->empty()) {
     for (auto& line : *aLogList) {
-      request->mResult.AppendElement(NS_ConvertUTF8toUTF16(line.c_str()));
+      request->mResult.AppendElement(NS_ConvertUTF8toUTF16(line.c_str()),
+                                     fallible);
     }
-    request->mResult.AppendElement(NS_LITERAL_STRING("+++++++ END ++++++++"));
+    request->mResult.AppendElement(NS_LITERAL_STRING("+++++++ END ++++++++"),
+                                   fallible);
   }
 
   request->Complete();
@@ -441,7 +443,7 @@ WebrtcGlobalInformation::GetAllStats(
     return;
   }
 
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   // CallbackObject does not support threadsafe refcounting, and must be
   // destroyed on main.
@@ -532,7 +534,7 @@ WebrtcGlobalInformation::GetLogging(
     return;
   }
 
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+  MOZ_ASSERT(XRE_IsParentProcess());
 
   // CallbackObject does not support threadsafe refcounting, and must be
   // destroyed on main.
@@ -626,7 +628,7 @@ WebrtcGlobalParent::RecvGetStatsResult(const int& aRequestId,
   }
 
   for (auto&& s : Stats) {
-    request->mResult.mReports.Value().AppendElement(s);
+    request->mResult.mReports.Value().AppendElement(s, fallible);
   }
 
   auto next = request->GetNextParent();
@@ -1005,7 +1007,7 @@ static void StoreLongTermICEStatisticsImpl_m(
 
   PeerConnectionCtx *ctx = GetPeerConnectionCtx();
   if (ctx) {
-    ctx->mStatsForClosedPeerConnections.AppendElement(*query->report);
+    ctx->mStatsForClosedPeerConnections.AppendElement(*query->report, fallible);
   }
 }
 

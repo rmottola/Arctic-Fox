@@ -18,11 +18,13 @@
 #include "nsFocusManager.h"
 #include "nsFrameManager.h"
 #include "nsRefreshDriver.h"
+#include "mozilla/dom/BlobBinding.h"
 #include "mozilla/dom/Touch.h"
 #include "mozilla/PendingAnimationTracker.h"
 #include "nsIObjectLoadingContent.h"
 #include "nsFrame.h"
 #include "mozilla/layers/ShadowLayers.h"
+#include "mozilla/layers/APZCCallbackHelper.h"
 #include "ClientLayerManager.h"
 #include "nsQueryObject.h"
 #ifdef MOZ_FMP4
@@ -99,6 +101,7 @@
 #include "nsIContentIterator.h"
 #include "nsIDOMStyleSheet.h"
 #include "nsIStyleSheet.h"
+#include "nsIStyleSheetService.h"
 #include "nsContentPermissionHelper.h"
 #include "nsNetUtil.h"
 
@@ -2487,6 +2490,34 @@ nsDOMWindowUtils::SetAsyncZoom(nsIDOMNode* aRootElement, float aValue)
 }
 
 NS_IMETHODIMP
+nsDOMWindowUtils::FlushApzRepaints(bool* aOutResult)
+{
+  nsIWidget* widget = GetWidget();
+  if (!widget) {
+    *aOutResult = false;
+    return NS_OK;
+  }
+  // If APZ is not enabled, this function is a no-op.
+  if (!widget->AsyncPanZoomEnabled()) {
+    *aOutResult = false;
+    return NS_OK;
+  }
+  LayerManager* manager = widget->GetLayerManager();
+  if (!manager) {
+    *aOutResult = false;
+    return NS_OK;
+  }
+  ShadowLayerForwarder* forwarder = manager->AsShadowForwarder();
+  if (!forwarder || !forwarder->HasShadowManager()) {
+    *aOutResult = false;
+    return NS_OK;
+  }
+  forwarder->GetShadowManager()->SendFlushApzRepaints();
+  *aOutResult = true;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsDOMWindowUtils::ComputeAnimationDistance(nsIDOMElement* aElement,
                                            const nsAString& aProperty,
                                            const nsAString& aValue1,
@@ -2865,11 +2896,8 @@ nsDOMWindowUtils::GetFileId(JS::Handle<JS::Value> aFile, JSContext* aCx,
     return NS_OK;
   }
 
-  nsISupports* nativeObj =
-    nsContentUtils::XPConnect()->GetNativeOfWrapper(aCx, obj);
-
-  nsCOMPtr<nsIDOMBlob> blob = do_QueryInterface(nativeObj);
-  if (blob) {
+  Blob* blob = nullptr;
+  if (NS_SUCCEEDED(UNWRAP_OBJECT(Blob, obj, blob))) {
     *_retval = blob->GetFileId();
     return NS_OK;
   }
@@ -2946,6 +2974,24 @@ nsDOMWindowUtils::GetFileReferences(const nsAString& aDatabaseName, int64_t aId,
   else {
     *aRefCnt = *aDBRefCnt = *aSliceRefCnt = -1;
     *aResult = false;
+  }
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::FlushPendingFileDeletions()
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+
+  using mozilla::dom::indexedDB::IndexedDatabaseManager;
+
+  nsRefPtr<IndexedDatabaseManager> mgr = IndexedDatabaseManager::Get();
+  if (mgr) {
+    nsresult rv = mgr->FlushPendingFileDeletions();
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
   }
 
   return NS_OK;
@@ -3129,12 +3175,27 @@ nsDOMWindowUtils::RemoteFrameFullscreenReverted()
   return NS_OK;
 }
 
+NS_IMETHODIMP
+nsDOMWindowUtils::HandleFullscreenRequests(bool* aRetVal)
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+
+  nsCOMPtr<nsIDocument> doc = GetDocument();
+  NS_ENSURE_STATE(doc);
+
+  *aRetVal = nsIDocument::HandlePendingFullscreenRequests(doc);
+  return NS_OK;
+}
+
 nsresult
 nsDOMWindowUtils::ExitFullscreen()
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
 
-  nsIDocument::ExitFullscreen(nullptr, /* async */ false);
+  nsCOMPtr<nsIDocument> doc = GetDocument();
+  NS_ENSURE_STATE(doc);
+
+  nsIDocument::ExitFullscreenInDocTree(doc);
   return NS_OK;
 }
 
@@ -3431,16 +3492,14 @@ nsDOMWindowUtils::DispatchEventToChromeOnly(nsIDOMEventTarget* aTarget,
 }
 
 NS_IMETHODIMP
-nsDOMWindowUtils::RunInStableState(nsIRunnable *runnable)
+nsDOMWindowUtils::RunInStableState(nsIRunnable *aRunnable)
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
 
-  nsCOMPtr<nsIAppShell> appShell(do_GetService(kAppShellCID));
-  if (!appShell) {
-    return NS_ERROR_NOT_AVAILABLE;
-  }
+  nsCOMPtr<nsIRunnable> runnable = aRunnable;
+  nsContentUtils::RunInStableState(runnable.forget());
 
-  return appShell->RunInStableState(runnable);
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -3476,6 +3535,7 @@ nsDOMWindowUtils::RequestCompositorProperty(const nsAString& property,
 NS_IMETHODIMP
 nsDOMWindowUtils::GetOMTAStyle(nsIDOMElement* aElement,
                                const nsAString& aProperty,
+                               const nsAString& aPseudoElement,
                                nsAString& aResult)
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
@@ -3487,6 +3547,15 @@ nsDOMWindowUtils::GetOMTAStyle(nsIDOMElement* aElement,
 
   nsRefPtr<nsROCSSPrimitiveValue> cssValue = nullptr;
   nsIFrame* frame = element->GetPrimaryFrame();
+  if (frame && !aPseudoElement.IsEmpty()) {
+    if (aPseudoElement.EqualsLiteral("::before")) {
+      frame = nsLayoutUtils::GetBeforeFrame(frame);
+    } else if (aPseudoElement.EqualsLiteral("::after")) {
+      frame = nsLayoutUtils::GetAfterFrame(frame);
+    } else {
+      return NS_ERROR_INVALID_ARG;
+    }
+  }
   if (frame && nsLayoutUtils::AreAsyncAnimationsEnabled()) {
     if (aProperty.EqualsLiteral("opacity")) {
       Layer* layer =
@@ -3513,7 +3582,7 @@ nsDOMWindowUtils::GetOMTAStyle(nsIDOMElement* aElement,
           forwarder->GetShadowManager()->SendGetAnimationTransform(
             layer->AsShadowableLayer()->GetShadow(), &transform);
           if (transform.type() == MaybeTransform::TMatrix4x4) {
-            gfx3DMatrix matrix = To3DMatrix(transform.get_Matrix4x4());
+            Matrix4x4 matrix = transform.get_Matrix4x4();
             cssValue = nsComputedDOMStyle::MatrixToCSSValue(matrix);
           }
         }
@@ -3818,6 +3887,21 @@ nsDOMWindowUtils::LeaveChaosMode()
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
   ChaosMode::leaveChaosMode();
   return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::HasRuleProcessorUsedByMultipleStyleSets(uint32_t aSheetType,
+                                                          bool* aRetVal)
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+
+  nsIPresShell* presShell = GetPresShell();
+  if (!presShell) {
+    return NS_ERROR_FAILURE;
+  }
+
+  return presShell->HasRuleProcessorUsedByMultipleStyleSets(aSheetType,
+                                                            aRetVal);
 }
 
 NS_INTERFACE_MAP_BEGIN(nsTranslationNodeList)

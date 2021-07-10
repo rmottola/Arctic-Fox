@@ -28,7 +28,7 @@ function frameScript() {
       getService(Ci.nsIPerformanceStatsService);
 
     // Make sure that the stopwatch is now active.
-    let monitor = PerformanceStats.getMonitor(["jank", "cpow", "ticks"]);
+    let monitor = PerformanceStats.getMonitor(["jank", "cpow", "ticks", "compartments"]);
 
     addMessageListener("compartments-test:getStatistics", () => {
       try {
@@ -60,10 +60,33 @@ function frameScript() {
   }
 }
 
-function Assert_leq(a, b, msg) {
-  Assert.ok(a <= b, `${msg}: ${a} <= ${b}`);
-}
+// A variant of `Assert` that doesn't spam the logs
+// in case of success.
+let SilentAssert = {
+  equal: function(a, b, msg) {
+    if (a == b) {
+      return;
+    }
+    Assert.equal(a, b, msg);
+  },
+  notEqual: function(a, b, msg) {
+    if (a != b) {
+      return;
+    }
+    Assert.notEqual(a, b, msg);
+  },
+  ok: function(a, msg) {
+    if (a) {
+      return;
+    }
+    Assert.ok(a, msg);
+  },
+  leq: function(a, b, msg) {
+    this.ok(a <= b, `${msg}: ${a} <= ${b}`);
+  }
+};
 
+let isShuttingDown = false;
 function monotinicity_tester(source, testName) {
   // In the background, check invariants:
   // - numeric data can only ever increase;
@@ -107,6 +130,10 @@ function monotinicity_tester(source, testName) {
   };
   let iteration = 0;
   let frameCheck = Task.async(function*() {
+    if (isShuttingDown) {
+      window.clearInterval(interval);
+      return;
+    }
     let name = `${testName}: ${iteration++}`;
     let snapshot = yield source();
     if (!snapshot) {
@@ -118,9 +145,9 @@ function monotinicity_tester(source, testName) {
 
     // Sanity check on the process data.
     sanityCheck(previous.processData, snapshot.processData);
-    Assert.equal(snapshot.processData.isSystem, true);
-    Assert.equal(snapshot.processData.name, "<process>");
-    Assert.equal(snapshot.processData.addonId, "");
+    SilentAssert.equal(snapshot.processData.isSystem, true);
+    SilentAssert.equal(snapshot.processData.name, "<process>");
+    SilentAssert.equal(snapshot.processData.addonId, "");
     previous.procesData = snapshot.processData;
 
     // Sanity check on components data.
@@ -131,13 +158,36 @@ function monotinicity_tester(source, testName) {
         ["jank", "totalSystemTime"],
         ["cpow", "totalCPOWTime"]
       ]) {
-        SilentAssert.leq(item[probe][k], snapshot.processData[probe][k],
-          `Sanity check (${testName}): component has a lower ${k} than process`);
+        // Note that we cannot expect components data to be always smaller
+        // than process data, as `getrusage` & co are not monotonic.
+        SilentAssert.leq(item[probe][k], 2 * snapshot.processData[probe][k],
+          `Sanity check (${testName}): ${k} of component is not impossibly larger than that of process`);
       }
 
       let key = item.groupId;
-      SilentAssert.ok(!map.has(key), "The component hasn't been seen yet.");
+      if (map.has(key)) {
+        let old = map.get(key);
+        Assert.ok(false, `Component ${key} has already been seen. Latest: ${item.title||item.addonId||item.name}, previous: ${old.title||old.addonId||old.name}`);
+      }
       map.set(key, item);
+    }
+    for (let item of snapshot.componentsData) {
+      if (!item.parentId) {
+        continue;
+      }
+      let parent = map.get(item.parentId);
+      SilentAssert.ok(parent, `The parent exists ${item.parentId}`);
+
+      for (let [probe, k] of [
+        ["jank", "totalUserTime"],
+        ["jank", "totalSystemTime"],
+        ["cpow", "totalCPOWTime"]
+      ]) {
+        // Note that we cannot expect components data to be always smaller
+        // than parent data, as `getrusage` & co are not monotonic.
+        SilentAssert.leq(item[probe][k], 2 * parent[probe][k],
+          `Sanity check (${testName}): ${k} of component is not impossibly larger than that of parent`);
+      }
     }
     for (let [key, item] of map) {
       sanityCheck(previous.componentsMap.get(key), item);
@@ -213,13 +263,20 @@ add_task(function* test() {
       info("Searching by title, we didn't find the main frame");
       continue;
     }
+    info("Found the main frame");
 
-    if (skipTotalUserTime || parent.jank.totalUserTime > 1000) {
+    if (skipTotalUserTime) {
+      info("Not looking for total user time on this platform, we're done");
+      break;
+    } else if (parent.jank.totalUserTime > 1000) {
+      info("Enough CPU time detected, we're done");
       break;
     } else {
-      info(`Not enough CPU time detected: ${parent.jank.totalUserTime}`)
+      info(`Not enough CPU time detected: ${parent.jank.totalUserTime}`);
+      info(`Details: ${JSON.stringify(parent, null, "\t")}`);
     }
   }
+  isShuttingDown = true;
 
   // Cleanup
   gBrowser.removeTab(newTab);

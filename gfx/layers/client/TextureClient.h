@@ -40,7 +40,7 @@ namespace mozilla {
 
 namespace layers {
 
-class AsyncTransactionTracker;
+class AsyncTransactionWaiter;
 class CompositableForwarder;
 class ISurfaceAllocator;
 class CompositableClient;
@@ -243,6 +243,7 @@ public:
 
   /**
    * Returns a DrawTarget to draw into the TextureClient.
+   * This function should never be called when not on the main thread!
    *
    * This must never be called on a TextureClient that is not sucessfully locked.
    * When called several times within one Lock/Unlock pair, this method should
@@ -267,6 +268,12 @@ public:
    *
    */
   virtual gfx::DrawTarget* BorrowDrawTarget() { return nullptr; }
+
+  /**
+   * This function can be used to update the contents of the TextureClient
+   * off the main thread.
+   */
+  virtual void UpdateFromSurface(gfx::DataSourceSurface* aSurface) { MOZ_CRASH(); }
 
   // TextureClients that can expose a DrawTarget should override this method.
   virtual gfx::SurfaceFormat GetFormat() const
@@ -448,7 +455,7 @@ public:
   /**
    * Set AsyncTransactionTracker of RemoveTextureFromCompositableAsync() transaction.
    */
-  virtual void SetRemoveFromCompositableTracker(AsyncTransactionTracker* aTracker) {}
+  virtual void SetRemoveFromCompositableWaiter(AsyncTransactionWaiter* aWaiter) {}
 
   /**
    * This function waits until the buffer is no longer being used.
@@ -485,7 +492,7 @@ private:
    * Here goes the shut-down code that uses virtual methods.
    * Must only be called by Release().
    */
-  void Finalize();
+  B2G_ACL_EXPORT void Finalize();
 
   friend class AtomicRefCountedWithFinalize<TextureClient>;
 
@@ -502,7 +509,7 @@ protected:
    * deserialized.
    * Calling ToSurfaceDescriptor again after it has already returned true,
    * or never constructing a TextureHost with aDescriptor may result in a memory
-   * leak (see CairoTextureClientD3D9 for example).
+   * leak (see TextureClientD3D9 for example).
    */
   virtual bool ToSurfaceDescriptor(SurfaceDescriptor& aDescriptor) = 0;
 
@@ -585,6 +592,8 @@ public:
   virtual bool CanExposeDrawTarget() const override { return true; }
 
   virtual gfx::DrawTarget* BorrowDrawTarget() override;
+
+  virtual void UpdateFromSurface(gfx::DataSourceSurface* aSurface) override;
 
   virtual bool AllocateForSurface(gfx::IntSize aSize,
                                   TextureAllocationFlags aFlags = ALLOC_DEFAULT) override;

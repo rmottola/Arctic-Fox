@@ -7,6 +7,7 @@
 #include "nsMixedContentBlocker.h"
 
 #include "nsContentPolicyUtils.h"
+#include "nsCSPContext.h"
 #include "nsThreadUtils.h"
 #include "nsINode.h"
 #include "nsCOMPtr.h"
@@ -14,7 +15,6 @@
 #include "nsISecurityEventSink.h"
 #include "nsIWebProgressListener.h"
 #include "nsContentUtils.h"
-#include "nsNetUtil.h"
 #include "nsIRequest.h"
 #include "nsIDocument.h"
 #include "nsIContentViewer.h"
@@ -291,8 +291,42 @@ nsMixedContentBlocker::AsyncOnChannelRedirect(nsIChannel* aOldChannel,
   return NS_OK;
 }
 
+/* This version of ShouldLoad() is non-static and called by the Content Policy
+ * API and AsyncOnChannelRedirect().  See nsIContentPolicy::ShouldLoad()
+ * for detailed description of the parameters.
+ */
 NS_IMETHODIMP
 nsMixedContentBlocker::ShouldLoad(uint32_t aContentType,
+                                  nsIURI* aContentLocation,
+                                  nsIURI* aRequestingLocation,
+                                  nsISupports* aRequestingContext,
+                                  const nsACString& aMimeGuess,
+                                  nsISupports* aExtra,
+                                  nsIPrincipal* aRequestPrincipal,
+                                  int16_t* aDecision)
+{
+  // We pass in false as the first parameter to ShouldLoad(), because the
+  // callers of this method don't know whether the load went through cached
+  // image redirects.  This is handled by direct callers of the static
+  // ShouldLoad.
+  nsresult rv = ShouldLoad(false,   //aHadInsecureImageRedirect
+                           aContentType,
+                           aContentLocation,
+                           aRequestingLocation,
+                           aRequestingContext,
+                           aMimeGuess,
+                           aExtra,
+                           aRequestPrincipal,
+                           aDecision);
+  return rv;
+}
+
+/* Static version of ShouldLoad() that contains all the Mixed Content Blocker
+ * logic.  Called from non-static ShouldLoad().
+ */
+nsresult
+nsMixedContentBlocker::ShouldLoad(bool aHadInsecureImageRedirect,
+                                  uint32_t aContentType,
                                   nsIURI* aContentLocation,
                                   nsIURI* aRequestingLocation,
                                   nsISupports* aRequestingContext,
@@ -419,6 +453,7 @@ nsMixedContentBlocker::ShouldLoad(uint32_t aContentType,
     case TYPE_SCRIPT:
     case TYPE_STYLESHEET:
     case TYPE_SUBDOCUMENT:
+    case TYPE_WEB_MANIFEST:
     case TYPE_XBL:
     case TYPE_XMLHTTPREQUEST:
     case TYPE_XSLT:
@@ -460,8 +495,12 @@ nsMixedContentBlocker::ShouldLoad(uint32_t aContentType,
     *aDecision = REJECT_REQUEST;
     return NS_ERROR_FAILURE;
   }
-
-  if (schemeLocal || schemeNoReturnData || schemeInherits || schemeSecure) {
+  // TYPE_IMAGE redirects are cached based on the original URI, not the final
+  // destination and hence cache hits for images may not have the correct
+  // aContentLocation.  Check if the cached hit went through an http redirect,
+  // and if it did, we can't treat this as a secure subresource.
+  if (!aHadInsecureImageRedirect &&
+      (schemeLocal || schemeNoReturnData || schemeInherits || schemeSecure)) {
     *aDecision = ACCEPT;
      return NS_OK;
   }
@@ -556,6 +595,26 @@ nsMixedContentBlocker::ShouldLoad(uint32_t aContentType,
   // Determine if the rootDoc is https and if the user decided to allow Mixed Content
   nsCOMPtr<nsIDocShell> docShell = NS_CP_GetDocShellFromContext(aRequestingContext);
   NS_ENSURE_TRUE(docShell, NS_OK);
+
+  // The page might have set the CSP directive 'upgrade-insecure-requests'. In such
+  // a case allow the http: load to succeed with the promise that the channel will
+  // get upgraded to https before fetching any data from the netwerk.
+  // Please see: nsHttpChannel::Connect()
+  //
+  // Please note that the CSP directive 'upgrade-insecure-requests' only applies to
+  // http: and ws: (for websockets). Websockets are not subject to mixed content
+  // blocking since insecure websockets are not allowed within secure pages. Hence,
+  // we only have to check against http: here. Skip mixed content blocking if the
+  // subresource load uses http: and the CSP directive 'upgrade-insecure-requests'
+  // is present on the page.
+  bool isHttpScheme = false;
+  rv = aContentLocation->SchemeIs("http", &isHttpScheme);
+  NS_ENSURE_SUCCESS(rv, rv);
+  if (isHttpScheme && docShell->GetDocument()->GetUpgradeInsecureRequests()) {
+    *aDecision = ACCEPT;
+    return NS_OK;
+  }
+
   bool rootHasSecureConnection = false;
   bool allowMixedContent = false;
   bool isRootDocShell = false;
@@ -564,7 +623,6 @@ nsMixedContentBlocker::ShouldLoad(uint32_t aContentType,
     *aDecision = REJECT_REQUEST;
     return rv;
   }
-
 
   // Get the sameTypeRoot tree item from the docshell
   nsCOMPtr<nsIDocShellTreeItem> sameTypeRoot;

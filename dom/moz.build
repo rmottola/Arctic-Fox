@@ -12,7 +12,6 @@ interfaces = [
     'core',
     'html',
     'events',
-    'devicestorage',
     'settings',
     'stylesheets',
     'sidebar',
@@ -42,6 +41,7 @@ DIRS += [
     'animation',
     'apps',
     'base',
+    'bluetooth',
     'activities',
     'archivereader',
     'requestsync',
@@ -96,6 +96,7 @@ DIRS += [
     'camera',
     'audiochannel',
     'broadcastchannel',
+    'messagechannel',
     'promise',
     'smil',
     'telephony',
@@ -151,11 +152,6 @@ if CONFIG['MOZ_B2G']:
         'mobileid',
         'engineeringmode'
     ]
-
-if CONFIG['MOZ_B2G_BT_API_V2']:
-    DIRS += ['bluetooth2']
-else:
-    DIRS += ['bluetooth']
 
 DIRS += ['presentation']
 

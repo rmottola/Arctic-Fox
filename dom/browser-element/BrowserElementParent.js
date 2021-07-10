@@ -36,22 +36,10 @@ function getIntPref(prefName, def) {
   }
 }
 
-function visibilityChangeHandler(e) {
-  // The visibilitychange event's target is the document.
-  let win = e.target.defaultView;
-
-  if (!win._browserElementParents) {
-    return;
-  }
-
-  let beps = Cu.nondeterministicGetWeakMapKeys(win._browserElementParents);
-  if (beps.length == 0) {
-    win.removeEventListener('visibilitychange', visibilityChangeHandler);
-    return;
-  }
-
-  for (let i = 0; i < beps.length; i++) {
-    beps[i]._ownerVisibilityChange();
+function handleWindowEvent(e) {
+  if (this._browserElementParents) {
+    let beps = Cu.nondeterministicGetWeakMapKeys(this._browserElementParents);
+    beps.forEach(bep => bep._handleOwnerEvent(e));
   }
 }
 
@@ -84,10 +72,11 @@ function BrowserElementParent() {
   this._pendingDOMRequests = {};
   this._pendingSetInputMethodActive = [];
   this._nextPaintListeners = [];
+  this._pendingDOMFullscreen = false;
 
-  Services.obs.addObserver(this, 'ask-children-to-exit-fullscreen', /* ownsWeak = */ true);
   Services.obs.addObserver(this, 'oop-frameloader-crashed', /* ownsWeak = */ true);
   Services.obs.addObserver(this, 'copypaste-docommand', /* ownsWeak = */ true);
+  Services.obs.addObserver(this, 'ask-children-to-execute-copypaste-command', /* ownsWeak = */ true);
 }
 
 BrowserElementParent.prototype = {
@@ -118,10 +107,14 @@ BrowserElementParent.prototype = {
     // BrowserElementParents.
     if (!this._window._browserElementParents) {
       this._window._browserElementParents = new WeakMap();
-      this._window.addEventListener('visibilitychange',
-                                    visibilityChangeHandler,
-                                    /* useCapture = */ false,
-                                    /* wantsUntrusted = */ false);
+      let handler = handleWindowEvent.bind(this._window);
+      let windowEvents = ['visibilitychange', 'mozfullscreenchange'];
+      let els = Cc["@mozilla.org/eventlistenerservice;1"]
+                  .getService(Ci.nsIEventListenerService);
+      for (let event of windowEvents) {
+        els.addSystemEventListener(this._window, event, handler,
+                                   /* useCapture = */ true);
+      }
     }
 
     this._window._browserElementParents.set(this, null);
@@ -192,15 +185,22 @@ BrowserElementParent.prototype = {
       "got-contentdimensions": this._gotDOMRequestResult,
       "got-can-go-back": this._gotDOMRequestResult,
       "got-can-go-forward": this._gotDOMRequestResult,
-      "entered-dom-fullscreen": this._enteredDomFullscreen,
+      "requested-dom-fullscreen": this._requestedDOMFullscreen,
       "fullscreen-origin-change": this._fullscreenOriginChange,
-      "rollback-fullscreen": this._remoteFrameFullscreenReverted,
-      "exit-fullscreen": this._exitFullscreen,
+      "exit-dom-fullscreen": this._exitDomFullscreen,
       "got-visible": this._gotDOMRequestResult,
       "visibilitychange": this._childVisibilityChange,
       "got-set-input-method-active": this._gotDOMRequestResult,
       "selectionstatechanged": this._handleSelectionStateChanged,
       "scrollviewchange": this._handleScrollViewChange,
+      "caretstatechanged": this._handleCaretStateChanged,
+      "findchange": this._handleFindChange,
+      "execute-script-done": this._gotDOMRequestResult,
+      "got-audio-channel-volume": this._gotDOMRequestResult,
+      "got-set-audio-channel-volume": this._gotDOMRequestResult,
+      "got-audio-channel-muted": this._gotDOMRequestResult,
+      "got-set-audio-channel-muted": this._gotDOMRequestResult,
+      "got-is-audio-channel-active": this._gotDOMRequestResult
     };
 
     let mmSecuritySensitiveCalls = {
@@ -216,7 +216,8 @@ BrowserElementParent.prototype = {
       "metachange": this._fireEventFromMsg,
       "resize": this._fireEventFromMsg,
       "activitydone": this._fireEventFromMsg,
-      "scroll": this._fireEventFromMsg
+      "scroll": this._fireEventFromMsg,
+      "opentab": this._fireEventFromMsg
     };
 
     this._mm.addMessageListener('browser-element-api:call', function(aMsg) {
@@ -434,8 +435,42 @@ BrowserElementParent.prototype = {
     this._frameElement.dispatchEvent(evt);
   },
 
+  // Called when state of accessible caret in child has changed.
+  // The fields of data is as following:
+  //  - rect: Contains bounding rectangle of selection, Include width, height,
+  //          top, bottom, left and right.
+  //  - commands: Describe what commands can be executed in child. Include canSelectAll,
+  //              canCut, canCopy and canPaste. For example: if we want to check if cut
+  //              command is available, using following code, if (data.commands.canCut) {}.
+  //  - zoomFactor: Current zoom factor in child frame.
+  //  - reason: The reason causes the state changed. Include "visibilitychange",
+  //            "updateposition", "longpressonemptycontent", "taponcaret", "presscaret",
+  //            "releasecaret".
+  //  - collapsed: Indicate current selection is collapsed or not.
+  //  - caretVisible: Indicate the caret visiibility.
+  //  - selectionVisible: Indicate current selection is visible or not.
+  _handleCaretStateChanged: function(data) {
+    let evt = this._createEvent('caretstatechanged', data.json,
+                                /* cancelable = */ false);
+
+    let self = this;
+    function sendDoCommandMsg(cmd) {
+      let data = { command: cmd };
+      self._sendAsyncMsg('copypaste-do-command', data);
+    }
+    Cu.exportFunction(sendDoCommandMsg, evt.detail, { defineAs: 'sendDoCommandMsg' });
+
+    this._frameElement.dispatchEvent(evt);
+  },
+
   _handleScrollViewChange: function(data) {
     let evt = this._createEvent("scrollviewchange", data.json,
+                                /* cancelable = */ false);
+    this._frameElement.dispatchEvent(evt);
+  },
+
+  _handleFindChange: function(data) {
+    let evt = this._createEvent("findchange", data.json,
                                 /* cancelable = */ false);
     this._frameElement.dispatchEvent(evt);
   },
@@ -611,6 +646,23 @@ BrowserElementParent.prototype = {
   getCanGoForward: defineDOMRequestMethod('get-can-go-forward'),
   getContentDimensions: defineDOMRequestMethod('get-contentdimensions'),
 
+  findAll: defineNoReturnMethod(function(searchString, caseSensitivity) {
+    return this._sendAsyncMsg('find-all', {
+      searchString,
+      caseSensitive: caseSensitivity == Ci.nsIBrowserElementAPI.FIND_CASE_SENSITIVE
+    });
+  }),
+
+  findNext: defineNoReturnMethod(function(direction) {
+    return this._sendAsyncMsg('find-next', {
+      backward: direction == Ci.nsIBrowserElementAPI.FIND_BACKWARD
+    });
+  }),
+
+  clearMatch: defineNoReturnMethod(function() {
+    return this._sendAsyncMsg('clear-match');
+  }),
+
   goBack: defineNoReturnMethod(function() {
     this._sendAsyncMsg('go-back');
   }),
@@ -626,6 +678,19 @@ BrowserElementParent.prototype = {
   stop: defineNoReturnMethod(function() {
     this._sendAsyncMsg('stop');
   }),
+
+  executeScript: function(script, options) {
+    if (!this._isAlive()) {
+      throw Components.Exception("Dead content process",
+                                 Cr.NS_ERROR_DOM_INVALID_STATE_ERR);
+    }
+
+    // Enforcing options.url or options.origin
+    if (!options.url && !options.origin) {
+      throw Components.Exception("Invalid argument", Cr.NS_ERROR_INVALID_ARG);
+    }
+    return this._sendDOMRequest('execute-script', {script, options});
+  },
 
   /*
    * The valid range of zoom scale is defined in preference "zoom.maxPercent" and "zoom.minPercent".
@@ -644,10 +709,11 @@ BrowserElementParent.prototype = {
     if (!this._isAlive()) {
       return null;
     }
-    let ioService =
-      Cc['@mozilla.org/network/io-service;1'].getService(Ci.nsIIOService);
-    let uri = ioService.newURI(_url, null, null);
+    
+    let uri = Services.io.newURI(_url, null, null);
     let url = uri.QueryInterface(Ci.nsIURL);
+
+    debug('original _options = ' + uneval(_options));
 
     // Ensure we have _options, we always use it to send the filename.
     _options = _options || {};
@@ -655,7 +721,7 @@ BrowserElementParent.prototype = {
       _options.filename = url.fileName;
     }
 
-    debug('_options = ' + uneval(_options));
+    debug('final _options = ' + uneval(_options));
 
     // Ensure we have a filename.
     if (!_options.filename) {
@@ -733,7 +799,37 @@ BrowserElementParent.prototype = {
                                              Ci.nsIRequestObserver])
     };
 
-    let channel = ioService.newChannelFromURI(url);
+    // If we have a URI we'll use it to get the triggering principal to use, 
+    // if not available a null principal is acceptable.
+    let referrer = null;
+    let principal = null;
+    if (_options.referrer) {
+      // newURI can throw on malformed URIs.
+      try {
+        referrer = Services.io.newURI(_options.referrer, null, null);
+      }
+      catch(e) {
+        debug('Malformed referrer -- ' + e);
+      }
+      // This simply returns null if there is no principal available
+      // for the requested uri. This is an acceptable fallback when
+      // calling newChannelFromURI2.
+      principal = 
+        Services.scriptSecurityManager.getAppCodebasePrincipal(
+          referrer, 
+          this._frameLoader.loadContext.appId, 
+          this._frameLoader.loadContext.isInBrowserElement);
+    }
+
+    debug('Using principal? ' + !!principal);
+
+    let channel = 
+      Services.io.newChannelFromURI2(url,
+                                     null,       // No document. 
+                                     principal,  // Loading principal
+                                     principal,  // Triggering principal
+                                     Ci.nsILoadInfo.SEC_NORMAL,
+                                     Ci.nsIContentPolicy.TYPE_OTHER);
 
     // XXX We would set private browsing information prior to calling this.
     channel.notificationCallbacks = interfaceRequestor;
@@ -750,8 +846,8 @@ BrowserElementParent.prototype = {
     channel.loadFlags |= flags;
 
     if (channel instanceof Ci.nsIHttpChannel) {
-      debug('Setting HTTP referrer = ' + this._window.document.documentURIObject);
-      channel.referrer = this._window.document.documentURIObject;
+      debug('Setting HTTP referrer = ' + (referrer && referrer.spec)); 
+      channel.referrer = referrer;
       if (channel instanceof Ci.nsIHttpChannelInternal) {
         channel.forceAllowThirdPartyCookie = true;
       }
@@ -882,6 +978,33 @@ BrowserElementParent.prototype = {
     }
   },
 
+  getAudioChannelVolume: function(aAudioChannel) {
+    return this._sendDOMRequest('get-audio-channel-volume',
+                                {audioChannel: aAudioChannel});
+  },
+
+  setAudioChannelVolume: function(aAudioChannel, aVolume) {
+    return this._sendDOMRequest('set-audio-channel-volume',
+                                {audioChannel: aAudioChannel,
+                                 volume: aVolume});
+  },
+
+  getAudioChannelMuted: function(aAudioChannel) {
+    return this._sendDOMRequest('get-audio-channel-muted',
+                                {audioChannel: aAudioChannel});
+  },
+
+  setAudioChannelMuted: function(aAudioChannel, aMuted) {
+    return this._sendDOMRequest('set-audio-channel-muted',
+                                {audioChannel: aAudioChannel,
+                                 muted: aMuted});
+  },
+
+  isAudioChannelActive: function(aAudioChannel) {
+    return this._sendDOMRequest('get-is-audio-channel-active',
+                                {audioChannel: aAudioChannel});
+  },
+
   /**
    * Called when the visibility of the window which owns this iframe changes.
    */
@@ -905,21 +1028,34 @@ BrowserElementParent.prototype = {
     this._fireEventFromMsg(data);
   },
 
-  _exitFullscreen: function() {
-    this._windowUtils.exitFullscreen();
-  },
-
-  _enteredDomFullscreen: function() {
+  _requestedDOMFullscreen: function() {
+    this._pendingDOMFullscreen = true;
     this._windowUtils.remoteFrameFullscreenChanged(this._frameElement);
   },
 
   _fullscreenOriginChange: function(data) {
     Services.obs.notifyObservers(
-      this._frameElement, "fullscreen-origin-change", data.json.origin);
+      this._frameElement, "fullscreen-origin-change", data.json.originNoSuffix);
   },
 
-  _remoteFrameFullscreenReverted: function(data) {
+  _exitDomFullscreen: function(data) {
     this._windowUtils.remoteFrameFullscreenReverted();
+  },
+
+  _handleOwnerEvent: function(evt) {
+    switch (evt.type) {
+      case 'visibilitychange':
+        this._ownerVisibilityChange();
+        break;
+      case 'mozfullscreenchange':
+        if (!this._window.document.mozFullScreen) {
+          this._sendAsyncMsg('exit-fullscreen');
+        } else if (this._pendingDOMFullscreen) {
+          this._pendingDOMFullscreen = false;
+          this._sendAsyncMsg('entered-fullscreen');
+        }
+        break;
+    }
   },
 
   _fireFatalError: function() {
@@ -935,16 +1071,14 @@ BrowserElementParent.prototype = {
         this._fireFatalError();
       }
       break;
-    case 'ask-children-to-exit-fullscreen':
-      if (this._isAlive() &&
-          this._frameElement.ownerDocument == subject &&
-          this._frameLoader.QueryInterface(Ci.nsIFrameLoader).tabParent) {
-        this._sendAsyncMsg('exit-fullscreen');
-      }
-      break;
     case 'copypaste-docommand':
       if (this._isAlive() && this._frameElement.isEqualNode(subject.wrappedJSObject)) {
         this._sendAsyncMsg('do-command', { command: data });
+      }
+      break;
+    case 'ask-children-to-execute-copypaste-command':
+      if (this._isAlive() && this._frameElement == subject.wrappedJSObject) {
+        this._sendAsyncMsg('copypaste-do-command', { command: data });
       }
       break;
     default:

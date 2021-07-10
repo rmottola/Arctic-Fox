@@ -21,7 +21,7 @@ using namespace android;
 namespace mozilla {
 
 extern PRLogModuleInfo* gMediaDecoderLog;
-#define DECODER_LOG(type, msg) PR_LOG(gMediaDecoderLog, type, msg)
+#define DECODER_LOG(type, msg) MOZ_LOG(gMediaDecoderLog, type, msg)
 
 MediaOmxCommonDecoder::MediaOmxCommonDecoder()
   : MediaDecoder()
@@ -29,6 +29,7 @@ MediaOmxCommonDecoder::MediaOmxCommonDecoder()
   , mCanOffloadAudio(false)
   , mFallbackToStateMachine(false)
 {
+  mDormantSupported = true;
   if (!gMediaDecoderLog) {
     gMediaDecoderLog = PR_NewLogModule("MediaDecoder");
   }
@@ -65,7 +66,7 @@ MediaOmxCommonDecoder::FirstFrameLoaded(nsAutoPtr<MediaInfo> aInfo,
 
   ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
   if (!CheckDecoderCanOffloadAudio()) {
-    DECODER_LOG(PR_LOG_DEBUG, ("In %s Offload Audio check failed",
+    DECODER_LOG(LogLevel::Debug, ("In %s Offload Audio check failed",
         __PRETTY_FUNCTION__));
     return;
   }
@@ -82,7 +83,7 @@ MediaOmxCommonDecoder::FirstFrameLoaded(nsAutoPtr<MediaInfo> aInfo,
   if (err != OK) {
     mAudioOffloadPlayer = nullptr;
     mFallbackToStateMachine = true;
-    DECODER_LOG(PR_LOG_DEBUG, ("In %s Unable to start offload audio %d."
+    DECODER_LOG(LogLevel::Debug, ("In %s Unable to start offload audio %d."
       "Switching to normal mode", __PRETTY_FUNCTION__, err));
     return;
   }
@@ -106,7 +107,7 @@ MediaOmxCommonDecoder::PauseStateMachine()
 {
   MOZ_ASSERT(NS_IsMainThread());
   GetReentrantMonitor().AssertCurrentThreadIn();
-  DECODER_LOG(PR_LOG_DEBUG, ("%s", __PRETTY_FUNCTION__));
+  DECODER_LOG(LogLevel::Debug, ("%s", __PRETTY_FUNCTION__));
 
   if (mShuttingDown) {
     return;
@@ -129,7 +130,7 @@ MediaOmxCommonDecoder::ResumeStateMachine()
 {
   MOZ_ASSERT(NS_IsMainThread());
   ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
-  DECODER_LOG(PR_LOG_DEBUG, ("%s current time %f", __PRETTY_FUNCTION__, mLogicalPosition));
+  DECODER_LOG(LogLevel::Debug, ("%s current time %f", __PRETTY_FUNCTION__, mLogicalPosition));
 
   if (mShuttingDown) {
     return;
@@ -160,7 +161,7 @@ void
 MediaOmxCommonDecoder::AudioOffloadTearDown()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  DECODER_LOG(PR_LOG_DEBUG, ("%s", __PRETTY_FUNCTION__));
+  DECODER_LOG(LogLevel::Debug, ("%s", __PRETTY_FUNCTION__));
 
   // mAudioOffloadPlayer can be null here if ResumeStateMachine was called
   // just before because of some other error.

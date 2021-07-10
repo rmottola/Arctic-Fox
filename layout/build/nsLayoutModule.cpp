@@ -28,6 +28,7 @@
 #include "nsIDocumentEncoder.h"
 #include "nsIFactory.h"
 #include "nsIFrameUtil.h"
+#include "nsIIdleService.h"
 #include "nsHTMLStyleSheet.h"
 #include "nsILayoutDebugger.h"
 #include "nsNameSpaceManager.h"
@@ -234,6 +235,7 @@ static void Shutdown();
 #include "mozilla/dom/time/TimeService.h"
 #include "StreamingProtocolService.h"
 
+#include "nsIPresentationService.h"
 #include "nsITelephonyService.h"
 #include "nsIVoicemailService.h"
 
@@ -254,7 +256,8 @@ static void Shutdown();
 
 #include "GMPService.h"
 
-#include "mozilla/dom/presentation/PresentationDeviceManager.h"
+#include "mozilla/dom/PresentationDeviceManager.h"
+#include "mozilla/dom/PresentationSessionTransport.h"
 
 #include "mozilla/TextInputProcessor.h"
 
@@ -287,6 +290,11 @@ using mozilla::gmp::GeckoMediaPluginService;
 #define PRESENTATION_DEVICE_MANAGER_CID \
 { 0xe1e79dec, 0x4085, 0x4994, { 0xac, 0x5b, 0x74, 0x4b, 0x01, 0x66, 0x97, 0xe6 } }
 
+#define PRESENTATION_SESSION_TRANSPORT_CID \
+{ 0xc9d023f4, 0x6228, 0x4c07, { 0x8b, 0x1d, 0x9c, 0x19, 0x57, 0x3f, 0xaa, 0x27 } }
+
+already_AddRefed<nsIPresentationService> NS_CreatePresentationService();
+
 // Factory Constructor
 NS_GENERIC_FACTORY_CONSTRUCTOR(txMozillaXSLTProcessor)
 NS_GENERIC_FACTORY_CONSTRUCTOR(XPathEvaluator)
@@ -309,7 +317,7 @@ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(DOMRequestService,
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(QuotaManager,
                                          QuotaManager::FactoryCreate)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(ServiceWorkerManager,
-                                         ServiceWorkerManager::FactoryCreate)
+                                         ServiceWorkerManager::GetInstance)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(ServiceWorkerPeriodicUpdater,
                                          ServiceWorkerPeriodicUpdater::GetSingleton)
 NS_GENERIC_FACTORY_CONSTRUCTOR(WorkerDebuggerManager)
@@ -343,11 +351,9 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsHapticFeedback)
 #endif
 #endif
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(ThirdPartyUtil, Init)
-#ifndef DISABLE_MOZ_RIL_GEOLOC
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsICellBroadcastService,
                                          NS_CreateCellBroadcastService)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsISmsService, NS_CreateSmsService)
-#endif
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIIccService, NS_CreateIccService)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIMmsService, NS_CreateMmsService)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIMobileMessageService,
@@ -381,14 +387,12 @@ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsVolumeService,
 #endif
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIMediaManagerService,
                                          MediaManager::GetInstance)
-#ifndef DISABLE_MOZ_RIL_GEOLOC
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIMobileConnectionService,
                                          NS_CreateMobileConnectionService)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsITelephonyService,
                                          NS_CreateTelephonyService)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIVoicemailService,
                                          NS_CreateVoicemailService)
-#endif
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(FakeTVService,
                                          TVServiceFactory::CreateFakeTVService)
 NS_GENERIC_FACTORY_CONSTRUCTOR(TVTunerData)
@@ -399,6 +403,9 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(TextInputProcessor)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(FakeInputPortService,
                                          InputPortServiceFactory::CreateFakeInputPortService)
 NS_GENERIC_FACTORY_CONSTRUCTOR(InputPortData)
+NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIPresentationService,
+                                         NS_CreatePresentationService)
+NS_GENERIC_FACTORY_CONSTRUCTOR(PresentationSessionTransport)
 //-----------------------------------------------------------------------------
 
 static bool gInitialized = false;
@@ -629,7 +636,7 @@ NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(Geolocation, Init)
 
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsGeolocationService, nsGeolocationService::GetGeolocationService)
 
-NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(AudioChannelService, AudioChannelService::GetOrCreateAudioChannelService)
+NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(AudioChannelService, AudioChannelService::GetOrCreate)
 
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(DataStoreService, DataStoreService::GetOrCreate)
 
@@ -803,15 +810,15 @@ NS_DEFINE_NAMED_CID(NS_HAPTICFEEDBACK_CID);
 #endif
 #endif
 #ifndef DISABLE_MOZ_RIL_GEOLOC
-NS_DEFINE_NAMED_CID(CELLBROADCAST_SERVICE_CID);
 #ifdef MOZ_WIDGET_GONK
 NS_DEFINE_NAMED_CID(GONK_GPS_GEOLOCATION_PROVIDER_CID);
 #endif
+#endif
+NS_DEFINE_NAMED_CID(CELLBROADCAST_SERVICE_CID);
 NS_DEFINE_NAMED_CID(TELEPHONY_SERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_VOICEMAIL_SERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_MOBILE_CONNECTION_SERVICE_CID);
 NS_DEFINE_NAMED_CID(SMS_SERVICE_CID);
-#endif
 NS_DEFINE_NAMED_CID(ICC_SERVICE_CID);
 NS_DEFINE_NAMED_CID(MMS_SERVICE_CID);
 NS_DEFINE_NAMED_CID(MOBILE_MESSAGE_SERVICE_CID);
@@ -847,7 +854,9 @@ NS_DEFINE_NAMED_CID(INPUTPORT_DATA_CID);
 
 NS_DEFINE_NAMED_CID(GECKO_MEDIA_PLUGIN_SERVICE_CID);
 
+NS_DEFINE_NAMED_CID(PRESENTATION_SERVICE_CID);
 NS_DEFINE_NAMED_CID(PRESENTATION_DEVICE_MANAGER_CID);
+NS_DEFINE_NAMED_CID(PRESENTATION_SESSION_TRANSPORT_CID);
 
 NS_DEFINE_NAMED_CID(TEXT_INPUT_PROCESSOR_CID);
 
@@ -1107,10 +1116,8 @@ static const mozilla::Module::CIDEntry kLayoutCIDs[] = {
 #endif
   { &kTHIRDPARTYUTIL_CID, false, nullptr, ThirdPartyUtilConstructor },
   { &kNS_STRUCTUREDCLONECONTAINER_CID, false, nullptr, nsStructuredCloneContainerConstructor },
-#ifndef DISABLE_MOZ_RIL_GEOLOC
   { &kCELLBROADCAST_SERVICE_CID, false, nullptr, nsICellBroadcastServiceConstructor },
   { &kSMS_SERVICE_CID, false, nullptr, nsISmsServiceConstructor },
-#endif
   { &kICC_SERVICE_CID, false, nullptr, nsIIccServiceConstructor },
   { &kMMS_SERVICE_CID, false, nullptr, nsIMmsServiceConstructor },
   { &kMOBILE_MESSAGE_SERVICE_CID, false, nullptr, nsIMobileMessageServiceConstructor },
@@ -1135,16 +1142,16 @@ static const mozilla::Module::CIDEntry kLayoutCIDs[] = {
 #ifdef ACCESSIBILITY
   { &kNS_ACCESSIBILITY_SERVICE_CID, false, nullptr, CreateA11yService },
 #endif
-#ifndef DISABLE_MOZ_RIL_GEOLOC
   { &kTELEPHONY_SERVICE_CID, false, nullptr, nsITelephonyServiceConstructor },
   { &kNS_MOBILE_CONNECTION_SERVICE_CID, false, NULL, nsIMobileConnectionServiceConstructor },
   { &kNS_VOICEMAIL_SERVICE_CID, false, nullptr, nsIVoicemailServiceConstructor },
-#endif
   { &kFAKE_TV_SERVICE_CID, false, nullptr, FakeTVServiceConstructor },
   { &kTV_TUNER_DATA_CID, false, nullptr, TVTunerDataConstructor },
   { &kTV_CHANNEL_DATA_CID, false, nullptr, TVChannelDataConstructor },
   { &kTV_PROGRAM_DATA_CID, false, nullptr, TVProgramDataConstructor },
+  { &kPRESENTATION_SERVICE_CID, false, nullptr, nsIPresentationServiceConstructor },
   { &kPRESENTATION_DEVICE_MANAGER_CID, false, nullptr, PresentationDeviceManagerConstructor },
+  { &kPRESENTATION_SESSION_TRANSPORT_CID, false, nullptr, PresentationSessionTransportConstructor },
   { &kTEXT_INPUT_PROCESSOR_CID, false, nullptr, TextInputProcessorConstructor },
   { &kFAKE_INPUTPORT_SERVICE_CID, false, nullptr, FakeInputPortServiceConstructor },
   { &kINPUTPORT_DATA_CID, false, nullptr, InputPortDataConstructor },
@@ -1274,10 +1281,8 @@ static const mozilla::Module::ContractIDEntry kLayoutContracts[] = {
 #endif
   { THIRDPARTYUTIL_CONTRACTID, &kTHIRDPARTYUTIL_CID },
   { NS_STRUCTUREDCLONECONTAINER_CONTRACTID, &kNS_STRUCTUREDCLONECONTAINER_CID },
-#ifndef DISABLE_MOZ_RIL_GEOLOC
   { CELLBROADCAST_SERVICE_CONTRACTID, &kCELLBROADCAST_SERVICE_CID },
   { SMS_SERVICE_CONTRACTID, &kSMS_SERVICE_CID },
-#endif
   { ICC_SERVICE_CONTRACTID, &kICC_SERVICE_CID },
   { MMS_SERVICE_CONTRACTID, &kMMS_SERVICE_CID },
   { MOBILE_MESSAGE_SERVICE_CONTRACTID, &kMOBILE_MESSAGE_SERVICE_CID },
@@ -1302,19 +1307,17 @@ static const mozilla::Module::ContractIDEntry kLayoutContracts[] = {
   { "@mozilla.org/accessibilityService;1", &kNS_ACCESSIBILITY_SERVICE_CID },
   { "@mozilla.org/accessibleRetrieval;1", &kNS_ACCESSIBILITY_SERVICE_CID },
 #endif
-#ifndef DISABLE_MOZ_RIL_GEOLOC
   { TELEPHONY_SERVICE_CONTRACTID, &kTELEPHONY_SERVICE_CID },
-#endif
   { FAKE_TV_SERVICE_CONTRACTID, &kFAKE_TV_SERVICE_CID },
   { TV_TUNER_DATA_CONTRACTID, &kTV_TUNER_DATA_CID },
   { TV_CHANNEL_DATA_CONTRACTID, &kTV_CHANNEL_DATA_CID },
   { TV_PROGRAM_DATA_CONTRACTID, &kTV_PROGRAM_DATA_CID },
   { "@mozilla.org/gecko-media-plugin-service;1",  &kGECKO_MEDIA_PLUGIN_SERVICE_CID },
-#ifndef DISABLE_MOZ_RIL_GEOLOC
   { NS_MOBILE_CONNECTION_SERVICE_CONTRACTID, &kNS_MOBILE_CONNECTION_SERVICE_CID },
   { NS_VOICEMAIL_SERVICE_CONTRACTID, &kNS_VOICEMAIL_SERVICE_CID },
-#endif
+  { PRESENTATION_SERVICE_CONTRACTID, &kPRESENTATION_SERVICE_CID },
   { PRESENTATION_DEVICE_MANAGER_CONTRACTID, &kPRESENTATION_DEVICE_MANAGER_CID },
+  { PRESENTATION_SESSION_TRANSPORT_CONTRACTID, &kPRESENTATION_SESSION_TRANSPORT_CID },
   { "@mozilla.org/text-input-processor;1", &kTEXT_INPUT_PROCESSOR_CID },
   { FAKE_INPUTPORT_SERVICE_CONTRACTID, &kFAKE_INPUTPORT_SERVICE_CID },
   { INPUTPORT_DATA_CONTRACTID, &kINPUTPORT_DATA_CID },
@@ -1331,6 +1334,7 @@ static const mozilla::Module::CategoryEntry kLayoutCategories[] = {
   { "net-channel-event-sinks", NS_MIXEDCONTENTBLOCKER_CONTRACTID, NS_MIXEDCONTENTBLOCKER_CONTRACTID },
   { "app-startup", "Script Security Manager", "service," NS_SCRIPTSECURITYMANAGER_CONTRACTID },
   { TOPIC_WEB_APP_CLEAR_DATA, "QuotaManager", "service," QUOTA_MANAGER_CONTRACTID },
+  { OBSERVER_TOPIC_IDLE_DAILY, "QuotaManager", QUOTA_MANAGER_CONTRACTID },
 #ifdef MOZ_WIDGET_GONK
   { "app-startup", "Volume Service", "service," NS_VOLUMESERVICE_CONTRACTID },
 #endif
@@ -1342,6 +1346,7 @@ static const mozilla::Module::CategoryEntry kLayoutCategories[] = {
   { "profile-after-change", "Bluetooth Service", BLUETOOTHSERVICE_CONTRACTID },
 #endif
   { "profile-after-change", "PresentationDeviceManager", PRESENTATION_DEVICE_MANAGER_CONTRACTID },
+  { "profile-after-change", "PresentationService", PRESENTATION_SERVICE_CONTRACTID },
   { "idle-daily", "ServiceWorker Periodic Updater", SERVICEWORKERPERIODICUPDATER_CONTRACTID },
   { nullptr }
 };

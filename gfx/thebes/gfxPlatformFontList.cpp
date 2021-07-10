@@ -23,16 +23,16 @@
 
 using namespace mozilla;
 
-#define LOG_FONTLIST(args) PR_LOG(gfxPlatform::GetLog(eGfxLog_fontlist), \
-                               PR_LOG_DEBUG, args)
-#define LOG_FONTLIST_ENABLED() PR_LOG_TEST( \
+#define LOG_FONTLIST(args) MOZ_LOG(gfxPlatform::GetLog(eGfxLog_fontlist), \
+                               LogLevel::Debug, args)
+#define LOG_FONTLIST_ENABLED() MOZ_LOG_TEST( \
                                    gfxPlatform::GetLog(eGfxLog_fontlist), \
-                                   PR_LOG_DEBUG)
-#define LOG_FONTINIT(args) PR_LOG(gfxPlatform::GetLog(eGfxLog_fontinit), \
-                               PR_LOG_DEBUG, args)
-#define LOG_FONTINIT_ENABLED() PR_LOG_TEST( \
+                                   LogLevel::Debug)
+#define LOG_FONTINIT(args) MOZ_LOG(gfxPlatform::GetLog(eGfxLog_fontinit), \
+                               LogLevel::Debug, args)
+#define LOG_FONTINIT_ENABLED() MOZ_LOG_TEST( \
                                    gfxPlatform::GetLog(eGfxLog_fontinit), \
-                                   PR_LOG_DEBUG)
+                                   LogLevel::Debug)
 
 gfxPlatformFontList *gfxPlatformFontList::sPlatformFontList = nullptr;
 
@@ -580,10 +580,10 @@ gfxPlatformFontList::SystemFindFontForChar(uint32_t aCh, uint32_t aNextCh,
 
     PRLogModuleInfo *log = gfxPlatform::GetLog(eGfxLog_textrun);
 
-    if (MOZ_UNLIKELY(PR_LOG_TEST(log, PR_LOG_WARNING))) {
+    if (MOZ_UNLIKELY(MOZ_LOG_TEST(log, LogLevel::Warning))) {
         uint32_t unicodeRange = FindCharUnicodeRange(aCh);
         int32_t script = mozilla::unicode::GetScriptCode(aCh);
-        PR_LOG(log, PR_LOG_WARNING,\
+        MOZ_LOG(log, LogLevel::Warning,\
                ("(textrun-systemfallback-%s) char: u+%6.6x "
                  "unicode-range: %d script: %d match: [%s]"
                 " time: %dus cmaps: %d\n",
@@ -1132,7 +1132,7 @@ SizeOfPrefFontEntryExcludingThis
     // again, we only care about the size of the array itself; we don't follow
     // the refPtrs stored in it, because they point to entries already owned
     // and accounted-for by the main font list
-    return aList.SizeOfExcludingThis(aMallocSizeOf);
+    return aList.ShallowSizeOfExcludingThis(aMallocSizeOf);
 }
 
 static size_t
@@ -1174,7 +1174,7 @@ gfxPlatformFontList::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
     aSizes->mFontListSize +=
         mCodepointsWithNoFonts.SizeOfExcludingThis(aMallocSizeOf);
     aSizes->mFontListSize +=
-        mFontFamiliesToLoad.SizeOfExcludingThis(aMallocSizeOf);
+        mFontFamiliesToLoad.ShallowSizeOfExcludingThis(aMallocSizeOf);
 
     aSizes->mFontListSize +=
         mPrefFonts.SizeOfExcludingThis(SizeOfPrefFontEntryExcludingThis,

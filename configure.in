@@ -246,7 +246,7 @@ if test -n "$gonkdir" ; then
         MOZ_SECUREELEMENT=1
         ;;
     17|18)
-        GONK_INCLUDES="-I$gonkdir/frameworks/native/include -I$gonkdir/frameworks/av/include -I$gonkdir/frameworks/av/include/media -I$gonkdir/frameworks/av/include/camera -I$gonkdir/frameworks/native/include/media/openmax -I$gonkdir/frameworks/av/media/libstagefright/include"
+        GONK_INCLUDES="-I$gonkdir/frameworks/native/include -I$gonkdir/frameworks/av/include -I$gonkdir/frameworks/av/include/media -I$gonkdir/frameworks/av/include/camera -I$gonkdir/frameworks/native/include/media/openmax -I$gonkdir/frameworks/av/media/libstagefright/include -I$gonkdir/external/mdnsresponder/mDNSShared"
         if test -d "$gonkdir/external/bluetooth/bluez"; then
           GONK_INCLUDES="$GONK_INCLUDES -I$gonkdir/external/dbus -I$gonkdir/external/bluetooth/bluez/lib"
             MOZ_B2G_BT=1
@@ -271,7 +271,7 @@ if test -n "$gonkdir" ; then
         MOZ_SECUREELEMENT=1
         ;;
     19)
-        GONK_INCLUDES="-I$gonkdir/frameworks/native/include -I$gonkdir/frameworks/av/include -I$gonkdir/frameworks/av/include/media -I$gonkdir/frameworks/av/include/camera -I$gonkdir/frameworks/native/include/media/openmax -I$gonkdir/frameworks/av/media/libstagefright/include"
+        GONK_INCLUDES="-I$gonkdir/frameworks/native/include -I$gonkdir/frameworks/av/include -I$gonkdir/frameworks/av/include/media -I$gonkdir/frameworks/av/include/camera -I$gonkdir/frameworks/native/include/media/openmax -I$gonkdir/frameworks/av/media/libstagefright/include -I$gonkdir/external/mdnsresponder/mDNSShared"
         MOZ_B2G_CAMERA=1
         MOZ_B2G_BT=1
         MOZ_B2G_BT_BLUEDROID=1
@@ -289,8 +289,8 @@ if test -n "$gonkdir" ; then
         AC_DEFINE(MOZ_AUDIO_OFFLOAD)
         MOZ_FMP4=1
         ;;
-    21)
-        GONK_INCLUDES="-I$gonkdir/frameworks/native/include -I$gonkdir/frameworks/av/include -I$gonkdir/frameworks/av/include/media -I$gonkdir/frameworks/av/include/camera -I$gonkdir/frameworks/native/include/media/openmax -I$gonkdir/frameworks/av/media/libstagefright/include"
+    21|22)
+        GONK_INCLUDES="-I$gonkdir/frameworks/native/include -I$gonkdir/frameworks/av/include -I$gonkdir/frameworks/av/include/media -I$gonkdir/frameworks/av/include/camera -I$gonkdir/frameworks/native/include/media/openmax -I$gonkdir/frameworks/av/media/libstagefright/include -I$gonkdir/external/mdnsresponder/mDNSShared"
         MOZ_AUDIO_OFFLOAD=1
         MOZ_OMX_DECODER=1
         MOZ_OMX_ENCODER=1
@@ -1439,6 +1439,7 @@ if test "$GNU_CC"; then
       if test "$result" = "yes"; then
           HAVE_X86_AVX2=1
       fi
+      ;;
     esac
 
     DSO_LDOPTS='-shared'
@@ -1648,8 +1649,8 @@ else
     _DEFINES_CXXFLAGS='-DMOZILLA_CLIENT -D_MOZILLA_CONFIG_H_ $(ACDEFINES)'
 fi
 
-#FIXME: Work around breaking optimizations performed by GCC 6
-if test "$GCC_MAJOR_VERSION" -eq "6" ; then
+#FIXME: Work around breaking optimizations performed by GCC 6 and later
+if test "$GCC_MAJOR_VERSION" -ge "6" ; then
     CFLAGS="$CFLAGS -fno-delete-null-pointer-checks -fno-lifetime-dse -fno-schedule-insns2"
     CXXFLAGS="$CXXFLAGS -fno-delete-null-pointer-checks -fno-lifetime-dse -fno-schedule-insns2"
 fi
@@ -3327,52 +3328,6 @@ if test -n "$MOZ_LINKER" -a "$OS_TARGET" = "Android"; then
   fi
 fi
 
-dnl Check for the existence of various allocation headers/functions
-
-MALLOC_HEADERS="malloc.h malloc_np.h malloc/malloc.h sys/malloc.h"
-MALLOC_H=
-
-for file in $MALLOC_HEADERS; do
-  MOZ_CHECK_HEADER($file, [MALLOC_H=$file])
-  if test "$MALLOC_H" != ""; then
-    AC_DEFINE_UNQUOTED(MALLOC_H, <$MALLOC_H>)
-    break
-  fi
-done
-
-MOZ_CHECK_HEADERS(alloca.h)
-
-AC_CHECK_FUNCS(strndup posix_memalign memalign)
-
-AC_CHECK_FUNCS(malloc_usable_size)
-MALLOC_USABLE_SIZE_CONST_PTR=const
-MOZ_CHECK_HEADERS([malloc.h], [
-  AC_MSG_CHECKING([whether malloc_usable_size definition can use const argument])
-  AC_TRY_COMPILE([#include <malloc.h>
-                  #include <stddef.h>
-                  size_t malloc_usable_size(const void *ptr);],
-                  [return malloc_usable_size(0);],
-                  AC_MSG_RESULT([yes]),
-                  AC_MSG_RESULT([no])
-                  MALLOC_USABLE_SIZE_CONST_PTR=)
-])
-AC_DEFINE_UNQUOTED([MALLOC_USABLE_SIZE_CONST_PTR],[$MALLOC_USABLE_SIZE_CONST_PTR])
-
-
-dnl In newer bionic headers, valloc is built but not defined,
-dnl so we check more carefully here.
-AC_MSG_CHECKING([for valloc in malloc.h])
-AC_EGREP_HEADER(valloc, malloc.h,
-                AC_DEFINE(HAVE_VALLOC)
-                AC_MSG_RESULT([yes]),
-                AC_MSG_RESULT([no]))
-
-AC_MSG_CHECKING([for valloc in unistd.h])
-AC_EGREP_HEADER(valloc, unistd.h,
-                AC_DEFINE(HAVE_VALLOC)
-                AC_MSG_RESULT([yes]),
-                AC_MSG_RESULT([no]))
-
 dnl See if compiler supports some gcc-style attributes
 
 AC_CACHE_CHECK(for __attribute__((always_inline)),
@@ -3406,6 +3361,8 @@ fi
 
 AC_HAVE_FUNCS(localeconv)
 fi # ! SKIP_COMPILER_CHECKS
+
+MOZ_CHECK_ALLOCATOR
 
 TARGET_XPCOM_ABI=
 if test -n "${CPU_ARCH}" -a -n "${TARGET_COMPILER_ABI}"; then
@@ -5109,7 +5066,7 @@ MOZ_ARG_DISABLE_BOOL(applemedia,
     MOZ_APPLEMEDIA=,
     MOZ_APPLEMEDIA=1)
 
-if test -n "$MOZ_WIDGET_TOOLKIT" = "cocoa" && test -n "$MOZ_APPLEMEDIA"; then
+if test "$MOZ_WIDGET_TOOLKIT" = "cocoa" -a -n "$MOZ_APPLEMEDIA"; then
   AC_DEFINE(MOZ_APPLEMEDIA)
   # hack in frameworks for fmp4 - see bug 1029974
   # We load VideoToolbox and CoreMedia dynamically, so they don't appear here.
@@ -5120,7 +5077,7 @@ if test -n "$MOZ_WIDGET_TOOLKIT" = "cocoa" && test -n "$MOZ_APPLEMEDIA"; then
 fi
 
 dnl ========================================================
-dnl = DirectShow supporthttps://github.com/mozilla/gecko-dev/commit/7aa93ab05f68bd7e712a54d0c2d725e9a9f988c0
+dnl = DirectShow support
 dnl ========================================================
 if test "$OS_ARCH" = "WINNT"; then
     dnl Enable DirectShow support by default.
@@ -6008,11 +5965,7 @@ MOZ_ARG_ENABLE_BOOL(verify-mar,
     MOZ_VERIFY_MAR_SIGNATURE= )
 
 if test -n "$MOZ_VERIFY_MAR_SIGNATURE"; then
-  if test "$OS_ARCH" = "WINNT"; then
-    AC_DEFINE(MOZ_VERIFY_MAR_SIGNATURE)
-  else
-    AC_MSG_ERROR([Can only build with --enable-verify-mar with a Windows target])
-  fi
+  AC_DEFINE(MOZ_VERIFY_MAR_SIGNATURE)
 fi
 
 dnl ========================================================
@@ -6412,6 +6365,21 @@ dnl = Runtime debugging and Optimization Options
 dnl =
 dnl ========================================================
 MOZ_ARG_HEADER(Runtime debugging and Optimizations)
+
+dnl ========================================================
+dnl Enabling AltiVec/VMX on PPC
+dnl ========================================================
+MOZ_ARG_ENABLE_BOOL(altivec,
+[  --enable-altivec        Enable PPC AltiVec/VMX optimizations and code],
+    HAVE_ALTIVEC=1,
+    HAVE_ALTIVEC=)
+AC_SUBST(HAVE_ALTIVEC)
+
+if test -n "$HAVE_ALTIVEC"; then
+  # -mabi=altivec is needed on 32bit
+  CFLAGS="$CFLAGS -maltivec -mabi=altivec"
+  CXXFLAGS="$CXXFLAGS -maltivec -mabi=altivec"
+fi
 
 dnl ========================================================
 dnl enable mobile optimizations
@@ -7980,12 +7948,6 @@ if test -n "$MOZ_SERVICES_CLOUDSYNC"; then
   AC_DEFINE(MOZ_SERVICES_CLOUDSYNC)
 fi
 
-dnl Build Captive Portal Detector if required
-AC_SUBST(MOZ_CAPTIVEDETECT)
-if test -n "$MOZ_CAPTIVEDETECT"; then
-  AC_DEFINE(MOZ_CAPTIVEDETECT)
-fi
-
 dnl Build second screen and casting features for external devices if required
 AC_SUBST(MOZ_DEVICES)
 if test -n "$MOZ_DEVICES"; then
@@ -8375,6 +8337,7 @@ AC_SUBST(INTEL_ARCHITECTURE)
 AC_SUBST(HAVE_TOOLCHAIN_SUPPORT_MSSSE3)
 AC_SUBST(HAVE_TOOLCHAIN_SUPPORT_MSSE4_1)
 AC_SUBST(HAVE_X86_AVX2)
+AC_SUBST(HAVE_ALTIVEC)
 AC_SUBST(GCC_USE_GNU_LD)
 
 AC_SUBST(MOZ_CHROME_FILE_FORMAT)

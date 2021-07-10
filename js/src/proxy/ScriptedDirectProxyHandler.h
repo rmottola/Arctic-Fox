@@ -103,10 +103,10 @@ class ScriptedDirectProxyHandler : public BaseProxyHandler {
 };
 
 bool
-proxy(JSContext* cx, unsigned argc, jsval* vp);
+proxy(JSContext* cx, unsigned argc, Value* vp);
 
 bool
-proxy_revocable(JSContext* cx, unsigned argc, jsval* vp);
+proxy_revocable(JSContext* cx, unsigned argc, Value* vp);
 
 } /* namespace js */
 

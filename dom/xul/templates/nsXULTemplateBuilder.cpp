@@ -502,7 +502,7 @@ nsXULTemplateBuilder::UpdateResult(nsIXULTemplateResult* aOldResult,
                                    nsIXULTemplateResult* aNewResult,
                                    nsIDOMNode* aQueryNode)
 {
-    PR_LOG(gXULTemplateLog, PR_LOG_ALWAYS,
+    MOZ_LOG(gXULTemplateLog, LogLevel::Info,
            ("nsXULTemplateBuilder::UpdateResult %p %p %p",
            aOldResult, aNewResult, aQueryNode));
 
@@ -1093,7 +1093,8 @@ nsXULTemplateBuilder::AttributeChanged(nsIDocument* aDocument,
                                        Element*     aElement,
                                        int32_t      aNameSpaceID,
                                        nsIAtom*     aAttribute,
-                                       int32_t      aModType)
+                                       int32_t      aModType,
+                                       const nsAttrValue* aOldValue)
 {
     if (aElement == mRoot && aNameSpaceID == kNameSpaceID_None) {
         // Check for a change to the 'ref' attribute on an atom, in which
@@ -1711,7 +1712,7 @@ nsXULTemplateBuilder::CompileQueries()
     }
 
     // always enable logging if the debug setting is used
-    if (PR_LOG_TEST(gXULTemplateLog, PR_LOG_DEBUG))
+    if (MOZ_LOG_TEST(gXULTemplateLog, LogLevel::Debug))
         mFlags |= eLoggingEnabled;
 
     nsCOMPtr<nsIDOMNode> rootnode = do_QueryInterface(mRoot);

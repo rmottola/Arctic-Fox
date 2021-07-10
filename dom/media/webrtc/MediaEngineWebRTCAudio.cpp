@@ -37,8 +37,8 @@ namespace mozilla {
 #endif
 
 extern PRLogModuleInfo* GetMediaManagerLog();
-#define LOG(msg) PR_LOG(GetMediaManagerLog(), PR_LOG_DEBUG, msg)
-#define LOG_FRAMES(msg) PR_LOG(GetMediaManagerLog(), 6, msg)
+#define LOG(msg) MOZ_LOG(GetMediaManagerLog(), mozilla::LogLevel::Debug, msg)
+#define LOG_FRAMES(msg) MOZ_LOG(GetMediaManagerLog(), mozilla::LogLevel::Verbose, msg)
 
 /**
  * Webrtc audio source.
@@ -187,7 +187,7 @@ MediaEngineWebRTCAudioSource::GetName(nsAString& aName)
 }
 
 void
-MediaEngineWebRTCAudioSource::GetUUID(nsAString& aUUID)
+MediaEngineWebRTCAudioSource::GetUUID(nsACString& aUUID)
 {
   if (mInitDone) {
     aUUID.Assign(mDeviceUUID);
@@ -259,9 +259,31 @@ MediaEngineWebRTCAudioSource::Config(bool aEchoOn, uint32_t aEcho,
   return NS_OK;
 }
 
+// GetBestFitnessDistance returns the best distance the capture device can offer
+// as a whole, given an accumulated number of ConstraintSets.
+// Ideal values are considered in the first ConstraintSet only.
+// Plain values are treated as Ideal in the first ConstraintSet.
+// Plain values are treated as Exact in subsequent ConstraintSets.
+// Infinity = UINT32_MAX e.g. device cannot satisfy accumulated ConstraintSets.
+// A finite result may be used to calculate this device's ranking as a choice.
+
+uint32_t MediaEngineWebRTCAudioSource::GetBestFitnessDistance(
+    const nsTArray<const dom::MediaTrackConstraintSet*>& aConstraintSets,
+    const nsString& aDeviceId)
+{
+  uint32_t distance = 0;
+
+  for (const MediaTrackConstraintSet* cs : aConstraintSets) {
+    distance = GetMinimumFitnessDistance(*cs, false, aDeviceId);
+    break; // distance is read from first entry only
+  }
+  return distance;
+}
+
 nsresult
 MediaEngineWebRTCAudioSource::Allocate(const dom::MediaTrackConstraints &aConstraints,
-                                       const MediaEnginePrefs &aPrefs)
+                                       const MediaEnginePrefs &aPrefs,
+                                       const nsString& aDeviceId)
 {
   if (mState == kReleased) {
     if (mInitDone) {
@@ -275,7 +297,7 @@ MediaEngineWebRTCAudioSource::Allocate(const dom::MediaTrackConstraints &aConstr
       LOG(("Audio device is not initalized"));
       return NS_ERROR_FAILURE;
     }
-  } else if (PR_LOG_TEST(GetMediaManagerLog(), PR_LOG_DEBUG)) {
+  } else if (MOZ_LOG_TEST(GetMediaManagerLog(), LogLevel::Debug)) {
     MonitorAutoLock lock(mMonitor);
     if (mSources.IsEmpty()) {
       LOG(("Audio device %d reallocated", mCapIndex));
@@ -478,11 +500,12 @@ MediaEngineWebRTCAudioSource::Shutdown()
 {
   if (!mInitDone) {
     // duplicate these here in case we failed during Init()
-    if (mChannel != -1) {
+    if (mChannel != -1 && mVoENetwork) {
       mVoENetwork->DeRegisterExternalTransport(mChannel);
     }
 
     delete mNullTransport;
+    mNullTransport = nullptr;
     return;
   }
 
@@ -514,6 +537,7 @@ MediaEngineWebRTCAudioSource::Shutdown()
   }
 
   delete mNullTransport;
+  mNullTransport = nullptr;
 
   mVoEProcessing = nullptr;
   mVoENetwork = nullptr;

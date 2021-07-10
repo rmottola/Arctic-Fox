@@ -227,7 +227,7 @@ public:
 
   bool BlockingReadNextMoof();
   bool HasMetadata();
-  already_AddRefed<mozilla::MediaLargeByteBuffer> Metadata();
+  already_AddRefed<mozilla::MediaByteBuffer> Metadata();
   MediaByteRange FirstCompleteMediaSegment();
   MediaByteRange FirstCompleteMediaHeader();
 

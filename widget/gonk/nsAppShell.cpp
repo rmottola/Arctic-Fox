@@ -34,10 +34,8 @@
 
 #include "base/basictypes.h"
 #include "GonkPermission.h"
+#include "libdisplay/BootAnimation.h"
 #include "nscore.h"
-#ifdef MOZ_OMX_DECODER
-#include "MediaResourceManagerService.h"
-#endif
 #include "mozilla/TouchEvents.h"
 #include "mozilla/FileUtils.h"
 #include "mozilla/Hal.h"
@@ -49,6 +47,7 @@
 #include "nativewindow/FakeSurfaceComposer.h"
 #endif
 #include "nsAppShell.h"
+#include "mozilla/DebugOnly.h"
 #include "mozilla/dom/Touch.h"
 #include "nsGkAtoms.h"
 #include "nsIObserverService.h"
@@ -575,18 +574,25 @@ GeckoInputReaderPolicy::setDisplayInfo()
                   DISPLAY_ORIENTATION_270,
                   "Orientation enums not matched!");
 
+    nsRefPtr<nsScreenGonk> screen = nsScreenManagerGonk::GetPrimaryScreen();
+
+    uint32_t rotation = nsIScreen::ROTATION_0_DEG;
+    DebugOnly<nsresult> rv = screen->GetRotation(&rotation);
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
+    nsIntRect screenBounds = screen->GetNaturalBounds();
+
     DisplayViewport viewport;
     viewport.displayId = 0;
-    viewport.orientation = nsScreenGonk::GetRotation();
-    viewport.physicalRight = viewport.deviceWidth = gScreenBounds.width;
-    viewport.physicalBottom = viewport.deviceHeight = gScreenBounds.height;
+    viewport.orientation = rotation;
+    viewport.physicalRight = viewport.deviceWidth = screenBounds.width;
+    viewport.physicalBottom = viewport.deviceHeight = screenBounds.height;
     if (viewport.orientation == DISPLAY_ORIENTATION_90 ||
         viewport.orientation == DISPLAY_ORIENTATION_270) {
-        viewport.logicalRight = gScreenBounds.height;
-        viewport.logicalBottom = gScreenBounds.width;
+        viewport.logicalRight = screenBounds.height;
+        viewport.logicalBottom = screenBounds.width;
     } else {
-        viewport.logicalRight = gScreenBounds.width;
-        viewport.logicalBottom = gScreenBounds.height;
+        viewport.logicalRight = screenBounds.width;
+        viewport.logicalBottom = screenBounds.height;
     }
     mConfig.setDisplayInfo(false, viewport);
 }
@@ -875,15 +881,12 @@ nsAppShell::Init()
 
     InitGonkMemoryPressureMonitoring();
 
-    if (XRE_GetProcessType() == GeckoProcessType_Default) {
+    if (XRE_IsParentProcess()) {
         printf("*****************************************************************\n");
         printf("***\n");
         printf("*** This is stdout. Most of the useful output will be in logcat.\n");
         printf("***\n");
         printf("*****************************************************************\n");
-#ifdef MOZ_OMX_DECODER
-        android::MediaResourceManagerService::instantiate();
-#endif
 #if ANDROID_VERSION >= 18 && (defined(MOZ_OMX_DECODER) || defined(MOZ_B2G_CAMERA))
         android::FakeSurfaceComposer::instantiate();
 #endif
@@ -928,6 +931,10 @@ nsAppShell::Observe(nsISupports* aSubject,
             updateHeadphoneSwitch();
         }
         mEnableDraw = true;
+
+        // System is almost booting up. Stop the bootAnim now.
+        StopBootAnimation();
+
         NotifyEvent();
         return NS_OK;
     }
@@ -1053,5 +1060,6 @@ nsAppShell::NotifyScreenRotation()
     gAppShell->mReaderPolicy->setDisplayInfo();
     gAppShell->mReader->requestRefreshConfiguration(InputReaderConfiguration::CHANGE_DISPLAY_INFO);
 
-    hal::NotifyScreenConfigurationChange(nsScreenGonk::GetConfiguration());
+    nsRefPtr<nsScreenGonk> screen = nsScreenManagerGonk::GetPrimaryScreen();
+    hal::NotifyScreenConfigurationChange(screen->GetConfiguration());
 }

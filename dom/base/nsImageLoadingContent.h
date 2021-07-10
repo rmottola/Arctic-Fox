@@ -17,6 +17,7 @@
 #include "imgIOnloadBlocker.h"
 #include "mozilla/CORSMode.h"
 #include "mozilla/EventStates.h"
+#include "mozilla/TimeStamp.h"
 #include "nsCOMPtr.h"
 #include "nsIImageLoadingContent.h"
 #include "nsIRequest.h"
@@ -24,6 +25,7 @@
 #include "nsAutoPtr.h"
 #include "nsIContentPolicy.h"
 #include "mozilla/dom/BindingDeclarations.h"
+#include "mozilla/net/ReferrerPolicy.h"
 
 class nsIURI;
 class nsIDocument;
@@ -201,6 +203,8 @@ protected:
    * default implementation returns CORS_NONE unconditionally.
    */
   virtual mozilla::CORSMode GetCORSMode();
+
+  virtual mozilla::net::ReferrerPolicy GetImageReferrerPolicy();
 
   // Subclasses are *required* to call BindToTree/UnbindFromTree.
   void BindToTree(nsIDocument* aDocument, nsIContent* aParent,
@@ -398,6 +402,8 @@ private:
    */
   mozilla::EventStates mForcedImageState;
 
+  mozilla::TimeStamp mMostRecentRequestChange;
+
   int16_t mImageBlockingStatus;
   bool mLoadingEnabled : 1;
 
@@ -414,7 +420,6 @@ private:
   bool mBroken : 1;
   bool mUserDisabled : 1;
   bool mSuppressed : 1;
-  bool mFireEventsOnDecode : 1;
 
 protected:
   /**

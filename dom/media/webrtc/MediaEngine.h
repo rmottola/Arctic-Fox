@@ -64,6 +64,8 @@ public:
   virtual void EnumerateAudioDevices(dom::MediaSourceEnum,
                                      nsTArray<nsRefPtr<MediaEngineAudioSource> >*) = 0;
 
+  virtual void Shutdown() = 0;
+
 protected:
   virtual ~MediaEngine() {}
 };
@@ -81,11 +83,13 @@ public:
 
   virtual ~MediaEngineSource() {}
 
+  virtual void Shutdown() = 0;
+
   /* Populate the human readable name of this device in the nsAString */
   virtual void GetName(nsAString&) = 0;
 
-  /* Populate the UUID of this device in the nsAString */
-  virtual void GetUUID(nsAString&) = 0;
+  /* Populate the UUID of this device in the nsACString */
+  virtual void GetUUID(nsACString&) = 0;
 
   /* Release the device back to the system. */
   virtual nsresult Deallocate() = 0;
@@ -160,6 +164,15 @@ public:
     mHasFakeTracks = aHasFakeTracks;
   }
 
+  /* This call reserves but does not start the device. */
+  virtual nsresult Allocate(const dom::MediaTrackConstraints &aConstraints,
+                            const MediaEnginePrefs &aPrefs,
+                            const nsString& aDeviceId) = 0;
+
+  virtual uint32_t GetBestFitnessDistance(
+      const nsTArray<const dom::MediaTrackConstraintSet*>& aConstraintSets,
+      const nsString& aDeviceId) = 0;
+
 protected:
   // Only class' own members can be initialized in constructor initializer list.
   explicit MediaEngineSource(MediaEngineState aState)
@@ -220,13 +233,6 @@ class MediaEngineVideoSource : public MediaEngineSource
 public:
   virtual ~MediaEngineVideoSource() {}
 
-  /* This call reserves but does not start the device. */
-  virtual nsresult Allocate(const dom::MediaTrackConstraints &aConstraints,
-                            const MediaEnginePrefs &aPrefs) = 0;
-
-  virtual uint32_t GetBestFitnessDistance(
-      const nsTArray<const dom::MediaTrackConstraintSet*>& aConstraintSets) = 0;
-
 protected:
   explicit MediaEngineVideoSource(MediaEngineState aState)
     : MediaEngineSource(aState) {}
@@ -242,9 +248,6 @@ class MediaEngineAudioSource : public MediaEngineSource
 public:
   virtual ~MediaEngineAudioSource() {}
 
-  /* This call reserves but does not start the device. */
-  virtual nsresult Allocate(const dom::MediaTrackConstraints &aConstraints,
-                            const MediaEnginePrefs &aPrefs) = 0;
 protected:
   explicit MediaEngineAudioSource(MediaEngineState aState)
     : MediaEngineSource(aState) {}

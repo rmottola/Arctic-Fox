@@ -8,7 +8,6 @@
 
 #include "mozilla/Attributes.h"
 #include "nsGenericHTMLElement.h"
-#include "nsIDOMHTMLTableElement.h"
 #include "mozilla/dom/HTMLTableCaptionElement.h"
 #include "mozilla/dom/HTMLTableSectionElement.h"
 
@@ -19,8 +18,7 @@ namespace dom {
 
 class TableRowsCollection;
 
-class HTMLTableElement final : public nsGenericHTMLElement,
-                               public nsIDOMHTMLTableElement
+class HTMLTableElement final : public nsGenericHTMLElement
 {
 public:
   explicit HTMLTableElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo);
@@ -193,7 +191,7 @@ public:
    * Called when an attribute is about to be changed
    */
   virtual nsresult BeforeSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
-                                 const nsAttrValueOrString* aValue,
+                                 nsAttrValueOrString* aValue,
                                  bool aNotify) override;
   /**
    * Called when an attribute has just been changed

@@ -14,7 +14,6 @@ include protocol PCompositor;
 include protocol PContentBridge;
 include protocol PContentPermissionRequest;
 include protocol PCycleCollectWithLogs;
-include protocol PDocAccessible;
 include protocol PPSMContentDownloader;
 include protocol PExternalHelperApp;
 include protocol PDeviceStorageRequest;
@@ -25,6 +24,7 @@ include protocol PHal;
 include protocol PIcc;
 include protocol PProcessHangMonitor;
 include protocol PImageBridge;
+include protocol PMedia;
 include protocol PMemoryReportRequest;
 include protocol PMobileConnection;
 include protocol PNecko;
@@ -50,6 +50,7 @@ include protocol PVoicemail;
 include protocol PJavaScript;
 include protocol PRemoteSpellcheckEngine;
 include protocol PWebrtcGlobal;
+include protocol PPresentation;
 include DOMTypes;
 include JavaScriptTypes;
 include InputStreamParams;
@@ -71,7 +72,7 @@ include "mozilla/dom/TabMessageUtils.h";
 using GeoPosition from "nsGeoPositionIPCSerialiser.h";
 
 using struct ChromePackage from "mozilla/chrome/RegistryMessageUtils.h";
-using struct ResourceMapping from "mozilla/chrome/RegistryMessageUtils.h";
+using struct SubstitutionMapping from "mozilla/chrome/RegistryMessageUtils.h";
 using struct OverrideMapping from "mozilla/chrome/RegistryMessageUtils.h";
 using base::ChildPrivileges from "base/process_util.h";
 using base::ProcessId from "base/process.h";
@@ -81,8 +82,6 @@ using struct mozilla::null_t from "ipc/IPCMessageUtils.h";
 using struct mozilla::void_t from "ipc/IPCMessageUtils.h";
 using mozilla::dom::asmjscache::OpenMode from "mozilla/dom/asmjscache/AsmJSCache.h";
 using mozilla::dom::asmjscache::WriteParams from "mozilla/dom/asmjscache/AsmJSCache.h";
-using mozilla::dom::AudioChannel from "mozilla/dom/AudioChannelBinding.h";
-using mozilla::dom::AudioChannelState from "AudioChannelCommon.h";
 using mozilla::dom::quota::PersistenceType from "mozilla/dom/quota/PersistenceType.h";
 using mozilla::hal::ProcessPriority from "mozilla/HalTypes.h";
 using gfxIntSize from "nsSize.h";
@@ -95,7 +94,7 @@ union ChromeRegistryItem
 {
     ChromePackage;
     OverrideMapping;
-    ResourceMapping;
+    SubstitutionMapping;
 };
 
 namespace mozilla {
@@ -271,6 +270,12 @@ struct FileSystemCreateFileParams
   bool replace;
 };
 
+struct FileSystemGetDirectoryListingParams
+{
+  nsString filesystem;
+  nsString realPath;
+};
+
 struct FileSystemGetFileOrDirectoryParams
 {
   nsString filesystem;
@@ -295,6 +300,7 @@ union FileSystemParams
 {
   FileSystemCreateDirectoryParams;
   FileSystemCreateFileParams;
+  FileSystemGetDirectoryListingParams;
   FileSystemGetFileOrDirectoryParams;
   FileSystemRemoveParams;
 };
@@ -420,7 +426,6 @@ prio(normal upto urgent) sync protocol PContent
     manages PCellBroadcast;
     manages PContentPermissionRequest;
     manages PCycleCollectWithLogs;
-    manages PDocAccessible;
     manages PDeviceStorageRequest;
     manages PFileSystemRequest;
     manages PPSMContentDownloader;
@@ -429,6 +434,7 @@ prio(normal upto urgent) sync protocol PContent
     manages PFMRadio;
     manages PHal;
     manages PIcc;
+    manages PMedia;
     manages PMemoryReportRequest;
     manages PMobileConnection;
     manages PNecko;
@@ -444,6 +450,7 @@ prio(normal upto urgent) sync protocol PContent
     manages PJavaScript;
     manages PRemoteSpellcheckEngine;
     manages PWebrtcGlobal;
+    manages PPresentation;
 
 both:
     // Depending on exactly how the new browser is being created, it might be
@@ -489,11 +496,6 @@ child:
     PMemoryReportRequest(uint32_t generation, bool anonymize,
                          bool minimizeMemoryUsage, MaybeFileDesc DMDFile);
 
-    /**
-     * Notify the AudioChannelService in the child processes.
-     */
-    async AudioChannelNotify();
-
     async SpeakerManagerNotify();
 
     /**
@@ -503,10 +505,6 @@ child:
     async BidiKeyboardNotify(bool isLangRTL);
 
     async UpdateServiceWorkerRegistrations();
-
-    async RemoveServiceWorkerRegistrationsForDomain(nsString aDomain);
-
-    async RemoveServiceWorkerRegistrations();
 
     async DataStoreNotify(uint32_t aAppId, nsString aName,
                           nsString aManifestURL);
@@ -523,7 +521,7 @@ child:
 
     PTestShell();
 
-    RegisterChrome(ChromePackage[] packages, ResourceMapping[] resources,
+    RegisterChrome(ChromePackage[] packages, SubstitutionMapping[] substitutions,
                    OverrideMapping[] overrides, nsCString locale, bool reset);
     RegisterChromeItem(ChromeRegistryItem item);
 
@@ -563,6 +561,7 @@ child:
 
     AppInfo(nsCString version, nsCString buildID, nsCString name, nsCString UAName,
             nsCString ID, nsCString vendor);
+    AppInit();
 
     // Notify child that last-pb-context-exited notification was observed
     LastPrivateDocShellDestroyed();
@@ -579,9 +578,6 @@ child:
 
     // Notify volume is removed.
     VolumeRemoved(nsString fsName);
-
-    // Ask the Nuwa process to create a new child process.
-    NuwaFork();
 
     NotifyProcessPriorityChanged(ProcessPriority priority);
     MinimizeMemoryUsage();
@@ -623,13 +619,13 @@ child:
     async StartProfiler(uint32_t aEntries, double aInterval, nsCString[] aFeatures,
                         nsCString[] aThreadNameFilters);
     async StopProfiler();
+    async PauseProfiler(bool aPause);
 
     async GatherProfile();
 
     InvokeDragSession(IPCDataTransfer[] transfers, uint32_t action);
 
     EndDragSession(bool aDoneDrag, bool aUserCancelled);
-    NuwaFreeze();
 
     async DomainSetChanged(uint32_t aSetType, uint32_t aChangeType, OptionalURIParams aDomain);
 
@@ -651,15 +647,21 @@ child:
      * Send gamepad status update to child.
      */
     GamepadUpdate(GamepadChangeEvent aGamepadEvent);
-parent:
-    /**
-     * Tell the parent process a new accessible document has been created.
-     * aParentDoc is the accessible document it was created in if any, and
-     * aParentAcc is the id of the accessible in that document the new document
-     * is a child of.
-     */
-    PDocAccessible(nullable PDocAccessible aParentDoc, uint64_t aParentAcc);
 
+
+    /**
+     * Tell the child that for testing purposes, a graphics device reset has
+     * occurred.
+     */
+    async TestGraphicsDeviceReset(uint32_t aReason);
+
+    /**
+     * Notify the child that presentation receiver has been launched with the
+     * correspondent iframe.
+     */
+    async NotifyPresentationReceiverLaunched(PBrowser aIframe, nsString aSessionId);
+
+parent:
     /**
      * Tell the content process some attributes of itself.  This is
      * among the first information queried by content processes after
@@ -733,7 +735,7 @@ parent:
 
     PFileSystemRequest(FileSystemParams params);
 
-    sync GetRandomValues(uint32_t length)
+    prio(urgent) sync GetRandomValues(uint32_t length)
         returns (uint8_t[] randomValues);
 
     async GetSystemMemory(uint64_t getterId);
@@ -741,7 +743,8 @@ parent:
     sync IsSecureURI(uint32_t type, URIParams uri, uint32_t flags)
         returns (bool isSecureURI);
 
-    sync GetLookAndFeelCache(LookAndFeelInt[] lookAndFeelIntCache);
+    sync GetLookAndFeelCache()
+        returns (LookAndFeelInt[] lookAndFeelIntCache);
 
     prio(urgent) async PHal();
 
@@ -770,6 +773,8 @@ parent:
 
     PVoicemail();
 
+    PMedia();
+
     PBluetooth();
 
     PFMRadio();
@@ -777,6 +782,8 @@ parent:
     PAsmJSCacheEntry(OpenMode openMode, WriteParams write, Principal principal);
 
     PWebrtcGlobal();
+    
+    PPresentation();
 
     // Services remoting
 
@@ -869,17 +876,10 @@ parent:
     // Tell the parent that the child has gone idle for the first time
     async FirstIdle();
 
-    // Get Muted from the main AudioChannelService.
-    sync AudioChannelGetState(AudioChannel aChannel, bool aElementHidden,
-                              bool aElementWasHidden)
-        returns (AudioChannelState value);
+    async AudioChannelServiceStatus(bool aActiveTelephonyChannel,
+                                    bool aContentOrNormalChannel,
+                                    bool aAnyActiveChannel);
 
-    sync AudioChannelRegisterType(AudioChannel aChannel, bool aWithVideo);
-    sync AudioChannelUnregisterType(AudioChannel aChannel,
-                                    bool aElementHidden,
-                                    bool aWithVideo);
-
-    async AudioChannelChangedNotification();
     async AudioChannelChangeDefVolChannel(int32_t aChannel, bool aHidden);
 
     sync DataStoreGetStores(nsString aName, nsString aOwner, Principal aPrincipal)
@@ -892,13 +892,6 @@ parent:
 
     // Notify the parent that the child has finished handling a system message.
     async SystemMessageHandled();
-
-    NuwaReady();
-    // Sent when nuwa finished its initialization process and is waiting for
-    // parent's signal to make it freeze.
-    NuwaWaitForFreeze();
-
-    sync AddNewProcess(uint32_t pid, ProtocolFdMapping[] aFds);
 
     // called by the child (test code only) to propagate volume changes to the parent
     async CreateFakeVolume(nsString fsName, nsString mountPoint);
@@ -978,6 +971,9 @@ parent:
                            int64_t fileId)
       returns (int32_t refCnt, int32_t dBRefCnt, int32_t sliceRefCnt,
                bool result);
+
+    // Use only for testing!
+    FlushPendingFileDeletions();
 
     /**
      * Tell the chrome process there is an creation of PBrowser.

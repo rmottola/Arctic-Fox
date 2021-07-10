@@ -33,17 +33,19 @@
 #ifdef XP_WIN
 # include "jswin.h"
 #endif
-#include "prmjtime.h"
 
+
+#include "builtin/AtomicsObject.h"
 #include "frontend/Parser.h"
 #include "jit/IonCode.h"
 #include "js/Class.h"
 #include "js/Conversions.h"
 #include "js/MemoryMetrics.h"
 
+#include "vm/Time.h"
+
 #include "jsobjinlines.h"
 
-#include "builtin/AtomicsObject.h"
 #include "frontend/ParseNode-inl.h"
 #include "jit/MacroAssembler-inl.h"
 #include "vm/ArrayBufferObject-inl.h"

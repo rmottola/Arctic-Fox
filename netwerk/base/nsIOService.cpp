@@ -24,7 +24,6 @@
 #include "nsCRT.h"
 #include "nsSecCheckWrapChannel.h"
 #include "nsSimpleNestedURI.h"
-#include "nsNetUtil.h"
 #include "nsTArray.h"
 #include "nsIConsoleService.h"
 #include "nsIUploadChannel2.h"
@@ -44,6 +43,9 @@
 #include "mozilla/LoadInfo.h"
 #include "mozilla/net/NeckoCommon.h"
 #include "mozilla/Telemetry.h"
+#include "mozilla/net/DNS.h"
+#include "CaptivePortalService.h"
+#include "ReferrerPolicy.h"
 
 #ifdef MOZ_WIDGET_GONK
 #include "nsINetworkManager.h"
@@ -55,6 +57,7 @@
 
 using namespace mozilla;
 using mozilla::net::IsNeckoChild;
+using mozilla::net::CaptivePortalService;
 
 #define PORT_PREF_PREFIX           "network.security.ports."
 #define PORT_PREF(x)               PORT_PREF_PREFIX x
@@ -68,6 +71,7 @@ using mozilla::net::IsNeckoChild;
 #define NECKO_BUFFER_CACHE_COUNT_PREF "network.buffer.cache.count"
 #define NECKO_BUFFER_CACHE_SIZE_PREF  "network.buffer.cache.size"
 #define NETWORK_NOTIFY_CHANGED_PREF   "network.notify.changed"
+#define NETWORK_CAPTIVE_PORTAL_PREF   "network.captive-portal-service.enabled"
 
 #define MAX_RECURSION_COUNT 50
 
@@ -196,7 +200,9 @@ nsIOService::Init()
     }
     else
         NS_WARNING("failed to get error service");
-    
+
+    InitializeCaptivePortalService();
+
     // setup our bad port list stuff
     for(int i=0; gBadPortList[i]; i++)
         mRestrictedPortList.AppendElement(gBadPortList[i]);
@@ -211,6 +217,7 @@ nsIOService::Init()
         prefBranch->AddObserver(NECKO_BUFFER_CACHE_COUNT_PREF, this, true);
         prefBranch->AddObserver(NECKO_BUFFER_CACHE_SIZE_PREF, this, true);
         prefBranch->AddObserver(NETWORK_NOTIFY_CHANGED_PREF, this, true);
+        prefBranch->AddObserver(NETWORK_CAPTIVE_PORTAL_PREF, this, true);
         PrefsChanged(prefBranch);
     }
     
@@ -244,6 +251,22 @@ nsIOService::Init()
 nsIOService::~nsIOService()
 {
     gIOService = nullptr;
+}
+
+nsresult
+nsIOService::InitializeCaptivePortalService()
+{
+    if (XRE_GetProcessType() != GeckoProcessType_Default) {
+        // We only initalize a captive portal service in the main process
+        return NS_OK;
+    }
+
+    mCaptivePortalService = do_GetService(NS_CAPTIVEPORTAL_CID);
+    if (mCaptivePortalService) {
+        return static_cast<CaptivePortalService*>(mCaptivePortalService.get())->Initialize();
+    }
+
+    return NS_OK;
 }
 
 nsresult
@@ -282,7 +305,7 @@ nsIOService::InitializeNetworkLinkService()
     }
 
     // go into managed mode if we can, and chrome process
-    if (XRE_GetProcessType() == GeckoProcessType_Default)
+    if (XRE_IsParentProcess())
     {
         mNetworkLinkService = do_GetService(NS_NETWORK_LINK_SERVICE_CONTRACTID, &rv);
     }
@@ -328,10 +351,52 @@ NS_IMPL_ISUPPORTS(nsIOService,
 ////////////////////////////////////////////////////////////////////////////////
 
 nsresult
+nsIOService::RecheckCaptivePortalIfLocalRedirect(nsIChannel* newChan)
+{
+    nsresult rv;
+
+    if (!mCaptivePortalService) {
+        return NS_OK;
+    }
+
+    nsCOMPtr<nsIURI> uri;
+    rv = newChan->GetURI(getter_AddRefs(uri));
+    if (NS_FAILED(rv)) {
+        return rv;
+    }
+
+    nsCString host;
+    rv = uri->GetHost(host);
+    if (NS_FAILED(rv)) {
+        return rv;
+    }
+
+    PRNetAddr prAddr;
+    if (PR_StringToNetAddr(host.BeginReading(), &prAddr) != PR_SUCCESS) {
+        // The redirect wasn't to an IP literal, so there's probably no need
+        // to trigger the captive portal detection right now. It can wait.
+        return NS_OK;
+    }
+
+    mozilla::net::NetAddr netAddr;
+    PRNetAddrToNetAddr(&prAddr, &netAddr);
+    if (IsIPAddrLocal(&netAddr)) {
+        // Redirects to local IP addresses are probably captive portals
+        mCaptivePortalService->RecheckCaptivePortal();
+    }
+
+    return NS_OK;
+}
+
+nsresult
 nsIOService::AsyncOnChannelRedirect(nsIChannel* oldChan, nsIChannel* newChan,
                                     uint32_t flags,
                                     nsAsyncRedirectVerifyHelper *helper)
 {
+    // If a redirect to a local network address occurs, then chances are we
+    // are in a captive portal, so we trigger a recheck.
+    RecheckCaptivePortalIfLocalRedirect(newChan);
+
     nsCOMPtr<nsIChannelEventSink> sink =
         do_GetService(NS_GLOBAL_CHANNELEVENTSINK_CONTRACTID);
     if (sink) {
@@ -585,9 +650,20 @@ nsIOService::NewChannelFromURIWithLoadInfo(nsIURI* aURI,
                                                  result);
 }
 
+/*  ***** DEPRECATED *****
+ * please use NewChannelFromURI2 providing the right arguments for:
+ *        * aLoadingNode
+ *        * aLoadingPrincipal
+ *        * aTriggeringPrincipal
+ *        * aSecurityFlags
+ *        * aContentPolicyType
+ *
+ * See nsIIoService.idl for a detailed description of those arguments
+ */
 NS_IMETHODIMP
 nsIOService::NewChannelFromURI(nsIURI *aURI, nsIChannel **result)
 {
+  NS_WARNING("Deprecated, use NewChannelFromURI2 providing loadInfo arguments!");
   return NewChannelFromURI2(aURI,
                             nullptr, // aLoadingNode
                             nullptr, // aLoadingPrincipal
@@ -763,12 +839,23 @@ nsIOService::NewChannelFromURIWithProxyFlags2(nsIURI* aURI,
                                                    result);
 }
 
+/*  ***** DEPRECATED *****
+ * please use NewChannelFromURIWithProxyFlags2 providing the right arguments for:
+ *        * aLoadingNode
+ *        * aLoadingPrincipal
+ *        * aTriggeringPrincipal
+ *        * aSecurityFlags
+ *        * aContentPolicyType
+ *
+ * See nsIIoService.idl for a detailed description of those arguments
+ */
 NS_IMETHODIMP
 nsIOService::NewChannelFromURIWithProxyFlags(nsIURI *aURI,
                                              nsIURI *aProxyURI,
                                              uint32_t aProxyFlags,
                                              nsIChannel **result)
 {
+  NS_WARNING("Deprecated, use NewChannelFromURIWithProxyFlags2 providing loadInfo arguments!");
   return NewChannelFromURIWithProxyFlags2(aURI,
                                           aProxyURI,
                                           aProxyFlags,
@@ -805,9 +892,20 @@ nsIOService::NewChannel2(const nsACString& aSpec,
                               result);
 }
 
+/*  ***** DEPRECATED *****
+ * please use NewChannel2 providing the right arguments for:
+ *        * aLoadingNode
+ *        * aLoadingPrincipal
+ *        * aTriggeringPrincipal
+ *        * aSecurityFlags
+ *        * aContentPolicyType
+ *
+ * See nsIIoService.idl for a detailed description of those arguments
+ */
 NS_IMETHODIMP
 nsIOService::NewChannel(const nsACString &aSpec, const char *aCharset, nsIURI *aBaseURI, nsIChannel **result)
 {
+  NS_WARNING("Deprecated, use NewChannel2 providing loadInfo arguments!");
   return NewChannel2(aSpec,
                      aCharset,
                      aBaseURI,
@@ -874,7 +972,7 @@ nsIOService::SetOffline(bool offline)
 
     NS_ASSERTION(observerService, "The observer service should not be null");
 
-    if (XRE_GetProcessType() == GeckoProcessType_Default) {
+    if (XRE_IsParentProcess()) {
         if (observerService) {
             (void)observerService->NotifyObservers(nullptr,
                 NS_IPC_IOSERVICE_SET_OFFLINE_TOPIC, offline ? 
@@ -963,7 +1061,7 @@ nsIOService::SetConnectivity(bool aConnectivity)
 {
     // This should only be called from ContentChild to pass the connectivity
     // value from the chrome process to the content process.
-    if (XRE_GetProcessType() == GeckoProcessType_Default) {
+    if (XRE_IsParentProcess()) {
         return NS_ERROR_NOT_AVAILABLE;
     }
     return SetConnectivityInternal(aConnectivity);
@@ -985,7 +1083,7 @@ nsIOService::SetConnectivityInternal(bool aConnectivity)
         return NS_OK;
     }
     // This notification sends the connectivity to the child processes
-    if (XRE_GetProcessType() == GeckoProcessType_Default) {
+    if (XRE_IsParentProcess()) {
         observerService->NotifyObservers(nullptr,
             NS_IPC_IOSERVICE_SET_CONNECTIVITY_TOPIC, aConnectivity ?
             MOZ_UTF16("true") :
@@ -1119,6 +1217,28 @@ nsIOService::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
         nsresult rv = prefs->GetBoolPref(NETWORK_NOTIFY_CHANGED_PREF, &allow);
         if (NS_SUCCEEDED(rv)) {
             mNetworkNotifyChanged = allow;
+        }
+    }
+
+    if (!pref || strcmp(pref, NETWORK_CAPTIVE_PORTAL_PREF) == 0) {
+        static int disabledForTest = -1;
+        if (disabledForTest == -1) {
+            char *s = getenv("MOZ_DISABLE_NONLOCAL_CONNECTIONS");
+            if (s) {
+                disabledForTest = (strncmp(s, "0", 1) == 0) ? 0 : 1;
+            } else {
+                disabledForTest = 0;
+            }
+        }
+
+        bool captivePortalEnabled;
+        nsresult rv = prefs->GetBoolPref(NETWORK_CAPTIVE_PORTAL_PREF, &captivePortalEnabled);
+        if (NS_SUCCEEDED(rv) && mCaptivePortalService) {
+            if (captivePortalEnabled && !disabledForTest) {
+                static_cast<CaptivePortalService*>(mCaptivePortalService.get())->Start();
+            } else {
+                static_cast<CaptivePortalService*>(mCaptivePortalService.get())->Stop();
+            }
         }
     }
 }
@@ -1268,6 +1388,10 @@ nsIOService::Observe(nsISupports *subject,
 
         SetOffline(true);
 
+        if (mCaptivePortalService) {
+            static_cast<CaptivePortalService*>(mCaptivePortalService.get())->Stop();
+        }
+
         // Break circular reference.
         mProxyService = nullptr;
     } else if (!strcmp(topic, NS_NETWORK_LINK_TOPIC)) {
@@ -1284,6 +1408,10 @@ nsIOService::Observe(nsISupports *subject,
                 NotifyObservers(nullptr,
                                 NS_NETWORK_LINK_TOPIC,
                                 MOZ_UTF16(NS_NETWORK_LINK_DATA_CHANGED));
+        }
+
+        if (mCaptivePortalService) {
+            mCaptivePortalService->RecheckCaptivePortal();
         }
     } else if (!strcmp(topic, kNetworkActiveChanged)) {
 #ifdef MOZ_WIDGET_GONK
@@ -1491,6 +1619,10 @@ nsIOService::OnNetworkLinkEvent(const char *data)
     } else if (!strcmp(data, NS_NETWORK_LINK_DATA_DOWN)) {
         isUp = false;
     } else if (!strcmp(data, NS_NETWORK_LINK_DATA_UP)) {
+        if (mCaptivePortalService) {
+            // Interface is up. Triggering a captive portal recheck.
+            mCaptivePortalService->RecheckCaptivePortal();
+        }
         isUp = true;
     } else if (!strcmp(data, NS_NETWORK_LINK_DATA_UNKNOWN)) {
         nsresult rv = mNetworkLinkService->GetIsLinkUp(&isUp);
@@ -1557,6 +1689,16 @@ nsIOService::ExtractCharsetFromContentType(const nsACString &aTypeHeader,
     return NS_OK;
 }
 
+// parse policyString to policy enum value (see ReferrerPolicy.h)
+NS_IMETHODIMP
+nsIOService::ParseAttributePolicyString(const nsAString& policyString,
+                                                uint32_t *outPolicyEnum)
+{
+  NS_ENSURE_ARG(outPolicyEnum);
+  *outPolicyEnum = (uint32_t)mozilla::net::AttributeReferrerPolicyFromString(policyString);
+  return NS_OK;
+}
+
 // nsISpeculativeConnect
 class IOServiceProxyCallback final : public nsIProtocolProxyCallback
 {
@@ -1614,14 +1756,21 @@ IOServiceProxyCallback::OnProxyAvailable(nsICancelable *request, nsIChannel *cha
     if (!speculativeHandler)
         return NS_OK;
 
-    speculativeHandler->SpeculativeConnect(uri,
-                                           mCallbacks);
+    nsLoadFlags loadFlags = 0;
+    channel->GetLoadFlags(&loadFlags);
+    if (loadFlags & nsIRequest::LOAD_ANONYMOUS) {
+        speculativeHandler->SpeculativeAnonymousConnect(uri, mCallbacks);
+    } else {
+        speculativeHandler->SpeculativeConnect(uri, mCallbacks);
+    }
+
     return NS_OK;
 }
 
-NS_IMETHODIMP
-nsIOService::SpeculativeConnect(nsIURI *aURI,
-                                nsIInterfaceRequestor *aCallbacks)
+nsresult
+nsIOService::SpeculativeConnectInternal(nsIURI *aURI,
+                                        nsIInterfaceRequestor *aCallbacks,
+                                        bool aAnonymous)
 {
     // Check for proxy information. If there is a proxy configured then a
     // speculative connect should not be performed because the potential
@@ -1652,8 +1801,14 @@ nsIOService::SpeculativeConnect(nsIURI *aURI,
                             nsILoadInfo::SEC_NORMAL,
                             nsIContentPolicy::TYPE_OTHER,
                             getter_AddRefs(channel));
-
     NS_ENSURE_SUCCESS(rv, rv);
+
+    if (aAnonymous) {
+        nsLoadFlags loadFlags = 0;
+        channel->GetLoadFlags(&loadFlags);
+        loadFlags |= nsIRequest::LOAD_ANONYMOUS;
+        channel->SetLoadFlags(loadFlags);
+    }
 
     nsCOMPtr<nsICancelable> cancelable;
     nsRefPtr<IOServiceProxyCallback> callback =
@@ -1663,6 +1818,20 @@ nsIOService::SpeculativeConnect(nsIURI *aURI,
         return pps2->AsyncResolve2(channel, 0, callback, getter_AddRefs(cancelable));
     }
     return pps->AsyncResolve(channel, 0, callback, getter_AddRefs(cancelable));
+}
+
+NS_IMETHODIMP
+nsIOService::SpeculativeConnect(nsIURI *aURI,
+                                nsIInterfaceRequestor *aCallbacks)
+{
+    return SpeculativeConnectInternal(aURI, aCallbacks, false);
+}
+
+NS_IMETHODIMP
+nsIOService::SpeculativeAnonymousConnect(nsIURI *aURI,
+                                         nsIInterfaceRequestor *aCallbacks)
+{
+    return SpeculativeConnectInternal(aURI, aCallbacks, true);
 }
 
 void

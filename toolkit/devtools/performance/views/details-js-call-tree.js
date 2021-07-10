@@ -26,7 +26,6 @@ let JsCallTreeView = Heritage.extend(DetailsSubview, {
     this._onLink = this._onLink.bind(this);
 
     this.container = $("#js-calltree-view .call-tree-cells-container");
-
     JITOptimizationsView.initialize();
   },
 
@@ -123,8 +122,8 @@ let JsCallTreeView = Heritage.extend(DetailsSubview, {
     root.attachTo(this.container);
 
     // When platform data isn't shown, hide the cateogry labels, since they're
-    // only available for C++ frames.
-    root.toggleCategories(options.contentOnly);
+    // only available for C++ frames. Pass *false* to make them invisible.
+    root.toggleCategories(!options.contentOnly);
 
     // Return the CallView for tests
     return root;

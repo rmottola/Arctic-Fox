@@ -208,12 +208,16 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(ServiceWorkerGlobalScope,
                                            WorkerGlobalScope)
+  IMPL_EVENT_HANDLER(notificationclick)
 
   ServiceWorkerGlobalScope(WorkerPrivate* aWorkerPrivate, const nsACString& aScope);
 
   virtual bool
   WrapGlobalObject(JSContext* aCx,
                    JS::MutableHandle<JSObject*> aReflector) override;
+
+  static bool
+  InterceptionEnabled(JSContext* aCx, JSObject* aObj);
 
   void
   GetScope(nsString& aScope) const
@@ -227,12 +231,19 @@ public:
   ServiceWorkerRegistrationWorkerThread*
   Registration();
 
+  already_AddRefed<Promise>
+  SkipWaiting(ErrorResult& aRv);
+
   IMPL_EVENT_HANDLER(activate)
   IMPL_EVENT_HANDLER(beforeevicted)
   IMPL_EVENT_HANDLER(evicted)
   IMPL_EVENT_HANDLER(fetch)
   IMPL_EVENT_HANDLER(install)
   IMPL_EVENT_HANDLER(message)
+
+  IMPL_EVENT_HANDLER(push)
+  IMPL_EVENT_HANDLER(pushsubscriptionchange)
+
 };
 
 class WorkerDebuggerGlobalScope final : public DOMEventTargetHelper,

@@ -204,7 +204,7 @@ MochiKit.Base.update(MochiKit.Sortable, {
             accept: options.accept
         }
 
-        // fix for goanna engine
+        // fix for gecko engine
         MochiKit.DOM.removeEmptyTextNodes(element);
 
         options.draggables = [];
@@ -321,7 +321,7 @@ MochiKit.Base.update(MochiKit.Sortable, {
             self.mark(dropon, 'before');
             if (dropon.previousSibling != element) {
                 var oldParentNode = element.parentNode;
-                element.style.visibility = 'hidden';  // fix goanna rendering
+                element.style.visibility = 'hidden';  // fix gecko rendering
                 dropon.parentNode.insertBefore(element, dropon);
                 if (dropon.parentNode != oldParentNode) {
                     self.options(oldParentNode).onChange(element);
@@ -333,7 +333,7 @@ MochiKit.Base.update(MochiKit.Sortable, {
             var nextElement = dropon.nextSibling || null;
             if (nextElement != element) {
                 var oldParentNode = element.parentNode;
-                element.style.visibility = 'hidden';  // fix goanna rendering
+                element.style.visibility = 'hidden';  // fix gecko rendering
                 dropon.parentNode.insertBefore(element, nextElement);
                 if (dropon.parentNode != oldParentNode) {
                     self.options(oldParentNode).onChange(element);

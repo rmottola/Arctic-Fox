@@ -20,6 +20,7 @@
 #include "nsIClassInfoImpl.h"
 #include "nsIConsoleListener.h"
 #include "nsPrintfCString.h"
+#include "nsIScriptError.h"
 
 #include "mozilla/Preferences.h"
 
@@ -60,6 +61,45 @@ nsConsoleService::nsConsoleService()
   // hm, but worry about circularity, bc we want to be able to report
   // prefs errs...
   mBufferSize = 250;
+}
+
+
+NS_IMETHODIMP
+nsConsoleService::ClearMessagesForWindowID(const uint64_t innerID)
+{
+  // Remove the messages related to this window
+  for (uint32_t i = 0; i < mBufferSize && mMessages[i]; i++) {
+    // Only messages implementing nsIScriptError interface exposes the inner window ID
+    nsCOMPtr<nsIScriptError> scriptError = do_QueryInterface(mMessages[i]);
+    if (!scriptError) {
+      continue;
+    }
+    uint64_t innerWindowID;
+    nsresult rv = scriptError->GetInnerWindowID(&innerWindowID);
+    if (NS_FAILED(rv) || innerWindowID != innerID) {
+      continue;
+    }
+
+    // Free this matching message!
+    NS_RELEASE(mMessages[i]);
+
+    uint32_t j = i;
+    // Now shift all the following messages
+    for (; j < mBufferSize - 1 && mMessages[j + 1]; j++) {
+      mMessages[j] = mMessages[j + 1];
+    }
+    // Nullify the current slot
+    mMessages[j] = nullptr;
+    mCurrent = j;
+
+    // The array is no longer full
+    mFull = false;
+
+    // Ensure the next iteration handles the messages we just shifted down
+    i--;
+  }
+
+  return NS_OK;
 }
 
 nsConsoleService::~nsConsoleService()
@@ -130,17 +170,6 @@ private:
   nsRefPtr<nsConsoleService> mService;
 };
 
-typedef nsCOMArray<nsIConsoleListener> ListenerArrayType;
-
-PLDHashOperator
-CollectCurrentListeners(nsISupports* aKey, nsIConsoleListener* aValue,
-                        void* aClosure)
-{
-  ListenerArrayType* listeners = static_cast<ListenerArrayType*>(aClosure);
-  listeners->AppendObject(aValue);
-  return PL_DHASH_NEXT;
-}
-
 NS_IMETHODIMP
 LogMessageRunnable::Run()
 {
@@ -149,7 +178,7 @@ LogMessageRunnable::Run()
   // Snapshot of listeners so that we don't reenter this hash during
   // enumeration.
   nsCOMArray<nsIConsoleListener> listeners;
-  mService->EnumerateListeners(CollectCurrentListeners, &listeners);
+  mService->CollectCurrentListeners(listeners);
 
   mService->SetIsDelivering();
 
@@ -288,18 +317,25 @@ nsConsoleService::LogMessageWithMode(nsIConsoleMessage* aMessage,
   }
 
   if (r) {
-    NS_DispatchToMainThread(r);
+    // avoid failing in XPCShell tests
+    nsCOMPtr<nsIThread> mainThread = do_GetMainThread();
+    if (mainThread) {
+      NS_DispatchToMainThread(r.forget());
+    }
   }
 
   return NS_OK;
 }
 
 void
-nsConsoleService::EnumerateListeners(ListenerHash::EnumReadFunction aFunction,
-                                     void* aClosure)
+nsConsoleService::CollectCurrentListeners(
+  nsCOMArray<nsIConsoleListener>& aListeners)
 {
   MutexAutoLock lock(mLock);
-  mListeners.EnumerateRead(aFunction, aClosure);
+  for (auto iter = mListeners.Iter(); !iter.Done(); iter.Next()) {
+    nsIConsoleListener* value = iter.UserData();
+    aListeners.AppendObject(value);
+  }
 }
 
 NS_IMETHODIMP

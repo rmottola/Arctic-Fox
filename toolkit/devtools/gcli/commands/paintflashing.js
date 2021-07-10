@@ -94,7 +94,9 @@ exports.items = [
         {
           type: "boolean",
           name: "chrome",
-          get hidden() l10n.hiddenByChromePref(),
+          get hidden() {
+            return gcli.hiddenByChromePref();
+          },
           description: l10n.lookup("paintflashingChromeDesc"),
         }
       ]
@@ -122,12 +124,14 @@ exports.items = [
         {
           type: "boolean",
           name: "chrome",
-          get hidden() l10n.hiddenByChromePref(),
+          get hidden() {
+            return gcli.hiddenByChromePref();
+          },
           description: l10n.lookup("paintflashingChromeDesc"),
         }
       ]
     }],
-    exec: function(args, context) {
+    exec: function*(args, context) {
       if (!args.chrome) {
         const value = yield context.updateExec("paintflashing_server --state off");
         isContentPaintFlashing = value;
@@ -153,7 +157,7 @@ exports.items = [
     tooltipText: l10n.lookup("paintflashingTooltip"),
     description: l10n.lookup("paintflashingToggleDesc"),
     manual: l10n.lookup("paintflashingManual"),
-    exec: function(args, context) {
+    exec: function*(args, context) {
       const value = yield context.updateExec("paintflashing_server --state toggle");
       isContentPaintFlashing = value;
       onPaintFlashingChanged(context.environment.target, value);

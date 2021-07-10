@@ -6,6 +6,7 @@
 #include "mozilla/Preferences.h"
 #include "MediaResource.h"
 #include "mozilla/dom/HTMLMediaElement.h"
+#include "mozilla/Services.h"
 #include "AndroidMediaPluginHost.h"
 #include "nsXPCOMStrings.h"
 #include "nsISeekableStream.h"
@@ -108,7 +109,7 @@ static bool IsOmxSupported()
   }
 
   if (!forceEnabled) {
-    nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+    nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
     if (gfxInfo) {
       int32_t status;
       if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_STAGEFRIGHT, &status))) {
@@ -206,6 +207,7 @@ static const char* GetOmxLibraryName()
 
 AndroidMediaPluginHost::AndroidMediaPluginHost() {
   MOZ_COUNT_CTOR(AndroidMediaPluginHost);
+  MOZ_ASSERT(NS_IsMainThread());
 
   mResourceServer = AndroidMediaResourceServer::Start();
 
@@ -304,11 +306,18 @@ void AndroidMediaPluginHost::DestroyDecoder(Decoder *aDecoder)
 }
 
 AndroidMediaPluginHost *sAndroidMediaPluginHost = nullptr;
-AndroidMediaPluginHost *GetAndroidMediaPluginHost()
+AndroidMediaPluginHost *EnsureAndroidMediaPluginHost()
 {
+  MOZ_DIAGNOSTIC_ASSERT(NS_IsMainThread());
   if (!sAndroidMediaPluginHost) {
     sAndroidMediaPluginHost = new AndroidMediaPluginHost();
   }
+  return sAndroidMediaPluginHost;
+}
+
+AndroidMediaPluginHost *GetAndroidMediaPluginHost()
+{
+  MOZ_ASSERT(sAndroidMediaPluginHost);
   return sAndroidMediaPluginHost;
 }
 

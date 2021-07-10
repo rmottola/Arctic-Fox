@@ -74,7 +74,8 @@ public:
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(AudioNode,
                                            DOMEventTargetHelper)
 
-  virtual AudioBufferSourceNode* AsAudioBufferSourceNode() {
+  virtual AudioBufferSourceNode* AsAudioBufferSourceNode()
+  {
     return nullptr;
   }
 
@@ -137,7 +138,8 @@ public:
     SendChannelMixingParametersToStream();
   }
 
-  struct InputNode {
+  struct InputNode final
+  {
     ~InputNode()
     {
       if (mStreamPort) {
@@ -165,7 +167,7 @@ public:
     uint32_t mOutputPort;
   };
 
-  MediaStream* Stream() { return mStream; }
+  AudioNodeStream* Stream() { return mStream; }
 
   const nsTArray<InputNode>& InputNodes() const
   {
@@ -218,9 +220,8 @@ private:
   nsRefPtr<AudioContext> mContext;
 
 protected:
-  // Must be set in the constructor. Must not be null.
-  // If MaxNumberOfInputs() is > 0, then mStream must be a ProcessedMediaStream.
-  nsRefPtr<MediaStream> mStream;
+  // Must be set in the constructor. Must not be null unless finished.
+  nsRefPtr<AudioNodeStream> mStream;
 
 private:
   // For every InputNode, there is a corresponding entry in mOutputNodes of the

@@ -67,6 +67,7 @@
 #include "mozilla/Preferences.h"
 #include "gfxTextRun.h"
 #include "nsFontFaceUtils.h"
+#include "nsLayoutStylesheetCache.h"
 
 #if defined(MOZ_WIDGET_GTK)
 #include "gfxPlatformGtk.h" // xxx - for UseFcFontList
@@ -247,13 +248,12 @@ nsPresContext::nsPresContext(nsIDocument* aDocument, nsPresContextType aType)
     mNeverAnimate = false;
   }
   NS_ASSERTION(mDocument, "Null document");
-  mFontFaceSetDirty = true;
 
   mCounterStylesDirty = true;
 
   // if text perf logging enabled, init stats struct
   PRLogModuleInfo *log = gfxPlatform::GetLog(eGfxLog_textperf);
-  if (log && log->level >= PR_LOG_WARNING) {
+  if (MOZ_LOG_TEST(log, LogLevel::Warning)) {
     mTextPerf = new gfxTextPerfMetrics();
   }
 
@@ -929,6 +929,12 @@ nsPresContext::PreferenceChanged(const char* aPrefName)
     mPrefChangedTimer = do_CreateInstance("@mozilla.org/timer;1");
     if (!mPrefChangedTimer)
       return;
+    // We will end up calling InvalidatePreferenceSheets one from each pres
+    // context, but all it's doing is clearing its cached sheet pointers,
+    // so it won't be wastefully recreating the sheet multiple times.
+    // The first pres context that has its mPrefChangedTimer called will
+    // be the one to cause the reconstruction of the pref style sheet.
+    nsLayoutStylesheetCache::InvalidatePreferenceSheets();
     mPrefChangedTimer->InitWithFuncCallback(nsPresContext::PrefChangedUpdateTimerCallback, (void*)this, 0, nsITimer::TYPE_ONE_SHOT);
   }
   if (prefName.EqualsLiteral("nglayout.debug.paint_flashing") ||
@@ -953,7 +959,7 @@ nsPresContext::UpdateAfterPreferencesChanged()
 
   // update the presShell: tell it to set the preference style rules up
   if (mShell) {
-    mShell->SetPreferenceStyleRules(true);
+    mShell->UpdatePreferenceStyles();
   }
 
   InvalidatePaintedLayers();
@@ -1110,11 +1116,6 @@ nsPresContext::Init(nsDeviceContext* aDeviceContext)
 void
 nsPresContext::SetShell(nsIPresShell* aShell)
 {
-  if (mFontFaceSet) {
-    // Clear out user font set if we have one
-    mFontFaceSet->DestroyUserFontSet();
-    mFontFaceSet = nullptr;
-  }
   if (mCounterStyleManager) {
     mCounterStyleManager->Disconnect();
     mCounterStyleManager = nullptr;
@@ -1320,12 +1321,40 @@ nsPresContext::GetRootPresContext()
 void
 nsPresContext::CompatibilityModeChanged()
 {
-  if (!mShell)
+  if (!mShell) {
     return;
+  }
 
-  // enable/disable the QuirkSheet
-  mShell->StyleSet()->
-    EnableQuirkStyleSheet(CompatibilityMode() == eCompatibility_NavQuirks);
+  nsIDocument* doc = mShell->GetDocument();
+  if (!doc) {
+    return;
+  }
+
+  if (doc->IsSVGDocument()) {
+    // SVG documents never load quirk.css.
+    return;
+  }
+
+  bool needsQuirkSheet = CompatibilityMode() == eCompatibility_NavQuirks;
+  if (mQuirkSheetAdded == needsQuirkSheet) {
+    return;
+  }
+
+  nsStyleSet* styleSet = mShell->StyleSet();
+  CSSStyleSheet* sheet = nsLayoutStylesheetCache::QuirkSheet();
+
+  if (needsQuirkSheet) {
+    // quirk.css needs to come after html.css; we just keep it at the end.
+    DebugOnly<nsresult> rv =
+      styleSet->AppendStyleSheet(nsStyleSet::eAgentSheet, sheet);
+    NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "failed to insert quirk.css");
+  } else {
+    DebugOnly<nsresult> rv =
+      styleSet->RemoveStyleSheet(nsStyleSet::eAgentSheet, sheet);
+    NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "failed to remove quirk.css");
+  }
+
+  mQuirkSheetAdded = needsQuirkSheet;
 }
 
 // Helper function for setting Anim Mode on image
@@ -1471,8 +1500,8 @@ nsPresContext::SetFullZoom(float aZoom)
   float oldHeightDevPixels = oldHeightAppUnits / float(mCurAppUnitsPerDevPixel);
   mDeviceContext->SetFullZoom(aZoom);
 
-  NS_ASSERTION(!mSupressResizeReflow, "two zooms happening at the same time? impossible!");
-  mSupressResizeReflow = true;
+  NS_ASSERTION(!mSuppressResizeReflow, "two zooms happening at the same time? impossible!");
+  mSuppressResizeReflow = true;
 
   mFullZoom = aZoom;
   mShell->GetViewManager()->
@@ -1481,7 +1510,7 @@ nsPresContext::SetFullZoom(float aZoom)
 
   AppUnitsPerDevPixelChanged();
 
-  mSupressResizeReflow = false;
+  mSuppressResizeReflow = false;
 }
 
 gfxSize
@@ -1624,7 +1653,7 @@ nsPresContext::SetBidi(uint32_t aSource, bool aForceRestyle)
   if (aForceRestyle && mShell) {
     // Reconstruct the root document element's frame and its children,
     // because we need to trigger frame reconstruction for direction change.
-    RebuildUserFontSet();
+    mDocument->RebuildUserFontSet();
     mShell->ReconstructFrames();
   }
 }
@@ -1774,6 +1803,15 @@ nsPresContext::UIResolutionChanged()
   }
 }
 
+void
+nsPresContext::UIResolutionChangedSync()
+{
+  if (!mPendingUIResolutionChanged) {
+    mPendingUIResolutionChanged = true;
+    UIResolutionChangedInternal();
+  }
+}
+
 /*static*/ bool
 nsPresContext::UIResolutionChangedSubdocumentCallback(nsIDocument* aDocument,
                                                       void* aData)
@@ -1789,9 +1827,24 @@ nsPresContext::UIResolutionChangedSubdocumentCallback(nsIDocument* aDocument,
 }
 
 static void
-NotifyUIResolutionChanged(TabParent* aTabParent, void* aArg)
+NotifyTabUIResolutionChanged(TabParent* aTab, void *aArg)
 {
-  aTabParent->UIResolutionChanged();
+  aTab->UIResolutionChanged();
+}
+
+static void
+NotifyChildrenUIResolutionChanged(nsIDOMWindow* aWindow)
+{
+  nsCOMPtr<nsPIDOMWindow> piWin = do_QueryInterface(aWindow);
+  if (!piWin) {
+    return;
+  }
+  nsCOMPtr<nsIDocument> doc = piWin->GetExtantDoc();
+  nsRefPtr<nsPIWindowRoot> topLevelWin = nsContentUtils::GetWindowRoot(doc);
+  if (!topLevelWin) {
+    return;
+  }
+  topLevelWin->EnumerateBrowsers(NotifyTabUIResolutionChanged, nullptr);
 }
 
 void
@@ -1804,10 +1857,8 @@ nsPresContext::UIResolutionChangedInternal()
     AppUnitsPerDevPixelChanged();
   }
 
-  // Recursively notify all remote leaf descendants that the
-  // resolution of the user interface has changed.
-  nsContentUtils::CallOnAllRemoteChildren(mDocument->GetWindow(),
-                                          NotifyUIResolutionChanged, nullptr);
+  // Recursively notify all remote leaf descendants of the change.
+  NotifyChildrenUIResolutionChanged(mDocument->GetWindow());
 
   mDocument->EnumerateSubDocuments(UIResolutionChangedSubdocumentCallback,
                                    nullptr);
@@ -1849,7 +1900,7 @@ nsPresContext::RebuildAllStyleData(nsChangeHint aExtraHint,
   mUsesRootEMUnits = false;
   mUsesExChUnits = false;
   mUsesViewportUnits = false;
-  RebuildUserFontSet();
+  mDocument->RebuildUserFontSet();
   RebuildCounterStyles();
 
   RestyleManager()->RebuildAllStyleData(aExtraHint, aRestyleHint);
@@ -1873,7 +1924,7 @@ nsPresContext::MediaFeatureValuesChanged(nsRestyleHint aRestyleHint,
   mPendingMediaFeatureValuesChanged = false;
 
   // MediumFeaturesChanged updates the applied rules, so it always gets called.
-  if (mShell && mShell->StyleSet()->MediumFeaturesChanged(this)) {
+  if (mShell && mShell->StyleSet()->MediumFeaturesChanged()) {
     aRestyleHint |= eRestyle_Subtree;
   }
 
@@ -1892,6 +1943,8 @@ nsPresContext::MediaFeatureValuesChanged(nsRestyleHint aRestyleHint,
     MOZ_ASSERT(PR_CLIST_IS_EMPTY(mDocument->MediaQueryLists()));
     return;
   }
+
+  mDocument->NotifyMediaFeatureValuesChanged();
 
   MOZ_ASSERT(nsContentUtils::IsSafeToRunScript());
 
@@ -1915,7 +1968,7 @@ nsPresContext::MediaFeatureValuesChanged(nsRestyleHint aRestyleHint,
     // Note that we intentionally send the notifications to media query
     // list in the order they were created and, for each list, to the
     // listeners in the order added.
-    MediaQueryList::NotifyList notifyList;
+    nsTArray<MediaQueryList::HandleChangeData> notifyList;
     for (PRCList *l = PR_LIST_HEAD(mDocument->MediaQueryLists());
          l != mDocument->MediaQueryLists(); l = PR_NEXT_LINK(l)) {
       MediaQueryList *mql = static_cast<MediaQueryList*>(l);
@@ -2031,112 +2084,9 @@ nsPresContext::HasAuthorSpecifiedRules(nsIFrame *aFrame, uint32_t ruleTypeMask) 
 }
 
 gfxUserFontSet*
-nsPresContext::GetUserFontSetInternal()
+nsPresContext::GetUserFontSet()
 {
-  // We want to initialize the user font set lazily the first time the
-  // user asks for it, rather than building it too early and forcing
-  // rule cascade creation.  Thus we try to enforce the invariant that
-  // we *never* build the user font set until the first call to
-  // GetUserFontSet.  However, once it's been requested, we can't wait
-  // for somebody to call GetUserFontSet in order to rebuild it (see
-  // comments below in RebuildUserFontSet for why).
-#ifdef DEBUG
-  bool userFontSetGottenBefore = mGetUserFontSetCalled;
-#endif
-  // Set mGetUserFontSetCalled up front, so that FlushUserFontSet will actually
-  // flush.
-  mGetUserFontSetCalled = true;
-  if (mFontFaceSetDirty) {
-    // If this assertion fails, and there have actually been changes to
-    // @font-face rules, then we will call StyleChangeReflow in
-    // FlushUserFontSet.  If we're in the middle of reflow,
-    // that's a bad thing to do, and the caller was responsible for
-    // flushing first.  If we're not (e.g., in frame construction), it's
-    // ok.
-    NS_ASSERTION(!userFontSetGottenBefore || !mShell->IsReflowLocked(),
-                 "FlushUserFontSet should have been called first");
-    FlushUserFontSet();
-  }
-
-  if (!mFontFaceSet) {
-    return nullptr;
-  }
-
-  return mFontFaceSet->GetUserFontSet();
-}
-
-gfxUserFontSet*
-nsPresContext::GetUserFontSetExternal()
-{
-  return GetUserFontSetInternal();
-}
-
-void
-nsPresContext::FlushUserFontSet()
-{
-  if (!mShell) {
-    return; // we've been torn down
-  }
-
-  if (!mGetUserFontSetCalled) {
-    return; // No one cares about this font set yet, but we want to be careful
-            // to not unset our mFontFaceSetDirty bit, so when someone really
-            // does we'll create it.
-  }
-
-  if (mFontFaceSetDirty) {
-    if (gfxPlatform::GetPlatform()->DownloadableFontsEnabled()) {
-      nsTArray<nsFontFaceRuleContainer> rules;
-      if (!mShell->StyleSet()->AppendFontFaceRules(this, rules)) {
-        return;
-      }
-
-      if (!mFontFaceSet) {
-        mFontFaceSet = new FontFaceSet(mDocument->GetInnerWindow(), this);
-      }
-      mFontFaceSet->EnsureUserFontSet(this);
-      bool changed = mFontFaceSet->UpdateRules(rules);
-
-      // We need to enqueue a style change reflow (for later) to
-      // reflect that we're modifying @font-face rules.  (However,
-      // without a reflow, nothing will happen to start any downloads
-      // that are needed.)
-      if (changed) {
-        UserFontSetUpdated();
-      }
-    }
-
-    mFontFaceSetDirty = false;
-  }
-}
-
-void
-nsPresContext::RebuildUserFontSet()
-{
-  if (!mGetUserFontSetCalled) {
-    // We want to lazily build the user font set the first time it's
-    // requested (so we don't force creation of rule cascades too
-    // early), so don't do anything now.
-    return;
-  }
-
-  mFontFaceSetDirty = true;
-  mDocument->SetNeedStyleFlush();
-
-  // Somebody has already asked for the user font set, so we need to
-  // post an event to rebuild it.  Setting the user font set to be dirty
-  // and lazily rebuilding it isn't sufficient, since it is only the act
-  // of rebuilding it that will trigger the style change reflow that
-  // calls GetUserFontSet.  (This reflow causes rebuilding of text runs,
-  // which starts font loads, whose completion causes another style
-  // change reflow).
-  if (!mPostedFlushUserFontSet) {
-    nsCOMPtr<nsIRunnable> ev =
-      NS_NewRunnableMethod(this, &nsPresContext::HandleRebuildUserFontSet);
-    if (NS_SUCCEEDED(NS_DispatchToCurrentThread(ev))) {
-      mPostedFlushUserFontSet = true;
-    }
-  }
+  return mDocument->GetUserFontSet();
 }
 
 void
@@ -2178,17 +2128,10 @@ nsPresContext::UserFontSetUpdated(gfxUserFontEntry* aUpdatedFont)
   // it contains that specific font (i.e. the one chosen within the family
   // given the weight, width, and slant from the nsStyleFont). If it does,
   // mark that frame dirty and skip inspecting its descendants.
-  nsFontFaceUtils::MarkDirtyForFontChange(mShell->GetRootFrame(), aUpdatedFont);
-}
-
-FontFaceSet*
-nsPresContext::Fonts()
-{
-  if (!mFontFaceSet) {
-    mFontFaceSet = new FontFaceSet(mDocument->GetInnerWindow(), this);
-    GetUserFontSet();  // this will cause the user font set to be created/updated
+  nsIFrame* root = mShell->GetRootFrame();
+  if (root) {
+    nsFontFaceUtils::MarkDirtyForFontChange(root, aUpdatedFont);
   }
-  return mFontFaceSet;
 }
 
 void
@@ -2243,14 +2186,11 @@ nsPresContext::NotifyMissingFonts()
 void
 nsPresContext::EnsureSafeToHandOutCSSRules()
 {
-  CSSStyleSheet::EnsureUniqueInnerResult res =
-    mShell->StyleSet()->EnsureUniqueInnerOnCSSSheets();
-  if (res == CSSStyleSheet::eUniqueInner_AlreadyUnique) {
+  if (!mShell->StyleSet()->EnsureUniqueInnerOnCSSSheets()) {
     // Nothing to do.
     return;
   }
 
-  MOZ_ASSERT(res == CSSStyleSheet::eUniqueInner_ClonedInner);
   RebuildAllStyleData(nsChangeHint(0), eRestyle_Subtree);
 }
 
@@ -2663,8 +2603,9 @@ nsPresContext::HavePendingInputEvent()
 void
 nsPresContext::NotifyFontFaceSetOnRefresh()
 {
-  if (mFontFaceSet) {
-    mFontFaceSet->DidRefresh();
+  FontFaceSet* set = mDocument->GetFonts();
+  if (set) {
+    set->DidRefresh();
   }
 }
 
@@ -2799,7 +2740,7 @@ nsPresContext::IsCrossProcessRootContentDocument()
     return false;
   }
 
-  if (XRE_GetProcessType() == GeckoProcessType_Default) {
+  if (XRE_IsParentProcess()) {
     return true;
   }
 
@@ -2935,7 +2876,7 @@ nsRootPresContext::ComputePluginGeometryUpdates(nsIFrame* aFrame,
   // This is not happening during a paint event.
   ApplyPluginGeometryUpdates();
 #else
-  if (XRE_GetProcessType() == GeckoProcessType_Default) {
+  if (XRE_IsParentProcess()) {
     InitApplyPluginGeometryTimer();
   }
 #endif

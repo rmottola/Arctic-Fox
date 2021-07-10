@@ -42,7 +42,8 @@ static const char *kTypeString[] = {"other",
                                     "xslt",
                                     "beacon",
                                     "fetch",
-                                    "image"}; // No "imageset" - bug 1196784
+                                    "imageset",
+                                    "manifest"};
 
 #define NUMBER_OF_TYPES MOZ_ARRAY_LENGTH(kTypeString)
 uint8_t nsContentBlocker::mBehaviorPref[NUMBER_OF_TYPES];

@@ -5,14 +5,17 @@
 #ifndef UseCounter_h_
 #define UseCounter_h_
 
+#include <stdint.h>
+
 namespace mozilla {
 
-enum UseCounter {
+enum UseCounter : int16_t {
   eUseCounter_UNKNOWN = -1,
 #define USE_COUNTER_DOM_METHOD(interface_, name_) \
     eUseCounter_##interface_##_##name_,
 #define USE_COUNTER_DOM_ATTRIBUTE(interface_, name_) \
-    eUseCounter_##interface_##_##name_,
+    eUseCounter_##interface_##_##name_##_getter, \
+    eUseCounter_##interface_##_##name_##_setter,
 #define USE_COUNTER_CSS_PROPERTY(name_, id_) \
     eUseCounter_property_##id_,
 #include "mozilla/dom/UseCounterList.h"

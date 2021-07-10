@@ -819,15 +819,19 @@ public:
   DisplayListClipState& ClipState() { return mClipState; }
 
   /**
-   * The will-change budget is calculated during the display list building
-   * phase for all the frames that want will change on a per-document basis.
-   * The cost should be fully calculated during the layer building phase
-   * and a decission to allow or disallow will-change for all frames of
-   * that document will be made by IsInWillChangeBudget.
+   * Add the current frame to the will-change budget if possible and
+   * remeber the outcome. Subsequent calls to IsInWillChangeBudget
+   * will return the same value as return here.
    */
-  void AddToWillChangeBudget(nsIFrame* aFrame, const nsSize& aSize);
+  bool AddToWillChangeBudget(nsIFrame* aFrame, const nsSize& aSize);
 
-  bool IsInWillChangeBudget(nsIFrame* aFrame) const;
+  /**
+   * This will add the current frame to the will-change budget the first
+   * time it is seen. On subsequent calls this will return the same
+   * answer. This effectively implements a first-come, first-served
+   * allocation of the will-change budget.
+   */
+  bool IsInWillChangeBudget(nsIFrame* aFrame, const nsSize& aSize);
 
   /**
    * Look up the cached animated geometry root for aFrame subject to
@@ -936,8 +940,10 @@ private:
   // will-change budget tracker
   nsDataHashtable<nsPtrHashKey<nsPresContext>, DocumentWillChangeBudget>
                                  mWillChangeBudget;
-  // Assert that we never check the budget before its fully calculated.
-  mutable mozilla::DebugOnly<bool> mWillChangeBudgetCalculated;
+
+  // Any frame listed in this set is already counted in the budget
+  // and thus is in-budget.
+  nsTHashtable<nsPtrHashKey<nsIFrame> > mBudgetSet;
 
   // rects are relative to the frame's reference frame
   nsDataHashtable<nsPtrHashKey<nsIFrame>, nsRect> mDirtyRectForScrolledContents;
@@ -2001,6 +2007,14 @@ public:
     : nsDisplayItem(aBuilder, aFrame)
   {}
 
+  /**
+   * @return true if this display item can be optimized into an image layer.
+   * It is an error to call GetContainer() unless you've called
+   * CanOptimizeToImageLayer() first and it returned true.
+   */
+  virtual bool CanOptimizeToImageLayer(LayerManager* aManager,
+                                       nsDisplayListBuilder* aBuilder) = 0;
+
   virtual already_AddRefed<ImageContainer> GetContainer(LayerManager* aManager,
                                                         nsDisplayListBuilder* aBuilder) = 0;
   virtual void ConfigureLayer(ImageLayer* aLayer,
@@ -2179,11 +2193,8 @@ protected:
  */
 class nsDisplayBorder : public nsDisplayItem {
 public:
-  nsDisplayBorder(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame) :
-    nsDisplayItem(aBuilder, aFrame)
-  {
-    MOZ_COUNT_CTOR(nsDisplayBorder);
-  }
+  nsDisplayBorder(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame);
+
 #ifdef NS_BUILD_REFCNT_LOGGING
   virtual ~nsDisplayBorder() {
     MOZ_COUNT_DTOR(nsDisplayBorder);
@@ -2203,6 +2214,8 @@ public:
 
 protected:
   nsRect CalculateBounds(const nsStyleBorder& aStyleBorder);
+
+  nsRect mBounds;
 };
 
 /**
@@ -2350,6 +2363,8 @@ public:
                                          const nsDisplayItemGeometry* aGeometry,
                                          nsRegion* aInvalidRegion) override;
   
+  virtual bool CanOptimizeToImageLayer(LayerManager* aManager,
+                                       nsDisplayListBuilder* aBuilder) override;
   virtual already_AddRefed<ImageContainer> GetContainer(LayerManager* aManager,
                                                         nsDisplayListBuilder *aBuilder) override;
   virtual void ConfigureLayer(ImageLayer* aLayer,
@@ -2376,7 +2391,7 @@ protected:
   // Cache the result of nsCSSRendering::FindBackground. Always null if
   // mIsThemed is true or if FindBackground returned false.
   const nsStyleBackground* mBackgroundStyle;
-  /* If this background can be a simple image layer, we store the format here. */
+  nsCOMPtr<imgIContainer> mImage;
   nsRefPtr<ImageContainer> mImageContainer;
   LayoutDeviceRect mDestRect;
   /* Bounds of this display item */
@@ -3516,22 +3531,6 @@ public:
   static Point3D GetDeltaToPerspectiveOrigin(const nsIFrame* aFrame,
                                              float aAppUnitsPerPixel);
 
-  /**
-   * Returns the bounds of a frame as defined for resolving percentage
-   * <translation-value>s in CSS transforms.  If
-   * UNIFIED_CONTINUATIONS is not defined, this is simply the frame's bounding
-   * rectangle, translated to the origin.  Otherwise, returns the smallest
-   * rectangle containing a frame and all of its continuations.  For example,
-   * if there is a <span> element with several continuations split over
-   * several lines, this function will return the rectangle containing all of
-   * those continuations.  This rectangle is relative to the origin of the
-   * frame's local coordinate space.
-   *
-   * @param aFrame The frame to get the bounding rect for.
-   * @return The frame's bounding rect, as described above.
-   */
-  static nsRect GetFrameBoundsForTransform(const nsIFrame* aFrame);
-
   struct FrameTransformProperties
   {
     FrameTransformProperties(const nsIFrame* aFrame,
@@ -3544,15 +3543,24 @@ public:
       : mFrame(nullptr)
       , mTransformList(aTransformList)
       , mToTransformOrigin(aToTransformOrigin)
-      , mToPerspectiveOrigin(aToPerspectiveOrigin)
       , mChildPerspective(aChildPerspective)
+      , mToPerspectiveOrigin(aToPerspectiveOrigin)
     {}
+
+    const Point3D& GetToPerspectiveOrigin() const
+    {
+      MOZ_ASSERT(mChildPerspective > 0, "Only valid with mChildPerspective > 0");
+      return mToPerspectiveOrigin;
+    }
 
     const nsIFrame* mFrame;
     nsRefPtr<nsCSSValueSharedList> mTransformList;
     const Point3D mToTransformOrigin;
-    const Point3D mToPerspectiveOrigin;
     nscoord mChildPerspective;
+
+  private:
+    // mToPerspectiveOrigin is only valid if mChildPerspective > 0.
+    Point3D mToPerspectiveOrigin;
   };
 
   /**
@@ -3563,24 +3571,24 @@ public:
    * @param aOrigin Relative to which point this transform should be applied.
    * @param aAppUnitsPerPixel The number of app units per graphics unit.
    * @param aBoundsOverride [optional] If this is nullptr (the default), the
-   *        computation will use the value of GetFrameBoundsForTransform(aFrame)
-   *        for the frame's bounding rectangle. Otherwise, it will use the
-   *        value of aBoundsOverride.  This is mostly for internal use and in
-   *        most cases you will not need to specify a value.
+   *        computation will use the value of TransformReferenceBox(aFrame).
+   *        Otherwise, it will use the value of aBoundsOverride.  This is
+   *        mostly for internal use and in most cases you will not need to
+   *        specify a value.
    * @param aOffsetByOrigin If true, the resulting matrix will be translated
    *        by aOrigin. This translation is applied *before* the CSS transform.
    */
-  static gfx3DMatrix GetResultingTransformMatrix(const nsIFrame* aFrame,
-                                                 const nsPoint& aOrigin,
-                                                 float aAppUnitsPerPixel,
-                                                 const nsRect* aBoundsOverride = nullptr,
-                                                 nsIFrame** aOutAncestor = nullptr,
-                                                 bool aOffsetByOrigin = false);
-  static gfx3DMatrix GetResultingTransformMatrix(const FrameTransformProperties& aProperties,
-                                                 const nsPoint& aOrigin,
-                                                 float aAppUnitsPerPixel,
-                                                 const nsRect* aBoundsOverride = nullptr,
-                                                 nsIFrame** aOutAncestor = nullptr);
+  static Matrix4x4 GetResultingTransformMatrix(const nsIFrame* aFrame,
+                                               const nsPoint& aOrigin,
+                                               float aAppUnitsPerPixel,
+                                               const nsRect* aBoundsOverride = nullptr,
+                                               nsIFrame** aOutAncestor = nullptr,
+                                               bool aOffsetByOrigin = false);
+  static Matrix4x4 GetResultingTransformMatrix(const FrameTransformProperties& aProperties,
+                                               const nsPoint& aOrigin,
+                                               float aAppUnitsPerPixel,
+                                               const nsRect* aBoundsOverride = nullptr,
+                                               nsIFrame** aOutAncestor = nullptr);
   /**
    * Return true when we should try to prerender the entire contents of the
    * transformed frame even when it's not completely visible (yet).
@@ -3607,12 +3615,12 @@ private:
   void SetReferenceFrameToAncestor(nsDisplayListBuilder* aBuilder);
   void Init(nsDisplayListBuilder* aBuilder);
 
-  static gfx3DMatrix GetResultingTransformMatrixInternal(const FrameTransformProperties& aProperties,
-                                                         const nsPoint& aOrigin,
-                                                         float aAppUnitsPerPixel,
-                                                         const nsRect* aBoundsOverride,
-                                                         nsIFrame** aOutAncestor,
-                                                         bool aOffsetByOrigin);
+  static Matrix4x4 GetResultingTransformMatrixInternal(const FrameTransformProperties& aProperties,
+                                                       const nsPoint& aOrigin,
+                                                       float aAppUnitsPerPixel,
+                                                       const nsRect* aBoundsOverride,
+                                                       nsIFrame** aOutAncestor,
+                                                       bool aOffsetByOrigin);
 
   nsDisplayWrapList mStoredList;
   Matrix4x4 mTransform;

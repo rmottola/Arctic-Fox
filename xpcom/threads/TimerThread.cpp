@@ -82,7 +82,7 @@ TimerObserverRunnable::Run()
 nsresult
 TimerThread::Init()
 {
-  PR_LOG(GetTimerLog(), PR_LOG_DEBUG,
+  MOZ_LOG(GetTimerLog(), LogLevel::Debug,
          ("TimerThread::Init [%d]\n", mInitialized));
 
   if (mInitialized) {
@@ -129,7 +129,7 @@ TimerThread::Init()
 nsresult
 TimerThread::Shutdown()
 {
-  PR_LOG(GetTimerLog(), PR_LOG_DEBUG, ("TimerThread::Shutdown begin\n"));
+  MOZ_LOG(GetTimerLog(), LogLevel::Debug, ("TimerThread::Shutdown begin\n"));
 
   if (!mThread) {
     return NS_ERROR_NOT_INITIALIZED;
@@ -167,7 +167,7 @@ TimerThread::Shutdown()
 
   mThread->Shutdown();    // wait for the thread to die
 
-  PR_LOG(GetTimerLog(), PR_LOG_DEBUG, ("TimerThread::Shutdown end\n"));
+  MOZ_LOG(GetTimerLog(), LogLevel::Debug, ("TimerThread::Shutdown end\n"));
   return NS_OK;
 }
 
@@ -205,7 +205,6 @@ TimerThread::Run()
   }
 #endif
 
-  NS_SetIgnoreStatusOfCurrentThread();
   MonitorAutoLock lock(mMonitor);
 
   // We need to know how many microseconds give a positive PRIntervalTime. This
@@ -236,7 +235,7 @@ TimerThread::Run()
     if (mSleeping) {
       // Sleep for 0.1 seconds while not firing timers.
       uint32_t milliseconds = 100;
-      if (ChaosMode::isActive(ChaosMode::TimerScheduling)) {
+      if (ChaosMode::isActive(ChaosFeature::TimerScheduling)) {
         milliseconds = ChaosMode::randomUint32LessThan(200);
       }
       waitFor = PR_MillisecondsToInterval(milliseconds);
@@ -260,13 +259,9 @@ TimerThread::Run()
           RemoveTimerInternal(timer);
           timer = nullptr;
 
-#ifdef DEBUG_TIMERS
-          if (PR_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
-            PR_LOG(GetTimerLog(), PR_LOG_DEBUG,
-                   ("Timer thread woke up %fms from when it was supposed to\n",
-                    fabs((now - timerRef->mTimeout).ToMilliseconds())));
-          }
-#endif
+          MOZ_LOG(GetTimerLog(), LogLevel::Debug,
+                 ("Timer thread woke up %fms from when it was supposed to\n",
+                  fabs((now - timerRef->mTimeout).ToMilliseconds())));
 
           {
             // We release mMonitor around the Fire call to avoid deadlock.
@@ -323,7 +318,7 @@ TimerThread::Run()
         // interval is so small we should not wait at all).
         double microseconds = (timeout - now).ToMilliseconds() * 1000;
 
-        if (ChaosMode::isActive(ChaosMode::TimerScheduling)) {
+        if (ChaosMode::isActive(ChaosFeature::TimerScheduling)) {
           // The mean value of sFractions must be 1 to ensure that
           // the average of a long sequence of timeouts converges to the
           // actual sum of their times.
@@ -346,16 +341,14 @@ TimerThread::Run()
         }
       }
 
-#ifdef DEBUG_TIMERS
-      if (PR_LOG_TEST(GetTimerLog(), PR_LOG_DEBUG)) {
+      if (MOZ_LOG_TEST(GetTimerLog(), LogLevel::Debug)) {
         if (waitFor == PR_INTERVAL_NO_TIMEOUT)
-          PR_LOG(GetTimerLog(), PR_LOG_DEBUG,
+          MOZ_LOG(GetTimerLog(), LogLevel::Debug,
                  ("waiting for PR_INTERVAL_NO_TIMEOUT\n"));
         else
-          PR_LOG(GetTimerLog(), PR_LOG_DEBUG,
+          MOZ_LOG(GetTimerLog(), LogLevel::Debug,
                  ("waiting for %u\n", PR_IntervalToMilliseconds(waitFor)));
       }
-#endif
     }
 
     mWaiting = true;
@@ -460,9 +453,9 @@ TimerThread::AddTimerInternal(nsTimerImpl* aTimer)
   NS_ADDREF(aTimer);
 
 #ifdef MOZ_TASK_TRACER
-  // Create a FakeTracedTask, and dispatch it here. This is the start point of
-  // the latency.
-  aTimer->DispatchTracedTask();
+  // Caller of AddTimer is the parent task of its timer event, so we store the
+  // TraceInfo here for later used.
+  aTimer->GetTLSTraceInfo();
 #endif
 
   return insertSlot - mTimers.Elements();

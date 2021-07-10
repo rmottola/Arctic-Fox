@@ -14,7 +14,7 @@
 // When processing the next thread event, the appshell may process native
 // events (if not in performance mode), which can result in suppressing the
 // next thread event for at most this many ticks:
-#define THREAD_EVENT_STARVATION_LIMIT PR_MillisecondsToInterval(20)
+#define THREAD_EVENT_STARVATION_LIMIT PR_MillisecondsToInterval(10)
 
 NS_IMPL_ISUPPORTS(nsBaseAppShell, nsIAppShell, nsIThreadObserver, nsIObserver)
 
@@ -378,7 +378,8 @@ nsBaseAppShell::RunSyncSectionsInternal(bool aStable,
 }
 
 void
-nsBaseAppShell::ScheduleSyncSection(nsIRunnable* aRunnable, bool aStable)
+nsBaseAppShell::ScheduleSyncSection(already_AddRefed<nsIRunnable> aRunnable,
+                                    bool aStable)
 {
   NS_ASSERTION(NS_IsMainThread(), "Should be on main thread.");
 
@@ -435,16 +436,16 @@ nsBaseAppShell::Observe(nsISupports *subject, const char *topic,
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsBaseAppShell::RunInStableState(nsIRunnable* aRunnable)
+void
+nsBaseAppShell::RunInStableState(already_AddRefed<nsIRunnable> aRunnable)
 {
-  ScheduleSyncSection(aRunnable, true);
-  return NS_OK;
+  ScheduleSyncSection(mozilla::Move(aRunnable), true);
 }
 
 NS_IMETHODIMP
 nsBaseAppShell::RunBeforeNextEvent(nsIRunnable* aRunnable)
 {
-  ScheduleSyncSection(aRunnable, false);
+  nsCOMPtr<nsIRunnable> runnable = aRunnable;
+  ScheduleSyncSection(runnable.forget(), false);
   return NS_OK;
 }

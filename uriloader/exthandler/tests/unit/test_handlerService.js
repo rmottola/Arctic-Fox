@@ -130,7 +130,7 @@ function run_test() {
     // Bug 395131 has been filed to make this test work more generically
     // by providing our own prefs for this test rather than this icky
     // special casing.
-    rootPrefBranch.getCharPref("goanna.handlerService.defaultHandlersVersion");
+    rootPrefBranch.getCharPref("gecko.handlerService.defaultHandlersVersion");
     haveDefaultHandlersVersion = true;
   } catch (ex) {}
 

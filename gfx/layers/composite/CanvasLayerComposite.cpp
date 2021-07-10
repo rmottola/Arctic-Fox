@@ -5,7 +5,7 @@
 
 #include "CanvasLayerComposite.h"
 #include "composite/CompositableHost.h"  // for CompositableHost
-#include "gfx2DGlue.h"                  // for ToFilter, ToMatrix4x4
+#include "gfx2DGlue.h"                  // for ToFilter
 #include "GraphicsFilter.h"             // for GraphicsFilter
 #include "gfxUtils.h"                   // for gfxUtils, etc
 #include "mozilla/gfx/Matrix.h"         // for Matrix4x4
@@ -95,17 +95,15 @@ CanvasLayerComposite::RenderLayer(const IntRect& aClipRect)
   }
 #endif
 
-  EffectChain effectChain(this);
-  AddBlendModeEffect(effectChain);
+  RenderWithAllMasks(this, mCompositor, aClipRect,
+                     [&](EffectChain& effectChain, const Rect& clipRect) {
+    mCompositableHost->Composite(this, effectChain,
+                          GetEffectiveOpacity(),
+                          GetEffectiveTransform(),
+                          GetEffectFilter(),
+                          clipRect);
+  });
 
-  LayerManagerComposite::AutoAddMaskEffect autoMaskEffect(mMaskLayer, effectChain);
-  gfx::Rect clipRect(aClipRect.x, aClipRect.y, aClipRect.width, aClipRect.height);
-
-  mCompositableHost->Composite(effectChain,
-                        GetEffectiveOpacity(),
-                        GetEffectiveTransform(),
-                        GetEffectFilter(),
-                        clipRect);
   mCompositableHost->BumpFlashCounter();
 }
 

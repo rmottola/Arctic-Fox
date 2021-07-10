@@ -16,7 +16,7 @@
 #include "nsTObserverArray.h"
 #include "mozilla/Attributes.h"
 #include "nsAutoPtr.h"
-#include "mozilla/ReentrantMonitor.h"
+#include "mozilla/AlreadyAddRefed.h"
 
 // A native thread
 class nsThread
@@ -29,6 +29,10 @@ public:
   NS_DECL_NSITHREAD
   NS_DECL_NSITHREADINTERNAL
   NS_DECL_NSISUPPORTSPRIORITY
+  // missing from NS_DECL_NSIEVENTTARGET because MSVC
+  nsresult Dispatch(nsIRunnable* aEvent, uint32_t aFlags) {
+    return Dispatch(nsCOMPtr<nsIRunnable>(aEvent).forget(), aFlags);
+  }
 
   enum MainThreadFlag
   {
@@ -66,14 +70,6 @@ public:
   static nsresult
   SetMainThreadObserver(nsIThreadObserver* aObserver);
 
-#ifdef MOZ_NUWA_PROCESS
-  void SetWorking();
-  void SetIdle();
-  mozilla::ReentrantMonitor& ThreadStatusMonitor() {
-    return mThreadStatusMonitor;
-  }
-#endif
-
 protected:
   static nsIThreadObserver* sMainThreadObserver;
 
@@ -107,8 +103,9 @@ protected:
     return mEvents->GetEvent(aMayWait, aEvent);
   }
   nsresult PutEvent(nsIRunnable* aEvent, nsNestedEventTarget* aTarget);
+  nsresult PutEvent(already_AddRefed<nsIRunnable>&& aEvent, nsNestedEventTarget* aTarget);
 
-  nsresult DispatchInternal(nsIRunnable* aEvent, uint32_t aFlags,
+  nsresult DispatchInternal(already_AddRefed<nsIRunnable>&& aEvent, uint32_t aFlags,
                             nsNestedEventTarget* aTarget);
 
   // Wrapper for nsEventQueue that supports chaining.
@@ -128,6 +125,11 @@ protected:
     void PutEvent(nsIRunnable* aEvent)
     {
       mQueue.PutEvent(aEvent);
+    }
+
+    void PutEvent(already_AddRefed<nsIRunnable>&& aEvent)
+    {
+      mQueue.PutEvent(mozilla::Move(aEvent));
     }
 
     bool HasPendingEvent()
@@ -182,7 +184,7 @@ protected:
 
   int32_t   mPriority;
   PRThread* mThread;
-  uint32_t  mRunningEvent;  // counter
+  uint32_t  mNestedEventLoopDepth;
   uint32_t  mStackSize;
 
   struct nsThreadShutdownContext* mShutdownContext;
@@ -191,12 +193,6 @@ protected:
   // Set to true when events posted to this thread will never run.
   bool mEventsAreDoomed;
   MainThreadFlag mIsMainThread;
-#ifdef MOZ_NUWA_PROCESS
-  mozilla::ReentrantMonitor mThreadStatusMonitor;
-  // The actual type is defined in nsThreadManager.h which is not exposed to
-  // file out of thread module.
-  void* mThreadStatusInfo;
-#endif
 };
 
 //-----------------------------------------------------------------------------
@@ -204,7 +200,7 @@ protected:
 class nsThreadSyncDispatch : public nsRunnable
 {
 public:
-  nsThreadSyncDispatch(nsIThread* aOrigin, nsIRunnable* aTask)
+  nsThreadSyncDispatch(nsIThread* aOrigin, already_AddRefed<nsIRunnable>&& aTask)
     : mOrigin(aOrigin)
     , mSyncTask(aTask)
     , mResult(NS_ERROR_NOT_INITIALIZED)

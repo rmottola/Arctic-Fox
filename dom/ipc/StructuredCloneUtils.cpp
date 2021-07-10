@@ -13,6 +13,7 @@
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/BlobBinding.h"
 #include "mozilla/dom/File.h"
+#include "mozilla/dom/ToJSValue.h"
 #include "nsContentUtils.h"
 #include "nsJSEnvironment.h"
 #include "MainThreadUtils.h"
@@ -50,14 +51,14 @@ Read(JSContext* aCx, JSStructuredCloneReader* aReader, uint32_t aTag,
     // while destructors are running.
     JS::Rooted<JS::Value> val(aCx);
     {
-      MOZ_ASSERT(aData < closure->mBlobs.Length());
-      nsRefPtr<Blob> blob = closure->mBlobs[aData];
+      MOZ_ASSERT(aData < closure->mBlobImpls.Length());
+      nsRefPtr<BlobImpl> blobImpl = closure->mBlobImpls[aData];
 
 #ifdef DEBUG
       {
         // Blob should not be mutable.
         bool isMutable;
-        MOZ_ASSERT(NS_SUCCEEDED(blob->GetMutable(&isMutable)));
+        MOZ_ASSERT(NS_SUCCEEDED(blobImpl->GetMutable(&isMutable)));
         MOZ_ASSERT(!isMutable);
       }
 #endif
@@ -66,7 +67,7 @@ Read(JSContext* aCx, JSStructuredCloneReader* aReader, uint32_t aTag,
       nsIGlobalObject *global = xpc::NativeGlobal(JS::CurrentGlobalOrNull(aCx));
       MOZ_ASSERT(global);
 
-      nsRefPtr<Blob> newBlob = Blob::Create(global, blob->Impl());
+      nsRefPtr<Blob> newBlob = Blob::Create(global, blobImpl);
       if (!ToJSValue(aCx, newBlob, &val)) {
         return nullptr;
       }
@@ -93,8 +94,8 @@ Write(JSContext* aCx, JSStructuredCloneWriter* aWriter,
     if (NS_SUCCEEDED(UNWRAP_OBJECT(Blob, aObj, blob)) &&
         NS_SUCCEEDED(blob->SetMutable(false)) &&
         JS_WriteUint32Pair(aWriter, SCTAG_DOM_BLOB,
-                           closure->mBlobs.Length())) {
-      closure->mBlobs.AppendElement(blob);
+                           closure->mBlobImpls.Length())) {
+      closure->mBlobImpls.AppendElement(blob->Impl());
       return true;
     }
   }

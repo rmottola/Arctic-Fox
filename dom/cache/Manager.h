@@ -18,6 +18,9 @@ class nsIInputStream;
 class nsIThread;
 
 namespace mozilla {
+
+class ErrorResult;
+
 namespace dom {
 namespace cache {
 
@@ -131,6 +134,9 @@ public:
   // Synchronously shutdown from main thread.  This spins the event loop.
   static void ShutdownAllOnMainThread();
 
+  // Cancel actions for given origin or all actions if passed string is null.
+  static void AbortOnMainThread(const nsACString& aOrigin);
+
   // Must be called by Listener objects before they are destroyed.
   void RemoveListener(Listener* aListener);
 
@@ -194,7 +200,8 @@ private:
   ~Manager();
   void Init(Manager* aOldManager);
   void Shutdown();
-  already_AddRefed<Context> CurrentContext();
+
+  void Abort();
 
   ListenerId SaveListener(Listener* aListener);
   Listener* GetListener(ListenerId aListenerId) const;

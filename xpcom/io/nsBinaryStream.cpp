@@ -896,9 +896,9 @@ nsBinaryInputStream::ReadObject(bool aIsStrongRef, nsISupports** aObject)
     return rv;
   }
 
-  // HACK: Intercept old (pre-goanna6) nsIURI IID, and replace with
+  // HACK: Intercept old (pre-gecko6) nsIURI IID, and replace with
   // the updated IID, so that we're QI'ing to an actual interface.
-  // (As soon as we drop support for upgrading from pre-goanna6, we can
+  // (As soon as we drop support for upgrading from pre-gecko6, we can
   // remove this chunk.)
   static const nsIID oldURIiid = {
     0x7a22cc0, 0xce5, 0x11d3,

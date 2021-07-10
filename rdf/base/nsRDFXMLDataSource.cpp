@@ -71,11 +71,12 @@
 #include "nsIRDFXMLSerializer.h"
 #include "nsIRDFXMLSink.h"
 #include "nsIRDFXMLSource.h"
+#include "nsISafeOutputStream.h"
 #include "nsIServiceManager.h"
 #include "nsIStreamListener.h"
 #include "nsIURL.h"
 #include "nsIFileURL.h"
-#include "nsNetUtil.h"
+#include "nsISafeOutputStream.h"
 #include "nsIChannel.h"
 #include "nsRDFCID.h"
 #include "nsRDFBaseDataSources.h"
@@ -827,10 +828,10 @@ RDFXMLDataSourceImpl::Flush(void)
     if (! mURL)
         return NS_ERROR_NOT_INITIALIZED;
 
-    if (PR_LOG_TEST(gLog, PR_LOG_NOTICE)) {
+    if (MOZ_LOG_TEST(gLog, LogLevel::Debug)) {
       nsAutoCString spec;
       mURL->GetSpec(spec);
-      PR_LOG(gLog, PR_LOG_NOTICE,
+      MOZ_LOG(gLog, LogLevel::Debug,
              ("rdfxml[%p] flush(%s)", this, spec.get()));
     }
 
@@ -911,13 +912,13 @@ RDFXMLDataSourceImpl::Refresh(bool aBlocking)
     if (mURL) {
         mURL->GetSpec(spec);
     }
-    PR_LOG(gLog, PR_LOG_NOTICE,
+    MOZ_LOG(gLog, LogLevel::Debug,
            ("rdfxml[%p] refresh(%s) %sblocking", this, spec.get(), (aBlocking ? "" : "non")));
     
     // If an asynchronous load is already pending, then just let it do
     // the honors.
     if (IsLoading()) {
-        PR_LOG(gLog, PR_LOG_NOTICE,
+        MOZ_LOG(gLog, LogLevel::Debug,
                ("rdfxml[%p] refresh(%s) a load was pending", this, spec.get()));
 
         if (aBlocking) {
@@ -969,12 +970,12 @@ RDFXMLDataSourceImpl::Refresh(bool aBlocking)
 NS_IMETHODIMP
 RDFXMLDataSourceImpl::BeginLoad(void)
 {
-    if (PR_LOG_TEST(gLog, PR_LOG_NOTICE)) {
+    if (MOZ_LOG_TEST(gLog, LogLevel::Debug)) {
       nsAutoCString spec;
       if (mURL) {
           mURL->GetSpec(spec);
       }
-      PR_LOG(gLog, PR_LOG_NOTICE,
+      MOZ_LOG(gLog, LogLevel::Debug,
              ("rdfxml[%p] begin-load(%s)", this, spec.get()));
     }
     
@@ -995,12 +996,12 @@ RDFXMLDataSourceImpl::BeginLoad(void)
 NS_IMETHODIMP
 RDFXMLDataSourceImpl::Interrupt(void)
 {
-    if (PR_LOG_TEST(gLog, PR_LOG_NOTICE)) {
+    if (MOZ_LOG_TEST(gLog, LogLevel::Debug)) {
       nsAutoCString spec;
       if (mURL) {
           mURL->GetSpec(spec);
       }
-      PR_LOG(gLog, PR_LOG_NOTICE,
+      MOZ_LOG(gLog, LogLevel::Debug,
              ("rdfxml[%p] interrupt(%s)", this, spec.get()));
     }
 
@@ -1020,12 +1021,12 @@ RDFXMLDataSourceImpl::Interrupt(void)
 NS_IMETHODIMP
 RDFXMLDataSourceImpl::Resume(void)
 {
-    if (PR_LOG_TEST(gLog, PR_LOG_NOTICE)) {
+    if (MOZ_LOG_TEST(gLog, LogLevel::Debug)) {
       nsAutoCString spec;
       if (mURL) {
           mURL->GetSpec(spec);
       }
-      PR_LOG(gLog, PR_LOG_NOTICE,
+      MOZ_LOG(gLog, LogLevel::Debug,
              ("rdfxml[%p] resume(%s)", this, spec.get()));
     }
     
@@ -1045,12 +1046,12 @@ RDFXMLDataSourceImpl::Resume(void)
 NS_IMETHODIMP
 RDFXMLDataSourceImpl::EndLoad(void)
 {
-    if (PR_LOG_TEST(gLog, PR_LOG_NOTICE)) {
+    if (MOZ_LOG_TEST(gLog, LogLevel::Debug)) {
       nsAutoCString spec;
       if (mURL) {
           mURL->GetSpec(spec);
       }
-      PR_LOG(gLog, PR_LOG_NOTICE,
+      MOZ_LOG(gLog, LogLevel::Debug,
              ("rdfxml[%p] end-load(%s)", this, spec.get()));
     }
     

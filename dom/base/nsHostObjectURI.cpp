@@ -9,7 +9,6 @@
 #include "nsAutoPtr.h"
 #include "nsIObjectInputStream.h"
 #include "nsIObjectOutputStream.h"
-#include "nsIProgrammingLanguage.h"
 
 #include "mozilla/ipc/BackgroundUtils.h"
 #include "mozilla/ipc/URIUtils.h"
@@ -212,7 +211,7 @@ nsHostObjectURI::GetInterfaces(uint32_t *count, nsIID * **array)
 }
 
 NS_IMETHODIMP 
-nsHostObjectURI::GetHelperForLanguage(uint32_t language, nsISupports **_retval)
+nsHostObjectURI::GetScriptableHelper(nsIXPCScriptable **_retval)
 {
   *_retval = nullptr;
   return NS_OK;
@@ -243,13 +242,6 @@ nsHostObjectURI::GetClassID(nsCID * *aClassID)
   NS_ENSURE_TRUE(*aClassID, NS_ERROR_OUT_OF_MEMORY);
 
   return GetClassIDNoAlloc(*aClassID);
-}
-
-NS_IMETHODIMP 
-nsHostObjectURI::GetImplementationLanguage(uint32_t *aImplementationLanguage)
-{
-  *aImplementationLanguage = nsIProgrammingLanguage::CPLUSPLUS;
-  return NS_OK;
 }
 
 NS_IMETHODIMP 

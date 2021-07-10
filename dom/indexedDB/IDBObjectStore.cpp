@@ -303,13 +303,14 @@ StructuredCloneWriteCallback(JSContext* aCx,
   {
     Blob* blob = nullptr;
     if (NS_SUCCEEDED(UNWRAP_OBJECT(Blob, aObj, blob))) {
-      uint64_t size;
-      MOZ_ALWAYS_TRUE(NS_SUCCEEDED(blob->GetSize(&size)));
+      ErrorResult rv;
+      uint64_t size = blob->GetSize(rv);
+      MOZ_ASSERT(!rv.Failed());
 
       size = NativeEndian::swapToLittleEndian(size);
 
       nsString type;
-      MOZ_ALWAYS_TRUE(NS_SUCCEEDED(blob->GetType(type)));
+      blob->GetType(type);
 
       NS_ConvertUTF16toUTF8 convType(type);
       uint32_t convTypeLength =
@@ -439,7 +440,8 @@ ResolveMysteryFile(BlobImpl* aImpl,
   BlobChild* actor = ActorFromRemoteBlobImpl(aImpl);
   if (actor) {
     return actor->SetMysteryBlobInfo(aName, aContentType,
-                                     aSize, aLastModifiedDate);
+                                     aSize, aLastModifiedDate,
+                                     BlobDirState::eUnknownIfDir);
   }
   return true;
 }
@@ -1243,14 +1245,17 @@ IDBObjectStore::AddOrPut(JSContext* aCx,
           return nullptr;
         }
 
-        MOZ_ALWAYS_TRUE(fileActorOrMutableFileIds.AppendElement(fileActor));
+        MOZ_ALWAYS_TRUE(fileActorOrMutableFileIds.AppendElement(fileActor,
+                                                                fallible));
       } else {
         const int64_t fileId = blobOrFileInfo.mFileInfo->Id();
         MOZ_ASSERT(fileId > 0);
 
-        MOZ_ALWAYS_TRUE(fileActorOrMutableFileIds.AppendElement(fileId));
+        MOZ_ALWAYS_TRUE(fileActorOrMutableFileIds.AppendElement(fileId,
+                                                                fallible));
 
-        nsRefPtr<FileInfo>* newFileInfo = fileInfosToKeepAlive.AppendElement();
+        nsRefPtr<FileInfo>* newFileInfo =
+          fileInfosToKeepAlive.AppendElement(fallible);
         if (NS_WARN_IF(!newFileInfo)) {
           aRv = NS_ERROR_OUT_OF_MEMORY;
           return nullptr;
@@ -1430,7 +1435,7 @@ IDBObjectStore::Index(const nsAString& aName, ErrorResult &aRv)
 {
   AssertIsOnOwningThread();
 
-  if (mTransaction->IsFinished()) {
+  if (mTransaction->IsCommittingOrDone() || mDeletedSpec) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return nullptr;
   }

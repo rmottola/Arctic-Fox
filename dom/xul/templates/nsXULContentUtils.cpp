@@ -40,7 +40,6 @@
 #include "nsXULContentUtils.h"
 #include "nsLayoutCID.h"
 #include "nsNameSpaceManager.h"
-#include "nsNetUtil.h"
 #include "nsRDFCID.h"
 #include "nsString.h"
 #include "nsXPIDLString.h"
@@ -363,6 +362,6 @@ nsXULContentUtils::LogTemplateError(const char* aStr)
   nsCOMPtr<nsIConsoleService> cs = do_GetService(NS_CONSOLESERVICE_CONTRACTID);
   if (cs) {
     cs->LogStringMessage(message.get());
-    PR_LOG(gXULTemplateLog, PR_LOG_ALWAYS, ("Error parsing template: %s", aStr));
+    MOZ_LOG(gXULTemplateLog, LogLevel::Info, ("Error parsing template: %s", aStr));
   }
 }

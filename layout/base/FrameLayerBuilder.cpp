@@ -331,11 +331,17 @@ public:
   }
 
   /**
-   * If this represents only a nsDisplayImage, and the image type
-   * supports being optimized to an ImageLayer (TYPE_RASTER only) returns
-   * an ImageContainer for the image.
+   * If this represents only a nsDisplayImage, and the image type supports being
+   * optimized to an ImageLayer, returns true.
    */
-  already_AddRefed<ImageContainer> CanOptimizeImageLayer(nsDisplayListBuilder* aBuilder);
+  bool CanOptimizeToImageLayer(nsDisplayListBuilder* aBuilder);
+
+  /**
+   * If this represents only a nsDisplayImage, and the image type supports being
+   * optimized to an ImageLayer, returns an ImageContainer for the underlying
+   * image if one is available.
+   */
+  already_AddRefed<ImageContainer> GetContainerForImageLayer(nsDisplayListBuilder* aBuilder);
 
   bool VisibleAboveRegionIntersects(const nsIntRect& aRect) const
   { return mVisibleAboveRegion.Intersects(aRect); }
@@ -1032,6 +1038,19 @@ protected:
                                  const nsIFrame* aReferenceFrame,
                                  const nsPoint& aTopLeft,
                                  bool aDidResetScrollPositionForLayerPixelAlignment);
+
+  /**
+   * Attempt to prepare an ImageLayer based upon the provided PaintedLayerData.
+   * Returns nullptr on failure.
+   */
+  already_AddRefed<Layer> PrepareImageLayer(PaintedLayerData* aData);
+
+  /**
+   * Attempt to prepare a ColorLayer based upon the provided PaintedLayerData.
+   * Returns nullptr on failure.
+   */
+  already_AddRefed<Layer> PrepareColorLayer(PaintedLayerData* aData);
+
   /**
    * Grab the next recyclable ColorLayer, or create one if there are no
    * more recyclable ColorLayers.
@@ -2460,8 +2479,18 @@ PaintedLayerData::UpdateCommonClipCount(
   }
 }
 
+bool
+PaintedLayerData::CanOptimizeToImageLayer(nsDisplayListBuilder* aBuilder)
+{
+  if (!mImage) {
+    return false;
+  }
+
+  return mImage->CanOptimizeToImageLayer(mLayer->Manager(), aBuilder);
+}
+
 already_AddRefed<ImageContainer>
-PaintedLayerData::CanOptimizeImageLayer(nsDisplayListBuilder* aBuilder)
+PaintedLayerData::GetContainerForImageLayer(nsDisplayListBuilder* aBuilder)
 {
   if (!mImage) {
     return nullptr;
@@ -2894,6 +2923,58 @@ static int32_t FindIndexOfLayerIn(nsTArray<NewLayerEntry>& aArray,
 }
 #endif
 
+already_AddRefed<Layer>
+ContainerState::PrepareImageLayer(PaintedLayerData* aData)
+{
+  nsRefPtr<ImageContainer> imageContainer =
+    aData->GetContainerForImageLayer(mBuilder);
+  if (!imageContainer) {
+    return nullptr;
+  }
+
+  nsRefPtr<ImageLayer> imageLayer = CreateOrRecycleImageLayer(aData->mLayer);
+  imageLayer->SetContainer(imageContainer);
+  aData->mImage->ConfigureLayer(imageLayer, mParameters);
+  imageLayer->SetPostScale(mParameters.mXScale,
+                           mParameters.mYScale);
+
+  if (aData->mItemClip.HasClip()) {
+    ParentLayerIntRect clip =
+      ViewAs<ParentLayerPixel>(ScaleToNearestPixels(aData->mItemClip.GetClipRect()));
+    clip.MoveBy(ViewAs<ParentLayerPixel>(mParameters.mOffset));
+    imageLayer->SetClipRect(Some(clip));
+  } else {
+    imageLayer->SetClipRect(Nothing());
+  }
+
+  mLayerBuilder->StoreOptimizedLayerForFrame(aData->mImage, imageLayer);
+  FLB_LOG_PAINTED_LAYER_DECISION(aData,
+                                 "  Selected image layer=%p\n", imageLayer.get());
+
+  return imageLayer.forget();
+}
+
+already_AddRefed<Layer>
+ContainerState::PrepareColorLayer(PaintedLayerData* aData)
+{
+  nsRefPtr<ColorLayer> colorLayer = CreateOrRecycleColorLayer(aData->mLayer);
+  colorLayer->SetColor(aData->mSolidColor);
+
+  // Copy transform
+  colorLayer->SetBaseTransform(aData->mLayer->GetBaseTransform());
+  colorLayer->SetPostScale(aData->mLayer->GetPostXScale(),
+                           aData->mLayer->GetPostYScale());
+
+  nsIntRect visibleRect = aData->mVisibleRegion.GetBounds();
+  visibleRect.MoveBy(-GetTranslationForPaintedLayer(aData->mLayer));
+  colorLayer->SetBounds(visibleRect);
+  colorLayer->SetClipRect(Nothing());
+
+  FLB_LOG_PAINTED_LAYER_DECISION(aData,
+                                 "  Selected color layer=%p\n", colorLayer.get());
+
+  return colorLayer.forget();
+}
 
 template<typename FindOpaqueBackgroundColorCallbackType>
 void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueBackgroundColorCallbackType aFindOpaqueBackgroundColor)
@@ -2922,72 +3003,46 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
   NewLayerEntry* newLayerEntry = &mNewChildLayers[data->mNewChildLayersIndex];
 
   nsRefPtr<Layer> layer;
-  nsRefPtr<ImageContainer> imageContainer = data->CanOptimizeImageLayer(mBuilder);
+  bool canOptimizeToImageLayer = data->CanOptimizeToImageLayer(mBuilder);
 
   FLB_LOG_PAINTED_LAYER_DECISION(data, "Selecting layer for pld=%p\n", data);
-  FLB_LOG_PAINTED_LAYER_DECISION(data, "  Solid=%i, hasImage=%i, canOptimizeAwayPaintedLayer=%i\n",
-          data->mIsSolidColorInVisibleRegion, !!imageContainer,
+  FLB_LOG_PAINTED_LAYER_DECISION(data, "  Solid=%i, hasImage=%c, canOptimizeAwayPaintedLayer=%i\n",
+          data->mIsSolidColorInVisibleRegion, canOptimizeToImageLayer ? 'y' : 'n',
           CanOptimizeAwayPaintedLayer(data, mLayerBuilder));
 
-  if ((data->mIsSolidColorInVisibleRegion || imageContainer) &&
+  if ((data->mIsSolidColorInVisibleRegion || canOptimizeToImageLayer) &&
       CanOptimizeAwayPaintedLayer(data, mLayerBuilder)) {
-    NS_ASSERTION(!(data->mIsSolidColorInVisibleRegion && imageContainer),
+    NS_ASSERTION(!(data->mIsSolidColorInVisibleRegion && canOptimizeToImageLayer),
                  "Can't be a solid color as well as an image!");
-    if (imageContainer) {
-      nsRefPtr<ImageLayer> imageLayer = CreateOrRecycleImageLayer(data->mLayer);
-      imageLayer->SetContainer(imageContainer);
-      data->mImage->ConfigureLayer(imageLayer, mParameters);
-      imageLayer->SetPostScale(mParameters.mXScale,
-                               mParameters.mYScale);
-      if (data->mItemClip.HasClip()) {
-        ParentLayerIntRect clip = ViewAs<ParentLayerPixel>(ScaleToNearestPixels(data->mItemClip.GetClipRect()));
-        clip.MoveBy(ViewAs<ParentLayerPixel>(mParameters.mOffset));
-        imageLayer->SetClipRect(Some(clip));
-      } else {
-        imageLayer->SetClipRect(Nothing());
-      }
-      layer = imageLayer;
-      mLayerBuilder->StoreOptimizedLayerForFrame(data->mImage,
-                                                 imageLayer);
-      FLB_LOG_PAINTED_LAYER_DECISION(data, "  Selected image layer=%p\n", layer.get());
-    } else {
-      nsRefPtr<ColorLayer> colorLayer = CreateOrRecycleColorLayer(data->mLayer);
-      colorLayer->SetColor(data->mSolidColor);
 
-      // Copy transform
-      colorLayer->SetBaseTransform(data->mLayer->GetBaseTransform());
-      colorLayer->SetPostScale(data->mLayer->GetPostXScale(), data->mLayer->GetPostYScale());
+    layer = canOptimizeToImageLayer ? PrepareImageLayer(data)
+                                    : PrepareColorLayer(data);
 
-      nsIntRect visibleRect = data->mVisibleRegion.GetBounds();
-      visibleRect.MoveBy(-GetTranslationForPaintedLayer(data->mLayer));
-      colorLayer->SetBounds(visibleRect);
-      colorLayer->SetClipRect(Nothing());
+    if (layer) {
+      NS_ASSERTION(FindIndexOfLayerIn(mNewChildLayers, layer) < 0,
+                   "Layer already in list???");
+      NS_ASSERTION(newLayerEntry->mLayer == data->mLayer,
+                   "Painted layer at wrong index");
+      // Store optimized layer in reserved slot
+      newLayerEntry = &mNewChildLayers[data->mNewChildLayersIndex + 1];
+      NS_ASSERTION(!newLayerEntry->mLayer, "Slot already occupied?");
+      newLayerEntry->mLayer = layer;
+      newLayerEntry->mAnimatedGeometryRoot = data->mAnimatedGeometryRoot;
+      newLayerEntry->mFixedPosFrameForLayerData = data->mFixedPosFrameForLayerData;
 
-      layer = colorLayer;
-      FLB_LOG_PAINTED_LAYER_DECISION(data, "  Selected color layer=%p\n", layer.get());
+      // Hide the PaintedLayer. We leave it in the layer tree so that we
+      // can find and recycle it later.
+      ParentLayerIntRect emptyRect;
+      data->mLayer->SetClipRect(Some(emptyRect));
+      data->mLayer->SetVisibleRegion(nsIntRegion());
+      data->mLayer->InvalidateRegion(data->mLayer->GetValidRegion().GetBounds());
+      data->mLayer->SetEventRegions(EventRegions());
     }
-
-    NS_ASSERTION(FindIndexOfLayerIn(mNewChildLayers, layer) < 0,
-                 "Layer already in list???");
-    NS_ASSERTION(newLayerEntry->mLayer == data->mLayer,
-                 "Painted layer at wrong index");
-    // Store optimized layer in reserved slot
-    newLayerEntry = &mNewChildLayers[data->mNewChildLayersIndex + 1];
-    NS_ASSERTION(!newLayerEntry->mLayer, "Slot already occupied?");
-    newLayerEntry->mLayer = layer;
-    newLayerEntry->mAnimatedGeometryRoot = data->mAnimatedGeometryRoot;
-    newLayerEntry->mFixedPosFrameForLayerData = data->mFixedPosFrameForLayerData;
-
-    // Hide the PaintedLayer. We leave it in the layer tree so that we
-    // can find and recycle it later.
-    ParentLayerIntRect emptyRect;
-    data->mLayer->SetClipRect(Some(emptyRect));
-    data->mLayer->SetVisibleRegion(nsIntRegion());
-    data->mLayer->InvalidateRegion(data->mLayer->GetValidRegion().GetBounds());
-    data->mLayer->SetEventRegions(EventRegions());
-  } else {
+  }
+  
+  if (!layer) {
+    // We couldn't optimize to an image layer or a color layer above.
     layer = data->mLayer;
-    imageContainer = nullptr;
     layer->SetClipRect(Nothing());
     FLB_LOG_PAINTED_LAYER_DECISION(data, "  Selected painted layer=%p\n", layer.get());
   }
@@ -3143,12 +3198,9 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
         ScaleRegionToOutsidePixels(data->mDispatchToContentHitRegion));
     regions.mHitRegion.OrWith(maybeHitRegion);
 
-    nsIntPoint translation = -GetTranslationForPaintedLayer(data->mLayer);
-    regions.mHitRegion.MoveBy(translation);
-    regions.mDispatchToContentHitRegion.MoveBy(translation);
-    regions.mNoActionRegion.MoveBy(translation);
-    regions.mHorizontalPanRegion.MoveBy(translation);
-    regions.mVerticalPanRegion.MoveBy(translation);
+    Matrix mat = layer->GetBaseTransform().As2D();
+    mat.Invert();
+    regions.ApplyTranslationAndScale(mat._31, mat._32, mat._11, mat._22);
 
     layer->SetEventRegions(regions);
   }
@@ -4618,6 +4670,7 @@ static bool
 ChooseScaleAndSetTransform(FrameLayerBuilder* aLayerBuilder,
                            nsDisplayListBuilder* aDisplayListBuilder,
                            nsIFrame* aContainerFrame,
+                           nsDisplayItem* aContainerItem,
                            const nsRect& aVisibleRect,
                            const Matrix4x4* aTransform,
                            const ContainerLayerParameters& aIncomingScale,
@@ -4672,12 +4725,32 @@ ChooseScaleAndSetTransform(FrameLayerBuilder* aLayerBuilder,
   if (canDraw2D) {
     // If the container's transform is animated off main thread, fix a suitable scale size
     // for animation
-    if (aContainerFrame->GetContent() &&
+    if (aContainerItem &&
+        aContainerItem->GetType() == nsDisplayItem::TYPE_TRANSFORM &&
         nsLayoutUtils::HasAnimationsForCompositor(
-          aContainerFrame->GetContent(), eCSSProperty_transform)) {
+          aContainerFrame, eCSSProperty_transform)) {
+      // Use the size of the nearest widget as the maximum size.  This
+      // is important since it might be a popup that is bigger than the
+      // pres context's size.
+      nsPresContext* presContext = aContainerFrame->PresContext();
+      nsIWidget* widget = aContainerFrame->GetNearestWidget();
+      nsSize displaySize;
+      if (widget) {
+        IntSize widgetSize = widget->GetClientSize();
+        int32_t p2a = presContext->AppUnitsPerDevPixel();
+        displaySize.width = NSIntPixelsToAppUnits(widgetSize.width, p2a);
+        displaySize.height = NSIntPixelsToAppUnits(widgetSize.height, p2a);
+      } else {
+        displaySize = presContext->GetVisibleArea().Size();
+      }
+      // compute scale using the animation on the container (ignoring
+      // its ancestors)
       scale = nsLayoutUtils::ComputeSuitableScaleForAnimation(
-                aContainerFrame->GetContent(), aVisibleRect.Size(),
-                aContainerFrame->PresContext()->GetVisibleArea().Size());
+                aContainerFrame, aVisibleRect.Size(),
+                displaySize);
+      // multiply by the scale inherited from ancestors
+      scale.width *= aIncomingScale.mXScale;
+      scale.height *= aIncomingScale.mYScale;
     } else {
       // Scale factors are normalized to a power of 2 to reduce the number of resolution changes
       scale = RoundToFloatPrecision(ThebesMatrix(transform2d).ScaleFactors(true));
@@ -4861,6 +4934,7 @@ FrameLayerBuilder::BuildContainerLayerFor(nsDisplayListBuilder* aBuilder,
       aContainerItem ? aContainerItem->GetVisibleRectForChildren() :
           aContainerFrame->GetVisualOverflowRectRelativeToSelf();
   if (!ChooseScaleAndSetTransform(this, aBuilder, aContainerFrame,
+                                  aContainerItem,
                                   bounds.Intersect(childrenVisible),
                                   aTransform, aParameters,
                                   containerLayer, state, scaleParameters)) {
@@ -5255,7 +5329,7 @@ FrameLayerBuilder::PaintItems(nsTArray<ClippedDisplayItem>& aItems,
       nsIFrame* frame = cdi->mItem->Frame();
       frame->AddStateBits(NS_FRAME_PAINTED_THEBES);
 #ifdef MOZ_DUMP_PAINTING
-      if (gfxUtils::sDumpPainting) {
+      if (gfxUtils::sDumpPaintItems) {
         DebugPaintItem(aDrawTarget, aPresContext, cdi->mItem, aBuilder);
       } else {
 #else
@@ -5323,7 +5397,7 @@ public:
       rect.mY = iterRect->Y();
       rect.mWidth = iterRect->Width();
       rect.mHeight = iterRect->Height();
-      aRectangles.AppendElement(rect);
+      aRectangles.AppendElement(rect, fallible);
     }
   }
 

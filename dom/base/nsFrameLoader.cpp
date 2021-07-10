@@ -965,6 +965,9 @@ nsFrameLoader::SwapWithOtherRemoteLoader(nsFrameLoader* aOther,
 
   ourFrameFrame->EndSwapDocShells(otherFrame);
 
+  ourShell->BackingScaleFactorChanged();
+  otherShell->BackingScaleFactorChanged();
+
   ourDoc->FlushPendingNotifications(Flush_Layout);
   otherDoc->FlushPendingNotifications(Flush_Layout);
 
@@ -1630,12 +1633,12 @@ nsFrameLoader::ShouldUseRemoteProcess()
 
   // Don't try to launch nested children if we don't have OMTC.
   // They won't render!
-  if (XRE_GetProcessType() == GeckoProcessType_Content &&
+  if (XRE_IsContentProcess() &&
       !CompositorChild::ChildProcessHasCompositor()) {
     return false;
   }
 
-  if (XRE_GetProcessType() == GeckoProcessType_Content &&
+  if (XRE_IsContentProcess() &&
       !(PR_GetEnv("MOZ_NESTED_OOP_TABS") ||
         Preferences::GetBool("dom.ipc.tabs.nested.enabled", false))) {
     return false;
@@ -2603,7 +2606,8 @@ nsFrameLoader::AttributeChanged(nsIDocument* aDocument,
                                 mozilla::dom::Element* aElement,
                                 int32_t      aNameSpaceID,
                                 nsIAtom*     aAttribute,
-                                int32_t      aModType)
+                                int32_t      aModType,
+                                const nsAttrValue* aOldValue)
 {
   MOZ_ASSERT(mObservingOwnerContent);
   // TODO: Implement ContentShellAdded for remote browsers (bug 658304)
@@ -2674,7 +2678,7 @@ nsFrameLoader::ResetPermissionManagerStatus()
 {
   // The resetting of the permissions status can run only
   // in the main process.
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     return;
   }
 

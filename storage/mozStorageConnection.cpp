@@ -152,7 +152,7 @@ Module gModules[] = {
 
 void tracefunc (void *aClosure, const char *aStmt)
 {
-  PR_LOG(gStorageLog, PR_LOG_DEBUG, ("sqlite3_trace on %p for '%s'", aClosure,
+  MOZ_LOG(gStorageLog, LogLevel::Debug, ("sqlite3_trace on %p for '%s'", aClosure,
                                      aStmt));
 }
 
@@ -582,7 +582,13 @@ Connection::initialize()
     return convertResultCode(srv);
   }
 
-  return initializeInternal(nullptr);
+  // Do not set mDatabaseFile or mFileURL here since this is a "memory"
+  // database.
+
+  nsresult rv = initializeInternal();
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  return NS_OK;
 }
 
 nsresult
@@ -606,10 +612,12 @@ Connection::initialize(nsIFile *aDatabaseFile)
     return convertResultCode(srv);
   }
 
-  rv = initializeInternal(aDatabaseFile);
-  NS_ENSURE_SUCCESS(rv, rv);
-
+  // Do not set mFileURL here since this is database does not have an associated
+  // URL.
   mDatabaseFile = aDatabaseFile;
+
+  rv = initializeInternal();
+  NS_ENSURE_SUCCESS(rv, rv);
 
   return NS_OK;
 }
@@ -636,19 +644,40 @@ Connection::initialize(nsIFileURL *aFileURL)
     return convertResultCode(srv);
   }
 
-  rv = initializeInternal(databaseFile);
-  NS_ENSURE_SUCCESS(rv, rv);
-
+  // Set both mDatabaseFile and mFileURL here.
   mFileURL = aFileURL;
   mDatabaseFile = databaseFile;
+
+  rv = initializeInternal();
+  NS_ENSURE_SUCCESS(rv, rv);
 
   return NS_OK;
 }
 
-
 nsresult
-Connection::initializeInternal(nsIFile* aDatabaseFile)
+Connection::initializeInternal()
 {
+  MOZ_ASSERT(mDBConn);
+
+  if (mFileURL) {
+    const char* dbPath = ::sqlite3_db_filename(mDBConn, "main");
+    MOZ_ASSERT(dbPath);
+
+    const char* telemetryFilename =
+      ::sqlite3_uri_parameter(dbPath, "telemetryFilename");
+    if (telemetryFilename) {
+      if (NS_WARN_IF(*telemetryFilename == '\0')) {
+        return NS_ERROR_INVALID_ARG;
+      }
+      mTelemetryFilename = telemetryFilename;
+    }
+  }
+
+  if (mTelemetryFilename.IsEmpty()) {
+    mTelemetryFilename = getFilename();
+    MOZ_ASSERT(!mTelemetryFilename.IsEmpty());
+  }
+
   // Properly wrap the database handle's mutex.
   sharedDBMutex.initWithMutex(sqlite3_db_mutex(mDBConn));
 
@@ -657,14 +686,11 @@ Connection::initializeInternal(nsIFile* aDatabaseFile)
 
   // SQLite tracing can slow down queries (especially long queries)
   // significantly. Don't trace unless the user is actively monitoring SQLite.
-  if (PR_LOG_TEST(gStorageLog, PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(gStorageLog, LogLevel::Debug)) {
     ::sqlite3_trace(mDBConn, tracefunc, this);
 
-    nsAutoCString leafName(":memory");
-    if (aDatabaseFile)
-      (void)aDatabaseFile->GetNativeLeafName(leafName);
-    PR_LOG(gStorageLog, PR_LOG_NOTICE, ("Opening connection to '%s' (%p)",
-                                        leafName.get(), this));
+    MOZ_LOG(gStorageLog, LogLevel::Debug, ("Opening connection to '%s' (%p)",
+                                        mTelemetryFilename.get(), this));
   }
 
   int64_t pageSize = Service::getDefaultPageSize();
@@ -878,11 +904,11 @@ Connection::internalClose(sqlite3 *aNativeConnection)
   }
 #endif // DEBUG
 
-  if (PR_LOG_TEST(gStorageLog, PR_LOG_NOTICE)) {
+  if (MOZ_LOG_TEST(gStorageLog, LogLevel::Debug)) {
     nsAutoCString leafName(":memory");
     if (mDatabaseFile)
         (void)mDatabaseFile->GetNativeLeafName(leafName);
-    PR_LOG(gStorageLog, PR_LOG_NOTICE, ("Closing connection to '%s'",
+    MOZ_LOG(gStorageLog, LogLevel::Debug, ("Closing connection to '%s'",
                                         leafName.get()));
   }
 
@@ -908,7 +934,7 @@ Connection::internalClose(sqlite3 *aNativeConnection)
 
     sqlite3_stmt *stmt = nullptr;
     while ((stmt = ::sqlite3_next_stmt(aNativeConnection, stmt))) {
-      PR_LOG(gStorageLog, PR_LOG_NOTICE,
+      MOZ_LOG(gStorageLog, LogLevel::Debug,
              ("Auto-finalizing SQL statement '%s' (%x)",
               ::sqlite3_sql(stmt),
               stmt));
@@ -1006,7 +1032,7 @@ Connection::stepStatement(sqlite3 *aNativeConnection, sqlite3_stmt *aStatement)
                       : Telemetry::kSlowSQLThresholdForHelperThreads;
   if (duration.ToMilliseconds() >= threshold) {
     nsDependentCString statementString(::sqlite3_sql(aStatement));
-    Telemetry::RecordSlowSQLStatement(statementString, getFilename(),
+    Telemetry::RecordSlowSQLStatement(statementString, mTelemetryFilename,
                                       duration.ToMilliseconds());
   }
 
@@ -1058,7 +1084,7 @@ Connection::prepareStatement(sqlite3 *aNativeConnection, const nsCString &aSQL,
 #ifdef DEBUG
     NS_WARNING(warnMsg.get());
 #endif
-    PR_LOG(gStorageLog, PR_LOG_ERROR, ("%s", warnMsg.get()));
+    MOZ_LOG(gStorageLog, LogLevel::Error, ("%s", warnMsg.get()));
   }
 
   (void)::sqlite3_extended_result_codes(aNativeConnection, 0);
@@ -1092,7 +1118,7 @@ Connection::executeSql(sqlite3 *aNativeConnection, const char *aSqlString)
                       : Telemetry::kSlowSQLThresholdForHelperThreads;
   if (duration.ToMilliseconds() >= threshold) {
     nsDependentCString statementString(aSqlString);
-    Telemetry::RecordSlowSQLStatement(statementString, getFilename(),
+    Telemetry::RecordSlowSQLStatement(statementString, mTelemetryFilename,
                                       duration.ToMilliseconds());
   }
 

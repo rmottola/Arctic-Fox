@@ -35,7 +35,8 @@ ContentHostBase::~ContentHostBase()
 }
 
 void
-ContentHostTexture::Composite(EffectChain& aEffectChain,
+ContentHostTexture::Composite(LayerComposite* aLayer,
+                              EffectChain& aEffectChain,
                               float aOpacity,
                               const gfx::Matrix4x4& aTransform,
                               const Filter& aFilter,
@@ -218,10 +219,15 @@ ContentHostTexture::Composite(EffectChain& aEffectChain,
 }
 
 void
-ContentHostTexture::UseTextureHost(TextureHost* aTexture)
+ContentHostTexture::UseTextureHost(const nsTArray<TimedTexture>& aTextures)
 {
-  ContentHostBase::UseTextureHost(aTexture);
-  mTextureHost = aTexture;
+  ContentHostBase::UseTextureHost(aTextures);
+  MOZ_ASSERT(aTextures.Length() == 1);
+  const TimedTexture& t = aTextures[0];
+  MOZ_ASSERT(t.mPictureRect.IsEqualInterior(
+      nsIntRect(nsIntPoint(0, 0), nsIntSize(t.mTexture->GetSize()))),
+      "Only default picture rect supported");
+  mTextureHost = t.mTexture;
   mTextureHostOnWhite = nullptr;
   mTextureSourceOnWhite = nullptr;
   if (mTextureHost) {
@@ -301,7 +307,7 @@ ContentHostTexture::Dump(std::stringstream& aStream,
 
 static inline void
 AddWrappedRegion(const nsIntRegion& aInput, nsIntRegion& aOutput,
-                 const nsIntSize& aSize, const nsIntPoint& aShift)
+                 const IntSize& aSize, const nsIntPoint& aShift)
 {
   nsIntRegion tempRegion;
   tempRegion.And(IntRect(aShift, aSize), aInput);
@@ -341,7 +347,7 @@ ContentHostSingleBuffered::UpdateThebes(const ThebesBufferData& aData,
   // Shift to the rotation point
   destRegion.MoveBy(aData.rotation());
 
-  nsIntSize bufferSize = aData.rect().Size();
+  IntSize bufferSize = aData.rect().Size();
 
   // Select only the pixels that are still within the buffer.
   nsIntRegion finalRegion;

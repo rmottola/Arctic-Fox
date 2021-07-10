@@ -4153,7 +4153,7 @@ nsTArray<MediaSource::Indice> MPEG4Source::exportIndex()
     return nsTArray<MediaSource::Indice>(Move(index));
   }
 
-  if (!index.SetCapacity(mSampleTable->countSamples())) {
+  if (!index.SetCapacity(mSampleTable->countSamples(), mozilla::fallible)) {
     return nsTArray<MediaSource::Indice>(Move(index));
   }
   for (uint32_t sampleIndex = 0; sampleIndex < mSampleTable->countSamples();
@@ -4181,17 +4181,17 @@ nsTArray<MediaSource::Indice> MPEG4Source::exportIndex()
           (compositionTime * 1000000ll + duration * 1000000ll) / mTimescale;
       indice.sync = isSyncSample;
       indice.start_decode = (decodeTime * 1000000ll) / mTimescale;
-      MOZ_ALWAYS_TRUE(index.AppendElement(indice));
+      MOZ_ALWAYS_TRUE(index.AppendElement(indice, mozilla::fallible)); // FIXME why fallible
   }
 
   // Fix up composition durations so we don't end up with any unsightly gaps.
   if (index.Length() != 0) {
       FallibleTArray<Indice*> composition_order;
-      if (!composition_order.SetCapacity(index.Length())) {
+      if (!composition_order.SetCapacity(index.Length(), mozilla::fallible)) {
         return nsTArray<MediaSource::Indice>(Move(index));
       }
       for (uint32_t i = 0; i < index.Length(); i++) {
-        MOZ_ALWAYS_TRUE(composition_order.AppendElement(&index[i]));
+        MOZ_ALWAYS_TRUE(composition_order.AppendElement(&index[i], mozilla::fallible));  // FIXME why fallible
       }
 
       composition_order.Sort(CompositionSorter());

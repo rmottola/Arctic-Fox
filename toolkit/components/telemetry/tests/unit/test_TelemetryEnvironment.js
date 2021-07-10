@@ -398,11 +398,14 @@ function checkSystemSection(data) {
   let gfxData = data.system.gfx;
   Assert.ok("D2DEnabled" in gfxData);
   Assert.ok("DWriteEnabled" in gfxData);
-  Assert.ok("DWriteVersion" in gfxData);
+  // DWriteVersion is disabled due to main thread jank and will be enabled
+  // again as part of bug 1154500.
+  //Assert.ok("DWriteVersion" in gfxData);
   if (gIsWindows) {
     Assert.equal(typeof gfxData.D2DEnabled, "boolean");
     Assert.equal(typeof gfxData.DWriteEnabled, "boolean");
-    Assert.ok(checkString(gfxData.DWriteVersion));
+    // As above, will be enabled again as part of bug 1154500.
+    //Assert.ok(checkString(gfxData.DWriteVersion));
   }
 
   Assert.ok("adapters" in gfxData);
@@ -427,6 +430,9 @@ function checkSystemSection(data) {
     }
   }
 
+  Assert.equal(typeof gfxData.features, "object");
+  Assert.equal(typeof gfxData.features.compositor, "string");
+
   try {
     // If we've not got nsIGfxInfoDebug, then this will throw and stop us doing
     // this test.
@@ -436,6 +442,9 @@ function checkSystemSection(data) {
       Assert.equal(GFX_VENDOR_ID, gfxData.adapters[0].vendorID);
       Assert.equal(GFX_DEVICE_ID, gfxData.adapters[0].deviceID);
     }
+
+    let features = gfxInfo.getFeatures();
+    Assert.equal(features.compositor, gfxData.features.compositor);
   }
   catch (e) {}
 }

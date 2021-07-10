@@ -562,7 +562,7 @@ already_AddRefed<nsIDOMGeoPosition>
 nsGeolocationRequest::AdjustedLocation(nsIDOMGeoPosition *aPosition)
 {
   nsCOMPtr<nsIDOMGeoPosition> pos = aPosition;
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     GPSLOG("child process just copying position");
     return pos.forget();
   }
@@ -756,7 +756,7 @@ nsresult nsGeolocationService::Init()
     return NS_ERROR_FAILURE;
   }
 
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     sGeoInitPending = false;
     return NS_OK;
   }
@@ -1008,7 +1008,7 @@ nsGeolocationService::StartDevice(nsIPrincipal *aPrincipal)
   // inactivivity
   SetDisconnectTimer();
 
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     ContentChild* cpc = ContentChild::GetSingleton();
     cpc->SendAddGeolocationListener(IPC::Principal(aPrincipal),
                                     HighAccuracyRequested());
@@ -1071,7 +1071,7 @@ nsGeolocationService::UpdateAccuracy(bool aForceHigh)
 {
   bool highRequired = aForceHigh || HighAccuracyRequested();
 
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     ContentChild* cpc = ContentChild::GetSingleton();
     if (cpc->IsAlive()) {
       cpc->SendSetGeolocationHigherAccuracy(highRequired);
@@ -1098,7 +1098,7 @@ nsGeolocationService::StopDevice()
     mDisconnectTimer = nullptr;
   }
 
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     ContentChild* cpc = ContentChild::GetSingleton();
     cpc->SendRemoveGeolocationListener();
     return; // bail early

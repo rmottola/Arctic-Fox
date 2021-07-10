@@ -274,7 +274,6 @@ public:
   typedef MediaPromise<SeekResolveValue, bool /* aIgnored */, /* IsExclusive = */ true> SeekPromise;
 
   NS_DECL_THREADSAFE_ISUPPORTS
-  NS_DECL_NSIOBSERVER
 
   // Enumeration for the valid play states (see mPlayState)
   enum PlayState {
@@ -399,8 +398,7 @@ public:
   // Return the duration of the video in seconds.
   virtual double GetDuration();
 
-  // Return the duration of the video in seconds.
-  int64_t GetMediaDuration() final override;
+  AbstractCanonical<media::NullableTimeUnit>* CanonicalDurationOrNull() override;
 
   // A media stream is assumed to be infinite if the metadata doesn't
   // contain the duration, and range requests are not supported, and
@@ -432,7 +430,8 @@ public:
 
   // Called as data arrives on the stream and is read into the cache.  Called
   // on the main thread only.
-  virtual void NotifyDataArrived(const char* aBuffer, uint32_t aLength, int64_t aOffset) override;
+  virtual void NotifyDataArrived(uint32_t aLength, int64_t aOffset,
+                                 bool aThrottleUpdates) override;
 
   // Called by MediaResource when the principal of the resource has
   // changed. Called on main thread only.
@@ -452,6 +451,7 @@ public:
   // Call on the main thread only.
   virtual bool IsEndedOrShutdown() const;
 
+protected:
   // Updates the media duration. This is called while the media is being
   // played, calls before the media has reached loaded metadata are ignored.
   // The duration is assumed to be an estimate, and so a degree of
@@ -461,6 +461,7 @@ public:
   // changed, this causes a durationchanged event to fire to the media
   // element.
   void UpdateEstimatedMediaDuration(int64_t aDuration) override;
+public:
 
   // Set a flag indicating whether seeking is supported
   virtual void SetMediaSeekable(bool aMediaSeekable) override;
@@ -507,10 +508,6 @@ public:
 
   // Returns a weak reference to the media decoder owner.
   MediaDecoderOwner* GetMediaOwner() const;
-
-  // Called by the state machine to notify the decoder that the duration
-  // has changed.
-  void DurationChanged(media::TimeUnit aNewDuration);
 
   bool OnStateMachineTaskQueue() const override;
 
@@ -874,8 +871,21 @@ protected:
   // Return true if the decoder has reached the end of playback
   bool IsEnded() const;
 
+  // Called by the state machine to notify the decoder that the duration
+  // has changed.
+  void DurationChanged();
+
   // State-watching manager.
   WatchManager<MediaDecoder> mWatchManager;
+
+  // Buffered range, mirrored from the reader.
+  Mirror<media::TimeIntervals> mBuffered;
+
+  // Whether the state machine is shut down.
+  Mirror<bool> mStateMachineIsShutdown;
+
+  // Used by the ogg decoder to watch mStateMachineIsShutdown.
+  virtual void ShutdownBitChanged() {}
 
   // NextFrameStatus, mirrored from the state machine.
   Mirror<MediaDecoderOwner::NextFrameStatus> mNextFrameStatus;
@@ -883,6 +893,9 @@ protected:
   /******
    * The following members should be accessed with the decoder lock held.
    ******/
+
+  // Whether the decoder implementation supports dormant mode.
+  bool mDormantSupported;
 
   // Current decoding position in the stream. This is where the decoder
   // is up to consuming the stream. This is not adjusted during decoder
@@ -929,10 +942,11 @@ public:
   AbstractCanonical<bool>* CanonicalPreservesPitch() { return &mPreservesPitch; }
 protected:
 
-  // Duration of the media resource. Set to -1 if unknown.
-  // Set when the metadata is loaded. Accessed on the main thread
-  // only.
-  int64_t mDuration;
+  // Official duration of the media resource as observed by script.
+  double mDuration;
+
+  // Duration of the media resource according to the state machine.
+  Mirror<media::NullableTimeUnit> mStateMachineDuration;
 
   // True if the media is seekable (i.e. supports random access).
   bool mMediaSeekable;
@@ -980,10 +994,19 @@ public:
   AbstractCanonical<media::NullableTimeUnit>* CanonicalEstimatedDuration() { return &mEstimatedDuration; }
 protected:
 
-  // Media duration set explicitly by JS. Currently, this is only ever present for MSE.
+  // Media duration set explicitly by JS. At present, this is only ever present
+  // for MSE.
   Canonical<Maybe<double>> mExplicitDuration;
   double ExplicitDuration() { return mExplicitDuration.Ref().ref(); }
-  void SetExplicitDuration(double aValue) { mExplicitDuration.Set(Some(aValue)); }
+  void SetExplicitDuration(double aValue)
+  {
+    mExplicitDuration.Set(Some(aValue));
+
+    // We Invoke DurationChanged explicitly, rather than using a watcher, so
+    // that it takes effect immediately, rather than at the end of the current task.
+    DurationChanged();
+  }
+
 public:
   AbstractCanonical<Maybe<double>>* CanonicalExplicitDuration() { return &mExplicitDuration; }
 protected:
@@ -1074,6 +1097,9 @@ protected:
   // True if audio tracks and video tracks are constructed and added into the
   // track list, false if all tracks are removed from the track list.
   bool mMediaTracksConstructed;
+
+  // True if we've already fired metadataloaded.
+  bool mFiredMetadataLoaded;
 
   // Stores media info, including info of audio tracks and video tracks, should
   // only be accessed from main thread.

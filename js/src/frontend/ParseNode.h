@@ -908,6 +908,7 @@ class ParseNode
     };
 
     bool getConstantValue(ExclusiveContext* cx, AllowConstantObjects allowObjects, MutableHandleValue vp,
+                          Value* compare = nullptr, size_t ncompare = 0,
                           NewObjectKind newKind = TenuredObject);
     inline bool isConstant();
 

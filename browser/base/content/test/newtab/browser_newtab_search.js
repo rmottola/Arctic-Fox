@@ -274,7 +274,7 @@ function promiseNewSearchEngine(basename, numLogos) {
 
 function checkCurrentEngine(basename, has1xLogo, has2xLogo) {
   let engine = Services.search.currentEngine;
-  ok(engine.name.contains(basename),
+  ok(engine.name.includes(basename),
      "Sanity check: current engine: engine.name=" + engine.name +
      " basename=" + basename);
 

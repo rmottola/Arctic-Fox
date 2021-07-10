@@ -11,13 +11,13 @@ function forceCheckAndTestStatus(status, next) {
   let mozSettings = window.navigator.mozSettings;
   let forceSent = false;
 
-  mozSettings.addObserver("goanna.updateStatus", function statusObserver(setting) {
+  mozSettings.addObserver("gecko.updateStatus", function statusObserver(setting) {
     if (!forceSent) {
       return;
     }
 
-    mozSettings.removeObserver("goanna.updateStatus", statusObserver);
-    is(setting.settingValue, status, "goanna.updateStatus");
+    mozSettings.removeObserver("gecko.updateStatus", statusObserver);
+    is(setting.settingValue, status, "gecko.updateStatus");
     next();
   });
 

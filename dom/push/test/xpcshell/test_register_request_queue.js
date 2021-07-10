@@ -3,7 +3,7 @@
 
 'use strict';
 
-const {PushDB, PushService} = serviceExports;
+const {PushDB, PushService, PushServiceWebSocket} = serviceExports;
 
 function run_test() {
   do_get_profile();
@@ -18,9 +18,8 @@ function run_test() {
 }
 
 add_task(function* test_register_request_queue() {
-  let db = new PushDB();
-  let promiseDB = promisifyDatabase(db);
-  do_register_cleanup(() => cleanupDatabase(db));
+  let db = PushServiceWebSocket.newPushDB();
+  do_register_cleanup(() => {return db.drop().then(_ => db.close());});
 
   let helloDefer = Promise.defer();
   let onHello = after(2, function onHello(request) {
@@ -32,6 +31,7 @@ add_task(function* test_register_request_queue() {
     helloDefer.resolve();
   });
   PushService.init({
+    serverURI: "wss://push.example.org/",
     networkInfo: new MockDesktopNetworkInfo(),
     db,
     makeWebSocket(uri) {
@@ -45,10 +45,12 @@ add_task(function* test_register_request_queue() {
   });
 
   let firstRegister = PushNotificationService.register(
-    'https://example.com/page/1'
+    'https://example.com/page/1',
+    { appId: Ci.nsIScriptSecurityManager.NO_APP_ID, inBrowser: false }
   );
   let secondRegister = PushNotificationService.register(
-    'https://example.com/page/1'
+    'https://example.com/page/1',
+    { appId: Ci.nsIScriptSecurityManager.NO_APP_ID, inBrowser: false }
   );
 
   yield waitForPromise(Promise.all([

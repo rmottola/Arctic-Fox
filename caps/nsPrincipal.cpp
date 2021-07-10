@@ -13,10 +13,10 @@
 #include "nsReadableUtils.h"
 #include "pratom.h"
 #include "nsIURI.h"
+#include "nsIURL.h"
+#include "nsIURIWithPrincipal.h"
 #include "nsJSPrincipals.h"
 #include "nsIEffectiveTLDService.h"
-#include "nsIObjectInputStream.h"
-#include "nsIObjectOutputStream.h"
 #include "nsIClassInfoImpl.h"
 #include "nsIProtocolHandler.h"
 #include "nsError.h"
@@ -69,9 +69,7 @@ nsPrincipal::InitializeStatics()
 }
 
 nsPrincipal::nsPrincipal()
-  : mAppId(nsIScriptSecurityManager::UNKNOWN_APP_ID)
-  , mInMozBrowser(false)
-  , mCodebaseImmutable(false)
+  : mCodebaseImmutable(false)
   , mDomainImmutable(false)
   , mInitialized(false)
 { }
@@ -80,9 +78,7 @@ nsPrincipal::~nsPrincipal()
 { }
 
 nsresult
-nsPrincipal::Init(nsIURI *aCodebase,
-                  uint32_t aAppId,
-                  bool aInMozBrowser)
+nsPrincipal::Init(nsIURI *aCodebase, const OriginAttributes& aOriginAttributes)
 {
   NS_ENSURE_STATE(!mInitialized);
   NS_ENSURE_ARG(aCodebase);
@@ -91,9 +87,7 @@ nsPrincipal::Init(nsIURI *aCodebase,
 
   mCodebase = NS_TryToMakeImmutable(aCodebase);
   mCodebaseImmutable = URIIsImmutable(mCodebase);
-
-  mAppId = aAppId;
-  mInMozBrowser = aInMozBrowser;
+  mOriginAttributes = aOriginAttributes;
 
   return NS_OK;
 }
@@ -157,99 +151,51 @@ nsPrincipal::GetOriginForURI(nsIURI* aURI, nsACString& aOrigin)
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsPrincipal::GetOrigin(nsACString& aOrigin)
+nsresult
+nsPrincipal::GetOriginInternal(nsACString& aOrigin)
 {
   return GetOriginForURI(mCodebase, aOrigin);
 }
 
-NS_IMETHODIMP
-nsPrincipal::EqualsConsideringDomain(nsIPrincipal *aOther, bool *aResult)
+bool
+nsPrincipal::SubsumesInternal(nsIPrincipal* aOther,
+                              BasePrincipal::DocumentDomainConsideration aConsideration)
 {
-  *aResult = false;
+  MOZ_ASSERT(aOther);
 
-  if (!aOther) {
-    NS_WARNING("Need a principal to compare this to!");
-    return NS_OK;
-  }
-
+  // For nsPrincipal, Subsumes is equivalent to Equals.
   if (aOther == this) {
-    *aResult = true;
-    return NS_OK;
+    return true;
   }
 
-  if (!nsScriptSecurityManager::AppAttributesEqual(this, aOther)) {
-      return NS_OK;
+  if (OriginAttributesRef() != Cast(aOther)->OriginAttributesRef()) {
+    return false;
   }
 
   // If either the subject or the object has changed its principal by
   // explicitly setting document.domain then the other must also have
   // done so in order to be considered the same origin. This prevents
   // DNS spoofing based on document.domain (154930)
+  nsresult rv;
+  if (aConsideration == ConsiderDocumentDomain) {
+    // Get .domain on each principal.
+    nsCOMPtr<nsIURI> thisDomain, otherDomain;
+    GetDomain(getter_AddRefs(thisDomain));
+    aOther->GetDomain(getter_AddRefs(otherDomain));
 
-  nsCOMPtr<nsIURI> thisURI;
-  this->GetDomain(getter_AddRefs(thisURI));
-  bool thisSetDomain = !!thisURI;
-  if (!thisURI) {
-      this->GetURI(getter_AddRefs(thisURI));
+    // If either has .domain set, we have equality i.f.f. the domains match.
+    // Otherwise, we fall through to the non-document-domain-considering case.
+    if (thisDomain || otherDomain) {
+      return nsScriptSecurityManager::SecurityCompareURIs(thisDomain, otherDomain);
+    }
   }
 
-  nsCOMPtr<nsIURI> otherURI;
-  aOther->GetDomain(getter_AddRefs(otherURI));
-  bool otherSetDomain = !!otherURI;
-  if (!otherURI) {
-      aOther->GetURI(getter_AddRefs(otherURI));
-  }
-
-  *aResult = thisSetDomain == otherSetDomain &&
-             nsScriptSecurityManager::SecurityCompareURIs(thisURI, otherURI);
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsPrincipal::Equals(nsIPrincipal *aOther, bool *aResult)
-{
-  *aResult = false;
-
-  if (!aOther) {
-    NS_WARNING("Need a principal to compare this to!");
-    return NS_OK;
-  }
-
-  if (aOther == this) {
-    *aResult = true;
-    return NS_OK;
-  }
-
-  if (!nsScriptSecurityManager::AppAttributesEqual(this, aOther)) {
-    return NS_OK;
-  }
-
-  nsCOMPtr<nsIURI> otherURI;
-  nsresult rv = aOther->GetURI(getter_AddRefs(otherURI));
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
-
-  NS_ASSERTION(mCodebase,
-               "shouldn't be calling this on principals from preferences");
+    nsCOMPtr<nsIURI> otherURI;
+    rv = aOther->GetURI(getter_AddRefs(otherURI));
+    NS_ENSURE_SUCCESS(rv, false);
 
   // Compare codebases.
-  *aResult = nsScriptSecurityManager::SecurityCompareURIs(mCodebase,
-                                                          otherURI);
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsPrincipal::Subsumes(nsIPrincipal *aOther, bool *aResult)
-{
-  return Equals(aOther, aResult);
-}
-
-NS_IMETHODIMP
-nsPrincipal::SubsumesConsideringDomain(nsIPrincipal *aOther, bool *aResult)
-{
-  return EqualsConsideringDomain(aOther, aResult);
+  return nsScriptSecurityManager::SecurityCompareURIs(mCodebase, otherURI);
 }
 
 NS_IMETHODIMP
@@ -288,6 +234,12 @@ nsPrincipal::CheckMayLoad(nsIURI* aURI, bool aReport, bool aAllowIfInheritsPrinc
   }
   if (uriPrin && nsIPrincipal::Subsumes(uriPrin)) {
       return NS_OK;
+  }
+
+  // If this principal is associated with an addon, check whether that addon
+  // has been given permission to load from this domain.
+  if (AddonAllowsLoad(aURI)) {
+    return NS_OK;
   }
 
   if (nsScriptSecurityManager::SecurityCompareURIs(mCodebase, aURI)) {
@@ -362,49 +314,6 @@ nsPrincipal::SetDomain(nsIURI* aDomain)
 }
 
 NS_IMETHODIMP
-nsPrincipal::GetJarPrefix(nsACString& aJarPrefix)
-{
-  MOZ_ASSERT(mAppId != nsIScriptSecurityManager::UNKNOWN_APP_ID);
-
-  mozilla::GetJarPrefix(mAppId, mInMozBrowser, aJarPrefix);
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsPrincipal::GetAppStatus(uint16_t* aAppStatus)
-{
-  *aAppStatus = GetAppStatus();
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsPrincipal::GetAppId(uint32_t* aAppId)
-{
-  if (mAppId == nsIScriptSecurityManager::UNKNOWN_APP_ID) {
-    MOZ_ASSERT(false);
-    *aAppId = nsIScriptSecurityManager::NO_APP_ID;
-    return NS_OK;
-  }
-
-  *aAppId = mAppId;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsPrincipal::GetIsInBrowserElement(bool* aIsInBrowserElement)
-{
-  *aIsInBrowserElement = mInMozBrowser;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsPrincipal::GetUnknownAppId(bool* aUnknownAppId)
-{
-  *aUnknownAppId = mAppId == nsIScriptSecurityManager::UNKNOWN_APP_ID;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 nsPrincipal::GetBaseDomain(nsACString& aBaseDomain)
 {
   // For a file URI, we return the file path.
@@ -459,13 +368,13 @@ nsPrincipal::Read(nsIObjectInputStream* aStream)
 
   domain = do_QueryInterface(supports);
 
-  uint32_t appId;
-  rv = aStream->Read32(&appId);
+  nsAutoCString suffix;
+  rv = aStream->ReadCString(suffix);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  bool inMozBrowser;
-  rv = aStream->ReadBoolean(&inMozBrowser);
-  NS_ENSURE_SUCCESS(rv, rv);
+  OriginAttributes attrs;
+  bool ok = attrs.PopulateFromSuffix(suffix);
+  NS_ENSURE_TRUE(ok, NS_ERROR_FAILURE);
 
   rv = NS_ReadOptionalObject(aStream, true, getter_AddRefs(supports));
   NS_ENSURE_SUCCESS(rv, rv);
@@ -473,7 +382,7 @@ nsPrincipal::Read(nsIObjectInputStream* aStream)
   // This may be null.
   nsCOMPtr<nsIContentSecurityPolicy> csp = do_QueryInterface(supports, &rv);
 
-  rv = Init(codebase, appId, inMozBrowser);
+  rv = Init(codebase, attrs);
   NS_ENSURE_SUCCESS(rv, rv);
 
   rv = SetCsp(csp);
@@ -507,8 +416,11 @@ nsPrincipal::Write(nsIObjectOutputStream* aStream)
     return rv;
   }
 
-  aStream->Write32(mAppId);
-  aStream->WriteBoolean(mInMozBrowser);
+  nsAutoCString suffix;
+  OriginAttributesRef().CreateSuffix(suffix);
+
+  rv = aStream->WriteStringZ(suffix.get());
+  NS_ENSURE_SUCCESS(rv, rv);
 
   rv = NS_WriteOptionalCompoundObject(aStream, mCSP,
                                       NS_GET_IID(nsIContentSecurityPolicy),
@@ -521,16 +433,6 @@ nsPrincipal::Write(nsIObjectOutputStream* aStream)
   // on the deserialized URIs in Read().
 
   return NS_OK;
-}
-
-uint16_t
-nsPrincipal::GetAppStatus()
-{
-  if (mAppId == nsIScriptSecurityManager::UNKNOWN_APP_ID) {
-    NS_WARNING("Asking for app status on a principal with an unknown app id");
-    return nsIPrincipal::APP_STATUS_NOT_INSTALLED;
-  }
-  return nsScriptSecurityManager::AppStatusForPrincipal(this);
 }
 
 // Helper-function to indicate whether the CSS Unprefixing Service
@@ -709,8 +611,6 @@ nsPrincipal::IsOnCSSUnprefixingWhitelist()
 
 /************************************************************************************************************************/
 
-static const char EXPANDED_PRINCIPAL_SPEC[] = "[Expanded Principal]";
-
 NS_IMPL_CLASSINFO(nsExpandedPrincipal, nullptr, nsIClassInfo::MAIN_THREAD_ONLY,
                   NS_EXPANDEDPRINCIPAL_CID)
 NS_IMPL_QUERY_INTERFACE_CI(nsExpandedPrincipal,
@@ -720,9 +620,39 @@ NS_IMPL_CI_INTERFACE_GETTER(nsExpandedPrincipal,
                              nsIPrincipal,
                              nsIExpandedPrincipal)
 
+struct OriginComparator
+{
+  bool LessThan(nsIPrincipal* a, nsIPrincipal* b) const
+  {
+    nsAutoCString originA;
+    nsresult rv = a->GetOrigin(originA);
+    NS_ENSURE_SUCCESS(rv, false);
+    nsAutoCString originB;
+    rv = b->GetOrigin(originB);
+    NS_ENSURE_SUCCESS(rv, false);
+    return originA < originB;
+  }
+
+  bool Equals(nsIPrincipal* a, nsIPrincipal* b) const
+  {
+    nsAutoCString originA;
+    nsresult rv = a->GetOrigin(originA);
+    NS_ENSURE_SUCCESS(rv, false);
+    nsAutoCString originB;
+    rv = b->GetOrigin(originB);
+    NS_ENSURE_SUCCESS(rv, false);
+    return a == b;
+  }
+};
+
 nsExpandedPrincipal::nsExpandedPrincipal(nsTArray<nsCOMPtr <nsIPrincipal> > &aWhiteList)
 {
-  mPrincipals.AppendElements(aWhiteList);
+  // We force the principals to be sorted by origin so that nsExpandedPrincipal
+  // origins can have a canonical form.
+  OriginComparator c;
+  for (size_t i = 0; i < aWhiteList.Length(); ++i) {
+    mPrincipals.InsertElementSorted(aWhiteList[i], c);
+  }
 }
 
 nsExpandedPrincipal::~nsExpandedPrincipal()
@@ -741,102 +671,52 @@ nsExpandedPrincipal::SetDomain(nsIURI* aDomain)
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsExpandedPrincipal::GetOrigin(nsACString& aOrigin)
+nsresult
+nsExpandedPrincipal::GetOriginInternal(nsACString& aOrigin)
 {
-  aOrigin.AssignLiteral(EXPANDED_PRINCIPAL_SPEC);
+  aOrigin.AssignLiteral("[Expanded Principal [");
+  for (size_t i = 0; i < mPrincipals.Length(); ++i) {
+    if (i != 0) {
+      aOrigin.AppendLiteral(", ");
+    }
+
+    nsAutoCString subOrigin;
+    nsresult rv = mPrincipals.ElementAt(i)->GetOrigin(subOrigin);
+    NS_ENSURE_SUCCESS(rv, rv);
+    aOrigin.Append(subOrigin);
+  }
+
+  aOrigin.Append("]]");
   return NS_OK;
 }
 
-typedef nsresult (NS_STDCALL nsIPrincipal::*nsIPrincipalMemFn)(nsIPrincipal* aOther,
-                                                               bool* aResult);
-#define CALL_MEMBER_FUNCTION(THIS,MEM_FN)  ((THIS)->*(MEM_FN))
-
-// nsExpandedPrincipal::Equals and nsExpandedPrincipal::EqualsConsideringDomain
-// shares the same logic. The difference only that Equals requires 'this'
-// and 'aOther' to Subsume each other while EqualsConsideringDomain requires
-// bidirectional SubsumesConsideringDomain.
-static nsresult
-Equals(nsExpandedPrincipal* aThis, nsIPrincipalMemFn aFn, nsIPrincipal* aOther,
-       bool* aResult)
+bool
+nsExpandedPrincipal::SubsumesInternal(nsIPrincipal* aOther,
+                                      BasePrincipal::DocumentDomainConsideration aConsideration)
 {
-  // If (and only if) 'aThis' and 'aOther' both Subsume/SubsumesConsideringDomain
-  // each other, then they are Equal.
-  *aResult = false;
-  // Calling the corresponding subsume function on this (aFn).
-  nsresult rv = CALL_MEMBER_FUNCTION(aThis, aFn)(aOther, aResult);
-  NS_ENSURE_SUCCESS(rv, rv);
-  if (!*aResult)
-    return NS_OK;
-
-  // Calling the corresponding subsume function on aOther (aFn).
-  rv = CALL_MEMBER_FUNCTION(aOther, aFn)(aThis, aResult);
-  NS_ENSURE_SUCCESS(rv, rv);
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsExpandedPrincipal::Equals(nsIPrincipal* aOther, bool* aResult)
-{
-  return ::Equals(this, &nsIPrincipal::Subsumes, aOther, aResult);
-}
-
-NS_IMETHODIMP
-nsExpandedPrincipal::EqualsConsideringDomain(nsIPrincipal* aOther, bool* aResult)
-{
-  return ::Equals(this, &nsIPrincipal::SubsumesConsideringDomain, aOther, aResult);
-}
-
-// nsExpandedPrincipal::Subsumes and nsExpandedPrincipal::SubsumesConsideringDomain
-// shares the same logic. The difference only that Subsumes calls are replaced
-//with SubsumesConsideringDomain calls in the second case.
-static nsresult
-Subsumes(nsExpandedPrincipal* aThis, nsIPrincipalMemFn aFn, nsIPrincipal* aOther,
-         bool* aResult)
-{
-  nsresult rv;
+  // If aOther is an ExpandedPrincipal too, we break it down into its component
+  // nsIPrincipals, and check subsumes on each one.
   nsCOMPtr<nsIExpandedPrincipal> expanded = do_QueryInterface(aOther);
   if (expanded) {
-    // If aOther is an ExpandedPrincipal too, check if all of its
-    // principals are subsumed.
     nsTArray< nsCOMPtr<nsIPrincipal> >* otherList;
     expanded->GetWhiteList(&otherList);
     for (uint32_t i = 0; i < otherList->Length(); ++i){
-      rv = CALL_MEMBER_FUNCTION(aThis, aFn)((*otherList)[i], aResult);
-      NS_ENSURE_SUCCESS(rv, rv);
-      if (!*aResult) {
-        // If we don't subsume at least one principal of aOther, return false.
-        return NS_OK;
+      if (!SubsumesInternal((*otherList)[i], aConsideration)) {
+        return false;
       }
     }
-  } else {
-    // For a regular aOther, one of our principals must subsume it.
-    nsTArray< nsCOMPtr<nsIPrincipal> >* list;
-    aThis->GetWhiteList(&list);
-    for (uint32_t i = 0; i < list->Length(); ++i){
-      rv = CALL_MEMBER_FUNCTION((*list)[i], aFn)(aOther, aResult);
-      NS_ENSURE_SUCCESS(rv, rv);
-      if (*aResult) {
-        // If one of our principal subsumes it, return true.
-        return NS_OK;
-      }
+    return true;
+  }
+
+  // We're dealing with a regular principal. One of our principals must subsume
+  // it.
+  for (uint32_t i = 0; i < mPrincipals.Length(); ++i) {
+    if (Cast(mPrincipals[i])->Subsumes(aOther, aConsideration)) {
+      return true;
     }
   }
-  return NS_OK;
-}
 
-#undef CALL_MEMBER_FUNCTION
-
-NS_IMETHODIMP
-nsExpandedPrincipal::Subsumes(nsIPrincipal* aOther, bool* aResult)
-{
-  return ::Subsumes(this, &nsIPrincipal::Subsumes, aOther, aResult);
-}
-
-NS_IMETHODIMP
-nsExpandedPrincipal::SubsumesConsideringDomain(nsIPrincipal* aOther, bool* aResult)
-{
-  return ::Subsumes(this, &nsIPrincipal::SubsumesConsideringDomain, aOther, aResult);
+  return false;
 }
 
 NS_IMETHODIMP
@@ -873,41 +753,6 @@ nsExpandedPrincipal::GetWhiteList(nsTArray<nsCOMPtr<nsIPrincipal> >** aWhiteList
 }
 
 NS_IMETHODIMP
-nsExpandedPrincipal::GetJarPrefix(nsACString& aJarPrefix)
-{
-  aJarPrefix.Truncate();
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsExpandedPrincipal::GetAppStatus(uint16_t* aAppStatus)
-{
-  *aAppStatus = nsIPrincipal::APP_STATUS_NOT_INSTALLED;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsExpandedPrincipal::GetAppId(uint32_t* aAppId)
-{
-  *aAppId = nsIScriptSecurityManager::NO_APP_ID;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsExpandedPrincipal::GetIsInBrowserElement(bool* aIsInBrowserElement)
-{
-  *aIsInBrowserElement = false;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsExpandedPrincipal::GetUnknownAppId(bool* aUnknownAppId)
-{
-  *aUnknownAppId = false;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 nsExpandedPrincipal::GetBaseDomain(nsACString& aBaseDomain)
 {
   return NS_ERROR_NOT_AVAILABLE;
@@ -925,9 +770,7 @@ nsExpandedPrincipal::IsOnCSSUnprefixingWhitelist()
 void
 nsExpandedPrincipal::GetScriptLocation(nsACString& aStr)
 {
-  aStr.Assign(EXPANDED_PRINCIPAL_SPEC);
-  aStr.AppendLiteral(" (");
-
+  aStr.Assign("[Expanded Principal [");
   for (size_t i = 0; i < mPrincipals.Length(); ++i) {
     if (i != 0) {
       aStr.AppendLiteral(", ");
@@ -939,7 +782,7 @@ nsExpandedPrincipal::GetScriptLocation(nsACString& aStr)
     aStr.Append(spec);
 
   }
-  aStr.Append(")");
+  aStr.Append("]]");
 }
 
 //////////////////////////////////////////

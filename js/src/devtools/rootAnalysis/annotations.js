@@ -57,7 +57,6 @@ function indirectCallCannotGC(fullCaller, fullVariable)
 
 // Ignore calls through functions pointers with these types
 var ignoreClasses = {
-    "JS::CallbackTracer" : true,
     "JSStringFinalizer" : true,
     "SprintfState" : true,
     "SprintfStateStr" : true,
@@ -189,6 +188,8 @@ var ignoreFunctions = {
     // static and dynamic checks for no GC in the non-test code, and in the test
     // code we fall back to only the dynamic checks.
     "void test::RingbufferDumper::OnTestPartResult(testing::TestPartResult*)" : true,
+
+    "float64 JS_GetCurrentEmbedderTime()" : true,
 };
 
 function isProtobuf(name)
@@ -330,6 +331,54 @@ function isOverridableField(initialCSU, csu, field)
         if (field == 'GetWindowProxy' || field == 'GetWindowProxyPreserveColor')
             return false;
     }
-
+    if (initialCSU == 'nsICycleCollectorListener' && field == 'NoteWeakMapEntry')
+        return false;
+    if (initialCSU == 'nsICycleCollectorListener' && field == 'NoteEdge')
+        return false;
     return true;
+}
+
+function listGCTypes() {
+    return [
+        'JSObject',
+        'JSString',
+        'JSFatInlineString',
+        'JSExternalString',
+        'js::Shape',
+        'js::AccessorShape',
+        'js::BaseShape',
+        'JSScript',
+        'js::ObjectGroup',
+        'js::LazyScript',
+        'js::jit::JitCode',
+        'JS::Symbol',
+    ];
+}
+
+function listGCPointers() {
+    return [
+        'JS::Value',
+        'jsid',
+
+        // AutoCheckCannotGC should also not be held live across a GC function.
+        'JS::AutoCheckCannotGC',
+    ];
+}
+
+function listNonGCTypes() {
+    return [
+    ];
+}
+
+function listNonGCPointers() {
+    return [
+    ];
+}
+
+// Flexible mechanism for deciding an arbitrary type is a GCPointer. Its one
+// use turned out to be unnecessary due to another change, but the mechanism
+// seems useful for something like /Vector.*Something/.
+function isGCPointer(typeName)
+{
+    return false;
 }

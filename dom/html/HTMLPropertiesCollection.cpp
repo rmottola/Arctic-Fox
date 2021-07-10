@@ -159,7 +159,8 @@ HTMLPropertiesCollection::NamedItem(const nsAString& aName)
 void
 HTMLPropertiesCollection::AttributeChanged(nsIDocument *aDocument, Element* aElement,
                                            int32_t aNameSpaceID, nsIAtom* aAttribute,
-                                           int32_t aModType)
+                                           int32_t aModType,
+                                           const nsAttrValue* aOldValue)
 {
   mIsDirty = true;
 }
@@ -438,7 +439,8 @@ PropertyNodeList::GetValues(JSContext* aCx, nsTArray<JS::Value >& aResult,
 void
 PropertyNodeList::AttributeChanged(nsIDocument* aDocument, Element* aElement,
                                    int32_t aNameSpaceID, nsIAtom* aAttribute,
-                                   int32_t aModType)
+                                   int32_t aModType,
+                                   const nsAttrValue* aOldValue)
 {
   mIsDirty = true;
 }

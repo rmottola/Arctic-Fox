@@ -225,13 +225,22 @@ struct Zone : public JS::shadow::Zone,
     bool isAtomsZone() const { return runtimeFromAnyThread()->isAtomsZone(this); }
     bool isSelfHostingZone() const { return runtimeFromAnyThread()->isSelfHostingZone(this); }
 
+    void prepareForCompacting();
+
 #ifdef DEBUG
     // For testing purposes, return the index of the zone group which this zone
     // was swept in in the last GC.
     unsigned lastZoneGroupIndex() { return gcLastZoneGroupIndex; }
 #endif
 
+    using DebuggerVector = js::Vector<js::Debugger*, 0, js::SystemAllocPolicy>;
+
   private:
+    DebuggerVector* debuggers;
+
+    using LogTenurePromotionQueue = js::Vector<JSObject*, 0, js::SystemAllocPolicy>;
+    LogTenurePromotionQueue awaitingTenureLogging;
+
     void sweepBreakpoints(js::FreeOp* fop);
     void sweepCompartments(js::FreeOp* fop, bool keepAtleastOne, bool lastGC);
 
@@ -242,6 +251,18 @@ struct Zone : public JS::shadow::Zone,
     }
 
   public:
+    bool hasDebuggers() const { return debuggers && debuggers->length(); }
+    DebuggerVector* getDebuggers() const { return debuggers; }
+    DebuggerVector* getOrCreateDebuggers(JSContext* cx);
+
+    void enqueueForPromotionToTenuredLogging(JSObject& obj) {
+        MOZ_ASSERT(hasDebuggers());
+        MOZ_ASSERT(!IsInsideNursery(&obj));
+        if (!awaitingTenureLogging.append(&obj))
+            js::CrashAtUnhandlableOOM("Zone::enqueueForPromotionToTenuredLogging");
+    }
+    void logPromotionsToTenured();
+
     js::gc::ArenaLists arenas;
 
     js::TypeZone types;

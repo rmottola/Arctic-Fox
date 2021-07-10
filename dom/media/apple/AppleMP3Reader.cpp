@@ -24,9 +24,9 @@ using namespace mozilla::media;
 namespace mozilla {
 
 extern PRLogModuleInfo* gMediaDecoderLog;
-#define LOGE(...) PR_LOG(gMediaDecoderLog, PR_LOG_ERROR, (__VA_ARGS__))
-#define LOGW(...) PR_LOG(gMediaDecoderLog, PR_LOG_WARNING, (__VA_ARGS__))
-#define LOGD(...) PR_LOG(gMediaDecoderLog, PR_LOG_DEBUG, (__VA_ARGS__))
+#define LOGE(...) MOZ_LOG(gMediaDecoderLog, mozilla::LogLevel::Error, (__VA_ARGS__))
+#define LOGW(...) MOZ_LOG(gMediaDecoderLog, mozilla::LogLevel::Warning, (__VA_ARGS__))
+#define LOGD(...) MOZ_LOG(gMediaDecoderLog, mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 #define PROPERTY_ID_FORMAT "%c%c%c%c"
 #define PROPERTY_ID_PRINT(x) ((x) >> 24), \
@@ -387,7 +387,7 @@ AppleMP3Reader::ReadMetadata(MediaInfo* aInfo,
                                    bytes,
                                    0 /* flags */);
 
-    mMP3FrameParser.Parse(bytes, numBytes, offset);
+    mMP3FrameParser.Parse(reinterpret_cast<uint8_t*>(bytes), numBytes, offset);
 
     offset += numBytes;
 
@@ -524,23 +524,26 @@ AppleMP3Reader::Seek(int64_t aTime, int64_t aEndTime)
 }
 
 void
-AppleMP3Reader::NotifyDataArrived(const char* aBuffer,
-                                  uint32_t aLength,
-                                  int64_t aOffset)
+AppleMP3Reader::NotifyDataArrivedInternal(uint32_t aLength, int64_t aOffset)
 {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(OnTaskQueue());
   if (!mMP3FrameParser.NeedsData()) {
     return;
   }
 
-  mMP3FrameParser.Parse(aBuffer, aLength, aOffset);
+  nsRefPtr<MediaByteBuffer> bytes = mDecoder->GetResource()->SilentReadAt(aOffset, aLength);
+  NS_ENSURE_TRUE_VOID(bytes);
+  mMP3FrameParser.Parse(bytes->Elements(), aLength, aOffset);
+  if (!mMP3FrameParser.IsMP3()) {
+    return;
+  }
 
   uint64_t duration = mMP3FrameParser.GetDuration();
   if (duration != mDuration) {
     LOGD("Updating media duration to %lluus\n", duration);
+    MOZ_ASSERT(mDecoder);
     mDuration = duration;
-    ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-    mDecoder->UpdateEstimatedMediaDuration(duration);
+    mDecoder->DispatchUpdateEstimatedMediaDuration(duration);
   }
 }
 

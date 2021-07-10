@@ -8,7 +8,7 @@
  */
 
 typedef long long GLint64; // Should this be int64?
-typedef unsigned long long GLuint64; // Should this be uint64?
+typedef unsigned long long GLuint64;
 
 [Pref="webgl.enable-prototype-webgl2"]
 interface WebGLQuery {
@@ -26,11 +26,9 @@ interface WebGLSync {
 interface WebGLTransformFeedback {
 };
 
-/*
 [Pref="webgl.enable-prototype-webgl2"]
 interface WebGLVertexArrayObject {
 };
-*/
 
 [Pref="webgl.enable-prototype-webgl2"]
 interface WebGL2RenderingContext : WebGLRenderingContext
@@ -319,11 +317,13 @@ interface WebGL2RenderingContext : WebGLRenderingContext
 
     const GLint64 TIMEOUT_IGNORED                              = -1;
 
+    /* WebGL-specific enums */
+    const GLenum MAX_CLIENT_WAIT_TIMEOUT_WEBGL                 = 0x9247;
+
     /* Buffer objects */
     void copyBufferSubData(GLenum readTarget, GLenum writeTarget, GLintptr readOffset,
                            GLintptr writeOffset, GLsizeiptr size);
-    void getBufferSubData(GLenum target, GLintptr offset, ArrayBuffer returnedData);
-    void getBufferSubData(GLenum target, GLintptr offset, ArrayBufferView returnedData);
+    void getBufferSubData(GLenum target, GLintptr offset, ArrayBuffer? returnedData);
 
     /* Framebuffer objects */
     void blitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0,
@@ -380,9 +380,13 @@ interface WebGL2RenderingContext : WebGLRenderingContext
     void uniform2ui(WebGLUniformLocation? location, GLuint v0, GLuint v1);
     void uniform3ui(WebGLUniformLocation? location, GLuint v0, GLuint v1, GLuint v2);
     void uniform4ui(WebGLUniformLocation? location, GLuint v0, GLuint v1, GLuint v2, GLuint v3);
+    void uniform1uiv(WebGLUniformLocation? location, Uint32Array value);
     void uniform1uiv(WebGLUniformLocation? location, sequence<GLuint> value);
+    void uniform2uiv(WebGLUniformLocation? location, Uint32Array value);
     void uniform2uiv(WebGLUniformLocation? location, sequence<GLuint> value);
+    void uniform3uiv(WebGLUniformLocation? location, Uint32Array value);
     void uniform3uiv(WebGLUniformLocation? location, sequence<GLuint> value);
+    void uniform4uiv(WebGLUniformLocation? location, Uint32Array value);
     void uniform4uiv(WebGLUniformLocation? location, sequence<GLuint> value);
     void uniformMatrix2x3fv(WebGLUniformLocation? location, GLboolean transpose, Float32Array value);
     void uniformMatrix2x3fv(WebGLUniformLocation? location, GLboolean transpose, sequence<GLfloat> value);
@@ -472,10 +476,8 @@ interface WebGL2RenderingContext : WebGLRenderingContext
     void uniformBlockBinding(WebGLProgram? program, GLuint uniformBlockIndex, GLuint uniformBlockBinding);
 
     /* Vertex Array Objects */
-    /*
     WebGLVertexArrayObject? createVertexArray();
     void deleteVertexArray(WebGLVertexArrayObject? vertexArray);
     [WebGLHandlesContextLoss] GLboolean isVertexArray(WebGLVertexArrayObject? vertexArray);
     void bindVertexArray(WebGLVertexArrayObject? array);
-    */
 };

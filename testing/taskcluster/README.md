@@ -95,7 +95,7 @@ task:
   - repository: Target HG repository (ex:
     https://hg.mozilla.org/mozilla-central)
 
-  - revision: Target HG revision for goanna
+  - revision: Target HG revision for gecko
 
   - owner: Email address of the committer
 
@@ -111,7 +111,7 @@ locations in the future)
   - repository: Target HG repository (ex:
     https://hg.mozilla.org/mozilla-central)
 
-  - revision: Target HG revision for goanna
+  - revision: Target HG revision for gecko
 
   - owner: Email address of the committer
 

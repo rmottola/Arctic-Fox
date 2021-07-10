@@ -39,12 +39,12 @@ public:
     MOZ_ASSERT(aController);
   }
 
+protected:
   virtual ~CheckProfileStatusCallback()
   {
     mController = nullptr;
   }
 
-private:
   nsRefPtr<BluetoothProfileController> mController;
 };
 

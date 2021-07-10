@@ -65,6 +65,16 @@ class nsIDocShell;
 #define MINVALUE_GL_MAX_RENDERBUFFER_SIZE             1024  // Different from the spec, which sets it to 1 on page 164
 #define MINVALUE_GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS  8     // Page 164
 
+/*
+ * WebGL-only GLenums
+ */
+#define LOCAL_GL_BROWSER_DEFAULT_WEBGL                       0x9244
+#define LOCAL_GL_CONTEXT_LOST_WEBGL                          0x9242
+#define LOCAL_GL_MAX_CLIENT_WAIT_TIMEOUT_WEBGL               0x9247
+#define LOCAL_GL_UNPACK_COLORSPACE_CONVERSION_WEBGL          0x9243
+#define LOCAL_GL_UNPACK_FLIP_Y_WEBGL                         0x9240
+#define LOCAL_GL_UNPACK_PREMULTIPLY_ALPHA_WEBGL              0x9241
+
 namespace mozilla {
 
 class WebGLActiveInfo;
@@ -170,6 +180,7 @@ class WebGLContext
     friend class WebGLExtensionCompressedTexturePVRTC;
     friend class WebGLExtensionCompressedTextureS3TC;
     friend class WebGLExtensionDepthTexture;
+    friend class WebGLExtensionDisjointTimerQuery;
     friend class WebGLExtensionDrawBuffers;
     friend class WebGLExtensionLoseContext;
     friend class WebGLExtensionVertexArray;
@@ -815,9 +826,8 @@ public:
         UniformMatrix2fv_base(loc, transpose, value.Length(),
                               value.Elements());
     }
-    void UniformMatrix2fv_base(WebGLUniformLocation* loc,
-                               WebGLboolean transpose, size_t arrayLength,
-                               const float* data);
+    void UniformMatrix2fv_base(WebGLUniformLocation* loc, bool transpose,
+                               size_t arrayLength, const float* data);
 
     void UniformMatrix3fv(WebGLUniformLocation* loc, WebGLboolean transpose,
                           const dom::Float32Array& value)
@@ -830,9 +840,8 @@ public:
     {
         UniformMatrix3fv_base(loc, transpose, value.Length(), value.Elements());
     }
-    void UniformMatrix3fv_base(WebGLUniformLocation* loc,
-                               WebGLboolean transpose, size_t arrayLength,
-                               const float* data);
+    void UniformMatrix3fv_base(WebGLUniformLocation* loc, bool transpose,
+                               size_t arrayLength, const float* data);
 
     void UniformMatrix4fv(WebGLUniformLocation* loc, WebGLboolean transpose,
                           const dom::Float32Array& value)
@@ -840,15 +849,14 @@ public:
         value.ComputeLengthAndData();
         UniformMatrix4fv_base(loc, transpose, value.Length(), value.Data());
     }
-    void UniformMatrix4fv(WebGLUniformLocation* loc, WebGLboolean transpose,
+    void UniformMatrix4fv(WebGLUniformLocation* loc, bool transpose,
                           const dom::Sequence<float>& value)
     {
         UniformMatrix4fv_base(loc, transpose, value.Length(),
                               value.Elements());
     }
-    void UniformMatrix4fv_base(WebGLUniformLocation* loc,
-                               WebGLboolean transpose, size_t arrayLength,
-                               const float* data);
+    void UniformMatrix4fv_base(WebGLUniformLocation* loc, bool transpose,
+                               size_t arrayLength, const float* data);
 
     void UseProgram(WebGLProgram* prog);
 
@@ -864,10 +872,13 @@ public:
                                     GLuint* out_rawLoc,
                                     GLsizei* out_numElementsToUpload);
     bool ValidateUniformMatrixArraySetter(WebGLUniformLocation* loc,
-                                          uint8_t setterDims, GLenum setterType,
+                                          uint8_t setterCols,
+                                          uint8_t setterRows,
+                                          GLenum setterType,
                                           size_t setterArraySize,
                                           bool setterTranspose,
-                                          const char* info, GLuint* out_rawLoc,
+                                          const char* info,
+                                          GLuint* out_rawLoc,
                                           GLsizei* out_numElementsToUpload);
     void ValidateProgram(WebGLProgram* prog);
     bool ValidateUniformLocation(const char* info, WebGLUniformLocation* loc);
@@ -926,18 +937,19 @@ protected:
     WebGLRefPtr<WebGLBuffer> mBoundTransformFeedbackBuffer;
     WebGLRefPtr<WebGLBuffer> mBoundUniformBuffer;
 
-    UniquePtr<WebGLRefPtr<WebGLBuffer>[]> mBoundUniformBuffers;
-    UniquePtr<WebGLRefPtr<WebGLBuffer>[]> mBoundTransformFeedbackBuffers;
+    nsTArray<WebGLRefPtr<WebGLBuffer>> mBoundUniformBuffers;
+    nsTArray<WebGLRefPtr<WebGLBuffer>> mBoundTransformFeedbackBuffers;
 
     WebGLRefPtr<WebGLBuffer>& GetBufferSlotByTarget(GLenum target);
     WebGLRefPtr<WebGLBuffer>& GetBufferSlotByTargetIndexed(GLenum target,
                                                            GLuint index);
-    bool ValidateBufferUsageEnum(GLenum target, const char* info);
+
+    GLenum GetCurrentBinding(WebGLBuffer* buffer) const;
 
 // -----------------------------------------------------------------------------
 // Queries (WebGL2ContextQueries.cpp)
 protected:
-    WebGLRefPtr<WebGLQuery>* GetQueryTargetSlot(GLenum target);
+    WebGLRefPtr<WebGLQuery>& GetQuerySlotByTarget(GLenum target);
 
     WebGLRefPtr<WebGLQuery> mActiveOcclusionQuery;
     WebGLRefPtr<WebGLQuery> mActiveTransformFeedbackQuery;
@@ -948,7 +960,7 @@ public:
     void Disable(GLenum cap);
     void Enable(GLenum cap);
     bool GetStencilBits(GLint* out_stencilBits);
-    JS::Value GetParameter(JSContext* cx, GLenum pname, ErrorResult& rv);
+    virtual JS::Value GetParameter(JSContext* cx, GLenum pname, ErrorResult& rv);
 
     void GetParameter(JSContext* cx, GLenum pname,
                       JS::MutableHandle<JS::Value> retval, ErrorResult& rv)
@@ -1385,10 +1397,15 @@ private:
 private:
     // -------------------------------------------------------------------------
     // Context customization points
+    virtual WebGLVertexArray* CreateVertexArrayImpl();
+
     virtual bool ValidateAttribPointerType(bool integerMode, GLenum type, GLsizei* alignment, const char* info) = 0;
     virtual bool ValidateBufferTarget(GLenum target, const char* info) = 0;
     virtual bool ValidateBufferIndexedTarget(GLenum target, const char* info) = 0;
-    virtual bool ValidateBufferForTarget(GLenum target, WebGLBuffer* buffer, const char* info) = 0;
+    virtual bool ValidateBufferForTarget(GLenum target, WebGLBuffer* buffer, const char* info);
+    virtual bool ValidateBufferUsageEnum(GLenum usage, const char* info) = 0;
+    virtual bool ValidateQueryTarget(GLenum usage, const char* info) = 0;
+    virtual bool ValidateUniformMatrixTranspose(bool transpose, const char* info) = 0;
 
 protected:
     int32_t MaxTextureSizeForTarget(TexTarget target) const {
@@ -1423,6 +1440,9 @@ protected:
     nsTArray<WebGLRefPtr<WebGLTexture> > mBound2DTextures;
     nsTArray<WebGLRefPtr<WebGLTexture> > mBoundCubeMapTextures;
     nsTArray<WebGLRefPtr<WebGLTexture> > mBound3DTextures;
+    nsTArray<WebGLRefPtr<WebGLSampler> > mBoundSamplers;
+
+    void ResolveTexturesForDraw() const;
 
     WebGLRefPtr<WebGLProgram> mCurrentProgram;
     RefPtr<const webgl::LinkedProgramInfo> mActiveProgramLinkInfo;
@@ -1591,6 +1611,8 @@ public:
     friend class WebGLBuffer;
     friend class WebGLSampler;
     friend class WebGLShader;
+    friend class WebGLSync;
+    friend class WebGLTimerQuery;
     friend class WebGLTransformFeedback;
     friend class WebGLUniformLocation;
     friend class WebGLVertexArray;

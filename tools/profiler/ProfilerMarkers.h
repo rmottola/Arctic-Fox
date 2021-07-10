@@ -137,7 +137,7 @@ private:
 };
 
 /**
- * Tracks when touch events are processed by goanna, not when
+ * Tracks when touch events are processed by gecko, not when
  * the touch actually occured in gonk/android.
  */
 class TouchDataPayload : public ProfilerMarkerPayload

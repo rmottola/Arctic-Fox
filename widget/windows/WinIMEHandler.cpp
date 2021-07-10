@@ -174,13 +174,16 @@ IMEHandler::NotifyIME(nsWindow* aWindow,
   if (IsTSFAvailable()) {
     switch (aIMENotification.mMessage) {
       case NOTIFY_IME_OF_SELECTION_CHANGE: {
-        nsresult rv = nsTextStore::OnSelectionChange();
+        nsresult rv = nsTextStore::OnSelectionChange(aIMENotification);
         // If IMM IME is active, we need to notify nsIMM32Handler of updating
         // composition change.  It will adjust candidate window position or
         // composition window position.
-        if (IsIMMActive()) {
+        bool isIMMActive = IsIMMActive();
+        if (isIMMActive) {
           nsIMM32Handler::OnUpdateComposition(aWindow);
         }
+        nsIMM32Handler::OnSelectionChange(aWindow, aIMENotification,
+                                          isIMMActive);
         return rv;
       }
       case NOTIFY_IME_OF_COMPOSITION_UPDATE:
@@ -189,14 +192,18 @@ IMEHandler::NotifyIME(nsWindow* aWindow,
         // composition window position.
         if (IsIMMActive()) {
           nsIMM32Handler::OnUpdateComposition(aWindow);
+        } else {
+          nsTextStore::OnUpdateComposition();
         }
         return NS_OK;
       case NOTIFY_IME_OF_TEXT_CHANGE:
         return nsTextStore::OnTextChange(aIMENotification);
       case NOTIFY_IME_OF_FOCUS:
+        nsIMM32Handler::OnFocusChange(true, aWindow);
         return nsTextStore::OnFocusChange(true, aWindow,
                                           aWindow->GetInputContext());
       case NOTIFY_IME_OF_BLUR:
+        nsIMM32Handler::OnFocusChange(false, aWindow);
         return nsTextStore::OnFocusChange(false, aWindow,
                                           aWindow->GetInputContext());
       case NOTIFY_IME_OF_MOUSE_BUTTON_EVENT:
@@ -238,18 +245,25 @@ IMEHandler::NotifyIME(nsWindow* aWindow,
     case NOTIFY_IME_OF_COMPOSITION_UPDATE:
       nsIMM32Handler::OnUpdateComposition(aWindow);
       return NS_OK;
+    case NOTIFY_IME_OF_SELECTION_CHANGE:
+      nsIMM32Handler::OnSelectionChange(aWindow, aIMENotification, true);
+      return NS_OK;
     case NOTIFY_IME_OF_MOUSE_BUTTON_EVENT:
       return nsIMM32Handler::OnMouseButtonEvent(aWindow, aIMENotification);
-#ifdef NS_ENABLE_TSF
+    case NOTIFY_IME_OF_FOCUS:
+      nsIMM32Handler::OnFocusChange(true, aWindow);
+      return NS_OK;
     case NOTIFY_IME_OF_BLUR:
+      nsIMM32Handler::OnFocusChange(false, aWindow);
+#ifdef NS_ENABLE_TSF
       // If a plugin gets focus while TSF has focus, we need to notify TSF of
       // the blur.
       if (nsTextStore::ThinksHavingFocus()) {
         return nsTextStore::OnFocusChange(false, aWindow,
                                           aWindow->GetInputContext());
       }
-      return NS_ERROR_NOT_IMPLEMENTED;
 #endif //NS_ENABLE_TSF
+      return NS_OK;
     default:
       return NS_ERROR_NOT_IMPLEMENTED;
   }

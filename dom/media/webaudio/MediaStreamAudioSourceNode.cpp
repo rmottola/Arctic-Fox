@@ -107,7 +107,7 @@ MediaStreamAudioSourceNode::PrincipalChanged(DOMMediaStream* aDOMMediaStream)
     if (doc) {
       nsIPrincipal* docPrincipal = doc->NodePrincipal();
       nsIPrincipal* streamPrincipal = mInputStream->GetPrincipal();
-      if (NS_FAILED(docPrincipal->Subsumes(streamPrincipal, &subsumes))) {
+      if (!streamPrincipal || NS_FAILED(docPrincipal->Subsumes(streamPrincipal, &subsumes))) {
         subsumes = false;
       }
     }

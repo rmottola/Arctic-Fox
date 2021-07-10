@@ -8,7 +8,7 @@
 #define mozilla_dom_bluetooth_BluetoothSocket_h
 
 #include "BluetoothCommon.h"
-#include "mozilla/ipc/SocketBase.h"
+#include "mozilla/ipc/DataSocket.h"
 
 BEGIN_BLUETOOTH_NAMESPACE
 
@@ -16,31 +16,30 @@ class BluetoothSocketObserver;
 class BluetoothSocketResultHandler;
 class DroidSocketImpl;
 
-class BluetoothSocket : public mozilla::ipc::SocketConsumerBase
+class BluetoothSocket final : public mozilla::ipc::DataSocket
 {
 public:
-  BluetoothSocket(BluetoothSocketObserver* aObserver,
+  BluetoothSocket(BluetoothSocketObserver* aObserver);
+
+  nsresult Connect(const nsAString& aDeviceAddress,
+                   const BluetoothUuid& aServiceUuid,
+                   BluetoothSocketType aType,
+                   int aChannel,
+                   bool aAuth, bool aEncrypt);
+
+  nsresult Listen(const nsAString& aServiceName,
+                  const BluetoothUuid& aServiceUuid,
                   BluetoothSocketType aType,
-                  bool aAuth,
-                  bool aEncrypt);
+                  int aChannel,
+                  bool aAuth, bool aEncrypt);
 
-  bool ConnectSocket(const nsAString& aDeviceAddress,
-                     const BluetoothUuid& aServiceUuid,
-                     int aChannel);
-
-  bool ListenSocket(const nsAString& aServiceName,
-                    const BluetoothUuid& aServiceUuid,
-                    int aChannel);
-
-  void CloseSocket();
-
-  bool SendSocketData(mozilla::ipc::UnixSocketRawData* aData);
-
-  virtual void OnConnectSuccess() override;
-  virtual void OnConnectError() override;
-  virtual void OnDisconnect() override;
-  virtual void ReceiveSocketData(
-    nsAutoPtr<mozilla::ipc::UnixSocketRawData>& aMessage) override;
+  /**
+   * Method to be called whenever data is received. This is only called on the
+   * main thread.
+   *
+   * @param aBuffer Data received from the socket.
+   */
+  void ReceiveSocketData(nsAutoPtr<mozilla::ipc::UnixSocketBuffer>& aBuffer);
 
   inline void GetAddress(nsAString& aDeviceAddress)
   {
@@ -57,13 +56,25 @@ public:
     mCurrentRes = aRes;
   }
 
+  // Methods for |DataSocket|
+  //
+
+  void SendSocketData(mozilla::ipc::UnixSocketIOBuffer* aBuffer) override;
+
+  // Methods for |SocketBase|
+  //
+
+  void CloseSocket() override;
+
+  void OnConnectSuccess() override;
+  void OnConnectError() override;
+  void OnDisconnect() override;
+
 private:
   BluetoothSocketObserver* mObserver;
   BluetoothSocketResultHandler* mCurrentRes;
   DroidSocketImpl* mImpl;
   nsString mDeviceAddress;
-  bool mAuth;
-  bool mEncrypt;
 };
 
 END_BLUETOOTH_NAMESPACE

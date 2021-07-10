@@ -33,7 +33,7 @@ class GeckoInstance(object):
                       "startup.homepage_welcome_url": "about:blank"}
 
     def __init__(self, host, port, bin, profile=None, app_args=None, symbols_path=None,
-                  goanna_log=None, prefs=None):
+                  gecko_log=None, prefs=None):
         self.marionette_host = host
         self.marionette_port = port
         self.bin = bin
@@ -50,7 +50,7 @@ class GeckoInstance(object):
         self.app_args = app_args or []
         self.runner = None
         self.symbols_path = symbols_path
-        self.goanna_log = goanna_log
+        self.gecko_log = gecko_log
 
     def start(self):
         profile_args = {"preferences": deepcopy(self.required_prefs)}
@@ -79,17 +79,17 @@ class GeckoInstance(object):
             'processOutputLine': [NullOutput()],
         }
 
-        if self.goanna_log == '-':
+        if self.gecko_log == '-':
             process_args['stream'] = sys.stdout
         else:
-            if self.goanna_log is None:
-                self.goanna_log = 'goanna.log'
-            elif os.path.isdir(self.goanna_log):
-                fname = "goanna-%d.log" % time.time()
-                self.goanna_log = os.path.join(self.goanna_log, fname)
+            if self.gecko_log is None:
+                self.gecko_log = 'gecko.log'
+            elif os.path.isdir(self.gecko_log):
+                fname = "gecko-%d.log" % time.time()
+                self.gecko_log = os.path.join(self.gecko_log, fname)
 
-            self.goanna_log = os.path.realpath(self.goanna_log)
-            if os.access(self.goanna_log, os.F_OK):
+            self.gecko_log = os.path.realpath(self.gecko_log)
+            if os.access(self.gecko_log, os.F_OK):
                 if platform.system() is 'Windows':
                     # NOTE: windows has a weird filesystem where it happily 'closes'
                     # the file, but complains if you try to delete it. You get a
@@ -101,7 +101,7 @@ class GeckoInstance(object):
                     tries = 0
                     while tries < 10:
                         try:
-                            os.remove(self.goanna_log)
+                            os.remove(self.gecko_log)
                             break
                         except WindowsError as e:
                             if e.errno == errno.EACCES:
@@ -110,9 +110,9 @@ class GeckoInstance(object):
                             else:
                                 raise e
                 else:
-                    os.remove(self.goanna_log)
+                    os.remove(self.gecko_log)
 
-            process_args['logfile'] = self.goanna_log
+            process_args['logfile'] = self.gecko_log
 
         env = os.environ.copy()
 

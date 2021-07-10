@@ -11,7 +11,7 @@ interface nsIPrefBranch;
 /**
  * nsINetUtil provides various network-related utility methods.
  */
-[scriptable, uuid(ca68c485-9db3-4c12-82a6-4fab7948e2d5)]
+[scriptable, uuid(fe2625ec-b884-4df1-b39c-9e830e47aa94)]
 interface nsINetUtil : nsISupports
 {
   /**
@@ -31,7 +31,7 @@ interface nsINetUtil : nsISupports
                                       out AUTF8String aCharset,
                                       out boolean aHadCharset);
 
-    /**
+  /**
    * Parse a Content-Type header value in relaxed mode.  This is a more
    * permissive parser that ignores things that go against RFC 7231 section
    * 3.1.1.1.  This is typically useful for parsing Content-Type header values
@@ -215,4 +215,16 @@ interface nsINetUtil : nsISupports
                                         out AUTF8String aCharset,
                                         out long aCharsetStart,
                                         out long aCharsetEnd);
+
+/**
+   * Parse an attribute referrer policy string (no-referrer, origin, unsafe-url)
+   * and return the according integer code (defined in nsIHttpChannel.idl)
+   *
+   * @param aPolicyString
+   *        the policy string given as attribute
+   * @return aPolicyEnum
+   *         referrer policy code from nsIHttpChannel.idl, (see parser in
+   *         ReferrerPolicy.h for details)
+   */
+  unsigned long parseAttributePolicyString(in AString aPolicyString);
 };

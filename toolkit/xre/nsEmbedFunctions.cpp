@@ -75,6 +75,8 @@
 
 #include "GeckoProfiler.h"
 
+ #include "base/histogram.h"
+
 #if defined(MOZ_SANDBOX) && defined(XP_WIN)
 #define TARGET_SANDBOX_EXPORTS
 #include "mozilla/sandboxing/loggingCallbacks.h"
@@ -139,8 +141,8 @@ static int32_t sInitCounter;
 
 nsresult
 XRE_InitEmbedding2(nsIFile *aLibXULDirectory,
-		   nsIFile *aAppDirectory,
-		   nsIDirectoryServiceProvider *aAppDirProvider)
+                   nsIFile *aAppDirectory,
+                   nsIDirectoryServiceProvider *aAppDirProvider)
 {
   // Initialize some globals to make nsXREDirProvider happy
   static char* kNullCommandLine[] = { nullptr };
@@ -280,6 +282,10 @@ XRE_InitChildProcess(int aArgc,
   DllBlocklist_Initialize();
 #endif
 
+  // This is needed by Telemetry to initialize histogram collection.
+  UniquePtr<base::StatisticsRecorder> statisticsRecorder =
+    MakeUnique<base::StatisticsRecorder>();
+
 #if !defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_WIDGET_GONK)
   // On non-Fennec Gecko, the GMPLoader code resides in plugin-container,
   // and we must forward it through to the GMP code here.
@@ -347,6 +353,18 @@ XRE_InitChildProcess(int aArgc,
     return NS_ERROR_FAILURE;
   }
 
+  ReceivePort* ports_out_receiver = new ReceivePort();
+  if (!child_message.AddDescriptor(MachMsgPortDescriptor(ports_out_receiver->GetPort()))) {
+    NS_WARNING("Adding descriptor to message failed");
+    return NS_ERROR_FAILURE;
+  }
+
+  ReceivePort* ports_in_receiver = new ReceivePort();
+  if (!child_message.AddDescriptor(MachMsgPortDescriptor(ports_in_receiver->GetPort()))) {
+    NS_WARNING("Adding descriptor to message failed");
+    return NS_ERROR_FAILURE;
+  }
+
   MachPortSender child_sender(mach_port_name);
   kern_return_t err = child_sender.SendMessage(child_message, kTimeoutMs);
   if (err != KERN_SUCCESS) {
@@ -365,12 +383,27 @@ XRE_InitChildProcess(int aArgc,
     NS_WARNING("child GetTranslatedPort(0) failed");
     return NS_ERROR_FAILURE;
   }
+
   err = task_set_bootstrap_port(mach_task_self(),
                                 parent_message.GetTranslatedPort(0));
+
+  if (parent_message.GetTranslatedPort(1) == MACH_PORT_NULL) {
+    NS_WARNING("child GetTranslatedPort(1) failed");
+    return NS_ERROR_FAILURE;
+  }
+  MachPortSender* ports_out_sender = new MachPortSender(parent_message.GetTranslatedPort(1));
+
+  if (parent_message.GetTranslatedPort(2) == MACH_PORT_NULL) {
+    NS_WARNING("child GetTranslatedPort(2) failed");
+    return NS_ERROR_FAILURE;
+  }
+  MachPortSender* ports_in_sender = new MachPortSender(parent_message.GetTranslatedPort(2));
+
   if (err != KERN_SUCCESS) {
     NS_WARNING("child task_set_bootstrap_port() failed");
     return NS_ERROR_FAILURE;
   }
+
 #endif
 
   SetupErrorHandling(aArgv[0]);
@@ -411,6 +444,11 @@ XRE_InitChildProcess(int aArgc,
   char* end = 0;
   base::ProcessId parentPID = strtol(parentPIDString, &end, 10);
   MOZ_ASSERT(!*end, "invalid parent PID");
+
+#ifdef XP_MACOSX
+  mozilla::ipc::SharedMemoryBasic::SetupMachMemory(parentPID, ports_in_receiver, ports_in_sender,
+                                                   ports_out_sender, ports_out_receiver, true);
+#endif
 
 #if defined(XP_WIN)
   // On Win7+, register the application user model id passed in by
@@ -530,6 +568,7 @@ XRE_InitChildProcess(int aArgc,
     }
   }
 
+  statisticsRecorder = nullptr;
   profiler_shutdown();
   NS_LogTerm();
   return XRE_DeinitCommandLine();
@@ -698,6 +737,9 @@ void
 XRE_ShutdownChildProcess()
 {
   MOZ_ASSERT(NS_IsMainThread(), "Wrong thread!");
+#if defined(XP_MACOSX)
+  mozilla::ipc::SharedMemoryBasic::Shutdown();
+#endif
 
   mozilla::DebugOnly<MessageLoop*> ioLoop = XRE_GetIOMessageLoop();
   MOZ_ASSERT(!!ioLoop, "Bad shutdown order");

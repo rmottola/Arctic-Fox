@@ -17,6 +17,7 @@
 #include "nsTObserverArray.h"
 #include "nsTArray.h"
 #include "nsTHashtable.h"
+#include "nsTObserverArray.h"
 #include "nsClassHashtable.h"
 #include "nsHashKeys.h"
 #include "mozilla/Attributes.h"
@@ -28,6 +29,8 @@ class nsPresContext;
 class nsIPresShell;
 class nsIDocument;
 class imgIRequest;
+class nsIDOMEvent;
+class nsINode;
 
 namespace mozilla {
 class RefreshDriverTimer;
@@ -222,6 +225,17 @@ public:
   void RevokeFrameRequestCallbacks(nsIDocument* aDocument);
 
   /**
+   * Queue a new event to dispatch in next tick before the style flush
+   */
+  void ScheduleEventDispatch(nsINode* aTarget, nsIDOMEvent* aEvent);
+
+  /**
+   * Cancel all pending events scheduled by ScheduleEventDispatch which
+   * targets any node in aDocument.
+   */
+  void CancelPendingEvents(nsIDocument* aDocument);
+
+  /**
    * Tell the refresh driver that it is done driving refreshes and
    * should stop its timer and forget about its pres context.  This may
    * be called from within a refresh.
@@ -307,6 +321,7 @@ private:
   };
   typedef nsClassHashtable<nsUint32HashKey, ImageStartData> ImageStartTable;
 
+  void DispatchPendingEvents();
   void RunFrameRequestCallbacks(int64_t aNowEpoch, mozilla::TimeStamp aNowTime);
 
   void Tick(int64_t aNowEpoch, mozilla::TimeStamp aNowTime);
@@ -392,13 +407,19 @@ private:
   RequestTable mRequests;
   ImageStartTable mStartTable;
 
+  struct PendingEvent {
+    nsCOMPtr<nsINode> mTarget;
+    nsCOMPtr<nsIDOMEvent> mEvent;
+  };
+
   nsAutoTArray<nsIPresShell*, 16> mStyleFlushObservers;
   nsAutoTArray<nsIPresShell*, 16> mLayoutFlushObservers;
   nsAutoTArray<nsIPresShell*, 16> mPresShellsToInvalidateIfHidden;
   // nsTArray on purpose, because we want to be able to swap.
   nsTArray<nsIDocument*> mFrameRequestCallbackDocs;
   nsTArray<nsIDocument*> mThrottledFrameRequestCallbackDocs;
-  nsTArray<nsAPostRefreshObserver*> mPostRefreshObservers;
+  nsTObserverArray<nsAPostRefreshObserver*> mPostRefreshObservers;
+  nsTArray<PendingEvent> mPendingEvents;
 
   // Helper struct for processing image requests
   struct ImageRequestParameters {

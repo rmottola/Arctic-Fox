@@ -471,6 +471,7 @@ public:
   void DrawWindow(nsGlobalWindow& window, double x, double y, double w, double h,
                   const nsAString& bgColor, uint32_t flags,
                   mozilla::ErrorResult& error);
+  void DrawWidgetAsOnScreen(nsGlobalWindow& aWindow, mozilla::ErrorResult& error);
   void AsyncDrawXULElement(nsXULElement& elem, double x, double y, double w,
                            double h, const nsAString& bgColor, uint32_t flags,
                            mozilla::ErrorResult& error);
@@ -759,6 +760,9 @@ protected:
     return CurrentState().font;
   }
 
+  // This function maintains a list of raw pointers to cycle-collected
+  // objects. We need to ensure that no entries persist beyond unlink,
+  // since the objects are logically destructed at that point.
   static std::vector<CanvasRenderingContext2D*>& DemotableContexts();
   static void DemoteOldestContextIfNecessary();
 
@@ -1063,7 +1067,7 @@ protected:
     mozilla::gfx::Float miterLimit;
     mozilla::gfx::Float globalAlpha;
     mozilla::gfx::Float shadowBlur;
-    FallibleTArray<mozilla::gfx::Float> dash;
+    nsTArray<mozilla::gfx::Float> dash;
     mozilla::gfx::Float dashOffset;
 
     mozilla::gfx::CompositionOp op;

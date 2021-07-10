@@ -23,6 +23,8 @@
 #include "nsEscape.h"
 #include "nsIURL.h"
 #include "nsNetUtil.h"
+#include "mozilla/Services.h"
+#include "nsIOutputStream.h"
 #include "nsXPCOMStrings.h"
 #include "nscore.h"
 #include "nsDirectoryServiceDefs.h"
@@ -546,7 +548,7 @@ STDMETHODIMP nsDataObj::GetData(LPFORMATETC aFormat, LPSTGMEDIUM pSTM)
           return GetFileContents ( *aFormat, *pSTM );
         if ( format == PreferredDropEffect )
           return GetPreferredDropEffect( *aFormat, *pSTM );
-        //PR_LOG(gWindowsLog, PR_LOG_ALWAYS, 
+        //MOZ_LOG(gWindowsLog, LogLevel::Info, 
         //       ("***** nsDataObj::GetData - Unknown format %u\n", format));
         return GetText(df, *aFormat, *pSTM);
       } //switch

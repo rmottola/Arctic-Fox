@@ -12,7 +12,8 @@
  */
 let { Ci, Cc, CC, Cu, Cr } = require("chrome");
 let Services = require("Services");
-let { ActorPool, RegisteredActorFactory, ObservedActorFactory } = require("devtools/server/actors/common");
+let { ActorPool, OriginalLocation, RegisteredActorFactory,
+      ObservedActorFactory } = require("devtools/server/actors/common");
 let { LocalDebuggerTransport, ChildDebuggerTransport } =
   require("devtools/toolkit/transport/transport");
 let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
@@ -46,7 +47,9 @@ this.dbg_assert = dbg_assert;
 // Overload `Components` to prevent SDK loader exception on Components
 // object usage
 Object.defineProperty(this, "Components", {
-  get: function () require("chrome").components
+  get: function() {
+    return require("chrome").components;
+  }
 });
 
 if (isWorker) {
@@ -184,9 +187,13 @@ var DebuggerServer = {
     this._initialized = true;
   },
 
-  get protocol() require("devtools/server/protocol"),
+  get protocol() {
+    return require("devtools/server/protocol");
+  },
 
-  get initialized() this._initialized,
+  get initialized() {
+    return this._initialized;
+  },
 
   /**
    * Performs cleanup tasks before shutting down the debugger server. Such tasks
@@ -537,6 +544,11 @@ var DebuggerServer = {
       constructor: "AnimationsActor",
       type: { tab: true }
     });
+    this.registerModule("devtools/server/actors/promises", {
+      prefix: "promises",
+      constructor: "PromisesActor",
+      type: { global: true, tab: true }
+    });
   },
 
   /**
@@ -749,7 +761,9 @@ var DebuggerServer = {
    * @return boolean
    *         true if the caller is running in a content
    */
-  get isInChildProcess() !!this.parentMessageManager,
+  get isInChildProcess() {
+    return !!this.parentMessageManager;
+  },
 
   /**
    * In a chrome parent process, ask all content child processes
@@ -1130,9 +1144,14 @@ EventEmitter.decorate(DebuggerServer);
 
 if (this.exports) {
   exports.DebuggerServer = DebuggerServer;
+  exports.ActorPool = ActorPool;
+  exports.OriginalLocation = OriginalLocation;
 }
+
 // Needed on B2G (See header note)
 this.DebuggerServer = DebuggerServer;
+this.ActorPool = ActorPool;
+this.OriginalLocation = OriginalLocation;
 
 // When using DebuggerServer.addActors, some symbols are expected to be in
 // the scope of the added actor even before the corresponding modules are
@@ -1142,11 +1161,6 @@ let includes = ["Components", "Ci", "Cu", "require", "Services", "DebuggerServer
 includes.forEach(name => {
   DebuggerServer[name] = this[name];
 });
-
-// Export ActorPool for requirers of main.js
-if (this.exports) {
-  exports.ActorPool = ActorPool;
-}
 
 /**
  * Creates a DebuggerServerConnection.
@@ -1564,7 +1578,7 @@ DebuggerServerConnection.prototype = {
       dumpn("--------------------- actorPool actors: " +
             uneval(Object.keys(this._actorPool._actors)));
     }
-    for each (let pool in this._extraPools) {
+    for (let pool of this._extraPools) {
       if (pool !== this._actorPool) {
         dumpn("--------------------- extraPool actors: " +
               uneval(Object.keys(pool._actors)));

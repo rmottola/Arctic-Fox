@@ -29,6 +29,7 @@ pref("browser.sessionstore.restore_on_demand", false);
 pref("browser.sessionstore.resume_from_crash", false);
 // No e10s on mulet
 pref("browser.tabs.remote.autostart.1", false);
+pref("browser.tabs.remote.autostart.2", false);
 #endif
 
 // Bug 945235: Prevent all bars to be considered visible:
@@ -116,7 +117,9 @@ pref("mozilla.widget.force-24bpp", true);
 pref("mozilla.widget.use-buffer-pixmap", true);
 pref("mozilla.widget.disable-native-theme", true);
 pref("layout.reflow.synthMouseMove", false);
+#ifndef MOZ_X11
 pref("layers.enable-tiles", true);
+#endif
 pref("layers.low-precision-buffer", true);
 pref("layers.low-precision-opacity", "0.5");
 pref("layers.progressive-paint", true);
@@ -360,9 +363,9 @@ pref("browser.dom.window.dump.enabled", false);
 
 // Default Content Security Policy to apply to certified apps.
 // If you change this CSP, make sure to update the fast path in nsCSPService.cpp
-pref("security.apps.certified.CSP.default", "default-src *; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline' app://theme.gaiamobile.org");
+pref("security.apps.certified.CSP.default", "default-src * data: blob:; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline' app://theme.gaiamobile.org");
 // Default Content Security Policy to apply to trusted apps.
-pref("security.apps.trusted.CSP.default", "default-src *; object-src 'none'; frame-src 'none'");
+pref("security.apps.trusted.CSP.default", "default-src * data: blob:; object-src 'none'; frame-src 'none'");
 
 // Temporarily force-enable GL compositing.  This is default-disabled
 // deep within the bowels of the widgetry system.  Remove me when GL
@@ -543,6 +546,9 @@ pref("app.update.socket.maxErrors", 20);
 // Enable update logging for now, to diagnose growing pains in the
 // field.
 pref("app.update.log", true);
+
+// SystemUpdate API
+pref("dom.system_update.active", "@mozilla.org/updates/update-prompt;1");
 #else
 // Explicitly disable the shutdown watchdog.  It's enabled by default.
 // When the updater is disabled, we want to know about shutdown hangs.
@@ -644,7 +650,7 @@ pref("dom.ipc.processPriorityManager.temporaryPriorityLockMS", 5000);
 // processes.  We use these different levels to force the low-memory killer to
 // kill processes in a LRU order.
 pref("dom.ipc.processPriorityManager.BACKGROUND.LRUPoolLevels", 5);
-pref("dom.ipc.processPriorityManager.FOREGROUND.LRUPoolLevels", 3);
+pref("dom.ipc.processPriorityManager.BACKGROUND_PERCEIVABLE.LRUPoolLevels", 4);
 
 // Kernel parameters for process priorities.  These affect how processes are
 // killed on low-memory and their relative CPU priorities.
@@ -672,12 +678,8 @@ pref("hal.processPriorityManager.gonk.FOREGROUND_KEYBOARD.OomScoreAdjust", 200);
 pref("hal.processPriorityManager.gonk.FOREGROUND_KEYBOARD.cgroup", "apps");
 
 pref("hal.processPriorityManager.gonk.BACKGROUND_PERCEIVABLE.OomScoreAdjust", 400);
-pref("hal.processPriorityManager.gonk.BACKGROUND_PERCEIVABLE.KillUnderKB", 7168);
+pref("hal.processPriorityManager.gonk.BACKGROUND_PERCEIVABLE.KillUnderKB", 8192);
 pref("hal.processPriorityManager.gonk.BACKGROUND_PERCEIVABLE.cgroup", "apps/bg_perceivable");
-
-pref("hal.processPriorityManager.gonk.BACKGROUND_HOMESCREEN.OomScoreAdjust", 534);
-pref("hal.processPriorityManager.gonk.BACKGROUND_HOMESCREEN.KillUnderKB", 8192);
-pref("hal.processPriorityManager.gonk.BACKGROUND_HOMESCREEN.cgroup", "apps/bg_non_interactive");
 
 pref("hal.processPriorityManager.gonk.BACKGROUND.OomScoreAdjust", 667);
 pref("hal.processPriorityManager.gonk.BACKGROUND.KillUnderKB", 20480);
@@ -854,6 +856,8 @@ pref("general.useragent.device_id", "");
 
 // Make <audio> and <video> talk to the AudioChannelService.
 pref("media.useAudioChannelService", true);
+// Add Mozilla AudioChannel APIs.
+pref("media.useAudioChannelAPI", true);
 
 pref("b2g.version", @MOZ_B2G_VERSION@);
 pref("b2g.osName", @MOZ_B2G_OS_NAME@);
@@ -865,10 +869,6 @@ pref("consoleservice.buffered", false);
 // Performance testing suggests 2k is a better page size for SQLite.
 pref("toolkit.storage.pageSize", 2048);
 #endif
-
-// Enable captive portal detection.
-pref("captivedetect.canonicalURL", "http://detectportal.firefox.com/success.txt");
-pref("captivedetect.canonicalContent", "success\n");
 
 // The url of the manifest we use for ADU pings.
 pref("ping.manifestURL", "https://marketplace.firefox.com/packaged.webapp");
@@ -1033,6 +1033,9 @@ pref("dom.mapped_arraybuffer.enabled", true);
 
 // BroadcastChannel API
 pref("dom.broadcastChannel.enabled", true);
+
+// SystemUpdate API
+pref("dom.system_update.enabled", true);
 
 // UDPSocket API
 pref("dom.udpsocket.enabled", true);

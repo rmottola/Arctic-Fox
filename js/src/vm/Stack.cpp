@@ -135,9 +135,9 @@ AssertDynamicScopeMatchesStaticScope(JSContext* cx, JSScript* script, JSObject* 
     RootedObject enclosingScope(cx, script->enclosingStaticScope());
     for (StaticScopeIter<NoGC> i(enclosingScope); !i.done(); i++) {
         if (i.type() == StaticScopeIter<NoGC>::NonSyntactic) {
-            while (scope->is<DynamicWithObject>()) {
-                MOZ_ASSERT(!scope->as<DynamicWithObject>().isSyntactic());
-                scope = &scope->as<DynamicWithObject>().enclosingScope();
+            while (scope->is<DynamicWithObject>() || scope->is<NonSyntacticVariablesObject>()) {
+                MOZ_ASSERT(!IsSyntacticScope(scope));
+                scope = &scope->as<ScopeObject>().enclosingScope();
             }
         } else if (i.hasSyntacticDynamicScopeObject()) {
             switch (i.type()) {
@@ -166,9 +166,7 @@ AssertDynamicScopeMatchesStaticScope(JSContext* cx, JSScript* script, JSObject* 
         }
     }
 
-    // The scope chain is always ended by one or more non-syntactic
-    // ScopeObjects (viz. GlobalObject or an unqualified varobj).
-    MOZ_ASSERT(!IsSyntacticScope(scope));
+    MOZ_ASSERT(scope->is<GlobalObject>() || scope->is<DebugScopeObject>());
 #endif
 }
 
@@ -358,21 +356,7 @@ InterpreterFrame::markValues(JSTracer* trc, Value* sp, jsbytecode* pc)
 
     JSScript* script = this->script();
     size_t nfixed = script->nfixed();
-    size_t nlivefixed = script->nbodyfixed();
-
-    if (nfixed != nlivefixed) {
-        NestedScopeObject* staticScope = script->getStaticBlockScope(pc);
-        while (staticScope && !staticScope->is<StaticBlockObject>())
-            staticScope = staticScope->enclosingNestedScope();
-
-        if (staticScope) {
-            StaticBlockObject& blockObj = staticScope->as<StaticBlockObject>();
-            nlivefixed = blockObj.localOffset() + blockObj.numVariables();
-        }
-    }
-
-    MOZ_ASSERT(nlivefixed <= nfixed);
-    MOZ_ASSERT(nlivefixed >= script->nbodyfixed());
+    size_t nlivefixed = script->calculateLiveFixed(pc);
 
     if (nfixed == nlivefixed) {
         // All locals are live.

@@ -27,5 +27,6 @@ ac_add_options --enable-strip
 ac_add_options --enable-install-strip
 ac_add_options --enable-application=browser
 ac_add_options --with-branding=browser/branding/arcticfox
-ac_add_options --enable-optimize="-fno-schedule-insns2 -fno-lifetime-dse -fno-delete-null-pointer-checks"
+ac_add_options --enable-optimize
+ac_add_options --enable-altivec
 ac_add_options --disable-jemalloc

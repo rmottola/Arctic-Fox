@@ -44,6 +44,9 @@ if not CONFIG['MOZ_NATIVE_WEBP']:
 if CONFIG['MOZ_JXR']:
     external_dirs += ['media/jxrlib']
 
+if CONFIG['CPU_ARCH'] == 'arm':
+    external_dirs += ['media/openmax_dl']
+
 external_dirs += [
     'media/kiss_fft',
     'media/libcubeb',

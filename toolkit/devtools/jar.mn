@@ -95,6 +95,7 @@ toolkit.jar:
     content/global/devtools/webaudioeditor/views/properties.js        (webaudioeditor/views/properties.js)
     content/global/devtools/webaudioeditor/views/automation.js        (webaudioeditor/views/automation.js)
     content/global/devtools/performance.xul                           (performance/performance.xul)
+*   content/global/devtools/performance/system.js                     (performance/system.js)
     content/global/devtools/performance/performance-controller.js     (performance/performance-controller.js)
     content/global/devtools/performance/performance-view.js           (performance/performance-view.js)
     content/global/devtools/performance/views/overview.js             (performance/views/overview.js)

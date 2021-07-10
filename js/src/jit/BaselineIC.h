@@ -19,6 +19,7 @@
 #include "jit/BaselineJIT.h"
 #include "jit/SharedIC.h"
 #include "jit/SharedICRegisters.h"
+#include "js/TraceableVector.h"
 #include "vm/ArrayObject.h"
 #include "vm/ReceiverGuard.h"
 #include "vm/TypedArrayCommon.h"
@@ -1691,12 +1692,12 @@ class ICSetElem_DenseOrUnboxedArrayAddImpl : public ICSetElem_DenseOrUnboxedArra
     mozilla::Array<HeapPtrShape, NumShapes> shapes_;
 
     ICSetElem_DenseOrUnboxedArrayAddImpl(JitCode* stubCode, ObjectGroup* group,
-                                         const AutoShapeVector* shapes)
+                                         Handle<ShapeVector> shapes)
       : ICSetElem_DenseOrUnboxedArrayAdd(stubCode, group, ProtoChainDepth)
     {
-        MOZ_ASSERT(shapes->length() == NumShapes);
+        MOZ_ASSERT(shapes.length() == NumShapes);
         for (size_t i = 0; i < NumShapes; i++)
-            shapes_[i].init((*shapes)[i]);
+            shapes_[i].init(shapes[i]);
     }
 
   public:
@@ -1741,7 +1742,7 @@ class ICSetElemDenseOrUnboxedArrayAddCompiler : public ICStubCompiler {
     {}
 
     template <size_t ProtoChainDepth>
-    ICUpdatedStub* getStubSpecific(ICStubSpace* space, const AutoShapeVector* shapes);
+    ICUpdatedStub* getStubSpecific(ICStubSpace* space, Handle<ShapeVector> shapes);
 
     ICUpdatedStub* getStub(ICStubSpace* space);
 
@@ -1984,7 +1985,7 @@ class ICIn_NativeDoesNotExistImpl : public ICIn_NativeDoesNotExist
   private:
     mozilla::Array<HeapPtrShape, NumShapes> shapes_;
 
-    ICIn_NativeDoesNotExistImpl(JitCode* stubCode, const AutoShapeVector* shapes,
+    ICIn_NativeDoesNotExistImpl(JitCode* stubCode, Handle<ShapeVector> shapes,
                                 HandlePropertyName name);
 
   public:
@@ -2018,7 +2019,7 @@ class ICInNativeDoesNotExistCompiler : public ICStubCompiler
                                    size_t protoChainDepth);
 
     template <size_t ProtoChainDepth>
-    ICStub* getStubSpecific(ICStubSpace* space, const AutoShapeVector* shapes) {
+    ICStub* getStubSpecific(ICStubSpace* space, Handle<ShapeVector> shapes) {
         return newStub<ICIn_NativeDoesNotExistImpl<ProtoChainDepth>>(space, getStubCode(), shapes,
                                                                      name_);}
 
@@ -2159,7 +2160,7 @@ class ICGetName_Scope : public ICMonitoredStub
     uint32_t offset_;
 
     ICGetName_Scope(JitCode* stubCode, ICStub* firstMonitorStub,
-                    AutoShapeVector* shapes, uint32_t offset);
+                    Handle<ShapeVector> shapes, uint32_t offset);
 
     static Kind GetStubKind() {
         return (Kind) (GetName_Scope0 + NumHops);
@@ -2181,7 +2182,7 @@ class ICGetName_Scope : public ICMonitoredStub
 
     class Compiler : public ICStubCompiler {
         ICStub* firstMonitorStub_;
-        AutoShapeVector* shapes_;
+        Rooted<ShapeVector> shapes_;
         bool isFixedSlot_;
         uint32_t offset_;
 
@@ -2197,10 +2198,10 @@ class ICGetName_Scope : public ICMonitoredStub
 
       public:
         Compiler(JSContext* cx, ICStub* firstMonitorStub,
-                 AutoShapeVector* shapes, bool isFixedSlot, uint32_t offset)
+                 ShapeVector&& shapes, bool isFixedSlot, uint32_t offset)
           : ICStubCompiler(cx, GetStubKind(), Engine::Baseline),
             firstMonitorStub_(firstMonitorStub),
-            shapes_(shapes),
+            shapes_(cx, mozilla::Forward<ShapeVector>(shapes)),
             isFixedSlot_(isFixedSlot),
             offset_(offset)
         {
@@ -2707,7 +2708,7 @@ class ICGetProp_NativeDoesNotExistImpl : public ICGetProp_NativeDoesNotExist
 
     ICGetProp_NativeDoesNotExistImpl(JitCode* stubCode, ICStub* firstMonitorStub,
                                      ReceiverGuard guard,
-                                     const AutoShapeVector* shapes);
+                                     Handle<ShapeVector> shapes);
 
   public:
     void traceShapes(JSTracer* trc) {
@@ -2742,7 +2743,7 @@ class ICGetPropNativeDoesNotExistCompiler : public ICStubCompiler
                                         HandleObject obj, size_t protoChainDepth);
 
     template <size_t ProtoChainDepth>
-    ICStub* getStubSpecific(ICStubSpace* space, const AutoShapeVector* shapes) {
+    ICStub* getStubSpecific(ICStubSpace* space, Handle<ShapeVector> shapes) {
         ReceiverGuard guard(obj_);
         return newStub<ICGetProp_NativeDoesNotExistImpl<ProtoChainDepth>>
             (space, getStubCode(), firstMonitorStub_, guard, shapes);
@@ -3468,7 +3469,7 @@ class ICSetProp_NativeAddImpl : public ICSetProp_NativeAdd
     mozilla::Array<HeapPtrShape, NumShapes> shapes_;
 
     ICSetProp_NativeAddImpl(JitCode* stubCode, ObjectGroup* group,
-                            const AutoShapeVector* shapes,
+                            Handle<ShapeVector> shapes,
                             Shape* newShape, ObjectGroup* newGroup, uint32_t offset);
 
   public:
@@ -3508,7 +3509,7 @@ class ICSetPropNativeAddCompiler : public ICStubCompiler
                                size_t protoChainDepth, bool isFixedSlot, uint32_t offset);
 
     template <size_t ProtoChainDepth>
-    ICUpdatedStub* getStubSpecific(ICStubSpace* space, const AutoShapeVector* shapes)
+    ICUpdatedStub* getStubSpecific(ICStubSpace* space, Handle<ShapeVector> shapes)
     {
         RootedObjectGroup newGroup(cx, obj_->getGroup(cx));
         if (!newGroup)

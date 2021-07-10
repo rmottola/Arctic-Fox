@@ -300,11 +300,11 @@ public:
   nsMargin GetDeflationForBackground(nsPresContext* aPresContext) const;
 
   /** Get width of table + colgroup + col collapse: elements that
-   *  continue along the length of the whole left side.
+   *  continue along the length of the whole iStart side.
    *  see nsTablePainter about continuous borders
    */
-  nscoord GetContinuousLeftBCBorderWidth() const;
-  void SetContinuousLeftBCBorderWidth(nscoord aValue);
+  nscoord GetContinuousIStartBCBorderWidth() const;
+  void SetContinuousIStartBCBorderWidth(nscoord aValue);
 
   friend class nsDelayedCalcBCBorders;
 
@@ -319,8 +319,7 @@ public:
   // border to the results of these functions.
   virtual nscoord GetMinISize(nsRenderingContext *aRenderingContext) override;
   virtual nscoord GetPrefISize(nsRenderingContext *aRenderingContext) override;
-  virtual IntrinsicISizeOffsetData
-    IntrinsicISizeOffsets(nsRenderingContext* aRenderingContext) override;
+  virtual IntrinsicISizeOffsetData IntrinsicISizeOffsets() override;
 
   virtual mozilla::LogicalSize
   ComputeSize(nsRenderingContext *aRenderingContext,
@@ -815,7 +814,7 @@ protected:
 
   void SetColumnDimensions(nscoord aHeight, WritingMode aWM,
                            const LogicalMargin& aBorderPadding,
-                           nscoord aContainerWidth);
+                           const nsSize& aContainerSize);
 
   int32_t CollectRows(nsIFrame*                   aFrame,
                       nsTArray<nsTableRowFrame*>& aCollection);
@@ -874,7 +873,7 @@ protected:
     uint32_t mRowInserted:1;
     uint32_t mNeedToCalcBCBorders:1;
     uint32_t mGeometryDirty:1;
-    uint32_t mLeftContBCBorder:8;
+    uint32_t mIStartContBCBorder:8;
     uint32_t mNeedToCollapse:1;    // rows, cols that have visibility:collapse need to be collapsed
     uint32_t mHasZeroColSpans:1;
     uint32_t mNeedColSpanExpansion:1;
@@ -996,15 +995,15 @@ inline void nsTableFrame::SetNeedToCalcBCBorders(bool aValue)
 }
 
 inline nscoord
-nsTableFrame::GetContinuousLeftBCBorderWidth() const
+nsTableFrame::GetContinuousIStartBCBorderWidth() const
 {
   int32_t aPixelsToTwips = nsPresContext::AppUnitsPerCSSPixel();
-  return BC_BORDER_END_HALF_COORD(aPixelsToTwips, mBits.mLeftContBCBorder);
+  return BC_BORDER_END_HALF_COORD(aPixelsToTwips, mBits.mIStartContBCBorder);
 }
 
-inline void nsTableFrame::SetContinuousLeftBCBorderWidth(nscoord aValue)
+inline void nsTableFrame::SetContinuousIStartBCBorderWidth(nscoord aValue)
 {
-  mBits.mLeftContBCBorder = (unsigned) aValue;
+  mBits.mIStartContBCBorder = (unsigned) aValue;
 }
 
 #define ABORT0() \

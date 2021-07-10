@@ -2364,10 +2364,10 @@ KeyboardLayout::LoadLayout(HKL aLayout)
 
   ::SetKeyboardState(originalKbdState);
 
-  if (PR_LOG_TEST(sKeyboardLayoutLogger, PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(sKeyboardLayoutLogger, PR_LOG_DEBUG)) {
     static const UINT kExtendedScanCode[] = { 0x0000, 0xE000 };
     static const UINT kMapType = MAPVK_VSC_TO_VK_EX;
-    PR_LOG(sKeyboardLayoutLogger, PR_LOG_DEBUG,
+    MOZ_LOG(sKeyboardLayoutLogger, PR_LOG_DEBUG,
            ("Logging virtual keycode values for scancode (0x%p)...",
             mKeyboardLayout));
     for (uint32_t i = 0; i < ArrayLength(kExtendedScanCode); i++) {
@@ -2375,7 +2375,7 @@ KeyboardLayout::LoadLayout(HKL aLayout)
         UINT scanCode = kExtendedScanCode[i] + j;
         UINT virtualKeyCode =
           ::MapVirtualKeyEx(scanCode, kMapType, mKeyboardLayout);
-        PR_LOG(sKeyboardLayoutLogger, PR_LOG_DEBUG,
+        MOZ_LOG(sKeyboardLayoutLogger, LogLevel::Debug,
                ("0x%04X, %s", scanCode, kVirtualKeyName[virtualKeyCode]));
       }
     }

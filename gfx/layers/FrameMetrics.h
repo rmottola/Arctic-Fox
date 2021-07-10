@@ -180,15 +180,6 @@ public:
     return scrollableRect;
   }
 
-  // Return the scale factor needed to fit the viewport
-  // into its composition bounds.
-  CSSToParentLayerScale CalculateIntrinsicScale() const
-  {
-    return CSSToParentLayerScale(
-        std::max(mCompositionBounds.width / mViewport.width,
-                 mCompositionBounds.height / mViewport.height));
-  }
-
   CSSSize CalculateCompositedSizeInCssPixels() const
   {
     return mCompositionBounds.Size() / GetZoom();
@@ -890,6 +881,8 @@ struct ZoomConstraints {
     return !(*this == other);
   }
 };
+
+typedef Maybe<ZoomConstraints> MaybeZoomConstraints;
 
 } // namespace layers
 } // namespace mozilla

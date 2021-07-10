@@ -18,6 +18,8 @@
 #include "nsSize.h"
 #include "limits.h"
 
+class nsIDocument;
+
 namespace mozilla {
 namespace layers {
 class LayerManager;
@@ -107,6 +109,7 @@ native Orientation(mozilla::image::Orientation);
 native TempRefSourceSurface(already_AddRefed<mozilla::gfx::SourceSurface>);
 native TempRefImgIContainer(already_AddRefed<imgIContainer>);
 native nsIntSizeByVal(nsIntSize);
+[ptr] native nsIDocument(nsIDocument);
 
 
 /**
@@ -116,7 +119,7 @@ native nsIntSizeByVal(nsIntSize);
  *
  * Internally, imgIContainer also manages animation of images.
  */
-[scriptable, builtinclass, uuid(e3261ae7-4749-4cf6-bf06-59946233366f)]
+[scriptable, builtinclass, uuid(4880727a-5673-44f7-b248-f6c86e22a434)]
 interface imgIContainer : nsISupports
 {
   /**
@@ -270,8 +273,17 @@ interface imgIContainer : nsISupports
   [notxpcom] boolean isOpaque();
 
   /**
+   * @return true if getImageContainer() is expected to return a valid
+   *         ImageContainer when passed the given @Manager and @Flags
+   *         parameters.
+   */
+  [noscript, notxpcom] boolean isImageContainerAvailable(in LayerManager aManager,
+                                                         in uint32_t aFlags);
+  /**
    * Attempts to create an ImageContainer (and Image) containing the current
-   * frame. Only valid for RASTER type images.
+   * frame.
+   *
+   * Avoid calling this unless you're actually going to layerize this image.
    *
    * @param aManager The LayerManager which will be used to create the
    *                 ImageContainer.
@@ -535,4 +547,10 @@ interface imgIContainer : nsISupports
    * Removes any ImageWrappers and returns the unwrapped base image.
    */
   [notxpcom, nostdcall] TempRefImgIContainer unwrap();
+
+  /*
+   * Propagate the use counters (if any) from this container to the passed in
+   * document.
+   */
+  [noscript, notxpcom] void propagateUseCounters(in nsIDocument aDocument);
 };

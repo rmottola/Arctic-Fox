@@ -12,7 +12,6 @@
 #include "mozilla/Omnijar.h"
 #include "nsAutoPtr.h"
 #include "nsIInputStream.h"
-#include "nsNetUtil.h"
 #define gfxToolkitPlatform gfxAndroidPlatform
 
 #include "nsXULAppAPI.h"
@@ -60,8 +59,8 @@ GetFontInfoLog()
 }
 
 #undef LOG
-#define LOG(args) PR_LOG(GetFontInfoLog(), PR_LOG_DEBUG, args)
-#define LOG_ENABLED() PR_LOG_TEST(GetFontInfoLog(), PR_LOG_DEBUG)
+#define LOG(args) MOZ_LOG(GetFontInfoLog(), mozilla::LogLevel::Debug, args)
+#define LOG_ENABLED() MOZ_LOG_TEST(GetFontInfoLog(), mozilla::LogLevel::Debug)
 
 static cairo_user_data_key_t sFTUserFontDataKey;
 
@@ -532,7 +531,7 @@ FT2FontEntry::CopyFontTable(uint32_t aTableTag,
         return NS_ERROR_FAILURE;
     }
 
-    if (!aBuffer.SetLength(len)) {
+    if (!aBuffer.SetLength(len, fallible)) {
         return NS_ERROR_OUT_OF_MEMORY;
     }
     uint8_t *buf = aBuffer.Elements();
@@ -617,8 +616,16 @@ FT2FontFamily::AddFacesToFontList(InfallibleTArray<FontListEntry>* aFontList,
 class FontNameCache {
 public:
     FontNameCache()
-        : mWriteNeeded(false)
+        : mMap(&mOps, sizeof(FNCMapEntry), 0)
+        , mWriteNeeded(false)
     {
+        // HACK ALERT: it's weird to assign |mOps| after we passed a pointer to
+        // it to |mMap|'s constructor. A more normal approach here would be to
+        // have a static |sOps| member. Unfortunately, this mysteriously but
+        // consistently makes Fennec start-up slower, so we take this
+        // unorthodox approach instead. It's safe because PLDHashTable's
+        // constructor doesn't dereference the pointer; it just makes a copy of
+        // it.
         mOps = (PLDHashTableOps) {
             StringHash,
             HashMatchEntry,
@@ -627,9 +634,7 @@ public:
             nullptr
         };
 
-        PL_DHashTableInit(&mMap, &mOps, sizeof(FNCMapEntry), 0);
-
-        MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default,
+        MOZ_ASSERT(XRE_IsParentProcess(),
                    "StartupCacheFontNameCache should only be used in chrome "
                    "process");
         mCache = mozilla::scache::StartupCache::GetSingleton();
@@ -639,23 +644,18 @@ public:
 
     ~FontNameCache()
     {
-        if (!mMap.IsInitialized()) {
-            return;
-        }
         if (!mWriteNeeded || !mCache) {
-            PL_DHashTableFinish(&mMap);
             return;
         }
 
         nsAutoCString buf;
         PL_DHashTableEnumerate(&mMap, WriteOutMap, &buf);
-        PL_DHashTableFinish(&mMap);
         mCache->PutBuffer(CACHE_KEY, buf.get(), buf.Length() + 1);
     }
 
     void Init()
     {
-        if (!mMap.IsInitialized() || !mCache) {
+        if (!mCache) {
             return;
         }
         uint32_t size;
@@ -686,8 +686,8 @@ public:
             }
             uint32_t filesize = strtoul(beginning, nullptr, 10);
 
-            FNCMapEntry* mapEntry = static_cast<FNCMapEntry*>
-                (PL_DHashTableAdd(&mMap, filename.get(), fallible));
+            auto mapEntry =
+                static_cast<FNCMapEntry*>(mMap.Add(filename.get(), fallible));
             if (mapEntry) {
                 mapEntry->mFilename.Assign(filename);
                 mapEntry->mTimestamp = timestamp;
@@ -710,12 +710,7 @@ public:
     GetInfoForFile(const nsCString& aFileName, nsCString& aFaceList,
                    uint32_t *aTimestamp, uint32_t *aFilesize)
     {
-        if (!mMap.IsInitialized()) {
-            return;
-        }
-        FNCMapEntry *entry =
-            static_cast<FNCMapEntry*>(PL_DHashTableSearch(&mMap,
-                                                          aFileName.get()));
+        auto entry = static_cast<FNCMapEntry*>(mMap.Search(aFileName.get()));
         if (entry) {
             *aTimestamp = entry->mTimestamp;
             *aFilesize = entry->mFilesize;
@@ -731,11 +726,8 @@ public:
     CacheFileInfo(const nsCString& aFileName, const nsCString& aFaceList,
                   uint32_t aTimestamp, uint32_t aFilesize)
     {
-        if (!mMap.IsInitialized()) {
-            return;
-        }
-        FNCMapEntry* entry = static_cast<FNCMapEntry*>
-            (PL_DHashTableAdd(&mMap, aFileName.get(), fallible));
+        auto entry =
+            static_cast<FNCMapEntry*>(mMap.Add(aFileName.get(), fallible));
         if (entry) {
             entry->mFilename.Assign(aFileName);
             entry->mTimestamp = aTimestamp;
@@ -1161,7 +1153,7 @@ gfxFT2FontList::FindFonts()
     mCodepointsWithNoFonts.SetRange(0,0x1f);     // C0 controls
     mCodepointsWithNoFonts.SetRange(0x7f,0x9f);  // C1 controls
 
-    if (XRE_GetProcessType() != GeckoProcessType_Default) {
+    if (!XRE_IsParentProcess()) {
         // Content process: ask the Chrome process to give us the list
         InfallibleTArray<FontListEntry> fonts;
         mozilla::dom::ContentChild::GetSingleton()->SendReadFontList(&fonts);

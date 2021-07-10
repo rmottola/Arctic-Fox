@@ -611,7 +611,7 @@ function DataChannelWrapper(dataChannel, peerConnectionWrapper) {
       is(this.readyState, "open", "data channel is 'open' after 'onopen'");
       resolve(this);
     };
-  }), 60000, "channel didn't open in time");
+  }), 180000, "channel didn't open in time");
 }
 
 DataChannelWrapper.prototype = {
@@ -1153,21 +1153,18 @@ PeerConnectionWrapper.prototype = {
       return;
     }
     this.holdIceCandidates.then(() => {
-      this.addIceCandidate(candidate);
-    });
-  },
-
-  /**
-   * Adds an ICE candidate and automatically handles the failure case.
-   *
-   * @param {object} candidate
-   *        SDP candidate
-   */
-  addIceCandidate : function(candidate) {
-    info(this + ": adding ICE candidate " + JSON.stringify(candidate));
-    return this._pc.addIceCandidate(candidate).then(() => {
-      info(this + ": Successfully added an ICE candidate");
-    });
+      info(this + ": adding ICE candidate " + JSON.stringify(candidate));
+      return this._pc.addIceCandidate(candidate);
+    })
+    .then(() => ok(true, this + " successfully added an ICE candidate"))
+    .catch(e =>
+      // The onicecandidate callback runs independent of the test steps
+      // and therefore errors thrown from in there don't get caught by the
+      // race of the Promises around our test steps.
+      // Note: as long as we are queuing ICE candidates until the success
+      //       of sRD() this should never ever happen.
+      ok(false, this + " adding ICE candidate failed with: " + e.message)
+    );
   },
 
   /**

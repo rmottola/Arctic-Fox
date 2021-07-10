@@ -21,7 +21,7 @@ function fetchXHR(name, onload, onerror, headers) {
   x.send();
 }
 
-fetchXHR('synthesized.txt', function(xhr) {
+fetchXHR('bare-synthesized.txt', function(xhr) {
   my_ok(xhr.status == 200, "load should be successful");
   my_ok(xhr.responseText == "synthesized response body", "load should have synthesized response");
   finish();
@@ -46,16 +46,33 @@ fetchXHR('synthesized-headers.txt', function(xhr) {
   finish();
 });
 
-fetch('synthesized-redirect-real-file.txt', function(xhr) {
+fetchXHR('synthesized-redirect-real-file.txt', function(xhr) {
 dump("Got status AARRGH " + xhr.status + " " + xhr.responseText + "\n");
   my_ok(xhr.status == 200, "load should be successful");
   my_ok(xhr.responseText == "This is a real file.\n", "Redirect to real file should complete.");
   finish();
 });
 
-fetch('synthesized-redirect-synthesized.txt', function(xhr) {
+fetchXHR('synthesized-redirect-twice-real-file.txt', function(xhr) {
   my_ok(xhr.status == 200, "load should be successful");
-  my_ok(xhr.responseText == "synthesized response body", "load should have synthesized response");
+  my_ok(xhr.responseText == "This is a real file.\n", "Redirect to real file (twice) should complete.");
+  finish();
+});
+
+fetchXHR('synthesized-redirect-synthesized.txt', function(xhr) {
+  my_ok(xhr.status == 200, "synth+redirect+synth load should be successful");
+  my_ok(xhr.responseText == "synthesized response body", "load should have redirected+synthesized response");
+  finish();
+});
+
+fetchXHR('synthesized-redirect-twice-synthesized.txt', function(xhr) {
+  my_ok(xhr.status == 200, "synth+redirect+synth (twice) load should be successful");
+  my_ok(xhr.responseText == "synthesized response body", "load should have redirected+synthesized (twice) response");
+  finish();
+});
+
+fetchXHR('fetch/redirect.sjs', function(xhr) {
+  my_ok(xhr.status == 404, "redirected load should be uninterrupted");
   finish();
 });
 
@@ -117,14 +134,33 @@ fetchXHR('hello-after-extracting.gz', function(xhr) {
   finish();
 });
 
-fetchXHR('http://example.com/tests/dom/base/test/file_CrossSiteXHR_server.sjs?status=200&allowOrigin=*', function(xhr) {
+fetchXHR('http://example.com/tests/dom/security/test/cors/file_CrossSiteXHR_server.sjs?status=200&allowOrigin=*', function(xhr) {
   my_ok(xhr.status == 200, "cross origin load with correct headers should be successful");
   my_ok(xhr.getResponseHeader("access-control-allow-origin") == null, "cors headers should be filtered out");
   finish();
 });
 
+// Test that when the page fetches a url the controlling SW forces a redirect to
+// another location. This other location fetch should also be intercepted by
+// the SW.
+fetchXHR('something.txt', function(xhr) {
+  my_ok(xhr.status == 200, "load should be successful");
+  my_ok(xhr.responseText == "something else response body", "load should have something else");
+  finish();
+});
+
+// Test fetch will internally get it's SkipServiceWorker flag set. The request is
+// made from the SW through fetch(). fetch() fetches a server-side JavaScript
+// file that force a redirect. The redirect location fetch does not go through
+// the SW.
+fetchXHR('redirect_serviceworker.sjs', function(xhr) {
+  my_ok(xhr.status == 200, "load should be successful");
+  my_ok(xhr.responseText == "// empty worker, always succeed!\n", "load should have redirection content");
+  finish();
+});
+
 expectAsyncResult();
-fetch('http://example.com/tests/dom/base/test/file_CrossSiteXHR_server.sjs?status=200&allowOrigin=*')
+fetch('http://example.com/tests/dom/security/test/cors/file_CrossSiteXHR_server.sjs?status=200&allowOrigin=*')
 .then(function(res) {
   my_ok(res.ok, "Valid CORS request should receive valid response");
   my_ok(res.type == "cors", "Response type should be CORS");
@@ -138,7 +174,7 @@ fetch('http://example.com/tests/dom/base/test/file_CrossSiteXHR_server.sjs?statu
 });
 
 expectAsyncResult();
-fetch('http://example.com/tests/dom/base/test/file_CrossSiteXHR_server.sjs?status=200', { mode: 'no-cors' })
+fetch('http://example.com/tests/dom/security/test/cors/file_CrossSiteXHR_server.sjs?status=200', { mode: 'no-cors' })
 .then(function(res) {
   my_ok(res.type == "opaque", "Response type should be opaque");
   my_ok(res.status == 0, "Status should be 0");

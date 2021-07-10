@@ -55,7 +55,7 @@ let shutdown = Task.async(function*() {
   yield AnimationsController.destroy();
   // Don't assume that AnimationsPanel is defined here, it's in another file.
   if (typeof AnimationsPanel !== "undefined") {
-    yield AnimationsPanel.destroy()
+    yield AnimationsPanel.destroy();
   }
   gToolbox = gInspector = null;
 });
@@ -97,8 +97,11 @@ let AnimationsController = {
     }
     this.initialized = promise.defer();
 
+    this.onPanelVisibilityChange = this.onPanelVisibilityChange.bind(this);
+    this.onNewNodeFront = this.onNewNodeFront.bind(this);
+    this.onAnimationMutations = this.onAnimationMutations.bind(this);
+
     let target = gToolbox.target;
-    this.animationsFront = new AnimationsFront(target.client, target.form);
 
     // Expose actor capabilities.
     this.hasToggleAll = yield target.actorHasMethod("animations", "toggleAll");
@@ -106,12 +109,19 @@ let AnimationsController = {
                                                          "setCurrentTime");
     this.hasMutationEvents = yield target.actorHasMethod("animations",
                                                          "stopAnimationPlayerUpdates");
+    this.hasSetPlaybackRate = yield target.actorHasMethod("animationplayer",
+                                                          "setPlaybackRate");
+    this.hasTargetNode = yield target.actorHasMethod("domwalker",
+                                                     "getNodeFromActor");
+    this.isNewUI = Services.prefs.getBoolPref("devtools.inspector.animationInspectorV3");
 
-    this.onPanelVisibilityChange = this.onPanelVisibilityChange.bind(this);
-    this.onNewNodeFront = this.onNewNodeFront.bind(this);
+    if (this.destroyed) {
+      console.warn("Could not fully initialize the AnimationsController");
+      return;
+    }
 
+    this.animationsFront = new AnimationsFront(target.client, target.form);
     this.startListeners();
-
     yield this.onNewNodeFront();
 
     this.initialized.resolve();
@@ -151,6 +161,9 @@ let AnimationsController = {
     gInspector.selection.off("new-node-front", this.onNewNodeFront);
     gInspector.sidebar.off("select", this.onPanelVisibilityChange);
     gToolbox.off("select", this.onPanelVisibilityChange);
+    if (this.isListeningToMutations) {
+      this.animationsFront.off("mutations", this.onAnimationMutations);
+    }
   },
 
   isPanelVisible: function() {
@@ -213,15 +226,55 @@ let AnimationsController = {
 
     this.animationPlayers = yield this.animationsFront.getAnimationPlayersForNode(nodeFront);
     this.startAllAutoRefresh();
+
+    // Start listening for animation mutations only after the first method call
+    // otherwise events won't be sent.
+    if (!this.isListeningToMutations && this.hasMutationEvents) {
+      this.animationsFront.on("mutations", this.onAnimationMutations);
+      this.isListeningToMutations = true;
+    }
+  }),
+
+  onAnimationMutations: Task.async(function*(changes) {
+    // Insert new players into this.animationPlayers when new animations are
+    // added.
+    for (let {type, player} of changes) {
+      if (type === "added") {
+        this.animationPlayers.push(player);
+        if (!this.isNewUI) {
+          player.startAutoRefresh();
+        }
+      }
+
+      if (type === "removed") {
+        if (!this.isNewUI) {
+          player.stopAutoRefresh();
+        }
+        yield player.release();
+        let index = this.animationPlayers.indexOf(player);
+        this.animationPlayers.splice(index, 1);
+      }
+    }
+
+    // Let the UI know the list has been updated.
+    this.emit(this.PLAYERS_UPDATED_EVENT, this.animationPlayers);
   }),
 
   startAllAutoRefresh: function() {
+    if (this.isNewUI) {
+      return;
+    }
+
     for (let front of this.animationPlayers) {
       front.startAutoRefresh();
     }
   },
 
   stopAllAutoRefresh: function() {
+    if (this.isNewUI) {
+      return;
+    }
+
     for (let front of this.animationPlayers) {
       front.stopAutoRefresh();
     }

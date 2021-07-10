@@ -62,13 +62,13 @@ function test()
   var doc = document.getElementById("t").contentDocument;
 
   var winProto = Object.getPrototypeOf(win);
-  ise(winProto, win.Window.prototype, "The proto chain of the Xray should mirror the prototype chain of the Xrayed object");
+  is(winProto, win.Window.prototype, "The proto chain of the Xray should mirror the prototype chain of the Xrayed object");
 
   var namedPropertiesObject = Object.getPrototypeOf(winProto);
-  ise(Cu.getClassName(namedPropertiesObject, /* unwrap = */ true), "WindowProperties", "The proto chain of the Xray should mirror the prototype chain of the Xrayed object");
+  is(Cu.getClassName(namedPropertiesObject, /* unwrap = */ true), "WindowProperties", "The proto chain of the Xray should mirror the prototype chain of the Xrayed object");
 
   var eventTargetProto = Object.getPrototypeOf(namedPropertiesObject);
-  ise(eventTargetProto, win.EventTarget.prototype, "The proto chain of the Xray should mirror the prototype chain of the Xrayed object");
+  is(eventTargetProto, win.EventTarget.prototype, "The proto chain of the Xray should mirror the prototype chain of the Xrayed object");
 
   // Xrays need to filter expandos.
   checkWindowXrayProperty(win, "expando", undefined);

@@ -9,6 +9,7 @@
 
 #include "nsString.h"
 
+class nsILoadGroup;
 class nsIPrincipal;
 
 namespace mozilla {
@@ -35,7 +36,8 @@ public:
   virtual void
   ComparisonResult(nsresult aStatus,
                    bool aInCacheAndEqual,
-                   const nsAString& aNewCacheName) = 0;
+                   const nsAString& aNewCacheName,
+                   const nsACString& aMaxScope) = 0;
 
   NS_IMETHOD_(MozExternalRefCountType) AddRef() = 0;
   NS_IMETHOD_(MozExternalRefCountType) Release() = 0;
@@ -43,7 +45,7 @@ public:
 
 nsresult
 Compare(nsIPrincipal* aPrincipal, const nsAString& aCacheName,
-        const nsAString& aURL, CompareCallback* aCallback);
+        const nsAString& aURL, CompareCallback* aCallback, nsILoadGroup* aLoadGroup);
 
 } // namespace serviceWorkerScriptCache
 

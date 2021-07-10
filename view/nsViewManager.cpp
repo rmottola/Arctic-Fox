@@ -368,6 +368,17 @@ nsViewManager::ProcessPendingUpdatesForView(nsView* aView,
   for (uint32_t i = 0; i < widgets.Length(); ++i) {
     nsView* view = nsView::GetViewFor(widgets[i]);
     if (view) {
+      if (view->mNeedsWindowPropertiesSync) {
+        view->mNeedsWindowPropertiesSync = false;
+        if (nsViewManager* vm = view->GetViewManager()) {
+          if (nsIPresShell* ps = vm->GetPresShell()) {
+            ps->SyncWindowProperties(view);
+          }
+        }
+      }
+    }
+    view = nsView::GetViewFor(widgets[i]);
+    if (view) {
       view->ResetWidgetBounds(false, true);
     }
   }
@@ -427,8 +438,17 @@ nsViewManager::ProcessPendingUpdatesPaint(nsIWidget* aWidget)
       }
     }
     nsView* view = nsView::GetViewFor(aWidget);
+
     if (!view) {
       NS_ERROR("FlushDelayedResize destroyed the nsView?");
+      return;
+    }
+
+    nsIWidgetListener* previousListener = aWidget->GetPreviouslyAttachedWidgetListener();
+
+    if (previousListener &&
+        previousListener != view &&
+        view->IsPrimaryFramePaintSuppressed()) {
       return;
     }
 
@@ -1138,3 +1158,4 @@ nsViewManager::InvalidateHierarchy()
     }
   }
 }
+

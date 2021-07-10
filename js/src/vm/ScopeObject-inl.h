@@ -193,7 +193,7 @@ StaticScopeIter<allowGC>::fun() const
 
 }  /* namespace js */
 
-inline JSObject *
+inline JSObject*
 JSObject::enclosingScope()
 {
     if (is<js::ScopeObject>())

@@ -13,7 +13,6 @@
 #include "jscompartment.h"
 #include "jsgc.h"
 #include "jsutil.h"
-#include "prmjtime.h"
 
 #include "gc/GCInternals.h"
 #include "gc/Memory.h"
@@ -23,6 +22,7 @@
 #if defined(DEBUG)
 #include "vm/ScopeObject.h"
 #endif
+#include "vm/Time.h"
 #include "vm/TypedArrayObject.h"
 #include "vm/TypeInference.h"
 
@@ -197,6 +197,7 @@ js::Nursery::allocateObject(JSContext* cx, size_t size, size_t numDynamic, const
     /* If we want external slots, add them. */
     HeapSlot* slots = nullptr;
     if (numDynamic) {
+        MOZ_ASSERT(clasp->isNative());
         slots = static_cast<HeapSlot*>(allocateBuffer(cx->zone(), numDynamic * sizeof(HeapSlot)));
         if (!slots) {
             /*
@@ -246,9 +247,9 @@ js::Nursery::allocateBuffer(Zone* zone, uint32_t nbytes)
     }
 
     void* buffer = zone->pod_malloc<uint8_t>(nbytes);
-    if (buffer) {
-        /* If this put fails, we will only leak the slots. */
-        (void)mallocedBuffers.put(buffer);
+    if (buffer && !mallocedBuffers.putNew(buffer)) {
+        js_free(buffer);
+        return nullptr;
     }
     return buffer;
 }
@@ -273,11 +274,8 @@ js::Nursery::reallocateBuffer(JSObject* obj, void* oldBuffer,
 
     if (!isInside(oldBuffer)) {
         void* newBuffer = obj->zone()->pod_realloc<uint8_t>((uint8_t*)oldBuffer, oldBytes, newBytes);
-        if (newBuffer && oldBytes != newBytes) {
-            removeMallocedBuffer(oldBuffer);
-            /* If this put fails, we will only leak the slots. */
-            (void)mallocedBuffers.put(newBuffer);
-        }
+        if (newBuffer && oldBuffer != newBuffer)
+            MOZ_ALWAYS_TRUE(mallocedBuffers.rekeyAs(oldBuffer, newBuffer, newBuffer));
         return newBuffer;
     }
 
@@ -531,6 +529,12 @@ js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList
     }
     TIME_END(pretenure);
 
+    TIME_START(logPromotionsToTenured);
+    for (ZonesIter zone(rt, SkipAtoms); !zone.done(); zone.next()) {
+        zone->logPromotionsToTenured();
+    }
+    TIME_END(logPromotionsToTenured);
+
     // We ignore gcMaxBytes when allocating for minor collection. However, if we
     // overflowed, we disable the nursery. The next time we allocate, we'll fail
     // because gcBytes >= gcMaxBytes.
@@ -549,13 +553,13 @@ js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList
         static bool printedHeader = false;
         if (!printedHeader) {
             fprintf(stderr,
-                    "MinorGC: Reason               PRate  Size Time   mkVals mkClls mkSlts mkWCll mkGnrc ckTbls mkRntm mkDbgr clrNOC collct swpABO updtIn runFin frSlts clrSB  sweep resize pretnr\n");
+                    "MinorGC: Reason               PRate  Size Time   mkVals mkClls mkSlts mkWCll mkGnrc ckTbls mkRntm mkDbgr clrNOC collct swpABO updtIn runFin frSlts clrSB  sweep resize pretnr logPtT\n");
             printedHeader = true;
         }
 
 #define FMT " %6" PRIu64
         fprintf(stderr,
-                "MinorGC: %20s %5.1f%% %4d" FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT "\n",
+                "MinorGC: %20s %5.1f%% %4d" FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT "\n",
                 js::gcstats::ExplainReason(reason),
                 promotionRate * 100,
                 numActiveChunks_,
@@ -577,7 +581,8 @@ js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList
                 TIME_TOTAL(clearStoreBuffer),
                 TIME_TOTAL(sweep),
                 TIME_TOTAL(resize),
-                TIME_TOTAL(pretenure));
+                TIME_TOTAL(pretenure),
+                TIME_TOTAL(logPromotionsToTenured));
 #undef FMT
     }
 }
@@ -627,6 +632,7 @@ js::Nursery::freeMallocedBuffers()
 void
 js::Nursery::waitBackgroundFreeEnd()
 {
+    MOZ_ASSERT(freeMallocedBuffersTask);
     freeMallocedBuffersTask->join();
 }
 

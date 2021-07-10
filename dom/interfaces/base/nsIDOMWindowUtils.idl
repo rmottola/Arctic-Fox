@@ -49,7 +49,7 @@ interface nsIJSRAIIHelper;
 interface nsIContentPermissionRequest;
 interface nsIObserver;
 
-[scriptable, uuid(ec176f3b-2886-4090-938e-dded103c5f1c)]
+[scriptable, uuid(bbcb87fb-ce2e-4e05-906b-9258687664e2)]
 interface nsIDOMWindowUtils : nsISupports {
 
   /**
@@ -1194,6 +1194,15 @@ interface nsIDOMWindowUtils : nsISupports {
   void remoteFrameFullscreenReverted();
 
   /**
+   * Calls the document to handle any pending fullscreen requests.
+   * It is called when the parent document has entered fullscreen, and
+   * we want to put the current document into fullscreen as well.
+   * The return value indicates whether there is any fullscreen request
+   * handled by this call.
+   */
+  boolean handleFullscreenRequests();
+
+  /**
    * Called when the child frame has fully exit fullscreen, so that the parent
    * process can also fully exit.
    */
@@ -1437,6 +1446,16 @@ interface nsIDOMWindowUtils : nsISupports {
   void setAsyncZoom(in nsIDOMNode aRootElement, in float aValue);
 
   /**
+   * Do a round-trip to the compositor to ensure any pending APZ repaint requests
+   * get flushed to the main thread. If the function returns true, the flush was
+   * triggered and an "apz-repaints-flushed" notification will be dispatched via
+   * the observer service once the flush is complete. If the function returns
+   * false, an error occurred or a flush is not needed, and the notification
+   * will not fire. This is intended to be used by test code only!
+   */
+  bool flushApzRepaints();
+
+  /**
    * Method for testing StyleAnimationValue::ComputeDistance.
    *
    * Returns the distance between the two values as reported by
@@ -1525,6 +1544,8 @@ interface nsIDOMWindowUtils : nsISupports {
                             [optional] out long aRefCnt,
                             [optional] out long aDBRefCnt,
                             [optional] out long aSliceRefCnt);
+
+  void flushPendingFileDeletions();
 
   /**
    * Return whether incremental GC has been disabled due to a binary add-on.
@@ -1695,9 +1716,11 @@ interface nsIDOMWindowUtils : nsISupports {
    attribute boolean paintFlashing;
 
    /**
-    * Allows running of a "synchronous section", in the form of an nsIRunnable
-    * once the event loop has reached a "stable state". We've reached a stable
-    * state when the currently executing task/event has finished, see:
+    * Add a "synchronous section", in the form of an nsIRunnable run once the
+    * event loop has reached a "stable state". |runnable| must not cause any
+    * queued events to be processed (i.e. must not spin the event loop).
+    * We've reached a stable state when the currently executing task/event has
+    * finished, see:
     * http://www.whatwg.org/specs/web-apps/current-work/multipage/webappapis.html#synchronous-section
     * In practice this runs aRunnable once the currently executing event
     * finishes. If called multiple times per task/event, all the runnables will
@@ -1723,7 +1746,8 @@ interface nsIDOMWindowUtils : nsISupports {
     * If the property is NOT currently being animated on the compositor thread,
     * returns an empty string.
     */
-   AString getOMTAStyle(in nsIDOMElement aElement, in AString aProperty);
+   AString getOMTAStyle(in nsIDOMElement aElement, in AString aProperty,
+                        [optional] in AString aPseudoElement);
 
    /**
     * Special function that gets a property syncronously from the last composite
@@ -1833,6 +1857,15 @@ interface nsIDOMWindowUtils : nsISupports {
    * Decrease the chaos mode activation level. See enterChaosMode().
    */
   void leaveChaosMode();
+
+  /**
+   * Returns whether the document's style set's rule processor for the
+   * specified level of the cascade is shared by multiple style sets.
+   * (Used by tests to ensure that certain optimizations do not regress.)
+   *
+   * @param aSheetType One of the nsIStyleSheetService.*_SHEET constants.
+   */
+  bool hasRuleProcessorUsedByMultipleStyleSets(in unsigned long aSheetType);
 };
 
 [scriptable, uuid(c694e359-7227-4392-a138-33c0cc1f15a6)]

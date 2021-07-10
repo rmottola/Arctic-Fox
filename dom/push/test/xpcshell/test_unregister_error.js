@@ -3,7 +3,7 @@
 
 'use strict';
 
-const {PushDB, PushService} = serviceExports;
+const {PushDB, PushService, PushServiceWebSocket} = serviceExports;
 
 const channelID = '00c7fa13-7b71-447d-bd27-a91abc09d1b2';
 
@@ -14,18 +14,19 @@ function run_test() {
 }
 
 add_task(function* test_unregister_error() {
-  let db = new PushDB();
-  let promiseDB = promisifyDatabase(db);
-  do_register_cleanup(() => cleanupDatabase(db));
-  yield promiseDB.put({
+  let db = PushServiceWebSocket.newPushDB();
+  do_register_cleanup(() => {return db.drop().then(_ => db.close());});
+  yield db.put({
     channelID: channelID,
     pushEndpoint: 'https://example.org/update/failure',
     scope: 'https://example.net/page/failure',
+    originAttributes: '',
     version: 1
   });
 
   let unregisterDefer = Promise.defer();
   PushService.init({
+    serverURI: "wss://push.example.org/",
     networkInfo: new MockDesktopNetworkInfo(),
     db,
     makeWebSocket(uri) {
@@ -54,9 +55,9 @@ add_task(function* test_unregister_error() {
   });
 
   yield PushNotificationService.unregister(
-    'https://example.net/page/failure');
+    'https://example.net/page/failure', '');
 
-  let result = yield promiseDB.getByChannelID(channelID);
+  let result = yield db.getByKeyID(channelID);
   ok(!result, 'Deleted push record exists');
 
   // Make sure we send a request to the server.

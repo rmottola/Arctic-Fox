@@ -371,6 +371,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     this._onContextNewTabCommand = this.openRequestInTab.bind(this);
     this._onContextCopyUrlCommand = this.copyUrl.bind(this);
     this._onContextCopyImageAsDataUriCommand = this.copyImageAsDataUri.bind(this);
+    this._onContextCopyResponseCommand = this.copyResponse.bind(this);
     this._onContextResendCommand = this.cloneSelectedRequest.bind(this);
     this._onContextToggleRawHeadersCommand = this.toggleRawHeaders.bind(this);
     this._onContextPerfCommand = () => NetMonitorView.toggleFrontendMode();
@@ -394,6 +395,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     $("#network-request-popup").addEventListener("popupshowing", this._onContextShowing, false);
     $("#request-menu-context-newtab").addEventListener("command", this._onContextNewTabCommand, false);
     $("#request-menu-context-copy-url").addEventListener("command", this._onContextCopyUrlCommand, false);
+    $("#request-menu-context-copy-response").addEventListener("command", this._onContextCopyResponseCommand, false);
     $("#request-menu-context-copy-image-as-data-uri").addEventListener("command", this._onContextCopyImageAsDataUriCommand, false);
     $("#toggle-raw-headers").addEventListener("click", this.toggleRawHeadersEvent, false);
 
@@ -454,6 +456,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     $("#network-request-popup").removeEventListener("popupshowing", this._onContextShowing, false);
     $("#request-menu-context-newtab").removeEventListener("command", this._onContextNewTabCommand, false);
     $("#request-menu-context-copy-url").removeEventListener("command", this._onContextCopyUrlCommand, false);
+    $("#request-menu-context-copy-response").removeEventListener("command", this._onContextCopyResponseCommand, false);
     $("#request-menu-context-copy-image-as-data-uri").removeEventListener("command", this._onContextCopyImageAsDataUriCommand, false);
     $("#request-menu-context-resend").removeEventListener("command", this._onContextResendCommand, false);
     $("#request-menu-context-perf").removeEventListener("command", this._onContextPerfCommand, false);
@@ -563,6 +566,93 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
   },
 
   /**
+   * Copy the request url query string parameters from the currently selected item.
+   */
+  copyUrlParams: function() {
+    let selected = this.selectedItem.attachment;
+    let params = nsIURL(selected.url).query.split("&");
+    let string = params.join(Services.appinfo.OS === "WINNT" ? "\r\n" : "\n");
+    clipboardHelper.copyString(string, document);
+  },
+
+  /**
+   * Extracts any urlencoded form data sections (e.g. "?foo=bar&baz=42") from a
+   * POST request.
+   *
+   * @param object aHeaders
+   *        The "requestHeaders".
+   * @param object aUploadHeaders
+   *        The "requestHeadersFromUploadStream".
+   * @param object aPostData
+   *        The "requestPostData".
+   * @return array
+   *        A promise that is resolved with the extracted form data.
+   */
+  _getFormDataSections: Task.async(function*(aHeaders, aUploadHeaders, aPostData) {
+    let formDataSections = [];
+
+    let { headers: requestHeaders } = aHeaders;
+    let { headers: payloadHeaders } = aUploadHeaders;
+    let allHeaders = [...payloadHeaders, ...requestHeaders];
+
+    let contentTypeHeader = allHeaders.find(e => e.name.toLowerCase() == "content-type");
+    let contentTypeLongString = contentTypeHeader ? contentTypeHeader.value : "";
+    let contentType = yield gNetwork.getString(contentTypeLongString);
+
+    if (contentType.includes("x-www-form-urlencoded")) {
+      let postDataLongString = aPostData.postData.text;
+      let postData = yield gNetwork.getString(postDataLongString);
+
+      for (let section of postData.split(/\r\n|\r|\n/)) {
+        // Before displaying it, make sure this section of the POST data
+        // isn't a line containing upload stream headers.
+        if (payloadHeaders.every(header => !section.startsWith(header.name))) {
+          formDataSections.push(section);
+        }
+      }
+    }
+
+    return formDataSections;
+  }),
+
+  /**
+   * Copy the request form data parameters (or raw payload) from the currently selected item.
+   */
+  copyPostData: Task.async(function*() {
+    let selected = this.selectedItem.attachment;
+    let view = this;
+
+    // Try to extract any form data parameters.
+    let formDataSections = yield view._getFormDataSections(
+      selected.requestHeaders,
+      selected.requestHeadersFromUploadStream,
+      selected.requestPostData);
+
+    let params = [];
+    formDataSections.forEach(section => {
+      let paramsArray = parseQueryString(section);
+      if (paramsArray) {
+        params = [...params, ...paramsArray];
+      }
+    });
+
+    let string = params
+      .map(param => param.name + (param.value ? "=" + param.value : ""))
+      .join(Services.appinfo.OS === "WINNT" ? "\r\n" : "\n");
+
+    // Fall back to raw payload.
+    if (!string) {
+      let postData = selected.requestPostData.postData.text;
+      string = yield gNetwork.getString(postData);
+      if (Services.appinfo.OS !== "WINNT") {
+        string = string.replace(/\r/g, "");
+      }
+    }
+
+    clipboardHelper.copyString(string, document);
+  }),
+
+  /**
    * Copy a cURL command from the currently selected item.
    */
   copyAsCurl: function() {
@@ -595,6 +685,30 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
   },
 
   /**
+   * Copy the raw request headers from the currently selected item.
+   */
+  copyRequestHeaders: function() {
+    let selected = this.selectedItem.attachment;
+    let rawHeaders = selected.requestHeaders.rawHeaders.trim();
+    if (Services.appinfo.OS !== "WINNT") {
+      rawHeaders = rawHeaders.replace(/\r/g, "");
+    }
+    clipboardHelper.copyString(rawHeaders, document);
+  },
+
+  /**
+   * Copy the raw response headers from the currently selected item.
+   */
+  copyResponseHeaders: function() {
+    let selected = this.selectedItem.attachment;
+    let rawHeaders = selected.responseHeaders.rawHeaders.trim();
+    if (Services.appinfo.OS !== "WINNT") {
+      rawHeaders = rawHeaders.replace(/\r/g, "");
+    }
+    clipboardHelper.copyString(rawHeaders, document);
+  },
+
+  /**
    * Copy image as data uri.
    */
   copyImageAsDataUri: function() {
@@ -604,6 +718,18 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     gNetwork.getString(text).then(aString => {
       let data = "data:" + mimeType + ";" + encoding + "," + aString;
       clipboardHelper.copyString(data, document);
+    });
+  },
+
+  /**
+   * Copy response data as a string.
+   */
+  copyResponse: function() {
+    let selected = this.selectedItem.attachment;
+    let text = selected.responseContent.content.text;
+
+    gNetwork.getString(text).then(aString => {
+      clipboardHelper.copyString(aString, document);
     });
   },
 
@@ -955,51 +1081,51 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    *         True if the item should be visible, false otherwise.
    */
   isHtml: function({ attachment: { mimeType } })
-    mimeType && mimeType.contains("/html"),
+    mimeType && mimeType.includes("/html"),
 
   isCss: function({ attachment: { mimeType } })
-    mimeType && mimeType.contains("/css"),
+    mimeType && mimeType.includes("/css"),
 
   isJs: function({ attachment: { mimeType } })
     mimeType && (
-      mimeType.contains("/ecmascript") ||
-      mimeType.contains("/javascript") ||
-      mimeType.contains("/x-javascript")),
+      mimeType.includes("/ecmascript") ||
+      mimeType.includes("/javascript") ||
+      mimeType.includes("/x-javascript")),
 
   isXHR: function({ attachment: { isXHR } })
     isXHR,
 
   isFont: function({ attachment: { url, mimeType } }) // Fonts are a mess.
     (mimeType && (
-      mimeType.contains("font/") ||
-      mimeType.contains("/font"))) ||
-    url.contains(".eot") ||
-    url.contains(".ttf") ||
-    url.contains(".otf") ||
-    url.contains(".woff"),
+      mimeType.includes("font/") ||
+      mimeType.includes("/font"))) ||
+    url.includes(".eot") ||
+    url.includes(".ttf") ||
+    url.includes(".otf") ||
+    url.includes(".woff"),
 
   isImage: function({ attachment: { mimeType } })
-    mimeType && mimeType.contains("image/"),
+    mimeType && mimeType.includes("image/"),
 
   isMedia: function({ attachment: { mimeType } }) // Not including images.
     mimeType && (
-      mimeType.contains("audio/") ||
-      mimeType.contains("video/") ||
-      mimeType.contains("model/")),
+      mimeType.includes("audio/") ||
+      mimeType.includes("video/") ||
+      mimeType.includes("model/")),
 
   isFlash: function({ attachment: { url, mimeType } }) // Flash is a mess.
     (mimeType && (
-      mimeType.contains("/x-flv") ||
-      mimeType.contains("/x-shockwave-flash"))) ||
-    url.contains(".swf") ||
-    url.contains(".flv"),
+      mimeType.includes("/x-flv") ||
+      mimeType.includes("/x-shockwave-flash"))) ||
+    url.includes(".swf") ||
+    url.includes(".flv"),
 
   isOther: function(e)
     !this.isHtml(e) && !this.isCss(e) && !this.isJs(e) && !this.isXHR(e) &&
     !this.isFont(e) && !this.isImage(e) && !this.isMedia(e) && !this.isFlash(e),
 
   isFreetextMatch: function({ attachment: { url } }, text) //no text is a positive match
-    !text || url.contains(text),
+    !text || url.includes(text),
 
   /**
    * Predicates used when sorting items.
@@ -1463,7 +1589,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
         let { mimeType } = aItem.attachment;
         let { text, encoding } = aValue.content;
 
-        if (mimeType.contains("image/")) {
+        if (mimeType.includes("image/")) {
           let responseBody = yield gNetwork.getString(text);
           let node = $(".requests-menu-icon", aItem.target);
           node.src = "data:" + mimeType + ";" + encoding + "," + responseBody;
@@ -1752,7 +1878,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     let { url } = hovered;
     let { mimeType, text, encoding } = hovered.responseContent.content;
 
-    if (mimeType && mimeType.contains("image/") && (
+    if (mimeType && mimeType.includes("image/") && (
       aTarget.classList.contains("requests-menu-icon") ||
       aTarget.classList.contains("requests-menu-file")))
     {
@@ -1799,16 +1925,34 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     let copyUrlElement = $("#request-menu-context-copy-url");
     copyUrlElement.hidden = !selectedItem;
 
+    let copyUrlParamsElement = $("#request-menu-context-copy-url-params");
+    copyUrlParamsElement.hidden = !selectedItem || !nsIURL(selectedItem.attachment.url).query;
+
+    let copyPostDataElement = $("#request-menu-context-copy-post-data");
+    copyPostDataElement.hidden = !selectedItem || !selectedItem.attachment.requestPostData;
+
     let copyAsCurlElement = $("#request-menu-context-copy-as-curl");
     copyAsCurlElement.hidden = !selectedItem || !selectedItem.attachment.responseContent;
+
+    let copyRequestHeadersElement = $("#request-menu-context-copy-request-headers");
+    copyRequestHeadersElement.hidden = !selectedItem || !selectedItem.attachment.requestHeaders;
+
+    let copyResponseHeadersElement = $("#response-menu-context-copy-response-headers");
+    copyResponseHeadersElement.hidden = !selectedItem || !selectedItem.attachment.responseHeaders;
+
+    let copyResponse = $("#request-menu-context-copy-response");
+    copyResponse.hidden = !selectedItem ||
+      !selectedItem.attachment.responseContent ||
+      !selectedItem.attachment.responseContent.content.text ||
+      selectedItem.attachment.responseContent.content.text.length === 0;
 
     let copyImageAsDataUriElement = $("#request-menu-context-copy-image-as-data-uri");
     copyImageAsDataUriElement.hidden = !selectedItem ||
       !selectedItem.attachment.responseContent ||
-      !selectedItem.attachment.responseContent.content.mimeType.contains("image/");
+      !selectedItem.attachment.responseContent.content.mimeType.includes("image/");
 
-    let separator = $("#request-menu-context-separator");
-    separator.hidden = !selectedItem;
+    let separators = $all(".request-menu-context-separator");
+    Array.forEach(separators, separator => separator.hidden = !selectedItem);
 
     let newTabElement = $("#request-menu-context-newtab");
     newTabElement.hidden = !selectedItem;
@@ -2413,19 +2557,19 @@ NetworkDetailsView.prototype = {
   /**
    * Sets the network request headers shown in this view.
    *
-   * @param object aHeadersResponse
+   * @param object aHeaders
    *        The "requestHeaders" message received from the server.
-   * @param object aHeadersFromUploadStream
+   * @param object aUploadHeaders
    *        The "requestHeadersFromUploadStream" inferred from the POST payload.
    * @return object
    *        A promise that resolves when request headers are set.
    */
-  _setRequestHeaders: Task.async(function*(aHeadersResponse, aHeadersFromUploadStream) {
-    if (aHeadersResponse && aHeadersResponse.headers.length) {
-      yield this._addHeaders(this._requestHeaders, aHeadersResponse);
+  _setRequestHeaders: Task.async(function*(aHeaders, aUploadHeaders) {
+    if (aHeaders && aHeaders.headers.length) {
+      yield this._addHeaders(this._requestHeaders, aHeaders);
     }
-    if (aHeadersFromUploadStream && aHeadersFromUploadStream.headers.length) {
-      yield this._addHeaders(this._requestHeadersFromUpload, aHeadersFromUploadStream);
+    if (aUploadHeaders && aUploadHeaders.headers.length) {
+      yield this._addHeaders(this._requestHeadersFromUpload, aUploadHeaders);
     }
   }),
 
@@ -2553,40 +2697,28 @@ NetworkDetailsView.prototype = {
   /**
    * Sets the network request post params shown in this view.
    *
-   * @param object aHeadersResponse
+   * @param object aHeaders
    *        The "requestHeaders" message received from the server.
-   * @param object aHeadersFromUploadStream
+   * @param object aUploadHeaders
    *        The "requestHeadersFromUploadStream" inferred from the POST payload.
-   * @param object aPostDataResponse
+   * @param object aPostData
    *        The "requestPostData" message received from the server.
    * @return object
    *        A promise that is resolved when the request post params are set.
    */
-  _setRequestPostParams: Task.async(function*(aHeadersResponse, aHeadersFromUploadStream, aPostDataResponse) {
-    if (!aHeadersResponse || !aHeadersFromUploadStream || !aPostDataResponse) {
+  _setRequestPostParams: Task.async(function*(aHeaders, aUploadHeaders, aPostData) {
+    if (!aHeaders || !aUploadHeaders || !aPostData) {
       return;
     }
 
-    let { headers: requestHeaders } = aHeadersResponse;
-    let { headers: payloadHeaders } = aHeadersFromUploadStream;
-    let allHeaders = [...payloadHeaders, ...requestHeaders];
+    let formDataSections = yield RequestsMenuView.prototype._getFormDataSections(
+      aHeaders, aUploadHeaders, aPostData);
 
-    let contentTypeHeader = allHeaders.find(e => e.name.toLowerCase() == "content-type");
-    let contentTypeLongString = contentTypeHeader ? contentTypeHeader.value : "";
-    let postDataLongString = aPostDataResponse.postData.text;
-
-    let postData = yield gNetwork.getString(postDataLongString);
-    let contentType = yield gNetwork.getString(contentTypeLongString);
-
-    // Handle query strings (e.g. "?foo=bar&baz=42").
-    if (contentType.contains("x-www-form-urlencoded")) {
-      for (let section of postData.split(/\r\n|\r|\n/)) {
-        // Before displaying it, make sure this section of the POST data
-        // isn't a line containing upload stream headers.
-        if (payloadHeaders.every(header => !section.startsWith(header.name))) {
-          this._addParams(this._paramsFormData, section);
-        }
-      }
+    // Handle urlencoded form data sections (e.g. "?foo=bar&baz=42").
+    if (formDataSections.length > 0) {
+      formDataSections.forEach(section => {
+        this._addParams(this._paramsFormData, section);
+      });
     }
     // Handle actual forms ("multipart/form-data" content type).
     else {
@@ -2600,6 +2732,9 @@ NetworkDetailsView.prototype = {
 
       $("#request-post-data-textarea-box").hidden = false;
       let editor = yield NetMonitorView.editor("#request-post-data-textarea");
+      let postDataLongString = aPostData.postData.text;
+      let postData = yield gNetwork.getString(postDataLongString);
+
       // Most POST bodies are usually JSON, so they can be neatly
       // syntax highlighted as JS. Otheriwse, fall back to plain text.
       try {
@@ -2709,7 +2844,7 @@ NetworkDetailsView.prototype = {
       }
     }
     // Handle images.
-    else if (mimeType.contains("image/")) {
+    else if (mimeType.includes("image/")) {
       $("#response-content-image-box").setAttribute("align", "center");
       $("#response-content-image-box").setAttribute("pack", "center");
       $("#response-content-image-box").hidden = false;
@@ -2742,7 +2877,7 @@ NetworkDetailsView.prototype = {
       // Maybe set a more appropriate mode in the Source Editor if possible,
       // but avoid doing this for very large files.
       if (responseBody.length < SOURCE_SYNTAX_HIGHLIGHT_MAX_FILE_SIZE) {
-        let mapping = Object.keys(CONTENT_MIME_TYPE_MAPPINGS).find(key => mimeType.contains(key));
+        let mapping = Object.keys(CONTENT_MIME_TYPE_MAPPINGS).find(key => mimeType.includes(key));
         if (mapping) {
           editor.setMode(CONTENT_MIME_TYPE_MAPPINGS[mapping]);
         }
@@ -2897,14 +3032,11 @@ NetworkDetailsView.prototype = {
 
       // Warning icons
       let cipher = $("#security-warning-cipher");
-      let sslv3 = $("#security-warning-sslv3");
 
       if (securityInfo.state === "weak") {
         cipher.hidden = securityInfo.weaknessReasons.indexOf("cipher") === -1;
-        sslv3.hidden = securityInfo.weaknessReasons.indexOf("sslv3") === -1;
       } else {
         cipher.hidden = true;
-        sslv3.hidden = true;
       }
 
       let enabledLabel = L10N.getStr("netmonitor.security.enabled");

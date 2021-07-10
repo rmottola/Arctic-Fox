@@ -376,7 +376,6 @@ window[chromehidden~="toolbar"] toolbar:not(.toolbar-primary):not(#nav-bar):not(
 }
 
 #navigator-toolbox ,
-#status-bar ,
 #mainPopupSet {
   min-width: 1px;
 }
@@ -563,19 +562,16 @@ window[chromehidden~="toolbar"] toolbar:not(.toolbar-primary):not(#nav-bar):not(
   -moz-binding: url("chrome://browser/content/urlbarBindings.xml#click-to-play-plugins-notification");
 }
 
+#password-fill-notification {
+  -moz-binding: url("chrome://browser/content/urlbarBindings.xml#password-fill-notification");
+}
+
+.login-fill-item {
+  -moz-binding: url("chrome://passwordmgr/content/login.xml#login");
+}
+
 .plugin-popupnotification-centeritem {
   -moz-binding: url("chrome://browser/content/urlbarBindings.xml#plugin-popupnotification-center-item");
-}
-
-/* override hidden="true" for the status bar compatibility shim
-   in case it was persisted for the real status bar */
-#status-bar {
-  display: -moz-box;
-}
-
-/* Remove the resizer from the statusbar compatibility shim */
-#status-bar[hideresizer] > .statusbar-resizerpanel {
-  display: none;
 }
 
 browser[tabmodalPromptShowing] {
@@ -700,6 +696,51 @@ notification[value="translation"] {
   -moz-binding: url("chrome://browser/content/translation-infobar.xml#translationbar");
 }
 
+/** See bug 872317 for why the following rule is necessary. */
+
+#downloads-button {
+  -moz-binding: url("chrome://browser/content/downloads/download.xml#download-toolbarbutton");
+}
+
+/*** Visibility of downloads indicator controls ***/
+
+#downloads-button[indicator] > image.toolbarbutton-icon {
+  display: none;
+}
+
+toolbarpaletteitem[place="palette"] > #downloads-button[indicator] > image.toolbarbutton-icon {
+  display: -moz-box;
+}
+
+toolbarpaletteitem[place="palette"] > #downloads-button[indicator] > stack.toolbarbutton-icon {
+  display: none;
+}
+
+#downloads-button:-moz-any([progress], [counter], [paused]) #downloads-indicator-icon,
+#downloads-button:not(:-moz-any([progress], [counter], [paused]))
+                                                   #downloads-indicator-progress-area
+{
+  visibility: hidden;
+}
+
+/* Hacks for toolbar full and text modes, until bug 573329 removes them */
+
+toolbar[mode="text"] > #downloads-button {
+  display: -moz-box;
+  -moz-box-orient: vertical;
+  -moz-box-pack: center;
+}
+
+toolbar[mode="text"] > #downloads-button > .toolbarbutton-text {
+  -moz-box-ordinal-group: 1;
+}
+
+toolbar[mode="text"] > #downloads-button > .toolbarbutton-icon {
+  display: -moz-box;
+  -moz-box-ordinal-group: 2;
+  visibility: collapse;
+}
+
 /* Strict icon size for PMkit 'ui/button' */
 toolbarbutton[pmkit-button="true"] > .toolbarbutton-badge-container > .toolbarbutton-icon {
   width: 16px;
@@ -707,11 +748,14 @@ toolbarbutton[pmkit-button="true"] > .toolbarbutton-badge-container > .toolbarbu
 }
 
 /* Remove white bar at the bottom of the screen when watching HTML5 video in fullscreen */
+#main-window[inDOMFullscreen] #navigator-toolbox,
+#main-window[inDOMFullscreen] #fullscr-toggler,
 #main-window[inDOMFullscreen] #sidebar-box,
 #main-window[inDOMFullscreen] #sidebar-splitter {
   visibility: collapse;
 }
 
+#main-window[inFullscreen]:not([OSXLionFullscreen]) toolbar:not([fullscreentoolbar=true]),
 #main-window[inFullscreen] #global-notificationbox,
 #main-window[inFullscreen] #high-priority-global-notificationbox {
   visibility: collapse;

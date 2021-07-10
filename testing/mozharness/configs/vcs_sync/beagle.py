@@ -1,4 +1,4 @@
-# This is for goanna-dev, which is a developer-oriented repo with
+# This is for gecko-dev, which is a developer-oriented repo with
 # release-train and inbound branches.
 
 import os
@@ -79,7 +79,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g26_v1_2",
@@ -112,7 +112,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g26_v1_2f",
@@ -145,7 +145,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g28_v1_3",
@@ -178,7 +178,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g28_v1_3t",
@@ -211,7 +211,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g30_v1_4",
@@ -244,7 +244,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g34_v2_1",
@@ -272,7 +272,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g37_v2_2",
@@ -300,7 +300,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g37_v2_2r",
@@ -328,7 +328,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g32_v2_0",
@@ -356,7 +356,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g32_v2_0m",
@@ -384,7 +384,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g18_v1_1_0_hd",
@@ -412,7 +412,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g18_v1_0_1",
@@ -440,7 +440,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-b2g18_v1_0_0",
@@ -468,7 +468,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-aurora",
@@ -496,7 +496,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-beta",
@@ -528,7 +528,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-release",
@@ -560,7 +560,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-esr17",
@@ -588,7 +588,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-esr31",
@@ -619,7 +619,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/releases/mozilla-esr38",
@@ -650,7 +650,7 @@ config = {
         },
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/integration/mozilla-inbound",
@@ -674,7 +674,7 @@ config = {
         "tag_config": {},
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/integration/b2g-inbound",
@@ -698,7 +698,7 @@ config = {
         "tag_config": {},
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }, {
         "repo": "https://hg.mozilla.org/integration/fx-team",
@@ -722,17 +722,17 @@ config = {
         "tag_config": {},
         "mapper": {
             "url": "https://api.pub.build.mozilla.org/mapper",
-            "project": "goanna-dev"
+            "project": "gecko-dev"
         },
     }],
     "remote_targets": {
         "github-beagle": {
-            "repo": "git@github.com:mozilla/goanna-dev.git",
+            "repo": "git@github.com:mozilla/gecko-dev.git",
             "ssh_key": "~/.ssh/releng-github-id_rsa",
             "vcs": "git",
         },
         "gitmo-beagle": {
-            "repo": "gitolite3@git.mozilla.org:integration/goanna-dev.git",
+            "repo": "gitolite3@git.mozilla.org:integration/gecko-dev.git",
             "ssh_key": "~/.ssh/vcs-sync_rsa",
             "vcs": "git",
         },

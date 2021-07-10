@@ -40,12 +40,6 @@ public:
       mManager->DrainComplete();
     }
   }
-  virtual void NotifyResourcesStatusChanged() override
-  {
-    if (mManager->mActiveCallback) {
-      mManager->mActiveCallback->NotifyResourcesStatusChanged();
-    }
-  }
   virtual void ReleaseMediaResources() override
   {
     if (mManager->mActiveCallback) {
@@ -249,12 +243,6 @@ SharedDecoderProxy::Shutdown()
 {
   mManager->SetIdle(this);
   return NS_OK;
-}
-
-bool
-SharedDecoderProxy::IsWaitingMediaResources()
-{
-  return mManager->mDecoder->IsWaitingMediaResources();
 }
 
 bool

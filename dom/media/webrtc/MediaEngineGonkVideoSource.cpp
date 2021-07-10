@@ -26,8 +26,8 @@ using namespace android;
 
 #undef LOG
 extern PRLogModuleInfo* GetMediaManagerLog();
-#define LOG(msg) PR_LOG(GetMediaManagerLog(), PR_LOG_DEBUG, msg)
-#define LOGFRAME(msg) PR_LOG(GetMediaManagerLog(), 6, msg)
+#define LOG(msg) MOZ_LOG(GetMediaManagerLog(), mozilla::LogLevel::Debug, msg)
+#define LOGFRAME(msg) MOZ_LOG(GetMediaManagerLog(), mozilla::LogLevel::Verbose, msg)
 
 class MediaBufferListener : public GonkCameraSource::DirectBufferListener {
 public:
@@ -147,13 +147,14 @@ MediaEngineGonkVideoSource::NumCapabilities()
 
 nsresult
 MediaEngineGonkVideoSource::Allocate(const dom::MediaTrackConstraints& aConstraints,
-                                     const MediaEnginePrefs& aPrefs)
+                                     const MediaEnginePrefs& aPrefs,
+                                     const nsString& aDeviceId)
 {
   LOG((__FUNCTION__));
 
   ReentrantMonitorAutoEnter sync(mCallbackMonitor);
   if (mState == kReleased && mInitDone) {
-    ChooseCapability(aConstraints, aPrefs);
+    ChooseCapability(aConstraints, aPrefs, aDeviceId);
     NS_DispatchToMainThread(WrapRunnable(nsRefPtr<MediaEngineGonkVideoSource>(this),
                                          &MediaEngineGonkVideoSource::AllocImpl));
     mCallbackMonitor.Wait();
@@ -334,8 +335,8 @@ MediaEngineGonkVideoSource::Init()
 {
   nsAutoCString deviceName;
   ICameraControl::GetCameraName(mCaptureIndex, deviceName);
-  CopyUTF8toUTF16(deviceName, mDeviceName);
-  CopyUTF8toUTF16(deviceName, mUniqueId);
+  SetName(NS_ConvertUTF8toUTF16(deviceName));
+  SetUUID(deviceName.get());
 
   mInitDone = true;
 }

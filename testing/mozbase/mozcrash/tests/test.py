@@ -180,7 +180,7 @@ class TestJavaException(unittest.TestCase):
        def setUp(self):
                self.test_log = ["01-30 20:15:41.937 E/GeckoAppShell( 1703): >>> REPORTING UNCAUGHT EXCEPTION FROM THREAD 9 (\"GeckoBackgroundThread\")",
                        "01-30 20:15:41.937 E/GeckoAppShell( 1703): java.lang.NullPointerException",
-                       "01-30 20:15:41.937 E/GeckoAppShell( 1703):    at org.mozilla.goanna.GeckoApp$21.run(GeckoApp.java:1833)",
+                       "01-30 20:15:41.937 E/GeckoAppShell( 1703):    at org.mozilla.gecko.GeckoApp$21.run(GeckoApp.java:1833)",
                        "01-30 20:15:41.937 E/GeckoAppShell( 1703):    at android.os.Handler.handleCallback(Handler.java:587)"]
 
        def test_uncaught_exception(self):

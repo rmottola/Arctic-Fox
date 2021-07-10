@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-from __future__ import unicode_literals
+from __future__ import absolute_import, unicode_literals
 
 import itertools
 import os
@@ -82,7 +82,7 @@ class AndroidEclipseBackend(CommonBackend):
     def _Element_for_classpathentry(self, cpe):
         """Turn a ClassPathEntry into an XML Element, like one of:
         <classpathentry including="**/*.java" kind="src" path="preprocessed"/>
-        <classpathentry including="**/*.java" excluding="org/mozilla/goanna/Excluded.java|org/mozilla/goanna/SecondExcluded.java" kind="src" path="src"/>
+        <classpathentry including="**/*.java" excluding="org/mozilla/gecko/Excluded.java|org/mozilla/gecko/SecondExcluded.java" kind="src" path="src"/>
         <classpathentry including="**/*.java" kind="src" path="thirdparty">
             <attributes>
                 <attribute name="ignore_optional_problems" value="true"/>
@@ -116,7 +116,7 @@ class AndroidEclipseBackend(CommonBackend):
 
     def _Element_for_extra_jar(self, name):
         """Turn a referenced JAR name into an XML Element, like:
-        <classpathentry exported="true" kind="lib" path="/Users/nalexander/Mozilla/goanna-dev/build/mobile/robocop/robotium-solo-4.3.1.jar"/>
+        <classpathentry exported="true" kind="lib" path="/Users/nalexander/Mozilla/gecko-dev/build/mobile/robocop/robotium-solo-4.3.1.jar"/>
         """
         e = ET.Element('classpathentry')
         e.set('kind', 'lib')
@@ -126,7 +126,7 @@ class AndroidEclipseBackend(CommonBackend):
 
     def _Element_for_filtered_resources(self, filtered_resources):
         """Turn a list of filtered resource arguments like
-        ['1.0-projectRelativePath-matches-false-false-*org/mozilla/goanna/resources/**']
+        ['1.0-projectRelativePath-matches-false-false-*org/mozilla/gecko/resources/**']
         into an XML Element, like:
         <filteredResources>
           <filter>
@@ -135,7 +135,7 @@ class AndroidEclipseBackend(CommonBackend):
             <type>30</type>
             <matcher>
               <id>org.eclipse.ui.ide.multiFilter</id>
-              <arguments>1.0-projectRelativePath-matches-false-false-*org/mozilla/goanna/resources/**</arguments>
+              <arguments>1.0-projectRelativePath-matches-false-false-*org/mozilla/gecko/resources/**</arguments>
             </matcher>
           </filter>
         </filteredResources>

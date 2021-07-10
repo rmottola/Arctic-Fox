@@ -33,7 +33,7 @@
              summary isn't being displayed, so we ensure that items share the
              same minimum width.
              -->
-        <xul:description class="downloadDisplayName"
+        <xul:description class="downloadTarget"
                          crop="center"
                          style="min-width: &downloadsSummary.minWidth2;"
                          xbl:inherits="value=displayName,tooltiptext=displayName"/>

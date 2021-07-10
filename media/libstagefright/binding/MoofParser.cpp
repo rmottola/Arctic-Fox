@@ -10,7 +10,7 @@
 
 #include "mozilla/Logging.h"
 
-#ifdef PR_LOGGING
+#if defined(MOZ_FMP4)
 extern PRLogModuleInfo* GetDemuxerLog();
 
 /* Polyfill __func__ on MSVC to pass to the log. */
@@ -20,7 +20,7 @@ extern PRLogModuleInfo* GetDemuxerLog();
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
-#define LOG(name, arg, ...) PR_LOG(GetDemuxerLog(), PR_LOG_DEBUG, (TOSTRING(name) "(%p)::%s: " arg, this, __func__, ##__VA_ARGS__))
+#define LOG(name, arg, ...) MOZ_LOG(GetDemuxerLog(), mozilla::LogLevel::Debug, (TOSTRING(name) "(%p)::%s: " arg, this, __func__, ##__VA_ARGS__))
 #else
 #define LOG(...)
 #endif
@@ -181,7 +181,7 @@ MoofParser::HasMetadata()
   return !!ftyp.Length() && !!moov.Length();
 }
 
-already_AddRefed<mozilla::MediaLargeByteBuffer>
+already_AddRefed<mozilla::MediaByteBuffer>
 MoofParser::Metadata()
 {
   MediaByteRange ftyp;
@@ -190,8 +190,8 @@ MoofParser::Metadata()
   if (!ftyp.Length() || !moov.Length()) {
     return nullptr;
   }
-  nsRefPtr<MediaLargeByteBuffer> metadata = new MediaLargeByteBuffer();
-  if (!metadata->SetLength(ftyp.Length() + moov.Length())) {
+  nsRefPtr<MediaByteBuffer> metadata = new MediaByteBuffer();
+  if (!metadata->SetLength(ftyp.Length() + moov.Length(), fallible)) {
     // OOM
     return nullptr;
   }
@@ -528,7 +528,7 @@ Moof::ParseTrun(Box& aBox, Tfhd& aTfhd, Mvhd& aMvhd, Mdhd& aMdhd, Edts& aEdts, u
   uint64_t decodeTime = *aDecodeTime;
   nsTArray<Interval<Microseconds>> timeRanges;
 
-  if (!mIndex.SetCapacity(sampleCount)) {
+  if (!mIndex.SetCapacity(sampleCount, fallible)) {
     LOG(Moof, "Out of Memory");
     return false;
   }
@@ -561,7 +561,8 @@ Moof::ParseTrun(Box& aBox, Tfhd& aTfhd, Mvhd& aMvhd, Mdhd& aMdhd, Edts& aEdts, u
     // because every audio sample is a keyframe.
     sample.mSync = !(sampleFlags & 0x1010000) || aIsAudio;
 
-    MOZ_ALWAYS_TRUE(mIndex.AppendElement(sample));
+    // FIXME: Make this infallible after bug 968520 is done.
+    MOZ_ALWAYS_TRUE(mIndex.AppendElement(sample, fallible));
 
     mMdatRange = mMdatRange.Extents(sample.mByteRange);
   }

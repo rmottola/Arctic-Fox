@@ -278,7 +278,6 @@ SimpleTest.is = function (a, b, name) {
     var diag = pass ? "" : "got " + repr(a) + ", expected " + repr(b)
     SimpleTest.ok(pass, name, diag);
 };
-SimpleTest.ise = SimpleTest.is;
 
 SimpleTest.isfuzzy = function (a, b, epsilon, name) {
   var pass = (a >= b - epsilon) && (a <= b + epsilon);

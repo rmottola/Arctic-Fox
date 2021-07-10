@@ -10,6 +10,7 @@
 #include "nsIJARChannel.h"
 #include "nsIJARURI.h"
 #include "nsIInputStreamPump.h"
+#include "InterceptedJARChannel.h"
 #include "nsIInterfaceRequestor.h"
 #include "nsIProgressEventSink.h"
 #include "nsIStreamListener.h"
@@ -27,6 +28,13 @@
 #include "mozilla/Logging.h"
 
 class nsJARInputThunk;
+class nsInputStreamPump;
+
+namespace mozilla {
+namespace net {
+  class InterceptedJARChannel;
+} // namespace net
+} // namespace mozilla
 
 //-----------------------------------------------------------------------------
 
@@ -53,6 +61,9 @@ public:
 
     nsresult Init(nsIURI *uri);
 
+    nsresult OverrideSecurityInfo(nsISupports* aSecurityInfo);
+    void OverrideURI(nsIURI* aRedirectedURI);
+
 private:
     virtual ~nsJARChannel();
 
@@ -69,9 +80,21 @@ private:
                                     mozilla::net::MemoryDownloader::Data aData)
         override;
 
-#if defined(PR_LOGGING)
+    // Returns true if this channel should intercept the network request and
+    // prepare for a possible synthesized response instead.
+    bool ShouldIntercept();
+
+    nsresult ContinueAsyncOpen();
+    void FinishAsyncOpen();
+
+    // Discard the prior interception and continue with the original network
+    // request.
+    void ResetInterception();
+    // Override this channel's pending response with a synthesized one. The
+    // content will be asynchronously read from the pump.
+    void OverrideWithSynthesizedResponse(nsIInputStream* aSynthesizedInput);
+
     nsCString                       mSpec;
-#endif
 
     bool                            mOpened;
 
@@ -109,6 +132,11 @@ private:
     nsCOMPtr<nsIURI>                mJarBaseURI;
     nsCString                       mJarEntry;
     nsCString                       mInnerJarEntry;
+
+    nsRefPtr<nsInputStreamPump> mSynthesizedResponsePump;
+    int64_t mSynthesizedStreamLength;
+
+    friend class mozilla::net::InterceptedJARChannel;
 };
 
 #endif // nsJARChannel_h__

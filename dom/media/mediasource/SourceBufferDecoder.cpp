@@ -16,7 +16,7 @@ extern PRLogModuleInfo* GetMediaSourceLog();
 #define __func__ __FUNCTION__
 #endif
 
-#define MSE_DEBUG(arg, ...) PR_LOG(GetMediaSourceLog(), PR_LOG_DEBUG, ("SourceBufferDecoder(%p:%s)::%s: " arg, this, mResource->GetContentType().get(), __func__, ##__VA_ARGS__))
+#define MSE_DEBUG(arg, ...) MOZ_LOG(GetMediaSourceLog(), mozilla::LogLevel::Debug, ("SourceBufferDecoder(%p:%s)::%s: " arg, this, mResource->GetContentType().get(), __func__, ##__VA_ARGS__))
 
 namespace mozilla {
 
@@ -179,12 +179,6 @@ SourceBufferDecoder::Trim(int64_t aDuration)
 }
 
 void
-SourceBufferDecoder::UpdateEstimatedMediaDuration(int64_t aDuration)
-{
-  MSE_DEBUG("UNIMPLEMENTED");
-}
-
-void
 SourceBufferDecoder::SetMediaSeekable(bool aMediaSeekable)
 {
   MSE_DEBUG("UNIMPLEMENTED");
@@ -203,15 +197,8 @@ SourceBufferDecoder::GetOwner()
 }
 
 void
-SourceBufferDecoder::NotifyDataArrived(const char* aBuffer, uint32_t aLength, int64_t aOffset)
+SourceBufferDecoder::NotifyDataArrived(uint32_t aLength, int64_t aOffset, bool aThrottleUpdates)
 {
-  mReader->NotifyDataArrived(aBuffer, aLength, aOffset);
-
-  // XXX: Params make no sense to parent decoder as it relates to a
-  // specific SourceBufferDecoder's data stream.  Pass bogus values here to
-  // force parent decoder's state machine to recompute end time for
-  // infinite length media.
-  mParentDecoder->NotifyDataArrived(nullptr, 0, 0);
 }
 
 media::TimeIntervals

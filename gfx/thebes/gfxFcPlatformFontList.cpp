@@ -36,18 +36,14 @@ using namespace mozilla::unicode;
 
 #define PRINTING_FC_PROPERTY "gfx.printing"
 
-#ifdef PR_LOGGING
-
-#define LOG_FONTLIST(args) PR_LOG(gfxPlatform::GetLog(eGfxLog_fontlist), \
-                               PR_LOG_DEBUG, args)
-#define LOG_FONTLIST_ENABLED() PR_LOG_TEST( \
+#define LOG_FONTLIST(args) MOZ_LOG(gfxPlatform::GetLog(eGfxLog_fontlist), \
+                               LogLevel::Debug, args)
+#define LOG_FONTLIST_ENABLED() MOZ_LOG_TEST( \
                                    gfxPlatform::GetLog(eGfxLog_fontlist), \
-                                   PR_LOG_DEBUG)
-#define LOG_CMAPDATA_ENABLED() PR_LOG_TEST( \
+                                   LogLevel::Debug)
+#define LOG_CMAPDATA_ENABLED() MOZ_LOG_TEST( \
                                    gfxPlatform::GetLog(eGfxLog_cmapdata), \
-                                   PR_LOG_DEBUG)
-
-#endif
+                                   LogLevel::Debug)
 
 static const FcChar8*
 ToFcChar8Ptr(const char* aStr)
@@ -387,7 +383,6 @@ gfxFontconfigFontEntry::ReadCMAP(FontInfoData *aFontInfoData)
         mCharacterMap = new gfxCharacterMap();
     }
 
-#ifdef PR_LOGGING
     LOG_FONTLIST(("(fontlist-cmap) name: %s, size: %d hash: %8.8x%s\n",
                   NS_ConvertUTF16toUTF8(mName).get(),
                   charmap->SizeOfIncludingThis(moz_malloc_size_of),
@@ -398,7 +393,6 @@ gfxFontconfigFontEntry::ReadCMAP(FontInfoData *aFontInfoData)
                 NS_ConvertUTF16toUTF8(mName).get());
         charmap->Dump(prefix, eGfxLog_cmapdata);
     }
-#endif
 
     return rv;
 }
@@ -495,7 +489,7 @@ PrepareFontOptions(FcPattern* aPattern,
 {
     NS_ASSERTION(aFontOptions, "null font options passed to PrepareFontOptions");
 
-    // xxx - taken from the gfxPangoFonts code, needs to be reviewed
+    // xxx - taken from the gfxFontconfigFonts code, needs to be reviewed
 
     FcBool printing;
     if (FcPatternGetBool(aPattern, PRINTING_FC_PROPERTY, 0, &printing) !=
@@ -807,7 +801,7 @@ gfxFontconfigFontEntry::CopyFontTable(uint32_t aTableTag,
     if (FT_Load_Sfnt_Table(mFTFace, aTableTag, 0, nullptr, &length) != 0) {
         return NS_ERROR_NOT_AVAILABLE;
     }
-    if (!aBuffer.SetLength(length)) {
+    if (!aBuffer.SetLength(length, fallible)) {
         return NS_ERROR_OUT_OF_MEMORY;
     }
     if (FT_Load_Sfnt_Table(mFTFace, aTableTag, 0, aBuffer.Elements(), &length) != 0) {
@@ -850,7 +844,6 @@ gfxFontconfigFontFamily::FindStyleVariations(FontInfoData *aFontInfoData)
             fp->AddFullname(fontEntry, fullname);
         }
 
-#ifdef PR_LOGGING
         if (LOG_FONTLIST_ENABLED()) {
             LOG_FONTLIST(("(fontlist) added (%s) to family (%s)"
                  " with style: %s weight: %d stretch: %d"
@@ -862,7 +855,6 @@ gfxFontconfigFontFamily::FindStyleVariations(FontInfoData *aFontInfoData)
                  NS_ConvertUTF16toUTF8(psname).get(),
                  NS_ConvertUTF16toUTF8(fullname).get()));
         }
-#endif
     }
     mFaceNamesInitialized = true;
     mFontPatterns.Clear();

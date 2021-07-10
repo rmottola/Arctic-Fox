@@ -443,7 +443,7 @@ js::CompletePropertyDescriptor(MutableHandle<PropertyDescriptor> desc)
 
 bool
 js::ReadPropertyDescriptors(JSContext* cx, HandleObject props, bool checkAccessors,
-                            AutoIdVector* ids, AutoPropertyDescriptorVector* descs)
+                            AutoIdVector* ids, MutableHandle<PropertyDescriptorVector> descs)
 {
     if (!GetPropertyKeys(cx, props, JSITER_OWNONLY | JSITER_SYMBOLS, ids))
         return false;
@@ -455,7 +455,7 @@ js::ReadPropertyDescriptors(JSContext* cx, HandleObject props, bool checkAccesso
         RootedValue v(cx);
         if (!GetProperty(cx, props, props, id, &v) ||
             !ToPropertyDescriptor(cx, v, checkAccessors, &desc) ||
-            !descs->append(desc))
+            !descs.append(desc))
         {
             return false;
         }
@@ -467,7 +467,7 @@ bool
 js::DefineProperties(JSContext* cx, HandleObject obj, HandleObject props)
 {
     AutoIdVector ids(cx);
-    AutoPropertyDescriptorVector descs(cx);
+    Rooted<PropertyDescriptorVector> descs(cx, PropertyDescriptorVector(cx));
     if (!ReadPropertyDescriptors(cx, props, true, &ids, &descs))
         return false;
 
@@ -527,15 +527,15 @@ js::SetIntegrityLevel(JSContext* cx, HandleObject obj, IntegrityLevel level)
             return false;
 
         // Get an in-order list of the shapes in this object.
-        AutoShapeVector shapes(cx);
+        Rooted<ShapeVector> shapes(cx, ShapeVector(cx));
         for (Shape::Range<NoGC> r(nobj->lastProperty()); !r.empty(); r.popFront()) {
             if (!shapes.append(&r.front()))
                 return false;
         }
         Reverse(shapes.begin(), shapes.end());
 
-        for (size_t i = 0; i < shapes.length(); i++) {
-            StackShape unrootedChild(shapes[i]);
+        for (Shape* shape : shapes) {
+            StackShape unrootedChild(shape);
             RootedGeneric<StackShape*> child(cx, &unrootedChild);
             child->attrs |= GetSealedOrFrozenAttributes(child->attrs, level);
 
@@ -1362,15 +1362,15 @@ InitializePropertiesFromCompatibleNativeObject(JSContext* cx,
             return false;
 
         // Get an in-order list of the shapes in the src object.
-        AutoShapeVector shapes(cx);
+        Rooted<ShapeVector> shapes(cx, ShapeVector(cx));
         for (Shape::Range<NoGC> r(src->lastProperty()); !r.empty(); r.popFront()) {
             if (!shapes.append(&r.front()))
                 return false;
         }
         Reverse(shapes.begin(), shapes.end());
 
-        for (size_t i = 0; i < shapes.length(); i++) {
-            StackShape unrootedChild(shapes[i]);
+        for (Shape* shape : shapes) {
+            StackShape unrootedChild(shape);
             RootedGeneric<StackShape*> child(cx, &unrootedChild);
             shape = cx->compartment()->propertyTree.getChild(cx, shape, *child);
             if (!shape)
@@ -2946,7 +2946,7 @@ JS::OrdinaryToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHan
     /* Avoid recursive death when decompiling in ReportValueError. */
     RootedString str(cx);
     if (hint == JSTYPE_STRING) {
-        str = JS_InternString(cx, clasp->name);
+        str = JS_AtomizeAndPinString(cx, clasp->name);
         if (!str)
             return false;
     } else {

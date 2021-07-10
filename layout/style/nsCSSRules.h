@@ -147,6 +147,8 @@ public:
   virtual bool UseForPresentation(nsPresContext* aPresContext,
                                     nsMediaQueryResultCacheKey& aKey) override;
 
+  bool UseForPresentation(nsPresContext* aPresContext);
+
   enum Function {
     eURL,
     eURLPrefix,
@@ -408,7 +410,7 @@ public:
 
   NS_IMETHOD GetParentRule(nsIDOMCSSRule **aParent) override;
   void DropReference() { mRule = nullptr; }
-  virtual mozilla::css::Declaration* GetCSSDeclaration(bool aAllocate) override;
+  virtual mozilla::css::Declaration* GetCSSDeclaration(Operation aOperation) override;
   virtual nsresult SetCSSDeclaration(mozilla::css::Declaration* aDecl) override;
   virtual void GetCSSParsingEnvironment(CSSParsingEnvironment& aCSSParseEnv) override;
   virtual nsIDocument* DocToUpdate() override;
@@ -541,7 +543,7 @@ public:
 
   NS_IMETHOD GetParentRule(nsIDOMCSSRule **aParent) override;
   void DropReference() { mRule = nullptr; }
-  virtual mozilla::css::Declaration* GetCSSDeclaration(bool aAllocate) override;
+  virtual mozilla::css::Declaration* GetCSSDeclaration(Operation aOperation) override;
   virtual nsresult SetCSSDeclaration(mozilla::css::Declaration* aDecl) override;
   virtual void GetCSSParsingEnvironment(CSSParsingEnvironment& aCSSParseEnv) override;
   virtual nsIDocument* DocToUpdate() override;

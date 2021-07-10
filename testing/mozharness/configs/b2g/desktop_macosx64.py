@@ -37,9 +37,9 @@ config = {
 
     #########################################################################
     ###### 64 bit specific ######
-    'base_name': 'B2G_%(branch)s_macosx64_goanna',
-    'platform': 'macosx64_goanna',
-    'stage_platform': 'macosx64_goanna',
+    'base_name': 'B2G_%(branch)s_macosx64_gecko',
+    'platform': 'macosx64_gecko',
+    'stage_platform': 'macosx64_gecko',
     'stage_product': 'b2g',
     'env': {
         'MOZBUILD_STATE_PATH': os.path.join(os.getcwd(), '.mozbuild'),
@@ -73,7 +73,7 @@ config = {
         'MINIDUMP_SAVE_PATH': '%(base_work_dir)s/minidumps',
     },
     'purge_minsize': 12,
-    'src_mozconfig': 'b2g/config/mozconfigs/macosx64_goanna/nightly',
+    'src_mozconfig': 'b2g/config/mozconfigs/macosx64_gecko/nightly',
     'tooltool_manifest_src': 'b2g/config/tooltool-manifests/macosx64/releng.manifest',
     #########################################################################
 }

@@ -9,10 +9,10 @@ const { Promise } = require("resource://gre/modules/Promise.jsm");
 const { Task } = require("resource://gre/modules/Task.jsm");
 const { getColor } = require("devtools/shared/theme");
 const EventEmitter = require("devtools/toolkit/event-emitter");
-const FrameUtils = require("devtools/shared/profiler/frame-utils");
+const FrameUtils = require("devtools/performance/frame-utils");
 
 loader.lazyRequireGetter(this, "CATEGORY_MAPPINGS",
-  "devtools/shared/profiler/global", true);
+  "devtools/performance/global", true);
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 const GRAPH_SRC = "chrome://global/content/devtools/graphs-frame.xhtml";
@@ -38,12 +38,28 @@ const OVERVIEW_HEADER_TEXT_PADDING_LEFT = 6; // px
 const OVERVIEW_HEADER_TEXT_PADDING_TOP = 5; // px
 const OVERVIEW_HEADER_TIMELINE_STROKE_COLOR = "rgba(128, 128, 128, 0.5)";
 
+const FLAME_GRAPH_BLOCK_HEIGHT = 15; // px
 const FLAME_GRAPH_BLOCK_BORDER = 1; // px
-const FLAME_GRAPH_BLOCK_TEXT_FONT_SIZE = 9; // px
-const FLAME_GRAPH_BLOCK_TEXT_FONT_FAMILY = "sans-serif";
+const FLAME_GRAPH_BLOCK_TEXT_FONT_SIZE = 10; // px
+const FLAME_GRAPH_BLOCK_TEXT_FONT_FAMILY = "message-box, Helvetica Neue, Helvetica, sans-serif";
 const FLAME_GRAPH_BLOCK_TEXT_PADDING_TOP = 0; // px
 const FLAME_GRAPH_BLOCK_TEXT_PADDING_LEFT = 3; // px
 const FLAME_GRAPH_BLOCK_TEXT_PADDING_RIGHT = 3; // px
+
+const PALLETTE_SIZE = 20; // Large enough number for a diverse pallette.
+const PALLETTE_HUE_OFFSET = Math.random() * 90;
+const PALLETTE_HUE_RANGE = 270;
+const PALLETTE_SATURATION = 100;
+const PALLETTE_BRIGHTNESS = 55;
+const PALLETTE_OPACITY = 0.35;
+
+const COLOR_PALLETTE = Array.from(Array(PALLETTE_SIZE)).map((_, i) => "hsla" +
+  "(" + ((PALLETTE_HUE_OFFSET + (i / PALLETTE_SIZE * PALLETTE_HUE_RANGE))|0 % 360) +
+  "," + PALLETTE_SATURATION + "%" +
+  "," + PALLETTE_BRIGHTNESS + "%" +
+  "," + PALLETTE_OPACITY +
+  ")"
+);
 
 /**
  * A flamegraph visualization. This implementation is responsable only with
@@ -931,23 +947,6 @@ FlameGraph.prototype = {
   }
 };
 
-const FLAME_GRAPH_BLOCK_HEIGHT = 12; // px
-
-const PALLETTE_SIZE = 10;
-const PALLETTE_HUE_OFFSET = Math.random() * 90;
-const PALLETTE_HUE_RANGE = 270;
-const PALLETTE_SATURATION = 100;
-const PALLETTE_BRIGHTNESS = 65;
-const PALLETTE_OPACITY = 0.55;
-
-const COLOR_PALLETTE = Array.from(Array(PALLETTE_SIZE)).map((_, i) => "hsla" +
-  "(" + ((PALLETTE_HUE_OFFSET + (i / PALLETTE_SIZE * PALLETTE_HUE_RANGE))|0 % 360) +
-  "," + PALLETTE_SATURATION + "%" +
-  "," + PALLETTE_BRIGHTNESS + "%" +
-  "," + PALLETTE_OPACITY +
-  ")"
-);
-
 /**
  * A collection of utility functions converting various data sources
  * into a format drawable by the FlameGraph.
@@ -1203,4 +1202,7 @@ let FlameGraphUtils = {
 
 exports.FlameGraph = FlameGraph;
 exports.FlameGraphUtils = FlameGraphUtils;
+exports.PALLETTE_SIZE = PALLETTE_SIZE;
 exports.FLAME_GRAPH_BLOCK_HEIGHT = FLAME_GRAPH_BLOCK_HEIGHT;
+exports.FLAME_GRAPH_BLOCK_TEXT_FONT_SIZE = FLAME_GRAPH_BLOCK_TEXT_FONT_SIZE;
+exports.FLAME_GRAPH_BLOCK_TEXT_FONT_FAMILY = FLAME_GRAPH_BLOCK_TEXT_FONT_FAMILY;

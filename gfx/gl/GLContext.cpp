@@ -14,6 +14,7 @@
 #include "GLBlitHelper.h"
 #include "GLReadTexImageHelper.h"
 
+#include "gfxCrashReporterUtils.h"
 #include "gfxUtils.h"
 #include "GLContextProvider.h"
 #include "GLTextureImage.h"
@@ -69,6 +70,7 @@ static const char *sExtensionNames[] = {
     "GL_ANGLE_instanced_arrays",
     "GL_ANGLE_texture_compression_dxt3",
     "GL_ANGLE_texture_compression_dxt5",
+    "GL_ANGLE_timer_query",
     "GL_APPLE_client_storage",
     "GL_APPLE_texture_range",
     "GL_APPLE_vertex_array_object",
@@ -95,6 +97,8 @@ static const char *sExtensionNames[] = {
     "GL_ARB_texture_non_power_of_two",
     "GL_ARB_texture_rectangle",
     "GL_ARB_texture_storage",
+    "GL_ARB_texture_swizzle",
+    "GL_ARB_timer_query",
     "GL_ARB_transform_feedback2",
     "GL_ARB_uniform_buffer_object",
     "GL_ARB_vertex_array_object",
@@ -103,6 +107,7 @@ static const char *sExtensionNames[] = {
     "GL_EXT_color_buffer_float",
     "GL_EXT_color_buffer_half_float",
     "GL_EXT_copy_texture",
+    "GL_EXT_disjoint_timer_query",
     "GL_EXT_draw_buffers",
     "GL_EXT_draw_buffers2",
     "GL_EXT_draw_instanced",
@@ -118,6 +123,7 @@ static const char *sExtensionNames[] = {
     "GL_EXT_read_format_bgra",
     "GL_EXT_robustness",
     "GL_EXT_sRGB",
+    "GL_EXT_sRGB_write_control",
     "GL_EXT_shader_texture_lod",
     "GL_EXT_texture3D",
     "GL_EXT_texture_compression_dxt1",
@@ -126,6 +132,7 @@ static const char *sExtensionNames[] = {
     "GL_EXT_texture_format_BGRA8888",
     "GL_EXT_texture_sRGB",
     "GL_EXT_texture_storage",
+    "GL_EXT_timer_query",
     "GL_EXT_transform_feedback",
     "GL_EXT_unpack_subimage",
     "GL_IMG_read_format",
@@ -343,7 +350,10 @@ ClearSymbols(GLLibraryLoader::SymLoadStruct *symbols)
 bool
 GLContext::InitWithPrefix(const char *prefix, bool trygl)
 {
+    ScopedGfxFeatureReporter reporter("GL Context");
+
     if (mInitialized) {
+        reporter.SetSuccessful();
         return true;
     }
 
@@ -784,7 +794,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
             }
         }
 
-        if (IsExtensionSupported(ARB_sync)) {
+        if (IsSupported(GLFeature::sync)) {
             SymLoadStruct syncSymbols[] = {
                 { (PRFuncPtr*) &mSymbols.fFenceSync,      { "FenceSync",      nullptr } },
                 { (PRFuncPtr*) &mSymbols.fIsSync,         { "IsSync",         nullptr } },
@@ -797,7 +807,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
             };
 
             if (!LoadSymbols(&syncSymbols[0], trygl, prefix)) {
-                NS_ERROR("GL supports ARB_sync without supplying its functions.");
+                NS_ERROR("GL supports sync without supplying its functions.");
 
                 MarkExtensionUnsupported(ARB_sync);
                 ClearSymbols(syncSymbols);
@@ -1037,6 +1047,26 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
             }
         }
 
+        if (IsSupported(GLFeature::query_counter)) {
+            SymLoadStruct coreSymbols[] = {
+                { (PRFuncPtr*) &mSymbols.fQueryCounter, { "QueryCounter", nullptr } },
+                END_SYMBOLS
+            };
+            SymLoadStruct extSymbols[] = {
+                { (PRFuncPtr*) &mSymbols.fQueryCounter, { "QueryCounterEXT", "QueryCounterANGLE", nullptr } },
+                END_SYMBOLS
+            };
+
+            bool useCore = IsFeatureProvidedByCoreSymbols(GLFeature::query_counter);
+
+            if (!LoadSymbols(useCore ? coreSymbols : extSymbols, trygl, prefix)) {
+                NS_ERROR("GL supports query counters without supplying its functions.");
+
+                MarkUnsupported(GLFeature::query_counter);
+                ClearSymbols(coreSymbols);
+            }
+        }
+
         if (IsSupported(GLFeature::query_objects)) {
             SymLoadStruct coreSymbols[] = {
                 { (PRFuncPtr*) &mSymbols.fBeginQuery, { "BeginQuery", nullptr } },
@@ -1050,13 +1080,13 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
             };
 
             SymLoadStruct extSymbols[] = {
-                { (PRFuncPtr*) &mSymbols.fBeginQuery, { "BeginQueryEXT", nullptr } },
-                { (PRFuncPtr*) &mSymbols.fGenQueries, { "GenQueriesEXT", nullptr } },
-                { (PRFuncPtr*) &mSymbols.fDeleteQueries, { "DeleteQueriesEXT", nullptr } },
-                { (PRFuncPtr*) &mSymbols.fEndQuery, { "EndQueryEXT", nullptr } },
-                { (PRFuncPtr*) &mSymbols.fGetQueryiv, { "GetQueryivEXT", nullptr } },
-                { (PRFuncPtr*) &mSymbols.fGetQueryObjectuiv, { "GetQueryObjectuivEXT", nullptr } },
-                { (PRFuncPtr*) &mSymbols.fIsQuery, { "IsQueryEXT", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fBeginQuery, { "BeginQueryEXT", "BeginQueryANGLE", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fGenQueries, { "GenQueriesEXT", "GenQueriesANGLE", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fDeleteQueries, { "DeleteQueriesEXT", "DeleteQueriesANGLE", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fEndQuery, { "EndQueryEXT", "EndQueryANGLE", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fGetQueryiv, { "GetQueryivEXT", "GetQueryivANGLE", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fGetQueryObjectuiv, { "GetQueryObjectuivEXT", "GetQueryObjectuivANGLE", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fIsQuery, { "IsQueryEXT", "IsQueryANGLE", nullptr } },
                 END_SYMBOLS
             };
 
@@ -1066,10 +1096,34 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
                 NS_ERROR("GL supports query objects without supplying its functions.");
 
                 MarkUnsupported(GLFeature::query_objects);
+                MarkUnsupported(GLFeature::get_query_object_i64v);
                 MarkUnsupported(GLFeature::get_query_object_iv);
                 MarkUnsupported(GLFeature::occlusion_query);
                 MarkUnsupported(GLFeature::occlusion_query_boolean);
                 MarkUnsupported(GLFeature::occlusion_query2);
+                ClearSymbols(coreSymbols);
+            }
+        }
+
+        if (IsSupported(GLFeature::get_query_object_i64v)) {
+            SymLoadStruct coreSymbols[] = {
+                { (PRFuncPtr*) &mSymbols.fGetQueryObjecti64v, { "GetQueryObjecti64v", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fGetQueryObjectui64v, { "GetQueryObjectui64v", nullptr } },
+                END_SYMBOLS
+            };
+
+            SymLoadStruct extSymbols[] = {
+                { (PRFuncPtr*) &mSymbols.fGetQueryObjecti64v, { "GetQueryObjecti64vEXT", "GetQueryObjecti64vANGLE", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fGetQueryObjectui64v, { "GetQueryObjectui64vEXT", "GetQueryObjectui64vANGLE", nullptr } },
+                END_SYMBOLS
+            };
+
+            bool useCore = IsFeatureProvidedByCoreSymbols(GLFeature::get_query_object_i64v);
+            if (!LoadSymbols(useCore ? coreSymbols : extSymbols, trygl, prefix)) {
+                NS_ERROR("GL supports 64 bit query object getters without supplying its functions.");
+
+                MarkUnsupported(GLFeature::get_query_object_i64v);
+                MarkUnsupported(GLFeature::query_counter);
                 ClearSymbols(coreSymbols);
             }
         }
@@ -1081,7 +1135,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
             };
 
             SymLoadStruct extSymbols[] = {
-                { (PRFuncPtr*) &mSymbols.fGetQueryObjectiv, { "GetQueryObjectivEXT", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fGetQueryObjectiv, { "GetQueryObjectivEXT", "GetQueryObjectivANGLE", nullptr } },
                 END_SYMBOLS
             };
 
@@ -1219,6 +1273,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
                 { (PRFuncPtr*) &mSymbols.fUniform3uiv, { "Uniform3uiv", "Uniform3uivEXT", nullptr } },
                 { (PRFuncPtr*) &mSymbols.fUniform4uiv, { "Uniform4uiv", "Uniform4uivEXT", nullptr } },
                 { (PRFuncPtr*) &mSymbols.fGetFragDataLocation, { "GetFragDataLocation", "GetFragDataLocationEXT", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fGetUniformuiv, { "GetUniformuiv", "GetUniformuivEXT", nullptr } },
                 END_SYMBOLS
             };
 
@@ -1510,6 +1565,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
                                  true);
         }
 
+        reporter.SetSuccessful();
     } else {
         // if initialization fails, ensure all symbols are zero, to avoid hard-to-understand bugs
         mSymbols.Zero();
@@ -2396,7 +2452,7 @@ GLBlitHelper*
 GLContext::BlitHelper()
 {
     if (!mBlitHelper) {
-        mBlitHelper = MakeUnique<GLBlitHelper>(this);
+        mBlitHelper.reset(new GLBlitHelper(this));
     }
 
     return mBlitHelper.get();

@@ -18,8 +18,8 @@
 #ifdef PR_LOGGING
 extern PRLogModuleInfo* GetMediaSourceLog();
 
-#define MSE_DEBUG(arg, ...) PR_LOG(GetMediaSourceLog(), PR_LOG_DEBUG, ("TrackBuffersManager(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
-#define MSE_DEBUGV(arg, ...) PR_LOG(GetMediaSourceLog(), PR_LOG_DEBUG + 1, ("TrackBuffersManager(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
+#define MSE_DEBUG(arg, ...) MOZ_LOG(GetMediaSourceLog(), mozilla::LogLevel::Debug, ("TrackBuffersManager(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
+#define MSE_DEBUGV(arg, ...) MOZ_LOG(GetMediaSourceLog(), mozilla::LogLevel::Verbose, ("TrackBuffersManager(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
 #else
 #define MSE_DEBUG(...)
 #define MSE_DEBUGV(...)
@@ -47,7 +47,7 @@ static Atomic<uint32_t> sStreamSourceID(0u);
 TrackBuffersManager::TrackBuffersManager(dom::SourceBufferAttributes* aAttributes,
                                          MediaSourceDecoder* aParentDecoder,
                                          const nsACString& aType)
-  : mInputBuffer(new MediaLargeByteBuffer)
+  : mInputBuffer(new MediaByteBuffer)
   , mAppendState(AppendState::WAITING_FOR_SEGMENT)
   , mBufferFull(false)
   , mFirstInitializationSegmentReceived(false)
@@ -73,7 +73,7 @@ TrackBuffersManager::~TrackBuffersManager()
 }
 
 bool
-TrackBuffersManager::AppendData(MediaLargeByteBuffer* aData,
+TrackBuffersManager::AppendData(MediaByteBuffer* aData,
                                 TimeUnit aTimestampOffset)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -309,8 +309,8 @@ TrackBuffersManager::CompleteResetParserState()
     CreateDemuxerforMIMEType();
     // Recreate our input buffer. We can't directly assign the initData buffer
     // to mInputBuffer as it will get modified in the Segment Parser Loop.
-    mInputBuffer = new MediaLargeByteBuffer;
-    mInputBuffer->AppendElements(*mInitData);
+    mInputBuffer = new MediaByteBuffer;
+    mInputBuffer->AppendElements(*mInitData, fallible);
   }
   RecreateParser(true);
 
@@ -525,7 +525,7 @@ TrackBuffersManager::AppendIncomingBuffers()
   for (auto& incomingBuffer : mIncomingBuffers) {
     if (!mInputBuffer) {
       mInputBuffer = incomingBuffer.first();
-    } else if (!mInputBuffer->AppendElements(*incomingBuffer.first())) {
+    } else if (!mInputBuffer->AppendElements(*incomingBuffer.first(), fallible)) {
       RejectAppend(NS_ERROR_OUT_OF_MEMORY, __func__);
     }
     mTimestampOffset = incomingBuffer.second();
@@ -704,12 +704,12 @@ TrackBuffersManager::CreateDemuxerforMIMEType()
 }
 
 void
-TrackBuffersManager::AppendDataToCurrentInputBuffer(MediaLargeByteBuffer* aData)
+TrackBuffersManager::AppendDataToCurrentInputBuffer(MediaByteBuffer* aData)
 {
   MOZ_ASSERT(mCurrentInputBuffer);
   int64_t offset = mCurrentInputBuffer->GetLength();
   mCurrentInputBuffer->AppendData(aData);
-  // A MediaLargeByteBuffer has a maximum size of 2GB.
+  // A MediaByteBuffer has a maximum size of 2GiB.
   mInputDemuxer->NotifyDataArrived(uint32_t(aData->Length()), offset);
 }
 
@@ -978,8 +978,8 @@ TrackBuffersManager::CodedFrameProcessing()
     // The mediaRange is offset by the init segment position previously added.
     uint32_t length =
       mediaRange.mEnd - (mProcessedInput - mInputBuffer->Length());
-    nsRefPtr<MediaLargeByteBuffer> segment = new MediaLargeByteBuffer;
-    if (!segment->AppendElements(mInputBuffer->Elements(), length)) {
+    nsRefPtr<MediaByteBuffer> segment = new MediaByteBuffer;
+    if (!segment->AppendElements(mInputBuffer->Elements(), length, fallible)) {
       return CodedFrameProcessingPromise::CreateAndReject(NS_ERROR_OUT_OF_MEMORY, __func__);
     }
     AppendDataToCurrentInputBuffer(segment);

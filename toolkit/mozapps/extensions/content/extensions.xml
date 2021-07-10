@@ -853,8 +853,7 @@
           <xul:hbox class="basicinfo-container">
               <xul:hbox class="name-container">
                 <xul:label anonid="name" class="name" crop="end" flex="1"
-                           xbl:inherits="value=name,tooltiptext=name"/>
-                <xul:label anonid="version" class="version"/>
+                           tooltip="addonitem-tooltip" xbl:inherits="value=name"/>
                 <xul:label class="nativeIndicator nativeAddon" value="●" tooltiptext="&addon.nativeAddon;"/>
                 <xul:label class="nativeIndicator compatAddon" value="●" tooltiptext="&addon.compatAddon;"/>
                 <xul:label class="disabled-postfix" value="&addon.disabled.postfix;"/>
@@ -1039,9 +1038,6 @@
         document.getAnonymousElementByAttribute(this, "anonid",
                                                 "info");
       </field>
-      <field name="_version">
-        document.getAnonymousElementByAttribute(this, "anonid", "version");
-      </field>
       <field name="_experimentState">
         document.getAnonymousElementByAttribute(this, "anonid", "experiment-state");
       </field>
@@ -1177,11 +1173,6 @@
             this._icon.src = iconURL;
           else
             this._icon.src = "";
-
-          if (shouldShowVersionNumber(this.mAddon))
-            this._version.value = this.mAddon.version;
-          else
-            this._version.hidden = true;
 
           if (this.mAddon.description)
             this._description.value = this.mAddon.description;
@@ -1468,14 +1459,6 @@
               this._experimentTime.value = timeMessage;
             }
           }
-        ]]></body>
-      </method>
-
-      <method name="_updateUpgradeInfo">
-        <body><![CDATA[
-          // Only update the version string if we're displaying the upgrade info
-          if (this.hasAttribute("upgrade") && shouldShowVersionNumber(this.mAddon))
-            this._version.value = this.mManualUpdate.version;
         ]]></body>
       </method>
 
@@ -1769,7 +1752,6 @@
 
           this.mManualUpdate = aInstall;
           this._showStatus("update-available");
-          this._updateUpgradeInfo();
         ]]></body>
       </method>
 
@@ -1971,8 +1953,7 @@
         </xul:vbox>
         <xul:vbox class="fade name-outer-container" flex="1">
           <xul:hbox class="name-container">
-            <xul:label anonid="name" class="name" crop="end"/>
-            <xul:label anonid="version" class="version" hidden="true"/>
+            <xul:label anonid="name" class="name" crop="end" tooltip="addonitem-tooltip"/>
           </xul:hbox>
         </xul:vbox>
         <xul:vbox class="install-status-container">
@@ -1993,9 +1974,6 @@
       </field>
       <field name="_name">
         document.getAnonymousElementByAttribute(this, "anonid", "name");
-      </field>
-      <field name="_version">
-        document.getAnonymousElementByAttribute(this, "anonid", "version");
       </field>
       <field name="_warning">
         document.getAnonymousElementByAttribute(this, "anonid", "warning");
@@ -2024,14 +2002,6 @@
             this._icon.src = this.mAddon.iconURL ||
                              (this.mInstall ? this.mInstall.iconURL : "");
             this._name.value = this.mAddon.name;
-
-            if (this.mAddon.version) {
-              this._version.value = this.mAddon.version;
-              this._version.hidden = false;
-            } else {
-              this._version.hidden = true;
-            }
-
           } else {
             this._icon.src = this.mInstall.iconURL;
             // AddonInstall.name isn't always available - fallback to filename
@@ -2044,13 +2014,6 @@
                        null, null);
               url.QueryInterface(Components.interfaces.nsIURL);
               this._name.value = url.fileName;
-            }
-
-            if (this.mInstall.version) {
-              this._version.value = this.mInstall.version;
-              this._version.hidden = false;
-            } else {
-              this._version.hidden = true;
             }
           }
 

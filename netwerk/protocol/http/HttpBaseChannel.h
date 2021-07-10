@@ -248,6 +248,7 @@ public:
     const NetAddr& GetPeerAddr() { return mPeerAddr; }
 
     nsresult OverrideSecurityInfo(nsISupports* aSecurityInfo);
+    void OverrideURI(nsIURI* aRedirectedURI);
 
 public: /* Necko internal use only... */
     bool IsNavigation();
@@ -478,7 +479,7 @@ protected:
 template <class T>
 nsresult HttpAsyncAborter<T>::AsyncAbort(nsresult status)
 {
-  PR_LOG(gHttpLog, 4,
+  MOZ_LOG(gHttpLog, LogLevel::Debug,
          ("HttpAsyncAborter::AsyncAbort [this=%p status=%x]\n", mThis, status));
 
   mThis->mStatus = status;
@@ -495,7 +496,7 @@ inline void HttpAsyncAborter<T>::HandleAsyncAbort()
   NS_PRECONDITION(!mCallOnResume, "How did that happen?");
 
   if (mThis->mSuspendCount) {
-    PR_LOG(gHttpLog, 4,
+    MOZ_LOG(gHttpLog, LogLevel::Debug,
            ("Waiting until resume to do async notification [this=%p]\n", mThis));
     mCallOnResume = &T::HandleAsyncAbort;
     return;

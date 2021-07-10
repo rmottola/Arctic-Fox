@@ -8,6 +8,8 @@
 
 #include "nsTransitionManager.h"
 #include "nsAnimationManager.h"
+#include "mozilla/dom/CSSTransitionBinding.h"
+
 #include "nsIContent.h"
 #include "nsStyleContext.h"
 #include "nsCSSProps.h"
@@ -20,6 +22,7 @@
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/ContentEvents.h"
 #include "mozilla/StyleAnimationValue.h"
+#include "mozilla/dom/DocumentTimeline.h"
 #include "mozilla/dom/Element.h"
 #include "nsIFrame.h"
 #include "Layers.h"
@@ -38,16 +41,6 @@ using mozilla::dom::KeyframeEffectReadOnly;
 
 using namespace mozilla;
 using namespace mozilla::css;
-
-const nsString&
-ElementPropertyTransition::Name() const
-{
-   if (!mName.Length()) {
-     const_cast<ElementPropertyTransition*>(this)->mName =
-       NS_ConvertUTF8toUTF16(nsCSSProps::GetStringValue(TransitionProperty()));
-   }
-   return dom::KeyframeEffectReadOnly::Name();
-}
 
 double
 ElementPropertyTransition::CurrentValuePortion() const
@@ -85,7 +78,25 @@ ElementPropertyTransition::CurrentValuePortion() const
  * CSSTransition                                                             *
  *****************************************************************************/
 
-mozilla::dom::AnimationPlayState
+JSObject*
+CSSTransition::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
+{
+  return dom::CSSTransitionBinding::Wrap(aCx, this, aGivenProto);
+}
+
+void
+CSSTransition::GetTransitionProperty(nsString& aRetVal) const
+{
+  // Once we make the effect property settable (bug 1049975) we will need
+  // to store the transition property on the CSSTransition itself but for
+  // now we can just query the effect.
+  MOZ_ASSERT(mEffect && mEffect->AsTransition(),
+             "Transitions should have a transition effect");
+  nsCSSProperty prop = mEffect->AsTransition()->TransitionProperty();
+  aRetVal = NS_ConvertUTF8toUTF16(nsCSSProps::GetStringValue(prop));
+}
+
+AnimationPlayState
 CSSTransition::PlayStateFromJS() const
 {
   FlushStyle();
@@ -93,10 +104,10 @@ CSSTransition::PlayStateFromJS() const
 }
 
 void
-CSSTransition::PlayFromJS()
+CSSTransition::PlayFromJS(ErrorResult& aRv)
 {
   FlushStyle();
-  Animation::PlayFromJS();
+  Animation::PlayFromJS(aRv);
 }
 
 CommonAnimationManager*
@@ -108,6 +119,61 @@ CSSTransition::GetAnimationManager() const
   }
 
   return context->TransitionManager();
+}
+
+nsCSSProperty
+CSSTransition::TransitionProperty() const
+{
+  // FIXME: Once we support replacing/removing the effect (bug 1049975)
+  // we'll need to store the original transition property so we keep
+  // returning the same value in that case.
+  dom::KeyframeEffectReadOnly* effect = GetEffect();
+  MOZ_ASSERT(effect && effect->AsTransition(),
+             "Transition should have a transition effect");
+  return effect->AsTransition()->TransitionProperty();
+}
+
+bool
+CSSTransition::HasLowerCompositeOrderThan(const Animation& aOther) const
+{
+  // 0. Object-equality case
+  if (&aOther == this) {
+    return false;
+  }
+
+  // 1. Transitions sort lowest
+  const CSSTransition* otherTransition = aOther.AsCSSTransition();
+  if (!otherTransition) {
+    return true;
+  }
+
+  // 2. CSS transitions that correspond to a transition-property property sort
+  // lower than CSS transitions owned by script.
+  if (!IsUsingCustomCompositeOrder()) {
+    return !aOther.IsUsingCustomCompositeOrder() ?
+           Animation::HasLowerCompositeOrderThan(aOther) :
+           false;
+  }
+  if (!aOther.IsUsingCustomCompositeOrder()) {
+    return true;
+  }
+
+  // 3. Sort by document order
+  MOZ_ASSERT(mOwningElement.IsSet() && otherTransition->OwningElement().IsSet(),
+             "Transitions using custom composite order should have an owning "
+             "element");
+  if (!mOwningElement.Equals(otherTransition->OwningElement())) {
+    return mOwningElement.LessThan(otherTransition->OwningElement());
+  }
+
+  // 4. (Same element and pseudo): Sort by transition generation
+  if (mSequenceNum != otherTransition->mSequenceNum) {
+    return mSequenceNum < otherTransition->mSequenceNum;
+  }
+
+  // 5. (Same transition generation): Sort by transition property
+  return nsCSSProps::GetStringValue(TransitionProperty()) <
+         nsCSSProps::GetStringValue(otherTransition->TransitionProperty());
 }
 
 /*****************************************************************************
@@ -341,9 +407,9 @@ nsTransitionManager::StyleContextChanged(dom::Element *aElement,
           currentValue != segment.mToValue) {
         // stop the transition
         if (!anim->GetEffect()->IsFinishedTransition()) {
-          anim->CancelFromStyle();
           collection->UpdateAnimationGeneration(mPresContext);
         }
+        anim->CancelFromStyle();
         animations.RemoveElementAt(i);
       }
     } while (i != 0);
@@ -566,7 +632,13 @@ nsTransitionManager::ConsiderStartingTransition(
   segment.mToKey = 1;
   segment.mTimingFunction.Init(tf);
 
-  nsRefPtr<CSSTransition> animation = new CSSTransition(timeline);
+  nsRefPtr<CSSTransition> animation =
+    new CSSTransition(mPresContext->Document()->GetScopeObject());
+  animation->SetOwningElement(
+    OwningElementRef(*aElement, aNewStyleContext->GetPseudoType()));
+  animation->SetTimeline(timeline);
+  animation->SetCreationSequence(
+    mPresContext->RestyleManager()->GetAnimationGeneration());
   // The order of the following two calls is important since PlayFromStyle
   // will add the animation to the PendingAnimationTracker of its effect's
   // document. When we come to make effect writeable (bug 1049975) we should
@@ -652,6 +724,7 @@ nsTransitionManager::PruneCompletedTransitions(mozilla::dom::Element* aElement,
     if (!ExtractComputedValueForTransition(prop.mProperty, aNewStyleContext,
                                            currentValue) ||
         currentValue != segment.mToValue) {
+      anim->CancelFromStyle();
       animations.RemoveElementAt(i);
     }
   } while (i != 0);

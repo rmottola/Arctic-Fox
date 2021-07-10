@@ -20,6 +20,7 @@
 #include "nsILoadContext.h"
 #include "nsIWeakReferenceUtils.h"
 #include "nsIInterfaceRequestor.h"
+#include "mozilla/dom/ChannelInfo.h"
 
 #define BEGIN_WORKERS_NAMESPACE \
   namespace mozilla { namespace dom { namespace workers {
@@ -198,6 +199,11 @@ enum WorkerPreference
   WORKERPREF_DUMP = 0, // browser.dom.window.dump.enabled
   WORKERPREF_DOM_CACHES, // dom.caches.enabled
   WORKERPREF_SERVICEWORKERS, // dom.serviceWorkers.enabled
+  WORKERPREF_INTERCEPTION_ENABLED, // dom.serviceWorkers.interception.enabled
+  WORKERPREF_DOM_WORKERNOTIFICATION, // dom.webnotifications.workers.enabled
+  WORKERPREF_DOM_CACHES_TESTING, // dom.caches.testing.enabled
+  WORKERPREF_SERVICEWORKERS_TESTING, // dom.serviceWorkers.testing.enabled
+  WORKERPREF_INTERCEPTION_OPAQUE_ENABLED, // dom.serviceWorkers.interception.opaque.enabled
   WORKERPREF_COUNT
 };
 
@@ -244,7 +250,10 @@ struct WorkerLoadInfo
 
   nsString mServiceWorkerCacheName;
 
+  ChannelInfo mChannelInfo;
+
   uint64_t mWindowID;
+  uint64_t mServiceWorkerID;
 
   bool mFromWindow;
   bool mEvalAllowed;
@@ -254,6 +263,8 @@ struct WorkerLoadInfo
   bool mIsInPrivilegedApp;
   bool mIsInCertifiedApp;
   bool mIndexedDBAllowed;
+  bool mPrivateBrowsing;
+  bool mServiceWorkersTestingInWindow;
 
   WorkerLoadInfo();
   ~WorkerLoadInfo();
@@ -321,7 +332,7 @@ public:
 };
 
 WorkerCrossThreadDispatcher*
-GetWorkerCrossThreadDispatcher(JSContext* aCx, jsval aWorker);
+GetWorkerCrossThreadDispatcher(JSContext* aCx, JS::Value aWorker);
 
 // Random unique constant to facilitate JSPrincipal debugging
 const uint32_t kJSPrincipalsDebugToken = 0x7e2df9d2;

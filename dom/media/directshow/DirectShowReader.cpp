@@ -28,7 +28,7 @@ GetDirectShowLog() {
   return log;
 }
 
-#define LOG(...) PR_LOG(GetDirectShowLog(), PR_LOG_DEBUG, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(GetDirectShowLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 DirectShowReader::DirectShowReader(AbstractMediaDecoder* aDecoder)
   : MediaDecoderReader(aDecoder),
@@ -84,7 +84,7 @@ ParseMP3Headers(MP3FrameParser *aParser, MediaResource *aResource)
       return NS_ERROR_FAILURE;
     }
 
-    aParser->Parse(buffer, bytesRead, offset);
+    aParser->Parse(reinterpret_cast<uint8_t*>(buffer), bytesRead, offset);
     offset += bytesRead;
   }
 
@@ -401,19 +401,25 @@ DirectShowReader::SeekInternal(int64_t aTargetUs)
 }
 
 void
-DirectShowReader::NotifyDataArrived(const char* aBuffer, uint32_t aLength, int64_t aOffset)
+DirectShowReader::NotifyDataArrivedInternal(uint32_t aLength, int64_t aOffset)
 {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(OnTaskQueue());
+  if (!mMP3FrameParser.NeedsData()) {
+    return;
+  }
+
+  nsRefPtr<MediaByteBuffer> bytes = mDecoder->GetResource()->SilentReadAt(aOffset, aLength);
+  NS_ENSURE_TRUE_VOID(bytes);
+  mMP3FrameParser.Parse(bytes->Elements(), aLength, aOffset);
   if (!mMP3FrameParser.IsMP3()) {
     return;
   }
-  mMP3FrameParser.Parse(aBuffer, aLength, aOffset);
+
   int64_t duration = mMP3FrameParser.GetDuration();
   if (duration != mDuration) {
-    mDuration = duration;
     MOZ_ASSERT(mDecoder);
-    ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-    mDecoder->UpdateEstimatedMediaDuration(mDuration);
+    mDuration = duration;
+    mDecoder->DispatchUpdateEstimatedMediaDuration(mDuration);
   }
 }
 

@@ -25,9 +25,9 @@ namespace mozilla {
 //#define SEEK_LOGGING
 
 extern PRLogModuleInfo* gMediaDecoderLog;
-#define LOG(type, msg) PR_LOG(gMediaDecoderLog, type, msg)
+#define LOG(type, msg) MOZ_LOG(gMediaDecoderLog, type, msg)
 #ifdef SEEK_LOGGING
-#define SEEK_LOG(type, msg) PR_LOG(gMediaDecoderLog, type, msg)
+#define SEEK_LOG(type, msg) MOZ_LOG(gMediaDecoderLog, type, msg)
 #else
 #define SEEK_LOG(type, msg)
 #endif
@@ -252,7 +252,7 @@ nsRefPtr<MediaDecoderReader::SeekPromise>
 WaveReader::Seek(int64_t aTarget, int64_t aEndTime)
 {
   MOZ_ASSERT(OnTaskQueue());
-  LOG(PR_LOG_DEBUG, ("%p About to seek to %lld", mDecoder, aTarget));
+  LOG(LogLevel::Debug, ("%p About to seek to %lld", mDecoder, aTarget));
 
   if (NS_FAILED(ResetDecode())) {
     return SeekPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
@@ -274,6 +274,7 @@ WaveReader::Seek(int64_t aTarget, int64_t aEndTime)
 
 media::TimeIntervals WaveReader::GetBuffered()
 {
+  MOZ_ASSERT(OnTaskQueue());
   if (!mInfo.HasAudio()) {
     return media::TimeIntervals();
   }

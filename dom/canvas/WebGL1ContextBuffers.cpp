@@ -35,18 +35,18 @@ WebGL1Context::ValidateBufferIndexedTarget(GLenum target, const char* info)
     return false;
 }
 
-/** Buffer and Target validation for BindBuffer */
 bool
-WebGL1Context::ValidateBufferForTarget(GLenum target, WebGLBuffer* buffer,
-                                       const char* info)
+WebGL1Context::ValidateBufferUsageEnum(GLenum usage, const char* info)
 {
-    if (!buffer)
+    switch (usage) {
+    case LOCAL_GL_STREAM_DRAW:
+    case LOCAL_GL_STATIC_DRAW:
+    case LOCAL_GL_DYNAMIC_DRAW:
         return true;
-
-    if (buffer->HasEverBeenBound() && target != buffer->Target()) {
-        ErrorInvalidOperation("%s: buffer already bound to a different target", info);
-        return false;
+    default:
+        break;
     }
 
-    return true;
+    ErrorInvalidEnumInfo(info, usage);
+    return false;
 }

@@ -21,9 +21,9 @@
 
 #include "jsfriendapi.h"
 #include "mozilla/ArrayUtils.h"
-#include "mozilla/ipc/UnixSocketConnector.h"
 #include "nsTArray.h"
 #include "nsThreadUtils.h" // For NS_IsMainThread.
+#include "RilConnector.h"
 
 USING_WORKERS_NAMESPACE
 using namespace mozilla::ipc;
@@ -32,11 +32,7 @@ namespace {
 
 static const char RIL_SOCKET_NAME[] = "/dev/socket/rilproxy";
 
-// Network port to connect to for adb forwarded sockets when doing
-// desktop development.
-static const uint32_t RIL_TEST_PORT = 6200;
-
-static nsTArray<nsRefPtr<mozilla::ipc::RilConsumer> > sRilConsumers;
+static nsTArray<nsAutoPtr<mozilla::ipc::RilConsumer>> sRilConsumers;
 
 class ConnectWorkerToRIL final : public WorkerTask
 {
@@ -57,15 +53,13 @@ public:
   {
     MOZ_ASSERT(NS_IsMainThread());
 
-    if (sRilConsumers.Length() <= mClientId ||
-        !sRilConsumers[mClientId] ||
-        sRilConsumers[mClientId]->GetConnectionStatus() != SOCKET_CONNECTED) {
-      // Probably shuting down.
+    if (sRilConsumers.Length() <= mClientId || !sRilConsumers[mClientId]) {
+      // Probably shutting down.
       delete mRawData;
       return NS_OK;
     }
 
-    sRilConsumers[mClientId]->SendSocketData(mRawData);
+    sRilConsumers[mClientId]->Send(mRawData);
     return NS_OK;
   }
 
@@ -199,109 +193,6 @@ DispatchRILEvent::RunTask(JSContext* aCx)
   return JS_CallFunctionName(aCx, obj, "onRILMessage", args, &rval);
 }
 
-class RilConnector final : public mozilla::ipc::UnixSocketConnector
-{
-public:
-  RilConnector(unsigned long aClientId)
-    : mClientId(aClientId)
-  { }
-
-  int Create() override;
-  bool CreateAddr(bool aIsServer,
-                  socklen_t& aAddrSize,
-                  sockaddr_any& aAddr,
-                  const char* aAddress) override;
-  bool SetUp(int aFd) override;
-  bool SetUpListenSocket(int aFd) override;
-  void GetSocketAddr(const sockaddr_any& aAddr,
-                     nsAString& aAddrStr) override;
-
-private:
-  unsigned long mClientId;
-};
-
-int
-RilConnector::Create()
-{
-  MOZ_ASSERT(!NS_IsMainThread());
-
-  int fd = -1;
-
-#if defined(MOZ_WIDGET_GONK)
-  fd = socket(AF_LOCAL, SOCK_STREAM, 0);
-#else
-  // If we can't hit a local loopback, fail later in connect.
-  fd = socket(AF_INET, SOCK_STREAM, 0);
-#endif
-
-  if (fd < 0) {
-    NS_WARNING("Could not open ril socket!");
-    return -1;
-  }
-
-  if (!SetUp(fd)) {
-    NS_WARNING("Could not set up socket!");
-  }
-  return fd;
-}
-
-bool
-RilConnector::CreateAddr(bool aIsServer,
-                         socklen_t& aAddrSize,
-                         sockaddr_any& aAddr,
-                         const char* aAddress)
-{
-  // We never open ril socket as server.
-  MOZ_ASSERT(!aIsServer);
-  uint32_t af;
-#if defined(MOZ_WIDGET_GONK)
-  af = AF_LOCAL;
-#else
-  af = AF_INET;
-#endif
-  switch (af) {
-  case AF_LOCAL:
-    aAddr.un.sun_family = af;
-    if(strlen(aAddress) > sizeof(aAddr.un.sun_path)) {
-      NS_WARNING("Address too long for socket struct!");
-      return false;
-    }
-    strcpy((char*)&aAddr.un.sun_path, aAddress);
-    aAddrSize = strlen(aAddress) + offsetof(struct sockaddr_un, sun_path) + 1;
-    break;
-  case AF_INET:
-    aAddr.in.sin_family = af;
-    aAddr.in.sin_port = htons(RIL_TEST_PORT + mClientId);
-    aAddr.in.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    aAddrSize = sizeof(sockaddr_in);
-    break;
-  default:
-    NS_WARNING("Socket type not handled by connector!");
-    return false;
-  }
-  return true;
-}
-
-bool
-RilConnector::SetUp(int aFd)
-{
-  // Nothing to do here.
-  return true;
-}
-
-bool
-RilConnector::SetUpListenSocket(int aFd)
-{
-  // Nothing to do here.
-  return true;
-}
-
-void
-RilConnector::GetSocketAddr(const sockaddr_any& aAddr, nsAString& aAddrStr)
-{
-  MOZ_CRASH("This should never be called!");
-}
-
 } // namespace
 
 namespace mozilla {
@@ -310,7 +201,6 @@ namespace ipc {
 RilConsumer::RilConsumer(unsigned long aClientId,
                          WorkerCrossThreadDispatcher* aDispatcher)
   : mDispatcher(aDispatcher)
-  , mClientId(aClientId)
   , mShutdown(false)
 {
   // Only append client id after RIL_SOCKET_NAME when it's not connected to
@@ -324,7 +214,8 @@ RilConsumer::RilConsumer(unsigned long aClientId,
     mAddress = addr_un.sun_path;
   }
 
-  Connect(new RilConnector(mClientId), mAddress.get());
+  mSocket = new StreamSocket(this, aClientId);
+  mSocket->Connect(new RilConnector(mAddress, aClientId));
 }
 
 nsresult
@@ -357,7 +248,7 @@ RilConsumer::Shutdown()
   MOZ_ASSERT(NS_IsMainThread());
 
   for (unsigned long i = 0; i < sRilConsumers.Length(); i++) {
-    nsRefPtr<RilConsumer>& instance = sRilConsumers[i];
+    nsAutoPtr<RilConsumer> instance(sRilConsumers[i]);
     if (!instance) {
       continue;
     }
@@ -369,42 +260,58 @@ RilConsumer::Shutdown()
 }
 
 void
-RilConsumer::ReceiveSocketData(nsAutoPtr<UnixSocketRawData>& aMessage)
+RilConsumer::Send(UnixSocketRawData* aRawData)
+{
+  if (!mSocket || mSocket->GetConnectionStatus() != SOCKET_CONNECTED) {
+    // Probably shutting down.
+    delete aRawData;
+    return;
+  }
+  mSocket->SendSocketData(aRawData);
+}
+
+void
+RilConsumer::Close()
+{
+  mSocket->Close();
+  mSocket = nullptr;
+}
+
+// |StreamSocketConnector|
+
+void
+RilConsumer::ReceiveSocketData(int aIndex,
+                               nsAutoPtr<UnixSocketBuffer>& aBuffer)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  nsRefPtr<DispatchRILEvent> dre(new DispatchRILEvent(mClientId, aMessage.forget()));
+  nsRefPtr<DispatchRILEvent> dre(new DispatchRILEvent(aIndex, aBuffer.forget()));
   mDispatcher->PostTask(dre);
 }
 
 void
-RilConsumer::OnConnectSuccess()
+RilConsumer::OnConnectSuccess(int aIndex)
 {
   // Nothing to do here.
-  CHROMIUM_LOG("RIL[%lu]: %s\n", mClientId, __FUNCTION__);
+  CHROMIUM_LOG("RIL[%d]: %s\n", aIndex, __FUNCTION__);
 }
 
 void
-RilConsumer::OnConnectError()
+RilConsumer::OnConnectError(int aIndex)
 {
-  CHROMIUM_LOG("RIL[%lu]: %s\n", mClientId, __FUNCTION__);
+  CHROMIUM_LOG("RIL[%d]: %s\n", aIndex, __FUNCTION__);
   Close();
 }
 
 void
-RilConsumer::OnDisconnect()
+RilConsumer::OnDisconnect(int aIndex)
 {
-  CHROMIUM_LOG("RIL[%lu]: %s\n", mClientId, __FUNCTION__);
-  if (!mShutdown) {
-    Connect(new RilConnector(mClientId), mAddress.get(),
-            GetSuggestedConnectDelayMs());
+  CHROMIUM_LOG("RIL[%d]: %s\n", aIndex, __FUNCTION__);
+  if (mShutdown) {
+    return;
   }
-}
-
-ConnectionOrientedSocketIO*
-RilConsumer::GetIO()
-{
-  return PrepareAccept(new RilConnector(mClientId));
+  mSocket->Connect(new RilConnector(mAddress, aIndex),
+                   mSocket->GetSuggestedConnectDelayMs());
 }
 
 } // namespace ipc

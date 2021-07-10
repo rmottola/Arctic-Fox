@@ -120,7 +120,6 @@
       oncommand="OpenBrowserWindow({remote: false});"/>
     <command id="History:UndoCloseTab" oncommand="undoCloseTab();"/>
     <command id="History:UndoCloseWindow" oncommand="undoCloseWindow();"/>
-    <command id="Browser:ToggleAddonBar" oncommand="toggleAddonBar();"/>
   </commandset>
 
   <commandset id="placesCommands">
@@ -442,8 +441,6 @@
 #expand    <key id="key_selectTab7" oncommand="gBrowser.selectTabAtIndex(6, event);" key="7" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
 #expand    <key id="key_selectTab8" oncommand="gBrowser.selectTabAtIndex(7, event);" key="8" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
 #expand    <key id="key_selectLastTab" oncommand="gBrowser.selectTabAtIndex(-1, event);" key="9" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
-
-    <key id="key_toggleAddonBar" command="Browser:ToggleAddonBar" key="&toggleAddonBarCmd.key;" modifiers="accel"/>
 
   </keyset>
 

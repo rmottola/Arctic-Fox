@@ -182,11 +182,9 @@ AltSvcMapping::GetConnectionInfo(nsHttpConnectionInfo **outCI,
                                  nsProxyInfo *pi)
 {
   nsRefPtr<nsHttpConnectionInfo> ci =
-    new nsHttpConnectionInfo(mAlternateHost, mAlternatePort, mNPNToken,
-                             mUsername, pi, mOriginHost, mOriginPort);
-  if (!mHttps) {
-    ci->SetRelaxed(true);
-  }
+    new nsHttpConnectionInfo(mOriginHost, mOriginPort, mNPNToken,
+                             mUsername, pi, mAlternateHost, mAlternatePort);
+  ci->SetInsecureScheme(!mHttps);
   ci->SetPrivate(mPrivate);
   ci.forget(outCI);
 }
@@ -284,6 +282,13 @@ public:
          this, socketControl.get(), bypassAuth));
 
     if (bypassAuth) {
+      if (mMapping->HTTPS()) {
+        MOZ_ASSERT(false); // cannot happen but worth the runtime sanity check
+        LOG(("AltSvcTransaction::MaybeValidate %p"
+             "somehow indicates bypassAuth on https:// origin\n", this));
+        return;
+      }
+
       LOG(("AltSvcTransaction::MaybeValidate() %p "
            "validating alternate service because relaxed", this));
       mMapping->SetValidated(true);
@@ -463,6 +468,14 @@ AltSvcCache::ClearHostMapping(const nsACString &host, int32_t port)
   existing = mHash.GetWeak(key);
   if (existing) {
     existing->SetExpired();
+  }
+}
+
+void
+AltSvcCache::ClearHostMapping(nsHttpConnectionInfo *ci)
+{
+  if (!ci->GetOrigin().IsEmpty()) {
+    ClearHostMapping(ci->GetOrigin(), ci->OriginPort());
   }
 }
 

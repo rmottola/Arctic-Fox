@@ -27,7 +27,8 @@ class AudioNodeStream;
  * pointers can be different (e.g. if the buffers are contained inside
  * some malloced object).
  */
-class ThreadSharedFloatArrayBufferList : public ThreadSharedObject {
+class ThreadSharedFloatArrayBufferList final : public ThreadSharedObject
+{
 public:
   /**
    * Construct with null data.
@@ -37,7 +38,8 @@ public:
     mContents.SetLength(aCount);
   }
 
-  struct Storage {
+  struct Storage final
+  {
     Storage() :
       mDataToFree(nullptr),
       mFree(nullptr),
@@ -94,7 +96,7 @@ public:
   virtual size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const override
   {
     size_t amount = ThreadSharedObject::SizeOfExcludingThis(aMallocSizeOf);
-    amount += mContents.SizeOfExcludingThis(aMallocSizeOf);
+    amount += mContents.ShallowSizeOfExcludingThis(aMallocSizeOf);
     for (size_t i = 0; i < mContents.Length(); i++) {
       amount += mContents[i].SizeOfExcludingThis(aMallocSizeOf);
     }
@@ -108,7 +110,7 @@ public:
   }
 
 private:
-  AutoFallibleTArray<Storage,2> mContents;
+  nsAutoTArray<Storage, 2> mContents;
 };
 
 /**
@@ -234,14 +236,14 @@ AudioBufferSumOfSquares(const float* aInput, uint32_t aLength);
  * All methods of this class and its subclasses are called on the
  * MediaStreamGraph thread.
  */
-class AudioNodeEngine {
+class AudioNodeEngine
+{
 public:
   // This should be compatible with AudioNodeStream::OutputChunks.
   typedef nsAutoTArray<AudioChunk, 1> OutputChunks;
 
   explicit AudioNodeEngine(dom::AudioNode* aNode)
     : mNode(aNode)
-    , mNodeMutex("AudioNodeEngine::mNodeMutex")
     , mInputCount(aNode ? aNode->NumberOfInputs() : 1)
     , mOutputCount(aNode ? aNode->NumberOfOutputs() : 0)
   {
@@ -341,17 +343,10 @@ public:
     aOutput[0] = aInput[0];
   }
 
-  Mutex& NodeMutex() { return mNodeMutex;}
-
   bool HasNode() const
   {
+    MOZ_ASSERT(NS_IsMainThread());
     return !!mNode;
-  }
-
-  dom::AudioNode* Node() const
-  {
-    mNodeMutex.AssertCurrentThreadOwns();
-    return mNode;
   }
 
   dom::AudioNode* NodeMainThread() const
@@ -364,7 +359,6 @@ public:
   {
     MOZ_ASSERT(NS_IsMainThread());
     MOZ_ASSERT(mNode != nullptr);
-    mNodeMutex.AssertCurrentThreadOwns();
     mNode = nullptr;
   }
 
@@ -394,7 +388,6 @@ public:
 
 private:
   dom::AudioNode* mNode;
-  Mutex mNodeMutex;
   const uint16_t mInputCount;
   const uint16_t mOutputCount;
 };

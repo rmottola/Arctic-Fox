@@ -22,7 +22,7 @@
 #include "mozilla/WindowsVersion.h"
 
 PRLogModuleInfo* GetDemuxerLog();
-#define LOG(...) PR_LOG(GetDemuxerLog(), PR_LOG_DEBUG, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(GetDemuxerLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 using mozilla::layers::Image;
 using mozilla::layers::IMFYCbCrImage;
@@ -153,11 +153,6 @@ WMFVideoMFTManager::InitializeDXVA()
   if (!mDXVAEnabled ||
       (mLayersBackend != LayersBackend::LAYERS_D3D9 &&
        mLayersBackend != LayersBackend::LAYERS_D3D11)) {
-    return false;
-  }
-
-  if (gfxWindowsPlatform::GetPlatform()->IsWARP() ||
-      !gfxPlatform::CanUseDXVA()) {
     return false;
   }
 

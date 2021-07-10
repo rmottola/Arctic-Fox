@@ -99,6 +99,12 @@ public:
                                             ErrorResult& aRv);
   already_AddRefed<Promise> StartDiscovery(ErrorResult& aRv);
   already_AddRefed<Promise> StopDiscovery(ErrorResult& aRv);
+
+  already_AddRefed<Promise> StartLeScan(
+    const nsTArray<nsString>& aServiceUuids, ErrorResult& aRv);
+  already_AddRefed<Promise> StopLeScan(
+    BluetoothDiscoveryHandle& aDiscoveryHandle, ErrorResult& aRv);
+
   already_AddRefed<Promise> Pair(const nsAString& aDeviceAddress,
                                  ErrorResult& aRv);
   already_AddRefed<Promise> Unpair(const nsAString& aDeviceAddress,
@@ -178,6 +184,21 @@ public:
    */
   void SetDiscoveryHandleInUse(BluetoothDiscoveryHandle* aDiscoveryHandle);
 
+  /**
+   * Append a BluetoothDiscoveryHandle to LeScan handle array.
+   *
+   * @param aDiscoveryHandle [in] Discovery handle to be appended.
+   */
+  void AppendLeScanHandle(BluetoothDiscoveryHandle* aDiscoveryHandle);
+
+  /**
+   * Remove the BluetoothDiscoverHandle with the given UUID from LeScan handle
+   * array.
+   *
+   * @param aScanUuid [in] The UUID of the LE scan task.
+   */
+  void RemoveLeScanHandle(const nsAString& aScanUuid);
+
 private:
   BluetoothAdapter(nsPIDOMWindow* aOwner, const BluetoothValue& aValue);
   ~BluetoothAdapter();
@@ -223,6 +244,13 @@ private:
   void HandlePropertyChanged(const BluetoothValue& aValue);
 
   /**
+   * Handle "DeviceFound" bluetooth signal.
+   *
+   * @param aValue [in] Properties array of the discovered device.
+   */
+  void HandleDeviceFound(const BluetoothValue& aValue);
+
+  /**
    * Handle DEVICE_PAIRED_ID bluetooth signal.
    *
    * @param aValue [in] Properties array of the paired device.
@@ -243,11 +271,11 @@ private:
   void HandleDeviceUnpaired(const BluetoothValue& aValue);
 
   /**
-   * Handle "DeviceFound" bluetooth signal.
+   * Handle "LeDeviceFound" bluetooth signal.
    *
-   * @param aValue [in] Properties array of the discovered device.
+   * @param aValue [in] Properties array of the scanned device.
    */
-  void HandleDeviceFound(const BluetoothValue& aValue);
+  void HandleLeDeviceFound(const BluetoothValue& aValue);
 
   /**
    * Fire BluetoothAttributeEvent to trigger onattributechanged event handler.
@@ -331,19 +359,28 @@ private:
   nsRefPtr<BluetoothDiscoveryHandle> mDiscoveryHandleInUse;
 
   /**
-   * Arrays of references to BluetoothDevices created by this adapter.
-   * This array is empty when adapter state is Disabled.
+   * Handles to fire 'ondevicefound' event handler for scanned device
+   *
+   * Each non-stopped LeScan process has a LeScan handle which is
+   * responsible to dispatch LeDeviceEvent.
+   */
+  nsTArray<nsRefPtr<BluetoothDiscoveryHandle> > mLeScanHandleArray;
+
+  /**
+   * nsRefPtr array of BluetoothDevices created by this adapter. The array is
+   * empty when adapter state is Disabled.
    *
    * Devices will be appended when
-   * 1) Enabling BT: Paired devices reported by stack.
-   * 2) Discovering: Discovered devices during discovery operation.
-   * A device won't be appended if a device object with the same
-   * address already exists.
+   *   1) adapter is enabling: Paired devices reported by stack.
+   *   2) adapter is discovering: Discovered devices during discovery operation.
+   *   3) adapter paired with a device: The paired device reported by stack.
+   * Note devices with identical address won't be appended.
    *
    * Devices will be removed when
-   * 1) Starting discovery: All unpaired devices will be removed before this
-   *    adapter starts a new discovery.
-   * 2) Disabling BT: All devices will be removed.
+   *   1) adapter is disabling: All devices will be removed.
+   *   2) adapter starts discovery: All unpaired devices will be removed before
+   *      this new discovery starts.
+   *   3) adapter unpaired with a device: The unpaired device will be removed.
    */
   nsTArray<nsRefPtr<BluetoothDevice> > mDevices;
 };

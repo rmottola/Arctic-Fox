@@ -31,7 +31,7 @@ extern PRLogModuleInfo* gMediaPromiseLog;
 
 #define PROMISE_LOG(x, ...) \
   MOZ_ASSERT(gMediaPromiseLog); \
-  PR_LOG(gMediaPromiseLog, PR_LOG_DEBUG, (x, ##__VA_ARGS__))
+  MOZ_LOG(gMediaPromiseLog, mozilla::LogLevel::Debug, (x, ##__VA_ARGS__))
 
 namespace detail {
 template<typename ThisType, typename Ret, typename ArgType>
@@ -703,6 +703,9 @@ public:
     DispatchAll();
   }
 };
+
+// A generic promise type that does the trick for simple use cases.
+typedef MediaPromise<bool, nsresult, /* IsExclusive = */ false> GenericPromise;
 
 /*
  * Class to encapsulate a promise for a particular role. Use this as the member
