@@ -1313,33 +1313,6 @@ class AutoSuppressGC
     }
 };
 
-#ifdef DEBUG
-/* Disable OOM testing in sections which are not OOM safe. */
-class AutoEnterOOMUnsafeRegion
-{
-    bool oomEnabled_;
-    int64_t oomAfter_;
-
-  public:
-    AutoEnterOOMUnsafeRegion()
-      : oomEnabled_(OOM_maxAllocations != UINT32_MAX)
-    {
-        if (oomEnabled_) {
-            oomAfter_ = OOM_maxAllocations - OOM_counter;
-            OOM_maxAllocations = UINT32_MAX;
-        }
-    }
-
-    ~AutoEnterOOMUnsafeRegion() {
-        MOZ_ASSERT(OOM_maxAllocations == UINT32_MAX);
-        if (oomEnabled_)
-            OOM_maxAllocations = OOM_counter + oomAfter_;
-    }
-};
-#else
-class AutoEnterOOMUnsafeRegion {};
-#endif /* DEBUG */
-
 // A singly linked list of zones.
 class ZoneList
 {
