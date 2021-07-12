@@ -27,7 +27,6 @@
 #include "nsIBrowserDOMWindow.h"
 #include "nsIDOMEventTarget.h"
 #include "nsIInterfaceRequestor.h"
-#include "nsIDOMJSWindow.h"
 #include "nsIDOMChromeWindow.h"
 #include "nsIScriptGlobalObject.h"
 #include "nsIScriptObjectPrincipal.h"
@@ -325,7 +324,6 @@ class nsGlobalWindow : public mozilla::dom::EventTarget,
                        public nsPIDOMWindow,
                        public nsIScriptGlobalObject,
                        public nsIScriptObjectPrincipal,
-                       public nsIDOMJSWindow,
                        public nsSupportsWeakReference,
                        public nsIInterfaceRequestor,
                        public PRCListStr
@@ -385,8 +383,15 @@ public:
   // nsIDOMWindow
   NS_DECL_NSIDOMWINDOW
 
-  // nsIDOMJSWindow
-  NS_DECL_NSIDOMJSWINDOW
+  nsresult
+  OpenJS(const nsAString& aUrl, const nsAString& aName,
+         const nsAString& aOptions, nsIDOMWindow **_retval);
+  void CaptureEvents();
+  void ReleaseEvents();
+  void Dump(const nsAString& aStr);
+  void SetResizable(bool aResizable) const;
+  nsresult GetScriptableContent(JSContext* aCx,
+                                JS::MutableHandle<JS::Value> aVal);
 
   // nsIDOMEventTarget
   NS_DECL_NSIDOMEVENTTARGET
@@ -501,7 +506,8 @@ public:
   NS_DECL_NSIINTERFACEREQUESTOR
 
   // WebIDL interface.
-  already_AddRefed<nsIDOMWindow> IndexedGetter(uint32_t aIndex, bool& aFound);
+  already_AddRefed<nsIDOMWindow> IndexedGetterOuter(uint32_t aIndex);
+  already_AddRefed<nsIDOMWindow> IndexedGetter(uint32_t aIndex);
 
   void GetSupportedNames(nsTArray<nsString>& aNames);
 
@@ -1045,7 +1051,6 @@ public:
   int32_t RequestAnimationFrame(mozilla::dom::FrameRequestCallback& aCallback,
                                 mozilla::ErrorResult& aError);
   void CancelAnimationFrame(int32_t aHandle, mozilla::ErrorResult& aError);
-  nsPerformance* GetPerformance();
 #ifdef MOZ_WEBSPEECH
   mozilla::dom::SpeechSynthesis*
     GetSpeechSynthesis(mozilla::ErrorResult& aError);

@@ -969,8 +969,8 @@ nsOuterWindowProxy::GetSubframeWindow(JSContext *cx,
   }
 
   nsGlobalWindow* win = GetWindow(proxy);
-  bool unused;
-  return win->IndexedGetter(index, unused);
+  MOZ_ASSERT(win->IsOuterWindow());
+  return win->IndexedGetterOuter(index);
 }
 
 bool
@@ -1648,7 +1648,6 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsGlobalWindow)
   // Make sure this matches the cast in nsGlobalWindow::FromWrapper()
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMEventTarget)
   NS_INTERFACE_MAP_ENTRY(nsIDOMWindow)
-  NS_INTERFACE_MAP_ENTRY(nsIDOMJSWindow)
   if (aIID.Equals(NS_GET_IID(nsIDOMWindowInternal))) {
     foundInterface = static_cast<nsIDOMWindowInternal*>(this);
     if (!sWarnedAboutWindowInternal) {
@@ -3639,14 +3638,6 @@ nsGlobalWindow::GetHistory(nsISupports** aHistory)
 }
 
 nsPerformance*
-nsGlobalWindow::GetPerformance()
-{
-  FORWARD_TO_INNER(GetPerformance, (), nullptr);
-
-  return nsPIDOMWindow::GetPerformance();
-}
-
-nsPerformance*
 nsPIDOMWindow::GetPerformance()
 {
   MOZ_ASSERT(IsInnerWindow());
@@ -4011,7 +4002,7 @@ nsGlobalWindow::GetMozSelfSupport(ErrorResult& aError)
   return mMozSelfSupport;
 }
 
-NS_IMETHODIMP
+nsresult
 nsGlobalWindow::GetScriptableContent(JSContext* aCx, JS::MutableHandle<JS::Value> aVal)
 {
   ErrorResult rv;
@@ -4236,16 +4227,21 @@ nsGlobalWindow::GetFrames(nsIDOMWindowCollection** aFrames)
 }
 
 already_AddRefed<nsIDOMWindow>
-nsGlobalWindow::IndexedGetter(uint32_t aIndex, bool& aFound)
+nsGlobalWindow::IndexedGetterOuter(uint32_t aIndex)
 {
-  aFound = false;
-
-  FORWARD_TO_OUTER(IndexedGetter, (aIndex, aFound), nullptr);
+  MOZ_RELEASE_ASSERT(IsOuterWindow());
 
   nsDOMWindowList* windows = GetWindowList();
   NS_ENSURE_TRUE(windows, nullptr);
 
-  return windows->IndexedGetter(aIndex, aFound);
+  return windows->IndexedGetter(aIndex);
+}
+
+already_AddRefed<nsIDOMWindow>
+nsGlobalWindow::IndexedGetter(uint32_t aIndex)
+{
+  FORWARD_TO_OUTER(IndexedGetterOuter, (aIndex), nullptr);
+  MOZ_CRASH();
 }
 
 void
@@ -6712,11 +6708,11 @@ nsGlobalWindow::GetFullScreen(bool* aFullScreen)
   return rv.StealNSResult();
 }
 
-NS_IMETHODIMP
+void
 nsGlobalWindow::Dump(const nsAString& aStr)
 {
   if (!nsContentUtils::DOMWindowDumpEnabled()) {
-    return NS_OK;
+    return;
   }
 
   char *cstr = ToNewUTF8String(aStr);
@@ -6743,8 +6739,6 @@ nsGlobalWindow::Dump(const nsAString& aStr)
     fflush(fp);
     free(cstr);
   }
-
-  return NS_OK;
 }
 
 void
@@ -6993,6 +6987,7 @@ nsGlobalWindow::AlertOrConfirm(bool aAlert,
 void
 nsGlobalWindow::Alert(mozilla::ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
   Alert(EmptyString(), aError);
 }
 
@@ -8048,6 +8043,8 @@ nsGlobalWindow::ScrollBy(const ScrollToOptions& aOptions)
 NS_IMETHODIMP
 nsGlobalWindow::ScrollByLines(int32_t numLines)
 {
+  FORWARD_TO_INNER(ScrollByLines, (numLines), NS_ERROR_UNEXPECTED);
+
   ScrollByLines(numLines, ScrollOptions());
 
   return NS_OK;
@@ -8057,6 +8054,8 @@ void
 nsGlobalWindow::ScrollByLines(int32_t numLines,
                               const ScrollOptions& aOptions)
 {
+  MOZ_ASSERT(IsInnerWindow());
+
   FlushPendingNotifications(Flush_Layout);
   nsIScrollableFrame *sf = GetScrollFrame();
   if (sf) {
@@ -8075,6 +8074,8 @@ nsGlobalWindow::ScrollByLines(int32_t numLines,
 NS_IMETHODIMP
 nsGlobalWindow::ScrollByPages(int32_t numPages)
 {
+  FORWARD_TO_INNER(ScrollByPages, (numPages), NS_ERROR_UNEXPECTED);
+
   ScrollByPages(numPages, ScrollOptions());
 
   return NS_OK;
@@ -8084,6 +8085,8 @@ void
 nsGlobalWindow::ScrollByPages(int32_t numPages,
                               const ScrollOptions& aOptions)
 {
+  MOZ_ASSERT(IsInnerWindow());
+
   FlushPendingNotifications(Flush_Layout);
   nsIScrollableFrame *sf = GetScrollFrame();
   if (sf) {
@@ -8102,6 +8105,8 @@ nsGlobalWindow::ScrollByPages(int32_t numPages,
 void
 nsGlobalWindow::MozScrollSnap()
 {
+  MOZ_ASSERT(IsInnerWindow());
+
   FlushPendingNotifications(Flush_Layout);
   nsIScrollableFrame *sf = GetScrollFrame();
   if (sf) {
@@ -8113,6 +8118,8 @@ void
 nsGlobalWindow::MozRequestOverfill(OverfillCallback& aCallback,
                                    mozilla::ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
+
   nsIWidget* widget = nsContentUtils::WidgetForDocument(mDoc);
   if (widget) {
     mozilla::layers::LayerManager* manager = widget->GetLayerManager();
@@ -8135,17 +8142,6 @@ nsGlobalWindow::ClearTimeout(int32_t aHandle, ErrorResult& aError)
   }
 }
 
-NS_IMETHODIMP
-nsGlobalWindow::ClearTimeout(int32_t aHandle)
-{
-  FORWARD_TO_INNER(ClearTimeout, (aHandle), NS_ERROR_UNEXPECTED);
-
-  ErrorResult rv;
-  ClearTimeout(aHandle, rv);
-
-  return rv.StealNSResult();
-}
-
 void
 nsGlobalWindow::ClearInterval(int32_t aHandle, ErrorResult& aError)
 {
@@ -8154,41 +8150,26 @@ nsGlobalWindow::ClearInterval(int32_t aHandle, ErrorResult& aError)
   }
 }
 
-NS_IMETHODIMP
-nsGlobalWindow::ClearInterval(int32_t aHandle)
-{
-  ErrorResult rv;
-  ClearInterval(aHandle, rv);
-
-  return rv.StealNSResult();
-}
-
-NS_IMETHODIMP
-nsGlobalWindow::SetResizable(bool aResizable)
+void
+nsGlobalWindow::SetResizable(bool aResizable) const
 {
   // nop
-
-  return NS_OK;
 }
 
-NS_IMETHODIMP
+void
 nsGlobalWindow::CaptureEvents()
 {
   if (mDoc) {
     mDoc->WarnOnceAbout(nsIDocument::eUseOfCaptureEvents);
   }
-
-  return NS_OK;
 }
 
-NS_IMETHODIMP
+void
 nsGlobalWindow::ReleaseEvents()
 {
   if (mDoc) {
     mDoc->WarnOnceAbout(nsIDocument::eUseOfReleaseEvents);
   }
-
-  return NS_OK;
 }
 
 static
@@ -8391,12 +8372,11 @@ nsGlobalWindow::Open(const nsAString& aUrl, const nsAString& aName,
   return rv;
 }
 
-NS_IMETHODIMP
+nsresult
 nsGlobalWindow::OpenJS(const nsAString& aUrl, const nsAString& aName,
                        const nsAString& aOptions, nsIDOMWindow **_retval)
 {
-  FORWARD_TO_OUTER(OpenJS, (aUrl, aName, aOptions, _retval),
-                   NS_ERROR_NOT_INITIALIZED);
+  MOZ_ASSERT(IsOuterWindow());
   return OpenInternal(aUrl, aName, aOptions,
                       false,          // aDialog
                       false,          // aContentModal
@@ -8500,58 +8480,6 @@ nsGlobalWindow::OpenDialog(JSContext* aCx, const nsAString& aUrl,
                             aError, nullptr);
 }
 
-NS_IMETHODIMP
-nsGlobalWindow::OpenDialog(const nsAString& aUrl, const nsAString& aName,
-                           const nsAString& aOptions, nsIDOMWindow** _retval)
-{
-  FORWARD_TO_OUTER(OpenDialog, (aUrl, aName, aOptions, _retval),
-                   NS_ERROR_NOT_INITIALIZED);
-
-  if (!nsContentUtils::IsCallerChrome()) {
-    return NS_ERROR_DOM_SECURITY_ERR;
-  }
-
-  nsAXPCNativeCallContext *ncc = nullptr;
-  nsresult rv = nsContentUtils::XPConnect()->
-    GetCurrentNativeCallContext(&ncc);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  if (!ncc)
-    return NS_ERROR_NOT_AVAILABLE;
-
-  JSContext *cx = nullptr;
-
-  rv = ncc->GetJSContext(&cx);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  uint32_t argc;
-  JS::Value *argv = nullptr;
-
-  // XXX - need to get this as nsISupports?
-  ncc->GetArgc(&argc);
-  ncc->GetArgvPtr(&argv);
-
-  // Strip the url, name and options from the args seen by scripts.
-  uint32_t argOffset = argc < 3 ? argc : 3;
-  nsCOMPtr<nsIJSArgArray> argvArray;
-  rv = NS_CreateJSArgv(cx, argc - argOffset, argv + argOffset,
-                       getter_AddRefs(argvArray));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  return OpenInternal(aUrl, aName, aOptions,
-                      true,             // aDialog
-                      false,            // aContentModal
-                      false,            // aCalledNoScript
-                      false,            // aDoJSFixups
-                      true,                // aNavigate
-                      argvArray, nullptr,  // Arguments
-                      nullptr,             // aLoadInfo
-		      false,               // aForceNoOpener
-                      GetPrincipal(),      // aCalleePrincipal
-                      cx,                  // aJSCallerContext
-                      _retval);
-}
-
 already_AddRefed<nsIDOMWindow>
 nsGlobalWindow::GetFramesOuter()
 {
@@ -8564,18 +8492,6 @@ already_AddRefed<nsIDOMWindow>
 nsGlobalWindow::GetFrames(ErrorResult& aError)
 {
   FORWARD_TO_OUTER_OR_THROW(GetFramesOuter, (), aError, nullptr);
-}
-
-NS_IMETHODIMP
-nsGlobalWindow::GetFrames(nsIDOMWindow** aFrames)
-{
-  FORWARD_TO_INNER(GetFrames, (aFrames), NS_ERROR_UNEXPECTED);
-
-  ErrorResult rv;
-  nsCOMPtr<nsIDOMWindow> frames = GetFrames(rv);
-  frames.forget(aFrames);
-
-  return rv.StealNSResult();
 }
 
 nsGlobalWindow*
@@ -9994,6 +9910,7 @@ void
 nsGlobalWindow::Atob(const nsAString& aAsciiBase64String,
                      nsAString& aBinaryData, ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
   aError = nsContentUtils::Atob(aAsciiBase64String, aBinaryData);
 }
 
@@ -10001,6 +9918,8 @@ NS_IMETHODIMP
 nsGlobalWindow::Atob(const nsAString& aAsciiBase64String,
                      nsAString& aBinaryData)
 {
+  FORWARD_TO_INNER(Atob, (aAsciiBase64String, aBinaryData), NS_ERROR_UNEXPECTED);
+
   ErrorResult rv;
   Atob(aAsciiBase64String, aBinaryData, rv);
 
@@ -10011,6 +9930,7 @@ void
 nsGlobalWindow::Btoa(const nsAString& aBinaryData,
                      nsAString& aAsciiBase64String, ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
   aError = nsContentUtils::Btoa(aBinaryData, aAsciiBase64String);
 }
 
@@ -10018,6 +9938,8 @@ NS_IMETHODIMP
 nsGlobalWindow::Btoa(const nsAString& aBinaryData,
                      nsAString& aAsciiBase64String)
 {
+  FORWARD_TO_INNER(Btoa, (aBinaryData, aAsciiBase64String), NS_ERROR_UNEXPECTED);
+
   ErrorResult rv;
   Btoa(aBinaryData, aAsciiBase64String, rv);
 
@@ -10835,6 +10757,7 @@ already_AddRefed<nsICSSDeclaration>
 nsGlobalWindow::GetComputedStyle(Element& aElt, const nsAString& aPseudoElt,
                                  ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
   return GetComputedStyleHelper(aElt, aPseudoElt, false, aError);
 }
 
@@ -10843,6 +10766,7 @@ nsGlobalWindow::GetComputedStyle(nsIDOMElement* aElt,
                                  const nsAString& aPseudoElt,
                                  nsIDOMCSSStyleDeclaration** aReturn)
 {
+  FORWARD_TO_INNER(GetComputedStyle, (aElt, aPseudoElt, aReturn), NS_ERROR_UNEXPECTED);
   return GetComputedStyleHelper(aElt, aPseudoElt, false, aReturn);
 }
 
@@ -10851,6 +10775,7 @@ nsGlobalWindow::GetDefaultComputedStyle(Element& aElt,
                                         const nsAString& aPseudoElt,
                                         ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
   return GetComputedStyleHelper(aElt, aPseudoElt, true, aError);
 }
 
@@ -10859,6 +10784,7 @@ nsGlobalWindow::GetDefaultComputedStyle(nsIDOMElement* aElt,
                                         const nsAString& aPseudoElt,
                                         nsIDOMCSSStyleDeclaration** aReturn)
 {
+  FORWARD_TO_INNER(GetDefaultComputedStyle, (aElt, aPseudoElt, aReturn), NS_ERROR_UNEXPECTED);
   return GetComputedStyleHelper(aElt, aPseudoElt, true, aReturn);
 }
 
@@ -10868,9 +10794,7 @@ nsGlobalWindow::GetComputedStyleHelper(nsIDOMElement* aElt,
                                        bool aDefaultStylesOnly,
                                        nsIDOMCSSStyleDeclaration** aReturn)
 {
-  FORWARD_TO_INNER(GetComputedStyleHelper,
-                   (aElt, aPseudoElt, aDefaultStylesOnly, aReturn),
-                   NS_ERROR_UNEXPECTED);
+  MOZ_ASSERT(IsInnerWindow());
 
   NS_ENSURE_ARG_POINTER(aReturn);
   *aReturn = nullptr;
@@ -11200,12 +11124,15 @@ nsGlobalWindow::GetInterface(JSContext* aCx, nsIJSID* aIID,
                              JS::MutableHandle<JS::Value> aRetval,
                              ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
   dom::GetInterface(aCx, this, aIID, aRetval, aError);
 }
 
 already_AddRefed<CacheStorage>
 nsGlobalWindow::GetCaches(ErrorResult& aRv)
 {
+  MOZ_ASSERT(IsInnerWindow());
+
   if (!mCacheStorage) {
     bool forceTrustedOrigin =
       GetOuterWindowInternal()->GetServiceWorkersTestingEnabled();
@@ -13954,6 +13881,8 @@ nsGlobalChromeWindow::Create(nsGlobalWindow *aOuterWindow)
 NS_IMETHODIMP
 nsGlobalChromeWindow::GetWindowState(uint16_t* aWindowState)
 {
+  FORWARD_TO_INNER_CHROME(GetWindowState, (aWindowState), NS_ERROR_UNEXPECTED);
+
   *aWindowState = WindowState();
   return NS_OK;
 }
@@ -13961,6 +13890,7 @@ nsGlobalChromeWindow::GetWindowState(uint16_t* aWindowState)
 uint16_t
 nsGlobalWindow::WindowState()
 {
+  MOZ_ASSERT(IsInnerWindow());
   nsCOMPtr<nsIWidget> widget = GetMainWidget();
 
   int32_t mode = widget ? widget->SizeMode() : 0;
@@ -13985,6 +13915,8 @@ nsGlobalWindow::WindowState()
 NS_IMETHODIMP
 nsGlobalChromeWindow::Maximize()
 {
+  FORWARD_TO_INNER_CHROME(Maximize, (), NS_ERROR_UNEXPECTED);
+
   ErrorResult rv;
   Maximize(rv);
   return rv.StealNSResult();
@@ -13993,6 +13925,8 @@ nsGlobalChromeWindow::Maximize()
 void
 nsGlobalWindow::Maximize(ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
+
   nsCOMPtr<nsIWidget> widget = GetMainWidget();
 
   if (widget) {
@@ -14003,6 +13937,8 @@ nsGlobalWindow::Maximize(ErrorResult& aError)
 NS_IMETHODIMP
 nsGlobalChromeWindow::Minimize()
 {
+  FORWARD_TO_INNER_CHROME(Minimize, (), NS_ERROR_UNEXPECTED);
+
   ErrorResult rv;
   Minimize(rv);
   return rv.StealNSResult();
@@ -14011,6 +13947,8 @@ nsGlobalChromeWindow::Minimize()
 void
 nsGlobalWindow::Minimize(ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
+
   nsCOMPtr<nsIWidget> widget = GetMainWidget();
 
   if (widget) {
@@ -14021,6 +13959,8 @@ nsGlobalWindow::Minimize(ErrorResult& aError)
 NS_IMETHODIMP
 nsGlobalChromeWindow::Restore()
 {
+  FORWARD_TO_INNER_CHROME(Restore, (), NS_ERROR_UNEXPECTED);
+
   ErrorResult rv;
   Restore(rv);
   return rv.StealNSResult();
@@ -14029,6 +13969,8 @@ nsGlobalChromeWindow::Restore()
 void
 nsGlobalWindow::Restore(ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
+
   nsCOMPtr<nsIWidget> widget = GetMainWidget();
 
   if (widget) {
@@ -14039,6 +13981,8 @@ nsGlobalWindow::Restore(ErrorResult& aError)
 NS_IMETHODIMP
 nsGlobalChromeWindow::GetAttention()
 {
+  FORWARD_TO_INNER_CHROME(GetAttention, (), NS_ERROR_UNEXPECTED);
+
   ErrorResult rv;
   GetAttention(rv);
   return rv.StealNSResult();
@@ -14047,12 +13991,15 @@ nsGlobalChromeWindow::GetAttention()
 void
 nsGlobalWindow::GetAttention(ErrorResult& aResult)
 {
+  MOZ_ASSERT(IsInnerWindow());
   return GetAttentionWithCycleCount(-1, aResult);
 }
 
 NS_IMETHODIMP
 nsGlobalChromeWindow::GetAttentionWithCycleCount(int32_t aCycleCount)
 {
+  FORWARD_TO_INNER_CHROME(GetAttentionWithCycleCount, (aCycleCount), NS_ERROR_UNEXPECTED);
+
   ErrorResult rv;
   GetAttentionWithCycleCount(aCycleCount, rv);
   return rv.StealNSResult();
@@ -14062,6 +14009,8 @@ void
 nsGlobalWindow::GetAttentionWithCycleCount(int32_t aCycleCount,
                                            ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
+
   nsCOMPtr<nsIWidget> widget = GetMainWidget();
 
   if (widget) {
@@ -14072,6 +14021,8 @@ nsGlobalWindow::GetAttentionWithCycleCount(int32_t aCycleCount,
 NS_IMETHODIMP
 nsGlobalChromeWindow::BeginWindowMove(nsIDOMEvent *aMouseDownEvent, nsIDOMElement* aPanel)
 {
+  FORWARD_TO_INNER_CHROME(BeginWindowMove, (aMouseDownEvent, aPanel), NS_ERROR_UNEXPECTED);
+
   NS_ENSURE_TRUE(aMouseDownEvent, NS_ERROR_FAILURE);
   Event* mouseDownEvent = aMouseDownEvent->InternalDOMEvent();
   NS_ENSURE_TRUE(mouseDownEvent, NS_ERROR_FAILURE);
@@ -14088,6 +14039,8 @@ void
 nsGlobalWindow::BeginWindowMove(Event& aMouseDownEvent, Element* aPanel,
                                 ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
+
   nsCOMPtr<nsIWidget> widget;
 
   // if a panel was supplied, use its widget instead.
@@ -14260,6 +14213,9 @@ nsGlobalWindow::SetBrowserDOMWindow(nsIBrowserDOMWindow* aBrowserWindow,
 NS_IMETHODIMP
 nsGlobalChromeWindow::NotifyDefaultButtonLoaded(nsIDOMElement* aDefaultButton)
 {
+  FORWARD_TO_INNER_CHROME(NotifyDefaultButtonLoaded,
+                          (aDefaultButton), NS_ERROR_UNEXPECTED);
+
   nsCOMPtr<Element> defaultButton = do_QueryInterface(aDefaultButton);
   NS_ENSURE_ARG(defaultButton);
 
@@ -14272,6 +14228,7 @@ void
 nsGlobalWindow::NotifyDefaultButtonLoaded(Element& aDefaultButton,
                                           ErrorResult& aError)
 {
+  MOZ_ASSERT(IsInnerWindow());
 #ifdef MOZ_XUL
   // Don't snap to a disabled button.
   nsCOMPtr<nsIDOMXULControlElement> xulControl =
