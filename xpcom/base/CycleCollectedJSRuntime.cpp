@@ -887,7 +887,7 @@ CycleCollectedJSRuntime::SetPendingException(nsIException* aException)
   mPendingException = aException;
 }
 
-nsTArray<nsCOMPtr<nsIRunnable>>&
+std::queue<nsCOMPtr<nsIRunnable>>&
 CycleCollectedJSRuntime::GetPromiseMicroTaskQueue()
 {
   return mPromiseMicroTaskQueue;
