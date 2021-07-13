@@ -2802,6 +2802,12 @@ WorkerThreadPrimaryRunnable::Run()
 
       BackgroundChild::CloseForCurrentThread();
 
+#ifdef MOZ_ENABLE_PROFILER_SPS
+      if (stack) {
+        stack->sampleRuntime(nullptr);
+      }
+#endif
+
     }
 
     // Destroy the main context.  This will unroot the main worker global and
