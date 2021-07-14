@@ -3632,6 +3632,10 @@ nsCycleCollector::Collect(ccType aCCType,
     timeLog.Checkpoint("Collect::FreeSnowWhite");
   }
 
+  if (aCCType != SliceCC) {
+    mResults.mAnyManual = true;
+  }
+
   ++mResults.mNumSlices;
 
   bool continueSlice = aBudget.isUnlimited() || !aPreferShorterSlices;
@@ -3829,6 +3833,7 @@ nsCycleCollector::BeginCollection(ccType aCCType,
   // Set up the data structures for building the graph.
   mGraph.Init();
   mResults.Init();
+  mResults.mAnyManual = (aCCType != SliceCC);
   bool mergeZones = ShouldMergeZones(aCCType);
   mResults.mMergedZones = mergeZones;
 
