@@ -769,6 +769,28 @@ nsThread::ProcessNextEvent(bool aMayWait, bool* aResult)
     }
   }
 
+
+#ifdef MOZ_CRASHREPORTER
+  if (MAIN_THREAD == mIsMainThread && !ShuttingDown()) {
+    // Keep an eye on memory usage (cheap, ~7ms) somewhat frequently,
+    // but save memory reports (expensive, ~75ms) less frequently.
+    const size_t LOW_MEMORY_CHECK_SECONDS = 30;
+    const size_t LOW_MEMORY_SAVE_SECONDS = 3 * 60;
+
+    static TimeStamp nextCheck = TimeStamp::NowLoRes()
+      + TimeDuration::FromSeconds(LOW_MEMORY_CHECK_SECONDS);
+
+    TimeStamp now = TimeStamp::NowLoRes();
+    if (now >= nextCheck) {
+      if (SaveMemoryReportNearOOM()) {
+        nextCheck = now + TimeDuration::FromSeconds(LOW_MEMORY_SAVE_SECONDS);
+      } else {
+        nextCheck = now + TimeDuration::FromSeconds(LOW_MEMORY_CHECK_SECONDS);
+      }
+    }
+  }
+#endif
+
   bool notifyMainThreadObserver =
     (MAIN_THREAD == mIsMainThread) && sMainThreadObserver;
   if (notifyMainThreadObserver) {
