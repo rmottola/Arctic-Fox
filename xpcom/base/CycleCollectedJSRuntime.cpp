@@ -64,6 +64,7 @@
 #include "mozilla/dom/DOMJSClass.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "jsprf.h"
+#include "js/Debug.h"
 #include "nsCycleCollectionNoteRootCallback.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsCycleCollector.h"
@@ -423,6 +424,8 @@ CycleCollectedJSRuntime::CycleCollectedJSRuntime(JSRuntime* aParentRuntime,
     InstanceClassHasProtoAtDepth
   };
   SetDOMCallbacks(mJSRuntime, &DOMcallbacks);
+
+  JS::dbg::SetDebuggerMallocSizeOf(mJSRuntime, moz_malloc_size_of);
 
   nsCycleCollector_registerJSRuntime(this);
 }
