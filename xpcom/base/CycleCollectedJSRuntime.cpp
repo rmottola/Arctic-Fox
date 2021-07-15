@@ -71,6 +71,10 @@
 #include "nsDOMJSUtils.h"
 #include "nsJSUtils.h"
 
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
+
 #include "nsIException.h"
 #include "nsThreadUtils.h"
 #include "xpcpublic.h"
