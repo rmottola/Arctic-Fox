@@ -586,9 +586,6 @@ public:
     inline void AddWrappedJSRoot(nsXPCWrappedJS* wrappedJS);
     inline void AddObjectHolderRoot(XPCJSObjectHolder* holder);
 
-    static void SuspectWrappedNative(XPCWrappedNative* wrapper,
-                                     nsCycleCollectionNoteRootCallback& cb);
-
     void DebugDump(int16_t depth);
 
     void SystemIsBeingShutDown();
@@ -2251,6 +2248,7 @@ public:
 
     bool HasExternalReference() const {return mRefCnt > 1;}
 
+    void Suspect(nsCycleCollectionNoteRootCallback& cb);
     void NoteTearoffs(nsCycleCollectionTraversalCallback& cb);
 
     // Make ctor and dtor protected (rather than private) to placate nsCOMPtr.
