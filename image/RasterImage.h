@@ -429,9 +429,6 @@ private: // data
 
   TimeStamp mDrawStartTime;
 
-  // Initializes ProgressTracker and resets it on RasterImage destruction.
-  nsAutoPtr<ProgressTrackerInit> mProgressTrackerInit;
-
 
   //////////////////////////////////////////////////////////////////////////////
   // Scaling.
@@ -479,8 +476,7 @@ private: // data
   bool CanDiscard();
 
 protected:
-  explicit RasterImage(ProgressTracker* aProgressTracker = nullptr,
-                       ImageURL* aURI = nullptr);
+  explicit RasterImage(ImageURL* aURI = nullptr);
 
   bool ShouldAnimate() override;
 
