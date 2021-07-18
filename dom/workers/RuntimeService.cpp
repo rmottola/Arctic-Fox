@@ -975,6 +975,15 @@ public:
     }
   }
 
+  virtual void AfterProcessTask(uint32_t aRecursionDepth) override
+  {
+    // Only perform the Promise microtask checkpoint on the outermost event
+    // loop.  Don't run it, for example, during sync XHR or importScripts.
+    if (aRecursionDepth == 2) {
+      CycleCollectedJSRuntime::AfterProcessTask(aRecursionDepth);
+    }
+  }
+
 private:
   WorkerPrivate* mWorkerPrivate;
 };
