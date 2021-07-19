@@ -5287,8 +5287,6 @@ WorkerPrivate::DoRunLoop(JSContext* aCx)
           }
         }
 
-        mPreemptingRunnableInfos.Clear();
-
         // Clear away our MessagePorts.
         mWorkerPorts.Clear();
 
