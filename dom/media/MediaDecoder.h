@@ -336,7 +336,7 @@ public:
   }
   void SetResource(MediaResource* aResource)
   {
-    NS_ASSERTION(NS_IsMainThread(), "Should only be called on main thread");
+    MOZ_ASSERT(NS_IsMainThread());
     mResource = aResource;
   }
 
@@ -637,6 +637,7 @@ public:
 
   void OnSeekRejected()
   {
+    MOZ_ASSERT(NS_IsMainThread());
     mSeekRequest.Complete();
     mLogicallySeeking = false;
   }
@@ -647,7 +648,11 @@ public:
   void SeekingStarted(MediaDecoderEventVisibility aEventVisibility = MediaDecoderEventVisibility::Observable);
 
   void UpdateLogicalPosition(MediaDecoderEventVisibility aEventVisibility);
-  void UpdateLogicalPosition() { UpdateLogicalPosition(MediaDecoderEventVisibility::Observable); }
+  void UpdateLogicalPosition()
+  {
+    MOZ_ASSERT(NS_IsMainThread());
+    UpdateLogicalPosition(MediaDecoderEventVisibility::Observable);
+  }
 
   // Find the end of the cached data starting at the current decoder
   // position.
