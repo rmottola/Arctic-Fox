@@ -38,7 +38,7 @@ public:
   virtual size_t SizeOfAudioQueueInFrames() override;
 
   virtual nsRefPtr<VideoDataPromise>
-  RequestVideoData(bool aSkipToNextKeyframe, int64_t aTimeThreshold) override;
+  RequestVideoData(bool aSkipToNextKeyframe, int64_t aTimeThreshold, bool aForceDecodeAhead) override;
 
   virtual nsRefPtr<AudioDataPromise> RequestAudioData() override;
 
@@ -166,6 +166,7 @@ private:
       , mNumSamplesInput(0)
       , mNumSamplesOutput(0)
       , mDecodeAhead(aDecodeAhead)
+      , mForceDecodeAhead(false)
       , mActive(false)
       , mInputExhausted(false)
       , mError(false)
@@ -202,6 +203,7 @@ private:
     uint64_t mNumSamplesInput;
     uint64_t mNumSamplesOutput;
     uint32_t mDecodeAhead;
+    bool mForceDecodeAhead;
     // Whether this stream exists in the media.
     bool mActive;
     bool mInputExhausted;

@@ -34,7 +34,7 @@ public:
   size_t SizeOfAudioQueueInFrames() override;
 
   nsRefPtr<VideoDataPromise>
-  RequestVideoData(bool aSkipToNextKeyframe, int64_t aTimeThreshold) override;
+  RequestVideoData(bool aSkipToNextKeyframe, int64_t aTimeThreshold, bool aForceDecodeAhead) override;
 
   nsRefPtr<AudioDataPromise> RequestAudioData() override;
 
@@ -184,6 +184,7 @@ private:
       : mOwner(aOwner)
       , mType(aType)
       , mDecodeAhead(aDecodeAhead)
+      , mForceDecodeAhead(false)
       , mUpdateScheduled(false)
       , mDemuxEOS(false)
       , mWaitingForData(false)
@@ -216,6 +217,7 @@ private:
 
     // Only accessed from reader's task queue.
     uint32_t mDecodeAhead;
+    bool mForceDecodeAhead;
     bool mUpdateScheduled;
     bool mDemuxEOS;
     bool mWaitingForData;
@@ -269,6 +271,7 @@ private:
     void ResetState()
     {
       MOZ_ASSERT(mOwner->OnTaskQueue());
+      mForceDecodeAhead = false;
       mDemuxEOS = false;
       mWaitingForData = false;
       mReceivedNewData = false;
