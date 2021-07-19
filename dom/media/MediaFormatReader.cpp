@@ -1435,6 +1435,12 @@ MediaFormatReader::SetSharedDecoderManager(SharedDecoderManager* aManager)
 #endif
 }
 
+bool
+MediaFormatReader::VideoIsHardwareAccelerated() const
+{
+  return mVideo.mDecoder && mVideo.mDecoder->IsHardwareAccelerated();
+}
+
 void
 MediaFormatReader::NotifyDemuxer(uint32_t aLength, int64_t aOffset)
 {

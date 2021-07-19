@@ -82,6 +82,8 @@ public:
 
   bool IsAsync() const override { return true; }
 
+  bool VideoIsHardwareAccelerated() const override;
+
   void DisableHardwareAcceleration() override;
 
   bool IsWaitForDataSupported() override { return true; }
