@@ -77,8 +77,6 @@ public:
 
   virtual void DisableHardwareAcceleration() override;
 
-  static bool IsVideoAccelerated(layers::LayersBackend aBackend);
-
   virtual bool VideoIsHardwareAccelerated() const override;
 
 private:

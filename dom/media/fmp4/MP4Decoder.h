@@ -36,6 +36,10 @@ public:
 
   // Returns true if the MP4 backend is preffed on.
   static bool IsEnabled();
+
+  static bool IsVideoAccelerated(layers::LayersBackend aBackend);
+  static bool CanCreateAACDecoder();
+  static bool CanCreateH264Decoder();
 };
 
 } // namespace mozilla
