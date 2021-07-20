@@ -191,7 +191,7 @@ DecodedStream::DecodedStream(ReentrantMonitor& aMonitor)
 DecodedStreamData*
 DecodedStream::GetData() const
 {
-	GetReentrantMonitor().AssertCurrentThreadIn();
+  GetReentrantMonitor().AssertCurrentThreadIn();
   return mData.get();
 }
 

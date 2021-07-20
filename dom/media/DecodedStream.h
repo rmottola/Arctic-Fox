@@ -95,7 +95,7 @@ public:
 
 class DecodedStream {
 public:
-	explicit DecodedStream(ReentrantMonitor& aMonitor);
+  explicit DecodedStream(ReentrantMonitor& aMonitor);
   DecodedStreamData* GetData() const;
   void DestroyData();
   void RecreateData(MediaStreamGraph* aGraph);

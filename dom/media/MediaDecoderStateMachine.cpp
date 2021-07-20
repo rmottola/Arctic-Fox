@@ -3077,6 +3077,20 @@ void MediaDecoderStateMachine::OnAudioSinkError()
   DecodeError();
 }
 
+void MediaDecoderStateMachine::AddOutputStream(ProcessedMediaStream* aStream,
+                                               bool aFinishWhenEnded)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  DECODER_LOG("AddOutputStream aStream=%p!", aStream);
+
+  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
+  if (!GetDecodedStream()) {
+    RecreateDecodedStream(aStream->Graph());
+  }
+  mDecodedStream.Connect(aStream, aFinishWhenEnded);
+  DispatchAudioCaptured();
+}
+
 DecodedStreamData* MediaDecoderStateMachine::GetDecodedStream() const
 {
   AssertCurrentThreadInMonitor();
@@ -3102,20 +3116,6 @@ void MediaDecoderStateMachine::DispatchAudioCaptured()
     }
   });
   TaskQueue()->Dispatch(r.forget());
-}
-
-void MediaDecoderStateMachine::AddOutputStream(ProcessedMediaStream* aStream,
-                                               bool aFinishWhenEnded)
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  DECODER_LOG("AddOutputStream aStream=%p!", aStream);
-
-  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-  if (!GetDecodedStream()) {
-    RecreateDecodedStream(aStream->Graph());
-  }
-  mDecodedStream.Connect(aStream, aFinishWhenEnded);
-  DispatchAudioCaptured();
 }
 
 void MediaDecoderStateMachine::RecreateDecodedStream(MediaStreamGraph* aGraph)
