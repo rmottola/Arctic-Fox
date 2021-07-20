@@ -310,10 +310,7 @@ public:
     if (mReader) {
       mReader->BreakCycles();
     }
-    {
-      ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-      mDecodedStream.DestroyData();
-    }
+    mDecodedStream.DestroyData();
     mDecoder = nullptr;
   }
 
