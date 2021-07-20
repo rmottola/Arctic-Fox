@@ -43,8 +43,7 @@ public:
   void SetPlaybackRate(double aPlaybackRate);
   void SetPreservesPitch(bool aPreservesPitch);
 
-  void StartPlayback();
-  void StopPlayback();
+  void SetPlaying(bool aPlaying);
 
 private:
   ~AudioSink() {}
