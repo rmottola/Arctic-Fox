@@ -182,8 +182,8 @@ OutputStreamData::Init(DecodedStream* aDecodedStream, ProcessedMediaStream* aStr
   aStream->AddListener(mListener);
 }
 
-DecodedStream::DecodedStream(ReentrantMonitor& aMonitor)
-  : mMonitor(aMonitor)
+DecodedStream::DecodedStream()
+  : mMonitor("DecodedStream::mMonitor")
 {
   //
 }
@@ -191,7 +191,7 @@ DecodedStream::DecodedStream(ReentrantMonitor& aMonitor)
 DecodedStreamData*
 DecodedStream::GetData() const
 {
-  GetReentrantMonitor().AssertCurrentThreadIn();
+  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
   return mData.get();
 }
 
@@ -199,7 +199,7 @@ void
 DecodedStream::DestroyData()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  GetReentrantMonitor().AssertCurrentThreadIn();
+  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
 
   // Avoid the redundant blocking to output stream.
   if (!mData) {
@@ -234,7 +234,7 @@ void
 DecodedStream::RecreateData(MediaStreamGraph* aGraph)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  GetReentrantMonitor().AssertCurrentThreadIn();
+  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
   MOZ_ASSERT((aGraph && !mData && OutputStreams().IsEmpty()) || // first time
              (!aGraph && mData)); // 2nd time and later
 
@@ -287,7 +287,7 @@ void
 DecodedStream::Connect(ProcessedMediaStream* aStream, bool aFinishWhenEnded)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  GetReentrantMonitor().AssertCurrentThreadIn();
+  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
 
   OutputStreamData* os = OutputStreams().AppendElement();
   os->Init(this, aStream);
@@ -322,7 +322,7 @@ DecodedStream::Remove(MediaStream* aStream)
 void
 DecodedStream::SetPlaying(bool aPlaying)
 {
-  GetReentrantMonitor().AssertCurrentThreadIn();
+  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
   MOZ_ASSERT(mData);
   mData->SetPlaying(aPlaying);
 }

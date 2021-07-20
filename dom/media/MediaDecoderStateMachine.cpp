@@ -239,8 +239,7 @@ MediaDecoderStateMachine::MediaDecoderStateMachine(MediaDecoder* aDecoder,
   mDecodingFrozenAtStateDecoding(false),
   mSentLoadedMetadataEvent(false),
   mSentFirstFrameLoadedEvent(false),
-  mSentPlaybackEndedEvent(false),
-  mDecodedStream(mDecoder->GetReentrantMonitor())
+  mSentPlaybackEndedEvent(false)
 {
   MOZ_COUNT_CTOR(MediaDecoderStateMachine);
   NS_ASSERTION(NS_IsMainThread(), "Should be on main thread.");
@@ -3088,7 +3087,6 @@ uint32_t MediaDecoderStateMachine::GetAmpleVideoFrames() const
 
 DecodedStreamData* MediaDecoderStateMachine::GetDecodedStream() const
 {
-  AssertCurrentThreadInMonitor();
   return mDecodedStream.GetData();
 }
 
@@ -3119,7 +3117,6 @@ void MediaDecoderStateMachine::AddOutputStream(ProcessedMediaStream* aStream,
   MOZ_ASSERT(NS_IsMainThread());
   DECODER_LOG("AddOutputStream aStream=%p!", aStream);
 
-  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
   if (!GetDecodedStream()) {
     RecreateDecodedStream(aStream->Graph());
   }
@@ -3130,9 +3127,15 @@ void MediaDecoderStateMachine::AddOutputStream(ProcessedMediaStream* aStream,
 void MediaDecoderStateMachine::RecreateDecodedStream(MediaStreamGraph* aGraph)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
   mDecodedStream.RecreateData(aGraph);
-  mDecodedStream.SetPlaying(IsPlaying());
+
+  nsRefPtr<MediaDecoderStateMachine> self = this;
+  nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([self] () -> void
+  {
+    ReentrantMonitorAutoEnter mon(self->mDecoder->GetReentrantMonitor());
+    self->mDecodedStream.SetPlaying(self->IsPlaying());
+  });
+  TaskQueue()->Dispatch(r.forget());
 }
 
 } // namespace mozilla
