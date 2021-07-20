@@ -397,9 +397,6 @@ MediaCodecReader::DecodeAudioDataSync()
     } else if (status == -EAGAIN) {
       if (TimeStamp::Now() > timeout) {
         // Don't let this loop run for too long. Try it again later.
-        if (CheckAudioResources()) {
-          DispatchAudioTask();
-        }
         return;
       }
       continue; // Try it again now.
@@ -445,11 +442,22 @@ MediaCodecReader::DecodeAudioDataSync()
 void
 MediaCodecReader::DecodeAudioDataTask()
 {
-  if (AudioQueue().GetSize() == 0 && !AudioQueue().IsFinished()) {
-    DecodeAudioDataSync();
-  }
+  MOZ_ASSERT(mAudioTrack.mTaskQueue->IsCurrentThreadIn());
   MonitorAutoLock al(mAudioTrack.mTrackMonitor);
   if (mAudioTrack.mAudioPromise.IsEmpty()) {
+    // Clear the data in queue because the promise might be canceled by
+    // ResetDecode().
+    AudioQueue().Reset();
+    return;
+  }
+  if (AudioQueue().GetSize() == 0 && !AudioQueue().IsFinished()) {
+    MonitorAutoUnlock ul(mAudioTrack.mTrackMonitor);
+    DecodeAudioDataSync();
+  }
+  // Since we unlock the monitor above, we should check the promise again
+  // because the promise might be canceled by ResetDecode().
+  if (mAudioTrack.mAudioPromise.IsEmpty()) {
+    AudioQueue().Reset();
     return;
   }
   if (AudioQueue().GetSize() > 0) {
@@ -471,9 +479,22 @@ MediaCodecReader::DecodeAudioDataTask()
 void
 MediaCodecReader::DecodeVideoFrameTask(int64_t aTimeThreshold)
 {
-  DecodeVideoFrameSync(aTimeThreshold);
+  MOZ_ASSERT(mVideoTrack.mTaskQueue->IsCurrentThreadIn());
   MonitorAutoLock al(mVideoTrack.mTrackMonitor);
   if (mVideoTrack.mVideoPromise.IsEmpty()) {
+    // Clear the data in queue because the promise might be canceled by
+    // ResetDecode().
+    VideoQueue().Reset();
+    return;
+  }
+  {
+    MonitorAutoUnlock ul(mVideoTrack.mTrackMonitor);
+    DecodeVideoFrameSync(aTimeThreshold);
+  }
+  // Since we unlock the monitor above, we should check the promise again
+  // because the promise might be canceled by ResetDecode().
+  if (mVideoTrack.mVideoPromise.IsEmpty()) {
+    VideoQueue().Reset();
     return;
   }
   if (VideoQueue().GetSize() > 0) {
@@ -745,7 +766,6 @@ nsresult
 MediaCodecReader::ResetDecode()
 {
   if (CheckAudioResources()) {
-    mAudioTrack.mTaskQueue->Flush();
     MonitorAutoLock al(mAudioTrack.mTrackMonitor);
     if (!mAudioTrack.mAudioPromise.IsEmpty()) {
       mAudioTrack.mAudioPromise.Reject(CANCELED, __func__);
@@ -754,7 +774,6 @@ MediaCodecReader::ResetDecode()
     mAudioTrack.mDiscontinuity = true;
   }
   if (CheckVideoResources()) {
-    mVideoTrack.mTaskQueue->Flush();
     MonitorAutoLock al(mVideoTrack.mTrackMonitor);
     if (!mVideoTrack.mVideoPromise.IsEmpty()) {
       mVideoTrack.mVideoPromise.Reject(CANCELED, __func__);
@@ -898,9 +917,6 @@ MediaCodecReader::DecodeVideoFrameSync(int64_t aTimeThreshold)
     } else if (status == -EAGAIN) {
       if (TimeStamp::Now() > timeout) {
         // Don't let this loop run for too long. Try it again later.
-        if (CheckVideoResources()) {
-          DispatchVideoTask(aTimeThreshold);
-        }
         return;
       }
       continue; // Try it again now.
@@ -1030,16 +1046,15 @@ MediaCodecReader::Seek(int64_t aTime, int64_t aEndTime)
 {
   MOZ_ASSERT(OnTaskQueue());
 
-  mVideoTrack.mSeekTimeUs = aTime;
-  mAudioTrack.mSeekTimeUs = aTime;
-  mVideoTrack.mInputEndOfStream = false;
-  mVideoTrack.mOutputEndOfStream = false;
-  mAudioTrack.mInputEndOfStream = false;
-  mAudioTrack.mOutputEndOfStream = false;
-  mAudioTrack.mFlushed = false;
-  mVideoTrack.mFlushed = false;
+  int64_t timestamp = sInvalidTimestampUs;
 
   if (CheckVideoResources()) {
+    MonitorAutoLock al(mVideoTrack.mTrackMonitor);
+    mVideoTrack.mSeekTimeUs = aTime;
+    mVideoTrack.mInputEndOfStream = false;
+    mVideoTrack.mOutputEndOfStream = false;
+    mVideoTrack.mFlushed = false;
+
     VideoFrameContainer* videoframe = mDecoder->GetVideoFrameContainer();
     if (videoframe) {
       layers::ImageContainer* image = videoframe->GetImageContainer();
@@ -1050,7 +1065,6 @@ MediaCodecReader::Seek(int64_t aTime, int64_t aEndTime)
 
     MediaBuffer* source_buffer = nullptr;
     MediaSource::ReadOptions options;
-    int64_t timestamp = sInvalidTimestampUs;
     options.setSeekTo(aTime, MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC);
     if (mVideoTrack.mSource->read(&source_buffer, &options) != OK ||
         source_buffer == nullptr) {
@@ -1061,12 +1075,25 @@ MediaCodecReader::Seek(int64_t aTime, int64_t aEndTime)
       if (format->findInt64(kKeyTime, &timestamp) &&
           IsValidTimestampUs(timestamp)) {
         mVideoTrack.mSeekTimeUs = timestamp;
-        mAudioTrack.mSeekTimeUs = timestamp;
       }
       format = nullptr;
     }
     source_buffer->release();
   }
+
+  {
+    MonitorAutoLock al(mAudioTrack.mTrackMonitor);
+    mAudioTrack.mInputEndOfStream = false;
+    mAudioTrack.mOutputEndOfStream = false;
+    mAudioTrack.mFlushed = false;
+
+    if (IsValidTimestampUs(timestamp)) {
+      mAudioTrack.mSeekTimeUs = timestamp;
+    } else {
+      mAudioTrack.mSeekTimeUs = aTime;
+    }
+  }
+
   return SeekPromise::CreateAndResolve(aTime, __func__);
 }
 
@@ -1287,11 +1314,11 @@ bool
 MediaCodecReader::CreateTaskQueues()
 {
   if (mAudioTrack.mSource != nullptr && !mAudioTrack.mTaskQueue) {
-    mAudioTrack.mTaskQueue = CreateFlushableMediaDecodeTaskQueue();
+    mAudioTrack.mTaskQueue = CreateMediaDecodeTaskQueue();
     NS_ENSURE_TRUE(mAudioTrack.mTaskQueue, false);
   }
   if (mVideoTrack.mSource != nullptr && !mVideoTrack.mTaskQueue) {
-    mVideoTrack.mTaskQueue = CreateFlushableMediaDecodeTaskQueue();
+    mVideoTrack.mTaskQueue = CreateMediaDecodeTaskQueue();
     NS_ENSURE_TRUE(mVideoTrack.mTaskQueue, false);
     mVideoTrack.mReleaseBufferTaskQueue = CreateMediaDecodeTaskQueue();
     NS_ENSURE_TRUE(mVideoTrack.mReleaseBufferTaskQueue, false);
