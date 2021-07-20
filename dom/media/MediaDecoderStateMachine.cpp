@@ -3077,18 +3077,13 @@ void MediaDecoderStateMachine::OnAudioSinkError()
   DecodeError();
 }
 
-void MediaDecoderStateMachine::AddOutputStream(ProcessedMediaStream* aStream,
-                                               bool aFinishWhenEnded)
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  DECODER_LOG("AddOutputStream aStream=%p!", aStream);
 
-  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-  if (!GetDecodedStream()) {
-    RecreateDecodedStream(aStream->Graph());
-  }
-  mDecodedStream.Connect(aStream, aFinishWhenEnded);
-  DispatchAudioCaptured();
+uint32_t MediaDecoderStateMachine::GetAmpleVideoFrames() const
+{
+  AssertCurrentThreadInMonitor();
+  return (mReader->IsAsync() && mReader->VideoIsHardwareAccelerated())
+    ? std::max<uint32_t>(sVideoQueueHWAccelSize, MIN_VIDEO_QUEUE_SIZE)
+    : std::max<uint32_t>(sVideoQueueDefaultSize, MIN_VIDEO_QUEUE_SIZE);
 }
 
 DecodedStreamData* MediaDecoderStateMachine::GetDecodedStream() const
@@ -3118,20 +3113,26 @@ void MediaDecoderStateMachine::DispatchAudioCaptured()
   TaskQueue()->Dispatch(r.forget());
 }
 
+void MediaDecoderStateMachine::AddOutputStream(ProcessedMediaStream* aStream,
+                                               bool aFinishWhenEnded)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  DECODER_LOG("AddOutputStream aStream=%p!", aStream);
+
+  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
+  if (!GetDecodedStream()) {
+    RecreateDecodedStream(aStream->Graph());
+  }
+  mDecodedStream.Connect(aStream, aFinishWhenEnded);
+  DispatchAudioCaptured();
+}
+
 void MediaDecoderStateMachine::RecreateDecodedStream(MediaStreamGraph* aGraph)
 {
   MOZ_ASSERT(NS_IsMainThread());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
   mDecodedStream.RecreateData(aGraph);
   mDecodedStream.SetPlaying(IsPlaying());
-}
-
-uint32_t MediaDecoderStateMachine::GetAmpleVideoFrames() const
-{
-  AssertCurrentThreadInMonitor();
-  return (mReader->IsAsync() && mReader->VideoIsHardwareAccelerated())
-    ? std::max<uint32_t>(sVideoQueueHWAccelSize, MIN_VIDEO_QUEUE_SIZE)
-    : std::max<uint32_t>(sVideoQueueDefaultSize, MIN_VIDEO_QUEUE_SIZE);
 }
 
 } // namespace mozilla
