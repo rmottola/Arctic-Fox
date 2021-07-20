@@ -80,6 +80,7 @@ DecodedStreamData::DecodedStreamData(SourceMediaStream* aStream)
   , mStream(aStream)
   , mHaveBlockedForPlayState(false)
   , mHaveBlockedForStateMachineNotPlaying(false)
+  , mEOSVideoCompensation(false)
 {
   mListener = new DecodedStreamGraphListener(mStream);
   mStream->AddListener(mListener);
