@@ -1031,7 +1031,7 @@ void MediaDecoderStateMachine::StopPlayback()
 
   AssertCurrentThreadInMonitor();
 
-  mDecoder->NotifyPlaybackStopped();
+  mDecoder->DispatchPlaybackStopped();
 
   if (IsPlaying()) {
     mPlayDuration = GetClock();
@@ -1070,7 +1070,7 @@ void MediaDecoderStateMachine::MaybeStartPlayback()
 
   DECODER_LOG("MaybeStartPlayback() starting playback");
 
-  mDecoder->NotifyPlaybackStarted();
+  mDecoder->DispatchPlaybackStarted();
   SetPlayStartTime(TimeStamp::Now());
   MOZ_ASSERT(IsPlaying());
 
