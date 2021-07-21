@@ -316,7 +316,7 @@ public:
    * mReentrantMonitor.
    *
    * If this ImageContainer has an ImageClient for async video:
-   * Schelude a task to send the image to the compositor using the 
+   * Schedule a task to send the image to the compositor using the
    * PImageBridge protcol without using the main thread.
    */
   void SetCurrentImage(Image* aImage);
