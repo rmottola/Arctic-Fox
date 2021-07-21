@@ -438,7 +438,7 @@ static void FlushAllImagesSync(ImageClient* aClient, ImageContainer* aContainer,
   MOZ_ASSERT(aClient);
   sImageBridgeChildSingleton->BeginTransaction();
   if (aContainer) {
-    aContainer->ClearCurrentImage();
+    aContainer->ClearImagesFromImageBridge();
   }
   aClient->FlushAllImages(aWaiter);
   sImageBridgeChildSingleton->EndTransaction();

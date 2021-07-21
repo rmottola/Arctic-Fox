@@ -246,7 +246,7 @@ ImageContainer::SetCurrentImageInternal(Image *aImage)
 }
 
 void
-ImageContainer::ClearCurrentImage()
+ImageContainer::ClearImagesFromImageBridge()
 {
   ReentrantMonitorAutoEnter mon(mReentrantMonitor);
   SetCurrentImageInternal(nullptr);
@@ -271,7 +271,8 @@ ImageContainer::SetCurrentImage(Image *aImage)
 ImageContainer::ClearAllImages()
 {
   if (IsAsync()) {
-    // Let ImageClient release all TextureClients.
+    // Let ImageClient release all TextureClients. This doesn't return
+    // until ImageBridge has called ClearCurrentImageFromImageBridge.
     ImageBridgeChild::FlushAllImages(mImageClient, this);
     return;
   }
