@@ -657,7 +657,10 @@ int64_t
 DecodedStream::GetPosition() const
 {
   ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
-  return mData->GetPosition();
+  // This is only called after MDSM starts playback. So mStartTime is
+  // guaranteed to be something.
+  MOZ_ASSERT(mStartTime.isSome());
+  return mStartTime.ref() + mData->GetPosition();
 }
 
 bool
