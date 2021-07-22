@@ -651,10 +651,6 @@ protected:
   // Can only be called on the state machine thread.
   void SetPlayStartTime(const TimeStamp& aTimeStamp);
 
-public:
-  // Update mAudioEndTime.
-  void OnAudioEndTimeUpdate(int64_t aAudioEndTime);
-
 private:
   // Update mDecoder's playback offset.
   void OnPlaybackOffsetUpdate(int64_t aPlaybackOffset);
@@ -1056,10 +1052,9 @@ protected:
 public:
   AbstractCanonical<int64_t>* CanonicalCurrentPosition() { return &mCurrentPosition; }
 protected:
-  // The end time of the last audio frame that's been pushed onto the audio
-  // hardware in microseconds. This will approximately be the end time of the
-  // audio stream, unless another frame is pushed to the hardware.
-  int64_t mAudioEndTime;
+  // The end time of the last audio frame that's been pushed onto the audio sink
+  // or DecodedStream in microseconds. This will approximately be the end time
+  // of the audio stream, unless another frame is pushed to the hardware.
   int64_t AudioEndTime() const;
 
   // The end time of the last decoded audio frame. This signifies the end of
