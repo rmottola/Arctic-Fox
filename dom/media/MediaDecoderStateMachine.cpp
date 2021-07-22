@@ -2283,6 +2283,7 @@ nsresult MediaDecoderStateMachine::RunStateMachine()
           ->Then(TaskQueue(), __func__, this,
                  &MediaDecoderStateMachine::OnMetadataRead,
                  &MediaDecoderStateMachine::OnMetadataNotRead));
+
       }
       return NS_OK;
     }
