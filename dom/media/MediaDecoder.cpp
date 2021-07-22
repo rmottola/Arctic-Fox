@@ -508,7 +508,7 @@ nsresult MediaDecoder::InitializeStateMachine(MediaDecoder* aCloneDonor)
   // set them now
   SetStateMachineParameters();
 
-  return ScheduleStateMachineThread();
+  return ScheduleStateMachine();
 }
 
 void MediaDecoder::SetStateMachineParameters()
@@ -530,7 +530,7 @@ void MediaDecoder::SetMinimizePrerollUntilPlaybackStarts()
   MOZ_DIAGNOSTIC_ASSERT(!mDecoderStateMachine);
 }
 
-nsresult MediaDecoder::ScheduleStateMachineThread()
+nsresult MediaDecoder::ScheduleStateMachine()
 {
   MOZ_ASSERT(NS_IsMainThread());
   if (mShuttingDown)
@@ -539,7 +539,7 @@ nsresult MediaDecoder::ScheduleStateMachineThread()
   MOZ_ASSERT(mDecoderStateMachine);
   NS_ENSURE_STATE(mDecoderStateMachine);
   ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
-  mDecoderStateMachine->ScheduleStateMachine();
+  mDecoderStateMachine->ScheduleStateMachineCrossThread();
   return NS_OK;
 }
 
@@ -553,7 +553,7 @@ nsresult MediaDecoder::Play()
   if (mPausedForPlaybackRateNull) {
     return NS_OK;
   }
-  ScheduleStateMachineThread();
+  ScheduleStateMachine();
   if (IsEnded()) {
     return Seek(0, SeekTarget::PrevSyncPoint);
   } else if (mPlayState == PLAY_STATE_LOADING) {
@@ -1037,7 +1037,7 @@ void MediaDecoder::ChangeState(PlayState aState)
     RemoveMediaTracks();
   }
 
-  ScheduleStateMachineThread();
+  ScheduleStateMachine();
 
   CancelDormantTimer();
   // Start dormant timer if necessary

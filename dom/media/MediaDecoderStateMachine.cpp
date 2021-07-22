@@ -2943,6 +2943,7 @@ void MediaDecoderStateMachine::ScheduleStateMachineWithLockAndWakeDecoder()
 void
 MediaDecoderStateMachine::ScheduleStateMachine()
 {
+  MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
   if (mDispatchedStateMachine) {
     return;
