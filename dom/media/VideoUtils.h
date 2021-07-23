@@ -13,7 +13,7 @@
 #include "nsIThread.h"
 #include "nsSize.h"
 #include "nsRect.h"
-#include "MediaPromise.h"
+#include "MozPromise.h"
 
 #if !(defined(XP_WIN) || defined(XP_MACOSX) || defined(LINUX)) || \
     defined(MOZ_ASAN)
@@ -215,6 +215,10 @@ class SharedThreadPool;
 // thread pool to ensure they can run when the MediaDataDecoder clients'
 // thread pool is blocked.  Tasks on the PLATFORM_DECODER thread pool must not
 // wait on tasks in the PLAYBACK thread pool.
+//
+// No new dependencies on this mechanism should be added, as methods are being
+// made async supported by MozPromise, making this unnecessary and
+// permitting unifying the pool.
 enum class MediaThreadType {
   PLAYBACK, // MediaDecoderStateMachine and MediaDecoderReader
   PLATFORM_DECODER

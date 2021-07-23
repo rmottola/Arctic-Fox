@@ -223,7 +223,7 @@ private:
       mPromise.SetMonitor(&mMonitor);
     }
 
-    MediaPromiseHolder<PromiseType> mPromise;
+    MozPromiseHolder<PromiseType> mPromise;
 
     bool HasPromise() override { return !mPromise.IsEmpty(); }
     void RejectPromise(MediaDecoderReader::NotDecodedReason aReason,
