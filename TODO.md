@@ -118,6 +118,9 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1190316 - Apply fullscreen transition on only the target monitor
 - 1190669 - 4 parts
 - Bug 1191112 - 3 parts
+- Bug 1189588: [MSE] Remove MediaSourceDemuxer::NotifyTimeRangesChanged
+- Bug 1189138 Video corruption when seeking backward on YouTube
+- Bug 1184867 - 2015-07-31 : new MSE- 3 parts
 - Bug 1189809 - 2015-07-31 Remove the ill-fated DynamicTraceable
 - Bug 1186384 - Consider device pixel scale on fullscreen transition wi
 - Bug 1181142 - Part 2: Make the minimum jemalloc4 allocation size 16 b
@@ -127,6 +130,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1160014 - 2015-07-24 - Implement fullscreen part 4-6
 - Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
 - Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
+- Bug 1171379 - and check all related on bugzilla
 - Bug 909154. Remove the prefixed mozRequestAnimationFrame and its acco
 - Bug 1184429 - 2015-07-17 P1. & P2
 - Bug 1182316: Part 3 - Add assertions to most other WebIDL entry point
