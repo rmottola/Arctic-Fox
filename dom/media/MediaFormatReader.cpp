@@ -640,6 +640,7 @@ void
 MediaFormatReader::NotifyInputExhausted(TrackType aTrack)
 {
   MOZ_ASSERT(OnTaskQueue());
+  LOGV("Decoder has requested more %s data", TrackTypeToStr(aTrack));
   auto& decoder = GetDecoderData(aTrack);
   decoder.mInputExhausted = true;
   ScheduleUpdate(aTrack);
@@ -662,6 +663,7 @@ void
 MediaFormatReader::NotifyError(TrackType aTrack)
 {
   MOZ_ASSERT(OnTaskQueue());
+  LOGV("Decoder has requested more %s data", TrackTypeToStr(aTrack));
   auto& decoder = GetDecoderData(aTrack);
   decoder.mError = true;
   decoder.mNeedDraining = true;
@@ -681,6 +683,7 @@ void
 MediaFormatReader::NotifyEndOfStream(TrackType aTrack)
 {
   MOZ_ASSERT(OnTaskQueue());
+  LOGV("%s Decoding error", TrackTypeToStr(aTrack));
   auto& decoder = GetDecoderData(aTrack);
   decoder.mDemuxEOS = true;
   decoder.mNeedDraining = true;
@@ -785,6 +788,8 @@ MediaFormatReader::RequestDemuxSamples(TrackType aTrack)
     // Nothing left to demux.
     return;
   }
+
+  LOGV("Requesting extra demux %s", TrackTypeToStr(aTrack));
   if (aTrack == TrackInfo::kVideoTrack) {
     DoDemuxVideo();
   } else {
@@ -935,12 +940,15 @@ MediaFormatReader::Update(TrackType aTrack)
     return;
   }
 
+  LOGV("Processing update for %s", TrackTypeToStr(aTrack));
+
   bool needInput = false;
   bool needOutput = false;
   auto& decoder = GetDecoderData(aTrack);
   decoder.mUpdateScheduled = false;
 
   if (UpdateReceivedNewData(aTrack)) {
+    LOGV("Nothing more to do");
     return;
   }
 
@@ -1031,6 +1039,7 @@ MediaFormatReader::ReturnOutput(MediaData* aData, TrackType aTrack)
   auto& decoder = GetDecoderData(aTrack);
   MOZ_ASSERT(decoder.HasPromise());
   if (decoder.mDiscontinuity) {
+    LOGV("Setting discontinuity flag");
     decoder.mDiscontinuity = false;
     aData->mDiscontinuity = true;
   }
@@ -1051,6 +1060,7 @@ MediaFormatReader::ReturnOutput(MediaData* aData, TrackType aTrack)
   } else if (aTrack == TrackInfo::kVideoTrack) {
     mVideo.mPromise.Resolve(static_cast<VideoData*>(aData), __func__);
   }
+  LOG("Resolved data promise for %s", TrackTypeToStr(aTrack));
 }
 
 size_t
@@ -1092,6 +1102,7 @@ nsresult
 MediaFormatReader::ResetDecode()
 {
   MOZ_ASSERT(OnTaskQueue());
+  LOGV("");
 
   mAudio.mSeekRequest.DisconnectIfExists();
   mVideo.mSeekRequest.DisconnectIfExists();
@@ -1295,6 +1306,7 @@ void
 MediaFormatReader::OnSeekFailed(TrackType aTrack, DemuxerFailureReason aResult)
 {
   MOZ_ASSERT(OnTaskQueue());
+  LOGV("%s failure = %d", TrackTypeToStr(aTrack), aResult);
   if (aTrack == TrackType::kVideoTrack) {
     mVideo.mSeekRequest.Complete();
   } else {
@@ -1314,6 +1326,7 @@ void
 MediaFormatReader::DoVideoSeek()
 {
   MOZ_ASSERT(mPendingSeekTime.isSome());
+  LOGV("Seeking video to %lld", mPendingSeekTime.ref().ToMicroseconds());
   media::TimeUnit seekTime = mPendingSeekTime.ref();
   mVideo.mSeekRequest.Begin(mVideo.mTrackDemuxer->Seek(seekTime)
                           ->Then(TaskQueue(), __func__, this,
@@ -1340,6 +1353,7 @@ void
 MediaFormatReader::DoAudioSeek()
 {
   MOZ_ASSERT(mPendingSeekTime.isSome());
+  LOGV("Seeking audio to %lld", mPendingSeekTime.ref().ToMicroseconds());
   media::TimeUnit seekTime = mPendingSeekTime.ref();
   mAudio.mSeekRequest.Begin(mAudio.mTrackDemuxer->Seek(seekTime)
                          ->Then(TaskQueue(), __func__, this,
@@ -1455,6 +1469,7 @@ MediaFormatReader::NotifyDemuxer(uint32_t aLength, int64_t aOffset)
 {
   MOZ_ASSERT(OnTaskQueue());
 
+  LOGV("aLength=%u, aOffset=%lld", aLength, aOffset);
   if (mShutdown) {
     return;
   }
