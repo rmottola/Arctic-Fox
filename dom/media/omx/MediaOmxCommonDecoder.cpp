@@ -122,7 +122,7 @@ MediaOmxCommonDecoder::PauseStateMachine()
       GetStateMachine(),
       &MediaDecoderStateMachine::SetDormant,
       true);
-  GetStateMachine()->TaskQueue()->Dispatch(event.forget());
+  GetStateMachine()->OwnerThread()->Dispatch(event.forget());
 }
 
 void
@@ -151,7 +151,7 @@ MediaOmxCommonDecoder::ResumeStateMachine()
       GetStateMachine(),
       &MediaDecoderStateMachine::Seek,
       target);
-  GetStateMachine()->TaskQueue()->Dispatch(event.forget());
+  GetStateMachine()->OwnerThread()->Dispatch(event.forget());
 
   mNextState = mPlayState;
   ChangeState(PLAY_STATE_LOADING);
@@ -161,7 +161,7 @@ MediaOmxCommonDecoder::ResumeStateMachine()
       GetStateMachine(),
       &MediaDecoderStateMachine::SetDormant,
       false);
-  GetStateMachine()->TaskQueue()->Dispatch(event.forget());
+  GetStateMachine()->OwnerThread()->Dispatch(event.forget());
   UpdateLogicalPosition();
 }
 

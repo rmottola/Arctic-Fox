@@ -244,7 +244,7 @@ MediaOmxReader::AsyncReadMetadata()
 
   nsRefPtr<MediaOmxReader> self = this;
   mMediaResourceRequest.Begin(mOmxDecoder->AllocateMediaResources()
-    ->Then(TaskQueue(), __func__,
+    ->Then(OwnerThread(), __func__,
       [self] (bool) -> void {
         self->mMediaResourceRequest.Complete();
         self->HandleResourceAllocated();
@@ -540,7 +540,7 @@ MediaOmxReader::Seek(int64_t aTarget, int64_t aEndTime)
     mVideoSeekTimeUs = aTarget;
 
     nsRefPtr<MediaOmxReader> self = this;
-    mSeekRequest.Begin(DecodeToFirstVideoData()->Then(TaskQueue(), __func__, [self] (VideoData* v) {
+    mSeekRequest.Begin(DecodeToFirstVideoData()->Then(OwnerThread(), __func__, [self] (VideoData* v) {
       self->mSeekRequest.Complete();
       self->mAudioSeekTimeUs = v->mTime;
       self->mSeekPromise.Resolve(self->mAudioSeekTimeUs, __func__);
@@ -602,7 +602,7 @@ int64_t MediaOmxReader::ProcessCachedData(int64_t aOffset)
   if (OnTaskQueue()) {
     runnable->Run();
   } else {
-    TaskQueue()->Dispatch(runnable.forget());
+    OwnerThread()->Dispatch(runnable.forget());
   }
 
   return resourceLength - aOffset - bufferLength;
