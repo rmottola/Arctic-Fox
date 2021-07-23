@@ -150,9 +150,8 @@ MediaOmxCommonDecoder::ResumeStateMachine()
     NS_NewRunnableMethodWithArg<SeekTarget>(
       GetStateMachine(),
       &MediaDecoderStateMachine::Seek,
-      mRequestedSeekTarget);
-  GetStateMachine()->TaskQueue()->Dispatch(event);
-  mRequestedSeekTarget.Reset();
+      target);
+  GetStateMachine()->TaskQueue()->Dispatch(event.forget());
 
   mNextState = mPlayState;
   ChangeState(PLAY_STATE_LOADING);
