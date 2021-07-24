@@ -206,7 +206,8 @@ FlushableMediaTaskQueue::FlushLocked()
   mQueueMonitor.AssertCurrentThreadOwns();
   MOZ_ASSERT(mIsFlushing);
 
-  // Clear the tasks.
+  // Clear the tasks. If this strikes you as awful, stop using a
+  // FlushableMediaTaskQueue.
   while (!mTasks.empty()) {
     mTasks.pop();
   }
