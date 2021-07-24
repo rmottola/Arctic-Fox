@@ -25,7 +25,7 @@
 
 #include "mozilla/Preferences.h"
 #include "SharedThreadPool.h"
-#include "MediaTaskQueue.h"
+#include "TaskQueue.h"
 
 #include "MediaInfo.h"
 #include "H264Converter.h"
@@ -151,7 +151,7 @@ PlatformDecoderModule::CreatePDM()
 
 already_AddRefed<MediaDataDecoder>
 PlatformDecoderModule::CreateDecoder(const TrackInfo& aConfig,
-                                     FlushableMediaTaskQueue* aTaskQueue,
+                                     FlushableTaskQueue* aTaskQueue,
                                      MediaDataDecoderCallback* aCallback,
                                      layers::LayersBackend aLayersBackend,
                                      layers::ImageContainer* aImageContainer)

@@ -51,7 +51,7 @@ public:
 };
 
 SharedDecoderManager::SharedDecoderManager()
-  : mTaskQueue(new FlushableMediaTaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER)))
+  : mTaskQueue(new FlushableTaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER)))
   , mActiveProxy(nullptr)
   , mActiveCallback(nullptr)
   , mWaitForInternalDrain(false)
@@ -72,7 +72,7 @@ SharedDecoderManager::CreateVideoDecoder(
   const VideoInfo& aConfig,
   layers::LayersBackend aLayersBackend,
   layers::ImageContainer* aImageContainer,
-  FlushableMediaTaskQueue* aVideoTaskQueue,
+  FlushableTaskQueue* aVideoTaskQueue,
   MediaDataDecoderCallback* aCallback)
 {
   if (!mDecoder) {

@@ -7,7 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "MediaTaskQueue.h"
+#include "TaskQueue.h"
 #include "FFmpegLog.h"
 #include "FFmpegDataDecoder.h"
 #include "prsystem.h"
@@ -19,7 +19,7 @@ namespace mozilla
 bool FFmpegDataDecoder<LIBAV_VER>::sFFmpegInitDone = false;
 StaticMutex FFmpegDataDecoder<LIBAV_VER>::sMonitor;
 
-FFmpegDataDecoder<LIBAV_VER>::FFmpegDataDecoder(FlushableMediaTaskQueue* aTaskQueue,
+FFmpegDataDecoder<LIBAV_VER>::FFmpegDataDecoder(FlushableTaskQueue* aTaskQueue,
                                                 AVCodecID aCodecID)
   : mTaskQueue(aTaskQueue)
   , mCodecContext(nullptr)

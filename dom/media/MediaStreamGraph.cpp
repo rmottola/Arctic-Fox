@@ -2652,7 +2652,7 @@ SourceMediaStream::GetEndOfAppendedData(TrackID aID)
 
 void
 SourceMediaStream::DispatchWhenNotEnoughBuffered(TrackID aID,
-    MediaTaskQueue* aSignalQueue, nsIRunnable* aSignalRunnable)
+    TaskQueue* aSignalQueue, nsIRunnable* aSignalRunnable)
 {
   MutexAutoLock lock(mMutex);
   TrackData* data = FindDataForTrack(aID);

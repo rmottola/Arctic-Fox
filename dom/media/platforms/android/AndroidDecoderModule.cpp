@@ -261,7 +261,7 @@ AndroidDecoderModule::CreateVideoDecoder(
                                 const VideoInfo& aConfig,
                                 layers::LayersBackend aLayersBackend,
                                 layers::ImageContainer* aImageContainer,
-                                FlushableMediaTaskQueue* aVideoTaskQueue,
+                                FlushableTaskQueue* aVideoTaskQueue,
                                 MediaDataDecoderCallback* aCallback)
 {
   MediaFormat::LocalRef format;
@@ -280,7 +280,7 @@ AndroidDecoderModule::CreateVideoDecoder(
 
 already_AddRefed<MediaDataDecoder>
 AndroidDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
-                                         FlushableMediaTaskQueue* aAudioTaskQueue,
+                                         FlushableTaskQueue* aAudioTaskQueue,
                                          MediaDataDecoderCallback* aCallback)
 {
   MOZ_ASSERT(aConfig.mBitDepth == 16, "We only handle 16-bit audio!");

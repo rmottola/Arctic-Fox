@@ -31,7 +31,7 @@
 #include "nsContentUtils.h"
 #include "MediaShutdownManager.h"
 #include "SharedThreadPool.h"
-#include "MediaTaskQueue.h"
+#include "TaskQueue.h"
 #include "nsIEventTarget.h"
 #include "prenv.h"
 #include "mozilla/Preferences.h"
@@ -179,8 +179,8 @@ MediaDecoderStateMachine::MediaDecoderStateMachine(MediaDecoder* aDecoder,
                                                    MediaDecoderReader* aReader,
                                                    bool aRealTime) :
   mDecoder(aDecoder),
-  mTaskQueue(new MediaTaskQueue(GetMediaThreadPool(MediaThreadType::PLAYBACK),
-                                /* aSupportsTailDispatch = */ true)),
+  mTaskQueue(new TaskQueue(GetMediaThreadPool(MediaThreadType::PLAYBACK),
+                           /* aSupportsTailDispatch = */ true)),
   mWatchManager(this, mTaskQueue),
   mProducerID(ImageContainer::AllocateProducerID()),
   mRealTime(aRealTime),

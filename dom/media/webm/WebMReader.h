@@ -59,7 +59,7 @@ public:
 class WebMReader : public MediaDecoderReader
 {
 public:
-  explicit WebMReader(AbstractMediaDecoder* aDecoder, MediaTaskQueue* aBorrowedTaskQueue = nullptr);
+  explicit WebMReader(AbstractMediaDecoder* aDecoder, TaskQueue* aBorrowedTaskQueue = nullptr);
 
 protected:
   ~WebMReader();
@@ -116,7 +116,7 @@ public:
   int64_t GetLastVideoFrameTime();
   void SetLastVideoFrameTime(int64_t aFrameTime);
   layers::LayersBackend GetLayersBackendType() { return mLayersBackendType; }
-  FlushableMediaTaskQueue* GetVideoTaskQueue() { return mVideoTaskQueue; }
+  FlushableTaskQueue* GetVideoTaskQueue() { return mVideoTaskQueue; }
   uint64_t GetCodecDelay() { return mCodecDelay; }
 
 protected:
@@ -204,7 +204,7 @@ private:
   layers::LayersBackend mLayersBackendType;
 
   // For hardware video decoding.
-  nsRefPtr<FlushableMediaTaskQueue> mVideoTaskQueue;
+  nsRefPtr<FlushableTaskQueue> mVideoTaskQueue;
 
   // Booleans to indicate if we have audio and/or video data
   bool mHasVideo;

@@ -17,7 +17,7 @@ PRLogModuleInfo* GetDemuxerLog();
 namespace mozilla {
 
 WMFMediaDataDecoder::WMFMediaDataDecoder(MFTManager* aMFTManager,
-                                         FlushableMediaTaskQueue* aTaskQueue,
+                                         FlushableTaskQueue* aTaskQueue,
                                          MediaDataDecoderCallback* aCallback)
   : mTaskQueue(aTaskQueue)
   , mCallback(aCallback)
