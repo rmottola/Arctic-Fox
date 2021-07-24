@@ -45,8 +45,8 @@ public:
     unused << rv;
   }
 
-  // DEPRECATED; do not use! If a flush happens at the same time, this function
-  // can hang and block forever! This needs to be removed in the future.
+  // DEPRECATED! Do not us, if a flush happens at the same time, this function
+  // can hang and block forever!
   void SyncDispatch(already_AddRefed<nsIRunnable> aRunnable);
 
   // Puts the queue in a shutdown state and returns immediately. The queue will

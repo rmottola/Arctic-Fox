@@ -105,7 +105,7 @@ private:
 
 void
 MediaTaskQueue::SyncDispatch(already_AddRefed<nsIRunnable> aRunnable) {
-  NS_WARNING("MediaTaskQueue::SyncDispatch is deprecated and potentially dangerous. Don't use!");
+  NS_WARNING("MediaTaskQueue::SyncDispatch is dangerous and deprecated. Stop using this!");
   nsRefPtr<MediaTaskQueueSyncRunnable> task(new MediaTaskQueueSyncRunnable(Move(aRunnable)));
 
   // Tail dispatchers don't interact nicely with sync dispatch. We require that
