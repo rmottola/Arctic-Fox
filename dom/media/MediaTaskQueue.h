@@ -35,6 +35,8 @@ public:
 
   TaskDispatcher& TailDispatcher() override;
 
+  MediaTaskQueue* AsTaskQueue() override { return this; }
+
   void Dispatch(already_AddRefed<nsIRunnable> aRunnable,
                 DispatchFailureHandling aFailureHandling = AssertDispatchSuccess,
                 DispatchReason aReason = NormalDispatch) override
