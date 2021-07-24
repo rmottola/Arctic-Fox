@@ -53,7 +53,7 @@ public:
   virtual bool IsCurrentThreadIn() = 0;
 
   // Returns true if dispatch is generally reliable. This is used to guard
-  // against FlushableMediaTaskQueues, which eventually needs to go away.
+  // against FlushableMediaTaskQueues, which should go away.
   virtual bool IsDispatchReliable() { return true; }
 
   // Returns a TaskDispatcher that will dispatch its tasks when the currently-
