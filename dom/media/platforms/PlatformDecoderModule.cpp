@@ -24,8 +24,9 @@
 #include "GMPDecoderModule.h"
 
 #include "mozilla/Preferences.h"
+#include "mozilla/TaskQueue.h"
+
 #include "SharedThreadPool.h"
-#include "TaskQueue.h"
 
 #include "MediaInfo.h"
 #include "H264Converter.h"

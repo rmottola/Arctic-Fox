@@ -89,7 +89,6 @@ XPIDL_MODULE = 'dom_media'
 
 EXPORTS += [
     'AbstractMediaDecoder.h',
-    'AbstractThread.h',
     'AudioBufferUtils.h',
     'AudioChannelFormat.h',
     'AudioCompactor.h',
@@ -125,7 +124,6 @@ EXPORTS += [
     'MediaTimer.h',
     'MediaTrack.h',
     'MediaTrackList.h',
-    'MozPromise.h',
     'MP3Decoder.h',
     'MP3Demuxer.h',
     'MP3FrameParser.h',
@@ -134,11 +132,7 @@ EXPORTS += [
     'SelfRef.h',
     'SharedBuffer.h',
     'SharedThreadPool.h',
-    'StateMirroring.h',
-    'StateWatching.h',
     'StreamBuffer.h',
-    'TaskDispatcher.h',
-    'TaskQueue.h',
     'ThreadPoolCOMListener.h',
     'TimeUnits.h',
     'TimeVarying.h',
@@ -150,7 +144,13 @@ EXPORTS += [
 ]
 
 EXPORTS.mozilla += [
+    'AbstractThread.h',
     'MediaManager.h',
+    'MozPromise.h',
+    'StateMirroring.h',
+    'StateWatching.h',
+    'TaskDispatcher.h',
+    'TaskQueue.h',
 ]
 
 EXPORTS.mozilla.media.webrtc += [
