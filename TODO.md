@@ -184,8 +184,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
 - 1185106 - at least part 0 to 4 for TFF
-- 1184634 - Rename MediaTaskQueue to TaskQueue
-- 1184634 - Rename MediaPromise to MozPromise
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
 - 1227567 - Optimise module namespace imports in Ion where we have
