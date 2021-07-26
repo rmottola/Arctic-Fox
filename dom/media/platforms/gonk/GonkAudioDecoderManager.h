@@ -38,8 +38,6 @@ public:
   virtual bool HasQueuedSample() override;
 
 private:
-  bool PerformFormatSpecificProcess(MediaRawData* aSample);
-
   nsresult CreateAudioData(int64_t aStreamOffset,
                               AudioData** aOutData);
 
@@ -49,7 +47,6 @@ private:
   uint32_t mAudioRate;
   const uint32_t mAudioProfile;
   nsTArray<uint8_t> mUserData;
-  bool mUseAdts;
 
   MediaDataDecoderCallback*  mReaderCallback;
   android::MediaBuffer* mAudioBuffer;
