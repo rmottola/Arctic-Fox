@@ -20,11 +20,13 @@
 #include "gfxWindowsPlatform.h"
 #include "nsServiceManagerUtils.h"      // for do_GetService
 #include "MediaInfo.h"
+#include "prsystem.h"
 
 namespace mozilla {
 
 static bool sIsWMFEnabled = false;
 static bool sDXVAEnabled = false;
+static int  sNumDecoderThreads = -1;
 
 WMFDecoderModule::WMFDecoderModule()
   : mWMFInitialized(false)
@@ -45,6 +47,25 @@ WMFDecoderModule::DisableHardwareAcceleration()
   sDXVAEnabled = false;
 }
 
+static void
+SetNumOfDecoderThreads()
+{
+  MOZ_ASSERT(NS_IsMainThread(), "Preferences can only be read on main thread");
+  int32_t numCores = PR_GetNumberOfProcessors();
+
+  // If we have more than 4 cores, let the decoder decide how many threads.
+  // On an 8 core machine, WMF chooses 4 decoder threads
+  const int WMF_DECODER_DEFAULT = -1;
+  int32_t prefThreadCount = Preferences::GetInt("media.wmf.decoder.thread-count", -1);
+  if (prefThreadCount != WMF_DECODER_DEFAULT) {
+    sNumDecoderThreads = std::max(prefThreadCount, 1);
+  } else if (numCores > 4) {
+    sNumDecoderThreads = WMF_DECODER_DEFAULT;
+  } else {
+    sNumDecoderThreads = std::max(numCores - 1, 1);
+  }
+}
+
 /* static */
 void
 WMFDecoderModule::Init()
@@ -52,6 +73,14 @@ WMFDecoderModule::Init()
   MOZ_ASSERT(NS_IsMainThread(), "Must be on main thread.");
   sIsWMFEnabled = Preferences::GetBool("media.windows-media-foundation.enabled", false);
   sDXVAEnabled = gfxPlatform::GetPlatform()->CanUseHardwareVideoDecoding();
+  SetNumOfDecoderThreads();
+}
+
+/* static */
+int
+WMFDecoderModule::GetNumDecoderThreads()
+{
+  return sNumDecoderThreads;
 }
 
 nsresult

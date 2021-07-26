@@ -342,6 +342,7 @@ pref("media.fragmented-mp4.enabled", true);
 pref("media.use-blank-decoder", false);
 #ifdef MOZ_WMF
 pref("media.windows-media-foundation.enabled", true);
+pref("media.wmf.decoder.thread-count", -1);
 #endif
 #if defined(MOZ_FFMPEG)
 pref("media.ffmpeg.enabled", true);
