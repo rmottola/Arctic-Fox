@@ -17,6 +17,7 @@
 #include "nsServiceManagerUtils.h"
 #include "nsIGfxInfo.h"
 #include "GfxDriverInfo.h"
+#include "gfxWindowsPlatform.h"
 #include "nsServiceManagerUtils.h"      // for do_GetService
 #include "MediaInfo.h"
 
