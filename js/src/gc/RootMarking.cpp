@@ -119,13 +119,6 @@ MarkExactStackRoots(JSRuntime* rt, JSTracer* trc)
     MarkExactStackRootsAcrossTypes<PerThreadData*>(&rt->mainThread, trc);
 }
 
-void
-JS::AutoIdArray::trace(JSTracer* trc)
-{
-    MOZ_ASSERT(tag_ == IDARRAY);
-    TraceRange(trc, idArray->length, idArray->begin(), "JSAutoIdArray.idArray");
-}
-
 inline void
 AutoGCRooter::trace(JSTracer* trc)
 {
@@ -133,12 +126,6 @@ AutoGCRooter::trace(JSTracer* trc)
       case PARSER:
         frontend::MarkParser(trc, this);
         return;
-
-      case IDARRAY: {
-        JSIdArray* ida = static_cast<AutoIdArray*>(this)->idArray;
-        TraceRange(trc, ida->length, ida->begin(), "JS::AutoIdArray.idArray");
-        return;
-      }
 
       case VALVECTOR: {
         AutoValueVector::VectorImpl& vector = static_cast<AutoValueVector*>(this)->vector;

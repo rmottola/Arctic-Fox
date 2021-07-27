@@ -1033,8 +1033,8 @@ nsJSObjWrapper::NP_Enumerate(NPObject* npobj, NPIdentifier** idarray,
   JS::Rooted<JSObject*> jsobj(cx, npjsobj->mJSObj);
   JSAutoCompartment ac(cx, jsobj);
 
-  JS::AutoIdArray ida(cx, JS_Enumerate(cx, jsobj));
-  if (!ida) {
+  JS::Rooted<JS::IdVector> ida(cx, JS::IdVector(cx));
+  if (!JS_Enumerate(cx, jsobj, &ida)) {
     return false;
   }
 
