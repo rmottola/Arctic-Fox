@@ -1101,6 +1101,9 @@ DataViewObject::class_constructor(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
+    if (!ThrowIfNotConstructing(cx, args, "DataView"))
+        return false;
+
     RootedObject bufobj(cx);
     if (!GetFirstArgumentAsObject(cx, args, "DataView constructor", &bufobj))
         return false;
