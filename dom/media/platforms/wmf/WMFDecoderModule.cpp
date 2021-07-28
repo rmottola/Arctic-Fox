@@ -24,7 +24,6 @@
 
 namespace mozilla {
 
-static bool sIsWMFEnabled = false;
 static bool sDXVAEnabled = false;
 static int  sNumDecoderThreads = -1;
 static bool sIsIntelDecoderEnabled = false;
@@ -73,7 +72,6 @@ void
 WMFDecoderModule::Init()
 {
   MOZ_ASSERT(NS_IsMainThread(), "Must be on main thread.");
-  sIsWMFEnabled = Preferences::GetBool("media.windows-media-foundation.enabled", false);
   sDXVAEnabled = gfxPlatform::GetPlatform()->CanUseHardwareVideoDecoding();
   sIsIntelDecoderEnabled = Preferences::GetBool("media.webm.intel_decoder.enabled", false);
   SetNumOfDecoderThreads();
@@ -89,9 +87,7 @@ WMFDecoderModule::GetNumDecoderThreads()
 nsresult
 WMFDecoderModule::Startup()
 {
-  if (sIsWMFEnabled) {
-    mWMFInitialized = SUCCEEDED(wmf::MFStartup());
-  }
+  mWMFInitialized = SUCCEEDED(wmf::MFStartup());
   return mWMFInitialized ? NS_OK : NS_ERROR_FAILURE;
 }
 
