@@ -79,7 +79,8 @@ public:
 
   // An audio decoder module must support AAC by default.
   // A video decoder must support H264 by default.
-  // If more codecs are to be supported, SupportsMimeType will have to be extended.
+  // If more codecs are to be supported, SupportsMimeType will have
+  // to be extended
   virtual bool SupportsMimeType(const nsACString& aMimeType);
 
   enum ConversionRequired {
