@@ -62,7 +62,6 @@
 #include "AppleMP3Reader.h"
 #endif
 #ifdef MOZ_FMP4
-#include "MP4Reader.h"
 #include "MP4Decoder.h"
 #include "MP4Demuxer.h"
 #endif
@@ -682,9 +681,7 @@ MediaDecoderReader* DecoderTraits::CreateReader(const nsACString& aType, Abstrac
   }
 #ifdef MOZ_FMP4
   if (IsMP4SupportedType(aType)) {
-    decoderReader = Preferences::GetBool("media.format-reader.mp4", true) ?
-      static_cast<MediaDecoderReader*>(new MediaFormatReader(aDecoder, new MP4Demuxer(aDecoder->GetResource()))) :
-      static_cast<MediaDecoderReader*>(new MP4Reader(aDecoder));
+    decoderReader = new MediaFormatReader(aDecoder, new MP4Demuxer(aDecoder->GetResource()));
   } else
 #endif
 if (IsMP3SupportedType(aType)) {

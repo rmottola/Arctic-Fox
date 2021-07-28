@@ -11,7 +11,6 @@ SOURCES += [
     'TestIntervalSet.cpp',
     'TestMozPromise.cpp',
     'TestMP3Demuxer.cpp',
-    'TestMP4Demuxer.cpp',
     'TestMP4Reader.cpp',
     'TestTrackEncoder.cpp',
     'TestVideoSegment.cpp',

@@ -493,11 +493,6 @@ pref("media.mediasource.webm.enabled", false);
 // Enable new MediaSource architecture.
 pref("media.mediasource.format-reader", true);
 
-// Enable the MediaFormatReader architecture for mp4 + MSE.
-pref("media.mediasource.format-reader.mp4", true);
-// Enable the MediaFormatReader architecture for plain mp4.
-pref("media.format-reader.mp4", true);
-
 // Enable new MediaFormatReader architecture for webm in MSE
 pref("media.mediasource.format-reader.webm", false);
 // Enable new MediaFormatReader architecture for plain webm.
