@@ -494,9 +494,9 @@ pref("media.mediasource.webm.enabled", false);
 // Enable new MediaSource architecture.
 pref("media.mediasource.format-reader", true);
 
-// Enable the MediaFormatReader architecture for MP4 + MSE.
+// Enable the MediaFormatReader architecture for mp4 + MSE.
 pref("media.mediasource.format-reader.mp4", true);
-// Enable the MediaFormatReader architecture for plain MP4.
+// Enable the MediaFormatReader architecture for plain mp4.
 pref("media.format-reader.mp4", true);
 
 #ifdef MOZ_WEBSPEECH
