@@ -23,6 +23,7 @@
 #ifdef MOZ_WEBM
 #include "WebMDecoder.h"
 #include "WebMReader.h"
+#include "WebMDemuxer.h"
 #endif
 #ifdef MOZ_RAW
 #include "RawDecoder.h"
@@ -720,7 +721,9 @@ if (IsMP3SupportedType(aType)) {
   } else
 #endif
   if (IsWebMType(aType)) {
-    decoderReader = new WebMReader(aDecoder);
+    decoderReader = Preferences::GetBool("media.format-reader.webm", true) ?
+      static_cast<MediaDecoderReader*>(new MediaFormatReader(aDecoder, new WebMDemuxer(aDecoder->GetResource()))) :
+      new WebMReader(aDecoder);
   } else
 #ifdef MOZ_DIRECTSHOW
   if (IsDirectShowSupportedType(aType)) {

@@ -25,6 +25,7 @@
 
 #ifdef MOZ_WEBM
 #include "WebMReader.h"
+#include "WebMDemuxer.h"
 #endif
 
 extern PRLogModuleInfo* GetMediaSourceLog();
@@ -697,7 +698,12 @@ CreateReaderForType(const nsACString& aType, AbstractMediaDecoder* aDecoder,
 
 #ifdef MOZ_WEBM
   if (DecoderTraits::IsWebMType(aType)) {
-    return new WebMReader(aDecoder, aBorrowedTaskQueue);
+    bool useFormatDecoder =
+      Preferences::GetBool("media.mediasource.format-reader.webm", true);
+    MediaDecoderReader* reader = useFormatDecoder ?
+      static_cast<MediaDecoderReader*>(new MediaFormatReader(aDecoder, new WebMDemuxer(aDecoder->GetResource()), aBorrowedTaskQueue)) :
+      new WebMReader(aDecoder, aBorrowedTaskQueue);
+    return reader;
   }
 #endif
 
