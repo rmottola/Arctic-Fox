@@ -17,12 +17,24 @@ createHTML({
 // output side. We then sanity check the audio by comparing the frequency domain
 // data from both analysers.
 
+/*
+ * Use as callback to Array.reduce to get an object { value, index }
+ * that contains the largest element in the array.
+ */
+var maxWithIndex = function(a, b, i) {
+  if (b >= a.value) {
+    return { value: b, index: i };
+  } else {
+    return a;
+  }
+};
+
 runNetworkTest(function() {
   var test = new PeerConnectionTest();
 
   var audioContext = new AudioContext();
-  var inputAnalyser;
-  var outputAnalyser;
+  var inputAnalyser, outputAnalyser;
+  var inputData, outputData;
 
   test.setMediaConstraints([{audio: true}], []);
   test.chain.replace("PC_LOCAL_GUM", [
@@ -56,12 +68,35 @@ runNetworkTest(function() {
       return Promise.resolve();
   }]);
   test.chain.append([
-    function CHECK_AUDIO_FLOW(test) {
-      var inputData = new Uint8Array(inputAnalyser.frequencyBinCount);
+    function GET_INPUT_DATA(test) {
+      inputData = new Uint8Array(inputAnalyser.frequencyBinCount);
       inputAnalyser.getByteFrequencyData(inputData);
-
-      var outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
-      outputAnalyser.getByteFrequencyData(outputData);
+      return Promise.resolve();
+    },
+    function GET_OUTPUT_DATA(test) {
+      // We've seen completely silent output with e10s, suggesting that the
+      // machine is overloaded. Here we wait for actual audio data on the
+      // output side before we proceed.
+      return new Promise(resolve => {
+        is(test.pcRemote.mediaCheckers.length, 1, "One media element on remote side");
+        var elem = test.pcRemote.mediaCheckers[0].element;
+        var data = new Uint8Array(outputAnalyser.frequencyBinCount);
+        elem.ontimeupdate = ev => {
+          outputAnalyser.getByteFrequencyData(data);
+          if (data.reduce(maxWithIndex, { value: -1, index: -1 }).value === 0) {
+            info("Waiting for output data... time: " + elem.currentTime);
+            return;
+          }
+          elem.ontimeupdate = null;
+          outputData = data;
+          resolve();
+        };
+      });
+    },
+    function CHECK_AUDIO_FLOW(test) {
+      // This is for sanity check only. We'll deem that the streams are working
+      // if the global maxima in the frequency domain for both the input and
+      // the output are within 10 (out of 1024) steps of each other.
 
       is(inputData.length, outputData.length, "Equally sized datasets");
       var numChecks = 0;
