@@ -507,7 +507,6 @@ AppleVDADecoder::CreateVDADecoder(
   nsRefPtr<AppleVDADecoder> decoder =
     new AppleVDADecoder(aConfig, aVideoTaskQueue, aCallback, aImageContainer);
   if (NS_FAILED(decoder->Init())) {
-    NS_ERROR("AppleVDADecoder an error occurred");
     return nullptr;
   }
   return decoder.forget();
