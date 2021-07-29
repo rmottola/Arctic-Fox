@@ -565,5 +565,3 @@ var addRenegotiationAnswerer = (chain, commands, checks) => {
   });
   addRenegotiation(chain, commands, checks);
 };
-
-
