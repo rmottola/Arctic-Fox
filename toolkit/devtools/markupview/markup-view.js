@@ -2218,7 +2218,7 @@ MarkupElementContainer.prototype = Heritage.extend(MarkupContainer.prototype, {
     // the tooltip, because we want the full-size image
     this.node.getImageData().then(data => {
       data.data.string().then(str => {
-        clipboardHelper.copyString(str, this.markup.doc);
+        clipboardHelper.copyString(str);
       });
     });
   },

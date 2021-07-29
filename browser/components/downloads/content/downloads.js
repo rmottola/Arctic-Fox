@@ -1236,7 +1236,7 @@ DownloadsViewItemController.prototype = {
     downloadsCmd_copyLocation() {
       let clipboard = Cc["@mozilla.org/widget/clipboardhelper;1"]
                       .getService(Ci.nsIClipboardHelper);
-      clipboard.copyString(this.download.source.url, document);
+      clipboard.copyString(this.download.source.url);
     },
 
     downloadsCmd_doDefault() {

@@ -2869,7 +2869,7 @@ WebConsoleFrame.prototype = {
       }
     }
 
-    clipboardHelper.copyString(strings.join("\n"), this.document);
+    clipboardHelper.copyString(strings.join("\n"));
   },
 
   /**
