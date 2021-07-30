@@ -84,7 +84,20 @@ protected:
       return NS_OK;
     }
 
-    mCallback->Call(cx, value);
+    JS::Rooted<JSObject*> asyncStack(cx, mPromise->mAllocationStack);
+    JS::Rooted<JSString*> asyncCause(cx, JS_NewStringCopyZ(cx, "Promise"));
+    if (!asyncCause) {
+      JS_ClearPendingException(cx);
+      return NS_ERROR_OUT_OF_MEMORY;
+    }
+
+    {
+      Maybe<JS::AutoSetAsyncStackForNewCalls> sas;
+      if (asyncStack) {
+        sas.emplace(cx, asyncStack, asyncCause);
+      }
+      mCallback->Call(cx, value);
+    }
 
     return NS_OK;
   }
@@ -406,10 +419,11 @@ Promise::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 }
 
 already_AddRefed<Promise>
-Promise::Create(nsIGlobalObject* aGlobal, ErrorResult& aRv)
+Promise::Create(nsIGlobalObject* aGlobal, ErrorResult& aRv,
+                JS::Handle<JSObject*> aDesiredProto)
 {
   nsRefPtr<Promise> p = new Promise(aGlobal);
-  p->CreateWrapper(aRv);
+  p->CreateWrapper(aDesiredProto, aRv);
   if (aRv.Failed()) {
     return nullptr;
   }
@@ -417,7 +431,7 @@ Promise::Create(nsIGlobalObject* aGlobal, ErrorResult& aRv)
 }
 
 void
-Promise::CreateWrapper(ErrorResult& aRv)
+Promise::CreateWrapper(JS::Handle<JSObject*> aDesiredProto, ErrorResult& aRv)
 {
   AutoJSAPI jsapi;
   if (!jsapi.Init(mGlobal)) {
@@ -427,7 +441,7 @@ Promise::CreateWrapper(ErrorResult& aRv)
   JSContext* cx = jsapi.cx();
 
   JS::Rooted<JS::Value> wrapper(cx);
-  if (!GetOrCreateDOMReflector(cx, this, &wrapper)) {
+  if (!GetOrCreateDOMReflector(cx, this, &wrapper, aDesiredProto)) {
     JS_ClearPendingException(cx);
     aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
     return;
@@ -469,10 +483,10 @@ bool
 Promise::PerformMicroTaskCheckpoint()
 {
   CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
-  nsTArray<nsCOMPtr<nsIRunnable>>& microtaskQueue =
+  std::queue<nsCOMPtr<nsIRunnable>>& microtaskQueue =
     runtime->GetPromiseMicroTaskQueue();
 
-  if (microtaskQueue.IsEmpty()) {
+  if (microtaskQueue.empty()) {
     return false;
   }
 
@@ -482,11 +496,11 @@ Promise::PerformMicroTaskCheckpoint()
   }
 
   do {
-    nsCOMPtr<nsIRunnable> runnable = microtaskQueue.ElementAt(0);
+    nsCOMPtr<nsIRunnable> runnable = microtaskQueue.front();
     MOZ_ASSERT(runnable);
 
     // This function can re-enter, so we remove the element before calling.
-    microtaskQueue.RemoveElementAt(0);
+    microtaskQueue.pop();
     nsresult rv = runnable->Run();
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return false;
@@ -494,7 +508,8 @@ Promise::PerformMicroTaskCheckpoint()
     if (cx.isSome()) {
       JS_CheckForInterrupt(cx.ref());
     }
-  } while (!microtaskQueue.IsEmpty());
+    runtime->AfterProcessMicrotask();
+  } while (!microtaskQueue.empty());
 
   return true;
 }
@@ -627,8 +642,8 @@ Promise::CreateThenableFunction(JSContext* aCx, Promise* aPromise, uint32_t aTas
 }
 
 /* static */ already_AddRefed<Promise>
-Promise::Constructor(const GlobalObject& aGlobal,
-                     PromiseInit& aInit, ErrorResult& aRv)
+Promise::Constructor(const GlobalObject& aGlobal, PromiseInit& aInit,
+                     ErrorResult& aRv, JS::Handle<JSObject*> aDesiredProto)
 {
   nsCOMPtr<nsIGlobalObject> global;
   global = do_QueryInterface(aGlobal.GetAsSupports());
@@ -637,7 +652,7 @@ Promise::Constructor(const GlobalObject& aGlobal,
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Create(global, aRv);
+  nsRefPtr<Promise> promise = Create(global, aRv, aDesiredProto);
   if (aRv.Failed()) {
     return nullptr;
   }
@@ -943,6 +958,26 @@ NS_IMPL_CYCLE_COLLECTION(AllResolveHandler, mCountdownHolder)
 Promise::All(const GlobalObject& aGlobal,
              const Sequence<JS::Value>& aIterable, ErrorResult& aRv)
 {
+  JSContext* cx = aGlobal.Context();
+
+  nsTArray<nsRefPtr<Promise>> promiseList;
+
+  for (uint32_t i = 0; i < aIterable.Length(); ++i) {
+    JS::Rooted<JS::Value> value(cx, aIterable.ElementAt(i));
+    nsRefPtr<Promise> nextPromise = Promise::Resolve(aGlobal, value, aRv);
+
+    MOZ_ASSERT(!aRv.Failed());
+
+    promiseList.AppendElement(Move(nextPromise));
+  }
+
+  return Promise::All(aGlobal, promiseList, aRv);
+}
+
+/* static */ already_AddRefed<Promise>
+Promise::All(const GlobalObject& aGlobal,
+             const nsTArray<nsRefPtr<Promise>>& aPromiseList, ErrorResult& aRv)
+{
   nsCOMPtr<nsIGlobalObject> global =
     do_QueryInterface(aGlobal.GetAsSupports());
   if (!global) {
@@ -952,7 +987,7 @@ Promise::All(const GlobalObject& aGlobal,
 
   JSContext* cx = aGlobal.Context();
 
-  if (aIterable.Length() == 0) {
+  if (aPromiseList.IsEmpty()) {
     JS::Rooted<JSObject*> empty(cx, JS_NewArrayObject(cx, 0));
     if (!empty) {
       aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
@@ -969,7 +1004,7 @@ Promise::All(const GlobalObject& aGlobal,
     return nullptr;
   }
   nsRefPtr<CountdownHolder> holder =
-    new CountdownHolder(aGlobal, promise, aIterable.Length());
+    new CountdownHolder(aGlobal, promise, aPromiseList.Length());
 
   JS::Rooted<JSObject*> obj(cx, JS::CurrentGlobalOrNull(cx));
   if (!obj) {
@@ -979,20 +1014,16 @@ Promise::All(const GlobalObject& aGlobal,
 
   nsRefPtr<PromiseCallback> rejectCb = new RejectPromiseCallback(promise, obj);
 
-  for (uint32_t i = 0; i < aIterable.Length(); ++i) {
-    JS::Rooted<JS::Value> value(cx, aIterable.ElementAt(i));
-    nsRefPtr<Promise> nextPromise = Promise::Resolve(aGlobal, value, aRv);
-
-    MOZ_ASSERT(!aRv.Failed());
-
+  for (uint32_t i = 0; i < aPromiseList.Length(); ++i) {
     nsRefPtr<PromiseNativeHandler> resolveHandler =
       new AllResolveHandler(holder, i);
 
     nsRefPtr<PromiseCallback> resolveCb =
       new NativePromiseCallback(resolveHandler, Resolved);
+
     // Every promise gets its own resolve callback, which will set the right
     // index in the array to the resolution value.
-    nextPromise->AppendCallbacks(resolveCb, rejectCb);
+    aPromiseList[i]->AppendCallbacks(resolveCb, rejectCb);
   }
 
   return promise.forget();
@@ -1139,10 +1170,10 @@ Promise::DispatchToMicroTask(nsIRunnable* aRunnable)
   MOZ_ASSERT(aRunnable);
 
   CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
-  nsTArray<nsCOMPtr<nsIRunnable>>& microtaskQueue =
+  std::queue<nsCOMPtr<nsIRunnable>>& microtaskQueue =
     runtime->GetPromiseMicroTaskQueue();
 
-  microtaskQueue.AppendElement(aRunnable);
+  microtaskQueue.push(aRunnable);
 }
 
 #if defined(DOM_PROMISE_DEPRECATED_REPORTING)
@@ -1185,10 +1216,17 @@ Promise::MaybeReportRejected()
   // Now post an event to do the real reporting async
   // Since Promises preserve their wrapper, it is essential to nsRefPtr<> the
   // AsyncErrorReporter, otherwise if the call to DispatchToMainThread fails, it
-  // will leak. See Bug 958684.
-  nsRefPtr<AsyncErrorReporter> r =
-    new AsyncErrorReporter(CycleCollectedJSRuntime::Get()->Runtime(), xpcReport);
-  NS_DispatchToMainThread(r);
+  // will leak. See Bug 958684.  So... don't use DispatchToMainThread()
+  nsCOMPtr<nsIThread> mainThread = do_GetMainThread();
+  if (NS_WARN_IF(!mainThread)) {
+    // Would prefer NS_ASSERTION, but that causes failure in xpcshell tests
+    NS_WARNING("!!! Trying to report rejected Promise after MainThread shutdown");
+  }
+  if (mainThread) {
+    nsRefPtr<AsyncErrorReporter> r =
+      new AsyncErrorReporter(CycleCollectedJSRuntime::Get()->Runtime(), xpcReport);
+    mainThread->Dispatch(r.forget(), NS_DISPATCH_NORMAL);
+  }
 }
 #endif // defined(DOM_PROMISE_DEPRECATED_REPORTING)
 
@@ -1276,7 +1314,7 @@ Promise::ResolveInternal(JSContext* aCx,
       }
 
       nsRefPtr<PromiseInit> thenCallback =
-        new PromiseInit(thenObj, mozilla::dom::GetIncumbentGlobal());
+        new PromiseInit(nullptr, thenObj, mozilla::dom::GetIncumbentGlobal());
       nsRefPtr<ThenableResolverTask> task =
         new ThenableResolverTask(this, valueObj, thenCallback);
       DispatchToMicroTask(task);
@@ -1605,7 +1643,7 @@ PromiseWorkerProxy::RunCallback(JSContext* aCx,
   if (!runnable->Dispatch(aCx)) {
     nsRefPtr<WorkerControlRunnable> runnable =
       new PromiseWorkerProxyControlRunnable(mWorkerPrivate, this);
-    mWorkerPrivate->DispatchControlRunnable(runnable);
+    mWorkerPrivate->DispatchControlRunnable(runnable.forget());
   }
 }
 

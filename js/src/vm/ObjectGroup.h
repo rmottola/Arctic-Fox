@@ -126,8 +126,8 @@ AsTaggedProto(HandleObject obj)
 }
 
 namespace gc {
-void MergeCompartments(JSCompartment *source, JSCompartment *target);
-}
+void MergeCompartments(JSCompartment* source, JSCompartment* target);
+} // namespace gc
 
 /*
  * The NewObjectKind allows an allocation site to specify the type properties
@@ -176,10 +176,10 @@ enum NewObjectKind {
 /* Type information about an object accessed by a script. */
 class ObjectGroup : public gc::TenuredCell
 {
-    friend void gc::MergeCompartments(JSCompartment *source, JSCompartment *target);
+    friend void gc::MergeCompartments(JSCompartment* source, JSCompartment* target);
 
     /* Class shared by objects in this group. */
-    const Class *clasp_;
+    const Class* clasp_;
 
     /* Prototype shared by objects in this group. */
     HeapPtrObject proto_;
@@ -319,7 +319,7 @@ class ObjectGroup : public gc::TenuredCell
         return nullptr;
     }
 
-    UnboxedLayout &unboxedLayoutDontCheckGeneration() const {
+    UnboxedLayout& unboxedLayoutDontCheckGeneration() const {
         MOZ_ASSERT(addendumKind() == Addendum_UnboxedLayout);
         return *maybeUnboxedLayoutDontCheckGeneration();
     }
@@ -729,6 +729,14 @@ class ObjectGroupCompartment
 PlainObject*
 NewPlainObjectWithProperties(ExclusiveContext* cx, IdValuePair* properties, size_t nproperties,
                              NewObjectKind newKind);
+
+bool
+CombineArrayElementTypes(ExclusiveContext* cx, JSObject* newObj,
+                         const Value* compare, size_t ncompare);
+
+bool
+CombinePlainObjectPropertyTypes(ExclusiveContext* cx, JSObject* newObj,
+                                const Value* compare, size_t ncompare);
 
 } // namespace js
 

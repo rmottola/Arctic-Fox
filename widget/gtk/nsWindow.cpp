@@ -729,14 +729,13 @@ nsWindow::GetParent(void)
 float
 nsWindow::GetDPI()
 {
-    Display *dpy = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
-    int defaultScreen = DefaultScreen(dpy);
-    double heightInches = DisplayHeightMM(dpy, defaultScreen)/MM_PER_INCH_FLOAT;
+    GdkScreen *screen = gdk_display_get_default_screen(gdk_display_get_default());
+    double heightInches = gdk_screen_get_height_mm(screen)/MM_PER_INCH_FLOAT;
     if (heightInches < 0.25) {
         // Something's broken, but we'd better not crash.
         return 96.0f;
     }
-    return float(DisplayHeight(dpy, defaultScreen)/heightInches);
+    return float(gdk_screen_get_height(screen)/heightInches);
 }
 
 double
@@ -1951,22 +1950,25 @@ nsWindow::HasPendingInputEvent()
     bool haveEvent;
 #ifdef MOZ_X11
     XEvent ev;
-    Display *display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
-    haveEvent =
-        XCheckMaskEvent(display,
-                        KeyPressMask | KeyReleaseMask | ButtonPressMask |
-                        ButtonReleaseMask | EnterWindowMask | LeaveWindowMask |
-                        PointerMotionMask | PointerMotionHintMask |
-                        Button1MotionMask | Button2MotionMask |
-                        Button3MotionMask | Button4MotionMask |
-                        Button5MotionMask | ButtonMotionMask | KeymapStateMask |
-                        VisibilityChangeMask | StructureNotifyMask |
-                        ResizeRedirectMask | SubstructureNotifyMask |
-                        SubstructureRedirectMask | FocusChangeMask |
-                        PropertyChangeMask | ColormapChangeMask |
-                        OwnerGrabButtonMask, &ev);
-    if (haveEvent) {
-        XPutBackEvent(display, &ev);
+    GdkDisplay* gdkDisplay = gdk_display_get_default();
+    if (GDK_IS_X11_DISPLAY(gdkDisplay)) {
+        Display *display = GDK_DISPLAY_XDISPLAY(gdkDisplay);
+        haveEvent =
+            XCheckMaskEvent(display,
+                            KeyPressMask | KeyReleaseMask | ButtonPressMask |
+                            ButtonReleaseMask | EnterWindowMask | LeaveWindowMask |
+                            PointerMotionMask | PointerMotionHintMask |
+                            Button1MotionMask | Button2MotionMask |
+                            Button3MotionMask | Button4MotionMask |
+                            Button5MotionMask | ButtonMotionMask | KeymapStateMask |
+                            VisibilityChangeMask | StructureNotifyMask |
+                            ResizeRedirectMask | SubstructureNotifyMask |
+                            SubstructureRedirectMask | FocusChangeMask |
+                            PropertyChangeMask | ColormapChangeMask |
+                            OwnerGrabButtonMask, &ev);
+        if (haveEvent) {
+            XPutBackEvent(display, &ev);
+        }
     }
 #else
     haveEvent = false;
@@ -2047,71 +2049,52 @@ gdk_window_flash(GdkWindow *    aGdkWindow,
 #endif // DEBUG
 #endif
 
-struct ExposeRegion
-{
-    nsIntRegion mRegion;
-
 #if (MOZ_WIDGET_GTK == 2)
-    GdkRectangle *mRects;
-    GdkRectangle *mRectsEnd;
+static bool
+ExtractExposeRegion(nsIntRegion& aRegion, GdkEventExpose* aEvent)
+{
+  GdkRectangle* rects;
+  gint nrects;
+  gdk_region_get_rectangles(aEvent->region, &rects, &nrects);
 
-    ExposeRegion() : mRects(nullptr)
-    {
-    }
-    ~ExposeRegion()
-    {
-        g_free(mRects);
-    }
-    bool Init(GdkEventExpose *aEvent)
-    {
-        gint nrects;
-        gdk_region_get_rectangles(aEvent->region, &mRects, &nrects);
+  if (nrects > MAX_RECTS_IN_REGION) {
+      // Just use the bounding box
+      rects[0] = aEvent->area;
+      nrects = 1;
+  }
 
-        if (nrects > MAX_RECTS_IN_REGION) {
-            // Just use the bounding box
-            mRects[0] = aEvent->area;
-            nrects = 1;
-        }
+  for (GdkRectangle* r = rects; r < rects + nrects; r++) {
+      aRegion.Or(aRegion, nsIntRect(r->x, r->y, r->width, r->height));
+      LOGDRAW(("\t%d %d %d %d\n", r->x, r->y, r->width, r->height));
+  }
 
-        mRectsEnd = mRects + nrects;
-
-        for (GdkRectangle *r = mRects; r < mRectsEnd; r++) {
-            mRegion.Or(mRegion, nsIntRect(r->x, r->y, r->width, r->height));
-            LOGDRAW(("\t%d %d %d %d\n", r->x, r->y, r->width, r->height));
-        }
-        return true;
-    }
+  g_free(rects);
+  return true;
+}
 
 #else
 # ifdef cairo_copy_clip_rectangle_list
 #  error "Looks like we're including Mozilla's cairo instead of system cairo"
 # endif
-    cairo_rectangle_list_t *mRects;
+static bool
+ExtractExposeRegion(nsIntRegion& aRegion, cairo_t* cr)
+{
+  cairo_rectangle_list_t* rects = cairo_copy_clip_rectangle_list(cr);
+  if (rects->status != CAIRO_STATUS_SUCCESS) {
+      NS_WARNING("Failed to obtain cairo rectangle list.");
+      return false;
+  }
 
-    ExposeRegion() : mRects(nullptr)
-    {
-    }
-    ~ExposeRegion()
-    {
-        cairo_rectangle_list_destroy(mRects);
-    }
-    bool Init(cairo_t* cr)
-    {
-        mRects = cairo_copy_clip_rectangle_list(cr);
-        if (mRects->status != CAIRO_STATUS_SUCCESS) {
-            NS_WARNING("Failed to obtain cairo rectangle list.");
-            return false;
-        }
+  for (int i = 0; i < rects->num_rectangles; i++)  {
+      const cairo_rectangle_t& r = rects->rectangles[i];
+      aRegion.Or(aRegion, nsIntRect(r.x, r.y, r.width, r.height));
+      LOGDRAW(("\t%d %d %d %d\n", r.x, r.y, r.width, r.height));
+  }
 
-        for (int i = 0; i < mRects->num_rectangles; i++)  {
-            const cairo_rectangle_t& r = mRects->rectangles[i];
-            mRegion.Or(mRegion, nsIntRect(r.x, r.y, r.width, r.height));
-            LOGDRAW(("\t%d %d %d %d\n", r.x, r.y, r.width, r.height));
-        }
-        return true;
-    }
+  cairo_rectangle_list_destroy(rects);
+  return true;
+}
 #endif
-};
 
 #if (MOZ_WIDGET_GTK == 2)
 gboolean
@@ -2134,17 +2117,17 @@ nsWindow::OnExposeEvent(cairo_t *cr)
     if (!listener)
         return FALSE;
 
-    ExposeRegion exposeRegion;
+    nsIntRegion exposeRegion;
 #if (MOZ_WIDGET_GTK == 2)
-    if (!exposeRegion.Init(aEvent)) {
+    if (!ExtractExposeRegion(exposeRegion, aEvent)) {
 #else
-    if (!exposeRegion.Init(cr)) {
+    if (!ExtractExposeRegion(exposeRegion, cr)) {
 #endif
         return FALSE;
     }
 
     gint scale = GdkScaleFactor();
-    nsIntRegion& region = exposeRegion.mRegion;
+    nsIntRegion region = exposeRegion;
     region.ScaleRoundOut(scale, scale);
 
     ClientLayerManager *clientLayers =
@@ -2237,33 +2220,11 @@ nsWindow::OnExposeEvent(cairo_t *cr)
         return TRUE;
     }
 
-    gfxASurface* surf;
-#if (MOZ_WIDGET_GTK == 2)
-    surf = GetThebesSurface();
-#else
-    surf = GetThebesSurface(cr);
-#endif
-
-    nsRefPtr<gfxContext> ctx;
-    if (gfxPlatform::GetPlatform()->
-            SupportsAzureContentForType(BackendType::CAIRO)) {
-        IntSize intSize(surf->GetSize().width, surf->GetSize().height);
-        RefPtr<DrawTarget> dt =
-          gfxPlatform::GetPlatform()->CreateDrawTargetForSurface(surf, intSize);
-        ctx = new gfxContext(dt);
-    } else if (gfxPlatform::GetPlatform()->
-                   SupportsAzureContentForType(BackendType::SKIA) &&
-               surf->GetType() == gfxSurfaceType::Image) {
-       gfxImageSurface* imgSurf = static_cast<gfxImageSurface*>(surf);
-       SurfaceFormat format = ImageFormatToSurfaceFormat(imgSurf->Format());
-       IntSize intSize(surf->GetSize().width, surf->GetSize().height);
-       RefPtr<DrawTarget> dt =
-         gfxPlatform::GetPlatform()->CreateDrawTargetForData(
-                        imgSurf->Data(), intSize, imgSurf->Stride(), format);
-       ctx = new gfxContext(dt);
-    } else {
-        MOZ_CRASH("Unexpected content type");
+    RefPtr<DrawTarget> dt = StartRemoteDrawing();
+    if(!dt) {
+        return FALSE;
     }
+    nsRefPtr<gfxContext> ctx = new gfxContext(dt);
 
 #ifdef MOZ_X11
     nsIntRect boundsRect; // for shaped only
@@ -2338,11 +2299,7 @@ nsWindow::OnExposeEvent(cairo_t *cr)
     }
 #  ifdef MOZ_HAVE_SHMIMAGE
     if (mShmImage && MOZ_LIKELY(!mIsDestroyed)) {
-#if (MOZ_WIDGET_GTK == 2)
-        mShmImage->Put(mGdkWindow, exposeRegion.mRects, exposeRegion.mRectsEnd);
-#else
-        mShmImage->Put(mGdkWindow, exposeRegion.mRects);
-#endif
+        mShmImage->Put(mGdkWindow, exposeRegion);
     }
 #  endif  // MOZ_HAVE_SHMIMAGE
 #endif // MOZ_X11
@@ -2605,23 +2562,26 @@ nsWindow::OnMotionNotifyEvent(GdkEventMotion *aEvent)
 #ifdef MOZ_X11
     XEvent xevent;
 
-    while (XPending (GDK_WINDOW_XDISPLAY(aEvent->window))) {
-        XEvent peeked;
-        XPeekEvent (GDK_WINDOW_XDISPLAY(aEvent->window), &peeked);
-        if (peeked.xany.window != gdk_x11_window_get_xid(aEvent->window)
-            || peeked.type != MotionNotify)
-            break;
+    bool isX11Display = GDK_IS_X11_DISPLAY(gdk_display_get_default());
+    if (isX11Display) {
+        while (XPending (GDK_WINDOW_XDISPLAY(aEvent->window))) {
+            XEvent peeked;
+            XPeekEvent (GDK_WINDOW_XDISPLAY(aEvent->window), &peeked);
+            if (peeked.xany.window != gdk_x11_window_get_xid(aEvent->window)
+                || peeked.type != MotionNotify)
+                break;
 
-        synthEvent = true;
-        XNextEvent (GDK_WINDOW_XDISPLAY(aEvent->window), &xevent);
-    }
+            synthEvent = true;
+            XNextEvent (GDK_WINDOW_XDISPLAY(aEvent->window), &xevent);
+        }
 #if (MOZ_WIDGET_GTK == 2)
-    // if plugins still keeps the focus, get it back
-    if (gPluginFocusWindow && gPluginFocusWindow != this) {
-        nsRefPtr<nsWindow> kungFuDeathGrip = gPluginFocusWindow;
-        gPluginFocusWindow->LoseNonXEmbedPluginFocus();
-    }
+        // if plugins still keeps the focus, get it back
+        if (gPluginFocusWindow && gPluginFocusWindow != this) {
+            nsRefPtr<nsWindow> kungFuDeathGrip = gPluginFocusWindow;
+            gPluginFocusWindow->LoseNonXEmbedPluginFocus();
+        }
 #endif /* MOZ_WIDGET_GTK2 */
+    }
 #endif /* MOZ_X11 */
 
     WidgetMouseEvent event(true, NS_MOUSE_MOVE, this, WidgetMouseEvent::eReal);
@@ -3922,20 +3882,23 @@ nsWindow::SetWindowClass(const nsAString &xulWinType)
   gdk_window_set_role(shellWindow, role);
 
 #ifdef MOZ_X11
-  XClassHint *class_hint = XAllocClassHint();
-  if (!class_hint) {
-    free(res_name);
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
-  class_hint->res_name = res_name;
-  class_hint->res_class = const_cast<char*>(res_class);
+  GdkDisplay *display = gdk_display_get_default();
+  if (GDK_IS_X11_DISPLAY(display)) {
+      XClassHint *class_hint = XAllocClassHint();
+      if (!class_hint) {
+        free(res_name);
+        return NS_ERROR_OUT_OF_MEMORY;
+      }
+      class_hint->res_name = res_name;
+      class_hint->res_class = const_cast<char*>(res_class);
 
-  // Can't use gtk_window_set_wmclass() for this; it prints
-  // a warning & refuses to make the change.
-  XSetClassHint(GDK_DISPLAY_XDISPLAY(gdk_display_get_default()),
-                gdk_x11_window_get_xid(shellWindow),
-                class_hint);
-  XFree(class_hint);
+      // Can't use gtk_window_set_wmclass() for this; it prints
+      // a warning & refuses to make the change.
+      XSetClassHint(GDK_DISPLAY_XDISPLAY(display),
+                    gdk_x11_window_get_xid(shellWindow),
+                    class_hint);
+      XFree(class_hint);
+  }
 #endif /* MOZ_X11 */
 
   free(res_name);
@@ -4196,7 +4159,7 @@ nsWindow::ConfigureChildren(const nsTArray<Configuration>& aConfigurations)
 
     for (uint32_t i = 0; i < aConfigurations.Length(); ++i) {
         const Configuration& configuration = aConfigurations[i];
-        nsWindow* w = static_cast<nsWindow*>(configuration.mChild);
+        nsWindow* w = static_cast<nsWindow*>(configuration.mChild.get());
         NS_ASSERTION(w->GetParent() == this,
                      "Configured widget is not a child");
         w->SetWindowClipRegion(configuration.mClipRegion, true);
@@ -5652,20 +5615,22 @@ key_press_event_cb(GtkWidget *widget, GdkEventKey *event)
     // are generated only when the key is physically released.
 #define NS_GDKEVENT_MATCH_MASK 0x1FFF /* GDK_SHIFT_MASK .. GDK_BUTTON5_MASK */
     GdkDisplay* gdkDisplay = gtk_widget_get_display(widget);
-    Display* dpy = GDK_DISPLAY_XDISPLAY(gdkDisplay);
-    while (XPending(dpy)) {
-        XEvent next_event;
-        XPeekEvent(dpy, &next_event);
-        GdkWindow* nextGdkWindow =
-            gdk_x11_window_lookup_for_display(gdkDisplay, next_event.xany.window);
-        if (nextGdkWindow != event->window ||
-            next_event.type != KeyPress ||
-            next_event.xkey.keycode != event->hardware_keycode ||
-            next_event.xkey.state != (event->state & NS_GDKEVENT_MATCH_MASK)) {
-            break;
+    if (GDK_IS_X11_DISPLAY(gdkDisplay)) {
+        Display* dpy = GDK_DISPLAY_XDISPLAY(gdkDisplay);
+        while (XPending(dpy)) {
+            XEvent next_event;
+            XPeekEvent(dpy, &next_event);
+            GdkWindow* nextGdkWindow =
+                gdk_x11_window_lookup_for_display(gdkDisplay, next_event.xany.window);
+            if (nextGdkWindow != event->window ||
+                next_event.type != KeyPress ||
+                next_event.xkey.keycode != event->hardware_keycode ||
+                next_event.xkey.state != (event->state & NS_GDKEVENT_MATCH_MASK)) {
+                break;
+            }
+            XNextEvent(dpy, &next_event);
+            event->time = next_event.xkey.time;
         }
-        XNextEvent(dpy, &next_event);
-        event->time = next_event.xkey.time;
     }
 #endif
 
@@ -6062,11 +6027,14 @@ nsWindow::NotifyIMEInternal(const IMENotification& aIMENotification)
         case NOTIFY_IME_OF_BLUR:
             mIMModule->OnFocusChangeInGecko(false);
             return NS_OK;
+        case NOTIFY_IME_OF_POSITION_CHANGE:
+            mIMModule->OnLayoutChange();
+            return NS_OK;
         case NOTIFY_IME_OF_COMPOSITION_UPDATE:
             mIMModule->OnUpdateComposition();
             return NS_OK;
         case NOTIFY_IME_OF_SELECTION_CHANGE:
-            mIMModule->OnSelectionChange(this);
+            mIMModule->OnSelectionChange(this, aIMENotification);
             return NS_OK;
         default:
             return NS_ERROR_NOT_IMPLEMENTED;
@@ -6105,7 +6073,8 @@ nsIMEUpdatePreference
 nsWindow::GetIMEUpdatePreference()
 {
     nsIMEUpdatePreference updatePreference(
-        nsIMEUpdatePreference::NOTIFY_SELECTION_CHANGE);
+        nsIMEUpdatePreference::NOTIFY_SELECTION_CHANGE |
+        nsIMEUpdatePreference::NOTIFY_POSITION_CHANGE);
     // We shouldn't notify IME of selection change caused by changes of
     // composition string.  Therefore, we don't need to be notified selection
     // changes which are caused by compositionchange events handled.
@@ -6258,24 +6227,49 @@ nsWindow::StartRemoteDrawing()
     return nullptr;
   }
 
-  IntSize size(surf->GetSize().width, surf->GetSize().height);
+  nsIntSize size = surf->GetSize();
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
 
-  return gfxPlatform::GetPlatform()->CreateDrawTargetForSurface(surf, size);
+  gfxPlatform *platform = gfxPlatform::GetPlatform();
+  if (platform->SupportsAzureContentForType(BackendType::CAIRO) ||
+      surf->GetType() == gfxSurfaceType::Xlib) {
+    return platform->CreateDrawTargetForSurface(surf, size);
+  } else if (platform->SupportsAzureContentForType(BackendType::SKIA) &&
+             surf->GetType() == gfxSurfaceType::Image) {
+    gfxImageSurface* imgSurf = static_cast<gfxImageSurface*>(surf);
+    SurfaceFormat format = ImageFormatToSurfaceFormat(imgSurf->Format());
+    return platform->CreateDrawTargetForData(
+                     imgSurf->Data(), size, imgSurf->Stride(), format);
+  } else {
+    return nullptr;
+  }
+}
+
+void
+nsWindow::EndRemoteDrawingInRegion(DrawTarget* aDrawTarget, nsIntRegion& aInvalidRegion)
+{
+#ifdef MOZ_X11
+#  ifdef MOZ_HAVE_SHMIMAGE
+  if (!mGdkWindow || mIsFullyObscured || !mHasMappedToplevel || mIsDestroyed ||
+      !mShmImage)
+    return;
+
+  gint scale = GdkScaleFactor();
+  if (scale != 1) {
+    aInvalidRegion.ScaleInverseRoundOut(scale, scale);
+  }
+
+  mShmImage->Put(mGdkWindow, aInvalidRegion);
+
+#  endif // MOZ_HAVE_SHMIMAGE
+#endif // MOZ_X11
 }
 
 // return the gfxASurface for rendering to this widget
 gfxASurface*
 nsWindow::GetThebesSurface()
-#if (MOZ_WIDGET_GTK == 3)
-{
-    return GetThebesSurface(nullptr);
-}
-gfxASurface*
-nsWindow::GetThebesSurface(cairo_t *cr)
-#endif
 {
     if (!mGdkWindow)
         return nullptr;

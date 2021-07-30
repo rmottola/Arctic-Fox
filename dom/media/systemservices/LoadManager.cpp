@@ -14,15 +14,14 @@
 #include "nsString.h"
 #include "nsThreadUtils.h"
 #include "nsReadableUtils.h"
-#include "nsNetUtil.h"
 #include "nsIObserverService.h"
 
 // NSPR_LOG_MODULES=LoadManager:5
 PRLogModuleInfo *gLoadManagerLog = nullptr;
 #undef LOG
 #undef LOG_ENABLED
-#define LOG(args) PR_LOG(gLoadManagerLog, PR_LOG_DEBUG, args)
-#define LOG_ENABLED() PR_LOG_TEST(gLoadManagerLog, 5)
+#define LOG(args) MOZ_LOG(gLoadManagerLog, mozilla::LogLevel::Debug, args)
+#define LOG_ENABLED() MOZ_LOG_TEST(gLoadManagerLog, mozilla::LogLevel::Verbose)
 
 namespace mozilla {
 

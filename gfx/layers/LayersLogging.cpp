@@ -8,6 +8,7 @@
 #include "LayersLogging.h"
 #include <stdint.h>                     // for uint8_t
 #include "gfxColor.h"                   // for gfxRGBA
+#include "ImageTypes.h"                 // for ImageFormat
 #include "mozilla/gfx/Matrix.h"         // for Matrix4x4, Matrix
 #include "mozilla/gfx/Point.h"          // for IntSize
 #include "nsDebug.h"                    // for NS_ERROR
@@ -218,28 +219,46 @@ AppendToString(std::stringstream& aStream, const ScrollableLayerGuid& s,
 }
 
 void
-AppendToString(std::stringstream& aStream, const Matrix4x4& m,
+AppendToString(std::stringstream& aStream, const ZoomConstraints& z,
+               const char* pfx, const char* sfx)
+{
+  aStream << pfx
+          << nsPrintfCString("{ z=%d dt=%d min=%f max=%f }", z.mAllowZoom, z.mAllowDoubleTapZoom, z.mMinZoom.scale, z.mMaxZoom.scale).get()
+          << sfx;
+}
+
+void
+AppendToString(std::stringstream& aStream, const Matrix& m,
                const char* pfx, const char* sfx)
 {
   aStream << pfx;
-  if (m.Is2D()) {
-    Matrix matrix = m.As2D();
-    if (matrix.IsIdentity()) {
-      aStream << "[ I ]";
-      aStream << sfx;
-      return;
-    }
-    aStream << nsPrintfCString(
-      "[ %g %g; %g %g; %g %g; ]",
-      matrix._11, matrix._12, matrix._21, matrix._22, matrix._31, matrix._32).get();
+  if (m.IsIdentity()) {
+    aStream << "[ I ]";
   } else {
     aStream << nsPrintfCString(
-      "[ %g %g %g %g; %g %g %g %g; %g %g %g %g; %g %g %g %g; ]",
-      m._11, m._12, m._13, m._14,
-      m._21, m._22, m._23, m._24,
-      m._31, m._32, m._33, m._34,
-      m._41, m._42, m._43, m._44).get();
+      "[ %g %g; %g %g; %g %g; ]",
+      m._11, m._12, m._21, m._22, m._31, m._32).get();
   }
+  aStream << sfx;
+}
+
+void
+AppendToString(std::stringstream& aStream, const Matrix4x4& m,
+               const char* pfx, const char* sfx)
+{
+  if (m.Is2D()) {
+    Matrix matrix = m.As2D();
+    AppendToString(aStream, matrix, pfx, sfx);
+    return;
+  }
+
+  aStream << pfx;
+  aStream << nsPrintfCString(
+    "[ %g %g %g %g; %g %g %g %g; %g %g %g %g; %g %g %g %g; ]",
+    m._11, m._12, m._13, m._14,
+    m._21, m._22, m._23, m._24,
+    m._31, m._32, m._33, m._34,
+    m._41, m._42, m._43, m._44).get();
   aStream << sfx;
 }
 
@@ -316,6 +335,83 @@ AppendToString(std::stringstream& aStream, mozilla::gfx::SurfaceFormat format,
   case SurfaceFormat::A8:        aStream << "SurfaceFormat::A8"; break;
   case SurfaceFormat::YUV:       aStream << "SurfaceFormat::YUV"; break;
   case SurfaceFormat::UNKNOWN:   aStream << "SurfaceFormat::UNKNOWN"; break;
+  default:
+    NS_ERROR("unknown surface format");
+    aStream << "???";
+  }
+
+  aStream << sfx;
+}
+
+void
+AppendToString(std::stringstream& aStream, gfx::SurfaceType aType,
+               const char* pfx, const char* sfx)
+{
+  aStream << pfx;
+  switch(aType) {
+  case SurfaceType::DATA:
+    aStream << "SurfaceType::DATA"; break;
+  case SurfaceType::D2D1_BITMAP:
+    aStream << "SurfaceType::D2D1_BITMAP"; break;
+  case SurfaceType::D2D1_DRAWTARGET:
+    aStream << "SurfaceType::D2D1_DRAWTARGET"; break;
+  case SurfaceType::CAIRO:
+    aStream << "SurfaceType::CAIRO"; break;
+  case SurfaceType::CAIRO_IMAGE:
+    aStream << "SurfaceType::CAIRO_IMAGE"; break;
+  case SurfaceType::COREGRAPHICS_IMAGE:
+    aStream << "SurfaceType::COREGRAPHICS_IMAGE"; break;
+  case SurfaceType::COREGRAPHICS_CGCONTEXT:
+    aStream << "SurfaceType::COREGRAPHICS_CGCONTEXT"; break;
+  case SurfaceType::SKIA:
+    aStream << "SurfaceType::SKIA"; break;
+  case SurfaceType::DUAL_DT:
+    aStream << "SurfaceType::DUAL_DT"; break;
+  case SurfaceType::D2D1_1_IMAGE:
+    aStream << "SurfaceType::D2D1_1_IMAGE"; break;
+  case SurfaceType::RECORDING:
+    aStream << "SurfaceType::RECORDING"; break;
+  case SurfaceType::TILED:
+    aStream << "SurfaceType::TILED"; break;
+  default:
+    NS_ERROR("unknown surface type");
+    aStream << "???";
+  }
+  aStream << sfx;
+}
+
+
+void
+AppendToString(std::stringstream& aStream, ImageFormat format,
+               const char* pfx, const char* sfx)
+{
+  aStream << pfx;
+  switch (format) {
+  case ImageFormat::PLANAR_YCBCR:
+    aStream << "ImageFormat::PLANAR_YCBCR"; break;
+  case ImageFormat::GRALLOC_PLANAR_YCBCR:
+    aStream << "ImageFormat::GRALLOC_PLANAR_YCBCR"; break;
+  case ImageFormat::GONK_CAMERA_IMAGE:
+    aStream << "ImageFormat::GONK_CAMERA_IMAGE"; break;
+  case ImageFormat::SHARED_RGB:
+    aStream << "ImageFormat::SHARED_RGB"; break;
+  case ImageFormat::CAIRO_SURFACE:
+    aStream << "ImageFormat::CAIRO_SURFACE"; break;
+  case ImageFormat::MAC_IOSURFACE:
+    aStream << "ImageFormat::MAC_IOSURFACE"; break;
+  case ImageFormat::SURFACE_TEXTURE:
+    aStream << "ImageFormat::SURFACE_TEXTURE"; break;
+  case ImageFormat::EGLIMAGE:
+    aStream << "ImageFormat::EGLIMAGE"; break;
+  case ImageFormat::D3D9_RGB32_TEXTURE:
+    aStream << "ImageFormat::D3D9_RBG32_TEXTURE"; break;
+  case ImageFormat::OVERLAY_IMAGE:
+    aStream << "ImageFormat::OVERLAY_IMAGE"; break;
+  case ImageFormat::D3D11_SHARE_HANDLE_TEXTURE:
+    aStream << "ImageFormat::D3D11_SHARE_HANDLE_TEXTURE"; break;
+  default:
+    NS_ERROR("unknown image format");
+    aStream << "???";
   }
 
   aStream << sfx;

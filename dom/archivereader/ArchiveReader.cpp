@@ -10,7 +10,7 @@
 #include "ArchiveZipEvent.h"
 
 #include "nsIURI.h"
-#include "nsNetUtil.h"
+#include "nsNetCID.h"
 
 #include "mozilla/dom/ArchiveReaderBinding.h"
 #include "mozilla/dom/BindingDeclarations.h"
@@ -95,8 +95,12 @@ nsresult
 ArchiveReader::GetInputStream(nsIInputStream** aInputStream)
 {
   // Getting the input stream
-  mBlobImpl->GetInternalStream(aInputStream);
-  NS_ENSURE_TRUE(*aInputStream, NS_ERROR_UNEXPECTED);
+  ErrorResult rv;
+  mBlobImpl->GetInternalStream(aInputStream, rv);
+  if (NS_WARN_IF(rv.Failed())) {
+    return rv.StealNSResult();
+  }
+
   return NS_OK;
 }
 

@@ -20,6 +20,7 @@
 #include "mozilla/layers/LayersSurfaces.h"  // for SurfaceDescriptor
 #include "mozilla/layers/PLayerChild.h"  // for PLayerChild
 #include "mozilla/layers/LayerTransactionChild.h"
+#include "mozilla/layers/ShadowLayerChild.h"
 #include "mozilla/layers/TextureClientPool.h" // for TextureClientPool
 #include "mozilla/layers/PersistentBufferProvider.h"
 #include "ClientReadbackLayer.h"        // for ClientReadbackLayer
@@ -221,7 +222,7 @@ ClientLayerManager::BeginTransactionWithTarget(gfxContext* aTarget)
 
   // If we have a non-default target, we need to let our shadow manager draw
   // to it. This will happen at the end of the transaction.
-  if (aTarget && XRE_GetProcessType() == GeckoProcessType_Default) {
+  if (aTarget && XRE_IsParentProcess()) {
     mShadowTarget = aTarget;
   } else {
     NS_ASSERTION(!aTarget,
@@ -370,7 +371,7 @@ ClientLayerManager::GetRemoteRenderer()
 CompositorChild*
 ClientLayerManager::GetCompositorChild()
 {
-  if (XRE_GetProcessType() != GeckoProcessType_Default) {
+  if (!XRE_IsParentProcess()) {
     return CompositorChild::Get();
   }
   return GetRemoteRenderer();
@@ -610,21 +611,6 @@ ClientLayerManager::ForwardTransaction(bool aScheduleComposite)
 
         break;
       }
-      case EditReply::TReturnReleaseFence: {
-        const ReturnReleaseFence& rep = reply.get_ReturnReleaseFence();
-        FenceHandle fence = rep.fence();
-        PTextureChild* child = rep.textureChild();
-
-        if (!fence.IsValid() || !child) {
-          break;
-        }
-        RefPtr<TextureClient> texture = TextureClient::AsTextureClient(child);
-        if (texture) {
-          texture->SetReleaseFenceHandle(fence);
-        }
-        break;
-      }
-
       default:
         NS_RUNTIMEABORT("not reached");
       }

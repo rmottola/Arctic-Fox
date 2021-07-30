@@ -297,10 +297,24 @@ public:
    * drawn is specified by aEffectChain. aRect is the quad to draw, in user space.
    * aTransform transforms from user space to screen space. If texture coords are
    * required, these will be in the primary effect in the effect chain.
+   * aVisibleRect is used to determine which edges should be antialiased,
+   * without applying the effect to the inner edges of a tiled layer.
    */
   virtual void DrawQuad(const gfx::Rect& aRect, const gfx::Rect& aClipRect,
                         const EffectChain& aEffectChain,
-                        gfx::Float aOpacity, const gfx::Matrix4x4 &aTransform) = 0;
+                        gfx::Float aOpacity, const gfx::Matrix4x4& aTransform,
+                        const gfx::Rect& aVisibleRect) = 0;
+
+  /**
+   * Overload of DrawQuad, with aVisibleRect defaulted to the value of aRect.
+   * Use this when you are drawing a single quad that is not part of a tiled
+   * layer.
+   */
+  void DrawQuad(const gfx::Rect& aRect, const gfx::Rect& aClipRect,
+                        const EffectChain& aEffectChain,
+                        gfx::Float aOpacity, const gfx::Matrix4x4& aTransform) {
+      DrawQuad(aRect, aClipRect, aEffectChain, aOpacity, aTransform, aRect);
+  }
 
   /*
    * Clear aRect on current render target.
@@ -464,9 +478,15 @@ public:
   ScreenRotation GetScreenRotation() const {
     return mScreenRotation;
   }
-
   void SetScreenRotation(ScreenRotation aRotation) {
     mScreenRotation = aRotation;
+  }
+
+  TimeStamp GetCompositionTime() const {
+    return mCompositionTime;
+  }
+  void SetCompositionTime(TimeStamp aTimeStamp) {
+    mCompositionTime = aTimeStamp;
   }
 
 protected:
@@ -482,6 +502,11 @@ protected:
    * Set the global Compositor backend, checking that one isn't already set.
    */
   static void SetBackend(LayersBackend backend);
+
+  /**
+   * Render time for the current composition.
+   */
+  TimeStamp mCompositionTime;
 
   uint32_t mCompositorID;
   DiagnosticTypes mDiagnosticTypes;

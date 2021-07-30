@@ -15,6 +15,7 @@
 #include "nsCSSProperty.h"
 #include "nsStyleStructFwd.h"
 #include "nsCSSKeywords.h"
+#include "mozilla/UseCounter.h"
 
 // Length of the "--" prefix on custom names (such as custom property names,
 // and, in the future, custom media query names).
@@ -516,6 +517,20 @@ public:
     return gPropertyEnabled[aProperty];
   }
 
+private:
+  // A table for the use counter associated with each CSS property.  If a
+  // property does not have a use counter defined in UseCounters.conf, then
+  // its associated entry is |eUseCounter_UNKNOWN|.
+  static const mozilla::UseCounter gPropertyUseCounter[eCSSProperty_COUNT_no_shorthands];
+
+public:
+
+  static mozilla::UseCounter UseCounterFor(nsCSSProperty aProperty) {
+    MOZ_ASSERT(0 <= aProperty && aProperty < eCSSProperty_COUNT_no_shorthands,
+               "out of range");
+    return gPropertyUseCounter[aProperty];
+  }
+
   static bool IsEnabled(nsCSSProperty aProperty, EnabledState aEnabled)
   {
     if (IsEnabled(aProperty)) {
@@ -648,6 +663,7 @@ public:
   static const KTableValue kMaskTypeKTable[];
   static const KTableValue kMathVariantKTable[];
   static const KTableValue kMathDisplayKTable[];
+  static const KTableValue kContainKTable[];
   static const KTableValue kContextOpacityKTable[];
   static const KTableValue kContextPatternKTable[];
   static const KTableValue kObjectFitKTable[];
@@ -692,6 +708,7 @@ public:
   static const KTableValue kTextOverflowKTable[];
   static const KTableValue kTextTransformKTable[];
   static const KTableValue kTouchActionKTable[];
+  static const KTableValue kTransformBoxKTable[];
   static const KTableValue kTransitionTimingFunctionKTable[];
   static const KTableValue kUnicodeBidiKTable[];
   static const KTableValue kUserFocusKTable[];

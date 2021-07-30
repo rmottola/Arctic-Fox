@@ -1,4 +1,4 @@
-# This is for goanna-projects, which is a low-SLA developer-oriented repo
+# This is for gecko-projects, which is a low-SLA developer-oriented repo
 # with mozilla-central based project branches.
 
 import os
@@ -66,7 +66,7 @@ config = {
     "conversion_repos": CONVERSION_REPOS,
     "remote_targets": {
         "github-project-branches": {
-            "repo": "git@github.com:mozilla/goanna-projects.git",
+            "repo": "git@github.com:mozilla/gecko-projects.git",
             "ssh_key": "~/.ssh/releng-github-id_rsa",
             "vcs": "git",
             "force_push": True,
@@ -100,7 +100,7 @@ config = {
     ],
     "pip_index": False,
 
-    "combined_mapfile": "combined_goanna_mapfile",
+    "combined_mapfile": "combined_gecko_mapfile",
 
     "default_notify_from": "developer-services+%s@mozilla.org" % hostname,
     "notify_config": [{

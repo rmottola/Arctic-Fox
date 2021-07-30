@@ -38,17 +38,17 @@ class B2gMultilocale(LocalesMixin, BaseScript, VCSMixin, GaiaLocalesMixin):
             "dest": "gaia_languages_file",
             "help": "languages file for gaia multilocale profile",
         }],
-        [["--goanna-languages-file"], {
+        [["--gecko-languages-file"], {
             "dest": "locales_file",
-            "help": "languages file for goanna multilocale",
+            "help": "languages file for gecko multilocale",
         }],
-        [["--goanna-l10n-root"], {
+        [["--gecko-l10n-root"], {
             "dest": "hg_l10n_base",
-            "help": "root location for goanna l10n repos",
+            "help": "root location for gecko l10n repos",
         }],
-        [["--goanna-l10n-base-dir"], {
+        [["--gecko-l10n-base-dir"], {
             "dest": "l10n_dir",
-            "help": "dir to clone goanna l10n repos into, relative to the work directory",
+            "help": "dir to clone gecko l10n repos into, relative to the work directory",
         }],
         [["--merge-locales"], {
             "dest": "merge_locales",
@@ -85,11 +85,11 @@ class B2gMultilocale(LocalesMixin, BaseScript, VCSMixin, GaiaLocalesMixin):
                                 'gaia_l10n_vcs': 'hg',
                                 'vcs_share_base': os.environ.get('HG_SHARE_BASE_DIR'),
                                 'locales_dir': 'b2g/locales',
-                                'l10n_dir': 'goanna-l10n',
+                                'l10n_dir': 'gecko-l10n',
                                 # I forget what this was for.  Copied from the Android multilocale stuff
                                 'ignore_locales': ["en-US", "multi"],
                                 # This only has 2 locales in it.  We probably need files that mirror gaia's locale lists
-                                # We need 2 sets of locales files because the locale names in gaia are different than goanna, e.g. 'es' vs 'es-ES'
+                                # We need 2 sets of locales files because the locale names in gaia are different than gecko, e.g. 'es' vs 'es-ES'
                                 # We'll need to override this for localizer buidls
                                 'locales_file': 'build/b2g/locales/all-locales',
                                 'mozilla_dir': 'build',
@@ -110,9 +110,9 @@ class B2gMultilocale(LocalesMixin, BaseScript, VCSMixin, GaiaLocalesMixin):
             if 'gaia_l10n_root' not in self.config:
                 message += 'Must specify --gaia-l10n-root!\n'
             if 'locales_file' not in self.config:
-                message += 'Must specify --goanna-languages-file!\n'
+                message += 'Must specify --gecko-languages-file!\n'
             if 'hg_l10n_base' not in self.config:
-                message += 'Must specify --goanna-l10n-root!\n'
+                message += 'Must specify --gecko-l10n-root!\n'
             if message:
                 self.fatal(message)
 
@@ -123,7 +123,7 @@ class B2gMultilocale(LocalesMixin, BaseScript, VCSMixin, GaiaLocalesMixin):
 
         c = self.config
         dirs = {
-            'src': os.path.join(c['work_dir'], 'goanna'),
+            'src': os.path.join(c['work_dir'], 'gecko'),
             'work_dir': abs_dirs['abs_work_dir'],
             'gaia_l10n_base_dir': os.path.join(abs_dirs['abs_work_dir'], self.config['gaia_l10n_base_dir']),
             'abs_compare_locales_dir': os.path.join(abs_dirs['base_work_dir'], 'compare-locales'),
@@ -135,7 +135,7 @@ class B2gMultilocale(LocalesMixin, BaseScript, VCSMixin, GaiaLocalesMixin):
 
     # Actions {{{2
     def pull(self):
-        """ Clone gaia and goanna locale repos
+        """ Clone gaia and gecko locale repos
         """
         languages_file = self.config['gaia_languages_file']
         l10n_base_dir = self.query_abs_dirs()['gaia_l10n_base_dir']
@@ -146,10 +146,10 @@ class B2gMultilocale(LocalesMixin, BaseScript, VCSMixin, GaiaLocalesMixin):
 
         self.pull_gaia_locale_source(l10n_config, parse_config_file(languages_file).keys(), l10n_base_dir)
         self.pull_locale_source()
-        goanna_locales = self.query_locales()
-        # populate b2g/overrides, which isn't in goanna atm
+        gecko_locales = self.query_locales()
+        # populate b2g/overrides, which isn't in gecko atm
         dirs = self.query_abs_dirs()
-        for locale in goanna_locales:
+        for locale in gecko_locales:
             self.mkdir_p(os.path.join(dirs['abs_l10n_dir'], locale, 'b2g', 'chrome', 'overrides'))
             self.copytree(os.path.join(dirs['abs_l10n_dir'], locale, 'mobile', 'overrides'),
                           os.path.join(dirs['abs_l10n_dir'], locale, 'b2g', 'chrome', 'overrides'),
@@ -159,12 +159,12 @@ class B2gMultilocale(LocalesMixin, BaseScript, VCSMixin, GaiaLocalesMixin):
         """ Do the multilocale portion of the build + packaging.
         """
         dirs = self.query_abs_dirs()
-        goanna_locales = self.query_locales()
+        gecko_locales = self.query_locales()
         make = self.query_exe('make', return_type='string')
         env = self.query_env(
             partial_env={
                 'LOCALE_MERGEDIR': dirs['abs_merge_dir'],
-                'MOZ_CHROME_MULTILOCALE': 'en-US ' + ' '.join(goanna_locales),
+                'MOZ_CHROME_MULTILOCALE': 'en-US ' + ' '.join(gecko_locales),
             }
         )
         merge_env = self.query_env(
@@ -175,7 +175,7 @@ class B2gMultilocale(LocalesMixin, BaseScript, VCSMixin, GaiaLocalesMixin):
 
             }
         )
-        for locale in goanna_locales:
+        for locale in gecko_locales:
             command = make + ' merge-%s L10NBASEDIR=%s LOCALE_MERGEDIR=%s' % (locale, dirs['abs_l10n_dir'], dirs['abs_merge_dir'])
             status = self.run_command(command,
                                       cwd=dirs['abs_locales_dir'],

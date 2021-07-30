@@ -86,19 +86,20 @@ protected:
   virtual bool
   DeallocPBroadcastChannelParent(PBroadcastChannelParent* aActor) override;
 
-  virtual PMediaParent*
-  AllocPMediaParent() override;
+  virtual PNuwaParent*
+  AllocPNuwaParent() override;
 
   virtual bool
-  DeallocPMediaParent(PMediaParent* aActor) override;
+  RecvPNuwaConstructor(PNuwaParent* aActor) override;
 
   virtual bool
-  RecvRegisterServiceWorker(const ServiceWorkerRegistrationData& aData)
-                            override;
+  DeallocPNuwaParent(PNuwaParent* aActor) override;
+
+  virtual PServiceWorkerManagerParent*
+  AllocPServiceWorkerManagerParent() override;
 
   virtual bool
-  RecvUnregisterServiceWorker(const PrincipalInfo& aPrincipalInfo,
-                              const nsString& aScope) override;
+  DeallocPServiceWorkerManagerParent(PServiceWorkerManagerParent* aActor) override;
 
   virtual bool
   RecvShutdownServiceWorkerRegistrar() override;
@@ -119,7 +120,37 @@ protected:
   AllocPCacheStreamControlParent() override;
 
   virtual bool
-  DeallocPCacheStreamControlParent(dom::cache::PCacheStreamControlParent* aActor) override;
+  DeallocPCacheStreamControlParent(dom::cache::PCacheStreamControlParent* aActor)
+                                   override;
+
+  virtual PUDPSocketParent*
+  AllocPUDPSocketParent(const OptionalPrincipalInfo& pInfo,
+                        const nsCString& aFilter) override;
+  virtual bool
+  RecvPUDPSocketConstructor(PUDPSocketParent*,
+                            const OptionalPrincipalInfo& aPrincipalInfo,
+                            const nsCString& aFilter) override;
+  virtual bool
+  DeallocPUDPSocketParent(PUDPSocketParent*) override;
+
+  virtual PMessagePortParent*
+  AllocPMessagePortParent(const nsID& aUUID,
+                          const nsID& aDestinationUUID,
+                          const uint32_t& aSequenceID) override;
+
+  virtual bool
+  RecvPMessagePortConstructor(PMessagePortParent* aActor,
+                              const nsID& aUUID,
+                              const nsID& aDestinationUUID,
+                              const uint32_t& aSequenceID) override;
+
+  virtual bool
+  DeallocPMessagePortParent(PMessagePortParent* aActor) override;
+
+  virtual bool
+  RecvMessagePortForceClose(const nsID& aUUID,
+                            const nsID& aDestinationUUID,
+                            const uint32_t& aSequenceID) override;
 };
 
 } // namespace ipc

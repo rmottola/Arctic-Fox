@@ -6,15 +6,19 @@
 
 #include "ActorsChild.h" // IndexedDB
 #include "BroadcastChannelChild.h"
+#include "ServiceWorkerManagerChild.h"
 #include "FileDescriptorSetChild.h"
-#include "mozilla/media/MediaChild.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/dom/PBlobChild.h"
 #include "mozilla/dom/cache/ActorUtils.h"
 #include "mozilla/dom/indexedDB/PBackgroundIDBFactoryChild.h"
 #include "mozilla/dom/ipc/BlobChild.h"
+#include "mozilla/dom/MessagePortChild.h"
+#include "mozilla/dom/NuwaChild.h"
 #include "mozilla/ipc/PBackgroundTestChild.h"
 #include "mozilla/layout/VsyncChild.h"
+#include "mozilla/net/PUDPSocketChild.h"
+#include "mozilla/dom/network/UDPSocketChild.h"
 #include "nsID.h"
 #include "nsTraceRefcnt.h"
 
@@ -48,9 +52,13 @@ public:
 namespace mozilla {
 namespace ipc {
 
+using mozilla::dom::UDPSocketChild;
+using mozilla::net::PUDPSocketChild;
+
 using mozilla::dom::cache::PCacheChild;
 using mozilla::dom::cache::PCacheStorageChild;
 using mozilla::dom::cache::PCacheStreamControlChild;
+using mozilla::dom::PNuwaChild;
 
 // -----------------------------------------------------------------------------
 // BackgroundChildImpl::ThreadLocal
@@ -213,6 +221,23 @@ BackgroundChildImpl::DeallocPVsyncChild(PVsyncChild* aActor)
   return true;
 }
 
+PUDPSocketChild*
+BackgroundChildImpl::AllocPUDPSocketChild(const OptionalPrincipalInfo& aPrincipalInfo,
+                                          const nsCString& aFilter)
+{
+  MOZ_CRASH("AllocPUDPSocket should not be called");
+  return nullptr;
+}
+
+bool
+BackgroundChildImpl::DeallocPUDPSocketChild(PUDPSocketChild* child)
+{
+
+  UDPSocketChild* p = static_cast<UDPSocketChild*>(child);
+  p->ReleaseIPDLReference();
+  return true;
+}
+
 // -----------------------------------------------------------------------------
 // BroadcastChannel API
 // -----------------------------------------------------------------------------
@@ -234,6 +259,28 @@ BackgroundChildImpl::DeallocPBroadcastChannelChild(
 {
   nsRefPtr<dom::BroadcastChannelChild> child =
     dont_AddRef(static_cast<dom::BroadcastChannelChild*>(aActor));
+  MOZ_ASSERT(child);
+  return true;
+}
+
+// -----------------------------------------------------------------------------
+// ServiceWorkerManager
+// -----------------------------------------------------------------------------
+
+dom::PServiceWorkerManagerChild*
+BackgroundChildImpl::AllocPServiceWorkerManagerChild()
+{
+  nsRefPtr<dom::workers::ServiceWorkerManagerChild> agent =
+    new dom::workers::ServiceWorkerManagerChild();
+  return agent.forget().take();
+}
+
+bool
+BackgroundChildImpl::DeallocPServiceWorkerManagerChild(
+                                             PServiceWorkerManagerChild* aActor)
+{
+  nsRefPtr<dom::workers::ServiceWorkerManagerChild> child =
+    dont_AddRef(static_cast<dom::workers::ServiceWorkerManagerChild*>(aActor));
   MOZ_ASSERT(child);
   return true;
 }
@@ -283,16 +330,41 @@ BackgroundChildImpl::DeallocPCacheStreamControlChild(PCacheStreamControlChild* a
   return true;
 }
 
-media::PMediaChild*
-BackgroundChildImpl::AllocPMediaChild()
+// -----------------------------------------------------------------------------
+// MessageChannel/MessagePort API
+// -----------------------------------------------------------------------------
+
+dom::PMessagePortChild*
+BackgroundChildImpl::AllocPMessagePortChild(const nsID& aUUID,
+                                            const nsID& aDestinationUUID,
+                                            const uint32_t& aSequenceID)
 {
-  return media::AllocPMediaChild();
+  nsRefPtr<dom::MessagePortChild> agent = new dom::MessagePortChild();
+  return agent.forget().take();
 }
 
 bool
-BackgroundChildImpl::DeallocPMediaChild(media::PMediaChild *aActor)
+BackgroundChildImpl::DeallocPMessagePortChild(PMessagePortChild* aActor)
 {
-  return media::DeallocPMediaChild(aActor);
+  nsRefPtr<dom::MessagePortChild> child =
+    dont_AddRef(static_cast<dom::MessagePortChild*>(aActor));
+  MOZ_ASSERT(child);
+  return true;
+}
+
+PNuwaChild*
+BackgroundChildImpl::AllocPNuwaChild()
+{
+  return new mozilla::dom::NuwaChild();
+}
+
+bool
+BackgroundChildImpl::DeallocPNuwaChild(PNuwaChild* aActor)
+{
+  MOZ_ASSERT(aActor);
+
+  delete aActor;
+  return true;
 }
 
 } // namespace ipc

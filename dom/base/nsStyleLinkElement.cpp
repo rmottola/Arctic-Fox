@@ -23,7 +23,6 @@
 #include "nsIDOMComment.h"
 #include "nsIDOMNode.h"
 #include "nsIDOMStyleSheet.h"
-#include "nsNetUtil.h"
 #include "nsUnicharUtils.h"
 #include "nsCRT.h"
 #include "nsXPCOMCIDInternal.h"
@@ -404,7 +403,7 @@ nsStyleLinkElement::DoUpdateStyleSheet(nsIDocument* aOldDocument,
   nsresult rv = NS_OK;
   if (isInline) {
     nsAutoString text;
-    if (!nsContentUtils::GetNodeTextContent(thisContent, false, text)) {
+    if (!nsContentUtils::GetNodeTextContent(thisContent, false, text, fallible)) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
 

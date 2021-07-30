@@ -5,7 +5,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "AppleUtils.h"
-#include "MP4Reader.h"
 #include "MP4Decoder.h"
 #include "mp4_demuxer/Adts.h"
 #include "MediaInfo.h"
@@ -13,13 +12,13 @@
 #include "mozilla/Logging.h"
 
 PRLogModuleInfo* GetAppleMediaLog();
-#define LOG(...) PR_LOG(GetAppleMediaLog(), PR_LOG_DEBUG, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(GetAppleMediaLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 #define FourCC2Str(n) ((char[5]){(char)(n >> 24), (char)(n >> 16), (char)(n >> 8), (char)(n), 0})
 
 namespace mozilla {
 
 AppleATDecoder::AppleATDecoder(const AudioInfo& aConfig,
-                               FlushableMediaTaskQueue* aAudioTaskQueue,
+                               FlushableTaskQueue* aAudioTaskQueue,
                                MediaDataDecoderCallback* aCallback)
   : mConfig(aConfig)
   , mFileStreamError(false)
@@ -152,8 +151,6 @@ _PassthroughInputDataCallback(AudioConverterRef aAudioConverter,
     return kNoMoreDataErr;
   }
 
-  LOG("AudioConverter wants %u packets of audio data\n", *aNumDataPackets);
-
   if (aPacketDesc) {
     userData->mPacket.mStartOffset = 0;
     userData->mPacket.mVariableFramesInPacket = 0;
@@ -250,11 +247,9 @@ AppleATDecoder::DecodeSample(MediaRawData* aSample)
 
     if (numFrames) {
       outputData.AppendElements(decoded.get(), numFrames * channels);
-      LOG("%d frames decoded", numFrames);
     }
 
     if (rv == kNoMoreDataErr) {
-      LOG("done processing compressed packet");
       break;
     }
   } while (true);
@@ -265,21 +260,23 @@ AppleATDecoder::DecodeSample(MediaRawData* aSample)
 
   size_t numFrames = outputData.Length() / channels;
   int rate = mOutputFormat.mSampleRate;
-  CheckedInt<Microseconds> duration = FramesToUsecs(numFrames, rate);
-  if (!duration.isValid()) {
+  media::TimeUnit duration = FramesToTimeUnit(numFrames, rate);
+  if (!duration.IsValid()) {
     NS_WARNING("Invalid count of accumulated audio samples");
     return NS_ERROR_FAILURE;
   }
 
+#ifdef LOG_SAMPLE_DECODE
   LOG("pushed audio at time %lfs; duration %lfs\n",
       (double)aSample->mTime / USECS_PER_S,
-      (double)duration.value() / USECS_PER_S);
+      duration.ToSeconds());
+#endif
 
   nsAutoArrayPtr<AudioDataValue> data(new AudioDataValue[outputData.Length()]);
   PodCopy(data.get(), &outputData[0], outputData.Length());
   nsRefPtr<AudioData> audio = new AudioData(aSample->mOffset,
                                             aSample->mTime,
-                                            duration.value(),
+                                            duration.ToMicroseconds(),
                                             numFrames,
                                             data.forget(),
                                             channels,

@@ -11,7 +11,6 @@
 #include "nsIComponentManager.h"
 #include "nsIServiceManager.h"
 #include "nsComponentManagerUtils.h"
-#include "nsNetUtil.h"
 #include "nsScriptLoader.h"
 #include "nsFrameLoader.h"
 #include "xpcpublic.h"
@@ -25,6 +24,7 @@
 using mozilla::dom::StructuredCloneData;
 using mozilla::dom::StructuredCloneClosure;
 using namespace mozilla;
+using namespace mozilla::dom;
 
 bool
 nsInProcessTabChildGlobal::DoSendBlockingMessage(JSContext* aCx,

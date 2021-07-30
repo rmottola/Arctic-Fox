@@ -3,7 +3,7 @@
 
 'use strict';
 
-const {PushDB, PushService} = serviceExports;
+const {PushDB, PushService, PushServiceWebSocket} = serviceExports;
 
 function run_test() {
   do_get_profile();
@@ -15,13 +15,13 @@ function run_test() {
 }
 
 add_task(function* test_notification_version_string() {
-  let db = new PushDB();
-  let promiseDB = promisifyDatabase(db);
-  do_register_cleanup(() => cleanupDatabase(db));
-  yield promiseDB.put({
+  let db = PushServiceWebSocket.newPushDB();
+  do_register_cleanup(() => {return db.drop().then(_ => db.close());});
+  yield db.put({
     channelID: '6ff97d56-d0c0-43bc-8f5b-61b855e1d93b',
     pushEndpoint: 'https://example.org/updates/1',
     scope: 'https://example.com/page/1',
+    originAttributes: '',
     version: 2
   });
 
@@ -29,6 +29,7 @@ add_task(function* test_notification_version_string() {
 
   let ackDefer = Promise.defer();
   PushService.init({
+    serverURI: "wss://push.example.org/",
     networkInfo: new MockDesktopNetworkInfo(),
     db,
     makeWebSocket(uri) {
@@ -66,7 +67,7 @@ add_task(function* test_notification_version_string() {
   yield waitForPromise(ackDefer.promise, DEFAULT_TIMEOUT,
     'Timed out waiting for string acknowledgement');
 
-  let storeRecord = yield promiseDB.getByChannelID(
+  let storeRecord = yield db.getByKeyID(
     '6ff97d56-d0c0-43bc-8f5b-61b855e1d93b');
   strictEqual(storeRecord.version, 4, 'Wrong record version');
 });

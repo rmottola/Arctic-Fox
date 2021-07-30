@@ -83,7 +83,7 @@ static JSObjWrapperTable sJSObjWrappers;
 static bool sJSObjWrappersAccessible = false;
 
 // Hash of NPObject wrappers that wrap NPObjects as JSObjects.
-static PLDHashTable sNPObjWrappers;
+static PLDHashTable* sNPObjWrappers;
 
 // Global wrapper count. This includes JSObject wrappers *and*
 // NPObject wrappers. When this count goes to zero, there are no more
@@ -394,23 +394,24 @@ DestroyJSObjWrapperTable()
 static bool
 CreateNPObjWrapperTable()
 {
-  MOZ_ASSERT(!sNPObjWrappers.IsInitialized());
+  MOZ_ASSERT(!sNPObjWrappers);
 
   if (!RegisterGCCallbacks()) {
     return false;
   }
 
-  PL_DHashTableInit(&sNPObjWrappers, PL_DHashGetStubOps(),
-                    sizeof(NPObjWrapperHashEntry));
+  sNPObjWrappers =
+    new PLDHashTable(PL_DHashGetStubOps(), sizeof(NPObjWrapperHashEntry));
   return true;
 }
 
 static void
 DestroyNPObjWrapperTable()
 {
-  MOZ_ASSERT(sNPObjWrappers.EntryCount() == 0);
+  MOZ_ASSERT(sNPObjWrappers->EntryCount() == 0);
 
-  PL_DHashTableFinish(&sNPObjWrappers);
+  delete sNPObjWrappers;
+  sNPObjWrappers = nullptr;
 }
 
 static void
@@ -429,7 +430,7 @@ OnWrapperDestroyed()
       DestroyJSObjWrapperTable();
     }
 
-    if (sNPObjWrappers.IsInitialized()) {
+    if (sNPObjWrappers) {
       // No more wrappers, and our hash was initialized. Finish the
       // hash to prevent leaking it.
       DestroyNPObjWrapperTable();
@@ -488,7 +489,7 @@ NPVariantToJSVal(NPP npp, JSContext* cx, const NPVariant* variant)
   case NPVariantType_Void :
     return JS::UndefinedValue();
   case NPVariantType_Null :
-    return JSVAL_NULL;
+    return JS::NullValue();
   case NPVariantType_Bool :
     return JS::BooleanValue(NPVARIANT_TO_BOOLEAN(*variant));
   case NPVariantType_Int32 :
@@ -1032,8 +1033,8 @@ nsJSObjWrapper::NP_Enumerate(NPObject* npobj, NPIdentifier** idarray,
   JS::Rooted<JSObject*> jsobj(cx, npjsobj->mJSObj);
   JSAutoCompartment ac(cx, jsobj);
 
-  JS::AutoIdArray ida(cx, JS_Enumerate(cx, jsobj));
-  if (!ida) {
+  JS::Rooted<JS::IdVector> ida(cx, JS::IdVector(cx));
+  if (!JS_Enumerate(cx, jsobj, &ida)) {
     return false;
   }
 
@@ -1054,7 +1055,7 @@ nsJSObjWrapper::NP_Enumerate(NPObject* npobj, NPIdentifier** idarray,
     NPIdentifier id;
     if (v.isString()) {
       JS::Rooted<JSString*> str(cx, v.toString());
-      str = JS_InternJSString(cx, str);
+      str = JS_AtomizeAndPinJSString(cx, str);
       if (!str) {
         PR_Free(*idarray);
         return false;
@@ -1555,9 +1556,9 @@ CallNPMethodInternal(JSContext* cx, JS::Handle<JSObject*> obj, unsigned argc,
     // the function object.
 
     if (npobj->_class->invoke) {
-      JSFunction* fun = ::JS_GetObjectFunction(funobj);
+      JSFunction *fun = ::JS_GetObjectFunction(funobj);
       JS::Rooted<JSString*> funId(cx, ::JS_GetFunctionId(fun));
-      JSString* name = ::JS_InternJSString(cx, funId);
+      JSString *name = ::JS_AtomizeAndPinJSString(cx, funId);
       NPIdentifier id = StringToNPIdentifier(cx, name);
 
       ok = npobj->_class->invoke(npobj, id, npargs, argc, &v);
@@ -1757,8 +1758,8 @@ NPObjWrapper_Finalize(js::FreeOp* fop, JSObject* obj)
 {
   NPObject* npobj = (NPObject*)::JS_GetPrivate(obj);
   if (npobj) {
-    if (sNPObjWrappers.IsInitialized()) {
-      PL_DHashTableRemove(&sNPObjWrappers, npobj);
+    if (sNPObjWrappers) {
+      sNPObjWrappers->Remove(npobj);
     }
   }
 
@@ -1773,7 +1774,7 @@ NPObjWrapper_ObjectMoved(JSObject* obj, const JSObject* old)
   // The wrapper JSObject has been moved, so we need to update the entry in the
   // sNPObjWrappers hash table, if present.
 
-  if (!sNPObjWrappers.IsInitialized()) {
+  if (!sNPObjWrappers) {
     return;
   }
 
@@ -1782,11 +1783,11 @@ NPObjWrapper_ObjectMoved(JSObject* obj, const JSObject* old)
     return;
   }
 
-  // Calling PL_DHashTableSearch() will not result in GC.
+  // Calling PLDHashTable::Search() will not result in GC.
   JS::AutoSuppressGCAnalysis nogc;
 
-  NPObjWrapperHashEntry* entry = static_cast<NPObjWrapperHashEntry*>
-    (PL_DHashTableSearch(&sNPObjWrappers, npobj));
+  auto entry =
+    static_cast<NPObjWrapperHashEntry*>(sNPObjWrappers->Search(npobj));
   MOZ_ASSERT(entry && entry->mJSObj);
   MOZ_ASSERT(entry->mJSObj == old);
   entry->mJSObj = obj;
@@ -1832,14 +1833,14 @@ nsNPObjWrapper::OnDestroy(NPObject* npobj)
     return;
   }
 
-  if (!sNPObjWrappers.IsInitialized()) {
+  if (!sNPObjWrappers) {
     // No hash yet (or any more), no used wrappers available.
 
     return;
   }
 
-  NPObjWrapperHashEntry* entry = static_cast<NPObjWrapperHashEntry*>
-    (PL_DHashTableSearch(&sNPObjWrappers, npobj));
+  auto entry =
+    static_cast<NPObjWrapperHashEntry*>(sNPObjWrappers->Search(npobj));
 
   if (entry && entry->mJSObj) {
     // Found a live NPObject wrapper, null out its JSObjects' private
@@ -1848,7 +1849,7 @@ nsNPObjWrapper::OnDestroy(NPObject* npobj)
     ::JS_SetPrivate(entry->mJSObj, nullptr);
 
     // Remove the npobj from the hash now that it went away.
-    PL_DHashTableRawRemove(&sNPObjWrappers, entry);
+    PL_DHashTableRawRemove(sNPObjWrappers, entry);
 
     // The finalize hook will call OnWrapperDestroyed().
   }
@@ -1882,15 +1883,15 @@ nsNPObjWrapper::GetNewOrUsed(NPP npp, JSContext* cx, NPObject* npobj)
     return nullptr;
   }
 
-  if (!sNPObjWrappers.IsInitialized()) {
+  if (!sNPObjWrappers) {
     // No hash yet (or any more), initialize it.
     if (!CreateNPObjWrapperTable()) {
       return nullptr;
     }
   }
 
-  NPObjWrapperHashEntry* entry = static_cast<NPObjWrapperHashEntry*>
-    (PL_DHashTableAdd(&sNPObjWrappers, npobj, fallible));
+  auto entry =
+    static_cast<NPObjWrapperHashEntry*>(sNPObjWrappers->Add(npobj, fallible));
 
   if (!entry) {
     // Out of memory
@@ -1912,25 +1913,24 @@ nsNPObjWrapper::GetNewOrUsed(NPP npp, JSContext* cx, NPObject* npobj)
   entry->mNPObj = npobj;
   entry->mNpp = npp;
 
-  uint32_t generation = sNPObjWrappers.Generation();
+  uint32_t generation = sNPObjWrappers->Generation();
 
   // No existing JSObject, create one.
 
   JS::Rooted<JSObject*> obj(cx, ::JS_NewObject(cx, js::Jsvalify(&sNPObjectJSWrapperClass)));
 
-  if (generation != sNPObjWrappers.Generation()) {
+  if (generation != sNPObjWrappers->Generation()) {
       // Reload entry if the JS_NewObject call caused a GC and reallocated
       // the table (see bug 445229). This is guaranteed to succeed.
 
-      entry = static_cast<NPObjWrapperHashEntry*>
-        (PL_DHashTableSearch(&sNPObjWrappers, npobj));
-      NS_ASSERTION(entry, "Hashtable didn't find what we just added?");
+      NS_ASSERTION(sNPObjWrappers->Search(npobj),
+                   "Hashtable didn't find what we just added?");
   }
 
   if (!obj) {
     // OOM? Remove the stale entry from the hash.
 
-    PL_DHashTableRawRemove(&sNPObjWrappers, entry);
+    PL_DHashTableRawRemove(sNPObjWrappers, entry);
 
     return nullptr;
   }
@@ -1945,66 +1945,6 @@ nsNPObjWrapper::GetNewOrUsed(NPP npp, JSContext* cx, NPObject* npobj)
   _retainobject(npobj);
 
   return obj;
-}
-
-
-// Struct for passing an NPP and a JSContext to
-// NPObjWrapperPluginDestroyedCallback
-struct NppAndCx
-{
-  NPP npp;
-  JSContext* cx;
-};
-
-static PLDHashOperator
-NPObjWrapperPluginDestroyedCallback(PLDHashTable* table, PLDHashEntryHdr* hdr,
-                                    uint32_t number, void* arg)
-{
-  NPObjWrapperHashEntry* entry = (NPObjWrapperHashEntry*)hdr;
-  NppAndCx* nppcx = reinterpret_cast<NppAndCx*>(arg);
-
-  if (entry->mNpp == nppcx->npp) {
-    // Prevent invalidate() and deallocate() from touching the hash
-    // we're enumerating.
-    const PLDHashTableOps* ops = table->Ops();
-    table->SetOps(nullptr);
-
-    NPObject* npobj = entry->mNPObj;
-
-    if (npobj->_class && npobj->_class->invalidate) {
-      npobj->_class->invalidate(npobj);
-    }
-
-#ifdef NS_BUILD_REFCNT_LOGGING
-    {
-      int32_t refCnt = npobj->referenceCount;
-      while (refCnt) {
-        --refCnt;
-        NS_LOG_RELEASE(npobj, refCnt, "BrowserNPObject");
-      }
-    }
-#endif
-
-    // Force deallocation of plugin objects since the plugin they came
-    // from is being torn down.
-    if (npobj->_class && npobj->_class->deallocate) {
-      npobj->_class->deallocate(npobj);
-    } else {
-      PR_Free(npobj);
-    }
-
-    ::JS_SetPrivate(entry->mJSObj, nullptr);
-
-    table->SetOps(ops);
-
-    if (sDelayedReleases && sDelayedReleases->RemoveElement(npobj)) {
-      OnWrapperDestroyed();
-    }
-
-    return PL_DHASH_REMOVE;
-  }
-
-  return PL_DHASH_NEXT;
 }
 
 // static
@@ -2033,13 +1973,51 @@ nsJSNPRuntime::OnPluginDestroy(NPP npp)
     sJSObjWrappersAccessible = true;
   }
 
-  // Use the safe JSContext here as we're not always able to find the
-  // JSContext associated with the NPP any more.
-  AutoSafeJSContext cx;
-  if (sNPObjWrappers.IsInitialized()) {
-    NppAndCx nppcx = { npp, cx };
-    PL_DHashTableEnumerate(&sNPObjWrappers,
-                           NPObjWrapperPluginDestroyedCallback, &nppcx);
+  if (sNPObjWrappers) {
+    for (auto i = sNPObjWrappers->Iter(); !i.Done(); i.Next()) {
+      auto entry = static_cast<NPObjWrapperHashEntry*>(i.Get());
+
+      if (entry->mNpp == npp) {
+        // HACK: temporarily hide the table we're enumerating so that
+        // invalidate() and deallocate() don't touch it.
+        PLDHashTable *tmp = sNPObjWrappers;
+        sNPObjWrappers = nullptr;
+
+        NPObject *npobj = entry->mNPObj;
+
+        if (npobj->_class && npobj->_class->invalidate) {
+          npobj->_class->invalidate(npobj);
+        }
+
+#ifdef NS_BUILD_REFCNT_LOGGING
+        {
+          int32_t refCnt = npobj->referenceCount;
+          while (refCnt) {
+            --refCnt;
+            NS_LOG_RELEASE(npobj, refCnt, "BrowserNPObject");
+          }
+        }
+#endif
+
+        // Force deallocation of plugin objects since the plugin they came
+        // from is being torn down.
+        if (npobj->_class && npobj->_class->deallocate) {
+          npobj->_class->deallocate(npobj);
+        } else {
+          PR_Free(npobj);
+        }
+
+        ::JS_SetPrivate(entry->mJSObj, nullptr);
+
+        sNPObjWrappers = tmp;
+
+        if (sDelayedReleases && sDelayedReleases->RemoveElement(npobj)) {
+          OnWrapperDestroyed();
+        }
+
+        i.Remove();
+      }
+    }
   }
 }
 
@@ -2070,8 +2048,8 @@ LookupNPP(NPObject* npobj)
     return o->mNpp;
   }
 
-  NPObjWrapperHashEntry* entry = static_cast<NPObjWrapperHashEntry*>
-    (PL_DHashTableAdd(&sNPObjWrappers, npobj, fallible));
+  auto entry =
+    static_cast<NPObjWrapperHashEntry*>(sNPObjWrappers->Add(npobj, fallible));
 
   if (!entry) {
     return nullptr;

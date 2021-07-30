@@ -375,14 +375,19 @@ class TestRecursiveMakeBackend(BackendTester):
 
         expected = [
             'GENERATED_FILES += bar.c',
+            'EXTRA_MDDEPEND_FILES += bar.c.pp',
             'bar.c: %s/generate-bar.py' % env.topsrcdir,
-            '$(call py_action,file_generate,%s/generate-bar.py baz bar.c)' % env.topsrcdir,
+            '$(REPORT_BUILD)',
+            '$(call py_action,file_generate,%s/generate-bar.py baz bar.c $(MDDEPDIR)/bar.c.pp)' % env.topsrcdir,
             '',
             'GENERATED_FILES += foo.c',
+            'EXTRA_MDDEPEND_FILES += foo.c.pp',
             'foo.c: %s/generate-foo.py %s/foo-data' % (env.topsrcdir, env.topsrcdir),
-            '$(call py_action,file_generate,%s/generate-foo.py main foo.c %s/foo-data)' % (env.topsrcdir, env.topsrcdir),
+            '$(REPORT_BUILD)',
+            '$(call py_action,file_generate,%s/generate-foo.py main foo.c $(MDDEPDIR)/foo.c.pp %s/foo-data)' % (env.topsrcdir, env.topsrcdir),
             '',
             'GENERATED_FILES += quux.c',
+            'EXTRA_MDDEPEND_FILES += quux.c.pp',
         ]
 
         self.maxDiff = None
@@ -483,6 +488,7 @@ class TestRecursiveMakeBackend(BackendTester):
 
         m = InstallManifest(path=os.path.join(install_dir, 'dist_bin'))
         self.assertIn('components/my_module.xpt', m)
+        self.assertIn('components/interfaces.manifest', m)
 
         m = InstallManifest(path=mozpath.join(install_dir, 'dist_include'))
         self.assertIn('foo.h', m)

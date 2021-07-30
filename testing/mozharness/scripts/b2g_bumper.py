@@ -6,12 +6,12 @@
 # ***** END LICENSE BLOCK *****
 """ b2g_bumper.py
 
-    Updates a goanna repo with up to date information from B2G repositories.
+    Updates a gecko repo with up to date information from B2G repositories.
 
     In particular, it updates gaia.json which is used by B2G desktop builds,
     and updates the XML manifests used by device builds.
 
-    This is to tie the external repository revisions to a visible goanna commit
+    This is to tie the external repository revisions to a visible gecko commit
     which appears on TBPL, so sheriffs can blame the appropriate changes.
 """
 
@@ -58,7 +58,7 @@ class B2GBumper(VCSScript, MapperMixin):
                 'import-git-ref-cache',
                 'clobber',
                 'check-treestatus',
-                'checkout-goanna',
+                'checkout-gecko',
                 'bump-gaia',
                 'checkout-manifests',
                 'massage-manifests',
@@ -105,9 +105,9 @@ class B2GBumper(VCSScript, MapperMixin):
         abs_dirs.update({
             'manifests_dir':
             os.path.join(abs_dirs['abs_work_dir'], 'manifests'),
-            'goanna_local_dir':
+            'gecko_local_dir':
             os.path.join(abs_dirs['abs_work_dir'],
-                         self.config['goanna_local_dir']),
+                         self.config['gecko_local_dir']),
         })
         self.abs_dirs = abs_dirs
         return self.abs_dirs
@@ -263,9 +263,9 @@ class B2GBumper(VCSScript, MapperMixin):
         dirs = self.query_abs_dirs()
         device_config = self.config['devices'][device]
         manifest_file = os.path.join(
-            dirs['goanna_local_dir'],
+            dirs['gecko_local_dir'],
             'b2g', 'config',
-            device_config.get('goanna_device_dir', device),
+            device_config.get('gecko_device_dir', device),
             'sources.xml')
         return manifest_file
 
@@ -294,7 +294,7 @@ class B2GBumper(VCSScript, MapperMixin):
                         "ssh -oIdentityFile=%s -l %s" % (
                             self.config["ssh_key"], self.config["ssh_user"],
                         ),
-                        self.config["goanna_push_url"]]
+                        self.config["gecko_push_url"]]
         status = self.run_command(command, cwd=repo_path,
                                   error_list=HgErrorList)
         if status != 0:
@@ -420,7 +420,7 @@ class B2GBumper(VCSScript, MapperMixin):
         "Return True if we can land based on treestatus"
         c = self.config
         dirs = self.query_abs_dirs()
-        tree = c.get('treestatus_tree', os.path.basename(c['goanna_pull_url'].rstrip("/")))
+        tree = c.get('treestatus_tree', os.path.basename(c['gecko_pull_url'].rstrip("/")))
         treestatus_url = "%s/%s?format=json" % (c['treestatus_base_url'], tree)
         treestatus_json = os.path.join(dirs['abs_work_dir'], 'treestatus.json')
         if not os.path.exists(dirs['abs_work_dir']):
@@ -467,13 +467,13 @@ class B2GBumper(VCSScript, MapperMixin):
             self.info("breaking early since treestatus is closed")
             sys.exit(0)
 
-    def checkout_goanna(self):
+    def checkout_gecko(self):
         c = self.config
         dirs = self.query_abs_dirs()
-        dest = dirs['goanna_local_dir']
+        dest = dirs['gecko_local_dir']
         repos = [{
-            'repo': c['goanna_pull_url'],
-            'tag': c.get('goanna_tag', 'default'),
+            'repo': c['gecko_pull_url'],
+            'tag': c.get('gecko_tag', 'default'),
             'dest': dest,
             'vcs': 'hgtool',
             'hgtool_base_bundle_urls': c.get('hgtool_base_bundle_urls'),
@@ -521,7 +521,7 @@ class B2GBumper(VCSScript, MapperMixin):
 
     def commit_manifests(self):
         dirs = self.query_abs_dirs()
-        repo_path = dirs['goanna_local_dir']
+        repo_path = dirs['gecko_local_dir']
         for device, device_config in self.query_devices().items():
             manifest_path = self.query_manifest_path(device)
             self.hg_add(repo_path, manifest_path)
@@ -531,7 +531,7 @@ class B2GBumper(VCSScript, MapperMixin):
 
     def bump_gaia(self):
         dirs = self.query_abs_dirs()
-        repo_path = dirs['goanna_local_dir']
+        repo_path = dirs['gecko_local_dir']
         gaia_json_path = os.path.join(repo_path,
                                       self.config['gaia_revision_file'])
         contents = self._read_json(gaia_json_path)
@@ -576,7 +576,7 @@ class B2GBumper(VCSScript, MapperMixin):
 
     def push(self):
         dirs = self.query_abs_dirs()
-        repo_path = dirs['goanna_local_dir']
+        repo_path = dirs['gecko_local_dir']
         return self.hg_push(repo_path)
 
     def push_loop(self):
@@ -588,7 +588,7 @@ class B2GBumper(VCSScript, MapperMixin):
                 self.info("breaking early since treestatus is closed")
                 break
 
-            self.checkout_goanna()
+            self.checkout_gecko()
             if not self.config.get('skip_gaia_json') and self.bump_gaia():
                 changed = True
             self.checkout_manifests()

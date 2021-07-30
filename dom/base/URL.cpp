@@ -27,7 +27,6 @@ NS_IMPL_CYCLE_COLLECTION_CLASS(URL)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(URL)
   if (tmp->mSearchParams) {
-    tmp->mSearchParams->RemoveObserver(tmp);
     NS_IMPL_CYCLE_COLLECTION_UNLINK(mSearchParams)
   }
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
@@ -358,7 +357,7 @@ URL::UpdateURLSearchParams()
     }
   }
 
-  mSearchParams->ParseInput(search, this);
+  mSearchParams->ParseInput(search);
 }
 
 void
@@ -485,22 +484,6 @@ URL::SearchParams()
 }
 
 void
-URL::SetSearchParams(URLSearchParams& aSearchParams)
-{
-  if (mSearchParams) {
-    mSearchParams->RemoveObserver(this);
-  }
-
-  // the observer will be cleared using the cycle collector.
-  mSearchParams = &aSearchParams;
-  mSearchParams->AddObserver(this);
-
-  nsAutoString search;
-  mSearchParams->Serialize(search);
-  SetSearchInternal(search);
-}
-
-void
 URL::GetHash(nsAString& aHash, ErrorResult& aRv) const
 {
   aHash.Truncate();
@@ -534,8 +517,7 @@ void
 URL::CreateSearchParamsIfNeeded()
 {
   if (!mSearchParams) {
-    mSearchParams = new URLSearchParams();
-    mSearchParams->AddObserver(this);
+    mSearchParams = new URLSearchParams(this);
     UpdateURLSearchParams();
   }
 }

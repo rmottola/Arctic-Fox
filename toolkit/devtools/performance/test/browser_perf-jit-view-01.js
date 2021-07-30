@@ -6,11 +6,11 @@
  * if on, and displays selected frames on focus.
  */
 
-const { RecordingUtils } = devtools.require("devtools/performance/recording-utils");
+const RecordingUtils = devtools.require("devtools/performance/recording-utils");
 
 Services.prefs.setBoolPref(INVERT_PREF, false);
 
-function spawnTest () {
+function* spawnTest() {
   let { panel } = yield initPerformance(SIMPLE_URL);
   let { EVENTS, $, $$, window, PerformanceController } = panel.panelWin;
   let { OverviewView, DetailsView, JITOptimizationsView, JsCallTreeView, RecordingsView } = panel.panelWin;

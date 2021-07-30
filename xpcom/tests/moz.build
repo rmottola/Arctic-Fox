@@ -63,7 +63,6 @@ GeckoCppUnitTests([
     'TestObserverArray',
     'TestObserverService',
     'TestPipe',
-    'TestPLDHash',
     'TestStringAPI',
     'TestTArray',
     'TestTextFormatter',
@@ -77,8 +76,6 @@ if CONFIG['MOZ_MEMORY']:
 
 # XXX Make these tests work in libxul builds.
 #CPP_UNIT_TESTS += [
-#    'TestThreads',
-#    'TestXPIDLString',
 #    'TestAtoms',
 #]
 
@@ -99,6 +96,9 @@ XPIDL_MODULE = 'xpcomtest'
 XPIDL_SOURCES += [
     'NotXPCOMTest.idl',
 ]
+
+# Don't add our test-only .xpt files to the normal manifests
+XPIDL_NO_MANIFEST = True
 
 LOCAL_INCLUDES += [
     '../ds',

@@ -21,15 +21,16 @@
 #include "mozilla/Logging.h"
 #include "VideoUtils.h"
 #include <algorithm>
+#include "gfxPlatform.h"
 
 PRLogModuleInfo* GetAppleMediaLog();
-#define LOG(...) PR_LOG(GetAppleMediaLog(), PR_LOG_DEBUG, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(GetAppleMediaLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 //#define LOG_MEDIA_SHA1
 
 namespace mozilla {
 
 AppleVDADecoder::AppleVDADecoder(const VideoInfo& aConfig,
-                               FlushableMediaTaskQueue* aVideoTaskQueue,
+                               FlushableTaskQueue* aVideoTaskQueue,
                                MediaDataDecoderCallback* aCallback,
                                layers::ImageContainer* aImageContainer)
   : mTaskQueue(aVideoTaskQueue)
@@ -74,6 +75,11 @@ AppleVDADecoder::~AppleVDADecoder()
 nsresult
 AppleVDADecoder::Init()
 {
+  if (!gfxPlatform::GetPlatform()->CanUseHardwareVideoDecoding()) {
+    // This GPU is blacklisted for hardware decoding.
+    return NS_ERROR_FAILURE;
+  }
+
   if (mDecoder) {
     return NS_OK;
   }
@@ -189,9 +195,9 @@ PlatformCallback(void* decompressionOutputRefCon,
   AutoCFRelease<CFNumberRef> kfref =
     (CFNumberRef)CFDictionaryGetValue(frameInfo, CFSTR("FRAME_KEYFRAME"));
 
-  Microseconds dts;
-  Microseconds pts;
-  Microseconds duration;
+  int64_t dts;
+  int64_t pts;
+  int64_t duration;
   int64_t byte_offset;
   char is_sync_point;
 
@@ -202,11 +208,12 @@ PlatformCallback(void* decompressionOutputRefCon,
   CFNumberGetValue(kfref, kCFNumberSInt8Type, &is_sync_point);
 
   nsAutoPtr<AppleVDADecoder::AppleFrameRef> frameRef(
-    new AppleVDADecoder::AppleFrameRef(dts,
-    pts,
-    duration,
-    byte_offset,
-    is_sync_point == 1));
+    new AppleVDADecoder::AppleFrameRef(
+      media::TimeUnit::FromMicroseconds(dts),
+      media::TimeUnit::FromMicroseconds(pts),
+      media::TimeUnit::FromMicroseconds(duration),
+      byte_offset,
+      is_sync_point == 1));
 
   // Forward the data back to an object method which can access
   // the correct MP4Reader callback.
@@ -246,9 +253,9 @@ AppleVDADecoder::OutputFrame(CVPixelBufferRef aImage,
 
   LOG("mp4 output frame %lld dts %lld pts %lld duration %lld us%s",
     aFrameRef->byte_offset,
-    aFrameRef->decode_timestamp,
-    aFrameRef->composition_timestamp,
-    aFrameRef->duration,
+    aFrameRef->decode_timestamp.ToMicroseconds(),
+    aFrameRef->composition_timestamp.ToMicroseconds(),
+    aFrameRef->duration.ToMicroseconds(),
     aFrameRef->is_sync_point ? " keyframe" : ""
   );
 
@@ -271,10 +278,11 @@ AppleVDADecoder::OutputFrame(CVPixelBufferRef aImage,
   data = VideoData::CreateFromImage(info,
                                     mImageContainer,
                                     aFrameRef->byte_offset,
-                                    aFrameRef->composition_timestamp,
-                                    aFrameRef->duration, image.forget(),
+                                    aFrameRef->composition_timestamp.ToMicroseconds(),
+                                    aFrameRef->duration.ToMicroseconds(),
+                                    image.forget(),
                                     aFrameRef->is_sync_point,
-                                    aFrameRef->decode_timestamp,
+                                    aFrameRef->decode_timestamp.ToMicroseconds(),
                                     visible);
 
   if (!data) {
@@ -492,14 +500,13 @@ AppleVDADecoder::CreateOutputConfiguration()
 already_AddRefed<AppleVDADecoder>
 AppleVDADecoder::CreateVDADecoder(
   const VideoInfo& aConfig,
-  FlushableMediaTaskQueue* aVideoTaskQueue,
+  FlushableTaskQueue* aVideoTaskQueue,
   MediaDataDecoderCallback* aCallback,
   layers::ImageContainer* aImageContainer)
 {
   nsRefPtr<AppleVDADecoder> decoder =
     new AppleVDADecoder(aConfig, aVideoTaskQueue, aCallback, aImageContainer);
   if (NS_FAILED(decoder->Init())) {
-    NS_ERROR("AppleVDADecoder an error occurred");
     return nullptr;
   }
   return decoder.forget();

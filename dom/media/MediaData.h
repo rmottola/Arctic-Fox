@@ -22,7 +22,6 @@ class Image;
 class ImageContainer;
 } // namespace layers
 
-class MediaLargeByteBuffer;
 class MediaByteBuffer;
 class SharedTrackInfo;
 
@@ -75,6 +74,11 @@ public:
 
   int64_t GetEndTime() const { return mTime + mDuration; }
 
+  bool AdjustForStartTime(int64_t aStartTime)
+  {
+    mTime = mTime - aStartTime;
+    return mTime >= 0;
+  }
 protected:
   explicit MediaData(Type aType)
     : mType(aType)
@@ -101,11 +105,14 @@ public:
             AudioDataValue* aData,
             uint32_t aChannels,
             uint32_t aRate)
-    : MediaData(AUDIO_DATA, aOffset, aTime, aDuration)
+    : MediaData(sType, aOffset, aTime, aDuration)
     , mFrames(aFrames)
     , mChannels(aChannels)
     , mRate(aRate)
     , mAudioData(aData) {}
+
+  static const Type sType = AUDIO_DATA;
+  static const char* sTypeName;
 
   // Creates a new VideoData identical to aOther, but with a different
   // specified timestamp and duration. All data from aOther is copied
@@ -149,6 +156,9 @@ public:
   typedef layers::ImageContainer ImageContainer;
   typedef layers::Image Image;
   typedef layers::PlanarYCbCrImage PlanarYCbCrImage;
+
+  static const Type sType = VIDEO_DATA;
+  static const char* sTypeName;
 
   // YCbCr data obtained from decoding the video. The index's are:
   //   0 = Y
@@ -259,18 +269,6 @@ public:
                                   const IntRect& aPicture,
                                   bool aCopyData);
 
-  // Constructs a duplicate VideoData object. This intrinsically tells the
-  // player that it does not need to update the displayed frame when this
-  // frame is played; this frame is identical to the previous.
-  static already_AddRefed<VideoData> CreateDuplicate(int64_t aOffset,
-                                                     int64_t aTime,
-                                                     int64_t aDuration,
-                                                     int64_t aTimecode)
-  {
-    nsRefPtr<VideoData> rv = new VideoData(aOffset, aTime, aDuration, aTimecode);
-    return rv.forget();
-  }
-
   size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const;
 
   // Dimensions at which to display the video frame. The picture region
@@ -281,21 +279,17 @@ public:
   // This frame's image.
   nsRefPtr<Image> mImage;
 
-  // When true, denotes that this frame is identical to the frame that
-  // came before; it's a duplicate. mBuffer will be empty.
-  const bool mDuplicate;
+  int32_t mFrameID;
 
-  VideoData(int64_t aOffset,
-            int64_t aTime,
-            int64_t aDuration,
-            int64_t aTimecode);
+  bool mSentToCompositor;
 
   VideoData(int64_t aOffset,
             int64_t aTime,
             int64_t aDuration,
             bool aKeyframe,
             int64_t aTimecode,
-            IntSize aDisplay);
+            IntSize aDisplay,
+            int32_t aFrameID);
 
 protected:
   ~VideoData();
@@ -420,8 +414,6 @@ private:
   // It is designed to share potentially big byte arrays.
 class MediaLargeByteBuffer : public FallibleTArray<uint8_t> {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(MediaLargeByteBuffer);
-  MediaLargeByteBuffer() = default;
-  explicit MediaLargeByteBuffer(size_t aCapacity) : FallibleTArray<uint8_t>(aCapacity) {}
 
 private:
   ~MediaLargeByteBuffer() {}

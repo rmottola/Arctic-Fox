@@ -45,10 +45,10 @@ extern PRLogModuleInfo *gWidgetFocusLog;
 extern PRLogModuleInfo *gWidgetDragLog;
 extern PRLogModuleInfo *gWidgetDrawLog;
 
-#define LOG(args) PR_LOG(gWidgetLog, 4, args)
-#define LOGFOCUS(args) PR_LOG(gWidgetFocusLog, 4, args)
-#define LOGDRAG(args) PR_LOG(gWidgetDragLog, 4, args)
-#define LOGDRAW(args) PR_LOG(gWidgetDrawLog, 4, args)
+#define LOG(args) MOZ_LOG(gWidgetLog, mozilla::LogLevel::Debug, args)
+#define LOGFOCUS(args) MOZ_LOG(gWidgetFocusLog, mozilla::LogLevel::Debug, args)
+#define LOGDRAG(args) MOZ_LOG(gWidgetDragLog, mozilla::LogLevel::Debug, args)
+#define LOGDRAW(args) MOZ_LOG(gWidgetDrawLog, mozilla::LogLevel::Debug, args)
 
 #else
 
@@ -194,7 +194,10 @@ public:
                                                guint            aTime,
                                                gpointer         aData);
 
-  already_AddRefed<mozilla::gfx::DrawTarget> StartRemoteDrawing() override;
+    virtual already_AddRefed<mozilla::gfx::DrawTarget>
+                       StartRemoteDrawing() override;
+    virtual void       EndRemoteDrawingInRegion(mozilla::gfx::DrawTarget* aDrawTarget,
+                                                nsIntRegion& aInvalidRegion) override;
 
 private:
     void               UpdateAlpha(gfxPattern* aPattern, nsIntRect aBoundsRect);
@@ -476,9 +479,6 @@ private:
                                           LayersBackend aBackendHint = mozilla::layers::LayersBackend::LAYERS_NONE,
                                           LayerManagerPersistence aPersistence = LAYER_MANAGER_CURRENT,
                                           bool* aAllowRetaining = nullptr) override;
-#if (MOZ_WIDGET_GTK == 3)
-    gfxASurface* GetThebesSurface(cairo_t *cr);
-#endif
 
     void CleanLayerManagerRecursive();
 

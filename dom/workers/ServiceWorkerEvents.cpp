@@ -18,6 +18,7 @@
 #include "nsSerializationHelper.h"
 #include "nsQueryObject.h"
 
+#include "mozilla/Preferences.h"
 #include "mozilla/dom/FetchEventBinding.h"
 #include "mozilla/dom/PromiseNativeHandler.h"
 #include "mozilla/dom/Request.h"
@@ -97,11 +98,14 @@ class FinishResponse final : public nsRunnable
 {
   nsMainThreadPtrHandle<nsIInterceptedChannel> mChannel;
   nsRefPtr<InternalResponse> mInternalResponse;
+  ChannelInfo mWorkerChannelInfo;
 public:
   FinishResponse(nsMainThreadPtrHandle<nsIInterceptedChannel>& aChannel,
-                 InternalResponse* aInternalResponse)
+                 InternalResponse* aInternalResponse,
+                 const ChannelInfo& aWorkerChannelInfo)
     : mChannel(aChannel)
     , mInternalResponse(aInternalResponse)
+    , mWorkerChannelInfo(aWorkerChannelInfo)
   {
   }
 
@@ -110,13 +114,17 @@ public:
   {
     AssertIsOnMainThread();
 
-    nsCOMPtr<nsISupports> infoObj;
-    nsresult rv = NS_DeserializeObject(mInternalResponse->GetSecurityInfo(), getter_AddRefs(infoObj));
-    if (NS_SUCCEEDED(rv)) {
-      rv = mChannel->SetSecurityInfo(infoObj);
-      if (NS_WARN_IF(NS_FAILED(rv))) {
-        return rv;
-      }
+    ChannelInfo channelInfo;
+    if (mInternalResponse->GetChannelInfo().IsInitialized()) {
+      channelInfo = mInternalResponse->GetChannelInfo();
+    } else {
+      // We are dealing with a synthesized response here, so fall back to the
+      // channel info for the worker script.
+      channelInfo = mWorkerChannelInfo;
+    }
+    nsresult rv = mChannel->SetChannelInfo(&channelInfo);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
     }
 
     mChannel->SynthesizeStatus(mInternalResponse->GetStatus(), mInternalResponse->GetStatusText());
@@ -159,11 +167,14 @@ struct RespondWithClosure
 {
   nsMainThreadPtrHandle<nsIInterceptedChannel> mInterceptedChannel;
   nsRefPtr<InternalResponse> mInternalResponse;
+  ChannelInfo mWorkerChannelInfo;
 
   RespondWithClosure(nsMainThreadPtrHandle<nsIInterceptedChannel>& aChannel,
-                     InternalResponse* aInternalResponse)
+                     InternalResponse* aInternalResponse,
+                     const ChannelInfo& aWorkerChannelInfo)
     : mInterceptedChannel(aChannel)
     , mInternalResponse(aInternalResponse)
+    , mWorkerChannelInfo(aWorkerChannelInfo)
   {
   }
 };
@@ -173,7 +184,9 @@ void RespondWithCopyComplete(void* aClosure, nsresult aStatus)
   nsAutoPtr<RespondWithClosure> data(static_cast<RespondWithClosure*>(aClosure));
   nsCOMPtr<nsIRunnable> event;
   if (NS_SUCCEEDED(aStatus)) {
-    event = new FinishResponse(data->mInterceptedChannel, data->mInternalResponse);
+    event = new FinishResponse(data->mInterceptedChannel,
+                               data->mInternalResponse,
+                               data->mWorkerChannelInfo);
   } else {
     event = new CancelChannelRunnable(data->mInterceptedChannel);
   }
@@ -218,6 +231,17 @@ RespondWithHandler::ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValu
     return;
   }
 
+  WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
+  MOZ_ASSERT(worker);
+  worker->AssertIsOnWorkerThread();
+
+  // Allow opaque response interception to be disabled until we can ensure the
+  // security implications are not a complete disaster.
+  if (response->Type() == ResponseType::Opaque &&
+      !worker->OpaqueInterceptionEnabled()) {
+    return;
+  }
+
   // Section 4.2, step 2.2 "If either response's type is "opaque" and request's
   // mode is not "no-cors" or response's type is error, return a network error."
   if (((response->Type() == ResponseType::Opaque) && (mRequestMode != RequestMode::No_cors)) ||
@@ -234,9 +258,10 @@ RespondWithHandler::ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValu
     return;
   }
 
-  nsAutoPtr<RespondWithClosure> closure(new RespondWithClosure(mInterceptedChannel, ir));
+  nsAutoPtr<RespondWithClosure> closure(
+      new RespondWithClosure(mInterceptedChannel, ir, worker->GetChannelInfo()));
   nsCOMPtr<nsIInputStream> body;
-  response->GetBody(getter_AddRefs(body));
+  ir->GetInternalBody(getter_AddRefs(body));
   // Errors and redirects may not have a body.
   if (body) {
     response->SetBodyUsed();

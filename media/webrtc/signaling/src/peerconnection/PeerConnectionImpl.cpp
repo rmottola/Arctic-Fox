@@ -70,6 +70,7 @@
 #include "nsPrintfCString.h"
 #include "nsURLHelper.h"
 #include "nsNetUtil.h"
+#include "nsIURLParser.h"
 #include "nsIDOMDataChannel.h"
 #include "nsIDOMLocation.h"
 #include "nsNullPrincipal.h"
@@ -263,7 +264,7 @@ static nsresult InitNSSInContent()
 {
   NS_ENSURE_TRUE(NS_IsMainThread(), NS_ERROR_NOT_SAME_THREAD);
 
-  if (XRE_GetProcessType() != GeckoProcessType_Content) {
+  if (!XRE_IsContentProcess()) {
     MOZ_ASSERT_UNREACHABLE("Must be called in content process");
     return NS_ERROR_FAILURE;
   }
@@ -366,7 +367,7 @@ bool PCUuidGenerator::Generate(std::string* idp) {
 
 
 PeerConnectionImpl::PeerConnectionImpl(const GlobalObject* aGlobal)
-: mTimeCard(PR_LOG_TEST(signalingLogInfo(),PR_LOG_ERROR) ?
+: mTimeCard(MOZ_LOG_TEST(signalingLogInfo(),LogLevel::Error) ?
             create_timecard() : nullptr)
   , mSignalingState(PCImplSignalingState::SignalingStable)
   , mIceConnectionState(PCImplIceConnectionState::New)
@@ -589,7 +590,7 @@ PeerConnectionImpl::AddIceServer(const RTCIceServer &aServer,
 
       // Bug 1039655 - TURN TCP is not e10s ready
       if ((transport == kNrIceTransportTcp) &&
-          (XRE_GetProcessType() != GeckoProcessType_Default)) {
+          (!XRE_IsParentProcess())) {
         continue;
       }
 
@@ -636,7 +637,7 @@ PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
 
   // Initialize NSS if we are in content process. For chrome process, NSS should already
   // been initialized.
-  if (XRE_GetProcessType() == GeckoProcessType_Default) {
+  if (XRE_IsParentProcess()) {
     // This code interferes with the C++ unit test startup code.
     nsCOMPtr<nsISupports> nssDummy = do_GetService("@mozilla.org/psm;1", &res);
     NS_ENSURE_SUCCESS(res, res);
@@ -2940,7 +2941,7 @@ static void ToRTCIceCandidateStats(
       cand.mMozLocalTransport.Construct(
           NS_ConvertASCIItoUTF16(c->local_addr.transport.c_str()));
     }
-    report->mIceCandidateStats.Value().AppendElement(cand);
+    report->mIceCandidateStats.Value().AppendElement(cand, fallible);
   }
 }
 
@@ -2977,7 +2978,7 @@ static void RecordIceStats_s(
     s.mMozPriority.Construct(p->priority);
     s.mSelected.Construct(p->selected);
     s.mState.Construct(RTCStatsIceCandidatePairState(p->state));
-    report->mIceCandidatePairStats.Value().AppendElement(s);
+    report->mIceCandidatePairStats.Value().AppendElement(s, fallible);
   }
 
   std::vector<NrIceCandidate> candidates;
@@ -3056,7 +3057,8 @@ PeerConnectionImpl::ExecuteStatsQuery_s(RTCStatsQuery *query) {
             s.mBytesReceived.Construct(bytesReceived);
             s.mPacketsLost.Construct(packetsLost);
             s.mMozRtt.Construct(rtt);
-            query->report->mInboundRTPStreamStats.Value().AppendElement(s);
+            query->report->mInboundRTPStreamStats.Value().AppendElement(s,
+                                                                        fallible);
           }
         }
         // Then, fill in local side (with cross-link to remote only if present)
@@ -3093,7 +3095,8 @@ PeerConnectionImpl::ExecuteStatsQuery_s(RTCStatsQuery *query) {
               s.mDroppedFrames.Construct(droppedFrames);
             }
           }
-          query->report->mOutboundRTPStreamStats.Value().AppendElement(s);
+          query->report->mOutboundRTPStreamStats.Value().AppendElement(s,
+                                                                       fallible);
         }
         break;
       }
@@ -3125,7 +3128,8 @@ PeerConnectionImpl::ExecuteStatsQuery_s(RTCStatsQuery *query) {
             s.mIsRemote = true;
             s.mPacketsSent.Construct(packetsSent);
             s.mBytesSent.Construct(bytesSent);
-            query->report->mOutboundRTPStreamStats.Value().AppendElement(s);
+            query->report->mOutboundRTPStreamStats.Value().AppendElement(s,
+                                                                         fallible);
           }
         }
         // Then, fill in local side (with cross-link to remote only if present)
@@ -3179,7 +3183,8 @@ PeerConnectionImpl::ExecuteStatsQuery_s(RTCStatsQuery *query) {
             s.mDiscardedPackets.Construct(discardedPackets);
           }
         }
-        query->report->mInboundRTPStreamStats.Value().AppendElement(s);
+        query->report->mInboundRTPStreamStats.Value().AppendElement(s,
+                                                                    fallible);
         break;
       }
     }

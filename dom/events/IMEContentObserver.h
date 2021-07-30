@@ -18,6 +18,7 @@
 #include "nsIScrollObserver.h"
 #include "nsIWidget.h" // for nsIMEUpdatePreference
 #include "nsStubMutationObserver.h"
+#include "nsThreadUtils.h"
 #include "nsWeakReference.h"
 
 class nsIContent;
@@ -38,9 +39,10 @@ class IMEContentObserver final : public nsISelectionListener
                                , public nsSupportsWeakReference
                                , public nsIEditorObserver
 {
-  friend class AsyncMergeableNotificationsFlusher;
-
 public:
+  typedef widget::IMENotification::TextChangeData TextChangeData;
+  typedef widget::IMENotification::TextChangeDataBase TextChangeDataBase;
+
   IMEContentObserver();
 
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
@@ -72,6 +74,17 @@ public:
    * storing the instance.
    */
   void DisconnectFromEventStateManager();
+  /**
+   * MaybeReinitialize() tries to restart to observe the editor's root node.
+   * This is useful when the editor is reframed and all children are replaced
+   * with new node instances.
+   * @return            Returns true if the instance is managing the content.
+   *                    Otherwise, false.
+   */
+  bool MaybeReinitialize(nsIWidget* aWidget,
+                         nsPresContext* aPresContext,
+                         nsIContent* aContent,
+                         nsIEditor* aEditor);
   bool IsManaging(nsPresContext* aPresContext, nsIContent* aContent);
   bool IsEditorHandlingEventForComposition() const;
   bool KeepAliveDuringDeactive() const
@@ -79,77 +92,80 @@ public:
     return mUpdatePreference.WantDuringDeactive();
   }
   nsIWidget* GetWidget() const { return mWidget; }
+  nsIEditor* GetEditor() const { return mEditor; }
+  void SuppressNotifyingIME() { mSuppressNotifications++; }
+  void UnsuppressNotifyingIME()
+  {
+    if (!mSuppressNotifications || --mSuppressNotifications) {
+      return;
+    }
+    FlushMergeableNotifications();
+  }
+  nsPresContext* GetPresContext() const;
   nsresult GetSelectionAndRoot(nsISelection** aSelection,
                                nsIContent** aRoot) const;
-
-  struct TextChangeData
-  {
-    // mStartOffset is the start offset of modified or removed text in
-    // original content and inserted text in new content.
-    uint32_t mStartOffset;
-    // mRemovalEndOffset is the end offset of modified or removed text in
-    // original content.  If the value is same as mStartOffset, no text hasn't
-    // been removed yet.
-    uint32_t mRemovedEndOffset;
-    // mAddedEndOffset is the end offset of inserted text or same as
-    // mStartOffset if just removed.  The vlaue is offset in the new content.
-    uint32_t mAddedEndOffset;
-
-    bool mCausedOnlyByComposition;
-    bool mStored;
-
-    TextChangeData()
-      : mStartOffset(0)
-      , mRemovedEndOffset(0)
-      , mAddedEndOffset(0)
-      , mCausedOnlyByComposition(false)
-      , mStored(false)
-    {
-    }
-
-    TextChangeData(uint32_t aStartOffset,
-                   uint32_t aRemovedEndOffset,
-                   uint32_t aAddedEndOffset,
-                   bool aCausedByComposition)
-      : mStartOffset(aStartOffset)
-      , mRemovedEndOffset(aRemovedEndOffset)
-      , mAddedEndOffset(aAddedEndOffset)
-      , mCausedOnlyByComposition(aCausedByComposition)
-      , mStored(true)
-    {
-      MOZ_ASSERT(aRemovedEndOffset >= aStartOffset,
-                 "removed end offset must not be smaller than start offset");
-      MOZ_ASSERT(aAddedEndOffset >= aStartOffset,
-                 "added end offset must not be smaller than start offset");
-    }
-    // Positive if text is added. Negative if text is removed.
-    int64_t Difference() const 
-    {
-      return mAddedEndOffset - mRemovedEndOffset;
-    }
-  };
 
 private:
   ~IMEContentObserver() {}
 
-  void MaybeNotifyIMEOfTextChange(const TextChangeData& aTextChangeData);
-  void MaybeNotifyIMEOfSelectionChange(bool aCausedByComposition);
-  void MaybeNotifyIMEOfPositionChange();
+  enum State {
+    eState_NotObserving,
+    eState_Initializing,
+    eState_StoppedObserving,
+    eState_Observing
+  };
+  State GetState() const;
+  bool IsObservingContent(nsPresContext* aPresContext,
+                          nsIContent* aContent) const;
+  bool IsReflowLocked() const;
+  bool IsSafeToNotifyIME() const;
+
+  void PostFocusSetNotification();
+  void MaybeNotifyIMEOfFocusSet()
+  {
+    PostFocusSetNotification();
+    FlushMergeableNotifications();
+  }
+  void PostTextChangeNotification(const TextChangeDataBase& aTextChangeData);
+  void MaybeNotifyIMEOfTextChange(const TextChangeDataBase& aTextChangeData)
+  {
+    PostTextChangeNotification(aTextChangeData);
+    FlushMergeableNotifications();
+  }
+  void PostSelectionChangeNotification(bool aCausedByComposition,
+                                       bool aCausedBySelectionEvent);
+  void MaybeNotifyIMEOfSelectionChange(bool aCausedByComposition,
+                                       bool aCausedBySelectionEvent)
+  {
+    PostSelectionChangeNotification(aCausedByComposition,
+                                    aCausedBySelectionEvent);
+    FlushMergeableNotifications();
+  }
+  void PostPositionChangeNotification();
+  void MaybeNotifyIMEOfPositionChange()
+  {
+    PostPositionChangeNotification();
+    FlushMergeableNotifications();
+  }
 
   void NotifyContentAdded(nsINode* aContainer, int32_t aStart, int32_t aEnd);
   void ObserveEditableNode();
   /**
-   *  UnregisterObservers() unresiters all listeners and observers.
-   *  @param aPostEvent     When true, DOM event will be posted to the thread.
-   *                        Otherwise, dispatched when safe.
+   *  NotifyIMEOfBlur() notifies IME of blur.
    */
-  void UnregisterObservers(bool aPostEvent);
-  void StoreTextChangeData(const TextChangeData& aTextChangeData);
+  void NotifyIMEOfBlur();
+  /**
+   *  UnregisterObservers() unregisters all listeners and observers.
+   */
+  void UnregisterObservers();
   void FlushMergeableNotifications();
-
-#ifdef DEBUG
-  void TestMergingTextChangeData();
-#endif
+  void ClearPendingNotifications()
+  {
+    mIsFocusEventPending = false;
+    mIsSelectionChangeEventPending = false;
+    mIsPositionChangeEventPending = false;
+    mTextChangeData.Clear();
+  }
 
   nsCOMPtr<nsIWidget> mWidget;
   nsCOMPtr<nsISelection> mSelection;
@@ -218,12 +234,125 @@ private:
 
   nsIMEUpdatePreference mUpdatePreference;
   uint32_t mPreAttrChangeLength;
+  uint32_t mSuppressNotifications;
   int64_t mPreCharacterDataChangeLength;
 
+  bool mIsObserving;
+  bool mIMEHasFocus;
+  bool mIsFocusEventPending;
   bool mIsSelectionChangeEventPending;
   bool mSelectionChangeCausedOnlyByComposition;
+  bool mSelectionChangeCausedOnlyBySelectionEvent;
   bool mIsPositionChangeEventPending;
   bool mIsFlushingPendingNotifications;
+
+
+  /**
+   * Helper classes to notify IME.
+   */
+
+  class AChangeEvent: public nsRunnable
+  {
+  protected:
+    enum ChangeEventType
+    {
+      eChangeEventType_Focus,
+      eChangeEventType_Selection,
+      eChangeEventType_Text,
+      eChangeEventType_Position,
+      eChangeEventType_FlushPendingEvents
+    };
+
+    AChangeEvent(ChangeEventType aChangeEventType,
+                 IMEContentObserver* aIMEContentObserver)
+      : mIMEContentObserver(aIMEContentObserver)
+      , mChangeEventType(aChangeEventType)
+    {
+      MOZ_ASSERT(mIMEContentObserver);
+    }
+
+    nsRefPtr<IMEContentObserver> mIMEContentObserver;
+    ChangeEventType mChangeEventType;
+
+    /**
+     * CanNotifyIME() checks if mIMEContentObserver can and should notify IME.
+     */
+    bool CanNotifyIME() const;
+
+    /**
+     * IsSafeToNotifyIME() checks if it's safe to noitify IME.
+     */
+    bool IsSafeToNotifyIME() const;
+  };
+
+  class FocusSetEvent: public AChangeEvent
+  {
+  public:
+    explicit FocusSetEvent(IMEContentObserver* aIMEContentObserver)
+      : AChangeEvent(eChangeEventType_Focus, aIMEContentObserver)
+    {
+    }
+    NS_IMETHOD Run() override;
+  };
+
+  class SelectionChangeEvent : public AChangeEvent
+  {
+  public:
+    SelectionChangeEvent(IMEContentObserver* aIMEContentObserver,
+                         bool aCausedByComposition,
+                         bool aCausedBySelectionEvent)
+      : AChangeEvent(eChangeEventType_Selection, aIMEContentObserver)
+      , mCausedByComposition(aCausedByComposition)
+      , mCausedBySelectionEvent(aCausedBySelectionEvent)
+    {
+      aIMEContentObserver->mSelectionChangeCausedOnlyByComposition = false;
+      aIMEContentObserver->mSelectionChangeCausedOnlyBySelectionEvent = false;
+    }
+    NS_IMETHOD Run() override;
+
+  private:
+    bool mCausedByComposition;
+    bool mCausedBySelectionEvent;
+  };
+
+  class TextChangeEvent : public AChangeEvent
+  {
+  public:
+    TextChangeEvent(IMEContentObserver* aIMEContentObserver,
+                    TextChangeDataBase& aTextChangeData)
+      : AChangeEvent(eChangeEventType_Text, aIMEContentObserver)
+      , mTextChangeData(aTextChangeData)
+    {
+      MOZ_ASSERT(mTextChangeData.IsValid());
+      // Reset aTextChangeData because this now consumes the data.
+      aTextChangeData.Clear();
+    }
+    NS_IMETHOD Run() override;
+
+  private:
+    TextChangeDataBase mTextChangeData;
+  };
+
+  class PositionChangeEvent final : public AChangeEvent
+  {
+  public:
+    explicit PositionChangeEvent(IMEContentObserver* aIMEContentObserver)
+      : AChangeEvent(eChangeEventType_Position, aIMEContentObserver)
+    {
+    }
+    NS_IMETHOD Run() override;
+  };
+
+  class AsyncMergeableNotificationsFlusher : public AChangeEvent
+  {
+  public:
+    explicit AsyncMergeableNotificationsFlusher(
+      IMEContentObserver* aIMEContentObserver)
+      : AChangeEvent(eChangeEventType_FlushPendingEvents, aIMEContentObserver)
+    {
+    }
+    NS_IMETHOD Run() override;
+  };
 };
 
 } // namespace mozilla

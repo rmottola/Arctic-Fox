@@ -5,14 +5,23 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "ServiceWorkerScriptCache.h"
+#include "mozilla/unused.h"
 #include "mozilla/dom/CacheBinding.h"
 #include "mozilla/dom/cache/CacheStorage.h"
 #include "mozilla/dom/cache/Cache.h"
+#include "mozilla/dom/Promise.h"
+#include "mozilla/dom/PromiseWorkerProxy.h"
+#include "mozilla/ipc/BackgroundUtils.h"
+#include "mozilla/ipc/PBackgroundSharedTypes.h"
+#include "nsIHttpChannelInternal.h"
+#include "nsIStreamLoader.h"
 #include "nsIThreadRetargetableRequest.h"
-#include "nsSerializationHelper.h"
 
 #include "nsIPrincipal.h"
+#include "nsNetUtil.h"
+#include "nsScriptLoader.h"
 #include "Workers.h"
+#include "nsStringStream.h"
 
 using mozilla::dom::cache::Cache;
 using mozilla::dom::cache::CacheStorage;
@@ -24,7 +33,8 @@ namespace serviceWorkerScriptCache {
 namespace {
 
 already_AddRefed<CacheStorage>
-CreateCacheStorage(nsIPrincipal* aPrincipal, ErrorResult& aRv)
+CreateCacheStorage(nsIPrincipal* aPrincipal, ErrorResult& aRv,
+                   nsIXPConnectJSObjectHolder** aHolder = nullptr)
 {
   AssertIsOnMainThread();
   MOZ_ASSERT(aPrincipal);
@@ -47,9 +57,24 @@ CreateCacheStorage(nsIPrincipal* aPrincipal, ErrorResult& aRv)
     return nullptr;
   }
 
+  if (aHolder) {
+    sandbox.forget(aHolder);
+  }
+
+  // We assume private browsing is not enabled here.  The ScriptLoader
+  // explicitly fails for private browsing so there should never be
+  // a service worker running in private browsing mode.  Therefore if
+  // we are purging scripts or running a comparison algorithm we cannot
+  // be in private browing.
+  //
+  // Also, bypass the CacheStorage trusted origin checks.  The ServiceWorker
+  // has validated the origin prior to this point.  All the information
+  // to revalidate is not available now.
   return CacheStorage::CreateOnMainThread(cache::CHROME_ONLY_NAMESPACE,
-                                          sandboxGlobalObject,
-                                          aPrincipal, aRv);
+                                          sandboxGlobalObject, aPrincipal,
+                                          false /* private browsing */,
+                                          true /* force trusted origin */,
+                                          aRv);
 }
 
 class CompareManager;
@@ -72,7 +97,7 @@ public:
   }
 
   nsresult
-  Initialize(nsIPrincipal* aPrincipal, const nsAString& aURL)
+  Initialize(nsIPrincipal* aPrincipal, const nsAString& aURL, nsILoadGroup* aLoadGroup)
   {
     MOZ_ASSERT(aPrincipal);
     AssertIsOnMainThread();
@@ -83,10 +108,20 @@ public:
       return rv;
     }
 
+    nsCOMPtr<nsILoadGroup> loadGroup;
+    rv = NS_NewLoadGroup(getter_AddRefs(loadGroup), aPrincipal);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    // Note that because there is no "serviceworker" RequestContext type, we can
+    // use the external TYPE_SCRIPT content policy types when loading a service
+    // worker.
     rv = NS_NewChannel(getter_AddRefs(mChannel),
                        uri, aPrincipal,
                        nsILoadInfo::SEC_NORMAL,
-                       nsIContentPolicy::TYPE_SCRIPT); // FIXME(nsm): TYPE_SERVICEWORKER
+                       nsIContentPolicy::TYPE_SCRIPT,
+                       loadGroup);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -275,7 +310,7 @@ public:
 
   nsresult
   Initialize(nsIPrincipal* aPrincipal, const nsAString& aURL,
-             const nsAString& aCacheName)
+             const nsAString& aCacheName, nsILoadGroup* aLoadGroup)
   {
     AssertIsOnMainThread();
     MOZ_ASSERT(aPrincipal);
@@ -285,14 +320,14 @@ public:
     // Always create a CacheStorage since we want to write the network entry to
     // the cache even if there isn't an existing one.
     ErrorResult result;
-    mCacheStorage = CreateCacheStorage(aPrincipal, result);
+    mCacheStorage = CreateCacheStorage(aPrincipal, result, getter_AddRefs(mSandbox));
     if (NS_WARN_IF(result.Failed())) {
       MOZ_ASSERT(!result.IsErrorWithMessage());
       return result.StealNSResult();
     }
 
     mCN = new CompareNetwork(this);
-    nsresult rv = mCN->Initialize(aPrincipal, aURL);
+    nsresult rv = mCN->Initialize(aPrincipal, aURL, aLoadGroup);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -314,6 +349,13 @@ public:
   {
     AssertIsOnMainThread();
     return mURL;
+  }
+
+  void
+  SetMaxScope(const nsACString& aMaxScope)
+  {
+    MOZ_ASSERT(!mNetworkFinished);
+    mMaxScope = aMaxScope;
   }
 
   void
@@ -407,7 +449,8 @@ public:
     }
 
     MOZ_ASSERT(mState == WaitingForPut);
-    mCallback->ComparisonResult(NS_OK, false /* aIsEqual */, mNewCacheName);
+    mCallback->ComparisonResult(NS_OK, false /* aIsEqual */,
+                                mNewCacheName, mMaxScope);
     Cleanup();
   }
 
@@ -432,9 +475,31 @@ public:
   }
 
   void
-  SetSecurityInfo(nsISerializable* aSecurityInfo)
+  InitChannelInfo(nsIChannel* aChannel)
   {
-    NS_SerializeToString(aSecurityInfo, mSecurityInfo);
+    mChannelInfo.InitFromChannel(aChannel);
+  }
+
+  nsresult
+  SetPrincipalInfo(nsIChannel* aChannel)
+  {
+    nsIScriptSecurityManager* ssm = nsContentUtils::GetSecurityManager();
+    NS_ASSERTION(ssm, "Should never be null!");
+
+    nsCOMPtr<nsIPrincipal> channelPrincipal;
+    nsresult rv = ssm->GetChannelResultPrincipal(aChannel, getter_AddRefs(channelPrincipal));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    UniquePtr<mozilla::ipc::PrincipalInfo> principalInfo(new mozilla::ipc::PrincipalInfo());
+    rv = PrincipalToPrincipalInfo(channelPrincipal, principalInfo.get());
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    mPrincipalInfo = Move(principalInfo);
+    return NS_OK;
   }
 
 private:
@@ -449,7 +514,8 @@ private:
   Fail(nsresult aStatus)
   {
     AssertIsOnMainThread();
-    mCallback->ComparisonResult(aStatus, false /* aIsEqual */, EmptyString());
+    mCallback->ComparisonResult(aStatus, false /* aIsEqual */,
+                                EmptyString(), EmptyCString());
     Cleanup();
   }
 
@@ -475,7 +541,7 @@ private:
     }
 
     if (aIsEqual) {
-      mCallback->ComparisonResult(aStatus, aIsEqual, EmptyString());
+      mCallback->ComparisonResult(aStatus, aIsEqual, EmptyString(), mMaxScope);
       Cleanup();
       return;
     }
@@ -530,7 +596,10 @@ private:
       new InternalResponse(200, NS_LITERAL_CSTRING("OK"));
     ir->SetBody(body);
 
-    ir->SetSecurityInfo(mSecurityInfo);
+    ir->InitChannelInfo(mChannelInfo);
+    if (mPrincipalInfo) {
+      ir->SetPrincipalInfo(Move(mPrincipalInfo));
+    }
 
     nsRefPtr<Response> response = new Response(aCache->GetGlobalObject(), ir);
 
@@ -552,6 +621,7 @@ private:
   }
 
   nsRefPtr<CompareCallback> mCallback;
+  nsCOMPtr<nsIXPConnectJSObjectHolder> mSandbox;
   nsRefPtr<CacheStorage> mCacheStorage;
 
   nsRefPtr<CompareNetwork> mCN;
@@ -561,7 +631,11 @@ private:
   // Only used if the network script has changed and needs to be cached.
   nsString mNewCacheName;
 
-  nsCString mSecurityInfo;
+  ChannelInfo mChannelInfo;
+
+  UniquePtr<mozilla::ipc::PrincipalInfo> mPrincipalInfo;
+
+  nsCString mMaxScope;
 
   enum {
     WaitingForOpen,
@@ -588,15 +662,10 @@ CompareNetwork::OnStartRequest(nsIRequest* aRequest, nsISupports* aContext)
   MOZ_ASSERT(channel == mChannel);
 #endif
 
-  nsCOMPtr<nsISupports> infoObj;
-  mChannel->GetSecurityInfo(getter_AddRefs(infoObj));
-  if (infoObj) {
-    nsCOMPtr<nsISerializable> serializable = do_QueryInterface(infoObj);
-    if (serializable) {
-      mManager->SetSecurityInfo(serializable);
-    } else {
-      NS_WARNING("A non-serializable object was obtained from nsIChannel::GetSecurityInfo()!");
-    }
+  mManager->InitChannelInfo(mChannel);
+  nsresult rv = mManager->SetPrincipalInfo(mChannel);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
   }
 
   return NS_OK;
@@ -647,6 +716,14 @@ CompareNetwork::OnStreamComplete(nsIStreamLoader* aLoader, nsISupports* aContext
       mManager->NetworkFinished(NS_ERROR_FAILURE);
       return NS_OK;
     }
+
+    nsAutoCString maxScope;
+    // Note: we explicitly don't check for the return value here, because the
+    // absense of the header is not an error condition.
+    unused << httpChannel->GetResponseHeader(NS_LITERAL_CSTRING("Service-Worker-Allowed"),
+                                             maxScope);
+
+    mManager->SetMaxScope(maxScope);
   }
   else {
     // The only supported request schemes are http, https, and app.
@@ -920,7 +997,8 @@ GenerateCacheName(nsAString& aName)
 
 nsresult
 Compare(nsIPrincipal* aPrincipal, const nsAString& aCacheName,
-        const nsAString& aURL, CompareCallback* aCallback)
+        const nsAString& aURL, CompareCallback* aCallback,
+        nsILoadGroup* aLoadGroup)
 {
   AssertIsOnMainThread();
   MOZ_ASSERT(aPrincipal);
@@ -929,7 +1007,7 @@ Compare(nsIPrincipal* aPrincipal, const nsAString& aCacheName,
 
   nsRefPtr<CompareManager> cm = new CompareManager(aCallback);
 
-  nsresult rv = cm->Initialize(aPrincipal, aURL, aCacheName);
+  nsresult rv = cm->Initialize(aPrincipal, aURL, aCacheName, aLoadGroup);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }

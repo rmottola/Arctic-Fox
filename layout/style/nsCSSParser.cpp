@@ -111,6 +111,8 @@ public:
 
   nsresult SetStyleSheet(CSSStyleSheet* aSheet);
 
+  nsIDocument* GetDocument();
+
   nsresult SetQuirkMode(bool aQuirkMode);
 
   nsresult SetChildLoader(mozilla::css::Loader* aChildLoader);
@@ -886,6 +888,7 @@ protected:
   // for 'clip' and '-moz-image-region'
   bool ParseRect(nsCSSProperty aPropID);
   bool ParseColumns();
+  bool ParseContain(nsCSSValue& aValue);
   bool ParseContent();
   bool ParseCounterData(nsCSSProperty aPropID);
   bool ParseCursor();
@@ -1322,6 +1325,15 @@ CSSParserImpl::SetStyleSheet(CSSStyleSheet* aSheet)
   return NS_OK;
 }
 
+nsIDocument*
+CSSParserImpl::GetDocument()
+{
+  if (!mSheet) {
+    return nullptr;
+  }
+  return mSheet->GetDocument();
+}
+
 nsresult
 CSSParserImpl::SetQuirkMode(bool aQuirkMode)
 {
@@ -1674,7 +1686,8 @@ CSSParserImpl::ParseProperty(const nsCSSProperty aPropID,
       aDeclaration->ExpandTo(&mData);
       *aChanged = mData.TransferFromBlock(mTempData, aPropID,
                                           PropertyEnabledState(), aIsImportant,
-                                          true, false, aDeclaration);
+                                          true, false, aDeclaration,
+                                          GetDocument());
       aDeclaration->CompressFrom(&mData);
     }
     CLEAR_ERROR();
@@ -2742,7 +2755,9 @@ CSSParserImpl::GetToken(bool aSkipWS)
       return true;
     }
   }
-  return mScanner->Next(mToken, aSkipWS);
+  return mScanner->Next(mToken, aSkipWS ?
+                        eCSSScannerExclude_WhitespaceAndComments :
+                        eCSSScannerExclude_Comments);
 }
 
 void
@@ -6885,7 +6900,7 @@ CSSParserImpl::ParseDeclaration(css::Declaration* aDeclaration,
                                          PropertyEnabledState(),
                                          status == ePriority_Important,
                                          false, aMustCallValueAppended,
-                                         aDeclaration);
+                                         aDeclaration, GetDocument());
   }
 
   return true;
@@ -8078,17 +8093,17 @@ CSSParserImpl::ParseOptionalLineNameListAfterSubgrid(nsCSSValue& aValue)
   }
 }
 
-// Parse a <track-breadth>
+// Parse a <track-breadth>.
 bool
 CSSParserImpl::ParseGridTrackBreadth(nsCSSValue& aValue)
 {
   if (ParseNonNegativeVariant(aValue,
-                              VARIANT_LPCALC | VARIANT_KEYWORD,
+                              VARIANT_AUTO | VARIANT_LPCALC | VARIANT_KEYWORD,
                               nsCSSProps::kGridTrackBreadthKTable)) {
     return true;
   }
 
-  // Attempt to parse <flex> (a dimension with the "fr" unit)
+  // Attempt to parse <flex> (a dimension with the "fr" unit).
   if (!GetToken(true)) {
     return false;
   }
@@ -8102,17 +8117,16 @@ CSSParserImpl::ParseGridTrackBreadth(nsCSSValue& aValue)
   return true;
 }
 
-// Parse a <track-size>
+// Parse a <track-size>.
 CSSParseResult
 CSSParserImpl::ParseGridTrackSize(nsCSSValue& aValue)
 {
-  // Attempt to parse 'auto' or a single <track-breadth>
-  if (ParseGridTrackBreadth(aValue) ||
-      ParseVariant(aValue, VARIANT_AUTO, nullptr)) {
+  // Attempt to parse a single <track-breadth>.
+  if (ParseGridTrackBreadth(aValue)) {
     return CSSParseResult::Ok;
   }
 
-  // Attempt to parse a minmax() function
+  // Attempt to parse a minmax() function.
   if (!GetToken(true)) {
     return CSSParseResult::NotFound;
   }
@@ -10225,6 +10239,8 @@ CSSParserImpl::ParseSingleValueProperty(nsCSSValue& aValue,
         return ParseTextOverflow(aValue);
       case eCSSProperty_touch_action:
         return ParseTouchAction(aValue);
+      case eCSSProperty_contain:
+        return ParseContain(aValue);
       default:
         MOZ_ASSERT(false, "should not reach here");
         return false;
@@ -12328,6 +12344,29 @@ CSSParserImpl::ParseFontVariantEastAsian(nsCSSValue& aValue)
                             maskEastAsian);
 }
 
+bool
+CSSParserImpl::ParseContain(nsCSSValue& aValue)
+{
+  if (ParseVariant(aValue, VARIANT_INHERIT | VARIANT_NONE, nullptr)) {
+    return true;
+  }
+  static const int32_t maskContain[] = { MASK_END_VALUE };
+  if (!ParseBitmaskValues(aValue, nsCSSProps::kContainKTable, maskContain)) {
+    return false;
+  }
+  if (aValue.GetIntValue() & NS_STYLE_CONTAIN_STRICT) {
+    if (aValue.GetIntValue() != NS_STYLE_CONTAIN_STRICT) {
+      // Disallow any other keywords in combination with 'strict'.
+      return false;
+    }
+    // Strict implies layout, style, and paint.
+    // However, for serialization purposes, we keep the strict bit around.
+    aValue.SetIntValue(NS_STYLE_CONTAIN_STRICT |
+        NS_STYLE_CONTAIN_ALL_BITS, eCSSUnit_Enumerated);
+  }
+  return true;
+}
+
 static const int32_t maskLigatures[] = {
   NS_FONT_VARIANT_LIGATURES_COMMON_MASK,
   NS_FONT_VARIANT_LIGATURES_DISCRETIONARY_MASK,
@@ -13058,7 +13097,7 @@ CSSParserImpl::ParseListStyle()
 bool
 CSSParserImpl::ParseListStyleType(nsCSSValue& aValue)
 {
-  if (ParseVariant(aValue, VARIANT_INHERIT, nullptr)) {
+  if (ParseVariant(aValue, VARIANT_INHERIT | VARIANT_STRING, nullptr)) {
     return true;
   }
 

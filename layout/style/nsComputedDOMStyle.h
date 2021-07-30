@@ -41,7 +41,6 @@ class nsStyleGradient;
 struct nsStyleImage;
 class nsStyleSides;
 struct nsTimingFunction;
-class gfx3DMatrix;
 
 class nsComputedDOMStyle final : public nsDOMCSSDeclaration
 {
@@ -99,12 +98,12 @@ public:
   // nsDOMCSSDeclaration abstract methods which should never be called
   // on a nsComputedDOMStyle object, but must be defined to avoid
   // compile errors.
-  virtual mozilla::css::Declaration* GetCSSDeclaration(bool) override;
+  virtual mozilla::css::Declaration* GetCSSDeclaration(Operation) override;
   virtual nsresult SetCSSDeclaration(mozilla::css::Declaration*) override;
   virtual nsIDocument* DocToUpdate() override;
   virtual void GetCSSParsingEnvironment(CSSParsingEnvironment& aCSSParseEnv) override;
 
-  static nsROCSSPrimitiveValue* MatrixToCSSValue(gfx3DMatrix& aMatrix);
+  static nsROCSSPrimitiveValue* MatrixToCSSValue(const mozilla::gfx::Matrix4x4& aMatrix);
 
   static void RegisterPrefChangeCallbacks();
   static void UnregisterPrefChangeCallbacks();
@@ -232,7 +231,7 @@ private:
   mozilla::dom::CSSValue* DoGetFontLanguageOverride();
   mozilla::dom::CSSValue* DoGetFontSize();
   mozilla::dom::CSSValue* DoGetFontSizeAdjust();
-  mozilla::dom::CSSValue* DoGetOSXFontSmoothing();
+  mozilla::dom::CSSValue* DoGetOsxFontSmoothing();
   mozilla::dom::CSSValue* DoGetFontStretch();
   mozilla::dom::CSSValue* DoGetFontStyle();
   mozilla::dom::CSSValue* DoGetFontSynthesis();
@@ -392,6 +391,7 @@ private:
   mozilla::dom::CSSValue* DoGetClear();
   mozilla::dom::CSSValue* DoGetFloat();
   mozilla::dom::CSSValue* DoGetDisplay();
+  mozilla::dom::CSSValue* DoGetContain();
   mozilla::dom::CSSValue* DoGetPosition();
   mozilla::dom::CSSValue* DoGetClip();
   mozilla::dom::CSSValue* DoGetImageOrientation();
@@ -406,6 +406,7 @@ private:
   mozilla::dom::CSSValue* DoGetPageBreakInside();
   mozilla::dom::CSSValue* DoGetTouchAction();
   mozilla::dom::CSSValue* DoGetTransform();
+  mozilla::dom::CSSValue* DoGetTransformBox();
   mozilla::dom::CSSValue* DoGetTransformOrigin();
   mozilla::dom::CSSValue* DoGetPerspective();
   mozilla::dom::CSSValue* DoGetBackfaceVisibility();

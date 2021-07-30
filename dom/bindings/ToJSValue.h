@@ -218,6 +218,15 @@ ToJSValue(JSContext* aCx,
   return ToJSValue(aCx, *aArgument.get(), aValue);
 }
 
+template <typename T>
+MOZ_WARN_UNUSED_RESULT bool
+ToJSValue(JSContext* aCx,
+          const NonNull<T>& aArgument,
+          JS::MutableHandle<JS::Value> aValue)
+{
+  return ToJSValue(aCx, *aArgument.get(), aValue);
+}
+
 // Accept WebIDL dictionaries
 template <class T>
 MOZ_WARN_UNUSED_RESULT
@@ -280,6 +289,18 @@ MOZ_WARN_UNUSED_RESULT bool
 ToJSValue(JSContext* aCx,
           ErrorResult& aArgument,
           JS::MutableHandle<JS::Value> aValue);
+
+// Accept owning WebIDL unions.
+template <typename T>
+MOZ_WARN_UNUSED_RESULT
+typename EnableIf<IsBaseOf<AllOwningUnionBase, T>::value, bool>::Type
+ToJSValue(JSContext* aCx,
+          const T& aArgument,
+          JS::MutableHandle<JS::Value> aValue)
+{
+  JS::Rooted<JSObject*> global(aCx, JS::CurrentGlobalOrNull(aCx));
+  return aArgument.ToJSVal(aCx, global, aValue);
+}
 
 // Accept pointers to other things we accept
 template <typename T>

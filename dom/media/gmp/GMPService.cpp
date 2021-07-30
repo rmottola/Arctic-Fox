@@ -3,8 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "GMPService.h"
 #include "GMPServiceParent.h"
 #include "GMPServiceChild.h"
+#include "GMPContentParent.h"
 #include "prio.h"
 #include "mozilla/Logging.h"
 #include "GMPParent.h"
@@ -50,8 +52,8 @@ GetGMPLog()
   return sLog;
 }
 
-#define LOGD(msg) PR_LOG(GetGMPLog(), PR_LOG_DEBUG, msg)
-#define LOG(level, msg) PR_LOG(GetGMPLog(), (level), msg)
+#define LOGD(msg) MOZ_LOG(GetGMPLog(), mozilla::LogLevel::Debug, msg)
+#define LOG(level, msg) MOZ_LOG(GetGMPLog(), (level), msg)
 
 #ifdef __CLASS__
 #undef __CLASS__
@@ -104,7 +106,7 @@ private:
     MOZ_ASSERT(NS_IsMainThread());
 
     if (!sSingletonService) {
-      if (XRE_GetProcessType() == GeckoProcessType_Default) {
+      if (XRE_IsParentProcess()) {
         nsRefPtr<GeckoMediaPluginServiceParent> service =
           new GeckoMediaPluginServiceParent();
         service->Init();
@@ -275,8 +277,8 @@ GeckoMediaPluginService::GetThread(nsIThread** aThread)
     InitializePlugins();
   }
 
-  NS_ADDREF(mGMPThread);
-  *aThread = mGMPThread;
+  nsCOMPtr<nsIThread> copy = mGMPThread;
+  copy.forget(aThread);
 
   return NS_OK;
 }

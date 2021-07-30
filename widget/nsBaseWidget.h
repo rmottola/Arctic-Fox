@@ -143,8 +143,13 @@ public:
   virtual void            SetShowsFullScreenButton(bool aShow) override {}
   virtual void            SetWindowAnimationType(WindowAnimationType aType) override {}
   NS_IMETHOD              HideWindowChrome(bool aShouldHide) override;
-  virtual void            PrepareForDOMFullscreenTransition() override {}
+  virtual bool PrepareForFullscreenTransition(nsISupports** aData) override { return false; }
+  virtual void PerformFullscreenTransition(FullscreenTransitionStage aStage,
+                                           uint16_t aDuration,
+                                           nsISupports* aData,
+                                           nsIRunnable* aCallback) override;
   NS_IMETHOD              MakeFullScreen(bool aFullScreen, nsIScreen* aScreen = nullptr) override;
+
   virtual LayerManager*   GetLayerManager(PLayerTransactionChild* aShadowManager = nullptr,
                                           LayersBackend aBackendHint = mozilla::layers::LayersBackend::LAYERS_NONE,
                                           LayerManagerPersistence aPersistence = LAYER_MANAGER_CURRENT,
@@ -216,7 +221,7 @@ public:
                             const mozilla::WidgetKeyboardEvent& aEvent,
                             DoCommandCallback aCallback,
                             void* aCallbackData) override { return false; }
-  virtual bool            ComputeShouldAccelerate(bool aDefault);
+  virtual bool            ComputeShouldAccelerate();
   NS_IMETHOD              GetToggledKeyState(uint32_t aKeyCode, bool* aLEDState) override { return NS_ERROR_NOT_IMPLEMENTED; }
   virtual nsIMEUpdatePreference GetIMEUpdatePreference() override { return nsIMEUpdatePreference(); }
   NS_IMETHOD              OnDefaultButtonLoaded(const nsIntRect &aButtonRect) override { return NS_ERROR_NOT_IMPLEMENTED; }
@@ -231,6 +236,8 @@ public:
   NS_IMETHOD              AttachViewToTopLevel(bool aUseAttachedEvents) override;
   virtual nsIWidgetListener* GetAttachedWidgetListener() override;
   virtual void               SetAttachedWidgetListener(nsIWidgetListener* aListener) override;
+  virtual nsIWidgetListener* GetPreviouslyAttachedWidgetListener() override;
+  virtual void               SetPreviouslyAttachedWidgetListener(nsIWidgetListener* aListener) override;
   NS_IMETHOD_(TextEventDispatcher*) GetTextEventDispatcher() override final;
 
   // Helper function for dispatching events which are not processed by APZ,
@@ -242,6 +249,10 @@ public:
 
   void SetConfirmedTargetAPZC(uint64_t aInputBlockId,
                               const nsTArray<ScrollableLayerGuid>& aTargets) const override;
+
+  void UpdateZoomConstraints(const uint32_t& aPresShellId,
+                             const FrameMetrics::ViewID& aViewId,
+                             const mozilla::Maybe<ZoomConstraints>& aConstraints) override;
 
   bool AsyncPanZoomEnabled() const override;
 
@@ -275,6 +286,13 @@ public:
     return aClientSize;
   }
 
+  // return the widget's outside dimensions
+  // in global coordinates in display pixel.
+  nsIntRect GetScaledScreenBounds();
+
+  // return the screen the widget is in.
+  already_AddRefed<nsIScreen> GetWidgetScreen();
+
   // return true if this is a popup widget with a native titlebar
   bool IsPopupWithTitleBar() const
   {
@@ -289,6 +307,10 @@ public:
 
   virtual const SizeConstraints& GetSizeConstraints() const override;
   virtual void SetSizeConstraints(const SizeConstraints& aConstraints) override;
+
+  virtual bool CaptureWidgetOnScreen(mozilla::RefPtr<mozilla::gfx::DrawTarget> aDT) override {
+    return false;
+  }
 
   /**
    * Use this when GetLayerManager() returns a BasicLayerManager
@@ -445,8 +467,6 @@ protected:
 
   virtual CompositorChild* GetRemoteRenderer() override;
 
-  virtual void GetPreferredCompositorBackends(nsTArray<mozilla::layers::LayersBackend>& aHints);
-
   /**
    * Notify the widget that this window is being used with OMTC.
    */
@@ -471,6 +491,7 @@ protected:
 
   nsIWidgetListener* mWidgetListener;
   nsIWidgetListener* mAttachedWidgetListener;
+  nsIWidgetListener* mPreviouslyAttachedWidgetListener;
   nsRefPtr<LayerManager> mLayerManager;
   nsRefPtr<CompositorChild> mCompositorChild;
   nsRefPtr<CompositorParent> mCompositorParent;
@@ -483,7 +504,6 @@ protected:
   nsCursor          mCursor;
   bool              mUpdateCursor;
   nsBorderStyle     mBorderStyle;
-  bool              mUseLayersAcceleration;
   bool              mUseAttachedEvents;
   nsIntRect         mBounds;
   nsIntRect*        mOriginalBounds;

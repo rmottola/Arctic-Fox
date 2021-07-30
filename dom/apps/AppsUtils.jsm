@@ -46,21 +46,48 @@ this.mozIApplication = function(aApp) {
 
 mozIApplication.prototype = {
   hasPermission: function(aPermission) {
-    let uri = Services.io.newURI(this.origin, null, null);
-    let secMan = Cc["@mozilla.org/scriptsecuritymanager;1"]
-                   .getService(Ci.nsIScriptSecurityManager);
     // This helper checks an URI inside |aApp|'s origin and part of |aApp| has a
     // specific permission. It is not checking if browsers inside |aApp| have such
     // permission.
-    let principal = secMan.getAppCodebasePrincipal(uri, this.localId,
-                                                   /*mozbrowser*/false);
+    let principal = this.principal;
+    if (this.installerIsBrowser) {
+      let uri = Services.io.newURI(this.origin, null, null);
+      principal =
+        Services.scriptSecurityManager.getAppCodebasePrincipal(uri, this.localId,
+                                                               /*mozbrowser*/false);
+    }
     let perm = Services.perms.testExactPermissionFromPrincipal(principal,
                                                                aPermission);
     return (perm === Ci.nsIPermissionManager.ALLOW_ACTION);
   },
 
   hasWidgetPage: function(aPageURL) {
-    return this.widgetPages.indexOf(aPageURL) != -1;
+    let uri = Services.io.newURI(aPageURL, null, null);
+    let filepath = AppsUtils.getFilePath(uri.path);
+    let eliminatedUri = Services.io.newURI(uri.prePath + filepath, null, null);
+    let equalCriterion = aUrl => Services.io.newURI(aUrl, null, null)
+                                            .equals(eliminatedUri);
+    return this.widgetPages.find(equalCriterion) !== undefined;
+  },
+
+  get principal() {
+    if (this._principal) {
+      return this._principal;
+    }
+
+    this._principal = null;
+
+    try {
+      this._principal = Services.scriptSecurityManager.getAppCodebasePrincipal(
+        Services.io.newURI(this.origin, null, null),
+        this.localId,
+        this.installerIsBrowser
+      );
+    } catch(e) {
+      dump("Could not create app principal " + e + "\n");
+    }
+
+    return this._principal;
   },
 
   QueryInterface: function(aIID) {
@@ -196,6 +223,16 @@ this.AppsUtils = {
     aRequestChannel.asyncOpen(listener, null);
 
     return deferred.promise;
+  },
+
+  // Eliminate query and hash string.
+  getFilePath: function(aPagePath) {
+    let urlParser = Cc["@mozilla.org/network/url-parser;1?auth=no"]
+                    .getService(Ci.nsIURLParser);
+    let uriData = [aPagePath, aPagePath.length, {}, {}, {}, {}, {}, {}];
+    urlParser.parsePath.apply(urlParser, uriData);
+    let [{value: pathPos}, {value: pathLen}] = uriData.slice(2, 4);
+    return aPagePath.substr(pathPos, pathLen);
   },
 
   getAppByManifestURL: function getAppByManifestURL(aApps, aManifestURL) {
@@ -471,7 +508,7 @@ this.AppsUtils = {
     let hadCharset = { };
     let charset = { };
     let netutil = Cc["@mozilla.org/network/util;1"].getService(Ci.nsINetUtil);
-    let contentType = netutil.parseContentType(aContentType, charset, hadCharset);
+    let contentType = netutil.parseResponseContentType(aContentType, charset, hadCharset);
     if (aInstallOrigin != aWebappOrigin &&
         !(contentType == "application/x-web-app-manifest+json" ||
           contentType == "application/manifest+json")) {
@@ -899,6 +936,10 @@ ManifestHelper.prototype = {
     // If no start point is specified, we use the root launch path.
     // In all error cases, we just return null.
     if ((aStartPoint || "") === "") {
+      // W3C start_url takes precedence over mozApps launch_path
+      if (this._localeProp("start_url")) {
+        return this._baseURI.resolve(this._localeProp("start_url") || "/");
+      }
       return this._baseURI.resolve(this._localeProp("launch_path") || "/");
     }
 

@@ -110,7 +110,7 @@ xpc::NewSandboxConstructor()
 }
 
 static bool
-SandboxDump(JSContext* cx, unsigned argc, jsval* vp)
+SandboxDump(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -147,7 +147,7 @@ SandboxDump(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-SandboxDebug(JSContext* cx, unsigned argc, jsval* vp)
+SandboxDebug(JSContext* cx, unsigned argc, Value* vp)
 {
 #ifdef DEBUG
     return SandboxDump(cx, argc, vp);
@@ -291,15 +291,15 @@ SandboxFetch(JSContext* cx, JS::HandleObject scope, const CallArgs& args)
         FetchRequest(global, Constify(request), Constify(options), rv);
     rv.WouldReportJSException();
     if (rv.Failed()) {
-        return ThrowMethodFailedWithDetails(cx, rv, "Sandbox", "fetch");
+        return ThrowMethodFailed(cx, rv);
     }
-    if (!GetOrCreateDOMReflector(cx, scope, response, args.rval())) {
+    if (!GetOrCreateDOMReflector(cx, response, args.rval())) {
         return false;
     }
     return true;
 }
 
-static bool SandboxFetchPromise(JSContext* cx, unsigned argc, jsval* vp)
+static bool SandboxFetchPromise(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedObject callee(cx, &args.callee());
@@ -323,7 +323,7 @@ SandboxCreateFetch(JSContext* cx, HandleObject obj)
 }
 
 static bool
-SandboxIsProxy(JSContext* cx, unsigned argc, jsval* vp)
+SandboxIsProxy(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() < 1) {
@@ -350,7 +350,7 @@ SandboxIsProxy(JSContext* cx, unsigned argc, jsval* vp)
  *                         [optional] object options)
  */
 static bool
-SandboxExportFunction(JSContext* cx, unsigned argc, jsval* vp)
+SandboxExportFunction(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() < 2) {
@@ -363,7 +363,7 @@ SandboxExportFunction(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-SandboxCreateObjectIn(JSContext* cx, unsigned argc, jsval* vp)
+SandboxCreateObjectIn(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() < 1) {
@@ -389,7 +389,7 @@ SandboxCreateObjectIn(JSContext* cx, unsigned argc, jsval* vp)
 }
 
 static bool
-SandboxCloneInto(JSContext* cx, unsigned argc, jsval* vp)
+SandboxCloneInto(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() < 2) {
@@ -1029,8 +1029,9 @@ xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp, nsISupports* prin
     if (!sandbox)
         return NS_ERROR_FAILURE;
 
-    CompartmentPrivate::Get(sandbox)->writeToGlobalPrototype =
-      options.writeToGlobalPrototype;
+    CompartmentPrivate* priv = CompartmentPrivate::Get(sandbox);
+    priv->allowWaivers = options.allowWaivers;
+    priv->writeToGlobalPrototype = options.writeToGlobalPrototype;
 
     // Set up the wantXrays flag, which indicates whether xrays are desired even
     // for same-origin access.
@@ -1041,7 +1042,7 @@ xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp, nsISupports* prin
     // Arguably we should just flip the default for chrome and still honor the
     // flag, but such a change would break code in subtle ways for minimal
     // benefit. So we just switch it off here.
-    CompartmentPrivate::Get(sandbox)->wantXrays =
+    priv->wantXrays =
       AccessCheck::isChrome(sandbox) ? false : options.wantXrays;
 
     {
@@ -1053,7 +1054,11 @@ xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp, nsISupports* prin
                 return NS_ERROR_XPC_UNEXPECTED;
 
             // Now check what sort of thing we've got in |proto|
-            JSObject* unwrappedProto = js::UncheckedUnwrap(options.proto, false);
+            JSObject* unwrappedProto = js::CheckedUnwrap(options.proto, false);
+            if (!unwrappedProto) {
+                JS_ReportError(cx, "Sandbox must subsume sandboxPrototype");
+                return NS_ERROR_INVALID_ARG;
+            }
             const js::Class* unwrappedClass = js::GetObjectClass(unwrappedProto);
             if (IS_WN_CLASS(unwrappedClass) ||
                 mozilla::dom::IsDOMClass(Jsvalify(unwrappedClass))) {
@@ -1476,6 +1481,7 @@ SandboxOptions::Parse()
 {
     bool ok = ParseObject("sandboxPrototype", &proto) &&
               ParseBoolean("wantXrays", &wantXrays) &&
+              ParseBoolean("allowWaivers", &allowWaivers) &&
               ParseBoolean("wantComponents", &wantComponents) &&
               ParseBoolean("wantExportHelpers", &wantExportHelpers) &&
               ParseString("sandboxName", sandboxName) &&

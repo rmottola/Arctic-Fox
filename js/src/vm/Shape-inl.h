@@ -78,11 +78,11 @@ Shape::search(ExclusiveContext *cx, Shape *start, jsid id, ShapeTable::Entry **p
     return nullptr;
 }
 
-inline Shape *
-Shape::new_(ExclusiveContext *cx, StackShape& unrootedOther, uint32_t nfixed)
+inline Shape*
+Shape::new_(ExclusiveContext* cx, StackShape& unrootedOther, uint32_t nfixed)
 {
     RootedGeneric<StackShape*> other(cx, &unrootedOther);
-    Shape *shape = other->isAccessorShape()
+    Shape* shape = other->isAccessorShape()
                    ? js::Allocate<AccessorShape>(cx)
                    : js::Allocate<Shape>(cx);
     if (!shape) {

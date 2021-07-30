@@ -24,12 +24,6 @@ namespace image {
 
 // Inherited methods from Image.
 
-nsresult
-DynamicImage::Init(const char* aMimeType, uint32_t aFlags)
-{
-  return NS_OK;
-}
-
 already_AddRefed<ProgressTracker>
 DynamicImage::GetProgressTracker()
 {
@@ -200,6 +194,12 @@ DynamicImage::IsOpaque()
   return false;
 }
 
+NS_IMETHODIMP_(bool)
+DynamicImage::IsImageContainerAvailable(LayerManager* aManager, uint32_t aFlags)
+{
+  return false;
+}
+
 NS_IMETHODIMP_(already_AddRefed<ImageContainer>)
 DynamicImage::GetImageContainer(LayerManager* aManager, uint32_t aFlags)
 {
@@ -334,6 +334,12 @@ DynamicImage::Unwrap()
 {
   nsCOMPtr<imgIContainer> self(this);
   return self.forget();
+}
+
+void
+DynamicImage::PropagateUseCounters(nsIDocument*)
+{
+  // No use counters.
 }
 
 } // namespace image

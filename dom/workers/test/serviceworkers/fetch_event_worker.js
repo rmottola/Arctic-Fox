@@ -1,7 +1,7 @@
 var seenIndex = false;
 
 onfetch = function(ev) {
-  if (ev.request.url.includes("synthesized.txt")) {
+  if (ev.request.url.includes("bare-synthesized.txt")) {
     ev.respondWith(Promise.resolve(
       new Response("synthesized response body", {})
     ));
@@ -33,11 +33,23 @@ onfetch = function(ev) {
     ));
   }
 
-  else if (ev.request.url.includes("synthesized-redirect-synthesized.txt")) {
+  else if (ev.request.url.includes("synthesized-redirect-twice-real-file.txt")) {
     ev.respondWith(Promise.resolve(
-      Response.redirect("synthesized.txt")
+      Response.redirect("synthesized-redirect-real-file.txt")
     ));
   }
+
+  else if (ev.request.url.includes("synthesized-redirect-synthesized.txt")) {
+    ev.respondWith(Promise.resolve(
+      Response.redirect("bare-synthesized.txt")
+    ));
+  }
+
+  else if (ev.request.url.includes("synthesized-redirect-twice-synthesized.txt")) {
+    ev.respondWith(Promise.resolve(
+      Response.redirect("synthesized-redirect-synthesized.txt")
+     ));
+   }
 
   else if (ev.request.url.includes("ignored.txt")) {
   }
@@ -132,7 +144,7 @@ onfetch = function(ev) {
   }
 
   else if (ev.request.url.includes('opaque-on-same-origin')) {
-    var url = 'http://example.com/tests/dom/base/test/file_CrossSiteXHR_server.sjs?status=200';
+    var url = 'http://example.com/tests/dom/security/test/cors/file_CrossSiteXHR_server.sjs?status=200';
     ev.respondWith(fetch(url, { mode: 'no-cors' }));
   }
 
@@ -142,7 +154,7 @@ onfetch = function(ev) {
       return;
     }
 
-    var url = 'http://example.com/tests/dom/base/test/file_CrossSiteXHR_server.sjs?status=200';
+    var url = 'http://example.com/tests/dom/security/test/cors/file_CrossSiteXHR_server.sjs?status=200';
     ev.respondWith(fetch(url, { mode: ev.request.mode }));
   }
 
@@ -152,7 +164,7 @@ onfetch = function(ev) {
       return;
     }
 
-    var url = 'http://example.com/tests/dom/base/test/file_CrossSiteXHR_server.sjs?status=200&allowOrigin=*';
+    var url = 'http://example.com/tests/dom/security/test/cors/file_CrossSiteXHR_server.sjs?status=200&allowOrigin=*';
     ev.respondWith(fetch(url));
   }
 
@@ -179,4 +191,20 @@ onfetch = function(ev) {
       return new Response(body + body);
     }));
   }
-}
+
+  else if (ev.request.url.includes('something.txt')) {
+    ev.respondWith(Response.redirect('fetch/somethingelse.txt'));
+  }
+
+  else if (ev.request.url.includes('somethingelse.txt')) {
+    ev.respondWith(new Response('something else response body', {}));
+  }
+
+  else if (ev.request.url.includes('redirect_serviceworker.sjs')) {
+    // The redirect_serviceworker.sjs server-side JavaScript file redirects to
+    // 'http://mochi.test:8888/tests/dom/workers/test/serviceworkers/worker.js'
+    // The redirected fetch should not go through the SW since the original
+    // fetch was initiated from a SW.
+    ev.respondWith(fetch('redirect_serviceworker.sjs'));
+  }
+};

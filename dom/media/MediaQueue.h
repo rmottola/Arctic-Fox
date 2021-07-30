@@ -6,11 +6,12 @@
 #if !defined(MediaQueue_h_)
 #define MediaQueue_h_
 
-#include "nsDeque.h"
-#include "nsTArray.h"
 #include "mozilla/ReentrantMonitor.h"
 #include "mozilla/RefPtr.h"
-#include "MediaTaskQueue.h"
+#include "mozilla/TaskQueue.h"
+
+#include "nsDeque.h"
+#include "nsTArray.h"
 
 namespace mozilla {
 
@@ -142,6 +143,13 @@ template <class T> class MediaQueue : private nsDeque {
     }
   }
 
+  void GetFirstElements(uint32_t aMaxElements, nsTArray<nsRefPtr<T>>* aResult) {
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    for (int32_t i = 0; i < (int32_t)aMaxElements && i < GetSize(); ++i) {
+      *aResult->AppendElement() = static_cast<T*>(ObjectAt(i));
+    }
+  }
+
   uint32_t FrameCount() {
     ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     uint32_t frames = 0;
@@ -157,7 +165,7 @@ template <class T> class MediaQueue : private nsDeque {
     mPopListeners.Clear();
   }
 
-  void AddPopListener(nsIRunnable* aRunnable, MediaTaskQueue* aTarget) {
+  void AddPopListener(nsIRunnable* aRunnable, TaskQueue* aTarget) {
     ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     mPopListeners.AppendElement(Listener(aRunnable, aTarget));
   }
@@ -166,7 +174,7 @@ private:
   mutable ReentrantMonitor mReentrantMonitor;
 
   struct Listener {
-    Listener(nsIRunnable* aRunnable, MediaTaskQueue* aTarget)
+    Listener(nsIRunnable* aRunnable, TaskQueue* aTarget)
       : mRunnable(aRunnable)
       , mTarget(aTarget)
     {
@@ -177,7 +185,7 @@ private:
     {
     }
     nsCOMPtr<nsIRunnable> mRunnable;
-    RefPtr<MediaTaskQueue> mTarget;
+    RefPtr<TaskQueue> mTarget;
   };
 
   nsTArray<Listener> mPopListeners;

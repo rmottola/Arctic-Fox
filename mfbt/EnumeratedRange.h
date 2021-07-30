@@ -20,8 +20,8 @@
 #ifndef mozilla_EnumeratedRange_h
 #define mozilla_EnumeratedRange_h
 
-#include "mozilla/IntegerRange.h"
 #include "mozilla/IntegerTypeTraits.h"
+#include "mozilla/ReverseIterator.h"
 
 namespace mozilla {
 
@@ -31,20 +31,15 @@ template<typename IntTypeT, typename EnumTypeT>
 class EnumeratedIterator
 {
 public:
-  typedef const EnumTypeT ValueType;
-  typedef typename MakeSigned<IntTypeT>::Type DifferenceType;
-
   template<typename EnumType>
   explicit EnumeratedIterator(EnumType aCurrent)
     : mCurrent(aCurrent) { }
 
   template<typename IntType, typename EnumType>
-  EnumeratedIterator(const EnumeratedIterator<IntType, EnumType>& aOther)
+  explicit EnumeratedIterator(const EnumeratedIterator<IntType, EnumType>& aOther)
     : mCurrent(aOther.mCurrent) { }
 
-  // Since operator* is required to return a reference, we return
-  // a reference to our member here.
-  const EnumTypeT& operator*() const { return mCurrent; }
+  EnumTypeT operator*() const { return mCurrent; }
 
   /* Increment and decrement operators */
 
@@ -69,25 +64,6 @@ public:
     auto ret = *this;
     mCurrent = EnumTypeT(IntTypeT(mCurrent) - IntTypeT(1));
     return ret;
-  }
-
-  EnumeratedIterator operator+(DifferenceType aN) const
-  {
-    return EnumeratedIterator(EnumTypeT(IntTypeT(mCurrent) + aN));
-  }
-  EnumeratedIterator operator-(DifferenceType aN) const
-  {
-    return EnumeratedIterator(EnumTypeT(IntTypeT(mCurrent) - aN));
-  }
-  EnumeratedIterator& operator+=(DifferenceType aN)
-  {
-    mCurrent = EnumTypeT(IntTypeT(mCurrent) + aN);
-    return *this;
-  }
-  EnumeratedIterator& operator-=(DifferenceType aN)
-  {
-    mCurrent = EnumTypeT(IntTypeT(mCurrent) - aN);
-    return *this;
   }
 
   /* Comparison operators */
@@ -199,7 +175,9 @@ template<typename IntType, typename EnumType>
 inline detail::EnumeratedRange<IntType, EnumType>
 MakeEnumeratedRange(EnumType aBegin, EnumType aEnd)
 {
+#ifdef DEBUG
   typedef typename MakeUnsigned<IntType>::Type UnsignedType;
+#endif
   static_assert(sizeof(IntType) >= sizeof(EnumType),
                 "IntType should be at least as big as EnumType!");
   MOZ_ASSERT(aBegin <= aEnd, "Cannot generate invalid, unbounded range!");

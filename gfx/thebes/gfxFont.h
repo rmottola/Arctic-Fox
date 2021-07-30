@@ -105,8 +105,8 @@ struct gfxFontStyle {
 
     // The aspect-value (ie., the ratio actualsize:actualxheight) that any
     // actual physical font created from this font structure must have when
-    // rendering or measuring a string. A value of 0 means no adjustment
-    // needs to be done.
+    // rendering or measuring a string. A value of -1.0 means no adjustment
+    // needs to be done; otherwise the value must be nonnegative.
     float sizeAdjust;
 
     // baseline offset, used when simulating sub/superscript glyphs
@@ -164,9 +164,9 @@ struct gfxFontStyle {
     uint8_t variantSubSuper;
 
     // Return the final adjusted font size for the given aspect ratio.
-    // Not meant to be called when sizeAdjust = 0.
+    // Not meant to be called when sizeAdjust = -1.0.
     gfxFloat GetAdjustedSize(gfxFloat aspect) const {
-        NS_ASSERTION(sizeAdjust != 0.0, "Not meant to be called when sizeAdjust = 0");
+        NS_ASSERTION(sizeAdjust >= 0.0, "Not meant to be called when sizeAdjust = -1.0");
         gfxFloat adjustedSize = std::max(NS_round(size*(sizeAdjust/aspect)), 1.0);
         return std::min(adjustedSize, FONT_MAX_SIZE);
     }
@@ -324,9 +324,7 @@ public:
         AgeAllGenerations();
     }
 
-    void FlushShapedWordCaches() {
-        mFonts.EnumerateEntries(ClearCachedWordsForFont, nullptr);
-    }
+    void FlushShapedWordCaches();
 
     void AddSizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf,
                                 FontCacheSizes* aSizes) const;
@@ -395,8 +393,6 @@ protected:
 
     nsTHashtable<HashEntry> mFonts;
 
-    static PLDHashOperator ClearCachedWordsForFont(HashEntry* aHashEntry, void*);
-    static PLDHashOperator AgeCachedWordsForFont(HashEntry* aHashEntry, void*);
     static void WordCacheExpirationTimerCallback(nsITimer* aTimer, void* aCache);
     nsCOMPtr<nsITimer>      mWordCacheExpirationTimer;
 };
@@ -1066,8 +1062,8 @@ protected:
 
         size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) {
             return aMallocSizeOf(this) +
-                mDetails.SizeOfExcludingThis(aMallocSizeOf) +
-                mOffsetToIndex.SizeOfExcludingThis(aMallocSizeOf);
+                mDetails.ShallowSizeOfExcludingThis(aMallocSizeOf) +
+                mOffsetToIndex.ShallowSizeOfExcludingThis(aMallocSizeOf);
         }
 
     private:
@@ -1389,7 +1385,9 @@ public:
     }
 
     virtual gfxFloat GetAdjustedSize() const {
-        return mAdjustedSize > 0.0 ? mAdjustedSize : mStyle.size;
+        return mAdjustedSize > 0.0
+                 ? mAdjustedSize
+                 : (mStyle.sizeAdjust == 0.0 ? 0.0 : mStyle.size);
     }
 
     float FUnitsToDevUnitsFactor() const {
@@ -1712,11 +1710,7 @@ public:
 
     // Called by the gfxFontCache timer to increment the age of all the words,
     // so that they'll expire after a sufficient period of non-use
-    void AgeCachedWords() {
-        if (mWordCache) {
-            (void)mWordCache->EnumerateEntries(AgeCacheEntry, this);
-        }
-    }
+    void AgeCachedWords();
 
     // Discard all cached word records; called on memory-pressure notification.
     void ClearCachedWords() {
@@ -1843,7 +1837,7 @@ protected:
     // (and with variantCaps set to normal).
     // Default implementation relies on gfxFontEntry::CreateFontInstance;
     // backends that don't implement that will need to override this and use
-    // an alternative technique. (gfxPangoFonts, I'm looking at you...)
+    // an alternative technique. (gfxFontconfigFonts, I'm looking at you...)
     virtual already_AddRefed<gfxFont> GetSmallCapsFont();
 
     // subclasses may provide (possibly hinted) glyph widths (in font units);
@@ -2021,7 +2015,6 @@ protected:
 
     nsAutoPtr<nsTHashtable<CacheHashEntry> > mWordCache;
 
-    static PLDHashOperator AgeCacheEntry(CacheHashEntry *aEntry, void *aUserData);
     static const uint32_t  kShapedWordCacheMaxAge = 3;
 
     bool                       mIsValid;

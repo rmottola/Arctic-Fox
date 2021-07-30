@@ -1217,10 +1217,6 @@ toolbar[iconsize="small"] #feed-button {
   max-width: 27em;
 }
 
-.popup-progress-meter {
-  margin-top: .5em;
-}
-
 .addon-install-confirmation-name {
   font-weight: bold;
 }
@@ -1740,7 +1736,7 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
   list-style-image: url("chrome://mozapps/skin/places/defaultFavicon.png");
 }
 
-.alltabs-item[selected="true"] {
+.alltabs-item[visuallyselected="true"] {
   font-weight: bold;
 }
 
@@ -1895,38 +1891,6 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
   opacity: .3;
 }
 
-/* Add-on bar */
-
-#addon-bar {
-  box-shadow: 0 1px 0 rgba(0,0,0,.15) inset;
-  padding: 0;
-  min-height: 20px;
-}
-
-#status-bar {
-  min-height: 0;
-  -moz-appearance: none;
-  background-color: transparent;
-  border: none;
-}
-
-#addon-bar[customizing] > #status-bar {
-  opacity: .5;
-  background-image: repeating-linear-gradient(135deg,
-                                              rgba(255,255,255,.3), rgba(255,255,255,.3) 5px,
-                                              rgba(0,0,0,.3) 5px, rgba(0,0,0,.3) 10px);
-}
-
-#status-bar > statusbarpanel {
-  border-width: 0;
-  -moz-appearance: none;
-}
-
-#addonbar-closebutton > .toolbarbutton-icon {
-  margin-top: -2px;
-  margin-bottom: -2px;
-}
-
 /* Status panel */
 
 .statuspanel-label {
@@ -1985,6 +1949,9 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
 %endif
 %include ../shared/plugin-doorhanger.inc.css
 %include ../shared/badcontent-doorhanger.inc.css
+%include ../shared/login-doorhanger.inc.css
+
+%include downloads/indicator.css
 
 %ifdef MOZ_DEVTOOLS
 .gcli-panel {

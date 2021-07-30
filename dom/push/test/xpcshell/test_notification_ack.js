@@ -3,7 +3,7 @@
 
 'use strict';
 
-const {PushDB, PushService} = serviceExports;
+const {PushDB, PushService, PushServiceWebSocket} = serviceExports;
 
 let userAgentID = '5ab1d1df-7a3d-4024-a469-b9e1bb399fad';
 
@@ -19,27 +19,29 @@ function run_test() {
 }
 
 add_task(function* test_notification_ack() {
-  let db = new PushDB();
-  let promiseDB = promisifyDatabase(db);
-  do_register_cleanup(() => cleanupDatabase(db));
+  let db = PushServiceWebSocket.newPushDB();
+  do_register_cleanup(() => {return db.drop().then(_ => db.close());});
   let records = [{
     channelID: '21668e05-6da8-42c9-b8ab-9cc3f4d5630c',
     pushEndpoint: 'https://example.com/update/1',
     scope: 'https://example.org/1',
+    originAttributes: '',
     version: 1
   }, {
     channelID: '9a5ff87f-47c9-4215-b2b8-0bdd38b4b305',
     pushEndpoint: 'https://example.com/update/2',
     scope: 'https://example.org/2',
+    originAttributes: '',
     version: 2
   }, {
     channelID: '5477bfda-22db-45d4-9614-fee369630260',
     pushEndpoint: 'https://example.com/update/3',
     scope: 'https://example.org/3',
+    originAttributes: '',
     version: 3
   }];
   for (let record of records) {
-    yield promiseDB.put(record);
+    yield db.put(record);
   }
 
   let notifyPromise = Promise.all([
@@ -51,6 +53,7 @@ add_task(function* test_notification_ack() {
   let acks = 0;
   let ackDefer = Promise.defer();
   PushService.init({
+    serverURI: "wss://push.example.org/",
     networkInfo: new MockDesktopNetworkInfo(),
     db,
     makeWebSocket(uri) {

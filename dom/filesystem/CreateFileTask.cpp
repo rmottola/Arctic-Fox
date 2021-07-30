@@ -18,6 +18,7 @@
 #include "mozilla/dom/ipc/BlobParent.h"
 #include "nsIFile.h"
 #include "nsNetUtil.h"
+#include "nsIOutputStream.h"
 #include "nsStringGlue.h"
 
 namespace mozilla {
@@ -39,9 +40,9 @@ CreateFileTask::CreateFileTask(FileSystemBase* aFileSystem,
   MOZ_ASSERT(aFileSystem);
   GetOutputBufferSize();
   if (aBlobData) {
-    if (FileSystemUtils::IsParentProcess()) {
-      nsresult rv = aBlobData->GetInternalStream(getter_AddRefs(mBlobStream));
-      NS_WARN_IF(NS_FAILED(rv));
+    if (XRE_IsParentProcess()) {
+      aBlobData->GetInternalStream(getter_AddRefs(mBlobStream), aRv);
+      NS_WARN_IF(aRv.Failed());
     } else {
       mBlobData = aBlobData;
     }
@@ -56,12 +57,12 @@ CreateFileTask::CreateFileTask(FileSystemBase* aFileSystem,
 }
 
 CreateFileTask::CreateFileTask(FileSystemBase* aFileSystem,
-                       const FileSystemCreateFileParams& aParam,
-                       FileSystemRequestParent* aParent)
+                               const FileSystemCreateFileParams& aParam,
+                               FileSystemRequestParent* aParent)
   : FileSystemTaskBase(aFileSystem, aParam, aParent)
   , mReplace(false)
 {
-  MOZ_ASSERT(FileSystemUtils::IsParentProcess(),
+  MOZ_ASSERT(XRE_IsParentProcess(),
              "Only call from parent process!");
   MOZ_ASSERT(NS_IsMainThread(), "Only call on main thread!");
   MOZ_ASSERT(aFileSystem);
@@ -82,8 +83,11 @@ CreateFileTask::CreateFileTask(FileSystemBase* aFileSystem,
   nsRefPtr<BlobImpl> blobImpl = bp->GetBlobImpl();
   MOZ_ASSERT(blobImpl, "blobData should not be null.");
 
-  nsresult rv = blobImpl->GetInternalStream(getter_AddRefs(mBlobStream));
-  NS_WARN_IF(NS_FAILED(rv));
+  ErrorResult rv;
+  blobImpl->GetInternalStream(getter_AddRefs(mBlobStream), rv);
+  if (NS_WARN_IF(rv.Failed())) {
+    rv.SuppressException();
+  }
 }
 
 CreateFileTask::~CreateFileTask()
@@ -165,7 +169,7 @@ CreateFileTask::Work()
     nsCOMPtr<nsIOutputStream> mStream;
   };
 
-  MOZ_ASSERT(FileSystemUtils::IsParentProcess(),
+  MOZ_ASSERT(XRE_IsParentProcess(),
              "Only call from parent process!");
   MOZ_ASSERT(!NS_IsMainThread(), "Only call on worker thread!");
 
@@ -321,7 +325,7 @@ CreateFileTask::GetPermissionAccessType(nsCString& aAccess) const
 void
 CreateFileTask::GetOutputBufferSize() const
 {
-  if (sOutputBufferSize || !FileSystemUtils::IsParentProcess()) {
+  if (sOutputBufferSize || !XRE_IsParentProcess()) {
     return;
   }
   sOutputBufferSize =

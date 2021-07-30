@@ -50,12 +50,9 @@ public:
     // nsLoadGroup methods:
 
     explicit nsLoadGroup(nsISupports* outer);
-
-    nsresult Init();
-
-protected:
     virtual ~nsLoadGroup();
 
+protected:
     nsresult MergeLoadFlags(nsIRequest *aRequest, nsLoadFlags& flags);
 
 private:

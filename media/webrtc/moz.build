@@ -105,3 +105,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'gonk':
             build_for_standalone=1
         )
         GYP_DIRS['signalingstandalone'].non_unified_sources += signaling_non_unified_sources
+
+if CONFIG['MOZ_X11']:
+    CXXFLAGS += CONFIG['TK_CFLAGS']
+

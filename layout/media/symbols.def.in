@@ -62,6 +62,7 @@ vpx_codec_get_cx_data
 vpx_codec_enc_config_default
 vpx_img_alloc
 vpx_codec_encode
+vpx_codec_err_to_string
 #endif
 #endif
 #ifdef MOZ_VORBIS

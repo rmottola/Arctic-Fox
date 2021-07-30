@@ -121,9 +121,9 @@ class MachCommands(MachCommandBase):
         default='browser',
         help='Test type, usually one of: browser, b2g, b2g-qemu.')
     @CommandArgument('--profile',
-        help='Path to goanna profile to use.')
-    @CommandArgument('--goanna-log',
-        help='Path to goanna log file, or "-" for stdout.')
+        help='Path to gecko profile to use.')
+    @CommandArgument('--gecko-log',
+        help='Path to gecko log file, or "-" for stdout.')
     @CommandArgument('--jsdebugger', action='store_true',
         help='Enable the jsdebugger for marionette javascript.')
     @CommandArgument('--pydebugger',

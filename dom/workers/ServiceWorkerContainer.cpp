@@ -10,11 +10,13 @@
 #include "nsIServiceWorkerManager.h"
 #include "nsNetUtil.h"
 #include "nsPIDOMWindow.h"
+#include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
 
 #include "nsCycleCollectionParticipant.h"
 #include "nsServiceManagerUtils.h"
 
+#include "mozilla/dom/Navigator.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/ServiceWorkerContainerBinding.h"
 #include "mozilla/dom/workers/bindings/ServiceWorker.h"
@@ -33,6 +35,25 @@ NS_IMPL_RELEASE_INHERITED(ServiceWorkerContainer, DOMEventTargetHelper)
 NS_IMPL_CYCLE_COLLECTION_INHERITED(ServiceWorkerContainer, DOMEventTargetHelper,
                                    mControllerWorker, mReadyPromise)
 
+/* static */ bool
+ServiceWorkerContainer::IsEnabled(JSContext* aCx, JSObject* aGlobal)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  JS::Rooted<JSObject*> global(aCx, aGlobal);
+  nsCOMPtr<nsPIDOMWindow> window = Navigator::GetWindowFromGlobal(global);
+  if (!window) {
+    return false;
+  }
+
+  nsIDocument* doc = window->GetExtantDoc();
+  if (!doc || nsContentUtils::IsInPrivateBrowsing(doc)) {
+    return false;
+  }
+
+  return Preferences::GetBool("dom.serviceWorkers.enabled", false);
+}
+
 ServiceWorkerContainer::ServiceWorkerContainer(nsPIDOMWindow* aWindow)
   : DOMEventTargetHelper(aWindow)
 {
@@ -48,6 +69,13 @@ ServiceWorkerContainer::DisconnectFromOwner()
 {
   RemoveReadyPromise();
   DOMEventTargetHelper::DisconnectFromOwner();
+}
+
+void
+ServiceWorkerContainer::ControllerChanged(ErrorResult& aRv)
+{
+  mControllerWorker = nullptr;
+  aRv = DispatchTrustedEvent(NS_LITERAL_STRING("controllerchange"));
 }
 
 void
@@ -136,8 +164,13 @@ ServiceWorkerContainer::GetController()
       return nullptr;
     }
 
+    // TODO: What should we do here if the ServiceWorker script fails to load?
+    //       In theory the DOM ServiceWorker object can exist without the worker
+    //       thread running, but it seems our design does not expect that.
     nsCOMPtr<nsISupports> serviceWorker;
-    rv = swm->GetDocumentController(GetOwner(), getter_AddRefs(serviceWorker));
+    rv = swm->GetDocumentController(GetOwner(),
+                                    nullptr, // aLoadFailedRunnable
+                                    getter_AddRefs(serviceWorker));
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return nullptr;
     }
@@ -233,7 +266,8 @@ ServiceWorkerContainer::GetScopeForUrl(const nsAString& aUrl,
     return;
   }
 
-  aRv = swm->GetScopeForUrl(aUrl, aScope);
+  aRv = swm->GetScopeForUrl(GetOwner()->GetExtantDoc()->NodePrincipal(),
+                            aUrl, aScope);
 }
 
 // Testing only.

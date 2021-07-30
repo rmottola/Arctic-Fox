@@ -17,17 +17,18 @@
 
 namespace mozilla {
 
+class TaskQueue;
 class TaskDispatcher;
 
 /*
  * We often want to run tasks on a target that guarantees that events will never
  * run in parallel. There are various target types that achieve this - namely
- * nsIThread and MediaTaskQueue. Note that nsIThreadPool (which implements
+ * nsIThread and TaskQueue. Note that nsIThreadPool (which implements
  * nsIEventTarget) does not have this property, so we do not want to use
  * nsIEventTarget for this purpose. This class encapsulates the specifics of
  * the structures we might use here and provides a consistent interface.
  *
- * At present, the supported AbstractThread implementations are MediaTaskQueue
+ * At present, the supported AbstractThread implementations are TaskQueue
  * and AbstractThread::MainThread. If you add support for another thread that is
  * not the MainThread, you'll need to figure out how to make it unique such that
  * comparing AbstractThread pointers is equivalent to comparing nsIThread pointers.
@@ -39,7 +40,7 @@ public:
   // if the caller is not running in an AbstractThread.
   static AbstractThread* GetCurrent() { return sCurrentThreadTLS.get(); }
 
-  AbstractThread(bool aRequireTailDispatch) : mRequireTailDispatch(aRequireTailDispatch) {}
+  AbstractThread(bool aSupportsTailDispatch) : mSupportsTailDispatch(aSupportsTailDispatch) {}
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(AbstractThread);
 
@@ -52,7 +53,7 @@ public:
   virtual bool IsCurrentThreadIn() = 0;
 
   // Returns true if dispatch is generally reliable. This is used to guard
-  // against FlushableMediaTaskQueues, which eventually needs to go away.
+  // against FlushableTaskQueues, which should go away.
   virtual bool IsDispatchReliable() { return true; }
 
   // Returns a TaskDispatcher that will dispatch its tasks when the currently-
@@ -62,9 +63,15 @@ public:
   // threads which support it.
   virtual TaskDispatcher& TailDispatcher() = 0;
 
-  // Returns true if this task queue requires all dispatches performed by its
-  // tasks to go through the tail dispatcher.
-  bool RequiresTailDispatch() const { return mRequireTailDispatch; }
+  // Returns true if this supports the tail dispatcher.
+  bool SupportsTailDispatch() const { return mSupportsTailDispatch; }
+
+  // Returns true if this thread requires all dispatches originating from
+  // aThread go through the tail dispatcher.
+  bool RequiresTailDispatch(AbstractThread* aThread) const;
+
+  virtual TaskQueue* AsTaskQueue() { MOZ_CRASH("Not a task queue!"); }
+  virtual nsIThread* AsXPCOMThread() { MOZ_CRASH("Not an XPCOM thread!"); }
 
   // Convenience method for getting an AbstractThread for the main thread.
   static AbstractThread* MainThread();
@@ -82,7 +89,7 @@ protected:
 
   // True if we want to require that every task dispatched from tasks running in
   // this queue go through our queue's tail dispatcher.
-  const bool mRequireTailDispatch;
+  const bool mSupportsTailDispatch;
 };
 
 } // namespace mozilla

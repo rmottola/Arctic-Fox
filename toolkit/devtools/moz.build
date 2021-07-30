@@ -23,7 +23,7 @@ DIRS += [
     'styleinspector',
     'tern',
     'transport',
-    'webconsole',
+    'webconsole'
 ]
 
 if CONFIG['MOZ_DEVTOOLS']:

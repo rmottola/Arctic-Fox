@@ -578,6 +578,17 @@ load 1054010-1.html
 load 1058954-1.html
 load 1134531.html
 load 1134667.html
+load 1137723-1.html
+load 1137723-2.html
+# The tests for bug 1137723 above causes delayed assertions too,
+# the next 3 lines can be removed once that is fixed.
+asserts(0-3) load 1134667.html
+asserts(0-3) load 1134667.html
+asserts(0-3) load 1134667.html
+load 1146103.html
+load 1146107.html
+load 1146114.html
+load 1156222.html
 load 1222783.xhtml
 load details-display-none-summary-1.html
 load details-display-none-summary-2.html

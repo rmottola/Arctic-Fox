@@ -9,7 +9,6 @@
 #include <ICrypto.h>
 #include "GonkAudioDecoderManager.h"
 #include "MediaDecoderReader.h"
-#include "mp4_demuxer/Adts.h"
 #include "VideoUtils.h"
 #include "nsTArray.h"
 #include "mozilla/Logging.h"
@@ -26,7 +25,7 @@
 #define GADM_LOG(...) __android_log_print(ANDROID_LOG_DEBUG, "GonkAudioDecoderManager", __VA_ARGS__)
 
 PRLogModuleInfo* GetDemuxerLog();
-#define LOG(...) PR_LOG(GetDemuxerLog(), PR_LOG_DEBUG, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(GetDemuxerLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 #define READ_OUTPUT_BUFFER_TIMEOUT_US  3000
 
 using namespace android;
@@ -34,24 +33,18 @@ typedef android::MediaCodecProxy MediaCodecProxy;
 
 namespace mozilla {
 
-GonkAudioDecoderManager::GonkAudioDecoderManager(
-  MediaTaskQueue* aTaskQueue,
-  const AudioInfo& aConfig)
-  : GonkDecoderManager(aTaskQueue)
+GonkAudioDecoderManager::GonkAudioDecoderManager(const AudioInfo& aConfig)
+  : mLastDecodedTime(0)
   , mAudioChannels(aConfig.mChannels)
   , mAudioRate(aConfig.mRate)
   , mAudioProfile(aConfig.mProfile)
-  , mUseAdts(true)
   , mAudioBuffer(nullptr)
+  , mMonitor("GonkAudioDecoderManager")
 {
   MOZ_COUNT_CTOR(GonkAudioDecoderManager);
   MOZ_ASSERT(mAudioChannels);
   mUserData.AppendElements(aConfig.mCodecSpecificConfig->Elements(),
                            aConfig.mCodecSpecificConfig->Length());
-  // Pass through mp3 without applying an ADTS header.
-  if (!aConfig.mMimeType.EqualsLiteral("audio/mp4a-latm")) {
-      mUseAdts = false;
-  }
 }
 
 GonkAudioDecoderManager::~GonkAudioDecoderManager()
@@ -81,12 +74,12 @@ GonkAudioDecoderManager::Init(MediaDataDecoderCallback* aCallback)
   }
   sp<AMessage> format = new AMessage;
   // Fixed values
-  GADM_LOG("Init Audio channel no:%d, sample-rate:%d", mAudioChannels, mAudioRate);
+  GADM_LOG("Configure audio mime type:%s, chan no:%d, sample-rate:%d, profile:%d",
+           mMimeType.get(), mAudioChannels, mAudioRate, mAudioProfile);
   format->setString("mime", "audio/mp4a-latm");
   format->setInt32("channel-count", mAudioChannels);
   format->setInt32("sample-rate", mAudioRate);
   format->setInt32("aac-profile", mAudioProfile);
-  format->setInt32("is-adts", true);
   status_t err = mDecoder->configure(format, nullptr, nullptr, 0);
   if (err != OK || !mDecoder->Prepare()) {
     return nullptr;
@@ -102,32 +95,50 @@ GonkAudioDecoderManager::Init(MediaDataDecoderCallback* aCallback)
   }
 }
 
-status_t
-GonkAudioDecoderManager::SendSampleToOMX(MediaRawData* aSample)
+bool
+GonkAudioDecoderManager::HasQueuedSample()
 {
-  return mDecoder->Input(reinterpret_cast<const uint8_t*>(aSample->Data()),
-                         aSample->Size(),
-                         aSample->mTime,
-                         0);
+    MonitorAutoLock mon(mMonitor);
+    return mQueueSample.Length();
 }
 
-bool
-GonkAudioDecoderManager::PerformFormatSpecificProcess(MediaRawData* aSample)
+nsresult
+GonkAudioDecoderManager::Input(MediaRawData* aSample)
 {
-  if (aSample && mUseAdts) {
-    int8_t frequency_index =
-        mp4_demuxer::Adts::GetFrequencyIndex(mAudioRate);
-    bool rv = mp4_demuxer::Adts::ConvertSample(mAudioChannels,
-                                               frequency_index,
-                                               mAudioProfile,
-                                               aSample);
-    if (!rv) {
-      GADM_LOG("Failed to apply ADTS header");
-      return false;
+  MonitorAutoLock mon(mMonitor);
+  nsRefPtr<MediaRawData> sample;
+
+  if (aSample) {
+    sample = aSample;
+  } else {
+    // It means EOS with empty sample.
+    sample = new MediaRawData();
+  }
+
+  mQueueSample.AppendElement(sample);
+
+  status_t rv;
+  while (mQueueSample.Length()) {
+    nsRefPtr<MediaRawData> data = mQueueSample.ElementAt(0);
+    {
+      MonitorAutoUnlock mon_exit(mMonitor);
+      rv = mDecoder->Input(reinterpret_cast<const uint8_t*>(data->mData),
+                           data->mSize,
+                           data->mTime,
+                           0);
+    }
+    if (rv == OK) {
+      mQueueSample.RemoveElementAt(0);
+    } else if (rv == -EAGAIN || rv == -ETIMEDOUT) {
+      // In most cases, EAGAIN or ETIMEOUT are safe because OMX can't fill
+      // buffer on time.
+      return NS_OK;
+    } else {
+      return NS_ERROR_UNEXPECTED;
     }
   }
 
-  return true;
+  return NS_OK;
 }
 
 nsresult
@@ -148,6 +159,14 @@ GonkAudioDecoderManager::CreateAudioData(int64_t aStreamOffset, AudioData **v) {
     ReleaseAudioBuffer();
     return NS_ERROR_NOT_AVAILABLE;
   }
+
+  if (mLastDecodedTime > timeUs) {
+    ReleaseAudioBuffer();
+    GADM_LOG("Output decoded sample time is revert. time=%lld", timeUs);
+    MOZ_ASSERT(false);
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+  mLastDecodedTime = timeUs;
 
   const uint8_t *data = static_cast<const uint8_t*>(mAudioBuffer->data());
   size_t dataOffset = mAudioBuffer->range_offset();
@@ -170,6 +189,23 @@ GonkAudioDecoderManager::CreateAudioData(int64_t aStreamOffset, AudioData **v) {
                                                 mAudioRate);
   ReleaseAudioBuffer();
   audioData.forget(v);
+  return NS_OK;
+}
+
+nsresult
+GonkAudioDecoderManager::Flush()
+{
+  {
+    MonitorAutoLock mon(mMonitor);
+    mQueueSample.Clear();
+  }
+
+  mLastDecodedTime = 0;
+
+  if (mDecoder->flush() != OK) {
+    return NS_ERROR_FAILURE;
+  }
+
   return NS_OK;
 }
 
@@ -199,6 +235,25 @@ GonkAudioDecoderManager::Output(int64_t aStreamOffset,
     {
       // If the format changed, update our cached info.
       GADM_LOG("Decoder format changed");
+      sp<AMessage> audioCodecFormat;
+
+      if (mDecoder->getOutputFormat(&audioCodecFormat) != OK ||
+        audioCodecFormat == nullptr) {
+        return NS_ERROR_UNEXPECTED;
+      }
+
+      int32_t codec_channel_count = 0;
+      int32_t codec_sample_rate = 0;
+
+      if (!audioCodecFormat->findInt32("channel-count", &codec_channel_count) ||
+        !audioCodecFormat->findInt32("sample-rate", &codec_sample_rate)) {
+        return NS_ERROR_UNEXPECTED;
+      }
+
+      // Update AudioInfo
+      mAudioChannels = codec_channel_count;
+      mAudioRate = codec_sample_rate;
+
       return Output(aStreamOffset, aOutData);
     }
     case android::INFO_OUTPUT_BUFFERS_CHANGED:
@@ -248,17 +303,6 @@ void GonkAudioDecoderManager::ReleaseAudioBuffer() {
     mDecoder->ReleaseMediaBuffer(mAudioBuffer);
     mAudioBuffer = nullptr;
   }
-}
-
-nsresult
-GonkAudioDecoderManager::Flush()
-{
-  GonkDecoderManager::Flush();
-  status_t err = mDecoder->flush();
-  if (err != OK) {
-    return NS_ERROR_FAILURE;
-  }
-  return NS_OK;
 }
 
 } // namespace mozilla

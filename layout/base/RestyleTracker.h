@@ -258,7 +258,8 @@ public:
    * if the element already had eRestyle_LaterSiblings set on it.
    */
   bool AddPendingRestyle(Element* aElement, nsRestyleHint aRestyleHint,
-                         nsChangeHint aMinChangeHint);
+                         nsChangeHint aMinChangeHint,
+                         const RestyleHintData* aRestyleHintData = nullptr);
 
   /**
    * Process the restyles we've been tracking.
@@ -276,8 +277,9 @@ public:
   }
 
   struct Hints {
-    nsRestyleHint mRestyleHint;       // What we want to restyle
-    nsChangeHint mChangeHint;         // The minimal change hint for "self"
+    nsRestyleHint mRestyleHint;        // What we want to restyle
+    nsChangeHint mChangeHint;          // The minimal change hint for "self"
+    RestyleHintData mRestyleHintData;  // Data associated with mRestyleHint
   };
 
   struct RestyleData : Hints {
@@ -286,9 +288,13 @@ public:
       mChangeHint = NS_STYLE_HINT_NONE;
     }
 
-    RestyleData(nsRestyleHint aRestyleHint, nsChangeHint aChangeHint) {
+    RestyleData(nsRestyleHint aRestyleHint, nsChangeHint aChangeHint,
+                const RestyleHintData* aRestyleHintData) {
       mRestyleHint = aRestyleHint;
       mChangeHint = aChangeHint;
+      if (aRestyleHintData) {
+        mRestyleHintData = *aRestyleHintData;
+      }
     }
 
     // Descendant elements we must check that we ended up restyling, ordered
@@ -312,6 +318,14 @@ public:
    * the element.  aData is set to nullptr iff false is returned.
    */
   bool GetRestyleData(Element* aElement, nsAutoPtr<RestyleData>& aData);
+
+  /**
+   * Returns whether there is a RestyleData entry in mPendingRestyles
+   * for the given element.
+   */
+  bool HasRestyleData(Element* aElement) {
+    return mPendingRestyles.Contains(aElement);
+  }
 
   /**
    * For each element in aElements, appends it to mRestyleRoots if it
@@ -341,7 +355,8 @@ public:
 
 private:
   bool AddPendingRestyleToTable(Element* aElement, nsRestyleHint aRestyleHint,
-                                nsChangeHint aMinChangeHint);
+                                nsChangeHint aMinChangeHint,
+                                const RestyleHintData* aRestyleHintData = nullptr);
 
   /**
    * Handle a single mPendingRestyles entry.  aRestyleHint must not
@@ -350,7 +365,8 @@ private:
    */
   inline void ProcessOneRestyle(Element* aElement,
                                 nsRestyleHint aRestyleHint,
-                                nsChangeHint aChangeHint);
+                                nsChangeHint aChangeHint,
+                                const RestyleHintData& aRestyleHintData);
 
   typedef nsClassHashtable<nsISupportsHashKey, RestyleData> PendingRestyleTable;
   typedef nsAutoTArray< nsRefPtr<Element>, 32> RestyleRootArray;
@@ -381,7 +397,8 @@ private:
 inline bool
 RestyleTracker::AddPendingRestyleToTable(Element* aElement,
                                          nsRestyleHint aRestyleHint,
-                                         nsChangeHint aMinChangeHint)
+                                         nsChangeHint aMinChangeHint,
+                                         const RestyleHintData* aRestyleHintData)
 {
   RestyleData* existingData;
 
@@ -396,8 +413,9 @@ RestyleTracker::AddPendingRestyleToTable(Element* aElement,
   }
 
   if (!existingData) {
-    RestyleData* rd = new RestyleData(aRestyleHint, aMinChangeHint);
-#if defined(MOZ_ENABLE_PROFILER_SPS)
+    RestyleData* rd =
+      new RestyleData(aRestyleHint, aMinChangeHint, aRestyleHintData);
+#if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
     if (profiler_feature_active("restyle")) {
       rd->mBacktrace.reset(profiler_get_backtrace());
     }
@@ -411,6 +429,10 @@ RestyleTracker::AddPendingRestyleToTable(Element* aElement,
   existingData->mRestyleHint =
     nsRestyleHint(existingData->mRestyleHint | aRestyleHint);
   NS_UpdateHint(existingData->mChangeHint, aMinChangeHint);
+  if (aRestyleHintData) {
+    existingData->mRestyleHintData.mSelectorsForDescendants
+      .AppendElements(aRestyleHintData->mSelectorsForDescendants);
+  }
 
   return hadRestyleLaterSiblings;
 }
@@ -418,10 +440,12 @@ RestyleTracker::AddPendingRestyleToTable(Element* aElement,
 inline bool
 RestyleTracker::AddPendingRestyle(Element* aElement,
                                   nsRestyleHint aRestyleHint,
-                                  nsChangeHint aMinChangeHint)
+                                  nsChangeHint aMinChangeHint,
+                                  const RestyleHintData* aRestyleHintData)
 {
   bool hadRestyleLaterSiblings =
-    AddPendingRestyleToTable(aElement, aRestyleHint, aMinChangeHint);
+    AddPendingRestyleToTable(aElement, aRestyleHint, aMinChangeHint,
+                             aRestyleHintData);
 
   // We can only treat this element as a restyle root if we would
   // actually restyle its descendants (so either call

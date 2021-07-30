@@ -23,8 +23,8 @@
 class nsIURI;
 
 #define NS_NULLPRINCIPAL_CID \
-{ 0xa0bd8b42, 0xf6bf, 0x4fb9, \
-  { 0x93, 0x42, 0x90, 0xbf, 0xc9, 0xb7, 0xa1, 0xab } }
+{ 0x34a19ab6, 0xca47, 0x4098, \
+  { 0xa7, 0xb8, 0x4a, 0xfc, 0xdd, 0xcd, 0x8f, 0x88 } }
 #define NS_NULLPRINCIPAL_CONTRACTID "@mozilla.org/nullprincipal;1"
 
 #define NS_NULLPRINCIPAL_SCHEME "moz-nullprincipal"
@@ -40,44 +40,36 @@ public:
   NS_DECL_NSISERIALIZABLE
 
   NS_IMETHOD QueryInterface(REFNSIID aIID, void** aInstancePtr) override;
-  NS_IMETHOD Equals(nsIPrincipal* other, bool* _retval) override;
-  NS_IMETHOD EqualsConsideringDomain(nsIPrincipal* other, bool* _retval) override;
   NS_IMETHOD GetHashValue(uint32_t* aHashValue) override;
   NS_IMETHOD GetURI(nsIURI** aURI) override;
   NS_IMETHOD GetDomain(nsIURI** aDomain) override;
   NS_IMETHOD SetDomain(nsIURI* aDomain) override;
-  NS_IMETHOD GetOrigin(nsACString& aOrigin) override;
-  NS_IMETHOD Subsumes(nsIPrincipal* other, bool* _retval) override;
-  NS_IMETHOD SubsumesConsideringDomain(nsIPrincipal* other, bool* _retval) override;
   NS_IMETHOD CheckMayLoad(nsIURI* uri, bool report, bool allowIfInheritsPrincipal) override;
-  NS_IMETHOD GetJarPrefix(nsACString& aJarPrefix) override;
-  NS_IMETHOD GetAppStatus(uint16_t* aAppStatus) override;
-  NS_IMETHOD GetAppId(uint32_t* aAppStatus) override;
-  NS_IMETHOD GetIsInBrowserElement(bool* aIsInBrowserElement) override;
-  NS_IMETHOD GetUnknownAppId(bool* aUnknownAppId) override;
   NS_IMETHOD GetIsNullPrincipal(bool* aIsNullPrincipal) override;
   NS_IMETHOD GetBaseDomain(nsACString& aBaseDomain) override;
+  nsresult GetOriginInternal(nsACString& aOrigin) override;
 
   // Returns null on failure.
   static already_AddRefed<nsNullPrincipal> CreateWithInheritedAttributes(nsIPrincipal *aInheritFrom);
 
   // Returns null on failure.
   static already_AddRefed<nsNullPrincipal>
-    Create(uint32_t aAppId = nsIScriptSecurityManager::NO_APP_ID,
-           bool aInMozBrowser = false);
+    Create(const mozilla::OriginAttributes& aOriginAttributes = mozilla::OriginAttributes());
 
-  nsresult Init(uint32_t aAppId = nsIScriptSecurityManager::NO_APP_ID,
-                bool aInMozBrowser = false);
+  nsresult Init(const mozilla::OriginAttributes& aOriginAttributes = mozilla::OriginAttributes());
 
   virtual void GetScriptLocation(nsACString &aStr) override;
 
  protected:
   virtual ~nsNullPrincipal() {}
 
+  bool SubsumesInternal(nsIPrincipal* aOther, DocumentDomainConsideration aConsideration) override
+  {
+    return aOther == this;
+  }
+
   nsCOMPtr<nsIURI> mURI;
   nsCOMPtr<nsIContentSecurityPolicy> mCSP;
-  uint32_t mAppId;
-  bool mInMozBrowser;
 };
 
 #endif // nsNullPrincipal_h__

@@ -254,7 +254,8 @@ nsCSSCompressedDataBlock::MapRuleInfoInto(nsRuleData *aRuleData) const
                 // We can't cache anything on the rule tree if we use any data from
                 // the style context, since data cached in the rule tree could be
                 // used with a style context with a different value.
-                aRuleData->mCanStoreInRuleTree = false;
+                uint8_t wm = WritingMode(aRuleData->mStyleContext).GetBits();
+                aRuleData->mConditions.SetWritingModeDependency(wm);
             }
             nsCSSValue* target = aRuleData->ValueFor(iProp);
             if (target->GetUnit() == eCSSUnit_Null) {
@@ -613,12 +614,14 @@ nsCSSExpandedDataBlock::TransferFromBlock(nsCSSExpandedDataBlock& aFromBlock,
                                           bool aIsImportant,
                                           bool aOverrideImportant,
                                           bool aMustCallValueAppended,
-                                          css::Declaration* aDeclaration)
+                                          css::Declaration* aDeclaration,
+                                          nsIDocument* aSheetDocument)
 {
     if (!nsCSSProps::IsShorthand(aPropID)) {
         return DoTransferFromBlock(aFromBlock, aPropID,
                                    aIsImportant, aOverrideImportant,
-                                   aMustCallValueAppended, aDeclaration);
+                                   aMustCallValueAppended, aDeclaration,
+                                   aSheetDocument);
     }
 
     // We can pass eIgnoreEnabledState (here, and in ClearProperty above) rather
@@ -630,7 +633,8 @@ nsCSSExpandedDataBlock::TransferFromBlock(nsCSSExpandedDataBlock& aFromBlock,
     CSSPROPS_FOR_SHORTHAND_SUBPROPERTIES(p, aPropID, aEnabledState) {
         changed |= DoTransferFromBlock(aFromBlock, *p,
                                        aIsImportant, aOverrideImportant,
-                                       aMustCallValueAppended, aDeclaration);
+                                       aMustCallValueAppended, aDeclaration,
+                                       aSheetDocument);
     }
     return changed;
 }
@@ -641,7 +645,8 @@ nsCSSExpandedDataBlock::DoTransferFromBlock(nsCSSExpandedDataBlock& aFromBlock,
                                             bool aIsImportant,
                                             bool aOverrideImportant,
                                             bool aMustCallValueAppended,
-                                            css::Declaration* aDeclaration)
+                                            css::Declaration* aDeclaration,
+                                            nsIDocument* aSheetDocument)
 {
   bool changed = false;
   MOZ_ASSERT(aFromBlock.HasPropertyBit(aPropID), "oops");
@@ -669,6 +674,13 @@ nsCSSExpandedDataBlock::DoTransferFromBlock(nsCSSExpandedDataBlock& aFromBlock,
     aDeclaration->ValueAppended(aPropID);
   }
 
+  if (aSheetDocument) {
+    UseCounter useCounter = nsCSSProps::UseCounterFor(aPropID);
+    if (useCounter != eUseCounter_UNKNOWN) {
+      aSheetDocument->SetDocumentAndPageUseCounter(useCounter);
+    }
+  }
+
   SetPropertyBit(aPropID);
   aFromBlock.ClearPropertyBit(aPropID);
 
@@ -693,7 +705,8 @@ nsCSSExpandedDataBlock::MapRuleInfoInto(nsCSSProperty aPropID,
   nsCSSProperty physicalProp = aPropID;
   if (nsCSSProps::PropHasFlags(aPropID, CSS_PROPERTY_LOGICAL)) {
     EnsurePhysicalProperty(physicalProp, aRuleData);
-    aRuleData->mCanStoreInRuleTree = false;
+    uint8_t wm = WritingMode(aRuleData->mStyleContext).GetBits();
+    aRuleData->mConditions.SetWritingModeDependency(wm);
   }
 
   nsCSSValue* dest = aRuleData->ValueFor(physicalProp);

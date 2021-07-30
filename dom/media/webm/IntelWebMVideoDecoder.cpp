@@ -5,10 +5,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include "IntelWebMVideoDecoder.h"
 
+#include "mozilla/TaskQueue.h"
+
 #include "gfx2DGlue.h"
 #include "Layers.h"
 #include "MediaResource.h"
-#include "MediaTaskQueue.h"
 #include "mozilla/dom/HTMLMediaElement.h"
 #include "nsError.h"
 #include "SharedThreadPool.h"
@@ -21,9 +22,7 @@
 
 #undef LOG
 PRLogModuleInfo* GetDemuxerLog();
-#define LOG(...) PR_LOG(GetDemuxerLog(), PR_LOG_DEBUG, (__VA_ARGS__))
-
-using namespace mp4_demuxer;
+#define LOG(...) MOZ_LOG(GetDemuxerLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 namespace mozilla {
 

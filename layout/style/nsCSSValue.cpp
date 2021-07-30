@@ -1293,6 +1293,20 @@ nsCSSValue::AppendToString(nsCSSProperty aProperty, nsAString& aResult,
                          aResult);
       break;
 
+    case eCSSProperty_contain:
+      if (intValue & NS_STYLE_CONTAIN_STRICT) {
+        NS_ASSERTION(intValue == (NS_STYLE_CONTAIN_STRICT | NS_STYLE_CONTAIN_ALL_BITS),
+                     "contain: strict should imply contain: layout style paint");
+        // Only output strict.
+        intValue = NS_STYLE_CONTAIN_STRICT;
+      }
+      nsStyleUtil::AppendBitmaskCSSValue(aProperty,
+                                         intValue,
+                                         NS_STYLE_CONTAIN_STRICT,
+                                         NS_STYLE_CONTAIN_PAINT,
+                                         aResult);
+      break;
+
     default:
       const nsAFlatCString& name = nsCSSProps::LookupPropertyValue(aProperty, intValue);
       AppendASCIItoUTF16(name, aResult);
@@ -2518,7 +2532,7 @@ nsCSSValueGradient::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) con
   n += mAngle.SizeOfExcludingThis(aMallocSizeOf);
   n += mRadialValues[0].SizeOfExcludingThis(aMallocSizeOf);
   n += mRadialValues[1].SizeOfExcludingThis(aMallocSizeOf);
-  n += mStops.SizeOfExcludingThis(aMallocSizeOf);
+  n += mStops.ShallowSizeOfExcludingThis(aMallocSizeOf);
   for (uint32_t i = 0; i < mStops.Length(); i++) {
     n += mStops[i].SizeOfExcludingThis(aMallocSizeOf);
   }
@@ -2678,7 +2692,7 @@ nsCSSCornerSizes::corners[4] = {
 size_t
 mozilla::css::GridTemplateAreasValue::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
 {
-  size_t n = mNamedAreas.SizeOfExcludingThis(aMallocSizeOf);
-  n += mTemplates.SizeOfExcludingThis(aMallocSizeOf);
+  size_t n = mNamedAreas.ShallowSizeOfExcludingThis(aMallocSizeOf);
+  n += mTemplates.ShallowSizeOfExcludingThis(aMallocSizeOf);
   return n;
 }

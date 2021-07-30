@@ -365,7 +365,7 @@ int32_t
 gfxMemorySharedReadLock::ReadUnlock()
 {
   int32_t readCount = PR_ATOMIC_DECREMENT(&mReadCount);
-  NS_ASSERTION(readCount >= 0, "ReadUnlock called without ReadLock.");
+  MOZ_ASSERT(readCount >= 0);
 
   return readCount;
 }
@@ -415,7 +415,7 @@ gfxShmSharedReadLock::ReadUnlock() {
   }
   ShmReadLockInfo* info = GetShmReadLockInfoPtr();
   int32_t readCount = PR_ATOMIC_DECREMENT(&info->readCount);
-  NS_ASSERTION(readCount >= 0, "ReadUnlock called without a ReadLock.");
+  MOZ_ASSERT(readCount >= 0);
   if (readCount <= 0) {
     mAllocator->FreeShmemSection(mShmemSection);
   }
@@ -511,6 +511,7 @@ TileClient::TileClient(const TileClient& o)
   mBackLock = o.mBackLock;
   mFrontLock = o.mFrontLock;
   mCompositableClient = o.mCompositableClient;
+  mUpdateRect = o.mUpdateRect;
 #ifdef GFX_TILEDLAYER_DEBUG_OVERLAY
   mLastUpdate = o.mLastUpdate;
 #endif
@@ -530,6 +531,7 @@ TileClient::operator=(const TileClient& o)
   mBackLock = o.mBackLock;
   mFrontLock = o.mFrontLock;
   mCompositableClient = o.mCompositableClient;
+  mUpdateRect = o.mUpdateRect;
 #ifdef GFX_TILEDLAYER_DEBUG_OVERLAY
   mLastUpdate = o.mLastUpdate;
 #endif
@@ -539,6 +541,18 @@ TileClient::operator=(const TileClient& o)
   return *this;
 }
 
+void
+TileClient::Dump(std::stringstream& aStream)
+{
+  aStream << "TileClient(bb=" << (TextureClient*)mBackBuffer << " fb=" << mFrontBuffer.get();
+  if (mBackBufferOnWhite) {
+    aStream << " bbow=" << mBackBufferOnWhite.get();
+  }
+  if (mFrontBufferOnWhite) {
+    aStream << " fbow=" << mFrontBufferOnWhite.get();
+  }
+  aStream << ")";
+}
 
 void
 TileClient::Flip()
@@ -547,10 +561,12 @@ TileClient::Flip()
   if (mFrontBuffer && mFrontBuffer->GetIPDLActor() &&
       mCompositableClient && mCompositableClient->GetIPDLActor()) {
     // remove old buffer from CompositableHost
-    RefPtr<AsyncTransactionTracker> tracker = new RemoveTextureFromCompositableTracker();
+    RefPtr<AsyncTransactionWaiter> waiter = new AsyncTransactionWaiter();
+    RefPtr<AsyncTransactionTracker> tracker =
+        new RemoveTextureFromCompositableTracker(waiter);
     // Hold TextureClient until transaction complete.
     tracker->SetTextureClient(mFrontBuffer);
-    mFrontBuffer->SetRemoveFromCompositableTracker(tracker);
+    mFrontBuffer->SetRemoveFromCompositableWaiter(waiter);
     // RemoveTextureFromCompositableAsync() expects CompositorChild's presence.
     mManager->AsShadowForwarder()->RemoveTextureFromCompositableAsync(tracker,
                                                                       mCompositableClient,
@@ -588,6 +604,8 @@ CopyFrontToBack(TextureClient* aFront,
 
   gfx::IntPoint rectToCopyTopLeft = aRectToCopy.TopLeft();
   aFront->CopyToTextureClient(aBack, &aRectToCopy, &rectToCopyTopLeft);
+
+  aFront->Unlock();
   return true;
 }
 
@@ -643,10 +661,12 @@ TileClient::DiscardFrontBuffer()
     if (mFrontBuffer->GetIPDLActor() &&
         mCompositableClient && mCompositableClient->GetIPDLActor()) {
       // remove old buffer from CompositableHost
-      RefPtr<AsyncTransactionTracker> tracker = new RemoveTextureFromCompositableTracker();
+      RefPtr<AsyncTransactionWaiter> waiter = new AsyncTransactionWaiter();
+      RefPtr<AsyncTransactionTracker> tracker =
+          new RemoveTextureFromCompositableTracker(waiter);
       // Hold TextureClient until transaction complete.
       tracker->SetTextureClient(mFrontBuffer);
-      mFrontBuffer->SetRemoveFromCompositableTracker(tracker);
+      mFrontBuffer->SetRemoveFromCompositableWaiter(waiter);
       // RemoveTextureFromCompositableAsync() expects CompositorChild's presence.
       mManager->AsShadowForwarder()->RemoveTextureFromCompositableAsync(tracker,
                                                                         mCompositableClient,
@@ -684,9 +704,9 @@ TileClient::DiscardBackBuffer()
        mManager->ReportClientLost(*mBackBufferOnWhite);
      }
     } else {
-      mManager->ReturnTextureClient(*mBackBuffer);
+      mManager->ReturnTextureClientDeferred(*mBackBuffer);
       if (mBackBufferOnWhite) {
-        mManager->ReturnTextureClient(*mBackBufferOnWhite);
+        mManager->ReturnTextureClientDeferred(*mBackBufferOnWhite);
       }
     }
     mBackLock->ReadUnlock();
@@ -795,20 +815,14 @@ TileClient::GetTileDescriptor()
   if (mFrontLock->GetType() == gfxSharedReadLock::TYPE_MEMORY) {
     return TexturedTileDescriptor(nullptr, mFrontBuffer->GetIPDLActor(),
                                   mFrontBufferOnWhite ? MaybeTexture(mFrontBufferOnWhite->GetIPDLActor()) : MaybeTexture(null_t()),
+                                  mUpdateRect,
                                   TileLock(uintptr_t(mFrontLock.get())));
   } else {
     gfxShmSharedReadLock *lock = static_cast<gfxShmSharedReadLock*>(mFrontLock.get());
     return TexturedTileDescriptor(nullptr, mFrontBuffer->GetIPDLActor(),
                                   mFrontBufferOnWhite ? MaybeTexture(mFrontBufferOnWhite->GetIPDLActor()) : MaybeTexture(null_t()),
+                                  mUpdateRect,
                                   TileLock(lock->GetShmemSection()));
-  }
-}
-
-void
-ClientTiledLayerBuffer::ReadUnlock() {
-  for (size_t i = 0; i < mRetainedTiles.Length(); i++) {
-    if (mRetainedTiles[i].IsPlaceholderTile()) continue;
-    mRetainedTiles[i].ReadUnlock();
   }
 }
 
@@ -852,9 +866,12 @@ ClientTiledLayerBuffer::GetSurfaceDescriptorTiles()
       tileDesc = mRetainedTiles[i].GetTileDescriptor();
     }
     tiles.AppendElement(tileDesc);
+    mRetainedTiles[i].mUpdateRect = IntRect();
   }
   return SurfaceDescriptorTiles(mValidRegion, mPaintedRegion,
-                                tiles, mRetainedWidth, mRetainedHeight,
+                                tiles,
+                                mTiles.mFirst.x, mTiles.mFirst.y,
+                                mTiles.mSize.width, mTiles.mSize.height,
                                 mResolution, mFrameResolution.xScale,
                                 mFrameResolution.yScale);
 }
@@ -1079,6 +1096,71 @@ ClientTiledLayerBuffer::UnlockTile(TileClient aTile)
   }
 }
 
+void ClientTiledLayerBuffer::Update(const nsIntRegion& newValidRegion,
+                                    const nsIntRegion& aPaintRegion)
+{
+  const IntSize scaledTileSize = GetScaledTileSize();
+  const gfx::IntRect newBounds = newValidRegion.GetBounds();
+
+  const TilesPlacement oldTiles = mTiles;
+  const TilesPlacement newTiles(floor_div(newBounds.x, scaledTileSize.width),
+                          floor_div(newBounds.y, scaledTileSize.height),
+                          floor_div(GetTileStart(newBounds.x, scaledTileSize.width)
+                                    + newBounds.width, scaledTileSize.width) + 1,
+                          floor_div(GetTileStart(newBounds.y, scaledTileSize.height)
+                                    + newBounds.height, scaledTileSize.height) + 1);
+
+  const size_t oldTileCount = mRetainedTiles.Length();
+  const size_t newTileCount = newTiles.mSize.width * newTiles.mSize.height;
+
+  nsTArray<TileClient> oldRetainedTiles;
+  mRetainedTiles.SwapElements(oldRetainedTiles);
+  mRetainedTiles.SetLength(newTileCount);
+
+  for (size_t oldIndex = 0; oldIndex < oldTileCount; oldIndex++) {
+    const TileIntPoint tilePosition = oldTiles.TilePosition(oldIndex);
+    const size_t newIndex = newTiles.TileIndex(tilePosition);
+    // First, get the already existing tiles to the right place in the new array.
+    // Leave placeholders (default constructor) where there was no tile.
+    if (newTiles.HasTile(tilePosition)) {
+      mRetainedTiles[newIndex] = oldRetainedTiles[oldIndex];
+    } else {
+      // release tiles that we are not going to reuse before allocating new ones
+      // to avoid allocating unnecessarily.
+      oldRetainedTiles[oldIndex].Release();
+    }
+  }
+
+  oldRetainedTiles.Clear();
+
+  for (size_t i = 0; i < newTileCount; ++i) {
+    const TileIntPoint tilePosition = newTiles.TilePosition(i);
+
+    IntPoint tileOffset = GetTileOffset(tilePosition);
+    nsIntRegion tileDrawRegion = IntRect(tileOffset, scaledTileSize);
+    tileDrawRegion.AndWith(aPaintRegion);
+
+    if (tileDrawRegion.IsEmpty()) {
+      continue;
+    }
+
+    TileClient tile = mRetainedTiles[i];
+    tile = ValidateTile(tile, GetTileOffset(tilePosition),
+                        tileDrawRegion);
+
+    mRetainedTiles[i] = tile;
+  }
+
+  PostValidate(aPaintRegion);
+  for (size_t i = 0; i < mRetainedTiles.Length(); ++i) {
+    UnlockTile(mRetainedTiles[i]);
+  }
+
+  mTiles = newTiles;
+  mValidRegion = newValidRegion;
+  mPaintedRegion.OrWith(aPaintRegion);
+}
+
 TileClient
 ClientTiledLayerBuffer::ValidateTile(TileClient aTile,
                                     const nsIntPoint& aTileOrigin,
@@ -1114,6 +1196,8 @@ ClientTiledLayerBuffer::ValidateTile(TileClient aTile,
                         content, mode,
                         &createdTextureClient, extraPainted,
                         &backBufferOnWhite);
+
+  aTile.mUpdateRect = offsetScaledDirtyRegion.GetBounds().Union(extraPainted.GetBounds());
 
   extraPainted.MoveBy(aTileOrigin);
   extraPainted.And(extraPainted, mNewValidRegion);

@@ -135,10 +135,7 @@ CompositorD3D11::Initialize()
 
   ScopedGfxFeatureReporter reporter("D3D11 Layers", force);
 
-  if (!gfxPlatform::CanUseDirect3D11()) {
-    NS_WARNING("Direct3D 11-accelerated layers are not supported on this system.");
-    return false;
-  }
+  MOZ_ASSERT(gfxPlatform::CanUseDirect3D11());
 
   HRESULT hr;
 
@@ -745,7 +742,8 @@ CompositorD3D11::DrawQuad(const gfx::Rect& aRect,
                           const gfx::Rect& aClipRect,
                           const EffectChain& aEffectChain,
                           gfx::Float aOpacity,
-                          const gfx::Matrix4x4& aTransform)
+                          const gfx::Matrix4x4& aTransform,
+                          const gfx::Rect& aVisibleRect)
 {
   if (mCurrentClip.IsEmpty()) {
     return;
@@ -1022,7 +1020,7 @@ CompositorD3D11::BeginFrame(const nsIntRegion& aInvalidRegion,
     return;
   }
 
-  nsIntSize oldSize = mSize;
+  IntSize oldSize = mSize;
   UpdateRenderTarget();
 
   // Failed to create a render target or the view.
@@ -1096,7 +1094,7 @@ CompositorD3D11::EndFrame()
 
   mContext->Flush();
 
-  nsIntSize oldSize = mSize;
+  IntSize oldSize = mSize;
   EnsureSize();
   UINT presentInterval = 0;
 

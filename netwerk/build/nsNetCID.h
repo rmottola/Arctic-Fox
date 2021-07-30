@@ -317,12 +317,13 @@
 #define NS_SOCKETTRANSPORTSERVICE_CONTRACTID \
     "@mozilla.org/network/socket-transport-service;1"
 #define NS_SOCKETTRANSPORTSERVICE_CID                \
-{ /* c07e81e0-ef12-11d2-92b6-00105a1b0d64 */         \
-    0xc07e81e0,                                      \
-    0xef12,                                          \
-    0x11d2,                                          \
-    {0x92, 0xb6, 0x00, 0x10, 0x5a, 0x1b, 0x0d, 0x64} \
+{ /* ad56b25f-e6bb-4db3-9f7b-5b7db33fd2b1 */         \
+    0xad56b25f,                                      \
+    0xe6bb,                                          \
+    0x4db3,                                          \
+    {0x9f, 0x7b, 0x5b, 0x7d, 0xb3, 0x3f, 0xd2, 0xb1} \
 }
+
 
 // component implementing nsIServerSocket
 #define NS_SERVERSOCKET_CONTRACTID \
@@ -466,6 +467,17 @@
     0x7221, \
     0x4419, \
     { 0xae, 0xcf, 0x05, 0xf8, 0xfa, 0xf0, 0x0c, 0x9b } \
+}
+
+// captive portal service implementing nsICaptivePortalService
+#define NS_CAPTIVEPORTAL_CONTRACTID \
+    "@mozilla.org/network/captive-portal-service;1"
+#define NS_CAPTIVEPORTAL_CID \
+{ /* bdbe0555-fc3d-4f7b-9205-c309ceb2d641 */ \
+    0xbdbe0555, \
+    0xfc3d, \
+    0x4f7b, \
+  { 0x92, 0x05, 0xc3, 0x09, 0xce, 0xb2, 0xd6, 0x41 } \
 }
 
 /******************************************************************************
@@ -625,14 +637,20 @@
     {0x8c, 0xda, 0x00, 0x60, 0xb0, 0xfc, 0x14, 0xa3} \
 }
 
-#define NS_RESURL_CID                    \
-{ /* ff8fe7ec-2f74-4408-b742-6b7a546029a8 */         \
-    0xff8fe7ec,                                      \
-    0x2f74,                                          \
-    0x4408,                                          \
-    {0xb7, 0x42, 0x6b, 0x7a, 0x54, 0x60, 0x29, 0xa8} \
+#define NS_EXTENSIONPROTOCOLHANDLER_CID              \
+{ /* aea16cd0-f020-4138-b068-0716c4a15b5a */         \
+    0xaea16cd0,                                      \
+    0xf020,                                          \
+    0x4138,                                          \
+    {0xb0, 0x68, 0x07, 0x16, 0xc4, 0xa1, 0x5b, 0x5a} \
 }
 
+#define NS_SUBSTITUTINGURL_CID                       \
+{ 0xdea9657c,                                        \
+  0x18cf,                                            \
+  0x4984,                                            \
+  { 0xbd, 0xe9, 0xcc, 0xef, 0x5d, 0x8a, 0xb4, 0x73 } \
+}
 
 /******************************************************************************
  * netwerk/protocol/file/ classes

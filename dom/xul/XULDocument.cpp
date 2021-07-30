@@ -135,35 +135,37 @@ PRLogModuleInfo* XULDocument::gXULLog;
 
 //----------------------------------------------------------------------
 
-struct BroadcasterMapEntry : public PLDHashEntryHdr {
-    Element*         mBroadcaster; // [WEAK]
-    nsSmallVoidArray mListeners;   // [OWNING] of BroadcastListener objects
-};
-
 struct BroadcastListener {
     nsWeakPtr mListener;
     nsCOMPtr<nsIAtom> mAttribute;
 };
 
+struct BroadcasterMapEntry : public PLDHashEntryHdr
+{
+    Element* mBroadcaster;  // [WEAK]
+    nsTArray<BroadcastListener*> mListeners;  // [OWNING] of BroadcastListener objects
+};
+
 Element*
 nsRefMapEntry::GetFirstElement()
 {
-    return static_cast<Element*>(mRefContentList.SafeElementAt(0));
+    return mRefContentList.SafeElementAt(0);
 }
 
 void
 nsRefMapEntry::AppendAll(nsCOMArray<nsIContent>* aElements)
 {
-    for (int32_t i = 0; i < mRefContentList.Count(); ++i) {
-        aElements->AppendObject(static_cast<nsIContent*>(mRefContentList[i]));
+    for (size_t i = 0; i < mRefContentList.Length(); ++i) {
+        aElements->AppendObject(mRefContentList[i]);
     }
 }
 
 bool
 nsRefMapEntry::AddElement(Element* aElement)
 {
-    if (mRefContentList.IndexOf(aElement) >= 0)
+    if (mRefContentList.Contains(aElement)) {
         return true;
+    }
     return mRefContentList.AppendElement(aElement);
 }
 
@@ -171,7 +173,7 @@ bool
 nsRefMapEntry::RemoveElement(Element* aElement)
 {
     mRefContentList.RemoveElement(aElement);
-    return mRefContentList.Count() == 0;
+    return mRefContentList.IsEmpty();
 }
 
 //----------------------------------------------------------------------
@@ -215,9 +217,7 @@ XULDocument::~XULDocument()
     mPersistenceIds.Clear();
 
     // Destroy our broadcaster map.
-    if (mBroadcasterMap) {
-        PL_DHashTableDestroy(mBroadcasterMap);
-    }
+    delete mBroadcasterMap;
 
     delete mTemplateBuilderTable;
 
@@ -375,7 +375,7 @@ XULDocument::StartDocumentLoad(const char* aCommand, nsIChannel* aChannel,
                                nsIStreamListener **aDocListener,
                                bool aReset, nsIContentSink* aSink)
 {
-    if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING)) {
+    if (MOZ_LOG_TEST(gXULLog, LogLevel::Warning)) {
 
         nsCOMPtr<nsIURI> uri;
         nsresult rv = aChannel->GetOriginalURI(getter_AddRefs(uri));
@@ -383,7 +383,7 @@ XULDocument::StartDocumentLoad(const char* aCommand, nsIChannel* aChannel,
             nsAutoCString urlspec;
             rv = uri->GetSpec(urlspec);
             if (NS_SUCCEEDED(rv)) {
-                PR_LOG(gXULLog, PR_LOG_WARNING,
+                MOZ_LOG(gXULLog, LogLevel::Warning,
                        ("xul: load document '%s'", urlspec.get()));
             }
         }
@@ -559,11 +559,11 @@ XULDocument::EndLoad()
     }
 
     OnPrototypeLoadDone(true);
-    if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING)) {
+    if (MOZ_LOG_TEST(gXULLog, LogLevel::Warning)) {
         nsAutoCString urlspec;
         rv = uri->GetSpec(urlspec);
         if (NS_SUCCEEDED(rv)) {
-            PR_LOG(gXULLog, PR_LOG_WARNING,
+            MOZ_LOG(gXULLog, LogLevel::Warning,
                    ("xul: Finished loading document '%s'", urlspec.get()));
         }
     }
@@ -614,13 +614,14 @@ ClearBroadcasterMapEntry(PLDHashTable* aTable, PLDHashEntryHdr* aEntry)
 {
     BroadcasterMapEntry* entry =
         static_cast<BroadcasterMapEntry*>(aEntry);
-    for (int32_t i = entry->mListeners.Count() - 1; i >= 0; --i) {
-        delete (BroadcastListener*)entry->mListeners[i];
+    for (size_t i = entry->mListeners.Length() - 1; i != (size_t)-1; --i) {
+        delete entry->mListeners[i];
     }
+    entry->mListeners.Clear();
 
     // N.B. that we need to manually run the dtor because we
-    // constructed the nsSmallVoidArray object in-place.
-    entry->mListeners.~nsSmallVoidArray();
+    // constructed the nsTArray object in-place.
+    entry->mListeners.~nsTArray<BroadcastListener*>();
 }
 
 static bool
@@ -764,16 +765,14 @@ XULDocument::AddBroadcastListenerFor(Element& aBroadcaster, Element& aListener,
     };
 
     if (! mBroadcasterMap) {
-        mBroadcasterMap = PL_NewDHashTable(&gOps, sizeof(BroadcasterMapEntry));
+        mBroadcasterMap = new PLDHashTable(&gOps, sizeof(BroadcasterMapEntry));
     }
 
-    BroadcasterMapEntry* entry =
-        static_cast<BroadcasterMapEntry*>
-                   (PL_DHashTableSearch(mBroadcasterMap, &aBroadcaster));
-
+    auto entry = static_cast<BroadcasterMapEntry*>
+                            (mBroadcasterMap->Search(&aBroadcaster));
     if (!entry) {
         entry = static_cast<BroadcasterMapEntry*>
-            (PL_DHashTableAdd(mBroadcasterMap, &aBroadcaster, fallible));
+                           (mBroadcasterMap->Add(&aBroadcaster, fallible));
 
         if (! entry) {
             aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
@@ -782,26 +781,22 @@ XULDocument::AddBroadcastListenerFor(Element& aBroadcaster, Element& aListener,
 
         entry->mBroadcaster = &aBroadcaster;
 
-        // N.B. placement new to construct the nsSmallVoidArray object
-        // in-place
-        new (&entry->mListeners) nsSmallVoidArray();
+        // N.B. placement new to construct the nsTArray object in-place
+        new (&entry->mListeners) nsTArray<BroadcastListener*>();
     }
 
     // Only add the listener if it's not there already!
     nsCOMPtr<nsIAtom> attr = do_GetAtom(aAttr);
 
-    BroadcastListener* bl;
-    for (int32_t i = entry->mListeners.Count() - 1; i >= 0; --i) {
-        bl = static_cast<BroadcastListener*>(entry->mListeners[i]);
-
+    for (size_t i = entry->mListeners.Length() - 1; i != (size_t)-1; --i) {
+        BroadcastListener* bl = entry->mListeners[i];
         nsCOMPtr<Element> blListener = do_QueryReferent(bl->mListener);
 
         if (blListener == &aListener && bl->mAttribute == attr)
             return;
     }
 
-    bl = new BroadcastListener;
-
+    BroadcastListener* bl = new BroadcastListener;
     bl->mListener  = do_GetWeakReference(&aListener);
     bl->mAttribute = attr;
 
@@ -832,24 +827,20 @@ XULDocument::RemoveBroadcastListenerFor(Element& aBroadcaster,
     if (! mBroadcasterMap)
         return;
 
-    BroadcasterMapEntry* entry =
-        static_cast<BroadcasterMapEntry*>
-                   (PL_DHashTableSearch(mBroadcasterMap, &aBroadcaster));
-
+    auto entry = static_cast<BroadcasterMapEntry*>
+                            (mBroadcasterMap->Search(&aBroadcaster));
     if (entry) {
         nsCOMPtr<nsIAtom> attr = do_GetAtom(aAttr);
-        for (int32_t i = entry->mListeners.Count() - 1; i >= 0; --i) {
-            BroadcastListener* bl =
-                static_cast<BroadcastListener*>(entry->mListeners[i]);
-
+        for (size_t i = entry->mListeners.Length() - 1; i != (size_t)-1; --i) {
+            BroadcastListener* bl = entry->mListeners[i];
             nsCOMPtr<Element> blListener = do_QueryReferent(bl->mListener);
 
             if (blListener == &aListener && bl->mAttribute == attr) {
                 entry->mListeners.RemoveElementAt(i);
                 delete bl;
 
-                if (entry->mListeners.Count() == 0)
-                    PL_DHashTableRemove(mBroadcasterMap, &aBroadcaster);
+                if (entry->mListeners.IsEmpty())
+                    mBroadcasterMap->RemoveEntry(entry);
 
                 break;
             }
@@ -919,7 +910,8 @@ XULDocument::ExecuteOnBroadcastHandlerFor(Element* aBroadcaster,
 void
 XULDocument::AttributeWillChange(nsIDocument* aDocument,
                                  Element* aElement, int32_t aNameSpaceID,
-                                 nsIAtom* aAttribute, int32_t aModType)
+                                 nsIAtom* aAttribute, int32_t aModType,
+                                 const nsAttrValue* aNewValue)
 {
     MOZ_ASSERT(aElement, "Null content!");
     NS_PRECONDITION(aAttribute, "Must have an attribute that's changing!");
@@ -936,7 +928,8 @@ XULDocument::AttributeWillChange(nsIDocument* aDocument,
 void
 XULDocument::AttributeChanged(nsIDocument* aDocument,
                               Element* aElement, int32_t aNameSpaceID,
-                              nsIAtom* aAttribute, int32_t aModType)
+                              nsIAtom* aAttribute, int32_t aModType,
+                              const nsAttrValue* aOldValue)
 {
     NS_ASSERTION(aDocument == this, "unexpected doc");
 
@@ -954,20 +947,16 @@ XULDocument::AttributeChanged(nsIDocument* aDocument,
     // Synchronize broadcast listeners
     if (mBroadcasterMap &&
         CanBroadcast(aNameSpaceID, aAttribute)) {
-        BroadcasterMapEntry* entry =
-            static_cast<BroadcasterMapEntry*>
-                       (PL_DHashTableSearch(mBroadcasterMap, aElement));
+        auto entry = static_cast<BroadcasterMapEntry*>
+                                (mBroadcasterMap->Search(aElement));
 
         if (entry) {
             // We've got listeners: push the value.
             nsAutoString value;
             bool attrSet = aElement->GetAttr(kNameSpaceID_None, aAttribute, value);
 
-            int32_t i;
-            for (i = entry->mListeners.Count() - 1; i >= 0; --i) {
-                BroadcastListener* bl =
-                    static_cast<BroadcastListener*>(entry->mListeners[i]);
-
+            for (size_t i = entry->mListeners.Length() - 1; i != (size_t)-1; --i) {
+                BroadcastListener* bl = entry->mListeners[i];
                 if ((bl->mAttribute == aAttribute) ||
                     (bl->mAttribute == nsGkAtoms::_asterisk)) {
                     nsCOMPtr<Element> listenerEl
@@ -2279,14 +2268,14 @@ XULDocument::PrepareToWalk()
     nsXULPrototypeElement* proto = mCurrentPrototype->GetRootElement();
 
     if (! proto) {
-        if (PR_LOG_TEST(gXULLog, PR_LOG_ERROR)) {
+        if (MOZ_LOG_TEST(gXULLog, LogLevel::Error)) {
             nsCOMPtr<nsIURI> url = mCurrentPrototype->GetURI();
 
             nsAutoCString urlspec;
             rv = url->GetSpec(urlspec);
             if (NS_FAILED(rv)) return rv;
 
-            PR_LOG(gXULLog, PR_LOG_ERROR,
+            MOZ_LOG(gXULLog, LogLevel::Error,
                    ("xul: error parsing '%s'", urlspec.get()));
         }
 
@@ -2550,7 +2539,7 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
     *aShouldReturn = false;
     *aFailureFromContent = false;
 
-    if (PR_LOG_TEST(gXULLog, PR_LOG_DEBUG)) {
+    if (MOZ_LOG_TEST(gXULLog, LogLevel::Debug)) {
         nsAutoCString urlspec;
         aURI->GetSpec(urlspec);
         nsAutoCString parentDoc;
@@ -2561,7 +2550,7 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
         if (!(parentDoc.get()))
             parentDoc = "";
 
-        PR_LOG(gXULLog, PR_LOG_DEBUG,
+        MOZ_LOG(gXULLog, LogLevel::Debug,
                 ("xul: %s loading overlay %s", parentDoc.get(), urlspec.get()));
     }
 
@@ -2621,7 +2610,7 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
             return NS_OK;
         }
 
-        PR_LOG(gXULLog, PR_LOG_DEBUG, ("xul: overlay was cached"));
+        MOZ_LOG(gXULLog, LogLevel::Debug, ("xul: overlay was cached"));
 
         // Found the overlay's prototype in the cache, fully loaded. If
         // this is a dynamic overlay, this will call ResumeWalk.
@@ -2630,10 +2619,10 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
     }
     else {
         // Not there. Initiate a load.
-        PR_LOG(gXULLog, PR_LOG_DEBUG, ("xul: overlay was not cached"));
+        MOZ_LOG(gXULLog, LogLevel::Debug, ("xul: overlay was not cached"));
 
         if (mIsGoingAway) {
-            PR_LOG(gXULLog, PR_LOG_DEBUG, ("xul: ...and document already destroyed"));
+            MOZ_LOG(gXULLog, LogLevel::Debug, ("xul: ...and document already destroyed"));
             return NS_ERROR_NOT_AVAILABLE;
         }
 
@@ -3586,8 +3575,8 @@ XULDocument::CreateElementFromPrototype(nsXULPrototypeElement* aPrototype,
     *aResult = nullptr;
     nsresult rv = NS_OK;
 
-    if (PR_LOG_TEST(gXULLog, PR_LOG_NOTICE)) {
-        PR_LOG(gXULLog, PR_LOG_NOTICE,
+    if (MOZ_LOG_TEST(gXULLog, LogLevel::Debug)) {
+        MOZ_LOG(gXULLog, LogLevel::Debug,
                ("xul: creating <%s> from prototype",
                 NS_ConvertUTF16toUTF8(aPrototype->mNodeInfo->QualifiedName()).get()));
     }
@@ -3856,10 +3845,10 @@ XULDocument::OverlayForwardReference::Resolve()
         if (NS_FAILED(rv)) return eResolve_Error;
     }
 
-    if (PR_LOG_TEST(gXULLog, PR_LOG_NOTICE)) {
+    if (MOZ_LOG_TEST(gXULLog, LogLevel::Debug)) {
         nsAutoCString idC;
         idC.AssignWithConversion(id);
-        PR_LOG(gXULLog, PR_LOG_NOTICE,
+        MOZ_LOG(gXULLog, LogLevel::Debug,
                ("xul: overlay resolved '%s'",
                 idC.get()));
     }
@@ -4025,7 +4014,7 @@ XULDocument::OverlayForwardReference::Merge(nsIContent* aTargetNode,
 
 XULDocument::OverlayForwardReference::~OverlayForwardReference()
 {
-    if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING) && !mResolved) {
+    if (MOZ_LOG_TEST(gXULLog, LogLevel::Warning) && !mResolved) {
         nsAutoString id;
         mOverlay->GetAttr(kNameSpaceID_None, nsGkAtoms::id, id);
 
@@ -4041,7 +4030,7 @@ XULDocument::OverlayForwardReference::~OverlayForwardReference()
         nsresult rv = mDocument->mChannel->GetOriginalURI(getter_AddRefs(docURI));
         if (NS_SUCCEEDED(rv))
             docURI->GetSpec(parentDoc);
-        PR_LOG(gXULLog, PR_LOG_WARNING,
+        MOZ_LOG(gXULLog, LogLevel::Warning,
                ("xul: %s overlay failed to resolve '%s' in %s",
                 urlspec.get(), idC.get(), parentDoc.get()));
     }
@@ -4068,7 +4057,7 @@ XULDocument::BroadcasterHookup::Resolve()
 
 XULDocument::BroadcasterHookup::~BroadcasterHookup()
 {
-    if (PR_LOG_TEST(gXULLog, PR_LOG_WARNING) && !mResolved) {
+    if (MOZ_LOG_TEST(gXULLog, LogLevel::Warning) && !mResolved) {
         // Tell the world we failed
 
         nsAutoString broadcasterID;
@@ -4086,7 +4075,7 @@ XULDocument::BroadcasterHookup::~BroadcasterHookup()
         nsAutoCString attributeC,broadcasteridC;
         attributeC.AssignWithConversion(attribute);
         broadcasteridC.AssignWithConversion(broadcasterID);
-        PR_LOG(gXULLog, PR_LOG_WARNING,
+        MOZ_LOG(gXULLog, LogLevel::Warning,
                ("xul: broadcaster hookup failed <%s attribute='%s'> to %s",
                 nsAtomCString(mObservesElement->NodeInfo()->NameAtom()).get(),
                 attributeC.get(),
@@ -4135,16 +4124,14 @@ XULDocument::BroadcastAttributeChangeFromOverlay(nsIContent* aNode,
     if (!aNode->IsElement())
         return rv;
 
-    BroadcasterMapEntry* entry = static_cast<BroadcasterMapEntry*>
-        (PL_DHashTableSearch(mBroadcasterMap, aNode->AsElement()));
+    auto entry = static_cast<BroadcasterMapEntry*>
+                            (mBroadcasterMap->Search(aNode->AsElement()));
     if (!entry)
         return rv;
 
     // We've got listeners: push the value.
-    int32_t i;
-    for (i = entry->mListeners.Count() - 1; i >= 0; --i) {
-        BroadcastListener* bl = static_cast<BroadcastListener*>
-            (entry->mListeners[i]);
+    for (size_t i = entry->mListeners.Length() - 1; i != (size_t)-1; --i) {
+        BroadcastListener* bl = entry->mListeners[i];
 
         if ((bl->mAttribute != aAttribute) &&
             (bl->mAttribute != nsGkAtoms::_asterisk))
@@ -4289,7 +4276,7 @@ XULDocument::CheckBroadcasterHookup(Element* aElement,
     }
 
     // Tell the world we succeeded
-    if (PR_LOG_TEST(gXULLog, PR_LOG_NOTICE)) {
+    if (MOZ_LOG_TEST(gXULLog, LogLevel::Debug)) {
         nsCOMPtr<nsIContent> content =
             do_QueryInterface(listener);
 
@@ -4300,7 +4287,7 @@ XULDocument::CheckBroadcasterHookup(Element* aElement,
         nsAutoCString attributeC,broadcasteridC;
         attributeC.AssignWithConversion(attribute);
         broadcasteridC.AssignWithConversion(broadcasterID);
-        PR_LOG(gXULLog, PR_LOG_NOTICE,
+        MOZ_LOG(gXULLog, LogLevel::Debug,
                ("xul: broadcaster hookup <%s attribute='%s'> to %s",
                 nsAtomCString(content->NodeInfo()->NameAtom()).get(),
                 attributeC.get(),

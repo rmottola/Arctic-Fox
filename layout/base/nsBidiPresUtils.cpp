@@ -18,6 +18,7 @@
 #include "nsTextFrame.h"
 #include "nsBlockFrame.h"
 #include "nsIFrameInlines.h"
+#include "nsStyleStructInlines.h"
 #include "RubyUtils.h"
 #include "nsRubyFrame.h"
 #include "nsRubyBaseFrame.h"
@@ -700,31 +701,44 @@ nsBidiPresUtils::ResolveParagraph(nsBlockFrame* aBlockFrame,
 #endif
 #endif
 
-  if (runCount == 1 && frameCount == 1 &&
+  bool isNonBidi = false;
+
+  nsIFrame* frame0 = frameCount > 0 ? aBpd->FrameAt(0) : nullptr;
+  nsIFrame* frame1 = frameCount > 1 ? aBpd->FrameAt(1) : nullptr;
+
+  // Non-bidi frames
+  if (runCount == 1 && (frameCount == 1 || frameCount == 2) &&
       aBpd->mParagraphDepth == 0 && aBpd->GetDirection() == NSBIDI_LTR &&
-      aBpd->GetParaLevel() == 0) {
-    // We have a single left-to-right frame in a left-to-right paragraph,
+      aBpd->GetParaLevel() == 0 &&
+      frame0 != NS_BIDI_CONTROL_FRAME &&
+      !frame0->Properties().Get(nsIFrame::EmbeddingLevelProperty()) &&
+      !frame0->Properties().Get(nsIFrame::BaseLevelProperty())) {
+    // We have a left-to-right frame in a left-to-right paragraph,
     // without bidi isolation from the surrounding text.
-    // Make sure that the embedding level and base level frame properties aren't
+    // The embedding level and base level frame properties aren't
     // set (because if they are this frame used to have some other direction,
-    // so we can't do this optimization), and we're done.
-    nsIFrame* frame = aBpd->FrameAt(0);
-    if (frame != NS_BIDI_CONTROL_FRAME &&
-        !frame->Properties().Get(nsIFrame::EmbeddingLevelProperty()) &&
-        !frame->Properties().Get(nsIFrame::BaseLevelProperty())) {
+    // so we can't do this optimization)
+    // As long as this is the only frame, or it's followed by a linebreak,
+    // this is a non-bidi paragraph.
+    if (!frame1 || (frame1 != NS_BIDI_CONTROL_FRAME &&
+                    frame1->GetType() == nsGkAtoms::brFrame)) {
+      isNonBidi = true;
+    }
+  }
+
+  if (isNonBidi) {
 #ifdef DEBUG
 #ifdef NOISY_BIDI
-      printf("early return for single direction frame %p\n", (void*)frame);
+    printf("early return for single direction frame %p\n", (void*)frame);
 #endif
 #endif
-      frame->AddStateBits(NS_FRAME_IS_BIDI);
-      return NS_OK;
-    }
+    return NS_OK;
   }
 
   nsIFrame* firstFrame = nullptr;
   nsIFrame* lastFrame = nullptr;
 
+  // Bidi frames
   for (; ;) {
     if (fragmentLength <= 0) {
       // Get the next frame from mLogicalFrames
@@ -1037,7 +1051,8 @@ nsBidiPresUtils::TraverseFrames(nsBlockFrame*              aBlockFrame,
       if (nsGkAtoms::textFrame == frameType) {
         if (content != aBpd->mPrevContent) {
           aBpd->mPrevContent = content;
-          if (!frame->StyleText()->NewlineIsSignificant()) {
+          if (!frame->StyleText()->NewlineIsSignificant(
+                static_cast<nsTextFrame*>(frame))) {
             content->AppendTextTo(aBpd->mBuffer);
           } else {
             /*
@@ -1231,7 +1246,7 @@ nsBidiPresUtils::ResolveParagraphWithinBlock(nsBlockFrame* aBlockFrame,
   aBpd->ResetData();
 }
 
-void
+/* static */ nscoord
 nsBidiPresUtils::ReorderFrames(nsIFrame* aFirstFrameOnLine,
                                int32_t aNumFramesOnLine,
                                WritingMode aLineWM,
@@ -1241,16 +1256,17 @@ nsBidiPresUtils::ReorderFrames(nsIFrame* aFirstFrameOnLine,
   // If this line consists of a line frame, reorder the line frame's children.
   if (aFirstFrameOnLine->GetType() == nsGkAtoms::lineFrame) {
     aFirstFrameOnLine = aFirstFrameOnLine->GetFirstPrincipalChild();
-    if (!aFirstFrameOnLine)
-      return;
+    if (!aFirstFrameOnLine) {
+      return 0;
+    }
     // All children of the line frame are on the first line. Setting aNumFramesOnLine
     // to -1 makes InitLogicalArrayFromLine look at all of them.
     aNumFramesOnLine = -1;
   }
 
   BidiLineData bld(aFirstFrameOnLine, aNumFramesOnLine);
-  RepositionInlineFrames(&bld, aFirstFrameOnLine, aLineWM,
-                         aContainerSize, aStart);
+  return RepositionInlineFrames(&bld, aFirstFrameOnLine, aLineWM,
+                                aContainerSize, aStart);
 }
 
 nsIFrame*
@@ -1405,6 +1421,42 @@ nsBidiPresUtils::IsFirstOrLast(nsIFrame* aFrame,
   }
 }
 
+/* static */ void
+nsBidiPresUtils::RepositionRubyContentFrame(
+  nsIFrame* aFrame, WritingMode aFrameWM, const LogicalMargin& aBorderPadding)
+{
+  const nsFrameList& childList = aFrame->PrincipalChildList();
+  if (childList.IsEmpty()) {
+    return;
+  }
+
+  // Reorder the children.
+  // XXX It currently doesn't work properly because we do not
+  // resolve frames inside ruby content frames.
+  nscoord isize = ReorderFrames(childList.FirstChild(),
+                                childList.GetLength(),
+                                aFrameWM, aFrame->GetSize(),
+                                aBorderPadding.IStart(aFrameWM));
+  isize += aBorderPadding.IEnd(aFrameWM);
+
+  if (aFrame->StyleText()->mRubyAlign == NS_STYLE_RUBY_ALIGN_START) {
+    return;
+  }
+  nscoord residualISize = aFrame->ISize(aFrameWM) - isize;
+  if (residualISize <= 0) {
+    return;
+  }
+
+  // When ruby-align is not "start", if the content does not fill this
+  // frame, we need to center the children.
+  const nsSize dummyContainerSize;
+  for (nsIFrame* child : childList) {
+    LogicalRect rect = child->GetLogicalRect(aFrameWM, dummyContainerSize);
+    rect.IStart(aFrameWM) += residualISize / 2;
+    child->SetRect(aFrameWM, rect, dummyContainerSize);
+  }
+}
+
 /* static */ nscoord
 nsBidiPresUtils::RepositionRubyFrame(
   nsIFrame* aFrame,
@@ -1413,11 +1465,7 @@ nsBidiPresUtils::RepositionRubyFrame(
   const LogicalMargin& aBorderPadding)
 {
   nsIAtom* frameType = aFrame->GetType();
-  MOZ_ASSERT(frameType == nsGkAtoms::rubyFrame ||
-             frameType == nsGkAtoms::rubyBaseFrame ||
-             frameType == nsGkAtoms::rubyTextFrame ||
-             frameType == nsGkAtoms::rubyBaseContainerFrame ||
-             frameType == nsGkAtoms::rubyTextContainerFrame);
+  MOZ_ASSERT(RubyUtils::IsRubyBox(frameType));
 
   nscoord icoord = 0;
   WritingMode frameWM = aFrame->GetWritingMode();
@@ -1464,14 +1512,7 @@ nsBidiPresUtils::RepositionRubyFrame(
   } else {
     if (frameType == nsGkAtoms::rubyBaseFrame ||
         frameType == nsGkAtoms::rubyTextFrame) {
-      // Reorder the children.
-      // XXX It currently doesn't work properly because we do not
-      // resolve frames inside ruby content frames.
-      const nsFrameList& childList = aFrame->PrincipalChildList();
-      if (childList.NotEmpty()) {
-        ReorderFrames(childList.FirstChild(), childList.GetLength(),
-                      frameWM, frameSize, aBorderPadding.IStart(frameWM));
-      }
+      RepositionRubyContentFrame(aFrame, frameWM, aBorderPadding);
     }
     // Note that, ruby text container is not present in all conditions
     // above. It is intended, because the children of rtc are reordered
@@ -1554,7 +1595,7 @@ nsBidiPresUtils::RepositionFrame(nsIFrame* aFrame,
     }
     icoord += reverseDir ?
       borderPadding.IStart(frameWM) : borderPadding.IEnd(frameWM);
-  } else if (aFrame->StyleDisplay()->IsRubyDisplayType()) {
+  } else if (RubyUtils::IsRubyBox(aFrame->GetType())) {
     icoord += RepositionRubyFrame(aFrame, aContinuationStates,
                                   aContainerWM, borderPadding);
   } else {
@@ -1562,28 +1603,23 @@ nsBidiPresUtils::RepositionFrame(nsIFrame* aFrame,
       frameWM.IsOrthogonalTo(aContainerWM) ? aFrame->BSize() : frameISize;
   }
 
-  // LogicalRect doesn't correctly calculate the vertical position
-  // in vertical writing modes with right-to-left direction (Bug 1131451).
-  // This does the correct calculation ad hoc pending the fix for that.
-  nsRect rect = aFrame->GetRect();
-
-  LogicalMargin margin = frameMargin.ConvertTo(aContainerWM, frameWM);
   // In the following variables, if aContainerReverseDir is true, i.e.
   // the container is positioning its children in reverse of its logical
   // direction, the "StartOrEnd" refers to the distance from the frame
   // to the inline end edge of the container, elsewise, it refers to the
   // distance to the inline start edge.
-  nscoord marginStartOrEnd = aContainerReverseDir ?
-    margin.IEnd(aContainerWM) : margin.IStart(aContainerWM);
+  const LogicalMargin margin = frameMargin.ConvertTo(aContainerWM, frameWM);
+  nscoord marginStartOrEnd =
+    aContainerReverseDir ? margin.IEnd(aContainerWM)
+                         : margin.IStart(aContainerWM);
   nscoord frameStartOrEnd = aStartOrEnd + marginStartOrEnd;
-  // Whether we are placing frames from right to left.
-  // e.g. If the frames are placed reversely in LTR mode, they are
-  // actually placed from right to left.
-  bool orderingRTL = aContainerReverseDir == aContainerWM.IsBidiLTR();
-  (aContainerWM.IsVertical() ? rect.y : rect.x) = orderingRTL ?
-    lineSize - (frameStartOrEnd + icoord) : frameStartOrEnd;
-  (aContainerWM.IsVertical() ? rect.height : rect.width) = icoord;
-  aFrame->SetRect(rect);
+
+  LogicalRect rect = aFrame->GetLogicalRect(aContainerWM, aContainerSize);
+  rect.ISize(aContainerWM) = icoord;
+  rect.IStart(aContainerWM) =
+    aContainerReverseDir ? lineSize - frameStartOrEnd - icoord
+                         : frameStartOrEnd;
+  aFrame->SetRect(aContainerWM, rect, aContainerSize);
 
   return icoord + margin.IStartEnd(aContainerWM);
 }
@@ -1596,8 +1632,7 @@ nsBidiPresUtils::InitContinuationStates(nsIFrame*              aFrame,
   state->mFirstVisualFrame = nullptr;
   state->mFrameCount = 0;
 
-  if (!IsBidiLeaf(aFrame) ||
-      aFrame->StyleDisplay()->IsRubyDisplayType()) {
+  if (!IsBidiLeaf(aFrame) || RubyUtils::IsRubyBox(aFrame->GetType())) {
     // Continue for child frames
     nsIFrame* frame;
     for (frame = aFrame->GetFirstPrincipalChild();
@@ -1609,7 +1644,7 @@ nsBidiPresUtils::InitContinuationStates(nsIFrame*              aFrame,
   }
 }
 
-void
+/* static */ nscoord
 nsBidiPresUtils::RepositionInlineFrames(BidiLineData *aBld,
                                         nsIFrame* aFirstChild,
                                         WritingMode aLineWM,
@@ -1646,6 +1681,7 @@ nsBidiPresUtils::RepositionInlineFrames(BidiLineData *aBld,
       start, &continuationStates,
       aLineWM, false, aContainerSize);
   }
+  return start;
 }
 
 bool

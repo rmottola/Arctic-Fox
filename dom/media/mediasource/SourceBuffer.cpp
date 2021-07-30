@@ -29,9 +29,9 @@ class JSObject;
 extern PRLogModuleInfo* GetMediaSourceLog();
 extern PRLogModuleInfo* GetMediaSourceAPILog();
 
-#define MSE_DEBUG(arg, ...) PR_LOG(GetMediaSourceLog(), PR_LOG_DEBUG, ("SourceBuffer(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
-#define MSE_DEBUGV(arg, ...) PR_LOG(GetMediaSourceLog(), PR_LOG_DEBUG + 1, ("SourceBuffer(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
-#define MSE_API(arg, ...) PR_LOG(GetMediaSourceAPILog(), PR_LOG_DEBUG, ("SourceBuffer(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
+#define MSE_DEBUG(arg, ...) MOZ_LOG(GetMediaSourceLog(), mozilla::LogLevel::Debug, ("SourceBuffer(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
+#define MSE_DEBUGV(arg, ...) MOZ_LOG(GetMediaSourceLog(), mozilla::LogLevel::Verbose, ("SourceBuffer(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
+#define MSE_API(arg, ...) MOZ_LOG(GetMediaSourceAPILog(), mozilla::LogLevel::Debug, ("SourceBuffer(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
 
 namespace mozilla {
 
@@ -115,6 +115,12 @@ SourceBuffer::GetBuffered(ErrorResult& aRv)
   nsRefPtr<dom::TimeRanges> tr = new dom::TimeRanges();
   ranges.ToTimeRanges(tr);
   return tr.forget();
+}
+
+media::TimeIntervals
+SourceBuffer::GetTimeIntervals()
+{
+  return mContentManager->Buffered();
 }
 
 void
@@ -271,7 +277,7 @@ SourceBuffer::Ended()
   mContentManager->Ended();
   // We want the MediaSourceReader to refresh its buffered range as it may
   // have been modified (end lined up).
-  mMediaSource->GetDecoder()->NotifyDataArrived(nullptr, 1, mReportedOffset++);
+  mMediaSource->GetDecoder()->NotifyDataArrived(1, mReportedOffset++, /* aThrottleUpdates = */ false);
 }
 
 SourceBuffer::SourceBuffer(MediaSource* aMediaSource, const nsACString& aType)
@@ -398,7 +404,7 @@ SourceBuffer::AppendData(const uint8_t* aData, uint32_t aLength, ErrorResult& aR
 {
   MSE_DEBUG("AppendData(aLength=%u)", aLength);
 
-  nsRefPtr<MediaLargeByteBuffer> data = PrepareAppend(aData, aLength, aRv);
+  nsRefPtr<MediaByteBuffer> data = PrepareAppend(aData, aLength, aRv);
   if (!data) {
     return;
   }
@@ -446,7 +452,7 @@ SourceBuffer::AppendDataCompletedWithSuccess(bool aHasActiveTracks)
     // Tell our parent decoder that we have received new data.
     // The information provided do not matter much so long as it is monotonically
     // increasing.
-    mMediaSource->GetDecoder()->NotifyDataArrived(nullptr, 1, mReportedOffset++);
+    mMediaSource->GetDecoder()->NotifyDataArrived(1, mReportedOffset++, /* aThrottleUpdates = */ false);
     // Send progress event.
     mMediaSource->GetDecoder()->NotifyBytesDownloaded();
   }
@@ -493,7 +499,7 @@ SourceBuffer::AppendError(bool aDecoderError)
   }
 }
 
-already_AddRefed<MediaLargeByteBuffer>
+already_AddRefed<MediaByteBuffer>
 SourceBuffer::PrepareAppend(const uint8_t* aData, uint32_t aLength, ErrorResult& aRv)
 {
   typedef SourceBufferContentManager::EvictDataResult Result;
@@ -551,7 +557,7 @@ SourceBuffer::PrepareAppend(const uint8_t* aData, uint32_t aLength, ErrorResult&
     return nullptr;
   }
 
-  nsRefPtr<MediaLargeByteBuffer> data = new MediaLargeByteBuffer();
+  nsRefPtr<MediaByteBuffer> data = new MediaByteBuffer();
   if (!data->AppendElements(aData, aLength, fallible)) {
     aRv.Throw(NS_ERROR_DOM_QUOTA_EXCEEDED_ERR);
     return nullptr;

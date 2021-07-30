@@ -20,6 +20,7 @@
 #include "selfhosted.out.h"
 
 #include "builtin/Intl.h"
+#include "builtin/MapObject.h"
 #include "builtin/Object.h"
 #include "builtin/Reflect.h"
 #include "builtin/SelfHostingDefines.h"
@@ -513,6 +514,32 @@ js::intrinsic_IsArrayIterator(JSContext* cx, unsigned argc, Value* vp)
     MOZ_ASSERT(args[0].isObject());
 
     args.rval().setBoolean(args[0].toObject().is<ArrayIteratorObject>());
+    return true;
+}
+
+bool
+js::intrinsic_IsMapIterator(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args[0].isObject());
+
+    args.rval().setBoolean(args[0].toObject().is<MapIteratorObject>());
+    return true;
+}
+
+bool
+intrinsic_GetNextMapEntryForIterator(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 2);
+    MOZ_ASSERT(args[0].toObject().is<MapIteratorObject>());
+    MOZ_ASSERT(args[1].isObject());
+
+    Rooted<MapIteratorObject*> mapIterator(cx, &args[0].toObject().as<MapIteratorObject>());
+    RootedArrayObject result(cx, &args[1].toObject().as<ArrayObject>());
+
+    args.rval().setBoolean(MapIteratorObject::next(cx, mapIterator, result));
     return true;
 }
 
@@ -1400,6 +1427,11 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("CallArrayIteratorMethodIfWrapped",
           CallNonGenericSelfhostedMethod<Is<ArrayIteratorObject>>,      2,0),
 
+    JS_FN("IsMapIterator",           intrinsic_IsMapIterator,           1,0),
+    JS_FN("_GetNextMapEntryForIterator", intrinsic_GetNextMapEntryForIterator, 3,0),
+    JS_FN("CallMapIteratorMethodIfWrapped",
+          CallNonGenericSelfhostedMethod<Is<MapIteratorObject>>,        2,0),
+
 
     JS_FN("NewStringIterator",       intrinsic_NewStringIterator,       0,0),
     JS_FN("IsStringIterator",        intrinsic_IsStringIterator,        1,0),
@@ -1707,17 +1739,34 @@ static bool
 CloneProperties(JSContext* cx, HandleNativeObject selfHostedObject, HandleObject clone)
 {
     AutoIdVector ids(cx);
+    Vector<uint8_t, 16> attrs(cx);
 
     for (size_t i = 0; i < selfHostedObject->getDenseInitializedLength(); i++) {
         if (!selfHostedObject->getDenseElement(i).isMagic(JS_ELEMENTS_HOLE)) {
             if (!ids.append(INT_TO_JSID(i)))
                 return false;
+            if (!attrs.append(JSPROP_ENUMERATE))
+                return false;
         }
     }
 
+    Rooted<ShapeVector> shapes(cx, ShapeVector(cx));
     for (Shape::Range<NoGC> range(selfHostedObject->lastProperty()); !range.empty(); range.popFront()) {
         Shape& shape = range.front();
-        if (shape.enumerable() && !ids.append(shape.propid()))
+        if (shape.enumerable() && !shapes.append(&shape))
+            return false;
+    }
+
+    // Now our shapes are in last-to-first order, so....
+    Reverse(shapes.begin(), shapes.end());
+    for (size_t i = 0; i < shapes.length(); ++i) {
+        MOZ_ASSERT(!shapes[i]->isAccessorShape(),
+                   "Can't handle cloning accessors here yet.");
+        if (!ids.append(shapes[i]->propid()))
+            return false;
+        uint8_t shapeAttrs =
+            shapes[i]->attributes() & (JSPROP_ENUMERATE | JSPROP_PERMANENT | JSPROP_READONLY);
+        if (!attrs.append(shapeAttrs))
             return false;
     }
 
@@ -1729,7 +1778,7 @@ CloneProperties(JSContext* cx, HandleNativeObject selfHostedObject, HandleObject
         if (!GetUnclonedValue(cx, selfHostedObject, id, &selfHostedValue))
             return false;
         if (!CloneValue(cx, selfHostedValue, &val) ||
-            !JS_DefinePropertyById(cx, clone, id, val, 0))
+            !JS_DefinePropertyById(cx, clone, id, val, attrs[i]))
         {
             return false;
         }

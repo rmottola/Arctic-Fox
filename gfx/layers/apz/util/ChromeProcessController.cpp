@@ -69,14 +69,11 @@ ChromeProcessController::RequestContentRepaint(const FrameMetrics& aFrameMetrics
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (aFrameMetrics.GetScrollId() == FrameMetrics::NULL_SCROLL_ID) {
-    return;
-  }
-
-  nsCOMPtr<nsIContent> targetContent = nsLayoutUtils::FindContentFor(aFrameMetrics.GetScrollId());
-  if (targetContent) {
-    FrameMetrics metrics = aFrameMetrics;
-    APZCCallbackHelper::UpdateSubFrame(targetContent, metrics);
+  FrameMetrics metrics = aFrameMetrics;
+  if (metrics.IsRootContent()) {
+    APZCCallbackHelper::UpdateRootFrame(metrics);
+  } else {
+    APZCCallbackHelper::UpdateSubFrame(metrics);
   }
 }
 
@@ -112,14 +109,6 @@ ChromeProcessController::Destroy()
 
   MOZ_ASSERT(MessageLoop::current() == mUILoop);
   mWidget = nullptr;
-}
-
-float
-ChromeProcessController::GetPresShellResolution() const
-{
-  // The document in the chrome process cannot be zoomed, so its pres shell
-  // resolution is 1.
-  return 1.0f;
 }
 
 nsIPresShell*
@@ -163,7 +152,7 @@ ChromeProcessController::HandleSingleTap(const CSSPoint& aPoint,
     return;
   }
 
-  mAPZEventState->ProcessSingleTap(aPoint, aModifiers, aGuid, GetPresShellResolution());
+  mAPZEventState->ProcessSingleTap(aPoint, aModifiers, aGuid);
 }
 
 void
@@ -180,7 +169,7 @@ ChromeProcessController::HandleLongTap(const mozilla::CSSPoint& aPoint, Modifier
   }
 
   mAPZEventState->ProcessLongTap(GetPresShell(), aPoint, aModifiers, aGuid,
-      aInputBlockId, GetPresShellResolution());
+      aInputBlockId);
 }
 
 void
@@ -210,4 +199,11 @@ ChromeProcessController::NotifyMozMouseScrollEvent(const FrameMetrics::ViewID& a
   }
 
   APZCCallbackHelper::NotifyMozMouseScrollEvent(aScrollId, aEvent);
+}
+
+void
+ChromeProcessController::NotifyFlushComplete()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  APZCCallbackHelper::NotifyFlushComplete();
 }

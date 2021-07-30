@@ -133,9 +133,9 @@ class SmokeTestRunner(object):
 
         partial_mar = os.path.join(run_dir, 'partial.mar')
         if not os.path.exists(partial_mar):
-            build_goanna_mar = os.path.join(self.b2g.update_tools,
-                                           'build-goanna-mar.py')
-            subprocess.check_call([sys.executable, build_goanna_mar,
+            build_gecko_mar = os.path.join(self.b2g.update_tools,
+                                           'build-gecko-mar.py')
+            subprocess.check_call([sys.executable, build_gecko_mar,
                                    '--from', start_data.complete_mar,
                                    '--to', finish_data.complete_mar,
                                    partial_mar])

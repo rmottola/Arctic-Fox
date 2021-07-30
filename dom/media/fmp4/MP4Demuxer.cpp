@@ -15,6 +15,14 @@
 #include "mp4_demuxer/BufferStream.h"
 #include "mp4_demuxer/Index.h"
 
+PRLogModuleInfo* GetDemuxerLog() {
+  static PRLogModuleInfo* log = nullptr;
+  if (!log) {
+    log = PR_NewLogModule("MP4Demuxer");
+  }
+  return log;
+}
+
 namespace mozilla {
 
 class MP4TrackDemuxer : public MediaTrackDemuxer
@@ -65,7 +73,7 @@ private:
 MP4Demuxer::MP4Demuxer(MediaResource* aResource)
   : mResource(aResource)
   , mStream(new mp4_demuxer::ResourceStream(aResource))
-  , mInitData(new MediaLargeByteBuffer)
+  , mInitData(new MediaByteBuffer)
 {
 }
 

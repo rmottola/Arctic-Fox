@@ -12,9 +12,12 @@
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIHttpHeaderVisitor.h"
+#include "nsIJARChannel.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsIThreadRetargetableRequest.h"
 #include "nsIUploadChannel2.h"
+#include "nsIInterfaceRequestorUtils.h"
+#include "nsIPipe.h"
 
 #include "nsContentPolicyUtils.h"
 #include "nsCORSListenerProxy.h"
@@ -216,36 +219,34 @@ FetchDriver::BasicFetch()
     }
 
     nsRefPtr<InternalResponse> response = new InternalResponse(200, NS_LITERAL_CSTRING("OK"));
-    {
-      ErrorResult result;
-      uint64_t size = blob->GetSize(result);
-      if (NS_WARN_IF(result.Failed())) {
-        FailWithNetworkError();
-        return result.StealNSResult();
-      }
+    ErrorResult result;
+    uint64_t size = blob->GetSize(result);
+    if (NS_WARN_IF(result.Failed())) {
+      FailWithNetworkError();
+      return result.StealNSResult();
+    }
 
-      nsAutoString sizeStr;
-      sizeStr.AppendInt(size);
-      response->Headers()->Append(NS_LITERAL_CSTRING("Content-Length"), NS_ConvertUTF16toUTF8(sizeStr), result);
-      if (NS_WARN_IF(result.Failed())) {
-        FailWithNetworkError();
-        return result.StealNSResult();
-      }
+    nsAutoString sizeStr;
+    sizeStr.AppendInt(size);
+    response->Headers()->Append(NS_LITERAL_CSTRING("Content-Length"), NS_ConvertUTF16toUTF8(sizeStr), result);
+    if (NS_WARN_IF(result.Failed())) {
+      FailWithNetworkError();
+      return result.StealNSResult();
+    }
 
-      nsAutoString type;
-      blob->GetType(type);
-      response->Headers()->Append(NS_LITERAL_CSTRING("Content-Type"), NS_ConvertUTF16toUTF8(type), result);
-      if (NS_WARN_IF(result.Failed())) {
-        FailWithNetworkError();
-        return result.StealNSResult();
-      }
+    nsAutoString type;
+    blob->GetType(type);
+    response->Headers()->Append(NS_LITERAL_CSTRING("Content-Type"), NS_ConvertUTF16toUTF8(type), result);
+    if (NS_WARN_IF(result.Failed())) {
+      FailWithNetworkError();
+      return result.StealNSResult();
     }
 
     nsCOMPtr<nsIInputStream> stream;
-    rv = blob->GetInternalStream(getter_AddRefs(stream));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
+    blob->GetInternalStream(getter_AddRefs(stream), result);
+    if (NS_WARN_IF(result.Failed())) {
       FailWithNetworkError();
-      return rv;
+      return result.StealNSResult();
     }
 
     response->SetBody(stream);
@@ -293,9 +294,9 @@ FetchDriver::BasicFetch()
     return FailWithNetworkError();
   }
 
-  if (scheme.LowerCaseEqualsLiteral("file")) {
-  } else if (scheme.LowerCaseEqualsLiteral("http") ||
-             scheme.LowerCaseEqualsLiteral("https")) {
+  if (scheme.LowerCaseEqualsLiteral("http") ||
+      scheme.LowerCaseEqualsLiteral("https") ||
+      scheme.LowerCaseEqualsLiteral("app")) {
     return HttpFetch();
   }
 
@@ -417,21 +418,37 @@ FetchDriver::HttpFetch(bool aCORSFlag, bool aCORSPreflightFlag, bool aAuthentica
     // Step 2. Set the referrer.
     nsAutoString referrer;
     mRequest->GetReferrer(referrer);
-    // The referrer should have already been resolved to a URL by the caller.
-    MOZ_ASSERT(!referrer.EqualsLiteral(kFETCH_CLIENT_REFERRER_STR));
-    if (!referrer.IsEmpty()) {
-      nsCOMPtr<nsIURI> refURI;
-      rv = NS_NewURI(getter_AddRefs(refURI), referrer, nullptr, nullptr);
+    if (referrer.EqualsLiteral(kFETCH_CLIENT_REFERRER_STR)) {
+      rv = nsContentUtils::SetFetchReferrerURIWithPolicy(mPrincipal,
+                                                         mDocument,
+                                                         httpChan);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        return FailWithNetworkError();
+      }
+    } else if (referrer.IsEmpty()) {
+      rv = httpChan->SetReferrerWithPolicy(nullptr, net::RP_No_Referrer);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        return FailWithNetworkError();
+      }
+    } else {
+      // From "Determine request's Referrer" step 3
+      // "If request's referrer is a URL, let referrerSource be request's
+      // referrer."
+      //
+      // XXXnsm - We never actually hit this from a fetch() call since both
+      // fetch and Request() create a new internal request whose referrer is
+      // always set to about:client. Should we just crash here instead until
+      // someone tries to use FetchDriver for non-fetch() APIs?
+      nsCOMPtr<nsIURI> referrerURI;
+      rv = NS_NewURI(getter_AddRefs(referrerURI), referrer, nullptr, nullptr);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return FailWithNetworkError();
       }
 
-      net::ReferrerPolicy referrerPolicy = net::RP_Default;
-      if (mDocument) {
-        referrerPolicy = mDocument->GetReferrerPolicy();
-      }
-
-      rv = httpChan->SetReferrerWithPolicy(refURI, referrerPolicy);
+      rv =
+        httpChan->SetReferrerWithPolicy(referrerURI,
+                                        mDocument ? mDocument->GetReferrerPolicy() :
+                                                    net::RP_Default);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return FailWithNetworkError();
       }
@@ -486,8 +503,10 @@ FetchDriver::HttpFetch(bool aCORSFlag, bool aCORSPreflightFlag, bool aAuthentica
   // While the spec also gates on the client being a ServiceWorker, we can't
   // infer that here. Instead we rely on callers to set the flag correctly.
   if (mRequest->SkipServiceWorker()) {
-    nsCOMPtr<nsIHttpChannelInternal> internalChan = do_QueryInterface(httpChan);
-    internalChan->ForceNoIntercept();
+    if (httpChan) {
+      nsCOMPtr<nsIHttpChannelInternal> internalChan = do_QueryInterface(httpChan);
+      internalChan->ForceNoIntercept();
+    }
   }
 
   nsCOMPtr<nsIStreamListener> listener = this;
@@ -525,7 +544,7 @@ FetchDriver::HttpFetch(bool aCORSFlag, bool aCORSPreflightFlag, bool aAuthentica
                                unsafeHeaders,
                                getter_AddRefs(preflightChannel));
   } else {
-   rv = chan->AsyncOpen(listener, nullptr);
+    rv = chan->AsyncOpen(listener, nullptr);
   }
 
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -547,14 +566,16 @@ FetchDriver::ContinueHttpFetchAfterNetworkFetch()
 }
 
 already_AddRefed<InternalResponse>
-FetchDriver::BeginAndGetFilteredResponse(InternalResponse* aResponse)
+FetchDriver::BeginAndGetFilteredResponse(InternalResponse* aResponse, nsIURI* aFinalURI)
 {
   MOZ_ASSERT(aResponse);
-  if (!aResponse->FinalURL()) {
-    nsAutoCString reqURL;
+  nsAutoCString reqURL;
+  if (aFinalURI) {
+    aFinalURI->GetSpec(reqURL);
+  } else {
     mRequest->GetURL(reqURL);
-    aResponse->SetUrl(reqURL);
   }
+  aResponse->SetUrl(reqURL);
 
   // FIXME(nsm): Handle mixed content check, step 7 of fetch.
 
@@ -583,7 +604,7 @@ FetchDriver::BeginAndGetFilteredResponse(InternalResponse* aResponse)
 void
 FetchDriver::BeginResponse(InternalResponse* aResponse)
 {
-  nsRefPtr<InternalResponse> r = BeginAndGetFilteredResponse(aResponse);
+  nsRefPtr<InternalResponse> r = BeginAndGetFilteredResponse(aResponse, nullptr);
   // Release the ref.
 }
 
@@ -658,28 +679,31 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
     return rv;
   }
 
-  nsCOMPtr<nsIHttpChannel> channel = do_QueryInterface(aRequest);
-  // For now we only support HTTP.
-  MOZ_ASSERT(channel);
+  nsRefPtr<InternalResponse> response;
+  nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(aRequest);
+  if (httpChannel) {
+    uint32_t responseStatus;
+    httpChannel->GetResponseStatus(&responseStatus);
 
-  aRequest->GetStatus(&rv);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    FailWithNetworkError();
-    return rv;
-  }
+    nsAutoCString statusText;
+    httpChannel->GetResponseStatusText(statusText);
 
-  uint32_t responseStatus;
-  channel->GetResponseStatus(&responseStatus);
+    response = new InternalResponse(responseStatus, statusText);
 
-  nsAutoCString statusText;
-  channel->GetResponseStatusText(statusText);
+    nsRefPtr<FillResponseHeaders> visitor = new FillResponseHeaders(response);
+    rv = httpChannel->VisitResponseHeaders(visitor);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      NS_WARNING("Failed to visit all headers.");
+    }
+  } else {
+    nsCOMPtr<nsIJARChannel> jarChannel = do_QueryInterface(aRequest);
+    // If it is not an http channel, it has to be a jar one.
+    MOZ_ASSERT(jarChannel);
 
-  nsRefPtr<InternalResponse> response = new InternalResponse(responseStatus, statusText);
-
-  nsRefPtr<FillResponseHeaders> visitor = new FillResponseHeaders(response);
-  rv = channel->VisitResponseHeaders(visitor);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    NS_WARNING("Failed to visit all headers.");
+    // We simulate the http protocol for jar/app requests
+    uint32_t responseStatus = 200;
+    nsAutoCString statusText;
+    response = new InternalResponse(responseStatus, NS_LITERAL_CSTRING("OK"));
   }
 
   // We open a pipe so that we can immediately set the pipe's read end as the
@@ -700,15 +724,20 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
   }
   response->SetBody(pipeInputStream);
 
-  nsCOMPtr<nsISupports> securityInfo;
-  rv = channel->GetSecurityInfo(getter_AddRefs(securityInfo));
-  if (securityInfo) {
-    response->SetSecurityInfo(securityInfo);
+  nsCOMPtr<nsIChannel> channel = do_QueryInterface(aRequest);
+  response->InitChannelInfo(channel);
+
+  nsCOMPtr<nsIURI> channelURI;
+  rv = channel->GetURI(getter_AddRefs(channelURI));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    FailWithNetworkError();
+    // Cancel request.
+    return rv;
   }
 
   // Resolves fetch() promise which may trigger code running in a worker.  Make
   // sure the Response is fully initialized before calling this.
-  mResponse = BeginAndGetFilteredResponse(response);
+  mResponse = BeginAndGetFilteredResponse(response, channelURI);
 
   nsCOMPtr<nsIEventTarget> sts = do_GetService(NS_STREAMTRANSPORTSERVICE_CONTRACTID, &rv);
   if (NS_WARN_IF(NS_FAILED(rv))) {

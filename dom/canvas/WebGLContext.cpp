@@ -324,6 +324,7 @@ WebGLContext::DestroyResourcesAndContext()
     mBound2DTextures.Clear();
     mBoundCubeMapTextures.Clear();
     mBound3DTextures.Clear();
+    mBoundSamplers.Clear();
     mBoundArrayBuffer = nullptr;
     mBoundCopyReadBuffer = nullptr;
     mBoundCopyWriteBuffer = nullptr;
@@ -342,14 +343,8 @@ WebGLContext::DestroyResourcesAndContext()
     mBoundTransformFeedback = nullptr;
     mDefaultTransformFeedback = nullptr;
 
-    if (mBoundTransformFeedbackBuffers) {
-        for (GLuint i = 0; i < mGLMaxTransformFeedbackSeparateAttribs; i++) {
-            mBoundTransformFeedbackBuffers[i] = nullptr;
-        }
-    }
-
-    for (GLuint i = 0; i < mGLMaxUniformBufferBindings; i++)
-        mBoundUniformBuffers[i] = nullptr;
+    mBoundTransformFeedbackBuffers.Clear();
+    mBoundUniformBuffers.Clear();
 
     while (!mTextures.isEmpty())
         mTextures.getLast()->DeleteOnce();
@@ -530,10 +525,10 @@ HasAcceleratedLayers(const nsCOMPtr<nsIGfxInfo>& gfxInfo)
 }
 
 static already_AddRefed<GLContext>
-CreateHeadlessNativeGL(bool forceEnabled, const nsCOMPtr<nsIGfxInfo>& gfxInfo,
-                       bool requireCompatProfile, WebGLContext* webgl)
+CreateHeadlessNativeGL(CreateContextFlags flags, const nsCOMPtr<nsIGfxInfo>& gfxInfo,
+                       WebGLContext* webgl)
 {
-    if (!forceEnabled &&
+    if (!(flags & CreateContextFlags::FORCE_ENABLE_HARDWARE) &&
         IsFeatureInBlacklist(gfxInfo, nsIGfxInfo::FEATURE_WEBGL_OPENGL))
     {
         webgl->GenerateWarning("Refused to create native OpenGL context"
@@ -541,7 +536,7 @@ CreateHeadlessNativeGL(bool forceEnabled, const nsCOMPtr<nsIGfxInfo>& gfxInfo,
         return nullptr;
     }
 
-    nsRefPtr<GLContext> gl = gl::GLContextProvider::CreateHeadless(requireCompatProfile);
+    nsRefPtr<GLContext> gl = gl::GLContextProvider::CreateHeadless(flags);
     if (!gl) {
         webgl->GenerateWarning("Error during native OpenGL init.");
         return nullptr;
@@ -555,21 +550,13 @@ CreateHeadlessNativeGL(bool forceEnabled, const nsCOMPtr<nsIGfxInfo>& gfxInfo,
 // right now, we get ANGLE implicitly by using EGL on Windows.
 // Eventually, we want to be able to pick ANGLE-EGL or native EGL.
 static already_AddRefed<GLContext>
-CreateHeadlessANGLE(bool forceEnabled, const nsCOMPtr<nsIGfxInfo>& gfxInfo,
-                    bool requireCompatProfile, WebGLContext* webgl)
+CreateHeadlessANGLE(CreateContextFlags flags, const nsCOMPtr<nsIGfxInfo>& gfxInfo,
+                    WebGLContext* webgl)
 {
     nsRefPtr<GLContext> gl;
 
 #ifdef XP_WIN
-    if (!forceEnabled &&
-        IsFeatureInBlacklist(gfxInfo, nsIGfxInfo::FEATURE_WEBGL_ANGLE))
-    {
-        webgl->GenerateWarning("Refused to create ANGLE OpenGL context"
-                               " because of blacklisting.");
-        return nullptr;
-    }
-
-    gl = gl::GLContextProviderEGL::CreateHeadless(requireCompatProfile);
+    gl = gl::GLContextProviderEGL::CreateHeadless(flags);,
     if (!gl) {
         webgl->GenerateWarning("Error during ANGLE OpenGL init.");
         return nullptr;
@@ -581,13 +568,12 @@ CreateHeadlessANGLE(bool forceEnabled, const nsCOMPtr<nsIGfxInfo>& gfxInfo,
 }
 
 static already_AddRefed<GLContext>
-CreateHeadlessEGL(bool forceEnabled, bool requireCompatProfile,
-                  WebGLContext* webgl)
+CreateHeadlessEGL(CreateContextFlags flags, WebGLContext* webgl)
 {
     nsRefPtr<GLContext> gl;
 
 #ifdef ANDROID
-    gl = gl::GLContextProviderEGL::CreateHeadless(requireCompatProfile);
+    gl = gl::GLContextProviderEGL::CreateHeadless(flags);
     if (!gl) {
         webgl->GenerateWarning("Error during EGL OpenGL init.");
         return nullptr;
@@ -599,7 +585,7 @@ CreateHeadlessEGL(bool forceEnabled, bool requireCompatProfile,
 }
 
 static already_AddRefed<GLContext>
-CreateHeadlessGL(bool forceEnabled, const nsCOMPtr<nsIGfxInfo>& gfxInfo,
+CreateHeadlessGL(CreateContextFlags flags, const nsCOMPtr<nsIGfxInfo>& gfxInfo,
                  WebGLContext* webgl)
 {
     bool preferEGL = PR_GetEnv("MOZ_WEBGL_PREFER_EGL");
@@ -608,21 +594,21 @@ CreateHeadlessGL(bool forceEnabled, const nsCOMPtr<nsIGfxInfo>& gfxInfo,
     if (PR_GetEnv("MOZ_WEBGL_FORCE_OPENGL"))
         disableANGLE = true;
 
-    bool requireCompatProfile = webgl->IsWebGL2() ? false : true;
+    if (!webgl->IsWebGL2()) {
+        flags |= CreateContextFlags::REQUIRE_COMPAT_PROFILE;
+    }
 
     nsRefPtr<GLContext> gl;
 
     if (preferEGL)
-        gl = CreateHeadlessEGL(forceEnabled, requireCompatProfile, webgl);
+        gl = CreateHeadlessEGL(flags, webgl);
 
     if (!gl && !disableANGLE) {
-        gl = CreateHeadlessANGLE(forceEnabled, gfxInfo, requireCompatProfile,
-                                 webgl);
+        gl = CreateHeadlessANGLE(flags, gfxInfo, webgl);
     }
 
     if (!gl) {
-        gl = CreateHeadlessNativeGL(forceEnabled, gfxInfo,
-                                    requireCompatProfile, webgl);
+        gl = CreateHeadlessNativeGL(flags, gfxInfo, webgl);
     }
 
     return gl.forget();
@@ -731,7 +717,7 @@ CreateOffscreen(GLContext* gl, const WebGLContextOptions& options,
 bool
 WebGLContext::CreateOffscreenGL(bool forceEnabled)
 {
-    nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+    nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
 
     layers::ISurfaceAllocator* surfAllocator = nullptr;
 #ifdef MOZ_WIDGET_GONK
@@ -747,7 +733,10 @@ WebGLContext::CreateOffscreenGL(bool forceEnabled)
     }
 #endif
 
-    gl = CreateHeadlessGL(forceEnabled, gfxInfo, this);
+    CreateContextFlags flags = forceEnabled ? CreateContextFlags::FORCE_ENABLE_HARDWARE :
+                                              CreateContextFlags::NONE;
+
+    gl = CreateHeadlessGL(flags, gfxInfo, this);
 
     do {
         if (!gl)
@@ -896,7 +885,7 @@ WebGLContext::SetDimensions(int32_t signedWidth, int32_t signedHeight)
         return NS_ERROR_FAILURE;
     }
 
-    nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+    nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
     bool failIfMajorPerformanceCaveat =
                     !gfxPrefs::WebGLDisableFailIfMajorPerformanceCaveat() &&
                     !HasAcceleratedLayers(gfxInfo);
@@ -1854,10 +1843,13 @@ WebGLContext::TexImageFromVideoElement(const TexImageTarget texImageTarget,
         }
     }
 
+    AutoLockImage lockedImage(container);
+    Image* srcImage = lockedImage.GetImage();
+    if (!srcImage) {
+      return false;
+    }
+
     gl->MakeCurrent();
-    nsRefPtr<mozilla::layers::Image> srcImage = container->LockCurrentImage();
-    if (!srcImage)
-        return false;
 
     WebGLTexture* tex = ActiveBoundTextureForTexImageTarget(texImageTarget);
 
@@ -1871,11 +1863,13 @@ WebGLContext::TexImageFromVideoElement(const TexImageTarget texImageTarget,
                         0, format, type, nullptr);
     }
 
-    bool ok = gl->BlitHelper()->BlitImageToTexture(srcImage.get(),
+    const gl::OriginPos destOrigin = mPixelStoreFlipY ? gl::OriginPos::BottomLeft
+                                                      : gl::OriginPos::TopLeft;
+    bool ok = gl->BlitHelper()->BlitImageToTexture(srcImage,
                                                    srcImage->GetSize(),
-                                                   tex->GLName(),
+                                                   tex->mGLName,
                                                    texImageTarget.get(),
-                                                   mPixelStoreFlipY);
+                                                   destOrigin);
     if (ok) {
         TexInternalFormat effectiveInternalFormat =
             EffectiveInternalFormatFromInternalFormatAndType(internalFormat,
@@ -1887,9 +1881,6 @@ WebGLContext::TexImageFromVideoElement(const TexImageTarget texImageTarget,
                           WebGLImageDataStatus::InitializedImageData);
         tex->Bind(TexImageTargetToTexTarget(texImageTarget));
     }
-
-    srcImage = nullptr;
-    container->UnlockCurrentImage();
     return ok;
 }
 
@@ -1942,6 +1933,7 @@ NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(WebGLContext,
   mBound2DTextures,
   mBoundCubeMapTextures,
   mBound3DTextures,
+  mBoundSamplers,
   mBoundArrayBuffer,
   mBoundCopyReadBuffer,
   mBoundCopyWriteBuffer,

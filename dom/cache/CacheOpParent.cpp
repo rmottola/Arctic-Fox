@@ -72,30 +72,6 @@ CacheOpParent::Execute(Manager* aManager)
 
   mManager = aManager;
 
-  // Handle add/addAll op with a FetchPut object
-  if (mOpArgs.type() == CacheOpArgs::TCacheAddAllArgs) {
-    MOZ_ASSERT(mCacheId != INVALID_CACHE_ID);
-
-    const CacheAddAllArgs& args = mOpArgs.get_CacheAddAllArgs();
-    const nsTArray<CacheRequest>& list = args.requestList();
-
-    nsAutoTArray<nsCOMPtr<nsIInputStream>, 256> requestStreamList;
-    for (uint32_t i = 0; i < list.Length(); ++i) {
-      requestStreamList.AppendElement(DeserializeCacheStream(list[i].body()));
-    }
-
-    nsRefPtr<FetchPut> fetchPut;
-    nsresult rv = FetchPut::Create(this, mManager, mCacheId, list,
-                                   requestStreamList, getter_AddRefs(fetchPut));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      OnOpComplete(ErrorResult(rv), CacheAddAllResult());
-      return;
-    }
-
-    mFetchPutList.AppendElement(fetchPut.forget());
-    return;
-  }
-
   // Handle put op
   if (mOpArgs.type() == CacheOpArgs::TCachePutAllArgs) {
     MOZ_ASSERT(mCacheId != INVALID_CACHE_ID);
@@ -151,11 +127,6 @@ CacheOpParent::ActorDestroy(ActorDestroyReason aReason)
     mVerifier = nullptr;
   }
 
-  for (uint32_t i = 0; i < mFetchPutList.Length(); ++i) {
-    mFetchPutList[i]->ClearListener();
-  }
-  mFetchPutList.Clear();
-
   if (mManager) {
     mManager->RemoveListener(this);
     mManager = nullptr;
@@ -193,7 +164,7 @@ CacheOpParent::OnOpComplete(ErrorResult&& aRv, const CacheOpResult& aResult,
 
   // Never send an op-specific result if we have an error.  Instead, send
   // void_t() to ensure that we don't leak actors on the child side.
-  if (aRv.Failed()) {
+  if (NS_WARN_IF(aRv.Failed())) {
     unused << Send__delete__(this, aRv, void_t());
     aRv.SuppressException(); // We serialiazed it, as best we could.
     return;
@@ -220,18 +191,6 @@ CacheOpParent::OnOpComplete(ErrorResult&& aRv, const CacheOpResult& aResult,
   }
 
   unused << Send__delete__(this, aRv, result.SendAsOpResult());
-}
-
-void
-CacheOpParent::OnFetchPut(FetchPut* aFetchPut, ErrorResult&& aRv)
-{
-  NS_ASSERT_OWNINGTHREAD(CacheOpParent);
-  MOZ_ASSERT(aFetchPut);
-
-  aFetchPut->ClearListener();
-  MOZ_ALWAYS_TRUE(mFetchPutList.RemoveElement(aFetchPut));
-
-  OnOpComplete(Move(aRv), CacheAddAllResult());
 }
 
 already_AddRefed<nsIInputStream>

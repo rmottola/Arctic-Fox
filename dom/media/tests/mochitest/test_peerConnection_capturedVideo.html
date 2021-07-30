@@ -25,17 +25,14 @@ runNetworkTest(function() {
   var test = new PeerConnectionTest();
   test.setOfferOptions({ offerToReceiveVideo: false,
                          offerToReceiveAudio: false });
-  test.chain.insertAfter("PC_LOCAL_GUM", [
+  test.setMediaConstraints([{video: true, audio: true}], []);
+  test.chain.replace("PC_LOCAL_GUM", [
     function PC_LOCAL_CAPTUREVIDEO(test) {
       return metadataLoaded
         .then(() => {
           var stream = v1.mozCaptureStreamUntilEnded();
           is(stream.getTracks().length, 2, "Captured stream has 2 tracks");
-          stream.getTracks().forEach(tr => {
-            test.pcLocal._pc.addTrack(tr, stream);
-            test.pcLocal.expectedLocalTrackTypesById[tr.id] = tr.kind;
-          });
-          test.pcLocal.constraints = [{ video: true, audio:true }]; // fool tests
+          test.pcLocal.attachMedia(stream, "audiovideo", "local");
         });
     }
   ]);

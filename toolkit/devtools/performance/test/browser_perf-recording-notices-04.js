@@ -5,13 +5,14 @@
  * Tests that when a recording overlaps the circular buffer, that
  * a class is assigned to the recording notices.
  */
-function spawnTest () {
-  // Make sure the profiler module is stopped so we can set a new buffer limit
-  nsIProfilerModule.StopProfiler();
-  Services.prefs.setIntPref(PROFILER_BUFFER_SIZE_PREF, 1000);
-
+function* spawnTest() {
   let { panel } = yield initPerformance(SIMPLE_URL, void 0, { TEST_MOCK_PROFILER_CHECK_TIMER: 10 });
   let { EVENTS, $, PerformanceController, PerformanceView } = panel.panelWin;
+
+  // Make sure the profiler module is stopped so we can set a new buffer limit
+  loadFrameScripts();
+  yield PMM_stopProfiler();
+  Services.prefs.setIntPref(PROFILER_BUFFER_SIZE_PREF, 1000);
 
   yield startRecording(panel);
 

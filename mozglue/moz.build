@@ -7,7 +7,10 @@
 if CONFIG['MOZ_LINKER']:
     DIRS += ['linker']
 
-DIRS += ['build']
+DIRS += [
+  'build',
+  'misc',
+]
 
 if CONFIG['MOZ_CRT']:
     DIRS += ['crt']

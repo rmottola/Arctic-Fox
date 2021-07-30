@@ -64,7 +64,7 @@ class B2GDesktopTest(BlobUploadMixin, TestingMixin, MercurialScript):
         {'substr': 'FAILED (errors=', 'level': ERROR},
         {'substr': r'''Could not successfully complete transport of message to Gecko, socket closed''', 'level': ERROR},
         {'substr': r'''Could not communicate with Marionette server. Is the Gecko process still running''', 'level': ERROR},
-        {'substr': r'''Connection to Marionette server is lost. Check goanna''', 'level': ERROR},
+        {'substr': r'''Connection to Marionette server is lost. Check gecko''', 'level': ERROR},
         {'substr': 'Timeout waiting for marionette on port', 'level': ERROR},
         {'regex': re.compile(r'''(Timeout|NoSuchAttribute|Javascript|NoSuchElement|XPathLookup|NoSuchWindow|StaleElement|ScriptTimeout|ElementNotVisible|NoSuchFrame|InvalidElementState|NoAlertPresent|InvalidCookieDomain|UnableToSetCookie|InvalidSelector|MoveTargetOutOfBounds)Exception'''), 'level': ERROR},
     ]
@@ -175,7 +175,7 @@ class B2GDesktopTest(BlobUploadMixin, TestingMixin, MercurialScript):
             self.fatal("'%s' not defined in the in-tree config! Please add it to '%s'. "
                        "See bug 981030 for more details." %
                        (suite,
-                        os.path.join('goanna', 'testing', self.config['in_tree_config'])))
+                        os.path.join('gecko', 'testing', self.config['in_tree_config'])))
 
         if options:
             for option in options:

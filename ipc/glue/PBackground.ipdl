@@ -10,13 +10,15 @@ include protocol PCache;
 include protocol PCacheStorage;
 include protocol PCacheStreamControl;
 include protocol PFileDescriptorSet;
+include protocol PMessagePort;
+include protocol PNuwa;
+include protocol PServiceWorkerManager;
+include protocol PUDPSocket;
 include protocol PVsync;
-include protocol PMedia;
 
 include DOMTypes;
 include PBackgroundSharedTypes;
 include PBackgroundIDBSharedTypes;
-include ServiceWorkerRegistrarTypes;
 
 using mozilla::dom::cache::Namespace from "mozilla/dom/cache/Types.h";
 include "mozilla/dom/cache/IPCUtils.h";
@@ -34,8 +36,11 @@ sync protocol PBackground
   manages PCacheStorage;
   manages PCacheStreamControl;
   manages PFileDescriptorSet;
+  manages PMessagePort;
+  manages PNuwa;
+  manages PServiceWorkerManager;
+  manages PUDPSocket;
   manages PVsync;
-  manages PMedia;
 
 parent:
   // Only called at startup during mochitests to check the basic infrastructure.
@@ -44,17 +49,22 @@ parent:
   PBackgroundIDBFactory(LoggingInfo loggingInfo);
 
   PVsync();
-  PMedia();
 
+  PUDPSocket(OptionalPrincipalInfo pInfo, nsCString filter);
   PBroadcastChannel(PrincipalInfo pInfo, nsString origin, nsString channel,
                     bool privateBrowsing);
 
-  RegisterServiceWorker(ServiceWorkerRegistrationData data);
-  UnregisterServiceWorker(PrincipalInfo principalInfo,
-                          nsString scope);
+  PServiceWorkerManager();
+
   ShutdownServiceWorkerRegistrar();
 
   PCacheStorage(Namespace aNamespace, PrincipalInfo aPrincipalInfo);
+
+  PMessagePort(nsID uuid, nsID destinationUuid, uint32_t sequenceId);
+
+  PNuwa();
+
+  MessagePortForceClose(nsID uuid, nsID destinationUuid, uint32_t sequenceId);
 
 child:
   PCache();

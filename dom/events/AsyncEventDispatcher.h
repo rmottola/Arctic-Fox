@@ -28,12 +28,18 @@ namespace mozilla {
 class AsyncEventDispatcher : public nsCancelableRunnable
 {
 public:
+  /**
+   * If aOnlyChromeDispatch is true, the event is dispatched to only
+   * chrome node. In that case, if aTarget is already a chrome node,
+   * the event is dispatched to it, otherwise the dispatch path starts
+   * at the first chrome ancestor of that target.
+   */
   AsyncEventDispatcher(nsINode* aTarget, const nsAString& aEventType,
-                       bool aBubbles, bool aDispatchChromeOnly)
+                       bool aBubbles, bool aOnlyChromeDispatch)
     : mTarget(aTarget)
     , mEventType(aEventType)
     , mBubbles(aBubbles)
-    , mDispatchChromeOnly(aDispatchChromeOnly)
+    , mOnlyChromeDispatch(aOnlyChromeDispatch)
   {
   }
 
@@ -62,7 +68,7 @@ public:
   nsCOMPtr<nsIDOMEvent> mEvent;
   nsString              mEventType;
   bool                  mBubbles = false;
-  bool                  mDispatchChromeOnly = false;
+  bool                  mOnlyChromeDispatch = false;
   bool                  mCanceled = false;
 };
 

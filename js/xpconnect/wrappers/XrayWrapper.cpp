@@ -301,11 +301,29 @@ bool JSXrayTraits::getOwnPropertyFromTargetIfSafe(JSContext* cx,
             return ReportWrapperDenial(cx, id, WrapperDenialForXray, "value not same-origin with target");
         }
 
-        // Disallow non-Xrayable objects.
+        // Disallow (most) non-Xrayable objects.
         XrayType xrayType = GetXrayType(propObj);
         if (xrayType == NotXray || xrayType == XrayForOpaqueObject) {
-            JSAutoCompartment ac(cx, wrapper);
-            return ReportWrapperDenial(cx, id, WrapperDenialForXray, "value not Xrayable");
+            if (IdentifyStandardInstance(propObj) == JSProto_ArrayBuffer) {
+                // Given that non-Xrayable objects are now opaque by default,
+                // this restriction is somewhat more draconian than it needs to
+                // be. It's true that script can't do much with an opaque
+                // object, so in general it doesn't make much of a difference.
+                // But one place it _does_ make a difference is in the
+                // structured clone algorithm. When traversing an object to
+                // clone it, the algorithm dutifully traverses inspects the
+                // security wrapper without unwrapping it, so it won't see
+                // properties we restrict here. But there are some object types
+                // that the structured clone algorithm can handle safely even
+                // without Xrays (i.e. ArrayBuffer, where it just clones the
+                // underlying byte array).
+                //
+                // So we make some special cases here for such situations. Pass
+                // them through.
+            } else {
+                JSAutoCompartment ac(cx, wrapper);
+                return ReportWrapperDenial(cx, id, WrapperDenialForXray, "value not Xrayable");
+            }
         }
 
         // Disallow callables.
@@ -1231,9 +1249,9 @@ XPCWrappedNativeXrayTraits::resolveNativeProperty(JSContext* cx, HandleObject wr
     desc.setAttributes(JSPROP_ENUMERATE);
     desc.setGetter(nullptr);
     desc.setSetter(nullptr);
-    desc.value().set(JSVAL_VOID);
+    desc.value().setUndefined();
 
-    RootedValue fval(cx, JSVAL_VOID);
+    RootedValue fval(cx, JS::UndefinedValue());
     if (member->IsConstant()) {
         if (!member->GetConstantValue(ccx, iface, desc.value().address())) {
             JS_ReportError(cx, "Failed to convert constant native property to JS value");
@@ -1291,7 +1309,7 @@ wrappedJSObject_getter(JSContext* cx, unsigned argc, Value* vp)
     }
     RootedObject wrapper(cx, &args.thisv().toObject());
     if (!IsWrapper(wrapper) || !WrapperFactory::IsXrayWrapper(wrapper) ||
-        !AccessCheck::wrapperSubsumes(wrapper)) {
+        !WrapperFactory::AllowWaiver(wrapper)) {
         JS_ReportError(cx, "Unexpected object");
         return false;
     }
@@ -1354,7 +1372,7 @@ XrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
     // Handle .wrappedJSObject for subsuming callers. This should move once we
     // sort out own-ness for the holder.
     if (id == GetRTIdByIndex(cx, XPCJSRuntime::IDX_WRAPPED_JSOBJECT) &&
-        AccessCheck::wrapperSubsumes(wrapper))
+        WrapperFactory::AllowWaiver(wrapper))
     {
         if (!JS_AlreadyHasOwnPropertyById(cx, holder, id, &found))
             return false;
@@ -1390,8 +1408,7 @@ XPCWrappedNativeXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsW
         nsGlobalWindow* win = AsWindow(cx, wrapper);
         // Note: As() unwraps outer windows to get to the inner window.
         if (win) {
-            bool unused;
-            nsCOMPtr<nsIDOMWindow> subframe = win->IndexedGetter(index, unused);
+            nsCOMPtr<nsIDOMWindow> subframe = win->IndexedGetter(index);
             if (subframe) {
                 nsGlobalWindow* global = static_cast<nsGlobalWindow*>(subframe.get());
                 global->EnsureInnerWindow();
@@ -1537,8 +1554,7 @@ DOMXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper, Handl
         nsGlobalWindow* win = AsWindow(cx, wrapper);
         // Note: As() unwraps outer windows to get to the inner window.
         if (win) {
-            bool unused;
-            nsCOMPtr<nsIDOMWindow> subframe = win->IndexedGetter(index, unused);
+            nsCOMPtr<nsIDOMWindow> subframe = win->IndexedGetter(index);
             if (subframe) {
                 nsGlobalWindow* global = static_cast<nsGlobalWindow*>(subframe.get());
                 global->EnsureInnerWindow();

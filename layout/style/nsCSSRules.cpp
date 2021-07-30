@@ -1148,6 +1148,12 @@ DocumentRule::SetConditionText(const nsAString& aConditionText)
 DocumentRule::UseForPresentation(nsPresContext* aPresContext,
                                  nsMediaQueryResultCacheKey& aKey)
 {
+  return UseForPresentation(aPresContext);
+}
+
+bool
+DocumentRule::UseForPresentation(nsPresContext* aPresContext)
+{
   nsIDocument *doc = aPresContext->Document();
   nsIURI *docURI = doc->GetDocumentURI();
   nsAutoCString docURISpec;
@@ -2103,7 +2109,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsCSSKeyframeStyleDeclaration)
 NS_INTERFACE_MAP_END_INHERITING(nsDOMCSSDeclaration)
 
 css::Declaration*
-nsCSSKeyframeStyleDeclaration::GetCSSDeclaration(bool aAllocate)
+nsCSSKeyframeStyleDeclaration::GetCSSDeclaration(Operation aOperation)
 {
   if (mRule) {
     return mRule->Declaration();
@@ -2664,7 +2670,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsCSSPageStyleDeclaration)
 NS_INTERFACE_MAP_END_INHERITING(nsDOMCSSDeclaration)
 
 css::Declaration*
-nsCSSPageStyleDeclaration::GetCSSDeclaration(bool aAllocate)
+nsCSSPageStyleDeclaration::GetCSSDeclaration(Operation aOperation)
 {
   if (mRule) {
     return mRule->Declaration();

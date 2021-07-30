@@ -180,6 +180,7 @@
 #include "mozilla/gfx/2D.h"
 #include "nsSubDocumentFrame.h"
 #include "nsQueryObject.h"
+#include "nsLayoutStylesheetCache.h"
 
 #ifdef ANDROID
 #include "nsIDocShellTreeOwner.h"
@@ -203,14 +204,10 @@ using namespace mozilla::layout;
 
 CapturingContentInfo nsIPresShell::gCaptureInfo =
   { false /* mAllowed */, false /* mPointerLock */, false /* mRetargetToElement */,
-    false /* mPreventDrag */, nullptr /* mContent */ };
+    false /* mPreventDrag */ };
 nsIContent* nsIPresShell::gKeyDownTarget;
 nsClassHashtable<nsUint32HashKey, nsIPresShell::PointerCaptureInfo>* nsIPresShell::gPointerCaptureList;
 nsClassHashtable<nsUint32HashKey, nsIPresShell::PointerInfo>* nsIPresShell::gActivePointersIds;
-
-// convert a color value to a string, in the CSS format #RRGGBB
-// *  - initially created for bugs 31816, 20760, 22963
-static void ColorToString(nscolor aColor, nsAutoString &aString);
 
 // RangePaintInfo is used to paint ranges to offscreen buffers
 struct RangePaintInfo {
@@ -760,7 +757,6 @@ PresShell::BeforeAfterKeyboardEventEnabled()
 PresShell::PresShell()
   : mMouseLocation(NS_UNCONSTRAINEDSIZE, NS_UNCONSTRAINEDSIZE)
 {
-  mSelection = nullptr;
 #ifdef MOZ_REFLOW_PERF
   mReflowCountMgr = new ReflowCountMgr();
   mReflowCountMgr->SetPresContext(mPresContext);
@@ -847,10 +843,6 @@ PresShell::~PresShell()
   delete mFrameConstructor;
 
   mCurrentEventContent = nullptr;
-
-  NS_IF_RELEASE(mPresContext);
-  NS_IF_RELEASE(mDocument);
-  NS_IF_RELEASE(mSelection);
 }
 
 /**
@@ -876,7 +868,6 @@ PresShell::Init(nsIDocument* aDocument,
   }
 
   mDocument = aDocument;
-  NS_ADDREF(mDocument);
   mViewManager = aViewManager;
 
   // Create our frame constructor.
@@ -889,7 +880,6 @@ PresShell::Init(nsIDocument* aDocument,
 
   // Bind the context to the presentation shell.
   mPresContext = aPresContext;
-  NS_ADDREF(mPresContext);
   aPresContext->SetShell(this);
 
   // Now we can initialize the style set.
@@ -901,13 +891,13 @@ PresShell::Init(nsIDocument* aDocument,
   // frames.
   mPresContext->CompatibilityModeChanged();
 
-  // setup the preference style rules (no forced reflow), and do it
-  // before creating any frames.
-  SetPreferenceStyleRules(false);
+  // Add the preference style sheet.
+  UpdatePreferenceStyles();
 
   if (TouchCaretPrefEnabled() && !AccessibleCaretEnabled()) {
     // Create touch caret handle
     mTouchCaret = new TouchCaret(this);
+    mTouchCaret->Init();
   }
 
   if (SelectionCaretPrefEnabled() && !AccessibleCaretEnabled()) {
@@ -921,7 +911,7 @@ PresShell::Init(nsIDocument* aDocument,
     mAccessibleCaretEventHub = new AccessibleCaretEventHub();
   }
 
-  NS_ADDREF(mSelection = new nsFrameSelection());
+  mSelection = new nsFrameSelection();
 
   mSelection->Init(this, nullptr);
 
@@ -990,6 +980,11 @@ PresShell::Init(nsIDocument* aDocument,
   SetupFontInflation();
 
   mTouchManager.Init(this, mDocument);
+
+  if (mPresContext->IsRootContentDocument()) {
+    mZoomConstraintsClient = new ZoomConstraintsClient();
+    mZoomConstraintsClient->Init(this, mDocument);
+  }
 }
 
 enum TextPerfLogType {
@@ -1007,12 +1002,12 @@ LogTextPerfStats(gfxTextPerfMetrics* aTextPerf,
   PRLogModuleInfo* tpLog = gfxPlatform::GetLog(eGfxLog_textperf);
 
   // ignore XUL contexts unless at debug level
-  PRLogModuleLevel logLevel = PR_LOG_WARNING;
+  mozilla::LogLevel logLevel = LogLevel::Warning;
   if (aCounts.numContentTextRuns == 0) {
-    logLevel = PR_LOG_DEBUG;
+    logLevel = LogLevel::Debug;
   }
 
-  if (!PR_LOG_TEST(tpLog, logLevel)) {
+  if (!MOZ_LOG_TEST(tpLog, logLevel)) {
     return;
   }
 
@@ -1037,7 +1032,7 @@ LogTextPerfStats(gfxTextPerfMetrics* aTextPerf,
   }
 
   if (aLogType == eLog_loaddone) {
-    PR_LOG(tpLog, logLevel,
+    MOZ_LOG(tpLog, logLevel,
            ("%s reflow: %d chars: %d "
             "[%s] "
             "content-textruns: %d chrome-textruns: %d "
@@ -1057,7 +1052,7 @@ LogTextPerfStats(gfxTextPerfMetrics* aTextPerf,
             aCounts.textrunConst, aCounts.textrunDestr,
             aTextPerf->cumulative.textrunDestr));
   } else {
-    PR_LOG(tpLog, logLevel,
+    MOZ_LOG(tpLog, logLevel,
            ("%s reflow: %d chars: %d "
             "content-textruns: %d chrome-textruns: %d "
             "max-textrun-len: %d "
@@ -1102,6 +1097,11 @@ PresShell::Destroy()
 
   if (mHaveShutDown)
     return;
+
+  if (mZoomConstraintsClient) {
+    mZoomConstraintsClient->Destroy();
+    mZoomConstraintsClient = nullptr;
+  }
 
 #ifdef ACCESSIBILITY
   if (mDocAccessible) {
@@ -1195,7 +1195,7 @@ PresShell::Destroy()
   }
 
   // release our pref style sheet, if we have one still
-  ClearPreferenceStyleRules();
+  RemovePreferenceStyles();
 
   mIsDestroying = true;
 
@@ -1225,7 +1225,7 @@ PresShell::Destroy()
     mViewManager = nullptr;
   }
 
-  mStyleSet->BeginShutdown(mPresContext);
+  mStyleSet->BeginShutdown();
   nsRefreshDriver* rd = GetPresContext()->RefreshDriver();
 
   // This shell must be removed from the document before the frame
@@ -1283,7 +1283,7 @@ PresShell::Destroy()
   }
 
   // Let the style set do its cleanup.
-  mStyleSet->Shutdown(mPresContext);
+  mStyleSet->Shutdown();
 
   if (mPresContext) {
     // We hold a reference to the pres context, and it holds a weak link back
@@ -1330,348 +1330,60 @@ nsIPresShell::GetAuthorStyleDisabled() const
   return mStyleSet->GetAuthorStyleDisabled();
 }
 
-nsresult
-PresShell::SetPreferenceStyleRules(bool aForceReflow)
+void
+PresShell::UpdatePreferenceStyles()
 {
   if (!mDocument) {
-    return NS_ERROR_NULL_POINTER;
+    return;
   }
-
-  nsPIDOMWindow *window = mDocument->GetWindow();
 
   // If the document doesn't have a window there's no need to notify
   // its presshell about changes to preferences since the document is
   // in a state where it doesn't matter any more (see
   // nsDocumentViewer::Close()).
-
-  if (!window) {
-    return NS_ERROR_NULL_POINTER;
+  if (!mDocument->GetWindow()) {
+    return;
   }
 
-  NS_PRECONDITION(mPresContext, "presContext cannot be null");
-  if (mPresContext) {
-    // first, make sure this is not a chrome shell
-    if (nsContentUtils::IsInChromeDocshell(mDocument)) {
-      return NS_OK;
-    }
-
-#ifdef DEBUG_attinasi
-    printf("Setting Preference Style Rules:\n");
-#endif
-    // if here, we need to create rules for the prefs
-    // - this includes the background-color, the text-color,
-    //   the link color, the visited link color and the link-underlining
-
-    // first clear any exising rules
-    nsresult result = ClearPreferenceStyleRules();
-
-    // now the link rules (must come after the color rules, or links will not be correct color!)
-    // XXX - when there is both an override and agent pref stylesheet this won't matter,
-    //       as the color rules will be overrides and the links rules will be agent
-    if (NS_SUCCEEDED(result)) {
-      result = SetPrefLinkRules();
-    }
-    if (NS_SUCCEEDED(result)) {
-      result = SetPrefFocusRules();
-    }
-    if (NS_SUCCEEDED(result)) {
-      result = SetPrefNoScriptRule();
-    }
-    if (NS_SUCCEEDED(result)) {
-      result = SetPrefNoFramesRule();
-    }
-#ifdef DEBUG_attinasi
-    printf( "Preference Style Rules set: error=%ld\n", (long)result);
-#endif
-
-    // Note that this method never needs to force any calculation; the caller
-    // will recalculate style if needed
-
-    return result;
+  // Documents in chrome shells do not have any preference style rules applied.
+  if (nsContentUtils::IsInChromeDocshell(mDocument)) {
+    return;
   }
 
-  return NS_ERROR_NULL_POINTER;
+  // We need to pass in mPresContext so that if the nsLayoutStylesheetCache
+  // needs to recreate the pref style sheet, it has somewhere to get the
+  // pref styling information from.  All pres contexts for
+  // IsChromeOriginImage() == false will have the same pref styling information,
+  // and similarly for IsChromeOriginImage() == true, so it doesn't really
+  // matter which pres context we pass in when it does need to be recreated.
+  // (See nsPresContext::GetDocumentColorPreferences for how whether we
+  // are a chrome origin image affects some pref styling information.)
+  nsRefPtr<CSSStyleSheet> newPrefSheet =
+    mPresContext->IsChromeOriginImage() ?
+      nsLayoutStylesheetCache::ChromePreferenceSheet(mPresContext) :
+      nsLayoutStylesheetCache::ContentPreferenceSheet(mPresContext);
+
+  if (mPrefStyleSheet == newPrefSheet) {
+    return;
+  }
+
+  mStyleSet->BeginUpdate();
+
+  RemovePreferenceStyles();
+
+  mStyleSet->AppendStyleSheet(nsStyleSet::eUserSheet, newPrefSheet);
+  mPrefStyleSheet = newPrefSheet;
+
+  mStyleSet->EndUpdate();
 }
 
-nsresult PresShell::ClearPreferenceStyleRules(void)
+void
+PresShell::RemovePreferenceStyles()
 {
-  nsresult result = NS_OK;
   if (mPrefStyleSheet) {
-    NS_ASSERTION(mStyleSet, "null styleset entirely unexpected!");
-    if (mStyleSet) {
-      // remove the sheet from the styleset:
-      // - note that we have to check for success by comparing the count before and after...
-#ifdef DEBUG
-      int32_t numBefore = mStyleSet->SheetCount(nsStyleSet::eUserSheet);
-      NS_ASSERTION(numBefore > 0, "no user stylesheets in styleset, but we have one!");
-#endif
-      mStyleSet->RemoveStyleSheet(nsStyleSet::eUserSheet, mPrefStyleSheet);
-
-#ifdef DEBUG_attinasi
-      NS_ASSERTION((numBefore - 1) == mStyleSet->GetNumberOfUserStyleSheets(),
-                   "Pref stylesheet was not removed");
-      printf("PrefStyleSheet removed\n");
-#endif
-      // clear the sheet pointer: it is strictly historical now
-      mPrefStyleSheet = nullptr;
-    }
-  }
-  return result;
-}
-
-nsresult
-PresShell::CreatePreferenceStyleSheet()
-{
-  NS_ASSERTION(!mPrefStyleSheet, "prefStyleSheet already exists");
-  mPrefStyleSheet = new CSSStyleSheet(CORS_NONE, mozilla::net::RP_Default);
-  nsCOMPtr<nsIURI> uri;
-  nsresult rv = NS_NewURI(getter_AddRefs(uri), "about:PreferenceStyleSheet", nullptr);
-  if (NS_FAILED(rv)) {
+    mStyleSet->RemoveStyleSheet(nsStyleSet::eUserSheet, mPrefStyleSheet);
     mPrefStyleSheet = nullptr;
-    return rv;
   }
-  NS_ASSERTION(uri, "null but no error");
-  mPrefStyleSheet->SetURIs(uri, uri, uri);
-  mPrefStyleSheet->SetComplete();
-  uint32_t index;
-  rv =
-    mPrefStyleSheet->InsertRuleInternal(NS_LITERAL_STRING("@namespace svg url(http://www.w3.org/2000/svg);"),
-                                        0, &index);
-  if (NS_FAILED(rv)) {
-    mPrefStyleSheet = nullptr;
-    return rv;
-  }
-  rv =
-    mPrefStyleSheet->InsertRuleInternal(NS_LITERAL_STRING("@namespace url(http://www.w3.org/1999/xhtml);"),
-                                        0, &index);
-  if (NS_FAILED(rv)) {
-    mPrefStyleSheet = nullptr;
-    return rv;
-  }
-
-  mStyleSet->AppendStyleSheet(nsStyleSet::eUserSheet, mPrefStyleSheet);
-  return NS_OK;
-}
-
-// XXX We want these after the @namespace rules.  Does order matter
-// for these rules, or can we call StyleRule::StyleRuleCount()
-// and just "append"?
-static uint32_t sInsertPrefSheetRulesAt = 2;
-
-nsresult
-PresShell::SetPrefNoScriptRule()
-{
-  nsresult rv = NS_OK;
-
-  // also handle the case where print is done from print preview
-  // see bug #342439 for more details
-  nsIDocument* doc = mDocument;
-  if (doc->IsStaticDocument()) {
-    doc = doc->GetOriginalDocument();
-  }
-
-  bool scriptEnabled = doc->IsScriptEnabled();
-  if (scriptEnabled) {
-    if (!mPrefStyleSheet) {
-      rv = CreatePreferenceStyleSheet();
-      NS_ENSURE_SUCCESS(rv, rv);
-    }
-
-    uint32_t index = 0;
-    mPrefStyleSheet->
-      InsertRuleInternal(NS_LITERAL_STRING("noscript{display:none!important}"),
-                         sInsertPrefSheetRulesAt, &index);
-  }
-
-  return rv;
-}
-
-nsresult PresShell::SetPrefNoFramesRule(void)
-{
-  NS_ASSERTION(mPresContext,"null prescontext not allowed");
-  if (!mPresContext) {
-    return NS_ERROR_FAILURE;
-  }
-
-  nsresult rv = NS_OK;
-
-  if (!mPrefStyleSheet) {
-    rv = CreatePreferenceStyleSheet();
-    NS_ENSURE_SUCCESS(rv, rv);
-  }
-
-  NS_ASSERTION(mPrefStyleSheet, "prefstylesheet should not be null");
-
-  bool allowSubframes = true;
-  nsCOMPtr<nsIDocShell> docShell(mPresContext->GetDocShell());
-  if (docShell) {
-    docShell->GetAllowSubframes(&allowSubframes);
-  }
-  if (!allowSubframes) {
-    uint32_t index = 0;
-    rv = mPrefStyleSheet->
-      InsertRuleInternal(NS_LITERAL_STRING("noframes{display:block}"),
-                         sInsertPrefSheetRulesAt, &index);
-    NS_ENSURE_SUCCESS(rv, rv);
-    rv = mPrefStyleSheet->
-      InsertRuleInternal(NS_LITERAL_STRING("frame, frameset, iframe {display:none!important}"),
-                         sInsertPrefSheetRulesAt, &index);
-  }
-  return rv;
-}
-
-nsresult PresShell::SetPrefLinkRules(void)
-{
-  NS_ASSERTION(mPresContext,"null prescontext not allowed");
-  if (!mPresContext) {
-    return NS_ERROR_FAILURE;
-  }
-
-  nsresult rv = NS_OK;
-
-  if (!mPrefStyleSheet) {
-    rv = CreatePreferenceStyleSheet();
-    NS_ENSURE_SUCCESS(rv, rv);
-  }
-
-  NS_ASSERTION(mPrefStyleSheet, "prefstylesheet should not be null");
-
-  // support default link colors:
-  //   this means the link colors need to be overridable,
-  //   which they are if we put them in the agent stylesheet,
-  //   though if using an override sheet this will cause authors grief still
-  //   In the agent stylesheet, they are !important when we are ignoring document colors
-
-  nscolor linkColor(mPresContext->DefaultLinkColor());
-  nscolor activeColor(mPresContext->DefaultActiveLinkColor());
-  nscolor visitedColor(mPresContext->DefaultVisitedLinkColor());
-
-  NS_NAMED_LITERAL_STRING(ruleClose, "}");
-  uint32_t index = 0;
-  nsAutoString strColor;
-
-  // insert a rule to color links: '*|*:link {color: #RRGGBB [!important];}'
-  ColorToString(linkColor, strColor);
-  rv = mPrefStyleSheet->
-    InsertRuleInternal(NS_LITERAL_STRING("*|*:link{color:") +
-                       strColor + ruleClose,
-                       sInsertPrefSheetRulesAt, &index);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  // - visited links: '*|*:visited {color: #RRGGBB [!important];}'
-  ColorToString(visitedColor, strColor);
-  rv = mPrefStyleSheet->
-    InsertRuleInternal(NS_LITERAL_STRING("*|*:visited{color:") +
-                       strColor + ruleClose,
-                       sInsertPrefSheetRulesAt, &index);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  // - active links: '*|*:-moz-any-link:active {color: #RRGGBB [!important];}'
-  ColorToString(activeColor, strColor);
-  rv = mPrefStyleSheet->
-    InsertRuleInternal(NS_LITERAL_STRING("*|*:-moz-any-link:active{color:") +
-                       strColor + ruleClose,
-                       sInsertPrefSheetRulesAt, &index);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  bool underlineLinks =
-    mPresContext->GetCachedBoolPref(kPresContext_UnderlineLinks);
-
-  if (underlineLinks) {
-    // create a rule to make underlining happen
-    //  '*|*:-moz-any-link {text-decoration:[underline|none];}'
-    // no need for important, we want these to be overridable
-    // NOTE: these must go in the agent stylesheet or they cannot be
-    //       overridden by authors
-    rv = mPrefStyleSheet->
-      InsertRuleInternal(NS_LITERAL_STRING("*|*:-moz-any-link:not(svg|a){text-decoration:underline}"),
-                         sInsertPrefSheetRulesAt, &index);
-  } else {
-    rv = mPrefStyleSheet->
-      InsertRuleInternal(NS_LITERAL_STRING("*|*:-moz-any-link{text-decoration:none}"),
-                         sInsertPrefSheetRulesAt, &index);
-  }
-
-  return rv;
-}
-
-nsresult PresShell::SetPrefFocusRules(void)
-{
-  NS_ASSERTION(mPresContext,"null prescontext not allowed");
-  nsresult result = NS_OK;
-
-  if (!mPresContext)
-    result = NS_ERROR_FAILURE;
-
-  if (NS_SUCCEEDED(result) && !mPrefStyleSheet)
-    result = CreatePreferenceStyleSheet();
-
-  if (NS_SUCCEEDED(result)) {
-    NS_ASSERTION(mPrefStyleSheet, "prefstylesheet should not be null");
-
-    if (mPresContext->GetUseFocusColors()) {
-      nscolor focusBackground(mPresContext->FocusBackgroundColor());
-      nscolor focusText(mPresContext->FocusTextColor());
-
-      // insert a rule to make focus the preferred color
-      uint32_t index = 0;
-      nsAutoString strRule, strColor;
-
-      ///////////////////////////////////////////////////////////////
-      // - focus: '*:focus
-      ColorToString(focusText,strColor);
-      strRule.AppendLiteral("*:focus,*:focus>font {color: ");
-      strRule.Append(strColor);
-      strRule.AppendLiteral(" !important; background-color: ");
-      ColorToString(focusBackground,strColor);
-      strRule.Append(strColor);
-      strRule.AppendLiteral(" !important; } ");
-      // insert the rules
-      result = mPrefStyleSheet->
-        InsertRuleInternal(strRule, sInsertPrefSheetRulesAt, &index);
-    }
-    uint8_t focusRingWidth = mPresContext->FocusRingWidth();
-    bool focusRingOnAnything = mPresContext->GetFocusRingOnAnything();
-    uint8_t focusRingStyle = mPresContext->GetFocusRingStyle();
-
-    if ((NS_SUCCEEDED(result) && focusRingWidth != 1 && focusRingWidth <= 4 ) || focusRingOnAnything) {
-      uint32_t index = 0;
-      nsAutoString strRule;
-      if (!focusRingOnAnything)
-        strRule.AppendLiteral("*|*:link:focus, *|*:visited");    // If we only want focus rings on the normal things like links
-      strRule.AppendLiteral(":focus {outline: ");     // For example 3px dotted WindowText (maximum 4)
-      strRule.AppendInt(focusRingWidth);
-      if (focusRingStyle == 0) // solid
-        strRule.AppendLiteral("px solid -moz-mac-focusring !important; -moz-outline-radius: 3px; outline-offset: 1px; } ");
-      else // dotted
-        strRule.AppendLiteral("px dotted WindowText !important; } ");
-      // insert the rules
-      result = mPrefStyleSheet->
-        InsertRuleInternal(strRule, sInsertPrefSheetRulesAt, &index);
-      NS_ENSURE_SUCCESS(result, result);
-      if (focusRingWidth != 1) {
-        // If the focus ring width is different from the default, fix buttons with rings
-        strRule.AssignLiteral("button::-moz-focus-inner, input[type=\"reset\"]::-moz-focus-inner,");
-        strRule.AppendLiteral("input[type=\"button\"]::-moz-focus-inner, ");
-        strRule.AppendLiteral("input[type=\"submit\"]::-moz-focus-inner { padding: 1px 2px 1px 2px; border: ");
-        strRule.AppendInt(focusRingWidth);
-        if (focusRingStyle == 0) // solid
-          strRule.AppendLiteral("px solid transparent !important; } ");
-        else
-          strRule.AppendLiteral("px dotted transparent !important; } ");
-        result = mPrefStyleSheet->
-          InsertRuleInternal(strRule, sInsertPrefSheetRulesAt, &index);
-        NS_ENSURE_SUCCESS(result, result);
-
-        strRule.AssignLiteral("button:focus::-moz-focus-inner, input[type=\"reset\"]:focus::-moz-focus-inner,");
-        strRule.AppendLiteral("input[type=\"button\"]:focus::-moz-focus-inner, input[type=\"submit\"]:focus::-moz-focus-inner {");
-        strRule.AppendLiteral("border-color: ButtonText !important; }");
-        result = mPrefStyleSheet->
-          InsertRuleInternal(strRule, sInsertPrefSheetRulesAt, &index);
-      }
-    }
-  }
-  return result;
 }
 
 void
@@ -2082,7 +1794,7 @@ PresShell::ResizeReflowIgnoreOverride(nscoord aWidth, nscoord aHeight)
   // Take this ref after viewManager so it'll make sure to go away first.
   nsCOMPtr<nsIPresShell> kungFuDeathGrip(this);
 
-  if (!GetPresContext()->SupressingResizeReflow()) {
+  if (!GetPresContext()->SuppressingResizeReflow()) {
     // Have to make sure that the content notifications are flushed before we
     // start messing with the frame model; otherwise we can get content doubling.
     mDocument->FlushPendingNotifications(Flush_ContentAndNotify);
@@ -2563,6 +2275,26 @@ PresShell::CheckVisibilityContent(nsIContent* aNode, int16_t aStartOffset,
   return NS_OK;
 }
 
+NS_IMETHODIMP
+PresShell::GetSelectionCaretsVisibility(bool* aOutVisibility)
+{
+  *aOutVisibility = (SelectionCaretPrefEnabled() && mSelectionCarets->GetVisibility());
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+PresShell::SetSelectionCaretsVisibility(bool aVisibility)
+{
+  if (SelectionCaretPrefEnabled() && mSelectionCarets) {
+    if (aVisibility) {
+      mSelectionCarets->UpdateSelectionCarets();
+    } else {
+      mSelectionCarets->SetVisibility(false);
+    }
+  }
+  return NS_OK;
+}
+
 //end implementations nsISelectionController
 
 nsIFrame*
@@ -2695,7 +2427,7 @@ PresShell::BeginLoad(nsIDocument *aDocument)
     tp = mPresContext->GetTextPerfMetrics();
   }
 
-  bool shouldLog = gLog && PR_LOG_TEST(gLog, PR_LOG_DEBUG);
+  bool shouldLog = gLog && MOZ_LOG_TEST(gLog, LogLevel::Debug);
   if (shouldLog || tp) {
     mLoadBegin = TimeStamp::Now();
   }
@@ -2706,7 +2438,7 @@ PresShell::BeginLoad(nsIDocument *aDocument)
     if (uri) {
       uri->GetSpec(spec);
     }
-    PR_LOG(gLog, PR_LOG_DEBUG,
+    MOZ_LOG(gLog, LogLevel::Debug,
            ("(presshell) %p load begin [%s]\n",
             this, spec.get()));
   }
@@ -2731,7 +2463,7 @@ PresShell::LoadComplete()
   }
 
   // log load
-  bool shouldLog = gLog && PR_LOG_TEST(gLog, PR_LOG_DEBUG);
+  bool shouldLog = gLog && MOZ_LOG_TEST(gLog, LogLevel::Debug);
   if (shouldLog || tp) {
     TimeDuration loadTime = TimeStamp::Now() - mLoadBegin;
     nsIURI* uri = mDocument->GetDocumentURI();
@@ -2740,7 +2472,7 @@ PresShell::LoadComplete()
       uri->GetSpec(spec);
     }
     if (shouldLog) {
-      PR_LOG(gLog, PR_LOG_DEBUG,
+      MOZ_LOG(gLog, LogLevel::Debug,
              ("(presshell) %p load done time-ms: %9.2f [%s]\n",
               this, loadTime.ToMilliseconds(), spec.get()));
     }
@@ -3910,7 +3642,7 @@ PresShell::ClearMouseCaptureOnView(nsView* aView)
         if (view) {
           do {
             if (view == aView) {
-              NS_RELEASE(gCaptureInfo.mContent);
+              gCaptureInfo.mContent = nullptr;
               // the view containing the captured content likely disappeared so
               // disable capture for now.
               gCaptureInfo.mAllowed = false;
@@ -3925,7 +3657,7 @@ PresShell::ClearMouseCaptureOnView(nsView* aView)
       }
     }
 
-    NS_RELEASE(gCaptureInfo.mContent);
+    gCaptureInfo.mContent = nullptr;
   }
 
   // disable mouse capture until the next mousedown as a dialog has opened
@@ -3944,20 +3676,20 @@ nsIPresShell::ClearMouseCapture(nsIFrame* aFrame)
 
   // null frame argument means clear the capture
   if (!aFrame) {
-    NS_RELEASE(gCaptureInfo.mContent);
+    gCaptureInfo.mContent = nullptr;
     gCaptureInfo.mAllowed = false;
     return;
   }
 
   nsIFrame* capturingFrame = gCaptureInfo.mContent->GetPrimaryFrame();
   if (!capturingFrame) {
-    NS_RELEASE(gCaptureInfo.mContent);
+    gCaptureInfo.mContent = nullptr;
     gCaptureInfo.mAllowed = false;
     return;
   }
 
   if (nsLayoutUtils::IsAncestorFrameCrossDoc(aFrame, capturingFrame)) {
-    NS_RELEASE(gCaptureInfo.mContent);
+    gCaptureInfo.mContent = nullptr;
     gCaptureInfo.mAllowed = false;
   }
 }
@@ -4263,7 +3995,7 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
       // Flush any pending update of the user font set, since that could
       // cause style changes (for updating ex/ch units, and to cause a
       // reflow).
-      mPresContext->FlushUserFontSet();
+      mDocument->FlushUserFontSet();
 
       mPresContext->FlushCounterStyles();
 
@@ -4411,8 +4143,7 @@ PresShell::DocumentStatesChanged(nsIDocument* aDocument,
   NS_PRECONDITION(aDocument == mDocument, "Unexpected aDocument");
 
   if (mDidInitialize &&
-      mStyleSet->HasDocumentStateDependentStyle(mPresContext,
-                                                mDocument->GetRootElement(),
+      mStyleSet->HasDocumentStateDependentStyle(mDocument->GetRootElement(),
                                                 aStateMask)) {
     mPresContext->RestyleManager()->PostRestyleEvent(mDocument->GetRootElement(),
                                                      eRestyle_Subtree,
@@ -4433,7 +4164,8 @@ PresShell::AttributeWillChange(nsIDocument* aDocument,
                                Element*     aElement,
                                int32_t      aNameSpaceID,
                                nsIAtom*     aAttribute,
-                               int32_t      aModType)
+                               int32_t      aModType,
+                               const nsAttrValue* aNewValue)
 {
   NS_PRECONDITION(!mIsDocumentGone, "Unexpected AttributeWillChange");
   NS_PRECONDITION(aDocument == mDocument, "Unexpected aDocument");
@@ -4444,7 +4176,8 @@ PresShell::AttributeWillChange(nsIDocument* aDocument,
   if (mDidInitialize) {
     nsAutoCauseReflowNotifier crNotifier(this);
     mPresContext->RestyleManager()->AttributeWillChange(aElement, aNameSpaceID,
-                                                        aAttribute, aModType);
+                                                        aAttribute, aModType,
+                                                        aNewValue);
     VERIFY_STYLE_TREE;
   }
 }
@@ -4454,7 +4187,8 @@ PresShell::AttributeChanged(nsIDocument* aDocument,
                             Element*     aElement,
                             int32_t      aNameSpaceID,
                             nsIAtom*     aAttribute,
-                            int32_t      aModType)
+                            int32_t      aModType,
+                            const nsAttrValue* aOldValue)
 {
   NS_PRECONDITION(!mIsDocumentGone, "Unexpected AttributeChanged");
   NS_PRECONDITION(aDocument == mDocument, "Unexpected aDocument");
@@ -4465,7 +4199,8 @@ PresShell::AttributeChanged(nsIDocument* aDocument,
   if (mDidInitialize) {
     nsAutoCauseReflowNotifier crNotifier(this);
     mPresContext->RestyleManager()->AttributeChanged(aElement, aNameSpaceID,
-                                                     aAttribute, aModType);
+                                                     aAttribute, aModType,
+                                                     aOldValue);
     VERIFY_STYLE_TREE;
   }
 }
@@ -4675,8 +4410,9 @@ nsIPresShell::ReconstructStyleDataInternal()
     return;
   }
 
+  mDocument->RebuildUserFontSet();
+
   if (mPresContext) {
-    mPresContext->RebuildUserFontSet();
     mPresContext->RebuildCounterStyles();
   }
 
@@ -4918,7 +4654,7 @@ PresShell::RenderDocument(const nsRect& aRect, uint32_t aFlags,
       // taking snapshots.
       if (layerManager &&
           (!layerManager->AsClientLayerManager() ||
-           XRE_GetProcessType() == GeckoProcessType_Default)) {
+           XRE_IsParentProcess())) {
         flags |= nsLayoutUtils::PAINT_WIDGET_LAYERS;
       }
     }
@@ -5512,7 +5248,7 @@ void PresShell::UpdateCanvasBackground()
   if (!FrameConstructor()->GetRootElementFrame()) {
     mCanvasBackgroundColor = GetDefaultBackgroundColorToDraw();
   }
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     if (TabChild* tabChild = TabChild::GetFrom(this)) {
       tabChild->SetBackgroundColor(mCanvasBackgroundColor);
     }
@@ -6218,7 +5954,7 @@ public:
   }
   ~AutoUpdateHitRegion()
   {
-    if (XRE_GetProcessType() != GeckoProcessType_Content ||
+    if (!XRE_IsContentProcess() ||
         !mFrame || !mShell) {
       return;
     }
@@ -6408,14 +6144,14 @@ nsIPresShell::SetCapturingContent(nsIContent* aContent, uint8_t aFlags)
     return;
   }
 
-  NS_IF_RELEASE(gCaptureInfo.mContent);
+  gCaptureInfo.mContent = nullptr;
 
   // only set capturing content if allowed or the CAPTURE_IGNOREALLOWED or
   // CAPTURE_POINTERLOCK flags are used.
   if ((aFlags & CAPTURE_IGNOREALLOWED) || gCaptureInfo.mAllowed ||
       (aFlags & CAPTURE_POINTERLOCK)) {
     if (aContent) {
-      NS_ADDREF(gCaptureInfo.mContent = aContent);
+      gCaptureInfo.mContent = aContent;
     }
     // CAPTURE_POINTERLOCK is the same as CAPTURE_RETARGETTOELEMENT & CAPTURE_IGNOREALLOWED
     gCaptureInfo.mRetargetToElement = ((aFlags & CAPTURE_RETARGETTOELEMENT) != 0) ||
@@ -7230,11 +6966,11 @@ PresShell::HandleEvent(nsIFrame* aFrame,
   // Make touch events, mouse events and hardware key events to be the source
   // events of TaskTracer, and originate the rest correlation tasks from here.
   SourceEventType type = SourceEventType::Unknown;
-  if (WidgetTouchEvent* inputEvent = aEvent->AsTouchEvent()) {
+  if (aEvent->AsTouchEvent()) {
     type = SourceEventType::Touch;
-  } else if (WidgetMouseEvent* inputEvent = aEvent->AsMouseEvent()) {
+  } else if (aEvent->AsMouseEvent()) {
     type = SourceEventType::Mouse;
-  } else if (WidgetKeyboardEvent* inputEvent = aEvent->AsKeyboardEvent()) {
+  } else if (aEvent->AsKeyboardEvent()) {
     type = SourceEventType::Key;
   }
   AutoSourceEvent taskTracerEvent(type);
@@ -7985,7 +7721,7 @@ PresShell::HandlePositionedEvent(nsIFrame* aTargetFrame,
       // We use weak pointers because during this tight loop, the node
       // will *not* go away.  And this happens on every mousemove.
       while (targetElement && !targetElement->IsElement()) {
-        targetElement = targetElement->GetParent();
+        targetElement = targetElement->GetFlattenedTreeParent();
       }
 
       // If we found an element, target it.  Otherwise, target *nothing*.
@@ -8066,7 +7802,7 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent, nsEventStatus* aStatus)
               // ESC key released while in DOM fullscreen mode.
               // Fully exit all browser windows and documents from
               // fullscreen mode.
-              nsIDocument::ExitFullscreen(nullptr, /* async */ true);
+              nsIDocument::AsyncExitFullscreen(nullptr);
             }
           }
           nsCOMPtr<nsIDocument> pointerLockedDoc =
@@ -9054,7 +8790,7 @@ PresShell::DidCauseReflow()
 void
 PresShell::WillDoReflow()
 {
-  mPresContext->FlushUserFontSet();
+  mDocument->FlushUserFontSet();
 
   mPresContext->FlushCounterStyles();
 
@@ -9298,7 +9034,8 @@ PresShell::DoReflow(nsIFrame* target, bool aInterruptible)
                                              target->GetView(),
                                              boundsRelativeToTarget);
   nsContainerFrame::SyncWindowProperties(mPresContext, target,
-                                         target->GetView(), &rcx);
+                                         target->GetView(), &rcx,
+                                         nsContainerFrame::SET_ASYNC);
 
   target->DidReflow(mPresContext, nullptr, nsDidReflowStatus::FINISHED);
   if (target == rootFrame && size.BSize(wm) == NS_UNCONSTRAINEDSIZE) {
@@ -10733,16 +10470,6 @@ void ReflowCountMgr::DisplayDiffsInTotals(const char * aStr)
 
 #endif // MOZ_REFLOW_PERF
 
-// make a color string like #RRGGBB
-void ColorToString(nscolor aColor, nsAutoString &aString)
-{
-  char buf[8];
-
-  PR_snprintf(buf, sizeof(buf), "#%02x%02x%02x",
-              NS_GET_R(aColor), NS_GET_G(aColor), NS_GET_B(aColor));
-  CopyASCIItoUTF16(buf, aString);
-}
-
 nsIFrame* nsIPresShell::GetAbsoluteContainingBlock(nsIFrame *aFrame)
 {
   return FrameConstructor()->GetAbsoluteContainingBlock(aFrame,
@@ -11039,7 +10766,7 @@ nsIPresShell::RecomputeFontSizeInflationEnabled()
         mFontSizeInflationEnabled = false;
         return;
       }
-    } else if (XRE_GetProcessType() == GeckoProcessType_Default) {
+    } else if (XRE_IsParentProcess()) {
       // We're in the master process.  Cancel inflation if it's been
       // explicitly disabled.
       if (FontSizeInflationDisabledInMasterProcess()) {
@@ -11131,4 +10858,38 @@ PresShell::ResumePainting()
 
   mPaintingIsFrozen = false;
   GetPresContext()->RefreshDriver()->Thaw();
+}
+
+void
+nsIPresShell::SyncWindowProperties(nsView* aView)
+{
+  nsIFrame* frame = aView->GetFrame();
+  if (frame && mPresContext) {
+    nsRenderingContext rcx(CreateReferenceRenderingContext());
+    nsContainerFrame::SyncWindowProperties(mPresContext, frame, aView, &rcx, 0);
+  }
+}
+
+nsresult
+nsIPresShell::HasRuleProcessorUsedByMultipleStyleSets(uint32_t aSheetType,
+                                                      bool* aRetVal)
+{
+  nsStyleSet::sheetType type;
+  switch (aSheetType) {
+    case nsIStyleSheetService::AGENT_SHEET:
+      type = nsStyleSet::eAgentSheet;
+      break;
+    case nsIStyleSheetService::USER_SHEET:
+      type = nsStyleSet::eUserSheet;
+      break;
+    case nsIStyleSheetService::AUTHOR_SHEET:
+      type = nsStyleSet::eDocSheet;
+      break;
+    default:
+      MOZ_ASSERT(false, "unexpected aSheetType value");
+      return NS_ERROR_ILLEGAL_VALUE;
+  }
+
+  *aRetVal = mStyleSet->HasRuleProcessorUsedByMultipleStyleSets(type);
+  return NS_OK;
 }

@@ -32,6 +32,8 @@ public:
     nsStyleContext_id,
     nsInheritedStyleData_id,
     nsResetStyleData_id,
+    nsConditionalResetStyleData_id,
+    nsConditionalResetStyleDataEntry_id,
     nsFrameList_id,
 
     CustomCounterStyle_id,
@@ -135,7 +137,7 @@ private:
     { return NS_PTR_TO_INT32(aKey); }
 
     size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
-    { return mEntries.SizeOfExcludingThis(aMallocSizeOf); }
+    { return mEntries.ShallowSizeOfExcludingThis(aMallocSizeOf); }
 
     enum { ALLOW_MEMMOVE = false };
   };

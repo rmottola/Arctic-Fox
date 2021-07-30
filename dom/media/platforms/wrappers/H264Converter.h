@@ -25,7 +25,7 @@ public:
                 const VideoInfo& aConfig,
                 layers::LayersBackend aLayersBackend,
                 layers::ImageContainer* aImageContainer,
-                FlushableMediaTaskQueue* aVideoTaskQueue,
+                FlushableTaskQueue* aVideoTaskQueue,
                 MediaDataDecoderCallback* aCallback);
   virtual ~H264Converter();
 
@@ -34,7 +34,6 @@ public:
   virtual nsresult Flush() override;
   virtual nsresult Drain() override;
   virtual nsresult Shutdown() override;
-  virtual bool IsWaitingMediaResources() override;
   virtual bool IsHardwareAccelerated() const override;
 
   // Return true if mimetype is H.264.
@@ -54,7 +53,7 @@ private:
   VideoInfo mCurrentConfig;
   layers::LayersBackend mLayersBackend;
   nsRefPtr<layers::ImageContainer> mImageContainer;
-  nsRefPtr<FlushableMediaTaskQueue> mVideoTaskQueue;
+  nsRefPtr<FlushableTaskQueue> mVideoTaskQueue;
   MediaDataDecoderCallback* mCallback;
   nsRefPtr<MediaDataDecoder> mDecoder;
   bool mNeedAVCC;

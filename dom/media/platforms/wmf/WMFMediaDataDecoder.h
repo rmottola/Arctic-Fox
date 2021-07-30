@@ -9,9 +9,9 @@
 
 
 #include "WMF.h"
-#include "MP4Reader.h"
 #include "MFTDecoder.h"
 #include "mozilla/RefPtr.h"
+#include "PlatformDecoderModule.h"
 
 namespace mozilla {
 
@@ -55,7 +55,7 @@ public:
 class WMFMediaDataDecoder : public MediaDataDecoder {
 public:
   WMFMediaDataDecoder(MFTManager* aOutputSource,
-                      FlushableMediaTaskQueue* aAudioTaskQueue,
+                      FlushableTaskQueue* aAudioTaskQueue,
                       MediaDataDecoderCallback* aCallback);
   ~WMFMediaDataDecoder();
 
@@ -69,7 +69,6 @@ public:
 
   virtual nsresult Shutdown() override;
 
-  virtual bool IsWaitingMediaResources() { return false; };
   virtual bool IsHardwareAccelerated() const override;
 
 private:
@@ -90,7 +89,7 @@ private:
 
   void ProcessShutdown();
 
-  RefPtr<FlushableMediaTaskQueue> mTaskQueue;
+  RefPtr<FlushableTaskQueue> mTaskQueue;
   MediaDataDecoderCallback* mCallback;
 
   RefPtr<MFTDecoder> mDecoder;

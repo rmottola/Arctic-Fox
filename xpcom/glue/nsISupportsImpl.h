@@ -1084,7 +1084,7 @@ _class::GetInterfaces(uint32_t* _count, nsIID*** _array)                      \
 }                                                                             \
                                                                               \
 NS_IMETHODIMP                                                                 \
-_class::GetHelperForLanguage(uint32_t _language, nsISupports** _retval)       \
+_class::GetScriptableHelper(nsIXPCScriptable** _retval)                       \
 {                                                                             \
   *_retval = nullptr;                                                         \
   return NS_OK;                                                               \
@@ -1108,13 +1108,6 @@ NS_IMETHODIMP                                                                 \
 _class::GetClassID(nsCID** _classID)                                          \
 {                                                                             \
   *_classID = nullptr;                                                        \
-  return NS_OK;                                                               \
-}                                                                             \
-                                                                              \
-NS_IMETHODIMP                                                                 \
-_class::GetImplementationLanguage(uint32_t* _language)                        \
-{                                                                             \
-  *_language = nsIProgrammingLanguage::CPLUSPLUS;                             \
   return NS_OK;                                                               \
 }                                                                             \
                                                                               \

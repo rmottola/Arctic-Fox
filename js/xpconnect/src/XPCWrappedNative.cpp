@@ -17,10 +17,12 @@
 #include "XrayWrapper.h"
 
 #include "nsContentUtils.h"
+#include "nsCycleCollectionNoteRootCallback.h"
 
 #include <stdint.h>
 #include "mozilla/DeferredFinalize.h"
 #include "mozilla/Likely.h"
+#include "mozilla/unused.h"
 #include "mozilla/dom/BindingUtils.h"
 #include <algorithm>
 
@@ -66,7 +68,7 @@ NS_CYCLE_COLLECTION_CLASSNAME(XPCWrappedNative)::Traverse
         NS_IMPL_CYCLE_COLLECTION_DESCRIBE(XPCWrappedNative, tmp->mRefCnt.get())
     }
 
-    if (tmp->mRefCnt.get() > 1) {
+    if (tmp->HasExternalReference()) {
 
         // If our refcount is > 1, our reference to the flat JS object is
         // considered "strong", and we're going to traverse it.
@@ -93,6 +95,25 @@ NS_CYCLE_COLLECTION_CLASSNAME(XPCWrappedNative)::Traverse
 }
 
 void
+XPCWrappedNative::Suspect(nsCycleCollectionNoteRootCallback& cb)
+{
+    if (!IsValid() || IsWrapperExpired())
+        return;
+
+    MOZ_ASSERT(NS_IsMainThread(),
+               "Suspecting wrapped natives from non-main thread");
+
+    // Only record objects that might be part of a cycle as roots, unless
+    // the callback wants all traces (a debug feature). Do this even if
+    // the XPCWN doesn't own the JS reflector object in case the reflector
+    // keeps alive other C++ things. This is safe because if the reflector
+    // had died the reference from the XPCWN to it would have been cleared.
+    JSObject* obj = GetFlatJSObjectPreserveColor();
+    if (JS::ObjectIsMarkedGray(obj) || cb.WantAllTraces())
+        cb.NoteJSRoot(obj);
+}
+
+void
 XPCWrappedNative::NoteTearoffs(nsCycleCollectionTraversalCallback& cb)
 {
     // Tearoffs hold their native object alive. If their JS object hasn't been
@@ -102,13 +123,11 @@ XPCWrappedNative::NoteTearoffs(nsCycleCollectionTraversalCallback& cb)
     // record an edge here.
     XPCWrappedNativeTearOffChunk* chunk;
     for (chunk = &mFirstChunk; chunk; chunk = chunk->mNextChunk) {
-        XPCWrappedNativeTearOff* to = chunk->mTearOffs;
-        for (int i = XPC_WRAPPED_NATIVE_TEAROFFS_PER_CHUNK-1; i >= 0; i--, to++) {
-            JSObject* jso = to->GetJSObjectPreserveColor();
-            if (!jso) {
-                NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb, "tearoff's mNative");
-                cb.NoteXPCOMChild(to->GetNative());
-            }
+        XPCWrappedNativeTearOff* to = &chunk->mTearOff;
+        JSObject* jso = to->GetJSObjectPreserveColor();
+        if (!jso) {
+            NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb, "tearoff's mNative");
+            cb.NoteXPCOMChild(to->GetNative());
         }
     }
 }
@@ -656,16 +675,12 @@ XPCWrappedNative::GatherProtoScriptableCreateInfo(nsIClassInfo* classInfo,
         return;
     }
 
-    nsCOMPtr<nsISupports> possibleHelper;
-    nsresult rv = classInfo->GetHelperForLanguage(nsIProgrammingLanguage::JAVASCRIPT,
-                                                  getter_AddRefs(possibleHelper));
-    if (NS_SUCCEEDED(rv) && possibleHelper) {
-        nsCOMPtr<nsIXPCScriptable> helper(do_QueryInterface(possibleHelper));
-        if (helper) {
-            uint32_t flags = helper->GetScriptableFlags();
-            sciProto.SetCallback(helper.forget());
-            sciProto.SetFlags(XPCNativeScriptableFlags(flags));
-        }
+    nsCOMPtr<nsIXPCScriptable> helper;
+    nsresult rv = classInfo->GetScriptableHelper(getter_AddRefs(helper));
+    if (NS_SUCCEEDED(rv) && helper) {
+        uint32_t flags = helper->GetScriptableFlags();
+        sciProto.SetCallback(helper.forget());
+        sciProto.SetFlags(XPCNativeScriptableFlags(flags));
     }
 }
 
@@ -892,37 +907,24 @@ XPCWrappedNative::FlatJSObjectFinalized()
 
     XPCWrappedNativeTearOffChunk* chunk;
     for (chunk = &mFirstChunk; chunk; chunk = chunk->mNextChunk) {
-        XPCWrappedNativeTearOff* to = chunk->mTearOffs;
-        for (int i = XPC_WRAPPED_NATIVE_TEAROFFS_PER_CHUNK-1; i >= 0; i--, to++) {
-            JSObject* jso = to->GetJSObjectPreserveColor();
-            if (jso) {
-                JS_SetPrivate(jso, nullptr);
+        XPCWrappedNativeTearOff* to = &chunk->mTearOff;
+        JSObject* jso = to->GetJSObjectPreserveColor();
+        if (jso) {
+            JS_SetPrivate(jso, nullptr);
 #ifdef DEBUG
-                JS_UpdateWeakPointerAfterGCUnbarriered(&jso);
-                MOZ_ASSERT(!jso);
+            JS_UpdateWeakPointerAfterGCUnbarriered(&jso);
+            MOZ_ASSERT(!jso);
 #endif
-                to->JSObjectFinalized();
-            }
-
-            // We also need to release any native pointers held...
-            nsISupports* obj = to->GetNative();
-            if (obj) {
-#ifdef XP_WIN
-                // Try to detect free'd pointer
-                MOZ_ASSERT(*(int*)obj != 0xdddddddd, "bad pointer!");
-                MOZ_ASSERT(*(int*)obj != 0,          "bad pointer!");
-#endif
-                XPCJSRuntime* rt = GetRuntime();
-                if (rt) {
-                    DeferredFinalize(obj);
-                } else {
-                    obj->Release();
-                }
-                to->SetNative(nullptr);
-            }
-
-            to->SetInterface(nullptr);
+            to->JSObjectFinalized();
         }
+
+        // We also need to release any native pointers held...
+        nsRefPtr<nsISupports> native = to->TakeNative();
+        if (native && GetRuntime()) {
+            DeferredFinalize(native.forget().take());
+        }
+
+        to->SetInterface(nullptr);
     }
 
     nsWrapperCache* cache = nullptr;
@@ -996,17 +998,15 @@ XPCWrappedNative::SystemIsBeingShutDown()
 
     XPCWrappedNativeTearOffChunk* chunk;
     for (chunk = &mFirstChunk; chunk; chunk = chunk->mNextChunk) {
-        XPCWrappedNativeTearOff* to = chunk->mTearOffs;
-        for (int i = XPC_WRAPPED_NATIVE_TEAROFFS_PER_CHUNK-1; i >= 0; i--, to++) {
-            if (JSObject* jso = to->GetJSObjectPreserveColor()) {
-                JS_SetPrivate(jso, nullptr);
-                to->SetJSObject(nullptr);
-            }
-            // We leak the tearoff mNative
-            // (for the same reason we leak mIdentity - see above).
-            to->SetNative(nullptr);
-            to->SetInterface(nullptr);
+        XPCWrappedNativeTearOff* to = &chunk->mTearOff;
+        if (JSObject* jso = to->GetJSObjectPreserveColor()) {
+            JS_SetPrivate(jso, nullptr);
+            to->SetJSObject(nullptr);
         }
+        // We leak the tearoff mNative
+        // (for the same reason we leak mIdentity - see above).
+        unused << to->TakeNative().take();
+        to->SetInterface(nullptr);
     }
 
     if (mFirstChunk.mNextChunk) {
@@ -1056,26 +1056,6 @@ XPCWrappedNative::ExtendSet(XPCNativeInterface* aInterface)
 }
 
 XPCWrappedNativeTearOff*
-XPCWrappedNative::LocateTearOff(XPCNativeInterface* aInterface)
-{
-    for (XPCWrappedNativeTearOffChunk* chunk = &mFirstChunk;
-         chunk != nullptr;
-         chunk = chunk->mNextChunk) {
-        XPCWrappedNativeTearOff* tearOff = chunk->mTearOffs;
-        XPCWrappedNativeTearOff* const end = tearOff +
-            XPC_WRAPPED_NATIVE_TEAROFFS_PER_CHUNK;
-        for (tearOff = chunk->mTearOffs;
-             tearOff < end;
-             tearOff++) {
-            if (tearOff->GetInterface() == aInterface) {
-                return tearOff;
-            }
-        }
-    }
-    return nullptr;
-}
-
-XPCWrappedNativeTearOff*
 XPCWrappedNative::FindTearOff(XPCNativeInterface* aInterface,
                               bool needJSObject /* = false */,
                               nsresult* pError /* = nullptr */)
@@ -1090,33 +1070,27 @@ XPCWrappedNative::FindTearOff(XPCNativeInterface* aInterface,
     for (lastChunk = chunk = &mFirstChunk;
          chunk;
          lastChunk = chunk, chunk = chunk->mNextChunk) {
-        to = chunk->mTearOffs;
-        XPCWrappedNativeTearOff* const end = chunk->mTearOffs +
-            XPC_WRAPPED_NATIVE_TEAROFFS_PER_CHUNK;
-        for (to = chunk->mTearOffs;
-             to < end;
-             to++) {
-            if (to->GetInterface() == aInterface) {
-                if (needJSObject && !to->GetJSObjectPreserveColor()) {
-                    AutoMarkingWrappedNativeTearOffPtr tearoff(cx, to);
-                    bool ok = InitTearOffJSObject(to);
-                    // During shutdown, we don't sweep tearoffs.  So make sure
-                    // to unmark manually in case the auto-marker marked us.
-                    // We shouldn't ever be getting here _during_ our
-                    // Mark/Sweep cycle, so this should be safe.
-                    to->Unmark();
-                    if (!ok) {
-                        to = nullptr;
-                        rv = NS_ERROR_OUT_OF_MEMORY;
-                    }
+        to = &chunk->mTearOff;
+        if (to->GetInterface() == aInterface) {
+            if (needJSObject && !to->GetJSObjectPreserveColor()) {
+                AutoMarkingWrappedNativeTearOffPtr tearoff(cx, to);
+                bool ok = InitTearOffJSObject(to);
+                // During shutdown, we don't sweep tearoffs.  So make sure
+                // to unmark manually in case the auto-marker marked us.
+                // We shouldn't ever be getting here _during_ our
+                // Mark/Sweep cycle, so this should be safe.
+                to->Unmark();
+                if (!ok) {
+                    to = nullptr;
+                    rv = NS_ERROR_OUT_OF_MEMORY;
                 }
-                if (pError)
-                    *pError = rv;
-                return to;
             }
-            if (!firstAvailable && to->IsAvailable())
-                firstAvailable = to;
+            if (pError)
+                *pError = rv;
+            return to;
         }
+        if (!firstAvailable && to->IsAvailable())
+            firstAvailable = to;
     }
 
     to = firstAvailable;
@@ -1124,7 +1098,7 @@ XPCWrappedNative::FindTearOff(XPCNativeInterface* aInterface,
     if (!to) {
         auto newChunk = new XPCWrappedNativeTearOffChunk();
         lastChunk->mNextChunk = newChunk;
-        to = newChunk->mTearOffs;
+        to = &newChunk->mTearOff;
     }
 
     {
@@ -1163,7 +1137,10 @@ XPCWrappedNative::InitTearOff(XPCWrappedNativeTearOff* aTearOff,
 
     const nsIID* iid = aInterface->GetIID();
     nsISupports* identity = GetIdentityObject();
-    nsISupports* obj;
+
+    // This is an nsRefPtr instead of an nsCOMPtr because it may not be the
+    // canonical nsISupports for this object.
+    nsRefPtr<nsISupports> qiResult;
 
     // If the scriptable helper forbids us from reflecting additional
     // interfaces, then don't even try the QI, just fail.
@@ -1179,16 +1156,15 @@ XPCWrappedNative::InitTearOff(XPCWrappedNativeTearOff* aTearOff,
 
     aTearOff->SetReserved();
 
-    if (NS_FAILED(identity->QueryInterface(*iid, (void**)&obj)) || !obj) {
+    if (NS_FAILED(identity->QueryInterface(*iid, getter_AddRefs(qiResult))) || !qiResult) {
         aTearOff->SetInterface(nullptr);
         return NS_ERROR_NO_INTERFACE;
     }
 
     // Guard against trying to build a tearoff for a shared nsIClassInfo.
     if (iid->Equals(NS_GET_IID(nsIClassInfo))) {
-        nsCOMPtr<nsISupports> alternate_identity(do_QueryInterface(obj));
+        nsCOMPtr<nsISupports> alternate_identity(do_QueryInterface(qiResult));
         if (alternate_identity.get() != identity) {
-            NS_RELEASE(obj);
             aTearOff->SetInterface(nullptr);
             return NS_ERROR_NO_INTERFACE;
         }
@@ -1210,7 +1186,7 @@ XPCWrappedNative::InitTearOff(XPCWrappedNativeTearOff* aTearOff,
     // The code in this block also does a check for the double wrapped
     // nsIPropertyBag case.
 
-    nsCOMPtr<nsIXPConnectWrappedJS> wrappedJS(do_QueryInterface(obj));
+    nsCOMPtr<nsIXPConnectWrappedJS> wrappedJS(do_QueryInterface(qiResult));
     if (wrappedJS) {
         RootedObject jso(cx, wrappedJS->GetJSObject());
         if (jso == mFlatJSObject) {
@@ -1226,7 +1202,6 @@ XPCWrappedNative::InitTearOff(XPCWrappedNativeTearOff* aTearOff,
             // JSObject or a matching Interface before proceeding.
             // I think we can get away with this bit of ugliness.
 
-            NS_RELEASE(obj);
             aTearOff->SetInterface(nullptr);
             return NS_OK;
         }
@@ -1248,7 +1223,6 @@ XPCWrappedNative::InitTearOff(XPCWrappedNativeTearOff* aTearOff,
                 RootedObject answer(cx, clasp->CallQueryInterfaceOnJSObject(cx, jso, *iid));
 
                 if (!answer) {
-                    NS_RELEASE(obj);
                     aTearOff->SetInterface(nullptr);
                     return NS_ERROR_NO_INTERFACE;
                 }
@@ -1259,7 +1233,6 @@ XPCWrappedNative::InitTearOff(XPCWrappedNativeTearOff* aTearOff,
     if (NS_FAILED(nsXPConnect::SecurityManager()->CanCreateWrapper(cx, *iid, identity,
                                                                    GetClassInfo()))) {
         // the security manager vetoed. It should have set an exception.
-        NS_RELEASE(obj);
         aTearOff->SetInterface(nullptr);
         return NS_ERROR_XPC_SECURITY_MANAGER_VETO;
     }
@@ -1270,13 +1243,12 @@ XPCWrappedNative::InitTearOff(XPCWrappedNativeTearOff* aTearOff,
     // previous call might not be correct anymore.
 
     if (!mSet->HasInterface(aInterface) && !ExtendSet(aInterface)) {
-        NS_RELEASE(obj);
         aTearOff->SetInterface(nullptr);
         return NS_ERROR_NO_INTERFACE;
     }
 
     aTearOff->SetInterface(aInterface);
-    aTearOff->SetNative(obj);
+    aTearOff->SetNative(qiResult);
     if (needJSObject && !InitTearOffJSObject(aTearOff))
         return NS_ERROR_OUT_OF_MEMORY;
 
@@ -1327,11 +1299,11 @@ class MOZ_STACK_CLASS CallMethodHelper
     uint8_t mJSContextIndex; // TODO make const
     uint8_t mOptArgcIndex; // TODO make const
 
-    jsval* const mArgv;
+    Value* const mArgv;
     const uint32_t mArgc;
 
     MOZ_ALWAYS_INLINE bool
-    GetArraySizeFromParam(uint8_t paramIndex, uint32_t* result) const;
+    GetArraySizeFromParam(uint8_t paramIndex, HandleValue maybeArray, uint32_t* result);
 
     MOZ_ALWAYS_INLINE bool
     GetInterfaceTypeFromParam(uint8_t paramIndex,
@@ -1421,7 +1393,7 @@ XPCWrappedNative::CallMethod(XPCCallContext& ccx,
 bool
 CallMethodHelper::Call()
 {
-    mCallContext.SetRetVal(JSVAL_VOID);
+    mCallContext.SetRetVal(JS::UndefinedValue());
 
     XPCJSRuntime::Get()->SetPendingException(nullptr);
 
@@ -1480,7 +1452,7 @@ CallMethodHelper::~CallMethodHelper()
                     // We need some basic information to properly destroy the array.
                     uint32_t array_count = 0;
                     nsXPTType datum_type;
-                    if (!GetArraySizeFromParam(i, &array_count) ||
+                    if (!GetArraySizeFromParam(i, UndefinedHandleValue, &array_count) ||
                         !NS_SUCCEEDED(mIFaceInfo->GetTypeForParam(mVTableIndex,
                                                                   &paramInfo,
                                                                   1, &datum_type))) {
@@ -1514,7 +1486,8 @@ CallMethodHelper::~CallMethodHelper()
 
 bool
 CallMethodHelper::GetArraySizeFromParam(uint8_t paramIndex,
-                                        uint32_t* result) const
+                                        HandleValue maybeArray,
+                                        uint32_t* result)
 {
     nsresult rv;
     const nsXPTParamInfo& paramInfo = mMethodInfo->GetParam(paramIndex);
@@ -1524,6 +1497,22 @@ CallMethodHelper::GetArraySizeFromParam(uint8_t paramIndex,
     rv = mIFaceInfo->GetSizeIsArgNumberForParam(mVTableIndex, &paramInfo, 0, &paramIndex);
     if (NS_FAILED(rv))
         return Throw(NS_ERROR_XPC_CANT_GET_ARRAY_INFO, mCallContext);
+
+    // If the array length wasn't passed, it might have been listed as optional.
+    // When converting arguments from JS to C++, we pass the array as |maybeArray|,
+    // and give ourselves the chance to infer the length. Once we have it, we stick
+    // it in the right slot so that we can find it again when cleaning up the params.
+    // from the array.
+    if (paramIndex >= mArgc && maybeArray.isObject()) {
+        MOZ_ASSERT(mMethodInfo->GetParam(paramIndex).IsOptional());
+        RootedObject arrayOrNull(mCallContext, maybeArray.isObject() ? &maybeArray.toObject()
+                                                                     : nullptr);
+        if (!JS_IsArrayObject(mCallContext, maybeArray) ||
+            !JS_GetArrayLength(mCallContext, arrayOrNull, &GetDispatchParam(paramIndex)->val.u32))
+        {
+            return Throw(NS_ERROR_XPC_CANT_CONVERT_OBJECT_TO_ARRAY, mCallContext);
+        }
+    }
 
     *result = GetDispatchParam(paramIndex)->val.u32;
 
@@ -1570,14 +1559,14 @@ CallMethodHelper::GetOutParamSource(uint8_t paramIndex, MutableHandleValue srcp)
     if (paramInfo.IsOut() && !paramInfo.IsRetval()) {
         MOZ_ASSERT(paramIndex < mArgc || paramInfo.IsOptional(),
                    "Expected either enough arguments or an optional argument");
-        jsval arg = paramIndex < mArgc ? mArgv[paramIndex] : JSVAL_NULL;
+        Value arg = paramIndex < mArgc ? mArgv[paramIndex] : JS::NullValue();
         if (paramIndex < mArgc) {
             RootedObject obj(mCallContext);
             if (!arg.isPrimitive())
                 obj = &arg.toObject();
             if (!obj || !JS_GetPropertyById(mCallContext, obj, mIdxValueId, srcp)) {
                 // Explicitly passed in unusable value for out param.  Note
-                // that if i >= mArgc we already know that |arg| is JSVAL_NULL,
+                // that if i >= mArgc we already know that |arg| is JS::NullValue(),
                 // and that's ok.
                 ThrowBadParam(NS_ERROR_XPC_NEED_OUT_OBJECT, paramIndex,
                               mCallContext);
@@ -1620,7 +1609,7 @@ CallMethodHelper::GatherAndConvertResults()
             datum_type = type;
 
         if (isArray || isSizedString) {
-            if (!GetArraySizeFromParam(i, &array_count))
+            if (!GetArraySizeFromParam(i, UndefinedHandleValue, &array_count))
                 return false;
         }
 
@@ -1841,7 +1830,7 @@ CallMethodHelper::ConvertIndependentParam(uint8_t i)
     // indirectly, regardless of in/out-ness.
     if (type_tag == nsXPTType::T_JSVAL) {
         // Root the value.
-        dp->val.j = JSVAL_VOID;
+        dp->val.j.setUndefined();
         if (!js::AddRawValueRoot(mCallContext, &dp->val.j, "XPCWrappedNative::CallMethod param"))
             return false;
     }
@@ -1875,9 +1864,9 @@ CallMethodHelper::ConvertIndependentParam(uint8_t i)
         if (i < mArgc)
             src = mArgv[i];
         else if (type_tag == nsXPTType::T_JSVAL)
-            src = JSVAL_VOID;
+            src.setUndefined();
         else
-            src = JSVAL_NULL;
+            src.setNull();
     }
 
     nsID param_iid;
@@ -1991,7 +1980,7 @@ CallMethodHelper::ConvertDependentParam(uint8_t i)
         // Handle the 'in' case.
         MOZ_ASSERT(i < mArgc || paramInfo.IsOptional(),
                      "Expected either enough arguments or an optional argument");
-        src = i < mArgc ? mArgv[i] : JSVAL_NULL;
+        src = i < mArgc ? mArgv[i] : JS::NullValue();
     }
 
     nsID param_iid;
@@ -2002,7 +1991,7 @@ CallMethodHelper::ConvertDependentParam(uint8_t i)
     nsresult err;
 
     if (isArray || isSizedString) {
-        if (!GetArraySizeFromParam(i, &array_count))
+        if (!GetArraySizeFromParam(i, src, &array_count))
             return false;
 
         if (isArray) {
@@ -2051,7 +2040,7 @@ CallMethodHelper::CleanupParam(nsXPTCMiniVariant& param, nsXPTType& type)
 
     switch (type.TagPart()) {
         case nsXPTType::T_JSVAL:
-            js::RemoveRawValueRoot(mCallContext, (jsval*)&param.val);
+            js::RemoveRawValueRoot(mCallContext, (Value*)&param.val);
             break;
         case nsXPTType::T_INTERFACE:
         case nsXPTType::T_INTERFACE_IS:

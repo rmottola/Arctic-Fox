@@ -1,4 +1,5 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -56,8 +57,10 @@ struct ManifestDirective
   const char* directive;
   int argc;
 
-  // Some directives should only be delivered for NS_COMPONENT_LOCATION
-  // manifests.
+  // Binary components are only allowed for APP locations.
+  bool apponly;
+
+  // Some directives should only be delivered for APP or EXTENSION locations.
   bool componentonly;
 
   bool ischrome;
@@ -88,56 +91,56 @@ struct ManifestDirective
 };
 static const ManifestDirective kParsingTable[] = {
   {
-    "manifest",         1, false, true, true, false,
+    "manifest",         1, false, false, true, true, false,
     &nsComponentManagerImpl::ManifestManifest, nullptr, XPTONLY_MANIFEST
   },
   {
-    "binary-component", 1, true, false, false, false,
+    "binary-component", 1, false, true, false, false, false,
     &nsComponentManagerImpl::ManifestBinaryComponent, nullptr, nullptr
   },
   {
-    "interfaces",       1, true, false, false, false,
+    "interfaces",       1, false, true, false, false, false,
     &nsComponentManagerImpl::ManifestXPT, nullptr, XPTONLY_XPT
   },
   {
-    "component",        2, true, false, false, false,
+    "component",        2, false, true, false, false, false,
     &nsComponentManagerImpl::ManifestComponent, nullptr, nullptr
   },
   {
-    "contract",         2, true, false, false, false,
+    "contract",         2, false, true, false, false, false,
     &nsComponentManagerImpl::ManifestContract, nullptr, nullptr, true
   },
   {
-    "category",         3, true, false, false, false,
+    "category",         3, false, true, false, false, false,
     &nsComponentManagerImpl::ManifestCategory, nullptr, nullptr
   },
   {
-    "content",          2, true, true, true,  true,
+    "content",          2, false, true, true, true,  true,
     nullptr, &nsChromeRegistry::ManifestContent, nullptr
   },
   {
-    "locale",           3, true, true, true, false,
+    "locale",           3, false, true, true, true, false,
     nullptr, &nsChromeRegistry::ManifestLocale, nullptr
   },
   {
-    "skin",             3, false, true, true, false,
+    "skin",             3, false, false, true, true, false,
     nullptr, &nsChromeRegistry::ManifestSkin, nullptr
   },
   {
-    "overlay",          2, true, true, false, false,
+    "overlay",          2, false, true, true, false, false,
     nullptr, &nsChromeRegistry::ManifestOverlay, nullptr
   },
   {
-    "style",            2, false, true, false, false,
+    "style",            2, false, false, true, false, false,
     nullptr, &nsChromeRegistry::ManifestStyle, nullptr
   },
   { // NB: note that while skin manifests can use this, they are only allowed
     // to use it for chrome://../skin/ URLs
-    "override",         2, false, true, true, false,
+    "override",         2, false, false, true, true, false,
     nullptr, &nsChromeRegistry::ManifestOverride, nullptr
   },
   {
-    "resource",         2, true, true, true, false,
+    "resource",         2, false, true, true, true, false,
     nullptr, &nsChromeRegistry::ManifestResource, nullptr
   }
 };
@@ -508,7 +511,7 @@ ParseManifest(NSLocationType aType, FileLocation& aFile, char* aBuf,
 
   nsAutoString appID;
   nsAutoString appVersion;
-  nsAutoString goannaVersion;
+  nsAutoString geckoVersion;
   nsAutoString osTarget;
   nsAutoString abi;
   nsAutoString process;
@@ -533,7 +536,7 @@ ParseManifest(NSLocationType aType, FileLocation& aFile, char* aBuf,
 
     rv = xapp->GetPlatformVersion(s);
     if (NS_SUCCEEDED(rv)) {
-      CopyUTF8toUTF16(s, goannaVersion);
+      CopyUTF8toUTF16(s, geckoVersion);
     }
 
     nsCOMPtr<nsIXULRuntime> xruntime(do_QueryInterface(xapp));
@@ -585,7 +588,7 @@ ParseManifest(NSLocationType aType, FileLocation& aFile, char* aBuf,
   }
 #endif
 
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     process = kContent;
   } else {
     process = kMain;
@@ -655,6 +658,12 @@ ParseManifest(NSLocationType aType, FileLocation& aFile, char* aBuf,
       continue;
     }
 
+    if (directive->apponly && NS_APP_LOCATION != aType) {
+      LogMessageWithContext(aFile, line,
+                            "Only application manifests may use the '%s' directive.", token);
+      continue;
+    }
+
     if (directive->componentonly && NS_SKIN_LOCATION == aType) {
       LogMessageWithContext(aFile, line,
                             "Skin manifest not allowed to use '%s' directive.",
@@ -699,7 +708,7 @@ ParseManifest(NSLocationType aType, FileLocation& aFile, char* aBuf,
           CheckStringFlag(kProcess, wtoken, process, stProcess) ||
           CheckVersionFlag(kOsVersion, wtoken, osVersion, stOsVersion) ||
           CheckVersionFlag(kAppVersion, wtoken, appVersion, stAppVersion) ||
-          CheckVersionFlag(kGeckoVersion, wtoken, goannaVersion, stGeckoVersion)) {
+          CheckVersionFlag(kGeckoVersion, wtoken, geckoVersion, stGeckoVersion)) {
         continue;
       }
 

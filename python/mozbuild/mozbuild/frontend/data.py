@@ -15,7 +15,7 @@ contains the code for converting executed mozbuild files into these data
 structures.
 """
 
-from __future__ import unicode_literals
+from __future__ import absolute_import, unicode_literals
 
 from mozbuild.util import (
     shell_quote,
@@ -157,17 +157,19 @@ class XPIDLFile(ContextDerived):
     """Describes an XPIDL file to be compiled."""
 
     __slots__ = (
+        'add_to_manifest',
         'basename',
         'install_target',
         'source_path',
     )
 
-    def __init__(self, context, source, module):
+    def __init__(self, context, source, module, add_to_manifest):
         ContextDerived.__init__(self, context)
 
         self.source_path = source
         self.basename = mozpath.basename(source)
         self.module = module
+        self.add_to_manifest = add_to_manifest
 
         self.install_target = context['FINAL_TARGET']
 

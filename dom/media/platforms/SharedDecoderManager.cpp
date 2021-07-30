@@ -40,12 +40,6 @@ public:
       mManager->DrainComplete();
     }
   }
-  virtual void NotifyResourcesStatusChanged() override
-  {
-    if (mManager->mActiveCallback) {
-      mManager->mActiveCallback->NotifyResourcesStatusChanged();
-    }
-  }
   virtual void ReleaseMediaResources() override
   {
     if (mManager->mActiveCallback) {
@@ -57,7 +51,7 @@ public:
 };
 
 SharedDecoderManager::SharedDecoderManager()
-  : mTaskQueue(new FlushableMediaTaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER)))
+  : mTaskQueue(new FlushableTaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER)))
   , mActiveProxy(nullptr)
   , mActiveCallback(nullptr)
   , mWaitForInternalDrain(false)
@@ -78,7 +72,7 @@ SharedDecoderManager::CreateVideoDecoder(
   const VideoInfo& aConfig,
   layers::LayersBackend aLayersBackend,
   layers::ImageContainer* aImageContainer,
-  FlushableMediaTaskQueue* aVideoTaskQueue,
+  FlushableTaskQueue* aVideoTaskQueue,
   MediaDataDecoderCallback* aCallback)
 {
   if (!mDecoder) {
@@ -249,12 +243,6 @@ SharedDecoderProxy::Shutdown()
 {
   mManager->SetIdle(this);
   return NS_OK;
-}
-
-bool
-SharedDecoderProxy::IsWaitingMediaResources()
-{
-  return mManager->mDecoder->IsWaitingMediaResources();
 }
 
 bool

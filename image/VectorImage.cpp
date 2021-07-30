@@ -328,8 +328,7 @@ NS_IMPL_ISUPPORTS(VectorImage,
 //------------------------------------------------------------------------------
 // Constructor / Destructor
 
-VectorImage::VectorImage(ProgressTracker* aProgressTracker,
-                         ImageURL* aURI /* = nullptr */) :
+VectorImage::VectorImage(ImageURL* aURI /* = nullptr */) :
   ImageResource(aURI), // invoke superclass's constructor
   mLockCount(0),
   mIsInitialized(false),
@@ -337,9 +336,7 @@ VectorImage::VectorImage(ProgressTracker* aProgressTracker,
   mIsDrawing(false),
   mHaveAnimations(false),
   mHasPendingInvalidation(false)
-{
-  mProgressTrackerInit = new ProgressTrackerInit(this, aProgressTracker);
-}
+{ }
 
 VectorImage::~VectorImage()
 {
@@ -714,6 +711,12 @@ VectorImage::GetFrame(uint32_t aWhichFrame,
                      Nothing(), aFlags);
 
   return result == DrawResult::SUCCESS ? dt->Snapshot() : nullptr;
+}
+
+NS_IMETHODIMP_(bool)
+VectorImage::IsImageContainerAvailable(LayerManager* aManager, uint32_t aFlags)
+{
+  return false;
 }
 
 //******************************************************************************
@@ -1252,6 +1255,15 @@ VectorImage::InvalidateObserversOnNextRefreshDriverTick()
     mHasPendingInvalidation = true;
   } else {
     SendInvalidationNotifications();
+  }
+}
+
+void
+VectorImage::PropagateUseCounters(nsIDocument* aParentDocument)
+{
+  nsIDocument* doc = mSVGDocumentWrapper->GetDocument();
+  if (doc) {
+    doc->PropagateUseCounters(aParentDocument);
   }
 }
 

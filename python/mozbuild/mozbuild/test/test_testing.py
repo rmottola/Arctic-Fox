@@ -107,10 +107,10 @@ ALL_TESTS_JSON = b'''
             "dir_relpath": "mobile/android/tests/background/junit3/src/common",
             "file_relpath": "mobile/android/tests/background/junit3/src/common/TestAndroidLogWriters.java",
             "flavor": "instrumentation",
-            "here": "/Users/nalexander/Mozilla/goanna-dev/mobile/android/tests/background/junit3",
-            "manifest": "/Users/nalexander/Mozilla/goanna-dev/mobile/android/tests/background/junit3/instrumentation.ini",
+            "here": "/Users/nalexander/Mozilla/gecko-dev/mobile/android/tests/background/junit3",
+            "manifest": "/Users/nalexander/Mozilla/gecko-dev/mobile/android/tests/background/junit3/instrumentation.ini",
             "name": "src/common/TestAndroidLogWriters.java",
-            "path": "/Users/nalexander/Mozilla/goanna-dev/mobile/android/tests/background/junit3/src/common/TestAndroidLogWriters.java",
+            "path": "/Users/nalexander/Mozilla/gecko-dev/mobile/android/tests/background/junit3/src/common/TestAndroidLogWriters.java",
             "relpath": "src/common/TestAndroidLogWriters.java",
             "subsuite": "background"
         }
@@ -120,10 +120,10 @@ ALL_TESTS_JSON = b'''
             "dir_relpath": "mobile/android/tests/browser/junit3/src",
             "file_relpath": "mobile/android/tests/browser/junit3/src/TestDistribution.java",
             "flavor": "instrumentation",
-            "here": "/Users/nalexander/Mozilla/goanna-dev/mobile/android/tests/browser/junit3",
-            "manifest": "/Users/nalexander/Mozilla/goanna-dev/mobile/android/tests/browser/junit3/instrumentation.ini",
+            "here": "/Users/nalexander/Mozilla/gecko-dev/mobile/android/tests/browser/junit3",
+            "manifest": "/Users/nalexander/Mozilla/gecko-dev/mobile/android/tests/browser/junit3/instrumentation.ini",
             "name": "src/TestDistribution.java",
-            "path": "/Users/nalexander/Mozilla/goanna-dev/mobile/android/tests/browser/junit3/src/TestDistribution.java",
+            "path": "/Users/nalexander/Mozilla/gecko-dev/mobile/android/tests/browser/junit3/src/TestDistribution.java",
             "relpath": "src/TestDistribution.java",
             "subsuite": "browser"
         }

@@ -774,7 +774,7 @@ CssHtmlTree.prototype = {
   },
 
   _onCopyColor: function() {
-    clipboardHelper.copyString(this._colorToCopy, this.styleDocument);
+    clipboardHelper.copyString(this._colorToCopy);
   },
 
   /**
@@ -812,7 +812,7 @@ CssHtmlTree.prototype = {
         result = textArray[0];
       }
 
-      clipboardHelper.copyString(result, this.styleDocument);
+      clipboardHelper.copyString(result);
 
       if (event) {
         event.preventDefault();

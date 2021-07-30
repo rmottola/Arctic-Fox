@@ -302,6 +302,8 @@ protected:
     bool mIsFlushingLayout;
 
 private:
+    static const PLDHashTableOps sRequestInfoHashOps;
+
     // A list of kids that are in the middle of their onload calls and will let
     // us know once they're done.  We don't want to fire onload for "normal"
     // DocLoaderIsEmpty calls (those coming from requests finishing in our
@@ -322,9 +324,6 @@ private:
     nsRequestInfo *GetRequestInfo(nsIRequest* aRequest);
     void ClearRequestInfoHash();
     int64_t CalculateMaxProgress();
-    static PLDHashOperator CalcMaxProgressCallback(PLDHashTable* table,
-                                                   PLDHashEntryHdr* hdr,
-                                                   uint32_t number, void* arg);
 ///    void DumpChannelInfo(void);
 
     // used to clear our internal progress state between loads...

@@ -18,8 +18,8 @@ using media::TimeUnit;
 using media::TimeIntervals;
 
 MediaSourceDemuxer::MediaSourceDemuxer()
-  : mTaskQueue(new MediaTaskQueue(GetMediaThreadPool(MediaThreadType::PLAYBACK),
-                                  /* aSupportsTailDispatch = */ false))
+  : mTaskQueue(new TaskQueue(GetMediaThreadPool(MediaThreadType::PLAYBACK),
+                             /* aSupportsTailDispatch = */ false))
   , mMonitor("MediaSourceDemuxer")
 {
   MOZ_ASSERT(NS_IsMainThread());

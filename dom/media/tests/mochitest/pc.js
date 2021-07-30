@@ -28,77 +28,6 @@ const signalingStateTransitions = {
   "closed": []
 }
 
-/**
- * This class provides a state checker for media elements which store
- * a media stream to check for media attribute state and events fired.
- * When constructed by a caller, an object instance is created with
- * a media element, event state checkers for canplaythrough, timeupdate, and
- * time changing on the media element and stream.
- *
- * @param {HTMLMediaElement} element the media element being analyzed
- */
-function MediaElementChecker(element) {
-  this.element = element;
-  this.canPlayThroughFired = false;
-  this.timeUpdateFired = false;
-  this.timePassed = false;
-
-  var elementId = this.element.getAttribute('id');
-
-  // When canplaythrough fires, we track that it's fired and remove the
-  // event listener.
-  var canPlayThroughCallback = () => {
-    info('canplaythrough fired for media element ' + elementId);
-    this.canPlayThroughFired = true;
-    this.element.removeEventListener('canplaythrough', canPlayThroughCallback,
-                                     false);
-  };
-
-  // When timeupdate fires, we track that it's fired and check if time
-  // has passed on the media stream and media element.
-  var timeUpdateCallback = () => {
-    this.timeUpdateFired = true;
-    info('timeupdate fired for media element ' + elementId);
-
-    // If time has passed, then track that and remove the timeupdate event
-    // listener.
-    if(element.mozSrcObject && element.mozSrcObject.currentTime > 0 &&
-       element.currentTime > 0) {
-      info('time passed for media element ' + elementId);
-      this.timePassed = true;
-      this.element.removeEventListener('timeupdate', timeUpdateCallback,
-                                       false);
-    }
-  };
-
-  element.addEventListener('canplaythrough', canPlayThroughCallback, false);
-  element.addEventListener('timeupdate', timeUpdateCallback, false);
-}
-
-MediaElementChecker.prototype = {
-
-  /**
-   * Waits until the canplaythrough & timeupdate events to fire along with
-   * ensuring time has passed on the stream and media element.
-   */
-  waitForMediaFlow: function() {
-    var elementId = this.element.getAttribute('id');
-    info('Analyzing element: ' + elementId);
-
-    return waitUntil(() => this.canPlayThroughFired && this.timeUpdateFired && this.timePassed)
-      .then(() => ok(true, 'Media flowing for ' + elementId));
-  },
-
-  /**
-   * Checks if there is no media flow present by checking that the ready
-   * state of the media element is HAVE_METADATA.
-   */
-  checkForNoMediaFlow: function() {
-    ok(this.element.readyState === HTMLMediaElement.HAVE_METADATA,
-       'Media element has a ready state of HAVE_METADATA');
-  }
-};
-
 // Also remove mode 0 if it's offered
 // Note, we don't bother removing the fmtp lines, which makes a good test
 // for some SDP parsing issues.
@@ -336,8 +265,13 @@ PeerConnectionTest.prototype.createDataChannel = function(options) {
     });
   }
 
-  return Promise.all([localPromise, remotePromise]).then(result => {
-    return { local: result[0], remote: result[1] };
+  // pcRemote.observedNegotiationNeeded might be undefined if
+  // !options.negotiated, which means we just wait on pcLocal
+  return Promise.all([this.pcLocal.observedNegotiationNeeded,
+                      this.pcRemote.observedNegotiationNeeded]).then(() => {
+    return Promise.all([localPromise, remotePromise]).then(result => {
+      return { local: result[0], remote: result[1] };
+    });
   });
 };
 
@@ -611,7 +545,7 @@ function DataChannelWrapper(dataChannel, peerConnectionWrapper) {
       is(this.readyState, "open", "data channel is 'open' after 'onopen'");
       resolve(this);
     };
-  }), 60000, "channel didn't open in time");
+  }), 180000, "channel didn't open in time");
 }
 
 DataChannelWrapper.prototype = {
@@ -712,6 +646,39 @@ DataChannelWrapper.prototype = {
 
 
 /**
+ * This class provides helpers around analysing the audio content in a stream
+ * using WebAudio AnalyserNodes.
+ *
+ * @constructor
+ * @param {object} stream
+ *                 A MediaStream object whose audio track we shall analyse.
+ */
+function AudioStreamAnalyser(stream) {
+  if (stream.getAudioTracks().length === 0) {
+    throw new Error("No audio track in stream");
+  }
+  this.stream = stream;
+  this.audioContext = new AudioContext();
+  this.sourceNode = this.audioContext.createMediaStreamSource(this.stream);
+  this.analyser = this.audioContext.createAnalyser();
+  this.sourceNode.connect(this.analyser);
+  this.data = new Uint8Array(this.analyser.frequencyBinCount);
+}
+
+AudioStreamAnalyser.prototype = {
+  /**
+   * Get an array of frequency domain data for our stream's audio track.
+   *
+   * @returns {array} A Uint8Array containing the frequency domain data.
+   */
+  getByteFrequencyData: function() {
+    this.analyser.getByteFrequencyData(this.data);
+    return this.data;
+  }
+};
+
+
+/**
  * This class acts as a wrapper around a PeerConnection instance.
  *
  * @constructor
@@ -731,7 +698,7 @@ function PeerConnectionWrapper(label, configuration, h264) {
   this.constraints = [ ];
   this.offerOptions = {};
   this.streams = [ ];
-  this.mediaCheckers = [ ];
+  this.mediaElements = [ ];
 
   this.dataChannels = [ ];
 
@@ -742,13 +709,11 @@ function PeerConnectionWrapper(label, configuration, h264) {
   this.remoteRequiresTrickleIce = false;
   this.localMediaElements = [];
 
-  this.expectedLocalTrackTypesById = {};
-  this.expectedRemoteTrackTypesById = {};
-  this.observedRemoteTrackTypesById = {};
+  this.expectedLocalTrackInfoById = {};
+  this.expectedRemoteTrackInfoById = {};
+  this.observedRemoteTrackInfoById = {};
 
   this.disableRtpCountChecking = false;
-
-  this.negotiationNeededFired = false;
 
   this.iceCheckingRestartExpected = false;
 
@@ -859,6 +824,7 @@ PeerConnectionWrapper.prototype = {
     this.streams.push(stream);
 
     if (side === 'local') {
+      this.expectNegotiationNeeded();
       // In order to test both the addStream and addTrack APIs, we do video one
       // way and audio + audiovideo the other.
       if (type == "video") {
@@ -875,12 +841,15 @@ PeerConnectionWrapper.prototype = {
       stream.getTracks().forEach(track => {
         ok(track.id, "track has id");
         ok(track.kind, "track has kind");
-        this.expectedLocalTrackTypesById[track.id] = track.kind;
+        this.expectedLocalTrackInfoById[track.id] = {
+            type: track.kind,
+            streamId: stream.id
+          };
       });
     }
 
     var element = createMediaElement(type, this.label + '_' + side + this.streams.length);
-    this.mediaCheckers.push(new MediaElementChecker(element));
+    this.mediaElements.push(element);
     element.mozSrcObject = stream;
     element.play();
 
@@ -888,19 +857,25 @@ PeerConnectionWrapper.prototype = {
     // Don't store remote ones because they should stop when the PC does.
     if (side === 'local') {
       this.localMediaElements.push(element);
+      return this.observedNegotiationNeeded;
     }
   },
 
   removeSender : function(index) {
     var sender = this._pc.getSenders()[index];
-    delete this.expectedLocalTrackTypesById[sender.track.id];
+    delete this.expectedLocalTrackInfoById[sender.track.id];
+    this.expectNegotiationNeeded();
     this._pc.removeTrack(sender);
+    return this.observedNegotiationNeeded;
   },
 
-  senderReplaceTrack : function(index, withTrack) {
+  senderReplaceTrack : function(index, withTrack, withStreamId) {
     var sender = this._pc.getSenders()[index];
-    delete this.expectedLocalTrackTypesById[sender.track.id];
-    this.expectedLocalTrackTypesById[withTrack.id] = withTrack.kind;
+    delete this.expectedLocalTrackInfoById[sender.track.id];
+    this.expectedLocalTrackInfoById[withTrack.id] = {
+        type: withTrack.kind,
+        streamId: withStreamId
+      };
     return sender.replaceTrack(withTrack);
   },
 
@@ -934,7 +909,7 @@ PeerConnectionWrapper.prototype = {
               " with video track " + track.id);
           });
         }
-        this.attachMedia(stream, type, 'local');
+        return this.attachMedia(stream, type, 'local');
       });
     }));
   },
@@ -963,6 +938,9 @@ PeerConnectionWrapper.prototype = {
     var label = 'channel_' + this.dataChannels.length;
     info(this + ": Create data channel '" + label);
 
+    if (!this.dataChannels.length) {
+      this.expectNegotiationNeeded();
+    }
     var channel = this._pc.createDataChannel(label, options);
     var wrapper = new DataChannelWrapper(channel, this);
     this.dataChannels.push(wrapper);
@@ -1006,6 +984,7 @@ PeerConnectionWrapper.prototype = {
    *        mozRTCSessionDescription for the local description request
    */
   setLocalDescription : function(desc) {
+    this.observedNegotiationNeeded = undefined;
     return this._pc.setLocalDescription(desc).then(() => {
       info(this + ": Successfully set the local description");
     });
@@ -1036,6 +1015,7 @@ PeerConnectionWrapper.prototype = {
    *        mozRTCSessionDescription for the remote description request
    */
   setRemoteDescription : function(desc) {
+    this.observedNegotiationNeeded = undefined;
     return this._pc.setRemoteDescription(desc).then(() => {
       info(this + ": Successfully set remote description");
       this.releaseIceCandidates();
@@ -1081,20 +1061,23 @@ PeerConnectionWrapper.prototype = {
   /**
    * Checks whether a given track is expected, has not been observed yet, and
    * is of the correct type. Then, moves the track from
-   * |expectedTrackTypesById| to |observedTrackTypesById|.
+   * |expectedTrackInfoById| to |observedTrackInfoById|.
    */
   checkTrackIsExpected : function(track,
-                                  expectedTrackTypesById,
-                                  observedTrackTypesById) {
-    ok(expectedTrackTypesById[track.id], "track id " + track.id + " was expected");
-    ok(!observedTrackTypesById[track.id], "track id " + track.id + " was not yet observed");
+                                  expectedTrackInfoById,
+                                  observedTrackInfoById) {
+    ok(expectedTrackInfoById[track.id], "track id " + track.id + " was expected");
+    ok(!observedTrackInfoById[track.id], "track id " + track.id + " was not yet observed");
     var observedKind = track.kind;
-    var expectedKind = expectedTrackTypesById[track.id];
+    var expectedKind = expectedTrackInfoById[track.id].type;
     is(observedKind, expectedKind,
         "track id " + track.id + " was of kind " +
         observedKind + ", which matches " + expectedKind);
-    observedTrackTypesById[track.id] = expectedTrackTypesById[track.id];
-    delete expectedTrackTypesById[track.id];
+    observedTrackInfoById[track.id] = expectedTrackInfoById[track.id];
+  },
+
+  allExpectedTracksAreObserved: function(expected, observed) {
+    return Object.keys(expected).every(trackId => observed[trackId]);
   },
 
   setupAddStreamEventHandler: function() {
@@ -1112,11 +1095,12 @@ PeerConnectionWrapper.prototype = {
 
       event.stream.getTracks().forEach(track => {
         this.checkTrackIsExpected(track,
-                                  this.expectedRemoteTrackTypesById,
-                                  this.observedRemoteTrackTypesById);
+                                  this.expectedRemoteTrackInfoById,
+                                  this.observedRemoteTrackInfoById);
       });
 
-      if (Object.keys(this.expectedRemoteTrackTypesById).length === 0) {
+      if (this.allExpectedTracksAreObserved(this.expectedRemoteTrackInfoById,
+                                            this.observedRemoteTrackInfoById)) {
         resolveAllAddStreamEventsDone();
       }
 
@@ -1153,21 +1137,18 @@ PeerConnectionWrapper.prototype = {
       return;
     }
     this.holdIceCandidates.then(() => {
-      this.addIceCandidate(candidate);
-    });
-  },
-
-  /**
-   * Adds an ICE candidate and automatically handles the failure case.
-   *
-   * @param {object} candidate
-   *        SDP candidate
-   */
-  addIceCandidate : function(candidate) {
-    info(this + ": adding ICE candidate " + JSON.stringify(candidate));
-    return this._pc.addIceCandidate(candidate).then(() => {
-      info(this + ": Successfully added an ICE candidate");
-    });
+      info(this + ": adding ICE candidate " + JSON.stringify(candidate));
+      return this._pc.addIceCandidate(candidate);
+    })
+    .then(() => ok(true, this + " successfully added an ICE candidate"))
+    .catch(e =>
+      // The onicecandidate callback runs independent of the test steps
+      // and therefore errors thrown from in there don't get caught by the
+      // race of the Promises around our test steps.
+      // Note: as long as we are queuing ICE candidates until the success
+      //       of sRD() this should never ever happen.
+      ok(false, this + " adding ICE candidate failed with: " + e.message)
+    );
   },
 
   /**
@@ -1363,24 +1344,14 @@ PeerConnectionWrapper.prototype = {
   },
 
   checkLocalMediaTracks : function() {
-    var observedLocalTrackTypesById = {};
-    // We do not want to empty out this.expectedLocalTrackTypesById, so make a
-    // copy.
-    var expectedLocalTrackTypesById =
-      JSON.parse(JSON.stringify((this.expectedLocalTrackTypesById)));
-    info(this + " Checking local tracks " +
-         JSON.stringify(expectedLocalTrackTypesById));
-    this._pc.getLocalStreams().forEach(stream => {
-      stream.getTracks().forEach(track => {
-        this.checkTrackIsExpected(track,
-                                  expectedLocalTrackTypesById,
-                                  observedLocalTrackTypesById);
-      });
+    var observed = {};
+    info(this + " Checking local tracks " + JSON.stringify(this.expectedLocalTrackInfoById));
+    this._pc.getSenders().forEach(sender => {
+      this.checkTrackIsExpected(sender.track, this.expectedLocalTrackInfoById, observed);
     });
 
-    Object.keys(expectedLocalTrackTypesById).forEach(id => {
-      ok(false, this + " local id " + id + " was observed");
-    });
+    Object.keys(this.expectedLocalTrackInfoById).forEach(
+        id => ok(observed[id], this + " local id " + id + " was observed"));
   },
 
   /**
@@ -1393,10 +1364,11 @@ PeerConnectionWrapper.prototype = {
     this.checkLocalMediaTracks();
 
     info(this + " Checking remote tracks " +
-         JSON.stringify(this.expectedRemoteTrackTypesById));
+         JSON.stringify(this.expectedRemoteTrackInfoById));
 
     // No tracks are expected
-    if (Object.keys(this.expectedRemoteTrackTypesById).length === 0) {
+    if (this.allExpectedTracksAreObserved(this.expectedRemoteTrackInfoById,
+                                          this.observedRemoteTrackInfoById)) {
       return;
     }
 
@@ -1404,19 +1376,18 @@ PeerConnectionWrapper.prototype = {
   },
 
   checkMsids: function() {
-    var checkSdpForMsids = (desc, streams, side) => {
-      streams.forEach(stream => {
-        stream.getTracks().forEach(track => {
-          ok(desc.sdp.match(new RegExp("a=msid:" + stream.id + " " + track.id)),
-             this + ": " + side + " SDP contains stream " + stream.id +
-             " and track " + track.id );
-        });
+    var checkSdpForMsids = (desc, expectedTrackInfo, side) => {
+      Object.keys(expectedTrackInfo).forEach(trackId => {
+        var streamId = expectedTrackInfo[trackId].streamId;
+        ok(desc.sdp.match(new RegExp("a=msid:" + streamId + " " + trackId)),
+           this + ": " + side + " SDP contains stream " + streamId +
+           " and track " + trackId );
       });
     };
 
-    checkSdpForMsids(this.localDescription, this._pc.getLocalStreams(),
+    checkSdpForMsids(this.localDescription, this.expectedLocalTrackInfoById,
                      "local");
-    checkSdpForMsids(this.remoteDescription, this._pc.getRemoteStreams(),
+    checkSdpForMsids(this.remoteDescription, this.expectedRemoteTrackInfoById,
                      "remote");
   },
 
@@ -1481,11 +1452,145 @@ PeerConnectionWrapper.prototype = {
   },
 
   /**
-   * Check that media flow is present on all media elements involved in this
-   * test by waiting for confirmation that media flow is present.
+   * Check that media flow is present on the given media element by waiting for
+   * it to reach ready state HAVE_ENOUGH_DATA and progress time further than
+   * the start of the check.
+   *
+   * This ensures, that the stream being played is producing
+   * data and that at least one video frame has been displayed.
+   *
+   * @param {object} element
+   *        A media element to wait for data flow on.
+   * @returns {Promise}
+   *        A promise that resolves when media is flowing.
    */
-  checkMediaFlowPresent : function() {
-    return Promise.all(this.mediaCheckers.map(checker => checker.waitForMediaFlow()));
+  waitForMediaElementFlow : function(element) {
+    return new Promise(resolve => {
+      info("Checking data flow to element: " + element.id);
+      var haveEnoughData = false;
+      var oncanplay = () => {
+        info("Element " + element.id + " saw 'canplay', " +
+             "meaning HAVE_ENOUGH_DATA was just reached.");
+        haveEnoughData = true;
+        element.removeEventListener("canplay", oncanplay);
+      };
+      var ontimeupdate = () => {
+        info("Element " + element.id + " saw 'timeupdate'" +
+             ", currentTime=" + element.currentTime +
+             "s, readyState=" + element.readyState);
+        if (haveEnoughData || element.readyState == element.HAVE_ENOUGH_DATA) {
+          element.removeEventListener("timeupdate", ontimeupdate);
+          ok(true, "Media flowing for element: " + element.id);
+          resolve();
+        }
+      };
+      element.addEventListener("canplay", oncanplay);
+      element.addEventListener("timeupdate", ontimeupdate);
+    });
+  },
+
+  /**
+   * Wait for RTP packet flow for the given MediaStreamTrack.
+   *
+   * @param {object} track
+   *        A MediaStreamTrack to wait for data flow on.
+   * @returns {Promise}
+   *        A promise that resolves when media is flowing.
+   */
+  waitForRtpFlow(track) {
+    var hasFlow = stats => {
+      var rtpStatsKey = Object.keys(stats)
+        .find(key => !stats[key].isRemote && stats[key].type.endsWith("boundrtp"));
+      ok(rtpStatsKey, "Should have RTP stats for track " + track.id);
+      var rtp = stats[rtpStatsKey];
+      var nrPackets = rtp[rtp.type == "outboundrtp" ? "packetsSent"
+                                                    : "packetsReceived"];
+      info("Track " + track.id + " has " + nrPackets + " " +
+           rtp.type + " RTP packets.");
+      return nrPackets > 0;
+    };
+
+    return new Promise(resolve => {
+      info("Checking RTP packet flow for track " + track.id);
+
+      var waitForFlow = () => {
+        this._pc.getStats(track).then(stats => {
+          if (hasFlow(stats)) {
+            ok(true, "RTP flowing for track " + track.id);
+            resolve();
+          } else {
+            wait(200).then(waitForFlow);
+          }
+        });
+      };
+      waitForFlow();
+    });
+  },
+
+  /**
+   * Wait for presence of video flow on all media elements and rtp flow on
+   * all sending and receiving track involved in this test.
+   *
+   * @returns {Promise}
+   *        A promise that resolves when media flows for all elements and tracks
+   */
+  waitForMediaFlow : function() {
+    return Promise.all([].concat(
+      this.mediaElements.map(element => this.waitForMediaElementFlow(element)),
+      this._pc.getSenders().map(sender => this.waitForRtpFlow(sender.track)),
+      this._pc.getReceivers().map(receiver => this.waitForRtpFlow(receiver.track))));
+  },
+
+  /**
+   * Check that correct audio (typically a flat tone) is flowing to this
+   * PeerConnection. Uses WebAudio AnalyserNodes to compare input and output
+   * audio data in the frequency domain.
+   *
+   * @param {object} from
+   *        A PeerConnectionWrapper whose audio RTPSender we use as source for
+   *        the audio flow check.
+   * @returns {Promise}
+   *        A promise that resolves when we're receiving the tone from |from|.
+   */
+  checkReceivingToneFrom : function(from) {
+    var inputElem = from.localMediaElements[0];
+
+    // As input we use the stream of |from|'s first available audio sender.
+    var inputSenderTracks = from._pc.getSenders().map(sn => sn.track);
+    var inputAudioStream = from._pc.getLocalStreams()
+      .find(s => s.getAudioTracks().some(t => inputSenderTracks.includes(t)));
+    var inputAnalyser = new AudioStreamAnalyser(inputAudioStream);
+
+    // It would have been nice to have a working getReceivers() here, but until
+    // we do, let's use what remote streams we have.
+    var outputAudioStream = this._pc.getRemoteStreams()
+      .find(s => s.getAudioTracks().length > 0);
+    var outputAnalyser = new AudioStreamAnalyser(outputAudioStream);
+
+    var maxWithIndex = (a, b, i) => (b >= a.value) ? { value: b, index: i } : a;
+    var initial = { value: -1, index: -1 };
+
+    return new Promise((resolve, reject) => inputElem.ontimeupdate = () => {
+      var inputData = inputAnalyser.getByteFrequencyData();
+      var outputData = outputAnalyser.getByteFrequencyData();
+
+      var inputMax = inputData.reduce(maxWithIndex, initial);
+      var outputMax = outputData.reduce(maxWithIndex, initial);
+      info("Comparing maxima; input[" + inputMax.index + "] = " + inputMax.value +
+           ", output[" + outputMax.index + "] = " + outputMax.value);
+      if (!inputMax.value || !outputMax.value) {
+        return;
+      }
+
+      // When the input and output maxima are within reasonable distance
+      // from each other, we can be sure that the input tone has made it
+      // through the peer connection.
+      if (Math.abs(inputMax.index - outputMax.index) < 10) {
+        ok(true, "input and output audio data matches");
+        inputElem.ontimeupdate = null;
+        resolve();
+      }
+    });
   },
 
   /**
@@ -1507,11 +1612,6 @@ PeerConnectionWrapper.prototype = {
    */
   checkStats : function(stats, twoMachines) {
     var toNum = obj => obj? obj : 0;
-    var numTracks = streams =>
-        streams.reduce((count, stream) => count +
-                       stream.getAudioTracks().length +
-                       stream.getVideoTracks().length,
-                       0);
 
     const isWinXP = navigator.userAgent.indexOf("Windows NT 5.1") != -1;
 
@@ -1599,8 +1699,8 @@ PeerConnectionWrapper.prototype = {
       });
     is(JSON.stringify(counters), JSON.stringify(counters2),
        "Spec and MapClass variant of RTCStatsReport enumeration agree");
-    var nin = numTracks(this._pc.getRemoteStreams());
-    var nout = numTracks(this._pc.getLocalStreams());
+    var nin = Object.keys(this.expectedRemoteTrackInfoById).length;
+    var nout = Object.keys(this.expectedLocalTrackInfoById).length;
     var ndata = this.dataChannels.length;
 
     // TODO(Bug 957145): Restore stronger inboundrtp test once Bug 948249 is fixed
@@ -1701,6 +1801,14 @@ PeerConnectionWrapper.prototype = {
       var numAudioVideoDataTracks = numAudioTracks + numVideoTracks + numDataTracks;
       info("expected audio + video + data tracks: " + numAudioVideoDataTracks);
       is(numAudioVideoDataTracks, numIceConnections, "stats ICE connections matches expected A/V tracks");
+    }
+  },
+
+  expectNegotiationNeeded : function() {
+    if (!this.observedNegotiationNeeded) {
+      this.observedNegotiationNeeded = new Promise((resolve) => {
+        this.onnegotiationneeded = resolve;
+      });
     }
   },
 

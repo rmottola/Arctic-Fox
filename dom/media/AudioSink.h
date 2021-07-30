@@ -27,6 +27,9 @@ public:
 
   int64_t GetPosition();
 
+  // Thread-safe. Can be called on any thread.
+  int64_t GetEndTime() const;
+
   // Check whether we've pushed more frames to the audio hardware than it has
   // played.
   bool HasUnplayedFrames();
@@ -43,8 +46,7 @@ public:
   void SetPlaybackRate(double aPlaybackRate);
   void SetPreservesPitch(bool aPreservesPitch);
 
-  void StartPlayback();
-  void StopPlayback();
+  void SetPlaying(bool aPlaying);
 
 private:
   ~AudioSink() {}
@@ -91,8 +93,6 @@ private:
   void StartAudioStreamPlaybackIfNeeded();
   void WriteSilence(uint32_t aFrames);
 
-  int64_t GetEndTime();
-
   MediaQueue<AudioData>& AudioQueue();
 
   ReentrantMonitor& GetReentrantMonitor();
@@ -115,7 +115,7 @@ private:
   // microseconds. We can add this to the audio stream position to determine
   // the current audio time. Accessed on audio and state machine thread.
   // Synchronized by decoder monitor.
-  int64_t mStartTime;
+  const int64_t mStartTime;
 
   // PCM frames written to the stream so far.
   Atomic<int64_t> mWritten;
@@ -125,7 +125,7 @@ private:
   // stream error.
   int64_t mLastGoodPosition;
 
-  AudioInfo mInfo;
+  const AudioInfo mInfo;
 
   dom::AudioChannel mChannel;
 
@@ -140,23 +140,6 @@ private:
   bool mSetPreservesPitch;
 
   bool mPlaying;
-
-  class OnAudioEndTimeUpdateTask : public nsRunnable {
-  public:
-    explicit OnAudioEndTimeUpdateTask(MediaDecoderStateMachine* aStateMachine);
-
-    NS_IMETHOD Run() override;
-
-    void Dispatch(int64_t aEndTime);
-    void Cancel();
-
-  private:
-    Mutex mMutex;
-    int64_t mEndTime;
-    nsRefPtr<MediaDecoderStateMachine> mStateMachine;
-  };
-
-  nsRefPtr<OnAudioEndTimeUpdateTask> mOnAudioEndTimeUpdateTask;
 };
 
 } // namespace mozilla

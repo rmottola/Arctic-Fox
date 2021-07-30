@@ -56,13 +56,13 @@ public:
                                     int aArg) override;
   virtual void NotifyMozMouseScrollEvent(const FrameMetrics::ViewID& aScrollId,
                                          const nsString& aEvent) override;
+  virtual void NotifyFlushComplete() override;
 private:
   nsCOMPtr<nsIWidget> mWidget;
   nsRefPtr<APZEventState> mAPZEventState;
   MessageLoop* mUILoop;
 
   void InitializeRoot();
-  float GetPresShellResolution() const;
   nsIPresShell* GetPresShell() const;
   nsIDocument* GetDocument() const;
   already_AddRefed<nsIDOMWindowUtils> GetDOMWindowUtils() const;

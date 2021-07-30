@@ -154,9 +154,10 @@ js::DestroyContext(JSContext* cx, DestroyContextMode mode)
     JS_AbortIfWrongThread(rt);
 
     if (cx->outstandingRequests != 0)
-        MOZ_CRASH();
+        MOZ_CRASH("Attempted to destroy a context while it is in a request.");
 
     cx->roots.checkNoGCRooters();
+    FinishPersistentRootedChains(cx->roots);
 
     if (mode != DCM_NEW_FAILED) {
         if (JSContextCallback cxCallback = rt->cxCallback) {
@@ -263,6 +264,10 @@ PopulateReportBlame(JSContext* cx, JSErrorReport* report)
 
     report->filename = iter.scriptFilename();
     report->lineno = iter.computeLine(&report->column);
+    // XXX: Make the column 1-based as in other browsers, instead of 0-based
+    // which is how SpiderMonkey stores it internally. This will be
+    // unnecessary once bug 1144340 is fixed.
+    report->column++;
     report->isMuted = iter.mutedErrors();
 }
 

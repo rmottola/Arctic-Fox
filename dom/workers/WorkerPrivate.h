@@ -9,6 +9,7 @@
 
 #include "Workers.h"
 
+#include "nsIContentPolicy.h"
 #include "nsIContentSecurityPolicy.h"
 #include "nsILoadGroup.h"
 #include "nsIWorkerDebugger.h"
@@ -37,6 +38,7 @@ class nsIDocument;
 class nsIEventTarget;
 class nsIPrincipal;
 class nsIScriptContext;
+class nsISerializable;
 class nsIThread;
 class nsIThreadInternal;
 class nsITimer;
@@ -71,6 +73,7 @@ class WorkerDebuggerGlobalScope;
 class WorkerGlobalScope;
 class WorkerPrivate;
 class WorkerRunnable;
+class WorkerStructuredCloneClosure;
 class WorkerThread;
 
 // SharedMutex is a small wrapper around an (internal) reference-counted Mutex
@@ -185,7 +188,9 @@ private:
   bool mMainThreadObjectsForgotten;
   WorkerType mWorkerType;
   TimeStamp mCreationTimeStamp;
+  DOMHighResTimeStamp mCreationTimeHighRes;
   TimeStamp mNowBaseTimeStamp;
+  DOMHighResTimeStamp mNowBaseTimeHighRes;
 
 protected:
   // The worker is owned by its thread, which is represented here.  This is set
@@ -227,7 +232,7 @@ private:
                       ErrorResult& aRv);
 
   nsresult
-  DispatchPrivate(WorkerRunnable* aRunnable, nsIEventTarget* aSyncLoopTarget);
+  DispatchPrivate(already_AddRefed<WorkerRunnable>&& aRunnable, nsIEventTarget* aSyncLoopTarget);
 
 public:
   virtual JSObject*
@@ -252,19 +257,19 @@ public:
   }
 
   nsresult
-  Dispatch(WorkerRunnable* aRunnable)
+  Dispatch(already_AddRefed<WorkerRunnable>&& aRunnable)
   {
-    return DispatchPrivate(aRunnable, nullptr);
+    return DispatchPrivate(Move(aRunnable), nullptr);
   }
 
   nsresult
-  DispatchControlRunnable(WorkerControlRunnable* aWorkerControlRunnable);
+  DispatchControlRunnable(already_AddRefed<WorkerControlRunnable>&& aWorkerControlRunnable);
 
   nsresult
-  DispatchDebuggerRunnable(WorkerRunnable* aDebuggerRunnable);
+  DispatchDebuggerRunnable(already_AddRefed<WorkerRunnable>&& aDebuggerRunnable);
 
   already_AddRefed<WorkerRunnable>
-  MaybeWrapAsWorkerRunnable(nsIRunnable* aRunnable);
+  MaybeWrapAsWorkerRunnable(already_AddRefed<nsIRunnable>&& aRunnable);
 
   already_AddRefed<nsIEventTarget>
   GetEventTarget();
@@ -345,7 +350,7 @@ public:
                                JSContext* aCx,
                                uint64_t aMessagePortSerial,
                                JSAutoStructuredCloneBuffer&& aBuffer,
-                               nsTArray<nsCOMPtr<nsISupports>>& aClonedObjects);
+                               WorkerStructuredCloneClosure& aClosure);
 
   void
   UpdateRuntimeOptions(JSContext* aCx,
@@ -463,6 +468,12 @@ public:
     return mLoadInfo.mWindowID;
   }
 
+  uint64_t
+  ServiceWorkerID() const
+  {
+    return mLoadInfo.mServiceWorkerID;
+  }
+
   nsIURI*
   GetBaseURI() const
   {
@@ -486,6 +497,35 @@ public:
     MOZ_ASSERT(IsServiceWorker());
     AssertIsOnMainThread();
     return mLoadInfo.mServiceWorkerCacheName;
+  }
+
+  const ChannelInfo&
+  GetChannelInfo() const
+  {
+    MOZ_ASSERT(IsServiceWorker());
+    return mLoadInfo.mChannelInfo;
+  }
+
+  void
+  SetChannelInfo(const ChannelInfo& aChannelInfo)
+  {
+    MOZ_ASSERT(IsServiceWorker());
+    AssertIsOnMainThread();
+    MOZ_ASSERT(!mLoadInfo.mChannelInfo.IsInitialized());
+    MOZ_ASSERT(aChannelInfo.IsInitialized());
+    mLoadInfo.mChannelInfo = aChannelInfo;
+  }
+
+  void
+  InitChannelInfo(nsIChannel* aChannel)
+  {
+    mLoadInfo.mChannelInfo.InitFromChannel(aChannel);
+  }
+
+  void
+  InitChannelInfo(const ChannelInfo& aChannelInfo)
+  {
+    mLoadInfo.mChannelInfo = aChannelInfo;
   }
 
   // This is used to handle importScripts(). When the worker is first loaded
@@ -516,9 +556,19 @@ public:
     return mCreationTimeStamp;
   }
 
+  DOMHighResTimeStamp CreationTimeHighRes() const
+  {
+    return mCreationTimeHighRes;
+  }
+
   TimeStamp NowBaseTimeStamp() const
   {
     return mNowBaseTimeStamp;
+  }
+
+  DOMHighResTimeStamp NowBaseTimeHighRes() const
+  {
+    return mNowBaseTimeHighRes;
   }
 
   nsIPrincipal*
@@ -578,12 +628,7 @@ public:
     return mLoadInfo.mChannel.forget();
   }
 
-  nsIDocument*
-  GetDocument() const
-  {
-    AssertIsOnMainThread();
-    return mLoadInfo.mWindow ? mLoadInfo.mWindow->GetExtantDoc() : nullptr;
-  }
+  nsIDocument* GetDocument() const;
 
   nsPIDOMWindow*
   GetWindow()
@@ -689,6 +734,28 @@ public:
     return mWorkerType == WorkerTypeService;
   }
 
+  nsContentPolicyType
+  ContentPolicyType() const
+  {
+    return ContentPolicyType(mWorkerType);
+  }
+
+  static nsContentPolicyType
+  ContentPolicyType(WorkerType aWorkerType)
+  {
+    switch (aWorkerType) {
+    case WorkerTypeDedicated:
+      return nsIContentPolicy::TYPE_INTERNAL_WORKER;
+    case WorkerTypeShared:
+      return nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER;
+    case WorkerTypeService:
+      return nsIContentPolicy::TYPE_SCRIPT;
+    default:
+      MOZ_ASSERT_UNREACHABLE("Invalid worker type");
+      return nsIContentPolicy::TYPE_INVALID;
+    }
+  }
+
   const nsCString&
   SharedWorkerName() const
   {
@@ -708,6 +775,19 @@ public:
     return mLoadInfo.mIndexedDBAllowed;
   }
 
+  bool
+  IsInPrivateBrowsing() const
+  {
+    return mLoadInfo.mPrivateBrowsing;
+  }
+
+  // Determine if the SW testing per-window flag is set by devtools
+  bool
+  ServiceWorkersTestingInWindow() const
+  {
+    return mLoadInfo.mServiceWorkersTestingInWindow;
+  }
+
   void
   GetAllSharedWorkers(nsTArray<nsRefPtr<SharedWorker>>& aSharedWorkers);
 
@@ -716,6 +796,12 @@ public:
 
   void
   UpdateOverridenLoadGroup(nsILoadGroup* aBaseLoadGroup);
+
+  already_AddRefed<nsIRunnable>
+  StealLoadFailedAsyncRunnable()
+  {
+    return mLoadInfo.mLoadFailedAsyncRunnable.forget();
+  }
 
   IMPL_EVENT_HANDLER(message)
   IMPL_EVENT_HANDLER(error)
@@ -862,9 +948,6 @@ class WorkerPrivate : public WorkerPrivateParent<WorkerPrivate>
   // modifications are done with mMutex held *only* in DEBUG builds.
   nsTArray<nsAutoPtr<SyncLoopInfo>> mSyncLoopStack;
 
-  struct PreemptingRunnableInfo;
-  nsTArray<PreemptingRunnableInfo> mPreemptingRunnableInfos;
-
   nsCOMPtr<nsITimer> mTimer;
 
   nsCOMPtr<nsITimer> mGCTimer;
@@ -874,6 +957,9 @@ class WorkerPrivate : public WorkerPrivateParent<WorkerPrivate>
   nsRefPtr<MemoryReporter> mMemoryReporter;
 
   nsRefPtrHashtable<nsUint64HashKey, MessagePort> mWorkerPorts;
+
+  // fired on the main thread if the worker script fails to load
+  nsCOMPtr<nsIRunnable> mLoadFailedRunnable;
 
   TimeStamp mKillTime;
   uint32_t mErrorHandlerRecursionCount;
@@ -924,7 +1010,8 @@ public:
   static nsresult
   GetLoadInfo(JSContext* aCx, nsPIDOMWindow* aWindow, WorkerPrivate* aParent,
               const nsAString& aScriptURL, bool aIsChromeWorker,
-              LoadGroupBehavior aLoadGroupBehavior, WorkerLoadInfo* aLoadInfo);
+              LoadGroupBehavior aLoadGroupBehavior, WorkerType aWorkerType,
+              WorkerLoadInfo* aLoadInfo);
 
   static void
   OverrideLoadInfoLoadGroup(WorkerLoadInfo& aLoadInfo);
@@ -1194,6 +1281,42 @@ public:
     return mPreferences[WORKERPREF_SERVICEWORKERS];
   }
 
+  // Determine if the SW testing browser-wide pref is set
+  bool
+  ServiceWorkersTestingEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_SERVICEWORKERS_TESTING];
+  }
+
+  bool
+  InterceptionEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_INTERCEPTION_ENABLED];
+  }
+
+  bool
+  OpaqueInterceptionEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_INTERCEPTION_OPAQUE_ENABLED];
+  }
+
+  bool
+  DOMWorkerNotificationEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_DOM_WORKERNOTIFICATION];
+  }
+
+  bool
+  DOMCachesTestingEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_DOM_CACHES_TESTING];
+  }
+
   bool
   OnLine() const
   {
@@ -1211,10 +1334,13 @@ public:
   }
 
   void
-  OnProcessNextEvent(uint32_t aRecursionDepth);
+  ClearMainEventQueue(WorkerRanOrNot aRanOrNot);
 
   void
-  AfterProcessNextEvent(uint32_t aRecursionDepth);
+  OnProcessNextEvent();
+
+  void
+  AfterProcessNextEvent();
 
   void
   AssertValidSyncLoop(nsIEventTarget* aSyncLoopTarget)
@@ -1241,19 +1367,14 @@ public:
     return mWorkerScriptExecutedSuccessfully;
   }
 
-  // Just like nsIAppShell::RunBeforeNextEvent. May only be called on the worker
-  // thread.
-  bool
-  RunBeforeNextEvent(nsIRunnable* aRunnable);
+  void
+  MaybeDispatchLoadFailedRunnable();
 
 private:
   WorkerPrivate(JSContext* aCx, WorkerPrivate* aParent,
                 const nsAString& aScriptURL, bool aIsChromeWorker,
                 WorkerType aWorkerType, const nsACString& aSharedWorkerName,
                 WorkerLoadInfo& aLoadInfo);
-
-  void
-  ClearMainEventQueue(WorkerRanOrNot aRanOrNot);
 
   bool
   MayContinueRunning()

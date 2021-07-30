@@ -13,13 +13,13 @@ let { gDevTools } = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {
 let { DevToolsUtils } = Cu.import("resource://gre/modules/devtools/DevToolsUtils.jsm", {});
 let { DebuggerServer } = Cu.import("resource://gre/modules/devtools/dbg-server.jsm", {});
 let { merge } = devtools.require("sdk/util/object");
+let { generateUUID } = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
 let { getPerformanceActorsConnection, PerformanceFront } = devtools.require("devtools/performance/front");
-
-let nsIProfilerModule = Cc["@mozilla.org/tools/profiler;1"].getService(Ci.nsIProfiler);
 let TargetFactory = devtools.TargetFactory;
+
 let mm = null;
 
-const FRAME_SCRIPT_UTILS_URL = "chrome://global/content/devtools/frame-script-utils.js"
+const FRAME_SCRIPT_UTILS_URL = "chrome://browser/content/devtools/frame-script-utils.js"
 const EXAMPLE_URL = "http://example.com/browser/browser/devtools/performance/test/";
 const SIMPLE_URL = EXAMPLE_URL + "doc_simple-test.html";
 
@@ -37,6 +37,7 @@ const INVERT_PREF = "devtools.performance.ui.invert-call-tree";
 const INVERT_FLAME_PREF = "devtools.performance.ui.invert-flame-graph";
 const FLATTEN_PREF = "devtools.performance.ui.flatten-tree-recursion";
 const JIT_PREF = "devtools.performance.ui.show-jit-optimizations";
+const EXPERIMENTAL_PREF = "devtools.performance.ui.experimental";
 
 // All tests are asynchronous.
 waitForExplicitFinish();
@@ -56,7 +57,7 @@ let DEFAULT_PREFS = [
   "devtools.performance.memory.max-log-length",
   "devtools.performance.profiler.buffer-size",
   "devtools.performance.profiler.sample-frequency-khz",
-  "devtools.performance.ui.retro-mode",
+  "devtools.performance.ui.experimental",
 ].reduce((prefs, pref) => {
   prefs[pref] = Preferences.get(pref);
   return prefs;
@@ -68,15 +69,9 @@ Services.prefs.setBoolPref("devtools.performance.enabled", true);
 // be affected by this pref.
 Services.prefs.setBoolPref("devtools.debugger.log", false);
 
-// Disable retro mode.
-// TODO bug 1160313
-Services.prefs.setBoolPref("devtools.performance.ui.retro-mode", false);
-
 /**
  * Call manually in tests that use frame script utils after initializing
- * the tool. Must be called after initializing so we can detect
- * whether or not `content` is a CPOW or not. Call after init but before navigating
- * to different pages.
+ * the tool. Must be called after initializing (once we have a tab).
  */
 function loadFrameScripts () {
   mm = gBrowser.selectedBrowser.messageManager;
@@ -91,9 +86,6 @@ registerCleanupFunction(() => {
   Object.keys(DEFAULT_PREFS).forEach(pref => {
     Preferences.set(pref, DEFAULT_PREFS[pref]);
   });
-
-  // Make sure the profiler module is stopped when the test finishes.
-  nsIProfilerModule.StopProfiler();
 
   Cu.forceGC();
 });
@@ -509,6 +501,16 @@ function reload (aTarget, aEvent = "navigate") {
 }
 
 /**
+* Forces cycle collection and GC, used in AudioNode destruction tests.
+*/
+function forceCC () {
+  info("Triggering GC/CC...");
+  SpecialPowers.DOMWindowUtils.cycleCollect();
+  SpecialPowers.DOMWindowUtils.garbageCollect();
+  SpecialPowers.DOMWindowUtils.garbageCollect();
+}
+
+/**
  * Inflate a particular sample's stack and return an array of strings.
  */
 function getInflatedStackLocations(thread, sample) {
@@ -555,7 +557,7 @@ function getFrameNodePath(root, path) {
  * Synthesize a profile for testing.
  */
 function synthesizeProfileForTest(samples) {
-  const { RecordingUtils } = devtools.require("devtools/performance/recording-utils");
+  const RecordingUtils = devtools.require("devtools/performance/recording-utils");
 
   samples.unshift({
     time: 0,
@@ -569,4 +571,40 @@ function synthesizeProfileForTest(samples) {
     samples: samples,
     markers: []
   }, uniqueStacks);
+}
+
+function PMM_isProfilerActive () {
+  return sendProfilerCommand("IsActive");
+}
+
+function PMM_stopProfiler () {
+  return Task.spawn(function*() {
+    let isActive = (yield sendProfilerCommand("IsActive")).isActive;
+    if (isActive) {
+      return sendProfilerCommand("StopProfiler");
+    }
+  });
+}
+
+function sendProfilerCommand (method, args=[]) {
+  let deferred = Promise.defer();
+
+  if (!mm) {
+    throw new Error("`loadFrameScripts()` must be called when using MessageManager.");
+  }
+
+  let id = generateUUID().toString();
+  mm.addMessageListener("devtools:test:profiler:response", handler);
+  mm.sendAsyncMessage("devtools:test:profiler", { method, args, id });
+
+  function handler ({ data }) {
+    if (id !== data.id) {
+      return;
+    }
+
+    mm.removeMessageListener("devtools:test:profiler:response", handler);
+    deferred.resolve(data.data);
+  }
+
+  return deferred.promise;
 }

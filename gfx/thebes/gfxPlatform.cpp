@@ -11,6 +11,7 @@
 #include "mozilla/layers/ISurfaceAllocator.h"     // for GfxMemoryImageReporter
 
 #include "mozilla/Logging.h"
+#include "mozilla/Services.h"
 #include "prprf.h"
 
 #include "gfxPlatform.h"
@@ -31,7 +32,6 @@
 
 #if defined(XP_WIN)
 #include "gfxWindowsPlatform.h"
-#include "gfxD2DSurface.h"
 #elif defined(XP_MACOSX)
 #include "gfxPlatformMac.h"
 #include "gfxQuartzSurface.h"
@@ -107,6 +107,7 @@ class mozilla::gl::SkiaGLGlue : public GenericAtomicRefCounted {
 #include "nsIXULRuntime.h"
 #include "VsyncSource.h"
 #include "SoftwareVsyncSource.h"
+#include "nscore.h" // for NS_FREE_PERMANENT_DATA
 
 namespace mozilla {
 namespace layers {
@@ -119,6 +120,7 @@ void ShutdownTileCache();
 
 using namespace mozilla;
 using namespace mozilla::layers;
+using namespace mozilla::gl;
 
 gfxPlatform *gPlatform = nullptr;
 static bool gEverInitialized = false;
@@ -250,7 +252,7 @@ void CrashStatsLogForwarder::UpdateCrashReport()
            mCrashCriticalKey.get(), message.str().c_str());
   }
 }
-  
+
 void CrashStatsLogForwarder::Log(const std::string& aString)
 {
   MutexAutoLock lock(mMutex);
@@ -417,6 +419,7 @@ gfxPlatform::gfxPlatform()
   , mTileHeight(-1)
   , mAzureCanvasBackendCollector(this, &gfxPlatform::GetAzureBackendInfo)
   , mApzSupportCollector(this, &gfxPlatform::GetApzSupportInfo)
+  , mCompositorBackend(layers::LayersBackend::LAYERS_NONE)
 {
     mAllowDownloadableFonts = UNINITIALIZED_VALUE;
     mFallbackUsesCmaps = UNINITIALIZED_VALUE;
@@ -446,6 +449,12 @@ gfxPlatform::GetPlatform()
         Init();
     }
     return gPlatform;
+}
+
+bool
+gfxPlatform::Initialized()
+{
+  return !!gPlatform;
 }
 
 void RecordingPrefChanged(const char *aPrefName, void *aClosure)
@@ -512,7 +521,7 @@ gfxPlatform::Init()
      * incase that code crashes. See bug #591561. */
     nsCOMPtr<nsIGfxInfo> gfxInfo;
     /* this currently will only succeed on Windows */
-    gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+    gfxInfo = services::GetGfxInfo();
 
 #if defined(XP_WIN)
     gPlatform = new gfxWindowsPlatform;
@@ -529,7 +538,7 @@ gfxPlatform::Init()
 #endif
 
 #ifdef MOZ_GL_DEBUG
-    mozilla::gl::GLContext::StaticInit();
+    GLContext::StaticInit();
 #endif
 
     InitLayersAccelerationPrefs();
@@ -553,7 +562,7 @@ gfxPlatform::Init()
 
     gPlatform->mScreenReferenceSurface =
         gPlatform->CreateOffscreenSurface(IntSize(1, 1),
-                                          gfxContentType::COLOR_ALPHA);
+                                          gfxImageFormat::ARGB32);
     if (!gPlatform->mScreenReferenceSurface) {
         NS_RUNTIMEABORT("Could not initialize mScreenReferenceSurface");
     }
@@ -577,11 +586,11 @@ gfxPlatform::Init()
     gPlatform->mFontPrefsObserver = new FontPrefsObserver();
     Preferences::AddStrongObservers(gPlatform->mFontPrefsObserver, kObservedPrefs);
 
-    mozilla::gl::GLContext::PlatformStartup();
+    GLContext::PlatformStartup();
 
 #ifdef MOZ_WIDGET_ANDROID
     // Texture pool init
-    mozilla::gl::TexturePoolOGL::Init();
+    TexturePoolOGL::Init();
 #endif
 
 #ifdef MOZ_WIDGET_GONK
@@ -661,11 +670,11 @@ gfxPlatform::Shutdown()
 
 #ifdef MOZ_WIDGET_ANDROID
     // Shut down the texture pool
-    mozilla::gl::TexturePoolOGL::Shutdown();
+    TexturePoolOGL::Shutdown();
 #endif
 
     // Shut down the default GL context provider.
-    mozilla::gl::GLContextProvider::Shutdown();
+    GLContextProvider::Shutdown();
 
 #if defined(XP_WIN)
     // The above shutdown calls operate on the available context providers on
@@ -674,11 +683,11 @@ gfxPlatform::Shutdown()
     // We should only support the default GL provider on Windows; then, this
     // could go away. Unfortunately, we currently support WGL (the default) for
     // WebGL on Optimus.
-    mozilla::gl::GLContextProviderEGL::Shutdown();
+    GLContextProviderEGL::Shutdown();
 #endif
 
     // This is a bit iffy - we're assuming that we were the ones that set the
-    // log forwarder in the Factory, so that it's our responsibility to 
+    // log forwarder in the Factory, so that it's our responsibility to
     // delete it.
     delete mozilla::gfx::Factory::GetLogForwarder();
     mozilla::gfx::Factory::SetLogForwarder(nullptr);
@@ -704,7 +713,7 @@ gfxPlatform::InitLayersIPC()
 
     AsyncTransactionTrackersHolder::Initialize();
 
-    if (XRE_GetProcessType() == GeckoProcessType_Default)
+    if (XRE_IsParentProcess())
     {
         mozilla::layers::CompositorParent::StartUp();
 #ifndef MOZ_WIDGET_GONK
@@ -726,7 +735,7 @@ gfxPlatform::ShutdownLayersIPC()
     }
     sLayersIPCIsUp = false;
 
-    if (XRE_GetProcessType() == GeckoProcessType_Default)
+    if (XRE_IsParentProcess())
     {
         // This must happen after the shutdown of media and widgets, which
         // are triggered by the NS_XPCOM_SHUTDOWN_OBSERVER_ID notification.
@@ -753,7 +762,7 @@ gfxPlatform::~gfxPlatform()
     // cairo_debug_* function unconditionally.
     //
     // because cairo can assert and thus crash on shutdown, don't do this in release builds
-#if defined(DEBUG) || defined(NS_BUILD_REFCNT_LOGGING) || defined(MOZ_VALGRIND)
+#ifdef NS_FREE_PERMANENT_DATA
 #ifdef USE_SKIA
     // must do Skia cleanup before Cairo cleanup, because Skia may be referencing
     // Cairo objects e.g. through SkCairoFTTypeface
@@ -902,21 +911,6 @@ gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurfa
 
   RefPtr<SourceSurface> srcBuffer;
 
-#ifdef XP_WIN
-  if (aSurface->GetType() == gfxSurfaceType::D2D &&
-      format != SurfaceFormat::A8) {
-    NativeSurface surf;
-    surf.mFormat = format;
-    surf.mType = NativeSurfaceType::D3D10_TEXTURE;
-    surf.mSurface = static_cast<gfxD2DSurface*>(aSurface)->GetTexture();
-    surf.mSize = aSurface->GetSize();
-    mozilla::gfx::DrawTarget *dt = static_cast<mozilla::gfx::DrawTarget*>(aSurface->GetData(&kDrawTarget));
-    if (dt) {
-      dt->Flush();
-    }
-    srcBuffer = aTarget->CreateSourceSurfaceFromNativeSurface(surf);
-  }
-#endif
   // Currently no other DrawTarget types implement CreateSourceSurfaceFromNativeSurface
 
   if (!srcBuffer) {
@@ -1060,7 +1054,7 @@ gfxPlatform::ComputeTileSize()
 {
   // The tile size should be picked in the parent processes
   // and sent to the child processes over IPDL GetTileSize.
-  if (XRE_GetProcessType() != GeckoProcessType_Default) {
+  if (!XRE_IsParentProcess()) {
     NS_RUNTIMEABORT("wrong process.");
   }
 
@@ -1141,7 +1135,7 @@ gfxPlatform::InitializeSkiaCacheLimits()
   }
 }
 
-mozilla::gl::SkiaGLGlue*
+SkiaGLGlue*
 gfxPlatform::GetSkiaGLGlue()
 {
 #ifdef USE_SKIA_GPU
@@ -1151,14 +1145,13 @@ gfxPlatform::GetSkiaGLGlue()
      * FIXME: This should be stored in TLS or something, since there needs to be one for each thread using it. As it
      * stands, this only works on the main thread.
      */
-    bool requireCompatProfile = true;
-    nsRefPtr<mozilla::gl::GLContext> glContext;
-    glContext = mozilla::gl::GLContextProvider::CreateHeadless(requireCompatProfile);
+    nsRefPtr<GLContext> glContext;
+    glContext = GLContextProvider::CreateHeadless(CreateContextFlags::REQUIRE_COMPAT_PROFILE);
     if (!glContext) {
       printf_stderr("Failed to create GLContext for SkiaGL!\n");
       return nullptr;
     }
-    mSkiaGlue = new mozilla::gl::SkiaGLGlue(glContext);
+    mSkiaGlue = new SkiaGLGlue(glContext);
     MOZ_ASSERT(mSkiaGlue->GetGrContext(), "No GrContext");
     InitializeSkiaCacheLimits();
   }
@@ -1204,8 +1197,7 @@ gfxPlatform::CreateDrawTargetForBackend(BackendType aBackend, const IntSize& aSi
   // CreateOffscreenSurface() and CreateDrawTargetForSurface() for all
   // backends).
   if (aBackend == BackendType::CAIRO) {
-    nsRefPtr<gfxASurface> surf = CreateOffscreenSurface(aSize,
-                                                        ContentForFormat(aFormat));
+    nsRefPtr<gfxASurface> surf = CreateOffscreenSurface(aSize, SurfaceFormatToImageFormat(aFormat));
     if (!surf || surf->CairoStatus()) {
       return nullptr;
     }
@@ -1247,7 +1239,7 @@ gfxPlatform::CreateDrawTargetForData(unsigned char* aData, const IntSize& aSize,
   NS_ASSERTION(mContentBackend != BackendType::NONE, "No backend.");
 
   BackendType backendType = mContentBackend;
-  
+
   if (!Factory::DoesBackendSupportDataDrawtarget(mContentBackend)) {
     backendType = BackendType::CAIRO;
   }
@@ -2242,8 +2234,9 @@ gfxPlatform::OptimalFormatForContent(gfxContentType aContent)
  */
 static bool sLayersSupportsD3D9 = false;
 static bool sLayersSupportsD3D11 = false;
+bool gANGLESupportsD3D11 = false;
 static bool sLayersSupportsHardwareVideoDecoding = false;
-static bool sANGLESupportsD3D11 = false;
+static bool sLayersHardwareVideoDecodingFailed = false;
 static bool sBufferRotationCheckPref = true;
 static bool sPrefBrowserTabsRemoteAutostart = false;
 
@@ -2263,7 +2256,7 @@ InitLayersAccelerationPrefs()
     gfxPrefs::GetSingleton();
     sPrefBrowserTabsRemoteAutostart = BrowserTabsRemoteAutostart();
 
-    nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+    nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
     int32_t status;
 #ifdef XP_WIN
     if (gfxPrefs::LayersAccelerationForceEnabled()) {
@@ -2286,7 +2279,7 @@ InitLayersAccelerationPrefs()
       }
       if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE, &status))) {
         if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
-            sANGLESupportsD3D11 = true;
+          gANGLESupportsD3D11 = true;
         }
       }
     }
@@ -2302,6 +2295,10 @@ InitLayersAccelerationPrefs()
         sLayersSupportsHardwareVideoDecoding = true;
       }
     }
+
+    Preferences::AddBoolVarCache(&sLayersHardwareVideoDecodingFailed,
+                                 "media.hardware-video-decoding.failed",
+                                 false);
 
     sLayersAccelerationPrefsInitialized = true;
   }
@@ -2331,16 +2328,47 @@ gfxPlatform::CanUseHardwareVideoDecoding()
   // this function is called from the compositor thread, so it is not
   // safe to init the prefs etc. from here.
   MOZ_ASSERT(sLayersAccelerationPrefsInitialized);
-  return sLayersSupportsHardwareVideoDecoding;
+  return sLayersSupportsHardwareVideoDecoding && !sLayersHardwareVideoDecodingFailed;
 }
 
 bool
 gfxPlatform::CanUseDirect3D11ANGLE()
 {
   MOZ_ASSERT(sLayersAccelerationPrefsInitialized);
-  return sANGLESupportsD3D11;
+  return gANGLESupportsD3D11;
 }
 
+bool
+gfxPlatform::ShouldUseLayersAcceleration()
+{
+  const char *acceleratedEnv = PR_GetEnv("MOZ_ACCELERATED");
+  if (gfxPrefs::LayersAccelerationDisabled() ||
+      InSafeMode() ||
+      (acceleratedEnv && *acceleratedEnv == '0'))
+  {
+    return false;
+  }
+  if (gfxPrefs::LayersAccelerationForceEnabled()) {
+    return true;
+  }
+  if (AccelerateLayersByDefault()) {
+    return true;
+  }
+  if (acceleratedEnv && *acceleratedEnv != '0') {
+    return true;
+  }
+  return false;
+}
+
+bool
+gfxPlatform::AccelerateLayersByDefault()
+{
+#if defined(MOZ_GL_PROVIDER) || defined(MOZ_WIDGET_UIKIT)
+  return true;
+#else
+  return false;
+#endif
+}
 
 bool
 gfxPlatform::BufferRotationEnabled()
@@ -2388,12 +2416,6 @@ gfxPlatform::UsesOffMainThreadCompositing()
     // Linux users who chose OpenGL are being grandfathered in to OMTC
     result |= gfxPrefs::LayersAccelerationForceEnabled();
 
-#if !defined(NIGHTLY_BUILD)
-    // Yeah, these two env vars do the same thing.
-    // I'm told that one of them is enabled on some test slaves config,
-    // so be slightly careful if you think you can remove one of them.
-    result &= PR_GetEnv("MOZ_USE_OMTC") || PR_GetEnv("MOZ_OMTC_ENABLED");
-#endif
 #endif
     firstTime = false;
   }
@@ -2405,7 +2427,7 @@ gfxPlatform::UsesOffMainThreadCompositing()
 already_AddRefed<mozilla::gfx::VsyncSource>
 gfxPlatform::CreateHardwareVsyncSource()
 {
-  NS_WARNING("Hardware Vsync support not yet implemented. Falling back to software timers\n");
+  NS_WARNING("Hardware Vsync support not yet implemented. Falling back to software timers");
   nsRefPtr<mozilla::gfx::VsyncSource> softwareVsync = new SoftwareVsyncSource();
   return softwareVsync.forget();
 }
@@ -2495,4 +2517,70 @@ gfxPlatform::UseProgressivePaint()
 gfxPlatform::PerfWarnings()
 {
   return gfxPrefs::PerfWarnings();
+}
+
+void
+gfxPlatform::GetAcceleratedCompositorBackends(nsTArray<LayersBackend>& aBackends)
+{
+  // Being whitelisted is not enough to accelerate, but not being whitelisted is
+  // enough not to:
+  bool whitelisted = false;
+
+  nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+  if (gfxInfo) {
+    // bug 655578: on X11 at least, we must always call GetData (even if we don't need that information)
+    // as that's what causes GfxInfo initialization which kills the zombie 'glxtest' process.
+    // initially we relied on the fact that GetFeatureStatus calls GetData for us, but bug 681026 showed
+    // that assumption to be unsafe.
+    gfxInfo->GetData();
+
+    int32_t status;
+    if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_OPENGL_LAYERS, &status))) {
+      if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
+        aBackends.AppendElement(LayersBackend::LAYERS_OPENGL);
+        whitelisted = true;
+      }
+    }
+  }
+
+  if (!whitelisted) {
+    static int tell_me_once = 0;
+    if (!tell_me_once) {
+      NS_WARNING("OpenGL-accelerated layers are not supported on this system");
+      tell_me_once = 1;
+    }
+#ifdef MOZ_WIDGET_ANDROID
+    NS_RUNTIMEABORT("OpenGL-accelerated layers are a hard requirement on this platform. "
+                    "Cannot continue without support for them");
+#endif
+  }
+}
+
+void
+gfxPlatform::GetCompositorBackends(bool useAcceleration, nsTArray<mozilla::layers::LayersBackend>& aBackends)
+{
+  if (useAcceleration) {
+    GetAcceleratedCompositorBackends(aBackends);
+  }
+  if (SupportsBasicCompositor()) {
+    aBackends.AppendElement(LayersBackend::LAYERS_BASIC);
+  }
+}
+
+void
+gfxPlatform::NotifyCompositorCreated(LayersBackend aBackend)
+{
+  if (mCompositorBackend == aBackend) {
+    return;
+  }
+
+  NS_ASSERTION(mCompositorBackend == LayersBackend::LAYERS_NONE, "Compositor backend changed.");
+
+  // Set the backend before we notify so it's available immediately.
+  mCompositorBackend = aBackend;
+
+  // Notify that we created a compositor, so telemetry can update.
+  if (nsCOMPtr<nsIObserverService> obsvc = services::GetObserverService()) {
+    obsvc->NotifyObservers(nullptr, "compositor:created", nullptr);
+  }
 }

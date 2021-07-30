@@ -16,7 +16,8 @@
 
 namespace mozilla {
 
-class MediaEngineCameraVideoSource : public MediaEngineVideoSource
+class MediaEngineCameraVideoSource : public MediaEngineVideoSource,
+                                     private MediaConstraintsHelper
 {
 public:
   explicit MediaEngineCameraVideoSource(int aIndex,
@@ -34,7 +35,7 @@ public:
 
 
   virtual void GetName(nsAString& aName) override;
-  virtual void GetUUID(nsAString& aUUID) override;
+  virtual void GetUUID(nsACString& aUUID) override;
   virtual void SetDirectListeners(bool aHasListeners) override;
   virtual nsresult Config(bool aEchoOn, uint32_t aEcho,
                           bool aAgcOn, uint32_t aAGC,
@@ -59,7 +60,10 @@ public:
   }
 
   uint32_t GetBestFitnessDistance(
-      const nsTArray<const dom::MediaTrackConstraintSet*>& aConstraintSets) override;
+      const nsTArray<const dom::MediaTrackConstraintSet*>& aConstraintSets,
+      const nsString& aDeviceId) override;
+
+  virtual void Shutdown() override {};
 
 protected:
   struct CapabilityCandidate {
@@ -78,23 +82,21 @@ protected:
                              layers::Image* aImage,
                              TrackID aID,
                              StreamTime delta);
-  template<class ValueType, class ConstrainRange>
-  static uint32_t FitnessDistance(ValueType n, const ConstrainRange& aRange);
-  static uint32_t FitnessDistance(int32_t n,
-      const dom::OwningLongOrConstrainLongRange& aConstraint, bool aAdvanced);
-  static uint32_t FitnessDistance(double n,
-      const dom::OwningDoubleOrConstrainDoubleRange& aConstraint, bool aAdvanced);
-
-  static uint32_t GetFitnessDistance(const webrtc::CaptureCapability& aCandidate,
-                                     const dom::MediaTrackConstraintSet &aConstraints,
-                                     bool aAdvanced);
+  uint32_t GetFitnessDistance(const webrtc::CaptureCapability& aCandidate,
+                              const dom::MediaTrackConstraintSet &aConstraints,
+                              bool aAdvanced,
+                              const nsString& aDeviceId);
   static void TrimLessFitCandidates(CapabilitySet& set);
   static void LogConstraints(const dom::MediaTrackConstraintSet& aConstraints,
                              bool aAdvanced);
   virtual size_t NumCapabilities();
   virtual void GetCapability(size_t aIndex, webrtc::CaptureCapability& aOut);
   bool ChooseCapability(const dom::MediaTrackConstraints &aConstraints,
-                        const MediaEnginePrefs &aPrefs);
+                        const MediaEnginePrefs &aPrefs,
+                        const nsString& aDeviceId);
+  void SetName(nsString aName);
+  void SetUUID(const char* aUUID);
+  const nsCString& GetUUID(); // protected access
 
   // Engine variables.
 
@@ -122,8 +124,10 @@ protected:
   webrtc::CaptureCapability mCapability; // Doesn't work on OS X.
 
   nsTArray<webrtc::CaptureCapability> mHardcodedCapabilities; // For OSX & B2G
+private:
   nsString mDeviceName;
-  nsString mUniqueId;
+  nsCString mUniqueId;
+  nsString mFacingMode;
 };
 
 

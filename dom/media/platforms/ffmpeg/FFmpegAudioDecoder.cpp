@@ -4,10 +4,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "MediaTaskQueue.h"
-#include "FFmpegRuntimeLinker.h"
+#include "mozilla/TaskQueue.h"
 
+#include "FFmpegRuntimeLinker.h"
 #include "FFmpegAudioDecoder.h"
+#include "TimeUnits.h"
 
 #define MAX_CHANNELS 16
 
@@ -15,7 +16,7 @@ namespace mozilla
 {
 
 FFmpegAudioDecoder<LIBAV_VER>::FFmpegAudioDecoder(
-  FlushableMediaTaskQueue* aTaskQueue, MediaDataDecoderCallback* aCallback,
+  FlushableTaskQueue* aTaskQueue, MediaDataDecoderCallback* aCallback,
   const AudioInfo& aConfig)
   : FFmpegDataDecoder(aTaskQueue, GetCodecId(aConfig.mMimeType))
   , mCallback(aCallback)
@@ -113,7 +114,7 @@ FFmpegAudioDecoder<LIBAV_VER>::DecodePacket(MediaRawData* aSample)
   }
 
   int64_t samplePosition = aSample->mOffset;
-  Microseconds pts = aSample->mTime;
+  media::TimeUnit pts = media::TimeUnit::FromMicroseconds(aSample->mTime);
 
   while (packet.size > 0) {
     int decoded;
@@ -133,23 +134,28 @@ FFmpegAudioDecoder<LIBAV_VER>::DecodePacket(MediaRawData* aSample)
       nsAutoArrayPtr<AudioDataValue> audio(
         CopyAndPackAudio(mFrame, numChannels, mFrame->nb_samples));
 
-      CheckedInt<Microseconds> duration =
-        FramesToUsecs(mFrame->nb_samples, samplingRate);
-      if (!duration.isValid()) {
+      media::TimeUnit duration =
+        FramesToTimeUnit(mFrame->nb_samples, samplingRate);
+      if (!duration.IsValid()) {
         NS_WARNING("Invalid count of accumulated audio samples");
         mCallback->Error();
         return;
       }
 
       nsRefPtr<AudioData> data = new AudioData(samplePosition,
-                                               pts,
-                                               duration.value(),
+                                               pts.ToMicroseconds(),
+                                               duration.ToMicroseconds(),
                                                mFrame->nb_samples,
                                                audio.forget(),
                                                numChannels,
                                                samplingRate);
       mCallback->Output(data);
-      pts += duration.value();
+      pts += duration;
+      if (!pts.IsValid()) {
+        NS_WARNING("Invalid count of accumulated audio samples");
+        mCallback->Error();
+        return;
+      }
     }
     packet.data += bytesConsumed;
     packet.size -= bytesConsumed;

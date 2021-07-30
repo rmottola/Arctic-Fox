@@ -9,11 +9,12 @@
 #include "VideoUtils.h"
 #include "WMFUtils.h"
 #include "nsTArray.h"
+#include "TimeUnits.h"
 
 #include "mozilla/Logging.h"
 
 PRLogModuleInfo* GetDemuxerLog();
-#define LOG(...) PR_LOG(GetDemuxerLog(), PR_LOG_DEBUG, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(GetDemuxerLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 namespace mozilla {
 
@@ -283,19 +284,19 @@ WMFAudioMFTManager::Output(int64_t aStreamOffset,
   }
 
   buffer->Unlock();
-  int64_t timestamp;
-  hr = FramesToUsecs(mAudioFrameOffset + mAudioFrameSum, mAudioRate, &timestamp);
-  NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
+
+  media::TimeUnit timestamp =
+    FramesToTimeUnit(mAudioFrameOffset + mAudioFrameSum, mAudioRate);
+  NS_ENSURE_TRUE(timestamp.IsValid(), E_FAIL);
 
   mAudioFrameSum += numFrames;
 
-  int64_t duration;
-  hr = FramesToUsecs(numFrames, mAudioRate, &duration);
-  NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
+  media::TimeUnit duration = FramesToTimeUnit(numFrames, mAudioRate);
+  NS_ENSURE_TRUE(duration.IsValid(), E_FAIL);
 
   aOutData = new AudioData(aStreamOffset,
-                           timestamp,
-                           duration,
+                           timestamp.ToMicroseconds(),
+                           duration.ToMicroseconds(),
                            numFrames,
                            audioData.forget(),
                            mAudioChannels,
@@ -303,7 +304,7 @@ WMFAudioMFTManager::Output(int64_t aStreamOffset,
 
   #ifdef LOG_SAMPLE_DECODE
   LOG("Decoded audio sample! timestamp=%lld duration=%lld currentLength=%u",
-      timestamp, duration, currentLength);
+      timestamp.ToMicroseconds(), duration.ToMicroseconds(), currentLength);
   #endif
 
   return S_OK;

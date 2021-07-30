@@ -32,7 +32,7 @@ dictionary MediaPlayStatus
   DOMString   playStatus = "";
 };
 
-[CheckPermissions="bluetooth"]
+[CheckAnyPermissions="bluetooth"]
 interface BluetoothAdapter : EventTarget {
   readonly attribute BluetoothAdapterState  state;
   [AvailableIn=CertifiedApps]
@@ -93,6 +93,12 @@ interface BluetoothAdapter : EventTarget {
   Promise<void> unpair(DOMString deviceAddress);
 
   sequence<BluetoothDevice> getPairedDevices();
+
+  [NewObject]
+  Promise<BluetoothDiscoveryHandle> startLeScan(sequence<DOMString> serviceUuids);
+
+  [NewObject]
+  Promise<void> stopLeScan(BluetoothDiscoveryHandle discoveryHandle);
 
   [NewObject, Throws, AvailableIn=CertifiedApps]
   DOMRequest getConnectedDevices(unsigned short serviceUuid);

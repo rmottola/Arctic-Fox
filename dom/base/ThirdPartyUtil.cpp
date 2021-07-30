@@ -5,7 +5,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "ThirdPartyUtil.h"
+#include "nsNetCID.h"
 #include "nsNetUtil.h"
+#include "nsIChannel.h"
 #include "nsIServiceManager.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIDOMWindow.h"
@@ -24,7 +26,7 @@ NS_IMPL_ISUPPORTS(ThirdPartyUtil, mozIThirdPartyUtil)
 //
 static PRLogModuleInfo *gThirdPartyLog;
 #undef LOG
-#define LOG(args)     PR_LOG(gThirdPartyLog, PR_LOG_DEBUG, args)
+#define LOG(args)     MOZ_LOG(gThirdPartyLog, mozilla::LogLevel::Debug, args)
 
 nsresult
 ThirdPartyUtil::Init()

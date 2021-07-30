@@ -6,33 +6,65 @@
 
 #include "WMF.h"
 #include "WMFDecoderModule.h"
-#include "WMFDecoder.h"
 #include "WMFVideoMFTManager.h"
 #include "WMFAudioMFTManager.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/DebugOnly.h"
+#include "mozilla/Services.h"
 #include "WMFMediaDataDecoder.h"
 #include "nsIWindowsRegKey.h"
 #include "nsComponentManagerUtils.h"
 #include "nsServiceManagerUtils.h"
 #include "nsIGfxInfo.h"
 #include "GfxDriverInfo.h"
+#include "gfxWindowsPlatform.h"
 #include "nsServiceManagerUtils.h"      // for do_GetService
 #include "MediaInfo.h"
+#include "prsystem.h"
 
 namespace mozilla {
 
-bool WMFDecoderModule::sIsWMFEnabled = false;
-bool WMFDecoderModule::sDXVAEnabled = false;
+static bool sDXVAEnabled = false;
+static int  sNumDecoderThreads = -1;
+static bool sIsIntelDecoderEnabled = false;
 
 WMFDecoderModule::WMFDecoderModule()
+  : mWMFInitialized(false)
 {
 }
 
 WMFDecoderModule::~WMFDecoderModule()
 {
-  DebugOnly<HRESULT> hr = wmf::MFShutdown();
-  NS_ASSERTION(SUCCEEDED(hr), "MFShutdown failed");
+  if (mWMFInitialized) {
+    DebugOnly<HRESULT> hr = wmf::MFShutdown();
+    NS_ASSERTION(SUCCEEDED(hr), "MFShutdown failed");
+  }
+}
+
+void
+WMFDecoderModule::DisableHardwareAcceleration()
+{
+  sDXVAEnabled = false;
+  sIsIntelDecoderEnabled = false;
+}
+
+static void
+SetNumOfDecoderThreads()
+{
+  MOZ_ASSERT(NS_IsMainThread(), "Preferences can only be read on main thread");
+  int32_t numCores = PR_GetNumberOfProcessors();
+
+  // If we have more than 4 cores, let the decoder decide how many threads.
+  // On an 8 core machine, WMF chooses 4 decoder threads
+  const int WMF_DECODER_DEFAULT = -1;
+  int32_t prefThreadCount = Preferences::GetInt("media.wmf.decoder.thread-count", -1);
+  if (prefThreadCount != WMF_DECODER_DEFAULT) {
+    sNumDecoderThreads = std::max(prefThreadCount, 1);
+  } else if (numCores > 4) {
+    sNumDecoderThreads = WMF_DECODER_DEFAULT;
+  } else {
+    sNumDecoderThreads = std::max(numCores - 1, 1);
+  }
 }
 
 /* static */
@@ -40,34 +72,30 @@ void
 WMFDecoderModule::Init()
 {
   MOZ_ASSERT(NS_IsMainThread(), "Must be on main thread.");
-  sIsWMFEnabled = Preferences::GetBool("media.windows-media-foundation.enabled", false);
-  if (!sIsWMFEnabled) {
-    return;
-  }
-  if (NS_FAILED(WMFDecoder::LoadDLLs())) {
-    sIsWMFEnabled = false;
-  }
-  sDXVAEnabled = Preferences::GetBool("media.windows-media-foundation.use-dxva", false);
+  sDXVAEnabled = gfxPlatform::GetPlatform()->CanUseHardwareVideoDecoding();
+  sIsIntelDecoderEnabled = Preferences::GetBool("media.webm.intel_decoder.enabled", false);
+  SetNumOfDecoderThreads();
+}
+
+/* static */
+int
+WMFDecoderModule::GetNumDecoderThreads()
+{
+  return sNumDecoderThreads;
 }
 
 nsresult
 WMFDecoderModule::Startup()
 {
-  if (!sIsWMFEnabled) {
-    return NS_ERROR_FAILURE;
-  }
-  if (FAILED(wmf::MFStartup())) {
-    NS_WARNING("Failed to initialize Windows Media Foundation");
-    return NS_ERROR_FAILURE;
-  }
-  return NS_OK;
+  mWMFInitialized = SUCCEEDED(wmf::MFStartup());
+  return mWMFInitialized ? NS_OK : NS_ERROR_FAILURE;
 }
 
 already_AddRefed<MediaDataDecoder>
 WMFDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
                                      layers::LayersBackend aLayersBackend,
                                      layers::ImageContainer* aImageContainer,
-                                     FlushableMediaTaskQueue* aVideoTaskQueue,
+                                     FlushableTaskQueue* aVideoTaskQueue,
                                      MediaDataDecoderCallback* aCallback)
 {
   nsRefPtr<MediaDataDecoder> decoder =
@@ -82,7 +110,7 @@ WMFDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
 
 already_AddRefed<MediaDataDecoder>
 WMFDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
-                                     FlushableMediaTaskQueue* aAudioTaskQueue,
+                                     FlushableTaskQueue* aAudioTaskQueue,
                                      MediaDataDecoderCallback* aCallback)
 {
   nsRefPtr<MediaDataDecoder> decoder =
@@ -98,7 +126,7 @@ WMFDecoderModule::ShouldUseDXVA(const VideoInfo& aConfig) const
   static bool isAMD = false;
   static bool initialized = false;
   if (!initialized) {
-    nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+    nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
     nsAutoString vendor;
     gfxInfo->GetAdapterVendorID(vendor);
     isAMD = vendor.Equals(widget::GfxDriverInfo::GetDeviceVendor(widget::VendorAMD), nsCaseInsensitiveStringComparator()) ||
@@ -117,7 +145,8 @@ WMFDecoderModule::SupportsSharedDecoders(const VideoInfo& aConfig) const
 {
   // If DXVA is enabled, but we're not going to use it for this specific config, then
   // we can't use the shared decoder.
-  return !sDXVAEnabled || ShouldUseDXVA(aConfig);
+  return !AgnosticMimeType(aConfig.mMimeType) &&
+    (!sDXVAEnabled || ShouldUseDXVA(aConfig));
 }
 
 bool
@@ -125,10 +154,11 @@ WMFDecoderModule::SupportsMimeType(const nsACString& aMimeType)
 {
   return aMimeType.EqualsLiteral("video/mp4") ||
          aMimeType.EqualsLiteral("video/avc") ||
-         aMimeType.EqualsLiteral("video/webm; codecs=vp8") ||
-         aMimeType.EqualsLiteral("video/webm; codecs=vp9") ||
          aMimeType.EqualsLiteral("audio/mp4a-latm") ||
-         aMimeType.EqualsLiteral("audio/mpeg");
+         aMimeType.EqualsLiteral("audio/mpeg") ||
+         (sIsIntelDecoderEnabled &&
+          (aMimeType.EqualsLiteral("video/webm; codecs=vp8") ||
+           aMimeType.EqualsLiteral("video/webm; codecs=vp9")));
 }
 
 PlatformDecoderModule::ConversionRequired

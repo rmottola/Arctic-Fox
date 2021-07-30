@@ -124,12 +124,23 @@ public:
   const LogicalMargin ComputedLogicalPadding() const
     { return LogicalMargin(mWritingMode, mComputedPadding); }
 
+  void SetComputedLogicalMargin(mozilla::WritingMode aWM,
+                                const LogicalMargin& aMargin)
+    { mComputedMargin = aMargin.GetPhysicalMargin(aWM); }
   void SetComputedLogicalMargin(const LogicalMargin& aMargin)
-    { mComputedMargin = aMargin.GetPhysicalMargin(mWritingMode); }
+    { SetComputedLogicalMargin(mWritingMode, aMargin); }
+
+  void SetComputedLogicalBorderPadding(mozilla::WritingMode aWM,
+                                       const LogicalMargin& aMargin)
+    { mComputedBorderPadding = aMargin.GetPhysicalMargin(aWM); }
   void SetComputedLogicalBorderPadding(const LogicalMargin& aMargin)
-    { mComputedBorderPadding = aMargin.GetPhysicalMargin(mWritingMode); }
+    { SetComputedLogicalBorderPadding(mWritingMode, aMargin); }
+
+  void SetComputedLogicalPadding(mozilla::WritingMode aWM,
+                                 const LogicalMargin& aMargin)
+    { mComputedPadding = aMargin.GetPhysicalMargin(aWM); }
   void SetComputedLogicalPadding(const LogicalMargin& aMargin)
-    { mComputedPadding = aMargin.GetPhysicalMargin(mWritingMode); }
+    { SetComputedLogicalPadding(mWritingMode, aMargin); }
 
   WritingMode GetWritingMode() const { return mWritingMode; }
 
@@ -159,6 +170,7 @@ public:
   }
 
   nsCSSOffsetState(nsIFrame *aFrame, nsRenderingContext *aRenderingContext,
+                   mozilla::WritingMode aContainingBlockWritingMode,
                    nscoord aContainingBlockISize);
 
 #ifdef DEBUG
@@ -180,9 +192,11 @@ private:
    * Computes margin values from the specified margin style information, and
    * fills in the mComputedMargin member.
    *
+   * @param aWM Writing mode of the containing block
    * @param aPercentBasis
-   *    Logical size to use for resolving percentage margin values in
-   *    the inline and block axes.
+   *    Logical size in the writing mode of the containing block to use
+   *    for resolving percentage margin values in the inline and block
+   *    axes.
    *    The inline size is usually the containing block inline-size
    *    (width if writing mode is horizontal, and height if vertical).
    *    The block size is usually the containing block inline-size, per
@@ -191,15 +205,18 @@ private:
    *    Flexbox and Grid.
    * @return true if the margin is dependent on the containing block size.
    */
-  bool ComputeMargin(const mozilla::LogicalSize& aPercentBasis);
+  bool ComputeMargin(mozilla::WritingMode aWM,
+                     const mozilla::LogicalSize& aPercentBasis);
   
   /**
    * Computes padding values from the specified padding style information, and
    * fills in the mComputedPadding member.
    *
+   * @param aWM Writing mode of the containing block
    * @param aPercentBasis
-   *    Length to use for resolving percentage padding values in
-   *    the inline and block axes.
+   *    Logical size in the writing mode of the containing block to use
+   *    for resolving percentage padding values in the inline and block
+   *    axes.
    *    The inline size is usually the containing block inline-size
    *    (width if writing mode is horizontal, and height if vertical).
    *    The block size is usually the containing block inline-size, per
@@ -208,12 +225,14 @@ private:
    *    Flexbox and Grid.
    * @return true if the padding is dependent on the containing block size.
    */
-  bool ComputePadding(const mozilla::LogicalSize& aPercentBasis,
+  bool ComputePadding(mozilla::WritingMode aWM,
+                      const mozilla::LogicalSize& aPercentBasis,
                       nsIAtom* aFrameType);
 
 protected:
 
-  void InitOffsets(const mozilla::LogicalSize& aPercentBasis,
+  void InitOffsets(mozilla::WritingMode aWM,
+                   const mozilla::LogicalSize& aPercentBasis,
                    nsIAtom* aFrameType,
                    const nsMargin *aBorder = nullptr,
                    const nsMargin *aPadding = nullptr);
@@ -417,13 +436,32 @@ struct nsHTMLReflowState : public nsCSSOffsetState {
                                                            GetWritingMode());
   }
 
+  nsSize
+  ComputedPhysicalSize() const {
+    return nsSize(ComputedWidth(), ComputedHeight());
+  }
+
   // XXX this will need to change when we make mComputedOffsets logical;
   // we won't be able to return a reference for the physical offsets
   const nsMargin& ComputedPhysicalOffsets() const { return mComputedOffsets; }
   nsMargin& ComputedPhysicalOffsets() { return mComputedOffsets; }
 
-  LogicalMargin ComputedLogicalOffsets() const
+  const LogicalMargin ComputedLogicalOffsets() const
     { return LogicalMargin(mWritingMode, mComputedOffsets); }
+
+  void SetComputedLogicalOffsets(const LogicalMargin& aOffsets)
+    { mComputedOffsets = aOffsets.GetPhysicalMargin(mWritingMode); }
+
+  // Return the state's computed size including border-padding, with
+  // unconstrained dimensions replaced by zero.
+  nsSize ComputedSizeAsContainerIfConstrained() const {
+    const nscoord wd = ComputedWidth();
+    const nscoord ht = ComputedHeight();
+    return nsSize(wd == NS_UNCONSTRAINEDSIZE
+                  ? 0 : wd + ComputedPhysicalBorderPadding().LeftRight(),
+                  ht == NS_UNCONSTRAINEDSIZE
+                  ? 0 : ht + ComputedPhysicalBorderPadding().TopBottom());
+  }
 
 private:
   // the available width in which to reflow the frame. The space
@@ -816,27 +854,27 @@ public:
                            mozilla::WritingMode aWritingMode,
                            const mozilla::LogicalMargin& aComputedOffsets,
                            mozilla::LogicalPoint* aPosition,
-                           nscoord aContainerWidth) {
-    // Subtract the width of the frame from the container width that we
+                           const nsSize& aContainerSize) {
+    // Subtract the size of the frame from the container size that we
     // use for converting between the logical and physical origins of
     // the frame. This accounts for the fact that logical origins in RTL
     // coordinate systems are at the top right of the frame instead of
     // the top left.
-    nscoord frameWidth = aFrame->GetSize().width;
+    nsSize frameSize = aFrame->GetSize();
     nsPoint pos = aPosition->GetPhysicalPoint(aWritingMode,
-                                              aContainerWidth - frameWidth);
+                                              aContainerSize - frameSize);
     ApplyRelativePositioning(aFrame,
                              aComputedOffsets.GetPhysicalMargin(aWritingMode),
                              &pos);
     *aPosition = mozilla::LogicalPoint(aWritingMode, pos,
-                                       aContainerWidth - frameWidth);
+                                       aContainerSize - frameSize);
   }
 
   void ApplyRelativePositioning(mozilla::LogicalPoint* aPosition,
-                                nscoord aContainerWidth) const {
+                                const nsSize& aContainerSize) const {
     ApplyRelativePositioning(frame, mWritingMode,
                              ComputedLogicalOffsets(), aPosition,
-                             aContainerWidth);
+                             aContainerSize);
   }
 
 #ifdef DEBUG
@@ -880,9 +918,6 @@ protected:
 
   void CalculateHypotheticalBox(nsPresContext*    aPresContext,
                                 nsIFrame*         aPlaceholderFrame,
-                                nsIFrame*         aContainingBlock,
-                                nscoord           aBlockIStartContentEdge,
-                                nscoord           aBlockContentISize,
                                 const nsHTMLReflowState* cbrs,
                                 nsHypotheticalBox& aHypotheticalBox,
                                 nsIAtom*          aFrameType);

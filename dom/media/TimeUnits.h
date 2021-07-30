@@ -121,6 +121,14 @@ public:
     return TimeUnit(INT64_MAX);
   }
 
+  static TimeUnit Invalid() {
+    TimeUnit ret;
+    ret.mValue = CheckedInt64(INT64_MAX);
+    // Force an overflow to render the CheckedInt invalid.
+    ret.mValue += 1;
+    return ret;
+  }
+
   int64_t ToMicroseconds() const {
     return mValue.value();
   }
@@ -259,7 +267,7 @@ public:
     return TimeIntervals(TimeInterval(TimeUnit::FromMicroseconds(INT64_MIN),
                                       TimeUnit::FromMicroseconds(INT64_MIN)));
   }
-  bool IsInvalid()
+  bool IsInvalid() const
   {
     return Length() == 1 && Start(0).ToMicroseconds() == INT64_MIN &&
       End(0).ToMicroseconds() == INT64_MIN;

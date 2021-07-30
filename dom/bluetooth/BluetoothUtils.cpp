@@ -12,6 +12,7 @@
 #include "mozilla/dom/bluetooth/BluetoothTypes.h"
 #include "nsContentUtils.h"
 #include "nsISystemMessagesInternal.h"
+#include "nsIUUIDGenerator.h"
 #include "nsServiceManagerUtils.h"
 #include "nsXULAppAPI.h"
 
@@ -74,6 +75,27 @@ StringToUuid(const char* aString, BluetoothUuid& aUuid)
   memcpy(&aUuid.mUuid[8], &uuid3, sizeof(uint16_t));
   memcpy(&aUuid.mUuid[10], &uuid4, sizeof(uint32_t));
   memcpy(&aUuid.mUuid[14], &uuid5, sizeof(uint16_t));
+}
+
+void
+GenerateUuid(nsAString &aUuidString)
+{
+  nsresult rv;
+  nsCOMPtr<nsIUUIDGenerator> uuidGenerator =
+    do_GetService("@mozilla.org/uuid-generator;1", &rv);
+  NS_ENSURE_SUCCESS_VOID(rv);
+
+  nsID uuid;
+  rv = uuidGenerator->GenerateUUIDInPlace(&uuid);
+  NS_ENSURE_SUCCESS_VOID(rv);
+
+  // Build a string in {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx} format
+  char uuidBuffer[NSID_LENGTH];
+  uuid.ToProvidedString(uuidBuffer);
+  NS_ConvertASCIItoUTF16 uuidString(uuidBuffer);
+
+  // Remove {} and the null terminator
+  aUuidString.Assign(Substring(uuidString, 1, NSID_LENGTH - 3));
 }
 
 void
@@ -156,7 +178,7 @@ SetJsObject(JSContext* aContext,
         break;
       }
       case BluetoothValue::Tuint32_t:
-        val = INT_TO_JSVAL(v.get_uint32_t());
+        val.setInt32(v.get_uint32_t());
         break;
       case BluetoothValue::Tbool:
         val.setBoolean(v.get_bool());
@@ -248,7 +270,6 @@ BroadcastSystemMessage(const nsAString& aType,
   return true;
 }
 
-#ifdef MOZ_B2G_BT_API_V2
 void
 DispatchReplySuccess(BluetoothReplyRunnable* aRunnable)
 {
@@ -275,8 +296,14 @@ DispatchReplyError(BluetoothReplyRunnable* aRunnable,
   MOZ_ASSERT(aRunnable);
   MOZ_ASSERT(!aErrorStr.IsEmpty());
 
+  // Reply will be deleted by the runnable after running on main thread
+#ifndef MOZ_B2G_BT_API_V1
   BluetoothReply* reply =
     new BluetoothReply(BluetoothReplyError(STATUS_FAIL, nsString(aErrorStr)));
+#else
+  BluetoothReply* reply =
+    new BluetoothReply(BluetoothReplyError(nsString(aErrorStr)));
+#endif
 
   aRunnable->SetReply(reply); // runnable will delete reply after Run()
   NS_WARN_IF(NS_FAILED(NS_DispatchToMainThread(aRunnable)));
@@ -289,30 +316,23 @@ DispatchReplyError(BluetoothReplyRunnable* aRunnable,
   MOZ_ASSERT(aRunnable);
   MOZ_ASSERT(aStatus != STATUS_SUCCESS);
 
+  // Reply will be deleted by the runnable after running on main thread
+#ifndef MOZ_B2G_BT_API_V1
   BluetoothReply* reply =
     new BluetoothReply(BluetoothReplyError(aStatus, EmptyString()));
+#else
+  BluetoothReply* reply =
+    new BluetoothReply(
+      BluetoothReplyError(NS_LITERAL_STRING("Internal error")));
+#endif
 
   aRunnable->SetReply(reply); // runnable will delete reply after Run()
   NS_WARN_IF(NS_FAILED(NS_DispatchToMainThread(aRunnable)));
 }
 
-void
-DispatchStatusChangedEvent(const nsAString& aType,
-                           const nsAString& aAddress,
-                           bool aStatus)
-{
-  MOZ_ASSERT(NS_IsMainThread());
-
-  InfallibleTArray<BluetoothNamedValue> data;
-  BT_APPEND_NAMED_VALUE(data, "address", nsString(aAddress));
-  BT_APPEND_NAMED_VALUE(data, "status", aStatus);
-
-  BluetoothService* bs = BluetoothService::Get();
-  NS_ENSURE_TRUE_VOID(bs);
-  bs->DistributeSignal(aType, NS_LITERAL_STRING(KEY_ADAPTER), data);
-}
-#else
+#if MOZ_B2G_BT_API_V2
 // TODO: remove with bluetooth1
+#else
 void
 DispatchBluetoothReply(BluetoothReplyRunnable* aRunnable,
                        const BluetoothValue& aValue,
@@ -333,8 +353,8 @@ DispatchBluetoothReply(BluetoothReplyRunnable* aRunnable,
     BT_WARNING("Failed to dispatch to main thread!");
   }
 }
+#endif
 
-// TODO: remove with bluetooth1
 void
 DispatchStatusChangedEvent(const nsAString& aType,
                            const nsAString& aAddress,
@@ -346,18 +366,15 @@ DispatchStatusChangedEvent(const nsAString& aType,
   BT_APPEND_NAMED_VALUE(data, "address", nsString(aAddress));
   BT_APPEND_NAMED_VALUE(data, "status", aStatus);
 
-  BluetoothSignal signal(nsString(aType), NS_LITERAL_STRING(KEY_ADAPTER), data);
-
   BluetoothService* bs = BluetoothService::Get();
   NS_ENSURE_TRUE_VOID(bs);
-  bs->DistributeSignal(signal);
-}
-#endif
 
-bool
-IsMainProcess()
-{
-  return XRE_GetProcessType() == GeckoProcessType_Default;
+#ifndef MOZ_B2G_BT_API_V1
+  bs->DistributeSignal(aType, NS_LITERAL_STRING(KEY_ADAPTER), data);
+#else
+  BluetoothSignal signal(nsString(aType), NS_LITERAL_STRING(KEY_ADAPTER), data);
+  bs->DistributeSignal(signal);
+#endif
 }
 
 END_BLUETOOTH_NAMESPACE

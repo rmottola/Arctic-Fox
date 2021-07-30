@@ -62,46 +62,6 @@ function after(times, func) {
 }
 
 /**
- * Wraps a Push database in a proxy that returns promises for all asynchronous
- * methods. This makes it easier to test the database code with Task.jsm.
- *
- * @param {PushDB} db A Push database.
- * @returns {Proxy} A proxy that traps function property gets and returns
- *  promisified functions.
- */
-function promisifyDatabase(db) {
-  return new Proxy(db, {
-    get(target, property) {
-      let method = target[property];
-      if (typeof method != 'function') {
-        return method;
-      }
-      return function(...params) {
-        return new Promise((resolve, reject) => {
-          method.call(target, ...params, resolve, reject);
-        });
-      };
-    }
-  });
-}
-
-/**
- * Clears and closes an open Push database.
- *
- * @param {PushDB} db A Push database.
- * @returns {Promise} A promise that fulfills when the database is closed.
- */
-function cleanupDatabase(db) {
-  return new Promise(resolve => {
-    function close() {
-      db.close();
-      resolve();
-    }
-    db.drop(close, close);
-  });
-}
-
-/**
  * Defers one or more callbacks until the next turn of the event loop. Multiple
  * callbacks are executed in order.
  *
@@ -236,7 +196,10 @@ function setPrefs(prefs = {}) {
     'adaptive.gap': 60000,
     'adaptive.upperLimit': 29 * 60 * 1000,
     // Misc. defaults.
-    'adaptive.mobile': ''
+    'adaptive.mobile': '',
+    'http2.maxRetries': 2,
+    'http2.retryInterval': 500,
+    'http2.reset_retry_count_after_ms': 60000
   }, prefs);
   for (let pref in defaultPrefs) {
     servicePrefs.set(pref, defaultPrefs[pref]);

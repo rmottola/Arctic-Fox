@@ -29,6 +29,7 @@
 #include "nsIDOMWindowUtils.h"
 #include "nsIInterfaceRequestorUtils.h"
 #include "nsILoadContext.h"
+#include "nsIProgrammingLanguage.h"
 #include "nsIServiceManager.h"
 #include "nsISupportsPrimitives.h"
 #include "nsIWebNavigation.h"
@@ -468,7 +469,7 @@ private:
         id = NS_LITERAL_STRING("Worker");
       }
 
-      mCallData->SetIDs(id, frame.mFilename);
+      mCallData->SetIDs(frame.mFilename, id);
     }
 
     // Now we could have the correct window (if we are not window-less).
@@ -606,7 +607,7 @@ private:
         return;
       }
 
-      if (!arguments.AppendElement(value)) {
+      if (!arguments.AppendElement(value, fallible)) {
         return;
       }
     }
@@ -767,7 +768,7 @@ Console::Time(JSContext* aCx, const JS::Handle<JS::Value> aTime)
   Sequence<JS::Value> data;
   SequenceRooter<JS::Value> rooter(aCx, &data);
 
-  if (!aTime.isUndefined() && !data.AppendElement(aTime)) {
+  if (!aTime.isUndefined() && !data.AppendElement(aTime, fallible)) {
     return;
   }
 
@@ -780,7 +781,7 @@ Console::TimeEnd(JSContext* aCx, const JS::Handle<JS::Value> aTime)
   Sequence<JS::Value> data;
   SequenceRooter<JS::Value> rooter(aCx, &data);
 
-  if (!aTime.isUndefined() && !data.AppendElement(aTime)) {
+  if (!aTime.isUndefined() && !data.AppendElement(aTime, fallible)) {
     return;
   }
 
@@ -793,7 +794,7 @@ Console::TimeStamp(JSContext* aCx, const JS::Handle<JS::Value> aData)
   Sequence<JS::Value> data;
   SequenceRooter<JS::Value> rooter(aCx, &data);
 
-  if (aData.isString() && !data.AppendElement(aData)) {
+  if (aData.isString() && !data.AppendElement(aData, fallible)) {
     return;
   }
 
@@ -833,7 +834,7 @@ Console::ProfileMethod(JSContext* aCx, const nsAString& aAction,
   Sequence<JS::Value>& sequence = event.mArguments.Value();
 
   for (uint32_t i = 0; i < aData.Length(); ++i) {
-    if (!sequence.AppendElement(aData[i])) {
+    if (!sequence.AppendElement(aData[i], fallible)) {
       return;
     }
   }
@@ -953,13 +954,13 @@ public:
     }
   }
 
-  virtual bool Equals(const TimelineMarker* aOther) override
+  virtual bool Equals(const TimelineMarker& aOther) override
   {
     if (!TimelineMarker::Equals(aOther)) {
       return false;
     }
     // Console markers must have matching causes as well.
-    return GetCause() == aOther->GetCause();
+    return GetCause() == aOther.GetCause();
   }
 
   virtual void AddDetails(JSContext* aCx,
@@ -981,7 +982,6 @@ public:
                           const nsAString& aCause)
     : TimelineMarker(aDocShell, "TimeStamp", aMetaData, aCause)
   {
-    CaptureStack();
     MOZ_ASSERT(aMetaData == TRACING_TIMESTAMP);
   }
 
@@ -991,7 +991,6 @@ public:
     if (!GetCause().IsEmpty()) {
       aMarker.mCauseName.Construct(GetCause());
     }
-    aMarker.mEndStack = GetStack();
   }
 };
 
@@ -1379,7 +1378,7 @@ FlushOutput(JSContext* aCx, Sequence<JS::Value>& aSequence, nsString &aOutput)
       return false;
     }
 
-    if (!aSequence.AppendElement(JS::StringValue(str))) {
+    if (!aSequence.AppendElement(JS::StringValue(str), fallible)) {
       return false;
     }
 
@@ -1510,7 +1509,7 @@ Console::ProcessArguments(JSContext* aCx,
           v = aData[index++];
         }
 
-        if (!aSequence.AppendElement(v)) {
+        if (!aSequence.AppendElement(v, fallible)) {
           return false;
         }
 
@@ -1533,13 +1532,13 @@ Console::ProcessArguments(JSContext* aCx,
           int32_t diff = aSequence.Length() - aStyles.Length();
           if (diff > 0) {
             for (int32_t i = 0; i < diff; i++) {
-              if (!aStyles.AppendElement(JS::NullValue())) {
+              if (!aStyles.AppendElement(JS::NullValue(), fallible)) {
                 return false;
               }
             }
           }
 
-          if (!aStyles.AppendElement(JS::StringValue(jsString))) {
+          if (!aStyles.AppendElement(JS::StringValue(jsString), fallible)) {
             return false;
           }
         }
@@ -1611,7 +1610,7 @@ Console::ProcessArguments(JSContext* aCx,
 
   // The rest of the array, if unused by the format string.
   for (; index < aData.Length(); ++index) {
-    if (!aSequence.AppendElement(aData[index])) {
+    if (!aSequence.AppendElement(aData[index], fallible)) {
       return false;
     }
   }
@@ -1747,7 +1746,7 @@ Console::ArgumentsToValueList(const nsTArray<JS::Heap<JS::Value>>& aData,
                               Sequence<JS::Value>& aSequence)
 {
   for (uint32_t i = 0; i < aData.Length(); ++i) {
-    if (!aSequence.AppendElement(aData[i])) {
+    if (!aSequence.AppendElement(aData[i], fallible)) {
       return false;
     }
   }

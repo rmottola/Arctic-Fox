@@ -87,7 +87,7 @@ static int32_t sMaxDecodeCount = 0;
  */
 #define LOG_CONTAINER_ERROR                      \
   PR_BEGIN_MACRO                                 \
-  PR_LOG (GetImgLog(), PR_LOG_ERROR,             \
+  MOZ_LOG (GetImgLog(), LogLevel::Error,             \
           ("RasterImage: [this=%p] Error "      \
            "detected at line %u for image of "   \
            "type %s\n", this, __LINE__,          \
@@ -254,8 +254,7 @@ NS_IMPL_ISUPPORTS(RasterImage, imgIContainer, nsIProperties,
 #endif
 
 //******************************************************************************
-RasterImage::RasterImage(ProgressTracker* aProgressTracker,
-                         ImageURL* aURI /* = nullptr */) :
+RasterImage::RasterImage(ImageURL* aURI /* = nullptr */) :
   ImageResource(aURI), // invoke superclass's constructor
   mSize(0,0),
   mLockCount(0),
@@ -279,8 +278,6 @@ RasterImage::RasterImage(ProgressTracker* aProgressTracker,
   mAnimationFinished(false),
   mWantFullDecode(false)
 {
-  mProgressTrackerInit = new ProgressTrackerInit(this, aProgressTracker);
-
   Telemetry::GetHistogramById(Telemetry::IMAGE_DECODE_COUNT)->Add(0);
 }
 
@@ -825,6 +822,18 @@ RasterImage::GetCurrentImage(ImageContainer* aContainer, uint32_t aFlags)
   return MakePair(result.first(), Move(image));
 }
 
+NS_IMETHODIMP_(bool)
+RasterImage::IsImageContainerAvailable(LayerManager* aManager, uint32_t aFlags)
+{
+  int32_t maxTextureSize = aManager->GetMaxTextureSize();
+  if (!mHasSize ||
+      mSize.width > maxTextureSize ||
+      mSize.height > maxTextureSize) {
+    return false;
+  }
+
+  return true;
+}
 
 NS_IMETHODIMP_(already_AddRefed<ImageContainer>)
 RasterImage::GetImageContainer(LayerManager* aManager, uint32_t aFlags)
@@ -896,7 +905,10 @@ RasterImage::UpdateImageContainer()
   }
 
   mLastImageContainerDrawResult = result.first();
-  container->SetCurrentImage(result.second());
+  nsAutoTArray<ImageContainer::NonOwningImage,1> imageList;
+  imageList.AppendElement(
+      ImageContainer::NonOwningImage(result.second()));
+  container->SetCurrentImages(imageList);
 }
 
 size_t
@@ -1230,11 +1242,9 @@ RasterImage::NotifyForLoadEvent(Progress aProgress)
     // to draw. (We may have already sent some of these notifications from
     // NotifyForDecodeOnlyOnDraw(), but ProgressTracker will ensure no duplicate
     // notifications get sent.)
-    aProgress |= FLAG_ONLOAD_BLOCKED |
-                 FLAG_DECODE_STARTED |
+    aProgress |= FLAG_DECODE_STARTED |
                  FLAG_FRAME_COMPLETE |
-                 FLAG_DECODE_COMPLETE |
-                 FLAG_ONLOAD_UNBLOCKED;
+                 FLAG_DECODE_COMPLETE;
   }
   
   // If we encountered an error, make sure we notify for that as well.
@@ -1256,7 +1266,7 @@ RasterImage::NotifyForDecodeOnlyOnDraw()
     return;
   }
 
-  NotifyProgress(FLAG_DECODE_STARTED | FLAG_ONLOAD_BLOCKED);
+  NotifyProgress(FLAG_DECODE_STARTED);
 }
 
 nsresult
@@ -2160,6 +2170,12 @@ RasterImage::Unwrap()
 {
   nsCOMPtr<imgIContainer> self(this);
   return self.forget();
+}
+
+void
+RasterImage::PropagateUseCounters(nsIDocument*)
+{
+  // No use counters.
 }
 
 IntSize

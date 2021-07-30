@@ -8,6 +8,8 @@
 #define AbstractMediaDecoder_h_
 
 #include "mozilla/Attributes.h"
+#include "mozilla/StateMirroring.h"
+
 #include "MediaInfo.h"
 #include "nsISupports.h"
 #include "nsDataHashtable.h"
@@ -50,6 +52,10 @@ public:
   // Returns true if the decoder is shut down.
   virtual bool IsShutdown() const = 0;
 
+  // A special version of the above for the ogg decoder that is allowed to be
+  // called cross-thread.
+  virtual bool IsOggDecoderShutdown() { return false; }
+
   virtual bool OnStateMachineTaskQueue() const = 0;
 
   virtual bool OnDecodeTaskQueue() const = 0;
@@ -68,13 +74,18 @@ public:
   virtual void NotifyDecodedFrames(uint32_t aParsed, uint32_t aDecoded,
                                    uint32_t aDropped) = 0;
 
-  // Return the duration of the media in microseconds.
-  virtual int64_t GetMediaDuration() = 0;
+  virtual AbstractCanonical<media::NullableTimeUnit>* CanonicalDurationOrNull() { return nullptr; };
 
-  // Sets the duration of the media in microseconds. The MediaDecoder
-  // fires a durationchange event to its owner (e.g., an HTML audio
-  // tag).
-  virtual void UpdateEstimatedMediaDuration(int64_t aDuration) = 0;
+protected:
+  virtual void UpdateEstimatedMediaDuration(int64_t aDuration) {};
+public:
+  void DispatchUpdateEstimatedMediaDuration(int64_t aDuration)
+  {
+    nsCOMPtr<nsIRunnable> r =
+      NS_NewRunnableMethodWithArg<int64_t>(this, &AbstractMediaDecoder::UpdateEstimatedMediaDuration,
+                                           aDuration);
+    NS_DispatchToMainThread(r);
+  }
 
   // Set the media as being seekable or not.
   virtual void SetMediaSeekable(bool aMediaSeekable) = 0;
@@ -108,7 +119,8 @@ public:
 
   // Called by the reader's MediaResource as data arrives over the network.
   // Must be called on the main thread.
-  virtual void NotifyDataArrived(const char* aBuffer, uint32_t aLength, int64_t aOffset) = 0;
+  virtual void NotifyDataArrived(uint32_t aLength, int64_t aOffset,
+                                 bool aThrottleUpdates) = 0;
 
   // Set by Reader if the current audio track can be offloaded
   virtual void SetPlatformCanOffloadAudio(bool aCanOffloadAudio) {}

@@ -10,6 +10,7 @@ this.EXPORTED_SYMBOLS = [ "BrowserUtils" ];
 const {interfaces: Ci, utils: Cu, classes: Cc} = Components;
 
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.importGlobalProperties(['URL']);
 
 this.BrowserUtils = {
 
@@ -20,6 +21,21 @@ this.BrowserUtils = {
     for (let a of args)
       dump(a + " ");
     dump("\n");
+  },
+
+  /**
+   * restartApplication: Restarts the application, keeping it in
+   * safe mode if it is already in safe mode.
+   */
+  restartApplication: function() {
+    let appStartup = Cc["@mozilla.org/toolkit/app-startup;1"]
+                       .getService(Ci.nsIAppStartup);
+    //if already in safe mode restart in safe mode
+    if (Services.appinfo.inSafeMode) {
+      appStartup.restartInSafeMode(Ci.nsIAppStartup.eAttemptQuit | Ci.nsIAppStartup.eRestart);
+      return;
+    }
+    appStartup.quit(Ci.nsIAppStartup.eAttemptQuit | Ci.nsIAppStartup.eRestart);
   },
 
   /**
@@ -76,6 +92,30 @@ this.BrowserUtils = {
 
   makeURIFromCPOW: function(aCPOWURI) {
     return Services.io.newURI(aCPOWURI.spec, aCPOWURI.originCharset, null);
+  },
+
+  // Creates a codebase principal from a canonical origin string. This is
+  // the inverse operation of .origin on a codebase principal.
+  principalFromOrigin: function(aOriginString) {
+    if (aOriginString.startsWith('[')) {
+      throw new Error("principalFromOrigin does not support System and Expanded principals");
+    }
+
+    if (aOriginString.startsWith("moz-nullprincipal:")) {
+      throw new Error("principalFromOrigin does not support nsNullPrincipal");
+    }
+
+    var parts = aOriginString.split('!');
+    if (parts.length > 2) {
+      throw new Error("bad origin string: " + aOriginString);
+    }
+
+    var uri = Services.io.newURI(parts[0], null, null);
+    var attrs = {};
+    // Parse the parameters string into a dictionary.
+    (parts[1] || "").split("&").map((x) => x.split('=')).forEach((x) => attrs[x[0]] = x[1]);
+
+    return Services.scriptSecurityManager.createCodebasePrincipal(uri, attrs);
   },
 
   /**

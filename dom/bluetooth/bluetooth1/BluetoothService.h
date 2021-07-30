@@ -155,7 +155,7 @@ public:
    *
    * @return NS_OK if discovery stopped correctly, false otherwise
    */
-  virtual nsresult
+  virtual void
   StopDiscoveryInternal(BluetoothReplyRunnable* aRunnable) = 0;
 
   /**
@@ -163,7 +163,7 @@ public:
    *
    * @return NS_OK if discovery stopped correctly, false otherwise
    */
-  virtual nsresult
+  virtual void
   StartDiscoveryInternal(BluetoothReplyRunnable* aRunnable) = 0;
 
   /**
@@ -363,6 +363,9 @@ protected:
   virtual nsresult
   HandleStartup();
 
+  virtual void
+  CompleteToggleBt(bool aEnabled);
+
   /**
    * Called when the startup settings check has completed.
    */
@@ -388,8 +391,6 @@ protected:
   // Called by Get().
   static BluetoothService*
   Create();
-
-  void CompleteToggleBt(bool aEnabled);
 
   typedef nsClassHashtable<nsStringHashKey, BluetoothSignalObserverList >
   BluetoothSignalObserverTable;

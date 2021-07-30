@@ -51,7 +51,7 @@ interface nsIXULAppInfo : nsISupports
   readonly attribute ACString platformVersion;
 
   /**
-   * The build ID/date of goanna and the XULRunner platform.
+   * The build ID/date of gecko and the XULRunner platform.
    */
   readonly attribute ACString platformBuildID;
   

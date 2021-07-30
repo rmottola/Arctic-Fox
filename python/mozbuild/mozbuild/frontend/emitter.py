@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-from __future__ import unicode_literals
+from __future__ import absolute_import, unicode_literals
 
 import itertools
 import logging
@@ -827,7 +827,7 @@ class TreeMetadataEmitter(LoggingMixin):
 
         for idl in context['XPIDL_SOURCES']:
             yield XPIDLFile(context, mozpath.join(context.srcdir, idl),
-                xpidl_module)
+                xpidl_module, add_to_manifest=not context['XPIDL_NO_MANIFEST'])
 
     def _process_generated_files(self, context):
         generated_files = context.get('GENERATED_FILES')

@@ -208,7 +208,8 @@ function Tooltip(doc, options) {
     }
 
     this.emit("keypress", event.keyCode);
-    if (this.options.get("closeOnKeys").indexOf(event.keyCode) !== -1) {
+    if (this.options.get("closeOnKeys").indexOf(event.keyCode) !== -1 &&
+        this.isShown()) {
       event.stopPropagation();
       this.hide();
     }
@@ -795,8 +796,8 @@ Tooltip.prototype = {
     // Create an iframe to host the cubic-bezier widget
     let iframe = this.doc.createElementNS(XHTML_NS, "iframe");
     iframe.setAttribute("transparent", true);
-    iframe.setAttribute("width", "200");
-    iframe.setAttribute("height", "415");
+    iframe.setAttribute("width", "410");
+    iframe.setAttribute("height", "360");
     iframe.setAttribute("flex", "1");
     iframe.setAttribute("class", "devtools-tooltip-iframe");
 

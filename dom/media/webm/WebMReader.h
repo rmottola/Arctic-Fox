@@ -59,7 +59,7 @@ public:
 class WebMReader : public MediaDecoderReader
 {
 public:
-  explicit WebMReader(AbstractMediaDecoder* aDecoder);
+  explicit WebMReader(AbstractMediaDecoder* aDecoder, TaskQueue* aBorrowedTaskQueue = nullptr);
 
 protected:
   ~WebMReader();
@@ -91,8 +91,6 @@ public:
   Seek(int64_t aTime, int64_t aEndTime) override;
 
   virtual media::TimeIntervals GetBuffered() override;
-  virtual void NotifyDataArrived(const char* aBuffer, uint32_t aLength,
-                                 int64_t aOffset) override;
   virtual int64_t GetEvictionOffset(double aTime) override;
 
   virtual bool IsMediaSeekable() override;
@@ -118,10 +116,13 @@ public:
   int64_t GetLastVideoFrameTime();
   void SetLastVideoFrameTime(int64_t aFrameTime);
   layers::LayersBackend GetLayersBackendType() { return mLayersBackendType; }
-  FlushableMediaTaskQueue* GetVideoTaskQueue() { return mVideoTaskQueue; }
+  FlushableTaskQueue* GetVideoTaskQueue() { return mVideoTaskQueue; }
   uint64_t GetCodecDelay() { return mCodecDelay; }
 
 protected:
+
+  virtual void NotifyDataArrivedInternal(uint32_t aLength, int64_t aOffset) override;
+
   // Decode a nestegg packet of audio data. Push the audio data on the
   // audio queue. Returns true when there's more audio to decode,
   // false if the audio is finished, end of file has been reached,
@@ -203,7 +204,7 @@ private:
   layers::LayersBackend mLayersBackendType;
 
   // For hardware video decoding.
-  nsRefPtr<FlushableMediaTaskQueue> mVideoTaskQueue;
+  nsRefPtr<FlushableTaskQueue> mVideoTaskQueue;
 
   // Booleans to indicate if we have audio and/or video data
   bool mHasVideo;

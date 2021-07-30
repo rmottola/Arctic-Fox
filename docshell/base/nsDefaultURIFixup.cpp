@@ -4,7 +4,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "nsNetCID.h"
 #include "nsNetUtil.h"
+#include "nsIProtocolHandler.h"
 #include "nsCRT.h"
 
 #include "nsIFile.h"
@@ -448,7 +450,7 @@ nsDefaultURIFixup::KeywordToURI(const nsACString& aKeyword,
   }
   keyword.Trim(" ");
 
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     dom::ContentChild* contentChild = dom::ContentChild::GetSingleton();
     if (!contentChild) {
       return NS_ERROR_NOT_AVAILABLE;

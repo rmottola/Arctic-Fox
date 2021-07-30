@@ -10,6 +10,7 @@
 #include "nsIQueryContentEventResult.h"
 #include "nsString.h"
 #include "nsRect.h"
+#include "Units.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/EventForwards.h"
 
@@ -31,6 +32,7 @@ protected:
   uint32_t mEventID;
 
   uint32_t mOffset;
+  uint32_t mTentativeCaretOffset;
   nsString mString;
   mozilla::LayoutDeviceIntRect mRect;
 

@@ -63,7 +63,6 @@ static nsITimer* gFlushTimer = nullptr;
 nsHtml5TreeOpExecutor::nsHtml5TreeOpExecutor()
   : nsHtml5DocumentBuilder(false)
   , mPreloadedURLs(23)  // Mean # of preloadable resources per page on dmoz
-  , mSpeculationReferrerPolicyWasSet(false)
   , mSpeculationReferrerPolicy(mozilla::net::RP_Default)
 {
   // zeroing operator new for everything else
@@ -948,13 +947,25 @@ void
 nsHtml5TreeOpExecutor::PreloadImage(const nsAString& aURL,
                                     const nsAString& aCrossOrigin,
                                     const nsAString& aSrcset,
-                                    const nsAString& aSizes)
+                                    const nsAString& aSizes,
+                                    const nsAString& aImageReferrerPolicy)
 {
   nsCOMPtr<nsIURI> baseURI = BaseURIForPreload();
   nsCOMPtr<nsIURI> uri = mDocument->ResolvePreloadImage(baseURI, aURL, aSrcset,
                                                         aSizes);
   if (uri && ShouldPreloadURI(uri)) {
-    mDocument->MaybePreLoadImage(uri, aCrossOrigin, mSpeculationReferrerPolicy);
+    // use document wide referrer policy
+    mozilla::net::ReferrerPolicy referrerPolicy = mSpeculationReferrerPolicy;
+    // if enabled in preferences, use the referrer attribute from the image, if provided
+    bool referrerAttributeEnabled = Preferences::GetBool("network.http.enablePerElementReferrer", false);
+    if (referrerAttributeEnabled) {
+      mozilla::net::ReferrerPolicy imageReferrerPolicy = mozilla::net::ReferrerPolicyFromString(aImageReferrerPolicy);
+      if (imageReferrerPolicy != mozilla::net::RP_Unset) {
+        referrerPolicy = imageReferrerPolicy;
+      }
+    }
+
+    mDocument->MaybePreLoadImage(uri, aCrossOrigin, referrerPolicy);
   }
 }
 
@@ -1014,20 +1025,10 @@ nsHtml5TreeOpExecutor::SetSpeculationReferrerPolicy(const nsAString& aReferrerPo
 void
 nsHtml5TreeOpExecutor::SetSpeculationReferrerPolicy(ReferrerPolicy aReferrerPolicy)
 {
-  if (mSpeculationReferrerPolicyWasSet &&
-      aReferrerPolicy != mSpeculationReferrerPolicy) {
-    // According to the Referrer Policy spec, if there's already been a policy
-    // set and another attempt is made to set a _different_ policy, the result
-    // is a "No Referrer" policy.
-    mSpeculationReferrerPolicy = mozilla::net::RP_No_Referrer;
-  }
-  else {
-    // Record "speculated" referrer policy locally and thread through the
-    // speculation phase.  The actual referrer policy will be set by
-    // HTMLMetaElement::BindToTree().
-    mSpeculationReferrerPolicyWasSet = true;
-    mSpeculationReferrerPolicy = aReferrerPolicy;
-  }
+  // Record "speculated" referrer policy locally and thread through the
+  // speculation phase.  The actual referrer policy will be set by
+  // HTMLMetaElement::BindToTree().
+  mSpeculationReferrerPolicy = aReferrerPolicy;
 }
 
 #ifdef DEBUG_NS_HTML5_TREE_OP_EXECUTOR_FLUSH

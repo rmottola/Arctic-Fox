@@ -291,14 +291,14 @@ class FirefoxUIUpdates(FirefoxUITests):
         env = self.query_env(avoid_host_env=True)
         bin_dir = os.path.dirname(self.query_python_path())
         fx_ui_tests_bin = os.path.join(bin_dir, 'firefox-ui-update')
-        goanna_log=os.path.join(dirs['abs_work_dir'], 'goanna.log')
+        gecko_log=os.path.join(dirs['abs_work_dir'], 'gecko.log')
 
         # Build the command
         cmd = [
             fx_ui_tests_bin,
             '--installer', installer_path,
             # Log to stdout until tests are stable.
-            '--goanna-log=-',
+            '--gecko-log=-',
             '--address=localhost:%s' % marionette_port,
         ]
 
@@ -319,20 +319,20 @@ class FirefoxUIUpdates(FirefoxUITests):
 
         # Return more output if we fail
         if return_code != 0:
-            if os.path.exists(goanna_log):
-                contents = self.read_from_file(goanna_log, verbose=False)
-                self.warning('== Dumping goanna output ==')
+            if os.path.exists(gecko_log):
+                contents = self.read_from_file(gecko_log, verbose=False)
+                self.warning('== Dumping gecko output ==')
                 self.warning(contents)
-                self.warning('== End of goanna output ==')
+                self.warning('== End of gecko output ==')
             else:
-                # We're outputting to stdout with --goanna-log=- so there is not log to
+                # We're outputting to stdout with --gecko-log=- so there is not log to
                 # complaing about. Remove the commented line below when changing
                 # this behaviour.
-                # self.warning('No goanna.log was found: %s' % goanna_log)
+                # self.warning('No gecko.log was found: %s' % gecko_log)
                 pass
 
         if cleanup:
-            for filepath in (installer_path, goanna_log):
+            for filepath in (installer_path, gecko_log):
                 if os.path.exists(filepath):
                     self.debug('Removing %s' % filepath)
                     os.remove(filepath)

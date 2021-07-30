@@ -72,11 +72,11 @@ uint32_t gGlyphExtentsSetupLazyTight = 0;
 uint32_t gGlyphExtentsSetupFallBackToTight = 0;
 #endif
 
-#define LOG_FONTINIT(args) PR_LOG(gfxPlatform::GetLog(eGfxLog_fontinit), \
-                                  PR_LOG_DEBUG, args)
-#define LOG_FONTINIT_ENABLED() PR_LOG_TEST( \
+#define LOG_FONTINIT(args) MOZ_LOG(gfxPlatform::GetLog(eGfxLog_fontinit), \
+                                  LogLevel::Debug, args)
+#define LOG_FONTINIT_ENABLED() MOZ_LOG_TEST( \
                                         gfxPlatform::GetLog(eGfxLog_fontinit), \
-                                        PR_LOG_DEBUG)
+                                        LogLevel::Debug)
 
 
 /*
@@ -295,27 +295,21 @@ gfxFontCache::DestroyFont(gfxFont *aFont)
 }
 
 /*static*/
-PLDHashOperator
-gfxFontCache::AgeCachedWordsForFont(HashEntry* aHashEntry, void* aUserData)
-{
-    aHashEntry->mFont->AgeCachedWords();
-    return PL_DHASH_NEXT;
-}
-
-/*static*/
 void
 gfxFontCache::WordCacheExpirationTimerCallback(nsITimer* aTimer, void* aCache)
 {
     gfxFontCache* cache = static_cast<gfxFontCache*>(aCache);
-    cache->mFonts.EnumerateEntries(AgeCachedWordsForFont, nullptr);
+    for (auto it = cache->mFonts.Iter(); !it.Done(); it.Next()) {
+        it.Get()->mFont->AgeCachedWords();
+    }
 }
 
-/*static*/
-PLDHashOperator
-gfxFontCache::ClearCachedWordsForFont(HashEntry* aHashEntry, void* aUserData)
+void
+gfxFontCache::FlushShapedWordCaches()
 {
-    aHashEntry->mFont->ClearCachedWords();
-    return PL_DHASH_NEXT;
+    for (auto it = mFonts.Iter(); !it.Done(); it.Next()) {
+        it.Get()->mFont->ClearCachedWords();
+    }
 }
 
 /*static*/
@@ -762,14 +756,6 @@ gfxFont::gfxFont(gfxFontEntry *aFontEntry, const gfxFontStyle *aFontStyle,
     mKerningSet = HasFeatureSet(HB_TAG('k','e','r','n'), mKerningEnabled);
 }
 
-static PLDHashOperator
-NotifyFontDestroyed(nsPtrHashKey<gfxFont::GlyphChangeObserver>* aKey,
-                    void* aClosure)
-{
-    aKey->GetKey()->ForgetFont();
-    return PL_DHASH_NEXT;
-}
-
 gfxFont::~gfxFont()
 {
     uint32_t i, count = mGlyphExtentsArray.Length();
@@ -783,7 +769,9 @@ gfxFont::~gfxFont()
     mFontEntry->NotifyFontDestroyed(this);
 
     if (mGlyphChangeObservers) {
-        mGlyphChangeObservers->EnumerateEntries(NotifyFontDestroyed, nullptr);
+        for (auto it = mGlyphChangeObservers->Iter(); !it.Done(); it.Next()) {
+            it.Get()->GetKey()->ForgetFont();
+        }
     }
 }
 
@@ -810,20 +798,6 @@ gfxFont::GetGlyphHAdvance(gfxContext *aCtx, uint16_t aGID)
         return 0;
     }
     return shaper->GetGlyphHAdvance(aGID) / 65536.0;
-}
-
-/*static*/
-PLDHashOperator
-gfxFont::AgeCacheEntry(CacheHashEntry *aEntry, void *aUserData)
-{
-    if (!aEntry->mShapedWord) {
-        NS_ASSERTION(aEntry->mShapedWord, "cache entry has no gfxShapedWord!");
-        return PL_DHASH_REMOVE;
-    }
-    if (aEntry->mShapedWord->IncrementAge() == kShapedWordCacheMaxAge) {
-        return PL_DHASH_REMOVE;
-    }
-    return PL_DHASH_NEXT;
 }
 
 static void
@@ -2201,6 +2175,7 @@ gfxFont::Measure(gfxTextRun *aTextRun,
         ((aBoundingBoxType == LOOSE_INK_EXTENTS &&
             !needsGlyphExtents &&
             !aTextRun->HasDetailedGlyphs()) ||
+         (MOZ_UNLIKELY(GetStyle()->sizeAdjust == 0.0)) ||
          (MOZ_UNLIKELY(GetStyle()->size == 0))) ? nullptr
         : GetOrCreateGlyphExtents(aTextRun->GetAppUnitsPerDevUnit());
     double x = 0;
@@ -2322,12 +2297,22 @@ gfxFont::Measure(gfxTextRun *aTextRun,
     return metrics;
 }
 
-static PLDHashOperator
-NotifyGlyphChangeObservers(nsPtrHashKey<gfxFont::GlyphChangeObserver>* aKey,
-                           void* aClosure)
+void
+gfxFont::AgeCachedWords()
 {
-    aKey->GetKey()->NotifyGlyphsChanged();
-    return PL_DHASH_NEXT;
+    if (mWordCache) {
+        for (auto it = mWordCache->Iter(); !it.Done(); it.Next()) {
+            CacheHashEntry *entry = it.Get();
+            if (!entry->mShapedWord) {
+                NS_ASSERTION(entry->mShapedWord,
+                             "cache entry has no gfxShapedWord!");
+                it.Remove();
+            } else if (entry->mShapedWord->IncrementAge() ==
+                       kShapedWordCacheMaxAge) {
+                it.Remove();
+            }
+        }
+    }
 }
 
 void
@@ -2340,7 +2325,9 @@ gfxFont::NotifyGlyphsChanged()
     }
 
     if (mGlyphChangeObservers) {
-        mGlyphChangeObservers->EnumerateEntries(NotifyGlyphChangeObservers, nullptr);
+        for (auto it = mGlyphChangeObservers->Iter(); !it.Done(); it.Next()) {
+            it.Get()->GetKey()->NotifyGlyphsChanged();
+        }
     }
 }
 
@@ -3341,7 +3328,7 @@ gfxFont::SanitizeMetrics(gfxFont::Metrics *aMetrics, bool aIsBadUnderlineFont)
 {
     // Even if this font size is zero, this font is created with non-zero size.
     // However, for layout and others, we should return the metrics of zero size font.
-    if (mStyle.size == 0.0) {
+    if (mStyle.size == 0.0 || mStyle.sizeAdjust == 0.0) {
         memset(aMetrics, 0, sizeof(gfxFont::Metrics));
         return;
     }
@@ -3656,7 +3643,7 @@ gfxFontStyle::ParseFontLanguageOverride(const nsString& aLangTag)
 
 gfxFontStyle::gfxFontStyle() :
     language(nsGkAtoms::x_western),
-    size(DEFAULT_PIXEL_FONT_SIZE), sizeAdjust(0.0f), baselineOffset(0.0f),
+    size(DEFAULT_PIXEL_FONT_SIZE), sizeAdjust(-1.0f), baselineOffset(0.0f),
     languageOverride(NO_FONT_LANGUAGE_OVERRIDE),
     weight(NS_FONT_WEIGHT_NORMAL), stretch(NS_FONT_STRETCH_NORMAL),
     systemFont(true), printerFont(false), useGrayscaleAntialiasing(false),
@@ -3701,7 +3688,7 @@ gfxFontStyle::gfxFontStyle(uint8_t aStyle, uint16_t aWeight, int16_t aStretch,
 
     if (size >= FONT_MAX_SIZE) {
         size = FONT_MAX_SIZE;
-        sizeAdjust = 0.0;
+        sizeAdjust = -1.0f;
     } else if (size < 0.0) {
         NS_WARNING("negative font size");
         size = 0.0;

@@ -92,16 +92,16 @@ AudioNode::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
   // - mStream
   size_t amount = 0;
 
-  amount += mInputNodes.SizeOfExcludingThis(aMallocSizeOf);
+  amount += mInputNodes.ShallowSizeOfExcludingThis(aMallocSizeOf);
   for (size_t i = 0; i < mInputNodes.Length(); i++) {
     amount += mInputNodes[i].SizeOfExcludingThis(aMallocSizeOf);
   }
 
   // Just measure the array. The entire audio node graph is measured via the
   // MediaStreamGraph's streams, so we don't want to double-count the elements.
-  amount += mOutputNodes.SizeOfExcludingThis(aMallocSizeOf);
+  amount += mOutputNodes.ShallowSizeOfExcludingThis(aMallocSizeOf);
 
-  amount += mOutputParams.SizeOfExcludingThis(aMallocSizeOf);
+  amount += mOutputParams.ShallowSizeOfExcludingThis(aMallocSizeOf);
   for (size_t i = 0; i < mOutputParams.Length(); i++) {
     amount += mOutputParams[i]->SizeOfIncludingThis(aMallocSizeOf);
   }
@@ -212,15 +212,13 @@ AudioNode::Connect(AudioNode& aDestination, uint32_t aOutput,
   input->mInputNode = this;
   input->mInputPort = aInput;
   input->mOutputPort = aOutput;
-  if (aDestination.mStream) {
+  AudioNodeStream* destinationStream = aDestination.mStream;
+  if (mStream && destinationStream) {
     // Connect streams in the MediaStreamGraph
-    MOZ_ASSERT(aDestination.mStream->AsProcessedStream());
-    ProcessedMediaStream* ps =
-      static_cast<ProcessedMediaStream*>(aDestination.mStream.get());
     MOZ_ASSERT(aInput <= UINT16_MAX, "Unexpected large input port number");
     MOZ_ASSERT(aOutput <= UINT16_MAX, "Unexpected large output port number");
-    input->mStreamPort =
-      ps->AllocateInputPort(mStream, MediaInputPort::FLAG_BLOCK_INPUT,
+    input->mStreamPort = destinationStream->
+      AllocateInputPort(mStream, MediaInputPort::FLAG_BLOCK_INPUT,
                             static_cast<uint16_t>(aInput),
                             static_cast<uint16_t>(aOutput));
   }
@@ -260,43 +258,41 @@ AudioNode::Connect(AudioParam& aDestination, uint32_t aOutput,
   MediaStream* stream = aDestination.Stream();
   MOZ_ASSERT(stream->AsProcessedStream());
   ProcessedMediaStream* ps = static_cast<ProcessedMediaStream*>(stream);
-
-  // Setup our stream as an input to the AudioParam's stream
-  MOZ_ASSERT(aOutput <= UINT16_MAX, "Unexpected large output port number");
-  input->mStreamPort = ps->AllocateInputPort(mStream, MediaInputPort::FLAG_BLOCK_INPUT,
-                                             0, static_cast<uint16_t>(aOutput));
+  if (mStream) {
+    // Setup our stream as an input to the AudioParam's stream
+    MOZ_ASSERT(aOutput <= UINT16_MAX, "Unexpected large output port number");
+    input->mStreamPort =
+      ps->AllocateInputPort(mStream, MediaInputPort::FLAG_BLOCK_INPUT,
+                            0, static_cast<uint16_t>(aOutput));
+  }
 }
 
 void
 AudioNode::SendDoubleParameterToStream(uint32_t aIndex, double aValue)
 {
-  AudioNodeStream* ns = static_cast<AudioNodeStream*>(mStream.get());
-  MOZ_ASSERT(ns, "How come we don't have a stream here?");
-  ns->SetDoubleParameter(aIndex, aValue);
+  MOZ_ASSERT(mStream, "How come we don't have a stream here?");
+  mStream->SetDoubleParameter(aIndex, aValue);
 }
 
 void
 AudioNode::SendInt32ParameterToStream(uint32_t aIndex, int32_t aValue)
 {
-  AudioNodeStream* ns = static_cast<AudioNodeStream*>(mStream.get());
-  MOZ_ASSERT(ns, "How come we don't have a stream here?");
-  ns->SetInt32Parameter(aIndex, aValue);
+  MOZ_ASSERT(mStream, "How come we don't have a stream here?");
+  mStream->SetInt32Parameter(aIndex, aValue);
 }
 
 void
 AudioNode::SendThreeDPointParameterToStream(uint32_t aIndex, const ThreeDPoint& aValue)
 {
-  AudioNodeStream* ns = static_cast<AudioNodeStream*>(mStream.get());
-  MOZ_ASSERT(ns, "How come we don't have a stream here?");
-  ns->SetThreeDPointParameter(aIndex, aValue);
+  MOZ_ASSERT(mStream, "How come we don't have a stream here?");
+  mStream->SetThreeDPointParameter(aIndex, aValue);
 }
 
 void
 AudioNode::SendChannelMixingParametersToStream()
 {
-  AudioNodeStream* ns = static_cast<AudioNodeStream*>(mStream.get());
-  MOZ_ASSERT(ns, "How come we don't have a stream here?");
-  ns->SetChannelMixingParameters(mChannelCount, mChannelCountMode,
+  MOZ_ASSERT(mStream, "How come we don't have a stream here?");
+  mStream->SetChannelMixingParameters(mChannelCount, mChannelCountMode,
                                  mChannelInterpretation);
 }
 
@@ -304,7 +300,7 @@ void
 AudioNode::SendTimelineParameterToStream(AudioNode* aNode, uint32_t aIndex,
                                          const AudioParamTimeline& aValue)
 {
-  AudioNodeStream* ns = static_cast<AudioNodeStream*>(aNode->mStream.get());
+  AudioNodeStream* ns = aNode->mStream;
   MOZ_ASSERT(ns, "How come we don't have a stream here?");
   ns->SetTimelineParameter(aIndex, aValue);
 }
@@ -322,7 +318,8 @@ AudioNode::Disconnect(uint32_t aOutput, ErrorResult& aRv)
   // ADDREF message to this (main) thread.  Wait for a round trip before
   // releasing nodes, to give engines receiving sound now time to keep their
   // nodes alive.
-  class RunnableRelease : public nsRunnable {
+  class RunnableRelease final : public nsRunnable
+  {
   public:
     explicit RunnableRelease(already_AddRefed<AudioNode> aNode)
       : mNode(aNode) {}
@@ -348,10 +345,12 @@ AudioNode::Disconnect(uint32_t aOutput, ErrorResult& aRv)
         // Remove one instance of 'dest' from mOutputNodes. There could be
         // others, and it's not correct to remove them all since some of them
         // could be for different output ports.
-        nsCOMPtr<nsIRunnable> runnable =
-          new RunnableRelease(mOutputNodes[i].forget());
+        nsRefPtr<AudioNode> output = mOutputNodes[i].forget();
         mOutputNodes.RemoveElementAt(i);
-        mStream->RunAfterPendingUpdates(runnable.forget());
+        if (mStream) {
+          nsRefPtr<nsIRunnable> runnable = new RunnableRelease(output.forget());
+          mStream->RunAfterPendingUpdates(runnable.forget());
+        }
         break;
       }
     }
@@ -380,17 +379,12 @@ void
 AudioNode::DestroyMediaStream()
 {
   if (mStream) {
-    {
-      // Remove the node reference on the engine, and take care to not
-      // hold the lock when the stream gets destroyed, because that will
-      // cause the engine to be destroyed as well, and we don't want to
-      // be holding the lock as we're trying to destroy it!
-      AudioNodeStream* ns = static_cast<AudioNodeStream*>(mStream.get());
-      MutexAutoLock lock(ns->Engine()->NodeMutex());
-      MOZ_ASSERT(ns, "How come we don't have a stream here?");
-      MOZ_ASSERT(ns->Engine()->Node() == this, "Invalid node reference");
-      ns->Engine()->ClearNode();
-    }
+    // Remove the node pointer on the engine.
+    AudioNodeStream* ns = mStream;
+    MOZ_ASSERT(ns, "How come we don't have a stream here?");
+    MOZ_ASSERT(ns->Engine()->NodeMainThread() == this,
+               "Invalid node reference");
+    ns->Engine()->ClearNode();
 
     mStream->Destroy();
     mStream = nullptr;
@@ -422,9 +416,8 @@ AudioNode::SetPassThrough(bool aPassThrough)
 {
   MOZ_ASSERT(NumberOfInputs() <= 1 && NumberOfOutputs() == 1);
   mPassThrough = aPassThrough;
-  AudioNodeStream* ns = static_cast<AudioNodeStream*>(mStream.get());
-  MOZ_ASSERT(ns, "How come we don't have a stream here?");
-  ns->SetPassThrough(mPassThrough);
+  MOZ_ASSERT(mStream, "How come we don't have a stream here?");
+  mStream->SetPassThrough(mPassThrough);
 }
 
 } // namespace dom

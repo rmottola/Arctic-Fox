@@ -166,9 +166,6 @@ public:
   virtual nsresult StopAnimation() override;
 
   // Methods inherited from Image
-  nsresult Init(const char* aMimeType,
-                uint32_t aFlags) override;
-
   virtual void OnSurfaceDiscarded() override;
 
   // Raster-specific methods
@@ -289,6 +286,8 @@ public:
   }
 
 private:
+  nsresult Init(const char* aMimeType, uint32_t aFlags);
+
   DrawResult DrawWithPreDownscaleIfNeeded(DrawableFrameRef&& aFrameRef,
                                           gfxContext* aContext,
                                           const nsIntSize& aSize,
@@ -430,9 +429,6 @@ private: // data
 
   TimeStamp mDrawStartTime;
 
-  // Initializes ProgressTracker and resets it on RasterImage destruction.
-  nsAutoPtr<ProgressTrackerInit> mProgressTrackerInit;
-
 
   //////////////////////////////////////////////////////////////////////////////
   // Scaling.
@@ -480,8 +476,7 @@ private: // data
   bool CanDiscard();
 
 protected:
-  explicit RasterImage(ProgressTracker* aProgressTracker = nullptr,
-                       ImageURL* aURI = nullptr);
+  explicit RasterImage(ImageURL* aURI = nullptr);
 
   bool ShouldAnimate() override;
 

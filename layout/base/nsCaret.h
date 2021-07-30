@@ -158,6 +158,7 @@ class nsCaret final : public nsISelectionListener
 protected:
     static void   CaretBlinkCallback(nsITimer *aTimer, void *aClosure);
 
+    bool          IsBidiUI();
     void          CheckSelectionLanguageChange();
 
     void          ResetBlinking();
@@ -206,6 +207,12 @@ protected:
      */
     bool                  mIsBlinkOn;
     /**
+     * mBlinkCount is used to control the number of times to blink the caret
+     * before stopping the blink. This is reset each time we reset the
+     * blinking.
+     */
+    int32_t               mBlinkCount;
+    /**
      * mIsVisible is true when SetVisible was last called with 'true'.
      */
     bool                  mVisible;
@@ -224,6 +231,10 @@ protected:
      * it's in non-user-modifiable content.
      */
     bool                  mIgnoreUserModify;
+
+    // Preference
+    static bool sSelectionCaretEnabled;
+    static bool sSelectionCaretsAffectCaret;
 };
 
 #endif //nsCaret_h__

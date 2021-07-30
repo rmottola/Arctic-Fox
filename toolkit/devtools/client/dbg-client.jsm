@@ -188,7 +188,7 @@ function eventSource(aProto) {
     let name = arguments[0];
     let listeners = this._getListeners(name).slice(0);
 
-    for each (let listener in listeners) {
+    for (let listener of listeners) {
       try {
         listener.apply(null, arguments);
       } catch (e) {
@@ -1883,8 +1883,8 @@ ThreadClient.prototype = {
    *        The property name of the grip cache we want to clear.
    */
   _clearObjectClients: function (aGripCacheName) {
-    for each (let grip in this[aGripCacheName]) {
-      grip.valid = false;
+    for (let id in this[aGripCacheName]) {
+      this[aGripCacheName][id].valid = false;
     }
     this[aGripCacheName] = {};
   },
@@ -2069,9 +2069,15 @@ ObjectClient.prototype = {
 
   valid: true,
 
-  get isFrozen() this._grip.frozen,
-  get isSealed() this._grip.sealed,
-  get isExtensible() this._grip.extensible,
+  get isFrozen() {
+    return this._grip.frozen;
+  },
+  get isSealed() {
+    return this._grip.sealed;
+  },
+  get isExtensible() {
+    return this._grip.extensible;
+  },
 
   getDefinitionSite: DebuggerClient.requester({
     type: "definitionSite"
@@ -2165,7 +2171,36 @@ ObjectClient.prototype = {
       }
       return aPacket;
     }
-  })
+  }),
+
+  /**
+   * Request the promises directly depending on the current promise.
+   */
+  getDependentPromises: DebuggerClient.requester({
+    type: "dependentPromises"
+  }, {
+    before: function(aPacket) {
+      if (this._grip.class !== "Promise") {
+        throw new Error("getDependentPromises is only valid for promise " +
+          "grips.");
+      }
+      return aPacket;
+    }
+  }),
+
+  /**
+   * Request the stack to the promise's allocation point.
+   */
+  getPromiseAllocationStack: DebuggerClient.requester({
+    type: "allocationStack"
+  }, {
+    before: function(aPacket) {
+      if (this._grip.class !== "Promise") {
+        throw new Error("getAllocationStack is only valid for promise grips.");
+      }
+      return aPacket;
+    }
+  }),
 };
 
 /**
@@ -2225,12 +2260,24 @@ function SourceClient(aClient, aForm) {
 }
 
 SourceClient.prototype = {
-  get _transport() this._client._transport,
-  get isBlackBoxed() this._isBlackBoxed,
-  get isPrettyPrinted() this._isPrettyPrinted,
-  get actor() this._form.actor,
-  get request() this._client.request,
-  get url() this._form.url,
+  get _transport() {
+    return this._client._transport;
+  },
+  get isBlackBoxed() {
+    return this._isBlackBoxed;
+  },
+  get isPrettyPrinted() {
+    return this._isPrettyPrinted;
+  },
+  get actor() {
+    return this._form.actor;
+  },
+  get request() {
+    return this._client.request;
+  },
+  get url() {
+    return this._form.url;
+  },
 
   /**
    * Black box this SourceClient's source.
@@ -2301,6 +2348,39 @@ SourceClient.prototype = {
       this._onSourceResponse(aResponse, aCallback)
     });
   },
+
+  /**
+   * Request a PropertyIteratorClient instance to ease listing
+   * properties for this object.
+   *
+   * @param options Object
+   *        A dictionary object with various boolean attributes:
+   *        - ignoreSafeGetters Boolean
+   *          If true, do not iterate over safe getters.
+   *        - ignoreIndexedProperties Boolean
+   *          If true, filters out Array items.
+   *          e.g. properties names between `0` and `object.length`.
+   *        - ignoreNonIndexedProperties Boolean
+   *          If true, filters out items that aren't array items
+   *          e.g. properties names that are not a number between `0`
+   *          and `object.length`.
+   *        - sort Boolean
+   *          If true, the iterator will sort the properties by name
+   *          before dispatching them.
+   * @param aOnResponse function Called with the client instance.
+   */
+  enumProperties: DebuggerClient.requester({
+    type: "enumProperties",
+    options: args(0)
+  }, {
+    after: function(aResponse) {
+      if (aResponse.iterator) {
+        return { iterator: new PropertyIteratorClient(this._client, aResponse.iterator) };
+      }
+      return aResponse;
+    },
+    telemetry: "ENUMPROPERTIES"
+  }),
 
   /**
    * Pretty print this source's text.
@@ -2441,6 +2521,74 @@ SourceClient.prototype = {
 };
 
 /**
+ * A PropertyIteratorClient provides a way to access to property names and
+ * values of an object efficiently, slice by slice.
+ * Note that the properties can be sorted in the backend,
+ * this is controled while creating the PropertyIteratorClient
+ * from ObjectClient.enumProperties.
+ *
+ * @param aClient DebuggerClient
+ *        The debugger client parent.
+ * @param aGrip Object
+ *        A PropertyIteratorActor grip returned by the protocol via
+ *        TabActor.enumProperties request.
+ */
+function PropertyIteratorClient(aClient, aGrip) {
+  this._grip = aGrip;
+  this._client = aClient;
+  this.request = this._client.request;
+}
+
+PropertyIteratorClient.prototype = {
+  get actor() { return this._grip.actor; },
+
+  /**
+   * Get the total number of properties available in the iterator.
+   */
+  get count() { return this._grip.count; },
+
+  /**
+   * Get one or more property names that correspond to the positions in the
+   * indexes parameter.
+   *
+   * @param indexes Array
+   *        An array of property indexes.
+   * @param aCallback Function
+   *        The function called when we receive the property names.
+   */
+  names: DebuggerClient.requester({
+    type: "names",
+    indexes: args(0)
+  }, {}),
+
+  /**
+   * Get a set of following property value(s).
+   *
+   * @param start Number
+   *        The index of the first property to fetch.
+   * @param count Number
+   *        The number of properties to fetch.
+   * @param aCallback Function
+   *        The function called when we receive the property values.
+   */
+  slice: DebuggerClient.requester({
+    type: "slice",
+    start: args(0),
+    count: args(1)
+  }, {}),
+
+  /**
+   * Get all the property values.
+   *
+   * @param aCallback Function
+   *        The function called when we receive the property values.
+   */
+  all: DebuggerClient.requester({
+    type: "all"
+  }, {}),
+};
+
+/**
  * Breakpoint clients are used to remove breakpoints that are no longer used.
  *
  * @param aClient DebuggerClient
@@ -2576,7 +2724,9 @@ function EnvironmentClient(aClient, aForm) {
 
 EnvironmentClient.prototype = {
 
-  get actor() this._form.actor,
+  get actor() {
+    return this._form.actor;
+  },
   get _transport() { return this._client._transport; },
 
   /**

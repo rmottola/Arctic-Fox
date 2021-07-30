@@ -45,6 +45,8 @@ XPCOMUtils.defineLazyServiceGetter(this, "Favicons",
 XPCOMUtils.defineLazyServiceGetter(this, "gDNSService",
                                    "@mozilla.org/network/dns-service;1",
                                    "nsIDNSService");
+XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
+                                  "resource://gre/modules/LightweightThemeManager.jsm");
 
 
 const nsIWebNavigation = Ci.nsIWebNavigation;
@@ -983,9 +985,6 @@ var gBrowserInit = {
       document.documentElement.setAttribute("height", defaultHeight);
     }
 
-    if (!gShowPageResizers)
-      document.getElementById("status-bar").setAttribute("hideresizer", "true");
-
     if (!window.toolbar.visible) {
       // adjust browser UI for popups
       if (gURLBar) {
@@ -1184,7 +1183,6 @@ var gBrowserInit = {
     BrowserOffline.init();
     OfflineApps.init();
     IndexedDBPromptHelper.init();
-    AddonManager.addAddonListener(AddonsMgrListener);
     gRemoteTabsUI.init();
 
     // Ensure login manager is up and running.
@@ -1194,7 +1192,6 @@ var gBrowserInit = {
     if (gMultiProcessBrowser)
       TabCrashReporter.init();
 #endif
-    ReadingListUI.init();
 
     SidebarUI.startDelayedLoad();
 
@@ -1260,7 +1257,7 @@ var gBrowserInit = {
     // auto-resume downloads begin (such as after crashing or quitting with
     // active downloads) and speeds up the first-load of the download manager UI.
     // If the user manually opens the download manager before the timeout, the
-    // downloads will start right away, and getting the service again won't hurt.
+    // downloads will start right away, and initializing again won't hurt.
     setTimeout(function() {
       try {
         Cu.import("resource:///modules/DownloadsCommon.jsm", {})
@@ -1378,6 +1375,8 @@ var gBrowserInit = {
         appMenuOpening = null;
       }, false);
     }
+
+    ReadingListUI.init();
 
     window.addEventListener("mousemove", MousePosTracker, false);
     window.addEventListener("dragover", MousePosTracker, false);
@@ -1534,7 +1533,6 @@ var gBrowserInit = {
       BrowserOffline.uninit();
       OfflineApps.uninit();
       IndexedDBPromptHelper.uninit();
-      AddonManager.removeAddonListener(AddonsMgrListener);
     }
 
     // Final window teardown, do this last.
@@ -1560,7 +1558,7 @@ var gBrowserInit = {
                          'viewToolbarsMenu', 'viewSidebarMenuMenu', 'Browser:Reload',
                          'viewFullZoomMenu', 'pageStyleMenu', 'charsetMenu', 'View:PageSource', 'View:FullScreen',
                          'viewHistorySidebar', 'Browser:AddBookmarkAs', 'Browser:BookmarkAllTabs',
-                         'View:PageInfo', 'Browser:ToggleAddonBar'];
+                         'View:PageInfo'];
     var element;
 
     for (let disabledItem of disabledItems) {
@@ -3008,9 +3006,6 @@ var PrintPreviewListener = {
     this._chromeState.notificationsOpen = !notificationBox.notificationsHidden;
     notificationBox.notificationsHidden = true;
 
-    var addonBar = document.getElementById("addon-bar");
-    this._chromeState.addonBarOpen = !addonBar.collapsed;
-    addonBar.collapsed = true;
     gBrowser.updateWindowResizers();
 
     this._chromeState.findOpen = gFindBarInitialized && !gFindBar.hidden;
@@ -3031,11 +3026,6 @@ var PrintPreviewListener = {
   _showChrome: function () {
     if (this._chromeState.notificationsOpen)
       gBrowser.getNotificationBox().notificationsHidden = false;
-
-    if (this._chromeState.addonBarOpen) {
-      document.getElementById("addon-bar").collapsed = false;
-      gBrowser.updateWindowResizers();
-    }
 
     if (this._chromeState.findOpen)
       gFindBar.open();
@@ -4820,7 +4810,6 @@ function onViewToolbarsPopupShowing(aEvent, aInsertPoint) {
   var firstMenuItem = aInsertPoint || popup.firstChild;
 
   let toolbarNodes = Array.slice(gNavToolbox.childNodes);
-  toolbarNodes.push(document.getElementById("addon-bar"));
 
   for (let toolbar of toolbarNodes) {
     let toolbarName = toolbar.getAttribute("toolbarname");
@@ -4957,10 +4946,19 @@ var TabsInTitlebar = {
     this._readPref();
     Services.prefs.addObserver(this._prefName, this, false);
 
-    // Don't trust the initial value of the sizemode attribute; wait for
-    // the resize event (handled in tabbrowser.xml).
-    this.allowedBy("sizemode", false);
-
+    // We need to update the appearance of the titlebar when the menu changes
+    // from the active to the inactive state. We can't, however, rely on
+    // DOMMenuBarInactive, because the menu fires this event and then removes
+    // the inactive attribute after an event-loop spin.
+    //
+    // Because updating the appearance involves sampling the heights and margins
+    // of various elements, it's important that the layout be more or less
+    // settled before updating the titlebar. So instead of listening to
+    // DOMMenuBarActive and DOMMenuBarInactive, we use a MutationObserver to
+    // watch the "invalid" attribute directly.
+    let menu = document.getElementById("toolbar-menubar");
+    this._menuObserver = new MutationObserver(this._onMenuMutate);
+    this._menuObserver.observe(menu, {attributes: true});
     this._initialized = true;
 #endif
   },
@@ -4970,14 +4968,20 @@ var TabsInTitlebar = {
     if (allow) {
       if (condition in this._disallowed) {
         delete this._disallowed[condition];
-        this._update();
+        this._update(true);
       }
     } else {
       if (!(condition in this._disallowed)) {
         this._disallowed[condition] = null;
-        this._update();
+        this._update(true);
       }
     }
+#endif
+  },
+
+  updateAppearance: function updateAppearance(aForce) {
+#ifdef CAN_DRAW_IN_TITLEBAR
+    this._update(aForce);
 #endif
   },
 
@@ -4991,16 +4995,33 @@ var TabsInTitlebar = {
       this._readPref();
   },
 
+  _onMenuMutate: function (aMutations) {
+    // We don't care about restored windows, since the menu shouldn't be
+    // pushing the tab-strip down.
+    if (document.documentElement.getAttribute("sizemode") == "normal") {
+      return;
+    }
+
+    for (let mutation of aMutations) {
+      if (mutation.attributeName == "inactive" ||
+          mutation.attributeName == "autohide") {
+        TabsInTitlebar._update(true);
+        return;
+      }
+    }
+  },
+
   _initialized: false,
   _disallowed: {},
   _prefName: "browser.tabs.drawInTitlebar",
+  _lastSizeMode: null,
 
   _readPref: function () {
     this.allowedBy("pref",
                    Services.prefs.getBoolPref(this._prefName));
   },
 
-  _update: function () {
+  _update: function (aForce=false) {
     function $(id) document.getElementById(id);
     function rect(ele) ele.getBoundingClientRect();
 
@@ -5008,18 +5029,48 @@ var TabsInTitlebar = {
       return;
 
     let allowed = true;
+
+    if (!aForce) {
+      // _update is called on resize events, because the window is not ready
+      // after sizemode events. However, we only care about the event when the
+      // sizemode is different from the last time we updated the appearance of
+      // the tabs in the titlebar.
+      let sizemode = document.documentElement.getAttribute("sizemode");
+      if (this._lastSizeMode == sizemode) {
+        return;
+      }
+      let oldSizeMode = this._lastSizeMode;
+      this._lastSizeMode = sizemode;
+      // Don't update right now if we are leaving fullscreen, since the UI is
+      // still changing in the consequent "fullscreen" event. Code there will
+      // call this function again when everything is ready.
+      // See browser-fullScreen.js: FullScreen.toggle and bug 1173768.
+      if (oldSizeMode == "fullscreen") {
+        return;
+      }
+    }
+
     for (let something in this._disallowed) {
       allowed = false;
       break;
     }
 
-    if (allowed == this.enabled)
-      return;
-
     let titlebar = $("titlebar");
+    let titlebarContent = $("titlebar-content");
+    let menubar = $("toolbar-menubar");
+
+    // Reset the margins that _update modifies so that we can take accurate
+    // measurements.
+    titlebarContent.style.marginBottom = "";
+    titlebar.style.marginBottom = "";
+    menubar.style.marginBottom = "";
 
     if (allowed) {
-      let tabsToolbar       = $("TabsToolbar");
+      // We set the tabsintitlebar attribute first so that our CSS for
+      // tabsintitlebar manifests before we do our measurements.
+      document.documentElement.setAttribute("tabsintitlebar", "true");
+
+      function rect(ele)   ele.getBoundingClientRect();
 
 #ifdef MENUBAR_CAN_AUTOHIDE
       let appmenuButtonBox  = $("appmenu-button-container");
@@ -5028,25 +5079,58 @@ var TabsInTitlebar = {
       let captionButtonsBox = $("titlebar-buttonbox");
       this._sizePlaceholder("caption-buttons", rect(captionButtonsBox).width);
 
-      let tabsToolbarRect = rect(tabsToolbar);
-      let titlebarTop = rect($("titlebar-content")).top;
-      titlebar.style.marginBottom = - Math.min(tabsToolbarRect.top - titlebarTop,
-                                               tabsToolbarRect.height) + "px";
+      let titlebarContentHeight = rect(titlebarContent).height;
+      let menuHeight = this._outerHeight(menubar);
 
-      document.documentElement.setAttribute("tabsintitlebar", "true");
+      // If the titlebar is taller than the menubar, add more padding to the
+      // bottom of the menubar so that it matches.
+      if (menuHeight && titlebarContentHeight > menuHeight) {
+        let menuTitlebarDelta = titlebarContentHeight - menuHeight;
+        menubar.style.marginBottom = menuTitlebarDelta + "px";
+        menuHeight += menuTitlebarDelta;
+      }
 
-      if (!this._draghandle) {
+      // Next, we calculate how much we need to stretch the titlebar down to
+      // go all the way to the bottom of the tab strip.
+      let tabsToolbar = $("TabsToolbar");
+      let tabAndMenuHeight = this._outerHeight(tabsToolbar) + menuHeight;
+      titlebarContent.style.marginBottom = tabAndMenuHeight + "px";
+
+      // Finally, we have to determine how much to bring up the elements below
+      // the titlebar. We start with a baseHeight of tabAndMenuHeight, to offset
+      // the amount we added to the titlebar content. Then, we have two cases:
+      //
+      // 1) The titlebar is larger than the tabAndMenuHeight. This can happen in
+      //    large font mode with the menu autohidden. In this case, we want to
+      //    add tabAndMenuHeight, since this should line up the bottom of the
+      //    tabstrip with the bottom of the titlebar.
+      //
+      // 2) The titlebar is equal to or smaller than the tabAndMenuHeight. This
+      //    is the more common case, and occurs with normal font sizes. In this
+      //    case, we want to bring the menu and tabstrip right up to the top of
+      //    the titlebar, so we add the titlebarContentHeight to the baseHeight.
+      let baseHeight = tabAndMenuHeight;
+      baseHeight += (titlebarContentHeight > tabAndMenuHeight) ? tabAndMenuHeight
+                                                               : titlebarContentHeight;
+      titlebar.style.marginBottom = "-" + baseHeight + "px";
+
+      if (!this._draghandles) {
+        this._draghandles = {};
         let tmp = {};
         Components.utils.import("resource://gre/modules/WindowDraggingUtils.jsm", tmp);
-        this._draghandle = new tmp.WindowDraggingElement(tabsToolbar);
-        this._draghandle.mouseDownCheck = function () {
+
+        let mouseDownCheck = function () {
           return !this._dragBindingAlive && TabsInTitlebar.enabled;
         };
+
+        this._draghandles.tabsToolbar = new tmp.WindowDraggingElement(tabsToolbar);
+        this._draghandles.tabsToolbar.mouseDownCheck = mouseDownCheck;
+
+        this._draghandles.navToolbox = new tmp.WindowDraggingElement(gNavToolbox);
+        this._draghandles.navToolbox.mouseDownCheck = mouseDownCheck;
       }
     } else {
       document.documentElement.removeAttribute("tabsintitlebar");
-
-      titlebar.style.marginBottom = "";
     }
     
     ToolbarIconColor.inferFromText();
@@ -5056,12 +5140,30 @@ var TabsInTitlebar = {
     Array.forEach(document.querySelectorAll(".titlebar-placeholder[type='"+ type +"']"),
                   function (node) { node.width = width; });
   },
+
+  /**
+   * Retrieve the height of an element, including its top and bottom
+   * margins.
+   *
+   * @param ele
+   *        The element to measure.
+   * @return
+   *        The height and margins as an integer. If the height of the element
+   *        is 0, then this returns 0, regardless of what the margins are.
+   */
+  _outerHeight: function (ele) {
+    let cstyle = document.defaultView.getComputedStyle(ele);
+    let margins = parseInt(cstyle.marginTop) + parseInt(cstyle.marginBottom);
+    let height = ele.getBoundingClientRect().height;
+    return height > 0 ? Math.abs(height + margins) : 0;
+  },
 #endif
 
   uninit: function () {
 #ifdef CAN_DRAW_IN_TITLEBAR
     this._initialized = false;
     Services.prefs.removeObserver(this._prefName, this);
+    this._menuObserver.disconnect();
 #endif
   }
 };
@@ -5074,14 +5176,14 @@ function updateAppButtonDisplay() {
     document.getElementById("toolbar-menubar").getAttribute("autohide") == "true";
 
 #ifdef CAN_DRAW_IN_TITLEBAR
-  document.getElementById("titlebar").hidden = !displayAppButton;
+  document.getElementById("titlebar").hidden = gInPrintPreviewMode;
 
-  if (displayAppButton)
+  if (!gInPrintPreviewMode)
     document.documentElement.setAttribute("chromemargin", "0,2,2,2");
   else
     document.documentElement.removeAttribute("chromemargin");
 
-  TabsInTitlebar.allowedBy("drawing-in-titlebar", displayAppButton);
+  TabsInTitlebar.allowedBy("drawing-in-titlebar", !gInPrintPreviewMode);
 #else
   document.getElementById("appmenu-toolbar-button").hidden =
     !displayAppButton;
@@ -5384,11 +5486,24 @@ function handleLinkClick(event, href, linkNode) {
     catch (e) { }
   }
 
+  // first get document wide referrer policy, then
+  // get referrer attribute from clicked link and parse it and
+  // allow per element referrer to overrule the document wide referrer if enabled
+  let referrerPolicy = doc.referrerPolicy;
+  if (Services.prefs.getBoolPref("network.http.enablePerElementReferrer") &&
+      linkNode) {
+    let referrerAttrValue = Services.netUtils.parseAttributePolicyString(linkNode.
+                            getAttribute("referrer"));
+    if (referrerAttrValue != Ci.nsIHttpChannel.REFERRER_POLICY_DEFAULT) {
+      referrerPolicy = referrerAttrValue;
+    }
+  }
+
   urlSecurityCheck(href, doc.nodePrincipal);
   let params = { charset: doc.characterSet,
                  allowMixedContent: persistAllowMixedContentInChildTab,
                  referrerURI: referrerURI,
-                 referrerPolicy: doc.referrerPolicy,
+                 referrerPolicy: referrerPolicy,
                  noReferrer: BrowserUtils.linkHasNoReferrer(linkNode) };
   openLinkIn(href, where, params);
   event.preventDefault();
@@ -7342,11 +7457,6 @@ function duplicateTabIn(aTab, where, delta) {
       gBrowser.selectedTab = newTab;
       break;
   }
-}
-
-function toggleAddonBar() {
-  let addonBar = document.getElementById("addon-bar");
-  setToolbarVisibility(addonBar, addonBar.collapsed);
 }
 
 #ifdef MOZ_DEVTOOLS

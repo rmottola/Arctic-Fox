@@ -33,6 +33,8 @@ public:
   IMPL_EVENT_HANDLER(error)
   IMPL_EVENT_HANDLER(message)
 
+  static bool IsEnabled(JSContext* aCx, JSObject* aGlobal);
+
   explicit ServiceWorkerContainer(nsPIDOMWindow* aWindow);
 
   virtual JSObject*
@@ -73,14 +75,18 @@ public:
   // DOMEventTargetHelper
   void DisconnectFromOwner() override;
 
+  // Invalidates |mControllerWorker| and dispatches a "controllerchange"
+  // event.
+  void
+  ControllerChanged(ErrorResult& aRv);
+
 private:
   ~ServiceWorkerContainer();
 
   void RemoveReadyPromise();
 
   // This only changes when a worker hijacks everything in its scope by calling
-  // replace().
-  // FIXME(nsm): Bug 982711. Provide API to let SWM invalidate this.
+  // claim.
   nsRefPtr<workers::ServiceWorker> mControllerWorker;
 
   nsRefPtr<Promise> mReadyPromise;

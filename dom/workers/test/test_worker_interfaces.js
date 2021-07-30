@@ -142,7 +142,15 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "MessagePort",
 // IMPORTANT: Do not change this list without review from a DOM peer!
+    "Notification",
+// IMPORTANT: Do not change this list without review from a DOM peer!
     "Performance",
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    "PerformanceEntry",
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    "PerformanceMark",
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    "PerformanceMeasure",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Promise",
 // IMPORTANT: Do not change this list without review from a DOM peer!
@@ -150,7 +158,7 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Response",
 // IMPORTANT: Do not change this list without review from a DOM peer!
-    { name: "ServiceWorkerRegistration", nightly: true, b2g: false },
+    { name: "ServiceWorkerRegistration", release: false, b2g: false },
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "TextDecoder",
 // IMPORTANT: Do not change this list without review from a DOM peer!

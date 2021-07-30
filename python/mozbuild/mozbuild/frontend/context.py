@@ -14,7 +14,7 @@ If you are looking for the absolute authority on what moz.build files can
 contain, you've come to the right place.
 """
 
-from __future__ import unicode_literals
+from __future__ import absolute_import, unicode_literals
 
 import os
 
@@ -693,6 +693,9 @@ VARIABLES = {
           GENERATED_FILES += ['bar.c']
           bar = GENERATED_FILES['bar.c']
           bar.script = 'generate.py:make_bar'
+
+        The chosen script entry point may optionally return a set of strings,
+        indicating extra files the output depends on.
         """, 'export'),
 
     'DEFINES': (OrderedDict, dict,
@@ -1176,6 +1179,14 @@ VARIABLES = {
         This is the name of the ``.xpt`` file that is created by linking
         ``XPIDL_SOURCES`` together. If unspecified, it defaults to be the same
         as ``MODULE``.
+        """, None),
+
+    'XPIDL_NO_MANIFEST': (bool, bool,
+        """Indicate that the XPIDL module should not be added to a manifest.
+
+        This flag exists primarily to prevent test-only XPIDL modules from being
+        added to the application's chrome manifest. Most XPIDL modules should
+        not use this flag.
         """, None),
 
     'IPDL_SOURCES': (StrictOrderingOnAppendList, list,

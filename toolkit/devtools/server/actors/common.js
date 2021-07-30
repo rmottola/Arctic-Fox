@@ -6,6 +6,8 @@
 
 "use strict";
 
+const promise = require("promise");
+
 /**
  * Creates "registered" actors factory meant for creating another kind of
  * factories, ObservedActorFactory, during the call to listTabs.
@@ -280,8 +282,8 @@ ActorPool.prototype = {
    * Run all actor cleanups.
    */
   cleanup: function AP_cleanup() {
-    for each (let actor in this._cleanups) {
-      actor.disconnect();
+    for (let id in this._cleanups) {
+      this._cleanups[id].disconnect();
     }
     this._cleanups = {};
   },
@@ -294,6 +296,171 @@ ActorPool.prototype = {
 }
 
 exports.ActorPool = ActorPool;
+
+/**
+ * An OriginalLocation represents a location in an original source.
+ *
+ * @param SourceActor actor
+ *        A SourceActor representing an original source.
+ * @param Number line
+ *        A line within the given source.
+ * @param Number column
+ *        A column within the given line.
+ * @param String name
+ *        The name of the symbol corresponding to this OriginalLocation.
+ */
+function OriginalLocation(actor, line, column, name) {
+  this._connection = actor ? actor.conn : null;
+  this._actorID = actor ? actor.actorID : undefined;
+  this._line = line;
+  this._column = column;
+  this._name = name;
+}
+
+OriginalLocation.fromGeneratedLocation = function (generatedLocation) {
+  return new OriginalLocation(
+    generatedLocation.generatedSourceActor,
+    generatedLocation.generatedLine,
+    generatedLocation.generatedColumn
+  );
+};
+
+OriginalLocation.prototype = {
+  get originalSourceActor() {
+    return this._connection ? this._connection.getActor(this._actorID) : null;
+  },
+
+  get originalUrl() {
+    let actor = this.originalSourceActor;
+    let source = actor.source;
+    return source ? source.url : actor._originalUrl;
+  },
+
+  get originalLine() {
+    return this._line;
+  },
+
+  get originalColumn() {
+    return this._column;
+  },
+
+  get originalName() {
+    return this._name;
+  },
+
+  get generatedSourceActor() {
+    throw new Error("Shouldn't  access generatedSourceActor from an OriginalLocation");
+  },
+
+  get generatedLine() {
+    throw new Error("Shouldn't access generatedLine from an OriginalLocation");
+  },
+
+  get generatedColumn() {
+    throw new Error("Shouldn't access generatedColumn from an Originallocation");
+  },
+
+  equals: function (other) {
+    return this.originalSourceActor.url == other.originalSourceActor.url &&
+           this.originalLine === other.originalLine &&
+           (this.originalColumn === undefined ||
+            other.originalColumn === undefined ||
+            this.originalColumn === other.originalColumn);
+  },
+
+  toJSON: function () {
+    return {
+      source: this.originalSourceActor.form(),
+      line: this.originalLine,
+      column: this.originalColumn
+    };
+  }
+};
+
+exports.OriginalLocation = OriginalLocation;
+
+/**
+ * A GeneratedLocation represents a location in an original source.
+ *
+ * @param SourceActor actor
+ *        A SourceActor representing a generated source.
+ * @param Number line
+ *        A line within the given source.
+ * @param Number column
+ *        A column within the given line.
+ */
+function GeneratedLocation(actor, line, column, lastColumn) {
+  this._connection = actor ? actor.conn : null;
+  this._actorID = actor ? actor.actorID : undefined;
+  this._line = line;
+  this._column = column;
+  this._lastColumn = (lastColumn !== undefined) ? lastColumn : column + 1;
+}
+
+GeneratedLocation.fromOriginalLocation = function (originalLocation) {
+  return new GeneratedLocation(
+    originalLocation.originalSourceActor,
+    originalLocation.originalLine,
+    originalLocation.originalColumn
+  );
+};
+
+GeneratedLocation.prototype = {
+  get originalSourceActor() {
+    throw new Error();
+  },
+
+  get originalUrl() {
+    throw new Error("Shouldn't access originalUrl from a GeneratedLocation");
+  },
+
+  get originalLine() {
+    throw new Error("Shouldn't access originalLine from a GeneratedLocation");
+  },
+
+  get originalColumn() {
+    throw new Error("Shouldn't access originalColumn from a GeneratedLocation");
+  },
+
+  get originalName() {
+    throw new Error("Shouldn't access originalName from a GeneratedLocation");
+  },
+
+  get generatedSourceActor() {
+    return this._connection ? this._connection.getActor(this._actorID) : null;
+  },
+
+  get generatedLine() {
+    return this._line;
+  },
+
+  get generatedColumn() {
+    return this._column;
+  },
+
+  get generatedLastColumn() {
+    return this._lastColumn;
+  },
+
+  equals: function (other) {
+    return this.generatedSourceActor.url == other.generatedSourceActor.url &&
+           this.generatedLine === other.generatedLine &&
+           (this.generatedColumn === undefined ||
+            other.generatedColumn === undefined ||
+            this.generatedColumn === other.generatedColumn);
+  },
+
+  toJSON: function () {
+    return {
+      source: this.generatedSourceActor.form(),
+      line: this.generatedLine,
+      column: this.generatedColumn,
+      lastColumn: this.generatedLastColumn
+    };
+  }
+};
+
+exports.GeneratedLocation = GeneratedLocation;
 
 // TODO bug 863089: use Debugger.Script.prototype.getOffsetColumn when it is
 // implemented.
@@ -319,3 +486,36 @@ exports.getOffsetColumn = function getOffsetColumn(aOffset, aScript) {
 
   return bestOffsetMapping.columnNumber;
 }
+
+/**
+ * A method decorator that ensures the actor is in the expected state before
+ * proceeding. If the actor is not in the expected state, the decorated method
+ * returns a rejected promise.
+ *
+ * The actor's state must be at this.state property.
+ *
+ * @param String expectedState
+ *        The expected state.
+ * @param String activity
+ *        Additional info about what's going on.
+ * @param Function method
+ *        The actor method to proceed with when the actor is in the expected
+ *        state.
+ *
+ * @returns Function
+ *          The decorated method.
+ */
+function expectState(expectedState, method, activity) {
+  return function(...args) {
+    if (this.state !== expectedState) {
+      const msg = `Wrong state while ${activity}:` +
+                  `Expected '${expectedState}', ` +
+                  `but current state is '${this.state}'.`;
+      return promise.reject(new Error(msg));
+    }
+
+    return method.apply(this, args);
+  };
+}
+
+exports.expectState = expectState;

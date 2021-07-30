@@ -127,6 +127,8 @@ pref("dom.indexedDB.experimental", false);
 pref("dom.indexedDB.logging.enabled", true);
 // Detailed output in log messages.
 pref("dom.indexedDB.logging.details", true);
+// Enable profiler marks for indexedDB events.
+pref("dom.indexedDB.logging.profiler-marks", false);
 
 // Whether or not selection events are enabled
 pref("dom.select_events.enabled", true);
@@ -137,6 +139,13 @@ pref("dom.select_events.textcontrols.enabled", true);
 // Whether or not the document visbility API is enabled
 pref("dom.visibilityAPI.enabled", true);
 
+// Whether or not the Permissions API is enabled.
+#ifdef NIGHTLY_BUILD
+pref("dom.permissions.enabled", true);
+#else
+pref("dom.permissions.enabled", false);
+#endif
+
 // Whether or not Web Workers are enabled.
 pref("dom.workers.enabled", true);
 // The number of workers per domain allowed to run concurrently.
@@ -145,11 +154,14 @@ pref("dom.workers.maxPerDomain", 20);
 // Whether or not Shared Web Workers are enabled.
 pref("dom.workers.sharedWorkers.enabled", true);
 
-// WebSocket in workers are disabled by default.
-pref("dom.workers.websocket.enabled", true);
-
 // Service workers
 pref("dom.serviceWorkers.enabled", false);
+
+// Allow service workers to intercept network requests using the fetch event
+pref("dom.serviceWorkers.interception.enabled", false);
+
+// Allow service workers to intercept opaque (cross origin) responses
+pref("dom.serviceWorkers.interception.opaque.enabled", false);
 
 // Whether nonzero values can be returned from performance.timing.*
 pref("dom.enable_performance", true);
@@ -179,9 +191,6 @@ pref("dom.keyboardevent.code.enabled", true);
 // even if this is true).
 pref("dom.keyboardevent.dispatch_during_composition", false);
 
-// Whether the WebCrypto API is enabled
-pref("dom.webcrypto.enabled", true);
-
 // Whether the UndoManager API is enabled
 pref("dom.undo_manager.enabled", false);
 
@@ -194,7 +203,7 @@ pref("dom.url.getters_decode_hash", false);
 // Whether to run add-on code in different compartments from browser code. This
 // causes a separate compartment for each (addon, global) combination, which may
 // significantly increase the number of compartments in the system.
-#ifdef NIGHTLY_BUILD
+#ifdef E10S_TESTING_ONLY
 pref("dom.compartment_per_addon", true);
 #else
 pref("dom.compartment_per_addon", false);
@@ -332,7 +341,7 @@ pref("media.fragmented-mp4.enabled", true);
 // decoder works on all platforms.
 pref("media.use-blank-decoder", false);
 #ifdef MOZ_WMF
-pref("media.windows-media-foundation.enabled", true);
+pref("media.wmf.decoder.thread-count", -1);
 #endif
 #if defined(MOZ_FFMPEG)
 pref("media.ffmpeg.enabled", true);
@@ -411,12 +420,13 @@ pref("media.peerconnection.video.start_bitrate", 300);
 pref("media.peerconnection.video.max_bitrate", 2000);
 #endif
 pref("media.navigator.permission.disabled", false);
-pref("media.peerconnection.default_iceservers", "[{\"urls\": [\"stun:stun.services.mozilla.com\"]}]");
+pref("media.peerconnection.default_iceservers", "[]");
 pref("media.peerconnection.ice.loopback", false); // Set only for testing in offline environments.
 pref("media.peerconnection.use_document_iceservers", true);
 pref("media.peerconnection.identity.enabled", true);
 pref("media.peerconnection.identity.timeout", 10000);
-pref("media.peerconnection.ice.loopback", false); // Set only for testing in offline environments.
+pref("media.peerconnection.ice.stun_client_maximum_transmits", 7);
+pref("media.peerconnection.ice.trickle_grace_period", 5000);
 // These values (aec, agc, and noice) are from media/webrtc/trunk/webrtc/common_types.h
 // kXxxUnchanged = 0, kXxxDefault = 1, and higher values are specific to each
 // setting (for Xxx = Ec, Agc, or Ns).  Defaults are all set to kXxxDefault here.
@@ -483,10 +493,10 @@ pref("media.mediasource.webm.enabled", false);
 // Enable new MediaSource architecture.
 pref("media.mediasource.format-reader", true);
 
-// Enable the MediaFormatReader architecture for MP4 + MSE.
-pref("media.mediasource.format-reader.mp4", true);
-// Enable the MediaFormatReader architecture for plain MP4.
-pref("media.format-reader.mp4", true);
+// Enable new MediaFormatReader architecture for webm in MSE
+pref("media.mediasource.format-reader.webm", false);
+// Enable new MediaFormatReader architecture for plain webm.
+pref("media.format-reader.webm", false);
 
 #ifdef MOZ_WEBSPEECH
 pref("media.webspeech.recognition.enable", false);
@@ -836,9 +846,9 @@ pref("devtools.errorconsole.deprecation_warnings", false);
 
 // Disable debugging chrome
 #ifdef MOZ_DEV_EDITION
-pref("devtools.chrome.enabled", true);
+sticky_pref("devtools.chrome.enabled", true);
 #else
-pref("devtools.chrome.enabled", false);
+sticky_pref("devtools.chrome.enabled", false);
 #endif
 
 // Disable remote debugging protocol logging
@@ -846,9 +856,9 @@ pref("devtools.debugger.log", false);
 pref("devtools.debugger.log.verbose", false);
 // Disable remote debugging connections
 #ifdef MOZ_DEV_EDITION
-pref("devtools.debugger.remote-enabled", true);
+sticky_pref("devtools.debugger.remote-enabled", true);
 #else
-pref("devtools.debugger.remote-enabled", false);
+sticky_pref("devtools.debugger.remote-enabled", false);
 #endif
 pref("devtools.debugger.remote-port", 6000);
 // Force debugger server binding on the loopback interface
@@ -1307,7 +1317,7 @@ pref("dom.require_user_interaction_for_beforeunload", true);
 
 pref("dom.disable_open_during_load",                false);
 pref("dom.popup_maximum",                           20);
-pref("dom.popup_allowed_events", "change click dblclick mouseup reset submit touchend");
+pref("dom.popup_allowed_events", "change click dblclick mouseup notificationclick reset submit touchend");
 pref("dom.disable_open_click_delay", 1000);
 
 pref("dom.storage.enabled", true);
@@ -1380,6 +1390,11 @@ pref("javascript.options.ion",              true);
 pref("javascript.options.asmjs",            true);
 pref("javascript.options.native_regexp",    true);
 pref("javascript.options.parallel_parsing", true);
+#if !defined(RELEASE_BUILD) && !defined(ANDROID) && !defined(MOZ_B2G) && !defined(XP_IOS)
+pref("javascript.options.asyncstack",       true);
+#else
+pref("javascript.options.asyncstack",       false);
+#endif
 pref("javascript.options.ion.offthread_compilation", true);
 // This preference instructs the JS engine to discard the
 // source of any privileged JS after compilation. This saves
@@ -1566,6 +1581,9 @@ pref("network.http.referer.XOriginPolicy", 0);
 // Controls whether we send HTTPS referrers to other HTTPS sites.
 // By default this is enabled for compatibility (see bug 141641)
 pref("network.http.sendSecureXSiteReferrer", true);
+
+// Controls whether referrer attributes in <a>, <img>, <area>, and <iframe> are honoured
+pref("network.http.enablePerElementReferrer", false);
 
 // Maximum number of consecutive redirects before aborting.
 pref("network.http.redirection-limit", 20);
@@ -2014,6 +2032,14 @@ pref("network.automatic-ntlm-auth.allow-proxies", true);
 pref("network.automatic-ntlm-auth.allow-non-fqdn", false);
 pref("network.automatic-ntlm-auth.trusted-uris", "");
 
+// Sub-resources HTTP-authentication:
+//   0 - don't allow sub-resources to open HTTP authentication credentials
+//       dialogs
+//   1 - allow sub-resources to open HTTP authentication credentials dialogs,
+//       but don't allow it for cross-origin sub-resources
+//   2 - allow the cross-origin authentication as well.
+pref("network.auth.allow-subresource-auth", 1);
+
 pref("permissions.default.image",           1); // 1-Accept, 2-Deny, 3-dontAcceptForeign
 
 pref("network.proxy.type",                  5);
@@ -2075,6 +2101,13 @@ pref("intl.locale.matchOS",                 false);
 // for ISO-8859-1
 pref("intl.fallbackCharsetList.ISO-8859-1", "windows-1252");
 pref("font.language.group",                 "chrome://global/locale/intl.properties");
+
+// Android-specific pref to use key-events-only mode for IME-unaware webapps.
+#ifdef MOZ_WIDGET_ANDROID
+pref("intl.ime.hack.on_ime_unaware_apps.fire_key_events_for_composition", true);
+#else
+pref("intl.ime.hack.on_ime_unaware_apps.fire_key_events_for_composition", false);
+#endif
 
 // these locales have right-to-left UI
 pref("intl.uidirection.ar", "rtl");
@@ -2171,7 +2204,7 @@ pref("security.csp.debug", false);
 pref("security.csp.experimentalEnabled", false);
 
 // Default Content Security Policy to apply to privileged apps.
-pref("security.apps.privileged.CSP.default", "default-src *; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'");
+pref("security.apps.privileged.CSP.default", "default-src * data: blob:; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'");
 
 // Mixed content blocking
 pref("security.mixed_content.block_active_content", false);
@@ -2410,9 +2443,6 @@ pref("layout.word_select.stop_at_punctuation", true);
 // Windows default is 1 for word delete behavior, the rest as for 2.
 pref("layout.selection.caret_style", 0);
 
-// pref to force frames to be resizable
-pref("layout.frames.force_resizability", false);
-
 // pref to report CSS errors to the error console
 pref("layout.css.report_errors", true);
 
@@ -2555,6 +2585,9 @@ pref("layout.css.overflow-clip-box.enabled", false);
 
 // Is support for CSS grid enabled?
 pref("layout.css.grid.enabled", false);
+
+// Is support for CSS contain enabled?
+pref("layout.css.contain.enabled", false);
 
 // Is support for CSS Ruby enabled?
 //
@@ -2706,7 +2739,9 @@ pref("plugin.sessionPermissionNow.intervalInMinutes", 60);
 // to allow it persistently.
 pref("plugin.persistentPermissionAlways.intervalInDays", 90);
 
-#ifndef DEBUG
+// Set IPC timeouts for plugins and tabs, except in leak-checking builds.
+// (NS_FREE_PERMANENT_DATA is C++ only, so approximate its definition here.)
+#if !defined(DEBUG) && !defined(MOZ_ASAN) && !defined(MOZ_VALGRIND)
 // How long a plugin is allowed to process a synchronous IPC message
 // before we consider it "hung".
 pref("dom.ipc.plugins.timeoutSecs", 45);
@@ -2732,7 +2767,7 @@ pref("dom.ipc.plugins.hangUIMinDisplaySecs", 10);
 // we fear the worst and kill it.
 pref("dom.ipc.tabs.shutdownTimeoutSecs", 5);
 #else
-// No timeout in DEBUG builds
+// No timeout in leak-checking builds
 pref("dom.ipc.plugins.timeoutSecs", 0);
 pref("dom.ipc.plugins.contentTimeoutSecs", 0);
 pref("dom.ipc.plugins.processLaunchTimeoutSecs", 0);
@@ -2776,6 +2811,12 @@ pref("svg.marker-improvements.enabled", true);
 // Is support for the new getBBox method from SVG 2 enabled?
 // See https://svgwg.org/svg2-draft/single-page.html#types-SVGBoundingBoxOptions
 pref("svg.new-getBBox.enabled", false);
+
+#ifdef RELEASE_BUILD
+pref("svg.transform-box.enabled", false);
+#else
+pref("svg.transform-box.enabled", true);
+#endif // RELEASE_BUILD
 
 // Default font types and sizes by locale
 pref("font.default.ar", "sans-serif");
@@ -3367,6 +3408,34 @@ pref("intl.tsf.hack.google_ja_input.do_not_return_no_layout_error_at_first_char"
 // composition string.
 pref("intl.tsf.hack.google_ja_input.do_not_return_no_layout_error_at_caret", true);
 #endif
+
+// If composition_font is set, Gecko sets the font to IME.  IME may use
+// the fonts on their window like candidate window.  If they are empty,
+// Gecko uses the system default font which is set to the IM context.
+// The font name must not start with '@'.  When the writing mode is vertical,
+// Gecko inserts '@' to the start of the font name automatically.
+// FYI: Changing these prefs requires to restart.
+pref("intl.imm.composition_font", "");
+
+// Japanist 2003's candidate window is broken if the font is "@System" which
+// is default composition font for vertical writing mode.
+// You can specify font to use on candidate window of Japanist 2003.
+// This value must not start with '@'.
+// FYI: Changing this pref requires to restart.
+pref("intl.imm.composition_font.japanist_2003", "MS PGothic");
+
+// Even if IME claims that they support vertical writing mode but it may not
+// support vertical writing mode for its candidate window.  This pref allows
+// to ignore the claim.
+// FYI: Changing this pref requires to restart.
+pref("intl.imm.vertical_writing.always_assume_not_supported", false);
+
+// We cannot retrieve active IME name with IMM32 API if a TIP of TSF is active.
+// This pref can specify active IME name when Japanese TIP is active.
+// For example:
+//   Google Japanese Input: "Google 日本語入力 IMM32 モジュール"
+//   ATOK 2011: "ATOK 2011" (similarly, e.g., ATOK 2013 is "ATOK 2013")
+pref("intl.imm.japanese.assume_active_tip_name_as", "");
 
 // See bug 448927, on topmost panel, some IMEs are not usable on Windows.
 pref("ui.panel.default_level_parent", false);
@@ -4191,6 +4260,13 @@ pref("image.high_quality_downscaling.min_factor", 335);
 // interpreted as number of decoded bytes.
 pref("image.high_quality_upscaling.max_size", 20971520);
 
+// The threshold for inferring that changes to an <img> element's |src|
+// attribute by JavaScript represent an animation, in milliseconds. If the |src|
+// attribute is changing more frequently than this value, then we enter a
+// special "animation mode" which is designed to eliminate flicker. Set to 0 to
+// disable.
+pref("image.infer-src-animation.threshold-ms", 2000);
+
 // Should we optimize away the surfaces of single-color images?
 pref("image.single-color-optimization.enabled", true);
 
@@ -4274,6 +4350,7 @@ pref("gl.require-hardware", false);
 #ifdef XP_WIN
 pref("webgl.angle.try-d3d11", true);
 pref("webgl.angle.force-d3d11", false);
+pref("webgl.angle.force-warp", false);
 #endif
 
 #ifdef MOZ_WIDGET_GONK
@@ -4322,6 +4399,9 @@ pref("layers.acceleration.force-enabled", false);
 
 pref("layers.acceleration.draw-fps", false);
 
+// Enable DEAA antialiasing for transformed layers in the compositor
+pref("layers.deaa.enabled", false);
+
 pref("layers.dump", false);
 #ifdef MOZ_DUMP_PAINTING
 // If we're dumping layers, also dump the texture data
@@ -4350,7 +4430,7 @@ pref("layers.max-active", -1);
 pref("layers.tiles.adjust", true);
 
 // Set the default values, and then override per-platform as needed
-pref("layers.offmainthreadcomposition.enabled", false);
+pref("layers.offmainthreadcomposition.enabled", true);
 // Compositor target frame rate. NOTE: If vsync is enabled the compositor
 // frame rate will still be capped.
 // -1 -> default (match layout.frame_rate or 60 FPS)
@@ -4362,24 +4442,19 @@ pref("layers.offmainthreadcomposition.frame-rate", -1);
 pref("layers.async-video.enabled", true);
 pref("layers.async-video-oop.enabled",true);
 
-#ifdef XP_WIN
-pref("layers.offmainthreadcomposition.enabled", true);
+#ifdef MOZ_WIDGET_UIKIT
+pref("layers.async-pan-zoom.enabled", true);
 #endif
 
-#ifdef MOZ_WIDGET_QT
-pref("layers.offmainthreadcomposition.enabled", true);
+#ifdef MOZ_WIDGET_UIKIT
+pref("layers.async-pan-zoom.enabled", true);
 #endif
 
 #ifdef XP_MACOSX
-pref("layers.offmainthreadcomposition.enabled", true);
 pref("layers.enable-tiles", true);
 pref("layers.tiled-drawtarget.enabled", true);
 #endif
 
-// ANDROID covers android and b2g
-#ifdef ANDROID
-pref("layers.offmainthreadcomposition.enabled", true);
-#endif
 
 // same effect as layers.offmainthreadcomposition.enabled, but specifically for
 // use with tests.
@@ -4485,6 +4560,9 @@ pref("alerts.durationImmediate", 20000);
 pref("full-screen-api.enabled", false);
 pref("full-screen-api.allow-trusted-requests-only", true);
 pref("full-screen-api.pointer-lock.enabled", true);
+// transition duration of fade-to-black and fade-from-black, unit: ms
+pref("full-screen-api.transition-duration.enter", "400 400");
+pref("full-screen-api.transition-duration.leave", "400 400");
 
 // DOM idle observers API
 pref("dom.idle-observers-api.enabled", true);
@@ -4569,6 +4647,11 @@ pref("dom.push.adaptive.upperLimit", 1740000); // 29 min
 
 // enable udp wakeup support
 pref("dom.push.udp.wakeupEnabled", false);
+
+// WebPush prefs:
+pref("dom.push.http2.reset_retry_count_after_ms", 60000);
+pref("dom.push.http2.maxRetries", 2);
+pref("dom.push.http2.retryInterval", 5000);
 
 // WebNetworkStats
 pref("dom.mozNetworkStats.enabled", false);
@@ -4750,11 +4833,19 @@ pref("ui.touch_activation.duration_ms", 10);
 // actions when the fifo is written to.  Disable this in general.
 pref("memory_info_dumper.watch_fifo.enabled", false);
 
-#ifdef MOZ_CAPTIVEDETECT
+// If minInterval is 0, the check will only happen
+// when the service has a strong suspicion we are in a captive portal
+pref("network.captive-portal-service.minInterval", 60000); // 60 seconds
+pref("network.captive-portal-service.maxInterval", 1500000); // 25 minutes
+// Every 10 checks, the delay is increased by a factor of 5
+pref("network.captive-portal-service.backoffFactor", "5.0");
+pref("network.captive-portal-service.enabled", false);
+
+pref("captivedetect.canonicalURL", "http://detectportal.firefox.com/success.txt");
+pref("captivedetect.canonicalContent", "success\n");
 pref("captivedetect.maxWaitingTime", 5000);
 pref("captivedetect.pollingTime", 3000);
 pref("captivedetect.maxRetryCount", 5);
-#endif
 
 #ifdef RELEASE_BUILD
 pref("dom.forms.inputmode", false);
@@ -4853,12 +4944,31 @@ pref("selectioncaret.enabled", false);
 // user click on selection caret or not. In app units.
 pref("selectioncaret.inflatesize.threshold", 40);
 
+// Selection carets do not affect caret visibility.
+pref("selectioncaret.visibility.affectscaret", false);
+
+// Selection caret visibility does not observe composition
+// selections generated by soft keyboard managers.
+pref("selectioncaret.observes.compositions", false);
+
+// The Touch caret by default observes the b2g visibility rules, and
+// not the extended Android visibility rules that allow for touchcaret
+// display in empty editable fields, for example.
+pref("touchcaret.extendedvisibility", false);
+
+// Desktop and b2g don't need to open or close the Android
+// TextSelection (Actionbar) utility.
+pref("caret.manages-android-actionbar", false);
+
 // New implementation to unify touch-caret and selection-carets.
 pref("layout.accessiblecaret.enabled", false);
 
 // Timeout in milliseconds to hide the accessiblecaret under cursor mode while
 // no one touches it. Set the value to 0 to disable this feature.
 pref("layout.accessiblecaret.timeout_ms", 3000);
+
+// Selection carets will fall-back to internal LongTap detector.
+pref("selectioncaret.detects.longtap", true);
 
 // Wakelock is disabled by default.
 pref("dom.wakelock.enabled", false);
@@ -4894,6 +5004,10 @@ pref("dom.caches.enabled", true);
 // platforms; and set to 0 to disable the low-memory check altogether.
 pref("camera.control.low_memory_thresholdMB", 404);
 #endif
+
+// SystemUpdate API
+pref("dom.system_update.enabled", false);
+pref("dom.system_update.debug", false);
 
 // UDPSocket API
 pref("dom.udpsocket.enabled", false);
@@ -5057,9 +5171,12 @@ pref("reader.toolbar.vertical", true);
 pref("media.gmp.insecure.allow", false);
 #endif
 
-// Use vsync aligned rendering.
-// Only supported on windows, os x, and b2g
-#if defined(XP_WIN) || defined(XP_MACOSX)
+pref("dom.audiochannel.mutedByDefault", false);
+
+// Use vsync aligned rendering. b2g prefs are in b2g.js.
+// Hardware vsync supported on windows, os x, and b2g.
+// Linux and fennec will use software vsync.
+#if defined(XP_MACOSX) || defined(XP_WIN) || defined(XP_LINUX)
 pref("gfx.vsync.hw-vsync.enabled", false);
 pref("gfx.vsync.compositor", true);
 pref("gfx.vsync.refreshdriver", true);
@@ -5090,5 +5207,3 @@ pref("memory.report_concurrency", 10);
 // Turn rewriting of youtube embeds on/off
 pref("plugins.rewrite_youtube_embeds", true);
 
-// Thick caret when behind CJK characters
-pref("layout.cjkthickcaret", true);

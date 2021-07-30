@@ -10,6 +10,8 @@
 #endif
 
 #include "nsIComponentRegistrar.h"
+#include "nsIScriptSecurityManager.h"
+#include "nsServiceManagerUtils.h"
 #include "nsIServiceManager.h"
 #include "nsNetUtil.h"
 
@@ -20,7 +22,7 @@
 // set NSPR_LOG_MODULES=Test:5
 //
 static PRLogModuleInfo *gTestLog = nullptr;
-#define LOG(args) PR_LOG(gTestLog, PR_LOG_DEBUG, args)
+#define LOG(args) MOZ_LOG(gTestLog, mozilla::LogLevel::Debug, args)
 
 //-----------------------------------------------------------------------------
 // InputTestConsumer

@@ -1418,7 +1418,7 @@ CssRuleView.prototype = {
         text = text.replace(rx, "");
       }
 
-      clipboardHelper.copyString(text, this.doc);
+      clipboardHelper.copyString(text);
       event.preventDefault();
     } catch(e) {
       console.error(e);
@@ -1429,7 +1429,7 @@ CssRuleView.prototype = {
    * Copy the most recently selected color value to clipboard.
    */
   _onCopyColor: function() {
-    clipboardHelper.copyString(this._colorToCopy, this.styleDocument);
+    clipboardHelper.copyString(this._colorToCopy);
   },
 
   /**
