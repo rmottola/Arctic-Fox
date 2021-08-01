@@ -147,14 +147,12 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1178938 - 2015-07-02 5 parts
 - Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1161802 - 2015-06-10  part 1 to 8
-- Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
 - Bug 1204872 - 2015-09
 - Bug 1198861 - (1 of 2) Improve aliasing information and type barrier handling 
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
 - Bug 1161802 part 2 - Split nsGlobalWindow::SetFullScreenInternal into
 - Bug 1053413 part 1 - Some code style conversion on affected code.
-- Bug 947854 - 2015-05-05 parto 0 to 4
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 1179569: Remove use of decoder's monitor in ResetDecode(). r=bholley
 - Bug 1178437 - Do the dormant-enabled tracking on the main thread. 
@@ -218,18 +216,12 @@ Check with Roy Tam:
 
 # Patches that apply but break things:
 - Bug 1096294 - 2015-02-24 Display pseudo-arrays like arrays in the console; r=pbrosset
-- Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
 
 What with LightweightThemeConsumer.jsm 
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/af76a72464c5dd2030f8a2353640d97f27e8517a
 
-To verify:
-- Verify requirements of 968520
-
-Verify all here:
-https://github.com/mozilla/newtab-dev/commits/6fd700984bdd3fcbcf548d0fdd8c0b571ba7d7e0/layout/base/nsDisplayList.cpp
 
 ### FIXME / TODO
 - fix devtools structure, from browser/themes/osx/devtools to browser/devtools
@@ -286,8 +278,6 @@ in TenFourFOX: TENFOURFOX_VMX - VPX_VMX_ASM
 - NekcoOriginAttributes
 - 529808 - Remove the static atom table. - if all the rest has been added... remove it again
 - see if window.requestIdleCallback can be backported
-
-Check if NullPtr removal has any effects on our supported platforms. See: Bug 1120062
 
 ### last checked TFF backport commit
 #512: M1472018 M1469309 M1472925 M1470260 (part 1)
