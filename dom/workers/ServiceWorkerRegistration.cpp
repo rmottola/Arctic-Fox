@@ -1075,8 +1075,7 @@ ServiceWorkerRegistrationWorkerThread::ShowNotification(JSContext* aCx,
 already_AddRefed<Promise>
 ServiceWorkerRegistrationWorkerThread::GetNotifications(const GetNotificationOptions& aOptions, ErrorResult& aRv)
 {
-  MOZ_ASSERT(false);
-  return nullptr;
+  return Notification::WorkerGet(mWorkerPrivate, aOptions, mScope, aRv);
 }
 
 } // dom namespace
