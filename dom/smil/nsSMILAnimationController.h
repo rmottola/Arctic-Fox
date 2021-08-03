@@ -144,12 +144,6 @@ protected:
   void DoSample(bool aSkipUnchangedContainers);
 
   void RewindElements();
-  static PLDHashOperator RewindNeeded(
-      TimeContainerPtrKey* aKey, void* aData);
-  static PLDHashOperator RewindAnimation(
-      AnimationElementPtrKey* aKey, void* aData);
-  static PLDHashOperator ClearRewindNeeded(
-      TimeContainerPtrKey* aKey, void* aData);
 
   void DoMilestoneSamples();
   static PLDHashOperator GetNextMilestone(
