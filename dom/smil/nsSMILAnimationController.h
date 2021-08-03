@@ -123,12 +123,6 @@ protected:
   typedef nsPtrHashKey<mozilla::dom::SVGAnimationElement> AnimationElementPtrKey;
   typedef nsTHashtable<AnimationElementPtrKey> AnimationElementHashtable;
 
-  struct SampleTimeContainerParams
-  {
-    TimeContainerHashtable* mActiveContainers;
-    bool                    mSkipUnchangedContainers;
-  };
-
   struct SampleAnimationParams
   {
     TimeContainerHashtable* mActiveContainers;
@@ -140,10 +134,6 @@ protected:
     nsTArray<nsRefPtr<mozilla::dom::SVGAnimationElement> > mElements;
     nsSMILMilestone                                        mMilestone;
   };
-
-  // Cycle-collection implementation helpers
-  static PLDHashOperator CompositorTableEntryTraverse(
-      nsSMILCompositor* aCompositor, void* aArg);
 
   // Returns mDocument's refresh driver, if it's got one.
   nsRefreshDriver* GetRefreshDriver();
@@ -173,8 +163,6 @@ protected:
   static PLDHashOperator GetMilestoneElements(
       TimeContainerPtrKey* aKey, void* aData);
 
-  static PLDHashOperator SampleTimeContainer(
-      TimeContainerPtrKey* aKey, void* aData);
   static PLDHashOperator SampleAnimation(
       AnimationElementPtrKey* aKey, void* aData);
   static void SampleTimedElement(mozilla::dom::SVGAnimationElement* aElement,
