@@ -123,12 +123,6 @@ protected:
   typedef nsPtrHashKey<mozilla::dom::SVGAnimationElement> AnimationElementPtrKey;
   typedef nsTHashtable<AnimationElementPtrKey> AnimationElementHashtable;
 
-  struct SampleAnimationParams
-  {
-    TimeContainerHashtable* mActiveContainers;
-    nsSMILCompositorTable*  mCompositorTable;
-  };
-
   struct GetMilestoneElementsParams
   {
     nsTArray<nsRefPtr<mozilla::dom::SVGAnimationElement> > mElements;
@@ -163,8 +157,6 @@ protected:
   static PLDHashOperator GetMilestoneElements(
       TimeContainerPtrKey* aKey, void* aData);
 
-  static PLDHashOperator SampleAnimation(
-      AnimationElementPtrKey* aKey, void* aData);
   static void SampleTimedElement(mozilla::dom::SVGAnimationElement* aElement,
                                  TimeContainerHashtable* aActiveContainers);
   static void AddAnimationToCompositorTable(
