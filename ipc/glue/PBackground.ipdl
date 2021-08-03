@@ -51,7 +51,7 @@ parent:
   PVsync();
 
   PUDPSocket(OptionalPrincipalInfo pInfo, nsCString filter);
-  PBroadcastChannel(PrincipalInfo pInfo, nsString origin, nsString channel,
+  PBroadcastChannel(PrincipalInfo pInfo, nsCString origin, nsString channel,
                     bool privateBrowsing);
 
   PServiceWorkerManager();
