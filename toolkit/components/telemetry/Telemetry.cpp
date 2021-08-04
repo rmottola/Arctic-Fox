@@ -3823,28 +3823,20 @@ KeyedHistogram::Add(const nsCString& key, uint32_t sample)
 void
 KeyedHistogram::Clear(bool onlySubsession)
 {
-  mSubsessionMap.EnumerateEntries(&KeyedHistogram::ClearHistogramEnumerator, nullptr);
+#if !defined(MOZ_WIDGET_GONK) && !defined(MOZ_WIDGET_ANDROID)
+  for (auto iter = mSubsessionMap.Iter(); !iter.Done(); iter.Next()) {
+    iter.Get()->mData->Clear();
+  }
   mSubsessionMap.Clear();
   if (onlySubsession) {
     return;
   }
+#endif
 
-  mHistogramMap.EnumerateEntries(&KeyedHistogram::ClearHistogramEnumerator, nullptr);
+  for (auto iter = mHistogramMap.Iter(); !iter.Done(); iter.Next()) {
+    iter.Get()->mData->Clear();
+  }
   mHistogramMap.Clear();
-}
-
-/* static */
-PLDHashOperator
-KeyedHistogram::ReflectKeys(KeyedHistogramEntry* entry, void* arg)
-{
-  ReflectKeysArgs* args = static_cast<ReflectKeysArgs*>(arg);
-
-  JS::RootedValue jsKey(args->jsContext);
-  const NS_ConvertUTF8toUTF16 key(entry->GetKey());
-  jsKey.setString(JS_NewUCStringCopyN(args->jsContext, key.Data(), key.Length()));
-  args->vector->append(jsKey);
-
-  return PL_DHASH_NEXT;
 }
 
 nsresult
