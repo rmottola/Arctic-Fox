@@ -2691,6 +2691,9 @@ ClipItemsExceptCaret(nsDisplayList* aList,
     }
 
     bool isCaret = i->GetType() == nsDisplayItem::TYPE_CARET;
+    if (aUsingDisplayPort && isCaret) {
+      static_cast<nsDisplayCaret*>(i)->SetNeedsCustomScrollClip();
+    }
     if (!aUsingDisplayPort && !isCaret) {
       bool unused;
       nsRect bounds = i->GetBounds(aBuilder, &unused);

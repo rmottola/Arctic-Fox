@@ -276,6 +276,7 @@ public:
     mFontSmoothingBackgroundColor(NS_RGBA(0,0,0,0)),
     mExclusiveToOneItem(false),
     mSingleItemFixedToViewport(false),
+    mIsCaret(false),
     mNeedComponentAlpha(false),
     mForceTransparentSurface(false),
     mHideAllLayersBelow(false),
@@ -440,6 +441,10 @@ public:
    */
   bool mSingleItemFixedToViewport;
   /**
+   * True if the layer contains exactly one item for the caret.
+   */
+  bool mIsCaret;
+  /**
    * True if there is any text visible in the layer that's over
    * transparent pixels in the layer.
    */
@@ -521,6 +526,7 @@ struct NewLayerEntry {
     , mHideAllLayersBelow(false)
     , mOpaqueForAnimatedGeometryRootParent(false)
     , mPropagateComponentAlphaFlattening(true)
+    , mIsCaret(false)
   {}
   // mLayer is null if the previous entry is for a PaintedLayer that hasn't
   // been optimized to some other form (yet).
@@ -552,6 +558,7 @@ struct NewLayerEntry {
   // If true, then the content flags for this layer should contribute
   // to our decision to flatten component alpha layers, false otherwise.
   bool mPropagateComponentAlphaFlattening;
+  bool mIsCaret;
 };
 
 class PaintedLayerDataTree;
@@ -3037,6 +3044,7 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
       newLayerEntry->mLayer = layer;
       newLayerEntry->mAnimatedGeometryRoot = data->mAnimatedGeometryRoot;
       newLayerEntry->mFixedPosFrameForLayerData = data->mFixedPosFrameForLayerData;
+      newLayerEntry->mIsCaret = data->mIsCaret;
 
       // Hide the PaintedLayer. We leave it in the layer tree so that we
       // can find and recycle it later.
@@ -3388,11 +3396,13 @@ ContainerState::NewPaintedLayerData(nsDisplayItem* aItem,
     FindFixedPosFrameForLayerData(aAnimatedGeometryRoot, aShouldFixToViewport);
   data.mReferenceFrame = aItem->ReferenceFrame();
   data.mSingleItemFixedToViewport = aShouldFixToViewport;
+  data.mIsCaret = aItem->GetType() == nsDisplayItem::TYPE_CARET;
 
   data.mNewChildLayersIndex = mNewChildLayers.Length();
   NewLayerEntry* newLayerEntry = mNewChildLayers.AppendElement();
   newLayerEntry->mAnimatedGeometryRoot = aAnimatedGeometryRoot;
   newLayerEntry->mFixedPosFrameForLayerData = data.mFixedPosFrameForLayerData;
+  newLayerEntry->mIsCaret = data.mIsCaret;
   // newLayerEntry->mOpaqueRegion is filled in later from
   // paintedLayerData->mOpaqueRegion, if necessary.
 
@@ -3552,6 +3562,13 @@ ContainerState::ComputeOpaqueRect(nsDisplayItem* aItem,
     }
   }
   return opaquePixels;
+}
+
+static bool
+IsCaretWithCustomClip(nsDisplayItem* aItem, nsDisplayItem::Type aItemType)
+{
+  return aItemType == nsDisplayItem::TYPE_CARET &&
+    static_cast<nsDisplayCaret*>(aItem)->NeedsCustomScrollClip();
 }
 
 /*
@@ -3840,6 +3857,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
           layerState == LAYER_ACTIVE_FORCE) {
         newLayerEntry->mPropagateComponentAlphaFlattening = false;
       }
+      newLayerEntry->mIsCaret = itemType == nsDisplayItem::TYPE_CARET;
       // nsDisplayTransform::BuildLayer must set layerContentsVisibleRect.
       // We rely on this to ensure 3D transforms compute a reasonable
       // layer visible region.
@@ -3879,9 +3897,10 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
                                          layerState,
                                          topLeft, nullptr);
     } else {
+      bool forceOwnLayer = shouldFixToViewport || IsCaretWithCustomClip(item, itemType);
       PaintedLayerData* paintedLayerData =
         mPaintedLayerDataTree.FindPaintedLayerFor(animatedGeometryRoot, itemVisibleRect,
-                                                  shouldFixToViewport, [&]() {
+                                                  forceOwnLayer, [&]() {
           return NewPaintedLayerData(item, itemVisibleRect, animatedGeometryRoot,
                                      topLeft, shouldFixToViewport);
         });
