@@ -106,30 +106,12 @@ public:
                          PLDHashTable::kDefaultInitialLength);
   typedef bool (*ReflectEntryFunc)(EntryType *entry, JSContext *cx, JS::Handle<JSObject*> obj);
   bool ReflectIntoJS(ReflectEntryFunc entryFunc, JSContext *cx, JS::Handle<JSObject*> obj);
-private:
-  struct EnumeratorArgs {
-    JSContext *cx;
-    JS::Handle<JSObject*> obj;
-    ReflectEntryFunc entryFunc;
-  };
-  static PLDHashOperator ReflectEntryStub(EntryType *entry, void *arg);
 };
 
 template<class EntryType>
 AutoHashtable<EntryType>::AutoHashtable(uint32_t initLength)
   : nsTHashtable<EntryType>(initLength)
 {
-}
-
-template<typename EntryType>
-PLDHashOperator
-AutoHashtable<EntryType>::ReflectEntryStub(EntryType *entry, void *arg)
-{
-  EnumeratorArgs *args = static_cast<EnumeratorArgs *>(arg);
-  if (!args->entryFunc(entry, args->cx, args->obj)) {
-    return PL_DHASH_STOP;
-  }
-  return PL_DHASH_NEXT;
 }
 
 /**
@@ -141,9 +123,12 @@ bool
 AutoHashtable<EntryType>::ReflectIntoJS(ReflectEntryFunc entryFunc,
                                         JSContext *cx, JS::Handle<JSObject*> obj)
 {
-  EnumeratorArgs args = { cx, obj, entryFunc };
-  uint32_t num = this->EnumerateEntries(ReflectEntryStub, static_cast<void*>(&args));
-  return num == this->Count();
+  for (auto iter = this->Iter(); !iter.Done(); iter.Next()) {
+    if (!entryFunc(iter.Get(), cx, obj)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // This class is conceptually a list of ProcessedStack objects, but it represents them
@@ -787,17 +772,9 @@ private:
   KeyedHistogramMapType mHistogramMap;
   KeyedHistogramMapType mSubsessionMap;
 
-  struct ReflectKeysArgs {
-    JSContext* jsContext;
-    JS::AutoValueVector* vector;
-  };
-  static PLDHashOperator ReflectKeys(KeyedHistogramEntry* entry, void* arg);
-
   static bool ReflectKeyedHistogram(KeyedHistogramEntry* entry,
                                     JSContext* cx,
                                     JS::Handle<JSObject*> obj);
-
-  static PLDHashOperator ClearHistogramEnumerator(KeyedHistogramEntry*, void*);
 
   const nsCString mName;
   const nsCString mExpiration;
@@ -3824,14 +3801,6 @@ KeyedHistogram::GetDataset(uint32_t* dataset) const
   return NS_OK;
 }
 
-/* static */
-PLDHashOperator
-KeyedHistogram::ClearHistogramEnumerator(KeyedHistogramEntry* entry, void*)
-{
-  entry->mData->Clear();
-  return PL_DHASH_NEXT;
-}
-
 nsresult
 KeyedHistogram::Add(const nsCString& key, uint32_t sample)
 {
@@ -3886,11 +3855,11 @@ KeyedHistogram::GetJSKeys(JSContext* cx, JS::CallArgs& args)
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
-  ReflectKeysArgs reflectArgs = { cx, &keys };
-  const uint32_t num = mHistogramMap.EnumerateEntries(&KeyedHistogram::ReflectKeys,
-                                                      static_cast<void*>(&reflectArgs));
-  if (num != mHistogramMap.Count()) {
-    return NS_ERROR_FAILURE;
+  for (auto iter = mHistogramMap.Iter(); !iter.Done(); iter.Next()) {
+    JS::RootedValue jsKey(cx);
+    const NS_ConvertUTF8toUTF16 key(iter.Get()->GetKey());
+    jsKey.setString(JS_NewUCStringCopyN(cx, key.Data(), key.Length()));
+    keys.append(jsKey);
   }
 
   JS::RootedObject jsKeys(cx, JS_NewArrayObject(cx, keys));
