@@ -1376,7 +1376,8 @@ struct MaskLayerUserData : public LayerUserData
            mAppUnitsPerDevPixel == aOther.mAppUnitsPerDevPixel;
   }
 
-  nsRefPtr<const MaskLayerImageCache::MaskLayerImageKey> mImageKey;
+  // Keeps a MaskLayerImageKey alive by managing its mLayerCount member-var
+  MaskLayerImageCache::MaskLayerImageKeyRef mImageKey;
   // properties of the mask layer; the mask layer may be re-used if these
   // remain unchanged.
   nsTArray<DisplayItemClip::RoundedRect> mRoundedClipRects;
@@ -5892,7 +5893,7 @@ ContainerState::CreateMaskLayer(Layer *aLayer,
   userData->mOffset = newData.mOffset;
   userData->mAppUnitsPerDevPixel = newData.mAppUnitsPerDevPixel;
   userData->mRoundedClipRects.SwapElements(newData.mRoundedClipRects);
-  userData->mImageKey = lookupKey;
+  userData->mImageKey.Reset(lookupKey);
 
   return maskLayer.forget();
 }
