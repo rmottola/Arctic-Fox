@@ -370,12 +370,18 @@ AudioDestinationNode::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const
 }
 
 void
-AudioDestinationNode::DestroyMediaStream()
+AudioDestinationNode::DestroyAudioChannelAgent()
 {
   if (mAudioChannelAgent && !Context()->IsOffline()) {
     mAudioChannelAgent->StopPlaying();
     mAudioChannelAgent = nullptr;
   }
+}
+
+void
+AudioDestinationNode::DestroyMediaStream()
+{
+  DestroyAudioChannelAgent();
 
   if (!mStream)
     return;
