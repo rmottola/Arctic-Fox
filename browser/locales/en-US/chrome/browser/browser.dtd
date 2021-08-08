@@ -107,8 +107,6 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY fullScreenAutohide.accesskey "H">
 <!ENTITY fullScreenExit.label "Exit Full Screen Mode">
 <!ENTITY fullScreenExit.accesskey "F">
-<!ENTITY fullscreenAllowButton.label "Allow">
-<!ENTITY fullscreenExitButton.label "Deny">
 <!ENTITY fullscreenApproval.value "Allow fullscreen?">
 
 <!ENTITY fullscreenExitHint.value "Press ESC at any time to exit fullscreen.">

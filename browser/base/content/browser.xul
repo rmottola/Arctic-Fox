@@ -1051,18 +1051,6 @@
       <vbox id="full-screen-warning-message" align="center">
         <description id="full-screen-domain-text"/>
         <description class="full-screen-description" value="&fullscreenExitHint.value;"/>
-        <vbox id="full-screen-approval-pane" align="center">
-          <description class="full-screen-description" value="&fullscreenApproval.value;"/>
-          <hbox>
-            <button label="&fullscreenAllowButton.label;"
-                    oncommand="FullScreen.setFullscreenAllowed(true);"
-                    class="full-screen-approval-button"/>
-            <button label="&fullscreenExitButton.label;"
-                    oncommand="FullScreen.setFullscreenAllowed(false);"
-                    class="full-screen-approval-button"/>
-          </hbox>
-          <checkbox id="full-screen-remember-decision"/>
-        </vbox>
       </vbox>
     </hbox>
   </hbox>
