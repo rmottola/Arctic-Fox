@@ -223,8 +223,6 @@ let gPermissionObject = {
     }
   },
 
-  "fullscreen": {},
-
   "pointerLock": {
     exactHostMatch: true
   },
