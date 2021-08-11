@@ -2210,6 +2210,9 @@ pref("security.apps.privileged.CSP.default", "default-src * data: blob:; script-
 pref("security.mixed_content.block_active_content", false);
 pref("security.mixed_content.block_display_content", false);
 
+// Sub-resource integrity
+pref("security.sri.enable", false);
+
 // Enable pinning checks by default.
 pref("security.cert_pinning.enforcement_level", 2);
 
