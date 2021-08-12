@@ -9,6 +9,10 @@
 #include "SourceBuffer.h"
 #include "MediaSourceDemuxer.h"
 
+#ifdef MOZ_WEBM
+#include "WebMDemuxer.h"
+#endif
+
 #ifdef MOZ_FMP4
 #include "MP4Demuxer.h"
 #endif
@@ -687,8 +691,7 @@ TrackBuffersManager::CreateDemuxerforMIMEType()
 
 #ifdef MOZ_WEBM
   if (mType.LowerCaseEqualsLiteral("video/webm") || mType.LowerCaseEqualsLiteral("audio/webm")) {
-    NS_WARNING("Waiting on WebMDemuxer");
-    //mInputDemuxer = new WebMDemuxer(mCurrentInputBuffer);
+    mInputDemuxer = new WebMDemuxer(mCurrentInputBuffer);
     return;
   }
 #endif
