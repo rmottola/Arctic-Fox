@@ -144,7 +144,12 @@ public:
    * Call this to reevaluate whether we should start/stop due to our owner
    * document being active, inactive, visible or hidden.
    */
-  virtual void NotifyOwnerDocumentActivityChanged();
+  void NotifyOwnerDocumentActivityChanged();
+
+  // This method does the work necessary for the
+  // NotifyOwnerDocumentActivityChanged() notification.  It returns true if the
+  // media element was paused as a result.
+  virtual bool NotifyOwnerDocumentActivityChangedInternal();
 
   // Called by the video decoder object, on the main thread,
   // when it has read the metadata containing video dimensions,
@@ -999,6 +1004,9 @@ protected:
 
   // Recomputes ready state and fires events as necessary based on current state.
   void UpdateReadyStateInternal();
+
+  // Notifies the audio channel agent when the element starts or stops playing.
+  void NotifyAudioChannelAgent(bool aPlaying);
 
   class nsAsyncEventRunner;
   using nsGenericHTMLElement::DispatchEvent;
