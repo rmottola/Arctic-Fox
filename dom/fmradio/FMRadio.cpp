@@ -194,7 +194,7 @@ FMRadio::Notify(const FMRadioEventType& aType)
         DispatchTrustedEvent(NS_LITERAL_STRING("enabled"));
       } else {
         if (mAudioChannelAgentEnabled) {
-          mAudioChannelAgent->StopPlaying();
+          mAudioChannelAgent->NotifyStoppedPlaying();
           mAudioChannelAgentEnabled = false;
         }
 
@@ -456,7 +456,7 @@ FMRadio::EnableAudioChannelAgent()
 
   float volume = 0.0;
   bool muted = true;
-  mAudioChannelAgent->StartPlaying(&volume, &muted);
+  mAudioChannelAgent->NotifyStartedPlaying(&volume, &muted);
   WindowVolumeChanged(volume, muted);
 
   mAudioChannelAgentEnabled = true;

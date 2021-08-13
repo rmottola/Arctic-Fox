@@ -338,7 +338,7 @@ AudioManager::HandleAudioChannelProcessChanged()
   // the RIL plumbing sets the PHONE_STATE_NORMAL audio state. This seems to be
   // an issue for the VoIP call but it is not. Once the RIL plumbing sets the
   // the PHONE_STATE_NORMAL audio state the AudioManager::mPhoneAudioAgent
-  // member will call the StopPlaying() method causing that this function will
+  // member will call the NotifyStoppedPlaying() method causing that this function will
   // be called again and therefore the audio manager sets the
   // PHONE_STATE_IN_COMMUNICATION audio state.
 
@@ -627,7 +627,7 @@ AudioManager::SetPhoneState(int32_t aState)
   mPhoneState = aState;
 
   if (mPhoneAudioAgent) {
-    mPhoneAudioAgent->StopPlaying();
+    mPhoneAudioAgent->NotifyStoppedPlaying();
     mPhoneAudioAgent = nullptr;
   }
 
@@ -645,7 +645,7 @@ AudioManager::SetPhoneState(int32_t aState)
     float volume = 0.0;
     bool muted = true;
 
-    nsresult rv = mPhoneAudioAgent->StartPlaying(&volume, &muted);
+    nsresult rv = mPhoneAudioAgent->NotifyStartedPlaying(&volume, &muted);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
