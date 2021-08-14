@@ -74,6 +74,12 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         this.inputField.addEventListener("overflow", this, false);
         this.inputField.addEventListener("underflow", this, false);
 
+        try {
+          if (this._prefs.getBoolPref("unifiedcomplete")) {
+            this.setAttribute("autocompletesearch", "unifiedcomplete");
+          }
+        } catch (ex) {}
+
         const kXULNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
         var textBox = document.getAnonymousElementByAttribute(this,
                                                 "anonid", "textbox-input-box");
@@ -148,6 +154,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             switch (action.type) {
               case "switchtab": {
                 returnValue = action.params.url;
+                break;
+              }
+              case "keyword": {
+                returnValue = action.params.input;
                 break;
               }
             }
@@ -287,8 +297,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                 if (switchToTabHavingURI(action.params.originalUrl || url) &&
                     isTabEmpty(prevTab))
                   gBrowser.removeTab(prevTab);
+                return;
+              } else if (action.type == "keyword") {
+                url = action.params.url;
               }
-              return;
             }
             continueOperation.call(this);
           }
@@ -570,7 +582,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
             Cc["@mozilla.org/widget/clipboardhelper;1"]
               .getService(Ci.nsIClipboardHelper)
-              .copyString(val, document);
+              .copyString(val);
           },
           supportsCommand: function(aCommand) {
             switch (aCommand) {
@@ -612,6 +624,14 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               case "trimURLs":
                 this._mayTrimURLs = this._prefs.getBoolPref(aData);
                 break;
+              case "unifiedcomplete":
+                let useUnifiedComplete = false;
+                try {
+                  useUnifiedComplete = this._prefs.getBoolPref(aData);
+                } catch (ex) {}
+                this.setAttribute("autocompletesearch",
+                                  useUnifiedComplete ? "unifiedcomplete"
+                                                     : "urlinline history");
             }
           } else {
             let originalUrl = ReaderParent.parseReaderUrl(aValue);
@@ -830,7 +850,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
         Cc["@mozilla.org/widget/clipboardhelper;1"]
           .getService(Ci.nsIClipboardHelper)
-          .copyStringToClipboard(val, Ci.nsIClipboard.kSelectionClipboard, document);
+          .copyStringToClipboard(val, Ci.nsIClipboard.kSelectionClipboard);
       ]]></handler>
     </handlers>
 
@@ -971,10 +991,18 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             // Check if this is meant to be an action
             let action = this.mInput._parseActionUrl(url);
             if (action) {
-              if (action.type == "switchtab")
-                url = action.param;
-              else
-                return;
+              // TODO (bug 1054816): Centralise the implementation of actions
+              // into a JS module.
+              switch (action.type) {
+                case "switchtab": //Fall through.
+                case "keyword": {
+                  url = action.params.url;
+                  break;
+                }
+                default: {
+                  return;
+                }
+              }
             }
 
             // respect the usual clicking subtleties
@@ -1006,42 +1034,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
   </binding>
 
   <binding id="addon-progress-notification" extends="chrome://global/content/bindings/notification.xml#popup-notification">
-    <content align="start">
-      <xul:image class="popup-notification-icon"
-                 xbl:inherits="popupid,src=icon"/>
-      <xul:vbox flex="1">
-        <xul:label class="popup-notification-originHost header"
-                   xbl:inherits="value=originhost"
-                   crop="end"/>
-        <xul:description class="popup-notification-description"
-                         xbl:inherits="xbl:text=label,popupid"/>
-        <xul:progressmeter anonid="progressmeter" flex="1" mode="undetermined" class="popup-progress-meter"/>
-        <xul:label anonid="progresstext" class="popup-progress-label" flex="1" crop="end"/>
-        <xul:spacer flex="1"/>
-        <xul:hbox class="popup-notification-button-container"
-                  pack="end" align="center">
-          <children includes="button"/>
-          <xul:button anonid="button"
-                      class="popup-notification-menubutton"
-                      type="menu-button"
-                      xbl:inherits="oncommand=buttoncommand,label=buttonlabel,accesskey=buttonaccesskey">
-            <xul:menupopup anonid="menupopup"
-                           xbl:inherits="oncommand=menucommand">
-              <children/>
-              <xul:menuitem class="menuitem-iconic popup-notification-closeitem close-icon"
-                            label="&closeNotificationItem.label;"
-                            xbl:inherits="oncommand=closeitemcommand"/>
-            </xul:menupopup>
-          </xul:button>
-        </xul:hbox>
-      </xul:vbox>
-      <xul:vbox pack="start">
-        <xul:toolbarbutton anonid="closebutton"
-                           class="messageCloseButton close-icon popup-notification-closebutton tabbable"
-                           xbl:inherits="oncommand=closebuttoncommand"
-                           tooltiptext="&closeNotification.tooltip;"/>
-      </xul:vbox>
-    </content>
     <implementation>
       <constructor><![CDATA[
         if (!this.notification)
@@ -1065,10 +1057,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
       ]]></destructor>
 
       <field name="progressmeter" readonly="true">
-        document.getAnonymousElementByAttribute(this, "anonid", "progressmeter");
+        document.getElementById("addon-progress-notification-progressmeter"); 
       </field>
       <field name="progresstext" readonly="true">
-        document.getAnonymousElementByAttribute(this, "anonid", "progresstext");
+        document.getElementById("addon-progress-notification-progresstext");
       </field>
       <field name="DownloadUtils" readonly="true">
         let utils = {};
@@ -1093,11 +1085,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         <parameter name="aMaxProgress"/>
         <body><![CDATA[
           if (aMaxProgress == -1) {
-            this.progressmeter.mode = "undetermined";
+            this.progressmeter.setAttribute("mode", "undetermined");
           }
           else {
-            this.progressmeter.mode = "determined";
-            this.progressmeter.value = (aProgress * 100) / aMaxProgress;
+            this.progressmeter.setAttribute("mode", "determined");
+            this.progressmeter.setAttribute("value", (aProgress * 100) / aMaxProgress);
           }
 
           let now = Date.now();
@@ -1125,7 +1117,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
           let status = null;
           [status, this.notification.last] = this.DownloadUtils.getDownloadStatus(aProgress, aMaxProgress, speed, this.notification.last);
-         this.progresstext.value = this.progresstext.tooltipText = status;
+          this.progresstext.setAttribute("value", status);
+          this.progresstext.setAttribute("tooltiptext", status);
         ]]></body>
       </method>
 
@@ -1167,9 +1160,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           if (downloadingCount == 0) {
             this.destroy();
             if (Preferences.get("xpinstall.customConfirmationUI", false)) {
-              this.progressmeter.mode = "undetermined";
-              this.progresstext.value = this.progresstext.tooltipText =
-                gNavigatorBundle.getString("addonDownloadVerifying");
+              this.progressmeter.setAttribute("mode", "undetermined");
+              let status = gNavigatorBundle.getString("addonDownloadVerifying");
+              this.progresstext.setAttribute("value", status);
+              this.progresstext.setAttribute("tooltiptext", status);
             } else {
               PopupNotifications.remove(this.notification);
             }
@@ -1800,6 +1794,16 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
       <handler event="keypress" keycode="VK_ENTER" group="system" action="this._accept(event);"/>
       <handler event="keypress" keycode="VK_RETURN" group="system" action="this._accept(event);"/>
     </handlers>
+  </binding>
+
+  <!-- This is the XBL notification definition for the login fill doorhanger,
+       which is empty because the actual panel is not implemented inside an XBL
+       binding, but made of elements added to the notification panel. This
+       allows accessing the full structure while the panel is hidden. -->
+  <binding id="password-fill-notification" extends="chrome://global/content/bindings/notification.xml#popup-notification">
+    <content>
+      <children/>
+    </content>
   </binding>
 
   <binding id="splitmenu">

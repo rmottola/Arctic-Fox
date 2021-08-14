@@ -26,7 +26,12 @@ public:
   static BluetoothGattManager* Get();
   static void InitGattInterface(BluetoothProfileResultHandler* aRes);
   static void DeinitGattInterface(BluetoothProfileResultHandler* aRes);
-  virtual ~BluetoothGattManager();
+
+  void StartLeScan(const nsTArray<nsString>& aServiceUuids,
+                   BluetoothReplyRunnable* aRunnable);
+
+  void StopLeScan(const nsAString& aScanUuid,
+                  BluetoothReplyRunnable* aRunnable);
 
   void Connect(const nsAString& aAppUuid,
                const nsAString& aDeviceAddr,
@@ -70,12 +75,31 @@ public:
     const nsTArray<uint8_t>& aValue,
     BluetoothReplyRunnable* aRunnable);
 
+  void ReadDescriptorValue(
+    const nsAString& aAppUuid,
+    const BluetoothGattServiceId& aServiceId,
+    const BluetoothGattId& aCharacteristicId,
+    const BluetoothGattId& aDescriptorId,
+    BluetoothReplyRunnable* aRunnable);
+
+  void WriteDescriptorValue(
+    const nsAString& aAppUuid,
+    const BluetoothGattServiceId& aServiceId,
+    const BluetoothGattId& aCharacteristicId,
+    const BluetoothGattId& aDescriptorId,
+    const nsTArray<uint8_t>& aValue,
+    BluetoothReplyRunnable* aRunnable);
+
 private:
+  ~BluetoothGattManager();
+
   class CleanupResultHandler;
   class CleanupResultHandlerRunnable;
   class InitGattResultHandler;
   class RegisterClientResultHandler;
   class UnregisterClientResultHandler;
+  class StartLeScanResultHandler;
+  class StopLeScanResultHandler;
   class ConnectResultHandler;
   class DisconnectResultHandler;
   class DiscoverResultHandler;
@@ -84,6 +108,8 @@ private:
   class DeregisterNotificationsResultHandler;
   class ReadCharacteristicValueResultHandler;
   class WriteCharacteristicValueResultHandler;
+  class ReadDescriptorValueResultHandler;
+  class WriteDescriptorValueResultHandler;
 
   BluetoothGattManager();
 

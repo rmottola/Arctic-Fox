@@ -71,6 +71,21 @@
   -moz-box-flex: 1; /* make menu items expand to fill toolbar height */
 }
 
+#main-window[tabsintitlebar][sizemode="normal"] #toolbar-menubar[autohide="true"][inactive="true"]:not([customizing="true"]) {
+  visibility: hidden;
+}
+
+#main-window[sizemode="normal"] #toolbar-menubar,
+/* We want a 4px gap between the TabsToolbar and the toolbar-menubar when the
+   toolbar-menu is displayed in either restored or maximized mode. */
+#main-window:not([sizemode="fullscreen"]) #toolbar-menubar:-moz-any(:not([autohide="true"]), :not([inactive="true"])) {
+  margin-bottom: 4px;
+}
+
+#toolbar-menubar:not([autohide="true"]) {
+  -moz-binding: url("chrome://global/content/bindings/toolbar.xml#toolbar-drag");
+}
+
 #navigator-toolbox {
   -moz-appearance: none;
   background-color: transparent;
@@ -139,6 +154,16 @@
 }
 
 /* ::::: app menu button ::::: */
+
+/* The app menu button must appear on top of the navigator-toolbox in order
+ * for click and hover mouse events to work properly for the button in the
+ * restored window state. Otherwise, elements in the navigator-toolbox, like the
+ * menubar can swallow these events. It will also place the button above the
+ * fog on themes with Aero Glass.
+ */
+#main-window[tabsintitlebar] #appmenu-button-container {
+  z-index: 1;
+}
 
 #appmenu-button {
   -moz-appearance: none;
@@ -576,13 +601,21 @@
 }
 
 @media (-moz-windows-classic) {
-  #main-window[sizemode="normal"] > #titlebar > #titlebar-content > #appmenu-button-container {
+  #main-window[tabsintitlebar][sizemode="normal"] > #titlebar > #titlebar-content > #appmenu-button-container,
+  #main-window[tabsintitlebar][sizemode="normal"] > #tab-view-deck > #browser-panel > #navigator-toolbox > #toolbar-menubar {
     margin-top: 4px;
   }
 }
 
+/* The button box must appear on top of the navigator-toolbox in order for
+ * click and hover mouse events to work properly for the button in the restored
+ * window state. Otherwise, elements in the navigator-toolbox, like the menubar,
+ * can swallow those events. It will also place the buttons above the fog on
+ * themes with Aero Glass.
+ */
 #titlebar-buttonbox {
   -moz-appearance: -moz-window-button-box;
+  z-index: 1;
 }
 
 #main-window[sizemode="maximized"] #titlebar-buttonbox {
@@ -939,8 +972,8 @@ toolbar[mode=full] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
   transition: background-color .4s;
 }
 
-:-moz-any(#TabsToolbar, #addon-bar) .toolbarbutton-1,
-:-moz-any(#TabsToolbar, #addon-bar) .toolbarbutton-1 > .toolbarbutton-menubutton-button,
+#TabsToolbar .toolbarbutton-1,
+#TabsToolbar .toolbarbutton-1 > .toolbarbutton-menubutton-button,
 .tabbrowser-arrowscrollbox > .scrollbutton-up,
 .tabbrowser-arrowscrollbox > .scrollbutton-down {
   -moz-appearance: none;
@@ -958,17 +991,6 @@ toolbar[mode=full] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
                     linear-gradient(transparent, rgba(0,0,0,.25) 30%);
   background-position: 1px -1px, 0 -1px, 100% -1px;
   background-size: calc(100% - 2px) 100%, 1px 100%, 1px 100%;
-  background-repeat: no-repeat;
-}
-
-#addon-bar .toolbarbutton-1:not([disabled]):hover,
-#addon-bar .toolbarbutton-1[open],
-#addon-bar .toolbarbutton-1 > .toolbarbutton-menubutton-button:not([disabled]):hover {
-  background-image: linear-gradient(to top, transparent, rgba(0,0,0,.15)),
-                    linear-gradient(to top, transparent, rgba(0,0,0,.15) 30%),
-                    linear-gradient(to top, transparent, rgba(0,0,0,.15) 30%);
-  background-position: left, left, right;
-  background-size: auto, 1px 100%, 1px 100%;
   background-repeat: no-repeat;
 }
 
@@ -1887,6 +1909,10 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
   background-image: linear-gradient(to top, @toolbarShadowColor@ 1px, rgba(0,0,0,.05) 1px, transparent 50%);
 }
 
+#main-window[tabsintitlebar] #TabsToolbar {
+  background-color: transparent;
+}
+
 .tabbrowser-tab,
 .tabs-newtab-button {
   -moz-appearance: none;
@@ -2274,11 +2300,6 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
   max-width: 27em;
 }
 
-.popup-progress-meter,
-#addon-install-confirmation-content {
-  margin-top: 1em;
-}
-
 .addon-install-confirmation-name {
   font-weight: bold;
 }
@@ -2644,48 +2665,6 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
   outline: 1px dotted -moz-dialogText;
 }
 
-/* Add-on bar */
-
-#addon-bar {
-  -moz-appearance: none;
-  min-height: 20px;
-  border-top-style: none;
-  border-bottom-style: none;
-  padding-top: 1px;
-  background-image: linear-gradient(rgba(0,0,0,.15) 1px, rgba(255,255,255,.15) 1px);
-  background-size: 100% 2px;
-  background-repeat: no-repeat;
-}
-
-#status-bar {
-  -moz-appearance: none;
-  background-color: transparent;
-  border: none;
-  min-height: 0;
-}
-
-#addon-bar[customizing] > #status-bar {
-  opacity: .5;
-  background-image: repeating-linear-gradient(135deg,
-                                              rgba(255,255,255,.3), rgba(255,255,255,.3) 5px,
-                                              rgba(0,0,0,.3) 5px, rgba(0,0,0,.3) 10px);
-}
-
-#status-bar > statusbarpanel {
-  border-width: 0;
-  -moz-appearance: none;
-}
-
-#addonbar-closebutton {
-  border: none;
-  padding: 0 5px;
-  -moz-appearance: none;
-}
-
-toolbar[brighttext] #addonbar-closebutton {
-  list-style-image: url("chrome://global/skin/icons/close-inverted.png");
-}
-
 /* Status panel */
 
 .statuspanel-label {
@@ -2748,6 +2727,9 @@ toolbar[brighttext] #addonbar-closebutton {
 %endif
 %include ../shared/plugin-doorhanger.inc.css
 %include ../shared/badcontent-doorhanger.inc.css
+%include ../shared/login-doorhanger.inc.css
+
+%include downloads/indicator.css
 
 %ifdef MOZ_DEVTOOLS
 /* Error counter */

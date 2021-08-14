@@ -10,19 +10,19 @@
 namespace mozilla {
 
 extern PRLogModuleInfo* gMediaStreamGraphLog;
-#define STREAM_LOG(type, msg) PR_LOG(gMediaStreamGraphLog, type, msg)
+#define STREAM_LOG(type, msg) MOZ_LOG(gMediaStreamGraphLog, type, msg)
 
 #ifdef DEBUG
 void
 StreamBuffer::DumpTrackInfo() const
 {
-  STREAM_LOG(PR_LOG_ALWAYS, ("DumpTracks: mTracksKnownTime %lld", mTracksKnownTime));
+  STREAM_LOG(LogLevel::Info, ("DumpTracks: mTracksKnownTime %lld", mTracksKnownTime));
   for (uint32_t i = 0; i < mTracks.Length(); ++i) {
     Track* track = mTracks[i];
     if (track->IsEnded()) {
-      STREAM_LOG(PR_LOG_ALWAYS, ("Track[%d] %d: ended", i, track->GetID()));
+      STREAM_LOG(LogLevel::Info, ("Track[%d] %d: ended", i, track->GetID()));
     } else {
-      STREAM_LOG(PR_LOG_ALWAYS, ("Track[%d] %d: %lld", i, track->GetID(),
+      STREAM_LOG(LogLevel::Info, ("Track[%d] %d: %lld", i, track->GetID(),
                                  track->GetEnd()));
     }
   }

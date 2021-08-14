@@ -92,6 +92,14 @@ extern bool gBluetoothDebugFlag;
                                           BluetoothValue(value)))
 
 /**
+ * Wrap literal name and value into a BluetoothNamedValue
+ * and insert it to the array.
+ */
+#define BT_INSERT_NAMED_VALUE(array, index, name, value)                      \
+  array.InsertElementAt(index, BluetoothNamedValue(NS_LITERAL_STRING(name),   \
+                                                   BluetoothValue(value)))
+
+/**
  * Ensure success of system message broadcast with void return.
  */
 #define BT_ENSURE_TRUE_VOID_BROADCAST_SYSMSG(type, parameters)       \
@@ -263,7 +271,8 @@ enum BluetoothStatus {
   STATUS_PARM_INVALID,
   STATUS_UNHANDLED,
   STATUS_AUTH_FAILURE,
-  STATUS_RMT_DEV_DOWN
+  STATUS_RMT_DEV_DOWN,
+  NUM_STATUS
 };
 
 enum BluetoothBondState {
@@ -305,7 +314,8 @@ enum BluetoothSspVariant {
   SSP_VARIANT_PASSKEY_CONFIRMATION,
   SSP_VARIANT_PASSKEY_ENTRY,
   SSP_VARIANT_CONSENT,
-  SSP_VARIANT_PASSKEY_NOTIFICATION
+  SSP_VARIANT_PASSKEY_NOTIFICATION,
+  NUM_SSP_VARIANT
 };
 
 struct BluetoothUuid {
@@ -370,6 +380,22 @@ struct BluetoothProperty {
 
   /* PROPERTY_REMOTE_VERSION_INFO */
   BluetoothRemoteInfo mRemoteInfo;
+};
+
+/* Physical transport for GATT connections to remote dual-mode devices */
+enum BluetoothTransport {
+  TRANSPORT_AUTO,   /* No preference of physical transport */
+  TRANSPORT_BREDR,  /* Prefer BR/EDR transport */
+  TRANSPORT_LE      /* Prefer LE transport */
+};
+
+struct BluetoothActivityEnergyInfo {
+  uint8_t mStatus;
+  uint8_t mStackState;  /* stack reported state */
+  uint64_t mTxTime;     /* in ms */
+  uint64_t mRxTime;     /* in ms */
+  uint64_t mIdleTime;   /* in ms */
+  uint64_t mEnergyUsed; /* a product of mA, V and ms */
 };
 
 enum BluetoothSocketType {
@@ -441,6 +467,12 @@ enum BluetoothHandsfreeConnectionState
 enum BluetoothHandsfreeNetworkState {
   HFP_NETWORK_STATE_NOT_AVAILABLE,
   HFP_NETWORK_STATE_AVAILABLE
+};
+
+enum BluetoothHandsfreeWbsConfig {
+  HFP_WBS_NONE, /* Neither CVSD nor mSBC codec, but other optional codec.*/
+  HFP_WBS_NO,   /* CVSD */
+  HFP_WBS_YES   /* mSBC */
 };
 
 enum BluetoothHandsfreeNRECState {
@@ -717,6 +749,22 @@ struct BluetoothGattNotifyParam {
   BluetoothGattId mCharId;
   uint16_t mLength;
   bool mIsNotify;
+};
+
+/**
+ * EIR Data Type, Advertising Data Type (AD Type) and OOB Data Type Definitions
+ * Please refer to https://www.bluetooth.org/en-us/specification/\
+ * assigned-numbers/generic-access-profile
+ */
+enum BluetoothGapDataType {
+  GAP_INCOMPLETE_UUID16  = 0X02, // Incomplete List of 16-bit Service Class UUIDs
+  GAP_COMPLETE_UUID16    = 0X03, // Complete List of 16-bit Service Class UUIDs
+  GAP_INCOMPLETE_UUID32  = 0X04, // Incomplete List of 32-bit Service Class UUIDs
+  GAP_COMPLETE_UUID32    = 0X05, // Complete List of 32-bit Service Class UUIDs»
+  GAP_INCOMPLETE_UUID128 = 0X06, // Incomplete List of 128-bit Service Class UUIDs
+  GAP_COMPLETE_UUID128   = 0X07, // Complete List of 128-bit Service Class UUIDs
+  GAP_SHORTENED_NAME     = 0X08, // Shortened Local Name
+  GAP_COMPLETE_NAME      = 0X09, // Complete Local Name
 };
 
 END_BLUETOOTH_NAMESPACE

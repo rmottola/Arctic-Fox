@@ -13,8 +13,11 @@
 
 class nsIContent;
 class nsIDocument;
+class nsIPresShell;
 class nsIWidget;
 template<class T> struct already_AddRefed;
+template<class T> class nsCOMPtr;
+template<class T> class nsRefPtr;
 
 namespace mozilla {
 namespace layers {
@@ -41,23 +44,21 @@ class APZCCallbackHelper
     typedef mozilla::layers::ScrollableLayerGuid ScrollableLayerGuid;
 
 public:
-    /* Applies the scroll and zoom parameters from the given FrameMetrics object to
-       the root frame corresponding to the given pres shell. If tiled thebes
-       layers are enabled, this will align the displayport to tile boundaries.
-       Setting the scroll position can cause some small adjustments to be made
-       to the actual scroll position. aMetrics' display port and scroll position
-       will be updated with any modifications made. */
-    static void UpdateRootFrame(nsIPresShell* aPresShell,
-                                FrameMetrics& aMetrics);
+    /* Applies the scroll and zoom parameters from the given FrameMetrics object
+       to the root frame for the given metrics' scrollId. If tiled thebes layers
+       are enabled, this will align the displayport to tile boundaries. Setting
+       the scroll position can cause some small adjustments to be made to the
+       actual scroll position. aMetrics' display port and scroll position will
+       be updated with any modifications made. */
+    static void UpdateRootFrame(FrameMetrics& aMetrics);
 
-    /* Applies the scroll parameters from the given FrameMetrics object to the subframe
-       corresponding to the given content object. If tiled thebes
+    /* Applies the scroll parameters from the given FrameMetrics object to the
+       subframe corresponding to given metrics' scrollId. If tiled thebes
        layers are enabled, this will align the displayport to tile boundaries.
        Setting the scroll position can cause some small adjustments to be made
        to the actual scroll position. aMetrics' display port and scroll position
        will be updated with any modifications made. */
-    static void UpdateSubFrame(nsIContent* aContent,
-                               FrameMetrics& aMetrics);
+    static void UpdateSubFrame(FrameMetrics& aMetrics);
 
     /* Get the presShellId and view ID for the given content element.
      * If the view ID does not exist, one is created.
@@ -88,8 +89,7 @@ public:
        pres shell resolution, to cancel out a compositor-side transform (added in
        bug 1076241) that APZ doesn't unapply. */
     static CSSPoint ApplyCallbackTransform(const CSSPoint& aInput,
-                                           const ScrollableLayerGuid& aGuid,
-                                           float aPresShellResolution);
+                                           const ScrollableLayerGuid& aGuid);
 
     /* Same as above, but operates on LayoutDeviceIntPoint.
        Requires an additonal |aScale| parameter to convert between CSS and
@@ -97,15 +97,13 @@ public:
     static mozilla::LayoutDeviceIntPoint
     ApplyCallbackTransform(const LayoutDeviceIntPoint& aPoint,
                            const ScrollableLayerGuid& aGuid,
-                           const CSSToLayoutDeviceScale& aScale,
-                           float aPresShellResolution);
+                           const CSSToLayoutDeviceScale& aScale);
 
     /* Convenience function for applying a callback transform to all touch
      * points of a touch event. */
     static void ApplyCallbackTransform(WidgetTouchEvent& aEvent,
                                        const ScrollableLayerGuid& aGuid,
-                                       const CSSToLayoutDeviceScale& aScale,
-                                       float aPresShellResolution);
+                                       const CSSToLayoutDeviceScale& aScale);
 
     /* Dispatch a widget event via the widget stored in the event, if any.
      * In a child process, allows the TabParent event-capture mechanism to
@@ -161,6 +159,9 @@ public:
 
     /* Notify content of a mouse scroll testing event. */
     static void NotifyMozMouseScrollEvent(const FrameMetrics::ViewID& aScrollId, const nsString& aEvent);
+
+    /* Notify content that the repaint flush is complete. */
+    static void NotifyFlushComplete();
 };
 
 } // namespace layers

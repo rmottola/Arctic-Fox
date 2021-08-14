@@ -20,6 +20,8 @@
 #include "nsIClassInfoImpl.h"
 #include "nsIConsoleListener.h"
 #include "nsPrintfCString.h"
+#include "nsProxyRelease.h"
+#include "nsIScriptError.h"
 
 #include "mozilla/Preferences.h"
 
@@ -62,8 +64,51 @@ nsConsoleService::nsConsoleService()
   mBufferSize = 250;
 }
 
+
+NS_IMETHODIMP
+nsConsoleService::ClearMessagesForWindowID(const uint64_t innerID)
+{
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+
+  // Remove the messages related to this window
+  for (uint32_t i = 0; i < mBufferSize && mMessages[i]; i++) {
+    // Only messages implementing nsIScriptError interface exposes the inner window ID
+    nsCOMPtr<nsIScriptError> scriptError = do_QueryInterface(mMessages[i]);
+    if (!scriptError) {
+      continue;
+    }
+    uint64_t innerWindowID;
+    nsresult rv = scriptError->GetInnerWindowID(&innerWindowID);
+    if (NS_FAILED(rv) || innerWindowID != innerID) {
+      continue;
+    }
+
+    // Free this matching message!
+    NS_RELEASE(mMessages[i]);
+
+    uint32_t j = i;
+    // Now shift all the following messages
+    for (; j < mBufferSize - 1 && mMessages[j + 1]; j++) {
+      mMessages[j] = mMessages[j + 1];
+    }
+    // Nullify the current slot
+    mMessages[j] = nullptr;
+    mCurrent = j;
+
+    // The array is no longer full
+    mFull = false;
+
+    // Ensure the next iteration handles the messages we just shifted down
+    i--;
+  }
+
+  return NS_OK;
+}
+
 nsConsoleService::~nsConsoleService()
 {
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+
   uint32_t i = 0;
   while (i < mBufferSize && mMessages[i]) {
     NS_RELEASE(mMessages[i]);
@@ -130,17 +175,6 @@ private:
   nsRefPtr<nsConsoleService> mService;
 };
 
-typedef nsCOMArray<nsIConsoleListener> ListenerArrayType;
-
-PLDHashOperator
-CollectCurrentListeners(nsISupports* aKey, nsIConsoleListener* aValue,
-                        void* aClosure)
-{
-  ListenerArrayType* listeners = static_cast<ListenerArrayType*>(aClosure);
-  listeners->AppendObject(aValue);
-  return PL_DHASH_NEXT;
-}
-
 NS_IMETHODIMP
 LogMessageRunnable::Run()
 {
@@ -149,7 +183,7 @@ LogMessageRunnable::Run()
   // Snapshot of listeners so that we don't reenter this hash during
   // enumeration.
   nsCOMArray<nsIConsoleListener> listeners;
-  mService->EnumerateListeners(CollectCurrentListeners, &listeners);
+  mService->CollectCurrentListeners(listeners);
 
   mService->SetIsDelivering();
 
@@ -171,6 +205,7 @@ nsConsoleService::LogMessage(nsIConsoleMessage* aMessage)
   return LogMessageWithMode(aMessage, OutputToLog);
 }
 
+// This can be called off the main thread.
 nsresult
 nsConsoleService::LogMessageWithMode(nsIConsoleMessage* aMessage,
                                      nsConsoleService::OutputMode aOutputMode)
@@ -284,22 +319,32 @@ nsConsoleService::LogMessageWithMode(nsIConsoleMessage* aMessage,
   }
 
   if (retiredMessage) {
-    NS_RELEASE(retiredMessage);
+    // Release |retiredMessage| on the main thread in case it is an instance of
+    // a mainthread-only class like nsScriptErrorWithStack and we're off the
+    // main thread.
+    NS_ReleaseOnMainThread(retiredMessage);
   }
 
   if (r) {
-    NS_DispatchToMainThread(r);
+    // avoid failing in XPCShell tests
+    nsCOMPtr<nsIThread> mainThread = do_GetMainThread();
+    if (mainThread) {
+      NS_DispatchToMainThread(r.forget());
+    }
   }
 
   return NS_OK;
 }
 
 void
-nsConsoleService::EnumerateListeners(ListenerHash::EnumReadFunction aFunction,
-                                     void* aClosure)
+nsConsoleService::CollectCurrentListeners(
+  nsCOMArray<nsIConsoleListener>& aListeners)
 {
   MutexAutoLock lock(mLock);
-  mListeners.EnumerateRead(aFunction, aClosure);
+  for (auto iter = mListeners.Iter(); !iter.Done(); iter.Next()) {
+    nsIConsoleListener* value = iter.UserData();
+    aListeners.AppendObject(value);
+  }
 }
 
 NS_IMETHODIMP
@@ -317,6 +362,8 @@ NS_IMETHODIMP
 nsConsoleService::GetMessageArray(uint32_t* aCount,
                                   nsIConsoleMessage*** aMessages)
 {
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+
   nsIConsoleMessage** messageArray;
 
   /*
@@ -413,6 +460,8 @@ nsConsoleService::UnregisterListener(nsIConsoleListener* aListener)
 NS_IMETHODIMP
 nsConsoleService::Reset()
 {
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+
   /*
    * Make sure nobody trips into the buffer while it's being reset
    */

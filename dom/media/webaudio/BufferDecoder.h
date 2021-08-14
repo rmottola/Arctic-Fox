@@ -7,10 +7,11 @@
 #ifndef BUFFER_DECODER_H_
 #define BUFFER_DECODER_H_
 
-#include "AbstractMediaDecoder.h"
-#include "MediaTaskQueue.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/ReentrantMonitor.h"
+#include "mozilla/TaskQueue.h"
+
+#include "AbstractMediaDecoder.h"
 
 namespace mozilla {
 
@@ -18,7 +19,7 @@ namespace mozilla {
  * This class provides a decoder object which decodes a media file that lives in
  * a memory buffer.
  */
-class BufferDecoder : public AbstractMediaDecoder
+class BufferDecoder final : public AbstractMediaDecoder
 {
 public:
   // This class holds a weak pointer to MediaResource.  It's the responsibility
@@ -28,7 +29,7 @@ public:
   NS_DECL_THREADSAFE_ISUPPORTS
 
   // This has to be called before decoding begins
-  void BeginDecoding(MediaTaskQueue* aTaskQueueIdentity);
+  void BeginDecoding(TaskQueue* aTaskQueueIdentity);
 
   virtual ReentrantMonitor& GetReentrantMonitor() final override;
 
@@ -44,10 +45,6 @@ public:
 
   virtual void NotifyDecodedFrames(uint32_t aParsed, uint32_t aDecoded,
                                    uint32_t aDropped) final override;
-
-  virtual int64_t GetMediaDuration() final override;
-
-  virtual void UpdateEstimatedMediaDuration(int64_t aDuration) final override;
 
   virtual void SetMediaSeekable(bool aMediaSeekable) final override;
 
@@ -73,7 +70,7 @@ public:
 
   virtual void NotifyWaitingForResourcesStatusChanged() final override;
 
-  virtual void NotifyDataArrived(const char* aBuffer, uint32_t aLength, int64_t aOffset) final override;
+  virtual void NotifyDataArrived(uint32_t, int64_t, bool) final override {};
 
 private:
   virtual ~BufferDecoder();
@@ -82,7 +79,7 @@ private:
   // It's just there in order for us to be able to override
   // GetReentrantMonitor correctly.
   ReentrantMonitor mReentrantMonitor;
-  nsRefPtr<MediaTaskQueue> mTaskQueueIdentity;
+  nsRefPtr<TaskQueue> mTaskQueueIdentity;
   nsRefPtr<MediaResource> mResource;
 };
 

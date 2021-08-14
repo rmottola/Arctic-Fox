@@ -4,27 +4,24 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "AbstractThread.h"
-
-#include "MediaTaskQueue.h"
-#include "nsThreadUtils.h"
-#include "TaskDispatcher.h"
-
-#include "nsIAppShell.h"
-#include "nsWidgetsCID.h"
-#include "nsServiceManagerUtils.h"
+#include "mozilla/AbstractThread.h"
 
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/StaticPtr.h"
+#include "mozilla/TaskQueue.h"
+#include "mozilla/TaskDispatcher.h"
 #include "mozilla/unused.h"
+
+#include "nsThreadUtils.h"
+#include "nsContentUtils.h"
+#include "nsServiceManagerUtils.h"
+
 
 namespace mozilla {
 
 StaticRefPtr<AbstractThread> sMainThread;
 ThreadLocal<AbstractThread*> AbstractThread::sCurrentThreadTLS;
-
-static NS_DEFINE_CID(kAppShellCID, NS_APPSHELL_CID);
 
 class XPCOMThreadWrapper : public AbstractThread
 {
@@ -51,7 +48,7 @@ public:
   {
     nsCOMPtr<nsIRunnable> r = aRunnable;
     AbstractThread* currentThread;
-    if (aReason != TailDispatch && (currentThread = GetCurrent()) && currentThread->RequiresTailDispatch()) {
+    if (aReason != TailDispatch && (currentThread = GetCurrent()) && RequiresTailDispatch(currentThread)) {
       currentThread->TailDispatcher().AddTask(this, r.forget(), aFailureHandling);
       return;
     }
@@ -87,17 +84,26 @@ public:
       mTailDispatcher.emplace(/* aIsTailDispatcher = */ true);
 
       nsCOMPtr<nsIRunnable> event = NS_NewRunnableMethod(this, &XPCOMThreadWrapper::FireTailDispatcher);
-      nsCOMPtr<nsIAppShell> appShell = do_GetService(kAppShellCID);
-      appShell->RunInStableState(event);
+      nsContentUtils::RunInStableState(event.forget());
     }
 
     return mTailDispatcher.ref();
   }
 
+  virtual nsIThread* AsXPCOMThread() override { return mTarget; }
+
 private:
   nsRefPtr<nsIThread> mTarget;
   Maybe<AutoTaskDispatcher> mTailDispatcher;
 };
+
+bool
+AbstractThread::RequiresTailDispatch(AbstractThread* aThread) const
+{
+  // We require tail dispatch if both the source and destination
+  // threads support it.
+  return SupportsTailDispatch() && aThread->SupportsTailDispatch();
+}
 
 AbstractThread*
 AbstractThread::MainThread()

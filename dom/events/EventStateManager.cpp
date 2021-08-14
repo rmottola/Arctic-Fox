@@ -485,7 +485,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
   NS_WARN_IF_FALSE(!aTargetFrame ||
                    !aTargetFrame->GetContent() ||
                    aTargetFrame->GetContent() == aTargetContent ||
-                   aTargetFrame->GetContent()->GetParent() == aTargetContent,
+                   aTargetFrame->GetContent()->GetFlattenedTreeParent() == aTargetContent,
                    "aTargetFrame should be related with aTargetContent");
 
   mCurrentTarget = aTargetFrame;
@@ -604,7 +604,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     // window edge) wont update the cursor if the cached value and the current
     // cursor match. So when the mouse exits a remote frame, clear the cached
     // widget cursor so a proper update will occur when the mouse re-enters.
-    if (XRE_GetProcessType() == GeckoProcessType_Content) {
+    if (XRE_IsContentProcess()) {
       ClearCachedWidgetCursor(mCurrentTarget);
     }
 
@@ -805,18 +805,8 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     }
     break;
   case NS_SELECTION_SET:
-    {
-      WidgetSelectionEvent* selectionEvent = aEvent->AsSelectionEvent();
-      if (IsTargetCrossProcess(selectionEvent)) {
-        // Will not be handled locally, remote the event
-        if (GetCrossProcessTarget()->SendSelectionEvent(*selectionEvent)) {
-          selectionEvent->mSucceeded = true;
-        }
-        break;
-      }
-      ContentEventHandler handler(mPresContext);
-      handler.OnSelectionEvent(selectionEvent);
-    }
+    IMEStateManager::HandleSelectionEvent(aPresContext, GetFocusedContent(),
+                                          aEvent->AsSelectionEvent());
     break;
   case NS_CONTENT_COMMAND_CUT:
   case NS_CONTENT_COMMAND_COPY:
@@ -844,21 +834,6 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
       DoQuerySelectedText(&selectedText);
       NS_ASSERTION(selectedText.mSucceeded, "Failed to get selected text");
       compositionEvent->mData = selectedText.mReply.mString;
-    }
-    // through to compositionend handling
-  case NS_COMPOSITION_END:
-  case NS_COMPOSITION_CHANGE:
-  case NS_COMPOSITION_COMMIT_AS_IS:
-  case NS_COMPOSITION_COMMIT:
-    {
-      WidgetCompositionEvent* compositionEvent = aEvent->AsCompositionEvent();
-      if (IsTargetCrossProcess(compositionEvent)) {
-        // Will not be handled locally, remote the event
-        if (GetCrossProcessTarget()->SendCompositionEvent(*compositionEvent)) {
-          // Cancel local dispatching
-          aEvent->mFlags.mPropagationStopped = true;
-        }
-      }
     }
     break;
   }
@@ -3384,7 +3359,7 @@ EventStateManager::RemoteQueryContentEvent(WidgetEvent* aEvent)
 TabParent*
 EventStateManager::GetCrossProcessTarget()
 {
-  return TabParent::GetIMETabParent();
+  return IMEStateManager::GetActiveTabParent();
 }
 
 bool
@@ -3395,7 +3370,7 @@ EventStateManager::IsTargetCrossProcess(WidgetGUIEvent* aEvent)
   nsIContent *focusedContent = GetFocusedContent();
   if (focusedContent && focusedContent->IsEditable())
     return false;
-  return TabParent::GetIMETabParent() != nullptr;
+  return IMEStateManager::GetActiveTabParent() != nullptr;
 }
 
 void

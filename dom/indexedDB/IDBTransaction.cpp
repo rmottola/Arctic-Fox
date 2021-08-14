@@ -16,11 +16,9 @@
 #include "mozilla/dom/DOMError.h"
 #include "mozilla/dom/DOMStringList.h"
 #include "mozilla/ipc/BackgroundChild.h"
-#include "nsIAppShell.h"
 #include "nsPIDOMWindow.h"
 #include "nsServiceManagerUtils.h"
 #include "nsTHashtable.h"
-#include "nsWidgetsCID.h"
 #include "ProfilerHelpers.h"
 #include "ReportInternalError.h"
 #include "WorkerFeature.h"
@@ -35,36 +33,6 @@ namespace indexedDB {
 
 using namespace mozilla::dom::workers;
 using namespace mozilla::ipc;
-
-namespace {
-
-NS_DEFINE_CID(kAppShellCID, NS_APPSHELL_CID);
-
-bool
-RunBeforeNextEvent(IDBTransaction* aTransaction)
-{
-  MOZ_ASSERT(aTransaction);
-
-  if (NS_IsMainThread()) {
-    nsCOMPtr<nsIAppShell> appShell = do_GetService(kAppShellCID);
-    MOZ_ASSERT(appShell);
-
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(appShell->RunBeforeNextEvent(aTransaction)));
-
-    return true;
-  }
-
-  WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
-  MOZ_ASSERT(workerPrivate);
-
-  if (NS_WARN_IF(!workerPrivate->RunBeforeNextEvent(aTransaction))) {
-    return false;
-  }
-
-  return true;
-}
-
-} // namespace
 
 class IDBTransaction::WorkerFeature final
   : public mozilla::dom::workers::WorkerFeature
@@ -222,15 +190,8 @@ IDBTransaction::CreateVersionChange(
 
   transaction->SetScriptOwner(aDatabase->GetScriptOwner());
 
-  if (NS_WARN_IF(!RunBeforeNextEvent(transaction))) {
-    MOZ_ASSERT(!NS_IsMainThread());
-#ifdef DEBUG
-    // Silence assertions.
-    transaction->mSentCommitOrAbort = true;
-#endif
-    aActor->SendDeleteMeInternal(/* aFailedConstructor */ true);
-    return nullptr;
-  }
+  nsCOMPtr<nsIRunnable> runnable = do_QueryObject(transaction);
+  nsContentUtils::RunInMetastableState(runnable.forget());
 
   transaction->mBackgroundActor.mVersionChangeBackgroundActor = aActor;
   transaction->mNextObjectStoreId = aNextObjectStoreId;
@@ -262,10 +223,8 @@ IDBTransaction::Create(IDBDatabase* aDatabase,
 
   transaction->SetScriptOwner(aDatabase->GetScriptOwner());
 
-  if (NS_WARN_IF(!RunBeforeNextEvent(transaction))) {
-    MOZ_ASSERT(!NS_IsMainThread());
-    return nullptr;
-  }
+  nsCOMPtr<nsIRunnable> runnable = do_QueryObject(transaction);
+  nsContentUtils::RunInMetastableState(runnable.forget());
 
   transaction->mCreating = true;
 
@@ -448,7 +407,7 @@ IDBTransaction::SendCommit()
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(NS_SUCCEEDED(mAbortCode));
-  MOZ_ASSERT(IsFinished());
+  MOZ_ASSERT(IsCommittingOrDone());
   MOZ_ASSERT(!mSentCommitOrAbort);
   MOZ_ASSERT(!mPendingRequestCount);
 
@@ -481,7 +440,7 @@ IDBTransaction::SendAbort(nsresult aResultCode)
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(NS_FAILED(aResultCode));
-  MOZ_ASSERT(IsFinished());
+  MOZ_ASSERT(IsCommittingOrDone());
   MOZ_ASSERT(!mSentCommitOrAbort);
 
   // Don't do this in the macro because we always need to increment the serial
@@ -640,13 +599,9 @@ IDBTransaction::AbortInternal(nsresult aAbortCode,
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(NS_FAILED(aAbortCode));
+  MOZ_ASSERT(!IsCommittingOrDone());
 
   nsRefPtr<DOMError> error = aError;
-
-  if (IsFinished()) {
-    // Already finished, nothing to do here.
-    return;
-  }
 
   const bool isVersionChange = mMode == VERSION_CHANGE;
   const bool isInvalidated = mDatabase->IsInvalidated();
@@ -740,6 +695,12 @@ IDBTransaction::Abort(IDBRequest* aRequest)
   AssertIsOnOwningThread();
   MOZ_ASSERT(aRequest);
 
+  if (IsCommittingOrDone()) {
+    // Already started (and maybe finished) the commit or abort so there is
+    // nothing to do here.
+    return;
+  }
+
   ErrorResult rv;
   nsRefPtr<DOMError> error = aRequest->GetError(rv);
 
@@ -751,6 +712,12 @@ IDBTransaction::Abort(nsresult aErrorCode)
 {
   AssertIsOnOwningThread();
 
+  if (IsCommittingOrDone()) {
+    // Already started (and maybe finished) the commit or abort so there is
+    // nothing to do here.
+    return;
+  }
+
   nsRefPtr<DOMError> error = new DOMError(GetOwner(), aErrorCode);
   AbortInternal(aErrorCode, error.forget());
 }
@@ -760,7 +727,7 @@ IDBTransaction::Abort(ErrorResult& aRv)
 {
   AssertIsOnOwningThread();
 
-  if (IsFinished()) {
+  if (IsCommittingOrDone()) {
     aRv = NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR;
     return;
   }
@@ -905,7 +872,7 @@ IDBTransaction::ObjectStore(const nsAString& aName, ErrorResult& aRv)
 {
   AssertIsOnOwningThread();
 
-  if (IsFinished()) {
+  if (IsCommittingOrDone()) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return nullptr;
   }
@@ -1029,11 +996,12 @@ WorkerFeature::Notify(JSContext* aCx, Status aStatus)
   if (mTransaction && aStatus > Terminating) {
     mTransaction->AssertIsOnOwningThread();
 
-    nsRefPtr<IDBTransaction> transaction = mTransaction;
-    mTransaction = nullptr;
+    nsRefPtr<IDBTransaction> transaction = Move(mTransaction);
 
-    IDB_REPORT_INTERNAL_ERR();
-    transaction->AbortInternal(NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR, nullptr);
+    if (!transaction->IsCommittingOrDone()) {
+      IDB_REPORT_INTERNAL_ERR();
+      transaction->AbortInternal(NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR, nullptr);
+    }
   }
 
   return true;

@@ -9,6 +9,7 @@
 let PerformanceView = {
 
   _state: null,
+
   // Set to true if the front emits a "buffer-status" event, indicating
   // that the server has support for determining buffer status.
   _bufferStatusSupported: false,
@@ -30,6 +31,10 @@ let PerformanceView = {
     recorded: [
       { deck: "#performance-view", pane: "#performance-view-content" },
       { deck: "#details-pane-container", pane: "#details-pane" }
+    ],
+    loading: [
+      { deck: "#performance-view", pane: "#performance-view-content" },
+      { deck: "#details-pane-container", pane: "#loading-notice" }
     ]
   },
 
@@ -50,6 +55,7 @@ let PerformanceView = {
     this._onRecordingStopped = this._onRecordingStopped.bind(this);
     this._onRecordingStarted = this._onRecordingStarted.bind(this);
     this._onProfilerStatusUpdated = this._onProfilerStatusUpdated.bind(this);
+    this._onRecordingWillStop = this._onRecordingWillStop.bind(this);
 
     for (let button of $$(".record-button")) {
       button.addEventListener("click", this._onRecordButtonClick);
@@ -62,6 +68,7 @@ let PerformanceView = {
     PerformanceController.on(EVENTS.RECORDING_STOPPED, this._onRecordingStopped);
     PerformanceController.on(EVENTS.RECORDING_SELECTED, this._onRecordingSelected);
     PerformanceController.on(EVENTS.PROFILER_STATUS_UPDATED, this._onProfilerStatusUpdated);
+    PerformanceController.on(EVENTS.RECORDING_WILL_STOP, this._onRecordingWillStop);
 
     this.setState("empty");
 
@@ -87,6 +94,7 @@ let PerformanceView = {
     PerformanceController.off(EVENTS.RECORDING_STOPPED, this._onRecordingStopped);
     PerformanceController.off(EVENTS.RECORDING_SELECTED, this._onRecordingSelected);
     PerformanceController.off(EVENTS.PROFILER_STATUS_UPDATED, this._onProfilerStatusUpdated);
+    PerformanceController.off(EVENTS.RECORDING_WILL_STOP, this._onRecordingWillStop);
 
     yield ToolbarView.destroy();
     yield RecordingsView.destroy();
@@ -215,6 +223,17 @@ let PerformanceView = {
     // switch state to "recorded".
     if (recording === PerformanceController.getCurrentRecording()) {
       this.setState("recorded");
+    }
+  },
+
+  /**
+   * Fired when a recording is stopping, but not yet completed
+   */
+  _onRecordingWillStop: function (_, recording) {
+    // Lock the details view while the recording is being loaded in the UI.
+    // Only do this if this is the current recording.
+    if (recording === PerformanceController.getCurrentRecording()) {
+      this.setState("loading");
     }
   },
 

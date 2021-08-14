@@ -232,7 +232,7 @@ struct ParseContext : public GenericParseContext
                                        the same name. */
 
     // All inner functions in this context. Only filled in when parsing syntax.
-    AutoFunctionVector innerFunctions;
+    Rooted<TraceableVector<JSFunction*>> innerFunctions;
 
     // In a function context, points to a Directive struct that can be updated
     // to reflect new directives encountered in the Directive Prologue that
@@ -273,7 +273,7 @@ struct ParseContext : public GenericParseContext
         oldpc(prs->pc),
         lexdeps(prs->context),
         funcStmts(nullptr),
-        innerFunctions(prs->context),
+        innerFunctions(prs->context, TraceableVector<JSFunction*>(prs->context)),
         newDirectives(newDirectives),
         inDeclDestructuring(false)
     {
@@ -287,7 +287,7 @@ struct ParseContext : public GenericParseContext
     unsigned blockid() { return stmtStack.innermost() ? stmtStack.innermost()->blockid : bodyid; }
 
     StmtInfoPC* innermostStmt() const { return stmtStack.innermost(); }
-    StmtInfoPC* innermostScopeStmt() const { return stmtStack.innermostScopal(); }
+    StmtInfoPC* innermostScopeStmt() const { return stmtStack.innermostScopeStmt(); }
 
     // True if we are at the topmost level of a entire script or function body.
     // For example, while parsing this code we would encounter f1 and f2 at
@@ -459,8 +459,8 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
      * Allocate a new parsed object or function container from
      * cx->tempLifoAlloc.
      */
-    ObjectBox *newObjectBox(JSObject *obj);
-    FunctionBox *newFunctionBox(Node fn, JSFunction *fun, ParseContext<ParseHandler> *pc,
+    ObjectBox* newObjectBox(JSObject* obj);
+    FunctionBox* newFunctionBox(Node fn, JSFunction* fun, ParseContext<ParseHandler>* pc,
                                 Directives directives, GeneratorKind generatorKind);
 
     /*
@@ -700,11 +700,15 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
                                 ParseNodeKind headKind);
     bool checkForHeadConstInitializers(Node pn1);
 
-    bool isValidSimpleAssignmentTarget(Node node);
+    enum FunctionCallBehavior {
+        PermitAssignmentToFunctionCalls,
+        ForbidAssignmentToFunctionCalls
+    };
 
-    // Invalid assignment targets are handled differently in different places.
-    // Select the desired semantics using |flavor|.
-    bool reportIfArgumentsEvalTarget(Node target);
+    bool isValidSimpleAssignmentTarget(Node node,
+                                       FunctionCallBehavior behavior = ForbidAssignmentToFunctionCalls);
+
+    bool reportIfArgumentsEvalTarget(Node nameNode);
     bool reportIfNotValidSimpleAssignmentTarget(Node target, AssignmentFlavor flavor);
 
     bool checkAndMarkAsIncOperand(Node kid, AssignmentFlavor flavor);
@@ -725,13 +729,22 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     Node propertyList(YieldHandling yieldHandling, PropListType type);
     Node newPropertyListNode(PropListType type);
 
-    bool checkAndPrepareLexical(bool isConst, const TokenPos &errorPos);
-    Node makeInitializedLexicalBinding(HandlePropertyName name, bool isConst, const TokenPos &pos);
+    bool checkAndPrepareLexical(bool isConst, const TokenPos& errorPos);
+    Node makeInitializedLexicalBinding(HandlePropertyName name, bool isConst, const TokenPos& pos);
 
     Node newBindingNode(PropertyName* name, bool functionScope, VarContext varContext = HoistVars);
-    bool checkDestructuring(BindData<ParseHandler>* data, Node left);
-    bool checkDestructuringObject(BindData<ParseHandler>* data, Node objectPattern);
+
+    // Top-level entrypoint into destructuring pattern checking/name-analyzing.
+    bool checkDestructuringPattern(BindData<ParseHandler>* data, Node pattern);
+
+    // Recursive methods for checking/name-analyzing subcomponents of a
+    // destructuring pattern.  The array/object methods *must* be passed arrays
+    // or objects.  The name method may be passed anything but will report an
+    // error if not passed a name.
     bool checkDestructuringArray(BindData<ParseHandler>* data, Node arrayPattern);
+    bool checkDestructuringObject(BindData<ParseHandler>* data, Node objectPattern);
+    bool checkDestructuringName(BindData<ParseHandler>* data, Node expr);
+
     bool bindInitialized(BindData<ParseHandler>* data, Node pn);
     bool makeSetCall(Node node, unsigned errnum);
     Node cloneDestructuringDefault(Node opn);

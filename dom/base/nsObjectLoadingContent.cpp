@@ -20,6 +20,8 @@
 #include "nsIDOMHTMLObjectElement.h"
 #include "nsIDOMHTMLAppletElement.h"
 #include "nsIExternalProtocolHandler.h"
+#include "nsIInterfaceRequestorUtils.h"
+#include "nsIHttpChannelInternal.h"
 #include "nsIObjectFrame.h"
 #include "nsIPermissionManager.h"
 #include "nsPluginHost.h"
@@ -38,6 +40,7 @@
 #include "nsIBlocklistService.h"
 #include "nsIAsyncVerifyRedirectCallback.h"
 #include "nsIAppShell.h"
+#include "nsIXULRuntime.h"
 #include "nsIScriptError.h"
 
 #include "nsError.h"
@@ -116,8 +119,8 @@ GetObjectLog()
   return sLog;
 }
 
-#define LOG(args) PR_LOG(GetObjectLog(), PR_LOG_DEBUG, args)
-#define LOG_ENABLED() PR_LOG_TEST(GetObjectLog(), PR_LOG_DEBUG)
+#define LOG(args) MOZ_LOG(GetObjectLog(), mozilla::LogLevel::Debug, args)
+#define LOG_ENABLED() MOZ_LOG_TEST(GetObjectLog(), mozilla::LogLevel::Debug)
 
 static bool
 IsJavaMIME(const nsACString & aMIMEType)
@@ -1962,7 +1965,7 @@ nsObjectLoadingContent::UpdateObjectParameters(bool aJavaURI)
       // end up trying to dispatch to a nsFrameLoader, which will complain that
       // it couldn't find a way to handle application/octet-stream
       nsAutoCString parsedMime, dummy;
-      NS_ParseContentType(newMime, parsedMime, dummy);
+      NS_ParseResponseContentType(newMime, parsedMime, dummy);
       if (!parsedMime.IsEmpty()) {
         mChannel->SetContentType(parsedMime);
       }
@@ -2629,6 +2632,13 @@ nsObjectLoadingContent::OpenChannel()
   if (scriptChannel) {
     // Allow execution against our context if the principals match
     scriptChannel->SetExecutionPolicy(nsIScriptChannel::EXECUTE_NORMAL);
+  }
+
+  nsCOMPtr<nsIHttpChannelInternal> internalChannel = do_QueryInterface(httpChan);
+  if (internalChannel) {
+    // Bug 1168676. object/embed tags are not allowed to be intercepted by
+    // ServiceWorkers.
+    internalChannel->ForceNoIntercept();
   }
 
   // AsyncOpen can fail if a file does not exist.
@@ -3309,6 +3319,14 @@ nsObjectLoadingContent::ShouldPlay(FallbackType &aReason, bool aIgnoreCurrentTyp
     Preferences::AddUintVarCache(&sPersistentTimeoutDays,
                                  "plugin.persistentPermissionAlways.intervalInDays", 90);
     sPrefsInitialized = true;
+  }
+
+  if (XRE_IsParentProcess() &&
+      BrowserTabsRemoteAutostart()) {
+    // Plugins running OOP from the chrome process along with plugins running
+    // OOP from the content process will hang. Let's prevent that situation.
+    aReason = eFallbackDisabled;
+    return false;
   }
 
   nsRefPtr<nsPluginHost> pluginHost = nsPluginHost::GetInst();

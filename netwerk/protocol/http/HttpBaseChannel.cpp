@@ -12,6 +12,7 @@
 
 #include "nsHttpHandler.h"
 #include "nsMimeTypes.h"
+#include "nsNetCID.h"
 #include "nsNetUtil.h"
 
 #include "nsICachingChannel.h"
@@ -104,14 +105,7 @@ HttpBaseChannel::~HttpBaseChannel()
 {
   LOG(("Destroying HttpBaseChannel @%x\n", this));
 
-  if (mLoadInfo) {
-    nsCOMPtr<nsIThread> mainThread;
-    NS_GetMainThread(getter_AddRefs(mainThread));
-    
-    nsILoadInfo *forgetableLoadInfo;
-    mLoadInfo.forget(&forgetableLoadInfo);
-    NS_ProxyRelease(mainThread, forgetableLoadInfo, false);
-  }
+  NS_ReleaseOnMainThread(mLoadInfo);
 
   // Make sure we don't leak
   CleanRedirectCacheChainIfNecessary();
@@ -1497,6 +1491,16 @@ HttpBaseChannel::OverrideSecurityInfo(nsISupports* aSecurityInfo)
   return NS_OK;
 }
 
+void
+HttpBaseChannel::OverrideURI(nsIURI* aRedirectedURI)
+{
+  MOZ_RELEASE_ASSERT(mLoadFlags & LOAD_REPLACE,
+                     "This can only happen if the LOAD_REPLACE flag is set");
+  MOZ_RELEASE_ASSERT(ShouldIntercept(),
+                     "This can only be called on channels that can be intercepted");
+  mURI = aRedirectedURI;
+}
+
 NS_IMETHODIMP
 HttpBaseChannel::IsNoStoreResponse(bool *value)
 {
@@ -2218,7 +2222,7 @@ HttpBaseChannel::AddCookiesToRequest()
   }
 
   bool useCookieService =
-    (XRE_GetProcessType() == GeckoProcessType_Default);
+    (XRE_IsParentProcess());
   nsXPIDLCString cookie;
   if (useCookieService) {
     nsICookieService *cs = gHttpHandler->GetCookieService();
@@ -2303,6 +2307,14 @@ HttpBaseChannel::SetupReplacementChannel(nsIURI       *newURI,
       do_QueryInterface(newChannel);
     if (newPBChannel) {
       newPBChannel->SetPrivate(mPrivateBrowsing);
+    }
+  }
+
+  // Preserve any skip-serviceworker-flag if possible.
+  if (mForceNoIntercept) {
+    nsCOMPtr<nsIHttpChannelInternal> httpChan = do_QueryInterface(newChannel);
+    if (httpChan) {
+      httpChan->ForceNoIntercept();
     }
   }
 

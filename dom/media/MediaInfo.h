@@ -66,7 +66,6 @@ public:
     mLanguage = aLanguage;
     mEnabled = aEnabled;
     mTrackId = aTrackId;
-    mType = aType;
   }
 
   // Fields common with MediaTrack object.
@@ -242,8 +241,6 @@ public:
   // Describing how many degrees video frames should be rotated in clock-wise to
   // get correct view.
   Rotation mRotation;
-
-  bool mIsHardwareAccelerated;
 };
 
 class AudioInfo : public TrackInfo {
@@ -414,7 +411,7 @@ public:
   // The Ogg reader tries to kinda-sorta compute the duration by seeking to the
   // end and determining the timestamp of the last frame. This isn't useful as
   // a duration until we know the start time, so we need to track it separately.
-  media::NullableTimeUnit mMetadataEndTime;
+  media::NullableTimeUnit mUnadjustedMetadataEndTime;
 
   EncryptionInfo mCrypto;
 };

@@ -147,6 +147,12 @@ protected:
   DoRequest(const StopDiscoveryRequest& aRequest);
 
   bool
+  DoRequest(const StartLeScanRequest& aRequest);
+
+  bool
+  DoRequest(const StopLeScanRequest& aRequest);
+
+  bool
   DoRequest(const PairRequest& aRequest);
 
   bool
@@ -249,6 +255,12 @@ protected:
 
   bool
   DoRequest(const GattClientWriteCharacteristicValueRequest& aRequest);
+
+  bool
+  DoRequest(const GattClientReadDescriptorValueRequest& aRequest);
+
+  bool
+  DoRequest(const GattClientWriteDescriptorValueRequest& aRequest);
 };
 
 END_BLUETOOTH_NAMESPACE

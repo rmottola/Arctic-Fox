@@ -249,7 +249,7 @@ pref("browser.warnOnQuit", true);
 // might still show the window closing dialog with showQuitWarning == false.
 pref("browser.showQuitWarning", false);
 pref("browser.fullscreen.autohide", true);
-pref("browser.fullscreen.animateUp", 0);
+pref("browser.fullscreen.animate", true);
 pref("browser.overlink-delay", 80);
 
 pref("browser.urlbar.clickSelectsAll", true);
@@ -315,26 +315,12 @@ pref("browser.download.debug", false);
 pref("browser.download.saveLinkAsFilenameTimeout", 4000);
 
 pref("browser.download.useDownloadDir", true);
-
 pref("browser.download.folderList", 1);
-pref("browser.download.manager.showAlertOnComplete", true);
-pref("browser.download.manager.showAlertInterval", 2000);
-pref("browser.download.manager.retention", 2);
-pref("browser.download.manager.showWhenStarting", true);
-pref("browser.download.manager.closeWhenDone", false);
-pref("browser.download.manager.focusWhenStarting", false);
-pref("browser.download.manager.flashCount", 2);
 pref("browser.download.manager.addToRecentDocs", true);
-pref("browser.download.manager.quitBehavior", 2);
-pref("browser.download.manager.scanWhenDone", true);
 pref("browser.download.manager.resumeOnWakeDelay", 10000);
 
 // This records whether or not the panel has been shown at least once.
 pref("browser.download.panel.shown", false);
-
-// This records whether or not at least one session with the Downloads Panel
-// enabled has been completed already.
-pref("browser.download.panel.firstSessionCompleted", false);
 
 // search engines URL
 pref("browser.search.searchEnginesURL",      "https://addons.palemoon.org/search-plugins/");
@@ -933,6 +919,8 @@ pref("browser.tabs.remote.desktopbehavior", true);
 // This will require a restart.
 pref("security.sandbox.windows.log", false);
 
+pref("dom.ipc.plugins.sandbox-level.flash", 0);
+
 #if defined(MOZ_CONTENT_SANDBOX)
 // This controls the strength of the Windows content process sandbox for testing
 // purposes. This will require a restart.
@@ -1022,10 +1010,6 @@ pref("services.sync.prefs.sync.addons.ignoreUserEnabledChanges", true);
 // source, and this would propagate automatically to other,
 // uncompromised Sync-connected devices.
 pref("services.sync.prefs.sync.app.update.mode", true);
-pref("services.sync.prefs.sync.browser.download.manager.closeWhenDone", true);
-pref("services.sync.prefs.sync.browser.download.manager.retention", true);
-pref("services.sync.prefs.sync.browser.download.manager.scanWhenDone", true);
-pref("services.sync.prefs.sync.browser.download.manager.showWhenStarting", true);
 pref("services.sync.prefs.sync.browser.formfill.enable", true);
 pref("services.sync.prefs.sync.browser.link.open_newwindow", true);
 pref("services.sync.prefs.sync.browser.offline-apps.notify", true);
@@ -1051,7 +1035,7 @@ pref("services.sync.prefs.sync.extensions.update.enabled", true);
 pref("services.sync.prefs.sync.intl.accept_languages", true);
 pref("services.sync.prefs.sync.javascript.enabled", true);
 pref("services.sync.prefs.sync.layout.spellcheckDefault", true);
-pref("services.sync.prefs.sync.lightweightThemes.isThemeSelected", true);
+pref("services.sync.prefs.sync.lightweightThemes.selectedThemeID", true);
 pref("services.sync.prefs.sync.lightweightThemes.usedThemes", true);
 pref("services.sync.prefs.sync.network.cookie.cookieBehavior", true);
 pref("services.sync.prefs.sync.network.cookie.lifetimePolicy", true);
@@ -1083,7 +1067,8 @@ pref("services.sync.prefs.sync.xpinstall.whitelist.required", true);
 #endif
 
 // Developer edition preferences
-pref("browser.devedition.theme.enabled", false);
+sticky_pref("lightweightThemes.selectedThemeID", "firefox-devedition@mozilla.org");
+sticky_pref("browser.devedition.theme.enabled", true);
 
 // Enable the error console
 pref("devtools.errorconsole.enabled", true);
@@ -1121,13 +1106,19 @@ pref("devtools.performance.timeline.hidden-markers", "[]");
 pref("devtools.performance.profiler.buffer-size", 10000000);
 pref("devtools.performance.profiler.sample-frequency-khz", 1);
 pref("devtools.performance.ui.show-jit-optimizations", false);
-// If in aurora (40.0, will revert for 40.1), set default
-// to retro mode.
-// TODO bug 1160313
-#if MOZ_UPDATE_CHANNEL == aurora
-  pref("devtools.performance.ui.retro-mode", true);
+
+// Enable experimental options in the UI only in Nightly
+#if defined(NIGHTLY_BUILD)
+pref("devtools.performance.ui.experimental", true);
 #else
-  pref("devtools.performance.ui.retro-mode", false);
+pref("devtools.performance.ui.experimental", false);
+#endif
+
+// Default theme ("dark" or "light")
+#ifdef MOZ_DEV_EDITION
+sticky_pref("devtools.theme", "dark");
+#else
+sticky_pref("devtools.theme", "light");
 #endif
 
 
@@ -1138,6 +1129,17 @@ pref("devtools.serviceWorkers.testing.enabled", false);
 pref("devtools.gcli.imgurClientID", '0df414e888d7240');
 // Imgur's upload URL
 pref("devtools.gcli.imgurUploadURL", "https://api.imgur.com/3/image");
+
+pref("devtools.webconsole.filter.serviceworkers", false);
+pref("devtools.webconsole.filter.sharedworkers", false);
+pref("devtools.webconsole.filter.windowlessworkers", false);
+
+pref("devtools.browserconsole.filter.serviceworkers", true);
+pref("devtools.browserconsole.filter.sharedworkers", true);
+pref("devtools.browserconsole.filter.windowlessworkers", true);
+
+// Max number of inputs to store in web console history.
+pref("devtools.webconsole.inputHistoryCount", 50);
 
 // Whether the character encoding menu is under the main Firefox button. This
 // preference is a string so that localizers can alter it.
@@ -1195,6 +1197,10 @@ pref("security.csp.speccompliant", true);
 pref("security.mixed_content.block_active_content", true);
 
 
+// Required blocklist freshness for OneCRL OCSP bypass
+// (default should be at least as large as extensions.blocklist.interval)
+pref("security.onecrl.maximum_staleness_in_seconds", 0);
+
 // Override the Gecko-default value of false for Firefox.
 pref("plain_text.wrap_long_lines", true);
 
@@ -1221,9 +1227,13 @@ pref("network.disable.ipc.security", true);
 
 // Disable ReadingList by default.
 pref("browser.readinglist.enabled", false);
+pref("readinglist.scheduler.enabled", false);
+pref("readinglist.server", "https://readinglist.services.mozilla.com/v1");
 
 pref("browser.translation.detectLanguage", false);
 pref("browser.translation.neverForLanguages", "");
+
+pref("browser.defaultbrowser.notificationbar", false);
 
 // Telemetry settings.
 // Determines if Telemetry pings can be archived locally.
@@ -1235,6 +1245,12 @@ pref("toolkit.telemetry.optoutSample", true);
 pref("browser.display.standalone_images.background_color", "#2E3B41");
 
 pref("view_source.tab", true);
+
+// Enable Service Workers for desktop on non-release builds
+#ifndef RELEASE_BUILD
+pref("dom.serviceWorkers.enabled", true);
+pref("dom.serviceWorkers.interception.enabled", true);
+#endif
 
 // Disable reader mode by default.
 pref("reader.parse-on-load.enabled", false);
@@ -1293,3 +1309,17 @@ pref("status4evar.status.toolbar.maxLength", 0);
 
 pref("status4evar.status.popup.invertMirror", false);
 pref("status4evar.status.popup.mouseMirror", true);
+
+#ifdef E10S_TESTING_ONLY
+// At the moment, autostart.2 is used, while autostart.1 is unused.
+// We leave it here set to false to reset users' defaults and allow
+// us to change everybody to true in the future, when desired.
+pref("browser.tabs.remote.autostart.1", false);
+pref("browser.tabs.remote.autostart.2", true);
+#endif
+
+#ifdef E10S_TESTING_ONLY
+// Enable e10s add-on interposition by default.
+pref("extensions.interposition.enabled", true);
+pref("extensions.interposition.prefetching", true);
+#endif

@@ -150,7 +150,7 @@ another thing;"""
           hoverclass:   options.hoverclass
         }
 
-        // fix for goanna engine   
+        // fix for gecko engine   
         Element.cleanWhitespace(element); 
         """
         expected = r"""var options_for_droppable={overlap:options.overlap,containment:options.containment,tree:options.tree,hoverclass:options.hoverclass,onHover:Sortable.onHover}

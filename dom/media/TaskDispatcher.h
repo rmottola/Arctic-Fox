@@ -7,14 +7,15 @@
 #if !defined(TaskDispatcher_h_)
 #define TaskDispatcher_h_
 
-#include "AbstractThread.h"
-
+#include "mozilla/AbstractThread.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/unused.h"
 
 #include "nsISupportsImpl.h"
 #include "nsTArray.h"
 #include "nsThreadUtils.h"
+
+#include <queue>
 
 namespace mozilla {
 

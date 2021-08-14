@@ -16,12 +16,12 @@
 
 #include "jsprf.h"
 #include "jsutil.h"
-#include "prmjtime.h"
 
 #include "gc/Memory.h"
 #include "vm/Debugger.h"
 #include "vm/HelperThreads.h"
 #include "vm/Runtime.h"
+#include "vm/Time.h"
 
 using namespace js;
 using namespace js::gc;
@@ -1272,8 +1272,16 @@ Statistics::endSlice()
         slices.back().end = PRMJ_Now();
         slices.back().endFaults = GetPageFaultCount();
 
-        runtime->addTelemetry(JS_TELEMETRY_GC_SLICE_MS, t(slices.back().end - slices.back().start));
+        int64_t sliceTime = slices.back().end - slices.back().start;
+        runtime->addTelemetry(JS_TELEMETRY_GC_SLICE_MS, t(sliceTime));
         runtime->addTelemetry(JS_TELEMETRY_GC_RESET, !!slices.back().resetReason);
+
+        if (slices.back().budget.isTimeBudget()) {
+            int64_t budget = slices.back().budget.timeBudget.budget;
+            runtime->addTelemetry(JS_TELEMETRY_GC_BUDGET_MS, t(budget));
+            if (budget == runtime->gc.defaultSliceBudget())
+                runtime->addTelemetry(JS_TELEMETRY_GC_ANIMATION_MS, t(sliceTime));
+        }
     }
 
     bool last = !runtime->gc.isIncrementalGCInProgress();

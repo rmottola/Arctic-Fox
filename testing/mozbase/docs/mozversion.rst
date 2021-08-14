@@ -97,7 +97,7 @@ Firefox OS::
     device_id: msm7627a
     gaia_changeset: 9a222ac02db176e47299bb37112ae40aeadbeca7
     gaia_date: 1389005812
-    goanna_changeset: 3a2d8af198510726b063a217438fcf2591f4dfcf
+    gecko_changeset: 3a2d8af198510726b063a217438fcf2591f4dfcf
     platform_buildid: 20140106040201
     platform_changeset: 14ac61461f2a
     platform_repository: http://hg.mozilla.org/mozilla-central

@@ -71,17 +71,17 @@ protected:
   virtual bool
   DeallocPFileDescriptorSetChild(PFileDescriptorSetChild* aActor) override;
 
-  virtual PMediaChild*
-  AllocPMediaChild() override;
-
-  virtual bool
-  DeallocPMediaChild(PMediaChild* aActor) override;
-
   virtual PVsyncChild*
   AllocPVsyncChild() override;
 
   virtual bool
   DeallocPVsyncChild(PVsyncChild* aActor) override;
+
+  virtual PUDPSocketChild*
+  AllocPUDPSocketChild(const OptionalPrincipalInfo& aPrincipalInfo,
+                       const nsCString& aFilter) override;
+  virtual bool
+  DeallocPUDPSocketChild(PUDPSocketChild* aActor) override;
 
   virtual PBroadcastChannelChild*
   AllocPBroadcastChannelChild(const PrincipalInfo& aPrincipalInfo,
@@ -91,6 +91,12 @@ protected:
 
   virtual bool
   DeallocPBroadcastChannelChild(PBroadcastChannelChild* aActor) override;
+
+  virtual PServiceWorkerManagerChild*
+  AllocPServiceWorkerManagerChild() override;
+
+  virtual bool
+  DeallocPServiceWorkerManagerChild(PServiceWorkerManagerChild* aActor) override;
 
   virtual dom::cache::PCacheStorageChild*
   AllocPCacheStorageChild(const dom::cache::Namespace& aNamespace,
@@ -109,6 +115,19 @@ protected:
 
   virtual bool
   DeallocPCacheStreamControlChild(dom::cache::PCacheStreamControlChild* aActor) override;
+
+  virtual PMessagePortChild*
+  AllocPMessagePortChild(const nsID& aUUID, const nsID& aDestinationUUID,
+                         const uint32_t& aSequenceID) override;
+
+  virtual bool
+  DeallocPMessagePortChild(PMessagePortChild* aActor) override;
+
+  virtual PNuwaChild*
+  AllocPNuwaChild() override;
+
+  virtual bool
+  DeallocPNuwaChild(PNuwaChild* aActor) override;
 };
 
 class BackgroundChildImpl::ThreadLocal final

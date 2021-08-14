@@ -12,10 +12,11 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/TimeStamp.h" // for TimeStamp, TimeDuration
 #include "mozilla/dom/AnimationBinding.h" // for AnimationPlayState
-#include "mozilla/dom/DocumentTimeline.h" // for DocumentTimeline
+#include "mozilla/dom/AnimationTimeline.h" // for AnimationTimeline
 #include "mozilla/dom/KeyframeEffect.h" // for KeyframeEffectReadOnly
 #include "mozilla/dom/Promise.h" // for Promise
 #include "nsCSSProperty.h" // for nsCSSProperty
+#include "nsIGlobalObject.h"
 
 // X11 has a #define for CurrentTime.
 #ifdef CurrentTime
@@ -40,10 +41,10 @@ class AnimValuesStyleRule;
 class CommonAnimationManager;
 } // namespace css
 
+namespace dom {
+
 class CSSAnimation;
 class CSSTransition;
-
-namespace dom {
 
 class Animation
   : public nsISupports
@@ -53,26 +54,29 @@ protected:
   virtual ~Animation() {}
 
 public:
-  explicit Animation(DocumentTimeline* aTimeline)
-    : mTimeline(aTimeline)
+  explicit Animation(nsIGlobalObject* aGlobal)
+    : mGlobal(aGlobal)
     , mPlaybackRate(1.0)
     , mPendingState(PendingState::NotPending)
+    , mSequenceNum(kUnsequenced)
     , mIsRunningOnCompositor(false)
-    , mIsPreviousStateFinished(false)
     , mFinishedAtLastComposeStyle(false)
     , mIsRelevant(false)
+    , mFinishedIsResolved(false)
   {
   }
 
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(Animation)
 
-  DocumentTimeline* GetParentObject() const { return mTimeline; }
+  AnimationTimeline* GetParentObject() const { return mTimeline; }
   virtual JSObject* WrapObject(JSContext* aCx,
                                JS::Handle<JSObject*> aGivenProto) override;
 
   virtual CSSAnimation* AsCSSAnimation() { return nullptr; }
+  virtual const CSSAnimation* AsCSSAnimation() const { return nullptr; }
   virtual CSSTransition* AsCSSTransition() { return nullptr; }
+  virtual const CSSTransition* AsCSSTransition() const { return nullptr; }
 
   /**
    * Flag to pass to Play to indicate whether or not it should automatically
@@ -89,7 +93,8 @@ public:
 
   KeyframeEffectReadOnly* GetEffect() const { return mEffect; }
   void SetEffect(KeyframeEffectReadOnly* aEffect);
-  DocumentTimeline* Timeline() const { return mTimeline; }
+  AnimationTimeline* GetTimeline() const { return mTimeline; }
+  void SetTimeline(AnimationTimeline* aTimeline);
   Nullable<TimeDuration> GetStartTime() const { return mStartTime; }
   void SetStartTime(const Nullable<TimeDuration>& aNewStartTime);
   Nullable<TimeDuration> GetCurrentTime() const;
@@ -101,8 +106,8 @@ public:
   virtual Promise* GetFinished(ErrorResult& aRv);
   void Cancel();
   virtual void Finish(ErrorResult& aRv);
-  virtual void Play(LimitBehavior aLimitBehavior);
-  virtual void Pause();
+  virtual void Play(ErrorResult& aRv, LimitBehavior aLimitBehavior);
+  virtual void Pause(ErrorResult& aRv);
   bool IsRunningOnCompositor() const { return mIsRunningOnCompositor; }
 
   // Wrapper functions for Animation DOM methods when called
@@ -117,18 +122,20 @@ public:
   void SetCurrentTimeAsDouble(const Nullable<double>& aCurrentTime,
                               ErrorResult& aRv);
   virtual AnimationPlayState PlayStateFromJS() const { return PlayState(); }
-  virtual void PlayFromJS() { Play(LimitBehavior::AutoRewind); }
+  virtual void PlayFromJS(ErrorResult& aRv)
+  {
+    Play(aRv, LimitBehavior::AutoRewind);
+  }
   /**
    * PauseFromJS is currently only here for symmetry with PlayFromJS but
    * in future we will likely have to flush style in
    * CSSAnimation::PauseFromJS so we leave it for now.
    */
-  void PauseFromJS() { Pause(); }
+  void PauseFromJS(ErrorResult& aRv) { Pause(aRv); }
+
   // Wrapper functions for Animation DOM methods when called from style.
-  //
-  // Typically these DOM methods also notify style of changes but when
-  // we are calling from style we don't need to do this.
-  void CancelFromStyle() { DoCancel(); }
+
+  virtual void CancelFromStyle() { DoCancel(); }
 
   void Tick();
 
@@ -215,11 +222,6 @@ public:
    */
   Nullable<TimeDuration> GetCurrentOrPendingStartTime() const;
 
-  const nsString& Name() const
-  {
-    return mEffect ? mEffect->Name() : EmptyString();
-  }
-
   bool IsPausedOrPausing() const
   {
     return PlayState() == AnimationPlayState::Paused ||
@@ -257,6 +259,20 @@ public:
   }
   bool IsRelevant() const { return mIsRelevant; }
   void UpdateRelevance();
+
+  /**
+   * Returns true if this Animation has a lower composite order than aOther.
+   */
+  virtual bool HasLowerCompositeOrderThan(const Animation& aOther) const;
+  /**
+   * Returns true if this Animation is involved in some sort of
+   * custom composite ordering (such as the ordering defined for CSS
+   * animations or CSS transitions).
+   *
+   * When this is true, this class will not update the sequence number.
+   */
+  virtual bool IsUsingCustomCompositeOrder() const { return false; }
+
   void SetIsRunningOnCompositor() { mIsRunningOnCompositor = true; }
   void ClearIsRunningOnCompositor() { mIsRunningOnCompositor = false; }
   /**
@@ -281,8 +297,8 @@ protected:
   void SilentlySetCurrentTime(const TimeDuration& aNewCurrentTime);
   void SilentlySetPlaybackRate(double aPlaybackRate);
   void DoCancel();
-  void DoPlay(LimitBehavior aLimitBehavior);
-  void DoPause();
+  void DoPlay(ErrorResult& aRv, LimitBehavior aLimitBehavior);
+  void DoPause(ErrorResult& aRv);
   void ResumeAt(const TimeDuration& aReadyTime);
   void PauseAt(const TimeDuration& aReadyTime);
   void FinishPendingAt(const TimeDuration& aReadyTime)
@@ -296,19 +312,37 @@ protected:
     }
   }
 
-  void UpdateTiming();
-  void UpdateFinishedState(bool aSeekFlag = false);
+  /**
+   * Finishing behavior depends on if changes to timing occurred due
+   * to a seek or regular playback.
+   */
+  enum class SeekFlag {
+    NoSeek,
+    DidSeek
+  };
+
+  enum class SyncNotifyFlag {
+    Sync,
+    Async
+  };
+
+  void UpdateTiming(SeekFlag aSeekFlag,
+                    SyncNotifyFlag aSyncNotifyFlag);
+  void UpdateFinishedState(SeekFlag aSeekFlag,
+                           SyncNotifyFlag aSyncNotifyFlag);
   void UpdateEffect();
   void FlushStyle() const;
   void PostUpdate();
+  void ResetFinishedPromise();
+  void MaybeResolveFinishedPromise();
+  void DoFinishNotification(SyncNotifyFlag aSyncNotifyFlag);
+
   /**
    * Remove this animation from the pending animation tracker and reset
    * mPendingState as necessary. The caller is responsible for resolving or
    * aborting the mReady promise as necessary.
    */
   void CancelPendingTasks();
-
-  bool IsFinished() const;
 
   bool IsPossiblyOrphanedPendingAnimation() const;
   StickyTimeDuration EffectEnd() const;
@@ -318,7 +352,8 @@ protected:
   virtual css::CommonAnimationManager* GetAnimationManager() const = 0;
   AnimationCollection* GetCollection() const;
 
-  nsRefPtr<DocumentTimeline> mTimeline;
+  nsCOMPtr<nsIGlobalObject> mGlobal;
+  nsRefPtr<AnimationTimeline> mTimeline;
   nsRefPtr<KeyframeEffectReadOnly> mEffect;
   // The beginning of the delay period.
   Nullable<TimeDuration> mStartTime; // Timeline timescale
@@ -327,7 +362,7 @@ protected:
   Nullable<TimeDuration> mPreviousCurrentTime; // Animation timescale
   double mPlaybackRate;
 
-  // A Promise that is replaced on each call to Play() (and in future Pause())
+  // A Promise that is replaced on each call to Play()
   // and fulfilled when Play() is successfully completed.
   // This object is lazily created by GetReady.
   // See http://w3c.github.io/web-animations/#current-ready-promise
@@ -349,14 +384,26 @@ protected:
   enum class PendingState { NotPending, PlayPending, PausePending };
   PendingState mPendingState;
 
+  static uint64_t sNextSequenceNum;
+  static const uint64_t kUnsequenced = UINT64_MAX;
+
+  // The sequence number assigned to this animation. This is kUnsequenced
+  // while the animation is in the idle state and is updated each time
+  // the animation transitions out of the idle state.
+  uint64_t mSequenceNum;
+
   bool mIsRunningOnCompositor;
-  // Indicates whether we were in the finished state during our
-  // most recent unthrottled sample (our last ComposeStyle call).
-  bool mIsPreviousStateFinished; // Spec calls this "previous finished state"
   bool mFinishedAtLastComposeStyle;
   // Indicates that the animation should be exposed in an element's
   // getAnimations() list.
   bool mIsRelevant;
+
+  nsRevocableEventPtr<nsRunnableMethod<Animation>> mFinishNotificationTask;
+  // True if mFinished is resolved or would be resolved if mFinished has
+  // yet to be created. This is not set when mFinished is rejected since
+  // in that case mFinished is immediately reset to represent a new current
+  // finished promise.
+  bool mFinishedIsResolved;
 };
 
 } // namespace dom

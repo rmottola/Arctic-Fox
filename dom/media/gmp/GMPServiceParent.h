@@ -52,6 +52,9 @@ public:
   void AbortAsyncShutdown();
 
   int32_t AsyncShutdownTimeoutMs();
+#ifdef MOZ_CRASHREPORTER
+  void SetAsyncShutdownPluginState(GMPParent* aGMPParent, char aId, const nsCString& aState);
+#endif // MOZ_CRASHREPORTER
 
 private:
   friend class GMPServiceParent;
@@ -73,7 +76,8 @@ private:
 
   void UnloadPlugins();
   void CrashPlugins();
-  void SetAsyncShutdownComplete();
+  void NotifySyncShutdownComplete();
+  void NotifyAsyncShutdownComplete();
 
   void LoadFromEnvironment();
   void ProcessPossiblePlugin(nsIFile* aDir);
@@ -135,6 +139,20 @@ private:
   // Protected by mMutex from the base class.
   nsTArray<nsRefPtr<GMPParent>> mPlugins;
   bool mShuttingDown;
+  nsTArray<nsRefPtr<GMPParent>> mAsyncShutdownPlugins;
+#ifdef MOZ_CRASHREPORTER
+  class AsyncShutdownPluginStates
+  {
+  public:
+    void Update(const nsCString& aPlugin, const nsCString& aInstance,
+                char aId, const nsCString& aState);
+  private:
+    struct State { nsAutoCString mStateSequence; nsCString mLastStateDescription; };
+    typedef nsClassHashtable<nsCStringHashKey, State> StatesByInstance;
+    typedef nsClassHashtable<nsCStringHashKey, StatesByInstance> StateInstancesByPlugin;
+    StateInstancesByPlugin mStates;
+  } mAsyncShutdownPluginStates;
+#endif // MOZ_CRASHREPORTER
 
   // True if we've inspected MOZ_GMP_PATH on the GMP thread and loaded any
   // plugins found there into mPlugins.
@@ -155,11 +173,9 @@ private:
     T mValue;
   };
 
-  MainThreadOnly<bool> mWaitingForPluginsAsyncShutdown;
+  MainThreadOnly<bool> mWaitingForPluginsSyncShutdown;
 
   nsTArray<nsString> mPluginsWaitingForDeletion;
-
-  nsTArray<nsRefPtr<GMPParent>> mAsyncShutdownPlugins; // GMP Thread only.
 
   nsCOMPtr<nsIFile> mStorageBaseDir;
 

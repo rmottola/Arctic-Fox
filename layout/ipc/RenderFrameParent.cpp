@@ -89,7 +89,6 @@ public:
   explicit RemoteContentController(RenderFrameParent* aRenderFrame)
     : mUILoop(MessageLoop::current())
     , mRenderFrame(aRenderFrame)
-    , mHaveZoomConstraints(false)
   { }
 
   virtual void RequestContentRepaint(const FrameMetrics& aFrameMetrics) override
@@ -222,14 +221,6 @@ public:
     MessageLoop::current()->PostDelayedTask(FROM_HERE, aTask, aDelayMs);
   }
 
-  virtual bool GetRootZoomConstraints(ZoomConstraints* aOutConstraints) override
-  {
-    if (mHaveZoomConstraints && aOutConstraints) {
-      *aOutConstraints = mZoomConstraints;
-    }
-    return mHaveZoomConstraints;
-  }
-
   virtual bool GetTouchSensitiveRegion(CSSRect* aOutRegion) override
   {
     if (mTouchSensitiveRegion.IsEmpty())
@@ -270,13 +261,15 @@ public:
     }
   }
 
-  // Methods used by RenderFrameParent to set fields stored here.
-
-  void SaveZoomConstraints(const ZoomConstraints& aConstraints)
-  {
-    mHaveZoomConstraints = true;
-    mZoomConstraints = aConstraints;
+  void NotifyFlushComplete() override {
+    MOZ_ASSERT(NS_IsMainThread());
+    if (mRenderFrame) {
+      TabParent* browser = TabParent::GetFrom(mRenderFrame->Manager());
+      browser->NotifyFlushComplete();
+    }
   }
+
+  // Methods used by RenderFrameParent to set fields stored here.
 
   void SetTouchSensitiveRegion(const nsRegion& aRegion)
   {
@@ -286,8 +279,6 @@ private:
   MessageLoop* mUILoop;
   RenderFrameParent* mRenderFrame;
 
-  bool mHaveZoomConstraints;
-  ZoomConstraints mZoomConstraints;
   nsRegion mTouchSensitiveRegion;
 };
 
@@ -320,7 +311,7 @@ RenderFrameParent::RenderFrameParent(nsFrameLoader* aFrameLoader,
     *aTextureFactoryIdentifier = TextureFactoryIdentifier();
   }
 
-  if (XRE_GetProcessType() == GeckoProcessType_Default) {
+  if (XRE_IsParentProcess()) {
     // Our remote frame will push layers updates to the compositor,
     // and we'll keep an indirect reference to that tree.
     *aId = mLayersId = CompositorParent::AllocateLayerTreeId();
@@ -333,7 +324,7 @@ RenderFrameParent::RenderFrameParent(nsFrameLoader* aFrameLoader,
       mContentController = new RemoteContentController(this);
       CompositorParent::SetControllerForLayerTree(mLayersId, mContentController);
     }
-  } else if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  } else if (XRE_IsContentProcess()) {
     ContentChild::GetSingleton()->SendAllocateLayerTreeId(aId);
     mLayersId = *aId;
     CompositorChild::Get()->SendNotifyChildCreated(mLayersId);
@@ -441,7 +432,7 @@ void
 RenderFrameParent::ActorDestroy(ActorDestroyReason why)
 {
   if (mLayersId != 0) {
-    if (XRE_GetProcessType() == GeckoProcessType_Content) {
+    if (XRE_IsContentProcess()) {
       ContentChild::GetSingleton()->SendDeallocateLayerTreeId(mLayersId);
     } else {
       CompositorParent::DeallocateLayerTreeId(mLayersId);
@@ -591,12 +582,8 @@ RenderFrameParent::SetAllowedTouchBehavior(uint64_t aInputBlockId,
 void
 RenderFrameParent::UpdateZoomConstraints(uint32_t aPresShellId,
                                          ViewID aViewId,
-                                         bool aIsRoot,
-                                         const ZoomConstraints& aConstraints)
+                                         const Maybe<ZoomConstraints>& aConstraints)
 {
-  if (mContentController && aIsRoot) {
-    mContentController->SaveZoomConstraints(aConstraints);
-  }
   if (GetApzcTreeManager()) {
     GetApzcTreeManager()->UpdateZoomConstraints(ScrollableLayerGuid(mLayersId, aPresShellId, aViewId),
                                                 aConstraints);

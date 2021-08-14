@@ -80,7 +80,7 @@ TableTicker* Sampler::sActiveSampler;
 static mozilla::StaticAutoPtr<mozilla::ProfilerIOInterposeObserver>
                                                             sInterposeObserver;
 
-// The name that identifies the goanna thread for calls to
+// The name that identifies the gecko thread for calls to
 // profiler_register_thread.
 static const char * gGeckoThreadName = "GeckoMain";
 
@@ -829,12 +829,26 @@ bool mozilla_sampler_is_paused() {
 void mozilla_sampler_pause() {
   if (Sampler::GetActiveSampler()) {
     Sampler::GetActiveSampler()->SetPaused(true);
+#ifndef SPS_STANDALONE
+  if (Sampler::CanNotifyObservers()) {
+    nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+    if (os)
+      os->NotifyObservers(nullptr, "profiler-paused", nullptr);
+  }
+#endif
   }
 }
 
 void mozilla_sampler_resume() {
   if (Sampler::GetActiveSampler()) {
     Sampler::GetActiveSampler()->SetPaused(false);
+#ifndef SPS_STANDALONE
+  if (Sampler::CanNotifyObservers()) {
+    nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+    if (os)
+      os->NotifyObservers(nullptr, "profiler-resumed", nullptr);
+  }
+#endif
   }
 }
 

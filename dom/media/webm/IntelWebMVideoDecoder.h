@@ -13,11 +13,10 @@
 #include "PlatformDecoderModule.h"
 #include "mozilla/Monitor.h"
 
-#include "mp4_demuxer/mp4_demuxer.h"
 #include "MediaInfo.h"
 #include "MediaData.h"
 
-class MediaTaskQueue;
+class TaskQueue;
 
 namespace mozilla {
 
@@ -65,7 +64,7 @@ private:
 
   // TaskQueue on which decoder can choose to decode.
   // Only non-null up until the decoder is created.
-  nsRefPtr<FlushableMediaTaskQueue> mTaskQueue;
+  nsRefPtr<FlushableTaskQueue> mTaskQueue;
 
   // Monitor that protects all non-threadsafe state; the primitives
   // that follow.

@@ -45,10 +45,7 @@ CompositorD3D9::Initialize()
 
   ScopedGfxFeatureReporter reporter("D3D9 Layers", force);
 
-  if (!gfxPlatform::CanUseDirect3D9()) {
-    NS_WARNING("Direct3D 9-accelerated layers are not supported on this system.");
-    return false;
-  }
+  MOZ_ASSERT(gfxPlatform::CanUseDirect3D9());
 
   mDeviceManager = gfxWindowsPlatform::GetPlatform()->GetD3D9DeviceManager();
   if (!mDeviceManager) {
@@ -245,7 +242,8 @@ CompositorD3D9::DrawQuad(const gfx::Rect &aRect,
                          const gfx::Rect &aClipRect,
                          const EffectChain &aEffectChain,
                          gfx::Float aOpacity,
-                         const gfx::Matrix4x4 &aTransform)
+                         const gfx::Matrix4x4& aTransform,
+                         const gfx::Rect& aVisibleRect)
 {
   if (!mDeviceManager) {
     return;
@@ -671,7 +669,7 @@ CompositorD3D9::EndFrame()
   if (mDeviceManager) {
     device()->EndScene();
 
-    nsIntSize oldSize = mSize;
+    IntSize oldSize = mSize;
     EnsureSize();
     if (oldSize == mSize) {
       if (mTarget) {

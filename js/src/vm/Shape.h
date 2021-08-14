@@ -353,16 +353,10 @@ class BaseShape : public gc::TenuredCell
         UNCACHEABLE_PROTO   =  0x800,
         IMMUTABLE_PROTOTYPE = 0x1000,
 
-        // These two flags control which scope a new variables ends up on in the
-        // scope chain. If the variable is "qualified" (i.e., if it was defined
-        // using var, let, or const) then it ends up on the lowest scope in the
-        // chain that has the QUALIFIED_VAROBJ flag set. If it's "unqualified"
-        // (i.e., if it was introduced without any var, let, or const, which
-        // incidentally is an error in strict mode) then it goes on the lowest
-        // scope in the chain with the UNQUALIFIED_VAROBJ flag set (which is
-        // typically the global).
+        // See JSObject::isQualifiedVarObj().
         QUALIFIED_VAROBJ    = 0x2000,
-        UNQUALIFIED_VAROBJ  = 0x4000,
+
+        // 0x4000 is unused.
 
         // For a function used as an interpreted constructor, whether a 'new'
         // type had constructor information cleared.
@@ -382,14 +376,15 @@ class BaseShape : public gc::TenuredCell
     HeapPtrUnownedBaseShape unowned_;
 
     /* For owned BaseShapes, the shape's shape table. */
-    ShapeTable       *table_;
+    ShapeTable*      table_;
 
-    BaseShape(const BaseShape &base) = delete;
+    BaseShape(const BaseShape& base) = delete;
+    BaseShape& operator=(const BaseShape& other) = delete;
 
   public:
-    void finalize(FreeOp *fop);
+    void finalize(FreeOp* fop);
 
-    BaseShape(JSCompartment *comp, const Class *clasp, uint32_t objectFlags)
+    BaseShape(JSCompartment* comp, const Class* clasp, uint32_t objectFlags)
     {
         MOZ_ASSERT(!(objectFlags & ~OBJECT_FLAG_MASK));
         mozilla::PodZero(this);
@@ -403,29 +398,22 @@ class BaseShape : public gc::TenuredCell
     /* Not defined: BaseShapes must not be stack allocated. */
     ~BaseShape();
 
-    BaseShape &operator=(const BaseShape &other) {
-        clasp_ = other.clasp_;
-        flags = other.flags;
-        slotSpan_ = other.slotSpan_;
-        compartment_ = other.compartment_;
-        return *this;
-    }
-
-    const Class *clasp() const { return clasp_; }
+    const Class* clasp() const { return clasp_; }
 
     bool isOwned() const { return !!(flags & OWNED_SHAPE); }
 
-    inline void adoptUnowned(UnownedBaseShape *other);
+    static void copyFromUnowned(BaseShape& dest, UnownedBaseShape& src);
+    inline void adoptUnowned(UnownedBaseShape* other);
 
     void setOwned(UnownedBaseShape* unowned) {
         flags |= OWNED_SHAPE;
-        this->unowned_ = unowned;
+        unowned_ = unowned;
     }
 
     uint32_t getObjectFlags() const { return flags & OBJECT_FLAG_MASK; }
 
     bool hasTable() const { MOZ_ASSERT_IF(table_, isOwned()); return table_ != nullptr; }
-    ShapeTable &table() const { MOZ_ASSERT(table_ && isOwned()); return *table_; }
+    ShapeTable& table() const { MOZ_ASSERT(table_ && isOwned()); return *table_; }
     void setTable(ShapeTable *table) { MOZ_ASSERT(isOwned()); table_ = table; }
 
     uint32_t slotSpan() const { MOZ_ASSERT(isOwned()); return slotSpan_; }
@@ -472,24 +460,6 @@ class BaseShape : public gc::TenuredCell
 
 class UnownedBaseShape : public BaseShape {};
 
-inline void
-BaseShape::adoptUnowned(UnownedBaseShape* other)
-{
-    // This is a base shape owned by a dictionary object, update it to reflect the
-    // unowned base shape of a new last property.
-    MOZ_ASSERT(isOwned());
-
-    uint32_t span = slotSpan();
-    ShapeTable* table = &this->table();
-
-    *this = *other;
-    setOwned(other);
-    setTable(table);
-    setSlotSpan(span);
-
-    assertConsistency();
-}
-
 UnownedBaseShape*
 BaseShape::unowned()
 {
@@ -499,13 +469,15 @@ BaseShape::unowned()
 UnownedBaseShape*
 BaseShape::toUnowned()
 {
-    MOZ_ASSERT(!isOwned() && !unowned_); return static_cast<UnownedBaseShape*>(this);
+    MOZ_ASSERT(!isOwned() && !unowned_);
+    return static_cast<UnownedBaseShape*>(this);
 }
 
 UnownedBaseShape*
 BaseShape::baseUnowned()
 {
-    MOZ_ASSERT(isOwned() && unowned_); return unowned_;
+    MOZ_ASSERT(isOwned() && unowned_);
+    return unowned_;
 }
 
 /* Entries for the per-compartment baseShapes set of unowned base shapes. */
@@ -541,17 +513,8 @@ struct StackBaseShape : public DefaultHasher<ReadBarrieredUnownedBaseShape>
     };
 
     static inline HashNumber hash(const Lookup& lookup);
-    static inline bool match(UnownedBaseShape *key, const Lookup& lookup);
+    static inline bool match(UnownedBaseShape* key, const Lookup& lookup);
 };
-
-inline
-BaseShape::BaseShape(const StackBaseShape &base)
-{
-    mozilla::PodZero(this);
-    this->clasp_ = base.clasp;
-    this->flags = base.flags;
-    this->compartment_ = base.compartment;
-}
 
 typedef HashSet<ReadBarrieredUnownedBaseShape,
                 StackBaseShape,
@@ -1138,7 +1101,7 @@ typedef HashSet<InitialShapeEntry, InitialShapeEntry, SystemAllocPolicy> Initial
 struct StackShape
 {
     /* For performance, StackShape only roots when absolutely necessary. */
-    UnownedBaseShape *base;
+    UnownedBaseShape* base;
     jsid propid;
     GetterOp rawGetter;
     SetterOp rawSetter;

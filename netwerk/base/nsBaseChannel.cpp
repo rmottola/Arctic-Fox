@@ -6,7 +6,9 @@
 
 #include "nsBaseChannel.h"
 #include "nsURLHelper.h"
-#include "nsNetUtil.h"
+#include "nsNetCID.h"
+#include "nsMimeTypes.h"
+#include "nsIContentSniffer.h"
 #include "nsMimeTypes.h"
 #include "nsIHttpEventSink.h"
 #include "nsIHttpChannel.h"
@@ -286,7 +288,7 @@ nsBaseChannel::ClassifyURI()
 {
   // For channels created in the child process, delegate to the parent to
   // classify URIs.
-  if (XRE_GetProcessType() != GeckoProcessType_Default) {
+  if (!XRE_IsParentProcess()) {
     return;
   }
 

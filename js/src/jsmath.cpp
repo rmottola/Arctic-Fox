@@ -29,9 +29,10 @@
 #include "jscompartment.h"
 #include "jslibmath.h"
 #include "jstypes.h"
-#include "prmjtime.h"
 
 #include "js/Class.h"
+
+#include "vm/Time.h"
 
 #include "jsobjinlines.h"
 

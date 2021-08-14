@@ -7,8 +7,8 @@
 #if !defined(StateWatching_h_)
 #define StateWatching_h_
 
-#include "AbstractThread.h"
-
+#include "mozilla/AbstractThread.h"
+#include "mozilla/TaskDispatcher.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/unused.h"
 
@@ -60,7 +60,7 @@ extern PRLogModuleInfo* gStateWatchingLog;
 
 #define WATCH_LOG(x, ...) \
   MOZ_ASSERT(gStateWatchingLog); \
-  PR_LOG(gStateWatchingLog, PR_LOG_DEBUG, (x, ##__VA_ARGS__))
+  MOZ_LOG(gStateWatchingLog, LogLevel::Debug, (x, ##__VA_ARGS__))
 
 /*
  * AbstractWatcher is a superclass from which all watchers must inherit.

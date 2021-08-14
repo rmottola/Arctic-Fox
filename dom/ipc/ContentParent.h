@@ -7,6 +7,7 @@
 #ifndef mozilla_dom_ContentParent_h
 #define mozilla_dom_ContentParent_h
 
+#include "mozilla/dom/NuwaParent.h"
 #include "mozilla/dom/PContentParent.h"
 #include "mozilla/dom/nsIContentParent.h"
 #include "mozilla/ipc/GeckoChildProcessHost.h"
@@ -236,7 +237,7 @@ public:
       return mIsForBrowser;
     }
 #ifdef MOZ_NUWA_PROCESS
-    bool IsNuwaProcess() const;
+    bool IsNuwaProcess();
 #endif
 
     GeckoChildProcessHost* Process() {
@@ -250,11 +251,7 @@ public:
     }
 
     bool NeedsPermissionsUpdate() const {
-#ifdef MOZ_NUWA_PROCESS
-        return !IsNuwaProcess() && mSendPermissionUpdates;
-#else
         return mSendPermissionUpdates;
-#endif
     }
 
     bool NeedsDataStoreInfos() const {
@@ -378,6 +375,9 @@ public:
     DeallocPContentPermissionRequestParent(PContentPermissionRequestParent* actor) override;
 
     bool HasGamepadListener() const { return mHasGamepadListener; }
+
+    void SetNuwaParent(NuwaParent* aNuwaParent) { mNuwaParent = aNuwaParent; }
+    void ForkNewProcess(bool aBlocking);
 
 protected:
     void OnChannelConnected(int32_t pid) override;
@@ -637,6 +637,9 @@ private:
     virtual bool RecvPVoicemailConstructor(PVoicemailParent* aActor) override;
     virtual bool DeallocPVoicemailParent(PVoicemailParent* aActor) override;
 
+    virtual PMediaParent* AllocPMediaParent() override;
+    virtual bool DeallocPMediaParent(PMediaParent* aActor) override;
+
     virtual bool DeallocPStorageParent(PStorageParent* aActor) override;
 
     virtual PBluetoothParent* AllocPBluetoothParent() override;
@@ -645,6 +648,10 @@ private:
 
     virtual PFMRadioParent* AllocPFMRadioParent() override;
     virtual bool DeallocPFMRadioParent(PFMRadioParent* aActor) override;
+
+    virtual PPresentationParent* AllocPPresentationParent() override;
+    virtual bool DeallocPPresentationParent(PPresentationParent* aActor) override;
+    virtual bool RecvPPresentationConstructor(PPresentationParent* aActor) override;
 
     virtual PAsmJSCacheEntryParent* AllocPAsmJSCacheEntryParent(
                                  const asmjscache::OpenMode& aOpenMode,
@@ -740,24 +747,16 @@ private:
 
     virtual bool RecvFirstIdle() override;
 
-    virtual bool RecvAudioChannelGetState(const AudioChannel& aChannel,
-                                          const bool& aElementHidden,
-                                          const bool& aElementWasHidden,
-                                          AudioChannelState* aValue) override;
-
-    virtual bool RecvAudioChannelRegisterType(const AudioChannel& aChannel,
-                                              const bool& aWithVideo) override;
-    virtual bool RecvAudioChannelUnregisterType(const AudioChannel& aChannel,
-                                                const bool& aElementHidden,
-                                                const bool& aWithVideo) override;
-
-    virtual bool RecvAudioChannelChangedNotification() override;
-
     virtual bool RecvAudioChannelChangeDefVolChannel(const int32_t& aChannel,
                                                      const bool& aHidden) override;
+
+    virtual bool RecvAudioChannelServiceStatus(const bool& aTelephonyChannel,
+                                               const bool& aContentOrNormalChannel,
+                                               const bool& aAnyChannel) override;
+
     virtual bool RecvGetSystemMemory(const uint64_t& getterId) override;
 
-    virtual bool RecvGetLookAndFeelCache(nsTArray<LookAndFeelInt>&& aLookAndFeelIntCache) override;
+    virtual bool RecvGetLookAndFeelCache(nsTArray<LookAndFeelInt>* aLookAndFeelIntCache) override;
 
     virtual bool RecvDataStoreGetStores(
                        const nsString& aName,
@@ -771,12 +770,10 @@ private:
 
     virtual bool RecvSystemMessageHandled() override;
 
-    virtual bool RecvNuwaReady() override;
-
-    virtual bool RecvNuwaWaitForFreeze() override;
-
-    virtual bool RecvAddNewProcess(const uint32_t& aPid,
-                                   InfallibleTArray<ProtocolFdMapping>&& aFds) override;
+    // Callbacks from NuwaParent.
+    void OnNuwaReady();
+    void OnNewProcessCreated(uint32_t aPid,
+                             UniquePtr<nsTArray<ProtocolFdMapping>>&& aFds);
 
     virtual bool RecvCreateFakeVolume(const nsString& fsName, const nsString& mountPoint) override;
 
@@ -841,10 +838,8 @@ private:
                           int32_t* aSliceRefCnt,
                           bool* aResult) override;
 
-    virtual PDocAccessibleParent* AllocPDocAccessibleParent(PDocAccessibleParent*, const uint64_t&) override;
-    virtual bool DeallocPDocAccessibleParent(PDocAccessibleParent*) override;
-    virtual bool RecvPDocAccessibleConstructor(PDocAccessibleParent* aDoc,
-                                               PDocAccessibleParent* aParentDoc, const uint64_t& aParentID) override;
+    virtual bool
+    RecvFlushPendingFileDeletions() override;
 
     virtual PWebrtcGlobalParent* AllocPWebrtcGlobalParent() override;
     virtual bool DeallocPWebrtcGlobalParent(PWebrtcGlobalParent *aActor) override;
@@ -914,6 +909,9 @@ private:
     bool mShutdownPending;
     bool mIPCOpen;
 
+    // Allows NuwaParent to access OnNuwaReady() and OnNewProcessCreated().
+    friend class NuwaParent;
+
     nsRefPtr<nsConsoleService>  mConsoleService;
     nsConsoleService* GetConsoleService();
 
@@ -931,6 +929,11 @@ private:
 #endif
 
     PProcessHangMonitorParent* mHangMonitorActor;
+
+    // NuwaParent and ContentParent hold strong references to each other. The
+    // cycle will be broken when either actor is destroyed.
+    nsRefPtr<NuwaParent> mNuwaParent;
+
 #ifdef MOZ_ENABLE_PROFILER_SPS
     nsRefPtr<mozilla::ProfileGatherer> mGatherer;
 #endif

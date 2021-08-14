@@ -23,21 +23,17 @@ public:
   CreateVideoDecoder(const VideoInfo& aConfig,
                      layers::LayersBackend aLayersBackend,
                      layers::ImageContainer* aImageContainer,
-                     FlushableMediaTaskQueue* aVideoTaskQueue,
+                     FlushableTaskQueue* aVideoTaskQueue,
                      MediaDataDecoderCallback* aCallback) override;
 
   virtual already_AddRefed<MediaDataDecoder>
   CreateAudioDecoder(const AudioInfo& aConfig,
-                     FlushableMediaTaskQueue* aAudioTaskQueue,
+                     FlushableTaskQueue* aAudioTaskQueue,
                      MediaDataDecoderCallback* aCallback) override;
 
   bool SupportsMimeType(const nsACString& aMimeType) override;
 
-  virtual void DisableHardwareAcceleration() override
-  {
-    sDXVAEnabled = false;
-  }
-
+  virtual void DisableHardwareAcceleration() override;
   virtual bool SupportsSharedDecoders(const VideoInfo& aConfig) const override;
 
   virtual ConversionRequired
@@ -52,11 +48,12 @@ public:
 
   // Called on main thread.
   static void Init();
+
+  // Called from any thread, must call init first
+  static int GetNumDecoderThreads();
 private:
   bool ShouldUseDXVA(const VideoInfo& aConfig) const;
-
-  static bool sIsWMFEnabled;
-  static bool sDXVAEnabled;
+  bool mWMFInitialized;
 };
 
 } // namespace mozilla

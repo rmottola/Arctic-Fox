@@ -16,6 +16,7 @@
 #include "nsIRemoteOpenFileListener.h"
 #include "nsProxyRelease.h"
 #include "SerializedLoadContext.h"
+#include "nsNetUtil.h"
 
 // needed to alloc/free NSPR file descriptors
 #include "private/pprio.h"
@@ -607,6 +608,12 @@ RemoteOpenFileChild::MoveToNative(nsIFile *newParent, const nsACString &newName)
 
 NS_IMETHODIMP
 RemoteOpenFileChild::RenameTo(nsIFile *newParentDir, const nsAString &newName)
+{
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+NS_IMETHODIMP
+RemoteOpenFileChild::RenameToNative(nsIFile *newParentDir, const nsACString &newName)
 {
   return NS_ERROR_NOT_IMPLEMENTED;
 }

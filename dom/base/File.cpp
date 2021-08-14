@@ -229,6 +229,12 @@ Blob::IsFile() const
   return mImpl->IsFile();
 }
 
+bool
+Blob::IsDirectory() const
+{
+  return mImpl->IsDirectory();
+}
+
 const nsTArray<nsRefPtr<BlobImpl>>*
 Blob::GetSubBlobImpls() const
 {
@@ -283,52 +289,16 @@ Blob::CreateSlice(uint64_t aStart, uint64_t aLength,
   return blob.forget();
 }
 
-NS_IMETHODIMP
-Blob::GetSize(uint64_t* aSize)
-{
-  MOZ_ASSERT(aSize);
-
-  ErrorResult rv;
-  *aSize = GetSize(rv);
-  return rv.StealNSResult();
-}
-
 uint64_t
 Blob::GetSize(ErrorResult& aRv)
 {
   return mImpl->GetSize(aRv);
 }
 
-NS_IMETHODIMP
+void
 Blob::GetType(nsAString &aType)
 {
   mImpl->GetType(aType);
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-Blob::Slice(int64_t aStart, int64_t aEnd,
-            const nsAString& aContentType, uint8_t aArgc,
-            nsIDOMBlob **aBlob)
-{
-  Optional<int64_t> start;
-  if (aArgc > 0) {
-    start.Construct(aStart);
-  }
-
-  Optional<int64_t> end;
-  if (aArgc > 1) {
-    end.Construct(aEnd);
-  }
-
-  ErrorResult rv;
-  nsRefPtr<Blob> blob = Slice(start, end, aContentType, rv);
-  if (rv.Failed()) {
-    return rv.StealNSResult();
-  }
-
-  blob.forget(aBlob);
-  return NS_OK;
 }
 
 already_AddRefed<Blob>
@@ -406,13 +376,13 @@ Blob::Constructor(
   return blob.forget();
 }
 
-NS_IMETHODIMP_(int64_t)
+int64_t
 Blob::GetFileId()
 {
   return mImpl->GetFileId();
 }
 
-NS_IMETHODIMP_(void)
+void
 Blob::AddFileInfo(indexedDB::FileInfo* aFileInfo)
 {
   mImpl->AddFileInfo(aFileInfo);
@@ -424,16 +394,16 @@ Blob::GetFileInfo(indexedDB::FileManager* aFileManager)
   return mImpl->GetFileInfo(aFileManager);
 }
 
-NS_IMETHODIMP_(bool)
-Blob::IsMemoryFile()
+bool
+Blob::IsMemoryFile() const
 {
   return mImpl->IsMemoryFile();
 }
 
-NS_IMETHODIMP
-Blob::GetInternalStream(nsIInputStream** aStream)
+void
+Blob::GetInternalStream(nsIInputStream** aStream, ErrorResult& aRv)
 {
-  return mImpl->GetInternalStream(aStream);
+  mImpl->GetInternalStream(aStream, aRv);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -457,10 +427,11 @@ File::Create(nsISupports* aParent, BlobImpl* aImpl)
 /* static */ already_AddRefed<File>
 File::Create(nsISupports* aParent, const nsAString& aName,
              const nsAString& aContentType, uint64_t aLength,
-             int64_t aLastModifiedDate)
+             int64_t aLastModifiedDate, BlobDirState aDirState)
 {
   nsRefPtr<File> file = new File(aParent,
-    new BlobImplBase(aName, aContentType, aLength, aLastModifiedDate));
+    new BlobImplBase(aName, aContentType, aLength, aLastModifiedDate,
+                     aDirState));
   return file.forget();
 }
 
@@ -911,16 +882,17 @@ BlobImplBase::GetSendInfo(nsIInputStream** aBody, uint64_t* aContentLength,
 {
   MOZ_ASSERT(aContentLength);
 
-  nsresult rv;
+  ErrorResult rv;
 
   nsCOMPtr<nsIInputStream> stream;
-  rv = GetInternalStream(getter_AddRefs(stream));
-  NS_ENSURE_SUCCESS(rv, rv);
+  GetInternalStream(getter_AddRefs(stream), rv);
+  if (NS_WARN_IF(rv.Failed())) {
+    return rv.StealNSResult();
+  }
 
-  ErrorResult error;
-  *aContentLength = GetSize(error);
-  if (NS_WARN_IF(error.Failed())) {
-    return error.StealNSResult();
+  *aContentLength = GetSize(rv);
+  if (NS_WARN_IF(rv.Failed())) {
+    return rv.StealNSResult();
   }
 
   nsAutoString contentType;
@@ -1063,13 +1035,16 @@ const uint32_t sFileStreamFlags =
   nsIFileInputStream::DEFER_OPEN |
   nsIFileInputStream::SHARE_DELETE;
 
-nsresult
-BlobImplFile::GetInternalStream(nsIInputStream** aStream)
+void
+BlobImplFile::GetInternalStream(nsIInputStream** aStream, ErrorResult& aRv)
 {
-  return mWholeFile ?
-    NS_NewLocalFileInputStream(aStream, mFile, -1, -1, sFileStreamFlags) :
-    NS_NewPartialLocalFileInputStream(aStream, mFile, mStart, mLength,
-                                      -1, -1, sFileStreamFlags);
+  if (mWholeFile) {
+    aRv = NS_NewLocalFileInputStream(aStream, mFile, -1, -1, sFileStreamFlags);
+    return;
+  }
+
+  aRv = NS_NewPartialLocalFileInputStream(aStream, mFile, mStart, mLength,
+                                          -1, -1, sFileStreamFlags);
 }
 
 void
@@ -1079,6 +1054,17 @@ BlobImplFile::SetPath(const nsAString& aPath)
              aPath[aPath.Length() - 1] == char16_t('/'),
              "Path must end with a path separator");
   mPath = aPath;
+}
+
+void
+BlobImplFile::LookupAndCacheIsDirectory()
+{
+  MOZ_ASSERT(mIsFile,
+             "This should only be called when this object has been created "
+             "from an nsIFile to note that the nsIFile is a directory");
+  bool isDir;
+  mFile->IsDirectory(&isDir);
+  mDirState = isDir ? BlobDirState::eIsDir : BlobDirState::eIsNotDir;
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1096,13 +1082,15 @@ BlobImplMemory::CreateSlice(uint64_t aStart, uint64_t aLength,
   return impl.forget();
 }
 
-nsresult
-BlobImplMemory::GetInternalStream(nsIInputStream** aStream)
+void
+BlobImplMemory::GetInternalStream(nsIInputStream** aStream, ErrorResult& aRv)
 {
-  if (mLength > INT32_MAX)
-    return NS_ERROR_FAILURE;
+  if (mLength > INT32_MAX) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return;
+  }
 
-  return DataOwnerAdapter::Create(mDataOwner, mStart, mLength, aStream);
+  aRv = DataOwnerAdapter::Create(mDataOwner, mStart, mLength, aStream);
 }
 
 /* static */ StaticMutex
@@ -1228,13 +1216,13 @@ BlobImplTemporaryBlob::CreateSlice(uint64_t aStart, uint64_t aLength,
   return impl.forget();
 }
 
-nsresult
-BlobImplTemporaryBlob::GetInternalStream(nsIInputStream** aStream)
+void
+BlobImplTemporaryBlob::GetInternalStream(nsIInputStream** aStream,
+                                         ErrorResult& aRv)
 {
   nsCOMPtr<nsIInputStream> stream =
     new nsTemporaryFileInputStream(mFileDescOwner, mStartPos, mStartPos + mLength);
   stream.forget(aStream);
-  return NS_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////

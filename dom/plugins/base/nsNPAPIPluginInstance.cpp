@@ -91,8 +91,7 @@ static nsRefPtr<GLContext> sPluginContext = nullptr;
 static bool EnsureGLContext()
 {
   if (!sPluginContext) {
-    bool requireCompatProfile = true;
-    sPluginContext = GLContextProvider::CreateHeadless(requireCompatProfile);
+    sPluginContext = GLContextProvider::CreateHeadless(CreateContextFlags::REQUIRE_COMPAT_PROFILE);
   }
 
   return sPluginContext != nullptr;
@@ -978,7 +977,7 @@ already_AddRefed<AndroidSurfaceTexture> nsNPAPIPluginInstance::CreateSurfaceText
 void nsNPAPIPluginInstance::OnSurfaceTextureFrameAvailable()
 {
   if (mRunning == RUNNING && mOwner)
-    AndroidBridge::Bridge()->ScheduleComposite();
+    AndroidBridge::Bridge()->InvalidateAndScheduleComposite();
 }
 
 void* nsNPAPIPluginInstance::AcquireContentWindow()

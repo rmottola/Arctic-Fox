@@ -25,9 +25,8 @@ class ImageContainer;
 
 class MediaDataDecoder;
 class MediaDataDecoderCallback;
-class FlushableMediaTaskQueue;
+class FlushableTaskQueue;
 class CDMProxy;
-typedef int64_t Microseconds;
 
 // The PlatformDecoderModule interface is used by the MP4Reader to abstract
 // access to the H264 and Audio (AAC/MP3) decoders provided by various platforms.
@@ -73,15 +72,20 @@ public:
   // See CreateVideoDecoder and CreateAudioDecoder for implementation details.
   virtual already_AddRefed<MediaDataDecoder>
   CreateDecoder(const TrackInfo& aConfig,
-                FlushableMediaTaskQueue* aTaskQueue,
+                FlushableTaskQueue* aTaskQueue,
                 MediaDataDecoderCallback* aCallback,
                 layers::LayersBackend aLayersBackend = layers::LayersBackend::LAYERS_NONE,
                 layers::ImageContainer* aImageContainer = nullptr);
 
   // An audio decoder module must support AAC by default.
   // A video decoder must support H264 by default.
-  // If more codecs are to be supported, SupportsMimeType will have to be extended.
+  // If more codecs are to be supported, SupportsMimeType will have
+  // to be extended
   virtual bool SupportsMimeType(const nsACString& aMimeType);
+
+  // MimeType can be decoded with shipped decoders if no platform decoders exist
+  static bool AgnosticMimeType(const nsACString& aMimeType);
+
 
   enum ConversionRequired {
     kNeedNone,
@@ -97,7 +101,7 @@ public:
   virtual void DisableHardwareAcceleration() {}
 
   virtual bool SupportsSharedDecoders(const VideoInfo& aConfig) const {
-    return true;
+    return !AgnosticMimeType(aConfig.mMimeType);
   }
 
 protected:
@@ -120,7 +124,7 @@ protected:
   CreateVideoDecoder(const VideoInfo& aConfig,
                      layers::LayersBackend aLayersBackend,
                      layers::ImageContainer* aImageContainer,
-                     FlushableMediaTaskQueue* aVideoTaskQueue,
+                     FlushableTaskQueue* aVideoTaskQueue,
                      MediaDataDecoderCallback* aCallback) = 0;
 
   // Creates an Audio decoder with the specified properties.
@@ -135,7 +139,7 @@ protected:
   // This is called on the decode task queue.
   virtual already_AddRefed<MediaDataDecoder>
   CreateAudioDecoder(const AudioInfo& aConfig,
-                     FlushableMediaTaskQueue* aAudioTaskQueue,
+                     FlushableTaskQueue* aAudioTaskQueue,
                      MediaDataDecoderCallback* aCallback) = 0;
 
   // PDM pref caches...
@@ -172,8 +176,6 @@ public:
 
   virtual void DrainComplete() = 0;
 
-  virtual void NotifyResourcesStatusChanged() {};
-
   virtual void ReleaseMediaResources() {};
 };
 
@@ -187,7 +189,7 @@ public:
 // (like in Flush() and Drain()).
 //
 // Decoding is done asynchronously. Any async work can be done on the
-// MediaTaskQueue passed into the PlatformDecoderModules's Create*Decoder()
+// TaskQueue passed into the PlatformDecoderModules's Create*Decoder()
 // function. This may not be necessary for platforms with async APIs
 // for decoding.
 class MediaDataDecoder {
@@ -239,10 +241,6 @@ public:
   // returned.
   virtual nsresult Shutdown() = 0;
 
-  // For Codec Resource Management
-  virtual bool IsWaitingMediaResources() {
-    return false;
-  };
   virtual bool IsHardwareAccelerated() const { return false; }
 
   // ConfigurationChanged will be called to inform the video or audio decoder

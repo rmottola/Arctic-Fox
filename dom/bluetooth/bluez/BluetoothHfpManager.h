@@ -87,7 +87,6 @@ public:
   }
 
   static BluetoothHfpManager* Get();
-  ~BluetoothHfpManager();
 
   bool Listen();
 
@@ -124,6 +123,9 @@ public:
   void IgnoreWaitingCall();
   void ToggleCalls();
 #endif
+
+protected:
+  ~BluetoothHfpManager();
 
 private:
   void ParseAtCommand(const nsACString& aAtCommand, const int aStart,

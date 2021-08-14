@@ -19,8 +19,8 @@ using dom::ConstrainDoubleRange;
 using dom::MediaTrackConstraintSet;
 
 extern PRLogModuleInfo* GetMediaManagerLog();
-#define LOG(msg) PR_LOG(GetMediaManagerLog(), PR_LOG_DEBUG, msg)
-#define LOGFRAME(msg) PR_LOG(GetMediaManagerLog(), 6, msg)
+#define LOG(msg) MOZ_LOG(GetMediaManagerLog(), mozilla::LogLevel::Debug, msg)
+#define LOGFRAME(msg) MOZ_LOG(GetMediaManagerLog(), mozilla::LogLevel::Verbose, msg)
 
 /**
  * Webrtc video source.
@@ -151,9 +151,7 @@ MediaEngineWebRTCVideoSource::NotifyPull(MediaStreamGraph* aGraph,
 size_t
 MediaEngineWebRTCVideoSource::NumCapabilities()
 {
-  NS_ConvertUTF16toUTF8 uniqueId(mUniqueId); // TODO: optimize this?
-
-  int num = mViECapture->NumberOfCapabilities(uniqueId.get(), kMaxUniqueIdLength);
+  int num = mViECapture->NumberOfCapabilities(GetUUID().get(), kMaxUniqueIdLength);
   if (num > 0) {
     return num;
   }
@@ -205,29 +203,29 @@ MediaEngineWebRTCVideoSource::GetCapability(size_t aIndex,
   if (!mHardcodedCapabilities.IsEmpty()) {
     MediaEngineCameraVideoSource::GetCapability(aIndex, aOut);
   }
-  NS_ConvertUTF16toUTF8 uniqueId(mUniqueId); // TODO: optimize this?
-  mViECapture->GetCaptureCapability(uniqueId.get(), kMaxUniqueIdLength, aIndex, aOut);
+  mViECapture->GetCaptureCapability(GetUUID().get(), kMaxUniqueIdLength, aIndex, aOut);
 }
 
 nsresult
 MediaEngineWebRTCVideoSource::Allocate(const dom::MediaTrackConstraints &aConstraints,
-                                       const MediaEnginePrefs &aPrefs)
+                                       const MediaEnginePrefs &aPrefs,
+                                       const nsString& aDeviceId)
 {
   LOG((__FUNCTION__));
   if (mState == kReleased && mInitDone) {
     // Note: if shared, we don't allow a later opener to affect the resolution.
     // (This may change depending on spec changes for Constraints/settings)
 
-    if (!ChooseCapability(aConstraints, aPrefs)) {
+    if (!ChooseCapability(aConstraints, aPrefs, aDeviceId)) {
       return NS_ERROR_UNEXPECTED;
     }
-    if (mViECapture->AllocateCaptureDevice(NS_ConvertUTF16toUTF8(mUniqueId).get(),
+    if (mViECapture->AllocateCaptureDevice(GetUUID().get(),
                                            kMaxUniqueIdLength, mCaptureIndex)) {
       return NS_ERROR_FAILURE;
     }
     mState = kAllocated;
     LOG(("Video device %d allocated", mCaptureIndex));
-  } else if (PR_LOG_TEST(GetMediaManagerLog(), PR_LOG_DEBUG)) {
+  } else if (MOZ_LOG_TEST(GetMediaManagerLog(), LogLevel::Debug)) {
     MonitorAutoLock lock(mMonitor);
     if (mSources.IsEmpty()) {
       LOG(("Video device %d reallocated", mCaptureIndex));
@@ -266,7 +264,7 @@ MediaEngineWebRTCVideoSource::Deallocate()
     // another thread anywhere else, b) ViEInputManager::DestroyCaptureDevice() grabs
     // an exclusive object lock and deletes it in a critical section, so all in all
     // this should be safe threadwise.
-    NS_DispatchToMainThread(WrapRunnable(mViECapture,
+    NS_DispatchToMainThread(WrapRunnable(mViECapture.get(),
                                          &webrtc::ViECapture::ReleaseCaptureDevice,
                                          mCaptureIndex),
                             NS_DISPATCH_SYNC);
@@ -387,9 +385,8 @@ MediaEngineWebRTCVideoSource::Init()
                                     uniqueId, kMaxUniqueIdLength)) {
     return;
   }
-
-  CopyUTF8toUTF16(deviceName, mDeviceName);
-  CopyUTF8toUTF16(uniqueId, mUniqueId);
+  SetName(NS_ConvertUTF8toUTF16(deviceName));
+  SetUUID(uniqueId);
 
   mInitDone = true;
 }
@@ -422,9 +419,10 @@ MediaEngineWebRTCVideoSource::Shutdown()
   if (mState == kAllocated || mState == kStopped) {
     Deallocate();
   }
-  mViECapture->Release();
-  mViERender->Release();
-  mViEBase->Release();
+  mViECapture = nullptr;
+  mViERender = nullptr;
+  mViEBase = nullptr;
+
   mState = kReleased;
   mInitDone = false;
 }
@@ -442,11 +440,9 @@ void MediaEngineWebRTCVideoSource::Refresh(int aIndex) {
     return;
   }
 
-  CopyUTF8toUTF16(deviceName, mDeviceName);
+  SetName(NS_ConvertUTF8toUTF16(deviceName));
 #ifdef DEBUG
-  nsString temp;
-  CopyUTF8toUTF16(uniqueId, temp);
-  MOZ_ASSERT(temp.Equals(mUniqueId));
+  MOZ_ASSERT(GetUUID().Equals(uniqueId));
 #endif
 }
 

@@ -191,12 +191,6 @@ using namespace mozilla::gfx;
 using namespace mozilla::layers;
 using namespace mozilla::widget;
 
-namespace mozilla {
-namespace widget {
-  extern int32_t IsTouchDeviceSupportPresent();
-}
-}
-
 /**************************************************************
  **************************************************************
  **
@@ -248,9 +242,6 @@ BYTE            nsWindow::sLastMouseButton        = 0;
 
 // Trim heap on minimize. (initialized, but still true.)
 int             nsWindow::sTrimOnMinimize         = 2;
-
-// Default value for general window class (used when the pref is the empty string).
-const char*     nsWindow::sDefaultMainWindowClass = kClassNameGeneral;
 
 TriStateBool nsWindow::sHasBogusPopupsDropShadowOnMultiMonitor = TRI_UNKNOWN;
 
@@ -332,6 +323,7 @@ nsWindow::nsWindow() : nsWindowBase()
   mIconSmall            = nullptr;
   mIconBig              = nullptr;
   mWnd                  = nullptr;
+  mTransitionWnd        = nullptr;
   mPaintDC              = nullptr;
   mCompositeDC          = nullptr;
   mPrevWndProc          = nullptr;
@@ -534,11 +526,11 @@ nsWindow::Create(nsIWidget *aParent,
     }
   }
 
-  nsAutoString className;
+  const wchar_t* className;
   if (aInitData->mDropShadow) {
-    GetWindowPopupClass(className);
+    className = GetWindowPopupClass();
   } else {
-    GetWindowClass(className);
+    className = GetWindowClass();
   }
   // Plugins are created in the disabled state so that they can't
   // steal focus away from our main window.  This is especially
@@ -549,7 +541,7 @@ nsWindow::Create(nsIWidget *aParent,
     style |= WS_DISABLED;
   }
   mWnd = ::CreateWindowExW(extendedStyle,
-                           className.get(),
+                           className,
                            L"",
                            style,
                            aRect.x,
@@ -595,11 +587,11 @@ nsWindow::Create(nsIWidget *aParent,
     // The FAKETRACKPOINTSCROLLABLE needs to have the specific window styles it
     // is given below so that it catches the Trackpoint driver's heuristics.
     HWND scrollContainerWnd = ::CreateWindowW
-      (className.get(), L"FAKETRACKPOINTSCROLLCONTAINER",
+      (className, L"FAKETRACKPOINTSCROLLCONTAINER",
        WS_CHILD | WS_VISIBLE,
        0, 0, 0, 0, mWnd, nullptr, nsToolkit::mDllInstance, nullptr);
     HWND scrollableWnd = ::CreateWindowW
-      (className.get(), L"FAKETRACKPOINTSCROLLABLE",
+      (className, L"FAKETRACKPOINTSCROLLABLE",
        WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP | 0x30,
        0, 0, 0, 0, scrollContainerWnd, nullptr, nsToolkit::mDllInstance,
        nullptr);
@@ -716,13 +708,14 @@ NS_METHOD nsWindow::Destroy()
  *
  **************************************************************/
 
-void nsWindow::RegisterWindowClass(const nsString& aClassName, UINT aExtraStyle,
-                                   LPWSTR aIconID)
+const wchar_t*
+nsWindow::RegisterWindowClass(const wchar_t* aClassName,
+                              UINT aExtraStyle, LPWSTR aIconID) const
 {
   WNDCLASSW wc;
-  if (::GetClassInfoW(nsToolkit::mDllInstance, aClassName.get(), &wc)) {
+  if (::GetClassInfoW(nsToolkit::mDllInstance, aClassName, &wc)) {
     // already registered
-    return;
+    return aClassName;
   }
 
   wc.style         = CS_DBLCLKS | aExtraStyle;
@@ -734,7 +727,7 @@ void nsWindow::RegisterWindowClass(const nsString& aClassName, UINT aExtraStyle,
   wc.hCursor       = nullptr;
   wc.hbrBackground = mBrush;
   wc.lpszMenuName  = nullptr;
-  wc.lpszClassName = aClassName.get();
+  wc.lpszClassName = aClassName;
 
   if (!::RegisterClassW(&wc)) {
     // For older versions of Win32 (i.e., not XP), the registration may
@@ -742,34 +735,31 @@ void nsWindow::RegisterWindowClass(const nsString& aClassName, UINT aExtraStyle,
     wc.style = CS_DBLCLKS;
     ::RegisterClassW(&wc);
   }
+  return aClassName;
 }
 
 static LPWSTR const gStockApplicationIcon = MAKEINTRESOURCEW(32512);
 
 // Return the proper window class for everything except popups.
-void nsWindow::GetWindowClass(nsString& aWindowClass)
+const wchar_t*
+nsWindow::GetWindowClass() const
 {
   switch (mWindowType) {
   case eWindowType_invisible:
-    aWindowClass.AssignLiteral(kClassNameHidden);
-    RegisterWindowClass(aWindowClass, 0, gStockApplicationIcon);
-    break;
+    return RegisterWindowClass(kClassNameHidden, 0, gStockApplicationIcon);
   case eWindowType_dialog:
-    aWindowClass.AssignLiteral(kClassNameDialog);
-    RegisterWindowClass(aWindowClass, 0, 0);
-    break;
+    return RegisterWindowClass(kClassNameDialog, 0, 0);
   default:
-    GetMainWindowClass(aWindowClass);
-    RegisterWindowClass(aWindowClass, 0, gStockApplicationIcon);
-    break;
+    return RegisterWindowClass(GetMainWindowClass(), 0, gStockApplicationIcon);
   }
 }
 
 // Return the proper popup window class
-void nsWindow::GetWindowPopupClass(nsString& aWindowClass)
+const wchar_t*
+nsWindow::GetWindowPopupClass() const
 {
-  aWindowClass.AssignLiteral(kClassNameDropShadow);
-  RegisterWindowClass(aWindowClass, CS_XP_DROPSHADOW, gStockApplicationIcon);
+  return RegisterWindowClass(kClassNameDropShadow,
+                             CS_XP_DROPSHADOW, gStockApplicationIcon);
 }
 
 /**************************************************************
@@ -1396,7 +1386,7 @@ NS_METHOD nsWindow::Move(double aX, double aY)
           ::SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
           // no annoying assertions. just mention the issue.
           if (x < 0 || x >= workArea.right || y < 0 || y >= workArea.bottom) {
-            PR_LOG(gWindowsLog, PR_LOG_ALWAYS,
+            MOZ_LOG(gWindowsLog, LogLevel::Info,
                    ("window moved to offscreen position\n"));
           }
         }
@@ -1522,6 +1512,15 @@ NS_METHOD nsWindow::Resize(double aX, double aY, double aWidth, double aHeight, 
     ClearThemeRegion();
     VERIFY(::SetWindowPos(mWnd, nullptr, x, y,
                           width, GetHeight(height), flags));
+    if (mTransitionWnd) {
+      // If we have a fullscreen transition window, we need to make
+      // it topmost again, otherwise the taskbar may be raised by
+      // the system unexpectedly when we leave fullscreen state.
+      ::SetWindowPos(mTransitionWnd, HWND_TOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+      // Every transition window is only used once.
+      mTransitionWnd = nullptr;
+    }
     SetThemeRegion();
   }
 
@@ -1809,10 +1808,10 @@ NS_METHOD nsWindow::SetFocus(bool aRaise)
   if (mWnd) {
 #ifdef WINSTATE_DEBUG_OUTPUT
     if (mWnd == WinUtils::GetTopLevelHWND(mWnd)) {
-      PR_LOG(gWindowsLog, PR_LOG_ALWAYS,
+      MOZ_LOG(gWindowsLog, LogLevel::Info,
              ("*** SetFocus: [  top] raise=%d\n", aRaise));
     } else {
-      PR_LOG(gWindowsLog, PR_LOG_ALWAYS,
+      MOZ_LOG(gWindowsLog, LogLevel::Info,
              ("*** SetFocus: [child] raise=%d\n", aRaise));
     }
 #endif
@@ -2701,7 +2700,7 @@ void nsWindow::UpdateGlass()
     break;
   }
 
-  PR_LOG(gWindowsLog, PR_LOG_ALWAYS,
+  MOZ_LOG(gWindowsLog, LogLevel::Info,
          ("glass margins: left:%d top:%d right:%d bottom:%d\n",
           margins.cxLeftWidth, margins.cyTopHeight,
           margins.cxRightWidth, margins.cyBottomHeight));
@@ -2832,6 +2831,172 @@ NS_METHOD nsWindow::Invalidate(const nsIntRect & aRect)
   return NS_OK;
 }
 
+static LRESULT CALLBACK
+FullscreenTransitionWindowProc(HWND hWnd, UINT uMsg,
+                               WPARAM wParam, LPARAM lParam)
+{
+  switch (uMsg) {
+    case WM_FULLSCREEN_TRANSITION_BEFORE:
+    case WM_FULLSCREEN_TRANSITION_AFTER: {
+      DWORD duration = (DWORD)lParam;
+      DWORD flags = AW_BLEND;
+      if (uMsg == WM_FULLSCREEN_TRANSITION_AFTER) {
+        flags |= AW_HIDE;
+      }
+      ::AnimateWindow(hWnd, duration, flags);
+      // The message sender should have added ref for us.
+      NS_DispatchToMainThread(
+        already_AddRefed<nsIRunnable>((nsIRunnable*)wParam));
+      break;
+    }
+    case WM_DESTROY:
+      ::PostQuitMessage(0);
+      break;
+    default:
+      return ::DefWindowProcW(hWnd, uMsg, wParam, lParam);
+  }
+  return 0;
+}
+
+struct FullscreenTransitionInitData
+{
+  nsIntRect mBounds;
+  HANDLE mSemaphore;
+  HANDLE mThread;
+  HWND mWnd;
+
+  FullscreenTransitionInitData()
+    : mSemaphore(nullptr)
+    , mThread(nullptr)
+    , mWnd(nullptr) { }
+
+  ~FullscreenTransitionInitData()
+  {
+    if (mSemaphore) {
+      ::CloseHandle(mSemaphore);
+    }
+    if (mThread) {
+      ::CloseHandle(mThread);
+    }
+  }
+};
+
+static DWORD WINAPI
+FullscreenTransitionThreadProc(LPVOID lpParam)
+{
+  // Initialize window class
+  static bool sInitialized = false;
+  if (!sInitialized) {
+    WNDCLASSW wc = {};
+    wc.lpfnWndProc = ::FullscreenTransitionWindowProc;
+    wc.hInstance = nsToolkit::mDllInstance;
+    wc.hbrBackground = ::CreateSolidBrush(RGB(0, 0, 0));
+    wc.lpszClassName = kClassNameTransition;
+    ::RegisterClassW(&wc);
+    sInitialized = true;
+  }
+
+  auto data = static_cast<FullscreenTransitionInitData*>(lpParam);
+  HWND wnd = ::CreateWindowW(
+    kClassNameTransition, L"", 0, 0, 0, 0, 0,
+    nullptr, nullptr, nsToolkit::mDllInstance, nullptr);
+  if (!wnd) {
+    ::ReleaseSemaphore(data->mSemaphore, 1, nullptr);
+    return 0;
+  }
+
+  // Since AnimateWindow blocks the thread of the transition window,
+  // we need to hide the cursor for that window, otherwise the system
+  // would show the busy pointer to the user.
+  ::ShowCursor(false);
+  ::SetWindowLongW(wnd, GWL_STYLE, 0);
+  ::SetWindowLongW(wnd, GWL_EXSTYLE, WS_EX_LAYERED |
+                   WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
+  ::SetWindowPos(wnd, HWND_TOPMOST, data->mBounds.x, data->mBounds.y,
+                 data->mBounds.width, data->mBounds.height, 0);
+  data->mWnd = wnd;
+  ::ReleaseSemaphore(data->mSemaphore, 1, nullptr);
+  // The initialization data may no longer be valid
+  // after we release the semaphore.
+  data = nullptr;
+
+  MSG msg;
+  while (::GetMessageW(&msg, nullptr, 0, 0)) {
+    ::TranslateMessage(&msg);
+    ::DispatchMessage(&msg);
+  }
+  ::ShowCursor(true);
+  ::DestroyWindow(wnd);
+  return 0;
+}
+
+class FullscreenTransitionData final : public nsISupports
+{
+public:
+  NS_DECL_ISUPPORTS
+
+  explicit FullscreenTransitionData(HWND aWnd)
+    : mWnd(aWnd)
+  {
+    MOZ_ASSERT(NS_IsMainThread(), "FullscreenTransitionData "
+               "should be constructed in the main thread");
+  }
+
+  const HWND mWnd;
+
+private:
+  ~FullscreenTransitionData()
+  {
+    MOZ_ASSERT(NS_IsMainThread(), "FullscreenTransitionData "
+               "should be deconstructed in the main thread");
+    ::PostMessageW(mWnd, WM_DESTROY, 0, 0);
+  }
+};
+
+NS_IMPL_ISUPPORTS0(FullscreenTransitionData)
+
+/* virtual */ bool
+nsWindow::PrepareForFullscreenTransition(nsISupports** aData)
+{
+  FullscreenTransitionInitData initData;
+  nsCOMPtr<nsIScreen> screen = GetWidgetScreen();
+  screen->GetRectDisplayPix(&initData.mBounds.x, &initData.mBounds.y,
+                            &initData.mBounds.width, &initData.mBounds.height);
+  // Create a semaphore for synchronizing the window handle which will
+  // be created by the transition thread and used by the main thread for
+  // posting the transition messages.
+  initData.mSemaphore = ::CreateSemaphore(nullptr, 0, 1, nullptr);
+  if (initData.mSemaphore) {
+    initData.mThread = ::CreateThread(
+      nullptr, 0, FullscreenTransitionThreadProc, &initData, 0, nullptr);
+    if (initData.mThread) {
+      ::WaitForSingleObject(initData.mSemaphore, INFINITE);
+    }
+  }
+  if (!initData.mWnd) {
+    return false;
+  }
+
+  mTransitionWnd = initData.mWnd;
+  auto data = new FullscreenTransitionData(initData.mWnd);
+  *aData = data;
+  NS_ADDREF(data);
+  return true;
+}
+
+/* virtual */ void
+nsWindow::PerformFullscreenTransition(FullscreenTransitionStage aStage,
+                                      uint16_t aDuration, nsISupports* aData,
+                                      nsIRunnable* aCallback)
+{
+  auto data = static_cast<FullscreenTransitionData*>(aData);
+  nsCOMPtr<nsIRunnable> callback = aCallback;
+  UINT msg = aStage == eBeforeFullscreenToggle ?
+    WM_FULLSCREEN_TRANSITION_BEFORE : WM_FULLSCREEN_TRANSITION_AFTER;
+  WPARAM wparam = (WPARAM)callback.forget().take();
+  ::PostMessage(data->mWnd, msg, wparam, (LPARAM)aDuration);
+}
+
 NS_IMETHODIMP
 nsWindow::MakeFullScreen(bool aFullScreen, nsIScreen* aTargetScreen)
 {
@@ -2856,27 +3021,19 @@ nsWindow::MakeFullScreen(bool aFullScreen, nsIScreen* aTargetScreen)
     SetSizeMode(mOldSizeMode);
   }
 
-  UpdateNonClientMargins();
-
-  bool visible = mIsVisible;
-  if (mOldSizeMode == nsSizeMode_Normal)
-    Show(false);
+  // If we are going fullscreen, the window size continues to change
+  // and the window will be reflow again then.
+  UpdateNonClientMargins(mSizeMode, /* Reflow */ !aFullScreen);
   
   // Will call hide chrome, reposition window. Note this will
   // also cache dimensions for restoration, so it should only
   // be called once per fullscreen request.
   nsresult rv = nsBaseWidget::MakeFullScreen(aFullScreen, aTargetScreen);
 
-  if (visible) {
-    Show(true);
-    Invalidate();
-
-    if (!aFullScreen && mOldSizeMode == nsSizeMode_Normal) {
-      // Ensure the window exiting fullscreen get activated. Window
-      // activation was bypassed by SetSizeMode, and hiding window for
-      // transition could also blur the current window.
-      DispatchFocusToTopLevelWindow(true);
-    }
+  if (mIsVisible && !aFullScreen && mOldSizeMode == nsSizeMode_Normal) {
+    // Ensure the window exiting fullscreen get activated. Window
+    // activation might be bypassed in SetSizeMode.
+    DispatchFocusToTopLevelWindow(true);
   }
 
   // Notify the taskbar that we have exited full screen mode.
@@ -2906,12 +3063,10 @@ nsWindow::MakeFullScreen(bool aFullScreen, nsIScreen* aTargetScreen)
 // Return some native data according to aDataType
 void* nsWindow::GetNativeData(uint32_t aDataType)
 {
-  nsAutoString className;
   switch (aDataType) {
     case NS_NATIVE_TMP_WINDOW:
-      GetWindowClass(className);
       return (void*)::CreateWindowExW(mIsRTL ? WS_EX_LAYOUTRTL : 0,
-                                      className.get(),
+                                      GetWindowClass(),
                                       L"",
                                       WS_CHILD,
                                       CW_USEDEFAULT,
@@ -2948,6 +3103,29 @@ void* nsWindow::GetNativeData(uint32_t aDataType)
   }
 
   return nullptr;
+}
+
+void
+nsWindow::SetNativeData(uint32_t aDataType, uintptr_t aVal)
+{
+  switch (aDataType) {
+    case NS_NATIVE_CHILD_WINDOW:
+      {
+        HWND childWindow = reinterpret_cast<HWND>(aVal);
+
+        // Make sure the window is styled to be a child window.
+        LONG_PTR style = GetWindowLongPtr(childWindow, GWL_STYLE);
+        style |= WS_CHILD;
+        style &= ~WS_POPUP;
+        SetWindowLongPtr(childWindow, GWL_STYLE, style);
+
+        // Do the reparenting.
+        ::SetParent(childWindow, mWnd);
+        break;
+      }
+    default:
+      NS_ERROR("SetNativeData called with unsupported data type.");
+  }
 }
 
 // Free some native data according to aDataType
@@ -3034,7 +3212,7 @@ NS_METHOD nsWindow::SetIcon(const nsAString& aIconSpec)
 #ifdef DEBUG_SetIcon
   else {
     NS_LossyConvertUTF16toASCII cPath(iconPath);
-    PR_LOG(gWindowsLog, PR_LOG_ALWAYS,
+    MOZ_LOG(gWindowsLog, LogLevel::Info,
            ("\nIcon load error; icon=%s, rc=0x%08X\n\n", 
             cPath.get(), ::GetLastError()));
   }
@@ -3048,7 +3226,7 @@ NS_METHOD nsWindow::SetIcon(const nsAString& aIconSpec)
 #ifdef DEBUG_SetIcon
   else {
     NS_LossyConvertUTF16toASCII cPath(iconPath);
-    PR_LOG(gWindowsLog, PR_LOG_ALWAYS,
+    MOZ_LOG(gWindowsLog, LogLevel::Info,
            ("\nSmall icon load error; icon=%s, rc=0x%08X\n\n", 
             cPath.get(), ::GetLastError()));
   }
@@ -3263,36 +3441,6 @@ nsWindow::HasPendingInputEvent()
  * Get the layer manager associated with this widget.
  *
  **************************************************************/
-
-struct LayerManagerPrefs {
-  LayerManagerPrefs()
-    : mAccelerateByDefault(true)
-    , mDisableAcceleration(false)
-    , mPreferOpenGL(false)
-    , mPreferD3D9(false)
-  {}
-  bool mAccelerateByDefault;
-  bool mDisableAcceleration;
-  bool mForceAcceleration;
-  bool mPreferOpenGL;
-  bool mPreferD3D9;
-};
-
-static void
-GetLayerManagerPrefs(LayerManagerPrefs* aManagerPrefs)
-{
-  aManagerPrefs->mDisableAcceleration = gfxPrefs::LayersAccelerationDisabled();
-  aManagerPrefs->mForceAcceleration = gfxPrefs::LayersAccelerationForceEnabled();
-  aManagerPrefs->mPreferOpenGL = gfxPrefs::LayersPreferOpenGL();
-  aManagerPrefs->mPreferD3D9 = gfxPrefs::LayersPreferD3D9();
-
-  const char *acceleratedEnv = PR_GetEnv("MOZ_ACCELERATED");
-  aManagerPrefs->mAccelerateByDefault =
-    aManagerPrefs->mAccelerateByDefault ||
-    (acceleratedEnv && (*acceleratedEnv != '0'));
-  aManagerPrefs->mDisableAcceleration =
-    aManagerPrefs->mDisableAcceleration || gfxPlatform::InSafeMode();
-}
 
 LayerManager*
 nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
@@ -3562,10 +3710,7 @@ nsWindow::UpdateThemeGeometries(const nsTArray<ThemeGeometry>& aThemeGeometries)
 uint32_t
 nsWindow::GetMaxTouchPoints() const
 {
-  if (IsWin7OrLater() && IsTouchDeviceSupportPresent()) {
-    return GetSystemMetrics(SM_MAXIMUMTOUCHES);
-  }
-  return 0;
+  return WinUtils::GetMaxTouchPoints();
 }
 
 /**************************************************************
@@ -3905,7 +4050,7 @@ bool nsWindow::DispatchMouseEvent(uint32_t aEventType, WPARAM wParam,
   event.clickCount = sLastClickCount;
 
 #ifdef NS_DEBUG_XX
-  PR_LOG(gWindowsLog, PR_LOG_ALWAYS,
+  MOZ_LOG(gWindowsLog, LogLevel::Info,
          ("Msg Time: %d Click Count: %d\n", curMsgTime, event.clickCount));
 #endif
 
@@ -5925,30 +6070,30 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp)
 
 #ifdef WINSTATE_DEBUG_OUTPUT
   if (mWnd == WinUtils::GetTopLevelHWND(mWnd)) {
-    PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("*** OnWindowPosChanged: [  top] "));
+    MOZ_LOG(gWindowsLog, LogLevel::Info, ("*** OnWindowPosChanged: [  top] "));
   } else {
-    PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("*** OnWindowPosChanged: [child] "));
+    MOZ_LOG(gWindowsLog, LogLevel::Info, ("*** OnWindowPosChanged: [child] "));
   }
-  PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("WINDOWPOS flags:"));
+  MOZ_LOG(gWindowsLog, LogLevel::Info, ("WINDOWPOS flags:"));
   if (wp->flags & SWP_FRAMECHANGED) {
-    PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("SWP_FRAMECHANGED "));
+    MOZ_LOG(gWindowsLog, LogLevel::Info, ("SWP_FRAMECHANGED "));
   }
   if (wp->flags & SWP_SHOWWINDOW) {
-    PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("SWP_SHOWWINDOW "));
+    MOZ_LOG(gWindowsLog, LogLevel::Info, ("SWP_SHOWWINDOW "));
   }
   if (wp->flags & SWP_NOSIZE) {
-    PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("SWP_NOSIZE "));
+    MOZ_LOG(gWindowsLog, LogLevel::Info, ("SWP_NOSIZE "));
   }
   if (wp->flags & SWP_HIDEWINDOW) {
-    PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("SWP_HIDEWINDOW "));
+    MOZ_LOG(gWindowsLog, LogLevel::Info, ("SWP_HIDEWINDOW "));
   }
   if (wp->flags & SWP_NOZORDER) {
-    PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("SWP_NOZORDER "));
+    MOZ_LOG(gWindowsLog, LogLevel::Info, ("SWP_NOZORDER "));
   }
   if (wp->flags & SWP_NOACTIVATE) {
-    PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("SWP_NOACTIVATE "));
+    MOZ_LOG(gWindowsLog, LogLevel::Info, ("SWP_NOACTIVATE "));
   }
-  PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("\n"));
+  MOZ_LOG(gWindowsLog, LogLevel::Info, ("\n"));
 #endif
 
   // Handle window size mode changes
@@ -5992,19 +6137,19 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp)
 #ifdef WINSTATE_DEBUG_OUTPUT
     switch (mSizeMode) {
       case nsSizeMode_Normal:
-          PR_LOG(gWindowsLog, PR_LOG_ALWAYS, 
+          MOZ_LOG(gWindowsLog, LogLevel::Info, 
                  ("*** mSizeMode: nsSizeMode_Normal\n"));
         break;
       case nsSizeMode_Minimized:
-        PR_LOG(gWindowsLog, PR_LOG_ALWAYS, 
+        MOZ_LOG(gWindowsLog, LogLevel::Info, 
                ("*** mSizeMode: nsSizeMode_Minimized\n"));
         break;
       case nsSizeMode_Maximized:
-          PR_LOG(gWindowsLog, PR_LOG_ALWAYS, 
+          MOZ_LOG(gWindowsLog, LogLevel::Info, 
                  ("*** mSizeMode: nsSizeMode_Maximized\n"));
         break;
       default:
-          PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("*** mSizeMode: ??????\n"));
+          MOZ_LOG(gWindowsLog, LogLevel::Info, ("*** mSizeMode: ??????\n"));
         break;
     };
 #endif
@@ -6088,7 +6233,7 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp)
     mLastSize.height = newHeight;
 
 #ifdef WINSTATE_DEBUG_OUTPUT
-    PR_LOG(gWindowsLog, PR_LOG_ALWAYS, 
+    MOZ_LOG(gWindowsLog, LogLevel::Info, 
            ("*** Resize window: %d x %d x %d x %d\n", wp->x, wp->y, 
             newWidth, newHeight));
 #endif
@@ -6398,7 +6543,7 @@ nsWindow::ConfigureChildren(const nsTArray<Configuration>& aConfigurations)
   // need.
   for (uint32_t i = 0; i < aConfigurations.Length(); ++i) {
     const Configuration& configuration = aConfigurations[i];
-    nsWindow* w = static_cast<nsWindow*>(configuration.mChild);
+    nsWindow* w = static_cast<nsWindow*>(configuration.mChild.get());
     NS_ASSERTION(w->GetParent() == this,
                  "Configured widget is not a child");
     nsresult rv = w->SetWindowClipRegion(configuration.mClipRegion, true);
@@ -6642,35 +6787,6 @@ nsWindow::ShouldUseOffMainThreadCompositing()
 }
 
 void
-nsWindow::GetPreferredCompositorBackends(nsTArray<LayersBackend>& aHints)
-{
-  LayerManagerPrefs prefs;
-  GetLayerManagerPrefs(&prefs);
-
-  // We don't currently support using an accelerated layer manager with
-  // transparent windows so don't even try. I'm also not sure if we even
-  // want to support this case. See bug 593471
-  if (!(prefs.mDisableAcceleration ||
-        mTransparencyMode == eTransparencyTransparent ||
-        (IsPopup() && gfxWindowsPlatform::GetPlatform()->IsWARP()))) {
-    // See bug 1150376, D3D11 composition can cause issues on some devices
-    // on windows 7 where presentation fails randomly for windows with drop
-    // shadows.
-    if (prefs.mPreferOpenGL) {
-      aHints.AppendElement(LayersBackend::LAYERS_OPENGL);
-    }
-
-    if (!prefs.mPreferD3D9) {
-      aHints.AppendElement(LayersBackend::LAYERS_D3D11);
-    } else {
-      // We don't want D3D9 except when explicitly preffed on
-      aHints.AppendElement(LayersBackend::LAYERS_D3D9);
-    }
-  }
-  aHints.AppendElement(LayersBackend::LAYERS_BASIC);
-}
-
-void
 nsWindow::WindowUsesOMTC()
 {
   ULONG_PTR style = ::GetClassLongPtr(mWnd, GCL_STYLE);
@@ -6694,14 +6810,15 @@ nsWindow::HasBogusPopupsDropShadowOnMultiMonitor() {
         gfxWindowsPlatform::RENDER_DIRECT2D ? TRI_TRUE : TRI_FALSE;
     if (!sHasBogusPopupsDropShadowOnMultiMonitor) {
       // Otherwise check if Direct3D 9 may be used.
-      LayerManagerPrefs prefs;
-      GetLayerManagerPrefs(&prefs);
-      if (!prefs.mDisableAcceleration && !prefs.mPreferOpenGL) {
-        nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+      if (gfxPlatform::GetPlatform()->ShouldUseLayersAcceleration() &&
+          !gfxPrefs::LayersPreferOpenGL())
+      {
+        nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
         if (gfxInfo) {
           int32_t status;
           if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_9_LAYERS, &status))) {
-            if (status == nsIGfxInfo::FEATURE_STATUS_OK || prefs.mForceAcceleration)
+            if (status == nsIGfxInfo::FEATURE_STATUS_OK ||
+                gfxPrefs::LayersAccelerationForceEnabled())
             {
               sHasBogusPopupsDropShadowOnMultiMonitor = TRI_TRUE;
             }
@@ -6777,7 +6894,7 @@ NS_IMETHODIMP
 nsWindow::GetToggledKeyState(uint32_t aKeyCode, bool* aLEDState)
 {
 #ifdef DEBUG_KBSTATE
-  PR_LOG(gWindowsLog, PR_LOG_ALWAYS, ("GetToggledKeyState\n"));
+  MOZ_LOG(gWindowsLog, LogLevel::Info, ("GetToggledKeyState\n"));
 #endif 
   NS_ENSURE_ARG_POINTER(aLEDState);
   *aLEDState = (::GetKeyState(aKeyCode) & 1) != 0;
@@ -7017,13 +7134,13 @@ LRESULT CALLBACK nsWindow::MozSpecialMsgFilter(int code, WPARAM wParam, LPARAM l
     if (code != gLastMsgCode) {
       if (gMSGFEvents[inx].mId == code) {
 #ifdef DEBUG
-        PR_LOG(gWindowsLog, PR_LOG_ALWAYS, 
+        MOZ_LOG(gWindowsLog, LogLevel::Info, 
                ("MozSpecialMessageProc - code: 0x%X  - %s  hw: %p\n", 
                 code, gMSGFEvents[inx].mStr, pMsg->hwnd));
 #endif
       } else {
 #ifdef DEBUG
-        PR_LOG(gWindowsLog, PR_LOG_ALWAYS, 
+        MOZ_LOG(gWindowsLog, LogLevel::Info, 
                ("MozSpecialMessageProc - code: 0x%X  - %d  hw: %p\n", 
                 code, gMSGFEvents[inx].mId, pMsg->hwnd));
 #endif
@@ -7109,7 +7226,7 @@ void nsWindow::RegisterSpecialDropdownHooks()
                                       nullptr, GetCurrentThreadId());
 #ifdef POPUP_ROLLUP_DEBUG_OUTPUT
     if (!sMsgFilterHook) {
-      PR_LOG(gWindowsLog, PR_LOG_ALWAYS, 
+      MOZ_LOG(gWindowsLog, LogLevel::Info, 
              ("***** SetWindowsHookEx is NOT installed for WH_MSGFILTER!\n"));
     }
 #endif
@@ -7122,7 +7239,7 @@ void nsWindow::RegisterSpecialDropdownHooks()
                                       nullptr, GetCurrentThreadId());
 #ifdef POPUP_ROLLUP_DEBUG_OUTPUT
     if (!sCallProcHook) {
-      PR_LOG(gWindowsLog, PR_LOG_ALWAYS, 
+      MOZ_LOG(gWindowsLog, LogLevel::Info, 
              ("***** SetWindowsHookEx is NOT installed for WH_CALLWNDPROC!\n"));
     }
 #endif
@@ -7135,7 +7252,7 @@ void nsWindow::RegisterSpecialDropdownHooks()
                                        nullptr, GetCurrentThreadId());
 #ifdef POPUP_ROLLUP_DEBUG_OUTPUT
     if (!sCallMouseHook) {
-      PR_LOG(gWindowsLog, PR_LOG_ALWAYS, 
+      MOZ_LOG(gWindowsLog, LogLevel::Info, 
              ("***** SetWindowsHookEx is NOT installed for WH_MOUSE!\n"));
     }
 #endif
@@ -7559,13 +7676,20 @@ bool nsWindow::CanTakeFocus()
   return false;
 }
 
-void nsWindow::GetMainWindowClass(nsAString& aClass)
+/* static */ const wchar_t*
+nsWindow::GetMainWindowClass()
 {
-  NS_PRECONDITION(aClass.IsEmpty(), "aClass should be empty string");
-  nsresult rv = Preferences::GetString("ui.window_class_override", &aClass);
-  if (NS_FAILED(rv) || aClass.IsEmpty()) {
-    aClass.AssignASCII(sDefaultMainWindowClass);
+  static const wchar_t* sMainWindowClass = nullptr;
+  if (!sMainWindowClass) {
+    nsAdoptingString className =
+      Preferences::GetString("ui.window_class_override");
+    if (!className.IsEmpty()) {
+      sMainWindowClass = wcsdup(className.get());
+    } else {
+      sMainWindowClass = kClassNameGeneral;
+    }
   }
+  return sMainWindowClass;
 }
 
 LPARAM nsWindow::lParamToScreen(LPARAM lParam)
@@ -7602,6 +7726,47 @@ void nsWindow::PickerClosed()
   }
 }
 
+bool nsWindow::CaptureWidgetOnScreen(RefPtr<DrawTarget> aDT)
+{
+  BOOL dwmEnabled = false;
+  if (WinUtils::dwmIsCompositionEnabledPtr &&
+      WinUtils::dwmFlushProcPtr &&
+      WinUtils::dwmIsCompositionEnabledPtr(&dwmEnabled) &&
+      dwmEnabled)
+  {
+    WinUtils::dwmFlushProcPtr();
+  }
+
+  HDC dc = ::GetDC(mWnd);
+  uint32_t flags = (mTransparencyMode == eTransparencyOpaque)
+                   ? 0
+                   : gfxWindowsSurface::FLAG_IS_TRANSPARENT;
+
+  nsRefPtr<gfxASurface> surf = new gfxWindowsSurface(dc, flags);
+  IntSize size(surf->GetSize().width, surf->GetSize().height);
+  if (size.width < 0 || size.height < 0) {
+    ::ReleaseDC(mWnd, dc);
+    return false;
+  }
+
+  RefPtr<DrawTarget> source = Factory::CreateDrawTargetForCairoSurface(surf->CairoSurface(), size);
+  if (!source) {
+    ::ReleaseDC(mWnd, dc);
+    return false;
+  }
+  RefPtr<SourceSurface> snapshot = source->Snapshot();
+  if (!snapshot) {
+    ::ReleaseDC(mWnd, dc);
+    return false;
+  }
+
+  aDT->DrawSurface(snapshot,
+                   Rect(0, 0, size.width, size.height),
+                   Rect(0, 0, size.width, size.height));
+  ::ReleaseDC(mWnd, dc);
+  return true;
+}
+
 bool nsWindow::PreRender(LayerManagerComposite*)
 {
   // This can block waiting for WM_SETTEXT to finish
@@ -7615,6 +7780,24 @@ bool nsWindow::PreRender(LayerManagerComposite*)
 void nsWindow::PostRender(LayerManagerComposite*)
 {
   LeaveCriticalSection(&mPresentLock);
+}
+
+bool
+nsWindow::ComputeShouldAccelerate()
+{
+  // We don't currently support using an accelerated layer manager with
+  // transparent windows so don't even try. I'm also not sure if we even
+  // want to support this case. See bug 593471.
+  //
+  // Also see bug 1150376, D3D11 composition can cause issues on some devices
+  // on Windows 7 where presentation fails randomly for windows with drop
+  // shadows.
+  if (mTransparencyMode == eTransparencyTransparent ||
+      (IsPopup() && gfxWindowsPlatform::GetPlatform()->IsWARP()))
+  {
+    return false;
+  }
+  return nsBaseWidget::ComputeShouldAccelerate();
 }
 
 /**************************************************************

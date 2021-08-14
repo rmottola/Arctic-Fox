@@ -5,14 +5,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const {Cc, Ci, Cu, Cr} = require("chrome");
-const { PerformanceFront } = require("devtools/performance/front");
-
-Cu.import("resource://gre/modules/Task.jsm");
+const { Cc, Ci, Cu, Cr } = require("chrome");
+const { Task } = require("resource://gre/modules/Task.jsm");
 
 loader.lazyRequireGetter(this, "promise");
 loader.lazyRequireGetter(this, "EventEmitter",
   "devtools/toolkit/event-emitter");
+loader.lazyRequireGetter(this, "PerformanceFront",
+  "devtools/performance/front", true);
 
 function PerformancePanel(iframeWindow, toolbox) {
   this.panelWin = iframeWindow;
@@ -56,7 +56,9 @@ PerformancePanel.prototype = {
 
   // DevToolPanel API
 
-  get target() this._toolbox.target,
+  get target() {
+    return this._toolbox.target;
+  },
 
   destroy: Task.async(function*() {
     // Make sure this panel is not already destroyed.

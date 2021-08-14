@@ -33,7 +33,7 @@ BufferDecoder::~BufferDecoder()
 }
 
 void
-BufferDecoder::BeginDecoding(MediaTaskQueue* aTaskQueueIdentity)
+BufferDecoder::BeginDecoding(TaskQueue* aTaskQueueIdentity)
 {
   MOZ_ASSERT(!mTaskQueueIdentity && aTaskQueueIdentity);
   mTaskQueueIdentity = aTaskQueueIdentity;
@@ -81,19 +81,6 @@ BufferDecoder::NotifyBytesConsumed(int64_t aBytes, int64_t aOffset)
 void
 BufferDecoder::NotifyDecodedFrames(uint32_t aParsed, uint32_t aDecoded,
                                    uint32_t aDropped)
-{
-  // ignore
-}
-
-int64_t
-BufferDecoder::GetMediaDuration()
-{
-  // unknown
-  return -1;
-}
-
-void
-BufferDecoder::UpdateEstimatedMediaDuration(int64_t aDuration)
 {
   // ignore
 }
@@ -162,12 +149,6 @@ BufferDecoder::OnReadMetadataCompleted()
 
 void
 BufferDecoder::NotifyWaitingForResourcesStatusChanged()
-{
-  // ignore
-}
-
-void
-BufferDecoder::NotifyDataArrived(const char* aBuffer, uint32_t aLength, int64_t aOffset)
 {
   // ignore
 }

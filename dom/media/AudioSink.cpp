@@ -12,42 +12,9 @@ namespace mozilla {
 
 extern PRLogModuleInfo* gMediaDecoderLog;
 #define SINK_LOG(msg, ...) \
-  PR_LOG(gMediaDecoderLog, PR_LOG_DEBUG, ("AudioSink=%p " msg, this, ##__VA_ARGS__))
+  MOZ_LOG(gMediaDecoderLog, LogLevel::Debug, ("AudioSink=%p " msg, this, ##__VA_ARGS__))
 #define SINK_LOG_V(msg, ...) \
-  PR_LOG(gMediaDecoderLog, PR_LOG_DEBUG+1, ("AudioSink=%p " msg, this, ##__VA_ARGS__))
-
-AudioSink::OnAudioEndTimeUpdateTask::OnAudioEndTimeUpdateTask(
-                                     MediaDecoderStateMachine* aStateMachine)
-  : mMutex("OnAudioEndTimeUpdateTask")
-  , mEndTime(0)
-  , mStateMachine(aStateMachine)
-{
-}
-
-NS_IMETHODIMP
-AudioSink::OnAudioEndTimeUpdateTask::Run() {
-  MutexAutoLock lock(mMutex);
-  if (mStateMachine) {
-    mStateMachine->OnAudioEndTimeUpdate(mEndTime);
-  }
-  return NS_OK;
-}
-
-void
-AudioSink::OnAudioEndTimeUpdateTask::Dispatch(int64_t aEndTime) {
-  MutexAutoLock lock(mMutex);
-  if (mStateMachine) {
-    mEndTime = aEndTime;
-    nsRefPtr<AudioSink::OnAudioEndTimeUpdateTask> runnable(this);
-    mStateMachine->TaskQueue()->Dispatch(runnable.forget());
-  }
-}
-
-void
-AudioSink::OnAudioEndTimeUpdateTask::Cancel() {
-  MutexAutoLock lock(mMutex);
-  mStateMachine = nullptr;
-}
+  MOZ_LOG(gMediaDecoderLog, LogLevel::Verbose, ("AudioSink=%p " msg, this, ##__VA_ARGS__))
 
 // The amount of audio frames that is used to fuzz rounding errors.
 static const int64_t AUDIO_FUZZ_FRAMES = 1;
@@ -69,8 +36,6 @@ AudioSink::AudioSink(MediaDecoderStateMachine* aStateMachine,
   , mSetPreservesPitch(false)
   , mPlaying(true)
 {
-  NS_ASSERTION(mStartTime != -1, "Should have audio start time by now");
-  mOnAudioEndTimeUpdateTask = new OnAudioEndTimeUpdateTask(aStateMachine);
 }
 
 nsresult
@@ -107,7 +72,7 @@ AudioSink::GetPosition()
     mLastGoodPosition = pos;
   }
 
-  return mLastGoodPosition;
+  return mStartTime + mLastGoodPosition;
 }
 
 bool
@@ -133,7 +98,6 @@ AudioSink::PrepareToShutdown()
 void
 AudioSink::Shutdown()
 {
-  mOnAudioEndTimeUpdateTask->Cancel();
   mThread->Shutdown();
   mThread = nullptr;
   MOZ_ASSERT(!mAudioStream);
@@ -165,18 +129,10 @@ AudioSink::SetPreservesPitch(bool aPreservesPitch)
 }
 
 void
-AudioSink::StartPlayback()
+AudioSink::SetPlaying(bool aPlaying)
 {
   AssertCurrentThreadInMonitor();
-  mPlaying = true;
-  GetReentrantMonitor().NotifyAll();
-}
-
-void
-AudioSink::StopPlayback()
-{
-  AssertCurrentThreadInMonitor();
-  mPlaying = false;
+  mPlaying = aPlaying;
   GetReentrantMonitor().NotifyAll();
 }
 
@@ -226,10 +182,6 @@ AudioSink::AudioLoop()
       mWritten += PlaySilence(static_cast<uint32_t>(missingFrames.value()));
     } else {
       mWritten += PlayFromAudioQueue();
-    }
-    int64_t endTime = GetEndTime();
-    if (endTime != -1) {
-      mOnAudioEndTimeUpdateTask->Dispatch(endTime);
     }
   }
   ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
@@ -435,7 +387,7 @@ AudioSink::WriteSilence(uint32_t aFrames)
 }
 
 int64_t
-AudioSink::GetEndTime()
+AudioSink::GetEndTime() const
 {
   CheckedInt64 playedUsecs = FramesToUsecs(mWritten, mInfo.mRate) + mStartTime;
   if (!playedUsecs.isValid()) {

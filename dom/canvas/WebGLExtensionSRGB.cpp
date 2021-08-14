@@ -34,10 +34,11 @@ WebGLExtensionSRGB::IsSupported(const WebGLContext* webgl)
 {
     gl::GLContext* gl = webgl->GL();
 
-    return gl->IsSupported(gl::GLFeature::sRGB);
+    return gl->IsSupported(gl::GLFeature::sRGB_framebuffer) &&
+           gl->IsSupported(gl::GLFeature::sRGB_texture);
 }
 
 
-IMPL_WEBGL_EXTENSION_GOOP(WebGLExtensionSRGB)
+IMPL_WEBGL_EXTENSION_GOOP(WebGLExtensionSRGB, EXT_sRGB)
 
 } // namespace mozilla

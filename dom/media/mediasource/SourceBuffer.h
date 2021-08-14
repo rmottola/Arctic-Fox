@@ -7,7 +7,7 @@
 #ifndef mozilla_dom_SourceBuffer_h_
 #define mozilla_dom_SourceBuffer_h_
 
-#include "MediaPromise.h"
+#include "mozilla/MozPromise.h"
 #include "MediaSource.h"
 #include "js/RootingAPI.h"
 #include "mozilla/Assertions.h"
@@ -33,7 +33,7 @@ struct JSContext;
 namespace mozilla {
 
 class ErrorResult;
-class MediaLargeByteBuffer;
+class MediaByteBuffer;
 template <typename T> class AsyncEventRunner;
 class TrackBuffersManager;
 
@@ -151,6 +151,7 @@ public:
   }
 
   already_AddRefed<TimeRanges> GetBuffered(ErrorResult& aRv);
+  TimeIntervals GetTimeIntervals();
 
   double TimestampOffset() const
   {
@@ -255,11 +256,11 @@ private:
   // http://w3c.github.io/media-source/#sourcebuffer-append-error
   void AppendError(bool aDecoderError);
 
-  // Implements the "Prepare Append Algorithm". Returns MediaLargeByteBuffer object
+  // Implements the "Prepare Append Algorithm". Returns MediaByteBuffer object
   // on success or nullptr (with aRv set) on error.
-  already_AddRefed<MediaLargeByteBuffer> PrepareAppend(const uint8_t* aData,
-                                                       uint32_t aLength,
-                                                       ErrorResult& aRv);
+  already_AddRefed<MediaByteBuffer> PrepareAppend(const uint8_t* aData,
+                                                  uint32_t aLength,
+                                                  ErrorResult& aRv);
 
   void AppendDataCompletedWithSuccess(bool aHasActiveTracks);
   void AppendDataErrored(nsresult aError);
@@ -278,7 +279,7 @@ private:
 
   int64_t mReportedOffset;
 
-  MediaPromiseRequestHolder<SourceBufferContentManager::AppendPromise> mPendingAppend;
+  MozPromiseRequestHolder<SourceBufferContentManager::AppendPromise> mPendingAppend;
   const nsCString mType;
 };
 

@@ -1210,6 +1210,44 @@ StackBaseShape::match(UnownedBaseShape *key, const Lookup& lookup)
     return key->flags == lookup.flags && key->clasp_ == lookup.clasp;
 }
 
+inline
+BaseShape::BaseShape(const StackBaseShape& base)
+  : clasp_(base.clasp),
+    compartment_(base.compartment),
+    flags(base.flags),
+    slotSpan_(0),
+    unowned_(nullptr),
+    table_(nullptr)
+{
+}
+
+/* static */ void
+BaseShape::copyFromUnowned(BaseShape& dest, UnownedBaseShape& src)
+{
+    dest.clasp_ = src.clasp_;
+    dest.slotSpan_ = src.slotSpan_;
+    dest.compartment_ = src.compartment_;
+    dest.unowned_ = &src;
+    dest.flags = src.flags | OWNED_SHAPE;
+}
+
+inline void
+BaseShape::adoptUnowned(UnownedBaseShape* other)
+{
+    // This is a base shape owned by a dictionary object, update it to reflect the
+    // unowned base shape of a new last property.
+    MOZ_ASSERT(isOwned());
+
+    uint32_t span = slotSpan();
+    ShapeTable* table = &this->table();
+
+    BaseShape::copyFromUnowned(*this, *other);
+    setTable(table);
+    setSlotSpan(span);
+
+    assertConsistency();
+}
+
 /* static */ UnownedBaseShape*
 BaseShape::getUnowned(ExclusiveContext* cx, StackBaseShape& base)
 {
@@ -1525,6 +1563,10 @@ EmptyShape::insertInitialShape(ExclusiveContext *cx, HandleShape shape, HandleOb
     MOZ_ASSERT(p);
 
     InitialShapeEntry& entry = const_cast<InitialShapeEntry&>(*p);
+
+    // The metadata callback can end up causing redundant changes of the initial shape.
+    if (entry.shape == shape)
+        return;
 
     /* The new shape had better be rooted at the old one. */
 #ifdef DEBUG

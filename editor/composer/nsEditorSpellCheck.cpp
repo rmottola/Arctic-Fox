@@ -320,7 +320,7 @@ private:
   nsCOMPtr<nsIEditorSpellCheckCallback> mCallback;
 };
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::InitSpellChecker(nsIEditor* aEditor, bool aEnableSelectionChecking, nsIEditorSpellCheckCallback* aCallback)
 {
   NS_ENSURE_TRUE(aEditor, NS_ERROR_NULL_POINTER);
@@ -407,13 +407,13 @@ nsEditorSpellCheck::InitSpellChecker(nsIEditor* aEditor, bool aEnableSelectionCh
   return NS_OK;
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::GetNextMisspelledWord(char16_t **aNextMisspelledWord)
 {
   NS_ENSURE_TRUE(mSpellChecker, NS_ERROR_NOT_INITIALIZED);
 
   nsAutoString nextMisspelledWord;
-  
+
   DeleteSuggestedWordList();
   // Beware! This may flush notifications via synchronous
   // ScrollSelectionIntoView.
@@ -424,7 +424,7 @@ nsEditorSpellCheck::GetNextMisspelledWord(char16_t **aNextMisspelledWord)
   return rv;
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::GetSuggestedWord(char16_t **aSuggestedWord)
 {
   nsAutoString word;
@@ -439,7 +439,7 @@ nsEditorSpellCheck::GetSuggestedWord(char16_t **aSuggestedWord)
   return NS_OK;
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::CheckCurrentWord(const char16_t *aSuggestedWord,
                                      bool *aIsMisspelled)
 {
@@ -450,7 +450,7 @@ nsEditorSpellCheck::CheckCurrentWord(const char16_t *aSuggestedWord,
                                   aIsMisspelled, &mSuggestedWordList);
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::CheckCurrentWordNoSuggest(const char16_t *aSuggestedWord,
                                               bool *aIsMisspelled)
 {
@@ -460,7 +460,7 @@ nsEditorSpellCheck::CheckCurrentWordNoSuggest(const char16_t *aSuggestedWord,
                                   aIsMisspelled, nullptr);
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::ReplaceWord(const char16_t *aMisspelledWord,
                                 const char16_t *aReplaceWord,
                                 bool             allOccurrences)
@@ -471,7 +471,7 @@ nsEditorSpellCheck::ReplaceWord(const char16_t *aMisspelledWord,
                                 nsDependentString(aReplaceWord), allOccurrences);
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::IgnoreWordAllOccurrences(const char16_t *aWord)
 {
   NS_ENSURE_TRUE(mSpellChecker, NS_ERROR_NOT_INITIALIZED);
@@ -479,7 +479,7 @@ nsEditorSpellCheck::IgnoreWordAllOccurrences(const char16_t *aWord)
   return mSpellChecker->IgnoreAll(nsDependentString(aWord));
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::GetPersonalDictionary()
 {
   NS_ENSURE_TRUE(mSpellChecker, NS_ERROR_NOT_INITIALIZED);
@@ -490,7 +490,7 @@ nsEditorSpellCheck::GetPersonalDictionary()
   return mSpellChecker->GetPersonalDictionary(&mDictionaryList);
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::GetPersonalDictionaryWord(char16_t **aDictionaryWord)
 {
   if ( mDictionaryIndex < int32_t( mDictionaryList.Length()))
@@ -505,7 +505,7 @@ nsEditorSpellCheck::GetPersonalDictionaryWord(char16_t **aDictionaryWord)
   return NS_OK;
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::AddWordToDictionary(const char16_t *aWord)
 {
   NS_ENSURE_TRUE(mSpellChecker, NS_ERROR_NOT_INITIALIZED);
@@ -513,7 +513,7 @@ nsEditorSpellCheck::AddWordToDictionary(const char16_t *aWord)
   return mSpellChecker->AddWordToPersonalDictionary(nsDependentString(aWord));
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::RemoveWordFromDictionary(const char16_t *aWord)
 {
   NS_ENSURE_TRUE(mSpellChecker, NS_ERROR_NOT_INITIALIZED);
@@ -521,7 +521,7 @@ nsEditorSpellCheck::RemoveWordFromDictionary(const char16_t *aWord)
   return mSpellChecker->RemoveWordFromPersonalDictionary(nsDependentString(aWord));
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::GetDictionaryList(char16_t ***aDictionaryList, uint32_t *aCount)
 {
   NS_ENSURE_TRUE(mSpellChecker, NS_ERROR_NOT_INITIALIZED);
@@ -572,7 +572,7 @@ nsEditorSpellCheck::GetDictionaryList(char16_t ***aDictionaryList, uint32_t *aCo
   return rv;
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::GetCurrentDictionary(nsAString& aDictionary)
 {
   NS_ENSURE_TRUE(mSpellChecker, NS_ERROR_NOT_INITIALIZED);
@@ -580,7 +580,7 @@ nsEditorSpellCheck::GetCurrentDictionary(nsAString& aDictionary)
   return mSpellChecker->GetCurrentDictionary(aDictionary);
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::SetCurrentDictionary(const nsAString& aDictionary)
 {
   NS_ENSURE_TRUE(mSpellChecker, NS_ERROR_NOT_INITIALIZED);
@@ -638,7 +638,7 @@ nsEditorSpellCheck::CheckCurrentDictionary()
   return NS_OK;
 }
 
-NS_IMETHODIMP    
+NS_IMETHODIMP
 nsEditorSpellCheck::UninitSpellChecker()
 {
   NS_ENSURE_TRUE(mSpellChecker, NS_ERROR_NOT_INITIALIZED);
@@ -653,14 +653,14 @@ nsEditorSpellCheck::UninitSpellChecker()
 
 
 /* void setFilter (in nsITextServicesFilter filter); */
-NS_IMETHODIMP 
+NS_IMETHODIMP
 nsEditorSpellCheck::SetFilter(nsITextServicesFilter *filter)
 {
   mTxtSrvFilter = filter;
   return NS_OK;
 }
 
-nsresult    
+nsresult
 nsEditorSpellCheck::DeleteSuggestedWordList()
 {
   mSuggestedWordList.Clear();

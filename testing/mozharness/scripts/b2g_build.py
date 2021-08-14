@@ -47,12 +47,12 @@ class B2GBuild(LocalesMixin, PurgeMixin,
         'clobber',
         'checkout-sources',
         # Deprecated
-        'checkout-goanna',
+        'checkout-gecko',
         'download-gonk',
         'unpack-gonk',
         'checkout-gaia',
         'checkout-gaia-l10n',
-        'checkout-goanna-l10n',
+        'checkout-gecko-l10n',
         'checkout-compare-locales',
         # End deprecated
         'get-blobs',
@@ -79,13 +79,13 @@ class B2GBuild(LocalesMixin, PurgeMixin,
             "dest": "gaia_languages_file",
             "help": "languages file for gaia multilocale profile",
         }],
-        [["--goanna-languages-file"], {
+        [["--gecko-languages-file"], {
             "dest": "locales_file",
-            "help": "languages file for goanna multilocale",
+            "help": "languages file for gecko multilocale",
         }],
-        [["--goanna-l10n-base-dir"], {
+        [["--gecko-l10n-base-dir"], {
             "dest": "l10n_dir",
-            "help": "dir to clone goanna l10n repos into, relative to the work directory",
+            "help": "dir to clone gecko l10n repos into, relative to the work directory",
         }],
         [["--merge-locales"], {
             "dest": "merge_locales",
@@ -123,12 +123,12 @@ class B2GBuild(LocalesMixin, PurgeMixin,
         default_config = {
             'default_vcs': 'hgtool',
             'ccache': True,
-            'locales_dir': 'goanna/b2g/locales',
-            'l10n_dir': 'goanna-l10n',
+            'locales_dir': 'gecko/b2g/locales',
+            'l10n_dir': 'gecko-l10n',
             'ignore_locales': ['en-US', 'multi'],
-            'locales_file': 'goanna/b2g/locales/all-locales',
-            'mozilla_dir': 'build/goanna',
-            'objdir': 'build/objdir-goanna',
+            'locales_file': 'gecko/b2g/locales/all-locales',
+            'mozilla_dir': 'build/gecko',
+            'objdir': 'build/objdir-gecko',
             'merge_locales': True,
             'compare_locales_repo': 'https://hg.mozilla.org/build/compare-locales',
             'compare_locales_rev': 'RELEASE_AUTOMATION',
@@ -157,14 +157,14 @@ class B2GBuild(LocalesMixin, PurgeMixin,
         )
 
         dirs = self.query_abs_dirs()
-        self.objdir = os.path.join(dirs['work_dir'], 'objdir-goanna')
+        self.objdir = os.path.join(dirs['work_dir'], 'objdir-gecko')
         self.abs_dirs['abs_obj_dir'] = self.objdir
         if self.config.get("update_type", "ota") == "fota":
-            self.make_updates_cmd = ['./build.sh', 'goanna-update-fota']
+            self.make_updates_cmd = ['./build.sh', 'gecko-update-fota']
             self.extra_update_attrs = 'isOsUpdate="true"'
             self.isOSUpdate = True
         else:
-            self.make_updates_cmd = ['./build.sh', 'goanna-update-full']
+            self.make_updates_cmd = ['./build.sh', 'gecko-update-full']
             self.extra_update_attrs = None
             self.isOSUpdate = False
         self.package_urls = {}
@@ -339,7 +339,7 @@ class B2GBuild(LocalesMixin, PurgeMixin,
 
     def checkout_sources(self):
         super(B2GBuild, self).checkout_sources()
-        self.checkout_goanna_l10n()
+        self.checkout_gecko_l10n()
         self.checkout_gaia_l10n()
         self.checkout_compare_locales()
 
@@ -349,23 +349,23 @@ class B2GBuild(LocalesMixin, PurgeMixin,
 
     def download_blobs(self):
         dirs = self.query_abs_dirs()
-        goanna_config = self.load_goanna_config()
-        if 'tooltool_manifest' in goanna_config:
-            # The manifest is relative to the goanna config
-            config_dir = os.path.join(dirs['goanna_src'], 'b2g', 'config',
+        gecko_config = self.load_gecko_config()
+        if 'tooltool_manifest' in gecko_config:
+            # The manifest is relative to the gecko config
+            config_dir = os.path.join(dirs['gecko_src'], 'b2g', 'config',
                                       self.config.get('b2g_config_dir', self.config['target']))
-            manifest = os.path.abspath(os.path.join(config_dir, goanna_config['tooltool_manifest']))
+            manifest = os.path.abspath(os.path.join(config_dir, gecko_config['tooltool_manifest']))
             self.tooltool_fetch(manifest=manifest,
-                                bootstrap_cmd=goanna_config.get('tooltool_bootstrap_cmd'),
+                                bootstrap_cmd=gecko_config.get('tooltool_bootstrap_cmd'),
                                 output_dir=dirs['work_dir'])
 
     def unpack_blobs(self):
         dirs = self.query_abs_dirs()
         tar = self.query_exe('tar', return_type="list")
-        goanna_config = self.load_goanna_config()
+        gecko_config = self.load_gecko_config()
         extra_tarballs = self.config.get('additional_source_tarballs', [])
-        if 'additional_source_tarballs' in goanna_config:
-            extra_tarballs.extend(goanna_config['additional_source_tarballs'])
+        if 'additional_source_tarballs' in gecko_config:
+            extra_tarballs.extend(gecko_config['additional_source_tarballs'])
 
         for tarball in extra_tarballs:
             self.run_command(tar + ["xf", tarball], cwd=dirs['work_dir'],
@@ -376,9 +376,9 @@ class B2GBuild(LocalesMixin, PurgeMixin,
             self.info('Skipping checkout_gaia_l10n because no gaia language file was specified.')
             return
 
-        l10n_config = self.load_goanna_config().get('gaia', {}).get('l10n')
+        l10n_config = self.load_gecko_config().get('gaia', {}).get('l10n')
         if not l10n_config:
-            self.fatal("gaia.l10n is required in the goanna config when --gaia-languages-file is specified.")
+            self.fatal("gaia.l10n is required in the gecko config when --gaia-languages-file is specified.")
 
         abs_work_dir = self.query_abs_dirs()['abs_work_dir']
         languages_file = os.path.join(abs_work_dir, 'gaia', self.config['gaia_languages_file'])
@@ -386,13 +386,13 @@ class B2GBuild(LocalesMixin, PurgeMixin,
 
         self.pull_gaia_locale_source(l10n_config, parse_config_file(languages_file).keys(), l10n_base_dir)
 
-    def checkout_goanna_l10n(self):
-        hg_l10n_base = self.load_goanna_config().get('goanna_l10n_root')
+    def checkout_gecko_l10n(self):
+        hg_l10n_base = self.load_gecko_config().get('gecko_l10n_root')
         self.pull_locale_source(hg_l10n_base=hg_l10n_base)
-        goanna_locales = self.query_locales()
-        # populate b2g/overrides, which isn't in goanna atm
+        gecko_locales = self.query_locales()
+        # populate b2g/overrides, which isn't in gecko atm
         dirs = self.query_abs_dirs()
-        for locale in goanna_locales:
+        for locale in gecko_locales:
             self.mkdir_p(os.path.join(dirs['abs_l10n_dir'], locale, 'b2g', 'chrome', 'overrides'))
             self.copytree(os.path.join(dirs['abs_l10n_dir'], locale, 'mobile', 'overrides'),
                           os.path.join(dirs['abs_l10n_dir'], locale, 'b2g', 'chrome', 'overrides'),
@@ -407,14 +407,14 @@ class B2GBuild(LocalesMixin, PurgeMixin,
         abs_rev = self.vcs_checkout(repo=repo, dest=dest, revision=rev, vcs=vcs)
         self.set_buildbot_property('compare_locales_revision', abs_rev, write_to_file=True)
 
-    def query_do_translate_hg_to_git(self, goanna_config_key=None):
+    def query_do_translate_hg_to_git(self, gecko_config_key=None):
         manifest_config = self.config.get('manifest', {})
         branch = self.query_branch()
         if self.query_is_nightly() and branch in manifest_config['branches'] and \
                 manifest_config.get('translate_hg_to_git'):
-            if goanna_config_key is None:
+            if gecko_config_key is None:
                 return True
-            if self.goanna_config.get(goanna_config_key):
+            if self.gecko_config.get(gecko_config_key):
                 return True
         return False
 
@@ -432,8 +432,8 @@ class B2GBuild(LocalesMixin, PurgeMixin,
         locale_manifest = []
         if self.gaia_locale_revisions:
             gaia_l10n_git_root = None
-            if self.query_do_translate_hg_to_git(goanna_config_key='gaia_l10n_git_root'):
-                gaia_l10n_git_root = self.goanna_config['gaia_l10n_git_root']
+            if self.query_do_translate_hg_to_git(gecko_config_key='gaia_l10n_git_root'):
+                gaia_l10n_git_root = self.gecko_config['gaia_l10n_git_root']
             for locale in self.gaia_locale_revisions.keys():
                 repo = self.gaia_locale_revisions[locale]['repo']
                 revision = self.gaia_locale_revisions[locale]['revision']
@@ -450,24 +450,24 @@ class B2GBuild(LocalesMixin, PurgeMixin,
                             "gaia-l10n/%s" % locale,
                         )
                     )
-        if self.goanna_locale_revisions:
-            goanna_l10n_git_root = None
-            if self.query_do_translate_hg_to_git(goanna_config_key='goanna_l10n_git_root'):
-                goanna_l10n_git_root = self.goanna_config['goanna_l10n_git_root']
-            for locale in self.goanna_locale_revisions.keys():
-                repo = self.goanna_locale_revisions[locale]['repo']
-                revision = self.goanna_locale_revisions[locale]['revision']
-                locale_manifest.append('  <!-- Mercurial-Information: <project name="%s" path="goanna-l10n/%s" remote="hgmozillaorg" revision="%s"/> -->' %
+        if self.gecko_locale_revisions:
+            gecko_l10n_git_root = None
+            if self.query_do_translate_hg_to_git(gecko_config_key='gecko_l10n_git_root'):
+                gecko_l10n_git_root = self.gecko_config['gecko_l10n_git_root']
+            for locale in self.gecko_locale_revisions.keys():
+                repo = self.gecko_locale_revisions[locale]['repo']
+                revision = self.gecko_locale_revisions[locale]['revision']
+                locale_manifest.append('  <!-- Mercurial-Information: <project name="%s" path="gecko-l10n/%s" remote="hgmozillaorg" revision="%s"/> -->' %
                                        (repo.replace('https://hg.mozilla.org/', ''), locale, revision))
-                if goanna_l10n_git_root:
+                if gecko_l10n_git_root:
                     locale_manifest.append(
                         self._generate_git_locale_manifest(
                             locale,
                             manifest_config['translate_base_url'],
-                            goanna_l10n_git_root % {'locale': locale},
+                            gecko_l10n_git_root % {'locale': locale},
                             revision,
                             git_base_url,
-                            "goanna-l10n/%s" % locale,
+                            "gecko-l10n/%s" % locale,
                         )
                     )
         return locale_manifest
@@ -487,7 +487,7 @@ class B2GBuild(LocalesMixin, PurgeMixin,
         manifest.appendChild(dom.createTextNode("\n  "))
         manifest.appendChild(dom.createComment('Mercurial-Information: <remote fetch="https://hg.mozilla.org/" name="hgmozillaorg">'))
         manifest.appendChild(dom.createTextNode("\n  "))
-        manifest.appendChild(dom.createComment('Mercurial-Information: <project name="%s" path="goanna" remote="hgmozillaorg" revision="%s"/>' %
+        manifest.appendChild(dom.createComment('Mercurial-Information: <project name="%s" path="gecko" remote="hgmozillaorg" revision="%s"/>' %
                              (self.query_repo(), self.query_revision())))
 
         if self.query_do_translate_hg_to_git():
@@ -509,14 +509,14 @@ class B2GBuild(LocalesMixin, PurgeMixin,
             manifest.appendChild(dom.createTextNode("\n  "))
             url = manifest_config['translate_base_url']
             # increase timeout from 15m to 60m until bug 1044515 is resolved (attempts = 120)
-            goanna_git = self.query_mapper_git_revision(url, 'goanna',
+            gecko_git = self.query_mapper_git_revision(url, 'gecko',
                                                        self.query_revision(),
                                                        require_answer=self.config.get('require_git_rev',
                                                                                       True),
                                                        attempts=120)
-            project_name = "https://git.mozilla.org/releases/goanna.git".replace(git_base_url, '')
+            project_name = "https://git.mozilla.org/releases/gecko.git".replace(git_base_url, '')
             # XXX This assumes that we have a mozillaorg remote
-            add_project(dom, name=project_name, path="goanna", remote="mozillaorg", revision=goanna_git)
+            add_project(dom, name=project_name, path="gecko", remote="mozillaorg", revision=gecko_git)
         manifest.appendChild(dom.createTextNode("\n"))
 
         self.write_to_file(sourcesfile, dom.toxml(), verbose=False)
@@ -538,8 +538,8 @@ class B2GBuild(LocalesMixin, PurgeMixin,
 
     def build(self):
         dirs = self.query_abs_dirs()
-        goanna_config = self.load_goanna_config()
-        build_targets = goanna_config.get('build_targets', [])
+        gecko_config = self.load_gecko_config()
+        build_targets = gecko_config.get('build_targets', [])
         build_targets.extend(self.config.get("build_targets", []))
         if not build_targets:
             cmds = [self.generate_build_command()]
@@ -577,8 +577,8 @@ class B2GBuild(LocalesMixin, PurgeMixin,
 
     def build_symbols(self):
         dirs = self.query_abs_dirs()
-        goanna_config = self.load_goanna_config()
-        if goanna_config.get('config_version', 0) < 1:
+        gecko_config = self.load_gecko_config()
+        if gecko_config.get('config_version', 0) < 1:
             self.info("Skipping build_symbols for old configuration")
             return
 
@@ -608,7 +608,7 @@ class B2GBuild(LocalesMixin, PurgeMixin,
             self.info("Not a nightly build. Skipping...")
             return
         dirs = self.query_abs_dirs()
-        self.load_goanna_config()
+        self.load_gecko_config()
         cmd = self.make_updates_cmd[:]
         env = self.query_build_env()
 
@@ -643,19 +643,19 @@ class B2GBuild(LocalesMixin, PurgeMixin,
         dirs = self.query_abs_dirs()
 
         # Copy stuff into build/upload directory
-        goanna_config = self.load_goanna_config()
+        gecko_config = self.load_gecko_config()
 
         output_dir = self.query_device_outputdir()
 
         # Zip up stuff
         files = []
-        for item in goanna_config.get('zip_files', []):
+        for item in gecko_config.get('zip_files', []):
             if isinstance(item, list):
                 pattern, target = item
             else:
                 pattern, target = item, None
 
-            pattern = pattern.format(objdir=self.objdir, workdir=dirs['work_dir'], srcdir=dirs['goanna_src'])
+            pattern = pattern.format(objdir=self.objdir, workdir=dirs['work_dir'], srcdir=dirs['gecko_src'])
             for f in glob.glob(pattern):
                 files.append((f, target))
 
@@ -687,9 +687,9 @@ class B2GBuild(LocalesMixin, PurgeMixin,
 
         public_files = []
         public_upload_patterns = []
-        public_upload_patterns = goanna_config.get('public_upload_files', [])
+        public_upload_patterns = gecko_config.get('public_upload_files', [])
         # Copy gaia profile
-        if goanna_config.get('package_gaia', True):
+        if gecko_config.get('package_gaia', True):
             zip_name = os.path.join(dirs['work_dir'], "gaia.zip")
             self.info("creating %s" % zip_name)
             cmd = ['zip', '-r', '-9', '-u', zip_name, 'gaia/profile']
@@ -704,9 +704,9 @@ class B2GBuild(LocalesMixin, PurgeMixin,
 
         files.append(os.path.join(output_dir, 'system', 'build.prop'))
 
-        upload_patterns = goanna_config.get('upload_files', [])
+        upload_patterns = gecko_config.get('upload_files', [])
         for base_pattern in upload_patterns + public_upload_patterns:
-            pattern = base_pattern.format(objdir=self.objdir, workdir=dirs['work_dir'], srcdir=dirs['goanna_src'])
+            pattern = base_pattern.format(objdir=self.objdir, workdir=dirs['work_dir'], srcdir=dirs['gecko_src'])
             for f in glob.glob(pattern):
                 if base_pattern in upload_patterns:
                     files.append(f)
@@ -849,7 +849,7 @@ class B2GBuild(LocalesMixin, PurgeMixin,
 
         dirs = self.query_abs_dirs()
         c = self.config
-        target = self.load_goanna_config().get('upload_platform', self.config['target'])
+        target = self.load_gecko_config().get('upload_platform', self.config['target'])
         if c.get("target_suffix"):
             target += c["target_suffix"]
         if self.config.get('debug_build'):
@@ -962,7 +962,7 @@ class B2GBuild(LocalesMixin, PurgeMixin,
         upload_dir = dirs['abs_upload_dir'] + '-manifest'
         # Delete the upload dir so we don't upload previous stuff by accident
         self.rmtree(upload_dir)
-        target = self.load_goanna_config().get('upload_platform', self.config['target'])
+        target = self.load_gecko_config().get('upload_platform', self.config['target'])
         if self.config['manifest'].get('target_suffix'):
             target += self.config['manifest']['target_suffix']
         buildid = self.query_buildid()

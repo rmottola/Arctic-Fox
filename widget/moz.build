@@ -6,7 +6,7 @@
 
 toolkit = CONFIG['MOZ_WIDGET_TOOLKIT']
 
-if toolkit in ('cocoa', 'qt', 'gonk'):
+if toolkit in ('cocoa', 'qt', 'gonk', 'uikit'):
     DIRS += [toolkit]
 if toolkit in ('qt', 'gonk', 'gtk2', 'gtk3'):
     EXPORTS += ['nsIPrintDialogService.h']
@@ -109,6 +109,7 @@ EXPORTS += [
 EXPORTS.mozilla += [
     'BasicEvents.h',
     'CommandList.h',
+    'ContentCache.h',
     'ContentEvents.h',
     'EventClassList.h',
     'EventForwards.h',
@@ -126,11 +127,13 @@ EXPORTS.mozilla += [
 ]
 
 EXPORTS.mozilla.widget += [
+    'IMEData.h',
     'PuppetBidiKeyboard.h',
     'WidgetMessageUtils.h',
 ]
 
 UNIFIED_SOURCES += [
+    'ContentCache.cpp',
     'ContentHelper.cpp',
     'GfxDriverInfo.cpp',
     'GfxInfoBase.cpp',
@@ -199,7 +202,7 @@ if toolkit in ('cocoa', 'windows'):
         'nsBaseClipboard.cpp',
     ]
 
-if toolkit in ('qt', 'gtk2', 'gtk3', 'cocoa', 'windows', 'gonk'):
+if toolkit in ('qt', 'gtk2', 'gtk3', 'cocoa', 'windows', 'gonk', 'uikit'):
     UNIFIED_SOURCES += [
         'nsBaseFilePicker.cpp',
     ]

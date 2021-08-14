@@ -7,6 +7,8 @@
 #include "nsDataHandler.h"
 #include "nsNetCID.h"
 #include "nsError.h"
+#include "DataChannelChild.h"
+#include "plstr.h"
 
 static NS_DEFINE_CID(kSimpleURICID, NS_SIMPLEURI_CID);
 
@@ -108,9 +110,12 @@ nsDataHandler::NewChannel2(nsIURI* uri,
                            nsIChannel** result)
 {
     NS_ENSURE_ARG_POINTER(uri);
-    nsDataChannel* channel = new nsDataChannel(uri);
-    if (!channel)
-        return NS_ERROR_OUT_OF_MEMORY;
+    nsDataChannel* channel;
+    if (XRE_IsParentProcess()) {
+        channel = new nsDataChannel(uri);
+    } else {
+        channel = new mozilla::net::DataChannelChild(uri);
+    }
     NS_ADDREF(channel);
 
     nsresult rv = channel->Init();

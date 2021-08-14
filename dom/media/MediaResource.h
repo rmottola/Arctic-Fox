@@ -9,11 +9,14 @@
 #include "mozilla/Mutex.h"
 #include "nsIChannel.h"
 #include "nsIURI.h"
+#include "nsISeekableStream.h"
 #include "nsIStreamingProtocolController.h"
 #include "nsIStreamListener.h"
 #include "nsIChannelEventSink.h"
 #include "nsIInterfaceRequestor.h"
 #include "MediaCache.h"
+#include "MediaData.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/TimeStamp.h"
 #include "nsThreadUtils.h"
@@ -287,6 +290,48 @@ public:
   // results and requirements are the same as per the Read method.
   virtual nsresult ReadAt(int64_t aOffset, char* aBuffer,
                           uint32_t aCount, uint32_t* aBytes) = 0;
+  // This method returns nullptr if anything fails.
+  // Otherwise, it returns an owned buffer.
+  // MediaReadAt may return fewer bytes than requested if end of stream is
+  // encountered. There is no need to call it again to get more data.
+  virtual already_AddRefed<MediaByteBuffer> MediaReadAt(int64_t aOffset, uint32_t aCount)
+  {
+    nsRefPtr<MediaByteBuffer> bytes = new MediaByteBuffer();
+    bool ok = bytes->SetLength(aCount, fallible);
+    NS_ENSURE_TRUE(ok, nullptr);
+    char* curr = reinterpret_cast<char*>(bytes->Elements());
+    const char* start = curr;
+    while (aCount > 0) {
+      uint32_t bytesRead;
+      nsresult rv = ReadAt(aOffset, curr, aCount, &bytesRead);
+      NS_ENSURE_SUCCESS(rv, nullptr);
+      if (!bytesRead) {
+        break;
+      }
+      aOffset += bytesRead;
+      aCount -= bytesRead;
+      curr += bytesRead;
+    }
+    bytes->SetLength(curr - start);
+    return bytes.forget();
+  }
+
+  // ReadAt without side-effects. Given that our MediaResource infrastructure
+  // is very side-effecty, this accomplishes its job by checking the initial
+  // position and seeking back to it. If the seek were to fail, a side-effect
+  // might be observable.
+  //
+  // This method returns null if anything fails, including the failure to read
+  // aCount bytes. Otherwise, it returns an owned buffer.
+  virtual already_AddRefed<MediaByteBuffer> SilentReadAt(int64_t aOffset, uint32_t aCount)
+  {
+    int64_t pos = Tell();
+    nsRefPtr<MediaByteBuffer> bytes = MediaReadAt(aOffset, aCount);
+    Seek(nsISeekableStream::NS_SEEK_SET, pos);
+    NS_ENSURE_TRUE(bytes && bytes->Length() == aCount, nullptr);
+    return bytes.forget();
+  }
+
   // Seek to the given bytes offset in the stream. aWhence can be
   // one of:
   //   NS_SEEK_SET
@@ -598,6 +643,7 @@ public:
   virtual nsresult Read(char* aBuffer, uint32_t aCount, uint32_t* aBytes) override;
   virtual nsresult ReadAt(int64_t offset, char* aBuffer,
                           uint32_t aCount, uint32_t* aBytes) override;
+  virtual already_AddRefed<MediaByteBuffer> MediaReadAt(int64_t aOffset, uint32_t aCount) override;
   virtual nsresult Seek(int32_t aWhence, int64_t aOffset) override;
   virtual int64_t  Tell() override;
 
@@ -703,7 +749,7 @@ protected:
   // A data received event for the decoder that has been dispatched but has
   // not yet been processed.
   nsRevocableEventPtr<nsRunnableMethod<ChannelMediaResource, void, false> > mDataReceivedEvent;
-  uint32_t           mSuspendCount;
+  Atomic<uint32_t>   mSuspendCount;
   // When this flag is set, if we get a network error we should silently
   // reopen the stream.
   bool               mReopenOnError;

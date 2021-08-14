@@ -33,7 +33,6 @@ public:
   virtual bool IsTransportSeekable() final override;
   virtual bool OnDecodeTaskQueue() const final override;
   virtual bool OnStateMachineTaskQueue() const final override;
-  virtual int64_t GetMediaDuration() final override { MOZ_ASSERT_UNREACHABLE(""); return -1; };
   virtual layers::ImageContainer* GetImageContainer() final override;
   virtual MediaDecoderOwner* GetOwner() final override;
   virtual SourceBufferResource* GetResource() const final override;
@@ -45,14 +44,13 @@ public:
   virtual void FirstFrameLoaded(nsAutoPtr<MediaInfo> aInfo,
                                 MediaDecoderEventVisibility aEventVisibility) final override;
   virtual void NotifyBytesConsumed(int64_t aBytes, int64_t aOffset) final override;
-  virtual void NotifyDataArrived(const char* aBuffer, uint32_t aLength, int64_t aOffset) final override;
+  virtual void NotifyDataArrived(uint32_t aLength, int64_t aOffset, bool aThrottleUpdates) final override;
   virtual void NotifyDecodedFrames(uint32_t aParsed, uint32_t aDecoded, uint32_t aDropped) final override;
   virtual void NotifyWaitingForResourcesStatusChanged() final override;
   virtual void OnReadMetadataCompleted() final override;
   virtual void QueueMetadata(int64_t aTime, nsAutoPtr<MediaInfo> aInfo, nsAutoPtr<MetadataTags> aTags) final override;
   virtual void RemoveMediaTracks() final override;
   virtual void SetMediaSeekable(bool aMediaSeekable) final override;
-  virtual void UpdateEstimatedMediaDuration(int64_t aDuration) final override;
   virtual bool HasInitializationData() final override;
 
   // SourceBufferResource specific interface below.
@@ -74,7 +72,7 @@ public:
     return mReader;
   }
 
-  void SetTaskQueue(MediaTaskQueue* aTaskQueue)
+  void SetTaskQueue(TaskQueue* aTaskQueue)
   {
     MOZ_ASSERT((!mTaskQueue && aTaskQueue) || (mTaskQueue && !aTaskQueue));
     mTaskQueue = aTaskQueue;
@@ -117,7 +115,7 @@ private:
   virtual ~SourceBufferDecoder();
 
   // Our TrackBuffer's task queue, this is only non-null during initialization.
-  RefPtr<MediaTaskQueue> mTaskQueue;
+  RefPtr<TaskQueue> mTaskQueue;
 
   nsRefPtr<MediaResource> mResource;
 

@@ -11,6 +11,7 @@
 
 #include "mozilla/MemoryReporting.h"
 
+#include "js/TraceableVector.h"
 #include "js/Vector.h"
 #include "vm/Runtime.h"
 
@@ -504,10 +505,11 @@ struct AutoResolving {
 /*
  * Enumerate all contexts in a runtime.
  */
-class ContextIter {
+class ContextIter
+{
     JSContext* iter;
 
-public:
+  public:
     explicit ContextIter(JSRuntime* rt) {
         iter = rt->contextList.getFirst();
     }
@@ -662,22 +664,10 @@ CheckForInterrupt(JSContext* cx)
 
 /************************************************************************/
 
-typedef JS::AutoVectorRooter<JSString*> AutoStringVector;
 typedef JS::AutoVectorRooter<PropertyName*> AutoPropertyNameVector;
-typedef JS::AutoVectorRooter<Shape*> AutoShapeVector;
 
-class AutoObjectUnsigned32HashMap : public AutoHashMapRooter<JSObject*, uint32_t>
-{
-  public:
-    explicit AutoObjectUnsigned32HashMap(JSContext* cx
-                                         MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-      : AutoHashMapRooter<JSObject*, uint32_t>(cx, OBJU32HASHMAP)
-    {
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-    }
-
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
+using ShapeVector = js::TraceableVector<Shape*>;
+using StringVector = js::TraceableVector<JSString*>;
 
 /* AutoArrayRooter roots an external array of Values. */
 class AutoArrayRooter : private JS::AutoGCRooter
@@ -779,6 +769,7 @@ bool intrinsic_IsPackedArray(JSContext* cx, unsigned argc, Value* vp);
 
 bool intrinsic_IsSuspendedStarGenerator(JSContext* cx, unsigned argc, Value* vp);
 bool intrinsic_IsArrayIterator(JSContext* cx, unsigned argc, Value* vp);
+bool intrinsic_IsMapIterator(JSContext* cx, unsigned argc, Value* vp);
 bool intrinsic_IsStringIterator(JSContext* cx, unsigned argc, Value* vp);
 
 bool intrinsic_IsArrayBuffer(JSContext* cx, unsigned argc, Value* vp);

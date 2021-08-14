@@ -21,7 +21,7 @@
 
 struct ChromePackage;
 class nsIObserver;
-struct ResourceMapping;
+struct SubstitutionMapping;
 struct OverrideMapping;
 class nsIDomainPolicy;
 
@@ -195,9 +195,6 @@ public:
                                          const FileDescriptor& aCCLog) override;
 
     virtual bool
-    RecvAudioChannelNotify() override;
-
-    virtual bool
     RecvDataStoreNotify(const uint32_t& aAppId, const nsString& aName,
                         const nsString& aManifestURL) override;
 
@@ -256,6 +253,9 @@ public:
     PVoicemailChild* SendPVoicemailConstructor(PVoicemailChild* aActor);
     virtual bool DeallocPVoicemailChild(PVoicemailChild*) override;
 
+    virtual PMediaChild* AllocPMediaChild() override;
+    virtual bool DeallocPMediaChild(PMediaChild* aActor) override;
+
     virtual PStorageChild* AllocPStorageChild() override;
     virtual bool DeallocPStorageChild(PStorageChild* aActor) override;
 
@@ -264,6 +264,11 @@ public:
 
     virtual PFMRadioChild* AllocPFMRadioChild() override;
     virtual bool DeallocPFMRadioChild(PFMRadioChild* aActor) override;
+
+    virtual PPresentationChild* AllocPPresentationChild() override;
+    virtual bool DeallocPPresentationChild(PPresentationChild* aActor) override;
+    virtual bool RecvNotifyPresentationReceiverLaunched(PBrowserChild* aIframe,
+                                                        const nsString& aSessionId) override;
 
     virtual PAsmJSCacheEntryChild* AllocPAsmJSCacheEntryChild(
                                  const asmjscache::OpenMode& aOpenMode,
@@ -276,7 +281,7 @@ public:
     virtual bool DeallocPSpeechSynthesisChild(PSpeechSynthesisChild* aActor) override;
 
     virtual bool RecvRegisterChrome(InfallibleTArray<ChromePackage>&& packages,
-                                    InfallibleTArray<ResourceMapping>&& resources,
+                                    InfallibleTArray<SubstitutionMapping>&& resources,
                                     InfallibleTArray<OverrideMapping>&& overrides,
                                     const nsCString& locale,
                                     const bool& reset) override;
@@ -295,10 +300,6 @@ public:
     virtual bool RecvBidiKeyboardNotify(const bool& isLangRTL) override;
 
     virtual bool RecvUpdateServiceWorkerRegistrations() override;
-
-    virtual bool RecvRemoveServiceWorkerRegistrationsForDomain(const nsString& aDomain) override;
-
-    virtual bool RecvRemoveServiceWorkerRegistrations() override;
 
     virtual bool RecvNotifyVisited(const URIParams& aURI) override;
     // auto remove when alertfinished is received.
@@ -339,6 +340,7 @@ public:
     virtual bool RecvAppInfo(const nsCString& version, const nsCString& buildID,
                              const nsCString& name, const nsCString& UAName,
                              const nsCString& ID, const nsCString& vendor) override;
+    virtual bool RecvAppInit() override;
 
     virtual bool RecvLastPrivateDocShellDestroyed() override;
 
@@ -360,8 +362,6 @@ public:
                                       const bool& aIsHotSwappable) override;
     virtual bool RecvVolumeRemoved(const nsString& aFsName) override;
 
-    virtual bool RecvNuwaFork() override;
-
     virtual bool
     RecvNotifyProcessPriorityChanged(const hal::ProcessPriority& aPriority) override;
     virtual bool RecvMinimizeMemoryUsage() override;
@@ -371,8 +371,6 @@ public:
     virtual bool RecvUnregisterSheet(const URIParams& aURI, const uint32_t& aType) override;
 
     virtual bool RecvNotifyPhoneStateChange(const nsString& state) override;
-
-    virtual bool RecvNuwaFreeze() override;
 
     void AddIdleObserver(nsIObserver* aObserver, uint32_t aIdleTimeInS);
     void RemoveIdleObserver(nsIObserver* aObserver, uint32_t aIdleTimeInS);
@@ -392,6 +390,7 @@ public:
                                    const double& aInterval,
                                    nsTArray<nsCString>&& aFeatures,
                                    nsTArray<nsCString>&& aThreadNameFilters) override;
+    virtual bool RecvPauseProfiler(const bool& aPause) override;
     virtual bool RecvStopProfiler() override;
     virtual bool RecvGatherProfile() override;
     virtual bool RecvDomainSetChanged(const uint32_t& aSetType, const uint32_t& aChangeType,
@@ -441,8 +440,6 @@ public:
                                          const ContentParentId& aCpID,
                                          const bool& aIsForApp,
                                          const bool& aIsForBrowser) override;
-    virtual PDocAccessibleChild* AllocPDocAccessibleChild(PDocAccessibleChild*, const uint64_t&) override;
-    virtual bool DeallocPDocAccessibleChild(PDocAccessibleChild*) override;
 
     void GetAvailableDictionaries(InfallibleTArray<nsString>& aDictionaries);
 
@@ -468,6 +465,8 @@ public:
     DeallocPContentPermissionRequestChild(PContentPermissionRequestChild* actor) override;
 
     virtual bool RecvGamepadUpdate(const GamepadChangeEvent& aGamepadEvent) override;
+
+    virtual bool RecvTestGraphicsDeviceReset(const uint32_t& aResetReason) override;
 
 private:
     virtual void ActorDestroy(ActorDestroyReason why) override;
@@ -514,6 +513,9 @@ private:
 
     DISALLOW_EVIL_CONSTRUCTORS(ContentChild);
 };
+
+void
+InitOnContentProcessCreated();
 
 uint64_t
 NextWindowID();

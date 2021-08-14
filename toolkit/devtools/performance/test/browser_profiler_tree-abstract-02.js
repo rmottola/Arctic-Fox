@@ -9,21 +9,16 @@
 let { AbstractTreeItem } = Cu.import("resource://gre/modules/devtools/AbstractTreeItem.jsm", {});
 let { Heritage } = Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm", {});
 
-function spawnTest () {
+function* spawnTest() {
   let container = document.createElement("vbox");
   gBrowser.selectedBrowser.parentNode.appendChild(container);
 
   // Populate the tree and test `expand`, `collapse` and `getChild`...
 
   let treeRoot = new MyCustomTreeItem(gDataSrc, { parent: null });
+  treeRoot.autoExpandDepth = 1;
   treeRoot.attachTo(container);
 
-  ok(!treeRoot.expanded,
-    "The root node should not be expanded yet.");
-  ok(!treeRoot.populated,
-    "The root node should not be populated yet.");
-
-  treeRoot.expand();
   ok(treeRoot.expanded,
     "The root node should now be expanded.");
   ok(treeRoot.populated,

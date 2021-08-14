@@ -1,9 +1,9 @@
 # Backlog of Mozilla patches:
 (grossly ordered in dependency order, not always correct, oldest to work on at the bottom)
 
+- Bug 1633339 - Fix infinite loop when network changes and e10s is disabled.
 - Bug 1533969 - Fix build error with newer glibc. (gettid)
--  Bug 1530958 (CVE-2019-9791) Spidermonkey: IonMonkey's type inference is incorrect for constructors entered via OSR
- 
+- Bug 1530958 (CVE-2019-9791) Spidermonkey: IonMonkey's type inference is incorrect for constructors entered via OSR
 - Bug 1499277 - Remove unnecessary SCInput::readNativeEndian; fix SCInput::readPtr on big endian systems. r=sfink
 - 1499861 - issues when backporting on other collections
 - 1477632 - Always inline PLDHashTable::SearchTable(
@@ -13,6 +13,10 @@
 - 1472018 - Limit the lock scope in WebCryptoThreadPool::Shutdown.
 - Bug 1464751 2018-05-28 If there is no JIT, there should be no JIT signal handlers
 - 1469309 - Remove an unused sensor type
+- Bug 1443943 Allow internal callers of performance.now() to opt-out of
+- Bug 1443943 - 2018-03-09 - Port the performance APIs only to only clamping/jittering
+- Bug 1420092 -2017-11-23 - Don't always enable mozjemalloc by default when building the js engine. r=njn
+- Bug 1423875. Fix InitializePropertiesFromCompatibleNativeObject to ge
 - 1419960 - Make the noopener window feature not affect whether oth
 - 1381728 - Part 1 : <object data="data:text/html",...> should have
 - 1412081 - Call KillClearOnShutdown(ShutdownPhase::ShutdownFinal)
@@ -46,6 +50,8 @@
 - Bug 1159751: Ensure WARP can never be used for Windows 7. r=milan 
 - Bug 1178426. Add GfxInfo to ServicesList.h. r=nfroyd 
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
+- 1114580 - toStringTag - several diffs still to analyze
+- Bug 1278838 2016-06-09- Remove separate worker binding for Performance API
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1266391 - 2016-04-21 Introduce an enum class mozilla::unicode::Script, and u
 - Bug 1209100 - 2016-03-21 - Back out bug 1165185 on inbound.
@@ -61,7 +67,11 @@
 - Bug 1219339 - 2016-01-14 : switch GetStaticInstance to use IPC's Singleton<T>
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
-- Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu 
+- Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
+- Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu
+- 1164427 - Implement elementsFromPoint (= Tests)
+- Bug 1230948 - Update web-platform-tests expected data to revision 63b
+- Bug 1160971 - 4 parts
 - Bug 1233176 - 2015-12-22 - Scalar Replacement: Initialize properties with the defa
 - Bug 1231109 - Drop FreeBSD checks for unsupported versions. r=jld
 - rest of 1198458
@@ -70,14 +80,19 @@
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
 - Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
+- Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
+- Bug 1039986 - 2015-10-27 - (Fix cloudflare?)  Make Function.prototype.toString work on Web IDL interfa
+- Bug 1238935 - r=jonco 
+- Bug 1214126 - 5 Parts
 - Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
 - Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1089695 - Fixing wrong dependency in Places shutdown. r=mak 
 - Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or 
 - Bug 1205533 - 2015-09-18 - Fix and disallow warnings in gfx/qcms/
+- Bug 1191148 - Don't count fullscreen request handled if we don't chanyesy
 - Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
@@ -87,18 +102,49 @@
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1202085 2015-10-26 - Part 0 to 6
+- Bug 930414 - 22 parts
+- Bug 1188347  - 5 parts
+- Bug 1188643 2015-09-30 - Buffer more audio in audio capture mode to avoid glitche
 - Bug 1205870 - 2015-09-22 - Make sure all possible unboxed array inline capacities 
 - Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
-- Bug 1184388 - 2015-10- 30- 3/3
+- Bug 1072313 - 2015-09-21 - Never call TextureClient::KeepUntilFullDeallocation off
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
+- Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
+-  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
+- Bug 1167409 - for parts
+- Bug 1192667 - Trigger fullscreen transition when exiting fullscreen
+- Bug 1198563
+- Bug 1190316 - Apply fullscreen transition on only the target monitor
+- 1190669 - 4 parts
+- Bug 1191112 - 3 parts
+- Bug 1189588: [MSE] Remove MediaSourceDemuxer::NotifyTimeRangesChanged
+- Bug 1189138 Video corruption when seeking backward on YouTube
+- Bug 1184867 - 2015-07-31 : new MSE- 3 parts
+- Bug 1189809 - 2015-07-31 Remove the ill-fated DynamicTraceable
+- Bug 1186384 - Consider device pixel scale on fullscreen transition wi
+- Bug 1181142 - Part 2: Make the minimum jemalloc4 allocation size 16 b
+- Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
+- bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
+- Bug 1203857 - Allow to build standalone js against jemalloc4. r=gps 
+- Bug 1160014 - 2015-07-24 - Implement fullscreen part 4-6
 - Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
 - Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
+- Bug 1171379 - and check all related on bugzilla
+- Bug 909154. Remove the prefixed mozRequestAnimationFrame and its acco
+- Bug 1184429 - 2015-07-17 P1. & P2
+- Bug 1182316: Part 3 - Add assertions to most other WebIDL entry point
+- Bug 1182316 - 2015-07-12 - Part 2 - Rework FORWARD_TO_OUTER_OR_THROW. r=peterv
+- Bug 1179110 - 2015-07-02 Use a Maybe<> to store start time, rather than using -1
+- Bug 1184201 - Disable fullscreen transition on Windows
+- 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
+- Bug 1160014 - part 1 to 4
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
 - Bug 1181869 - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 905127 - Part 2 - remove unnecessary nsNetUtil.h includes r=jduell
 - Bug 905127 - 2015-07-07 - Part 1 - Make some functions from nsNetUtil not inline.
-- Bug 1172785 - 206-07-06 remaining parts of RTCCertificate
+- Bug 1172785 - 2016-07-06 remaining parts of RTCCertificate
+- 1178938 - 2015-07-02 5 parts
 - Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
@@ -110,6 +156,9 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1053413 part 1 - Some code style conversion on affected code.
 - Bug 947854 - 2015-05-05 parto 0 to 4
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
+- Bug 1179569: Remove use of decoder's monitor in ResetDecode(). r=bholley
+- Bug 1178437 - Do the dormant-enabled tracking on the main thread. 
+- Bug 1175768 - 2015-06-27 -  Use mirroring for buffered ranges. r=jya- 
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
@@ -130,52 +179,23 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1171555 - Remove overly verbose ServiceWorker warnings.
 - Bug 1173415 - Fix incorrect mask used for
 - Bug 1167356 - 2015-06-11
-- Bug 1130028 - Custom elements, set registered prototype in compartmen
+- Bug 1129873 - 2015-06-08 - [GTK3] Implement wrapper to GtkAppChooserDialog to allo
 - 1190496 - Hoist SharedThreadPool into xpcom.
-- Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
-- Check all: https://bugzilla.mozilla.org/show_bug.cgi?id=1167235 
-- Bug 1167823 - arity side effects, 14 patches
 - 1190495 - Hoist TaskQueue into xpcom
 - 1188976 - Hoist MozPromise into xpcom
 - 1185106 - at least part 0 to 4 for TFF
-- 1184634 - Rename MediaTaskQueue to TaskQueue
-- 1184634 - Rename MediaPromise to MozPromise
-- 1164427 - Implement elementsFromPoint (= Tests)
-- 1160485 - 2015-05-01 - remove implicit conversion from RefPtr<T> to TemporaryRef<T>
-- 1165162 - 2015-05-15 - Serialize originSuffix into .origin. r=gabor,sr=sicking
-- 1163423 - 2015-05-12 JS_HasOwnProperty
-- 1142669 part 6 - Don't inline scripts that are known to inline a
-- 1141862 - 2015-04-03 : 6 parts
-- 1124291 - SIMD (interpreter): Implemented int8x16 and int16x8 
-- 1114580 - toStringTag - several diffs still to analyze
-- 1083359 - Part 1 - Add the asyncCause and asyncParent properties 
-- 1041586 - Implement Symbol.isConcatSpreadable
-- 1041586 - Autogenerate symbol names
+- Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
-- Bug 1168053 - 2015-05-29 - Unified build fix in dom/media/gmp. r=jwwang 
-- 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
-- 470143 - Part 2/2 - TrackedOptimization changes for TypeOfNoSuchV
-- Bug 1067610 -2015-05-19  - Refactor backtracking allocator to handle grouped regis
-- https://bugzilla.mozilla.org/show_bug.cgi?id=1162986
 - 1227567 - Optimise module namespace imports in Ion where we have
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
-- 1199143 - Inline heavyweight functions.
-- 1030095 - Remove restriction on inlining recursive calls
-- 1155788 - Make the Ion inner-window optimizations work again. 
-- 1150654 - Add CantInlineNoSpecialization to distinguish natives f
-
-https://bugzilla.mozilla.org/show_bug.cgi?id=1062473
 
 
 impacting download and shutdown:
-Bug 1043863 - Use AsyncShutdown to shutdown Places. r=mak
-Bug 1150855 - Remove uses of the curly syntax. r=jaws
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
 
 Mac Specific
-- Bug 1142457 - Compute stopwatch durations per thread on MacOS X.
 SkiaGL: https://bugzilla.mozilla.org/show_bug.cgi?id=1150944
 
 More session store stuff to check:
@@ -196,6 +216,9 @@ Check with Roy Tam:
 - Bug 1129633 - part1. Use win8 geolocation with a fallback to MLS
 - bug 1139012 - telemetry for MLS vs win8 geolocation response.
 
+# Patches that apply but break things:
+- Bug 1096294 - 2015-02-24 Display pseudo-arrays like arrays in the console; r=pbrosset
+- Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
 
 What with LightweightThemeConsumer.jsm 
 
@@ -221,8 +244,15 @@ Check TelemetryEnvironment.jsm _isDefaultBrowser
 Analyze all:
 https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 
+Remove hack of parserequestcontenttype in nsNetUtil.cpp
+
 
 Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
+And why #include "nsIFrameInlines.h" in layout/style/nsStyleTransformMatrix.cpp ?
+
+Fallible hacks:
+appendElements made fallible when not so in original FF:
+media/libstagefright/frameworks/av/media/libstagefright/MPEG4Extractor.cpp
 
 Check ALTIVEC/VMX
 - gfx/2d/Factory.cpp -> enough __ALTIVEC__ on non-Apple VMX ?
@@ -265,7 +295,7 @@ Check if NullPtr removal has any effects on our supported platforms. See: Bug 11
 -- consider non taken bugs for platforms we do support compared to TFF (and update list here)
 https://github.com/classilla/tenfourfox/issues/526
 
-## JS Sputink checks:
+## JS Sputnik checks:
 
 2018-12-10:
 * Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6048 | Fail: 928 | Failed to load: 0 - Hangs on "iter-close"

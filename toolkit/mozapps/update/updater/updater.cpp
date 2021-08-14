@@ -120,6 +120,11 @@ static bool sUseHardLinks = true;
 # define MAYBE_USE_HARD_LINKS 0
 #endif
 
+#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && !defined(XP_MACOSX)
+#include "nss.h"
+#include "prerror.h"
+#endif
+
 #ifdef XP_WIN
 #include "registrycertificates.h"
 BOOL PathAppendSafe(LPWSTR base, LPCWSTR extra);
@@ -2427,6 +2432,20 @@ int NS_main(int argc, NS_tchar **argv)
     _exit(1);
   }
 #endif
+
+#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && !defined(XP_MACOSX)
+  // On Windows and Mac we rely on native APIs to do verifications so we don't
+  // need to initialize NSS at all there.
+  // Otherwise, minimize the amount of NSS we depend on by avoiding all the NSS
+  // databases.
+  if (NSS_NoDB_Init(NULL) != SECSuccess) {
+   PRErrorCode error = PR_GetError();
+   fprintf(stderr, "Could not initialize NSS: %s (%d)",
+           PR_ErrorToName(error), (int) error);
+    _exit(1);
+  }
+#endif
+
   InitProgressUI(&argc, &argv);
 
   // To process an update the updater command line must at a minimum have the

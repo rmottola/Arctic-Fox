@@ -27,6 +27,10 @@
 #endif
 #include "SerializedLoadContext.h"
 #include "nsIOService.h"
+#include "nsINetworkPredictor.h"
+#include "nsINetworkPredictorVerifier.h"
+#include "mozilla/ipc/URIUtils.h"
+#include "nsNetUtil.h"
 
 using mozilla::dom::TCPSocketChild;
 using mozilla::dom::TCPServerSocketChild;
@@ -164,6 +168,20 @@ NeckoChild::DeallocPWebSocketChild(PWebSocketChild* child)
 {
   WebSocketChannelChild* p = static_cast<WebSocketChannelChild*>(child);
   p->ReleaseIPDLReference();
+  return true;
+}
+
+PDataChannelChild*
+NeckoChild::AllocPDataChannelChild(const uint32_t& channelId)
+{
+  MOZ_ASSERT_UNREACHABLE("Should never get here");
+  return nullptr;
+}
+
+bool
+NeckoChild::DeallocPDataChannelChild(PDataChannelChild* child)
+{
+  // NB: See DataChannelChild::ActorDestroy.
   return true;
 }
 
@@ -316,6 +334,43 @@ NeckoChild::RecvAsyncAuthPromptForNestedFrame(const TabId& aNestedFrameId,
     return false;
   }
   tabChild->SendAsyncAuthPrompt(aUri, aRealm, aCallbackId);
+  return true;
+}
+
+/* Predictor Messages */
+bool
+NeckoChild::RecvPredOnPredictPreconnect(const URIParams& aURI)
+{
+  MOZ_ASSERT(NS_IsMainThread(), "PredictorChild::RecvOnPredictPreconnect "
+                                "off main thread.");
+
+  nsCOMPtr<nsIURI> uri = DeserializeURI(aURI);
+
+  // Get the current predictor
+  nsresult rv = NS_OK;
+  nsCOMPtr<nsINetworkPredictorVerifier> predictor =
+    do_GetService("@mozilla.org/network/predictor;1", &rv);
+  NS_ENSURE_SUCCESS(rv, false);
+
+  predictor->OnPredictPreconnect(uri);
+  return true;
+}
+
+bool
+NeckoChild::RecvPredOnPredictDNS(const URIParams& aURI)
+{
+  MOZ_ASSERT(NS_IsMainThread(), "PredictorChild::RecvOnPredictDNS off "
+                                "main thread.");
+
+  nsCOMPtr<nsIURI> uri = DeserializeURI(aURI);
+
+  // Get the current predictor
+  nsresult rv = NS_OK;
+  nsCOMPtr<nsINetworkPredictorVerifier> predictor =
+    do_GetService("@mozilla.org/network/predictor;1", &rv);
+  NS_ENSURE_SUCCESS(rv, false);
+
+  predictor->OnPredictDNS(uri);
   return true;
 }
 

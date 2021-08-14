@@ -8,20 +8,16 @@
 #include "jsapi-tests/tests.h"
 
 class CCWTestTracer : public JS::CallbackTracer {
-    static void staticCallback(JS::CallbackTracer* trc, void** thingp, JS::TraceKind kind) {
-        static_cast<CCWTestTracer*>(trc)->callback(thingp, kind);
-    }
-
-    void callback(void** thingp, JS::TraceKind kind) {
+    void onChild(const JS::GCCellPtr& thing) override {
         numberOfThingsTraced++;
 
-        printf("*thingp         = %p\n", *thingp);
+        printf("*thingp         = %p\n", thing.asCell());
         printf("*expectedThingp = %p\n", *expectedThingp);
 
-        printf("kind         = %d\n", static_cast<int>(kind));
+        printf("kind         = %d\n", static_cast<int>(thing.kind()));
         printf("expectedKind = %d\n", static_cast<int>(expectedKind));
 
-        if (*thingp != *expectedThingp || kind != expectedKind)
+        if (thing.asCell() != *expectedThingp || thing.kind() != expectedKind)
             okay = false;
     }
 
@@ -32,7 +28,7 @@ class CCWTestTracer : public JS::CallbackTracer {
     JS::TraceKind expectedKind;
 
     CCWTestTracer(JSContext* cx, void** expectedThingp, JS::TraceKind expectedKind)
-      : JS::CallbackTracer(JS_GetRuntime(cx), staticCallback),
+      : JS::CallbackTracer(JS_GetRuntime(cx)),
         okay(true),
         numberOfThingsTraced(0),
         expectedThingp(expectedThingp),

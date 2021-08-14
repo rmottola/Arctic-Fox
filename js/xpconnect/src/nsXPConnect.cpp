@@ -26,7 +26,6 @@
 
 #include "nsDOMMutationObserver.h"
 #include "nsICycleCollectorListener.h"
-#include "nsThread.h"
 #include "mozilla/XPTInterfaceInfoManager.h"
 #include "nsIObjectInputStream.h"
 #include "nsIObjectOutputStream.h"
@@ -37,10 +36,7 @@ using namespace mozilla::dom;
 using namespace xpc;
 using namespace JS;
 
-NS_IMPL_ISUPPORTS(nsXPConnect,
-                  nsIXPConnect,
-                  nsISupportsWeakReference,
-                  nsIThreadObserver)
+NS_IMPL_ISUPPORTS(nsXPConnect, nsIXPConnect)
 
 nsXPConnect* nsXPConnect::gSelf = nullptr;
 bool         nsXPConnect::gOnceAliveNowDead = false;
@@ -62,8 +58,7 @@ const char XPC_XPCONNECT_CONTRACTID[]     = "@mozilla.org/js/xpc/XPConnect;1";
 
 nsXPConnect::nsXPConnect()
     :   mRuntime(nullptr),
-        mShuttingDown(false),
-        mEventDepth(0)
+        mShuttingDown(false)
 {
     mRuntime = XPCJSRuntime::newXPCJSRuntime(this);
 
@@ -121,11 +116,6 @@ nsXPConnect::InitStatics()
     // balanced by explicit call to ReleaseXPConnectSingleton()
     NS_ADDREF(gSelf);
 
-    // Set XPConnect as the main thread observer.
-    if (NS_FAILED(nsThread::SetMainThreadObserver(gSelf))) {
-        MOZ_CRASH();
-    }
-
     // Fire up the SSM.
     nsScriptSecurityManager::InitStatics();
     gScriptSecurityManager = nsScriptSecurityManager::GetScriptSecurityManager();
@@ -153,8 +143,6 @@ nsXPConnect::ReleaseXPConnectSingleton()
 {
     nsXPConnect* xpc = gSelf;
     if (xpc) {
-        nsThread::SetMainThreadObserver(nullptr);
-
         nsrefcnt cnt;
         NS_RELEASE2(xpc, cnt);
     }
@@ -214,12 +202,15 @@ xpc::ErrorReport::Init(JSErrorReport* aReport, const char* aFallbackMessage,
     mIsMuted = aReport->isMuted;
 }
 
-#ifdef PR_LOGGING
 static PRLogModuleInfo* gJSDiagnostics;
-#endif
 
 void
 xpc::ErrorReport::LogToConsole()
+{
+  LogToConsoleWithStack(nullptr);
+}
+void
+xpc::ErrorReport::LogToConsoleWithStack(JS::HandleObject aStack)
 {
     // Log to stdout.
     if (nsContentUtils::DOMWindowDumpEnabled()) {
@@ -241,25 +232,32 @@ xpc::ErrorReport::LogToConsole()
         fflush(stderr);
     }
 
-#ifdef PR_LOGGING
     // Log to the PR Log Module.
     if (!gJSDiagnostics)
         gJSDiagnostics = PR_NewLogModule("JSDiagnostics");
     if (gJSDiagnostics) {
-        PR_LOG(gJSDiagnostics,
-                JSREPORT_IS_WARNING(mFlags) ? PR_LOG_WARNING : PR_LOG_ERROR,
+        MOZ_LOG(gJSDiagnostics,
+                JSREPORT_IS_WARNING(mFlags) ? LogLevel::Warning : LogLevel::Error,
                 ("file %s, line %u\n%s", NS_LossyConvertUTF16toASCII(mFileName).get(),
                  mLineNumber, NS_LossyConvertUTF16toASCII(mErrorMsg).get()));
     }
-#endif
 
     // Log to the console. We do this last so that we can simply return if
     // there's no console service without affecting the other reporting
     // mechanisms.
     nsCOMPtr<nsIConsoleService> consoleService =
       do_GetService(NS_CONSOLESERVICE_CONTRACTID);
-    nsCOMPtr<nsIScriptError> errorObject =
-      do_CreateInstance("@mozilla.org/scripterror;1");
+
+    nsCOMPtr<nsIScriptError> errorObject;
+    if (mWindowID && aStack) {
+      // Only set stack on messages related to a document
+      // As we cache messages in the console service,
+      // we have to ensure not leaking them after the related
+      // context is destroyed and we only track document lifecycle for now.
+      errorObject = new nsScriptErrorWithStack(aStack);
+    } else {
+      errorObject = new nsScriptError();
+    }
     NS_ENSURE_TRUE_VOID(consoleService && errorObject);
 
     nsresult rv = errorObject->InitWithWindowID(mErrorMsg, mFileName, mSourceLine,
@@ -496,13 +494,39 @@ NativeInterface2JSObject(HandleObject aScope,
     return NS_OK;
 }
 
-/* nsIXPConnectJSObjectHolder wrapNative (in JSContextPtr aJSContext, in JSObjectPtr aScope, in nsISupports aCOMObj, in nsIIDRef aIID); */
+/* JSObjectPtr wrapNative (in JSContextPtr aJSContext, in JSObjectPtr aScope, in nsISupports aCOMObj, in nsIIDRef aIID); */
 NS_IMETHODIMP
 nsXPConnect::WrapNative(JSContext * aJSContext,
                         JSObject * aScopeArg,
                         nsISupports* aCOMObj,
                         const nsIID & aIID,
-                        nsIXPConnectJSObjectHolder** aHolder)
+                        JSObject** aRetVal)
+{
+    MOZ_ASSERT(aJSContext, "bad param");
+    MOZ_ASSERT(aScopeArg, "bad param");
+    MOZ_ASSERT(aCOMObj, "bad param");
+
+    RootedObject aScope(aJSContext, aScopeArg);
+    RootedValue v(aJSContext);
+    nsresult rv = NativeInterface2JSObject(aScope, aCOMObj, nullptr, &aIID,
+                                           true, &v, nullptr);
+    if (NS_FAILED(rv))
+        return rv;
+
+    if (!v.isObjectOrNull())
+        return NS_ERROR_FAILURE;
+
+    *aRetVal = v.toObjectOrNull();
+    return NS_OK;
+}
+
+/* nsIXPConnectJSObjectHolder wrapNativeHolder(in JSContextPtr aJSContext, in JSObjectPtr aScope, in nsISupports aCOMObj, in nsIIDRef aIID); */
+NS_IMETHODIMP
+nsXPConnect::WrapNativeHolder(JSContext * aJSContext,
+                              JSObject * aScopeArg,
+                              nsISupports* aCOMObj,
+                              const nsIID & aIID,
+                              nsIXPConnectJSObjectHolder **aHolder)
 {
     MOZ_ASSERT(aHolder, "bad param");
     MOZ_ASSERT(aJSContext, "bad param");
@@ -515,7 +539,7 @@ nsXPConnect::WrapNative(JSContext * aJSContext,
                                     true, &v, aHolder);
 }
 
-/* void wrapNativeToJSVal (in JSContextPtr aJSContext, in JSObjectPtr aScope, in nsISupports aCOMObj, in nsIIDPtr aIID, out jsval aVal, out nsIXPConnectJSObjectHolder aHolder); */
+/* void wrapNativeToJSVal (in JSContextPtr aJSContext, in JSObjectPtr aScope, in nsISupports aCOMObj, in nsIIDPtr aIID, out jsval aVal); */
 NS_IMETHODIMP
 nsXPConnect::WrapNativeToJSVal(JSContext* aJSContext,
                                JSObject* aScopeArg,
@@ -678,27 +702,6 @@ nsXPConnect::GetWrappedNativeOfNativeObject(JSContext * aJSContext,
     if (NS_FAILED(rv))
         return NS_ERROR_FAILURE;
     *_retval = static_cast<nsIXPConnectWrappedNative*>(wrapper);
-    return NS_OK;
-}
-
-/* nsIStackFrame createStackFrameLocation (in uint32_t aLanguage, in string aFilename, in string aFunctionName, in int32_t aLineNumber, in nsIStackFrame aCaller); */
-NS_IMETHODIMP
-nsXPConnect::CreateStackFrameLocation(uint32_t aLanguage,
-                                      const char* aFilename,
-                                      const char* aFunctionName,
-                                      int32_t aLineNumber,
-                                      nsIStackFrame* aCaller,
-                                      nsIStackFrame** _retval)
-{
-    MOZ_ASSERT(_retval, "bad param");
-
-    nsCOMPtr<nsIStackFrame> stackFrame =
-        exceptions::CreateStackFrameLocation(aLanguage,
-                                             aFilename,
-                                             aFunctionName,
-                                             aLineNumber,
-                                             aCaller);
-    stackFrame.forget(_retval);
     return NS_OK;
 }
 
@@ -933,81 +936,6 @@ nsXPConnect::JSToVariant(JSContext* ctx, HandleValue value, nsIVariant** _retval
         return NS_ERROR_FAILURE;
 
     return NS_OK;
-}
-
-namespace {
-
-class DummyRunnable : public nsRunnable {
-public:
-    NS_IMETHOD Run() { return NS_OK; }
-};
-
-} // namespace
-
-NS_IMETHODIMP
-nsXPConnect::OnProcessNextEvent(nsIThreadInternal* aThread, bool aMayWait,
-                                uint32_t aRecursionDepth)
-{
-    MOZ_ASSERT(NS_IsMainThread());
-
-    // If ProcessNextEvent was called during a Promise "then" callback, we
-    // must process any pending microtasks before blocking in the event loop,
-    // otherwise we may deadlock until an event enters the queue later.
-    if (aMayWait) {
-        if (Promise::PerformMicroTaskCheckpoint()) {
-            // If any microtask was processed, we post a dummy event in order to
-            // force the ProcessNextEvent call not to block.  This is required
-            // to support nested event loops implemented using a pattern like
-            // "while (condition) thread.processNextEvent(true)", in case the
-            // condition is triggered here by a Promise "then" callback.
-            NS_DispatchToMainThread(new DummyRunnable());
-        }
-    }
-
-    // Record this event.
-    mEventDepth++;
-
-    // Start the slow script timer.
-    mRuntime->OnProcessNextEvent();
-
-    // Push a null JSContext so that we don't see any script during
-    // event processing.
-    bool ok = PushNullJSContext();
-    NS_ENSURE_TRUE(ok, NS_ERROR_FAILURE);
-    return NS_OK;
-}
-
-NS_IMETHODIMP
-nsXPConnect::AfterProcessNextEvent(nsIThreadInternal* aThread,
-                                   uint32_t aRecursionDepth,
-                                   bool aEventWasProcessed)
-{
-    // Watch out for unpaired events during observer registration.
-    if (MOZ_UNLIKELY(mEventDepth == 0))
-        return NS_OK;
-    mEventDepth--;
-
-    // Now that we're back to the event loop, reset the slow script checkpoint.
-    mRuntime->OnAfterProcessNextEvent();
-
-    // Call cycle collector occasionally.
-    MOZ_ASSERT(NS_IsMainThread());
-    nsJSContext::MaybePokeCC();
-
-    nsContentUtils::PerformMainThreadMicroTaskCheckpoint();
-
-    Promise::PerformMicroTaskCheckpoint();
-
-    PopNullJSContext();
-
-    return NS_OK;
-}
-
-NS_IMETHODIMP
-nsXPConnect::OnDispatchedEvent(nsIThreadInternal* aThread)
-{
-    NS_NOTREACHED("Why tell us?");
-    return NS_ERROR_UNEXPECTED;
 }
 
 NS_IMETHODIMP
@@ -1342,17 +1270,14 @@ bool
 SetAddonInterposition(const nsACString& addonIdStr, nsIAddonInterposition* interposition)
 {
     JSAddonId* addonId;
-    {
-        // We enter the junk scope just to allocate a string, which actually will go
-        // in the system zone.
-        AutoJSAPI jsapi;
-        jsapi.Init(xpc::PrivilegedJunkScope());
-        addonId = NewAddonId(jsapi.cx(), addonIdStr);
-        if (!addonId)
-            return false;
-    }
-
-    return XPCWrappedNativeScope::SetAddonInterposition(addonId, interposition);
+    // We enter the junk scope just to allocate a string, which actually will go
+    // in the system zone.
+    AutoJSAPI jsapi;
+    jsapi.Init(xpc::PrivilegedJunkScope());
+    addonId = NewAddonId(jsapi.cx(), addonIdStr);
+    if (!addonId)
+        return false;
+    return XPCWrappedNativeScope::SetAddonInterposition(jsapi.cx(), addonId, interposition);
 }
 
 } // namespace xpc

@@ -3,10 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * Reference https://wiki.mozilla.org/User:Shellylin/InputPort#Basic_Port_Interface
+ * Reference https://wiki.mozilla.org/Input_Port_API#Basic_Port_Interface
  */
 
-[Pref="dom.inputport.enabled", CheckPermissions="inputport", AvailableIn=CertifiedApps]
+[Pref="dom.inputport.enabled", CheckAnyPermissions="inputport", AvailableIn=CertifiedApps]
 interface InputPort : EventTarget {
   readonly attribute DOMString id;
   readonly attribute MediaStream stream;

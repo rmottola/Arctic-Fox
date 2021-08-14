@@ -317,23 +317,23 @@ NS_DebugBreak(uint32_t aSeverity, const char* aStr, const char* aExpr,
   InitLog();
 
   FixedBuffer buf;
-  PRLogModuleLevel ll = PR_LOG_WARNING;
+  mozilla::LogLevel ll = LogLevel::Warning;
   const char* sevString = "WARNING";
 
   switch (aSeverity) {
     case NS_DEBUG_ASSERTION:
       sevString = "###!!! ASSERTION";
-      ll = PR_LOG_ERROR;
+      ll = LogLevel::Error;
       break;
 
     case NS_DEBUG_BREAK:
       sevString = "###!!! BREAK";
-      ll = PR_LOG_ALWAYS;
+      ll = LogLevel::Error;
       break;
 
     case NS_DEBUG_ABORT:
       sevString = "###!!! ABORT";
-      ll = PR_LOG_ALWAYS;
+      ll = LogLevel::Error;
       break;
 
     default:
@@ -369,12 +369,12 @@ NS_DebugBreak(uint32_t aSeverity, const char* aStr, const char* aExpr,
 #  undef PrintToBuffer
 
   // Write out the message to the debug log
-  PR_LOG(gDebugLog, ll, ("%s", buf.buffer));
+  MOZ_LOG(gDebugLog, ll, ("%s", buf.buffer));
   PR_LogFlush();
 
   // errors on platforms without a debugdlg ring a bell on stderr
 #if !defined(XP_WIN)
-  if (ll != PR_LOG_WARNING) {
+  if (ll != LogLevel::Warning) {
     fprintf(stderr, "\07");
   }
 #endif

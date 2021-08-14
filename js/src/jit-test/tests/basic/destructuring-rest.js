@@ -13,16 +13,15 @@ assertThrowsInstanceOf(() => new Function('[...a++] = []'), SyntaxError, 'postfi
 assertThrowsInstanceOf(() => new Function('[...!a] = []'), SyntaxError, 'unary expression');
 assertThrowsInstanceOf(() => new Function('[...a+b] = []'), SyntaxError, 'binary expression');
 assertThrowsInstanceOf(() => new Function('var [...a.x] = []'), SyntaxError, 'lvalue expression in declaration');
+assertThrowsInstanceOf(() => new Function('var [...(b)] = []'), SyntaxError);
 
-// XXX: The way the current parser works, certain things, like a trailing comma
-// and parenthesis, are lost before we check for destructuring.
-// See bug 1041341. Once fixed, please update these assertions
+// XXX: The way the current parser works, a trailing comma is lost before we
+//      check for destructuring.  See bug 1041341. Once fixed, please update
+//      this assertion.
 assertThrowsInstanceOf(() =>
 	assertThrowsInstanceOf(() => new Function('[...b,] = []'), SyntaxError)
 	, Error);
-assertThrowsInstanceOf(() =>
-	assertThrowsInstanceOf(() => new Function('var [...(b)] = []'), SyntaxError)
-	, Error);
+
 
 var inputArray = [1, 2, 3];
 var inputDeep = [1, inputArray];
@@ -81,7 +80,7 @@ testDeclaration(testVar);
 function testGlobal(pattern, input, binding) {
   binding = binding || 'rest';
   return new Function('input',
-    '(' + pattern + ') = input;' +
+    '(' + pattern + ' = input);' +
     'return ' + binding
   )(input);
 }
@@ -91,7 +90,7 @@ function testClosure(pattern, input, binding) {
   binding = binding || 'rest';
   return new Function('input',
     'var ' + binding + '; (function () {' +
-    '(' + pattern + ') = input;' +
+    '(' + pattern + ' = input);' +
     '})();' +
     'return ' + binding
   )(input);

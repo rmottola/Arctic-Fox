@@ -19,7 +19,6 @@
 #include "GraphicsFilter.h"
 #include "nsCSSPseudoElements.h"
 #include "FrameMetrics.h"
-#include "gfx3DMatrix.h"
 #include "nsIWidget.h"
 #include "nsCSSProperty.h"
 #include "nsStyleCoord.h"
@@ -799,6 +798,14 @@ public:
   static gfxSize GetTransformToAncestorScale(nsIFrame* aFrame);
 
   /**
+   * Gets the scale factors of the transform for aFrame relative to the root
+   * frame if this transform is 2D, or the identity scale factors otherwise.
+   * If some frame on the path from aFrame to the display root frame may have an
+   * animated scale, returns the identity scale factors.
+   */
+  static gfxSize GetTransformToAncestorScaleExcludingAnimated(nsIFrame* aFrame);
+
+  /**
    * Find the nearest common ancestor frame for aFrame1 and aFrame2. The
    * ancestor frame could be cross-doc.
    */
@@ -908,7 +915,7 @@ public:
    * @return The smallest rect that contains the image of aBounds.
    */
   static nsRect MatrixTransformRect(const nsRect &aBounds,
-                                    const gfx3DMatrix &aMatrix, float aFactor);
+                                    const Matrix4x4 &aMatrix, float aFactor);
 
   /**
    * Helper function that, given a rectangle and a matrix, returns the smallest
@@ -921,7 +928,7 @@ public:
    * @return The smallest rect that contains the image of aBounds.
    */
   static nsRect MatrixTransformRectOut(const nsRect &aBounds,
-                                    const gfx3DMatrix &aMatrix, float aFactor);
+                                       const Matrix4x4 &aMatrix, float aFactor);
   /**
    * Helper function that, given a point and a matrix, returns the image
    * of that point under the matrix transform.
@@ -932,7 +939,7 @@ public:
    * @return The image of the point under the transform.
    */
   static nsPoint MatrixTransformPoint(const nsPoint &aPoint,
-                                      const gfx3DMatrix &aMatrix, float aFactor);
+                                      const Matrix4x4 &aMatrix, float aFactor);
 
   /**
    * Given a graphics rectangle in graphics space, return a rectangle in
@@ -1289,18 +1296,27 @@ public:
 
   /**
    * Get the contribution of aFrame to its containing block's intrinsic
-   * width.  This considers the child's intrinsic width, its 'width',
-   * 'min-width', and 'max-width' properties, and its padding, border,
-   * and margin.
+   * size for the given physical axis.  This considers the child's intrinsic
+   * width, its 'width', 'min-width', and 'max-width' properties (or 'height'
+   * variations if that's what matches aAxis) and its padding, border and margin
+   * in the corresponding dimension.
    */
   enum IntrinsicISizeType { MIN_ISIZE, PREF_ISIZE };
   enum {
     IGNORE_PADDING = 0x01
   };
+  static nscoord IntrinsicForAxis(mozilla::PhysicalAxis aAxis,
+                                  nsRenderingContext*   aRenderingContext,
+                                  nsIFrame*             aFrame,
+                                  IntrinsicISizeType    aType,
+                                  uint32_t              aFlags = 0);
+  /**
+   * Calls IntrinsicForAxis with aFrame's parent's inline physical axis.
+   */
   static nscoord IntrinsicForContainer(nsRenderingContext* aRenderingContext,
-                                       nsIFrame* aFrame,
-                                       IntrinsicISizeType aType,
-                                       uint32_t aFlags = 0);
+                                       nsIFrame*           aFrame,
+                                       IntrinsicISizeType  aType,
+                                       uint32_t            aFlags = 0);
 
   /*
    * Convert nsStyleCoord to nscoord when percentages depend on the
@@ -2128,32 +2144,43 @@ public:
                                         bool clear);
 
   /**
-   * Returns true if the content node has animations or transitions that can be
+   * Given a frame with possibly animated content, finds the content node
+   * that contains its animations as well as the frame's pseudo-element type
+   * relative to the resulting content node. Returns true if animated content
+   * was found, otherwise it returns false and the output parameters are
+   * undefined.
+   */
+  static bool GetAnimationContent(const nsIFrame* aFrame,
+                                  nsIContent* &aContentResult,
+                                  nsCSSPseudoElements::Type &aPseudoTypeResult);
+
+  /**
+   * Returns true if the frame has animations or transitions that can be
    * performed on the compositor.
    */
-  static bool HasAnimationsForCompositor(nsIContent* aContent,
+  static bool HasAnimationsForCompositor(const nsIFrame* aFrame,
                                          nsCSSProperty aProperty);
 
   /**
-   * Returns true if the content node has animations or transitions for the
+   * Returns true if the frame has animations or transitions for the
    * property.
    */
-  static bool HasAnimations(nsIContent* aContent, nsCSSProperty aProperty);
+  static bool HasAnimations(const nsIFrame* aFrame, nsCSSProperty aProperty);
 
   /**
-   * Returns true if the content node has any current animations or transitions
+   * Returns true if the frame has any current animations or transitions
    * (depending on the value of |aAnimationProperty|).
    * A current animation is any animation that has not yet finished playing
    * including paused animations.
    */
-  static bool HasCurrentAnimations(nsIContent* aContent,
+  static bool HasCurrentAnimations(const nsIFrame* aFrame,
                                    nsIAtom* aAnimationProperty);
 
   /**
-   * Returns true if the content node has any current animations or transitions
+   * Returns true if the frame has any current animations or transitions
    * for any of the specified properties.
    */
-  static bool HasCurrentAnimationsForProperties(nsIContent* aContent,
+  static bool HasCurrentAnimationsForProperties(const nsIFrame* aFrame,
                                                 const nsCSSProperty* aProperties,
                                                 size_t aPropertyCount);
 
@@ -2168,7 +2195,7 @@ public:
   static bool IsAnimationLoggingEnabled();
 
   /**
-   * Find a suitable scale for an element (aContent) over the course of any
+   * Find a suitable scale for a element (aFrame's content) over the course of any
    * animations and transitions of the CSS transform property on the
    * element that run on the compositor thread.
    * It will check the maximum and minimum scale during the animations and
@@ -2178,7 +2205,7 @@ public:
    * @param aVisibleSize is the size of the area we want to paint
    * @param aDisplaySize is the size of the display area of the pres context
    */
-  static gfxSize ComputeSuitableScaleForAnimation(nsIContent* aContent,
+  static gfxSize ComputeSuitableScaleForAnimation(const nsIFrame* aFrame,
                                                   const nsSize& aVisibleSize,
                                                   const nsSize& aDisplaySize);
 
@@ -2315,6 +2342,10 @@ public:
 
   static bool FontSizeInflationDisabledInMasterProcess() {
     return sFontSizeInflationDisabledInMasterProcess;
+  }
+
+  static bool SVGTransformBoxEnabled() {
+    return sSVGTransformBoxEnabled;
   }
 
   /**
@@ -2670,6 +2701,9 @@ public:
    */
   static bool ContainsMetricsWithId(const Layer* aLayer, const ViewID& aScrollId);
 
+  static bool ShouldUseNoScriptSheet(nsIDocument* aDocument);
+  static bool ShouldUseNoFramesSheet(nsIDocument* aDocument);
+
 private:
   static uint32_t sFontSizeInflationEmPerLine;
   static uint32_t sFontSizeInflationMinTwips;
@@ -2681,6 +2715,7 @@ private:
   static bool sInvalidationDebuggingIsEnabled;
   static bool sCSSVariablesEnabled;
   static bool sInterruptibleReflowEnabled;
+  static bool sSVGTransformBoxEnabled;
 
   /**
    * Helper function for LogTestDataForPaint().

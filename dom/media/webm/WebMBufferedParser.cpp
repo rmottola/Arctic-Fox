@@ -300,9 +300,8 @@ bool WebMBufferedState::GetOffsetForTime(uint64_t aTime, int64_t* aOffset)
   return true;
 }
 
-void WebMBufferedState::NotifyDataArrived(const char* aBuffer, uint32_t aLength, int64_t aOffset)
+void WebMBufferedState::NotifyDataArrived(const unsigned char* aBuffer, uint32_t aLength, int64_t aOffset)
 {
-  NS_ASSERTION(NS_IsMainThread(), "Should be on main thread.");
   uint32_t idx = mRangeParsers.IndexOfFirstElementGt(aOffset - 1);
   if (idx == 0 || !(mRangeParsers[idx-1] == aOffset)) {
     // If the incoming data overlaps an already parsed range, adjust the
@@ -329,7 +328,7 @@ void WebMBufferedState::NotifyDataArrived(const char* aBuffer, uint32_t aLength,
     }
   }
 
-  mRangeParsers[idx].Append(reinterpret_cast<const unsigned char*>(aBuffer),
+  mRangeParsers[idx].Append(aBuffer,
                             aLength,
                             mTimeMapping,
                             mReentrantMonitor);
@@ -347,6 +346,50 @@ void WebMBufferedState::NotifyDataArrived(const char* aBuffer, uint32_t aLength,
   }
 }
 
+void WebMBufferedState::Reset() {
+  mRangeParsers.Clear();
+  mTimeMapping.Clear();
+}
+
+void WebMBufferedState::UpdateIndex(const nsTArray<MediaByteRange>& aRanges, MediaResource* aResource)
+{
+  for (uint32_t index = 0; index < aRanges.Length(); index++) {
+    const MediaByteRange& range = aRanges[index];
+    int64_t offset = range.mStart;
+    uint32_t length = range.mEnd - range.mStart;
+
+    uint32_t idx = mRangeParsers.IndexOfFirstElementGt(offset - 1);
+    if (!idx || !(mRangeParsers[idx-1] == offset)) {
+      // If the incoming data overlaps an already parsed range, adjust the
+      // buffer so that we only reparse the new data.  It's also possible to
+      // have an overlap where the end of the incoming data is within an
+      // already parsed range, but we don't bother handling that other than by
+      // avoiding storing duplicate timecodes when the parser runs.
+      if (idx != mRangeParsers.Length() && mRangeParsers[idx].mStartOffset <= offset) {
+        // Complete overlap, skip parsing.
+        if (offset + length <= mRangeParsers[idx].mCurrentOffset) {
+          continue;
+        }
+
+        // Partial overlap, adjust the buffer to parse only the new data.
+        int64_t adjust = mRangeParsers[idx].mCurrentOffset - offset;
+        NS_ASSERTION(adjust >= 0, "Overlap detection bug.");
+        offset += adjust;
+        length -= uint32_t(adjust);
+      } else {
+        mRangeParsers.InsertElementAt(idx, WebMBufferedParser(offset));
+        if (idx) {
+          mRangeParsers[idx].SetTimecodeScale(mRangeParsers[0].GetTimecodeScale());
+        }
+      }
+    }
+    nsRefPtr<MediaByteBuffer> bytes = aResource->MediaReadAt(offset, length);
+    if(bytes) {
+      NotifyDataArrived(bytes->Elements(), bytes->Length(), offset);
+    }
+  }
+}
+
 int64_t WebMBufferedState::GetInitEndOffset()
 {
   if (mRangeParsers.IsEmpty()) {
@@ -355,4 +398,37 @@ int64_t WebMBufferedState::GetInitEndOffset()
   return mRangeParsers[0].mInitEndOffset;
 }
 
+bool WebMBufferedState::GetStartTime(uint64_t *aTime)
+{
+  ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+
+  if (mTimeMapping.IsEmpty()) {
+    return false;
+  }
+
+  uint32_t idx = mTimeMapping.IndexOfFirstElementGt(0, SyncOffsetComparator());
+  if (idx == mTimeMapping.Length()) {
+    return false;
+  }
+
+  *aTime = mTimeMapping[idx].mTimecode;
+  return true;
+}
+
+bool
+WebMBufferedState::GetNextKeyframeTime(uint64_t aTime, uint64_t* aKeyframeTime)
+{
+  ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+  int64_t offset = 0;
+  bool rv = GetOffsetForTime(aTime, &offset);
+  if (!rv) {
+    return false;
+  }
+  uint32_t idx = mTimeMapping.IndexOfFirstElementGt(offset, SyncOffsetComparator());
+  if (idx == mTimeMapping.Length()) {
+    return false;
+  }
+  *aKeyframeTime = mTimeMapping[idx].mTimecode;
+  return true;
+}
 } // namespace mozilla

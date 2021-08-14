@@ -1146,6 +1146,9 @@ class JSScript : public js::gc::TenuredCell
         return function_ ? bindings.numUnaliasedBodyLevelLocals() : 0;
     }
 
+    // Calculate the number of fixed slots that are live at a particular bytecode.
+    size_t calculateLiveFixed(jsbytecode* pc);
+
     // Aliases for clarity when dealing with lexical slots.
     size_t fixedLexicalBegin() const {
         return nfixedvars();
@@ -1508,7 +1511,7 @@ class JSScript : public js::gc::TenuredCell
 
   public:
     bool initScriptCounts(JSContext* cx);
-    js::PCCounts getPCCounts(jsbytecode* pc);
+    js::PCCounts& getPCCounts(jsbytecode* pc);
     void addIonCounts(js::jit::IonScriptCounts* ionCounts);
     js::jit::IonScriptCounts* getIonCounts();
     js::ScriptCounts releaseScriptCounts();

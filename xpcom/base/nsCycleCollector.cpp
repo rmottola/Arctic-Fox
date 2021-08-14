@@ -182,6 +182,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "mozilla/AutoTimelineMarker.h"
 #include "mozilla/Likely.h"
 #include "mozilla/PoisonIOInterposer.h"
 #include "mozilla/Telemetry.h"
@@ -832,21 +833,20 @@ private:
   PLDHashTable mPtrToNodeMap;
   bool mOutOfMemory;
 
-public:
-  CCGraph() : mRootCount(0), mOutOfMemory(false) {}
+  static const uint32_t kInitialMapLength = 16384;
 
-  ~CCGraph()
-  {
-    if (mPtrToNodeMap.IsInitialized()) {
-      PL_DHashTableFinish(&mPtrToNodeMap);
-    }
-  }
+public:
+  CCGraph()
+    : mRootCount(0)
+    , mPtrToNodeMap(&PtrNodeOps, sizeof(PtrToNodeEntry), kInitialMapLength)
+    , mOutOfMemory(false)
+  {}
+
+  ~CCGraph() {}
 
   void Init()
   {
     MOZ_ASSERT(IsEmpty(), "Failed to call CCGraph::Clear");
-    PL_DHashTableInit(&mPtrToNodeMap, &PtrNodeOps,
-                      sizeof(PtrToNodeEntry), 16384);
   }
 
   void Clear()
@@ -855,7 +855,7 @@ public:
     mEdges.Clear();
     mWeakMaps.Clear();
     mRootCount = 0;
-    PL_DHashTableFinish(&mPtrToNodeMap);
+    mPtrToNodeMap.ClearAndPrepareForLength(kInitialMapLength);
     mOutOfMemory = false;
   }
 
@@ -864,13 +864,14 @@ public:
   {
     return mNodes.IsEmpty() && mEdges.IsEmpty() &&
            mWeakMaps.IsEmpty() && mRootCount == 0 &&
-           !mPtrToNodeMap.IsInitialized();
+           mPtrToNodeMap.EntryCount() == 0;
   }
 #endif
 
+  PtrToNodeEntry* FindNodeEntry(void* aPtr);
   PtrInfo* FindNode(void* aPtr);
   PtrToNodeEntry* AddNodeToMap(void* aPtr);
-  void RemoveNodeFromMap(void* aPtr);
+  void RemoveNodeFromMap(PtrToNodeEntry* aPtr);
 
   uint32_t MapCount() const
   {
@@ -886,15 +887,21 @@ public:
 
     // We don't measure what the WeakMappings point to, because the
     // pointers are non-owning.
-    *aWeakMapsSize = mWeakMaps.SizeOfExcludingThis(aMallocSizeOf);
+    *aWeakMapsSize = mWeakMaps.ShallowSizeOfExcludingThis(aMallocSizeOf);
   }
 };
+
+PtrToNodeEntry*
+CCGraph::FindNodeEntry(void* aPtr)
+{
+  return
+    static_cast<PtrToNodeEntry*>(mPtrToNodeMap.Search(aPtr));
+}
 
 PtrInfo*
 CCGraph::FindNode(void* aPtr)
 {
-  PtrToNodeEntry* e =
-    static_cast<PtrToNodeEntry*>(PL_DHashTableSearch(&mPtrToNodeMap, aPtr));
+  PtrToNodeEntry* e = FindNodeEntry(aPtr);
   return e ? e->mNode : nullptr;
 }
 
@@ -906,8 +913,7 @@ CCGraph::AddNodeToMap(void* aPtr)
     return nullptr;
   }
 
-  PtrToNodeEntry* e = static_cast<PtrToNodeEntry*>
-    (PL_DHashTableAdd(&mPtrToNodeMap, aPtr, fallible));
+  auto e = static_cast<PtrToNodeEntry*>(mPtrToNodeMap.Add(aPtr, fallible));
   if (!e) {
     mOutOfMemory = true;
     MOZ_ASSERT(false, "Ran out of memory while building cycle collector graph");
@@ -917,9 +923,9 @@ CCGraph::AddNodeToMap(void* aPtr)
 }
 
 void
-CCGraph::RemoveNodeFromMap(void* aPtr)
+CCGraph::RemoveNodeFromMap(PtrToNodeEntry* aEntry)
 {
-  PL_DHashTableRemove(&mPtrToNodeMap, aPtr);
+  mPtrToNodeMap.RemoveEntry(aEntry);
 }
 
 
@@ -2840,6 +2846,11 @@ nsCycleCollector::ForgetSkippable(bool aRemoveChildlessNodes,
 {
   CheckThreadSafety();
 
+  mozilla::Maybe<mozilla::AutoGlobalTimelineMarker> marker;
+  if (NS_IsMainThread()) {
+    marker.emplace("nsCycleCollector::ForgetSkippable");
+  }
+
   // If we remove things from the purple buffer during graph building, we may
   // lose track of an object that was mutated during graph building.
   MOZ_ASSERT(mIncrementalPhase == IdlePhase);
@@ -3559,6 +3570,9 @@ nsCycleCollector::CleanupAfterCollection()
   timeLog.Checkpoint("CleanupAfterCollection::telemetry");
 
   if (mJSRuntime) {
+    mJSRuntime->FinalizeDeferredThings(mResults.mAnyManual
+                                       ? CycleCollectedJSRuntime::FinalizeNow
+                                       : CycleCollectedJSRuntime::FinalizeIncrementally);
     mJSRuntime->EndCycleCollectionCallback(mResults);
     timeLog.Checkpoint("CleanupAfterCollection::EndCycleCollectionCallback()");
   }
@@ -3605,6 +3619,11 @@ nsCycleCollector::Collect(ccType aCCType,
 
   MOZ_ASSERT(!IsIncrementalGCInProgress());
 
+  mozilla::Maybe<mozilla::AutoGlobalTimelineMarker> marker;
+  if (NS_IsMainThread()) {
+    marker.emplace("nsCycleCollector::Collect");
+  }
+
   bool startedIdle = (mIncrementalPhase == IdlePhase);
   bool collectedAny = false;
 
@@ -3614,6 +3633,10 @@ nsCycleCollector::Collect(ccType aCCType,
     TimeLog timeLog;
     FreeSnowWhite(true);
     timeLog.Checkpoint("Collect::FreeSnowWhite");
+  }
+
+  if (aCCType != SliceCC) {
+    mResults.mAnyManual = true;
   }
 
   ++mResults.mNumSlices;
@@ -3813,6 +3836,7 @@ nsCycleCollector::BeginCollection(ccType aCCType,
   // Set up the data structures for building the graph.
   mGraph.Init();
   mResults.Init();
+  mResults.mAnyManual = (aCCType != SliceCC);
   bool mergeZones = ShouldMergeZones(aCCType);
   mResults.mMergedZones = mergeZones;
 
@@ -3866,8 +3890,10 @@ nsCycleCollector::RemoveObjectFromGraph(void* aObj)
     return;
   }
 
-  if (PtrInfo* pinfo = mGraph.FindNode(aObj)) {
-    mGraph.RemoveNodeFromMap(aObj);
+  PtrToNodeEntry* e = mGraph.FindNodeEntry(aObj);
+  PtrInfo* pinfo = e ? e->mNode : nullptr;
+  if (pinfo) {
+    mGraph.RemoveNodeFromMap(e);
 
     pinfo->mPointer = nullptr;
     pinfo->mParticipant = nullptr;

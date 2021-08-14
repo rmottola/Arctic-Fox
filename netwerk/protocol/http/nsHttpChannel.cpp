@@ -7,6 +7,8 @@
 // HttpLog.h should generally be included first
 #include "HttpLog.h"
 
+#include "mozilla/dom/nsCSPUtils.h"
+#include "mozilla/dom/nsCSPContext.h"
 #include "nsHttp.h"
 #include "nsHttpChannel.h"
 #include "nsHttpHandler.h"
@@ -15,6 +17,7 @@
 #include "nsICacheStorageService.h"
 #include "nsICacheStorage.h"
 #include "nsICacheEntry.h"
+#include "nsICaptivePortalService.h"
 #include "nsICryptoHash.h"
 #include "nsINetworkInterceptController.h"
 #include "nsIStringBundle.h"
@@ -24,7 +27,10 @@
 #include "nsIProtocolProxyService2.h"
 #include "nsIURIClassifier.h"
 #include "nsMimeTypes.h"
+#include "nsNetCID.h"
 #include "nsNetUtil.h"
+#include "nsIURL.h"
+#include "nsIStreamTransportService.h"
 #include "prprf.h"
 #include "prnetdb.h"
 #include "nsEscape.h"
@@ -159,6 +165,8 @@ bool IsRedirectStatus(uint32_t status)
            status == 307 || status == 308;
 }
 
+} // unnamed namespace
+
 // We only treat 3xx responses as redirects if they have a Location header and
 // the status code is in a whitelist.
 bool
@@ -167,8 +175,6 @@ WillRedirect(const nsHttpResponseHead * response)
     return IsRedirectStatus(response->Status()) &&
            response->PeekHeader(nsHttp::Location);
 }
-
-} // unnamed namespace
 
 nsresult
 StoreAuthorizationMetaData(nsICacheEntry *entry, nsHttpRequestHead *requestHead);
@@ -315,7 +321,48 @@ nsHttpChannel::Connect()
     rv = mURI->SchemeIs("https", &isHttps);
     NS_ENSURE_SUCCESS(rv,rv);
 
-    if (mAllowSTS && !isHttps) {
+    if (!isHttps) {
+        // If any of the documents up the chain to the root doucment makes use of
+        // the CSP directive 'upgrade-insecure-requests', then it's time to fulfill
+        // the promise to CSP and mixed content blocking to upgrade the channel
+        // from http to https.
+        if (mLoadInfo && mLoadInfo->GetUpgradeInsecureRequests()) {
+            // Please note that cross origin top level navigations are not subject
+            // to upgrade-insecure-requests, see:
+            // http://www.w3.org/TR/upgrade-insecure-requests/#examples
+            nsCOMPtr<nsIPrincipal> resultPrincipal;
+            nsContentUtils::GetSecurityManager()->
+                GetChannelResultPrincipal(this, getter_AddRefs(resultPrincipal));
+            bool crossOriginNavigation =
+                (mLoadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_DOCUMENT) &&
+                (!resultPrincipal->Equals(mLoadInfo->LoadingPrincipal()));
+
+            if (!crossOriginNavigation) {
+                // let's log a message to the console that we are upgrading a request
+                nsAutoCString spec, scheme;
+                mURI->GetSpec(spec);
+                mURI->GetScheme(scheme);
+                // append the additional 's' for security to the scheme :-)
+                scheme.AppendASCII("s");
+                NS_ConvertUTF8toUTF16 reportSpec(spec);
+                NS_ConvertUTF8toUTF16 reportScheme(scheme);
+
+                const char16_t* params[] = { reportSpec.get(), reportScheme.get() };
+                uint32_t innerWindowId = mLoadInfo ? mLoadInfo->GetInnerWindowID() : 0;
+                CSP_LogLocalizedStr(NS_LITERAL_STRING("upgradeInsecureRequest").get(),
+                                    params, ArrayLength(params),
+                                    EmptyString(), // aSourceFile
+                                    EmptyString(), // aScriptSample
+                                    0, // aLineNumber
+                                    0, // aColumnNumber
+                                    nsIScriptError::warningFlag, "CSP",
+                                    innerWindowId);
+
+                Telemetry::Accumulate(Telemetry::HTTP_SCHEME_UPGRADE, 4);
+                return AsyncCall(&nsHttpChannel::HandleAsyncRedirectChannelToHttps);
+            }
+        }
+
         // enforce Strict-Transport-Security
         nsISiteSecurityService* sss = gHttpHandler->GetSSService();
         NS_ENSURE_TRUE(sss, NS_ERROR_OUT_OF_MEMORY);
@@ -332,12 +379,21 @@ nsHttpChannel::Connect()
 
         if (isStsHost) {
             LOG(("nsHttpChannel::Connect() STS permissions found\n"));
-            return AsyncCall(&nsHttpChannel::HandleAsyncRedirectChannelToHttps);
+            if (mAllowSTS) {
+                Telemetry::Accumulate(Telemetry::HTTP_SCHEME_UPGRADE, 3);
+                return AsyncCall(&nsHttpChannel::HandleAsyncRedirectChannelToHttps);
+            } else {
+                Telemetry::Accumulate(Telemetry::HTTP_SCHEME_UPGRADE, 2);
+            }
+        } else {
+            Telemetry::Accumulate(Telemetry::HTTP_SCHEME_UPGRADE, 1);
         }
+    } else {
+        Telemetry::Accumulate(Telemetry::HTTP_SCHEME_UPGRADE, 0);
     }
 
     // ensure that we are using a valid hostname
-    if (!net_IsValidHostName(nsDependentCString(mConnectionInfo->Host())))
+    if (!net_IsValidHostName(nsDependentCString(mConnectionInfo->Origin())))
         return NS_ERROR_UNKNOWN_HOST;
 
     // Finalize ConnectionInfo flags before SpeculativeConnect
@@ -912,7 +968,7 @@ nsHttpChannel::CallOnStartRequest()
         if (!mContentTypeHint.IsEmpty())
             mResponseHead->SetContentType(mContentTypeHint);
         else if (mResponseHead->Version() == NS_HTTP_VERSION_0_9 &&
-                 mConnectionInfo->Port() != mConnectionInfo->DefaultPort())
+                 mConnectionInfo->OriginPort() != mConnectionInfo->DefaultPort())
             mResponseHead->SetContentType(NS_LITERAL_CSTRING(TEXT_PLAIN));
         else {
             // Uh-oh.  We had better find out what type we are!
@@ -1241,11 +1297,6 @@ nsHttpChannel::ProcessSSLInformation()
         NS_SUCCEEDED(securityInfo->GetSecurityState(&state)) &&
         (state & nsIWebProgressListener::STATE_IS_BROKEN)) {
         // Send weak crypto warnings to the web console
-        if (state & nsIWebProgressListener::STATE_USES_SSL_3) {
-            nsString consoleErrorTag = NS_LITERAL_STRING("WeakProtocolVersionWarning");
-            nsString consoleErrorCategory = NS_LITERAL_STRING("SSL");
-            AddSecurityMessage(consoleErrorTag, consoleErrorCategory);
-        }
         if (state & nsIWebProgressListener::STATE_USES_WEAK_CRYPTO) {
             nsString consoleErrorTag = NS_LITERAL_STRING("WeakCipherSuiteWarning");
             nsString consoleErrorCategory = NS_LITERAL_STRING("SSL");
@@ -2432,7 +2483,7 @@ nsHttpChannel::ProcessPartialContent()
         LOG(("nsHttpChannel::ProcessPartialContent [this=%p] "
              "206 has different total entity size than the content length "
              "of the original partially cached entity.\n", this));
-        
+
         mCacheEntry->AsyncDoom(nullptr);
         Cancel(NS_ERROR_CORRUPTED_CONTENT);
         return CallOnStartRequest();
@@ -2836,7 +2887,15 @@ nsHttpChannel::OpenCacheEntry(bool isHttps)
         NS_ENSURE_SUCCESS(rv, rv);
     }
     else {
-        openURI = mURI;
+        // In the case of intercepted channels, we need to construct the cache
+        // entry key based on the original URI, so that in case the intercepted
+        // channel is redirected, the cache entry key before and after the
+        // redirect is the same.
+        if (PossiblyIntercepted()) {
+            openURI = mOriginalURI;
+        } else {
+            openURI = mURI;
+        }
     }
 
     uint32_t appId = info->AppId();
@@ -2865,7 +2924,7 @@ nsHttpChannel::OpenCacheEntry(bool isHttps)
     }
 
     if (!mPostID && mApplicationCache) {
-        rv = cacheStorageService->AppCacheStorage(info, 
+        rv = cacheStorageService->AppCacheStorage(info,
             mApplicationCache,
             getter_AddRefs(cacheStorage));
     }
@@ -2914,6 +2973,11 @@ nsHttpChannel::OpenCacheEntry(bool isHttps)
                 new InterceptedChannelChrome(this, controller, entry);
         intercepted->NotifyController();
     } else {
+        if (mInterceptCache == INTERCEPTED) {
+            DebugOnly<bool> exists;
+            MOZ_ASSERT(NS_SUCCEEDED(cacheStorage->Exists(openURI, extension, &exists)) && exists,
+                       "The entry must exist in the cache after we create it here");
+        }
         rv = cacheStorage->AsyncOpenURI(openURI, extension, cacheEntryOpenFlags, this);
         NS_ENSURE_SUCCESS(rv, rv);
     }
@@ -4967,9 +5031,9 @@ nsHttpChannel::BeginConnect()
         (mapping = gHttpHandler->GetAltServiceMapping(scheme,
                                                       host, port,
                                                       mPrivateBrowsing))) {
-        LOG(("nsHttpChannel %p Alt Service Mapping Found %s://%s:%d\n", this,
-             scheme.get(), mapping->AlternateHost().get(),
-             mapping->AlternatePort()));
+        LOG(("nsHttpChannel %p Alt Service Mapping Found %s://%s:%d [%s]\n",
+             this, scheme.get(), mapping->AlternateHost().get(),
+             mapping->AlternatePort(), mapping->HashKey().get()));
 
         if (!(mLoadFlags & LOAD_ANONYMOUS) && !mPrivateBrowsing) {
             nsAutoCString altUsedLine(mapping->AlternateHost());
@@ -5120,6 +5184,7 @@ nsHttpChannel::BeginConnect()
     if (mLoadFlags & LOAD_FRESH_CONNECTION) {
         // just the initial document resets the whole pool
         if (mLoadFlags & LOAD_INITIAL_DOCUMENT_URI) {
+            gHttpHandler->ConnMgr()->ClearAltServiceMappings();
             gHttpHandler->ConnMgr()->DoShiftReloadConnectionCleanup(mConnectionInfo);
         }
         mCaps &= ~NS_HTTP_ALLOW_PIPELINING;
@@ -5929,7 +5994,7 @@ nsHttpChannel::OnDataAvailable(nsIRequest *request, nsISupports *ctxt,
             }
             mLogicalOffset += count;
         }
-        
+
         return rv;
     }
 
@@ -6158,69 +6223,9 @@ nsHttpChannel::SetOfflineCacheToken(nsISupports *token)
     return NS_ERROR_NOT_IMPLEMENTED;
 }
 
-NS_IMPL_ADDREF(nsHttpChannelCacheKey)
-NS_IMPL_RELEASE(nsHttpChannelCacheKey)
-NS_INTERFACE_TABLE_HEAD(nsHttpChannelCacheKey)
-NS_INTERFACE_TABLE_BEGIN
-NS_INTERFACE_TABLE_ENTRY_AMBIGUOUS(nsHttpChannelCacheKey,
-                                   nsISupports, nsISupportsPRUint32)
-NS_INTERFACE_TABLE_ENTRY_AMBIGUOUS(nsHttpChannelCacheKey,
-                                   nsISupportsPrimitive, nsISupportsPRUint32)
-NS_INTERFACE_TABLE_ENTRY(nsHttpChannelCacheKey,
-                         nsISupportsPRUint32)
-NS_INTERFACE_TABLE_ENTRY(nsHttpChannelCacheKey,
-                         nsISupportsCString)
-NS_INTERFACE_TABLE_END
-NS_INTERFACE_TABLE_TAIL
-
-NS_IMETHODIMP nsHttpChannelCacheKey::GetType(uint16_t *aType)
-{
-    NS_ENSURE_ARG_POINTER(aType);
-
-    *aType = TYPE_PRUINT32;
-    return NS_OK;
-}
-
-nsresult nsHttpChannelCacheKey::SetData(uint32_t aPostID,
-                                        const nsACString& aKey)
-{
-    nsresult rv;
-
-    mSupportsCString =
-        do_CreateInstance(NS_SUPPORTS_CSTRING_CONTRACTID, &rv);
-    if (NS_FAILED(rv)) return rv;
-
-    mSupportsCString->SetData(aKey);
-    if (NS_FAILED(rv)) return rv;
-
-    mSupportsPRUint32 =
-        do_CreateInstance(NS_SUPPORTS_PRUINT32_CONTRACTID, &rv);
-    if (NS_FAILED(rv)) return rv;
-
-    mSupportsPRUint32->SetData(aPostID);
-    if (NS_FAILED(rv)) return rv;
-
-    return NS_OK;
-}
-
-nsresult nsHttpChannelCacheKey::GetData(uint32_t *aPostID,
-                                        nsACString& aKey)
-{
-    nsresult rv;
-
-    rv = mSupportsPRUint32->GetData(aPostID);
-    if (NS_FAILED(rv)) {
-      return rv;
-    }
-
-    return mSupportsCString->GetData(aKey);
-}
-
 NS_IMETHODIMP
 nsHttpChannel::GetCacheKey(nsISupports **key)
 {
-    // mayhemer: TODO - do we need this API?
-
     nsresult rv;
     NS_ENSURE_ARG_POINTER(key);
 
@@ -6228,17 +6233,13 @@ nsHttpChannel::GetCacheKey(nsISupports **key)
 
     *key = nullptr;
 
-    nsRefPtr<nsHttpChannelCacheKey> container =
-        new nsHttpChannelCacheKey();
+    nsCOMPtr<nsISupportsPRUint32> container =
+        do_CreateInstance(NS_SUPPORTS_PRUINT32_CONTRACTID, &rv);
 
     if (!container)
         return NS_ERROR_OUT_OF_MEMORY;
 
-    nsAutoCString cacheKey;
-    rv = GenerateCacheKey(mPostID, cacheKey);
-    if (NS_FAILED(rv)) return rv;
-
-    rv = container->SetData(mPostID, cacheKey);
+    rv = container->SetData(mPostID);
     if (NS_FAILED(rv)) return rv;
 
     return CallQueryInterface(container.get(), key);

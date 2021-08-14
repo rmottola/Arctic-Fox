@@ -5,13 +5,24 @@ const { ActorPool, appendExtraActors, createExtraActors } = require("devtools/se
 const { RootActor } = require("devtools/server/actors/root");
 const { ThreadActor } = require("devtools/server/actors/script");
 const { DebuggerServer } = require("devtools/server/main");
+const { TabSources } = require("devtools/server/actors/utils/TabSources");
 const promise = require("promise");
 const makeDebugger = require("devtools/server/actors/utils/make-debugger");
 
-var gTestGlobals = [];
+let gTestGlobals = [];
 DebuggerServer.addTestGlobal = function(aGlobal) {
   gTestGlobals.push(aGlobal);
 };
+
+DebuggerServer.getTestGlobal = function(name) {
+  for (let g of gTestGlobals) {
+    if (g.__name == name) {
+      return g;
+    }
+  }
+
+  return null;
+}
 
 // A mock tab list, for use by tests. This simply presents each global in
 // gTestGlobals as a tab, and the list is fixed: it never calls its
@@ -46,7 +57,7 @@ function TestTabList(aConnection) {
 TestTabList.prototype = {
   constructor: TestTabList,
   getList: function () {
-    return Promise.resolve([tabActor for (tabActor of this._tabActors)]);
+    return Promise.resolve([...this._tabActors]);
   }
 };
 
@@ -84,11 +95,18 @@ TestTabActor.prototype = {
   actorPrefix: "TestTabActor",
 
   get window() {
-    return { wrappedJSObject: this._global };
+    return this._global;
   },
 
   get url() {
     return this._global.__name;
+  },
+
+  get sources() {
+    if (!this._sources) {
+      this._sources = new TabSources(this.threadActor);
+    }
+    return this._sources;
   },
 
   form: function() {
@@ -124,6 +142,7 @@ TestTabActor.prototype = {
   },
 
   onReload: function(aRequest) {
+    this.sources.reset({ sourceMaps: true });
     this.threadActor.clearDebuggees();
     this.threadActor.dbg.addDebuggees();
     return {};

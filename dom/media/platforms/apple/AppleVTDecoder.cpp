@@ -12,15 +12,15 @@
 #include "AppleVTLinker.h"
 #include "mp4_demuxer/H264.h"
 #include "MediaData.h"
-#include "MacIOSurfaceImage.h"
 #include "mozilla/ArrayUtils.h"
 #include "nsAutoPtr.h"
 #include "nsThreadUtils.h"
 #include "mozilla/Logging.h"
 #include "VideoUtils.h"
+#include "gfxPlatform.h"
 
 PRLogModuleInfo* GetAppleMediaLog();
-#define LOG(...) PR_LOG(GetAppleMediaLog(), PR_LOG_DEBUG, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(GetAppleMediaLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 //#define LOG_MEDIA_SHA1
 
 #ifdef LOG_MEDIA_SHA1
@@ -30,7 +30,7 @@ PRLogModuleInfo* GetAppleMediaLog();
 namespace mozilla {
 
 AppleVTDecoder::AppleVTDecoder(const VideoInfo& aConfig,
-                               FlushableMediaTaskQueue* aVideoTaskQueue,
+                               FlushableTaskQueue* aVideoTaskQueue,
                                MediaDataDecoderCallback* aCallback,
                                layers::ImageContainer* aImageContainer)
   : AppleVDADecoder(aConfig, aVideoTaskQueue, aCallback, aImageContainer)
@@ -345,23 +345,19 @@ AppleVTDecoder::CreateDecoderExtensions()
   const void* extensionKeys[] =
     { kCVImageBufferChromaLocationBottomFieldKey,
       kCVImageBufferChromaLocationTopFieldKey,
-      AppleCMLinker::skPropExtensionAtoms,
-      AppleCMLinker::skPropFullRangeVideo /* Not defined in 10.6 */ };
+      AppleCMLinker::skPropExtensionAtoms };
 
   const void* extensionValues[] =
     { kCVImageBufferChromaLocation_Left,
       kCVImageBufferChromaLocation_Left,
-      atoms,
-      kCFBooleanTrue };
+      atoms };
   static_assert(ArrayLength(extensionKeys) == ArrayLength(extensionValues),
                 "Non matching keys/values array size");
 
   return CFDictionaryCreate(kCFAllocatorDefault,
                             extensionKeys,
                             extensionValues,
-                            AppleCMLinker::skPropFullRangeVideo ?
-                              ArrayLength(extensionKeys) :
-                              ArrayLength(extensionKeys) - 1,
+                            ArrayLength(extensionKeys),
                             &kCFTypeDictionaryKeyCallBacks,
                             &kCFTypeDictionaryValueCallBacks);
 }
@@ -374,7 +370,13 @@ AppleVTDecoder::CreateDecoderSpecification()
   }
 
   const void* specKeys[] = { AppleVTLinker::skPropEnableHWAccel };
-  const void* specValues[] = { kCFBooleanTrue };
+  const void* specValues[1];
+  if (gfxPlatform::GetPlatform()->CanUseHardwareVideoDecoding()) {
+    specValues[0] = kCFBooleanTrue;
+  } else {
+    // This GPU is blacklisted for hardware decoding.
+    specValues[0] = kCFBooleanFalse;
+  }
   static_assert(ArrayLength(specKeys) == ArrayLength(specValues),
                 "Non matching keys/values array size");
 

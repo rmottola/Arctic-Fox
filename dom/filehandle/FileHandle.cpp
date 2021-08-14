@@ -21,6 +21,7 @@
 #include "nsIEventTarget.h"
 #include "nsISeekableStream.h"
 #include "nsNetUtil.h"
+#include "nsIAsyncStreamCopier.h"
 #include "nsString.h"
 #include "nsStringStream.h"
 #include "nsThreadUtils.h"
@@ -592,7 +593,7 @@ FileHandleBase::Finish()
   FileService* service = FileService::Get();
   MOZ_ASSERT(service, "This should never be null");
 
-  nsIEventTarget* target = service->StreamTransportTarget();
+  nsIEventTarget* target = service->ThreadPoolTarget();
 
   nsresult rv = target->Dispatch(helper, NS_DISPATCH_NORMAL);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -632,8 +633,8 @@ FileHandleBase::GetInputStream(const Blob& aValue, uint64_t* aInputLength,
   }
 
   nsCOMPtr<nsIInputStream> stream;
-  aRv = file.GetInternalStream(getter_AddRefs(stream));
-  if (aRv.Failed()) {
+  file.GetInternalStream(getter_AddRefs(stream), aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
 
@@ -739,7 +740,7 @@ ReadHelper::DoAsyncRun(nsISupports* aStream)
   FileService* service = FileService::Get();
   MOZ_ASSERT(service, "This should never be null");
 
-  nsIEventTarget* target = service->StreamTransportTarget();
+  nsIEventTarget* target = service->ThreadPoolTarget();
 
   nsCOMPtr<nsIAsyncStreamCopier> copier;
   nsresult rv =
@@ -814,7 +815,7 @@ WriteHelper::DoAsyncRun(nsISupports* aStream)
   FileService* service = FileService::Get();
   MOZ_ASSERT(service, "This should never be null");
 
-  nsIEventTarget* target = service->StreamTransportTarget();
+  nsIEventTarget* target = service->ThreadPoolTarget();
 
   nsCOMPtr<nsIAsyncStreamCopier> copier;
   nsresult rv =

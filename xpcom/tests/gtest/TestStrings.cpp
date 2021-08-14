@@ -1,4 +1,5 @@
-/* vim:set ts=2 sw=2 et cindent: */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -157,7 +158,7 @@ TEST(Strings, findinreadable)
   free(r);
 
   // Should not find a match
-  EXPECT_FALSE(FindInReadable(NS_LITERAL_CSTRING("goanna"), delim_begin, delim_end));
+  EXPECT_FALSE(FindInReadable(NS_LITERAL_CSTRING("gecko"), delim_begin, delim_end));
 
   // When no match is found, range should be empty
   EXPECT_EQ(delim_begin, delim_end);
@@ -224,7 +225,7 @@ TEST(Strings, rfindinreadable)
   // Should not find a match
   delim_begin = begin;
   delim_end = end;
-  EXPECT_FALSE(RFindInReadable(NS_LITERAL_CSTRING("goanna"), delim_begin, delim_end));
+  EXPECT_FALSE(RFindInReadable(NS_LITERAL_CSTRING("gecko"), delim_begin, delim_end));
 
   // When no match is found, range should be empty
   EXPECT_EQ(delim_begin, delim_end);

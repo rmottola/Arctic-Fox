@@ -306,7 +306,7 @@ class Node {
     Node() { construct<void>(nullptr); }
 
     template<typename T>
-    Node(T* ptr) {
+    MOZ_IMPLICIT Node(T* ptr) {
         construct(ptr);
     }
     template<typename T>
@@ -317,7 +317,7 @@ class Node {
 
     // We can construct and assign from rooted forms of pointers.
     template<typename T>
-    Node(const Rooted<T*>& root) {
+    MOZ_IMPLICIT Node(const Rooted<T*>& root) {
         construct(root.get());
     }
     template<typename T>
@@ -331,7 +331,7 @@ class Node {
     // JS::ubi::Node are both essentially tagged references to other sorts of
     // objects, so letting conversions happen automatically is appropriate.
     MOZ_IMPLICIT Node(JS::HandleValue value);
-    Node(JS::TraceKind kind, void* ptr);
+    explicit Node(const JS::GCCellPtr& thing);
 
     // copy construction and copy assignment just use memcpy, since we know
     // instances contain nothing but a vtable pointer and a data pointer.

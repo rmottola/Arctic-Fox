@@ -5,7 +5,7 @@
  * Test basic functionality of PerformanceFront, retrieving timeline data.
  */
 
-function spawnTest () {
+function* spawnTest() {
   let { target, front } = yield initBackend(SIMPLE_URL);
 
   let lastMemoryDelta = 0;
@@ -68,8 +68,11 @@ function spawnTest () {
       counters.ticks.push({ delta, timestamps });
       lastTickDelta = delta;
     }
+    else if (name === "frames") {
+      // Nothing to do here.
+    }
     else {
-      throw new Error("unknown event " + name);
+      ok(false, `Received unknown event: ${name}`);
     }
 
     if (name === "markers" && counters[name].length === 1 ||

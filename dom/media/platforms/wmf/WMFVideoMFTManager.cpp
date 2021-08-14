@@ -20,9 +20,10 @@
 #include "gfxWindowsPlatform.h"
 #include "IMFYCbCrImage.h"
 #include "mozilla/WindowsVersion.h"
+#include "mozilla/Preferences.h"
 
 PRLogModuleInfo* GetDemuxerLog();
-#define LOG(...) PR_LOG(GetDemuxerLog(), PR_LOG_DEBUG, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(GetDemuxerLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 using mozilla::layers::Image;
 using mozilla::layers::IMFYCbCrImage;
@@ -131,6 +132,7 @@ public:
   NS_IMETHOD Run() {
     NS_ASSERTION(NS_IsMainThread(), "Must be on main thread.");
     if (mBackend == LayersBackend::LAYERS_D3D11 &&
+        Preferences::GetBool("media.windows-media-foundation.allow-d3d11-dxva", false) &&
         IsWin8OrLater()) {
       mDXVA2Manager = DXVA2Manager::CreateD3D11DXVA();
     } else {
@@ -153,11 +155,6 @@ WMFVideoMFTManager::InitializeDXVA()
   if (!mDXVAEnabled ||
       (mLayersBackend != LayersBackend::LAYERS_D3D9 &&
        mLayersBackend != LayersBackend::LAYERS_D3D11)) {
-    return false;
-  }
-
-  if (gfxWindowsPlatform::GetPlatform()->IsWARP() ||
-      !gfxPlatform::CanUseDXVA()) {
     return false;
   }
 
@@ -185,13 +182,15 @@ WMFVideoMFTManager::Init()
   HRESULT hr = decoder->Create(GetMFTGUID());
   NS_ENSURE_TRUE(SUCCEEDED(hr), nullptr);
 
-  if (useDxva) {
-    RefPtr<IMFAttributes> attr(decoder->GetAttributes());
-
-    UINT32 aware = 0;
-    if (attr) {
+  RefPtr<IMFAttributes> attr(decoder->GetAttributes());
+  UINT32 aware = 0;
+  if (attr) {
       attr->GetUINT32(MF_SA_D3D_AWARE, &aware);
-    }
+      attr->SetUINT32(CODECAPI_AVDecNumWorkerThreads,
+                      WMFDecoderModule::GetNumDecoderThreads());
+  }
+
+  if (useDxva) {
     if (aware) {
       // TODO: Test if I need this anywhere... Maybe on Vista?
       //hr = attr->SetUINT32(CODECAPI_AVDecVideoAcceleration_H264, TRUE);
@@ -397,8 +396,10 @@ WMFVideoMFTManager::CreateBasicVideoFrame(IMFSample* aSample,
   b.mPlanes[2].mOffset = 0;
   b.mPlanes[2].mSkip = 0;
 
-  Microseconds pts = GetSampleTime(aSample);
-  Microseconds duration = GetSampleDuration(aSample);
+  media::TimeUnit pts = GetSampleTime(aSample);
+  NS_ENSURE_TRUE(pts.IsValid(), E_FAIL);
+  media::TimeUnit duration = GetSampleDuration(aSample);
+  NS_ENSURE_TRUE(duration.IsValid(), E_FAIL);
 
   nsRefPtr<layers::PlanarYCbCrImage> image =
     new IMFYCbCrImage(buffer, twoDBuffer);
@@ -413,8 +414,8 @@ WMFVideoMFTManager::CreateBasicVideoFrame(IMFSample* aSample,
     VideoData::CreateFromImage(mVideoInfo,
                                mImageContainer,
                                aStreamOffset,
-                               std::max(0LL, pts),
-                               duration,
+                               pts.ToMicroseconds(),
+                               duration.ToMicroseconds(),
                                image.forget(),
                                false,
                                -1,
@@ -445,13 +446,15 @@ WMFVideoMFTManager::CreateD3DVideoFrame(IMFSample* aSample,
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
   NS_ENSURE_TRUE(image, E_FAIL);
 
-  Microseconds pts = GetSampleTime(aSample);
-  Microseconds duration = GetSampleDuration(aSample);
+  media::TimeUnit pts = GetSampleTime(aSample);
+  NS_ENSURE_TRUE(pts.IsValid(), E_FAIL);
+  media::TimeUnit duration = GetSampleDuration(aSample);
+  NS_ENSURE_TRUE(duration.IsValid(), E_FAIL);
   nsRefPtr<VideoData> v = VideoData::CreateFromImage(mVideoInfo,
                                                      mImageContainer,
                                                      aStreamOffset,
-                                                     pts,
-                                                     duration,
+                                                     pts.ToMicroseconds(),
+                                                     duration.ToMicroseconds(),
                                                      image.forget(),
                                                      false,
                                                      -1,

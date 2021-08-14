@@ -2,7 +2,7 @@
 
 '''
 Command line interface to fetch details from the b2g/config/gaia.json properties
-file used to link a particular version of gaia to goanna.
+file used to link a particular version of gaia to gecko.
 '''
 
 import argparse
@@ -13,19 +13,19 @@ import urlparse
 
 parser = argparse.ArgumentParser(
     description='Get various information about gaia version tied to particular \
-    goanna')
+    gecko')
 
-parser.add_argument('goanna', metavar="GECKO_DIR", help="Path to goanna revision")
+parser.add_argument('gecko', metavar="GECKO_DIR", help="Path to gecko revision")
 parser.add_argument('prop', help="Property type",
                     choices=['repository', 'revision'])
 
 args = parser.parse_args()
 
-if not os.path.isdir(args.goanna):
-        print >> sys.stderr, 'Given goanna path is not a directory'
+if not os.path.isdir(args.gecko):
+        print >> sys.stderr, 'Given gecko path is not a directory'
         sys.exit(1)
 
-props_path = os.path.join(args.goanna, 'b2g/config/gaia.json')
+props_path = os.path.join(args.gecko, 'b2g/config/gaia.json')
 
 if not os.path.isfile(props_path):
         print >> sys.stderr, \

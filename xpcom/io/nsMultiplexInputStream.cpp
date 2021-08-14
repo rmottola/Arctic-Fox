@@ -11,10 +11,12 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/MathAlgorithms.h"
+#include "mozilla/Mutex.h"
 
 #include "base/basictypes.h"
 
 #include "nsMultiplexInputStream.h"
+#include "nsICloneableInputStream.h"
 #include "nsIMultiplexInputStream.h"
 #include "nsISeekableStream.h"
 #include "nsCOMPtr.h"
@@ -23,6 +25,7 @@
 #include "nsIIPCSerializableInputStream.h"
 #include "mozilla/ipc/InputStreamUtils.h"
 
+using namespace mozilla;
 using namespace mozilla::ipc;
 
 using mozilla::DeprecatedAbs;
@@ -31,6 +34,7 @@ class nsMultiplexInputStream final
   : public nsIMultiplexInputStream
   , public nsISeekableStream
   , public nsIIPCSerializableInputStream
+  , public nsICloneableInputStream
 {
 public:
   nsMultiplexInputStream();
@@ -40,6 +44,7 @@ public:
   NS_DECL_NSIMULTIPLEXINPUTSTREAM
   NS_DECL_NSISEEKABLESTREAM
   NS_DECL_NSIIPCSERIALIZABLEINPUTSTREAM
+  NS_DECL_NSICLONEABLEINPUTSTREAM
 
 private:
   ~nsMultiplexInputStream()
@@ -59,6 +64,7 @@ private:
                              const char* aFromRawSegment, uint32_t aToOffset,
                              uint32_t aCount, uint32_t* aWriteCount);
 
+  Mutex mLock; // Protects access to all data members.
   nsTArray<nsCOMPtr<nsIInputStream>> mStreams;
   uint32_t mCurrentStream;
   bool mStartedReadingCurrent;
@@ -75,7 +81,8 @@ NS_IMPL_QUERY_INTERFACE_CI(nsMultiplexInputStream,
                            nsIMultiplexInputStream,
                            nsIInputStream,
                            nsISeekableStream,
-                           nsIIPCSerializableInputStream)
+                           nsIIPCSerializableInputStream,
+                           nsICloneableInputStream)
 NS_IMPL_CI_INTERFACE_GETTER(nsMultiplexInputStream,
                             nsIMultiplexInputStream,
                             nsIInputStream,
@@ -119,7 +126,8 @@ TellMaybeSeek(nsISeekableStream* aSeekable, int64_t* aResult)
 }
 
 nsMultiplexInputStream::nsMultiplexInputStream()
-  : mCurrentStream(0),
+  : mLock("nsMultiplexInputStream lock"),
+    mCurrentStream(0),
     mStartedReadingCurrent(false),
     mStatus(NS_OK)
 {
@@ -129,6 +137,7 @@ nsMultiplexInputStream::nsMultiplexInputStream()
 NS_IMETHODIMP
 nsMultiplexInputStream::GetCount(uint32_t* aCount)
 {
+  MutexAutoLock lock(mLock);
   *aCount = mStreams.Length();
   return NS_OK;
 }
@@ -150,6 +159,7 @@ SeekableStreamAtBeginning(nsIInputStream* aStream)
 NS_IMETHODIMP
 nsMultiplexInputStream::AppendStream(nsIInputStream* aStream)
 {
+  MutexAutoLock lock(mLock);
   NS_ASSERTION(SeekableStreamAtBeginning(aStream),
                "Appended stream not at beginning.");
   return mStreams.AppendElement(aStream) ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
@@ -159,6 +169,7 @@ nsMultiplexInputStream::AppendStream(nsIInputStream* aStream)
 NS_IMETHODIMP
 nsMultiplexInputStream::InsertStream(nsIInputStream* aStream, uint32_t aIndex)
 {
+  MutexAutoLock lock(mLock);
   NS_ASSERTION(SeekableStreamAtBeginning(aStream),
                "Inserted stream not at beginning.");
   mStreams.InsertElementAt(aIndex, aStream);
@@ -173,6 +184,7 @@ nsMultiplexInputStream::InsertStream(nsIInputStream* aStream, uint32_t aIndex)
 NS_IMETHODIMP
 nsMultiplexInputStream::RemoveStream(uint32_t aIndex)
 {
+  MutexAutoLock lock(mLock);
   mStreams.RemoveElementAt(aIndex);
   if (mCurrentStream > aIndex) {
     --mCurrentStream;
@@ -187,6 +199,7 @@ nsMultiplexInputStream::RemoveStream(uint32_t aIndex)
 NS_IMETHODIMP
 nsMultiplexInputStream::GetStream(uint32_t aIndex, nsIInputStream** aResult)
 {
+  MutexAutoLock lock(mLock);
   *aResult = mStreams.SafeElementAt(aIndex, nullptr);
   if (NS_WARN_IF(!*aResult)) {
     return NS_ERROR_NOT_AVAILABLE;
@@ -200,6 +213,7 @@ nsMultiplexInputStream::GetStream(uint32_t aIndex, nsIInputStream** aResult)
 NS_IMETHODIMP
 nsMultiplexInputStream::Close()
 {
+  MutexAutoLock lock(mLock);
   mStatus = NS_BASE_STREAM_CLOSED;
 
   nsresult rv = NS_OK;
@@ -219,6 +233,7 @@ nsMultiplexInputStream::Close()
 NS_IMETHODIMP
 nsMultiplexInputStream::Available(uint64_t* aResult)
 {
+  MutexAutoLock lock(mLock);
   if (NS_FAILED(mStatus)) {
     return mStatus;
   }
@@ -243,6 +258,7 @@ nsMultiplexInputStream::Available(uint64_t* aResult)
 NS_IMETHODIMP
 nsMultiplexInputStream::Read(char* aBuf, uint32_t aCount, uint32_t* aResult)
 {
+  MutexAutoLock lock(mLock);
   // It is tempting to implement this method in terms of ReadSegments, but
   // that would prevent this class from being used with streams that only
   // implement Read (e.g., file streams).
@@ -294,6 +310,8 @@ NS_IMETHODIMP
 nsMultiplexInputStream::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
                                      uint32_t aCount, uint32_t* aResult)
 {
+  MutexAutoLock lock(mLock);
+
   if (mStatus == NS_BASE_STREAM_CLOSED) {
     *aResult = 0;
     return NS_OK;
@@ -371,6 +389,8 @@ nsMultiplexInputStream::ReadSegCb(nsIInputStream* aIn, void* aClosure,
 NS_IMETHODIMP
 nsMultiplexInputStream::IsNonBlocking(bool* aNonBlocking)
 {
+  MutexAutoLock lock(mLock);
+
   uint32_t len = mStreams.Length();
   if (len == 0) {
     // Claim to be non-blocking, since we won't block the caller.
@@ -399,6 +419,8 @@ nsMultiplexInputStream::IsNonBlocking(bool* aNonBlocking)
 NS_IMETHODIMP
 nsMultiplexInputStream::Seek(int32_t aWhence, int64_t aOffset)
 {
+  MutexAutoLock lock(mLock);
+
   if (NS_FAILED(mStatus)) {
     return mStatus;
   }
@@ -640,6 +662,8 @@ nsMultiplexInputStream::Seek(int32_t aWhence, int64_t aOffset)
 NS_IMETHODIMP
 nsMultiplexInputStream::Tell(int64_t* aResult)
 {
+  MutexAutoLock lock(mLock);
+
   if (NS_FAILED(mStatus)) {
     return mStatus;
   }
@@ -697,6 +721,8 @@ void
 nsMultiplexInputStream::Serialize(InputStreamParams& aParams,
                                   FileDescriptorArray& aFileDescriptors)
 {
+  MutexAutoLock lock(mLock);
+
   MultiplexInputStreamParams params;
 
   uint32_t streamCount = mStreams.Length();
@@ -757,3 +783,65 @@ nsMultiplexInputStream::Deserialize(const InputStreamParams& aParams,
 
   return true;
 }
+
+NS_IMETHODIMP
+nsMultiplexInputStream::GetCloneable(bool* aCloneable)
+{
+  MutexAutoLock lock(mLock);
+  //XXXnsm Cloning a multiplex stream which has started reading is not permitted
+  //right now.
+  if (mCurrentStream > 0 || mStartedReadingCurrent) {
+    *aCloneable = false;
+    return NS_OK;
+  }
+
+  uint32_t len = mStreams.Length();
+  for (uint32_t i = 0; i < len; ++i) {
+    nsCOMPtr<nsICloneableInputStream> cis = do_QueryInterface(mStreams[i]);
+    if (!cis || !cis->GetCloneable()) {
+      *aCloneable = false;
+      return NS_OK;
+    }
+  }
+
+  *aCloneable = true;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMultiplexInputStream::Clone(nsIInputStream** aClone)
+{
+  MutexAutoLock lock(mLock);
+
+  //XXXnsm Cloning a multiplex stream which has started reading is not permitted
+  //right now.
+  if (mCurrentStream > 0 || mStartedReadingCurrent) {
+    return NS_ERROR_FAILURE;
+  }
+
+  nsRefPtr<nsMultiplexInputStream> clone = new nsMultiplexInputStream();
+
+  nsresult rv;
+  uint32_t len = mStreams.Length();
+  for (uint32_t i = 0; i < len; ++i) {
+    nsCOMPtr<nsICloneableInputStream> substream = do_QueryInterface(mStreams[i]);
+    if (NS_WARN_IF(!substream)) {
+      return NS_ERROR_FAILURE;
+    }
+
+    nsCOMPtr<nsIInputStream> clonedSubstream;
+    rv = substream->Clone(getter_AddRefs(clonedSubstream));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    rv = clone->AppendStream(clonedSubstream);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  clone.forget(aClone);
+  return NS_OK;
+}
+

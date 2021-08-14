@@ -44,6 +44,9 @@ using namespace mozilla::ipc;
 namespace mozilla {
 namespace net {
 
+extern bool
+WillRedirect(const nsHttpResponseHead * response);
+
 namespace {
 
 const uint32_t kMaxFileDescriptorsPerMessage = 250;
@@ -177,6 +180,8 @@ HttpChannelChild::HttpChannelChild()
   , mDivertingToParent(false)
   , mFlushedForDiversion(false)
   , mSuspendSent(false)
+  , mSynthesizedResponse(false)
+  , mShouldParentIntercept(false)
 {
   LOG(("Creating HttpChannelChild @%x\n", this));
 
@@ -324,7 +329,7 @@ class StartRequestEvent : public ChannelEvent
                     const nsCString& securityInfoSerialization,
                     const NetAddr& selfAddr,
                     const NetAddr& peerAddr,
-                    const HttpChannelCacheKey& cacheKey)
+                    const uint32_t& cacheKey)
   : mChild(child)
   , mChannelStatus(channelStatus)
   , mResponseHead(responseHead)
@@ -362,7 +367,7 @@ class StartRequestEvent : public ChannelEvent
   nsCString mSecurityInfoSerialization;
   NetAddr mSelfAddr;
   NetAddr mPeerAddr;
-  HttpChannelCacheKey mCacheKey;
+  uint32_t mCacheKey;
 };
 
 bool
@@ -378,7 +383,7 @@ HttpChannelChild::RecvOnStartRequest(const nsresult& channelStatus,
                                      const NetAddr& selfAddr,
                                      const NetAddr& peerAddr,
                                      const int16_t& redirectCount,
-                                     const HttpChannelCacheKey& cacheKey)
+                                     const uint32_t& cacheKey)
 {
   LOG(("HttpChannelChild::RecvOnStartRequest [this=%p]\n", this));
   // mFlushedForDiversion and mDivertingToParent should NEVER be set at this
@@ -419,7 +424,7 @@ HttpChannelChild::OnStartRequest(const nsresult& channelStatus,
                                  const nsCString& securityInfoSerialization,
                                  const NetAddr& selfAddr,
                                  const NetAddr& peerAddr,
-                                 const HttpChannelCacheKey& cacheKey)
+                                 const uint32_t& cacheKey)
 {
   LOG(("HttpChannelChild::OnStartRequest [this=%p]\n", this));
 
@@ -447,11 +452,22 @@ HttpChannelChild::OnStartRequest(const nsresult& channelStatus,
   mCacheExpirationTime = cacheExpirationTime;
   mCachedCharset = cachedCharset;
 
-  nsRefPtr<nsHttpChannelCacheKey> tmpKey = new nsHttpChannelCacheKey();
-  tmpKey->SetData(cacheKey.postId(), cacheKey.key());
-  CallQueryInterface(tmpKey.get(), getter_AddRefs(mCacheKey));
-
   AutoEventEnqueuer ensureSerialDispatch(mEventQ);
+
+  nsresult rv;
+  nsCOMPtr<nsISupportsPRUint32> container =
+    do_CreateInstance(NS_SUPPORTS_PRUINT32_CONTRACTID, &rv);
+  if (NS_FAILED(rv)) {
+    Cancel(rv);
+    return;
+  }
+
+  rv = container->SetData(cacheKey);
+  if (NS_FAILED(rv)) {
+    Cancel(rv);
+    return;
+  }
+  mCacheKey = container;
 
   // replace our request headers with what actually got sent in the parent
   mRequestHead.Headers() = requestHeaders;
@@ -1100,6 +1116,14 @@ HttpChannelChild::Redirect1Begin(const uint32_t& newChannelId,
     return;
   }
 
+  nsCOMPtr<nsIHttpChannelChild> httpChannelChild = do_QueryInterface(newChannel);
+  if (mSynthesizedResponse && httpChannelChild) {
+    // In the case where there was a synthesized response that caused a redirection,
+    // we must force the new channel to intercept the request in the parent before a
+    // network transaction is initiated.
+    httpChannelChild->ForceIntercepted();
+  }
+
   mRedirectChannelChild = do_QueryInterface(newChannel);
   if (mRedirectChannelChild) {
     mRedirectChannelChild->ConnectParent(newChannelId);
@@ -1245,7 +1269,7 @@ HttpChannelChild::ConnectParent(uint32_t id)
   // until OnStopRequest, or we do a redirect, or we hit an IPDL error.
   AddIPDLReference();
 
-  HttpChannelConnectArgs connectArgs(id);
+  HttpChannelConnectArgs connectArgs(id, mShouldParentIntercept);
   PBrowserOrId browser = static_cast<ContentChild*>(gNeckoChild->Manager())
                          ->GetBrowserOrId(tabChild);
   if (!gNeckoChild->
@@ -1266,6 +1290,15 @@ HttpChannelChild::CompleteRedirectSetup(nsIStreamListener *listener,
 
   NS_ENSURE_TRUE(!mIsPending, NS_ERROR_IN_PROGRESS);
   NS_ENSURE_TRUE(!mWasOpened, NS_ERROR_ALREADY_OPENED);
+
+  if (mShouldParentIntercept) {
+    // This is a redirected channel, and the corresponding parent channel has started
+    // AsyncOpen but was intercepted and suspended. We must tear it down and start
+    // fresh - we will intercept the child channel this time, before creating a new
+    // parent channel unnecessarily.
+    PHttpChannelChild::Send__delete__(this);
+    return AsyncOpen(listener, aContext);
+  }
 
   /*
    * No need to check for cancel: we don't get here if nsHttpChannel canceled
@@ -1433,39 +1466,6 @@ HttpChannelChild::Resume()
 //-----------------------------------------------------------------------------
 // HttpChannelChild::nsIChannel
 //-----------------------------------------------------------------------------
-
-// helper function to assign loadInfo to openArgs
-void
-propagateLoadInfo(nsILoadInfo *aLoadInfo,
-                  HttpChannelOpenArgs& openArgs)
-{
-  mozilla::ipc::PrincipalInfo requestingPrincipalInfo;
-  mozilla::ipc::PrincipalInfo triggeringPrincipalInfo;
-
-  if (aLoadInfo) {
-    mozilla::ipc::PrincipalToPrincipalInfo(aLoadInfo->LoadingPrincipal(),
-                                           &requestingPrincipalInfo);
-    openArgs.requestingPrincipalInfo() = requestingPrincipalInfo;
-
-    mozilla::ipc::PrincipalToPrincipalInfo(aLoadInfo->TriggeringPrincipal(),
-                                           &triggeringPrincipalInfo);
-    openArgs.triggeringPrincipalInfo() = triggeringPrincipalInfo;
-
-    openArgs.securityFlags() = aLoadInfo->GetSecurityFlags();
-    openArgs.contentPolicyType() = aLoadInfo->InternalContentPolicyType();
-    openArgs.innerWindowID() = aLoadInfo->GetInnerWindowID();
-    return;
-  }
-
-  // use default values if no loadInfo is provided
-  mozilla::ipc::PrincipalToPrincipalInfo(nsContentUtils::GetSystemPrincipal(),
-                                         &requestingPrincipalInfo);
-  openArgs.requestingPrincipalInfo() = requestingPrincipalInfo;
-  openArgs.triggeringPrincipalInfo() = requestingPrincipalInfo;
-  openArgs.securityFlags() = nsILoadInfo::SEC_NORMAL;
-  openArgs.contentPolicyType() = nsIContentPolicy::TYPE_OTHER;
-  openArgs.innerWindowID() = 0;
-}
 
 NS_IMETHODIMP
 HttpChannelChild::GetSecurityInfo(nsISupports **aSecurityInfo)
@@ -1659,21 +1659,22 @@ HttpChannelChild::ContinueAsyncOpen()
   
   openArgs.allowStaleCacheContent() = mAllowStaleCacheContent;
 
+  uint32_t cacheKey = 0;
   if (mCacheKey) {
-    uint32_t postId;
-    nsAutoCString key;
-    nsresult rv = static_cast<nsHttpChannelCacheKey *>(
-      static_cast<nsISupportsPRUint32 *>(mCacheKey.get()))->GetData(&postId,
-                                                                    key);
+    nsCOMPtr<nsISupportsPRUint32> container = do_QueryInterface(mCacheKey);
+    if (!container) {
+      return NS_ERROR_ILLEGAL_VALUE;
+    }
+
+    nsresult rv = container->GetData(&cacheKey);
     if (NS_FAILED(rv)) {
       return rv;
     }
-    openArgs.cacheKey() = HttpChannelCacheKey(postId, key);
-  } else {
-    openArgs.cacheKey() = mozilla::void_t();
   }
+  openArgs.cacheKey() = cacheKey;
 
-  propagateLoadInfo(mLoadInfo, openArgs);
+  nsresult rv = mozilla::ipc::LoadInfoToLoadInfoArgs(mLoadInfo, &openArgs.loadInfo());
+  NS_ENSURE_SUCCESS(rv, rv);
 
   // The socket transport in the chrome process now holds a logical ref to us
   // until OnStopRequest, or we do a redirect, or we hit an IPDL error.
@@ -2144,8 +2145,14 @@ HttpChannelChild::DivertToParent(ChannelDiverterChild **aChild)
 void
 HttpChannelChild::ResetInterception()
 {
-  mInterceptListener->Cleanup();
+  if (mInterceptListener) {
+    mInterceptListener->Cleanup();
+  }
   mInterceptListener = nullptr;
+
+  // The chance to intercept any further requests associated with this channel
+  // (such as redirects) has passed.
+  ForceNoIntercept();
 
   // Continue with the original cross-process request
   nsresult rv = ContinueAsyncOpen();
@@ -2157,10 +2164,14 @@ HttpChannelChild::OverrideWithSynthesizedResponse(nsAutoPtr<nsHttpResponseHead>&
                                                   nsIInputStream* aSynthesizedInput,
                                                   nsIStreamListener* aStreamListener)
 {
-  // Intercepted responses should already be decoded.
-  SetApplyConversion(false);
+  // Intercepted responses should already be decoded.  If its a redirect,
+  // however, we want to respect the encoding of the final result instead.
+  if (!WillRedirect(aResponseHead)) {
+    SetApplyConversion(false);
+  }
 
   mResponseHead = aResponseHead;
+  mSynthesizedResponse = true;
 
   uint16_t status = mResponseHead->Status();
   if (status != 200 && status != 404) {
@@ -2202,6 +2213,13 @@ HttpChannelChild::OverrideWithSynthesizedResponse(nsAutoPtr<nsHttpResponseHead>&
   if (mCanceled) {
     mSynthesizedResponsePump->Cancel(mStatus);
   }
+}
+
+NS_IMETHODIMP
+HttpChannelChild::ForceIntercepted()
+{
+  mShouldParentIntercept = true;
+  return NS_OK;
 }
 
 } // namespace net

@@ -9,13 +9,14 @@
 
 #include "AudioNode.h"
 #include "FFTBlock.h"
+#include "AlignedTArray.h"
 
 namespace mozilla {
 namespace dom {
 
 class AudioContext;
 
-class AnalyserNode : public AudioNode
+class AnalyserNode final : public AudioNode
 {
 public:
   explicit AnalyserNode(AudioContext* aContext);
@@ -70,15 +71,16 @@ private:
   bool AllocateBuffer();
   bool FFTAnalysis();
   void ApplyBlackmanWindow(float* aBuffer, uint32_t aSize);
+  void GetTimeDomainData(float* aData, size_t aLength);
 
 private:
   FFTBlock mAnalysisBlock;
+  nsTArray<AudioChunk> mChunks;
   double mMinDecibels;
   double mMaxDecibels;
   double mSmoothingTimeConstant;
-  uint32_t mWriteIndex;
-  FallibleTArray<float> mBuffer;
-  FallibleTArray<float> mOutputBuffer;
+  size_t mCurrentChunk = 0;
+  AlignedTArray<float> mOutputBuffer;
 };
 
 } // namespace dom

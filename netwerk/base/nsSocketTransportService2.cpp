@@ -29,6 +29,7 @@ using namespace mozilla;
 using namespace mozilla::net;
 
 PRLogModuleInfo *gSocketTransportLog = nullptr;
+PRLogModuleInfo *gUDPSocketLog = nullptr;
 
 nsSocketTransportService *gSocketTransportService = nullptr;
 PRThread                 *gSocketThread           = nullptr;
@@ -71,6 +72,7 @@ nsSocketTransportService::nsSocketTransportService()
     , mProbedMaxCount(false)
 {
     gSocketTransportLog = PR_NewLogModule("nsSocketTransport");
+    gUDPSocketLog = PR_NewLogModule("UDPSocket");
 
     NS_ASSERTION(NS_IsMainThread(), "wrong thread");
 
@@ -112,13 +114,21 @@ nsSocketTransportService::GetThreadSafely()
 }
 
 NS_IMETHODIMP
-nsSocketTransportService::Dispatch(nsIRunnable *event, uint32_t flags)
+nsSocketTransportService::DispatchFromScript(nsIRunnable *event, uint32_t flags)
 {
-    SOCKET_LOG(("STS dispatch [%p]\n", event));
+  nsCOMPtr<nsIRunnable> event_ref(event);
+  return Dispatch(event_ref.forget(), flags);
+}
+
+NS_IMETHODIMP
+nsSocketTransportService::Dispatch(already_AddRefed<nsIRunnable>&& event, uint32_t flags)
+{
+    nsCOMPtr<nsIRunnable> event_ref(event);
+    SOCKET_LOG(("STS dispatch [%p]\n", event_ref.get()));
 
     nsCOMPtr<nsIThread> thread = GetThreadSafely();
     nsresult rv;
-    rv = thread ? thread->Dispatch(event, flags) : NS_ERROR_NOT_INITIALIZED;
+    rv = thread ? thread->Dispatch(event_ref.forget(), flags) : NS_ERROR_NOT_INITIALIZED;
     if (rv == NS_ERROR_UNEXPECTED) {
         // Thread is no longer accepting events. We must have just shut it
         // down on the main thread. Pretend we never saw it.
@@ -225,7 +235,7 @@ nsSocketTransportService::AddToPollList(SocketContext *sock)
     }
     
     uint32_t newSocketIndex = mActiveCount;
-    if (ChaosMode::isActive(ChaosMode::NetworkScheduling)) {
+    if (ChaosMode::isActive(ChaosFeature::NetworkScheduling)) {
       newSocketIndex = ChaosMode::randomUint32LessThan(mActiveCount + 1);
       PodMove(mActiveList + newSocketIndex + 1, mActiveList + newSocketIndex,
               mActiveCount - newSocketIndex);
@@ -424,6 +434,7 @@ nsSocketTransportService::Poll(bool wait, uint32_t *interval)
 
 NS_IMPL_ISUPPORTS(nsSocketTransportService,
                   nsISocketTransportService,
+                  nsIRoutedSocketTransportService,
                   nsIEventTarget,
                   nsIThreadObserver,
                   nsIRunnable,
@@ -613,6 +624,20 @@ nsSocketTransportService::CreateTransport(const char **types,
                                           nsIProxyInfo *proxyInfo,
                                           nsISocketTransport **result)
 {
+    return CreateRoutedTransport(types, typeCount, host, port, NS_LITERAL_CSTRING(""), 0,
+                                 proxyInfo, result);
+}
+
+NS_IMETHODIMP
+nsSocketTransportService::CreateRoutedTransport(const char **types,
+                                                uint32_t typeCount,
+                                                const nsACString &host,
+                                                int32_t port,
+                                                const nsACString &hostRoute,
+                                                int32_t portRoute,
+                                                nsIProxyInfo *proxyInfo,
+                                                nsISocketTransport **result)
+{
 #if defined(MOZILLA_XPCOMRT_API)
     NS_WARNING("nsSocketTransportService::CreateTransport not implemented");
     return NS_ERROR_NOT_IMPLEMENTED;
@@ -621,7 +646,7 @@ nsSocketTransportService::CreateTransport(const char **types,
     NS_ENSURE_TRUE(port >= 0 && port <= 0xFFFF, NS_ERROR_ILLEGAL_VALUE);
 
     nsRefPtr<nsSocketTransport> trans = new nsSocketTransport();
-    nsresult rv = trans->Init(types, typeCount, host, port, proxyInfo);
+    nsresult rv = trans->Init(types, typeCount, host, port, hostRoute, portRoute, proxyInfo);
     if (NS_FAILED(rv)) {
         return rv;
     }
@@ -684,14 +709,13 @@ nsSocketTransportService::OnDispatchedEvent(nsIThreadInternal *thread)
 
 NS_IMETHODIMP
 nsSocketTransportService::OnProcessNextEvent(nsIThreadInternal *thread,
-                                             bool mayWait, uint32_t depth)
+                                             bool mayWait)
 {
     return NS_OK;
 }
 
 NS_IMETHODIMP
 nsSocketTransportService::AfterProcessNextEvent(nsIThreadInternal* thread,
-                                                uint32_t depth,
                                                 bool eventWasProcessed)
 {
     return NS_OK;
@@ -710,7 +734,6 @@ nsSocketTransportService::Run()
     if (IsNuwaProcess()) {
         NuwaMarkCurrentThread(nullptr, nullptr);
     }
-    NS_SetIgnoreStatusOfCurrentThread();
 #endif
 
     SOCKET_LOG(("STS thread init\n"));

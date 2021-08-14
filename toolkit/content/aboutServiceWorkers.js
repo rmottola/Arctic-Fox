@@ -120,7 +120,7 @@ function display(info) {
   createItem(bundle.GetStringFromName('waitingCacheName'), info.waitingCacheName);
 
   let pushItem = createItem(bundle.GetStringFromName('pushEndpoint'), bundle.GetStringFromName('waiting'));
-  PushNotificationService.registration(info.scope).then(
+  PushNotificationService.registration(info.scope, info.principal.originAttributes).then(
     pushRecord => {
       pushItem.data = JSON.stringify(pushRecord);
     },
@@ -132,7 +132,7 @@ function display(info) {
   let updateButton = document.createElement("button");
   updateButton.appendChild(document.createTextNode(bundle.GetStringFromName('update')));
   updateButton.onclick = function() {
-    gSWM.update(info.scope);
+    gSWM.propagateSoftUpdate(info.principal.originAttributes, info.scope);
   };
   div.appendChild(updateButton);
 
@@ -164,7 +164,7 @@ function display(info) {
     };
 
     loadingMessage.classList.remove('inactive');
-    gSWM.unregister(info.principal, cb, info.scope);
+    gSWM.propagateUnregister(info.principal, cb, info.scope);
   };
 
   let sep = document.createElement('hr');

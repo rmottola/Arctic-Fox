@@ -487,7 +487,7 @@ nsUDPSocket::AddOutputBytes(uint64_t aBytes)
 void
 nsUDPSocket::OnMsgClose()
 {
-  SOCKET_LOG(("nsUDPSocket::OnMsgClose [this=%p]\n", this));
+  UDPSOCKET_LOG(("nsUDPSocket::OnMsgClose [this=%p]\n", this));
 
   if (NS_FAILED(mCondition))
     return;
@@ -505,7 +505,7 @@ nsUDPSocket::OnMsgClose()
 void
 nsUDPSocket::OnMsgAttach()
 {
-  SOCKET_LOG(("nsUDPSocket::OnMsgAttach [this=%p]\n", this));
+  UDPSOCKET_LOG(("nsUDPSocket::OnMsgAttach [this=%p]\n", this));
 
   if (NS_FAILED(mCondition))
     return;
@@ -1145,10 +1145,10 @@ class SendRequestRunnable: public nsRunnable {
 public:
   SendRequestRunnable(nsUDPSocket *aSocket,
                       const NetAddr &aAddr,
-                      FallibleTArray<uint8_t> &aData)
+                      FallibleTArray<uint8_t>&& aData)
     : mSocket(aSocket)
     , mAddr(aAddr)
-    , mData(aData)
+    , mData(Move(aData))
   { }
 
   NS_DECL_NSIRUNNABLE
@@ -1195,7 +1195,7 @@ nsUDPSocket::Send(const nsACString &aHost, uint16_t aPort,
   *_retval = 0;
 
   FallibleTArray<uint8_t> fallibleArray;
-  if (!fallibleArray.InsertElementsAt(0, aData, aDataLength)) {
+  if (!fallibleArray.InsertElementsAt(0, aData, aDataLength, fallible)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
@@ -1253,12 +1253,13 @@ nsUDPSocket::SendWithAddress(const NetAddr *aAddr, const uint8_t *aData,
     *_retval = count;
   } else {
     FallibleTArray<uint8_t> fallibleArray;
-    if (!fallibleArray.InsertElementsAt(0, aData, aDataLength)) {
+    if (!fallibleArray.InsertElementsAt(0, aData, aDataLength, fallible)) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
 
-    nsresult rv = mSts->Dispatch(new SendRequestRunnable(this, *aAddr, fallibleArray),
-                                 NS_DISPATCH_NORMAL);
+    nsresult rv = mSts->Dispatch(
+      new SendRequestRunnable(this, *aAddr, Move(fallibleArray)),
+      NS_DISPATCH_NORMAL);
     NS_ENSURE_SUCCESS(rv, rv);
     *_retval = aDataLength;
   }
@@ -1312,7 +1313,7 @@ nsUDPSocket::SetSocketOption(const PRSocketOptionData& aOpt)
   }
 
   if (PR_SetSocketOption(mFD, &aOpt) != PR_SUCCESS) {
-    SOCKET_LOG(("nsUDPSocket::SetSocketOption [this=%p] failed for type %d, "
+    UDPSOCKET_LOG(("nsUDPSocket::SetSocketOption [this=%p] failed for type %d, "
       "error %d\n", this, aOpt.option, PR_GetError()));
     return NS_ERROR_FAILURE;
   }

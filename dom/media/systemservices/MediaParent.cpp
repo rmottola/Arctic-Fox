@@ -13,15 +13,18 @@
 #include "MediaEngine.h"
 #include "VideoUtils.h"
 #include "nsThreadUtils.h"
+#include "nsNetCID.h"
 #include "nsNetUtil.h"
+#include "nsIOutputStream.h"
 #include "nsILineInputStream.h"
+#include "nsISafeOutputStream.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsISupportsImpl.h"
 #include "mozilla/Logging.h"
 
 #undef LOG
 PRLogModuleInfo *gMediaParentLog;
-#define LOG(args) PR_LOG(gMediaParentLog, PR_LOG_DEBUG, args)
+#define LOG(args) MOZ_LOG(gMediaParentLog, mozilla::LogLevel::Debug, args)
 
 // A file in the profile dir is used to persist mOriginKeys used to anonymize
 // deviceIds to be unique per origin, to avoid them being supercookies.
@@ -32,13 +35,13 @@ PRLogModuleInfo *gMediaParentLog;
 namespace mozilla {
 namespace media {
 
-static StaticMutex gMutex;
-static ParentSingleton* sParentSingleton = nullptr;
+static Parent<PMediaParent>* sIPCServingParent;
 
-class ParentSingleton : public nsISupports
+static OriginKeyStore* sOriginKeyStore = nullptr;
+
+class OriginKeyStore : public nsISupports
 {
   NS_DECL_THREADSAFE_ISUPPORTS
-
   class OriginKey
   {
   public:
@@ -104,10 +107,7 @@ class ParentSingleton : public nsISupports
   class OriginKeysLoader : public OriginKeysTable
   {
   public:
-    OriginKeysLoader()
-    {
-      Load();
-    }
+    OriginKeysLoader() {}
 
     nsresult
     GetOriginKey(const nsACString& aOrigin, nsCString& result)
@@ -123,13 +123,7 @@ class ParentSingleton : public nsISupports
     already_AddRefed<nsIFile>
     GetFile()
     {
-      if (!mProfileDir) {
-        nsresult rv = NS_GetSpecialDirectory(NS_APP_USER_PROFILE_50_DIR,
-                                             getter_AddRefs(mProfileDir));
-        if (NS_WARN_IF(NS_FAILED(rv))) {
-          return nullptr;
-        }
-      }
+      MOZ_ASSERT(mProfileDir);
       nsCOMPtr<nsIFile> file;
       nsresult rv = mProfileDir->Clone(getter_AddRefs(file));
       if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -317,135 +311,227 @@ class ParentSingleton : public nsISupports
       return NS_OK;
     }
 
+    void
+    SetProfileDir(nsIFile* aProfileDir)
+    {
+      MOZ_ASSERT(!NS_IsMainThread());
+      bool first = !mProfileDir;
+      mProfileDir = aProfileDir;
+      // Load from disk when we first get a profileDir, but not subsequently.
+      if (first) {
+        Load();
+      }
+    }
   private:
     nsCOMPtr<nsIFile> mProfileDir;
   };
 
 private:
-  virtual ~ParentSingleton()
+  virtual ~OriginKeyStore()
   {
-    sParentSingleton = nullptr;
+    sOriginKeyStore = nullptr;
     LOG((__FUNCTION__));
   }
 
 public:
-  static ParentSingleton* Get()
+  static OriginKeyStore* Get()
   {
-    // Protect creation of singleton and access from multiple Background threads.
-    //
-    // Multiple Background threads happen because sanitize.js calls us from the
-    // chrome process and gets a thread separate from the one servicing ipc from
-    // the content process.
-
-    StaticMutexAutoLock lock(gMutex);
-    if (!sParentSingleton) {
-      sParentSingleton = new ParentSingleton();
+    MOZ_ASSERT(NS_IsMainThread());
+    if (!sOriginKeyStore) {
+      sOriginKeyStore = new OriginKeyStore();
     }
-    return sParentSingleton;
+    return sOriginKeyStore;
   }
 
+  // Only accessed on StreamTS thread
   OriginKeysLoader mOriginKeys;
   OriginKeysTable mPrivateBrowsingOriginKeys;
 };
 
-NS_IMPL_ISUPPORTS0(ParentSingleton)
+NS_IMPL_ISUPPORTS0(OriginKeyStore)
 
-bool
-Parent::RecvGetOriginKey(const uint32_t& aRequestId,
+template<> /* static */
+Parent<PMediaParent>* Parent<PMediaParent>::GetSingleton()
+{
+  return sIPCServingParent;
+}
+
+template<> /* static */
+Parent<NonE10s>* Parent<NonE10s>::GetSingleton()
+{
+  nsRefPtr<MediaManager> mgr = MediaManager::GetInstance();
+  if (!mgr) {
+    return nullptr;
+  }
+  return mgr->GetNonE10sParent();
+}
+
+// TODO: Remove once upgraded to GCC 4.8+ on linux. Bogus error on static func:
+// error: 'this' was not captured for this lambda function
+
+template<class Super> static
+Parent<Super>* GccGetSingleton() { return Parent<Super>::GetSingleton(); };
+
+
+template<class Super> bool
+Parent<Super>::RecvGetOriginKey(const uint32_t& aRequestId,
                          const nsCString& aOrigin,
                          const bool& aPrivateBrowsing)
 {
-  // Hand over to stream-transport thread.
+  MOZ_ASSERT(NS_IsMainThread());
+
+  // First, get profile dir.
+
+  MOZ_ASSERT(NS_IsMainThread());
+  nsCOMPtr<nsIFile> profileDir;
+  nsresult rv = NS_GetSpecialDirectory(NS_APP_USER_PROFILE_50_DIR,
+                                       getter_AddRefs(profileDir));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return false;
+  }
+
+  // Then over to stream-transport thread to do the actual file io.
+  // Stash a pledge to hold the answer and get an id for this request.
+
+  nsRefPtr<Pledge<nsCString>> p = new Pledge<nsCString>();
+  uint32_t id = mOutstandingPledges.Append(*p);
 
   nsCOMPtr<nsIEventTarget> sts = do_GetService(NS_STREAMTRANSPORTSERVICE_CONTRACTID);
   MOZ_ASSERT(sts);
-  nsRefPtr<ParentSingleton> singleton(mSingleton);
+  nsRefPtr<OriginKeyStore> store(mOriginKeyStore);
+  bool sameProcess = mSameProcess;
 
-  nsRefPtr<PledgeRunnable<nsCString>> p = PledgeRunnable<nsCString>::New(
-      [singleton, aOrigin, aPrivateBrowsing](nsCString& aResult) {
+  rv = sts->Dispatch(NewRunnableFrom([id, profileDir, store, sameProcess,
+                                      aOrigin, aPrivateBrowsing]() -> nsresult {
+    MOZ_ASSERT(!NS_IsMainThread());
+    store->mOriginKeys.SetProfileDir(profileDir);
+    nsCString result;
     if (aPrivateBrowsing) {
-      singleton->mPrivateBrowsingOriginKeys.GetOriginKey(aOrigin, aResult);
+      store->mPrivateBrowsingOriginKeys.GetOriginKey(aOrigin, result);
     } else {
-      singleton->mOriginKeys.GetOriginKey(aOrigin, aResult);
+      store->mOriginKeys.GetOriginKey(aOrigin, result);
+    }
+
+    // Pass result back to main thread.
+    nsresult rv;
+    rv = NS_DispatchToMainThread(NewRunnableFrom([id, store, sameProcess,
+                                                  result]() -> nsresult {
+      Parent* parent = GccGetSingleton<Super>(); // GetSingleton();
+      if (!parent) {
+        return NS_OK;
+      }
+      nsRefPtr<Pledge<nsCString>> p = parent->mOutstandingPledges.Remove(id);
+      if (!p) {
+        return NS_ERROR_UNEXPECTED;
+      }
+      p->Resolve(result);
+      return NS_OK;
+    }), NS_DISPATCH_NORMAL);
+
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
     }
     return NS_OK;
-  });
-  nsresult rv = sts->Dispatch(p, NS_DISPATCH_NORMAL);
+  }), NS_DISPATCH_NORMAL);
+
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return false;
   }
-  nsRefPtr<media::Parent> keepAlive(this);
-  p->Then([this, keepAlive, aRequestId](const nsCString& aKey) mutable {
-    if (!mDestroyed) {
-      unused << SendGetOriginKeyResponse(aRequestId, aKey);
+
+  p->Then([aRequestId, sameProcess](const nsCString& aKey) mutable {
+    if (!sameProcess) {
+      if (!sIPCServingParent) {
+        return NS_OK;
+      }
+      unused << sIPCServingParent->SendGetOriginKeyResponse(aRequestId, aKey);
+    } else {
+      nsRefPtr<MediaManager> mgr = MediaManager::GetInstance();
+      if (!mgr) {
+        return NS_OK;
+      }
+      nsRefPtr<Pledge<nsCString>> pledge =
+          mgr->mGetOriginKeyPledges.Remove(aRequestId);
+      if (pledge) {
+        pledge->Resolve(aKey);
+      }
     }
     return NS_OK;
   });
   return true;
 }
 
-bool
-Parent::RecvSanitizeOriginKeys(const uint64_t& aSinceWhen)
+template<class Super> bool
+Parent<Super>::RecvSanitizeOriginKeys(const uint64_t& aSinceWhen)
 {
-  // Hand over to stream-transport thread.
+  MOZ_ASSERT(NS_IsMainThread());
+  nsCOMPtr<nsIFile> profileDir;
+  nsresult rv = NS_GetSpecialDirectory(NS_APP_USER_PROFILE_50_DIR,
+                                         getter_AddRefs(profileDir));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return false;
+  }
+  // Over to stream-transport thread to do the file io.
 
   nsCOMPtr<nsIEventTarget> sts = do_GetService(NS_STREAMTRANSPORTSERVICE_CONTRACTID);
   MOZ_ASSERT(sts);
-  nsRefPtr<ParentSingleton> singleton(mSingleton);
+  nsRefPtr<OriginKeyStore> store(mOriginKeyStore);
 
-  nsRefPtr<PledgeRunnable<bool>> p = PledgeRunnable<bool>::New(
-      [singleton, aSinceWhen](bool) {
-    singleton->mPrivateBrowsingOriginKeys.Clear(aSinceWhen);
-    singleton->mOriginKeys.Clear(aSinceWhen);
+  rv = sts->Dispatch(NewRunnableFrom([profileDir, store, aSinceWhen]() -> nsresult {
+    MOZ_ASSERT(!NS_IsMainThread());
+    store->mOriginKeys.SetProfileDir(profileDir);
+    store->mPrivateBrowsingOriginKeys.Clear(aSinceWhen);
+    store->mOriginKeys.Clear(aSinceWhen);
     return NS_OK;
-  });
-  nsresult rv = sts->Dispatch(p, NS_DISPATCH_NORMAL);
+  }), NS_DISPATCH_NORMAL);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return false;
   }
   return true;
 }
 
-void
-Parent::ActorDestroy(ActorDestroyReason aWhy)
+template<class Super> void
+Parent<Super>::ActorDestroy(ActorDestroyReason aWhy)
 {
   // No more IPC from here
   mDestroyed = true;
   LOG((__FUNCTION__));
 }
 
-Parent::Parent()
-  : mSingleton(ParentSingleton::Get())
+template<class Super>
+Parent<Super>::Parent(bool aSameProcess)
+  : mOriginKeyStore(OriginKeyStore::Get())
   , mDestroyed(false)
+  , mSameProcess(aSameProcess)
 {
   if (!gMediaParentLog)
     gMediaParentLog = PR_NewLogModule("MediaParent");
   LOG(("media::Parent: %p", this));
-
-  MOZ_COUNT_CTOR(Parent);
 }
 
-Parent::~Parent()
+template<class Super>
+Parent<Super>::~Parent()
 {
   LOG(("~media::Parent: %p", this));
-
-  MOZ_COUNT_DTOR(Parent);
 }
 
 PMediaParent*
 AllocPMediaParent()
 {
-  Parent* obj = new Parent();
-  obj->AddRef();
-  return obj;
+  MOZ_ASSERT(!sIPCServingParent);
+  sIPCServingParent = new Parent<PMediaParent>();
+  return sIPCServingParent;
 }
 
 bool
 DeallocPMediaParent(media::PMediaParent *aActor)
 {
-  static_cast<Parent*>(aActor)->Release();
+  MOZ_ASSERT(sIPCServingParent == static_cast<Parent<PMediaParent>*>(aActor));
+  delete sIPCServingParent;
   return true;
 }
 
 }
 }
+
+// Instantiate templates to satisfy linker
+template class mozilla::media::Parent<mozilla::media::NonE10s>;

@@ -18,7 +18,7 @@ class MarionetteTransport(object):
     """
 
     max_packet_length = 4096
-    connection_lost_msg = "Connection to Marionette server is lost. Check goanna.log (desktop firefox) or logcat (b2g) for errors."
+    connection_lost_msg = "Connection to Marionette server is lost. Check gecko.log (desktop firefox) or logcat (b2g) for errors."
 
     def __init__(self, addr, port, socket_timeout=360.0):
         self.addr = addr

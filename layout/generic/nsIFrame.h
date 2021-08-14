@@ -659,39 +659,39 @@ public:
    * Dimensions and position in logical coordinates in the frame's writing mode
    *  or another writing mode
    */
-  mozilla::LogicalRect GetLogicalRect(nscoord aContainerWidth) const {
-    return GetLogicalRect(GetWritingMode(), aContainerWidth);
+  mozilla::LogicalRect GetLogicalRect(const nsSize& aContainerSize) const {
+    return GetLogicalRect(GetWritingMode(), aContainerSize);
   }
-  mozilla::LogicalPoint GetLogicalPosition(nscoord aContainerWidth) const {
-    return GetLogicalPosition(GetWritingMode(), aContainerWidth);
+  mozilla::LogicalPoint GetLogicalPosition(const nsSize& aContainerSize) const {
+    return GetLogicalPosition(GetWritingMode(), aContainerSize);
   }
   mozilla::LogicalSize GetLogicalSize() const {
     return GetLogicalSize(GetWritingMode());
   }
   mozilla::LogicalRect GetLogicalRect(mozilla::WritingMode aWritingMode,
-                                      nscoord aContainerWidth) const {
-    return mozilla::LogicalRect(aWritingMode, GetRect(), aContainerWidth);
+                                      const nsSize& aContainerSize) const {
+    return mozilla::LogicalRect(aWritingMode, GetRect(), aContainerSize);
   }
   mozilla::LogicalPoint GetLogicalPosition(mozilla::WritingMode aWritingMode,
-                                           nscoord aContainerWidth) const {
-    return GetLogicalRect(aWritingMode, aContainerWidth).Origin(aWritingMode);
+                                           const nsSize& aContainerSize) const {
+    return GetLogicalRect(aWritingMode, aContainerSize).Origin(aWritingMode);
   }
   mozilla::LogicalSize GetLogicalSize(mozilla::WritingMode aWritingMode) const {
     return mozilla::LogicalSize(aWritingMode, GetSize());
   }
-  nscoord IStart(nscoord aContainerWidth) const {
-    return IStart(GetWritingMode(), aContainerWidth);
+  nscoord IStart(const nsSize& aContainerSize) const {
+    return IStart(GetWritingMode(), aContainerSize);
   }
   nscoord IStart(mozilla::WritingMode aWritingMode,
-                 nscoord aContainerWidth) const {
-    return GetLogicalPosition(aWritingMode, aContainerWidth).I(aWritingMode);
+                 const nsSize& aContainerSize) const {
+    return GetLogicalPosition(aWritingMode, aContainerSize).I(aWritingMode);
   }
-  nscoord BStart(nscoord aContainerWidth) const {
-    return BStart(GetWritingMode(), aContainerWidth);
+  nscoord BStart(const nsSize& aContainerSize) const {
+    return BStart(GetWritingMode(), aContainerSize);
   }
   nscoord BStart(mozilla::WritingMode aWritingMode,
-                 nscoord aContainerWidth) const {
-    return GetLogicalPosition(aWritingMode, aContainerWidth).B(aWritingMode);
+                 const nsSize& aContainerSize) const {
+    return GetLogicalPosition(aWritingMode, aContainerSize).B(aWritingMode);
   }
   nscoord ISize() const { return ISize(GetWritingMode()); }
   nscoord ISize(mozilla::WritingMode aWritingMode) const {
@@ -721,8 +721,9 @@ public:
   /**
    * Set this frame's rect from a logical rect in its own writing direction
    */
-  void SetRect(const mozilla::LogicalRect& aRect, nscoord aContainerWidth) {
-    SetRect(GetWritingMode(), aRect, aContainerWidth);
+  void SetRect(const mozilla::LogicalRect& aRect,
+               const nsSize& aContainerSize) {
+    SetRect(GetWritingMode(), aRect, aContainerSize);
   }
   /**
    * Set this frame's rect from a logical rect in a different writing direction
@@ -730,8 +731,8 @@ public:
    */
   void SetRect(mozilla::WritingMode aWritingMode,
                const mozilla::LogicalRect& aRect,
-               nscoord aContainerWidth) {
-    SetRect(aRect.GetPhysicalRect(aWritingMode, aContainerWidth));
+               const nsSize& aContainerSize) {
+    SetRect(aRect.GetPhysicalRect(aWritingMode, aContainerSize));
   }
 
   /**
@@ -753,12 +754,12 @@ public:
   void SetPosition(const nsPoint& aPt) { mRect.MoveTo(aPt); }
   void SetPosition(mozilla::WritingMode aWritingMode,
                    const mozilla::LogicalPoint& aPt,
-                   nscoord aContainerWidth) {
-    // We subtract mRect.width from the container width to account for
+                   const nsSize& aContainerSize) {
+    // We subtract mRect.Size() from the container size to account for
     // the fact that logical origins in RTL coordinate systems are at
     // the top right of the frame instead of the top left.
     mRect.MoveTo(aPt.GetPhysicalPoint(aWritingMode,
-                                      aContainerWidth - mRect.width));
+                                      aContainerSize - mRect.Size()));
   }
 
   /**
@@ -780,7 +781,12 @@ public:
   void MovePositionBy(mozilla::WritingMode aWritingMode,
                       const mozilla::LogicalPoint& aTranslation)
   {
-    MovePositionBy(aTranslation.GetPhysicalPoint(aWritingMode, 0));
+    // The LogicalPoint represents a vector rather than a point within a
+    // rectangular coordinate space, so we use a null containerSize when
+    // converting logical to physical.
+    const nsSize nullContainerSize;
+    MovePositionBy(aTranslation.GetPhysicalPoint(aWritingMode,
+                                                 nullContainerSize));
   }
 
   /**
@@ -794,14 +800,14 @@ public:
   nsPoint GetNormalPosition() const;
   mozilla::LogicalPoint
   GetLogicalNormalPosition(mozilla::WritingMode aWritingMode,
-                           nscoord aContainerWidth) const
+                           const nsSize& aContainerSize) const
   {
-    // Subtract the width of this frame from the container width to get
+    // Subtract the size of this frame from the container size to get
     // the correct position in rtl frames where the origin is on the
     // right instead of the left
     return mozilla::LogicalPoint(aWritingMode,
                                  GetNormalPosition(),
-                                 aContainerWidth - mRect.width);
+                                 aContainerSize - mRect.Size());
   }
 
   virtual nsPoint GetPositionOfChildIgnoringScrolling(nsIFrame* aChild)
@@ -1647,8 +1653,13 @@ public:
       , hPctPadding(0.0f), hPctMargin(0.0f)
     {}
   };
-  virtual IntrinsicISizeOffsetData
-    IntrinsicISizeOffsets(nsRenderingContext* aRenderingContext) = 0;
+  virtual IntrinsicISizeOffsetData IntrinsicISizeOffsets() = 0;
+
+  /**
+   * Return the bsize components of padding, border, and margin
+   * that contribute to the intrinsic width that applies to the parent.
+   */
+  IntrinsicISizeOffsetData IntrinsicBSizeOffsets();
 
   virtual mozilla::IntrinsicSize GetIntrinsicSize() = 0;
 
@@ -2582,7 +2593,7 @@ public:
    *
    * @return whether the frame correspods to generated content
    */
-  bool IsGeneratedContentFrame() {
+  bool IsGeneratedContentFrame() const {
     return (mState & NS_FRAME_GENERATED_CONTENT) != 0;
   }
 

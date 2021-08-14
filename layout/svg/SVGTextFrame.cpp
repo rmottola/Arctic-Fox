@@ -43,6 +43,7 @@
 #include "SVGTextPathElement.h"
 #include "nsLayoutUtils.h"
 #include "nsFrameSelection.h"
+#include "nsStyleStructInlines.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -2532,7 +2533,8 @@ CharIterator::IsOriginalCharTrimmed() const
   return !((index >= mTrimmedOffset &&
             index < mTrimmedOffset + mTrimmedLength) ||
            (index >= mTrimmedOffset + mTrimmedLength &&
-            mFrameForTrimCheck->StyleText()->NewlineIsSignificant() &&
+            mFrameForTrimCheck->StyleText()->
+              NewlineIsSignificant(mFrameForTrimCheck) &&
             mFrameForTrimCheck->GetContent()->GetText()->CharAt(index) == '\n'));
 }
 
@@ -3408,7 +3410,8 @@ SVGTextFrame::MutationObserver::AttributeChanged(
                                                 mozilla::dom::Element* aElement,
                                                 int32_t aNameSpaceID,
                                                 nsIAtom* aAttribute,
-                                                int32_t aModType)
+                                                int32_t aModType,
+                                                const nsAttrValue* aOldValue)
 {
   if (!aElement->IsSVGElement()) {
     return;
@@ -3877,13 +3880,15 @@ SVGTextFrame::ReflowSVG()
     nsSVGEffects::UpdateEffects(this);
   }
 
+  // Now unset the various reflow bits. Do this before calling
+  // FinishAndStoreOverflow since FinishAndStoreOverflow can require glyph
+  // positions (to resolve transform-origin).
+  mState &= ~(NS_FRAME_FIRST_REFLOW | NS_FRAME_IS_DIRTY |
+              NS_FRAME_HAS_DIRTY_CHILDREN);
+
   nsRect overflow = nsRect(nsPoint(0,0), mRect.Size());
   nsOverflowAreas overflowAreas(overflow, overflow);
   FinishAndStoreOverflow(overflowAreas, mRect.Size());
-
-  // Now unset the various reflow bits:
-  mState &= ~(NS_FRAME_FIRST_REFLOW | NS_FRAME_IS_DIRTY |
-              NS_FRAME_HAS_DIRTY_CHILDREN);
 
   // XXX nsSVGContainerFrame::ReflowSVG only looks at its nsISVGChildFrame
   // children, and calls ConsiderChildOverflow on them.  Does it matter
@@ -3918,10 +3923,22 @@ SVGTextFrame::GetBBoxContribution(const gfx::Matrix &aToBBoxUserspace,
                                   uint32_t aFlags)
 {
   NS_ASSERTION(GetFirstPrincipalChild(), "must have a child frame");
+  SVGBBox bbox;
+  nsIFrame* kid = GetFirstPrincipalChild();
+  if (kid && NS_SUBTREE_DIRTY(kid)) {
+    // Return an empty bbox if our kid's subtree is dirty. This may be called
+    // in that situation, e.g. when we're building a display list after an
+    // interrupted reflow. This can also be called during reflow before we've
+    // been reflowed, e.g. if an earlier sibling is calling FinishAndStoreOverflow and
+    // needs our parent's perspective matrix, which depends on the SVG bbox
+    // contribution of this frame. In the latter situation, when all siblings have
+    // been reflowed, the parent will compute its perspective and rerun
+    // FinishAndStoreOverflow for all its children.
+    return bbox;
+  }
 
   UpdateGlyphPositioning();
 
-  SVGBBox bbox;
   nsPresContext* presContext = PresContext();
 
   TextRenderedRunIterator it(this);

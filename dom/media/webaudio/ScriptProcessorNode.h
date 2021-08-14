@@ -16,7 +16,7 @@ namespace dom {
 class AudioContext;
 class SharedBuffers;
 
-class ScriptProcessorNode : public AudioNode
+class ScriptProcessorNode final : public AudioNode
 {
 public:
   ScriptProcessorNode(AudioContext* aContext,
@@ -77,11 +77,6 @@ public:
     return mBufferSize;
   }
 
-  SharedBuffers* GetSharedBuffers() const
-  {
-    return mSharedBuffers;
-  }
-
   uint32_t NumberOfOutputChannels() const
   {
     return mNumberOfOutputChannels;
@@ -101,7 +96,6 @@ protected:
   virtual ~ScriptProcessorNode();
 
 private:
-  nsAutoPtr<SharedBuffers> mSharedBuffers;
   const uint32_t mBufferSize;
   const uint32_t mNumberOfOutputChannels;
 };

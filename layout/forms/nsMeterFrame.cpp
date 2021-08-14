@@ -141,7 +141,7 @@ nsMeterFrame::ReflowBarFrame(nsIFrame*                aBarFrame,
                              const nsHTMLReflowState& aReflowState,
                              nsReflowStatus&          aStatus)
 {
-  bool vertical = StyleDisplay()->mOrient == NS_STYLE_ORIENT_VERTICAL;
+  bool vertical = ResolvedOrientationIsVertical();
   WritingMode wm = aBarFrame->GetWritingMode();
   LogicalSize availSize = aReflowState.ComputedSize(wm);
   availSize.BSize(wm) = NS_UNCONSTRAINEDSIZE;
@@ -164,7 +164,7 @@ nsMeterFrame::ReflowBarFrame(nsIFrame*                aBarFrame,
 
   size = NSToCoordRound(size * position);
 
-  if (!vertical && StyleVisibility()->mDirection == NS_STYLE_DIRECTION_RTL) {
+  if (!vertical && (wm.IsVertical() ? wm.IsVerticalRL() : !wm.IsBidiLTR())) {
     xoffset += aReflowState.ComputedWidth() - size;
   }
 
@@ -236,10 +236,10 @@ nsMeterFrame::ComputeAutoSize(nsRenderingContext *aRenderingContext,
   LogicalSize autoSize(wm);
   autoSize.BSize(wm) = autoSize.ISize(wm) = fontMet->Font().size; // 1em
 
-  if (StyleDisplay()->mOrient == NS_STYLE_ORIENT_VERTICAL) {
-    autoSize.Height(wm) *= 5; // 5em
+  if (ResolvedOrientationIsVertical() == wm.IsVertical()) {
+    autoSize.ISize(wm) *= 5; // 5em
   } else {
-    autoSize.Width(wm) *= 5; // 5em
+    autoSize.BSize(wm) *= 5; // 5em
   }
 
   return autoSize.ConvertTo(aWM, wm);
@@ -252,15 +252,14 @@ nsMeterFrame::GetMinISize(nsRenderingContext *aRenderingContext)
   NS_ENSURE_SUCCESS(
       nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fontMet)), 0);
 
-  nscoord minWidth = fontMet->Font().size; // 1em
+  nscoord minISize = fontMet->Font().size; // 1em
 
-  if (StyleDisplay()->mOrient == NS_STYLE_ORIENT_AUTO ||
-      StyleDisplay()->mOrient == NS_STYLE_ORIENT_HORIZONTAL) {
-    // The orientation is horizontal
-    minWidth *= 5; // 5em
+  if (ResolvedOrientationIsVertical() == GetWritingMode().IsVertical()) {
+    // The orientation is inline
+    minISize *= 5; // 5em
   }
 
-  return minWidth;
+  return minISize;
 }
 
 nscoord

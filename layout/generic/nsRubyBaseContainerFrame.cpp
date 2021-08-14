@@ -367,8 +367,9 @@ nsRubyBaseContainerFrame::Reflow(nsPresContext* aPresContext,
   // When there are no frames inside the ruby base container, EndSpan
   // will return 0. However, in this case, the actual width of the
   // container could be non-zero because of non-empty ruby annotations.
-  MOZ_ASSERT(NS_INLINE_IS_BREAK(aStatus) ||
-             isize == lineSpanSize || mFrames.IsEmpty());
+  // XXX When bug 765861 gets fixed, this warning should be upgraded.
+  NS_WARN_IF_FALSE(NS_INLINE_IS_BREAK(aStatus) ||
+                   isize == lineSpanSize || mFrames.IsEmpty(), "bad isize");
 
   // If there exists any span, the columns must either be completely
   // reflowed, or be not reflowed at all.
@@ -585,10 +586,8 @@ nsRubyBaseContainerFrame::ReflowOneColumn(const ReflowState& aReflowState,
 
   nsAutoString baseText;
   if (aColumn.mBaseFrame) {
-    if (!nsContentUtils::GetNodeTextContent(aColumn.mBaseFrame->GetContent(),
-                                            true, baseText)) {
-      NS_RUNTIMEABORT("OOM");
-    }
+    nsContentUtils::GetNodeTextContent(aColumn.mBaseFrame->GetContent(),
+                                       true, baseText);
   }
 
   // Reflow text frames
@@ -596,10 +595,9 @@ nsRubyBaseContainerFrame::ReflowOneColumn(const ReflowState& aReflowState,
     nsRubyTextFrame* textFrame = aColumn.mTextFrames[i];
     if (textFrame) {
       nsAutoString annotationText;
-      if (!nsContentUtils::GetNodeTextContent(textFrame->GetContent(),
-                                              true, annotationText)) {
-        NS_RUNTIMEABORT("OOM");
-      }
+      nsContentUtils::GetNodeTextContent(textFrame->GetContent(),
+                                         true, annotationText);
+
       // Per CSS Ruby spec, the content comparison for auto-hiding
       // takes place prior to white spaces collapsing (white-space)
       // and text transformation (text-transform), and ignores elements

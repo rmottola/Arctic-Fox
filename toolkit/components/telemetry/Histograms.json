@@ -246,6 +246,22 @@
     "n_buckets": 50,
     "description": "Time spent running JS GC (ms)"
   },
+  "GC_BUDGET_MS": {
+    "alert_emails": ["dev-telemetry-gc-alerts@mozilla.org"],
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "100",
+    "n_buckets": 10,
+    "description": "Requested GC slice budget (ms)"
+  },
+  "GC_ANIMATION_MS": {
+    "alert_emails": ["dev-telemetry-gc-alerts@mozilla.org"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": 50,
+    "description": "Time spent running JS GC when animating (ms)"
+  },
   "GC_MAX_PAUSE_MS": {
     "expires_in_version": "never",
     "kind": "linear",
@@ -1236,6 +1252,12 @@
     "expires_in_version": "40",
     "kind": "boolean",
     "description": "Whether a WAP content type response is served to the browser."
+  },
+  "HTTP_SCHEME_UPGRADE": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 10,
+    "description": "Was the URL upgraded to HTTPS?  (0=already HTTPS, 1=no reason to upgrade, 2=STS upgrade blocked by pref, 3=upgraded with STS, 4=upgraded with CSP)"
   },
   "SSL_HANDSHAKE_VERSION": {
     "expires_in_version": "never",
@@ -5126,6 +5148,20 @@
     "n_buckets": "80 + 1",
     "description": "The time (in milliseconds) after showing a PopupNotification that the mainAction was first triggered"
   },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_ENUMPROPERTIES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'enumProperties' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_ENUMPROPERTIES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'enumProperties' request to go round trip."
+  },
   "VIDEO_CANPLAYTYPE_H264_CONSTRAINT_SET_FLAG": {
     "expires_in_version": "40",
     "kind": "enumerated",
@@ -6346,12 +6382,12 @@
     "kind": "exponential",
     "high": "5000",
     "n_buckets": 20,
-    "description": "Tracking how ServiceWorkerRegistrar loads data before the first content is shown"
+    "description": "Tracking how ServiceWorkerRegistrar loads data before the first content is shown. File bugs in Core::DOM in case of a Telemetry regression."
   },
   "SERVICE_WORKER_REQUEST_PASSTHROUGH": {
     "expires_in_version": "50",
     "kind": "boolean",
-    "description": "Intercepted fetch sending back same Request object."
+    "description": "Intercepted fetch sending back same Request object. File bugs in Core::DOM in case of a Telemetry regression."
   },
   "LOOP_CLIENT_CALL_URL_REQUESTS_SUCCESS": {
     "expires_in_version": "never",
@@ -6375,6 +6411,12 @@
     "expires_in_version": "never",
     "kind": "boolean",
     "description": "Whether a session is set to autostart e10s windows"
+  },
+  "E10S_AUTOSTART_STATUS": {
+    "expires_in_version": "40",
+    "kind": "enumerated",
+    "n_values": 6,
+    "description": "Why e10s is enabled or disabled (0=ENABLED_BY_USER, 1=ENABLED_BY_DEFAULT, 2=DISABLED_BY_USER, 3=DISABLED_IN_SAFE_MODE, 4=DISABLED_FOR_ACCESSIBILITY, 5=DISABLED_FOR_MAC_GFX)"
   },
   "E10S_WINDOW": {
     "expires_in_version": "never",
@@ -6900,17 +6942,39 @@
   "SERVICE_WORKER_SPAWN_ATTEMPTS": {
     "expires_in_version": "50",
     "kind": "count",
-    "description": "Count attempts to spawn a ServiceWorker for a domain"
+    "description": "Count attempts to spawn a ServiceWorker for a domain. File bugs in Core::DOM in case of a Telemetry regression."
   },
   "SERVICE_WORKER_WAS_SPAWNED": {
     "expires_in_version": "50",
     "kind": "count",
-    "description": "Count ServiceWorkers that really did get a thread created for them"
+    "description": "Count ServiceWorkers that really did get a thread created for them. File bugs in Core::DOM in case of a Telemetry regression."
   },
   "SERVICE_WORKER_SPAWN_GETS_QUEUED": {
     "expires_in_version": "50",
     "kind": "count",
-    "description": "Tracking whether a ServiceWorker spawn gets queued due to hitting max workers per domain limit"
+    "description": "Tracking whether a ServiceWorker spawn gets queued due to hitting max workers per domain limit. File bugs in Core::DOM in case of a Telemetry regression."
+  },
+  "SERVICE_WORKER_REGISTRATIONS": {
+    "expires_in_version": "50",
+    "kind": "count",
+    "description": "Count how many registrations occurs. File bugs in Core::DOM in case of a Telemetry regression."
+  },
+  "SERVICE_WORKER_CONTROLLED_DOCUMENTS": {
+    "expires_in_version": "50",
+    "kind": "count",
+    "description": "Count whenever a document is controlled. File bugs in Core::DOM in case of a Telemetry regression."
+  },
+  "SERVICE_WORKER_UPDATED": {
+    "expires_in_version": "50",
+    "kind": "count",
+    "description": "Count ServiceWorkers scripts that are updated. File bugs in Core::DOM in case of a Telemetry regression."
+  },
+  "SERVICE_WORKER_LIFE_TIME": {
+    "expires_in_version": "50",
+    "kind": "exponential",
+    "high": "120000",
+    "n_buckets": 20,
+    "description": "Tracking how long a ServiceWorker stays alive after it is spawned. File bugs in Core::DOM in case of a Telemetry regression."
   },
   "UDP_SOCKET_PARALLEL_CLOSE_COUNT": {
     "expires_in_version": "41",
@@ -6925,5 +6989,13 @@
     "high": "60000",
     "n_buckets": 30,
     "description": "Time PR_Close of a UDP socket taken (ms)"
+  },
+  "GRAPHICS_DRIVER_STARTUP_TEST": {
+    "alert_emails": ["danderson@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 20,
+    "releaseChannelCollection": "opt-out",
+    "description": "Reports whether or not graphics drivers crashed during startup."
   }
 }

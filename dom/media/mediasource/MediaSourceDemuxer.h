@@ -7,15 +7,16 @@
 #if !defined(MediaSourceDemuxer_h_)
 #define MediaSourceDemuxer_h_
 
+#include "mozilla/Atomics.h"
 #include "mozilla/Maybe.h"
+#include "mozilla/Monitor.h"
+#include "mozilla/TaskQueue.h"
+
 #include "MediaDataDemuxer.h"
 #include "MediaDecoderReader.h"
 #include "MediaResource.h"
 #include "MediaSource.h"
-#include "MediaTaskQueue.h"
 #include "TrackBuffersManager.h"
-#include "mozilla/Atomics.h"
-#include "mozilla/Monitor.h"
 
 namespace mozilla {
 
@@ -52,7 +53,7 @@ public:
   /* interface for TrackBuffersManager */
   void AttachSourceBuffer(TrackBuffersManager* aSourceBuffer);
   void DetachSourceBuffer(TrackBuffersManager* aSourceBuffer);
-  MediaTaskQueue* GetTaskQueue() { return mTaskQueue; }
+  TaskQueue* GetTaskQueue() { return mTaskQueue; }
 
 	// Gap allowed between frames.
   static const media::TimeUnit EOS_FUZZ;
@@ -72,7 +73,7 @@ private:
     return !GetTaskQueue() || GetTaskQueue()->IsCurrentThreadIn();
   }
 
-  RefPtr<MediaTaskQueue> mTaskQueue;
+  RefPtr<TaskQueue> mTaskQueue;
   nsTArray<nsRefPtr<MediaSourceTrackDemuxer>> mDemuxers;
 
   nsTArray<nsRefPtr<TrackBuffersManager>> mSourceBuffers;

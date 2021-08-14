@@ -13,14 +13,13 @@
 #include "nsIObserver.h"
 #include "mozilla/CORSMode.h"
 #include "DOMMediaStream.h"
-#include "AudioChannelCommon.h"
 #include "DecoderTraits.h"
 #include "nsIAudioChannelAgent.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/TextTrackManager.h"
 #include "MediaDecoder.h"
-#include "StateWatching.h"
+#include "mozilla/StateWatching.h"
 #include "nsGkAtoms.h"
 
 // X.h on Linux #defines CurrentTime as 0L, so we have to #undef it here.
@@ -211,7 +210,7 @@ public:
 
   // Called by the media decoder and the video frame to get the
   // ImageContainer containing the video data.
-  virtual VideoFrameContainer* GetVideoFrameContainer() final override;
+  B2G_ACL_EXPORT virtual VideoFrameContainer* GetVideoFrameContainer() final override;
   layers::ImageContainer* GetImageContainer();
 
   // Dispatch events
@@ -977,8 +976,8 @@ protected:
   // Check the permissions for audiochannel.
   bool CheckAudioChannelPermissions(const nsAString& aType);
 
-  // This method does the check for muting/fading/unmuting the audio channel.
-  nsresult UpdateChannelMuteState(mozilla::dom::AudioChannelState aCanPlay);
+  // This method does the check for muting/nmuting the audio channel.
+  nsresult UpdateChannelMuteState(float aVolume, bool aMuted);
 
   // Seeks to aTime seconds. aSeekType can be Exact to seek to exactly the
   // seek target, or PrevSyncPoint if a quicker but less precise seek is
@@ -1315,8 +1314,8 @@ protected:
   // Audio Channel.
   AudioChannel mAudioChannel;
 
-  // The audio channel has been faded.
-  bool mAudioChannelFaded;
+  // The audio channel volume
+  float mAudioChannelVolume;
 
   // Is this media element playing?
   bool mPlayingThroughTheAudioChannel;

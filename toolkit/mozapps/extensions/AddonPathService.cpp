@@ -14,6 +14,7 @@
 #include "nsThreadUtils.h"
 #include "nsIIOService.h"
 #include "nsNetUtil.h"
+#include "nsIFileURL.h"
 #include "nsIResProtocolHandler.h"
 #include "nsIChromeRegistry.h"
 #include "nsIJARURI.h"
@@ -193,7 +194,7 @@ ResolveURI(nsIURI* aURI, nsAString& out)
 JSAddonId*
 MapURIToAddonID(nsIURI* aURI)
 {
-  if (!NS_IsMainThread() || XRE_GetProcessType() != GeckoProcessType_Default) {
+  if (!NS_IsMainThread() || !XRE_IsParentProcess()) {
     return nullptr;
   }
 

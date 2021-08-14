@@ -6,13 +6,13 @@
  * for meta nodes when viewing "content only".
  */
 
-const { CATEGORY_MASK } = devtools.require("devtools/shared/profiler/global");
-const { RecordingUtils } = devtools.require("devtools/performance/recording-utils");
+const { CATEGORY_MASK } = devtools.require("devtools/performance/global");
+const RecordingUtils = devtools.require("devtools/performance/recording-utils");
 
 Services.prefs.setBoolPref(INVERT_PREF, false);
 Services.prefs.setBoolPref(PLATFORM_DATA_PREF, false);
 
-function spawnTest () {
+function* spawnTest() {
   let { panel } = yield initPerformance(SIMPLE_URL);
   let { EVENTS, $, $$, window, PerformanceController } = panel.panelWin;
   let { OverviewView, DetailsView, JITOptimizationsView, JsCallTreeView, RecordingsView } = panel.panelWin;

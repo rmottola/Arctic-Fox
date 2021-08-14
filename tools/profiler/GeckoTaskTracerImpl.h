@@ -18,7 +18,7 @@ typedef nsTArray<nsCString> TraceInfoLogsType;
 
 struct TraceInfo
 {
-  TraceInfo(uint32_t aThreadId, bool aStartLogging)
+  TraceInfo(uint32_t aThreadId)
     : mCurTraceSourceId(0)
     , mCurTaskId(0)
     , mSavedCurTraceSourceId(0)
@@ -27,7 +27,7 @@ struct TraceInfo
     , mSavedCurTraceSourceType(Unknown)
     , mThreadId(aThreadId)
     , mLastUniqueTaskId(0)
-    , mStartLogging(aStartLogging)
+    , mObsolete(false)
     , mLogsMutex("TraceInfoMutex")
   {
     MOZ_COUNT_CTOR(TraceInfo);
@@ -46,7 +46,7 @@ struct TraceInfo
   SourceEventType mSavedCurTraceSourceType;
   uint32_t mThreadId;
   uint32_t mLastUniqueTaskId;
-  bool mStartLogging;
+  mozilla::Atomic<bool> mObsolete;
 
   // This mutex protects the following log array because MoveLogsInto() might
   // be called on another thread.
@@ -85,6 +85,10 @@ enum ActionType {
 
 void LogDispatch(uint64_t aTaskId, uint64_t aParentTaskId,
                  uint64_t aSourceEventId, SourceEventType aSourceEventType);
+
+void LogDispatch(uint64_t aTaskId, uint64_t aParentTaskId,
+                 uint64_t aSourceEventId, SourceEventType aSourceEventType,
+                 int aDelayTimeMs);
 
 void LogBegin(uint64_t aTaskId, uint64_t aSourceEventId);
 

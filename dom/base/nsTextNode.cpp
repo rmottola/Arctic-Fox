@@ -150,7 +150,7 @@ nsTextNode::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
 
 void nsTextNode::UnbindFromTree(bool aDeep, bool aNullParent)
 {
-  ResetDirectionSetByTextNode(this, aNullParent);
+  ResetDirectionSetByTextNode(this);
 
   nsGenericDOMDataNode::UnbindFromTree(aDeep, aNullParent);
 }
@@ -268,7 +268,8 @@ nsAttributeTextNode::AttributeChanged(nsIDocument* aDocument,
                                       Element* aElement,
                                       int32_t aNameSpaceID,
                                       nsIAtom* aAttribute,
-                                      int32_t aModType)
+                                      int32_t aModType,
+                                      const nsAttrValue* aOldValue)
 {
   if (aNameSpaceID == mNameSpaceID && aAttribute == mAttrName &&
       aElement == mGrandparent) {

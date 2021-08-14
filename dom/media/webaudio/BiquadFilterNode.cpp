@@ -73,13 +73,13 @@ SetParamsOnBiquad(WebCore::Biquad& aBiquad,
   }
 }
 
-class BiquadFilterNodeEngine : public AudioNodeEngine
+class BiquadFilterNodeEngine final : public AudioNodeEngine
 {
 public:
   BiquadFilterNodeEngine(AudioNode* aNode, AudioDestinationNode* aDestination)
     : AudioNodeEngine(aNode)
     , mSource(nullptr)
-    , mDestination(static_cast<AudioNodeStream*> (aDestination->Stream()))
+    , mDestination(aDestination->Stream())
     // Keep the default values in sync with the default values in
     // BiquadFilterNode::BiquadFilterNode
     , mType(BiquadFilterType::Lowpass)
@@ -218,7 +218,7 @@ public:
     // - mDestination - probably not owned
     // - AudioParamTimelines - counted in the AudioNode
     size_t amount = AudioNodeEngine::SizeOfExcludingThis(aMallocSizeOf);
-    amount += mBiquads.SizeOfExcludingThis(aMallocSizeOf);
+    amount += mBiquads.ShallowSizeOfExcludingThis(aMallocSizeOf);
     return amount;
   }
 
@@ -244,14 +244,14 @@ BiquadFilterNode::BiquadFilterNode(AudioContext* aContext)
               ChannelCountMode::Max,
               ChannelInterpretation::Speakers)
   , mType(BiquadFilterType::Lowpass)
-  , mFrequency(new AudioParam(this, SendFrequencyToStream, 350.f))
-  , mDetune(new AudioParam(this, SendDetuneToStream, 0.f))
-  , mQ(new AudioParam(this, SendQToStream, 1.f))
-  , mGain(new AudioParam(this, SendGainToStream, 0.f))
+  , mFrequency(new AudioParam(this, SendFrequencyToStream, 350.f, "frequency"))
+  , mDetune(new AudioParam(this, SendDetuneToStream, 0.f, "detune"))
+  , mQ(new AudioParam(this, SendQToStream, 1.f, "Q"))
+  , mGain(new AudioParam(this, SendGainToStream, 0.f, "gain"))
 {
   BiquadFilterNodeEngine* engine = new BiquadFilterNodeEngine(this, aContext->Destination());
   mStream = aContext->Graph()->CreateAudioNodeStream(engine, MediaStreamGraph::INTERNAL_STREAM);
-  engine->SetSourceStream(static_cast<AudioNodeStream*> (mStream.get()));
+  engine->SetSourceStream(mStream);
 }
 
 BiquadFilterNode::~BiquadFilterNode()

@@ -138,13 +138,18 @@ void
 CheckHashTablesAfterMovingGC(JSRuntime* rt);
 #endif
 
-struct MovingTracer : JS::CallbackTracer {
-    explicit MovingTracer(JSRuntime* rt) : CallbackTracer(rt, Visit, TraceWeakMapKeysValues) {}
+struct MovingTracer : JS::CallbackTracer
+{
+    explicit MovingTracer(JSRuntime* rt) : CallbackTracer(rt, TraceWeakMapKeysValues) {}
 
-    static void Visit(JS::CallbackTracer* jstrc, void** thingp, JS::TraceKind kind);
-    static bool IsMovingTracer(JSTracer* trc) {
-        return trc->isCallbackTracer() && trc->asCallbackTracer()->hasCallback(Visit);
+    void onObjectEdge(JSObject** objp) override;
+    void onChild(const JS::GCCellPtr& thing) override {
+        MOZ_ASSERT(!RelocationOverlay::isCellForwarded(thing.asCell()));
     }
+
+#ifdef DEBUG
+    TracerKind getTracerKind() const override { return TracerKind::Moving; }
+#endif
 };
 
 class AutoMaybeStartBackgroundAllocation

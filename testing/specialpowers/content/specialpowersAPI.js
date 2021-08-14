@@ -1135,6 +1135,23 @@ SpecialPowersAPI.prototype = {
     });
   },
 
+  // Force-registering an app in the registry
+  injectApp: function(aAppId, aApp) {
+    this._sendSyncMessage("SPWebAppService", {
+      op: "inject-app",
+      appId: aAppId,
+      app: aApp
+    });
+  },
+
+  // Removing app from the registry
+  rejectApp: function(aAppId) {
+    this._sendSyncMessage("SPWebAppService", {
+      op: "reject-app",
+      appId: aAppId
+    });
+  },
+
   _proxiedObservers: {
     "specialpowers-http-notify-request": function(aMessage) {
       let uri = aMessage.json.uri;
@@ -1239,7 +1256,7 @@ SpecialPowersAPI.prototype = {
     var val = this._sendSyncMessage('SPPrefService', msg);
 
     if (val == null || val[0] == null)
-      throw "Error getting pref";
+      throw "Error getting pref '" + aPrefName + "'";
     return val[0];
   },
   _setPref: function(aPrefName, aPrefType, aValue, aIid) {
@@ -1553,7 +1570,7 @@ SpecialPowersAPI.prototype = {
   copyString: function(str, doc) {
     Components.classes["@mozilla.org/widget/clipboardhelper;1"].
       getService(Components.interfaces.nsIClipboardHelper).
-      copyString(str, doc);
+      copyString(str);
   },
 
   openDialog: function(win, args) {
@@ -1637,7 +1654,7 @@ SpecialPowersAPI.prototype = {
   clipboardCopyString: function(preExpectedVal, doc) {
     var cbHelperSvc = Components.classes["@mozilla.org/widget/clipboardhelper;1"].
                       getService(Components.interfaces.nsIClipboardHelper);
-    cbHelperSvc.copyString(preExpectedVal, doc);
+    cbHelperSvc.copyString(preExpectedVal);
   },
 
   supportsSelectionClipboard: function() {
@@ -1870,6 +1887,13 @@ SpecialPowersAPI.prototype = {
 
   getStorageUsageForURI: function(uri, callback, appId, inBrowser) {
     this._quotaManagerRequest('getUsage', uri, appId, inBrowser, callback);
+  },
+
+  // Technically this restarts the QuotaManager for all URIs, but we need
+  // a specific one to perform the synchronized callback when the reset is
+  // complete.
+  resetStorageForURI: function(uri, callback, appId, inBrowser) {
+    this._quotaManagerRequest('reset', uri, appId, inBrowser, callback);
   },
 
   _quotaManagerRequest: function(op, uri, appId, inBrowser, callback) {

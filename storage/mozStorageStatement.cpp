@@ -11,7 +11,6 @@
 #include "nsMemory.h"
 #include "nsThreadUtils.h"
 #include "nsIClassInfoImpl.h"
-#include "nsIProgrammingLanguage.h"
 #include "Variant.h"
 
 #include "mozIStorageError.h"
@@ -58,15 +57,10 @@ public:
   }
 
   NS_IMETHODIMP
-  GetHelperForLanguage(uint32_t aLanguage, nsISupports **_helper) override
+  GetScriptableHelper(nsIXPCScriptable **_helper) override
   {
-    if (aLanguage == nsIProgrammingLanguage::JAVASCRIPT) {
-      static StatementJSHelper sJSHelper;
-      *_helper = &sJSHelper;
-      return NS_OK;
-    }
-
-    *_helper = nullptr;
+    static StatementJSHelper sJSHelper;
+    *_helper = &sJSHelper;
     return NS_OK;
   }
 
@@ -88,13 +82,6 @@ public:
   GetClassID(nsCID **_id) override
   {
     *_id = nullptr;
-    return NS_OK;
-  }
-
-  NS_IMETHODIMP
-  GetImplementationLanguage(uint32_t *_language) override
-  {
-    *_language = nsIProgrammingLanguage::CPLUSPLUS;
     return NS_OK;
   }
 
@@ -143,15 +130,15 @@ Statement::initialize(Connection *aDBConnection,
                                             PromiseFlatCString(aSQLStatement),
                                             &mDBStatement);
   if (srv != SQLITE_OK) {
-      PR_LOG(gStorageLog, PR_LOG_ERROR,
+      MOZ_LOG(gStorageLog, LogLevel::Error,
              ("Sqlite statement prepare error: %d '%s'", srv,
               ::sqlite3_errmsg(aNativeConnection)));
-      PR_LOG(gStorageLog, PR_LOG_ERROR,
+      MOZ_LOG(gStorageLog, LogLevel::Error,
              ("Statement was: '%s'", PromiseFlatCString(aSQLStatement).get()));
       return NS_ERROR_FAILURE;
     }
 
-  PR_LOG(gStorageLog, PR_LOG_NOTICE, ("Initialized statement '%s' (0x%p)",
+  MOZ_LOG(gStorageLog, LogLevel::Debug, ("Initialized statement '%s' (0x%p)",
                                       PromiseFlatCString(aSQLStatement).get(),
                                       mDBStatement));
 
@@ -289,7 +276,7 @@ Statement::getAsyncStatement(sqlite3_stmt **_stmt)
       return rc;
     }
 
-    PR_LOG(gStorageLog, PR_LOG_NOTICE,
+    MOZ_LOG(gStorageLog, LogLevel::Debug,
            ("Cloned statement 0x%p to 0x%p", mDBStatement, mAsyncStatement));
   }
 
@@ -379,7 +366,7 @@ Statement::internalFinalize(bool aDestructing)
     // In either case, the connection is still valid, hence closing
     // here is safe.
     //
-    PR_LOG(gStorageLog, PR_LOG_NOTICE, ("Finalizing statement '%s' during garbage-collection",
+    MOZ_LOG(gStorageLog, LogLevel::Debug, ("Finalizing statement '%s' during garbage-collection",
                                         ::sqlite3_sql(mDBStatement)));
     srv = ::sqlite3_finalize(mDBStatement);
   }
@@ -411,7 +398,7 @@ Statement::internalFinalize(bool aDestructing)
     NS_WARNING(msg);
 #endif // 0
 
-    PR_LOG(gStorageLog, PR_LOG_WARNING, (msg));
+    MOZ_LOG(gStorageLog, LogLevel::Warning, (msg));
 
     ::PR_smprintf_free(msg);
   }
@@ -539,7 +526,7 @@ Statement::Reset()
     return NS_ERROR_NOT_INITIALIZED;
 
 #ifdef DEBUG
-  PR_LOG(gStorageLog, PR_LOG_DEBUG, ("Resetting statement: '%s'",
+  MOZ_LOG(gStorageLog, LogLevel::Debug, ("Resetting statement: '%s'",
                                      ::sqlite3_sql(mDBStatement)));
 
   checkAndLogStatementPerformance(mDBStatement);
@@ -617,10 +604,10 @@ Statement::ExecuteStep(bool *_moreResults)
   }
   int srv = mDBConnection->stepStatement(mNativeConnection, mDBStatement);
 
-  if (srv != SQLITE_ROW && srv != SQLITE_DONE && PR_LOG_TEST(gStorageLog, PR_LOG_DEBUG)) {
+  if (srv != SQLITE_ROW && srv != SQLITE_DONE && MOZ_LOG_TEST(gStorageLog, LogLevel::Debug)) {
       nsAutoCString errStr;
       (void)mDBConnection->GetLastErrorString(errStr);
-      PR_LOG(gStorageLog, PR_LOG_DEBUG,
+      MOZ_LOG(gStorageLog, LogLevel::Debug,
              ("Statement::ExecuteStep error: %s", errStr.get()));
   }
 
@@ -641,7 +628,7 @@ Statement::ExecuteStep(bool *_moreResults)
     mExecuting = false;
   }
   else if (mExecuting) {
-    PR_LOG(gStorageLog, PR_LOG_ERROR,
+    MOZ_LOG(gStorageLog, LogLevel::Error,
            ("SQLite error after mExecuting was true!"));
     mExecuting = false;
   }
@@ -839,6 +826,18 @@ Statement::GetBlob(uint32_t aIndex,
   *_blob = static_cast<uint8_t *>(blob);
   *_size = size;
   return NS_OK;
+}
+
+NS_IMETHODIMP
+Statement::GetBlobAsString(uint32_t aIndex, nsAString& aValue)
+{
+  return DoGetBlobAsString(this, aIndex, aValue);
+}
+
+NS_IMETHODIMP
+Statement::GetBlobAsUTF8String(uint32_t aIndex, nsACString& aValue)
+{
+  return DoGetBlobAsString(this, aIndex, aValue);
 }
 
 NS_IMETHODIMP

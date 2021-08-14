@@ -29,6 +29,12 @@
 #include "nsIURI.h"
 #include "nsILoadGroup.h"
 #include "nsNetUtil.h"
+#include "nsStringStream.h"
+#include "nsIAuthPrompt.h"
+#include "nsIAuthPrompt2.h"
+#include "nsIOutputStream.h"
+#include "nsISupportsPrimitives.h"
+#include "nsIInterfaceRequestorUtils.h"
 #include "nsStreamUtils.h"
 #include "nsThreadUtils.h"
 #include "nsIUploadChannel.h"
@@ -1958,7 +1964,12 @@ nsXMLHttpRequest::OnDataAvailable(nsIRequest *request,
 
   if (cancelable) {
     // We don't have to read from the local file for the blob response
-    mDOMBlob->GetSize(&mDataAvailable);
+    ErrorResult error;
+    mDataAvailable = mDOMBlob->GetSize(error);
+    if (NS_WARN_IF(error.Failed())) {
+      return error.StealNSResult();
+    }
+
     ChangeState(XML_HTTP_REQUEST_LOADING);
     return request->Cancel(NS_OK);
   }
@@ -2206,9 +2217,6 @@ nsXMLHttpRequest::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
                                          nullptr, getter_AddRefs(listener),
                                          !(mState & XML_HTTP_REQUEST_USE_XSITE_AC));
     NS_ENSURE_SUCCESS(rv, rv);
-
-    // the spec requires the response document.referrer to be the empty string
-    mResponseXML->SetReferrer(NS_LITERAL_CSTRING(""));
 
     mXMLParserStreamListener = listener;
     rv = mXMLParserStreamListener->OnStartRequest(request, ctxt);
@@ -2711,50 +2719,10 @@ nsXMLHttpRequest::Send(nsIVariant* aVariant, const Nullable<RequestBody>& aBody)
     httpChannel->GetRequestMethod(method); // If GET, method name will be uppercase
 
     if (!IsSystemXHR()) {
-      // Get the referrer for the request.
-      //
-      // If it weren't for history.push/replaceState, we could just use the
-      // principal's URI here.  But since we want changes to the URI effected
-      // by push/replaceState to be reflected in the XHR referrer, we have to
-      // be more clever.
-      //
-      // If the document's original URI (before any push/replaceStates) matches
-      // our principal, then we use the document's current URI (after
-      // push/replaceStates).  Otherwise (if the document is, say, a data:
-      // URI), we just use the principal's URI.
-
-      nsCOMPtr<nsIURI> principalURI;
-      mPrincipal->GetURI(getter_AddRefs(principalURI));
-
-      nsIScriptContext* sc = GetContextForEventHandlers(&rv);
-      NS_ENSURE_SUCCESS(rv, rv);
-      nsCOMPtr<nsIDocument> doc =
-        nsContentUtils::GetDocumentFromScriptContext(sc);
-
-      nsCOMPtr<nsIURI> docCurURI;
-      nsCOMPtr<nsIURI> docOrigURI;
-      net::ReferrerPolicy referrerPolicy = net::RP_Default;
-
-      if (doc) {
-        docCurURI = doc->GetDocumentURI();
-        docOrigURI = doc->GetOriginalURI();
-        referrerPolicy = doc->GetReferrerPolicy();
-      }
-
-      nsCOMPtr<nsIURI> referrerURI;
-
-      if (principalURI && docCurURI && docOrigURI) {
-        bool equal = false;
-        principalURI->Equals(docOrigURI, &equal);
-        if (equal) {
-          referrerURI = docCurURI;
-        }
-      }
-
-      if (!referrerURI)
-        referrerURI = principalURI;
-
-      httpChannel->SetReferrerWithPolicy(referrerURI, referrerPolicy);
+      nsCOMPtr<nsPIDOMWindow> owner = GetOwner();
+      nsCOMPtr<nsIDocument> doc = owner ? owner->GetExtantDoc() : nullptr;
+      nsContentUtils::SetFetchReferrerURIWithPolicy(mPrincipal, doc,
+                                                    httpChannel);
     }
 
     // Some extensions override the http protocol handler and provide their own
@@ -3037,7 +3005,7 @@ nsXMLHttpRequest::Send(nsIVariant* aVariant, const Nullable<RequestBody>& aBody)
         if (scheme.LowerCaseEqualsLiteral("app") ||
             scheme.LowerCaseEqualsLiteral("jar")) {
           mIsMappedArrayBuffer = true;
-          if (XRE_GetProcessType() != GeckoProcessType_Default) {
+          if (!XRE_IsParentProcess()) {
             nsCOMPtr<nsIJARChannel> jarChannel = do_QueryInterface(mChannel);
             // For memory mapping from child process, we need to get file
             // descriptor of the JAR file opened remotely on the parent proess.

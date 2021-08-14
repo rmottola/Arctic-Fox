@@ -432,27 +432,12 @@ IDBDatabase::RefreshSpec(bool aMayDelete)
 {
   AssertIsOnOwningThread();
 
-  class MOZ_STACK_CLASS Helper final
-  {
-  public:
-    static PLDHashOperator
-    RefreshTransactionsSpec(nsPtrHashKey<IDBTransaction>* aTransaction,
-                            void* aClosure)
-    {
-      MOZ_ASSERT(aTransaction);
-      aTransaction->GetKey()->AssertIsOnOwningThread();
-      MOZ_ASSERT(aClosure);
-
-      bool mayDelete = *static_cast<bool*>(aClosure);
-
-      nsRefPtr<IDBTransaction> transaction = aTransaction->GetKey();
-      transaction->RefreshSpec(mayDelete);
-
-      return PL_DHASH_NEXT;
-    }
-  };
-
-  mTransactions.EnumerateEntries(Helper::RefreshTransactionsSpec, &aMayDelete);
+  for (auto iter = mTransactions.Iter(); !iter.Done(); iter.Next()) {
+    nsRefPtr<IDBTransaction> transaction = iter.Get()->GetKey();
+    MOZ_ASSERT(transaction);
+    transaction->AssertIsOnOwningThread();
+    transaction->RefreshSpec(aMayDelete);
+  }
 }
 
 nsPIDOMWindow*
@@ -892,70 +877,93 @@ IDBDatabase::AbortTransactions(bool aShouldWarn)
 
   class MOZ_STACK_CLASS Helper final
   {
+    typedef nsAutoTArray<nsRefPtr<IDBTransaction>, 20> StrongTransactionArray;
+    typedef nsAutoTArray<IDBTransaction*, 20> WeakTransactionArray;
+
   public:
     static void
-    AbortTransactions(nsTHashtable<nsPtrHashKey<IDBTransaction>>& aTable,
-                      nsTArray<nsRefPtr<IDBTransaction>>& aAbortedTransactions)
+    AbortTransactions(IDBDatabase* aDatabase, const bool aShouldWarn)
     {
-      const uint32_t count = aTable.Count();
-      if (!count) {
+      MOZ_ASSERT(aDatabase);
+      aDatabase->AssertIsOnOwningThread();
+
+      nsTHashtable<nsPtrHashKey<IDBTransaction>>& transactionTable =
+        aDatabase->mTransactions;
+
+      if (!transactionTable.Count()) {
         return;
       }
 
-      nsAutoTArray<nsRefPtr<IDBTransaction>, 20> transactions;
-      transactions.SetCapacity(count);
+      StrongTransactionArray transactionsToAbort;
+      transactionsToAbort.SetCapacity(transactionTable.Count());
 
-      aTable.EnumerateEntries(Collect, &transactions);
-
-      MOZ_ASSERT(transactions.Length() == count);
-
-      for (uint32_t index = 0; index < count; index++) {
-        nsRefPtr<IDBTransaction> transaction = Move(transactions[index]);
+      for (auto iter = transactionTable.Iter(); !iter.Done(); iter.Next()) {
+        IDBTransaction* transaction = iter.Get()->GetKey();
         MOZ_ASSERT(transaction);
 
-        transaction->Abort(NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR);
+        transaction->AssertIsOnOwningThread();
 
-        // We only care about warning for write transactions.
-        if (transaction->GetMode() != IDBTransaction::READ_ONLY) {
-          aAbortedTransactions.AppendElement(Move(transaction));
+        // Transactions that are already done can simply be ignored. Otherwise
+        // there is a race here and it's possible that the transaction has not
+        // been successfully committed yet so we will warn the user.
+        if (!transaction->IsDone()) {
+          transactionsToAbort.AppendElement(transaction);
         }
       }
-    }
+      MOZ_ASSERT(transactionsToAbort.Length() <= transactionTable.Count());
 
-  private:
-    static PLDHashOperator
-    Collect(nsPtrHashKey<IDBTransaction>* aTransaction, void* aClosure)
-    {
-      MOZ_ASSERT(aTransaction);
-      aTransaction->GetKey()->AssertIsOnOwningThread();
-      MOZ_ASSERT(aClosure);
+      if (transactionsToAbort.IsEmpty()) {
+        return;
+      }
 
-      auto* array = static_cast<nsTArray<nsRefPtr<IDBTransaction>>*>(aClosure);
-      array->AppendElement(aTransaction->GetKey());
+      // We want to abort transactions as soon as possible so we iterate the
+      // transactions once and abort them all first, collecting the transactions
+      // that need to have a warning issued along the way. Those that need a
+      // warning will be a subset of those that are aborted, so we don't need
+      // additional strong references here.
+      WeakTransactionArray transactionsThatNeedWarning;
 
-      return PL_DHASH_NEXT;
+      for (nsRefPtr<IDBTransaction>& transaction : transactionsToAbort) {
+        MOZ_ASSERT(transaction);
+        MOZ_ASSERT(!transaction->IsDone());
+
+        if (aShouldWarn) {
+          switch (transaction->GetMode()) {
+            // We ignore transactions that could not have written any data.
+            case IDBTransaction::READ_ONLY:
+              break;
+
+            // We warn for any transactions that could have written data.
+            case IDBTransaction::READ_WRITE:
+            case IDBTransaction::READ_WRITE_FLUSH:
+            case IDBTransaction::VERSION_CHANGE:
+              transactionsThatNeedWarning.AppendElement(transaction);
+              break;
+
+            default:
+              MOZ_CRASH("Unknown mode!");
+          }
+        }
+
+        transaction->Abort(NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR);
+      }
+
+      static const char kWarningMessage[] =
+        "IndexedDBTransactionAbortNavigation";
+
+      for (IDBTransaction* transaction : transactionsThatNeedWarning) {
+        MOZ_ASSERT(transaction);
+
+        nsString filename;
+        uint32_t lineNo;
+        transaction->GetCallerLocation(filename, &lineNo);
+
+        aDatabase->LogWarning(kWarningMessage, filename, lineNo);
+      }
     }
   };
 
-  nsAutoTArray<nsRefPtr<IDBTransaction>, 5> abortedTransactions;
-  Helper::AbortTransactions(mTransactions, abortedTransactions);
-
-  if (aShouldWarn && !abortedTransactions.IsEmpty()) {
-    static const char kWarningMessage[] = "IndexedDBTransactionAbortNavigation";
-
-    for (uint32_t count = abortedTransactions.Length(), index = 0;
-         index < count;
-         index++) {
-      nsRefPtr<IDBTransaction>& transaction = abortedTransactions[index];
-      MOZ_ASSERT(transaction);
-
-      nsString filename;
-      uint32_t lineNo;
-      transaction->GetCallerLocation(filename, &lineNo);
-
-      LogWarning(kWarningMessage, filename, lineNo);
-    }
-  }
+  Helper::AbortTransactions(this, aShouldWarn);
 }
 
 PBackgroundIDBDatabaseFileChild*
@@ -1216,27 +1224,6 @@ IDBDatabase::ExpireFileActors(bool aExpireAll)
 
       return PL_DHASH_NEXT;
     }
-
-    static PLDHashOperator
-    MaybeExpireReceivedBlobs(nsISupportsHashKey* aKey,
-                             void* aClosure)
-    {
-      MOZ_ASSERT(aKey);
-      MOZ_ASSERT(!aClosure);
-
-      nsISupports* key = aKey->GetKey();
-      MOZ_ASSERT(key);
-
-      nsCOMPtr<nsIWeakReference> weakRef = do_QueryInterface(key);
-      MOZ_ASSERT(weakRef);
-
-      nsCOMPtr<nsISupports> referent = do_QueryReferent(weakRef);
-      if (!referent) {
-        return PL_DHASH_REMOVE;
-      }
-
-      return PL_DHASH_NEXT;
-    }
   };
 
   if (mBackgroundActor && mFileActors.Count()) {
@@ -1252,8 +1239,18 @@ IDBDatabase::ExpireFileActors(bool aExpireAll)
     if (aExpireAll) {
       mReceivedBlobs.Clear();
     } else {
-      mReceivedBlobs.EnumerateEntries(&Helper::MaybeExpireReceivedBlobs,
-                                      nullptr);
+      for (auto iter = mReceivedBlobs.Iter(); !iter.Done(); iter.Next()) {
+        nsISupports* key = iter.Get()->GetKey();
+        MOZ_ASSERT(key);
+
+        nsCOMPtr<nsIWeakReference> weakRef = do_QueryInterface(key);
+        MOZ_ASSERT(weakRef);
+
+        nsCOMPtr<nsISupports> referent = do_QueryReferent(weakRef);
+        if (!referent) {
+          iter.Remove();
+        }
+      }
     }
   }
 }
@@ -1282,6 +1279,26 @@ IDBDatabase::NoteFinishedMutableFile(IDBMutableFile* aMutableFile)
   // is in the list already.
 
   mLiveMutableFiles.RemoveElement(aMutableFile);
+}
+
+void
+IDBDatabase::OnNewFileHandle()
+{
+  MOZ_ASSERT(IndexedDatabaseManager::IsMainProcess());
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mBackgroundActor);
+
+  mBackgroundActor->SendNewFileHandle();
+}
+
+void
+IDBDatabase::OnFileHandleFinished()
+{
+  MOZ_ASSERT(IndexedDatabaseManager::IsMainProcess());
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mBackgroundActor);
+
+  mBackgroundActor->SendFileHandleFinished();
 }
 
 void

@@ -525,11 +525,6 @@ IonBuilder::canInlineTarget(JSFunction* target, CallInfo& callInfo)
         return DontInline(inlineScript, "Common inlining path");
     }
 
-    if (target->isHeavyweight()) {
-        trackOptimizationOutcome(TrackedOutcome::CantInlineHeavyweight);
-        return DontInline(inlineScript, "Heavyweight function");
-    }
-
     if (inlineScript->uninlineable()) {
         trackOptimizationOutcome(TrackedOutcome::CantInlineGeneric);
         return DontInline(inlineScript, "Uninlineable script");
@@ -12890,17 +12885,16 @@ IonBuilder::jsop_in_dense(MDefinition* obj, MDefinition* id, JSValueType unboxed
     return true;
 }
 
-static bool
-HasOnProtoChain(CompilerConstraintList* constraints, TypeSet::ObjectKey* key,
-                JSObject* protoObject, bool* hasOnProto)
+bool
+IonBuilder::hasOnProtoChain(TypeSet::ObjectKey* key, JSObject* protoObject, bool* hasOnProto)
 {
     MOZ_ASSERT(protoObject);
 
     while (true) {
-        if (!key->hasStableClassAndProto(constraints) || !key->clasp()->isNative())
+        if (!key->hasStableClassAndProto(constraints()) || !key->clasp()->isNative())
             return false;
 
-        JSObject* proto = key->proto().toObjectOrNull();
+        JSObject* proto = checkNurseryObject(key->proto().toObjectOrNull());
         if (!proto) {
             *hasOnProto = false;
             return true;
@@ -12944,7 +12938,7 @@ IonBuilder::tryFoldInstanceOf(MDefinition* lhs, JSObject* protoObject)
             continue;
 
         bool isInstance;
-        if (!HasOnProtoChain(constraints(), key, protoObject, &isInstance))
+        if (!hasOnProtoChain(key, protoObject, &isInstance))
             return false;
 
         if (isFirst) {

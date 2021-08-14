@@ -3152,13 +3152,16 @@ array_of(JSContext* cx, unsigned argc, Value* vp)
     // Step 4.
     RootedObject obj(cx);
     {
+        ConstructArgs cargs(cx);
+        if (!cargs.init(1))
+            return false;
+        cargs[0].setNumber(args.length());
+
         RootedValue v(cx);
-        Value argv[1] = {NumberValue(args.length())};
-        if (!InvokeConstructor(cx, args.thisv(), 1, argv, false, &v))
+        if (!Construct(cx, args.thisv(), cargs, args.thisv(), &v))
             return false;
-        obj = ToObject(cx, v);
-        if (!obj)
-            return false;
+
+        obj = &v.toObject();
     }
 
     // Step 8.
@@ -3247,9 +3250,6 @@ bool
 js::ArrayConstructor(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-
-    if (args.isConstructing())
-        MOZ_ASSERT(args.newTarget().toObject().as<JSFunction>().native() == js::ArrayConstructor);
 
     if (args.length() != 1 || !args[0].isNumber())
         return ArrayFromCallArgs(cx, args);

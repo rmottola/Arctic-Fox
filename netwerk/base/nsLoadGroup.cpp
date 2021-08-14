@@ -35,13 +35,76 @@ using namespace mozilla::net;
 //    set NSPR_LOG_MODULES=LoadGroup:5
 //    set NSPR_LOG_FILE=nspr.log
 //
-// this enables PR_LOG_DEBUG level information and places all output in
+// this enables LogLevel::Debug level information and places all output in
 // the file nspr.log
 //
 static PRLogModuleInfo* gLoadGroupLog = nullptr;
 
 #undef LOG
-#define LOG(args) PR_LOG(gLoadGroupLog, PR_LOG_DEBUG, args)
+#define LOG(args) MOZ_LOG(gLoadGroupLog, mozilla::LogLevel::Debug, args)
+
+////////////////////////////////////////////////////////////////////////////////
+// nsLoadGroupConnectionInfo
+
+class nsLoadGroupConnectionInfo final : public nsILoadGroupConnectionInfo
+{
+    ~nsLoadGroupConnectionInfo() {}
+
+public:
+    NS_DECL_THREADSAFE_ISUPPORTS
+    NS_DECL_NSILOADGROUPCONNECTIONINFO
+
+    nsLoadGroupConnectionInfo();
+private:
+    Atomic<uint32_t>       mBlockingTransactionCount;
+    nsAutoPtr<mozilla::net::SpdyPushCache> mSpdyCache;
+};
+
+NS_IMPL_ISUPPORTS(nsLoadGroupConnectionInfo, nsILoadGroupConnectionInfo)
+
+nsLoadGroupConnectionInfo::nsLoadGroupConnectionInfo()
+    : mBlockingTransactionCount(0)
+{
+}
+
+NS_IMETHODIMP
+nsLoadGroupConnectionInfo::GetBlockingTransactionCount(uint32_t *aBlockingTransactionCount)
+{
+    NS_ENSURE_ARG_POINTER(aBlockingTransactionCount);
+    *aBlockingTransactionCount = mBlockingTransactionCount;
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsLoadGroupConnectionInfo::AddBlockingTransaction()
+{
+    mBlockingTransactionCount++;
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsLoadGroupConnectionInfo::RemoveBlockingTransaction(uint32_t *_retval)
+{
+    NS_ENSURE_ARG_POINTER(_retval);
+        mBlockingTransactionCount--;
+        *_retval = mBlockingTransactionCount;
+    return NS_OK;
+}
+
+/* [noscript] attribute SpdyPushCachePtr spdyPushCache; */
+NS_IMETHODIMP
+nsLoadGroupConnectionInfo::GetSpdyPushCache(mozilla::net::SpdyPushCache **aSpdyPushCache)
+{
+    *aSpdyPushCache = mSpdyCache.get();
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsLoadGroupConnectionInfo::SetSpdyPushCache(mozilla::net::SpdyPushCache *aSpdyPushCache)
+{
+    mSpdyCache = aSpdyPushCache;
+    return NS_OK;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -86,6 +149,14 @@ RequestHashInitEntry(PLDHashEntryHdr *entry, const void *key)
     new (entry) RequestMapEntry(request);
 }
 
+static const PLDHashTableOps sRequestHashOps =
+{
+    PL_DHashVoidPtrKeyStub,
+    RequestHashMatchEntry,
+    PL_DHashMoveEntryStub,
+    RequestHashClearEntry,
+    RequestHashInitEntry
+};
 
 static void
 RescheduleRequest(nsIRequest *aRequest, int32_t delta)
@@ -95,22 +166,12 @@ RescheduleRequest(nsIRequest *aRequest, int32_t delta)
         p->AdjustPriority(delta);
 }
 
-static PLDHashOperator
-RescheduleRequests(PLDHashTable *table, PLDHashEntryHdr *hdr,
-                   uint32_t number, void *arg)
-{
-    RequestMapEntry *e = static_cast<RequestMapEntry *>(hdr);
-    int32_t *delta = static_cast<int32_t *>(arg);
-
-    RescheduleRequest(e->mKey, *delta);
-    return PL_DHASH_NEXT;
-}
-
-
 nsLoadGroup::nsLoadGroup(nsISupports* outer)
     : mForegroundCount(0)
     , mLoadFlags(LOAD_NORMAL)
     , mDefaultLoadFlags(0)
+    , mConnectionInfo(new nsLoadGroupConnectionInfo())
+    , mRequests(&sRequestHashOps, sizeof(RequestMapEntry))
     , mStatus(NS_OK)
     , mPriority(PRIORITY_NORMAL)
     , mIsCanceling(false)
@@ -132,10 +193,6 @@ nsLoadGroup::~nsLoadGroup()
 {
     DebugOnly<nsresult> rv = Cancel(NS_BINDING_ABORTED);
     NS_ASSERTION(NS_SUCCEEDED(rv), "Cancel failed");
-
-    if (mRequests.IsInitialized()) {
-        PL_DHashTableFinish(&mRequests);
-    }
 
     mDefaultLoadRequest = 0;
 
@@ -189,27 +246,28 @@ nsLoadGroup::GetStatus(nsresult *status)
     return NS_OK; 
 }
 
-// PLDHashTable enumeration callback that appends strong references to
-// all nsIRequest to an nsTArray<nsIRequest*>.
-static PLDHashOperator
-AppendRequestsToArray(PLDHashTable *table, PLDHashEntryHdr *hdr,
-                      uint32_t number, void *arg)
+static bool
+AppendRequestsToArray(PLDHashTable* aTable, nsTArray<nsIRequest*> *aArray)
 {
-    RequestMapEntry *e = static_cast<RequestMapEntry *>(hdr);
-    nsTArray<nsIRequest*> *array = static_cast<nsTArray<nsIRequest*> *>(arg);
+    for (auto iter = aTable->Iter(); !iter.Done(); iter.Next()) {
+        auto e = static_cast<RequestMapEntry*>(iter.Get());
+        nsIRequest *request = e->mKey;
+        NS_ASSERTION(request, "What? Null key in pldhash entry?");
 
-    nsIRequest *request = e->mKey;
-    NS_ASSERTION(request, "What? Null key in pldhash entry?");
-
-    bool ok = array->AppendElement(request) != nullptr;
-
-    if (!ok) {
-        return PL_DHASH_STOP;
+        bool ok = !!aArray->AppendElement(request);
+        if (!ok) {
+           break;
+        }
+        NS_ADDREF(request);
     }
 
-    NS_ADDREF(request);
-
-    return PL_DHASH_NEXT;
+    if (aArray->Length() != aTable->EntryCount()) {
+        for (uint32_t i = 0, len = aArray->Length(); i < len; ++i) {
+            NS_RELEASE((*aArray)[i]);
+        }
+        return false;
+    }
+    return true;
 }
 
 NS_IMETHODIMP
@@ -223,14 +281,7 @@ nsLoadGroup::Cancel(nsresult status)
 
     nsAutoTArray<nsIRequest*, 8> requests;
 
-    PL_DHashTableEnumerate(&mRequests, AppendRequestsToArray,
-                           static_cast<nsTArray<nsIRequest*> *>(&requests));
-
-    if (requests.Length() != count) {
-        for (uint32_t i = 0, len = requests.Length(); i < len; ++i) {
-            NS_RELEASE(requests[i]);
-        }
-
+    if (!AppendRequestsToArray(&mRequests, &requests)) {
         return NS_ERROR_OUT_OF_MEMORY;
     }
 
@@ -251,13 +302,13 @@ nsLoadGroup::Cancel(nsresult status)
 
         NS_ASSERTION(request, "NULL request found in list.");
 
-        if (!PL_DHashTableSearch(&mRequests, request)) {
+        if (!mRequests.Search(request)) {
             // |request| was removed already
             NS_RELEASE(request);
             continue;
         }
 
-        if (PR_LOG_TEST(gLoadGroupLog, PR_LOG_DEBUG)) {
+        if (MOZ_LOG_TEST(gLoadGroupLog, LogLevel::Debug)) {
             nsAutoCString nameStr;
             request->GetName(nameStr);
             LOG(("LOADGROUP [%x]: Canceling request %x %s.\n",
@@ -302,14 +353,7 @@ nsLoadGroup::Suspend()
 
     nsAutoTArray<nsIRequest*, 8> requests;
 
-    PL_DHashTableEnumerate(&mRequests, AppendRequestsToArray,
-                           static_cast<nsTArray<nsIRequest*> *>(&requests));
-
-    if (requests.Length() != count) {
-        for (uint32_t i = 0, len = requests.Length(); i < len; ++i) {
-            NS_RELEASE(requests[i]);
-        }
-
+    if (!AppendRequestsToArray(&mRequests, &requests)) {
         return NS_ERROR_OUT_OF_MEMORY;
     }
 
@@ -325,7 +369,7 @@ nsLoadGroup::Suspend()
         if (!request)
             continue;
 
-        if (PR_LOG_TEST(gLoadGroupLog, PR_LOG_DEBUG)) {
+        if (MOZ_LOG_TEST(gLoadGroupLog, LogLevel::Debug)) {
             nsAutoCString nameStr;
             request->GetName(nameStr);
             LOG(("LOADGROUP [%x]: Suspending request %x %s.\n",
@@ -354,14 +398,7 @@ nsLoadGroup::Resume()
 
     nsAutoTArray<nsIRequest*, 8> requests;
 
-    PL_DHashTableEnumerate(&mRequests, AppendRequestsToArray,
-                           static_cast<nsTArray<nsIRequest*> *>(&requests));
-
-    if (requests.Length() != count) {
-        for (uint32_t i = 0, len = requests.Length(); i < len; ++i) {
-            NS_RELEASE(requests[i]);
-        }
-
+    if (!AppendRequestsToArray(&mRequests, &requests)) {
         return NS_ERROR_OUT_OF_MEMORY;
     }
 
@@ -377,7 +414,7 @@ nsLoadGroup::Resume()
         if (!request)
             continue;
 
-        if (PR_LOG_TEST(gLoadGroupLog, PR_LOG_DEBUG)) {
+        if (MOZ_LOG_TEST(gLoadGroupLog, LogLevel::Debug)) {
             nsAutoCString nameStr;
             request->GetName(nameStr);
             LOG(("LOADGROUP [%x]: Resuming request %x %s.\n",
@@ -466,14 +503,14 @@ nsLoadGroup::AddRequest(nsIRequest *request, nsISupports* ctxt)
 {
     nsresult rv;
 
-    if (PR_LOG_TEST(gLoadGroupLog, PR_LOG_DEBUG)) {
+    if (MOZ_LOG_TEST(gLoadGroupLog, LogLevel::Debug)) {
         nsAutoCString nameStr;
         request->GetName(nameStr);
         LOG(("LOADGROUP [%x]: Adding request %x %s (count=%d).\n",
              this, request, nameStr.get(), mRequests.EntryCount()));
     }
 
-    NS_ASSERTION(!PL_DHashTableSearch(&mRequests, request),
+    NS_ASSERTION(!mRequests.Search(request),
                  "Entry added to loadgroup twice, don't do that");
 
     //
@@ -500,9 +537,8 @@ nsLoadGroup::AddRequest(nsIRequest *request, nsISupports* ctxt)
     // Add the request to the list of active requests...
     //
 
-    RequestMapEntry *entry = static_cast<RequestMapEntry *>
-        (PL_DHashTableAdd(&mRequests, request, fallible));
-
+    auto entry =
+        static_cast<RequestMapEntry*>(mRequests.Add(request, fallible));
     if (!entry) {
         return NS_ERROR_OUT_OF_MEMORY;
     }
@@ -538,7 +574,7 @@ nsLoadGroup::AddRequest(nsIRequest *request, nsISupports* ctxt)
                 // the damage...
                 //
 
-                PL_DHashTableRemove(&mRequests, request);
+                mRequests.Remove(request);
 
                 rv = NS_OK;
 
@@ -563,7 +599,7 @@ nsLoadGroup::RemoveRequest(nsIRequest *request, nsISupports* ctxt,
     NS_ENSURE_ARG_POINTER(request);
     nsresult rv;
 
-    if (PR_LOG_TEST(gLoadGroupLog, PR_LOG_DEBUG)) {
+    if (MOZ_LOG_TEST(gLoadGroupLog, LogLevel::Debug)) {
         nsAutoCString nameStr;
         request->GetName(nameStr);
         LOG(("LOADGROUP [%x]: Removing request %x %s status %x (count=%d).\n",
@@ -580,9 +616,7 @@ nsLoadGroup::RemoveRequest(nsIRequest *request, nsISupports* ctxt,
     // the request was *not* in the group so do not update the foreground
     // count or it will get messed up...
     //
-    RequestMapEntry *entry =
-        static_cast<RequestMapEntry *>
-                   (PL_DHashTableSearch(&mRequests, request));
+    auto entry = static_cast<RequestMapEntry*>(mRequests.Search(request));
 
     if (!entry) {
         LOG(("LOADGROUP [%x]: Unable to remove request %x. Not in group!\n",
@@ -591,7 +625,7 @@ nsLoadGroup::RemoveRequest(nsIRequest *request, nsISupports* ctxt,
         return NS_ERROR_FAILURE;
     }
 
-    PL_DHashTableRawRemove(&mRequests, entry);
+    mRequests.RemoveEntry(entry);
 
     // Collect telemetry stats only when default request is a timed channel.
     // Don't include failed requests in the timing statistics.
@@ -666,24 +700,16 @@ nsLoadGroup::RemoveRequest(nsIRequest *request, nsISupports* ctxt,
     return rv;
 }
 
-// PLDHashTable enumeration callback that appends all items in the
-// hash to an nsCOMArray
-static PLDHashOperator
-AppendRequestsToCOMArray(PLDHashTable *table, PLDHashEntryHdr *hdr,
-                         uint32_t number, void *arg)
-{
-    RequestMapEntry *e = static_cast<RequestMapEntry *>(hdr);
-    static_cast<nsCOMArray<nsIRequest>*>(arg)->AppendObject(e->mKey);
-    return PL_DHASH_NEXT;
-}
-
 NS_IMETHODIMP
 nsLoadGroup::GetRequests(nsISimpleEnumerator * *aRequests)
 {
     nsCOMArray<nsIRequest> requests;
     requests.SetCapacity(mRequests.EntryCount());
 
-    PL_DHashTableEnumerate(&mRequests, AppendRequestsToCOMArray, &requests);
+    for (auto iter = mRequests.Iter(); !iter.Done(); iter.Next()) {
+      auto e = static_cast<RequestMapEntry*>(iter.Get());
+      requests.AppendObject(e->mKey);
+    }
 
     return NS_NewArrayEnumerator(aRequests, requests);
 }
@@ -817,7 +843,10 @@ nsLoadGroup::AdjustPriority(int32_t aDelta)
     // Update the priority for each request that supports nsISupportsPriority
     if (aDelta != 0) {
         mPriority += aDelta;
-        PL_DHashTableEnumerate(&mRequests, RescheduleRequests, &aDelta);
+        for (auto iter = mRequests.Iter(); !iter.Done(); iter.Next()) {
+          auto e = static_cast<RequestMapEntry*>(iter.Get());
+          RescheduleRequest(e->mKey, aDelta);
+        }
     }
     return NS_OK;
 }
@@ -1053,87 +1082,6 @@ nsresult nsLoadGroup::MergeLoadFlags(nsIRequest *aRequest, nsLoadFlags& outFlags
 
     outFlags = flags;
     return rv;
-}
-
-// nsLoadGroupConnectionInfo
-
-class nsLoadGroupConnectionInfo final : public nsILoadGroupConnectionInfo
-{
-    ~nsLoadGroupConnectionInfo() {}
-
-public:
-    NS_DECL_THREADSAFE_ISUPPORTS
-    NS_DECL_NSILOADGROUPCONNECTIONINFO
-
-    nsLoadGroupConnectionInfo();
-private:
-    Atomic<uint32_t>       mBlockingTransactionCount;
-    nsAutoPtr<mozilla::net::SpdyPushCache> mSpdyCache;
-};
-
-NS_IMPL_ISUPPORTS(nsLoadGroupConnectionInfo, nsILoadGroupConnectionInfo)
-
-nsLoadGroupConnectionInfo::nsLoadGroupConnectionInfo()
-    : mBlockingTransactionCount(0)
-{
-}
-
-NS_IMETHODIMP
-nsLoadGroupConnectionInfo::GetBlockingTransactionCount(uint32_t *aBlockingTransactionCount)
-{
-    NS_ENSURE_ARG_POINTER(aBlockingTransactionCount);
-    *aBlockingTransactionCount = mBlockingTransactionCount;
-    return NS_OK;
-}
-
-NS_IMETHODIMP
-nsLoadGroupConnectionInfo::AddBlockingTransaction()
-{
-    mBlockingTransactionCount++;
-    return NS_OK;
-}
-
-NS_IMETHODIMP
-nsLoadGroupConnectionInfo::RemoveBlockingTransaction(uint32_t *_retval)
-{
-    NS_ENSURE_ARG_POINTER(_retval);
-        mBlockingTransactionCount--;
-        *_retval = mBlockingTransactionCount;
-    return NS_OK;
-}
-
-/* [noscript] attribute SpdyPushCachePtr spdyPushCache; */
-NS_IMETHODIMP
-nsLoadGroupConnectionInfo::GetSpdyPushCache(mozilla::net::SpdyPushCache **aSpdyPushCache)
-{
-    *aSpdyPushCache = mSpdyCache.get();
-    return NS_OK;
-}
-
-NS_IMETHODIMP
-nsLoadGroupConnectionInfo::SetSpdyPushCache(mozilla::net::SpdyPushCache *aSpdyPushCache)
-{
-    mSpdyCache = aSpdyPushCache;
-    return NS_OK;
-}
-
-nsresult nsLoadGroup::Init()
-{
-    static const PLDHashTableOps hash_table_ops =
-    {
-        PL_DHashVoidPtrKeyStub,
-        RequestHashMatchEntry,
-        PL_DHashMoveEntryStub,
-        RequestHashClearEntry,
-        RequestHashInitEntry
-    };
-
-    PL_DHashTableInit(&mRequests, &hash_table_ops,
-                      sizeof(RequestMapEntry));
-
-    mConnectionInfo = new nsLoadGroupConnectionInfo();
-
-    return NS_OK;
 }
 
 #undef LOG

@@ -37,7 +37,6 @@
 #include "nsPIDOMWindow.h"
 #include "nsIStyleRule.h"
 #include "nsIURL.h"
-#include "nsNetUtil.h"
 #include "nsEscape.h"
 #include "nsIFrameInlines.h"
 #include "nsIScrollableFrame.h"
@@ -1005,6 +1004,10 @@ nsGenericHTMLElement::ParseAttribute(int32_t aNamespaceID,
       return aResult.ParseIntValue(aValue);
     }
 
+    if (aAttribute == nsGkAtoms::referrer) {
+      return ParseReferrerAttribute(aValue, aResult);
+    }
+
     if (aAttribute == nsGkAtoms::name) {
       // Store name as an atom.  name="" means that the element has no name,
       // not that it has an emptystring as the name.
@@ -1270,6 +1273,19 @@ nsGenericHTMLElement::ParseImageAttribute(nsIAtom* aAttribute,
     return aResult.ParseIntWithBounds(aString, 0);
   }
   return false;
+}
+
+bool
+nsGenericHTMLElement::ParseReferrerAttribute(const nsAString& aString,
+                                             nsAttrValue& aResult)
+{
+  static const nsAttrValue::EnumTable kReferrerTable[] = {
+    { "no-referrer", net::RP_No_Referrer },
+    { "origin", net::RP_Origin },
+    { "unsafe-url", net::RP_Unsafe_URL },
+    { 0 }
+  };
+  return aResult.ParseEnumValue(aString, kReferrerTable, false);
 }
 
 bool
@@ -1742,35 +1758,51 @@ nsGenericHTMLElement::GetURIListAttr(nsIAtom* aAttr, nsAString& aResult)
   nsIDocument* doc = OwnerDoc(); 
   nsCOMPtr<nsIURI> baseURI = GetBaseURI();
 
-  // Value contains relative URIs split on spaces (U+0020)
-  const char16_t *start = value.BeginReading();
-  const char16_t *end   = value.EndReading();
-  const char16_t *iter  = start;
-  for (;;) {
-    if (iter < end && *iter != ' ') {
+  nsString::const_iterator end;
+  value.EndReading(end);
+
+  nsAString::const_iterator iter;
+  value.BeginReading(iter);
+
+  while (iter != end) {
+    while (*iter == ' ' && iter != end) {
       ++iter;
-    } else {  // iter is pointing at either end or a space
-      while (*start == ' ' && start < iter)
-        ++start;
-      if (iter != start) {
-        if (!aResult.IsEmpty())
-          aResult.Append(char16_t(' '));
-        const nsSubstring& uriPart = Substring(start, iter);
-        nsCOMPtr<nsIURI> attrURI;
-        nsContentUtils::NewURIWithDocumentCharset(getter_AddRefs(attrURI),
-                                                  uriPart, doc, baseURI);
-        if (attrURI) {
-          nsAutoCString spec;
-          attrURI->GetSpec(spec);
-          AppendUTF8toUTF16(spec, aResult);
-        } else {
-          aResult.Append(uriPart);
-        }
-      }
-      start = iter = iter + 1;
-      if (iter >= end)
-        break;
     }
+
+    if (iter == end) {
+      break;
+    }
+
+    nsAString::const_iterator start = iter;
+
+    while (iter != end && *iter != ' ') {
+      ++iter;
+    }
+
+    if (!aResult.IsEmpty()) {
+      aResult.Append(NS_LITERAL_STRING(" "));
+    }
+
+    const nsSubstring& uriPart = Substring(start, iter);
+    nsCOMPtr<nsIURI> attrURI;
+    nsresult rv =
+      nsContentUtils::NewURIWithDocumentCharset(getter_AddRefs(attrURI),
+                                                uriPart, doc, baseURI);
+    if (NS_FAILED(rv)) {
+      aResult.Append(uriPart);
+      continue;
+    }
+
+    MOZ_ASSERT(attrURI);
+
+    nsAutoCString spec;
+    rv = attrURI->GetSpec(spec);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      aResult.Append(uriPart);
+      continue;
+    }
+
+    AppendUTF8toUTF16(spec, aResult);
   }
 
   return NS_OK;
@@ -2097,7 +2129,7 @@ nsGenericHTMLFormElement::UnbindFromTree(bool aDeep, bool aNullParent)
 
 nsresult
 nsGenericHTMLFormElement::BeforeSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
-                                        const nsAttrValueOrString* aValue,
+                                        nsAttrValueOrString* aValue,
                                         bool aNotify)
 {
   if (aNameSpaceID == kNameSpaceID_None) {

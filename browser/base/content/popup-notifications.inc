@@ -88,7 +88,7 @@
 
     <popupnotification id="webapps-install-progress-notification" hidden="true">
       <popupnotificationcontent id="webapps-install-progress-content" orient="vertical" align="start"/>
-</popupnotification>
+    </popupnotification>
 
     <popupnotification id="servicesInstall-notification" hidden="true">
       <popupnotificationcontent orient="vertical" align="start">
@@ -98,12 +98,22 @@
 
     <popupnotification id="pointerLock-notification" hidden="true">
       <popupnotificationcontent orient="vertical" align="start">
-        <label id="pointerLock-cancel" value="&pointerLock.notification.message;"/>
+        <label id="pointerLock-cancel">&pointerLock.notification.message;</label>
       </popupnotificationcontent>
     </popupnotification>
 
+    <vbox id="login-fill-doorhanger" hidden="true">
+      <description id="login-fill-testing"
+                   value="Thanks for testing the login fill doorhanger!"/>
+      <textbox id="login-fill-filter"/>
+      <richlistbox id="login-fill-list"/>
+    </vbox>
 
     <popupnotification id="addon-progress-notification" hidden="true">
+      <popupnotificationcontent orient="vertical">
+        <progressmeter id="addon-progress-notification-progressmeter"/>
+        <label id="addon-progress-notification-progresstext" crop="end"/>
+      </popupnotificationcontent>
       <button id="addon-progress-cancel"
               oncommand="this.parentNode.cancel();"/>
       <button id="addon-progress-accept" disabled="true"/>
@@ -116,4 +126,4 @@
       <button id="addon-install-confirmation-accept"
               oncommand="gXPInstallObserver.acceptInstallation();
                          PopupNotifications.getNotification('addon-install-confirmation').remove();"/>
-</popupnotification>
+    </popupnotification>

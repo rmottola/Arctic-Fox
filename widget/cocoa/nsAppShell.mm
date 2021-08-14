@@ -719,8 +719,7 @@ nsAppShell::Exit(void)
 //
 // public
 NS_IMETHODIMP
-nsAppShell::OnProcessNextEvent(nsIThreadInternal *aThread, bool aMayWait,
-                               uint32_t aRecursionDepth)
+nsAppShell::OnProcessNextEvent(nsIThreadInternal *aThread, bool aMayWait)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
 
@@ -730,7 +729,7 @@ nsAppShell::OnProcessNextEvent(nsIThreadInternal *aThread, bool aMayWait,
   NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
   ::CFArrayAppendValue(mAutoreleasePools, pool);
 
-  return nsBaseAppShell::OnProcessNextEvent(aThread, aMayWait, aRecursionDepth);
+  return nsBaseAppShell::OnProcessNextEvent(aThread, aMayWait);
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
 }
@@ -744,7 +743,6 @@ nsAppShell::OnProcessNextEvent(nsIThreadInternal *aThread, bool aMayWait,
 // public
 NS_IMETHODIMP
 nsAppShell::AfterProcessNextEvent(nsIThreadInternal *aThread,
-                                  uint32_t aRecursionDepth,
                                   bool aEventWasProcessed)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
@@ -759,8 +757,7 @@ nsAppShell::AfterProcessNextEvent(nsIThreadInternal *aThread,
   ::CFArrayRemoveValueAtIndex(mAutoreleasePools, count - 1);
   [pool release];
 
-  return nsBaseAppShell::AfterProcessNextEvent(aThread, aRecursionDepth,
-                                               aEventWasProcessed);
+  return nsBaseAppShell::AfterProcessNextEvent(aThread, aEventWasProcessed);
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
 }

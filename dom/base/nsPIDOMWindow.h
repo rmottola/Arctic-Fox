@@ -63,8 +63,8 @@ enum UIStateChangeType
 };
 
 #define NS_PIDOMWINDOW_IID \
-{ 0x2485d4d7, 0xf7cb, 0x481e, \
-  { 0x9c, 0x89, 0xb2, 0xa8, 0x12, 0x67, 0x7f, 0x97 } }
+{ 0x2aebbbd7, 0x154b, 0x4341, \
+  { 0x8d, 0x02, 0x7f, 0x70, 0xf8, 0x3e, 0xf7, 0xa1 } }
 
 class nsPIDOMWindow : public nsIDOMWindowInternal
 {
@@ -202,8 +202,6 @@ public:
 
   float GetAudioVolume() const;
   nsresult SetAudioVolume(float aVolume);
-
-  float GetAudioGlobalVolume();
 
   virtual void SetServiceWorkersTestingEnabled(bool aEnabled)
   {
@@ -479,19 +477,38 @@ public:
     }
   }
 
+  enum FullscreenReason
+  {
+    // Toggling the fullscreen mode requires trusted context.
+    eForFullscreenMode,
+    // Fullscreen API is the API provided to untrusted content.
+    eForFullscreenAPI
+  };
+
   /**
    * Moves the top-level window into fullscreen mode if aIsFullScreen is true,
-   * otherwise exits fullscreen. If aFullscreenMode is true, this method is
-   * called for fullscreen mode instead of DOM fullscreen, which means it can
-   * only change window state in a context trusted for write.
+   * otherwise exits fullscreen.
    *
    * If aHMD is not null, the window is made full screen on the given VR HMD
    * device instead of its currrent display.
    *
    * Outer windows only.
    */
-  virtual nsresult SetFullScreenInternal(bool aIsFullscreen, bool aFullscreenMode,
-                                         mozilla::gfx::VRHMDInfo *aHMD = nullptr) = 0;
+  virtual nsresult SetFullscreenInternal(
+    FullscreenReason aReason, bool aIsFullscreen,
+    mozilla::gfx::VRHMDInfo *aHMD = nullptr) = 0;
+
+  /**
+   * This function should be called when the fullscreen state is flipped.
+   * If no widget is involved the fullscreen change, this method is called
+   * by SetFullscreenInternal, otherwise, it is called when the widget
+   * finishes its change to or from fullscreen.
+   *
+   * @param aIsFullscreen indicates whether the widget is in fullscreen.
+   *
+   * Outer windows only.
+   */
+  virtual void FinishFullscreenChange(bool aIsFullscreen) = 0;
 
   /**
    * Call this to check whether some node (this window, its document,

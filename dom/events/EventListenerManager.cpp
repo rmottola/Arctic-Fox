@@ -101,6 +101,8 @@ EventListenerManager::EventListenerManager(EventTarget* aTarget)
   , mMayHaveTouchEventListener(false)
   , mMayHaveMouseEnterLeaveEventListener(false)
   , mMayHavePointerEnterLeaveEventListener(false)
+  , mMayHaveKeyEventListener(false)
+  , mMayHaveInputOrCompositionEventListener(false)
   , mClearingListeners(false)
   , mIsMainThreadELM(NS_IsMainThread())
   , mNoListenerForEvent(0)
@@ -376,9 +378,27 @@ EventListenerManager::AddEventListenerInternal(
       window->SetHasGamepadEventListener();
     }
 #endif
+  } else if (aTypeAtom == nsGkAtoms::onkeydown ||
+             aTypeAtom == nsGkAtoms::onkeypress ||
+             aTypeAtom == nsGkAtoms::onkeyup) {
+    if (!aFlags.mInSystemGroup) {
+      mMayHaveKeyEventListener = true;
+    }
+  } else if (aTypeAtom == nsGkAtoms::oncompositionend ||
+             aTypeAtom == nsGkAtoms::oncompositionstart ||
+             aTypeAtom == nsGkAtoms::oncompositionupdate ||
+             aTypeAtom == nsGkAtoms::oninput) {
+    if (!aFlags.mInSystemGroup) {
+      mMayHaveInputOrCompositionEventListener = true;
+    }
   }
+
   if (aTypeAtom && mTarget) {
     mTarget->EventListenerAdded(aTypeAtom);
+  }
+
+  if (mIsMainThreadELM && mTarget) {
+    EventListenerService::NotifyAboutMainThreadListenerChange(mTarget);
   }
 }
 
@@ -496,6 +516,9 @@ EventListenerManager::RemoveEventListenerInternal(
         mNoListenerForEventAtom = nullptr;
         if (mTarget && aUserType) {
           mTarget->EventListenerRemoved(aUserType);
+        }
+        if (mIsMainThreadELM && mTarget) {
+          EventListenerService::NotifyAboutMainThreadListenerChange(mTarget);
         }
 
         if (!deviceType
@@ -630,6 +653,9 @@ EventListenerManager::SetEventHandlerInternal(
       mTarget->EventListenerRemoved(aName);
       mTarget->EventListenerAdded(aName);
     }
+    if (mIsMainThreadELM && mTarget) {
+      EventListenerService::NotifyAboutMainThreadListenerChange(mTarget);
+    }
   }
 
   // Set flag to indicate possible need for compilation later
@@ -756,6 +782,9 @@ EventListenerManager::RemoveEventHandler(nsIAtom* aName,
     mNoListenerForEventAtom = nullptr;
     if (mTarget && aName) {
       mTarget->EventListenerRemoved(aName);
+    }
+    if (mIsMainThreadELM && mTarget) {
+      EventListenerService::NotifyAboutMainThreadListenerChange(mTarget);
     }
   }
 }
@@ -902,7 +931,7 @@ EventListenerManager::CompileEventHandlerInternal(Listener* aListener,
   NS_ENSURE_TRUE(jsStr, NS_ERROR_OUT_OF_MEMORY);
 
   // Get the reflector for |aElement|, so that we can pass to setElement.
-  if (NS_WARN_IF(!GetOrCreateDOMReflector(cx, target, aElement, &v))) {
+  if (NS_WARN_IF(!GetOrCreateDOMReflector(cx, aElement, &v))) {
     return NS_ERROR_FAILURE;
   }
   JS::CompileOptions options(cx);
@@ -921,15 +950,15 @@ EventListenerManager::CompileEventHandlerInternal(Listener* aListener,
 
   if (jsEventHandler->EventName() == nsGkAtoms::onerror && win) {
     nsRefPtr<OnErrorEventHandlerNonNull> handlerCallback =
-      new OnErrorEventHandlerNonNull(handler, /* aIncumbentGlobal = */ nullptr);
+      new OnErrorEventHandlerNonNull(nullptr, handler, /* aIncumbentGlobal = */ nullptr);
     jsEventHandler->SetHandler(handlerCallback);
   } else if (jsEventHandler->EventName() == nsGkAtoms::onbeforeunload && win) {
     nsRefPtr<OnBeforeUnloadEventHandlerNonNull> handlerCallback =
-      new OnBeforeUnloadEventHandlerNonNull(handler, /* aIncumbentGlobal = */ nullptr);
+      new OnBeforeUnloadEventHandlerNonNull(nullptr, handler, /* aIncumbentGlobal = */ nullptr);
     jsEventHandler->SetHandler(handlerCallback);
   } else {
     nsRefPtr<EventHandlerNonNull> handlerCallback =
-      new EventHandlerNonNull(handler, /* aIncumbentGlobal = */ nullptr);
+      new EventHandlerNonNull(nullptr, handler, /* aIncumbentGlobal = */ nullptr);
     jsEventHandler->SetHandler(handlerCallback);
   }
 
@@ -1412,7 +1441,7 @@ size_t
 EventListenerManager::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const
 {
   size_t n = aMallocSizeOf(this);
-  n += mListeners.SizeOfExcludingThis(aMallocSizeOf);
+  n += mListeners.ShallowSizeOfExcludingThis(aMallocSizeOf);
   uint32_t count = mListeners.Length();
   for (uint32_t i = 0; i < count; ++i) {
     JSEventHandler* jsEventHandler =

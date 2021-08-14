@@ -17,7 +17,6 @@
 #include "nsIIDNService.h"
 #include "mozilla/Logging.h"
 #include "nsAutoPtr.h"
-#include "nsIProgrammingLanguage.h"
 #include "nsIURLParser.h"
 #include "nsNetCID.h"
 #include "mozilla/MemoryReporting.h"
@@ -46,9 +45,9 @@ static PRLogModuleInfo *gStandardURLLog;
 
 // The Chromium code defines its own LOG macro which we don't want
 #undef LOG
-#define LOG(args)     PR_LOG(gStandardURLLog, PR_LOG_DEBUG, args)
+#define LOG(args)     MOZ_LOG(gStandardURLLog, mozilla::LogLevel::Debug, args)
 #undef LOG_ENABLED
-#define LOG_ENABLED() PR_LOG_TEST(gStandardURLLog, PR_LOG_DEBUG)
+#define LOG_ENABLED() MOZ_LOG_TEST(gStandardURLLog, mozilla::LogLevel::Debug)
 
 //----------------------------------------------------------------------------
 
@@ -3259,7 +3258,7 @@ nsStandardURL::GetInterfaces(uint32_t *count, nsIID * **array)
 }
 
 NS_IMETHODIMP 
-nsStandardURL::GetHelperForLanguage(uint32_t language, nsISupports **_retval)
+nsStandardURL::GetScriptableHelper(nsIXPCScriptable **_retval)
 {
     *_retval = nullptr;
     return NS_OK;
@@ -3286,13 +3285,6 @@ nsStandardURL::GetClassID(nsCID * *aClassID)
     if (!*aClassID)
         return NS_ERROR_OUT_OF_MEMORY;
     return GetClassIDNoAlloc(*aClassID);
-}
-
-NS_IMETHODIMP 
-nsStandardURL::GetImplementationLanguage(uint32_t *aImplementationLanguage)
-{
-    *aImplementationLanguage = nsIProgrammingLanguage::CPLUSPLUS;
-    return NS_OK;
 }
 
 NS_IMETHODIMP 

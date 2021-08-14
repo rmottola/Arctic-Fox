@@ -24,6 +24,7 @@
 
 #include "WorkerPrivate.h"
 #include "WorkerRunnable.h"
+#include "WorkerScope.h"
 
 BEGIN_WORKERS_NAMESPACE
 using mozilla::dom::GlobalObject;
@@ -839,21 +840,6 @@ URL::SearchParams()
 }
 
 void
-URL::SetSearchParams(URLSearchParams& aSearchParams)
-{
-  if (mSearchParams) {
-    mSearchParams->RemoveObserver(this);
-  }
-
-  mSearchParams = &aSearchParams;
-  mSearchParams->AddObserver(this);
-
-  nsAutoString search;
-  mSearchParams->Serialize(search);
-  SetSearchInternal(search);
-}
-
-void
 URL::GetHash(nsAString& aHash, ErrorResult& aRv) const
 {
   nsRefPtr<GetterRunnable> runnable =
@@ -959,7 +945,7 @@ URL::UpdateURLSearchParams()
     nsAutoString search;
     ErrorResult rv;
     GetSearch(search, rv);
-    mSearchParams->ParseInput(NS_ConvertUTF16toUTF8(Substring(search, 1)), this);
+    mSearchParams->ParseInput(NS_ConvertUTF16toUTF8(Substring(search, 1)));
   }
 }
 
@@ -967,8 +953,7 @@ void
 URL::CreateSearchParamsIfNeeded()
 {
   if (!mSearchParams) {
-    mSearchParams = new URLSearchParams();
-    mSearchParams->AddObserver(this);
+    mSearchParams = new URLSearchParams(this);
     UpdateURLSearchParams();
   }
 }

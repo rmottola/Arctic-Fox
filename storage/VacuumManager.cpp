@@ -244,14 +244,14 @@ Vacuumer::HandleError(mozIStorageError *aError)
   NS_WARNING(warnMsg.get());
 #endif
 
-  if (PR_LOG_TEST(gStorageLog, PR_LOG_ERROR)) {
+  if (MOZ_LOG_TEST(gStorageLog, LogLevel::Error)) {
     int32_t result;
     nsresult rv = aError->GetResult(&result);
     NS_ENSURE_SUCCESS(rv, rv);
     nsAutoCString message;
     rv = aError->GetMessage(message);
     NS_ENSURE_SUCCESS(rv, rv);
-    PR_LOG(gStorageLog, PR_LOG_ERROR,
+    MOZ_LOG(gStorageLog, LogLevel::Error,
            ("Vacuum failed with error: %d '%s'. Database was: '%s'",
             result, message.get(), mDBFilename.get()));
   }
@@ -315,7 +315,7 @@ VacuumManager *
 VacuumManager::getSingleton()
 {
   //Don't allocate it in the child Process.
-  if (XRE_GetProcessType() != GeckoProcessType_Default) {
+  if (!XRE_IsParentProcess()) {
     return nullptr;
   }
 

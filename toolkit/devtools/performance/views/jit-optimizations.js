@@ -11,7 +11,7 @@ const JIT_EMPTY_TEXT = L10N.getStr("jit.empty");
 /**
  * View for rendering JIT Optimization data. The terminology and types
  * used here can be referenced:
- * @see toolkit/devtools/shared/profiler/jit.js
+ * @see toolkit/devtools/performance/modules/logic/jit.js
  */
 
 let JITOptimizationsView = {
@@ -232,7 +232,7 @@ let JITOptimizationsView = {
   /**
    * Creates an element for insertion in the raw view for an IonType.
    *
-   * @see toolkit/devtools/shared/profiler/jit.js
+   * @see toolkit/devtools/performance/modules/logic/jit.js
    * @param {IonType} ionType
    * @return {Element}
    */
@@ -247,7 +247,7 @@ let JITOptimizationsView = {
   /**
    * Creates an element for insertion in the raw view for an ObservedType.
    *
-   * @see toolkit/devtools/shared/profiler/jit.js
+   * @see toolkit/devtools/performance/modules/logic/jit.js
    * @param {ObservedType} type
    * @return {Element}
    */
@@ -287,7 +287,7 @@ let JITOptimizationsView = {
   /**
    * Creates an element for insertion in the raw view for an OptimizationAttempt.
    *
-   * @see toolkit/devtools/shared/profiler/jit.js
+   * @see toolkit/devtools/performance/modules/logic/jit.js
    * @param {OptimizationAttempt} attempt
    * @return {Element}
    */

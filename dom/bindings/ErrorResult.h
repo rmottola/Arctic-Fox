@@ -99,7 +99,7 @@ public:
   // Facilities for throwing a preexisting JS exception value via this
   // ErrorResult.  The contract is that any code which might end up calling
   // ThrowJSException() must call MightThrowJSException() even if no exception
-  // is being thrown.  Code that would call ReportJSException* or
+  // is being thrown.  Code that would call ReportJSException or
   // StealJSException as needed must first call WouldReportJSException even if
   // this ErrorResult has not failed.
   //
@@ -108,16 +108,7 @@ public:
   // will wrap it into whatever compartment they're working in, as needed.
   void ThrowJSException(JSContext* cx, JS::Handle<JS::Value> exn);
   void ReportJSException(JSContext* cx);
-  // Used to implement throwing exceptions from the JS implementation of
-  // bindings to callers of the binding.
-  void ReportJSExceptionFromJSImplementation(JSContext* aCx);
   bool IsJSException() const { return ErrorCode() == NS_ERROR_DOM_JS_EXCEPTION; }
-
-  void ThrowNotEnoughArgsError() { mResult = NS_ERROR_XPC_NOT_ENOUGH_ARGS; }
-  void ReportNotEnoughArgsError(JSContext* cx,
-                                const char* ifaceName,
-                                const char* memberName);
-  bool IsNotEnoughArgsError() const { return ErrorCode() == NS_ERROR_XPC_NOT_ENOUGH_ARGS; }
 
   // Report a generic error.  This should only be used if we're not
   // some more specific exception type.
@@ -192,8 +183,7 @@ private:
     MOZ_ASSERT(!IsErrorWithMessage(), "Don't overwrite errors with message");
     MOZ_ASSERT(aRv != NS_ERROR_DOM_JS_EXCEPTION, "Use ThrowJSException()");
     MOZ_ASSERT(!IsJSException(), "Don't overwrite JS exceptions");
-    MOZ_ASSERT(aRv != NS_ERROR_XPC_NOT_ENOUGH_ARGS, "Use ThrowNotEnoughArgsError()");
-    MOZ_ASSERT(!IsNotEnoughArgsError(), "Don't overwrite not enough args error");
+    MOZ_ASSERT(aRv != NS_ERROR_XPC_NOT_ENOUGH_ARGS, "May need to bring back ThrowNotEnoughArgsError");
     mResult = aRv;
   }
 

@@ -99,15 +99,6 @@ static inline bool
 Enumerate(JSContext* cx, HandleObject pobj, jsid id,
           bool enumerable, unsigned flags, Maybe<IdSet>& ht, AutoIdVector* props)
 {
-    // We implement __proto__ using a property on |Object.prototype|, but
-    // because __proto__ is highly deserving of removal, we don't want it to
-    // show up in property enumeration, even if only for |Object.prototype|
-    // (think introspection by Prototype-like frameworks that add methods to
-    // the built-in prototypes).  So exclude __proto__ if the object where the
-    // property was found has no [[Prototype]] and might be |Object.prototype|.
-    if (MOZ_UNLIKELY(!pobj->getTaggedProto().isObject() && JSID_IS_ATOM(id, cx->names().proto)))
-        return true;
-
     if (!(flags & JSITER_OWNONLY) || pobj->is<ProxyObject>() || pobj->getOps()->enumerate) {
         if (!ht) {
             ht.emplace(cx);
@@ -442,25 +433,6 @@ Snapshot(JSContext* cx, HandleObject pobj_, unsigned flags, AutoIdVector* props)
 
 #endif /* JS_MORE_DETERMINISTIC */
 
-    return true;
-}
-
-bool
-js::VectorToIdArray(JSContext* cx, AutoIdVector& props, JSIdArray** idap)
-{
-    JS_STATIC_ASSERT(sizeof(JSIdArray) > sizeof(jsid));
-    size_t len = props.length();
-    size_t idsz = len * sizeof(jsid);
-    size_t sz = (sizeof(JSIdArray) - sizeof(jsid)) + idsz;
-    JSIdArray* ida = reinterpret_cast<JSIdArray*>(cx->zone()->pod_malloc<uint8_t>(sz));
-    if (!ida)
-        return false;
-
-    ida->length = static_cast<int>(len);
-    jsid* v = props.begin();
-    for (int i = 0; i < ida->length; i++)
-        ida->vector[i].init(v[i]);
-    *idap = ida;
     return true;
 }
 

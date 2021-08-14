@@ -74,15 +74,6 @@ public:
   static const uint32_t INIT_FLAG_DOWNSCALE_DURING_DECODE  = 0x10;
   static const uint32_t INIT_FLAG_SYNC_LOAD                = 0x20;
 
-  /**
-   * Creates a new image container.
-   *
-   * @param aMimeType The mimetype of the image.
-   * @param aFlags Initialization flags of the INIT_FLAG_* variety.
-   */
-  virtual nsresult Init(const char* aMimeType,
-                        uint32_t aFlags) = 0;
-
   virtual already_AddRefed<ProgressTracker> GetProgressTracker() = 0;
   virtual void SetProgressTracker(ProgressTracker* aProgressTracker) {}
 
@@ -197,6 +188,7 @@ public:
 
 protected:
   explicit ImageResource(ImageURL* aURI);
+  ~ImageResource();
 
   // Shared functionality for implementors of imgIContainer. Every
   // implementation of attribute animationMode should forward here.

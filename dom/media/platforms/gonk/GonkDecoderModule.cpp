@@ -30,23 +30,22 @@ already_AddRefed<MediaDataDecoder>
 GonkDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
                                      mozilla::layers::LayersBackend aLayersBackend,
                                      mozilla::layers::ImageContainer* aImageContainer,
-                                     FlushableMediaTaskQueue* aVideoTaskQueue,
+                                     FlushableTaskQueue* aVideoTaskQueue,
                                      MediaDataDecoderCallback* aCallback)
 {
   nsRefPtr<MediaDataDecoder> decoder =
-  new GonkMediaDataDecoder(new GonkVideoDecoderManager(aVideoTaskQueue,
-                                                       aImageContainer, aConfig),
+  new GonkMediaDataDecoder(new GonkVideoDecoderManager(aImageContainer, aConfig),
                            aVideoTaskQueue, aCallback);
   return decoder.forget();
 }
 
 already_AddRefed<MediaDataDecoder>
 GonkDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
-                                      FlushableMediaTaskQueue* aAudioTaskQueue,
+                                      FlushableTaskQueue* aAudioTaskQueue,
                                       MediaDataDecoderCallback* aCallback)
 {
   nsRefPtr<MediaDataDecoder> decoder =
-  new GonkMediaDataDecoder(new GonkAudioDecoderManager(aAudioTaskQueue, aConfig),
+  new GonkMediaDataDecoder(new GonkAudioDecoderManager(aConfig),
                            aAudioTaskQueue, aCallback);
   return decoder.forget();
 }

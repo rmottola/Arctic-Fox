@@ -8,8 +8,11 @@
 #define VideoUtils_h
 
 #include "mozilla/Attributes.h"
-#include "mozilla/ReentrantMonitor.h"
 #include "mozilla/CheckedInt.h"
+#include "mozilla/MozPromise.h"
+#include "mozilla/ReentrantMonitor.h"
+#include "mozilla/RefPtr.h"
+
 #include "nsIThread.h"
 #include "nsSize.h"
 #include "nsRect.h"
@@ -22,7 +25,6 @@
 #include "nsThreadUtils.h"
 #include "prtime.h"
 #include "AudioSampleFormat.h"
-#include "mozilla/RefPtr.h"
 #include "TimeUnits.h"
 
 using mozilla::CheckedInt64;
@@ -126,10 +128,11 @@ media::TimeIntervals GetEstimatedBufferedTimeRanges(mozilla::MediaResource* aStr
                                                     int64_t aDurationUsecs);
 
 // Converts from number of audio frames (aFrames) to microseconds, given
-// the specified audio rate (aRate). Stores result in aOutUsecs. Returns true
-// if the operation succeeded, or false if there was an integer overflow
-// while calulating the conversion.
+// the specified audio rate (aRate).
 CheckedInt64 FramesToUsecs(int64_t aFrames, uint32_t aRate);
+// Converts from number of audio frames (aFrames) TimeUnit, given
+// the specified audio rate (aRate).
+media::TimeUnit FramesToTimeUnit(int64_t aFrames, uint32_t aRate);
 
 // Converts from microseconds (aUsecs) to number of audio frames, given the
 // specified audio rate (aRate). Stores the result in aOutFrames. Returns
@@ -214,6 +217,10 @@ class SharedThreadPool;
 // thread pool to ensure they can run when the MediaDataDecoder clients'
 // thread pool is blocked.  Tasks on the PLATFORM_DECODER thread pool must not
 // wait on tasks in the PLAYBACK thread pool.
+//
+// No new dependencies on this mechanism should be added, as methods are being
+// made async supported by MozPromise, making this unnecessary and
+// permitting unifying the pool.
 enum class MediaThreadType {
   PLAYBACK, // MediaDecoderStateMachine and MediaDecoderReader
   PLATFORM_DECODER
@@ -271,14 +278,42 @@ GenerateRandomName(nsCString& aOutSalt, uint32_t aLength);
 nsresult
 GenerateRandomPathName(nsCString& aOutSalt, uint32_t aLength);
 
-class MediaTaskQueue;
-class FlushableMediaTaskQueue;
+class TaskQueue;
+class FlushableTaskQueue;
 
-already_AddRefed<MediaTaskQueue>
+already_AddRefed<TaskQueue>
 CreateMediaDecodeTaskQueue();
 
-already_AddRefed<FlushableMediaTaskQueue>
+already_AddRefed<FlushableTaskQueue>
 CreateFlushableMediaDecodeTaskQueue();
+
+// Iteratively invokes aWork until aCondition returns true, or aWork returns false.
+// Use this rather than a while loop to avoid bogarting the task queue.
+template<class Work, class Condition>
+nsRefPtr<GenericPromise> InvokeUntil(Work aWork, Condition aCondition) {
+  nsRefPtr<GenericPromise::Private> p = new GenericPromise::Private(__func__);
+
+  if (aCondition()) {
+    p->Resolve(true, __func__);
+  }
+
+  struct Helper {
+    static void Iteration(nsRefPtr<GenericPromise::Private> aPromise, Work aWork, Condition aCondition) {
+      if (!aWork()) {
+        aPromise->Reject(NS_ERROR_FAILURE, __func__);
+      } else if (aCondition()) {
+        aPromise->Resolve(true, __func__);
+      } else {
+        nsCOMPtr<nsIRunnable> r =
+          NS_NewRunnableFunction([aPromise, aWork, aCondition] () { Iteration(aPromise, aWork, aCondition); });
+        AbstractThread::GetCurrent()->Dispatch(r.forget());
+      }
+    }
+  };
+
+  Helper::Iteration(p, aWork, aCondition);
+  return p.forget();
+}
 
 bool
 ParseCodecsString(const nsAString& aCodecs, nsTArray<nsString>& aOutCodecs);

@@ -27,12 +27,17 @@
 #include "mozilla/net/ReferrerPolicy.h"  // for member
 #include "nsWeakReference.h"
 #include "mozilla/dom/DocumentBinding.h"
+#include "mozilla/UseCounter.h"
 #include "mozilla/WeakPtr.h"
 #include "Units.h"
 #include "nsExpirationTracker.h"
 #include "nsClassHashtable.h"
 #include "prclist.h"
+#include "mozilla/UniquePtr.h"
+#include "mozilla/CORSMode.h"
+#include <bitset>                        // for member
 
+class gfxUserFontSet;
 class imgIRequest;
 class nsAString;
 class nsBindingManager;
@@ -49,6 +54,7 @@ class nsIChannel;
 class nsIContent;
 class nsIContentSink;
 class nsIDocShell;
+class nsIDocShellTreeItem;
 class nsIDocumentEncoder;
 class nsIDocumentObserver;
 class nsIDOMDocument;
@@ -80,7 +86,6 @@ class nsSMILAnimationController;
 class nsStyleSet;
 class nsTextNode;
 class nsWindowSizes;
-class nsSmallVoidArray;
 class nsDOMCaretPosition;
 class nsViewportInfo;
 class nsIGlobalObject;
@@ -120,6 +125,7 @@ class Event;
 class EventTarget;
 class FontFaceSet;
 class FrameRequestCallback;
+struct FullscreenRequest;
 class ImportManager;
 class HTMLBodyElement;
 struct LifecycleCallbackArgs;
@@ -146,17 +152,12 @@ template<typename> class Sequence;
 template<typename, typename> class CallbackObjectHolder;
 typedef CallbackObjectHolder<NodeFilter, nsIDOMNodeFilter> NodeFilterHolder;
 
-struct FullScreenOptions {
-  FullScreenOptions();
-  nsRefPtr<gfx::VRHMDInfo> mVRHMDDevice;
-};
-
 } // namespace dom
 } // namespace mozilla
 
 #define NS_IDOCUMENT_IID \
-{ 0xdcfa30f2, 0x2197, 0x421f, \
-  { 0xa7, 0x5a, 0x3e, 0x70, 0x18, 0x08, 0xde, 0x81 } }
+{ 0x21bbd52a, 0xc2d2, 0x4b2f, \
+  { 0xbc, 0x6c, 0xc9, 0x52, 0xbe, 0x23, 0x6b, 0x19 } }
 
 // Enum for requesting a particular type of document when creating a doc
 enum DocumentFlavor {
@@ -188,9 +189,11 @@ NS_GetContentList(nsINode* aRootNode,
 class nsIDocument : public nsINode
 {
   typedef mozilla::dom::GlobalObject GlobalObject;
+
 public:
   typedef mozilla::net::ReferrerPolicy ReferrerPolicyEnum;
   typedef mozilla::dom::Element Element;
+  typedef mozilla::dom::FullscreenRequest FullscreenRequest;
 
   NS_DECLARE_STATIC_IID_ACCESSOR(NS_IDOCUMENT_IID)
   NS_DECL_AND_IMPL_ZEROING_OPERATOR_NEW
@@ -231,7 +234,7 @@ public:
    * MayStartLayout() until SetMayStartLayout(true) is called on it.  Making
    * sure this happens is the responsibility of the caller of
    * StartDocumentLoad().
-   */  
+   */
   virtual nsresult StartDocumentLoad(const char* aCommand,
                                      nsIChannel* aChannel,
                                      nsILoadGroup* aLoadGroup,
@@ -315,8 +318,16 @@ public:
     return GetReferrerPolicy();
   }
 
-  void SetReferrer(const nsACString& aReferrer) {
-    mReferrer = aReferrer;
+  /**
+   * If true, this flag indicates that all subresource loads for this
+   * document need to be upgraded from http to https.
+   * This flag becomes true if the CSP of the document itself, or any
+   * of the document's ancestors up to the toplevel document makes use
+   * of the CSP directive 'upgrade-insecure-requests'.
+   */
+  bool GetUpgradeInsecureRequests() const
+  {
+    return mUpgradeInsecureRequests;
   }
 
   /**
@@ -367,8 +378,8 @@ public:
   }
 
   /**
-   * Set the document's character encoding. |aCharSetID| should be canonical. 
-   * That is, callers are responsible for the charset alias resolution. 
+   * Set the document's character encoding. |aCharSetID| should be canonical.
+   * That is, callers are responsible for the charset alias resolution.
    */
   virtual void SetDocumentCharacterSet(const nsACString& aCharSetID) = 0;
 
@@ -467,7 +478,7 @@ public:
   {
     mBidiEnabled = true;
   }
-  
+
   /**
    * Check if the document contains (or has contained) any MathML elements.
    */
@@ -475,7 +486,7 @@ public:
   {
     return mMathMLEnabled;
   }
-  
+
   void SetMathMLEnabled()
   {
     mMathMLEnabled = true;
@@ -488,7 +499,7 @@ public:
   {
     return mIsInitialDocumentInWindow;
   }
-  
+
   /**
    * Tell this document that it's the initial document in its window.  See
    * comments on mIsInitialDocumentInWindow for when this should be called.
@@ -497,7 +508,7 @@ public:
   {
     mIsInitialDocumentInWindow = aIsInitialDocument;
   }
-  
+
 
   /**
    * Get the bidi options for this document.
@@ -698,7 +709,7 @@ public:
   {
     mParentDocument = aParent;
   }
-  
+
   /**
    * Are plugins allowed in this document ?
    */
@@ -851,7 +862,7 @@ public:
   Element* GetHeadElement() {
     return GetHtmlChildElement(nsGkAtoms::head);
   }
-  
+
   /**
    * Accessors to the collection of stylesheets owned by this document.
    * Style sheets are ordered, most significant last.
@@ -886,7 +897,7 @@ public:
    * @throws no exceptions
    */
   virtual int32_t GetNumberOfStyleSheets() const = 0;
-  
+
   /**
    * Get a particular stylesheet
    * @param aIndex the index the stylesheet lives at.  This is zero-based
@@ -894,7 +905,7 @@ public:
    * @throws no exceptions
    */
   virtual nsIStyleSheet* GetStyleSheetAt(int32_t aIndex) const = 0;
-  
+
   /**
    * Insert a sheet at a particular spot in the stylesheet list (zero-based)
    * @param aSheet the sheet to insert
@@ -938,7 +949,7 @@ public:
    * and that observers should be notified and style sets updated
    */
   virtual void SetStyleSheetApplicableState(nsIStyleSheet* aSheet,
-                                            bool aApplicable) = 0;  
+                                            bool aApplicable) = 0;
 
   enum additionalSheetType {
     eAgentSheet,
@@ -1042,7 +1053,7 @@ public:
     nsPIDOMWindow* outer = mWindow ? mWindow->GetOuterWindow() : nullptr;
     return outer && outer->IsBackground();
   }
-  
+
   /**
    * Return the inner window used as the script compilation scope for
    * this document. If you're not absolutely sure you need this, use
@@ -1065,7 +1076,7 @@ public:
   /**
    * Return the inner window ID.
    */
-  uint64_t InnerWindowID()
+  uint64_t InnerWindowID() const
   {
     nsPIDOMWindow *window = GetInnerWindow();
     return window ? window->WindowID() : 0;
@@ -1073,7 +1084,7 @@ public:
 
   /**
    * Get the script loader for this document
-   */ 
+   */
   virtual nsScriptLoader* ScriptLoader() = 0;
 
   /**
@@ -1103,8 +1114,8 @@ public:
    * the <iframe> or <browser> that contains this document is also mode
    * fullscreen. This happens recursively in all ancestor documents.
    */
-  virtual void AsyncRequestFullScreen(Element* aElement,
-                                      mozilla::dom::FullScreenOptions& aOptions) = 0;
+  virtual void AsyncRequestFullScreen(
+    mozilla::UniquePtr<FullscreenRequest>&& aRequest) = 0;
 
   /**
    * Called when a frame in a child process has entered fullscreen or when a
@@ -1166,24 +1177,45 @@ public:
   virtual void SetApprovedForFullscreen(bool aIsApproved) = 0;
 
   /**
-   * Exits documents out of DOM fullscreen mode.
+   * Synchronously cleans up the fullscreen state on the given document.
    *
-   * If aDocument is null, all fullscreen documents in all browser windows
-   * exit fullscreen.
+   * Calling this without performing fullscreen transition could lead
+   * to undesired effect (the transition happens after document state
+   * flips), hence it should only be called either by nsGlobalWindow
+   * when we have performed the transition, or when it is necessary to
+   * clean up the state immediately. Otherwise, AsyncExitFullscreen()
+   * should be called instead.
    *
-   * If aDocument is non null, all documents from aDocument's fullscreen root
-   * to the fullscreen leaf exit fullscreen. 
-   *
-   * Note that the fullscreen leaf is the bottom-most document which is
-   * fullscreen, it may have non-fullscreen child documents. The fullscreen
-   * root is normally the chrome document.
-   *
-   * If aRunAsync is true, fullscreen is executed asynchronously.
-   *
-   * Note if aDocument is not fullscreen this function has no effect, even if
-   * aDocument has fullscreen ancestors.
+   * aDocument must not be null.
    */
-  static void ExitFullscreen(nsIDocument* aDocument, bool aRunAsync);
+  static void ExitFullscreenInDocTree(nsIDocument* aDocument);
+
+  /**
+   * Ask the document to exit fullscreen state asynchronously.
+   *
+   * Different from ExitFullscreenInDocTree(), this allows the window
+   * to perform fullscreen transition first if any.
+   *
+   * If aDocument is null, it will exit fullscreen from all documents
+   * in all windows.
+   */
+  static void AsyncExitFullscreen(nsIDocument* aDocument);
+
+  /**
+   * Handles one single fullscreen request, updates `aHandled` if the request
+   * is handled, and returns whether this request should be removed from the
+   * request queue.
+   */
+  static bool HandlePendingFullscreenRequest(const FullscreenRequest& aRequest,
+                                             nsIDocShellTreeItem* aRootShell,
+                                             bool* aHandled);
+
+  /**
+   * Handles any pending fullscreen in aDocument or its subdocuments.
+   *
+   * Returns whether there is any fullscreen request handled.
+   */
+  static bool HandlePendingFullscreenRequests(nsIDocument* aDocument);
 
   virtual void RequestPointerLock(Element* aElement) = 0;
 
@@ -1471,7 +1503,7 @@ public:
    * The document should save form control state.
    */
   virtual void RemovedFromDocShell() = 0;
-  
+
   /**
    * Get the layout history state that should be used to save and restore state
    * for nodes in this document.  This may return null; if that happens state
@@ -1580,7 +1612,7 @@ public:
   nsCompatibility GetCompatibilityMode() const {
     return mCompatMode;
   }
-  
+
   /**
    * Check whether we've ever fired a DOMTitleChanged event for this
    * document.
@@ -1729,7 +1761,7 @@ public:
 
   bool IsResourceDoc() const {
     return IsBeingUsedAsImage() || // Are we a helper-doc for an SVG image?
-      !!mDisplayDocument;          // Are we an external resource doc?
+      mHasDisplayDocument;         // Are we an external resource doc?
   }
 
   /**
@@ -1742,7 +1774,7 @@ public:
   {
     return mDisplayDocument;
   }
-  
+
   /**
    * Set the display document for this document.  aDisplayDocument must not be
    * null.
@@ -1758,6 +1790,7 @@ public:
     NS_PRECONDITION(!aDisplayDocument->GetDisplayDocument(),
                     "Display documents should not nest");
     mDisplayDocument = aDisplayDocument;
+    mHasDisplayDocument = !!aDisplayDocument;
   }
 
   /**
@@ -1784,7 +1817,7 @@ public:
       return mObservers;
     }
   protected:
-    nsAutoTArray< nsCOMPtr<nsIObserver>, 8 > mObservers;    
+    nsAutoTArray< nsCOMPtr<nsIObserver>, 8 > mObservers;
   };
 
   /**
@@ -2061,6 +2094,12 @@ public:
    */
   virtual bool IsDocumentRightToLeft() { return false; }
 
+  /**
+   * Called by Parser for link rel=preconnect
+   */
+  virtual void MaybePreconnect(nsIURI* uri,
+                               mozilla::CORSMode aCORSMode) = 0;
+
   enum DocumentTheme {
     Doc_Theme_Uninitialized, // not determined yet
     Doc_Theme_None,
@@ -2108,9 +2147,8 @@ public:
   /**
    * This method returns _all_ the elements in this document which
    * have id aElementId, if there are any.  Otherwise it returns null.
-   * The entries of the nsSmallVoidArray are Element*
    */
-  virtual const nsSmallVoidArray* GetAllElementsForId(const nsAString& aElementId) const = 0;
+  virtual const nsTArray<Element*>* GetAllElementsForId(const nsAString& aElementId) const = 0;
 
   /**
    * Lookup an image element using its associated ID, which is usually provided
@@ -2125,14 +2163,11 @@ public:
 
   virtual mozilla::dom::DocumentTimeline* Timeline() = 0;
 
-  typedef mozilla::dom::CallbackObjectHolder<
-    mozilla::dom::FrameRequestCallback,
-    nsIFrameRequestCallback> FrameRequestCallbackHolder;
-  nsresult ScheduleFrameRequestCallback(const FrameRequestCallbackHolder& aCallback,
+  nsresult ScheduleFrameRequestCallback(mozilla::dom::FrameRequestCallback& aCallback,
                                         int32_t *aHandle);
   void CancelFrameRequestCallback(int32_t aHandle);
 
-  typedef nsTArray<FrameRequestCallbackHolder> FrameRequestCallbackList;
+  typedef nsTArray<nsRefPtr<mozilla::dom::FrameRequestCallback>> FrameRequestCallbackList;
   /**
    * Put this document's frame request callbacks into the provided
    * list, and forget about them.
@@ -2177,6 +2212,10 @@ public:
   virtual void RemovePlugin(nsIObjectLoadingContent* aPlugin) = 0;
   virtual void GetPlugins(nsTArray<nsIObjectLoadingContent*>& aPlugins) = 0;
 
+  virtual nsresult AddResponsiveContent(nsIContent* aContent) = 0;
+  virtual void RemoveResponsiveContent(nsIContent* aContent) = 0;
+  virtual void NotifyMediaFeatureValuesChanged() = 0;
+
   virtual nsresult GetStateObject(nsIVariant** aResult) = 0;
 
   virtual nsDOMNavigationTiming* GetNavigationTiming() const = 0;
@@ -2185,9 +2224,9 @@ public:
 
   virtual Element* FindImageMap(const nsAString& aNormalizedMapName) = 0;
 
-  // Add aLink to the set of links that need their status resolved. 
+  // Add aLink to the set of links that need their status resolved.
   void RegisterPendingLinkUpdate(mozilla::dom::Link* aLink);
-  
+
   // Remove aLink from the set of links that need their status resolved.
   // This function must be called when links are removed from the document.
   void UnregisterPendingLinkUpdate(mozilla::dom::Link* aElement);
@@ -2202,8 +2241,9 @@ public:
     eDeprecatedOperationCount
   };
 #undef DEPRECATED_OPERATION
-  bool HasWarnedAbout(DeprecatedOperations aOperation);
-  void WarnOnceAbout(DeprecatedOperations aOperation, bool asError = false);
+  bool HasWarnedAbout(DeprecatedOperations aOperation) const;
+  void WarnOnceAbout(DeprecatedOperations aOperation,
+                     bool asError = false) const;
 
 #define DOCUMENT_WARNING(_op) e##_op,
   enum DocumentWarnings {
@@ -2211,14 +2251,14 @@ public:
     eDocumentWarningCount
   };
 #undef DOCUMENT_WARNING
-  bool HasWarnedAbout(DocumentWarnings aWarning);
+  bool HasWarnedAbout(DocumentWarnings aWarning) const;
   void WarnOnceAbout(DocumentWarnings aWarning,
                      bool asError = false,
                      const char16_t **aParams = nullptr,
-                     uint32_t aParamsLength = 0);
+                     uint32_t aParamsLength = 0) const;
 
   virtual void PostVisibilityUpdateEvent() = 0;
-  
+
   bool IsSyntheticDocument() const { return mIsSyntheticDocument; }
 
   void SetNeedLayoutFlush() {
@@ -2323,6 +2363,8 @@ public:
     eAttributeChanged
   };
 
+  nsIDocument* GetTopLevelContentDocument();
+
   /**
    * Registers an unresolved custom element that is a candidate for
    * upgrade when the definition is registered via registerElement.
@@ -2415,7 +2457,7 @@ public:
     CreateAttributeNS(const nsAString& aNamespaceURI,
                       const nsAString& aQualifiedName,
                       mozilla::ErrorResult& rv);
-  void GetInputEncoding(nsAString& aInputEncoding);
+  void GetInputEncoding(nsAString& aInputEncoding) const;
   already_AddRefed<nsLocation> GetLocation() const;
   void GetReferrer(nsAString& aReferrer) const;
   void GetLastModified(nsAString& aLastModified) const;
@@ -2460,16 +2502,16 @@ public:
   {
     return mVisibilityState != mozilla::dom::VisibilityState::Visible;
   }
-  bool MozHidden() // Not const because of WarnOnceAbout
+  bool MozHidden() const
   {
     WarnOnceAbout(ePrefixedVisibilityAPI);
     return Hidden();
   }
-  mozilla::dom::VisibilityState VisibilityState()
+  mozilla::dom::VisibilityState VisibilityState() const
   {
     return mVisibilityState;
   }
-  mozilla::dom::VisibilityState MozVisibilityState()
+  mozilla::dom::VisibilityState MozVisibilityState() const
   {
     WarnOnceAbout(ePrefixedVisibilityAPI);
     return VisibilityState();
@@ -2578,11 +2620,33 @@ public:
     }
   }
 
+  gfxUserFontSet* GetUserFontSet();
+  void FlushUserFontSet();
+  void RebuildUserFontSet(); // asynchronously
+  mozilla::dom::FontFaceSet* GetFonts() { return mFontFaceSet; }
+
   // FontFaceSource
-  mozilla::dom::FontFaceSet* GetFonts(mozilla::ErrorResult& aRv);
+  mozilla::dom::FontFaceSet* Fonts();
 
   bool DidFireDOMContentLoaded() const { return mDidFireDOMContentLoaded; }
-  
+
+  void SetDocumentUseCounter(mozilla::UseCounter aUseCounter)
+  {
+    if (!mUseCounters[aUseCounter]) {
+      mUseCounters[aUseCounter] = true;
+    }
+  }
+
+  void SetPageUseCounter(mozilla::UseCounter aUseCounter);
+
+  void SetDocumentAndPageUseCounter(mozilla::UseCounter aUseCounter)
+  {
+    SetDocumentUseCounter(aUseCounter);
+    SetPageUseCounter(aUseCounter);
+  }
+
+  void PropagateUseCounters(nsIDocument* aParentDocument);
+
   void SetUserHasInteracted(bool aUserHasInteracted)
   {
     mUserHasInteracted = aUserHasInteracted;
@@ -2597,9 +2661,27 @@ public:
   
   bool InlineScriptAllowedByCSP();
 
+protected:
+  bool GetUseCounter(mozilla::UseCounter aUseCounter)
+  {
+    return mUseCounters[aUseCounter];
+  }
+
+  void SetChildDocumentUseCounter(mozilla::UseCounter aUseCounter)
+  {
+    if (!mChildDocumentUseCounters[aUseCounter]) {
+      mChildDocumentUseCounters[aUseCounter] = true;
+    }
+  }
+
+  bool GetChildDocumentUseCounter(mozilla::UseCounter aUseCounter)
+  {
+    return mChildDocumentUseCounters[aUseCounter];
+  }
+
 private:
-  uint64_t mDeprecationWarnedAbout;
-  uint64_t mDocWarningWarnedAbout;
+  mutable std::bitset<eDeprecatedOperationCount> mDeprecationWarnedAbout;
+  mutable std::bitset<eDocumentWarningCount> mDocWarningWarnedAbout;
   SelectorCache mSelectorCache;
 
 protected:
@@ -2638,6 +2720,11 @@ protected:
 
   mozilla::dom::XPathEvaluator* XPathEvaluator();
 
+  void HandleRebuildUserFontSet() {
+    mPostedFlushUserFontSet = false;
+    FlushUserFontSet();
+  }
+
   nsCString mReferrer;
   nsString mLastModified;
 
@@ -2651,6 +2738,8 @@ protected:
 
   bool mReferrerPolicySet;
   ReferrerPolicyEnum mReferrerPolicy;
+
+  bool mUpgradeInsecureRequests;
 
   mozilla::WeakPtr<nsDocShell> mDocumentContainer;
 
@@ -2694,6 +2783,9 @@ protected:
   // Our cached .children collection
   nsCOMPtr<nsIHTMLCollection> mChildrenCollection;
 
+  // container for per-context fonts (downloadable, SVG, etc.)
+  nsRefPtr<mozilla::dom::FontFaceSet> mFontFaceSet;
+
   // Compatibility mode
   nsCompatibility mCompatMode;
 
@@ -2726,7 +2818,7 @@ protected:
   // If true, whoever is creating the document has gotten it to the
   // point where it's safe to start layout on it.
   bool mMayStartLayout;
-  
+
   // True iff we've ever fired a DOMTitleChanged event for this document
   bool mHaveFiredTitleChange;
 
@@ -2745,7 +2837,7 @@ protected:
   // True iff DNS prefetch is allowed for this document.  Note that if the
   // document has no window, DNS prefetch won't be performed no matter what.
   bool mAllowDNSPrefetch;
-  
+
   // True when this document is a static clone of a normal document
   bool mIsStaticDocument;
 
@@ -2826,6 +2918,21 @@ protected:
   bool mIsLinkUpdateRegistrationsForbidden;
 #endif
 
+  // Whether this document has a display document and thus is considered to
+  // be a resource document.  Normally this is the same as !!mDisplayDocument,
+  // but mDisplayDocument is cleared during Unlink.  mHasDisplayDocument is
+  // valid in the document's destructor.
+  bool mHasDisplayDocument : 1;
+
+  // Is the current mFontFaceSet valid?
+  bool mFontFaceSetDirty;
+
+  // Has GetUserFontSet() been called?
+  bool mGetUserFontSetCalled;
+
+  // Do we currently have an event posted to call FlushUserFontSet?
+  bool mPostedFlushUserFontSet;
+
   enum Type {
     eUnknown, // should never be used
     eHTML,
@@ -2884,7 +2991,7 @@ protected:
   // if this document is part of a multipart document,
   // the ID can be used to distinguish it from the other parts.
   uint32_t mPartID;
-  
+
   // Cycle collector generation in which we're certain that this document
   // won't be collected
   uint32_t mMarkedCCGeneration;
@@ -2955,6 +3062,14 @@ protected:
 
   // Our live MediaQueryLists
   PRCList mDOMMediaQueryLists;
+
+  // Flags for use counters used directly by this document.
+  std::bitset<mozilla::eUseCounter_Count> mUseCounters;
+  // Flags for use counters used by any child documents of this document.
+  std::bitset<mozilla::eUseCounter_Count> mChildDocumentUseCounters;
+  // Flags for whether we've notified our top-level "page" of a use counter
+  // for this child document.
+  std::bitset<mozilla::eUseCounter_Count> mNotifiedPageForUseCounter;
 
   // Whether the user has interacted with the document or not:
   bool mUserHasInteracted;
@@ -3036,8 +3151,8 @@ NS_NewVideoDocument(nsIDocument** aInstancePtrResult);
 // Also, both aDocumentURI and aBaseURI must not be null.
 nsresult
 NS_NewDOMDocument(nsIDOMDocument** aInstancePtrResult,
-                  const nsAString& aNamespaceURI, 
-                  const nsAString& aQualifiedName, 
+                  const nsAString& aNamespaceURI,
+                  const nsAString& aQualifiedName,
                   nsIDOMDocumentType* aDoctype,
                   nsIURI* aDocumentURI,
                   nsIURI* aBaseURI,

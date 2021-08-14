@@ -151,7 +151,7 @@
  * the options passed via the MALLOC_OPTIONS environment variable but is
  * applied in addition to them.
  */
-#ifdef MOZ_B2G
+#ifdef MOZ_WIDGET_GONK
     /* Reduce the amount of unused dirty pages to 1MiB on B2G */
 #   define MOZ_MALLOC_OPTIONS "ff"
 #else
@@ -1510,10 +1510,16 @@ wrtmessage(const char *p1, const char *p2, const char *p3, const char *p4)
 #if defined(MOZ_MEMORY) && !defined(MOZ_MEMORY_WINDOWS)
 #define	_write	write
 #endif
-	_write(STDERR_FILENO, p1, (unsigned int) strlen(p1));
-	_write(STDERR_FILENO, p2, (unsigned int) strlen(p2));
-	_write(STDERR_FILENO, p3, (unsigned int) strlen(p3));
-	_write(STDERR_FILENO, p4, (unsigned int) strlen(p4));
+	// Pretend to check _write() errors to suppress gcc warnings about
+	// warn_unused_result annotations in some versions of glibc headers.
+	if (_write(STDERR_FILENO, p1, (unsigned int) strlen(p1)) < 0)
+		return;
+	if (_write(STDERR_FILENO, p2, (unsigned int) strlen(p2)) < 0)
+		return;
+	if (_write(STDERR_FILENO, p3, (unsigned int) strlen(p3)) < 0)
+		return;
+	if (_write(STDERR_FILENO, p4, (unsigned int) strlen(p4)) < 0)
+		return;
 }
 
 MOZ_JEMALLOC_API
@@ -1539,6 +1545,12 @@ void	(*_malloc_message)(const char *p1, const char *p2, const char *p3,
 #include "mozilla/TaggedAnonymousMemory.h"
 // Note: MozTaggedAnonymousMmap() could call an LD_PRELOADed mmap
 // instead of the one defined here; use only MozTagAnonymousMemory().
+
+#ifdef MOZ_MEMORY_ANDROID
+// Android's pthread.h does not declare pthread_atfork() until SDK 21.
+extern MOZ_EXPORT
+int pthread_atfork(void (*)(void), void (*)(void), void(*)(void));
+#endif
 
 /* RELEASE_ASSERT calls jemalloc_crash() instead of calling MOZ_CRASH()
  * directly because we want crashing to add a frame to the stack.  This makes
@@ -2323,9 +2335,10 @@ pages_map(void *addr, size_t size)
 		if (munmap(ret, size) == -1) {
 			char buf[STRERROR_BUF];
 
-			strerror_r(errno, buf, sizeof(buf));
-			_malloc_message(_getprogname(),
-			    ": (malloc) Error in munmap(): ", buf, "\n");
+			if (strerror_r(errno, buf, sizeof(buf)) == 0) {
+				_malloc_message(_getprogname(),
+					": (malloc) Error in munmap(): ", buf, "\n");
+			}
 			if (opt_abort)
 				abort();
 		}
@@ -2352,9 +2365,10 @@ pages_unmap(void *addr, size_t size)
 	if (munmap(addr, size) == -1) {
 		char buf[STRERROR_BUF];
 
-		strerror_r(errno, buf, sizeof(buf));
-		_malloc_message(_getprogname(),
-		    ": (malloc) Error in munmap(): ", buf, "\n");
+		if (strerror_r(errno, buf, sizeof(buf)) == 0) {
+			_malloc_message(_getprogname(),
+				": (malloc) Error in munmap(): ", buf, "\n");
+		}
 		if (opt_abort)
 			abort();
 	}
@@ -6247,13 +6261,8 @@ malloc_good_size_impl(size_t size)
 }
 
 
-#if defined(MOZ_MEMORY_ANDROID) && (ANDROID_VERSION < 19)
 MOZ_MEMORY_API size_t
-malloc_usable_size_impl(void *ptr)
-#else
-MOZ_MEMORY_API size_t
-malloc_usable_size_impl(const void *ptr)
-#endif
+malloc_usable_size_impl(MALLOC_USABLE_SIZE_CONST_PTR void *ptr)
 {
 	DARWIN_ONLY(return (szone->size)(szone, ptr));
 

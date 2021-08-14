@@ -36,6 +36,7 @@
 #include "xpcprivate.h"
 #include "xpcpublic.h"
 #include "nsContentUtils.h"
+#include "nsXULAppAPI.h"
 #include "WrapperFactory.h"
 
 #include "mozilla/AddonPathService.h"
@@ -68,12 +69,10 @@ static const char kJSCachePrefix[] = "jsloader";
 #define XPC_SERIALIZATION_BUFFER_SIZE   (64 * 1024)
 #define XPC_DESERIALIZATION_BUFFER_SIZE (12 * 8192)
 
-#ifdef PR_LOGGING
 // NSPR_LOG_MODULES=JSComponentLoader:5
 static PRLogModuleInfo* gJSCLLog;
-#endif
 
-#define LOG(args) PR_LOG(gJSCLLog, PR_LOG_DEBUG, args)
+#define LOG(args) MOZ_LOG(gJSCLLog, mozilla::LogLevel::Debug, args)
 
 // Components.utils.import error messages
 #define ERROR_SCOPE_OBJ "%s - Second argument must be an object."
@@ -117,7 +116,7 @@ Dump(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-Debug(JSContext* cx, unsigned argc, jsval* vp)
+Debug(JSContext* cx, unsigned argc, Value* vp)
 {
 #ifdef DEBUG
     return Dump(cx, argc, vp);
@@ -198,11 +197,9 @@ mozJSComponentLoader::mozJSComponentLoader()
 {
     MOZ_ASSERT(!sSelf, "mozJSComponentLoader should be a singleton");
 
-#ifdef PR_LOGGING
     if (!gJSCLLog) {
         gJSCLLog = PR_NewLogModule("JSComponentLoader");
     }
-#endif
 
     sSelf = this;
 }
@@ -372,35 +369,7 @@ mozJSComponentLoader::LoadModule(FileLocation& aFile)
         return nullptr;
 
     JSAutoCompartment ac(cx, entry->obj);
-
-    nsCOMPtr<nsIXPConnectJSObjectHolder> cm_holder;
-    rv = xpc->WrapNative(cx, entry->obj, cm,
-                         NS_GET_IID(nsIComponentManager),
-                         getter_AddRefs(cm_holder));
-
-    if (NS_FAILED(rv)) {
-        return nullptr;
-    }
-
-    JSObject* cm_jsobj = cm_holder->GetJSObject();
-    if (!cm_jsobj) {
-        return nullptr;
-    }
-
-    nsCOMPtr<nsIXPConnectJSObjectHolder> file_holder;
     RootedObject entryObj(cx, entry->obj);
-    rv = xpc->WrapNative(cx, entryObj, file,
-                         NS_GET_IID(nsIFile),
-                         getter_AddRefs(file_holder));
-
-    if (NS_FAILED(rv)) {
-        return nullptr;
-    }
-
-    JSObject* file_jsobj = file_holder->GetJSObject();
-    if (!file_jsobj) {
-        return nullptr;
-    }
 
     RootedValue NSGetFactory_val(cx);
     if (!JS_GetProperty(cx, entryObj, "NSGetFactory", &NSGetFactory_val) ||
@@ -614,17 +583,18 @@ mozJSComponentLoader::PrepareObjectForLocation(JSContext* aCx,
     if (testFile) {
         *aRealFile = true;
 
-        nsCOMPtr<nsIXPConnectJSObjectHolder> locationHolder;
-        rv = xpc->WrapNative(aCx, obj, aComponentFile,
-                             NS_GET_IID(nsIFile),
-                             getter_AddRefs(locationHolder));
-        NS_ENSURE_SUCCESS(rv, nullptr);
+        if (XRE_IsParentProcess()) {
+            RootedObject locationObj(aCx);
 
-        RootedObject locationObj(aCx, locationHolder->GetJSObject());
-        NS_ENSURE_TRUE(locationObj, nullptr);
+            rv = xpc->WrapNative(aCx, obj, aComponentFile,
+                                 NS_GET_IID(nsIFile),
+                                 locationObj.address());
+            NS_ENSURE_SUCCESS(rv, nullptr);
+            NS_ENSURE_TRUE(locationObj, nullptr);
 
-        if (!JS_DefineProperty(aCx, obj, "__LOCATION__", locationObj, 0))
-            return nullptr;
+            if (!JS_DefineProperty(aCx, obj, "__LOCATION__", locationObj, 0))
+                return nullptr;
+        }
     }
 
     nsAutoCString nativePath;

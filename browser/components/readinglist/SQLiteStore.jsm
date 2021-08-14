@@ -27,7 +27,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "Sqlite",
  */
 this.SQLiteStore = function SQLiteStore(pathRelativeToProfileDir) {
   this.pathRelativeToProfileDir = pathRelativeToProfileDir;
-  this._ensureConnection(pathRelativeToProfileDir);
 };
 
 this.SQLiteStore.prototype = {
@@ -35,13 +34,16 @@ this.SQLiteStore.prototype = {
   /**
    * Yields the number of items in the store that match the given options.
    *
-   * @param optsList A variable number of options objects that control the
+   * @param userOptsList A variable number of options objects that control the
    *        items that are matched.  See Options Objects in ReadingList.jsm.
+   * @param controlOpts A single options object.  Use this to filter out items
+   *        that don't match it -- in other words, to override the user options.
+   *        See Options Objects in ReadingList.jsm.
    * @return Promise<number> The number of matching items in the store.
    *         Rejected with an Error on error.
    */
-  count: Task.async(function* (...optsList) {
-    let [sql, args] = sqlFromOptions(optsList);
+  count: Task.async(function* (userOptsList=[], controlOpts={}) {
+    let [sql, args] = sqlWhereFromOptions(userOptsList, controlOpts);
     let count = 0;
     let conn = yield this._connectionPromise;
     yield conn.executeCached(`
@@ -55,14 +57,17 @@ this.SQLiteStore.prototype = {
    *
    * @param callback Called for each item in the enumeration.  It's passed a
    *        single object, an item.
-   * @param optsList A variable number of options objects that control the
+   * @param userOptsList A variable number of options objects that control the
    *        items that are matched.  See Options Objects in ReadingList.jsm.
+   * @param controlOpts A single options object.  Use this to filter out items
+   *        that don't match it -- in other words, to override the user options.
+   *        See Options Objects in ReadingList.jsm.
    * @return Promise<null> Resolved when the enumeration completes.  Rejected
    *         with an Error on error.
    */
-  forEachItem: Task.async(function* (callback, ...optsList) {
-    let [sql, args] = sqlFromOptions(optsList);
-    let colNames = ReadingList.ItemBasicPropertyNames;
+  forEachItem: Task.async(function* (callback, userOptsList=[], controlOpts={}) {
+    let [sql, args] = sqlWhereFromOptions(userOptsList, controlOpts);
+    let colNames = ReadingList.ItemRecordProperties;
     let conn = yield this._connectionPromise;
     yield conn.executeCached(`
       SELECT ${colNames} FROM items ${sql};
@@ -71,7 +76,7 @@ this.SQLiteStore.prototype = {
 
   /**
    * Adds an item to the store that isn't already present.  See
-   * ReadingList.prototype.addItems.
+   * ReadingList.prototype.addItem.
    *
    * @param items A simple object representing an item.
    * @return Promise<null> Resolved when the store is updated.  Rejected with an
@@ -99,18 +104,23 @@ this.SQLiteStore.prototype = {
    *         Error on error.
    */
   updateItem: Task.async(function* (item) {
-    let assignments = [];
-    for (let propName in item) {
-      assignments.push(`${propName} = :${propName}`);
-    }
-    let conn = yield this._connectionPromise;
-    yield conn.executeCached(`
-      UPDATE items SET ${assignments} WHERE url = :url;
-    `, item);
+    yield this._updateItem(item, "url");
   }),
 
   /**
-   * Deletes an item from the store.
+   * Same as updateItem, but the item is keyed off of its `guid` instead of its
+   * `url`.
+   *
+   * @param item The item to update.  It must have a `guid`.
+   * @return Promise<null> Resolved when the store is updated.  Rejected with an
+   *         Error on error.
+   */
+  updateItemByGUID: Task.async(function* (item) {
+    yield this._updateItem(item, "guid");
+  }),
+
+  /**
+   * Deletes an item from the store by its URL.
    *
    * @param url The URL string of the item to delete.
    * @return Promise<null> Resolved when the store is updated.  Rejected with an
@@ -124,40 +134,85 @@ this.SQLiteStore.prototype = {
   }),
 
   /**
-   * Call this when you're done with the store.  Don't use it afterward.
+   * Deletes an item from the store by its GUID.
+   *
+   * @param guid The GUID string of the item to delete.
+   * @return Promise<null> Resolved when the store is updated.  Rejected with an
+   *         Error on error.
    */
-  destroy: Task.async(function* () {
+  deleteItemByGUID: Task.async(function* (guid) {
     let conn = yield this._connectionPromise;
-    yield conn.close();
-    this._connectionPromise = Promise.reject("Store destroyed");
+    yield conn.executeCached(`
+      DELETE FROM items WHERE guid = :guid;
+    `, { guid: guid });
   }),
 
   /**
-   * Creates the database connection if it hasn't been created already.
-   *
-   * @param pathRelativeToProfileDir The path of the database file relative to
-   *        the profile directory.
+   * Call this when you're done with the store.  Don't use it afterward.
    */
-  _ensureConnection: Task.async(function* (pathRelativeToProfileDir) {
-    if (!this._connectionPromise) {
-      this._connectionPromise = Task.spawn(function* () {
-        let conn = yield Sqlite.openConnection({
-          path: pathRelativeToProfileDir,
-          sharedMemoryCache: false,
-        });
-        Sqlite.shutdown.addBlocker("readinglist/SQLiteStore: Destroy",
-                                   this.destroy.bind(this));
-        yield conn.execute(`
-          PRAGMA locking_mode = EXCLUSIVE;
-        `);
-        yield this._checkSchema(conn);
-        return conn;
+  destroy() {
+    if (!this._destroyPromise) {
+      this._destroyPromise = Task.spawn(function* () {
+        let conn = yield this._connectionPromise;
+        yield conn.close();
+        this.__connectionPromise = Promise.reject("Store destroyed");
       }.bind(this));
     }
+    return this._destroyPromise;
+  },
+
+  /**
+   * Promise<Sqlite.OpenedConnection>
+   */
+  get _connectionPromise() {
+    if (!this.__connectionPromise) {
+      this.__connectionPromise = this._createConnection();
+    }
+    return this.__connectionPromise;
+  },
+
+  /**
+   * Creates the database connection.
+   *
+   * @return Promise<Sqlite.OpenedConnection>
+   */
+  _createConnection: Task.async(function* () {
+    let conn = yield Sqlite.openConnection({
+      path: this.pathRelativeToProfileDir,
+      sharedMemoryCache: false,
+    });
+    Sqlite.shutdown.addBlocker("readinglist/SQLiteStore: Destroy",
+                               this.destroy.bind(this));
+    yield conn.execute(`
+      PRAGMA locking_mode = EXCLUSIVE;
+    `);
+    yield this._checkSchema(conn);
+    return conn;
   }),
 
-  // Promise<Sqlite.OpenedConnection>
-  _connectionPromise: null,
+  /**
+   * Updates the properties of an item that's already present in the store.  See
+   * ReadingList.prototype.updateItem.
+   *
+   * @param item The item to update.  It must have the property named by
+   *        keyProp.
+   * @param keyProp The item is keyed off of this property.
+   * @return Promise<null> Resolved when the store is updated.  Rejected with an
+   *         Error on error.
+   */
+  _updateItem: Task.async(function* (item, keyProp) {
+    let assignments = [];
+    for (let propName in item) {
+      assignments.push(`${propName} = :${propName}`);
+    }
+    let conn = yield this._connectionPromise;
+    if (!item[keyProp]) {
+      throw new Error("Item must have " + keyProp);
+    }
+    yield conn.executeCached(`
+      UPDATE items SET ${assignments} WHERE ${keyProp} = :${keyProp};
+    `, item);
+  }),
 
   // The current schema version.
   _schemaVersion: 1,
@@ -179,17 +234,23 @@ this.SQLiteStore.prototype = {
     yield conn.execute(`
       PRAGMA journal_size_limit = 524288;
     `);
+    // Not important, but FYI: The order that these columns are listed in
+    // follows the order that the server doc lists the fields in the article
+    // data model, more or less:
+    // http://readinglist.readthedocs.org/en/latest/model.html
     yield conn.execute(`
       CREATE TABLE items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         guid TEXT UNIQUE,
-        url TEXT NOT NULL UNIQUE,
-        resolvedURL TEXT UNIQUE,
-        lastModified INTEGER,
+        serverLastModified INTEGER,
+        url TEXT UNIQUE,
+        preview TEXT,
         title TEXT,
+        resolvedURL TEXT UNIQUE,
         resolvedTitle TEXT,
         excerpt TEXT,
-        status INTEGER,
+        archived BOOLEAN,
+        deleted BOOLEAN,
         favorite BOOLEAN,
         isArticle BOOLEAN,
         wordCount INTEGER,
@@ -199,7 +260,8 @@ this.SQLiteStore.prototype = {
         storedOn INTEGER,
         markedReadBy TEXT,
         markedReadOn INTEGER,
-        readPosition INTEGER
+        readPosition INTEGER,
+        syncStatus INTEGER
       );
     `);
     yield conn.execute(`
@@ -213,14 +275,14 @@ this.SQLiteStore.prototype = {
 
 /**
  * Returns a simple object whose properties are the
- * ReadingList.ItemBasicPropertyNames properties lifted from the given row.
+ * ReadingList.ItemRecordProperties lifted from the given row.
  *
  * @param row A mozIStorageRow.
  * @return The item.
  */
 function itemFromRow(row) {
   let item = {};
-  for (let name of ReadingList.ItemBasicPropertyNames) {
+  for (let name of ReadingList.ItemRecordProperties) {
     item[name] = row.getResultByName(name);
   }
   return item;
@@ -230,20 +292,24 @@ function itemFromRow(row) {
  * Returns the back part of a SELECT statement generated from the given list of
  * options.
  *
- * @param optsList See Options Objects in ReadingList.jsm.
+ * @param userOptsList A variable number of options objects that control the
+ *        items that are matched.  See Options Objects in ReadingList.jsm.
+ * @param controlOpts A single options object.  Use this to filter out items
+ *        that don't match it -- in other words, to override the user options.
+ *        See Options Objects in ReadingList.jsm.
  * @return An array [sql, args].  sql is a string of SQL.  args is an object
  *         that contains arguments for all the parameters in sql.
  */
-function sqlFromOptions(optsList) {
-  // We modify the options objects, which were passed in by the store client, so
-  // clone them first.
-  optsList = Cu.cloneInto(optsList, {}, { cloneFunctions: false });
+function sqlWhereFromOptions(userOptsList, controlOpts) {
+  // We modify the options objects in userOptsList, which were passed in by the
+  // store client, so clone them first.
+  userOptsList = Cu.cloneInto(userOptsList, {}, { cloneFunctions: false });
 
   let sort;
   let sortDir;
   let limit;
   let offset;
-  for (let opts of optsList) {
+  for (let opts of userOptsList) {
     if ("sort" in opts) {
       sort = opts.sort;
       delete opts.sort;
@@ -278,21 +344,44 @@ function sqlFromOptions(optsList) {
   }
 
   let args = {};
+  let mainExprs = [];
 
-  function uniqueParamName(name) {
-    if (name in args) {
-      for (let i = 1; ; i++) {
-        let newName = `${name}_${i}`;
-        if (!(newName in args)) {
-          return newName;
-        }
-      }
-    }
-    return name;
+  let controlSQLExpr = sqlExpressionFromOptions([controlOpts], args);
+  if (controlSQLExpr) {
+    mainExprs.push(`(${controlSQLExpr})`);
   }
 
-  // Build a WHERE clause for the remaining properties.  Assume they all refer
-  // to columns.  (If they don't, the SQL query will fail.)
+  let userSQLExpr = sqlExpressionFromOptions(userOptsList, args);
+  if (userSQLExpr) {
+    mainExprs.push(`(${userSQLExpr})`);
+  }
+
+  if (mainExprs.length) {
+    let conjunction = mainExprs.join(" AND ");
+    fragments.unshift(`WHERE ${conjunction}`);
+  }
+
+  let sql = fragments.join(" ");
+  return [sql, args];
+}
+
+/**
+ * Returns a SQL expression generated from the given options list.  Each options
+ * object in the list generates a subexpression, and all the subexpressions are
+ * OR'ed together to produce the final top-level expression.  (e.g., an optsList
+ * with three options objects would generate an expression like "(guid = :guid
+ * OR (title = :title AND unread = :unread) OR resolvedURL = :resolvedURL)".)
+ *
+ * All the properties of the options objects are assumed to refer to columns in
+ * the database.  If they don't, your SQL query will fail.
+ *
+ * @param optsList See Options Objects in ReadingList.jsm.
+ * @param args An object that will hold the SQL parameters.  It will be
+ *        modified.
+ * @return A string of SQL.  Also, args will contain arguments for all the
+ *         parameters in the SQL.
+ */
+function sqlExpressionFromOptions(optsList, args) {
   let disjunctions = [];
   for (let opts of optsList) {
     let conjunctions = [];
@@ -304,14 +393,14 @@ function sqlFromOptions(optsList) {
         let array = opts[key];
         let params = [];
         for (let i = 0; i < array.length; i++) {
-          let paramName = uniqueParamName(key);
+          let paramName = uniqueParamName(args, key);
           params.push(`:${paramName}`);
           args[paramName] = array[i];
         }
         conjunctions.push(`${key} IN (${params})`);
       }
       else {
-        let paramName = uniqueParamName(key);
+        let paramName = uniqueParamName(args, key);
         conjunctions.push(`${key} = :${paramName}`);
         args[paramName] = opts[key];
       }
@@ -322,11 +411,26 @@ function sqlFromOptions(optsList) {
     }
   }
   let disjunction = disjunctions.join(" OR ");
-  if (disjunction) {
-    let where = `WHERE ${disjunction}`;
-    fragments = [where].concat(fragments);
-  }
+  return disjunction;
+}
 
-  let sql = fragments.join(" ");
-  return [sql, args];
+/**
+ * Returns a version of the given name such that it doesn't conflict with the
+ * name of any property in args.  e.g., if name is "foo" but args already has
+ * properties named "foo", "foo1", and "foo2", then "foo3" is returned.
+ *
+ * @param args An object.
+ * @param name The name you want to use.
+ * @return A unique version of the given name.
+ */
+function uniqueParamName(args, name) {
+  if (name in args) {
+    for (let i = 1; ; i++) {
+      let newName = `${name}_${i}`;
+      if (!(newName in args)) {
+        return newName;
+      }
+    }
+  }
+  return name;
 }

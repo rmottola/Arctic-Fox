@@ -38,7 +38,9 @@
 #endif
 
 static char _progname[1024] = "huh?";
-static unsigned int _gdb_sleep_duration = 300;
+
+// Note: some tests manipulate this value.
+unsigned int _gdb_sleep_duration = 300;
 
 #if defined(LINUX) && defined(DEBUG) && \
       (defined(__i386) || defined(__x86_64) || defined(PPC))
@@ -259,7 +261,7 @@ void InstallSignalHandlers(const char *ProgramName)
   sigaction(SIGFPE, &sa, &osa);
 #endif
 
-  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+  if (XRE_IsContentProcess()) {
     /*
      * If the user is debugging a Gecko parent process in gdb and hits ^C to
      * suspend, a SIGINT signal will be sent to the child. We ignore this signal

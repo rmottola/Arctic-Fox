@@ -315,12 +315,12 @@ NS_IMETHODIMP CacheIOThread::OnDispatchedEvent(nsIThreadInternal *thread)
   return NS_OK;
 }
 
-NS_IMETHODIMP CacheIOThread::OnProcessNextEvent(nsIThreadInternal *thread, bool mayWait, uint32_t recursionDepth)
+NS_IMETHODIMP CacheIOThread::OnProcessNextEvent(nsIThreadInternal *thread, bool mayWait)
 {
   return NS_OK;
 }
 
-NS_IMETHODIMP CacheIOThread::AfterProcessNextEvent(nsIThreadInternal *thread, uint32_t recursionDepth,
+NS_IMETHODIMP CacheIOThread::AfterProcessNextEvent(nsIThreadInternal *thread,
                                                    bool eventWasProcessed)
 {
   return NS_OK;
@@ -335,7 +335,7 @@ size_t CacheIOThread::SizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) co
   size_t n = 0;
   n += mallocSizeOf(mThread);
   for (uint32_t level = 0; level < LAST_LEVEL; ++level) {
-    n += mEventQueue[level].SizeOfExcludingThis(mallocSizeOf);
+    n += mEventQueue[level].ShallowSizeOfExcludingThis(mallocSizeOf);
     // Events referenced by the queues are arbitrary objects we cannot be sure
     // are reported elsewhere as well as probably not implementing nsISizeOf
     // interface.  Deliberatly omitting them from reporting here.

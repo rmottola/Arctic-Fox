@@ -12,6 +12,7 @@ this.EXPORTED_SYMBOLS = [ "AutoCompleteE10S" ];
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/nsFormAutoCompleteResult.jsm");
 
 // nsITreeView implementation that feeds the autocomplete popup
 // with the search data.
@@ -75,11 +76,12 @@ this.AutoCompleteE10S = {
     messageManager.addMessageListener("FormAutoComplete:ClosePopup", this);
   },
 
-  _initPopup: function(browserWindow, rect) {
+  _initPopup: function(browserWindow, rect, direction) {
     this.browser = browserWindow.gBrowser.selectedBrowser;
     this.popup = this.browser.autoCompletePopup;
     this.popup.hidden = false;
     this.popup.setAttribute("width", rect.width);
+    this.popup.style.direction = direction;
 
     this.x = rect.left;
     this.y = rect.top + rect.height;
@@ -128,17 +130,37 @@ this.AutoCompleteE10S = {
   search: function(message) {
     let browserWindow = message.target.ownerDocument.defaultView;
     let rect = message.data;
+    let direction = message.data.direction;
 
-    this._initPopup(browserWindow, rect);
+    this._initPopup(browserWindow, rect, direction);
 
+    // NB: We use .wrappedJSObject here in order to pass our mock DOM object
+    // without being rejected by XPConnect (which attempts to enforce that DOM
+    // objects are implemented in C++.
     let formAutoComplete = Cc["@mozilla.org/satchel/form-autocomplete;1"]
-                             .getService(Ci.nsIFormAutoComplete);
+                             .getService(Ci.nsIFormAutoComplete).wrappedJSObject;
+
+    let values, labels;
+    if (message.data.datalistResult) {
+      // Create a full FormAutoCompleteResult from the mock one that we pass
+      // over IPC.
+      message.data.datalistResult =
+        new FormAutoCompleteResult(message.data.untrimmedSearchString,
+                                   Ci.nsIAutoCompleteResult.RESULT_SUCCESS,
+                                   0, "", message.data.datalistResult.values,
+                                   message.data.datalistResult.labels,
+                                   [], null);
+    } else {
+      message.data.datalistResult = null;
+    }
 
     formAutoComplete.autoCompleteSearchAsync(message.data.inputName,
                                              message.data.untrimmedSearchString,
+                                             message.data.mockField,
                                              null,
-                                             null,
-                                             this.onSearchComplete.bind(this));
+                                             message.data.datalistResult,
+                                             { onSearchCompletion:
+                                               this.onSearchComplete.bind(this) });
   },
 
   // The second half of search, this fills in the popup and returns the

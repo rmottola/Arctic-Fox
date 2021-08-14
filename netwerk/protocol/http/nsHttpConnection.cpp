@@ -614,22 +614,6 @@ nsHttpConnection::SetupNPNList(nsISSLSocketControl *ssl, uint32_t caps)
         protocolArray.AppendElement(npnToken);
     }
 
-    nsCString authHost = mConnInfo->GetAuthenticationHost();
-    int32_t   authPort = mConnInfo->GetAuthenticationPort();
-
-    if (!authHost.IsEmpty()) {
-        ssl->SetAuthenticationName(authHost);
-        ssl->SetAuthenticationPort(authPort);
-    }
-
-    if (mConnInfo->GetRelaxed()) { // http:// over tls
-        if (authHost.IsEmpty() || authHost.Equals(mConnInfo->GetHost())) {
-            LOG(("nsHttpConnection::SetupSSL %p TLS-Relaxed "
-                 "with Same Host Auth Bypass", this));
-            ssl->SetBypassAuthentication(true);
-        }
-    }
-
     nsresult rv = ssl->SetNPNList(protocolArray);
     LOG(("nsHttpConnection::SetupNPNList %p %x\n",this, rv));
     return rv;
@@ -658,10 +642,10 @@ nsHttpConnection::AddTransaction(nsAHttpTransaction *httpTransaction,
          needTunnel ? " over tunnel" : ""));
 
     // do a runtime check here just for defense in depth
-    if (transCI->GetRelaxed() &&
+    if (transCI->GetInsecureScheme() &&
         httpTransaction->RequestHead() && httpTransaction->RequestHead()->IsHTTPS()) {
-        LOG(("This Cannot happen - https on relaxed tls stream\n"));
-        MOZ_ASSERT(false, "https:// on tls relaxed");
+        LOG(("This Cannot happen - https on insecure scheme tls stream\n"));
+        MOZ_ASSERT(false, "https:// on tls insecure scheme");
         return NS_ERROR_FAILURE;
     }
 
@@ -694,6 +678,14 @@ nsHttpConnection::Close(nsresult reason)
             EndIdleMonitoring();
 
         mTLSFilter = nullptr;
+
+        // The connection and security errors clear out alt-svc mappings
+        // in case any previously validated ones are now invalid
+        if (((reason == NS_ERROR_NET_RESET) ||
+             (NS_ERROR_GET_MODULE(reason) == NS_ERROR_MODULE_SECURITY))
+            && mConnInfo) {
+            gHttpHandler->ConnMgr()->ClearHostMapping(mConnInfo);
+        }
 
         if (mSocketTransport) {
             mSocketTransport->SetEventSink(nullptr, nullptr);
@@ -815,7 +807,7 @@ nsHttpConnection::CanReuse()
         NS_SUCCEEDED(mSocketIn->Available(&dataSize)) && dataSize) {
         LOG(("nsHttpConnection::CanReuse %p %s"
              "Socket not reusable because read data pending (%llu) on it.\n",
-             this, mConnInfo->Host(), dataSize));
+             this, mConnInfo->Origin(), dataSize));
         canReuse = false;
     }
     return canReuse;
@@ -1118,7 +1110,7 @@ nsHttpConnection::OnHeadersAvailable(nsAHttpTransaction *trans,
             if (isHttps) {
                 if (mConnInfo->UsingHttpsProxy()) {
                     LOG(("%p new TLSFilterTransaction %s %d\n",
-                         this, mConnInfo->Host(), mConnInfo->Port()));
+                         this, mConnInfo->Origin(), mConnInfo->OriginPort()));
                     SetupSecondaryTLS();
                 }
 
@@ -1629,7 +1621,7 @@ nsresult
 nsHttpConnection::OnSocketWritable()
 {
     LOG(("nsHttpConnection::OnSocketWritable [this=%p] host=%s\n",
-         this, mConnInfo->Host()));
+         this, mConnInfo->Origin()));
 
     nsresult rv;
     uint32_t transactionBytes;
@@ -1741,7 +1733,7 @@ nsHttpConnection::OnWriteSegment(char *buf,
         return NS_ERROR_FAILURE; // stop iterating
     }
 
-    if (ChaosMode::isActive(ChaosMode::IOAmounts) &&
+    if (ChaosMode::isActive(ChaosFeature::IOAmounts) &&
         ChaosMode::randomUint32LessThan(2)) {
         // read 1...count bytes
         count = ChaosMode::randomUint32LessThan(count) + 1;
@@ -1873,7 +1865,7 @@ nsHttpConnection::SetupSecondaryTLS()
     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
     MOZ_ASSERT(!mTLSFilter);
     LOG(("nsHttpConnection %p SetupSecondaryTLS %s %d\n",
-         this, mConnInfo->Host(), mConnInfo->Port()));
+         this, mConnInfo->Origin(), mConnInfo->OriginPort()));
 
     nsHttpConnectionInfo *ci = nullptr;
     if (mTransaction) {
@@ -1885,7 +1877,7 @@ nsHttpConnection::SetupSecondaryTLS()
     MOZ_ASSERT(ci);
 
     mTLSFilter = new TLSFilterTransaction(mTransaction,
-                                          ci->Host(), ci->Port(), this, this);
+                                          ci->Origin(), ci->OriginPort(), this, this);
 
     if (mTransaction) {
         mTransaction = mTLSFilter;
@@ -1915,8 +1907,8 @@ nsHttpConnection::MakeConnectString(nsAHttpTransaction *trans,
     }
 
     nsHttpHandler::GenerateHostPort(
-        nsDependentCString(trans->ConnectionInfo()->Host()),
-                           trans->ConnectionInfo()->Port(), result);
+        nsDependentCString(trans->ConnectionInfo()->Origin()),
+                           trans->ConnectionInfo()->OriginPort(), result);
 
     // CONNECT host:port HTTP/1.1
     request->SetMethod(NS_LITERAL_CSTRING("CONNECT"));

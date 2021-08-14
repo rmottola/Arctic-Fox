@@ -183,6 +183,11 @@ public:
   void NotifyLayersUpdated(const FrameMetrics& aLayerMetrics, bool aIsFirstPaint);
 
   /**
+   * Flush any pending repaint request.
+   */
+  void FlushRepaintIfPending();
+
+  /**
    * The platform implementation must set the compositor parent so that we can
    * request composites.
    */
@@ -362,7 +367,7 @@ public:
 
   // Return whether or not a scroll delta will be able to scroll in either
   // direction.
-  bool CanScroll(double aDeltaX, double aDeltaY) const;
+  bool CanScrollWithWheel(const LayoutDevicePoint& aDelta) const;
 
   void NotifyMozMouseScrollEvent(const nsString& aString) const;
 
@@ -890,6 +895,11 @@ public:
   bool IsRootForLayersId() const {
     ReentrantMonitorAutoEnter lock(mMonitor);
     return mFrameMetrics.IsLayersIdRoot();
+  }
+
+  bool IsRootContent() const {
+    ReentrantMonitorAutoEnter lock(mMonitor);
+    return mFrameMetrics.IsRootContent();
   }
 
 private:

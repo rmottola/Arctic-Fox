@@ -7,83 +7,62 @@
 #ifndef mozilla_ipc_streamsocket_h
 #define mozilla_ipc_streamsocket_h
 
-#include "mozilla/ipc/SocketBase.h"
 #include "ConnectionOrientedSocket.h"
 
 namespace mozilla {
 namespace ipc {
 
+class StreamSocketConsumer;
 class StreamSocketIO;
 class UnixSocketConnector;
 
-class StreamSocket : public SocketConsumerBase
-                   , public ConnectionOrientedSocket
+class StreamSocket final : public ConnectionOrientedSocket
 {
 public:
-  StreamSocket();
+  StreamSocket(StreamSocketConsumer* aConsumer, int aIndex);
 
   /**
-   * Queue data to be sent to the socket on the IO thread. Can only be called on
-   * originating thread.
+   * Method to be called whenever data is received. Main-thread only.
    *
-   * @param aMessage Data to be sent to socket
-   *
-   * @return true if data is queued, false otherwise (i.e. not connected)
+   * @param aBuffer Data received from the socket.
    */
-  bool SendSocketData(UnixSocketRawData* aMessage);
-
-  /**
-   * Convenience function for sending strings to the socket (common in bluetooth
-   * profile usage). Converts to a UnixSocketRawData struct. Can only be called
-   * on originating thread.
-   *
-   * @param aMessage String to be sent to socket
-   *
-   * @return true if data is queued, false otherwise (i.e. not connected)
-   */
-  bool SendSocketData(const nsACString& aMessage);
+  void ReceiveSocketData(nsAutoPtr<UnixSocketBuffer>& aBuffer);
 
   /**
    * Starts a task on the socket that will try to connect to a socket in a
    * non-blocking manner.
    *
    * @param aConnector Connector object for socket type specific functions
-   * @param aAddress Address to connect to.
-   * @param aDelayMs Time delay in milli-seconds.
-   *
-   * @return true on connect task started, false otherwise.
+   * @param aDelayMs Time delay in milliseconds.
+   * @return NS_OK on success, or an XPCOM error code otherwise.
    */
-  bool Connect(UnixSocketConnector* aConnector,
-               const char* aAddress,
-               int aDelayMs = 0);
+  nsresult Connect(UnixSocketConnector* aConnector, int aDelayMs = 0);
 
-  /**
-   * Queues the internal representation of socket for deletion. Can be called
-   * from main thread.
-   */
-  void Close();
+  // Methods for |ConnectionOrientedSocket|
+  //
 
-  /**
-   * Get the current sockaddr for the socket
-   */
-  void GetSocketAddr(nsAString& aAddrStr);
+  nsresult PrepareAccept(UnixSocketConnector* aConnector,
+                         ConnectionOrientedSocketIO*& aIO) override;
+
+  // Methods for |DataSocket|
+  //
+
+  void SendSocketData(UnixSocketIOBuffer* aBuffer) override;
+
+  // Methods for |SocketBase|
+  //
+
+  void Close() override;
+  void OnConnectSuccess() override;
+  void OnConnectError() override;
+  void OnDisconnect() override;
 
 protected:
   virtual ~StreamSocket();
 
-  // Prepares an instance of |StreamSocket| in DISCONNECTED state
-  // for accepting a connection. Subclasses implementing |GetIO|
-  // need to call this method.
-  ConnectionOrientedSocketIO* PrepareAccept(UnixSocketConnector* aConnector);
-
 private:
-
-  // Legacy interface from |SocketBase|; should be replaced by |Close|.
-  void CloseSocket() override
-  {
-    Close();
-  }
-
+  StreamSocketConsumer* mConsumer;
+  int mIndex;
   StreamSocketIO* mIO;
 };
 

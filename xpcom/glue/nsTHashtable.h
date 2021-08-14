@@ -20,13 +20,6 @@
 
 #include <new>
 
-// helper function for nsTHashtable::Clear()
-PLDHashOperator PL_DHashStubEnumRemove(PLDHashTable* aTable,
-                                       PLDHashEntryHdr* aEntry,
-                                       uint32_t aOrdinal,
-                                       void* aUserArg);
-
-
 /**
  * a base class for templated hashtables.
  *
@@ -79,6 +72,16 @@ PLDHashOperator PL_DHashStubEnumRemove(PLDHashTable* aTable,
  * @author "Benjamin Smedberg <bsmedberg@covad.net>"
  */
 
+// These are the codes returned by |Enumerator| functions, which control
+// EnumerateEntry()'s behavior. The PLD/PL_D prefix is because they originated
+// in PLDHashTable, but that class no longer uses them.
+enum PLDHashOperator
+{
+  PL_DHASH_NEXT = 0,          // enumerator says continue
+  PL_DHASH_STOP = 1,          // enumerator says stop
+  PL_DHASH_REMOVE = 2         // enumerator says remove
+};
+
 template<class EntryType>
 class MOZ_NEEDS_NO_VTABLE_TYPE nsTHashtable
 {
@@ -87,8 +90,12 @@ class MOZ_NEEDS_NO_VTABLE_TYPE nsTHashtable
 public:
   // Separate constructors instead of default aInitLength parameter since
   // otherwise the default no-arg constructor isn't found.
-  nsTHashtable() { Init(PL_DHASH_DEFAULT_INITIAL_LENGTH); }
-  explicit nsTHashtable(uint32_t aInitLength) { Init(aInitLength); }
+  nsTHashtable()
+    : mTable(Ops(), sizeof(EntryType), PLDHashTable::kDefaultInitialLength)
+  {}
+  explicit nsTHashtable(uint32_t aInitLength)
+    : mTable(Ops(), sizeof(EntryType), aInitLength)
+  {}
 
   /**
    * destructor, cleans up and deallocates
@@ -127,12 +134,8 @@ public:
    */
   EntryType* GetEntry(KeyType aKey) const
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
     return static_cast<EntryType*>(
-      PL_DHashTableSearch(const_cast<PLDHashTable*>(&mTable),
-                          EntryType::KeyToPointer(aKey)));
+      const_cast<PLDHashTable*>(&mTable)->Search(EntryType::KeyToPointer(aKey)));
   }
 
   /**
@@ -150,22 +153,15 @@ public:
    */
   EntryType* PutEntry(KeyType aKey)
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
-    return static_cast<EntryType*>  // infallible add
-      (PL_DHashTableAdd(&mTable, EntryType::KeyToPointer(aKey)));
+    // infallible add
+    return static_cast<EntryType*>(mTable.Add(EntryType::KeyToPointer(aKey)));
   }
 
   MOZ_WARN_UNUSED_RESULT
   EntryType* PutEntry(KeyType aKey, const fallible_t&)
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
-    return static_cast<EntryType*>
-      (PL_DHashTableAdd(&mTable, EntryType::KeyToPointer(aKey),
-                        mozilla::fallible));
+    return static_cast<EntryType*>(mTable.Add(EntryType::KeyToPointer(aKey),
+                                              mozilla::fallible));
   }
 
   /**
@@ -174,11 +170,7 @@ public:
    */
   void RemoveEntry(KeyType aKey)
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
-    PL_DHashTableRemove(&mTable,
-                        EntryType::KeyToPointer(aKey));
+    mTable.Remove(EntryType::KeyToPointer(aKey));
   }
 
   /**
@@ -207,7 +199,11 @@ public:
   typedef PLDHashOperator (*Enumerator)(EntryType* aEntry, void* userArg);
 
   /**
-   * Enumerate all the entries of the function.
+   * Enumerate all the entries of the function. If any entries are removed via
+   * a PL_DHASH_REMOVE return value from |aEnumFunc|, the table may be shrunk
+   * at the end. Use RawRemoveEntry() instead if you wish to remove an entry
+   * without possibly shrinking the table.
+   * WARNING: this function is deprecated. Please use Iterator instead.
    * @param     enumFunc the <code>Enumerator</code> function to call
    * @param     userArg a pointer to pass to the
    *            <code>Enumerator</code> function
@@ -215,22 +211,62 @@ public:
    */
   uint32_t EnumerateEntries(Enumerator aEnumFunc, void* aUserArg)
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
+    uint32_t n = 0;
+    for (auto iter = mTable.Iter(); !iter.Done(); iter.Next()) {
+      auto entry = static_cast<EntryType*>(iter.Get());
+      PLDHashOperator op = aEnumFunc(entry, aUserArg);
+      n++;
+      if (op & PL_DHASH_REMOVE) {
+        iter.Remove();
+      }
+      if (op & PL_DHASH_STOP) {
+        break;
+      }
+    }
+    return n;
+  }
 
-    s_EnumArgs args = { aEnumFunc, aUserArg };
-    return PL_DHashTableEnumerate(&mTable, s_EnumStub, &args);
+  // This is an iterator that also allows entry removal. Example usage:
+  //
+  //   for (auto iter = table.Iter(); !iter.Done(); iter.Next()) {
+  //     Entry* entry = iter.Get();
+  //     // ... do stuff with |entry| ...
+  //     // ... possibly call iter.Remove() once ...
+  //   }
+  //
+  class Iterator : public PLDHashTable::Iterator
+  {
+  public:
+    typedef PLDHashTable::Iterator Base;
+
+    explicit Iterator(nsTHashtable* aTable) : Base(&aTable->mTable) {}
+    Iterator(Iterator&& aOther) : Base(aOther.mTable) {}
+    ~Iterator() {}
+
+    EntryType* Get() const { return static_cast<EntryType*>(Base::Get()); }
+
+  private:
+    Iterator() = delete;
+    Iterator(const Iterator&) = delete;
+    Iterator& operator=(const Iterator&) = delete;
+    Iterator& operator=(const Iterator&&) = delete;
+  };
+
+  Iterator Iter() { return Iterator(this); }
+
+  Iterator ConstIter() const
+  {
+    return Iterator(const_cast<nsTHashtable*>(this));
   }
 
   /**
-   * remove all entries, return hashtable to "pristine" state ;)
+   * Remove all entries, return hashtable to "pristine" state. It's
+   * conceptually the same as calling the destructor and then re-calling the
+   * constructor.
    */
   void Clear()
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
-    PL_DHashTableEnumerate(&mTable, PL_DHashStubEnumRemove, nullptr);
+    mTable.Clear();
   }
 
   /**
@@ -317,9 +353,6 @@ public:
    */
   void MarkImmutable()
   {
-    NS_ASSERTION(mTable.IsInitialized(),
-                 "nsTHashtable was not initialized properly.");
-
     PL_DHashMarkTableImmutable(&mTable);
   }
 #endif
@@ -342,23 +375,6 @@ protected:
   static void s_InitEntry(PLDHashEntryHdr* aEntry, const void* aKey);
 
   /**
-   * passed internally during enumeration.  Allocated on the stack.
-   *
-   * @param userFunc the Enumerator function passed to
-   *   EnumerateEntries by the client
-   * @param userArg the userArg passed unaltered
-   */
-  struct s_EnumArgs
-  {
-    Enumerator userFunc;
-    void* userArg;
-  };
-
-  static PLDHashOperator s_EnumStub(PLDHashTable* aTable,
-                                    PLDHashEntryHdr* aEntry,
-                                    uint32_t aNumber, void* aArg);
-
-  /**
    * passed internally during sizeOf counting.  Allocated on the stack.
    *
    * @param userFunc the SizeOfEntryExcludingThisFun passed to
@@ -379,10 +395,9 @@ private:
   nsTHashtable(nsTHashtable<EntryType>& aToCopy) = delete;
 
   /**
-   * Initialize the table.
-   * @param aInitLength the initial number of buckets in the hashtable
+   * Gets the table's ops.
    */
-  void Init(uint32_t aInitLength);
+  static const PLDHashTableOps* Ops();
 
   /**
    * An implementation of SizeOfEntryExcludingThisFun that calls SizeOfExcludingThis()
@@ -407,24 +422,20 @@ nsTHashtable<EntryType>::nsTHashtable(nsTHashtable<EntryType>&& aOther)
   // aOther shouldn't touch mTable after this, because we've stolen the table's
   // pointers but not overwitten them.
   MOZ_MAKE_MEM_UNDEFINED(&aOther.mTable, sizeof(aOther.mTable));
-
-  // Indicate that aOther is not initialized.  This will make its destructor a
-  // nop, which is what we want.
-  aOther.mTable.SetOps(nullptr);
 }
 
 template<class EntryType>
 nsTHashtable<EntryType>::~nsTHashtable()
 {
-  if (mTable.IsInitialized()) {
-    PL_DHashTableFinish(&mTable);
-  }
 }
 
 template<class EntryType>
-void
-nsTHashtable<EntryType>::Init(uint32_t aInitLength)
+/* static */ const PLDHashTableOps*
+nsTHashtable<EntryType>::Ops()
 {
+  // If this variable is a global variable, we get strange start-up failures on
+  // WindowsCrtPatch.h (see bug 1166598 comment 20). But putting it inside a
+  // function avoids that problem.
   static const PLDHashTableOps sOps =
   {
     s_HashKey,
@@ -433,8 +444,7 @@ nsTHashtable<EntryType>::Init(uint32_t aInitLength)
     s_ClearEntry,
     s_InitEntry
   };
-
-  PL_DHashTableInit(&mTable, &sOps, sizeof(EntryType), aInitLength);
+  return &sOps;
 }
 
 // static
@@ -497,19 +507,6 @@ nsTHashtable<EntryType>::s_InitEntry(PLDHashEntryHdr* aEntry,
 }
 
 template<class EntryType>
-PLDHashOperator
-nsTHashtable<EntryType>::s_EnumStub(PLDHashTable* aTable,
-                                    PLDHashEntryHdr* aEntry,
-                                    uint32_t aNumber,
-                                    void* aArg)
-{
-  // dereferences the function-pointer to the user's enumeration function
-  return (*reinterpret_cast<s_EnumArgs*>(aArg)->userFunc)(
-    static_cast<EntryType*>(aEntry),
-    reinterpret_cast<s_EnumArgs*>(aArg)->userArg);
-}
-
-template<class EntryType>
 size_t
 nsTHashtable<EntryType>::s_SizeOfStub(PLDHashEntryHdr* aEntry,
                                       mozilla::MallocSizeOf aMallocSizeOf,
@@ -523,35 +520,6 @@ nsTHashtable<EntryType>::s_SizeOfStub(PLDHashEntryHdr* aEntry,
 }
 
 class nsCycleCollectionTraversalCallback;
-
-struct MOZ_STACK_CLASS nsTHashtableCCTraversalData
-{
-  nsTHashtableCCTraversalData(nsCycleCollectionTraversalCallback& aCallback,
-                              const char* aName,
-                              uint32_t aFlags)
-    : mCallback(aCallback)
-    , mName(aName)
-    , mFlags(aFlags)
-  {
-  }
-
-  nsCycleCollectionTraversalCallback& mCallback;
-  const char* mName;
-  uint32_t mFlags;
-};
-
-template<class EntryType>
-PLDHashOperator
-ImplCycleCollectionTraverse_EnumFunc(EntryType* aEntry, void* aUserData)
-{
-  auto userData = static_cast<nsTHashtableCCTraversalData*>(aUserData);
-
-  ImplCycleCollectionTraverse(userData->mCallback,
-                              *aEntry,
-                              userData->mName,
-                              userData->mFlags);
-  return PL_DHASH_NEXT;
-}
 
 template<class EntryType>
 inline void
@@ -567,10 +535,10 @@ ImplCycleCollectionTraverse(nsCycleCollectionTraversalCallback& aCallback,
                             const char* aName,
                             uint32_t aFlags = 0)
 {
-  nsTHashtableCCTraversalData userData(aCallback, aName, aFlags);
-
-  aField.EnumerateEntries(ImplCycleCollectionTraverse_EnumFunc<EntryType>,
-                          &userData);
+  for (auto iter = aField.Iter(); !iter.Done(); iter.Next()) {
+    EntryType* entry = iter.Get();
+    ImplCycleCollectionTraverse(aCallback, *entry, aName, aFlags);
+  }
 }
 
 #endif // nsTHashtable_h__

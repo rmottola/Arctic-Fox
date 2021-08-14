@@ -30,7 +30,7 @@ SpeakerManagerService::GetOrCreateSpeakerManagerService()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (XRE_GetProcessType() != GeckoProcessType_Default) {
+  if (!XRE_IsParentProcess()) {
     return SpeakerManagerServiceChild::GetOrCreateSpeakerManagerService();
   }
 
@@ -52,7 +52,7 @@ SpeakerManagerService::GetSpeakerManagerService()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (XRE_GetProcessType() != GeckoProcessType_Default) {
+  if (!XRE_IsParentProcess()) {
     return SpeakerManagerServiceChild::GetSpeakerManagerService();
   }
 
@@ -62,7 +62,7 @@ SpeakerManagerService::GetSpeakerManagerService()
 void
 SpeakerManagerService::Shutdown()
 {
-  if (XRE_GetProcessType() != GeckoProcessType_Default) {
+  if (!XRE_IsParentProcess()) {
     return SpeakerManagerServiceChild::Shutdown();
   }
 
@@ -146,8 +146,9 @@ SpeakerManagerService::SetAudioChannelActive(bool aIsActive)
 }
 
 NS_IMETHODIMP
-SpeakerManagerService::Observe(nsISupports* aSubject, const char* 
-                               aTopic, const char16_t* aData)
+SpeakerManagerService::Observe(nsISupports* aSubject,
+                               const char* aTopic,
+                               const char16_t* aData)
 {
   if (!strcmp(aTopic, "ipc:content-shutdown")) {
     nsCOMPtr<nsIPropertyBag2> props = do_QueryInterface(aSubject);
@@ -182,24 +183,21 @@ SpeakerManagerService::SpeakerManagerService()
     mVisible(false)
 {
   MOZ_COUNT_CTOR(SpeakerManagerService);
-  if (XRE_GetProcessType() == GeckoProcessType_Default) {
+  if (XRE_IsParentProcess()) {
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
     if (obs) {
       obs->AddObserver(this, "ipc:content-shutdown", false);
     }
   }
-  AudioChannelService* audioChannelService =
-    AudioChannelService::GetOrCreateAudioChannelService();
-  if (audioChannelService) {
-    audioChannelService->RegisterSpeakerManager(this);
-  }
+  nsRefPtr<AudioChannelService> audioChannelService =
+    AudioChannelService::GetOrCreate();
+  audioChannelService->RegisterSpeakerManager(this);
 }
 
 SpeakerManagerService::~SpeakerManagerService()
 {
   MOZ_COUNT_DTOR(SpeakerManagerService);
-  AudioChannelService* audioChannelService =
-    AudioChannelService::GetOrCreateAudioChannelService();
-  if (audioChannelService)
-    audioChannelService->UnregisterSpeakerManager(this);
+  nsRefPtr<AudioChannelService> audioChannelService =
+    AudioChannelService::GetOrCreate();
+  audioChannelService->UnregisterSpeakerManager(this);
 }
