@@ -599,6 +599,27 @@ AudioChannelService::RefreshAgentsVolume(nsPIDOMWindow* aWindow)
   }
 }
 
+void
+AudioChannelService::RefreshAgentsCapture(nsPIDOMWindow* aWindow,
+                                          uint64_t aInnerWindowID)
+{
+  MOZ_ASSERT(aWindow);
+  MOZ_ASSERT(aWindow->IsOuterWindow());
+
+  nsCOMPtr<nsPIDOMWindow> topWindow = aWindow->GetScriptableTop();
+  if (!topWindow) {
+    return;
+  }
+
+  AudioChannelWindow* winData = GetWindowData(topWindow->WindowID());
+
+  nsTObserverArray<AudioChannelAgent*>::ForwardIterator
+    iter(winData->mAgents);
+  while (iter.HasMore()) {
+    iter.GetNext()->WindowAudioCaptureChanged(aInnerWindowID);
+  }
+}
+
 /* static */ const nsAttrValue::EnumTable*
 AudioChannelService::GetAudioChannelTable()
 {

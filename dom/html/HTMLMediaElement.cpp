@@ -4491,7 +4491,7 @@ void HTMLMediaElement::UpdateAudioChannelPlayingState()
       if (!mAudioChannelAgent) {
         return;
       }
-      mAudioChannelAgent->InitWithWeakCallback(OwnerDoc()->GetWindow(),
+      mAudioChannelAgent->InitWithWeakCallback(OwnerDoc()->GetInnerWindow(),
                                                static_cast<int32_t>(mAudioChannel),
                                                this);
     }
@@ -4503,6 +4503,10 @@ void HTMLMediaElement::UpdateAudioChannelPlayingState()
 void
 HTMLMediaElement::NotifyAudioChannelAgent(bool aPlaying)
 {
+    // Immediately check if this should go to the MSG instead of the normal
+    // media playback route.
+    WindowAudioCaptureChanged();
+
   // This is needed to pass nsContentUtils::IsCallerChrome().
   // AudioChannel API should not called from content but it can happen that
   // this method has some content JS in its stack.
@@ -4525,6 +4529,15 @@ NS_IMETHODIMP HTMLMediaElement::WindowVolumeChanged(float aVolume, bool aMuted)
 
   UpdateChannelMuteState(aVolume, aMuted);
   mPaused.SetCanPlay(!aMuted);
+  return NS_OK;
+}
+
+NS_IMETHODIMP HTMLMediaElement::WindowAudioCaptureChanged()
+{
+  MOZ_ASSERT(mAudioChannelAgent);
+  DebugOnly<bool> captured = OwnerDoc()->GetInnerWindow()->GetAudioCaptured();
+
+  // Something is going to happen here!!
   return NS_OK;
 }
 

@@ -24,6 +24,7 @@ NS_IMPL_CYCLE_COLLECTING_RELEASE(AudioChannelAgent)
 
 AudioChannelAgent::AudioChannelAgent()
   : mAudioChannelType(AUDIO_AGENT_CHANNEL_ERROR)
+  , mInnerWindowID(0)
   , mIsRegToService(false)
 {
 }
@@ -91,7 +92,7 @@ AudioChannelAgent::InitInternal(nsIDOMWindow* aWindow, int32_t aChannelType,
 
   nsCOMPtr<nsPIDOMWindow> pInnerWindow = do_QueryInterface(aWindow);
   MOZ_ASSERT(pInnerWindow->IsInnerWindow());
-  //mInnerWindowID = pInnerWindow->WindowID();
+  mInnerWindowID = pInnerWindow->WindowID();
 
   nsCOMPtr<nsPIDOMWindow> topWindow = pInnerWindow->GetScriptableTop();
   if (NS_WARN_IF(!topWindow)) {
@@ -185,4 +186,19 @@ uint64_t
 AudioChannelAgent::WindowID() const
 {
   return mWindow ? mWindow->WindowID() : 0;
+}
+
+void
+AudioChannelAgent::WindowAudioCaptureChanged(uint64_t aInnerWindowID)
+{
+  if (aInnerWindowID != mInnerWindowID) {
+    return;
+  }
+
+  nsCOMPtr<nsIAudioChannelAgentCallback> callback = GetCallback();
+  if (!callback) {
+    return;
+  }
+
+  callback->WindowAudioCaptureChanged();
 }
