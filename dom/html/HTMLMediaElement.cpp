@@ -1079,7 +1079,6 @@ void HTMLMediaElement::UpdatePreloadAction()
                                                        kNameSpaceID_None);
     // MSE doesn't work if preload is none, so it ignores the pref when src is
     // from MSE.
-    uint32_t preloadDefault = (mLoadingSrc && IsMediaSourceURI(mLoadingSrc)) ?
     uint32_t preloadDefault = mMediaSource ?
                               HTMLMediaElement::PRELOAD_ATTR_AUTO :
                               Preferences::GetInt("media.preload.default",
