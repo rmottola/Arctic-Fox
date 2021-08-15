@@ -657,7 +657,6 @@ void HTMLMediaElement::AbortExistingLoads()
     mMediaSource = nullptr;
   }
 
-  RemoveMediaElementFromURITable();
   mLoadingSrc = nullptr;
 
   if (mNetworkState == nsIDOMHTMLMediaElement::NETWORK_LOADING ||
