@@ -135,6 +135,15 @@ let WebProgressListener = {
       json.mayEnableCharacterEncodingMenu = docShell.mayEnableCharacterEncodingMenu;
       json.principal = content.document.nodePrincipal;
       json.synthetic = content.document.mozSyntheticDocument;
+
+      if (AppConstants.MOZ_CRASHREPORTER && CrashReporter.enabled) {
+        let uri = aLocationURI.clone();
+        try {
+          // If the current URI contains a username/password, remove it.
+          uri.userPass = "";
+        } catch (ex) { /* Ignore failures on about: URIs. */ }
+        CrashReporter.annotateCrashReport("URL", uri.spec);
+      }
     }
 
     sendAsyncMessage("Content:LocationChange", json, objects);
@@ -241,6 +250,17 @@ let WebNavigation =  {
   },
 
   loadURI: function(uri, flags, referrer, referrerPolicy, baseURI) {
+    if (AppConstants.MOZ_CRASHREPORTER && CrashReporter.enabled) {
+      let annotation = uri;
+      try {
+        let url = Services.io.newURI(uri, null, null);
+        // If the current URI contains a username/password, remove it.
+        url.userPass = "";
+        annotation = url.spec;
+      } catch (ex) { /* Ignore failures to parse and failures
+                      on about: URIs. */ }
+      CrashReporter.annotateCrashReport("URL", annotation);
+    }
     if (referrer)
       referrer = Services.io.newURI(referrer, null, null);
     if (baseURI)
