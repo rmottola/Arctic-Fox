@@ -563,14 +563,12 @@ this.MigrationUtils = Object.freeze({
    *        migrator for it, or with the first option selected as a fallback
    *        (The first option is hardcoded to be the most common browser for
    *         the OS we run on.  See migration.xul).
-   * @param [optional] aProfileToMigrate
-   *        If set, the migration wizard will import from the profile indicated.
    *          
    * @throws if aMigratorKey is invalid or if it points to a non-existent
    *         source.
    */
   startupMigration:
-  function MU_startupMigrator(aProfileStartup, aMigratorKey, aProfileToMigrate) {
+  function MU_startupMigrator(aProfileStartup, aMigratorKey) {
     if (!aProfileStartup) {
       throw new Error("a profile-startup instance is required for startup-migration");
     }
@@ -619,17 +617,10 @@ this.MigrationUtils = Object.freeze({
     let skipImportSourcePageBool = Cc["@mozilla.org/supports-PRBool;1"].
                                    createInstance(Ci.nsISupportsPRBool);
     skipImportSourcePageBool.data = skipSourcePage;
-    let profileToMigrate = null;
-    if (aProfileToMigrate) {
-      profileToMigrate = Cc["@mozilla.org/supports-string;1"].
-                         createInstance(Ci.nsISupportsString);
-      profileToMigrate.data = aProfileToMigrate;
-    }
     params.appendElement(keyCSTR, false);
     params.appendElement(migrator, false);
     params.appendElement(aProfileStartup, false);
     params.appendElement(skipImportSourcePageBool, false);
-    params.appendElement(profileToMigrate, false);
 
     this.showMigrationWizard(null, params);
   },
