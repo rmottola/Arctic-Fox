@@ -134,6 +134,7 @@ let WebProgressListener = {
       json.charset = content.document.characterSet;
       json.mayEnableCharacterEncodingMenu = docShell.mayEnableCharacterEncodingMenu;
       json.principal = content.document.nodePrincipal;
+      json.synthetic = content.document.mozSyntheticDocument;
     }
 
     sendAsyncMessage("Content:LocationChange", json, objects);
@@ -320,22 +321,6 @@ addEventListener("ImageContentLoaded", function (aEvent) {
                                               height: req.image.height });
   }
 }, false);
-
-let DocumentObserver = {
-  init: function() {
-    Services.obs.addObserver(this, "document-element-inserted", false);
-    addEventListener("unload", () => {
-      Services.obs.removeObserver(this, "document-element-inserted");
-    });
-  },
-
-  observe: function(aSubject, aTopic, aData) {
-    if (aSubject == content.document) {
-      sendAsyncMessage("DocumentInserted", {synthetic: aSubject.mozSyntheticDocument});
-    }
-  },
-};
-DocumentObserver.init();
 
 const ZoomManager = {
   get fullZoom() {
