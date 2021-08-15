@@ -102,6 +102,8 @@ static PRLogModuleInfo* gMediaElementEventsLog;
 #include "nsIPermissionManager.h"
 #include "nsContentTypeParser.h"
 
+#include "mozilla/EventStateManager.h"
+
 using namespace mozilla::layers;
 using mozilla::net::nsMediaFragmentURIParser;
 
