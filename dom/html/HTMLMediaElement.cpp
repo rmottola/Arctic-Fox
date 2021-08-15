@@ -994,7 +994,6 @@ void HTMLMediaElement::LoadFromSourceChildren()
       continue;
     }
 
-    RemoveMediaElementFromURITable();
     mLoadingSrc = uri;
     NS_ASSERTION(mNetworkState == nsIDOMHTMLMediaElement::NETWORK_LOADING,
                  "Network state should be loading");
