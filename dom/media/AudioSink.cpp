@@ -325,9 +325,6 @@ AudioSink::PlayFromAudioQueue()
 
   StartAudioStreamPlaybackIfNeeded();
 
-  if (audio->mOffset != -1) {
-    mStateMachine->DispatchOnPlaybackOffsetUpdate(audio->mOffset);
-  }
   return audio->mFrames;
 }
 

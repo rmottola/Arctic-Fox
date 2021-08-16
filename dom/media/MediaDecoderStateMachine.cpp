@@ -681,6 +681,7 @@ MediaDecoderStateMachine::OnAudioPopped(const AudioData* aSample)
 {
   MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
+  mDecoder->UpdatePlaybackOffset(std::max<int64_t>(0, aSample->mOffset));
   UpdateNextFrameStatus();
   DispatchAudioDecodeTaskIfNeeded();
 }
@@ -690,6 +691,7 @@ MediaDecoderStateMachine::OnVideoPopped(const VideoData* aSample)
 {
   MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
+  mDecoder->UpdatePlaybackOffset(aSample->mOffset);
   UpdateNextFrameStatus();
   DispatchVideoDecodeTaskIfNeeded();
   // Notify the decode thread that the video queue's buffers may have
@@ -2704,7 +2706,6 @@ void MediaDecoderStateMachine::UpdateRenderedVideoFrames()
     }
     VideoQueue().PushFront(currentFrame);
     if (framesRemoved > 0) {
-      OnPlaybackOffsetUpdate(currentFrame->mOffset);
       mVideoFrameEndTime = currentFrame->GetEndTime();
       MediaDecoder::FrameStatistics& frameStats = mDecoder->GetFrameStatistics();
       frameStats.NotifyPresentedFrame();
@@ -3094,13 +3095,6 @@ MediaDecoderStateMachine::AudioEndTime() const
   // is null in both cases.
   MOZ_ASSERT(!mAudioCompleted);
   return -1;
-}
-
-void MediaDecoderStateMachine::OnPlaybackOffsetUpdate(int64_t aPlaybackOffset)
-{
-  MOZ_ASSERT(OnTaskQueue());
-  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-  mDecoder->UpdatePlaybackOffset(aPlaybackOffset);
 }
 
 void MediaDecoderStateMachine::OnAudioSinkComplete()
