@@ -4021,7 +4021,10 @@ HTMLMediaElement::NotifyOwnerDocumentActivityChangedInternal()
     mDecoder->NotifyOwnerActivityChanged();
   }
 
-  bool pauseElement = !IsActive() || ComputedMuted();
+  bool pauseElement = !IsActive();
+#ifdef MOZ_B2G
+  pauseElement |= ComputedMuted();
+#endif
 
   SuspendOrResumeElement(pauseElement, !IsActive());
 
