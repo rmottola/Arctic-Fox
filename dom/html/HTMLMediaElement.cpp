@@ -1811,7 +1811,7 @@ void HTMLMediaElement::SetMutedInternal(uint32_t aMuted)
 
 void HTMLMediaElement::SetVolumeInternal()
 {
-  float effectiveVolume = mMuted ? 0.0f : float(mVolume * mAudioChannelVolume);
+  float effectiveVolume = ComputedVolume();
 
   if (mDecoder) {
     mDecoder->SetVolume(effectiveVolume);
@@ -4021,7 +4021,7 @@ HTMLMediaElement::NotifyOwnerDocumentActivityChangedInternal()
     mDecoder->NotifyOwnerActivityChanged();
   }
 
-  bool pauseElement = !IsActive() || (mMuted & MUTED_BY_AUDIO_CHANNEL);
+  bool pauseElement = !IsActive() || ComputedMuted();
 
   SuspendOrResumeElement(pauseElement, !IsActive());
 
@@ -4454,19 +4454,21 @@ nsresult HTMLMediaElement::UpdateChannelMuteState(float aVolume, bool aMuted)
   }
 
   // We have to mute this channel.
-  if (aMuted && !(mMuted & MUTED_BY_AUDIO_CHANNEL)) {
+  if (aMuted && !ComputedMuted()) {
     SetMutedInternal(mMuted | MUTED_BY_AUDIO_CHANNEL);
     if (UseAudioChannelAPI()) {
       DispatchAsyncEvent(NS_LITERAL_STRING("mozinterruptbegin"));
     }
-  } else if (!aMuted && (mMuted & MUTED_BY_AUDIO_CHANNEL)) {
+  } else if (!aMuted && ComputedMuted()) {
     SetMutedInternal(mMuted & ~MUTED_BY_AUDIO_CHANNEL);
     if (UseAudioChannelAPI()) {
       DispatchAsyncEvent(NS_LITERAL_STRING("mozinterruptend"));
     }
   }
 
-  SuspendOrResumeElement(mMuted & MUTED_BY_AUDIO_CHANNEL, false);
+#ifdef MOZ_B2G
+  SuspendOrResumeElement(ComputedMuted(), false);
+#endif
   return NS_OK;
 }
 
@@ -4534,7 +4536,11 @@ NS_IMETHODIMP HTMLMediaElement::WindowVolumeChanged(float aVolume, bool aMuted)
   NS_ENSURE_TRUE(nsContentUtils::IsCallerChrome(), NS_ERROR_NOT_AVAILABLE);
 
   UpdateChannelMuteState(aVolume, aMuted);
+
+#ifdef MOZ_B2G
   mPaused.SetCanPlay(!aMuted);
+#endif
+
   return NS_OK;
 }
 
@@ -4622,6 +4628,18 @@ HTMLMediaElement::NextFrameStatus()
     return mMediaStreamListener->NextFrameStatus();
   }
   return NEXT_FRAME_UNINITIALIZED;
+}
+
+float
+HTMLMediaElement::ComputedVolume() const
+{
+  return mMuted ? 0.0f : float(mVolume * mAudioChannelVolume);
+}
+
+bool
+HTMLMediaElement::ComputedMuted() const
+{
+  return (mMuted & MUTED_BY_AUDIO_CHANNEL);
 }
 
 } // namespace dom
