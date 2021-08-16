@@ -527,6 +527,8 @@ addEventListener("DOMWebNotificationClicked", function(event) {
 }, false);
 
 ContentWebRTC.init();
+addMessageListener("webrtc:Allow", ContentWebRTC);
+addMessageListener("webrtc:Deny", ContentWebRTC);
 addMessageListener("webrtc:StopSharing", ContentWebRTC);
 
 addEventListener("pageshow", function(event) {
