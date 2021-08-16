@@ -10,6 +10,7 @@ let {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource:///modules/ContentWebRTC.jsm");
 Cu.import("resource://gre/modules/InlineSpellChecker.jsm");
 Cu.import("resource://gre/modules/InlineSpellCheckerContent.jsm");
 
@@ -524,6 +525,9 @@ let pluginContent = new PluginContent(global);
 addEventListener("DOMWebNotificationClicked", function(event) {
   sendAsyncMessage("DOMWebNotificationClicked", {});
 }, false);
+
+ContentWebRTC.init();
+addMessageListener("webrtc:StopSharing", ContentWebRTC);
 
 addEventListener("pageshow", function(event) {
   if (event.target == content.document) {

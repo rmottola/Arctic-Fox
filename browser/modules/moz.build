@@ -16,6 +16,7 @@ EXTRA_JS_MODULES += [
     'ContentCrashReporters.jsm',
     'ContentLinkHandler.jsm',
     'ContentSearch.jsm',
+    'ContentWebRTC.jsm',
     'E10SUtils.jsm',
     'Feeds.jsm',
     'FormSubmitObserver.jsm',
