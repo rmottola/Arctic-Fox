@@ -277,13 +277,17 @@ MediaDecoderStateMachine::MediaDecoderStateMachine(MediaDecoder* aDecoder,
   timeBeginPeriod(1);
 #endif
 
+  nsRefPtr<MediaDecoderStateMachine> self = this;
+
   AudioQueue().AddPopListener(
-    NS_NewRunnableMethod(this, &MediaDecoderStateMachine::OnAudioPopped),
-    mTaskQueue);
+    [self] (const AudioData* aSample) {
+      self->OnAudioPopped(aSample);
+    }, mTaskQueue);
 
   VideoQueue().AddPopListener(
-    NS_NewRunnableMethod(this, &MediaDecoderStateMachine::OnVideoPopped),
-    mTaskQueue);
+    [self] (const VideoData* aSample) {
+      self->OnVideoPopped(aSample);
+    }, mTaskQueue);
 }
 
 MediaDecoderStateMachine::~MediaDecoderStateMachine()
@@ -673,7 +677,7 @@ MediaDecoderStateMachine::PushFront(VideoData* aSample)
 }
 
 void
-MediaDecoderStateMachine::OnAudioPopped()
+MediaDecoderStateMachine::OnAudioPopped(const AudioData* aSample)
 {
   MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
@@ -682,7 +686,7 @@ MediaDecoderStateMachine::OnAudioPopped()
 }
 
 void
-MediaDecoderStateMachine::OnVideoPopped()
+MediaDecoderStateMachine::OnVideoPopped(const VideoData* aSample)
 {
   MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());

@@ -400,8 +400,8 @@ protected:
   void PushFront(AudioData* aSample);
   void PushFront(VideoData* aSample);
 
-  void OnAudioPopped();
-  void OnVideoPopped();
+  void OnAudioPopped(const AudioData* aSample);
+  void OnVideoPopped(const VideoData* aSample);
 
   void VolumeChanged();
   void LogicalPlaybackRateChanged();
