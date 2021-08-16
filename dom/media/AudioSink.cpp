@@ -33,13 +33,7 @@ AudioSink::AudioSink(MediaQueue<AudioData>& aAudioQueue,
   , mLastGoodPosition(0)
   , mInfo(aInfo)
   , mChannel(aChannel)
-  , mVolume(1.0)
-  , mPlaybackRate(1.0)
-  , mPreservesPitch(false)
   , mStopAudioThread(false)
-  , mSetVolume(false)
-  , mSetPlaybackRate(false)
-  , mSetPreservesPitch(false)
   , mPlaying(true)
 {
 }
@@ -241,7 +235,6 @@ AudioSink::InitializeAudioStream()
 
   ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
   mAudioStream = audioStream;
-  UpdateStreamSettings();
 
   return NS_OK;
 }
@@ -304,8 +297,6 @@ AudioSink::IsPlaybackContinuing()
     return false;
   }
 
-  UpdateStreamSettings();
-
   return true;
 }
 
@@ -348,40 +339,6 @@ AudioSink::PlayFromAudioQueue()
   StartAudioStreamPlaybackIfNeeded();
 
   return audio->mFrames;
-}
-
-void
-AudioSink::UpdateStreamSettings()
-{
-  AssertCurrentThreadInMonitor();
-
-  bool setVolume = mSetVolume;
-  bool setPlaybackRate = mSetPlaybackRate;
-  bool setPreservesPitch = mSetPreservesPitch;
-  double volume = mVolume;
-  double playbackRate = mPlaybackRate;
-  bool preservesPitch = mPreservesPitch;
-
-  mSetVolume = false;
-  mSetPlaybackRate = false;
-  mSetPreservesPitch = false;
-
-  {
-    ReentrantMonitorAutoExit exit(GetReentrantMonitor());
-    if (setVolume) {
-      mAudioStream->SetVolume(volume);
-    }
-
-    if (setPlaybackRate &&
-        NS_FAILED(mAudioStream->SetPlaybackRate(playbackRate))) {
-      NS_WARNING("Setting the playback rate failed in AudioSink.");
-    }
-
-    if (setPreservesPitch &&
-      NS_FAILED(mAudioStream->SetPreservesPitch(preservesPitch))) {
-      NS_WARNING("Setting the pitch preservation failed in AudioSink.");
-    }
-  }
 }
 
 void
