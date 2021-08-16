@@ -236,6 +236,7 @@ AudioSink::Cleanup()
   nsRefPtr<AudioStream> audioStream;
   audioStream.swap(mAudioStream);
   // Suppress the callback when the stop is requested by MediaDecoderStateMachine.
+  // See Bug 115334.
   if (!mStopAudioThread) {
     mStateMachine->DispatchOnAudioSinkComplete();
   }
