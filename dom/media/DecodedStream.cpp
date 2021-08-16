@@ -286,6 +286,14 @@ DecodedStream::OutputStreams()
   return mOutputStreams;
 }
 
+bool
+DecodedStream::HasConsumers() const
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
+  return mOutputStreams.IsEmpty();
+}
+
 ReentrantMonitor&
 DecodedStream::GetReentrantMonitor() const
 {
