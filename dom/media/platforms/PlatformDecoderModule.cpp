@@ -26,7 +26,7 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/TaskQueue.h"
 
-#include "SharedThreadPool.h"
+#include "mozilla/SharedThreadPool.h"
 
 #include "MediaInfo.h"
 #include "H264Converter.h"
