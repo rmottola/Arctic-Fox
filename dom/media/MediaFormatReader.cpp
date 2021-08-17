@@ -317,18 +317,12 @@ MediaFormatReader::OnDemuxerInitDone(nsresult)
   if (videoActive) {
     mVideoTrackDemuxer =
       mMainThreadDemuxer->GetTrackDemuxer(TrackInfo::kVideoTrack, 0);
-    if (!mVideoTrackDemuxer) {
-      mMetadataPromise.Reject(ReadMetadataFailureReason::METADATA_ERROR, __func__);
-      return;
-    }
+   MOZ_ASSERT(mVideoTrackDemuxer);
   }
   if (audioActive) {
     mAudioTrackDemuxer =
       mMainThreadDemuxer->GetTrackDemuxer(TrackInfo::kAudioTrack, 0);
-    if (!mAudioTrackDemuxer) {
-      mMetadataPromise.Reject(ReadMetadataFailureReason::METADATA_ERROR, __func__);
-      return;
-    }
+    MOZ_ASSERT(mAudioTrackDemuxer);
   }
 
   mInitDone = true;
