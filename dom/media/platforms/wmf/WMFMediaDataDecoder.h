@@ -75,9 +75,7 @@ private:
 
   // Called on the task queue. Inserts the sample into the decoder, and
   // extracts output if available.
-  void Decode();
-  void EnsureDecodeTaskDispatched();
-  void PurgeInputQueue();
+  void ProcessDecode(MediaRawData* aSample);
 
   // Called on the task queue. Extracts output if available, and delivers
   // it to the reader. Called after ProcessDecode() and ProcessDrain().
@@ -99,10 +97,13 @@ private:
   // This is used to approximate the decoder's position in the media resource.
   int64_t mLastStreamOffset;
 
+  // For access to and waiting on mIsFlushing
   Monitor mMonitor;
-  std::queue<nsRefPtr<MediaRawData>> mInput;
-  bool mIsDecodeTaskDispatched;
+  // Set on reader/decode thread calling Flush() to indicate that output is
+  // not required and so input samples on mTaskQueue need not be processed.
+  // Cleared on mTaskQueue.
   bool mIsFlushing;
+
   bool mIsShutDown;
 };
 

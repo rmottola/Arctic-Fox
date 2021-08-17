@@ -23,7 +23,6 @@ WMFMediaDataDecoder::WMFMediaDataDecoder(MFTManager* aMFTManager,
   , mCallback(aCallback)
   , mMFTManager(aMFTManager)
   , mMonitor("WMFMediaDataDecoder")
-  , mIsDecodeTaskDispatched(false)
   , mIsFlushing(false)
   , mIsShutDown(false)
 {
@@ -71,18 +70,6 @@ WMFMediaDataDecoder::ProcessShutdown()
   mDecoder = nullptr;
 }
 
-void
-WMFMediaDataDecoder::EnsureDecodeTaskDispatched()
-{
-  mMonitor.AssertCurrentThreadOwns();
-  if (!mIsDecodeTaskDispatched) {
-    nsCOMPtr<nsIRunnable> runnable =
-      NS_NewRunnableMethod(this, &WMFMediaDataDecoder::Decode);
-    mTaskQueue->Dispatch(runnable.forget());
-    mIsDecodeTaskDispatched = true;
-  }
-}
-
 // Inserts data into the decoder's pipeline.
 nsresult
 WMFMediaDataDecoder::Input(MediaRawData* aSample)
@@ -90,50 +77,36 @@ WMFMediaDataDecoder::Input(MediaRawData* aSample)
   MOZ_ASSERT(mCallback->OnReaderTaskQueue());
   MOZ_DIAGNOSTIC_ASSERT(!mIsShutDown);
 
-  MonitorAutoLock mon(mMonitor);
-  mInput.push(aSample);
-  EnsureDecodeTaskDispatched();
+  nsCOMPtr<nsIRunnable> runnable =
+    NS_NewRunnableMethodWithArg<nsRefPtr<MediaRawData>>(
+      this,
+      &WMFMediaDataDecoder::ProcessDecode,
+      nsRefPtr<MediaRawData>(aSample));
+  mTaskQueue->Dispatch(runnable.forget());
   return NS_OK;
 }
 
 void
-WMFMediaDataDecoder::Decode()
+WMFMediaDataDecoder::ProcessDecode(MediaRawData* aSample)
 {
-  while (true) {
-    nsRefPtr<MediaRawData> input;
-    {
-      MonitorAutoLock mon(mMonitor);
-      MOZ_ASSERT(mIsDecodeTaskDispatched);
-      if (mInput.empty()) {
-        if (mIsFlushing) {
-          if (mDecoder) {
-            mDecoder->Flush();
-          }
-          mIsFlushing = false;
-        }
-        mIsDecodeTaskDispatched = false;
-        mon.NotifyAll();
-        return;
-      }
-      input = mInput.front();
-      mInput.pop();
+  {
+    MonitorAutoLock mon(mMonitor);
+    if (mIsFlushing) {
+      // Skip sample, to be released by runnable.
+      return;
     }
-
-    HRESULT hr = mMFTManager->Input(input);
-    if (FAILED(hr)) {
-      NS_WARNING("MFTManager rejected sample");
-      {
-        MonitorAutoLock mon(mMonitor);
-        PurgeInputQueue();
-      }
-      mCallback->Error();
-      continue; // complete flush if flushing
-    }
-
-    mLastStreamOffset = input->mOffset;
-
-    ProcessOutput();
   }
+
+  HRESULT hr = mMFTManager->Input(aSample);
+  if (FAILED(hr)) {
+    NS_WARNING("MFTManager rejected sample");
+    mCallback->Error();
+    return;
+  }
+
+  mLastStreamOffset = aSample->mOffset;
+
+  ProcessOutput();
 }
 
 void
@@ -151,21 +124,19 @@ WMFMediaDataDecoder::ProcessOutput()
     }
   } else if (FAILED(hr)) {
     NS_WARNING("WMFMediaDataDecoder failed to output data");
-    {
-      MonitorAutoLock mon(mMonitor);
-      PurgeInputQueue();
-    }
     mCallback->Error();
   }
 }
 
 void
-WMFMediaDataDecoder::PurgeInputQueue()
+WMFMediaDataDecoder::ProcessFlush()
 {
-  mMonitor.AssertCurrentThreadOwns();
-  while (!mInput.empty()) {
-    mInput.pop();
+  if (mDecoder) {
+    mDecoder->Flush();
   }
+  MonitorAutoLock mon(mMonitor);
+  mIsFlushing = false;
+  mon.NotifyAll();
 }
 
 nsresult
@@ -174,11 +145,12 @@ WMFMediaDataDecoder::Flush()
   MOZ_ASSERT(mCallback->OnReaderTaskQueue());
   MOZ_DIAGNOSTIC_ASSERT(!mIsShutDown);
 
+  nsCOMPtr<nsIRunnable> runnable =
+    NS_NewRunnableMethod(this, &WMFMediaDataDecoder::ProcessFlush);
   MonitorAutoLock mon(mMonitor);
-  PurgeInputQueue();
   mIsFlushing = true;
-  EnsureDecodeTaskDispatched();
-  while (mIsDecodeTaskDispatched || mIsFlushing) {
+  mTaskQueue->Dispatch(runnable.forget());
+  while (mIsFlushing) {
     mon.Wait();
   }
   return NS_OK;
@@ -187,7 +159,12 @@ WMFMediaDataDecoder::Flush()
 void
 WMFMediaDataDecoder::ProcessDrain()
 {
-  if (mDecoder) {
+  bool isFlushing;
+  {
+    MonitorAutoLock mon(mMonitor);
+    isFlushing = mIsFlushing;
+  }
+  if (!isFlushing && mDecoder) {
     // Order the decoder to drain...
     if (FAILED(mDecoder->SendMFTMessage(MFT_MESSAGE_COMMAND_DRAIN, 0))) {
       NS_WARNING("Failed to send DRAIN command to MFT");
