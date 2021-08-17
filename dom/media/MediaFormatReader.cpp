@@ -362,7 +362,7 @@ MediaFormatReader::EnsureDecodersSetup()
 
   if (HasAudio() && !mAudio.mDecoder) {
     NS_ENSURE_TRUE(IsSupportedAudioMimeType(mInfo.mAudio.mMimeType),
-                  false);
+                   false);
 
     mAudio.mDecoder =
       mPlatform->CreateDecoder(mAudio.mInfo ?
