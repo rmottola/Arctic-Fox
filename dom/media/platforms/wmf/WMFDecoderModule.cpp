@@ -8,6 +8,7 @@
 #include "WMFDecoderModule.h"
 #include "WMFVideoMFTManager.h"
 #include "WMFAudioMFTManager.h"
+#include "MFTDecoder.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Services.h"
@@ -98,13 +99,21 @@ WMFDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
                                      FlushableTaskQueue* aVideoTaskQueue,
                                      MediaDataDecoderCallback* aCallback)
 {
+  nsAutoPtr<WMFVideoMFTManager> manager =
+    new WMFVideoMFTManager(aConfig,
+                           aLayersBackend,
+                           aImageContainer,
+                           sDXVAEnabled && ShouldUseDXVA(aConfig));
+
+  nsRefPtr<MFTDecoder> mft = manager->Init();
+
+  if (!mft) {
+    return nullptr;
+  }
+
   nsRefPtr<MediaDataDecoder> decoder =
-    new WMFMediaDataDecoder(new WMFVideoMFTManager(aConfig,
-                                                   aLayersBackend,
-                                                   aImageContainer,
-                                                   sDXVAEnabled && ShouldUseDXVA(aConfig)),
-                            aVideoTaskQueue,
-                            aCallback);
+    new WMFMediaDataDecoder(manager.forget(), mft, aVideoTaskQueue, aCallback);
+
   return decoder.forget();
 }
 
@@ -113,10 +122,15 @@ WMFDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
                                      FlushableTaskQueue* aAudioTaskQueue,
                                      MediaDataDecoderCallback* aCallback)
 {
+  nsAutoPtr<WMFAudioMFTManager> manager = new WMFAudioMFTManager(aConfig);
+  nsRefPtr<MFTDecoder> mft = manager->Init();
+
+  if (!mft) {
+    return nullptr;
+  }
+
   nsRefPtr<MediaDataDecoder> decoder =
-    new WMFMediaDataDecoder(new WMFAudioMFTManager(aConfig),
-                            aAudioTaskQueue,
-                            aCallback);
+    new WMFMediaDataDecoder(manager.forget(), mft, aAudioTaskQueue, aCallback);
   return decoder.forget();
 }
 
