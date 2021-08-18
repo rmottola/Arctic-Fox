@@ -159,8 +159,6 @@ DriverCrashGuard::GetGuardFile()
 void
 DriverCrashGuard::ActivateGuard()
 {
-  MOZ_ASSERT(XRE_IsParentProcess());
-
   mGuardActivated = true;
 
 #ifdef MOZ_CRASHREPORTER
