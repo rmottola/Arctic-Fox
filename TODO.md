@@ -91,6 +91,7 @@
 - Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1089695 - Fixing wrong dependency in Places shutdown. r=mak 
 - Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or 
+- Bug 1170958 - 2015-09-30 - Allow MediaInputPort to lock to a specific input track
 - Bug 1205533 - 2015-09-18 - Fix and disallow warnings in gfx/qcms/
 - Bug 1191148 - Don't count fullscreen request handled if we don't chanyesy
 - Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
@@ -166,7 +167,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1157569 - 2015-06-27 - from part 13 onwards
 - Bug 1169268 - 2015-06-24 - Handle CFHTML data better. r=ndeakin 
 - Bug 1175535 - Don't require objects embedded in MIR nodes to always b (remove gen->alloc() for alloc)
-
+- Bug 968923 - 2015-07-17 - part 6 - add use counters for deprecated operations; r=bz
 - Bug 1152326 - When processing plugin updates only update the visibili
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
 - Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope. (and related)
