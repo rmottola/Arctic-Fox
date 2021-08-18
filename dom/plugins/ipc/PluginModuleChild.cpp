@@ -1291,9 +1291,7 @@ void
 _status(NPP aNPP,
         const char* aMessage)
 {
-    PLUGIN_LOG_DEBUG_FUNCTION;
-    ENSURE_PLUGIN_THREAD_VOID();
-    NS_WARNING("Not yet implemented!");
+    // NPN_Status is no longer supported.
 }
 
 void
