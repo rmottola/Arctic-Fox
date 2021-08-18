@@ -99,10 +99,11 @@ bool
 ContentProcess::Init()
 {
     mContent.Init(IOThreadChild::message_loop(),
-                         ParentPid(),
-                         IOThreadChild::channel());
+                  ParentPid(),
+                  IOThreadChild::channel());
     mXREEmbed.Start();
     mContent.InitXPCOM();
+    mContent.InitGraphicsDeviceData();
 
 #if defined(XP_WIN) && defined(MOZ_CONTENT_SANDBOX)
     SetUpSandboxEnvironment();

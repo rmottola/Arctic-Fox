@@ -5050,6 +5050,13 @@ ContentParent::RecvProfile(const nsCString& aProfile)
     return true;
 }
 
+bool
+ContentParent::RecvGetGraphicsDeviceInitData(DeviceInitData* aOut)
+{
+  gfxPlatform::GetPlatform()->GetDeviceInitData(aOut);
+  return true;
+}
+
 } // namespace dom
 } // namespace mozilla
 
