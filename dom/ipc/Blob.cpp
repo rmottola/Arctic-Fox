@@ -2096,6 +2096,9 @@ public:
   virtual void
   GetType(nsAString& aType) override;
 
+  virtual uint64_t
+  GetSerialNumber() const override;
+
   virtual already_AddRefed<BlobImpl>
   CreateSlice(uint64_t aStart,
               uint64_t aLength,
@@ -2814,6 +2817,13 @@ BlobParent::
 RemoteBlobImpl::GetType(nsAString& aType)
 {
   mBlobImpl->GetType(aType);
+}
+
+uint64_t
+BlobParent::
+RemoteBlobImpl::GetSerialNumber() const
+{
+  return mBlobImpl->GetSerialNumber();
 }
 
 already_AddRefed<BlobImpl>
