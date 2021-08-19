@@ -87,7 +87,7 @@ Directory::GetName(nsString& aRetval) const
   aRetval.Truncate();
 
   if (mPath.IsEmpty()) {
-    aRetval = mFileSystem->GetRootName();
+    mFileSystem->GetRootName(aRetval);
     return;
   }
 
