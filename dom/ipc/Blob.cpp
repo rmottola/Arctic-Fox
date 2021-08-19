@@ -1925,7 +1925,7 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
 
   virtual void
-  GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv) override;
+  GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv) const override;
 
   virtual already_AddRefed<BlobImpl>
   CreateSlice(uint64_t aStart,
@@ -2085,10 +2085,10 @@ public:
   SetLastModified(int64_t aLastModified) override;
 
   virtual void
-  GetMozFullPath(nsAString& aName, ErrorResult& aRv) override;
+  GetMozFullPath(nsAString& aName, ErrorResult& aRv) const override;
 
   virtual void
-  GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv) override;
+  GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv) const override;
 
   virtual uint64_t
   GetSize(ErrorResult& aRv) override;
@@ -2338,7 +2338,7 @@ NS_IMPL_QUERY_INTERFACE_INHERITED(BlobChild::RemoteBlobImpl,
 void
 BlobChild::
 RemoteBlobImpl::GetMozFullPathInternal(nsAString& aFilePath,
-                                       ErrorResult& aRv)
+                                       ErrorResult& aRv) const
 {
   if (!EventTargetIsOnCurrentThread(mActorTarget)) {
     MOZ_CRASH("Not implemented!");
@@ -2793,14 +2793,14 @@ RemoteBlobImpl::SetLastModified(int64_t aLastModified)
 
 void
 BlobParent::
-RemoteBlobImpl::GetMozFullPath(nsAString& aName, ErrorResult& aRv)
+RemoteBlobImpl::GetMozFullPath(nsAString& aName, ErrorResult& aRv) const
 {
   mBlobImpl->GetMozFullPath(aName, aRv);
 }
 
 void
 BlobParent::
-RemoteBlobImpl::GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv)
+RemoteBlobImpl::GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv) const
 {
   mBlobImpl->GetMozFullPathInternal(aFileName, aRv);
 }
