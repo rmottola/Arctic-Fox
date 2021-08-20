@@ -84,6 +84,10 @@ private:
   // it to the reader. Called after ProcessDecode() and ProcessDrain().
   void ProcessOutput();
 
+  // Called on the task queue. Orders the MFT to flush.  There is no output to
+  // extract.
+  void ProcessFlush();
+
   // Called on the task queue. Orders the MFT to drain, and then extracts
   // all available output.
   void ProcessDrain();
