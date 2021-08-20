@@ -5209,6 +5209,11 @@ pref("memory.report_concurrency", 1);
 pref("memory.report_concurrency", 10);
 #endif
 
+// Make <audio>, <video>, NPAPI plugins and webAudio talk to the AudioChannelService.
+pref("media.useAudioChannelService", true);
+// Add Mozilla AudioChannel APIs.
+pref("media.useAudioChannelAPI", false);
+
 // Turn rewriting of youtube embeds on/off
 pref("plugins.rewrite_youtube_embeds", true);
 
