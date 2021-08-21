@@ -547,7 +547,8 @@ GeckoMediaPluginServiceParent::PathRunnable::Run()
     mService->AddOnGMPThread(mPath);
   } else {
     mService->RemoveOnGMPThread(mPath,
-                                mOperation == REMOVE_AND_DELETE_FROM_DISK);
+                                mOperation == REMOVE_AND_DELETE_FROM_DISK,
+                                mDefer);
   }
   return NS_OK;
 }
@@ -570,12 +571,13 @@ GeckoMediaPluginServiceParent::RemovePluginDirectory(const nsAString& aDirectory
 
 NS_IMETHODIMP
 GeckoMediaPluginServiceParent::RemoveAndDeletePluginDirectory(
-  const nsAString& aDirectory)
+  const nsAString& aDirectory, const bool aDefer)
 {
   MOZ_ASSERT(NS_IsMainThread());
   return GMPDispatch(
     new PathRunnable(this, aDirectory,
-                     PathRunnable::EOperation::REMOVE_AND_DELETE_FROM_DISK));
+                     PathRunnable::EOperation::REMOVE_AND_DELETE_FROM_DISK,
+                     aDefer));
 }
 
 class DummyRunnable : public nsRunnable {
@@ -591,6 +593,7 @@ GeckoMediaPluginServiceParent::GetPluginVersionForAPI(const nsACString& aAPI,
 {
   NS_ENSURE_ARG(aTags && aTags->Length() > 0);
   NS_ENSURE_ARG(aHasPlugin);
+  NS_ENSURE_ARG(aOutVersion.IsEmpty());
 
   nsresult rv = EnsurePluginsOnDiskScanned();
   if (NS_FAILED(rv)) {
@@ -601,12 +604,20 @@ GeckoMediaPluginServiceParent::GetPluginVersionForAPI(const nsACString& aAPI,
   {
     MutexAutoLock lock(mMutex);
     nsCString api(aAPI);
-    GMPParent* gmp = FindPluginForAPIFrom(0, api, *aTags, nullptr);
-    if (gmp) {
+    size_t index = 0;
+
+    // We must parse the version number into a float for comparison. Yuck.
+    double maxParsedVersion = -1.;
+
+    *aHasPlugin = false;
+    while (GMPParent* gmp = FindPluginForAPIFrom(index, api, *aTags, &index)) {
       *aHasPlugin = true;
-      aOutVersion = gmp->GetVersion();
-    } else {
-      *aHasPlugin = false;
+      double parsedVersion = atof(gmp->GetVersion().get());
+      if (maxParsedVersion < 0 || parsedVersion > maxParsedVersion) {
+        maxParsedVersion = parsedVersion;
+        aOutVersion = gmp->GetVersion();
+      }
+      index++;
     }
   }
 
@@ -796,7 +807,8 @@ GeckoMediaPluginServiceParent::AddOnGMPThread(const nsAString& aDirectory)
 
 void
 GeckoMediaPluginServiceParent::RemoveOnGMPThread(const nsAString& aDirectory,
-                                                 const bool aDeleteFromDisk)
+                                                 const bool aDeleteFromDisk,
+                                                 const bool aCanDefer)
 {
   MOZ_ASSERT(NS_GetCurrentThread() == mGMPThread);
   LOGD(("%s::%s: %s", __CLASS__, __FUNCTION__, NS_LossyConvertUTF16toASCII(aDirectory).get()));
@@ -808,22 +820,37 @@ GeckoMediaPluginServiceParent::RemoveOnGMPThread(const nsAString& aDirectory,
   }
 
   MutexAutoLock lock(mMutex);
-  for (size_t i = 0; i < mPlugins.Length(); ++i) {
+  for (size_t i = mPlugins.Length() - 1; i < mPlugins.Length(); i--) {
     nsCOMPtr<nsIFile> pluginpath = mPlugins[i]->GetDirectory();
     bool equals;
-    if (NS_SUCCEEDED(directory->Equals(pluginpath, &equals)) && equals) {
-      mPlugins[i]->AbortAsyncShutdown();
-      mPlugins[i]->CloseActive(true);
-      if (aDeleteFromDisk) {
-        pluginpath->Remove(true);
+    if (NS_FAILED(directory->Equals(pluginpath, &equals)) || !equals) {
+      continue;
+    }
+
+    nsRefPtr<GMPParent> gmp = mPlugins[i];
+    if (aDeleteFromDisk && gmp->State() != GMPStateNotLoaded) {
+      // We have to wait for the child process to release its lib handle
+      // before we can delete the GMP.
+      gmp->MarkForDeletion();
+
+      if (!mPluginsWaitingForDeletion.Contains(aDirectory)) {
+        mPluginsWaitingForDeletion.AppendElement(aDirectory);
       }
+    }
+
+    if (gmp->State() == GMPStateNotLoaded || !aCanDefer) {
+      // GMP not in use or shutdown is being forced; can shut it down now.
+      gmp->AbortAsyncShutdown();
+      gmp->CloseActive(true);
       mPlugins.RemoveElementAt(i);
-      return;
     }
   }
-  NS_WARNING("Removing GMP which was never added.");
-  nsCOMPtr<nsIConsoleService> cs = do_GetService(NS_CONSOLESERVICE_CONTRACTID);
-  cs->LogStringMessage(MOZ_UTF16("Removing GMP which was never added."));
+
+  if (aDeleteFromDisk) {
+    if (NS_SUCCEEDED(directory->Remove(true))) {
+      mPluginsWaitingForDeletion.RemoveElement(aDirectory);
+    }
+  }
 }
 
 // May remove when Bug 1043671 is fixed
@@ -846,8 +873,7 @@ GeckoMediaPluginServiceParent::PluginTerminated(const RefPtr<GMPParent>& aPlugin
 
     nsString path = NS_ConvertUTF8toUTF16(path8);
     if (mPluginsWaitingForDeletion.Contains(path)) {
-      RemoveOnGMPThread(path, true /* delete */);
-      //RemoveOnGMPThread(path, true /* delete */, true /* can defer */);
+      RemoveOnGMPThread(path, true /* delete */, true /* can defer */);
     }
   }
 }
@@ -976,6 +1002,7 @@ nsresult
 GeckoMediaPluginServiceParent::GetNodeId(const nsAString& aOrigin,
                                          const nsAString& aTopLevelOrigin,
                                          bool aInPrivateBrowsing,
+                                         const nsACString& aVersion,
                                          nsACString& aOutId)
 {
   MOZ_ASSERT(NS_GetCurrentThread() == mGMPThread);
@@ -1004,7 +1031,8 @@ GeckoMediaPluginServiceParent::GetNodeId(const nsAString& aOrigin,
   }
 
   const uint32_t hash = AddToHash(HashString(aOrigin),
-                                  HashString(aTopLevelOrigin));
+                                  HashString(aTopLevelOrigin),
+                                  HashString(aVersion));
 
   if (aInPrivateBrowsing) {
     // For PB mode, we store the node id, indexed by the origin pair,
@@ -1124,10 +1152,11 @@ NS_IMETHODIMP
 GeckoMediaPluginServiceParent::GetNodeId(const nsAString& aOrigin,
                                          const nsAString& aTopLevelOrigin,
                                          bool aInPrivateBrowsing,
+                                         const nsACString& aVersion,
                                          UniquePtr<GetNodeIdCallback>&& aCallback)
 {
   nsCString nodeId;
-  nsresult rv = GetNodeId(aOrigin, aTopLevelOrigin, aInPrivateBrowsing, nodeId);
+  nsresult rv = GetNodeId(aOrigin, aTopLevelOrigin, aInPrivateBrowsing, aVersion, nodeId);
   aCallback->Done(rv, nodeId);
   return rv;
 }
@@ -1494,10 +1523,11 @@ bool
 GMPServiceParent::RecvGetGMPNodeId(const nsString& aOrigin,
                                    const nsString& aTopLevelOrigin,
                                    const bool& aInPrivateBrowsing,
+                                   const nsCString& aVersion,
                                    nsCString* aID)
 {
   nsresult rv = mService->GetNodeId(aOrigin, aTopLevelOrigin,
-                                    aInPrivateBrowsing, *aID);
+                                    aInPrivateBrowsing, aVersion, *aID);
   return NS_SUCCEEDED(rv);
 }
 
