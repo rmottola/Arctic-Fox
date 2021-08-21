@@ -853,7 +853,7 @@ GeckoMediaPluginServiceParent::PluginTerminated(const RefPtr<GMPParent>& aPlugin
 }
 
 void
-GeckoMediaPluginServiceParent::ReAddOnGMPThread(nsRefPtr<GMPParent>& aOld)
+GeckoMediaPluginServiceParent::ReAddOnGMPThread(const nsRefPtr<GMPParent>& aOld)
 {
   MOZ_ASSERT(NS_GetCurrentThread() == mGMPThread);
   LOGD(("%s::%s: %p", __CLASS__, __FUNCTION__, (void*) aOld));

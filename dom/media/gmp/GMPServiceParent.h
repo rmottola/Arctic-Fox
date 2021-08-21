@@ -99,7 +99,7 @@ private:
 
 protected:
   friend class GMPParent;
-  void ReAddOnGMPThread(nsRefPtr<GMPParent>& aOld);
+  void ReAddOnGMPThread(const nsRefPtr<GMPParent>& aOld);
   void PluginTerminated(const RefPtr<GMPParent>& aOld);
   virtual void InitializePlugins() override;
   virtual bool GetContentParentFrom(const nsACString& aNodeId,
