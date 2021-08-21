@@ -8,6 +8,7 @@ SOURCES += [
     'MockMediaResource.cpp',
     'TestAudioCompactor.cpp',
     'TestGMPCrossOrigin.cpp',
+    'TestGMPRemoveAndDelete.cpp',
     'TestIntervalSet.cpp',
     'TestMozPromise.cpp',
     'TestMP3Demuxer.cpp',
