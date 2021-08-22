@@ -148,7 +148,6 @@ EXPORTS.mozilla += [
     'MozPromise.h',
     'StateMirroring.h',
     'StateWatching.h',
-    'TaskQueue.h',
 ]
 
 EXPORTS.mozilla.media.webrtc += [
@@ -228,7 +227,6 @@ UNIFIED_SOURCES += [
     'MP3FrameParser.cpp',
     'RtspMediaResource.cpp',
     'StreamBuffer.cpp',
-    'TaskQueue.cpp',
     'TextTrack.cpp',
     'TextTrackCue.cpp',
     'TextTrackCueList.cpp',
