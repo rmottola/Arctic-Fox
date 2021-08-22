@@ -61,12 +61,6 @@ static const int VIDEO_TARGET_MS = 2*MEDIA_GRAPH_TARGET_PERIOD_MS +
 
 class MediaStreamGraphImpl;
 
-/**
- * Microseconds relative to the start of the graph timeline.
- */
-typedef int64_t GraphTime;
-const GraphTime GRAPH_TIME_MAX = MEDIA_TIME_MAX;
-
 class AudioCallbackDriver;
 class OfflineClockDriver;
 
