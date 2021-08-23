@@ -530,7 +530,7 @@ frontend::CompileLazyFunction(JSContext* cx, Handle<LazyScript*> lazy, const cha
 // Compile a JS function body, which might appear as the value of an event
 // handler attribute in an HTML <INPUT> tag, or in a Function() constructor.
 static bool
-CompileFunctionBody(JSContext* cx, MutableHandleFunction fun, const ReadOnlyCompileOptions &options,
+CompileFunctionBody(JSContext* cx, MutableHandleFunction fun, const ReadOnlyCompileOptions& options,
                     const AutoNameVector& formals, SourceBufferHolder& srcBuf,
                     HandleObject enclosingStaticScope, GeneratorKind generatorKind)
 {
