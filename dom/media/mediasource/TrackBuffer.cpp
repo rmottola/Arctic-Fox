@@ -267,9 +267,9 @@ TrackBuffer::BufferAppend()
 
   nsRefPtr<TrackBuffer> self = this;
 
-  ProxyMediaCall(mParentDecoder->GetReader()->OwnerThread(), this, __func__,
-                 &TrackBuffer::UpdateBufferedRanges,
-                 mLastAppendRange, /* aNotifyParent */ true)
+  InvokeAsync(mParentDecoder->GetReader()->OwnerThread(), this, __func__,
+              &TrackBuffer::UpdateBufferedRanges,
+              mLastAppendRange, /* aNotifyParent */ true)
       ->Then(mParentDecoder->GetReader()->OwnerThread(), __func__,
              [self] {
                self->mInitializationPromise.ResolveIfExists(self->HasInitSegment(), __func__);
@@ -941,9 +941,9 @@ TrackBuffer::CompleteInitializeDecoder(SourceBufferDecoder* aDecoder)
   MSE_DEBUG("Reader %p activated",
             aDecoder->GetReader());
   nsRefPtr<TrackBuffer> self = this;
-  ProxyMediaCall(mParentDecoder->GetReader()->OwnerThread(), this, __func__,
-                 &TrackBuffer::UpdateBufferedRanges,
-                 Interval<int64_t>(), /* aNotifyParent */ true)
+  InvokeAsync(mParentDecoder->GetReader()->OwnerThread(), this, __func__,
+              &TrackBuffer::UpdateBufferedRanges,
+              Interval<int64_t>(), /* aNotifyParent */ true)
       ->Then(mParentDecoder->GetReader()->OwnerThread(), __func__,
              [self] {
                self->mInitializationPromise.ResolveIfExists(self->HasInitSegment(), __func__);
@@ -1257,9 +1257,9 @@ TrackBuffer::RangeRemoval(TimeUnit aStart, TimeUnit aEnd)
 
   // Make sure our buffered ranges got updated before resolving promise.
   nsRefPtr<TrackBuffer> self = this;
-  ProxyMediaCall(mParentDecoder->GetReader()->OwnerThread(), this, __func__,
-                 &TrackBuffer::UpdateBufferedRanges,
-                 Interval<int64_t>(), /* aNotifyParent */ false)
+  InvokeAsync(mParentDecoder->GetReader()->OwnerThread(), this, __func__,
+              &TrackBuffer::UpdateBufferedRanges,
+              Interval<int64_t>(), /* aNotifyParent */ false)
     ->Then(mParentDecoder->GetReader()->OwnerThread(), __func__,
            [self] {
              self->mRangeRemovalPromise.ResolveIfExists(true, __func__);

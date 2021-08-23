@@ -33,8 +33,8 @@ const TimeUnit MediaSourceDemuxer::EOS_FUZZ = media::TimeUnit::FromMicroseconds(
 nsRefPtr<MediaSourceDemuxer::InitPromise>
 MediaSourceDemuxer::Init()
 {
-  return ProxyMediaCall(GetTaskQueue(), this, __func__,
-                        &MediaSourceDemuxer::AttemptInit);
+  return InvokeAsync(GetTaskQueue(), this, __func__,
+                     &MediaSourceDemuxer::AttemptInit);
 }
 
 nsRefPtr<MediaSourceDemuxer::InitPromise>
@@ -235,16 +235,16 @@ nsRefPtr<MediaSourceTrackDemuxer::SeekPromise>
 MediaSourceTrackDemuxer::Seek(media::TimeUnit aTime)
 {
   MOZ_ASSERT(mParent, "Called after BreackCycle()");
-  return ProxyMediaCall(mParent->GetTaskQueue(), this, __func__,
-                        &MediaSourceTrackDemuxer::DoSeek, aTime);
+  return InvokeAsync(mParent->GetTaskQueue(), this, __func__,
+                     &MediaSourceTrackDemuxer::DoSeek, aTime);
 }
 
 nsRefPtr<MediaSourceTrackDemuxer::SamplesPromise>
 MediaSourceTrackDemuxer::GetSamples(int32_t aNumSamples)
 {
   MOZ_ASSERT(mParent, "Called after BreackCycle()");
-  return ProxyMediaCall(mParent->GetTaskQueue(), this, __func__,
-                        &MediaSourceTrackDemuxer::DoGetSamples, aNumSamples);
+  return InvokeAsync(mParent->GetTaskQueue(), this, __func__,
+                     &MediaSourceTrackDemuxer::DoGetSamples, aNumSamples);
 }
 
 void
@@ -275,9 +275,9 @@ MediaSourceTrackDemuxer::GetNextRandomAccessPoint(media::TimeUnit* aTime)
 nsRefPtr<MediaSourceTrackDemuxer::SkipAccessPointPromise>
 MediaSourceTrackDemuxer::SkipToNextRandomAccessPoint(media::TimeUnit aTimeThreshold)
 {
-  return ProxyMediaCall(mParent->GetTaskQueue(), this, __func__,
-                        &MediaSourceTrackDemuxer::DoSkipToNextRandomAccessPoint,
-                        aTimeThreshold);
+  return InvokeAsync(mParent->GetTaskQueue(), this, __func__,
+                     &MediaSourceTrackDemuxer::DoSkipToNextRandomAccessPoint,
+                     aTimeThreshold);
 }
 
 int64_t

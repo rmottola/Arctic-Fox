@@ -106,8 +106,8 @@ TrackBuffersManager::BufferAppend()
   MSE_DEBUG("");
 
   mAppendRunning = true;
-  return ProxyMediaCall(GetTaskQueue(), this,
-                        __func__, &TrackBuffersManager::InitSegmentParserLoop);
+  return InvokeAsync(GetTaskQueue(), this,
+                     __func__, &TrackBuffersManager::InitSegmentParserLoop);
 }
 
 // The MSE spec requires that we abort the current SegmentParserLoop
@@ -154,9 +154,9 @@ TrackBuffersManager::RangeRemoval(TimeUnit aStart, TimeUnit aEnd)
 
   mEnded = false;
 
-  return ProxyMediaCall(GetTaskQueue(), this, __func__,
-                        &TrackBuffersManager::CodedFrameRemovalWithPromise,
-                        TimeInterval(aStart, aEnd));
+  return InvokeAsync(GetTaskQueue(), this, __func__,
+                     &TrackBuffersManager::CodedFrameRemovalWithPromise,
+                     TimeInterval(aStart, aEnd));
 }
 
 TrackBuffersManager::EvictDataResult
