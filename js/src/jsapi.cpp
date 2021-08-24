@@ -4228,7 +4228,7 @@ CompileFunction(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
                 const char* name, unsigned nargs, const char* const* argnames,
                 SourceBufferHolder& srcBuf,
                 HandleObject enclosingDynamicScope,
-                HandleObject enclosingStaticScope,
+                Handle<ScopeObject*> enclosingStaticScope,
                 MutableHandleFunction fun)
 {
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
