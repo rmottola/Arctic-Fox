@@ -128,6 +128,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - Bug 1203857 - Allow to build standalone js against jemalloc4. r=gps 
+- 1185106 - at least part 0 to 4 for TFF
 - Bug 1160014 - 2015-07-24 - Implement fullscreen part 4-6
 - Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
 - Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
@@ -141,7 +142,7 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - Bug 1160014 - part 1 to 4
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
-- Bug 1181869 - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
+- Bug 1181869 [provokes crashing] - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 905127 - Part 2 - remove unnecessary nsNetUtil.h includes r=jduell
 - Bug 905127 - 2015-07-07 - Part 1 - Make some functions from nsNetUtil not inline.
 - Bug 1172785 - 2016-07-06 remaining parts of RTCCertificate
@@ -179,10 +180,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1173415 - Fix incorrect mask used for
 - Bug 1167356 - 2015-06-11
 - Bug 1129873 - 2015-06-08 - [GTK3] Implement wrapper to GtkAppChooserDialog to allo
-- 1190496 - Hoist SharedThreadPool into xpcom.
-- 1190495 - Hoist TaskQueue into xpcom
-- 1188976 - Hoist MozPromise into xpcom
-- 1185106 - at least part 0 to 4 for TFF
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
 - 1227567 - Optimise module namespace imports in Ion where we have
