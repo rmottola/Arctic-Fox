@@ -3851,7 +3851,8 @@ Parser<ParseHandler>::variables(YieldHandling yieldHandling,
 
                 MUST_MATCH_TOKEN(TOK_ASSIGN, JSMSG_BAD_DESTRUCT_DECL);
 
-                Node init = assignExpr(InAllowed, yieldHandling);
+                Node init = assignExpr(pc->parsingForInit ? InProhibited : InAllowed,
+                                       yieldHandling);
                 if (!init)
                     return null();
 
@@ -3918,7 +3919,8 @@ Parser<ParseHandler>::variables(YieldHandling yieldHandling,
                 if (bindBeforeInitializer && !data.binder(&data, name, this))
                     return null();
 
-                Node init = assignExpr(InAllowed, yieldHandling);
+                Node init = assignExpr(pc->parsingForInit ? InProhibited : InAllowed,
+                                       yieldHandling);
                 if (!init)
                     return null();
 
