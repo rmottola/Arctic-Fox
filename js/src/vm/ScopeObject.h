@@ -1228,6 +1228,7 @@ CreateScopeObjectsForScopeChain(JSContext* cx, AutoObjectVector& scopeChain,
 bool HasNonSyntacticStaticScopeChain(JSObject* staticScope);
 
 #ifdef DEBUG
+void DumpStaticScopeChain(JSScript* script);
 bool
 AnalyzeEntrainedVariables(JSContext* cx, HandleScript script);
 #endif
