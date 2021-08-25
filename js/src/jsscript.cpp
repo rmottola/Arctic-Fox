@@ -602,7 +602,7 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
         HasNonSyntacticScope,
     };
 
-    uint32_t length, lineno, column, nslots, staticLevel;
+    uint32_t length, lineno, column, nslots;
     uint32_t natoms, nsrcnotes, i;
     uint32_t nconsts, nobjects, nregexps, ntrynotes, nblockscopes, nyieldoffsets;
     uint32_t prologueLength, version;
@@ -675,7 +675,6 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
         lineno = script->lineno();
         column = script->column();
         nslots = script->nslots();
-        staticLevel = script->staticLevel();
         natoms = script->natoms();
 
         nsrcnotes = script->numNotes();
@@ -769,7 +768,6 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
         JSVersion version_ = JSVersion(version);
         MOZ_ASSERT((version_ & VersionFlags::MASK) == unsigned(version_));
 
-        // staticLevel is set below.
         CompileOptions options(cx);
         options.setVersion(version_)
                .setNoScriptRval(!!(scriptBits & (1 << NoScriptRval)))
@@ -811,7 +809,7 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
         }
 
         script = JSScript::Create(cx, enclosingScope, !!(scriptBits & (1 << SavedCallerFun)),
-                                  options, /* staticLevel = */ 0, sourceObject, 0, 0);
+                                  options, sourceObject, 0, 0);
         if (!script)
             return false;
 
@@ -889,8 +887,7 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
 
     if (!xdr->codeUint32(&lineno) ||
         !xdr->codeUint32(&column) ||
-        !xdr->codeUint32(&nslots) ||
-        !xdr->codeUint32(&staticLevel))
+        !xdr->codeUint32(&nslots))
     {
         return false;
     }
@@ -899,7 +896,6 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
         script->lineno_ = lineno;
         script->column_ = column;
         script->nslots_ = nslots;
-        script->staticLevel_ = staticLevel;
     }
 
     jsbytecode* code = script->code();
@@ -2467,8 +2463,8 @@ JSScript::initCompartment(ExclusiveContext* cx)
 
 /* static */ JSScript*
 JSScript::Create(ExclusiveContext* cx, HandleObject enclosingScope, bool savedCallerFun,
-                 const ReadOnlyCompileOptions& options, unsigned staticLevel,
-                 HandleObject sourceObject, uint32_t bufStart, uint32_t bufEnd)
+                 const ReadOnlyCompileOptions& options, HandleObject sourceObject,
+                 uint32_t bufStart, uint32_t bufEnd)
 {
     MOZ_ASSERT(bufStart <= bufEnd);
 
@@ -2495,19 +2491,6 @@ JSScript::Create(ExclusiveContext* cx, HandleObject enclosingScope, bool savedCa
 
     script->version = options.version;
     MOZ_ASSERT(script->getVersion() == options.version);     // assert that no overflow occurred
-
-    // This is an unsigned-to-uint16_t conversion, test for too-high values.
-    // In practice, recursion in Parser and/or BytecodeEmitter will blow the
-    // stack if we nest functions more than a few hundred deep, so this will
-    // never trigger.  Oh well.
-    if (staticLevel > UINT16_MAX) {
-        if (cx->isJSContext()) {
-            JS_ReportErrorNumber(cx->asJSContext(),
-                                 GetErrorMessage, nullptr, JSMSG_TOO_DEEP, js_function_str);
-        }
-        return nullptr;
-    }
-    script->staticLevel_ = uint16_t(staticLevel);
 
     script->setSourceObject(sourceObject);
     script->sourceStart_ = bufStart;
@@ -3359,8 +3342,7 @@ CreateEmptyScriptForClone(JSContext* cx, HandleObject enclosingScope, HandleScri
            .setVersion(src->getVersion());
 
     return JSScript::Create(cx, enclosingScope, src->savedCallerFun(),
-                            options, src->staticLevel(),
-                            sourceObject, src->sourceStart(), src->sourceEnd());
+                            options, sourceObject, src->sourceStart(), src->sourceEnd());
 }
 
 JSScript*
@@ -4090,16 +4072,6 @@ LazyScript::hasUncompiledEnclosingScript() const
 
     JSFunction& fun = enclosingScope()->as<JSFunction>();
     return !fun.hasScript() || fun.hasUncompiledScript() || !fun.nonLazyScript()->code();
-}
-
-uint32_t
-LazyScript::staticLevel(JSContext* cx) const
-{
-    for (StaticScopeIter<NoGC> ssi(enclosingScope()); !ssi.done(); ssi++) {
-        if (ssi.type() == StaticScopeIter<NoGC>::Function)
-            return ssi.funScript()->staticLevel() + 1;
-    }
-    return 1;
 }
 
 void

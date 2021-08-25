@@ -910,8 +910,6 @@ class JSScript : public js::gc::TenuredCell
     uint16_t        nTypeSets_; /* number of type sets used in this script for
                                    dynamic type monitoring */
 
-    uint16_t        staticLevel_;/* static level for display maintenance */
-
     // Bit fields.
 
   public:
@@ -1055,7 +1053,7 @@ class JSScript : public js::gc::TenuredCell
   public:
     static JSScript* Create(js::ExclusiveContext* cx,
                             js::HandleObject enclosingScope, bool savedCallerFun,
-                            const JS::ReadOnlyCompileOptions& options, unsigned staticLevel,
+                            const JS::ReadOnlyCompileOptions& options,
                             js::HandleObject sourceObject, uint32_t sourceStart,
                             uint32_t sourceEnd);
 
@@ -1163,10 +1161,6 @@ class JSScript : public js::gc::TenuredCell
 
     size_t nslots() const {
         return nslots_;
-    }
-
-    size_t staticLevel() const {
-        return staticLevel_;
     }
 
     size_t nTypeSets() const {
@@ -1649,7 +1643,7 @@ class JSScript : public js::gc::TenuredCell
         return arr->vector[index];
     }
 
-    // The following 3 functions find the static scope just before the
+    // The following 4 functions find the static scope just before the
     // execution of the instruction pointed to by pc.
 
     js::NestedScopeObject* getStaticBlockScope(jsbytecode* pc);
@@ -1661,6 +1655,8 @@ class JSScript : public js::gc::TenuredCell
     // As innermostStaticScopeInScript, but returns the enclosing static scope
     // if the innermost static scope falls without the extent of the script.
     JSObject* innermostStaticScope(jsbytecode* pc);
+
+    JSObject* innermostStaticScope() { return innermostStaticScope(main()); }
 
     /*
      * The isEmpty method tells whether this script has code that computes any
@@ -2154,7 +2150,6 @@ class LazyScript : public gc::TenuredCell
     }
 
     bool hasUncompiledEnclosingScript() const;
-    uint32_t staticLevel(JSContext* cx) const;
 
     friend class GCMarker;
     void traceChildren(JSTracer* trc);

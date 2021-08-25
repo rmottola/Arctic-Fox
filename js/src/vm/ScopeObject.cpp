@@ -2611,6 +2611,15 @@ js::HasNonSyntacticStaticScopeChain(JSObject* staticScope)
     return false;
 }
 
+uint32_t
+js::StaticScopeChainLength(JSObject* staticScope)
+{
+    uint32_t length = 0;
+    for (StaticScopeIter<NoGC> ssi(staticScope); !ssi.done(); ssi++)
+        length++;
+    return length;
+}
+
 #ifdef DEBUG
 
 void
