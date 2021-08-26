@@ -492,7 +492,7 @@ let AboutPermissions = {
   /**
    * Permissions that don't have a global "Allow" option.
    */
-  _noGlobalAllow: ["desktop-notification", "geo", "indexedDB", "camera", "microphone", "push"
+  _noGlobalAllow: ["desktop-notification", "geo", "indexedDB", "camera", "microphone", "push",
                    "pointerLock"],
 
   /**
