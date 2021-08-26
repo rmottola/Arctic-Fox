@@ -460,11 +460,6 @@ HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame, ResumeFromEx
     if (!script->hasTrynotes())
         return;
 
-    uint32_t base = NumArgAndLocalSlots(frame);
-    SnapshotIterator si = frame.snapshotIterator();
-    MOZ_ASSERT(si.numAllocations() >= base);
-    const uint32_t stackDepth = si.numAllocations() - base;
-
     JSTryNote* tn = script->trynotes()->vector;
     JSTryNote* tnEnd = tn + script->trynotes()->length;
 
@@ -473,9 +468,6 @@ HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame, ResumeFromEx
         if (pcOffset < tn->start)
             continue;
         if (pcOffset >= tn->start + tn->length)
-            continue;
-
-        if (tn->stackDepth > stackDepth)
             continue;
 
         switch (tn->kind) {
@@ -1309,7 +1301,7 @@ MarkJitExitFrameCopiedArguments(JSTracer* trc, const VMFunction* f, ExitFooterFr
 #endif
 
 static void
-MarkJitExitFrame(JSTracer *trc, const JitFrameIterator &frame)
+MarkJitExitFrame(JSTracer* trc, const JitFrameIterator& frame)
 {
     // Ignore fake exit frames created by EnsureExitFrame.
     if (frame.isFakeExitFrame())
