@@ -69,6 +69,23 @@ const gXPInstallObserver = {
       return;
     }
 
+    let showNextConfirmation = () => {
+      // Make sure the browser is still alive.
+      if (gBrowser.browsers.indexOf(browser) == -1)
+        return;
+
+      let pending = this.pendingInstalls.get(browser);
+      if (pending && pending.length)
+        this.showInstallConfirmation(browser, pending.shift());
+    }
+
+    // If all installs have already been cancelled in some way then just show
+    // the next confirmation
+    if (installInfo.installs.every(i => i.state != AddonManager.STATE_DOWNLOADED)) {
+      showNextConfirmation();
+      return;
+    }
+
     const anchorID = "addons-notification-icon";
 
     // Make notifications persist a minimum of 30 seconds
@@ -84,25 +101,18 @@ const gXPInstallObserver = {
 
     let cancelInstallation = () => {
       if (installInfo) {
-        for (let install of installInfo.installs)
-          install.cancel();
+        for (let install of installInfo.installs) {
+          // The notification may have been closed because the add-ons got
+          // cancelled elsewhere, only try to cancel those that are still
+          // pending install.
+          if (install.state != AddonManager.STATE_CANCELLED)
+            install.cancel();
+        }
       }
 
       this.acceptInstallation = null;
 
-      let tab = gBrowser.getTabForBrowser(browser);
-      if (tab)
-        tab.removeEventListener("TabClose", cancelInstallation);
-
-      window.removeEventListener("unload", cancelInstallation);
-
-      // Make sure the browser is still alive.
-      if (gBrowser.browsers.indexOf(browser) == -1)
-        return;
-
-      let pending = this.pendingInstalls.get(browser);
-      if (pending && pending.length)
-        this.showInstallConfirmation(browser, pending.shift());
+      showNextConfirmation();
     };
 
     let unsigned = installInfo.installs.filter(i => i.addon.signedState <= AddonManager.SIGNEDSTATE_MISSING);
@@ -194,13 +204,13 @@ const gXPInstallObserver = {
     let tab = gBrowser.getTabForBrowser(browser);
     if (tab) {
       gBrowser.selectedTab = tab;
-      tab.addEventListener("TabClose", cancelInstallation);
     }
 
-    window.addEventListener("unload", cancelInstallation);
+    let popup = PopupNotifications.show(browser, "addon-install-confirmation",
+                                        messageString, anchorID, null, null,
+                                        options);
 
-    PopupNotifications.show(browser, "addon-install-confirmation", messageString,
-                            anchorID, null, null, options);
+    removeNotificationOnEnd(popup, installInfo.installs);
 
     Services.telemetry
             .getHistogramById("SECURITY_UI")
@@ -282,8 +292,10 @@ const gXPInstallObserver = {
         }
       };
 
-      let popup = PopupNotifications.show(browser, notificationID, messageString,
-                                          anchorID, action, null, options);
+      secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_ADDON_ASKING_PREVENTED);
+      let popup = PopupNotifications.show(browser, notificationID,
+                                          messageString, anchorID,
+                                          action, null, options);
       removeNotificationOnEnd(popup, installInfo.installs);
       break; }
     case "addon-install-started": {
