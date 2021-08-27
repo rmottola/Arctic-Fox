@@ -149,14 +149,12 @@ public:
     inline uint32_t Count() { return mTable->EntryCount(); }
 
     PLDHashTable::Iterator Iter() const { return PLDHashTable::Iterator(mTable); }
-    size_t SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf);
+    size_t SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 
     ~Native2WrappedNativeMap();
 private:
     Native2WrappedNativeMap();    // no implementation
     explicit Native2WrappedNativeMap(int size);
-
-    static size_t SizeOfEntryExcludingThis(PLDHashEntryHdr* hdr, mozilla::MallocSizeOf mallocSizeOf, void*);
 
 private:
     PLDHashTable* mTable;
@@ -260,14 +258,12 @@ public:
 
     PLDHashTable::Iterator Iter() { return PLDHashTable::Iterator(mTable); }
 
-    size_t SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf);
+    size_t SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 
     ~IID2NativeInterfaceMap();
 private:
     IID2NativeInterfaceMap();    // no implementation
     explicit IID2NativeInterfaceMap(int size);
-
-    static size_t SizeOfEntryExcludingThis(PLDHashEntryHdr* hdr, mozilla::MallocSizeOf mallocSizeOf, void*);
 
 private:
     PLDHashTable* mTable;
@@ -372,14 +368,12 @@ public:
     PLDHashTable::Iterator Iter() const { return PLDHashTable::Iterator(mTable); }
     PLDHashTable::Iterator Iter() { return PLDHashTable::Iterator(mTable); }
 
-    size_t SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf);
+    size_t SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 
     ~ClassInfo2WrappedNativeProtoMap();
 private:
     ClassInfo2WrappedNativeProtoMap();    // no implementation
     explicit ClassInfo2WrappedNativeProtoMap(int size);
-
-    static size_t SizeOfEntryExcludingThis(PLDHashEntryHdr* hdr, mozilla::MallocSizeOf mallocSizeOf, void*);
 
 private:
     PLDHashTable* mTable;
@@ -442,14 +436,12 @@ public:
     PLDHashTable::Iterator Iter() const { return PLDHashTable::Iterator(mTable); }
     PLDHashTable::Iterator Iter() { return PLDHashTable::Iterator(mTable); }
 
-    size_t SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf);
+    size_t SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 
     ~NativeSetMap();
 private:
     NativeSetMap();    // no implementation
     explicit NativeSetMap(int size);
-
-    static size_t SizeOfEntryExcludingThis(PLDHashEntryHdr* hdr, mozilla::MallocSizeOf mallocSizeOf, void*);
 
 private:
     PLDHashTable* mTable;

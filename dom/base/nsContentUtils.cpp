@@ -363,8 +363,8 @@ public:
     // We don't measure the |EventListenerManager| objects pointed to by the
     // entries because those references are non-owning.
     int64_t amount = sEventListenerManagersHash
-                   ? PL_DHashTableSizeOfExcludingThis(
-                       sEventListenerManagersHash, nullptr, MallocSizeOf)
+                   ? sEventListenerManagersHash->ShallowSizeOfIncludingThis(
+                       MallocSizeOf)
                    : 0;
 
     return MOZ_COLLECT_REPORT(
