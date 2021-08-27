@@ -1091,21 +1091,6 @@ SizeOfPrefFontEntryExcludingThis
     return aList.ShallowSizeOfExcludingThis(aMallocSizeOf);
 }
 
-static size_t
-SizeOfSharedCmapExcludingThis(CharMapHashKey*   aHashEntry,
-                              MallocSizeOf      aMallocSizeOf,
-                              void*             aUserArg)
-{
-    FontListSizes *sizes = static_cast<FontListSizes*>(aUserArg);
-
-    uint32_t size = aHashEntry->GetKey()->SizeOfIncludingThis(aMallocSizeOf);
-    sizes->mCharMapsSize += size;
-
-    // we return zero here because the measurements have been added directly
-    // to the relevant fields of the FontListSizes record
-    return 0;
-}
-
 void
 gfxPlatformFontList::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
                                             FontListSizes* aSizes) const
@@ -1140,8 +1125,11 @@ gfxPlatformFontList::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
         mBadUnderlineFamilyNames.SizeOfExcludingThis(aMallocSizeOf);
 
     aSizes->mFontListSize +=
-        mSharedCmaps.SizeOfExcludingThis(SizeOfSharedCmapExcludingThis,
-                                         aMallocSizeOf, aSizes);
+        mSharedCmaps.ShallowSizeOfExcludingThis(aMallocSizeOf);
+    for (auto iter = mSharedCmaps.ConstIter(); !iter.Done(); iter.Next()) {
+        aSizes->mCharMapsSize +=
+            iter.Get()->GetKey()->SizeOfIncludingThis(aMallocSizeOf);
+    }
 }
 
 void
