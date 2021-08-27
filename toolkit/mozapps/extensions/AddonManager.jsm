@@ -2672,8 +2672,6 @@ this.AddonManager = {
   ERROR_CORRUPT_FILE: -3,
   // An error occured trying to write to the filesystem.
   ERROR_FILE_ACCESS: -4,
-  // The downloaded file seems to be WebExtension.
-  ERROR_WEBEXT_FILE: -5,
 
   // These must be kept in sync with AddonUpdateChecker.
   // No error was encountered.
