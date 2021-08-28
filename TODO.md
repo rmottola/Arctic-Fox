@@ -63,6 +63,7 @@
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
 - Bug 1244650 - Failure to clear Forms and Search Data on exit. r
 - Bug 1243549 - Add missing bits. r=post-facto 
+- Bug 612168 [recheck existing] - Handle uninstalls of restartless addons in XPIProvider
 - Bug 1243549 - 2016-02-04 Make sure that startup sanitization doesn't throw
 - Bug 1219339 - 2016-01-14 : switch GetStaticInstance to use IPC's Singleton<T>
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
@@ -130,8 +131,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1203857 - Allow to build standalone js against jemalloc4. r=gps 
 - 1185106 - at least part 0 to 4 for TFF
 - Bug 1160014 - 2015-07-24 - Implement fullscreen part 4-6
-- Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
-- Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
 - Bug 1171379 - and check all related on bugzilla
 - Bug 909154. Remove the prefixed mozRequestAnimationFrame and its acco
 - Bug 1184429 - 2015-07-17 P1. & P2
@@ -153,7 +152,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1204872 - 2015-09
 - Bug 1198861 - (1 of 2) Improve aliasing information and type barrier handling 
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
-- Bug 1161802 part 2 - Split nsGlobalWindow::SetFullScreenInternal into
 - Bug 1053413 part 1 - Some code style conversion on affected code.
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 1179569: Remove use of decoder's monitor in ResetDecode(). r=bholley
@@ -165,7 +163,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1210607 - Check for null compartment in PopulateReport
 - Bug 1127618 - make push caches work in e10s. r=mcmanus r=froydnj IGNORE IDL
 - Bug 1123516 - 2015-06-30 - Implement maplike/setlike
-- Bug 1157569 - 2015-06-27 - from part 13 onwards
 - Bug 1169268 - 2015-06-24 - Handle CFHTML data better. r=ndeakin 
 - Bug 1175535 - Don't require objects embedded in MIR nodes to always b (remove gen->alloc() for alloc)
 - Bug 968923 - 2015-07-17 - part 6 - add use counters for deprecated operations; r=bz
