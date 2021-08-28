@@ -136,6 +136,8 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "IDBVersionChangeEvent",
 // IMPORTANT: Do not change this list without review from a DOM peer!
+    "ImageBitmap",
+// IMPORTANT: Do not change this list without review from a DOM peer!
     "ImageData",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "MessageEvent",
