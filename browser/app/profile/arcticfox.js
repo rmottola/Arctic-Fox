@@ -56,6 +56,9 @@ pref("extensions.update.autoUpdateDefault", true);
 // See the SCOPE constants in AddonManager.jsm for values to use here.
 pref("extensions.autoDisableScopes", 15);
 
+// Don't require signed add-ons by default
+pref("xpinstall.signatures.required", false);
+
 // Dictionary download preference
 pref("browser.dictionaries.download.url", "http://repository.binaryoutcast.com/dicts/");
 
