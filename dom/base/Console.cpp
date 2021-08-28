@@ -24,6 +24,7 @@
 #include "xpcprivate.h"
 #include "nsContentUtils.h"
 #include "nsDocShell.h"
+#include "nsProxyRelease.h"
 
 #include "nsIConsoleAPIStorage.h"
 #include "nsIDOMWindowUtils.h"
@@ -153,6 +154,8 @@ static const JSStructuredCloneCallbacks gConsoleCallbacks = {
 class ConsoleCallData final
 {
 public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ConsoleCallData)
+
   ConsoleCallData()
     : mMethodName(Console::MethodLog)
     , mPrivate(false)
@@ -241,6 +244,10 @@ public:
   Maybe<ConsoleStackEntry> mTopStackFrame;
   Maybe<nsTArray<ConsoleStackEntry>> mReifiedStack;
   nsCOMPtr<nsIStackFrame> mStack;
+
+private:
+  ~ConsoleCallData()
+  { }
 };
 
 // This class is used to clear any exception at the end of this method.
@@ -287,16 +294,13 @@ public:
       return false;
     }
 
-    AutoSyncLoopHolder syncLoop(mWorkerPrivate);
-    mSyncLoopTarget = syncLoop.EventTarget();
-
     if (NS_FAILED(NS_DispatchToMainThread(this))) {
       JS_ReportError(cx,
                      "Failed to dispatch to main thread for the Console API!");
       return false;
     }
 
-    return syncLoop.Run();
+    return true;
   }
 
 private:
@@ -315,14 +319,6 @@ private:
       RunWindowless();
     } else {
       RunWithWindow(window);
-    }
-
-    nsRefPtr<MainThreadStopSyncLoopRunnable> response =
-      new MainThreadStopSyncLoopRunnable(mWorkerPrivate,
-                                         mSyncLoopTarget.forget(),
-                                         true);
-    if (!response->Dispatch(nullptr)) {
-      NS_WARNING("Failed to dispatch response!");
     }
 
     return NS_OK;
@@ -391,9 +387,6 @@ protected:
   // Raw pointer because this method is async and this object is kept alive by
   // the caller.
   Console* mConsole;
-
-private:
-  nsCOMPtr<nsIEventTarget> mSyncLoopTarget;
 };
 
 // This runnable appends a CallData object into the Console queue running on
@@ -409,7 +402,30 @@ public:
 
 private:
   ~ConsoleCallDataRunnable()
-  { }
+  {
+    class ReleaseCallData final : public nsRunnable
+    {
+    public:
+      explicit ReleaseCallData(nsRefPtr<ConsoleCallData>& aCallData)
+      {
+        mCallData.swap(aCallData);
+      }
+
+      NS_IMETHOD Run() override
+      {
+        mCallData = nullptr;
+        return NS_OK;
+      }
+
+    private:
+      nsRefPtr<ConsoleCallData> mCallData;
+    };
+
+    nsRefPtr<ReleaseCallData> runnable = new ReleaseCallData(mCallData);
+    if(NS_FAILED(NS_DispatchToMainThread(runnable))) {
+      NS_WARNING("Failed to dispatch a ReleaseCallData runnable. Leaking.");
+    }
+  }
 
   bool
   PreDispatch(JSContext* aCx) override
@@ -517,7 +533,7 @@ private:
     mConsole->ProcessCallData(mCallData);
   }
 
-  ConsoleCallData* mCallData;
+  nsRefPtr<ConsoleCallData> mCallData;
 
   JSAutoStructuredCloneBuffer mArguments;
   ConsoleStructuredCloneData mData;
@@ -569,6 +585,7 @@ private:
       return false;
     }
 
+    mArguments.Clear();
     return true;
   }
 
@@ -1000,7 +1017,7 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
                 const nsAString& aMethodString,
                 const Sequence<JS::Value>& aData)
 {
-  nsAutoPtr<ConsoleCallData> callData(new ConsoleCallData());
+  nsRefPtr<ConsoleCallData> callData(new ConsoleCallData());
 
   ClearException ce(aCx);
 
@@ -1137,8 +1154,6 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
     return;
   }
 
-  // Note: we can pass the reference of callData because this runnable calls
-  // ProcessCallData() synchronously.
   nsRefPtr<ConsoleCallDataRunnable> runnable =
     new ConsoleCallDataRunnable(this, callData);
   runnable->Dispatch();
