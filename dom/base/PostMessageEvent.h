@@ -101,7 +101,7 @@ private:
   nsTArray<MessagePortIdentifier> mPortIdentifiers;
 };
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_PostMessageEvent_h

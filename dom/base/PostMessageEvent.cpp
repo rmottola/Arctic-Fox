@@ -36,7 +36,7 @@ struct StructuredCloneInfo
   nsTArray<nsRefPtr<MessagePortBase>> clonedPorts;
 };
 
-} // anonymous namespace
+} // namespace
 
 const JSStructuredCloneCallbacks PostMessageEvent::sPostMessageCallbacks = {
   PostMessageEvent::ReadStructuredClone,
@@ -405,5 +405,5 @@ PostMessageEvent::Write(JSContext* aCx, JS::Handle<JS::Value> aMessage,
                        &scInfo);
 }
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla
