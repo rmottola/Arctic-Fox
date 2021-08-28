@@ -133,6 +133,8 @@ const FIREFOX_ID                      = "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"
 const FIREFOX_APPCOMPATVERSION        = "27.9"
 #endif
 
+const XPI_SIGNATURE_CHECK_PERIOD      = 24 * 60 * 60;
+
 // The value for this is in Makefile.in
 #expand const DB_SCHEMA                       = __MOZ_EXTENSIONS_DB_SCHEMA__;
 const NOTIFICATION_TOOLBOXPROCESS_LOADED      = "ToolboxProcessLoaded";
@@ -1364,6 +1366,22 @@ function verifyDirSignedState(aDir, aExpectedID) {
 }
 
 /**
+ * Verifies that a bundle's contents are all correctly signed by an
+ * AMO-issued certificate
+ *
+ * @param  aBundle
+ *         the nsIFile for the bundle to check, either a directory or zip file
+ * @param  aExpectedID
+ *         the expected ID of the signature
+ * @return a Promise that resolves to an AddonManager.SIGNEDSTATE_* constant.
+ */
+function verifyBundleSignedState(aBundle, aExpectedID) {
+  if (aBundle.isFile())
+    return verifyZipSignedState(aBundle, aExpectedID);
+  return verifyDirSignedState(aBundle, aExpectedID);
+}
+
+/**
  * Replaces %...% strings in an addon url (update and updateInfo) with
  * appropriate values.
  *
@@ -2317,6 +2335,12 @@ this.XPIProvider = {
 
       this.extensionsActive = true;
       this.runPhase = XPI_BEFORE_UI_STARTUP;
+
+      let timerManager = Cc["@mozilla.org/updates/timer-manager;1"].
+                         getService(Ci.nsIUpdateTimerManager);
+      timerManager.registerTimer("xpi-signature-verification", () => {
+        this.verifySignatures();
+      }, XPI_SIGNATURE_CHECK_PERIOD);
     }
     catch (e) {
       logger.error("startup failed", e);
@@ -2465,6 +2489,45 @@ this.XPIProvider = {
     // Ensure any changes to the add-ons list are flushed to disk
     Services.prefs.setBoolPref(PREF_PENDING_OPERATIONS,
                                !XPIDatabase.writeAddonsList());
+  },
+
+  /**
+   * Verifies that all installed add-ons are still correctly signed.
+   */
+  verifySignatures: function XPI_verifySignatures() {
+    XPIDatabase.getAddonList(addon => SIGNED_TYPES.has(addon.type), (addons) => {
+      Task.spawn(function*() {
+        let changes = {
+          enabled: [],
+          disabled: []
+        };
+
+        for (let addon of addons) {
+          // The add-on might have vanished, we'll catch that on the next startup
+          if (!addon._sourceBundle.exists())
+            continue;
+
+          let signedState = yield verifyBundleSignedState(addon._sourceBundle, addon.id);
+          if (signedState == addon.signedState)
+            continue;
+
+          addon.signedState = signedState;
+          AddonManagerPrivate.callAddonListeners("onPropertyChanged",
+                                                 createWrapper(addon),
+                                                 ["signedState"]);
+
+          let disabled = XPIProvider.updateAddonDisabledState(addon);
+          if (disabled !== undefined)
+            changes[disabled ? "disabled" : "enabled"].push(addon.id);
+        }
+
+        XPIDatabase.saveChanges();
+
+        Services.obs.notifyObservers(null, "xpi-signature-changed", JSON.stringify(changes));
+      }).then(null, err => {
+        logger.error("XPI_verifySignature: " + err);
+      })
+    });
   },
 
   /**
@@ -4530,6 +4593,10 @@ this.XPIProvider = {
    * @param  aSoftDisabled
    *         Value for the softDisabled property. If undefined the value will
    *         not change. If true this will force userDisabled to be true
+   * @return a tri-state indicating the action taken for the add-on:
+   *           - undefined: The add-on did not change state
+   *           - true: The add-on because disabled
+   *           - false: The add-on became enabled
    * @throws if addon is not a DBAddonInternal
    */
   updateAddonDisabledState: function XPI_updateAddonDisabledState(aAddon,
@@ -4560,7 +4627,7 @@ this.XPIProvider = {
     if (aAddon.userDisabled == aUserDisabled &&
         aAddon.appDisabled == appDisabled &&
         aAddon.softDisabled == aSoftDisabled)
-      return;
+      return undefined;
 
     let wasDisabled = aAddon.disabled;
     let isDisabled = aUserDisabled || aSoftDisabled || appDisabled;
@@ -4580,21 +4647,22 @@ this.XPIProvider = {
       });
     }
 
+    let wrapper = createWrapper(aAddon);
+
     if (appDisabledChanged) {
       AddonManagerPrivate.callAddonListeners("onPropertyChanged",
-                                            aAddon,
-                                            ["appDisabled"]);
+                                             wrapper,
+                                             ["appDisabled"]);
     }
 
     // If the add-on is not visible or the add-on is not changing state then
     // there is no need to do anything else
     if (!aAddon.visible || (wasDisabled == isDisabled))
-      return;
+      return undefined;
 
     // Flag that active states in the database need to be updated on shutdown
     Services.prefs.setBoolPref(PREF_PENDING_OPERATIONS, true);
 
-    let wrapper = createWrapper(aAddon);
     // Have we just gone back to the current state?
     if (isDisabled != aAddon.active) {
       AddonManagerPrivate.callAddonListeners("onOperationCancelled", wrapper);
@@ -4646,6 +4714,8 @@ this.XPIProvider = {
     // Notify any other providers that a new theme has been enabled
     if (aAddon.type == "theme" && !isDisabled)
       AddonManagerPrivate.notifyAddonChanged(aAddon.id, aAddon.type, needsRestart);
+
+    return isDisabled;
   },
 
   /**
