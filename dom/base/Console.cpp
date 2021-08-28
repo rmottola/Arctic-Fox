@@ -203,6 +203,8 @@ public:
   virtual
   ~ConsoleRunnable()
   {
+    // Shutdown the StructuredCloneHelperInternal class.
+    Shutdown();
   }
 
   bool
