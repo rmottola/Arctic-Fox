@@ -25,7 +25,7 @@ interface nsIURI;
  * The callback interface for nsIHttpChannelInternal::HTTPUpgrade()
  */
 
-[scriptable, uuid(c025c35a-dda3-4a1d-9e6c-e02d7149ac79)]
+[scriptable, uuid(7b48d081-1dc1-4d08-b7a5-81491bf28c0e)]
 interface nsIHttpUpgradeListener : nsISupports
 {
     void onTransportAvailable(in nsISocketTransport   aTransport,
@@ -38,7 +38,7 @@ interface nsIHttpUpgradeListener : nsISupports
  * using any feature exposed by this interface, be aware that this interface
  * will change and you will be broken.  You have been warned.
  */
-[scriptable, uuid(26833ec7-4555-4f23-9281-3a12d4b76db1)]
+[scriptable, uuid(c025c35a-dda3-4a1d-9e6c-e02d7149ac79)]
 
 interface nsIHttpChannelInternal : nsISupports
 {
