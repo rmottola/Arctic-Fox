@@ -1240,8 +1240,14 @@ HttpChannelChild::Redirect3Complete()
   if (mLoadGroup)
     mLoadGroup->RemoveRequest(this, nullptr, NS_BINDING_ABORTED);
 
-  if (NS_FAILED(rv))
+  if (NS_SUCCEEDED(rv)) {
+    if (mLoadInfo) {
+      mLoadInfo->AppendRedirectedPrincipal(GetURIPrincipal());
+    }
+  }
+  else {
     NS_WARNING("CompleteRedirectSetup failed, HttpChannelChild already open?");
+  }
 
   // Release ref to new channel.
   mRedirectChannelChild = nullptr;
