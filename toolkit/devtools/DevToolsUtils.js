@@ -489,7 +489,7 @@ exports.fetch = function fetch(aURL, aOptions={ loadFromCache: true,
           Services.scriptSecurityManager.getSystemPrincipal(),
           null,      // aTriggeringPrincipal
           Ci.nsILoadInfo.SEC_NORMAL,
-          aOptions.policy);
+          Ci.nsIContentPolicy.TYPE_OTHER);
       } catch (ex) {
         deferred.reject(ex);
       }
