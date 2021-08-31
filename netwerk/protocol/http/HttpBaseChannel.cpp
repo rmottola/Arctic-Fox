@@ -39,6 +39,7 @@
 #include "nsINetworkInterceptController.h"
 #include "mozIThirdPartyUtil.h"
 #include "nsStreamUtils.h"
+#include "nsContentSecurityManager.h"
 
 #include <algorithm>
 
@@ -509,6 +510,15 @@ HttpBaseChannel::Open(nsIInputStream **aResult)
 {
   NS_ENSURE_TRUE(!mWasOpened, NS_ERROR_IN_PROGRESS);
   return NS_ImplementChannelOpen(this, aResult);
+}
+
+NS_IMETHODIMP
+HttpBaseChannel::Open2(nsIInputStream** aStream)
+{
+  nsCOMPtr<nsIStreamListener> listener;
+  nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
+  NS_ENSURE_SUCCESS(rv, rv);
+  return Open(aStream);
 }
 
 //-----------------------------------------------------------------------------
