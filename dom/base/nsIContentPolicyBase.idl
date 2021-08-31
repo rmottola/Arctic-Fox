@@ -24,7 +24,7 @@ typedef unsigned long nsContentPolicyType;
  * by launching a dialog to prompt the user for something).
  */
 
-[scriptable,uuid(4f2655e8-6365-4583-8510-732bff2186c5)]
+[scriptable,uuid(11b8d725-7c2b-429e-b51f-8b5b542d5009)]
 interface nsIContentPolicyBase : nsISupports
 {
   /**
@@ -57,6 +57,10 @@ interface nsIContentPolicyBase : nsISupports
    * Implementations of nsIContentPolicy should treat this the same way they
    * treat unknown types, because existing users of TYPE_OTHER may be converted
    * to use new content types.
+   *
+   * Note that the TYPE_INTERNAL_* constants are never passed to content
+   * policy implementations.  They are mapped to other TYPE_* constants, and
+   * are only intended for internal usage inside Gecko.
    */
   const nsContentPolicyType TYPE_OTHER = 1;
 
