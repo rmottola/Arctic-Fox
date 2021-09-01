@@ -560,7 +560,7 @@ function getCanApplyUpdates() {
       } else if (AppConstants.platform == "win") {
         // Example windowsVersion:  Windows XP == 5.1
         let windowsVersion = Services.sysinfo.getProperty("version");
-        LOG("gCanApplyUpdates - windowsVersion = " + windowsVersion);
+        LOG("getCanApplyUpdates - windowsVersion = " + windowsVersion);
 
       /**
        * For Vista, updates can be performed to a location requiring admin
@@ -583,13 +583,13 @@ function getCanApplyUpdates() {
             // appDir is under Program Files, so check if the user can elevate
             userCanElevate = Services.appinfo.QueryInterface(Ci.nsIWinAppHelper).
                              userCanElevate;
-            LOG("gCanApplyUpdates - on Vista, userCanElevate: " + userCanElevate);
+            LOG("getCanApplyUpdates - on Vista, userCanElevate: " + userCanElevate);
           }
           catch (ex) {
             // When the installation directory is not under Program Files,
             // fall through to checking if write access to the
             // installation directory is available.
-            LOG("gCanApplyUpdates - on Vista, appDir is not under Program Files");
+            LOG("getCanApplyUpdates - on Vista, appDir is not under Program Files");
           }
         }
 
@@ -617,7 +617,7 @@ function getCanApplyUpdates() {
           // if we're unable to create the test file this will throw an exception.
           let appDirTestFile = getAppBaseDir();
           appDirTestFile.append(FILE_PERMS_TEST);
-          LOG("gCanApplyUpdates - testing write access " + appDirTestFile.path);
+          LOG("getCanApplyUpdates - testing write access " + appDirTestFile.path);
           if (appDirTestFile.exists()) {
             appDirTestFile.remove(false);
           }
@@ -2429,7 +2429,7 @@ UpdateService.prototype = {
     // UPDATE_CANNOT_APPLY_EXTERNAL
     // UPDATE_CANNOT_APPLY_NOTIFY
     AUSTLMY.pingGeneric("UPDATE_CANNOT_APPLY_" + this._pingSuffix,
-                        gCanApplyUpdates);
+                        getCanApplyUpdates(), true);
     // Histogram IDs:
     // UPDATE_CANNOT_STAGE_EXTERNAL
     // UPDATE_CANNOT_STAGE_NOTIFY
@@ -2884,7 +2884,7 @@ UpdateService.prototype = {
       return;
     }
 
-    if (this._incompatibleAddons.length > 0 || !gCanApplyUpdates) {
+    if (this._incompatibleAddons.length > 0 || !getCanApplyUpdates) {
       LOG("UpdateService:onUpdateEnded - prompting because there are " +
           "incompatible add-ons");
       if (this._incompatibleAddons.length > 0) {
