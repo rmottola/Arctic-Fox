@@ -1591,10 +1591,6 @@ nsObjectLoadingContent::CheckLoadPolicy(int16_t *aContentPolicy)
 
   *aContentPolicy = nsIContentPolicy::ACCEPT;
   
-  // Double-check if we still have our mURI
-  if (!mURI) {
-    return false;
-  }
   nsresult rv = NS_CheckContentLoadPolicy(nsIContentPolicy::TYPE_OBJECT,
                                           mURI,
                                           doc->NodePrincipal(),
