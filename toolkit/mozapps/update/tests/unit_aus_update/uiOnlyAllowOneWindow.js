@@ -92,7 +92,7 @@ const WindowMediator = {
   },
 
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIWindowMediator])
-}
+};
 
 const WindowMediatorFactory = {
   createInstance: function createInstance(aOuter, aIID) {
