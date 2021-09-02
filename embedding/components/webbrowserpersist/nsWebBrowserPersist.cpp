@@ -2082,7 +2082,8 @@ nsWebBrowserPersist::MakeFilenameFromURI(nsIURI *aURI, nsString &aFilename)
         if (mPersistFlags & PERSIST_FLAGS_DONT_CHANGE_FILENAMES)
         {
             fileName.AssignWithConversion(NS_UnescapeURL(nameFromURL).get());
-            goto end;
+            aFilename = fileName;
+            return NS_OK;
         }
         if (!nameFromURL.IsEmpty())
         {
@@ -2122,7 +2123,6 @@ nsWebBrowserPersist::MakeFilenameFromURI(nsIURI *aURI, nsString &aFilename)
         fileName.Append(char16_t('a')); // 'a' is for arbitrary
     }
 
-end:
     aFilename = fileName;
     return NS_OK;
 }
