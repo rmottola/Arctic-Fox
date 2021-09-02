@@ -1490,7 +1490,7 @@ nsFrameLoader::SetOwnerContent(Element* aContent)
     mOwnerContent->RemoveMutationObserver(this);
   }
   mOwnerContent = aContent;
-  if (RenderFrameParent* rfp = GetCurrentRemoteFrame()) {
+  if (RenderFrameParent* rfp = GetCurrentRenderFrame()) {
     rfp->OwnerContentChanged(aContent);
   }
 
@@ -2230,7 +2230,7 @@ nsFrameLoader::GetRemoteBrowser() const
 }
 
 RenderFrameParent*
-nsFrameLoader::GetCurrentRemoteFrame() const
+nsFrameLoader::GetCurrentRenderFrame() const
 {
   if (mRemoteBrowser) {
     return mRemoteBrowser->GetRenderFrame();
