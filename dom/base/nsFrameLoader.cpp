@@ -487,7 +487,6 @@ nsFrameLoader::GetDocShell(nsIDocShell **aDocShell)
     if (NS_FAILED(rv))
       return rv;
     if (mRemoteFrame) {
-      NS_WARNING("No docshells for remote frames!");
       return rv;
     }
     NS_ASSERTION(mDocShell,
