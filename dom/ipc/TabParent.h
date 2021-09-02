@@ -426,6 +426,7 @@ public:
 
     void TakeDragVisualization(RefPtr<mozilla::gfx::SourceSurface>& aSurface,
                                int32_t& aDragAreaX, int32_t& aDragAreaY);
+    layout::RenderFrameParent* GetRenderFrame();
 protected:
     bool ReceiveMessage(const nsString& aMessage,
                         bool aSync,
@@ -478,7 +479,6 @@ protected:
 
 private:
     already_AddRefed<nsFrameLoader> GetFrameLoader(bool aUseCachedFrameLoaderAfterDestroy = false) const;
-    layout::RenderFrameParent* GetRenderFrame();
     nsRefPtr<nsIContentParent> mManager;
     void TryCacheDPIAndScale();
 
