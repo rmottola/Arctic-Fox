@@ -2233,7 +2233,6 @@ nsFrameLoader::TryRemoteBrowser()
     return false;
   }
 
-  mContentParent = mRemoteBrowser->Manager();
   mChildID = mRemoteBrowser->Manager()->ChildID();
 
   nsCOMPtr<nsIDocShellTreeItem> rootItem;
