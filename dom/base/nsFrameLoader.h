@@ -23,8 +23,8 @@
 #include "mozilla/dom/Element.h"
 #include "mozilla/Attributes.h"
 #include "nsStubMutationObserver.h"
-#include "nsIFrame.h"
 #include "Units.h"
+#include "nsIFrame.h"
 
 class nsIURI;
 class nsSubDocumentFrame;
