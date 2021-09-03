@@ -11,7 +11,7 @@
 namespace mozilla {
 namespace embedding {
 
-class PrintSettingsDialogParent MOZ_FINAL : public PPrintSettingsDialogParent
+class PrintSettingsDialogParent final : public PPrintSettingsDialogParent
 {
 public:
   virtual void

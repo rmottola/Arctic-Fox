@@ -9,7 +9,7 @@
 namespace mozilla {
 namespace embedding {
 
-class PrintSettingsDialogChild MOZ_FINAL : public PPrintSettingsDialogChild
+class PrintSettingsDialogChild final : public PPrintSettingsDialogChild
 {
   NS_INLINE_DECL_REFCOUNTING(PrintSettingsDialogChild)
 
