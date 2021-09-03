@@ -1,5 +1,5 @@
 /* Any copyright is dedicated to the Public Domain.
-   http://creativecommons.org/publicdomain/zero/1.0/ */
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
 subscriptLoader.loadSubScript("resource://gre/modules/ril_consts.js", this);
 
@@ -311,6 +311,7 @@ add_test(function test_sendMMI_get_IMEI_error() {
     mmiOptions = options;
     context.RIL[REQUEST_SEND_USSD](0, {
       rilRequestError: ERROR_RADIO_NOT_AVAILABLE,
+      errorMsg: GECKO_ERROR_RADIO_NOT_AVAILABLE
     });
   };
 
@@ -453,7 +454,8 @@ add_test(function test_sendMMI_USSD_error() {
   context.RIL.sendUSSD = function fakeSendUSSD(options){
     ussdOptions = options;
     context.RIL[REQUEST_SEND_USSD](0, {
-      rilRequestError: ERROR_GENERIC_FAILURE
+      rilRequestError: ERROR_GENERIC_FAILURE,
+      errorMsg: GECKO_ERROR_GENERIC_FAILURE
     });
   };
 
