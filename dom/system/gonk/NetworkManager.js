@@ -789,15 +789,18 @@ NetworkManager.prototype = {
 
     // Find a suitable network interface to activate.
     this.active = null;
+    let anyConnected = false;
 
-    let defaultDataNetwork;
     for each (let network in this.networkInterfaces) {
       if (network.state != Ci.nsINetworkInterface.NETWORK_STATE_CONNECTED) {
         continue;
       }
+      anyConnected = true;
 
-      if (network.type == Ci.nsINetworkInterface.NETWORK_TYPE_MOBILE) {
-        defaultDataNetwork = network;
+      // Set active only for default connections.
+      if (network.type != Ci.nsINetworkInterface.NETWORK_TYPE_WIFI &&
+          network.type != Ci.nsINetworkInterface.NETWORK_TYPE_MOBILE) {
+        continue;
       }
 
       this.active = network;
@@ -807,19 +810,9 @@ NetworkManager.prototype = {
       }
     }
 
-    // Give higher priority to default data APN than secondary APN.
-    // If default data APN is not connected, we still set default route
-    // and DNS on secondary APN.
-    if (this.active && defaultDataNetwork &&
-        this.isNetworkTypeSecondaryMobile(this.active.type) &&
-        this.active.type != this.preferredNetworkType) {
-      this.active = defaultDataNetwork;
-    }
-
     return Promise.resolve()
       .then(() => {
-        // Don't set default route on secondary APN
-        if (!this.active || this.isNetworkTypeSecondaryMobile(this.active.type)) {
+        if (!this.active) {
           return Promise.resolve();
         }
 
@@ -831,7 +824,7 @@ NetworkManager.prototype = {
         }
 
         if (this._manageOfflineStatus) {
-          Services.io.offline = !this.active;
+          Services.io.offline = !anyConnected;
         }
       });
   },
