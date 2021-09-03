@@ -306,6 +306,7 @@ private:
   CommandResult updateUpStream(NetworkParams& aOptions);
   CommandResult createNetwork(NetworkParams& aOptions);
   CommandResult destroyNetwork(NetworkParams& aOptions);
+  CommandResult getNetId(NetworkParams& aOptions);
 
   CommandResult addHostRouteLegacy(NetworkParams& aOptions);
   CommandResult removeHostRouteLegacy(NetworkParams& aOptions);
