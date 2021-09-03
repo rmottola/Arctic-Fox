@@ -34,8 +34,8 @@ add_test(function test_setCLIR_success() {
 
   let postedMessage = workerHelper.postedMessage;
 
-  do_check_eq(postedMessage.errorMsg, undefined);
-  do_check_true(postedMessage.success);
+  equal(postedMessage.errorMsg, undefined);
+  ok(postedMessage.success);
 
   run_next_test();
 });
@@ -59,8 +59,8 @@ add_test(function test_setCLIR_generic_failure() {
 
   let postedMessage = workerHelper.postedMessage;
 
-  do_check_eq(postedMessage.errorMsg, "GenericFailure");
-  do_check_false(postedMessage.success);
+  equal(postedMessage.errorMsg, "GenericFailure");
+  ok(!postedMessage.success);
 
   run_next_test();
 });
@@ -91,10 +91,10 @@ add_test(function test_getCLIR_n0_m1() {
 
   let postedMessage = workerHelper.postedMessage;
 
-  do_check_eq(postedMessage.errorMsg, undefined);
-  do_check_true(postedMessage.success);
-  do_check_eq(postedMessage.n, 0);
-  do_check_eq(postedMessage.m, 1);
+  equal(postedMessage.errorMsg, undefined);
+  ok(postedMessage.success);
+  equal(postedMessage.n, 0);
+  equal(postedMessage.m, 1);
   run_next_test();
 });
 
@@ -124,7 +124,7 @@ add_test(function test_getCLIR_error_generic_failure_invalid_length() {
 
   let postedMessage = workerHelper.postedMessage;
 
-  do_check_eq(postedMessage.errorMsg, "GenericFailure");
-  do_check_false(postedMessage.success);
+  equal(postedMessage.errorMsg, "GenericFailure");
+  ok(!postedMessage.success);
   run_next_test();
 });
