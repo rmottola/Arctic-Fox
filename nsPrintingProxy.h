@@ -29,16 +29,16 @@ public:
                                uint32_t aFlags);
 
     virtual PPrintProgressDialogChild*
-    AllocPPrintProgressDialogChild() override;
+    AllocPPrintProgressDialogChild() MOZ_OVERRIDE;
 
     virtual bool
-    DeallocPPrintProgressDialogChild(PPrintProgressDialogChild* aActor) override;
+    DeallocPPrintProgressDialogChild(PPrintProgressDialogChild* aActor) MOZ_OVERRIDE;
 
     virtual PPrintSettingsDialogChild*
-    AllocPPrintSettingsDialogChild() override;
+    AllocPPrintSettingsDialogChild() MOZ_OVERRIDE;
 
     virtual bool
-    DeallocPPrintSettingsDialogChild(PPrintSettingsDialogChild* aActor) override;
+    DeallocPPrintSettingsDialogChild(PPrintSettingsDialogChild* aActor) MOZ_OVERRIDE;
 };
 
 #endif
