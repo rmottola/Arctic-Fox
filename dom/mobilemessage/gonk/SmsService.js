@@ -108,7 +108,8 @@ function SmsService() {
   this.smsDefaultServiceId = this._getDefaultServiceId();
 
   this._portAddressedSmsApps = {};
-  this._portAddressedSmsApps[gWAP.WDP_PORT_PUSH] = this._handleSmsWdpPortPush.bind(this);
+  this._portAddressedSmsApps[gWAP.WDP_PORT_PUSH] =
+    (aMessage, aServiceId) => this._handleSmsWdpPortPush(aMessage, aServiceId);
 
   this._receivedSmsSegmentsMap = {};
 
@@ -209,7 +210,7 @@ SmsService.prototype = {
     }
     if (DEBUG) debug("Setting the timer for releasing the CPU wake lock.");
     this._smsHandledWakeLockTimer
-        .initWithCallback(this._releaseSmsHandledWakeLock.bind(this),
+        .initWithCallback(() => this._releaseSmsHandledWakeLock(),
                           SMS_HANDLED_WAKELOCK_TIMEOUT,
                           Ci.nsITimer.TYPE_ONE_SHOT);
   },
@@ -1045,7 +1046,7 @@ SmsService.prototype = {
                            this._processReceivedSmsSegment(segment));
     } else {
       gMobileMessageDatabaseService
-        .saveSmsSegment(segment, function notifyResult(aRv, aCompleteMessage) {
+        .saveSmsSegment(segment, (aRv, aCompleteMessage) => {
         handleReceivedAndAck(aRv,  // Ack according to the result after saving
                              aCompleteMessage);
       });
