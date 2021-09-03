@@ -41,13 +41,8 @@ add_test(function test_change_call_barring_password() {
 
 add_test(function test_check_change_call_barring_password_result() {
   let barringPasswordOptions;
-  let worker = newWorker({
-    postMessage: function(message) {
-      equal(barringPasswordOptions.pin, PIN);
-      equal(barringPasswordOptions.newPin, NEW_PIN);
-      equal(message.errorMsg, GECKO_ERROR_SUCCESS);
-    }
-  });
+  let workerHelper = newInterceptWorker();
+  let worker = workerHelper.worker;
 
   let context = worker.ContextPool._contexts[0];
   context.RIL.changeCallBarringPassword =
@@ -56,9 +51,13 @@ add_test(function test_check_change_call_barring_password_result() {
       context.RIL[REQUEST_CHANGE_BARRING_PASSWORD](0, {
         rilRequestError: ERROR_SUCCESS
       });
-    }
+    };
 
   context.RIL.changeCallBarringPassword({pin: PIN, newPin: NEW_PIN});
+
+  let postedMessage = workerHelper.postedMessage;
+  equal(barringPasswordOptions.pin, PIN);
+  equal(barringPasswordOptions.newPin, NEW_PIN);
 
   run_next_test();
 });
