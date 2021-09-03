@@ -661,7 +661,9 @@ nsUDPSocket::OnSocketReady(PRFileDesc *fd, int16_t outFlags)
 
   PRNetAddr prClientAddr;
   uint32_t count;
-  char buff[1500];
+  // Bug 1165423 - using 8k here because the packet could be larger
+  // than the MTU with fragmentation
+  char buff[8 * 1024];
   count = PR_RecvFrom(mFD, buff, sizeof(buff), 0, &prClientAddr, PR_INTERVAL_NO_WAIT);
 
   if (count < 1) {
@@ -809,10 +811,10 @@ nsUDPSocket::InitWithAddress(const NetAddr *aAddr, nsIPrincipal *aPrincipal,
 
 #ifdef MOZ_WIDGET_GONK
   if (mAppId != NECKO_UNKNOWN_APP_ID) {
-    nsCOMPtr<nsINetworkInterface> activeNetwork;
-    GetActiveNetworkInterface(activeNetwork);
-    mActiveNetwork =
-      new nsMainThreadPtrHolder<nsINetworkInterface>(activeNetwork);
+    nsCOMPtr<nsINetworkInfo> activeNetworkInfo;
+    GetActiveNetworkInfo(activeNetworkInfo);
+    mActiveNetworkInfo =
+      new nsMainThreadPtrHolder<nsINetworkInfo>(activeNetworkInfo);
   }
 #endif
 
@@ -912,19 +914,11 @@ nsUDPSocket::GetLocalAddr(nsINetAddr * *aResult)
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsUDPSocket::GetAddress(NetAddr *aResult)
-{
-  // no need to enter the lock here
-  memcpy(aResult, &mAddr, sizeof(mAddr));
-  return NS_OK;
-}
-
 void
 nsUDPSocket::SaveNetworkStats(bool aEnforce)
 {
 #ifdef MOZ_WIDGET_GONK
-  if (!mActiveNetwork || mAppId == NECKO_UNKNOWN_APP_ID) {
+  if (!mActiveNetworkInfo || mAppId == NECKO_UNKNOWN_APP_ID) {
     return;
   }
 
@@ -937,7 +931,7 @@ nsUDPSocket::SaveNetworkStats(bool aEnforce)
     // Create the event to save the network statistics.
     // the event is then dispathed to the main thread.
     nsRefPtr<nsRunnable> event =
-      new SaveNetworkStatsEvent(mAppId, mIsInBrowserElement, mActiveNetwork,
+      new SaveNetworkStatsEvent(mAppId, mIsInBrowserElement, mActiveNetworkInfo,
                                 mByteReadCount, mByteWriteCount, false);
     NS_DispatchToMainThread(event);
 
@@ -946,6 +940,14 @@ nsUDPSocket::SaveNetworkStats(bool aEnforce)
     mByteWriteCount = 0;
   }
 #endif
+}
+
+NS_IMETHODIMP
+nsUDPSocket::GetAddress(NetAddr *aResult)
+{
+  // no need to enter the lock here
+  memcpy(aResult, &mAddr, sizeof(mAddr));
+  return NS_OK;
 }
 
 namespace {
