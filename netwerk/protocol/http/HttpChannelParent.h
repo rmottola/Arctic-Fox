@@ -119,6 +119,7 @@ protected:
                    const OptionalLoadInfoArgs& aLoadInfoArgs,
                    const OptionalHttpResponseHead& aSynthesizedResponseHead,
                    const uint32_t&            aCacheKey,
+                   const nsCString&           aSchedulingContextID,
                    const bool&                aAllowStaleCacheContent);
 
   virtual bool RecvSetPriority(const uint16_t& priority) override;

@@ -121,7 +121,7 @@ HttpChannelParent::Init(const HttpChannelCreationArgs& aArgs)
                        a.entityID(), a.chooseApplicationCache(),
                        a.appCacheClientID(), a.allowSpdy(), a.allowAltSvc(), a.fds(),
                        a.loadInfo(), a.synthesizedResponseHead(), a.cacheKey(),
-                       a.allowStaleCacheContent());
+                       a.schedulingContextID(), a.allowStaleCacheContent());
   }
   case HttpChannelCreationArgs::THttpChannelConnectArgs:
   {
@@ -278,6 +278,7 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
                                  const OptionalLoadInfoArgs& aLoadInfoArgs,
                                  const OptionalHttpResponseHead& aSynthesizedResponseHead,
                                  const uint32_t&            aCacheKey,
+                                 const nsCString&           aSchedulingContextID,
                                  const bool&                aAllowStaleCacheContent)
 {
   nsCOMPtr<nsIURI> uri = DeserializeURI(aURI);
@@ -464,6 +465,10 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
       appCacheChan->SetChooseApplicationCache(chooseAppCache);
     }
   }
+
+  nsID schedulingContextID;
+  schedulingContextID.Parse(aSchedulingContextID.BeginReading());
+  mChannel->SetSchedulingContextID(schedulingContextID);
 
   rv = mChannel->AsyncOpen(mParentListener, nullptr);
   if (NS_FAILED(rv))
