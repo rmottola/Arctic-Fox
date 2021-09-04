@@ -16,6 +16,7 @@
 #include "nsIInterfaceRequestor.h"
 #include "TimingStruct.h"
 #include "Http2Push.h"
+#include "mozilla/net/DNS.h"
 
 #ifdef MOZ_WIDGET_GONK
 #include "nsINetworkManager.h"
@@ -446,6 +447,13 @@ private:
     bool                            m0RTTInProgress;
 
     nsresult                        mTransportStatus;
+
+public:
+    void GetNetworkAddresses(NetAddr &self, NetAddr &peer);
+
+private:
+    NetAddr                         mSelfAddr;
+    NetAddr                         mPeerAddr;
 };
 
 } // namespace net
