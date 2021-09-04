@@ -741,10 +741,11 @@ XPCOMUtils.defineLazyGetter(this, "gMmsTransactionHelper", function() {
                                    cancellable.done(aHttpStatus, aData));
         };
 
-        mmsConnection.ensureRouting(url)
-          .then(() => startTransaction(),
-                (aError) => {
-                  debug("Failed to ensureRouting: " + aError);
+        let onRejected = aReason => {
+          debug(aReason);
+          mmsConnection.release();
+          cancellable.done(_HTTP_STATUS_FAILED_TO_ROUTE, null);
+        };
 
         // TODO: |getNetId| will be implemented as a sync call in nsINetworkManager
         //       once Bug 1141903 is landed.
