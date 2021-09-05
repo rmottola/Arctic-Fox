@@ -2655,7 +2655,7 @@ nsXPCComponents_Utils::ForceGC()
 
 /* void forceCC (); */
 NS_IMETHODIMP
-nsXPCComponents_Utils::ForceCC(nsICycleCollectorListener *listener)
+nsXPCComponents_Utils::ForceCC(nsICycleCollectorListener* listener)
 {
     nsJSContext::CycleCollectNow(listener);
     return NS_OK;
