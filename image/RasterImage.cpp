@@ -1239,12 +1239,8 @@ RasterImage::NotifyForLoadEvent(Progress aProgress)
   if (mDecodeOnlyOnDraw) {
     // For decode-only-on-draw images, we want to send notifications as if we've
     // already finished decoding. Otherwise some observers will never even try
-    // to draw. (We may have already sent some of these notifications from
-    // NotifyForDecodeOnlyOnDraw(), but ProgressTracker will ensure no duplicate
-    // notifications get sent.)
-    aProgress |= FLAG_DECODE_STARTED |
-                 FLAG_FRAME_COMPLETE |
-                 FLAG_DECODE_COMPLETE;
+    // to draw.
+    aProgress |= FLAG_FRAME_COMPLETE | FLAG_DECODE_COMPLETE;
   }
   
   // If we encountered an error, make sure we notify for that as well.
@@ -1256,19 +1252,6 @@ RasterImage::NotifyForLoadEvent(Progress aProgress)
   NotifyProgress(aProgress);
 }
 
-void
-RasterImage::NotifyForDecodeOnlyOnDraw()
-{
-  if (!NS_IsMainThread()) {
-    nsCOMPtr<nsIRunnable> runnable =
-      NS_NewRunnableMethod(this, &RasterImage::NotifyForDecodeOnlyOnDraw);
-    NS_DispatchToMainThread(runnable);
-    return;
-  }
-
-  NotifyProgress(FLAG_DECODE_STARTED);
-}
-
 nsresult
 RasterImage::OnImageDataAvailable(nsIRequest*,
                                   nsISupports*,
@@ -1277,12 +1260,6 @@ RasterImage::OnImageDataAvailable(nsIRequest*,
                                   uint32_t aCount)
 {
   nsresult rv;
-
-  if (MOZ_UNLIKELY(mDecodeOnlyOnDraw && aOffset == 0)) {
-    // If we're a decode-only-on-draw image, send notifications as if we've just
-    // started decoding.
-    NotifyForDecodeOnlyOnDraw();
-  }
 
   // WriteToSourceBuffer always consumes everything it gets if it doesn't run
   // out of memory.
@@ -1590,14 +1567,6 @@ RasterImage::Decode(const Maybe<IntSize>& aSize, uint32_t aFlags)
     // will become locked again when LookupFrame touches them, and the remainder
     // will eventually expire.
     SurfaceCache::UnlockSurfaces(ImageKey(this));
-  }
-
-  if (aSize) {
-    // This isn't a size decode (which doesn't send any early notifications), so
-    // send out notifications right away.
-    NotifyProgress(decoder->TakeProgress(),
-                   decoder->TakeInvalidRect(),
-                   decoder->GetDecodeFlags());
   }
 
   if (mHasSourceData) {
