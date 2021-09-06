@@ -127,9 +127,14 @@ nsWEBPDecoder::WriteInternal(const char *aBuffer, uint32_t aCount)
   PostHasTransparency();
 
   if (!mImageData) {
-    PostDecoderError(NS_ERROR_FAILURE);
-    return;
+    MOZ_ASSERT(haveSize, "Didn't fetch metadata?");
+    nsresult rv_ = AllocateBasicFrame();
+    if (NS_FAILED(rv_)) {
+      return;
+    }
   }
+  MOZ_ASSERT(mImageData, "Should have a buffer now");
+  MOZ_ASSERT(mDecoder, "Should have a decoder now");
 
   // Transfer from mData to mImageData
   if (lastLineRead > mPreviousLastLine) {
