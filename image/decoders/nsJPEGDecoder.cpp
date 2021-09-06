@@ -196,7 +196,7 @@ nsJPEGDecoder::FinishInternal()
   // If we're not in any sort of error case, force our state to JPEG_DONE.
   if ((mState != JPEG_DONE && mState != JPEG_SINK_NON_JPEG_TRAILER) &&
       (mState != JPEG_ERROR) &&
-      !IsSizeDecode()) {
+      !IsMetadataDecode()) {
     mState = JPEG_DONE;
   }
 }
@@ -267,8 +267,8 @@ nsJPEGDecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
         return;
       }
 
-      // If we're doing a size decode, we're done.
-      if (IsSizeDecode()) {
+      // If we're doing a metadata decode, we're done.
+      if (IsMetadataDecode()) {
         return;
       }
 

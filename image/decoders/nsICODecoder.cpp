@@ -363,7 +363,7 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
                      PNGSIGNATURESIZE);
     if (mIsPNG) {
       mContainedDecoder = new nsPNGDecoder(mImage);
-      mContainedDecoder->SetSizeDecode(IsSizeDecode());
+      mContainedDecoder->SetMetadataDecode(IsMetadataDecode());
       mContainedDecoder->SetSendPartialInvalidations(mSendPartialInvalidations);
       mContainedDecoder->Init();
       if (!WriteToContainedDecoder(mSignature, PNGSIGNATURESIZE)) {
@@ -389,7 +389,7 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
 
     // Raymond Chen says that 32bpp only are valid PNG ICOs
     // http://blogs.msdn.com/b/oldnewthing/archive/2010/10/22/10079192.aspx
-    if (!IsSizeDecode() &&
+    if (!IsMetadataDecode() &&
         !static_cast<nsPNGDecoder*>(mContainedDecoder.get())->IsValidICO()) {
       PostDataError();
     }
@@ -440,7 +440,7 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
     nsBMPDecoder* bmpDecoder = new nsBMPDecoder(mImage);
     mContainedDecoder = bmpDecoder;
     bmpDecoder->SetUseAlphaData(true);
-    mContainedDecoder->SetSizeDecode(IsSizeDecode());
+    mContainedDecoder->SetMetadataDecode(IsMetadataDecode());
     mContainedDecoder->SetSendPartialInvalidations(mSendPartialInvalidations);
     mContainedDecoder->Init();
 
@@ -480,9 +480,8 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
     PostSize(mContainedDecoder->GetImageMetadata().GetWidth(),
              mContainedDecoder->GetImageMetadata().GetHeight());
 
-    // We have the size. If we're doing a size decode, we got what
-    // we came for.
-    if (IsSizeDecode()) {
+    // We have the size. If we're doing a metadata decode, we're done.
+    if (IsMetadataDecode()) {
       return;
     }
 

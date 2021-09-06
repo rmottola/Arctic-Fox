@@ -2599,7 +2599,7 @@ void nsJXRDecoder::WriteInternal(const char *aBuffer, uint32_t aCount)
 
         // We have the size. If we're doing a size decode, we got what
         // we came for.
-        if (IsSizeDecode())
+        if (IsMetadataDecode())
             return;
 
         CreateColorTransform();
@@ -2671,7 +2671,7 @@ void nsJXRDecoder::FinishInternal()
     //MOZ_ASSERT(GetFrameCount() <= 1, "Multiple JPEG-XR frames?");
 
     // Send notifications if appropriate
-    if (!IsSizeDecode() && HasSize())
+    if (!IsMetadataDecode() && HasSize())
     {
         if (DecodeAtEnd())
         {
