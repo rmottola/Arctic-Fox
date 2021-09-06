@@ -2605,6 +2605,14 @@ void nsJXRDecoder::WriteInternal(const char *aBuffer, uint32_t aCount)
         CreateColorTransform();
     }
 
+    // here we always allocate a Frame
+    // other decoders (JPEG, WEBP) check for an existing buffer.
+    // FIXME: can it be done here?
+    nsresult rv_ = AllocateBasicFrame();
+    if (NS_FAILED(rv_)) {
+      return;
+    }
+
     if (DecodeAtEnd())
     {
         // For now just accumulate the image data. The image will be decoded in FinishInternal().
