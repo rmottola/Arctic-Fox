@@ -129,24 +129,6 @@ private:
 class Image : public imgIContainer
 {
 public:
-  // Mimetype translation
-  enum eDecoderType {
-    eDecoderType_png     = 0,
-    eDecoderType_gif     = 1,
-    eDecoderType_jpeg    = 2,
-    eDecoderType_bmp     = 3,
-    eDecoderType_ico     = 4,
-    eDecoderType_icon    = 5,
-    eDecoderType_webp    = 6,
-#ifdef MOZ_JXR
-    eDecoderType_jxr     = 7,
-    eDecoderType_unknown = 8
-#else
-    eDecoderType_unknown = 7
-#endif
-  };
-  static eDecoderType GetDecoderType(const char* aMimeType);
-
   /**
    * Flags for Image initialization.
    *

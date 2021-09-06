@@ -21,8 +21,8 @@ class RasterImage;
 class nsWEBPDecoder : public Decoder
 {
 public:
-  nsWEBPDecoder(RasterImage* aImage);
-  ~nsWEBPDecoder() override;
+  explicit nsWEBPDecoder(RasterImage* aImage);
+  virtual ~nsWEBPDecoder();
 
   void InitInternal() override;
   void WriteInternal(const char* aBuffer, uint32_t aCount) override;
