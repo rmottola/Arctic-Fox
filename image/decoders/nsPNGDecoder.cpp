@@ -185,7 +185,7 @@ nsPNGDecoder::CreateFrame(png_uint_32 aXOffset, png_uint_32 aYOffset,
          ("PNGDecoderAccounting: nsPNGDecoder::CreateFrame -- created "
           "image frame with %dx%d pixels in container %p",
           aWidth, aHeight,
-          &mImage));
+          GetImage()));
 
 #ifdef PNG_APNG_SUPPORTED
   if (png_get_valid(mPNG, mInfo, PNG_INFO_acTL)) {
