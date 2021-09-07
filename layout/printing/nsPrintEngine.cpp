@@ -803,7 +803,6 @@ nsPrintEngine::PrintPreview(nsIPrintSettings* aPrintSettings,
 }
 
 //----------------------------------------------------------------------------------
-/* readonly attribute boolean isFramesetDocument; */
 NS_IMETHODIMP
 nsPrintEngine::GetIsFramesetDocument(bool *aIsFramesetDocument)
 {
@@ -813,7 +812,6 @@ nsPrintEngine::GetIsFramesetDocument(bool *aIsFramesetDocument)
 }
 
 //----------------------------------------------------------------------------------
-/* readonly attribute boolean isIFrameSelected; */
 NS_IMETHODIMP 
 nsPrintEngine::GetIsIFrameSelected(bool *aIsIFrameSelected)
 {
@@ -834,7 +832,6 @@ nsPrintEngine::GetIsIFrameSelected(bool *aIsIFrameSelected)
 }
 
 //----------------------------------------------------------------------------------
-/* readonly attribute boolean isRangeSelection; */
 NS_IMETHODIMP 
 nsPrintEngine::GetIsRangeSelection(bool *aIsRangeSelection)
 {
@@ -845,7 +842,6 @@ nsPrintEngine::GetIsRangeSelection(bool *aIsRangeSelection)
 }
 
 //----------------------------------------------------------------------------------
-/* readonly attribute boolean isFramesetFrameSelected; */
 NS_IMETHODIMP 
 nsPrintEngine::GetIsFramesetFrameSelected(bool *aIsFramesetFrameSelected)
 {
@@ -856,7 +852,6 @@ nsPrintEngine::GetIsFramesetFrameSelected(bool *aIsFramesetFrameSelected)
 }
 
 //----------------------------------------------------------------------------------
-/* readonly attribute long printPreviewNumPages; */
 NS_IMETHODIMP
 nsPrintEngine::GetPrintPreviewNumPages(int32_t *aPrintPreviewNumPages)
 {
@@ -918,7 +913,6 @@ nsPrintEngine::EnumerateDocumentNames(uint32_t* aCount,
 }
 
 //----------------------------------------------------------------------------------
-/* readonly attribute nsIPrintSettings globalPrintSettings; */
 nsresult
 nsPrintEngine::GetGlobalPrintSettings(nsIPrintSettings **aGlobalPrintSettings)
 {
@@ -934,7 +928,6 @@ nsPrintEngine::GetGlobalPrintSettings(nsIPrintSettings **aGlobalPrintSettings)
 }
 
 //----------------------------------------------------------------------------------
-/* readonly attribute boolean doingPrint; */
 NS_IMETHODIMP
 nsPrintEngine::GetDoingPrint(bool *aDoingPrint)
 {
@@ -944,7 +937,6 @@ nsPrintEngine::GetDoingPrint(bool *aDoingPrint)
 }
 
 //----------------------------------------------------------------------------------
-/* readonly attribute boolean doingPrintPreview; */
 NS_IMETHODIMP
 nsPrintEngine::GetDoingPrintPreview(bool *aDoingPrintPreview)
 {
@@ -954,7 +946,6 @@ nsPrintEngine::GetDoingPrintPreview(bool *aDoingPrintPreview)
 }
 
 //----------------------------------------------------------------------------------
-/* readonly attribute nsIPrintSettings currentPrintSettings; */
 NS_IMETHODIMP
 nsPrintEngine::GetCurrentPrintSettings(nsIPrintSettings * *aCurrentPrintSettings)
 {
