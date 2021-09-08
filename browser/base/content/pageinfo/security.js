@@ -3,6 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+Components.utils.import("resource://gre/modules/BrowserUtils.jsm");
+
 var security = {
   // Display the server certificate (static)
   viewCert : function () {
@@ -141,7 +143,7 @@ var security = {
                       getService(Components.interfaces.nsIEffectiveTLDService);
 
     var eTLD;
-    var uri = gDocument.documentURIObject;
+    var uri = BrowserUtils.makeURIFromCPOW(gDocument.documentURIObject);
     try {
       eTLD = eTLDService.getBaseDomain(uri);
     }
@@ -245,7 +247,7 @@ function securityOnLoad() {
   var yesStr = pageInfoBundle.getString("yes");
   var noStr = pageInfoBundle.getString("no");
 
-  var uri = gDocument.documentURIObject;
+  var uri = BrowserUtils.makeURIFromCPOW(gDocument.documentURIObject);
   setText("security-privacy-cookies-value",
           hostHasCookies(uri) ? yesStr : noStr);
   setText("security-privacy-passwords-value",
