@@ -46,6 +46,9 @@ browser.jar:
         skin/classic/browser/identity-icons-https.png
         skin/classic/browser/identity-icons-https-ev.png
         skin/classic/browser/identity-icons-https-mixed-active.png
+        skin/classic/browser/identity-icons-https-mixed-active@2x.png
+        skin/classic/browser/identity-icons-https-mixed-display.png
+        skin/classic/browser/identity-icons-https-mixed-display@2x.png
         skin/classic/browser/keyhole-forward-mask.svg
         skin/classic/browser/KUI-background.png
         skin/classic/browser/KUI-close.png

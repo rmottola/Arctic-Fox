@@ -1556,7 +1556,6 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
   -moz-margin-end: 1px;
 }
 
-/* Since we already have a padlock, always use the generic icon until the favicon loads
 .verifiedDomain > #page-proxy-favicon[pageproxystate="valid"] {
   list-style-image: url(chrome://browser/skin/identity-icons-https.png);
 }
@@ -1568,7 +1567,14 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
 .mixedActiveContent > #page-proxy-favicon[pageproxystate="valid"] {
   list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-active.png);
 }
-*/
+
+.mixedDisplayContent > #page-proxy-favicon[pageproxystate="valid"] {
+  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display@2x.png);
+}
+
+.mixedDisplayContent > #page-proxy-favicon[pageproxystate="valid"] {
+  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display.png);
+}
 
 #identity-box:hover > #page-proxy-favicon {
   -moz-image-region: rect(0, 32px, 16px, 16px);
