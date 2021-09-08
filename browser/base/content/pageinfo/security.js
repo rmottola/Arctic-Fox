@@ -60,7 +60,6 @@ var security = {
         cAName : issuerName,
         encryptionAlgorithm : undefined,
         encryptionStrength : undefined,
-        encryptionSuite : undefined,
         version: undefined,
         isBroken : isBroken,
         isMixed : isMixed,
@@ -73,7 +72,6 @@ var security = {
       try {
         retval.encryptionAlgorithm = status.cipherName;
         retval.encryptionStrength = status.secretKeyLength;
-        retval.encryptionSuite = status.cipherSuite;
         version = status.protocolVersion;
       }
       catch (e) {
@@ -104,7 +102,6 @@ var security = {
         cAName : "",
         encryptionAlgorithm : "",
         encryptionStrength : 0,
-        encryptionSuite : "",
         version: "",
         isBroken : isBroken,
         isMixed : isMixed,
