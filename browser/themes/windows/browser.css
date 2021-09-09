@@ -1424,16 +1424,10 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
   border-radius: 0;
 }
 
+
+#urlbar[pageproxystate="valid"] > #identity-box.chromeUI,
 #urlbar[pageproxystate="valid"] > #identity-box.verifiedIdentity {
-  color: hsl(92,100%,20%);
   -moz-margin-end: 4px;
-  background-image: -moz-linear-gradient(hsla(92,81%,16%,0),
-                                         hsla(92,81%,16%,.08) 25%,
-                                         hsla(92,81%,16%,.08) 75%,
-                                         hsla(92,81%,16%,0));
-  background-position: right;
-  background-repeat: no-repeat;
-  border-right: 1px solid hsla(92,100%,20%,0.5);
 }
 
 #urlbar[pageproxystate="valid"] > #identity-box.verifiedDomain {
@@ -1446,12 +1440,6 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
   background-position: right;
   background-repeat: no-repeat;
   border-right: 1px solid rgba(0,79,168,0.5);
-}
-
-#identity-box.verifiedIdentity:-moz-locale-dir(rtl) {
-  background-position: left;
-  border-right: none;
-  border-left: 1px solid hsla(92,100%,20%,0.5);
 }
 
 #identity-box.verifiedDomain:-moz-locale-dir(rtl) {
@@ -1541,43 +1529,18 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
 
 /* page proxy icon */
 
+%include ../shared/identity-block.inc.css
+
 #page-proxy-favicon {
-  width: 16px;
-  height: 16px;
   margin-top: 1px;
   margin-bottom: 1px;
   -moz-margin-start: 3px;
   -moz-margin-end: 2px;
-  list-style-image: url(chrome://browser/skin/identity-icons-generic.png);
   -moz-image-region: rect(0, 16px, 16px, 0);
 }
 
 @conditionalForwardWithUrlbar@ + #urlbar-container > #urlbar > #identity-box > #page-proxy-favicon {
   -moz-margin-end: 1px;
-}
-
-.verifiedDomain > #page-proxy-favicon[pageproxystate="valid"] {
-  list-style-image: url(chrome://browser/skin/identity-icons-https.png);
-}
-
-.verifiedIdentity > #page-proxy-favicon[pageproxystate="valid"] {
-  list-style-image: url(chrome://browser/skin/identity-icons-https-ev.png);
-}
-
-.mixedActiveContent > #page-proxy-favicon[pageproxystate="valid"] {
-  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-active.png);
-}
-
-.mixedDisplayContent > #page-proxy-favicon[pageproxystate="valid"] {
-  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display@2x.png);
-}
-
-.mixedDisplayContent > #page-proxy-favicon[pageproxystate="valid"] {
-  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display.png);
-}
-
-.mixedDisplayContentLoadedActiveBlocked > #page-proxy-favicon[pageproxystate="valid"] {
-  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display.png);
 }
 
 #identity-box:hover > #page-proxy-favicon {
@@ -1587,10 +1550,6 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
 #identity-box:hover:active > #page-proxy-favicon,
 #identity-box[open=true] > #page-proxy-favicon {
   -moz-image-region: rect(0, 48px, 16px, 32px);
-}
-
-#page-proxy-favicon[pageproxystate="invalid"] {
-  opacity: 0.3;
 }
 
 /* autocomplete */
