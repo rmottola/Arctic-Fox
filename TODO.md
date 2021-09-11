@@ -176,7 +176,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1171555 - Remove overly verbose ServiceWorker warnings.
 - Bug 1173415 - Fix incorrect mask used for
 - Bug 1167356 - 2015-06-11
-- Bug 1129873 - 2015-06-08 - [GTK3] Implement wrapper to GtkAppChooserDialog to allo
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
 - 1227567 - Optimise module namespace imports in Ion where we have
