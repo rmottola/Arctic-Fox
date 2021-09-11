@@ -249,7 +249,7 @@ class SharedContext
 
     inline bool allLocalsAliased();
 
-    bool strict() {
+    bool strict() const {
         return strictScript || localStrict;
     }
     bool setLocalStrictMode(bool strict) {
@@ -259,7 +259,7 @@ class SharedContext
     }
 
     // JSOPTION_EXTRA_WARNINGS warnings or strict mode errors.
-    bool needStrictChecks() {
+    bool needStrictChecks() const {
         return strict() || extraWarnings;
     }
 
@@ -359,6 +359,10 @@ class FunctionBox : public ObjectBox, public SharedContext
 
     bool hasDefaults() const {
         return length != function()->nargs() - function()->hasRest();
+    }
+
+    bool hasMappedArgsObj() const {
+        return !strict() && !function()->hasRest() && !hasDefaults() && !hasDestructuringArgs;
     }
 
     // Return whether this or an enclosing function is being parsed and

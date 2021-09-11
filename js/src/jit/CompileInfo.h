@@ -461,7 +461,7 @@ class CompileInfo
         return scriptNeedsArgsObj_;
     }
     bool argsObjAliasesFormals() const {
-        return scriptNeedsArgsObj_ && !script()->strict();
+        return scriptNeedsArgsObj_ && script()->hasMappedArgsObj();
     }
 
     AnalysisMode analysisMode() const {
