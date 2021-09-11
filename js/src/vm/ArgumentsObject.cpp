@@ -314,7 +314,7 @@ ArgumentsObject::createForIon(JSContext* cx, jit::JitFrameLayout* frame, HandleO
 }
 
 static bool
-args_delProperty(JSContext *cx, HandleObject obj, HandleId id, ObjectOpResult &result)
+args_delProperty(JSContext* cx, HandleObject obj, HandleId id, ObjectOpResult& result)
 {
     ArgumentsObject& argsobj = obj->as<ArgumentsObject>();
     if (JSID_IS_INT(id)) {
@@ -353,8 +353,8 @@ ArgGetter(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp)
 }
 
 static bool
-ArgSetter(JSContext *cx, HandleObject obj, HandleId id, MutableHandleValue vp,
-          ObjectOpResult &result)
+ArgSetter(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp,
+          ObjectOpResult& result)
 {
     if (!obj->is<NormalArgumentsObject>())
         return result.succeed();
@@ -472,8 +472,8 @@ StrictArgGetter(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue
 }
 
 static bool
-StrictArgSetter(JSContext *cx, HandleObject obj, HandleId id, MutableHandleValue vp,
-                ObjectOpResult &result)
+StrictArgSetter(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp,
+                ObjectOpResult& result)
 {
     if (!obj->is<StrictArgumentsObject>())
         return result.succeed();
