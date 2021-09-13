@@ -1682,12 +1682,12 @@ ParseNode::isConstant()
 class ObjectBox
 {
   public:
-    JSObject *object;
+    JSObject* object;
 
-    ObjectBox(JSObject *object, ObjectBox *traceLink);
+    ObjectBox(JSObject* object, ObjectBox* traceLink);
     bool isFunctionBox() { return object->is<JSFunction>(); }
-    FunctionBox *asFunctionBox();
-    void trace(JSTracer *trc);
+    FunctionBox* asFunctionBox();
+    void trace(JSTracer* trc);
 
   protected:
     friend struct CGObjectList;
