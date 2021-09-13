@@ -263,7 +263,7 @@ function securityOnLoad() {
 
   if (info.isBroken) {
     if (info.isMixed) {
-    hdr = pkiBundle.getString("pageInfo_MixedContent");
+      hdr = pkiBundle.getString("pageInfo_MixedContent");
     } else {
       hdr = pkiBundle.getFormattedString("pageInfo_BrokenEncryption",
                                          [info.encryptionAlgorithm,
