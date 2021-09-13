@@ -121,6 +121,7 @@ browser.jar:
         skin/classic/browser/webRTC-camera-black-16.png
         skin/classic/browser/webRTC-microphone-black-16.png
         skin/classic/browser/webRTC-screen-black-16.png
+*       skin/classic/browser/controlcenter/panel.css        (controlcenter/panel.css)
 *       skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
         skin/classic/browser/downloads/buttons.png                   (downloads/buttons.png)
         skin/classic/browser/downloads/contentAreaDownloadsView.css  (downloads/contentAreaDownloadsView.css)

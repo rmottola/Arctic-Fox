@@ -15,6 +15,7 @@
 #ifdef MOZ_DEVTOOLS
 <?xml-stylesheet href="chrome://global/skin/devtools/common.css" type="text/css"?>
 #endif
+<?xml-stylesheet href="chrome://browser/skin/controlcenter/panel.css" type="text/css"?>
 <?xml-stylesheet href="chrome://browser/skin/" type="text/css"?>
 
 <?xul-overlay href="chrome://global/content/editMenuOverlay.xul"?>
