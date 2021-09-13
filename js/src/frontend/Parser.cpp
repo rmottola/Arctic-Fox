@@ -802,7 +802,8 @@ Parser<ParseHandler>::checkStrictBinding(PropertyName* name, Node pn)
 
 template <>
 ParseNode*
-Parser<FullParseHandler>::standaloneFunctionBody(HandleFunction fun, const AutoNameVector& formals,
+Parser<FullParseHandler>::standaloneFunctionBody(HandleFunction fun,
+                                                 Handle<PropertyNameVector> formals,
                                                  GeneratorKind generatorKind,
                                                  Directives inheritedDirectives,
                                                  Directives* newDirectives,
