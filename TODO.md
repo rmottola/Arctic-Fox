@@ -211,6 +211,9 @@ Check with Roy Tam:
 # Patches that apply but break things:
 - Bug 1096294 - 2015-02-24 Display pseudo-arrays like arrays in the console; r=pbrosset
 
+# Not applicable - missing customizableUI
+- Bug 1170759 - Move detailed security information to a subpanel r=Gijs
+
 What with LightweightThemeConsumer.jsm 
 
 Parents of:
@@ -285,4 +288,10 @@ https://github.com/classilla/tenfourfox/issues/526
 * Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6048 | Fail: 928 | Failed to load: 0 - Hangs on "iter-close"
 * Harness: Tests To run: 55 | Total tests ran: 55 | Pass: 55 | Fail: 0 | Failed to load: 0
 * Language: Tests To run: 5052 | Total tests ran: 5052 | Pass: 4452 | Fail: 600 | Failed to load: 0
+* AnnexB: Tests To run: 81 | Total tests ran: 81 | Pass: 79 | Fail: 2 | Failed to load: 0
+
+2021-09-13:
+* Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6095 | Fail: 881 | Failed to load: 0
+* Harness: Tests To run: 55 | Total tests ran: 55 | Pass: 55 | Fail: 0 | Failed to load: 0
+* Language: Tests To run: 5052 | Total tests ran: 5052 | Pass: 4466 | Fail: 586 | Failed to load: 0
 * AnnexB: Tests To run: 81 | Total tests ran: 81 | Pass: 79 | Fail: 2 | Failed to load: 0
