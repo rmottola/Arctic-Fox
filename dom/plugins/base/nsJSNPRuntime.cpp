@@ -1849,7 +1849,7 @@ nsNPObjWrapper::OnDestroy(NPObject* npobj)
     ::JS_SetPrivate(entry->mJSObj, nullptr);
 
     // Remove the npobj from the hash now that it went away.
-    PL_DHashTableRawRemove(sNPObjWrappers, entry);
+    sNPObjWrappers->RawRemove(entry);
 
     // The finalize hook will call OnWrapperDestroyed().
   }
@@ -1930,7 +1930,7 @@ nsNPObjWrapper::GetNewOrUsed(NPP npp, JSContext* cx, NPObject* npobj)
   if (!obj) {
     // OOM? Remove the stale entry from the hash.
 
-    PL_DHashTableRawRemove(sNPObjWrappers, entry);
+    sNPObjWrappers->RawRemove(entry);
 
     return nullptr;
   }
