@@ -1041,9 +1041,8 @@ Fold(ExclusiveContext* cx, ParseNode** pnp,
                 break;
         }
 
-        // No constant-folding for (a**b**c[**d][...]), because
-        // (**) is right-associative and we would have to reverse
-        // the list first. It's not worth doing that.
+        // No constant-folding for (2**3**5), because (**) is right-
+        // associative. We would have to reverse the list. It's not worth it.
         if (pn->getKind() == PNK_POW && pn->pn_count > 2)
             break;
 
