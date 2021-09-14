@@ -4163,19 +4163,7 @@ FireControllerChangeOnMatchingDocument(nsISupports* aKey,
   return PL_DHASH_NEXT;
 }
 
-static PLDHashOperator
-ClaimMatchingClients(nsISupportsHashKey* aKey, void* aData)
-{
-  nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
-  ServiceWorkerRegistrationInfo* workerRegistration =
-    static_cast<ServiceWorkerRegistrationInfo*>(aData);
-  nsCOMPtr<nsIDocument> document = do_QueryInterface(aKey->GetKey());
-
-  swm->MaybeClaimClient(document, workerRegistration);
-
-  return PL_DHASH_NEXT;
-}
-} // namespace
+} // anonymous namespace
 
 void
 ServiceWorkerManager::GetAllClients(nsIPrincipal* aPrincipal,
@@ -4243,7 +4231,11 @@ ServiceWorkerManager::ClaimClients(nsIPrincipal* aPrincipal,
     return NS_ERROR_DOM_INVALID_STATE_ERR;
   }
 
-  mAllDocuments.EnumerateEntries(ClaimMatchingClients, registration);
+  nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+  for (auto iter = mAllDocuments.Iter(); !iter.Done(); iter.Next()) {
+    nsCOMPtr<nsIDocument> document = do_QueryInterface(iter.Get()->GetKey());
+    swm->MaybeClaimClient(document, registration);
+  }
 
   return NS_OK;
 }
