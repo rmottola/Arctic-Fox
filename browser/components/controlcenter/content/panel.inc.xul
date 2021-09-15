@@ -51,7 +51,7 @@
     </vbox>
   </hbox>
   <!-- Footer button to open security page info -->
-  <hbox id="identity-popup-button-container" align="center">
+  <hbox id="identity-popup-button-container" align="right">
     <button id="identity-popup-more-info-button"
             label="&identity.moreInfoLinkText;"
             oncommand="gIdentityHandler.handleMoreInfoClick(event);"/>
