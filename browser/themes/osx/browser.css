@@ -1932,10 +1932,6 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     list-style-image: url("chrome://browser/skin/places/bookmarksToolbar@2x.png");
     -moz-image-region: auto;
   }
-
-  #identity-popup.chromeUI > #identity-popup-container > #identity-popup-icon {
-    list-style-image: url("chrome://branding/content/icon128.png");
-  }
 }
 
 #appmenu_unsortedBookmarks,
