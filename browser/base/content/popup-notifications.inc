@@ -1,5 +1,13 @@
 # to be included inside a popupset element
 
+    <panel id="notification-popup"
+           type="arrow"
+           footertype="promobox"
+           position="after_start"
+           hidden="true"
+           orient="vertical"
+           role="alert"/>
+
     <popupnotification id="webRTC-shareDevices-notification" hidden="true">
       <popupnotificationcontent id="webRTC-selectCamera" orient="vertical">
         <label value="&getUserMedia.selectCamera.label;"
