@@ -276,11 +276,6 @@ const gXPInstallObserver = {
       removeNotificationOnEnd(popup, installInfo.installs);
       break; }
     case "addon-install-blocked": {
-      if (!options.displayOrigin) {
-        // Need to deal with missing originatingURI and with about:/data: URIs more gracefully,
-        // see bug 1063418 - but for now, bail:
-        return;
-      }
       messageString = gNavigatorBundle.getFormattedString("xpinstallPromptMessage",
                         [brandShortName]);
 
@@ -350,13 +345,12 @@ const gXPInstallObserver = {
         if (install.error < 0) {
           error += install.error;
           args = [brandShortName, install.name];
-        } else if (install.addon.jetsdk) {
+	}  else if (install.addon.jetsdk) {
           error += "JetSDK";
         } else if (install.addon.blocklistState == Ci.nsIBlocklistService.STATE_BLOCKED) {
           error += "Blocklisted";
           args = [install.name];
         } else {
-        else
           error += "Incompatible";
           args = [brandShortName, Services.appinfo.version, install.name];
         }
