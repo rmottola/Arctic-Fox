@@ -276,11 +276,6 @@ const gXPInstallObserver = {
       removeNotificationOnEnd(popup, installInfo.installs);
       break; }
     case "addon-install-blocked": {
-      if (!options.displayOrigin) {
-        // Need to deal with missing originatingURI and with about:/data: URIs more gracefully,
-        // see bug 1063418 - but for now, bail:
-        return;
-      }
       messageString = gNavigatorBundle.getFormattedString("xpinstallPromptMessage",
                         [brandShortName]);
 
