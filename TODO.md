@@ -70,6 +70,8 @@
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu
+- 1245241 remaining 4 parts
+- Bug 1245241 - 2016-02-18 - part 1 - Close Shmem file handles after mapping them wh
 - 1164427 - Implement elementsFromPoint (= Tests)
 - Bug 1230948 - Update web-platform-tests expected data to revision 63b
 - Bug 1160971 - 4 parts
