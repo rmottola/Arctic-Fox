@@ -1183,6 +1183,7 @@ TabParent::RecvPDocAccessibleConstructor(PDocAccessibleParent* aDoc,
     return parentDoc->AddChildDoc(doc, aParentID);
   } else {
     MOZ_ASSERT(!aParentID);
+    doc->SetTopLevel();
     a11y::DocManager::RemoteDocAdded(doc);
   }
 #endif
