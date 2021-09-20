@@ -32,7 +32,7 @@ public:
   {
     MOZ_COUNT_DTOR_INHERITED(DocAccessibleParent, ProxyAccessible);
     MOZ_ASSERT(mChildDocs.Length() == 0);
-    MOZ_ASSERT(!mParentDoc);
+    MOZ_ASSERT(!ParentDoc());
   }
 
   /*
@@ -49,7 +49,7 @@ public:
   void Unbind()
   {
     mParent = nullptr;
-    mParentDoc->mChildDocs.RemoveElement(this);
+    ParentDoc()->mChildDocs.RemoveElement(this);
     mParentDoc = nullptr;
   }
 
@@ -64,7 +64,7 @@ public:
    * Return the main processes representation of the parent document (if any)
    * of the document this object represents.
    */
-  DocAccessibleParent* Parent() const { return mParentDoc; }
+  DocAccessibleParent* ParentDoc() const { return mParentDoc; }
 
   /*
    * Called when a document in a content process notifies the main process of a
