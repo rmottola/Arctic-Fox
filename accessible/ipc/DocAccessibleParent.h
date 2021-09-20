@@ -57,6 +57,7 @@ public:
     mParentDoc = nullptr;
   }
 
+  virtual bool RecvShutdown() override;
   void Destroy();
   virtual void ActorDestroy(ActorDestroyReason aWhy) override
   {
