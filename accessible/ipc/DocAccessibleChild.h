@@ -75,9 +75,9 @@ public:
                               nsTArray<Attribute> *aAttributes) override;
 
   virtual bool RecvCaretOffset(const uint64_t& aID, int32_t* aOffset)
-    MOZ_OVERRIDE;
+    override;
   virtual bool RecvSetCaretOffset(const uint64_t& aID, const int32_t& aOffset,
-                                  bool* aValid) MOZ_OVERRIDE;
+                                  bool* aValid) override;
 
   virtual bool RecvCharacterCount(const uint64_t& aID, int32_t* aCount)
      override;
@@ -192,7 +192,7 @@ public:
 
   virtual bool RecvCharAt(const uint64_t& aID,
                           const int32_t& aOffset,
-                          uint16_t* aChar) MOZ_OVERRIDE;
+                          uint16_t* aChar) override;
 
   virtual bool RecvImagePosition(const uint64_t& aID,
                                  const uint32_t& aCoordType,
