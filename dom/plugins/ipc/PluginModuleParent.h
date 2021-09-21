@@ -504,7 +504,7 @@ private:
     void DoInjection(const nsAutoHandle& aSnapshot);
     static DWORD WINAPI GetToolhelpSnapshot(LPVOID aContext);
 
-    void OnCrash(DWORD processID) MOZ_OVERRIDE;
+    void OnCrash(DWORD processID) override;
 
     DWORD mFlashProcess1;
     DWORD mFlashProcess2;
