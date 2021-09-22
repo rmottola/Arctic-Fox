@@ -408,6 +408,9 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     /* State specific to the kind of parse being performed. */
     ParseHandler handler;
 
+    void prepareNodeForMutation(Node node) { handler.prepareNodeForMutation(node); }
+    void freeTree(Node node) { handler.freeTree(node); }
+
   private:
     bool reportHelper(ParseReportKind kind, bool strict, uint32_t offset,
                       unsigned errorNumber, va_list args);
@@ -732,6 +735,7 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
                                 ParseNodeKind headKind);
     bool checkForHeadConstInitializers(Node pn1);
 
+  public:
     enum FunctionCallBehavior {
         PermitAssignmentToFunctionCalls,
         ForbidAssignmentToFunctionCalls
@@ -740,6 +744,7 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     bool isValidSimpleAssignmentTarget(Node node,
                                        FunctionCallBehavior behavior = ForbidAssignmentToFunctionCalls);
 
+  private:
     bool reportIfArgumentsEvalTarget(Node nameNode);
     bool reportIfNotValidSimpleAssignmentTarget(Node target, AssignmentFlavor flavor);
 
