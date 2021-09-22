@@ -21,36 +21,6 @@ this.EXPORTED_SYMBOLS = [ "LoginManagerParent", "PasswordsMetricsProvider" ];
 
 var gDebug;
 
-function log(...pieces) {
-  function generateLogMessage(args) {
-    let strings = ['Login Manager (parent):'];
-
-    args.forEach(function(arg) {
-      if (typeof arg === 'string') {
-        strings.push(arg);
-      } else if (typeof arg === 'undefined') {
-        strings.push('undefined');
-      } else if (arg === null) {
-        strings.push('null');
-      } else {
-        try {
-          strings.push(JSON.stringify(arg, null, 2));
-        } catch(err) {
-          strings.push("<<something>>");
-        }
-      }
-    });
-    return strings.join(' ');
-  }
-
-  if (!gDebug)
-    return;
-
-  let message = generateLogMessage(pieces);
-  dump(message + "\n");
-  Services.console.logStringMessage(message);
-}
-
 #ifndef ANDROID
 #ifdef MOZ_SERVICES_HEALTHREPORT
 XPCOMUtils.defineLazyModuleGetter(this, "Metrics",
@@ -151,6 +121,37 @@ PasswordsMeasurement2.prototype = Object.freeze({
 
 #endif
 #endif
+
+
+function log(...pieces) {
+  function generateLogMessage(args) {
+    let strings = ['Login Manager (parent):'];
+
+    args.forEach(function(arg) {
+      if (typeof arg === 'string') {
+        strings.push(arg);
+      } else if (typeof arg === 'undefined') {
+        strings.push('undefined');
+      } else if (arg === null) {
+        strings.push('null');
+      } else {
+        try {
+          strings.push(JSON.stringify(arg, null, 2));
+        } catch(err) {
+          strings.push("<<something>>");
+        }
+      }
+    });
+    return strings.join(' ');
+  }
+
+  if (!gDebug)
+    return;
+
+  let message = generateLogMessage(pieces);
+  dump(message + "\n");
+  Services.console.logStringMessage(message);
+}
 
 function prefChanged() {
   gDebug = Services.prefs.getBoolPref("signon.debug");
