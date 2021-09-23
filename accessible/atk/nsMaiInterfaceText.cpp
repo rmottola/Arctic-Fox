@@ -347,7 +347,7 @@ getCharacterExtentsCB(AtkText *aText, gint aOffset,
   if (aCoords == ATK_XY_SCREEN) {
     geckoCoordType = nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE;
   } else {
-    giabbaCoordType = nsIAccessibleCoordinateType::COORDTYPE_WINDOW_RELATIVE;
+    geckoCoordType = nsIAccessibleCoordinateType::COORDTYPE_WINDOW_RELATIVE;
   }
 
   AccessibleWrap* accWrap = GetAccessibleWrap(ATK_OBJECT(aText));
