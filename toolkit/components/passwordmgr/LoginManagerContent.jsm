@@ -796,12 +796,6 @@ var LoginManagerContent = {
         return;
       }
 
-    if (isFormDisabled) {
-      log("autocomplete=off but form can be filled; notified observers");
-      recordAutofillResult(AUTOFILL_RESULT.AUTOCOMPLETE_OFF);
-      return;
-    }
-
       // Fill the form
 
       if (usernameField) {
