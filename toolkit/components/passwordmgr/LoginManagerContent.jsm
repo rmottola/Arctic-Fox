@@ -792,7 +792,6 @@ var LoginManagerContent = {
 
     // We will always have a selectedLogin at this point.
 
-    var didFillForm = false;
     if (autofillForm && !isFormDisabled) {
       // Fill the form
 
@@ -814,22 +813,20 @@ var LoginManagerContent = {
       if (passwordField.value != selectedLogin.password) {
         passwordField.setUserInput(selectedLogin.password);
       }
-      didFillForm = true;
     } else if (!autofillForm) {
       log("autofillForms=false but form can be filled; notified observers");
       recordAutofillResult(AUTOFILL_RESULT.NO_AUTOFILL_FORMS);
+      return;
     } else if (isFormDisabled) {
       log("autocomplete=off but form can be filled; notified observers");
       recordAutofillResult(AUTOFILL_RESULT.AUTOCOMPLETE_OFF);
+      return;
     }
 
-    if (didFillForm) {
-      recordAutofillResult(AUTOFILL_RESULT.FILLED);
-      let doc = form.ownerDocument;
-      let win = doc.defaultView;
-      let messageManager = messageManagerFromWindow(win);
-      messageManager.sendAsyncMessage("LoginStats:LoginFillSuccessful");
-    }
+    let doc = form.ownerDocument;
+    let win = doc.defaultView;
+    let messageManager = messageManagerFromWindow(win);
+    messageManager.sendAsyncMessage("LoginStats:LoginFillSuccessful");
   },
 
 };
