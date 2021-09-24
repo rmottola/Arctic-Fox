@@ -1008,7 +1008,7 @@ UserAutoCompleteResult.prototype = {
 
   getValueAt : function (index) {
     if (index < 0 || index >= this.logins.length)
-      throw "Index out of range.";
+      throw new Error("Index out of range.");
 
     return this.logins[index].username;
   },
@@ -1035,7 +1035,7 @@ UserAutoCompleteResult.prototype = {
 
   removeValueAt : function (index, removeFromDB) {
     if (index < 0 || index >= this.logins.length)
-        throw "Index out of range.";
+        throw new Error("Index out of range.");
 
     var [removedLogin] = this.logins.splice(index, 1);
 

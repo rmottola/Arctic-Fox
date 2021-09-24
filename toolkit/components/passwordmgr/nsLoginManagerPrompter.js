@@ -3,15 +3,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+const { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
 
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cr = Components.results;
-
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
-Components.utils.import("resource://gre/modules/SharedPromptUtils.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
+Cu.import("resource://gre/modules/SharedPromptUtils.jsm");
 
 /* Constants for password prompt telemetry.
  * Mirrored in mobile/android/components/LoginManagerPrompter.js */
@@ -136,7 +133,7 @@ LoginManagerPromptFactory.prototype = {
         }
         self._doAsyncPrompt();
       }
-    }
+    };
 
     Services.tm.mainThread.dispatch(runnable, Ci.nsIThread.DISPATCH_NORMAL);
     this.log("_doAsyncPrompt:run dispatched");
@@ -241,7 +238,7 @@ LoginManagerPrompter.prototype = {
       this.__strBundle = bunService.createBundle(
                   "chrome://passwordmgr/locale/passwordmgr.properties");
       if (!this.__strBundle)
-        throw "String bundle for Login Manager not present!";
+        throw new Error("String bundle for Login Manager not present!");
     }
 
     return this.__strBundle;
@@ -304,7 +301,8 @@ LoginManagerPrompter.prototype = {
   prompt : function (aDialogTitle, aText, aPasswordRealm,
                      aSavePassword, aDefaultText, aResult) {
     if (aSavePassword != Ci.nsIAuthPrompt.SAVE_PASSWORD_NEVER)
-      throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+      throw new Components.Exception("prompt only supports SAVE_PASSWORD_NEVER",
+                                     Cr.NS_ERROR_NOT_IMPLEMENTED);
 
     this.log("===== prompt() called =====");
 
@@ -328,7 +326,8 @@ LoginManagerPrompter.prototype = {
     this.log("===== promptUsernameAndPassword() called =====");
 
     if (aSavePassword == Ci.nsIAuthPrompt.SAVE_PASSWORD_FOR_SESSION)
-        throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+      throw new Components.Exception("promptUsernameAndPassword doesn't support SAVE_PASSWORD_FOR_SESSION",
+                                     Cr.NS_ERROR_NOT_IMPLEMENTED);
 
     var selectedLogin = null;
     var checkBox = { value : false };
@@ -430,7 +429,8 @@ LoginManagerPrompter.prototype = {
     this.log("===== promptPassword called() =====");
 
     if (aSavePassword == Ci.nsIAuthPrompt.SAVE_PASSWORD_FOR_SESSION)
-        throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+      throw new Components.Exception("promptPassword doesn't support SAVE_PASSWORD_FOR_SESSION",
+                                     Cr.NS_ERROR_NOT_IMPLEMENTED);
 
     var checkBox = { value : false };
     var checkBoxLabel = null;
@@ -689,7 +689,7 @@ LoginManagerPrompter.prototype = {
         level: aLevel,
         inProgress : false,
         prompter: this
-      }
+      };
 
       this._factory._asyncPrompts[hashKey] = asyncPrompt;
       this._factory._doAsyncPrompt();
@@ -1451,11 +1451,11 @@ LoginManagerPrompter.prototype = {
     if (aAuthInfo.flags & Ci.nsIAuthInformation.AUTH_PROXY) {
       this.log("getAuthTarget is for proxy auth");
       if (!(aChannel instanceof Ci.nsIProxiedChannel))
-        throw "proxy auth needs nsIProxiedChannel";
+        throw new Error("proxy auth needs nsIProxiedChannel");
 
       var info = aChannel.proxyInfo;
       if (!info)
-        throw "proxy auth needs nsIProxyInfo";
+        throw new Error("proxy auth needs nsIProxyInfo");
 
       // Proxies don't have a scheme, but we'll use "moz-proxy://"
       // so that it's more obvious what the login is for.
@@ -1538,7 +1538,7 @@ LoginManagerPrompter.prototype = {
         this.callback = null;
         this.context = null;
       }
-    }
+    };
   }
 
 }; // end of LoginManagerPrompter implementation
