@@ -81,6 +81,7 @@
 - Bug 1198458: Rollup of changes previously applied to media/webrtc/tru
 - Bug 1198458: Webrtc updated to branch 43
 - 1227567 - Optimise module namespace imports in Ion where we have
+- update SKIA 1082598
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
 - Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
