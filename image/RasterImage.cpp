@@ -654,7 +654,8 @@ RasterImage::CopyFrame(uint32_t aWhichFrame, uint32_t aFlags)
   }
 
   DataSourceSurface::MappedSurface mapping;
-  if (NS_WARN_IF(!surf->Map(DataSourceSurface::MapType::WRITE, &mapping))) {
+  if (!surf->Map(DataSourceSurface::MapType::WRITE, &mapping)) {
+    gfxCriticalError() << "RasterImage::CopyFrame failed to map surface";
     return nullptr;
   }
 
