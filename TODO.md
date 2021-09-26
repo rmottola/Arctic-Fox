@@ -108,7 +108,8 @@
 - remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
 - Bug 1192130 - Part 1: Add MOZ_NON_AUTOABLE to restrict using auto in
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
-Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
+- Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
+- Bug 1169268 - Don't crash when pasting files. r=ndeakin
 - Bug 1202085 2015-10-26 - Part 0 to 6
 - Bug 930414 - 22 parts
 - Bug 1188347  - 5 parts
@@ -153,12 +154,10 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1172785 - 2016-07-06 remaining parts of RTCCertificate
 - 1178938 - 2015-07-02 5 parts
 - Bug 1175622 - Use the right API when transitively marking object grou	
-- Bug 1161802 - 2015-06-10  part 1 to 8
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
 - Bug 1204872 - 2015-09
 - Bug 1198861 - (1 of 2) Improve aliasing information and type barrier handling 
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
-- Bug 1053413 part 1 - Some code style conversion on affected code.
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 1179569: Remove use of decoder's monitor in ResetDecode(). r=bholley
 - Bug 1178437 - Do the dormant-enabled tracking on the main thread. 
@@ -166,14 +165,8 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
 - Bug 1210607 - Check for null compartment in PopulateReport
-- Bug 1127618 - make push caches work in e10s. r=mcmanus r=froydnj IGNORE IDL
-- Bug 1123516 - 2015-06-30 - Implement maplike/setlike
-- Bug 1169268 - 2015-06-24 - Handle CFHTML data better. r=ndeakin 
 - Bug 968923 - 2015-07-17 - part 6 - add use counters for deprecated operations; r=bz
-- Bug 1152326 - When processing plugin updates only update the visibili
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
-- Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope. (and related)
-- Bug 1173255 - 2015-06-18 - Cleanup MediaManager e10s code in prep for deviceId con
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
@@ -182,9 +175,6 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 impacting download and shutdown:
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
-
-Mac Specific
-SkiaGL: https://bugzilla.mozilla.org/show_bug.cgi?id=1150944
 
 More session store stuff to check:
 
