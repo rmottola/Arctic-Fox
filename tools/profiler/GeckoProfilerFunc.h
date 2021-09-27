@@ -38,6 +38,7 @@ bool mozilla_sampler_is_active();
 void mozilla_sampler_responsiveness(TimeStamp time);
 void mozilla_sampler_frame_number(int frameNumber);
 const double* mozilla_sampler_get_responsiveness();
+
 void mozilla_sampler_save();
 
 mozilla::UniquePtr<char[]> mozilla_sampler_get_profile(float aSinceTime);
@@ -45,6 +46,12 @@ mozilla::UniquePtr<char[]> mozilla_sampler_get_profile(float aSinceTime);
 JSObject *mozilla_sampler_get_profile_data(JSContext *aCx, float aSinceTime);
 void mozilla_sampler_get_profile_data_async(float aSinceTime,
                                             mozilla::dom::Promise* aPromise);
+
+// Make this function easily callable from a debugger in a build without
+// debugging information (work around http://llvm.org/bugs/show_bug.cgi?id=22211)
+extern "C" {
+  void mozilla_sampler_save_profile_to_file(const char* aFilename);
+}
 
 const char** mozilla_sampler_get_features();
 
