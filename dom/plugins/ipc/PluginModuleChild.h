@@ -307,7 +307,6 @@ private:
 
     PRLibrary* mLibrary;
     nsCString mPluginFilename; // UTF8
-    nsCString mUserAgent;
     int mQuirks;
 
     bool mIsChrome;
