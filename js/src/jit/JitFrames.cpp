@@ -353,12 +353,12 @@ JitFrameIterator::machineState() const
 
     // The MachineState is used by GCs for marking call-sites.
     if (MOZ_UNLIKELY(isBailoutJS()))
-        return activation_->bailoutData()->machineState();
+        return *activation_->bailoutData()->machineState();
 
     SafepointReader reader(ionScript(), safepoint());
     uintptr_t* spill = spillBase();
-
     MachineState machine;
+
     for (GeneralRegisterBackwardIterator iter(reader.allGprSpills()); iter.more(); iter++)
         machine.setRegisterLocation(*iter, --spill);
 
@@ -1163,7 +1163,7 @@ MarkBailoutFrame(JSTracer* trc, const JitFrameIterator& frame)
 
     // The vector of recover instructions is already traced as part of the
     // JitActivation.
-    SnapshotIterator snapIter(frame);
+    SnapshotIterator snapIter(frame, frame.activation()->bailoutData()->machineState());
 
     // For each instruction, we read the allocations without evaluating the
     // recover instruction, nor reconstructing the frame. We are only looking at
@@ -1754,7 +1754,7 @@ RInstructionResults::trace(JSTracer* trc)
 }
 
 
-SnapshotIterator::SnapshotIterator(const JitFrameIterator& iter)
+SnapshotIterator::SnapshotIterator(const JitFrameIterator& iter, const MachineState* machineState)
   : snapshot_(iter.ionScript()->snapshots(),
               iter.snapshotOffset(),
               iter.ionScript()->snapshotsRVATableSize(),
@@ -1763,7 +1763,7 @@ SnapshotIterator::SnapshotIterator(const JitFrameIterator& iter)
              iter.ionScript()->recovers(),
              iter.ionScript()->recoversSize()),
     fp_(iter.jsFrame()),
-    machine_(iter.machineState()),
+    machine_(machineState),
     ionScript_(iter.ionScript()),
     instructionResults_(nullptr)
 {
@@ -1995,7 +1995,7 @@ SnapshotIterator::floatAllocationPointer(const RValueAllocation& alloc) const
 {
     switch (alloc.mode()) {
       case RValueAllocation::ANY_FLOAT_REG:
-        return machine_.address(alloc.fpuReg());
+        return machine_->address(alloc.fpuReg());
 
       case RValueAllocation::ANY_FLOAT_STACK:
         return (FloatRegisters::RegisterContent*) AddressOfFrameSlot(fp_, alloc.stackOffset());
@@ -2048,7 +2048,7 @@ SnapshotIterator::writeAllocationValuePayload(const RValueAllocation& alloc, Val
         break;
 
       case RValueAllocation::TYPED_REG:
-        machine_.write(alloc.reg2(), payload);
+        machine_->write(alloc.reg2(), payload);
         break;
 
       case RValueAllocation::TYPED_STACK:
@@ -2067,7 +2067,7 @@ SnapshotIterator::writeAllocationValuePayload(const RValueAllocation& alloc, Val
 #if defined(JS_NUNBOX32)
       case RValueAllocation::UNTYPED_REG_REG:
       case RValueAllocation::UNTYPED_STACK_REG:
-        machine_.write(alloc.reg2(), payload);
+        machine_->write(alloc.reg2(), payload);
         break;
 
       case RValueAllocation::UNTYPED_REG_STACK:
@@ -2076,7 +2076,7 @@ SnapshotIterator::writeAllocationValuePayload(const RValueAllocation& alloc, Val
         break;
 #elif defined(JS_PUNBOX64)
       case RValueAllocation::UNTYPED_REG:
-        machine_.write(alloc.reg(), v.asRawBits());
+        machine_->write(alloc.reg(), v.asRawBits());
         break;
 
       case RValueAllocation::UNTYPED_STACK:
@@ -2186,7 +2186,8 @@ SnapshotIterator::initInstructionResults(MaybeReadFallback& fallback)
         // Start a new snapshot at the beginning of the JitFrameIterator.  This
         // SnapshotIterator is used for evaluating the content of all recover
         // instructions.  The result is then saved on the JitActivation.
-        SnapshotIterator s(*fallback.frame);
+        MachineState machine = fallback.frame->machineState();
+        SnapshotIterator s(*fallback.frame, &machine);
         if (!s.computeInstructionResults(cx, results)) {
 
             // If the evaluation failed because of OOMs, then we discard the
@@ -2378,7 +2379,8 @@ InlineFrameIterator::InlineFrameIterator(JSContext* cx, const InlineFrameIterato
     script_(cx)
 {
     if (frame_) {
-        start_ = SnapshotIterator(*frame_);
+        machine_ = iter->machine_;
+        start_ = SnapshotIterator(*frame_, &machine_);
 
         // findNextFrame will iterate to the next frame and init. everything.
         // Therefore to settle on the same frame, we report one frame less readed.
@@ -2395,7 +2397,8 @@ InlineFrameIterator::resetOn(const JitFrameIterator* iter)
     frameCount_ = UINT32_MAX;
 
     if (iter) {
-        start_ = SnapshotIterator(*iter);
+        machine_ = iter->machineState();
+        start_ = SnapshotIterator(*iter, &machine_);
         findNextFrame();
     }
 }
