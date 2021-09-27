@@ -111,6 +111,12 @@ ProfileBuffer::ProfileBuffer(int aEntrySize)
 {
 }
 
+ProfileBuffer::~ProfileBuffer()
+{
+  mGeneration = INT_MAX;
+  deleteExpiredStoredMarkers();
+}
+
 // Called from signal, call only reentrant functions
 void ProfileBuffer::addTag(const ProfileEntry& aTag)
 {
