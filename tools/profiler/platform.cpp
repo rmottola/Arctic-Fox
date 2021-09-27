@@ -197,7 +197,7 @@ ProfilerMarker::~ProfilerMarker() {
 }
 
 void
-ProfilerMarker::SetGeneration(int aGenID) {
+ProfilerMarker::SetGeneration(uint32_t aGenID) {
   mGenID = aGenID;
 }
 
