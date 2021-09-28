@@ -55,7 +55,11 @@ public:
   void DetachSourceBuffer(TrackBuffersManager* aSourceBuffer);
   TaskQueue* GetTaskQueue() { return mTaskQueue; }
 
-	// Gap allowed between frames.
+  // Returns a string describing the state of the MediaSource internal
+  // buffered data. Used for debugging purposes.
+  void GetMozDebugReaderData(nsAString& aString);
+
+  // Gap allowed between frames.
   static const media::TimeUnit EOS_FUZZ;
 
 private:
