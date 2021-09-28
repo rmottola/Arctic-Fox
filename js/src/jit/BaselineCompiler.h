@@ -184,6 +184,7 @@ namespace jit {
     _(JSOP_RUNONCE)            \
     _(JSOP_REST)               \
     _(JSOP_TOID)               \
+    _(JSOP_TOSTRING)           \
     _(JSOP_TABLESWITCH)        \
     _(JSOP_ITER)               \
     _(JSOP_MOREITER)           \
