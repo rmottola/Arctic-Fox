@@ -388,7 +388,6 @@ public:
     media::TimeUnit aTimeThreshold) override;
   int64_t GetResourceOffset() const override;
   media::TimeIntervals GetBuffered() override;
-  int64_t GetEvictionOffset(media::TimeUnit aTime) override;
 
 private:
   // Destructor.
