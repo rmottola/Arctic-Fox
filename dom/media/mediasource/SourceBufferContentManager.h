@@ -11,7 +11,6 @@
 
 #include "MediaData.h"
 #include "MediaSourceDecoder.h"
-#include "SourceBuffer.h"
 #include "TimeUnits.h"
 #include "nsString.h"
 
@@ -23,6 +22,10 @@ namespace dom {
 
 using media::TimeUnit;
 using media::TimeIntervals;
+
+namespace dom {
+class SourceBuffer;
+}
 
 class SourceBufferContentManager {
 public:

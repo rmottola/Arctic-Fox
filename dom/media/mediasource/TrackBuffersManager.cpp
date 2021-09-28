@@ -5,9 +5,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "TrackBuffersManager.h"
+#include "ContainerParser.h"
+#include "MediaSourceDemuxer.h"
+#include "MediaSourceUtils.h"
+#include "mozilla/Preferences.h"
+#include "mozilla/StateMirroring.h"
 #include "SourceBufferResource.h"
 #include "SourceBuffer.h"
-#include "MediaSourceDemuxer.h"
 
 #ifdef MOZ_WEBM
 #include "WebMDemuxer.h"
@@ -30,6 +34,8 @@ extern PRLogModuleInfo* GetMediaSourceLog();
 #endif
 
 namespace mozilla {
+
+using dom::SourceBufferAppendMode;
 
 static const char*
 AppendStateToStr(TrackBuffersManager::AppendState aState)
