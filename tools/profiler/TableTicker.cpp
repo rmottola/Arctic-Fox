@@ -146,7 +146,8 @@ TableTicker::TableTicker(double aInterval, int aEntrySize,
     mThreadNameFilters[i] = aThreadNameFilters[i];
   }
 
-  sStartTime = mozilla::TimeStamp::Now();
+  bool ignore;
+  sStartTime = mozilla::TimeStamp::ProcessCreation(ignore);
 
   {
     mozilla::MutexAutoLock lock(*sRegisteredThreadsMutex);
@@ -300,13 +301,13 @@ void TableTicker::StreamMetaJSCustomObject(SpliceableJSONWriter& aWriter)
   }
 }
 
-void TableTicker::ToStreamAsJSON(std::ostream& stream, float aSinceTime)
+void TableTicker::ToStreamAsJSON(std::ostream& stream, double aSinceTime)
 {
   SpliceableJSONWriter b(mozilla::MakeUnique<OStreamJSONWriteFunc>(stream));
   StreamJSON(b, aSinceTime);
 }
 
-JSObject* TableTicker::ToJSObject(JSContext *aCx, float aSinceTime)
+JSObject* TableTicker::ToJSObject(JSContext* aCx, double aSinceTime)
 {
   JS::RootedValue val(aCx);
   {
@@ -318,14 +319,14 @@ JSObject* TableTicker::ToJSObject(JSContext *aCx, float aSinceTime)
   return &val.toObject();
 }
 
-UniquePtr<char[]> TableTicker::ToJSON(float aSinceTime)
+UniquePtr<char[]> TableTicker::ToJSON(double aSinceTime)
 {
   SpliceableChunkedJSONWriter b;
   StreamJSON(b, aSinceTime);
   return b.WriteFunc()->CopyData();
 }
 
-void TableTicker::ToJSObjectAsync(float aSinceTime,
+void TableTicker::ToJSObjectAsync(double aSinceTime,
                                   Promise* aPromise)
 {
   if (NS_WARN_IF(mGatherer)) {
@@ -411,7 +412,7 @@ void BuildJavaThreadJSObject(SpliceableJSONWriter& aWriter)
 }
 #endif
 
-void TableTicker::StreamJSON(SpliceableJSONWriter& aWriter, float aSinceTime)
+void TableTicker::StreamJSON(SpliceableJSONWriter& aWriter, double aSinceTime)
 {
   aWriter.Start(SpliceableJSONWriter::SingleLineStyle);
   {
@@ -997,7 +998,7 @@ void TableTicker::InplaceTick(TickSample* sample)
 
   if (sample) {
     mozilla::TimeDuration delta = sample->timestamp - sStartTime;
-    currThreadProfile.addTag(ProfileEntry('t', static_cast<float>(delta.ToMilliseconds())));
+    currThreadProfile.addTag(ProfileEntry('t', delta.ToMilliseconds()));
   }
 
   PseudoStack* stack = currThreadProfile.GetPseudoStack();
@@ -1025,23 +1026,23 @@ void TableTicker::InplaceTick(TickSample* sample)
 
   if (sample && currThreadProfile.GetThreadResponsiveness()->HasData()) {
     mozilla::TimeDuration delta = currThreadProfile.GetThreadResponsiveness()->GetUnresponsiveDuration(sample->timestamp);
-    currThreadProfile.addTag(ProfileEntry('r', static_cast<float>(delta.ToMilliseconds())));
+    currThreadProfile.addTag(ProfileEntry('r', delta.ToMilliseconds()));
   }
 
   // rssMemory is equal to 0 when we are not recording.
   if (sample && sample->rssMemory != 0) {
-    currThreadProfile.addTag(ProfileEntry('R', static_cast<float>(sample->rssMemory)));
+    currThreadProfile.addTag(ProfileEntry('R', static_cast<double>(sample->rssMemory)));
   }
 
   // ussMemory is equal to 0 when we are not recording.
   if (sample && sample->ussMemory != 0) {
-    currThreadProfile.addTag(ProfileEntry('U', static_cast<float>(sample->ussMemory)));
+    currThreadProfile.addTag(ProfileEntry('U', static_cast<double>(sample->ussMemory)));
   }
 
 #if defined(XP_WIN)
   if (mProfilePower) {
     mIntelPowerGadget->TakeSample();
-    currThreadProfile.addTag(ProfileEntry('p', static_cast<float>(mIntelPowerGadget->GetTotalPackagePowerInWatts())));
+    currThreadProfile.addTag(ProfileEntry('p', static_cast<double>(mIntelPowerGadget->GetTotalPackagePowerInWatts())));
   }
 #endif
 

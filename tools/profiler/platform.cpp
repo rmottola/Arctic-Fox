@@ -13,6 +13,7 @@
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/ThreadLocal.h"
+#include "mozilla/TimeStamp.h"
 #include "PseudoStack.h"
 #include "TableTicker.h"
 #include "nsIObserverService.h"
@@ -183,8 +184,8 @@ StackOwningThreadInfo::SetPendingDelete()
 }
 
 ProfilerMarker::ProfilerMarker(const char* aMarkerName,
-    ProfilerMarkerPayload* aPayload,
-    float aTime)
+                               ProfilerMarkerPayload* aPayload,
+                               double aTime)
   : mMarkerName(strdup(aMarkerName))
   , mPayload(aPayload)
   , mTime(aTime)
@@ -201,7 +202,7 @@ ProfilerMarker::SetGeneration(uint32_t aGenID) {
   mGenID = aGenID;
 }
 
-float
+double
 ProfilerMarker::GetTime() const {
   return mTime;
 }
@@ -465,6 +466,9 @@ void mozilla_sampler_init(void* stackTop)
     LOG("Failed to init.");
     return;
   }
+  bool ignore;
+  sStartTime = mozilla::TimeStamp::ProcessCreation(ignore);
+
   stack_key_initialized = true;
 
   Sampler::Startup();
@@ -560,7 +564,7 @@ void mozilla_sampler_save()
   t->HandleSaveRequest();
 }
 
-mozilla::UniquePtr<char[]> mozilla_sampler_get_profile(float aSinceTime)
+mozilla::UniquePtr<char[]> mozilla_sampler_get_profile(double aSinceTime)
 {
   TableTicker *t = tlsTicker.get();
   if (!t) {
@@ -570,7 +574,7 @@ mozilla::UniquePtr<char[]> mozilla_sampler_get_profile(float aSinceTime)
   return t->ToJSON(aSinceTime);
 }
 
-JSObject *mozilla_sampler_get_profile_data(JSContext *aCx, float aSinceTime)
+JSObject* mozilla_sampler_get_profile_data(JSContext* aCx, double aSinceTime)
 {
   TableTicker *t = tlsTicker.get();
   if (!t) {
@@ -580,7 +584,7 @@ JSObject *mozilla_sampler_get_profile_data(JSContext *aCx, float aSinceTime)
   return t->ToJSObject(aCx, aSinceTime);
 }
 
-void mozilla_sampler_get_profile_data_async(float aSinceTime,
+void mozilla_sampler_get_profile_data_async(double aSinceTime,
                                             mozilla::dom::Promise* aPromise)
 {
   TableTicker *t = tlsTicker.get();
@@ -978,9 +982,6 @@ void mozilla_sampler_sleep_end() {
 
 double mozilla_sampler_time(const mozilla::TimeStamp& aTime)
 {
-  if (!mozilla_sampler_is_active()) {
-    return 0.0;
-  }
   mozilla::TimeDuration delta = aTime - sStartTime;
   return delta.ToMilliseconds();
 }
@@ -1059,7 +1060,7 @@ void mozilla_sampler_add_marker(const char *aMarker, ProfilerMarkerPayload *aPay
   mozilla::TimeStamp origin = (aPayload && !aPayload->GetStartTime().IsNull()) ?
                      aPayload->GetStartTime() : mozilla::TimeStamp::Now();
   mozilla::TimeDuration delta = origin - sStartTime;
-  stack->addMarker(aMarker, payload.forget(), static_cast<float>(delta.ToMilliseconds()));
+  stack->addMarker(aMarker, payload.forget(), delta.ToMilliseconds());
 }
 
 // END externally visible functions
