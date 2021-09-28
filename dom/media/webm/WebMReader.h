@@ -10,6 +10,7 @@
 
 #include "FlushableTaskQueue.h"
 #include "MediaDecoderReader.h"
+#include "MediaResource.h"
 #include "PlatformDecoderModule.h"
 #include "nsAutoRef.h"
 #include "nestegg/nestegg.h"
@@ -217,6 +218,9 @@ private:
   // Booleans to indicate if we have audio and/or video data
   bool mHasVideo;
   bool mHasAudio;
+
+  MediaResourceIndex mResource;
+
 };
 
 } // namespace mozilla

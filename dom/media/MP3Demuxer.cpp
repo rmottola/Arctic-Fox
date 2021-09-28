@@ -230,10 +230,6 @@ MP3TrackDemuxer::FastSeek(const TimeUnit& aTime) {
     mOffset = std::min(StreamLength() - 1, mOffset);
   }
 
-  MP3DEMUXER_LOG("FastSeek mSamplesPerSecond=%d mSamplesPerFrame=%d "
-                 "numFrames=%" PRId64,
-                 mSamplesPerSecond, mSamplesPerFrame, numFrames);
-
   mParser.EndFrameSession();
 
   return Duration(mFrameIndex);
@@ -492,14 +488,6 @@ MP3TrackDemuxer::FindNextFrame() {
     return { 0, 0 };
   }
 
-  MP3DEMUXER_LOGV("FindNext() End mOffset=%" PRIu64 " mNumParsedFrames=%" PRIu64
-              " mFrameIndex=%" PRId64 " bufferEnd=%p frameBeg=%p"
-              " mTotalFrameLen=%" PRIu64 " mSamplesPerFrame=%d mSamplesPerSecond=%d "
-              "mChannels=%d",
-              mOffset, mNumParsedFrames, mFrameIndex, bufferEnd, frameBeg,
-              mTotalFrameLen, mSamplesPerFrame,
-              mSamplesPerSecond, mChannels);
-
   return { frameHeaderOffset, frameHeaderOffset + mParser.CurrentFrame().Length() };
 }
 
@@ -543,7 +531,6 @@ MP3TrackDemuxer::GetNextFrame(const MediaByteRange& aRange) {
                                      frame->Size());
 
   if (read != aRange.Length()) {
-    MP3DEMUXER_LOG("GetNext() Exit read=%u frame->mSize=%u", read, frame->mSize);
     return nullptr;
   }
 
