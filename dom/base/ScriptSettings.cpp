@@ -626,7 +626,10 @@ AutoEntryScript::DocshellEntryMonitor::Entry(JSContext* aCx, JSFunction* aFuncti
   if (rootedFunction) {
     JS::Rooted<JSString*> displayId(aCx, JS_GetFunctionDisplayId(rootedFunction));
     if (displayId) {
-      functionName.initTwoByte(aCx, displayId);
+      if (!functionName.initTwoByte(aCx, displayId)) {
+        JS_ClearPendingException(aCx);
+        return;
+      }
     }
   }
 
