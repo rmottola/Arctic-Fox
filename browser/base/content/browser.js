@@ -6080,31 +6080,21 @@ var IndexedDBPromptHelper = {
   _permissionsPrompt: "indexedDB-permissions-prompt",
   _permissionsResponse: "indexedDB-permissions-response",
 
-  _quotaPrompt: "indexedDB-quota-prompt",
-  _quotaResponse: "indexedDB-quota-response",
-  _quotaCancel: "indexedDB-quota-cancel",
-
   _notificationIcon: "indexedDB-notification-icon",
 
   init:
   function IndexedDBPromptHelper_init() {
     Services.obs.addObserver(this, this._permissionsPrompt, false);
-    Services.obs.addObserver(this, this._quotaPrompt, false);
-    Services.obs.addObserver(this, this._quotaCancel, false);
   },
 
   uninit:
   function IndexedDBPromptHelper_uninit() {
     Services.obs.removeObserver(this, this._permissionsPrompt);
-    Services.obs.removeObserver(this, this._quotaPrompt);
-    Services.obs.removeObserver(this, this._quotaCancel);
   },
 
   observe:
   function IndexedDBPromptHelper_observe(subject, topic, data) {
-    if (topic != this._permissionsPrompt &&
-        topic != this._quotaPrompt &&
-        topic != this._quotaCancel) {
+    if (topic != this._permissionsPrompt) {
       throw new Error("Unexpected topic!");
     }
 
@@ -6124,14 +6114,6 @@ var IndexedDBPromptHelper = {
       message = gNavigatorBundle.getFormattedString("offlineApps.available",
                                                     [ host ]);
       responseTopic = this._permissionsResponse;
-    }
-    else if (topic == this._quotaPrompt) {
-      message = gNavigatorBundle.getFormattedString("indexedDB.usage",
-                                                    [ host, data ]);
-      responseTopic = this._quotaResponse;
-    }
-    else if (topic == this._quotaCancel) {
-      responseTopic = this._quotaResponse;
     }
 
     const hiddenTimeoutDuration = 30000; // 30 seconds
@@ -6163,9 +6145,7 @@ var IndexedDBPromptHelper = {
       }
     ];
 
-    // This will be set to the result of PopupNotifications.show() below, or to
-    // the result of PopupNotifications.getNotification() if this is a
-    // quotaCancel notification.
+    // This will be set to the result of PopupNotifications.show().
     var notification;
 
     function timeoutNotification() {
@@ -6204,13 +6184,6 @@ var IndexedDBPromptHelper = {
         }
       }
     };
-
-    if (topic == this._quotaCancel) {
-      notification = PopupNotifications.getNotification(this._quotaPrompt,
-                                                        browser);
-      timeoutNotification();
-      return;
-    }
 
     notification = PopupNotifications.show(browser, topic, message,
                                            this._notificationIcon, mainAction,
