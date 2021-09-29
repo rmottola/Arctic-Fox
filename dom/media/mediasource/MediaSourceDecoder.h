@@ -58,7 +58,6 @@ public:
   void DetachMediaSource();
 
   void Ended(bool aEnded);
-  bool IsExpectingMoreData() override;
 
   // Return the duration of the video in seconds.
   virtual double GetDuration() override;

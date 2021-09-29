@@ -639,13 +639,6 @@ void MediaDecoder::QueueMetadata(const TimeUnit& aPublishTime,
   mDecoderStateMachine->QueueMetadata(aPublishTime, aInfo, aTags);
 }
 
-bool
-MediaDecoder::IsExpectingMoreData()
-{
-  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
-  return !mResource || mResource->IsExpectingMoreData();
-}
-
 void MediaDecoder::MetadataLoaded(nsAutoPtr<MediaInfo> aInfo,
                                   nsAutoPtr<MetadataTags> aTags,
                                   MediaDecoderEventVisibility aEventVisibility)
