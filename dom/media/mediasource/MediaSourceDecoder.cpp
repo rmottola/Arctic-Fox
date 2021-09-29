@@ -197,7 +197,7 @@ MediaSourceDecoder::Ended(bool aEnded)
 bool
 MediaSourceDecoder::IsExpectingMoreData()
 {
-  return !mEnded;
+  return GetResource()->IsExpectingMoreData();
 }
 
 void
