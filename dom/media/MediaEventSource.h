@@ -46,6 +46,15 @@ private:
   Atomic<bool> mRevoked;
 };
 
+enum class ListenerMode : int8_t {
+  // Allow at most one listener. Move will be used when possible
+  // to pass the event data to save copy.
+  Exclusive,
+  // This is the default. Event data will always be copied when passed
+  // to the listeners.
+  NonExclusive
+};
+
 namespace detail {
 
 /**
@@ -110,7 +119,7 @@ private:
 
 } // namespace detail
 
-template <typename T> class MediaEventSource;
+template <typename T, ListenerMode> class MediaEventSource;
 
 /**
  * Not thread-safe since this is not meant to be shared and therefore only
@@ -119,7 +128,7 @@ template <typename T> class MediaEventSource;
  * listener from an event source.
  */
 class MediaEventListener {
-  template <typename T>
+  template <typename T, ListenerMode>
   friend class MediaEventSource;
 
 public:
@@ -153,7 +162,7 @@ private:
 /**
  * A generic and thread-safe class to implement the observer pattern.
  */
-template <typename EventType>
+template <typename EventType, ListenerMode Mode = ListenerMode::NonExclusive>
 class MediaEventSource {
   static_assert(!IsReference<EventType>::value, "Ref-type not supported!");
   typedef typename detail::EventTypeTraits<EventType>::ArgType ArgType;
@@ -245,6 +254,7 @@ class MediaEventSource {
   MediaEventListener
   ConnectInternal(Target* aTarget, const Function& aFunction) {
     MutexAutoLock lock(mMutex);
+    MOZ_ASSERT(Mode == ListenerMode::NonExclusive || mListeners.IsEmpty());
     auto l = mListeners.AppendElement();
     l->reset(new ListenerImpl<Target, Function>(aTarget, aFunction));
     return MediaEventListener((*l)->Token());
@@ -345,8 +355,8 @@ private:
  * and event publisher. Mostly used as a member variable to publish events
  * to the listeners.
  */
-template <typename EventType>
-class MediaEventProducer : public MediaEventSource<EventType> {
+template <typename EventType, ListenerMode Mode = ListenerMode::NonExclusive>
+class MediaEventProducer : public MediaEventSource<EventType, Mode> {
 public:
   void Notify(const EventType& aEvent) {
     this->NotifyInternal(aEvent);
