@@ -46,7 +46,7 @@ function fetchWithXHR(uri, onLoadFunction) {
 function once(target, name, cb) {
   var p = new Promise(function(resolve, reject) {
     target.addEventListener(name, function() {
-      target.removeEventListener(name, cb);
+      target.removeEventListener(name, arguments.callee);
       resolve();
     });
   });
