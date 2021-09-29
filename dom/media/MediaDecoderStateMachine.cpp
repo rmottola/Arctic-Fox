@@ -1136,7 +1136,7 @@ static const char* const gMachineStateStr[] = {
   "NONE",
   "DECODING_METADATA",
   "WAIT_FOR_RESOURCES",
-  "WAIT_FOR_RESOURCES",
+  "WAIT_FOR_CDM",
   "DECODING_FIRSTFRAME",
   "DORMANT",
   "DECODING",
