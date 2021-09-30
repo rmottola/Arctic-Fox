@@ -217,7 +217,6 @@ MediaDecoderStateMachine::MediaDecoderStateMachine(MediaDecoder* aDecoder,
   mCorruptFrames(30),
   mDecodingFirstFrame(true),
   mDisabledHardwareAcceleration(false),
-  mDecodingFrozenAtStateDecoding(false),
   mSentLoadedMetadataEvent(false),
   mSentFirstFrameLoadedEvent(false),
   mSentPlaybackEndedEvent(false),
@@ -1245,7 +1244,6 @@ void MediaDecoderStateMachine::SetDormant(bool aDormant)
     nsCOMPtr<nsIRunnable> r = NS_NewRunnableMethod(mReader, &MediaDecoderReader::ReleaseMediaResources);
     DecodeTaskQueue()->Dispatch(r.forget());
   } else if ((aDormant != true) && (mState == DECODER_STATE_DORMANT)) {
-    mDecodingFrozenAtStateDecoding = true;
     ScheduleStateMachine();
     mDecodingFirstFrame = true;
     SetState(DECODER_STATE_DECODING_NONE);
@@ -1369,11 +1367,6 @@ void MediaDecoderStateMachine::PlayStateChanged()
     DispatchDecodeTasksIfNeeded();
   }
 
-  if (mDecodingFrozenAtStateDecoding) {
-    mDecodingFrozenAtStateDecoding = false;
-    DispatchDecodeTasksIfNeeded();
-  }
-
   // Some state transitions still happen synchronously on the main thread. So
   // if the main thread invokes Play() and then Seek(), the seek will initiate
   // synchronously on the main thread, and the asynchronous PlayInternal task
@@ -1428,8 +1421,6 @@ MediaDecoderStateMachine::Seek(SeekTarget aTarget)
 {
   MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-
-  mDecodingFrozenAtStateDecoding = false;
 
   if (IsShutdown()) {
     return MediaDecoder::SeekPromise::CreateAndReject(/* aIgnored = */ true, __func__);
@@ -1488,11 +1479,6 @@ MediaDecoderStateMachine::DispatchDecodeTasksIfNeeded()
     return;
   }
 
-  if (mState == DECODER_STATE_DECODING && mDecodingFrozenAtStateDecoding) {
-    DECODER_LOG("DispatchDecodeTasksIfNeeded return due to "
-                "mFreezeDecodingAtStateDecoding");
-    return;
-  }
   // NeedToDecodeAudio() can go from false to true while we hold the
   // monitor, but it can't go from true to false. This can happen because
   // NeedToDecodeAudio() takes into account the amount of decoded audio
