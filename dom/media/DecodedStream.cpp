@@ -424,6 +424,13 @@ DecodedStream::SetVolume(double aVolume)
 }
 
 void
+DecodedStream::SetSameOrigin(bool aSameOrigin)
+{
+  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
+  mSameOrigin = aSameOrigin;
+}
+
+void
 DecodedStream::InitTracks()
 {
   GetReentrantMonitor().AssertCurrentThreadIn();
@@ -671,14 +678,14 @@ DecodedStream::AdvanceTracks()
 }
 
 bool
-DecodedStream::SendData(bool aIsSameOrigin)
+DecodedStream::SendData()
 {
   ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
   MOZ_ASSERT(mStartTime.isSome(), "Must be called after StartPlayback()");
 
   InitTracks();
-  SendAudio(mVolume, aIsSameOrigin);
-  SendVideo(aIsSameOrigin);
+  SendAudio(mVolume, mSameOrigin);
+  SendVideo(mSameOrigin);
   AdvanceTracks();
 
   bool finished = (!mInfo.HasAudio() || mAudioQueue.IsFinished()) &&
