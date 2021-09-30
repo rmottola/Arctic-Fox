@@ -331,6 +331,9 @@ DecodedStream::RecreateData(MediaStreamGraph* aGraph)
   MOZ_ASSERT((aGraph && !mData && OutputStreams().IsEmpty()) || // first time
              (!aGraph && mData)); // 2nd time and later
 
+  if (!aGraph) {
+    aGraph = mData->mStream->Graph();
+  }
   auto source = aGraph->CreateSourceStream(nullptr);
   DestroyData();
   mData.reset(new DecodedStreamData(source, mPlaying));
@@ -371,7 +374,7 @@ DecodedStream::GetReentrantMonitor() const
 void
 DecodedStream::Connect(OutputStreamData* aStream)
 {
-	MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(NS_IsMainThread());
   GetReentrantMonitor().AssertCurrentThreadIn();
   NS_ASSERTION(!aStream->mPort, "Already connected?");
 
