@@ -39,6 +39,7 @@
 #include "nsPrintfCString.h"
 #include "DOMMediaStream.h"
 #include "DecodedStream.h"
+#include "mozilla/Logging.h"
 
 #include <algorithm>
 
@@ -2480,6 +2481,7 @@ void MediaDecoderStateMachine::CheckTurningOffHardwareDecoder(VideoData* aData)
           NS_NewRunnableMethod(mReader, &MediaDecoderReader::DisableHardwareAcceleration);
         DecodeTaskQueue()->Dispatch(task.forget());
       mDisabledHardwareAcceleration = true;
+      gfxCriticalNote << "Too many dropped/corrupted frames, disabling DXVA";
     }
   } else {
     mCorruptFrames.insert(0);
