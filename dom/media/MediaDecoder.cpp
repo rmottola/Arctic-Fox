@@ -994,7 +994,6 @@ void MediaDecoder::ChangeState(PlayState aState)
   }
 
   if (mPlayState == PLAY_STATE_SHUTDOWN) {
-    GetReentrantMonitor().NotifyAll();
     return;
   }
 
@@ -1011,8 +1010,6 @@ void MediaDecoder::ChangeState(PlayState aState)
   CancelDormantTimer();
   // Start dormant timer if necessary
   StartDormantTimer();
-
-  GetReentrantMonitor().NotifyAll();
 }
 
 void MediaDecoder::UpdateLogicalPosition(MediaDecoderEventVisibility aEventVisibility)
