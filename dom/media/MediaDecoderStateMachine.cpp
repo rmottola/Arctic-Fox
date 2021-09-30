@@ -371,7 +371,7 @@ void MediaDecoderStateMachine::SendStreamData()
   AssertCurrentThreadInMonitor();
   MOZ_ASSERT(!mAudioSink, "Should've been stopped in RunStateMachine()");
 
-  bool finished = mDecodedStream->SendData();
+  mDecodedStream->SendData();
 
   const auto clockTime = GetClock();
   while (true) {
@@ -386,12 +386,6 @@ void MediaDecoderStateMachine::SendStreamData()
       continue;
     }
     break;
-  }
-
-  // To be consistent with AudioSink, |mAudioCompleted| is not set
-  // until all samples are drained.
-  if (finished && AudioQueue().GetSize() == 0) {
-    mAudioCompleted = true;
   }
 }
 
@@ -1074,12 +1068,7 @@ void MediaDecoderStateMachine::MaybeStartPlayback()
   MOZ_ASSERT(IsPlaying());
 
   StartAudioThread();
-
-  // Tell DecodedStream to start playback with specified start time and media
-  // info. This is consistent with how we create AudioSink in StartAudioThread().
-  if (mAudioCaptured) {
-    mDecodedStream->StartPlayback(GetMediaTime(), mInfo);
-  }
+  StartDecodedStream();
 
   DispatchDecodeTasksIfNeeded();
 }
@@ -1782,6 +1771,32 @@ MediaDecoderStateMachine::StartAudioThread()
   }
 }
 
+void
+MediaDecoderStateMachine::StopDecodedStream()
+{
+  MOZ_ASSERT(OnTaskQueue());
+  AssertCurrentThreadInMonitor();
+  mDecodedStream->StopPlayback();
+  mDecodedStreamPromise.DisconnectIfExists();
+}
+
+void
+MediaDecoderStateMachine::StartDecodedStream()
+{
+  MOZ_ASSERT(OnTaskQueue());
+  AssertCurrentThreadInMonitor();
+
+  // Tell DecodedStream to start playback with specified start time and media
+  // info. This is consistent with how we create AudioSink in StartAudioThread().
+  if (mAudioCaptured && !mDecodedStreamPromise.Exists()) {
+    mDecodedStreamPromise.Begin(
+      mDecodedStream->StartPlayback(GetMediaTime(), mInfo)->Then(
+        OwnerThread(), __func__, this,
+        &MediaDecoderStateMachine::OnDecodedStreamFinish,
+        &MediaDecoderStateMachine::OnDecodedStreamError));
+  }
+}
+
 int64_t MediaDecoderStateMachine::AudioDecodedUsecs()
 {
   MOZ_ASSERT(OnTaskQueue());
@@ -2385,7 +2400,7 @@ nsresult MediaDecoderStateMachine::RunStateMachine()
         // Stop audio sink after call to AudioEndTime() above, otherwise it will
         // return an incorrect value due to a null mAudioSink.
         StopAudioThread();
-        mDecodedStream->StopPlayback();
+        StopDecodedStream();
       }
 
       return NS_OK;
@@ -2415,7 +2430,7 @@ MediaDecoderStateMachine::Reset()
   // outside of the decoder monitor while we are clearing the queue and causes
   // crash for no samples to be popped.
   StopAudioThread();
-  mDecodedStream->StopPlayback();
+  StopDecodedStream();
 
   mVideoFrameEndTime = -1;
   mDecodedVideoEndTime = -1;
@@ -3069,9 +3084,35 @@ void MediaDecoderStateMachine::OnAudioSinkError()
   DecodeError();
 }
 
+void
+MediaDecoderStateMachine::OnDecodedStreamFinish()
+{
+  MOZ_ASSERT(OnTaskQueue());
+  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
+  MOZ_ASSERT(mAudioCaptured, "Audio should be captured.");
+
+  mDecodedStreamPromise.Complete();
+  if (mInfo.HasAudio()) {
+    mAudioCompleted = true;
+  }
+  // To notify PlaybackEnded as soon as possible.
+  ScheduleStateMachine();
+}
+
+void
+MediaDecoderStateMachine::OnDecodedStreamError()
+{
+  MOZ_ASSERT(OnTaskQueue());
+  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
+  MOZ_ASSERT(mAudioCaptured, "Audio should be captured.");
+
+  mDecodedStreamPromise.Complete();
+  DecodeError();
+}
 
 uint32_t MediaDecoderStateMachine::GetAmpleVideoFrames() const
 {
+  MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
   return (mReader->IsAsync() && mReader->VideoIsHardwareAccelerated())
     ? std::max<uint32_t>(sVideoQueueHWAccelSize, MIN_VIDEO_QUEUE_SIZE)
@@ -3092,7 +3133,7 @@ void MediaDecoderStateMachine::DispatchAudioCaptured()
       // Start DecodedStream if we are already playing. Otherwise it will be
       // handled in MaybeStartPlayback().
       if (self->IsPlaying()) {
-        self->mDecodedStream->StartPlayback(self->GetMediaTime(), self->mInfo);
+        self->StartDecodedStream();
       }
       self->ScheduleStateMachine();
     }
@@ -3108,7 +3149,8 @@ void MediaDecoderStateMachine::DispatchAudioUncaptured()
     MOZ_ASSERT(self->OnTaskQueue());
     ReentrantMonitorAutoEnter mon(self->mDecoder->GetReentrantMonitor());
     if (self->mAudioCaptured) {
-      // Start again the audio sink
+      self->StopDecodedStream();
+      // Start again the audio sink.
       self->mAudioCaptured = false;
       if (self->IsPlaying()) {
         self->StartAudioThread();
