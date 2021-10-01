@@ -15,6 +15,7 @@
 #include "MediaDecoderStateMachine.h"
 #include "MediaTimer.h"
 #include "mediasink/DecodedAudioDataSink.h"
+#include "mediasink/AudioSinkWrapper.h"
 #include "nsTArray.h"
 #include "MediaDecoder.h"
 #include "MediaDecoderReader.h"
@@ -284,6 +285,15 @@ MediaDecoderStateMachine::MediaDecoderStateMachine(MediaDecoder* aDecoder,
     mTaskQueue, this, &MediaDecoderStateMachine::OnAudioPopped);
   mVideoQueueListener = VideoQueue().PopEvent().Connect(
     mTaskQueue, this, &MediaDecoderStateMachine::OnVideoPopped);
+
+  nsRefPtr<MediaDecoderStateMachine> self = this;
+  auto audioSinkCreator = [self] () {
+    MOZ_ASSERT(self->OnTaskQueue());
+    return new DecodedAudioDataSink(
+      self->mAudioQueue, self->GetMediaTime(),
+      self->mInfo.mAudio, self->mDecoder->GetAudioChannel());
+  };
+  mAudioSink = new AudioSinkWrapper(mTaskQueue, audioSinkCreator);
 }
 
 MediaDecoderStateMachine::~MediaDecoderStateMachine()
@@ -359,7 +369,7 @@ int64_t MediaDecoderStateMachine::GetDecodedAudioDuration()
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
   int64_t audioDecoded = AudioQueue().Duration();
-  if (AudioEndTime() != -1) {
+  if (mAudioSink->IsStarted()) {
     audioDecoded += AudioEndTime() - GetMediaTime();
   }
   return audioDecoded;
@@ -369,7 +379,7 @@ void MediaDecoderStateMachine::DiscardStreamData()
 {
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
-  MOZ_ASSERT(!mAudioSink, "Should've been stopped in RunStateMachine()");
+  MOZ_ASSERT(!mAudioSink->IsStarted(), "Should've been stopped in RunStateMachine()");
 
   const auto clockTime = GetClock();
   while (true) {
@@ -1134,9 +1144,7 @@ void MediaDecoderStateMachine::VolumeChanged()
 {
   MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-  if (mAudioSink) {
-    mAudioSink->SetVolume(mVolume);
-  }
+  mAudioSink->SetVolume(mVolume);
   mDecodedStream->SetVolume(mVolume);
 }
 
@@ -1253,6 +1261,8 @@ void MediaDecoderStateMachine::Shutdown()
   }
 
   Reset();
+
+  mAudioSink->Shutdown();
 
   // Shut down our start time rendezvous.
   if (mStartTimeRendezvous) {
@@ -1448,12 +1458,11 @@ void MediaDecoderStateMachine::StopAudioSink()
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
 
-  if (mAudioSink) {
-    DECODER_LOG("Shutdown audio thread");
-    mAudioSink->Shutdown();
-    mAudioSink = nullptr;
+  if (mAudioSink->IsStarted()) {
+    DECODER_LOG("Stop AudioSink");
+    mAudioSink->Stop();
+    mAudioSinkPromise.DisconnectIfExists();
   }
-  mAudioSinkPromise.DisconnectIfExists();
 }
 
 void
@@ -1737,25 +1746,19 @@ MediaDecoderStateMachine::StartAudioSink()
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
   if (mAudioCaptured) {
-    MOZ_ASSERT(!mAudioSink);
+    MOZ_ASSERT(!mAudioSink->IsStarted());
     return;
   }
 
-  if (HasAudio() && !mAudioSink) {
+  if (HasAudio() && !mAudioSink->IsStarted()) {
     mAudioCompleted = false;
-    mAudioSink = new DecodedAudioDataSink(mAudioQueue,
-                                          GetMediaTime(), mInfo.mAudio,
-                                          mDecoder->GetAudioChannel());
+    mAudioSink->Start(GetMediaTime(), mInfo);
 
     mAudioSinkPromise.Begin(
-      mAudioSink->Init()->Then(
+      mAudioSink->OnEnded(TrackInfo::kAudioTrack)->Then(
         OwnerThread(), __func__, this,
         &MediaDecoderStateMachine::OnAudioSinkComplete,
         &MediaDecoderStateMachine::OnAudioSinkError));
-
-    mAudioSink->SetVolume(mVolume);
-    mAudioSink->SetPlaybackRate(mPlaybackRate);
-    mAudioSink->SetPreservesPitch(mPreservesPitch);
   }
 }
 
@@ -1793,7 +1796,7 @@ int64_t MediaDecoderStateMachine::AudioDecodedUsecs()
   // The amount of audio we have decoded is the amount of audio data we've
   // already decoded and pushed to the hardware, plus the amount of audio
   // data waiting to be pushed to the hardware.
-  int64_t pushed = (AudioEndTime() != -1) ? (AudioEndTime() - GetMediaTime()) : 0;
+  int64_t pushed = mAudioSink->IsStarted() ? (AudioEndTime() - GetMediaTime()) : 0;
 
   // Currently for real time streams, AudioQueue().Duration() produce
   // wrong values (Bug 1114434), so we use frame counts to calculate duration.
@@ -1822,7 +1825,7 @@ bool MediaDecoderStateMachine::OutOfDecodedAudio()
     MOZ_ASSERT(OnTaskQueue());
     return IsAudioDecoding() && !AudioQueue().IsFinished() &&
            AudioQueue().GetSize() == 0 &&
-           (!mAudioSink || !mAudioSink->HasUnplayedFrames());
+           !mAudioSink->HasUnplayedFrames(TrackInfo::kAudioTrack);
 }
 
 bool MediaDecoderStateMachine::HasLowUndecodedData()
@@ -2385,8 +2388,7 @@ nsresult MediaDecoderStateMachine::RunStateMachine()
 
         mSentPlaybackEndedEvent = true;
 
-        // Stop audio sink after call to AudioEndTime() above, otherwise it will
-        // return an incorrect value due to a null mAudioSink.
+        // MediaSink::GetEndTime() must be called before stopping playback.
         StopAudioSink();
         StopDecodedStream();
       }
@@ -2549,8 +2551,8 @@ MediaDecoderStateMachine::GetAudioClock() const
   AssertCurrentThreadInMonitor();
   MOZ_ASSERT(HasAudio() && !mAudioCompleted && IsPlaying());
   // Since this function is called while we are playing and AudioSink is
-  // created once playback starts, mAudioSink is guaranteed to be non-null.
-  MOZ_ASSERT(mAudioSink);
+  // started once playback starts, IsStarted() is guaranteed to be true.
+  MOZ_ASSERT(mAudioSink->IsStarted());
   return mAudioSink->GetPosition();
 }
 
@@ -2893,9 +2895,7 @@ void MediaDecoderStateMachine::SetPlayStartTime(const TimeStamp& aTimeStamp)
   AssertCurrentThreadInMonitor();
   mPlayStartTime = aTimeStamp;
 
-  if (mAudioSink) {
-    mAudioSink->SetPlaying(!mPlayStartTime.IsNull());
-  }
+  mAudioSink->SetPlaying(!mPlayStartTime.IsNull());
   // Have DecodedStream remember the playing state so it doesn't need to
   // ask MDSM about IsPlaying(). Note we have to do this even before capture
   // happens since capture could happen in the middle of playback.
@@ -2988,9 +2988,7 @@ MediaDecoderStateMachine::LogicalPlaybackRateChanged()
   }
 
   mPlaybackRate = mLogicalPlaybackRate;
-  if (mAudioSink) {
-    mAudioSink->SetPlaybackRate(mPlaybackRate);
-  }
+  mAudioSink->SetPlaybackRate(mPlaybackRate);
 
   ScheduleStateMachine();
 }
@@ -2999,10 +2997,7 @@ void MediaDecoderStateMachine::PreservesPitchChanged()
 {
   MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-
-  if (mAudioSink) {
-    mAudioSink->SetPreservesPitch(mPreservesPitch);
-  }
+  mAudioSink->SetPreservesPitch(mPreservesPitch);
 }
 
 bool MediaDecoderStateMachine::IsShutdown()
@@ -3029,15 +3024,12 @@ MediaDecoderStateMachine::AudioEndTime() const
 {
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
-  if (mAudioSink) {
-    return mAudioSink->GetEndTime();
+  if (mAudioSink->IsStarted()) {
+    return mAudioSink->GetEndTime(TrackInfo::kAudioTrack);
   } else if (mAudioCaptured) {
     return mDecodedStream->AudioEndTime();
   }
-  // Don't call this after mAudioSink becomes null since we can't distinguish
-  // "before StartAudioSink" and "after StopAudioSink" where mAudioSink
-  // is null in both cases.
-  MOZ_ASSERT(!mAudioCompleted);
+  MOZ_ASSERT(!HasAudio());
   return -1;
 }
 
