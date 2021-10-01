@@ -365,13 +365,11 @@ int64_t MediaDecoderStateMachine::GetDecodedAudioDuration()
   return audioDecoded;
 }
 
-void MediaDecoderStateMachine::SendStreamData()
+void MediaDecoderStateMachine::DiscardStreamData()
 {
   MOZ_ASSERT(OnTaskQueue());
   AssertCurrentThreadInMonitor();
   MOZ_ASSERT(!mAudioSink, "Should've been stopped in RunStateMachine()");
-
-  mDecodedStream->SendData();
 
   const auto clockTime = GetClock();
   while (true) {
@@ -563,10 +561,6 @@ MediaDecoderStateMachine::OnAudioDecoded(AudioData* aAudioSample)
       }
       if (mIsAudioPrerolling && DonePrerollingAudio()) {
         StopPrerollingAudio();
-      }
-      // Schedule the state machine to send stream data as soon as possible.
-      if (mAudioCaptured) {
-        ScheduleStateMachine();
       }
       return;
     }
@@ -763,10 +757,6 @@ MediaDecoderStateMachine::OnNotDecoded(MediaData::Type aType,
         return;
       }
       CheckIfDecodeComplete();
-      // Schedule the state machine to notify track ended as soon as possible.
-      if (mAudioCaptured) {
-        ScheduleStateMachine();
-      }
       return;
     }
     case DECODER_STATE_SEEKING: {
@@ -853,7 +843,7 @@ MediaDecoderStateMachine::OnVideoDecoded(VideoData* aVideoSample)
       // frame pushed in the queue, schedule the state machine as soon as
       // possible to render the video frame or delay the state machine thread
       // accurately.
-      if (mAudioCaptured || VideoQueue().GetSize() == 1) {
+      if (VideoQueue().GetSize() == 1) {
         ScheduleStateMachine();
       }
 
@@ -2629,7 +2619,7 @@ void MediaDecoderStateMachine::UpdateRenderedVideoFrames()
   }
 
   if (mAudioCaptured) {
-    SendStreamData();
+    DiscardStreamData();
   }
 
   TimeStamp nowTime;
