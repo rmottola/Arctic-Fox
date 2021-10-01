@@ -3166,7 +3166,7 @@ void MediaDecoderStateMachine::AddOutputStream(ProcessedMediaStream* aStream,
 {
   MOZ_ASSERT(NS_IsMainThread());
   DECODER_LOG("AddOutputStream aStream=%p!", aStream);
-  mDecodedStream->Connect(aStream, aFinishWhenEnded);
+  mDecodedStream->AddOutput(aStream, aFinishWhenEnded);
   DispatchAudioCaptured();
 }
 
@@ -3174,7 +3174,7 @@ void MediaDecoderStateMachine::RemoveOutputStream(MediaStream* aStream)
 {
   MOZ_ASSERT(NS_IsMainThread());
   DECODER_LOG("RemoveOutputStream=%p!", aStream);
-  mDecodedStream->Remove(aStream);
+  mDecodedStream->RemoveOutput(aStream);
   if (!mDecodedStream->HasConsumers()) {
     DispatchAudioUncaptured();
   }
