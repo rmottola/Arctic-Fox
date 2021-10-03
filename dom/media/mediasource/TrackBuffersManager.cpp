@@ -762,12 +762,7 @@ void
 TrackBuffersManager::OnDemuxerResetDone(nsresult)
 {
   MOZ_ASSERT(OnTaskQueue());
-  MSE_DEBUG("mAbort:%d", static_cast<bool>(mAbort));
   mDemuxerInitRequest.Complete();
-  if (mAbort) {
-    RejectAppend(NS_ERROR_ABORT, __func__);
-    return;
-  }
 
   // Recreate track demuxers.
   uint32_t numVideos = mInputDemuxer->GetNumberTracks(TrackInfo::kVideoTrack);
