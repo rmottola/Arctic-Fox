@@ -36,6 +36,9 @@ extern PRLogModuleInfo* GetMediaSourceLog();
 namespace mozilla {
 
 using dom::SourceBufferAppendMode;
+using media::TimeUnit;
+using media::TimeInterval;
+using media::TimeIntervals;
 
 static const char*
 AppendStateToStr(TrackBuffersManager::AppendState aState)
@@ -210,7 +213,7 @@ TrackBuffersManager::EvictBefore(TimeUnit aTime)
   GetTaskQueue()->Dispatch(task.forget());
 }
 
-media::TimeIntervals
+TimeIntervals
 TrackBuffersManager::Buffered()
 {
   MSE_DEBUG("");
