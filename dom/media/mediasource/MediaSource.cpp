@@ -329,7 +329,7 @@ MediaSource::IsTypeSupported(const GlobalObject&, const nsAString& aType)
 /* static */ bool
 MediaSource::Enabled(JSContext* cx, JSObject* aGlobal)
 {
-return Preferences::GetBool("media.mediasource.enabled");
+  return Preferences::GetBool("media.mediasource.enabled");
 }
 
 void
