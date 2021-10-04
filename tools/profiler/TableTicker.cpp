@@ -368,7 +368,7 @@ void TableTicker::ProfileGathered()
 }
 
 struct SubprocessClosure {
-  explicit SubprocessClosure(SpliceableJSONWriter *aWriter)
+  explicit SubprocessClosure(SpliceableJSONWriter* aWriter)
     : mWriter(aWriter)
   {}
 
