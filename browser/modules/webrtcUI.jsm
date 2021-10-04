@@ -710,14 +710,14 @@ function updateBrowserSpecificIndicator(aBrowser, aState) {
   let windowId = aState.windowId;
   let notification; // Used by action callbacks.
   let mainAction = {
-    label: "Continue Sharing", //stringBundle.getString("getUserMedia.continueSharing.label"),
-    accessKey: "C", //stringBundle.getString("getUserMedia.continueSharing.accesskey"),
+    label: stringBundle.getString("getUserMedia.continueSharing.label"),
+    accessKey: stringBundle.getString("getUserMedia.continueSharing.accesskey"),
     callback: function () {},
     dismiss: true
   };
   let secondaryActions = [{
-    label: "Stop Sharing", //stringBundle.getString("getUserMedia.stopSharing.label"),
-    accessKey: "S", //stringBundle.getString("getUserMedia.stopSharing.accesskey"),
+    label: stringBundle.getString("getUserMedia.stopSharing.label"),
+    accessKey: stringBundle.getString("getUserMedia.stopSharing.accesskey"),
     callback: function () {
       let uri = Services.io.newURI(aState.documentURI, null, null);
       let host = getHost(uri);
