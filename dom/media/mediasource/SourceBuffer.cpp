@@ -427,7 +427,6 @@ SourceBuffer::AppendDataCompletedWithSuccess(bool aHasActiveTracks)
     if (!mActive) {
       mActive = true;
       mMediaSource->SourceBufferIsActive(this);
-      mMediaSource->GetDecoder()->NotifyWaitingForResourcesStatusChanged();
     }
   }
   if (mActive) {
