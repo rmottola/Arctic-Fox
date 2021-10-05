@@ -214,10 +214,9 @@ var gPermissionManager = {
         this._tree.treeBoxObject.rowCountChanged(this._view.rowCount - 1, 1);        
         // Re-do the sort, since we inserted this new item at the end. 
         gTreeUtils.sort(this._tree, this._view, this._permissions,
-                        this._lastPermissionSortColumn,
                         this._permissionsComparator,
                         this._lastPermissionSortColumn, 
-                        !this._lastPermissionSortAscending); // keep sort direction        
+                        this._lastPermissionSortAscending);        
       }
       else if (aData == "changed") {
         for (var i = 0; i < this._permissions.length; ++i) {
@@ -229,12 +228,11 @@ var gPermissionManager = {
         // Re-do the sort, if the status changed from Block to Allow
         // or vice versa, since if we're sorted on status, we may no
         // longer be in order. 
-        if (this._lastPermissionSortColumn == "statusCol") {
+        if (this._lastPermissionSortColumn.id == "statusCol") {
           gTreeUtils.sort(this._tree, this._view, this._permissions,
-                          this._lastPermissionSortColumn,
                           this._permissionsComparator,
                           this._lastPermissionSortColumn, 
-                          !this._lastPermissionSortAscending); // keep sort direction
+                          this._lastPermissionSortAscending);
         }
         this._tree.treeBoxObject.invalidate();
       }
