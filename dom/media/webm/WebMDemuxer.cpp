@@ -181,18 +181,6 @@ WebMDemuxer::InitBufferedState()
   mBufferedState = new WebMBufferedState;
 }
 
-already_AddRefed<MediaDataDemuxer>
-WebMDemuxer::Clone() const
-{
-  nsRefPtr<WebMDemuxer> demuxer = new WebMDemuxer(mResource.GetResource());
-  demuxer->InitBufferedState();
-  if (NS_FAILED(demuxer->ReadMetadata())) {
-    NS_WARNING("Couldn't recreate WebMDemuxer");
-    return nullptr;
-  }
-  return demuxer.forget();
-}
-
 bool
 WebMDemuxer::HasTrackType(TrackInfo::TrackType aType) const
 {
