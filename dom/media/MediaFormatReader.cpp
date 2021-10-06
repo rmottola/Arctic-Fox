@@ -1491,7 +1491,7 @@ MediaFormatReader::NotifyDemuxer(uint32_t aLength, int64_t aOffset)
   }
 
   if (aLength || aOffset) {
-    mDemuxer->NotifyDataArrived(aLength, aOffset);
+    mDemuxer->NotifyDataArrived();
   } else {
     mDemuxer->NotifyDataRemoved();
   }

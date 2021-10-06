@@ -447,9 +447,9 @@ WebMDemuxer::EnsureUpToDateIndex()
 }
 
 void
-WebMDemuxer::NotifyDataArrived(uint32_t aLength, int64_t aOffset)
+WebMDemuxer::NotifyDataArrived()
 {
-  WEBM_DEBUG("length: %ld offset: %ld", aLength, aOffset);
+  WEBM_DEBUG("");
   mNeedReIndex = true;
 }
 
