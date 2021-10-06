@@ -1100,6 +1100,7 @@ void MediaDecoder::UpdateEstimatedMediaDuration(int64_t aDuration)
 }
 
 void MediaDecoder::SetMediaSeekable(bool aMediaSeekable) {
+  MOZ_ASSERT(NS_IsMainThread());
   ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
   mMediaSeekable = aMediaSeekable;
 }
