@@ -478,7 +478,7 @@ DecodedStream::CreateData(MozPromiseHolder<GenericPromise>&& aPromise)
       return NS_OK;
     }
   private:
-    nsRefPtr<DecodedStream> mThis;
+    RefPtr<DecodedStream> mThis;
     Method mMethod;
     UniquePtr<DecodedStreamData> mData;
   };
