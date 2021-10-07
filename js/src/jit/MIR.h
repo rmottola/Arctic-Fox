@@ -1844,6 +1844,7 @@ class MSimdGeneralShuffle :
 
         setResultType(type);
         specialization_ = type;
+        setGuard(); // throws if lane index is out of bounds
         setMovable();
     }
 
