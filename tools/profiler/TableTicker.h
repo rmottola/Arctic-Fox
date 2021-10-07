@@ -8,6 +8,7 @@
 
 #include "platform.h"
 #include "mozilla/Mutex.h"
+#include "mozilla/Vector.h"
 #include "IntelPowerGadget.h"
 #ifdef MOZ_TASK_TRACER
 #include "GeckoTaskTracer.h"
@@ -17,15 +18,16 @@ namespace mozilla {
 class ProfileGatherer;
 } // namespace mozilla
 
+typedef mozilla::Vector<std::string> ThreadNameFilterList;
+
 static bool
-threadSelected(ThreadInfo* aInfo, char** aThreadNameFilters, uint32_t aFeatureCount) {
-  if (aFeatureCount == 0) {
+threadSelected(ThreadInfo* aInfo, const ThreadNameFilterList &aThreadNameFilters) {
+  if (aThreadNameFilters.empty()) {
     return true;
   }
 
-  for (uint32_t i = 0; i < aFeatureCount; ++i) {
-    const char* filterPrefix = aThreadNameFilters[i];
-    if (strncmp(aInfo->Name(), filterPrefix, strlen(filterPrefix)) == 0) {
+  for (uint32_t i = 0; i < aThreadNameFilters.length(); ++i) {
+    if (aThreadNameFilters[i] == aInfo->Name()) {
       return true;
     }
   }
@@ -49,7 +51,7 @@ class TableTicker: public Sampler {
       return;
     }
 
-    if (!threadSelected(aInfo, mThreadNameFilters, mFilterCount)) {
+    if (!threadSelected(aInfo, mThreadNameFilters)) {
       return;
     }
 
@@ -144,8 +146,7 @@ protected:
 
   // Keep the thread filter to check against new thread that
   // are started while profiling
-  char** mThreadNameFilters;
-  uint32_t mFilterCount;
+  ThreadNameFilterList mThreadNameFilters;
   bool mPrivacyMode;
   bool mAddMainThreadIO;
   bool mProfileMemory;
