@@ -2014,8 +2014,9 @@ CASE(EnableInterruptsPseudoOpcode)
     }
 
     if (script->hasScriptCounts()) {
-        PCCounts counts = script->getPCCounts(REGS.pc);
-        counts.numExec()++;
+        PCCounts* counts = script->getPCCounts(REGS.pc);
+        if (counts)
+            counts->numExec()++;
         moreInterrupts = true;
     }
 
