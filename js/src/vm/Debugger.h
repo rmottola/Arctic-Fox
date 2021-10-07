@@ -274,7 +274,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
         return enabled;
     }
 
-    void logTenurePromotion(JSObject& obj, double when);
+    void logTenurePromotion(JSRuntime* rt, JSObject& obj, double when);
     static JSObject* getObjectAllocationSite(JSObject& obj);
 
   private:
@@ -291,15 +291,12 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
 
     struct TenurePromotionsEntry : public mozilla::LinkedListElement<TenurePromotionsEntry>
     {
-        TenurePromotionsEntry(JSObject& obj, double when)
-            : className(obj.getClass()->name),
-              when(when),
-              frame(getObjectAllocationSite(obj))
-        { }
+        TenurePromotionsEntry(JSRuntime* rt, JSObject& obj, double when);
 
         const char* className;
         double when;
         RelocatablePtrObject frame;
+        size_t size;
     };
 
     using TenurePromotionsLog = mozilla::LinkedList<TenurePromotionsEntry>;
