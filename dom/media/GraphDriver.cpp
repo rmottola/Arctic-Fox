@@ -303,7 +303,6 @@ ThreadedDriver::RunThread()
     mGraphImpl->mFlushSourcesOnNextIteration = false;
     stillProcessing = mGraphImpl->OneIteration(mIterationStart,
                                                mIterationEnd,
-                                               stateComputedTime,
                                                nextStateComputedTime);
 
     if (mNextDriver && stillProcessing) {
@@ -849,7 +848,6 @@ AudioCallbackDriver::DataCallback(AudioDataValue* aBuffer, long aFrames)
 
     stillProcessing = mGraphImpl->OneIteration(mIterationStart,
                                                mIterationEnd,
-                                               stateComputedTime,
                                                nextStateComputedTime);
   } else {
     NS_WARNING("DataCallback buffer filled entirely from scratch buffer, skipping iteration.");
