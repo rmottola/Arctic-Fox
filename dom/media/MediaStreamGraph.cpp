@@ -877,7 +877,10 @@ MediaStreamGraphImpl::RecomputeBlockingAt(const nsTArray<MediaStream*>& aStreams
   for (uint32_t i = 0; i < aStreams.Length(); ++i) {
     MediaStream* stream = aStreams[i];
     stream->mBlockInThisPhase = false;
+  }
 
+  for (uint32_t i = 0; i < aStreams.Length(); ++i) {
+    MediaStream* stream = aStreams[i];
     AfterLoop al(stream, aTime);
 
     if (stream->mFinished) {
