@@ -2835,6 +2835,10 @@ public:
     if (mElement) {
       nsRefPtr<HTMLMediaElement> deathGrip = mElement;
       mElement->PlaybackEnded();
+      // Update NextFrameStatus() to move to NEXT_FRAME_UNAVAILABLE and
+      // HAVE_CURRENT_DATA.
+      mElement = nullptr;
+      NotifyWatchers();
     }
   }
 
