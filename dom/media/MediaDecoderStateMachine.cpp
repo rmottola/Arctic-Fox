@@ -1752,15 +1752,17 @@ MediaDecoderStateMachine::StartAudioSink()
     return;
   }
 
-  if (HasAudio() && !mAudioSink->IsStarted()) {
+  if (!mAudioSink->IsStarted()) {
     mAudioCompleted = false;
     mAudioSink->Start(GetMediaTime(), mInfo);
 
-    mAudioSinkPromise.Begin(
-      mAudioSink->OnEnded(TrackInfo::kAudioTrack)->Then(
+    auto promise = mAudioSink->OnEnded(TrackInfo::kAudioTrack);
+    if (promise) {
+      mAudioSinkPromise.Begin(promise->Then(
         OwnerThread(), __func__, this,
         &MediaDecoderStateMachine::OnAudioSinkComplete,
         &MediaDecoderStateMachine::OnAudioSinkError));
+    }
   }
 }
 
@@ -2598,12 +2600,8 @@ int64_t MediaDecoderStateMachine::GetClock(TimeStamp* aTimeStamp) const
   } else {
     if (mAudioCaptured) {
       clock_time = GetStreamClock();
-    } else if (HasAudio() && !mAudioCompleted) {
-      clock_time = GetAudioClock();
     } else {
-      t = TimeStamp::Now();
-      // Audio is disabled on this system. Sync to the system clock.
-      clock_time = GetVideoStreamPosition(t);
+      clock_time = mAudioSink->GetPosition(&t);
     }
     NS_ASSERTION(GetMediaTime() <= clock_time, "Clock should go forwards.");
   }
@@ -2979,17 +2977,6 @@ MediaDecoderStateMachine::LogicalPlaybackRateChanged()
     return;
   }
 
-  // AudioStream will handle playback rate change when we have audio.
-  // Do nothing while we are not playing. Change in playback rate will
-  // take effect next time we start playing again.
-  if (!HasAudio() && IsPlaying()) {
-    // Remember how much time we've spent in playing the media
-    // for playback rate will change from now on.
-    TimeStamp now = TimeStamp::Now();
-    mPlayDuration = GetVideoStreamPosition(now);
-    SetPlayStartTime(now);
-  }
-
   mPlaybackRate = mLogicalPlaybackRate;
   mAudioSink->SetPlaybackRate(mPlaybackRate);
 
@@ -3030,7 +3017,6 @@ void MediaDecoderStateMachine::OnAudioSinkComplete()
   MOZ_ASSERT(!mAudioCaptured, "Should be disconnected when capturing audio.");
 
   mAudioSinkPromise.Complete();
-  ResyncAudioClock();
   mAudioCompleted = true;
 }
 
@@ -3041,7 +3027,6 @@ void MediaDecoderStateMachine::OnAudioSinkError()
   MOZ_ASSERT(!mAudioCaptured, "Should be disconnected when capturing audio.");
 
   mAudioSinkPromise.Complete();
-  ResyncAudioClock();
   mAudioCompleted = true;
 
   // Make the best effort to continue playback when there is video.
