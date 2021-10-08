@@ -1651,7 +1651,7 @@ MediaStreamGraphImpl::RunInStableState(bool aSourceIsMSG)
         mLifecycleState = LIFECYCLE_WAITING_FOR_THREAD_SHUTDOWN;
         LIFECYCLE_LOG("Sending MediaStreamGraphShutDownRunnable %p", this);
         nsCOMPtr<nsIRunnable> event = new MediaStreamGraphShutDownRunnable(this );
-        NS_DispatchToMainThread(event);
+        NS_DispatchToMainThread(event.forget());
 
         LIFECYCLE_LOG("Disconnecting MediaStreamGraph %p", this);
         MediaStreamGraphImpl* graph;
@@ -1722,7 +1722,7 @@ MediaStreamGraphImpl::RunInStableState(bool aSourceIsMSG)
       // we have outstanding DOM objects that may need it.
       mLifecycleState = LIFECYCLE_WAITING_FOR_THREAD_SHUTDOWN;
       nsCOMPtr<nsIRunnable> event = new MediaStreamGraphShutDownRunnable(this);
-      NS_DispatchToMainThread(event);
+      NS_DispatchToMainThread(event.forget());
     }
 
     mDetectedNotRunning = mLifecycleState > LIFECYCLE_RUNNING;
@@ -1780,7 +1780,7 @@ MediaStreamGraphImpl::EnsureStableStateEventPosted()
     return;
   mPostedRunInStableStateEvent = true;
   nsCOMPtr<nsIRunnable> event = new MediaStreamGraphStableStateRunnable(this, true);
-  NS_DispatchToMainThread(event);
+  NS_DispatchToMainThread(event.forget());
 }
 
 void
@@ -2352,7 +2352,7 @@ MediaStream::AddMainThreadListener(MainThreadMediaStreamListener* aListener)
   };
 
   nsRefPtr<nsRunnable> runnable = new NotifyRunnable(this);
-  if (NS_WARN_IF(NS_FAILED(NS_DispatchToMainThread(runnable)))) {
+  if (NS_WARN_IF(NS_FAILED(NS_DispatchToMainThread(runnable.forget())))) {
     return;
   }
 
@@ -3160,11 +3160,11 @@ MediaStreamGraph::NotifyWhenGraphStarted(AudioNodeStream* aStream)
       if (graphImpl->CurrentDriver()->AsAudioCallbackDriver()) {
         nsCOMPtr<nsIRunnable> event = new dom::StateChangeTask(
             mStream->AsAudioNodeStream(), nullptr, AudioContextState::Running);
-        NS_DispatchToMainThread(event);
+        NS_DispatchToMainThread(event.forget());
       } else {
         nsCOMPtr<nsIRunnable> event = new GraphStartedRunnable(
             mStream->AsAudioNodeStream(), mStream->Graph());
-        NS_DispatchToMainThread(event);
+        NS_DispatchToMainThread(event.forget());
       }
     }
     virtual void RunDuringShutdown()
@@ -3285,7 +3285,7 @@ MediaStreamGraphImpl::AudioContextOperationCompleted(MediaStream* aStream,
 
   nsCOMPtr<nsIRunnable> event = new dom::StateChangeTask(
       aStream->AsAudioNodeStream(), aPromise, state);
-  NS_DispatchToMainThread(event);
+  NS_DispatchToMainThread(event.forget());
 }
 
 void
