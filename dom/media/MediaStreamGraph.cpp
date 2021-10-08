@@ -1527,6 +1527,7 @@ MediaStreamGraphImpl::OneIteration(GraphTime aFrom, GraphTime aTo,
   UpdateGraph(stateEnd);
 
   Process(stateFrom, stateEnd);
+  mProcessedTime = stateEnd;
 
   // Send updates to the main thread and wait for the next control loop
   // iteration.
