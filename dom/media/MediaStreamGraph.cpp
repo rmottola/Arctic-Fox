@@ -1275,7 +1275,7 @@ MediaStreamGraphImpl::PrepareUpdatesToMainThreadState(bool aFinalUpdate)
       update->mNextMainThreadFinished = stream->mNotifiedFinished;
     }
     if (!mPendingUpdateRunnables.IsEmpty()) {
-      mUpdateRunnables.MoveElementsFrom(Move(mPendingUpdateRunnables));
+      mUpdateRunnables.AppendElements(Move(mPendingUpdateRunnables));
     }
   }
 
@@ -1785,7 +1785,7 @@ MediaStreamGraphImpl::RunInStableState(bool aSourceIsMSG)
       // Defer calls to RunDuringShutdown() to happen while mMonitor is not held.
       for (uint32_t i = 0; i < mBackMessageQueue.Length(); ++i) {
         MessageBlock& mb = mBackMessageQueue[i];
-        controlMessagesToRunDuringShutdown.MoveElementsFrom(Move(mb.mMessages));
+        controlMessagesToRunDuringShutdown.AppendElements(Move(mb.mMessages));
       }
       mBackMessageQueue.Clear();
       MOZ_ASSERT(mCurrentTaskMessageQueue.IsEmpty());
@@ -2457,7 +2457,7 @@ void
 SourceMediaStream::FinishAddTracks()
 {
   MutexAutoLock lock(mMutex);
-  mUpdateTracks.MoveElementsFrom(Move(mPendingTracks));
+  mUpdateTracks.AppendElements(Move(mPendingTracks));
   if (GraphImpl()) {
     GraphImpl()->EnsureNextIteration();
   }
