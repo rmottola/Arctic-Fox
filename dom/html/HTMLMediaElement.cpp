@@ -3058,7 +3058,8 @@ void HTMLMediaElement::SetupSrcMediaStreamPlayback(DOMMediaStream* aStream)
     // version |mPlaybackStream|. If two media elements are playing the
     // same realtime DOMMediaStream, this allows them to pause playback
     // independently of each other.
-    mPlaybackStream = DOMMediaStream::CreateTrackUnionStream(window);
+    MediaStreamGraph* graph = mSrcStream->GetStream()->Graph();
+    mPlaybackStream = DOMMediaStream::CreateTrackUnionStream(window, graph);
     mPlaybackStreamInputPort = mPlaybackStream->GetStream()->AsProcessedStream()->
       AllocateInputPort(mSrcStream->GetStream(), MediaInputPort::FLAG_BLOCK_OUTPUT);
 
