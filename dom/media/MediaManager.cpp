@@ -480,12 +480,13 @@ public:
   CreateTrackUnionStream(nsIDOMWindow* aWindow,
                          GetUserMediaCallbackMediaStreamListener* aListener,
                          MediaEngineSource* aAudioSource,
-                         MediaEngineSource* aVideoSource)
+                         MediaEngineSource* aVideoSource,
+                         MediaStreamGraph* aMSG)
   {
     nsRefPtr<nsDOMUserMediaStream> stream = new nsDOMUserMediaStream(aListener,
                                                                      aAudioSource,
                                                                      aVideoSource);
-    stream->InitTrackUnionStream(aWindow);
+    stream->InitTrackUnionStream(aWindow, aMSG);
     return stream.forget();
   }
 
@@ -784,7 +785,13 @@ public:
     }
 #endif
 
-    MediaStreamGraph* msg = MediaStreamGraph::GetInstance();
+    MediaStreamGraph::GraphDriverType graphDriverType =
+      mAudioSource ? MediaStreamGraph::AUDIO_THREAD_DRIVER
+                   : MediaStreamGraph::SYSTEM_THREAD_DRIVER;
+    MediaStreamGraph* msg =
+      MediaStreamGraph::GetInstance(graphDriverType,
+                                    dom::AudioChannel::Normal);
+
     nsRefPtr<SourceMediaStream> stream = msg->CreateSourceStream(nullptr);
 
     nsRefPtr<DOMLocalMediaStream> domStream;
@@ -794,7 +801,7 @@ public:
     // them down instead.
     if (mAudioSource &&
         mAudioSource->GetMediaSource() == dom::MediaSourceEnum::AudioCapture) {
-      domStream = DOMLocalMediaStream::CreateAudioCaptureStream(window);
+      domStream = DOMLocalMediaStream::CreateAudioCaptureStream(window, msg);
       // It should be possible to pipe the capture stream to anything. CORS is
       // not a problem here, we got explicit user content.
       domStream->SetPrincipal(window->GetExtantDoc()->NodePrincipal());
@@ -806,7 +813,8 @@ public:
       // avoid us blocking
       nsRefPtr<nsDOMUserMediaStream> trackunion =
         nsDOMUserMediaStream::CreateTrackUnionStream(window, mListener,
-                                                     mAudioSource, mVideoSource);
+                                                     mAudioSource, mVideoSource,
+                                                     msg);
       trackunion->GetStream()->AsProcessedStream()->SetAutofinish(true);
       nsRefPtr<MediaInputPort> port = trackunion->GetStream()->AsProcessedStream()->
         AllocateInputPort(stream, MediaInputPort::FLAG_BLOCK_OUTPUT);
@@ -2792,7 +2800,10 @@ GetUserMediaCallbackMediaStreamListener::StopSharing()
     nsCOMPtr<nsPIDOMWindow> window = nsGlobalWindow::GetInnerWindowWithId(mWindowID);
     MOZ_ASSERT(window);
     window->SetAudioCapture(false);
-    MediaStreamGraph::GetInstance()->UnregisterCaptureStreamForWindow(mWindowID);
+    MediaStreamGraph* graph =
+      MediaStreamGraph::GetInstance(MediaStreamGraph::AUDIO_THREAD_DRIVER,
+                                    dom::AudioChannel::Normal);
+    graph->UnregisterCaptureStreamForWindow(mWindowID);
     mStream->Destroy();
   }
 }
