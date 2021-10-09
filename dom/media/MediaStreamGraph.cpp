@@ -59,7 +59,7 @@ PRLogModuleInfo* gMediaStreamGraphLog;
 #endif
 
 /**
- * The singleton graph instance.
+ * A hash table containing the graph instances, one per AudioChannel.
  */
 static nsDataHashtable<nsUint32HashKey, MediaStreamGraphImpl*> gGraphs;
 
@@ -2862,9 +2862,8 @@ ProcessedMediaStream::DestroyImpl()
   // SetStreamOrderDirty(), for other reasons.
 }
 
-MediaStreamGraphImpl::MediaStreamGraphImpl(bool aRealtime,
+MediaStreamGraphImpl::MediaStreamGraphImpl(GraphDriverType aDriverRequested,
                                            TrackRate aSampleRate,
-                                           bool aStartWithAudioDriver,
                                            dom::AudioChannel aChannel)
   : MediaStreamGraph(aSampleRate)
   , mPortCount(0)
@@ -2879,7 +2878,7 @@ MediaStreamGraphImpl::MediaStreamGraphImpl(bool aRealtime,
   , mFlushSourcesOnNextIteration(false)
   , mDetectedNotRunning(false)
   , mPostedRunInStableState(false)
-  , mRealtime(aRealtime)
+  , mRealtime(aDriverRequested != OFFLINE_THREAD_DRIVER)
   , mNonRealtimeProcessing(false)
   , mStreamOrderDirty(false)
   , mLatencyLog(AsyncLatencyLogger::Get())
@@ -2900,7 +2899,7 @@ MediaStreamGraphImpl::MediaStreamGraphImpl(bool aRealtime,
   }
 
   if (mRealtime) {
-    if (aStartWithAudioDriver) {
+    if (aDriverRequested == AUDIO_THREAD_DRIVER) {
       AudioCallbackDriver* driver = new AudioCallbackDriver(this, aChannel);
       mDriver = driver;
       mMixer.AddCallback(driver);
@@ -2957,7 +2956,7 @@ MediaStreamGraphShutdownObserver::Observe(nsISupports *aSubject,
 }
 
 MediaStreamGraph*
-MediaStreamGraph::GetInstance(bool aStartWithAudioDriver,
+MediaStreamGraph::GetInstance(MediaStreamGraph::GraphDriverType aGraphDriverRequested,
                               dom::AudioChannel aChannel)
 {
   NS_ASSERTION(NS_IsMainThread(), "Main thread only");
@@ -2973,10 +2972,15 @@ MediaStreamGraph::GetInstance(bool aStartWithAudioDriver,
 
     CubebUtils::InitPreferredSampleRate();
 
-    graph = new MediaStreamGraphImpl(true, CubebUtils::PreferredSampleRate(), aStartWithAudioDriver, aChannel);
+    graph = new MediaStreamGraphImpl(aGraphDriverRequested,
+                                     CubebUtils::PreferredSampleRate(),
+                                     aChannel);
+
     gGraphs.Put(channel, graph);
 
-    STREAM_LOG(LogLevel::Debug, ("Starting up MediaStreamGraph %p", graph));
+    STREAM_LOG(LogLevel::Debug,
+        ("Starting up MediaStreamGraph %p for channel %s",
+         graph, AudioChannelValues::strings[channel]));
   }
 
   return graph;
@@ -2987,7 +2991,10 @@ MediaStreamGraph::CreateNonRealtimeInstance(TrackRate aSampleRate)
 {
   NS_ASSERTION(NS_IsMainThread(), "Main thread only");
 
-  MediaStreamGraphImpl* graph = new MediaStreamGraphImpl(false, aSampleRate);
+  MediaStreamGraphImpl* graph =
+    new MediaStreamGraphImpl(OFFLINE_THREAD_DRIVER,
+                             aSampleRate,
+                             AudioChannel::Normal);
 
   STREAM_LOG(LogLevel::Debug, ("Starting up Offline MediaStreamGraph %p", graph));
 
