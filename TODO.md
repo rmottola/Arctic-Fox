@@ -103,6 +103,7 @@
 - Bug 1191148 - Don't count fullscreen request handled if we don't chanyesy
 - Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
+- Bug 901633
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
@@ -157,12 +158,15 @@
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
 - Bug 1204872 - 2015-09
 - Bug 1198861 - (1 of 2) Improve aliasing information and type barrier handling 
+- Bug 1200099. Add a test that captured cross-origin video
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 1179569: Remove use of decoder's monitor in ResetDecode(). r=bholley
 - Bug 1178437 - Do the dormant-enabled tracking on the main thread. 
+- Bug 1197669 - Part2 - 1. Ensure the EOS is sent to
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
+- Bug 1190676 - Part 12 - Fix mozCaptureStream. r=pehrsons 
 - Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
 - Bug 1210607 - Check for null compartment in PopulateReport
 - Bug 968923 - 2015-07-17 - part 6 - add use counters for deprecated operations; r=bz
@@ -170,6 +174,7 @@
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
+- Bug 1170081 - Add a tag to run only mochitests that use HTML
 
 
 impacting download and shutdown:
