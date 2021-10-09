@@ -891,6 +891,12 @@ function mediaTestCleanup(callback) {
     SpecialPowers.exactGC(window, cb);
 }
 
+// B2G emulator and Android 2.3 are condidered slow platforms
+function isSlowPlatform() {
+  return SpecialPowers.Services.appinfo.name == "B2G" ||
+         navigator.userAgent.indexOf("Mobile") != -1 && androidVersion == 10;
+}
+
 (function() {
   SimpleTest.requestFlakyTimeout("untriaged");
 
