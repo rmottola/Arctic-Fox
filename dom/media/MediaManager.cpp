@@ -992,7 +992,7 @@ ApplyConstraints(const MediaTrackConstraints &aConstraints,
         }
       }
       if (!aSources.Length()) {
-        aSources.MoveElementsFrom(rejects);
+        aSources.MoveElementsFrom(Move(rejects));
         aggregateConstraints.RemoveElementAt(aggregateConstraints.Length() - 1);
       }
     }
