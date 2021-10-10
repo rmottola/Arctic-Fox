@@ -113,7 +113,7 @@ AudioParam::Stream()
   mStream = stream.forget();
 
   // Setup the AudioParam's stream as an input to the owner AudioNode's stream
-  AudioNodeStream* nodeStream = mNode->Stream();
+  AudioNodeStream* nodeStream = mNode->GetStream();
   if (nodeStream) {
     mNodeStreamPort =
       nodeStream->AllocateInputPort(mStream, MediaInputPort::FLAG_BLOCK_INPUT);
