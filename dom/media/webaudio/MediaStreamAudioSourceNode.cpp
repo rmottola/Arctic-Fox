@@ -66,7 +66,7 @@ MediaStreamAudioSourceNode::Init(DOMMediaStream* aMediaStream, ErrorResult& aRv)
 
   mInputStream = aMediaStream;
   AudioNodeEngine* engine = new MediaStreamAudioSourceNodeEngine(this);
-  mStream = graph->CreateAudioNodeExternalInputStream(engine);
+  mStream = AudioNodeExternalInputStream::Create(graph, engine);
   ProcessedMediaStream* outputStream = static_cast<ProcessedMediaStream*>(mStream.get());
   mInputPort = outputStream->AllocateInputPort(inputStream,
                                                MediaInputPort::FLAG_BLOCK_INPUT);
