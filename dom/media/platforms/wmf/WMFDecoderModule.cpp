@@ -99,11 +99,11 @@ WMFDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
                                      FlushableTaskQueue* aVideoTaskQueue,
                                      MediaDataDecoderCallback* aCallback)
 {
-  nsAutoPtr<WMFVideoMFTManager> manager =
+  nsAutoPtr<WMFVideoMFTManager> manager(
     new WMFVideoMFTManager(aConfig,
                            aLayersBackend,
                            aImageContainer,
-                           sDXVAEnabled && ShouldUseDXVA(aConfig));
+                           sDXVAEnabled && ShouldUseDXVA(aConfig)));
 
   nsRefPtr<MFTDecoder> mft = manager->Init();
 
@@ -122,7 +122,7 @@ WMFDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
                                      FlushableTaskQueue* aAudioTaskQueue,
                                      MediaDataDecoderCallback* aCallback)
 {
-  nsAutoPtr<WMFAudioMFTManager> manager = new WMFAudioMFTManager(aConfig);
+  nsAutoPtr<WMFAudioMFTManager> manager(new WMFAudioMFTManager(aConfig));
   nsRefPtr<MFTDecoder> mft = manager->Init();
 
   if (!mft) {
