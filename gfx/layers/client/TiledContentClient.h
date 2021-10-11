@@ -549,6 +549,7 @@ protected:
   {
     MOZ_COUNT_DTOR(TiledContentClient);
 
+    mDestroyed = true;
     mTiledBuffer.Release();
     mLowPrecisionTiledBuffer.Release();
   }
