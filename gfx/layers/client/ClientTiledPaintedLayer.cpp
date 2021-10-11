@@ -398,10 +398,6 @@ ClientTiledPaintedLayer::RenderLayer()
   LayerManager::DrawPaintedLayerCallback callback =
     ClientManager()->GetPaintedLayerCallback();
   void *data = ClientManager()->GetPaintedLayerCallbackData();
-  if (!callback) {
-    ClientManager()->SetTransactionIncomplete();
-    return;
-  }
 
   if (!mContentClient) {
     mContentClient = new TiledContentClient(this, ClientManager());
@@ -444,6 +440,11 @@ ClientTiledPaintedLayer::RenderLayer()
   invalidRegion.Sub(neededRegion, mValidRegion);
   if (invalidRegion.IsEmpty()) {
     EndPaint();
+    return;
+  }
+
+  if (!callback) {
+    ClientManager()->SetTransactionIncomplete();
     return;
   }
 
