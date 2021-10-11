@@ -1255,8 +1255,6 @@ private:
   // successeeding.
   bool mDecodingFirstFrame;
 
-  bool mDisabledHardwareAcceleration;
-
   // True if we are back from DECODER_STATE_DORMANT state and
   // LoadedMetadataEvent was already sent.
   bool mSentLoadedMetadataEvent;
