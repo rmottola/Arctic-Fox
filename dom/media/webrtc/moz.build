@@ -29,7 +29,7 @@ if CONFIG['MOZ_WEBRTC']:
         'MediaEngineWebRTCAudio.cpp',
         'MediaEngineWebRTCVideo.cpp',
         'MediaTrackConstraints.cpp',
-	'RTCCertificate.cpp',
+        'RTCCertificate.cpp',
         'RTCIdentityProviderRegistrar.cpp',
     ]
     # MediaEngineWebRTC.cpp needs to be built separately.
@@ -91,5 +91,3 @@ if CONFIG['_MSC_VER']:
   CXXFLAGS += [
     '-wd4275', # non dll-interface class used as base for dll-interface class
   ]
-
-FAIL_ON_WARNINGS = True
