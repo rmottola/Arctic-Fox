@@ -417,7 +417,9 @@ public:
                    LayerManager::DrawPaintedLayerCallback aCallback,
                    void* aCallbackData);
 
-  void Update(const nsIntRegion& aNewValidRegion, const nsIntRegion& aPaintRegion);
+  void Update(const nsIntRegion& aNewValidRegion,
+              const nsIntRegion& aPaintRegion,
+              const nsIntRegion& aDirtyRegion);
 
   void ReadLock();
 
@@ -447,7 +449,7 @@ public:
       return;
     }
 
-    Update(nsIntRegion(), nsIntRegion());
+    Update(nsIntRegion(), nsIntRegion(), nsIntRegion());
     mResolution = aResolution;
   }
 
@@ -465,7 +467,8 @@ protected:
                     const nsIntPoint& aTileRect,
                     const nsIntRegion& dirtyRect);
 
-  void PostValidate(const nsIntRegion& aPaintRegion);
+  void PostValidate(const nsIntRegion& aPaintRegion,
+                    const nsIntRegion& aDirtyRegion);
 
   void UnlockTile(TileClient& aTile);
 
