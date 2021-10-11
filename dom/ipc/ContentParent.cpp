@@ -48,7 +48,6 @@
 #include "mozilla/dom/PFMRadioParent.h"
 #include "mozilla/dom/PMemoryReportRequestParent.h"
 #include "mozilla/dom/ServiceWorkerRegistrar.h"
-#include "mozilla/dom/asmjscache/AsmJSCache.h"
 #include "mozilla/dom/bluetooth/PBluetoothParent.h"
 #include "mozilla/dom/cellbroadcast/CellBroadcastParent.h"
 #include "mozilla/dom/devicestorage/DeviceStorageRequestParent.h"
@@ -3822,22 +3821,6 @@ bool
 ContentParent::RecvPPresentationConstructor(PPresentationParent* aActor)
 {
   return static_cast<PresentationParent*>(aActor)->Init();
-}
-
-asmjscache::PAsmJSCacheEntryParent*
-ContentParent::AllocPAsmJSCacheEntryParent(
-                                    const asmjscache::OpenMode& aOpenMode,
-                                    const asmjscache::WriteParams& aWriteParams,
-                                    const IPC::Principal& aPrincipal)
-{
-    return asmjscache::AllocEntryParent(aOpenMode, aWriteParams, aPrincipal);
-}
-
-bool
-ContentParent::DeallocPAsmJSCacheEntryParent(PAsmJSCacheEntryParent* aActor)
-{
-    asmjscache::DeallocEntryParent(aActor);
-    return true;
 }
 
 PSpeechSynthesisParent*
