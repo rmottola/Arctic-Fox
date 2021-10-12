@@ -694,9 +694,8 @@ MediaDecoderStateMachine::OnAudioPopped(const nsRefPtr<MediaData>& aSample)
 {
   MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-  int64_t offset = std::max<int64_t>(0, aSample->mOffset);
-  mPlaybackOffset = offset;
-  mDecoder->UpdatePlaybackOffset(offset);
+  mPlaybackOffset = std::max(mPlaybackOffset, aSample->mOffset);
+  mDecoder->UpdatePlaybackOffset(mPlaybackOffset);
   UpdateNextFrameStatus();
   DispatchAudioDecodeTaskIfNeeded();
 }
@@ -706,8 +705,8 @@ MediaDecoderStateMachine::OnVideoPopped(const nsRefPtr<MediaData>& aSample)
 {
   MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-  mPlaybackOffset = aSample->mOffset;
-  mDecoder->UpdatePlaybackOffset(aSample->mOffset);
+  mPlaybackOffset = std::max(mPlaybackOffset, aSample->mOffset);
+  mDecoder->UpdatePlaybackOffset(mPlaybackOffset);
   UpdateNextFrameStatus();
   DispatchVideoDecodeTaskIfNeeded();
 }
@@ -2480,6 +2479,9 @@ MediaDecoderStateMachine::Reset()
   mVideoDataRequest.DisconnectIfExists();
   mVideoWaitRequest.DisconnectIfExists();
   mSeekRequest.DisconnectIfExists();
+
+  mPlaybackOffset = 0;
+  mDecoder->UpdatePlaybackOffset(mPlaybackOffset);
 
   nsCOMPtr<nsIRunnable> resetTask =
     NS_NewRunnableMethod(mReader, &MediaDecoderReader::ResetDecode);
