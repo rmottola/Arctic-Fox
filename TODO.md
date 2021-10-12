@@ -155,11 +155,15 @@
 - Bug 1172785 - 2016-07-06 remaining parts of RTCCertificate
 - 1178938 - 2015-07-02 5 parts
 - Bug 1175622 - Use the right API when transitively marking object grou	
-- Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
+- Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
+- Bug 1051052 - Made mid an outparam in JsepSession::AddLocalIceCandida
 - Bug 1204872 - 2015-09
 - Bug 1198861 - (1 of 2) Improve aliasing information and type barrier handling 
 - Bug 1200099. Add a test that captured cross-origin video
+- Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
+- Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
+- Bug 830801 - Part 1. Set NOMINMAX define as default. r=mshal 
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 1179569: Remove use of decoder's monitor in ResetDecode(). r=bholley
 - Bug 1178437 - Do the dormant-enabled tracking on the main thread. 
