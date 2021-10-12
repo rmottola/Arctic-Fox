@@ -922,7 +922,11 @@ private:
   ReentrantMonitor mReentrantMonitor;
 
 protected:
+
   virtual void CallSeek(const SeekTarget& aTarget);
+
+  // Returns true if heuristic dormant is supported.
+  bool IsHeuristicDormantSupported() const;
 
   MozPromiseRequestHolder<SeekPromise> mSeekRequest;
 
