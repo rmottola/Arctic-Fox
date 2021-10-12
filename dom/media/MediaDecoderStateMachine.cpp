@@ -1097,7 +1097,6 @@ void MediaDecoderStateMachine::MaybeStartPlayback()
   MOZ_ASSERT(IsPlaying());
 
   StartMediaSink();
-  StartDecodedStream();
 
   DispatchDecodeTasksIfNeeded();
 }
@@ -1784,36 +1783,6 @@ MediaDecoderStateMachine::StartMediaSink()
   }
 }
 
-void
-MediaDecoderStateMachine::StopDecodedStream()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  AssertCurrentThreadInMonitor();
-
-  if (mStreamSink->IsStarted()) {
-    mStreamSink->Stop();
-    mDecodedStreamPromise.DisconnectIfExists();
-  }
-}
-
-void
-MediaDecoderStateMachine::StartDecodedStream()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  AssertCurrentThreadInMonitor();
-
-  // Tell DecodedStream to start playback with specified start time and media
-  // info. This is consistent with how we create AudioSink in StartAudioThread().
-  if (mAudioCaptured && !mStreamSink->IsStarted()) {
-    mStreamSink->Start(GetMediaTime(), mInfo);
-    mDecodedStreamPromise.Begin(
-      mStreamSink->OnEnded(TrackInfo::kAudioTrack)->Then(
-        OwnerThread(), __func__, this,
-        &MediaDecoderStateMachine::OnDecodedStreamFinish,
-        &MediaDecoderStateMachine::OnDecodedStreamError));
-  }
-}
-
 int64_t MediaDecoderStateMachine::AudioDecodedUsecs()
 {
   MOZ_ASSERT(OnTaskQueue());
@@ -2430,7 +2399,6 @@ nsresult MediaDecoderStateMachine::RunStateMachine()
 
         // MediaSink::GetEndTime() must be called before stopping playback.
         StopMediaSink();
-        StopDecodedStream();
       }
 
       return NS_OK;
@@ -2460,7 +2428,6 @@ MediaDecoderStateMachine::Reset()
   // outside of the decoder monitor while we are clearing the queue and causes
   // crash for no samples to be popped.
   StopMediaSink();
-  StopDecodedStream();
 
   mVideoFrameEndTime = -1;
   mDecodedVideoEndTime = -1;
@@ -3056,32 +3023,6 @@ void MediaDecoderStateMachine::OnMediaSinkError()
 }
 
 void
-MediaDecoderStateMachine::OnDecodedStreamFinish()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-  MOZ_ASSERT(mAudioCaptured, "Audio should be captured.");
-
-  mDecodedStreamPromise.Complete();
-  if (mInfo.HasAudio()) {
-    mAudioCompleted = true;
-  }
-  // To notify PlaybackEnded as soon as possible.
-  ScheduleStateMachine();
-}
-
-void
-MediaDecoderStateMachine::OnDecodedStreamError()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-  MOZ_ASSERT(mAudioCaptured, "Audio should be captured.");
-
-  mDecodedStreamPromise.Complete();
-  DecodeError();
-}
-
-void
 MediaDecoderStateMachine::SetAudioCaptured(bool aCaptured)
 {
   MOZ_ASSERT(OnTaskQueue());
@@ -3124,48 +3065,6 @@ uint32_t MediaDecoderStateMachine::GetAmpleVideoFrames() const
   return (mReader->IsAsync() && mReader->VideoIsHardwareAccelerated())
     ? std::max<uint32_t>(sVideoQueueHWAccelSize, MIN_VIDEO_QUEUE_SIZE)
     : std::max<uint32_t>(sVideoQueueDefaultSize, MIN_VIDEO_QUEUE_SIZE);
-}
-
-void MediaDecoderStateMachine::DispatchAudioCaptured()
-{
-  nsRefPtr<MediaDecoderStateMachine> self = this;
-  nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([self] () -> void
-  {
-    MOZ_ASSERT(self->OnTaskQueue());
-    ReentrantMonitorAutoEnter mon(self->mDecoder->GetReentrantMonitor());
-    if (!self->mAudioCaptured) {
-      // Stop the media sink if it's running.
-      self->StopMediaSink();
-      self->mAudioCaptured = true;
-      // Start DecodedStream if we are already playing. Otherwise it will be
-      // handled in MaybeStartPlayback().
-      if (self->IsPlaying()) {
-        self->StartDecodedStream();
-      }
-      self->ScheduleStateMachine();
-    }
-  });
-  OwnerThread()->Dispatch(r.forget());
-}
-
-void MediaDecoderStateMachine::DispatchAudioUncaptured()
-{
-  nsRefPtr<MediaDecoderStateMachine> self = this;
-  nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([self] () -> void
-  {
-    MOZ_ASSERT(self->OnTaskQueue());
-    ReentrantMonitorAutoEnter mon(self->mDecoder->GetReentrantMonitor());
-    if (self->mAudioCaptured) {
-      self->StopDecodedStream();
-      // Start again the media sink.
-      self->mAudioCaptured = false;
-      if (self->IsPlaying()) {
-        self->StartMediaSink();
-      }
-      self->ScheduleStateMachine();
-    }
-  });
-  OwnerThread()->Dispatch(r.forget());
 }
 
 void MediaDecoderStateMachine::AddOutputStream(ProcessedMediaStream* aStream,
