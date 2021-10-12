@@ -1352,6 +1352,7 @@ void MediaDecoder::UnpinForSeek()
 bool
 MediaDecoder::CanPlayThrough()
 {
+  MOZ_ASSERT(NS_IsMainThread());
   NS_ENSURE_TRUE(mDecoderStateMachine, false);
   return mDecoderStateMachine->IsRealTime() || GetStatistics().CanPlayThrough();
 }

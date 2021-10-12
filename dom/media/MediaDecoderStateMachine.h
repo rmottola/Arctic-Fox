@@ -206,8 +206,10 @@ private:
   // immediately stop playback and buffer downloaded data. Called on
   // the state machine thread.
   void StartBuffering();
-public:
 
+  bool CanPlayThrough();
+
+public:
   void DispatchStartBuffering()
   {
     nsCOMPtr<nsIRunnable> runnable =
