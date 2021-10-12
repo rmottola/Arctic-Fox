@@ -199,7 +199,6 @@ destroying the MediaDecoder object.
 #include "nsITimer.h"
 
 #include "AbstractMediaDecoder.h"
-#include "DecodedStream.h"
 #include "MediaDecoderOwner.h"
 #include "MediaEventSource.h"
 #include "MediaMetadataManager.h"
