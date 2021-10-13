@@ -145,7 +145,7 @@ ResidentFastDistinguishedAmount(int64_t* aN)
   return ResidentDistinguishedAmount(aN);
 }
 
-#define HAVE_RESIDENT_UNIQUE_REPORTER
+#define HAVE_RESIDENT_UNIQUE_REPORTER 1
 static nsresult
 ResidentUniqueDistinguishedAmount(int64_t* aN)
 {
@@ -315,7 +315,7 @@ GetKinfoVmentrySelf(int64_t* aPrss, uint64_t* aMaxreg)
   return NS_OK;
 }
 
-#define HAVE_PRIVATE_REPORTER
+#define HAVE_PRIVATE_REPORTER 1
 static nsresult
 PrivateDistinguishedAmount(int64_t* aN)
 {
@@ -553,7 +553,7 @@ VsizeMaxContiguousDistinguishedAmount(int64_t* aN)
   return NS_OK;
 }
 
-#define HAVE_PRIVATE_REPORTER
+#define HAVE_PRIVATE_REPORTER 1
 static nsresult
 PrivateDistinguishedAmount(int64_t* aN)
 {
@@ -907,6 +907,53 @@ NS_IMPL_ISUPPORTS(SystemHeapReporter, nsIMemoryReporter)
 
 #include <sys/resource.h>
 
+#define HAVE_RESIDENT_PEAK_REPORTER 1
+
+static nsresult
+ResidentPeakDistinguishedAmount(int64_t* aN)
+{
+  struct rusage usage;
+  if (0 == getrusage(RUSAGE_SELF, &usage)) {
+    // The units for ru_maxrrs:
+    // - Mac: bytes
+    // - Solaris: pages? But some sources it actually always returns 0, so
+    //   check for that
+    // - Linux, {Net/Open/Free}BSD, DragonFly: KiB
+#ifdef XP_MACOSX
+    *aN = usage.ru_maxrss;
+#elif defined(SOLARIS)
+    *aN = usage.ru_maxrss * getpagesize();
+#else
+    *aN = usage.ru_maxrss * 1024;
+#endif
+    if (*aN > 0) {
+      return NS_OK;
+    }
+  }
+  return NS_ERROR_FAILURE;
+}
+
+class ResidentPeakReporter final : public nsIMemoryReporter
+{
+  ~ResidentPeakReporter() {}
+
+public:
+  NS_DECL_ISUPPORTS
+
+  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                           nsISupports* aData, bool aAnonymize) override
+  {
+    int64_t amount = 0;
+    nsresult rv = ResidentPeakDistinguishedAmount(&amount);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    return MOZ_COLLECT_REPORT(
+      "resident-peak", KIND_OTHER, UNITS_BYTES, amount,
+"The peak 'resident' value for the lifetime of the process.");
+  }
+};
+NS_IMPL_ISUPPORTS(ResidentPeakReporter, nsIMemoryReporter)
+
 #define HAVE_PAGE_FAULT_REPORTERS 1
 
 class PageFaultsSoftReporter final : public nsIMemoryReporter
@@ -983,7 +1030,7 @@ public:
 };
 NS_IMPL_ISUPPORTS(PageFaultsHardReporter, nsIMemoryReporter)
 
-#endif  // HAVE_PAGE_FAULT_REPORTERS
+#endif  // XP_UNIX
 
 /**
  ** memory reporter implementation for jemalloc and OSX malloc,
@@ -1255,6 +1302,10 @@ nsMemoryReporterManager::Init()
 
 #ifdef HAVE_VSIZE_MAX_CONTIGUOUS_REPORTER
   RegisterStrongReporter(new VsizeMaxContiguousReporter());
+#endif
+
+#ifdef HAVE_RESIDENT_PEAK_REPORTER
+  RegisterStrongReporter(new ResidentPeakReporter());
 #endif
 
 #ifdef HAVE_RESIDENT_UNIQUE_REPORTER
@@ -2017,6 +2068,30 @@ nsMemoryReporterManager::ResidentFast()
 #ifdef HAVE_VSIZE_AND_RESIDENT_REPORTERS
   int64_t amount;
   nsresult rv = ResidentFastDistinguishedAmount(&amount);
+  NS_ENSURE_SUCCESS(rv, 0);
+  return amount;
+#else
+  return 0;
+#endif
+}
+
+NS_IMETHODIMP
+nsMemoryReporterManager::GetResidentPeak(int64_t* aAmount)
+{
+#ifdef HAVE_RESIDENT_PEAK_REPORTER
+  return ResidentPeakDistinguishedAmount(aAmount);
+#else
+  *aAmount = 0;
+  return NS_ERROR_NOT_AVAILABLE;
+#endif
+}
+
+/*static*/ int64_t
+nsMemoryReporterManager::ResidentPeak()
+{
+#ifdef HAVE_RESIDENT_PEAK_REPORTER
+  int64_t amount = 0;
+  nsresult rv = ResidentPeakDistinguishedAmount(&amount);
   NS_ENSURE_SUCCESS(rv, 0);
   return amount;
 #else
