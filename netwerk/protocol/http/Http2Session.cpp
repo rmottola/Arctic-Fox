@@ -110,7 +110,6 @@ Http2Session::Http2Session(nsISocketTransport *aSocketTransport, uint32_t versio
   , mWaitingForSettingsAck(false)
   , mGoAwayOnPush(false)
   , mUseH2Deps(false)
-  , mVersion(version)
 {
   MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
 
@@ -133,8 +132,6 @@ Http2Session::Http2Session(nsISocketTransport *aSocketTransport, uint32_t versio
 
   mPingThreshold = gHttpHandler->SpdyPingThreshold();
   mPreviousPingThreshold = mPingThreshold;
-
-  mNegotiatedToken.AssignLiteral(HTTP2_DRAFT_LATEST_TOKEN);
 }
 
 // Copy the 32 bit number into the destination, using network byte order
@@ -930,11 +927,7 @@ Http2Session::SendHello()
     LogIO(this, nullptr, "Session Window Bump ", packet, kFrameHeaderBytes + 4);
   }
 
-  // draft-14 and draft-15 are the only versions we support that do not
-  // allow our priority scheme. Blacklist them here - they are aliased
-  // as draft-15
-  if ((mVersion != HTTP_VERSION_2_DRAFT_15) &&
-      gHttpHandler->UseH2Deps() && gHttpHandler->CriticalRequestPrioritization()) {
+  if (gHttpHandler->UseH2Deps() && gHttpHandler->CriticalRequestPrioritization()) {
     mUseH2Deps = true;
     MOZ_ASSERT(mNextStreamID == kLeaderGroupID);
     CreatePriorityNode(kLeaderGroupID, 0, 200, "leader");
@@ -3474,14 +3467,6 @@ Http2Session::ConfirmTLSProfile()
    * this connection. However, we never enable TLS compression on our end,
    * anyway, so it'll never be on. All the same, see https://bugzil.la/965881
    * for the possibility for an interface to ensure it never gets turned on. */
-
-  nsresult rv = ssl->GetNegotiatedNPN(mNegotiatedToken);
-  if (NS_FAILED(rv)) {
-    // Fallback to showing the draft version, just in case
-    LOG3(("Http2Session::ConfirmTLSProfile %p could not get negotiated token. "
-          "Falling back to draft token.", this));
-    mNegotiatedToken.AssignLiteral(HTTP2_DRAFT_LATEST_TOKEN);
-  }
 
   mTLSProfileConfirmed = true;
   return NS_OK;
