@@ -2234,6 +2234,17 @@ RegisterWeakMemoryReporter(nsIMemoryReporter* aReporter)
 }
 
 nsresult
+UnregisterStrongMemoryReporter(nsIMemoryReporter* aReporter)
+{
+  nsCOMPtr<nsIMemoryReporterManager> mgr =
+    do_GetService("@mozilla.org/memory-reporter-manager;1");
+  if (!mgr) {
+    return NS_ERROR_FAILURE;
+  }
+  return mgr->UnregisterStrongReporter(aReporter);
+}
+
+nsresult
 UnregisterWeakMemoryReporter(nsIMemoryReporter* aReporter)
 {
   nsCOMPtr<nsIMemoryReporterManager> mgr =
