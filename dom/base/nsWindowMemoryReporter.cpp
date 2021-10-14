@@ -252,7 +252,7 @@ CollectWindowReports(nsGlobalWindow *aWindow,
   nsCOMPtr<nsIURI> location;
   if (aWindow->GetOuterWindow()) {
     // Our window should have a null top iff it has a null docshell.
-    MOZ_ASSERT(!!aWindow->GetTop() == !!aWindow->GetDocShell());
+    MOZ_ASSERT(!!aWindow->GetTopInternal() == !!aWindow->GetDocShell());
     top = aWindow->GetTopInternal();
     if (top) {
       location = GetWindowURI(top);
