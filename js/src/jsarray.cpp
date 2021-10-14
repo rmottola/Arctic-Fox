@@ -3762,7 +3762,7 @@ bool
 js::ArrayInfo(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    RootedBobject obj(cx);
+    RootedObject obj(cx);
 
     for (unsigned i = 0; i < args.length(); i++) {
         HandleValue arg = args[i];
