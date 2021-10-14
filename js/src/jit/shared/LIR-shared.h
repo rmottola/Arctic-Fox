@@ -6394,7 +6394,6 @@ class LPostWriteBarrierO : public LInstructionHelper<0, 2, 1>
         return getOperand(0);
     }
     const LAllocation* value() {
-        MOZ_ASSERT(valueOp == 1);
         return getOperand(1);
     }
     const LDefinition* temp() {
