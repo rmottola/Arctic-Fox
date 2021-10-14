@@ -220,10 +220,6 @@ public:
     return mActive;
   }
 
-#if defined(DEBUG)
-  void Dump(const char* aPath);
-#endif
-
 private:
   ~SourceBuffer();
 
