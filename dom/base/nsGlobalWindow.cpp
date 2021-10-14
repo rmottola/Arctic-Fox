@@ -3157,8 +3157,8 @@ bool
 nsGlobalWindow::DialogsAreBeingAbused()
 {
   MOZ_ASSERT(IsInnerWindow());
-  NS_ASSERTION(GetScriptableTop() &&
-               GetScriptableTop()->GetCurrentInnerWindowInternal() == this,
+  NS_ASSERTION(GetScriptableTopInternal() &&
+               GetScriptableTopInternal()->GetCurrentInnerWindowInternal() == this,
                "DialogsAreBeingAbused called with invalid window");
 
   if (mLastDialogQuitTime.IsNull() ||
