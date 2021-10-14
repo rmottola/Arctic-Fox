@@ -75,8 +75,10 @@ public:
   // buffered data. Used for debugging purposes.
   void GetMozDebugReaderData(nsAString& aString);
 
-	MediaDecoderOwner::NextFrameStatus NextFrameBufferedStatus() override;
-	bool CanPlayThrough() override;
+  void AddSizeOfResources(ResourceSizes* aSizes) override;
+
+  MediaDecoderOwner::NextFrameStatus NextFrameBufferedStatus() override;
+  bool CanPlayThrough() override;
 
 private:
   void DoSetMediaSourceDuration(double aDuration);

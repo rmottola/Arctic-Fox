@@ -194,6 +194,15 @@ MediaSourceDecoder::Ended(bool aEnded)
 }
 
 void
+MediaSourceDecoder::AddSizeOfResources(ResourceSizes* aSizes)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  if (GetDemuxer()) {
+    GetDemuxer()->AddSizeOfResources(aSizes);
+  }
+}
+
+void
 MediaSourceDecoder::SetInitialDuration(int64_t aDuration)
 {
   MOZ_ASSERT(NS_IsMainThread());

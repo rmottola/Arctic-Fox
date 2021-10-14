@@ -53,6 +53,8 @@ public:
   // buffered data. Used for debugging purposes.
   void GetMozDebugReaderData(nsAString& aString);
 
+  void AddSizeOfResources(MediaSourceDecoder::ResourceSizes* aSizes);
+
   // Gap allowed between frames.
   static const media::TimeUnit EOS_FUZZ;
 

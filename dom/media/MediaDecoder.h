@@ -184,6 +184,7 @@ destroying the MediaDecoder object.
 #if !defined(MediaDecoder_h_)
 #define MediaDecoder_h_
 
+#include "mozilla/Atomics.h"
 #include "mozilla/MozPromise.h"
 #include "mozilla/ReentrantMonitor.h"
 #include "mozilla/StateMirroring.h"
@@ -533,6 +534,39 @@ public:
   // queued decoded video and audio data.
   size_t SizeOfVideoQueue();
   size_t SizeOfAudioQueue();
+
+  // Helper struct for accumulating resource sizes that need to be measured
+  // asynchronously. Once all references are dropped the callback will be
+  // invoked.
+  struct ResourceSizes
+  {
+    typedef MozPromise<size_t, size_t, true> SizeOfPromise;
+    NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ResourceSizes)
+    explicit ResourceSizes(MallocSizeOf aMallocSizeOf)
+      : mMallocSizeOf(aMallocSizeOf)
+      , mByteSize(0)
+      , mCallback()
+    {
+    }
+
+    mozilla::MallocSizeOf mMallocSizeOf;
+    mozilla::Atomic<size_t> mByteSize;
+
+    nsRefPtr<SizeOfPromise> Promise()
+    {
+      return mCallback.Ensure(__func__);
+    }
+
+private:
+    ~ResourceSizes()
+    {
+      mCallback.ResolveIfExists(mByteSize, __func__);
+    }
+
+    MozPromiseHolder<SizeOfPromise> mCallback;
+  };
+
+  virtual void AddSizeOfResources(ResourceSizes* aSizes);
 
   VideoFrameContainer* GetVideoFrameContainer() final override
   {
