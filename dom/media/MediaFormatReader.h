@@ -175,6 +175,9 @@ private:
     void ReleaseMediaResources() override {
       mReader->ReleaseMediaResources();
     }
+    bool OnReaderTaskQueue() override {
+      return mReader->OnTaskQueue();
+    }
   private:
     MediaFormatReader* mReader;
     TrackType mType;
