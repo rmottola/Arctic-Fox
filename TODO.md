@@ -84,6 +84,9 @@
 - update SKIA 1082598
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
+- Bug 1235656 - Followup: Allow extended functions with guessed atoms i
+- Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
+- Bug 1223916 - 2015-11-14 Prohibit direct method calls at the parser level in 
 - Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
 - Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
@@ -142,6 +145,7 @@
 - Bug 1171379 - and check all related on bugzilla
 - Bug 909154. Remove the prefixed mozRequestAnimationFrame and its acco
 - Bug 1184429 - 2015-07-17 P1. & P2
+- Bug 1123386 - Part 4: Update the tooltool manifests for the OSX an
 - Bug 1182316: Part 3 - Add assertions to most other WebIDL entry point
 - Bug 1182316 - 2015-07-12 - Part 2 - Rework FORWARD_TO_OUTER_OR_THROW. r=peterv
 - Bug 1179110 - 2015-07-02 Use a Maybe<> to store start time, rather than using -1
@@ -161,6 +165,7 @@
 - Bug 1198861 - (1 of 2) Improve aliasing information and type barrier handling 
 - Bug 1200099. Add a test that captured cross-origin video
 - Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
+--Bug 1194422 - Expose census traversals to SpiderMonkey embedders; r=s
 - Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
 - Bug 830801 - Part 1. Set NOMINMAX define as default. r=mshal 
