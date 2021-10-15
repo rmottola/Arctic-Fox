@@ -29,6 +29,7 @@
 #include "jstypes.h"
 
 #include "asmjs/AsmJSValidate.h"
+#include "builtin/SelfHostingDefines.h"
 #include "frontend/BytecodeCompiler.h"
 #include "frontend/FoldConstants.h"
 #include "frontend/ParseMaps.h"
@@ -1278,6 +1279,9 @@ Parser<ParseHandler>::newFunction(HandleAtom atom, FunctionSyntaxKind kind,
 
     gc::AllocKind allocKind = gc::AllocKind::FUNCTION;
     JSFunction::Flags flags;
+#ifdef DEBUG
+    bool isGlobalSelfHostedBuiltin = false;
+#endif
     switch (kind) {
       case Expression:
         flags = JSFunction::INTERPRETED_LAMBDA;
@@ -1308,6 +1312,12 @@ Parser<ParseHandler>::newFunction(HandleAtom atom, FunctionSyntaxKind kind,
         allocKind = gc::AllocKind::FUNCTION_EXTENDED;
         break;
       default:
+#ifdef DEBUG
+        if (options().selfHostingMode && !pc->sc->isFunctionBox()) {
+            isGlobalSelfHostedBuiltin = true;
+            allocKind = gc::AllocKind::FUNCTION_EXTENDED;
+        }
+#endif
         flags = JSFunction::INTERPRETED_NORMAL;
         break;
     }
@@ -1316,8 +1326,13 @@ Parser<ParseHandler>::newFunction(HandleAtom atom, FunctionSyntaxKind kind,
                                allocKind, TenuredObject);
     if (!fun)
         return nullptr;
-    if (options().selfHostingMode)
+    if (options().selfHostingMode) {
         fun->setIsSelfHostedBuiltin();
+#ifdef DEBUG
+        if (isGlobalSelfHostedBuiltin)
+            fun->setExtendedSlot(HAS_SELFHOSTED_CANONICAL_NAME_SLOT, BooleanValue(false));
+#endif
+    }
     return fun;
 }
 
