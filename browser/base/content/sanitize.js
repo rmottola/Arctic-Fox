@@ -15,6 +15,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "Promise",
                                   "resource://gre/modules/Promise.js");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "DownloadsCommon",
+                                  "resource:///modules/DownloadsCommon.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetryStopwatch",
                                   "resource://gre/modules/TelemetryStopwatch.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
