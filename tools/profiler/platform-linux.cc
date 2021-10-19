@@ -322,7 +322,7 @@ static void* SignalSender(void* arg) {
     SamplerRegistry::sampler->DeleteExpiredMarkers();
 
     if (!SamplerRegistry::sampler->IsPaused()) {
-      mozilla::MutexAutoLock lock(*Sampler::sRegisteredThreadsMutex);
+      ::MutexAutoLock lock(*Sampler::sRegisteredThreadsMutex);
       std::vector<ThreadInfo*> threads =
         SamplerRegistry::sampler->GetRegisteredThreads();
 
@@ -515,7 +515,7 @@ bool Sampler::RegisterCurrentThread(const char* aName,
   if (!Sampler::sRegisteredThreadsMutex)
     return false;
 
-  mozilla::MutexAutoLock lock(*Sampler::sRegisteredThreadsMutex);
+  ::MutexAutoLock lock(*Sampler::sRegisteredThreadsMutex);
 
   int id = gettid();
   for (uint32_t i = 0; i < sRegisteredThreads->size(); i++) {
@@ -563,7 +563,7 @@ void Sampler::UnregisterCurrentThread()
 
   tlsStackTop.set(nullptr);
 
-  mozilla::MutexAutoLock lock(*Sampler::sRegisteredThreadsMutex);
+  ::MutexAutoLock lock(*Sampler::sRegisteredThreadsMutex);
 
   int id = gettid();
 

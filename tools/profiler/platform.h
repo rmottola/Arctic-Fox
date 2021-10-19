@@ -26,6 +26,14 @@
 // OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 // SUCH DAMAGE.
 
+#ifndef TOOLS_PLATFORM_H_
+#define TOOLS_PLATFORM_H_
+
+#ifdef SPS_STANDALONE
+#define MOZ_COUNT_CTOR(name)
+#define MOZ_COUNT_DTOR(name)
+#endif
+
 #ifdef ANDROID
 #include <android/log.h>
 #else
@@ -38,11 +46,15 @@
 
 #include <stdint.h>
 #include <math.h>
+#ifndef SPS_STANDALONE
 #include "MainThreadUtils.h"
-#include "mozilla/unused.h"
-#include "mozilla/TimeStamp.h"
 #include "mozilla/Mutex.h"
 #include "ThreadResponsiveness.h"
+#endif
+#include "mozilla/TimeStamp.h"
+#include "mozilla/UniquePtr.h"
+#include "mozilla/unused.h"
+#include "PlatformMacros.h"
 #include "v8-support.h"
 #include <vector>
 
@@ -58,9 +70,9 @@
 #  define ENABLE_ARM_LR_SAVING
 # endif
 # define LOG(text) \
-    __android_log_write(ANDROID_LOG_ERROR, "profiler", text)
+    __android_log_write(ANDROID_LOG_ERROR, "Profiler", text)
 # define LOGF(format, ...) \
-    __android_log_print(ANDROID_LOG_ERROR, "profiler", format, __VA_ARGS__)
+    __android_log_print(ANDROID_LOG_ERROR, "Profiler", format, __VA_ARGS__)
 #else
 extern bool moz_profiler_verbose();
 # define LOG(text) \
@@ -100,10 +112,22 @@ class Mutex {
   // Unlocks the given mutex. The mutex is assumed to be locked and owned by
   // the calling thread on entrance.
   virtual int Unlock() = 0;
+};
 
-  // Tries to lock the given mutex. Returns whether the mutex was
-  // successfully locked.
-  virtual bool TryLock() = 0;
+class MutexAutoLock {
+ public:
+  explicit MutexAutoLock(::Mutex& aMutex)
+    : mMutex(&aMutex)
+  {
+    mMutex->Lock();
+  }
+
+  ~MutexAutoLock() {
+    mMutex->Unlock();
+  }
+
+ private:
+  Mutex* mMutex;
 };
 
 // ----------------------------------------------------------------------------
@@ -124,6 +148,8 @@ class OS {
 
   // Called on startup to initialize platform specific things
   static void Startup();
+
+  static mozilla::UniquePtr< ::Mutex> CreateMutex(const char* aDesc);
 
  private:
   static const int msPerSecond = 1000;
@@ -338,7 +364,7 @@ class Sampler {
   static TableTicker* GetActiveSampler() { return sActiveSampler; }
   static void SetActiveSampler(TableTicker* sampler) { sActiveSampler = sampler; }
 
-  static mozilla::Mutex* sRegisteredThreadsMutex;
+  static mozilla::UniquePtr<Mutex> sRegisteredThreadsMutex;
 
   static bool CanNotifyObservers() {
 #ifdef MOZ_WIDGET_GONK
@@ -400,10 +426,12 @@ class ThreadInfo {
   void SetThreadId(int aThreadId) { mThreadId = aThreadId; }
 #endif
 
+#ifndef SPS_STANDALONE
   /**
    * May be null for the main thread if the profiler was started during startup
    */
   nsIThread* GetThread() const { return mThread.get(); }
+#endif
  private:
   char* mName;
   int mThreadId;
@@ -423,3 +451,5 @@ class StackOwningThreadInfo : public ThreadInfo {
 
   virtual void SetPendingDelete();
 };
+
+#endif /* ndef TOOLS_PLATFORM_H_ */
