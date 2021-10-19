@@ -12,7 +12,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "FormHistory",
 XPCOMUtils.defineLazyModuleGetter(this, "Downloads",
                                   "resource://gre/modules/Downloads.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Promise",
-                                  "resource://gre/modules/Promise.js");
+                                  "resource://gre/modules/Promise.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "DownloadsCommon",
@@ -42,15 +42,14 @@ Sanitizer.prototype = {
     aCallback(aItemName, canClear, aArg);
     return canClear;
   },
-  
+
   prefDomain: "",
-  isShutDown: false,
-  
+
   getNameFromPreference: function (aPreferenceName)
   {
     return aPreferenceName.substr(this.prefDomain.length);
   },
-  
+
   /**
    * Deletes privacy sensitive data in a batch, according to user preferences.
    * Returns a promise which is resolved if no errors occurred.  If an error
@@ -151,7 +150,6 @@ Sanitizer.prototype = {
     for (let itemName of itemsToClear) {
       let item = this.items[itemName];
       item.range = range;
-      item.isShutDown = this.isShutDown;
       if ("clear" in item) {
         let clearCallback = (itemName, aCanClear) => {
           // Some of these clear() may raise exceptions (see bug #265028)
@@ -177,7 +175,7 @@ Sanitizer.prototype = {
 
     return deferred.promise;
   },
-  
+
   // Time span only makes sense in certain cases.  Consumers who want
   // to only clear some private data can opt in by setting this to false,
   // and can optionally specify a specific range.  If timespan is not ignored,
@@ -711,8 +709,6 @@ Sanitizer.TIMESPAN_TODAY      = 4;
 Sanitizer.TIMESPAN_5MIN       = 5;
 Sanitizer.TIMESPAN_24HOURS    = 6;
 
-Sanitizer.IS_SHUTDOWN         = true;
-
 // Return a 2 element array representing the start and end times,
 // in the uSec-since-epoch format that PRTime likes.  If we should
 // clear everything, return null.  Use ts if it is defined; otherwise
@@ -722,7 +718,7 @@ Sanitizer.getClearRange = function (ts) {
     ts = Sanitizer.prefs.getIntPref("timeSpan");
   if (ts === Sanitizer.TIMESPAN_EVERYTHING)
     return null;
-  
+
   // PRTime is microseconds while JS time is milliseconds
   var endDate = Date.now() * 1000;
   switch (ts) {
@@ -755,7 +751,7 @@ Sanitizer.getClearRange = function (ts) {
 };
 
 Sanitizer._prefs = null;
-Sanitizer.__defineGetter__("prefs", function() 
+Sanitizer.__defineGetter__("prefs", function()
 {
   return Sanitizer._prefs ? Sanitizer._prefs
     : Sanitizer._prefs = Components.classes["@mozilla.org/preferences-service;1"]
@@ -764,7 +760,7 @@ Sanitizer.__defineGetter__("prefs", function()
 });
 
 // Shows sanitization UI
-Sanitizer.showUI = function(aParentWindow) 
+Sanitizer.showUI = function(aParentWindow)
 {
   var ww = Components.classes["@mozilla.org/embedcomp/window-watcher;1"]
                      .getService(Components.interfaces.nsIWindowWatcher);
@@ -779,37 +775,36 @@ Sanitizer.showUI = function(aParentWindow)
                 null);
 };
 
-/** 
- * Deletes privacy sensitive data in a batch, optionally showing the 
+/**
+ * Deletes privacy sensitive data in a batch, optionally showing the
  * sanitize UI, according to user preferences
  */
-Sanitizer.sanitize = function(aParentWindow) 
+Sanitizer.sanitize = function(aParentWindow)
 {
   Sanitizer.showUI(aParentWindow);
 };
 
-Sanitizer.onStartup = function() 
+Sanitizer.onStartup = function()
 {
   // we check for unclean exit with pending sanitization
   Sanitizer._checkAndSanitize();
 };
 
-Sanitizer.onShutdown = function() 
+Sanitizer.onShutdown = function()
 {
   // we check if sanitization is needed and perform it
-  Sanitizer._checkAndSanitize(Sanitizer.IS_SHUTDOWN);
+  Sanitizer._checkAndSanitize();
 };
 
 // this is called on startup and shutdown, to perform pending sanitizations
-Sanitizer._checkAndSanitize = function(isShutDown) 
+Sanitizer._checkAndSanitize = function()
 {
   const prefs = Sanitizer.prefs;
-  if (prefs.getBoolPref(Sanitizer.prefShutdown) && 
+  if (prefs.getBoolPref(Sanitizer.prefShutdown) &&
       !prefs.prefHasUserValue(Sanitizer.prefDidShutdown)) {
     // this is a shutdown or a startup after an unclean exit
     var s = new Sanitizer();
     s.prefDomain = "privacy.clearOnShutdown.";
-    s.isShutDown = isShutDown;
     s.sanitize().then(function() {
       prefs.setBoolPref(Sanitizer.prefDidShutdown, true);
     });
