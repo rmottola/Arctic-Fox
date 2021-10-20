@@ -30,6 +30,7 @@ EXTRA_JS_MODULES += [
     'QuotaManager.jsm',
     'ReaderParent.jsm',
     'RecentWindow.jsm',
+    'Sanitizer.jsm',
     'SharedFrame.jsm',
     'SitePermissions.jsm',
     'TabCrashReporter.jsm',
