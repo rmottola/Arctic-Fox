@@ -10828,8 +10828,10 @@ IonBuilder::getPropTryConstant(bool* emitted, MDefinition* obj, PropertyName* na
     }
 
     JSObject* singleton = testSingletonPropertyTypes(obj, name);
-    if (!singleton)
+    if (!singleton) {
+        trackOptimizationOutcome(TrackedOutcome::NotSingleton);
         return true;
+    }
 
     // Property access is a known constant -- safe to emit.
     obj->setImplicitlyUsedUnchecked();
