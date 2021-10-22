@@ -1000,8 +1000,7 @@ js::CreateThisForFunctionWithProto(JSContext* cx, HandleObject callee, HandleObj
 
         res = CreateThisForFunctionWithGroup(cx, group, newKind);
     } else {
-        gc::AllocKind allocKind = NewObjectGCKind(&PlainObject::class_);
-        res = NewObjectWithProto<PlainObject>(cx, proto, allocKind, newKind);
+        res = NewBuiltinClassInstance<PlainObject>(cx, newKind);
     }
 
     if (res) {
