@@ -219,6 +219,9 @@ What with LightweightThemeConsumer.jsm
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/af76a72464c5dd2030f8a2353640d97f27e8517a
 
+## Breaking JS
+Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
+Bug 1181869 - Update Bindings to use normal Rooted primitives
 
 ### FIXME / TODO
 - fix devtools structure, from browser/themes/osx/devtools to browser/devtools
