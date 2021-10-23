@@ -172,12 +172,8 @@
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 1179569: Remove use of decoder's monitor in ResetDecode(). r=bholley
 - Bug 1178437 - Do the dormant-enabled tracking on the main thread. 
-- Bug 1197669 - Part2 - 1. Ensure the EOS is sent to
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
-- Bug 1190676 - Part 12 - Fix mozCaptureStream. r=pehrsons 
-- Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
-- Bug 1210607 - Check for null compartment in PopulateReport
 - Bug 968923 - 2015-07-17 - part 6 - add use counters for deprecated operations; r=bz
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
@@ -217,7 +213,7 @@ Check with Roy Tam:
 What with LightweightThemeConsumer.jsm 
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/af76a72464c5dd2030f8a2353640d97f27e8517a
+https://github.com/mozilla/newtab-dev/commit/8ecb8c5e7fd11072329a84369c279de748cf2ec6
 
 ## Breaking JS
 Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
