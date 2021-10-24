@@ -213,7 +213,7 @@ Check with Roy Tam:
 What with LightweightThemeConsumer.jsm 
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/8ecb8c5e7fd11072329a84369c279de748cf2ec6
+https://github.com/mozilla/newtab-dev/commit/567240287fa9fe6f94fb49d0675512d6aa1c162c
 
 ## Breaking JS
 Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
@@ -241,12 +241,6 @@ And why #include "nsIFrameInlines.h" in layout/style/nsStyleTransformMatrix.cpp 
 Fallible hacks:
 appendElements made fallible when not so in original FF:
 media/libstagefright/frameworks/av/media/libstagefright/MPEG4Extractor.cpp
-
-Check ALTIVEC/VMX
-- gfx/2d/Factory.cpp -> enough __ALTIVEC__ on non-Apple VMX ?
-- gfx/2d/BlurVMX.cpp
-in TenFourFOX: TENFOURFOX_VMX - VPX_VMX_ASM
-- correct ifdef for  gfx/2d/Blur.cpp
 
 ### Further ToDo which would help portability:
 
