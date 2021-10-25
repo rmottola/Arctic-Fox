@@ -362,7 +362,7 @@ JitFrameIterator::machineState() const
     for (GeneralRegisterBackwardIterator iter(reader.allGprSpills()); iter.more(); iter++)
         machine.setRegisterLocation(*iter, --spill);
 
-    uint8_t* spillAlign = alignDoubleSpillWithOffset(reinterpret_cast<uint8_t *>(spill), 0);
+    uint8_t* spillAlign = alignDoubleSpillWithOffset(reinterpret_cast<uint8_t*>(spill), 0);
 
     char* floatSpill = reinterpret_cast<char*>(spillAlign);
     FloatRegisterSet fregs = reader.allFloatSpills().set();
@@ -546,7 +546,7 @@ BaselineFrameAndStackPointersFromTryNote(JSTryNote* tn, const JitFrameIterator& 
 }
 
 static void
-SettleOnTryNote(JSContext* cx, JSTryNote *tn, const JitFrameIterator& frame,
+SettleOnTryNote(JSContext* cx, JSTryNote* tn, const JitFrameIterator& frame,
                 ScopeIter& si, ResumeFromException* rfe, jsbytecode** pc)
 {
     RootedScript script(cx, frame.baselineFrame()->script());
@@ -1053,7 +1053,7 @@ MarkThisAndArguments(JSTracer* trc, JitFrameLayout* layout)
     size_t nargs = layout->numActualArgs();
     size_t nformals = 0;
     if (CalleeTokenIsFunction(layout->calleeToken())) {
-        JSFunction *fun = CalleeTokenToFunction(layout->calleeToken());
+        JSFunction* fun = CalleeTokenToFunction(layout->calleeToken());
         nformals = fun->nonLazyScript()->mayReadFrameArgsDirectly() ? 0 : fun->nargs();
     }
 
@@ -1387,7 +1387,6 @@ MarkJitExitFrame(JSTracer* trc, const JitFrameIterator& frame)
         TraceRoot(trc, oolgetter->obj(), "ion-ool-property-op-obj");
         return;
     }
-
 
     if (frame.isExitFrameLayout<IonOOLProxyExitFrameLayout>()) {
         IonOOLProxyExitFrameLayout* oolproxy = frame.exitFrame()->as<IonOOLProxyExitFrameLayout>();
@@ -3087,7 +3086,7 @@ JitProfilingFrameIterator::fixBaselineDebugModeOSRReturnAddress()
 {
     MOZ_ASSERT(type_ == JitFrame_BaselineJS);
     BaselineFrame* bl = (BaselineFrame*)(fp_ - BaselineFrame::FramePointerOffset -
-                                          BaselineFrame::Size());
+                                         BaselineFrame::Size());
     if (BaselineDebugModeOSRInfo* info = bl->getDebugModeOSRInfo())
         returnAddressToFp_ = info->resumeAddr;
 }
