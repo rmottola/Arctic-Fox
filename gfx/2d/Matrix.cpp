@@ -10,6 +10,7 @@
 #include <ostream>
 #include <math.h>
 #include <float.h>  // for FLT_EPSILON
+#include <limits>   // std::numeric_limits
 
 #include "mozilla/FloatingPoint.h" // for UnspecifiedNaN
 
