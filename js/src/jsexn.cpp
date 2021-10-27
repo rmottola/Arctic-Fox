@@ -716,7 +716,6 @@ ErrorReport::init(JSContext* cx, HandleValue exn)
             UniqueChars addonIdChars(JS_EncodeString(cx, addonId));
 
             const char* filename = nullptr;
-            
             if (reportp && reportp->filename) {
                 filename = strrchr(reportp->filename, '/');
                 if (filename)
@@ -795,9 +794,9 @@ ErrorReport::init(JSContext* cx, HandleValue exn)
         }
 
         if (JS_GetProperty(cx, exnObject, filename_str, &val)) {
-            JSString* tmp = ToString<CanGC>(cx, val);
+            RootedString tmp(cx, ToString<CanGC>(cx, val));
             if (tmp)
-                filename.encodeLatin1(cx, tmp);
+                filename.encodeUtf8(cx, tmp);
             else
                 cx->clearPendingException();
         } else {
@@ -840,7 +839,7 @@ ErrorReport::init(JSContext* cx, HandleValue exn)
     }
 
     if (str)
-        message_ = bytesStorage.encodeLatin1(cx, str);
+        message_ = bytesStorage.encodeUtf8(cx, str);
     if (!message_)
         message_ = "unknown (can't convert to string)";
 
