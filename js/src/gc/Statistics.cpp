@@ -953,7 +953,7 @@ Statistics::beginSlice(const ZoneGCStats& zoneStats, JSGCInvocationKind gckind,
         bool wasFullGC = zoneStats.isCollectingAllZones();
         if (sliceCallback)
             (*sliceCallback)(runtime, first ? JS::GC_CYCLE_BEGIN : JS::GC_SLICE_BEGIN,
-                             JS::GCDescription(!wasFullGC, gckind));
+                             JS::GCDescription(!wasFullGC, gckind, reason));
     }
 }
 
@@ -986,7 +986,7 @@ Statistics::endSlice()
         bool wasFullGC = zoneStats.isCollectingAllZones();
         if (sliceCallback)
             (*sliceCallback)(runtime, last ? JS::GC_CYCLE_END : JS::GC_SLICE_END,
-                             JS::GCDescription(!wasFullGC, gckind));
+                             JS::GCDescription(!wasFullGC, gckind, slices.back().reason));
     }
 
     /* Do this after the slice callback since it uses these values. */
