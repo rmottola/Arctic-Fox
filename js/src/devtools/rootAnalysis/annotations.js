@@ -340,10 +340,6 @@ function isOverridableField(initialCSU, csu, field)
         if (field == 'GetWindowProxy' || field == 'GetWindowProxyPreserveColor')
             return false;
     }
-    if (initialCSU == 'nsICycleCollectorListener' && field == 'NoteWeakMapEntry')
-        return false;
-    if (initialCSU == 'nsICycleCollectorListener' && field == 'NoteEdge')
-        return false;
     return true;
 }
 
