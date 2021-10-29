@@ -939,6 +939,10 @@ nsJARChannel::OverrideWithSynthesizedResponse(nsIInputStream* aSynthesizedInput)
 NS_IMETHODIMP
 nsJARChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *ctx)
 {
+    MOZ_ASSERT(!mLoadInfo || mLoadInfo->GetSecurityMode() == 0 ||
+               mLoadInfo->GetEnforceSecurity(),
+               "security flags in loadInfo but asyncOpen2() not called");
+
     LOG(("nsJARChannel::AsyncOpen [this=%x]\n", this));
 
     NS_ENSURE_ARG_POINTER(listener);
