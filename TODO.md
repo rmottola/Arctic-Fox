@@ -107,6 +107,8 @@
 - Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
 - Bug 901633
+- Bug 1155618 - Fix more out of memory handling issues r=terrence 
+- Bug 1186424- Refactor AsmJSValidate.cpp in preparation for paralleliz
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
