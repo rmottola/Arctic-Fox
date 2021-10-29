@@ -2495,7 +2495,7 @@ DefineProperty(JSContext* cx, HandleObject obj, const char* name, HandleValue va
     AutoRooterGetterSetter gsRoot(cx, attrs, const_cast<JSNative*>(&getter.op),
                                   const_cast<JSNative*>(&setter.op));
 
-    JSAtom *atom = Atomize(cx, name, strlen(name));
+    JSAtom* atom = Atomize(cx, name, strlen(name));
     if (!atom)
         return false;
     RootedId id(cx, AtomToId(atom));
@@ -3603,7 +3603,7 @@ JS_DefineFunctions(JSContext* cx, HandleObject obj, const JSFunctionSpec* fs,
 
             flags &= ~JSFUN_GENERIC_NATIVE;
             JSFunction* fun = DefineFunction(cx, ctor, id,
-					     GenericNativeMethodDispatcher,
+                                             GenericNativeMethodDispatcher,
                                              fs->nargs + 1, flags,
                                              gc::AllocKind::FUNCTION_EXTENDED);
             if (!fun)
