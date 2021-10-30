@@ -632,6 +632,9 @@ PluginModuleContentParent::PluginModuleContentParent()
 
 PluginModuleContentParent::~PluginModuleContentParent()
 {
+    XRE_GetIOMessageLoop()->PostTask(FROM_HERE,
+                                     new DeleteTask<Transport>(GetTransport()));
+
     Preferences::UnregisterCallback(TimeoutChanged, kContentTimeoutPref, this);
 }
 
