@@ -21,7 +21,7 @@
 #include "platform.h"
 #include "shared-libraries.h"
 #include "mozilla/StackWalk.h"
-#include "TableTicker.h"
+#include "GeckoSampler.h"
 
 // JSON
 #include "ProfileJSONWriter.h"
@@ -39,6 +39,8 @@
 #include "nsIObserverService.h"
 #include "mozilla/Services.h"
 #include "nsTArray.h"
+
+#include "mozilla/ProfileGatherer.h"
 #endif
 
 #if defined(SPS_OS_android) && !defined(MOZ_WIDGET_GONK)
@@ -70,8 +72,8 @@ pid_t gettid();
 #ifndef SPS_STANDALONE
 #if defined(SPS_PLAT_amd64_linux) || defined(SPS_PLAT_x86_linux)
 # define USE_LUL_STACKWALK
-# include "LulMain.h"
-# include "platform-linux-lul.h"
+# include "lul/LulMain.h"
+# include "lul/platform-linux-lul.h"
 #endif
 #endif
 
@@ -167,7 +169,7 @@ hasFeature(const char** aFeatures, uint32_t aFeatureCount, const char* aFeature)
   return false;
 }
 
-TableTicker::TableTicker(double aInterval, int aEntrySize,
+GeckoSampler::GeckoSampler(double aInterval, int aEntrySize,
                          const char** aFeatures, uint32_t aFeatureCount,
                          const char** aThreadNameFilters, uint32_t aFilterCount)
   : Sampler(aInterval, true, aEntrySize)
@@ -232,7 +234,7 @@ TableTicker::TableTicker(double aInterval, int aEntrySize,
 #endif
 }
 
-TableTicker::~TableTicker()
+GeckoSampler::~GeckoSampler()
 {
   if (IsActive())
     Stop();
@@ -264,7 +266,7 @@ TableTicker::~TableTicker()
 #endif
 }
 
-void TableTicker::HandleSaveRequest()
+void GeckoSampler::HandleSaveRequest()
 {
   if (!mSaveRequested)
     return;
@@ -278,12 +280,12 @@ void TableTicker::HandleSaveRequest()
 #endif
 }
 
-void TableTicker::DeleteExpiredMarkers()
+void GeckoSampler::DeleteExpiredMarkers()
 {
   mBuffer->deleteExpiredStoredMarkers();
 }
 
-void TableTicker::StreamTaskTracer(SpliceableJSONWriter& aWriter)
+void GeckoSampler::StreamTaskTracer(SpliceableJSONWriter& aWriter)
 {
 #ifdef MOZ_TASK_TRACER
   aWriter.StartArrayProperty("data");
@@ -315,7 +317,7 @@ void TableTicker::StreamTaskTracer(SpliceableJSONWriter& aWriter)
 }
 
 
-void TableTicker::StreamMetaJSCustomObject(SpliceableJSONWriter& aWriter)
+void GeckoSampler::StreamMetaJSCustomObject(SpliceableJSONWriter& aWriter)
 {
   aWriter.IntProperty("version", 3);
   aWriter.DoubleProperty("interval", interval());
@@ -369,14 +371,14 @@ void TableTicker::StreamMetaJSCustomObject(SpliceableJSONWriter& aWriter)
 #endif
 }
 
-void TableTicker::ToStreamAsJSON(std::ostream& stream, double aSinceTime)
+void GeckoSampler::ToStreamAsJSON(std::ostream& stream, double aSinceTime)
 {
   SpliceableJSONWriter b(mozilla::MakeUnique<OStreamJSONWriteFunc>(stream));
   StreamJSON(b, aSinceTime);
 }
 
 #ifndef SPS_STANDALONE
-JSObject* TableTicker::ToJSObject(JSContext *aCx, double aSinceTime)
+JSObject* GeckoSampler::ToJSObject(JSContext *aCx, double aSinceTime)
 {
   JS::RootedValue val(aCx);
   {
@@ -414,25 +416,25 @@ JSObject* TableTicker::ToJSObject(JSContext *aCx, double aSinceTime)
 }
 #endif
 
-UniquePtr<char[]> TableTicker::ToJSON(double aSinceTime)
+UniquePtr<char[]> GeckoSampler::ToJSON(double aSinceTime)
 {
   SpliceableChunkedJSONWriter b;
   StreamJSON(b, aSinceTime);
   return b.WriteFunc()->CopyData();
 }
 
-void TableTicker::ToJSObjectAsync(double aSinceTime,
-                                  Promise* aPromise)
+void GeckoSampler::ToJSObjectAsync(double aSinceTime,
+                                  mozilla::dom::Promise* aPromise)
 {
   if (NS_WARN_IF(mGatherer)) {
     return;
   }
 
-  mGatherer = new ProfileGatherer(this, aSinceTime, aPromise);
+  mGatherer = new mozilla::ProfileGatherer(this, aSinceTime, aPromise);
   mGatherer->Start();
 }
 
-void TableTicker::ProfileGathered()
+void GeckoSampler::ProfileGathered()
 {
   mGatherer = nullptr;
 }
@@ -507,7 +509,7 @@ void BuildJavaThreadJSObject(SpliceableJSONWriter& aWriter)
 }
 #endif
 
-void TableTicker::StreamJSON(SpliceableJSONWriter& aWriter, double aSinceTime)
+void GeckoSampler::StreamJSON(SpliceableJSONWriter& aWriter, double aSinceTime)
 {
   aWriter.Start(SpliceableJSONWriter::SingleLineStyle);
   {
@@ -577,7 +579,7 @@ void TableTicker::StreamJSON(SpliceableJSONWriter& aWriter, double aSinceTime)
   aWriter.End();
 }
 
-void TableTicker::FlushOnJSShutdown(JSRuntime* aRuntime)
+void GeckoSampler::FlushOnJSShutdown(JSRuntime* aRuntime)
 {
 #ifndef SPS_STANDALONE
   SetPaused(true);
@@ -610,7 +612,7 @@ void PseudoStack::flushSamplerOnJSShutdown()
 {
 #ifndef SPS_STANDALONE
   MOZ_ASSERT(mRuntime);
-  TableTicker* t = tlsTicker.get();
+  GeckoSampler* t = tlsTicker.get();
   if (t) {
     t->FlushOnJSShutdown(mRuntime);
   }
@@ -926,7 +928,7 @@ void StackWalkCallback(uint32_t aFrameNumber, void* aPC, void* aSP,
   nativeStack->count++;
 }
 
-void TableTicker::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSample)
+void GeckoSampler::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSample)
 {
 #ifndef XP_MACOSX
   uintptr_t thread = GetThreadHandle(aSample->threadProfile->GetPlatformData());
@@ -978,7 +980,7 @@ void TableTicker::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSample
 #endif
 
 #ifdef USE_LUL_STACKWALK
-void TableTicker::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSample)
+void GeckoSampler::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSample)
 {
   const mcontext_t* mc
     = &reinterpret_cast<ucontext_t *>(aSample->context)->uc_mcontext;
@@ -1097,13 +1099,13 @@ void doSampleStackTrace(ThreadProfile &aProfile, TickSample *aSample, bool aAddL
 #endif
 }
 
-void TableTicker::Tick(TickSample* sample)
+void GeckoSampler::Tick(TickSample* sample)
 {
   // Don't allow for ticks to happen within other ticks.
   InplaceTick(sample);
 }
 
-void TableTicker::InplaceTick(TickSample* sample)
+void GeckoSampler::InplaceTick(TickSample* sample)
 {
   ThreadProfile& currThreadProfile = *sample->threadProfile;
 
@@ -1185,7 +1187,7 @@ SyncProfile* NewSyncProfile()
 
 } // anonymous namespace
 
-SyncProfile* TableTicker::GetBacktrace()
+SyncProfile* GeckoSampler::GetBacktrace()
 {
   SyncProfile* profile = NewSyncProfile();
 
@@ -1240,7 +1242,7 @@ void mozilla_sampler_print_location1()
 }
 
 void
-TableTicker::GetBufferInfo(uint32_t *aCurrentPosition, uint32_t *aTotalSize, uint32_t *aGeneration)
+GeckoSampler::GetBufferInfo(uint32_t *aCurrentPosition, uint32_t *aTotalSize, uint32_t *aGeneration)
 {
   *aCurrentPosition = mBuffer->mWritePos;
   *aTotalSize = mBuffer->mEntrySize;

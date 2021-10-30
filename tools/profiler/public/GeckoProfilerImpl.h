@@ -35,14 +35,14 @@
 #undef min
 #endif
 
-class TableTicker;
+class GeckoSampler;
 
 namespace mozilla {
 class TimeStamp;
 }
 
 extern mozilla::ThreadLocal<ProfileStack *> tlsStack;
-extern mozilla::ThreadLocal<TableTicker *> tlsTicker;
+extern mozilla::ThreadLocal<GeckoSampler *> tlsTicker;
 extern mozilla::ThreadLocal<void *> tlsStackTop;
 extern bool stack_key_initialized;
 

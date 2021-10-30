@@ -17,4 +17,4 @@
 #
 # Modifying this file will now automatically clobber the buildbot machines \o/
 
-Bug 1164310 requires a clobber due to bug 1177844
+Bug 1178892 requires clobber for profiler file moves.
