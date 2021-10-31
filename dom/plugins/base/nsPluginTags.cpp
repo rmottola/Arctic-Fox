@@ -669,6 +669,10 @@ void nsPluginTag::ImportFlagsToPrefs(uint32_t flags)
 NS_IMETHODIMP
 nsPluginTag::GetBlocklistState(uint32_t *aResult)
 {
+#if defined(MOZ_WIDGET_ANDROID)
+  *aResult = nsIBlocklistService::STATE_NOT_BLOCKED;
+  return NS_OK;
+#else
   if (mCachedBlocklistStateValid) {
     *aResult = mCachedBlocklistState;
     return NS_OK;
@@ -702,6 +706,7 @@ nsPluginTag::GetBlocklistState(uint32_t *aResult)
   mCachedBlocklistState = (uint16_t) *aResult;
   mCachedBlocklistStateValid = true;
   return NS_OK;
+#endif // defined(MOZ_WIDGET_ANDROID)
 }
 
 bool
