@@ -195,7 +195,7 @@ nsInvalidPluginTag::~nsInvalidPluginTag()
 
 // Helper to check for a MIME in a comma-delimited preference
 static bool
-IsTypeInList(nsCString &aMimeType, nsCString aTypeList)
+IsTypeInList(const nsCString& aMimeType, nsCString aTypeList)
 {
   nsAutoCString searchStr;
   searchStr.Assign(',');
@@ -1098,7 +1098,7 @@ nsPluginHost::HavePluginForExtension(const nsACString & aExtension,
 }
 
 void
-nsPluginHost::GetPlugins(nsTArray<nsRefPtr<nsPluginTag> >& aPluginArray,
+nsPluginHost::GetPlugins(nsTArray<nsCOMPtr<nsIInternalPluginTag>>& aPluginArray,
                          bool aIncludeDisabled)
 {
   aPluginArray.Clear();
@@ -1159,7 +1159,7 @@ nsPluginHost::FindPreferredPlugin(const InfallibleTArray<nsPluginTag*>& matches)
 
   nsPluginTag *preferredPlugin = matches[0];
   for (unsigned int i = 1; i < matches.Length(); i++) {
-    if (mozilla::Version(matches[i]->mVersion.get()) > preferredPlugin->mVersion.get()) {
+    if (mozilla::Version(matches[i]->Version().get()) > preferredPlugin->Version().get()) {
       preferredPlugin = matches[i];
     }
   }
@@ -1346,12 +1346,12 @@ nsresult nsPluginHost::GetPlugin(const nsACString &aMimeType,
     rv = NS_OK;
     PLUGIN_LOG(PLUGIN_LOG_BASIC,
     ("nsPluginHost::GetPlugin Begin mime=%s, plugin=%s\n",
-     PromiseFlatCString(aMimeType).get(), pluginTag->mFileName.get()));
+     PromiseFlatCString(aMimeType).get(), pluginTag->FileName().get()));
 
 #ifdef DEBUG
-    if (!pluginTag->mFileName.IsEmpty())
+    if (!pluginTag->FileName().IsEmpty())
       printf("For %s found plugin %s\n",
-             PromiseFlatCString(aMimeType).get(), pluginTag->mFileName.get());
+             PromiseFlatCString(aMimeType).get(), pluginTag->FileName().get());
 #endif
 
     rv = EnsurePluginLoaded(pluginTag);
@@ -1366,7 +1366,7 @@ nsresult nsPluginHost::GetPlugin(const nsACString &aMimeType,
   PLUGIN_LOG(PLUGIN_LOG_NORMAL,
   ("nsPluginHost::GetPlugin End mime=%s, rv=%d, plugin=%p name=%s\n",
    PromiseFlatCString(aMimeType).get(), rv, *aPlugin,
-   (pluginTag ? pluginTag->mFileName.get() : "(not found)")));
+   (pluginTag ? pluginTag->FileName().get() : "(not found)")));
 
   return rv;
 }
@@ -1905,7 +1905,7 @@ nsPluginHost::ShouldAddPlugin(nsPluginTag* aPluginTag)
 #if defined(XP_WIN) && (defined(__x86_64__) || defined(_M_X64))
   // On 64-bit windows, the only plugin we should load is flash. Use library
   // filename and MIME type to check.
-  if (StringBeginsWith(aPluginTag->mFileName, NS_LITERAL_CSTRING("NPSWF"), nsCaseInsensitiveCStringComparator()) &&
+  if (StringBeginsWith(aPluginTag->FileName(), NS_LITERAL_CSTRING("NPSWF"), nsCaseInsensitiveCStringComparator()) &&
       (aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-shockwave-flash")) ||
        aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-shockwave-flash-test")))) {
     return true;
@@ -1918,7 +1918,7 @@ nsPluginHost::ShouldAddPlugin(nsPluginTag* aPluginTag)
   }
 #ifdef PLUGIN_LOGGING
   PLUGIN_LOG(PLUGIN_LOG_NORMAL,
-             ("ShouldAddPlugin : Ignoring non-flash plugin library %s\n", aPluginTag->mFileName.get()));
+             ("ShouldAddPlugin : Ignoring non-flash plugin library %s\n", aPluginTag->FileName().get()));
 #endif // PLUGIN_LOGGING
   return false;
 #else
@@ -1938,9 +1938,9 @@ nsPluginHost::AddPluginTag(nsPluginTag* aPluginTag)
   if (aPluginTag->IsActive()) {
     nsAdoptingCString disableFullPage =
       Preferences::GetCString(kPrefDisableFullPage);
-    for (uint32_t i = 0; i < aPluginTag->mMimeTypes.Length(); i++) {
-      if (!IsTypeInList(aPluginTag->mMimeTypes[i], disableFullPage)) {
-        RegisterWithCategoryManager(aPluginTag->mMimeTypes[i],
+    for (uint32_t i = 0; i < aPluginTag->MimeTypes().Length(); i++) {
+      if (!IsTypeInList(aPluginTag->MimeTypes()[i], disableFullPage)) {
+        RegisterWithCategoryManager(aPluginTag->MimeTypes()[i],
                                     ePluginRegister);
       }
     }
@@ -2525,11 +2525,15 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
     return;
   }
 
-  nsTArray<nsRefPtr<nsPluginTag>> plugins;
+  nsTArray<nsCOMPtr<nsIInternalPluginTag>> plugins;
   GetPlugins(plugins, true);
 
   for (size_t i = 0; i < plugins.Length(); i++) {
-    nsRefPtr<nsPluginTag> tag = plugins[i];
+    nsCOMPtr<nsIInternalPluginTag> basetag = plugins[i];
+
+    /// XXX(johns) Bug FIXME-jsplugins - We need to cleanup the various plugintag classes
+    ///            to be more sane and avoid this dance
+    nsPluginTag *tag = static_cast<nsPluginTag *>(basetag.get());
 
     if (!nsNPAPIPlugin::RunPluginOOP(tag)) {
       // Don't expose non-OOP plugins to content processes since we have no way
@@ -2538,15 +2542,15 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
     }
 
     aPlugins->AppendElement(PluginTag(tag->mId,
-                                      tag->mName,
-                                      tag->mDescription,
-                                      tag->mMimeTypes,
-                                      tag->mMimeDescriptions,
-                                      tag->mExtensions,
+                                      tag->Name(),
+                                      tag->Description(),
+                                      tag->MimeTypes(),
+                                      tag->MimeDescriptions(),
+                                      tag->Extensions(),
                                       tag->mIsJavaPlugin,
                                       tag->mIsFlashPlugin,
-                                      tag->mFileName,
-                                      tag->mVersion,
+                                      tag->FileName(),
+                                      tag->Version(),
                                       tag->mLastModifiedTime,
                                       tag->IsFromExtension()));
   }
@@ -2569,18 +2573,18 @@ nsPluginHost::UpdatePluginInfo(nsPluginTag* aPluginTag)
   // Update types with category manager
   nsAdoptingCString disableFullPage =
     Preferences::GetCString(kPrefDisableFullPage);
-  for (uint32_t i = 0; i < aPluginTag->mMimeTypes.Length(); i++) {
+  for (uint32_t i = 0; i < aPluginTag->MimeTypes().Length(); i++) {
     nsRegisterType shouldRegister;
 
-    if (IsTypeInList(aPluginTag->mMimeTypes[i], disableFullPage)) {
+    if (IsTypeInList(aPluginTag->MimeTypes()[i], disableFullPage)) {
       shouldRegister = ePluginUnregister;
     } else {
-      nsPluginTag *plugin = FindNativePluginForType(aPluginTag->mMimeTypes[i],
+      nsPluginTag *plugin = FindNativePluginForType(aPluginTag->MimeTypes()[i],
                                                     true);
       shouldRegister = plugin ? ePluginRegister : ePluginUnregister;
     }
 
-    RegisterWithCategoryManager(aPluginTag->mMimeTypes[i], shouldRegister);
+    RegisterWithCategoryManager(aPluginTag->MimeTypes()[i], shouldRegister);
   }
 
   nsCOMPtr<nsIObserverService> obsService =
@@ -2601,7 +2605,7 @@ nsPluginHost::IsTypeWhitelisted(const char *aMimeType)
 }
 
 void
-nsPluginHost::RegisterWithCategoryManager(nsCString &aMimeType,
+nsPluginHost::RegisterWithCategoryManager(const nsCString& aMimeType,
                                           nsRegisterType aType)
 {
   PLUGIN_LOG(PLUGIN_LOG_NORMAL,
@@ -2703,13 +2707,13 @@ nsPluginHost::WritePluginInfo()
     // filename & fullpath are on separate line
     // because they can contain field delimiter char
     PR_fprintf(fd, "%s%c%c\n%s%c%c\n%s%c%c\n",
-      (tag->mFileName.get()),
+      (tag->FileName().get()),
       PLUGIN_REGISTRY_FIELD_DELIMITER,
       PLUGIN_REGISTRY_END_OF_LINE_MARKER,
       (tag->mFullPath.get()),
       PLUGIN_REGISTRY_FIELD_DELIMITER,
       PLUGIN_REGISTRY_END_OF_LINE_MARKER,
-      (tag->mVersion.get()),
+      (tag->Version().get()),
       PLUGIN_REGISTRY_FIELD_DELIMITER,
       PLUGIN_REGISTRY_END_OF_LINE_MARKER);
 
@@ -2727,23 +2731,23 @@ nsPluginHost::WritePluginInfo()
 
     //description, name & mtypecount are on separate line
     PR_fprintf(fd, "%s%c%c\n%s%c%c\n%d\n",
-      (tag->mDescription.get()),
+      (tag->Description().get()),
       PLUGIN_REGISTRY_FIELD_DELIMITER,
       PLUGIN_REGISTRY_END_OF_LINE_MARKER,
-      (tag->mName.get()),
+      (tag->Name().get()),
       PLUGIN_REGISTRY_FIELD_DELIMITER,
       PLUGIN_REGISTRY_END_OF_LINE_MARKER,
-      tag->mMimeTypes.Length());
+      tag->MimeTypes().Length());
 
     // Add in each mimetype this plugin supports
-    for (uint32_t i = 0; i < tag->mMimeTypes.Length(); i++) {
+    for (uint32_t i = 0; i < tag->MimeTypes().Length(); i++) {
       PR_fprintf(fd, "%d%c%s%c%s%c%s%c%c\n",
         i,PLUGIN_REGISTRY_FIELD_DELIMITER,
-        (tag->mMimeTypes[i].get()),
+        (tag->MimeTypes()[i].get()),
         PLUGIN_REGISTRY_FIELD_DELIMITER,
-        (tag->mMimeDescriptions[i].get()),
+        (tag->MimeDescriptions()[i].get()),
         PLUGIN_REGISTRY_FIELD_DELIMITER,
-        (tag->mExtensions[i].get()),
+        (tag->Extensions()[i].get()),
         PLUGIN_REGISTRY_FIELD_DELIMITER,
         PLUGIN_REGISTRY_END_OF_LINE_MARKER);
     }
@@ -3085,7 +3089,7 @@ nsPluginHost::ReadPluginInfo()
     }
 
     MOZ_LOG(nsPluginLogging::gPluginLog, PLUGIN_LOG_BASIC,
-      ("LoadCachedPluginsInfo : Loading Cached plugininfo for %s\n", tag->mFileName.get()));
+      ("LoadCachedPluginsInfo : Loading Cached plugininfo for %s\n", tag->FileName().get()));
 
     if (!ShouldAddPlugin(tag)) {
       continue;
@@ -3779,7 +3783,7 @@ nsPluginHost::GetPluginName(nsNPAPIPluginInstance *aPluginInstance,
   if (!plugin)
     return NS_ERROR_FAILURE;
 
-  *aPluginName = TagForPlugin(plugin)->mName.get();
+  *aPluginName = TagForPlugin(plugin)->Name().get();
 
   return NS_OK;
 }
