@@ -954,6 +954,8 @@ nsPluginHost::TrySetUpPluginInstance(const nsACString &aMimeType,
 
   NS_ASSERTION(pluginTag, "Must have plugin tag here!");
 
+  plugin->GetLibrary()->SetHasLocalInstance();
+
   nsRefPtr<nsNPAPIPluginInstance> instance = new nsNPAPIPluginInstance();
 
   // This will create the owning reference. The connection must be made between the
