@@ -177,6 +177,7 @@ class PackedScopeCoordinate
     F(SUPERPROP) \
     F(SUPERELEM) \
     F(NEWTARGET) \
+    F(POSHOLDER) \
     \
     /* Unary operators. */ \
     F(TYPEOFNAME) \
