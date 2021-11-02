@@ -122,7 +122,6 @@
 - Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1169268 - Don't crash when pasting files. r=ndeakin
 - Bug 1202085 2015-10-26 - Part 0 to 6
-- Bug 930414 - 22 parts
 - Bug 1188347  - 5 parts
 - Bug 1188643 2015-09-30 - Buffer more audio in audio capture mode to avoid glitche
 - Bug 1072313: P2 Prevent instanciating MacIOSurfaceLib directly. r=ma
@@ -175,7 +174,6 @@
 - Bug 1200099. Add a test that captured cross-origin video
 - Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
 --Bug 1194422 - Expose census traversals to SpiderMonkey embedders; r=s
-- Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
 - Bug 830801 - Part 1. Set NOMINMAX define as default. r=mshal 
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
@@ -225,6 +223,9 @@ Parents of:
 https://github.com/mozilla/newtab-dev/commit/567240287fa9fe6f94fb49d0675512d6aa1c162c
 
 ## Breaking JS
+- Bug 930414 - 22 parts
+Bug 1195866 - Make allocations log report whether an allocation was i
+- Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
 Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
 Bug 1181869 - Update Bindings to use normal Rooted primitives
 
