@@ -448,16 +448,16 @@ GlobalObject::warnOnceAbout(JSContext* cx, HandleObject obj, WarnOnceFlag flag,
     return true;
 }
 
-JSFunction *
-GlobalObject::createConstructor(JSContext *cx, Native ctor, JSAtom *nameArg, unsigned length,
+JSFunction*
+GlobalObject::createConstructor(JSContext* cx, Native ctor, JSAtom* nameArg, unsigned length,
                                 gc::AllocKind kind)
 {
     RootedAtom name(cx, nameArg);
     return NewNativeConstructor(cx, ctor, length, name, kind);
 }
 
-static NativeObject *
-CreateBlankProto(JSContext *cx, const Class *clasp, HandleObject proto, HandleObject global)
+static NativeObject*
+CreateBlankProto(JSContext* cx, const Class* clasp, HandleObject proto, HandleObject global)
 {
     MOZ_ASSERT(clasp != &JSFunction::class_);
 
