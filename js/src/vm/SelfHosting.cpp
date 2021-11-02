@@ -617,7 +617,7 @@ intrinsic_StarGeneratorObjectIsClosed(JSContext* cx, unsigned argc, Value* vp)
 }
 
 bool
-js::intrinsic_MoveTypedArrayElements(JSContext *cx, unsigned argc, Value *vp)
+js::intrinsic_MoveTypedArrayElements(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     MOZ_ASSERT(args.length() == 4);
