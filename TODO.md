@@ -221,6 +221,10 @@ Parents of:
 https://github.com/mozilla/newtab-dev/commit/567240287fa9fe6f94fb49d0675512d6aa1c162c
 
 ## Breaking JS
+- Bug 1054756, part 5 - Remove Class::convert. 
+- Bug 1054756, part 4 - Remove BaseProxyHandler::defaultValue. r=jandem
+- Bug 1054756, part 3 - Implement Symbol.toPrimitive. Replace existing 
+- Bug 1088214 - Remove JSCLASS_IMPLEMENTS_BARRIERS now this is implemen
 - Bug 930414 - 22 parts
 Bug 1195866 - Make allocations log report whether an allocation was i
 - Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
