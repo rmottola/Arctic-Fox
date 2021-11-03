@@ -105,6 +105,7 @@
 - Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
 - Bug 1226909 multipart AsyncOpen2 
 - Bug 1213646: Allow URI_IS_UI_RESOURCE and safe about: URIs when SEC_A
+- Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
 - Bug 1182571 - 2051-10-19 Fix nsILoadInfo->GetContentPolicyType API to be less am
 - Bug 1170958 - 2015-09-30 - Allow MediaInputPort to lock to a specific input track
 - Bug 1205533 - 2015-09-18 - Fix and disallow warnings in gfx/qcms/
@@ -124,15 +125,12 @@
 - Bug 1202085 2015-10-26 - Part 0 to 6
 - Bug 1188347  - 5 parts
 - Bug 1188643 2015-09-30 - Buffer more audio in audio capture mode to avoid glitche
-- Bug 1072313: P2 Prevent instanciating MacIOSurfaceLib directly. r=ma
-- Bug 1072313: P1. Make MacIOSurface refcount thread-safe. r=mattwoodrow
 - Bug 1205870 - 2015-09-22 - Make sure all possible unboxed array inline capacities 
 - Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
 -  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
-- Bug 1072313 - Check for more leaks in the layers code. r=mstange
 - Bug 1167409 - for parts
 - Bug 1192667 - Trigger fullscreen transition when exiting fullscreen
 - Bug 1198563
