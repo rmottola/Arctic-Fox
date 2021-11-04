@@ -233,20 +233,20 @@ class JS_FRIEND_API(SecurityWrapper) : public Base
     virtual bool enter(JSContext* cx, HandleObject wrapper, HandleId id, Wrapper::Action act,
                        bool* bp) const override;
 
-    virtual bool defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
+    virtual bool defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
                                 Handle<JSPropertyDescriptor> desc,
-                                ObjectOpResult &result) const override;
-    virtual bool isExtensible(JSContext *cx, HandleObject wrapper, bool *extensible) const override;
-    virtual bool preventExtensions(JSContext *cx, HandleObject wrapper,
-                                   ObjectOpResult &result) const override;
-    virtual bool setPrototype(JSContext *cx, HandleObject proxy, HandleObject proto,
-                              ObjectOpResult &result) const override;
-    virtual bool setImmutablePrototype(JSContext *cx, HandleObject proxy, bool *succeeded) const override;
+                                ObjectOpResult& result) const override;
+    virtual bool isExtensible(JSContext* cx, HandleObject wrapper, bool *extensible) const override;
+    virtual bool preventExtensions(JSContext* cx, HandleObject wrapper,
+                                   ObjectOpResult& result) const override;
+    virtual bool setPrototype(JSContext* cx, HandleObject proxy, HandleObject proto,
+                              ObjectOpResult& result) const override;
+    virtual bool setImmutablePrototype(JSContext* cx, HandleObject proxy, bool* succeeded) const override;
 
-    virtual bool nativeCall(JSContext *cx, IsAcceptableThis test, NativeImpl impl,
-                            const CallArgs &args) const override;
+    virtual bool nativeCall(JSContext* cx, IsAcceptableThis test, NativeImpl impl,
+                            const CallArgs& args) const override;
     virtual bool objectClassIs(HandleObject obj, ESClassValue classValue,
-                               JSContext *cx) const override;
+                               JSContext* cx) const override;
     virtual bool regexp_toShared(JSContext* cx, HandleObject proxy, RegExpGuard* g) const override;
     virtual bool boxedValue_unbox(JSContext* cx, HandleObject proxy, MutableHandleValue vp) const override;
     virtual bool defaultValue(JSContext* cx, HandleObject wrapper, JSType hint,
