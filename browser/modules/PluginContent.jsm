@@ -658,20 +658,6 @@ PluginContent.prototype = {
     this._showClickToPlayNotification(null, false);
   },
 
-  // Match the behaviour of nsPermissionManager
-  _getHostFromPrincipal: function (principal) {
-    if (!principal.URI || principal.URI.schemeIs("moz-nullprincipal")) {
-      return "(null)";
-    }
-
-    try {
-      if (principal.URI.host)
-        return principal.URI.host;
-    } catch (e) {}
-
-    return principal.origin;
-  },
-
   /**
    * Activate the plugins that the user has specified.
    */
@@ -736,7 +722,6 @@ PluginContent.prototype = {
     let pluginData = this.pluginData;
 
     let principal = this.content.document.nodePrincipal;
-    let principalHost = this._getHostFromPrincipal(principal);
     let location = this.content.document.location.href;
 
     for (let p of plugins) {
@@ -752,11 +737,11 @@ PluginContent.prototype = {
       let permissionObj = Services.perms.
         getPermissionObject(principal, pluginInfo.permissionString, false);
       if (permissionObj) {
-        pluginInfo.pluginPermissionHost = permissionObj.host;
+        pluginInfo.pluginPermissionPrePath = permissionObj.principal.originNoSuffix;
         pluginInfo.pluginPermissionType = permissionObj.expireType;
       }
       else {
-        pluginInfo.pluginPermissionHost = principalHost;
+        pluginInfo.pluginPermissionPrePath = principal.originNoSuffix;
         pluginInfo.pluginPermissionType = undefined;
       }
 
@@ -766,7 +751,6 @@ PluginContent.prototype = {
     this.global.sendAsyncMessage("PluginContent:ShowClickToPlayNotification", {
       plugins: [... this.pluginData.values()],
       showNow: showNow,
-      host: principalHost,
       location: location,
     }, null, principal);
   },
@@ -849,7 +833,6 @@ PluginContent.prototype = {
     this.global.sendAsyncMessage("PluginContent:UpdateHiddenPluginUI", {
       haveInsecure: haveInsecure,
       actions: [... actions.values()],
-      host: this._getHostFromPrincipal(principal),
       location: location,
     }, null, principal);
   },

@@ -1634,8 +1634,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             return;
           }
 
-          let host = this.notification.options.host;
-          this._setupDescription("pluginActivateMultiple.message", null, host);
+          let prePath = this.notification.options.principal.URI.prePath;
+          this._setupDescription("pluginActivateMultiple.message", null, prePath);
 
           var showBox = document.getAnonymousElementByAttribute(this, "anonid", "plugin-notification-showbox");
 
@@ -1674,7 +1674,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
       <method name="_setupSingleState">
         <body><![CDATA[
           var action = this._items[0].action;
-          var host = action.pluginPermissionHost;
+          var prePath = action.pluginPermissionPrePath;
 
           let label, linkLabel, linkUrl, button1, button2;
 
@@ -1769,7 +1769,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               Cu.reportError(Error("Unexpected blocklist state"));
             }
           }
-          this._setupDescription(label, action.pluginName, host);
+          this._setupDescription(label, action.pluginName, prePath);
           this._setupLink(linkLabel, action.detailsLink);
 
           this._primaryButton.label = gNavigatorBundle.getString(button1.label);
@@ -1790,7 +1790,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
       <method name="_setupDescription">
         <parameter name="baseString" />
         <parameter name="pluginName" /> <!-- null for the multiple-plugin case -->
-        <parameter name="host" />
+        <parameter name="prePath" />
         <body><![CDATA[
           var bsn = this._brandShortName;
           var span = document.getAnonymousElementByAttribute(this, "anonid", "click-to-play-plugins-notification-description");
@@ -1798,17 +1798,17 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             span.removeChild(span.lastChild);
           }
 
-          var args = ["__host__", this._brandShortName];
+          var args = ["__prepath__", this._brandShortName];
           if (pluginName) {
             args.unshift(pluginName);
           }
           var bases = gNavigatorBundle.getFormattedString(baseString, args).
-            split("__host__", 2);
+            split("__prepath__", 2);
 
           span.appendChild(document.createTextNode(bases[0]));
-          var hostSpan = document.createElementNS("http://www.w3.org/1999/xhtml", "em");
-          hostSpan.appendChild(document.createTextNode(host));
-          span.appendChild(hostSpan);
+          var prePathSpan = document.createElementNS("http://www.w3.org/1999/xhtml", "em");
+          prePathSpan.appendChild(document.createTextNode(prePath));
+          span.appendChild(prePathSpan);
           span.appendChild(document.createTextNode(bases[1] + " "));
         ]]></body>
       </method>
