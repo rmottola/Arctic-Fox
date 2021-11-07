@@ -3916,10 +3916,24 @@ XRE_StopLateWriteChecks(void) {
   mozilla::StopLateWriteChecks();
 }
 
+// Separate stub function to let us specifically suppress it in Valgrind
+void
+XRE_CreateStatsObject()
+{
+  // A initializer to initialize histogram collection, a chromium
+  // thing used by Telemetry (and effectively a global; it's all static).
+  // Note: purposely leaked
+  base::StatisticsRecorder* statistics_recorder = new base::StatisticsRecorder();
+  MOZ_LSAN_INTENTIONALLY_LEAK_OBJECT(statistics_recorder);
+  unused << statistics_recorder;
+}
+
 int
 XRE_main(int argc, char* argv[], const nsXREAppData* aAppData, uint32_t aFlags)
 {
   XREMain main;
+
+  XRE_CreateStatsObject();
   int result = main.XRE_main(argc, argv, aAppData);
   mozilla::RecordShutdownEndTimeStamp();
   return result;
