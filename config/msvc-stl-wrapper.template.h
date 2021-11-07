@@ -12,9 +12,6 @@
 #  error "STL code can only be used with -fno-exceptions"
 #endif
 
-// Suppress windef.h min and max macros - they make std::min/max not compile.
-#define NOMINMAX 1
-
 // Include mozalloc after the STL header and all other headers it includes
 // have been preprocessed.
 #if !defined(MOZ_INCLUDE_MOZALLOC_H)
