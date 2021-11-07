@@ -47,6 +47,8 @@ if CONFIG['INTEL_ARCHITECTURE'] and CONFIG['GNU_CC'] and CONFIG['OS_ARCH'] != 'W
             'trunk/src/opts/SkBlitRow_opts_SSE4_asm.S',
         ]
 
+ALLOW_COMPILER_WARNINGS = True
+
 FINAL_LIBRARY = 'gkmedias'
 LOCAL_INCLUDES += [
     'trunk/include/config',

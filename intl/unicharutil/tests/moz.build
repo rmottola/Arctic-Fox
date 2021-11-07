@@ -14,3 +14,6 @@ GeckoSimplePrograms([
 USE_LIBS += [
     'unicharutil_external_s',
 ]
+
+# XXX: We should fix these warnings.
+ALLOW_COMPILER_WARNINGS = True

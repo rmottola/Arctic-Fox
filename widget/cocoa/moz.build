@@ -75,6 +75,9 @@ if CONFIG['GNU_CXX']:
 # XXX: We should fix these warnings.
 ALLOW_COMPILER_WARNINGS = True
 
+# XXX: We should fix these warnings.
+ALLOW_COMPILER_WARNINGS = True
+
 FINAL_LIBRARY = 'xul'
 LOCAL_INCLUDES += [
     '/layout/forms',

@@ -33,5 +33,3 @@ if CONFIG['_MSC_VER']:
 
 if CONFIG['OS_ARCH'] == 'WINNT':
     RCINCLUDE = 'xpcshell.rc'
-
-FAIL_ON_WARNINGS = True

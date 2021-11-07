@@ -60,8 +60,6 @@ if CONFIG['MOZ_X11']:
         'nsDragService.cpp',
     ]
 
-FAIL_ON_WARNINGS = True
-
 if CONFIG['ACCESSIBILITY']:
     UNIFIED_SOURCES += [
         'maiRedundantObjectFactory.c',

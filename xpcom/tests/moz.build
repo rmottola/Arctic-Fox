@@ -15,8 +15,6 @@ TEST_DIRS += [
 if CONFIG['OS_ARCH'] == 'WINNT':
     TEST_DIRS += ['windows']
 
-FAIL_ON_WARNINGS = True
-
 EXPORTS.testing += [
     'TestHarness.h',
 ]

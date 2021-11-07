@@ -75,8 +75,6 @@ if CONFIG['OS_ARCH'] == 'WINNT':
         'version',
     ]
 
-FAIL_ON_WARNINGS = True
-
 JS_PREFERENCE_FILES += [
     'b2g.js',
 ]

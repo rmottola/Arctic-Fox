@@ -36,8 +36,6 @@ UNIFIED_SOURCES += [
 if CONFIG['MOZ_JXR']:
     SOURCES += ['nsJXRDecoder.cpp']
 
-FAIL_ON_WARNINGS = True
-
 # Decoders need RasterImage.h
 LOCAL_INCLUDES += [
     '/image',

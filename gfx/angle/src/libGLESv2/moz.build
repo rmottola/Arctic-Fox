@@ -60,6 +60,8 @@ DEFINES['GL_APICALL'] = ""
 DEFINES['GL_GLEXT_PROTOTYPES'] = ""
 DEFINES['EGLAPI'] = ""
 
+ALLOW_COMPILER_WARNINGS = True
+
 # ANGLE uses the STL, so we can't use Mozilla's derpy STL wrappers.
 DISABLE_STL_WRAPPING = True
 

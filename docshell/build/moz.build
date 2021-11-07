@@ -24,5 +24,3 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
     LOCAL_INCLUDES += ['/uriloader/exthandler/mac']
 
 FINAL_LIBRARY = 'xul'
-
-FAIL_ON_WARNINGS = True
