@@ -6,14 +6,11 @@
 
 XPCSHELL_TESTS_MANIFESTS += ['unit/xpcshell.ini']
 
-GeckoSimplePrograms([
-    'NormalizationTest',
-    'UnicharSelfTest',
-], msvcrt='static')
-
-USE_LIBS += [
-    'unicharutil_external_s',
+SOURCES += [
+    'NormalizationTest.cpp',
 ]
 
 # XXX: We should fix these warnings.
 ALLOW_COMPILER_WARNINGS = True
+
+FINAL_LIBRARY = 'xul-gtest'
