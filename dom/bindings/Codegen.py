@@ -14361,6 +14361,9 @@ class CallbackMember(CGNativeMember):
                                         self.descriptorProvider,
                                         exceptionCode=self.exceptionCode,
                                         isCallbackReturnValue=isCallbackReturnValue,
+                                        # Allow returning a callback type that
+                                        # allows non-callable objects.
+                                        allowTreatNonCallableAsNull=True,
                                         sourceDescription=sourceDescription),
             replacements)
         assignRetval = string.Template(
