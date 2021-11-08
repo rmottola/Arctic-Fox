@@ -2080,7 +2080,7 @@ XrayWrapper<Base, Traits>::delete_(JSContext* cx, HandleObject wrapper,
 
 template <typename Base, typename Traits>
 bool
-XrayWrapper<Base, Traits>::get(JSContext *cx, HandleObject wrapper,
+XrayWrapper<Base, Traits>::get(JSContext* cx, HandleObject wrapper,
                                HandleObject receiver, HandleId id,
                                MutableHandleValue vp) const
 {
@@ -2092,8 +2092,8 @@ XrayWrapper<Base, Traits>::get(JSContext *cx, HandleObject wrapper,
 
 template <typename Base, typename Traits>
 bool
-XrayWrapper<Base, Traits>::set(JSContext *cx, HandleObject wrapper, HandleId id, HandleValue v,
-                               HandleValue receiver, ObjectOpResult &result) const
+XrayWrapper<Base, Traits>::set(JSContext* cx, HandleObject wrapper, HandleId id, HandleValue v,
+                               HandleValue receiver, ObjectOpResult& result) const
 {
     MOZ_ASSERT(!Traits::HasPrototype);
     // Skip our Base if it isn't already BaseProxyHandler.

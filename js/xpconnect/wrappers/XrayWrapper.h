@@ -417,34 +417,34 @@ class XrayWrapper : public Base {
     { };
 
     /* Standard internal methods. */
-    virtual bool getOwnPropertyDescriptor(JSContext *cx, JS::Handle<JSObject*> wrapper, JS::Handle<jsid> id,
+    virtual bool getOwnPropertyDescriptor(JSContext* cx, JS::Handle<JSObject*> wrapper, JS::Handle<jsid> id,
                                           JS::MutableHandle<JSPropertyDescriptor> desc) const override;
-    virtual bool defineProperty(JSContext *cx, JS::Handle<JSObject*> wrapper, JS::Handle<jsid> id,
+    virtual bool defineProperty(JSContext* cx, JS::Handle<JSObject*> wrapper, JS::Handle<jsid> id,
                                 JS::Handle<JSPropertyDescriptor> desc,
-                                JS::ObjectOpResult &result) const override;
-    virtual bool ownPropertyKeys(JSContext *cx, JS::Handle<JSObject*> wrapper,
+                                JS::ObjectOpResult& result) const override;
+    virtual bool ownPropertyKeys(JSContext* cx, JS::Handle<JSObject*> wrapper,
                                  JS::AutoIdVector& props) const override;
     virtual bool delete_(JSContext* cx, JS::Handle<JSObject*> wrapper,
                          JS::Handle<jsid> id, JS::ObjectOpResult &result) const override;
-    virtual bool enumerate(JSContext *cx, JS::Handle<JSObject*> wrapper,
+    virtual bool enumerate(JSContext* cx, JS::Handle<JSObject*> wrapper,
                            JS::MutableHandle<JSObject*> objp) const override;
-    virtual bool getPrototype(JSContext *cx, JS::HandleObject wrapper,
+    virtual bool getPrototype(JSContext* cx, JS::HandleObject wrapper,
                               JS::MutableHandleObject protop) const override;
-    virtual bool setPrototype(JSContext *cx, JS::HandleObject wrapper,
-                              JS::HandleObject proto, JS::ObjectOpResult &result) const override;
-    virtual bool setImmutablePrototype(JSContext *cx, JS::HandleObject wrapper,
+    virtual bool setPrototype(JSContext* cx, JS::HandleObject wrapper,
+                              JS::HandleObject proto, JS::ObjectOpResult& result) const override;
+    virtual bool setImmutablePrototype(JSContext* cx, JS::HandleObject wrapper,
                                        bool *succeeded) const override;
     virtual bool preventExtensions(JSContext *cx, JS::Handle<JSObject*> wrapper,
                                    JS::ObjectOpResult &result) const override;
-    virtual bool isExtensible(JSContext *cx, JS::Handle<JSObject*> wrapper, bool *extensible) const override;
-    virtual bool has(JSContext *cx, JS::Handle<JSObject*> wrapper, JS::Handle<jsid> id,
-                     bool *bp) const override;
-    virtual bool get(JSContext *cx, JS::Handle<JSObject*> wrapper, JS::Handle<JSObject*> receiver,
+    virtual bool isExtensible(JSContext* cx, JS::Handle<JSObject*> wrapper, bool* extensible) const override;
+    virtual bool has(JSContext* cx, JS::Handle<JSObject*> wrapper, JS::Handle<jsid> id,
+                     bool* bp) const override;
+    virtual bool get(JSContext* cx, JS::Handle<JSObject*> wrapper, JS::Handle<JSObject*> receiver,
                      JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp) const override;
-    virtual bool set(JSContext *cx, JS::Handle<JSObject*> wrapper, JS::Handle<jsid> id,
+    virtual bool set(JSContext* cx, JS::Handle<JSObject*> wrapper, JS::Handle<jsid> id,
                      JS::Handle<JS::Value> v, JS::Handle<JS::Value> receiver,
-                     JS::ObjectOpResult &result) const override;
-    virtual bool call(JSContext *cx, JS::Handle<JSObject*> wrapper,
+                     JS::ObjectOpResult& result) const override;
+    virtual bool call(JSContext* cx, JS::Handle<JSObject*> wrapper,
                       const JS::CallArgs& args) const override;
     virtual bool construct(JSContext* cx, JS::Handle<JSObject*> wrapper,
                            const JS::CallArgs& args) const override;
@@ -511,15 +511,15 @@ public:
 
     // We just forward the high-level methods to the BaseProxyHandler versions
     // which implement them in terms of lower-level methods.
-    virtual bool has(JSContext *cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
+    virtual bool has(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
                      bool* bp) const override;
     virtual bool get(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<JSObject*> receiver,
                      JS::Handle<jsid> id, JS::MutableHandle<JS::Value> vp) const override;
-    virtual bool set(JSContext *cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
+    virtual bool set(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
                      JS::Handle<JS::Value> v, JS::Handle<JS::Value> receiver,
                      JS::ObjectOpResult &result) const override;
 
-    virtual bool getPropertyDescriptor(JSContext *cx, JS::Handle<JSObject*> proxy,
+    virtual bool getPropertyDescriptor(JSContext* cx, JS::Handle<JSObject*> proxy,
                                        JS::Handle<jsid> id,
                                        JS::MutableHandle<JSPropertyDescriptor> desc) const override;
     virtual bool hasOwn(JSContext* cx, JS::Handle<JSObject*> proxy, JS::Handle<jsid> id,
@@ -546,7 +546,7 @@ public:
 
     static const size_t SandboxProxySlot = 0;
 
-    static inline JSObject *getSandboxProxy(JS::Handle<JSObject*> proxy)
+    static inline JSObject* getSandboxProxy(JS::Handle<JSObject*> proxy)
     {
         return &js::GetProxyExtra(proxy, SandboxProxySlot).toObject();
     }
