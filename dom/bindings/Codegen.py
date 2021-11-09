@@ -5937,7 +5937,7 @@ def getWrapTemplateForType(type, descriptorProvider, result, successCode,
             $*{recTemplate}
             """,
             result=result,
-        setNull=setNull(),
+            setNull=setNull(),
             recTemplate=recTemplate)
         return code, recInfall
 
@@ -15848,14 +15848,14 @@ class CGEventMethod(CGNativeMember):
                                   e->${varname} = ${srcname}.Value().Obj();
                                 }
                                 """,
-                            varname=name,
-                            srcname=srcname);
+                                varname=name,
+                                srcname=srcname)
                         else:
                             members += fill(
                                 """
                                 e->${varname}.set(${srcname}.Obj());
                                 """,
-                            varname=name, srcname=srcname);
+                                varname=name, srcname=srcname)
                     else:
                         members += "e->%s = %s.%s;\n" % (name, self.args[1].name, name)
                     if m.type.isAny() or m.type.isObject() or m.type.isSpiderMonkeyInterface():
