@@ -518,11 +518,6 @@ void
 BluetoothAdapter::SetDiscoveryHandleInUse(
   BluetoothDiscoveryHandle* aDiscoveryHandle)
 {
-  // Stop discovery handle in use from listening to "DeviceFound" signal
-  if (mDiscoveryHandleInUse) {
-    mDiscoveryHandleInUse->DisconnectFromOwner();
-  }
-
   mDiscoveryHandleInUse = aDiscoveryHandle;
 }
 
