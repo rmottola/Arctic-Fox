@@ -307,8 +307,8 @@ Proxy::callProp(JSContext* cx, HandleObject proxy, HandleObject receiver, Handle
 }
 
 bool
-Proxy::set(JSContext *cx, HandleObject proxy, HandleId id, HandleValue v, HandleValue receiver,
-           ObjectOpResult &result)
+Proxy::set(JSContext* cx, HandleObject proxy, HandleId id, HandleValue v, HandleValue receiver,
+           ObjectOpResult& result)
 {
     JS_CHECK_RECURSION(cx, return false);
     const BaseProxyHandler* handler = proxy->as<ProxyObject>().handler();

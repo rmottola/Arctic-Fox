@@ -369,26 +369,26 @@ namespace js {
  */
 
 extern JS_FRIEND_API(bool)
-proxy_LookupProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleObject objp,
+proxy_LookupProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleObject objp,
                     JS::MutableHandle<Shape*> propp);
 extern JS_FRIEND_API(bool)
-proxy_DefineProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+proxy_DefineProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                      JS::Handle<JSPropertyDescriptor> desc,
-                     JS::ObjectOpResult &result);
+                     JS::ObjectOpResult& result);
 extern JS_FRIEND_API(bool)
-proxy_HasProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, bool* foundp);
+proxy_HasProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* foundp);
 extern JS_FRIEND_API(bool)
-proxy_GetProperty(JSContext *cx, JS::HandleObject obj, JS::HandleObject receiver, JS::HandleId id,
+proxy_GetProperty(JSContext* cx, JS::HandleObject obj, JS::HandleObject receiver, JS::HandleId id,
                   JS::MutableHandleValue vp);
 extern JS_FRIEND_API(bool)
-proxy_SetProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue bp,
+proxy_SetProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue bp,
                   JS::HandleValue receiver, JS::ObjectOpResult &result);
 extern JS_FRIEND_API(bool)
-proxy_GetOwnPropertyDescriptor(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+proxy_GetOwnPropertyDescriptor(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                                JS::MutableHandle<JSPropertyDescriptor> desc);
 extern JS_FRIEND_API(bool)
-proxy_DeleteProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
-                     JS::ObjectOpResult &result);
+proxy_DeleteProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+                     JS::ObjectOpResult& result);
 
 extern JS_FRIEND_API(void)
 proxy_Trace(JSTracer* trc, JSObject* obj);
