@@ -13603,10 +13603,13 @@ class CGBindingImplClass(CGClass):
         wrapArgs = [Argument('JSContext*', 'aCx'),
                     Argument('JS::Handle<JSObject*>', 'aGivenProto')]
         if not descriptor.wrapperCache:
+            wrapReturnType = "bool"
             wrapArgs.append(Argument('JS::MutableHandle<JSObject*>',
                                      'aReflector'))
+        else:
+            wrapReturnType = "JSObject*"
         self.methodDecls.insert(0,
-                                ClassMethod(wrapMethodName, "JSObject*",
+                                ClassMethod(wrapMethodName, wrapReturnType,
                                             wrapArgs, virtual=descriptor.wrapperCache,
                                             breakAfterReturnDecl=" ",
                                             override=descriptor.wrapperCache,
@@ -13725,11 +13728,13 @@ class CGExampleClass(CGBindingImplClass):
         if self.descriptor.wrapperCache:
             reflectorArg = ""
             reflectorPassArg = ""
+            returnType = "JSObject*"
         else:
             reflectorArg = ", JS::MutableHandle<JSObject*> aReflector"
             reflectorPassArg = ", aReflector"
+            returnType = "bool"
         classImpl = ccImpl + ctordtor + "\n" + dedent("""
-            JSObject*
+            ${returnType}
             ${nativeType}::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto${reflectorArg})
             {
               return ${ifaceName}Binding::Wrap(aCx, this, aGivenProto${reflectorPassArg});
@@ -13740,6 +13745,7 @@ class CGExampleClass(CGBindingImplClass):
             ifaceName=self.descriptor.name,
             nativeType=self.nativeLeafName(self.descriptor),
             parentType=self.nativeLeafName(self.parentDesc) if self.parentIface else "",
+            returnType=returnType,
             reflectorArg=reflectorArg,
             reflectorPassArg=reflectorPassArg)
 
