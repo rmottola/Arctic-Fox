@@ -68,8 +68,7 @@ class StartDiscoveryTask final : public BluetoothReplyRunnable
 {
 public:
   StartDiscoveryTask(BluetoothAdapter* aAdapter, Promise* aPromise)
-    : BluetoothReplyRunnable(nullptr, aPromise,
-                             NS_LITERAL_STRING("StartDiscovery"))
+    : BluetoothReplyRunnable(nullptr, aPromise)
     , mAdapter(aAdapter)
   {
     MOZ_ASSERT(aPromise);
@@ -117,8 +116,7 @@ class StartLeScanTask final : public BluetoothReplyRunnable
 public:
   StartLeScanTask(BluetoothAdapter* aAdapter, Promise* aPromise,
                   const nsTArray<nsString>& aServiceUuids)
-    : BluetoothReplyRunnable(nullptr, aPromise,
-                             NS_LITERAL_STRING("StartLeScan"))
+    : BluetoothReplyRunnable(nullptr, aPromise)
     , mAdapter(aAdapter)
     , mServiceUuids(aServiceUuids)
   {
@@ -175,8 +173,7 @@ public:
   StopLeScanTask(BluetoothAdapter* aAdapter,
                  Promise* aPromise,
                  const nsAString& aScanUuid)
-      : BluetoothReplyRunnable(nullptr, aPromise,
-                               NS_LITERAL_STRING("StopLeScan"))
+      : BluetoothReplyRunnable(nullptr, aPromise)
       , mAdapter(aAdapter)
       , mScanUuid(aScanUuid)
   {
@@ -575,9 +572,7 @@ BluetoothAdapter::StartDiscovery(ErrorResult& aRv)
   }
 
   // Return BluetoothDiscoveryHandle in StartDiscoveryTask
-  nsRefPtr<BluetoothReplyRunnable> result =
-    new StartDiscoveryTask(this, promise);
-  bs->StartDiscoveryInternal(result);
+  bs->StartDiscoveryInternal(new StartDiscoveryTask(this, promise));
 
   return promise.forget();
 }
@@ -607,11 +602,7 @@ BluetoothAdapter::StopDiscovery(ErrorResult& aRv)
   BluetoothService* bs = BluetoothService::Get();
   BT_ENSURE_TRUE_REJECT(bs, promise, NS_ERROR_NOT_AVAILABLE);
 
-  nsRefPtr<BluetoothReplyRunnable> result =
-    new BluetoothVoidReplyRunnable(nullptr /* DOMRequest */,
-                                   promise,
-                                   NS_LITERAL_STRING("StopDiscovery"));
-  bs->StopDiscoveryInternal(result);
+  bs->StopDiscoveryInternal(new BluetoothVoidReplyRunnable(nullptr, promise));
 
   return promise.forget();
 }
@@ -708,13 +699,10 @@ BluetoothAdapter::SetName(const nsAString& aName, ErrorResult& aRv)
   nsString name(aName);
   BluetoothNamedValue property(NS_LITERAL_STRING("Name"),
                                BluetoothValue(name));
-  nsRefPtr<BluetoothReplyRunnable> result =
-    new BluetoothVoidReplyRunnable(nullptr /* DOMRequest */,
-                                   promise,
-                                   NS_LITERAL_STRING("SetName"));
   BT_ENSURE_TRUE_REJECT(
-    NS_SUCCEEDED(bs->SetProperty(BluetoothObjectType::TYPE_ADAPTER,
-                                 property, result)),
+    NS_SUCCEEDED(
+      bs->SetProperty(BluetoothObjectType::TYPE_ADAPTER, property,
+                      new BluetoothVoidReplyRunnable(nullptr, promise))),
     promise,
     NS_ERROR_DOM_OPERATION_ERR);
 
@@ -751,13 +739,10 @@ BluetoothAdapter::SetDiscoverable(bool aDiscoverable, ErrorResult& aRv)
   // Wrap property to set and runnable to handle result
   BluetoothNamedValue property(NS_LITERAL_STRING("Discoverable"),
                                BluetoothValue(aDiscoverable));
-  nsRefPtr<BluetoothReplyRunnable> result =
-    new BluetoothVoidReplyRunnable(nullptr /* DOMRequest */,
-                                   promise,
-                                   NS_LITERAL_STRING("SetDiscoverable"));
   BT_ENSURE_TRUE_REJECT(
-    NS_SUCCEEDED(bs->SetProperty(BluetoothObjectType::TYPE_ADAPTER,
-                                 property, result)),
+    NS_SUCCEEDED(
+      bs->SetProperty(BluetoothObjectType::TYPE_ADAPTER, property,
+                      new BluetoothVoidReplyRunnable(nullptr, promise))),
     promise,
     NS_ERROR_DOM_OPERATION_ERR);
 
@@ -833,19 +818,12 @@ BluetoothAdapter::PairUnpair(bool aPair, const nsAString& aDeviceAddress,
 
   nsresult rv;
   if (aPair) {
-    nsRefPtr<BluetoothReplyRunnable> result =
-      new BluetoothVoidReplyRunnable(nullptr /* DOMRequest */,
-                                     promise,
-                                     NS_LITERAL_STRING("Pair"));
-    rv = bs->CreatePairedDeviceInternal(aDeviceAddress,
-                                        kCreatePairedDeviceTimeout,
-                                        result);
+    rv = bs->CreatePairedDeviceInternal(
+           aDeviceAddress, kCreatePairedDeviceTimeout,
+           new BluetoothVoidReplyRunnable(nullptr, promise));
   } else {
-    nsRefPtr<BluetoothReplyRunnable> result =
-      new BluetoothVoidReplyRunnable(nullptr /* DOMRequest */,
-                                     promise,
-                                     NS_LITERAL_STRING("Unpair"));
-    rv = bs->RemoveDeviceInternal(aDeviceAddress, result);
+    rv = bs->RemoveDeviceInternal(aDeviceAddress,
+           new BluetoothVoidReplyRunnable(nullptr, promise));
   }
   BT_ENSURE_TRUE_REJECT(NS_SUCCEEDED(rv), promise, NS_ERROR_DOM_OPERATION_ERR);
 
@@ -892,9 +870,7 @@ BluetoothAdapter::Enable(ErrorResult& aRv)
 
   // Wrap runnable to handle result
   nsRefPtr<BluetoothReplyRunnable> result =
-    new BluetoothVoidReplyRunnable(nullptr, /* DOMRequest */
-                                   promise,
-                                   NS_LITERAL_STRING("Enable"));
+    new BluetoothVoidReplyRunnable(nullptr, promise);
 
   if (NS_FAILED(bs->EnableDisable(true, result))) {
     // Restore adapter state and reject promise
@@ -933,9 +909,7 @@ BluetoothAdapter::Disable(ErrorResult& aRv)
 
   // Wrap runnable to handle result
   nsRefPtr<BluetoothReplyRunnable> result =
-    new BluetoothVoidReplyRunnable(nullptr, /* DOMRequest */
-                                   promise,
-                                   NS_LITERAL_STRING("Disable"));
+    new BluetoothVoidReplyRunnable(nullptr, promise);
 
   if (NS_FAILED(bs->EnableDisable(false, result))) {
     // Restore adapter state and reject promise
