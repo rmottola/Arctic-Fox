@@ -246,9 +246,6 @@ Shell Service not working? present but fails.
 Check TelemetryEnvironment.jsm _isDefaultBrowser
 
 
-Analyze all:
-https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
-
 Remove hack of parserequestcontenttype in nsNetUtil.cpp
 
 
@@ -272,9 +269,6 @@ media/libstagefright/frameworks/av/media/libstagefright/MPEG4Extractor.cpp
 - move SharedThreadPool from domi/media to xpcom/threads
 - complete 1487964 port
 - check bugs: bug 1275755, bug 1352874, bug 1440824 as prerequisites for Bug 529808
-
-- Bug 1172609 - 8 part ICU update
-
 
 
 ### Further Further ToDo:
