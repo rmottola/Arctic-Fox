@@ -131,6 +131,7 @@
 - Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
+- Bug 895274 - 1 to 270 parts
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
 -  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
 - Bug 1167409 - for parts
