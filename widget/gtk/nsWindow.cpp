@@ -2299,7 +2299,7 @@ nsWindow::OnExposeEvent(cairo_t *cr)
     }
 #  ifdef MOZ_HAVE_SHMIMAGE
     if (mShmImage && MOZ_LIKELY(!mIsDestroyed)) {
-        mShmImage->Put(mGdkWindow, exposeRegion);
+        mShmImage->Put(mGdkWindow, region);
     }
 #  endif  // MOZ_HAVE_SHMIMAGE
 #endif // MOZ_X11
@@ -6371,11 +6371,6 @@ nsWindow::EndRemoteDrawingInRegion(DrawTarget* aDrawTarget, nsIntRegion& aInvali
 
   if (mThebesSurface) {
     aInvalidRegion.AndWith(nsIntRect(nsIntPoint(0, 0), mThebesSurface->GetSize()));
-  }
-
-  gint scale = GdkScaleFactor();
-  if (scale != 1) {
-    aInvalidRegion.ScaleInverseRoundOut(scale, scale);
   }
 
   mShmImage->Put(mGdkWindow, aInvalidRegion);
