@@ -6726,3 +6726,9 @@ nsWindow::SynthesizeNativeMouseScrollEvent(mozilla::LayoutDeviceIntPoint aPoint,
 
   return NS_OK;
 }
+
+int32_t
+nsWindow::RoundsWidgetCoordinatesTo()
+{
+    return GdkScaleFactor();
+}
