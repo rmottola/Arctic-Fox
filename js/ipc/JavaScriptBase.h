@@ -179,10 +179,10 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
                            bool* result) {
         return Base::SendObjectClassIs(objId.serialize(), classValue, result);
     }
-    bool SendClassName(const ObjectId &objId, nsString* result) {
+    bool SendClassName(const ObjectId& objId, nsString* result) {
         return Base::SendClassName(objId.serialize(), result);
     }
-    bool SendGetPrototype(const ObjectId &objId, ReturnStatus* rs, ObjectOrNullVariant* result) {
+    bool SendGetPrototype(const ObjectId& objId, ReturnStatus* rs, ObjectOrNullVariant* result) {
         return Base::SendGetPrototype(objId.serialize(), rs, result);
     }
 
