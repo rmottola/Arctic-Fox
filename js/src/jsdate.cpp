@@ -2874,7 +2874,7 @@ date_toString(JSContext* cx, unsigned argc, Value* vp)
             // Step 3.a.
             RootedValue unboxed(cx);
             if (!Unbox(cx, obj, &unboxed))
-                return false;\
+                return false;
             tv = unboxed.toNumber();
         }
         // ObjectClassIs can throw for objects from other compartments.
