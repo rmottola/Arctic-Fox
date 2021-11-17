@@ -410,7 +410,7 @@ class JS_FRIEND_API(DirectProxyHandler) : public BaseProxyHandler
                                               AutoIdVector& props) const override;
     virtual bool nativeCall(JSContext* cx, IsAcceptableThis test, NativeImpl impl,
                             const CallArgs& args) const override;
-    virtual bool hasInstance(JSContext *cx, HandleObject proxy, MutableHandleValue v,
+    virtual bool hasInstance(JSContext* cx, HandleObject proxy, MutableHandleValue v,
                              bool* bp) const override;
     virtual bool objectClassIs(HandleObject obj, ESClassValue classValue,
                                JSContext* cx) const override;
