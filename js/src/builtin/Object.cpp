@@ -83,7 +83,7 @@ js::obj_propertyIsEnumerable(JSContext* cx, unsigned argc, Value* vp)
 
     /* Step 1. */
     RootedId idRoot(cx);
-    if (!ValueToId<CanGC>(cx, idValue, &idRoot))
+    if (!ToPropertyKey(cx, idValue, &idRoot))
         return false;
 
     /* Step 2. */
@@ -541,7 +541,7 @@ js::obj_hasOwnProperty(JSContext* cx, unsigned argc, Value* vp)
 
     /* Step 1. */
     RootedId idRoot(cx);
-    if (!ValueToId<CanGC>(cx, idValue, &idRoot))
+    if (!ToPropertyKey(cx, idValue, &idRoot))
         return false;
 
     /* Step 2. */
@@ -784,7 +784,7 @@ js::obj_defineProperty(JSContext *cx, unsigned argc, Value *vp)
     if (!GetFirstArgumentAsObject(cx, args, "Object.defineProperty", &obj))
         return false;
     RootedId id(cx);
-    if (!ValueToId<CanGC>(cx, args.get(1), &id))
+    if (!ToPropertyKey(cx, args.get(1), &id))
         return false;
 
     // Steps 4-5.

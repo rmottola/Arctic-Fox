@@ -2324,7 +2324,7 @@ END_CASE(JSOP_AND)
 
 #define FETCH_ELEMENT_ID(n, id)                                               \
     JS_BEGIN_MACRO                                                            \
-        if (!ValueToId<CanGC>(cx, REGS.stackHandleAt(n), &(id))) \
+        if (!ToPropertyKey(cx, REGS.stackHandleAt(n), &(id)))                 \
             goto error;                                                       \
     JS_END_MACRO
 
@@ -2790,7 +2790,7 @@ CASE(JSOP_STRICTDELELEM)
 
     ObjectOpResult result;
     ReservedRooted<jsid> id(&rootId0);
-    if (!ValueToId<CanGC>(cx, propval, &id))
+    if (!ToPropertyKey(cx, propval, &id))
         goto error;
     if (!DeleteProperty(cx, obj, id, result))
         goto error;
@@ -4502,7 +4502,7 @@ js::DeleteElementJit(JSContext* cx, HandleValue val, HandleValue index, bool* bp
         return false;
 
     RootedId id(cx);
-    if (!ValueToId<CanGC>(cx, index, &id))
+    if (!ToPropertyKey(cx, index, &id))
         return false;
     ObjectOpResult result;
     if (!DeleteProperty(cx, obj, id, result))
@@ -4538,7 +4538,7 @@ js::SetObjectElement(JSContext* cx, HandleObject obj, HandleValue index, HandleV
                      bool strict)
 {
     RootedId id(cx);
-    if (!ValueToId<CanGC>(cx, index, &id))
+    if (!ToPropertyKey(cx, index, &id))
         return false;
     RootedValue receiver(cx, ObjectValue(*obj));
     return SetObjectElementOperation(cx, obj, id, value, receiver, strict);
@@ -4550,7 +4550,7 @@ js::SetObjectElement(JSContext* cx, HandleObject obj, HandleValue index, HandleV
 {
     MOZ_ASSERT(pc);
     RootedId id(cx);
-    if (!ValueToId<CanGC>(cx, index, &id))
+    if (!ToPropertyKey(cx, index, &id))
         return false;
     RootedValue receiver(cx, ObjectValue(*obj));
     return SetObjectElementOperation(cx, obj, id, value, receiver, strict, script, pc);
@@ -4734,7 +4734,7 @@ js::InitGetterSetterOperation(JSContext* cx, jsbytecode* pc, HandleObject obj, H
                               HandleObject val)
 {
     RootedId id(cx);
-    if (!ValueToId<CanGC>(cx, idval, &id))
+    if (!ToPropertyKey(cx, idval, &id))
         return false;
 
     return InitGetterSetterOperation(cx, pc, obj, id, val);
