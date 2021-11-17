@@ -534,7 +534,6 @@ private:
 
     MOZ_ASSERT(argumentsValue.isObject());
     JS::Rooted<JSObject*> argumentsObj(aCx, &argumentsValue.toObject());
-    MOZ_ASSERT(JS_IsArrayObject(aCx, argumentsObj));
 
     uint32_t length;
     if (!JS_GetArrayLength(aCx, argumentsObj, &length)) {
@@ -629,7 +628,6 @@ private:
 
     MOZ_ASSERT(argumentsValue.isObject());
     JS::Rooted<JSObject*> argumentsObj(aCx, &argumentsValue.toObject());
-    MOZ_ASSERT(JS_IsArrayObject(aCx, argumentsObj));
 
     uint32_t length;
     if (!JS_GetArrayLength(aCx, argumentsObj, &length)) {
