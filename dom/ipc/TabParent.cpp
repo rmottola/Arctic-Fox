@@ -2088,7 +2088,7 @@ TabParent::RecvNotifyIMEPositionChange(const ContentCache& aContentCache,
 }
 
 bool
-TabParent::RecvOnEventNeedingAckReceived(const uint32_t& aMessage)
+TabParent::RecvOnEventNeedingAckHandled(const uint32_t& aMessage)
 {
   // This is called when the child process receives WidgetCompositionEvent or
   // WidgetSelectionEvent.
@@ -2097,10 +2097,10 @@ TabParent::RecvOnEventNeedingAckReceived(const uint32_t& aMessage)
     return true;
   }
 
-  // While calling OnEventNeedingAckReceived(), TabParent *might* be destroyed
+  // While calling OnEventNeedingAckHandled(), TabParent *might* be destroyed
   // since it may send notifications to IME.
   nsRefPtr<TabParent> kungFuDeathGrip(this);
-  mContentCache.OnEventNeedingAckReceived(widget, aMessage);
+  mContentCache.OnEventNeedingAckHandled(widget, aMessage);
   return true;
 }
 
