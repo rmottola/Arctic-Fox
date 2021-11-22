@@ -2469,10 +2469,6 @@ nsXULPopupManager::KeyDown(nsIDOMKeyEvent* aKeyEvent)
   if (!mActiveMenuBar && (!item || item->PopupType() != ePopupTypeMenu))
     return NS_OK;
 
-  // Since a menu was open, stop propagation of the event to keep other event
-  // listeners from becoming confused.
-  aKeyEvent->StopPropagation();
-
   int32_t menuAccessKey = -1;
 
   // If the key just pressed is the access key (usually Alt),
@@ -2510,6 +2506,9 @@ nsXULPopupManager::KeyDown(nsIDOMKeyEvent* aKeyEvent)
     }
   }
 
+  // Since a menu was open, stop propagation of the event to keep other event
+  // listeners from becoming confused.
+  aKeyEvent->StopPropagation();
   return NS_OK;
 }
 
