@@ -847,12 +847,7 @@ EventSource::AnnounceConnection()
     return;
   }
 
-  nsCOMPtr<nsIDOMEvent> event;
-  rv = NS_NewDOMEvent(getter_AddRefs(event), this, nullptr, nullptr);
-  if (NS_FAILED(rv)) {
-    NS_WARNING("Failed to create the open event!!!");
-    return;
-  }
+  nsRefPtr<Event> event = NS_NewDOMEvent(this, nullptr, nullptr);
 
   // it doesn't bubble, and it isn't cancelable
   rv = event->InitEvent(NS_LITERAL_STRING("open"), false, false);
@@ -912,12 +907,7 @@ EventSource::ReestablishConnection()
     return;
   }
 
-  nsCOMPtr<nsIDOMEvent> event;
-  rv = NS_NewDOMEvent(getter_AddRefs(event), this, nullptr, nullptr);
-  if (NS_FAILED(rv)) {
-    NS_WARNING("Failed to create the error event!!!");
-    return;
-  }
+  nsRefPtr<Event> event = NS_NewDOMEvent(this, nullptr, nullptr);
 
   // it doesn't bubble, and it isn't cancelable
   rv = event->InitEvent(NS_LITERAL_STRING("error"), false, false);
@@ -1068,12 +1058,7 @@ EventSource::FailConnection()
     return;
   }
 
-  nsCOMPtr<nsIDOMEvent> event;
-  rv = NS_NewDOMEvent(getter_AddRefs(event), this, nullptr, nullptr);
-  if (NS_FAILED(rv)) {
-    NS_WARNING("Failed to create the error event!!!");
-    return;
-  }
+  nsRefPtr<Event> event = NS_NewDOMEvent(this, nullptr, nullptr);
 
   // it doesn't bubble, and it isn't cancelable
   rv = event->InitEvent(NS_LITERAL_STRING("error"), false, false);
@@ -1236,27 +1221,20 @@ EventSource::DispatchAllMessageEvents()
     // create an event that uses the MessageEvent interface,
     // which does not bubble, is not cancelable, and has no default action
 
-    nsCOMPtr<nsIDOMEvent> event;
-    rv = NS_NewDOMMessageEvent(getter_AddRefs(event), this, nullptr, nullptr);
-    if (NS_FAILED(rv)) {
-      NS_WARNING("Failed to create the message event!!!");
-      return;
-    }
+    nsRefPtr<MessageEvent> event =
+      NS_NewDOMMessageEvent(this, nullptr, nullptr);
 
-    nsCOMPtr<nsIDOMMessageEvent> messageEvent = do_QueryInterface(event);
-    rv = messageEvent->InitMessageEvent(message->mEventName,
-                                        false, false,
-                                        jsData,
-                                        mOrigin,
-                                        message->mLastEventID, nullptr);
+    rv = event->InitMessageEvent(message->mEventName, false, false, jsData,
+                                 mOrigin, message->mLastEventID, nullptr);
     if (NS_FAILED(rv)) {
       NS_WARNING("Failed to init the message event!!!");
       return;
     }
 
-    messageEvent->SetTrusted(true);
+    event->SetTrusted(true);
 
-    rv = DispatchDOMEvent(nullptr, event, nullptr, nullptr);
+    rv = DispatchDOMEvent(nullptr, static_cast<Event*>(event), nullptr,
+                          nullptr);
     if (NS_FAILED(rv)) {
       NS_WARNING("Failed to dispatch the message event!!!");
       return;

@@ -347,4 +347,9 @@ ToCanonicalSupports(mozilla::dom::Event* e)
   return static_cast<nsIDOMEvent*>(e);
 }
 
+already_AddRefed<mozilla::dom::Event>
+NS_NewDOMEvent(mozilla::dom::EventTarget* aOwner,
+               nsPresContext* aPresContext,
+               mozilla::WidgetEvent* aEvent);
+
 #endif // mozilla_dom_Event_h_

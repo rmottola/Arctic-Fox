@@ -133,6 +133,7 @@ LOCAL_INCLUDES += [
     '/dom/html',
     '/dom/settings',
     '/dom/storage',
+    '/dom/svg',
     '/dom/workers',
     '/dom/xml',
     '/dom/xul',
