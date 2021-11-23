@@ -2271,6 +2271,7 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
     FreeOp* fop = rt->defaultFreeOp();
     sweepTypesAfterCompacting(zone);
     zone->sweepBreakpoints(fop);
+    zone->sweepWeakMaps();
 
     for (CompartmentsInZoneIter c(zone); !c.done(); c.next()) {
         c->sweepInnerViews();
@@ -2284,7 +2285,6 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
         c->sweepSelfHostingScriptSource();
         c->sweepDebugScopes();
         c->sweepJitCompartment(fop);
-        c->sweepWeakMaps();
         c->sweepNativeIterators();
         c->sweepTemplateObjects();
     }
@@ -2604,9 +2604,9 @@ GCRuntime::updatePointersToRelocatedCells(Zone* zone)
         Debugger::markAll(&trc);
         Debugger::markIncomingCrossCompartmentEdges(&trc);
 
+        WeakMapBase::markAll(zone, &trc);
         for (CompartmentsInZoneIter c(zone); !c.done(); c.next()) {
             c->trace(&trc);
-            WeakMapBase::markAll(c, &trc);
             if (c->watchpointMap)
                 c->watchpointMap->markAll(&trc);
         }
@@ -3892,9 +3892,9 @@ GCRuntime::beginMarkPhase(JS::gcreason::Reason reason)
             zone->arenas.unmarkAll();
         }
 
-        for (GCCompartmentsIter c(rt); !c.done(); c.next()) {
-            /* Unmark all weak maps in the compartments being collected. */
-            WeakMapBase::unmarkCompartment(c);
+        for (GCZonesIter zone(rt); !zone.done(); zone.next()) {
+            /* Unmark all weak maps in the zones being collected. */
+            WeakMapBase::unmarkZone(zone);
         }
 
         if (isFull)
@@ -3976,7 +3976,7 @@ GCRuntime::beginMarkPhase(JS::gcreason::Reason reason)
     return true;
 }
 
-template <class CompartmentIterT>
+template <class ZoneIterT>
 void
 GCRuntime::markWeakReferences(gcstats::Phase phase)
 {
@@ -3992,11 +3992,13 @@ GCRuntime::markWeakReferences(gcstats::Phase phase)
 
     for (;;) {
         bool markedAny = false;
-        for (CompartmentIterT c(rt); !c.done(); c.next()) {
+        if (!marker.isWeakMarkingTracer()) {
+            for (ZoneIterT zone(rt); !zone.done(); zone.next())
+                markedAny |= WeakMapBase::markZoneIteratively(zone, &marker);
+        }
+        for (CompartmentsIterT<ZoneIterT> c(rt); !c.done(); c.next()) {
             if (c->watchpointMap)
                 markedAny |= c->watchpointMap->markIteratively(&marker);
-            if (!marker.isWeakMarkingTracer())
-                markedAny |= WeakMapBase::markCompartmentIteratively(c, &marker);
         }
         markedAny |= Debugger::markAllIteratively(&marker);
         markedAny |= jit::JitRuntime::MarkJitcodeGlobalTableIteratively(&marker);
@@ -4015,7 +4017,7 @@ GCRuntime::markWeakReferences(gcstats::Phase phase)
 void
 GCRuntime::markWeakReferencesInCurrentGroup(gcstats::Phase phase)
 {
-    markWeakReferences<GCCompartmentGroupIter>(phase);
+    markWeakReferences<GCZoneGroupIter>(phase);
 }
 
 template <class ZoneIterT, class CompartmentIterT>
@@ -4044,7 +4046,7 @@ GCRuntime::markGrayReferencesInCurrentGroup(gcstats::Phase phase)
 void
 GCRuntime::markAllWeakReferences(gcstats::Phase phase)
 {
-    markWeakReferences<GCCompartmentsIter>(phase);
+    markWeakReferences<GCZonesIter>(phase);
 }
 
 void
@@ -4147,8 +4149,8 @@ js::gc::MarkingValidator::nonIncrementalMark()
     if (!markedWeakMaps.init())
         return;
 
-    for (GCCompartmentsIter c(runtime); !c.done(); c.next()) {
-        if (!WeakMapBase::saveCompartmentMarkedWeakMaps(c, markedWeakMaps))
+    for (GCZonesIter zone(runtime); !zone.done(); zone.next()) {
+        if (!WeakMapBase::saveZoneMarkedWeakMaps(zone, markedWeakMaps))
             return;
     }
 
@@ -4179,8 +4181,8 @@ js::gc::MarkingValidator::nonIncrementalMark()
         {
             gcstats::AutoPhase ap(gc->stats, gcstats::PHASE_UNMARK);
 
-            for (GCCompartmentsIter c(runtime); !c.done(); c.next())
-                WeakMapBase::unmarkCompartment(c);
+            for (GCZonesIter zone(runtime); !zone.done(); zone.next())
+                WeakMapBase::unmarkZone(zone);
 
             MOZ_ASSERT(gcmarker->isDrained());
             gcmarker->reset();
@@ -4229,8 +4231,8 @@ js::gc::MarkingValidator::nonIncrementalMark()
         Swap(*entry, *bitmap);
     }
 
-    for (GCCompartmentsIter c(runtime); !c.done(); c.next())
-        WeakMapBase::unmarkCompartment(c);
+    for (GCZonesIter zone(runtime); !zone.done(); zone.next())
+        WeakMapBase::unmarkZone(zone);
     WeakMapBase::restoreMarkedWeakMaps(markedWeakMaps);
 
     gc->marker.weakKeys.clear();
@@ -4432,8 +4434,8 @@ GCRuntime::findZoneEdgesForWeakMaps()
      * group.
      */
 
-    for (GCCompartmentsIter comp(rt); !comp.done(); comp.next()) {
-        if (!WeakMapBase::findZoneEdgesForCompartment(comp))
+    for (GCZonesIter zone(rt); !zone.done(); zone.next()) {
+        if (!WeakMapBase::findInterZoneEdges(zone))
             return false;
     }
 
@@ -4961,9 +4963,11 @@ GCRuntime::beginSweepingZoneGroup()
                 c->sweepObjectPendingMetadata();
                 c->sweepDebugScopes();
                 c->sweepJitCompartment(&fop);
-                c->sweepWeakMaps();
                 c->sweepTemplateObjects();
             }
+
+            for (GCZoneGroupIter zone(rt); !zone.done(); zone.next())
+                zone->sweepWeakMaps();
 
             // Bug 1071218: the following two methods have not yet been
             // refactored to work on a single zone-group at once.
