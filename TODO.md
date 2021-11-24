@@ -90,6 +90,7 @@
 - Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
 - Bug 1223916 - 2015-11-14 Prohibit direct method calls at the parser level in 
 - Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
+- Bug 1211546 - Unbreak the non-unified build. (r=sfink, r=nbp, r=shu) 
 - Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
