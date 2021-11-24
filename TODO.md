@@ -164,15 +164,9 @@
 - Bug 1160014 - part 1 to 4
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
 - Bug 1181869 [provokes crashing] - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
-- Bug 905127 - Part 2 - remove unnecessary nsNetUtil.h includes r=jduell
-- Bug 905127 - 2015-07-07 - Part 1 - Make some functions from nsNetUtil not inline.
-- Bug 1172785 - 2016-07-06 remaining parts of RTCCertificate
-- 1178938 - 2015-07-02 5 parts
-- Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
 - Bug 1051052 - Made mid an outparam in JsepSession::AddLocalIceCandida
 - Bug 1204872 - 2015-09
-- Bug 1200099. Add a test that captured cross-origin video
 - Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
 --Bug 1194422 - Expose census traversals to SpiderMonkey embedders; r=s
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
@@ -224,6 +218,7 @@ https://github.com/mozilla/newtab-dev/commit/567240287fa9fe6f94fb49d0675512d6aa1
 - Bug 1208747 - Move most of Stopwatch-related code to XPCOM-land (JSAP
 - Bug 1206290 - Part 1: Implement a JS::ubi::PostOrder depth first trav
 - Bug 1187062 - Part 2: Implement a concrete JS::ubi::StackFrame clas
+- Bug 1187062 - Part 1: Add the JS::ubi::StackFrame interface; r=sfink
 -  Bug 1187062 - Part 0: Make js::Debugger::getObjectAllocationSite retu
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
 - Bug 1054756, part 5 - Remove Class::convert. 
