@@ -851,10 +851,18 @@ PeerConnectionMedia::IceGatheringStateChange_s(NrIceCtx* ctx,
       }
 
       NrIceCandidate candidate;
-      nsresult res = stream->GetDefaultCandidate(&candidate);
+      nsresult res = stream->GetDefaultCandidate(1, &candidate);
+      NrIceCandidate rtcpCandidate;
+      // Optional; component won't exist if doing rtcp-mux
+      if (NS_FAILED(stream->GetDefaultCandidate(2, &rtcpCandidate))) {
+        rtcpCandidate.cand_addr.host.clear();
+        rtcpCandidate.cand_addr.port = 0;
+      }
       if (NS_SUCCEEDED(res)) {
         EndOfLocalCandidates(candidate.cand_addr.host,
                              candidate.cand_addr.port,
+                             rtcpCandidate.cand_addr.host,
+                             rtcpCandidate.cand_addr.port,
                              i);
       } else {
         CSFLogError(logTag, "%s: GetDefaultCandidate failed for level %u, "
@@ -919,12 +927,15 @@ PeerConnectionMedia::OnCandidateFound_s(NrIceMediaStream *aStream,
 void
 PeerConnectionMedia::EndOfLocalCandidates(const std::string& aDefaultAddr,
                                           uint16_t aDefaultPort,
+                                          const std::string& aDefaultRtcpAddr,
+                                          uint16_t aDefaultRtcpPort,
                                           uint16_t aMLine) {
   // We will still be around because we have not started teardown yet
   GetMainThread()->Dispatch(
     WrapRunnable(this,
                  &PeerConnectionMedia::EndOfLocalCandidates_m,
-                 aDefaultAddr, aDefaultPort, aMLine),
+                 aDefaultAddr, aDefaultPort,
+                 aDefaultRtcpAddr, aDefaultRtcpPort, aMLine),
     NS_DISPATCH_NORMAL);
 }
 
@@ -963,8 +974,14 @@ PeerConnectionMedia::OnCandidateFound_m(const std::string &candidate,
 void
 PeerConnectionMedia::EndOfLocalCandidates_m(const std::string& aDefaultAddr,
                                             uint16_t aDefaultPort,
+                                            const std::string& aDefaultRtcpAddr,
+                                            uint16_t aDefaultRtcpPort,
                                             uint16_t aMLine) {
-  SignalEndOfLocalCandidates(aDefaultAddr, aDefaultPort, aMLine);
+  SignalEndOfLocalCandidates(aDefaultAddr,
+                             aDefaultPort,
+                             aDefaultRtcpAddr,
+                             aDefaultRtcpPort,
+                             aMLine);
 }
 
 void
