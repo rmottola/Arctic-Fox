@@ -1110,7 +1110,13 @@ js::FutexRuntime::destroyInstance()
 bool
 js::FutexRuntime::isWaiting()
 {
-    return state_ == Waiting || state_ == WaitingInterrupted;
+    // When a worker is awoken for an interrupt it goes into state
+    // WaitingNotifiedForInterrupt for a short time before it actually
+    // wakes up and goes into WaitingInterrupted.  In those states the
+    // worker is still waiting, and if an explicit wake arrives the
+    // worker transitions to Woken.  See further comments in
+    // FutexRuntime::wait().
+    return state_ == Waiting || state_ == WaitingInterrupted || state_ == WaitingNotifiedForInterrupt;
 }
 
 bool
@@ -1180,7 +1186,7 @@ js::FutexRuntime::wait(JSContext* cx, double timeout_ms, AtomicsObject::FutexWai
             *result = AtomicsObject::FutexOK;
             goto finished;
 
-          case FutexRuntime::WokenForJSInterrupt:
+          case FutexRuntime::WaitingNotifiedForInterrupt:
             // The interrupt handler may reenter the engine.  In that case
             // there are two complications:
             //
@@ -1190,7 +1196,7 @@ js::FutexRuntime::wait(JSContext* cx, double timeout_ms, AtomicsObject::FutexWai
             //   To that end, we flag the thread as interrupted around
             //   the interrupt and check state_ when the interrupt
             //   handler returns.  A futexWake() call that reaches the
-            //   runtime during the interrupt sets state_ to woken.
+            //   runtime during the interrupt sets state_ to Woken.
             //
             // - It is in principle possible for futexWait() to be
             //   reentered on the same thread/runtime and waiting on the
@@ -1238,7 +1244,7 @@ js::FutexRuntime::wake(WakeReason reason)
     MOZ_ASSERT(lockHolder_ == PR_GetCurrentThread());
     MOZ_ASSERT(isWaiting());
 
-    if (state_ == WaitingInterrupted && reason == WakeExplicit) {
+    if ((state_ == WaitingInterrupted || state_ == WaitingNotifiedForInterrupt) && reason == WakeExplicit) {
         state_ = Woken;
         return;
     }
@@ -1247,7 +1253,9 @@ js::FutexRuntime::wake(WakeReason reason)
         state_ = Woken;
         break;
       case WakeForJSInterrupt:
-        state_ = WokenForJSInterrupt;
+        if (state_ == WaitingNotifiedForInterrupt)
+            return;
+        state_ = WaitingNotifiedForInterrupt;
         break;
       default:
         MOZ_CRASH();
