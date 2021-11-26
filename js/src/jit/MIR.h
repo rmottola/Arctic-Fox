@@ -4464,6 +4464,7 @@ class MGuardObject
         setGuard();
         setMovable();
         setResultType(MIRType_Object);
+        setResultTypeSet(ins->resultTypeSet());
     }
 
   public:
@@ -4510,6 +4511,7 @@ class MPolyInlineGuard
     {
         setGuard();
         setResultType(MIRType_Object);
+        setResultTypeSet(ins->resultTypeSet());
     }
 
   public:
@@ -10634,6 +10636,7 @@ class MGuardShape
         setGuard();
         setMovable();
         setResultType(MIRType_Object);
+        setResultTypeSet(obj->resultTypeSet());
 
         // Disallow guarding on unboxed object shapes. The group is better to
         // guard on, and guarding on the shape can interact badly with
@@ -10687,6 +10690,7 @@ class MGuardReceiverPolymorphic
         setGuard();
         setMovable();
         setResultType(MIRType_Object);
+        setResultTypeSet(obj->resultTypeSet());
     }
 
   public:
