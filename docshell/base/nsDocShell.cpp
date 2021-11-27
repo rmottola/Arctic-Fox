@@ -2821,8 +2821,6 @@ nsDocShell::HistoryTransactionRemoved(int32_t aIndex)
   return NS_OK;
 }
 
-unsigned long nsDocShell::gProfileTimelineRecordingsCount = 0;
-
 mozilla::LinkedList<nsDocShell::ObservedDocShell>* nsDocShell::gObservedDocShells = nullptr;
 
 NS_IMETHODIMP
@@ -2831,14 +2829,14 @@ nsDocShell::SetRecordProfileTimelineMarkers(bool aValue)
   bool currentValue = nsIDocShell::GetRecordProfileTimelineMarkers();
   if (currentValue != aValue) {
     if (aValue) {
-      ++gProfileTimelineRecordingsCount;
+      TimelineConsumers::AddConsumer();
       UseEntryScriptProfiling();
 
       MOZ_ASSERT(!mObserved);
       mObserved.reset(new ObservedDocShell(this));
       GetOrCreateObservedDocShells().insertFront(mObserved.get());
     } else {
-      --gProfileTimelineRecordingsCount;
+      TimelineConsumers::RemoveConsumer();
       UnuseEntryScriptProfiling();
 
       mObserved.reset(nullptr);
