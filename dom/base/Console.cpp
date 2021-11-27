@@ -1135,7 +1135,7 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
 
         mozilla::UniquePtr<TimelineMarker> marker =
           MakeUnique<TimestampTimelineMarker>(docShell, TRACING_TIMESTAMP, key);
-        docShell->AddProfileTimelineMarker(Move(marker));
+        TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
       }
       // For `console.time(foo)` and `console.timeEnd(foo)`
       else if (isTimelineRecording && aData.Length() == 1) {
@@ -1148,7 +1148,7 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
               MakeUnique<ConsoleTimelineMarker>(docShell,
                                                 aMethodName == MethodTime ? TRACING_INTERVAL_START : TRACING_INTERVAL_END,
                                                 key);
-            docShell->AddProfileTimelineMarker(Move(marker));
+            TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
           }
         }
       }
