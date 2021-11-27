@@ -1494,7 +1494,7 @@ nsRefreshDriver::DispatchPendingEvents()
 }
 
 void
-nsRefreshDriver::RunFrameRequestCallbacks(int64_t aNowEpoch, TimeStamp aNowTime)
+nsRefreshDriver::RunFrameRequestCallbacks(TimeStamp aNowTime)
 {
   // Grab all of our frame request callbacks up front.
   nsTArray<DocumentFrameCallbacks>
@@ -1669,7 +1669,7 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
       // This is the Flush_Style case.
 
       DispatchPendingEvents();
-      RunFrameRequestCallbacks(aNowEpoch, aNowTime);
+      RunFrameRequestCallbacks(aNowTime);
 
       if (mPresContext && mPresContext->GetPresShell()) {
         bool tracingStyleFlush = false;
