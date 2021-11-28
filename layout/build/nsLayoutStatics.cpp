@@ -305,6 +305,10 @@ nsLayoutStatics::Initialize()
   RequestSyncWifiService::Init();
 #endif
 
+#ifdef DEBUG
+  nsStyleContext::Initialize();
+#endif
+
   MediaDecoder::InitStatics();
 
   PromiseDebugging::Init();
