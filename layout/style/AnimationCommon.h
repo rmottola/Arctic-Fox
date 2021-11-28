@@ -42,9 +42,6 @@ class CommonAnimationManager : public nsIStyleRuleProcessor,
 public:
   explicit CommonAnimationManager(nsPresContext *aPresContext);
 
-  // nsISupports
-  NS_DECL_ISUPPORTS
-
   // nsIStyleRuleProcessor (parts)
   virtual nsRestyleHint HasStateDependentStyle(StateRuleProcessorData* aData) override;
   virtual nsRestyleHint HasStateDependentStyle(PseudoElementStateRuleProcessorData* aData) override;
