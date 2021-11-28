@@ -51,8 +51,6 @@ IsGeometricProperty(nsCSSProperty aProperty)
   }
 }
 
-namespace css {
-
 CommonAnimationManager::CommonAnimationManager(nsPresContext *aPresContext)
   : mPresContext(aPresContext)
   , mIsObservingRefreshDriver(false)
@@ -435,7 +433,7 @@ CommonAnimationManager::LayerAnimationRecordFor(nsCSSProperty aProperty)
 /* static */ void
 CommonAnimationManager::Initialize()
 {
-  const auto& info = css::CommonAnimationManager::sLayerAnimationInfo;
+  const auto& info = CommonAnimationManager::sLayerAnimationInfo;
   for (size_t i = 0; i < ArrayLength(info); i++) {
     auto record = info[i];
     MOZ_ASSERT(nsCSSProps::PropHasFlags(record.mProperty,
@@ -519,8 +517,6 @@ AnimValuesStyleRule::List(FILE* out, int32_t aIndent) const
   fprintf_stderr(out, "%s", str.get());
 }
 #endif
-
-} // namespace css
 
 bool
 AnimationCollection::CanAnimatePropertyOnCompositor(
@@ -683,7 +679,7 @@ AnimationCollection::PostUpdateLayerAnimations()
                                    CSS_PROPERTY_CAN_ANIMATE_ON_COMPOSITOR) &&
           !propsHandled.HasProperty(prop)) {
         propsHandled.AddProperty(prop);
-        nsChangeHint changeHint = css::CommonAnimationManager::
+        nsChangeHint changeHint = CommonAnimationManager::
           LayerAnimationRecordFor(prop)->mChangeHint;
         dom::Element* element = GetElementToRestyle();
         if (element) {
@@ -908,7 +904,7 @@ AnimationCollection::CanThrottleAnimation(TimeStamp aTime)
   }
 
 
-  const auto& info = css::CommonAnimationManager::sLayerAnimationInfo;
+  const auto& info = CommonAnimationManager::sLayerAnimationInfo;
   for (size_t i = 0; i < ArrayLength(info); i++) {
     auto record = info[i];
     if (!HasAnimationOfProperty(record.mProperty)) {

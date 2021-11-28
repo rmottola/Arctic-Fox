@@ -35,8 +35,6 @@ namespace mozilla {
 class RestyleTracker;
 struct AnimationCollection;
 
-namespace css {
-
 bool IsGeometricProperty(nsCSSProperty aProperty);
 
 class CommonAnimationManager : public nsIStyleRuleProcessor,
@@ -60,9 +58,9 @@ public:
 #ifdef MOZ_XUL
   virtual void RulesMatching(XULTreeRuleProcessorData* aData) override;
 #endif
-  virtual size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf)
+  virtual size_t SizeOfExcludingThis(MallocSizeOf aMallocSizeOf)
     const MOZ_MUST_OVERRIDE override;
-  virtual size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf)
+  virtual size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf)
     const MOZ_MUST_OVERRIDE override;
 
 #ifdef DEBUG
@@ -80,7 +78,7 @@ public:
   // Tell the restyle tracker about all the styles that we're currently
   // animating, so that it can update the animation rule for these
   // elements.
-  void AddStyleUpdatesTo(mozilla::RestyleTracker& aTracker);
+  void AddStyleUpdatesTo(RestyleTracker& aTracker);
 
   AnimationCollection*
   GetAnimations(dom::Element *aElement,
@@ -109,13 +107,13 @@ public:
     Cannot_Throttle
   };
 
-  nsIStyleRule* GetAnimationRule(mozilla::dom::Element* aElement,
+  nsIStyleRule* GetAnimationRule(dom::Element* aElement,
                                  nsCSSPseudoElements::Type aPseudoType);
 
   static bool ExtractComputedValueForTransition(
                   nsCSSProperty aProperty,
                   nsStyleContext* aStyleContext,
-                  mozilla::StyleAnimationValue& aComputedValue);
+                  StyleAnimationValue& aComputedValue);
 
   // For CSS properties that may be animated on a separate layer, represents
   // a record of the corresponding layer type and change hint.
@@ -141,7 +139,7 @@ protected:
   virtual ~CommonAnimationManager();
 
   // For ElementCollectionRemoved
-  friend struct mozilla::AnimationCollection;
+  friend struct AnimationCollection;
 
   void AddElementCollection(AnimationCollection* aCollection);
   void ElementCollectionRemoved() { MaybeStartOrStopObservingRefreshDriver(); }
@@ -196,15 +194,14 @@ public:
   virtual void List(FILE* out = stdout, int32_t aIndent = 0) const override;
 #endif
 
-  void AddValue(nsCSSProperty aProperty,
-                mozilla::StyleAnimationValue &aStartValue)
+  void AddValue(nsCSSProperty aProperty, StyleAnimationValue &aStartValue)
   {
     PropertyValuePair v = { aProperty, aStartValue };
     mPropertyValuePairs.AppendElement(v);
   }
 
   // Caller must fill in returned value.
-  mozilla::StyleAnimationValue* AddEmptyValue(nsCSSProperty aProperty)
+  StyleAnimationValue* AddEmptyValue(nsCSSProperty aProperty)
   {
     PropertyValuePair *p = mPropertyValuePairs.AppendElement();
     p->mProperty = aProperty;
@@ -213,7 +210,7 @@ public:
 
   struct PropertyValuePair {
     nsCSSProperty mProperty;
-    mozilla::StyleAnimationValue mValue;
+    StyleAnimationValue mValue;
   };
 
   void AddPropertiesToSet(nsCSSPropertySet& aSet) const
@@ -230,8 +227,6 @@ private:
   InfallibleTArray<PropertyValuePair> mPropertyValuePairs;
 };
 
-} // namespace css
-
 typedef InfallibleTArray<nsRefPtr<dom::Animation>> AnimationPtrArray;
 
 enum EnsureStyleRuleFlags {
@@ -242,7 +237,7 @@ enum EnsureStyleRuleFlags {
 struct AnimationCollection : public PRCList
 {
   AnimationCollection(dom::Element *aElement, nsIAtom *aElementProperty,
-                      mozilla::css::CommonAnimationManager *aManager)
+                      CommonAnimationManager *aManager)
     : mElement(aElement)
     , mElementProperty(aElementProperty)
     , mManager(aManager)
@@ -278,9 +273,9 @@ struct AnimationCollection : public PRCList
 
   void EnsureStyleRuleFor(TimeStamp aRefreshTime, EnsureStyleRuleFlags aFlags);
 
-  bool CanThrottleTransformChanges(mozilla::TimeStamp aTime);
+  bool CanThrottleTransformChanges(TimeStamp aTime);
 
-  bool CanThrottleAnimation(mozilla::TimeStamp aTime);
+  bool CanThrottleAnimation(TimeStamp aTime);
 
   enum CanAnimateFlags {
     // Testing for width, height, top, right, bottom, or left.
@@ -375,10 +370,10 @@ public:
     return nsCSSPseudoElements::ePseudo_after;
   }
 
-  mozilla::dom::Element* GetElementToRestyle() const;
+  dom::Element* GetElementToRestyle() const;
 
   void PostRestyleForAnimation(nsPresContext *aPresContext) {
-    mozilla::dom::Element* element = GetElementToRestyle();
+    dom::Element* element = GetElementToRestyle();
     if (element) {
       nsRestyleHint hint = IsForTransitions() ? eRestyle_CSSTransitions
                                               : eRestyle_CSSAnimations;
@@ -397,9 +392,9 @@ public:
   // i.e., in an atom list)
   nsIAtom *mElementProperty;
 
-  mozilla::css::CommonAnimationManager *mManager;
+  CommonAnimationManager *mManager;
 
-  mozilla::AnimationPtrArray mAnimations;
+  AnimationPtrArray mAnimations;
 
   // This style rule contains the style data for currently animating
   // values.  It only matches when styling with animation.  When we
@@ -408,7 +403,7 @@ public:
   // afterwards with animation.
   // NOTE: If we don't need to apply any styles, mStyleRule will be
   // null, but mStyleRuleRefreshTime will still be valid.
-  nsRefPtr<mozilla::css::AnimValuesStyleRule> mStyleRule;
+  nsRefPtr<AnimValuesStyleRule> mStyleRule;
 
   // RestyleManager keeps track of the number of animation
   // 'mini-flushes' (see nsTransitionManager::UpdateAllThrottledStyles()).
