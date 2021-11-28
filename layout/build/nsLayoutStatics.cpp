@@ -307,6 +307,7 @@ nsLayoutStatics::Initialize()
 
 #ifdef DEBUG
   nsStyleContext::Initialize();
+  mozilla::css::CommonAnimationManager::Initialize();
 #endif
 
   MediaDecoder::InitStatics();
