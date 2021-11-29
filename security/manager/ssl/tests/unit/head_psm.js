@@ -91,6 +91,23 @@ const certificateUsageStatusResponder        = 0x0400;
 
 const NO_FLAGS = 0;
 
+// Commonly certificates are represented as PEM. The format is roughly as
+// follows:
+//
+// -----BEGIN CERTIFICATE-----
+// [some lines of base64, each typically 64 characters long]
+// -----END CERTIFICATE-----
+//
+// However, nsIX509CertDB.constructX509FromBase64 and related functions do not
+// handle input of this form. Instead, they require a single string of base64
+// with no newlines or BEGIN/END headers. This is a helper function to convert
+// PEM to the format that nsIX509CertDB requires.
+function pemToBase64(pem) {
+  return pem.replace(/-----BEGIN CERTIFICATE-----/, "")
+            .replace(/-----END CERTIFICATE-----/, "")
+            .replace(/[\r\n]/g, "");
+}
+
 function readFile(file) {
   let fstream = Cc["@mozilla.org/network/file-input-stream;1"]
                   .createInstance(Ci.nsIFileInputStream);
@@ -102,8 +119,16 @@ function readFile(file) {
 
 function addCertFromFile(certdb, filename, trustString) {
   let certFile = do_get_file(filename, false);
-  let der = readFile(certFile);
-  certdb.addCert(der, trustString, null);
+  let certBytes = readFile(certFile);
+  let successful = false;
+  try {
+    certdb.addCert(certBytes, trustString, null);
+    successful = true;
+  } catch (e) {}
+  if (!successful) {
+    // It might be PEM instead of DER.
+    certdb.addCertFromBase64(pemToBase64(certBytes), trustString, null);
+  }
 }
 
 function constructCertFromFile(filename) {
@@ -135,7 +160,7 @@ function checkCertErrorGeneric(certdb, cert, expectedError, usage) {
   if (expectedError != -1 ) {
     do_check_eq(error, expectedError);
   } else {
-    do_check_neq (error, 0);
+    do_check_neq(error, PRErrorCodeSuccess);
   }
 }
 

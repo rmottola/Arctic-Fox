@@ -7,7 +7,7 @@ let certDB = Cc["@mozilla.org/security/x509certdb;1"]
                .getService(Ci.nsIX509CertDB);
 
 function load_cert(cert, trust) {
-  let file = "test_intermediate_basic_usage_constraints/" + cert + ".der";
+  let file = "test_intermediate_basic_usage_constraints/" + cert + ".pem";
   addCertFromFile(certDB, file, trust);
 }
 
@@ -30,8 +30,9 @@ function run_test() {
   let ee = certDB.constructX509(cert_der, cert_der.length);
   let hasEVPolicy = {};
   let verifiedChain = {};
-  equal(Cr.NS_OK, certDB.verifyCertNow(ee, certificateUsageSSLServer,
-                                       NO_FLAGS, verifiedChain, hasEVPolicy));
+  equal(PRErrorCodeSuccess, certDB.verifyCertNow(ee, certificateUsageSSLServer,
+                                                 NO_FLAGS, verifiedChain,
+                                                 hasEVPolicy));
   // Change the already existing intermediate certificate's trust using
   // addCertFromBase64(). We use findCertByNickname first to ensure that the
   // certificate already exists.
