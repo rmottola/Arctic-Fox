@@ -36,7 +36,7 @@ LIRGeneratorShared::use(MDefinition* mir, LUse policy)
 }
 
 template <size_t X> void
-LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X> *lir, MDefinition *mir,
+LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X>* lir, MDefinition* mir,
                            LDefinition::Policy policy)
 {
     LDefinition::Type type = LDefinition::TypeFrom(mir->type());
@@ -44,8 +44,8 @@ LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X> *lir,
 }
 
 template <size_t X> void
-LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X> *lir, MDefinition *mir,
-                           const LDefinition &def)
+LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X>* lir, MDefinition* mir,
+                           const LDefinition& def)
 {
     // Call instructions should use defineReturn.
     MOZ_ASSERT(!lir->isCall());
@@ -320,7 +320,7 @@ LIRGeneratorShared::useRegisterOrConstantAtStart(MDefinition* mir)
 }
 
 LAllocation
-LIRGeneratorShared::useRegisterOrZeroAtStart(MDefinition *mir)
+LIRGeneratorShared::useRegisterOrZeroAtStart(MDefinition* mir)
 {
     if (mir->isConstant() && mir->toConstant()->value().isInt32(0))
         return LAllocation();
@@ -550,7 +550,7 @@ LIRGeneratorShared::useRegisterForTypedLoad(MDefinition* mir, MIRType type)
 }
 
 void
-LIRGeneratorShared::useBox(LInstruction *lir, size_t n, MDefinition *mir,
+LIRGeneratorShared::useBox(LInstruction* lir, size_t n, MDefinition* mir,
                            LUse::Policy policy, bool useAtStart)
 {
     MOZ_ASSERT(mir->type() == MIRType_Value);

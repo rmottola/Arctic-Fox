@@ -524,7 +524,7 @@ SIMDObject::initClass(JSContext* cx, Handle<GlobalObject*> global)
 }
 
 JSObject*
-js::InitSIMDClass(JSContext *cx, HandleObject obj)
+js::InitSIMDClass(JSContext* cx, HandleObject obj)
 {
     MOZ_ASSERT(obj->is<GlobalObject>());
     Rooted<GlobalObject*> global(cx, &obj->as<GlobalObject>());

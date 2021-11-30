@@ -324,7 +324,7 @@ class SimdAllPolicy final : public TypePolicy
 {
   public:
     SPECIALIZATION_DATA_;
-    virtual bool adjustInputs(TempAllocator &alloc, MInstruction *ins) override;
+    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* ins) override;
 };
 
 template <unsigned Op>
@@ -332,21 +332,21 @@ class SimdPolicy final : public TypePolicy
 {
   public:
     SPECIALIZATION_DATA_;
-    virtual bool adjustInputs(TempAllocator &alloc, MInstruction *ins) override;
+    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* ins) override;
 };
 
 class SimdSelectPolicy final : public TypePolicy
 {
   public:
     SPECIALIZATION_DATA_;
-    virtual bool adjustInputs(TempAllocator &alloc, MInstruction *ins) override;
+    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* ins) override;
 };
 
 class SimdShufflePolicy final : public TypePolicy
 {
   public:
     SPECIALIZATION_DATA_;
-    virtual bool adjustInputs(TempAllocator &alloc, MInstruction *ins) override;
+    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* ins) override;
 };
 
 // SIMD value-type policy, use the returned type of the instruction to determine
@@ -454,36 +454,36 @@ class StoreTypedArrayElementStaticPolicy;
 class StoreUnboxedScalarPolicy : public TypePolicy
 {
   private:
-    static bool adjustValueInput(TempAllocator &alloc, MInstruction *ins, Scalar::Type arrayType,
-                                 MDefinition *value, int valueOperand);
+    static bool adjustValueInput(TempAllocator& alloc, MInstruction* ins, Scalar::Type arrayType,
+                                 MDefinition* value, int valueOperand);
 
     friend class StoreTypedArrayHolePolicy;
     friend class StoreTypedArrayElementStaticPolicy;
 
   public:
     EMPTY_DATA_;
-    virtual bool adjustInputs(TempAllocator &alloc, MInstruction *ins) override;
+    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* ins) override;
 };
 
 class StoreTypedArrayHolePolicy final : public StoreUnboxedScalarPolicy
 {
   public:
     EMPTY_DATA_;
-    virtual bool adjustInputs(TempAllocator &alloc, MInstruction *ins) override;
+    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* ins) override;
 };
 
 class StoreTypedArrayElementStaticPolicy final : public StoreUnboxedScalarPolicy
 {
   public:
     EMPTY_DATA_;
-    virtual bool adjustInputs(TempAllocator &alloc, MInstruction *ins) override;
+    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* ins) override;
 };
 
 class StoreUnboxedObjectOrNullPolicy final : public TypePolicy
 {
   public:
     EMPTY_DATA_;
-    virtual bool adjustInputs(TempAllocator &alloc, MInstruction *def) override;
+    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* def) override;
 };
 
 // Accepts integers and doubles. Everything else is boxed.

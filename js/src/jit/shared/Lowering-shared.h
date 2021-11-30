@@ -107,7 +107,7 @@ class LIRGeneratorShared : public MDefinitionVisitor
     inline LAllocation useKeepaliveOrConstant(MDefinition* mir);
     inline LAllocation useRegisterOrConstant(MDefinition* mir);
     inline LAllocation useRegisterOrConstantAtStart(MDefinition* mir);
-    inline LAllocation useRegisterOrZeroAtStart(MDefinition *mir);
+    inline LAllocation useRegisterOrZeroAtStart(MDefinition* mir);
     inline LAllocation useRegisterOrNonDoubleConstant(MDefinition* mir);
 
     inline LUse useRegisterForTypedLoad(MDefinition* mir, MIRType type);
@@ -150,7 +150,7 @@ class LIRGeneratorShared : public MDefinitionVisitor
                        LDefinition::Policy policy = LDefinition::REGISTER);
     template <size_t X>
     inline void define(details::LInstructionFixedDefsTempsHelper<1, X>* lir, MDefinition* mir,
-                       const LDefinition &def);
+                       const LDefinition& def);
 
     template <size_t Ops, size_t Temps>
     inline void defineReuseInput(LInstructionHelper<1, Ops, Temps>* lir, MDefinition* mir, uint32_t operand);

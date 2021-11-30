@@ -327,7 +327,7 @@ namespace FunctionType {
   bool ReturnTypeGetter(JSContext* cx, const JS::CallArgs& args);
   bool ABIGetter(JSContext* cx, const JS::CallArgs& args);
   bool IsVariadicGetter(JSContext* cx, const JS::CallArgs& args);
-}
+} // namespace FunctionType
 
 namespace CClosure {
   static void Trace(JSTracer* trc, JSObject* obj);
@@ -348,7 +348,7 @@ namespace CClosure {
       void** args;
       ClosureInfo* cinfo;
   };
-}
+} // namespace CClosure
 
 namespace CData {
   static void Finalize(JSFreeOp* fop, JSObject* obj);
@@ -1488,7 +1488,7 @@ TypeError(JSContext* cx, const char* expected, HandleValue actual)
 static JSObject*
 InitCTypeClass(JSContext* cx, HandleObject ctypesObj)
 {
-  JSFunction *fun = JS_DefineFunction(cx, ctypesObj, "CType", ConstructAbstract, 0,
+  JSFunction* fun = JS_DefineFunction(cx, ctypesObj, "CType", ConstructAbstract, 0,
                                       CTYPESCTOR_FLAGS);
   if (!fun)
     return nullptr;
@@ -5245,7 +5245,7 @@ ArrayType::Getter(JSContext* cx, HandleObject obj, HandleId idval, MutableHandle
 
 bool
 ArrayType::Setter(JSContext* cx, HandleObject obj, HandleId idval, MutableHandleValue vp,
-                  ObjectOpResult &result)
+                  ObjectOpResult& result)
 {
   // This should never happen, but we'll check to be safe.
   if (!CData::IsCData(obj)) {
@@ -7649,7 +7649,7 @@ CDataFinalizer::Construct(JSContext* cx, unsigned argc, Value* vp)
 
   // Get arguments
   if (args.length() == 0) { // Special case: the empty (already finalized) object
-    JSObject *objResult = JS_NewObjectWithGivenProto(cx, &sCDataFinalizerClass, objProto);
+    JSObject* objResult = JS_NewObjectWithGivenProto(cx, &sCDataFinalizerClass, objProto);
     args.rval().setObject(*objResult);
     return true;
   }
@@ -7748,7 +7748,7 @@ CDataFinalizer::Construct(JSContext* cx, unsigned argc, Value* vp)
 
   // 5. Create |objResult|
 
-  JSObject *objResult = JS_NewObjectWithGivenProto(cx, &sCDataFinalizerClass, objProto);
+  JSObject* objResult = JS_NewObjectWithGivenProto(cx, &sCDataFinalizerClass, objProto);
   if (!objResult) {
     return false;
   }

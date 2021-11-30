@@ -155,7 +155,7 @@ struct MovingTracer : JS::CallbackTracer
 class AutoMaybeStartBackgroundAllocation
 {
   private:
-    JSRuntime *runtime;
+    JSRuntime* runtime;
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 
   public:
@@ -165,7 +165,7 @@ class AutoMaybeStartBackgroundAllocation
         MOZ_GUARD_OBJECT_NOTIFIER_INIT;
     }
 
-    void tryToStartBackgroundAllocation(JSRuntime *rt) {
+    void tryToStartBackgroundAllocation(JSRuntime* rt) {
         runtime = rt;
     }
 
