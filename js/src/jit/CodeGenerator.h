@@ -251,11 +251,11 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitCallInitElementArray(LCallInitElementArray* lir);
     void visitThrow(LThrow* lir);
     void visitTypeOfV(LTypeOfV* lir);
-    void visitOutOfLineTypeOfV(OutOfLineTypeOfV *ool);
+    void visitOutOfLineTypeOfV(OutOfLineTypeOfV* ool);
     void visitToIdV(LToIdV* lir);
-    template<typename T> void emitLoadElementT(LLoadElementT* lir, const T &source);
+    template<typename T> void emitLoadElementT(LLoadElementT* lir, const T& source);
     void visitLoadElementT(LLoadElementT* lir);
-    void visitLoadElementV(LLoadElementV *load);
+    void visitLoadElementV(LLoadElementV* load);
     void visitLoadElementHole(LLoadElementHole* lir);
     void visitLoadUnboxedPointerV(LLoadUnboxedPointerV* lir);
     void visitLoadUnboxedPointerT(LLoadUnboxedPointerT* lir);
