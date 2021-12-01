@@ -25,11 +25,7 @@ using namespace mozilla::Compression;
 
 namespace {
 
-extern "C" {
-
 #include "lz4.c"
-
-}
 
 }/* anonymous namespace */
 
