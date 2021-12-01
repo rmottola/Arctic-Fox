@@ -170,6 +170,7 @@
 - Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
 --Bug 1194422 - Expose census traversals to SpiderMonkey embedders; r=s
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
+- Bug 1195545 - 2015-08-27 - Add instruction reordering pass to IonMonkey, r=sunfish. 
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
@@ -191,10 +192,9 @@ More session store stuff to check:
 ARM fixes to check
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1179514
 
-Lightweight themes stuff:
-
-- Bug 1148996 - Install a devedition lightweight theme on startup, then
-
+# Build System - not working
+Bug 706103 - replace chrome copy of files by overrides in browser/the
+Bug 1137364 - part 2 - move browser themes icon installation to FINAL
 
 Check with Roy Tam:
 - Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 
@@ -217,6 +217,7 @@ https://github.com/mozilla/newtab-dev/commit/567240287fa9fe6f94fb49d0675512d6aa1
 - Bug 1191570 - Use ToPropertyKey everywhere ES6 says to use it. r=Wald
 - Bug 1208747 - Move most of Stopwatch-related code to XPCOM-land (JSAP
 - Bug 1206290 - Part 1: Implement a JS::ubi::PostOrder depth first trav
+- Bug 1209704 - Part 2: Share storage and mixins between Read and Wri
 - Bug 1187062 - Part 2: Implement a concrete JS::ubi::StackFrame clas
 - Bug 1187062 - Part 1: Add the JS::ubi::StackFrame interface; r=sfink
 -  Bug 1187062 - Part 0: Make js::Debugger::getObjectAllocationSite retu
@@ -226,6 +227,7 @@ https://github.com/mozilla/newtab-dev/commit/567240287fa9fe6f94fb49d0675512d6aa1
 - Bug 1054756, part 3 - Implement Symbol.toPrimitive. Replace existing 
 - Bug 1088214 - Remove JSCLASS_IMPLEMENTS_BARRIERS now this is implemen
 - Bug 1193583 - Fix eval to always execute under a non-extensible lexi
+- Bug 1191236 - Remove extract() methods used by operation forwarding 
 - Bug 930414 - 22 parts
 Bug 1195866 - Make allocations log report whether an allocation was i
 - Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
