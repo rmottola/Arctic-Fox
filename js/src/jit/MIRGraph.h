@@ -57,7 +57,7 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock>
     // This block cannot be reached by any means.
     bool unreachable_;
 
-    MResumePoint *callerResumePoint_;
+    MResumePoint* callerResumePoint_;
 
     // Pushes a copy of a local variable or argument.
     void pushVariable(uint32_t slot);

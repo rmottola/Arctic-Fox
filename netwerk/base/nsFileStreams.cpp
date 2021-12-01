@@ -413,7 +413,7 @@ nsFileInputStream::Create(nsISupports *aOuter, REFNSIID aIID, void **aResult)
 
 nsresult
 nsFileInputStream::Open(nsIFile* aFile, int32_t aIOFlags, int32_t aPerm)
-{   
+{
     nsresult rv = NS_OK;
 
     // If the previous file is open, close it

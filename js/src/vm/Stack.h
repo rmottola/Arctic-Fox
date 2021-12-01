@@ -30,8 +30,8 @@ struct JSCompartment;
 namespace JS {
 namespace dbg {
 class AutoEntryMonitor;
-}
-}
+} // namespace dbg
+} // namespace JS
 
 namespace js {
 
@@ -608,7 +608,7 @@ class InterpreterFrame
 
     inline void pushOnScopeChain(ScopeObject& scope);
     inline void popOffScopeChain();
-    inline void replaceInnermostScope(ScopeObject &scope);
+    inline void replaceInnermostScope(ScopeObject& scope);
 
     /*
      * For blocks with aliased locals, these interfaces push and pop entries on
@@ -619,7 +619,7 @@ class InterpreterFrame
 
     bool pushBlock(JSContext* cx, StaticBlockObject& block);
     void popBlock(JSContext* cx);
-    bool freshenBlock(JSContext *cx);
+    bool freshenBlock(JSContext* cx);
 
     /*
      * With
@@ -1392,11 +1392,11 @@ class Activation
         return offsetof(Activation, prevProfiling_);
     }
 
-    SavedFrame *asyncStack() {
+    SavedFrame* asyncStack() {
         return asyncStack_;
     }
 
-    JSString *asyncCause() {
+    JSString* asyncCause() {
         return asyncCause_;
     }
 

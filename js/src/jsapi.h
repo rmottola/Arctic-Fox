@@ -2666,9 +2666,9 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
     JS::MutableHandleObject object() {
         return JS::MutableHandleObject::fromMarkedLocation(&desc()->obj);
     }
-    unsigned &attributesRef() { return desc()->attrs; }
-    JSGetterOp &getter() { return desc()->getter; }
-    JSSetterOp &setter() { return desc()->setter; }
+    unsigned& attributesRef() { return desc()->attrs; }
+    JSGetterOp& getter() { return desc()->getter; }
+    JSSetterOp& setter() { return desc()->setter; }
     JS::MutableHandleValue value() {
         return JS::MutableHandleValue::fromMarkedLocation(&desc()->value);
     }
@@ -5405,7 +5405,7 @@ GetSavedFrameSource(JSContext* cx, HandleObject savedFrame, MutableHandleString 
  * Given a SavedFrame JSObject, get its line property. Defaults to 0.
  */
 extern JS_PUBLIC_API(SavedFrameResult)
-GetSavedFrameLine(JSContext *cx, HandleObject savedFrame, uint32_t *linep);
+GetSavedFrameLine(JSContext* cx, HandleObject savedFrame, uint32_t* linep);
 
 /*
  * Given a SavedFrame JSObject, get its column property. Defaults to 0.

@@ -341,7 +341,7 @@ class MOZ_STACK_CLASS TryNoteIter
 };
 
 bool
-HandleClosingGeneratorReturn(JSContext *cx, AbstractFramePtr frame, bool ok);
+HandleClosingGeneratorReturn(JSContext* cx, AbstractFramePtr frame, bool ok);
 
 /************************************************************************/
 
@@ -445,12 +445,12 @@ bool
 InitGetterSetterOperation(JSContext* cx, jsbytecode* pc, HandleObject obj, HandleId id,
                           HandleObject val);
 
-unsigned
-GetInitDataPropAttrs(JSOp op);
-
 bool
 InitGetterSetterOperation(JSContext* cx, jsbytecode* pc, HandleObject obj, HandlePropertyName name,
                           HandleObject val);
+
+unsigned
+GetInitDataPropAttrs(JSOp op);
 
 bool
 EnterWithOperation(JSContext* cx, AbstractFramePtr frame, HandleValue val, HandleObject staticWith);

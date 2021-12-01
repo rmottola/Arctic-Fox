@@ -115,14 +115,14 @@ js_strncpy(char16_t* dst, const char16_t* src, size_t nelem)
 namespace js {
 
 /* Initialize the String class, returning its prototype object. */
-extern JSObject *
-InitStringClass(JSContext *cx, HandleObject obj);
+extern JSObject*
+InitStringClass(JSContext* cx, HandleObject obj);
 
 /*
  * Convert a value to a printable C string.
  */
-extern const char *
-ValueToPrintable(JSContext *cx, const Value &, JSAutoByteString *bytes, bool asSource = false);
+extern const char*
+ValueToPrintable(JSContext* cx, const Value&, JSAutoByteString* bytes, bool asSource = false);
 
 extern mozilla::UniquePtr<char[], JS::FreePolicy>
 DuplicateString(ExclusiveContext* cx, const char* s);

@@ -120,7 +120,7 @@ class JS_FRIEND_API(CrossCompartmentWrapper) : public Wrapper
     virtual bool ownPropertyKeys(JSContext* cx, HandleObject wrapper,
                                  AutoIdVector& props) const override;
     virtual bool delete_(JSContext* cx, HandleObject wrapper, HandleId id,
-                         ObjectOpResult &result) const override;
+                         ObjectOpResult& result) const override;
     virtual bool enumerate(JSContext* cx, HandleObject wrapper, MutableHandleObject objp) const override;
     virtual bool getPrototype(JSContext* cx, HandleObject proxy,
                               MutableHandleObject protop) const override;

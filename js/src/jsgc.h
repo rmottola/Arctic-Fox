@@ -1269,11 +1269,11 @@ enum VerifierType {
 
 #ifdef JS_GC_ZEAL
 
-extern const char *ZealModeHelpText;
+extern const char* ZealModeHelpText;
 
 /* Check that write barriers have been used correctly. See jsgc.cpp. */
 void
-VerifyBarriers(JSRuntime *rt, VerifierType type);
+VerifyBarriers(JSRuntime* rt, VerifierType type);
 
 void
 MaybeVerifyBarriers(JSContext* cx, bool always = false);
@@ -1341,8 +1341,8 @@ class ZoneList
     ZoneList& operator=(const ZoneList& other) = delete;
 };
 
-JSObject *
-NewMemoryStatisticsObject(JSContext *cx);
+JSObject*
+NewMemoryStatisticsObject(JSContext* cx);
 
 } /* namespace gc */
 
