@@ -641,7 +641,7 @@ class ArenaLists
         return offset + size_t(thingKind) * sizeof(FreeList);
     }
 
-    const FreeList *getFreeList(AllocKind thingKind) const {
+    const FreeList* getFreeList(AllocKind thingKind) const {
         return &freeLists[thingKind];
     }
 
@@ -840,7 +840,7 @@ class ArenaLists
 
     enum ArenaAllocMode { HasFreeThings = true, IsEmpty = false };
     template <ArenaAllocMode hasFreeThings>
-    TenuredCell *allocateFromArenaInner(JS::Zone *zone, ArenaHeader *aheader, AllocKind kind);
+    TenuredCell* allocateFromArenaInner(JS::Zone* zone, ArenaHeader* aheader, AllocKind kind);
 
     inline void normalizeBackgroundFinalizeState(AllocKind thingKind);
 
@@ -1124,7 +1124,7 @@ class RelocationOverlay
         return magic_ == Relocated;
     }
 
-    Cell *forwardingAddress() const {
+    Cell* forwardingAddress() const {
         MOZ_ASSERT(isForwarded());
         return newLocation_;
     }
@@ -1176,9 +1176,9 @@ TYPE_MIGHT_BE_FORWARDED(ObjectGroup, false)
 
 template <typename T>
 inline bool
-IsForwarded(T *t)
+IsForwarded(T* t)
 {
-    RelocationOverlay *overlay = RelocationOverlay::fromCell(t);
+    RelocationOverlay* overlay = RelocationOverlay::fromCell(t);
     if (!TypeMightBeForwarded(t)) {
         MOZ_ASSERT(!overlay->isForwarded());
         return false;
