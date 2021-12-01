@@ -363,16 +363,16 @@ JSObject::create(js::ExclusiveContext* cx, js::gc::AllocKind kind, js::gc::Initi
 }
 
 inline void
-JSObject::setInitialShapeMaybeNonNative(js::Shape *shape)
+JSObject::setInitialShapeMaybeNonNative(js::Shape* shape)
 {
-    static_cast<js::NativeObject *>(this)->shape_.init(shape);
+    static_cast<js::NativeObject*>(this)->shape_.init(shape);
 }
 
 inline void
-JSObject::setShapeMaybeNonNative(js::Shape *shape)
+JSObject::setShapeMaybeNonNative(js::Shape* shape)
 {
     MOZ_ASSERT(!is<js::UnboxedPlainObject>());
-    static_cast<js::NativeObject *>(this)->shape_ = shape;
+    static_cast<js::NativeObject*>(this)->shape_ = shape;
 }
 
 inline void
@@ -382,12 +382,12 @@ JSObject::setInitialSlotsMaybeNonNative(js::HeapSlot* slots)
 }
 
 inline void
-JSObject::setInitialElementsMaybeNonNative(js::HeapSlot *elements)
+JSObject::setInitialElementsMaybeNonNative(js::HeapSlot* elements)
 {
-    static_cast<js::NativeObject *>(this)->elements_ = elements;
+    static_cast<js::NativeObject*>(this)->elements_ = elements;
 }
 
-inline js::GlobalObject &
+inline js::GlobalObject&
 JSObject::global() const
 {
     /*
@@ -487,7 +487,7 @@ JSObject::wasNewScriptCleared() const
 namespace js {
 
 static MOZ_ALWAYS_INLINE bool
-IsFunctionObject(const js::Value &v)
+IsFunctionObject(const js::Value& v)
 {
     return v.isObject() && v.toObject().is<JSFunction>();
 }
@@ -689,15 +689,15 @@ NewObjectWithClassProto(ExclusiveContext* cx, const Class* clasp, HandleObject p
  * Create a native instance of the given class with parent and proto set
  * according to the context's active global.
  */
-inline JSObject *
-NewBuiltinClassInstance(ExclusiveContext *cx, const Class *clasp, gc::AllocKind allocKind,
+inline JSObject*
+NewBuiltinClassInstance(ExclusiveContext* cx, const Class* clasp, gc::AllocKind allocKind,
                         NewObjectKind newKind = GenericObject)
 {
     return NewObjectWithClassProto(cx, clasp, nullptr, allocKind, newKind);
 }
 
-inline JSObject *
-NewBuiltinClassInstance(ExclusiveContext *cx, const Class *clasp, NewObjectKind newKind = GenericObject)
+inline JSObject*
+NewBuiltinClassInstance(ExclusiveContext* cx, const Class* clasp, NewObjectKind newKind = GenericObject)
 {
     gc::AllocKind allocKind = gc::GetGCObjectKind(clasp);
     return NewBuiltinClassInstance(cx, clasp, allocKind, newKind);

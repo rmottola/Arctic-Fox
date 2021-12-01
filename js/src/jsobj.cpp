@@ -871,7 +871,7 @@ js::NewObjectWithGroupCommon(ExclusiveContext* cx, HandleObjectGroup group,
         return nullptr;
 
     if (isCachable && !obj->as<NativeObject>().hasDynamicSlots()) {
-        NewObjectCache &cache = cx->asJSContext()->runtime()->newObjectCache;
+        NewObjectCache& cache = cx->asJSContext()->runtime()->newObjectCache;
         NewObjectCache::EntryIndex entry = -1;
         cache.lookupGroup(group, allocKind, &entry);
         cache.fillGroup(entry, group, allocKind, &obj->as<NativeObject>());
@@ -915,7 +915,7 @@ js::CreateThis(JSContext* cx, const Class* newclasp, HandleObject callee)
     return NewObjectWithClassProto(cx, newclasp, proto, kind);
 }
 
-static inline JSObject* 
+static inline JSObject*
 CreateThisForFunctionWithGroup(JSContext* cx, HandleObjectGroup group,
                                NewObjectKind newKind)
 {
@@ -2687,7 +2687,7 @@ js::DefineProperty(ExclusiveContext* cx, HandleObject obj, PropertyName* name, H
 
 bool
 js::DefineElement(ExclusiveContext* cx, HandleObject obj, uint32_t index, HandleValue value,
-                   JSGetterOp getter, JSSetterOp setter, unsigned attrs)
+                  JSGetterOp getter, JSSetterOp setter, unsigned attrs)
 {
     MOZ_ASSERT(getter != JS_PropertyStub);
     MOZ_ASSERT(setter != JS_StrictPropertyStub);
@@ -3246,7 +3246,7 @@ dumpValue(const Value& v)
 }
 
 JS_FRIEND_API(void)
-js::DumpValue(const Value &val)
+js::DumpValue(const Value& val)
 {
     dumpValue(val);
     fputc('\n', stderr);
@@ -3644,17 +3644,17 @@ JSObject::sizeOfIncludingThisInNursery() const
 
     MOZ_ASSERT(!isTenured());
 
-    const Nursery &nursery = compartment()->runtimeFromAnyThread()->gc.nursery;
+    const Nursery& nursery = compartment()->runtimeFromAnyThread()->gc.nursery;
     size_t size = Arena::thingSize(allocKindForTenure(nursery));
 
     if (is<NativeObject>()) {
-        const NativeObject &native = as<NativeObject>();
+        const NativeObject& native = as<NativeObject>();
 
         size += native.numFixedSlots() * sizeof(Value);
         size += native.numDynamicSlots() * sizeof(Value);
 
         if (native.hasDynamicElements()) {
-            js::ObjectElements &elements = *native.getElementsHeader();
+            js::ObjectElements& elements = *native.getElementsHeader();
             if (!elements.isCopyOnWrite() || elements.ownerObject() == this)
                 size += elements.capacity * sizeof(HeapSlot);
         }
@@ -3669,7 +3669,7 @@ JSObject::sizeOfIncludingThisInNursery() const
 size_t
 JS::ubi::Concrete<JSObject>::size(mozilla::MallocSizeOf mallocSizeOf) const
 {
-    JSObject &obj = get();
+    JSObject& obj = get();
 
     if (!obj.isTenured())
         return obj.sizeOfIncludingThisInNursery();

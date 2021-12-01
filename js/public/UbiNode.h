@@ -145,13 +145,13 @@ namespace ubi {
 class Edge;
 class EdgeRange;
 
-}
-}
+} // namespace ubi
+} // namespace JS
 
 namespace mozilla {
 template<>
 class DefaultDelete<JS::ubi::EdgeRange> : public JS::DeletePolicy<JS::ubi::EdgeRange> { };
-}
+} // namespace mozilla
 
 namespace JS {
 namespace ubi {
@@ -258,8 +258,8 @@ class Base {
     }
 
   private:
-    Base(const Base &rhs) = delete;
-    Base &operator=(const Base &rhs) = delete;
+    Base(const Base& rhs) = delete;
+    Base& operator=(const Base& rhs) = delete;
 };
 
 // A traits template with a specialization for each referent type that
@@ -681,10 +681,10 @@ template<> struct Concrete<JSString> : TracerConcrete<JSString> {
     size_t size(mozilla::MallocSizeOf mallocSizeOf) const override;
 
   protected:
-    explicit Concrete(JSString* ptr) : TracerConcrete<JSString>(ptr) { }
+    explicit Concrete(JSString *ptr) : TracerConcrete<JSString>(ptr) { }
 
   public:
-    static void construct(void* storage, JSString* ptr) { new (storage) Concrete(ptr); }
+    static void construct(void *storage, JSString *ptr) { new (storage) Concrete(ptr); }
 };
 
 // The ubi::Node null pointer. Any attempt to operate on a null ubi::Node asserts.

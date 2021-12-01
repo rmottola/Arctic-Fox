@@ -681,7 +681,7 @@ Int32ToCString(ToCStringBuf* cbuf, int32_t i, size_t* len, int base = 10)
 }
 
 template <AllowGC allowGC>
-static JSString *
+static JSString*
 NumberToStringWithBase(ExclusiveContext* cx, double d, int base);
 
 MOZ_ALWAYS_INLINE bool

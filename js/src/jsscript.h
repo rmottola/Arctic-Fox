@@ -66,7 +66,7 @@ CopyScript(JSContext* cx, HandleObject scriptStaticScope, HandleScript src, Hand
 
 } // namespace detail
 
-}
+} // namespace js
 
 /*
  * Type of try note associated with each catch or finally block, and also with
