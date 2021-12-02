@@ -21,7 +21,7 @@ using namespace js::gc;
 JS_STATIC_ASSERT(AllocKinds == unsigned(AllocKind::LIMIT));
 JS_STATIC_ASSERT(LastObjectAllocKind == unsigned(AllocKind::OBJECT_LAST));
 
-static FILE *gcTraceFile = nullptr;
+static FILE* gcTraceFile = nullptr;
 
 static HashSet<const Class*, DefaultHasher<const Class*>, SystemAllocPolicy> tracedClasses;
 static HashSet<const ObjectGroup*, DefaultHasher<const ObjectGroup*>, SystemAllocPolicy> tracedGroups;
@@ -230,7 +230,7 @@ js::gc::TraceTenuredFinalize(Cell* thing)
     if (!gcTraceFile)
         return;
     if (thing->tenuredGetAllocKind() == AllocKind::OBJECT_GROUP)
-        tracedGroups.remove(static_cast<const ObjectGroup *>(thing));
+        tracedGroups.remove(static_cast<const ObjectGroup*>(thing));
     TraceEvent(TraceEventTenuredFinalize, uint64_t(thing));
 }
 

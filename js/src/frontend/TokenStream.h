@@ -532,9 +532,9 @@ class MOZ_STACK_CLASS TokenStream
     };
 
     bool advance(size_t position);
-    void tell(Position *);
-    void seek(const Position &pos);
-    bool seek(const Position &pos, const TokenStream &other);
+    void tell(Position*);
+    void seek(const Position& pos);
+    bool seek(const Position& pos, const TokenStream& other);
 #ifdef DEBUG
     inline bool debugHasNoLookahead() const {
         return lookahead == 0;
