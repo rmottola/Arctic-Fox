@@ -177,9 +177,9 @@ struct Statistics
             slices.back().resetReason = reason;
     }
 
-    void nonincremental(const char *reason) { nonincrementalReason_ = reason; }
+    void nonincremental(const char* reason) { nonincrementalReason_ = reason; }
 
-    const char *nonincrementalReason() const { return nonincrementalReason_; }
+    const char* nonincrementalReason() const { return nonincrementalReason_; }
 
     void count(Stat s) {
         MOZ_ASSERT(s < STAT_LIMIT);
