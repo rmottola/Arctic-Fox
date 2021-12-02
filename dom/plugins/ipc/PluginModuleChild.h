@@ -274,11 +274,10 @@ public:
         QUIRK_FLASH_RETURN_EMPTY_DOCUMENT_ORIGIN        = 1 << 11,
         // Win: Addresses a Unity bug with mouse capture.
         QUIRK_UNITY_FIXUP_MOUSE_CAPTURE                 = 1 << 12,
-        // Mac: Work around a Flash bug that causes long hangs when Flash
-        // tries to display its camera and microphone access dialog while
-        // it thinks HiDPI support is available. This is Adobe bug
-        // ADBE 3921114, which should get fixed in a future release. When
-        // this happens we'll no longer need this quirk. See bug 1118615.
+        // Mac: Work around a Flash ActionScript bug that causes long hangs if
+        // Flash thinks HiDPI support is available. Adobe is tracking this as
+        // ADBE 3921114. If this turns out to be Adobe's fault and they fix it,
+        // we'll no longer need this quirk. See bug 1118615.
         QUIRK_FLASH_HIDE_HIDPI_SUPPORT                  = 1 << 13,
     };
 
