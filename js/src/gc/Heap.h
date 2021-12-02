@@ -75,7 +75,9 @@ enum InitialHeap {
 };
 
 /* The GC allocation kinds. */
-enum class AllocKind : uint8_t {
+// FIXME: uint8_t would make more sense for the underlying type, but causes
+// miscompilations in GCC (fixed in 4.8.5 and 4.9.3). See also bug 1143966.
+enum class AllocKind {
     FIRST,
     OBJECT_FIRST = FIRST,
     FUNCTION = FIRST,
