@@ -637,8 +637,8 @@ class ParseNode
         } unary;
         struct {                        /* name, labeled statement, etc. */
             union {
-                JSAtom*      atom;      /* lexical name or label atom */
-                ObjectBox*   objbox;    /* block or regexp object */
+                JSAtom*     atom;      /* lexical name or label atom */
+                ObjectBox*  objbox;    /* block or regexp object */
                 FunctionBox* funbox;    /* function object */
             };
             union {

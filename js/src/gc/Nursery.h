@@ -44,7 +44,7 @@ struct TenureCountCache;
 
 namespace jit {
 class MacroAssembler;
-}
+} // namespace jit
 
 class TenuringTracer : public JSTracer
 {

@@ -128,7 +128,7 @@ struct BytecodeEmitter
           : code(cx), notes(cx), lastNoteOffset(0), currentLine(lineNum), lastColumn(0)
         {}
     };
-    EmitSection prologue, main,* current;
+    EmitSection prologue, main, *current;
 
     /* the parser */
     Parser<FullParseHandler>* const parser;

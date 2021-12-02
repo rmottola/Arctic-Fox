@@ -248,33 +248,33 @@ void
 CodeGeneratorShared::restoreLive(LInstruction* ins)
 {
     MOZ_ASSERT(!ins->isCall());
-    LSafepoint *safepoint = ins->safepoint();
+    LSafepoint* safepoint = ins->safepoint();
     masm.PopRegsInMask(safepoint->liveRegs());
 }
 
 void
-CodeGeneratorShared::restoreLiveIgnore(LInstruction *ins, LiveRegisterSet ignore)
+CodeGeneratorShared::restoreLiveIgnore(LInstruction* ins, LiveRegisterSet ignore)
 {
     MOZ_ASSERT(!ins->isCall());
-    LSafepoint *safepoint = ins->safepoint();
+    LSafepoint* safepoint = ins->safepoint();
     masm.PopRegsInMaskIgnore(safepoint->liveRegs(), ignore);
 }
 
 void
-CodeGeneratorShared::saveLiveVolatile(LInstruction *ins)
+CodeGeneratorShared::saveLiveVolatile(LInstruction* ins)
 {
     MOZ_ASSERT(!ins->isCall());
-    LSafepoint *safepoint = ins->safepoint();
+    LSafepoint* safepoint = ins->safepoint();
     LiveRegisterSet regs;
     regs.set() = RegisterSet::Intersect(safepoint->liveRegs().set(), RegisterSet::Volatile());
     masm.PushRegsInMask(regs);
 }
 
 void
-CodeGeneratorShared::restoreLiveVolatile(LInstruction *ins)
+CodeGeneratorShared::restoreLiveVolatile(LInstruction* ins)
 {
     MOZ_ASSERT(!ins->isCall());
-    LSafepoint *safepoint = ins->safepoint();
+    LSafepoint* safepoint = ins->safepoint();
     LiveRegisterSet regs;
     regs.set() = RegisterSet::Intersect(safepoint->liveRegs().set(), RegisterSet::Volatile());
     masm.PopRegsInMask(regs);
@@ -283,7 +283,7 @@ CodeGeneratorShared::restoreLiveVolatile(LInstruction *ins)
 void
 CodeGeneratorShared::verifyHeapAccessDisassembly(uint32_t begin, uint32_t end, bool isLoad,
                                                  Scalar::Type type, unsigned numElems,
-                                                 const Operand &mem, LAllocation alloc)
+                                                 const Operand& mem, LAllocation alloc)
 {
 #ifdef DEBUG
     using namespace Disassembler;

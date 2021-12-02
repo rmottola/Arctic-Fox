@@ -62,7 +62,7 @@ LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X>* lir,
 }
 
 template <size_t X, size_t Y> void
-LIRGeneratorShared::defineFixed(LInstructionHelper<1, X, Y> *lir, MDefinition *mir, const LAllocation &output)
+LIRGeneratorShared::defineFixed(LInstructionHelper<1, X, Y>* lir, MDefinition* mir, const LAllocation& output)
 {
     LDefinition::Type type = LDefinition::TypeFrom(mir->type());
 
@@ -236,12 +236,12 @@ LIRGeneratorShared::redefine(MDefinition* def, MDefinition* as)
               case MIRType_ObjectOrNull:
               case MIRType_String:
               case MIRType_Symbol: {
-                LAssertResultT *check = new(alloc()) LAssertResultT(useRegister(def));
+                LAssertResultT* check = new(alloc()) LAssertResultT(useRegister(def));
                 add(check, def->toInstruction());
                 break;
               }
               case MIRType_Value: {
-                LAssertResultV *check = new(alloc()) LAssertResultV();
+                LAssertResultV* check = new(alloc()) LAssertResultV();
                 useBox(check, LAssertRangeV::Input, def);
                 add(check, def->toInstruction());
                 break;

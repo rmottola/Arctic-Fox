@@ -224,7 +224,7 @@ Zone::discardJitCode(FreeOp* fop)
 #ifdef DEBUG
         /* Assert no baseline scripts are marked as active. */
         for (ZoneCellIterUnderGC i(this, AllocKind::SCRIPT); !i.done(); i.next()) {
-            JSScript *script = i.get<JSScript>();
+            JSScript* script = i.get<JSScript>();
             MOZ_ASSERT_IF(script->hasBaselineScript(), !script->baselineScript()->active());
         }
 #endif
@@ -236,7 +236,7 @@ Zone::discardJitCode(FreeOp* fop)
         jit::InvalidateAll(fop, this);
 
         for (ZoneCellIterUnderGC i(this, AllocKind::SCRIPT); !i.done(); i.next()) {
-            JSScript *script = i.get<JSScript>();
+            JSScript* script = i.get<JSScript>();
             jit::FinishInvalidation(fop, script);
 
             /*
@@ -308,7 +308,7 @@ Zone::notifyObservingDebuggers()
         if (!global)
             continue;
 
-        GlobalObject::DebuggerVector *dbgs = global->getDebuggers();
+        GlobalObject::DebuggerVector* dbgs = global->getDebuggers();
         if (!dbgs)
             continue;
 

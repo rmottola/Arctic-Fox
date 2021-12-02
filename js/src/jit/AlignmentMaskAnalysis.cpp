@@ -37,8 +37,8 @@ AnalyzeAsmHeapAddress(MDefinition* ptr, MIRGraph& graph)
     if (!ptr->isBitAnd())
         return;
 
-    MDefinition *lhs = ptr->toBitAnd()->getOperand(0);
-    MDefinition *rhs = ptr->toBitAnd()->getOperand(1);
+    MDefinition* lhs = ptr->toBitAnd()->getOperand(0);
+    MDefinition* rhs = ptr->toBitAnd()->getOperand(1);
     int lhsIndex = 0;
     if (lhs->isConstantValue()) {
         mozilla::Swap(lhs, rhs);
@@ -47,8 +47,8 @@ AnalyzeAsmHeapAddress(MDefinition* ptr, MIRGraph& graph)
     if (!lhs->isAdd() || !lhs->hasOneUse() || !rhs->isConstantValue())
         return;
 
-    MDefinition *op0 = lhs->toAdd()->getOperand(0);
-    MDefinition *op1 = lhs->toAdd()->getOperand(1);
+    MDefinition* op0 = lhs->toAdd()->getOperand(0);
+    MDefinition* op1 = lhs->toAdd()->getOperand(1);
     int op0Index = 0;
     if (op0->isConstantValue()) {
         mozilla::Swap(op0, op1);

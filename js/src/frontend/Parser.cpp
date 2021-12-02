@@ -4838,7 +4838,7 @@ Parser<FullParseHandler>::forStatement(YieldHandling yieldHandling)
                 if (!blockObj)
                     return null();
                 pn1 = variables(yieldHandling, constDecl ? PNK_CONST : PNK_LET, InForInit,
-		                nullptr, blockObj, DontHoistVars);
+                                nullptr, blockObj, DontHoistVars);
             } else {
                 // Pass |InProhibited| when parsing an expression so that |in|
                 // isn't parsed in a RelationalExpression as a binary operator.

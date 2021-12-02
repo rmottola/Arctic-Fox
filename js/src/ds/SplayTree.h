@@ -68,11 +68,11 @@ class SplayTree
         return !root;
     }
 
-    T *maybeLookup(const T &v)
+    T* maybeLookup(const T& v)
     {
         if (!root)
             return nullptr;
-        Node *last = lookup(v);
+        Node* last = lookup(v);
         return (C::compare(v, last->item) == 0) ? &(last->item) : nullptr;
     }
 
