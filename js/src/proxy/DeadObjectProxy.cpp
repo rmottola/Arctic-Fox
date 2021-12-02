@@ -29,9 +29,9 @@ DeadObjectProxy::getOwnPropertyDescriptor(JSContext* cx, HandleObject wrapper, H
 }
 
 bool
-DeadObjectProxy::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
+DeadObjectProxy::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
                                 Handle<PropertyDescriptor> desc,
-                                ObjectOpResult &result) const
+                                ObjectOpResult& result) const
 {
     ReportDead(cx);
     return false;
@@ -68,14 +68,14 @@ DeadObjectProxy::getPrototype(JSContext* cx, HandleObject proxy, MutableHandleOb
 }
 
 bool
-DeadObjectProxy::preventExtensions(JSContext *cx, HandleObject proxy, ObjectOpResult &result) const
+DeadObjectProxy::preventExtensions(JSContext* cx, HandleObject proxy, ObjectOpResult& result) const
 {
     ReportDead(cx);
     return false;
 }
 
 bool
-DeadObjectProxy::isExtensible(JSContext *cx, HandleObject proxy, bool *extensible) const
+DeadObjectProxy::isExtensible(JSContext* cx, HandleObject proxy, bool* extensible) const
 {
     // This is kind of meaningless, but dead-object semantics aside,
     // [[Extensible]] always being true is consistent with other proxy types.

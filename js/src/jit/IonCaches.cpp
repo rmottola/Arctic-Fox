@@ -2552,7 +2552,7 @@ GenerateCallSetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
         MOZ_ASSERT(target);
 
         // JSSetterOp: bool fn(JSContext* cx, HandleObject obj,
-        //                     HandleId id, HandleValue value, ObjectOpResult &result);
+        //                     HandleId id, HandleValue value, ObjectOpResult& result);
 
         // First, allocate an ObjectOpResult on the stack. We push this before
         // the stubCode pointer in order to match the layout of
@@ -3348,16 +3348,16 @@ SetPropertyIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex
         if (!addedSetterStub && canCache == MaybeCanAttachAddSlot &&
             IsPropertyAddInlineable(cx, &obj->as<NativeObject>(), id, cache.value(), oldShape,
                                     cache.needsTypeBarrier(), &checkTypeset))
-    {
-        if (!cache.attachAddSlot(cx, outerScript, ion, obj, oldShape, oldGroup, checkTypeset))
-            return false;
-        addedSetterStub = true;
-    }
+        {
+            if (!cache.attachAddSlot(cx, outerScript, ion, obj, oldShape, oldGroup, checkTypeset))
+                return false;
+            addedSetterStub = true;
+        }
 
-    checkTypeset = false;
-    if (!addedSetterStub && cache.canAttachStub() &&
-        CanAttachAddUnboxedExpando(cx, obj, oldShape, id, cache.value(),
-                                   cache.needsTypeBarrier(), &checkTypeset))
+        checkTypeset = false;
+        if (!addedSetterStub && cache.canAttachStub() &&
+            CanAttachAddUnboxedExpando(cx, obj, oldShape, id, cache.value(),
+                                       cache.needsTypeBarrier(), &checkTypeset))
         {
             if (!cache.attachAddSlot(cx, outerScript, ion, obj, oldShape, oldGroup, checkTypeset))
                 return false;

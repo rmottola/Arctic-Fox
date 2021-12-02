@@ -40,7 +40,7 @@ class ScriptedDirectProxyHandler : public BaseProxyHandler {
                                        bool* succeeded) const override;
 
     virtual bool preventExtensions(JSContext* cx, HandleObject proxy,
-                                   ObjectOpResult &result) const override;
+                                   ObjectOpResult& result) const override;
     virtual bool isExtensible(JSContext* cx, HandleObject proxy, bool* extensible) const override;
 
     virtual bool has(JSContext* cx, HandleObject proxy, HandleId id, bool* bp) const override;

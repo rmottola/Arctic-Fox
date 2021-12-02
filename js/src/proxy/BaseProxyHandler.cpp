@@ -98,8 +98,8 @@ BaseProxyHandler::get(JSContext* cx, HandleObject proxy, HandleValue receiver,
 }
 
 bool
-BaseProxyHandler::set(JSContext *cx, HandleObject proxy, HandleId id, HandleValue v,
-                      HandleValue receiver, ObjectOpResult &result) const
+BaseProxyHandler::set(JSContext* cx, HandleObject proxy, HandleId id, HandleValue v,
+                      HandleValue receiver, ObjectOpResult& result) const
 {
     assertEnteredPolicy(cx, proxy, id, SET);
 
@@ -119,9 +119,9 @@ BaseProxyHandler::set(JSContext *cx, HandleObject proxy, HandleId id, HandleValu
 }
 
 bool
-js::SetPropertyIgnoringNamedGetter(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
+js::SetPropertyIgnoringNamedGetter(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
                                    HandleValue receiver, Handle<PropertyDescriptor> ownDesc_,
-                                   ObjectOpResult &result)
+                                   ObjectOpResult& result)
 {
     Rooted<PropertyDescriptor> ownDesc(cx, ownDesc_);
 
@@ -181,7 +181,7 @@ js::SetPropertyIgnoringNamedGetter(JSContext *cx, HandleObject obj, HandleId id,
 
         // A very old nonstandard SpiderMonkey extension: default to the Class
         // getter and setter ops.
-        const Class *clasp = receiverObj->getClass();
+        const Class* clasp = receiverObj->getClass();
         MOZ_ASSERT(clasp->getProperty != JS_PropertyStub);
         MOZ_ASSERT(clasp->setProperty != JS_StrictPropertyStub);
         return DefineProperty(cx, receiverObj, id, v, clasp->getProperty, clasp->setProperty,
@@ -355,14 +355,14 @@ BaseProxyHandler::weakmapKeyDelegate(JSObject* proxy) const
 }
 
 bool
-BaseProxyHandler::getPrototype(JSContext *cx, HandleObject proxy, MutableHandleObject protop) const
+BaseProxyHandler::getPrototype(JSContext* cx, HandleObject proxy, MutableHandleObject protop) const
 {
     MOZ_CRASH("Must override getPrototype with lazy prototype.");
 }
 
 bool
-BaseProxyHandler::setPrototype(JSContext *cx, HandleObject proxy, HandleObject proto,
-                               ObjectOpResult &result) const
+BaseProxyHandler::setPrototype(JSContext* cx, HandleObject proxy, HandleObject proto,
+                               ObjectOpResult& result) const
 {
     // Disallow sets of protos on proxies with lazy protos, but no hook.
     // This keeps us away from the footgun of having the first proto set opt
@@ -373,7 +373,7 @@ BaseProxyHandler::setPrototype(JSContext *cx, HandleObject proxy, HandleObject p
 }
 
 bool
-BaseProxyHandler::setImmutablePrototype(JSContext *cx, HandleObject proxy, bool *succeeded) const
+BaseProxyHandler::setImmutablePrototype(JSContext* cx, HandleObject proxy, bool* succeeded) const
 {
     *succeeded = false;
     return true;

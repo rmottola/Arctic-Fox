@@ -38,8 +38,8 @@ SecurityWrapper<Base>::nativeCall(JSContext* cx, IsAcceptableThis test, NativeIm
 
 template <class Base>
 bool
-SecurityWrapper<Base>::setPrototype(JSContext *cx, HandleObject wrapper, HandleObject proto,
-                                    ObjectOpResult &result) const
+SecurityWrapper<Base>::setPrototype(JSContext* cx, HandleObject wrapper, HandleObject proto,
+                                    ObjectOpResult& result) const
 {
     ReportUnwrapDenied(cx);
     return false;
@@ -56,8 +56,8 @@ SecurityWrapper<Base>::setImmutablePrototype(JSContext* cx, HandleObject wrapper
 
 template <class Base>
 bool
-SecurityWrapper<Base>::preventExtensions(JSContext *cx, HandleObject wrapper,
-                                         ObjectOpResult &result) const
+SecurityWrapper<Base>::preventExtensions(JSContext* cx, HandleObject wrapper,
+                                         ObjectOpResult& result) const
 {
     // Just like BaseProxyHandler, SecurityWrappers claim by default to always
     // be extensible, so as not to leak information about the state of the

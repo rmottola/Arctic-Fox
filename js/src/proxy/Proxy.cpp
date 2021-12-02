@@ -121,11 +121,11 @@ Proxy::getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
 }
 
 bool
-Proxy::defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
-                      Handle<PropertyDescriptor> desc, ObjectOpResult &result)
+Proxy::defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
+                      Handle<PropertyDescriptor> desc, ObjectOpResult& result)
 {
     JS_CHECK_RECURSION(cx, return false);
-    const BaseProxyHandler *handler = proxy->as<ProxyObject>().handler();
+    const BaseProxyHandler* handler = proxy->as<ProxyObject>().handler();
     AutoEnterPolicy policy(cx, handler, proxy, id, BaseProxyHandler::SET, true);
     if (!policy.allowed()) {
         if (!policy.returnValue())
@@ -147,7 +147,7 @@ Proxy::ownPropertyKeys(JSContext* cx, HandleObject proxy, AutoIdVector& props)
 }
 
 bool
-Proxy::delete_(JSContext *cx, HandleObject proxy, HandleId id, ObjectOpResult &result)
+Proxy::delete_(JSContext* cx, HandleObject proxy, HandleId id, ObjectOpResult& result)
 {
     JS_CHECK_RECURSION(cx, return false);
     const BaseProxyHandler* handler = proxy->as<ProxyObject>().handler();
@@ -182,7 +182,7 @@ js::AppendUnique(JSContext* cx, AutoIdVector& base, AutoIdVector& others)
 }
 
 /* static */ bool
-Proxy::getPrototype(JSContext *cx, HandleObject proxy, MutableHandleObject proto)
+Proxy::getPrototype(JSContext* cx, HandleObject proxy, MutableHandleObject proto)
 {
     MOZ_ASSERT(proxy->hasLazyPrototype());
     JS_CHECK_RECURSION(cx, return false);
@@ -190,7 +190,7 @@ Proxy::getPrototype(JSContext *cx, HandleObject proxy, MutableHandleObject proto
 }
 
 /* static */ bool
-Proxy::setPrototype(JSContext *cx, HandleObject proxy, HandleObject proto, ObjectOpResult &result)
+Proxy::setPrototype(JSContext* cx, HandleObject proxy, HandleObject proto, ObjectOpResult& result)
 {
     MOZ_ASSERT(proxy->hasLazyPrototype());
     JS_CHECK_RECURSION(cx, return false);
@@ -198,23 +198,23 @@ Proxy::setPrototype(JSContext *cx, HandleObject proxy, HandleObject proto, Objec
 }
 
 /* static */ bool
-Proxy::setImmutablePrototype(JSContext *cx, HandleObject proxy, bool *succeeded)
+Proxy::setImmutablePrototype(JSContext* cx, HandleObject proxy, bool* succeeded)
 {
     JS_CHECK_RECURSION(cx, return false);
-    const BaseProxyHandler *handler = proxy->as<ProxyObject>().handler();
+    const BaseProxyHandler* handler = proxy->as<ProxyObject>().handler();
     return handler->setImmutablePrototype(cx, proxy, succeeded);
 }
 
 /* static */ bool
-Proxy::preventExtensions(JSContext *cx, HandleObject proxy, ObjectOpResult &result)
+Proxy::preventExtensions(JSContext* cx, HandleObject proxy, ObjectOpResult& result)
 {
     JS_CHECK_RECURSION(cx, return false);
-    const BaseProxyHandler *handler = proxy->as<ProxyObject>().handler();
+    const BaseProxyHandler* handler = proxy->as<ProxyObject>().handler();
     return handler->preventExtensions(cx, proxy, result);
 }
 
 /* static */ bool
-Proxy::isExtensible(JSContext *cx, HandleObject proxy, bool *extensible)
+Proxy::isExtensible(JSContext* cx, HandleObject proxy, bool* extensible)
 {
     JS_CHECK_RECURSION(cx, return false);
     return proxy->as<ProxyObject>().handler()->isExtensible(cx, proxy, extensible);
@@ -561,7 +561,7 @@ js::proxy_innerObject(JSObject* obj)
 }
 
 bool
-js::proxy_LookupProperty(JSContext *cx, HandleObject obj, HandleId id,
+js::proxy_LookupProperty(JSContext* cx, HandleObject obj, HandleId id,
                          MutableHandleObject objp, MutableHandleShape propp)
 {
     bool found;
@@ -579,9 +579,9 @@ js::proxy_LookupProperty(JSContext *cx, HandleObject obj, HandleId id,
 }
 
 bool
-js::proxy_DefineProperty(JSContext *cx, HandleObject obj, HandleId id,
+js::proxy_DefineProperty(JSContext* cx, HandleObject obj, HandleId id,
                          Handle<JSPropertyDescriptor> desc,
-                         ObjectOpResult &result)
+                         ObjectOpResult& result)
 {
     return Proxy::defineProperty(cx, obj, id, desc, result);
 }
@@ -600,8 +600,8 @@ js::proxy_GetProperty(JSContext* cx, HandleObject obj, HandleValue receiver, Han
 }
 
 bool
-js::proxy_SetProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                      HandleValue receiver, ObjectOpResult &result)
+js::proxy_SetProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
+                      HandleValue receiver, ObjectOpResult& result)
 {
     return Proxy::set(cx, obj, id, v, receiver, result);
 }
@@ -614,9 +614,9 @@ js::proxy_GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
 }
 
 bool
-js::proxy_DeleteProperty(JSContext *cx, HandleObject obj, HandleId id, ObjectOpResult &result)
+js::proxy_DeleteProperty(JSContext* cx, HandleObject obj, HandleId id, ObjectOpResult& result)
 {
- if (!Proxy::delete_(cx, obj, id, result))
+    if (!Proxy::delete_(cx, obj, id, result))
         return false;
     return SuppressDeletedProperty(cx, obj, id); // XXX is this necessary?
 }
