@@ -64,7 +64,7 @@ WrapperAnswer::ok(ReturnStatus* rs)
 }
 
 bool
-WrapperAnswer::ok(ReturnStatus *rs, const JS::ObjectOpResult &result)
+WrapperAnswer::ok(ReturnStatus* rs, const JS::ObjectOpResult& result)
 {
     *rs = result
           ? ReturnStatus(ReturnSuccess())
@@ -73,7 +73,7 @@ WrapperAnswer::ok(ReturnStatus *rs, const JS::ObjectOpResult &result)
 }
 
 bool
-WrapperAnswer::RecvPreventExtensions(const ObjectId &objId, ReturnStatus *rs)
+WrapperAnswer::RecvPreventExtensions(const ObjectId& objId, ReturnStatus* rs)
 {
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(scopeForTargetObjects())))
@@ -104,8 +104,8 @@ EmptyDesc(PPropertyDescriptor* desc)
 }
 
 bool
-WrapperAnswer::RecvGetPropertyDescriptor(const ObjectId &objId, const JSIDVariant &idVar,
-                                         ReturnStatus *rs, PPropertyDescriptor *out)
+WrapperAnswer::RecvGetPropertyDescriptor(const ObjectId& objId, const JSIDVariant& idVar,
+                                         ReturnStatus* rs, PPropertyDescriptor* out)
 {
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(scopeForTargetObjects())))
@@ -196,7 +196,7 @@ WrapperAnswer::RecvDefineProperty(const ObjectId& objId, const JSIDVariant& idVa
 }
 
 bool
-WrapperAnswer::RecvDelete(const ObjectId &objId, const JSIDVariant &idVar, ReturnStatus *rs)
+WrapperAnswer::RecvDelete(const ObjectId& objId, const JSIDVariant& idVar, ReturnStatus* rs)
 {
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(scopeForTargetObjects())))
@@ -311,8 +311,8 @@ WrapperAnswer::RecvGet(const ObjectId& objId, const JSVariant& receiverVar,
 }
 
 bool
-WrapperAnswer::RecvSet(const ObjectId &objId, const JSIDVariant &idVar, const JSVariant &value,
-                       const JSVariant &receiverVar, ReturnStatus *rs)
+WrapperAnswer::RecvSet(const ObjectId& objId, const JSIDVariant& idVar, const JSVariant& value,
+                       const JSVariant& receiverVar, ReturnStatus* rs)
 {
     // We may run scripted setters.
     AutoEntryScript aes(xpc::NativeGlobal(scopeForTargetObjects()),
@@ -573,7 +573,7 @@ WrapperAnswer::RecvClassName(const ObjectId& objId, nsCString* name)
 }
 
 bool
-WrapperAnswer::RecvGetPrototype(const ObjectId &objId, ReturnStatus *rs, ObjectOrNullVariant *result)
+WrapperAnswer::RecvGetPrototype(const ObjectId& objId, ReturnStatus* rs, ObjectOrNullVariant* result)
 {
     *result = NullVariant();
 

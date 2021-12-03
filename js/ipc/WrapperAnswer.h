@@ -14,7 +14,7 @@ namespace mozilla {
 
 namespace dom {
 class AutoJSAPI;
-}
+} // namespace dom
 
 namespace jsipc {
 

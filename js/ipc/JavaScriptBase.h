@@ -35,7 +35,7 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
 
     /*** IPC handlers ***/
 
-    bool RecvPreventExtensions(const uint64_t &objId, ReturnStatus* rs) {
+    bool RecvPreventExtensions(const uint64_t& objId, ReturnStatus* rs) {
         return Answer::RecvPreventExtensions(ObjectId::deserialize(objId), rs);
     }
     bool RecvGetPropertyDescriptor(const uint64_t& objId, const JSIDVariant& id,
@@ -50,11 +50,11 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
         return Answer::RecvGetOwnPropertyDescriptor(ObjectId::deserialize(objId), id, rs, out);
     }
     bool RecvDefineProperty(const uint64_t& objId, const JSIDVariant& id,
-                            const PPropertyDescriptor &flags, ReturnStatus *rs) {
+                            const PPropertyDescriptor& flags, ReturnStatus* rs) {
         return Answer::RecvDefineProperty(ObjectId::deserialize(objId), id, flags, rs);
     }
     bool RecvDelete(const uint64_t& objId, const JSIDVariant& id,
-                      ReturnStatus *rs) {
+                      ReturnStatus* rs) {
         return Answer::RecvDelete(ObjectId::deserialize(objId), id, rs);
     }
 
@@ -122,13 +122,13 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
 
     /*** Dummy call handlers ***/
 
-    bool SendDropObject(const ObjectId &objId) {
+    bool SendDropObject(const ObjectId& objId) {
         return Base::SendDropObject(objId.serialize());
     }
     bool SendPreventExtensions(const ObjectId& objId, ReturnStatus* rs) {
         return Base::SendPreventExtensions(objId.serialize(), rs);
     }
-    bool SendGetPropertyDescriptor(const ObjectId &objId, const JSIDVariant& id,
+    bool SendGetPropertyDescriptor(const ObjectId& objId, const JSIDVariant& id,
                                      ReturnStatus* rs,
                                      PPropertyDescriptor* out) {
         return Base::SendGetPropertyDescriptor(objId.serialize(), id, rs, out);
@@ -141,7 +141,7 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
     }
     bool SendDefineProperty(const ObjectId& objId, const JSIDVariant& id,
                             const PPropertyDescriptor& flags,
-                            ReturnStatus *rs) {
+                            ReturnStatus* rs) {
         return Base::SendDefineProperty(objId.serialize(), id, flags, rs);
     }
     bool SendDelete(const ObjectId& objId, const JSIDVariant& id, ReturnStatus* rs) {
@@ -197,7 +197,7 @@ class JavaScriptBase : public WrapperOwner, public WrapperAnswer, public Base
     }
 
     bool SendGetPropertyKeys(const ObjectId& objId, const uint32_t& flags,
-                             ReturnStatus *rs, nsTArray<JSIDVariant> *ids) {
+                             ReturnStatus* rs, nsTArray<JSIDVariant>* ids) {
         return Base::SendGetPropertyKeys(objId.serialize(), flags, rs, ids);
     }
     bool SendInstanceOf(const ObjectId& objId, const JSIID& iid,
