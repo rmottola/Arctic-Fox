@@ -127,9 +127,15 @@ PlacesController.prototype = {
   isCommandEnabled: function PC_isCommandEnabled(aCommand) {
     switch (aCommand) {
     case "cmd_undo":
-      return PlacesUtils.transactionManager.numberOfUndoItems > 0;
+      if (!PlacesUIUtils.useAsyncTransactions)
+        return PlacesUtils.transactionManager.numberOfUndoItems > 0;
+
+      return PlacesTransactions.topUndoEntry != null;
     case "cmd_redo":
-      return PlacesUtils.transactionManager.numberOfRedoItems > 0;
+      if (!PlacesUIUtils.useAsyncTransactions)
+        return PlacesUtils.transactionManager.numberOfRedoItems > 0;
+
+      return PlacesTransactions.topRedoEntry != null;
     case "cmd_cut":
     case "placesCmd_cut":
     case "placesCmd_moveBookmarks":
@@ -202,10 +208,18 @@ PlacesController.prototype = {
   doCommand: function PC_doCommand(aCommand) {
     switch (aCommand) {
     case "cmd_undo":
-      PlacesUtils.transactionManager.undoTransaction();
+      if (!PlacesUIUtils.useAsyncTransactions) {
+        PlacesUtils.transactionManager.undoTransaction();
+        return;
+      }
+      PlacesTransactions.undo().then(null, Components.utils.reportError);
       break;
     case "cmd_redo":
-      PlacesUtils.transactionManager.redoTransaction();
+      if (!PlacesUIUtils.useAsyncTransactions) {
+        PlacesUtils.transactionManager.redoTransaction();
+        return;
+      }
+      PlacesTransactions.redo().then(null, Components.utils.reportError);
       break;
     case "cmd_cut":
     case "placesCmd_cut":
