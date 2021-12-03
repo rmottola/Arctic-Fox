@@ -848,3 +848,7 @@ bin/libfreebl_32int64_3.so
 #if defined(MOZ_ASAN) && defined(CLANG_CL)
 @BINPATH@/clang_rt.asan_dynamic-i386.dll
 #endif
+
+#ifdef MOZ_MULET
+#include ../../b2g/installer/package-manifest.in
+#endif
