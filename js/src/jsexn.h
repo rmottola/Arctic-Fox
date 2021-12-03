@@ -118,10 +118,10 @@ ExnTypeFromProtoKey(JSProtoKey key)
 
 class AutoClearPendingException
 {
-    JSContext *cx;
+    JSContext* cx;
 
   public:
-    explicit AutoClearPendingException(JSContext *cxArg)
+    explicit AutoClearPendingException(JSContext* cxArg)
       : cx(cxArg)
     { }
 

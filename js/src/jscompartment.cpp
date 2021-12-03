@@ -484,7 +484,7 @@ JSCompartment::traceOutgoingCrossCompartmentWrappers(JSTracer* trc)
     for (WrapperMap::Enum e(crossCompartmentWrappers); !e.empty(); e.popFront()) {
         Value v = e.front().value();
         if (e.front().key().kind == CrossCompartmentKey::ObjectWrapper) {
-            ProxyObject *wrapper = &v.toObject().as<ProxyObject>();
+            ProxyObject* wrapper = &v.toObject().as<ProxyObject>();
 
             /*
              * We have a cross-compartment wrapper. Its private pointer may
@@ -930,10 +930,10 @@ JSCompartment::unsetIsDebuggee()
 }
 
 void
-JSCompartment::clearBreakpointsIn(FreeOp *fop, js::Debugger *dbg, HandleObject handler)
+JSCompartment::clearBreakpointsIn(FreeOp* fop, js::Debugger* dbg, HandleObject handler)
 {
     for (gc::ZoneCellIter i(zone(), gc::AllocKind::SCRIPT); !i.done(); i.next()) {
-        JSScript *script = i.get<JSScript>();
+        JSScript* script = i.get<JSScript>();
         if (script->compartment() == this && script->hasAnyBreakpointsOrStepMode())
             script->clearBreakpointsIn(fop, dbg, handler);
     }
@@ -941,17 +941,17 @@ JSCompartment::clearBreakpointsIn(FreeOp *fop, js::Debugger *dbg, HandleObject h
 
 void
 JSCompartment::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
-                                      size_t *tiAllocationSiteTables,
-                                      size_t *tiArrayTypeTables,
-                                      size_t *tiObjectTypeTables,
-                                      size_t *compartmentObject,
-                                      size_t *compartmentTables,
-                                      size_t *innerViewsArg,
-                                      size_t *lazyArrayBuffersArg,
-                                      size_t *objectMetadataTablesArg,
-                                      size_t *crossCompartmentWrappersArg,
-                                      size_t *regexpCompartment,
-                                      size_t *savedStacksSet)
+                                      size_t* tiAllocationSiteTables,
+                                      size_t* tiArrayTypeTables,
+                                      size_t* tiObjectTypeTables,
+                                      size_t* compartmentObject,
+                                      size_t* compartmentTables,
+                                      size_t* innerViewsArg,
+                                      size_t* lazyArrayBuffersArg,
+                                      size_t* objectMetadataTablesArg,
+                                      size_t* crossCompartmentWrappersArg,
+                                      size_t* regexpCompartment,
+                                      size_t* savedStacksSet)
 {
     *compartmentObject += mallocSizeOf(this);
     objectGroups.addSizeOfExcludingThis(mallocSizeOf, tiAllocationSiteTables,
