@@ -515,7 +515,12 @@ public:
     }
     bool AsyncPanZoomEnabled() { return mAsyncPanZoomEnabled; }
 
-    virtual ScreenIntSize GetInnerSize();
+    virtual ScreenIntSize GetInnerSize() override;
+
+    virtual PWebBrowserPersistDocumentChild* AllocPWebBrowserPersistDocumentChild(const uint64_t& aOuterWindowID) override;
+    virtual bool RecvPWebBrowserPersistDocumentConstructor(PWebBrowserPersistDocumentChild *aActor,
+                                                           const uint64_t& aOuterWindowID) override;
+    virtual bool DeallocPWebBrowserPersistDocumentChild(PWebBrowserPersistDocumentChild* aActor) override;
 
 protected:
     virtual ~TabChild();
@@ -525,7 +530,7 @@ protected:
     virtual bool RecvDestroy() override;
     virtual bool RecvSetUpdateHitRegion(const bool& aEnabled) override;
     virtual bool RecvSetIsDocShellActive(const bool& aIsActive) override;
-    virtual bool RecvNavigateDocument(const bool& aForward) override;
+    virtual bool RecvNavigateByKey(const bool& aForward, const bool& aForDocumentNavigation) override;
 
     virtual bool RecvRequestNotifyAfterRemotePaint() override;
 

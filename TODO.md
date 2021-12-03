@@ -63,12 +63,15 @@
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
 - Bug 1244650 - Failure to clear Forms and Search Data on exit. r
 - Bug 1243549 - Add missing bits. r=post-facto 
+- Bug 612168 [recheck existing] - Handle uninstalls of restartless addons in XPIProvider
 - Bug 1243549 - 2016-02-04 Make sure that startup sanitization doesn't throw
 - Bug 1219339 - 2016-01-14 : switch GetStaticInstance to use IPC's Singleton<T>
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu
+- 1245241 remaining 4 parts
+- Bug 1245241 - 2016-02-18 - part 1 - Close Shmem file handles after mapping them wh
 - 1164427 - Implement elementsFromPoint (= Tests)
 - Bug 1230948 - Update web-platform-tests expected data to revision 63b
 - Bug 1160971 - 4 parts
@@ -77,8 +80,13 @@
 - rest of 1198458
 - Bug 1198458: Rollup of changes previously applied to media/webrtc/tru
 - Bug 1198458: Webrtc updated to branch 43
+- 1227567 - Optimise module namespace imports in Ion where we have
+- update SKIA 1082598
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
+- Bug 1235656 - Followup: Allow extended functions with guessed atoms i
+- Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
+- Bug 1223916 - 2015-11-14 Prohibit direct method calls at the parser level in 
 - Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
 - Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
@@ -88,26 +96,37 @@
 - Bug 1214126 - 5 Parts
 - Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
+- 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
+- Bug 1214508: SharedStubs - Part 1: Move the getprop stubs in to share
 - Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1089695 - Fixing wrong dependency in Places shutdown. r=mak 
-- Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or 
+- Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or
+- Bug 1257650 - 2016-03-19 Skip Security checks if triggeringPrincipal is System
+- Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
+- Bug 1226909 multipart AsyncOpen2 
+- Bug 1213646: Allow URI_IS_UI_RESOURCE and safe about: URIs when SEC_A
+- Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
+- Bug 1182571 - 2051-10-19 Fix nsILoadInfo->GetContentPolicyType API to be less am
+- Bug 1170958 - 2015-09-30 - Allow MediaInputPort to lock to a specific input track
 - Bug 1205533 - 2015-09-18 - Fix and disallow warnings in gfx/qcms/
 - Bug 1191148 - Don't count fullscreen request handled if we don't chanyesy
 - Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
+- Bug 901633
+- Bug 1155618 - Fix more out of memory handling issues r=terrence 
+- Bug 1186424- Refactor AsmJSValidate.cpp in preparation for paralleliz
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
 - Bug 1192130 - Part 1: Add MOZ_NON_AUTOABLE to restrict using auto in
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
-Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
+- Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
+- Bug 1169268 - Don't crash when pasting files. r=ndeakin
 - Bug 1202085 2015-10-26 - Part 0 to 6
-- Bug 930414 - 22 parts
 - Bug 1188347  - 5 parts
 - Bug 1188643 2015-09-30 - Buffer more audio in audio capture mode to avoid glitche
 - Bug 1205870 - 2015-09-22 - Make sure all possible unboxed array inline capacities 
 - Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
-- Bug 1072313 - 2015-09-21 - Never call TextureClient::KeepUntilFullDeallocation off
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
@@ -127,12 +146,12 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - Bug 1203857 - Allow to build standalone js against jemalloc4. r=gps 
+- 1185106 - at least part 0 to 4 for TFF
 - Bug 1160014 - 2015-07-24 - Implement fullscreen part 4-6
-- Bug 1182428 - 2015-07-23 - Fix the ObjectGroup hazards, r=jonco 
-- Bug 1180993 - 2015-07-20 - Part 3: Correct use sites of functions which return alr
 - Bug 1171379 - and check all related on bugzilla
 - Bug 909154. Remove the prefixed mozRequestAnimationFrame and its acco
 - Bug 1184429 - 2015-07-17 P1. & P2
+- Bug 1123386 - Part 4: Update the tooltool manifests for the OSX an
 - Bug 1182316: Part 3 - Add assertions to most other WebIDL entry point
 - Bug 1182316 - 2015-07-12 - Part 2 - Rework FORWARD_TO_OUTER_OR_THROW. r=peterv
 - Bug 1179110 - 2015-07-02 Use a Maybe<> to store start time, rather than using -1
@@ -140,63 +159,37 @@ Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - Bug 1160014 - part 1 to 4
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
-- Bug 1181869 - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
+- Bug 1181869 [provokes crashing] - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 905127 - Part 2 - remove unnecessary nsNetUtil.h includes r=jduell
 - Bug 905127 - 2015-07-07 - Part 1 - Make some functions from nsNetUtil not inline.
 - Bug 1172785 - 2016-07-06 remaining parts of RTCCertificate
 - 1178938 - 2015-07-02 5 parts
 - Bug 1175622 - Use the right API when transitively marking object grou	
-- Bug 1161802 - 2015-06-10  part 1 to 8
-- Bug 1166840 - 2015-05-21 Remove unused document argument in uses of nsIClipboard¿ 
-- Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust 
+- Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
+- Bug 1051052 - Made mid an outparam in JsepSession::AddLocalIceCandida
 - Bug 1204872 - 2015-09
 - Bug 1198861 - (1 of 2) Improve aliasing information and type barrier handling 
+- Bug 1200099. Add a test that captured cross-origin video
+- Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
+--Bug 1194422 - Expose census traversals to SpiderMonkey embedders; r=s
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
-- Bug 1161802 part 2 - Split nsGlobalWindow::SetFullScreenInternal into
-- Bug 1053413 part 1 - Some code style conversion on affected code.
-- Bug 947854 - 2015-05-05 parto 0 to 4
+- Bug 830801 - Part 1. Set NOMINMAX define as default. r=mshal 
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 1179569: Remove use of decoder's monitor in ResetDecode(). r=bholley
 - Bug 1178437 - Do the dormant-enabled tracking on the main thread. 
-- Bug 1175768 - 2015-06-27 -  Use mirroring for buffered ranges. r=jya- 
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
-- Bug 1197316 - 2015-08-23 - Remove PR_snprintf calls in xpcom/. r=froydnj 
-- Bug 1210607 - Check for null compartment in PopulateReport
-- Bug 1127618 - make push caches work in e10s. r=mcmanus r=froydnj IGNORE IDL
-- Bug 1123516 - 2015-06-30 - Implement maplike/setlike
-- Bug 1157569 - 2015-06-27 - from part 13 onwards
-- Bug 1169268 - 2015-06-24 - Handle CFHTML data better. r=ndeakin 
-- Bug 1175535 - Don't require objects embedded in MIR nodes to always b (remove gen->alloc() for alloc)
-
-- Bug 1152326 - When processing plugin updates only update the visibili
+- Bug 968923 - 2015-07-17 - part 6 - add use counters for deprecated operations; r=bz
 - Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
-- Bug 1165486 2015-06-21 - Rename hasPollutedGlobalScope to hasNonSyntacticScope. (and related)
-- Bug 1173255 - 2015-06-18 - Cleanup MediaManager e10s code in prep for deviceId con
-- Bug 1174450 - 2015-06-16 -  part 1 to 14
-- Bug 1174372 - Initialize ExecutableAllocator static fields in JS_Init
-- remaining parts of Bug 968923 (2015-06)
-- Bug 1171555 - Remove overly verbose ServiceWorker warnings.
-- Bug 1173415 - Fix incorrect mask used for
-- Bug 1167356 - 2015-06-11
-- Bug 1129873 - 2015-06-08 - [GTK3] Implement wrapper to GtkAppChooserDialog to allo
-- 1190496 - Hoist SharedThreadPool into xpcom.
-- 1190495 - Hoist TaskQueue into xpcom
-- 1188976 - Hoist MozPromise into xpcom
-- 1185106 - at least part 0 to 4 for TFF
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
-- 1227567 - Optimise module namespace imports in Ion where we have
-- 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
+- Bug 1170081 - Add a tag to run only mochitests that use HTML
 
 
 impacting download and shutdown:
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
-
-Mac Specific
-SkiaGL: https://bugzilla.mozilla.org/show_bug.cgi?id=1150944
 
 More session store stuff to check:
 
@@ -218,18 +211,25 @@ Check with Roy Tam:
 
 # Patches that apply but break things:
 - Bug 1096294 - 2015-02-24 Display pseudo-arrays like arrays in the console; r=pbrosset
-- Bug 1167823 - Remove dead code for checking whether a parse tree node has side effects. r=shu
+
+# Not applicable - missing customizableUI
+- Bug 1170759 - Move detailed security information to a subpanel r=Gijs
 
 What with LightweightThemeConsumer.jsm 
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/af76a72464c5dd2030f8a2353640d97f27e8517a
+https://github.com/mozilla/newtab-dev/commit/567240287fa9fe6f94fb49d0675512d6aa1c162c
 
-To verify:
-- Verify requirements of 968520
-
-Verify all here:
-https://github.com/mozilla/newtab-dev/commits/6fd700984bdd3fcbcf548d0fdd8c0b571ba7d7e0/layout/base/nsDisplayList.cpp
+## Breaking JS
+- Bug 1054756, part 5 - Remove Class::convert. 
+- Bug 1054756, part 4 - Remove BaseProxyHandler::defaultValue. r=jandem
+- Bug 1054756, part 3 - Implement Symbol.toPrimitive. Replace existing 
+- Bug 1088214 - Remove JSCLASS_IMPLEMENTS_BARRIERS now this is implemen
+- Bug 930414 - 22 parts
+Bug 1195866 - Make allocations log report whether an allocation was i
+- Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
+Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
+Bug 1181869 - Update Bindings to use normal Rooted primitives
 
 ### FIXME / TODO
 - fix devtools structure, from browser/themes/osx/devtools to browser/devtools
@@ -253,12 +253,6 @@ And why #include "nsIFrameInlines.h" in layout/style/nsStyleTransformMatrix.cpp 
 Fallible hacks:
 appendElements made fallible when not so in original FF:
 media/libstagefright/frameworks/av/media/libstagefright/MPEG4Extractor.cpp
-
-Check ALTIVEC/VMX
-- gfx/2d/Factory.cpp -> enough __ALTIVEC__ on non-Apple VMX ?
-- gfx/2d/BlurVMX.cpp
-in TenFourFOX: TENFOURFOX_VMX - VPX_VMX_ASM
-- correct ifdef for  gfx/2d/Blur.cpp
 
 ### Further ToDo which would help portability:
 
@@ -287,8 +281,6 @@ in TenFourFOX: TENFOURFOX_VMX - VPX_VMX_ASM
 - 529808 - Remove the static atom table. - if all the rest has been added... remove it again
 - see if window.requestIdleCallback can be backported
 
-Check if NullPtr removal has any effects on our supported platforms. See: Bug 1120062
-
 ### last checked TFF backport commit
 #512: M1472018 M1469309 M1472925 M1470260 (part 1)
 
@@ -301,4 +293,10 @@ https://github.com/classilla/tenfourfox/issues/526
 * Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6048 | Fail: 928 | Failed to load: 0 - Hangs on "iter-close"
 * Harness: Tests To run: 55 | Total tests ran: 55 | Pass: 55 | Fail: 0 | Failed to load: 0
 * Language: Tests To run: 5052 | Total tests ran: 5052 | Pass: 4452 | Fail: 600 | Failed to load: 0
+* AnnexB: Tests To run: 81 | Total tests ran: 81 | Pass: 79 | Fail: 2 | Failed to load: 0
+
+2021-09-13:
+* Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6095 | Fail: 881 | Failed to load: 0
+* Harness: Tests To run: 55 | Total tests ran: 55 | Pass: 55 | Fail: 0 | Failed to load: 0
+* Language: Tests To run: 5052 | Total tests ran: 5052 | Pass: 4466 | Fail: 586 | Failed to load: 0
 * AnnexB: Tests To run: 81 | Total tests ran: 81 | Pass: 79 | Fail: 2 | Failed to load: 0

@@ -116,6 +116,7 @@ class Notification : public DOMEventTargetHelper
   friend class NotificationObserver;
   friend class NotificationStorageCallback;
   friend class ServiceWorkerNotificationObserver;
+  friend class WorkerGetRunnable;
   friend class WorkerNotificationObserver;
 
 public:
@@ -157,6 +158,7 @@ public:
     const nsAString& aTag,
     const nsAString& aIcon,
     const nsAString& aData,
+    const nsAString& aServiceWorkerRegistrationID,
     ErrorResult& aRv);
 
   void GetID(nsAString& aRetval) {
@@ -214,9 +216,20 @@ public:
   static NotificationPermission GetPermission(const GlobalObject& aGlobal,
                                               ErrorResult& aRv);
 
+  static already_AddRefed<Promise>
+  Get(nsPIDOMWindow* aWindow,
+      const GetNotificationOptions& aFilter,
+      const nsAString& aScope,
+      ErrorResult& aRv);
+
   static already_AddRefed<Promise> Get(const GlobalObject& aGlobal,
                                        const GetNotificationOptions& aFilter,
                                        ErrorResult& aRv);
+
+  static already_AddRefed<Promise> WorkerGet(workers::WorkerPrivate* aWorkerPrivate,
+                                             const GetNotificationOptions& aFilter,
+                                             const nsAString& aScope,
+                                             ErrorResult& aRv);
 
   // Notification implementation of
   // ServiceWorkerRegistration.showNotification.
@@ -276,14 +289,14 @@ public:
   bool DispatchClickEvent();
   bool DispatchNotificationClickEvent();
 protected:
-  // Callers MUST bind the Notification to the correct DOMEventTargetHelper parent using
-  // BindToOwner().
-  Notification(const nsAString& aID, const nsAString& aTitle, const nsAString& aBody,
+  Notification(nsIGlobalObject* aGlobal, const nsAString& aID,
+               const nsAString& aTitle, const nsAString& aBody,
                NotificationDirection aDir, const nsAString& aLang,
                const nsAString& aTag, const nsAString& aIconUrl,
                const NotificationBehavior& aBehavior);
 
-  static already_AddRefed<Notification> CreateInternal(const nsAString& aID,
+  static already_AddRefed<Notification> CreateInternal(nsIGlobalObject* aGlobal,
+                                                       const nsAString& aID,
                                                        const nsAString& aTitle,
                                                        const NotificationOptions& aOptions);
 
@@ -377,6 +390,7 @@ private:
   CreateAndShow(nsIGlobalObject* aGlobal,
                 const nsAString& aTitle,
                 const NotificationOptions& aOptions,
+                const nsAString& aScope,
                 ErrorResult& aRv);
 
   nsIPrincipal* GetPrincipal();

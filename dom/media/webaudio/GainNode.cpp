@@ -94,8 +94,7 @@ public:
       // Apply the gain to the output buffer
       for (size_t channel = 0; channel < aOutput->mChannelData.Length(); ++channel) {
         const float* inputBuffer = static_cast<const float*> (aInput.mChannelData[channel]);
-        float* buffer = static_cast<float*> (const_cast<void*>
-                          (aOutput->mChannelData[channel]));
+        float* buffer = aOutput->ChannelFloatsForWrite(channel);
         AudioBlockCopyChannelWithScale(inputBuffer, computedGain, buffer);
       }
     }
@@ -128,7 +127,8 @@ GainNode::GainNode(AudioContext* aContext)
   , mGain(new AudioParam(this, SendGainToStream, 1.0f, "gain"))
 {
   GainNodeEngine* engine = new GainNodeEngine(this, aContext->Destination());
-  mStream = aContext->Graph()->CreateAudioNodeStream(engine, MediaStreamGraph::INTERNAL_STREAM);
+  mStream = AudioNodeStream::Create(aContext->Graph(), engine,
+                                    AudioNodeStream::NO_STREAM_FLAGS);
   engine->SetSourceStream(mStream);
 }
 

@@ -52,6 +52,7 @@
 #include "nsComponentManagerUtils.h"
 #include "nsSize.h"
 #include "nsCheapSets.h"
+#include "mozilla/dom/ImageBitmapSource.h"
 
 #define DEFAULT_HOME_PAGE "www.mozilla.org"
 #define PREF_BROWSER_STARTUP_HOMEPAGE "browser.startup.homepage"
@@ -129,7 +130,7 @@ class VRHMDInfo;
 } // namespace mozilla
 
 extern already_AddRefed<nsIScriptTimeoutHandler>
-NS_CreateJSTimeoutHandler(nsGlobalWindow *aWindow,
+NS_CreateJSTimeoutHandler(JSContext* aCx, nsGlobalWindow *aWindow,
                           mozilla::dom::Function& aFunction,
                           const mozilla::dom::Sequence<JS::Value>& aArguments,
                           mozilla::ErrorResult& aError);
@@ -1131,6 +1132,15 @@ public:
     GetContent(aCx, aRetval, aError);
   }
 
+  already_AddRefed<mozilla::dom::Promise>
+  CreateImageBitmap(const mozilla::dom::ImageBitmapSource& aImage,
+                    mozilla::ErrorResult& aRv);
+
+  already_AddRefed<mozilla::dom::Promise>
+  CreateImageBitmap(const mozilla::dom::ImageBitmapSource& aImage,
+                    int32_t aSx, int32_t aSy, int32_t aSw, int32_t aSh,
+                    mozilla::ErrorResult& aRv);
+
   // ChromeWindow bits.  Do NOT call these unless your window is in
   // fact an nsGlobalChromeWindow.
   uint16_t WindowState();
@@ -1385,7 +1395,8 @@ public:
   nsresult SetTimeoutOrInterval(nsIScriptTimeoutHandler *aHandler,
                                 int32_t interval,
                                 bool aIsInterval, int32_t* aReturn) override;
-  int32_t SetTimeoutOrInterval(mozilla::dom::Function& aFunction,
+  int32_t SetTimeoutOrInterval(JSContext* aCx,
+                               mozilla::dom::Function& aFunction,
                                int32_t aTimeout,
                                const mozilla::dom::Sequence<JS::Value>& aArguments,
                                bool aIsInterval, mozilla::ErrorResult& aError);
@@ -1617,6 +1628,8 @@ protected:
 private:
   // Fire the JS engine's onNewGlobalObject hook.  Only used on inner windows.
   void FireOnNewGlobalObject();
+
+  void DisconnectEventTargetObjects();
 
 protected:
   // This member is also used on both inner and outer windows, but

@@ -7,6 +7,7 @@
 #include "mozilla/LoadInfo.h"
 
 #include "mozilla/Assertions.h"
+#include "mozilla/dom/ToJSValue.h"
 #include "nsFrameLoader.h"
 #include "nsIDocShell.h"
 #include "nsIDocument.h"
@@ -22,8 +23,7 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
                    nsIPrincipal* aTriggeringPrincipal,
                    nsINode* aLoadingContext,
                    nsSecurityFlags aSecurityFlags,
-                   nsContentPolicyType aContentPolicyType,
-                   nsIURI* aBaseURI)
+                   nsContentPolicyType aContentPolicyType)
   : mLoadingPrincipal(aLoadingContext ?
                         aLoadingContext->NodePrincipal() : aLoadingPrincipal)
   , mTriggeringPrincipal(aTriggeringPrincipal ?
@@ -31,11 +31,12 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   , mLoadingContext(do_GetWeakReference(aLoadingContext))
   , mSecurityFlags(aSecurityFlags)
   , mInternalContentPolicyType(aContentPolicyType)
-  , mBaseURI(aBaseURI)
   , mUpgradeInsecureRequests(false)
   , mInnerWindowID(0)
   , mOuterWindowID(0)
   , mParentOuterWindowID(0)
+  , mEnforceSecurity(false)
+  , mInitialSecurityCheckDone(false)
   , mIsFromProcessingFrameAttributes(false)
 {
   MOZ_ASSERT(mLoadingPrincipal);
@@ -88,7 +89,10 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
                    bool aUpgradeInsecureRequests,
                    uint64_t aInnerWindowID,
                    uint64_t aOuterWindowID,
-                   uint64_t aParentOuterWindowID)
+                   uint64_t aParentOuterWindowID,
+                   bool aEnforceSecurity,
+                   bool aInitialSecurityCheckDone,
+                   nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChain)
   : mLoadingPrincipal(aLoadingPrincipal)
   , mTriggeringPrincipal(aTriggeringPrincipal)
   , mSecurityFlags(aSecurityFlags)
@@ -97,10 +101,14 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   , mInnerWindowID(aInnerWindowID)
   , mOuterWindowID(aOuterWindowID)
   , mParentOuterWindowID(aParentOuterWindowID)
+  , mEnforceSecurity(aEnforceSecurity)
+  , mInitialSecurityCheckDone(aInitialSecurityCheckDone)
   , mIsFromProcessingFrameAttributes(false)
 {
   MOZ_ASSERT(mLoadingPrincipal);
   MOZ_ASSERT(mTriggeringPrincipal);
+
+  mRedirectChain.SwapElements(aRedirectChain);
 }
 
 LoadInfo::~LoadInfo()
@@ -161,6 +169,26 @@ LoadInfo::GetSecurityFlags(nsSecurityFlags* aResult)
 }
 
 NS_IMETHODIMP
+LoadInfo::GetSecurityMode(uint32_t *aFlags)
+{
+  *aFlags = (mSecurityFlags &
+              (nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_DATA_INHERITS |
+               nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_DATA_IS_BLOCKED |
+               nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_INHERITS |
+               nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL |
+               nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS));
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetRequireCorsWithCredentials(bool* aResult)
+{
+  *aResult =
+    (mSecurityFlags & nsILoadInfo::SEC_REQUIRE_CORS_WITH_CREDENTIALS);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 LoadInfo::GetForceInheritPrincipal(bool* aInheritPrincipal)
 {
   *aInheritPrincipal =
@@ -176,6 +204,22 @@ LoadInfo::GetLoadingSandboxed(bool* aLoadingSandboxed)
 }
 
 NS_IMETHODIMP
+LoadInfo::GetAboutBlankInherits(bool* aResult)
+{
+  *aResult =
+    (mSecurityFlags & nsILoadInfo::SEC_ABOUT_BLANK_INHERITS);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetAllowChrome(bool* aResult)
+{
+  *aResult =
+    (mSecurityFlags & nsILoadInfo::SEC_ALLOW_CHROME);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 LoadInfo::GetExternalContentPolicyType(nsContentPolicyType* aResult)
 {
   *aResult = nsContentUtils::InternalContentPolicyTypeToExternal(mInternalContentPolicyType);
@@ -186,20 +230,6 @@ nsContentPolicyType
 LoadInfo::InternalContentPolicyType()
 {
   return mInternalContentPolicyType;
-}
-
-NS_IMETHODIMP
-LoadInfo::GetBaseURI(nsIURI** aBaseURI)
-{
-  *aBaseURI = mBaseURI;
-  NS_IF_ADDREF(*aBaseURI);
-  return NS_OK;
-}
-
-nsIURI*
-LoadInfo::BaseURI()
-{
-  return mBaseURI;
 }
 
 NS_IMETHODIMP
@@ -242,6 +272,66 @@ LoadInfo::GetIsFromProcessingFrameAttributes(bool *aIsFromProcessingFrameAttribu
   MOZ_ASSERT(aIsFromProcessingFrameAttributes);
   *aIsFromProcessingFrameAttributes = mIsFromProcessingFrameAttributes;
   return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::SetEnforceSecurity(bool aEnforceSecurity)
+{
+  // Indicates whether the channel was openend using AsyncOpen2. Once set
+  // to true, it must remain true throughout the lifetime of the channel.
+  // Setting it to anything else than true will be discarded.
+  MOZ_ASSERT(aEnforceSecurity, "aEnforceSecurity must be true");
+  mEnforceSecurity = mEnforceSecurity || aEnforceSecurity;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetEnforceSecurity(bool* aResult)
+{
+  *aResult = mEnforceSecurity;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::SetInitialSecurityCheckDone(bool aInitialSecurityCheckDone)
+{
+  // Indicates whether the channel was ever evaluated by the
+  // ContentSecurityManager. Once set to true, this flag must
+  // remain true throughout the lifetime of the channel.
+  // Setting it to anything else than true will be discarded.
+  MOZ_ASSERT(aInitialSecurityCheckDone, "aInitialSecurityCheckDone must be true");
+  mInitialSecurityCheckDone = mInitialSecurityCheckDone || aInitialSecurityCheckDone;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetInitialSecurityCheckDone(bool* aResult)
+{
+  *aResult = mInitialSecurityCheckDone;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::AppendRedirectedPrincipal(nsIPrincipal* aPrincipal)
+{
+  NS_ENSURE_ARG(aPrincipal);
+  mRedirectChain.AppendElement(aPrincipal);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetRedirectChain(JSContext* aCx, JS::MutableHandle<JS::Value> aChain)
+{
+  if (!ToJSValue(aCx, mRedirectChain, aChain)) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+  return NS_OK;
+}
+
+const nsTArray<nsCOMPtr<nsIPrincipal>>&
+LoadInfo::RedirectChain()
+{
+  return mRedirectChain;
 }
 
 } // namespace mozilla

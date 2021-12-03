@@ -69,7 +69,7 @@ class BufferPointer
  * allocated portion being constructed or the existing stack).
  *
  * The abstraction handles transparent re-allocation of the heap memory when it
- * needs to be enlarged to accomodate new data.  Similarly to the C stack, the
+ * needs to be enlarged to accommodate new data.  Similarly to the C stack, the
  * data that's written to the reconstructed stack grows from high to low in memory.
  *
  * The lowest region of the allocated memory contains a BaselineBailoutInfo structure that
@@ -412,7 +412,7 @@ class SnapshotIteratorForBailout : public SnapshotIterator
 
   public:
     SnapshotIteratorForBailout(JitActivation* activation, JitFrameIterator& iter)
-      : SnapshotIterator(iter),
+      : SnapshotIterator(iter, activation->bailoutData()->machineState()),
         activation_(activation),
         iter_(iter)
     {
@@ -1471,8 +1471,10 @@ jit::BailoutIonToBaseline(JSContext* cx, JitActivation* activation, JitFrameIter
 
     // Allocate buffer to hold stack replacement data.
     BaselineStackBuilder builder(iter, 1024);
-    if (!builder.init())
+    if (!builder.init()) {
+        ReportOutOfMemory(cx);
         return BAILOUT_RETURN_FATAL_ERROR;
+    }
     JitSpew(JitSpew_BaselineBailouts, "  Incoming frame ptr = %p", builder.startFrame());
 
     SnapshotIteratorForBailout snapIter(activation, iter);

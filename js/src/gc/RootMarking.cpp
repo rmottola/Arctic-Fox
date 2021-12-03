@@ -145,12 +145,6 @@ AutoGCRooter::trace(JSTracer* trc)
         return;
       }
 
-      case NAMEVECTOR: {
-        AutoNameVector::VectorImpl& vector = static_cast<AutoNameVector*>(this)->vector;
-        TraceRootRange(trc, vector.length(), vector.begin(), "js::AutoNameVector.vector");
-        return;
-      }
-
       case VALARRAY: {
         /*
          * We don't know the template size parameter, but we can safely treat it
@@ -347,18 +341,6 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc, TraceOrMarkRuntime traceOrMark)
         }
 
         MarkPersistentRootedChains(trc);
-    }
-
-    if (rt->asyncStackForNewActivations)
-        TraceRoot(trc, &rt->asyncStackForNewActivations, "asyncStackForNewActivations");
-
-    if (rt->asyncCauseForNewActivations)
-        TraceRoot(trc, &rt->asyncCauseForNewActivations, "asyncCauseForNewActivations");
-
-    if (rt->scriptAndCountsVector) {
-        ScriptAndCountsVector& vec = *rt->scriptAndCountsVector;
-        for (size_t i = 0; i < vec.length(); i++)
-            TraceRoot(trc, &vec[i].script, "scriptAndCountsVector");
     }
 
     if (!rt->isBeingDestroyed() && !rt->isHeapMinorCollecting()) {

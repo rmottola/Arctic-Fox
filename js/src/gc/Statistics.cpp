@@ -7,6 +7,7 @@
 #include "gc/Statistics.h"
 
 #include "mozilla/ArrayUtils.h"
+#include "mozilla/IntegerRange.h"
 #include "mozilla/PodOperations.h"
 #include "mozilla/UniquePtr.h"
 
@@ -27,215 +28,12 @@ using namespace js;
 using namespace js::gc;
 using namespace js::gcstats;
 
+using mozilla::MakeRange;
 using mozilla::PodArrayZero;
 using mozilla::PodZero;
 
 /* Except for the first and last, slices of less than 10ms are not reported. */
 static const int64_t SLICE_MIN_REPORT_TIME = 10 * PRMJ_USEC_PER_MSEC;
-
-class gcstats::StatisticsSerializer
-{
-    typedef Vector<char, 128, SystemAllocPolicy> CharBuffer;
-    CharBuffer buf_;
-    bool asJSON_;
-    bool needComma_;
-    bool oom_;
-
-    static const int MaxFieldValueLength = 128;
-
-  public:
-    enum Mode {
-        AsJSON = true,
-        AsText = false
-    };
-
-    explicit StatisticsSerializer(Mode asJSON)
-      : buf_(), asJSON_(asJSON), needComma_(false), oom_(false)
-    {}
-
-    bool isJSON() { return asJSON_; }
-
-    bool isOOM() { return oom_; }
-
-    void endLine() {
-        if (!asJSON_) {
-            p("\n");
-            needComma_ = false;
-        }
-    }
-
-    void extra(const char* str) {
-        if (!asJSON_) {
-            needComma_ = false;
-            p(str);
-        }
-    }
-
-    void appendString(const char* name, const char* value) {
-        put(name, value, "", true);
-    }
-
-    void appendNumber(const char* name, const char* vfmt, const char* units, ...) {
-        va_list va;
-        va_start(va, units);
-        append(name, vfmt, va, units);
-        va_end(va);
-    }
-
-    void appendDecimal(const char* name, const char* units, double d) {
-        if (d < 0)
-            d = 0;
-        if (asJSON_)
-            appendNumber(name, "%d.%03d", units, int(d), int(d * 1000.) % 1000);
-        else
-            appendNumber(name, "%.1f", units, d);
-    }
-
-    void appendIfNonzeroMS(const char* name, double v) {
-        if (asJSON_ || v >= 0.1)
-            appendDecimal(name, "ms", v);
-    }
-
-    void beginObject(const char* name) {
-        if (needComma_)
-            pJSON(", ");
-        if (asJSON_ && name) {
-            putKey(name);
-            pJSON(": ");
-        }
-        pJSON("{");
-        needComma_ = false;
-    }
-
-    void endObject() {
-        needComma_ = false;
-        pJSON("}");
-        needComma_ = true;
-    }
-
-    void beginArray(const char* name) {
-        if (needComma_)
-            pJSON(", ");
-        if (asJSON_)
-            putKey(name);
-        pJSON(": [");
-        needComma_ = false;
-    }
-
-    void endArray() {
-        needComma_ = false;
-        pJSON("]");
-        needComma_ = true;
-    }
-
-    char16_t* finishJSString() {
-        char* buf = finishCString();
-        if (!buf)
-            return nullptr;
-
-        size_t nchars = strlen(buf);
-        char16_t* out = js_pod_malloc<char16_t>(nchars + 1);
-        if (!out) {
-            oom_ = true;
-            js_free(buf);
-            return nullptr;
-        }
-
-        CopyAndInflateChars(out, buf, nchars);
-        js_free(buf);
-
-        out[nchars] = 0;
-        return out;
-    }
-
-    char* finishCString() {
-        if (oom_)
-            return nullptr;
-
-        buf_.append('\0');
-
-        char* buf = buf_.extractRawBuffer();
-        if (!buf)
-            oom_ = true;
-
-        return buf;
-    }
-
-  private:
-    void append(const char* name, const char* vfmt,
-                va_list va, const char* units)
-    {
-        char val[MaxFieldValueLength];
-        JS_vsnprintf(val, MaxFieldValueLength, vfmt, va);
-        put(name, val, units, false);
-    }
-
-    void p(const char* cstr) {
-        if (oom_)
-            return;
-
-        if (!buf_.append(cstr, strlen(cstr)))
-            oom_ = true;
-    }
-
-    void p(const char c) {
-        if (oom_)
-            return;
-
-        if (!buf_.append(c))
-            oom_ = true;
-    }
-
-    void pJSON(const char* str) {
-        if (asJSON_)
-            p(str);
-    }
-
-    void put(const char* name, const char* val, const char* units, bool valueIsQuoted) {
-        if (needComma_)
-            p(", ");
-        needComma_ = true;
-
-        putKey(name);
-        p(": ");
-        if (valueIsQuoted)
-            putQuoted(val);
-        else
-            p(val);
-        if (!asJSON_)
-            p(units);
-    }
-
-    void putQuoted(const char* str) {
-        pJSON("\"");
-        p(str);
-        pJSON("\"");
-    }
-
-    void putKey(const char* str) {
-        if (!asJSON_) {
-            p(str);
-            return;
-        }
-
-        p("\"");
-        const char* c = str;
-        while (*c) {
-            if (*c == ' ' || *c == '\t')
-                p('_');
-            else if (isupper(*c))
-                p(tolower(*c));
-            else if (*c == '+')
-                p("added_");
-            else if (*c == '-')
-                p("removed_");
-            else if (*c != '(' && *c != ')')
-                p(*c);
-            c++;
-        }
-        p("\"");
-    }
-};
 
 /*
  * If this fails, then you can either delete this assertion and allow all
@@ -389,7 +187,7 @@ static ExtraPhaseInfo phaseExtra[PHASE_LIMIT] = { { 0, 0 } };
 // Mapping from all nodes with a multi-parented child to a Vector of all
 // multi-parented children and their descendants. (Single-parented children will
 // not show up in this list.)
-static mozilla::Vector<Phase> dagDescendants[Statistics::MAX_MULTIPARENT_PHASES + 1];
+static mozilla::Vector<Phase> dagDescendants[Statistics::NumTimingArrays];
 
 struct AllPhaseIterator {
     int current;
@@ -397,7 +195,7 @@ struct AllPhaseIterator {
     size_t activeSlot;
     mozilla::Vector<Phase>::Range descendants;
 
-    explicit AllPhaseIterator(Statistics::PhaseTimeTable table)
+    explicit AllPhaseIterator(const Statistics::PhaseTimeTable table)
       : current(0)
       , baseLevel(0)
       , activeSlot(PHASE_DAG_NONE)
@@ -443,20 +241,6 @@ struct AllPhaseIterator {
     }
 };
 
-static void
-FormatPhaseTimes(StatisticsSerializer& ss, const char* name, Statistics::PhaseTimeTable times)
-{
-    ss.beginObject(name);
-
-    for (AllPhaseIterator iter(times); !iter.done(); iter.advance()) {
-        Phase phase;
-        size_t dagSlot;
-        iter.get(&phase, &dagSlot);
-        ss.appendIfNonzeroMS(phases[phase].name, t(times[dagSlot][phase]));
-    }
-    ss.endObject();
-}
-
 void
 Statistics::gcDuration(int64_t* total, int64_t* maxPause) const
 {
@@ -478,90 +262,6 @@ Statistics::sccDurations(int64_t* total, int64_t* maxPause)
         *total += sccTimes[i];
         *maxPause = Max(*maxPause, sccTimes[i]);
     }
-}
-
-bool
-Statistics::formatData(StatisticsSerializer& ss, uint64_t timestamp)
-{
-    MOZ_ASSERT(!aborted);
-
-    int64_t total, longest;
-    gcDuration(&total, &longest);
-
-    int64_t sccTotal, sccLongest;
-    sccDurations(&sccTotal, &sccLongest);
-
-    double mmu20 = computeMMU(20 * PRMJ_USEC_PER_MSEC);
-    double mmu50 = computeMMU(50 * PRMJ_USEC_PER_MSEC);
-
-    ss.beginObject(nullptr);
-    if (ss.isJSON())
-        ss.appendNumber("Timestamp", "%llu", "", (unsigned long long)timestamp);
-    if (slices.length() > 1 || ss.isJSON())
-        ss.appendDecimal("Max Pause", "ms", t(longest));
-    else
-        ss.appendString("Reason", ExplainReason(slices[0].reason));
-    ss.appendDecimal("Total Time", "ms", t(total));
-    ss.appendNumber("Zones Collected", "%d", "", zoneStats.collectedZoneCount);
-    ss.appendNumber("Total Zones", "%d", "", zoneStats.zoneCount);
-    ss.appendNumber("Total Compartments", "%d", "", zoneStats.compartmentCount);
-    ss.appendNumber("Minor GCs", "%d", "", counts[STAT_MINOR_GC]);
-    ss.appendNumber("Store Buffer Overflows", "%d", "", counts[STAT_STOREBUFFER_OVERFLOW]);
-    ss.appendNumber("MMU (20ms)", "%d", "%", int(mmu20 * 100));
-    ss.appendNumber("MMU (50ms)", "%d", "%", int(mmu50 * 100));
-    ss.appendDecimal("SCC Sweep Total", "ms", t(sccTotal));
-    ss.appendDecimal("SCC Sweep Max Pause", "ms", t(sccLongest));
-    if (nonincrementalReason_ || ss.isJSON()) {
-        ss.appendString("Nonincremental Reason",
-                        nonincrementalReason_ ? nonincrementalReason_ : "none");
-    }
-    ss.appendNumber("Allocated", "%u", "MB", unsigned(preBytes / 1024 / 1024));
-    ss.appendNumber("+Chunks", "%d", "", counts[STAT_NEW_CHUNK]);
-    ss.appendNumber("-Chunks", "%d", "", counts[STAT_DESTROY_CHUNK]);
-    ss.endLine();
-
-    if (slices.length() > 1 || ss.isJSON()) {
-        ss.beginArray("Slices");
-        for (size_t i = 0; i < slices.length(); i++) {
-            int64_t width = slices[i].duration();
-            if (i != 0 && i != slices.length() - 1 && width < SLICE_MIN_REPORT_TIME &&
-                !slices[i].resetReason && !ss.isJSON())
-            {
-                continue;
-            }
-
-            char budgetDescription[200];
-            slices[i].budget.describe(budgetDescription, sizeof(budgetDescription) - 1);
-
-            ss.beginObject(nullptr);
-            ss.extra("    ");
-            ss.appendNumber("Slice", "%d", "", i);
-            ss.appendDecimal("Pause", "", t(width));
-            ss.extra(" (");
-            ss.appendDecimal("When", "ms", t(slices[i].start - slices[0].start));
-            ss.appendString("Reason", ExplainReason(slices[i].reason));
-            ss.appendString("Budget", budgetDescription);
-            if (ss.isJSON()) {
-                ss.appendDecimal("Page Faults", "",
-                                 double(slices[i].endFaults - slices[i].startFaults));
-
-                ss.appendNumber("Start Timestamp", "%llu", "", (unsigned long long)slices[i].start);
-                ss.appendNumber("End Timestamp", "%llu", "", (unsigned long long)slices[i].end);
-            }
-            if (slices[i].resetReason)
-                ss.appendString("Reset", slices[i].resetReason);
-            ss.extra("): ");
-            FormatPhaseTimes(ss, "Times", slices[i].phaseTimes);
-            ss.endLine();
-            ss.endObject();
-        }
-        ss.endArray();
-    }
-    ss.extra("    Totals: ");
-    FormatPhaseTimes(ss, "Totals", phaseTimes);
-    ss.endObject();
-
-    return !ss.isOOM();
 }
 
 typedef Vector<UniqueChars, 8, SystemAllocPolicy> FragmentVector;
@@ -595,7 +295,7 @@ Join(const FragmentVector& fragments, const char* separator = "") {
 }
 
 static int64_t
-SumChildTimes(size_t phaseSlot, Phase phase, Statistics::PhaseTimeTable phaseTimes)
+SumChildTimes(size_t phaseSlot, Phase phase, const Statistics::PhaseTimeTable phaseTimes)
 {
     // Sum the contributions from single-parented children.
     int64_t total = 0;
@@ -669,7 +369,8 @@ Statistics::formatCompactSummaryMessage() const
                     "Max Pause: %.3fms; MMU 20ms: %.1f%%; MMU 50ms: %.1f%%; Total: %.3fms; ",
                     t(longest), mmu20 * 100., mmu50 * 100., t(total));
     } else {
-        JS_snprintf(buffer, sizeof(buffer), "Non-Incremental: %.3fms; ", t(total));
+        JS_snprintf(buffer, sizeof(buffer), "Non-Incremental: %.3fms (%s); ",
+                    t(total), nonincrementalReason_);
     }
     if (!fragments.append(make_string_copy(buffer)))
         return UniqueChars(nullptr);
@@ -699,7 +400,7 @@ Statistics::formatCompactSummaryMessage() const
 }
 
 UniqueChars
-Statistics::formatCompactSlicePhaseTimes(PhaseTimeTable phaseTimes) const
+Statistics::formatCompactSlicePhaseTimes(const PhaseTimeTable phaseTimes) const
 {
     static const int64_t MaxUnaccountedTimeUS = 100;
 
@@ -825,7 +526,7 @@ Statistics::formatDetailedSliceDescription(unsigned i, const SliceData& slice)
 }
 
 UniqueChars
-Statistics::formatDetailedPhaseTimes(PhaseTimeTable phaseTimes)
+Statistics::formatDetailedPhaseTimes(const PhaseTimeTable phaseTimes)
 {
     static const char* LevelToIndent[] = { "", "  ", "    ", "      " };
     static const int64_t MaxUnaccountedChildTimeUS = 50;
@@ -1012,7 +713,7 @@ FilterJsonKey(const char*const buffer)
 }
 
 UniqueChars
-Statistics::formatJsonPhaseTimes(PhaseTimeTable phaseTimes)
+Statistics::formatJsonPhaseTimes(const PhaseTimeTable phaseTimes)
 {
     FragmentVector fragments;
     char buffer[128];
@@ -1030,14 +731,6 @@ Statistics::formatJsonPhaseTimes(PhaseTimeTable phaseTimes)
             return UniqueChars(nullptr);
     }
     return Join(fragments, ",");
-}
-
-char16_t*
-Statistics::formatMessage()
-{
-    StatisticsSerializer ss(StatisticsSerializer::AsText);
-    formatData(ss, 0);
-    return ss.finishJSString();
 }
 
 Statistics::Statistics(JSRuntime* rt)
@@ -1058,7 +751,7 @@ Statistics::Statistics(JSRuntime* rt)
     PodArrayZero(phaseTotals);
     PodArrayZero(counts);
     PodArrayZero(phaseStartTimes);
-    for (size_t d = 0; d < MAX_MULTIPARENT_PHASES + 1; d++)
+    for (auto d : MakeRange(NumTimingArrays))
         PodArrayZero(phaseTimes[d]);
 
     static bool initialized = false;
@@ -1090,7 +783,7 @@ Statistics::Statistics(JSRuntime* rt)
                 j++;
             } while (j != PHASE_LIMIT && phases[j].parent != PHASE_MULTI_PARENTS);
         }
-        MOZ_ASSERT(dagSlot <= MAX_MULTIPARENT_PHASES);
+        MOZ_ASSERT(dagSlot <= MaxMultiparentPhases - 1);
 
         // Fill in the depth of each node in the tree. Multi-parented nodes
         // have depth 0.
@@ -1164,7 +857,7 @@ static int64_t
 SumPhase(Phase phase, Statistics::PhaseTimeTable times)
 {
     int64_t sum = 0;
-    for (size_t i = 0; i < Statistics::MAX_MULTIPARENT_PHASES + 1; i++)
+    for (auto i : MakeRange(Statistics::NumTimingArrays))
         sum += times[i][phase];
     return sum;
 }
@@ -1196,7 +889,7 @@ Statistics::beginGC(JSGCInvocationKind kind)
 void
 Statistics::endGC()
 {
-    for (size_t j = 0; j < MAX_MULTIPARENT_PHASES + 1; j++)
+    for (auto j : MakeRange(NumTimingArrays))
         for (int i = 0; i < PHASE_LIMIT; i++)
             phaseTotals[j][i] += phaseTimes[j][i];
 
@@ -1231,7 +924,7 @@ Statistics::endGC()
     // Clear the timers at the end of a GC because we accumulate time in
     // between GCs for some (which come before PHASE_GC_BEGIN in the list.)
     PodZero(&phaseStartTimes[PHASE_GC_BEGIN], PHASE_LIMIT - PHASE_GC_BEGIN);
-    for (size_t d = PHASE_DAG_NONE; d < MAX_MULTIPARENT_PHASES + 1; d++)
+    for (size_t d = PHASE_DAG_NONE; d < NumTimingArrays; d++)
         PodZero(&phaseTimes[d][PHASE_GC_BEGIN], PHASE_LIMIT - PHASE_GC_BEGIN);
 
     aborted = false;
@@ -1247,7 +940,7 @@ Statistics::beginSlice(const ZoneGCStats& zoneStats, JSGCInvocationKind gckind,
     if (first)
         beginGC(gckind);
 
-    SliceData data(budget, reason, PRMJ_Now(), GetPageFaultCount());
+    SliceData data(budget, reason, PRMJ_Now(), JS_GetCurrentEmbedderTime(), GetPageFaultCount());
     if (!slices.append(data)) {
         // OOM testing fails if we CrashAtUnhandlableOOM here.
         aborted = true;
@@ -1261,7 +954,7 @@ Statistics::beginSlice(const ZoneGCStats& zoneStats, JSGCInvocationKind gckind,
         bool wasFullGC = zoneStats.isCollectingAllZones();
         if (sliceCallback)
             (*sliceCallback)(runtime, first ? JS::GC_CYCLE_BEGIN : JS::GC_SLICE_BEGIN,
-                             JS::GCDescription(!wasFullGC, gckind));
+                             JS::GCDescription(!wasFullGC, gckind, reason));
     }
 }
 
@@ -1270,6 +963,7 @@ Statistics::endSlice()
 {
     if (!aborted) {
         slices.back().end = PRMJ_Now();
+        slices.back().endTimestamp = JS_GetCurrentEmbedderTime();
         slices.back().endFaults = GetPageFaultCount();
 
         int64_t sliceTime = slices.back().end - slices.back().start;
@@ -1293,7 +987,7 @@ Statistics::endSlice()
         bool wasFullGC = zoneStats.isCollectingAllZones();
         if (sliceCallback)
             (*sliceCallback)(runtime, last ? JS::GC_CYCLE_END : JS::GC_SLICE_END,
-                             JS::GCDescription(!wasFullGC, gckind));
+                             JS::GCDescription(!wasFullGC, gckind, slices.back().reason));
     }
 
     /* Do this after the slice callback since it uses these values. */

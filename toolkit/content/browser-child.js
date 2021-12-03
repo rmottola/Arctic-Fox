@@ -130,9 +130,20 @@ let WebProgressListener = {
 
     if (aWebProgress && aWebProgress.isTopLevel) {
       json.documentURI = content.document.documentURIObject.spec;
+      json.title = content.document.title;
       json.charset = content.document.characterSet;
       json.mayEnableCharacterEncodingMenu = docShell.mayEnableCharacterEncodingMenu;
       json.principal = content.document.nodePrincipal;
+      json.synthetic = content.document.mozSyntheticDocument;
+
+      if (AppConstants.MOZ_CRASHREPORTER && CrashReporter.enabled) {
+        let uri = aLocationURI.clone();
+        try {
+          // If the current URI contains a username/password, remove it.
+          uri.userPass = "";
+        } catch (ex) { /* Ignore failures on about: URIs. */ }
+        CrashReporter.annotateCrashReport("URL", uri.spec);
+      }
     }
 
     sendAsyncMessage("Content:LocationChange", json, objects);
@@ -239,6 +250,17 @@ let WebNavigation =  {
   },
 
   loadURI: function(uri, flags, referrer, referrerPolicy, baseURI) {
+    if (AppConstants.MOZ_CRASHREPORTER && CrashReporter.enabled) {
+      let annotation = uri;
+      try {
+        let url = Services.io.newURI(uri, null, null);
+        // If the current URI contains a username/password, remove it.
+        url.userPass = "";
+        annotation = url.spec;
+      } catch (ex) { /* Ignore failures to parse and failures
+                      on about: URIs. */ }
+      CrashReporter.annotateCrashReport("URL", annotation);
+    }
     if (referrer)
       referrer = Services.io.newURI(referrer, null, null);
     if (baseURI)
@@ -319,22 +341,6 @@ addEventListener("ImageContentLoaded", function (aEvent) {
                                               height: req.image.height });
   }
 }, false);
-
-let DocumentObserver = {
-  init: function() {
-    Services.obs.addObserver(this, "document-element-inserted", false);
-    addEventListener("unload", () => {
-      Services.obs.removeObserver(this, "document-element-inserted");
-    });
-  },
-
-  observe: function(aSubject, aTopic, aData) {
-    if (aSubject == content.document) {
-      sendAsyncMessage("DocumentInserted", {synthetic: aSubject.mozSyntheticDocument});
-    }
-  },
-};
-DocumentObserver.init();
 
 const ZoomManager = {
   get fullZoom() {

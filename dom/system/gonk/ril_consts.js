@@ -229,20 +229,9 @@ this.ERROR_SUBSCRIPTION_NOT_AVAILABLE = 12;
 this.ERROR_MODE_NOT_SUPPORTED = 13;
 this.ERROR_FDN_CHECK_FAILURE = 14;
 this.ERROR_ILLEGAL_SIM_OR_ME = 15;
-this.ERROR_DIAL_MODIFIED_TO_USSD = 17;
-this.ERROR_DIAL_MODIFIED_TO_SS = 18;
-this.ERROR_DIAL_MODIFIED_TO_DIAL = 19;
-this.ERROR_USSD_MODIFIED_TO_DIAL = 20;
-this.ERROR_USSD_MODIFIED_TO_SS = 21;
-this.ERROR_USSD_MODIFIED_TO_USSD = 22;
-this.ERROR_SS_MODIFIED_TO_DIAL = 23;
-this.ERROR_SS_MODIFIED_TO_USSD = 24;
-this.ERROR_SS_MODIFIED_TO_SS = 25;
-this.ERROR_SUBSCRIPTION_NOT_SUPPORTED = 26;
-this.ERROR_INVALID_PARAMETER = 27;
-this.ERROR_REJECTED_BY_REMOTE = 28;
+this.ERROR_MISSING_RESOURCE = 16;
+this.ERROR_NO_SUCH_ELEMENT = 17;
 
-this.GECKO_ERROR_SUCCESS = null;
 this.GECKO_ERROR_RADIO_NOT_AVAILABLE = "RadioNotAvailable";
 this.GECKO_ERROR_GENERIC_FAILURE = "GenericFailure";
 this.GECKO_ERROR_PASSWORD_INCORRECT = "IncorrectPassword";
@@ -250,7 +239,6 @@ this.GECKO_ERROR_SIM_PIN2 = "SimPin2";
 this.GECKO_ERROR_SIM_PUK2 = "SimPuk2";
 this.GECKO_ERROR_REQUEST_NOT_SUPPORTED = "RequestNotSupported";
 this.GECKO_ERROR_CANCELLED = "Cancelled";
-this.GECKO_ERROR_ILLEGAL_SIM_OR_ME = "IllegalSIMorME";
 this.GECKO_ERROR_OP_NOT_ALLOWED_DURING_VOICE_CALL = "OpNotAllowedDuringVoiceCall";
 this.GECKO_ERROR_OP_NOT_ALLOWED_BEFORE_REG_TO_NW = "OpNotAllowedBeforeRegToNw";
 this.GECKO_ERROR_SMS_SEND_FAIL_RETRY = "SmsSendFailRetry";
@@ -258,21 +246,13 @@ this.GECKO_ERROR_SIM_ABSENT = "SimAbsent";
 this.GECKO_ERROR_SUBSCRIPTION_NOT_AVAILABLE = "SubscriptionNotAvailable";
 this.GECKO_ERROR_MODE_NOT_SUPPORTED = "ModeNotSupported";
 this.GECKO_ERROR_FDN_CHECK_FAILURE = "FdnCheckFailure";
-this.GECKO_ERROR_DIAL_MODIFIED_TO_USSD = "DialModifiedToUssd";
-this.GECKO_ERROR_DIAL_MODIFIED_TO_SS = "DialModifiedToSs";
-this.GECKO_ERROR_DIAL_MODIFIED_TO_DIAL = "DialModifiedToDial";
-this.GECKO_ERROR_USSD_MODIFIED_TO_DIAL = "UssdModifiedToDial";
-this.GECKO_ERROR_USSD_MODIFIED_TO_SS = "UssdModifiedToSs";
-this.GECKO_ERROR_USSD_MODIFIED_TO_USSD = "UssdModifiedToUssd";
-this.GECKO_ERROR_SS_MODIFIED_TO_DIAL = "SsModifiedToDial";
-this.GECKO_ERROR_SS_MODIFIED_TO_USSD = "SsModifiedToUssd";
-this.GECKO_ERROR_SS_MODIFIED_TO_SS = "SsModifiedToSs";
-this.GECKO_ERROR_SUBSCRIPTION_NOT_SUPPORTED = "SubscriptionNotSupported";
+this.GECKO_ERROR_ILLEGAL_SIM_OR_ME = "IllegalSIMorME";
+this.GECKO_ERROR_MISSING_RESOURCE = "MissingResource";
+this.GECKO_ERROR_NO_SUCH_ELEMENT = "NoSuchElement";
 this.GECKO_ERROR_INVALID_PARAMETER = "InvalidParameter";
-this.GECKO_ERROR_REJECTED_BY_REMOTE = "RejectedByRemote";
+this.GECKO_ERROR_UNSPECIFIED_ERROR = "UnspecifiedError";
 
 this.RIL_ERROR_TO_GECKO_ERROR = {};
-RIL_ERROR_TO_GECKO_ERROR[ERROR_SUCCESS] = GECKO_ERROR_SUCCESS;
 RIL_ERROR_TO_GECKO_ERROR[ERROR_RADIO_NOT_AVAILABLE] = GECKO_ERROR_RADIO_NOT_AVAILABLE;
 RIL_ERROR_TO_GECKO_ERROR[ERROR_GENERIC_FAILURE] = GECKO_ERROR_GENERIC_FAILURE;
 RIL_ERROR_TO_GECKO_ERROR[ERROR_PASSWORD_INCORRECT] = GECKO_ERROR_PASSWORD_INCORRECT;
@@ -288,18 +268,8 @@ RIL_ERROR_TO_GECKO_ERROR[ERROR_SUBSCRIPTION_NOT_AVAILABLE] = GECKO_ERROR_SUBSCRI
 RIL_ERROR_TO_GECKO_ERROR[ERROR_MODE_NOT_SUPPORTED] = GECKO_ERROR_MODE_NOT_SUPPORTED;
 RIL_ERROR_TO_GECKO_ERROR[ERROR_FDN_CHECK_FAILURE] = GECKO_ERROR_FDN_CHECK_FAILURE;
 RIL_ERROR_TO_GECKO_ERROR[ERROR_ILLEGAL_SIM_OR_ME] = GECKO_ERROR_ILLEGAL_SIM_OR_ME;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_DIAL_MODIFIED_TO_USSD] = GECKO_ERROR_DIAL_MODIFIED_TO_USSD;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_DIAL_MODIFIED_TO_SS] = GECKO_ERROR_DIAL_MODIFIED_TO_SS;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_DIAL_MODIFIED_TO_DIAL] = GECKO_ERROR_DIAL_MODIFIED_TO_DIAL;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_USSD_MODIFIED_TO_DIAL] = GECKO_ERROR_USSD_MODIFIED_TO_DIAL;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_USSD_MODIFIED_TO_SS] = GECKO_ERROR_USSD_MODIFIED_TO_SS;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_USSD_MODIFIED_TO_USSD] = GECKO_ERROR_USSD_MODIFIED_TO_USSD;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_SS_MODIFIED_TO_DIAL] = GECKO_ERROR_SS_MODIFIED_TO_DIAL;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_SS_MODIFIED_TO_USSD] = GECKO_ERROR_SS_MODIFIED_TO_USSD;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_SS_MODIFIED_TO_SS] = GECKO_ERROR_SS_MODIFIED_TO_SS;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_SUBSCRIPTION_NOT_SUPPORTED] = GECKO_ERROR_SUBSCRIPTION_NOT_SUPPORTED;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_INVALID_PARAMETER] = GECKO_ERROR_INVALID_PARAMETER;
-RIL_ERROR_TO_GECKO_ERROR[ERROR_REJECTED_BY_REMOTE] = GECKO_ERROR_REJECTED_BY_REMOTE;
+RIL_ERROR_TO_GECKO_ERROR[ERROR_MISSING_RESOURCE] = GECKO_ERROR_MISSING_RESOURCE;
+RIL_ERROR_TO_GECKO_ERROR[ERROR_NO_SUCH_ELEMENT] = GECKO_ERROR_NO_SUCH_ELEMENT;
 
 // 3GPP 23.040 clause 9.2.3.6 TP-Message-Reference(TP-MR):
 // The number of times the MS automatically repeats the SMS-SUBMIT shall be in
@@ -493,11 +463,6 @@ this.CELL_INFO_TYPE_GSM = 1;
 this.CELL_INFO_TYPE_CDMA = 2;
 this.CELL_INFO_TYPE_LTE = 3;
 this.CELL_INFO_TYPE_WCDMA = 4;
-
-// Order matters.
-this.AUDIO_STATE_NO_CALL  = 0;
-this.AUDIO_STATE_INCOMING = 1;
-this.AUDIO_STATE_IN_CALL  = 2;
 
 this.CALL_STATE_UNKNOWN = -1;
 this.CALL_STATE_ACTIVE = 0;
@@ -1442,6 +1407,30 @@ this.CB_UMTS_MESSAGE_TYPE_SCHEDULE = 2;
 this.CB_UMTS_MESSAGE_TYPE_CBS41    = 3;
 
 /**
+ * Number plan identification defined in
+ * |Table 10.5.118: Called party BCD number| of 3GPP TS 24.008.
+ */
+this.CALLED_PARTY_BCD_NPI_UNKNOWN  = 0;
+this.CALLED_PARTY_BCD_NPI_ISDN     = 1;
+this.CALLED_PARTY_BCD_NPI_DATA     = 3;
+this.CALLED_PARTY_BCD_NPI_TELEX    = 4;
+this.CALLED_PARTY_BCD_NPI_NATIONAL = 8;
+this.CALLED_PARTY_BCD_NPI_PRIVATE  = 9;
+
+/**
+ * Array of number plan identification values which can be used to map an
+ * enumeration to the corresponding value.
+ */
+this.CALLED_PARTY_BCD_NPI = [
+  CALLED_PARTY_BCD_NPI_UNKNOWN,
+  CALLED_PARTY_BCD_NPI_ISDN,
+  CALLED_PARTY_BCD_NPI_DATA,
+  CALLED_PARTY_BCD_NPI_TELEX,
+  CALLED_PARTY_BCD_NPI_NATIONAL,
+  CALLED_PARTY_BCD_NPI_PRIVATE
+];
+
+/**
  * GSM PDU constants
  */
 
@@ -1727,12 +1716,35 @@ this.PDU_NL_IDENTIFIER_TAMIL      = 11;
 this.PDU_NL_IDENTIFIER_TELUGU     = 12;
 this.PDU_NL_IDENTIFIER_URDU       = 13;
 
-// National Language Locking Shift Tables, see 3GPP TS 23.038
-this.PDU_NL_LOCKING_SHIFT_TABLES = [
-  /**
-   * National Language Identifier: 0x00
-   * 6.2.1 GSM 7 bit Default Alphabet
-   */
+// The mapping of mcc and their extra GSM national language locking / single
+// shift table tuples to enable. The default GSM alphabet and extension table
+// are always enabled and need not to be list here.
+//
+// The content should be updated when a relevant national regulatory body
+// requests. See 'NOTE 2' of 6.2.1.2.5 in 3GPP TS 23.038:
+// "
+// Encoding of a message using the national locking shift mechanism is not
+// intended to be implemented until a formal request is issued by the
+// relevant national regulatory body. This is because a receiving entity
+// not supporting the relevant locking-shift decoding will present different
+// characters from the ones intended by the sending entity.
+// "
+this.PDU_MCC_NL_TABLE_TUPLES_MAPPING = {
+  // Configuration for Turkey.
+  //
+  // The Turkish single shift table contains 7 extra characters
+  // (Ğ, İ, Ş, ç, ğ, ı, ş) than the GSM default alphabet extension table. Since
+  // all the 7 characters are also included in Turkish locking shift table, it's
+  // not necessary to enable Turkish single shift table. Using GSM default
+  // alphabet extension table instead saves 3 octets when these extension table
+  // characters present in a message.
+  286: [[PDU_NL_IDENTIFIER_TURKISH, PDU_NL_IDENTIFIER_DEFAULT]]
+};
+
+/*
+ * 3GPP TS 23.038 - 6.2.1 GSM 7 bit Default Alphabet
+ */
+this.PDU_NL_GSM_DEFAULT_ALPHABET =
   // 01.....23.....4.....5.....6.....7.....8.....9.....A.B.....C.....D.E.....F.....
     "@\u00a3$\u00a5\u00e8\u00e9\u00f9\u00ec\u00f2\u00c7\n\u00d8\u00f8\r\u00c5\u00e5"
   // 0.....12.....3.....4.....5.....6.....7.....8.....9.....A.....B.....C.....D.....E.....F.....
@@ -1748,7 +1760,15 @@ this.PDU_NL_LOCKING_SHIFT_TABLES = [
   // 0.....123456789ABCDEF
   + "\u00bfabcdefghijklmno"
   // 0123456789AB.....C.....D.....E.....F.....
-  + "pqrstuvwxyz\u00e4\u00f6\u00f1\u00fc\u00e0",
+  + "pqrstuvwxyz\u00e4\u00f6\u00f1\u00fc\u00e0";
+
+// National Language Locking Shift Tables, see 3GPP TS 23.038
+this.PDU_NL_LOCKING_SHIFT_TABLES = [
+  /**
+   * National Language Identifier: 0x00
+   * 6.2.1 GSM 7 bit Default Alphabet
+   */
+  PDU_NL_GSM_DEFAULT_ALPHABET,
 
   /**
    * National Language Identifier: 0x01
@@ -1774,23 +1794,9 @@ this.PDU_NL_LOCKING_SHIFT_TABLES = [
   /**
    * National Language Identifier: 0x02
    * A.3.2 Void
+   * Fallback to GSM Default Alphabet
    */
-  // 0123456789A.BCD.EF
-    "          \n  \r  "
-  // 0123456789AB.....CDEF
-  + "           \uffff    "
-  // 0123456789ABCDEF
-  + "                "
-  // 0123456789ABCDEF
-  + "                "
-  // 0123456789ABCDEF
-  + "                "
-  // 0123456789ABCDEF
-  + "                "
-  // 0123456789ABCDEF
-  + "                "
-  // 0123456789ABCDEF
-  + "                ",
+  PDU_NL_GSM_DEFAULT_ALPHABET,
 
   /**
    * National Language Identifier: 0x03

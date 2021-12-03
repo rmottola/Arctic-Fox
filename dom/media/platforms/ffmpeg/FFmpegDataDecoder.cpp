@@ -37,7 +37,7 @@ FFmpegDataDecoder<LIBAV_VER>::~FFmpegDataDecoder()
 }
 
 nsresult
-FFmpegDataDecoder<LIBAV_VER>::Init()
+FFmpegDataDecoder<LIBAV_VER>::InitDecoder()
 {
   FFMPEG_LOG("Initialising FFmpeg decoder.");
 

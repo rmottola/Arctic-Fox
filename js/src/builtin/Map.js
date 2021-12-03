@@ -47,11 +47,8 @@ function MapIteratorNext() {
     // Steps 8-9 (omitted).
 
     var mapIterationResultPair = iteratorTemp.mapIterationResultPair;
-    if (!mapIterationResultPair) {
-        mapIterationResultPair = iteratorTemp.mapIterationResultPair = NewDenseArray(2);
-        mapIterationResultPair[0] = null;
-        mapIterationResultPair[1] = null;
-    }
+    if (!mapIterationResultPair)
+        mapIterationResultPair = iteratorTemp.mapIterationResultPair = [null, null];
 
     var retVal = {value: undefined, done: true};
 
@@ -91,3 +88,4 @@ function MapSpecies() {
     // Step 1.
     return this;
 }
+_SetCanonicalName(MapSpecies, "get [Symbol.species]");

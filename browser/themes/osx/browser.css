@@ -980,30 +980,10 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
     border-radius: 0;
 }
 
+#urlbar[pageproxystate="valid"] > #identity-box.chromeUI,
 #urlbar[pageproxystate="valid"] > #identity-box.verifiedIdentity {
     color: hsl(92,100%,30%);
     -moz-margin-end: 4px;
-    background-image: -moz-linear-gradient(hsla(92,81%,16%,0),
-        hsla(92,81%,16%,.08) 25%,
-        hsla(92,81%,16%,.08) 75%,
-        hsla(92,81%,16%,0));
-    background-position: right;
-    background-repeat: no-repeat; 
-}
-
-#urlbar[pageproxystate="valid"] > #identity-box.verifiedDomain {
-    color: rgb(0,79,168);
-    -moz-margin-end: 4px;
-    background-image: -moz-linear-gradient(rgba(0,79,168,0),
-        rgba(0,79,168,.08) 25%,
-        rgba(0,79,168,.08) 75%,
-        rgba(0,79,168,0));
-    background-position: right;
-    background-repeat: no-repeat;
-}
-
-#identity-box.verifiedIdentity:-moz-locale-dir(rtl) {
-    background-position: left;
 }
 
 #identity-box.verifiedIdentity:not(:-moz-lwtheme) {
@@ -1082,43 +1062,46 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
 
 /* page proxy icon */
 
+
+%include ../shared/identity-block.inc.css
+
 #page-proxy-favicon {
-    width: 16px;
-    height: 16px;
     margin-top: 1px;
     margin-bottom: 1px;
     -moz-margin-start: 3px;
     -moz-margin-end: 2px;
-    list-style-image: url(chrome://browser/skin/identity-icons-generic.png);
-    -moz-image-region: rect(0, 16px, 16px, 0);
 }
 
-@conditionalForwardWithUrlbar@ + #urlbar-container > #urlbar > #identity-box > #page-proxy-favicon {
-    -moz-margin-end: 1px;
-}
 
-/* Since we already have a padlock, always use the generic icon until the favicon loads
-.verifiedDomain > #page-proxy-favicon[pageproxystate="valid"] {
-    list-style-image: url(chrome://browser/skin/identity-icons-https.png);
-}
-
-.verifiedIdentity > #page-proxy-favicon[pageproxystate="valid"] {
-    list-style-image: url(chrome://browser/skin/identity-icons-https-ev.png);
-}
-
-.mixedActiveContent > #page-proxy-favicon[pageproxystate="valid"] {
-    list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-active.png);
-}
-*/
-
-#identity-box:hover > #page-proxy-favicon {
+@media not all and (min-resolution: 1.1dppx) {
+  #identity-box:hover:active > #page-proxy-favicon,
+  #identity-box[open=true] > #page-proxy-favicon {
     -moz-image-region: rect(0, 32px, 16px, 16px);
+  }
+
+  /* The chromeUI identity-icon set includes three states,
+     but OS X only uses two of them. */
+  #identity-box.chromeUI:hover:active > #page-proxy-favicon,
+  #identity-box.chromeUI[open=true] > #page-proxy-favicon {
+    -moz-image-region: rect(0, 48px, 16px, 32px);
+  }
 }
 
-#identity-box:hover:active > #page-proxy-favicon,
-#identity-box[open=true] > #page-proxy-favicon {
-    -moz-image-region: rect(0, 48px, 16px, 32px);
+
+@media (min-resolution: 1.1dppx) {
+  #identity-box:hover:active > #page-proxy-favicon,
+  #identity-box[open=true] > #page-proxy-favicon {
+    -moz-image-region: rect(0, 64px, 32px, 32px);
+  }
+
+  /* The chromeUI identity-icon set includes three states,
+     but OS X only uses two of them. */
+  #identity-box.chromeUI:hover:active > #page-proxy-favicon,
+  #identity-box.chromeUI[open=true] > #page-proxy-favicon {
+    -moz-image-region: rect(0, 96px, 32px, 64px);
+  }
 }
+
 
 #page-proxy-favicon[pageproxystate="invalid"] {
     opacity: 0.3;
@@ -1887,136 +1870,6 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 
 /* ::::: Identity Indicator Styling ::::: */
 
-/* Popup Icons */
-#identity-popup-icon {
-    height: 64px;
-    width: 64px;
-    padding: 0;
-    list-style-image: url("chrome://browser/skin/identity.png");
-    -moz-image-region: rect(0px, 64px, 64px, 0px);
-}
-
-#identity-popup.verifiedDomain > #identity-popup-container > #identity-popup-icon {
-    -moz-image-region: rect(64px, 64px, 128px, 0px);
-}
-
-#identity-popup.verifiedIdentity > #identity-popup-container > #identity-popup-icon {
-    -moz-image-region: rect(128px, 64px, 192px, 0px);
-}
-
-/* Popup Body Text */
-.identity-popup-description {
-    white-space: pre-wrap;
-    -moz-padding-start: 15px;
-    margin: 2px 0 4px;
-}
-
-.identity-popup-label {
-    white-space: pre-wrap;
-    -moz-padding-start: 15px;
-    margin: 0;
-}
-
-#identity-popup-content-host,
-#identity-popup-content-box.verifiedIdentity > #identity-popup-content-owner {
-    font-size: 1.2em;
-}
-
-#identity-popup-content-host {
-    margin-top: 3px;
-    margin-bottom: 5px;
-    font-weight: bold;
-    max-width: 300px;
-}
-
-#identity-popup-content-owner {
-    margin-top: 4px;
-    margin-bottom: 0 !important;
-    font-weight: bold;
-    max-width: 300px;
-}
-
-.verifiedDomain > #identity-popup-content-owner {
-    font-weight: normal;
-}
-
-#identity-popup-content-verifier {
-    margin: 4px 0 2px;
-}
-
-#identity-popup-content-box.verifiedIdentity > #identity-popup-encryption ,
-#identity-popup-content-box.verifiedDomain > #identity-popup-encryption {
-    margin-top: 10px;
-    -moz-margin-start: -24px;
-}
-
-#identity-popup-content-box.verifiedIdentity > #identity-popup-encryption > vbox > #identity-popup-encryption-icon ,
-#identity-popup-content-box.verifiedDomain > #identity-popup-encryption > vbox > #identity-popup-encryption-icon {
-    list-style-image: url("chrome://browser/skin/Secure24.png");
-}
-
-#identity-popup-more-info-button {
-    margin-top: 6px;
-    margin-bottom: 0;
-    -moz-margin-end: 0;
-}
-
-
-.popup-notification-icon[popupid="click-to-play-plugins"] {
-    list-style-image: url(chrome://mozapps/skin/plugins/pluginBlocked-64.png);
-}
-
-.popup-notification-icon[popupid="web-notifications"] {
-    list-style-image: url(chrome://browser/skin/notification-64.png);
-}
-
-.addon-progress-description {
-    width: 350px;
-    max-width: 350px;
-}
-
-.popup-progress-label,
-.popup-progress-meter {
-    -moz-margin-start: 0;
-    -moz-margin-end: 0;
-}
-
-.popup-progress-cancel {
-    -moz-appearance: none;
-    background: transparent;
-    border: none;
-    padding: 0;
-    min-height: 16px;
-    min-width: 16px;
-    max-height: 16px;
-    max-width: 16px;
-    margin: 0 1px 0 1px;
-    list-style-image: url(chrome://mozapps/skin/downloads/buttons.png);
-    -moz-image-region: rect(0px, 16px, 16px, 0px);    
-}
-
-.popup-progress-cancel:hover {
-    -moz-image-region: rect(16px, 32px, 32px, 16px);
-}
-
-.popup-progress-cancel:active {
-    -moz-image-region: rect(32px, 32px, 48px, 16px);
-}
-
-#identity-popup > .panel-arrowcontainer > .panel-arrowcontent {
-  padding: 0;
-}
-
-#identity-popup-container {
-  padding: 16px;
-}
-
-#identity-popup-button-container {
-  background: linear-gradient(to bottom, rgba(0,0,0,0.04) 60%, transparent);
-  padding: 16px;
-  margin-top: 5px;
-}
-
 %include ../shared/notification-icons.inc.css
 
 /* Notification icon box */
@@ -2054,10 +1907,6 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 }
 #pointerLock-cancel {
     margin: 0px;
-}
-
-#identity-popup-container {
-    min-width: 280px;
 }
 
 /* Bookmarks roots menu-items */
@@ -2272,21 +2121,12 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     box-shadow: 0 0 2px white;
 }
 
-#full-screen-warning-container[obscure-browser] {
-    background-color: rgba(0,0,0,0.3);
-}
-
 .full-screen-description {
     font-size: 150%;
 }
 
 #full-screen-domain-text {
     font-size: 300%;
-}
-
-.full-screen-approval-button,
-#full-screen-remember-decision {
-    font-size: 120%;
 }
 
 %ifdef MOZ_DEVTOOLS

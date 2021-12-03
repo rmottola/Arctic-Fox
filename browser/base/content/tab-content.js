@@ -583,7 +583,6 @@ let DOMFullscreenHandler = {
 
   init: function() {
     addMessageListener("DOMFullscreen:Entered", this);
-    addMessageListener("DOMFullscreen:Approved", this);
     addMessageListener("DOMFullscreen:CleanUp", this);
     addEventListener("MozDOMFullscreen:Request", this);
     addEventListener("MozDOMFullscreen:Entered", this);
@@ -606,14 +605,6 @@ let DOMFullscreenHandler = {
           // to handle, neither we have been in fullscreen, tell the
           // parent to just exit.
           sendAsyncMessage("DOMFullscreen:Exit");
-        }
-        break;
-      }
-      case "DOMFullscreen:Approved": {
-        if (this._fullscreenDoc) {
-          Services.obs.notifyObservers(this._fullscreenDoc,
-                                       "fullscreen-approved",
-                                       "");
         }
         break;
       }

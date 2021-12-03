@@ -60,8 +60,8 @@ DEFINES['GL_APICALL'] = ""
 DEFINES['GL_GLEXT_PROTOTYPES'] = ""
 DEFINES['EGLAPI'] = ""
 
-# ANGLE uses the STL, so we can't use Mozilla's derpy STL wrappers.
-DISABLE_STL_WRAPPING = True
+ALLOW_COMPILER_WARNINGS = True
+
 
 
 LOCAL_INCLUDES += [ '../../include', '../../src', '../../src/third_party/khronos' ]

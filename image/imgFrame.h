@@ -157,19 +157,6 @@ public:
                             GraphicsFilter aFilter,
                             uint32_t aImageFlags);
 
-  /**
-   * Reinitializes an existing imgFrame with new parameters. You must be holding
-   * a RawAccessFrameRef to the imgFrame, and it must never have been written
-   * to, marked finished, or aborted.
-   *
-   * XXX(seth): We will remove this in bug 1117607.
-   */
-  nsresult ReinitForDecoder(const nsIntSize& aImageSize,
-                            const nsIntRect& aRect,
-                            SurfaceFormat aFormat,
-                            uint8_t aPaletteDepth = 0,
-                            bool aNonPremult = false);
-
   DrawableFrameRef DrawableRef();
   RawAccessFrameRef RawAccessRef();
 
@@ -244,7 +231,7 @@ public:
    */
   uint32_t GetBytesPerPixel() const { return GetIsPaletted() ? 1 : 4; }
 
-  IntSize GetImageSize() { return mImageSize; }
+  IntSize GetImageSize() const { return mImageSize; }
   nsIntRect GetRect() const;
   IntSize GetSize() const { return mSize; }
   bool NeedsPadding() const { return mOffset != nsIntPoint(0, 0); }
@@ -355,6 +342,7 @@ private: // data
 
   bool mHasNoAlpha;
   bool mAborted;
+  bool mOptimizable;
 
 
   //////////////////////////////////////////////////////////////////////////////
@@ -384,7 +372,6 @@ private: // data
 
   bool mSinglePixel;
   bool mCompositingFailed;
-  bool mOptimizable;
 };
 
 /**
@@ -444,6 +431,8 @@ public:
   }
 
 private:
+  DrawableFrameRef(const DrawableFrameRef& aOther) = delete;
+
   nsRefPtr<imgFrame> mFrame;
   VolatileBufferPtr<uint8_t> mRef;
 };
@@ -526,6 +515,8 @@ public:
   }
 
 private:
+  RawAccessFrameRef(const RawAccessFrameRef& aOther) = delete;
+
   nsRefPtr<imgFrame> mFrame;
 };
 

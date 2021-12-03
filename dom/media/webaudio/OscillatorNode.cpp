@@ -308,8 +308,7 @@ public:
     }
 
     AllocateAudioBlock(1, aOutput);
-    float* output = static_cast<float*>(
-        const_cast<void*>(aOutput->mChannelData[0]));
+    float* output = aOutput->ChannelFloatsForWrite(0);
 
     uint32_t start, end;
     FillBounds(output, ticks, start, end);
@@ -385,7 +384,8 @@ OscillatorNode::OscillatorNode(AudioContext* aContext)
   , mStartCalled(false)
 {
   OscillatorNodeEngine* engine = new OscillatorNodeEngine(this, aContext->Destination());
-  mStream = aContext->Graph()->CreateAudioNodeStream(engine, MediaStreamGraph::SOURCE_STREAM);
+  mStream = AudioNodeStream::Create(aContext->Graph(), engine,
+                                    AudioNodeStream::NEED_MAIN_THREAD_FINISHED);
   engine->SetSourceStream(mStream);
   mStream->AddMainThreadListener(this);
 }

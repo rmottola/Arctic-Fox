@@ -1,10 +1,12 @@
-# -*- indent-tabs-mode: nil; js-indent-level: 4 -*-
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+// -*- indent-tabs-mode: nil; js-indent-level: 4 -*-
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
+                                  "resource://gre/modules/AppConstants.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
                                   "resource://gre/modules/PlacesUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "FormHistory",
@@ -12,21 +14,44 @@ XPCOMUtils.defineLazyModuleGetter(this, "FormHistory",
 XPCOMUtils.defineLazyModuleGetter(this, "Downloads",
                                   "resource://gre/modules/Downloads.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Promise",
-                                  "resource:///modules/promise.js");
+                                  "resource://gre/modules/Promise.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PromiseUtils",
+                                  "resource://gre/modules/PromiseUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "DownloadsCommon",
+                                  "resource:///modules/DownloadsCommon.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetryStopwatch",
                                   "resource://gre/modules/TelemetryStopwatch.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
                                   "resource://gre/modules/devtools/Console.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
+                                  "resource://gre/modules/Preferences.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "setTimeout",
+                                  "resource://gre/modules/Timer.jsm");
 
-function Sanitizer() {}
+/**
+ * A number of iterations after which to yield time back
+ * to the system.
+ */
+const YIELD_PERIOD = 10;
+
+function Sanitizer() {
+}
 Sanitizer.prototype = {
   // warning to the caller: this one may raise an exception (e.g. bug #265028)
   clearItem: function (aItemName)
   {
     if (this.items[aItemName].canClear)
       this.items[aItemName].clear();
+  },
+
+  promiseCanClearItem: function (aItemName, aArg) {
+    return new Promise(resolve => {
+      return this.canClearItem(aItemName,
+                              (_, canClear) => resolve(canClear),
+                              aArg)
+    });
   },
 
   canClearItem: function (aItemName, aCallback, aArg)
@@ -40,15 +65,14 @@ Sanitizer.prototype = {
     aCallback(aItemName, canClear, aArg);
     return canClear;
   },
-  
+
   prefDomain: "",
-  isShutDown: false,
-  
+
   getNameFromPreference: function (aPreferenceName)
   {
     return aPreferenceName.substr(this.prefDomain.length);
   },
-  
+
   /**
    * Deletes privacy sensitive data in a batch, according to user preferences.
    * Returns a promise which is resolved if no errors occurred.  If an error
@@ -58,15 +82,61 @@ Sanitizer.prototype = {
    * If the consumer specifies the (optional) array parameter, only those
    * items get cleared (irrespective of the preference settings)
    */
-  sanitize: function (aItemsToClear)
-  {
-    var deferred = Promise.defer();
-    var seenError = false;
+  sanitize: Task.async(function*(aItemsToClear = null) {
+    let progress = {};
+    let promise = this._sanitize(aItemsToClear, progress);
+
+    //
+    // Depending on preferences, the sanitizer may perform asynchronous
+    // work before it starts cleaning up the Places database (e.g. closing
+    // windows). We need to make sure that the connection to that database
+    // hasn't been closed by the time we use it.
+    //
+    let shutdownClient = Cc["@mozilla.org/browser/nav-history-service;1"]
+       .getService(Ci.nsPIPlacesDatabase)
+       .shutdownClient
+       .jsclient;
+
+    shutdownClient.addBlocker("sanitize.js: Sanitize",
+      promise,
+      {
+        fetchState: () => {
+          return { progress };
+        }
+      }
+    );
+    try {
+      yield promise;
+    } finally {
+      Services.obs.notifyObservers(null, "sanitizer-sanitization-complete", "");
+    }
+  }),
+
+  _sanitize: Task.async(function*(aItemsToClear, progress = {}) {
+    let seenError = false;
+    let itemsToClear;
     if (Array.isArray(aItemsToClear)) {
-      var itemsToClear = [...aItemsToClear];
+      // Shallow copy the array, as we are going to modify
+      // it in place later.
+      itemsToClear = [...aItemsToClear];
     } else {
       let branch = Services.prefs.getBranch(this.prefDomain);
-      itemsToClear = Object.keys(this.items).filter(itemName => branch.getBoolPref(itemName));
+      itemsToClear = Object.keys(this.items).filter(itemName => {
+        try {
+          return branch.getBoolPref(itemName);
+        } catch (ex) {
+          return false;
+        }
+      });
+    }
+
+    // Store the list of items to clear, in case we are killed before we
+    // get a chance to complete.
+    Preferences.set(Sanitizer.PREF_SANITIZE_IN_PROGRESS, JSON.stringify(itemsToClear));
+
+    // Store the list of items to clear, for debugging/forensics purposes
+    for (let k of itemsToClear) {
+      progress[k] = "ready";
     }
 
     // Ensure open windows get cleared first, if they're in our list, so that they don't stick
@@ -75,73 +145,56 @@ Sanitizer.prototype = {
     let openWindowsIndex = itemsToClear.indexOf("openWindows");
     if (openWindowsIndex != -1) {
       itemsToClear.splice(openWindowsIndex, 1);
-      let item = this.items.openWindows;
-
-      function onWindowsCleaned() {
-        try {
-          let clearedPromise = this.sanitize(itemsToClear);
-          clearedPromise.then(deferred.resolve, deferred.reject);
-        } catch(e) {
-          let error = "Sanitizer threw after closing windows: " + e;
-          Cu.reportError(error);
-          deferred.reject(error);
-        }
-      }
-
-      let ok = item.clear(onWindowsCleaned.bind(this));
-      // When cancelled, reject immediately
-      if (!ok) {
-        deferred.reject("Sanitizer canceled closing windows");
-      }
-
-      return deferred.promise;
+      yield this.items.openWindows.clear();
+      progress.openWindows = "cleared";
     }
-
-    TelemetryStopwatch.start("FX_SANITIZE_TOTAL");
 
     // Cache the range of times to clear
-    if (this.ignoreTimespan)
-      var range = null;  // If we ignore timespan, clear everything
-    else
+    let range = null;
+    // If we ignore timespan, clear everything,
+    // otherwise, pick a range.
+    if (!this.ignoreTimespan) {
       range = this.range || Sanitizer.getClearRange();
-
-    let itemCount = Object.keys(itemsToClear).length;
-    let onItemComplete = function() {
-      if (!--itemCount) {
-        TelemetryStopwatch.finish("FX_SANITIZE_TOTAL");
-        seenError ? deferred.reject() : deferred.resolve();
-      }
-    };
+    }
     for (let itemName of itemsToClear) {
       let item = this.items[itemName];
+      if (!("clear" in item)) {
+        progress[itemName] = "`clear` not in item";
+        continue;
+      }
       item.range = range;
-      item.isShutDown = this.isShutDown;
-      if ("clear" in item) {
-        let clearCallback = (itemName, aCanClear) => {
-          // Some of these clear() may raise exceptions (see bug #265028)
-          // to sanitize as much as possible, we catch and store them,
-          // rather than fail fast.
-          // Callers should check returned errors and give user feedback
-          // about items that could not be sanitized
-          let item = this.items[itemName];
-          try {
-            if (aCanClear)
-              item.clear();
-          } catch(er) {
-            seenError = true;
-            console.error("Error sanitizing " + itemName + ": " + er + "\n");
-          }
-          onItemComplete();
-        };
-        this.canClearItem(itemName, clearCallback);
-      } else {
-        onItemComplete();
+      let canClear = yield this.promiseCanClearItem(itemName);
+      if (!canClear) {
+        progress[itemName] = "cannot clear item";
+        continue;
+      }
+      // Some of these clear() may raise exceptions (see bug #265028)
+      // to sanitize as much as possible, we catch and store them,
+      // rather than fail fast.
+      // Callers should check returned errors and give user feedback
+      // about items that could not be sanitized
+      let refObj = {};
+      try {
+        TelemetryStopwatch.start("FX_SANITIZE_TOTAL", refObj);
+        yield item.clear();
+        progress[itemName] = "cleared";
+      } catch(er) {
+        progress[itemName] = "failed";
+        seenError = true;
+        console.error("Error sanitizing " + itemName, er);
+      } finally {
+        TelemetryStopwatch.finish("FX_SANITIZE_TOTAL", refObj);
       }
     }
 
-    return deferred.promise;
-  },
-  
+    // Sanitization is complete.
+    Preferences.reset(Sanitizer.PREF_SANITIZE_IN_PROGRESS);
+    progress = {};
+    if (seenError) {
+      throw new Error("Error sanitizing");
+    }
+  }),
+
   // Time span only makes sense in certain cases.  Consumers who want
   // to only clear some private data can opt in by setting this to false,
   // and can optionally specify a specific range.  If timespan is not ignored,
@@ -154,7 +207,8 @@ Sanitizer.prototype = {
     cache: {
       clear: function ()
       {
-        TelemetryStopwatch.start("FX_SANITIZE_CACHE");
+        let refObj = {};
+        TelemetryStopwatch.start("FX_SANITIZE_CACHE", refObj);
 
         var cache = Cc["@mozilla.org/netwerk/cache-storage-service;1"].
                     getService(Ci.nsICacheStorageService);
@@ -170,7 +224,7 @@ Sanitizer.prototype = {
           imageCache.clearCache(false); // true=chrome, false=content
         } catch(er) {}
 
-        TelemetryStopwatch.finish("FX_SANITIZE_CACHE");
+        TelemetryStopwatch.finish("FX_SANITIZE_CACHE", refObj);
       },
 
       get canClear()
@@ -180,10 +234,12 @@ Sanitizer.prototype = {
     },
 
     cookies: {
-      clear: function ()
+      clear: Task.async(function* ()
       {
-        TelemetryStopwatch.start("FX_SANITIZE_COOKIES");
-        TelemetryStopwatch.start("FX_SANITIZE_COOKIES_2");
+        let yieldCounter = 0;
+        let refObj = {};
+        TelemetryStopwatch.start("FX_SANITIZE_COOKIES", refObj);
+        TelemetryStopwatch.start("FX_SANITIZE_COOKIES_2", refObj);
 
         var cookieMgr = Components.classes["@mozilla.org/cookiemanager;1"]
                                   .getService(Ci.nsICookieManager);
@@ -193,17 +249,22 @@ Sanitizer.prototype = {
           while (cookiesEnum.hasMoreElements()) {
             var cookie = cookiesEnum.getNext().QueryInterface(Ci.nsICookie2);
 
-            if (cookie.creationTime > this.range[0])
+            if (cookie.creationTime > this.range[0]) {
               // This cookie was created after our cutoff, clear it
               cookieMgr.remove(cookie.host, cookie.name, cookie.path, false);
+
+              if (++yieldCounter % YIELD_PERIOD == 0) {
+                yield new Promise(resolve => setTimeout(resolve, 0)); // Don't block the main thread too long
+              }
+            }
           }
         }
         else {
           // Remove everything
           cookieMgr.removeAll();
+          yield new Promise(resolve => setTimeout(resolve, 0)); // Don't block the main thread too long
         }
-
-        TelemetryStopwatch.finish("FX_SANITIZE_COOKIES_2");
+        TelemetryStopwatch.finish("FX_SANITIZE_COOKIES_2", refObj);
 
         // Clear deviceIds. Done asynchronously (returns before complete).
         let mediaMgr = Components.classes["@mozilla.org/mediaManagerService;1"]
@@ -211,7 +272,13 @@ Sanitizer.prototype = {
         mediaMgr.sanitizeDeviceIds(this.range && this.range[0]);
 
         // Clear plugin data.
-        TelemetryStopwatch.start("FX_SANITIZE_PLUGINS");
+        TelemetryStopwatch.start("FX_SANITIZE_PLUGINS", refObj);
+        yield this.promiseClearPluginCookies();
+        TelemetryStopwatch.finish("FX_SANITIZE_PLUGINS", refObj);
+        TelemetryStopwatch.finish("FX_SANITIZE_COOKIES", refObj);
+      }),
+
+      promiseClearPluginCookies: Task.async(function*() {
         const phInterface = Ci.nsIPluginHost;
         const FLAG_CLEAR_ALL = phInterface.FLAG_CLEAR_ALL;
         let ph = Cc["@mozilla.org/plugin/host;1"].getService(phInterface);
@@ -220,30 +287,26 @@ Sanitizer.prototype = {
         // that this.range[1] is actually now, so we compute age range based
         // on the lower bound. If this.range results in a negative age, do
         // nothing.
-        let age = this.range ? (Date.now() / 1000 - this.range[0] / 1000000)
-                             : -1;
+        let age = this.range ? (Date.now() / 1000 - this.range[0] / 1000000) : -1;
         if (!this.range || age >= 0) {
           let tags = ph.getPluginTags();
-          for (let i = 0; i < tags.length; i++) {
+          for (let tag of tags) {
             try {
-              ph.clearSiteData(tags[i], null, FLAG_CLEAR_ALL, age);
-            } catch (e) {
+              let rv = yield new Promise(resolve =>
+                ph.clearSiteData(tag, null, FLAG_CLEAR_ALL, age, resolve)
+              );
               // If the plugin doesn't support clearing by age, clear everything.
-              if (e.result == Components.results.
-                    NS_ERROR_PLUGIN_TIME_RANGE_NOT_SUPPORTED) {
-                try {
-                  ph.clearSiteData(tags[i], null, FLAG_CLEAR_ALL, -1);
-                } catch (e) {
-                  // Ignore errors from the plugin
-                }
+              if (rv == Components.results.NS_ERROR_PLUGIN_TIME_RANGE_NOT_SUPPORTED) {
+                yield new Promise(resolve =>
+                  ph.clearSiteData(tag, null, FLAG_CLEAR_ALL, -1, resolve)
+                );
               }
+            } catch (ex) {
+              // Ignore errors from plug-ins
             }
           }
         }
-
-        TelemetryStopwatch.finish("FX_SANITIZE_PLUGINS");
-        TelemetryStopwatch.finish("FX_SANITIZE_COOKIES");
-      },
+      }),
 
       get canClear()
       {
@@ -271,33 +334,37 @@ Sanitizer.prototype = {
     },
 
     history: {
-      clear: function ()
+      clear: Task.async(function* ()
       {
-        TelemetryStopwatch.start("FX_SANITIZE_HISTORY");
-
-        if (this.range)
-          PlacesUtils.history.removeVisitsByTimeframe(this.range[0], this.range[1]);
-        else
-          PlacesUtils.history.removeAllPages();
-
+        let refObj = {};
+        TelemetryStopwatch.start("FX_SANITIZE_HISTORY", refObj);
         try {
-          var os = Components.classes["@mozilla.org/observer-service;1"]
-                             .getService(Components.interfaces.nsIObserverService);
-          let clearStartingTime = this.range ? String(this.range[0]) : "";
-          os.notifyObservers(null, "browser:purge-session-history", clearStartingTime);
-        }
-        catch (e) { }
+          if (this.range) {
+            yield PlacesUtils.history.removeVisitsByFilter({
+              beginDate: new Date(this.range[0] / 1000),
+              endDate: new Date(this.range[1] / 1000)
+            });
+          } else {
+            // Remove everything.
+            yield PlacesUtils.history.clear();
+          }
 
-        // Clear last URL of the Open Web Location dialog
-        var prefs = Components.classes["@mozilla.org/preferences-service;1"]
-                              .getService(Components.interfaces.nsIPrefBranch);
-        try {
-          prefs.clearUserPref("general.open_location.last_url");
-        }
-        catch (e) { }
+          try {
+            let clearStartingTime = this.range ? String(this.range[0]) : "";
+            Services.obs.notifyObservers(null, "browser:purge-session-history", clearStartingTime);
+          } catch (e) { }
 
-        TelemetryStopwatch.finish("FX_SANITIZE_HISTORY");
-      },
+          try {
+            let predictor = Components.classes["@mozilla.org/network/predictor;1"]
+                                      .getService(Components.interfaces.nsINetworkPredictor);
+            predictor.reset();
+          } catch (e) {
+            console.error("Error while resetting the predictor", e);
+          }
+        } finally {
+          TelemetryStopwatch.finish("FX_SANITIZE_HISTORY", refObj);
+        }
+      }),
 
       get canClear()
       {
@@ -310,7 +377,8 @@ Sanitizer.prototype = {
     formdata: {
       clear: function ()
       {
-        TelemetryStopwatch.start("FX_SANITIZE_FORMDATA");
+        let refObj = {};
+        TelemetryStopwatch.start("FX_SANITIZE_FORMDATA", refObj);
 
         // Clear undo history of all searchBars
         var windowManager = Components.classes['@mozilla.org/appshell/window-mediator;1']
@@ -323,6 +391,13 @@ Sanitizer.prototype = {
           if (searchBar)
             searchBar.textbox.reset();
           let tabBrowser = currentWindow.gBrowser;
+          if (!tabBrowser) {
+            // No tab browser? This means that it's too early during startup (typically,
+            // Session Restore hasn't completed yet). Since we don't have find
+            // bars at that stage and since Session Restore will not restore
+            // find bars further down during startup, we have nothing to clear.
+            continue;
+          }
           for (let tab of tabBrowser.tabs) {
             if (tabBrowser.isFindBarInitialized(tab))
               tabBrowser.getFindBar(tab).clear();
@@ -337,7 +412,7 @@ Sanitizer.prototype = {
         }
         FormHistory.update(change);
 
-        TelemetryStopwatch.finish("FX_SANITIZE_FORMDATA");
+        TelemetryStopwatch.finish("FX_SANITIZE_FORMDATA", refObj);
       },
 
       canClear : function(aCallback, aArg)
@@ -410,30 +485,11 @@ Sanitizer.prototype = {
       }
     },
 
-    passwords: {
-      clear: function ()
-      {
-        TelemetryStopwatch.start("FX_SANITIZE_PASSWORDS");
-        var pwmgr = Components.classes["@mozilla.org/login-manager;1"]
-                              .getService(Components.interfaces.nsILoginManager);
-        // Passwords are timeless, and don't respect the timeSpan setting
-        pwmgr.removeAllLogins();
-        TelemetryStopwatch.finish("FX_SANITIZE_PASSWORDS");
-      },
-
-      get canClear()
-      {
-        var pwmgr = Components.classes["@mozilla.org/login-manager;1"]
-                              .getService(Components.interfaces.nsILoginManager);
-        var count = pwmgr.countLogins("", "", ""); // count all logins
-        return (count > 0);
-      }
-    },
-
     sessions: {
       clear: function ()
       {
-        TelemetryStopwatch.start("FX_SANITIZE_SESSIONS");
+        let refObj = {};
+        TelemetryStopwatch.start("FX_SANITIZE_SESSIONS", refObj);
 
         // clear all auth tokens
         var sdr = Components.classes["@mozilla.org/security/sdr;1"]
@@ -445,7 +501,7 @@ Sanitizer.prototype = {
                            .getService(Components.interfaces.nsIObserverService);
         os.notifyObservers(null, "net:clear-active-logins", null);
 
-        TelemetryStopwatch.finish("FX_SANITIZE_SESSIONS");
+        TelemetryStopwatch.finish("FX_SANITIZE_SESSIONS", refObj);
       },
 
       get canClear()
@@ -457,7 +513,8 @@ Sanitizer.prototype = {
     siteSettings: {
       clear: function ()
       {
-        TelemetryStopwatch.start("FX_SANITIZE_SITESETTINGS");
+        let refObj = {};
+        TelemetryStopwatch.start("FX_SANITIZE_SITESETTINGS", refObj);
 
         // Clear site-specific permissions like "Allow this site to open popups"
         // we ignore the "end" range and hope it is now() - none of the
@@ -499,11 +556,15 @@ Sanitizer.prototype = {
         sss.clearAll();
 
         // Clear all push notification subscriptions
-        var push = Cc["@mozilla.org/push/NotificationService;1"]
-                    .getService(Ci.nsIPushNotificationService);
-        push.clearAll();
+        try {
+          var push = Cc["@mozilla.org/push/NotificationService;1"]
+                      .getService(Ci.nsIPushNotificationService);
+          push.clearAll();
+        } catch (e) {
+          dump("Web Push may not be available.\n");
+        }
 
-        TelemetryStopwatch.finish("FX_SANITIZE_SITESETTINGS");
+        TelemetryStopwatch.finish("FX_SANITIZE_SITESETTINGS", refObj);
       },
 
       get canClear()
@@ -538,14 +599,9 @@ Sanitizer.prototype = {
           win.getInterface(Ci.nsIDocShell).contentViewer.resetCloseWindow();
         }
       },
-      clear: function(aCallback)
-      {
+      clear: Task.async(function*() {
         // NB: this closes all *browser* windows, not other windows like the library, about window,
         // browser console, etc.
-
-        if (!aCallback) {
-          throw "Sanitizer's openWindows clear() requires a callback.";
-        }
 
         // Keep track of the time in case we get stuck in la-la-land because of onbeforeunload
         // dialogs
@@ -561,7 +617,7 @@ Sanitizer.prototype = {
           // If someone says "no" to a beforeunload prompt, we abort here:
           if (!this._canCloseWindow(someWin)) {
             this._resetAllWindowClosures(windowList);
-            return false;
+            throw new Error("Sanitize could not close windows: cancelled by user");
           }
 
           // ...however, beforeunload prompts spin the event loop, and so the code here won't get
@@ -570,13 +626,14 @@ Sanitizer.prototype = {
           // 'forget', and the timespans will be all wrong by now anyway:
           if (existingWindow.performance.now() > (startDate + 60 * 1000)) {
             this._resetAllWindowClosures(windowList);
-            return false;
+            throw new Error("Sanitize could not close windows: timeout");
           }
         }
 
         // If/once we get here, we should actually be able to close all windows.
 
-        TelemetryStopwatch.start("FX_SANITIZE_OPENWINDOWS");
+        let refObj = {};
+        TelemetryStopwatch.start("FX_SANITIZE_OPENWINDOWS", refObj);
 
         // First create a new window. We do this first so that on non-mac, we don't
         // accidentally close the app by closing all the windows.
@@ -586,39 +643,58 @@ Sanitizer.prototype = {
         let newWindow = existingWindow.openDialog("chrome://browser/content/", "_blank",
                                                   features, defaultArgs);
 
-        // Window creation and destruction is asynchronous. We need to wait
-        // until all existing windows are fully closed, and the new window is
-        // fully open, before continuing. Otherwise the rest of the sanitizer
-        // could run too early (and miss new cookies being set when a page
-        // closes) and/or run too late (and not have a fully-formed window yet
-        // in existence). See bug 1088137.
-        let newWindowOpened = false;
-        function onWindowOpened(subject, topic, data) {
-          if (subject != newWindow)
-            return;
-
-          Services.obs.removeObserver(onWindowOpened, "browser-delayed-startup-finished");
-          newWindowOpened = true;
-          // If we're the last thing to happen, invoke callback.
-          if (numWindowsClosing == 0) {
-            TelemetryStopwatch.finish("FX_SANITIZE_OPENWINDOWS");
-            aCallback();
-          }
-        }
-
-        let numWindowsClosing = windowList.length;
-        function onWindowClosed() {
-          numWindowsClosing--;
-          if (numWindowsClosing == 0) {
-            Services.obs.removeObserver(onWindowClosed, "xul-window-destroyed");
-            // If we're the last thing to happen, invoke callback.
-            if (newWindowOpened) {
-              TelemetryStopwatch.finish("FX_SANITIZE_OPENWINDOWS");
-              aCallback();
+        if (AppConstants.platform == "macosx") {
+          let onFullScreen = function(e) {
+            newWindow.removeEventListener("fullscreen", onFullScreen);
+            let docEl = newWindow.document.documentElement;
+            let sizemode = docEl.getAttribute("sizemode");
+            if (!newWindow.fullScreen && sizemode == "fullscreen") {
+              docEl.setAttribute("sizemode", "normal");
+              e.preventDefault();
+              e.stopPropagation();
+              return false;
             }
           }
+          newWindow.addEventListener("fullscreen", onFullScreen);
         }
 
+        let promiseReady = new Promise(resolve => {
+          // Window creation and destruction is asynchronous. We need to wait
+          // until all existing windows are fully closed, and the new window is
+          // fully open, before continuing. Otherwise the rest of the sanitizer
+          // could run too early (and miss new cookies being set when a page
+          // closes) and/or run too late (and not have a fully-formed window yet
+          // in existence). See bug 1088137.
+          let newWindowOpened = false;
+          function onWindowOpened(subject, topic, data) {
+            if (subject != newWindow)
+              return;
+
+            Services.obs.removeObserver(onWindowOpened, "browser-delayed-startup-finished");
+            if (AppConstants.platform == "macosx") {
+              newWindow.removeEventListener("fullscreen", onFullScreen);
+            }
+            newWindowOpened = true;
+            // If we're the last thing to happen, invoke callback.
+            if (numWindowsClosing == 0) {
+              TelemetryStopwatch.finish("FX_SANITIZE_OPENWINDOWS", refObj);
+              resolve();
+            }
+          }
+
+          let numWindowsClosing = windowList.length;
+          function onWindowClosed() {
+            numWindowsClosing--;
+            if (numWindowsClosing == 0) {
+              Services.obs.removeObserver(onWindowClosed, "xul-window-destroyed");
+              // If we're the last thing to happen, invoke callback.
+              if (newWindowOpened) {
+                TelemetryStopwatch.finish("FX_SANITIZE_OPENWINDOWS", refObj);
+                resolve();
+              }
+            }
+          }
+        });
         Services.obs.addObserver(onWindowOpened, "browser-delayed-startup-finished", false);
         Services.obs.addObserver(onWindowClosed, "xul-window-destroyed", false);
 
@@ -627,8 +703,8 @@ Sanitizer.prototype = {
           windowList.pop().close();
         }
         newWindow.focus();
-        return true;
-      },
+        yield promiseReady;
+      }),
 
       get canClear()
       {
@@ -641,9 +717,10 @@ Sanitizer.prototype = {
 
 
 // "Static" members
-Sanitizer.prefDomain          = "privacy.sanitize.";
-Sanitizer.prefShutdown        = "sanitizeOnShutdown";
-Sanitizer.prefDidShutdown     = "didShutdownSanitize";
+Sanitizer.PREF_DOMAIN = "privacy.sanitize.";
+Sanitizer.PREF_SANITIZE_ON_SHUTDOWN = "privacy.sanitize.sanitizeOnShutdown";
+Sanitizer.PREF_SANITIZE_IN_PROGRESS = "privacy.sanitize.sanitizeInProgress";
+Sanitizer.PREF_SANITIZE_DID_SHUTDOWN = "privacy.sanitize.didShutdownSanitize";
 
 // Time span constants corresponding to values of the privacy.sanitize.timeSpan
 // pref.  Used to determine how much history to clear, for various items
@@ -655,8 +732,6 @@ Sanitizer.TIMESPAN_TODAY      = 4;
 Sanitizer.TIMESPAN_5MIN       = 5;
 Sanitizer.TIMESPAN_24HOURS    = 6;
 
-Sanitizer.IS_SHUTDOWN         = true;
-
 // Return a 2 element array representing the start and end times,
 // in the uSec-since-epoch format that PRTime likes.  If we should
 // clear everything, return null.  Use ts if it is defined; otherwise
@@ -666,7 +741,7 @@ Sanitizer.getClearRange = function (ts) {
     ts = Sanitizer.prefs.getIntPref("timeSpan");
   if (ts === Sanitizer.TIMESPAN_EVERYTHING)
     return null;
-  
+
   // PRTime is microseconds while JS time is milliseconds
   var endDate = Date.now() * 1000;
   switch (ts) {
@@ -699,63 +774,82 @@ Sanitizer.getClearRange = function (ts) {
 };
 
 Sanitizer._prefs = null;
-Sanitizer.__defineGetter__("prefs", function() 
+Sanitizer.__defineGetter__("prefs", function()
 {
   return Sanitizer._prefs ? Sanitizer._prefs
     : Sanitizer._prefs = Components.classes["@mozilla.org/preferences-service;1"]
                          .getService(Components.interfaces.nsIPrefService)
-                         .getBranch(Sanitizer.prefDomain);
+                         .getBranch(Sanitizer.PREF_DOMAIN);
 });
 
 // Shows sanitization UI
-Sanitizer.showUI = function(aParentWindow) 
+Sanitizer.showUI = function(aParentWindow)
 {
   var ww = Components.classes["@mozilla.org/embedcomp/window-watcher;1"]
                      .getService(Components.interfaces.nsIWindowWatcher);
-#ifdef XP_MACOSX
-  ww.openWindow(null, // make this an app-modal window on Mac
-#else
-  ww.openWindow(aParentWindow,
-#endif
+  let win = AppConstants.platform == "macosx" ?
+    null: // make this an app-modal window on Mac
+    aParentWindow;
+  ww.openWindow(win,
                 "chrome://browser/content/sanitize.xul",
                 "Sanitize",
                 "chrome,titlebar,dialog,centerscreen,modal",
                 null);
 };
 
-/** 
- * Deletes privacy sensitive data in a batch, optionally showing the 
+/**
+ * Deletes privacy sensitive data in a batch, optionally showing the
  * sanitize UI, according to user preferences
  */
-Sanitizer.sanitize = function(aParentWindow) 
+Sanitizer.sanitize = function(aParentWindow)
 {
   Sanitizer.showUI(aParentWindow);
 };
 
-Sanitizer.onStartup = function() 
-{
-  // we check for unclean exit with pending sanitization
-  Sanitizer._checkAndSanitize();
-};
+Sanitizer.onStartup = Task.async(function*() {
+  // Make sure that we are triggered during shutdown, at the right time,
+  // and only once.
+  let placesClient = Cc["@mozilla.org/browser/nav-history-service;1"]
+                       .getService(Ci.nsPIPlacesDatabase)
+                       .shutdownClient
+                       .jsclient;
 
-Sanitizer.onShutdown = function() 
-{
-  // we check if sanitization is needed and perform it
-  Sanitizer._checkAndSanitize(Sanitizer.IS_SHUTDOWN);
-};
-
-// this is called on startup and shutdown, to perform pending sanitizations
-Sanitizer._checkAndSanitize = function(isShutDown) 
-{
-  const prefs = Sanitizer.prefs;
-  if (prefs.getBoolPref(Sanitizer.prefShutdown) && 
-      !prefs.prefHasUserValue(Sanitizer.prefDidShutdown)) {
-    // this is a shutdown or a startup after an unclean exit
-    var s = new Sanitizer();
-    s.prefDomain = "privacy.clearOnShutdown.";
-    s.isShutDown = isShutDown;
-    s.sanitize().then(function() {
-      prefs.setBoolPref(Sanitizer.prefDidShutdown, true);
-    });
+  let deferredSanitization = PromiseUtils.defer();
+  let sanitizationInProgress = false;
+  let doSanitize = function() {
+    if (!sanitizationInProgress) {
+      sanitizationInProgress = true;
+      Sanitizer.onShutdown().catch(er => {Promise.reject(er) /* Do not return rejected promise */;}).then(() =>
+        deferredSanitization.resolve()
+      );
+    }
+    return deferredSanitization.promise;
   }
-};
+  placesClient.addBlocker("sanitize.js: Sanitize on shutdown", doSanitize);
+
+  // Handle incomplete sanitizations
+  if (Preferences.has(Sanitizer.PREF_SANITIZE_IN_PROGRESS)) {
+    // Firefox crashed during sanitization.
+    let s = new Sanitizer();
+    let json = Preferences.get(Sanitizer.PREF_SANITIZE_IN_PROGRESS);
+    let itemsToClear = JSON.parse(json);
+    yield s.sanitize(itemsToClear);
+  }
+  if (Preferences.has(Sanitizer.PREF_SANITIZE_DID_SHUTDOWN)) {
+    // Firefox crashed before having a chance to sanitize during shutdown.
+    // (note that if Firefox crashed during shutdown sanitization, we
+    // will hit both `if` so we will run a second double-sanitization).
+    yield Sanitizer.onShutdown();
+  }
+});
+
+Sanitizer.onShutdown = Task.async(function*() {
+  if (!Preferences.get(Sanitizer.PREF_SANITIZE_ON_SHUTDOWN)) {
+    return;
+  }
+  // Need to sanitize upon shutdown
+  let s = new Sanitizer();
+  s.prefDomain = "privacy.clearOnShutdown.";
+  yield s.sanitize();
+  Preferences.set(Sanitizer.PREF_SANITIZE_DID_SHUTDOWN, true);
+});

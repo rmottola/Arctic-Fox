@@ -284,6 +284,7 @@ private:
    */
   CommandResult configureInterface(NetworkParams& aOptions);
   CommandResult dhcpRequest(NetworkParams& aOptions);
+  CommandResult stopDhcp(NetworkParams& aOptions);
   CommandResult enableInterface(NetworkParams& aOptions);
   CommandResult disableInterface(NetworkParams& aOptions);
   CommandResult resetConnections(NetworkParams& aOptions);
@@ -306,6 +307,7 @@ private:
   CommandResult updateUpStream(NetworkParams& aOptions);
   CommandResult createNetwork(NetworkParams& aOptions);
   CommandResult destroyNetwork(NetworkParams& aOptions);
+  CommandResult getNetId(NetworkParams& aOptions);
 
   CommandResult addHostRouteLegacy(NetworkParams& aOptions);
   CommandResult removeHostRouteLegacy(NetworkParams& aOptions);

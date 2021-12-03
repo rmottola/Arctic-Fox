@@ -44,3 +44,6 @@ EXTRA_PP_COMPONENTS += [
 EXTRA_JS_MODULES += [
    'distribution.js',
 ]
+
+with Files('controlcenter/**'):
+    BUG_COMPONENT = ('Firefox', 'General')

@@ -56,7 +56,6 @@ EXPORTS += [
     'nsISupportsBase.h',
     'nsObjCExceptions.h',
     'nsQueryObject.h',
-    'nsStackWalk.h',
     'nsTraceRefcnt.h',
     'nsWeakPtr.h',
 ]
@@ -76,9 +75,9 @@ EXPORTS.mozilla += [
     'DeferredFinalize.h',
     'ErrorNames.h',
     'HoldDropJSObjects.h',
+    'JSObjectHolder.h',
     'LinuxUtils.h',
     'nsMemoryInfoDumper.h',
-    'StackWalk.h',
     'StaticMutex.h',
     'StaticPtr.h',
     'SystemMemoryReporter.h',
@@ -100,6 +99,7 @@ UNIFIED_SOURCES += [
     'DeferredFinalize.cpp',
     'ErrorNames.cpp',
     'HoldDropJSObjects.cpp',
+    'JSObjectHolder.cpp',
     'nsConsoleMessage.cpp',
     'nsConsoleService.cpp',
     'nsCycleCollector.cpp',
@@ -118,16 +118,6 @@ UNIFIED_SOURCES += [
     'nsUUIDGenerator.cpp',
     'nsVersionComparatorImpl.cpp',
 ]
-
-# MOZ_STACKWALKING is defined in configure.in when the build configuration meets
-# the conditions for NS_StackWalk to work correctly.
-# We exclude this file from other build configurations so that if somebody adds a
-# new usage of NS_StackWalk it will cause a link error, which is better than having
-# NS_StackWalk silently return garbage at runtime.
-if CONFIG['MOZ_STACKWALKING']:
-    SOURCES += [
-        'nsStackWalk.cpp',
-    ]
 
 if CONFIG['OS_ARCH'] == 'Linux':
     SOURCES += [
@@ -155,5 +145,3 @@ LOCAL_INCLUDES += [
 
 if CONFIG['MOZ_WIDGET_GTK']:
     CXXFLAGS += CONFIG['TK_CFLAGS']
-
-FAIL_ON_WARNINGS = True

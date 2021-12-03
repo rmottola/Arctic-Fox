@@ -436,19 +436,11 @@ gfxPlatformFontList::LoadBadUnderlineList()
     }
 }
 
-static PLDHashOperator
-RebuildLocalFonts(nsPtrHashKey<gfxUserFontSet>* aKey,
-                  void* aClosure)
-{
-    aKey->GetKey()->RebuildLocalRules();
-    return PL_DHASH_NEXT;
-}
-
 void
 gfxPlatformFontList::UpdateFontList()
 {
     InitFontList();
-    mUserFontSetList.EnumerateEntries(RebuildLocalFonts, nullptr);
+    RebuildLocalFonts();
 }
 
 struct FontListData {
@@ -966,50 +958,6 @@ gfxPlatformFontList::LoadFontInfo()
     return done;
 }
 
-struct LookupMissedFaceNamesData {
-    explicit LookupMissedFaceNamesData(gfxPlatformFontList *aFontList)
-        : mFontList(aFontList), mFoundName(false) {}
-
-    gfxPlatformFontList *mFontList;
-    bool mFoundName;
-};
-
-/*static*/ PLDHashOperator
-gfxPlatformFontList::LookupMissedFaceNamesProc(nsStringHashKey *aKey,
-                                               void *aUserArg)
-{
-    LookupMissedFaceNamesData *data =
-        reinterpret_cast<LookupMissedFaceNamesData*>(aUserArg);
-
-    if (data->mFontList->FindFaceName(aKey->GetKey())) {
-        data->mFoundName = true;
-        return PL_DHASH_STOP;
-    }
-    return PL_DHASH_NEXT;
-}
-
-struct LookupMissedOtherNamesData {
-    explicit LookupMissedOtherNamesData(gfxPlatformFontList *aFontList)
-        : mFontList(aFontList), mFoundName(false) {}
-
-    gfxPlatformFontList *mFontList;
-    bool mFoundName;
-};
-
-/*static*/ PLDHashOperator
-gfxPlatformFontList::LookupMissedOtherNamesProc(nsStringHashKey *aKey,
-                                                void *aUserArg)
-{
-    LookupMissedOtherNamesData *data =
-        reinterpret_cast<LookupMissedOtherNamesData*>(aUserArg);
-
-    if (data->mFontList->FindFamily(aKey->GetKey())) {
-        data->mFoundName = true;
-        return PL_DHASH_STOP;
-    }
-    return PL_DHASH_NEXT;
-}
-
 void 
 gfxPlatformFontList::CleanupLoader()
 {
@@ -1018,26 +966,26 @@ gfxPlatformFontList::CleanupLoader()
     bool rebuilt = false, forceReflow = false;
 
     // if had missed face names that are now available, force reflow all
-    if (mFaceNamesMissed &&
-        mFaceNamesMissed->Count() != 0) {
-        LookupMissedFaceNamesData namedata(this);
-        mFaceNamesMissed->EnumerateEntries(LookupMissedFaceNamesProc, &namedata);
-        if (namedata.mFoundName) {
-            rebuilt = true;
-            mUserFontSetList.EnumerateEntries(RebuildLocalFonts, nullptr);
+    if (mFaceNamesMissed) {
+        for (auto it = mFaceNamesMissed->Iter(); !it.Done(); it.Next()) {
+            if (FindFaceName(it.Get()->GetKey())) {
+                rebuilt = true;
+                RebuildLocalFonts();
+                break;
+            }
         }
         mFaceNamesMissed = nullptr;
     }
 
     if (mOtherNamesMissed) {
-        LookupMissedOtherNamesData othernamesdata(this);
-        mOtherNamesMissed->EnumerateEntries(LookupMissedOtherNamesProc,
-                                            &othernamesdata);
-        mOtherNamesMissed = nullptr;
-        if (othernamesdata.mFoundName) {
-            forceReflow = true;
-            ForceGlobalReflow();
+        for (auto it = mOtherNamesMissed->Iter(); !it.Done(); it.Next()) {
+            if (FindFamily(it.Get()->GetKey())) {
+                forceReflow = true;
+                ForceGlobalReflow();
+                break;
+            }
         }
+        mOtherNamesMissed = nullptr;
     }
 
     if (LOG_FONTINIT_ENABLED() && mFontInfo) {
@@ -1080,74 +1028,44 @@ gfxPlatformFontList::ForceGlobalReflow()
     Preferences::SetBool(kPrefName, !fontInternalChange);
 }
 
+void
+gfxPlatformFontList::RebuildLocalFonts()
+{
+    for (auto it = mUserFontSetList.Iter(); !it.Done(); it.Next()) {
+        it.Get()->GetKey()->RebuildLocalRules();
+    }
+}
+
 // Support for memory reporting
 
-static size_t
-SizeOfFamilyEntryExcludingThis(const nsAString&               aKey,
-                               const nsRefPtr<gfxFontFamily>& aFamily,
-                               MallocSizeOf                   aMallocSizeOf,
-                               void*                          aUserArg)
-{
-    FontListSizes *sizes = static_cast<FontListSizes*>(aUserArg);
-    aFamily->AddSizeOfExcludingThis(aMallocSizeOf, sizes);
-
-    sizes->mFontListSize += aKey.SizeOfExcludingThisIfUnshared(aMallocSizeOf);
-
-    // we return zero here because the measurements have been added directly
-    // to the relevant fields of the FontListSizes record
-    return 0;
-}
-
-// this is also used by subclasses that hold additional hashes of family names
+// this is also used by subclasses that hold additional font tables
 /*static*/ size_t
-gfxPlatformFontList::SizeOfFamilyNameEntryExcludingThis
-    (const nsAString&               aKey,
-     const nsRefPtr<gfxFontFamily>& aFamily,
-     MallocSizeOf                   aMallocSizeOf,
-     void*                          aUserArg)
+gfxPlatformFontList::SizeOfFontFamilyTableExcludingThis(
+    const FontFamilyTable& aTable,
+    MallocSizeOf aMallocSizeOf)
 {
-    // we don't count the size of the family here, because this is an *extra*
-    // reference to a family that will have already been counted in the main list
-    return aKey.SizeOfExcludingThisIfUnshared(aMallocSizeOf);
+    size_t n = aTable.ShallowSizeOfExcludingThis(aMallocSizeOf);
+    for (auto iter = aTable.ConstIter(); !iter.Done(); iter.Next()) {
+        // We don't count the size of the family here, because this is an
+        // *extra* reference to a family that will have already been counted in
+        // the main list.
+        n += iter.Key().SizeOfExcludingThisIfUnshared(aMallocSizeOf);
+    }
+    return n;
 }
 
-static size_t
-SizeOfFontNameEntryExcludingThis(const nsAString&              aKey,
-                                 const nsRefPtr<gfxFontEntry>& aFont,
-                                 MallocSizeOf                  aMallocSizeOf,
-                                 void*                         aUserArg)
+/*static*/ size_t
+gfxPlatformFontList::SizeOfFontEntryTableExcludingThis(
+    const FontEntryTable& aTable,
+    MallocSizeOf aMallocSizeOf)
 {
-    // the font itself is counted by its owning family; here we only care about
-    // the name stored in the hashtable key
-    return aKey.SizeOfExcludingThisIfUnshared(aMallocSizeOf);
-}
-
-static size_t
-SizeOfPrefFontEntryExcludingThis
-    (const uint32_t&                           aKey,
-     const nsTArray<nsRefPtr<gfxFontFamily> >& aList,
-     MallocSizeOf                              aMallocSizeOf,
-     void*                                     aUserArg)
-{
-    // again, we only care about the size of the array itself; we don't follow
-    // the refPtrs stored in it, because they point to entries already owned
-    // and accounted-for by the main font list
-    return aList.ShallowSizeOfExcludingThis(aMallocSizeOf);
-}
-
-static size_t
-SizeOfSharedCmapExcludingThis(CharMapHashKey*   aHashEntry,
-                              MallocSizeOf      aMallocSizeOf,
-                              void*             aUserArg)
-{
-    FontListSizes *sizes = static_cast<FontListSizes*>(aUserArg);
-
-    uint32_t size = aHashEntry->GetKey()->SizeOfIncludingThis(aMallocSizeOf);
-    sizes->mCharMapsSize += size;
-
-    // we return zero here because the measurements have been added directly
-    // to the relevant fields of the FontListSizes record
-    return 0;
+    size_t n = aTable.ShallowSizeOfExcludingThis(aMallocSizeOf);
+    for (auto iter = aTable.ConstIter(); !iter.Done(); iter.Next()) {
+        // The font itself is counted by its owning family; here we only care
+        // about the names stored in the hashtable keys.
+        n += iter.Key().SizeOfExcludingThisIfUnshared(aMallocSizeOf);
+    }
+    return n;
 }
 
 void
@@ -1155,20 +1073,23 @@ gfxPlatformFontList::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
                                             FontListSizes* aSizes) const
 {
     aSizes->mFontListSize +=
-        mFontFamilies.SizeOfExcludingThis(SizeOfFamilyEntryExcludingThis,
-                                          aMallocSizeOf, aSizes);
+        mFontFamilies.ShallowSizeOfExcludingThis(aMallocSizeOf);
+    for (auto iter = mFontFamilies.ConstIter(); !iter.Done(); iter.Next()) {
+        aSizes->mFontListSize +=
+            iter.Key().SizeOfExcludingThisIfUnshared(aMallocSizeOf);
+        iter.Data()->AddSizeOfIncludingThis(aMallocSizeOf, aSizes);
+    }
 
     aSizes->mFontListSize +=
-        mOtherFamilyNames.SizeOfExcludingThis(SizeOfFamilyNameEntryExcludingThis,
-                                              aMallocSizeOf);
+        SizeOfFontFamilyTableExcludingThis(mOtherFamilyNames, aMallocSizeOf);
 
     if (mExtraNames) {
         aSizes->mFontListSize +=
-            mExtraNames->mFullnames.SizeOfExcludingThis(SizeOfFontNameEntryExcludingThis,
-                                                        aMallocSizeOf);
+            SizeOfFontEntryTableExcludingThis(mExtraNames->mFullnames,
+                                              aMallocSizeOf);
         aSizes->mFontListSize +=
-            mExtraNames->mPostscriptNames.SizeOfExcludingThis(SizeOfFontNameEntryExcludingThis,
-                                                              aMallocSizeOf);
+            SizeOfFontEntryTableExcludingThis(mExtraNames->mPostscriptNames,
+                                              aMallocSizeOf);
     }
 
     aSizes->mFontListSize +=
@@ -1177,15 +1098,24 @@ gfxPlatformFontList::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
         mFontFamiliesToLoad.ShallowSizeOfExcludingThis(aMallocSizeOf);
 
     aSizes->mFontListSize +=
-        mPrefFonts.SizeOfExcludingThis(SizeOfPrefFontEntryExcludingThis,
-                                       aMallocSizeOf);
+        mPrefFonts.ShallowSizeOfExcludingThis(aMallocSizeOf);
+    for (auto iter = mPrefFonts.ConstIter(); !iter.Done(); iter.Next()) {
+        // Again, we only care about the size of the array itself; we don't
+        // follow the refPtrs stored in it, because they point to entries
+        // already owned and accounted-for by the main font list.
+        aSizes->mFontListSize +=
+            iter.Data().ShallowSizeOfExcludingThis(aMallocSizeOf);
+    }
 
     aSizes->mFontListSize +=
         mBadUnderlineFamilyNames.SizeOfExcludingThis(aMallocSizeOf);
 
     aSizes->mFontListSize +=
-        mSharedCmaps.SizeOfExcludingThis(SizeOfSharedCmapExcludingThis,
-                                         aMallocSizeOf, aSizes);
+        mSharedCmaps.ShallowSizeOfExcludingThis(aMallocSizeOf);
+    for (auto iter = mSharedCmaps.ConstIter(); !iter.Done(); iter.Next()) {
+        aSizes->mCharMapsSize +=
+            iter.Get()->GetKey()->SizeOfIncludingThis(aMallocSizeOf);
+    }
 }
 
 void

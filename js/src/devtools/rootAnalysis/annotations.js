@@ -66,6 +66,7 @@ var ignoreClasses = {
     "XPCOMFunctions" : true, // I'm a little unsure of this one
     "_MD_IOVector" : true,
     "malloc_table_t": true, // replace_malloc
+    "malloc_hook_table_t": true, // replace_malloc
 };
 
 // Ignore calls through TYPE.FIELD, where TYPE is the class or struct name containing
@@ -238,24 +239,13 @@ function ignoreGCFunction(mangled)
     if (fun.indexOf("void nsCOMPtr<T>::Assert_NoQueryNeeded()") >= 0)
         return true;
 
+    // These call through an 'op' function pointer.
+    if (fun.indexOf("js::WeakMap<Key, Value, HashPolicy>::getDelegate(") >= 0)
+        return true;
+
     // XXX modify refillFreeList<NoGC> to not need data flow analysis to understand it cannot GC.
     if (/refillFreeList/.test(fun) && /\(js::AllowGC\)0u/.test(fun))
         return true;
-    return false;
-}
-
-function isRootedTypeName(name)
-{
-    if (name == "mozilla::ErrorResult" ||
-        name == "JSErrorResult" ||
-        name == "WrappableJSErrorResult" ||
-        name == "js::frontend::TokenStream" ||
-        name == "js::frontend::TokenStream::Position" ||
-        name == "ModuleCompiler" ||
-        name == "JSAddonId")
-    {
-        return true;
-    }
     return false;
 }
 
@@ -281,14 +271,34 @@ function stripUCSAndNamespace(name)
     return name;
 }
 
-function isRootedPointerTypeName(name)
+function isRootedGCTypeName(name)
+{
+    return (name == "JSAddonId");
+}
+
+function isRootedGCPointerTypeName(name)
 {
     name = stripUCSAndNamespace(name);
 
     if (name.startsWith('MaybeRooted<'))
         return /\(js::AllowGC\)1u>::RootType/.test(name);
 
+    if (name == "ErrorResult" ||
+        name == "JSErrorResult" ||
+        name == "WrappableJSErrorResult" ||
+        name == "frontend::TokenStream" ||
+        name == "frontend::TokenStream::Position" ||
+        name == "ModuleCompiler")
+    {
+        return true;
+    }
+
     return name.startsWith('Rooted') || name.startsWith('PersistentRooted');
+}
+
+function isRootedTypeName(name)
+{
+    return isRootedGCTypeName(name) || isRootedGCPointerTypeName(name);
 }
 
 function isUnsafeStorage(typeName)
@@ -331,10 +341,6 @@ function isOverridableField(initialCSU, csu, field)
         if (field == 'GetWindowProxy' || field == 'GetWindowProxyPreserveColor')
             return false;
     }
-    if (initialCSU == 'nsICycleCollectorListener' && field == 'NoteWeakMapEntry')
-        return false;
-    if (initialCSU == 'nsICycleCollectorListener' && field == 'NoteEdge')
-        return false;
     return true;
 }
 
@@ -359,6 +365,10 @@ function listGCPointers() {
     return [
         'JS::Value',
         'jsid',
+
+        'js::TypeSet',
+        'js::TypeSet::ObjectKey',
+        'js::TypeSet::Type',
 
         // AutoCheckCannotGC should also not be held live across a GC function.
         'JS::AutoCheckCannotGC',

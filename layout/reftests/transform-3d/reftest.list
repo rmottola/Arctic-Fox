@@ -11,7 +11,7 @@
 == rotatex-perspective-1c.html rotatex-1-ref.html
 == rotatex-perspective-3a.html rotatex-perspective-3-ref.html
 == scalez-1a.html scalez-1-ref.html
-== preserve3d-1a.html preserve3d-1-ref.html
+fuzzy-if(cocoaWidget,17,4) == preserve3d-1a.html preserve3d-1-ref.html
 == preserve3d-1b.html about:blank
 == preserve3d-clipped.html about:blank
 == preserve3d-2a.html preserve3d-2-ref.html
@@ -56,10 +56,13 @@ pref(layout.css.will-change.enabled,true) == willchange-containing-block.html?wi
 pref(layout.css.will-change.enabled,true) != willchange-containing-block.html?willchange willchange-containing-block.html?noblock
 fuzzy-if(winWidget&&!layersGPUAccelerated,1,606) == scroll-perspective-1.html scroll-perspective-1-ref.html
 # Bugs
-fails-if(!layersGPUAccelerated) == 1035611-1.html 1035611-1-ref.html # Bug 1072898 for !layersGPUAccelerated failures
+== 1035611-1.html 1035611-1-ref.html # Bug 1072898 for !layersGPUAccelerated failures
 fuzzy(3,99) == animate-cube-radians.html animate-cube-radians-ref.html # subpixel AA
 fuzzy(3,99) fuzzy-if(/^Windows\x20NT\x206\.1/.test(http.oscpu)&&!layersGPUAccelerated,16,6) fuzzy-if(Mulet,16,9) == animate-cube-radians-zoom.html animate-cube-radians-zoom-ref.html
 != animate-cube-radians-ref.html animate-cube-radians-zoom-ref.html
 fuzzy(3,99) == animate-cube-degrees.html animate-cube-degrees-ref.html # subpixel AA
 == animate-cube-degrees-zoom.html animate-cube-degrees-zoom-ref.html
 != animate-cube-degrees-ref.html animate-cube-degrees-zoom-ref.html
+fuzzy-if(cocoaWidget,128,9) == animate-preserve3d-parent.html animate-preserve3d-ref.html # intermittently fuzzy on Mac
+fuzzy-if(cocoaWidget,128,9) == animate-preserve3d-child.html animate-preserve3d-ref.html # intermittently fuzzy on Mac
+== animate-backface-hidden.html about:blank

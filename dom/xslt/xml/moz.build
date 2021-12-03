@@ -9,8 +9,6 @@ UNIFIED_SOURCES += [
     'txXMLUtils.cpp',
 ]
 
-FAIL_ON_WARNINGS = True
-
 LOCAL_INCLUDES += [
     '../base',
     '../xpath',

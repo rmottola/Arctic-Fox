@@ -96,7 +96,6 @@ public:
   NS_IMETHOD Run() override
   {
     MOZ_ASSERT(NS_IsMainThread());
-    mDecoder->Finish();
     mDecoder->GetImage()->FinalizeDecoder(mDecoder);
     return NS_OK;
   }
@@ -129,6 +128,7 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 /* static */ StaticRefPtr<DecodePool> DecodePool::sSingleton;
+/* static */ uint32_t DecodePool::sNumCores = 0;
 
 NS_IMPL_ISUPPORTS(DecodePool, nsIObserver)
 
@@ -202,8 +202,8 @@ public:
       return;
     }
 
-    if (aDecoder->IsSizeDecode()) {
-      mSizeDecodeQueue.AppendElement(Move(decoder));
+    if (aDecoder->IsMetadataDecode()) {
+      mMetadataDecodeQueue.AppendElement(Move(decoder));
     } else {
       mFullDecodeQueue.AppendElement(Move(decoder));
     }
@@ -217,14 +217,9 @@ public:
     MonitorAutoLock lock(mMonitor);
 
     do {
-      // XXX(seth): The queue popping code below is NOT efficient, obviously,
-      // since we're removing an element from the front of the array. However,
-      // it's not worth implementing something better right now, because we are
-      // replacing this FIFO behavior with LIFO behavior very soon.
-
-      // Prioritize size decodes over full decodes.
-      if (!mSizeDecodeQueue.IsEmpty()) {
-        return PopWorkFromQueue(mSizeDecodeQueue);
+      // Prioritize metadata decodes over full decodes.
+      if (!mMetadataDecodeQueue.IsEmpty()) {
+        return PopWorkFromQueue(mMetadataDecodeQueue);
       }
 
       if (!mFullDecodeQueue.IsEmpty()) {
@@ -249,17 +244,17 @@ private:
   {
     Work work;
     work.mType = Work::Type::DECODE;
-    work.mDecoder = aQueue.ElementAt(0);
-    aQueue.RemoveElementAt(0);
+    work.mDecoder = aQueue.LastElement();
+    aQueue.RemoveElementAt(aQueue.Length() - 1);
 
     return work;
   }
 
   nsThreadPoolNaming mThreadNaming;
 
-  // mMonitor guards mQueue and mShuttingDown.
+  // mMonitor guards the queues and mShuttingDown.
   Monitor mMonitor;
-  nsTArray<nsRefPtr<Decoder>> mSizeDecodeQueue;
+  nsTArray<nsRefPtr<Decoder>> mMetadataDecodeQueue;
   nsTArray<nsRefPtr<Decoder>> mFullDecodeQueue;
   bool mShuttingDown;
 };
@@ -306,6 +301,7 @@ private:
 DecodePool::Initialize()
 {
   MOZ_ASSERT(NS_IsMainThread());
+  sNumCores = PR_GetNumberOfProcessors();
   DecodePool::Singleton();
 }
 
@@ -321,6 +317,12 @@ DecodePool::Singleton()
   return sSingleton;
 }
 
+/* static */ uint32_t
+DecodePool::NumberOfCores()
+{
+  return sNumCores;
+}
+
 DecodePool::DecodePool()
   : mImpl(new DecodePoolImpl)
   , mMutex("image::DecodePool")
@@ -329,7 +331,7 @@ DecodePool::DecodePool()
   int32_t prefLimit = gfxPrefs::ImageMTDecodingLimit();
   uint32_t limit;
   if (prefLimit <= 0) {
-    int32_t numCores = PR_GetNumberOfProcessors();
+    int32_t numCores = NumberOfCores();
     if (numCores <= 1) {
       limit = 1;
     } else if (numCores == 2) {
@@ -489,7 +491,6 @@ DecodePool::NotifyDecodeComplete(Decoder* aDecoder)
     return;
   }
 
-  aDecoder->Finish();
   aDecoder->GetImage()->FinalizeDecoder(aDecoder);
 }
 

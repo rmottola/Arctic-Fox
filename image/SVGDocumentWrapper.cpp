@@ -33,9 +33,11 @@
 // undef the GetCurrentTime macro defined in WinBase.h from the MS Platform SDK
 #undef GetCurrentTime
 
-using namespace mozilla::dom;
-
 namespace mozilla {
+
+using namespace dom;
+using namespace gfx;
+
 namespace image {
 
 NS_IMPL_ISUPPORTS(SVGDocumentWrapper,
@@ -213,7 +215,6 @@ SVGDocumentWrapper::OnDataAvailable(nsIRequest* aRequest, nsISupports* ctxt,
 
 /** nsIRequestObserver methods **/
 
-/* void onStartRequest (in nsIRequest request, in nsISupports ctxt); */
 NS_IMETHODIMP
 SVGDocumentWrapper::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
 {

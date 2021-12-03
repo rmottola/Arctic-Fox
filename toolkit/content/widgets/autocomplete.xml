@@ -130,7 +130,7 @@
       <property name="timeout"
                 onset="this.setAttribute('timeout', val); return val;">
         <getter><![CDATA[
-          // For security reasons delay searches on pasted values. 
+          // For security reasons delay searches on pasted values.
           if (this._valueIsPasted) {
             let t = parseInt(this.getAttribute('pastetimeout'));
             return isNaN(t) ? 1000 : t;
@@ -481,7 +481,7 @@
                   kind: "key"
                 };
               }
-              cancel = this.mController.handleEnter(false);
+              cancel = this.handleEnter();
               break;
             case KeyEvent.DOM_VK_DELETE:
 #ifdef XP_MACOSX
@@ -508,6 +508,12 @@
           }
 
           return true;
+        ]]></body>
+      </method>
+
+      <method name="handleEnter">
+        <body><![CDATA[
+          return this.mController.handleEnter(false);
         ]]></body>
       </method>
 

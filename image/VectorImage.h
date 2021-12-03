@@ -36,8 +36,8 @@ public:
   // Methods inherited from Image
   virtual size_t SizeOfSourceWithComputedFallback(MallocSizeOf aMallocSizeOf)
     const override;
-  virtual size_t SizeOfDecoded(gfxMemoryLocation aLocation,
-                               MallocSizeOf aMallocSizeOf) const override;
+  virtual void CollectSizeOfSurfaces(nsTArray<SurfaceMemoryCounter>& aCounters,
+                                     MallocSizeOf aMallocSizeOf) const override;
 
   virtual nsresult OnImageDataAvailable(nsIRequest* aRequest,
                                         nsISupports* aContext,
@@ -67,6 +67,8 @@ public:
   // Callbacks for SVGLoadEventListener.
   void OnSVGDocumentLoaded();
   void OnSVGDocumentError();
+
+  virtual void ReportUseCounters() override;
 
 protected:
   explicit VectorImage(ImageURL* aURI = nullptr);

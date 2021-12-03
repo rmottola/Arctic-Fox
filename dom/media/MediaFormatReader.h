@@ -35,7 +35,7 @@ public:
   size_t SizeOfAudioQueueInFrames() override;
 
   nsRefPtr<VideoDataPromise>
-  RequestVideoData(bool aSkipToNextKeyframe, int64_t aTimeThreshold, bool aForceDecodeAhead) override;
+  RequestVideoData(bool aSkipToNextKeyframe, int64_t aTimeThreshold) override;
 
   nsRefPtr<AudioDataPromise> RequestAudioData() override;
 
@@ -61,7 +61,6 @@ public:
     return mSeekable;
   }
 
-  int64_t GetEvictionOffset(double aTime) override;
 protected:
   void NotifyDataArrivedInternal(uint32_t aLength, int64_t aOffset) override;
 public:
@@ -106,7 +105,10 @@ private:
   void NotifyDemuxer(uint32_t aLength, int64_t aOffset);
   void ReturnOutput(MediaData* aData, TrackType aTrack);
 
-  bool EnsureDecodersSetup();
+  bool EnsureDecodersCreated();
+  // It returns true when all decoders are initialized. False when there is pending
+  // initialization.
+  bool EnsureDecodersInitialized();
 
   // Enqueues a task to call Update(aTrack) on the decoder task queue.
   // Lock for corresponding track must be held.
@@ -173,6 +175,9 @@ private:
     void ReleaseMediaResources() override {
       mReader->ReleaseMediaResources();
     }
+    bool OnReaderTaskQueue() override {
+      return mReader->OnTaskQueue();
+    }
   private:
     MediaFormatReader* mReader;
     TrackType mType;
@@ -185,12 +190,12 @@ private:
       : mOwner(aOwner)
       , mType(aType)
       , mDecodeAhead(aDecodeAhead)
-      , mForceDecodeAhead(false)
       , mUpdateScheduled(false)
       , mDemuxEOS(false)
       , mWaitingForData(false)
       , mReceivedNewData(false)
       , mDiscontinuity(true)
+      , mDecoderInitialized(false)
       , mOutputRequested(false)
       , mInputExhausted(false)
       , mError(false)
@@ -218,7 +223,6 @@ private:
 
     // Only accessed from reader's task queue.
     uint32_t mDecodeAhead;
-    bool mForceDecodeAhead;
     bool mUpdateScheduled;
     bool mDemuxEOS;
     bool mWaitingForData;
@@ -239,6 +243,8 @@ private:
     }
 
     // MediaDataDecoder handler's variables.
+    // False when decoder is created. True when decoder Init() promise is resolved.
+    bool mDecoderInitialized;
     bool mOutputRequested;
     bool mInputExhausted;
     bool mError;
@@ -271,7 +277,6 @@ private:
     void ResetState()
     {
       MOZ_ASSERT(mOwner->OnTaskQueue());
-      mForceDecodeAhead = false;
       mDemuxEOS = false;
       mWaitingForData = false;
       mReceivedNewData = false;
@@ -333,6 +338,9 @@ private:
 
   DecoderData& GetDecoderData(TrackType aTrack);
 
+  void OnDecoderInitDone(const nsTArray<TrackType>& aTrackTypes);
+  void OnDecoderInitFailed(MediaDataDecoder::DecoderFailureReason aReason);
+
   // Demuxer objects.
   void OnDemuxerInitDone(nsresult);
   void OnDemuxerInitFailed(DemuxerFailureReason aFailure);
@@ -386,6 +394,8 @@ private:
   // Set to true if any of our track buffers may be blocking.
   bool mTrackDemuxersMayBlock;
 
+  bool mHardwareAccelerationDisabled;
+
   // Seeking objects.
   bool IsSeeking() const { return mPendingSeekTime.isSome(); }
   void AttemptSeek();
@@ -407,14 +417,10 @@ private:
   Maybe<media::TimeUnit> mPendingSeekTime;
   MozPromiseHolder<SeekPromise> mSeekPromise;
 
-  nsRefPtr<SharedDecoderManager> mSharedDecoderManager;
+  // Pending decoders initialization.
+  MozPromiseRequestHolder<MediaDataDecoder::InitPromise::AllPromiseType> mDecodersInitRequest;
 
-  // Main thread objects
-  // Those are only used to calculate our buffered range on the main thread.
-  // The cached buffered range is calculated one when required.
-  nsRefPtr<MediaDataDemuxer> mMainThreadDemuxer;
-  nsRefPtr<MediaTrackDemuxer> mAudioTrackDemuxer;
-  nsRefPtr<MediaTrackDemuxer> mVideoTrackDemuxer;
+  nsRefPtr<SharedDecoderManager> mSharedDecoderManager;
 
 #if defined(READER_DORMANT_HEURISTIC)
   const bool mDormantEnabled;

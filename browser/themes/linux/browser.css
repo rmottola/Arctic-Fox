@@ -961,43 +961,13 @@ toolbar[iconsize="small"] #feed-button {
   color: GrayText;
 }
 
-/* Favicon */
+%include ../shared/identity-block.inc.css
+
 #page-proxy-favicon {
-  width: 16px;
-  height: 16px;
   margin-top: 2px;
   margin-bottom: 2px;
   -moz-margin-start: 4px;
   -moz-margin-end: 3px;
-  list-style-image: url(chrome://browser/skin/identity-icons-generic.png);
-  -moz-image-region: rect(0, 16px, 16px, 0);
-}
-
-/* Since we already have a padlock, always use the generic icon until the favicon loads
-.verifiedDomain > #page-proxy-favicon[pageproxystate="valid"] {
-  list-style-image: url(chrome://browser/skin/identity-icons-https.png);
-}
-
-.verifiedIdentity > #page-proxy-favicon[pageproxystate="valid"] {
-  list-style-image: url(chrome://browser/skin/identity-icons-https-ev.png);
-}
-
-.mixedActiveContent > #page-proxy-favicon[pageproxystate="valid"] {
-  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-active.png);
-}
-*/
-
-#identity-box:hover > #page-proxy-favicon {
-  -moz-image-region: rect(0, 32px, 16px, 16px);
-}
-
-#identity-box:hover:active > #page-proxy-favicon,
-#identity-box[open=true] > #page-proxy-favicon {
-  -moz-image-region: rect(0, 48px, 16px, 32px);
-}
-
-#page-proxy-favicon[pageproxystate="invalid"] {
-  opacity: 0.3;
 }
 
 /* Identity indicator */
@@ -1028,13 +998,11 @@ toolbar[iconsize="small"] #feed-button {
   -moz-padding-end: 5px;
 }
 
+
+#urlbar[pageproxystate="valid"] > #identity-box.chromeUI,
 #urlbar[pageproxystate="valid"] > #identity-box.verifiedIdentity {
-  color: rgb(95,127,67);
+  background-color: #fff;
   -moz-margin-end: 4px;
-  background-image: linear-gradient(rgba(226,246,208,1),
-                                    rgba(203,235,177,1));
-  background-position: right;
-  background-repeat: no-repeat;
 }
 
 #urlbar[pageproxystate="valid"] > #identity-box.verifiedDomain {
@@ -1078,81 +1046,6 @@ toolbar[iconsize="small"] #feed-button {
 #urlbar[https_color="secure-mixed"]:-moz-lwtheme-darktext,
 #urlbar[https_color="secure-only"]:-moz-lwtheme-darktext {
   box-shadow: inset 0 0 2px;
-}
-
-/* Identity popup icons */
-#identity-popup-icon {
-  height: 64px;
-  width: 64px;
-  padding: 0;
-  list-style-image: url("chrome://browser/skin/identity.png");
-  -moz-image-region: rect(0px, 64px, 64px, 0px);
-}
-
-#identity-popup.verifiedDomain > #identity-popup-container > #identity-popup-icon {
-  -moz-image-region: rect(64px, 64px, 128px, 0px);
-}
-
-#identity-popup.verifiedIdentity > #identity-popup-container > #identity-popup-icon {
-  -moz-image-region: rect(128px, 64px, 192px, 0px);
-}
-
-/* Identity popup body text */
-.identity-popup-description {
-  white-space: pre-wrap;
-  -moz-padding-start: 15px;
-  margin: 2px 0 4px;
-}
-
-.identity-popup-label {
-  white-space: pre-wrap;
-  -moz-padding-start: 15px;
-  margin: 0;
-}
-
-#identity-popup-content-host ,
-#identity-popup-content-owner {
-  font-weight: bold;
-  max-width: 300px;
-}
-
-#identity-popup-content-host ,
-#identity-popup-content-box.verifiedIdentity > #identity-popup-content-owner {
-  font-size: 140%;
-}
-
-#identity-popup-content-owner {
-  margin-bottom: 0 !important;
-}
-
-#identity-popup-content-verifier {
-  margin: 4px 0 2px;
-}
-
-#identity-popup-content-box.verifiedIdentity > #identity-popup-encryption ,
-#identity-popup-content-box.verifiedDomain > #identity-popup-encryption {
-  margin-top: 10px;
-  -moz-margin-start: -18px;
-}
-
-#identity-popup-content-box.verifiedIdentity > #identity-popup-encryption > vbox > #identity-popup-encryption-icon ,
-#identity-popup-content-box.verifiedDomain > #identity-popup-encryption > vbox > #identity-popup-encryption-icon {
-  list-style-image: url("chrome://browser/skin/Secure.png");
-}
-
-#identity-popup > .panel-arrowcontainer > .panel-arrowcontent {
-  padding: 0;
-}
-
-#identity-popup-container {
-  min-width: 280px;
-  padding: 10px;
-}
-
-#identity-popup-button-container {
-  background: linear-gradient(to bottom, rgba(0,0,0,0.04) 60%, transparent);
-  padding: 10px;
-  margin-top: 5px;
 }
 
 %include ../shared/notification-icons.inc.css
@@ -1353,6 +1246,52 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
 
 #urlbar-stop-button {
   list-style-image: url("moz-icon://stock/gtk-stop?size=menu");
+}
+
+@media (min-resolution: 1.1dppx) {
+  #urlbar > toolbarbutton {
+    list-style-image: url("chrome://browser/skin/reload-stop-go@2x.png");
+  }
+
+  #urlbar-go-button {
+    -moz-image-region: rect(0, 84px, 28px, 56px);
+  }
+
+  #urlbar-go-button:hover {
+    -moz-image-region: rect(28px, 84px, 56px, 56px);
+  }
+
+  #urlbar-go-button:hover:active {
+    -moz-image-region: rect(56px, 84px, 84px, 56px);
+  }
+
+  #urlbar-reload-button {
+    -moz-image-region: rect(0, 28px, 28px, 0);
+  }
+
+  #urlbar-reload-button:not([disabled]):hover {
+    -moz-image-region: rect(28px, 28px, 56px, 0);
+  }
+
+  #urlbar-reload-button:not([disabled]):hover:active {
+    -moz-image-region: rect(56px, 28px, 84px, 0);
+  }
+
+  #urlbar-stop-button {
+    -moz-image-region: rect(0, 56px, 28px, 28px);
+  }
+
+  #urlbar-stop-button:not([disabled]):hover {
+    -moz-image-region: rect(28px, 56px, 56px, 28px);
+  }
+
+  #urlbar-stop-button:hover:active {
+    -moz-image-region: rect(56px, 56px, 84px, 28px);
+  }
+
+  #urlbar > toolbarbutton > .toolbarbutton-icon {
+    width: 14px;
+  }
 }
 
 /* Popup blocker button */
@@ -1926,21 +1865,12 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
   box-shadow: 0 0 2px white;
 }
 
-#full-screen-warning-container[obscure-browser] {
-  background-color: rgba(0,0,0,0.3);
-}
-
 .full-screen-description {
   font-size: 150%;
 }
 
 #full-screen-domain-text {
   font-size: 300%;
-}
-
-.full-screen-approval-button,
-#full-screen-remember-decision {
-  font-size: 120%;
 }
 
 %ifdef MOZ_DEVTOOLS

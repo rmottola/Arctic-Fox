@@ -101,12 +101,22 @@ AudioContext::AudioContext(nsPIDOMWindow* aWindow,
   , mIsShutDown(false)
   , mCloseCalled(false)
 {
-  aWindow->AddAudioContext(this);
+  bool mute = aWindow->AddAudioContext(this);
 
   // Note: AudioDestinationNode needs an AudioContext that must already be
   // bound to the window.
   mDestination = new AudioDestinationNode(this, aIsOffline, aChannel,
                                           aNumberOfChannels, aLength, aSampleRate);
+
+  // The context can't be muted until it has a destination.
+  if (mute) {
+    Mute();
+  }
+}
+
+void
+AudioContext::Init()
+{
   // We skip calling SetIsOnlyNodeForContext and the creation of the
   // audioChannelAgent during mDestination's constructor, because we can only
   // call them after mDestination has been set up.
@@ -147,6 +157,7 @@ AudioContext::Constructor(const GlobalObject& aGlobal,
   nsRefPtr<AudioContext> object =
     new AudioContext(window, false,
                      AudioChannelService::GetDefaultAudioChannel());
+  object->Init();
 
   RegisterWeakMemoryReporter(object);
 
@@ -165,6 +176,7 @@ AudioContext::Constructor(const GlobalObject& aGlobal,
   }
 
   nsRefPtr<AudioContext> object = new AudioContext(window, false, aChannel);
+  object->Init();
 
   RegisterWeakMemoryReporter(object);
 
@@ -611,17 +623,12 @@ AudioContext::UnregisterPannerNode(PannerNode* aNode)
   }
 }
 
-static PLDHashOperator
-FindConnectedSourcesOn(nsPtrHashKey<PannerNode>* aEntry, void* aData)
-{
-  aEntry->GetKey()->FindConnectedSources();
-  return PL_DHASH_NEXT;
-}
-
 void
 AudioContext::UpdatePannerSource()
 {
-  mPannerNodes.EnumerateEntries(FindConnectedSourcesOn, nullptr);
+  for (auto iter = mPannerNodes.Iter(); !iter.Done(); iter.Next()) {
+    iter.Get()->GetKey()->FindConnectedSources();
+  }
 }
 
 uint32_t
@@ -658,11 +665,9 @@ AudioContext::Shutdown()
 {
   mIsShutDown = true;
 
-  // We mute rather than suspending, because the delay between the ::Shutdown
-  // call and the CC would make us overbuffer in the MediaStreamGraph.
-  // See bug 936784 for details.
   if (!mIsOffline) {
-    Mute();
+    ErrorResult dummy;
+    nsRefPtr<Promise> ignored = Close(dummy);
   }
 
   // Release references to active nodes.
@@ -837,6 +842,8 @@ AudioContext::Suspend(ErrorResult& aRv)
     return promise.forget();
   }
 
+  Destination()->DestroyAudioChannelAgent();
+
   MediaStream* ds = DestinationStream();
   if (ds) {
     ds->BlockStreamIfNeeded();
@@ -875,6 +882,8 @@ AudioContext::Resume(ErrorResult& aRv)
     return promise.forget();
   }
 
+  Destination()->CreateAudioChannelAgent();
+
   MediaStream* ds = DestinationStream();
   if (ds) {
     ds->UnblockStreamIfNeeded();
@@ -909,15 +918,23 @@ AudioContext::Close(ErrorResult& aRv)
 
   mCloseCalled = true;
 
-  mPromiseGripArray.AppendElement(promise);
-  Graph()->ApplyAudioContextOperation(DestinationStream()->AsAudioNodeStream(),
-                                      AudioContextOperation::Close, promise);
-
-  MediaStream* ds = DestinationStream();
-  if (ds) {
-    ds->BlockStreamIfNeeded();
+  if (Destination()) {
+    Destination()->DestroyAudioChannelAgent();
   }
 
+  mPromiseGripArray.AppendElement(promise);
+
+  // This can be called when freeing a document, and the streams are dead at
+  // this point, so we need extra null-checks.
+  MediaStream* ds = DestinationStream();
+  if (ds) {
+    Graph()->ApplyAudioContextOperation(ds->AsAudioNodeStream(),
+                                        AudioContextOperation::Close, promise);
+
+    if (ds) {
+      ds->BlockStreamIfNeeded();
+    }
+  }
   return promise.forget();
 }
 
@@ -927,8 +944,11 @@ AudioContext::UpdateNodeCount(int32_t aDelta)
   bool firstNode = mNodeCount == 0;
   mNodeCount += aDelta;
   MOZ_ASSERT(mNodeCount >= 0);
-  // mDestinationNode may be null when we're destroying nodes unlinked by CC
-  if (!firstNode && mDestination) {
+  // mDestinationNode may be null when we're destroying nodes unlinked by CC.
+  // Skipping unnecessary calls after shutdown avoids RunInStableState events
+  // getting stuck in CycleCollectedJSRuntime during final cycle collection
+  // (bug 1200514).
+  if (!firstNode && mDestination && !mIsShutDown) {
     mDestination->SetIsOnlyNodeForContext(mNodeCount == 1);
   }
 }
@@ -1013,8 +1033,8 @@ AudioContext::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
   for (uint32_t i = 0; i < mDecodeJobs.Length(); ++i) {
     amount += mDecodeJobs[i]->SizeOfIncludingThis(aMallocSizeOf);
   }
-  amount += mActiveNodes.SizeOfExcludingThis(nullptr, aMallocSizeOf);
-  amount += mPannerNodes.SizeOfExcludingThis(nullptr, aMallocSizeOf);
+  amount += mActiveNodes.ShallowSizeOfExcludingThis(aMallocSizeOf);
+  amount += mPannerNodes.ShallowSizeOfExcludingThis(aMallocSizeOf);
   return amount;
 }
 

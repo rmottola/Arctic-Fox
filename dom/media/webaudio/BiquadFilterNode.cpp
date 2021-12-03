@@ -206,7 +206,7 @@ public:
       SetParamsOnBiquad(mBiquads[i], aStream->SampleRate(), mType, freq, q, gain, detune);
 
       mBiquads[i].process(input,
-                          static_cast<float*>(const_cast<void*>(aOutput->mChannelData[i])),
+                          aOutput->ChannelFloatsForWrite(i),
                           aInput.GetDuration());
     }
   }
@@ -250,7 +250,8 @@ BiquadFilterNode::BiquadFilterNode(AudioContext* aContext)
   , mGain(new AudioParam(this, SendGainToStream, 0.f, "gain"))
 {
   BiquadFilterNodeEngine* engine = new BiquadFilterNodeEngine(this, aContext->Destination());
-  mStream = aContext->Graph()->CreateAudioNodeStream(engine, MediaStreamGraph::INTERNAL_STREAM);
+  mStream = AudioNodeStream::Create(aContext->Graph(), engine,
+                                    AudioNodeStream::NO_STREAM_FLAGS);
   engine->SetSourceStream(mStream);
 }
 

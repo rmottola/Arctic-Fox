@@ -448,6 +448,7 @@ VP8TrackEncoder::GetEncodedTrack(EncodedFrameContainer& aData)
 {
   PROFILER_LABEL("VP8TrackEncoder", "GetEncodedTrack",
     js::ProfileEntry::Category::OTHER);
+  bool EOS;
   {
     // Move all the samples from mRawSegment to mSourceSegment. We only hold
     // the monitor in this block.
@@ -463,6 +464,7 @@ VP8TrackEncoder::GetEncodedTrack(EncodedFrameContainer& aData)
       return NS_ERROR_FAILURE;
     }
     mSourceSegment.AppendFrom(&mRawSegment);
+    EOS = mEndOfStream;
   }
 
   VideoSegment::ChunkIterator iter(mSourceSegment);
@@ -536,7 +538,7 @@ VP8TrackEncoder::GetEncodedTrack(EncodedFrameContainer& aData)
   VP8LOG("RemoveLeading %lld\n",totalProcessedDuration);
 
   // End of stream, pull the rest frames in encoder.
-  if (mEndOfStream) {
+  if (EOS) {
     VP8LOG("mEndOfStream is true\n");
     mEncodingComplete = true;
     if (vpx_codec_encode(mVPXContext, nullptr, mEncodedTimestamp,

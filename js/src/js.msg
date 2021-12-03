@@ -64,6 +64,7 @@ MSG_DEF(JSMSG_BAD_ARRAY_LENGTH,        0, JSEXN_RANGEERR, "invalid array length"
 MSG_DEF(JSMSG_REDECLARED_VAR,          2, JSEXN_TYPEERR, "redeclaration of {0} {1}")
 MSG_DEF(JSMSG_UNDECLARED_VAR,          1, JSEXN_REFERENCEERR, "assignment to undeclared variable {0}")
 MSG_DEF(JSMSG_GETTER_ONLY,             0, JSEXN_TYPEERR, "setting a property that has only a getter")
+MSG_DEF(JSMSG_OVERWRITING_ACCESSOR,    1, JSEXN_TYPEERR, "can't overwrite accessor property {0}")
 MSG_DEF(JSMSG_UNDEFINED_PROP,          1, JSEXN_REFERENCEERR, "reference to undefined property {0}")
 MSG_DEF(JSMSG_INVALID_MAP_ITERABLE,    1, JSEXN_TYPEERR, "iterable for {0} should have array-like objects")
 MSG_DEF(JSMSG_NESTING_GENERATOR,       0, JSEXN_TYPEERR, "already executing generator")
@@ -366,6 +367,7 @@ MSG_DEF(JSMSG_CANT_SET_NW_NC,          0, JSEXN_TYPEERR, "proxy can't successful
 MSG_DEF(JSMSG_CANT_SET_WO_SETTER,      0, JSEXN_TYPEERR, "proxy can't succesfully set an accessor property without a setter")
 MSG_DEF(JSMSG_CANT_SKIP_NC,            0, JSEXN_TYPEERR, "proxy can't skip a non-configurable property")
 MSG_DEF(JSMSG_INVALID_TRAP_RESULT,     2, JSEXN_TYPEERR, "trap {1} for {0} returned an invalid result")
+MSG_DEF(JSMSG_ONWKEYS_STR_SYM,         0, JSEXN_TYPEERR,  "proxy [[OwnPropertyKeys]] must return an array with only string and symbol elements")
 MSG_DEF(JSMSG_MUST_REPORT_SAME_VALUE,  0, JSEXN_TYPEERR, "proxy must report the same value for a non-writable, non-configurable property")
 MSG_DEF(JSMSG_MUST_REPORT_UNDEFINED,   0, JSEXN_TYPEERR, "proxy must report undefined for a non-configurable accessor property without a getter")
 MSG_DEF(JSMSG_OBJECT_ACCESS_DENIED,    0, JSEXN_ERR, "Permission denied to access object")
@@ -374,6 +376,7 @@ MSG_DEF(JSMSG_PROXY_CONSTRUCT_OBJECT,  0, JSEXN_TYPEERR, "proxy [[Construct]] mu
 MSG_DEF(JSMSG_PROXY_EXTENSIBILITY,     0, JSEXN_TYPEERR, "proxy must report same extensiblitity as target")
 MSG_DEF(JSMSG_PROXY_GETOWN_OBJORUNDEF, 0, JSEXN_TYPEERR, "proxy [[GetOwnProperty]] must return an object or undefined")
 MSG_DEF(JSMSG_PROXY_REVOKED,           0, JSEXN_TYPEERR, "illegal operation attempted on a revoked proxy")
+MSG_DEF(JSMSG_PROXY_ARG_REVOKED,       1, JSEXN_TYPEERR, "argument {0} cannot be a revoked proxy")
 
 // Structured cloning
 MSG_DEF(JSMSG_SC_BAD_CLONE_VERSION,    0, JSEXN_ERR, "unsupported structured clone version")

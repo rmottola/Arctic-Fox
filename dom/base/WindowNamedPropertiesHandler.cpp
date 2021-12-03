@@ -117,9 +117,7 @@ WindowNamedPropertiesHandler::getOwnPropDescriptor(JSContext* aCx,
       if (!WrapObject(aCx, childWin, &v)) {
         return false;
       }
-      aDesc.object().set(aProxy);
-      aDesc.value().set(v);
-      aDesc.setAttributes(JSPROP_ENUMERATE);
+      FillPropertyDescriptor(aDesc, aProxy, 0, v);
       return true;
     }
   }
@@ -137,9 +135,7 @@ WindowNamedPropertiesHandler::getOwnPropDescriptor(JSContext* aCx,
     if (!WrapObject(aCx, element, &v)) {
       return false;
     }
-    aDesc.object().set(aProxy);
-    aDesc.value().set(v);
-    aDesc.setAttributes(JSPROP_ENUMERATE);
+    FillPropertyDescriptor(aDesc, aProxy, 0, v);
     return true;
   }
 
@@ -153,9 +149,7 @@ WindowNamedPropertiesHandler::getOwnPropDescriptor(JSContext* aCx,
   if (!WrapObject(aCx, result, cache, nullptr, &v)) {
     return false;
   }
-  aDesc.object().set(aProxy);
-  aDesc.value().set(v);
-  aDesc.setAttributes(JSPROP_ENUMERATE);
+  FillPropertyDescriptor(aDesc, aProxy, 0, v);
   return true;
 }
 
@@ -178,6 +172,11 @@ WindowNamedPropertiesHandler::ownPropNames(JSContext* aCx,
                                            unsigned flags,
                                            JS::AutoIdVector& aProps) const
 {
+  if (!(flags & JSITER_HIDDEN)) {
+    // None of our named properties are enumerable.
+    return true;
+  }
+
   // Grab the DOM window.
   nsGlobalWindow* win = xpc::WindowOrNull(JS_GetGlobalForObject(aCx, aProxy));
   nsTArray<nsString> names;

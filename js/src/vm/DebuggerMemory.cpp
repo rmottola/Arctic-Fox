@@ -388,6 +388,10 @@ DebuggerMemory::drainTenurePromotionsLog(JSContext* cx, unsigned argc, Value* vp
         if (!DefineProperty(cx, obj, cx->names().class_, classNameValue))
             return false;
 
+        RootedValue sizeValue(cx, NumberValue(entry->size));
+        if (!DefineProperty(cx, obj, cx->names().size, sizeValue))
+            return false;
+
         result->setDenseElement(i, ObjectValue(*obj));
 
         // Pop the front queue entry, and delete it immediately, so that
@@ -1254,7 +1258,7 @@ class ByAllocationStack : public CountType {
 
 #ifdef DEBUG
         // Check that nothing rehashes our table while we hold pointers into it.
-        uint32_t generation = count.table.generation();
+        Generation generation = count.table.generation();
 #endif
 
         // Build a vector of pointers to entries; sort by total; and then use

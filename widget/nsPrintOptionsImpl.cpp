@@ -223,6 +223,31 @@ nsPrintOptions::SerializeToPrintData(nsIPrintSettings* aSettings,
   aSettings->GetIsInitializedFromPrefs(&data->isInitializedFromPrefs());
   aSettings->GetPersistMarginBoxSettings(&data->persistMarginBoxSettings());
 
+  aSettings->GetPrintOptionsBits(&data->optionFlags());
+
+  // Initialize the platform-specific values that don't
+  // default-initialize, so that we don't send uninitialized data over
+  // IPC (which leads to valgrind warnings, and, for bools, fatal
+  // assertions).
+  // data->driverName() default-initializes
+  // data->deviceName() default-initializes
+  data->isFramesetDocument() = false;
+  data->isFramesetFrameSelected() = false;
+  data->isIFrameSelected() = false;
+  data->isRangeSelection() = false;
+  // data->GTKPrintSettings() default-initializes
+  // data->printJobName() default-initializes
+  data->printAllPages() = true;
+  data->mustCollate() = false;
+  // data->disposition() default-initializes
+  data->pagesAcross() = 1;
+  data->pagesDown() = 1;
+  data->printTime() = 0;
+  data->detailedErrorReporting() = true;
+  // data->faxNumber() default-initializes
+  data->addHeaderAndFooter() = false;
+  data->fileNameExtensionHidden() = false;
+
   return NS_OK;
 }
 
@@ -311,6 +336,8 @@ nsPrintOptions::DeserializeToPrintSettings(const PrintData& data,
   settings->SetIsInitializedFromPrinter(data.isInitializedFromPrinter());
   settings->SetIsInitializedFromPrefs(data.isInitializedFromPrefs());
   settings->SetPersistMarginBoxSettings(data.persistMarginBoxSettings());
+
+  settings->SetPrintOptionsBits(data.optionFlags());
 
   return NS_OK;
 }

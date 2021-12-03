@@ -5,6 +5,11 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 DIRS += ['build', 'decoders', 'encoders']
+if CONFIG['ENABLE_TESTS']:
+    DIRS += ['test/gtest']
+
+with Files('**'):
+    BUG_COMPONENT = ('Core', 'ImageLib')
 
 BROWSER_CHROME_MANIFESTS += ['test/browser/browser.ini']
 
@@ -49,6 +54,7 @@ UNIFIED_SOURCES += [
     'ClippedImage.cpp',
     'DecodePool.cpp',
     'Decoder.cpp',
+    'DecoderFactory.cpp',
     'DynamicImage.cpp',
     'FrameAnimator.cpp',
     'FrozenImage.cpp',
@@ -80,8 +86,6 @@ SOURCES += [
     'ProgressTracker.cpp',
     'RasterImage.cpp',
 ]
-
-FAIL_ON_WARNINGS = True
 
 include('/ipc/chromium/chromium-config.mozbuild')
 

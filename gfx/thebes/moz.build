@@ -250,7 +250,8 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
         'gfxMacPlatformFontList.mm',
     ]
 
-FAIL_ON_WARNINGS = not CONFIG['_MSC_VER']
+if CONFIG['_MSC_VER']:
+    ALLOW_COMPILER_WARNINGS = True
 
 include('/ipc/chromium/chromium-config.mozbuild')
 

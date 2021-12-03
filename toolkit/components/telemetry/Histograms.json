@@ -5162,6 +5162,12 @@
     "n_buckets": "1000",
     "description": "The time (in milliseconds) that it took a 'enumProperties' request to go round trip."
   },
+  "MEDIA_WMF_DECODE_ERROR": {
+    "expires_in_version": "50",
+    "kind": "enumerated",
+    "n_values": 256,
+    "description": "WMF media decoder error or success (0) codes."
+  },
   "VIDEO_CANPLAYTYPE_H264_CONSTRAINT_SET_FLAG": {
     "expires_in_version": "40",
     "kind": "enumerated",
@@ -5868,6 +5874,12 @@
     "high": "500",
     "n_buckets": 50,
     "description": "Size (in MB) of a cache that reached a file count limit"
+  },
+  "NETWORK_CACHE_HASH_STATS": {
+    "expires_in_version": "46",
+    "kind": "enumerated",
+    "n_values": "160",
+    "description": "The longest hash match between a newly added entry and all the existing entries."
   },
   "DATABASE_LOCKED_EXCEPTION": {
     "expires_in_version": "42",
@@ -6678,15 +6690,6 @@
     "extended_statistics_ok": true,
     "description": "Sanitize: Time it takes to sanitize recent downloads (ms)"
   },
-  "FX_SANITIZE_PASSWORDS": {
-    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "30000",
-    "n_buckets": 20,
-    "extended_statistics_ok": true,
-    "description": "Sanitize: Time it takes to sanitize saved passwords (ms)"
-  },
   "FX_SANITIZE_SESSIONS": {
     "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
     "expires_in_version": "40",
@@ -6794,15 +6797,6 @@
     "n_buckets": 20,
     "extended_statistics_ok": true,
     "description": "Sanitize: Time it takes to sanitize recent downloads (ms)"
-  },
-  "FX_SANITIZE_PASSWORDS": {
-    "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "30000",
-    "n_buckets": 20,
-    "extended_statistics_ok": true,
-    "description": "Sanitize: Time it takes to sanitize saved passwords (ms)"
   },
   "FX_SANITIZE_SESSIONS": {
     "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],

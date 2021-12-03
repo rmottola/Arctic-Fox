@@ -469,6 +469,8 @@ PrepareForDebuggerOnIonCompilationHook(JSContext* cx, jit::MIRGraph& graph,
 void
 jit::FinishOffThreadBuilder(JSContext* cx, IonBuilder* builder)
 {
+    MOZ_ASSERT(HelperThreadState().isLocked());
+
     // Clean the references to the pending IonBuilder, if we just finished it.
     if (builder->script()->baselineScript()->hasPendingIonBuilder() &&
         builder->script()->baselineScript()->pendingIonBuilder() == builder)
@@ -574,17 +576,23 @@ class AutoLazyLinkExitFrame
 void
 jit::LazyLink(JSContext* cx, HandleScript calleeScript)
 {
-    // Get the pending builder from the Ion frame.
-    MOZ_ASSERT(calleeScript->hasBaselineScript());
-    IonBuilder* builder = calleeScript->baselineScript()->pendingIonBuilder();
-    calleeScript->baselineScript()->removePendingIonBuilder(calleeScript);
+    IonBuilder* builder;
+
+    {
+        AutoLockHelperThreadState lock;
+
+        // Get the pending builder from the Ion frame.
+        MOZ_ASSERT(calleeScript->hasBaselineScript());
+        builder = calleeScript->baselineScript()->pendingIonBuilder();
+        calleeScript->baselineScript()->removePendingIonBuilder(calleeScript);
+
+        // Remove from pending.
+        builder->removeFrom(HelperThreadState().ionLazyLinkList());
+    }
 
     // See PrepareForDebuggerOnIonCompilationHook
     AutoScriptVector debugScripts(cx);
     OnIonCompilationInfo info(builder->alloc().lifoAlloc());
-
-    // Remove from pending.
-    builder->removeFrom(HelperThreadState().ionLazyLinkList());
 
     {
         AutoEnterAnalysis enterTypes(cx);
@@ -599,7 +607,10 @@ jit::LazyLink(JSContext* cx, HandleScript calleeScript)
     if (info.filled())
         Debugger::onIonCompilation(cx, debugScripts, info.graph);
 
-    FinishOffThreadBuilder(cx, builder);
+    {
+        AutoLockHelperThreadState lock;
+        FinishOffThreadBuilder(cx, builder);
+    }
 
     MOZ_ASSERT(calleeScript->hasBaselineScript());
     MOZ_ASSERT(calleeScript->baselineOrIonRawPointer());
@@ -1746,14 +1757,18 @@ GenerateLIR(MIRGenerator* mir)
     {
         AutoTraceLog log(logger, TraceLogger_RegisterAllocation);
 
-        switch (mir->optimizationInfo().registerAllocator()) {
-          case RegisterAllocator_Backtracking: {
+        IonRegisterAllocator allocator = mir->optimizationInfo().registerAllocator();
+
+        switch (allocator) {
+          case RegisterAllocator_Backtracking:
+          case RegisterAllocator_Testbed: {
 #ifdef DEBUG
             if (!integrity.record())
                 return nullptr;
 #endif
 
-            BacktrackingAllocator regalloc(mir, &lirgen, *lir);
+            BacktrackingAllocator regalloc(mir, &lirgen, *lir,
+                                           allocator == RegisterAllocator_Testbed);
             if (!regalloc.go())
                 return nullptr;
 
@@ -2406,8 +2421,10 @@ jit::CanEnter(JSContext* cx, RunState& state)
             return Method_CantCompile;
         }
 
-        if (!state.maybeCreateThisForConstructor(cx))
+        if (!state.maybeCreateThisForConstructor(cx)) {
+            cx->recoverFromOutOfMemory();
             return Method_Skipped;
+        }
     }
 
     // If --ion-eager is used, compile with Baseline first, so that we
@@ -2592,15 +2609,15 @@ jit::SetEnterJitData(JSContext* cx, EnterJitData& data, RunState& state, AutoVal
             ScriptFrameIter iter(cx);
             if (iter.isFunctionFrame())
                 data.calleeToken = CalleeToToken(iter.callee(cx), /* constructing = */ false);
-                
+
             // Push newTarget onto the stack, as well as Argv.
             if (!vals.reserve(2))
                 return false;
-            
+
             data.maxArgc = 2;
             data.maxArgv = vals.begin();
             vals.infallibleAppend(state.asExecute()->thisv());
-            if (iter.isFunctionFrame()) { 
+            if (iter.isFunctionFrame()) {
                 if (state.asExecute()->newTarget().isNull())
                     vals.infallibleAppend(iter.newTarget());
                 else
@@ -3076,7 +3093,7 @@ AutoFlushICache::setRange(uintptr_t start, size_t len)
 //
 // For efficiency it is expected that all large ranges will be flushed within an
 // AutoFlushICache, so check.  If this assertion is hit then it does not necessarily
-// indicate a progam fault but it might indicate a lost opportunity to merge cache
+// indicate a program fault but it might indicate a lost opportunity to merge cache
 // flushing.  It can be corrected by wrapping the call in an AutoFlushICache to context.
 //
 // Note this can be called without TLS PerThreadData defined so this case needs

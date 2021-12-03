@@ -21,13 +21,17 @@ class RasterImage;
 class nsWEBPDecoder : public Decoder
 {
 public:
-  nsWEBPDecoder(RasterImage* aImage);
-  ~nsWEBPDecoder() override;
+  virtual ~nsWEBPDecoder();
 
   void InitInternal() override;
   void WriteInternal(const char* aBuffer, uint32_t aCount) override;
   void FinishInternal() override;
 private:
+  friend class DecoderFactory;
+
+  // Decoders should only be instantiated via DecoderFactory.
+  explicit nsWEBPDecoder(RasterImage* aImage);
+
   WebPIDecoder *mDecoder;
   uint8_t *mData;          // Pointer to WebP-decoded data.
   int mPreviousLastLine;   // Last image scan-line read so far.

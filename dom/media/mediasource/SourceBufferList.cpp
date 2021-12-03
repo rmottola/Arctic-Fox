@@ -38,7 +38,11 @@ SourceBufferList::IndexedGetter(uint32_t aIndex, bool& aFound)
 {
   MOZ_ASSERT(NS_IsMainThread());
   aFound = aIndex < mSourceBuffers.Length();
-  return aFound ? mSourceBuffers[aIndex] : nullptr;
+
+  if (!aFound) {
+    return nullptr;
+  }
+  return mSourceBuffers[aIndex];
 }
 
 uint32_t
@@ -171,16 +175,6 @@ SourceBufferList::QueueAsyncSimpleEvent(const char* aName)
   nsCOMPtr<nsIRunnable> event = new AsyncEventRunner<SourceBufferList>(this, aName);
   NS_DispatchToMainThread(event);
 }
-
-#if defined(DEBUG)
-void
-SourceBufferList::Dump(const char* aPath)
-{
-  for (uint32_t i = 0; i < mSourceBuffers.Length(); ++i) {
-    mSourceBuffers[i]->Dump(aPath);
-  }
-}
-#endif
 
 SourceBufferList::SourceBufferList(MediaSource* aMediaSource)
   : DOMEventTargetHelper(aMediaSource->GetParentObject())

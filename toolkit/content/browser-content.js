@@ -643,3 +643,83 @@ let FindBar = {
   },
 };
 FindBar.init();
+
+// An event listener for custom "WebChannelMessageToChrome" events on pages.
+addEventListener("WebChannelMessageToChrome", function (e) {
+  // If target is window then we want the document principal, otherwise fallback to target itself.
+  let principal = e.target.nodePrincipal ? e.target.nodePrincipal : e.target.document.nodePrincipal;
+
+  if (e.detail) {
+    sendAsyncMessage("WebChannelMessageToChrome", e.detail, { eventTarget: e.target }, principal);
+  } else  {
+    Cu.reportError("WebChannel message failed. No message detail.");
+  }
+}, true, true);
+
+// This should be kept in sync with /browser/base/content.js.
+// Add message listener for "WebChannelMessageToContent" messages from chrome scripts.
+addMessageListener("WebChannelMessageToContent", function (e) {
+  if (e.data) {
+    // e.objects.eventTarget will be defined if sending a response to
+    // a WebChannelMessageToChrome event. An unsolicited send
+    // may not have an eventTarget defined, in this case send to the
+    // main content window.
+    let eventTarget = e.objects.eventTarget || content;
+
+    // Use nodePrincipal if available, otherwise fallback to document principal.
+    let targetPrincipal = eventTarget instanceof Ci.nsIDOMWindow ? eventTarget.document.nodePrincipal : eventTarget.nodePrincipal;
+
+    if (e.principal.subsumes(targetPrincipal)) {
+      // If eventTarget is a window, use it as the targetWindow, otherwise
+      // find the window that owns the eventTarget.
+      let targetWindow = eventTarget instanceof Ci.nsIDOMWindow ? eventTarget : eventTarget.ownerDocument.defaultView;
+
+      eventTarget.dispatchEvent(new targetWindow.CustomEvent("WebChannelMessageToContent", {
+        detail: Cu.cloneInto({
+          id: e.data.id,
+          message: e.data.message,
+        }, targetWindow),
+      }));
+    } else {
+      Cu.reportError("WebChannel message failed. Principal mismatch.");
+    }
+  } else {
+    Cu.reportError("WebChannel message failed. No message data.");
+  }
+});
+
+let MediaPlaybackListener = {
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver]),
+
+  init() {
+    Services.obs.addObserver(this, "media-playback", false);
+    addMessageListener("MediaPlaybackMute", this);
+    addEventListener("unload", () => {
+      MediaPlaybackListener.uninit();
+    });
+  },
+
+  uninit() {
+    Services.obs.removeObserver(this, "media-playback");
+    removeMessageListener("MediaPlaybackMute", this);
+  },
+
+  observe(subject, topic, data) {
+    if (topic === "media-playback") {
+      if (subject && subject.top == global.content) {
+        let name = "MediaPlayback:";
+        name += (data === "active") ? "Start" : "Stop";
+        sendAsyncMessage(name);
+      }
+    }
+  },
+
+  receiveMessage(msg) {
+    if (msg.name == "MediaPlaybackMute") {
+      let utils = global.content.QueryInterface(Ci.nsIInterfaceRequestor)
+                                .getInterface(Ci.nsIDOMWindowUtils);
+      utils.audioMuted = msg.data.type === "mute";
+    }
+  },
+};
+MediaPlaybackListener.init();

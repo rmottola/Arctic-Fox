@@ -40,6 +40,7 @@ EXTRA_JS_MODULES += [
     'LoginDoorhangers.jsm',
     'LoginHelper.jsm',
     'LoginManagerContent.jsm',
+    'LoginRecipes.jsm',
     'OSCrypto.jsm',
 ]
 

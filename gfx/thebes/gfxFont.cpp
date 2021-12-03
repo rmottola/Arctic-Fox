@@ -312,30 +312,16 @@ gfxFontCache::FlushShapedWordCaches()
     }
 }
 
-/*static*/
-size_t
-gfxFontCache::AddSizeOfFontEntryExcludingThis(HashEntry* aHashEntry,
-                                              MallocSizeOf aMallocSizeOf,
-                                              void* aUserArg)
-{
-    HashEntry *entry = static_cast<HashEntry*>(aHashEntry);
-    FontCacheSizes *sizes = static_cast<FontCacheSizes*>(aUserArg);
-    entry->mFont->AddSizeOfExcludingThis(aMallocSizeOf, sizes);
-
-    // The entry's size is recorded in the |sizes| parameter, so we return zero
-    // here to the hashtable enumerator.
-    return 0;
-}
-
 void
 gfxFontCache::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
                                      FontCacheSizes* aSizes) const
 {
     // TODO: add the overhead of the expiration tracker (generation arrays)
 
-    aSizes->mFontInstances +=
-        mFonts.SizeOfExcludingThis(AddSizeOfFontEntryExcludingThis,
-                                   aMallocSizeOf, aSizes);
+    aSizes->mFontInstances += mFonts.ShallowSizeOfExcludingThis(aMallocSizeOf);
+    for (auto iter = mFonts.ConstIter(); !iter.Done(); iter.Next()) {
+        iter.Get()->mFont->AddSizeOfExcludingThis(aMallocSizeOf, aSizes);
+    }
 }
 
 void
@@ -633,14 +619,11 @@ gfxShapedText::SetGlyphs(uint32_t aIndex, CompressedGlyph aGlyph,
 
 #define ZWNJ 0x200C
 #define ZWJ  0x200D
-// U+061C ARABIC LETTER MARK is expected to be added to XIDMOD_DEFAULT_IGNORABLE
-// in a future Unicode update. Add it manually for now
-#define ALM  0x061C
 static inline bool
 IsDefaultIgnorable(uint32_t aChar)
 {
     return GetIdentifierModification(aChar) == XIDMOD_DEFAULT_IGNORABLE ||
-           aChar == ZWNJ || aChar == ZWJ || aChar == ALM;
+           aChar == ZWNJ || aChar == ZWJ;
 }
 
 void
@@ -3007,7 +2990,7 @@ gfxFont::InitFakeSmallCapsRun(gfxContext     *aContext,
                                     convertedString,
                                     true,
                                     mStyle.explicitLanguage
-                                      ? mStyle.language : nullptr,
+                                      ? mStyle.language.get() : nullptr,
                                     charsToMergeArray,
                                     deletedCharsArray);
 

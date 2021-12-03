@@ -96,8 +96,13 @@
 #include "mozilla/OSFileConstants.h"
 #include "mozilla/Services.h"
 
-#ifdef MOZ_WEBSPEECH
+#ifdef MOZ_WEBSPEECH_TEST_BACKEND
 #include "mozilla/dom/FakeSpeechRecognitionService.h"
+#endif
+#ifdef MOZ_WEBSPEECH_POCKETSPHINX
+#include "mozilla/dom/PocketSphinxSpeechRecognitionService.h"
+#endif
+#ifdef MOZ_WEBSPEECH
 #include "mozilla/dom/nsSynthVoiceRegistry.h"
 #endif
 
@@ -212,6 +217,7 @@ static void Shutdown();
 #ifdef MOZ_GAMEPAD
 #include "mozilla/dom/GamepadServiceTest.h"
 #endif
+#include "mozilla/dom/nsContentSecurityManager.h"
 #include "mozilla/dom/nsCSPService.h"
 #include "mozilla/dom/nsCSPContext.h"
 #include "nsICellBroadcastService.h"
@@ -640,10 +646,14 @@ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(AudioChannelService, AudioChannelServic
 
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(DataStoreService, DataStoreService::GetOrCreate)
 
-#ifdef MOZ_WEBSPEECH
+#ifdef MOZ_WEBSPEECH_TEST_BACKEND
 NS_GENERIC_FACTORY_CONSTRUCTOR(FakeSpeechRecognitionService)
 #endif
+#ifdef MOZ_WEBSPEECH_POCKETSPHINX
+NS_GENERIC_FACTORY_CONSTRUCTOR(PocketSphinxSpeechRecognitionService)
+#endif
 
+NS_GENERIC_FACTORY_CONSTRUCTOR(nsContentSecurityManager)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsCSPContext)
 NS_GENERIC_FACTORY_CONSTRUCTOR(CSPService)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMixedContentBlocker)
@@ -789,6 +799,7 @@ NS_DEFINE_NAMED_CID(NS_GEOLOCATION_CID);
 NS_DEFINE_NAMED_CID(NS_AUDIOCHANNEL_SERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_DATASTORE_SERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_FOCUSMANAGER_CID);
+NS_DEFINE_NAMED_CID(NS_CONTENTSECURITYMANAGER_CID);
 NS_DEFINE_NAMED_CID(CSPSERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_CSPCONTEXT_CID);
 NS_DEFINE_NAMED_CID(NS_MIXEDCONTENTBLOCKER_CID);
@@ -836,8 +847,13 @@ NS_DEFINE_NAMED_CID(NS_MEDIAMANAGERSERVICE_CID);
 #ifdef MOZ_GAMEPAD
 NS_DEFINE_NAMED_CID(NS_GAMEPAD_TEST_CID);
 #endif
-#ifdef MOZ_WEBSPEECH
+#ifdef MOZ_WEBSPEECH_TEST_BACKEND
 NS_DEFINE_NAMED_CID(NS_FAKE_SPEECH_RECOGNITION_SERVICE_CID);
+#endif
+#ifdef MOZ_WEBSPEECH_POCKETSPHINX
+NS_DEFINE_NAMED_CID(NS_POCKETSPHINX_SPEECH_RECOGNITION_SERVICE_CID);
+#endif
+#ifdef MOZ_WEBSPEECH
 NS_DEFINE_NAMED_CID(NS_SYNTHVOICEREGISTRY_CID);
 #endif
 
@@ -1093,10 +1109,16 @@ static const mozilla::Module::CIDEntry kLayoutCIDs[] = {
   { &kNS_AUDIOCHANNEL_SERVICE_CID, false, nullptr, AudioChannelServiceConstructor },
   { &kNS_DATASTORE_SERVICE_CID, false, nullptr, DataStoreServiceConstructor },
   { &kNS_FOCUSMANAGER_CID, false, nullptr, CreateFocusManager },
-#ifdef MOZ_WEBSPEECH
+#ifdef MOZ_WEBSPEECH_TEST_BACKEND
   { &kNS_FAKE_SPEECH_RECOGNITION_SERVICE_CID, false, nullptr, FakeSpeechRecognitionServiceConstructor },
+#endif
+#ifdef MOZ_WEBSPEECH_POCKETSPHINX
+  { &kNS_POCKETSPHINX_SPEECH_RECOGNITION_SERVICE_CID, false, nullptr, PocketSphinxSpeechRecognitionServiceConstructor },
+#endif
+#ifdef MOZ_WEBSPEECH
   { &kNS_SYNTHVOICEREGISTRY_CID, true, nullptr, nsSynthVoiceRegistryConstructor },
 #endif
+  { &kNS_CONTENTSECURITYMANAGER_CID, false, nullptr, nsContentSecurityManagerConstructor },
   { &kCSPSERVICE_CID, false, nullptr, CSPServiceConstructor },
   { &kNS_CSPCONTEXT_CID, false, nullptr, nsCSPContextConstructor },
   { &kNS_MIXEDCONTENTBLOCKER_CID, false, nullptr, nsMixedContentBlockerConstructor },
@@ -1257,10 +1279,16 @@ static const mozilla::Module::ContractIDEntry kLayoutContracts[] = {
   { "@mozilla.org/audiochannel/service;1", &kNS_AUDIOCHANNEL_SERVICE_CID },
   { "@mozilla.org/datastore-service;1", &kNS_DATASTORE_SERVICE_CID },
   { "@mozilla.org/focus-manager;1", &kNS_FOCUSMANAGER_CID },
-#ifdef MOZ_WEBSPEECH
+#ifdef MOZ_WEBSPEECH_TEST_BACKEND
   { NS_SPEECH_RECOGNITION_SERVICE_CONTRACTID_PREFIX "fake", &kNS_FAKE_SPEECH_RECOGNITION_SERVICE_CID },
+#endif
+#ifdef MOZ_WEBSPEECH_POCKETSPHINX
+  { NS_SPEECH_RECOGNITION_SERVICE_CONTRACTID_PREFIX "pocketsphinx", &kNS_POCKETSPHINX_SPEECH_RECOGNITION_SERVICE_CID },
+#endif
+#ifdef MOZ_WEBSPEECH
   { NS_SYNTHVOICEREGISTRY_CONTRACTID, &kNS_SYNTHVOICEREGISTRY_CID },
 #endif
+  { NS_CONTENTSECURITYMANAGER_CONTRACTID, &kNS_CONTENTSECURITYMANAGER_CID },
   { CSPSERVICE_CONTRACTID, &kCSPSERVICE_CID },
   { NS_CSPCONTEXT_CONTRACTID, &kNS_CSPCONTEXT_CID },
   { NS_MIXEDCONTENTBLOCKER_CONTRACTID, &kNS_MIXEDCONTENTBLOCKER_CID },

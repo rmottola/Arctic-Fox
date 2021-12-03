@@ -24,6 +24,7 @@ NS_IMPL_CYCLE_COLLECTING_RELEASE(AudioChannelAgent)
 
 AudioChannelAgent::AudioChannelAgent()
   : mAudioChannelType(AUDIO_AGENT_CHANNEL_ERROR)
+  , mInnerWindowID(0)
   , mIsRegToService(false)
 {
 }
@@ -31,11 +32,10 @@ AudioChannelAgent::AudioChannelAgent()
 AudioChannelAgent::~AudioChannelAgent()
 {
   if (mIsRegToService) {
-    StopPlaying();
+    NotifyStoppedPlaying();
   }
 }
 
-/* readonly attribute long audioChannelType; */
 NS_IMETHODIMP AudioChannelAgent::GetAudioChannelType(int32_t *aAudioChannelType)
 {
   *aAudioChannelType = mAudioChannelType;
@@ -91,7 +91,7 @@ AudioChannelAgent::InitInternal(nsIDOMWindow* aWindow, int32_t aChannelType,
 
   nsCOMPtr<nsPIDOMWindow> pInnerWindow = do_QueryInterface(aWindow);
   MOZ_ASSERT(pInnerWindow->IsInnerWindow());
-  //mInnerWindowID = pInnerWindow->WindowID();
+  mInnerWindowID = pInnerWindow->WindowID();
 
   nsCOMPtr<nsPIDOMWindow> topWindow = pInnerWindow->GetScriptableTop();
   if (NS_WARN_IF(!topWindow)) {
@@ -118,8 +118,8 @@ AudioChannelAgent::InitInternal(nsIDOMWindow* aWindow, int32_t aChannelType,
   return NS_OK;
 }
 
-/* boolean startPlaying (); */
-NS_IMETHODIMP AudioChannelAgent::StartPlaying(float *aVolume, bool* aMuted)
+NS_IMETHODIMP AudioChannelAgent::NotifyStartedPlaying(float *aVolume,
+                                                      bool* aMuted)
 {
   MOZ_ASSERT(aVolume);
   MOZ_ASSERT(aMuted);
@@ -139,8 +139,7 @@ NS_IMETHODIMP AudioChannelAgent::StartPlaying(float *aVolume, bool* aMuted)
   return NS_OK;
 }
 
-/* void stopPlaying (); */
-NS_IMETHODIMP AudioChannelAgent::StopPlaying(void)
+NS_IMETHODIMP AudioChannelAgent::NotifyStoppedPlaying(void)
 {
   if (mAudioChannelType == AUDIO_AGENT_CHANNEL_ERROR ||
       !mIsRegToService) {
@@ -184,4 +183,19 @@ uint64_t
 AudioChannelAgent::WindowID() const
 {
   return mWindow ? mWindow->WindowID() : 0;
+}
+
+void
+AudioChannelAgent::WindowAudioCaptureChanged(uint64_t aInnerWindowID)
+{
+  if (aInnerWindowID != mInnerWindowID) {
+    return;
+  }
+
+  nsCOMPtr<nsIAudioChannelAgentCallback> callback = GetCallback();
+  if (!callback) {
+    return;
+  }
+
+  callback->WindowAudioCaptureChanged();
 }

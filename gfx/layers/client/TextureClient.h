@@ -50,6 +50,7 @@ class PTextureChild;
 class TextureChild;
 class BufferTextureClient;
 class TextureClient;
+class TextureClientRecycleAllocator;
 #ifdef GFX_DEBUG_TRACK_CLIENTS_IN_POOL
 class TextureClientPool;
 #endif
@@ -138,6 +139,12 @@ protected:
   virtual ~TextureReadbackSink() {}
 };
 
+enum class BackendSelector
+{
+  Content,
+  Canvas
+};
+
 /**
  * TextureClient is a thin abstraction over texture data that need to be shared
  * between the content process and the compositor process. It is the
@@ -174,7 +181,7 @@ public:
   CreateForDrawing(ISurfaceAllocator* aAllocator,
                    gfx::SurfaceFormat aFormat,
                    gfx::IntSize aSize,
-                   gfx::BackendType aMoz2dBackend,
+                   BackendSelector aSelector,
                    TextureFlags aTextureFlags,
                    TextureAllocationFlags flags = ALLOC_DEFAULT);
 
@@ -273,7 +280,7 @@ public:
    * This function can be used to update the contents of the TextureClient
    * off the main thread.
    */
-  virtual void UpdateFromSurface(gfx::DataSourceSurface* aSurface) { MOZ_CRASH(); }
+  virtual void UpdateFromSurface(gfx::SourceSurface* aSurface) { MOZ_CRASH(); }
 
   // TextureClients that can expose a DrawTarget should override this method.
   virtual gfx::SurfaceFormat GetFormat() const
@@ -401,6 +408,8 @@ public:
    * help avoid race conditions in some cases.
    * It's a temporary hack to ensure that DXGI textures don't get destroyed
    * between serialization and deserialization.
+   *
+   * This must not be called off the texture's IPDL thread.
    */
   void KeepUntilFullDeallocation(UniquePtr<KeepAlive> aKeep, bool aMainThreadOnly = false);
 
@@ -485,14 +494,31 @@ public:
      mShared = true;
    }
 
+  ISurfaceAllocator* GetAllocator()
+  {
+    return mAllocator;
+  }
+
+   TextureClientRecycleAllocator* GetRecycleAllocator() { return mRecycleAllocator; }
+   void SetRecycleAllocator(TextureClientRecycleAllocator* aAllocator);
+
 private:
+  static void TextureClientRecycleCallback(TextureClient* aClient, void* aClosure);
+
   /**
-   * Called once, just before the destructor.
+   * Called once, during the destruction of the Texture, on the thread in which
+   * texture's reference count reaches 0 (could be any thread).
    *
    * Here goes the shut-down code that uses virtual methods.
    * Must only be called by Release().
    */
   B2G_ACL_EXPORT void Finalize();
+
+  /**
+   * Called once during the destruction of the texture on the IPDL thread, if
+   * the texture is shared on the compositor (otherwise it is not called at all).
+   */
+  virtual void FinalizeOnIPDLThread() {}
 
   friend class AtomicRefCountedWithFinalize<TextureClient>;
 
@@ -513,13 +539,9 @@ protected:
    */
   virtual bool ToSurfaceDescriptor(SurfaceDescriptor& aDescriptor) = 0;
 
-  ISurfaceAllocator* GetAllocator()
-  {
-    return mAllocator;
-  }
-
   RefPtr<TextureChild> mActor;
   RefPtr<ISurfaceAllocator> mAllocator;
+  RefPtr<TextureClientRecycleAllocator> mRecycleAllocator;
   TextureFlags mFlags;
   FenceHandle mReleaseFenceHandle;
   FenceHandle mAcquireFenceHandle;
@@ -593,7 +615,7 @@ public:
 
   virtual gfx::DrawTarget* BorrowDrawTarget() override;
 
-  virtual void UpdateFromSurface(gfx::DataSourceSurface* aSurface) override;
+  virtual void UpdateFromSurface(gfx::SourceSurface* aSurface) override;
 
   virtual bool AllocateForSurface(gfx::IntSize aSize,
                                   TextureAllocationFlags aFlags = ALLOC_DEFAULT) override;

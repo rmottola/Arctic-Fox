@@ -23,8 +23,8 @@ if (typeof Components != "undefined") {
   throw new Error("Please load this module with Component.utils.import or with require()");
 }
 
-let libxul = new SharedAll.Library("libxul", SharedAll.Constants.Path.libxul);
-let Type = SharedAll.Type;
+var libxul = new SharedAll.Library("libxul", SharedAll.Constants.Path.libxul);
+var Type = SharedAll.Type;
 
 libxul.declareLazyFFI(Primitives, "compress",
   "workerlz4_compress",

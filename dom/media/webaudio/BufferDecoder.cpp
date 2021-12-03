@@ -46,13 +46,6 @@ BufferDecoder::GetReentrantMonitor()
 }
 
 bool
-BufferDecoder::IsShutdown() const
-{
-  // BufferDecoder cannot be shut down.
-  return false;
-}
-
-bool
 BufferDecoder::OnStateMachineTaskQueue() const
 {
   // BufferDecoder doesn't have the concept of a state machine.
@@ -125,18 +118,6 @@ BufferDecoder::MetadataLoaded(nsAutoPtr<MediaInfo> aInfo, nsAutoPtr<MetadataTags
 
 void
 BufferDecoder::FirstFrameLoaded(nsAutoPtr<MediaInfo> aInfo, MediaDecoderEventVisibility aEventVisibility)
-{
-  // ignore
-}
-
-void
-BufferDecoder::QueueMetadata(int64_t aTime, nsAutoPtr<MediaInfo> aInfo, nsAutoPtr<MetadataTags> aTags)
-{
-  // ignore
-}
-
-void
-BufferDecoder::RemoveMediaTracks()
 {
   // ignore
 }

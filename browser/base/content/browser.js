@@ -1203,9 +1203,6 @@ var gBrowserInit = {
     gNavToolbox.customizeDone = BrowserToolboxCustomizeDone;
     gNavToolbox.customizeChange = BrowserToolboxCustomizeChange;
 
-    // Set up Sanitize Item
-    this._initializeSanitizer();
-
     // Enable/Disable auto-hide tabbar
     gBrowser.tabContainer.updateVisibility();
 
@@ -1612,9 +1609,6 @@ var gBrowserInit = {
     // initialise the offline listener
     BrowserOffline.init();
 
-    // Set up Sanitize Item
-    this._initializeSanitizer();
-
     // initialize the private browsing UI
     gPrivateBrowsingUI.init();
 
@@ -1637,52 +1631,6 @@ var gBrowserInit = {
     BrowserOffline.uninit();
   },
 #endif
-
-  _initializeSanitizer: function() {
-    const kDidSanitizeDomain = "privacy.sanitize.didShutdownSanitize";
-    if (gPrefService.prefHasUserValue(kDidSanitizeDomain)) {
-      gPrefService.clearUserPref(kDidSanitizeDomain);
-      // We need to persist this preference change, since we want to
-      // check it at next app start even if the browser exits abruptly
-      gPrefService.savePrefFile(null);
-    }
-
-    /**
-     * Migrate Firefox 3.0 privacy.item prefs under one of these conditions:
-     *
-     * a) User has customized any privacy.item prefs
-     * b) privacy.sanitize.sanitizeOnShutdown is set
-     */
-    if (!gPrefService.getBoolPref("privacy.sanitize.migrateFx3Prefs")) {
-      let itemBranch = gPrefService.getBranch("privacy.item.");
-      let itemArray = itemBranch.getChildList("");
-
-      // See if any privacy.item prefs are set
-      let doMigrate = itemArray.some(function (name) itemBranch.prefHasUserValue(name));
-      // Or if sanitizeOnShutdown is set
-      if (!doMigrate)
-        doMigrate = gPrefService.getBoolPref("privacy.sanitize.sanitizeOnShutdown");
-
-      if (doMigrate) {
-        let cpdBranch = gPrefService.getBranch("privacy.cpd.");
-        let clearOnShutdownBranch = gPrefService.getBranch("privacy.clearOnShutdown.");
-        for (let name of itemArray) {
-          try {
-            // don't migrate password or offlineApps clearing in the CRH dialog since
-            // there's no UI for those anymore. They default to false. bug 497656
-            if (name != "passwords" && name != "offlineApps")
-              cpdBranch.setBoolPref(name, itemBranch.getBoolPref(name));
-            clearOnShutdownBranch.setBoolPref(name, itemBranch.getBoolPref(name));
-          }
-          catch(e) {
-            Cu.reportError("Exception thrown during privacy pref migration: " + e);
-          }
-        }
-      }
-
-      gPrefService.setBoolPref("privacy.sanitize.migrateFx3Prefs", true);
-    }
-  },
 }
 
 
@@ -1735,13 +1683,14 @@ function HandleAppCommandEvent(evt) {
     BrowserOpenFileWindow();
     break;
   case "Print":
-    PrintUtils.print();
+    PrintUtils.print(gBrowser.selectedBrowser.contentWindowAsCPOW,
+                     gBrowser.selectedBrowser);
     break;
   case "Save":
-    saveDocument(window.content.document);
+    saveBrowser(gBrowser.selectedBrowser);
     break;
   case "SendMail":
-    MailIntegration.sendLinkForWindow(window.content);
+    MailIntegration.sendLinkForBrowser(gBrowser.selectedBrowser);
     break;
   default:
     return;
@@ -2362,8 +2311,10 @@ function BrowserViewSource(browser) {
 // doc - document to use for source, or null for this window's document
 // initialTab - name of the initial tab to display, or null for the first tab
 // imageElement - image to load in the Media Tab of the Page Info window; can be null/omitted
-function BrowserPageInfo(doc, initialTab, imageElement) {
-  var args = {doc: doc, initialTab: initialTab, imageElement: imageElement};
+// frameOuterWindowID - the id of the frame that the context menu opened in; can be null/omitted
+function BrowserPageInfo(doc, initialTab, imageElement, frameOuterWindowID) {
+  var args = {doc: doc, initialTab: initialTab, imageElement: imageElement,
+              frameOuterWindowID: frameOuterWindowID};
   var windows = Services.wm.getEnumerator("Browser:page-info");
 
   var documentURL = doc ? doc.location : window.gBrowser.selectedBrowser.contentDocumentAsCPOW.location;
@@ -6077,31 +6028,21 @@ var IndexedDBPromptHelper = {
   _permissionsPrompt: "indexedDB-permissions-prompt",
   _permissionsResponse: "indexedDB-permissions-response",
 
-  _quotaPrompt: "indexedDB-quota-prompt",
-  _quotaResponse: "indexedDB-quota-response",
-  _quotaCancel: "indexedDB-quota-cancel",
-
   _notificationIcon: "indexedDB-notification-icon",
 
   init:
   function IndexedDBPromptHelper_init() {
     Services.obs.addObserver(this, this._permissionsPrompt, false);
-    Services.obs.addObserver(this, this._quotaPrompt, false);
-    Services.obs.addObserver(this, this._quotaCancel, false);
   },
 
   uninit:
   function IndexedDBPromptHelper_uninit() {
     Services.obs.removeObserver(this, this._permissionsPrompt);
-    Services.obs.removeObserver(this, this._quotaPrompt);
-    Services.obs.removeObserver(this, this._quotaCancel);
   },
 
   observe:
   function IndexedDBPromptHelper_observe(subject, topic, data) {
-    if (topic != this._permissionsPrompt &&
-        topic != this._quotaPrompt &&
-        topic != this._quotaCancel) {
+    if (topic != this._permissionsPrompt) {
       throw new Error("Unexpected topic!");
     }
 
@@ -6121,14 +6062,6 @@ var IndexedDBPromptHelper = {
       message = gNavigatorBundle.getFormattedString("offlineApps.available",
                                                     [ host ]);
       responseTopic = this._permissionsResponse;
-    }
-    else if (topic == this._quotaPrompt) {
-      message = gNavigatorBundle.getFormattedString("indexedDB.usage",
-                                                    [ host, data ]);
-      responseTopic = this._quotaResponse;
-    }
-    else if (topic == this._quotaCancel) {
-      responseTopic = this._quotaResponse;
     }
 
     const hiddenTimeoutDuration = 30000; // 30 seconds
@@ -6160,9 +6093,7 @@ var IndexedDBPromptHelper = {
       }
     ];
 
-    // This will be set to the result of PopupNotifications.show() below, or to
-    // the result of PopupNotifications.getNotification() if this is a
-    // quotaCancel notification.
+    // This will be set to the result of PopupNotifications.show().
     var notification;
 
     function timeoutNotification() {
@@ -6201,13 +6132,6 @@ var IndexedDBPromptHelper = {
         }
       }
     };
-
-    if (topic == this._quotaCancel) {
-      notification = PopupNotifications.getNotification(this._quotaPrompt,
-                                                        browser);
-      timeoutNotification();
-      return;
-    }
 
     notification = PopupNotifications.show(browser, topic, message,
                                            this._notificationIcon, mainAction,
@@ -6306,9 +6230,8 @@ function warnAboutClosingWindow() {
 }
 
 var MailIntegration = {
-  sendLinkForWindow: function (aWindow) {
-    this.sendMessage(aWindow.location.href,
-                     aWindow.document.title);
+  sendLinkForBrowser: function (aBrowser) {
+    this.sendMessage(aBrowser.currentURI.spec, aBrowser.contentTitle);
   },
 
   sendMessage: function (aBody, aSubject) {
@@ -6509,12 +6432,14 @@ function formatURL(aFormat, aIsPref) {
  */
 var gIdentityHandler = {
   // Mode strings used to control CSS display
-  IDENTITY_MODE_IDENTIFIED       : "verifiedIdentity", // High-quality identity information
-  IDENTITY_MODE_DOMAIN_VERIFIED  : "verifiedDomain",   // Minimal SSL CA-signed domain verification
-  IDENTITY_MODE_UNKNOWN          : "unknownIdentity",  // No trusted identity information
-  IDENTITY_MODE_MIXED_CONTENT    : "unknownIdentity mixedContent",  // SSL with unauthenticated content
-  IDENTITY_MODE_MIXED_ACTIVE_CONTENT    : "unknownIdentity mixedContent mixedActiveContent",  // SSL with unauthenticated content
-  IDENTITY_MODE_CHROMEUI         : "chromeUI",         // Part of the product's UI
+  IDENTITY_MODE_IDENTIFIED                             : "verifiedIdentity", // High-quality identity information
+  IDENTITY_MODE_DOMAIN_VERIFIED                        : "verifiedDomain",   // Minimal SSL CA-signed domain verification
+  IDENTITY_MODE_UNKNOWN                                : "unknownIdentity",  // No trusted identity information
+  IDENTITY_MODE_USES_WEAK_CIPHER                       : "unknownIdentity weakCipher",  // SSL with RC4 cipher suite or SSL3
+  IDENTITY_MODE_MIXED_DISPLAY_LOADED                   : "unknownIdentity mixedContent mixedDisplayContent",  // SSL with unauthenticated display content
+  IDENTITY_MODE_MIXED_ACTIVE_LOADED                    : "unknownIdentity mixedContent mixedActiveContent",  // SSL with unauthenticated active (and perhaps also display) content
+  IDENTITY_MODE_MIXED_DISPLAY_LOADED_ACTIVE_BLOCKED    : "unknownIdentity mixedContent mixedDisplayContentLoadedActiveBlocked",  // SSL with unauthenticated display content; unauthenticated active content is blocked.
+  IDENTITY_MODE_CHROMEUI                               : "chromeUI",         // Part of the product's UI
 
   // Cache the most recent SSLStatus and Location seen in checkIdentity
   _lastStatus : null,
@@ -6522,21 +6447,6 @@ var gIdentityHandler = {
   _mode : "unknownIdentity",
 
   // smart getters
-  get _encryptionLabel () {
-    delete this._encryptionLabel;
-    this._encryptionLabel = {};
-    this._encryptionLabel[this.IDENTITY_MODE_DOMAIN_VERIFIED] =
-      gNavigatorBundle.getString("identity.encrypted");
-    this._encryptionLabel[this.IDENTITY_MODE_IDENTIFIED] =
-      gNavigatorBundle.getString("identity.encrypted");
-    this._encryptionLabel[this.IDENTITY_MODE_UNKNOWN] =
-      gNavigatorBundle.getString("identity.unencrypted");
-    this._encryptionLabel[this.IDENTITY_MODE_MIXED_CONTENT] =
-      gNavigatorBundle.getString("identity.mixed_content");
-    this._encryptionLabel[this.IDENTITY_MODE_MIXED_ACTIVE_CONTENT] =
-      gNavigatorBundle.getString("identity.mixed_content");
-    return this._encryptionLabel;
-  },
   get _identityPopup () {
     delete this._identityPopup;
     return this._identityPopup = document.getElementById("identity-popup");
@@ -6569,11 +6479,6 @@ var gIdentityHandler = {
     delete this._identityPopupContentVerif;
     return this._identityPopupContentVerif =
       document.getElementById("identity-popup-content-verifier");
-  },
-  get _identityPopupEncLabel () {
-    delete this._identityPopupEncLabel;
-    return this._identityPopupEncLabel =
-      document.getElementById("identity-popup-encryption-label");
   },
   get _identityIconLabel () {
     delete this._identityIconLabel;
@@ -6697,11 +6602,14 @@ var gIdentityHandler = {
     } else if (state & nsIWebProgressListener.STATE_IS_SECURE) {
       this.setMode(this.IDENTITY_MODE_DOMAIN_VERIFIED);
     } else if (state & nsIWebProgressListener.STATE_IS_BROKEN) {
-      if ((state & nsIWebProgressListener.STATE_LOADED_MIXED_ACTIVE_CONTENT) &&
-          gPrefService.getBoolPref("security.mixed_content.block_active_content")) {
-        this.setMode(this.IDENTITY_MODE_MIXED_ACTIVE_CONTENT);
+      if (state & nsIWebProgressListener.STATE_LOADED_MIXED_ACTIVE_CONTENT) {
+        this.setMode(this.IDENTITY_MODE_MIXED_ACTIVE_LOADED);
+      } else if (state & nsIWebProgressListener.STATE_BLOCKED_MIXED_ACTIVE_CONTENT) {
+        this.setMode(this.IDENTITY_MODE_MIXED_DISPLAY_LOADED_ACTIVE_BLOCKED);
+      } else if (state & nsIWebProgressListener.STATE_LOADED_MIXED_DISPLAY_CONTENT) {
+        this.setMode(this.IDENTITY_MODE_MIXED_DISPLAY_LOADED);
       } else {
-        this.setMode(this.IDENTITY_MODE_MIXED_CONTENT);
+        this.setMode(this.IDENTITY_MODE_USES_WEAK_CIPHER);
       }
     } else {
       this.setMode(this.IDENTITY_MODE_UNKNOWN);
@@ -6843,6 +6751,8 @@ var gIdentityHandler = {
                         "rtl" : "ltr";
       break; }
     case this.IDENTITY_MODE_CHROMEUI:
+      let brandBundle = document.getElementById("bundle_brand");
+      icon_label = brandBundle.getString("brandShortName");
       break;
     default:
       tooltip = gNavigatorBundle.getString("identity.unknown.tooltip");
@@ -6878,26 +6788,33 @@ var gIdentityHandler = {
     this._identityPopup.className = newMode;
     this._identityPopupContentBox.className = newMode;
 
-    // Set the static strings up front
-    this._identityPopupEncLabel.textContent = this._encryptionLabel[newMode];
-
     // Initialize the optional strings to empty values
     let supplemental = "";
     let verifier = "";
     let host = "";
     let owner = "";
 
+    if (newMode == this.IDENTITY_MODE_CHROMEUI) {
+      let brandBundle = document.getElementById("bundle_brand");
+      host = brandBundle.getString("brandFullName");
+    } else {
+      try {
+        host = this.getEffectiveHost();
+      } catch (e) {
+        // Some URIs might have no hosts.
+        host = this._lastUri.specIgnoringRef;
+      }
+    }
+
     switch (newMode) {
     case this.IDENTITY_MODE_DOMAIN_VERIFIED:
-      host = this.getEffectiveHost();
       owner = gNavigatorBundle.getString("identity.ownerUnknown2");
       verifier = this._identityBox.tooltipText;
       break;
     case this.IDENTITY_MODE_IDENTIFIED: {
       // If it's identified, then we can populate the dialog with credentials
       let iData = this.getIdentityData();
-      host = this.getEffectiveHost();
-      owner = iData.subjectOrg;
+      host = owner = iData.subjectOrg;
       verifier = this._identityBox.tooltipText;
 
       // Build an appropriate supplemental block out of whatever location data we have
@@ -6910,11 +6827,27 @@ var gIdentityHandler = {
         supplemental += iData.state;
       else if (iData.country) // Country only
         supplemental += iData.country;
-      break; }
+      break;
+    }
+    case this.IDENTITY_MODE_UNKNOWN:
+      supplemental = gNavigatorBundle.getString("identity.not_secure");
+      break;
+    case this.IDENTITY_MODE_USES_WEAK_CIPHER:
+      supplemental = gNavigatorBundle.getString("identity.uses_weak_cipher");
+      break;
+    case this.IDENTITY_MODE_MIXED_DISPLAY_LOADED:
+    case this.IDENTITY_MODE_MIXED_DISPLAY_LOADED_ACTIVE_BLOCKED:
+      supplemental = gNavigatorBundle.getString("identity.mixed_display_loaded");
+      break;
+    case this.IDENTITY_MODE_MIXED_ACTIVE_LOADED:
+      supplemental = gNavigatorBundle.getString("identity.mixed_active_loaded2");
+      break;
     }
 
-    // Push the appropriate strings out to the UI
-    this._identityPopupContentHost.textContent = host;
+    // Push the appropriate strings out to the UI. Need to use |value| for the
+    // host as it's a <label> that will be cropped if too long. Using
+    // |textContent| would simply wrap the value.
+    this._identityPopupContentHost.value = host;
     this._identityPopupContentOwner.textContent = owner;
     this._identityPopupContentSupp.textContent = supplemental;
     this._identityPopupContentVerif.textContent = verifier;
@@ -6932,10 +6865,9 @@ var gIdentityHandler = {
       return; // Left click, space or enter only
     }
 
-    // Don't allow left click, space or enter if the location
-    // is chrome UI or the location has been modified.
-    if (this._mode == this.IDENTITY_MODE_CHROMEUI ||
-        gURLBar.getAttribute("pageproxystate") != "valid") {
+    // Don't allow left click, space or enter if the location has been modified.
+    if (gURLBar.getAttribute("pageproxystate") != "valid") {
+      TelemetryStopwatch.cancel("FX_IDENTITY_POPUP_OPEN_MS");
       return;
     }
 
@@ -7581,6 +7513,15 @@ function focusNextFrame(event) {
   if (element.ownerDocument == document)
     focusAndSelectUrlBar();
 }
+
+function BrowserOpenNewTabOrWindow(event) {
+  if (event.shiftKey) {
+    OpenBrowserWindow();
+  } else {
+    BrowserOpenTab();
+  }
+}
+
 
 let ToolbarIconColor = {
   init: function () {

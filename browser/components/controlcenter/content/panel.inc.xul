@@ -1,0 +1,44 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<panel id="identity-popup"
+       type="arrow"
+       hidden="true"
+       noautofocus="true"
+       onpopupshown="if (event.target == this)
+                       gIdentityHandler.onPopupShown(event);"
+       orient="vertical"
+       level="top">
+  <hbox id="identity-popup-container" align="top">
+    <image id="identity-popup-icon"/>
+    <vbox id="identity-popup-content-box">
+      <label id="identity-popup-content-host"
+             class="identity-popup-description"
+             crop="end"/>
+      <label id="identity-popup-connection-secure"
+             class="identity-popup-label"
+             value="&identity.connectionSecure;"/>
+      <label id="identity-popup-connection-not-secure"
+             class="identity-popup-label"
+             value="&identity.connectionNotSecure;"/>
+      <description id="identity-popup-content-owner"
+                   class="identity-popup-description"/>
+      <description id="identity-popup-content-supplemental"
+                   class="identity-popup-description"/>
+      <description id="identity-popup-content-verifier"
+                   class="identity-popup-description"/>
+      <vbox id="identity-popup-permissions">
+        <label class="identity-popup-label header"
+               value="&identity.permissions;"/>
+        <vbox id="identity-popup-permission-list" class="indent"/>
+      </vbox>
+    </vbox>
+  </hbox>
+  <!-- Footer button to open security page info -->
+  <hbox id="identity-popup-button-container" align="right">
+    <button id="identity-popup-more-info-button"
+            label="&identity.moreInfoLinkText;"
+            oncommand="gIdentityHandler.handleMoreInfoClick(event);"/>
+  </hbox>
+</panel>

@@ -1,4 +1,4 @@
-/* vim:set tw=80 expandtab softtabstop=4 ts=4 sw=4: */
+/* vim:set tw=80 expandtab softtabstop=2 ts=2 sw=2: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -80,13 +80,35 @@ nsICODecoder::FinishInternal()
   // We shouldn't be called in error cases
   MOZ_ASSERT(!HasError(), "Shouldn't call FinishInternal after error!");
 
-  // Finish the internally used decoder as well
-  if (mContainedDecoder) {
-    mContainedDecoder->FinishSharedDecoder();
-    mDecodeDone = mContainedDecoder->GetDecodeDone();
-    mProgress |= mContainedDecoder->TakeProgress();
-    mInvalidRect.UnionRect(mInvalidRect, mContainedDecoder->TakeInvalidRect());
+  // Finish the internally used decoder as well.
+  if (mContainedDecoder && !mContainedDecoder->HasError()) {
+    mContainedDecoder->FinishInternal();
   }
+
+  GetFinalStateFromContainedDecoder();
+}
+
+void
+nsICODecoder::FinishWithErrorInternal()
+{
+  GetFinalStateFromContainedDecoder();
+}
+
+void
+nsICODecoder::GetFinalStateFromContainedDecoder()
+{
+  if (!mContainedDecoder) {
+    return;
+  }
+
+  mDecodeDone = mContainedDecoder->GetDecodeDone();
+  mDataError = mDataError || mContainedDecoder->HasDataError();
+  mFailCode = NS_SUCCEEDED(mFailCode) ? mContainedDecoder->GetDecoderError()
+                                      : mFailCode;
+  mDecodeAborted = mContainedDecoder->WasAborted();
+  mProgress |= mContainedDecoder->TakeProgress();
+  mInvalidRect.UnionRect(mInvalidRect, mContainedDecoder->TakeInvalidRect());
+  mCurrentFrame = mContainedDecoder->GetCurrentFrameRef();
 }
 
 // Returns a buffer filled with the bitmap file header in little endian:
@@ -222,13 +244,8 @@ void
 nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call WriteInternal after error!");
-
-  if (!aCount) {
-    if (mContainedDecoder) {
-      WriteToContainedDecoder(aBuffer, aCount);
-    }
-    return;
-  }
+  MOZ_ASSERT(aBuffer);
+  MOZ_ASSERT(aCount > 0);
 
   while (aCount && (mPos < ICONCOUNTOFFSET)) { // Skip to the # of icons.
     if (mPos == 2) { // if the third byte is 1: This is an icon, 2: a cursor
@@ -254,9 +271,10 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
   }
 
   uint16_t colorDepth = 0;
-  nsIntSize prefSize = mImage->GetRequestedResolution();
-  if (prefSize.width == 0 && prefSize.height == 0) {
-    prefSize.SizeTo(PREFICONSIZE, PREFICONSIZE);
+
+  // If we didn't get a #-moz-resolution, default to PREFICONSIZE.
+  if (mResolution.width == 0 && mResolution.height == 0) {
+    mResolution.SizeTo(PREFICONSIZE, PREFICONSIZE);
   }
 
   // A measure of the difference in size between the entry we've found
@@ -294,8 +312,8 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
       // Calculate the delta between this image's size and the desired size,
       // so we can see if it is better than our current-best option.
       // In the case of several equally-good images, we use the last one.
-      int32_t delta = (e.mWidth == 0 ? 256 : e.mWidth) - prefSize.width +
-                      (e.mHeight == 0 ? 256 : e.mHeight) - prefSize.height;
+      int32_t delta = (e.mWidth == 0 ? 256 : e.mWidth) - mResolution.width +
+                      (e.mHeight == 0 ? 256 : e.mHeight) - mResolution.height;
       if (e.mBitCount >= colorDepth &&
           ((diff < 0 && delta >= diff) || (delta >= 0 && delta <= diff))) {
         diff = delta;
@@ -346,11 +364,12 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
                      PNGSIGNATURESIZE);
     if (mIsPNG) {
       mContainedDecoder = new nsPNGDecoder(mImage);
-      mContainedDecoder->SetSizeDecode(IsSizeDecode());
+      mContainedDecoder->SetMetadataDecode(IsMetadataDecode());
       mContainedDecoder->SetSendPartialInvalidations(mSendPartialInvalidations);
-      mContainedDecoder->InitSharedDecoder(mImageData, mImageDataLength,
-                                           mColormap, mColormapSize,
-                                           Move(mRefForContainedDecoder));
+      if (mFirstFrameDecode) {
+        mContainedDecoder->SetIsFirstFrameDecode();
+      }
+      mContainedDecoder->Init();
       if (!WriteToContainedDecoder(mSignature, PNGSIGNATURESIZE)) {
         return;
       }
@@ -374,7 +393,7 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
 
     // Raymond Chen says that 32bpp only are valid PNG ICOs
     // http://blogs.msdn.com/b/oldnewthing/archive/2010/10/22/10079192.aspx
-    if (!IsSizeDecode() &&
+    if (!IsMetadataDecode() &&
         !static_cast<nsPNGDecoder*>(mContainedDecoder.get())->IsValidICO()) {
       PostDataError();
     }
@@ -425,11 +444,12 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
     nsBMPDecoder* bmpDecoder = new nsBMPDecoder(mImage);
     mContainedDecoder = bmpDecoder;
     bmpDecoder->SetUseAlphaData(true);
-    mContainedDecoder->SetSizeDecode(IsSizeDecode());
+    mContainedDecoder->SetMetadataDecode(IsMetadataDecode());
     mContainedDecoder->SetSendPartialInvalidations(mSendPartialInvalidations);
-    mContainedDecoder->InitSharedDecoder(mImageData, mImageDataLength,
-                                         mColormap, mColormapSize,
-                                         Move(mRefForContainedDecoder));
+    if (mFirstFrameDecode) {
+      mContainedDecoder->SetIsFirstFrameDecode();
+    }
+    mContainedDecoder->Init();
 
     // The ICO format when containing a BMP does not include the 14 byte
     // bitmap file header. To use the code of the BMP decoder we need to
@@ -467,9 +487,8 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
     PostSize(mContainedDecoder->GetImageMetadata().GetWidth(),
              mContainedDecoder->GetImageMetadata().GetHeight());
 
-    // We have the size. If we're doing a size decode, we got what
-    // we came for.
-    if (IsSizeDecode()) {
+    // We have the size. If we're doing a metadata decode, we're done.
+    if (IsMetadataDecode()) {
       return;
     }
 
@@ -630,36 +649,6 @@ nsICODecoder::ProcessDirEntry(IconDirEntry& aTarget)
   memcpy(&aTarget.mImageOffset, mDirEntryArray + 12,
          sizeof(aTarget.mImageOffset));
   aTarget.mImageOffset = LittleEndian::readUint32(&aTarget.mImageOffset);
-}
-
-bool
-nsICODecoder::NeedsNewFrame() const
-{
-  if (mContainedDecoder) {
-    return mContainedDecoder->NeedsNewFrame();
-  }
-
-  return Decoder::NeedsNewFrame();
-}
-
-nsresult
-nsICODecoder::AllocateFrame(const nsIntSize& aTargetSize /* = nsIntSize() */)
-{
-  nsresult rv;
-
-  if (mContainedDecoder) {
-    rv = mContainedDecoder->AllocateFrame(aTargetSize);
-    mCurrentFrame = mContainedDecoder->GetCurrentFrameRef();
-    mProgress |= mContainedDecoder->TakeProgress();
-    mInvalidRect.UnionRect(mInvalidRect, mContainedDecoder->TakeInvalidRect());
-    return rv;
-  }
-
-  // Grab a strong ref that we'll later hand over to the contained decoder. This
-  // lets us avoid creating a RawAccessFrameRef off-main-thread.
-  rv = Decoder::AllocateFrame(aTargetSize);
-  mRefForContainedDecoder = GetCurrentFrameRef();
-  return rv;
 }
 
 } // namespace image

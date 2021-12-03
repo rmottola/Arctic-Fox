@@ -1052,7 +1052,7 @@ CodeGeneratorShared::markSafepoint(LInstruction* ins)
 void
 CodeGeneratorShared::markSafepointAt(uint32_t offset, LInstruction* ins)
 {
-    MOZ_ASSERT_IF(!safepointIndices_.empty(),
+    MOZ_ASSERT_IF(!safepointIndices_.empty() && !masm.oom(),
                   offset - safepointIndices_.back().displacement() >= sizeof(uint32_t));
     masm.propagateOOM(safepointIndices_.append(SafepointIndex(offset, ins->safepoint())));
 }
@@ -1081,7 +1081,8 @@ CodeGeneratorShared::ensureOsiSpace()
         for (int32_t i = 0; i < paddingSize; ++i)
             masm.nop();
     }
-    MOZ_ASSERT(masm.currentOffset() - lastOsiPointOffset_ >= Assembler::PatchWrite_NearCallSize());
+    MOZ_ASSERT_IF(!masm.oom(),
+                  masm.currentOffset() - lastOsiPointOffset_ >= Assembler::PatchWrite_NearCallSize());
     lastOsiPointOffset_ = masm.currentOffset();
 }
 

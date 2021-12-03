@@ -61,12 +61,9 @@ NewObjectCache::newObjectFromHit(JSContext* cx, EntryIndex entryIndex, gc::Initi
         return nullptr;
 
     NativeObject* obj = static_cast<NativeObject*>(Allocate<JSObject, NoGC>(cx, entry->kind, 0,
-                                                                             heap, group->clasp()));
-    if (!obj) {
-        // It's expected that this can return nullptr.
-        cx->recoverFromOutOfMemory();
+                                                                            heap, group->clasp()));
+    if (!obj)
         return nullptr;
-    }
 
     copyCachedToObject(obj, templateObj, entry->kind);
 

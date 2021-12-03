@@ -52,6 +52,7 @@
 #include "nsISSLSocketControl.h"
 #include "sslt.h"
 #include "nsContentUtils.h"
+#include "nsContentSecurityManager.h"
 #include "nsIClassOfService.h"
 #include "nsIPermissionManager.h"
 #include "nsIPrincipal.h"
@@ -205,6 +206,11 @@ AutoRedirectVetoNotifier::ReportRedirectResult(bool succeeded)
 {
     if (!mChannel)
         return;
+
+    // Append the initial uri of the channel to the redirectChain
+    if (succeeded && mChannel->mLoadInfo) {
+        mChannel->mLoadInfo->AppendRedirectedPrincipal(mChannel->GetURIPrincipal());
+    }
 
     mChannel->mRedirectChannel = nullptr;
 
@@ -679,25 +685,27 @@ nsHttpChannel::ContinueHandleAsyncFallback(nsresult rv)
 }
 
 void
-nsHttpChannel::SetupTransactionLoadGroupInfo()
+nsHttpChannel::SetupTransactionSchedulingContext()
 {
-    // Find the loadgroup at the end of the chain in order
-    // to make sure all channels derived from the load group
-    // use the same connection scope.
-    nsCOMPtr<nsILoadGroupChild> childLoadGroup = do_QueryInterface(mLoadGroup);
-    if (!childLoadGroup)
+    if (!EnsureSchedulingContextID()) {
         return;
+    }
 
-    nsCOMPtr<nsILoadGroup> rootLoadGroup;
-    childLoadGroup->GetRootLoadGroup(getter_AddRefs(rootLoadGroup));
-    if (!rootLoadGroup)
+    nsISchedulingContextService *scsvc =
+        gHttpHandler->GetSchedulingContextService();
+    if (!scsvc) {
         return;
+    }
 
-    // Set the load group connection scope on the transaction
-    nsCOMPtr<nsILoadGroupConnectionInfo> ci;
-    rootLoadGroup->GetConnectionInfo(getter_AddRefs(ci));
-    if (ci)
-        mTransaction->SetLoadGroupConnectionInfo(ci);
+    nsCOMPtr<nsISchedulingContext> sc;
+    nsresult rv = scsvc->GetSchedulingContext(mSchedulingContextID,
+                                              getter_AddRefs(sc));
+
+    if (NS_FAILED(rv)) {
+        return;
+    }
+
+    mTransaction->SetSchedulingContext(sc);
 }
 
 static bool
@@ -914,7 +922,7 @@ nsHttpChannel::SetupTransaction()
     }
 
     mTransaction->SetClassOfService(mClassOfService);
-    SetupTransactionLoadGroupInfo();
+    SetupTransactionSchedulingContext();
 
     rv = nsInputStreamPump::Create(getter_AddRefs(mTransactionPump),
                                    responseStream);
@@ -2061,10 +2069,14 @@ nsHttpChannel::OpenRedirectChannel(nsresult rv)
     }
 
     // open new channel
-    rv = mRedirectChannel->AsyncOpen(mListener, mListenerContext);
-    if (NS_FAILED(rv)) {
-        return rv;
+    if (mLoadInfo && mLoadInfo->GetEnforceSecurity()) {
+        MOZ_ASSERT(!mListenerContext, "mListenerContext should be null!");
+        rv = mRedirectChannel->AsyncOpen2(mListener);
     }
+    else {
+        rv = mRedirectChannel->AsyncOpen(mListener, mListenerContext);
+    }
+    NS_ENSURE_SUCCESS(rv, rv);
 
     mStatus = NS_BINDING_REDIRECTED;
 
@@ -2124,9 +2136,14 @@ nsHttpChannel::ContinueDoReplaceWithProxy(nsresult rv)
     mRedirectChannel->SetOriginalURI(mOriginalURI);
 
     // open new channel
-    rv = mRedirectChannel->AsyncOpen(mListener, mListenerContext);
-    if (NS_FAILED(rv))
-        return rv;
+    if (mLoadInfo && mLoadInfo->GetEnforceSecurity()) {
+        MOZ_ASSERT(!mListenerContext, "mListenerContext should be null!");
+        rv = mRedirectChannel->AsyncOpen2(mListener);
+    }
+    else {
+        rv = mRedirectChannel->AsyncOpen(mListener, mListenerContext);
+    }
+    NS_ENSURE_SUCCESS(rv, rv);
 
     mStatus = NS_BINDING_REDIRECTED;
 
@@ -2785,9 +2802,14 @@ nsHttpChannel::ContinueProcessFallback(nsresult rv)
     // Make sure to do this _after_ calling OnChannelRedirect
     mRedirectChannel->SetOriginalURI(mOriginalURI);
 
-    rv = mRedirectChannel->AsyncOpen(mListener, mListenerContext);
-    if (NS_FAILED(rv))
-        return rv;
+    if (mLoadInfo && mLoadInfo->GetEnforceSecurity()) {
+        MOZ_ASSERT(!mListenerContext, "mListenerContext should be null!");
+        rv = mRedirectChannel->AsyncOpen2(mListener);
+    }
+    else {
+        rv = mRedirectChannel->AsyncOpen(mListener, mListenerContext);
+    }
+    NS_ENSURE_SUCCESS(rv, rv);
 
     if (mLoadFlags & LOAD_INITIAL_DOCUMENT_URI) {
         Telemetry::Accumulate(Telemetry::HTTP_OFFLINE_CACHE_DOCUMENT_LOAD,
@@ -4710,10 +4732,14 @@ nsHttpChannel::ContinueProcessRedirection(nsresult rv)
     // should really be handled by the event sink implementation.
 
     // begin loading the new channel
-    rv = mRedirectChannel->AsyncOpen(mListener, mListenerContext);
-
-    if (NS_FAILED(rv))
-        return rv;
+    if (mLoadInfo && mLoadInfo->GetEnforceSecurity()) {
+        MOZ_ASSERT(!mListenerContext, "mListenerContext should be null!");
+        rv = mRedirectChannel->AsyncOpen2(mListener);
+    }
+    else {
+        rv = mRedirectChannel->AsyncOpen(mListener, mListenerContext);
+    }
+    NS_ENSURE_SUCCESS(rv, rv);
 
     // close down this channel
     Cancel(NS_BINDING_REDIRECTED);
@@ -4920,6 +4946,10 @@ nsHttpChannel::GetSecurityInfo(nsISupports **securityInfo)
 NS_IMETHODIMP
 nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
 {
+    MOZ_ASSERT(!mLoadInfo || mLoadInfo->GetSecurityMode() == 0 ||
+               mLoadInfo->GetInitialSecurityCheckDone(),
+               "security flags in loadInfo but asyncOpen2() not called");
+
     LOG(("nsHttpChannel::AsyncOpen [this=%p]\n", this));
 
     NS_ENSURE_ARG_POINTER(listener);
@@ -4978,6 +5008,15 @@ nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
         ReleaseListeners();
 
     return rv;
+}
+
+NS_IMETHODIMP
+nsHttpChannel::AsyncOpen2(nsIStreamListener *aListener)
+{
+  nsCOMPtr<nsIStreamListener> listener = aListener;
+  nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
+  NS_ENSURE_SUCCESS(rv, rv);
+  return AsyncOpen(listener, nullptr);
 }
 
 // BeginConnect() will not call AsyncAbort() on an error and if AsyncAbort needs
@@ -6077,11 +6116,15 @@ nsHttpChannel::OnTransportStatus(nsITransport *trans, nsresult status,
 
     if (status == NS_NET_STATUS_CONNECTED_TO ||
         status == NS_NET_STATUS_WAITING_FOR) {
-        nsCOMPtr<nsISocketTransport> socketTransport =
-            do_QueryInterface(trans);
-        if (socketTransport) {
-            socketTransport->GetSelfAddr(&mSelfAddr);
-            socketTransport->GetPeerAddr(&mPeerAddr);
+        if (mTransaction) {
+            mTransaction->GetNetworkAddresses(mSelfAddr, mPeerAddr);
+        } else {
+            nsCOMPtr<nsISocketTransport> socketTransport =
+                do_QueryInterface(trans);
+            if (socketTransport) {
+                socketTransport->GetSelfAddr(&mSelfAddr);
+                socketTransport->GetPeerAddr(&mPeerAddr);
+            }
         }
     }
 

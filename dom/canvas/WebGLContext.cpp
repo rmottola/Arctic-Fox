@@ -556,7 +556,7 @@ CreateHeadlessANGLE(CreateContextFlags flags, const nsCOMPtr<nsIGfxInfo>& gfxInf
     nsRefPtr<GLContext> gl;
 
 #ifdef XP_WIN
-    gl = gl::GLContextProviderEGL::CreateHeadless(flags);,
+    gl = gl::GLContextProviderEGL::CreateHeadless(flags);
     if (!gl) {
         webgl->GenerateWarning("Error during ANGLE OpenGL init.");
         return nullptr;
@@ -1280,7 +1280,6 @@ WebGLContext::GetContextAttributes(Nullable<dom::WebGLContextAttributes>& retval
     result.mFailIfMajorPerformanceCaveat = mOptions.failIfMajorPerformanceCaveat;
 }
 
-/* [noscript] DOMString mozGetUnderlyingParamString(in GLenum pname); */
 NS_IMETHODIMP
 WebGLContext::MozGetUnderlyingParamString(uint32_t pname, nsAString& retval)
 {

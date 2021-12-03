@@ -39,9 +39,6 @@ class TrackBuffersManager;
 
 namespace dom {
 
-using media::TimeUnit;
-using media::TimeIntervals;
-
 class TimeRanges;
 
 class SourceBufferAttributes {
@@ -90,16 +87,16 @@ public:
   {
     MonitorAutoLock mon(mMonitor);
     mApparentTimestampOffset = aTimestampOffset;
-    mTimestampOffset = TimeUnit::FromSeconds(aTimestampOffset);
+    mTimestampOffset = media::TimeUnit::FromSeconds(aTimestampOffset);
   }
 
-  TimeUnit GetTimestampOffset()
+  media::TimeUnit GetTimestampOffset()
   {
     MonitorAutoLock mon(mMonitor);
     return mTimestampOffset;
   }
 
-  void SetTimestampOffset(TimeUnit& aTimestampOffset)
+  void SetTimestampOffset(media::TimeUnit& aTimestampOffset)
   {
     MonitorAutoLock mon(mMonitor);
     mTimestampOffset = aTimestampOffset;
@@ -131,7 +128,7 @@ private:
   double mAppendWindowEnd;
   SourceBufferAppendMode mAppendMode;
   double mApparentTimestampOffset;
-  TimeUnit mTimestampOffset;
+  media::TimeUnit mTimestampOffset;
 };
 
 class SourceBuffer final : public DOMEventTargetHelper
@@ -151,7 +148,7 @@ public:
   }
 
   already_AddRefed<TimeRanges> GetBuffered(ErrorResult& aRv);
-  TimeIntervals GetTimeIntervals();
+  media::TimeIntervals GetTimeIntervals();
 
   double TimestampOffset() const
   {
@@ -223,10 +220,6 @@ public:
     return mActive;
   }
 
-#if defined(DEBUG)
-  void Dump(const char* aPath);
-#endif
-
 private:
   ~SourceBuffer();
 
@@ -273,7 +266,6 @@ private:
   nsRefPtr<SourceBufferAttributes> mAttributes;
 
   bool mUpdating;
-  bool mIsUsingFormatReader;
 
   mozilla::Atomic<bool> mActive;
 

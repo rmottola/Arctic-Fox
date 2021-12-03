@@ -8,6 +8,7 @@
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Move.h"
 #include "imgIContainer.h"
+#include "LookupResult.h"
 #include "MainThreadUtils.h"
 #include "RasterImage.h"
 
@@ -265,25 +266,26 @@ FrameAnimator::GetFirstFrameRefreshArea() const
   return mFirstFrameRefreshArea;
 }
 
-DrawableFrameRef
+LookupResult
 FrameAnimator::GetCompositedFrame(uint32_t aFrameNum)
 {
   MOZ_ASSERT(aFrameNum != 0, "First frame is never composited");
 
   // If we have a composited version of this frame, return that.
   if (mLastCompositedFrameIndex == int32_t(aFrameNum)) {
-    return mCompositingFrame->DrawableRef();
+    return LookupResult(mCompositingFrame->DrawableRef(), MatchType::EXACT);
   }
 
   // Otherwise return the raw frame. DoBlend is required to ensure that we only
   // hit this case if the frame is not paletted and doesn't require compositing.
-  DrawableFrameRef ref =
+  LookupResult result =
     SurfaceCache::Lookup(ImageKey(mImage),
                          RasterSurfaceKey(mSize,
                                           0,  // Default decode flags.
                                           aFrameNum));
-  MOZ_ASSERT(!ref || !ref->GetIsPaletted(), "About to return a paletted frame");
-  return ref;
+  MOZ_ASSERT(!result || !result.DrawableRef()->GetIsPaletted(),
+             "About to return a paletted frame");
+  return result;
 }
 
 int32_t
@@ -317,32 +319,63 @@ FrameAnimator::GetTimeoutForFrame(uint32_t aFrameNum) const
   return data.mRawTimeout;
 }
 
-size_t
-FrameAnimator::SizeOfCompositingFrames(gfxMemoryLocation aLocation,
-                                       MallocSizeOf aMallocSizeOf) const
+static void
+DoCollectSizeOfCompositingSurfaces(const RawAccessFrameRef& aSurface,
+                                   SurfaceMemoryCounterType aType,
+                                   nsTArray<SurfaceMemoryCounter>& aCounters,
+                                   MallocSizeOf aMallocSizeOf)
 {
-  size_t n = 0;
+  // Concoct a SurfaceKey for this surface.
+  SurfaceKey key = RasterSurfaceKey(aSurface->GetImageSize(),
+                                    imgIContainer::DECODE_FLAGS_DEFAULT,
+                                    /* aFrameNum = */ 0);
 
+  // Create a counter for this surface.
+  SurfaceMemoryCounter counter(key, /* aIsLocked = */ true, aType);
+
+  // Extract the surface's memory usage information.
+  size_t heap = aSurface
+    ->SizeOfExcludingThis(gfxMemoryLocation::IN_PROCESS_HEAP, aMallocSizeOf);
+  counter.Values().SetDecodedHeap(heap);
+
+  size_t nonHeap = aSurface
+    ->SizeOfExcludingThis(gfxMemoryLocation::IN_PROCESS_NONHEAP, nullptr);
+  counter.Values().SetDecodedNonHeap(nonHeap);
+
+  // Record it.
+  aCounters.AppendElement(counter);
+}
+
+void
+FrameAnimator::CollectSizeOfCompositingSurfaces(
+    nsTArray<SurfaceMemoryCounter>& aCounters,
+    MallocSizeOf aMallocSizeOf) const
+{
   if (mCompositingFrame) {
-    n += mCompositingFrame->SizeOfExcludingThis(aLocation, aMallocSizeOf);
-  }
-  if (mCompositingPrevFrame) {
-    n += mCompositingPrevFrame->SizeOfExcludingThis(aLocation, aMallocSizeOf);
+    DoCollectSizeOfCompositingSurfaces(mCompositingFrame,
+                                       SurfaceMemoryCounterType::COMPOSITING,
+                                       aCounters,
+                                       aMallocSizeOf);
   }
 
-  return n;
+  if (mCompositingPrevFrame) {
+    DoCollectSizeOfCompositingSurfaces(mCompositingPrevFrame,
+                                       SurfaceMemoryCounterType::COMPOSITING_PREV,
+                                       aCounters,
+                                       aMallocSizeOf);
+  }
 }
 
 RawAccessFrameRef
 FrameAnimator::GetRawFrame(uint32_t aFrameNum) const
 {
-  DrawableFrameRef ref =
+  LookupResult result =
     SurfaceCache::Lookup(ImageKey(mImage),
                          RasterSurfaceKey(mSize,
                                           0,  // Default decode flags.
                                           aFrameNum));
-  return ref ? ref->RawAccessRef()
-             : RawAccessFrameRef();
+  return result ? result.DrawableRef()->RawAccessRef()
+                : RawAccessFrameRef();
 }
 
 //******************************************************************************

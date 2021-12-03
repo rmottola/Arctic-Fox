@@ -281,11 +281,15 @@ public:
    * This callback must be provided to EndTransaction. The callback data
    * must be the nsDisplayListBuilder containing this FrameLayerBuilder.
    * This function can be called multiple times in a row to draw
-   * different regions.
+   * different regions. This will occur when, for example, progressive paint is
+   * enabled. In these cases aDirtyRegion can optionally be used to specify the
+   * total region that will be drawn during the transaction, possibly allowing
+   * the callback to make optimizations.
    */
   static void DrawPaintedLayer(PaintedLayer* aLayer,
                               gfxContext* aContext,
                               const nsIntRegion& aRegionToDraw,
+                              const nsIntRegion* aDirtyRegion,
                               mozilla::layers::DrawRegionClip aClip,
                               const nsIntRegion& aRegionToInvalidate,
                               void* aCallbackData);
@@ -563,8 +567,6 @@ protected:
                                                        uint32_t aDisplayItemKey, 
                                                        LayerManagerData* aData);
 
-  static PLDHashOperator DumpDisplayItemDataForFrame(nsRefPtrHashKey<DisplayItemData>* aEntry,
-                                                     void* aClosure);
   /**
    * We store one of these for each display item associated with a
    * PaintedLayer, in a hashtable that maps each PaintedLayer to an array
@@ -681,14 +683,6 @@ public:
   void ComputeGeometryChangeForItem(DisplayItemData* aData);
 
 protected:
-  static PLDHashOperator ProcessRemovedDisplayItems(nsRefPtrHashKey<DisplayItemData>* aEntry,
-                                                    void* aUserArg);
-  static PLDHashOperator RestoreDisplayItemData(nsRefPtrHashKey<DisplayItemData>* aEntry,
-                                                void *aUserArg);
-
-  static PLDHashOperator RestorePaintedLayerItemEntries(PaintedLayerItemsEntry* aEntry,
-                                                       void *aUserArg);
-
   /**
    * Returns true if the DOM has been modified since we started painting,
    * in which case we should bail out and not paint anymore. This should

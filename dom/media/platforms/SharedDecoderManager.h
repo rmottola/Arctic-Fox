@@ -41,12 +41,13 @@ public:
   friend class SharedDecoderProxy;
   friend class SharedDecoderCallback;
 
-  void DisableHardwareAcceleration();
   bool Recreate(const VideoInfo& aConfig);
 
 private:
   virtual ~SharedDecoderManager();
   void DrainComplete();
+
+  nsRefPtr<MediaDataDecoder::InitPromise> InitDecoder();
 
   nsRefPtr<PlatformDecoderModule> mPDM;
   nsRefPtr<MediaDataDecoder> mDecoder;
@@ -56,6 +57,9 @@ private:
   SharedDecoderProxy* mActiveProxy;
   MediaDataDecoderCallback* mActiveCallback;
   nsAutoPtr<MediaDataDecoderCallback> mCallback;
+  MozPromiseHolder<MediaDataDecoder::InitPromise> mDecoderInitPromise;
+  MozPromiseRequestHolder<MediaDataDecoder::InitPromise> mDecoderInitPromiseRequest;
+  bool mInit;
   // access protected by mMonitor
   bool mWaitForInternalDrain;
   Monitor mMonitor;
@@ -69,12 +73,12 @@ public:
                      MediaDataDecoderCallback* aCallback);
   virtual ~SharedDecoderProxy();
 
-  virtual nsresult Init() override;
+  virtual nsRefPtr<MediaDataDecoder::InitPromise> Init() override;
   virtual nsresult Input(MediaRawData* aSample) override;
   virtual nsresult Flush() override;
   virtual nsresult Drain() override;
   virtual nsresult Shutdown() override;
-  virtual bool IsHardwareAccelerated() const override;
+  virtual bool IsHardwareAccelerated(nsACString& aFailureReason) const override;
 
   friend class SharedDecoderManager;
 

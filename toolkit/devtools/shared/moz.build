@@ -12,6 +12,9 @@ if CONFIG['MOZ_DEVTOOLS']:
 
 EXTRA_JS_MODULES.devtools.shared += [
   'async-storage.js',
+  'framerate.js',
+  'memory.js',
+  'timeline.js',
   'worker-helper.js',
   'worker.js'
 ]

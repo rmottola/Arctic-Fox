@@ -270,6 +270,7 @@ UNIFIED_SOURCES += [
     'proxy/CrossCompartmentWrapper.cpp',
     'proxy/DeadObjectProxy.cpp',
     'proxy/DirectProxyHandler.cpp',
+    'proxy/OpaqueCrossCompartmentWrapper.cpp',
     'proxy/Proxy.cpp',
     'proxy/ScriptedDirectProxyHandler.cpp',
     'proxy/ScriptedIndirectProxyHandler.cpp',
@@ -610,8 +611,8 @@ if CONFIG['OS_ARCH'] == 'SunOS':
         'socket',
     ]
 
-if CONFIG['GNU_CXX']:
-    FAIL_ON_WARNINGS = True
+if not CONFIG['GNU_CXX']:
+    ALLOW_COMPILER_WARNINGS = True
 
 NO_EXPAND_LIBS = True
 

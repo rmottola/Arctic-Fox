@@ -1341,8 +1341,7 @@ gfxDWriteFontList::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
     gfxPlatformFontList::AddSizeOfExcludingThis(aMallocSizeOf, aSizes);
 
     aSizes->mFontListSize +=
-        mFontSubstitutes.SizeOfExcludingThis(SizeOfFamilyNameEntryExcludingThis,
-                                             aMallocSizeOf);
+        SizeOfFontFamilyTableExcludingThis(mFontSubstitutes, aMallocSizeOf);
 
     aSizes->mFontListSize +=
         mNonExistingFonts.ShallowSizeOfExcludingThis(aMallocSizeOf);
@@ -1582,7 +1581,9 @@ DirectWriteFontInfo::LoadFontFamilyData(const nsAString& aFamilyName)
     nsAutoTArray<wchar_t, 32> famName;
 
     uint32_t len = aFamilyName.Length();
-    famName.SetLength(len + 1, fallible);
+    if(!famName.SetLength(len + 1, fallible)) {
+        return;
+    }
     memcpy(famName.Elements(), aFamilyName.BeginReading(), len * sizeof(char16_t));
     famName[len] = 0;
 

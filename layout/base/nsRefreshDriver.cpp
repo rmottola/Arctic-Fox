@@ -78,6 +78,7 @@ static PRLogModuleInfo *gLog = nullptr;
 
 #define DEFAULT_FRAME_RATE 60
 #define DEFAULT_THROTTLED_FRAME_RATE 1
+#define DEFAULT_RECOMPUTE_VISIBILITY_INTERVAL_MS 1000
 // after 10 minutes, stop firing off inactive timers
 #define DEFAULT_INACTIVE_TIMER_DISABLE_SECONDS 600
 
@@ -974,6 +975,17 @@ nsRefreshDriver::GetThrottledTimerInterval()
   return 1000.0 / rate;
 }
 
+/* static */ mozilla::TimeDuration
+nsRefreshDriver::GetMinRecomputeVisibilityInterval()
+{
+  int32_t interval =
+    Preferences::GetInt("layout.visibility.min-recompute-interval-ms", -1);
+  if (interval <= 0) {
+    interval = DEFAULT_RECOMPUTE_VISIBILITY_INTERVAL_MS;
+  }
+  return TimeDuration::FromMilliseconds(interval);
+}
+
 double
 nsRefreshDriver::GetRefreshTimerInterval() const
 {
@@ -1020,7 +1032,9 @@ nsRefreshDriver::nsRefreshDriver(nsPresContext* aPresContext)
     mFreezeCount(0),
     mThrottledFrameRequestInterval(TimeDuration::FromMilliseconds(
                                      GetThrottledTimerInterval())),
+    mMinRecomputeVisibilityInterval(GetMinRecomputeVisibilityInterval()),
     mThrottled(false),
+    mNeedToRecomputeVisibility(false),
     mTestControllingRefreshes(false),
     mViewManagerFlushIsPending(false),
     mRequestedHighPrecision(false),
@@ -1032,6 +1046,7 @@ nsRefreshDriver::nsRefreshDriver(nsPresContext* aPresContext)
   mMostRecentRefresh = TimeStamp::Now();
   mMostRecentTick = mMostRecentRefresh;
   mNextThrottledFrameRequestTick = mMostRecentTick;
+  mNextRecomputeVisibilityTick = mMostRecentTick;
 }
 
 nsRefreshDriver::~nsRefreshDriver()
@@ -1687,56 +1702,75 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
           NS_RELEASE(shell);
         }
 
+        mNeedToRecomputeVisibility = true;
+
         if (tracingStyleFlush) {
           profiler_tracing("Paint", "Styles", TRACING_INTERVAL_END);
         }
-      }
 
-      if (!nsLayoutUtils::AreAsyncAnimationsEnabled()) {
-        mPresContext->TickLastStyleUpdateForAllAnimations();
+        if (!nsLayoutUtils::AreAsyncAnimationsEnabled()) {
+          mPresContext->TickLastStyleUpdateForAllAnimations();
+        }
       }
     } else if  (i == 1) {
       // This is the Flush_Layout case.
-      if (mPresContext && mPresContext->GetPresShell()) {
-        bool tracingLayoutFlush = false;
-        nsAutoTArray<nsIPresShell*, 16> observers;
-        observers.AppendElements(mLayoutFlushObservers);
-        for (uint32_t j = observers.Length();
-             j && mPresContext && mPresContext->GetPresShell(); --j) {
-          // Make sure to not process observers which might have been removed
-          // during previous iterations.
-          nsIPresShell* shell = observers[j - 1];
-          if (!mLayoutFlushObservers.Contains(shell))
-            continue;
+      bool tracingLayoutFlush = false;
+      nsAutoTArray<nsIPresShell*, 16> observers;
+      observers.AppendElements(mLayoutFlushObservers);
+      for (uint32_t j = observers.Length();
+           j && mPresContext && mPresContext->GetPresShell(); --j) {
+        // Make sure to not process observers which might have been removed
+        // during previous iterations.
+        nsIPresShell* shell = observers[j - 1];
+        if (!mLayoutFlushObservers.Contains(shell))
+          continue;
 
-          if (!tracingLayoutFlush) {
-            tracingLayoutFlush = true;
-            profiler_tracing("Paint", "Reflow", mReflowCause, TRACING_INTERVAL_START);
-            mReflowCause = nullptr;
-          }
-
-          NS_ADDREF(shell);
-          mLayoutFlushObservers.RemoveElement(shell);
-          shell->mReflowScheduled = false;
-          shell->mSuppressInterruptibleReflows = false;
-          mozFlushType flushType = HasPendingAnimations(shell)
-                                 ? Flush_Layout
-                                 : Flush_InterruptibleLayout;
-          shell->FlushPendingNotifications(ChangesToFlush(flushType, false));
-          // Inform the FontFaceSet that we ticked, so that it can resolve its
-          // ready promise if it needs to.
-          nsPresContext* presContext = shell->GetPresContext();
-          if (presContext) {
-            presContext->NotifyFontFaceSetOnRefresh();
-          }
-          NS_RELEASE(shell);
+        if (!tracingLayoutFlush) {
+          tracingLayoutFlush = true;
+          profiler_tracing("Paint", "Reflow", mReflowCause, TRACING_INTERVAL_START);
+          mReflowCause = nullptr;
         }
 
-        if (tracingLayoutFlush) {
-          profiler_tracing("Paint", "Reflow", TRACING_INTERVAL_END);
+        NS_ADDREF(shell);
+        mLayoutFlushObservers.RemoveElement(shell);
+        shell->mReflowScheduled = false;
+        shell->mSuppressInterruptibleReflows = false;
+        mozFlushType flushType = HasPendingAnimations(shell)
+                               ? Flush_Layout
+                               : Flush_InterruptibleLayout;
+        shell->FlushPendingNotifications(ChangesToFlush(flushType, false));
+        // Inform the FontFaceSet that we ticked, so that it can resolve its
+        // ready promise if it needs to.
+        nsPresContext* presContext = shell->GetPresContext();
+        if (presContext) {
+          presContext->NotifyFontFaceSetOnRefresh();
         }
+        NS_RELEASE(shell);
+      }
+
+      mNeedToRecomputeVisibility = true;
+
+      if (tracingLayoutFlush) {
+        profiler_tracing("Paint", "Reflow", TRACING_INTERVAL_END);
       }
     }
+
+    // The pres context may be destroyed during we do the flushing.
+    if (!mPresContext || !mPresContext->GetPresShell()) {
+      StopTimer();
+      return;
+    }
+  }
+
+  // Recompute image visibility if it's necessary and enough time has passed
+  // since the last time we did it.
+  if (mNeedToRecomputeVisibility && !mThrottled &&
+      aNowTime >= mNextRecomputeVisibilityTick &&
+      !presShell->IsPaintingSuppressed()) {
+    mNextRecomputeVisibilityTick = aNowTime + mMinRecomputeVisibilityInterval;
+    mNeedToRecomputeVisibility = false;
+
+    presShell->ScheduleImageVisibilityUpdate();
   }
 
   /*
@@ -1754,8 +1788,16 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
     // script modifies the hashtable. Instead, we build a (local) array of
     // images to refresh, and then we refresh each image in that array.
     nsCOMArray<imgIContainer> imagesToRefresh(mRequests.Count());
-    mRequests.EnumerateEntries(nsRefreshDriver::ImageRequestEnumerator,
-                               &imagesToRefresh);
+
+    for (auto iter = mRequests.Iter(); !iter.Done(); iter.Next()) {
+      nsISupportsHashKey* entry = iter.Get();
+      auto req = static_cast<imgIRequest*>(entry->GetKey());
+      MOZ_ASSERT(req, "Unable to retrieve the image request");
+      nsCOMPtr<imgIContainer> image;
+      if (NS_SUCCEEDED(req->GetImage(getter_AddRefs(image)))) {
+        imagesToRefresh.AppendElement(image);
+      }
+    }
 
     for (uint32_t i = 0; i < imagesToRefresh.Length(); i++) {
       imagesToRefresh[i]->RequestRefresh(aNowTime);
@@ -1817,40 +1859,22 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
   NS_ASSERTION(mInRefresh, "Still in refresh");
 }
 
-/* static */ PLDHashOperator
-nsRefreshDriver::ImageRequestEnumerator(nsISupportsHashKey* aEntry,
-                                        void* aUserArg)
+void
+nsRefreshDriver::BeginRefreshingImages(RequestTable& aEntries,
+                                       ImageRequestParameters* aParms)
 {
-  nsCOMArray<imgIContainer>* imagesToRefresh =
-    static_cast<nsCOMArray<imgIContainer>*> (aUserArg);
-  imgIRequest* req = static_cast<imgIRequest*>(aEntry->GetKey());
-  MOZ_ASSERT(req, "Unable to retrieve the image request");
-  nsCOMPtr<imgIContainer> image;
-  if (NS_SUCCEEDED(req->GetImage(getter_AddRefs(image)))) {
-    imagesToRefresh->AppendElement(image);
+  for (auto iter = aEntries.Iter(); !iter.Done(); iter.Next()) {
+    auto req = static_cast<imgIRequest*>(iter.Get()->GetKey());
+    MOZ_ASSERT(req, "Unable to retrieve the image request");
+
+    aParms->mRequests->PutEntry(req);
+
+    nsCOMPtr<imgIContainer> image;
+    if (NS_SUCCEEDED(req->GetImage(getter_AddRefs(image)))) {
+      image->SetAnimationStartTime(aParms->mDesired);
+    }
   }
-
-  return PL_DHASH_NEXT;
-}
-
-/* static */ PLDHashOperator
-nsRefreshDriver::BeginRefreshingImages(nsISupportsHashKey* aEntry,
-                                       void* aUserArg)
-{
-  ImageRequestParameters* parms =
-    static_cast<ImageRequestParameters*> (aUserArg);
-
-  imgIRequest* req = static_cast<imgIRequest*>(aEntry->GetKey());
-  MOZ_ASSERT(req, "Unable to retrieve the image request");
-
-  parms->mRequests->PutEntry(req);
-
-  nsCOMPtr<imgIContainer> image;
-  if (NS_SUCCEEDED(req->GetImage(getter_AddRefs(image)))) {
-    image->SetAnimationStartTime(parms->mDesired);
-  }
-
-  return PL_DHASH_REMOVE;
+  aEntries.Clear();
 }
 
 /* static */ PLDHashOperator
@@ -1873,14 +1897,14 @@ nsRefreshDriver::StartTableRefresh(const uint32_t& aDelay,
     // to the main requests table.
     if (prevMultiple != static_cast<uint32_t>(curr.ToMilliseconds()) / aDelay) {
       parms->mDesired = start + TimeDuration::FromMilliseconds(prevMultiple * aDelay);
-      aData->mEntries.EnumerateEntries(nsRefreshDriver::BeginRefreshingImages, parms);
+      BeginRefreshingImages(aData->mEntries, parms);
     }
   } else {
     // This is the very first time we've drawn images with this time delay.
     // Set the animation start time to "now" and move all the images in this
     // table to the main requests table.
     parms->mDesired = parms->mCurrent;
-    aData->mEntries.EnumerateEntries(nsRefreshDriver::BeginRefreshingImages, parms);
+    BeginRefreshingImages(aData->mEntries, parms);
     aData->mStartTime.emplace(parms->mCurrent);
   }
 

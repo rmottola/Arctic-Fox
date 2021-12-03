@@ -38,7 +38,7 @@ public:
         AudioBlockCopyChannelWithScale(
             static_cast<const float*>(aInput[0].mChannelData[i]),
             aInput[0].mVolume,
-            static_cast<float*>(const_cast<void*>(aOutput[i].mChannelData[0])));
+            aOutput[i].ChannelFloatsForWrite(0));
       } else {
         // Pad with silent channels if needed
         aOutput[i].SetNull(WEBAUDIO_BLOCK_SIZE);
@@ -60,8 +60,9 @@ ChannelSplitterNode::ChannelSplitterNode(AudioContext* aContext,
               ChannelInterpretation::Speakers)
   , mOutputCount(aOutputCount)
 {
-  mStream = aContext->Graph()->CreateAudioNodeStream(new ChannelSplitterNodeEngine(this),
-                                                     MediaStreamGraph::INTERNAL_STREAM);
+  mStream = AudioNodeStream::Create(aContext->Graph(),
+                                    new ChannelSplitterNodeEngine(this),
+                                    AudioNodeStream::NO_STREAM_FLAGS);
 }
 
 ChannelSplitterNode::~ChannelSplitterNode()

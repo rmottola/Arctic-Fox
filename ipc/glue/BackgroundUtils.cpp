@@ -16,8 +16,15 @@
 #include "nsNullPrincipal.h"
 #include "nsServiceManagerUtils.h"
 #include "nsString.h"
+#include "nsTArray.h"
 
 namespace mozilla {
+namespace net {
+class OptionalLoadInfoArgs;
+}
+
+using namespace mozilla::net;
+
 namespace ipc {
 
 already_AddRefed<nsIPrincipal>
@@ -220,66 +227,90 @@ PrincipalToPrincipalInfo(nsIPrincipal* aPrincipal,
 
 nsresult
 LoadInfoToLoadInfoArgs(nsILoadInfo *aLoadInfo,
-                       mozilla::net::LoadInfoArgs* aLoadInfoArgs)
+                       OptionalLoadInfoArgs* aOptionalLoadInfoArgs)
 {
-  nsresult rv = NS_OK;
-
-  if (aLoadInfo) {
-    rv = PrincipalToPrincipalInfo(aLoadInfo->LoadingPrincipal(),
-                                  &aLoadInfoArgs->requestingPrincipalInfo());
-    NS_ENSURE_SUCCESS(rv, rv);
-    rv = PrincipalToPrincipalInfo(aLoadInfo->TriggeringPrincipal(),
-                                  &aLoadInfoArgs->triggeringPrincipalInfo());
-    NS_ENSURE_SUCCESS(rv, rv);
-    aLoadInfoArgs->securityFlags() = aLoadInfo->GetSecurityFlags();
-    aLoadInfoArgs->contentPolicyType() = aLoadInfo->InternalContentPolicyType();
-    aLoadInfoArgs->upgradeInsecureRequests() = aLoadInfo->GetUpgradeInsecureRequests();
-    aLoadInfoArgs->innerWindowID() = aLoadInfo->GetInnerWindowID();
-    aLoadInfoArgs->outerWindowID() = aLoadInfo->GetOuterWindowID();
-    aLoadInfoArgs->parentOuterWindowID() = aLoadInfo->GetParentOuterWindowID();
+  if (!aLoadInfo) {
+    // if there is no loadInfo, then there is nothing to serialize
+    *aOptionalLoadInfoArgs = void_t();
     return NS_OK;
   }
 
-  // use default values if no loadInfo is provided
-  rv = PrincipalToPrincipalInfo(nsContentUtils::GetSystemPrincipal(),
-                                &aLoadInfoArgs->requestingPrincipalInfo());
+  nsresult rv = NS_OK;
+  PrincipalInfo requestingPrincipalInfo;
+  rv = PrincipalToPrincipalInfo(aLoadInfo->LoadingPrincipal(),
+                                &requestingPrincipalInfo);
   NS_ENSURE_SUCCESS(rv, rv);
-  rv = PrincipalToPrincipalInfo(nsContentUtils::GetSystemPrincipal(),
-                                &aLoadInfoArgs->triggeringPrincipalInfo());
-  NS_ENSURE_SUCCESS(rv, rv);
-  aLoadInfoArgs->securityFlags() = nsILoadInfo::SEC_NORMAL;
-  aLoadInfoArgs->contentPolicyType() = nsIContentPolicy::TYPE_OTHER;
-  aLoadInfoArgs->upgradeInsecureRequests() = false;
-  aLoadInfoArgs->innerWindowID() = 0;
-  aLoadInfoArgs->outerWindowID() = 0;
-  aLoadInfoArgs->parentOuterWindowID() = 0;
+
+  PrincipalInfo triggeringPrincipalInfo;
+  rv = PrincipalToPrincipalInfo(aLoadInfo->TriggeringPrincipal(),
+                                &triggeringPrincipalInfo);
+
+  nsTArray<PrincipalInfo> redirectChain;
+  for (const nsCOMPtr<nsIPrincipal>& principal : aLoadInfo->RedirectChain()) {
+    rv = PrincipalToPrincipalInfo(principal, redirectChain.AppendElement());
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  *aOptionalLoadInfoArgs =
+    LoadInfoArgs(
+      requestingPrincipalInfo,
+      triggeringPrincipalInfo,
+      aLoadInfo->GetSecurityFlags(),
+      aLoadInfo->InternalContentPolicyType(),
+      aLoadInfo->GetUpgradeInsecureRequests(),
+      aLoadInfo->GetInnerWindowID(),
+      aLoadInfo->GetOuterWindowID(),
+      aLoadInfo->GetParentOuterWindowID(),
+      aLoadInfo->GetEnforceSecurity(),
+      aLoadInfo->GetInitialSecurityCheckDone(),
+      redirectChain);
+
   return NS_OK;
 }
 
 nsresult
-LoadInfoArgsToLoadInfo(const mozilla::net::LoadInfoArgs& aLoadInfoArgs,
+LoadInfoArgsToLoadInfo(const OptionalLoadInfoArgs& aOptionalLoadInfoArgs,
                        nsILoadInfo** outLoadInfo)
 {
+  if (aOptionalLoadInfoArgs.type() == OptionalLoadInfoArgs::Tvoid_t) {
+    *outLoadInfo = nullptr;
+    return NS_OK;
+  }
+
+  const LoadInfoArgs& loadInfoArgs =
+    aOptionalLoadInfoArgs.get_LoadInfoArgs();
+
   nsresult rv = NS_OK;
   nsCOMPtr<nsIPrincipal> requestingPrincipal =
-    PrincipalInfoToPrincipal(aLoadInfoArgs.requestingPrincipalInfo(), &rv);
+    PrincipalInfoToPrincipal(loadInfoArgs.requestingPrincipalInfo(), &rv);
   NS_ENSURE_SUCCESS(rv, rv);
   nsCOMPtr<nsIPrincipal> triggeringPrincipal =
-    PrincipalInfoToPrincipal(aLoadInfoArgs.triggeringPrincipalInfo(), &rv);
+    PrincipalInfoToPrincipal(loadInfoArgs.triggeringPrincipalInfo(), &rv);
   NS_ENSURE_SUCCESS(rv, rv);
+
+  nsTArray<nsCOMPtr<nsIPrincipal>> redirectChain;
+  for (const PrincipalInfo& principalInfo : loadInfoArgs.redirectChain()) {
+    nsCOMPtr<nsIPrincipal> redirectedPrincipal =
+      PrincipalInfoToPrincipal(principalInfo, &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+    redirectChain.AppendElement(redirectedPrincipal.forget());
+  }
 
   nsCOMPtr<nsILoadInfo> loadInfo =
     new mozilla::LoadInfo(requestingPrincipal,
                           triggeringPrincipal,
-                          aLoadInfoArgs.securityFlags(),
-                          aLoadInfoArgs.contentPolicyType(),
-                          aLoadInfoArgs.upgradeInsecureRequests(),
-                          aLoadInfoArgs.innerWindowID(),
-                          aLoadInfoArgs.outerWindowID(),
-                          aLoadInfoArgs.parentOuterWindowID());
+                          loadInfoArgs.securityFlags(),
+                          loadInfoArgs.contentPolicyType(),
+                          loadInfoArgs.upgradeInsecureRequests(),
+                          loadInfoArgs.innerWindowID(),
+                          loadInfoArgs.outerWindowID(),
+                          loadInfoArgs.parentOuterWindowID(),
+                          loadInfoArgs.enforceSecurity(),
+                          loadInfoArgs.initialSecurityCheckDone(),
+                          redirectChain);
 
-  loadInfo.forget(outLoadInfo);
-  return NS_OK;
+   loadInfo.forget(outLoadInfo);
+   return NS_OK;
 }
 
 } // namespace ipc

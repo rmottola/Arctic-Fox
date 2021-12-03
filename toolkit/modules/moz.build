@@ -12,6 +12,10 @@ MOCHITEST_CHROME_MANIFESTS += ['tests/chrome/chrome.ini']
 SPHINX_TREES['toolkit_modules'] = 'docs'
 
 EXTRA_JS_MODULES += [
+    'addons/MatchPattern.jsm',
+    'addons/WebRequest.jsm',
+    'addons/WebRequestCommon.jsm',
+    'addons/WebRequestContent.js',
     'Battery.jsm',
     'BinarySearch.jsm',
     'BrowserUtils.jsm',
@@ -21,7 +25,6 @@ EXTRA_JS_MODULES += [
     'debug.js',
     'DeferredTask.jsm',
     'Deprecated.jsm',
-    'Dict.jsm',
     'FileUtils.jsm',
     'Finder.jsm',
     'Geometry.jsm',

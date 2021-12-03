@@ -220,6 +220,8 @@ class RefTest(object):
     # And for about:newtab content fetch and pings.
     prefs['browser.newtabpage.directory.source'] = 'data:application/json,{"reftest":1}'
     prefs['browser.newtabpage.directory.ping'] = ''
+    # Allow unsigned add-ons
+    prefs['xpinstall.signatures.required'] = False
 
     #Don't use auto-enabled e10s
     prefs['browser.tabs.remote.autostart.1'] = False
@@ -767,7 +769,10 @@ class ReftestOptions(OptionParser):
       if options.debugger is not None:
         self.error("cannot specify a debugger with parallel tests")
 
-    options.leakThresholds = {"default": options.defaultLeakThreshold}
+    options.leakThresholds = {
+        "default": options.defaultLeakThreshold,
+        "tab": 25000,  # See dependencies of bug 1051230.
+    }
 
     return options
 

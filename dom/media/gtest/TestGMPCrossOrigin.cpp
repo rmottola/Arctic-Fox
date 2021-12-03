@@ -8,10 +8,16 @@
 #include "nsIObserverService.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
+#include "GMPTestMonitor.h"
 #include "GMPVideoDecoderProxy.h"
 #include "GMPVideoEncoderProxy.h"
 #include "GMPDecryptorProxy.h"
 #include "GMPServiceParent.h"
+#ifdef XP_WIN
+#include "GMPVideoDecoderTrialCreator.h"
+#include "mozilla/dom/MediaKeySystemAccess.h"
+#include "mozilla/Monitor.h"
+#endif
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsIFile.h"
 #include "nsISimpleEnumerator.h"
@@ -27,40 +33,6 @@ using namespace std;
 
 using namespace mozilla;
 using namespace mozilla::gmp;
-
-class GMPTestMonitor
-{
-public:
-  GMPTestMonitor()
-    : mFinished(false)
-  {
-  }
-
-  void AwaitFinished()
-  {
-    MOZ_ASSERT(NS_IsMainThread());
-    while (!mFinished) {
-      NS_ProcessNextEvent(nullptr, true);
-    }
-    mFinished = false;
-  }
-
-private:
-  void MarkFinished()
-  {
-    mFinished = true;
-  }
-
-public:
-  void SetFinished()
-  {
-    NS_DispatchToMainThread(NS_NewNonOwningRunnableMethod(this,
-                                                          &GMPTestMonitor::MarkFinished));
-  }
-
-private:
-  bool mFinished;
-};
 
 struct GMPTestRunner
 {
@@ -115,6 +87,7 @@ protected:
   {
     nsTArray<nsCString> tags;
     tags.AppendElement(NS_LITERAL_CSTRING("h264"));
+    tags.AppendElement(NS_LITERAL_CSTRING("fake"));
 
     nsRefPtr<GeckoMediaPluginService> service =
       GeckoMediaPluginService::GetGeckoMediaPluginService();
@@ -497,6 +470,7 @@ GetNodeId(const nsAString& aOrigin,
   nsresult rv = service->GetNodeId(aOrigin,
                                    aTopLevelOrigin,
                                    aInPBMode,
+                                   NS_LITERAL_CSTRING(""),
                                    Move(callback));
   EXPECT_TRUE(NS_SUCCEEDED(rv) && NS_SUCCEEDED(result));
   return nodeId;
@@ -1377,7 +1351,12 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
   virtual void Decrypted(uint32_t aId,
                          GMPErr aResult,
                          const nsTArray<uint8_t>& aDecryptedData) override { }
-  virtual void Terminated() override { }
+  virtual void Terminated() override {
+    if (mDecryptor) {
+      mDecryptor->Close();
+      mDecryptor = nullptr;
+    }
+  }
 
 private:
   ~GMPStorageTest() { }
@@ -1503,3 +1482,65 @@ TEST(GeckoMediaPlugins, GMPStorageLongRecordNames) {
   nsRefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestLongRecordNames);
 }
+
+#ifdef XP_WIN
+class GMPTrialCreateTest
+{
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(GMPStorageTest)
+
+  void DoTest() {
+    EnsureNSSInitializedChromeOrContent();
+    mCreator = new mozilla::dom::GMPVideoDecoderTrialCreator();
+    mCreator->MaybeAwaitTrialCreate(NS_LITERAL_STRING("broken"), nullptr, this, nullptr);
+    AwaitFinished();
+  }
+
+  GMPTrialCreateTest()
+    : mMonitor("GMPTrialCreateTest")
+    , mFinished(false)
+    , mPassed(false)
+  {
+  }
+
+  void MaybeResolve(mozilla::dom::MediaKeySystemAccess* aAccess) {
+    mPassed = false;
+    SetFinished();
+  }
+
+  void MaybeReject(nsresult aResult, const nsACString& aUnusedMessage) {
+    mPassed = true;
+    SetFinished();
+  }
+
+private:
+  ~GMPTrialCreateTest() { }
+
+  void Dummy() {
+    // Intentionally left blank.
+  }
+
+  void SetFinished() {
+    mFinished = true;
+    NS_DispatchToMainThread(NS_NewRunnableMethod(this, &GMPTrialCreateTest::Dummy));
+  }
+
+  void AwaitFinished() {
+    while (!mFinished) {
+      NS_ProcessNextEvent(nullptr, true);
+    }
+    mFinished = false;
+  }
+
+  nsRefPtr<mozilla::dom::GMPVideoDecoderTrialCreator> mCreator;
+
+  Monitor mMonitor;
+  Atomic<bool> mFinished;
+  bool mPassed;
+};
+
+TEST(GeckoMediaPlugins, GMPTrialCreateFail) {
+  nsRefPtr<GMPTrialCreateTest> runner = new GMPTrialCreateTest();
+  runner->DoTest();
+}
+
+#endif // XP_WIN

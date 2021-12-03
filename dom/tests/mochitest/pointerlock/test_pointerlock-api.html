@@ -28,10 +28,6 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=633602
 
         SimpleTest.waitForExplicitFinish();
 
-        // Grant "fullscreen" permission on the test domain. This means fullscreen will be
-        // automatically approved, so pointer lock in the tests will be too.
-        SpecialPowers.setFullscreenAllowed(document);
-
         SpecialPowers.pushPrefEnv({"set": [
           ["full-screen-api.enabled", true],
           ["full-screen-api.allow-trusted-requests-only", false],
@@ -43,7 +39,6 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=633602
         // normally run in an iframe, which by default will not have the
         // allowfullscreen attribute set, so full-screen won't work.
         var gTestFiles = [
-          "file_approval.html",
           "file_screenClientXYConst.html",
           "file_childIframe.html",
           "file_doubleLock.html",
@@ -63,13 +58,14 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=633602
           "file_allowPointerLockSandboxFlag.html"
         ];
 
+        var gDisableList = [
+          // Bug 1174323
+          { file: "file_screenClientXYConst.html",
+            platform: "MacIntel" }
+        ];
+
         var gTestWindow = null;
         var gTestIndex = 0;
-
-        function finish() {
-          SpecialPowers.removeFullscreenAllowed(document)
-          SimpleTest.finish();
-        }
 
         function nextTest() {
           if (gTestWindow) {
@@ -80,10 +76,24 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=633602
 
         function runNextTest() {
           if (gTestIndex < gTestFiles.length) {
-            gTestWindow = window.open(gTestFiles[gTestIndex], "", "width=500,height=500");
+            var file = gTestFiles[gTestIndex];
             gTestIndex++;
+
+            var skipTest = false;
+            for (var item of gDisableList) {
+              if (item.file == file && navigator.platform == item.platform) {
+                skipTest = true;
+                break;
+              }
+            }
+            if (!skipTest) {
+              info(`Testing ${file}`);
+              gTestWindow = window.open(file, "", "width=500,height=500");
+            } else {
+              nextTest();
+            }
           } else {
-            finish();
+            SimpleTest.finish();
           }
         }
       </script>

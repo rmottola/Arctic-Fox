@@ -658,20 +658,6 @@ PluginContent.prototype = {
     this._showClickToPlayNotification(null, false);
   },
 
-  // Match the behaviour of nsPermissionManager
-  _getHostFromPrincipal: function (principal) {
-    if (!principal.URI || principal.URI.schemeIs("moz-nullprincipal")) {
-      return "(null)";
-    }
-
-    try {
-      if (principal.URI.host)
-        return principal.URI.host;
-    } catch (e) {}
-
-    return principal.origin;
-  },
-
   /**
    * Activate the plugins that the user has specified.
    */
@@ -718,7 +704,7 @@ PluginContent.prototype = {
     // If plugin is null, that means the user has navigated back to a page with
     // plugins, and we need to collect all the plugins.
     if (plugin === null) {
-      let contentWindow = this.global.content;
+      let contentWindow = this.content;
       let cwu = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
                              .getInterface(Ci.nsIDOMWindowUtils);
       // cwu.plugins may contain non-plugin <object>s, filter them out
@@ -735,8 +721,8 @@ PluginContent.prototype = {
 
     let pluginData = this.pluginData;
 
-    let principal = this.global.content.document.nodePrincipal;
-    let principalHost = this._getHostFromPrincipal(principal);
+    let principal = this.content.document.nodePrincipal;
+    let location = this.content.document.location.href;
 
     for (let p of plugins) {
       let pluginInfo = this._getPluginInfo(p);
@@ -751,11 +737,11 @@ PluginContent.prototype = {
       let permissionObj = Services.perms.
         getPermissionObject(principal, pluginInfo.permissionString, false);
       if (permissionObj) {
-        pluginInfo.pluginPermissionHost = permissionObj.host;
+        pluginInfo.pluginPermissionPrePath = permissionObj.principal.originNoSuffix;
         pluginInfo.pluginPermissionType = permissionObj.expireType;
       }
       else {
-        pluginInfo.pluginPermissionHost = principalHost;
+        pluginInfo.pluginPermissionPrePath = principal.originNoSuffix;
         pluginInfo.pluginPermissionType = undefined;
       }
 
@@ -765,7 +751,7 @@ PluginContent.prototype = {
     this.global.sendAsyncMessage("PluginContent:ShowClickToPlayNotification", {
       plugins: [... this.pluginData.values()],
       showNow: showNow,
-      host: principalHost,
+      location: location,
     }, null, principal);
   },
 
@@ -781,16 +767,13 @@ PluginContent.prototype = {
    *        to the current top-level document.
    */
   updateNotificationUI: function (document) {
-    let principal;
+    document = document || this.content.document;
 
-    if (document) {
-      // We're only interested in the top-level document, since that's
-      // the one that provides the Principal that we send back to the
-      // parent.
-      principal = document.defaultView.top.document.nodePrincipal;
-    } else {
-      principal = this.content.document.nodePrincipal;
-    }
+    // We're only interested in the top-level document, since that's
+    // the one that provides the Principal that we send back to the
+    // parent.
+    let principal = document.defaultView.top.document.nodePrincipal;
+    let location = document.location.href;
 
     // Make a copy of the actions from the last popup notification.
     let haveInsecure = false;
@@ -850,7 +833,7 @@ PluginContent.prototype = {
     this.global.sendAsyncMessage("PluginContent:UpdateHiddenPluginUI", {
       haveInsecure: haveInsecure,
       actions: [... actions.values()],
-      host: this._getHostFromPrincipal(principal),
+      location: location,
     }, null, principal);
   },
 

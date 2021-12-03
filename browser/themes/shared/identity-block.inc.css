@@ -1,0 +1,166 @@
+%if 0
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+%endif
+
+#urlbar[pageproxystate="valid"] > #identity-box.chromeUI,
+#urlbar[pageproxystate="valid"] > #identity-box.verifiedIdentity {
+  background-position: right;
+  background-size: 1px;
+  background-repeat: no-repeat;
+}
+
+#urlbar[pageproxystate="valid"] > #identity-box.verifiedIdentity {
+  color: hsl(92,100%,30%);
+  background-image: linear-gradient(hsla(92,81%,16%,0),
+                                    hsla(92,81%,16%,.2) 35%,
+                                    hsla(92,81%,16%,.2) 65%,
+                                    hsla(92,81%,16%,0));
+}
+
+
+%ifdef MOZ_OFFICIAL_BRANDING
+#urlbar[pageproxystate="valid"] > #identity-box.chromeUI {
+  color: rgb(229,115,0);
+  background-image: linear-gradient(rgba(229,114,0,0),
+                                    rgba(229,114,0,.5) 35%,
+                                    rgba(229,114,0,.5) 65%,
+                                    rgba(229,114,0,0));
+}
+%else
+%if MOZ_UPDATE_CHANNEL == aurora
+#urlbar[pageproxystate="valid"] > #identity-box.chromeUI {
+  color: hsl(214,90%,23%);
+  background-image: linear-gradient(hsla(208,99%,37%,0),
+                                    hsla(214,90%,23%,.5) 35%,
+                                    hsla(214,90%,23%,.5) 65%,
+                                    hsla(214,90%,23%,0));
+}
+%else
+#urlbar[pageproxystate="valid"] > #identity-box.chromeUI {
+  color: hsl(211,33%,32%);
+  background-image: linear-gradient(hsla(211,33%,32%,0),
+                                    hsla(211,33%,32%,.5) 35%,
+                                    hsla(211,33%,32%,.5) 65%,
+                                    hsla(211,33%,32%,0));
+}
+%endif
+%endif
+
+#identity-box.chromeUI:-moz-locale-dir(rtl),
+#identity-box.verifiedIdentity:-moz-locale-dir(rtl) {
+  background-position: left;
+}
+
+/* page proxy icon */
+
+#page-proxy-favicon {
+  width: 16px;
+  height: 16px;
+  list-style-image: url(chrome://browser/skin/identity-icons-generic.png);
+}
+
+.chromeUI > #page-proxy-favicon[pageproxystate="valid"] {
+  list-style-image: url(chrome://branding/content/identity-icons-brand.png);
+}
+
+.verifiedDomain > #page-proxy-favicon[pageproxystate="valid"] {
+  list-style-image: url(chrome://browser/skin/identity-icons-https.png);
+}
+
+.verifiedIdentity > #page-proxy-favicon[pageproxystate="valid"] {
+  list-style-image: url(chrome://browser/skin/identity-icons-https-ev.png);
+}
+
+.weakCipher > #page-proxy-favicon[pageproxystate="valid"] {
+  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display.png);
+}
+
+.mixedActiveContent > #page-proxy-favicon[pageproxystate="valid"] {
+  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-active.png);
+}
+
+.mixedDisplayContent > #page-proxy-favicon[pageproxystate="valid"] {
+  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display.png);
+}
+
+.mixedDisplayContentLoadedActiveBlocked > #page-proxy-favicon[pageproxystate="valid"] {
+  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display.png);
+}
+
+#page-proxy-favicon[pageproxystate="invalid"] {
+  opacity: 0.3;
+}
+
+@media not all and (min-resolution: 1.1dppx) {
+  #page-proxy-favicon {
+    -moz-image-region: rect(0, 16px, 16px, 0);
+  }
+
+  #identity-box:hover > #page-proxy-favicon {
+    -moz-image-region: rect(0, 32px, 16px, 16px);
+  }
+
+  #identity-box:hover:active > #page-proxy-favicon,
+  #identity-box[open=true] > #page-proxy-favicon {
+    -moz-image-region: rect(0, 48px, 16px, 32px);
+  }
+}
+
+@media (min-resolution: 1.1dppx) {
+  #page-proxy-favicon {
+    list-style-image: url(chrome://browser/skin/identity-icons-generic@2x.png);
+    -moz-image-region: rect(0, 32px, 32px, 0);
+  }
+
+  .chromeUI > #page-proxy-favicon[pageproxystate="valid"] {
+    list-style-image: url(chrome://branding/content/identity-icons-brand@2x.png);
+  }
+
+  .verifiedDomain > #page-proxy-favicon[pageproxystate="valid"] {
+    list-style-image: url(chrome://browser/skin/identity-icons-https@2x.png);
+  }
+
+  .verifiedIdentity > #page-proxy-favicon[pageproxystate="valid"] {
+    list-style-image: url(chrome://browser/skin/identity-icons-https-ev@2x.png);
+  }
+
+  .weakCipher > #page-proxy-favicon[pageproxystate="valid"] {
+    list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display@2x.png);
+  }
+
+  .mixedActiveContent > #page-proxy-favicon[pageproxystate="valid"] {
+    list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-active@2x.png);
+  }
+
+  .mixedDisplayContent > #page-proxy-favicon[pageproxystate="valid"] {
+    list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display@2x.png);
+  }
+
+  .mixedDisplayContentLoadedActiveBlocked > #page-proxy-favicon[pageproxystate="valid"] {
+    list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display@2x.png);
+  }
+
+  #identity-box:hover > #page-proxy-favicon {
+    -moz-image-region: rect(0, 64px, 32px, 32px);
+  }
+
+  #identity-box:hover:active > #page-proxy-favicon,
+  #identity-box[open=true] > #page-proxy-favicon {
+    -moz-image-region: rect(0, 96px, 32px, 64px);
+  }
+
+  #identity-popup.chromeUI > #identity-popup-container > #identity-popup-icon {
+    list-style-image: url("chrome://branding/content/icon128.png");
+    -moz-image-region: rect(0, 128px, 128px, 0);
+  }
+}
+
+#urlbar[actiontype="searchengine"] > #identity-box > #page-proxy-favicon {
+  -moz-image-region: inherit;
+  list-style-image: url(chrome://global/skin/icons/autocomplete-search.svg#search-icon);
+  width: 16px;
+  height: 16px;
+  opacity: 1;
+}

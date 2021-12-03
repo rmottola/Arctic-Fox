@@ -22,8 +22,6 @@ class RasterImage;
 class nsGIFDecoder2 : public Decoder
 {
 public:
-
-  explicit nsGIFDecoder2(RasterImage* aImage);
   ~nsGIFDecoder2();
 
   virtual void WriteInternal(const char* aBuffer, uint32_t aCount) override;
@@ -31,11 +29,15 @@ public:
   virtual Telemetry::ID SpeedHistogram() override;
 
 private:
+  friend class DecoderFactory;
+
+  // Decoders should only be instantiated via DecoderFactory.
+  explicit nsGIFDecoder2(RasterImage* aImage);
+
   // These functions will be called when the decoder has a decoded row,
   // frame size information, etc.
-
   void      BeginGIF();
-  void      BeginImageFrame(uint16_t aDepth);
+  nsresult  BeginImageFrame(uint16_t aDepth);
   void      EndImageFrame();
   void      FlushImageData();
   void      FlushImageData(uint32_t fromRow, uint32_t rows);

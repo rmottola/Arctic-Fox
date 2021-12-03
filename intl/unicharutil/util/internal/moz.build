@@ -18,6 +18,4 @@ LOCAL_INCLUDES += [
     '..',
 ]
 
-FAIL_ON_WARNINGS = True
-
 DIST_INSTALL = True

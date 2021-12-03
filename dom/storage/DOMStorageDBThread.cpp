@@ -170,24 +170,13 @@ DOMStorageDBThread::ShouldPreloadScope(const nsACString& aScope)
   return mScopesHavingData.Contains(aScope);
 }
 
-namespace {
-
-PLDHashOperator
-GetScopesHavingDataEnum(nsCStringHashKey* aKey, void* aArg)
-{
-  InfallibleTArray<nsCString>* scopes =
-      static_cast<InfallibleTArray<nsCString>*>(aArg);
-  scopes->AppendElement(aKey->GetKey());
-  return PL_DHASH_NEXT;
-}
-
-} // namespace
-
 void
 DOMStorageDBThread::GetScopesHavingData(InfallibleTArray<nsCString>* aScopes)
 {
   MonitorAutoLock monitor(mThreadObserver->GetMonitor());
-  mScopesHavingData.EnumerateEntries(GetScopesHavingDataEnum, aScopes);
+  for (auto iter = mScopesHavingData.Iter(); !iter.Done(); iter.Next()) {
+    aScopes->AppendElement(iter.Get()->GetKey());
+  }
 }
 
 nsresult
@@ -421,8 +410,7 @@ nsReverseStringSQLFunction::OnFunctionCall(
   rv = outVar->SetAsAUTF8String(result);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  *aResult = outVar.get();
-  outVar.forget();
+  outVar.forget(aResult);
   return NS_OK;
 }
 

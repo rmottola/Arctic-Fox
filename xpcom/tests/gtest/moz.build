@@ -22,10 +22,9 @@ UNIFIED_SOURCES += [
     'TestThreadPool.cpp',
     'TestThreads.cpp',
     'TestTimeStamp.cpp',
+    'TestTokenizer.cpp',
     'TestUTF.cpp',
     'TestXPIDLString.cpp',
 ]
 
 FINAL_LIBRARY = 'xul-gtest'
-
-FAIL_ON_WARNINGS = True

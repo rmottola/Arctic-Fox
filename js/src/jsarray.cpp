@@ -27,6 +27,7 @@
 
 #include "ds/Sort.h"
 #include "gc/Heap.h"
+#include "jit/InlinableNatives.h"
 #include "js/Class.h"
 #include "js/Conversions.h"
 #include "vm/ArgumentsObject.h"
@@ -83,12 +84,13 @@ js::GetLengthProperty(JSContext* cx, HandleObject obj, uint32_t* lengthp)
     if (!GetProperty(cx, obj, obj, cx->names().length, &value))
         return false;
 
-    if (value.isInt32()) {
-        *lengthp = uint32_t(value.toInt32()); // uint32_t cast does ToUint32
-        return true;
+    bool overflow;
+    if (!ToLengthClamped(cx, value, lengthp, &overflow)) {
+        if (!overflow)
+            return false;
+        *lengthp = UINT32_MAX;
     }
-
-    return ToUint32(cx, value, lengthp);
+    return true;
 }
 
 /*
@@ -1147,43 +1149,6 @@ ArrayJoin(JSContext* cx, CallArgs& args)
     return true;
 }
 
-/* ES5 15.4.4.2. NB: The algorithm here differs from the one in ES3. */
-static bool
-array_toString(JSContext* cx, unsigned argc, Value* vp)
-{
-    JS_CHECK_RECURSION(cx, return false);
-
-    CallArgs args = CallArgsFromVp(argc, vp);
-    RootedObject obj(cx, ToObject(cx, args.thisv()));
-    if (!obj)
-        return false;
-
-    RootedValue join(cx, args.calleev());
-    if (!GetProperty(cx, obj, obj, cx->names().join, &join))
-        return false;
-
-    if (!IsCallable(join)) {
-        JSString* str = JS_BasicObjectToString(cx, obj);
-        if (!str)
-            return false;
-        args.rval().setString(str);
-        return true;
-    }
-
-    InvokeArgs args2(cx);
-    if (!args2.init(0))
-        return false;
-
-    args2.setCallee(join);
-    args2.setThis(ObjectValue(*obj));
-
-    /* Do the call. */
-    if (!Invoke(cx, args2))
-        return false;
-    args.rval().set(args2.rval());
-    return true;
-}
-
 /* ES5 15.4.4.3 */
 static bool
 array_toLocaleString(JSContext* cx, unsigned argc, Value* vp)
@@ -1280,10 +1245,10 @@ ArrayReverseDenseKernel(JSContext* cx, HandleObject obj, uint32_t length)
         /* Fill out the array's initialized length to its proper length. */
         obj->as<NativeObject>().ensureDenseInitializedLength(cx, length, 0);
     } else {
-        // Unboxed arrays can only be reversed if their initialized length
+        // Unboxed arrays can only be reversed here if their initialized length
         // matches their actual length. Otherwise the reversal will place holes
         // at the beginning of the array, which we don't support.
-        if (length != obj->as<UnboxedArrayObject>().length())
+        if (length != obj->as<UnboxedArrayObject>().initializedLength())
             return DenseElementResult::Incomplete;
     }
 
@@ -2344,8 +2309,8 @@ CanOptimizeForDenseStorage(HandleObject arr, uint32_t startingIndex, uint32_t co
 }
 
 /* ES5 15.4.4.12. */
-bool
-js::array_splice(JSContext* cx, unsigned argc, Value* vp)
+static bool
+array_splice(JSContext* cx, unsigned argc, Value* vp)
 {
     return array_splice_impl(cx, argc, vp, true);
 }
@@ -3022,86 +2987,6 @@ js::array_slice_dense(JSContext* cx, HandleObject obj, int32_t begin, int32_t en
     return &argv[0].toObject();
 }
 
-/* ES5 15.4.4.20. */
-static bool
-array_filter(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-
-    /* Step 1. */
-    RootedObject obj(cx, ToObject(cx, args.thisv()));
-    if (!obj)
-        return false;
-
-    /* Step 2-3. */
-    uint32_t len;
-    if (!GetLengthProperty(cx, obj, &len))
-        return false;
-
-    /* Step 4. */
-    if (args.length() == 0) {
-        ReportMissingArg(cx, args.calleev(), 0);
-        return false;
-    }
-    RootedObject callable(cx, ValueToCallable(cx, args[0], args.length() - 1));
-    if (!callable)
-        return false;
-
-    /* Step 5. */
-    RootedValue thisv(cx, args.length() >= 2 ? args[1] : UndefinedValue());
-
-    /* Step 6. */
-    RootedObject arr(cx, NewFullyAllocatedArrayForCallingAllocationSite(cx, 0));
-    if (!arr)
-        return false;
-
-    /* Step 7. */
-    uint32_t k = 0;
-
-    /* Step 8. */
-    uint32_t to = 0;
-
-    /* Step 9. */
-    FastInvokeGuard fig(cx, ObjectValue(*callable));
-    InvokeArgs& args2 = fig.args();
-    RootedValue kValue(cx);
-    while (k < len) {
-        if (!CheckForInterrupt(cx))
-            return false;
-
-        /* Step a, b, and c.i. */
-        bool kNotPresent;
-        if (!GetElement(cx, obj, k, &kNotPresent, &kValue))
-            return false;
-
-        /* Step c.ii-iii. */
-        if (!kNotPresent) {
-            if (!args2.init(3))
-                return false;
-            args2.setCallee(ObjectValue(*callable));
-            args2.setThis(thisv);
-            args2[0].set(kValue);
-            args2[1].setNumber(k);
-            args2[2].setObject(*obj);
-            if (!fig.invoke(cx))
-                return false;
-
-            if (ToBoolean(args2.rval())) {
-                if (!SetArrayElement(cx, arr, to, kValue))
-                    return false;
-                to++;
-            }
-        }
-
-        /* Step d. */
-        k++;
-    }
-
-    /* Step 10. */
-    args.rval().setObject(*arr);
-    return true;
-}
-
 static bool
 array_isArray(JSContext* cx, unsigned argc, Value* vp)
 {
@@ -3185,30 +3070,30 @@ static const JSFunctionSpec array_methods[] = {
 #if JS_HAS_TOSOURCE
     JS_FN(js_toSource_str,      array_toSource,     0,0),
 #endif
-    JS_FN(js_toString_str,      array_toString,     0,0),
-    JS_FN(js_toLocaleString_str,array_toLocaleString,0,0),
+    JS_SELF_HOSTED_FN(js_toString_str, "ArrayToString",      0,0),
+    JS_FN(js_toLocaleString_str,       array_toLocaleString, 0,0),
 
     /* Perl-ish methods. */
     JS_FN("join",               array_join,         1,JSFUN_GENERIC_NATIVE),
     JS_FN("reverse",            array_reverse,      0,JSFUN_GENERIC_NATIVE),
     JS_FN("sort",               array_sort,         1,JSFUN_GENERIC_NATIVE),
-    JS_FN("push",               array_push,         1,JSFUN_GENERIC_NATIVE),
-    JS_FN("pop",                array_pop,          0,JSFUN_GENERIC_NATIVE),
-    JS_FN("shift",              array_shift,        0,JSFUN_GENERIC_NATIVE),
+    JS_INLINABLE_FN("push",     array_push,         1,JSFUN_GENERIC_NATIVE, ArrayPush),
+    JS_INLINABLE_FN("pop",      array_pop,          0,JSFUN_GENERIC_NATIVE, ArrayPop),
+    JS_INLINABLE_FN("shift",    array_shift,        0,JSFUN_GENERIC_NATIVE, ArrayShift),
     JS_FN("unshift",            array_unshift,      1,JSFUN_GENERIC_NATIVE),
-    JS_FN("splice",             array_splice,       2,JSFUN_GENERIC_NATIVE),
+    JS_INLINABLE_FN("splice",   array_splice,       2,JSFUN_GENERIC_NATIVE, ArraySplice),
 
     /* Pythonic sequence methods. */
-    JS_FN("concat",             array_concat,       1,JSFUN_GENERIC_NATIVE),
-    JS_FN("slice",              array_slice,        2,JSFUN_GENERIC_NATIVE),
+    JS_INLINABLE_FN("concat",   array_concat,       1,JSFUN_GENERIC_NATIVE, ArrayConcat),
+    JS_INLINABLE_FN("slice",    array_slice,        2,JSFUN_GENERIC_NATIVE, ArraySlice),
 
     JS_SELF_HOSTED_FN("lastIndexOf", "ArrayLastIndexOf", 1,0),
     JS_SELF_HOSTED_FN("indexOf",     "ArrayIndexOf",     1,0),
     JS_SELF_HOSTED_FN("forEach",     "ArrayForEach",     1,0),
     JS_SELF_HOSTED_FN("map",         "ArrayMap",         1,0),
+    JS_SELF_HOSTED_FN("filter",      "ArrayFilter",      1,0),
     JS_SELF_HOSTED_FN("reduce",      "ArrayReduce",      1,0),
     JS_SELF_HOSTED_FN("reduceRight", "ArrayReduceRight", 1,0),
-    JS_FN("filter",             array_filter,       1,JSFUN_GENERIC_NATIVE),
     JS_SELF_HOSTED_FN("some",        "ArraySome",        1,0),
     JS_SELF_HOSTED_FN("every",       "ArrayEvery",       1,0),
 
@@ -3225,16 +3110,16 @@ static const JSFunctionSpec array_methods[] = {
 
     /* ES7 additions */
     JS_SELF_HOSTED_FN("includes",    "ArrayIncludes",    2,0),
-
     JS_FS_END
 };
 
 static const JSFunctionSpec array_static_methods[] = {
-    JS_FN("isArray",            array_isArray,      1,0),
+    JS_INLINABLE_FN("isArray",       array_isArray,        1,0, ArrayIsArray),
     JS_SELF_HOSTED_FN("lastIndexOf", "ArrayStaticLastIndexOf", 2,0),
     JS_SELF_HOSTED_FN("indexOf",     "ArrayStaticIndexOf", 2,0),
     JS_SELF_HOSTED_FN("forEach",     "ArrayStaticForEach", 2,0),
     JS_SELF_HOSTED_FN("map",         "ArrayStaticMap",   2,0),
+    JS_SELF_HOSTED_FN("filter",      "ArrayStaticFilter", 2,0),
     JS_SELF_HOSTED_FN("every",       "ArrayStaticEvery", 2,0),
     JS_SELF_HOSTED_FN("some",        "ArrayStaticSome",  2,0),
     JS_SELF_HOSTED_FN("reduce",      "ArrayStaticReduce", 2,0),
@@ -3376,7 +3261,7 @@ const Class ArrayObject::class_ = {
     nullptr, /* construct */
     nullptr, /* trace */
     {
-        GenericCreateConstructor<ArrayConstructor, 1, gc::AllocKind::FUNCTION>,
+        GenericCreateConstructor<ArrayConstructor, 1, AllocKind::FUNCTION, &jit::JitInfo_Array>,
         CreateArrayPrototype,
         array_static_methods,
         nullptr,
@@ -3762,7 +3647,7 @@ bool
 js::ArrayInfo(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    RootedBobject obj(cx);
+    RootedObject obj(cx);
 
     for (unsigned i = 0; i < args.length(); i++) {
         HandleValue arg = args[i];

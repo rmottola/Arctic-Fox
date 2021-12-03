@@ -201,7 +201,6 @@ nsresult MediaOmxReader::InitOmxDecoder()
   if (!mOmxDecoder.get()) {
     //register sniffers, if they are not registered in this process.
     DataSource::RegisterDefaultSniffers();
-    mDecoder->GetResource()->SetReadMode(MediaCacheStream::MODE_METADATA);
 
     sp<DataSource> dataSource = new MediaStreamSource(mDecoder->GetResource());
     dataSource->initCheck();
@@ -210,10 +209,11 @@ nsresult MediaOmxReader::InitOmxDecoder()
     if (!mExtractor.get()) {
       return NS_ERROR_FAILURE;
     }
-    mOmxDecoder = new OmxDecoder(mDecoder->GetResource(), mDecoder);
+    mOmxDecoder = new OmxDecoder(mDecoder);
     if (!mOmxDecoder->Init(mExtractor)) {
       return NS_ERROR_FAILURE;
     }
+    mStreamSource = static_cast<MediaStreamSource*>(dataSource.get());
   }
   return NS_OK;
 }
@@ -394,8 +394,9 @@ bool MediaOmxReader::DecodeVideoFrame(bool &aKeyframeSkip,
       picture.height = (frame.Y.mHeight * mPicture.height) / mInitialFrame.height;
     }
 
+    MOZ_ASSERT(mStreamSource);
     // This is the approximate byte position in the stream.
-    int64_t pos = mDecoder->GetResource()->Tell();
+    int64_t pos = mStreamSource->Tell();
 
     nsRefPtr<VideoData> v;
     if (!frame.mGraphicBuffer) {
@@ -473,7 +474,8 @@ void MediaOmxReader::NotifyDataArrivedInternal(uint32_t aLength, int64_t aOffset
     return;
   }
 
-  nsRefPtr<MediaByteBuffer> bytes = mDecoder->GetResource()->SilentReadAt(aOffset, aLength);
+  nsRefPtr<MediaByteBuffer> bytes =
+    mDecoder->GetResource()->MediaReadAt(aOffset, aLength);
   NS_ENSURE_TRUE_VOID(bytes);
   mMP3FrameParser.Parse(bytes->Elements(), aLength, aOffset);
   if (!mMP3FrameParser.IsMP3()) {
@@ -492,8 +494,9 @@ bool MediaOmxReader::DecodeAudioData()
   MOZ_ASSERT(OnTaskQueue());
   EnsureActive();
 
+  MOZ_ASSERT(mStreamSource);
   // This is the approximate byte position in the stream.
-  int64_t pos = mDecoder->GetResource()->Tell();
+  int64_t pos = mStreamSource->Tell();
 
   // Read next frame
   MPAPI::AudioFrame source;

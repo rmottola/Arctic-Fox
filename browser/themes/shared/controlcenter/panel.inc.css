@@ -1,0 +1,91 @@
+#identity-popup-content-box:not(.verifiedIdentity) > #identity-popup-content-owner,
+#identity-popup-content-box:not(.verifiedIdentity):not(.verifiedDomain) > #identity-popup-content-verifier,
+#identity-popup-securityView:not(.unknownIdentity):not(.verifiedIdentity):not(.mixedContent):not(.weakCipher) > #identity-popup-content-supplemental,
+#identity-popup-content-box:not(.verifiedIdentity):not(.verifiedDomain):not(.chromeUI) > #identity-popup-connection-secure,
+#identity-popup-content-box:not(.unknownIdentity) > #identity-popup-connection-not-secure {
+  display: none;
+}
+
+
+/* PANEL */
+
+#identity-popup > .panel-arrowcontainer > .panel-arrowcontent {
+  padding: 0;
+}
+
+#identity-popup-container {
+  min-width: 25em;
+  padding: 10px;
+}
+
+/* ICON */
+
+#identity-popup.chromeUI > #identity-popup-container > #identity-popup-icon {
+  list-style-image: url("chrome://branding/content/icon64.png");
+}
+
+@media (min-resolution: 1.1dppx) {
+  #identity-popup.chromeUI > #identity-popup-container > #identity-popup-icon {
+    list-style-image: url("chrome://branding/content/icon128.png");
+  }
+}
+
+/* CONTENT */
+
+.identity-popup-label {
+  font-size: 120%;
+  white-space: pre-wrap;
+  -moz-padding-start: 15px;
+  margin: 0;
+}
+
+.identity-popup-description {
+  white-space: pre-wrap;
+  -moz-padding-start: 15px;
+  margin: 2px 0 4px;
+  font-size: 110%;
+}
+
+#identity-popup-content-box {
+  width: 40ch;
+}
+
+#identity-popup-content-host {
+  font-size: 140%;
+}
+
+#identity-popup-content-owner {
+  margin-bottom: 0;
+  font-weight: 700;
+}
+
+#identity-popup-content-host,
+#identity-popup-content-owner {
+  max-width: 300px;
+}
+
+#identity-popup-connection-secure,
+#identity-popup-connection-not-secure,
+#identity-popup-content-supplemental {
+  margin-bottom: 1em;
+}
+
+#identity-popup-connection-secure {
+  color: #418220;
+}
+
+#identity-popup-connection-not-secure {
+  color: #d74345;
+}
+
+/* PERMISSIONS */
+
+#identity-popup-permissions {
+  margin-top: 1em;
+}
+
+/* FOOTER BUTTONS */
+
+#identity-popup-button-container {
+  background-color: hsla(210,4%,10%,.07);
+}

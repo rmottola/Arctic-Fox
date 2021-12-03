@@ -51,8 +51,6 @@ class RasterImage;
 class nsJXRDecoder : public Decoder
 {
 public:
-
-    nsJXRDecoder(RasterImage* aImage, bool hasBeenDecoded);
     ~nsJXRDecoder();
 
     virtual void InitInternal();
@@ -60,6 +58,10 @@ public:
     virtual void FinishInternal();
 
 private:
+    friend class DecoderFactory;
+
+    // Decoders should only be instantiated via DecoderFactory.
+    nsJXRDecoder(RasterImage* aImage, bool hasBeenDecoded);
 
     tagPKImageDecode *m_pDecoder;
     tagPKFormatConverter *m_pConverter;

@@ -899,9 +899,17 @@ BacktrackingAllocator::tryMergeBundles(LiveBundle* bundle0, LiveBundle* bundle1)
         }
     }
 
+    // Limit the number of times we compare ranges if there are many ranges in
+    // one of the bundles, to avoid quadratic behavior.
+    static const size_t MAX_RANGES = 200;
+
     // Make sure that ranges in the bundles do not overlap.
     LiveRange::BundleLinkIterator iter0 = bundle0->rangesBegin(), iter1 = bundle1->rangesBegin();
+    size_t count = 0;
     while (iter0 && iter1) {
+        if (++count >= MAX_RANGES)
+            return true;
+
         LiveRange* range0 = LiveRange::get(*iter0);
         LiveRange* range1 = LiveRange::get(*iter1);
 
@@ -2325,11 +2333,12 @@ BacktrackingAllocator::minimalDef(LiveRange* range, LNode* ins)
 }
 
 bool
-BacktrackingAllocator::minimalUse(LiveRange* range, LNode* ins)
+BacktrackingAllocator::minimalUse(LiveRange* range, UsePosition* use)
 {
-    // Whether this is a minimal range capturing a use at ins.
+    // Whether this is a minimal range capturing |use|.
+    LNode* ins = insData[use->pos];
     return (range->from() == inputOf(ins)) &&
-           (range->to() == outputOf(ins) || range->to() == outputOf(ins).next());
+           (range->to() == (use->use->usedAtStart() ? outputOf(ins) : outputOf(ins).next()));
 }
 
 bool
@@ -2367,12 +2376,12 @@ BacktrackingAllocator::minimalBundle(LiveBundle* bundle, bool* pfixed)
             if (fixed)
                 return false;
             fixed = true;
-            if (minimalUse(range, insData[iter->pos]))
+            if (minimalUse(range, *iter))
                 minimal = true;
             break;
 
           case LUse::REGISTER:
-            if (minimalUse(range, insData[iter->pos]))
+            if (minimalUse(range, *iter))
                 minimal = true;
             break;
 
@@ -2504,6 +2513,13 @@ BacktrackingAllocator::trySplitAcrossHotcode(LiveBundle* bundle, bool* success)
         return false;
     LiveBundle* preBundle = nullptr;
     LiveBundle* postBundle = nullptr;
+    LiveBundle* coldBundle = nullptr;
+
+    if (testbed) {
+        coldBundle = LiveBundle::New(alloc(), bundle->spillSet(), bundle->spillParent());
+        if (!coldBundle)
+            return false;
+    }
 
     // Accumulate the ranges of hot and cold code in the bundle. Note that
     // we are only comparing with the single hot range found, so the cold code
@@ -2519,33 +2535,53 @@ BacktrackingAllocator::trySplitAcrossHotcode(LiveBundle* bundle, bool* success)
         }
 
         if (!coldPre.empty()) {
-            if (!preBundle) {
-                preBundle = LiveBundle::New(alloc(), bundle->spillSet(), bundle->spillParent());
-                if (!preBundle)
+            if (testbed) {
+                if (!coldBundle->addRangeAndDistributeUses(alloc(), range, coldPre.from, coldPre.to))
+                    return false;
+            } else {
+                if (!preBundle) {
+                    preBundle = LiveBundle::New(alloc(), bundle->spillSet(), bundle->spillParent());
+                    if (!preBundle)
+                        return false;
+                }
+                if (!preBundle->addRangeAndDistributeUses(alloc(), range, coldPre.from, coldPre.to))
                     return false;
             }
-            if (!preBundle->addRangeAndDistributeUses(alloc(), range, coldPre.from, coldPre.to))
-                return false;
         }
 
         if (!coldPost.empty()) {
-            if (!postBundle)
-                postBundle = LiveBundle::New(alloc(), bundle->spillSet(), bundle->spillParent());
-            if (!postBundle->addRangeAndDistributeUses(alloc(), range, coldPost.from, coldPost.to))
-                return false;
+            if (testbed) {
+                if (!coldBundle->addRangeAndDistributeUses(alloc(), range, coldPost.from, coldPost.to))
+                    return false;
+            } else {
+                if (!postBundle) {
+                    postBundle = LiveBundle::New(alloc(), bundle->spillSet(), bundle->spillParent());
+                    if (!postBundle)
+                        return false;
+                }
+                if (!postBundle->addRangeAndDistributeUses(alloc(), range, coldPost.from, coldPost.to))
+                    return false;
+            }
         }
     }
 
-    MOZ_ASSERT(preBundle || postBundle);
     MOZ_ASSERT(hotBundle->numRanges() != 0);
 
     LiveBundleVector newBundles;
     if (!newBundles.append(hotBundle))
         return false;
-    if (preBundle && !newBundles.append(preBundle))
-        return false;
-    if (postBundle && !newBundles.append(postBundle))
-        return false;
+
+    if (testbed) {
+        MOZ_ASSERT(coldBundle->numRanges() != 0);
+        if (!newBundles.append(coldBundle))
+            return false;
+    } else {
+        MOZ_ASSERT(preBundle || postBundle);
+        if (preBundle && !newBundles.append(preBundle))
+            return false;
+        if (postBundle && !newBundles.append(postBundle))
+            return false;
+    }
 
     *success = true;
     return splitAndRequeueBundles(bundle, newBundles);

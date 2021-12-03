@@ -6,7 +6,7 @@
 #include "nsISupports.idl"
 #include "nsIFile.idl"
 
-[scriptable, uuid(5878366c-73f6-486e-ad2f-9aca602864e4)]
+[scriptable, uuid(32d35d21-181f-4630-8caa-a431e2ebad72)]
 interface mozIGeckoMediaPluginChromeService : nsISupports
 {
   /**
@@ -23,14 +23,16 @@ interface mozIGeckoMediaPluginChromeService : nsISupports
 
   /**
    * Remove a directory for gecko media plugins and delete it from disk.
+   * If |defer| is true, wait until the plugin is unused before removing.
    * @note Main-thread API.
    */
-  void removeAndDeletePluginDirectory(in AString directory);
+  void removeAndDeletePluginDirectory(in AString directory,
+                                      [optional] in bool defer);
 
   /**
-   * Clears storage data associated with the origin.
+   * Clears storage data associated with the site.
    */
-  void forgetThisSite(in AString origin);
+  void forgetThisSite(in AString site);
 
   /**
    * Returns true if the given node id is allowed to store things

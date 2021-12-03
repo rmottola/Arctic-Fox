@@ -97,6 +97,7 @@
     macro(format, format, "format") \
     macro(frame, frame, "frame") \
     macro(from, from, "from") \
+    macro(gcCycleNumber, gcCycleNumber, "gcCycleNumber") \
     macro(GeneratorFunction, GeneratorFunction, "GeneratorFunction") \
     macro(get, get, "get") \
     macro(getInternals, getInternals, "getInternals") \
@@ -155,6 +156,7 @@
     macro(multiline, multiline, "multiline") \
     macro(name, name, "name") \
     macro(NaN, NaN, "NaN") \
+    macro(new, new_, "new") \
     macro(next, next, "next") \
     macro(NFC, NFC, "NFC") \
     macro(NFD, NFD, "NFD") \

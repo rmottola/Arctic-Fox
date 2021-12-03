@@ -50,7 +50,7 @@ public:
         AudioBlockCopyChannelWithScale(
             static_cast<const float*>(aInput[i].mChannelData[j]),
             aInput[i].mVolume,
-            static_cast<float*>(const_cast<void*>(aOutput[0].mChannelData[channelIndex])));
+            aOutput[0].ChannelFloatsForWrite(channelIndex));
         ++channelIndex;
         if (channelIndex >= channelCount) {
           return;
@@ -73,8 +73,9 @@ ChannelMergerNode::ChannelMergerNode(AudioContext* aContext,
               ChannelInterpretation::Speakers)
   , mInputCount(aInputCount)
 {
-  mStream = aContext->Graph()->CreateAudioNodeStream(new ChannelMergerNodeEngine(this),
-                                                     MediaStreamGraph::INTERNAL_STREAM);
+  mStream = AudioNodeStream::Create(aContext->Graph(),
+                                    new ChannelMergerNodeEngine(this),
+                                    AudioNodeStream::NO_STREAM_FLAGS);
 }
 
 ChannelMergerNode::~ChannelMergerNode()

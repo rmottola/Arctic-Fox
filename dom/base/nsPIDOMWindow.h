@@ -203,6 +203,9 @@ public:
   float GetAudioVolume() const;
   nsresult SetAudioVolume(float aVolume);
 
+  bool GetAudioCaptured() const;
+  nsresult SetAudioCapture(bool aCapture);
+
   virtual void SetServiceWorkersTestingEnabled(bool aEnabled)
   {
     MOZ_ASSERT(IsOuterWindow());
@@ -733,7 +736,7 @@ public:
                         const nsAString& aPopupWindowFeatures) = 0;
 
   // Inner windows only.
-  void AddAudioContext(mozilla::dom::AudioContext* aAudioContext);
+  bool AddAudioContext(mozilla::dom::AudioContext* aAudioContext);
   void RemoveAudioContext(mozilla::dom::AudioContext* aAudioContext);
   void MuteAudioContexts();
   void UnmuteAudioContexts();
@@ -849,6 +852,8 @@ protected:
 
   bool                   mAudioMuted;
   float                  mAudioVolume;
+
+  bool                   mAudioCaptured;
 
   // current desktop mode flag.
   bool                   mDesktopModeViewport;

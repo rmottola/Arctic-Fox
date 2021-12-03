@@ -42,6 +42,7 @@ public:
   NS_IMETHOD GetNodeId(const nsAString& aOrigin,
                        const nsAString& aTopLevelOrigin,
                        bool aInPrivateBrowsingMode,
+                       const nsACString& aVersion,
                        UniquePtr<GetNodeIdCallback>&& aCallback) override;
 
   NS_DECL_MOZIGECKOMEDIAPLUGINCHROMESERVICE
@@ -72,7 +73,8 @@ private:
                                   size_t* aOutPluginIndex);
 
   nsresult GetNodeId(const nsAString& aOrigin, const nsAString& aTopLevelOrigin,
-                     bool aInPrivateBrowsing, nsACString& aOutId);
+                     bool aInPrivateBrowsing, const nsACString& aVersion,
+                     nsACString& aOutId);
 
   void UnloadPlugins();
   void CrashPlugins();
@@ -84,7 +86,8 @@ private:
 
   void AddOnGMPThread(const nsAString& aDirectory);
   void RemoveOnGMPThread(const nsAString& aDirectory,
-                         const bool aDeleteFromDisk);
+                         const bool aDeleteFromDisk,
+                         const bool aCanDefer);
 
   nsresult SetAsyncShutdownTimeout();
 
@@ -99,7 +102,7 @@ private:
 
 protected:
   friend class GMPParent;
-  void ReAddOnGMPThread(nsRefPtr<GMPParent>& aOld);
+  void ReAddOnGMPThread(const nsRefPtr<GMPParent>& aOld);
   void PluginTerminated(const RefPtr<GMPParent>& aOld);
   virtual void InitializePlugins() override;
   virtual bool GetContentParentFrom(const nsACString& aNodeId,
@@ -122,10 +125,11 @@ private:
     };
 
     PathRunnable(GeckoMediaPluginServiceParent* aService, const nsAString& aPath,
-                 EOperation aOperation)
+                 EOperation aOperation, bool aDefer = false)
       : mService(aService)
       , mPath(aPath)
       , mOperation(aOperation)
+      , mDefer(aDefer)
     { }
 
     NS_DECL_NSIRUNNABLE
@@ -134,6 +138,7 @@ private:
     nsRefPtr<GeckoMediaPluginServiceParent> mService;
     nsString mPath;
     EOperation mOperation;
+    bool mDefer;
   };
 
   // Protected by mMutex from the base class.
@@ -189,7 +194,7 @@ private:
 };
 
 nsresult ReadSalt(nsIFile* aPath, nsACString& aOutData);
-bool MatchOrigin(nsIFile* aPath, const nsACString& aOrigin);
+bool MatchOrigin(nsIFile* aPath, const nsACString& aSite);
 
 class GMPServiceParent final : public PGMPServiceParent
 {
@@ -210,6 +215,7 @@ public:
   virtual bool RecvGetGMPNodeId(const nsString& aOrigin,
                                 const nsString& aTopLevelOrigin,
                                 const bool& aInPrivateBrowsing,
+                                const nsCString& aVersion,
                                 nsCString* aID) override;
   static bool RecvGetGMPPluginVersionForAPI(const nsCString& aAPI,
                                             nsTArray<nsCString>&& aTags,

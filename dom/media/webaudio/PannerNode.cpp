@@ -240,8 +240,9 @@ PannerNode::PannerNode(AudioContext* aContext)
   , mConeOuterAngle(360.)
   , mConeOuterGain(0.)
 {
-  mStream = aContext->Graph()->CreateAudioNodeStream(new PannerNodeEngine(this),
-                                                     MediaStreamGraph::INTERNAL_STREAM);
+  mStream = AudioNodeStream::Create(aContext->Graph(),
+                                    new PannerNodeEngine(this),
+                                    AudioNodeStream::NO_STREAM_FLAGS);
   // We should register once we have set up our stream and engine.
   Context()->Listener()->RegisterPannerNode(this);
 }
@@ -543,7 +544,7 @@ PannerNode::FindConnectedSources(AudioNode* aNode,
     // Check if this node is an AudioBufferSourceNode that still have a stream,
     // which means it has not finished playing.
     AudioBufferSourceNode* node = inputNodes[i].mInputNode->AsAudioBufferSourceNode();
-    if (node && node->Stream()) {
+    if (node && node->GetStream()) {
       aSources.AppendElement(node);
     }
   }

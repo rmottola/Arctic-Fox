@@ -18,10 +18,8 @@
 #include "gmp-video-decode.h"
 #include "gmp-video-encode.h"
 #include "GMPPlatform.h"
-#ifdef XP_WIN
-#include "nsCRT.h"
-#endif
-#include <fstream>
+#include "GMPUtils.h"
+#include "prio.h"
 
 static const int MAX_VOUCHER_LENGTH = 500000;
 
@@ -48,6 +46,13 @@ extern PRLogModuleInfo* GetGMPLog();
 
 namespace gmp {
 
+static bool
+FileExists(nsIFile* aFile)
+{
+  bool exists = false;
+  return aFile && NS_SUCCEEDED(aFile->Exists(&exists)) && exists;
+}
+
 GMPChild::GMPChild()
   : mAsyncShutdown(nullptr)
   , mGMPMessageLoop(MessageLoop::current())
@@ -63,14 +68,12 @@ GMPChild::~GMPChild()
 }
 
 static bool
-GetFileBase(const std::string& aPluginPath,
+GetFileBase(const nsAString& aPluginPath,
             nsCOMPtr<nsIFile>& aLibDirectory,
             nsCOMPtr<nsIFile>& aFileBase,
             nsAutoString& aBaseName)
 {
-  nsDependentCString pluginPath(aPluginPath.c_str());
-
-  nsresult rv = NS_NewLocalFile(NS_ConvertUTF8toUTF16(pluginPath),
+  nsresult rv = NS_NewLocalFile(aPluginPath,
                                 true, getter_AddRefs(aFileBase));
   if (NS_FAILED(rv)) {
     return false;
@@ -99,7 +102,7 @@ GetFileBase(const std::string& aPluginPath,
 }
 
 static bool
-GetFileBase(const std::string& aPluginPath,
+GetFileBase(const nsAString& aPluginPath,
             nsCOMPtr<nsIFile>& aFileBase,
             nsAutoString& aBaseName)
 {
@@ -108,7 +111,7 @@ GetFileBase(const std::string& aPluginPath,
 }
 
 static bool
-GetPluginFile(const std::string& aPluginPath,
+GetPluginFile(const nsAString& aPluginPath,
               nsCOMPtr<nsIFile>& aLibDirectory,
               nsCOMPtr<nsIFile>& aLibFile)
 {
@@ -129,7 +132,7 @@ GetPluginFile(const std::string& aPluginPath,
 }
 
 static bool
-GetPluginFile(const std::string& aPluginPath,
+GetPluginFile(const nsAString& aPluginPath,
               nsCOMPtr<nsIFile>& aLibFile)
 {
   nsCOMPtr<nsIFile> unusedlibDir;
@@ -137,7 +140,7 @@ GetPluginFile(const std::string& aPluginPath,
 }
 
 static bool
-GetInfoFile(const std::string& aPluginPath,
+GetInfoFile(const nsAString& aPluginPath,
             nsCOMPtr<nsIFile>& aInfoFile)
 {
   nsAutoString baseName;
@@ -163,7 +166,7 @@ GetNativeTarget(nsIFile* aFile)
 }
 
 static bool
-GetPluginPaths(const std::string& aPluginPath,
+GetPluginPaths(const nsAString& aPluginPath,
                nsCString &aPluginDirectoryPath,
                nsCString &aPluginFilePath)
 {
@@ -248,20 +251,20 @@ GMPChild::SetMacSandboxInfo()
 #endif // XP_MACOSX && MOZ_GMP_SANDBOX
 
 bool
-GMPChild::Init(const std::string& aPluginPath,
-               const std::string& aVoucherPath,
+GMPChild::Init(const nsAString& aPluginPath,
+               const nsAString& aVoucherPath,
                base::ProcessId aParentPid,
                MessageLoop* aIOLoop,
                IPC::Channel* aChannel)
 {
-  LOGD("%s pluginPath=%s", __FUNCTION__, aPluginPath.c_str());
+  LOGD("%s pluginPath=%s", __FUNCTION__, NS_ConvertUTF16toUTF8(aPluginPath).get());
 
   if (NS_WARN_IF(!Open(aChannel, aParentPid, aIOLoop))) {
     return false;
   }
 
   mPluginPath = aPluginPath;
-  mVoucherPath = aVoucherPath;
+  mSandboxVoucherPath = aVoucherPath;
   return true;
 }
 
@@ -273,7 +276,7 @@ GMPChild::RecvSetNodeId(const nsCString& aNodeId)
   // Store the per origin salt for the node id. Note: we do this in a
   // separate message than RecvStartPlugin() so that the string is not
   // sitting in a string on the IPC code's call stack.
-  mNodeId = std::string(aNodeId.BeginReading(), aNodeId.EndReading());
+  mNodeId = aNodeId;
   return true;
 }
 
@@ -286,76 +289,114 @@ GMPChild::GetAPI(const char* aAPIName, void* aHostAPI, void** aPluginAPI)
   return mGMPLoader->GetAPI(aAPIName, aHostAPI, aPluginAPI);
 }
 
+static bool
+ReadIntoArray(nsIFile* aFile,
+              nsTArray<uint8_t>& aOutDst,
+              size_t aMaxLength)
+{
+  if (!FileExists(aFile)) {
+    return false;
+  }
+
+  PRFileDesc* fd = nullptr;
+  nsresult rv = aFile->OpenNSPRFileDesc(PR_RDONLY, 0, &fd);
+  if (NS_FAILED(rv)) {
+    return false;
+  }
+
+  int32_t length = PR_Seek(fd, 0, PR_SEEK_END);
+  PR_Seek(fd, 0, PR_SEEK_SET);
+
+  if (length < 0 || (size_t)length > aMaxLength) {
+    NS_WARNING("EME file is longer than maximum allowed length");
+    PR_Close(fd);
+    return false;
+  }
+  aOutDst.SetLength(length);
+  int32_t bytesRead = PR_Read(fd, aOutDst.Elements(), length);
+  PR_Close(fd);
+  return (bytesRead == length);
+}
+
 #ifdef XP_WIN
+static bool
+ReadIntoString(nsIFile* aFile,
+               nsCString& aOutDst,
+               size_t aMaxLength)
+{
+  nsTArray<uint8_t> buf;
+  bool rv = ReadIntoArray(aFile, buf, aMaxLength);
+  if (rv) {
+    buf.AppendElement(0); // Append null terminator, required by nsC*String.
+    aOutDst = nsDependentCString((const char*)buf.Elements(), buf.Length() - 1);
+  }
+  return rv;
+}
+
 // Pre-load DLLs that need to be used by the EME plugin but that can't be
 // loaded after the sandbox has started
 bool
-GMPChild::PreLoadLibraries(const std::string& aPluginPath)
+GMPChild::PreLoadLibraries(const nsAString& aPluginPath)
 {
   // This must be in sorted order and lowercase!
-  static const char* whitelist[] =
-    {
-       "d3d9.dll", // Create an `IDirect3D9` to get adapter information
-       "dxva2.dll", // Get monitor information
-       "evr.dll", // MFGetStrideForBitmapInfoHeader
-       "mfh264dec.dll", // H.264 decoder (on Windows Vista)
-       "mfheaacdec.dll", // AAC decoder (on Windows Vista)
-       "mfplat.dll", // MFCreateSample, MFCreateAlignedMemoryBuffer, MFCreateMediaType
-       "msauddecmft.dll", // AAC decoder (on Windows 8)
-       "msmpeg2adec.dll", // AAC decoder (on Windows 7)
-       "msmpeg2vdec.dll", // H.264 decoder
-    };
-  static const int whitelistLen = sizeof(whitelist) / sizeof(whitelist[0]);
+  static const char* whitelist[] = {
+    "d3d9.dll", // Create an `IDirect3D9` to get adapter information
+    "dxva2.dll", // Get monitor information
+    "evr.dll", // MFGetStrideForBitmapInfoHeader
+    "mfh264dec.dll", // H.264 decoder (on Windows Vista)
+    "mfheaacdec.dll", // AAC decoder (on Windows Vista)
+    "mfplat.dll", // MFCreateSample, MFCreateAlignedMemoryBuffer, MFCreateMediaType
+    "msauddecmft.dll", // AAC decoder (on Windows 8)
+    "msmpeg2adec.dll", // AAC decoder (on Windows 7)
+    "msmpeg2vdec.dll", // H.264 decoder
+  };
 
   nsCOMPtr<nsIFile> infoFile;
   GetInfoFile(aPluginPath, infoFile);
 
-  nsString path;
-  infoFile->GetPath(path);
-
-  std::ifstream stream;
-#ifdef _MSC_VER
-  stream.open(static_cast<const wchar_t*>(path.get()));
-#else
-  stream.open(NS_ConvertUTF16toUTF8(path).get());
-#endif
-  if (!stream.good()) {
-    NS_WARNING("Failure opening info file for required DLLs");
+  static const size_t MAX_GMP_INFO_FILE_LENGTH = 5 * 1024;
+  nsAutoCString info;
+  if (!ReadIntoString(infoFile, info, MAX_GMP_INFO_FILE_LENGTH)) {
+    NS_WARNING("Failed to read info file in GMP process.");
     return false;
   }
 
-  do {
-    std::string line;
-    getline(stream, line);
-    if (stream.fail()) {
-      NS_WARNING("Failure reading info file for required DLLs");
-      return false;
+  // Note: we pass "\r\n" to SplitAt so that we'll split lines delimited
+  // by \n (Unix), \r\n (Windows) and \r (old MacOSX).
+  nsTArray<nsCString> lines;
+  SplitAt("\r\n", info, lines);
+  for (nsCString line : lines) {
+    // Make lowercase.
+    std::transform(line.BeginWriting(),
+                   line.EndWriting(),
+                   line.BeginWriting(),
+                   tolower);
+
+    const char* libraries = "libraries:";
+    int32_t offset = line.Find(libraries, false, 0);
+    if (offset == kNotFound) {
+      continue;
     }
-    std::transform(line.begin(), line.end(), line.begin(), tolower);
-    static const char* prefix = "libraries:";
-    static const int prefixLen = strlen(prefix);
-    if (0 == line.compare(0, prefixLen, prefix)) {
-      char* lineCopy = strdup(line.c_str() + prefixLen);
-      char* start = lineCopy;
-      while (char* tok = nsCRT::strtok(start, ", ", &start)) {
-        for (int i = 0; i < whitelistLen; i++) {
-          if (0 == strcmp(whitelist[i], tok)) {
-            LoadLibraryA(tok);
-            break;
-          }
+    // Line starts with "libraries:".
+    nsTArray<nsCString> libs;
+    SplitAt(",", Substring(line, offset + strlen(libraries)), libs);
+    for (nsCString lib : libs) {
+      lib.Trim(" ");
+      for (const char* whiteListedLib : whitelist) {
+        if (lib.EqualsASCII(whiteListedLib)) {
+          LoadLibraryA(lib.get());
+          break;
         }
       }
-      free(lineCopy);
-      break;
     }
-  } while (!stream.eof());
+  }
 
   return true;
 }
 #endif
 
 bool
-GMPChild::GetLibPath(nsACString& aOutLibPath)
+GMPChild::GetUTF8LibPath(nsACString& aOutLibPath)
 {
 #if defined(XP_MACOSX) && defined(MOZ_GMP_SANDBOX)
   nsAutoCString pluginDirectoryPath, pluginFilePath;
@@ -369,7 +410,17 @@ GMPChild::GetLibPath(nsACString& aOutLibPath)
   if (!GetPluginFile(mPluginPath, libFile)) {
     return false;
   }
-  return NS_SUCCEEDED(libFile->GetNativePath(aOutLibPath));
+
+  if (!FileExists(libFile)) {
+    NS_WARNING("Can't find GMP library file!");
+    return false;
+  }
+
+  nsAutoString path;
+  libFile->GetPath(path);
+  aOutLibPath = NS_ConvertUTF16toUTF8(path);
+
+  return true;
 #endif
 }
 
@@ -381,11 +432,14 @@ GMPChild::RecvStartPlugin()
 #if defined(XP_WIN)
   PreLoadLibraries(mPluginPath);
 #endif
-  PreLoadPluginVoucher(mPluginPath);
+  if (!PreLoadPluginVoucher()) {
+    NS_WARNING("Plugin voucher failed to load!");
+    return false;
+  }
   PreLoadSandboxVoucher();
 
   nsCString libPath;
-  if (!GetLibPath(libPath)) {
+  if (!GetUTF8LibPath(libPath)) {
     return false;
   }
 
@@ -407,8 +461,8 @@ GMPChild::RecvStartPlugin()
 
   if (!mGMPLoader->Load(libPath.get(),
                         libPath.Length(),
-                        &mNodeId[0],
-                        mNodeId.size(),
+                        mNodeId.BeginWriting(),
+                        mNodeId.Length(),
                         platformAPI)) {
     NS_WARNING("Failed to load GMP");
     return false;
@@ -566,77 +620,44 @@ GMPChild::ShutdownComplete()
   SendAsyncShutdownComplete();
 }
 
-static bool
-GetPluginVoucherFile(const std::string& aPluginPath,
+static void
+GetPluginVoucherFile(const nsAString& aPluginPath,
                      nsCOMPtr<nsIFile>& aOutVoucherFile)
 {
   nsAutoString baseName;
   GetFileBase(aPluginPath, aOutVoucherFile, baseName);
   nsAutoString infoFileName = baseName + NS_LITERAL_STRING(".voucher");
   aOutVoucherFile->AppendRelativePath(infoFileName);
-  return true;
 }
 
 bool
-GMPChild::PreLoadPluginVoucher(const std::string& aPluginPath)
+GMPChild::PreLoadPluginVoucher()
 {
   nsCOMPtr<nsIFile> voucherFile;
-  GetPluginVoucherFile(aPluginPath, voucherFile);
-
-  nsString path;
-  voucherFile->GetPath(path);
-
-  std::ifstream stream;
-  stream.open(NS_ConvertUTF16toUTF8(path).get(), std::ios::binary);
-  if (!stream.good()) {
-    return false;
+  GetPluginVoucherFile(mPluginPath, voucherFile);
+  if (!FileExists(voucherFile)) {
+    // Assume missing file is not fatal; that would break OpenH264.
+    return true;
   }
-
-  std::streampos start = stream.tellg();
-  stream.seekg (0, std::ios::end);
-  std::streampos end = stream.tellg();
-  stream.seekg (0, std::ios::beg);
-  auto length = end - start;
-  if (length > MAX_VOUCHER_LENGTH) {
-    NS_WARNING("Plugin voucher file too big!");
-    return false;
-  }
-
-  mPluginVoucher.SetLength(length);
-  stream.read((char*)mPluginVoucher.Elements(), length);
-  if (!stream) {
-    NS_WARNING("Failed to read plugin voucher file!");
-    return false;
-  }
-
-  return true;
+  return ReadIntoArray(voucherFile, mPluginVoucher, MAX_VOUCHER_LENGTH);
 }
 
 void
 GMPChild::PreLoadSandboxVoucher()
 {
-  std::ifstream stream;
-  stream.open(mVoucherPath.c_str(), std::ios::binary);
-  if (!stream.good()) {
-    NS_WARNING("PreLoadSandboxVoucher can't find sandbox voucher file!");
+  nsCOMPtr<nsIFile> f;
+  nsresult rv = NS_NewLocalFile(mSandboxVoucherPath, true, getter_AddRefs(f));
+  if (NS_FAILED(rv)) {
+    NS_WARNING("Can't create nsIFile for sandbox voucher");
+    return;
+  }
+  if (!FileExists(f)) {
+    // Assume missing file is not fatal; that would break OpenH264.
     return;
   }
 
-  std::streampos start = stream.tellg();
-  stream.seekg (0, std::ios::end);
-  std::streampos end = stream.tellg();
-  stream.seekg (0, std::ios::beg);
-  auto length = end - start;
-  if (length > MAX_VOUCHER_LENGTH) {
-    NS_WARNING("PreLoadSandboxVoucher sandbox voucher file too big!");
-    return;
-  }
-
-  mSandboxVoucher.SetLength(length);
-  stream.read((char*)mSandboxVoucher.Elements(), length);
-  if (!stream) {
-    NS_WARNING("PreLoadSandboxVoucher failed to read plugin voucher file!");
-    return;
+  if (!ReadIntoArray(f, mSandboxVoucher, MAX_VOUCHER_LENGTH)) {
+    NS_WARNING("Failed to read sandbox voucher");
   }
 }
 

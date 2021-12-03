@@ -56,6 +56,9 @@ pref("extensions.update.autoUpdateDefault", true);
 // See the SCOPE constants in AddonManager.jsm for values to use here.
 pref("extensions.autoDisableScopes", 15);
 
+// Don't require signed add-ons by default
+pref("xpinstall.signatures.required", false);
+
 // Dictionary download preference
 pref("browser.dictionaries.download.url", "http://repository.binaryoutcast.com/dicts/");
 
@@ -256,6 +259,9 @@ pref("browser.urlbar.clickSelectsAll", true);
 pref("browser.urlbar.doubleClickSelectsAll", false);
 pref("browser.urlbar.autoFill", true);
 pref("browser.urlbar.autoFill.typed", true);
+
+pref("browser.urlbar.unifiedcomplete", false);
+
 // 0: Match anywhere (e.g., middle of words)
 // 1: Match on word boundaries and then try matching anywhere
 // 2: Match only on word boundaries (e.g., after / or .)
@@ -478,7 +484,6 @@ pref("privacy.item.cookies",                false);
 
 pref("privacy.clearOnShutdown.history",     true);
 pref("privacy.clearOnShutdown.formdata",    true);
-pref("privacy.clearOnShutdown.passwords",   false);
 pref("privacy.clearOnShutdown.downloads",   true);
 pref("privacy.clearOnShutdown.cookies",     true);
 pref("privacy.clearOnShutdown.cache",       true);
@@ -1050,7 +1055,6 @@ pref("services.sync.prefs.sync.privacy.clearOnShutdown.downloads", true);
 pref("services.sync.prefs.sync.privacy.clearOnShutdown.formdata", true);
 pref("services.sync.prefs.sync.privacy.clearOnShutdown.history", true);
 pref("services.sync.prefs.sync.privacy.clearOnShutdown.offlineApps", true);
-pref("services.sync.prefs.sync.privacy.clearOnShutdown.passwords", true);
 pref("services.sync.prefs.sync.privacy.clearOnShutdown.sessions", true);
 pref("services.sync.prefs.sync.privacy.clearOnShutdown.siteSettings", true);
 pref("services.sync.prefs.sync.privacy.donottrackheader.enabled", true);
@@ -1170,15 +1174,15 @@ pref("browser.newtabpage.rows", 4);
 // Enable the DOM fullscreen API.
 pref("full-screen-api.enabled", true);
 
-// True if the fullscreen API requires approval upon a domain entering fullscreen.
-// Domains that have already had fullscreen permission granted won't re-request
-// approval.
-pref("full-screen-api.approval-required", true);
-
 // about:permissions
 // Maximum number of sites to return from the places database.
 // 0-100 (currently)
 pref("permissions.places-sites-limit", 50);
+
+// True if the fullscreen API requires approval upon a domain entering fullscreen.
+// Domains that have already had fullscreen permission granted won't re-request
+// approval.
+pref("full-screen-api.approval-required", true);
 
 // Startup Crash Tracking
 // number of startup crashes that can occur before starting into safe mode automatically

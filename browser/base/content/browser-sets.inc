@@ -16,26 +16,26 @@
   </stringbundleset>
 
   <commandset id="mainCommandSet">
-    <command id="cmd_newNavigator"                 oncommand="OpenBrowserWindow()"/>
+    <command id="cmd_newNavigator" oncommand="OpenBrowserWindow()" reserved="true"/>
     <command id="cmd_handleBackspace" oncommand="BrowserHandleBackspace();" />
     <command id="cmd_handleShiftBackspace" oncommand="BrowserHandleShiftBackspace();" />
 
-    <command id="cmd_newNavigatorTab" oncommand="BrowserOpenTab();"/>
+    <command id="cmd_newNavigatorTab" oncommand="BrowserOpenNewTabOrWindow(event);" reserved="true"/>
     <command id="Browser:OpenFile"  oncommand="BrowserOpenFileWindow();"/>
-    <command id="Browser:SavePage" oncommand="saveDocument(window.content.document);"/>
+    <command id="Browser:SavePage" oncommand="saveBrowser(gBrowser.selectedBrowser);"/>
 
     <command id="Browser:SendLink"
-             oncommand="MailIntegration.sendLinkForWindow(window.content);"/>
+             oncommand="MailIntegration.sendLinkForBrowser(gBrowser.selectedBrowser);"/>
 
     <command id="cmd_pageSetup" oncommand="PrintUtils.showPageSetup();"/>
-    <command id="cmd_print" oncommand="PrintUtils.print();"/>
+    <command id="cmd_print" oncommand="PrintUtils.print(window.gBrowser.selectedBrowser.contentWindowAsCPOW, window.gBrowser.selectedBrowser);"/>
     <command id="cmd_printPreview" oncommand="PrintUtils.printPreview(PrintPreviewListener);"/>
-    <command id="cmd_close" oncommand="BrowserCloseTabOrWindow()"/>
-    <command id="cmd_closeWindow" oncommand="BrowserTryToCloseWindow()"/>
+    <command id="cmd_close" oncommand="BrowserCloseTabOrWindow()" reserved="true"/>
+    <command id="cmd_closeWindow" oncommand="BrowserTryToCloseWindow()" reserved="true"/>
     <command id="cmd_ToggleTabsOnTop" oncommand="TabsOnTop.toggle()"/>
     <command id="cmd_CustomizeToolbars" oncommand="BrowserCustomizeToolbar()"/>
     <command id="cmd_restartApplication" oncommand="restart(false);"/>
-    <command id="cmd_quitApplication" oncommand="goQuitApplication()"/>
+    <command id="cmd_quitApplication" oncommand="goQuitApplication()" reserved="true"/>
 
 
     <commandset id="editMenuCommands"/>
@@ -76,8 +76,8 @@
     <command id="Browser:ReloadSkipCache" oncommand="BrowserReloadSkipCache()" disabled="true">
       <observes element="Browser:Reload" attribute="disabled"/>
     </command>
-    <command id="Browser:NextTab" oncommand="gBrowser.tabContainer.advanceSelectedTab(1, true);"/>
-    <command id="Browser:PrevTab" oncommand="gBrowser.tabContainer.advanceSelectedTab(-1, true);"/>
+    <command id="Browser:NextTab" oncommand="gBrowser.tabContainer.advanceSelectedTab(1, true);" reserved="true"/>
+    <command id="Browser:PrevTab" oncommand="gBrowser.tabContainer.advanceSelectedTab(-1, true);" reserved="true"/>
     <command id="Browser:ShowAllTabs" oncommand="allTabs.open();"/>
     <command id="Browser:FocusNextFrame" oncommand="focusNextFrame(event);"/>
     <command id="cmd_fullZoomReduce"  oncommand="FullZoom.reduce()"/>
@@ -113,7 +113,7 @@
     <command id="Tools:Sanitize"
      oncommand="Cc['@mozilla.org/browser/browserglue;1'].getService(Ci.nsIBrowserGlue).sanitize(window);"/>
     <command id="Tools:PrivateBrowsing"
-      oncommand="OpenBrowserWindow({private: true});"/>
+      oncommand="OpenBrowserWindow({private: true});" reserved="true"/>
     <command id="Tools:RemoteWindow"
       oncommand="OpenBrowserWindow({remote: true});"/>
     <command id="Tools:NonRemoteWindow"

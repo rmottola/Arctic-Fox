@@ -109,8 +109,10 @@ BaselineCompiler::compile()
     if (!emitOutOfLinePostBarrierSlot())
         return Method_Error;
 
-    if (masm.oom())
+    if (masm.oom()) {
+        ReportOutOfMemory(cx);
         return Method_Error;
+    }
 
     Linker linker(masm);
     AutoFlushICache afc("Baseline");
@@ -151,8 +153,10 @@ BaselineCompiler::compile()
             indexEntry.pcOffset = entry.pcOffset;
             indexEntry.nativeOffset = entry.nativeOffset;
             indexEntry.bufferOffset = pcEntries.length();
-            if (!pcMappingIndexEntries.append(indexEntry))
+            if (!pcMappingIndexEntries.append(indexEntry)) {
+                ReportOutOfMemory(cx);
                 return Method_Error;
+            }
             previousOffset = entry.nativeOffset;
         }
 
@@ -172,8 +176,10 @@ BaselineCompiler::compile()
         previousOffset = entry.nativeOffset;
     }
 
-    if (pcEntries.oom())
+    if (pcEntries.oom()) {
+        ReportOutOfMemory(cx);
         return Method_Error;
+    }
 
     prologueOffset_.fixup(&masm);
     epilogueOffset_.fixup(&masm);
@@ -288,6 +294,7 @@ BaselineCompiler::compile()
         JitcodeGlobalTable* globalTable = cx->runtime()->jitRuntime()->getJitcodeGlobalTable();
         if (!globalTable->addEntry(entry, cx->runtime())) {
             entry.destroy();
+            ReportOutOfMemory(cx);
             return Method_Error;
         }
 
@@ -798,6 +805,17 @@ BaselineCompiler::emitDebugTrap()
     return appendICEntry(ICEntry::Kind_DebugTrap, masm.currentOffset());
 }
 
+void
+BaselineCompiler::emitCoverage(jsbytecode* pc)
+{
+    PCCounts* counts = script->maybeGetPCCounts(pc);
+    if (!counts)
+        return;
+
+    uint64_t* counterAddr = &counts->numExec();
+    masm.inc64(AbsoluteAddress(counterAddr));
+}
+
 #ifdef JS_TRACE_LOGGING
 bool
 BaselineCompiler::emitTraceLoggerEnter()
@@ -895,6 +913,7 @@ BaselineCompiler::emitBody()
     bool lastOpUnreachable = false;
     uint32_t emittedOps = 0;
     mozilla::DebugOnly<jsbytecode*> prevpc = pc;
+    bool compileCoverage = script->hasScriptCounts();
 
     while (true) {
         JSOp op = JSOp(*pc);
@@ -940,12 +959,18 @@ BaselineCompiler::emitBody()
         bool addIndexEntry = (pc == script->code() || lastOpUnreachable || emittedOps > 100);
         if (addIndexEntry)
             emittedOps = 0;
-        if (!addPCMappingEntry(addIndexEntry))
+        if (!addPCMappingEntry(addIndexEntry)) {
+            ReportOutOfMemory(cx);
             return Method_Error;
+        }
 
         // Emit traps for breakpoints and step mode.
         if (compileDebugInstrumentation_ && !emitDebugTrap())
             return Method_Error;
+
+        // Emit code coverage code, to fill the same data as the interpreter.
+        if (compileCoverage)
+            emitCoverage(pc);
 
         switch (op) {
           default:
@@ -2596,9 +2621,9 @@ BaselineCompiler::emit_JSOP_SETLOCAL()
 bool
 BaselineCompiler::emitFormalArgAccess(uint32_t arg, bool get)
 {
-    // Fast path: the script does not use |arguments|, or is strict. In strict
-    // mode, formals do not alias the arguments object.
-    if (!script->argumentsHasVarBinding() || script->strict()) {
+    // Fast path: the script does not use |arguments| or formals don't
+    // alias the arguments object.
+    if (!script->argumentsAliasesFormals()) {
         if (get) {
             frame.pushArg(arg);
         } else {
@@ -3308,6 +3333,34 @@ BaselineCompiler::emit_JSOP_TOID()
 
     masm.bind(&done);
     frame.pop(); // Pop index.
+    frame.push(R0);
+    return true;
+}
+
+typedef JSString* (*ToStringFn)(JSContext*, HandleValue);
+static const VMFunction ToStringInfo = FunctionInfo<ToStringFn>(ToStringSlow);
+
+bool
+BaselineCompiler::emit_JSOP_TOSTRING()
+{
+    // Keep top stack value in R0.
+    frame.popRegsAndSync(1);
+
+    // Inline path for string.
+    Label done;
+    masm.branchTestString(Assembler::Equal, R0, &done);
+
+    prepareVMCall();
+
+    pushArg(R0);
+
+    // Call ToStringSlow which doesn't handle string inputs.
+    if (!callVM(ToStringInfo))
+        return false;
+
+    masm.tagValue(JSVAL_TYPE_STRING, ReturnReg, R0);
+
+    masm.bind(&done);
     frame.push(R0);
     return true;
 }

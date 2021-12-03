@@ -255,7 +255,11 @@ public:
     static bool IsOptimus();
 
     bool IsWARP() { return mIsWARP; }
-    bool DoesD3D11TextureSharingWork() { return mDoesD3D11TextureSharingWork; }
+
+    // Returns whether the compositor's D3D11 device supports texture sharing.
+    bool CompositorD3D11TextureSharingWorks() const {
+      return mCompositorD3D11TextureSharingWorks;
+    }
 
     bool SupportsApzWheelInput() const override {
       return true;
@@ -280,8 +284,9 @@ public:
     virtual already_AddRefed<mozilla::gfx::VsyncSource> CreateHardwareVsyncSource() override;
     static mozilla::Atomic<size_t> sD3D11MemoryUsed;
     static mozilla::Atomic<size_t> sD3D9MemoryUsed;
-    static mozilla::Atomic<size_t> sD3D9SurfaceImageUsed;
     static mozilla::Atomic<size_t> sD3D9SharedTextureUsed;
+
+    void GetDeviceInitData(mozilla::gfx::DeviceInitData* aOut) override;
 
 protected:
     bool AccelerateLayersByDefault() override {
@@ -289,6 +294,7 @@ protected:
     }
     void GetAcceleratedCompositorBackends(nsTArray<mozilla::layers::LayersBackend>& aBackends);
     virtual void GetPlatformCMSOutputProfile(void* &mem, size_t &size);
+    void SetDeviceInitData(mozilla::gfx::DeviceInitData& aData) override;
 
 protected:
     RenderMode mRenderMode;
@@ -307,6 +313,7 @@ private:
 
     void DisableD2D();
 
+    mozilla::gfx::FeatureStatus CheckAccelerationSupport();
     mozilla::gfx::FeatureStatus CheckD3D11Support(bool* aCanUseHardware);
     mozilla::gfx::FeatureStatus CheckD2DSupport();
     mozilla::gfx::FeatureStatus CheckD2D1Support();
@@ -314,6 +321,7 @@ private:
     void AttemptWARPDeviceCreation();
     void AttemptD3D11ImageBridgeDeviceCreation();
     bool AttemptD3D11ContentDeviceCreation();
+    bool CanUseD3D11ImageBridge();
 
     IDXGIAdapter1 *GetDXGIAdapter();
     bool IsDeviceReset(HRESULT hr, DeviceResetReason* aReason);
@@ -333,7 +341,7 @@ private:
     bool mIsWARP;
     bool mHasDeviceReset;
     bool mHasFakeDeviceReset;
-    bool mDoesD3D11TextureSharingWork;
+    bool mCompositorD3D11TextureSharingWorks;
     DeviceResetReason mDeviceResetReason;
 
     // These should not be accessed directly. Use the Get[Feature]Status

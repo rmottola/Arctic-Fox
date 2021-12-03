@@ -30,7 +30,6 @@ public:
     , mHasDirectListeners(false)
     , mCaptureIndex(aIndex)
     , mTrackID(0)
-    , mFps(-1)
   {}
 
 
@@ -48,10 +47,6 @@ public:
   virtual bool IsFake() override
   {
     return false;
-  }
-
-  virtual const dom::MediaSourceEnum GetMediaSource() override {
-      return dom::MediaSourceEnum::Camera;
   }
 
   virtual nsresult TakePhoto(PhotoCallback* aCallback) override
@@ -89,6 +84,9 @@ protected:
   static void TrimLessFitCandidates(CapabilitySet& set);
   static void LogConstraints(const dom::MediaTrackConstraintSet& aConstraints,
                              bool aAdvanced);
+static void LogCapability(const char* aHeader,
+                          const webrtc::CaptureCapability &aCapability,
+                          uint32_t aDistance);
   virtual size_t NumCapabilities();
   virtual void GetCapability(size_t aIndex, webrtc::CaptureCapability& aOut);
   bool ChooseCapability(const dom::MediaTrackConstraints &aConstraints,
@@ -119,7 +117,6 @@ protected:
   bool mHasDirectListeners;
   int mCaptureIndex;
   TrackID mTrackID;
-  int mFps; // Track rate (30 fps by default)
 
   webrtc::CaptureCapability mCapability; // Doesn't work on OS X.
 

@@ -326,12 +326,13 @@ GMPParent::Shutdown()
     return;
   }
 
+  nsRefPtr<GMPParent> self(this);
   DeleteProcess();
+
   // XXX Get rid of mDeleteProcessOnlyOnUnload and this code when
   // Bug 1043671 is fixed
   if (!mDeleteProcessOnlyOnUnload) {
     // Destroy ourselves and rise from the fire to save memory
-    nsRefPtr<GMPParent> self(this);
     mService->ReAddOnGMPThread(self);
   } // else we've been asked to die and stay dead
   MOZ_ASSERT(mState == GMPStateNotLoaded);

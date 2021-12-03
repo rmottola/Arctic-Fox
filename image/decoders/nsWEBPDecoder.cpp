@@ -65,7 +65,7 @@ nsWEBPDecoder::FinishInternal()
   MOZ_ASSERT(GetFrameCount() <= 1, "Multiple WebP frames?");
 
   // Send notifications if appropriate
-  if (!IsSizeDecode() && (GetFrameCount() == 1)) {
+  if (!IsMetadataDecode() && (GetFrameCount() == 1)) {
     PostFrameStop();
     PostDecodeDone();
   }
@@ -115,7 +115,7 @@ nsWEBPDecoder::WriteInternal(const char *aBuffer, uint32_t aCount)
   if (!HasSize())
     PostSize(width, height);
 
-  if (IsSizeDecode())
+  if (IsMetadataDecode())
     return;
 
   // The only valid format for WebP decoding for both alpha and non-alpha
@@ -127,9 +127,14 @@ nsWEBPDecoder::WriteInternal(const char *aBuffer, uint32_t aCount)
   PostHasTransparency();
 
   if (!mImageData) {
-    PostDecoderError(NS_ERROR_FAILURE);
-    return;
+    MOZ_ASSERT(HasSize(), "Didn't fetch metadata?");
+    nsresult rv_ = AllocateBasicFrame();
+    if (NS_FAILED(rv_)) {
+      return;
+    }
   }
+  MOZ_ASSERT(mImageData, "Should have a buffer now");
+  MOZ_ASSERT(mDecoder, "Should have a decoder now");
 
   // Transfer from mData to mImageData
   if (lastLineRead > mPreviousLastLine) {

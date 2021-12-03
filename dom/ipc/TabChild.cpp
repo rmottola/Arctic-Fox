@@ -34,6 +34,7 @@
 #include "mozilla/layout/RenderFrameChild.h"
 #include "mozilla/LookAndFeel.h"
 #include "mozilla/MouseEvents.h"
+#include "mozilla/PWebBrowserPersistDocumentChild.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/TextEvents.h"
@@ -94,6 +95,7 @@
 #include "nsIScriptError.h"
 #include "mozilla/EventForwards.h"
 #include "nsDeviceContext.h"
+#include "mozilla/WebBrowserPersistDocumentChild.h"
 
 #define BROWSER_ELEMENT_CHILD_SCRIPT \
     NS_LITERAL_STRING("chrome://global/content/BrowserElementChild.js")
@@ -2917,7 +2919,7 @@ TabChild::RecvSetIsDocShellActive(const bool& aIsActive)
 }
 
 bool
-TabChild::RecvNavigateDocument(const bool& aForward)
+TabChild::RecvNavigateByKey(const bool& aForward, const bool& aForDocumentNavigation)
 {
   nsIFocusManager* fm = nsFocusManager::GetFocusManager();
   if (fm) {
@@ -2925,9 +2927,20 @@ TabChild::RecvNavigateDocument(const bool& aForward)
     nsCOMPtr<nsPIDOMWindow> window = do_GetInterface(WebNavigation());
 
     // Move to the first or last document.
-    fm->MoveFocus(window, nullptr, aForward ? nsIFocusManager::MOVEFOCUS_FIRSTDOC :
-                                              nsIFocusManager::MOVEFOCUS_LASTDOC,
+    uint32_t type = aForward ?
+      (aForDocumentNavigation ? static_cast<uint32_t>(nsIFocusManager::MOVEFOCUS_FIRSTDOC) :
+                                static_cast<uint32_t>(nsIFocusManager::MOVEFOCUS_ROOT)) :
+      (aForDocumentNavigation ? static_cast<uint32_t>(nsIFocusManager::MOVEFOCUS_LASTDOC) :
+                                static_cast<uint32_t>(nsIFocusManager::MOVEFOCUS_LAST));
+    fm->MoveFocus(window, nullptr, type,
                   nsIFocusManager::FLAG_BYKEY, getter_AddRefs(result));
+
+    // No valid root element was found, so move to the first focusable element.
+    if (!result && aForward && !aForDocumentNavigation) {
+      fm->MoveFocus(window, nullptr, nsIFocusManager::MOVEFOCUS_FIRST,
+                  nsIFocusManager::FLAG_BYKEY, getter_AddRefs(result));
+    }
+
     SendRequestFocus(false);
   }
 
@@ -3490,7 +3503,6 @@ NS_INTERFACE_MAP_END_INHERITING(DOMEventTargetHelper)
 NS_IMPL_ADDREF_INHERITED(TabChildGlobal, DOMEventTargetHelper)
 NS_IMPL_RELEASE_INHERITED(TabChildGlobal, DOMEventTargetHelper)
 
-/* [notxpcom] boolean markForCC (); */
 // This method isn't automatically forwarded safely because it's notxpcom, so
 // the IDL binding doesn't know what value to return.
 NS_IMETHODIMP_(bool)
@@ -3547,3 +3559,35 @@ TabChildGlobal::GetGlobalJSObject()
   return ref->GetJSObject();
 }
 
+PWebBrowserPersistDocumentChild*
+TabChild::AllocPWebBrowserPersistDocumentChild(const uint64_t& aOuterWindowID)
+{
+  return new WebBrowserPersistDocumentChild();
+}
+
+bool
+TabChild::RecvPWebBrowserPersistDocumentConstructor(PWebBrowserPersistDocumentChild *aActor,
+                                                    const uint64_t& aOuterWindowID)
+{
+  nsCOMPtr<nsIDocument> rootDoc = GetDocument();
+  nsCOMPtr<nsIDocument> foundDoc;
+  if (aOuterWindowID) {
+    foundDoc = nsContentUtils::GetSubdocumentWithOuterWindowId(rootDoc, aOuterWindowID);
+  } else {
+    foundDoc = rootDoc;
+  }
+
+  if (!foundDoc) {
+    aActor->SendInitFailure(NS_ERROR_NO_CONTENT);
+  } else {
+    static_cast<WebBrowserPersistDocumentChild*>(aActor)->Start(foundDoc);
+  }
+  return true;
+}
+
+bool
+TabChild::DeallocPWebBrowserPersistDocumentChild(PWebBrowserPersistDocumentChild* aActor)
+{
+  delete aActor;
+  return true;
+}

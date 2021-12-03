@@ -478,6 +478,8 @@ pref("media.getusermedia.screensharing.allowed_domains", "mozilla.github.io,webe
 // OS/X 10.6 and XP have screen/window sharing off by default due to various issues - Caveat emptor
 pref("media.getusermedia.screensharing.allow_on_old_platforms", false);
 
+pref("media.getusermedia.audiocapture.enabled", false);
+
 // TextTrack support
 pref("media.webvtt.enabled", true);
 pref("media.webvtt.regions.enabled", false);
@@ -490,13 +492,8 @@ pref("media.mediasource.enabled", true);
 pref("media.mediasource.mp4.enabled", true);
 pref("media.mediasource.webm.enabled", false);
 
-// Enable new MediaSource architecture.
-pref("media.mediasource.format-reader", true);
-
-// Enable new MediaFormatReader architecture for webm in MSE
-pref("media.mediasource.format-reader.webm", false);
 // Enable new MediaFormatReader architecture for plain webm.
-pref("media.format-reader.webm", false);
+pref("media.format-reader.webm", true);
 
 #ifdef MOZ_WEBSPEECH
 pref("media.webspeech.recognition.enable", false);
@@ -517,6 +514,10 @@ pref("media.autoplay.allowscripted", true);
 // The default number of decoded video frames that are enqueued in
 // MediaDecoderReader's mVideoQueue.
 pref("media.video-queue.default-size", 10);
+
+// The maximum number of queued frames to send to the compositor.
+// By default, send all of them.
+pref("media.video-queue.send-to-compositor-size", 9999);
 
 // Whether to disable the video stats to prevent fingerprinting
 pref("media.video_stats.enabled", true);
@@ -1669,7 +1670,6 @@ pref("network.http.bypass-cachelock-threshold", 250);
 // Try and use SPDY when using SSL
 pref("network.http.spdy.enabled", true);
 pref("network.http.spdy.enabled.v3-1", true);
-pref("network.http.spdy.enabled.http2draft", true);
 pref("network.http.spdy.enabled.http2", true);
 pref("network.http.spdy.enabled.deps", true);
 pref("network.http.spdy.enforce-tls-profile", false);
@@ -2210,6 +2210,9 @@ pref("security.apps.privileged.CSP.default", "default-src * data: blob:; script-
 pref("security.mixed_content.block_active_content", false);
 pref("security.mixed_content.block_display_content", false);
 
+// Sub-resource integrity
+pref("security.sri.enable", false);
+
 // Enable pinning checks by default.
 pref("security.cert_pinning.enforcement_level", 2);
 
@@ -2715,14 +2718,6 @@ pref("hangmonitor.timeout", 0);
 pref("plugins.load_appdir_plugins", false);
 // If true, plugins will be click to play
 pref("plugins.click_to_play", false);
-
-// A comma-delimited list of plugin name prefixes matching plugins that will be
-// exposed when enumerating navigator.plugins[]. For example, prefix "Shockwave"
-// matches both Adobe Flash Player ("Shockwave Flash") and Adobe Shockwave
-// Player ("Shockwave for Director"). To hide all plugins from enumeration, use
-// the empty string "" to match no plugin names. To allow all plugins to be
-// enumerated, use the string "*" to match all plugin names.
-pref("plugins.enumerable_names", "*");
 
 // The default value for nsIPluginTag.enabledState (STATE_ENABLED = 2)
 pref("plugin.default.state", 2);
@@ -4235,12 +4230,7 @@ pref("image.cache.size", 5242880);
 // Size is given a weight of 1000 - timeweight.
 pref("image.cache.timeweight", 500);
 
-// Prevents images from automatically being decoded on load, instead allowing
-// them to be decoded on demand when they are drawn.
-pref("image.decode-only-on-draw.enabled", true);
-
 // Decode all images automatically on load, ignoring our normal heuristics.
-// Overrides image.decode-only-on-draw.enabled.
 pref("image.decode-immediately.enabled", false);
 
 // Whether we attempt to downscale images during decoding.
@@ -4392,6 +4382,9 @@ pref("layers.bench.enabled", false);
 #ifdef ANDROID
 // bug 838603 -- on Android, accidentally blacklisting OpenGL layers
 // means a startup crash for everyone.
+// Temporarily force-enable GL compositing.  This is default-disabled
+// deep within the bowels of the widgetry system.  Remove me when GL
+// compositing isn't default disabled in widget/android.
 pref("layers.acceleration.force-enabled", true);
 #else
 pref("layers.acceleration.force-enabled", false);
@@ -4453,6 +4446,7 @@ pref("layers.async-pan-zoom.enabled", true);
 #ifdef XP_MACOSX
 pref("layers.enable-tiles", true);
 pref("layers.tiled-drawtarget.enabled", true);
+pref("layers.tiles.edge-padding", false);
 #endif
 
 
@@ -4539,6 +4533,8 @@ pref("browser.history.maxStateObjectSize", 655360);
 
 // XPInstall prefs
 pref("xpinstall.whitelist.required", true);
+// Only Firefox requires add-on signatures
+pref("xpinstall.signatures.required", false);
 pref("extensions.alwaysUnpack", false);
 pref("extensions.minCompatiblePlatformVersion", "1.8");
 
@@ -5012,6 +5008,9 @@ pref("dom.system_update.debug", false);
 // UDPSocket API
 pref("dom.udpsocket.enabled", false);
 
+// MessageChannel enabled by default.
+pref("dom.messageChannel.enabled", true);
+
 // Disable before keyboard events and after keyboard events by default.
 pref("dom.beforeAfterKeyboardEvent.enabled", false);
 
@@ -5203,6 +5202,11 @@ pref("memory.report_concurrency", 1);
 // Desktop probably doesn't have swapped-out children like that.
 pref("memory.report_concurrency", 10);
 #endif
+
+// Make <audio>, <video>, NPAPI plugins and webAudio talk to the AudioChannelService.
+pref("media.useAudioChannelService", true);
+// Add Mozilla AudioChannel APIs.
+pref("media.useAudioChannelAPI", false);
 
 // Turn rewriting of youtube embeds on/off
 pref("plugins.rewrite_youtube_embeds", true);

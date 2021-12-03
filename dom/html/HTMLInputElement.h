@@ -19,6 +19,7 @@
 #include "nsIConstraintValidation.h"
 #include "mozilla/dom/HTMLFormElement.h" // for HasEverTriedInvalidSubmit()
 #include "mozilla/dom/HTMLInputElementBinding.h"
+#include "mozilla/dom/Promise.h"
 #include "nsIFilePicker.h"
 #include "nsIContentPrefService2.h"
 #include "mozilla/Decimal.h"
@@ -36,7 +37,6 @@ class EventChainPreVisitor;
 namespace dom {
 
 class Date;
-class DirPickerFileListBuilderTask;
 class File;
 class FileList;
 
@@ -94,11 +94,8 @@ class HTMLInputElement final : public nsGenericHTMLFormElementWithState,
                                public nsITextControlElement,
                                public nsIPhonetic,
                                public nsIDOMNSEditableElement,
-                               public nsITimerCallback,
                                public nsIConstraintValidation
 {
-  friend class DirPickerFileListBuilderTask;
-
 public:
   using nsIConstraintValidation::GetValidationMessage;
   using nsIConstraintValidation::CheckValidity;
@@ -276,14 +273,6 @@ public:
     return mSelectionProperties;
   }
 
-  // nsITimerCallback
-  NS_DECL_NSITIMERCALLBACK
-
-  // Avoid warning about the implementation of nsITimerCallback::Notify hiding
-  // our nsImageLoadingContent base class' implementation of
-  // imgINotificationObserver::Notify:
-  using nsImageLoadingContent::Notify;
-
   // nsIConstraintValidation
   bool     IsTooLong();
   bool     IsValueMissing() const;
@@ -445,15 +434,6 @@ public:
   // XPCOM GetForm() is OK
 
   FileList* GetFiles();
-
-  void OpenDirectoryPicker(ErrorResult& aRv);
-  void CancelDirectoryPickerScanIfRunning();
-
-  void StartProgressEventTimer();
-  void MaybeDispatchProgressEvent(bool aFinalProgress);
-  void DispatchProgressEvent(const nsAString& aType,
-                             bool aLengthComputable,
-                             uint64_t aLoaded, uint64_t aTotal);
 
   // XPCOM GetFormAction() is OK
   void SetFormAction(const nsAString& aValue, ErrorResult& aRv)
@@ -696,6 +676,22 @@ public:
                     uint32_t aEnd, const SelectionMode& aSelectMode,
                     ErrorResult& aRv, int32_t aSelectionStart = -1,
                     int32_t aSelectionEnd = -1);
+
+  bool DirectoryAttr() const
+  {
+    return HasAttr(kNameSpaceID_None, nsGkAtoms::directory);
+  }
+
+  void SetDirectoryAttr(bool aValue, ErrorResult& aRv)
+  {
+    SetHTMLBoolAttr(nsGkAtoms::directory, aValue, aRv);
+  }
+
+  bool IsFilesAndDirectoriesSupported() const;
+
+  already_AddRefed<Promise> GetFilesAndDirectories(ErrorResult& aRv);
+
+  void ChooseDirectory(ErrorResult& aRv);
 
   // XPCOM GetAlign() is OK
   void SetAlign(const nsAString& aValue, ErrorResult& aRv)
@@ -1281,8 +1277,6 @@ protected:
 
   nsRefPtr<FileList>  mFileList;
 
-  nsRefPtr<DirPickerFileListBuilderTask> mDirPickerFileListBuilderTask;
-
   nsString mStaticDocFileList;
   
   /** 
@@ -1300,13 +1294,6 @@ protected:
    * canceled.
    */
   Decimal mRangeThumbDragStartValue;
-
-  /**
-   * Timer that is used when mType == NS_FORM_INPUT_FILE and the user selects a
-   * directory. It is used to fire progress events while the list of files
-   * under that directory tree is built.
-   */
-  nsCOMPtr<nsITimer> mProgressTimer;
 
   /**
    * The selection properties cache for number controls.  This is needed because
@@ -1351,7 +1338,6 @@ protected:
   bool                     mCanShowInvalidUI    : 1;
   bool                     mHasRange            : 1;
   bool                     mIsDraggingRange     : 1;
-  bool                     mProgressTimerIsActive : 1;
   bool                     mNumberControlSpinnerIsSpinning : 1;
   bool                     mNumberControlSpinnerSpinsUp : 1;
   bool                     mPickerRunning : 1;

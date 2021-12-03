@@ -183,9 +183,9 @@ var shell = {
     debugCrashReport('Not online, postponing.');
 
     Services.obs.addObserver(function observer(subject, topic, state) {
-      let network = subject.QueryInterface(Ci.nsINetworkInterface);
-      if (network.state == Ci.nsINetworkInterface.NETWORK_STATE_CONNECTED
-          && network.type == Ci.nsINetworkInterface.NETWORK_TYPE_WIFI) {
+      let network = subject.QueryInterface(Ci.nsINetworkInfo);
+      if (network.state == Ci.nsINetworkInfo.NETWORK_STATE_CONNECTED
+          && network.type == Ci.nsINetworkInfo.NETWORK_TYPE_WIFI) {
         shell.submitQueuedCrashes();
 
         Services.obs.removeObserver(observer, topic);
@@ -312,6 +312,18 @@ var shell = {
                   .getInterface(Ci.nsIWebNavigation)
                   .sessionHistory = Cc["@mozilla.org/browser/shistory;1"]
                                       .createInstance(Ci.nsISHistory);
+
+    this.allowedAudioChannels = new Map();
+    let audioChannels = systemAppFrame.allowedAudioChannels;
+    audioChannels && audioChannels.forEach(function(audioChannel) {
+      this.allowedAudioChannels.set(audioChannel.name, audioChannel);
+      audioChannel.addEventListener('activestatechanged', this);
+      // Set all audio channels as unmuted by default
+      // because some audio in System app will be played
+      // before AudioChannelService[1] is Gaia is loaded.
+      // [1]: https://github.com/mozilla-b2g/gaia/blob/master/apps/system/js/audio_channel_service.js
+      audioChannel.setMuted(false);
+    }.bind(this));
 
     // On firefox mulet, shell.html is loaded in a tab
     // and we have to listen on the chrome event handler
@@ -550,6 +562,18 @@ var shell = {
       case 'unload':
         this.stop();
         break;
+      case 'activestatechanged':
+        var channel = evt.target;
+        // TODO: We should get the `isActive` state from evt.isActive.
+        // Then we don't need to do `channel.isActive()` here.
+        channel.isActive().onsuccess = function(evt) {
+          this.sendChromeEvent({
+            type: 'system-audiochannel-state-changed',
+            name: channel.name,
+            isActive: evt.target.result
+          });
+        }.bind(this);
+        break;
     }
   },
 
@@ -708,6 +732,11 @@ var CustomEventManager = {
       case 'inputregistry-remove':
         KeyboardHelper.handleEvent(detail);
         break;
+      case 'system-audiochannel-list':
+      case 'system-audiochannel-mute':
+      case 'system-audiochannel-volume':
+        SystemAppMozBrowserHelper.handleEvent(detail);
+        break;
       case 'do-command':
         DoCommandHelper.handleEvent(detail.cmd);
         break;
@@ -831,6 +860,63 @@ let KeyboardHelper = {
       case 'inputregistry-remove':
         Keyboard.inputRegistryGlue.returnMessage(detail);
 
+        break;
+    }
+  }
+};
+
+let SystemAppMozBrowserHelper = {
+  handleEvent: function systemAppMozBrowser_handleEvent(detail) {
+    let request;
+    let name;
+    switch (detail.type) {
+      case 'system-audiochannel-list':
+        let audioChannels = [];
+        shell.allowedAudioChannels.forEach(function(value, name) {
+          audioChannels.push(name);
+        });
+        SystemAppProxy._sendCustomEvent('mozSystemWindowChromeEvent', {
+          type: 'system-audiochannel-list',
+          audioChannels: audioChannels
+        });
+        break;
+      case 'system-audiochannel-mute':
+        name = detail.name;
+        let isMuted = detail.isMuted;
+        request = shell.allowedAudioChannels.get(name).setMuted(isMuted);
+        request.onsuccess = function() {
+          SystemAppProxy._sendCustomEvent('mozSystemWindowChromeEvent', {
+            type: 'system-audiochannel-mute-onsuccess',
+            name: name,
+            isMuted: isMuted
+          });
+        };
+        request.onerror = function() {
+          SystemAppProxy._sendCustomEvent('mozSystemWindowChromeEvent', {
+            type: 'system-audiochannel-mute-onerror',
+            name: name,
+            isMuted: isMuted
+          });
+        };
+        break;
+      case 'system-audiochannel-volume':
+        name = detail.name;
+        let volume = detail.volume;
+        request = shell.allowedAudioChannels.get(name).setVolume(volume);
+        request.onsuccess = function() {
+          sSystemAppProxy._sendCustomEvent('mozSystemWindowChromeEvent', {
+            type: 'system-audiochannel-volume-onsuccess',
+            name: name,
+            volume: volume
+          });
+        };
+        request.onerror = function() {
+          SystemAppProxy._sendCustomEvent('mozSystemWindowChromeEvent', {
+            type: 'system-audiochannel-volume-onerror',
+            name: name,
+            volume: volume
+          });
+        };
         break;
     }
   }

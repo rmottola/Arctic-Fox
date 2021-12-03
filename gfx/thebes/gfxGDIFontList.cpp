@@ -935,8 +935,7 @@ gfxGDIFontList::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
 {
     gfxPlatformFontList::AddSizeOfExcludingThis(aMallocSizeOf, aSizes);
     aSizes->mFontListSize +=
-        mFontSubstitutes.SizeOfExcludingThis(SizeOfFamilyNameEntryExcludingThis,
-                                             aMallocSizeOf);
+        SizeOfFontFamilyTableExcludingThis(mFontSubstitutes, aMallocSizeOf);
     aSizes->mFontListSize +=
         mNonExistingFonts.ShallowSizeOfExcludingThis(aMallocSizeOf);
     for (uint32_t i = 0; i < mNonExistingFonts.Length(); ++i) {

@@ -140,7 +140,7 @@ nsBMPDecoder::FinishInternal()
     MOZ_ASSERT(GetFrameCount() <= 1, "Multiple BMP frames?");
 
     // Send notifications if appropriate
-    if (!IsSizeDecode() && HasSize()) {
+    if (!IsMetadataDecode() && HasSize()) {
 
         // Invalidate
         nsIntRect r(0, 0, mBIH.width, GetHeight());
@@ -368,9 +368,8 @@ nsBMPDecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
         return;
       }
 
-      // We have the size. If we're doing a size decode, we got what
-      // we came for.
-      if (IsSizeDecode()) {
+      // We have the size. If we're doing a metadata decode, we're done.
+      if (IsMetadataDecode()) {
         return;
       }
 
@@ -437,10 +436,14 @@ nsBMPDecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
           return;
         }
       }
-      if (!mImageData) {
-        PostDecoderError(NS_ERROR_FAILURE);
-        return;
+
+      MOZ_ASSERT(!mImageData, "Already have a buffer allocated?");
+      nsresult rv = AllocateBasicFrame();
+      if (NS_FAILED(rv)) {
+          return;
       }
+
+      MOZ_ASSERT(mImageData, "Should have a buffer now");
 
       // Prepare for transparency
       if ((mBIH.compression == BI_RLE8) || (mBIH.compression == BI_RLE4)) {

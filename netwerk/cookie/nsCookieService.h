@@ -314,12 +314,7 @@ class nsCookieService final : public nsICookieService
     void                          NotifyChanged(nsISupports *aSubject, const char16_t *aData);
     void                          NotifyPurged(nsICookie2* aCookie);
     already_AddRefed<nsIArray>    CreatePurgeList(nsICookie2* aCookie);
-
-    /**
-     * This method is used to iterate the cookie hash table and select the ones
-     * that are part of a specific app.
-     */
-    static PLDHashOperator GetCookiesForApp(nsCookieEntry* entry, void* arg);
+    void                          UpdateCookieOldestTime(DBState* aDBState, nsCookie* aCookie);
 
     /**
      * This method is a helper that allows calling nsICookieManager::Remove()
@@ -356,7 +351,6 @@ class nsCookieService final : public nsICookieService
     int64_t                       mCookiePurgeAge;
 
     // friends!
-    friend PLDHashOperator purgeCookiesCallback(nsCookieEntry *aEntry, void *aArg);
     friend class DBListenerErrorHandler;
     friend class ReadCookieDBListener;
     friend class CloseCookieDBListener;

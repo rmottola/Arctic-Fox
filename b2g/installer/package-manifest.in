@@ -128,12 +128,16 @@
 #ifndef MOZ_FOLD_LIBS
 @BINPATH@/@DLL_PREFIX@mozsqlite3@DLL_SUFFIX@
 #endif
+@BINPATH@/@DLL_PREFIX@lgpllibs@DLL_SUFFIX@
 @RESPATH@/blocklist.xml
 @RESPATH@/ua-update.json
 #ifdef XP_UNIX
 #ifndef XP_MACOSX
 @RESPATH@/run-mozilla.sh
 #endif
+#endif
+#ifdef MOZ_WEBSPEECH_MODELS
+@BINPATH@/models/
 #endif
 
 ; [Components]
@@ -487,6 +491,8 @@
 #if defined(MOZ_WIDGET_GONK) && defined(MOZ_B2G_RIL)
 @RESPATH@/components/CellBroadcastService.js
 @RESPATH@/components/CellBroadcastService.manifest
+@RESPATH@/components/DataCallManager.js
+@RESPATH@/components/DataCallManager.manifest
 @BINPATH@/components/IccService.js
 @BINPATH@/components/IccService.manifest
 @RESPATH@/components/MmsService.js
@@ -494,6 +500,8 @@
 @RESPATH@/components/MobileMessageDatabaseService.js
 @RESPATH@/components/MobileMessageDatabaseService.manifest
 #ifndef DISABLE_MOZ_RIL_GEOLOC
+@RESPATH@/components/DataCallInterfaceService.js
+@RESPATH@/components/DataCallInterfaceService.manifest
 @RESPATH@/components/MobileConnectionService.js
 @RESPATH@/components/MobileConnectionService.manifest
 @RESPATH@/components/RadioInterfaceLayer.js
@@ -501,8 +509,8 @@
 @RESPATH@/components/SmsService.js
 @RESPATH@/components/SmsService.manifest
 #endif
-@RESPATH@/components/RILContentHelper.js
-@RESPATH@/components/RILContentHelper.manifest
+@RESPATH@/components/StkCmdFactory.js
+@RESPATH@/components/StkCmdFactory.manifest
 @RESPATH@/components/RILSystemMessengerHelper.js
 @RESPATH@/components/RILSystemMessengerHelper.manifest
 @RESPATH@/components/TelephonyAudioService.js

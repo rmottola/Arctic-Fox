@@ -32,8 +32,17 @@ class nsDiscriminatedUnion
 public:
 
   nsDiscriminatedUnion() : mType(nsIDataType::VTYPE_EMPTY) {}
+  nsDiscriminatedUnion(const nsDiscriminatedUnion&) = delete;
+  nsDiscriminatedUnion(nsDiscriminatedUnion&&) = delete;
+
+  ~nsDiscriminatedUnion() { Cleanup(); }
+
+  nsDiscriminatedUnion& operator=(const nsDiscriminatedUnion&) = delete;
+  nsDiscriminatedUnion& operator=(nsDiscriminatedUnion&&) = delete;
 
   void Cleanup();
+
+  uint16_t GetType() const { return mType; }
 
   nsresult ConvertToInt8(uint8_t* aResult) const;
   nsresult ConvertToInt16(int16_t* aResult) const;
@@ -63,6 +72,8 @@ public:
   nsresult ConvertToInterface(nsIID** aIID, void** aInterface) const;
   nsresult ConvertToArray(uint16_t* aType, nsIID* aIID,
                           uint32_t* aCount, void** aPtr) const;
+
+  nsresult SetFromVariant(nsIVariant* aValue);
 
   nsresult SetFromInt8(uint8_t aValue);
   nsresult SetFromInt16(int16_t aValue);
@@ -98,6 +109,8 @@ public:
   nsresult SetToVoid();
   nsresult SetToEmpty();
   nsresult SetToEmptyArray();
+
+  void Traverse(nsCycleCollectionTraversalCallback& aCb) const;
 
 private:
   nsresult ToManageableNumber(nsDiscriminatedUnion* aOutData) const;
@@ -174,14 +187,8 @@ public:
 
   nsVariant();
 
-  static nsresult SetFromVariant(nsDiscriminatedUnion* aData,
-                                 nsIVariant* aValue);
-
-  static void Traverse(const nsDiscriminatedUnion& aData,
-                       nsCycleCollectionTraversalCallback& aCb);
-
 private:
-  ~nsVariant();
+  ~nsVariant() {};
 
 protected:
   nsDiscriminatedUnion mData;

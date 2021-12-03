@@ -13,7 +13,7 @@ using namespace mozilla::dom;
 namespace mozilla {
 
 AudioNodeExternalInputStream::AudioNodeExternalInputStream(AudioNodeEngine* aEngine, TrackRate aSampleRate, uint32_t aContextId)
-  : AudioNodeStream(aEngine, MediaStreamGraph::INTERNAL_STREAM, aSampleRate, aContextId)
+  : AudioNodeStream(aEngine, NO_STREAM_FLAGS, aSampleRate, aContextId)
 {
   MOZ_COUNT_CTOR(AudioNodeExternalInputStream);
 }
@@ -23,51 +23,52 @@ AudioNodeExternalInputStream::~AudioNodeExternalInputStream()
   MOZ_COUNT_DTOR(AudioNodeExternalInputStream);
 }
 
+/* static */ already_AddRefed<AudioNodeExternalInputStream>
+AudioNodeExternalInputStream::Create(MediaStreamGraph* aGraph,
+                                     AudioNodeEngine* aEngine)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(aGraph->GraphRate() == aEngine->NodeMainThread()->Context()->SampleRate());
+
+  nsRefPtr<AudioNodeExternalInputStream> stream =
+    new AudioNodeExternalInputStream(aEngine, aGraph->GraphRate(),
+                                     aEngine->NodeMainThread()->Context()->Id());
+  aGraph->AddStream(stream);
+  return stream.forget();
+}
+
 /**
  * Copies the data in aInput to aOffsetInBlock within aBlock.
  * aBlock must have been allocated with AllocateInputBlock and have a channel
  * count that's a superset of the channels in aInput.
  */
+template <typename T>
 static void
-CopyChunkToBlock(const AudioChunk& aInput, AudioChunk *aBlock,
+CopyChunkToBlock(AudioChunk& aInput, AudioChunk *aBlock,
                  uint32_t aOffsetInBlock)
 {
   uint32_t blockChannels = aBlock->ChannelCount();
-  nsAutoTArray<const void*,2> channels;
+  nsAutoTArray<const T*,2> channels;
   if (aInput.IsNull()) {
     channels.SetLength(blockChannels);
     PodZero(channels.Elements(), blockChannels);
   } else {
-    channels.SetLength(aInput.ChannelCount());
-    PodCopy(channels.Elements(), aInput.mChannelData.Elements(), channels.Length());
+    const nsTArray<const T*>& inputChannels = aInput.ChannelData<T>();
+    channels.SetLength(inputChannels.Length());
+    PodCopy(channels.Elements(), inputChannels.Elements(), channels.Length());
     if (channels.Length() != blockChannels) {
       // We only need to upmix here because aBlock's channel count has been
       // chosen to be a superset of the channel count of every chunk.
-      AudioChannelsUpMix(&channels, blockChannels, nullptr);
+      AudioChannelsUpMix(&channels, blockChannels, static_cast<T*>(nullptr));
     }
   }
 
-  uint32_t duration = aInput.GetDuration();
   for (uint32_t c = 0; c < blockChannels; ++c) {
-    float* outputData =
-      static_cast<float*>(const_cast<void*>(aBlock->mChannelData[c])) + aOffsetInBlock;
+    float* outputData = aBlock->ChannelFloatsForWrite(c) + aOffsetInBlock;
     if (channels[c]) {
-      switch (aInput.mBufferFormat) {
-      case AUDIO_FORMAT_FLOAT32:
-        ConvertAudioSamplesWithScale(
-            static_cast<const float*>(channels[c]), outputData, duration,
-            aInput.mVolume);
-        break;
-      case AUDIO_FORMAT_S16:
-        ConvertAudioSamplesWithScale(
-            static_cast<const int16_t*>(channels[c]), outputData, duration,
-            aInput.mVolume);
-        break;
-      default:
-        NS_ERROR("Unhandled format");
-      }
+      ConvertAudioSamplesWithScale(channels[c], outputData, aInput.GetDuration(), aInput.mVolume);
     } else {
-      PodZero(outputData, duration);
+      PodZero(outputData, aInput.GetDuration());
     }
   }
 }
@@ -98,7 +99,18 @@ static void ConvertSegmentToAudioBlock(AudioSegment* aSegment,
 
   uint32_t duration = 0;
   for (AudioSegment::ChunkIterator ci(*aSegment); !ci.IsEnded(); ci.Next()) {
-    CopyChunkToBlock(*ci, aBlock, duration);
+    switch (ci->mBufferFormat) {
+      case AUDIO_FORMAT_S16: {
+        CopyChunkToBlock<int16_t>(*ci, aBlock, duration);
+        break;
+      }
+      case AUDIO_FORMAT_FLOAT32: {
+        CopyChunkToBlock<float>(*ci, aBlock, duration);
+        break;
+      }
+      case AUDIO_FORMAT_SILENCE:
+        break;
+    }
     duration += ci->GetDuration();
   }
 }

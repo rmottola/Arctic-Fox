@@ -31,6 +31,7 @@
 #include "frontend/BytecodeCompiler.h"
 #include "frontend/TokenStream.h"
 #include "gc/Marking.h"
+#include "jit/InlinableNatives.h"
 #include "jit/Ion.h"
 #include "jit/JitFrameIterator.h"
 #include "js/CallNonGenericMethod.h"
@@ -366,7 +367,7 @@ ResolveInterpretedFunctionPrototype(JSContext* cx, HandleFunction fun, HandleId 
     // Assert that fun is not a compiler-created function object, which
     // must never leak to script or embedding code and then be mutated.
     // Also assert that fun is not bound, per the ES5 15.3.4.5 ref above.
-    MOZ_ASSERT(!IsInternalFunctionObject(fun));
+    MOZ_ASSERT(!IsInternalFunctionObject(*fun));
     MOZ_ASSERT(!fun->isBoundFunction());
 
     // Make the prototype object an instance of Object with the same parent as
@@ -453,7 +454,7 @@ fun_resolve(JSContext* cx, HandleObject obj, HandleId id, bool* resolvedp)
 
     bool isLength = JSID_IS_ATOM(id, cx->names().length);
     if (isLength || JSID_IS_ATOM(id, cx->names().name)) {
-        MOZ_ASSERT(!IsInternalFunctionObject(obj));
+        MOZ_ASSERT(!IsInternalFunctionObject(*obj));
 
         RootedValue v(cx);
 
@@ -557,7 +558,8 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope, Han
             firstword |= HasSingletonType;
 
         atom = fun->displayAtom();
-        flagsword = (fun->nargs() << 16) | fun->flags();
+        flagsword = (fun->nargs() << 16) |
+                    (fun->flags() & ~JSFunction::NO_XDR_FLAGS);
 
         // The environment of any function which is not reused will always be
         // null, it is later defined when a function is cloned or reused to
@@ -761,12 +763,12 @@ JSFunction::trace(JSTracer* trc)
         // Functions can be be marked as interpreted despite having no script
         // yet at some points when parsing, and can be lazy with no lazy script
         // for self-hosted code.
-        if (hasScript() && u.i.s.script_)
+        if (hasScript() && !hasUncompiledScript())
             TraceManuallyBarrieredEdge(trc, &u.i.s.script_, "script");
         else if (isInterpretedLazy() && u.i.s.lazy_)
             TraceManuallyBarrieredEdge(trc, &u.i.s.lazy_, "lazyScript");
 
-        if (u.i.env_)
+        if (!isBeingParsed() && u.i.env_)
             TraceManuallyBarrieredEdge(trc, &u.i.env_, "fun_environment");
     }
 }
@@ -847,7 +849,6 @@ CreateFunctionPrototype(JSContext* cx, JSProtoKey key)
                                              /* enclosingScope = */ nullptr,
                                              /* savedCallerFun = */ false,
                                              options,
-                                             /* staticLevel = */ 0,
                                              sourceObject,
                                              0,
                                              ss->length()));
@@ -1376,6 +1377,8 @@ JSFunction::initBoundFunction(JSContext* cx, HandleObject target, HandleValue th
 
     self->initSlotRange(BOUND_FUNCTION_RESERVED_SLOTS, args, argslen);
 
+    self->setJitInfo(&jit::JitInfo_CallBoundFunction);
+
     return true;
 }
 
@@ -1535,7 +1538,7 @@ JSFunction::createScriptForLazilyInterpretedFunction(JSContext* cx, HandleFuncti
 
     /* Lazily cloned self-hosted script. */
     MOZ_ASSERT(fun->isSelfHostedBuiltin());
-    RootedAtom funAtom(cx, &fun->getExtendedSlot(0).toString()->asAtom());
+    RootedAtom funAtom(cx, &fun->getExtendedSlot(LAZY_FUNCTION_NAME_SLOT).toString()->asAtom());
     if (!funAtom)
         return false;
     Rooted<PropertyName*> funName(cx, funAtom->asPropertyName());
@@ -1581,7 +1584,7 @@ JSFunction::maybeRelazify(JSRuntime* rt)
     } else {
         MOZ_ASSERT(isSelfHostedBuiltin());
         MOZ_ASSERT(isExtended());
-        MOZ_ASSERT(getExtendedSlot(0).toString()->isAtom());
+        MOZ_ASSERT(getExtendedSlot(LAZY_FUNCTION_NAME_SLOT).toString()->isAtom());
     }
 }
 
@@ -1808,7 +1811,7 @@ FunctionConstructor(JSContext* cx, unsigned argc, Value* vp, GeneratorKind gener
     }
 
     AutoKeepAtoms keepAtoms(cx->perThreadData);
-    AutoNameVector formals(cx);
+    Rooted<PropertyNameVector> formals(cx, PropertyNameVector(cx));
 
     bool hasRest = false;
 
@@ -2187,8 +2190,6 @@ NewFunctionClone(JSContext* cx, HandleFunction fun, NewObjectKind newKind,
         return nullptr;
     RootedFunction clone(cx, &cloneobj->as<JSFunction>());
 
-    MOZ_ASSERT(useSameScript || !fun->isInterpretedLazy());
-
     uint16_t flags = fun->flags() & ~JSFunction::EXTENDED;
     if (allocKind == AllocKind::FUNCTION_EXTENDED)
         flags |= JSFunction::EXTENDED;
@@ -2330,8 +2331,7 @@ js::IdToFunctionName(JSContext* cx, HandleId id)
 
 JSFunction*
 js::DefineFunction(JSContext* cx, HandleObject obj, HandleId id, Native native,
-                   unsigned nargs, unsigned flags, AllocKind allocKind /* = AllocKind::FUNCTION */,
-                   NewObjectKind newKind /* = GenericObject */)
+                   unsigned nargs, unsigned flags, AllocKind allocKind /* = AllocKind::FUNCTION */)
 {
     GetterOp gop;
     SetterOp sop;
@@ -2360,11 +2360,11 @@ js::DefineFunction(JSContext* cx, HandleObject obj, HandleId id, Native native,
     if (!native)
         fun = NewScriptedFunction(cx, nargs,
                                   JSFunction::INTERPRETED_LAZY, atom,
-                                  allocKind, newKind, obj);
+                                  allocKind, GenericObject, obj);
     else if (flags & JSFUN_CONSTRUCTOR)
-        fun = NewNativeConstructor(cx, native, nargs, atom, allocKind, newKind);
+        fun = NewNativeConstructor(cx, native, nargs, atom, allocKind);
     else
-        fun = NewNativeFunction(cx, native, nargs, atom, allocKind, newKind);
+        fun = NewNativeFunction(cx, native, nargs, atom, allocKind);
 
     if (!fun)
         return nullptr;

@@ -26,14 +26,18 @@ class DocAccessibleParent : public ProxyAccessible,
 {
 public:
   DocAccessibleParent() :
-    ProxyAccessible(this), mParentDoc(nullptr), mShutdown(false)
+    ProxyAccessible(this), mParentDoc(nullptr),
+    mTopLevel(false), mShutdown(false)
   { MOZ_COUNT_CTOR_INHERITED(DocAccessibleParent, ProxyAccessible); }
   ~DocAccessibleParent()
   {
     MOZ_COUNT_DTOR_INHERITED(DocAccessibleParent, ProxyAccessible);
     MOZ_ASSERT(mChildDocs.Length() == 0);
-    MOZ_ASSERT(!mParentDoc);
+    MOZ_ASSERT(!ParentDoc());
   }
+
+  void SetTopLevel() { mTopLevel = true; }
+  bool IsTopLevel() const { return mTopLevel; }
 
   /*
    * Called when a message from a document in a child process notifies the main
@@ -49,10 +53,11 @@ public:
   void Unbind()
   {
     mParent = nullptr;
-    mParentDoc->mChildDocs.RemoveElement(this);
+    ParentDoc()->mChildDocs.RemoveElement(this);
     mParentDoc = nullptr;
   }
 
+  virtual bool RecvShutdown() override;
   void Destroy();
   virtual void ActorDestroy(ActorDestroyReason aWhy) override
   {
@@ -64,7 +69,7 @@ public:
    * Return the main processes representation of the parent document (if any)
    * of the document this object represents.
    */
-  DocAccessibleParent* Parent() const { return mParentDoc; }
+  DocAccessibleParent* ParentDoc() const { return mParentDoc; }
 
   /*
    * Called when a document in a content process notifies the main process of a
@@ -128,7 +133,7 @@ private:
   uint32_t AddSubtree(ProxyAccessible* aParent,
                       const nsTArray<AccessibleData>& aNewTree, uint32_t aIdx,
                       uint32_t aIdxInParent);
-  static PLDHashOperator ShutdownAccessibles(ProxyEntry* entry, void* unused);
+  void CheckDocTree() const;
 
   nsTArray<DocAccessibleParent*> mChildDocs;
   DocAccessibleParent* mParentDoc;
@@ -138,6 +143,7 @@ private:
    * proxy object so we can't use a real map.
    */
   nsTHashtable<ProxyEntry> mAccessibles;
+  bool mTopLevel;
   bool mShutdown;
 };
 

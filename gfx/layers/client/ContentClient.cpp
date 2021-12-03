@@ -35,7 +35,6 @@
 #ifdef MOZ_WIDGET_GTK
 #include "gfxPlatformGtk.h"
 #endif
-#include "gfx2DGlue.h"
 #include "ReadbackLayer.h"
 
 #include <vector>
@@ -130,12 +129,10 @@ ContentClientBasic::CreateBuffer(ContentType aType,
                                  RefPtr<gfx::DrawTarget>* aWhiteDT)
 {
   MOZ_ASSERT(!(aFlags & BUFFER_COMPONENT_ALPHA));
-  gfxImageFormat format =
-    gfxPlatform::GetPlatform()->OptimalFormatForContent(aType);
 
   *aBlackDT = gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(
     IntSize(aRect.width, aRect.height),
-    ImageFormatToSurfaceFormat(format));
+    gfxPlatform::GetPlatform()->Optimal2DFormatForContent(aType));
 }
 
 void
@@ -296,8 +293,8 @@ ContentClientRemoteBuffer::CreateBackBuffer(const IntRect& aBufferRect)
 {
   // gfx::BackendType::NONE means fallback to the content backend
   mTextureClient = CreateTextureClientForDrawing(
-    mSurfaceFormat, mSize, gfx::BackendType::NONE,
-    mTextureFlags,
+    mSurfaceFormat, mSize, BackendSelector::Content,
+    mTextureFlags | ExtraTextureFlags(),
     TextureAllocationFlags::ALLOC_CLEAR_BUFFER
   );
   if (!mTextureClient || !AddTextureClient(mTextureClient)) {
@@ -307,7 +304,7 @@ ContentClientRemoteBuffer::CreateBackBuffer(const IntRect& aBufferRect)
 
   if (mTextureFlags & TextureFlags::COMPONENT_ALPHA) {
     mTextureClientOnWhite = mTextureClient->CreateSimilar(
-      mTextureFlags,
+      mTextureFlags | ExtraTextureFlags(),
       TextureAllocationFlags::ALLOC_CLEAR_BUFFER_WHITE
     );
     if (!mTextureClientOnWhite || !AddTextureClient(mTextureClientOnWhite)) {

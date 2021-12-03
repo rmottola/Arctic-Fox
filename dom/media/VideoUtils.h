@@ -7,6 +7,7 @@
 #ifndef VideoUtils_h
 #define VideoUtils_h
 
+#include "FlushableTaskQueue.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/CheckedInt.h"
 #include "mozilla/MozPromise.h"
@@ -17,11 +18,6 @@
 #include "nsSize.h"
 #include "nsRect.h"
 
-#if !(defined(XP_WIN) || defined(XP_MACOSX) || defined(LINUX)) || \
-    defined(MOZ_ASAN)
-// For MEDIA_THREAD_STACK_SIZE
-#include "nsIThreadManager.h"
-#endif
 #include "nsThreadUtils.h"
 #include "prtime.h"
 #include "AudioSampleFormat.h"
@@ -165,18 +161,6 @@ static const int32_t MAX_VIDEO_HEIGHT = 3000;
 // before being used!
 void ScaleDisplayByAspectRatio(nsIntSize& aDisplay, float aAspectRatio);
 
-// The amount of virtual memory reserved for thread stacks.
-#if defined(MOZ_ASAN)
-// Use the system default in ASAN builds, because the default is assumed to be
-// larger than the size we want to use and is hopefully sufficient for ASAN.
-#define MEDIA_THREAD_STACK_SIZE nsIThreadManager::DEFAULT_STACK_SIZE
-#elif defined(XP_WIN) || defined(XP_MACOSX) || defined(LINUX)
-#define MEDIA_THREAD_STACK_SIZE (256 * 1024)
-#else
-// All other platforms use their system defaults.
-#define MEDIA_THREAD_STACK_SIZE nsIThreadManager::DEFAULT_STACK_SIZE
-#endif
-
 // Downmix multichannel Audio samples to Stereo.
 // Input are the buffer contains multichannel data,
 // the number of channels and the number of frames.
@@ -277,9 +261,6 @@ GenerateRandomName(nsCString& aOutSalt, uint32_t aLength);
 // path. This is based on code from nsExternalAppHandler::SetUpTempFile.
 nsresult
 GenerateRandomPathName(nsCString& aOutSalt, uint32_t aLength);
-
-class TaskQueue;
-class FlushableTaskQueue;
 
 already_AddRefed<TaskQueue>
 CreateMediaDecodeTaskQueue();

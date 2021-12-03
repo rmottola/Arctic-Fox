@@ -41,6 +41,7 @@
 #include "nsIApplicationCacheContainer.h"
 
 #include "nsIMemoryReporter.h"
+#include "DecoderFactory.h"
 #include "Image.h"
 #include "gfxPrefs.h"
 #include "prtime.h"
@@ -127,67 +128,6 @@ public:
 private:
   nsTArray<imgLoader*> mKnownLoaders;
 
-  struct MemoryCounter
-  {
-    MemoryCounter()
-      : mSource(0)
-      , mDecodedHeap(0)
-      , mDecodedNonHeap(0)
-    { }
-
-    void SetSource(size_t aCount) { mSource = aCount; }
-    size_t Source() const { return mSource; }
-    void SetDecodedHeap(size_t aCount) { mDecodedHeap = aCount; }
-    size_t DecodedHeap() const { return mDecodedHeap; }
-    void SetDecodedNonHeap(size_t aCount) { mDecodedNonHeap = aCount; }
-    size_t DecodedNonHeap() const { return mDecodedNonHeap; }
-
-    MemoryCounter& operator+=(const MemoryCounter& aOther)
-    {
-      mSource += aOther.mSource;
-      mDecodedHeap += aOther.mDecodedHeap;
-      mDecodedNonHeap += aOther.mDecodedNonHeap;
-      return *this;
-    }
-
-  private:
-    size_t mSource;
-    size_t mDecodedHeap;
-    size_t mDecodedNonHeap;
-  };
-
-  struct ImageMemoryCounter
-  {
-    ImageMemoryCounter(uint16_t aType, const nsACString& aURI, bool aIsUsed)
-      : mURI(aURI)
-      , mType(aType)
-      , mIsUsed(aIsUsed)
-    {
-      MOZ_ASSERT(!mURI.IsEmpty(), "Should have a URI for all images");
-    }
-
-    nsCString& URI() { return mURI; }
-    const nsCString& URI() const { return mURI; }
-    uint16_t Type() const { return mType; }
-    MemoryCounter& Values() { return mValues; }
-    const MemoryCounter& Values() const { return mValues; }
-    bool IsUsed() const { return mIsUsed; }
-
-    bool IsNotable() const
-    {
-      const size_t NotableThreshold = 16 * 1024;
-      size_t total = mValues.Source() + mValues.DecodedHeap()
-                                      + mValues.DecodedNonHeap();
-      return total >= NotableThreshold;
-    }
-
-  private:
-    nsCString mURI;
-    uint16_t mType;
-    MemoryCounter mValues;
-    bool mIsUsed;
-  };
-
   struct MemoryTotal
   {
     MemoryTotal& operator+=(const ImageMemoryCounter& aImageCounter)
@@ -226,7 +166,7 @@ private:
   // Reports all images of a single kind, e.g. all used chrome images.
   nsresult ReportCounterArray(nsIHandleReportCallback* aHandleReport,
                               nsISupports* aData,
-                              const nsTArray<ImageMemoryCounter>& aCounterArray,
+                              nsTArray<ImageMemoryCounter>& aCounterArray,
                               const char* aPathPrefix,
                               bool aAnonymize = false)
   {
@@ -236,7 +176,7 @@ private:
 
     // Report notable images, and compute total and non-notable aggregate sizes.
     for (uint32_t i = 0; i < aCounterArray.Length(); i++) {
-      ImageMemoryCounter counter = aCounterArray[i];
+      ImageMemoryCounter& counter = aCounterArray[i];
 
       if (aAnonymize) {
         counter.URI().Truncate();
@@ -254,7 +194,7 @@ private:
       summaryTotal += counter;
 
       if (counter.IsNotable()) {
-        rv = ReportCounter(aHandleReport, aData, aPathPrefix, counter);
+        rv = ReportImage(aHandleReport, aData, aPathPrefix, counter);
         NS_ENSURE_SUCCESS(rv, rv);
       } else {
         nonNotableTotal += counter;
@@ -274,10 +214,10 @@ private:
     return NS_OK;
   }
 
-  static nsresult ReportCounter(nsIHandleReportCallback* aHandleReport,
-                                nsISupports* aData,
-                                const char* aPathPrefix,
-                                const ImageMemoryCounter& aCounter)
+  static nsresult ReportImage(nsIHandleReportCallback* aHandleReport,
+                              nsISupports* aData,
+                              const char* aPathPrefix,
+                              const ImageMemoryCounter& aCounter)
   {
     nsAutoCString pathPrefix(NS_LITERAL_CSTRING("explicit/"));
     pathPrefix.Append(aPathPrefix);
@@ -286,14 +226,68 @@ private:
                         : "/vector/");
     pathPrefix.Append(aCounter.IsUsed() ? "used/" : "unused/");
     pathPrefix.Append("image(");
+    pathPrefix.AppendInt(aCounter.IntrinsicSize().width);
+    pathPrefix.Append("x");
+    pathPrefix.AppendInt(aCounter.IntrinsicSize().height);
+    pathPrefix.Append(", ");
+
     if (aCounter.URI().IsEmpty()) {
       pathPrefix.Append("<unknown URI>");
     } else {
       pathPrefix.Append(aCounter.URI());
     }
+
     pathPrefix.Append(")/");
 
-    return ReportValues(aHandleReport, aData, pathPrefix, aCounter.Values());
+    return ReportSurfaces(aHandleReport, aData, pathPrefix, aCounter);
+  }
+
+  static nsresult ReportSurfaces(nsIHandleReportCallback* aHandleReport,
+                                 nsISupports* aData,
+                                 const nsACString& aPathPrefix,
+                                 const ImageMemoryCounter& aCounter)
+  {
+    for (const SurfaceMemoryCounter& counter : aCounter.Surfaces()) {
+      nsAutoCString surfacePathPrefix(aPathPrefix);
+      surfacePathPrefix.Append(counter.IsLocked() ? "locked/" : "unlocked/");
+      surfacePathPrefix.Append("surface(");
+
+      if (counter.SubframeSize() &&
+          *counter.SubframeSize() != counter.Key().Size()) {
+        surfacePathPrefix.AppendInt(counter.SubframeSize()->width);
+        surfacePathPrefix.Append("x");
+        surfacePathPrefix.AppendInt(counter.SubframeSize()->height);
+        surfacePathPrefix.Append(" subframe of ");
+      }
+
+      surfacePathPrefix.AppendInt(counter.Key().Size().width);
+      surfacePathPrefix.Append("x");
+      surfacePathPrefix.AppendInt(counter.Key().Size().height);
+
+      if (counter.Type() == SurfaceMemoryCounterType::NORMAL) {
+        surfacePathPrefix.Append("@");
+        surfacePathPrefix.AppendFloat(counter.Key().AnimationTime());
+
+        if (counter.Key().Flags() != imgIContainer::DECODE_FLAGS_DEFAULT) {
+          surfacePathPrefix.Append(", flags:");
+          surfacePathPrefix.AppendInt(counter.Key().Flags(), /* aRadix = */ 16);
+        }
+      } else if (counter.Type() == SurfaceMemoryCounterType::COMPOSITING) {
+        surfacePathPrefix.Append(", compositing frame");
+      } else if (counter.Type() == SurfaceMemoryCounterType::COMPOSITING_PREV) {
+        surfacePathPrefix.Append(", compositing prev frame");
+      } else {
+        MOZ_ASSERT_UNREACHABLE("Unknown counter type");
+      }
+
+      surfacePathPrefix.Append(")/");
+
+      nsresult rv = ReportValues(aHandleReport, aData, surfacePathPrefix,
+                                 counter.Values());
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
+
+    return NS_OK;
   }
 
   static nsresult ReportTotal(nsIHandleReportCallback* aHandleReport,
@@ -410,20 +404,9 @@ private:
       return;
     }
 
-    nsRefPtr<ImageURL> imageURL(image->GetURI());
-    nsAutoCString spec;
-    imageURL->GetSpec(spec);
+    ImageMemoryCounter counter(image, ImagesMallocSizeOf, aIsUsed);
 
-    ImageMemoryCounter counter(image->GetType(), spec, aIsUsed);
-
-    counter.Values().SetSource(image->
-        SizeOfSourceWithComputedFallback(ImagesMallocSizeOf));
-    counter.Values().SetDecodedHeap(image->
-        SizeOfDecoded(gfxMemoryLocation::IN_PROCESS_HEAP, ImagesMallocSizeOf));
-    counter.Values().SetDecodedNonHeap(image->
-        SizeOfDecoded(gfxMemoryLocation::IN_PROCESS_NONHEAP, nullptr));
-
-    aArray->AppendElement(counter);
+    aArray->AppendElement(Move(counter));
   }
 
   static PLDHashOperator DoRecordCounterUsedDecoded(const ImageCacheKey&,
@@ -444,10 +427,12 @@ private:
     // memory.  This function's measurement is secondary -- the result doesn't
     // go in the "explicit" tree -- so we use moz_malloc_size_of instead of
     // ImagesMallocSizeOf to prevent DMD from seeing it reported twice.
+    ImageMemoryCounter counter(image, moz_malloc_size_of, /* aIsUsed = */ true);
+
     auto n = static_cast<size_t*>(aUserArg);
-    *n += image->SizeOfDecoded(gfxMemoryLocation::IN_PROCESS_HEAP,
-                               moz_malloc_size_of);
-    *n += image->SizeOfDecoded(gfxMemoryLocation::IN_PROCESS_NONHEAP, nullptr);
+    *n += counter.Values().DecodedHeap();
+    *n += counter.Values().DecodedNonHeap();
+
     return PL_DHASH_NEXT;
   }
 };
@@ -1341,7 +1326,6 @@ void imgLoader::ReadAcceptHeaderPref()
   }
 }
 
-/* void clearCache (in boolean chrome); */
 NS_IMETHODIMP
 imgLoader::ClearCache(bool chrome)
 {
@@ -1352,7 +1336,6 @@ imgLoader::ClearCache(bool chrome)
   }
 }
 
-/* void removeEntry(in nsIURI uri); */
 NS_IMETHODIMP
 imgLoader::RemoveEntry(nsIURI* aURI)
 {
@@ -1363,7 +1346,6 @@ imgLoader::RemoveEntry(nsIURI* aURI)
   return NS_ERROR_NOT_AVAILABLE;
 }
 
-/* imgIRequest findEntry(in nsIURI uri); */
 NS_IMETHODIMP
 imgLoader::FindEntryProperties(nsIURI* uri, nsIProperties** _retval)
 {
@@ -2507,7 +2489,8 @@ imgLoader::SupportImageWithMimeType(const char* aMimeType,
     return true;
   }
 
-  return Image::GetDecoderType(mimeType.get()) != Image::eDecoderType_unknown;
+  DecoderType type = DecoderFactory::GetDecoderType(mimeType.get());
+  return type != DecoderType::UNKNOWN;
 }
 
 NS_IMETHODIMP
@@ -2783,7 +2766,6 @@ ProxyListener::~ProxyListener()
 
 /** nsIRequestObserver methods **/
 
-/* void onStartRequest (in nsIRequest request, in nsISupports ctxt); */
 NS_IMETHODIMP
 ProxyListener::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
 {
@@ -2936,7 +2918,6 @@ imgCacheValidator::RemoveProxy(imgRequestProxy* aProxy)
 
 /** nsIRequestObserver methods **/
 
-/* void onStartRequest (in nsIRequest request, in nsISupports ctxt); */
 NS_IMETHODIMP
 imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
 {

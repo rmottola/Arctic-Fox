@@ -28,7 +28,10 @@ MediaStreamAudioDestinationNode::MediaStreamAudioDestinationNode(AudioContext* a
               2,
               ChannelCountMode::Explicit,
               ChannelInterpretation::Speakers)
-  , mDOMStream(DOMAudioNodeMediaStream::CreateTrackUnionStream(GetOwner(), this))
+  , mDOMStream(
+      DOMAudioNodeMediaStream::CreateTrackUnionStream(GetOwner(),
+                                                      this,
+                                                      aContext->Graph()))
 {
   // Ensure an audio track with the correct ID is exposed to JS
   mDOMStream->CreateDOMTrack(AudioNodeStream::AUDIO_TRACK, MediaSegment::AUDIO);
@@ -36,7 +39,8 @@ MediaStreamAudioDestinationNode::MediaStreamAudioDestinationNode(AudioContext* a
   ProcessedMediaStream* outputStream = mDOMStream->GetStream()->AsProcessedStream();
   MOZ_ASSERT(!!outputStream);
   AudioNodeEngine* engine = new AudioNodeEngine(this);
-  mStream = aContext->Graph()->CreateAudioNodeStream(engine, MediaStreamGraph::EXTERNAL_STREAM);
+  mStream = AudioNodeStream::Create(aContext->Graph(), engine,
+                                    AudioNodeStream::EXTERNAL_OUTPUT);
   mPort = outputStream->AllocateInputPort(mStream);
 
   nsIDocument* doc = aContext->GetParentObject()->GetExtantDoc();

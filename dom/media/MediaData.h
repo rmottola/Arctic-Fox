@@ -40,12 +40,14 @@ public:
   MediaData(Type aType,
             int64_t aOffset,
             int64_t aTimestamp,
-            int64_t aDuration)
+            int64_t aDuration,
+            uint32_t aFrames)
     : mType(aType)
     , mOffset(aOffset)
     , mTime(aTimestamp)
     , mTimecode(aTimestamp)
     , mDuration(aDuration)
+    , mFrames(aFrames)
     , mKeyframe(false)
     , mDiscontinuity(false)
   {}
@@ -66,6 +68,9 @@ public:
   // Duration of sample, in microseconds.
   int64_t mDuration;
 
+  // Amount of frames for contained data.
+  const uint32_t mFrames;
+
   bool mKeyframe;
 
   // True if this is the first sample after a gap or discontinuity in
@@ -79,13 +84,29 @@ public:
     mTime = mTime - aStartTime;
     return mTime >= 0;
   }
+
+  template <typename ReturnType>
+  const ReturnType* As() const
+  {
+    MOZ_ASSERT(this->mType == ReturnType::sType);
+    return static_cast<const ReturnType*>(this);
+  }
+
+  template <typename ReturnType>
+  ReturnType* As()
+  {
+    MOZ_ASSERT(this->mType == ReturnType::sType);
+    return static_cast<ReturnType*>(this);
+  }
+
 protected:
-  explicit MediaData(Type aType)
+  MediaData(Type aType, uint32_t aFrames)
     : mType(aType)
     , mOffset(0)
     , mTime(0)
     , mTimecode(0)
     , mDuration(0)
+    , mFrames(aFrames)
     , mKeyframe(false)
     , mDiscontinuity(false)
   {}
@@ -105,8 +126,7 @@ public:
             AudioDataValue* aData,
             uint32_t aChannels,
             uint32_t aRate)
-    : MediaData(sType, aOffset, aTime, aDuration)
-    , mFrames(aFrames)
+    : MediaData(sType, aOffset, aTime, aDuration, aFrames)
     , mChannels(aChannels)
     , mRate(aRate)
     , mAudioData(aData) {}
@@ -128,7 +148,6 @@ public:
   // If mAudioBuffer is null, creates it from mAudioData.
   void EnsureAudioBuffer();
 
-  const uint32_t mFrames;
   const uint32_t mChannels;
   const uint32_t mRate;
   // At least one of mAudioBuffer/mAudioData must be non-null.
@@ -289,7 +308,7 @@ public:
             bool aKeyframe,
             int64_t aTimecode,
             IntSize aDisplay,
-            int32_t aFrameID);
+            uint32_t aFrameID);
 
 protected:
   ~VideoData();
@@ -408,15 +427,6 @@ private:
   uint32_t mCapacity;
   CryptoSample mCryptoInternal;
   MediaRawData(const MediaRawData&); // Not implemented
-};
-
-  // MediaLargeByteBuffer is a ref counted fallible TArray.
-  // It is designed to share potentially big byte arrays.
-class MediaLargeByteBuffer : public FallibleTArray<uint8_t> {
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(MediaLargeByteBuffer);
-
-private:
-  ~MediaLargeByteBuffer() {}
 };
 
   // MediaByteBuffer is a ref counted infallible TArray.

@@ -10,7 +10,11 @@
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/dom/Date.h"
+#include "mozilla/dom/Directory.h"
+#include "mozilla/dom/FileSystemUtils.h"
+#include "mozilla/dom/OSFileSystem.h"
 #include "nsAttrValueInlines.h"
+#include "nsCRTGlue.h"
 
 #include "nsIDOMHTMLInputElement.h"
 #include "nsITextControlElement.h"
@@ -76,6 +80,7 @@
 
 // input type=file
 #include "mozilla/dom/File.h"
+#include "mozilla/dom/FileList.h"
 #include "nsIFile.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
@@ -329,167 +334,6 @@ UploadLastDir::ContentPrefCallback::HandleError(nsresult error)
 namespace {
 
 /**
- * This enumerator returns File objects after wrapping a single
- * nsIFile representing a directory. It enumerates the files under that
- * directory and its subdirectories as a flat list of files, ignoring/skipping
- * over symbolic links.
- *
- * The enumeration involves I/O, so this class must NOT be used on the main
- * thread or else the main thread could be blocked for a very long time.
- *
- * This enumerator does not walk the directory tree breadth-first, but it also
- * is not guaranteed to walk it depth-first either (since it uses
- * nsIFile::GetDirectoryEntries, which is not guaranteed to group a directory's
- * subdirectories at the beginning of the list that it returns).
- */
-class DirPickerRecursiveFileEnumerator final
-  : public nsISimpleEnumerator
-{
-  ~DirPickerRecursiveFileEnumerator() {}
-
-public:
-  NS_DECL_ISUPPORTS
-
-  explicit DirPickerRecursiveFileEnumerator(nsIFile* aTopDir)
-    : mTopDir(aTopDir)
-  {
-    MOZ_ASSERT(!NS_IsMainThread(), "This class blocks on I/O!");
-
-#ifdef DEBUG
-    {
-      bool isDir;
-      aTopDir->IsDirectory(&isDir);
-      MOZ_ASSERT(isDir);
-    }
-#endif
-
-    if (NS_FAILED(aTopDir->GetParent(getter_AddRefs(mTopDirsParent)))) {
-      // This just means that the name of the picked directory won't be
-      // included in the File.path string.
-      mTopDirsParent = aTopDir;
-    }
-
-    nsCOMPtr<nsISimpleEnumerator> entries;
-    if (NS_SUCCEEDED(mTopDir->GetDirectoryEntries(getter_AddRefs(entries))) &&
-        entries) {
-      mDirEnumeratorStack.AppendElement(entries);
-      LookupAndCacheNext();
-    }
-  }
-
-  NS_IMETHOD
-  GetNext(nsISupports** aResult) override
-  {
-    MOZ_ASSERT(!NS_IsMainThread(),
-               "Walking the directory tree involves I/O, so using this "
-               "enumerator can block a thread for a long time!");
-
-    if (!mNextFile) {
-      return NS_ERROR_FAILURE;
-    }
-
-    // The parent for this object will be set on the main thread.
-    nsRefPtr<File> domFile = File::CreateFromFile(nullptr, mNextFile);
-    nsCString relDescriptor;
-    nsresult rv =
-      mNextFile->GetRelativeDescriptor(mTopDirsParent, relDescriptor);
-    NS_ENSURE_SUCCESS(rv, rv);
-    NS_ConvertUTF8toUTF16 path(relDescriptor);
-    nsAutoString leafName;
-    mNextFile->GetLeafName(leafName);
-    MOZ_ASSERT(leafName.Length() <= path.Length());
-    int32_t length = path.Length() - leafName.Length();
-    MOZ_ASSERT(length >= 0);
-    if (length > 0) {
-      // Note that we leave the trailing "/" on the path.
-      BlobImplFile* blobImpl = static_cast<BlobImplFile*>(domFile->Impl());
-      MOZ_ASSERT(blobImpl);
-      blobImpl->SetPath(Substring(path, 0, uint32_t(length)));
-    }
-
-    nsCOMPtr<nsIDOMBlob> blob = domFile.get();
-    blob.forget(aResult);
-    LookupAndCacheNext();
-    return NS_OK;
-  }
-
-  NS_IMETHOD
-  HasMoreElements(bool* aResult) override
-  {
-    *aResult = !!mNextFile;
-    return NS_OK;
-  }
-
-private:
-
-  void
-  LookupAndCacheNext()
-  {
-    for (;;) {
-      if (mDirEnumeratorStack.IsEmpty()) {
-        mNextFile = nullptr;
-        break;
-      }
-
-      nsISimpleEnumerator* currentDirEntries =
-        mDirEnumeratorStack.LastElement();
-
-      bool hasMore;
-      DebugOnly<nsresult> rv = currentDirEntries->HasMoreElements(&hasMore);
-      MOZ_ASSERT(NS_SUCCEEDED(rv));
-
-      if (!hasMore) {
-        mDirEnumeratorStack.RemoveElementAt(mDirEnumeratorStack.Length() - 1);
-        continue;
-      }
-
-      nsCOMPtr<nsISupports> entry;
-      rv = currentDirEntries->GetNext(getter_AddRefs(entry));
-      MOZ_ASSERT(NS_SUCCEEDED(rv));
-
-      nsCOMPtr<nsIFile> file = do_QueryInterface(entry);
-      MOZ_ASSERT(file);
-
-      bool isLink, isSpecial;
-      file->IsSymlink(&isLink);
-      file->IsSpecial(&isSpecial);
-      if (isLink || isSpecial) {
-        continue;
-      }
-
-      bool isDir;
-      file->IsDirectory(&isDir);
-      if (isDir) {
-        nsCOMPtr<nsISimpleEnumerator> subDirEntries;
-        rv = file->GetDirectoryEntries(getter_AddRefs(subDirEntries));
-        MOZ_ASSERT(NS_SUCCEEDED(rv) && subDirEntries);
-        mDirEnumeratorStack.AppendElement(subDirEntries);
-        continue;
-      }
-
-#ifdef DEBUG
-      {
-        bool isFile;
-        file->IsFile(&isFile);
-        MOZ_ASSERT(isFile);
-      }
-#endif
-
-      mNextFile.swap(file);
-      return;
-    }
-  }
-
-private:
-  nsCOMPtr<nsIFile> mTopDir;
-  nsCOMPtr<nsIFile> mTopDirsParent; // May be mTopDir if no parent
-  nsCOMPtr<nsIFile> mNextFile;
-  nsTArray<nsCOMPtr<nsISimpleEnumerator> > mDirEnumeratorStack;
-};
-
-NS_IMPL_ISUPPORTS(DirPickerRecursiveFileEnumerator, nsISimpleEnumerator)
-
-/**
  * This may return nullptr if aDomFile's implementation of
  * File::mozFullPathInternal does not successfully return a non-empty
  * string that is a valid path. This can happen on Firefox OS, for example,
@@ -519,119 +363,6 @@ DOMFileToLocalFile(File* aDomFile)
 
 } // namespace
 
-class DirPickerFileListBuilderTask final
-  : public nsRunnable
-{
-public:
-  DirPickerFileListBuilderTask(HTMLInputElement* aInput, nsIFile* aTopDir)
-    : mPreviousFileListLength(0)
-    , mInput(aInput)
-    , mTopDir(aTopDir)
-    , mFileListLength(0)
-    , mCanceled(false)
-  {}
-
-  NS_IMETHOD Run() {
-    if (!NS_IsMainThread()) {
-      // Build up list of File objects on this dedicated thread:
-      nsCOMPtr<nsISimpleEnumerator> iter =
-        new DirPickerRecursiveFileEnumerator(mTopDir);
-      bool hasMore = true;
-      nsCOMPtr<nsISupports> tmp;
-      while (NS_SUCCEEDED(iter->HasMoreElements(&hasMore)) && hasMore) {
-        iter->GetNext(getter_AddRefs(tmp));
-        nsCOMPtr<nsIDOMBlob> domBlob = do_QueryInterface(tmp);
-        MOZ_ASSERT(domBlob);
-        mFileList.AppendElement(static_cast<File*>(domBlob.get()));
-        mFileListLength = mFileList.Length();
-        if (mCanceled) {
-          MOZ_ASSERT(!mInput, "This is bad - how did this happen?");
-          // There's no point dispatching to the main thread (that doesn't
-          // guarantee that we'll be destroyed there).
-          return NS_OK;
-        }
-      }
-      return NS_DispatchToMainThread(this);
-    }
-
-    // Now back on the main thread, set the list on our HTMLInputElement:
-    if (mCanceled || mFileList.IsEmpty()) {
-      return NS_OK;
-    }
-    MOZ_ASSERT(mInput->mDirPickerFileListBuilderTask,
-               "But we aren't canceled!");
-    if (mInput->mProgressTimer) {
-      mInput->mProgressTimerIsActive = false;
-      mInput->mProgressTimer->Cancel();
-    }
-
-    mInput->MaybeDispatchProgressEvent(true);        // Last progress event.
-    mInput->mDirPickerFileListBuilderTask = nullptr; // Now null out.
-
-    if (mCanceled) { // The last progress event may have canceled us
-      return NS_OK;
-    }
-
-    // Recreate File with the correct parent object.
-    nsCOMPtr<nsIGlobalObject> global = mInput->OwnerDoc()->GetScopeObject();
-    for (uint32_t i = 0; i < mFileList.Length(); ++i) {
-      MOZ_ASSERT(!mFileList[i]->GetParentObject());
-      mFileList[i] = File::Create(global, mFileList[i]->Impl());
-      MOZ_ASSERT(mFileList[i]);
-    }
-
-    // The text control frame (if there is one) isn't going to send a change
-    // event because it will think this is done by a script.
-    // So, we can safely send one by ourself.
-    mInput->SetFiles(mFileList, true);
-    nsresult rv =
-      nsContentUtils::DispatchTrustedEvent(mInput->OwnerDoc(),
-                                           static_cast<nsIDOMHTMLInputElement*>(mInput.get()),
-                                           NS_LITERAL_STRING("change"), true,
-                                           false);
-    // Clear mInput to make sure that it can't lose its last strong ref off the
-    // main thread (which may happen if our dtor runs off the main thread)!
-    mInput = nullptr;
-    return rv;
-  }
-
-  void Cancel()
-  {
-    MOZ_ASSERT(NS_IsMainThread() && !mCanceled);
-    // Clear mInput to make sure that it can't lose its last strong ref off the
-    // main thread (which may happen if our dtor runs off the main thread)!
-    mInput = nullptr;
-    mCanceled = true;
-  }
-
-  uint32_t GetFileListLength() const
-  {
-    return mFileListLength;
-  }
-
-  /**
-   * The number of files added to the FileList at the time the last progress
-   * event was fired.
-   *
-   * This is only read/set by HTMLInputElement on the main thread. The reason
-   * that this member is stored here rather than on HTMLInputElement is so that
-   * we don't increase the size of HTMLInputElement for something that's rarely
-   * used.
-   */
-  uint32_t mPreviousFileListLength;
-
-private:
-  nsRefPtr<HTMLInputElement> mInput;
-  nsCOMPtr<nsIFile> mTopDir;
-  nsTArray<nsRefPtr<File>> mFileList;
-
-  // We access the list length on both threads, so we need the indirection of
-  // this atomic member to make the access thread safe:
-  mozilla::Atomic<uint32_t> mFileListLength;
-
-  mozilla::Atomic<bool> mCanceled;
-};
-
 
 NS_IMETHODIMP
 HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
@@ -642,50 +373,13 @@ HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
     return NS_OK;
   }
 
-  mInput->CancelDirectoryPickerScanIfRunning();
-
   int16_t mode;
   mFilePicker->GetMode(&mode);
 
-  if (mode == static_cast<int16_t>(nsIFilePicker::modeGetFolder)) {
-    // Directory picking is different, since we still need to do more I/O to
-    // build up the list of File objects. Since this may block for a
-    // long time, we need to build the list off on another dedicated thread to
-    // avoid blocking any other activities that the browser is carrying out.
-
-    // The user selected this directory, so we always save this dir, even if
-    // no files are found under it.
-    nsCOMPtr<nsIFile> pickedDir;
-    mFilePicker->GetFile(getter_AddRefs(pickedDir));
-
-#ifdef DEBUG
-    {
-      bool isDir;
-      pickedDir->IsDirectory(&isDir);
-      MOZ_ASSERT(isDir);
-    }
-#endif
-
-    HTMLInputElement::gUploadLastDir->StoreLastUsedDirectory(
-      mInput->OwnerDoc(), pickedDir);
-
-    nsCOMPtr<nsIEventTarget> target
-      = do_GetService(NS_STREAMTRANSPORTSERVICE_CONTRACTID);
-    NS_ASSERTION(target, "Must have stream transport service");
-
-    mInput->StartProgressEventTimer();
-
-    // DirPickerFileListBuilderTask takes care of calling SetFiles() and
-    // dispatching the "change" event.
-    mInput->mDirPickerFileListBuilderTask =
-      new DirPickerFileListBuilderTask(mInput.get(), pickedDir.get());
-    return target->Dispatch(mInput->mDirPickerFileListBuilderTask,
-                            NS_DISPATCH_NORMAL);
-  }
-
   // Collect new selected filenames
   nsTArray<nsRefPtr<File>> newFiles;
-  if (mode == static_cast<int16_t>(nsIFilePicker::modeOpenMultiple)) {
+  if (mode == static_cast<int16_t>(nsIFilePicker::modeOpenMultiple) ||
+      mode == static_cast<int16_t>(nsIFilePicker::modeGetFolder)) {
     nsCOMPtr<nsISimpleEnumerator> iter;
     nsresult rv = mFilePicker->GetDomfiles(getter_AddRefs(iter));
     NS_ENSURE_SUCCESS(rv, rv);
@@ -1165,7 +859,6 @@ HTMLInputElement::HTMLInputElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
   , mCanShowInvalidUI(true)
   , mHasRange(false)
   , mIsDraggingRange(false)
-  , mProgressTimerIsActive(false)
   , mNumberControlSpinnerIsSpinning(false)
   , mNumberControlSpinnerSpinsUp(false)
   , mPickerRunning(false)
@@ -1189,9 +882,6 @@ HTMLInputElement::HTMLInputElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
 
 HTMLInputElement::~HTMLInputElement()
 {
-  if (mFileList) {
-    mFileList->Disconnect();
-  }
   if (mNumberControlSpinnerIsSpinning) {
     StopNumberControlSpinnerSpin(eDisallowDispatchingEvents);
   }
@@ -1246,10 +936,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLInputElement,
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mValidity)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mControllers)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFiles)
-  if (tmp->mFileList) {
-    tmp->mFileList->Disconnect();
-    tmp->mFileList = nullptr;
-  }
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mFileList)
   if (tmp->IsSingleLineTextControl(false)) {
     tmp->mInputData.mState->Unlink();
   }
@@ -1269,7 +956,6 @@ NS_INTERFACE_TABLE_HEAD_CYCLE_COLLECTION_INHERITED(HTMLInputElement)
                                nsIImageLoadingContent,
                                imgIOnloadBlocker,
                                nsIDOMNSEditableElement,
-                               nsITimerCallback,
                                nsIConstraintValidation)
 NS_INTERFACE_TABLE_TAIL_INHERITING(nsGenericHTMLFormElementWithState)
 
@@ -2782,58 +2468,6 @@ HTMLInputElement::GetFiles()
   return mFileList;
 }
 
-void
-HTMLInputElement::OpenDirectoryPicker(ErrorResult& aRv)
-{
-  if (mType != NS_FORM_INPUT_FILE) {
-    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
-  }
-  InitFilePicker(FILE_PICKER_DIRECTORY);
-}
-
-void
-HTMLInputElement::CancelDirectoryPickerScanIfRunning()
-{
-  if (!mDirPickerFileListBuilderTask) {
-    return;
-  }
-  if (mProgressTimer) {
-    mProgressTimerIsActive = false;
-    mProgressTimer->Cancel();
-  }
-  mDirPickerFileListBuilderTask->Cancel();
-  mDirPickerFileListBuilderTask = nullptr;
-}
-
-void
-HTMLInputElement::StartProgressEventTimer()
-{
-  if (!mProgressTimer) {
-    mProgressTimer = do_CreateInstance(NS_TIMER_CONTRACTID);
-  }
-  if (mProgressTimer) {
-    mProgressTimerIsActive = true;
-    mProgressTimer->Cancel();
-    mProgressTimer->InitWithCallback(this, kProgressEventInterval,
-                                           nsITimer::TYPE_ONE_SHOT);
-  }
-}
-
-// nsITimerCallback's only method
-NS_IMETHODIMP
-HTMLInputElement::Notify(nsITimer* aTimer)
-{
-  if (mProgressTimer == aTimer) {
-    mProgressTimerIsActive = false;
-    MaybeDispatchProgressEvent(false);
-    return NS_OK;
-  }
-
-  // Just in case some JS user wants to QI to nsITimerCallback and play with us...
-  NS_WARNING("Unexpected timer!");
-  return NS_ERROR_INVALID_POINTER;
-}
-
 /* static */ void
 HTMLInputElement::HandleNumberControlSpin(void* aData)
 {
@@ -2851,65 +2485,6 @@ HTMLInputElement::HandleNumberControlSpin(void* aData)
     input->StopNumberControlSpinnerSpin();
   } else {
     input->StepNumberControlForUserEvent(input->mNumberControlSpinnerSpinsUp ? 1 : -1);
-  }
-}
-
-void
-HTMLInputElement::MaybeDispatchProgressEvent(bool aFinalProgress)
-{
-  nsRefPtr<HTMLInputElement> kungFuDeathGrip;
-
-  if (aFinalProgress && mProgressTimerIsActive) {
-    // mProgressTimer may hold the last reference to us, so take another strong
-    // ref to make sure we don't die under Cancel() and leave this method
-    // running on deleted memory.
-    kungFuDeathGrip = this;
-
-    mProgressTimerIsActive = false;
-    mProgressTimer->Cancel();
-  }
-
-  uint32_t fileListLength = mDirPickerFileListBuilderTask->GetFileListLength();
-
-  if (mProgressTimerIsActive ||
-      fileListLength == mDirPickerFileListBuilderTask->mPreviousFileListLength) {
-    return;
-  }
-
-  if (!aFinalProgress) {
-    StartProgressEventTimer();
-  }
-
-  mDirPickerFileListBuilderTask->mPreviousFileListLength = fileListLength;
-
-  DispatchProgressEvent(NS_LITERAL_STRING(PROGRESS_STR),
-                        false,
-                        mDirPickerFileListBuilderTask->mPreviousFileListLength,
-                        0);
-}
-
-void
-HTMLInputElement::DispatchProgressEvent(const nsAString& aType,
-                                        bool aLengthComputable,
-                                        uint64_t aLoaded, uint64_t aTotal)
-{
-  NS_ASSERTION(!aType.IsEmpty(), "missing event type");
-
-  ProgressEventInit init;
-  init.mBubbles = false;
-  init.mCancelable = true; // XXXkhuey why?
-  init.mLengthComputable = aLengthComputable;
-  init.mLoaded = aLoaded;
-  init.mTotal = (aTotal == UINT64_MAX) ? 0 : aTotal;
-
-  nsRefPtr<ProgressEvent> event =
-    ProgressEvent::Constructor(this, aType, init);
-  event->SetTrusted(true);
-
-  bool doDefaultAction;
-  nsresult rv = DispatchEvent(event, &doDefaultAction);
-  if (NS_SUCCEEDED(rv) && !doDefaultAction) {
-    CancelDirectoryPickerScanIfRunning();
   }
 }
 
@@ -3293,7 +2868,9 @@ HTMLInputElement::Focus(ErrorResult& aError)
     return;
   }
 
-  // For file inputs, focus the button instead.
+  // For file inputs, focus the first button instead. In the case of there
+  // being two buttons (when the picker is a directory picker) the user can
+  // tab to the next one.
   nsIFrame* frame = GetPrimaryFrame();
   if (frame) {
     for (nsIFrame* childFrame = frame->GetFirstPrincipalChild();
@@ -3957,7 +3534,21 @@ HTMLInputElement::MaybeInitPickers(EventChainPostVisitor& aVisitor)
     return NS_OK;
   }
   if (mType == NS_FORM_INPUT_FILE) {
-    return InitFilePicker(FILE_PICKER_FILE);
+    // If the user clicked on the "Choose folder..." button we open the
+    // directory picker, else we open the file picker.
+    FilePickerType type = FILE_PICKER_FILE;
+    nsCOMPtr<nsIContent> target =
+      do_QueryInterface(aVisitor.mEvent->originalTarget);
+    if (target &&
+        target->GetParent() == this &&
+        target->IsRootOfNativeAnonymousSubtree() &&
+        target->HasAttr(kNameSpaceID_None, nsGkAtoms::directory)) {
+      MOZ_ASSERT(Preferences::GetBool("dom.input.dirpicker", false),
+                 "No API or UI should have been exposed to allow this code to "
+                 "be reached");
+      type = FILE_PICKER_DIRECTORY;
+    }
+    return InitFilePicker(type);
   }
   if (mType == NS_FORM_INPUT_COLOR) {
     return InitColorPicker();
@@ -5143,7 +4734,10 @@ HTMLInputElement::GetAttributeChangeHint(const nsIAtom* aAttribute,
 {
   nsChangeHint retval =
     nsGenericHTMLFormElementWithState::GetAttributeChangeHint(aAttribute, aModType);
-  if (aAttribute == nsGkAtoms::type) {
+  if (aAttribute == nsGkAtoms::type ||
+      // The presence or absence of the 'directory' attribute determines what
+      // buttons we show for type=file.
+      aAttribute == nsGkAtoms::directory) {
     NS_UpdateHint(retval, NS_STYLE_HINT_FRAMECHANGE);
   } else if (mType == NS_FORM_INPUT_IMAGE &&
              (aAttribute == nsGkAtoms::alt ||
@@ -5185,6 +4779,110 @@ nsMapRuleToAttributesFunc
 HTMLInputElement::GetAttributeMappingFunction() const
 {
   return &MapAttributesIntoRule;
+}
+
+
+// Directory picking methods:
+
+bool
+HTMLInputElement::IsFilesAndDirectoriesSupported() const
+{
+  // This method is supposed to return true if a file and directory picker
+  // supports the selection of both files and directories *at the same time*.
+  // Only Mac currently supports that. We could implement it for Mac, but
+  // currently we do not.
+  return false;
+}
+
+void
+HTMLInputElement::ChooseDirectory(ErrorResult& aRv)
+{
+  if (mType != NS_FORM_INPUT_FILE) {
+    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
+    return;
+  }
+  InitFilePicker(
+#if defined(ANDROID) || defined(MOZ_B2G)
+                 // No native directory picker - redirect to plain file picker
+                 FILE_PICKER_FILE
+#else
+                 FILE_PICKER_DIRECTORY
+#endif
+                 );
+}
+
+static already_AddRefed<OSFileSystem>
+MakeOrReuseFileSystem(const nsAString& aNewLocalRootPath,
+                      OSFileSystem* aFS,
+                      nsPIDOMWindow* aWindow)
+{
+  MOZ_ASSERT(aWindow);
+
+  nsRefPtr<OSFileSystem> fs;
+  if (aFS) {
+    const nsAString& prevLocalRootPath = aFS->GetLocalRootPath();
+    if (aNewLocalRootPath == prevLocalRootPath) {
+      fs = aFS;
+    }
+  }
+  if (!fs) {
+    fs = new OSFileSystem(aNewLocalRootPath);
+    fs->Init(aWindow);
+  }
+  return fs.forget();
+}
+
+already_AddRefed<Promise>
+HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
+{
+  nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
+  MOZ_ASSERT(global);
+  if (!global) {
+    return nullptr;
+  }
+
+  nsRefPtr<Promise> p = Promise::Create(global, aRv);
+  if (aRv.Failed()) {
+    return nullptr;
+  }
+
+  const nsTArray<nsRefPtr<File>>& filesAndDirs = GetFilesInternal();
+
+  Sequence<OwningFileOrDirectory> filesAndDirsSeq;
+
+  if (!filesAndDirsSeq.SetLength(filesAndDirs.Length(), mozilla::fallible_t())) {
+    p->MaybeReject(NS_ERROR_OUT_OF_MEMORY);
+    return p.forget();
+  }
+
+  nsPIDOMWindow* window = OwnerDoc()->GetInnerWindow();
+  nsRefPtr<OSFileSystem> fs;
+  for (uint32_t i = 0; i < filesAndDirs.Length(); ++i) {
+    if (filesAndDirs[i]->IsDirectory()) {
+#if defined(ANDROID) || defined(MOZ_B2G)
+      MOZ_ASSERT(false,
+                 "Directory picking should have been redirected to normal "
+                 "file picking for platforms that don't have a directory "
+                 "picker");
+#endif
+      nsAutoString path;
+      filesAndDirs[i]->GetMozFullPathInternal(path, aRv);
+      if (aRv.Failed()) {
+        return nullptr;
+      }
+      int32_t leafSeparatorIndex = path.RFind(FILE_PATH_SEPARATOR);
+      nsDependentSubstring dirname = Substring(path, 0, leafSeparatorIndex);
+      nsDependentSubstring basename = Substring(path, leafSeparatorIndex);
+      fs = MakeOrReuseFileSystem(dirname, fs, window);
+      filesAndDirsSeq[i].SetAsDirectory() = new Directory(fs, basename);
+    } else {
+      filesAndDirsSeq[i].SetAsFile() = filesAndDirs[i];
+    }
+  }
+
+  p->MaybeResolve(filesAndDirsSeq);
+
+  return p.forget();
 }
 
 

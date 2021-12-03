@@ -33,8 +33,6 @@ public:
 
   virtual ReentrantMonitor& GetReentrantMonitor() final override;
 
-  virtual bool IsShutdown() const final override;
-
   virtual bool OnStateMachineTaskQueue() const final override;
 
   virtual bool OnDecodeTaskQueue() const final override;
@@ -58,11 +56,8 @@ public:
   virtual void MetadataLoaded(nsAutoPtr<MediaInfo> aInfo,
                               nsAutoPtr<MetadataTags> aTags,
                               MediaDecoderEventVisibility aEventVisibility) final override;
-  virtual void QueueMetadata(int64_t aTime, nsAutoPtr<MediaInfo> aInfo, nsAutoPtr<MetadataTags> aTags) final override;
   virtual void FirstFrameLoaded(nsAutoPtr<MediaInfo> aInfo,
                                 MediaDecoderEventVisibility aEventVisibility) final override;
-
-  virtual void RemoveMediaTracks() final override;
 
   virtual void OnReadMetadataCompleted() final override;
 

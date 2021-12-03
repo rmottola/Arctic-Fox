@@ -135,7 +135,7 @@ public:
         AllocateAudioBlock(numChannels, &input);
         for (uint32_t i = 0; i < numChannels; ++i) {
           const float* src = static_cast<const float*>(aInput.mChannelData[i]);
-          float* dest = static_cast<float*>(const_cast<void*>(input.mChannelData[i]));
+          float* dest = input.ChannelFloatsForWrite(i);
           AudioBlockCopyChannelWithScale(src, aInput.mVolume, dest);
         }
       }
@@ -191,7 +191,8 @@ ConvolverNode::ConvolverNode(AudioContext* aContext)
   , mNormalize(true)
 {
   ConvolverNodeEngine* engine = new ConvolverNodeEngine(this, mNormalize);
-  mStream = aContext->Graph()->CreateAudioNodeStream(engine, MediaStreamGraph::INTERNAL_STREAM);
+  mStream = AudioNodeStream::Create(aContext->Graph(), engine,
+                                    AudioNodeStream::NO_STREAM_FLAGS);
 }
 
 ConvolverNode::~ConvolverNode()

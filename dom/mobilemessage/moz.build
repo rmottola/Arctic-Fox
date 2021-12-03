@@ -50,6 +50,7 @@ EXPORTS.mozilla.dom += [
 ]
 
 UNIFIED_SOURCES += [
+    'Assertions.cpp',
     'Constants.cpp',
     'DeletedMessageInfo.cpp',
     'DOMMobileMessageError.cpp',
@@ -71,8 +72,6 @@ IPDL_SOURCES += [
     'ipc/PSmsRequest.ipdl',
     'ipc/SmsTypes.ipdlh',
 ]
-
-FAIL_ON_WARNINGS = True
 
 LOCAL_INCLUDES += [
     '/dom/base',

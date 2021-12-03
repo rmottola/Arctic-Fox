@@ -182,7 +182,6 @@ nsStringBundle::FormatStringFromName(const char16_t *aName,
 
 NS_IMPL_ISUPPORTS(nsStringBundle, nsIStringBundle)
 
-/* void GetStringFromID (in long aID, out wstring aResult); */
 NS_IMETHODIMP
 nsStringBundle::GetStringFromID(int32_t aID, char16_t **aResult)
 {
@@ -202,7 +201,6 @@ nsStringBundle::GetStringFromID(int32_t aID, char16_t **aResult)
   return NS_OK;
 }
 
-/* void GetStringFromName (in wstring aName, out wstring aResult); */
 NS_IMETHODIMP
 nsStringBundle::GetStringFromName(const char16_t *aName, char16_t **aResult)
 {

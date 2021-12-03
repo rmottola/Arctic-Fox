@@ -13,6 +13,17 @@
 #include "prlock.h"
 #include "nsDebug.h"
 
+// These are the codes returned by |EnumReadFunction| and |EnumFunction|, which
+// control the behavior of EnumerateRead() and Enumerate(). The PLD/PL_D prefix
+// is because they originated in PLDHashTable, but that class no longer uses
+// them.
+enum PLDHashOperator
+{
+  PL_DHASH_NEXT = 0,          // enumerator says continue
+  PL_DHASH_STOP = 1,          // enumerator says stop
+  PL_DHASH_REMOVE = 2         // enumerator says remove
+};
+
 template<class KeyClass, class DataType, class UserDataType>
 class nsBaseHashtable; // forward declaration
 
@@ -267,116 +278,29 @@ public:
   void Clear() { nsTHashtable<EntryType>::Clear(); }
 
   /**
-   * client must provide a SizeOfEntryExcludingThisFun function for
-   *   SizeOfExcludingThis.
-   * @param     aKey the key being enumerated
-   * @param     aData Reference to data being enumerated.
-   * @param     aMallocSizeOf the function used to measure heap-allocated blocks
-   * @param     aUserArg passed unchanged from SizeOf{In,Ex}cludingThis
-   * @return    summed size of the things pointed to by the entries
-   */
-  typedef size_t
-    (*SizeOfEntryExcludingThisFun)(KeyType aKey,
-                                   const DataType& aData,
-                                   mozilla::MallocSizeOf aMallocSizeOf,
-                                   void* aUserArg);
-
-  /**
-   * Measure the size of the table's entry storage and the table itself.
-   * If |aSizeOfEntryExcludingThis| is non-nullptr, measure the size of things
-   * pointed to by entries.
+   * Measure the size of the table's entry storage. The size of things pointed
+   * to by entries must be measured separately; hence the "Shallow" prefix.
    *
-   * @param    aSizeOfEntryExcludingThis
-   *           the <code>SizeOfEntryExcludingThisFun</code> function to call
-   * @param    aMallocSizeOf the function used to meeasure heap-allocated blocks
-   * @param    aUserArg a point to pass to the
-   *           <code>SizeOfEntryExcludingThisFun</code> function
-   * @return   the summed size of the entries, the table, and the table's storage
+   * @param   aMallocSizeOf the function used to measure heap-allocated blocks
+   * @return  the summed size of the table's storage
    */
-  size_t SizeOfIncludingThis(SizeOfEntryExcludingThisFun aSizeOfEntryExcludingThis,
-                             mozilla::MallocSizeOf aMallocSizeOf,
-                             void* aUserArg = nullptr)
+  size_t ShallowSizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
   {
-    return aMallocSizeOf(this) +
-      this->SizeOfExcludingThis(aSizeOfEntryExcludingThis, aMallocSizeOf,
-                                aUserArg);
+    return this->mTable.ShallowSizeOfExcludingThis(aMallocSizeOf);
   }
 
   /**
-   * Measure the size of the table's entry storage, and if
-   * |aSizeOfEntryExcludingThis| is non-nullptr, measure the size of things
-   * pointed to by entries.
-   *
-   * @param     aSizeOfEntryExcludingThis the
-   *            <code>SizeOfEntryExcludingThisFun</code> function to call
-   * @param     aMallocSizeOf the function used to measure heap-allocated blocks
-   * @param     aUserArg a pointer to pass to the
-   *            <code>SizeOfEntryExcludingThisFun</code> function
-   * @return    the summed size of all the entries
+   * Like ShallowSizeOfExcludingThis, but includes sizeof(*this).
    */
-  size_t SizeOfExcludingThis(SizeOfEntryExcludingThisFun aSizeOfEntryExcludingThis,
-                             mozilla::MallocSizeOf aMallocSizeOf,
-                             void* aUserArg = nullptr) const
+  size_t ShallowSizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
   {
-    if (aSizeOfEntryExcludingThis) {
-      s_SizeOfArgs args = { aSizeOfEntryExcludingThis, aUserArg };
-      return PL_DHashTableSizeOfExcludingThis(&this->mTable, s_SizeOfStub,
-                                              aMallocSizeOf, &args);
-    }
-    return PL_DHashTableSizeOfExcludingThis(&this->mTable, nullptr,
-                                            aMallocSizeOf);
+    return aMallocSizeOf(this) + ShallowSizeOfExcludingThis(aMallocSizeOf);
   }
 
 #ifdef DEBUG
   using nsTHashtable<EntryType>::MarkImmutable;
 #endif
-
-protected:
-  struct s_SizeOfArgs
-  {
-    SizeOfEntryExcludingThisFun func;
-    void* userArg;
-  };
-
-  static size_t s_SizeOfStub(PLDHashEntryHdr* aEntry,
-                             mozilla::MallocSizeOf aMallocSizeOf,
-                             void* aArg);
 };
-
-class nsCycleCollectionTraversalCallback;
-
-struct MOZ_STACK_CLASS nsBaseHashtableCCTraversalData
-{
-  nsBaseHashtableCCTraversalData(nsCycleCollectionTraversalCallback& aCallback,
-                                 const char* aName,
-                                 uint32_t aFlags)
-    : mCallback(aCallback)
-    , mName(aName)
-    , mFlags(aFlags)
-  {
-  }
-
-  nsCycleCollectionTraversalCallback& mCallback;
-  const char* mName;
-  uint32_t mFlags;
-
-};
-
-template<typename K, typename T>
-PLDHashOperator
-ImplCycleCollectionTraverse_EnumFunc(K aKey,
-                                     T aData,
-                                     void* aUserData)
-{
-  nsBaseHashtableCCTraversalData* userData =
-    static_cast<nsBaseHashtableCCTraversalData*>(aUserData);
-
-  CycleCollectionNoteChild(userData->mCallback,
-                           aData,
-                           userData->mName,
-                           userData->mFlags);
-  return PL_DHASH_NEXT;
-}
 
 //
 // nsBaseHashtableET definitions
@@ -399,22 +323,6 @@ nsBaseHashtableET<KeyClass, DataType>::nsBaseHashtableET(
 template<class KeyClass, class DataType>
 nsBaseHashtableET<KeyClass, DataType>::~nsBaseHashtableET()
 {
-}
-
-
-//
-// nsBaseHashtable definitions
-//
-
-template<class KeyClass, class DataType, class UserDataType>
-size_t
-nsBaseHashtable<KeyClass, DataType, UserDataType>::s_SizeOfStub(
-    PLDHashEntryHdr* aHdr, mozilla::MallocSizeOf aMallocSizeOf, void* aArg)
-{
-  EntryType* ent = static_cast<EntryType*>(aHdr);
-  s_SizeOfArgs* eargs = static_cast<s_SizeOfArgs*>(aArg);
-
-  return (eargs->func)(ent->GetKey(), ent->mData, aMallocSizeOf, eargs->userArg);
 }
 
 #endif // nsBaseHashtable_h__

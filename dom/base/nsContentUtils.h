@@ -325,6 +325,23 @@ public:
    */
   static uint16_t ReverseDocumentPosition(uint16_t aDocumentPosition);
 
+  /**
+   * Returns a subdocument for aDocument with a particular outer window ID.
+   *
+   * @param aDocument
+   *        The document whose subdocuments will be searched.
+   * @param aOuterWindowID
+   *        The outer window ID for the subdocument to be found. This must
+   *        be a value greater than 0.
+   * @return nsIDocument*
+   *        A pointer to the found nsIDocument. nullptr if the subdocument
+   *        cannot be found, or if either aDocument or aOuterWindowId were
+   *        invalid. If the outer window ID belongs to aDocument itself, this
+   *        will return a pointer to aDocument.
+   */
+  static nsIDocument* GetSubdocumentWithOuterWindowId(nsIDocument *aDocument,
+                                                      uint64_t aOuterWindowId);
+
   static uint32_t CopyNewlineNormalizedUnicodeTo(const nsAString& aSource,
                                                  uint32_t aSrcOffset,
                                                  char16_t* aDest,
@@ -841,6 +858,9 @@ public:
                                     = EmptyString(),
                                   uint32_t aLineNumber = 0,
                                   uint32_t aColumnNumber = 0);
+
+  static nsresult
+  MaybeReportInterceptionErrorToConsole(nsIDocument* aDocument, nsresult aError);
 
   static void LogMessageToConsole(const char* aMsg, ...);
   
@@ -1398,38 +1418,6 @@ public:
    * FALSE.
    */
   static void NotifyInstalledMenuKeyboardListener(bool aInstalling);
-
-  /**
-   * Do security checks before loading a resource. Does the following checks:
-   *   nsIScriptSecurityManager::CheckLoadURIWithPrincipal
-   *   NS_CheckContentLoadPolicy
-   *   nsIScriptSecurityManager::CheckSameOriginURI
-   *
-   * You will still need to do at least SameOrigin checks before on redirects.
-   *
-   * @param aURIToLoad         URI that is getting loaded.
-   * @param aLoadingPrincipal  Principal of the resource that is initiating
-   *                           the load
-   * @param aCheckLoadFlags    Flags to be passed to
-   *                           nsIScriptSecurityManager::CheckLoadURIWithPrincipal
-   *                           NOTE: If this contains ALLOW_CHROME the
-   *                                 CheckSameOriginURI check will be skipped if
-   *                                 aURIToLoad is a chrome uri.
-   * @param aAllowData         Set to true to skip CheckSameOriginURI check when
-                               aURIToLoad is a data uri.
-   * @param aContentPolicyType Type     \
-   * @param aContext           Context   |- to be passed to
-   * @param aMimeGuess         Mimetype  |      NS_CheckContentLoadPolicy
-   * @param aExtra             Extra    /
-   */
-  static nsresult CheckSecurityBeforeLoad(nsIURI* aURIToLoad,
-                                          nsIPrincipal* aLoadingPrincipal,
-                                          uint32_t aCheckLoadFlags,
-                                          bool aAllowData,
-                                          uint32_t aContentPolicyType,
-                                          nsISupports* aContext,
-                                          const nsAFlatCString& aMimeGuess = EmptyCString(),
-                                          nsISupports* aExtra = nullptr);
 
   /**
    * Returns true if aPrincipal is the system principal.

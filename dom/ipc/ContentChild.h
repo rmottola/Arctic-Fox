@@ -76,6 +76,7 @@ public:
               IPC::Channel* aChannel);
     void InitProcessAttributes();
     void InitXPCOM();
+    void InitGraphicsDeviceData();
 
     static ContentChild* GetSingleton() {
         return sSingleton;
@@ -269,13 +270,6 @@ public:
     virtual bool DeallocPPresentationChild(PPresentationChild* aActor) override;
     virtual bool RecvNotifyPresentationReceiverLaunched(PBrowserChild* aIframe,
                                                         const nsString& aSessionId) override;
-
-    virtual PAsmJSCacheEntryChild* AllocPAsmJSCacheEntryChild(
-                                 const asmjscache::OpenMode& aOpenMode,
-                                 const asmjscache::WriteParams& aWriteParams,
-                                 const IPC::Principal& aPrincipal) override;
-    virtual bool DeallocPAsmJSCacheEntryChild(
-                                    PAsmJSCacheEntryChild* aActor) override;
 
     virtual PSpeechSynthesisChild* AllocPSpeechSynthesisChild() override;
     virtual bool DeallocPSpeechSynthesisChild(PSpeechSynthesisChild* aActor) override;

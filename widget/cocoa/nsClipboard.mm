@@ -5,6 +5,8 @@
 
 #include "mozilla/Logging.h"
 
+#include "mozilla/unused.h"
+
 #include "gfxPlatform.h"
 #include "nsCOMPtr.h"
 #include "nsClipboard.h"
@@ -47,17 +49,18 @@ nsClipboard::~nsClipboard()
 }
 
 // We separate this into its own function because after an @try, all local
-// variables within that function get marked as volatile, and our C++ type 
+// variables within that function get marked as volatile, and our C++ type
 // system doesn't like volatile things.
-static NSData* 
+static NSData*
 GetDataFromPasteboard(NSPasteboard* aPasteboard, NSString* aType)
 {
   NSData *data = nil;
   @try {
     data = [aPasteboard dataForType:aType];
   } @catch (NSException* e) {
-    NS_WARNING(nsPrintfCString("Exception raised while getting data from the pasteboard: \"%s - %s\"", 
+    NS_WARNING(nsPrintfCString("Exception raised while getting data from the pasteboard: \"%s - %s\"",
                                [[e name] UTF8String], [[e reason] UTF8String]).get());
+    mozilla::unused << e;
   }
   return data;
 }
@@ -466,11 +469,11 @@ nsClipboard::PasteboardDictFromTransferable(nsITransferable* aTransferable)
         continue;
       }
       CGImageRef imageRef = NULL;
-      nsresult rv = nsCocoaUtils::CreateCGImageFromSurface(surface, &imageRef);
+      rv = nsCocoaUtils::CreateCGImageFromSurface(surface, &imageRef);
       if (NS_FAILED(rv) || !imageRef) {
         continue;
       }
-      
+
       // Convert the CGImageRef to TIFF data.
       CFMutableDataRef tiffData = CFDataCreateMutable(kCFAllocatorDefault, 0);
       CGImageDestinationRef destRef = CGImageDestinationCreateWithData(tiffData,

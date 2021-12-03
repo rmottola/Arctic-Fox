@@ -29,6 +29,7 @@
 #include "jstypes.h"
 
 #include "asmjs/AsmJSValidate.h"
+#include "builtin/SelfHostingDefines.h"
 #include "frontend/BytecodeCompiler.h"
 #include "frontend/FoldConstants.h"
 #include "frontend/ParseMaps.h"
@@ -47,6 +48,22 @@ using namespace js::gc;
 using mozilla::Maybe;
 
 using JS::AutoGCRooter;
+
+JSFunction::AutoParseUsingFunctionBox::AutoParseUsingFunctionBox(ExclusiveContext* cx,
+                                                                 frontend::FunctionBox* funbox)
+  : fun_(cx, funbox->function()),
+    oldEnv_(cx, fun_->environment())
+{
+    fun_->setFunctionBox(funbox);
+    funbox->computeAllowSyntax(fun_);
+    funbox->computeInWith(fun_);
+}
+
+JSFunction::AutoParseUsingFunctionBox::~AutoParseUsingFunctionBox()
+{
+    fun_->unsetFunctionBox();
+    fun_->setEnvironment(oldEnv_);
+}
 
 namespace js {
 namespace frontend {
@@ -68,26 +85,6 @@ typedef Handle<NestedScopeObject*> HandleNestedScopeObject;
         }                                                                                   \
     JS_END_MACRO
 
-static const unsigned BlockIdLimit = 1 << ParseNode::NumBlockIdBits;
-
-template <typename ParseHandler>
-bool
-GenerateBlockId(TokenStream& ts, ParseContext<ParseHandler>* pc, uint32_t& blockid)
-{
-    if (pc->blockidGen == BlockIdLimit) {
-        ts.reportError(JSMSG_NEED_DIET, "program");
-        return false;
-    }
-    MOZ_ASSERT(pc->blockidGen < BlockIdLimit);
-    blockid = pc->blockidGen++;
-    return true;
-}
-
-template bool
-GenerateBlockId(TokenStream& ts, ParseContext<SyntaxParseHandler>* pc, uint32_t& blockid);
-
-template bool
-GenerateBlockId(TokenStream& ts, ParseContext<FullParseHandler>* pc, uint32_t& blockid);
 
 template <>
 bool
@@ -117,6 +114,58 @@ MarkUsesAsHoistedLexical(ParseNode* pn)
         pnu->pn_dflags |= PND_LEXICAL;
         pnup = &pnu->pn_link;
     }
+}
+
+void
+SharedContext::computeAllowSyntax(JSObject* staticScope)
+{
+    for (StaticScopeIter<CanGC> it(context, staticScope); !it.done(); it++) {
+        if (it.type() == StaticScopeIter<CanGC>::Function && !it.fun().isArrow()) {
+            // Any function supports new.target.
+            allowNewTarget_ = true;
+            allowSuperProperty_ = it.fun().allowSuperProperty();
+            if (it.maybeFunctionBox())
+                superScopeAlreadyNeedsHomeObject_ = it.maybeFunctionBox()->needsHomeObject();
+            break;
+        }
+    }
+}
+
+void
+SharedContext::computeInWith(JSObject* staticScope)
+{
+    for (StaticScopeIter<CanGC> it(context, staticScope); !it.done(); it++) {
+        if (it.type() == StaticScopeIter<CanGC>::With) {
+            inWith_ = true;
+            break;
+        }
+    }
+}
+
+void
+SharedContext::markSuperScopeNeedsHomeObject()
+{
+    MOZ_ASSERT(allowSuperProperty());
+
+    if (superScopeAlreadyNeedsHomeObject_)
+        return;
+
+    for (StaticScopeIter<CanGC> it(context, staticScope()); !it.done(); it++) {
+        if (it.type() == StaticScopeIter<CanGC>::Function && !it.fun().isArrow()) {
+            MOZ_ASSERT(it.fun().allowSuperProperty());
+            // If we are still emitting the outer function that needs a home
+            // object, mark it as needing one. Otherwise, we must be emitting
+            // an eval script, and the outer function must already be marked
+            // as needing a home object since it contains an eval.
+            if (it.maybeFunctionBox())
+                it.maybeFunctionBox()->setNeedsHomeObject();
+            else
+                MOZ_ASSERT(it.fun().nonLazyScript()->needsHomeObject());
+            superScopeAlreadyNeedsHomeObject_ = true;
+            return;
+        }
+    }
+    MOZ_CRASH("Must have found an enclosing function box scope that allows super.property");
 }
 
 // See comment on member function declaration.
@@ -176,7 +225,7 @@ ParseContext<FullParseHandler>::define(TokenStream& ts,
         dn->setOp((js_CodeSpec[dn->getOp()].format & JOF_SET) ? JSOP_SETARG : JSOP_GETARG);
         dn->pn_blockid = bodyid;
         dn->pn_dflags |= PND_BOUND;
-        if (!dn->pn_cookie.set(ts, staticLevel, args_.length()))
+        if (!dn->pn_scopecoord.setSlot(ts, args_.length()))
             return false;
         if (!args_.append(dn))
             return false;
@@ -196,7 +245,7 @@ ParseContext<FullParseHandler>::define(TokenStream& ts,
             dn->setOp((js_CodeSpec[dn->getOp()].format & JOF_SET) ? JSOP_SETLOCAL : JSOP_GETLOCAL);
             dn->pn_blockid = bodyid;
             dn->pn_dflags |= PND_BOUND;
-            if (!dn->pn_cookie.set(ts, staticLevel, vars_.length()))
+            if (!dn->pn_scopecoord.setSlot(ts, vars_.length()))
                 return false;
             if (!vars_.append(dn))
                 return false;
@@ -211,7 +260,6 @@ ParseContext<FullParseHandler>::define(TokenStream& ts,
       case Definition::CONST:
         dn->setOp(JSOP_INITLEXICAL);
         dn->pn_dflags |= (PND_LEXICAL | PND_BOUND);
-        MOZ_ASSERT(dn->pn_cookie.level() == staticLevel); /* see bindLet */
         if (atBodyLevel()) {
             if (!bodyLevelLexicals_.append(dn))
                 return false;
@@ -289,18 +337,18 @@ ParseContext<ParseHandler>::updateDecl(JSAtom* atom, Node pn)
     }
 
     MOZ_ASSERT(oldDecl->isBound());
-    MOZ_ASSERT(!oldDecl->pn_cookie.isFree());
-    newDecl->pn_cookie = oldDecl->pn_cookie;
+    MOZ_ASSERT(!oldDecl->pn_scopecoord.isFree());
+    newDecl->pn_scopecoord = oldDecl->pn_scopecoord;
     newDecl->pn_dflags |= PND_BOUND;
     if (IsArgOp(oldDecl->getOp())) {
         newDecl->setOp(JSOP_GETARG);
-        MOZ_ASSERT(args_[oldDecl->pn_cookie.slot()] == oldDecl);
-        args_[oldDecl->pn_cookie.slot()] = newDecl;
+        MOZ_ASSERT(args_[oldDecl->pn_scopecoord.slot()] == oldDecl);
+        args_[oldDecl->pn_scopecoord.slot()] = newDecl;
     } else {
         MOZ_ASSERT(IsLocalOp(oldDecl->getOp()));
         newDecl->setOp(JSOP_GETLOCAL);
-        MOZ_ASSERT(vars_[oldDecl->pn_cookie.slot()] == oldDecl);
-        vars_[oldDecl->pn_cookie.slot()] = newDecl;
+        MOZ_ASSERT(vars_[oldDecl->pn_scopecoord.slot()] == oldDecl);
+        vars_[oldDecl->pn_scopecoord.slot()] = newDecl;
     }
 }
 
@@ -383,7 +431,7 @@ ParseContext<ParseHandler>::generateFunctionBindings(ExclusiveContext* cx, Token
     // know how many vars there are.
     for (size_t i = 0; i < bodyLevelLexicals_.length(); i++) {
         Definition* dn = bodyLevelLexicals_[i];
-        if (!dn->pn_cookie.set(ts, dn->pn_cookie.level(), vars_.length() + i))
+        if (!dn->pn_scopecoord.setSlot(ts, vars_.length() + i))
             return false;
     }
 
@@ -487,7 +535,8 @@ Parser<SyntaxParseHandler>::abortIfSyntaxParser()
 template <typename ParseHandler>
 Parser<ParseHandler>::Parser(ExclusiveContext* cx, LifoAlloc* alloc,
                              const ReadOnlyCompileOptions& options,
-                             const char16_t* chars, size_t length, bool foldConstants,
+                             const char16_t* chars, size_t length,
+                             bool foldConstants,
                              Parser<SyntaxParseHandler>* syntaxParser,
                              LazyScript* lazyOuterFunction)
   : AutoGCRooter(cx, PARSER),
@@ -496,6 +545,7 @@ Parser<ParseHandler>::Parser(ExclusiveContext* cx, LifoAlloc* alloc,
     tokenStream(cx, options, chars, length, thisForCtor()),
     traceListHead(nullptr),
     pc(nullptr),
+    blockScopes(cx),
     sct(nullptr),
     ss(nullptr),
     keepAtoms(cx->perThreadData),
@@ -582,16 +632,16 @@ Parser<ParseHandler>::newObjectBox(JSObject* obj)
 
 template <typename ParseHandler>
 FunctionBox::FunctionBox(ExclusiveContext* cx, ObjectBox* traceListHead, JSFunction* fun,
-                         ParseContext<ParseHandler>* outerpc, Directives directives,
-                         bool extraWarnings, GeneratorKind generatorKind)
+                         JSObject* enclosingStaticScope, ParseContext<ParseHandler>* outerpc,
+                         Directives directives, bool extraWarnings, GeneratorKind generatorKind)
   : ObjectBox(fun, traceListHead),
     SharedContext(cx, directives, extraWarnings),
     bindings(),
+    enclosingStaticScope_(enclosingStaticScope),
     bufStart(0),
     bufEnd(0),
     length(0),
     generatorKindBits_(GeneratorKindAsBits(generatorKind)),
-    inWith_(false),                  // initialized below
     inGenexpLambda(false),
     hasDestructuringArgs(false),
     useAsm(false),
@@ -605,47 +655,17 @@ FunctionBox::FunctionBox(ExclusiveContext* cx, ObjectBox* traceListHead, JSFunct
     // baked into JIT code, so they must be allocated tenured. They are held by
     // the JSScript so cannot be collected during a minor GC anyway.
     MOZ_ASSERT(fun->isTenured());
-
-    if (!outerpc) {
-        inWith_ = false;
-
-    } else if (outerpc->parsingWith) {
-        // This covers cases that don't involve eval().  For example:
-        //
-        //   with (o) { (function() { g(); })(); }
-        //
-        // In this case, |outerpc| corresponds to global code, and
-        // outerpc->parsingWith is true.
-        inWith_ = true;
-
-    } else if (outerpc->sc->isFunctionBox()) {
-        // This is like the above case, but for more deeply nested functions.
-        // For example:
-        //
-        //   with (o) { eval("(function() { (function() { g(); })(); })();"); } }
-        //
-        // In this case, the inner anonymous function needs to inherit the
-        // setting of |inWith| from the outer one.
-        FunctionBox* parent = outerpc->sc->asFunctionBox();
-        if (parent && parent->inWith())
-            inWith_ = true;
-    } else {
-        // This is like the above case, but when inside eval.
-        //
-        // For example:
-        //
-        //   with(o) { eval("(function() { g(); })();"); }
-        //
-        // In this case, the static scope chain tells us the presence of with.
-        inWith_ = outerpc->sc->inWith();
-    }
 }
 
 template <typename ParseHandler>
 FunctionBox*
-Parser<ParseHandler>::newFunctionBox(Node fn, JSFunction* fun, ParseContext<ParseHandler>* outerpc,
-                                     Directives inheritedDirectives, GeneratorKind generatorKind)
+Parser<ParseHandler>::newFunctionBox(Node fn, JSFunction* fun,
+                                     ParseContext<ParseHandler>* outerpc,
+                                     Directives inheritedDirectives,
+                                     GeneratorKind generatorKind,
+                                     JSObject* enclosingStaticScope)
 {
+    MOZ_ASSERT_IF(outerpc, enclosingStaticScope == outerpc->innermostStaticScope());
     MOZ_ASSERT(fun);
 
     /*
@@ -656,7 +676,7 @@ Parser<ParseHandler>::newFunctionBox(Node fn, JSFunction* fun, ParseContext<Pars
      * function.
      */
     FunctionBox* funbox =
-        alloc.new_<FunctionBox>(context, traceListHead, fun, outerpc,
+        alloc.new_<FunctionBox>(context, traceListHead, fun, enclosingStaticScope, outerpc,
                                 inheritedDirectives, options().extraWarningsOption,
                                 generatorKind);
     if (!funbox) {
@@ -702,14 +722,12 @@ Parser<ParseHandler>::parse()
      *   protected from the GC by a root or a stack frame reference.
      */
     Directives directives(options().strictOption);
-    GlobalSharedContext globalsc(context, directives,
-                                 /* staticEvalScope = */ nullptr,
+    GlobalSharedContext globalsc(context, /* staticScope = */ nullptr, directives,
                                  options().extraWarningsOption);
     ParseContext<ParseHandler> globalpc(this, /* parent = */ nullptr, ParseHandler::null(),
                                         &globalsc, /* newDirectives = */ nullptr,
-                                        /* staticLevel = */ 0, /* bodyid = */ 0,
                                         /* blockScopeDepth = */ 0);
-    if (!globalpc.init(tokenStream))
+    if (!globalpc.init(*this))
         return null();
 
     Node pn = statements(YieldIsName);
@@ -772,10 +790,12 @@ Parser<ParseHandler>::checkStrictBinding(PropertyName* name, Node pn)
 
 template <>
 ParseNode*
-Parser<FullParseHandler>::standaloneFunctionBody(HandleFunction fun, const AutoNameVector& formals,
+Parser<FullParseHandler>::standaloneFunctionBody(HandleFunction fun,
+                                                 Handle<PropertyNameVector> formals,
                                                  GeneratorKind generatorKind,
                                                  Directives inheritedDirectives,
-                                                 Directives* newDirectives)
+                                                 Directives* newDirectives,
+                                                 HandleObject enclosingStaticScope)
 {
     MOZ_ASSERT(checkOptionsCalled);
 
@@ -788,17 +808,16 @@ Parser<FullParseHandler>::standaloneFunctionBody(HandleFunction fun, const AutoN
         return null();
     fn->pn_body = argsbody;
 
-    FunctionBox* funbox = newFunctionBox(fn, fun, /* outerpc = */ nullptr, inheritedDirectives,
-                                         generatorKind);
+    FunctionBox* funbox = newFunctionBox(fn, fun, inheritedDirectives, generatorKind,
+                                         enclosingStaticScope);
     if (!funbox)
         return null();
     funbox->length = fun->nargs() - fun->hasRest();
     handler.setFunctionBox(fn, funbox);
 
     ParseContext<FullParseHandler> funpc(this, pc, fn, funbox, newDirectives,
-                                         /* staticLevel = */ 0, /* bodyid = */ 0,
                                          /* blockScopeDepth = */ 0);
-    if (!funpc.init(tokenStream))
+    if (!funpc.init(*this))
         return null();
 
     for (unsigned i = 0; i < formals.length(); i++) {
@@ -932,12 +951,13 @@ Parser<FullParseHandler>::checkFunctionArguments()
 
         /*
          * Check whether any parameters have been assigned within this
-         * function. In strict mode parameters do not alias arguments[i], and
-         * to make the arguments object reflect initial parameter values prior
-         * to any mutation we create it eagerly whenever parameters are (or
-         * might, in the case of calls to eval) be assigned.
+         * function. If the arguments object is unmapped (strict mode or
+         * function with default/rest/destructing args), parameters do not alias
+         * arguments[i], and to make the arguments object reflect initial
+         * parameter values prior to any mutation we create it eagerly whenever
+         * parameters are (or might, in the case of calls to eval) assigned.
          */
-        if (pc->sc->needStrictChecks()) {
+        if (!funbox->hasMappedArgsObj()) {
             for (AtomDefnListMap::Range r = pc->decls().all(); !r.empty(); r.popFront()) {
                 DefinitionList& dlist = r.front().value();
                 for (DefinitionList::Range dr = dlist.all(); !dr.empty(); dr.popFront()) {
@@ -1120,56 +1140,118 @@ Parser<FullParseHandler>::makeDefIntoUse(Definition* dn, ParseNode* pn, JSAtom* 
     dn->setDefn(false);
     dn->setUsed(true);
     dn->pn_lexdef = (Definition*) pn;
-    dn->pn_cookie.makeFree();
+    dn->pn_scopecoord.makeFree();
     dn->pn_dflags &= ~PND_BOUND;
     return true;
 }
 
 /*
- * Parameter block types for the several Binder functions.  We use a common
- * helper function signature in order to share code among destructuring and
- * simple variable declaration parsers.  In the destructuring case, the binder
- * function is called indirectly from the variable declaration parser by way
- * of checkDestructuringPattern and its friends.
+ * Helper class for creating bindings.
+ *
+ * The same instance can be used more than once by repeatedly calling
+ * setNameNode() followed by bind().
+ *
+ * In the destructuring case, bind() is called indirectly from the variable
+ * declaration parser by way of checkDestructuringPattern and its friends.
  */
-
 template <typename ParseHandler>
 struct BindData
 {
-    explicit BindData(ExclusiveContext* cx) : let(cx) {}
-
-    typedef bool
-    (*Binder)(BindData* data, HandlePropertyName name, Parser<ParseHandler>* parser);
-
-    /* name node for definition processing and error source coordinates */
-    typename ParseHandler::Node pn;
-
-    JSOp            op;         /* prologue bytecode or nop */
-    Binder          binder;     /* binder, discriminates u */
-    bool            isConst;    /* const binding? */
-
     struct LetData {
         explicit LetData(ExclusiveContext* cx) : blockObj(cx) {}
         VarContext varContext;
         RootedStaticBlockObject blockObj;
-        unsigned   overflow;
-    } let;
+        unsigned overflow;
+    };
+
+    explicit BindData(ExclusiveContext* cx)
+      : kind_(Uninitialized), nameNode_(ParseHandler::null()), letData_(cx)
+    {}
 
     void initLexical(VarContext varContext, StaticBlockObject* blockObj, unsigned overflow,
-                     bool isConst = false) {
-        this->pn = ParseHandler::null();
-        this->op = JSOP_INITLEXICAL;
-        this->isConst = isConst;
-        this->binder = Parser<ParseHandler>::bindLexical;
-        this->let.varContext = varContext;
-        this->let.blockObj = blockObj;
-        this->let.overflow = overflow;
+                     bool isConst = false)
+    {
+        init(LexicalBinding, JSOP_INITLEXICAL, isConst);
+        letData_.varContext = varContext;
+        letData_.blockObj = blockObj;
+        letData_.overflow = overflow;
     }
 
     void initVarOrGlobalConst(JSOp op) {
-        this->op = op;
-        this->isConst = op == JSOP_DEFCONST;
-        this->binder = Parser<ParseHandler>::bindVarOrGlobalConst;
+        init(VarBinding, op, op == JSOP_DEFCONST);
+    }
+
+    void initDestructuring(JSOp op) {
+        init(DestructuringBinding, op, false);
+    }
+
+    void setNameNode(typename ParseHandler::Node pn) {
+        MOZ_ASSERT(isInitialized());
+        nameNode_ = pn;
+    }
+
+    typename ParseHandler::Node nameNode() {
+        MOZ_ASSERT(isInitialized());
+        return nameNode_;
+    }
+
+    JSOp op() {
+        MOZ_ASSERT(isInitialized());
+        return op_;
+    }
+
+    bool isConst() {
+        MOZ_ASSERT(isInitialized());
+        return isConst_;
+    }
+
+    const LetData& letData() {
+        MOZ_ASSERT(kind_ == LexicalBinding);
+        return letData_;
+    }
+
+    bool bind(HandlePropertyName name, Parser<ParseHandler>* parser) {
+        MOZ_ASSERT(isInitialized());
+        MOZ_ASSERT(nameNode_ != ParseHandler::null());
+        switch (kind_) {
+          case LexicalBinding:
+            return Parser<ParseHandler>::bindLexical(this, name, parser);
+          case VarBinding:
+            return Parser<ParseHandler>::bindVarOrGlobalConst(this, name, parser);
+          case DestructuringBinding:
+            return Parser<ParseHandler>::bindDestructuringArg(this, name, parser);
+          default:
+            MOZ_CRASH();
+        }
+        nameNode_ = ParseHandler::null();
+    }
+
+  private:
+    enum BindingKind {
+        Uninitialized,
+        LexicalBinding,
+        VarBinding,
+        DestructuringBinding
+    };
+
+    BindingKind kind_;
+
+    // Name node for definition processing and error source coordinates.
+    typename ParseHandler::Node nameNode_;
+
+    JSOp op_;         // Prologue bytecode or nop.
+    bool isConst_;    // Whether this is a const binding.
+    LetData letData_;
+
+    bool isInitialized() {
+        return kind_ != Uninitialized;
+    }
+
+    void init(BindingKind kind, JSOp op, bool isConst) {
+        MOZ_ASSERT(!isInitialized());
+        kind_ = kind;
+        op_ = op;
+        isConst_ = isConst;
     }
 };
 
@@ -1184,6 +1266,9 @@ Parser<ParseHandler>::newFunction(HandleAtom atom, FunctionSyntaxKind kind,
 
     gc::AllocKind allocKind = gc::AllocKind::FUNCTION;
     JSFunction::Flags flags;
+#ifdef DEBUG
+    bool isGlobalSelfHostedBuiltin = false;
+#endif
     switch (kind) {
       case Expression:
         flags = JSFunction::INTERPRETED_LAMBDA;
@@ -1214,6 +1299,12 @@ Parser<ParseHandler>::newFunction(HandleAtom atom, FunctionSyntaxKind kind,
         allocKind = gc::AllocKind::FUNCTION_EXTENDED;
         break;
       default:
+#ifdef DEBUG
+        if (options().selfHostingMode && !pc->sc->isFunctionBox()) {
+            isGlobalSelfHostedBuiltin = true;
+            allocKind = gc::AllocKind::FUNCTION_EXTENDED;
+        }
+#endif
         flags = JSFunction::INTERPRETED_NORMAL;
         break;
     }
@@ -1222,8 +1313,13 @@ Parser<ParseHandler>::newFunction(HandleAtom atom, FunctionSyntaxKind kind,
                                allocKind, TenuredObject);
     if (!fun)
         return nullptr;
-    if (options().selfHostingMode)
+    if (options().selfHostingMode) {
         fun->setIsSelfHostedBuiltin();
+#ifdef DEBUG
+        if (isGlobalSelfHostedBuiltin)
+            fun->setExtendedSlot(HAS_SELFHOSTED_CANONICAL_NAME_SLOT, BooleanValue(false));
+#endif
+    }
     return fun;
 }
 
@@ -1303,8 +1399,9 @@ ConvertDefinitionToNamedLambdaUse(TokenStream& ts, ParseContext<FullParseHandler
                                   FunctionBox* funbox, Definition* dn)
 {
     dn->setOp(JSOP_CALLEE);
-    if (!dn->pn_cookie.set(ts, pc->staticLevel, 0))
+    if (!dn->pn_scopecoord.setSlot(ts, 0))
         return false;
+    dn->pn_blockid = pc->blockid();
     dn->pn_dflags |= PND_BOUND;
     MOZ_ASSERT(dn->kind() == Definition::NAMED_LAMBDA);
 
@@ -1331,7 +1428,7 @@ IsNonDominatingInScopedSwitch(ParseContext<FullParseHandler>* pc, HandleAtom nam
     MOZ_ASSERT(dn->isLexical());
     StmtInfoPC* stmt = LexicalLookup(pc, name);
     if (stmt && stmt->type == StmtType::SWITCH)
-        return dn->pn_cookie.slot() < stmt->firstDominatingLexicalInCase;
+        return dn->pn_scopecoord.slot() < stmt->firstDominatingLexicalInCase;
     return false;
 }
 
@@ -1363,8 +1460,6 @@ bool
 Parser<FullParseHandler>::leaveFunction(ParseNode* fn, ParseContext<FullParseHandler>* outerpc,
                                         FunctionSyntaxKind kind)
 {
-    outerpc->blockidGen = pc->blockidGen;
-
     bool bodyLevel = outerpc->atBodyLevel();
     FunctionBox* funbox = fn->pn_funbox;
     MOZ_ASSERT(funbox == pc->sc->asFunctionBox());
@@ -1389,7 +1484,7 @@ Parser<FullParseHandler>::leaveFunction(ParseNode* fn, ParseContext<FullParseHan
              * by eval and function statements (which both flag the function as
              * having an extensible scope) or any enclosing 'with'.
              */
-            if (funbox->hasExtensibleScope() || outerpc->parsingWith)
+            if (funbox->hasExtensibleScope() || funbox->inWith())
                 handler.deoptimizeUsesWithin(dn, fn->pn_pos);
 
             if (!outer_dn) {
@@ -1484,8 +1579,6 @@ bool
 Parser<SyntaxParseHandler>::leaveFunction(Node fn, ParseContext<SyntaxParseHandler>* outerpc,
                                           FunctionSyntaxKind kind)
 {
-    outerpc->blockidGen = pc->blockidGen;
-
     FunctionBox* funbox = pc->sc->asFunctionBox();
     return addFreeVariablesFromLazyFunction(funbox->function(), outerpc);
 }
@@ -1569,10 +1662,10 @@ Parser<ParseHandler>::bindDestructuringArg(BindData<ParseHandler>* data,
         return false;
     }
 
-    if (!parser->checkStrictBinding(name, data->pn))
+    if (!parser->checkStrictBinding(name, data->nameNode()))
         return false;
 
-    return pc->define(parser->tokenStream, name, data->pn, Definition::VAR);
+    return pc->define(parser->tokenStream, name, data->nameNode(), Definition::VAR);
 }
 
 template <typename ParseHandler>
@@ -1662,9 +1755,7 @@ Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyn
                  * binder and its data.
                  */
                 BindData<ParseHandler> data(context);
-                data.pn = ParseHandler::null();
-                data.op = JSOP_DEFVAR;
-                data.binder = bindDestructuringArg;
+                data.initDestructuring(JSOP_DEFVAR);
                 Node destruct = destructuringExprWithoutYield(yieldHandling, &data, tt,
                                                               JSMSG_YIELD_IN_DEFAULT);
                 if (!destruct)
@@ -1860,7 +1951,8 @@ Parser<FullParseHandler>::checkFunctionDefinition(HandlePropertyName funName,
                     // that it knows where the argument is located.
                     pn->setOp(JSOP_GETARG);
                     pn->setDefn(true);
-                    pn->pn_cookie = dn->pn_cookie;
+                    pn->pn_scopecoord = dn->pn_scopecoord;
+                    pn->pn_blockid = dn->pn_blockid;
                     pn->pn_dflags |= PND_BOUND;
                     dn->markAsAssigned();
                 } else {
@@ -1882,7 +1974,7 @@ Parser<FullParseHandler>::checkFunctionDefinition(HandlePropertyName funName,
                 fn->pn_pos.end = pn->pn_pos.end;
 
                 fn->pn_body = nullptr;
-                fn->pn_cookie.makeFree();
+                fn->pn_scopecoord.makeFree();
 
                 pc->lexdeps->remove(funName);
                 handler.freeTree(pn);
@@ -1895,8 +1987,8 @@ Parser<FullParseHandler>::checkFunctionDefinition(HandlePropertyName funName,
 
         if (bodyLevel) {
             MOZ_ASSERT(pn->functionIsHoisted());
-            MOZ_ASSERT_IF(pc->sc->isFunctionBox(), !pn->pn_cookie.isFree());
-            MOZ_ASSERT_IF(!pc->sc->isFunctionBox(), pn->pn_cookie.isFree());
+            MOZ_ASSERT_IF(pc->sc->isFunctionBox(), !pn->pn_scopecoord.isFree());
+            MOZ_ASSERT_IF(!pc->sc->isFunctionBox(), pn->pn_scopecoord.isFree());
         } else {
             /*
              * As a SpiderMonkey-specific extension, non-body-level function
@@ -1904,7 +1996,7 @@ Parser<FullParseHandler>::checkFunctionDefinition(HandlePropertyName funName,
              * dynamically bound when control flow reaches the statement.
              */
             MOZ_ASSERT(!pc->sc->strict());
-            MOZ_ASSERT(pn->pn_cookie.isFree());
+            MOZ_ASSERT(pn->pn_scopecoord.isFree());
             if (pc->sc->isFunctionBox()) {
                 FunctionBox* funbox = pc->sc->asFunctionBox();
                 funbox->setMightAliasLocals();
@@ -1949,8 +2041,9 @@ Parser<FullParseHandler>::checkFunctionDefinition(HandlePropertyName funName,
     // that function, not any of its nested children. The initial syntax-only
     // parse recorded the free variables of nested functions and their extents,
     // so we can skip over them after accounting for their free variables.
-    if (LazyScript* lazyOuter = handler.lazyOuterFunction()) {
-        JSFunction* fun = handler.nextLazyInnerFunction();
+    Rooted<LazyScript*> lazyOuter(context, handler.lazyOuterFunction());
+    if (lazyOuter) {
+        RootedFunction fun(context, handler.nextLazyInnerFunction());
         MOZ_ASSERT(!fun->isLegacyGenerator());
         FunctionBox* funbox = newFunctionBox(pn, fun, pc, Directives(/* strict = */ false),
                                              fun->generatorKind());
@@ -2114,7 +2207,7 @@ template <typename ParseHandler>
 bool
 Parser<ParseHandler>::taggedTemplate(YieldHandling yieldHandling, Node nodeList, TokenKind tt)
 {
-    Node callSiteObjNode = handler.newCallSiteObject(pos().begin, pc->blockidGen);
+    Node callSiteObjNode = handler.newCallSiteObject(pos().begin);
     if (!callSiteObjNode)
         return false;
     handler.addList(nodeList, callSiteObjNode);
@@ -2304,6 +2397,9 @@ Parser<FullParseHandler>::functionArgsAndBody(InHandling inHandling, ParseNode* 
 
     YieldHandling yieldHandling = generatorKind != NotGenerator ? YieldIsKeyword : YieldIsName;
 
+    // We need to roll back the block scope vector if syntax parsing fails.
+    uint32_t oldBlockScopesLength = blockScopes.length();
+
     // Try a syntax parse for this inner function.
     do {
         // If we're assuming this function is an IIFE, always perform a full
@@ -2324,10 +2420,10 @@ Parser<FullParseHandler>::functionArgsAndBody(InHandling inHandling, ParseNode* 
             if (!parser->tokenStream.seek(position, tokenStream))
                 return false;
 
-            ParseContext<SyntaxParseHandler> funpc(parser, outerpc, SyntaxParseHandler::null(), funbox,
-                                                   newDirectives, outerpc->staticLevel + 1,
-                                                   outerpc->blockidGen, /* blockScopeDepth = */ 0);
-            if (!funpc.init(tokenStream))
+            ParseContext<SyntaxParseHandler> funpc(parser, outerpc, SyntaxParseHandler::null(),
+                                                   funbox, newDirectives,
+                                                   /* blockScopeDepth = */ 0);
+            if (!funpc.init(*parser))
                 return false;
 
             if (!parser->functionArgsAndBodyGeneric(inHandling, yieldHandling,
@@ -2342,8 +2438,6 @@ Parser<FullParseHandler>::functionArgsAndBody(InHandling inHandling, ParseNode* 
                 }
                 return false;
             }
-
-            outerpc->blockidGen = funpc.blockidGen;
 
             // Advance this parser over tokens processed by the syntax parser.
             parser->tokenStream.tell(&position);
@@ -2362,11 +2456,12 @@ Parser<FullParseHandler>::functionArgsAndBody(InHandling inHandling, ParseNode* 
         return true;
     } while (false);
 
+    blockScopes.resize(oldBlockScopesLength);
+
     // Continue doing a full parse for this inner function.
     ParseContext<FullParseHandler> funpc(this, pc, pn, funbox, newDirectives,
-                                         outerpc->staticLevel + 1, outerpc->blockidGen,
                                          /* blockScopeDepth = */ 0);
-    if (!funpc.init(tokenStream))
+    if (!funpc.init(*this))
         return false;
 
     if (!functionArgsAndBodyGeneric(inHandling, yieldHandling, pn, fun, kind))
@@ -2404,9 +2499,8 @@ Parser<SyntaxParseHandler>::functionArgsAndBody(InHandling inHandling, Node pn, 
 
     // Initialize early for possible flags mutation via destructuringExpr.
     ParseContext<SyntaxParseHandler> funpc(this, pc, handler.null(), funbox, newDirectives,
-                                           outerpc->staticLevel + 1, outerpc->blockidGen,
                                            /* blockScopeDepth = */ 0);
-    if (!funpc.init(tokenStream))
+    if (!funpc.init(*this))
         return false;
 
     YieldHandling yieldHandling = generatorKind != NotGenerator ? YieldIsKeyword : YieldIsName;
@@ -2443,8 +2537,8 @@ Parser<ParseHandler>::appendToCallSiteObj(Node callSiteObj)
 
 template <>
 ParseNode*
-Parser<FullParseHandler>::standaloneLazyFunction(HandleFunction fun, unsigned staticLevel,
-                                                 bool strict, GeneratorKind generatorKind)
+Parser<FullParseHandler>::standaloneLazyFunction(HandleFunction fun, bool strict,
+                                                 GeneratorKind generatorKind)
 {
     MOZ_ASSERT(checkOptionsCalled);
 
@@ -2457,9 +2551,9 @@ Parser<FullParseHandler>::standaloneLazyFunction(HandleFunction fun, unsigned st
     if (!tokenStream.peekTokenPos(&pn->pn_pos))
         return null();
 
+    RootedObject enclosing(context, fun->lazyScript()->enclosingScope());
     Directives directives(/* strict = */ strict);
-    FunctionBox* funbox = newFunctionBox(pn, fun, /* outerpc = */ nullptr, directives,
-                                         generatorKind);
+    FunctionBox* funbox = newFunctionBox(pn, fun, directives, generatorKind, enclosing);
     if (!funbox)
         return null();
     funbox->length = fun->nargs() - fun->hasRest();
@@ -2469,9 +2563,8 @@ Parser<FullParseHandler>::standaloneLazyFunction(HandleFunction fun, unsigned st
 
     Directives newDirectives = directives;
     ParseContext<FullParseHandler> funpc(this, /* parent = */ nullptr, pn, funbox,
-                                         &newDirectives, staticLevel, /* bodyid = */ 0,
-                                         /* blockScopeDepth = */ 0);
-    if (!funpc.init(tokenStream))
+                                         &newDirectives, /* blockScopeDepth = */ 0);
+    if (!funpc.init(*this))
         return null();
 
     YieldHandling yieldHandling = generatorKind != NotGenerator ? YieldIsKeyword : YieldIsName;
@@ -2985,30 +3078,29 @@ Parser<FullParseHandler>::bindLexical(BindData<FullParseHandler>* data,
                                       HandlePropertyName name, Parser<FullParseHandler>* parser)
 {
     ParseContext<FullParseHandler>* pc = parser->pc;
-    ParseNode* pn = data->pn;
+    ParseNode* pn = data->nameNode();
     if (!parser->checkStrictBinding(name, pn))
         return false;
 
     ExclusiveContext* cx = parser->context;
-    Rooted<StaticBlockObject*> blockObj(cx, data->let.blockObj);
+    Rooted<StaticBlockObject*> blockObj(cx, data->letData().blockObj);
 
     unsigned index;
     if (blockObj) {
         index = blockObj->numVariables();
         if (index >= StaticBlockObject::LOCAL_INDEX_LIMIT) {
-            parser->report(ParseError, false, pn, data->let.overflow);
+            parser->report(ParseError, false, pn, data->letData().overflow);
             return false;
         }
     } else {
         // If we don't have a block object, we are parsing a body-level let,
         // in which case we use a bogus index. See comment block below in
-        // setting the pn_cookie for explanation on how it gets adjusted.
+        // setting the pn_scopecoord for explanation on how it gets adjusted.
         index = 0;
     }
 
-    // For block-level lets, assign block-local index to pn->pn_cookie right
-    // away, encoding it as an upvar cookie whose skip tells the current
-    // static level. The emitter will adjust the node's slot based on its
+    // For block-level lets, assign block-local index to pn->pn_scopecoord
+    // right away. The emitter will adjust the node's slot based on its
     // stack depth model -- and, for global and eval code,
     // js::frontend::CompileScript will adjust the slot again to include
     // script->nfixed and body-level lets.
@@ -3016,17 +3108,17 @@ Parser<FullParseHandler>::bindLexical(BindData<FullParseHandler>* data,
     // For body-level lets, the index is bogus at this point and is adjusted
     // when creating Bindings. See ParseContext::generateFunctionBindings and
     // AppendPackedBindings.
-    if (!pn->pn_cookie.set(parser->tokenStream, pc->staticLevel, index))
+    if (!pn->pn_scopecoord.setSlot(parser->tokenStream, index))
         return false;
 
     Definition* dn = pc->decls().lookupFirst(name);
-    Definition::Kind bindingKind = data->isConst ? Definition::CONST : Definition::LET;
+    Definition::Kind bindingKind = data->isConst() ? Definition::CONST : Definition::LET;
 
     /*
      * For bindings that are hoisted to the beginning of the block/function,
      * define() right now. Otherwise, delay define until pushLetScope.
      */
-    if (data->let.varContext == HoistVars) {
+    if (data->letData().varContext == HoistVars) {
         if (dn && dn->pn_blockid == pc->blockid())
             return parser->reportRedeclaration(pn, dn->kind(), name);
         if (!pc->define(parser->tokenStream, name, pn, bindingKind))
@@ -3037,7 +3129,7 @@ Parser<FullParseHandler>::bindLexical(BindData<FullParseHandler>* data,
         bool redeclared;
         RootedId id(cx, NameToId(name));
         RootedShape shape(cx, StaticBlockObject::addVar(cx, blockObj, id,
-                                                        data->isConst, index, &redeclared));
+                                                        data->isConst(), index, &redeclared));
         if (!shape) {
             if (redeclared) {
                 // The only way to be redeclared without a previous definition is if we're in a
@@ -3055,7 +3147,7 @@ Parser<FullParseHandler>::bindLexical(BindData<FullParseHandler>* data,
     } else {
         // Body-level lets are hoisted and need to have been defined via
         // pc->define above.
-        MOZ_ASSERT(data->let.varContext == HoistVars);
+        MOZ_ASSERT(data->letData().varContext == HoistVars);
         MOZ_ASSERT(pc->decls().lookupFirst(name));
     }
 
@@ -3067,7 +3159,7 @@ template <>
 Parser<SyntaxParseHandler>::bindLexical(BindData<SyntaxParseHandler>* data,
                                         HandlePropertyName name, Parser<SyntaxParseHandler>* parser)
 {
-    if (!parser->checkStrictBinding(name, data->pn))
+    if (!parser->checkStrictBinding(name, data->nameNode()))
         return false;
 
     return true;
@@ -3147,10 +3239,7 @@ Parser<ParseHandler>::AutoPushStmtInfoPC::AutoPushStmtInfoPC(Parser<ParseHandler
     stmt_(parser.context)
 {
     stmt_.blockid = parser.pc->blockid();
-    NestedScopeObject* enclosing = nullptr;
-    if (StmtInfoPC* stmt = parser.pc->innermostScopeStmt())
-        enclosing = stmt->staticScope;
-    staticScope.initEnclosingNestedScopeFromParser(enclosing);
+    staticScope.initEnclosingScopeFromParser(parser.pc->innermostStaticScope());
     parser.pc->stmtStack.pushNestedScope(&stmt_, type, staticScope);
 }
 
@@ -3177,7 +3266,7 @@ Parser<ParseHandler>::AutoPushStmtInfoPC::~AutoPushStmtInfoPC()
             MOZ_ASSERT(!blockObj->inDictionaryMode());
             ForEachLetDef(ts, pc, blockObj, PopLetDecl<ParseHandler>());
         }
-        scopeObj->resetEnclosingNestedScopeFromParser();
+        scopeObj->resetEnclosingScopeFromParser();
     }
 }
 
@@ -3185,7 +3274,7 @@ template <typename ParseHandler>
 bool
 Parser<ParseHandler>::AutoPushStmtInfoPC::generateBlockId()
 {
-    return GenerateBlockId(parser_.tokenStream, parser_.pc, stmt_.blockid);
+    return parser_.generateBlockId(stmt_.staticScope, &stmt_.blockid);
 }
 
 template <typename ParseHandler>
@@ -3218,8 +3307,8 @@ Parser<ParseHandler>::bindVarOrGlobalConst(BindData<ParseHandler>* data,
 {
     ExclusiveContext* cx = parser->context;
     ParseContext<ParseHandler>* pc = parser->pc;
-    Node pn = data->pn;
-    bool isConstDecl = data->op == JSOP_DEFCONST;
+    Node pn = data->nameNode();
+    bool isConstDecl = data->op() == JSOP_DEFCONST;
 
     /* Default best op for pn is JSOP_GETNAME; we'll try to improve below. */
     parser->handler.setOp(pn, JSOP_GETNAME);
@@ -3286,7 +3375,7 @@ Parser<ParseHandler>::bindVarOrGlobalConst(BindData<ParseHandler>* data,
                        (!inCatchBody || OuterLet(pc, stmt, name))));
 
         if (parser->options().extraWarningsOption
-            ? data->op != JSOP_DEFVAR || dn_kind != Definition::VAR
+            ? data->op() != JSOP_DEFVAR || dn_kind != Definition::VAR
             : error)
         {
             JSAutoByteString bytes;
@@ -3385,24 +3474,24 @@ Parser<FullParseHandler>::bindInitialized(BindData<FullParseHandler>* data, Pars
 
     RootedPropertyName name(context, pn->pn_atom->asPropertyName());
 
-    data->pn = pn;
-    if (!data->binder(data, name, this))
+    data->setNameNode(pn);
+    if (!data->bind(name, this))
         return false;
 
     /*
      * Select the appropriate name-setting opcode, respecting eager selection
-     * done by the data->binder function.
+     * done by the data->bind function.
      */
-    if (data->op == JSOP_INITLEXICAL)
+    if (data->op() == JSOP_INITLEXICAL)
         pn->setOp(JSOP_INITLEXICAL);
     else if (pn->pn_dflags & PND_BOUND)
         pn->setOp(JSOP_SETLOCAL);
-    else if (data->op == JSOP_DEFCONST)
+    else if (data->op() == JSOP_DEFCONST)
         pn->setOp(JSOP_SETCONST);
     else
         pn->setOp(JSOP_SETNAME);
 
-    if (data->op == JSOP_DEFCONST)
+    if (data->op() == JSOP_DEFCONST)
         pn->pn_dflags |= PND_CONST;
 
     pn->markAsAssigned();
@@ -3650,6 +3739,7 @@ Parser<ParseHandler>::pushLexicalScope(HandleStaticBlockObject blockObj,
     if (!pn)
         return null();
 
+    blockObj->initEnclosingScopeFromParser(pc->innermostStaticScope());
     if (!stmt.makeInnermostLexicalScope(*blockObj))
         return null();
     handler.setBlockId(pn, stmt->blockid);
@@ -3851,7 +3941,8 @@ Parser<ParseHandler>::variables(YieldHandling yieldHandling,
 
                 MUST_MATCH_TOKEN(TOK_ASSIGN, JSMSG_BAD_DESTRUCT_DECL);
 
-                Node init = assignExpr(InAllowed, yieldHandling);
+                Node init = assignExpr(location == InForInit ? InProhibited : InAllowed,
+                                       yieldHandling);
                 if (!init)
                     return null();
 
@@ -3893,9 +3984,9 @@ Parser<ParseHandler>::variables(YieldHandling yieldHandling,
             pn2 = newBindingNode(name, kind == PNK_VAR || kind == PNK_GLOBALCONST, varContext);
             if (!pn2)
                 return null();
-            if (data.isConst)
+            if (data.isConst())
                 handler.setFlag(pn2, PND_CONST);
-            data.pn = pn2;
+            data.setNameNode(pn2);
 
             handler.addList(pn, pn2);
 
@@ -3915,10 +4006,11 @@ Parser<ParseHandler>::variables(YieldHandling yieldHandling,
                 // now. Otherwise we must wait until after parsing the initializing
                 // assignment.
                 bool bindBeforeInitializer = kind != PNK_LET && kind != PNK_CONST;
-                if (bindBeforeInitializer && !data.binder(&data, name, this))
+                if (bindBeforeInitializer && !data.bind(name, this))
                     return null();
 
-                Node init = assignExpr(InAllowed, yieldHandling);
+                Node init = assignExpr(location == InForInit ? InProhibited : InAllowed,
+                                       yieldHandling);
                 if (!init)
                     return null();
 
@@ -3944,19 +4036,19 @@ Parser<ParseHandler>::variables(YieldHandling yieldHandling,
                 }
 
                 if (performAssignment) {
-                    if (!bindBeforeInitializer && !data.binder(&data, name, this))
+                    if (!bindBeforeInitializer && !data.bind(name, this))
                         return null();
 
-                    if (!handler.finishInitializerAssignment(pn2, init, data.op))
+                    if (!handler.finishInitializerAssignment(pn2, init, data.op()))
                         return null();
                 }
             } else {
-                if (data.isConst && location == NotInForInit) {
+                if (data.isConst() && location == NotInForInit) {
                     report(ParseError, false, null(), JSMSG_BAD_CONST_DECL);
                     return null();
                 }
 
-                if (!data.binder(&data, name, this))
+                if (!data.bind(name, this))
                     return null();
             }
 
@@ -4026,10 +4118,7 @@ Parser<FullParseHandler>::checkAndPrepareLexical(bool isConst, const TokenPos &e
         StaticBlockObject* blockObj = StaticBlockObject::create(context);
         if (!blockObj)
             return false;
-        NestedScopeObject* enclosing = nullptr;
-        if (StmtInfoPC* stmt = pc->innermostScopeStmt())
-            enclosing = stmt->staticScope;
-        blockObj->initEnclosingNestedScopeFromParser(enclosing);
+        blockObj->initEnclosingScopeFromParser(pc->innermostStaticScope());
 
         ObjectBox* blockbox = newObjectBox(blockObj);
         if (!blockbox)
@@ -4041,7 +4130,10 @@ Parser<FullParseHandler>::checkAndPrepareLexical(bool isConst, const TokenPos &e
          * catch block (catch is a lexical scope by definition).
          */
         MOZ_ASSERT(stmt->canBeBlockScope() && stmt->type != StmtType::CATCH);
+
         pc->stmtStack.makeInnermostLexicalScope(*blockObj);
+        MOZ_ASSERT(!blockScopes[stmt->blockid]);
+        blockScopes[stmt->blockid].set(blockObj);
 
 #ifdef DEBUG
         ParseNode* tmp = pc->blockNode;
@@ -5162,8 +5254,7 @@ Parser<ParseHandler>::switchStatement(YieldHandling yieldHandling)
     MUST_MATCH_TOKEN(TOK_LC, JSMSG_CURLY_BEFORE_SWITCH);
 
     AutoPushStmtInfoPC stmtInfo(*this, StmtType::SWITCH);
-
-    if (!GenerateBlockId(tokenStream, pc, pc->innermostStmt()->blockid))
+    if (!stmtInfo.generateBlockId())
         return null();
 
     Node caseList = handler.newStatementList(pc->blockid(), pos());
@@ -5579,9 +5670,6 @@ Parser<FullParseHandler>::withStatement(YieldHandling yieldHandling)
         return null();
     MUST_MATCH_TOKEN(TOK_RP, JSMSG_PAREN_AFTER_WITH);
 
-    bool oldParsingWith = pc->parsingWith;
-    pc->parsingWith = true;
-
     Rooted<StaticWithObject*> staticWith(context, StaticWithObject::create(context));
     if (!staticWith)
         return null();
@@ -5595,7 +5683,6 @@ Parser<FullParseHandler>::withStatement(YieldHandling yieldHandling)
     }
 
     pc->sc->setBindingsAccessedDynamically();
-    pc->parsingWith = oldParsingWith;
 
     /*
      * Make sure to deoptimize lexical dependencies inside the |with|
@@ -5760,7 +5847,7 @@ Parser<ParseHandler>::tryStatement(YieldHandling yieldHandling)
             data.initLexical(HoistVars,
                              &stmtInfo->staticScope->template as<StaticBlockObject>(),
                              JSMSG_TOO_MANY_CATCH_VARS);
-            MOZ_ASSERT(data.let.blockObj);
+            MOZ_ASSERT(data.letData().blockObj);
 
             if (!tokenStream.getToken(&tt))
                 return null();
@@ -5790,8 +5877,8 @@ Parser<ParseHandler>::tryStatement(YieldHandling yieldHandling)
                 catchName = newBindingNode(label, false);
                 if (!catchName)
                     return null();
-                data.pn = catchName;
-                if (!data.binder(&data, label, this))
+                data.setNameNode(catchName);
+                if (!data.bind(label, this))
                     return null();
                 break;
               }
@@ -6785,9 +6872,10 @@ Parser<ParseHandler>::unaryExpr(YieldHandling yieldHandling, InvokedPrediction i
  *
  *   (E for (V in I)) => (function () { for (var V in I) yield E; })()
  *
- * so the transplanter must adjust static level as well as blockid. E's source
- * coordinates in root->pn_pos are critical to deciding which binding links to
- * preserve and which to cut.
+ * The transplanter transplants all name ParseNodes inside E with the original
+ * blockid to the block scope of the new function. E's source coordinates in
+ * root->pn_pos are critical to deciding which binding links to preserve and
+ * which to cut.
  *
  * NB: This is not a general tree transplanter -- it knows in particular that
  * the one or more bindings induced by V have not yet been created.
@@ -6798,14 +6886,21 @@ class LegacyCompExprTransplanter
     Parser<FullParseHandler>* parser;
     ParseContext<FullParseHandler>* outerpc;
     GeneratorKind   comprehensionKind;
-    unsigned        adjust;
+    uint32_t fromBlockId;
+    uint32_t toBlockId;
     HashSet<Definition*> visitedImplicitArguments;
 
   public:
     LegacyCompExprTransplanter(ParseNode* pn, Parser<FullParseHandler>* parser,
                                ParseContext<FullParseHandler>* outerpc,
-                               GeneratorKind kind, unsigned adj)
-      : root(pn), parser(parser), outerpc(outerpc), comprehensionKind(kind), adjust(adj),
+                               GeneratorKind kind, uint32_t fromBlockId,
+                               uint32_t toBlockId)
+      : root(pn),
+        parser(parser),
+        outerpc(outerpc),
+        comprehensionKind(kind),
+        fromBlockId(fromBlockId),
+        toBlockId(toBlockId),
         visitedImplicitArguments(parser->context)
     {}
 
@@ -6814,38 +6909,15 @@ class LegacyCompExprTransplanter
     }
 
     bool transplant(ParseNode* pn);
+    void adjustBlockId(ParseNode* pn);
 };
 
-/*
- * Any definitions nested within the legacy comprehension expression of a
- * generator expression must move "down" one static level, which of course
- * increases the upvar-frame-skip count.
- */
-template <typename ParseHandler>
-static bool
-BumpStaticLevel(TokenStream& ts, ParseNode* pn, ParseContext<ParseHandler>* pc)
-{
-    if (pn->pn_cookie.isFree())
-        return true;
-
-    unsigned level = unsigned(pn->pn_cookie.level()) + 1;
-    MOZ_ASSERT(level >= pc->staticLevel);
-    return pn->pn_cookie.set(ts, level, pn->pn_cookie.slot());
-}
-
-template <typename ParseHandler>
-static bool
-AdjustBlockId(TokenStream& ts, ParseNode* pn, unsigned adjust, ParseContext<ParseHandler>* pc)
+void
+LegacyCompExprTransplanter::adjustBlockId(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isArity(PN_LIST) || pn->isArity(PN_CODE) || pn->isArity(PN_NAME));
-    if (BlockIdLimit - pn->pn_blockid <= adjust + 1) {
-        ts.reportError(JSMSG_NEED_DIET, "program");
-        return false;
-    }
-    pn->pn_blockid += adjust;
-    if (pn->pn_blockid >= pc->blockidGen)
-        pc->blockidGen = pn->pn_blockid + 1;
-    return true;
+    if (pn->pn_blockid == fromBlockId)
+        pn->pn_blockid = toBlockId;
 }
 
 bool
@@ -6864,10 +6936,8 @@ LegacyCompExprTransplanter::transplant(ParseNode* pn)
             if (!transplant(pn2))
                 return false;
         }
-        if (pn->pn_pos >= root->pn_pos) {
-            if (!AdjustBlockId(parser->tokenStream, pn, adjust, pc))
-                return false;
-        }
+        if (pn->pn_pos >= root->pn_pos)
+            adjustBlockId(pn);
         break;
 
       case PN_TERNARY:
@@ -6899,11 +6969,8 @@ LegacyCompExprTransplanter::transplant(ParseNode* pn)
         if (!transplant(pn->maybeExpr()))
             return false;
 
-        if (pn->isDefn()) {
-            if (isGenexp && !BumpStaticLevel(parser->tokenStream, pn, pc))
-                return false;
-        } else if (pn->isUsed()) {
-            MOZ_ASSERT(pn->pn_cookie.isFree());
+        if (pn->isUsed()) {
+            MOZ_ASSERT(pn->pn_scopecoord.isFree());
 
             Definition* dn = pn->pn_lexdef;
             MOZ_ASSERT(dn->isDefn());
@@ -6917,12 +6984,8 @@ LegacyCompExprTransplanter::transplant(ParseNode* pn)
              * Non-placeholder definitions within the legacy comprehension
              * expression will be visited further below.
              */
-            if (dn->isPlaceholder() && dn->pn_pos >= root->pn_pos && dn->dn_uses == pn) {
-                if (isGenexp && !BumpStaticLevel(parser->tokenStream, dn, pc))
-                    return false;
-                if (!AdjustBlockId(parser->tokenStream, dn, adjust, pc))
-                    return false;
-            }
+            if (dn->isPlaceholder() && dn->pn_pos >= root->pn_pos && dn->dn_uses == pn)
+                adjustBlockId(dn);
 
             RootedAtom atom(parser->context, pn->pn_atom);
 #ifdef DEBUG
@@ -6933,12 +6996,8 @@ LegacyCompExprTransplanter::transplant(ParseNode* pn)
                 MOZ_ASSERT_IF(!pc->sc->isDotVariable(atom), !pc->decls().lookupFirst(atom));
 
                 if (pc->sc->isDotVariable(atom)) {
-                    if (dn->dn_uses == pn) {
-                        if (!BumpStaticLevel(parser->tokenStream, dn, pc))
-                            return false;
-                        if (!AdjustBlockId(parser->tokenStream, dn, adjust, pc))
-                            return false;
-                    }
+                    if (dn->dn_uses == pn)
+                        adjustBlockId(dn);
                 } else if (dn->pn_pos < root->pn_pos) {
                     /*
                      * The variable originally appeared to be a use of a
@@ -6992,10 +7051,7 @@ LegacyCompExprTransplanter::transplant(ParseNode* pn)
                      * to only bump the definition once.
                      */
                     if (isGenexp && !visitedImplicitArguments.has(dn)) {
-                        if (!BumpStaticLevel(parser->tokenStream, dn, pc))
-                            return false;
-                        if (!AdjustBlockId(parser->tokenStream, dn, adjust, pc))
-                            return false;
+                        adjustBlockId(dn);
                         if (!visitedImplicitArguments.put(dn))
                             return false;
                     }
@@ -7003,10 +7059,8 @@ LegacyCompExprTransplanter::transplant(ParseNode* pn)
             }
         }
 
-        if (pn->pn_pos >= root->pn_pos) {
-            if (!AdjustBlockId(parser->tokenStream, pn, adjust, pc))
-                return false;
-        }
+        if (pn->pn_pos >= root->pn_pos)
+            adjustBlockId(pn);
         break;
 
       case PN_NULLARY:
@@ -7067,7 +7121,7 @@ Parser<FullParseHandler>::legacyComprehensionTail(ParseNode* bodyExpr, unsigned 
         return nullptr;
     }
 
-    unsigned adjust;
+    unsigned targetBlockId;
     ParseNode* pn;
     ParseNode* pn3;
     ParseNode** pnp;
@@ -7078,48 +7132,20 @@ Parser<FullParseHandler>::legacyComprehensionTail(ParseNode* bodyExpr, unsigned 
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_FOR));
 
     bool isGenexp = comprehensionKind != NotGenerator;
+    MOZ_ASSERT_IF(isGenexp, comprehensionKind == LegacyGenerator);
 
-    if (isGenexp) {
-        MOZ_ASSERT(comprehensionKind == LegacyGenerator);
-        /*
-         * Generator expression desugars to an immediately applied lambda that
-         * yields the next value from a for-in loop (possibly nested, and with
-         * optional if guard). Make pn be the TOK_LC body node.
-         */
-        pn = pushLexicalScope(stmtInfo);
-        if (!pn)
-            return null();
-        adjust = pn->pn_blockid - blockid;
-    } else {
-        /*
-         * Make a parse-node and literal object representing the block scope of
-         * this array comprehension. Our caller in primaryExpr, the TOK_LB case
-         * aka the array initialiser case, has passed the blockid to claim for
-         * the comprehension's block scope. We allocate that id or one above it
-         * here, by calling pushLexicalScope.
-         *
-         * In the case of a comprehension expression that has nested blocks,
-         * we will allocate a higher blockid but then slide all blocks "to the
-         * right" to make room for the comprehension's block scope.
-         */
-        adjust = pc->blockid();
-        pn = pushLexicalScope(stmtInfo);
-        if (!pn)
-            return null();
-
-        MOZ_ASSERT(blockid <= pn->pn_blockid);
-        MOZ_ASSERT(blockid < pc->blockidGen);
-        MOZ_ASSERT(pc->bodyid < blockid);
-        pn->pn_blockid = stmtInfo->blockid = blockid;
-        MOZ_ASSERT(adjust < blockid);
-        adjust = blockid - adjust;
-    }
+    // Transplant bodyExpr into a new block scope we push.
+    pn = pushLexicalScope(stmtInfo);
+    if (!pn)
+        return null();
+    targetBlockId = pn->pn_blockid;
 
     handler.setBeginPosition(pn, bodyExpr);
 
     pnp = &pn->pn_expr;
 
-    LegacyCompExprTransplanter transplanter(bodyExpr, this, outerpc, comprehensionKind, adjust);
+    LegacyCompExprTransplanter transplanter(bodyExpr, this, outerpc, comprehensionKind,
+                                            blockid, targetBlockId);
     if (!transplanter.init())
         return null();
 
@@ -7231,8 +7257,8 @@ Parser<FullParseHandler>::legacyComprehensionTail(ParseNode* bodyExpr, unsigned 
             break;
 
           case TOK_NAME:
-            data.pn = pn3;
-            if (!data.binder(&data, name, this))
+            data.setNameNode(pn3);
+            if (!data.bind(name, this))
                 return null();
             break;
 
@@ -7333,7 +7359,6 @@ Parser<FullParseHandler>::legacyArrayComprehension(ParseNode* array)
     MOZ_ASSERT(array->pn_count == 1);
 
     uint32_t arrayBegin = handler.getPosition(array).begin;
-    uint32_t blockid = array->pn_blockid;
 
     ParseNode* bodyExpr = array->pn_head;
     array->pn_count = 0;
@@ -7342,14 +7367,14 @@ Parser<FullParseHandler>::legacyArrayComprehension(ParseNode* array)
 
     handler.freeTree(array);
 
-    ParseNode* comp = legacyComprehensionTail(bodyExpr, blockid, NotGenerator, nullptr,
+    ParseNode* comp = legacyComprehensionTail(bodyExpr, pc->blockid(), NotGenerator, nullptr,
                                               LegacyComprehensionHeadBlockScopeDepth(pc));
     if (!comp)
         return null();
 
     MUST_MATCH_TOKEN(TOK_RB, JSMSG_BRACKET_AFTER_ARRAY_COMPREHENSION);
 
-    return handler.newArrayComprehension(comp, blockid, TokenPos(arrayBegin, pos().end));
+    return handler.newArrayComprehension(comp, TokenPos(arrayBegin, pos().end));
 }
 
 template <>
@@ -7386,7 +7411,8 @@ Parser<ParseHandler>::generatorComprehensionLambda(GeneratorKind comprehensionKi
             return null();
     }
 
-    RootedFunction fun(context, newFunction(/* atom = */ nullptr, Expression, comprehensionKind, proto));
+    RootedFunction fun(context, newFunction(/* atom = */ nullptr, Expression,
+                                            comprehensionKind, proto));
     if (!fun)
         return null();
 
@@ -7398,9 +7424,8 @@ Parser<ParseHandler>::generatorComprehensionLambda(GeneratorKind comprehensionKi
 
     ParseContext<ParseHandler> genpc(this, outerpc, genfn, genFunbox,
                                      /* newDirectives = */ nullptr,
-                                     outerpc->staticLevel + 1, outerpc->blockidGen,
                                      /* blockScopeDepth = */ 0);
-    if (!genpc.init(tokenStream))
+    if (!genpc.init(*this))
         return null();
 
     /*
@@ -7567,8 +7592,8 @@ Parser<ParseHandler>::comprehensionFor(GeneratorKind comprehensionKind)
     Node decls = handler.newList(PNK_LET, lhs);
     if (!decls)
         return null();
-    data.pn = lhs;
-    if (!data.binder(&data, name, this))
+    data.setNameNode(lhs);
+    if (!data.bind(name, this))
         return null();
     Node letScope = pushLetScope(blockObj, stmtInfo);
     if (!letScope)
@@ -7830,37 +7855,12 @@ Parser<ParseHandler>::argumentList(YieldHandling yieldHandling, Node listNode, b
 
 template <typename ParseHandler>
 bool
-Parser<ParseHandler>::checkAllowedNestedSyntax(SharedContext::AllowedSyntax allowed,
-                                               SharedContext** allowingContext)
-{
-    for (GenericParseContext* gpc = pc; gpc; gpc = gpc->parent) {
-        SharedContext* sc = gpc->sc;
-
-        // Arrow functions don't help decide whether we should allow nested
-        // syntax, as they don't store any of the necessary state for themselves.
-        if (sc->isFunctionBox() && sc->asFunctionBox()->function()->isArrow())
-            continue;
-
-        if (!sc->allowSyntax(allowed))
-            return false;
-        if (allowingContext)
-            *allowingContext = sc;
-        return true;
-    }
-    return false;
-}
-
-template <typename ParseHandler>
-bool
 Parser<ParseHandler>::checkAndMarkSuperScope()
 {
-    SharedContext* foundContext = nullptr;
-    if (checkAllowedNestedSyntax(SharedContext::AllowedSyntax::SuperProperty, &foundContext)) {
-        if (foundContext->isFunctionBox())
-            foundContext->asFunctionBox()->setNeedsHomeObject();
-        return true;
-    }
-    return false;
+    if (!pc->sc->allowSuperProperty())
+        return false;
+    pc->sc->markSuperScopeNeedsHomeObject();
+    return true;
 }
 
 template <typename ParseHandler>
@@ -8139,7 +8139,7 @@ Parser<ParseHandler>::arrayInitializer(YieldHandling yieldHandling)
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_LB));
 
     uint32_t begin = pos().begin;
-    Node literal = handler.newArrayLiteral(begin, pc->blockidGen);
+    Node literal = handler.newArrayLiteral(begin);
     if (!literal)
         return null();
 
@@ -8638,8 +8638,13 @@ Parser<ParseHandler>::tryNewTarget(Node &newTarget)
 {
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_NEW));
 
-    uint32_t begin = pos().begin;
     newTarget = null();
+
+    Node newHolder = handler.newPosHolder(pos());
+    if (!newHolder)
+        return false;
+
+    uint32_t begin = pos().begin;
 
     // |new| expects to look for an operand, so we will honor that.
     TokenKind next;
@@ -8659,12 +8664,16 @@ Parser<ParseHandler>::tryNewTarget(Node &newTarget)
         return false;
     }
 
-    if (!checkAllowedNestedSyntax(SharedContext::AllowedSyntax::NewTarget)) {
+    if (!pc->sc->allowNewTarget()) {
         reportWithOffset(ParseError, false, begin, JSMSG_BAD_NEWTARGET);
         return false;
     }
 
-    newTarget = handler.newNewTarget(TokenPos(begin, pos().end));
+    Node targetHolder = handler.newPosHolder(pos());
+    if (!targetHolder)
+        return false;
+
+    newTarget = handler.newNewTarget(newHolder, targetHolder);
     return !!newTarget;
 }
 

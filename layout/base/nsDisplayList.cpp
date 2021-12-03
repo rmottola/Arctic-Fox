@@ -1805,7 +1805,7 @@ void FlushFramesArray(nsTArray<FramesWithDepth>& aSource, nsTArray<nsIFrame*>* a
   aSource.Sort();
   uint32_t length = aSource.Length();
   for (uint32_t i = 0; i < length; i++) {
-    aDest->MoveElementsFrom(aSource[i].mFrames);
+    aDest->AppendElements(Move(aSource[i].mFrames));
   }
   aSource.Clear();
 }
@@ -3241,6 +3241,7 @@ nsDisplayCaret::nsDisplayCaret(nsDisplayListBuilder* aBuilder,
   : nsDisplayItem(aBuilder, aCaretFrame)
   , mCaret(aBuilder->GetCaret())
   , mBounds(aBuilder->GetCaretRect() + ToReferenceFrame())
+  , mNeedsCustomScrollClip(false)
 {
   MOZ_COUNT_CTOR(nsDisplayCaret);
 }

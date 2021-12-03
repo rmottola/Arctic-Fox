@@ -42,8 +42,6 @@ Atomic<uintptr_t> gIDGenerator(0);
 
 using namespace workers;
 
-NS_IMPL_ISUPPORTS0(PromiseNativeHandler)
-
 // This class processes the promise's callbacks with promise's result.
 class PromiseCallbackTask final : public nsRunnable
 {
@@ -950,7 +948,8 @@ NS_IMPL_CYCLE_COLLECTING_ADDREF(AllResolveHandler)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(AllResolveHandler)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(AllResolveHandler)
-NS_INTERFACE_MAP_END_INHERITING(PromiseNativeHandler)
+  NS_INTERFACE_MAP_ENTRY(nsISupports)
+NS_INTERFACE_MAP_END
 
 NS_IMPL_CYCLE_COLLECTION(AllResolveHandler, mCountdownHolder)
 
@@ -1561,6 +1560,8 @@ PromiseWorkerProxy::Create(workers::WorkerPrivate* aWorkerPrivate,
   return proxy.forget();
 }
 
+NS_IMPL_ISUPPORTS0(PromiseWorkerProxy)
+
 PromiseWorkerProxy::PromiseWorkerProxy(workers::WorkerPrivate* aWorkerPrivate,
                                        Promise* aWorkerPromise,
                                        const JSStructuredCloneCallbacks* aCallbacks)
@@ -1619,9 +1620,9 @@ PromiseWorkerProxy::RunCallback(JSContext* aCx,
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  MutexAutoLock lock(mCleanUpLock);
+  MutexAutoLock lock(GetCleanUpLock());
   // If the worker thread's been cancelled we don't need to resolve the Promise.
-  if (mCleanedUp) {
+  if (IsClean()) {
     return;
   }
 

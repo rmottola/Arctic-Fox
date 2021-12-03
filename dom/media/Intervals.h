@@ -269,7 +269,7 @@ public:
 
   IntervalSet(SelfType&& aOther)
   {
-    mIntervals.MoveElementsFrom(Move(aOther.mIntervals));
+    mIntervals.AppendElements(Move(aOther.mIntervals));
   }
 
   explicit IntervalSet(const ElemType& aOther)
@@ -379,7 +379,7 @@ public:
       normalized.AppendElement(Move(mIntervals[i]));
     }
     mIntervals.Clear();
-    mIntervals.MoveElementsFrom(Move(normalized));
+    mIntervals.AppendElements(Move(normalized));
 
     return *this;
   }
@@ -481,9 +481,8 @@ public:
         j++;
       }
     }
-
     mIntervals.Clear();
-    mIntervals.MoveElementsFrom(Move(intersection));
+    mIntervals.AppendElements(Move(intersection));
     return *this;
   }
 
@@ -683,7 +682,7 @@ private:
       normalized.AppendElement(Move(current));
 
       mIntervals.Clear();
-      mIntervals.MoveElementsFrom(Move(normalized));
+      mIntervals.AppendElements(Move(normalized));
     }
   }
 

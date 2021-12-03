@@ -68,6 +68,7 @@ XPIDL_SOURCES += [
     'nsINSSErrorsService.idl',
     'nsINullChannel.idl',
     'nsIPACGenerator.idl',
+    'nsIPackagedAppService.idl',
     'nsIParentChannel.idl',
     'nsIParentRedirectingChannel.idl',
     'nsIPermission.idl',
@@ -85,13 +86,13 @@ XPIDL_SOURCES += [
     'nsIProxyInfo.idl',
     'nsIRandomGenerator.idl',
     'nsIRedirectChannelRegistrar.idl',
-    'nsIRedirectHistory.idl',
     'nsIRedirectResultListener.idl',
     'nsIRequest.idl',
     'nsIRequestObserver.idl',
     'nsIRequestObserverProxy.idl',
     'nsIResponseHeadProvider.idl',
     'nsIResumableChannel.idl',
+    'nsISchedulingContext.idl',
     'nsISecCheckWrapChannel.idl',
     'nsISecretDecoderRing.idl',
     'nsISecureBrowserUI.idl',
@@ -244,6 +245,7 @@ UNIFIED_SOURCES += [
     'Predictor.cpp',
     'ProxyAutoConfig.cpp',
     'RedirectChannelRegistrar.cpp',
+    'SchedulingContextService.cpp',
     'StreamingProtocolService.cpp',
     'Tickler.cpp',
     'TLSServerSocket.cpp',
@@ -277,8 +279,6 @@ EXTRA_COMPONENTS += [
 EXTRA_JS_MODULES += [
     'NetUtil.jsm',
 ]
-
-FAIL_ON_WARNINGS = True
 
 include('/ipc/chromium/chromium-config.mozbuild')
 

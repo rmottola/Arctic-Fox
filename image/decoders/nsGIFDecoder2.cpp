@@ -103,7 +103,7 @@ nsGIFDecoder2::FinishInternal()
   MOZ_ASSERT(!HasError(), "Shouldn't call FinishInternal after error!");
 
   // If the GIF got cut off, handle it anyway
-  if (!IsSizeDecode() && mGIFOpen) {
+  if (!IsMetadataDecode() && mGIFOpen) {
     if (mCurrentFrameIndex == mGIFStruct.images_decoded) {
       EndImageFrame();
     }
@@ -162,7 +162,7 @@ nsGIFDecoder2::BeginGIF()
 }
 
 //******************************************************************************
-void
+nsresult
 nsGIFDecoder2::BeginImageFrame(uint16_t aDepth)
 {
   MOZ_ASSERT(HasSize());
@@ -175,35 +175,31 @@ nsGIFDecoder2::BeginImageFrame(uint16_t aDepth)
     format = gfx::SurfaceFormat::B8G8R8X8;
   }
 
+  nsIntRect frameRect(mGIFStruct.x_offset, mGIFStruct.y_offset,
+                      mGIFStruct.width, mGIFStruct.height);
+
   // Use correct format, RGB for first frame, PAL for following frames
   // and include transparency to allow for optimization of opaque images
+  nsresult rv = NS_OK;
   if (mGIFStruct.images_decoded) {
-    // Image data is stored with original depth and palette
-    NeedNewFrame(mGIFStruct.images_decoded, mGIFStruct.x_offset,
-                 mGIFStruct.y_offset, mGIFStruct.width, mGIFStruct.height,
-                 format, aDepth);
+    // Image data is stored with original depth and palette.
+    rv = AllocateFrame(mGIFStruct.images_decoded, GetSize(),
+                       frameRect, format, aDepth);
   } else {
-    nsRefPtr<imgFrame> currentFrame = GetCurrentFrame();
-
-    // Our first full frame is automatically created by the image decoding
-    // infrastructure. Just use it as long as it matches up.
-    if (!currentFrame->GetRect().IsEqualEdges(nsIntRect(mGIFStruct.x_offset,
-                                                        mGIFStruct.y_offset,
-                                                        mGIFStruct.width,
-                                                        mGIFStruct.height))) {
-
+    if (!nsIntRect(nsIntPoint(), GetSize()).IsEqualEdges(frameRect)) {
       // We need padding on the first frame, which means that we don't draw into
       // part of the image at all. Report that as transparency.
       PostHasTransparency();
-
-      // Regardless of depth of input, image is decoded into 24bit RGB
-      NeedNewFrame(mGIFStruct.images_decoded, mGIFStruct.x_offset,
-                   mGIFStruct.y_offset, mGIFStruct.width, mGIFStruct.height,
-                   format);
     }
+
+    // Regardless of depth of input, the first frame is decoded into 24bit RGB.
+    rv = AllocateFrame(mGIFStruct.images_decoded, GetSize(),
+                       frameRect, format);
   }
 
   mCurrentFrameIndex = mGIFStruct.images_decoded;
+
+  return rv;
 }
 
 
@@ -693,7 +689,7 @@ nsGIFDecoder2::WriteInternal(const char* aBuffer, uint32_t aCount)
       mGIFStruct.screen_height = GETINT16(q + 2);
       mGIFStruct.global_colormap_depth = (q[4]&0x07) + 1;
 
-      if (IsSizeDecode()) {
+      if (IsMetadataDecode()) {
         MOZ_ASSERT(!mGIFOpen, "Gif should not be open at this point");
         PostSize(mGIFStruct.screen_width, mGIFStruct.screen_height);
         return;
@@ -905,6 +901,13 @@ nsGIFDecoder2::WriteInternal(const char* aBuffer, uint32_t aCount)
       break;
 
     case gif_image_header: {
+      if (mGIFStruct.images_decoded > 0 && IsFirstFrameDecode()) {
+        // We're about to get a second frame, but we only want the first. Stop
+        // decoding now.
+        mGIFStruct.state = gif_done;
+        break;
+      }
+
       // Get image offsets, with respect to the screen origin
       mGIFStruct.x_offset = GETINT16(q);
       mGIFStruct.y_offset = GETINT16(q + 2);
@@ -933,8 +936,8 @@ nsGIFDecoder2::WriteInternal(const char* aBuffer, uint32_t aCount)
           return;
         }
 
-        // If we were doing a size decode, we're done
-        if (IsSizeDecode()) {
+        // If we were doing a metadata decode, we're done.
+        if (IsMetadataDecode()) {
           return;
         }
       }
@@ -962,27 +965,13 @@ nsGIFDecoder2::WriteInternal(const char* aBuffer, uint32_t aCount)
       }
       // Mask to limit the color values within the colormap
       mColorMask = 0xFF >> (8 - realDepth);
-      BeginImageFrame(realDepth);
 
-      if (NeedsNewFrame()) {
-        // We now need a new frame from the decoder framework. We leave all our
-        // data in the buffer as if it wasn't consumed, copy to our hold and
-        // return to the decoder framework.
-        uint32_t size =
-          len + mGIFStruct.bytes_to_consume + mGIFStruct.bytes_in_hold;
-        if (size) {
-          if (SetHold(q,
-                      mGIFStruct.bytes_to_consume + mGIFStruct.bytes_in_hold,
-                      buf, len)) {
-            // Back into the decoder infrastructure so we can get called again.
-            GETN(9, gif_image_header_continue);
-            return;
-          }
-        }
-        break;
-      } else {
-        // FALL THROUGH
+      if (NS_FAILED(BeginImageFrame(realDepth))) {
+        mGIFStruct.state = gif_error;
+        return;
       }
+
+      // FALL THROUGH
     }
 
     case gif_image_header_continue: {
@@ -1108,7 +1097,8 @@ nsGIFDecoder2::WriteInternal(const char* aBuffer, uint32_t aCount)
       break;
 
     case gif_done:
-      MOZ_ASSERT(!IsSizeDecode(), "Size decodes shouldn't reach gif_done");
+      MOZ_ASSERT(!IsMetadataDecode(),
+                 "Metadata decodes shouldn't reach gif_done");
       FinishInternal();
       goto done;
 

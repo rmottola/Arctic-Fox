@@ -75,6 +75,8 @@ user_pref("extensions.getAddons.cache.enabled", false);
 user_pref("extensions.installDistroAddons", false);
 // XPI extensions are required for test harnesses to load
 user_pref("extensions.defaultProviders.enabled", true);
+// Disable signature requirements where possible
+user_pref("xpinstall.signatures.required", false);
 
 user_pref("geo.wifi.uri", "http://%(server)s/tests/dom/tests/mochitest/geolocation/network_geolocation.sjs");
 user_pref("geo.wifi.timeToWaitBeforeSending", 2000);
@@ -164,7 +166,7 @@ user_pref("layout.spammy_warnings.enabled", false);
 // Enable Media Source Extensions for testing
 user_pref("media.mediasource.enabled", true);
 user_pref("media.mediasource.mp4.enabled", true);
-user_pref("media.mediasource.webm.enabled", true);
+user_pref("media.mediasource.webm.enabled", false);
 
 // Enable mozContacts
 user_pref("dom.mozContacts.enabled", true);

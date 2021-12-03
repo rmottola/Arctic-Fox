@@ -132,14 +132,14 @@ function superElem(id) {
 
 function classStmt(id, heritage, body) {
     return Pattern({ type: "ClassStatement",
-                     name: id,
-                     heritage: heritage,
+                     id: id,
+                     superClass: heritage,
                      body: body});
 }
 function classExpr(id, heritage, body) {
     return Pattern({ type: "ClassExpression",
-                     name: id,
-                     heritage: heritage,
+                     id: id,
+                     superClass: heritage,
                      body: body});
 }
 function classMethod(id, body, kind, static) {
@@ -170,9 +170,15 @@ function arrowExpr(args, body) {
                      body: body });
 }
 
-function newTarget() {
-    return Pattern({ type: "NewTargetExpression" });
+function metaProperty(meta, property) {
+    return Pattern({ type: "MetaProperty",
+                     meta: meta,
+                     property: property });
 }
+function newTarget() {
+    return metaProperty(ident("new"), ident("target"));
+}
+
 function unExpr(op, arg) {
     return Pattern({ type: "UnaryExpression", operator: op, argument: arg });
 }

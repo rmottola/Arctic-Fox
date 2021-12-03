@@ -21,7 +21,6 @@
 #include "nsCycleCollectionParticipant.h"
 #include "nsCOMPtr.h"
 #include "nsIDOMBlob.h"
-#include "nsIDOMFileList.h"
 #include "nsIFile.h"
 #include "nsIMutable.h"
 #include "nsIXMLHttpRequest.h"
@@ -33,7 +32,7 @@
 class nsIFile;
 class nsIInputStream;
 
-#define FILEIMPL_IID \
+#define BLOBIMPL_IID \
   { 0xbccb3275, 0x6778, 0x4ac5, \
     { 0xaf, 0x03, 0x90, 0xed, 0x37, 0xad, 0xdf, 0x5d } }
 
@@ -282,9 +281,9 @@ public:
 
   void GetPath(nsAString& aName, ErrorResult& aRv);
 
-  void GetMozFullPath(nsAString& aFilename, ErrorResult& aRv);
+  void GetMozFullPath(nsAString& aFilename, ErrorResult& aRv) const;
 
-  void GetMozFullPathInternal(nsAString& aName, ErrorResult& aRv);
+  void GetMozFullPathInternal(nsAString& aName, ErrorResult& aRv) const;
 
 protected:
   virtual bool HasFileInterface() const override { return true; }
@@ -301,7 +300,7 @@ private:
 class BlobImpl : public nsISupports
 {
 public:
-  NS_DECLARE_STATIC_IID_ACCESSOR(FILEIMPL_IID)
+  NS_DECLARE_STATIC_IID_ACCESSOR(BLOBIMPL_IID)
   NS_DECL_THREADSAFE_ISUPPORTS
 
   BlobImpl() {}
@@ -314,13 +313,21 @@ public:
 
   virtual void SetLastModified(int64_t aLastModified) = 0;
 
-  virtual void GetMozFullPath(nsAString& aName, ErrorResult& aRv) = 0;
+  virtual void GetMozFullPath(nsAString& aName, ErrorResult& aRv) const = 0;
 
-  virtual void GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv) = 0;
+  virtual void GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv) const = 0;
 
   virtual uint64_t GetSize(ErrorResult& aRv) = 0;
 
   virtual void GetType(nsAString& aType) = 0;
+
+  /**
+   * An effectively-unique serial number identifying this instance of FileImpl.
+   *
+   * Implementations should obtain a serial number from
+   * FileImplBase::NextSerialNumber().
+   */
+  virtual uint64_t GetSerialNumber() const = 0;
 
   already_AddRefed<BlobImpl>
   Slice(const Optional<int64_t>& aStart, const Optional<int64_t>& aEnd,
@@ -379,6 +386,7 @@ public:
    * calling IsDirectory will MOZ_ASSERT.
    */
   virtual void LookupAndCacheIsDirectory() = 0;
+  virtual void SetIsDirectory(bool aIsDir) = 0;
   virtual bool IsDirectory() const = 0;
 
   /**
@@ -397,7 +405,7 @@ protected:
   virtual ~BlobImpl() {}
 };
 
-NS_DEFINE_STATIC_IID_ACCESSOR(BlobImpl, FILEIMPL_IID)
+NS_DEFINE_STATIC_IID_ACCESSOR(BlobImpl, BLOBIMPL_IID)
 
 class BlobImplBase : public BlobImpl
 {
@@ -413,6 +421,7 @@ public:
     , mStart(0)
     , mLength(aLength)
     , mLastModificationDate(aLastModifiedDate)
+    , mSerialNumber(NextSerialNumber())
   {
     // Ensure non-null mContentType by default
     mContentType.SetIsVoid(false);
@@ -428,6 +437,7 @@ public:
     , mStart(0)
     , mLength(aLength)
     , mLastModificationDate(INT64_MAX)
+    , mSerialNumber(NextSerialNumber())
   {
     // Ensure non-null mContentType by default
     mContentType.SetIsVoid(false);
@@ -441,6 +451,7 @@ public:
     , mStart(0)
     , mLength(aLength)
     , mLastModificationDate(INT64_MAX)
+    , mSerialNumber(NextSerialNumber())
   {
     // Ensure non-null mContentType by default
     mContentType.SetIsVoid(false);
@@ -455,6 +466,7 @@ public:
     , mStart(aStart)
     , mLength(aLength)
     , mLastModificationDate(INT64_MAX)
+    , mSerialNumber(NextSerialNumber())
   {
     NS_ASSERTION(aLength != UINT64_MAX,
                  "Must know length when creating slice");
@@ -470,10 +482,10 @@ public:
 
   virtual void SetLastModified(int64_t aLastModified) override;
 
-  virtual void GetMozFullPath(nsAString& aName, ErrorResult& aRv) override;
+  virtual void GetMozFullPath(nsAString& aName, ErrorResult& aRv) const override;
 
   virtual void GetMozFullPathInternal(nsAString& aFileName,
-                                      ErrorResult& aRv) override;
+                                      ErrorResult& aRv) const override;
 
   virtual uint64_t GetSize(ErrorResult& aRv) override
   {
@@ -481,6 +493,8 @@ public:
   }
 
   virtual void GetType(nsAString& aType) override;
+
+  virtual uint64_t GetSerialNumber() const override { return mSerialNumber; }
 
   virtual already_AddRefed<BlobImpl>
   CreateSlice(uint64_t aStart, uint64_t aLength,
@@ -551,6 +565,14 @@ public:
     MOZ_ASSERT(false, "Why is this being called on a non-BlobImplFile?");
   }
 
+  virtual void SetIsDirectory(bool aIsDir) override
+  {
+    MOZ_ASSERT(mIsFile,
+               "This should only be called when this object has been created "
+               "from an nsIFile to note that the nsIFile is a directory");
+    mDirState = aIsDir ? BlobDirState::eIsDir : BlobDirState::eIsNotDir;
+  }
+
   /**
    * Returns true if the nsIFile that this object wraps is a directory.
    */
@@ -558,7 +580,8 @@ public:
   {
     MOZ_ASSERT(mDirState != BlobDirState::eUnknownIfDir,
                "Must only be used by callers for whom the code paths are "
-               "know to call LookupAndCacheIsDirectory()");
+               "know to call LookupAndCacheIsDirectory() or "
+               "SetIsDirectory()");
     return mDirState == BlobDirState::eIsDir;
   }
 
@@ -591,6 +614,13 @@ public:
 protected:
   virtual ~BlobImplBase() {}
 
+  /**
+   * Returns a new, effectively-unique serial number. This should be used
+   * by implementations to obtain a serial number for GetSerialNumber().
+   * The implementation is thread safe.
+   */
+  static uint64_t NextSerialNumber();
+
   indexedDB::FileInfo* GetFileInfo() const
   {
     NS_ASSERTION(IsStoredFile(), "Should only be called on stored files!");
@@ -611,6 +641,8 @@ protected:
   uint64_t mLength;
 
   int64_t mLastModificationDate;
+
+  const uint64_t mSerialNumber;
 
   // Protected by IndexedDatabaseManager::FileMutex()
   nsTArray<nsRefPtr<indexedDB::FileInfo>> mFileInfos;
@@ -871,7 +903,7 @@ public:
   virtual int64_t GetLastModified(ErrorResult& aRv) override;
   virtual void SetLastModified(int64_t aLastModified) override;
   virtual void GetMozFullPathInternal(nsAString& aFullPath,
-                                      ErrorResult& aRv) override;
+                                      ErrorResult& aRv) const override;
   virtual void GetInternalStream(nsIInputStream** aInputStream,
                                  ErrorResult& aRv) override;
 
@@ -941,83 +973,6 @@ private:
   bool mWholeFile;
   bool mStoredFile;
   bool mIsTemporary;
-};
-
-class FileList final : public nsIDOMFileList,
-                       public nsWrapperCache
-{
-  ~FileList() {}
-
-public:
-  explicit FileList(nsISupports *aParent) : mParent(aParent)
-  {
-  }
-
-  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
-  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(FileList)
-
-  NS_DECL_NSIDOMFILELIST
-
-  virtual JSObject* WrapObject(JSContext *cx,
-                               JS::Handle<JSObject*> aGivenProto) override;
-
-  nsISupports* GetParentObject()
-  {
-    return mParent;
-  }
-
-  void Disconnect()
-  {
-    mParent = nullptr;
-  }
-
-  bool Append(File *aFile) { return mFiles.AppendElement(aFile); }
-
-  bool Remove(uint32_t aIndex) {
-    if (aIndex < mFiles.Length()) {
-      mFiles.RemoveElementAt(aIndex);
-      return true;
-    }
-
-    return false;
-  }
-
-  void Clear() { return mFiles.Clear(); }
-
-  static FileList* FromSupports(nsISupports* aSupports)
-  {
-#ifdef DEBUG
-    {
-      nsCOMPtr<nsIDOMFileList> list_qi = do_QueryInterface(aSupports);
-
-      // If this assertion fires the QI implementation for the object in
-      // question doesn't use the nsIDOMFileList pointer as the nsISupports
-      // pointer. That must be fixed, or we'll crash...
-      NS_ASSERTION(list_qi == static_cast<nsIDOMFileList*>(aSupports),
-                   "Uh, fix QI!");
-    }
-#endif
-
-    return static_cast<FileList*>(aSupports);
-  }
-
-  File* Item(uint32_t aIndex)
-  {
-    return mFiles.SafeElementAt(aIndex);
-  }
-  File* IndexedGetter(uint32_t aIndex, bool& aFound)
-  {
-    aFound = aIndex < mFiles.Length();
-    return aFound ? mFiles.ElementAt(aIndex) : nullptr;
-  }
-  uint32_t Length()
-  {
-    return mFiles.Length();
-  }
-
-private:
-  nsTArray<nsRefPtr<File>> mFiles;
-  nsISupports *mParent;
 };
 
 } // namespace dom

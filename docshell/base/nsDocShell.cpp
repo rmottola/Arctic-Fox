@@ -46,6 +46,7 @@
 #include "prenv.h"
 #include "nsIDOMWindow.h"
 #include "nsIGlobalObject.h"
+#include "nsIViewSourceChannel.h"
 #include "nsIWebBrowserChrome.h"
 #include "nsPoint.h"
 #include "nsIObserverService.h"
@@ -320,43 +321,6 @@ PingsEnabled(int32_t* aMaxPerLink, bool* aRequireSameHost)
   return allow;
 }
 
-static bool
-CheckPingURI(nsIURI* aURI, nsIContent* aContent)
-{
-  if (!aURI) {
-    return false;
-  }
-
-  // Check with nsIScriptSecurityManager
-  nsCOMPtr<nsIScriptSecurityManager> ssmgr =
-    do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID);
-  NS_ENSURE_TRUE(ssmgr, false);
-
-  nsresult rv = ssmgr->CheckLoadURIWithPrincipal(
-    aContent->NodePrincipal(), aURI, nsIScriptSecurityManager::STANDARD);
-  if (NS_FAILED(rv)) {
-    return false;
-  }
-
-  // Ignore non-HTTP(S)
-  bool match;
-  if ((NS_FAILED(aURI->SchemeIs("http", &match)) || !match) &&
-      (NS_FAILED(aURI->SchemeIs("https", &match)) || !match)) {
-    return false;
-  }
-
-  // Check with contentpolicy
-  int16_t shouldLoad = nsIContentPolicy::ACCEPT;
-  rv = NS_CheckContentLoadPolicy(nsIContentPolicy::TYPE_PING,
-                                 aURI,
-                                 aContent->NodePrincipal(),
-                                 aContent,
-                                 EmptyCString(), // mime hint
-                                 nullptr, // extra
-                                 &shouldLoad);
-  return NS_SUCCEEDED(rv) && NS_CP_ACCEPTED(shouldLoad);
-}
-
 typedef void (*ForEachPingCallback)(void* closure, nsIContent* content,
                                     nsIURI* uri, nsIIOService* ios);
 
@@ -407,7 +371,12 @@ ForEachPing(nsIContent* aContent, ForEachPingCallback aCallback, void* aClosure)
     ios->NewURI(NS_ConvertUTF16toUTF8(tokenizer.nextToken()),
                 doc->GetDocumentCharacterSet().get(),
                 baseURI, getter_AddRefs(uri));
-    if (CheckPingURI(uri, aContent)) {
+
+    // Explicitly not allow loading data: URIs
+    bool isDataScheme =
+      (NS_SUCCEEDED(uri->SchemeIs("data", &isDataScheme)) && isDataScheme);
+
+    if (!isDataScheme) {
       aCallback(aClosure, aContent, uri, ios);
     }
   }
@@ -427,55 +396,32 @@ OnPingTimeout(nsITimer* aTimer, void* aClosure)
   }
 }
 
-// Check to see if two URIs have the same host or not
-static bool
-IsSameHost(nsIURI* aUri1, nsIURI* aUri2)
-{
-  nsAutoCString host1, host2;
-  aUri1->GetAsciiHost(host1);
-  aUri2->GetAsciiHost(host2);
-  return host1.Equals(host2);
-}
-
 class nsPingListener final
   : public nsIStreamListener
-  , public nsIInterfaceRequestor
-  , public nsIChannelEventSink
 {
 public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSIREQUESTOBSERVER
   NS_DECL_NSISTREAMLISTENER
-  NS_DECL_NSIINTERFACEREQUESTOR
-  NS_DECL_NSICHANNELEVENTSINK
 
-  nsPingListener(bool aRequireSameHost, nsIContent* aContent,
-                 nsILoadGroup* aLoadGroup)
-    : mRequireSameHost(aRequireSameHost)
-    , mContent(aContent)
-    , mLoadGroup(aLoadGroup)
+  nsPingListener()
   {
+  }
+
+  void SetLoadGroup(nsILoadGroup* aLoadGroup) {
+    mLoadGroup = aLoadGroup;
   }
 
   nsresult StartTimeout();
 
-  void SetInterceptController(nsINetworkInterceptController* aInterceptController)
-  {
-    mInterceptController = aInterceptController;
-  }
-
 private:
   ~nsPingListener();
 
-  bool mRequireSameHost;
-  nsCOMPtr<nsIContent> mContent;
   nsCOMPtr<nsILoadGroup> mLoadGroup;
   nsCOMPtr<nsITimer> mTimer;
-  nsCOMPtr<nsINetworkInterceptController> mInterceptController;
 };
 
-NS_IMPL_ISUPPORTS(nsPingListener, nsIStreamListener, nsIRequestObserver,
-                  nsIInterfaceRequestor, nsIChannelEventSink)
+NS_IMPL_ISUPPORTS(nsPingListener, nsIStreamListener, nsIRequestObserver)
 
 nsPingListener::~nsPingListener()
 {
@@ -532,57 +478,6 @@ nsPingListener::OnStopRequest(nsIRequest* aRequest, nsISupports* aContext,
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsPingListener::GetInterface(const nsIID& aIID, void** aResult)
-{
-  if (aIID.Equals(NS_GET_IID(nsIChannelEventSink))) {
-    nsCOMPtr<nsIChannelEventSink> copy(this);
-    *aResult = copy.forget().take();
-    return NS_OK;
-  }
-
-  if (aIID.Equals(NS_GET_IID(nsINetworkInterceptController)) &&
-      mInterceptController) {
-    nsCOMPtr<nsINetworkInterceptController> copy(mInterceptController);
-    *aResult = copy.forget().take();
-    return NS_OK;
-  }
-
-  return NS_ERROR_NO_INTERFACE;
-}
-
-NS_IMETHODIMP
-nsPingListener::AsyncOnChannelRedirect(nsIChannel* aOldChan,
-                                       nsIChannel* aNewChan,
-                                       uint32_t aFlags,
-                                       nsIAsyncVerifyRedirectCallback* aCallback)
-{
-  nsCOMPtr<nsIURI> newURI;
-  aNewChan->GetURI(getter_AddRefs(newURI));
-
-  if (!CheckPingURI(newURI, mContent)) {
-    return NS_ERROR_ABORT;
-  }
-
-  if (!mRequireSameHost) {
-    aCallback->OnRedirectVerifyCallback(NS_OK);
-    return NS_OK;
-  }
-
-  // XXXbz should this be using something more like the nsContentUtils
-  // same-origin checker?
-  nsCOMPtr<nsIURI> oldURI;
-  aOldChan->GetURI(getter_AddRefs(oldURI));
-  NS_ENSURE_STATE(oldURI && newURI);
-
-  if (!IsSameHost(oldURI, newURI)) {
-    return NS_ERROR_ABORT;
-  }
-
-  aCallback->OnRedirectVerifyCallback(NS_OK);
-  return NS_OK;
-}
-
 struct MOZ_STACK_CLASS SendPingInfo
 {
   int32_t numPings;
@@ -603,21 +498,15 @@ SendPing(void* aClosure, nsIContent* aContent, nsIURI* aURI,
     return;
   }
 
-  if (info->requireSameHost) {
-    // Make sure the referrer and the given uri share the same origin.  We
-    // only require the same hostname.  The scheme and port may differ.
-    if (!IsSameHost(aURI, info->referrer)) {
-      return;
-    }
-  }
-
   nsIDocument* doc = aContent->OwnerDoc();
 
   nsCOMPtr<nsIChannel> chan;
   NS_NewChannel(getter_AddRefs(chan),
                 aURI,
                 doc,
-                nsILoadInfo::SEC_NORMAL,
+                info->requireSameHost
+                  ? nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_DATA_IS_BLOCKED
+                  : nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
                 nsIContentPolicy::TYPE_PING,
                 nullptr, // aLoadGroup
                 nullptr, // aCallbacks
@@ -716,25 +605,12 @@ SendPing(void* aClosure, nsIContent* aContent, nsIURI* aURI,
   if (!loadGroup) {
     return;
   }
+  nsCOMPtr<nsIInterfaceRequestor> callbacks = do_QueryInterface(info->docShell);
+  loadGroup->SetNotificationCallbacks(callbacks);
   chan->SetLoadGroup(loadGroup);
 
-  // Construct a listener that merely discards any response.  If successful at
-  // opening the channel, then it is not necessary to hold a reference to the
-  // channel.  The networking subsystem will take care of that for us.
-  nsPingListener* pingListener =
-    new nsPingListener(info->requireSameHost, aContent, loadGroup);
-
-  nsCOMPtr<nsINetworkInterceptController> interceptController =
-    do_QueryInterface(info->docShell);
-  pingListener->SetInterceptController(interceptController);
-  nsCOMPtr<nsIStreamListener> listener(pingListener);
-
-  // Observe redirects as well:
-  nsCOMPtr<nsIInterfaceRequestor> callbacks = do_QueryInterface(listener);
-  NS_ASSERTION(callbacks, "oops");
-  loadGroup->SetNotificationCallbacks(callbacks);
-
-  chan->AsyncOpen(listener, nullptr);
+  nsRefPtr<nsPingListener> pingListener = new nsPingListener();
+  chan->AsyncOpen2(pingListener);
 
   // Even if AsyncOpen failed, we still count this as a successful ping.  It's
   // possible that AsyncOpen may have failed after triggering some background
@@ -746,7 +622,11 @@ SendPing(void* aClosure, nsIContent* aContent, nsIURI* aURI,
     // If we failed to setup the timer, then we should just cancel the channel
     // because we won't be able to ensure that it goes away in a timely manner.
     chan->Cancel(NS_ERROR_ABORT);
+    return;
   }
+  // if the channel openend successfully, then make the pingListener hold
+  // a strong reference to the loadgroup which is released in ::OnStopRequest
+  pingListener->SetLoadGroup(loadGroup);
 }
 
 // Spec: http://whatwg.org/specs/web-apps/current-work/#ping
@@ -2001,7 +1881,6 @@ nsDocShell::GetChromeEventHandler(nsIDOMEventTarget** aChromeEventHandler)
   return NS_OK;
 }
 
-/* void setCurrentURI (in nsIURI uri); */
 NS_IMETHODIMP
 nsDocShell::SetCurrentURI(nsIURI* aURI)
 {
@@ -4610,7 +4489,9 @@ nsDocShell::GetDocument()
 nsPIDOMWindow*
 nsDocShell::GetWindow()
 {
-  NS_ENSURE_SUCCESS(EnsureScriptEnvironment(), nullptr);
+  if (NS_FAILED(EnsureScriptEnvironment())) {
+    return nullptr;
+  }
   return mScriptGlobal;
 }
 
@@ -5215,6 +5096,17 @@ nsDocShell::DisplayLoadError(nsresult aError, nsIURI* aURI,
         break;
       case NS_ERROR_CORRUPTED_CONTENT:
         // Broken Content Detected. e.g. Content-MD5 check failure.
+        error.AssignLiteral("corruptedContentError");
+        break;
+      case NS_ERROR_INTERCEPTION_FAILED:
+      case NS_ERROR_OPAQUE_INTERCEPTION_DISABLED:
+      case NS_ERROR_BAD_OPAQUE_INTERCEPTION_REQUEST_MODE:
+      case NS_ERROR_INTERCEPTED_ERROR_RESPONSE:
+      case NS_ERROR_INTERCEPTED_USED_RESPONSE:
+      case NS_ERROR_CLIENT_REQUEST_OPAQUE_INTERCEPTION:
+        // ServiceWorker intercepted request, but something went wrong.
+        nsContentUtils::MaybeReportInterceptionErrorToConsole(GetDocument(),
+                                                              aError);
         error.AssignLiteral("corruptedContentError");
         break;
       default:
@@ -7280,7 +7172,6 @@ nsDocShell::Embed(nsIContentViewer* aContentViewer,
   return NS_OK;
 }
 
-/* void setIsPrinting (in boolean aIsPrinting); */
 NS_IMETHODIMP
 nsDocShell::SetIsPrinting(bool aIsPrinting)
 {
@@ -7867,6 +7758,12 @@ nsDocShell::EndPageLoad(nsIWebProgress* aProgress,
                aStatus == NS_ERROR_UNSAFE_CONTENT_TYPE ||
                aStatus == NS_ERROR_REMOTE_XUL ||
                aStatus == NS_ERROR_OFFLINE ||
+               aStatus == NS_ERROR_INTERCEPTION_FAILED ||
+               aStatus == NS_ERROR_OPAQUE_INTERCEPTION_DISABLED ||
+               aStatus == NS_ERROR_BAD_OPAQUE_INTERCEPTION_REQUEST_MODE ||
+               aStatus == NS_ERROR_INTERCEPTED_ERROR_RESPONSE ||
+               aStatus == NS_ERROR_INTERCEPTED_USED_RESPONSE ||
+               aStatus == NS_ERROR_CLIENT_REQUEST_OPAQUE_INTERCEPTION ||
                NS_ERROR_GET_MODULE(aStatus) == NS_ERROR_MODULE_SECURITY) {
       // Errors to be shown for any frame
       DisplayLoadError(aStatus, url, nullptr, aChannel);
@@ -9750,7 +9647,8 @@ nsDocShell::InternalLoad(nsIURI* aURI,
   }
   if (IsFrame() && !isNewDocShell && !isTargetTopLevelDocShell) {
     NS_ASSERTION(requestingElement, "A frame but no DOM element!?");
-    contentType = nsIContentPolicy::TYPE_SUBDOCUMENT;
+    contentType = requestingElement->IsHTMLElement(nsGkAtoms::iframe) ?
+      nsIContentPolicy::TYPE_INTERNAL_IFRAME : nsIContentPolicy::TYPE_INTERNAL_FRAME;
   } else {
     contentType = nsIContentPolicy::TYPE_DOCUMENT;
   }
@@ -10639,20 +10537,18 @@ nsDocShell::DoURILoad(nsIURI* aURI,
 #endif
 
   if (!isSrcdoc) {
-    nsCOMPtr<nsILoadInfo> loadInfo =
-      new LoadInfo(requestingNode ? requestingNode->NodePrincipal() :
-                                    triggeringPrincipal.get(),
-                   triggeringPrincipal,
-                   requestingNode,
-                   securityFlags,
-                   aContentPolicyType,
-                   aBaseURI);
     rv = NS_NewChannelInternal(getter_AddRefs(channel),
                                aURI,
-                               loadInfo,
-                               nullptr,   // loadGroup
-                               static_cast<nsIInterfaceRequestor*>(this),
-                               loadFlags);
+                               requestingNode,
+                               requestingNode
+                                 ? requestingNode->NodePrincipal()
+                                 : triggeringPrincipal.get(),
+                                triggeringPrincipal,
+                                securityFlags,
+                                aContentPolicyType,
+                                nullptr,   // loadGroup
+                                static_cast<nsIInterfaceRequestor*>(this),
+                                loadFlags);
 
     if (NS_FAILED(rv)) {
       if (rv == NS_ERROR_UNKNOWN_PROTOCOL) {
@@ -10669,6 +10565,12 @@ nsDocShell::DoURILoad(nsIURI* aURI,
       }
       return rv;
     }
+    if (aBaseURI) {
+        nsCOMPtr<nsIViewSourceChannel> vsc = do_QueryInterface(channel);
+        if (vsc) {
+            vsc->SetBaseURI(aBaseURI);
+        }
+    }
   } else {
     nsAutoCString scheme;
     rv = aURI->GetScheme(scheme);
@@ -10680,17 +10582,15 @@ nsDocShell::DoURILoad(nsIURI* aURI,
       nsViewSourceHandler* vsh = nsViewSourceHandler::GetInstance();
       NS_ENSURE_TRUE(vsh, NS_ERROR_FAILURE);
 
-      rv = vsh->NewSrcdocChannel(aURI, aSrcdoc, getter_AddRefs(channel));
-      NS_ENSURE_SUCCESS(rv, rv);
-      nsCOMPtr<nsILoadInfo> loadInfo =
-        new LoadInfo(requestingNode ? requestingNode->NodePrincipal() :
-                                      triggeringPrincipal.get(),
-                     triggeringPrincipal,
-                     requestingNode,
-                     securityFlags,
-                     aContentPolicyType,
-                     aBaseURI);
-      channel->SetLoadInfo(loadInfo);
+      rv = vsh->NewSrcdocChannel(aURI, aBaseURI, aSrcdoc,
+                                 requestingNode,
+                                 requestingNode
+                                   ? requestingNode->NodePrincipal()
+                                   : triggeringPrincipal.get(),
+                                 triggeringPrincipal,
+                                 securityFlags,
+                                 aContentPolicyType,
+                                 getter_AddRefs(channel));
     } else {
       rv = NS_NewInputStreamChannelInternal(getter_AddRefs(channel),
                                             aURI,
@@ -10703,9 +10603,11 @@ nsDocShell::DoURILoad(nsIURI* aURI,
                                             triggeringPrincipal,
                                             securityFlags,
                                             aContentPolicyType,
-                                            true,
-                                            aBaseURI);
+                                            true);
       NS_ENSURE_SUCCESS(rv, rv);
+      nsCOMPtr<nsIInputStreamChannel> isc = do_QueryInterface(channel);
+      MOZ_ASSERT(isc);
+      isc->SetBaseURI(aBaseURI);
     }
   }
 
@@ -12032,7 +11934,7 @@ nsDocShell::AddToSessionHistory(nsIURI* aURI, nsIChannel* aChannel,
       nsCOMPtr<nsILoadInfo> loadInfo;
       aChannel->GetLoadInfo(getter_AddRefs(loadInfo));
       nsCOMPtr<nsIURI> baseURI;
-      loadInfo->GetBaseURI(getter_AddRefs(baseURI));
+      inStrmChan->GetBaseURI(getter_AddRefs(baseURI));
       entry->SetBaseURI(baseURI);
     }
   }
@@ -13036,7 +12938,6 @@ nsDocShell::IsFrame()
   return !!parent;
 }
 
-/* boolean IsBeingDestroyed (); */
 NS_IMETHODIMP
 nsDocShell::IsBeingDestroyed(bool* aDoomed)
 {
@@ -14245,7 +14146,7 @@ nsDocShell::ChannelIntercepted(nsIInterceptedChannel* aChannel)
 {
   nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
   if (!swm) {
-    aChannel->Cancel();
+    aChannel->Cancel(NS_ERROR_INTERCEPTION_FAILED);
     return NS_OK;
   }
 

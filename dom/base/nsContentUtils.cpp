@@ -363,8 +363,8 @@ public:
     // We don't measure the |EventListenerManager| objects pointed to by the
     // entries because those references are non-owning.
     int64_t amount = sEventListenerManagersHash
-                   ? PL_DHashTableSizeOfExcludingThis(
-                       sEventListenerManagersHash, nullptr, MallocSizeOf)
+                   ? sEventListenerManagersHash->ShallowSizeOfIncludingThis(
+                       MallocSizeOf)
                    : 0;
 
     return MOZ_COLLECT_REPORT(
@@ -3426,6 +3426,36 @@ nsContentUtils::ReportToConsole(uint32_t aErrorFlags,
                                      aLineNumber, aColumnNumber);
 }
 
+/* static */ nsresult
+nsContentUtils::MaybeReportInterceptionErrorToConsole(nsIDocument* aDocument,
+                                                      nsresult aError)
+{
+  const char* messageName = nullptr;
+  if (aError == NS_ERROR_INTERCEPTION_FAILED) {
+    messageName = "InterceptionFailed";
+  } else if (aError == NS_ERROR_OPAQUE_INTERCEPTION_DISABLED) {
+    messageName = "OpaqueInterceptionDisabled";
+  } else if (aError == NS_ERROR_BAD_OPAQUE_INTERCEPTION_REQUEST_MODE) {
+    messageName = "BadOpaqueInterceptionRequestMode";
+  } else if (aError == NS_ERROR_INTERCEPTED_ERROR_RESPONSE) {
+    messageName = "InterceptedErrorResponse";
+  } else if (aError == NS_ERROR_INTERCEPTED_USED_RESPONSE) {
+    messageName = "InterceptedUsedResponse";
+  } else if (aError == NS_ERROR_CLIENT_REQUEST_OPAQUE_INTERCEPTION) {
+    messageName = "ClientRequestOpaqueInterception";
+  }
+
+  if (messageName) {
+    return ReportToConsole(nsIScriptError::warningFlag,
+                           NS_LITERAL_CSTRING("Service Worker Interception"),
+                           aDocument,
+                           nsContentUtils::eDOM_PROPERTIES,
+                           messageName);
+  }
+
+  return NS_OK;
+}
+
 
 /* static */ nsresult
 nsContentUtils::ReportToConsoleNonLocalized(const nsAString& aErrorText,
@@ -3455,7 +3485,7 @@ nsContentUtils::ReportToConsoleNonLocalized(const nsAString& aErrorText,
   if (!aLineNumber) {
     JSContext *cx = GetCurrentJSContext();
     if (cx) {
-      nsJSUtils::GetCallingLocation(cx, spec, &aLineNumber);
+      nsJSUtils::GetCallingLocation(cx, spec, &aLineNumber, &aColumnNumber);
     }
   }
   if (spec.IsEmpty() && aURI)
@@ -3829,6 +3859,30 @@ nsContentUtils::MatchElementId(nsIContent *aContent, const nsAString& aId)
   return MatchElementId(aContent, id);
 }
 
+/* static */
+nsIDocument*
+nsContentUtils::GetSubdocumentWithOuterWindowId(nsIDocument *aDocument,
+                                                uint64_t aOuterWindowId)
+{
+  if (!aDocument || !aOuterWindowId) {
+    return nullptr;
+  }
+
+  nsCOMPtr<nsPIDOMWindow> window = nsGlobalWindow::GetOuterWindowWithId(aOuterWindowId);
+  if (!window) {
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIDocument> foundDoc = window->GetDoc();
+  if (nsContentUtils::ContentIsCrossDocDescendantOf(foundDoc, aDocument)) {
+    // Note that ContentIsCrossDocDescendantOf will return true if
+    // foundDoc == aDocument.
+    return foundDoc;
+  }
+
+  return nullptr;
+}
+
 // Convert the string from the given encoding to Unicode.
 /* static */
 nsresult
@@ -4122,7 +4176,7 @@ nsContentUtils::RemoveListenerManager(nsINode *aNode)
       listenerManager.swap(entry->mListenerManager);
       // Remove the entry and *then* do operations that could cause further
       // modification of sEventListenerManagersHash.  See bug 334177.
-      PL_DHashTableRawRemove(sEventListenerManagersHash, entry);
+      sEventListenerManagersHash->RawRemove(entry);
       if (listenerManager) {
         listenerManager->Disconnect();
       }
@@ -4704,55 +4758,6 @@ static bool SchemeIs(nsIURI* aURI, const char* aScheme)
 
   bool isScheme = false;
   return NS_SUCCEEDED(baseURI->SchemeIs(aScheme, &isScheme)) && isScheme;
-}
-
-/* static */
-nsresult
-nsContentUtils::CheckSecurityBeforeLoad(nsIURI* aURIToLoad,
-                                        nsIPrincipal* aLoadingPrincipal,
-                                        uint32_t aCheckLoadFlags,
-                                        bool aAllowData,
-                                        uint32_t aContentPolicyType,
-                                        nsISupports* aContext,
-                                        const nsAFlatCString& aMimeGuess,
-                                        nsISupports* aExtra)
-{
-  NS_PRECONDITION(aLoadingPrincipal, "Must have a loading principal here");
-
-  if (aLoadingPrincipal == sSystemPrincipal) {
-    return NS_OK;
-  }
-  
-  // XXXbz do we want to fast-path skin stylesheets loading XBL here somehow?
-  // CheckLoadURIWithPrincipal
-  nsresult rv = sSecurityManager->
-    CheckLoadURIWithPrincipal(aLoadingPrincipal, aURIToLoad, aCheckLoadFlags);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  // Content Policy
-  int16_t shouldLoad = nsIContentPolicy::ACCEPT;
-  rv = NS_CheckContentLoadPolicy(aContentPolicyType,
-                                 aURIToLoad,
-                                 aLoadingPrincipal,
-                                 aContext,
-                                 aMimeGuess,
-                                 aExtra,
-                                 &shouldLoad,
-                                 GetContentPolicy(),
-                                 sSecurityManager);
-  NS_ENSURE_SUCCESS(rv, rv);
-  if (NS_CP_REJECTED(shouldLoad)) {
-    return NS_ERROR_CONTENT_BLOCKED;
-  }
-
-  // Same Origin
-  if ((aAllowData && SchemeIs(aURIToLoad, "data")) ||
-      ((aCheckLoadFlags & nsIScriptSecurityManager::ALLOW_CHROME) &&
-       SchemeIs(aURIToLoad, "chrome"))) {
-    return NS_OK;
-  }
-
-  return aLoadingPrincipal->CheckMayLoad(aURIToLoad, true, false);
 }
 
 bool
@@ -7337,48 +7342,6 @@ nsContentUtils::CallOnAllRemoteChildren(nsIDOMWindow* aWindow,
 
 /* static */
 nsContentPolicyType
-nsContentUtils::InternalContentPolicyTypeToExternal(nsContentPolicyType aType)
-{
-  switch (aType) {
-  case nsIContentPolicy::TYPE_INTERNAL_SCRIPT:
-  case nsIContentPolicy::TYPE_INTERNAL_SCRIPT_PRELOAD:
-  case nsIContentPolicy::TYPE_INTERNAL_WORKER:
-  case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
-  case nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER:
-    return nsIContentPolicy::TYPE_SCRIPT;
-
-  case nsIContentPolicy::TYPE_INTERNAL_EMBED:
-  case nsIContentPolicy::TYPE_INTERNAL_OBJECT:
-    return nsIContentPolicy::TYPE_OBJECT;
-
-  case nsIContentPolicy::TYPE_INTERNAL_FRAME:
-  case nsIContentPolicy::TYPE_INTERNAL_IFRAME:
-    return nsIContentPolicy::TYPE_SUBDOCUMENT;
-
-  case nsIContentPolicy::TYPE_INTERNAL_AUDIO:
-  case nsIContentPolicy::TYPE_INTERNAL_VIDEO:
-  case nsIContentPolicy::TYPE_INTERNAL_TRACK:
-    return nsIContentPolicy::TYPE_MEDIA;
-
-  case nsIContentPolicy::TYPE_INTERNAL_XMLHTTPREQUEST:
-  case nsIContentPolicy::TYPE_INTERNAL_EVENTSOURCE:
-    return nsIContentPolicy::TYPE_XMLHTTPREQUEST;
-
-  case nsIContentPolicy::TYPE_INTERNAL_IMAGE:
-  case nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD:
-    return nsIContentPolicy::TYPE_IMAGE;
-
-  case nsIContentPolicy::TYPE_INTERNAL_STYLESHEET:
-  case nsIContentPolicy::TYPE_INTERNAL_STYLESHEET_PRELOAD:
-    return nsIContentPolicy::TYPE_STYLESHEET;
-
-  default:
-    return aType;
-  }
-}
-
-/* static */
-nsContentPolicyType
 nsContentUtils::InternalContentPolicyTypeToExternalOrMCBInternal(nsContentPolicyType aType)
 {
   switch (aType) {
@@ -7563,8 +7526,11 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
           if (file) {
             blobImpl = new BlobImplFile(file, false);
             ErrorResult rv;
+            // Ensure that file data is cached no that the content process
+            // has this data available to it when passed over:
             blobImpl->GetSize(rv);
             blobImpl->GetLastModified(rv);
+            blobImpl->LookupAndCacheIsDirectory();
           } else {
             blobImpl = do_QueryInterface(data);
           }
@@ -7602,7 +7568,9 @@ nsContentUtils::GetSurfaceData(mozilla::gfx::DataSourceSurface* aSurface,
                                size_t* aLength, int32_t* aStride)
 {
   mozilla::gfx::DataSourceSurface::MappedSurface map;
-  aSurface->Map(mozilla::gfx::DataSourceSurface::MapType::READ, &map);
+  if (NS_WARN_IF(!aSurface->Map(mozilla::gfx::DataSourceSurface::MapType::READ, &map))) {
+    return nullptr;
+  }
   mozilla::gfx::IntSize size = aSurface->GetSize();
   mozilla::CheckedInt32 requiredBytes =
     mozilla::CheckedInt32(map.mStride) * mozilla::CheckedInt32(size.height);
@@ -7989,6 +7957,38 @@ nsContentUtils::GetWindowRoot(nsIDocument* aDoc)
   return nullptr;
 }
 
+
+/* static */
+nsContentPolicyType
+nsContentUtils::InternalContentPolicyTypeToExternal(nsContentPolicyType aType)
+{
+  switch (aType) {
+  case nsIContentPolicy::TYPE_INTERNAL_SCRIPT:
+  case nsIContentPolicy::TYPE_INTERNAL_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
+    return nsIContentPolicy::TYPE_SCRIPT;
+
+  case nsIContentPolicy::TYPE_INTERNAL_EMBED:
+  case nsIContentPolicy::TYPE_INTERNAL_OBJECT:
+    return nsIContentPolicy::TYPE_OBJECT;
+
+  case nsIContentPolicy::TYPE_INTERNAL_FRAME:
+  case nsIContentPolicy::TYPE_INTERNAL_IFRAME:
+    return nsIContentPolicy::TYPE_SUBDOCUMENT;
+
+  case nsIContentPolicy::TYPE_INTERNAL_AUDIO:
+  case nsIContentPolicy::TYPE_INTERNAL_VIDEO:
+  case nsIContentPolicy::TYPE_INTERNAL_TRACK:
+    return nsIContentPolicy::TYPE_MEDIA;
+
+  case nsIContentPolicy::TYPE_INTERNAL_XMLHTTPREQUEST:
+  case nsIContentPolicy::TYPE_INTERNAL_EVENTSOURCE:
+    return nsIContentPolicy::TYPE_XMLHTTPREQUEST;
+
+  default:
+    return aType;
+  }
+}
 
 nsresult
 nsContentUtils::SetFetchReferrerURIWithPolicy(nsIPrincipal* aPrincipal,

@@ -128,6 +128,7 @@ CompositableClient::CompositableClient(CompositableForwarder* aForwarder,
 : mCompositableChild(nullptr)
 , mForwarder(aForwarder)
 , mTextureFlags(aTextureFlags)
+, mDestroyed(false)
 {
   MOZ_COUNT_CTOR(CompositableClient);
 }
@@ -169,6 +170,8 @@ CompositableClient::Connect(ImageContainer* aImageContainer)
 void
 CompositableClient::Destroy()
 {
+  mDestroyed = true;
+
   if (!mCompositableChild) {
     return;
   }
@@ -204,12 +207,12 @@ CompositableClient::CreateBufferTextureClient(gfx::SurfaceFormat aFormat,
 already_AddRefed<TextureClient>
 CompositableClient::CreateTextureClientForDrawing(gfx::SurfaceFormat aFormat,
                                                   gfx::IntSize aSize,
-                                                  gfx::BackendType aMoz2DBackend,
+                                                  BackendSelector aSelector,
                                                   TextureFlags aTextureFlags,
                                                   TextureAllocationFlags aAllocFlags)
 {
   return TextureClient::CreateForDrawing(GetForwarder(),
-                                         aFormat, aSize, aMoz2DBackend,
+                                         aFormat, aSize, aSelector,
                                          aTextureFlags | mTextureFlags,
                                          aAllocFlags);
 }

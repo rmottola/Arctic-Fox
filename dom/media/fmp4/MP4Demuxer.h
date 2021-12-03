@@ -29,8 +29,6 @@ public:
 
   virtual nsRefPtr<InitPromise> Init() override;
 
-  virtual already_AddRefed<MediaDataDemuxer> Clone() const override;
-
   virtual bool HasTrackType(TrackInfo::TrackType aType) const override;
 
   virtual uint32_t GetNumberTracks(TrackInfo::TrackType aType) const override;
@@ -42,7 +40,7 @@ public:
 
   virtual UniquePtr<EncryptionInfo> GetCrypto() override;
 
-  virtual void NotifyDataArrived(uint32_t aLength, int64_t aOffset) override;
+  virtual void NotifyDataArrived() override;
 
   virtual void NotifyDataRemoved() override;
 

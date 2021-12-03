@@ -348,9 +348,7 @@ private:
     void ActivateBundledFonts();
 #endif
 
-    typedef nsRefPtrHashtable<nsStringHashKey, gfxFontFamily> FontTable;
-
-    FontTable mFontSubstitutes;
+    FontFamilyTable mFontSubstitutes;
     nsTArray<nsString> mNonExistingFonts;
 };
 

@@ -1138,8 +1138,12 @@ IonBuilder::initParameters()
     // interpreter and didn't accumulate type information, try to use that OSR
     // frame to determine possible initial types for 'this' and parameters.
 
-    if (thisTypes->empty() && baselineFrame_)
-        thisTypes->addType(baselineFrame_->thisType, alloc_->lifoAlloc());
+    if (thisTypes->empty() && baselineFrame_) {
+        TypeSet::Type type = baselineFrame_->thisType;
+        if (type.isSingletonUnchecked())
+            checkNurseryObject(type.singleton());
+        thisTypes->addType(type, alloc_->lifoAlloc());
+    }
 
     MParameter* param = MParameter::New(alloc(), MParameter::THIS_SLOT, thisTypes);
     current->add(param);
@@ -1150,7 +1154,10 @@ IonBuilder::initParameters()
         if (types->empty() && baselineFrame_ &&
             !script_->baselineScript()->modifiesArguments())
         {
-            types->addType(baselineFrame_->argTypes[i], alloc_->lifoAlloc());
+            TypeSet::Type type = baselineFrame_->argTypes[i];
+            if (type.isSingletonUnchecked())
+                checkNurseryObject(type.singleton());
+            types->addType(type, alloc_->lifoAlloc());
         }
 
         param = MParameter::New(alloc(), i, types);
@@ -6566,6 +6573,8 @@ IonBuilder::makeCallHelper(JSFunction* target, CallInfo& callInfo)
 static bool
 DOMCallNeedsBarrier(const JSJitInfo* jitinfo, TemporaryTypeSet* types)
 {
+    MOZ_ASSERT(jitinfo->type() != JSJitInfo::InlinableNative);
+
     // If the return type of our DOM native is in "types" already, we don't
     // actually need a barrier.
     if (jitinfo->returnType() == JSVAL_TYPE_UNKNOWN)
@@ -7441,6 +7450,9 @@ IonBuilder::newPendingLoopHeader(MBasicBlock* predecessor, jsbytecode* pc, bool 
                 existingType = baselineFrame_->argTypes[arg];
             else
                 existingType = baselineFrame_->varTypes[var];
+
+            if (existingType.isSingletonUnchecked())
+                checkNurseryObject(existingType.singleton());
 
             // Extract typeset from value.
             LifoAlloc* lifoAlloc = alloc().lifoAlloc();
@@ -10794,7 +10806,7 @@ IonBuilder::getPropTryArgumentsCallee(bool* emitted, MDefinition* obj, PropertyN
     if (name != names().callee)
         return true;
 
-    MOZ_ASSERT(!script()->strict());
+    MOZ_ASSERT(script()->hasMappedArgsObj());
 
     obj->setImplicitlyUsedUnchecked();
     current->push(getCallee());
@@ -10818,8 +10830,10 @@ IonBuilder::getPropTryConstant(bool* emitted, MDefinition* obj, PropertyName* na
     }
 
     JSObject* singleton = testSingletonPropertyTypes(obj, name);
-    if (!singleton)
+    if (!singleton) {
+        trackOptimizationOutcome(TrackedOutcome::NotSingleton);
         return true;
+    }
 
     // Property access is a known constant -- safe to emit.
     obj->setImplicitlyUsedUnchecked();

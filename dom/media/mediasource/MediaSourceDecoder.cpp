@@ -7,15 +7,15 @@
 
 #include "mozilla/Logging.h"
 #include "mozilla/dom/HTMLMediaElement.h"
+#include "mozilla/Preferences.h"
 #include "MediaDecoderStateMachine.h"
 #include "MediaSource.h"
-#include "MediaSourceReader.h"
 #include "MediaSourceResource.h"
 #include "MediaSourceUtils.h"
-#include "SourceBufferDecoder.h"
 #include "VideoUtils.h"
 #include "MediaFormatReader.h"
 #include "MediaSourceDemuxer.h"
+#include "SourceBufferList.h"
 #include <algorithm>
 
 extern PRLogModuleInfo* GetMediaSourceLog();
@@ -27,11 +27,8 @@ using namespace mozilla::media;
 
 namespace mozilla {
 
-class SourceBufferDecoder;
-
 MediaSourceDecoder::MediaSourceDecoder(dom::HTMLMediaElement* aElement)
   : mMediaSource(nullptr)
-  , mIsUsingFormatReader(Preferences::GetBool("media.mediasource.format-reader", false))
   , mEnded(false)
 {
   SetExplicitDuration(UnspecifiedNaN<double>());
@@ -48,18 +45,16 @@ MediaSourceDecoder::Clone()
 MediaDecoderStateMachine*
 MediaSourceDecoder::CreateStateMachine()
 {
-  if (mIsUsingFormatReader) {
-    mDemuxer = new MediaSourceDemuxer();
-    mReader = new MediaFormatReader(this, mDemuxer);
-  } else {
-    mReader = new MediaSourceReader(this);
-  }
-  return new MediaDecoderStateMachine(this, mReader);
+  MOZ_ASSERT(NS_IsMainThread());
+  mDemuxer = new MediaSourceDemuxer();
+  nsRefPtr<MediaFormatReader> reader = new MediaFormatReader(this, mDemuxer);
+  return new MediaDecoderStateMachine(this, reader);
 }
 
 nsresult
 MediaSourceDecoder::Load(nsIStreamListener**, MediaDecoder*)
 {
+  MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!GetStateMachine());
   SetStateMachine(CreateStateMachine());
   if (!GetStateMachine()) {
@@ -71,7 +66,7 @@ MediaSourceDecoder::Load(nsIStreamListener**, MediaDecoder*)
   NS_ENSURE_SUCCESS(rv, rv);
 
   SetStateMachineParameters();
-  return ScheduleStateMachine();
+  return NS_OK;
 }
 
 media::TimeIntervals
@@ -157,6 +152,7 @@ MediaSourceDecoder::GetBuffered()
 void
 MediaSourceDecoder::Shutdown()
 {
+  MOZ_ASSERT(NS_IsMainThread());
   MSE_DEBUG("Shutdown");
   // Detach first so that TrackBuffers are unused on the main thread when
   // shut down on the decode task queue.
@@ -166,9 +162,6 @@ MediaSourceDecoder::Shutdown()
   mDemuxer = nullptr;
 
   MediaDecoder::Shutdown();
-  // Kick WaitForData out of its slumber.
-  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
-  mon.NotifyAll();
 }
 
 /*static*/
@@ -192,50 +185,21 @@ MediaSourceDecoder::DetachMediaSource()
   mMediaSource = nullptr;
 }
 
-already_AddRefed<SourceBufferDecoder>
-MediaSourceDecoder::CreateSubDecoder(const nsACString& aType, int64_t aTimestampOffset)
-{
-  MOZ_ASSERT(mReader && !mIsUsingFormatReader);
-  return GetReader()->CreateSubDecoder(aType, aTimestampOffset);
-}
-
-void
-MediaSourceDecoder::AddTrackBuffer(TrackBuffer* aTrackBuffer)
-{
-  MOZ_ASSERT(mReader && !mIsUsingFormatReader);
-  GetReader()->AddTrackBuffer(aTrackBuffer);
-}
-
-void
-MediaSourceDecoder::RemoveTrackBuffer(TrackBuffer* aTrackBuffer)
-{
-  MOZ_ASSERT(mReader && !mIsUsingFormatReader);
-  GetReader()->RemoveTrackBuffer(aTrackBuffer);
-}
-
-void
-MediaSourceDecoder::OnTrackBufferConfigured(TrackBuffer* aTrackBuffer, const MediaInfo& aInfo)
-{
-  MOZ_ASSERT(mReader && !mIsUsingFormatReader);
-  GetReader()->OnTrackBufferConfigured(aTrackBuffer, aInfo);
-}
-
 void
 MediaSourceDecoder::Ended(bool aEnded)
 {
-  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
+  MOZ_ASSERT(NS_IsMainThread());
   static_cast<MediaSourceResource*>(GetResource())->SetEnded(aEnded);
-  if (!mIsUsingFormatReader) {
-    GetReader()->Ended(aEnded);
-  }
   mEnded = true;
-  mon.NotifyAll();
 }
 
-bool
-MediaSourceDecoder::IsExpectingMoreData()
+void
+MediaSourceDecoder::AddSizeOfResources(ResourceSizes* aSizes)
 {
-  return !mEnded;
+  MOZ_ASSERT(NS_IsMainThread());
+  if (GetDemuxer()) {
+    GetDemuxer()->AddSizeOfResources(aSizes);
+  }
 }
 
 void
@@ -244,7 +208,6 @@ MediaSourceDecoder::SetInitialDuration(int64_t aDuration)
   MOZ_ASSERT(NS_IsMainThread());
   // Only use the decoded duration if one wasn't already
   // set.
-  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
   if (!mMediaSource || !IsNaN(ExplicitDuration())) {
     return;
   }
@@ -260,7 +223,6 @@ void
 MediaSourceDecoder::SetMediaSourceDuration(double aDuration, MSRangeRemovalAction aAction)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
   double oldDuration = ExplicitDuration();
   if (aDuration >= 0) {
     int64_t checkedDuration;
@@ -273,9 +235,6 @@ MediaSourceDecoder::SetMediaSourceDuration(double aDuration, MSRangeRemovalActio
   } else {
     SetExplicitDuration(PositiveInfinity<double>());
   }
-  if (!mIsUsingFormatReader && GetReader()) {
-    GetReader()->SetMediaSourceDuration(ExplicitDuration());
-  }
 
   if (mMediaSource && aAction != MSRangeRemovalAction::SKIP) {
     mMediaSource->DurationChange(oldDuration, aDuration);
@@ -285,46 +244,20 @@ MediaSourceDecoder::SetMediaSourceDuration(double aDuration, MSRangeRemovalActio
 double
 MediaSourceDecoder::GetMediaSourceDuration()
 {
-  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
+  MOZ_ASSERT(NS_IsMainThread());
   return ExplicitDuration();
-}
-
-void
-MediaSourceDecoder::NotifyTimeRangesChanged()
-{
-  MOZ_ASSERT(mReader && !mIsUsingFormatReader);
-  GetReader()->NotifyTimeRangesChanged();
-}
-
-void
-MediaSourceDecoder::PrepareReaderInitialization()
-{
-  if (mIsUsingFormatReader) {
-    return;
-  }
-  MOZ_ASSERT(mReader);
-  GetReader()->PrepareInitialization();
 }
 
 void
 MediaSourceDecoder::GetMozDebugReaderData(nsAString& aString)
 {
-  if (mIsUsingFormatReader) {
-    return;
-  }
-  GetReader()->GetMozDebugReaderData(aString);
-}
-
-bool
-MediaSourceDecoder::IsActiveReader(MediaDecoderReader* aReader)
-{
-  return !mIsUsingFormatReader && GetReader()->IsActiveReader(aReader);
+  mDemuxer->GetMozDebugReaderData(aString);
 }
 
 double
 MediaSourceDecoder::GetDuration()
 {
-  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
+  MOZ_ASSERT(NS_IsMainThread());
   return ExplicitDuration();
 }
 

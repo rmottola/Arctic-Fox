@@ -128,14 +128,20 @@ InternalRequest::MapContentPolicyTypeToRequestContext(nsContentPolicyType aConte
   case nsIContentPolicy::TYPE_STYLESHEET:
     context = RequestContext::Style;
     break;
-  case nsIContentPolicy::TYPE_OBJECT:
+  case nsIContentPolicy::TYPE_INTERNAL_OBJECT:
     context = RequestContext::Object;
+    break;
+  case nsIContentPolicy::TYPE_INTERNAL_EMBED:
+    context = RequestContext::Embed;
     break;
   case nsIContentPolicy::TYPE_DOCUMENT:
     context = RequestContext::Internal;
     break;
-  case nsIContentPolicy::TYPE_SUBDOCUMENT:
+  case nsIContentPolicy::TYPE_INTERNAL_IFRAME:
     context = RequestContext::Iframe;
+    break;
+  case nsIContentPolicy::TYPE_INTERNAL_FRAME:
+    context = RequestContext::Frame;
     break;
   case nsIContentPolicy::TYPE_REFRESH:
     context = RequestContext::Internal;
@@ -146,8 +152,11 @@ InternalRequest::MapContentPolicyTypeToRequestContext(nsContentPolicyType aConte
   case nsIContentPolicy::TYPE_PING:
     context = RequestContext::Ping;
     break;
-  case nsIContentPolicy::TYPE_XMLHTTPREQUEST:
+  case nsIContentPolicy::TYPE_INTERNAL_XMLHTTPREQUEST:
     context = RequestContext::Xmlhttprequest;
+    break;
+  case nsIContentPolicy::TYPE_INTERNAL_EVENTSOURCE:
+    context = RequestContext::Eventsource;
     break;
   case nsIContentPolicy::TYPE_OBJECT_SUBREQUEST:
     context = RequestContext::Plugin;
@@ -193,6 +202,45 @@ InternalRequest::MapContentPolicyTypeToRequestContext(nsContentPolicyType aConte
     break;
   }
   return context;
+}
+
+bool
+InternalRequest::IsNavigationRequest() const
+{
+  // https://fetch.spec.whatwg.org/#navigation-request-context
+  //
+  // A navigation request context is one of "form", "frame", "hyperlink",
+  // "iframe", "internal" (as long as context frame type is not "none"),
+  // "location", "metarefresh", and "prerender".
+  //
+  // TODO: include equivalent check for "form" context
+  // TODO: include equivalent check for "prerender" context
+  return mContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT ||
+         mContentPolicyType == nsIContentPolicy::TYPE_SUBDOCUMENT ||
+         mContentPolicyType == nsIContentPolicy::TYPE_INTERNAL_FRAME ||
+         mContentPolicyType == nsIContentPolicy::TYPE_INTERNAL_IFRAME ||
+         mContentPolicyType == nsIContentPolicy::TYPE_REFRESH;
+}
+
+bool
+InternalRequest::IsWorkerRequest() const
+{
+  // https://fetch.spec.whatwg.org/#worker-request-context
+  //
+  // A worker request context is one of "serviceworker", "sharedworker", and
+  // "worker".
+  //
+  // Note, service workers are not included here because currently there is
+  // no way to generate a Request with a "serviceworker" RequestContext.
+  // ServiceWorker scripts cannot be intercepted.
+  return mContentPolicyType == nsIContentPolicy::TYPE_INTERNAL_WORKER ||
+         mContentPolicyType == nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER;
+}
+
+bool
+InternalRequest::IsClientRequest() const
+{
+  return IsNavigationRequest() || IsWorkerRequest();
 }
 
 } // namespace dom

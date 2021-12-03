@@ -48,7 +48,6 @@
 #include "mozilla/dom/PFMRadioParent.h"
 #include "mozilla/dom/PMemoryReportRequestParent.h"
 #include "mozilla/dom/ServiceWorkerRegistrar.h"
-#include "mozilla/dom/asmjscache/AsmJSCache.h"
 #include "mozilla/dom/bluetooth/PBluetoothParent.h"
 #include "mozilla/dom/cellbroadcast/CellBroadcastParent.h"
 #include "mozilla/dom/devicestorage/DeviceStorageRequestParent.h"
@@ -1423,7 +1422,9 @@ ContentParent::Init()
     }
     Preferences::AddStrongObserver(this, "");
     if (obs) {
-        obs->NotifyObservers(static_cast<nsIObserver*>(this), "ipc:content-created", nullptr);
+        nsAutoString cpId;
+        cpId.AppendInt(static_cast<uint64_t>(this->ChildID()));
+        obs->NotifyObservers(static_cast<nsIObserver*>(this), "ipc:content-created", cpId.get());
     }
 
 #ifdef ACCESSIBILITY
@@ -1801,11 +1802,12 @@ ContentParent::OnBeginSyncTransaction() {
         if (!sDisableUnsafeCPOWWarnings) {
             if (console && cx) {
                 nsAutoString filename;
-                uint32_t lineno = 0;
-                nsJSUtils::GetCallingLocation(cx, filename, &lineno);
+                uint32_t lineno = 0, column = 0;
+                nsJSUtils::GetCallingLocation(cx, filename, &lineno, &column);
                 nsCOMPtr<nsIScriptError> error(do_CreateInstance(NS_SCRIPTERROR_CONTRACTID));
-                error->Init(NS_LITERAL_STRING("unsafe CPOW usage"), filename, EmptyString(),
-                            lineno, 0, nsIScriptError::warningFlag, "chrome javascript");
+                error->Init(NS_LITERAL_STRING("unsafe CPOW usage"), filename,
+                            EmptyString(), lineno, column,
+                            nsIScriptError::warningFlag, "chrome javascript");
                 console->LogMessage(error);
             } else {
                 NS_WARNING("Unsafe synchronous IPC message");
@@ -1991,9 +1993,20 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
             props->SetPropertyAsBool(NS_LITERAL_STRING("abnormal"), true);
 
         }
-        obs->NotifyObservers((nsIPropertyBag2*) props, "ipc:content-shutdown", nullptr);
+        nsAutoString cpId;
+        cpId.AppendInt(static_cast<uint64_t>(this->ChildID()));
+        obs->NotifyObservers((nsIPropertyBag2*) props, "ipc:content-shutdown", cpId.get());
     }
 
+    // Remove any and all idle listeners.
+    nsCOMPtr<nsIIdleService> idleService =
+        do_GetService("@mozilla.org/widget/idleservice;1");
+    MOZ_ASSERT(idleService);
+    nsRefPtr<ParentIdleListener> listener;
+    for (int32_t i = mIdleListeners.Length() - 1; i >= 0; --i) {
+        listener = static_cast<ParentIdleListener*>(mIdleListeners[i].get());
+        idleService->RemoveIdleObserver(listener, listener->mTime);
+    }
     mIdleListeners.Clear();
 
     MessageLoop::current()->
@@ -2010,38 +2023,77 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
     // least until after the current task finishes running.
     NS_DispatchToCurrentThread(new DelayedDeleteContentParentTask(this));
 
-    // Destroy any processes created by this ContentParent
-    ContentProcessManager *cpm = ContentProcessManager::GetSingleton();
+    // Release the appId's reference count of any processes
+    // created by this ContentParent and the frame opened by this ContentParent
+    // if this ContentParent crashes.
+    ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
     nsTArray<ContentParentId> childIDArray =
         cpm->GetAllChildProcessById(this->ChildID());
+    if (why == AbnormalShutdown) {
+      nsCOMPtr<nsIPermissionManager> permMgr = services::GetPermissionManager();
+      if(permMgr) {
+        // Release the appId's reference count of its child-processes
+        for (uint32_t i = 0; i < childIDArray.Length(); i++) {
+          nsTArray<TabContext> tabCtxs = cpm->GetTabContextByContentProcess(childIDArray[i]);
+          for (uint32_t j = 0 ; j < tabCtxs.Length() ; j++) {
+            if (tabCtxs[j].OwnOrContainingAppId() != nsIScriptSecurityManager::NO_APP_ID) {
+              permMgr->ReleaseAppId(tabCtxs[j].OwnOrContainingAppId());
+            }
+          }
+        }
+        // Release the appId's reference count belong to itself
+        nsTArray<TabContext> tabCtxs = cpm->GetTabContextByContentProcess(mChildID);
+        for (uint32_t i = 0; i < tabCtxs.Length() ; i++) {
+          if (tabCtxs[i].OwnOrContainingAppId()!= nsIScriptSecurityManager::NO_APP_ID) {
+            permMgr->ReleaseAppId(tabCtxs[i].OwnOrContainingAppId());
+          }
+        }
+      }
+    }
+
+    // Destroy any processes created by this ContentParent
     for(uint32_t i = 0; i < childIDArray.Length(); i++) {
         ContentParent* cp = cpm->GetContentProcessById(childIDArray[i]);
         MessageLoop::current()->PostTask(
             FROM_HERE,
             NewRunnableMethod(cp, &ContentParent::ShutDownProcess,
-                              CLOSE_CHANNEL));
+                              SEND_SHUTDOWN_MESSAGE));
     }
     cpm->RemoveContentProcess(this->ChildID());
+
+    if (mDriverCrashGuard) {
+      mDriverCrashGuard->NotifyCrashed();
+    }
 }
 
 void
-ContentParent::NotifyTabDestroying(PBrowserParent* aTab)
+ContentParent::NotifyTabDestroying(const TabId& aTabId,
+                                   const ContentParentId& aCpId)
 {
+  if (XRE_IsParentProcess()) {
     // There can be more than one PBrowser for a given app process
     // because of popup windows.  PBrowsers can also destroy
     // concurrently.  When all the PBrowsers are destroying, kick off
     // another task to ensure the child process *really* shuts down,
     // even if the PBrowsers themselves never finish destroying.
-    int32_t numLiveTabs = ManagedPBrowserParent().Length();
-    ++mNumDestroyingTabs;
-    if (mNumDestroyingTabs != numLiveTabs) {
+    ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
+    ContentParent* cp = cpm->GetContentProcessById(aCpId);
+    if (!cp) {
+        return;
+    }
+    ++cp->mNumDestroyingTabs;
+    nsTArray<TabId> tabIds = cpm->GetTabParentsByProcessId(aCpId);
+    if (static_cast<size_t>(cp->mNumDestroyingTabs) != tabIds.Length()) {
         return;
     }
 
     // We're dying now, so prevent this content process from being
     // recycled during its shutdown procedure.
-    MarkAsDead();
-    StartForceKillTimer();
+    cp->MarkAsDead();
+    cp->StartForceKillTimer();
+  } else {
+    ContentChild::GetSingleton()->SendNotifyTabDestroying(aTabId, aCpId);
+  }
 }
 
 static int32_t
@@ -2069,16 +2121,15 @@ ContentParent::StartForceKillTimer()
 }
 
 void
-ContentParent::NotifyTabDestroyed(PBrowserParent* aTab,
+ContentParent::NotifyTabDestroyed(const TabId& aTabId,
                                   bool aNotifiedDestroying)
 {
     if (aNotifiedDestroying) {
         --mNumDestroyingTabs;
     }
 
-    TabId id = static_cast<TabParent*>(aTab)->GetTabId();
     nsTArray<PContentPermissionRequestParent*> parentArray =
-        nsContentPermissionUtils::GetContentPermissionRequestParentById(id);
+        nsContentPermissionUtils::GetContentPermissionRequestParentById(aTabId);
 
     // Need to close undeleted ContentPermissionRequestParents before tab is closed.
     for (auto& permissionRequestParent : parentArray) {
@@ -2091,7 +2142,9 @@ ContentParent::NotifyTabDestroyed(PBrowserParent* aTab,
     // There can be more than one PBrowser for a given app process
     // because of popup windows.  When the last one closes, shut
     // us down.
-    if (ManagedPBrowserParent().Length() == 1) {
+    ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
+    nsTArray<TabId> tabIds = cpm->GetTabParentsByProcessId(this->ChildID());
+    if (tabIds.Length() == 1) {
         // In the case of normal shutdown, send a shutdown message to child to
         // allow it to perform shutdown tasks.
         MessageLoop::current()->PostTask(
@@ -2513,12 +2566,12 @@ ContentParent::RecvReadPermissions(InfallibleTArray<IPC::Permission>* aPermissio
         enumerator->GetNext(getter_AddRefs(supp));
         nsCOMPtr<nsIPermission> perm = do_QueryInterface(supp);
 
-        nsCString host;
-        perm->GetHost(host);
-        uint32_t appId;
-        perm->GetAppId(&appId);
-        bool isInBrowserElement;
-        perm->GetIsInBrowserElement(&isInBrowserElement);
+        nsCOMPtr<nsIPrincipal> principal;
+        perm->GetPrincipal(getter_AddRefs(principal));
+        nsCString origin;
+        if (principal) {
+            principal->GetOrigin(origin);
+        }
         nsCString type;
         perm->GetType(type);
         uint32_t capability;
@@ -2528,8 +2581,7 @@ ContentParent::RecvReadPermissions(InfallibleTArray<IPC::Permission>* aPermissio
         int64_t expireTime;
         perm->GetExpireTime(&expireTime);
 
-        aPermissions->AppendElement(IPC::Permission(host, appId,
-                                                    isInBrowserElement, type,
+        aPermissions->AppendElement(IPC::Permission(origin, type,
                                                     capability, expireType,
                                                     expireTime));
     }
@@ -2574,33 +2626,51 @@ ContentParent::RecvSetClipboard(const IPCDataTransfer& aDataTransfer,
 
         NS_ENSURE_SUCCESS(rv, true);
       } else if (item.data().type() == IPCDataTransferData::TnsCString) {
-        const IPCDataTransferImage& imageDetails = item.imageDetails();
-        const gfxIntSize size(imageDetails.width(), imageDetails.height());
-        if (!size.width || !size.height) {
-          return true;
+        if (item.flavor().EqualsLiteral(kJPEGImageMime) ||
+            item.flavor().EqualsLiteral(kJPGImageMime) ||
+            item.flavor().EqualsLiteral(kPNGImageMime) ||
+            item.flavor().EqualsLiteral(kGIFImageMime)) {
+          const IPCDataTransferImage& imageDetails = item.imageDetails();
+          const gfxIntSize size(imageDetails.width(), imageDetails.height());
+          if (!size.width || !size.height) {
+            return true;
+          }
+
+          nsCString text = item.data().get_nsCString();
+          mozilla::RefPtr<gfx::DataSourceSurface> image =
+            new mozilla::gfx::SourceSurfaceRawData();
+          mozilla::gfx::SourceSurfaceRawData* raw =
+            static_cast<mozilla::gfx::SourceSurfaceRawData*>(image.get());
+          raw->InitWrappingData(
+            reinterpret_cast<uint8_t*>(const_cast<nsCString&>(text).BeginWriting()),
+            size, imageDetails.stride(),
+            static_cast<mozilla::gfx::SurfaceFormat>(imageDetails.format()), false);
+          raw->GuaranteePersistance();
+
+          nsRefPtr<gfxDrawable> drawable = new gfxSurfaceDrawable(image, size);
+          nsCOMPtr<imgIContainer> imageContainer(image::ImageOps::CreateFromDrawable(drawable));
+
+          nsCOMPtr<nsISupportsInterfacePointer>
+            imgPtr(do_CreateInstance(NS_SUPPORTS_INTERFACE_POINTER_CONTRACTID, &rv));
+
+          rv = imgPtr->SetData(imageContainer);
+          NS_ENSURE_SUCCESS(rv, true);
+
+          trans->SetTransferData(item.flavor().get(), imgPtr, sizeof(nsISupports*));
+        } else {
+          nsCOMPtr<nsISupportsCString> dataWrapper =
+            do_CreateInstance(NS_SUPPORTS_CSTRING_CONTRACTID, &rv);
+          NS_ENSURE_SUCCESS(rv, true);
+
+          const nsCString& text = item.data().get_nsCString();
+          rv = dataWrapper->SetData(text);
+          NS_ENSURE_SUCCESS(rv, true);
+
+          rv = trans->SetTransferData(item.flavor().get(), dataWrapper,
+                                      text.Length());
+
+          NS_ENSURE_SUCCESS(rv, true);
         }
-
-        nsCString text = item.data().get_nsCString();
-        mozilla::RefPtr<gfx::DataSourceSurface> image =
-          new mozilla::gfx::SourceSurfaceRawData();
-        mozilla::gfx::SourceSurfaceRawData* raw =
-          static_cast<mozilla::gfx::SourceSurfaceRawData*>(image.get());
-        raw->InitWrappingData(
-          reinterpret_cast<uint8_t*>(const_cast<nsCString&>(text).BeginWriting()),
-          size, imageDetails.stride(),
-          static_cast<mozilla::gfx::SurfaceFormat>(imageDetails.format()), false);
-        raw->GuaranteePersistance();
-
-        nsRefPtr<gfxDrawable> drawable = new gfxSurfaceDrawable(image, size);
-        nsCOMPtr<imgIContainer> imageContainer(image::ImageOps::CreateFromDrawable(drawable));
-
-        nsCOMPtr<nsISupportsInterfacePointer>
-          imgPtr(do_CreateInstance(NS_SUPPORTS_INTERFACE_POINTER_CONTRACTID, &rv));
-
-        rv = imgPtr->SetData(imageContainer);
-        NS_ENSURE_SUCCESS(rv, true);
-
-        trans->SetTransferData(item.flavor().get(), imgPtr, sizeof(nsISupports*));
       }
     }
 
@@ -3802,22 +3872,6 @@ ContentParent::RecvPPresentationConstructor(PPresentationParent* aActor)
   return static_cast<PresentationParent*>(aActor)->Init();
 }
 
-asmjscache::PAsmJSCacheEntryParent*
-ContentParent::AllocPAsmJSCacheEntryParent(
-                                    const asmjscache::OpenMode& aOpenMode,
-                                    const asmjscache::WriteParams& aWriteParams,
-                                    const IPC::Principal& aPrincipal)
-{
-    return asmjscache::AllocEntryParent(aOpenMode, aWriteParams, aPrincipal);
-}
-
-bool
-ContentParent::DeallocPAsmJSCacheEntryParent(PAsmJSCacheEntryParent* aActor)
-{
-    asmjscache::DeallocEntryParent(aActor);
-    return true;
-}
-
 PSpeechSynthesisParent*
 ContentParent::AllocPSpeechSynthesisParent()
 {
@@ -4216,13 +4270,14 @@ ContentParent::GetConsoleService()
         return mConsoleService.get();
     }
 
+    // XXXkhuey everything about this is terrible.
     // Get the ConsoleService by CID rather than ContractID, so that we
     // can cast the returned pointer to an nsConsoleService (rather than
     // just an nsIConsoleService). This allows us to call the non-idl function
     // nsConsoleService::LogMessageWithMode.
     NS_DEFINE_CID(consoleServiceCID, NS_CONSOLESERVICE_CID);
-    nsCOMPtr<nsConsoleService>  consoleService(do_GetService(consoleServiceCID));
-    mConsoleService = consoleService;
+    nsCOMPtr<nsIConsoleService> consoleService(do_GetService(consoleServiceCID));
+    mConsoleService = static_cast<nsConsoleService*>(consoleService.get());
     return mConsoleService.get();
 }
 
@@ -4549,30 +4604,34 @@ ContentParent::RecvAddIdleObserver(const uint64_t& aObserver, const uint32_t& aI
 {
     nsresult rv;
     nsCOMPtr<nsIIdleService> idleService =
-      do_GetService("@mozilla.org/widget/idleservice;1", &rv);
+        do_GetService("@mozilla.org/widget/idleservice;1", &rv);
     NS_ENSURE_SUCCESS(rv, false);
 
-    nsRefPtr<ParentIdleListener> listener = new ParentIdleListener(this, aObserver);
-    mIdleListeners.Put(aObserver, listener);
-    idleService->AddIdleObserver(listener, aIdleTimeInS);
+    nsRefPtr<ParentIdleListener> listener =
+        new ParentIdleListener(this, aObserver, aIdleTimeInS);
+    rv = idleService->AddIdleObserver(listener, aIdleTimeInS);
+    NS_ENSURE_SUCCESS(rv, false);
+    mIdleListeners.AppendElement(listener);
     return true;
 }
 
 bool
 ContentParent::RecvRemoveIdleObserver(const uint64_t& aObserver, const uint32_t& aIdleTimeInS)
 {
-    nsresult rv;
-    nsCOMPtr<nsIIdleService> idleService =
-      do_GetService("@mozilla.org/widget/idleservice;1", &rv);
-    NS_ENSURE_SUCCESS(rv, false);
-
     nsRefPtr<ParentIdleListener> listener;
-    bool found = mIdleListeners.Get(aObserver, &listener);
-    if (found) {
-        mIdleListeners.Remove(aObserver);
-        idleService->RemoveIdleObserver(listener, aIdleTimeInS);
+    for (int32_t i = mIdleListeners.Length() - 1; i >= 0; --i) {
+        listener = static_cast<ParentIdleListener*>(mIdleListeners[i].get());
+        if (listener->mObserver == aObserver &&
+            listener->mTime == aIdleTimeInS) {
+            nsresult rv;
+            nsCOMPtr<nsIIdleService> idleService =
+                do_GetService("@mozilla.org/widget/idleservice;1", &rv);
+            NS_ENSURE_SUCCESS(rv, false);
+            idleService->RemoveIdleObserver(listener, aIdleTimeInS);
+            mIdleListeners.RemoveElementAt(i);
+            break;
+        }
     }
-
     return true;
 }
 
@@ -4774,8 +4833,12 @@ ContentParent::AllocateTabId(const TabId& aOpenerTabId,
 {
     TabId tabId;
     if (XRE_IsParentProcess()) {
-        ContentProcessManager *cpm = ContentProcessManager::GetSingleton();
+        ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
         tabId = cpm->AllocateTabId(aOpenerTabId, aContext, aCpId);
+        // Add appId's reference count in oop case
+        if (tabId) {
+          PermissionManagerAddref(aCpId, tabId);
+        }
     }
     else {
         ContentChild::GetSingleton()->SendAllocateTabId(aOpenerTabId,
@@ -4788,14 +4851,27 @@ ContentParent::AllocateTabId(const TabId& aOpenerTabId,
 
 /*static*/ void
 ContentParent::DeallocateTabId(const TabId& aTabId,
-                               const ContentParentId& aCpId)
+                               const ContentParentId& aCpId,
+                               bool aMarkedDestroying)
 {
     if (XRE_IsParentProcess()) {
+        // Release appId's reference count in oop case
+        if (aTabId) {
+          PermissionManagerRelease(aCpId, aTabId);
+        }
+
+        ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
+        ContentParent* cp = cpm->GetContentProcessById(aCpId);
+
+        cp->NotifyTabDestroyed(aTabId, aMarkedDestroying);
+
         ContentProcessManager::GetSingleton()->DeallocateTabId(aCpId,
                                                                aTabId);
     }
     else {
-        ContentChild::GetSingleton()->SendDeallocateTabId(aTabId);
+        ContentChild::GetSingleton()->SendDeallocateTabId(aTabId,
+                                                          aCpId,
+                                                          aMarkedDestroying);
     }
 }
 
@@ -4813,9 +4889,19 @@ ContentParent::RecvAllocateTabId(const TabId& aOpenerTabId,
 }
 
 bool
-ContentParent::RecvDeallocateTabId(const TabId& aTabId)
+ContentParent::RecvDeallocateTabId(const TabId& aTabId,
+                                   const ContentParentId& aCpId,
+                                   const bool& aMarkedDestroying)
 {
-    DeallocateTabId(aTabId, this->ChildID());
+    DeallocateTabId(aTabId, aCpId, aMarkedDestroying);
+    return true;
+}
+
+bool
+ContentParent::RecvNotifyTabDestroying(const TabId& aTabId,
+                                       const ContentParentId& aCpId)
+{
+    NotifyTabDestroying(aTabId, aCpId);
     return true;
 }
 
@@ -4986,6 +5072,38 @@ ContentParent::DeallocPContentPermissionRequestParent(PContentPermissionRequestP
     return true;
 }
 
+/* static */ bool
+ContentParent::PermissionManagerAddref(const ContentParentId& aCpId,
+                                       const TabId& aTabId)
+{
+  MOZ_ASSERT(XRE_IsParentProcess(),
+             "Call PermissionManagerAddref in content process!");
+  ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
+  uint32_t appId = cpm->GetAppIdByProcessAndTabId(aCpId, aTabId);
+  nsCOMPtr<nsIPermissionManager> permMgr = services::GetPermissionManager();
+  if (appId != nsIScriptSecurityManager::NO_APP_ID && permMgr) {
+    permMgr->AddrefAppId(appId);
+    return true;
+  }
+  return false;
+}
+
+/* static */ bool
+ContentParent::PermissionManagerRelease(const ContentParentId& aCpId,
+                                        const TabId& aTabId)
+{
+  MOZ_ASSERT(XRE_IsParentProcess(),
+             "Call PermissionManagerRelease in content process!");
+  ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
+  uint32_t appId = cpm->GetAppIdByProcessAndTabId(aCpId, aTabId);
+  nsCOMPtr<nsIPermissionManager> permMgr = services::GetPermissionManager();
+  if (appId != nsIScriptSecurityManager::NO_APP_ID && permMgr) {
+    permMgr->ReleaseAppId(appId);
+    return true;
+  }
+  return false;
+}
+
 bool
 ContentParent::RecvGetBrowserConfiguration(const nsCString& aURI, BrowserConfiguration* aConfig)
 {
@@ -5048,6 +5166,63 @@ ContentParent::RecvProfile(const nsCString& aProfile)
     mGatherer = nullptr;
 #endif
     return true;
+}
+
+bool
+ContentParent::RecvGetGraphicsDeviceInitData(DeviceInitData* aOut)
+{
+  gfxPlatform::GetPlatform()->GetDeviceInitData(aOut);
+  return true;
+}
+
+bool
+ContentParent::RecvBeginDriverCrashGuard(const uint32_t& aGuardType, bool* aOutCrashed)
+{
+  // Only one driver crash guard should be active at a time, per-process.
+  MOZ_ASSERT(!mDriverCrashGuard);
+
+  UniquePtr<gfx::DriverCrashGuard> guard;
+  switch (gfx::CrashGuardType(aGuardType)) {
+    case gfx::CrashGuardType::D3D11Layers:
+      guard = MakeUnique<gfx::D3D11LayersCrashGuard>(this);
+      break;
+    case gfx::CrashGuardType::D3D9Video:
+      guard = MakeUnique<gfx::D3D9VideoCrashGuard>(this);
+      break;
+    case gfx::CrashGuardType::GLContext:
+      guard = MakeUnique<gfx::GLContextCrashGuard>(this);
+      break;
+    default:
+      MOZ_ASSERT_UNREACHABLE("unknown crash guard type");
+      return false;
+  }
+
+  if (guard->Crashed()) {
+    *aOutCrashed = true;
+    return true;
+  }
+
+  *aOutCrashed = false;
+  mDriverCrashGuard = Move(guard);
+  return true;
+}
+
+bool
+ContentParent::RecvEndDriverCrashGuard(const uint32_t& aGuardType)
+{
+  mDriverCrashGuard = nullptr;
+  return true;
+}
+
+bool
+ContentParent::RecvGetDeviceStorageLocation(const nsString& aType,
+                                            nsString* aPath) {
+#ifdef MOZ_WIDGET_ANDROID
+  mozilla::AndroidBridge::GetExternalPublicDirectory(aType, *aPath);
+  return true;
+#else
+  return false;
+#endif
 }
 
 } // namespace dom

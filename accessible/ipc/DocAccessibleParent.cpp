@@ -8,6 +8,7 @@
 #include "nsAutoPtr.h"
 #include "mozilla/a11y/Platform.h"
 #include "ProxyAccessible.h"
+#include "mozilla/dom/TabParent.h"
 
 namespace mozilla {
 namespace a11y {
@@ -101,6 +102,8 @@ DocAccessibleParent::RecvHideEvent(const uint64_t& aRootID)
   if (mShutdown)
     return true;
 
+  CheckDocTree();
+
   ProxyEntry* rootEntry = mAccessibles.GetEntry(aRootID);
   if (!rootEntry) {
     NS_ERROR("invalid root being removed!");
@@ -167,11 +170,16 @@ DocAccessibleParent::AddChildDoc(DocAccessibleParent* aChildDoc,
   return true;
 }
 
-PLDHashOperator
-DocAccessibleParent::ShutdownAccessibles(ProxyEntry* entry, void*)
+bool
+DocAccessibleParent::RecvShutdown()
 {
-  ProxyDestroyed(entry->mProxy);
-  return PL_DHASH_REMOVE;
+  Destroy();
+
+  if (!static_cast<dom::TabParent*>(Manager())->IsDestroyed()) {
+  return PDocAccessibleParent::Send__delete__(this);
+  }
+
+  return true;
 }
 
 void
@@ -186,10 +194,28 @@ DocAccessibleParent::Destroy()
   for (uint32_t i = childDocCount - 1; i < childDocCount; i--)
     mChildDocs[i]->Destroy();
 
-  mAccessibles.EnumerateEntries(ShutdownAccessibles, nullptr);
+  for (auto iter = mAccessibles.Iter(); !iter.Done(); iter.Next()) {
+    ProxyDestroyed(iter.Get()->mProxy);
+    iter.Remove();
+  }
   ProxyDestroyed(this);
-  mParentDoc ? mParentDoc->RemoveChildDoc(this)
-    : GetAccService()->RemoteDocShutdown(this);
+  if (mParentDoc)
+    mParentDoc->RemoveChildDoc(this);
+  else if (IsTopLevel())
+    GetAccService()->RemoteDocShutdown(this);
 }
+
+void
+DocAccessibleParent::CheckDocTree() const
+{
+  size_t childDocs = mChildDocs.Length();
+  for (size_t i = 0; i < childDocs; i++) {
+    if (!mChildDocs[i] || mChildDocs[i]->mParentDoc != this)
+      MOZ_CRASH("document tree is broken!");
+
+    mChildDocs[i]->CheckDocTree();
+  }
 }
-}
+
+} // a11y
+} // mozilla

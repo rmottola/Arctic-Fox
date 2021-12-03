@@ -329,7 +329,7 @@ MediaSource::IsTypeSupported(const GlobalObject&, const nsAString& aType)
 /* static */ bool
 MediaSource::Enabled(JSContext* cx, JSObject* aGlobal)
 {
-return Preferences::GetBool("media.mediasource.enabled");
+  return Preferences::GetBool("media.mediasource.enabled");
 }
 
 void
@@ -407,7 +407,6 @@ MediaSource::Detach()
     return;
   }
   mMediaElement = nullptr;
-  mFirstSourceBufferInitialized = false;
   SetReadyState(MediaSourceReadyState::Closed);
   if (mActiveSourceBuffers) {
     mActiveSourceBuffers->Clear();
@@ -424,7 +423,6 @@ MediaSource::MediaSource(nsPIDOMWindow* aWindow)
   , mDecoder(nullptr)
   , mPrincipal(nullptr)
   , mReadyState(MediaSourceReadyState::Closed)
-  , mFirstSourceBufferInitialized(false)
 {
   MOZ_ASSERT(NS_IsMainThread());
   mSourceBuffers = new SourceBufferList(this);
@@ -514,44 +512,6 @@ MediaSource::NotifyEvicted(double aStart, double aEnd)
   // the given range.
   mSourceBuffers->Evict(aStart, aEnd);
 }
-
-void
-MediaSource::QueueInitializationEvent()
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  if (mFirstSourceBufferInitialized) {
-    return;
-  }
-  mFirstSourceBufferInitialized = true;
-  MSE_DEBUG("");
-  nsCOMPtr<nsIRunnable> task =
-    NS_NewRunnableMethod(this, &MediaSource::InitializationEvent);
-  NS_DispatchToMainThread(task);
-}
-
-void
-MediaSource::InitializationEvent()
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  MSE_DEBUG("");
-  if (mDecoder) {
-    mDecoder->PrepareReaderInitialization();
-  }
-}
-
-#if defined(DEBUG)
-void
-MediaSource::Dump(const char* aPath)
-{
-  char buf[255];
-  PR_snprintf(buf, sizeof(buf), "%s/mediasource-%p", aPath, this);
-  PR_MkDir(buf, 0700);
-
-  if (mSourceBuffers) {
-    mSourceBuffers->Dump(buf);
-  }
-}
-#endif
 
 void
 MediaSource::GetMozDebugReaderData(nsAString& aString)

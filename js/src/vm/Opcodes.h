@@ -769,7 +769,7 @@
      *   Stack: callee, this, args[0], ..., args[argc-1], newTarget => rval
      *   nuses: (argc+3)
      */ \
-    macro(JSOP_NEW,       82, js_new_str,   NULL,         3, -1,  1,  JOF_UINT16|JOF_INVOKE|JOF_TYPESET) \
+    macro(JSOP_NEW,       82, "new",   NULL,         3, -1,  1,  JOF_UINT16|JOF_INVOKE|JOF_TYPESET) \
     /*
      * Pushes newly created object onto the stack with provided [[Prototype]].
      *
@@ -1517,10 +1517,10 @@
     /*
      * Push "new.target"
      *
-     *  Category: Variables and Scopes
-     *  Type: Arguments
-     *  Operands:
-     *  Stack: => new.target
+     *   Category: Variables and Scopes
+     *   Type: Arguments
+     *   Operands:
+     *   Stack: => new.target
      */ \
     macro(JSOP_NEWTARGET,  148, "newtarget", NULL,      1,  0,  1,  JOF_BYTE) \
     \

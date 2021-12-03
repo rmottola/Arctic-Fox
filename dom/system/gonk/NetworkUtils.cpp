@@ -440,7 +440,6 @@ CommandResult::CommandResult(int32_t aResultCode)
     strerror_r(abs(aResultCode), strerrorBuf, STRERROR_R_BUF_SIZE);
     mResult.mReason = NS_ConvertUTF8toUTF16(strerrorBuf);
   }
-  mResult.mRet = true;
 }
 
 CommandResult::CommandResult(const mozilla::dom::NetworkResultOptions& aResult)
@@ -1498,11 +1497,13 @@ void NetworkUtils::ExecuteCommand(NetworkParams aOptions)
     BUILD_ENTRY(updateUpStream),
     BUILD_ENTRY(configureInterface),
     BUILD_ENTRY(dhcpRequest),
+    BUILD_ENTRY(stopDhcp),
     BUILD_ENTRY(enableInterface),
     BUILD_ENTRY(disableInterface),
     BUILD_ENTRY(resetConnections),
     BUILD_ENTRY(createNetwork),
     BUILD_ENTRY(destroyNetwork),
+    BUILD_ENTRY(getNetId),
 
     #undef BUILD_ENTRY
   };
@@ -1672,6 +1673,7 @@ CommandResult NetworkUtils::setDNS(NetworkParams& aOptions)
     // Lollipop.
     static CommandFunc COMMAND_CHAIN[] = {
       setInterfaceDns,
+      addDefaultRouteToNetwork,
       defaultAsyncSuccessHandler
     };
     NetIdManager::NetIdInfo netIdInfo;
@@ -1685,7 +1687,12 @@ CommandResult NetworkUtils::setDNS(NetworkParams& aOptions)
   if (SDK_VERSION >= 18) {
     // JB, KK.
     static CommandFunc COMMAND_CHAIN[] = {
+    #if ANDROID_VERSION == 18
+      // Since we don't use per-interface DNS lookup feature on JB,
+      // we need to set the default DNS interface whenever setting the
+      // DNS name server.
       setDefaultInterface,
+    #endif
       setInterfaceDns,
       defaultAsyncSuccessHandler
     };
@@ -1707,6 +1714,11 @@ CommandResult NetworkUtils::configureInterface(NetworkParams& aOptions)
     aOptions.mDns1_long,
     aOptions.mDns2_long
   );
+}
+
+CommandResult NetworkUtils::stopDhcp(NetworkParams& aOptions)
+{
+  return mNetUtils->do_dhcp_stop(GET_CHAR(mIfname));
 }
 
 CommandResult NetworkUtils::dhcpRequest(NetworkParams& aOptions) {
@@ -1863,6 +1875,17 @@ CommandResult NetworkUtils::setDefaultRouteLegacy(NetworkParams& aOptions)
     } else { /* type == AF_INET */
       RETURN_IF_FAILED(mNetUtils->do_ifc_set_default_route(autoIfname.get(), inet_addr(gateway)));
     }
+  }
+
+  // Set the default DNS interface.
+  if (SDK_VERSION >= 18) {
+    // For JB, KK only.
+    static CommandFunc COMMAND_CHAIN[] = {
+      setDefaultInterface,
+      defaultAsyncSuccessHandler
+    };
+    runChain(aOptions, COMMAND_CHAIN, setDnsFail);
+    return CommandResult::Pending();
   }
 
   return SUCCESS;
@@ -2480,6 +2503,27 @@ CommandResult NetworkUtils::destroyNetwork(NetworkParams& aOptions)
   aOptions.mNetId = netIdInfo.mNetId;
   runChain(aOptions, COMMAND_CHAIN, defaultAsyncFailureHandler);
   return CommandResult::Pending();
+}
+
+/**
+ * Query the netId associated with the given network interface name.
+ */
+CommandResult NetworkUtils::getNetId(NetworkParams& aOptions)
+{
+  NetworkResultOptions result;
+
+  if (SDK_VERSION < 20) {
+    // For pre-Lollipop, use the interface name as the fallback.
+    result.mNetId = GET_FIELD(mIfname);
+    return result;
+  }
+
+  NetIdManager::NetIdInfo netIdInfo;
+  if (-1 == mNetIdManager.lookup(GET_FIELD(mIfname), &netIdInfo)) {
+    return ESRCH;
+  }
+  result.mNetId.AppendInt(netIdInfo.mNetId, 10);
+  return result;
 }
 
 void NetworkUtils::sendBroadcastMessage(uint32_t code, char* reason)

@@ -31,8 +31,6 @@
 #include "mozilla/dom/ExternalHelperAppChild.h"
 #include "mozilla/dom/ProcessGlobal.h"
 #include "mozilla/dom/Promise.h"
-#include "mozilla/dom/asmjscache/AsmJSCache.h"
-#include "mozilla/dom/asmjscache/PAsmJSCacheEntryChild.h"
 #include "mozilla/dom/nsIContentChild.h"
 #include "mozilla/psm/PSMContentListener.h"
 #include "mozilla/hal_sandbox/PHalChild.h"
@@ -51,6 +49,7 @@
 #include "mozilla/plugins/PluginModuleParent.h"
 #include "mozilla/widget/WidgetMessageUtils.h"
 #include "mozilla/media/MediaChild.h"
+#include "mozilla/BasePrincipal.h"
 
 #if defined(MOZ_CONTENT_SANDBOX)
 #if defined(XP_WIN)
@@ -609,7 +608,6 @@ ContentChild::Init(MessageLoop* aIOLoop,
                    IPC::Channel* aChannel)
 {
 #ifdef MOZ_WIDGET_GTK
-    // sigh
     gtk_init(nullptr, nullptr);
 #endif
 
@@ -758,6 +756,14 @@ ContentChild::AppendProcessId(nsACString& aName)
 }
 
 void
+ContentChild::InitGraphicsDeviceData()
+{
+    // Initialize the graphics platform. This may contact the parent process
+    // to read device preferences.
+    gfxPlatform::GetPlatform();
+}
+
+void
 ContentChild::InitXPCOM()
 {
     // Do this as early as possible to get the parent process to initialize the
@@ -883,6 +889,32 @@ NS_IMPL_ISUPPORTS(
 , nsIMemoryReporterCallback
 )
 
+class MemoryReportFinishedCallback final : public nsIFinishReportingCallback
+{
+public:
+    NS_DECL_ISUPPORTS
+
+    explicit MemoryReportFinishedCallback(MemoryReportRequestChild* aActor)
+    : mActor(aActor)
+    {
+    }
+
+    NS_IMETHOD Callback(nsISupports* aUnused) override
+    {
+        bool sent = PMemoryReportRequestChild::Send__delete__(mActor);
+        return sent ? NS_OK : NS_ERROR_FAILURE;
+    }
+
+private:
+    ~MemoryReportFinishedCallback() {}
+
+    nsRefPtr<MemoryReportRequestChild> mActor;
+};
+NS_IMPL_ISUPPORTS(
+  MemoryReportFinishedCallback
+, nsIFinishReportingCallback
+)
+
 bool
 ContentChild::RecvPMemoryReportRequestConstructor(
     PMemoryReportRequestChild* aChild,
@@ -919,11 +951,12 @@ NS_IMETHODIMP MemoryReportRequestChild::Run()
     // MemoryReport.
     nsRefPtr<MemoryReportCallback> cb =
         new MemoryReportCallback(this, process);
-    mgr->GetReportsForThisProcessExtended(cb, nullptr, mAnonymize,
-                                          FileDescriptorToFILE(mDMDFile, "wb"));
+    nsRefPtr<MemoryReportFinishedCallback> finished =
+        new MemoryReportFinishedCallback(this);
 
-    bool sent = Send__delete__(this);
-    return sent ? NS_OK : NS_ERROR_FAILURE;
+    return mgr->GetReportsForThisProcessExtended(cb, nullptr, mAnonymize,
+                                                 FileDescriptorToFILE(mDMDFile, "wb"),
+                                                 finished, nullptr);
 }
 
 bool
@@ -1434,23 +1467,6 @@ ContentChild::DeallocPIccChild(PIccChild* aActor)
 {
     // IccChild is refcounted, must not be freed manually.
     static_cast<IccChild*>(aActor)->Release();
-    return true;
-}
-
-asmjscache::PAsmJSCacheEntryChild*
-ContentChild::AllocPAsmJSCacheEntryChild(
-                                    const asmjscache::OpenMode& aOpenMode,
-                                    const asmjscache::WriteParams& aWriteParams,
-                                    const IPC::Principal& aPrincipal)
-{
-    NS_NOTREACHED("Should never get here!");
-    return nullptr;
-}
-
-bool
-ContentChild::DeallocPAsmJSCacheEntryChild(PAsmJSCacheEntryChild* aActor)
-{
-    asmjscache::DeallocEntryChild(aActor);
     return true;
 }
 
@@ -2091,18 +2107,15 @@ ContentChild::RecvAddPermission(const IPC::Permission& permission)
     MOZ_ASSERT(permissionManager,
                "We have no permissionManager in the Content process !");
 
+    nsAutoCString originNoSuffix;
+    OriginAttributes attrs;
+    attrs.PopulateFromOrigin(permission.origin, originNoSuffix);
+
     nsCOMPtr<nsIURI> uri;
-    NS_NewURI(getter_AddRefs(uri), NS_LITERAL_CSTRING("http://") + nsCString(permission.host));
-    NS_ENSURE_TRUE(uri, true);
-
-    nsIScriptSecurityManager* secMan = nsContentUtils::GetSecurityManager();
-    MOZ_ASSERT(secMan);
-
-    nsCOMPtr<nsIPrincipal> principal;
-    nsresult rv = secMan->GetAppCodebasePrincipal(uri, permission.appId,
-                                                permission.isInBrowserElement,
-                                                getter_AddRefs(principal));
+    nsresult rv = NS_NewURI(getter_AddRefs(uri), originNoSuffix);
     NS_ENSURE_SUCCESS(rv, true);
+
+    nsCOMPtr<nsIPrincipal> principal = mozilla::BasePrincipal::CreateCodebasePrincipal(uri, attrs);
 
     // child processes don't care about modification time.
     int64_t modificationTime = 0;

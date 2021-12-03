@@ -932,7 +932,6 @@ Search.prototype = {
       comment: match.engineName,
       icon: match.iconUrl,
       style: "priority-search",
-      finalCompleteValue: match.url,
       frecency: FRECENCY_DEFAULT
     });
     return true;

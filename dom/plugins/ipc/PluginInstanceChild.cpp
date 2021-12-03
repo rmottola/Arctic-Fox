@@ -403,7 +403,9 @@ PluginInstanceChild::NPN_GetValue(NPNVariable aVar,
         if (!CallNPN_GetValue_NPNVdocumentOrigin(&v, &result)) {
             return NPERR_GENERIC_ERROR;
         }
-        if (result == NPERR_NO_ERROR) {
+        if (result == NPERR_NO_ERROR ||
+            (GetQuirks() &
+                PluginModuleChild::QUIRK_FLASH_RETURN_EMPTY_DOCUMENT_ORIGIN)) {
             *static_cast<char**>(aValue) = ToNewCString(v);
         }
         return result;
@@ -624,6 +626,14 @@ PluginInstanceChild::NPN_SetValue(NPPVariable aVar, void* aValue)
     }
 #endif
 
+    case NPPVpluginIsPlayingAudio: {
+        NPError rv = NPERR_GENERIC_ERROR;
+        if (!CallNPN_SetValue_NPPVpluginIsPlayingAudio((NPBool)(intptr_t)aValue, &rv)) {
+            return NPERR_GENERIC_ERROR;
+        }
+        return rv;
+    }
+
     default:
         MOZ_LOG(GetPluginLog(), LogLevel::Warning,
                ("In PluginInstanceChild::NPN_SetValue: Unhandled NPPVariable %i (%s)",
@@ -760,6 +770,20 @@ PluginInstanceChild::AnswerNPP_SetValue_NPNVprivateModeBool(const bool& value,
 
     NPBool v = value;
     *result = mPluginIface->setvalue(GetNPP(), NPNVprivateModeBool, &v);
+    return true;
+}
+
+bool
+PluginInstanceChild::AnswerNPP_SetValue_NPNVmuteAudioBool(const bool& value,
+                                                          NPError* result)
+{
+    if (!mPluginIface->setvalue) {
+        *result = NPERR_GENERIC_ERROR;
+        return true;
+    }
+
+    NPBool v = value;
+    *result = mPluginIface->setvalue(GetNPP(), NPNVmuteAudioBool, &v);
     return true;
 }
 
@@ -3797,39 +3821,6 @@ PluginInstanceChild::AsyncCall(PluginThreadCallback aFunc, void* aUserData)
     ProcessChild::message_loop()->PostTask(FROM_HERE, task);
 }
 
-static PLDHashOperator
-InvalidateObject(DeletingObjectEntry* e, void* userArg)
-{
-    NPObject* o = e->GetKey();
-    if (!e->mDeleted && o->_class && o->_class->invalidate)
-        o->_class->invalidate(o);
-
-    return PL_DHASH_NEXT;
-}
-
-static PLDHashOperator
-DeleteObject(DeletingObjectEntry* e, void* userArg)
-{
-    NPObject* o = e->GetKey();
-    if (!e->mDeleted) {
-        e->mDeleted = true;
-
-#ifdef NS_BUILD_REFCNT_LOGGING
-        {
-            int32_t refcnt = o->referenceCount;
-            while (refcnt) {
-                --refcnt;
-                NS_LOG_RELEASE(o, refcnt, "NPObject");
-            }
-        }
-#endif
-
-        PluginModuleChild::DeallocNPObject(o);
-    }
-
-    return PL_DHASH_NEXT;
-}
-
 void
 PluginInstanceChild::SwapSurfaces()
 {
@@ -3937,6 +3928,42 @@ PluginInstanceChild::ClearAllSurfaces()
 #endif
 }
 
+static void
+InvalidateObjects(nsTHashtable<DeletingObjectEntry>& aEntries)
+{
+    for (auto iter = aEntries.Iter(); !iter.Done(); iter.Next()) {
+        DeletingObjectEntry* e = iter.Get();
+        NPObject* o = e->GetKey();
+        if (!e->mDeleted && o->_class && o->_class->invalidate) {
+            o->_class->invalidate(o);
+        }
+    }
+}
+
+static void
+DeleteObjects(nsTHashtable<DeletingObjectEntry>& aEntries)
+{
+    for (auto iter = aEntries.Iter(); !iter.Done(); iter.Next()) {
+        DeletingObjectEntry* e = iter.Get();
+        NPObject* o = e->GetKey();
+        if (!e->mDeleted) {
+            e->mDeleted = true;
+
+#ifdef NS_BUILD_REFCNT_LOGGING
+            {
+                int32_t refcnt = o->referenceCount;
+                while (refcnt) {
+                    --refcnt;
+                    NS_LOG_RELEASE(o, refcnt, "NPObject");
+                }
+            }
+#endif
+
+            PluginModuleChild::DeallocNPObject(o);
+        }
+    }
+}
+
 void
 PluginInstanceChild::Destroy()
 {
@@ -3991,8 +4018,8 @@ PluginInstanceChild::Destroy()
     mDeletingHash = new nsTHashtable<DeletingObjectEntry>;
     PluginScriptableObjectChild::NotifyOfInstanceShutdown(this);
 
-    mDeletingHash->EnumerateEntries(InvalidateObject, nullptr);
-    mDeletingHash->EnumerateEntries(DeleteObject, nullptr);
+    InvalidateObjects(*mDeletingHash);
+    DeleteObjects(*mDeletingHash);
 
     // Null out our cached actors as they should have been killed in the
     // PluginInstanceDestroyed call above.

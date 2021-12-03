@@ -6,6 +6,10 @@
 
 #include "BroadcastChannelParent.h"
 #include "FileDescriptorSetParent.h"
+#ifdef MOZ_WEBRTC
+#include "CamerasParent.h"
+#endif
+#include "mozilla/media/MediaParent.h"
 #include "mozilla/AppProcessChecker.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/dom/ContentParent.h"
@@ -13,6 +17,7 @@
 #include "mozilla/dom/PBlobParent.h"
 #include "mozilla/dom/MessagePortParent.h"
 #include "mozilla/dom/ServiceWorkerRegistrar.h"
+#include "mozilla/dom/asmjscache/AsmJSCache.h"
 #include "mozilla/dom/cache/ActorUtils.h"
 #include "mozilla/dom/indexedDB/ActorsParent.h"
 #include "mozilla/dom/ipc/BlobParent.h"
@@ -38,6 +43,7 @@
 #endif
 
 using mozilla::ipc::AssertIsOnBackgroundThread;
+using mozilla::dom::asmjscache::PAsmJSCacheEntryParent;
 using mozilla::dom::cache::PCacheParent;
 using mozilla::dom::cache::PCacheStorageParent;
 using mozilla::dom::cache::PCacheStreamControlParent;
@@ -280,6 +286,35 @@ BackgroundParentImpl::DeallocPVsyncParent(PVsyncParent* aActor)
   return true;
 }
 
+camera::PCamerasParent*
+BackgroundParentImpl::AllocPCamerasParent()
+{
+  AssertIsInMainProcess();
+  AssertIsOnBackgroundThread();
+
+#ifdef MOZ_WEBRTC
+  nsRefPtr<mozilla::camera::CamerasParent> actor =
+      mozilla::camera::CamerasParent::Create();
+  return actor.forget().take();
+#else
+  return nullptr;
+#endif
+}
+
+bool
+BackgroundParentImpl::DeallocPCamerasParent(camera::PCamerasParent *aActor)
+{
+  AssertIsInMainProcess();
+  AssertIsOnBackgroundThread();
+  MOZ_ASSERT(aActor);
+
+#ifdef MOZ_WEBRTC
+  nsRefPtr<mozilla::camera::CamerasParent> actor =
+      dont_AddRef(static_cast<mozilla::camera::CamerasParent*>(aActor));
+#endif
+  return true;
+}
+
 namespace {
 
 class InitUDPSocketParentCallback final : public nsRunnable
@@ -369,7 +404,7 @@ BackgroundParentImpl::DeallocPUDPSocketParent(PUDPSocketParent* actor)
 mozilla::dom::PBroadcastChannelParent*
 BackgroundParentImpl::AllocPBroadcastChannelParent(
                                             const PrincipalInfo& aPrincipalInfo,
-                                            const nsString& aOrigin,
+                                            const nsCString& aOrigin,
                                             const nsString& aChannel,
                                             const bool& aPrivateBrowsing)
 {
@@ -387,7 +422,7 @@ class CheckPrincipalRunnable final : public nsRunnable
 public:
   CheckPrincipalRunnable(already_AddRefed<ContentParent> aParent,
                          const PrincipalInfo& aPrincipalInfo,
-                         const nsString& aOrigin)
+                         const nsCString& aOrigin)
     : mContentParent(aParent)
     , mPrincipalInfo(aPrincipalInfo)
     , mOrigin(aOrigin)
@@ -430,16 +465,15 @@ public:
       return NS_OK;
     }
 
-    nsCOMPtr<nsIURI> uri;
-    rv = NS_NewURI(getter_AddRefs(uri), mOrigin);
-    if (NS_FAILED(rv) || !uri) {
-      mContentParent->KillHard("BroadcastChannel killed: invalid origin URI.");
+    nsAutoCString origin;
+    rv = principal->GetOrigin(origin);
+    if (NS_FAILED(rv)) {
+      mContentParent->KillHard("BroadcastChannel killed: principal::GetOrigin failed.");
       return NS_OK;
     }
 
-    rv = principal->CheckMayLoad(uri, false, false);
-    if (NS_FAILED(rv)) {
-      mContentParent->KillHard("BroadcastChannel killed: the url cannot be loaded by the principal.");
+    if (NS_WARN_IF(!mOrigin.Equals(origin))) {
+      mContentParent->KillHard("BroadcastChannel killed: origins do not match.");
       return NS_OK;
     }
 
@@ -449,7 +483,7 @@ public:
 private:
   nsRefPtr<ContentParent> mContentParent;
   PrincipalInfo mPrincipalInfo;
-  nsString mOrigin;
+  nsCString mOrigin;
   nsCOMPtr<nsIThread> mBackgroundThread;
 };
 
@@ -459,7 +493,7 @@ bool
 BackgroundParentImpl::RecvPBroadcastChannelConstructor(
                                             PBroadcastChannelParent* actor,
                                             const PrincipalInfo& aPrincipalInfo,
-                                            const nsString& aOrigin,
+                                            const nsCString& aOrigin,
                                             const nsString& aChannel,
                                             const bool& aPrivateBrowsing)
 {
@@ -619,6 +653,30 @@ BackgroundParentImpl::RecvMessagePortForceClose(const nsID& aUUID,
   AssertIsOnBackgroundThread();
 
   return MessagePortParent::ForceClose(aUUID, aDestinationUUID, aSequenceID);
+}
+
+PAsmJSCacheEntryParent*
+BackgroundParentImpl::AllocPAsmJSCacheEntryParent(
+                               const dom::asmjscache::OpenMode& aOpenMode,
+                               const dom::asmjscache::WriteParams& aWriteParams,
+                               const PrincipalInfo& aPrincipalInfo)
+{
+  AssertIsInMainProcess();
+  AssertIsOnBackgroundThread();
+
+  return
+    dom::asmjscache::AllocEntryParent(aOpenMode, aWriteParams, aPrincipalInfo);
+}
+
+bool
+BackgroundParentImpl::DeallocPAsmJSCacheEntryParent(
+                                                 PAsmJSCacheEntryParent* aActor)
+{
+  AssertIsInMainProcess();
+  AssertIsOnBackgroundThread();
+
+  dom::asmjscache::DeallocEntryParent(aActor);
+  return true;
 }
 
 } // namespace ipc

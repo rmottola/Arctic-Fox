@@ -453,7 +453,7 @@ sandbox_convert(JSContext* cx, HandleObject obj, JSType type, MutableHandleValue
 
 static bool
 writeToProto_setProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
-                         JS::MutableHandleValue vp, JS::ObjectOpResult &result)
+                         JS::MutableHandleValue vp, JS::ObjectOpResult& result)
 {
     RootedObject proto(cx);
     if (!JS_GetPrototype(cx, obj, &proto))

@@ -353,6 +353,9 @@ nsMixedContentBlocker::ShouldLoad(bool aHadInsecureImageRedirect,
                       aContentType == nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER;
   aContentType = nsContentUtils::InternalContentPolicyTypeToExternal(aContentType);
 
+  MOZ_ASSERT(aContentType == nsContentUtils::InternalContentPolicyTypeToExternal(aContentType),
+             "We should only see external content policy types here.");
+
   // Assume active (high risk) content and blocked by default
   MixedContentTypes classification = eMixedScript;
   // Make decision to block/reject by default

@@ -42,6 +42,7 @@ const LTECELLINFO_CID =
 const NS_XPCOM_SHUTDOWN_OBSERVER_ID      = "xpcom-shutdown";
 const NS_PREFBRANCH_PREFCHANGE_TOPIC_ID  = "nsPref:changed";
 const NS_NETWORK_ACTIVE_CHANGED_TOPIC_ID = "network-active-changed";
+const NS_DATA_CALL_ERROR_TOPIC_ID        = "data-call-error";
 
 const kPrefRilDebuggingEnabled = "ril.debugging.enabled";
 
@@ -55,6 +56,10 @@ XPCOMUtils.defineLazyServiceGetter(this, "gMobileConnectionMessenger",
 XPCOMUtils.defineLazyServiceGetter(this, "gNetworkManager",
                                    "@mozilla.org/network/manager;1",
                                    "nsINetworkManager");
+
+XPCOMUtils.defineLazyServiceGetter(this, "gIccService",
+                                   "@mozilla.org/icc/iccservice;1",
+                                   "nsIIccService");
 
 XPCOMUtils.defineLazyGetter(this, "gRadioInterfaceLayer", function() {
   let ril = { numRadioInterfaces: 0 };
@@ -387,9 +392,8 @@ MobileConnectionProvider.prototype = {
    * really the case. See bug 787967
    */
   _checkRoamingBetweenOperators: function(aNetworkInfo) {
-    // TODO: Bug 864489 - B2G RIL: use ipdl as IPC in MozIccManager
-    // Should get iccInfo from GonkIccProvider.
-    let iccInfo = this._radioInterface.rilContext.iccInfo;
+    let icc = gIccService.getIccByServiceId(this._clientId);
+    let iccInfo = icc ? icc.iccInfo : null;
     let operator = aNetworkInfo.network;
     let state = aNetworkInfo.state;
 
@@ -533,10 +537,10 @@ MobileConnectionProvider.prototype = {
   updateDataInfo: function(aNewInfo, aBatch = false) {
     // For the data connection, the `connected` flag indicates whether
     // there's an active data call. We get correct `connected` state here.
-    let active = gNetworkManager.active;
+    let active = gNetworkManager.activeNetworkInfo;
     aNewInfo.connected = false;
     if (active &&
-        active.type === Ci.nsINetworkInterface.NETWORK_TYPE_MOBILE &&
+        active.type === Ci.nsINetworkInfo.NETWORK_TYPE_MOBILE &&
         active.serviceId === this._clientId) {
       aNewInfo.connected = true;
     }
@@ -1123,6 +1127,7 @@ function MobileConnectionService() {
 
   Services.prefs.addObserver(kPrefRilDebuggingEnabled, this, false);
   Services.obs.addObserver(this, NS_NETWORK_ACTIVE_CHANGED_TOPIC_ID, false);
+  Services.obs.addObserver(this, NS_DATA_CALL_ERROR_TOPIC_ID, false);
   Services.obs.addObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, false);
 
   debug("init complete");
@@ -1145,6 +1150,7 @@ MobileConnectionService.prototype = {
   _shutdown: function() {
     Services.prefs.removeObserver(kPrefRilDebuggingEnabled, this);
     Services.obs.removeObserver(this, NS_NETWORK_ACTIVE_CHANGED_TOPIC_ID);
+    Services.obs.removeObserver(this, NS_DATA_CALL_ERROR_TOPIC_ID);
     Services.obs.removeObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID);
   },
 
@@ -1414,6 +1420,14 @@ MobileConnectionService.prototype = {
           // Update connected flag only.
           provider.updateDataInfo({});
         }
+        break;
+      case NS_DATA_CALL_ERROR_TOPIC_ID:
+        try {
+          if (aSubject instanceof Ci.nsIRilNetworkInfo) {
+            let rilInfo = aSubject.QueryInterface(Ci.nsIRilNetworkInfo);
+            this.notifyDataError(rilInfo.serviceId, aData);
+          }
+        } catch (e) {}
         break;
       case NS_PREFBRANCH_PREFCHANGE_TOPIC_ID:
         if (aData === kPrefRilDebuggingEnabled) {

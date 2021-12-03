@@ -259,6 +259,12 @@ public:
    * The callee must draw all of aRegionToDraw.
    * This region is relative to 0,0 in the PaintedLayer.
    *
+   * aDirtyRegion, if non-null, contains the total region that is due to be
+   * painted during the transaction, even though only aRegionToDraw should
+   * be drawn during this call. The sum of every aRegionToDraw over the
+   * course of the transaction must equal aDirtyRegion. aDirtyRegion can be
+   * null if the total dirty region is unknown.
+   *
    * aRegionToInvalidate contains a region whose contents have been
    * changed by the layer manager and which must therefore be invalidated.
    * For example, this could be non-empty if a retained layer internally
@@ -279,6 +285,7 @@ public:
   typedef void (* DrawPaintedLayerCallback)(PaintedLayer* aLayer,
                                            gfxContext* aContext,
                                            const nsIntRegion& aRegionToDraw,
+                                           const nsIntRegion* aDirtyRegion,
                                            DrawRegionClip aClip,
                                            const nsIntRegion& aRegionToInvalidate,
                                            void* aCallbackData);
@@ -379,13 +386,6 @@ public:
   enum PaintedLayerCreationHint {
     NONE, SCROLLABLE
   };
-
-  /**
-   * Returns true if aLayer is optimized for the given PaintedLayerCreationHint.
-   */
-  virtual bool IsOptimizedFor(PaintedLayer* aLayer,
-                              PaintedLayerCreationHint aCreationHint)
-  { return true; }
 
   /**
    * CONSTRUCTION PHASE ONLY
@@ -1845,6 +1845,13 @@ public:
 
   bool UsedForReadback() { return mUsedForReadback; }
   void SetUsedForReadback(bool aUsed) { mUsedForReadback = aUsed; }
+
+  /**
+   * Returns true if aLayer is optimized for the given PaintedLayerCreationHint.
+   */
+  virtual bool IsOptimizedFor(LayerManager::PaintedLayerCreationHint aCreationHint)
+  { return true; }
+
   /**
    * Returns the residual translation. Apply this translation when drawing
    * into the PaintedLayer so that when mEffectiveTransform is applied afterwards

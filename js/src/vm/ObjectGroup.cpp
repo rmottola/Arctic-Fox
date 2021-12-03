@@ -819,6 +819,7 @@ ObjectGroup::newArrayObject(ExclusiveContext* cx,
     if (!table) {
         table = cx->new_<ObjectGroupCompartment::ArrayObjectTable>();
         if (!table || !table->init()) {
+            ReportOutOfMemory(cx);
             js_delete(table);
             table = nullptr;
             return nullptr;
@@ -1159,6 +1160,7 @@ ObjectGroup::newPlainObject(ExclusiveContext* cx, IdValuePair* properties, size_
     if (!table) {
         table = cx->new_<ObjectGroupCompartment::PlainObjectTable>();
         if (!table || !table->init()) {
+            ReportOutOfMemory(cx);
             js_delete(table);
             table = nullptr;
             return nullptr;
@@ -1351,6 +1353,7 @@ ObjectGroup::allocationSiteGroup(JSContext* cx, JSScript* script, jsbytecode* pc
     if (!table) {
         table = cx->new_<ObjectGroupCompartment::AllocationSiteTable>();
         if (!table || !table->init()) {
+            ReportOutOfMemory(cx);
             js_delete(table);
             table = nullptr;
             return nullptr;

@@ -74,7 +74,7 @@ nsContentPolicy::~nsContentPolicy()
 inline nsresult
 nsContentPolicy::CheckPolicy(CPMethod          policyMethod,
                              SCPMethod         simplePolicyMethod,
-                             uint32_t          contentType,
+                             nsContentPolicyType contentType,
                              nsIURI           *contentLocation,
                              nsIURI           *requestingLocation,
                              nsISupports      *requestingContext,
@@ -141,7 +141,7 @@ nsContentPolicy::CheckPolicy(CPMethod          policyMethod,
     int32_t count = entries.Count();
     for (int32_t i = 0; i < count; i++) {
         /* check the appropriate policy */
-        rv = (entries[i]->*policyMethod)(contentType, contentLocation,
+        rv = (entries[i]->*policyMethod)(externalType, contentLocation,
                                          requestingLocation, requestingContext,
                                          mimeType, extra, requestPrincipal,
                                          decision);
@@ -186,7 +186,7 @@ nsContentPolicy::CheckPolicy(CPMethod          policyMethod,
     count = simpleEntries.Count();
     for (int32_t i = 0; i < count; i++) {
         /* check the appropriate policy */
-        rv = (simpleEntries[i]->*simplePolicyMethod)(contentType, contentLocation,
+        rv = (simpleEntries[i]->*simplePolicyMethod)(externalType, contentLocation,
                                                      requestingLocation,
                                                      topFrameElement, isTopLevel,
                                                      mimeType, extra, requestPrincipal,

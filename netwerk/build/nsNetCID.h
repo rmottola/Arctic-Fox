@@ -480,6 +480,17 @@
   { 0x92, 0x05, 0xc3, 0x09, 0xce, 0xb2, 0xd6, 0x41 } \
 }
 
+// service implementing nsISchedulingContextService
+#define NS_SCHEDULINGCONTEXTSERVICE_CONTRACTID \
+    "@mozilla.org/network/scheduling-context-service;1"
+#define NS_SCHEDULINGCONTEXTSERVICE_CID \
+{ /* d5499fa7-7ba8-49ff-9e30-1858b99ace69 */ \
+    0xd5499fa7, \
+    0x7ba8, \
+    0x49ff, \
+    {0x93, 0x30, 0x18, 0x58, 0xb9, 0x9a, 0xce, 0x69} \
+}
+
 /******************************************************************************
  * netwerk/cache/ classes
  */
@@ -883,6 +894,16 @@
     0x091a,                                            \
     0x45a6,                                            \
     { 0x85, 0x44, 0x5a, 0x8d, 0x1a, 0xb7, 0x95, 0x37 } \
+}
+
+#define NS_PACKAGEDAPPSERVICE_CONTRACTID \
+    "@mozilla.org/network/packaged-app-service;1"
+#define NS_PACKAGEDAPPSERVICE_CID                      \
+{   /* adef6762-41b9-4470-a06a-dc29cf8de381 */         \
+    0xadef6762,                                        \
+    0x41b9,                                            \
+    0x4470,                                            \
+  { 0xa0, 0x6a, 0xdc, 0x29, 0xcf, 0x8d, 0xe3, 0x81 }   \
 }
 
 

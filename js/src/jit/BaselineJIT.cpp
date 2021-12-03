@@ -245,14 +245,19 @@ jit::BaselineCompile(JSContext* cx, JSScript* script, bool forceDebugInstrumenta
 
     LifoAlloc alloc(TempAllocator::PreferredLifoChunkSize);
     TempAllocator* temp = alloc.new_<TempAllocator>(&alloc);
-    if (!temp)
+    if (!temp) {
+        ReportOutOfMemory(cx);
         return Method_Error;
+    }
 
     JitContext jctx(cx, temp);
 
     BaselineCompiler compiler(cx, *temp, script);
-    if (!compiler.init())
+    if (!compiler.init()) {
+        ReportOutOfMemory(cx);
         return Method_Error;
+    }
+
     if (forceDebugInstrumentation)
         compiler.setCompileDebugInstrumentation();
 
@@ -907,7 +912,6 @@ BaselineScript::initTraceLogger(JSRuntime* runtime, JSScript* script)
         traceLoggerScriptEvent_ = TraceLoggerEvent(logger, TraceLogger_Scripts);
 
     if (TraceLogTextIdEnabled(TraceLogger_Engine) || TraceLogTextIdEnabled(TraceLogger_Scripts)) {
-        AutoWritableJitCode awjc(method_);
         CodeLocationLabel enter(method_, CodeOffsetLabel(traceLoggerEnterToggleOffset_));
         CodeLocationLabel exit(method_, CodeOffsetLabel(traceLoggerExitToggleOffset_));
         Assembler::ToggleToCmp(enter);

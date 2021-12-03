@@ -21,14 +21,18 @@ public:
   // MediaDataDemuxer interface.
   explicit MP3Demuxer(MediaResource* aSource);
   nsRefPtr<InitPromise> Init() override;
-  already_AddRefed<MediaDataDemuxer> Clone() const override;
   bool HasTrackType(TrackInfo::TrackType aType) const override;
   uint32_t GetNumberTracks(TrackInfo::TrackType aType) const override;
   already_AddRefed<MediaTrackDemuxer> GetTrackDemuxer(
       TrackInfo::TrackType aType, uint32_t aTrackNumber) override;
   bool IsSeekable() const override;
-  void NotifyDataArrived(uint32_t aLength, int64_t aOffset) override;
+  void NotifyDataArrived() override;
   void NotifyDataRemoved() override;
+  // Do not shift the calculated buffered range by the start time of the first
+  // decoded frame. The mac MP3 decoder will buffer some samples and the first
+  // frame returned has typically a start time that is non-zero, causing our
+  // buffered range to have a negative start time.
+  bool ShouldComputeStartTime() const override { return false; }
 
 private:
   // Synchronous initialization.
@@ -388,7 +392,6 @@ public:
     media::TimeUnit aTimeThreshold) override;
   int64_t GetResourceOffset() const override;
   media::TimeIntervals GetBuffered() override;
-  int64_t GetEvictionOffset(media::TimeUnit aTime) override;
 
 private:
   // Destructor.
@@ -442,7 +445,7 @@ private:
   double AverageFrameLength() const;
 
   // The (hopefully) MPEG resource.
-  nsRefPtr<MediaResource> mSource;
+  MediaResourceIndex mSource;
 
   // MPEG frame parser used to detect frames and extract side info.
   FrameParser mParser;

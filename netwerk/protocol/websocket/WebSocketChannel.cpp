@@ -1310,10 +1310,10 @@ WebSocketChannel::BeginOpen()
 
 #ifdef MOZ_WIDGET_GONK
   if (mAppId != NECKO_NO_APP_ID) {
-    nsCOMPtr<nsINetworkInterface> activeNetwork;
-    GetActiveNetworkInterface(activeNetwork);
-    mActiveNetwork =
-      new nsMainThreadPtrHolder<nsINetworkInterface>(activeNetwork);
+    nsCOMPtr<nsINetworkInfo> activeNetworkInfo;
+    GetActiveNetworkInfo(activeNetworkInfo);
+    mActiveNetworkInfo =
+      new nsMainThreadPtrHolder<nsINetworkInfo>(activeNetworkInfo);
   }
 #endif
 
@@ -2653,10 +2653,15 @@ WebSocketChannel::ApplyForAdmission()
 
   MOZ_ASSERT(!mCancelable);
 
-  return pps->AsyncResolve(mHttpChannel,
-                           nsIProtocolProxyService::RESOLVE_PREFER_HTTPS_PROXY |
-                           nsIProtocolProxyService::RESOLVE_ALWAYS_TUNNEL,
-                           this, getter_AddRefs(mCancelable));
+  nsresult rv;
+  rv = pps->AsyncResolve(mHttpChannel,
+                         nsIProtocolProxyService::RESOLVE_PREFER_HTTPS_PROXY |
+                         nsIProtocolProxyService::RESOLVE_ALWAYS_TUNNEL,
+                         this, getter_AddRefs(mCancelable));
+  NS_ASSERTION(NS_FAILED(rv) || mCancelable,
+               "nsIProtocolProxyService::AsyncResolve succeeded but didn't "
+               "return a cancelable object!");
+  return rv;
 }
 
 // Called after both OnStartRequest and OnTransportAvailable have
@@ -2783,7 +2788,7 @@ WebSocketChannel::OnProxyAvailable(nsICancelable *aRequest, nsIChannel *aChannel
     return NS_OK;
   }
 
-  MOZ_ASSERT(aRequest == mCancelable);
+  MOZ_ASSERT(!mCancelable || (aRequest == mCancelable));
   mCancelable = nullptr;
 
   nsAutoCString type;
@@ -3720,7 +3725,7 @@ WebSocketChannel::SaveNetworkStats(bool enforce)
 {
 #ifdef MOZ_WIDGET_GONK
   // Check if the active network and app id are valid.
-  if(!mActiveNetwork || mAppId == NECKO_NO_APP_ID) {
+  if(!mActiveNetworkInfo || mAppId == NECKO_NO_APP_ID) {
     return NS_OK;
   }
 
@@ -3746,7 +3751,7 @@ WebSocketChannel::SaveNetworkStats(bool enforce)
   // Create the event to save the network statistics.
   // the event is then dispathed to the main thread.
   nsRefPtr<nsRunnable> event =
-    new SaveNetworkStatsEvent(mAppId, mIsInBrowser, mActiveNetwork,
+    new SaveNetworkStatsEvent(mAppId, mIsInBrowser, mActiveNetworkInfo,
                               countRecv, countSent, false);
   NS_DispatchToMainThread(event);
 

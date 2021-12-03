@@ -15,6 +15,18 @@ loader.lazyImporter(this, "NetUtil", "resource://gre/modules/NetUtil.jsm");
 loader.lazyServiceGetter(this, "gActivityDistributor",
                          "@mozilla.org/network/http-activity-distributor;1",
                          "nsIHttpActivityDistributor");
+let _testing = false;
+Object.defineProperty(this, "gTesting", {
+  get: function() {
+    try {
+      const { gDevTools } = require("resource:///modules/devtools/gDevTools.jsm");
+      _testing = gDevTools.testing;
+    } catch (e) {
+      // gDevTools is not present on B2G.
+    }
+    return _testing;
+  }
+});
 
 ///////////////////////////////////////////////////////////////////////////////
 // Network logging
@@ -207,9 +219,42 @@ NetworkResponseListener.prototype = {
    */
   onStartRequest: function NRL_onStartRequest(aRequest)
   {
+    // Converter will call this again, we should just ignore that.
+    if (this.request)
+      return;
+
     this.request = aRequest;
     this._getSecurityInfo();
     this._findOpenResponse();
+    // We need to track the offset for the onDataAvailable calls where we pass the data
+    // from our pipe to the coverter.
+    this.offset = 0;
+
+    // In the multi-process mode, the conversion happens on the child side while we can
+    // only monitor the channel on the parent side. If the content is gzipped, we have
+    // to unzip it ourself. For that we use the stream converter services.
+    let channel = this.request;
+    if (channel instanceof Ci.nsIEncodedChannel &&
+        channel.contentEncodings &&
+        !channel.applyConversion) {
+      let encodingHeader = channel.getResponseHeader("Content-Encoding");
+      let scs = Cc["@mozilla.org/streamConverters;1"].
+        getService(Ci.nsIStreamConverterService);
+      let encodings = encodingHeader.split(/\s*\t*,\s*\t*/);
+      let nextListener = this;
+      let acceptedEncodings = ["gzip", "deflate", "x-gzip", "x-deflate"];
+      for (let i in encodings) {
+        // There can be multiple conversions applied
+        let enc = encodings[i].toLowerCase();
+        if (acceptedEncodings.indexOf(enc) > -1) {
+          this.converter = scs.asyncConvertData(enc, "uncompressed", nextListener, null);
+          nextListener = this.converter;
+        }
+      }
+      if (this.converter) {
+        this.converter.onStartRequest(this.request, null);
+      }
+    }
     // Asynchronously wait for the data coming from the request.
     this.setAsyncListener(this.sink.inputStream, this);
   },
@@ -372,6 +417,7 @@ NetworkResponseListener.prototype = {
     this.httpActivity = null;
     this.sink = null;
     this.inputStream = null;
+    this.converter = null;
     this.request = null;
     this.owner = null;
   },
@@ -399,15 +445,18 @@ NetworkResponseListener.prototype = {
 
     if (available != -1) {
       if (available != 0) {
-        // Note that passing 0 as the offset here is wrong, but the
-        // onDataAvailable() method does not use the offset, so it does not
-        // matter.
-        this.onDataAvailable(this.request, null, aStream, 0, available);
+        if (this.converter) {
+          this.converter.onDataAvailable(this.request, null, aStream, this.offset, available);
+        } else {
+          this.onDataAvailable(this.request, null, aStream, this.offset, available);
+        }
       }
+      this.offset += available;
       this.setAsyncListener(aStream, this);
     }
     else {
       this.onStreamClose();
+      this.offset = 0;
     }
   },
 }; // NetworkResponseListener.prototype
@@ -712,7 +761,7 @@ NetworkMonitor.prototype = {
     // TODO: one particular test (browser_styleeditor_fetch-from-cache.js) needs
     // the gDevTools.testing check. We will move to a better way to serve its
     // needs in bug 1167188, where this check should be removed.
-    if (!gDevTools.testing && aChannel.loadInfo &&
+    if (!gTesting && aChannel.loadInfo &&
         aChannel.loadInfo.loadingDocument === null &&
         aChannel.loadInfo.loadingPrincipal === Services.scriptSecurityManager.getSystemPrincipal()) {
       return false;
@@ -733,12 +782,6 @@ NetworkMonitor.prototype = {
       }
     }
 
-    if (aChannel.loadInfo) {
-      if (aChannel.loadInfo.contentPolicyType == Ci.nsIContentPolicy.TYPE_BEACON) {
-        return true;
-      }
-    }
-
     if (this.topFrame) {
       let topFrame = NetworkHelper.getTopFrameForRequest(aChannel);
       if (topFrame && topFrame === this.topFrame) {
@@ -749,6 +792,24 @@ NetworkMonitor.prototype = {
     if (this.appId) {
       let appId = NetworkHelper.getAppIdForRequest(aChannel);
       if (appId && appId == this.appId) {
+        return true;
+      }
+    }
+
+    // The following check is necessary because beacon channels don't come
+    // associated with a load group. Bug 1160837 will hopefully introduce a
+    // platform fix that will render the following code entirely useless.
+    if (aChannel.loadInfo &&
+        aChannel.loadInfo.contentPolicyType == Ci.nsIContentPolicy.TYPE_BEACON) {
+      let nonE10sMatch = this.window &&
+                         aChannel.loadInfo.loadingDocument === this.window.document;
+      let e10sMatch = this.topFrame &&
+                      this.topFrame.contentPrincipal &&
+                      this.topFrame.contentPrincipal.equals(aChannel.loadInfo.loadingPrincipal) &&
+                      this.topFrame.contentPrincipal.URI.spec == aChannel.referrer.spec;
+      let b2gMatch = this.appId &&
+                     aChannel.loadInfo.loadingPrincipal.appId === this.appId;
+      if (nonE10sMatch || e10sMatch || b2gMatch) {
         return true;
       }
     }

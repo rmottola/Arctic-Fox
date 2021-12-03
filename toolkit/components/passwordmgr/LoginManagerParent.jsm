@@ -5,12 +5,12 @@
 
 "use strict";
 
-const Cu = Components.utils;
-const Ci = Components.interfaces;
-const Cc = Components.classes;
+const { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
 
+Cu.importGlobalProperties(["URL"]);
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/Task.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "UserAutoCompleteResult",
                                   "resource://gre/modules/LoginManagerContent.jsm");
@@ -20,36 +20,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "AutoCompleteE10S",
 this.EXPORTED_SYMBOLS = [ "LoginManagerParent", "PasswordsMetricsProvider" ];
 
 var gDebug;
-
-function log(...pieces) {
-  function generateLogMessage(args) {
-    let strings = ['Login Manager (parent):'];
-
-    args.forEach(function(arg) {
-      if (typeof arg === 'string') {
-        strings.push(arg);
-      } else if (typeof arg === 'undefined') {
-        strings.push('undefined');
-      } else if (arg === null) {
-        strings.push('null');
-      } else {
-        try {
-          strings.push(JSON.stringify(arg, null, 2));
-        } catch(err) {
-          strings.push("<<something>>");
-        }
-      }
-    });
-    return strings.join(' ');
-  }
-
-  if (!gDebug)
-    return;
-
-  let message = generateLogMessage(pieces);
-  dump(message + "\n");
-  Services.console.logStringMessage(message);
-}
 
 #ifndef ANDROID
 #ifdef MOZ_SERVICES_HEALTHREPORT
@@ -152,6 +122,37 @@ PasswordsMeasurement2.prototype = Object.freeze({
 #endif
 #endif
 
+
+function log(...pieces) {
+  function generateLogMessage(args) {
+    let strings = ['Login Manager (parent):'];
+
+    args.forEach(function(arg) {
+      if (typeof arg === 'string') {
+        strings.push(arg);
+      } else if (typeof arg === 'undefined') {
+        strings.push('undefined');
+      } else if (arg === null) {
+        strings.push('null');
+      } else {
+        try {
+          strings.push(JSON.stringify(arg, null, 2));
+        } catch(err) {
+          strings.push("<<something>>");
+        }
+      }
+    });
+    return strings.join(' ');
+  }
+
+  if (!gDebug)
+    return;
+
+  let message = generateLogMessage(pieces);
+  dump(message + "\n");
+  Services.console.logStringMessage(message);
+}
+
 function prefChanged() {
   gDebug = Services.prefs.getBoolPref("signon.debug");
 }
@@ -169,6 +170,12 @@ var LoginManagerParent = {
     mm.addMessageListener("LoginStats:LoginEncountered", this);
     mm.addMessageListener("LoginStats:LoginFillSuccessful", this);
     Services.obs.addObserver(this, "LoginStats:NewSavedPassword", false);
+
+    XPCOMUtils.defineLazyGetter(this, "recipeParentPromise", () => {
+      const { LoginRecipesParent } = Cu.import("resource://gre/modules/LoginRecipes.jsm", {});
+      let parent = new LoginRecipesParent();
+      return parent.initializationPromise;
+    });
   },
 
   observe: function (aSubject, aTopic, aData) {
@@ -187,11 +194,11 @@ var LoginManagerParent = {
     switch (msg.name) {
       case "RemoteLogins:findLogins": {
         // TODO Verify msg.target's principals against the formOrigin?
-        this.findLogins(data.options.showMasterPassword,
-                        data.formOrigin,
-                        data.actionOrigin,
-                        data.requestId,
-                        msg.target.messageManager);
+        this.sendLoginDataToChild(data.options.showMasterPassword,
+                                  data.formOrigin,
+                                  data.actionOrigin,
+                                  data.requestId,
+                                  msg.target.messageManager);
         break;
       }
 
@@ -232,19 +239,35 @@ var LoginManagerParent = {
     }
   },
 
-  findLogins: function(showMasterPassword, formOrigin, actionOrigin,
-                       requestId, target) {
+  /**
+   * Send relevant data (e.g. logins and recipes) to the child process (LoginManagerContent).
+   */
+  sendLoginDataToChild: Task.async(function*(showMasterPassword, formOrigin, actionOrigin,
+                                             requestId, target) {
+    let recipes = [];
+    if (formOrigin) {
+      let formHost = (new URL(formOrigin)).host;
+      let recipeManager = yield this.recipeParentPromise;
+      recipes = recipeManager.getRecipesForHost(formHost);
+    }
+
     if (!showMasterPassword && !Services.logins.isLoggedIn) {
-      target.sendAsyncMessage("RemoteLogins:loginsFound",
-                              { requestId: requestId, logins: [] });
+      target.sendAsyncMessage("RemoteLogins:loginsFound", {
+        requestId: requestId,
+        logins: [],
+        recipes,
+      });
       return;
     }
 
     let allLoginsCount = Services.logins.countLogins(formOrigin, "", null);
     // If there are no logins for this site, bail out now.
     if (!allLoginsCount) {
-      target.sendAsyncMessage("RemoteLogins:loginsFound",
-                              { requestId: requestId, logins: [] });
+      target.sendAsyncMessage("RemoteLogins:loginsFound", {
+        requestId: requestId,
+        logins: [],
+        recipes,
+      });
       return;
     }
 
@@ -263,13 +286,16 @@ var LoginManagerParent = {
           Services.obs.removeObserver(this, "passwordmgr-crypto-login");
           Services.obs.removeObserver(this, "passwordmgr-crypto-loginCanceled");
           if (topic == "passwordmgr-crypto-loginCanceled") {
-            target.sendAsyncMessage("RemoteLogins:loginsFound",
-                                    { requestId: requestId, logins: [] });
+            target.sendAsyncMessage("RemoteLogins:loginsFound", {
+              requestId: requestId,
+              logins: [],
+              recipes,
+            });
             return;
           }
 
-          self.findLogins(showMasterPassword, formOrigin, actionOrigin,
-                          requestId, target);
+          self.sendLoginDataToChild(showMasterPassword, formOrigin, actionOrigin,
+                                    requestId, target);
         },
       };
 
@@ -284,8 +310,14 @@ var LoginManagerParent = {
     }
 
     var logins = Services.logins.findLogins({}, formOrigin, actionOrigin, null);
-    target.sendAsyncMessage("RemoteLogins:loginsFound",
-                            { requestId: requestId, logins: logins });
+    // Convert the array of nsILoginInfo to vanilla JS objects since nsILoginInfo
+    // doesn't support structured cloning.
+    var jsLogins = JSON.parse(JSON.stringify(logins));
+    target.sendAsyncMessage("RemoteLogins:loginsFound", {
+      requestId: requestId,
+      logins: jsLogins,
+      recipes,
+    });
 
     const PWMGR_FORM_ACTION_EFFECT =  Services.telemetry.getHistogramById("PWMGR_FORM_ACTION_EFFECT");
     if (logins.length == 0) {
@@ -296,7 +328,7 @@ var LoginManagerParent = {
       // logins.length < allLoginsCount
       PWMGR_FORM_ACTION_EFFECT.add(1);
     }
-  },
+  }),
 
   doAutocompleteSearch: function({ formOrigin, actionOrigin,
                                    searchString, previousResult,
@@ -339,9 +371,13 @@ var LoginManagerParent = {
       AutoCompleteE10S.showPopupWithResults(target.ownerDocument.defaultView, rect, result);
     }
 
-    target.messageManager.sendAsyncMessage("RemoteLogins:loginsAutoCompleted",
-                                           { requestId: requestId,
-                                             logins: matchingLogins });
+    // Convert the array of nsILoginInfo to vanilla JS objects since nsILoginInfo
+    // doesn't support structured cloning.
+    var jsLogins = JSON.parse(JSON.stringify(matchingLogins));
+    target.messageManager.sendAsyncMessage("RemoteLogins:loginsAutoCompleted", {
+      requestId: requestId,
+      logins: jsLogins,
+    });
   },
 
   onFormSubmit: function(hostname, formSubmitURL,

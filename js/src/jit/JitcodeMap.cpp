@@ -87,7 +87,7 @@ JitcodeGlobalEntry::IonEntry::callStackAtAddr(JSRuntime* rt, void* ptr,
                                               uint32_t maxResults) const
 {
     MOZ_ASSERT(maxResults >= 1);
-    MOZ_ASSERT(regionIdx < regionTable()->numRegions());
+
     uint32_t ptrOffset;
     JitcodeRegionEntry region = RegionAtAddr(*this, ptr, &ptrOffset);
 

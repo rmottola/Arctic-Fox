@@ -633,12 +633,10 @@ void MediaPipelineTransmit::AttachToTrack(const std::string& track_id) {
 
   stream_->AddListener(listener_);
 
- // // Is this a gUM mediastream?  If so, also register the Listener directly with
- // // the SourceMediaStream that's attached to the TrackUnion so we can get direct
- // // unqueued (and not resampled) data
- // if (domstream_->AddDirectListener(listener_)) {
- //   listener_->direct_connect_ = true;
- // }
+  // Is this a gUM mediastream?  If so, also register the Listener directly with
+  // the SourceMediaStream that's attached to the TrackUnion so we can get direct
+  // unqueued (and not resampled) data
+  listener_->direct_connect_ = domstream_->AddDirectListener(listener_);
 
 #ifndef MOZILLA_INTERNAL_API
   // this enables the unit tests that can't fiddle with principals and the like
@@ -755,107 +753,83 @@ nsresult MediaPipeline::PipelineTransport::SendRtpPacket(
     const void *data, int len) {
 
     nsAutoPtr<DataBuffer> buf(new DataBuffer(static_cast<const uint8_t *>(data),
-                                             len));
+                                             len, len + SRTP_MAX_EXPANSION));
 
     RUN_ON_THREAD(sts_thread_,
                   WrapRunnable(
                       RefPtr<MediaPipeline::PipelineTransport>(this),
-                      &MediaPipeline::PipelineTransport::SendRtpPacket_s,
-                      buf),
+                      &MediaPipeline::PipelineTransport::SendRtpRtcpPacket_s,
+                      buf, true),
                   NS_DISPATCH_NORMAL);
 
     return NS_OK;
 }
 
-nsresult MediaPipeline::PipelineTransport::SendRtpPacket_s(
-    nsAutoPtr<DataBuffer> data) {
-  ASSERT_ON_THREAD(sts_thread_);
-  if (!pipeline_)
-    return NS_OK;  // Detached
+nsresult MediaPipeline::PipelineTransport::SendRtpRtcpPacket_s(
+    nsAutoPtr<DataBuffer> data,
+    bool is_rtp) {
 
-  if (!pipeline_->rtp_.send_srtp_) {
-    MOZ_MTLOG(ML_DEBUG, "Couldn't write RTP packet; SRTP not set up yet");
+  ASSERT_ON_THREAD(sts_thread_);
+  if (!pipeline_) {
+    return NS_OK;  // Detached
+  }
+  TransportInfo& transport = is_rtp ? pipeline_->rtp_ : pipeline_->rtcp_;
+
+  if (!transport.send_srtp_) {
+    MOZ_MTLOG(ML_DEBUG, "Couldn't write RTP/RTCP packet; SRTP not set up yet");
     return NS_OK;
   }
 
-  MOZ_ASSERT(pipeline_->rtp_.transport_);
-  NS_ENSURE_TRUE(pipeline_->rtp_.transport_, NS_ERROR_NULL_POINTER);
+  MOZ_ASSERT(transport.transport_);
+  NS_ENSURE_TRUE(transport.transport_, NS_ERROR_NULL_POINTER);
 
-  // libsrtp enciphers in place, so we need a new, big enough
-  // buffer.
-  // XXX. allocates and deletes one buffer per packet sent.
-  // Bug 822129
-  int max_len = data->len() + SRTP_MAX_EXPANSION;
-  ScopedDeletePtr<unsigned char> inner_data(
-      new unsigned char[max_len]);
-  memcpy(inner_data, data->data(), data->len());
+  // libsrtp enciphers in place, so we need a big enough buffer.
+  MOZ_ASSERT(data->capacity() >= data->len() + SRTP_MAX_EXPANSION);
 
   int out_len;
-  nsresult res = pipeline_->rtp_.send_srtp_->ProtectRtp(inner_data,
-                                                        data->len(),
-                                                        max_len,
-                                                        &out_len);
-  if (!NS_SUCCEEDED(res))
+  nsresult res;
+  if (is_rtp) {
+    res = transport.send_srtp_->ProtectRtp(data->data(),
+                                           data->len(),
+                                           data->capacity(),
+                                           &out_len);
+  } else {
+    res = transport.send_srtp_->ProtectRtcp(data->data(),
+                                            data->len(),
+                                            data->capacity(),
+                                            &out_len);
+  }
+  if (!NS_SUCCEEDED(res)) {
     return res;
+  }
 
-  MOZ_MTLOG(ML_DEBUG, pipeline_->description_ << " sending RTP packet.");
-  pipeline_->increment_rtp_packets_sent(out_len);
-  return pipeline_->SendPacket(pipeline_->rtp_.transport_, inner_data,
-                               out_len);
+  // paranoia; don't have uninitialized bytes included in data->len()
+  data->SetLength(out_len);
+
+  MOZ_MTLOG(ML_DEBUG, pipeline_->description_ << " sending " <<
+            (is_rtp ? "RTP" : "RTCP") << " packet");
+  if (is_rtp) {
+    pipeline_->increment_rtp_packets_sent(out_len);
+  } else {
+    pipeline_->increment_rtcp_packets_sent();
+  }
+  return pipeline_->SendPacket(transport.transport_, data->data(), out_len);
 }
 
 nsresult MediaPipeline::PipelineTransport::SendRtcpPacket(
     const void *data, int len) {
 
     nsAutoPtr<DataBuffer> buf(new DataBuffer(static_cast<const uint8_t *>(data),
-                                             len));
+                                             len, len + SRTP_MAX_EXPANSION));
 
     RUN_ON_THREAD(sts_thread_,
                   WrapRunnable(
                       RefPtr<MediaPipeline::PipelineTransport>(this),
-                      &MediaPipeline::PipelineTransport::SendRtcpPacket_s,
-                      buf),
+                      &MediaPipeline::PipelineTransport::SendRtpRtcpPacket_s,
+                      buf, false),
                   NS_DISPATCH_NORMAL);
 
     return NS_OK;
-}
-
-nsresult MediaPipeline::PipelineTransport::SendRtcpPacket_s(
-    nsAutoPtr<DataBuffer> data) {
-  ASSERT_ON_THREAD(sts_thread_);
-  if (!pipeline_)
-    return NS_OK;  // Detached
-
-  if (!pipeline_->rtcp_.send_srtp_) {
-    MOZ_MTLOG(ML_DEBUG, "Couldn't write RTCP packet; SRTCP not set up yet");
-    return NS_OK;
-  }
-
-  MOZ_ASSERT(pipeline_->rtcp_.transport_);
-  NS_ENSURE_TRUE(pipeline_->rtcp_.transport_, NS_ERROR_NULL_POINTER);
-
-  // libsrtp enciphers in place, so we need a new, big enough
-  // buffer.
-  // XXX. allocates and deletes one buffer per packet sent.
-  // Bug 822129.
-  int max_len = data->len() + SRTP_MAX_EXPANSION;
-  ScopedDeletePtr<unsigned char> inner_data(
-      new unsigned char[max_len]);
-  memcpy(inner_data, data->data(), data->len());
-
-  int out_len;
-  nsresult res = pipeline_->rtcp_.send_srtp_->ProtectRtcp(inner_data,
-                                                          data->len(),
-                                                          max_len,
-                                                          &out_len);
-
-  if (!NS_SUCCEEDED(res))
-    return res;
-
-  MOZ_MTLOG(ML_DEBUG, pipeline_->description_ << " sending RTCP packet.");
-  pipeline_->increment_rtcp_packets_sent();
-  return pipeline_->SendPacket(pipeline_->rtcp_.transport_, inner_data,
-                               out_len);
 }
 
 void MediaPipelineTransmit::PipelineListener::
@@ -863,7 +837,7 @@ UnsetTrackId(MediaStreamGraphImpl* graph) {
 #ifndef USE_FAKE_MEDIA_STREAMS
   class Message : public ControlMessage {
   public:
-    Message(PipelineListener* listener) :
+    explicit Message(PipelineListener* listener) :
       ControlMessage(nullptr), listener_(listener) {}
     virtual void Run() override
     {
@@ -919,19 +893,19 @@ NewData(MediaStreamGraph* graph, TrackID tid,
     return;
   }
 
-  if (track_id_ != TRACK_INVALID) {
-    if (tid != track_id_) {
-      return;
-    }
-  } else if (conduit_->type() !=
-             (media.GetType() == MediaSegment::AUDIO ? MediaSessionConduit::AUDIO :
-                                                       MediaSessionConduit::VIDEO)) {
-    // Ignore data in case we have a muxed stream
+  if (conduit_->type() !=
+      (media.GetType() == MediaSegment::AUDIO ? MediaSessionConduit::AUDIO :
+                                                MediaSessionConduit::VIDEO)) {
+    // Ignore data of wrong kind in case we have a muxed stream
     return;
-  } else {
+  }
+
+  if (track_id_ == TRACK_INVALID) {
     // Don't lock during normal media flow except on first sample
     MutexAutoLock lock(mMutex);
     track_id_ = track_id_external_ = tid;
+  } else if (tid != track_id_) {
+    return;
   }
 
   // TODO(ekr@rtfm.com): For now assume that we have only one
@@ -974,97 +948,80 @@ void MediaPipelineTransmit::PipelineListener::ProcessAudioChunk(
     AudioSessionConduit *conduit,
     TrackRate rate,
     AudioChunk& chunk) {
-  // TODO(ekr@rtfm.com): Do more than one channel
-  nsAutoArrayPtr<int16_t> samples(new int16_t[chunk.mDuration]);
 
-  if (enabled_ && chunk.mBuffer) {
-    switch (chunk.mBufferFormat) {
-      case AUDIO_FORMAT_FLOAT32:
-        {
-          const float* buf = static_cast<const float *>(chunk.mChannelData[0]);
-          ConvertAudioSamplesWithScale(buf, static_cast<int16_t*>(samples),
-                                       chunk.mDuration, chunk.mVolume);
-        }
-        break;
-      case AUDIO_FORMAT_S16:
-        {
-          const short* buf = static_cast<const short *>(chunk.mChannelData[0]);
-          ConvertAudioSamplesWithScale(buf, samples, chunk.mDuration, chunk.mVolume);
-        }
-        break;
-      case AUDIO_FORMAT_SILENCE:
-        memset(samples, 0, chunk.mDuration * sizeof(samples[0]));
-        break;
-      default:
-        MOZ_ASSERT(PR_FALSE);
-        return;
-        break;
-    }
+  // Convert to interleaved, 16-bits integer audio, with a maximum of two
+  // channels (since the WebRTC.org code below makes the assumption that the
+  // input audio is either mono or stereo).
+  uint32_t outputChannels = chunk.ChannelCount() == 1 ? 1 : 2;
+  const int16_t* samples = nullptr;
+  nsAutoArrayPtr<int16_t> convertedSamples;
+
+  // If this track is not enabled, simply ignore the data in the chunk.
+  if (!enabled_) {
+    chunk.mBufferFormat = AUDIO_FORMAT_SILENCE;
+  }
+
+  // We take advantage of the fact that the common case (microphone directly to
+  // PeerConnection, that is, a normal call), the samples are already 16-bits
+  // mono, so the representation in interleaved and planar is the same, and we
+  // can just use that.
+  if (outputChannels == 1 && chunk.mBufferFormat == AUDIO_FORMAT_S16) {
+    samples = chunk.ChannelData<int16_t>().Elements()[0];
   } else {
-    // This means silence.
-    memset(samples, 0, chunk.mDuration * sizeof(samples[0]));
+    convertedSamples = new int16_t[chunk.mDuration * outputChannels];
+
+    switch (chunk.mBufferFormat) {
+        case AUDIO_FORMAT_FLOAT32:
+          DownmixAndInterleave(chunk.ChannelData<float>(),
+                               chunk.mDuration, chunk.mVolume, outputChannels,
+                               convertedSamples.get());
+          break;
+        case AUDIO_FORMAT_S16:
+          DownmixAndInterleave(chunk.ChannelData<int16_t>(),
+                               chunk.mDuration, chunk.mVolume, outputChannels,
+                               convertedSamples.get());
+          break;
+        case AUDIO_FORMAT_SILENCE:
+          PodZero(convertedSamples.get(), chunk.mDuration * outputChannels);
+          break;
+    }
+    samples = convertedSamples.get();
   }
 
   MOZ_ASSERT(!(rate%100)); // rate should be a multiple of 100
 
-  // Check if the rate has changed since the last time we came through
-  // I realize it may be overkill to check if the rate has changed, but
-  // I believe it is possible (e.g. if we change sources) and it costs us
-  // very little to handle this case
+  // Check if the rate or the number of channels has changed since the last time
+  // we came through. I realize it may be overkill to check if the rate has
+  // changed, but I believe it is possible (e.g. if we change sources) and it
+  // costs us very little to handle this case.
 
-  if (samplenum_10ms_ !=  rate/100) {
-    // Determine number of samples in 10 ms from the rate:
-    samplenum_10ms_ = rate/100;
-    // If we switch sample rates (e.g. if we switch codecs),
-    // we throw away what was in the sample_10ms_buffer at the old rate
-    samples_10ms_buffer_ = new int16_t[samplenum_10ms_];
-    buffer_current_ = 0;
+  uint32_t audio_10ms = rate / 100;
+
+  if (!packetizer_ ||
+      packetizer_->PacketSize() != audio_10ms ||
+      packetizer_->Channels() != outputChannels) {
+    // It's ok to drop the audio still in the packetizer here.
+    packetizer_ = new AudioPacketizer<int16_t, int16_t>(audio_10ms, outputChannels);
+   }
+
+  packetizer_->Input(samples, chunk.mDuration);
+
+  while (packetizer_->PacketsAvailable()) {
+    uint32_t samplesPerPacket = packetizer_->PacketSize() *
+                                packetizer_->Channels();
+
+    // We know that webrtc.org's code going to copy the samples down the line,
+    // so we can just use a stack buffer here instead of malloc-ing.
+    // Max size given stereo is 480*2*2 = 1920 (10ms of 16-bits stereo audio at
+    // 48KHz)
+    const size_t AUDIO_SAMPLE_BUFFER_MAX = 1920;
+    int16_t packet[AUDIO_SAMPLE_BUFFER_MAX];
+
+    packetizer_->Output(packet);
+    conduit->SendAudioFrame(packet,
+                            samplesPerPacket,
+                            rate, 0);
   }
-
-  // Vars to handle the non-sunny-day case (where the audio chunks
-  // we got are not multiples of 10ms OR there were samples left over
-  // from the last run)
-  int64_t chunk_remaining;
-  int64_t tocpy;
-  int16_t *samples_tmp = samples.get();
-
-  chunk_remaining = chunk.mDuration;
-
-  MOZ_ASSERT(chunk_remaining >= 0);
-
-  if (buffer_current_) {
-    tocpy = std::min(chunk_remaining, samplenum_10ms_ - buffer_current_);
-    memcpy(&samples_10ms_buffer_[buffer_current_], samples_tmp, tocpy * sizeof(int16_t));
-    buffer_current_ += tocpy;
-    samples_tmp += tocpy;
-    chunk_remaining -= tocpy;
-
-    if (buffer_current_ == samplenum_10ms_) {
-      // Send out the audio buffer we just finished filling
-      conduit->SendAudioFrame(samples_10ms_buffer_, samplenum_10ms_, rate, 0);
-      buffer_current_ = 0;
-    } else {
-      // We still don't have enough data to send a buffer
-      return;
-    }
-  }
-
-  // Now send (more) frames if there is more than 10ms of input left
-  tocpy = (chunk_remaining / samplenum_10ms_) * samplenum_10ms_;
-  if (tocpy > 0) {
-    conduit->SendAudioFrame(samples_tmp, tocpy, rate, 0);
-    samples_tmp += tocpy;
-    chunk_remaining -= tocpy;
-  }
-  // Copy what remains for the next run
-
-  MOZ_ASSERT(chunk_remaining < samplenum_10ms_);
-
-  if (chunk_remaining) {
-    memcpy(samples_10ms_buffer_, samples_tmp, chunk_remaining * sizeof(int16_t));
-    buffer_current_ = chunk_remaining;
-  }
-
 }
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
@@ -1392,19 +1349,18 @@ NotifyPull(MediaStreamGraph* graph, StreamTime desired_time) {
   // This comparison is done in total time to avoid accumulated roundoff errors.
   while (source_->TicksToTimeRoundDown(track_rate_, played_ticks_) <
          desired_time) {
-    // TODO(ekr@rtfm.com): Is there a way to avoid mallocating here?  Or reduce the size?
-    // Max size given mono is 480*2*1 = 960 (48KHz)
-#define AUDIO_SAMPLE_BUFFER_MAX 1000
-    MOZ_ASSERT((track_rate_/100)*sizeof(uint16_t) <= AUDIO_SAMPLE_BUFFER_MAX);
+    // Max size given stereo is 480*2*2 = 1920 (48KHz)
+    const size_t AUDIO_SAMPLE_BUFFER_MAX = 1920;
+    MOZ_ASSERT((track_rate_/100)*sizeof(uint16_t) * 2 <= AUDIO_SAMPLE_BUFFER_MAX);
 
-    nsRefPtr<SharedBuffer> samples = SharedBuffer::Create(AUDIO_SAMPLE_BUFFER_MAX);
-    int16_t *samples_data = static_cast<int16_t *>(samples->Data());
+    int16_t scratch_buffer[AUDIO_SAMPLE_BUFFER_MAX];
+
     int samples_length;
 
-    // This fetches 10ms of data
+    // This fetches 10ms of data, either mono or stereo
     MediaConduitErrorCode err =
         static_cast<AudioSessionConduit*>(conduit_.get())->GetAudioFrame(
-            samples_data,
+            scratch_buffer,
             track_rate_,
             0,  // TODO(ekr@rtfm.com): better estimate of "capture" (really playout) delay
             samples_length);
@@ -1415,23 +1371,46 @@ NotifyPull(MediaStreamGraph* graph, StreamTime desired_time) {
                 << ") to return data @ " << played_ticks_
                 << " (desired " << desired_time << " -> "
                 << source_->StreamTimeToSeconds(desired_time) << ")");
-      samples_length = (track_rate_/100)*sizeof(uint16_t); // if this is not enough we'll loop and provide more
-      memset(samples_data, '\0', samples_length);
+      samples_length = track_rate_/100; // if this is not enough we'll loop and provide more
+      PodArrayZero(scratch_buffer);
     }
 
-    MOZ_ASSERT(samples_length < AUDIO_SAMPLE_BUFFER_MAX);
+    MOZ_ASSERT(samples_length * sizeof(uint16_t) < AUDIO_SAMPLE_BUFFER_MAX);
 
     MOZ_MTLOG(ML_DEBUG, "Audio conduit returned buffer of length "
               << samples_length);
 
+    nsRefPtr<SharedBuffer> samples = SharedBuffer::Create(samples_length * sizeof(uint16_t));
+    int16_t *samples_data = static_cast<int16_t *>(samples->Data());
     AudioSegment segment;
-    nsAutoTArray<const int16_t*,1> channels;
-    channels.AppendElement(samples_data);
-    segment.AppendFrames(samples.forget(), channels, samples_length);
+    // We derive the number of channels of the stream from the number of samples
+    // the AudioConduit gives us, considering it gives us packets of 10ms and we
+    // know the rate.
+    uint32_t channelCount = samples_length / (track_rate_ / 100);
+    nsAutoTArray<int16_t*,2> channels;
+    nsAutoTArray<const int16_t*,2> outputChannels;
+    size_t frames = samples_length / channelCount;
+
+    channels.SetLength(channelCount);
+
+    size_t offset = 0;
+    for (size_t i = 0; i < channelCount; i++) {
+      channels[i] = samples_data + offset;
+      offset += frames;
+    }
+
+    DeinterleaveAndConvertBuffer(scratch_buffer,
+                                 frames,
+                                 channelCount,
+                                 channels.Elements());
+
+    outputChannels.AppendElements(channels);
+
+    segment.AppendFrames(samples.forget(), outputChannels, frames);
 
     // Handle track not actually added yet or removed/finished
     if (source_->AppendToTrack(track_id_, &segment)) {
-      played_ticks_ += track_rate_/100; // 10ms in TrackTicks
+      played_ticks_ += frames;
     } else {
       MOZ_MTLOG(ML_ERROR, "AppendToTrack failed");
       // we can't un-read the data, but that's ok since we don't want to

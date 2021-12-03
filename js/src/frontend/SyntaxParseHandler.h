@@ -45,6 +45,7 @@ class SyntaxParseHandler
         NodeHoistableDeclaration,
         NodeBreak,
         NodeThrow,
+        NodeEmptyStatement,
 
         NodeSuperProperty,
         NodeSuperElement,
@@ -172,6 +173,9 @@ class SyntaxParseHandler
 
     static Node null() { return NodeFailure; }
 
+    void prepareNodeForMutation(Node node) {}
+    void freeTree(Node node) {}
+
     void trace(JSTracer* trc) {}
 
     Node newName(PropertyName* name, uint32_t blockid, const TokenPos& pos, ExclusiveContext* cx) {
@@ -208,7 +212,7 @@ class SyntaxParseHandler
         return NodeGeneric;
     }
 
-    Node newCallSiteObject(uint32_t begin, unsigned blockidGen) {
+    Node newCallSiteObject(uint32_t begin) {
         return NodeGeneric;
     }
 
@@ -258,10 +262,8 @@ class SyntaxParseHandler
 
     // Expressions
 
-    Node newArrayComprehension(Node body, unsigned blockid, const TokenPos& pos) {
-        return NodeGeneric;
-    }
-    Node newArrayLiteral(uint32_t begin, unsigned blockid) { return NodeUnparenthesizedArray; }
+    Node newArrayComprehension(Node body, const TokenPos& pos) { return NodeGeneric; }
+    Node newArrayLiteral(uint32_t begin) { return NodeUnparenthesizedArray; }
     bool addElision(Node literal, const TokenPos& pos) { return true; }
     bool addSpreadElement(Node literal, uint32_t begin, Node inner) { return true; }
     void addArrayElement(Node literal, Node element) { }
@@ -279,7 +281,8 @@ class SyntaxParseHandler
     Node newSuperElement(Node expr, const TokenPos& pos) {
         return NodeSuperElement;
     }
-    Node newNewTarget(const TokenPos& pos) { return NodeGeneric; }
+    Node newNewTarget(Node newHolder, Node targetHolder) { return NodeGeneric; }
+    Node newPosHolder(const TokenPos& pos) { return NodeGeneric; }
 
     bool addPrototypeMutation(Node literal, uint32_t begin, Node expr) { return true; }
     bool addPropertyDefinition(Node literal, Node name, Node expr) { return true; }
@@ -294,7 +297,7 @@ class SyntaxParseHandler
     Node newStatementList(unsigned blockid, const TokenPos& pos) { return NodeGeneric; }
     void addStatementToList(Node list, Node stmt, ParseContext<SyntaxParseHandler>* pc) {}
     bool prependInitialYield(Node stmtList, Node gen) { return true; }
-    Node newEmptyStatement(const TokenPos& pos) { return NodeGeneric; }
+    Node newEmptyStatement(const TokenPos& pos) { return NodeEmptyStatement; }
 
     Node newExprStatement(Node expr, uint32_t end) {
         return expr == NodeUnparenthesizedString ? NodeStringExprStatement : NodeGeneric;
@@ -430,7 +433,8 @@ class SyntaxParseHandler
     }
 
     bool isStatementPermittedAfterReturnStatement(Node pn) {
-        return pn == NodeHoistableDeclaration || pn == NodeBreak || pn == NodeThrow;
+        return pn == NodeHoistableDeclaration || pn == NodeBreak || pn == NodeThrow ||
+               pn == NodeEmptyStatement;
     }
 
     void setOp(Node pn, JSOp op) {}

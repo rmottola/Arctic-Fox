@@ -19,6 +19,7 @@
 
 #include "asmjs/AsmJSLink.h"
 #include "asmjs/AsmJSValidate.h"
+#include "jit/InlinableNatives.h"
 #include "jit/JitFrameIterator.h"
 #include "js/Debug.h"
 #include "js/HashTable.h"
@@ -665,7 +666,7 @@ StartGC(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    SliceBudget budget;
+    auto budget = SliceBudget::unlimited();
     if (args.length() >= 1) {
         uint32_t work = 0;
         if (!ToUint32(cx, args[0], &work))
@@ -707,7 +708,7 @@ GCSlice(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    SliceBudget budget;
+    auto budget = SliceBudget::unlimited();
     if (args.length() == 1) {
         uint32_t work = 0;
         if (!ToUint32(cx, args[0], &work))
@@ -907,6 +908,25 @@ SaveStack(JSContext* cx, unsigned argc, Value* vp)
 
     args.rval().setObjectOrNull(stack);
     return true;
+}
+
+static bool
+CallFunctionFromNativeFrame(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+
+    if (args.length() != 1) {
+        JS_ReportError(cx, "The function takes exactly one argument.");
+        return false;
+    }
+    if (!args[0].isObject() || !IsCallable(args[0])) {
+        JS_ReportError(cx, "The first argument should be a function.");
+        return false;
+    }
+
+    RootedObject function(cx, &args[0].toObject());
+    return Call(cx, UndefinedHandleValue, function,
+                JS::HandleValueArray::empty(), args.rval());
 }
 
 static bool
@@ -1122,6 +1142,8 @@ DumpHeap(JSContext* cx, unsigned argc, Value* vp)
 
     if (i != args.length()) {
         JS_ReportError(cx, "bad arguments passed to dumpHeap");
+        if (dumpFile)
+            fclose(dumpFile);
         return false;
     }
 
@@ -1391,8 +1413,8 @@ GetObjectMetadata(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-bool
-js::testingFunc_bailout(JSContext* cx, unsigned argc, Value* vp)
+static bool
+testingFunc_bailout(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1401,8 +1423,8 @@ js::testingFunc_bailout(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-bool
-js::testingFunc_inJit(JSContext* cx, unsigned argc, Value* vp)
+static bool
+testingFunc_inJit(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1429,8 +1451,8 @@ js::testingFunc_inJit(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-bool
-js::testingFunc_inIon(JSContext* cx, unsigned argc, Value* vp)
+static bool
+testingFunc_inIon(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -2668,6 +2690,73 @@ SetARMHwCapFlags(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
+static bool
+GetLcovInfo(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+
+    if (args.length() > 1) {
+        JS_ReportError(cx, "Wrong number of arguments");
+        return false;
+    }
+
+    RootedObject global(cx);
+    if (args.hasDefined(0)) {
+        global = ToObject(cx, args[0]);
+        if (!global) {
+            JS_ReportError(cx, "First argument should be an object");
+            return false;
+        }
+        global = CheckedUnwrap(global);
+        if (!global) {
+            JS_ReportError(cx, "Permission denied to access global");
+            return false;
+        }
+        if (!global->is<GlobalObject>()) {
+            JS_ReportError(cx, "Argument must be a global object");
+            return false;
+        }
+    } else {
+        global = JS::CurrentGlobalOrNull(cx);
+    }
+
+    size_t length = 0;
+    char* content = nullptr;
+    {
+        AutoCompartment ac(cx, global);
+        content = js::GetCodeCoverageSummary(cx, &length);
+    }
+
+    if (!content)
+        return false;
+
+    JSString* str = JS_NewStringCopyN(cx, content, length);
+    free(content);
+
+    if (!str)
+        return false;
+
+    args.rval().setString(str);
+    return true;
+}
+
+#ifdef DEBUG
+static bool
+SetRNGState(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    if (!args.requireAtLeast(cx, "SetRNGState", 1))
+        return false;
+
+    double seed;
+    if (!ToNumber(cx, args[0], &seed))
+        return false;
+
+    cx->compartment()->rngState = static_cast<uint64_t>(seed) & RNG_MASK;
+    return true;
+}
+#endif
+
 static const JSFunctionSpecWithHelp TestingFunctions[] = {
     JS_FN_HELP("gc", ::GC, 0, 0,
 "gc([obj] | 'compartment' [, 'shrinking'])",
@@ -2715,6 +2804,11 @@ static const JSFunctionSpecWithHelp TestingFunctions[] = {
 "  Capture a stack. If 'maxDepth' is given, capture at most 'maxDepth' number\n"
 "  of frames. If 'compartment' is given, allocate the js::SavedFrame instances\n"
 "  with the given object's compartment."),
+
+    JS_FN_HELP("callFunctionFromNativeFrame", CallFunctionFromNativeFrame, 1, 0,
+"callFunctionFromNativeFrame(function)",
+"  Call 'function' with a (C++-)native frame on stack.\n"
+"  Required for testing that SaveStack properly handles native frames."),
 
     JS_FN_HELP("callFunctionWithAsyncStack", CallFunctionWithAsyncStack, 0, 0,
 "callFunctionWithAsyncStack(function, stack, asyncCause)",
@@ -2929,7 +3023,7 @@ gc::ZealModeHelpText),
 "getObjectMetadata(obj)",
 "  Get the metadata for an object."),
 
-    JS_FN_HELP("bailout", testingFunc_bailout, 0, 0,
+    JS_INLINABLE_FN_HELP("bailout", testingFunc_bailout, 0, 0, TestBailout,
 "bailout()",
 "  Force a bailout out of ionmonkey (if running in ionmonkey)."),
 
@@ -3102,6 +3196,17 @@ gc::ZealModeHelpText),
 "setARMHwCapFlags(\"flag1,flag2 flag3\")",
 "  On non-ARM, no-op. On ARM, set the hardware capabilities. The list of \n"
 "  flags is available by calling this function with \"help\" as the flag's name"),
+
+    JS_FN_HELP("getLcovInfo", GetLcovInfo, 1, 0,
+"getLcovInfo(global)",
+"  Generate LCOV tracefile for the given compartment.  If no global are provided then\n"
+"  the current global is used as the default one.\n"),
+
+#ifdef DEBUG
+    JS_FN_HELP("setRNGState", SetRNGState, 1, 0,
+"setRNGState(seed)",
+"  Set this compartment's RNG state.\n"),
+#endif
 
     JS_FS_HELP_END
 };

@@ -1844,6 +1844,7 @@ class MSimdGeneralShuffle :
 
         setResultType(type);
         specialization_ = type;
+        setGuard(); // throws if lane index is out of bounds
         setMovable();
     }
 
@@ -3794,6 +3795,8 @@ class MCallDOMNative : public MCall
     MCallDOMNative(JSFunction* target, uint32_t numActualArgs)
         : MCall(target, numActualArgs, false)
     {
+        MOZ_ASSERT(getJitInfo()->type() != JSJitInfo::InlinableNative);
+
         // If our jitinfo is not marked eliminatable, that means that our C++
         // implementation is fallible or that it never wants to be eliminated or
         // that we have no hope of ever doing the sort of argument analysis that

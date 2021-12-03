@@ -72,14 +72,14 @@ protected:
 
   virtual PBroadcastChannelParent*
   AllocPBroadcastChannelParent(const PrincipalInfo& aPrincipalInfo,
-                               const nsString& aOrigin,
+                               const nsCString& aOrigin,
                                const nsString& aChannel,
                                const bool& aPrivateBrowsing) override;
 
   virtual bool
   RecvPBroadcastChannelConstructor(PBroadcastChannelParent* actor,
                                    const PrincipalInfo& aPrincipalInfo,
-                                   const nsString& origin,
+                                   const nsCString& origin,
                                    const nsString& channel,
                                    const bool& aPrivateBrowsing) override;
 
@@ -100,6 +100,12 @@ protected:
 
   virtual bool
   DeallocPServiceWorkerManagerParent(PServiceWorkerManagerParent* aActor) override;
+
+  virtual PCamerasParent*
+  AllocPCamerasParent() override;
+
+  virtual bool
+  DeallocPCamerasParent(PCamerasParent* aActor) override;
 
   virtual bool
   RecvShutdownServiceWorkerRegistrar() override;
@@ -151,6 +157,14 @@ protected:
   RecvMessagePortForceClose(const nsID& aUUID,
                             const nsID& aDestinationUUID,
                             const uint32_t& aSequenceID) override;
+
+  virtual PAsmJSCacheEntryParent*
+  AllocPAsmJSCacheEntryParent(const dom::asmjscache::OpenMode& aOpenMode,
+                              const dom::asmjscache::WriteParams& aWriteParams,
+                              const PrincipalInfo& aPrincipalInfo) override;
+
+  virtual bool
+  DeallocPAsmJSCacheEntryParent(PAsmJSCacheEntryParent* aActor) override;
 };
 
 } // namespace ipc

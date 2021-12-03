@@ -369,7 +369,7 @@ js::XDRStaticWithObject(XDRState<mode>* xdr, HandleObject enclosingScope,
         Rooted<StaticWithObject*> obj(cx, StaticWithObject::create(cx));
         if (!obj)
             return false;
-        obj->initEnclosingNestedScope(enclosingScope);
+        obj->initEnclosingScope(enclosingScope);
         objp.set(obj);
     }
     // For encoding, there is nothing to do.  The only information that is
@@ -398,7 +398,7 @@ CloneStaticWithObject(JSContext* cx, HandleObject enclosingScope, Handle<StaticW
     if (!clone)
         return nullptr;
 
-    clone->initEnclosingNestedScope(enclosingScope);
+    clone->initEnclosingScope(enclosingScope);
 
     return clone;
 }
@@ -789,7 +789,7 @@ js::XDRStaticBlockObject(XDRState<mode>* xdr, HandleObject enclosingScope,
         obj = StaticBlockObject::create(cx);
         if (!obj)
             return false;
-        obj->initEnclosingNestedScope(enclosingScope);
+        obj->initEnclosingScope(enclosingScope);
         objp.set(obj);
     }
 
@@ -880,7 +880,7 @@ CloneStaticBlockObject(JSContext* cx, HandleObject enclosingScope, Handle<Static
     if (!clone)
         return nullptr;
 
-    clone->initEnclosingNestedScope(enclosingScope);
+    clone->initEnclosingScope(enclosingScope);
     clone->setLocalOffset(srcBlock->localOffset());
 
     /* Shape::Range is reverse order, so build a list in forward order. */
@@ -2564,7 +2564,7 @@ js::CreateScopeObjectsForScopeChain(JSContext* cx, AutoObjectVector& scopeChain,
         staticWith = StaticWithObject::create(cx);
         if (!staticWith)
             return false;
-        staticWith->initEnclosingNestedScope(staticEnclosingScope);
+        staticWith->initEnclosingScope(staticEnclosingScope);
         staticEnclosingScope = staticWith;
 
         dynamicWith = DynamicWithObject::create(cx, scopeChain[--i], dynamicEnclosingScope,
@@ -2592,7 +2592,54 @@ js::HasNonSyntacticStaticScopeChain(JSObject* staticScope)
     return false;
 }
 
+uint32_t
+js::StaticScopeChainLength(JSObject* staticScope)
+{
+    uint32_t length = 0;
+    for (StaticScopeIter<NoGC> ssi(staticScope); !ssi.done(); ssi++)
+        length++;
+    return length;
+}
+
 #ifdef DEBUG
+
+void
+js::DumpStaticScopeChain(JSScript* script)
+{
+    DumpStaticScopeChain(script->enclosingStaticScope());
+}
+
+void
+js::DumpStaticScopeChain(JSObject* staticScope)
+{
+    for (StaticScopeIter<NoGC> ssi(staticScope); !ssi.done(); ssi++) {
+        switch (ssi.type()) {
+          case StaticScopeIter<NoGC>::Function:
+            if (ssi.fun().isBeingParsed())
+                fprintf(stdout, "funbox [%p fun=%p]", ssi.maybeFunctionBox(), &ssi.fun());
+            else
+                fprintf(stdout, "function [%p]", &ssi.fun());
+            break;
+          case StaticScopeIter<NoGC>::Block:
+            fprintf(stdout, "block [%p]", &ssi.block());
+            break;
+          case StaticScopeIter<NoGC>::With:
+            fprintf(stdout, "with [%p]", &ssi.staticWith());
+            break;
+          case StaticScopeIter<NoGC>::NamedLambda:
+            fprintf(stdout, "named lambda");
+            break;
+          case StaticScopeIter<NoGC>::Eval:
+            fprintf(stdout, "eval [%p]", &ssi.eval());
+            break;
+          case StaticScopeIter<NoGC>::NonSyntactic:
+            fprintf(stdout, "non-syntactic [%p]", &ssi.nonSyntactic());
+            break;
+        }
+        fprintf(stdout, " -> ");
+    }
+    fprintf(stdout, "global\n");
+}
 
 typedef HashSet<PropertyName*> PropertyNameSet;
 

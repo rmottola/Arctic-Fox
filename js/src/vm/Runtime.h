@@ -36,6 +36,7 @@
 #ifdef DEBUG
 # include "js/Proxy.h" // For AutoEnterPolicy
 #endif
+#include "js/TraceableVector.h"
 #include "js/Vector.h"
 #include "vm/CommonPropertyNames.h"
 #include "vm/DateTime.h"
@@ -140,7 +141,7 @@ struct ScopeCoordinateNameCache {
     void purge();
 };
 
-typedef Vector<ScriptAndCounts, 0, SystemAllocPolicy> ScriptAndCountsVector;
+using ScriptAndCountsVector = TraceableVector<ScriptAndCounts, 0, SystemAllocPolicy>;
 
 struct EvalCacheEntry
 {
@@ -695,12 +696,12 @@ struct JSRuntime : public JS::shadow::Runtime,
      * New activations will reset this to nullptr on construction after getting
      * the current value, and will restore the previous value on destruction.
      */
-    js::SavedFrame* asyncStackForNewActivations;
+    JS::PersistentRooted<js::SavedFrame*> asyncStackForNewActivations;
 
     /*
      * Value of asyncCause to be attached to asyncStackForNewActivations.
      */
-    JSString* asyncCauseForNewActivations;
+    JS::PersistentRooted<JSString*> asyncCauseForNewActivations;
 
     /*
      * True if the async call was explicitly requested, e.g. via
@@ -925,6 +926,10 @@ struct JSRuntime : public JS::shadow::Runtime,
     static js::GlobalObject*
     createSelfHostingGlobal(JSContext* cx);
 
+    bool getUnclonedSelfHostedValue(JSContext* cx, js::HandlePropertyName name,
+                                    js::MutableHandleValue vp);
+    JSFunction* getUnclonedSelfHostedFunction(JSContext* cx, js::HandlePropertyName name);
+
     /* Space for interpreter frames. */
     js::InterpreterStack interpreterStack_;
 
@@ -956,10 +961,14 @@ struct JSRuntime : public JS::shadow::Runtime,
     }
     bool isSelfHostingCompartment(JSCompartment* comp) const;
     bool isSelfHostingZone(const JS::Zone* zone) const;
+    bool createLazySelfHostedFunctionClone(JSContext* cx, js::HandlePropertyName selfHostedName,
+                                           js::HandleAtom name, unsigned nargs,
+                                           js::MutableHandleFunction fun);
     bool cloneSelfHostedFunctionScript(JSContext* cx, js::Handle<js::PropertyName*> name,
                                        js::Handle<JSFunction*> targetFun);
     bool cloneSelfHostedValue(JSContext* cx, js::Handle<js::PropertyName*> name,
                               js::MutableHandleValue vp);
+    void assertSelfHostedFunctionHasCanonicalName(JSContext* cx, js::HandlePropertyName name);
 
     //-------------------------------------------------------------------------
     // Locale information
@@ -1056,7 +1065,7 @@ struct JSRuntime : public JS::shadow::Runtime,
 #endif
 
     /* Strong references on scripts held for PCCount profiling API. */
-    js::ScriptAndCountsVector* scriptAndCountsVector;
+    JS::PersistentRooted<js::ScriptAndCountsVector>* scriptAndCountsVector;
 
     /* Well-known numbers held for use by this runtime's contexts. */
     const js::Value     NaNValue;

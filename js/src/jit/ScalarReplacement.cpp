@@ -224,7 +224,7 @@ IsObjectEscaped(MInstruction* ins, JSObject* objDefault)
           case MDefinition::Op_GuardShape: {
             MGuardShape* guard = def->toGuardShape();
             MOZ_ASSERT(!ins->isGuardShape());
-            if (obj->as<NativeObject>().lastProperty() != guard->shape()) {
+            if (obj->maybeShape() != guard->shape()) {
                 JitSpewDef(JitSpew_Escape, "has a non-matching guard shape\n", guard);
                 return true;
             }
@@ -511,6 +511,8 @@ ObjectMemoryView::visitStoreFixedSlot(MStoreFixedSlot* ins)
         state_->setFixedSlot(ins->slot(), ins->value());
         ins->block()->insertBefore(ins->toInstruction(), state_);
     } else {
+        // UnsafeSetReserveSlot can access baked-in slots which are guarded by
+        // conditions, which are not seen by the escape analysis.
         MBail* bailout = MBail::New(alloc_, Bailout_Inevitable);
         ins->block()->insertBefore(ins, bailout);
     }
@@ -530,6 +532,8 @@ ObjectMemoryView::visitLoadFixedSlot(MLoadFixedSlot* ins)
     if (state_->hasFixedSlot(ins->slot())) {
         ins->replaceAllUsesWith(state_->getFixedSlot(ins->slot()));
     } else {
+        // UnsafeGetReserveSlot can access baked-in slots which are guarded by
+        // conditions, which are not seen by the escape analysis.
         MBail* bailout = MBail::New(alloc_, Bailout_Inevitable);
         ins->block()->insertBefore(ins, bailout);
         ins->replaceAllUsesWith(undefinedVal_);
@@ -572,6 +576,8 @@ ObjectMemoryView::visitStoreSlot(MStoreSlot* ins)
         state_->setDynamicSlot(ins->slot(), ins->value());
         ins->block()->insertBefore(ins->toInstruction(), state_);
     } else {
+        // UnsafeSetReserveSlot can access baked-in slots which are guarded by
+        // conditions, which are not seen by the escape analysis.
         MBail* bailout = MBail::New(alloc_, Bailout_Inevitable);
         ins->block()->insertBefore(ins, bailout);
     }
@@ -595,6 +601,8 @@ ObjectMemoryView::visitLoadSlot(MLoadSlot* ins)
     if (state_->hasDynamicSlot(ins->slot())) {
         ins->replaceAllUsesWith(state_->getDynamicSlot(ins->slot()));
     } else {
+        // UnsafeGetReserveSlot can access baked-in slots which are guarded by
+        // conditions, which are not seen by the escape analysis.
         MBail* bailout = MBail::New(alloc_, Bailout_Inevitable);
         ins->block()->insertBefore(ins, bailout);
         ins->replaceAllUsesWith(undefinedVal_);

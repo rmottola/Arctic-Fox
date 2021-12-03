@@ -47,16 +47,15 @@ MacroAssemblerMIPSCompat::convertInt32ToDouble(Register src, FloatRegister dest)
 void
 MacroAssemblerMIPSCompat::convertInt32ToDouble(const Address& src, FloatRegister dest)
 {
-    ma_lw(ScratchRegister, src);
-    as_mtc1(ScratchRegister, dest);
+    ma_ls(dest, src);
     as_cvtdw(dest, dest);
 }
 
 void
 MacroAssemblerMIPSCompat::convertInt32ToDouble(const BaseIndex& src, FloatRegister dest)
 {
-    computeScaledAddress(src, SecondScratchReg);
-    convertInt32ToDouble(Address(SecondScratchReg, src.offset), dest);
+    computeScaledAddress(src, ScratchRegister);
+    convertInt32ToDouble(Address(ScratchRegister, src.offset), dest);
 }
 
 void
@@ -76,6 +75,63 @@ MacroAssemblerMIPSCompat::convertUInt32ToDouble(Register src, FloatRegister dest
     // Add unsigned value of INT32_MIN
     ma_lid(SecondScratchDoubleReg, 2147483648.0);
     as_addd(dest, dest, SecondScratchDoubleReg);
+}
+
+void
+MacroAssemblerMIPSCompat::mul64(Imm64 imm, const Register64& dest)
+{
+    // LOW32  = LOW(LOW(dest) * LOW(imm));
+    // HIGH32 = LOW(HIGH(dest) * LOW(imm)) [multiply imm into upper bits]
+    //        + LOW(LOW(dest) * HIGH(imm)) [multiply dest into upper bits]
+    //        + HIGH(LOW(dest) * LOW(imm)) [carry]
+
+    // HIGH(dest) = LOW(HIGH(dest) * LOW(imm));
+    ma_li(ScratchRegister, Imm32(imm.value & LOW_32_MASK));
+    as_multu(dest.high, ScratchRegister);
+    as_mflo(dest.high);
+
+    // mfhi:mflo = LOW(dest) * LOW(imm);
+    as_multu(dest.low, ScratchRegister);
+
+    // HIGH(dest) += mfhi;
+    as_mfhi(ScratchRegister);
+    as_addu(dest.high, dest.high, ScratchRegister);
+
+    if (((imm.value >> 32) & LOW_32_MASK) == 5) {
+        // Optimized case for Math.random().
+
+        // HIGH(dest) += LOW(LOW(dest) * HIGH(imm));
+        as_sll(ScratchRegister, dest.low, 2);
+        as_addu(ScratchRegister, ScratchRegister, dest.low);
+        as_addu(dest.high, dest.high, ScratchRegister);
+
+        // LOW(dest) = mflo;
+        as_mflo(dest.low);
+    } else {
+        // tmp = mflo
+        as_mflo(SecondScratchReg);
+
+        // HIGH(dest) += LOW(LOW(dest) * HIGH(imm));
+        ma_li(ScratchRegister, Imm32((imm.value >> 32) & LOW_32_MASK));
+        as_multu(dest.low, ScratchRegister);
+        as_mflo(ScratchRegister);
+        as_addu(dest.high, dest.high, ScratchRegister);
+
+        // LOW(dest) = tmp;
+        ma_move(dest.low, SecondScratchReg);
+    }
+}
+
+static const double TO_DOUBLE_HIGH_SCALE = 0x100000000;
+
+void
+MacroAssemblerMIPSCompat::convertUInt64ToDouble(Register64 src, Register temp, FloatRegister dest)
+{
+    convertUInt32ToDouble(src.high, dest);
+    loadConstantDouble(TO_DOUBLE_HIGH_SCALE, ScratchDoubleReg);
+    mulDouble(ScratchDoubleReg, dest);
+    convertUInt32ToDouble(src.low, ScratchDoubleReg);
+    addDouble(ScratchDoubleReg, dest);
 }
 
 void
@@ -203,8 +259,7 @@ MacroAssemblerMIPSCompat::convertInt32ToFloat32(Register src, FloatRegister dest
 void
 MacroAssemblerMIPSCompat::convertInt32ToFloat32(const Address& src, FloatRegister dest)
 {
-    ma_lw(ScratchRegister, src);
-    as_mtc1(ScratchRegister, dest);
+    ma_ls(dest, src);
     as_cvtsw(dest, dest);
 }
 
@@ -266,7 +321,7 @@ void
 MacroAssemblerMIPS::ma_li(Register dest, ImmGCPtr ptr)
 {
     writeDataRelocation(ptr);
-    ma_liPatchable(dest, Imm32(uintptr_t(ptr.value)));
+    ma_liPatchable(dest, ImmPtr(ptr.value));
 }
 
 void
@@ -295,6 +350,11 @@ MacroAssemblerMIPS::ma_li(Register dest, Imm32 imm)
     }
 }
 
+void
+MacroAssemblerMIPS::ma_li(Register dest, ImmWord imm)
+{
+    ma_li(dest, Imm32(uint32_t(imm.value)));
+}
 
 // This method generates lui and ori instruction pair that can be modified by
 // UpdateLuiOriValue, either during compilation (eg. Assembler::bind), or
@@ -310,7 +370,13 @@ MacroAssemblerMIPS::ma_liPatchable(Register dest, Imm32 imm)
 void
 MacroAssemblerMIPS::ma_liPatchable(Register dest, ImmPtr imm)
 {
-    return ma_liPatchable(dest, Imm32(int32_t(imm.value)));
+    ma_liPatchable(dest, ImmWord(uintptr_t(imm.value)));
+}
+
+void
+MacroAssemblerMIPS::ma_liPatchable(Register dest, ImmWord imm)
+{
+    ma_liPatchable(dest, Imm32(int32_t(imm.value)));
 }
 
 // Shifts
@@ -1586,7 +1652,7 @@ MacroAssemblerMIPSCompat::movePtr(Register src, Register dest)
 void
 MacroAssemblerMIPSCompat::movePtr(ImmWord imm, Register dest)
 {
-    ma_li(dest, Imm32(imm.value));
+    ma_li(dest, imm);
 }
 
 void
@@ -1604,7 +1670,7 @@ void
 MacroAssemblerMIPSCompat::movePtr(AsmJSImmPtr imm, Register dest)
 {
     append(AsmJSAbsoluteLink(CodeOffsetLabel(nextOffset().getOffset()), imm.kind()));
-    ma_liPatchable(dest, Imm32(-1));
+    ma_liPatchable(dest, ImmWord(-1));
 }
 
 void
@@ -1658,7 +1724,7 @@ MacroAssemblerMIPSCompat::load16SignExtend(const BaseIndex& src, Register dest)
 void
 MacroAssemblerMIPSCompat::load32(const Address& address, Register dest)
 {
-    ma_lw(dest, address);
+    ma_load(dest, address, SizeWord);
 }
 
 void
@@ -1670,33 +1736,41 @@ MacroAssemblerMIPSCompat::load32(const BaseIndex& address, Register dest)
 void
 MacroAssemblerMIPSCompat::load32(AbsoluteAddress address, Register dest)
 {
-    ma_li(ScratchRegister, Imm32((uint32_t)address.addr));
-    as_lw(dest, ScratchRegister, 0);
+    movePtr(ImmPtr(address.addr), ScratchRegister);
+    load32(Address(ScratchRegister, 0), dest);
+}
+
+void
+MacroAssemblerMIPSCompat::load32(AsmJSAbsoluteAddress address, Register dest)
+{
+    movePtr(AsmJSImmPtr(address.kind()), ScratchRegister);
+    load32(Address(ScratchRegister, 0), dest);
 }
 
 void
 MacroAssemblerMIPSCompat::loadPtr(const Address& address, Register dest)
 {
-    ma_lw(dest, address);
+    ma_load(dest, address, SizeWord);
 }
 
 void
 MacroAssemblerMIPSCompat::loadPtr(const BaseIndex& src, Register dest)
 {
-    load32(src, dest);
+    ma_load(dest, src, SizeWord);
 }
 
 void
 MacroAssemblerMIPSCompat::loadPtr(AbsoluteAddress address, Register dest)
 {
-    ma_li(ScratchRegister, Imm32((uint32_t)address.addr));
-    as_lw(dest, ScratchRegister, 0);
+    movePtr(ImmPtr(address.addr), ScratchRegister);
+    loadPtr(Address(ScratchRegister, 0), dest);
 }
+
 void
 MacroAssemblerMIPSCompat::loadPtr(AsmJSAbsoluteAddress address, Register dest)
 {
     movePtr(AsmJSImmPtr(address.kind()), ScratchRegister);
-    loadPtr(Address(ScratchRegister, 0x0), dest);
+    loadPtr(Address(ScratchRegister, 0), dest);
 }
 
 void
@@ -1798,20 +1872,21 @@ MacroAssemblerMIPSCompat::store16(Register src, const BaseIndex& address)
 void
 MacroAssemblerMIPSCompat::store32(Register src, AbsoluteAddress address)
 {
-    storePtr(src, address);
+    movePtr(ImmPtr(address.addr), ScratchRegister);
+    store32(src, Address(ScratchRegister, 0));
 }
 
 void
 MacroAssemblerMIPSCompat::store32(Register src, const Address& address)
 {
-    storePtr(src, address);
+    ma_store(src, address, SizeWord);
 }
 
 void
 MacroAssemblerMIPSCompat::store32(Imm32 src, const Address& address)
 {
     move32(src, SecondScratchReg);
-    storePtr(SecondScratchReg, address);
+    ma_store(SecondScratchReg, address, SizeWord);
 }
 
 void
@@ -1830,8 +1905,8 @@ template <typename T>
 void
 MacroAssemblerMIPSCompat::storePtr(ImmWord imm, T address)
 {
-    ma_li(SecondScratchReg, Imm32(imm.value));
-    ma_sw(SecondScratchReg, address);
+    ma_li(SecondScratchReg, imm);
+    ma_store(SecondScratchReg, address, SizeWord);
 }
 
 template void MacroAssemblerMIPSCompat::storePtr<Address>(ImmWord imm, Address address);
@@ -1851,8 +1926,7 @@ template <typename T>
 void
 MacroAssemblerMIPSCompat::storePtr(ImmGCPtr imm, T address)
 {
-    ma_li(SecondScratchReg, imm);
-    ma_sw(SecondScratchReg, address);
+    storePtr(ImmWord(uintptr_t(imm.value)), address);
 }
 
 template void MacroAssemblerMIPSCompat::storePtr<Address>(ImmGCPtr imm, Address address);
@@ -1861,7 +1935,7 @@ template void MacroAssemblerMIPSCompat::storePtr<BaseIndex>(ImmGCPtr imm, BaseIn
 void
 MacroAssemblerMIPSCompat::storePtr(Register src, const Address& address)
 {
-    ma_sw(src, address);
+    ma_store(src, address, SizeWord);
 }
 
 void
@@ -1873,8 +1947,33 @@ MacroAssemblerMIPSCompat::storePtr(Register src, const BaseIndex& address)
 void
 MacroAssemblerMIPSCompat::storePtr(Register src, AbsoluteAddress dest)
 {
-    ma_li(ScratchRegister, Imm32((uint32_t)dest.addr));
-    as_sw(src, ScratchRegister, 0);
+    movePtr(ImmPtr(dest.addr), ScratchRegister);
+    storePtr(src, Address(ScratchRegister, 0));
+}
+
+void
+MacroAssemblerMIPSCompat::clampIntToUint8(Register reg)
+{
+    // look at (reg >> 8) if it is 0, then src shouldn't be clamped
+    // if it is <0, then we want to clamp to 0,
+    // otherwise, we wish to clamp to 255
+    Label done;
+    ma_move(ScratchRegister, reg);
+    asMasm().rshiftPtrArithmetic(Imm32(8), ScratchRegister);
+    ma_b(ScratchRegister, ScratchRegister, &done, Assembler::Zero, ShortJump);
+    {
+        Label negative;
+        ma_b(ScratchRegister, ScratchRegister, &negative, Assembler::Signed, ShortJump);
+        {
+            ma_li(reg, Imm32(255));
+            ma_b(&done, ShortJump);
+        }
+        bind(&negative);
+        {
+            ma_move(reg, zero);
+        }
+    }
+    bind(&done);
 }
 
 // Note: this function clobbers the input register.
@@ -2571,6 +2670,20 @@ MacroAssemblerMIPSCompat::branchTestBooleanTruthy(bool b, const ValueOperand& op
     ma_b(operand.payloadReg(), operand.payloadReg(), label, b ? NonZero : Zero);
 }
 
+void
+MacroAssemblerMIPSCompat::branchTest64(Condition cond, Register64 lhs, Register64 rhs,
+                                       Register temp, Label* label)
+{
+    if (cond == Assembler::Zero) {
+        MOZ_ASSERT(lhs.low == rhs.low);
+        MOZ_ASSERT(lhs.high == rhs.high);
+        as_or(ScratchRegister, lhs.low, lhs.high);
+        branchTestPtr(cond, ScratchRegister, ScratchRegister, label);
+    } else {
+        MOZ_CRASH("Unsupported condition");
+    }
+}
+
 Register
 MacroAssemblerMIPSCompat::extractObject(const Address& address, Register scratch)
 {
@@ -2834,7 +2947,7 @@ void
 MacroAssemblerMIPSCompat::pushValue(ValueOperand val)
 {
     // Allocate stack slots for type and payload. One for each.
-    ma_subu(StackPointer, StackPointer, Imm32(sizeof(Value)));
+    subPtr(Imm32(sizeof(Value)), StackPointer);
     // Store type and payload.
     storeValue(val, Address(StackPointer, 0));
 }
@@ -3004,7 +3117,7 @@ MacroAssemblerMIPSCompat::handleFailureWithHandlerTail(void* handler)
 {
     // Reserve space for exception information.
     int size = (sizeof(ResumeFromException) + ABIStackAlignment) & ~(ABIStackAlignment - 1);
-    ma_subu(StackPointer, StackPointer, Imm32(size));
+    subPtr(Imm32(size), StackPointer);
     ma_move(a0, StackPointer); // Use a0 since it is a first function argument
 
     // Call the handler.
@@ -3019,7 +3132,7 @@ MacroAssemblerMIPSCompat::handleFailureWithHandlerTail(void* handler)
     Label bailout;
 
     // Already clobbered a0, so use it...
-    ma_lw(a0, Address(StackPointer, offsetof(ResumeFromException, kind)));
+    load32(Address(StackPointer, offsetof(ResumeFromException, kind)), a0);
     branch32(Assembler::Equal, a0, Imm32(ResumeFromException::RESUME_ENTRY_FRAME), &entryFrame);
     branch32(Assembler::Equal, a0, Imm32(ResumeFromException::RESUME_CATCH), &catch_);
     branch32(Assembler::Equal, a0, Imm32(ResumeFromException::RESUME_FINALLY), &finally);
@@ -3032,7 +3145,7 @@ MacroAssemblerMIPSCompat::handleFailureWithHandlerTail(void* handler)
     // and return from the entry frame.
     bind(&entryFrame);
     moveValue(MagicValue(JS_ION_ERROR), JSReturnOperand);
-    ma_lw(StackPointer, Address(StackPointer, offsetof(ResumeFromException, stackPointer)));
+    loadPtr(Address(StackPointer, offsetof(ResumeFromException, stackPointer)), StackPointer);
 
     // We're going to be returning by the ion calling convention
     ma_pop(ra);
@@ -3042,9 +3155,9 @@ MacroAssemblerMIPSCompat::handleFailureWithHandlerTail(void* handler)
     // If we found a catch handler, this must be a baseline frame. Restore
     // state and jump to the catch block.
     bind(&catch_);
-    ma_lw(a0, Address(StackPointer, offsetof(ResumeFromException, target)));
-    ma_lw(BaselineFrameReg, Address(StackPointer, offsetof(ResumeFromException, framePointer)));
-    ma_lw(StackPointer, Address(StackPointer, offsetof(ResumeFromException, stackPointer)));
+    loadPtr(Address(StackPointer, offsetof(ResumeFromException, target)), a0);
+    loadPtr(Address(StackPointer, offsetof(ResumeFromException, framePointer)), BaselineFrameReg);
+    loadPtr(Address(StackPointer, offsetof(ResumeFromException, stackPointer)), StackPointer);
     jump(a0);
 
     // If we found a finally block, this must be a baseline frame. Push
@@ -3054,9 +3167,9 @@ MacroAssemblerMIPSCompat::handleFailureWithHandlerTail(void* handler)
     ValueOperand exception = ValueOperand(a1, a2);
     loadValue(Address(sp, offsetof(ResumeFromException, exception)), exception);
 
-    ma_lw(a0, Address(sp, offsetof(ResumeFromException, target)));
-    ma_lw(BaselineFrameReg, Address(sp, offsetof(ResumeFromException, framePointer)));
-    ma_lw(sp, Address(sp, offsetof(ResumeFromException, stackPointer)));
+    loadPtr(Address(sp, offsetof(ResumeFromException, target)), a0);
+    loadPtr(Address(sp, offsetof(ResumeFromException, framePointer)), BaselineFrameReg);
+    loadPtr(Address(sp, offsetof(ResumeFromException, stackPointer)), sp);
 
     pushValue(BooleanValue(true));
     pushValue(exception);
@@ -3065,8 +3178,8 @@ MacroAssemblerMIPSCompat::handleFailureWithHandlerTail(void* handler)
     // Only used in debug mode. Return BaselineFrame->returnValue() to the
     // caller.
     bind(&return_);
-    ma_lw(BaselineFrameReg, Address(StackPointer, offsetof(ResumeFromException, framePointer)));
-    ma_lw(StackPointer, Address(StackPointer, offsetof(ResumeFromException, stackPointer)));
+    loadPtr(Address(StackPointer, offsetof(ResumeFromException, framePointer)), BaselineFrameReg);
+    loadPtr(Address(StackPointer, offsetof(ResumeFromException, stackPointer)), StackPointer);
     loadValue(Address(BaselineFrameReg, BaselineFrame::reverseOffsetOfReturnValue()),
               JSReturnOperand);
     ma_move(StackPointer, BaselineFrameReg);
@@ -3088,9 +3201,9 @@ MacroAssemblerMIPSCompat::handleFailureWithHandlerTail(void* handler)
     // If we are bailing out to baseline to handle an exception, jump to
     // the bailout tail stub.
     bind(&bailout);
-    ma_lw(a2, Address(sp, offsetof(ResumeFromException, bailoutInfo)));
+    loadPtr(Address(sp, offsetof(ResumeFromException, bailoutInfo)), a2);
     ma_li(ReturnReg, Imm32(BAILOUT_RETURN_OK));
-    ma_lw(a1, Address(sp, offsetof(ResumeFromException, target)));
+    loadPtr(Address(sp, offsetof(ResumeFromException, target)), a1);
     jump(a1);
 }
 
@@ -3255,7 +3368,7 @@ MacroAssembler::Push(const Imm32 imm)
 void
 MacroAssembler::Push(const ImmWord imm)
 {
-    ma_li(ScratchRegister, Imm32(imm.value));
+    ma_li(ScratchRegister, imm);
     ma_push(ScratchRegister);
     adjustFrame(sizeof(intptr_t));
 }
@@ -3299,7 +3412,7 @@ void
 MacroAssembler::reserveStack(uint32_t amount)
 {
     if (amount)
-        ma_subu(StackPointer, StackPointer, Imm32(amount));
+        subPtr(Imm32(amount), StackPointer);
     adjustFrame(amount);
 }
 
@@ -3345,7 +3458,7 @@ MacroAssembler::call(JitCode* c)
 {
     BufferOffset bo = m_buffer.nextOffset();
     addPendingJump(bo, ImmPtr(c->raw()), Relocation::JITCODE);
-    ma_liPatchable(ScratchRegister, Imm32((uint32_t)c->raw()));
+    ma_liPatchable(ScratchRegister, ImmPtr(c->raw()));
     callJitNoProfiler(ScratchRegister);
 }
 
@@ -3353,18 +3466,18 @@ void
 MacroAssembler::callAndPushReturnAddress(Register callee)
 {
     // Push return address during jalr delay slot.
-    as_addiu(StackPointer, StackPointer, -sizeof(intptr_t));
+    subPtr(Imm32(sizeof(intptr_t)), StackPointer);
     as_jalr(callee);
-    as_sw(ra, StackPointer, 0);
+    storePtr(ra, Address(StackPointer, 0));
 }
 
 void
 MacroAssembler::callAndPushReturnAddress(Label* label)
 {
     // Push return address during bal delay slot.
-    as_addiu(StackPointer, StackPointer, -sizeof(intptr_t));
+    subPtr(Imm32(sizeof(intptr_t)), StackPointer);
     ma_bal(label, DontFillDelaySlot);
-    as_sw(ra, StackPointer, 0);
+    storePtr(ra, Address(StackPointer, 0));
 }
 
 // ===============================================================
@@ -3379,9 +3492,9 @@ MacroAssembler::setupUnalignedABICall(Register scratch)
     ma_move(scratch, StackPointer);
 
     // Force sp to be aligned
-    ma_subu(StackPointer, StackPointer, Imm32(sizeof(uint32_t)));
+    subPtr(Imm32(sizeof(uintptr_t)), StackPointer);
     ma_and(StackPointer, StackPointer, Imm32(~(ABIStackAlignment - 1)));
-    as_sw(scratch, StackPointer, 0);
+    storePtr(scratch, Address(StackPointer, 0));
 }
 
 void
@@ -3405,9 +3518,9 @@ MacroAssembler::callWithABIPre(uint32_t* stackAdjust, bool callFromAsmJS)
     reserveStack(stackForCall);
 
     // Save $ra because call is going to clobber it. Restore it in
-    // callWithABIPost. NOTE: This is needed for calls from BaselineIC.
+    // callWithABIPost. NOTE: This is needed for calls from SharedIC.
     // Maybe we can do this differently.
-    ma_sw(ra, Address(StackPointer, stackForCall - sizeof(intptr_t)));
+    storePtr(ra, Address(StackPointer, stackForCall - sizeof(intptr_t)));
 
     // Position all arguments.
     {
@@ -3427,11 +3540,11 @@ void
 MacroAssembler::callWithABIPost(uint32_t stackAdjust, MoveOp::Type result)
 {
     // Restore ra value (as stored in callWithABIPre()).
-    ma_lw(ra, Address(StackPointer, stackAdjust - sizeof(intptr_t)));
+    loadPtr(Address(StackPointer, stackAdjust - sizeof(intptr_t)), ra);
 
     if (dynamicAlignment_) {
         // Restore sp value from stack (as stored in setupUnalignedABICall()).
-        ma_lw(StackPointer, Address(StackPointer, stackAdjust));
+        loadPtr(Address(StackPointer, stackAdjust), StackPointer);
         // Use adjustFrame instead of freeStack because we already restored sp.
         adjustFrame(-stackAdjust);
     } else {
@@ -3461,7 +3574,7 @@ void
 MacroAssembler::callWithABINoProfiler(const Address& fun, MoveOp::Type result)
 {
     // Load the callee in t9, as above.
-    ma_lw(t9, Address(fun.base, fun.offset));
+    loadPtr(Address(fun.base, fun.offset), t9);
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
     call(t9);

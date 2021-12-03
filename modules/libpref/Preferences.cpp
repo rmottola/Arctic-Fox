@@ -218,18 +218,6 @@ AssertNotAlreadyCached(const char* aPrefType,
 }
 #endif
 
-static size_t
-SizeOfObserverEntryExcludingThis(ValueObserverHashKey* aKey,
-                                 const nsRefPtr<ValueObserver>& aData,
-                                 mozilla::MallocSizeOf aMallocSizeOf,
-                                 void*)
-{
-  size_t n = 0;
-  n += aKey->mPrefName.SizeOfExcludingThisIfUnshared(aMallocSizeOf);
-  n += aData->mClosures.ShallowSizeOfExcludingThis(aMallocSizeOf);
-  return n;
-}
-
 // Although this is a member of Preferences, it measures sPreferences and
 // several other global structures.
 /* static */ int64_t
@@ -241,7 +229,7 @@ Preferences::SizeOfIncludingThisAndOtherStuff(mozilla::MallocSizeOf aMallocSizeO
   if (gHashTable) {
     // pref keys are allocated in a private arena, which we count elsewhere.
     // pref stringvals are allocated out of the same private arena.
-    n += PL_DHashTableSizeOfExcludingThis(gHashTable, nullptr, aMallocSizeOf);
+    n += gHashTable->ShallowSizeOfIncludingThis(aMallocSizeOf);
   }
   if (gCacheData) {
     n += gCacheData->ShallowSizeOfIncludingThis(aMallocSizeOf);
@@ -251,8 +239,11 @@ Preferences::SizeOfIncludingThisAndOtherStuff(mozilla::MallocSizeOf aMallocSizeO
   }
   if (gObserverTable) {
     n += aMallocSizeOf(gObserverTable);
-    n += gObserverTable->SizeOfExcludingThis(SizeOfObserverEntryExcludingThis,
-                                             aMallocSizeOf);
+    n += gObserverTable->ShallowSizeOfIncludingThis(aMallocSizeOf);
+    for (auto iter = gObserverTable->Iter(); !iter.Done(); iter.Next()) {
+      n += iter.Key()->mPrefName.SizeOfExcludingThisIfUnshared(aMallocSizeOf);
+      n += iter.Data()->mClosures.ShallowSizeOfExcludingThis(aMallocSizeOf);
+    }
   }
   // We don't measure sRootBranch and sDefaultRootBranch here because
   // DMD indicates they are not significant.

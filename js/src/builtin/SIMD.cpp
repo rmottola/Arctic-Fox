@@ -21,6 +21,7 @@
 #include "jsprf.h"
 
 #include "builtin/TypedObject.h"
+#include "jit/InlinableNatives.h"
 #include "js/Value.h"
 
 #include "jsobjinlines.h"
@@ -244,7 +245,7 @@ const JSFunctionSpec Float32x4Defn::TypedObjectMethods[] = {
 
 const JSFunctionSpec Float32x4Defn::Methods[] = {
 #define SIMD_FLOAT32X4_FUNCTION_ITEM(Name, Func, Operands) \
-    JS_FN(#Name, js::simd_float32x4_##Name, Operands, 0),
+    JS_INLINABLE_FN(#Name, js::simd_float32x4_##Name, Operands, 0, SimdFloat32x4),
     FLOAT32X4_FUNCTION_LIST(SIMD_FLOAT32X4_FUNCTION_ITEM)
 #undef SIMD_FLOAT32x4_FUNCTION_ITEM
     JS_FS_END
@@ -344,7 +345,7 @@ const JSFunctionSpec Int32x4Defn::TypedObjectMethods[] = {
 
 const JSFunctionSpec Int32x4Defn::Methods[] = {
 #define SIMD_INT32X4_FUNCTION_ITEM(Name, Func, Operands) \
-    JS_FN(#Name, js::simd_int32x4_##Name, Operands, 0),
+    JS_INLINABLE_FN(#Name, js::simd_int32x4_##Name, Operands, 0, SimdInt32x4),
     INT32X4_FUNCTION_LIST(SIMD_INT32X4_FUNCTION_ITEM)
 #undef SIMD_INT32X4_FUNCTION_ITEM
     JS_FS_END
@@ -363,7 +364,7 @@ CreateAndBindSimdClass(JSContext* cx, Handle<GlobalObject*> global, HandleObject
 
     // Create type constructor itself and initialize its reserved slots.
     Rooted<SimdTypeDescr*> typeDescr(cx);
-    typeDescr = NewObjectWithProto<SimdTypeDescr>(cx, funcProto, SingletonObject);
+    typeDescr = NewObjectWithGivenProto<SimdTypeDescr>(cx, funcProto, SingletonObject);
     if (!typeDescr)
         return nullptr;
 
@@ -383,7 +384,7 @@ CreateAndBindSimdClass(JSContext* cx, Handle<GlobalObject*> global, HandleObject
     if (!objProto)
         return nullptr;
     Rooted<TypedProto*> proto(cx);
-    proto = NewObjectWithProto<TypedProto>(cx, objProto, SingletonObject);
+    proto = NewObjectWithGivenProto<TypedProto>(cx, objProto, SingletonObject);
     if (!proto)
         return nullptr;
     typeDescr->initReservedSlot(JS_DESCR_SLOT_TYPROTO, ObjectValue(*proto));
@@ -780,9 +781,9 @@ ReplaceLane(JSContext* cx, unsigned argc, Value* vp)
     Elem* vec = TypedObjectMemory<Elem*>(args[0]);
     Elem result[V::lanes];
 
-    if (!args[1].isInt32())
+    int32_t lanearg;
+    if (!args[1].isNumber() || !NumberIsInt32(args[1].toNumber(), &lanearg))
         return ErrorBadArgs(cx);
-    int32_t lanearg = args[1].toInt32();
     if (lanearg < 0 || uint32_t(lanearg) >= V::lanes)
         return ErrorBadArgs(cx);
     uint32_t lane = uint32_t(lanearg);
@@ -808,9 +809,9 @@ Swizzle(JSContext* cx, unsigned argc, Value* vp)
 
     uint32_t lanes[V::lanes];
     for (unsigned i = 0; i < V::lanes; i++) {
-        if (!args[i + 1].isInt32())
+        int32_t lane;
+        if (!args[i + 1].isNumber() || !NumberIsInt32(args[i + 1].toNumber(), &lane))
             return ErrorBadArgs(cx);
-        int32_t lane = args[i + 1].toInt32();
         if (lane < 0 || uint32_t(lane) >= V::lanes)
             return ErrorBadArgs(cx);
         lanes[i] = uint32_t(lane);
@@ -837,9 +838,9 @@ Shuffle(JSContext* cx, unsigned argc, Value* vp)
 
     uint32_t lanes[V::lanes];
     for (unsigned i = 0; i < V::lanes; i++) {
-        if (!args[i + 2].isInt32())
+        int32_t lane;
+        if (!args[i + 2].isNumber() || !NumberIsInt32(args[i + 2].toNumber(), &lane))
             return ErrorBadArgs(cx);
-        int32_t lane = args[i + 2].toInt32();
         if (lane < 0 || uint32_t(lane) >= (2 * V::lanes))
             return ErrorBadArgs(cx);
         lanes[i] = uint32_t(lane);

@@ -46,23 +46,11 @@ public:
   // Initializes the demuxer. Other methods cannot be called unless
   // initialization has completed and succeeded.
   // Typically a demuxer will wait to parse the metadata before resolving the
-  // promise. The promise will be rejected with WAITING_FOR_DATA should
-  // insufficient data be available at the time. Init() would have to be called
-  // again to retry once more data has been received.
+  // promise. The promise must not be resolved until sufficient data is
+  // supplied. For example, an incomplete metadata would cause the promise to be
+  // rejected should no more data be coming, while the demuxer would wait
+  // otherwise.
   virtual nsRefPtr<InitPromise> Init() = 0;
-
-  // MediaFormatReader ensures that calls to the MediaDataDemuxer are thread-safe.
-  // This is done by having multiple demuxers, created with Clone(), one per
-  // running thread.
-  // However, should the MediaDataDemuxer object guaranteed to be thread-safe
-  // such cloning is unnecessary and only one demuxer will be used across
-  // all threads.
-  virtual bool IsThreadSafe() { return false; }
-
-  // Clone the demuxer and return a new initialized demuxer.
-  // This can only be called once Init() has succeeded.
-  // The new demuxer can be immediately use to retrieve the track demuxers.
-  virtual already_AddRefed<MediaDataDemuxer> Clone() const = 0;
 
   // Returns true if a aType track type is available.
   virtual bool HasTrackType(TrackInfo::TrackType aType) const = 0;
@@ -89,15 +77,17 @@ public:
     return nullptr;
   }
 
-  // Notifies the demuxer that the underlying resource has received more data.
+  // Notifies the demuxer that the underlying resource has received more data
+  // since the demuxer was initialized.
   // The demuxer can use this mechanism to inform all track demuxers that new
-  // data is available.
-  virtual void NotifyDataArrived(uint32_t aLength, int64_t aOffset) { }
+  // data is available and to refresh its buffered range.
+  virtual void NotifyDataArrived() { }
 
-  // Notifies the demuxer that the underlying resource has had data removed.
+  // Notifies the demuxer that the underlying resource has had data removed
+  // since the demuxer was initialized.
   // The demuxer can use this mechanism to inform all track demuxers to update
-  // its TimeIntervals.
-  // This will be called should the demuxer be used with MediaSource.
+  // its buffered range.
+  // This will be called should the demuxer be used with MediaSourceResource.
   virtual void NotifyDataRemoved() { }
 
   // Indicate to MediaFormatReader if it should compute the start time
@@ -206,8 +196,6 @@ public:
   }
 
   virtual media::TimeIntervals GetBuffered() = 0;
-
-  virtual int64_t GetEvictionOffset(media::TimeUnit aTime) = 0;
 
   // If the MediaTrackDemuxer and MediaDataDemuxer hold cross references.
   // BreakCycles must be overridden.

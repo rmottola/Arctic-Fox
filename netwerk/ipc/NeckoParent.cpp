@@ -271,7 +271,7 @@ NeckoParent::AllocPFTPChannelParent(const PBrowserOrId& aBrowser,
     return nullptr;
   }
   PBOverrideStatus overrideStatus = PBOverrideStatusFromLoadContext(aSerialized);
-  FTPChannelParent *p = new FTPChannelParent(loadContext, overrideStatus);
+  FTPChannelParent *p = new FTPChannelParent(aBrowser, loadContext, overrideStatus);
   p->AddRef();
   return p;
 }
@@ -968,6 +968,22 @@ NeckoParent::OfflineNotification(nsISupports *aSubject)
   }
 
   return NS_OK;
+}
+
+bool
+NeckoParent::RecvRemoveSchedulingContext(const nsCString& scid)
+{
+  nsCOMPtr<nsISchedulingContextService> scsvc =
+    do_GetService("@mozilla.org/network/scheduling-context-service;1");
+  if (!scsvc) {
+    return true;
+  }
+
+  nsID id;
+  id.Parse(scid.BeginReading());
+  scsvc->RemoveSchedulingContext(id);
+
+  return true;
 }
 
 } // namespace net

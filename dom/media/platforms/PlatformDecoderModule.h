@@ -7,7 +7,9 @@
 #if !defined(PlatformDecoderModule_h_)
 #define PlatformDecoderModule_h_
 
+#include "FlushableTaskQueue.h"
 #include "MediaDecoderReader.h"
+#include "mozilla/MozPromise.h"
 #include "mozilla/layers/LayersTypes.h"
 #include "nsTArray.h"
 #include "mozilla/RefPtr.h"
@@ -98,8 +100,6 @@ public:
   // feeding it to MediaDataDecoder::Input.
   virtual ConversionRequired DecoderNeedsConversion(const TrackInfo& aConfig) const = 0;
 
-  virtual void DisableHardwareAcceleration() {}
-
   virtual bool SupportsSharedDecoders(const VideoInfo& aConfig) const {
     return !AgnosticMimeType(aConfig.mMimeType);
   }
@@ -177,6 +177,8 @@ public:
   virtual void DrainComplete() = 0;
 
   virtual void ReleaseMediaResources() {};
+
+  virtual bool OnReaderTaskQueue() = 0;
 };
 
 // MediaDataDecoder is the interface exposed by decoders created by the
@@ -184,9 +186,13 @@ public:
 // media data that the decoder accepts as valid input and produces as
 // output is determined when the MediaDataDecoder is created.
 //
-// All functions are only called on the decode task queue. Don't block
-// inside these functions, unless it's explicitly noted that you should
-// (like in Flush() and Drain()).
+// Unless otherwise noted, all functions are only called on the decode task
+// queue.  An exception is the MediaDataDecoder in
+// MP4Reader::IsVideoAccelerated() for which all calls (Init(),
+// IsHardwareAccelerated(), and Shutdown()) are from the main thread.
+//
+// Don't block inside these functions, unless it's explicitly noted that you
+// should (like in Flush()).
 //
 // Decoding is done asynchronously. Any async work can be done on the
 // TaskQueue passed into the PlatformDecoderModules's Create*Decoder()
@@ -197,16 +203,24 @@ protected:
   virtual ~MediaDataDecoder() {};
 
 public:
+  enum DecoderFailureReason {
+    INIT_ERROR,
+    CANCELED
+  };
+
+  typedef TrackInfo::TrackType TrackType;
+  typedef MozPromise<TrackType, DecoderFailureReason, /* IsExclusive = */ true> InitPromise;
+
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(MediaDataDecoder)
 
-  // Initialize the decoder. The decoder should be ready to decode after
-  // this returns. The decoder should do any initialization here, rather
+  // Initialize the decoder. The decoder should be ready to decode once
+  // promise resolves. The decoder should do any initialization here, rather
   // than in its constructor or PlatformDecoderModule::Create*Decoder(),
   // so that if the MP4Reader needs to shutdown during initialization,
   // it can call Shutdown() to cancel this operation. Any initialization
   // that requires blocking the calling thread in this function *must*
   // be done here so that it can be canceled by calling Shutdown()!
-  virtual nsresult Init() = 0;
+  virtual nsRefPtr<InitPromise> Init() = 0;
 
   // Inserts a sample into the decoder's decode pipeline.
   virtual nsresult Input(MediaRawData* aSample) = 0;
@@ -241,7 +255,10 @@ public:
   // returned.
   virtual nsresult Shutdown() = 0;
 
-  virtual bool IsHardwareAccelerated() const { return false; }
+  // Called from the state machine task queue or main thread.
+  // Decoder needs to decide whether or not hardware accelearation is supported
+  // after creating. It doesn't need to call Init() before calling this function.
+  virtual bool IsHardwareAccelerated(nsACString& aFailureReason) const { return false; }
 
   // ConfigurationChanged will be called to inform the video or audio decoder
   // that the format of the next input sample is about to change.

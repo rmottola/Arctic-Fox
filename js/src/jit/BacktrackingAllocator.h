@@ -546,6 +546,9 @@ class BacktrackingAllocator : protected RegisterAllocator
     friend class C1Spewer;
     friend class JSONSpewer;
 
+    // This flag is set when testing new allocator modifications.
+    bool testbed;
+
     BitSet* liveIn;
     FixedList<VirtualRegister> vregs;
 
@@ -606,8 +609,9 @@ class BacktrackingAllocator : protected RegisterAllocator
     SpillSlotList normalSlots, doubleSlots, quadSlots;
 
   public:
-    BacktrackingAllocator(MIRGenerator* mir, LIRGenerator* lir, LIRGraph& graph)
+    BacktrackingAllocator(MIRGenerator* mir, LIRGenerator* lir, LIRGraph& graph, bool testbed)
       : RegisterAllocator(mir, lir, graph),
+        testbed(testbed),
         liveIn(nullptr),
         callRanges(nullptr)
     { }
@@ -707,7 +711,7 @@ class BacktrackingAllocator : protected RegisterAllocator
     struct PrintLiveRange;
 
     bool minimalDef(LiveRange* range, LNode* ins);
-    bool minimalUse(LiveRange* range, LNode* ins);
+    bool minimalUse(LiveRange* range, UsePosition* use);
     bool minimalBundle(LiveBundle* bundle, bool* pfixed = nullptr);
 
     // Heuristic methods.

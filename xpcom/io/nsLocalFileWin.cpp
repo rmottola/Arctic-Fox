@@ -3189,7 +3189,6 @@ nsLocalFile::GetTarget(nsAString& aResult)
 }
 
 
-/* attribute bool followLinks; */
 NS_IMETHODIMP
 nsLocalFile::GetFollowLinks(bool* aFollowLinks)
 {
@@ -3251,7 +3250,6 @@ nsLocalFile::SetPersistentDescriptor(const nsACString& aPersistentDescriptor)
   }
 }
 
-/* attrib unsigned long fileAttributesWin; */
 NS_IMETHODIMP
 nsLocalFile::GetFileAttributesWin(uint32_t* aAttribs)
 {

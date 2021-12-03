@@ -43,9 +43,13 @@ browser.jar:
         skin/classic/browser/identity.png
         skin/classic/browser/imagedocument.png 
         skin/classic/browser/identity-icons-generic.png
+        skin/classic/browser/identity-icons-generic@2x.png
         skin/classic/browser/identity-icons-https.png
         skin/classic/browser/identity-icons-https-ev.png
         skin/classic/browser/identity-icons-https-mixed-active.png
+        skin/classic/browser/identity-icons-https-mixed-active@2x.png
+        skin/classic/browser/identity-icons-https-mixed-display.png
+        skin/classic/browser/identity-icons-https-mixed-display@2x.png
         skin/classic/browser/keyhole-forward-mask.svg
         skin/classic/browser/KUI-background.png
         skin/classic/browser/KUI-close.png
@@ -76,7 +80,6 @@ browser.jar:
         skin/classic/browser/Search-glass.png
         skin/classic/browser/searchbar.css
         skin/classic/browser/searchbar-dropdown-arrow.png
-        skin/classic/browser/Secure24.png
         skin/classic/browser/setDesktopBackground.css
         skin/classic/browser/slowStartup-16.png
         skin/classic/browser/Toolbar.png
@@ -117,6 +120,7 @@ browser.jar:
         skin/classic/browser/webRTC-camera-black-16.png
         skin/classic/browser/webRTC-microphone-black-16.png
         skin/classic/browser/webRTC-screen-black-16.png
+*       skin/classic/browser/controlcenter/panel.css        (controlcenter/panel.css)
 *       skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
         skin/classic/browser/downloads/buttons.png                   (downloads/buttons.png)
         skin/classic/browser/downloads/contentAreaDownloadsView.css  (downloads/contentAreaDownloadsView.css)

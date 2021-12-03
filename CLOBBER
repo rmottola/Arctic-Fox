@@ -16,9 +16,5 @@
 # Note: The description below will be part of the error message shown to users.
 #
 # Modifying this file will now automatically clobber the buildbot machines \o/
-#
-Bug 1154235: Merge BluetoothUtils.{cpp,h} variants into single file
 
-This patch set renames and removes source files. This requires updating
-the build system's dependency information from scratch. The issue has
-been reported in bug 1154232.
+Bug 1178892 requires clobber for profiler file moves.

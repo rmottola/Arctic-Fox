@@ -62,14 +62,13 @@ CanvasClient2D::Update(gfx::IntSize aSize, ClientCanvasLayer* aLayer)
     gfxContentType contentType = isOpaque
                                                 ? gfxContentType::COLOR
                                                 : gfxContentType::COLOR_ALPHA;
-    gfxImageFormat format
-      = gfxPlatform::GetPlatform()->OptimalFormatForContent(contentType);
+    gfx::SurfaceFormat surfaceFormat
+      = gfxPlatform::GetPlatform()->Optimal2DFormatForContent(contentType);
     TextureFlags flags = TextureFlags::DEFAULT;
     if (mTextureFlags & TextureFlags::ORIGIN_BOTTOM_LEFT) {
       flags |= TextureFlags::ORIGIN_BOTTOM_LEFT;
     }
 
-    gfx::SurfaceFormat surfaceFormat = gfx::ImageFormatToSurfaceFormat(format);
     mBuffer = CreateTextureClientForCanvas(surfaceFormat, aSize, flags, aLayer);
     if (!mBuffer) {
       NS_WARNING("Failed to allocate the TextureClient");
@@ -127,14 +126,13 @@ CanvasClient2D::CreateTextureClientForCanvas(gfx::SurfaceFormat aFormat,
                                                    mTextureFlags | aFlags);
   }
 
-  gfx::BackendType backend = gfxPlatform::GetPlatform()->GetPreferredCanvasBackend();
 #ifdef XP_WIN
-  return CreateTextureClientForDrawing(aFormat, aSize, backend, aFlags);
+  return CreateTextureClientForDrawing(aFormat, aSize, BackendSelector::Canvas, aFlags);
 #else
   // XXX - We should use CreateTextureClientForDrawing, but we first need
   // to use double buffering.
   return TextureClient::CreateForRawBufferAccess(GetForwarder(),
-                                                 aFormat, aSize, backend,
+                                                 aFormat, aSize, gfx::BackendType::NONE,
                                                  mTextureFlags | aFlags);
 #endif
 }

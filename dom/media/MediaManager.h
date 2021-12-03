@@ -103,7 +103,7 @@ public:
     return mStream->AsSourceStream();
   }
 
-  void StopScreenWindowSharing();
+  void StopSharing();
 
   void StopTrack(TrackID aID, bool aIsAudio);
 
@@ -579,17 +579,17 @@ public:
 
   nsresult EnumerateDevices(nsPIDOMWindow* aWindow, dom::Promise& aPromise);
   void OnNavigation(uint64_t aWindowID);
-  bool IsWindowActivelyCapturing(uint64_t aWindowId);
+  bool IsActivelyCapturingOrHasAPermission(uint64_t aWindowId);
 
   MediaEnginePrefs mPrefs;
 
   typedef nsTArray<nsRefPtr<MediaDevice>> SourceSet;
+  static bool IsPrivateBrowsing(nsPIDOMWindow *window);
 private:
   typedef media::Pledge<SourceSet*, dom::MediaStreamError> PledgeSourceSet;
 
   static bool IsPrivileged();
   static bool IsLoop(nsIURI* aDocURI);
-  static bool IsPrivateBrowsing(nsPIDOMWindow *window);
   static nsresult GenerateUUID(nsAString& aResult);
   static nsresult AnonymizeId(nsAString& aId, const nsACString& aOriginKey);
 public: // TODO: make private once we upgrade to GCC 4.8+ on linux.
@@ -597,10 +597,14 @@ public: // TODO: make private once we upgrade to GCC 4.8+ on linux.
   static already_AddRefed<nsIWritableVariant> ToJSArray(SourceSet& aDevices);
 private:
   already_AddRefed<PledgeSourceSet>
-  EnumerateRawDevices(uint64_t aWindowId, dom::MediaSourceEnum aSrcType,
+  EnumerateRawDevices(uint64_t aWindowId,
+                      dom::MediaSourceEnum aVideoType,
+                      dom::MediaSourceEnum aAudioType,
                       bool aFake, bool aFakeTracks);
   already_AddRefed<PledgeSourceSet>
-  EnumerateDevicesImpl(uint64_t aWindowId, dom::MediaSourceEnum aSrcType,
+  EnumerateDevicesImpl(uint64_t aWindowId,
+                       dom::MediaSourceEnum aVideoSrcType,
+                       dom::MediaSourceEnum aAudioSrcType,
                        bool aFake = false, bool aFakeTracks = false);
 
   StreamListeners* AddWindowID(uint64_t aWindowId);

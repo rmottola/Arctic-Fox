@@ -23,5 +23,3 @@ if CONFIG['CLANG_CXX']:
   ]
 
 FINAL_LIBRARY = 'xul'
-
-FAIL_ON_WARNINGS = True

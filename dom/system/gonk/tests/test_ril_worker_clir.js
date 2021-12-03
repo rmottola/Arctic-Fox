@@ -1,5 +1,5 @@
 /* Any copyright is dedicated to the Public Domain.
-   http://creativecommons.org/publicdomain/zero/1.0/ */
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
 subscriptLoader.loadSubScript("resource://gre/modules/ril_consts.js", this);
 
@@ -23,8 +23,7 @@ add_test(function test_setCLIR_success() {
 
   context.RIL.setCLIR = function fakeSetCLIR(options) {
     context.RIL[REQUEST_SET_CLIR](0, {
-      rilMessageType: "setCLIR",
-      rilRequestError: ERROR_SUCCESS
+      rilMessageType: "setCLIR"
     });
   };
 
@@ -34,8 +33,8 @@ add_test(function test_setCLIR_success() {
 
   let postedMessage = workerHelper.postedMessage;
 
-  do_check_eq(postedMessage.errorMsg, undefined);
-  do_check_true(postedMessage.success);
+  equal(postedMessage.errorMsg, undefined);
+  ok(postedMessage.success);
 
   run_next_test();
 });
@@ -48,7 +47,7 @@ add_test(function test_setCLIR_generic_failure() {
   context.RIL.setCLIR = function fakeSetCLIR(options) {
     context.RIL[REQUEST_SET_CLIR](0, {
       rilMessageType: "setCLIR",
-      rilRequestError: ERROR_GENERIC_FAILURE
+      errorMsg: GECKO_ERROR_GENERIC_FAILURE
     });
   };
 
@@ -58,8 +57,8 @@ add_test(function test_setCLIR_generic_failure() {
 
   let postedMessage = workerHelper.postedMessage;
 
-  do_check_eq(postedMessage.errorMsg, "GenericFailure");
-  do_check_false(postedMessage.success);
+  equal(postedMessage.errorMsg, "GenericFailure");
+  ok(!postedMessage.success);
 
   run_next_test();
 });
@@ -81,8 +80,7 @@ add_test(function test_getCLIR_n0_m1() {
       2   // Length.
     ];
     context.RIL[REQUEST_GET_CLIR](1, {
-      rilMessageType: "setCLIR",
-      rilRequestError: ERROR_SUCCESS
+      rilMessageType: "setCLIR"
     });
   };
 
@@ -90,10 +88,10 @@ add_test(function test_getCLIR_n0_m1() {
 
   let postedMessage = workerHelper.postedMessage;
 
-  do_check_eq(postedMessage.errorMsg, undefined);
-  do_check_true(postedMessage.success);
-  do_check_eq(postedMessage.n, 0);
-  do_check_eq(postedMessage.m, 1);
+  equal(postedMessage.errorMsg, undefined);
+  ok(postedMessage.success);
+  equal(postedMessage.n, 0);
+  equal(postedMessage.m, 1);
   run_next_test();
 });
 
@@ -114,8 +112,7 @@ add_test(function test_getCLIR_error_generic_failure_invalid_length() {
       0   // Length (invalid one).
     ];
     context.RIL[REQUEST_GET_CLIR](1, {
-      rilMessageType: "setCLIR",
-      rilRequestError: ERROR_SUCCESS
+      rilMessageType: "setCLIR"
     });
   };
 
@@ -123,7 +120,7 @@ add_test(function test_getCLIR_error_generic_failure_invalid_length() {
 
   let postedMessage = workerHelper.postedMessage;
 
-  do_check_eq(postedMessage.errorMsg, "GenericFailure");
-  do_check_false(postedMessage.success);
+  equal(postedMessage.errorMsg, "GenericFailure");
+  ok(!postedMessage.success);
   run_next_test();
 });

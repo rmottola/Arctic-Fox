@@ -453,8 +453,11 @@ JSRope::flattenInternal(ExclusiveContext* maybecx)
         }
     }
 
-    if (!AllocChars(this, wholeLength, &wholeChars, &wholeCapacity))
+    if (!AllocChars(this, wholeLength, &wholeChars, &wholeCapacity)) {
+        if (maybecx)
+            ReportOutOfMemory(maybecx);
         return nullptr;
+    }
 
     pos = wholeChars;
     first_visit_node: {

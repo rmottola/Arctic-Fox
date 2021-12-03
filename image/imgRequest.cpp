@@ -714,7 +714,6 @@ imgRequest::GetMultipart() const
 
 /** nsIRequestObserver methods **/
 
-/* void onStartRequest (in nsIRequest request, in nsISupports ctxt); */
 NS_IMETHODIMP
 imgRequest::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
 {
@@ -917,6 +916,7 @@ struct NewPartResult final
     : mImage(aExistingImage)
     , mIsFirstPart(!aExistingImage)
     , mSucceeded(false)
+    , mShouldResetCacheEntry(false)
   { }
 
   nsAutoCString mContentType;
@@ -924,6 +924,7 @@ struct NewPartResult final
   nsRefPtr<Image> mImage;
   const bool mIsFirstPart;
   bool mSucceeded;
+  bool mShouldResetCacheEntry;
 };
 
 static NewPartResult
@@ -983,6 +984,9 @@ PrepareForNewPart(nsIRequest* aRequest, nsIInputStream* aInStr, uint32_t aCount,
       // Transition to the new part.
       auto multipartImage = static_cast<MultipartImage*>(aExistingImage);
       multipartImage->BeginTransitionToPart(partImage);
+
+      // Reset our cache entry size so it doesn't keep growing without bound.
+      result.mShouldResetCacheEntry = true;
     }
   } else {
     MOZ_ASSERT(!aExistingImage, "New part for non-multipart channel?");
@@ -1042,6 +1046,10 @@ imgRequest::FinishPreparingForNewPart(const NewPartResult& aResult)
     nsRefPtr<ProgressTracker> progressTracker = GetProgressTracker();
     progressTracker->OnImageAvailable();
     MOZ_ASSERT(progressTracker->HasImage());
+  }
+
+  if (aResult.mShouldResetCacheEntry) {
+    ResetCacheEntry();
   }
 
   if (IsDecodeRequested()) {

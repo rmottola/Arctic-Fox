@@ -18,6 +18,8 @@ class MediaRawData;
 // Manage the data flow from inputting encoded data and outputting decode data.
 class GonkDecoderManager {
 public:
+  typedef TrackInfo::TrackType TrackType;
+
   virtual ~GonkDecoderManager() {}
 
   // Creates and initializs the GonkDecoder.
@@ -38,6 +40,8 @@ public:
 
   // Flush the queued sample.
   virtual nsresult Flush() = 0;
+
+  virtual TrackType GetTrackType() = 0;
 
   void ClearQueuedSample() {
     MOZ_ASSERT(mTaskQueue->IsCurrentThreadIn());
@@ -60,9 +64,9 @@ public:
 
   ~GonkMediaDataDecoder();
 
-  virtual nsresult Init() override;
+  virtual nsRefPtr<InitPromise> Init() override;
 
-  virtual nsresult Input(MediaRawData* aSample);
+  virtual nsresult Input(MediaRawData* aSample) override;
 
   virtual nsresult Flush() override;
 

@@ -8,6 +8,7 @@
 #define vm_ScopeObject_inl_h
 
 #include "vm/ScopeObject.h"
+#include "frontend/SharedContext.h"
 
 #include "jsobjinlines.h"
 
@@ -88,14 +89,15 @@ StaticScopeIter<allowGC>::operator++(int)
         obj = obj->template as<StaticNonSyntacticScopeObjects>().enclosingScopeForStaticScopeIter();
     } else if (onNamedLambda || !obj->template as<JSFunction>().isNamedLambda()) {
         onNamedLambda = false;
-        obj = obj->template as<JSFunction>().nonLazyScript()->enclosingStaticScope();
+        JSFunction& fun = obj->template as<JSFunction>();
+        if (fun.isBeingParsed())
+            obj = fun.functionBox()->enclosingStaticScope();
+        else
+            obj = fun.nonLazyScript()->enclosingStaticScope();
     } else {
         onNamedLambda = true;
     }
-    MOZ_ASSERT_IF(obj, obj->template is<NestedScopeObject>() ||
-                       obj->template is<StaticEvalObject>() ||
-                       obj->template is<StaticNonSyntacticScopeObjects>() ||
-                       obj->template is<JSFunction>());
+    MOZ_ASSERT_IF(obj, IsStaticScope(obj));
     MOZ_ASSERT_IF(onNamedLambda, obj->template is<JSFunction>());
 }
 
@@ -103,8 +105,12 @@ template <AllowGC allowGC>
 inline bool
 StaticScopeIter<allowGC>::hasSyntacticDynamicScopeObject() const
 {
-    if (obj->template is<JSFunction>())
-        return obj->template as<JSFunction>().isHeavyweight();
+    if (obj->template is<JSFunction>()) {
+        JSFunction& fun = obj->template as<JSFunction>();
+        if (fun.isBeingParsed())
+            return fun.functionBox()->isHeavyweight();
+        return fun.isHeavyweight();
+    }
     if (obj->template is<StaticBlockObject>())
         return obj->template as<StaticBlockObject>().needsClone();
     if (obj->template is<StaticWithObject>())
@@ -189,6 +195,16 @@ StaticScopeIter<allowGC>::fun() const
 {
     MOZ_ASSERT(type() == Function);
     return obj->template as<JSFunction>();
+}
+
+template <AllowGC allowGC>
+inline frontend::FunctionBox*
+StaticScopeIter<allowGC>::maybeFunctionBox() const
+{
+    MOZ_ASSERT(type() == Function);
+    if (fun().isBeingParsed())
+        return fun().functionBox();
+    return nullptr;
 }
 
 }  /* namespace js */

@@ -25,6 +25,7 @@ DIRS += [
     'gmp-plugin',
     'gmp-plugin-openh264',
     'imagecapture',
+    'mediasink',
     'mediasource',
     'ogg',
     'platforms',
@@ -93,17 +94,17 @@ EXPORTS += [
     'AudioChannelFormat.h',
     'AudioCompactor.h',
     'AudioMixer.h',
+    'AudioPacketizer.h',
     'AudioSampleFormat.h',
     'AudioSegment.h',
     'AudioStream.h',
     'BufferMediaResource.h',
     'CubebUtils.h',
-    'DecodedStream.h',
     'DecoderTraits.h',
     'DOMMediaStream.h',
     'EncodedBufferCache.h',
     'FileBlockCache.h',
-    'GraphDriver.h',
+    'FlushableTaskQueue.h',
     'Intervals.h',
     'Latency.h',
     'MediaCache.h',
@@ -113,6 +114,7 @@ EXPORTS += [
     'MediaDecoderOwner.h',
     'MediaDecoderReader.h',
     'MediaDecoderStateMachine.h',
+    'MediaEventSource.h',
     'MediaFormatReader.h',
     'MediaInfo.h',
     'MediaMetadataManager.h',
@@ -120,6 +122,7 @@ EXPORTS += [
     'MediaRecorder.h',
     'MediaResource.h',
     'MediaSegment.h',
+    'MediaStatistics.h',
     'MediaStreamGraph.h',
     'MediaTimer.h',
     'MediaTrack.h',
@@ -131,7 +134,6 @@ EXPORTS += [
     'RtspMediaResource.h',
     'SelfRef.h',
     'SharedBuffer.h',
-    'SharedThreadPool.h',
     'StreamBuffer.h',
     'ThreadPoolCOMListener.h',
     'TimeUnits.h',
@@ -144,13 +146,9 @@ EXPORTS += [
 ]
 
 EXPORTS.mozilla += [
-    'AbstractThread.h',
     'MediaManager.h',
-    'MozPromise.h',
     'StateMirroring.h',
     'StateWatching.h',
-    'TaskDispatcher.h',
-    'TaskQueue.h',
 ]
 
 EXPORTS.mozilla.media.webrtc += [
@@ -188,21 +186,20 @@ EXPORTS.mozilla.dom += [
 ]
 
 UNIFIED_SOURCES += [
-    'AbstractThread.cpp',
+    'AudioCaptureStream.cpp',
     'AudioChannelFormat.cpp',
     'AudioCompactor.cpp',
     'AudioSegment.cpp',
-    'AudioSink.cpp',
     'AudioStream.cpp',
     'AudioStreamTrack.cpp',
     'AudioTrack.cpp',
     'AudioTrackList.cpp',
     'CanvasCaptureMediaStream.cpp',
     'CubebUtils.cpp',
-    'DecodedStream.cpp',
     'DOMMediaStream.cpp',
     'EncodedBufferCache.cpp',
     'FileBlockCache.cpp',
+    'FlushableTaskQueue.cpp',
     'GetUserMediaRequest.cpp',
     'GraphDriver.cpp',
     'Latency.cpp',
@@ -228,9 +225,7 @@ UNIFIED_SOURCES += [
     'MP3Demuxer.cpp',
     'MP3FrameParser.cpp',
     'RtspMediaResource.cpp',
-    'SharedThreadPool.cpp',
     'StreamBuffer.cpp',
-    'TaskQueue.cpp',
     'TextTrack.cpp',
     'TextTrackCue.cpp',
     'TextTrackCueList.cpp',
@@ -275,8 +270,6 @@ EXTRA_JS_MODULES.media += [
     'PeerConnectionIdp.jsm',
     'RTCStatsReport.jsm',
 ]
-
-FAIL_ON_WARNINGS = True
 
 LOCAL_INCLUDES += [
     '/caps',

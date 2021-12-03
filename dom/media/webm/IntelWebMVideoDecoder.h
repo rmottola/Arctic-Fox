@@ -28,7 +28,8 @@ class IntelWebMVideoDecoder : public WebMVideoDecoder, public MediaDataDecoderCa
 {
 public:
   static WebMVideoDecoder* Create(WebMReader* aReader);
-  virtual nsresult Init(unsigned int aWidth, unsigned int aHeight) override;
+  virtual nsRefPtr<InitPromise> Init(unsigned int aWidth = 0,
+                                     unsigned int aHeight = 0) override;
   virtual nsresult Flush() override;
   virtual void Shutdown() override;
 
@@ -41,6 +42,11 @@ public:
 
   virtual void InputExhausted() override;
   virtual void Error() override;
+
+  virtual bool OnReaderTaskQueue() override
+  {
+    return mReader->OnTaskQueue();
+  }
 
   IntelWebMVideoDecoder(WebMReader* aReader);
   ~IntelWebMVideoDecoder();

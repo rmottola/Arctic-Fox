@@ -968,18 +968,30 @@ WatchProperty(JSContext* cx, HandleObject obj, HandleId id, HandleObject callabl
 extern bool
 UnwatchProperty(JSContext* cx, HandleObject obj, HandleId id);
 
-/*
- * ToPrimitive support, currently implemented like an internal method (JSClass::convert).
- * In ES6 this is just a method, @@toPrimitive. See bug 1054756.
- */
+/* ES6 draft rev 36 (2015 March 17) 7.1.1 ToPrimitive(vp, preferredType) */
+extern bool
+ToPrimitiveSlow(JSContext* cx, MutableHandleValue vp);
+
+inline bool
+ToPrimitive(JSContext* cx, MutableHandleValue vp)
+{
+    if (vp.isPrimitive())
+        return true;
+    return ToPrimitiveSlow(cx, vp);
+}
+
 extern bool
 ToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHandleValue vp);
 
-MOZ_ALWAYS_INLINE bool
-ToPrimitive(JSContext* cx, MutableHandleValue vp);
-
-MOZ_ALWAYS_INLINE bool
-ToPrimitive(JSContext* cx, JSType preferredType, MutableHandleValue vp);
+inline bool
+ToPrimitive(JSContext* cx, JSType preferredType, MutableHandleValue vp)
+{
+    MOZ_ASSERT(preferredType != JSTYPE_VOID);  // Use the other ToPrimitive!
+    if (vp.isPrimitive())
+        return true;
+    RootedObject obj(cx, &vp.toObject());
+    return ToPrimitive(cx, obj, preferredType, vp);
+}
 
 /*
  * toString support. (This isn't called GetClassName because there's a macro in
@@ -1275,8 +1287,21 @@ XDRObjectLiteral(XDRState<mode>* xdr, MutableHandleObject obj);
 extern bool
 ReportGetterOnlyAssignment(JSContext* cx, bool strict);
 
-extern JSObject*
-NonNullObject(JSContext* cx, const Value& v);
+/*
+ * Report a TypeError: "so-and-so is not an object".
+ * Using NotNullObject is usually less code.
+ */
+extern void
+ReportNotObject(JSContext* cx, const Value& v);
+
+inline JSObject*
+NonNullObject(JSContext* cx, const Value& v)
+{
+    if (v.isObject())
+        return &v.toObject();
+    ReportNotObject(cx, v);
+    return nullptr;
+}
 
 extern const char*
 InformalValueTypeName(const Value& v);

@@ -100,9 +100,8 @@ AudioParam::Stream()
 
   AudioNodeEngine* engine = new AudioNodeEngine(nullptr);
   nsRefPtr<AudioNodeStream> stream =
-    mNode->Context()->Graph()->CreateAudioNodeStream(engine,
-                                                     MediaStreamGraph::INTERNAL_STREAM,
-                                                     Node()->Context()->SampleRate());
+    AudioNodeStream::Create(mNode->Context()->Graph(), engine,
+                            AudioNodeStream::NO_STREAM_FLAGS);
 
   // Force the input to have only one channel, and make it down-mix using
   // the speaker rules if needed.
@@ -113,7 +112,7 @@ AudioParam::Stream()
   mStream = stream.forget();
 
   // Setup the AudioParam's stream as an input to the owner AudioNode's stream
-  AudioNodeStream* nodeStream = mNode->Stream();
+  AudioNodeStream* nodeStream = mNode->GetStream();
   if (nodeStream) {
     mNodeStreamPort =
       nodeStream->AllocateInputPort(mStream, MediaInputPort::FLAG_BLOCK_INPUT);

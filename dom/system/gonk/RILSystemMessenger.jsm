@@ -14,12 +14,6 @@ XPCOMUtils.defineLazyGetter(this, "RIL", function () {
   return obj;
 });
 
-XPCOMUtils.defineLazyGetter(this, "gStkCmdFactory", function() {
-  let stk = {};
-  Cu.import("resource://gre/modules/StkProactiveCmdFactory.jsm", stk);
-  return stk.StkProactiveCmdFactory;
-});
-
 /**
  * RILSystemMessenger
  */
@@ -35,6 +29,18 @@ RILSystemMessenger.prototype = {
    *        The message object to be broadcasted.
    */
   broadcastMessage: function(aType, aMessage) {
+    // Function stub to be replaced by the owner of this messenger.
+  },
+
+  /**
+   * Hook of the function to create MozStkCommand message.
+   * @param  aStkProactiveCmd
+   *         nsIStkProactiveCmd instance.
+   *
+   * @return a JS object which complies the dictionary of MozStkCommand defined
+   *         in MozStkCommandEvent.webidl
+   */
+  createCommandMessage: function(aStkProactiveCmd) {
     // Function stub to be replaced by the owner of this messenger.
   },
 
@@ -84,13 +90,19 @@ RILSystemMessenger.prototype = {
   },
 
   /**
-   * Wrapper to send 'sms-received', 'sms-delivery-success', 'sms-sent' system message.
+   * Wrapper to send 'sms-received', 'sms-delivery-success', 'sms-sent',
+   * 'sms-failed', 'sms-delivery-error' system message.
    */
   notifySms: function(aNotificationType, aId, aThreadId, aIccId, aDelivery,
                       aDeliveryStatus, aSender, aReceiver, aBody, aMessageClass,
                       aTimestamp, aSentTimestamp, aDeliveryTimestamp, aRead) {
-    let msgType =
-      ["sms-received", "sms-sent", "sms-delivery-success"][aNotificationType];
+    let msgType = [
+        "sms-received",
+        "sms-sent",
+        "sms-delivery-success",
+        "sms-failed",
+        "sms-delivery-error"
+      ][aNotificationType];
 
     if (!msgType) {
       throw new Error("Invalid Notification Type: " + aNotificationType);
@@ -316,7 +328,7 @@ RILSystemMessenger.prototype = {
   notifyStkProactiveCommand: function(aIccId, aCommand) {
     this.broadcastMessage("icc-stkcommand", {
       iccId: aIccId,
-      command: gStkCmdFactory.createCommandMessage(aCommand)
+      command: this.createCommandMessage(aCommand)
     });
   }
 };

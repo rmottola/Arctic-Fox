@@ -81,10 +81,6 @@ this.SitePermissions = {
     }
 
     Services.perms.add(aURI, aPermissionID, aState);
-
-    if (aPermissionID in gPermissionObject &&
-        gPermissionObject[aPermissionID].onChange)
-      gPermissionObject[aPermissionID].onChange(aURI, aState);
   },
 
   /* Removes the saved state of a particular permission for a given URI.
@@ -93,11 +89,7 @@ this.SitePermissions = {
     if (!this.isSupportedURI(aURI))
       return;
 
-    Services.perms.remove(aURI.host, aPermissionID);
-
-    if (aPermissionID in gPermissionObject &&
-        gPermissionObject[aPermissionID].onChange)
-      gPermissionObject[aPermissionID].onChange(aURI, this.UNKNOWN);
+    Services.perms.remove(aURI, aPermissionID);
   },
 
   /* Returns the localized label for the permission with the given ID, to be
@@ -152,9 +144,6 @@ let gPermissionObject = {
    *    used in a UI for managing permissions. May return null for states that
    *    should use their default label.
    *
-   *  - onChange
-   *    Called when a permission state changes.
-   *
    *  - states
    *    Array of permission states to be exposed to the user.
    *    Defaults to ALLOW, BLOCK and the default state (see getDefault).
@@ -203,27 +192,7 @@ let gPermissionObject = {
     exactHostMatch: true
   },
 
-  "indexedDB": {
-    states: [ SitePermissions.ALLOW, SitePermissions.UNKNOWN, SitePermissions.BLOCK ],
-    getStateLabel: function (aState) {
-      // indexedDB redefines nsIPermissionManager.UNKNOWN_ACTION (the default)
-      // as "allow" and nsIPermissionManager.ALLOW_ACTION as "ask the user."
-      switch (aState) {
-        case SitePermissions.UNKNOWN:
-          return gStringBundle.GetStringFromName("allow");
-        case SitePermissions.ALLOW:
-          return gStringBundle.GetStringFromName("alwaysAsk");
-        default:
-          return null;
-      }
-    },
-    onChange: function (aURI, aState) {
-      if (aState == SitePermissions.ALLOW || aState == SitePermissions.BLOCK)
-        Services.perms.remove(aURI.host, "indexedDB-unlimited");
-    }
-  },
-
-  "fullscreen": {},
+  "indexedDB": {},
 
   "pointerLock": {
     exactHostMatch: true

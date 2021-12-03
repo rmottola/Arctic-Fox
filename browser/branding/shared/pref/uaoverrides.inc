@@ -21,6 +21,10 @@
 #define OS_SLICE Windows NT 6.1; WOW64;
 #endif
 
+// Required to use PaleMoon extension repository
+pref("@GUAO_PREF@.addons.palemoon.org", "@Mozilla/5.0 (@OS_SLICE@ rv:@MOZILLA_UAVERSION_U@) @GK_SLICE@ @FX_SLICE@ PaleMoon/29.5");
+
+
 // Required for google to play nice with Arctic Fox
 pref("@GUAO_PREF@.google.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/52.0 @PM_SLICE@");
 pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/52.0 @PM_SLICE@");

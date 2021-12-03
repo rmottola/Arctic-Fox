@@ -29,9 +29,7 @@ VPXDecoder::VPXDecoder(const VideoInfo& aConfig,
   : mImageContainer(aImageContainer)
   , mTaskQueue(aTaskQueue)
   , mCallback(aCallback)
-  , mIter(nullptr)
-  , mDisplayWidth(aConfig.mDisplay.width)
-  , mDisplayHeight(aConfig.mDisplay.height)
+  , mInfo(aConfig)
 {
   MOZ_COUNT_CTOR(VPXDecoder);
   if (aConfig.mMimeType.EqualsLiteral("video/webm; codecs=vp8")) {
@@ -56,7 +54,7 @@ VPXDecoder::Shutdown()
   return NS_OK;
 }
 
-nsresult
+nsRefPtr<MediaDataDecoder::InitPromise>
 VPXDecoder::Init()
 {
   vpx_codec_iface_t* dx = nullptr;
@@ -66,16 +64,15 @@ VPXDecoder::Init()
     dx = vpx_codec_vp9_dx();
   }
   if (!dx || vpx_codec_dec_init(&mVPX, dx, nullptr, 0)) {
-    return NS_ERROR_FAILURE;
+    return InitPromise::CreateAndReject(DecoderFailureReason::INIT_ERROR, __func__);
   }
-  return NS_OK;
+  return InitPromise::CreateAndResolve(TrackInfo::kVideoTrack, __func__);
 }
 
 nsresult
 VPXDecoder::Flush()
 {
   mTaskQueue->Flush();
-  mIter = nullptr;
   return NS_OK;
 }
 
@@ -100,9 +97,10 @@ VPXDecoder::DoDecodeFrame(MediaRawData* aSample)
     return -1;
   }
 
+  vpx_codec_iter_t  iter = nullptr;
   vpx_image_t      *img;
 
-  if ((img = vpx_codec_get_frame(&mVPX, &mIter))) {
+  while ((img = vpx_codec_get_frame(&mVPX, &iter))) {
     NS_ASSERTION(img->fmt == VPX_IMG_FMT_I420, "WebM image format not I420");
 
     // Chroma shifts are rounded down as per the decoding examples in the SDK
@@ -125,9 +123,8 @@ VPXDecoder::DoDecodeFrame(MediaRawData* aSample)
     b.mPlanes[2].mWidth = (img->d_w + 1) >> img->x_chroma_shift;
     b.mPlanes[2].mOffset = b.mPlanes[2].mSkip = 0;
 
-    IntRect picture = IntRect(0, 0, img->d_w, img->d_h);
     VideoInfo info;
-    info.mDisplay = nsIntSize(mDisplayWidth, mDisplayHeight);
+    info.mDisplay = mInfo.mDisplay;
     nsRefPtr<VideoData> v = VideoData::Create(info,
                                               mImageContainer,
                                               aSample->mOffset,
@@ -135,19 +132,17 @@ VPXDecoder::DoDecodeFrame(MediaRawData* aSample)
                                               aSample->mDuration,
                                               b,
                                               aSample->mKeyframe,
-                                              -1,
-                                              picture);
+                                              aSample->mTimecode,
+                                              mInfo.mImage);
 
     if (!v) {
       LOG("Image allocation error source %ldx%ld display %ldx%ld picture %ldx%ld",
-          img->d_w, img->d_h, mDisplayWidth, mDisplayHeight,
-          picture.width, picture.height);
+          img->d_w, img->d_h, mInfo.mDisplay.width, mInfo.mDisplay.height,
+          mInfo.mImage.width, mInfo.mImage.height);
       return -1;
     }
     mCallback->Output(v);
-    return 1;
   }
-  mIter = nullptr;
   return 0;
 }
 

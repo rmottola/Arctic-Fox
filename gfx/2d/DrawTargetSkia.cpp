@@ -429,11 +429,11 @@ DrawTargetSkia::DrawSurfaceWithShadow(SourceSurface *aSurface,
 
   SkPaint paint;
 
-  SkImageFilter* filter = SkDropShadowImageFilter::Create(aOffset.x, aOffset.y,
-                                                          aSigma, aSigma,
-                                                          ColorToSkColor(aColor, 1.0));
+  SkAutoTUnref<SkImageFilter> filter(SkDropShadowImageFilter::Create(aOffset.x, aOffset.y,
+                                                                     aSigma, aSigma,
+                                                                     ColorToSkColor(aColor, 1.0)));
 
-  paint.setImageFilter(filter);
+  paint.setImageFilter(filter.get());
   paint.setXfermodeMode(GfxOpToSkiaOp(aOperator));
 
   mCanvas->drawBitmap(bitmap.mBitmap, aDest.x, aDest.y, &paint);
@@ -525,6 +525,26 @@ DrawTargetSkia::Fill(const Path *aPath,
   mCanvas->drawPath(skiaPath->GetPath(), paint.mPaint);
 }
 
+bool
+DrawTargetSkia::ShouldLCDRenderText(FontType aFontType, AntialiasMode aAntialiasMode)
+{
+  // For non-opaque surfaces, only allow subpixel AA if explicitly permitted.
+  if (!IsOpaque(mFormat) && !mPermitSubpixelAA) {
+    return false;
+  }
+
+  if (aAntialiasMode == AntialiasMode::DEFAULT) {
+    switch (aFontType) {
+      case FontType::MAC:
+        return true;
+      default:
+        // TODO: Figure out what to do for the other platforms.
+        return false;
+    }
+  }
+  return (aAntialiasMode == AntialiasMode::SUBPIXEL);
+}
+
 void
 DrawTargetSkia::FillGlyphs(ScaledFont *aFont,
                            const GlyphBuffer &aBuffer,
@@ -547,6 +567,9 @@ DrawTargetSkia::FillGlyphs(ScaledFont *aFont,
   paint.mPaint.setTextSize(SkFloatToScalar(skiaFont->mSize));
   paint.mPaint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
 
+  bool shouldLCDRenderText = ShouldLCDRenderText(aFont->GetType(), aOptions.mAntialiasMode);
+  paint.mPaint.setLCDRenderText(shouldLCDRenderText);
+
   if (aRenderingOptions && aRenderingOptions->GetType() == FontType::CAIRO) {
     switch (static_cast<const GlyphRenderingOptionsCairo*>(aRenderingOptions)->GetHinting()) {
       case FontHinting::NONE:
@@ -566,6 +589,9 @@ DrawTargetSkia::FillGlyphs(ScaledFont *aFont,
     if (static_cast<const GlyphRenderingOptionsCairo*>(aRenderingOptions)->GetAutoHinting()) {
       paint.mPaint.setAutohinted(true);
     }
+  } else if (aFont->GetType() == FontType::MAC && shouldLCDRenderText) {
+    // SkFontHost_mac only supports subpixel antialiasing when hinting is turned off.
+    paint.mPaint.setHinting(SkPaint::kNo_Hinting);
   } else {
     paint.mPaint.setHinting(SkPaint::kNormal_Hinting);
   }

@@ -56,7 +56,7 @@ public:
   // channels.  aOutputChunk must have already been allocated with at least as
   // many channels as were in any of the blocks passed to Write().
   void ReadChannel(const double aPerFrameDelays[WEBAUDIO_BLOCK_SIZE],
-                   const AudioChunk* aOutputChunk, uint32_t aChannel,
+                   AudioChunk* aOutputChunk, uint32_t aChannel,
                    ChannelInterpretation aChannelInterpretation);
 
   // Advance the buffer pointer
@@ -80,7 +80,7 @@ public:
 
 private:
   void ReadChannels(const double aPerFrameDelays[WEBAUDIO_BLOCK_SIZE],
-                    const AudioChunk* aOutputChunk,
+                    AudioChunk* aOutputChunk,
                     uint32_t aFirstChannel, uint32_t aNumChannelsToRead,
                     ChannelInterpretation aChannelInterpretation);
   bool EnsureBuffer();
@@ -94,7 +94,7 @@ private:
   // Circular buffer for capturing delayed samples.
   FallibleTArray<AudioChunk> mChunks;
   // Cache upmixed channel arrays.
-  nsAutoTArray<const void*,GUESS_AUDIO_CHANNELS> mUpmixChannels;
+  nsAutoTArray<const float*,GUESS_AUDIO_CHANNELS> mUpmixChannels;
   double mSmoothingRate;
   // Current delay, in fractional ticks
   double mCurrentDelay;

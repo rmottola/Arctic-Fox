@@ -156,8 +156,8 @@ typedef CallbackObjectHolder<NodeFilter, nsIDOMNodeFilter> NodeFilterHolder;
 } // namespace mozilla
 
 #define NS_IDOCUMENT_IID \
-{ 0x21bbd52a, 0xc2d2, 0x4b2f, \
-  { 0xbc, 0x6c, 0xc9, 0x52, 0xbe, 0x23, 0x6b, 0x19 } }
+{ 0x6d18ec0b, 0x1f68, 0x4ae6, \
+  { 0x8b, 0x3d, 0x8d, 0x7d, 0x8b, 0x8e, 0x28, 0xd4 } }
 
 // Enum for requesting a particular type of document when creating a doc
 enum DocumentFlavor {
@@ -1169,14 +1169,6 @@ public:
   virtual void SetFullscreenRoot(nsIDocument* aRoot) = 0;
 
   /**
-   * Sets whether this document is approved for fullscreen mode.
-   * Documents aren't approved for fullscreen until chrome has sent a
-   * "fullscreen-approved" notification with a subject which is a pointer
-   * to the approved document.
-   */
-  virtual void SetApprovedForFullscreen(bool aIsApproved) = 0;
-
-  /**
    * Synchronously cleans up the fullscreen state on the given document.
    *
    * Calling this without performing fullscreen transition could lead
@@ -2072,7 +2064,8 @@ public:
    */
   virtual void PreloadStyle(nsIURI* aURI, const nsAString& aCharset,
                             const nsAString& aCrossOriginAttr,
-                            ReferrerPolicyEnum aReferrerPolicy) = 0;
+                            ReferrerPolicyEnum aReferrerPolicy,
+                            const nsAString& aIntegrity) = 0;
 
   /**
    * Called by the chrome registry to load style sheets.  Can be put

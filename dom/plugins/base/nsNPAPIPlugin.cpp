@@ -106,6 +106,8 @@ using mozilla::plugins::PluginModuleContentParent;
 #define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoPlugins" , ## args)
 #endif
 
+#include "nsIAudioChannelAgent.h"
+
 using namespace mozilla;
 using namespace mozilla::plugins::parent;
 
@@ -1066,7 +1068,7 @@ _destroystream(NPP npp, NPStream *pstream, NPError reason)
     // the reference until it is to be deleted here. Deleting the wrapper will
     // release the wrapped nsIOutputStream.
     //
-    // The NPStream the plugin references should always be a sub-object of it's own
+    // The NPStream the plugin references should always be a sub-object of its own
     // 'ndata', which is our nsNPAPIStramWrapper. See bug 548441.
     NS_ASSERTION((char*)streamWrapper <= (char*)pstream &&
                  ((char*)pstream) + sizeof(*pstream)
@@ -1084,23 +1086,7 @@ _destroystream(NPP npp, NPStream *pstream, NPError reason)
 void
 _status(NPP npp, const char *message)
 {
-  if (!NS_IsMainThread()) {
-    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_status called from the wrong thread\n"));
-    return;
-  }
-  NPN_PLUGIN_LOG(PLUGIN_LOG_NORMAL, ("NPN_Status: npp=%p, message=%s\n",
-                                     (void*)npp, message));
-
-  if (!npp || !npp->ndata) {
-    NS_WARNING("_status: npp or npp->ndata == 0");
-    return;
-  }
-
-  nsNPAPIPluginInstance *inst = (nsNPAPIPluginInstance*)npp->ndata;
-
-  PluginDestructionGuard guard(inst);
-
-  inst->ShowStatus(message);
+  // NPN_Status is no longer supported.
 }
 
 void
@@ -2425,6 +2411,46 @@ _setvalue(NPP npp, NPPVariable variable, void *result)
     case NPPVpluginUsesDOMForCursorBool: {
       bool useDOMForCursor = (result != nullptr);
       return inst->SetUsesDOMForCursor(useDOMForCursor);
+    }
+
+    case NPPVpluginIsPlayingAudio: {
+      bool isMuted = !result;
+
+      nsNPAPIPluginInstance* inst = (nsNPAPIPluginInstance*) npp->ndata;
+      MOZ_ASSERT(inst);
+
+      if (isMuted && !inst->HasAudioChannelAgent()) {
+        return NPERR_NO_ERROR;
+      }
+
+      nsCOMPtr<nsIAudioChannelAgent> agent;
+      nsresult rv = inst->GetOrCreateAudioChannelAgent(getter_AddRefs(agent));
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        return NPERR_NO_ERROR;
+      }
+
+      MOZ_ASSERT(agent);
+
+      if (isMuted) {
+        rv = agent->NotifyStoppedPlaying();
+        if (NS_WARN_IF(NS_FAILED(rv))) {
+          return NPERR_NO_ERROR;
+        }
+      } else {
+        float volume = 0.0;
+        bool muted = true;
+        rv = agent->NotifyStartedPlaying(&volume, &muted);
+        if (NS_WARN_IF(NS_FAILED(rv))) {
+          return NPERR_NO_ERROR;
+        }
+
+        rv = inst->WindowVolumeChanged(volume, muted);
+        if (NS_WARN_IF(NS_FAILED(rv))) {
+          return NPERR_NO_ERROR;
+        }
+      }
+
+      return NPERR_NO_ERROR;
     }
 
 #ifndef MOZ_WIDGET_ANDROID

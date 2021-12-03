@@ -81,7 +81,7 @@ internalIntlRegExps.currencyDigitsRE = null;
 function getUnicodeLocaleExtensionSequenceRE() {
     return internalIntlRegExps.unicodeLocaleExtensionSequenceRE ||
            (internalIntlRegExps.unicodeLocaleExtensionSequenceRE =
-            regexp_construct_no_statics("-u(-[a-z0-9]{2,8})+"));
+            regexp_construct_no_statics("-u(?:-[a-z0-9]{2,8})+"));
 }
 
 
@@ -89,15 +89,38 @@ function getUnicodeLocaleExtensionSequenceRE() {
  * Removes Unicode locale extension sequences from the given language tag.
  */
 function removeUnicodeExtensions(locale) {
-    // Don't use std_String_replace directly with a regular expression,
-    // as that would set RegExp statics.
+    // A wholly-privateuse locale has no extension sequences.
+    if (callFunction(std_String_startsWith, locale, "x-"))
+        return locale;
+
+    // Otherwise, split on "-x-" marking the start of any privateuse component.
+    // Replace Unicode locale extension sequences in the left half, and return
+    // the concatenation.
+    var pos = callFunction(std_String_indexOf, locale, "-x-");
+    if (pos < 0)
+        pos = locale.length;
+
+    var left = callFunction(std_String_substring, locale, 0, pos);
+    var right = callFunction(std_String_substring, locale, pos);
+
     var extensions;
     var unicodeLocaleExtensionSequenceRE = getUnicodeLocaleExtensionSequenceRE();
-    while ((extensions = regexp_exec_no_statics(unicodeLocaleExtensionSequenceRE, locale)) !== null) {
-        locale = callFunction(std_String_replace, locale, extensions[0], "");
+    while ((extensions = regexp_exec_no_statics(unicodeLocaleExtensionSequenceRE, left)) !== null) {
+        left = callFunction(std_String_replace, left, extensions[0], "");
         unicodeLocaleExtensionSequenceRE.lastIndex = 0;
     }
-    return locale;
+
+    var combined = left + right;
+    assert(IsStructurallyValidLanguageTag(combined), "recombination produced an invalid language tag");
+    assert(function() {
+        var uindex = callFunction(std_String_indexOf, combined, "-u-");
+        if (uindex < 0)
+            return true;
+        var xindex = callFunction(std_String_indexOf, combined, "-x-");
+        return xindex > 0 && xindex < uindex;
+    }(), "recombination failed to remove all Unicode locale extension sequences");
+
+    return combined;
 }
 
 
@@ -232,11 +255,15 @@ function getDuplicateVariantRE() {
         // different subtag.
         "(?!" + alphanum + ")";
 
-    // Language tags are case insensitive (RFC 5646 section 2.1.1), but for
-    // this regular expression that's covered by having its character classes
-    // list both upper- and lower-case characters.
+    // Language tags are case insensitive (RFC 5646 section 2.1.1).  Using
+    // character classes covering both upper- and lower-case characters nearly
+    // addresses this -- but for the possibility of variant repetition with
+    // differing case, e.g. "en-variant-Variant".  Use a case-insensitive
+    // regular expression to address this.  (Note that there's no worry about
+    // case transformation accepting invalid characters here: users have
+    // already verified the string is alphanumeric Latin plus "-".)
     return (internalIntlRegExps.duplicateVariantRE =
-            regexp_construct_no_statics(duplicateVariant));
+            regexp_construct_no_statics(duplicateVariant, "i"));
 }
 
 
@@ -274,11 +301,15 @@ function getDuplicateSingletonRE() {
         // different subtag.
         "(?!" + alphanum + ")";
 
-    // Language tags are case insensitive (RFC 5646 section 2.1.1), but for
-    // this regular expression that's covered by having its character classes
-    // list both upper- and lower-case characters.
+    // Language tags are case insensitive (RFC 5646 section 2.1.1).  Using
+    // character classes covering both upper- and lower-case characters nearly
+    // addresses this -- but for the possibility of singleton repetition with
+    // differing case, e.g. "en-u-foo-U-foo".  Use a case-insensitive regular
+    // expression to address this.  (Note that there's no worry about case
+    // transformation accepting invalid characters here: users have already
+    // verified the string is alphanumeric Latin plus "-".)
     return (internalIntlRegExps.duplicateSingletonRE =
-            regexp_construct_no_statics(duplicateSingleton));
+            regexp_construct_no_statics(duplicateSingleton, "i"));
 }
 
 
@@ -1872,11 +1903,11 @@ var currencyDigits = {
     BHD: 3,
     BIF: 0,
     BYR: 0,
-    CLF: 0,
+    CLF: 4,
     CLP: 0,
     DJF: 0,
-    IQD: 3,
     GNF: 0,
+    IQD: 3,
     ISK: 0,
     JOD: 3,
     JPY: 0,

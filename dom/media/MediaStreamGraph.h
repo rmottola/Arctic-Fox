@@ -12,6 +12,7 @@
 
 #include "mozilla/dom/AudioChannelBinding.h"
 
+#include "AudioSegment.h"
 #include "AudioStream.h"
 #include "nsTArray.h"
 #include "nsIRunnable.h"
@@ -21,7 +22,6 @@
 #include "VideoSegment.h"
 #include "MainThreadUtils.h"
 #include "nsAutoRef.h"
-#include "GraphDriver.h"
 #include <speex/speex_resampler.h>
 #include "DOMMediaStream.h"
 #include "AudioContext.h"
@@ -313,7 +313,8 @@ class CameraPreviewMediaStream;
  * for those objects in arbitrary order and the MediaStreamGraph has to be able
  * to handle this.
  */
-class MediaStream : public mozilla::LinkedListElement<MediaStream> {
+class MediaStream : public mozilla::LinkedListElement<MediaStream>
+{
 public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(MediaStream)
 
@@ -432,8 +433,6 @@ public:
   virtual AudioNodeStream* AsAudioNodeStream() { return nullptr; }
   virtual CameraPreviewMediaStream* AsCameraPreviewStream() { return nullptr; }
 
-  // media graph thread only
-  void Init();
   // These Impl methods perform the core functionality of the control methods
   // above, on the media graph thread.
   /**
@@ -462,6 +461,9 @@ public:
   }
   void RemoveVideoOutputImpl(VideoFrameContainer* aContainer)
   {
+    // Ensure that any frames currently queued for playback by the compositor
+    // are removed.
+    aContainer->ClearFutureFrames();
     mVideoOutputs.RemoveElement(aContainer);
   }
   void ChangeExplicitBlockerCountImpl(GraphTime aTime, int32_t aDelta)
@@ -556,10 +558,6 @@ public:
   GraphTime StreamTimeToGraphTime(StreamTime aTime);
   bool IsFinishedOnGraphThread() { return mFinished; }
   void FinishOnGraphThread();
-  /**
-   * Identify which graph update index we are currently processing.
-   */
-  int64_t GetProcessingGraphUpdateIndex();
 
   bool HasCurrentData() { return mHasCurrentData; }
 
@@ -586,11 +584,9 @@ public:
   dom::AudioChannel AudioChannelType() const { return mAudioChannelType; }
 
 protected:
-  virtual void AdvanceTimeVaryingValuesToCurrentTime(GraphTime aCurrentTime, GraphTime aBlockedTime)
+  void AdvanceTimeVaryingValuesToCurrentTime(GraphTime aCurrentTime, GraphTime aBlockedTime)
   {
     mBufferStartTime += aBlockedTime;
-    mGraphUpdateIndices.InsertTimeAtStart(aBlockedTime);
-    mGraphUpdateIndices.AdvanceCurrentTime(aCurrentTime);
     mExplicitBlockerCount.AdvanceCurrentTime(aCurrentTime);
 
     mBuffer.ForgetUpTo(aCurrentTime - mBufferStartTime);
@@ -637,15 +633,14 @@ protected:
   };
   nsTArray<AudioOutput> mAudioOutputs;
   nsTArray<nsRefPtr<VideoFrameContainer> > mVideoOutputs;
-  // We record the last played video frame to avoid redundant setting
-  // of the current video frame.
+  // We record the last played video frame to avoid playing the frame again
+  // with a different frame id.
   VideoFrame mLastPlayedVideoFrame;
   // The number of times this stream has been explicitly blocked by the control
   // API, minus the number of times it has been explicitly unblocked.
   TimeVarying<GraphTime,uint32_t,0> mExplicitBlockerCount;
   nsTArray<nsRefPtr<MediaStreamListener> > mListeners;
   nsTArray<MainThreadMediaStreamListener*> mMainThreadListeners;
-  nsRefPtr<nsRunnable> mNotificationMainThreadRunnable;
   nsTArray<TrackID> mDisabledTrackIDs;
 
   // Precomputed blocking status (over GraphTime).
@@ -655,15 +650,14 @@ protected:
   // as necessary to account for that time instead) --- this avoids us having to
   // record the entire history of the stream's blocking-ness in mBlocked.
   TimeVarying<GraphTime,bool,5> mBlocked;
-  // Maps graph time to the graph update that affected this stream at that time
-  TimeVarying<GraphTime,int64_t,0> mGraphUpdateIndices;
 
   // MediaInputPorts to which this is connected
   nsTArray<MediaInputPort*> mConsumers;
 
   // Where audio output is going. There is one AudioOutputStream per
   // audio track.
-  struct AudioOutputStream {
+  struct AudioOutputStream
+  {
     // When we started audio playback for this track.
     // Add mStream->GetPosition() to find the current audio playback position.
     GraphTime mAudioPlaybackStartTime;
@@ -733,7 +727,8 @@ protected:
  * Audio and video can be written on any thread, but you probably want to
  * always write from the same thread to avoid unexpected interleavings.
  */
-class SourceMediaStream : public MediaStream {
+class SourceMediaStream : public MediaStream
+{
 public:
   explicit SourceMediaStream(DOMMediaStream* aWrapper) :
     MediaStream(aWrapper),
@@ -813,25 +808,12 @@ public:
    */
   bool AppendToTrack(TrackID aID, MediaSegment* aSegment, MediaSegment *aRawSegment = nullptr);
   /**
-   * Returns true if the buffer currently has enough data.
-   * Returns false if there isn't enough data or if no such track exists.
-   */
-  bool HaveEnoughBuffered(TrackID aID);
-  /**
    * Get the stream time of the end of the data that has been appended so far.
    * Can be called from any thread but won't be useful if it can race with
    * an AppendToTrack call, so should probably just be called from the thread
    * that also calls AppendToTrack.
    */
   StreamTime GetEndOfAppendedData(TrackID aID);
-  /**
-   * Ensures that aSignalRunnable will be dispatched to aSignalThread
-   * when we don't have enough buffered data in the track (which could be
-   * immediately). Will dispatch the runnable immediately if the track
-   * does not exist. No op if a runnable is already present for this track.
-   */
-  void DispatchWhenNotEnoughBuffered(TrackID aID,
-      TaskQueue* aSignalQueue, nsIRunnable* aSignalRunnable);
   /**
    * Indicate that a track has ended. Do not do any more API calls
    * affecting this track.
@@ -918,20 +900,16 @@ protected:
     // Resampler if the rate of the input track does not match the
     // MediaStreamGraph's.
     nsAutoRef<SpeexResamplerState> mResampler;
-#ifdef DEBUG
     int mResamplerChannelCount;
-#endif
     StreamTime mStart;
     // End-time of data already flushed to the track (excluding mData)
     StreamTime mEndOfFlushedData;
     // Each time the track updates are flushed to the media graph thread,
     // the segment buffer is emptied.
     nsAutoPtr<MediaSegment> mData;
-    nsTArray<ThreadAndRunnable> mDispatchWhenNotEnough;
     // Each time the track updates are flushed to the media graph thread,
     // this is cleared.
     uint32_t mCommands;
-    bool mHaveEnough;
   };
 
   bool NeedsMixing();
@@ -995,7 +973,8 @@ protected:
  * the Destroy message is processed on the graph manager thread we disconnect
  * the port and drop the graph's reference, destroying the object.
  */
-class MediaInputPort final {
+class MediaInputPort final
+{
 private:
   // Do not call this constructor directly. Instead call aDest->AllocateInputPort.
   MediaInputPort(MediaStream* aSource, ProcessedMediaStream* aDest,
@@ -1112,7 +1091,8 @@ private:
  * its output. The details of how the output is produced are handled by
  * subclasses overriding the ProcessInput method.
  */
-class ProcessedMediaStream : public MediaStream {
+class ProcessedMediaStream : public MediaStream
+{
 public:
   explicit ProcessedMediaStream(DOMMediaStream* aWrapper)
     : MediaStream(aWrapper), mAutofinish(false)
@@ -1216,21 +1196,33 @@ protected:
 };
 
 /**
- * Initially, at least, we will have a singleton MediaStreamGraph per
- * process.  Each OfflineAudioContext object creates its own MediaStreamGraph
- * object too.
+ * There can be multiple MediaStreamGraph per process: one per AudioChannel.
+ * Additionaly, each OfflineAudioContext object creates its own MediaStreamGraph
+ * object too..
  */
-class MediaStreamGraph {
+class MediaStreamGraph
+{
 public:
+
   // We ensure that the graph current time advances in multiples of
   // IdealAudioBlockSize()/AudioStream::PreferredSampleRate(). A stream that
   // never blocks and has a track with the ideal audio rate will produce audio
   // in multiples of the block size.
   //
 
+  // Initializing an graph that outputs audio can be quite long on some
+  // platforms. Code that want to output audio at some point can express the
+  // fact that they will need an audio stream at some point by passing
+  // AUDIO_THREAD_DRIVER when getting an instance of MediaStreamGraph, so that
+  // the graph starts with the right driver.
+  enum GraphDriverType {
+    AUDIO_THREAD_DRIVER,
+    SYSTEM_THREAD_DRIVER,
+    OFFLINE_THREAD_DRIVER
+  };
   // Main thread only
-  static MediaStreamGraph* GetInstance(bool aStartWithAudioDriver = false,
-                                       dom::AudioChannel aChannel = dom::AudioChannel::Normal);
+  static MediaStreamGraph* GetInstance(GraphDriverType aGraphDriverRequested,
+                                       dom::AudioChannel aChannel);
   static MediaStreamGraph* CreateNonRealtimeInstance(TrackRate aSampleRate);
   // Idempotent
   static void DestroyNonRealtimeInstance(MediaStreamGraph* aGraph);
@@ -1256,23 +1248,15 @@ public:
    * particular tracks of each input stream.
    */
   ProcessedMediaStream* CreateTrackUnionStream(DOMMediaStream* aWrapper);
-  // Internal AudioNodeStreams can only pass their output to another
-  // AudioNode, whereas external AudioNodeStreams can pass their output
-  // to an nsAudioStream for playback.
-  enum AudioNodeStreamKind { SOURCE_STREAM, INTERNAL_STREAM, EXTERNAL_STREAM };
   /**
-   * Create a stream that will process audio for an AudioNode.
-   * Takes ownership of aEngine.  aSampleRate is the sampling rate used
-   * for the stream.  If 0 is passed, the sampling rate of the engine's
-   * node will get used.
+   * Create a stream that will mix all its audio input.
    */
-  AudioNodeStream* CreateAudioNodeStream(AudioNodeEngine* aEngine,
-                                         AudioNodeStreamKind aKind,
-                                         TrackRate aSampleRate = 0);
+  ProcessedMediaStream* CreateAudioCaptureStream(DOMMediaStream* aWrapper);
 
-  AudioNodeExternalInputStream*
-  CreateAudioNodeExternalInputStream(AudioNodeEngine* aEngine,
-                                     TrackRate aSampleRate = 0);
+  /**
+   * Add a new stream to the graph.  Main thread.
+   */
+  void AddStream(MediaStream* aStream);
 
   /* From the main thread, ask the MSG to send back an event when the graph
    * thread is running, and audio is being processed. */
@@ -1312,10 +1296,15 @@ public:
    */
   TrackRate GraphRate() const { return mSampleRate; }
 
+  void RegisterCaptureStreamForWindow(uint64_t aWindowId,
+                                      ProcessedMediaStream* aCaptureStream);
+  void UnregisterCaptureStreamForWindow(uint64_t aWindowId);
+  already_AddRefed<MediaInputPort> ConnectToCaptureStream(
+    uint64_t aWindowId, MediaStream* aMediaStream);
+
 protected:
   explicit MediaStreamGraph(TrackRate aSampleRate)
-    : mNextGraphUpdateIndex(1)
-    , mSampleRate(aSampleRate)
+    : mSampleRate(aSampleRate)
   {
     MOZ_COUNT_CTOR(MediaStreamGraph);
   }
@@ -1326,11 +1315,6 @@ protected:
 
   // Media graph thread only
   nsTArray<nsCOMPtr<nsIRunnable> > mPendingUpdateRunnables;
-
-  // Main thread only
-  // The number of updates we have sent to the media graph thread + 1.
-  // We start this at 1 just to ensure that 0 is usable as a special value.
-  int64_t mNextGraphUpdateIndex;
 
   /**
    * Sample rate at which this graph runs. For real time graphs, this is

@@ -50,7 +50,7 @@ typedef HashSet<ReadBarrieredGlobalObject,
  * compartment.
  *
  * The purpose of this is to allow the garbage collector to easily find edges
- * from debugee object compartments to debugger compartments when calculating
+ * from debuggee object compartments to debugger compartments when calculating
  * the compartment groups.  Note that these edges are the inverse of the edges
  * stored in the cross compartment map.
  *
@@ -62,6 +62,11 @@ typedef HashSet<ReadBarrieredGlobalObject,
  * If InvisibleKeysOk is true, then the map can have keys in invisible-to-
  * debugger compartments. If it is false, we assert that such entries are never
  * created.
+ *
+ * Also note that keys in these weakmaps can be in any compartment, debuggee or
+ * not, because they cannot be deleted when a compartment is no longer a
+ * debuggee: the values need to maintain object identity across add/remove/add
+ * transitions.
  */
 template <class UnbarrieredKey, bool InvisibleKeysOk=false>
 class DebuggerWeakMap : private WeakMap<PreBarriered<UnbarrieredKey>, RelocatablePtrObject>
@@ -79,8 +84,19 @@ class DebuggerWeakMap : private WeakMap<PreBarriered<UnbarrieredKey>, Relocatabl
 
   public:
     typedef WeakMap<Key, Value, DefaultHasher<Key> > Base;
+
     explicit DebuggerWeakMap(JSContext* cx)
         : Base(cx), zoneCounts(cx->runtime()) { }
+
+    ~DebuggerWeakMap() {
+        // If our owning Debugger fails construction after already initializing
+        // this DebuggerWeakMap, we need to make sure that we aren't in the
+        // compartment's weak map list anymore. Normally, when we are destroyed
+        // because the GC finds us unreachable, the GC takes care of removing us
+        // from this list.
+        if (WeakMapBase::isInList())
+            WeakMapBase::removeWeakMapFromList(this);
+    }
 
   public:
     /* Expose those parts of HashMap public interface that are used by Debugger methods. */
@@ -269,7 +285,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
         return enabled;
     }
 
-    void logTenurePromotion(JSObject& obj, double when);
+    void logTenurePromotion(JSRuntime* rt, JSObject& obj, double when);
     static JSObject* getObjectAllocationSite(JSObject& obj);
 
   private:
@@ -286,15 +302,12 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
 
     struct TenurePromotionsEntry : public mozilla::LinkedListElement<TenurePromotionsEntry>
     {
-        TenurePromotionsEntry(JSObject& obj, double when)
-            : className(obj.getClass()->name),
-              when(when),
-              frame(getObjectAllocationSite(obj))
-        { }
+        TenurePromotionsEntry(JSRuntime* rt, JSObject& obj, double when);
 
         const char* className;
         double when;
         RelocatablePtrObject frame;
+        size_t size;
     };
 
     using TenurePromotionsLog = mozilla::LinkedList<TenurePromotionsEntry>;

@@ -8,7 +8,6 @@
 #include "nsContentUtils.h"
 #include "mozilla/StaticPtr.h"
 #include "MediaDecoder.h"
-#include "SharedThreadPool.h"
 #include "mozilla/Logging.h"
 
 namespace mozilla {
@@ -100,13 +99,6 @@ MediaShutdownManager::Observe(nsISupports *aSubjet,
   return NS_OK;
 }
 
-static PLDHashOperator
-ShutdownMediaDecoder(nsRefPtrHashKey<MediaDecoder>* aEntry, void*)
-{
-  aEntry->GetKey()->Shutdown();
-  return PL_DHASH_REMOVE;
-}
-
 void
 MediaShutdownManager::Shutdown()
 {
@@ -122,12 +114,10 @@ MediaShutdownManager::Shutdown()
 
   // Iterate over the decoders and shut them down, and remove them from the
   // hashtable.
-  mDecoders.EnumerateEntries(ShutdownMediaDecoder, nullptr);
-
-  // Ensure all media shared thread pools are shutdown. This joins with all
-  // threads in the state machine thread pool, the decoder thread pool, and
-  // any others.
-  SharedThreadPool::SpinUntilEmpty();
+  for (auto iter = mDecoders.Iter(); !iter.Done(); iter.Next()) {
+    iter.Get()->GetKey()->Shutdown();
+    iter.Remove();
+  }
 
   // Remove the MediaShutdownManager instance from the shutdown observer
   // list.

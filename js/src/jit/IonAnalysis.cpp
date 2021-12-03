@@ -1663,7 +1663,7 @@ jit::BuildDominatorTree(MIRGraph& graph)
         MBasicBlock* child = *i;
         MBasicBlock* parent = child->immediateDominator();
 
-        // Domininace is defined such that blocks always dominate themselves.
+        // Dominance is defined such that blocks always dominate themselves.
         child->addNumDominated(1);
 
         // If the block only self-dominates, it has no definite parent.
@@ -3424,10 +3424,11 @@ ArgumentsUseCanBeLazy(JSContext* cx, JSScript* script, MInstruction* ins, size_t
         return true;
 
     // arguments.length length can read fp->numActualArgs() directly.
-    // arguments.callee can read fp->callee() directly in non-strict code.
+    // arguments.callee can read fp->callee() directly if the arguments object
+    // is mapped.
     if (ins->isCallGetProperty() && index == 0 &&
         (ins->toCallGetProperty()->name() == cx->names().length ||
-         (!script->strict() && ins->toCallGetProperty()->name() == cx->names().callee)))
+         (script->hasMappedArgsObj() && ins->toCallGetProperty()->name() == cx->names().callee)))
     {
         return true;
     }
@@ -3476,8 +3477,11 @@ jit::AnalyzeArgumentsUsage(JSContext* cx, JSScript* scriptArg)
 
     MIRGraph graph(&temp);
     InlineScriptTree* inlineScriptTree = InlineScriptTree::New(&temp, nullptr, nullptr, script);
-    if (!inlineScriptTree)
+    if (!inlineScriptTree) {
+        ReportOutOfMemory(cx);
         return false;
+    }
+
     CompileInfo info(script, script->functionNonDelazifying(),
                      /* osrPc = */ nullptr, /* constructing = */ false,
                      Analysis_ArgumentsUsage,
@@ -3487,8 +3491,10 @@ jit::AnalyzeArgumentsUsage(JSContext* cx, JSScript* scriptArg)
     const OptimizationInfo* optimizationInfo = js_IonOptimizations.get(Optimization_Normal);
 
     CompilerConstraintList* constraints = NewCompilerConstraintList(temp);
-    if (!constraints)
+    if (!constraints) {
+        ReportOutOfMemory(cx);
         return false;
+    }
 
     BaselineInspector inspector(script);
     const JitCompileOptions options(cx);

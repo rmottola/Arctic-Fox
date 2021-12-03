@@ -201,11 +201,12 @@ HTMLVideoElement::WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
   return HTMLVideoElementBinding::Wrap(aCx, this, aGivenProto);
 }
 
-void
-HTMLVideoElement::NotifyOwnerDocumentActivityChanged()
+bool
+HTMLVideoElement::NotifyOwnerDocumentActivityChangedInternal()
 {
-  HTMLMediaElement::NotifyOwnerDocumentActivityChanged();
+  bool pauseElement = HTMLMediaElement::NotifyOwnerDocumentActivityChangedInternal();
   UpdateScreenWakeLock();
+  return pauseElement;
 }
 
 already_AddRefed<VideoPlaybackQuality>
@@ -261,7 +262,6 @@ HTMLVideoElement::UpdateScreenWakeLock()
   if (mScreenWakeLock && (mPaused || hidden)) {
     ErrorResult rv;
     mScreenWakeLock->Unlock(rv);
-    NS_WARN_IF_FALSE(!rv.Failed(), "Failed to unlock the wakelock.");
     mScreenWakeLock = nullptr;
     return;
   }

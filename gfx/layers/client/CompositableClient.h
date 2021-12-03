@@ -140,7 +140,7 @@ public:
   already_AddRefed<TextureClient>
   CreateTextureClientForDrawing(gfx::SurfaceFormat aFormat,
                                 gfx::IntSize aSize,
-                                gfx::BackendType aMoz2DBackend,
+                                BackendSelector aSelector,
                                 TextureFlags aTextureFlags,
                                 TextureAllocationFlags aAllocFlags = ALLOC_DEFAULT);
 
@@ -150,6 +150,8 @@ public:
   virtual bool Connect(ImageContainer* aImageContainer = nullptr);
 
   void Destroy();
+
+  bool IsDestroyed() { return mDestroyed; }
 
   PCompositableChild* GetIPDLActor() const;
 
@@ -229,6 +231,7 @@ protected:
   // Some layers may want to enforce some flags to all their textures
   // (like disallowing tiling)
   TextureFlags mTextureFlags;
+  bool mDestroyed;
   RefPtr<TextureClientRecycleAllocator> mTextureClientRecycler;
 
   friend class CompositableChild;

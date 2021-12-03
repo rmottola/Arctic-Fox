@@ -137,11 +137,12 @@ class GetNodeIdDone : public GetServiceChildCallback
 {
 public:
   GetNodeIdDone(const nsAString& aOrigin, const nsAString& aTopLevelOrigin,
-                bool aInPrivateBrowsing,
+                bool aInPrivateBrowsing, const nsACString& aVersion,
                 UniquePtr<GetNodeIdCallback>&& aCallback)
     : mOrigin(aOrigin),
       mTopLevelOrigin(aTopLevelOrigin),
       mInPrivateBrowsing(aInPrivateBrowsing),
+      mVersion(aVersion),
       mCallback(Move(aCallback))
   {
   }
@@ -155,7 +156,8 @@ public:
 
     nsCString outId;
     if (!aGMPServiceChild->SendGetGMPNodeId(mOrigin, mTopLevelOrigin,
-                                            mInPrivateBrowsing, &outId)) {
+                                            mInPrivateBrowsing, mVersion,
+                                            &outId)) {
       mCallback->Done(NS_ERROR_FAILURE, EmptyCString());
       return;
     }
@@ -167,6 +169,7 @@ private:
   nsString mOrigin;
   nsString mTopLevelOrigin;
   bool mInPrivateBrowsing;
+  nsCString mVersion;
   UniquePtr<GetNodeIdCallback> mCallback;
 };
 
@@ -174,10 +177,11 @@ NS_IMETHODIMP
 GeckoMediaPluginServiceChild::GetNodeId(const nsAString& aOrigin,
                                         const nsAString& aTopLevelOrigin,
                                         bool aInPrivateBrowsing,
+                                        const nsACString& aVersion,
                                         UniquePtr<GetNodeIdCallback>&& aCallback)
 {
   UniquePtr<GetServiceChildCallback> callback(
-    new GetNodeIdDone(aOrigin, aTopLevelOrigin, aInPrivateBrowsing,
+    new GetNodeIdDone(aOrigin, aTopLevelOrigin, aInPrivateBrowsing, aVersion,
                       Move(aCallback)));
   GetServiceChild(Move(callback));
   return NS_OK;

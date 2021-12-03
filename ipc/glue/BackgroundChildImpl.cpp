@@ -8,8 +8,13 @@
 #include "BroadcastChannelChild.h"
 #include "ServiceWorkerManagerChild.h"
 #include "FileDescriptorSetChild.h"
+#ifdef MOZ_WEBRTC
+#include "CamerasChild.h"
+#endif
+#include "mozilla/media/MediaChild.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/dom/PBlobChild.h"
+#include "mozilla/dom/asmjscache/AsmJSCache.h"
 #include "mozilla/dom/cache/ActorUtils.h"
 #include "mozilla/dom/indexedDB/PBackgroundIDBFactoryChild.h"
 #include "mozilla/dom/ipc/BlobChild.h"
@@ -55,6 +60,7 @@ namespace ipc {
 using mozilla::dom::UDPSocketChild;
 using mozilla::net::PUDPSocketChild;
 
+using mozilla::dom::asmjscache::PAsmJSCacheEntryChild;
 using mozilla::dom::cache::PCacheChild;
 using mozilla::dom::cache::PCacheStorageChild;
 using mozilla::dom::cache::PCacheStreamControlChild;
@@ -244,7 +250,7 @@ BackgroundChildImpl::DeallocPUDPSocketChild(PUDPSocketChild* child)
 
 dom::PBroadcastChannelChild*
 BackgroundChildImpl::AllocPBroadcastChannelChild(const PrincipalInfo& aPrincipalInfo,
-                                                 const nsString& aOrigin,
+                                                 const nsCString& aOrigin,
                                                  const nsString& aChannel,
                                                  const bool& aPrivateBrowsing)
 {
@@ -260,6 +266,29 @@ BackgroundChildImpl::DeallocPBroadcastChannelChild(
   nsRefPtr<dom::BroadcastChannelChild> child =
     dont_AddRef(static_cast<dom::BroadcastChannelChild*>(aActor));
   MOZ_ASSERT(child);
+  return true;
+}
+
+camera::PCamerasChild*
+BackgroundChildImpl::AllocPCamerasChild()
+{
+#ifdef MOZ_WEBRTC
+  nsRefPtr<camera::CamerasChild> agent =
+    new camera::CamerasChild();
+  return agent.forget().take();
+#else
+  return nullptr;
+#endif
+}
+
+bool
+BackgroundChildImpl::DeallocPCamerasChild(camera::PCamerasChild *aActor)
+{
+#ifdef MOZ_WEBRTC
+  nsRefPtr<camera::CamerasChild> child =
+      dont_AddRef(static_cast<camera::CamerasChild*>(aActor));
+  MOZ_ASSERT(aActor);
+#endif
   return true;
 }
 
@@ -364,6 +393,24 @@ BackgroundChildImpl::DeallocPNuwaChild(PNuwaChild* aActor)
   MOZ_ASSERT(aActor);
 
   delete aActor;
+  return true;
+}
+
+PAsmJSCacheEntryChild*
+BackgroundChildImpl::AllocPAsmJSCacheEntryChild(
+                               const dom::asmjscache::OpenMode& aOpenMode,
+                               const dom::asmjscache::WriteParams& aWriteParams,
+                               const PrincipalInfo& aPrincipalInfo)
+{
+  MOZ_CRASH("PAsmJSCacheEntryChild actors should be manually constructed!");
+}
+
+bool
+BackgroundChildImpl::DeallocPAsmJSCacheEntryChild(PAsmJSCacheEntryChild* aActor)
+{
+  MOZ_ASSERT(aActor);
+
+  dom::asmjscache::DeallocEntryChild(aActor);
   return true;
 }
 

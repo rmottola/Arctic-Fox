@@ -117,19 +117,6 @@ NS_NewChannelWithTriggeringPrincipal(nsIChannel           **outChannel,
                                aIoService);
 }
 
-nsresult
-NS_NewFileURI(nsIURI **result,
-              nsIFile *spec,
-              nsIIOService *ioService /* = nullptr */)     // pass in nsIIOService to optimize callers
-{
-    nsresult rv;
-    nsCOMPtr<nsIIOService> grip;
-    rv = net_EnsureIOService(&ioService, grip);
-    if (ioService)
-        rv = ioService->NewFileURI(spec, result);
-    return rv;
-}
-
 nsresult /* NS_NewChannelNode */
 NS_NewChannel(nsIChannel           **outChannel,
               nsIURI                *aUri,
@@ -323,16 +310,14 @@ NS_NewInputStreamChannelInternal(nsIChannel        **outChannel,
                                  nsIPrincipal       *aLoadingPrincipal,
                                  nsIPrincipal       *aTriggeringPrincipal,
                                  nsSecurityFlags     aSecurityFlags,
-                                 nsContentPolicyType aContentPolicyType,
-                                 nsIURI             *aBaseURI /* = nullptr */)
+                                 nsContentPolicyType aContentPolicyType)
 {
   nsCOMPtr<nsILoadInfo> loadInfo =
     new mozilla::LoadInfo(aLoadingPrincipal,
                           aTriggeringPrincipal,
                           aLoadingNode,
                           aSecurityFlags,
-                          aContentPolicyType,
-                          aBaseURI);
+                          aContentPolicyType);
   if (!loadInfo) {
     return NS_ERROR_UNEXPECTED;
   }
@@ -376,8 +361,7 @@ NS_NewInputStreamChannelInternal(nsIChannel        **outChannel,
                                  nsIPrincipal       *aTriggeringPrincipal,
                                  nsSecurityFlags     aSecurityFlags,
                                  nsContentPolicyType aContentPolicyType,
-                                 bool                aIsSrcdocChannel /* = false */,
-                                 nsIURI             *aBaseURI /* = nullptr */)
+                                 bool                aIsSrcdocChannel /* = false */)
 {
   nsresult rv;
   nsCOMPtr<nsIStringInputStream> stream;
@@ -403,8 +387,7 @@ NS_NewInputStreamChannelInternal(nsIChannel        **outChannel,
                                         aLoadingPrincipal,
                                         aTriggeringPrincipal,
                                         aSecurityFlags,
-                                        aContentPolicyType,
-                                        aBaseURI);
+                                        aContentPolicyType);
 
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -425,8 +408,7 @@ NS_NewInputStreamChannel(nsIChannel        **outChannel,
                          nsIPrincipal       *aLoadingPrincipal,
                          nsSecurityFlags     aSecurityFlags,
                          nsContentPolicyType aContentPolicyType,
-                         bool                aIsSrcdocChannel /* = false */,
-                         nsIURI             *aBaseURI /* = nullptr */)
+                         bool                aIsSrcdocChannel /* = false */)
 {
   return NS_NewInputStreamChannelInternal(outChannel,
                                           aUri,
@@ -437,8 +419,7 @@ NS_NewInputStreamChannel(nsIChannel        **outChannel,
                                           nullptr, // aTriggeringPrincipal
                                           aSecurityFlags,
                                           aContentPolicyType,
-                                          aIsSrcdocChannel,
-                                          aBaseURI);
+                                          aIsSrcdocChannel);
 }
 
 nsresult
@@ -1417,19 +1398,6 @@ NS_NewNotificationCallbacksAggregation(nsIInterfaceRequestor  *callbacks,
                                        nsIInterfaceRequestor **result)
 {
     return NS_NewNotificationCallbacksAggregation(callbacks, loadGroup, nullptr, result);
-}
-
-bool
-NS_IsOffline()
-{
-    bool offline = true;
-    bool connectivity = true;
-    nsCOMPtr<nsIIOService> ios = do_GetIOService();
-    if (ios) {
-        ios->GetOffline(&offline);
-        ios->GetConnectivity(&connectivity);
-    }
-    return offline || !connectivity;
 }
 
 bool

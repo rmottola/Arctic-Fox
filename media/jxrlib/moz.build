@@ -50,8 +50,6 @@ SOURCES += [
     'jxrgluelib/JXRMeta.c',
 ]
 
-FAIL_ON_WARNINGS = False
-
 # TODO: [rhinoduck] This comes from the jxr example. Is it necessary?
 DEFINES['DISABLE_PERF_MEASUREMENT'] = True
 

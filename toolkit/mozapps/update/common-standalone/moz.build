@@ -10,3 +10,6 @@ include('../common/sources.mozbuild')
 
 if CONFIG['OS_ARCH'] == 'WINNT':
     USE_STATIC_LIBS = True
+
+# XXX: We should fix these warnings
+ALLOW_COMPILER_WARNINGS = True

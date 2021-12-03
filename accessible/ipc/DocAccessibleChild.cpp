@@ -52,6 +52,12 @@ SerializeTree(Accessible* aRoot, nsTArray<AccessibleData>& aTree)
 Accessible*
 DocAccessibleChild::IdToAccessible(const uint64_t& aID) const
 {
+  if (!aID)
+    return mDoc;
+
+  if (!mDoc)
+    return nullptr;
+
   return mDoc->GetAccessibleByUniqueID(reinterpret_cast<void*>(aID));
 }
 

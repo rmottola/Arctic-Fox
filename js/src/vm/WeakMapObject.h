@@ -34,16 +34,17 @@ class ObjectWeakMap
 {
   private:
     ObjectValueMap map;
+    typedef gc::HashKeyRef<ObjectValueMap, JSObject*> StoreBufferRef;
 
   public:
-    explicit ObjectWeakMap(JSContext *cx);
+    explicit ObjectWeakMap(JSContext* cx);
     ~ObjectWeakMap();
 
-    JSObject *lookup(const JSObject *obj);
-    bool add(JSContext *cx, JSObject *obj, JSObject *target);
+    JSObject* lookup(const JSObject* obj);
+    bool add(JSContext* cx, JSObject* obj, JSObject* target);
     void clear();
 
-    void trace(JSTracer *trc);
+    void trace(JSTracer* trc);
     size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf);
     size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) {
         return mallocSizeOf(this) + sizeOfExcludingThis(mallocSizeOf);

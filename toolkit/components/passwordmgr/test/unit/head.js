@@ -16,6 +16,7 @@ const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/LoginRecipes.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "DownloadPaths",
                                   "resource://gre/modules/DownloadPaths.jsm");
@@ -195,6 +196,45 @@ const LoginTest = {
   assertTimeIsAboutNow: function (aTimeMs)
   {
     do_check_true(Math.abs(aTimeMs - Date.now()) < 30000);
+  }
+};
+
+const RecipeHelpers = {
+  initNewParent() {
+    return (new LoginRecipesParent({ defaults: false })).initializationPromise;
+  },
+
+  /**
+   * Create a document for the given URL containing the given HTML containing a
+   * form and return the <form>.
+   */
+  createTestForm(aDocumentURL, aHTML = "<form>") {
+    let parser = Cc["@mozilla.org/xmlextras/domparser;1"].
+                 createInstance(Ci.nsIDOMParser);
+    parser.init();
+    let parsedDoc = parser.parseFromString(aHTML, "text/html");
+
+    // Mock the document.location object so we can unit test without a frame. We use a proxy
+    // instead of just assigning to the property since it's not configurable or writable.
+    let document = new Proxy(parsedDoc, {
+      get(target, property, receiver) {
+        // document.location is normally null when a document is outside of a "browsing context".
+        // See https://html.spec.whatwg.org/#the-location-interface
+        if (property == "location") {
+          return new URL(aDocumentURL);
+        }
+        return target[property];
+      },
+    });
+
+    let form = parsedDoc.forms[0];
+
+    // Assign form.ownerDocument to the proxy so document.location works.
+    Object.defineProperty(form, "ownerDocument", {
+      value: document,
+    });
+
+    return form;
   }
 };
 

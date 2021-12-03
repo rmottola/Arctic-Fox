@@ -103,6 +103,9 @@
 #include "nsIStyleSheetService.h"
 #include "nsContentPermissionHelper.h"
 #include "nsNetUtil.h"
+#include "nsDocument.h"
+#include "HTMLImageElement.h"
+#include "mozilla/css/ImageLoader.h"
 
 #ifdef XP_WIN
 #undef GetClassName
@@ -2251,7 +2254,7 @@ nsDOMWindowUtils::GetLayerManagerRemote(bool* retval)
 }
 
 NS_IMETHODIMP
-nsDOMWindowUtils::GetSupportsHardwareH264Decoding(bool* retval)
+nsDOMWindowUtils::GetSupportsHardwareH264Decoding(nsAString& aRetval)
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
 
@@ -2264,9 +2267,15 @@ nsDOMWindowUtils::GetSupportsHardwareH264Decoding(bool* retval)
   if (!mgr)
     return NS_ERROR_FAILURE;
 
-  *retval = MP4Decoder::IsVideoAccelerated(mgr->GetCompositorBackendType());
+  nsCString failureReason;
+  if (MP4Decoder::IsVideoAccelerated(mgr->GetCompositorBackendType(), failureReason)) {
+    aRetval.AssignLiteral("Yes");
+  } else {
+    aRetval.AssignLiteral("No; ");
+    AppendUTF8toUTF16(failureReason, aRetval);
+  }
 #else
-  *retval = false;
+  aRetval.AssignLiteral("No; Compiled without MP4 support.");
 #endif
   return NS_OK;
 }
@@ -3871,6 +3880,30 @@ nsDOMWindowUtils::LeaveChaosMode()
 {
   MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
   ChaosMode::leaveChaosMode();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::ForceUseCounterFlush(nsIDOMNode *aNode)
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+  NS_ENSURE_ARG_POINTER(aNode);
+
+  if (nsCOMPtr<nsIDocument> doc = do_QueryInterface(aNode)) {
+    mozilla::css::ImageLoader* loader = doc->StyleImageLoader();
+    loader->FlushUseCounters();
+
+    static_cast<nsDocument*>(doc.get())->ReportUseCounters();
+    return NS_OK;
+  }
+
+  if (nsCOMPtr<nsIContent> content = do_QueryInterface(aNode)) {
+    if (HTMLImageElement* img = HTMLImageElement::FromContent(content)) {
+      img->FlushUseCounters();
+      return NS_OK;
+    }
+  }
+
   return NS_OK;
 }
 

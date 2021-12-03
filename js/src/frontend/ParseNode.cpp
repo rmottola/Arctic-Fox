@@ -215,7 +215,7 @@ PushNodeChildren(ParseNode* pn, NodeStack* stack)
       case PNK_OBJECT_PROPERTY_NAME:
       case PNK_FRESHENBLOCK:
       case PNK_SUPERPROP:
-      case PNK_NEWTARGET:
+      case PNK_POSHOLDER:
         MOZ_ASSERT(pn->isArity(PN_NULLARY));
         MOZ_ASSERT(!pn->isUsed(), "handle non-trivial cases separately");
         MOZ_ASSERT(!pn->isDefn(), "handle non-trivial cases separately");
@@ -285,6 +285,7 @@ PushNodeChildren(ParseNode* pn, NodeStack* stack)
       case PNK_SWITCH:
       case PNK_LETBLOCK:
       case PNK_CLASSMETHOD:
+      case PNK_NEWTARGET:
       case PNK_FOR: {
         MOZ_ASSERT(pn->isArity(PN_BINARY));
         stack->push(pn->pn_left);
@@ -682,15 +683,17 @@ Parser<FullParseHandler>::cloneParseTree(ParseNode* opn)
     switch (pn->getArity()) {
 #define NULLCHECK(e)    JS_BEGIN_MACRO if (!(e)) return nullptr; JS_END_MACRO
 
-      case PN_CODE:
-        NULLCHECK(pn->pn_funbox = newFunctionBox(pn, opn->pn_funbox->function(), pc,
+      case PN_CODE: {
+        RootedFunction fun(context, opn->pn_funbox->function());
+        NULLCHECK(pn->pn_funbox = newFunctionBox(pn, fun, pc,
                                                  Directives(/* strict = */ opn->pn_funbox->strict()),
                                                  opn->pn_funbox->generatorKind()));
         NULLCHECK(pn->pn_body = cloneParseTree(opn->pn_body));
-        pn->pn_cookie = opn->pn_cookie;
+        pn->pn_scopecoord = opn->pn_scopecoord;
         pn->pn_dflags = opn->pn_dflags;
         pn->pn_blockid = opn->pn_blockid;
         break;
+      }
 
       case PN_LIST:
         pn->makeEmpty();
@@ -876,7 +879,7 @@ Parser<FullParseHandler>::cloneLeftHandSide(ParseNode* opn)
         pn->pn_expr = nullptr;
         if (opn->isDefn()) {
             /* We copied some definition-specific state into pn. Clear it out. */
-            pn->pn_cookie.makeFree();
+            pn->pn_scopecoord.makeFree();
             pn->pn_dflags &= ~(PND_LEXICAL | PND_BOUND);
             pn->setDefn(false);
 
@@ -1154,8 +1157,12 @@ ObjectBox::trace(JSTracer* trc)
     ObjectBox* box = this;
     while (box) {
         TraceRoot(trc, &box->object, "parser.object");
-        if (box->isFunctionBox())
-            box->asFunctionBox()->bindings.trace(trc);
+        if (box->isFunctionBox()) {
+            FunctionBox* funbox = box->asFunctionBox();
+            funbox->bindings.trace(trc);
+            if (funbox->enclosingStaticScope_)
+                TraceRoot(trc, &funbox->enclosingStaticScope_, "funbox-enclosingStaticScope");
+        }
         box = box->traceLink;
     }
 }

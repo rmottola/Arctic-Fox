@@ -130,6 +130,9 @@ SpecialPowersObserver.prototype = new SpecialPowersObserverAPI();
     obs.removeObserver(this, "chrome-document-global-created");
     obs.removeObserver(this, "http-on-modify-request");
     obs.removeObserver(this, "xpcom-shutdown");
+    this._registerObservers._topics.forEach(function(element) {
+      obs.removeObserver(this._registerObservers, element);
+    });
     this._removeProcessCrashObservers();
 
     if (this._isFrameScriptLoaded) {
@@ -182,6 +185,36 @@ getService(Ci.nsIMessageBroadcaster);
     obs.removeObserver(this, "plugin-crashed");
     obs.removeObserver(this, "ipc:content-shutdown");
     this._processCrashObserversRegistered = false;
+  };
+
+  SpecialPowersObserver.prototype._registerObservers = {
+    _self: null,
+    _topics: [],
+    _add: function(topic) {
+      if (this._topics.indexOf(topic) < 0) {
+        this._topics.push(topic);
+        Services.obs.addObserver(this, topic, false);
+      }
+    },
+    observe: function (aSubject, aTopic, aData) {
+      var msg = { aData: aData };
+      switch (aTopic) {
+        case "perm-changed":
+          var permission = aSubject.QueryInterface(Ci.nsIPermission);
+
+          // specialPowersAPI will consume this value, and it is used as a
+          // fake permission, but only type and principal.appId will be used.
+          //
+          // We need to ensure that it looks the same as a real permission,
+          // so we fake these properties.
+          msg.permission = {
+            principal: { appId: permission.principal.appId },
+            type: permission.type
+          };
+        default:
+          this._self._sendAsyncMessage("specialpowers-" + aTopic, msg);
+      }
+    }
   };
 
   /**

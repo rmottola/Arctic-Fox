@@ -102,7 +102,7 @@ public:
   }
 
   virtual void GetMozFullPathInternal(nsAString& aFullPath,
-                                      ErrorResult& aRv) override;
+                                      ErrorResult& aRv) const override;
 
   virtual nsresult
   SetMutable(bool aMutable) override;

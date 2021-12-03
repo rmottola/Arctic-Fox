@@ -2183,9 +2183,14 @@ public:
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap) override;
   virtual void Paint(nsDisplayListBuilder* aBuilder, nsRenderingContext* aCtx) override;
   NS_DISPLAY_DECL_NAME("Caret", TYPE_CARET)
+
+  bool NeedsCustomScrollClip() { return mNeedsCustomScrollClip; }
+  void SetNeedsCustomScrollClip() { mNeedsCustomScrollClip = true; }
+
 protected:
   nsRefPtr<nsCaret> mCaret;
   nsRect mBounds;
+  bool mNeedsCustomScrollClip;
 };
 
 /**
@@ -2922,7 +2927,7 @@ protected:
     mBounds.UnionRect(mBounds, aOther->mBounds);
     mVisibleRect.UnionRect(mVisibleRect, aOther->mVisibleRect);
     mMergedFrames.AppendElement(aOther->mFrame);
-    mMergedFrames.MoveElementsFrom(aOther->mMergedFrames);
+    mMergedFrames.AppendElements(mozilla::Move(aOther->mMergedFrames));
   }
 
   nsDisplayList mList;

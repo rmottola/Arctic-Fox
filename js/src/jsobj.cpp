@@ -92,19 +92,16 @@ JS_ObjectToOuterObject(JSContext* cx, HandleObject obj)
     return GetOuterObject(cx, obj);
 }
 
-JSObject*
-js::NonNullObject(JSContext* cx, const Value& v)
+void
+js::ReportNotObject(JSContext* cx, const Value& v)
 {
-    if (v.isPrimitive()) {
-        RootedValue value(cx, v);
-        UniquePtr<char[], JS::FreePolicy> bytes =
-            DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, value, nullptr);
-        if (!bytes)
-            return nullptr;
+    MOZ_ASSERT(!v.isObject());
+
+    RootedValue value(cx, v);
+    UniquePtr<char[], JS::FreePolicy> bytes =
+        DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, value, nullptr);
+    if (bytes)
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_NONNULL_OBJECT, bytes.get());
-        return nullptr;
-    }
-    return &v.toObject();
 }
 
 const char*
@@ -293,12 +290,9 @@ js::ToPropertyDescriptor(JSContext* cx, HandleValue descval, bool checkAccessors
                          MutableHandle<PropertyDescriptor> desc)
 {
     // step 2
-    if (!descval.isObject()) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_NONNULL_OBJECT,
-                             InformalValueTypeName(descval));
+    RootedObject obj(cx, NonNullObject(cx, descval));
+    if (!obj)
         return false;
-    }
-    RootedObject obj(cx, &descval.toObject());
 
     // step 3
     desc.clear();
@@ -549,6 +543,19 @@ js::SetIntegrityLevel(JSContext* cx, HandleObject obj, IntegrityLevel level)
 
         MOZ_ASSERT(nobj->lastProperty()->slotSpan() == last->slotSpan());
         JS_ALWAYS_TRUE(nobj->setLastProperty(cx, last));
+
+        // Ordinarily ArraySetLength handles this, but we're going behind its back
+        // right now, so we must do this manually.
+        //
+        // ArraySetLength also implements the capacity <= length invariant for
+        // arrays with non-writable length.  We don't need to do anything special
+        // for that, because capacity was zeroed out by preventExtensions.  (See
+        // the assertion about getDenseCapacity above.)
+        if (level == IntegrityLevel::Frozen && obj->is<ArrayObject>()) {
+            if (!obj->as<ArrayObject>().maybeCopyElementsForWrite(cx))
+                return false;
+            obj->as<ArrayObject>().getElementsHeader()->setNonwritableArrayLength();
+        }
     } else {
         RootedId id(cx);
         Rooted<PropertyDescriptor> desc(cx);
@@ -585,21 +592,6 @@ js::SetIntegrityLevel(JSContext* cx, HandleObject obj, IntegrityLevel level)
             if (!DefineProperty(cx, obj, id, desc))
                 return false;
         }
-    }
-
-    // Ordinarily ArraySetLength handles this, but we're going behind its back
-    // right now, so we must do this manually.  Neither the custom property
-    // tree mutations nor the DefineProperty call in the above code will do
-    // this for us.
-    //
-    // ArraySetLength also implements the capacity <= length invariant for
-    // arrays with non-writable length.  We don't need to do anything special
-    // for that, because capacity was zeroed out by preventExtensions.  (See
-    // the assertion before the if-else above.)
-    if (level == IntegrityLevel::Frozen && obj->is<ArrayObject>()) {
-        if (!obj->as<ArrayObject>().maybeCopyElementsForWrite(cx))
-            return false;
-        obj->as<ArrayObject>().getElementsHeader()->setNonwritableArrayLength();
     }
 
     return true;
@@ -1008,8 +1000,7 @@ js::CreateThisForFunctionWithProto(JSContext* cx, HandleObject callee, HandleObj
 
         res = CreateThisForFunctionWithGroup(cx, group, newKind);
     } else {
-        gc::AllocKind allocKind = NewObjectGCKind(&PlainObject::class_);
-        res = NewObjectWithProto<PlainObject>(cx, proto, allocKind, newKind);
+        res = NewBuiltinClassInstance<PlainObject>(cx, newKind);
     }
 
     if (res) {
@@ -2745,18 +2736,6 @@ js::GetPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
 }
 
 bool
-js::ToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHandleValue vp)
-{
-    bool ok;
-    if (JSConvertOp op = obj->getClass()->convert)
-        ok = op(cx, obj, hint, vp);
-    else
-        ok = JS::OrdinaryToPrimitive(cx, obj, hint, vp);
-    MOZ_ASSERT_IF(ok, vp.isPrimitive());
-    return ok;
-}
-
-bool
 js::WatchGuts(JSContext* cx, JS::HandleObject origObj, JS::HandleId id, JS::HandleObject callable)
 {
     RootedObject obj(cx, GetInnerObject(origObj));
@@ -2960,6 +2939,47 @@ JS::OrdinaryToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHan
                       ? "primitive type"
                       : hint == JSTYPE_STRING ? "string" : "number");
     return false;
+}
+
+bool
+js::ToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHandleValue vp)
+{
+    bool ok;
+    if (JSConvertOp op = obj->getClass()->convert)
+        ok = op(cx, obj, hint, vp);
+    else
+        ok = JS::OrdinaryToPrimitive(cx, obj, hint, vp);
+    MOZ_ASSERT_IF(ok, vp.isPrimitive());
+    return ok;
+}
+
+bool
+js::ToPrimitiveSlow(JSContext* cx, MutableHandleValue vp)
+{
+    JSObject* obj = &vp.toObject();
+
+    /* Optimize new String(...).valueOf(). */
+    if (obj->is<StringObject>()) {
+        jsid id = NameToId(cx->names().valueOf);
+        StringObject* nobj = &obj->as<StringObject>();
+        if (ClassMethodIsNative(cx, nobj, &StringObject::class_, id, str_toString)) {
+            vp.setString(nobj->unbox());
+            return true;
+        }
+    }
+
+    /* Optimize new Number(...).valueOf(). */
+    if (obj->is<NumberObject>()) {
+        jsid id = NameToId(cx->names().valueOf);
+        NumberObject* nobj = &obj->as<NumberObject>();
+        if (ClassMethodIsNative(cx, nobj, &NumberObject::class_, id, num_valueOf)) {
+            vp.setNumber(nobj->unbox());
+            return true;
+        }
+    }
+
+    RootedObject objRoot(cx, obj);
+    return ToPrimitive(cx, objRoot, JSTYPE_VOID, vp);
 }
 
 bool
@@ -3338,7 +3358,7 @@ JSObject::dump()
     if (obj->isNative()) {
         fprintf(stderr, "properties:\n");
         Vector<Shape*, 8, SystemAllocPolicy> props;
-        for (Shape::Range<NoGC> r(obj->as<NativeObject>().lastProperty()); !r.empty(); r.popFront())
+        for (Shape::Range<NoGC> r(obj->as<NativeObject>().lastProperty()); !r.empty(); r.popFront()) {
             if (!props.append(&r.front())) {
                 fprintf(stderr, "(OOM while appending properties)\n");
                 break;

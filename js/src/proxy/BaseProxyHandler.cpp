@@ -32,6 +32,28 @@ BaseProxyHandler::has(JSContext* cx, HandleObject proxy, HandleId id, bool* bp) 
 }
 
 bool
+BaseProxyHandler::getPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
+                                        MutableHandle<PropertyDescriptor> desc) const
+{
+    assertEnteredPolicy(cx, proxy, id, GET | SET | GET_PROPERTY_DESCRIPTOR);
+
+    if (!getOwnPropertyDescriptor(cx, proxy, id, desc))
+        return false;
+    if (desc.object())
+        return true;
+
+    RootedObject proto(cx);
+    if (!GetPrototype(cx, proxy, &proto))
+        return false;
+    if (!proto) {
+        MOZ_ASSERT(!desc.object());
+        return true;
+    }
+    return GetPropertyDescriptor(cx, proto, id, desc);
+}
+
+
+bool
 BaseProxyHandler::hasOwn(JSContext* cx, HandleObject proxy, HandleId id, bool* bp) const
 {
     assertEnteredPolicy(cx, proxy, id, GET);
@@ -132,15 +154,26 @@ js::SetPropertyIgnoringNamedGetter(JSContext *cx, HandleObject obj, HandleId id,
             return CallJSSetterOp(cx, setter, receiverObj, id, &valCopy, result);
         }
 
-        // Steps 5.c-d. Adapt for SpiderMonkey by using HasOwnProperty instead
-        // of the standard [[GetOwnProperty]].
-        bool existingDescriptor;
-        if (!HasOwnProperty(cx, receiverObj, id, &existingDescriptor))
+        // Steps 5.c-d.
+        Rooted<PropertyDescriptor> existingDescriptor(cx);
+        if (!GetOwnPropertyDescriptor(cx, receiverObj, id, &existingDescriptor))
             return false;
 
-        // Steps 5.e-f.
+        // Step 5.e.
+        if (existingDescriptor.object()) {
+            // Step 5.e.i.
+            if (existingDescriptor.isAccessorDescriptor())
+                return result.fail(JSMSG_OVERWRITING_ACCESSOR);
+
+            // Step 5.e.ii.
+            if (!existingDescriptor.writable())
+                return result.fail(JSMSG_READ_ONLY);
+        }
+
+
+        // Steps 5.e.iii-iv. and 5.f.i.
         unsigned attrs =
-            existingDescriptor
+            existingDescriptor.object()
             ? JSPROP_IGNORE_ENUMERATE | JSPROP_IGNORE_READONLY | JSPROP_IGNORE_PERMANENT
             : JSPROP_ENUMERATE;
 

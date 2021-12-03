@@ -19,7 +19,8 @@ using namespace mozilla::jsipc;
 namespace mozilla {
 namespace dom {
 
-NS_IMPL_ISUPPORTS(ContentBridgeChild, nsIContentChild)
+NS_IMPL_ISUPPORTS(ContentBridgeChild,
+                  nsIContentChild)
 
 ContentBridgeChild::ContentBridgeChild(Transport* aTransport)
   : mTransport(aTransport)
@@ -47,6 +48,7 @@ ContentBridgeChild::Create(Transport* aTransport, ProcessId aOtherPid)
 
   DebugOnly<bool> ok = bridge->Open(aTransport, aOtherPid, XRE_GetIOMessageLoop());
   MOZ_ASSERT(ok);
+
   return bridge;
 }
 

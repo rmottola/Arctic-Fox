@@ -8,9 +8,13 @@ SOURCES += [
     'MockMediaResource.cpp',
     'TestAudioCompactor.cpp',
     'TestGMPCrossOrigin.cpp',
+    'TestGMPRemoveAndDelete.cpp',
+    'TestGMPUtils.cpp',
     'TestIntervalSet.cpp',
+    'TestMediaEventSource.cpp',
     'TestMozPromise.cpp',
     'TestMP3Demuxer.cpp',
+    'TestMP4Demuxer.cpp',
     'TestMP4Reader.cpp',
     'TestTrackEncoder.cpp',
     'TestVideoSegment.cpp',
@@ -49,5 +53,3 @@ LOCAL_INCLUDES += [
 ]
 
 FINAL_LIBRARY = 'xul-gtest'
-
-FAIL_ON_WARNINGS = True

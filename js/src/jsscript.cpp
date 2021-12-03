@@ -14,7 +14,9 @@
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/PodOperations.h"
+#include "mozilla/Vector.h"
 
+#include <algorithm>
 #include <string.h>
 
 #include "jsapi.h"
@@ -151,8 +153,10 @@ Bindings::initWithTemporaryStorage(ExclusiveContext* cx, InternalBindingsHandle 
 
 #ifdef DEBUG
     HashSet<PropertyName*> added(cx);
-    if (!added.init())
+    if (!added.init()) {
+        ReportOutOfMemory(cx);
         return false;
+    }
 #endif
 
     uint32_t slot = CallObject::RESERVED_SLOTS;
@@ -163,8 +167,10 @@ Bindings::initWithTemporaryStorage(ExclusiveContext* cx, InternalBindingsHandle 
 #ifdef DEBUG
         // The caller ensures no duplicate aliased names.
         MOZ_ASSERT(!added.has(bi->name()));
-        if (!added.put(bi->name()))
+        if (!added.put(bi->name())) {
+            ReportOutOfMemory(cx);
             return false;
+        }
 #endif
 
         StackBaseShape stackBase(cx, &CallObject::class_,
@@ -590,6 +596,7 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
         FunHasAnyAliasedFormal,
         ArgumentsHasVarBinding,
         NeedsArgsObj,
+        HasMappedArgsObj,
         IsGeneratorExp,
         IsLegacyGenerator,
         IsStarGenerator,
@@ -602,7 +609,7 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
         HasNonSyntacticScope,
     };
 
-    uint32_t length, lineno, column, nslots, staticLevel;
+    uint32_t length, lineno, column, nslots;
     uint32_t natoms, nsrcnotes, i;
     uint32_t nconsts, nobjects, nregexps, ntrynotes, nblockscopes, nyieldoffsets;
     uint32_t prologueLength, version;
@@ -675,7 +682,6 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
         lineno = script->lineno();
         column = script->column();
         nslots = script->nslots();
-        staticLevel = script->staticLevel();
         natoms = script->natoms();
 
         nsrcnotes = script->numNotes();
@@ -718,6 +724,8 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
             scriptBits |= (1 << ArgumentsHasVarBinding);
         if (script->analyzedArgsUsage() && script->needsArgsObj())
             scriptBits |= (1 << NeedsArgsObj);
+        if (script->hasMappedArgsObj())
+            scriptBits |= (1 << HasMappedArgsObj);
         if (!enclosingScript || enclosingScript->scriptSource() != script->scriptSource())
             scriptBits |= (1 << OwnSource);
         if (script->isGeneratorExp())
@@ -769,7 +777,6 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
         JSVersion version_ = JSVersion(version);
         MOZ_ASSERT((version_ & VersionFlags::MASK) == unsigned(version_));
 
-        // staticLevel is set below.
         CompileOptions options(cx);
         options.setVersion(version_)
                .setNoScriptRval(!!(scriptBits & (1 << NoScriptRval)))
@@ -811,7 +818,7 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
         }
 
         script = JSScript::Create(cx, enclosingScope, !!(scriptBits & (1 << SavedCallerFun)),
-                                  options, /* staticLevel = */ 0, sourceObject, 0, 0);
+                                  options, sourceObject, 0, 0);
         if (!script)
             return false;
 
@@ -859,6 +866,8 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
             script->setArgumentsHasVarBinding();
         if (scriptBits & (1 << NeedsArgsObj))
             script->setNeedsArgsObj(true);
+        if (scriptBits & (1 << HasMappedArgsObj))
+            script->hasMappedArgsObj_ = true;
         if (scriptBits & (1 << IsGeneratorExp))
             script->isGeneratorExp_ = true;
         if (scriptBits & (1 << HasSingleton))
@@ -889,8 +898,7 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
 
     if (!xdr->codeUint32(&lineno) ||
         !xdr->codeUint32(&column) ||
-        !xdr->codeUint32(&nslots) ||
-        !xdr->codeUint32(&staticLevel))
+        !xdr->codeUint32(&nslots))
     {
         return false;
     }
@@ -899,7 +907,6 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
         script->lineno_ = lineno;
         script->column_ = column;
         script->nslots_ = nslots;
-        script->staticLevel_ = staticLevel;
     }
 
     jsbytecode* code = script->code();
@@ -1278,53 +1285,79 @@ JSScript::initScriptCounts(JSContext* cx)
 {
     MOZ_ASSERT(!hasScriptCounts());
 
-    size_t n = 0;
+    // Record all pc which are the first instruction of a basic block.
+    mozilla::Vector<jsbytecode*, 16, SystemAllocPolicy> jumpTargets;
+    jsbytecode* end = codeEnd();
+    jsbytecode* mainEntry = main();
+    for (jsbytecode* pc = code(); pc != end; pc = GetNextPc(pc)) {
+        if (pc == mainEntry) {
+            if (!jumpTargets.append(pc))
+                return false;
+        }
 
-    for (jsbytecode* pc = code(); pc < codeEnd(); pc += GetBytecodeLength(pc))
-        n += PCCounts::numCounts(JSOp(*pc));
+        bool jump = IsJumpOpcode(JSOp(*pc));
+        if (jump) {
+            jsbytecode* target = pc + GET_JUMP_OFFSET(pc);
+            if (!jumpTargets.append(target))
+                return false;
 
-    size_t nbytes = (length() * sizeof(PCCounts)) + (n * sizeof(double));
-    uint8_t* base = zone()->pod_calloc<uint8_t>(nbytes);
-    if (!base)
+            if (BytecodeFallsThrough(JSOp(*pc))) {
+                jsbytecode* fallthrough = GetNextPc(pc);
+                if (!jumpTargets.append(fallthrough))
+                    return false;
+            }
+        }
+    }
+
+    // Mark catch/finally blocks as being jump targets.
+    if (hasTrynotes()) {
+        JSTryNote* tn = trynotes()->vector;
+        JSTryNote* tnlimit = tn + trynotes()->length;
+        for (; tn < tnlimit; tn++) {
+            jsbytecode* tryStart = mainEntry + tn->start;
+            jsbytecode* tryPc = tryStart - 1;
+            if (JSOp(*tryPc) != JSOP_TRY)
+                continue;
+
+            jsbytecode* tryTarget = tryStart + tn->length;
+            if (!jumpTargets.append(tryTarget))
+                return false;
+        }
+    }
+
+    // Sort all pc, and remove duplicates.
+    std::sort(jumpTargets.begin(), jumpTargets.end());
+    auto last = std::unique(jumpTargets.begin(), jumpTargets.end());
+    jumpTargets.erase(last, jumpTargets.end());
+
+    // Initialize all PCCounts counters to 0.
+    ScriptCounts::PCCountsVector base;
+    if (!base.reserve(jumpTargets.length()))
         return false;
 
-    /* Create compartment's scriptCountsMap if necessary. */
+    for (size_t i = 0; i < jumpTargets.length(); i++)
+        MOZ_ALWAYS_TRUE(base.emplaceBack(pcToOffset(jumpTargets[i])));
+
+    // Create compartment's scriptCountsMap if necessary.
     ScriptCountsMap* map = compartment()->scriptCountsMap;
     if (!map) {
         map = cx->new_<ScriptCountsMap>();
         if (!map || !map->init()) {
-            js_free(base);
             js_delete(map);
             return false;
         }
         compartment()->scriptCountsMap = map;
     }
 
-    uint8_t* cursor = base;
-
-    ScriptCounts scriptCounts;
-    scriptCounts.pcCountsVector = (PCCounts*) cursor;
-    cursor += length() * sizeof(PCCounts);
-
-    for (jsbytecode* pc = code(); pc < codeEnd(); pc += GetBytecodeLength(pc)) {
-        MOZ_ASSERT(uintptr_t(cursor) % sizeof(double) == 0);
-        scriptCounts.pcCountsVector[pcToOffset(pc)].counts = (double*) cursor;
-        size_t capacity = PCCounts::numCounts(JSOp(*pc));
-#ifdef DEBUG
-        scriptCounts.pcCountsVector[pcToOffset(pc)].capacity = capacity;
-#endif
-        cursor += capacity * sizeof(double);
-    }
-
-    if (!map->putNew(this, scriptCounts)) {
-        js_free(base);
+    // Register the current ScriptCount in the compartment's map.
+    if (!map->putNew(this, Move(base)))
         return false;
-    }
-    hasScriptCounts_ = true; // safe to set this;  we can't fail after this point
 
-    MOZ_ASSERT(size_t(cursor - base) == nbytes);
+    // safe to set this;  we can't fail after this point.
+    hasScriptCounts_ = true;
 
-    /* Enable interrupts in any interpreter frames running on this script. */
+    // Enable interrupts in any interpreter frames running on this script. This
+    // is used to let the interpreter increment the PCCounts, if present.
     for (ActivationIterator iter(cx->runtime()); !iter.done(); ++iter) {
         if (iter->isInterpreter())
             iter->asInterpreter()->enableInterruptsIfRunning(this);
@@ -1342,11 +1375,47 @@ static inline ScriptCountsMap::Ptr GetScriptCountsMapEntry(JSScript* script)
     return p;
 }
 
-js::PCCounts&
-JSScript::getPCCounts(jsbytecode* pc) {
-    MOZ_ASSERT(containsPC(pc));
+ScriptCounts&
+JSScript::getScriptCounts()
+{
     ScriptCountsMap::Ptr p = GetScriptCountsMapEntry(this);
-    return p->value().pcCountsVector[pcToOffset(pc)];
+    return p->value();
+}
+
+js::PCCounts*
+ScriptCounts::maybeGetPCCounts(size_t offset) {
+    PCCounts searched = PCCounts(offset);
+    PCCounts* elem = std::lower_bound(pcCounts_.begin(), pcCounts_.end(), searched);
+    if (elem == pcCounts_.end() || elem->pcOffset() != offset)
+        return nullptr;
+    return elem;
+}
+
+const js::PCCounts*
+ScriptCounts::maybeGetPCCounts(size_t offset) const {
+    PCCounts searched = PCCounts(offset);
+    const PCCounts* elem = std::lower_bound(pcCounts_.begin(), pcCounts_.end(), searched);
+    if (elem == pcCounts_.end() || elem->pcOffset() != offset)
+        return nullptr;
+    return elem;
+}
+
+const js::PCCounts*
+ScriptCounts::maybeGetThrowCounts(size_t offset) const {
+    PCCounts searched = PCCounts(offset);
+    const PCCounts* elem = std::lower_bound(throwCounts_.begin(), throwCounts_.end(), searched);
+    if (elem == throwCounts_.end() || elem->pcOffset() != offset)
+        return nullptr;
+    return elem;
+}
+
+js::PCCounts*
+ScriptCounts::getThrowCounts(size_t offset) {
+    PCCounts searched = PCCounts(offset);
+    PCCounts* elem = std::lower_bound(throwCounts_.begin(), throwCounts_.end(), searched);
+    if (elem == throwCounts_.end() || elem->pcOffset() != offset)
+        elem = throwCounts_.insert(elem, searched);
+    return elem;
 }
 
 void
@@ -1360,38 +1429,54 @@ JSScript::setIonScript(JSContext* maybecx, js::jit::IonScript* ionScript)
     updateBaselineOrIonRaw(maybecx);
 }
 
+js::PCCounts*
+JSScript::maybeGetPCCounts(jsbytecode* pc) {
+    MOZ_ASSERT(containsPC(pc));
+    return getScriptCounts().maybeGetPCCounts(pcToOffset(pc));
+}
+
+const js::PCCounts*
+JSScript::maybeGetThrowCounts(jsbytecode* pc) {
+    MOZ_ASSERT(containsPC(pc));
+    return getScriptCounts().maybeGetThrowCounts(pcToOffset(pc));
+}
+
+js::PCCounts*
+JSScript::getThrowCounts(jsbytecode* pc) {
+    MOZ_ASSERT(containsPC(pc));
+    return getScriptCounts().getThrowCounts(pcToOffset(pc));
+}
+
 void
 JSScript::addIonCounts(jit::IonScriptCounts* ionCounts)
 {
-    ScriptCountsMap::Ptr p = GetScriptCountsMapEntry(this);
-    if (p->value().ionCounts)
-        ionCounts->setPrevious(p->value().ionCounts);
-    p->value().ionCounts = ionCounts;
+    ScriptCounts& sc = getScriptCounts();
+    if (sc.ionCounts_)
+        ionCounts->setPrevious(sc.ionCounts_);
+    sc.ionCounts_ = ionCounts;
 }
 
 jit::IonScriptCounts*
 JSScript::getIonCounts()
 {
-    ScriptCountsMap::Ptr p = GetScriptCountsMapEntry(this);
-    return p->value().ionCounts;
+    return getScriptCounts().ionCounts_;
 }
 
-ScriptCounts
-JSScript::releaseScriptCounts()
+void
+JSScript::releaseScriptCounts(ScriptCounts* counts)
 {
     ScriptCountsMap::Ptr p = GetScriptCountsMapEntry(this);
-    ScriptCounts counts = p->value();
+    *counts = Move(p->value());
     compartment()->scriptCountsMap->remove(p);
     hasScriptCounts_ = false;
-    return counts;
 }
 
 void
 JSScript::destroyScriptCounts(FreeOp* fop)
 {
     if (hasScriptCounts()) {
-        ScriptCounts scriptCounts = releaseScriptCounts();
-        scriptCounts.destroy(fop);
+        ScriptCounts scriptCounts;
+        releaseScriptCounts(&scriptCounts);
     }
 }
 
@@ -2465,10 +2550,10 @@ JSScript::initCompartment(ExclusiveContext* cx)
     compartment_ = cx->compartment_;
 }
 
-JSScript *
-JSScript::Create(ExclusiveContext *cx, HandleObject enclosingScope, bool savedCallerFun,
-                 const ReadOnlyCompileOptions &options, unsigned staticLevel,
-                 HandleObject sourceObject, uint32_t bufStart, uint32_t bufEnd)
+/* static */ JSScript*
+JSScript::Create(ExclusiveContext* cx, HandleObject enclosingScope, bool savedCallerFun,
+                 const ReadOnlyCompileOptions& options, HandleObject sourceObject,
+                 uint32_t bufStart, uint32_t bufEnd)
 {
     MOZ_ASSERT(bufStart <= bufEnd);
 
@@ -2495,19 +2580,6 @@ JSScript::Create(ExclusiveContext *cx, HandleObject enclosingScope, bool savedCa
 
     script->version = options.version;
     MOZ_ASSERT(script->getVersion() == options.version);     // assert that no overflow occurred
-
-    // This is an unsigned-to-uint16_t conversion, test for too-high values.
-    // In practice, recursion in Parser and/or BytecodeEmitter will blow the
-    // stack if we nest functions more than a few hundred deep, so this will
-    // never trigger.  Oh well.
-    if (staticLevel > UINT16_MAX) {
-        if (cx->isJSContext()) {
-            JS_ReportErrorNumber(cx->asJSContext(),
-                                 GetErrorMessage, nullptr, JSMSG_TOO_DEEP, js_function_str);
-        }
-        return nullptr;
-    }
-    script->staticLevel_ = uint16_t(staticLevel);
 
     script->setSourceObject(sourceObject);
     script->sourceStart_ = bufStart;
@@ -2652,6 +2724,42 @@ JSScript::fullyInitTrivial(ExclusiveContext* cx, Handle<JSScript*> script)
     return SaveSharedScriptData(cx, script, ssd, 1);
 }
 
+/* static */ void
+JSScript::linkToFunctionFromEmitter(js::ExclusiveContext* cx, JS::Handle<JSScript*> script,
+                                    js::frontend::FunctionBox* funbox)
+{
+    script->funHasExtensibleScope_ = funbox->hasExtensibleScope();
+    script->funNeedsDeclEnvObject_ = funbox->needsDeclEnvObject();
+    script->needsHomeObject_       = funbox->needsHomeObject();
+    script->isDerivedClassConstructor_ = funbox->isDerivedClassConstructor();
+
+    if (funbox->argumentsHasLocalBinding()) {
+        script->setArgumentsHasVarBinding();
+        if (funbox->definitelyNeedsArgsObj())
+            script->setNeedsArgsObj(true);
+    } else {
+        MOZ_ASSERT(!funbox->definitelyNeedsArgsObj());
+    }
+    script->hasMappedArgsObj_ = funbox->hasMappedArgsObj();
+
+    script->funLength_ = funbox->length;
+
+    script->isGeneratorExp_ = funbox->inGenexpLambda;
+    script->setGeneratorKind(funbox->generatorKind());
+
+    // Link the function and the script to each other, so that StaticScopeIter
+    // may walk the scope chain of currently compiling scripts.
+    RootedFunction fun(cx, funbox->function());
+    MOZ_ASSERT(fun->isInterpreted());
+
+    script->setFunction(fun);
+
+    if (fun->isInterpretedLazy())
+        fun->setUnlazifiedScript(script);
+    else
+        fun->setScript(script);
+}
+
 /* static */ bool
 JSScript::fullyInitFromEmitter(ExclusiveContext* cx, HandleScript script, BytecodeEmitter* bce)
 {
@@ -2694,7 +2802,32 @@ JSScript::fullyInitFromEmitter(ExclusiveContext* cx, HandleScript script, Byteco
     if (!SaveSharedScriptData(cx, script, ssd, nsrcnotes))
         return false;
 
+#ifdef DEBUG
     FunctionBox* funbox = bce->sc->isFunctionBox() ? bce->sc->asFunctionBox() : nullptr;
+
+    // Assert that the properties set by linkToFunctionFromEmitter are
+    // correct.
+    if (funbox) {
+        MOZ_ASSERT(script->funHasExtensibleScope_ == funbox->hasExtensibleScope());
+        MOZ_ASSERT(script->funNeedsDeclEnvObject_ == funbox->needsDeclEnvObject());
+        MOZ_ASSERT(script->needsHomeObject_ == funbox->needsHomeObject());
+        MOZ_ASSERT(script->isDerivedClassConstructor_ == funbox->isDerivedClassConstructor());
+        MOZ_ASSERT(script->argumentsHasVarBinding() == funbox->argumentsHasLocalBinding());
+        MOZ_ASSERT(script->hasMappedArgsObj() == funbox->hasMappedArgsObj());
+        MOZ_ASSERT(script->functionNonDelazifying() == funbox->function());
+        MOZ_ASSERT(script->isGeneratorExp_ == funbox->inGenexpLambda);
+        MOZ_ASSERT(script->generatorKind() == funbox->generatorKind());
+    } else {
+        MOZ_ASSERT(!script->funHasExtensibleScope_);
+        MOZ_ASSERT(!script->funNeedsDeclEnvObject_);
+        MOZ_ASSERT(!script->needsHomeObject_);
+        MOZ_ASSERT(!script->isDerivedClassConstructor_);
+        MOZ_ASSERT(!script->argumentsHasVarBinding());
+        MOZ_ASSERT(!script->hasMappedArgsObj());
+        MOZ_ASSERT(!script->isGeneratorExp_);
+        MOZ_ASSERT(script->generatorKind() == NotGenerator);
+    }
+#endif
 
     if (bce->constList.length() != 0)
         bce->constList.finish(script->consts());
@@ -2709,37 +2842,10 @@ JSScript::fullyInitFromEmitter(ExclusiveContext* cx, HandleScript script, Byteco
     script->strict_ = bce->sc->strict();
     script->explicitUseStrict_ = bce->sc->hasExplicitUseStrict();
     script->bindingsAccessedDynamically_ = bce->sc->bindingsAccessedDynamically();
-    script->funHasExtensibleScope_ = funbox ? funbox->hasExtensibleScope() : false;
-    script->funNeedsDeclEnvObject_ = funbox ? funbox->needsDeclEnvObject() : false;
-    script->needsHomeObject_       = funbox ? funbox->needsHomeObject() : false;
-    script->isDerivedClassConstructor_ = funbox ? funbox->isDerivedClassConstructor() : false;
     script->hasSingletons_ = bce->hasSingletons;
 
-    if (funbox) {
-        if (funbox->argumentsHasLocalBinding()) {
-            // This must precede the script->bindings.transfer() call below
-            script->setArgumentsHasVarBinding();
-            if (funbox->definitelyNeedsArgsObj())
-                script->setNeedsArgsObj(true);
-        } else {
-            MOZ_ASSERT(!funbox->definitelyNeedsArgsObj());
-        }
-
-        script->funLength_ = funbox->length;
-    }
-
-    RootedFunction fun(cx, nullptr);
-    if (funbox) {
-        // The function should have already been earlier to enable
-        // StaticScopeIter to walk the static scope chain of
-        // currently compiling scripts.
-        MOZ_ASSERT(script->functionNonDelazifying() == funbox->function());
-        MOZ_ASSERT(!bce->script->noScriptRval());
-        script->isGeneratorExp_ = funbox->inGenexpLambda;
-        script->setGeneratorKind(funbox->generatorKind());
-        if (bce->yieldOffsetList.length() != 0)
-            bce->yieldOffsetList.finish(script->yieldOffsets(), prologueLength);
-    }
+    if (bce->yieldOffsetList.length() != 0)
+        bce->yieldOffsetList.finish(script->yieldOffsets(), prologueLength);
 
     // The call to nfixed() depends on the above setFunction() call.
     if (UINT32_MAX - script->nfixed() < bce->maxStackDepth) {
@@ -3234,6 +3340,7 @@ js::detail::CopyScript(JSContext* cx, HandleObject scriptStaticScope, HandleScri
         if (src->analyzedArgsUsage())
             dst->setNeedsArgsObj(src->needsArgsObj());
     }
+    dst->hasMappedArgsObj_ = src->hasMappedArgsObj();
     dst->cloneHasArray(src);
     dst->strict_ = src->strict();
     dst->explicitUseStrict_ = src->explicitUseStrict();
@@ -3324,8 +3431,7 @@ CreateEmptyScriptForClone(JSContext* cx, HandleObject enclosingScope, HandleScri
            .setVersion(src->getVersion());
 
     return JSScript::Create(cx, enclosingScope, src->savedCallerFun(),
-                            options, src->staticLevel(),
-                            sourceObject, src->sourceStart(), src->sourceEnd());
+                            options, sourceObject, src->sourceStart(), src->sourceEnd());
 }
 
 JSScript*
@@ -3860,9 +3966,9 @@ JSScript::formalIsAliased(unsigned argSlot)
 }
 
 bool
-JSScript::cookieIsAliased(const frontend::UpvarCookie& cookie)
+JSScript::localIsAliased(unsigned localSlot)
 {
-    return bindings.bindingIsAliased(bindings.numArgs() + cookie.slot());
+    return bindings.bindingIsAliased(bindings.numArgs() + localSlot);
 }
 
 bool
@@ -4055,16 +4161,6 @@ LazyScript::hasUncompiledEnclosingScript() const
 
     JSFunction& fun = enclosingScope()->as<JSFunction>();
     return !fun.hasScript() || fun.hasUncompiledScript() || !fun.nonLazyScript()->code();
-}
-
-uint32_t
-LazyScript::staticLevel(JSContext* cx) const
-{
-    for (StaticScopeIter<NoGC> ssi(enclosingScope()); !ssi.done(); ssi++) {
-        if (ssi.type() == StaticScopeIter<NoGC>::Function)
-            return ssi.funScript()->staticLevel() + 1;
-    }
-    return 1;
 }
 
 void

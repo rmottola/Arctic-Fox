@@ -47,14 +47,18 @@ public:
 
   }
 
-  nsresult Init() override {
+  nsRefPtr<InitPromise> Init() override {
     mSurfaceTexture = AndroidSurfaceTexture::Create();
     if (!mSurfaceTexture) {
       NS_WARNING("Failed to create SurfaceTexture for video decode\n");
-      return NS_ERROR_FAILURE;
+      return InitPromise::CreateAndReject(DecoderFailureReason::INIT_ERROR, __func__);
     }
 
-    return InitDecoder(mSurfaceTexture->JavaSurface());
+    if (NS_FAILED(InitDecoder(mSurfaceTexture->JavaSurface()))) {
+      return InitPromise::CreateAndReject(DecoderFailureReason::INIT_ERROR, __func__);
+    }
+
+    return InitPromise::CreateAndResolve(TrackInfo::kVideoTrack, __func__);
   }
 
   void Cleanup() override {
@@ -249,6 +253,9 @@ public:
 
 bool AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType)
 {
+  if (!AndroidBridge::Bridge() || (AndroidBridge::Bridge()->GetAPIVersion() < 16)) {
+    return false;
+  }
   if (aMimeType.EqualsLiteral("video/mp4") ||
       aMimeType.EqualsLiteral("video/avc")) {
     return true;
@@ -333,9 +340,17 @@ MediaCodecDataDecoder::~MediaCodecDataDecoder()
   Shutdown();
 }
 
-nsresult MediaCodecDataDecoder::Init()
+nsRefPtr<MediaDataDecoder::InitPromise> MediaCodecDataDecoder::Init()
 {
-  return InitDecoder(nullptr);
+  nsresult rv = InitDecoder(nullptr);
+
+  TrackInfo::TrackType type =
+    (mType == MediaData::AUDIO_DATA ? TrackInfo::TrackType::kAudioTrack
+                                    : TrackInfo::TrackType::kVideoTrack);
+
+  return NS_SUCCEEDED(rv) ?
+           InitPromise::CreateAndResolve(type, __func__) :
+           InitPromise::CreateAndReject(MediaDataDecoder::DecoderFailureReason::INIT_ERROR, __func__);
 }
 
 nsresult MediaCodecDataDecoder::InitDecoder(Surface::Param aSurface)

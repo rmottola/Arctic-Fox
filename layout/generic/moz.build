@@ -177,8 +177,6 @@ SOURCES += [
     'nsPluginFrame.cpp',
 ]
 
-FAIL_ON_WARNINGS = not CONFIG['_MSC_VER']
-
 include('/ipc/chromium/chromium-config.mozbuild')
 
 FINAL_LIBRARY = 'xul'

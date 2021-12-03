@@ -1625,6 +1625,8 @@ class KeepAliveHandler final : public PromiseNativeHandler
   {}
 
 public:
+  NS_DECL_ISUPPORTS
+
   explicit KeepAliveHandler(const nsMainThreadPtrHandle<ServiceWorker>& aServiceWorker)
     : mServiceWorker(aServiceWorker)
   {}
@@ -1649,6 +1651,8 @@ public:
 #endif
   }
 };
+
+NS_IMPL_ISUPPORTS0(KeepAliveHandler)
 
 // Returns a Promise if the event was successfully dispatched and no exceptions
 // were raised, otherwise returns null.
@@ -1698,6 +1702,8 @@ class LifecycleEventPromiseHandler final : public PromiseNativeHandler
   { }
 
 public:
+  NS_DECL_ISUPPORTS
+
   LifecycleEventPromiseHandler(const nsMainThreadPtrHandle<ContinueLifecycleTask>& aTask,
                                const nsMainThreadPtrHandle<ServiceWorker>& aServiceWorker,
                                bool aActivateImmediately)
@@ -1748,6 +1754,8 @@ public:
     NS_DispatchToMainThread(aer);
   }
 };
+
+NS_IMPL_ISUPPORTS0(LifecycleEventPromiseHandler)
 
 bool
 LifecycleEventWorkerRunnable::DispatchLifecycleEvent(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
@@ -2311,6 +2319,7 @@ class SendNotificationClickEventRunnable final : public WorkerRunnable
   const nsString mIcon;
   const nsString mData;
   const nsString mBehavior;
+  const nsString mScope;
 
 public:
   SendNotificationClickEventRunnable(
@@ -2324,7 +2333,8 @@ public:
     const nsAString& aTag,
     const nsAString& aIcon,
     const nsAString& aData,
-    const nsAString& aBehavior)
+    const nsAString& aBehavior,
+    const nsAString& aScope)
       : WorkerRunnable(aWorkerPrivate, WorkerThreadModifyBusyCount)
       , mServiceWorker(aServiceWorker)
       , mID(aID)
@@ -2336,6 +2346,7 @@ public:
       , mIcon(aIcon)
       , mData(aData)
       , mBehavior(aBehavior)
+      , mScope(aScope)
   {
     AssertIsOnMainThread();
     MOZ_ASSERT(aWorkerPrivate);
@@ -2351,7 +2362,9 @@ public:
 
     ErrorResult result;
     nsRefPtr<Notification> notification =
-      Notification::ConstructFromFields(aWorkerPrivate->GlobalScope(), mID, mTitle, mDir, mLang, mBody, mTag, mIcon, mData, result);
+      Notification::ConstructFromFields(aWorkerPrivate->GlobalScope(), mID,
+                                        mTitle, mDir, mLang, mBody, mTag, mIcon,
+                                        mData, mScope, result);
     if (NS_WARN_IF(result.Failed())) {
       return false;
     }
@@ -2368,7 +2381,14 @@ public:
     }
 
     event->SetTrusted(true);
-    target->DispatchDOMEvent(nullptr, event, nullptr, nullptr);
+    nsRefPtr<Promise> waitUntilPromise =
+      DispatchExtendableEventOnWorkerScope(aCx, aWorkerPrivate->GlobalScope(), event);
+
+    if (waitUntilPromise) {
+      nsRefPtr<KeepAliveHandler> handler = new KeepAliveHandler(mServiceWorker);
+      waitUntilPromise->AppendNativeHandler(handler);
+    }
+
     return true;
   }
 };
@@ -2400,7 +2420,11 @@ ServiceWorkerManager::SendNotificationClickEvent(const nsACString& aOriginSuffix
     new nsMainThreadPtrHolder<ServiceWorker>(serviceWorker));
 
   nsRefPtr<SendNotificationClickEventRunnable> r =
-    new SendNotificationClickEventRunnable(serviceWorker->GetWorkerPrivate(), serviceWorkerHandle, aID, aTitle, aDir, aLang, aBody, aTag, aIcon, aData, aBehavior);
+    new SendNotificationClickEventRunnable(serviceWorker->GetWorkerPrivate(),
+                                           serviceWorkerHandle, aID, aTitle,
+                                           aDir, aLang, aBody, aTag, aIcon,
+                                           aData, aBehavior,
+                                           NS_ConvertUTF8toUTF16(aScope));
 
   AutoJSAPI jsapi;
   jsapi.Init();
@@ -4139,19 +4163,7 @@ FireControllerChangeOnMatchingDocument(nsISupports* aKey,
   return PL_DHASH_NEXT;
 }
 
-static PLDHashOperator
-ClaimMatchingClients(nsISupportsHashKey* aKey, void* aData)
-{
-  nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
-  ServiceWorkerRegistrationInfo* workerRegistration =
-    static_cast<ServiceWorkerRegistrationInfo*>(aData);
-  nsCOMPtr<nsIDocument> document = do_QueryInterface(aKey->GetKey());
-
-  swm->MaybeClaimClient(document, workerRegistration);
-
-  return PL_DHASH_NEXT;
-}
-} // namespace
+} // anonymous namespace
 
 void
 ServiceWorkerManager::GetAllClients(nsIPrincipal* aPrincipal,
@@ -4219,7 +4231,11 @@ ServiceWorkerManager::ClaimClients(nsIPrincipal* aPrincipal,
     return NS_ERROR_DOM_INVALID_STATE_ERR;
   }
 
-  mAllDocuments.EnumerateEntries(ClaimMatchingClients, registration);
+  nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+  for (auto iter = mAllDocuments.Iter(); !iter.Done(); iter.Next()) {
+    nsCOMPtr<nsIDocument> document = do_QueryInterface(iter.Get()->GetKey());
+    swm->MaybeClaimClient(document, registration);
+  }
 
   return NS_OK;
 }

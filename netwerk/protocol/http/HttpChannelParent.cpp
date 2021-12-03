@@ -98,7 +98,7 @@ HttpChannelParent::ActorDestroy(ActorDestroyReason why)
   // If this is an intercepted channel, we need to make sure that any resources are
   // cleaned up to avoid leaks.
   if (mInterceptedChannel) {
-    mInterceptedChannel->Cancel();
+    mInterceptedChannel->Cancel(NS_ERROR_INTERCEPTION_FAILED);
     mInterceptedChannel = nullptr;
   }
 }
@@ -121,7 +121,7 @@ HttpChannelParent::Init(const HttpChannelCreationArgs& aArgs)
                        a.entityID(), a.chooseApplicationCache(),
                        a.appCacheClientID(), a.allowSpdy(), a.allowAltSvc(), a.fds(),
                        a.loadInfo(), a.synthesizedResponseHead(), a.cacheKey(),
-                       a.allowStaleCacheContent());
+                       a.schedulingContextID(), a.allowStaleCacheContent());
   }
   case HttpChannelCreationArgs::THttpChannelConnectArgs:
   {
@@ -275,9 +275,10 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
                                  const bool&                allowSpdy,
                                  const bool&                allowAltSvc,
                                  const OptionalFileDescriptorSet& aFds,
-                                 const LoadInfoArgs&        aLoadInfoArgs,
+                                 const OptionalLoadInfoArgs& aLoadInfoArgs,
                                  const OptionalHttpResponseHead& aSynthesizedResponseHead,
                                  const uint32_t&            aCacheKey,
+                                 const nsCString&           aSchedulingContextID,
                                  const bool&                aAllowStaleCacheContent)
 {
   nsCOMPtr<nsIURI> uri = DeserializeURI(aURI);
@@ -465,7 +466,16 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
     }
   }
 
-  rv = mChannel->AsyncOpen(mParentListener, nullptr);
+  nsID schedulingContextID;
+  schedulingContextID.Parse(aSchedulingContextID.BeginReading());
+  mChannel->SetSchedulingContextID(schedulingContextID);
+
+  if (loadInfo && loadInfo->GetEnforceSecurity()) {
+    rv = mChannel->AsyncOpen2(mParentListener);
+  }
+  else {
+    rv = mChannel->AsyncOpen(mParentListener, nullptr);
+  }
   if (NS_FAILED(rv))
     return SendFailedAsyncOpen(rv);
 

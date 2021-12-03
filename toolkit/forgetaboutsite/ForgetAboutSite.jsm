@@ -46,76 +46,65 @@ const Ci = Components.interfaces;
 const Cu = Components.utils;
 
 this.ForgetAboutSite = {
-  removeDataFromDomain: Task.async(function* (aDomain) {
-    let promises = [];
-
-    // History
-    promises.push(Task.spawn(function*() {
-      PlacesUtils.history.removePagesFromHost(aDomain, true);
-    }).catch(ex => {
-      throw new Error("Exception thrown while clearing the history: " + ex);
-    }));
+  removeDataFromDomain: function CRH_removeDataFromDomain(aDomain)
+  {
+    PlacesUtils.history.removePagesFromHost(aDomain, true);
 
     // Cache
-    promises.push(Task.spawn(function*() {
-      let cs = Cc["@mozilla.org/netwerk/cache-storage-service;1"].
-               getService(Ci.nsICacheStorageService);
-      // NOTE: There is no way to clear just that domain, so we clear out
-      //       everything.
+    let cs = Cc["@mozilla.org/netwerk/cache-storage-service;1"].
+             getService(Ci.nsICacheStorageService);
+    // NOTE: there is no way to clear just that domain, so we clear out
+    //       everything)
+    try {
       cs.clear();
-    }).catch(ex => {
-      throw new Error("Exception thrown while clearing the cache: " + ex);
-    }));
+    } catch (ex) {
+      Cu.reportError("Exception thrown while clearing the cache: " +
+        ex.toString());
+    }
 
     // Image Cache
-    promises.push(Task.spawn(function*() {
-      let imageCache = Cc["@mozilla.org/image/tools;1"].
-                       getService(Ci.imgITools).getImgCacheForDocument(null);
+    let imageCache = Cc["@mozilla.org/image/tools;1"].
+                     getService(Ci.imgITools).getImgCacheForDocument(null);
+    try {
       imageCache.clearCache(false); // true=chrome, false=content
-    }).catch(ex => {
-      throw new Error("Exception thrown while clearing the image cache: " + ex);
-    }));
+    } catch (ex) {
+      Cu.reportError("Exception thrown while clearing the image cache: " +
+        ex.toString());
+    }
 
     // Cookies
-    // Need to maximize the number of cookies cleaned here
-    promises.push(Task.spawn(function*() {
-      let cm = Cc["@mozilla.org/cookiemanager;1"].
-               getService(Ci.nsICookieManager2);
-      let enumerator = cm.enumerator;
-      while (enumerator.hasMoreElements()) {
-        let cookie = enumerator.getNext().QueryInterface(Ci.nsICookie2);
-        if (hasRootDomain(cookie.host, aDomain)) {
-          cm.remove(cookie.host, cookie.name, cookie.path, false);
-        }
-      }
-    }).catch(ex => {
-      throw new Error("Exception thrown while clearing cookies: " + ex);
-    }));
+    let cm = Cc["@mozilla.org/cookiemanager;1"].
+             getService(Ci.nsICookieManager2);
+    let enumerator = cm.getCookiesFromHost(aDomain);
+    while (enumerator.hasMoreElements()) {
+      let cookie = enumerator.getNext().QueryInterface(Ci.nsICookie);
+      cm.remove(cookie.host, cookie.name, cookie.path, false, cookie.originAttributes);
+    }
 
     // EME
-    promises.push(Task.spawn(function*() {
-      let mps = Cc["@mozilla.org/gecko-media-plugin-service;1"].
-                 getService(Ci.mozIGeckoMediaPluginChromeService);
-      mps.forgetThisSite(aDomain);
-    }).catch(ex => {
-      throw new Error("Exception thrown while Encrypted Media Extensions: " + ex);
-    }));
+    let mps = Cc["@mozilla.org/gecko-media-plugin-service;1"].
+               getService(Ci.mozIGeckoMediaPluginChromeService);
+    mps.forgetThisSite(aDomain);
 
     // Plugin data
     const phInterface = Ci.nsIPluginHost;
     const FLAG_CLEAR_ALL = phInterface.FLAG_CLEAR_ALL;
     let ph = Cc["@mozilla.org/plugin/host;1"].getService(phInterface);
     let tags = ph.getPluginTags();
-    for (let i = 0, iLen = tags.length; i < iLen; i++) {
-      promises.push(new Promise(resolve => {
+    let promises = [];
+    for (let i = 0; i < tags.length; i++) {
+      let promise = new Promise(resolve => {
+        let tag = tags[i];
         try {
-          ph.clearSiteData(tags[i], aDomain, FLAG_CLEAR_ALL, -1, resolve);
-        } catch (ex) {
-          // Ignore exceptions from the plugin, but resolve the promise.
-          // We cannot check if something is a bailout or an exception.
+          ph.clearSiteData(tags[i], aDomain, FLAG_CLEAR_ALL, -1, function(rv) {
+            resolve();
+          });
+        } catch (e) {
+          // Ignore errors from the plugin, but resolve the promise
           resolve();
         }
-      }));
+      });
+      promises.push(promise);
     }
 
     // Downloads
@@ -126,107 +115,91 @@ this.ForgetAboutSite = {
     }).then(null, Cu.reportError);
 
     // Passwords
-    promises.push(Task.spawn(function*() {
-      let lm = Cc["@mozilla.org/login-manager;1"].
-               getService(Ci.nsILoginManager);
-      // Clear all passwords for domain
+    let lm = Cc["@mozilla.org/login-manager;1"].
+             getService(Ci.nsILoginManager);
+    // Clear all passwords for domain
+    try {
       let logins = lm.getAllLogins();
-      for (let i = 0, iLen = logins.length; i < iLen; i++) {
-        if (hasRootDomain(logins[i].hostname, aDomain)) {
+      for (let i = 0; i < logins.length; i++)
+        if (hasRootDomain(logins[i].hostname, aDomain))
           lm.removeLogin(logins[i]);
-        }
+    }
+    // XXXehsan: is there a better way to do this rather than this
+    // hacky comparison?
+    catch (ex) {
+      if (ex.message.indexOf("User canceled Master Password entry") == -1) {
+        throw ex;
       }
-      // Clear any "do not save for this site" for this domain
-      let disabledHosts = lm.getAllDisabledHosts();
-      for (let i = 0, iLen = disabledHosts.length; i < iLen; i++) {
-        if (hasRootDomain(disabledHosts[i], aDomain)) {
-          lm.setLoginSavingEnabled(disabledHosts, true);
-        }
-      }
-    }).catch(ex => {
-      // XXX:
-      // Is there a better way to do this rather than this hacky comparison?
-      // Copied this from toolkit/components/passwordmgr/crypto-SDR.js
-      if (!ex.message.includes("User canceled master password entry")) {
-        throw new Error("Exception occured in clearing passwords: " + ex);
-      }
-    }));
+    }
+
+    // Clear any "do not save for this site" for this domain
+    let disabledHosts = lm.getAllDisabledHosts();
+    for (let i = 0; i < disabledHosts.length; i++)
+      if (hasRootDomain(disabledHosts[i], aDomain))
+        lm.setLoginSavingEnabled(disabledHosts, true);
 
     // Permissions
     let pm = Cc["@mozilla.org/permissionmanager;1"].
              getService(Ci.nsIPermissionManager);
     // Enumerate all of the permissions, and if one matches, remove it
-    let enumerator = pm.enumerator;
+    enumerator = pm.enumerator;
     while (enumerator.hasMoreElements()) {
       let perm = enumerator.getNext().QueryInterface(Ci.nsIPermission);
-      promises.push(new Promise((resolve, reject) => {
-        try {
-          if (hasRootDomain(perm.host, aDomain)) {
-            pm.remove(perm.host, perm.type);
-          }
-        } catch (ex) {
-          // Ignore entry
-        } finally {
-          resolve();
+      try {
+        if (hasRootDomain(perm.principal.URI.host, aDomain)) {
+          pm.removePermission(perm);
         }
-      }));
+      } catch (e) {
+        /* Ignore entry */
+      }
     }
 
     // Offline Storages
-    promises.push(Task.spawn(function*() {
-      let qm = Cc["@mozilla.org/dom/quota/manager;1"].
-               getService(Ci.nsIQuotaManager);
-      // delete data from both HTTP and HTTPS sites
-      let caUtils = {};
-      let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].
-                         getService(Ci.mozIJSSubScriptLoader);
-      scriptLoader.loadSubScript("chrome://global/content/contentAreaUtils.js",
-                                 caUtils);
-      let httpURI = caUtils.makeURI("http://" + aDomain);
-      let httpsURI = caUtils.makeURI("https://" + aDomain);
-      qm.clearStoragesForURI(httpURI);
-      qm.clearStoragesForURI(httpsURI);
-    }).catch(ex => {
-      throw new Error("Exception occured while clearing offline storages: " + ex);
-    }));
+    let qms = Cc["@mozilla.org/dom/quota-manager-service;1"].
+              getService(Ci.nsIQuotaManagerService);
+    // delete data from both HTTP and HTTPS sites
+    let caUtils = {};
+    let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].
+                       getService(Ci.mozIJSSubScriptLoader);
+    scriptLoader.loadSubScript("chrome://global/content/contentAreaUtils.js",
+                               caUtils);
+    let httpURI = caUtils.makeURI("http://" + aDomain);
+    let httpsURI = caUtils.makeURI("https://" + aDomain);
+    let httpPrincipal = Services.scriptSecurityManager.createCodebasePrincipal(httpURI, {});
+    let httpsPrincipal = Services.scriptSecurityManager.createCodebasePrincipal(httpsURI, {});
+    qms.clearStoragesForPrincipal(httpPrincipal);
+    qms.clearStoragesForPrincipal(httpsPrincipal);
+
+    function onContentPrefsRemovalFinished() {
+      // Everybody else (including extensions)
+      Services.obs.notifyObservers(null, "browser:purge-domain-data", aDomain);
+    }
 
     // Content Preferences
-    promises.push(Task.spawn(function*() {
-      let cps2 = Cc["@mozilla.org/content-pref/service;1"].
-                 getService(Ci.nsIContentPrefService2);
-      cps2.removeBySubdomain(aDomain, null, {
-        handleCompletion: (reason) => { 
-          // Notify other consumers, including extensions
-          Services.obs.notifyObservers(null, "browser:purge-domain-data", aDomain);
-          if (reason === cps2.COMPLETE_ERROR) {
-            throw new Error("Exception occured while clearing content preferences");
-          }
-        },
-        handleError() {}
-      });
-    }));
+    let cps2 = Cc["@mozilla.org/content-pref/service;1"].
+               getService(Ci.nsIContentPrefService2);
+    cps2.removeBySubdomain(aDomain, null, {
+      handleCompletion: () => onContentPrefsRemovalFinished(),
+      handleError: function() {}
+    });
 
     // Predictive network data - like cache, no way to clear this per
     // domain, so just trash it all
-    promises.push(Task.spawn(function*() {
-      let np = Cc["@mozilla.org/network/predictor;1"].
-               getService(Ci.nsINetworkPredictor);
-      np.reset();
-    }).catch(ex => {
-      throw new Error("Exception occured while clearing predictive network data: " + ex);
+    let np = Cc["@mozilla.org/network/predictor;1"].
+             getService(Ci.nsINetworkPredictor);
+    np.reset();
+
+    // Push notifications.
+    promises.push(new Promise(resolve => {
+      var push = Cc["@mozilla.org/push/Service;1"]
+                  .getService(Ci.nsIPushService);
+      push.clearForDomain(aDomain, status => {
+        (Components.isSuccessCode(status) ? resolve : reject)(status);
+      });
+    }).catch(e => {
+      dump("Web Push may not be available.\n");
     }));
 
-    let ErrorCount = 0;
-    for (let promise of promises) {
-      try {
-        yield promise;
-      } catch (ex) {
-        Cu.reportError(ex);
-        ErrorCount++;
-      }
-    }
-    if (ErrorCount !== 0) {
-      throw new Error(`There were a total of ${ErrorCount} errors during removal`);
-    }
-  })
+    return Promise.all(promises);
+  }
 }

@@ -41,8 +41,6 @@
 #include "mozilla/dom/WorkerPrivate.h"
 #include "nsThreadUtils.h"
 
-#include "mozilla/dom/FileListBinding.h"
-
 namespace mozilla {
 namespace dom {
 
@@ -538,13 +536,13 @@ File::GetLastModified(ErrorResult& aRv)
 }
 
 void
-File::GetMozFullPath(nsAString& aFilename, ErrorResult& aRv)
+File::GetMozFullPath(nsAString& aFilename, ErrorResult& aRv) const
 {
   mImpl->GetMozFullPath(aFilename, aRv);
 }
 
 void
-File::GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv)
+File::GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv) const
 {
   mImpl->GetMozFullPathInternal(aFileName, aRv);
 }
@@ -742,7 +740,7 @@ BlobImplBase::GetPath(nsAString& aPath, ErrorResult& aRv)
 }
 
 void
-BlobImplBase::GetMozFullPath(nsAString& aFileName, ErrorResult& aRv)
+BlobImplBase::GetMozFullPath(nsAString& aFileName, ErrorResult& aRv) const
 {
   NS_ASSERTION(mIsFile, "Should only be called on files");
 
@@ -766,7 +764,7 @@ BlobImplBase::GetMozFullPath(nsAString& aFileName, ErrorResult& aRv)
 }
 
 void
-BlobImplBase::GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv)
+BlobImplBase::GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv) const
 {
   if (!mIsFile) {
     aRv.Throw(NS_ERROR_FAILURE);
@@ -936,6 +934,13 @@ BlobImplBase::SetMutable(bool aMutable)
   return rv;
 }
 
+/* static */ uint64_t
+BlobImplBase::NextSerialNumber()
+{
+  static Atomic<uint64_t> nextSerialNumber;
+  return nextSerialNumber++;
+}
+
 ////////////////////////////////////////////////////////////////////////////
 // BlobImplFile implementation
 
@@ -950,7 +955,7 @@ BlobImplFile::CreateSlice(uint64_t aStart, uint64_t aLength,
 }
 
 void
-BlobImplFile::GetMozFullPathInternal(nsAString& aFilename, ErrorResult& aRv)
+BlobImplFile::GetMozFullPathInternal(nsAString& aFilename, ErrorResult& aRv) const
 {
   NS_ASSERTION(mIsFile, "Should only be called on files");
   aRv = mFile->GetPath(aFilename);
@@ -1223,42 +1228,6 @@ BlobImplTemporaryBlob::GetInternalStream(nsIInputStream** aStream,
   nsCOMPtr<nsIInputStream> stream =
     new nsTemporaryFileInputStream(mFileDescOwner, mStartPos, mStartPos + mLength);
   stream.forget(aStream);
-}
-
-////////////////////////////////////////////////////////////////////////////
-// FileList implementation
-
-NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(FileList, mFiles)
-
-NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(FileList)
-  NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
-  NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMFileList)
-  NS_INTERFACE_MAP_ENTRY(nsIDOMFileList)
-NS_INTERFACE_MAP_END
-
-NS_IMPL_CYCLE_COLLECTING_ADDREF(FileList)
-NS_IMPL_CYCLE_COLLECTING_RELEASE(FileList)
-
-JSObject*
-FileList::WrapObject(JSContext *cx, JS::Handle<JSObject*> aGivenProto)
-{
-  return mozilla::dom::FileListBinding::Wrap(cx, this, aGivenProto);
-}
-
-NS_IMETHODIMP
-FileList::GetLength(uint32_t* aLength)
-{
-  *aLength = Length();
-
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-FileList::Item(uint32_t aIndex, nsISupports** aFile)
-{
-  nsCOMPtr<nsIDOMBlob> file = Item(aIndex);
-  file.forget(aFile);
-  return NS_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////
