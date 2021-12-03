@@ -250,15 +250,16 @@ class JS_FRIEND_API(BaseProxyHandler)
                        bool* bp) const;
 
     /* Standard internal methods. */
-    virtual bool getOwnPropertyDescriptor(JSContext *cx, HandleObject proxy, HandleId id,
+    virtual bool getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
                                           MutableHandle<JSPropertyDescriptor> desc) const = 0;
-    virtual bool defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
+    virtual bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
                                 Handle<JSPropertyDescriptor> desc,
-                                ObjectOpResult &result) const = 0;
-    virtual bool ownPropertyKeys(JSContext *cx, HandleObject proxy,
-                                 AutoIdVector &props) const = 0;
-    virtual bool delete_(JSContext *cx, HandleObject proxy, HandleId id,
-                         ObjectOpResult &result) const = 0;
+                                ObjectOpResult& result) const = 0;
+    virtual bool ownPropertyKeys(JSContext* cx, HandleObject proxy,
+                                 AutoIdVector& props) const = 0;
+    virtual bool delete_(JSContext* cx, HandleObject proxy, HandleId id,
+                         ObjectOpResult& result) const = 0;
+
     /*
      * Because [[Enumerate]] is one of the standard traps it should be overridden.
      * However for convenience BaseProxyHandler includes a pure virtual implementation,
@@ -688,7 +689,7 @@ inline void assertEnteredPolicy(JSContext* cx, JSObject* obj, jsid id,
 #endif
 
 extern JS_FRIEND_API(JSObject*)
-InitProxyClass(JSContext *cx, JS::HandleObject obj);
+InitProxyClass(JSContext* cx, JS::HandleObject obj);
 
 } /* namespace js */
 
