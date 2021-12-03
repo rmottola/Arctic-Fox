@@ -516,7 +516,7 @@ function test_sequential() {
             is(container.childNodes.length, 1, "Should be one item listed");
             is(container.childNodes[0].firstChild.getAttribute("value"), "Theme Test", "Should have the right add-on");
 
-            Services.perms.remove("example.com", "install");
+            Services.perms.remove(makeURI("http://example.com"), "install");            
             wait_for_notification_close(() => {
               gBrowser.removeTab(gBrowser.selectedTab);
               runNextTest();
@@ -1053,7 +1053,7 @@ function test_cancel() {
           AddonManager.getAllInstalls(function(aInstalls) {
             is(aInstalls.length, 0, "Should be no pending install");
 
-            Services.perms.remove("example.com", "install");
+            Services.perms.remove(makeURI("http://example.com"), "install");            
             gBrowser.removeTab(gBrowser.selectedTab);
             runNextTest();
           });
