@@ -44,7 +44,6 @@ UNIFIED_SOURCES += [
     'testGCStoreBufferRemoval.cpp',
     'testGetPropertyDescriptor.cpp',
     'testHashTable.cpp',
-    'testHashTableInit.cpp',
     'testIndexToString.cpp',
     'testIntern.cpp',
     'testIntlAvailableLocales.cpp',
