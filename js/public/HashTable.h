@@ -1233,7 +1233,7 @@ class HashTable : private AllocPolicy
     // (The use of the METER() macro to increment stats violates this
     // restriction but we will live with that for now because it's enabled so
     // rarely.)
-    Entry &lookup(const Lookup &l, HashNumber keyHash, unsigned collisionBit) const
+    Entry& lookup(const Lookup& l, HashNumber keyHash, unsigned collisionBit) const
     {
         MOZ_ASSERT(isLiveHash(keyHash));
         MOZ_ASSERT(!(keyHash & sCollisionBit));
