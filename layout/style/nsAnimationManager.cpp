@@ -950,7 +950,6 @@ void
 nsAnimationManager::FlushAnimations(FlushFlags aFlags)
 {
   TimeStamp now = mPresContext->RefreshDriver()->MostRecentRefresh();
-  bool didThrottle = false;
   for (PRCList *l = PR_LIST_HEAD(&mElementCollections);
        l != &mElementCollections;
        l = PR_NEXT_LINK(l)) {
@@ -975,15 +974,9 @@ nsAnimationManager::FlushAnimations(FlushFlags aFlags)
       canThrottleTick &= (*iter)->CanThrottle();
     }
 
-    if (!canThrottleTick) {
-      collection->PostRestyleForAnimation(mPresContext);
-    } else {
-      didThrottle = true;
-    }
-  }
-
-  if (didThrottle) {
-    mPresContext->Document()->SetNeedStyleFlush();
+    collection->RequestRestyle(canThrottleTick ?
+                               AnimationCollection::RestyleType::Throttled :
+                               AnimationCollection::RestyleType::Standard);
   }
 
   MaybeStartOrStopObservingRefreshDriver();

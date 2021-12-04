@@ -248,6 +248,7 @@ struct AnimationCollection : public PRCList
     , mAnimationGeneration(0)
     , mCheckGeneration(0)
     , mNeedsRefreshes(true)
+    , mHasPendingAnimationRestyle(false)
 #ifdef DEBUG
     , mCalledPropertyDtor(false)
 #endif
@@ -288,6 +289,16 @@ struct AnimationCollection : public PRCList
     // specified property.
     CanAnimate_AllowPartial = 2
   };
+
+  enum class RestyleType {
+    // Animation style has changed but the compositor is applying the same
+    // change so we might be able to defer updating the main thread until it
+    // becomes necessary.
+    Throttled,
+    // Animation style has changed and needs to be updated on the main thread.
+    Standard
+  };
+  void RequestRestyle(RestyleType aRestyleType);
 
 private:
   static bool
@@ -432,6 +443,12 @@ public:
   // indefinitely into the future (because all of our animations are
   // either completed or paused).  May be invalidated by a style change.
   bool mNeedsRefreshes;
+
+private:
+  // Whether or not we have already posted for animation restyle.
+  // This is used to avoid making redundant requests and is reset each time
+  // the animation restyle is performed.
+  bool mHasPendingAnimationRestyle;
 
 #ifdef DEBUG
   bool mCalledPropertyDtor;
