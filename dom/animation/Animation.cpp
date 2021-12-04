@@ -355,6 +355,8 @@ Animation::Tick()
   UpdateTiming(SeekFlag::NoSeek, SyncNotifyFlag::Async);
 
   // FIXME: Detect the no-change case and don't request a restyle at all
+  // FIXME: Detect changes to IsPlaying() state and request RestyleType::Layer
+  //        so that layers get updated immediately
   AnimationCollection* collection = GetCollection();
   if (collection) {
     collection->RequestRestyle(CanThrottle() ?
@@ -924,7 +926,7 @@ Animation::PostUpdate()
 {
   AnimationCollection* collection = GetCollection();
   if (collection) {
-    collection->NotifyAnimationUpdated();
+    collection->RequestRestyle(AnimationCollection::RestyleType::Layer);
   }
 }
 
