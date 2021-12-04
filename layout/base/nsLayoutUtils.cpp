@@ -526,7 +526,7 @@ GetMinAndMaxScaleForAnimationProperty(const nsIFrame* aFrame,
 {
   for (size_t animIdx = aAnimations->mAnimations.Length(); animIdx-- != 0; ) {
     dom::Animation* anim = aAnimations->mAnimations[animIdx];
-    if (!anim->GetEffect() || anim->GetEffect()->IsFinishedTransition()) {
+    if (!anim->IsRelevant()) {
       continue;
     }
     dom::KeyframeEffectReadOnly* effect = anim->GetEffect();
