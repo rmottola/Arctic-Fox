@@ -1386,9 +1386,9 @@ bool
 TypedObject::isAttached() const
 {
     if (is<InlineTransparentTypedObject>()) {
-        ObjectWeakMap *table = compartment()->lazyArrayBuffers;
+        ObjectWeakMap* table = compartment()->lazyArrayBuffers;
         if (table) {
-            JSObject *buffer = table->lookup(this);
+            JSObject* buffer = table->lookup(this);
             if (buffer)
                 return !buffer->as<ArrayBufferObject>().isNeutered();
         }
@@ -1631,9 +1631,9 @@ ReportTypedObjTypeError(JSContext* cx,
 }
 
 /* static */ void
-OutlineTypedObject::obj_trace(JSTracer *trc, JSObject *object)
+OutlineTypedObject::obj_trace(JSTracer* trc, JSObject* object)
 {
-    OutlineTypedObject &typedObj = object->as<OutlineTypedObject>();
+    OutlineTypedObject& typedObj = object->as<OutlineTypedObject>();
 
     TraceEdge(trc, &typedObj.shape_, "OutlineTypedObject_shape");
 
@@ -1743,11 +1743,11 @@ ReportPropertyError(JSContext* cx,
 }
 
 bool
-TypedObject::obj_defineProperty(JSContext *cx, HandleObject obj, HandleId id,
+TypedObject::obj_defineProperty(JSContext* cx, HandleObject obj, HandleId id,
                                 Handle<JSPropertyDescriptor> desc,
-                                ObjectOpResult &result)
+                                ObjectOpResult& result)
 {
-    Rooted<TypedObject *> typedObj(cx, &obj->as<TypedObject>());
+    Rooted<TypedObject*> typedObj(cx, &obj->as<TypedObject>());
     return ReportTypedObjTypeError(cx, JSMSG_OBJECT_NOT_EXTENSIBLE, typedObj);
 }
 
@@ -1896,10 +1896,10 @@ TypedObject::obj_getArrayElement(JSContext* cx,
 }
 
 bool
-TypedObject::obj_setProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                             HandleValue receiver, ObjectOpResult &result)
+TypedObject::obj_setProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
+                             HandleValue receiver, ObjectOpResult& result)
 {
-    Rooted<TypedObject *> typedObj(cx, &obj->as<TypedObject>());
+    Rooted<TypedObject*> typedObj(cx, &obj->as<TypedObject>());
 
     switch (typedObj->typeDescr().kind()) {
       case type::Scalar:
@@ -2046,7 +2046,7 @@ IsOwnId(JSContext* cx, HandleObject obj, HandleId id)
 }
 
 bool
-TypedObject::obj_deleteProperty(JSContext *cx, HandleObject obj, HandleId id, ObjectOpResult &result)
+TypedObject::obj_deleteProperty(JSContext* cx, HandleObject obj, HandleId id, ObjectOpResult& result)
 {
     if (IsOwnId(cx, obj, id))
         return ReportPropertyError(cx, JSMSG_CANT_DELETE, id);
@@ -2145,9 +2145,9 @@ InlineTypedObject::createCopy(JSContext* cx, Handle<InlineTypedObject*> template
 }
 
 /* static */ void
-InlineTypedObject::obj_trace(JSTracer *trc, JSObject *object)
+InlineTypedObject::obj_trace(JSTracer* trc, JSObject* object)
 {
-    InlineTypedObject &typedObj = object->as<InlineTypedObject>();
+    InlineTypedObject& typedObj = object->as<InlineTypedObject>();
 
     TraceEdge(trc, &typedObj.shape_, "InlineTypedObject_shape");
 
@@ -2165,7 +2165,7 @@ InlineTypedObject::obj_trace(JSTracer *trc, JSObject *object)
 }
 
 /* static */ void
-InlineTypedObject::objectMovedDuringMinorGC(JSTracer *trc, JSObject *dst, JSObject *src)
+InlineTypedObject::objectMovedDuringMinorGC(JSTracer* trc, JSObject* dst, JSObject* src)
 {
     // Inline typed object element arrays can be preserved on the stack by Ion
     // and need forwarding pointers created during a minor GC. We can't do this
@@ -2183,10 +2183,10 @@ InlineTypedObject::objectMovedDuringMinorGC(JSTracer *trc, JSObject *dst, JSObje
     }
 }
 
-ArrayBufferObject *
-InlineTransparentTypedObject::getOrCreateBuffer(JSContext *cx)
+ArrayBufferObject*
+InlineTransparentTypedObject::getOrCreateBuffer(JSContext* cx)
 {
-    ObjectWeakMap *&table = cx->compartment()->lazyArrayBuffers;
+    ObjectWeakMap*& table = cx->compartment()->lazyArrayBuffers;
     if (!table) {
         table = cx->new_<ObjectWeakMap>(cx);
         if (!table)
@@ -2232,8 +2232,8 @@ InlineTransparentTypedObject::getOrCreateBuffer(JSContext *cx)
     return buffer;
 }
 
-ArrayBufferObject *
-OutlineTransparentTypedObject::getOrCreateBuffer(JSContext *cx)
+ArrayBufferObject*
+OutlineTransparentTypedObject::getOrCreateBuffer(JSContext* cx)
 {
     if (owner().is<ArrayBufferObject>())
         return &owner().as<ArrayBufferObject>();
