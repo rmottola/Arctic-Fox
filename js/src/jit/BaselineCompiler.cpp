@@ -820,7 +820,7 @@ BaselineCompiler::emitCoverage(jsbytecode* pc)
 bool
 BaselineCompiler::emitTraceLoggerEnter()
 {
-    TraceLoggerThread *logger = TraceLoggerForMainThread(cx->runtime());
+    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
     AllocatableRegisterSet regs(RegisterSet::Volatile());
     Register loggerReg = regs.takeAnyGeneral();
     Register scriptReg = regs.takeAnyGeneral();
@@ -854,7 +854,7 @@ BaselineCompiler::emitTraceLoggerEnter()
 bool
 BaselineCompiler::emitTraceLoggerExit()
 {
-    TraceLoggerThread *logger = TraceLoggerForMainThread(cx->runtime());
+    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
     AllocatableRegisterSet regs(RegisterSet::Volatile());
     Register loggerReg = regs.takeAnyGeneral();
 
@@ -1392,7 +1392,7 @@ BaselineCompiler::emit_JSOP_SYMBOL()
     return true;
 }
 
-typedef JSObject *(*DeepCloneObjectLiteralFn)(JSContext *, HandleObject, NewObjectKind);
+typedef JSObject* (*DeepCloneObjectLiteralFn)(JSContext*, HandleObject, NewObjectKind);
 static const VMFunction DeepCloneObjectLiteralInfo =
     FunctionInfo<DeepCloneObjectLiteralFn>(DeepCloneObjectLiteral);
 
@@ -1970,7 +1970,7 @@ BaselineCompiler::emit_JSOP_INITHIDDENPROP()
     return emit_JSOP_INITPROP();
 }
 
-typedef bool (*NewbornArrayPushFn)(JSContext *, HandleObject, const Value &);
+typedef bool (*NewbornArrayPushFn)(JSContext*, HandleObject, const Value&);
 static const VMFunction NewbornArrayPushInfo = FunctionInfo<NewbornArrayPushFn>(NewbornArrayPush);
 
 bool
@@ -3116,7 +3116,7 @@ BaselineCompiler::emit_JSOP_POPBLOCKSCOPE()
     return callVM(PopBlockScopeInfo);
 }
 
-typedef bool (*FreshenBlockScopeFn)(JSContext *, BaselineFrame *);
+typedef bool (*FreshenBlockScopeFn)(JSContext*, BaselineFrame*);
 static const VMFunction FreshenBlockScopeInfo =
     FunctionInfo<FreshenBlockScopeFn>(jit::FreshenBlockScope);
 
