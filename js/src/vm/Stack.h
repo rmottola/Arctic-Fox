@@ -1314,7 +1314,7 @@ class Activation
     //
     // Usually this is nullptr, meaning that normal stack capture will occur.
     // When this is set, the stack of any previous activation is ignored.
-    Rooted<SavedFrame *> asyncStack_;
+    Rooted<SavedFrame*> asyncStack_;
 
     // Value of asyncCause to be attached to asyncStack_.
     RootedString asyncCause_;

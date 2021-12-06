@@ -195,15 +195,15 @@ class SavedStacks {
         }
     };
 
-    bool        insertFrames(JSContext* cx, FrameIter& iter, MutableHandleSavedFrame frame,
-                             unsigned maxFrameCount = 0);
-    bool        adoptAsyncStack(JSContext* cx, HandleSavedFrame asyncStack,
-                                HandleString asyncCause,
-                                MutableHandleSavedFrame adoptedStack,
-                                unsigned maxFrameCount);
+    bool       insertFrames(JSContext* cx, FrameIter& iter, MutableHandleSavedFrame frame,
+                            unsigned maxFrameCount = 0);
+    bool       adoptAsyncStack(JSContext* cx, HandleSavedFrame asyncStack,
+                               HandleString asyncCause,
+                               MutableHandleSavedFrame adoptedStack,
+                               unsigned maxFrameCount);
     SavedFrame* getOrCreateSavedFrame(JSContext* cx, SavedFrame::HandleLookup lookup);
     SavedFrame* createFrameFromLookup(JSContext* cx, SavedFrame::HandleLookup lookup);
-    void        chooseSamplingProbability(JSContext* cx);
+    void       chooseSamplingProbability(JSContext* cx);
 
     // Cache for memoizing PCToLineNumber lookups.
 
