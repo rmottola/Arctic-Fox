@@ -414,7 +414,7 @@ CreateAndBindSimdClass(JSContext* cx, Handle<GlobalObject*> global, HandleObject
 
 template <typename T>
 static bool
-FillLanes(JSContext* cx, Handle<TypedObject*> result, const CallArgs &args)
+FillLanes(JSContext* cx, Handle<TypedObject*> result, const CallArgs& args)
 {
     typedef typename T::Elem Elem;
     InternalHandle<Elem*> mem(result, reinterpret_cast<Elem*>(result->typedMem()));

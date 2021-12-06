@@ -2510,7 +2510,7 @@ class PropertyDescriptorOperations
     // descriptors. It's complicated.
     bool isAccessorDescriptor() const { return hasAny(JSPROP_GETTER | JSPROP_SETTER); }
     bool isGenericDescriptor() const {
-        return (desc()->attrs &
+        return (desc()->attrs&
                 (JSPROP_GETTER | JSPROP_SETTER | JSPROP_IGNORE_READONLY | JSPROP_IGNORE_VALUE)) ==
                (JSPROP_IGNORE_READONLY | JSPROP_IGNORE_VALUE);
     }
