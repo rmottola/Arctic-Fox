@@ -863,7 +863,7 @@ static bool
 IsThisSlotDefinition(LDefinition* def)
 {
     return IsArgumentSlotDefinition(def) &&
-         def->output()->toArgument()->index() < THIS_FRAME_ARGSLOT + sizeof(Value);
+        def->output()->toArgument()->index() < THIS_FRAME_ARGSLOT + sizeof(Value);
 }
 
 bool
