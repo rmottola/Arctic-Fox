@@ -391,8 +391,8 @@ IsIncrementalBarrierNeededOnTenuredGCThing(JS::shadow::Runtime* rt, const JS::GC
  * of the current state of memory (both GC heap memory and GCthing-controlled
  * malloc memory.
  */
-extern JS_PUBLIC_API(JSObject *)
-NewMemoryInfoObject(JSContext *cx);
+extern JS_PUBLIC_API(JSObject*)
+NewMemoryInfoObject(JSContext* cx);
 
 } /* namespace gc */
 } /* namespace js */

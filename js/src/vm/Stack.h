@@ -255,6 +255,11 @@ class AbstractFramePtr
 
     inline void popBlock(JSContext* cx) const;
     inline void popWith(JSContext* cx) const;
+
+    friend void GDBTestInitAbstractFramePtr(AbstractFramePtr&, void*);
+    friend void GDBTestInitAbstractFramePtr(AbstractFramePtr&, InterpreterFrame*);
+    friend void GDBTestInitAbstractFramePtr(AbstractFramePtr&, jit::BaselineFrame*);
+    friend void GDBTestInitAbstractFramePtr(AbstractFramePtr&, jit::RematerializedFrame*);
 };
 
 class NullFramePtr : public AbstractFramePtr
@@ -1007,6 +1012,9 @@ class InterpreterRegs
     HandleValue stackHandleAt(int i) const {
         return HandleValue::fromMarkedLocation(&sp[i]);
     }
+
+    friend void GDBTestInitInterpreterRegs(InterpreterRegs&, js::InterpreterFrame*,
+                                           JS::Value*, uint8_t*);
 };
 
 /*****************************************************************************/

@@ -775,7 +775,7 @@ obj_getOwnPropertySymbols(JSContext* cx, unsigned argc, Value* vp)
 
 /* ES6 draft rev 32 (2015 Feb 2) 19.1.2.4: Object.defineProperty(O, P, Attributes) */
 bool
-js::obj_defineProperty(JSContext *cx, unsigned argc, Value *vp)
+js::obj_defineProperty(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 

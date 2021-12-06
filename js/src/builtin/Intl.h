@@ -10,19 +10,19 @@
 #include "NamespaceImports.h"
 #include "unicode/utypes.h"
 
-namespace js {
-
 /*
  * The Intl module specified by standard ECMA-402,
  * ECMAScript Internationalization API Specification.
  */
+
+namespace js {
 
 /**
  * Initializes the Intl Object and its standard built-in properties.
  * Spec: ECMAScript Internationalization API Specification, 8.0, 8.1
  */
 extern JSObject*
-InitIntlClass(JSContext *cx, HandleObject obj);
+InitIntlClass(JSContext* cx, HandleObject obj);
 
 /*
  * The following functions are for use by self-hosted code.
@@ -50,7 +50,7 @@ intl_Collator(JSContext* cx, unsigned argc, Value* vp);
  * Usage: availableLocales = intl_Collator_availableLocales()
  */
 extern bool
-intl_Collator_availableLocales(JSContext *cx, unsigned argc, Value* vp);
+intl_Collator_availableLocales(JSContext* cx, unsigned argc, Value* vp);
 
 /**
  * Returns an array with the collation type identifiers per Unicode

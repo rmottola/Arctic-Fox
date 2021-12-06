@@ -1779,7 +1779,7 @@ NodeBuilder::function(ASTType type, TokenPos* pos,
 
 bool
 NodeBuilder::classMethod(HandleValue name, HandleValue body, PropKind kind, bool isStatic,
-                         TokenPos *pos, MutableHandleValue dst)
+                         TokenPos* pos, MutableHandleValue dst)
 {
     RootedValue kindName(cx);
     if (!atomValue(kind == PROP_INIT
@@ -1804,14 +1804,14 @@ NodeBuilder::classMethod(HandleValue name, HandleValue body, PropKind kind, bool
 }
 
 bool
-NodeBuilder::classMethods(NodeVector &methods, MutableHandleValue dst)
+NodeBuilder::classMethods(NodeVector& methods, MutableHandleValue dst)
 {
     return newArray(methods, dst);
 }
 
 bool
 NodeBuilder::classDefinition(bool expr, HandleValue name, HandleValue heritage, HandleValue block,
-                             TokenPos *pos, MutableHandleValue dst)
+                             TokenPos* pos, MutableHandleValue dst)
 {
     ASTType type = expr ? AST_CLASS_EXPR : AST_CLASS_STMT;
     RootedValue cb(cx, callbacks[type]);
@@ -1912,7 +1912,7 @@ class ASTSerializer
     bool propertyName(ParseNode* pn, MutableHandleValue dst);
     bool property(ParseNode* pn, MutableHandleValue dst);
 
-    bool classMethod(ParseNode *pn, MutableHandleValue dst);
+    bool classMethod(ParseNode* pn, MutableHandleValue dst);
 
     bool optIdentifier(HandleAtom atom, TokenPos* pos, MutableHandleValue dst) {
         if (!atom) {
@@ -2502,7 +2502,7 @@ ASTSerializer::forIn(ParseNode* loop, ParseNode* head, HandleValue var, HandleVa
 }
 
 bool
-ASTSerializer::classDefinition(ParseNode *pn, bool expr, MutableHandleValue dst)
+ASTSerializer::classDefinition(ParseNode* pn, bool expr, MutableHandleValue dst)
 {
     RootedValue className(cx, MagicValue(JS_SERIALIZE_NO_NODE));
     RootedValue heritage(cx);
@@ -2713,7 +2713,7 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
         if (!methods.reserve(pn->pn_count))
             return false;
 
-        for (ParseNode *next = pn->pn_head; next; next = next->pn_next) {
+        for (ParseNode* next = pn->pn_head; next; next = next->pn_next) {
             MOZ_ASSERT(pn->pn_pos.encloses(next->pn_pos));
 
             RootedValue prop(cx);
@@ -2734,7 +2734,7 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
 }
 
 bool
-ASTSerializer::classMethod(ParseNode *pn, MutableHandleValue dst)
+ASTSerializer::classMethod(ParseNode* pn, MutableHandleValue dst)
 {
     PropKind kind;
     switch (pn->getOp()) {
