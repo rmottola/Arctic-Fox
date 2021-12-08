@@ -717,7 +717,7 @@ WrapCallable(JSContext* cx, HandleObject callable, HandleObject sandboxProtoProx
                  &xpc::sandboxProxyHandler);
 
     RootedValue priv(cx, ObjectValue(*callable));
-    JSObject *obj = js::NewProxyObject(cx, &xpc::sandboxCallableProxyHandler,
+    JSObject* obj = js::NewProxyObject(cx, &xpc::sandboxCallableProxyHandler,
                                        priv, nullptr);
     if (obj) {
         js::SetProxyExtra(obj, SandboxCallableProxyHandler::SandboxProxySlot,
@@ -827,11 +827,11 @@ xpc::SandboxProxyHandler::get(JSContext* cx, JS::Handle<JSObject*> proxy,
 }
 
 bool
-xpc::SandboxProxyHandler::set(JSContext *cx, JS::Handle<JSObject*> proxy,
+xpc::SandboxProxyHandler::set(JSContext* cx, JS::Handle<JSObject*> proxy,
                               JS::Handle<jsid> id,
                               JS::Handle<Value> v,
                               JS::Handle<Value> receiver,
-                              JS::ObjectOpResult &result) const
+                              JS::ObjectOpResult& result) const
 {
     return BaseProxyHandler::set(cx, proxy, id, v, receiver, result);
 }
