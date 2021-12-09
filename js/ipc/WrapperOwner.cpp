@@ -568,13 +568,13 @@ WrapperOwner::getOwnEnumerablePropertyKeys(JSContext* cx, HandleObject proxy, Au
 }
 
 bool
-CPOWProxyHandler::preventExtensions(JSContext *cx, HandleObject proxy, ObjectOpResult &result) const
+CPOWProxyHandler::preventExtensions(JSContext* cx, HandleObject proxy, ObjectOpResult& result) const
 {
     FORWARD(preventExtensions, (cx, proxy, result));
 }
 
 bool
-WrapperOwner::preventExtensions(JSContext *cx, HandleObject proxy, ObjectOpResult &result)
+WrapperOwner::preventExtensions(JSContext* cx, HandleObject proxy, ObjectOpResult& result)
 {
     ObjectId objId = idOf(proxy);
 

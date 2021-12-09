@@ -399,7 +399,7 @@ typedef bool
                      JS::MutableHandle<JSPropertyDescriptor> desc);
 typedef bool
 (* DeletePropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
-                     JS::ObjectOpResult &result);
+                     JS::ObjectOpResult& result);
 
 typedef bool
 (* WatchOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleObject callable);
