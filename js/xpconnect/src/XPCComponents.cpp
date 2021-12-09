@@ -2718,9 +2718,9 @@ nsXPCComponents_Utils::GetJSTestingFunctions(JSContext* cx,
                                in AString asyncCause); */
 NS_IMETHODIMP
 nsXPCComponents_Utils::CallFunctionWithAsyncStack(HandleValue function,
-                                                  nsIStackFrame *stack,
-                                                  const nsAString &asyncCause,
-                                                  JSContext *cx,
+                                                  nsIStackFrame* stack,
+                                                  const nsAString& asyncCause,
+                                                  JSContext* cx,
                                                   MutableHandleValue retval)
 {
     nsresult rv;
