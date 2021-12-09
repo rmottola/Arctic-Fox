@@ -1008,6 +1008,10 @@ PeerConnectionImpl::ConfigureJsepSessionCodecs() {
             videoCodec.mMaxFr = maxFr;
 
           }
+
+          videoCodec.mUseTmmbr = false;
+          branch->GetBoolPref("media.navigator.video.use_tmmbr",
+            &videoCodec.mUseTmmbr);
         }
         break;
       case SdpMediaSection::kText:
