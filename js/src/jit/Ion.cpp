@@ -2050,7 +2050,7 @@ IonCompile(JSContext* cx, JSScript* script,
         if (reason == AbortReason_PreliminaryObjects) {
             // Some group was accessed which has associated preliminary objects
             // to analyze. Do this now and we will try to build again shortly.
-            const MIRGenerator::ObjectGroupVector &groups = builder->abortedPreliminaryGroups();
+            const MIRGenerator::ObjectGroupVector& groups = builder->abortedPreliminaryGroups();
             for (size_t i = 0; i < groups.length(); i++) {
                 ObjectGroup* group = groups[i];
                 if (group->newScript()) {

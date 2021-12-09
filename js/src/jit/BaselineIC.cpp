@@ -4657,7 +4657,7 @@ ICIn_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICInNativeCompiler::generateStubCode(MacroAssembler &masm)
+ICInNativeCompiler::generateStubCode(MacroAssembler& masm)
 {
     MOZ_ASSERT(engine_ == Engine::Baseline);
 
@@ -4734,7 +4734,7 @@ ICInNativeDoesNotExistCompiler::getStub(ICStubSpace* space)
 }
 
 bool
-ICInNativeDoesNotExistCompiler::generateStubCode(MacroAssembler &masm)
+ICInNativeDoesNotExistCompiler::generateStubCode(MacroAssembler& masm)
 {
     MOZ_ASSERT(engine_ == Engine::Baseline);
 
@@ -4793,7 +4793,7 @@ ICInNativeDoesNotExistCompiler::generateStubCode(MacroAssembler &masm)
 }
 
 bool
-ICIn_Dense::Compiler::generateStubCode(MacroAssembler &masm)
+ICIn_Dense::Compiler::generateStubCode(MacroAssembler& masm)
 {
     MOZ_ASSERT(engine_ == Engine::Baseline);
 
@@ -9119,7 +9119,7 @@ ICCallStubCompiler::pushSpreadCallArguments(MacroAssembler& masm,
     masm.unboxObject(Address(masm.getStackPointer(),
                              (isConstructing * sizeof(Value)) + STUB_FRAME_SIZE), startReg);
     masm.loadPtr(Address(startReg, NativeObject::offsetOfElements()), startReg);
- 
+
     // Align the stack such that the JitFrameLayout is aligned on the
     // JitStackAlignment.
     if (isJitCall) {
@@ -9375,15 +9375,15 @@ ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
         // Use BaselineFrameReg instead of BaselineStackReg, because
         // BaselineFrameReg and BaselineStackReg hold the same value just after
         // calling enterStubFrame.
- 
+
         // newTarget
         if (isConstructing_)
             masm.pushValue(Address(BaselineFrameReg, STUB_FRAME_SIZE));
- 
+
         // array
         uint32_t valueOffset = isConstructing_;
         masm.pushValue(Address(BaselineFrameReg, valueOffset++ * sizeof(Value) + STUB_FRAME_SIZE));
- 
+
         // this
         masm.pushValue(Address(BaselineFrameReg, valueOffset++ * sizeof(Value) + STUB_FRAME_SIZE));
 
@@ -11211,7 +11211,7 @@ ICGetElem_Dense::Clone(JSContext* cx, ICStubSpace* space, ICStub* firstMonitorSt
 }
 
 ICGetElem_UnboxedArray::ICGetElem_UnboxedArray(JitCode* stubCode, ICStub* firstMonitorStub,
-                                               ObjectGroup* group)
+                                               ObjectGroup *group)
   : ICMonitoredStub(GetElem_UnboxedArray, stubCode, firstMonitorStub),
     group_(group)
 { }
