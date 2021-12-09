@@ -1526,6 +1526,9 @@ PeerConnectionImpl::SetLocalDescription(int32_t aAction, const char* aSDP)
     case IPeerConnection::kActionPRAnswer:
       sdpType = mozilla::kJsepSdpPranswer;
       break;
+    case IPeerConnection::kActionRollback:
+      sdpType = mozilla::kJsepSdpRollback;
+      break;
     default:
       MOZ_ASSERT(false);
       return NS_ERROR_FAILURE;
@@ -1554,7 +1557,7 @@ PeerConnectionImpl::SetLocalDescription(int32_t aAction, const char* aSDP)
     pco->OnSetLocalDescriptionSuccess(rv);
   }
 
-  UpdateSignalingState();
+  UpdateSignalingState(sdpType == mozilla::kJsepSdpRollback);
   return NS_OK;
 }
 
@@ -1622,11 +1625,14 @@ PeerConnectionImpl::SetRemoteDescription(int32_t action, const char* aSDP)
     case IPeerConnection::kActionPRAnswer:
       sdpType = mozilla::kJsepSdpPranswer;
       break;
+    case IPeerConnection::kActionRollback:
+      sdpType = mozilla::kJsepSdpRollback;
+      break;
     default:
       MOZ_ASSERT(false);
       return NS_ERROR_FAILURE;
-
   }
+
   nsresult nrv = mJsepSession->SetRemoteDescription(sdpType,
                                                     mRemoteRequestedSDP);
   if (NS_FAILED(nrv)) {
@@ -1760,7 +1766,7 @@ PeerConnectionImpl::SetRemoteDescription(int32_t action, const char* aSDP)
 #endif
   }
 
-  UpdateSignalingState();
+  UpdateSignalingState(sdpType == mozilla::kJsepSdpRollback);
   return NS_OK;
 }
 
@@ -2436,7 +2442,8 @@ PeerConnectionImpl::ShutdownMedia()
 }
 
 void
-PeerConnectionImpl::SetSignalingState_m(PCImplSignalingState aSignalingState)
+PeerConnectionImpl::SetSignalingState_m(PCImplSignalingState aSignalingState,
+                                        bool rollback)
 {
   PC_AUTO_ENTER_API_CALL_NO_CHECK();
   if (mSignalingState == aSignalingState ||
@@ -2444,33 +2451,35 @@ PeerConnectionImpl::SetSignalingState_m(PCImplSignalingState aSignalingState)
     return;
   }
 
-  bool restartGathering =
-    aSignalingState == PCImplSignalingState::SignalingHaveLocalOffer ||
-    (aSignalingState == PCImplSignalingState::SignalingStable &&
-     mSignalingState == PCImplSignalingState::SignalingHaveRemoteOffer);
+  if (aSignalingState == PCImplSignalingState::SignalingHaveLocalOffer ||
+      (aSignalingState == PCImplSignalingState::SignalingStable &&
+       mSignalingState == PCImplSignalingState::SignalingHaveRemoteOffer &&
+       !rollback)) {
+    mMedia->EnsureTransports(*mJsepSession);
+  }
 
   mSignalingState = aSignalingState;
-
-  if (mSignalingState == PCImplSignalingState::SignalingHaveLocalOffer ||
-      mSignalingState == PCImplSignalingState::SignalingStable) {
-    mMedia->UpdateTransports(*mJsepSession, restartGathering);
-  }
 
   bool fireNegotiationNeeded = false;
 
   if (mSignalingState == PCImplSignalingState::SignalingStable) {
-    mMedia->UpdateMediaPipelines(*mJsepSession);
-    InitializeDataChannel();
-    mMedia->StartIceChecks(*mJsepSession);
-    mShouldSuppressNegotiationNeeded = false;
-    if (!mJsepSession->AllLocalTracksAreAssigned()) {
-      CSFLogInfo(logTag, "Not all local tracks were assigned to an "
-                         "m-section, either because the offerer did not offer"
-                         " to receive enough tracks, or because tracks were "
-                         "added after CreateOffer/Answer, but before "
-                         "offer/answer completed. This requires "
-                         "renegotiation.");
-      fireNegotiationNeeded = true;
+    // If we're rolling back a local offer, we might need to remove some
+    // transports, but nothing further needs to be done.
+    mMedia->ActivateOrRemoveTransports(*mJsepSession);
+    if (!rollback) {
+      mMedia->UpdateMediaPipelines(*mJsepSession);
+      InitializeDataChannel();
+      mMedia->StartIceChecks(*mJsepSession);
+      mShouldSuppressNegotiationNeeded = false;
+      if (!mJsepSession->AllLocalTracksAreAssigned()) {
+        CSFLogInfo(logTag, "Not all local tracks were assigned to an "
+                           "m-section, either because the offerer did not offer"
+                           " to receive enough tracks, or because tracks were "
+                           "added after CreateOffer/Answer, but before "
+                           "offer/answer completed. This requires "
+                           "renegotiation.");
+        fireNegotiationNeeded = true;
+      }
     }
   } else {
     mShouldSuppressNegotiationNeeded = true;
@@ -2493,7 +2502,7 @@ PeerConnectionImpl::SetSignalingState_m(PCImplSignalingState aSignalingState)
 }
 
 void
-PeerConnectionImpl::UpdateSignalingState() {
+PeerConnectionImpl::UpdateSignalingState(bool rollback) {
   mozilla::JsepSignalingState state =
       mJsepSession->GetState();
 
@@ -2522,7 +2531,7 @@ PeerConnectionImpl::UpdateSignalingState() {
       MOZ_CRASH();
   }
 
-  SetSignalingState_m(newState);
+  SetSignalingState_m(newState, rollback);
 }
 
 bool
@@ -3318,6 +3327,10 @@ PeerConnectionImpl::IceStreamReady(NrIceMediaStream *aStream)
 //Telemetry for when calls start
 void
 PeerConnectionImpl::startCallTelem() {
+  if (!mStartTime.IsNull()) {
+    return;
+  }
+
   // Start time for calls
   mStartTime = TimeStamp::Now();
 
