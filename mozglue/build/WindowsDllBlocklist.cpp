@@ -682,7 +682,7 @@ continue_loading:
       return STATUS_DLL_NOT_FOUND;
     }
 
-    if (!CheckASLR(full_fname)) {
+    if (IsVistaOrLater() && !CheckASLR(full_fname.get())) {
       printf_stderr("LdrLoadDll: Blocking load of '%s'.  XPCOM components must support ASLR.\n", dllName);
       return STATUS_DLL_NOT_FOUND;
     }
