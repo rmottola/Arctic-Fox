@@ -305,7 +305,9 @@ let Scheduler = this.Scheduler = {
         let message = ["Meta_shutdown", [reset]];
 
         Scheduler.latestReceived = [];
-        Scheduler.latestSent = [Date.now(), ...message];
+        Scheduler.latestSent = [Date.now(),
+          Task.Debugging.generateReadableStack(new Error().stack),
+          ...message];
 
         // Wait for result
         let resources;
@@ -981,7 +983,7 @@ if (!SharedAll.Constants.Win) {
 /**
  * Gets the number of bytes available on disk to the current user.
  *
- * @param {string} Platform-specific path to a directory on the disk to 
+ * @param {string} Platform-specific path to a directory on the disk to
  * query for free available bytes.
  *
  * @return {number} The number of bytes available for the current user.
@@ -1010,10 +1012,15 @@ File.removeEmptyDir = function removeEmptyDir(path, options) {
  * Remove an existing file.
  *
  * @param {string} path The name of the file.
+ * @param {*=} options Additional options.
+ *   - {bool} ignoreAbsent If |false|, throw an error if the file does
+ *     not exist. |true| by default.
+ *
+ * @throws {OS.File.Error} In case of I/O error.
  */
-File.remove = function remove(path) {
+File.remove = function remove(path, options) {
   return Scheduler.post("remove",
-    [Type.path.toMsg(path)]);
+    [Type.path.toMsg(path), options], path);
 };
 
 
