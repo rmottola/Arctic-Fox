@@ -405,6 +405,10 @@ public:
     MOZ_ASSERT(onAsyncThread);
 #endif // DEBUG
 
+    nsCOMPtr<nsIRunnable> event = NS_NewRunnableMethodWithArg<nsCOMPtr<nsIThread>>
+      (mConnection, &Connection::shutdownAsyncThread, mAsyncExecutionThread);
+    (void)NS_DispatchToMainThread(event);
+
     // Internal close.
     (void)mConnection->internalClose(mNativeConnection);
 
@@ -526,6 +530,7 @@ Connection::Connection(Service *aService,
 , threadOpenedOn(do_GetCurrentThread())
 , mDBConn(nullptr)
 , mAsyncExecutionThreadShuttingDown(false)
+, mAsyncExecutionThreadIsAlive(false)
 , mConnectionClosed(false)
 , mTransactionInProgress(false)
 , mProgressHandler(nullptr)
@@ -542,6 +547,8 @@ Connection::~Connection()
 
   MOZ_ASSERT(!mAsyncExecutionThread,
              "AsyncClose has not been invoked on this connection!");
+  MOZ_ASSERT(!mAsyncExecutionThreadIsAlive,
+             "The async execution thread should have been shutdown!");
 }
 
 NS_IMPL_ADDREF(Connection)
@@ -609,6 +616,7 @@ Connection::getAsyncExecutionTarget()
                              mAsyncExecutionThread);
   }
 
+  mAsyncExecutionThreadIsAlive = true;
   return mAsyncExecutionThread;
 }
 
@@ -930,6 +938,17 @@ Connection::isClosed()
 {
   MutexAutoLock lockedScope(sharedAsyncExecutionMutex);
   return mConnectionClosed;
+}
+
+void
+Connection::shutdownAsyncThread(nsIThread *aThread) {
+  MOZ_ASSERT(!mAsyncExecutionThread);
+  MOZ_ASSERT(mAsyncExecutionThreadIsAlive);
+  MOZ_ASSERT(mAsyncExecutionThreadShuttingDown);
+
+  DebugOnly<nsresult> rv = aThread->Shutdown();
+  MOZ_ASSERT(NS_SUCCEEDED(rv));
+  mAsyncExecutionThreadIsAlive = false;
 }
 
 nsresult
