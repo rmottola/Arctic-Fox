@@ -223,11 +223,11 @@ let AddonWatcher = {
               Cu.reportError(ex.stack);
             }
           }
-	}
+        }
       } catch (ex) {
         Cu.reportError("Error in AddonWatcher._checkAddons " + ex);
         Cu.reportError(Task.Debugging.generateReadableStack(ex.stack));
-        }
+      }
     }.bind(this));
   },
   ignoreAddonForSession: function(addonid) {
