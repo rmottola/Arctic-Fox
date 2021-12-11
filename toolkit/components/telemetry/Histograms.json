@@ -5518,6 +5518,14 @@
     "n_buckets": "29",
     "description": "The number of times AddIceCandidate failed on a given PeerConnection, given that ICE failed."
   },
+  "PERF_MONITORING_TEST_CPU_RESCHEDULING_PROPORTION_MOVED": {
+    "alert_emails": ["dteller@mozilla.com"],
+    "expires_in_version": "44",
+    "kind": "linear",
+    "high": "100",
+    "n_buckets": "20",
+    "description": "Proportion (%) of reschedulings of the main process to another CPU during the execution of code inside a JS compartment. Updated while we are measuring jank."
+  },
   "COOKIES_3RDPARTY_NUM_SITES_ACCEPTED": {
     "expires_in_version": "40",
     "kind": "linear",
