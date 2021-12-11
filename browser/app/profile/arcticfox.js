@@ -436,6 +436,12 @@ pref("browser.tabs.closeButtons", 1);
 // false  return to the adjacent tab (old default)
 pref("browser.tabs.selectOwnerOnClose", true);
 
+#ifdef RELEASE_BUILD
+pref("browser.tabs.showAudioPlayingIcon", false);
+#else
+pref("browser.tabs.showAudioPlayingIcon", true);
+#endif
+
 pref("browser.allTabs.previews", false);
 pref("browser.ctrlTab.previews", false);
 pref("browser.ctrlTab.recentlyUsedLimit", 7);
