@@ -4966,6 +4966,7 @@ nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
 
     if (ShouldIntercept()) {
         mInterceptCache = MAYBE_INTERCEPT;
+        mResponseCouldBeSynthesized = true;
     }
 
     // Remember the cookie header that was set, if any
