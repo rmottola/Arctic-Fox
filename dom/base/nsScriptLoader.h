@@ -337,7 +337,8 @@ public:
   static nsresult ShouldLoadScript(nsIDocument* aDocument,
                                    nsISupports* aContext,
                                    nsIURI* aURI,
-                                   const nsAString &aType);
+                                   const nsAString &aType,
+                                   bool aIsPreLoad);
 
   /**
    * Starts deferring deferred scripts and puts them in the mDeferredRequests
@@ -418,7 +419,8 @@ private:
   static nsresult CheckContentPolicy(nsIDocument* aDocument,
                                      nsISupports *aContext,
                                      nsIURI *aURI,
-                                     const nsAString &aType);
+                                     const nsAString &aType,
+                                     bool aIsPreLoad);
 
   /**
    * Start a load for aRequest's URI.
