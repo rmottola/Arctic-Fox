@@ -691,10 +691,10 @@ class NodeBuilder
 
     bool exportBatchSpecifier(TokenPos* pos, MutableHandleValue dst);
 
-    bool classDefinition(bool expr, HandleValue name, HandleValue heritage, HandleValue block, TokenPos *pos,
+    bool classDefinition(bool expr, HandleValue name, HandleValue heritage, HandleValue block, TokenPos* pos,
                          MutableHandleValue dst);
-    bool classMethods(NodeVector &methods, MutableHandleValue dst);
-    bool classMethod(HandleValue name, HandleValue body, PropKind kind, bool isStatic, TokenPos *pos, MutableHandleValue dst);
+    bool classMethods(NodeVector& methods, MutableHandleValue dst);
+    bool classMethod(HandleValue name, HandleValue body, PropKind kind, bool isStatic, TokenPos* pos, MutableHandleValue dst);
 
     /*
      * expressions
@@ -2813,8 +2813,8 @@ ASTSerializer::rightAssociate(ParseNode* pn, MutableHandleValue dst)
     ParseNode* next;
     while (current != nullptr)
     {
-        next = current->pn_next;  
-        current->pn_next = prev;   
+        next = current->pn_next;
+        current->pn_next = prev;
         prev = current;
         current = next;
     }
@@ -3068,7 +3068,7 @@ ASTSerializer::expression(ParseNode* pn, MutableHandleValue dst)
         return leftAssociate(pn, dst);
 
       case PNK_POW:
-        return rightAssociate(pn, dst);
+	return rightAssociate(pn, dst);
 
       case PNK_DELETENAME:
       case PNK_DELETEPROP:
