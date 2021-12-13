@@ -1315,7 +1315,7 @@ NativeGetElement(JSContext* cx, HandleNativeObject obj, uint32_t index, MutableH
 
 bool
 SetPropertyByDefining(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
-                      HandleValue receiver, bool objHasOwn, ObjectOpResult& result);
+                      HandleValue receiver, ObjectOpResult& result);
 
 bool
 SetPropertyOnProto(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
