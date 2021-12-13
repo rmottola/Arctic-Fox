@@ -2193,7 +2193,7 @@ InlineTransparentTypedObject::getOrCreateBuffer(JSContext* cx)
             return nullptr;
     }
 
-    JSObject *obj = table->lookup(this);
+    JSObject* obj = table->lookup(this);
     if (obj)
         return &obj->as<ArrayBufferObject>();
 
@@ -2205,7 +2205,7 @@ InlineTransparentTypedObject::getOrCreateBuffer(JSContext* cx)
     // and its contents.
     gc::AutoSuppressGC suppress(cx);
 
-    ArrayBufferObject *buffer =
+    ArrayBufferObject* buffer =
         ArrayBufferObject::create(cx, nbytes, contents, ArrayBufferObject::DoesntOwnData);
     if (!buffer)
         return nullptr;
