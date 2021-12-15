@@ -901,6 +901,7 @@ let ViewSourceContent = {
   contextMenuItems: [
     {
       id: "goToLine",
+      accesskey: true,
       handler() {
         sendAsyncMessage("ViewSource:PromptAndGoToLine");
       }
@@ -945,6 +946,11 @@ let ViewSourceContent = {
       item.setAttribute("label", label);
       if ("checked" in itemSpec) {
         item.setAttribute("type", "checkbox");
+      }
+      if (itemSpec.accesskey) {
+        let accesskeyName = `context_${itemSpec.id}_accesskey`;
+        item.setAttribute("accesskey",
+                          this.bundle.GetStringFromName(accesskeyName))
       }
       menu.appendChild(item);
     });
