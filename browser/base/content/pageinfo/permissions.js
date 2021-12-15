@@ -204,7 +204,7 @@ function onIndexedDBClear()
             .getService(nsIQuotaManager)
             .clearStoragesForURI(gPermURI);
 
-  SitePermissions.remove(gPermURI, "indexedDB-unlimited");
+  SitePermissions.remove(gPermURI, "indexedDB");
   initIndexedDBRow();
 }
 
