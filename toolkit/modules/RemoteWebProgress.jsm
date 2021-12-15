@@ -194,7 +194,8 @@ RemoteWebProgressManager.prototype = {
 
       // Update the actual WebProgress fields.
       webProgress._isLoadingDocument = json.webProgress.isLoadingDocument;
-      webProgress._DOMWindow = json.webProgress.DOMWindowID;
+      webProgress._DOMWindow = objects.DOMWindow;
+      webProgress._DOMWindowID = json.webProgress.DOMWindowID;
       webProgress._loadType = json.webProgress.loadType;
       webProgress._webProgressCPOW = objects.webProgress;
     }
