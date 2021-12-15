@@ -18,12 +18,10 @@
 #include <fcntl.h>
 #elif defined(XP_UNIX)
 #include <sys/resource.h>
-#include <time.h>
 #include <unistd.h>
 #endif
 
 #ifdef XP_MACOSX
-#include <mach/mach_time.h>
 #include "MacQuirks.h"
 #endif
 
@@ -215,32 +213,6 @@ static int do_main(int argc, char* argv[], nsIFile *xreDirectory)
   return XRE_main(argc, argv, &appData, mainFlags);
 }
 
-/**
- * Local TimeStamp::Now()-compatible implementation used to record timestamps
- * which will be passed to XRE_StartupTimelineRecord().
- */
-static uint64_t
-TimeStamp_Now()
-{
-#ifdef XP_WIN
-  LARGE_INTEGER freq;
-  ::QueryPerformanceFrequency(&freq);
-  return GetTickCount64() * freq.QuadPart;
-#elif defined(XP_MACOSX)
-  return mach_absolute_time();
-#elif defined(HAVE_CLOCK_MONOTONIC)
-  struct timespec ts;
-  int rv = clock_gettime(CLOCK_MONOTONIC, &ts);
-
-  if (rv != 0) {
-    return 0;
-  }
-
-  uint64_t baseNs = (uint64_t)ts.tv_sec * 1000000000;
-  return baseNs + (uint64_t)ts.tv_nsec;
-#endif
-}
-
 static bool
 FileExists(const char *path)
 {
@@ -361,7 +333,7 @@ InitXPCOMGlue(const char *argv0, nsIFile **xreDirectory)
 
 int main(int argc, char* argv[])
 {
-  uint64_t start = TimeStamp_Now();
+  mozilla::TimeStamp start = mozilla::TimeStamp::Now();
 
 #ifdef XP_MACOSX
   TriggerQuirks();
