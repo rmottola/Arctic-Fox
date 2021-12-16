@@ -721,24 +721,24 @@ NewBuiltinClassInstance(ExclusiveContext* cx, gc::AllocKind allocKind, NewObject
 
 // Used to optimize calls to (new Object())
 bool
-NewObjectScriptedCall(JSContext *cx, MutableHandleObject obj);
+NewObjectScriptedCall(JSContext* cx, MutableHandleObject obj);
 
-JSObject *
-NewObjectWithGroupCommon(ExclusiveContext *cx, HandleObjectGroup group,
+JSObject*
+NewObjectWithGroupCommon(ExclusiveContext* cx, HandleObjectGroup group,
                          gc::AllocKind allocKind, NewObjectKind newKind);
 
 template <typename T>
-inline T *
-NewObjectWithGroup(ExclusiveContext *cx, HandleObjectGroup group,
+inline T*
+NewObjectWithGroup(ExclusiveContext* cx, HandleObjectGroup group,
                    gc::AllocKind allocKind, NewObjectKind newKind = GenericObject)
 {
-    JSObject *obj = NewObjectWithGroupCommon(cx, group, allocKind, newKind);
+    JSObject* obj = NewObjectWithGroupCommon(cx, group, allocKind, newKind);
     return obj ? &obj->as<T>() : nullptr;
 }
 
 template <typename T>
-inline T *
-NewObjectWithGroup(ExclusiveContext *cx, HandleObjectGroup group,
+inline T*
+NewObjectWithGroup(ExclusiveContext* cx, HandleObjectGroup group,
                    NewObjectKind newKind = GenericObject)
 {
     gc::AllocKind allocKind = gc::GetGCObjectKind(group->clasp());
@@ -836,8 +836,8 @@ ApplyAttributes(unsigned attrs, bool enumerable, bool writable, bool configurabl
 }
 
 
-extern js::NativeObject*
-InitClass(JSContext* cx, js::HandleObject obj, HandleObject parent_proto,
+extern NativeObject*
+InitClass(JSContext* cx, HandleObject obj, HandleObject parent_proto,
           const Class* clasp, JSNative constructor, unsigned nargs,
           const JSPropertySpec* ps, const JSFunctionSpec* fs,
           const JSPropertySpec* static_ps, const JSFunctionSpec* static_fs,
