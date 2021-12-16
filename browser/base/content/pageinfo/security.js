@@ -43,7 +43,7 @@ var security = {
     var isMixed =
       (ui.state & (Components.interfaces.nsIWebProgressListener.STATE_LOADED_MIXED_ACTIVE_CONTENT |
                    Components.interfaces.nsIWebProgressListener.STATE_LOADED_MIXED_DISPLAY_CONTENT));
-    var isInsecure = 
+    var isInsecure =
       (ui.state & Components.interfaces.nsIWebProgressListener.STATE_IS_INSECURE);
     var isEV =
       (ui.state & Components.interfaces.nsIWebProgressListener.STATE_IDENTITY_EV_TOPLEVEL);
@@ -107,7 +107,7 @@ var security = {
         isMixed : isMixed,
         isEV : isEV,
         cert : null
- 
+
       };
     }
   },
@@ -159,7 +159,7 @@ var security = {
       window.openDialog("chrome://browser/content/preferences/cookies.xul",
                         "Browser:Cookies", "", {filterString : eTLD});
   },
-  
+
   /**
    * Open the login manager window
    */
