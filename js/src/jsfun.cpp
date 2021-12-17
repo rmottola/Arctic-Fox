@@ -814,7 +814,7 @@ CreateFunctionPrototype(JSContext* cx, JSProtoKey key)
      * Bizarrely, |Function.prototype| must be an interpreted function, so
      * give it the guts to be one.
      */
-    JSObject *functionProto_ =
+    JSObject* functionProto_ =
         NewFunctionWithProto(cx, nullptr, 0, JSFunction::INTERPRETED,
                              self, nullptr, objectProto, AllocKind::FUNCTION,
                              SingletonObject);
@@ -2068,7 +2068,7 @@ js::NewNativeConstructor(ExclusiveContext* cx, Native native, unsigned nargs, Ha
                                 nullptr, allocKind, newKind);
 }
 
-JSFunction* 
+JSFunction*
 js::NewScriptedFunction(ExclusiveContext* cx, unsigned nargs,
                         JSFunction::Flags flags, HandleAtom atom,
                         gc::AllocKind allocKind /* = AllocKind::FUNCTION */,
