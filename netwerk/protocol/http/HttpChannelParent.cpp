@@ -120,8 +120,9 @@ HttpChannelParent::Init(const HttpChannelCreationArgs& aArgs)
                        a.thirdPartyFlags(), a.resumeAt(), a.startPos(),
                        a.entityID(), a.chooseApplicationCache(),
                        a.appCacheClientID(), a.allowSpdy(), a.allowAltSvc(), a.fds(),
-                       a.loadInfo(), a.synthesizedResponseHead(), a.cacheKey(),
-                       a.schedulingContextID(), a.allowStaleCacheContent());
+                       a.loadInfo(), a.synthesizedResponseHead(),
+                       a.synthesizedSecurityInfoSerialization(),
+                       a.cacheKey(), a.schedulingContextID(), a.allowStaleCacheContent());
   }
   case HttpChannelCreationArgs::THttpChannelConnectArgs:
   {
@@ -277,6 +278,7 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
                                  const OptionalFileDescriptorSet& aFds,
                                  const OptionalLoadInfoArgs& aLoadInfoArgs,
                                  const OptionalHttpResponseHead& aSynthesizedResponseHead,
+                                 const nsCString&           aSecurityInfoSerialization,
                                  const uint32_t&            aCacheKey,
                                  const nsCString&           aSchedulingContextID,
                                  const bool&                aAllowStaleCacheContent)
@@ -393,6 +395,13 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
   if (aSynthesizedResponseHead.type() == OptionalHttpResponseHead::TnsHttpResponseHead) {
     mSynthesizedResponseHead = new nsHttpResponseHead(aSynthesizedResponseHead.get_nsHttpResponseHead());
     mShouldIntercept = true;
+
+    if (!aSecurityInfoSerialization.IsEmpty()) {
+      nsCOMPtr<nsISupports> secInfo;
+      NS_DeserializeObject(aSecurityInfoSerialization, getter_AddRefs(secInfo));
+      mChannel->OverrideSecurityInfo(secInfo);
+    }
+
   } else {
     mChannel->ForceNoIntercept();
   }
