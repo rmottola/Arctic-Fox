@@ -1062,8 +1062,16 @@ public:
         }
 
         BeforeGLReadCall();
-        raw_fCopyTexImage2D(target, level, internalformat,
-                            x, y, width, height, border);
+        bool didCopyTexImage2D = false;
+        if (mScreen) {
+            didCopyTexImage2D = mScreen->CopyTexImage2D(target, level, internalformat, x,
+                                                        y, width, height, border);
+        }
+
+        if (!didCopyTexImage2D) {
+            raw_fCopyTexImage2D(target, level, internalformat, x, y, width, height,
+                                border);
+        }
         AfterGLReadCall();
     }
 
@@ -1964,6 +1972,9 @@ public:
     }
 
 private:
+
+    friend class SharedSurface_IOSurface;
+
     void raw_fCopyTexImage2D(GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border)
     {
         BEFORE_GL_CALL;

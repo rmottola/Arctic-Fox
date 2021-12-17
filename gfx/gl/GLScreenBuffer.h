@@ -218,6 +218,9 @@ public:
     void AfterDrawCall();
     void BeforeReadCall();
 
+    bool CopyTexImage2D(GLenum target, GLint level, GLenum internalformat, GLint x,
+                        GLint y, GLsizei width, GLsizei height, GLint border);
+
     void SetReadBuffer(GLenum userMode);
 
     /**
