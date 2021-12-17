@@ -552,7 +552,7 @@ class JSFunction : public js::NativeObject
   private:
     js::HeapPtrScript& mutableScript() {
         MOZ_ASSERT(hasScript());
-        return* (js::HeapPtrScript*)&u.i.s.script_;
+        return *(js::HeapPtrScript*)&u.i.s.script_;
     }
 
     inline js::FunctionExtended* toExtended();
