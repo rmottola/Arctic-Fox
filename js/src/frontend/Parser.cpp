@@ -4077,7 +4077,7 @@ Parser<ParseHandler>::variables(YieldHandling yieldHandling,
 
 template <>
 bool
-Parser<FullParseHandler>::checkAndPrepareLexical(bool isConst, const TokenPos &errorPos)
+Parser<FullParseHandler>::checkAndPrepareLexical(bool isConst, const TokenPos& errorPos)
 {
     /*
      * This is a lexical declaration. We must be directly under a block per the
@@ -4169,7 +4169,7 @@ CurrentLexicalStaticBlock(ParseContext<FullParseHandler>* pc)
 template <>
 ParseNode*
 Parser<FullParseHandler>::makeInitializedLexicalBinding(HandlePropertyName name, bool isConst,
-                                                        const TokenPos &pos)
+                                                        const TokenPos& pos)
 {
     // Handle the silliness of global and body level lexical decls.
     BindData<FullParseHandler> data(context);
