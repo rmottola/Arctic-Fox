@@ -5,8 +5,9 @@
 
 #include "WebGLContext.h"
 
+#include <queue>
+
 #include "AccessCheck.h"
-#include "CanvasUtils.h"
 #include "gfxContext.h"
 #include "gfxPattern.h"
 #include "gfxPrefs.h"
@@ -15,13 +16,13 @@
 #include "GLContext.h"
 #include "GLContextProvider.h"
 #include "GLReadTexImageHelper.h"
+#include "GLScreenBuffer.h"
 #include "ImageContainer.h"
 #include "ImageEncoder.h"
 #include "Layers.h"
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/HTMLVideoElement.h"
 #include "mozilla/dom/ImageData.h"
-#include "mozilla/dom/WebGLRenderingContextBinding.h"
 #include "mozilla/EnumeratedArrayCycleCollection.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/ProcessPriorityManager.h"
@@ -32,18 +33,25 @@
 #include "nsError.h"
 #include "nsIClassInfoImpl.h"
 #include "nsIConsoleService.h"
+#include "nsIDOMEvent.h"
 #include "nsIGfxInfo.h"
 #include "nsIObserverService.h"
-#include "nsIDOMEvent.h"
 #include "nsIVariant.h"
 #include "nsIWidget.h"
 #include "nsIXPConnect.h"
 #include "nsServiceManagerUtils.h"
 #include "nsSVGEffects.h"
 #include "prenv.h"
-#include <queue>
 #include "ScopedGLHelpers.h"
+
+#ifdef MOZ_WIDGET_GONK
+#include "mozilla/layers/ShadowLayers.h"
+#endif
+
+// Local
+#include "CanvasUtils.h"
 #include "WebGL1Context.h"
+#include "WebGLActiveInfo.h"
 #include "WebGLBuffer.h"
 #include "WebGLContextLossHandler.h"
 #include "WebGLContextUtils.h"
@@ -51,17 +59,20 @@
 #include "WebGLFramebuffer.h"
 #include "WebGLMemoryTracker.h"
 #include "WebGLObjectModel.h"
+#include "WebGLProgram.h"
 #include "WebGLQuery.h"
 #include "WebGLSampler.h"
+#include "WebGLShader.h"
 #include "WebGLTransformFeedback.h"
 #include "WebGLVertexArray.h"
 #include "WebGLVertexAttribData.h"
 
-#ifdef MOZ_WIDGET_GONK
-#include "mozilla/layers/ShadowLayers.h"
-#endif
+// Generated
+#include "mozilla/dom/WebGLRenderingContextBinding.h"
 
-using namespace mozilla;
+
+namespace mozilla {
+
 using namespace mozilla::dom;
 using namespace mozilla::gfx;
 using namespace mozilla::gl;
@@ -890,7 +901,7 @@ WebGLContext::SetDimensions(int32_t signedWidth, int32_t signedHeight)
                     !gfxPrefs::WebGLDisableFailIfMajorPerformanceCaveat() &&
                     !HasAcceleratedLayers(gfxInfo);
     if (failIfMajorPerformanceCaveat) {
-        Nullable<dom::WebGLContextAttributes> contextAttributes;
+        dom::Nullable<dom::WebGLContextAttributes> contextAttributes;
         this->GetContextAttributes(contextAttributes);
         if (contextAttributes.Value().mFailIfMajorPerformanceCaveat) {
             return NS_ERROR_FAILURE;
@@ -1162,8 +1173,6 @@ WebGLContext::UpdateLastUseIndex()
 
 static uint8_t gWebGLLayerUserData;
 
-namespace mozilla {
-
 class WebGLContextUserData : public LayerUserData
 {
 public:
@@ -1201,8 +1210,6 @@ public:
 private:
     nsRefPtr<HTMLCanvasElement> mCanvas;
 };
-
-} // end namespace mozilla
 
 already_AddRefed<layers::CanvasLayer>
 WebGLContext::GetCanvasLayer(nsDisplayListBuilder* builder,
@@ -1263,7 +1270,7 @@ WebGLContext::GetCanvasLayer(nsDisplayListBuilder* builder,
 }
 
 void
-WebGLContext::GetContextAttributes(Nullable<dom::WebGLContextAttributes>& retval)
+WebGLContext::GetContextAttributes(dom::Nullable<dom::WebGLContextAttributes>& retval)
 {
     retval.SetNull();
     if (IsContextLost())
@@ -1883,7 +1890,69 @@ WebGLContext::TexImageFromVideoElement(const TexImageTarget texImageTarget,
     return ok;
 }
 
-size_t mozilla::RoundUpToMultipleOf(size_t value, size_t multiple)
+void
+WebGLContext::TexSubImage2D(GLenum rawTexImageTarget, GLint level, GLint xoffset,
+                            GLint yoffset, GLenum format, GLenum type,
+                            dom::Element* elt, ErrorResult* const out_rv)
+{
+    // TODO: Consolidate all the parameter validation
+    // checks. Instead of spreading out the cheks in multple
+    // places, consolidate into one spot.
+
+    if (IsContextLost())
+        return;
+
+    if (!ValidateTexImageTarget(rawTexImageTarget,
+                                WebGLTexImageFunc::TexSubImage,
+                                WebGLTexDimensions::Tex2D))
+    {
+        ErrorInvalidEnumInfo("texSubImage2D: target", rawTexImageTarget);
+        return;
+    }
+
+    const TexImageTarget texImageTarget(rawTexImageTarget);
+
+    if (level < 0)
+        return ErrorInvalidValue("texSubImage2D: level is negative");
+
+    const int32_t maxLevel = MaxTextureLevelForTexImageTarget(texImageTarget);
+    if (level > maxLevel) {
+        ErrorInvalidValue("texSubImage2D: level %d is too large, max is %d",
+                          level, maxLevel);
+        return;
+    }
+
+    WebGLTexture* tex = ActiveBoundTextureForTexImageTarget(texImageTarget);
+    if (!tex)
+        return ErrorInvalidOperation("texSubImage2D: no texture bound on active texture unit");
+
+    const WebGLTexture::ImageInfo& imageInfo = tex->ImageInfoAt(texImageTarget, level);
+    const TexInternalFormat internalFormat = imageInfo.EffectiveInternalFormat();
+
+    // Trying to handle the video by GPU directly first
+    if (TexImageFromVideoElement(texImageTarget, level,
+                                 internalFormat.get(), format, type, *elt))
+    {
+        return;
+    }
+
+    RefPtr<gfx::DataSourceSurface> data;
+    WebGLTexelFormat srcFormat;
+    nsLayoutUtils::SurfaceFromElementResult res = SurfaceFromElement(*elt);
+    *out_rv = SurfaceFromElementResultToImageSurface(res, data, &srcFormat);
+    if (out_rv->Failed() || !data)
+        return;
+
+    gfx::IntSize size = data->GetSize();
+    uint32_t byteLength = data->Stride() * size.height;
+    TexSubImage2D_base(texImageTarget.get(), level, xoffset, yoffset, size.width,
+                       size.height, data->Stride(), format, type, data->GetData(),
+                       byteLength, js::Scalar::MaxTypedArrayViewType, srcFormat,
+                       mPixelStorePremultiplyAlpha);
+}
+
+size_t
+RoundUpToMultipleOf(size_t value, size_t multiple)
 {
     size_t overshoot = value + multiple - 1;
     return overshoot - (overshoot % multiple);
@@ -1958,3 +2027,5 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(WebGLContext)
     // ToSupports() method.
     NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMWebGLRenderingContext)
 NS_INTERFACE_MAP_END
+
+} // namespace mozilla
