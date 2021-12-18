@@ -259,7 +259,7 @@ Push.prototype = {
         }.bind(this),
 
         function() {
-          reject("denied");
+          reject("PermissionDeniedError");
         }
       );
     }.bind(this));
@@ -282,7 +282,7 @@ Push.prototype = {
         }.bind(this),
 
         function() {
-          reject("denied");
+          reject("PermissionDeniedError");
         }
       );
     }.bind(this));
