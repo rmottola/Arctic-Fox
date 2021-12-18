@@ -14,7 +14,6 @@ interface Principal;
 interface PushSubscription
 {
     readonly attribute USVString endpoint;
-    readonly attribute DOMString subscriptionId;
     Promise<boolean> unsubscribe();
     jsonifier;
 };
