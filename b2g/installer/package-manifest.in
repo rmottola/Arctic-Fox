@@ -634,13 +634,13 @@
 @RESPATH@/components/AppsService.js
 @RESPATH@/components/AppsService.manifest
 @RESPATH@/components/Push.js
-@BINPATH@/components/Push.manifest
-@BINPATH@/components/PushNotificationService.js
+@RESPATH@/components/Push.manifest
+@RESPATH@/components/PushNotificationService.js
 
-@BINPATH@/components/InterAppComm.manifest
-@BINPATH@/components/InterAppCommService.js
-@BINPATH@/components/InterAppConnection.js
-@BINPATH@/components/InterAppMessagePort.js
+@RESPATH@/components/InterAppComm.manifest
+@RESPATH@/components/InterAppCommService.js
+@RESPATH@/components/InterAppConnection.js
+@RESPATH@/components/InterAppMessagePort.js
 
 @BINPATH@/components/nsDOMIdentity.js
 @BINPATH@/components/nsIDService.js
