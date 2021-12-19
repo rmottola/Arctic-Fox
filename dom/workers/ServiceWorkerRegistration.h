@@ -22,6 +22,7 @@ namespace dom {
 
 class Promise;
 class PushManager;
+class WorkerPushManager;
 class WorkerListener;
 
 namespace workers {
@@ -235,6 +236,9 @@ public:
   bool
   Notify(JSContext* aCx, workers::Status aStatus) override;
 
+  already_AddRefed<WorkerPushManager>
+  GetPushManager(ErrorResult& aRv);
+
 private:
   enum Reason
   {
@@ -252,6 +256,10 @@ private:
 
   workers::WorkerPrivate* mWorkerPrivate;
   nsRefPtr<WorkerListener> mListener;
+
+#ifndef MOZ_SIMPLEPUSH
+  nsRefPtr<WorkerPushManager> mPushManager;
+#endif
 };
 
 } // namespace dom
