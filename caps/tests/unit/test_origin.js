@@ -20,9 +20,6 @@ function checkCrossOrigin(a, b) {
   do_check_false(a.subsumesConsideringDomain(b));
   do_check_false(b.subsumes(a));
   do_check_false(b.subsumesConsideringDomain(a));
-  do_check_eq(a.cookieJar === b.cookieJar,
-              a.originAttributes.appId == b.originAttributes.appId &&
-              a.originAttributes.inBrowser == b.originAttributes.inBrowser);
 }
 
 function checkOriginAttributes(prin, attrs, suffix) {
@@ -50,7 +47,7 @@ function run_test() {
   var nullPrin = Cu.getObjectPrincipal(new Cu.Sandbox(null));
   do_check_true(/^moz-nullprincipal:\{([0-9]|[a-z]|\-){36}\}$/.test(nullPrin.origin));
   checkOriginAttributes(nullPrin);
-  var ep = Cu.getObjectPrincipal(new Cu.Sandbox([exampleCom, nullPrin, exampleOrg]));
+  var ep = ssm.createExpandedPrincipal([exampleCom, nullPrin, exampleOrg]);
   checkOriginAttributes(ep);
   checkCrossOrigin(exampleCom, exampleOrg);
   checkCrossOrigin(exampleOrg, nullPrin);
@@ -95,6 +92,10 @@ function run_test() {
   var exampleOrg_addon = ssm.createCodebasePrincipal(makeURI('http://example.org'), {addonId: 'dummy'});
   checkOriginAttributes(exampleOrg_addon, { addonId: "dummy" }, '!addonId=dummy');
   do_check_eq(exampleOrg_addon.origin, 'http://example.org!addonId=dummy');
+
+  // Make sure that we refuse to create .origin for principals with UNKNOWN_APP_ID.
+  var simplePrin = ssm.getSimpleCodebasePrincipal(makeURI('http://example.com'));
+  try { simplePrin.origin; do_check_true(false); } catch (e) { do_check_true(true); }
 
   // Check that all of the above are cross-origin.
   checkCrossOrigin(exampleOrg_app, exampleOrg);

@@ -375,6 +375,9 @@ pref("browser.search.official", true);
 
 pref("browser.sessionhistory.max_entries", 50);
 
+// Built-in default permissions.
+pref("permissions.manager.defaultsUrl", "resource://app/defaults/permissions");
+
 // handle links targeting new windows
 // 1=current window/tab, 2=new window, 3=new tab in most recent window
 pref("browser.link.open_newwindow", 3);
