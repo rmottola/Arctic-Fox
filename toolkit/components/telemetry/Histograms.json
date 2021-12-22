@@ -7012,5 +7012,15 @@
     "n_values": 20,
     "releaseChannelCollection": "opt-out",
     "description": "Reports whether or not graphics drivers crashed during startup."
+  },
+  "PERMISSIONS_SQL_CORRUPTED": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Record the permissions.sqlite init failure"
+  },
+  "DEFECTIVE_PERMISSIONS_SQL_REMOVED": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Record the removal of defective permissions.sqlite"
   }
 }
