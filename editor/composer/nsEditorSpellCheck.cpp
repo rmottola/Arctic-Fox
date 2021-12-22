@@ -45,6 +45,7 @@
 #include "nsStringFwd.h"                // for nsAFlatString
 #include "nsStyleUtil.h"                // for nsStyleUtil
 #include "nsXULAppAPI.h"                // for XRE_GetProcessType
+#include "nsIPlaintextEditor.h"         // for editor flags
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -596,18 +597,24 @@ nsEditorSpellCheck::SetCurrentDictionary(const nsAString& aDictionary)
     // Ignore pending dictionary fetchers by increasing this number.
     mDictionaryFetcherGroup++;
 
-    if (mPreferredLang.IsEmpty() || 
-        !mPreferredLang.Equals(aDictionary, nsCaseInsensitiveStringComparator())) {    
-      // When user sets dictionary manually, we store this value associated
-      // with editor url, if it doesn't match the document language exactly.
-      // For example on "en" sites, we need to store "en-GB", otherwise
-      // the language might jump back to en-US although the user explicitly
-      // chose otherwise.
-      StoreCurrentDictionary(mEditor, aDictionary);
-    } else {
-      // If user sets a dictionary matching the language defined by
-      // document, we consider content pref has been canceled, and we clear it.
-      ClearCurrentDictionary(mEditor);
+    uint32_t flags = 0;
+    mEditor->GetFlags(&flags);
+    if (!(flags & nsIPlaintextEditor::eEditorMailMask)) {
+      if (mPreferredLang.IsEmpty() ||
+          !mPreferredLang.Equals(aDictionary, nsCaseInsensitiveStringComparator())) {
+        // When user sets dictionary manually, we store this value associated
+        // with editor url.
+        StoreCurrentDictionary(mEditor, aDictionary);
+      } else {
+        // If user sets a dictionary matching (even partially), lang defined by
+        // document, we consider content pref has been canceled, and we clear it.
+        ClearCurrentDictionary(mEditor);
+      }
+
+      // Also store it in as a preference. It will be used as a default value
+      // when everything else fails but we don't want this for mail composer
+      // because it has spellchecked dictionary settings in Preferences.
+      Preferences::SetString("spellchecker.dictionary", aDictionary);
     }
   }
   return mSpellChecker->SetCurrentDictionary(aDictionary);
@@ -685,6 +692,18 @@ nsEditorSpellCheck::UpdateCurrentDictionary(nsIEditorSpellCheckCallback* aCallba
     NS_ENSURE_SUCCESS(rv, rv);
     rootContent = do_QueryInterface(rootElement);
   }
+
+  // Try to get topmost document's document element for embedded mail editor.
+  uint32_t flags = 0;
+  mEditor->GetFlags(&flags);
+  if (flags & nsIPlaintextEditor::eEditorMailMask) {
+    nsCOMPtr<nsIDocument> ownerDoc = rootContent->OwnerDoc();
+    NS_ENSURE_TRUE(ownerDoc, NS_ERROR_FAILURE);
+    nsIDocument* parentDoc = ownerDoc->GetParentDocument();
+    if (parentDoc) {
+      rootContent = do_QueryInterface(parentDoc->GetDocumentElement());
+    }
+  }
   NS_ENSURE_TRUE(rootContent, NS_ERROR_FAILURE);
 
   nsRefPtr<DictionaryFetcher> fetcher =
@@ -747,16 +766,22 @@ nsEditorSpellCheck::DictionaryFetched(DictionaryFetcher* aFetcher)
   // If we successfully fetched a dictionary from content prefs, do not go
   // further. Use this exact dictionary.
   nsAutoString dictName;
-  dictName.Assign(aFetcher->mDictionary);
-  if (!dictName.IsEmpty()) {
-    if (NS_SUCCEEDED(SetCurrentDictionary(dictName))) {
-      // We take an early exit here, so clear the suggested word list.
-      DeleteSuggestedWordList();
-      return NS_OK;
+  uint32_t flags;
+  mEditor->GetFlags(&flags);
+  if (!(flags & nsIPlaintextEditor::eEditorMailMask)) {
+    dictName.Assign(aFetcher->mDictionary);
+    if (!dictName.IsEmpty()) {
+      if (NS_SUCCEEDED(SetCurrentDictionary(dictName))) {
+
+        // We take an early exit here, so let's not forget to clear the word
+        // list.
+        DeleteSuggestedWordList();
+        return NS_OK;
+      }
+      // May be dictionary was uninstalled ?
+      // Clear the content preference and continue.
+      ClearCurrentDictionary(mEditor);
     }
-    // Maybe the dictionary was uninstalled ?
-    // Clear the content preference and continue.
-    ClearCurrentDictionary(mEditor);  
   }
 
   // Priority 2:
