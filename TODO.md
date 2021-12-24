@@ -135,7 +135,6 @@
 - Bug 895274 - 1 to 270 parts
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
 -  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
-- Bug 1167409 - for parts
 - Bug 1192667 - Trigger fullscreen transition when exiting fullscreen
 - Bug 1198563
 - Bug 1190316 - Apply fullscreen transition on only the target monitor
@@ -151,7 +150,6 @@
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - Bug 1203857 - Allow to build standalone js against jemalloc4. r=gps 
 - 1185106 - at least part 0 to 4 for TFF
-- Bug 1160014 - 2015-07-24 - Implement fullscreen part 4-6
 - Bug 1171379 - and check all related on bugzilla
 - Bug 909154. Remove the prefixed mozRequestAnimationFrame and its acco
 - Bug 1184429 - 2015-07-17 P1. & P2
@@ -229,6 +227,7 @@ https://github.com/mozilla/newtab-dev/commit/567240287fa9fe6f94fb49d0675512d6aa1
 - Bug 1193583 - Fix eval to always execute under a non-extensible lexi
 - Bug 1191236 - Remove extract() methods used by operation forwarding 
 - Bug 930414 - 22 parts
+- Bug 1167409 - 4/4 - Inititalize ScriptSourceObject even when off-main
 Bug 1195866 - Make allocations log report whether an allocation was i
 - Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
 Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
