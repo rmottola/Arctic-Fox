@@ -85,13 +85,13 @@ gfxXlibSurface::gfxXlibSurface(cairo_surface_t *csurf)
 
 gfxXlibSurface::~gfxXlibSurface()
 {
-#if defined(GL_PROVIDER_GLX)
-    if (mGLXPixmap) {
-        gl::sGLXLibrary.DestroyPixmap(mDisplay, mGLXPixmap);
-    }
-#endif
     // gfxASurface's destructor calls RecordMemoryFreed().
     if (mPixmapTaken) {
+#if defined(GL_PROVIDER_GLX)
+        if (mGLXPixmap) {
+            gl::sGLXLibrary.DestroyPixmap(mDisplay, mGLXPixmap);
+        }
+#endif
         XFreePixmap (mDisplay, mDrawable);
     }
 }
@@ -276,7 +276,7 @@ void
 gfxXlibSurface::Finish()
 {
 #if defined(GL_PROVIDER_GLX)
-    if (mGLXPixmap) {
+    if (mPixmapTaken && mGLXPixmap) {
         gl::sGLXLibrary.DestroyPixmap(mDisplay, mGLXPixmap);
         mGLXPixmap = None;
     }
@@ -610,6 +610,14 @@ gfxXlibSurface::GetGLXPixmap()
     }
     return mGLXPixmap;
 }
+
+void
+gfxXlibSurface::BindGLXPixmap(GLXPixmap aPixmap)
+{
+    MOZ_ASSERT(!mGLXPixmap, "A GLXPixmap is already bound!");
+    mGLXPixmap = aPixmap;
+}
+
 #endif
 
 gfxMemoryLocation
