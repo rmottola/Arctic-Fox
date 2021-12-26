@@ -1236,16 +1236,6 @@ DrawTargetCG::StrokeRect(const Rect &aRect,
     return;
   }
 
-  MarkChanged();
-
-  CGContextSaveGState(mCg);
-
-  UnboundnessFixer fixer;
-  CGContextRef cg = fixer.Check(this, aDrawOptions.mCompositionOp);
-  if (MOZ2D_ERROR_IF(!cg)) {
-    return;
-  }
-
   // Stroking large rectangles with dashes is expensive with CG (fixed
   // overhead based on the number of dashes, regardless of whether the dashes
   // are visible), so we try to reduce the size of the stroked rectangle as
@@ -1257,6 +1247,16 @@ DrawTargetCG::StrokeRect(const Rect &aRect,
     if (rect.IsEmpty()) {
       return;
     }
+  }
+
+  MarkChanged();
+
+  CGContextSaveGState(mCg);
+
+  UnboundnessFixer fixer;
+  CGContextRef cg = fixer.Check(this, aDrawOptions.mCompositionOp);
+  if (MOZ2D_ERROR_IF(!cg)) {
+    return;
   }
 
   CGContextSetAlpha(mCg, aDrawOptions.mAlpha);
