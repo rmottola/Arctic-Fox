@@ -2885,6 +2885,7 @@ PresShell::CreateReferenceRenderingContext()
   if (mPresContext->IsScreen()) {
     rc = new gfxContext(gfxPlatform::GetPlatform()->ScreenReferenceDrawTarget());
   } else {
+    // We assume the devCtx has positive width and height for this call
     rc = devCtx->CreateRenderingContext();
   }
 
