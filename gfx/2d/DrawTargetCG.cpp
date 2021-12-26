@@ -1766,7 +1766,7 @@ DrawTargetCG::Init(BackendType aType,
 
   assert(mCg);
   if (!mCg) {
-    gfxCriticalError() << "Failed to create CG context";
+    gfxCriticalError() << "Failed to create CG context" << mSize << ", " << aStride;
     return false;
   }
 
@@ -1868,7 +1868,7 @@ DrawTargetCG::Init(CGContextRef cgContext, const IntSize &aSize)
 
   assert(mCg);
   if (!mCg) {
-    gfxCriticalError() << "Invalid CG context at Init";
+    gfxCriticalError() << "Invalid CG context at Init " << aSize;
     return false;
   }
 
