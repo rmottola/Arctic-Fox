@@ -1918,8 +1918,8 @@ CheckForApzAwareEventHandlers(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame)
   if (!content) {
     return;
   }
-  EventListenerManager* elm = nsContentUtils::GetExistingListenerManagerForNode(content);
-  if (nsLayoutUtils::HasApzAwareListeners(elm)) {
+
+  if (content->HasApzAwareListeners()) {
     aBuilder->SetAncestorHasApzAwareEventHandler(true);
   }
 }

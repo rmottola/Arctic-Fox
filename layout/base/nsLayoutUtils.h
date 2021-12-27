@@ -2647,7 +2647,6 @@ public:
                                       mozilla::WritingMode aLineWM,
                                       mozilla::WritingMode aFrameWM);
 
-  static bool HasApzAwareListeners(mozilla::EventListenerManager* aElm);
   static bool HasDocumentLevelListenersForApzAwareEvents(nsIPresShell* aShell);
 
   /**
