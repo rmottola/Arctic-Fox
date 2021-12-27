@@ -1020,13 +1020,6 @@ nsCSPParser::directive()
     // if we can not create a CSPDirective, we can skip parsing the srcs for that array
     return;
   }
-  
-  // Special-case handling of the referrer directive (since it doesn't contain
-  // source lists)
-  if (cspDir->equals(nsIContentSecurityPolicy::REFERRER_DIRECTIVE)) {
-    referrerDirectiveValue(cspDir);
-    return;
-  }
 
   // special case handling for upgrade-insecure-requests, which is only specified
   // by a directive name but does not include any srcs.
@@ -1039,6 +1032,13 @@ nsCSPParser::directive()
     }
     // add the directive and return
     mPolicy->addUpgradeInsecDir(static_cast<nsUpgradeInsecureDirective*>(cspDir));
+    return;
+  }
+
+  // special case handling of the referrer directive (since it doesn't contain
+  // source lists)
+  if (cspDir->equals(nsIContentSecurityPolicy::REFERRER_DIRECTIVE)) {
+    referrerDirectiveValue(cspDir);
     return;
   }
 
