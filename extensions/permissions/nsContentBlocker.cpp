@@ -14,6 +14,7 @@
 #include "nsContentPolicyUtils.h"
 #include "nsIObjectLoadingContent.h"
 #include "mozilla/ArrayUtils.h"
+#include "nsContentUtils.h"
 
 // Possible behavior pref values
 // Those map to the nsIPermissionManager values where possible
