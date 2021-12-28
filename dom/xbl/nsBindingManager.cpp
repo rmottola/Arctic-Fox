@@ -49,6 +49,7 @@
 #include "nsThreadUtils.h"
 #include "mozilla/dom/NodeListBinding.h"
 #include "mozilla/dom/ScriptSettings.h"
+#include "mozilla/unused.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -404,7 +405,9 @@ nsBindingManager::DoProcessAttachedQueue()
     }
     if (NS_SUCCEEDED(rv)) {
       NS_ADDREF_THIS();
-      NS_ADDREF(timer);
+      // We drop our reference to the timer here, since the timer callback is
+      // responsible for releasing the object.
+      unused << timer.forget().take();
     }
   }
 
