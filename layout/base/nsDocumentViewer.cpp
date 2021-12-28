@@ -131,7 +131,8 @@ using namespace mozilla::dom;
 #define BEFOREUNLOAD_REQUIRES_INTERACTION_PREFNAME "dom.require_user_interaction_for_beforeunload"
 
 //-----------------------------------------------------
-// PR LOGGING
+// LOGGING
+#include "LayoutLogging.h"
 #include "mozilla/Logging.h"
 
 #ifdef NS_PRINTING
@@ -2554,7 +2555,8 @@ nsDocumentViewer::FindContainerView()
             NS_WARNING("Subdocument container has non-subdocument frame");
           }
         } else {
-          NS_WARNING("Subdocument container has no frame");
+          // XXX Silenced by default in bug 117528
+          LAYOUT_WARNING("Subdocument container has no frame");
         }
       }
     }
