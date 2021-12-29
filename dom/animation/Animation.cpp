@@ -496,6 +496,8 @@ Animation::DoCancel()
   }
   ResetFinishedPromise();
 
+  DispatchPlaybackEvent(NS_LITERAL_STRING("cancel"));
+
   mHoldTime.SetNull();
   mStartTime.SetNull();
 
@@ -1149,7 +1151,9 @@ Animation::DispatchPlaybackEvent(const nsAString& aName)
 {
   AnimationPlaybackEventInit init;
 
-  init.mCurrentTime = GetCurrentTimeAsDouble();
+  if (aName.EqualsLiteral("finish")) {
+    init.mCurrentTime = GetCurrentTimeAsDouble();
+  }
   if (mTimeline) {
     init.mTimelineTime = mTimeline->GetCurrentTimeAsDouble();
   }
