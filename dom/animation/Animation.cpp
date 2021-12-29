@@ -7,7 +7,9 @@
 #include "Animation.h"
 #include "AnimationUtils.h"
 #include "mozilla/dom/AnimationBinding.h"
+#include "mozilla/dom/AnimationPlaybackEvent.h"
 #include "mozilla/AutoRestore.h"
+#include "mozilla/AsyncEventDispatcher.h" //For AsyncEventDispatcher
 #include "AnimationCommon.h" // For AnimationCollection,
                              // CommonAnimationManager
 #include "nsIDocument.h" // For nsIDocument
@@ -1103,10 +1105,10 @@ void
 Animation::DoFinishNotification(SyncNotifyFlag aSyncNotifyFlag)
 {
   if (aSyncNotifyFlag == SyncNotifyFlag::Sync) {
-    MaybeResolveFinishedPromise();
+    DoFinishNotificationImmediately();
   } else if (!mFinishNotificationTask.IsPending()) {
     nsRefPtr<nsRunnableMethod<Animation>> runnable =
-      NS_NewRunnableMethod(this, &Animation::MaybeResolveFinishedPromise);
+      NS_NewRunnableMethod(this, &Animation::DoFinishNotificationImmediately);
     Promise::DispatchToMicroTask(runnable);
     mFinishNotificationTask = runnable;
   }
@@ -1122,16 +1124,43 @@ Animation::ResetFinishedPromise()
 void
 Animation::MaybeResolveFinishedPromise()
 {
+  if (mFinished) {
+    mFinished->MaybeResolve(this);
+  }
+  mFinishedIsResolved = true;
+}
+
+void
+Animation::DoFinishNotificationImmediately()
+{
   mFinishNotificationTask.Revoke();
 
   if (PlayState() != AnimationPlayState::Finished) {
     return;
   }
 
-  if (mFinished) {
-    mFinished->MaybeResolve(this);
+  MaybeResolveFinishedPromise();
+
+  DispatchPlaybackEvent(NS_LITERAL_STRING("finish"));
+}
+
+void
+Animation::DispatchPlaybackEvent(const nsAString& aName)
+{
+  AnimationPlaybackEventInit init;
+
+  init.mCurrentTime = GetCurrentTimeAsDouble();
+  if (mTimeline) {
+    init.mTimelineTime = mTimeline->GetCurrentTimeAsDouble();
   }
-  mFinishedIsResolved = true;
+
+  nsRefPtr<AnimationPlaybackEvent> event =
+    AnimationPlaybackEvent::Constructor(this, aName, init);
+  event->SetTrusted(true);
+
+  nsRefPtr<AsyncEventDispatcher> asyncDispatcher =
+    new AsyncEventDispatcher(this, event);
+  asyncDispatcher->PostDOMEvent();
 }
 
 } // namespace dom
