@@ -243,7 +243,7 @@ KeyframeEffectReadOnly::ActiveDuration(const AnimationTiming& aTiming)
     aTiming.mIterationDuration.MultDouble(aTiming.mIterationCount));
 }
 
-// http://w3c.github.io/web-animations/#in-play
+// https://w3c.github.io/web-animations/#in-play
 bool
 KeyframeEffectReadOnly::IsInPlay(const Animation& aAnimation) const
 {
@@ -254,7 +254,7 @@ KeyframeEffectReadOnly::IsInPlay(const Animation& aAnimation) const
   return GetComputedTiming().mPhase == ComputedTiming::AnimationPhase_Active;
 }
 
-// http://w3c.github.io/web-animations/#current
+// https://w3c.github.io/web-animations/#current
 bool
 KeyframeEffectReadOnly::IsCurrent(const Animation& aAnimation) const
 {
@@ -267,6 +267,7 @@ KeyframeEffectReadOnly::IsCurrent(const Animation& aAnimation) const
          computedTiming.mPhase == ComputedTiming::AnimationPhase_Active;
 }
 
+// https://w3c.github.io/web-animations/#in-effect
 bool
 KeyframeEffectReadOnly::IsInEffect() const
 {
