@@ -505,7 +505,7 @@ HTMLFormElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
 {
   aVisitor.mWantsWillHandleEvent = true;
   if (aVisitor.mEvent->originalTarget == static_cast<nsIContent*>(this)) {
-    uint32_t msg = aVisitor.mEvent->message;
+    uint32_t msg = aVisitor.mEvent->mMessage;
     if (msg == NS_FORM_SUBMIT) {
       if (mGeneratingSubmit) {
         aVisitor.mCanHandle = false;
@@ -535,8 +535,8 @@ HTMLFormElement::WillHandleEvent(EventChainPostVisitor& aVisitor)
   // If this is the bubble stage and there is a nested form below us which
   // received a submit event we do *not* want to handle the submit event
   // for this form too.
-  if ((aVisitor.mEvent->message == NS_FORM_SUBMIT ||
-       aVisitor.mEvent->message == NS_FORM_RESET) &&
+  if ((aVisitor.mEvent->mMessage == NS_FORM_SUBMIT ||
+       aVisitor.mEvent->mMessage == NS_FORM_RESET) &&
       aVisitor.mEvent->mFlags.mInBubblingPhase &&
       aVisitor.mEvent->originalTarget != static_cast<nsIContent*>(this)) {
     aVisitor.mEvent->mFlags.mPropagationStopped = true;
@@ -548,7 +548,7 @@ nsresult
 HTMLFormElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
 {
   if (aVisitor.mEvent->originalTarget == static_cast<nsIContent*>(this)) {
-    uint32_t msg = aVisitor.mEvent->message;
+    uint32_t msg = aVisitor.mEvent->mMessage;
     if (msg == NS_FORM_SUBMIT) {
       // let the form know not to defer subsequent submissions
       mDeferSubmission = false;
