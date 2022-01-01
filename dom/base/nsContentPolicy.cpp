@@ -17,11 +17,13 @@
 #include "nsContentPolicy.h"
 #include "nsIURI.h"
 #include "nsIDocShell.h"
+#include "nsIDOMElement.h"
 #include "nsIDOMNode.h"
 #include "nsIDOMWindow.h"
 #include "nsIContent.h"
 #include "nsILoadContext.h"
 #include "nsCOMArray.h"
+#include "nsContentUtils.h"
 #include "mozilla/dom/nsMixedContentBlocker.h"
 
 using mozilla::LogLevel;

@@ -34,6 +34,7 @@
 #include "xpcpublic.h"
 #include "nsObserverService.h"
 #include "nsFocusManager.h"
+#include "nsIInterfaceRequestorUtils.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
