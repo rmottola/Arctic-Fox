@@ -500,6 +500,10 @@ public:
    */
   const nsIFrame* mAnimatedGeometryRoot;
   /**
+   * See NewLayerEntry::mAnimatedGeometryRootForScrollMetadata.
+   */
+  const nsIFrame* mAnimatedGeometryRootForScrollMetadata;
+  /**
    * The offset between mAnimatedGeometryRoot and the reference frame.
    */
   nsPoint mAnimatedGeometryRootOffset;
@@ -618,6 +622,7 @@ public:
 struct NewLayerEntry {
   NewLayerEntry()
     : mAnimatedGeometryRoot(nullptr)
+    , mAnimatedGeometryRootForScrollMetadata(nullptr)
     , mFixedPosFrameForLayerData(nullptr)
     , mLayerContentsVisibleRect(0, 0, -1, -1)
     , mHideAllLayersBelow(false)
@@ -629,6 +634,12 @@ struct NewLayerEntry {
   // been optimized to some other form (yet).
   nsRefPtr<Layer> mLayer;
   const nsIFrame* mAnimatedGeometryRoot;
+  // For fixed background layers, mAnimatedGeometryRoot is the animated geometry
+  // root of the viewport frame it's fixed to, but we need to annotate it with
+  // scroll metadata starting from the animated geometry root of the element
+  // it's the background of, so that during async scrolling we can correctly
+  // transform the fixed layer's clip.
+  const nsIFrame* mAnimatedGeometryRootForScrollMetadata;
   const nsIFrame* mFixedPosFrameForLayerData;
   // If non-null, this FrameMetrics is set to the be the first FrameMetrics
   // on the layer.
@@ -1263,6 +1274,10 @@ protected:
    * @param  aItem                 The item that is going to be added.
    * @param  aVisibleRect          The visible rect of the item.
    * @param  aAnimatedGeometryRoot The item's animated geometry root.
+   * @param  aAnimatedGeometryRootForScrollMetadata
+   *                               The animated geometry root to be used as
+   *                               the starting point in SetupScrollMetadata().
+   *                               See NewLayerEntry::mAnimatedGeometryRootForScrollMetadata.
    * @param  aTopLeft              The offset between aAnimatedGeometryRoot and
    *                               the reference frame.
    * @param aShouldFixToViewport   If true, aAnimatedGeometryRoot is the
@@ -1273,6 +1288,7 @@ protected:
   PaintedLayerData NewPaintedLayerData(nsDisplayItem* aItem,
                                        const nsIntRect& aVisibleRect,
                                        const nsIFrame* aAnimatedGeometryRoot,
+                                       const nsIFrame* aAnimatedGeometryRootForScrollMetadata,
                                        const nsPoint& aTopLeft,
                                        bool aShouldFixToViewport);
 
@@ -3089,6 +3105,7 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
       NS_ASSERTION(!newLayerEntry->mLayer, "Slot already occupied?");
       newLayerEntry->mLayer = layer;
       newLayerEntry->mAnimatedGeometryRoot = data->mAnimatedGeometryRoot;
+      newLayerEntry->mAnimatedGeometryRootForScrollMetadata = data->mAnimatedGeometryRootForScrollMetadata;
       newLayerEntry->mFixedPosFrameForLayerData = data->mFixedPosFrameForLayerData;
       newLayerEntry->mIsCaret = data->mIsCaret;
 
@@ -3464,11 +3481,13 @@ PaintedLayerData
 ContainerState::NewPaintedLayerData(nsDisplayItem* aItem,
                                     const nsIntRect& aVisibleRect,
                                     const nsIFrame* aAnimatedGeometryRoot,
+                                    const nsIFrame* aAnimatedGeometryRootForScrollMetadata,
                                     const nsPoint& aTopLeft,
                                     bool aShouldFixToViewport)
 {
   PaintedLayerData data;
   data.mAnimatedGeometryRoot = aAnimatedGeometryRoot;
+  data.mAnimatedGeometryRootForScrollMetadata = aAnimatedGeometryRootForScrollMetadata;
   data.mAnimatedGeometryRootOffset = aTopLeft;
   data.mFixedPosFrameForLayerData =
     FindFixedPosFrameForLayerData(aAnimatedGeometryRoot, aShouldFixToViewport);
@@ -3479,6 +3498,7 @@ ContainerState::NewPaintedLayerData(nsDisplayItem* aItem,
   data.mNewChildLayersIndex = mNewChildLayers.Length();
   NewLayerEntry* newLayerEntry = mNewChildLayers.AppendElement();
   newLayerEntry->mAnimatedGeometryRoot = aAnimatedGeometryRoot;
+  newLayerEntry->mAnimatedGeometryRootForScrollMetadata = aAnimatedGeometryRootForScrollMetadata;
   newLayerEntry->mFixedPosFrameForLayerData = data.mFixedPosFrameForLayerData;
   newLayerEntry->mIsCaret = data.mIsCaret;
   // newLayerEntry->mOpaqueRegion is filled in later from
@@ -3758,6 +3778,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
 
     bool forceInactive;
     const nsIFrame* animatedGeometryRoot;
+    const nsIFrame* animatedGeometryRootForScrollMetadata = nullptr;
     const nsIFrame* realAnimatedGeometryRootOfItem =
       nsLayoutUtils::GetAnimatedGeometryRootFor(item, mBuilder, mManager);
     if (mFlattenToSingleLayer) {
@@ -3767,6 +3788,11 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
       forceInactive = false;
       if (mManager->IsWidgetLayerManager()) {
         animatedGeometryRoot = realAnimatedGeometryRootOfItem;
+        // Unlike GetAnimatedGeometryRootFor(), GetAnimatedGeometryRootForFrame() does not
+        // take ShouldFixToViewport() into account, so it will return something different
+        // for fixed background items.
+        animatedGeometryRootForScrollMetadata = nsLayoutUtils::GetAnimatedGeometryRootForFrame(
+            mBuilder, item->Frame(), item->ReferenceFrame());
       } else {
         // For inactive layer subtrees, splitting content into PaintedLayers
         // based on animated geometry roots is pointless. It's more efficient
@@ -3778,6 +3804,9 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
         lastAnimatedGeometryRoot = animatedGeometryRoot;
         topLeft = animatedGeometryRoot->GetOffsetToCrossDoc(mContainerReferenceFrame);
       }
+    }
+    if (!animatedGeometryRootForScrollMetadata) {
+      animatedGeometryRootForScrollMetadata = animatedGeometryRoot;
     }
 
     nsDisplayItem::Type itemType = item->GetType();
@@ -3976,6 +4005,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
       NewLayerEntry* newLayerEntry = mNewChildLayers.AppendElement();
       newLayerEntry->mLayer = ownLayer;
       newLayerEntry->mAnimatedGeometryRoot = animatedGeometryRoot;
+      newLayerEntry->mAnimatedGeometryRootForScrollMetadata = animatedGeometryRootForScrollMetadata;
       newLayerEntry->mFixedPosFrameForLayerData = fixedPosFrame;
 
       // Don't attempt to flatten compnent alpha layers that are within
@@ -4029,6 +4059,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
         mPaintedLayerDataTree.FindPaintedLayerFor(animatedGeometryRoot, itemVisibleRect,
                                                   forceOwnLayer, [&]() {
           return NewPaintedLayerData(item, itemVisibleRect, animatedGeometryRoot,
+                                     animatedGeometryRootForScrollMetadata,
                                      topLeft, shouldFixToViewport);
         });
 
@@ -4517,7 +4548,7 @@ ContainerState::SetupScrollingMetadata(NewLayerEntry* aEntry)
   nsTArray<nsRefPtr<Layer>> maskLayers;
 
   nsIFrame* fParent;
-  for (const nsIFrame* f = aEntry->mAnimatedGeometryRoot;
+  for (const nsIFrame* f = aEntry->mAnimatedGeometryRootForScrollMetadata;
        f != mContainerAnimatedGeometryRoot;
        f = nsLayoutUtils::GetAnimatedGeometryRootForFrame(this->mBuilder,
            fParent, mContainerAnimatedGeometryRoot)) {
