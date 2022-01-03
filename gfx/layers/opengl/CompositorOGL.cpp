@@ -450,6 +450,8 @@ CompositorOGL::PrepareViewport(CompositingRenderTargetOGL* aRenderTarget)
   // Set the viewport correctly.
   mGLContext->fViewport(0, 0, size.width, size.height);
 
+  mRenderBound = Rect(0, 0, size.width, size.height);
+
   mViewportSize = size;
 
   if (!aRenderTarget->HasComplexProjection()) {
@@ -627,8 +629,6 @@ CompositorOGL::BeginFrame(const nsIntRegion& aInvalidRegion,
   if (aRenderBoundsOut) {
     *aRenderBoundsOut = rect;
   }
-
-  mRenderBoundsOut = rect;
 
   GLint width = rect.width;
   GLint height = rect.height;
@@ -992,7 +992,7 @@ CompositorOGL::DrawQuad(const Rect& aRect,
   // Do a simple culling if this rect is out of target buffer.
   // Inflate a small size to avoid some numerical imprecision issue.
   destRect.Inflate(1, 1);
-  if (!mRenderBoundsOut.Intersects(destRect)) {
+  if (!mRenderBound.Intersects(destRect)) {
     return;
   }
 
