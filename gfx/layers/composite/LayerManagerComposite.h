@@ -295,7 +295,7 @@ private:
    * Render the current layer tree to the active target.
    */
   void Render();
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
   void RenderToPresentationSurface();
 #endif
 
