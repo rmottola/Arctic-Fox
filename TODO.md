@@ -99,6 +99,7 @@
 - Bug 1214126 - 5 Parts
 - Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
+- Bug 1208385 part 1 - Store a pointer to the owning animation on each ¿ 
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - Bug 1214508: SharedStubs - Part 1: Move the getprop stubs in to share
 - Bug 1158111 - "Add caching and control updating tab offset values in 
