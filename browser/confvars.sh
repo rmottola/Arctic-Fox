@@ -8,12 +8,19 @@ MOZ_APP_VENDOR=org.wicknix
 MOZ_UPDATER=1
 MOZ_PHOENIX=1
 
-if test "$OS_TARGET" = "WINNT"; then
-  MOZ_BUNDLED_FONTS=1
-elif test "$OS_ARCH" = "Linux"; then
-  MOZ_VERIFY_MAR_SIGNATURE=1
-elif test "$OS_ARCH" = "Darwin"; then
-  MOZ_VERIFY_MAR_SIGNATURE=1
+if test "$OS_ARCH" = "WINNT"; then
+  MOZ_MAINTENANCE_SERVICE=1
+  if ! test "$HAVE_64BIT_BUILD"; then
+    if test "$MOZ_UPDATE_CHANNEL" = "nightly" -o \
+            "$MOZ_UPDATE_CHANNEL" = "beta" -o \
+            "$MOZ_UPDATE_CHANNEL" = "beta-dev" -o \
+            "$MOZ_UPDATE_CHANNEL" = "release" -o \
+            "$MOZ_UPDATE_CHANNEL" = "release-dev"; then
+      if ! test "$MOZ_DEBUG"; then
+        MOZ_STUB_INSTALLER=1
+      fi
+    fi
+  fi
 fi
 
 # Enable building ./signmar and running libmar signature tests
