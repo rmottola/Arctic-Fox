@@ -203,7 +203,7 @@ ParseTask::ParseTask(ExclusiveContext* cx, JSObject* exclusiveContextGlobal, JSC
     alloc(JSRuntime::TEMP_LIFO_ALLOC_PRIMARY_CHUNK_SIZE),
     exclusiveContextGlobal(initCx->runtime(), exclusiveContextGlobal),
     callback(callback), callbackData(callbackData),
-    script(initCx->runtime(), nullptr), errors(cx), overRecursed(false)
+    script(initCx->runtime()), errors(cx), overRecursed(false)
 {
 }
 
