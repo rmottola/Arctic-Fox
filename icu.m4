@@ -19,6 +19,22 @@ MOZ_ARG_WITH_BOOL(system-icu,
 if test -n "$MOZ_NATIVE_ICU"; then
     PKG_CHECK_MODULES(MOZ_ICU, icu-i18n >= 50.1)
     MOZ_SHARED_ICU=1
+elif test -n "$gonkdir" && test "$ANDROID_VERSION" -ge 18; then
+    dnl Use system's ICU since version is 50.1+.
+    if test -d "$gonkdir/external/icu/icu4c/source"; then
+        dnl gonk-L (API version is 21)
+        MOZ_ICU_GONK_PATH="$gonkdir/external/icu/icu4c/source"
+    elif test -d "$gonkdir/external/icu4c"; then
+        MOZ_ICU_GONK_PATH="$gonkdir/external/icu4c"
+    else
+        AC_MSG_ERROR([Cannot find ICU source code under gonk])
+    fi
+    MOZ_ICU_CFLAGS="-I$MOZ_ICU_GONK_PATH/common -I$MOZ_ICU_GONK_PATH/i18n"
+    dnl icudata is a datafile under /usr/icu/icudt<version number>l.dat,
+    dnl not shared library.  So we don't link to icudata on B2G.
+    MOZ_ICU_LIBS='-licui18n -licuuc'
+    MOZ_NATIVE_ICU=1
+    MOZ_SHARED_ICU=1
 else
     MOZ_ICU_CFLAGS='-I$(topsrcdir)/intl/icu/source/common -I$(topsrcdir)/intl/icu/source/i18n'
     AC_SUBST_LIST(MOZ_ICU_CFLAGS)
@@ -73,7 +89,7 @@ if test -n "$USE_ICU"; then
         fi
     fi
 
-    version=`sed -n 's/^[[[:space:]]]*#[[:space:]]*define[[:space:]][[:space:]]*U_ICU_VERSION_MAJOR_NUM[[:space:]][[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$icudir/common/unicode/uvernum.h"`
+    version=`sed -n 's/^[[:space:]]*#[[:space:]]*define[[:space:]][[:space:]]*U_ICU_VERSION_MAJOR_NUM[[:space:]][[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$icudir/common/unicode/uvernum.h"`
     if test x"$version" = x; then
        AC_MSG_ERROR([cannot determine icu version number from uvernum.h header file $lineno])
     fi
@@ -189,7 +205,7 @@ if test -z "$BUILDING_JS" -o -n "$JS_STANDALONE"; then
          export CXXFLAGS="$HOST_ICU_CXXFLAGS $HOST_OPTIMIZE_FLAGS"
          export LDFLAGS="$HOST_LDFLAGS"
          ac_configure_args="$HOST_ICU_BUILD_OPTS"
-         ac_configure_args="$ac_configure_args --enable-static --disable-shared --disable-extras --disable-icuio --disable-layout --disable-layoutex --disable-tests --disable-samples --disable-strict"
+         ac_configure_args="$ac_configure_args --enable-static --disable-shared --enable-extras=no --enable-icuio=no --enable-layout=no --enable-tests=no --enable-samples=no"
          AC_OUTPUT_SUBDIRS_NOW(intl/icu/source:intl/icu/host)
         ) || exit 1
     	# generate config/icucross.mk
