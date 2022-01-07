@@ -213,7 +213,7 @@ public:
         imageInfo.mImageDataStatus = newStatus;
     }
 
-    void EnsureNoUninitializedImageData(TexImageTarget imageTarget, GLint level);
+    bool EnsureInitializedImageData(TexImageTarget imageTarget, GLint level);
 
 protected:
     TexMinFilter mMinFilter;

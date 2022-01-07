@@ -463,7 +463,8 @@ WebGLContext::CopyTexSubImage2D_base(TexImageTarget texImageTarget, GLint level,
             tex->SetImageInfo(texImageTarget, level, width, height, 1,
                       effectiveInternalFormat,
                       WebGLImageDataStatus::UninitializedImageData);
-            tex->EnsureNoUninitializedImageData(texImageTarget, level);
+            if (!tex->EnsureInitializedImageData(texImageTarget, level))
+                return;
         }
 
         // if we are completely outside of the framebuffer, we can exit now with our black texture
@@ -611,7 +612,8 @@ WebGLContext::CopyTexSubImage2D(GLenum rawTexImgTarget,
         if (coversWholeImage) {
             tex->SetImageDataStatus(texImageTarget, level, WebGLImageDataStatus::InitializedImageData);
         } else {
-            tex->EnsureNoUninitializedImageData(texImageTarget, level);
+            if (!tex->EnsureInitializedImageData(texImageTarget, level))
+                return;
         }
     }
 
@@ -3052,7 +3054,8 @@ WebGLContext::CompressedTexSubImage2D(GLenum rawTexImgTarget, GLint level, GLint
         if (coversWholeImage) {
             tex->SetImageDataStatus(texImageTarget, level, WebGLImageDataStatus::InitializedImageData);
         } else {
-            tex->EnsureNoUninitializedImageData(texImageTarget, level);
+            if (!tex->EnsureInitializedImageData(texImageTarget, level))
+                return;
         }
     }
 
@@ -3526,7 +3529,8 @@ WebGLContext::TexSubImage2D_base(GLenum rawImageTarget, GLint level,
         if (coversWholeImage) {
             tex->SetImageDataStatus(texImageTarget, level, WebGLImageDataStatus::InitializedImageData);
         } else {
-            tex->EnsureNoUninitializedImageData(texImageTarget, level);
+            if (!tex->EnsureInitializedImageData(texImageTarget, level))
+                return;
         }
     }
     MakeContextCurrent();
