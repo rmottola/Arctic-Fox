@@ -1335,11 +1335,12 @@ WebGLContext::ClearScreen()
 
     colorAttachmentsMask[0] = true;
 
-    ForceClearFramebufferWithDefaultValues(clearMask, colorAttachmentsMask);
+    ForceClearFramebufferWithDefaultValues(mNeedsFakeNoAlpha, clearMask,
+                                           colorAttachmentsMask);
 }
 
 void
-WebGLContext::ForceClearFramebufferWithDefaultValues(GLbitfield mask,
+WebGLContext::ForceClearFramebufferWithDefaultValues(bool fakeNoAlpha, GLbitfield mask,
                                                      const bool colorAttachmentsMask[kMaxColorAttachments])
 {
     MakeContextCurrent();
@@ -1385,7 +1386,7 @@ WebGLContext::ForceClearFramebufferWithDefaultValues(GLbitfield mask,
 
         gl->fColorMask(1, 1, 1, 1);
 
-        if (mNeedsFakeNoAlpha) {
+        if (fakeNoAlpha) {
             gl->fClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         } else {
             gl->fClearColor(0.0f, 0.0f, 0.0f, 0.0f);
