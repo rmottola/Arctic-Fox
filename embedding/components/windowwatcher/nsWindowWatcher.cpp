@@ -367,7 +367,7 @@ nsWindowWatcher::OpenWindow(nsIDOMWindow* aParent,
   return OpenWindowInternal(aParent, aUrl, aName, aFeatures,
                             /* calledFromJS = */ false, dialog,
                             /* navigate = */ true, nullptr, argv,
-			    /* aLoadInfo */ nullptr, aResult);
+                            /* aLoadInfo */ nullptr, aResult);
 }
 
 struct SizeSpec
@@ -383,7 +383,7 @@ struct SizeSpec
     , mUseDefaultHeight(false)
   {
   }
-  
+
   int32_t mLeft;
   int32_t mTop;
   int32_t mOuterWidth;  // Total window width
@@ -407,7 +407,7 @@ struct SizeSpec
   {
     return mLeftSpecified || mTopSpecified;
   }
-  
+
   bool SizeSpecified() const
   {
     return mOuterWidthSpecified || mOuterHeightSpecified ||
@@ -425,7 +425,7 @@ nsWindowWatcher::OpenWindow2(nsIDOMWindow* aParent,
                              bool aNavigate,
                              nsITabParent* aOpeningTab,
                              nsISupports* aArguments,
-			     nsIDocShellLoadInfo* aLoadInfo,
+                             nsIDocShellLoadInfo* aLoadInfo,
                              nsIDOMWindow** aResult)
 			       
 {
@@ -447,8 +447,8 @@ nsWindowWatcher::OpenWindow2(nsIDOMWindow* aParent,
   return OpenWindowInternal(aParent, aUrl, aName, aFeatures,
                             aCalledFromScript, dialog,
                             aNavigate, aOpeningTab, argv,
-			    aLoadInfo,
-			    aResult);
+                            aLoadInfo,
+                            aResult);
 }
 
 nsresult
@@ -461,7 +461,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
                                     bool aNavigate,
                                     nsITabParent* aOpeningTab,
                                     nsIArray* aArgv,
-				    nsIDocShellLoadInfo* aLoadInfo,
+                                    nsIDocShellLoadInfo* aLoadInfo,
                                     nsIDOMWindow** aResult)
 {
   nsresult rv = NS_OK;
@@ -939,7 +939,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
     }
   }
 
-  nsCOMPtr<nsIDocShellLoadInfo> loadInfo =aLoadInfo;
+  nsCOMPtr<nsIDocShellLoadInfo> loadInfo = aLoadInfo;
   if (uriToLoad && aNavigate && !loadInfo) {
     newDocShell->CreateLoadInfo(getter_AddRefs(loadInfo));
     NS_ENSURE_TRUE(loadInfo, NS_ERROR_FAILURE);
@@ -1527,8 +1527,9 @@ nsWindowWatcher::CalculateChromeFlags(nsIDOMWindow* aParent,
   bool presenceFlag = false;
 
   chromeFlags = nsIWebBrowserChrome::CHROME_WINDOW_BORDERS;
-  if (aDialog && WinHasOption(aFeatures, "all", 0, &presenceFlag))
+  if (aDialog && WinHasOption(aFeatures, "all", 0, &presenceFlag)) {
     chromeFlags = nsIWebBrowserChrome::CHROME_ALL;
+  }
 
   /* Next, allow explicitly named options to override the initial settings */
 
