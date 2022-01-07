@@ -16,7 +16,7 @@ namespace mozilla {
 
 namespace devtools {
 class HeapSnapshot;
-}
+} // namespace devtools
 
 namespace dom {
 
@@ -44,6 +44,11 @@ public:
   OriginAttributesToSuffix(dom::GlobalObject& aGlobal,
                            const dom::OriginAttributesDictionary& aAttrs,
                            nsCString& aSuffix);
+
+  static bool
+  OriginAttributesMatchPattern(dom::GlobalObject& aGlobal,
+                               const dom::OriginAttributesDictionary& aAttrs,
+                               const dom::OriginAttributesPatternDictionary& aPattern);
 };
 
 } // namespace dom
