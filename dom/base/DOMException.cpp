@@ -675,7 +675,7 @@ DOMException::Create(nsresult aRv)
 }
 
 /* static */already_AddRefed<DOMException>
-DOMException::Create(nsresult aRv, const nsCString& aMessage)
+DOMException::Create(nsresult aRv, const nsACString& aMessage)
 {
   nsCString name;
   nsCString message;
