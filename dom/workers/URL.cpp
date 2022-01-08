@@ -953,7 +953,7 @@ void
 URL::CreateSearchParamsIfNeeded()
 {
   if (!mSearchParams) {
-    mSearchParams = new URLSearchParams(this);
+    mSearchParams = new URLSearchParams(this, this);
     UpdateURLSearchParams();
   }
 }
