@@ -794,6 +794,7 @@ Console::Trace(JSContext* aCx)
 
 // Displays an interactive listing of all the properties of an object.
 METHOD(Dir, "dir");
+METHOD(Dirxml, "dirxml");
 
 METHOD(Group, "group")
 METHOD(GroupCollapsed, "groupCollapsed")
