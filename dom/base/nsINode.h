@@ -2024,7 +2024,10 @@ private:
 protected:
   nsIContent* mNextSibling;
   nsIContent* mPreviousSibling;
-  nsIContent* mFirstChild;
+  // This reference is non-owning and safe, since in the case of documents,
+  // it is set to null when the document gets destroyed, and in the case of
+  // other nodes, the children keep the parents alive.
+  nsIContent* MOZ_NON_OWNING_REF mFirstChild;
 
   union {
     // Pointer to our primary frame.  Might be null.
