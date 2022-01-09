@@ -12,6 +12,7 @@
 #include "nsGkAtoms.h"              // for nsGkAtoms::baseURIProperty
 #include "nsIDOMNode.h"
 #include "mozilla/dom/NodeInfo.h"            // member (in nsCOMPtr)
+#include "nsINodeList.h"            // base class
 #include "nsIVariant.h"             // for use in GetUserData()
 #include "nsNodeInfoManager.h"      // for use in NodePrincipal()
 #include "nsPropertyTable.h"        // for typedefs
@@ -42,7 +43,7 @@ class nsIDOMNodeList;
 class nsIEditor;
 class nsIFrame;
 class nsIMutationObserver;
-class nsINodeList;
+class nsINode;
 class nsIPresShell;
 class nsIPrincipal;
 class nsIURI;
@@ -233,6 +234,50 @@ private:
 
   // This value is incremented on every mutation, for the life of the process.
   static uint64_t sGeneration;
+};
+
+/**
+ * Class that implements the nsIDOMNodeList interface (a list of children of
+ * the content), by holding a reference to the content and delegating GetLength
+ * and Item to its existing child list.
+ * @see nsIDOMNodeList
+ */
+class nsChildContentList final : public nsINodeList
+{
+public:
+  explicit nsChildContentList(nsINode* aNode)
+    : mNode(aNode)
+  {
+  }
+
+  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
+  NS_DECL_CYCLE_COLLECTION_SKIPPABLE_SCRIPT_HOLDER_CLASS(nsChildContentList)
+
+  // nsWrapperCache
+  virtual JSObject* WrapObject(JSContext *cx, JS::Handle<JSObject*> aGivenProto) override;
+
+  // nsIDOMNodeList interface
+  NS_DECL_NSIDOMNODELIST
+
+  // nsINodeList interface
+  virtual int32_t IndexOf(nsIContent* aContent) override;
+  virtual nsIContent* Item(uint32_t aIndex) override;
+
+  void DropReference()
+  {
+    mNode = nullptr;
+  }
+
+  virtual nsINode* GetParentObject() override
+  {
+    return mNode;
+  }
+
+private:
+  ~nsChildContentList() {}
+
+  // The node whose children make up the list (weak reference)
+  nsINode* mNode;
 };
 
 // This should be used for any nsINode sub-class that has fields of its own
@@ -1048,10 +1093,8 @@ public:
      * An object implementing nsIDOMNodeList for this content (childNodes)
      * @see nsIDOMNodeList
      * @see nsGenericHTMLElement::GetChildNodes
-     *
-     * MSVC 7 doesn't like this as an nsRefPtr
      */
-    nsChildContentList* mChildNodes;
+    nsRefPtr<nsChildContentList> mChildNodes;
 
     /**
      * Weak reference to this node

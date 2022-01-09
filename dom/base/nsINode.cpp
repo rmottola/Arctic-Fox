@@ -112,7 +112,6 @@ nsINode::nsSlots::~nsSlots()
 {
   if (mChildNodes) {
     mChildNodes->DropReference();
-    NS_RELEASE(mChildNodes);
   }
 
   if (mWeakReference) {
@@ -132,7 +131,6 @@ nsINode::nsSlots::Unlink()
 {
   if (mChildNodes) {
     mChildNodes->DropReference();
-    NS_RELEASE(mChildNodes);
   }
 }
 
@@ -368,12 +366,8 @@ nsINodeList*
 nsINode::ChildNodes()
 {
   nsSlots* slots = Slots();
-  if (!slots->mChildNodes) {
-    slots->mChildNodes = new nsChildContentList(this);
-    if (slots->mChildNodes) {
-      NS_ADDREF(slots->mChildNodes);
-    }
-  }
+  MOZ_ASSERT(!slots->mChildNodes);
+  slots->mChildNodes = new nsChildContentList(this);
 
   return slots->mChildNodes;
 }
