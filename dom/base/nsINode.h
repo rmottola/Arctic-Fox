@@ -1073,9 +1073,7 @@ public:
   {
   public:
    nsSlots()
-     : mChildNodes(nullptr),
-       mWeakReference(nullptr),
-       mEditableDescendantCount(0)
+     : mWeakReference(nullptr),
     {
     }
 
