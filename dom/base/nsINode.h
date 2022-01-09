@@ -1073,7 +1073,7 @@ public:
   {
   public:
    nsSlots()
-     : mWeakReference(nullptr),
+     : mWeakReference(nullptr)
     {
     }
 
