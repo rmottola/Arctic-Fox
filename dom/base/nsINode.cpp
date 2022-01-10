@@ -110,7 +110,8 @@ using namespace mozilla;
 using namespace mozilla::dom;
 
 nsINode::nsSlots::nsSlots()
-  : mWeakReference(nullptr)
+  : mWeakReference(nullptr),
+    mEditableDescendantCount(0)
 {
 }
 
