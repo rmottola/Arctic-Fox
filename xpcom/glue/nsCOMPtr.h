@@ -168,7 +168,7 @@ private:
   nsISupports* MOZ_OWNING_REF mRawPtr;
 };
 
-class nsQueryInterfaceWithError
+class nsQueryInterfaceWithError final
 {
 public:
   nsQueryInterfaceWithError(nsISupports* aRawPtr, nsresult* aError)
@@ -217,7 +217,7 @@ do_QueryInterface(already_AddRefed<T>&, nsresult*)
 
 ////////////////////////////////////////////////////////////////////////////
 // Using servicemanager with COMPtrs
-class nsGetServiceByCID
+class nsGetServiceByCID final
 {
 public:
   explicit nsGetServiceByCID(const nsCID& aCID) : mCID(aCID) {}
@@ -228,7 +228,7 @@ private:
   const nsCID& mCID;
 };
 
-class nsGetServiceByCIDWithError
+class nsGetServiceByCIDWithError final
 {
 public:
   nsGetServiceByCIDWithError(const nsCID& aCID, nsresult* aErrorPtr)
@@ -244,7 +244,7 @@ private:
   nsresult* mErrorPtr;
 };
 
-class nsGetServiceByContractID
+class nsGetServiceByContractID final
 {
 public:
   explicit nsGetServiceByContractID(const char* aContractID)
@@ -258,7 +258,7 @@ private:
   const char* mContractID;
 };
 
-class nsGetServiceByContractIDWithError
+class nsGetServiceByContractIDWithError final
 {
 public:
   nsGetServiceByContractIDWithError(const char* aContractID, nsresult* aErrorPtr)
