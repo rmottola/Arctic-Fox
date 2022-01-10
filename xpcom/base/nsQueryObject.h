@@ -15,7 +15,7 @@
 /*****************************************************************************/
 
 template<class T>
-class nsQueryObject : public nsCOMPtr_helper
+class MOZ_STACK_CLASS nsQueryObject : public nsCOMPtr_helper
 {
 public:
   explicit nsQueryObject(T* aRawPtr)
