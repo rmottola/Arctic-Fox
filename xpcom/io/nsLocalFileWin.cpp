@@ -1742,7 +1742,7 @@ nsLocalFile::GetVersionInfoField(const char* aField, nsAString& aResult)
       }
     }
   }
-  moz_free(ver);
+  free(ver);
 
   return rv;
 }
