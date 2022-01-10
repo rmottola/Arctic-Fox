@@ -386,6 +386,10 @@ protected:
    * WrapNode is called from WrapObject to actually wrap this node, WrapObject
    * does some additional checks and fix-up that's common to all nodes. WrapNode
    * should just call the DOM binding's Wrap function.
+   *
+   * aGivenProto is the prototype to use (or null if the default one should be
+   * used) and should just be passed directly on to the DOM binding's Wrap
+   * function.
    */
   virtual JSObject* WrapNode(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) = 0;
 
