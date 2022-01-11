@@ -64,27 +64,30 @@ struct MallocProvider
             client()->updateMallocCounter(numElems * sizeof(T));
             return p;
         }
-        size_t bytes;
-        if (MOZ_UNLIKELY(!CalculateAllocSize<T>(numElems, &bytes))) {
+        if (numElems & mozilla::tl::MulOverflowMask<sizeof(T)>::value) {
             client()->reportAllocationOverflow();
             return nullptr;
         }
-        return static_cast<T*>(client()->onOutOfMemory(AllocFunction::Malloc, bytes));
+        return (T*)client()->onOutOfMemory(AllocFunction::Malloc, numElems * sizeof(T));
     }
 
     template <class T, class U>
     T* pod_malloc_with_extra(size_t numExtra) {
-        size_t bytes;
-        if (MOZ_UNLIKELY((!CalculateAllocSizeWithExtra<T, U>(numExtra, &bytes)))) {
+        if (MOZ_UNLIKELY(numExtra & mozilla::tl::MulOverflowMask<sizeof(U)>::value)) {
             client()->reportAllocationOverflow();
             return nullptr;
         }
-        T* p = static_cast<T*>(js_malloc(bytes));
+        size_t bytes = sizeof(T) + numExtra * sizeof(U);
+        if (MOZ_UNLIKELY(bytes < sizeof(T))) {
+            client()->reportAllocationOverflow();
+            return nullptr;
+        }
+        T* p = reinterpret_cast<T*>(js_pod_malloc<uint8_t>(bytes));
         if (MOZ_LIKELY(p)) {
             client()->updateMallocCounter(bytes);
             return p;
         }
-        return static_cast<T*>(client()->onOutOfMemory(AllocFunction::Malloc, bytes));
+        return (T*)client()->onOutOfMemory(AllocFunction::Malloc, bytes);
     }
 
     template <class T>
@@ -105,27 +108,30 @@ struct MallocProvider
             client()->updateMallocCounter(numElems * sizeof(T));
             return p;
         }
-        size_t bytes;
-        if (MOZ_UNLIKELY(!CalculateAllocSize<T>(numElems, &bytes))) {
+        if (numElems & mozilla::tl::MulOverflowMask<sizeof(T)>::value) {
             client()->reportAllocationOverflow();
             return nullptr;
         }
-        return static_cast<T*>(client()->onOutOfMemory(AllocFunction::Calloc, bytes));
+        return (T*)client()->onOutOfMemory(AllocFunction::Calloc, numElems * sizeof(T));
     }
 
     template <class T, class U>
     T* pod_calloc_with_extra(size_t numExtra) {
-        size_t bytes;
-        if (MOZ_UNLIKELY((!CalculateAllocSizeWithExtra<T, U>(numExtra, &bytes)))) {
+        if (MOZ_UNLIKELY(numExtra & mozilla::tl::MulOverflowMask<sizeof(U)>::value)) {
             client()->reportAllocationOverflow();
             return nullptr;
         }
-        T* p = static_cast<T*>(js_calloc(bytes));
+        size_t bytes = sizeof(T) + numExtra * sizeof(U);
+        if (MOZ_UNLIKELY(bytes < sizeof(T))) {
+            client()->reportAllocationOverflow();
+            return nullptr;
+        }
+        T* p = reinterpret_cast<T*>(js_pod_calloc<uint8_t>(bytes));
         if (MOZ_LIKELY(p)) {
             client()->updateMallocCounter(bytes);
             return p;
         }
-        return static_cast<T*>(client()->onOutOfMemory(AllocFunction::Calloc, bytes));
+        return (T*)client()->onOutOfMemory(AllocFunction::Calloc, bytes);
     }
 
     template <class T>
@@ -145,12 +151,11 @@ struct MallocProvider
                 client()->updateMallocCounter((newSize - oldSize) * sizeof(T));
             return p;
         }
-        size_t bytes;
-        if (MOZ_UNLIKELY(!CalculateAllocSize<T>(newSize, &bytes))) {
+        if (newSize & mozilla::tl::MulOverflowMask<sizeof(T)>::value) {
             client()->reportAllocationOverflow();
             return nullptr;
         }
-        return static_cast<T*>(client()->onOutOfMemory(AllocFunction::Realloc, bytes));
+        return (T*)client()->onOutOfMemory(AllocFunction::Realloc, newSize * sizeof(T), prior);
     }
 
     JS_DECLARE_NEW_METHODS(new_, pod_malloc<uint8_t>, MOZ_ALWAYS_INLINE)
