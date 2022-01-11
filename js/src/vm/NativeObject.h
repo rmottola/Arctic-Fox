@@ -370,7 +370,7 @@ class NativeObject : public JSObject
     }
 
   public:
-    Shape *lastProperty() const {
+    Shape* lastProperty() const {
         MOZ_ASSERT(shape_);
         return shape_;
     }
@@ -666,7 +666,7 @@ class NativeObject : public JSObject
 
   public:
     /* Add a property whose id is not yet in this scope. */
-    static Shape *addProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
+    static Shape* addProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
                               JSGetterOp getter, JSSetterOp setter,
                               uint32_t slot, unsigned attrs, unsigned flags,
                               bool allowDictionary = true);
@@ -876,8 +876,8 @@ class NativeObject : public JSObject
      * capacity is not stored explicitly, and the allocated size of the slot
      * array is kept in sync with this count.
      */
-    static uint32_t dynamicSlotsCount(uint32_t nfixed, uint32_t span, const Class *clasp);
-    static uint32_t dynamicSlotsCount(Shape *shape) {
+    static uint32_t dynamicSlotsCount(uint32_t nfixed, uint32_t span, const Class* clasp);
+    static uint32_t dynamicSlotsCount(Shape* shape) {
         return dynamicSlotsCount(shape->numFixedSlots(), shape->slotSpan(), shape->getObjectClass());
     }
 
@@ -1430,7 +1430,7 @@ js::GetPropertyNoGC(JSContext* cx, JSObject* obj, const Value& receiver, jsid id
 
 inline bool
 js::SetProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
-                HandleValue receiver, ObjectOpResult &result)
+                HandleValue receiver, ObjectOpResult& result)
 {
     if (obj->getOps()->setProperty)
         return JSObject::nonNativeSetProperty(cx, obj, id, v, receiver, result);
@@ -1439,7 +1439,7 @@ js::SetProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
 
 inline bool
 js::SetElement(JSContext* cx, HandleObject obj, uint32_t index, HandleValue v,
-               HandleValue receiver, ObjectOpResult &result)
+               HandleValue receiver, ObjectOpResult& result)
 {
     if (obj->getOps()->setProperty)
         return JSObject::nonNativeSetElement(cx, obj, index, v, receiver, result);
