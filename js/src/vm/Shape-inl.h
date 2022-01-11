@@ -24,7 +24,7 @@
 namespace js {
 
 inline
-StackBaseShape::StackBaseShape(ExclusiveContext *cx, const Class *clasp, uint32_t objectFlags)
+StackBaseShape::StackBaseShape(ExclusiveContext* cx, const Class* clasp, uint32_t objectFlags)
   : flags(objectFlags),
     clasp(clasp),
     compartment(cx->compartment_)
@@ -37,8 +37,8 @@ Shape::search(ExclusiveContext* cx, jsid id)
     return search(cx, this, id, &_);
 }
 
-/* static */ inline Shape *
-Shape::search(ExclusiveContext *cx, Shape *start, jsid id, ShapeTable::Entry **pentry, bool adding)
+/* static */ inline Shape*
+Shape::search(ExclusiveContext* cx, Shape* start, jsid id, ShapeTable::Entry** pentry, bool adding)
 {
     if (start->inDictionary()) {
         *pentry = &start->table().search(id, adding);
@@ -149,13 +149,13 @@ AutoRooterGetterSetter::AutoRooterGetterSetter(ExclusiveContext* cx, uint8_t att
 }
 
 inline
-AutoRooterGetterSetter::AutoRooterGetterSetter(ExclusiveContext *cx, uint8_t attrs,
-                                               JSNative *pgetter, JSNative *psetter
+AutoRooterGetterSetter::AutoRooterGetterSetter(ExclusiveContext* cx, uint8_t attrs,
+                                               JSNative* pgetter, JSNative* psetter
                                                MOZ_GUARD_OBJECT_NOTIFIER_PARAM_IN_IMPL)
 {
     if (attrs & (JSPROP_GETTER | JSPROP_SETTER)) {
-        inner.emplace(cx, attrs, reinterpret_cast<GetterOp *>(pgetter),
-                      reinterpret_cast<SetterOp *>(psetter));
+        inner.emplace(cx, attrs, reinterpret_cast<GetterOp*>(pgetter),
+                      reinterpret_cast<SetterOp*>(psetter));
     }
     MOZ_GUARD_OBJECT_NOTIFIER_INIT;
 }

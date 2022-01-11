@@ -1058,7 +1058,7 @@ class DebugScopes
 };
 
 extern bool
-IsDebugScopeSlow(ProxyObject *proxy);
+IsDebugScopeSlow(ProxyObject* proxy);
 
 }  /* namespace js */
 

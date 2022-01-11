@@ -332,7 +332,7 @@ DeclEnvObject::createTemplateObject(JSContext* cx, HandleFunction fun, NewObject
 
     // Assign a fixed slot to a property with the same name as the lambda.
     Rooted<jsid> id(cx, AtomToId(fun->atom()));
-    const Class *clasp = obj->getClass();
+    const Class* clasp = obj->getClass();
     unsigned attrs = JSPROP_ENUMERATE | JSPROP_PERMANENT | JSPROP_READONLY;
 
     JSGetterOp getter = clasp->getProperty;
@@ -469,8 +469,8 @@ with_LookupProperty(JSContext* cx, HandleObject obj, HandleId id,
 }
 
 static bool
-with_DefineProperty(JSContext *cx, HandleObject obj, HandleId id, Handle<PropertyDescriptor> desc,
-                    ObjectOpResult &result)
+with_DefineProperty(JSContext* cx, HandleObject obj, HandleId id, Handle<PropertyDescriptor> desc,
+                    ObjectOpResult& result)
 {
     RootedObject actual(cx, &obj->as<DynamicWithObject>().object());
     return DefineProperty(cx, actual, id, desc, result);
@@ -503,8 +503,8 @@ with_GetProperty(JSContext* cx, HandleObject obj, HandleValue receiver, HandleId
 }
 
 static bool
-with_SetProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                 HandleValue receiver, ObjectOpResult &result)
+with_SetProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
+                 HandleValue receiver, ObjectOpResult& result)
 {
     RootedObject actual(cx, &obj->as<DynamicWithObject>().object());
     RootedValue actualReceiver(cx, receiver);
@@ -522,7 +522,7 @@ with_GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
 }
 
 static bool
-with_DeleteProperty(JSContext *cx, HandleObject obj, HandleId id, ObjectOpResult &result)
+with_DeleteProperty(JSContext* cx, HandleObject obj, HandleId id, ObjectOpResult& result)
 {
     RootedObject actual(cx, &obj->as<DynamicWithObject>().object());
     return DeleteProperty(cx, actual, id, result);
@@ -1498,15 +1498,15 @@ class DebugScopeProxy : public BaseProxyHandler
 
     MOZ_CONSTEXPR DebugScopeProxy() : BaseProxyHandler(&family) {}
 
-    bool preventExtensions(JSContext *cx, HandleObject proxy,
-                           ObjectOpResult &result) const override
+    bool preventExtensions(JSContext* cx, HandleObject proxy,
+                           ObjectOpResult& result) const override
     {
         // always [[Extensible]], can't be made non-[[Extensible]], like most
         // proxies
         return result.fail(JSMSG_CANT_CHANGE_EXTENSIBILITY);
     }
 
-    bool isExtensible(JSContext *cx, HandleObject proxy, bool *extensible) const override
+    bool isExtensible(JSContext* cx, HandleObject proxy, bool* extensible) const override
     {
         // See above.
         *extensible = true;
@@ -1661,8 +1661,8 @@ class DebugScopeProxy : public BaseProxyHandler
         }
     }
 
-    bool set(JSContext *cx, HandleObject proxy, HandleId id, HandleValue v, HandleValue receiver,
-             ObjectOpResult &result) const override
+    bool set(JSContext* cx, HandleObject proxy, HandleId id, HandleValue v, HandleValue receiver,
+             ObjectOpResult& result) const override
     {
         Rooted<DebugScopeObject*> debugScope(cx, &proxy->as<DebugScopeObject>());
         Rooted<ScopeObject*> scope(cx, &proxy->as<DebugScopeObject>().scope());
@@ -1688,9 +1688,9 @@ class DebugScopeProxy : public BaseProxyHandler
         }
     }
 
-    bool defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
+    bool defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
                         Handle<PropertyDescriptor> desc,
-                        ObjectOpResult &result) const override
+                        ObjectOpResult& result) const override
     {
         Rooted<ScopeObject*> scope(cx, &proxy->as<DebugScopeObject>().scope());
 
@@ -1789,8 +1789,8 @@ class DebugScopeProxy : public BaseProxyHandler
         return true;
     }
 
-    bool delete_(JSContext *cx, HandleObject proxy, HandleId id,
-                 ObjectOpResult &result) const override
+    bool delete_(JSContext* cx, HandleObject proxy, HandleId id,
+                 ObjectOpResult& result) const override
     {
         return result.fail(JSMSG_CANT_DELETE);
     }
@@ -1882,7 +1882,7 @@ DebugScopeObject::isOptimizedOut() const
 }
 
 bool
-js::IsDebugScopeSlow(ProxyObject *proxy)
+js::IsDebugScopeSlow(ProxyObject* proxy)
 {
     MOZ_ASSERT(proxy->hasClass(&ProxyObject::class_));
     return proxy->handler() == &DebugScopeProxy::singleton;
@@ -2033,7 +2033,7 @@ DebugScopes::hasDebugScope(JSContext* cx, ScopeObject& scope)
     if (!scopes)
         return nullptr;
 
-    if (JSObject *obj = scopes->proxiedScopes.lookup(&scope)) {
+    if (JSObject* obj = scopes->proxiedScopes.lookup(&scope)) {
         MOZ_ASSERT(CanUseDebugScopeMaps(cx));
         return &obj->as<DebugScopeObject>();
     }
@@ -2135,7 +2135,7 @@ DebugScopes::onPopCall(AbstractFramePtr frame, JSContext* cx)
 
         CallObject& callobj = frame.scopeChain()->as<CallObject>();
         scopes->liveScopes.remove(&callobj);
-        if (JSObject *obj = scopes->proxiedScopes.lookup(&callobj))
+        if (JSObject* obj = scopes->proxiedScopes.lookup(&callobj))
             debugScope = &obj->as<DebugScopeObject>();
     } else {
         ScopeIter si(cx, frame, frame.script()->main());
@@ -2545,13 +2545,13 @@ js::GetDebugScopeForFrame(JSContext* cx, AbstractFramePtr frame, jsbytecode* pc)
 }
 
 // See declaration and documentation in jsfriendapi.h
-JS_FRIEND_API(JSObject *)
-js::GetObjectEnvironmentObjectForFunction(JSFunction *fun)
+JS_FRIEND_API(JSObject*)
+js::GetObjectEnvironmentObjectForFunction(JSFunction* fun)
 {
     if (!fun->isInterpreted())
         return &fun->global();
 
-    JSObject *env = fun->environment();
+    JSObject* env = fun->environment();
     if (!env || !env->is<DynamicWithObject>())
         return &fun->global();
 
