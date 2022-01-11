@@ -166,6 +166,7 @@
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
 - Bug 1051052 - Made mid an outparam in JsepSession::AddLocalIceCandida
 - Bug 1204872 - 2015-09
+- bug 1181823 - convert test_ev_certs.js, test_keysize_ev.js, a
 - Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
 --Bug 1194422 - Expose census traversals to SpiderMonkey embedders; r=s
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
