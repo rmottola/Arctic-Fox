@@ -1262,7 +1262,7 @@ NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
 
 extern bool
 NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id, HandleValue value,
-                     GetterOp getter, SetterOp, unsigned attrs,
+                     JSGetterOp getter, JSSetterOp setter, unsigned attrs,
                      ObjectOpResult& result);
 
 extern bool
@@ -1278,11 +1278,11 @@ NativeDefineElement(ExclusiveContext* cx, HandleNativeObject obj, uint32_t index
 /* If the result out-param is omitted, throw on failure. */
 extern bool
 NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id, HandleValue value,
-                     GetterOp getter, SetterOp setter, unsigned attrs);
+                     JSGetterOp getter, JSSetterOp setter, unsigned attrs);
 
 extern bool
 NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, PropertyName* name,
-                     HandleValue value, GetterOp getter, SetterOp setter,
+                     HandleValue value, JSGetterOp getter, JSSetterOp setter,
                      unsigned attrs);
 
 extern bool
