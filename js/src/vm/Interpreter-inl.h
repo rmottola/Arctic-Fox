@@ -299,7 +299,7 @@ SetNameOperation(JSContext* cx, JSScript* script, jsbytecode* pc, HandleObject s
 }
 
 inline bool
-InitPropertyOperation(JSContext *cx, JSOp op, HandleObject obj, HandleId id, HandleValue rhs)
+InitPropertyOperation(JSContext* cx, JSOp op, HandleObject obj, HandleId id, HandleValue rhs)
 {
     if (obj->is<PlainObject>() || obj->is<JSFunction>()) {
         unsigned propAttrs = GetInitDataPropAttrs(op);
