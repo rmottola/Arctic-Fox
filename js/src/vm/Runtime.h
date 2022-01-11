@@ -84,7 +84,6 @@ ReportAllocationOverflow(ExclusiveContext* maybecx);
 extern MOZ_COLD void
 ReportOverRecursed(ExclusiveContext* cx);
 
-
 class Activation;
 class ActivationIterator;
 class AsmJSActivation;
@@ -103,7 +102,7 @@ typedef vixl::Simulator Simulator;
 #elif defined(JS_SIMULATOR)
 class Simulator;
 #endif
-}
+} // namespace jit
 
 /*
  * GetSrcNote cache to avoid O(n^2) growth in finding a source note for a
@@ -1330,9 +1329,9 @@ struct JSRuntime : public JS::shadow::Runtime,
     // All permanent atoms in the runtime, other than those in staticStrings.
     // Unlike |atoms_|, access to this does not require
     // AutoLockForExclusiveAccess because it is frozen and thus read-only.
-    js::FrozenAtomSet *permanentAtoms;
+    js::FrozenAtomSet* permanentAtoms;
 
-    bool transformToPermanentAtoms(JSContext *cx);
+    bool transformToPermanentAtoms(JSContext* cx);
 
     // Cached well-known symbols (ES6 rev 24 6.1.5.1). Like permanent atoms,
     // these are shared with the parentRuntime, if any.

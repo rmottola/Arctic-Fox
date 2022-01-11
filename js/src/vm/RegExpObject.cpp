@@ -112,7 +112,7 @@ RegExpObjectBuilder::clone(Handle<RegExpObject*> other)
      * the clone -- if the |RegExpStatics| provides more flags we'll
      * need a different |RegExpShared|.
      */
-    RegExpStatics *res = other->getProto()->global().getRegExpStatics(cx);
+    RegExpStatics* res = other->getProto()->global().getRegExpStatics(cx);
     if (!res)
         return nullptr;
 
@@ -566,7 +566,7 @@ RegExpShared::~RegExpShared()
 }
 
 void
-RegExpShared::trace(JSTracer *trc)
+RegExpShared::trace(JSTracer* trc)
 {
     if (trc->isMarkingTracer())
         marked_ = true;
