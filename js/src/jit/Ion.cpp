@@ -2959,8 +2959,10 @@ jit::IonScript::invalidate(JSContext* cx, bool resetUses, const char* reason)
 {
     JitSpew(JitSpew_IonInvalidate, " Invalidate IonScript %p: %s", this, reason);
     RecompileInfoVector list;
-    if (!list.append(recompileInfo()))
+    if (!list.append(recompileInfo())) {
+        ReportOutOfMemory(cx);
         return false;
+    }
     Invalidate(cx, list, resetUses, true);
     return true;
 }
@@ -2993,8 +2995,10 @@ jit::Invalidate(JSContext* cx, JSScript* script, bool resetUses, bool cancelOffT
 
     RecompileInfoVector scripts;
     MOZ_ASSERT(script->hasIonScript());
-    if (!scripts.append(script->ionScript()->recompileInfo()))
+    if (!scripts.append(script->ionScript()->recompileInfo())) {
+        ReportOutOfMemory(cx);
         return false;
+    }
 
     Invalidate(cx, scripts, resetUses, cancelOffThread);
     return true;
