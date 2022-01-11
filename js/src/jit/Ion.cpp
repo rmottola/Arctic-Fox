@@ -517,6 +517,27 @@ FinishAllOffThreadCompilations(JSCompartment* comp)
     }
 }
 
+class AutoLazyLinkExitFrame
+{
+    JitActivation* jitActivation_;
+    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
+
+  public:
+    explicit AutoLazyLinkExitFrame(JitActivation* jitActivation
+                                   MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
+      : jitActivation_(jitActivation)
+    {
+        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
+        MOZ_ASSERT(!jitActivation_->isLazyLinkExitFrame(),
+                   "Cannot stack multiple lazy-link frames.");
+        jitActivation_->setLazyLinkExitFrame(true);
+    }
+
+    ~AutoLazyLinkExitFrame() {
+        jitActivation_->setLazyLinkExitFrame(false);
+    }
+};
+
 static bool
 LinkCodeGen(JSContext* cx, IonBuilder* builder, CodeGenerator *codegen,
             AutoScriptVector* scripts, OnIonCompilationInfo* info)
@@ -551,27 +572,6 @@ LinkBackgroundCodeGen(JSContext* cx, IonBuilder* builder,
 
     return LinkCodeGen(cx, builder, codegen, scripts, info);
 }
-
-class AutoLazyLinkExitFrame
-{
-    JitActivation* jitActivation_;
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-
-  public:
-    explicit AutoLazyLinkExitFrame(JitActivation* jitActivation
-                                   MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-      : jitActivation_(jitActivation)
-    {
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-        MOZ_ASSERT(!jitActivation_->isLazyLinkExitFrame(),
-                   "Cannot stack multiple lazy-link frames.");
-        jitActivation_->setLazyLinkExitFrame(true);
-    }
-
-    ~AutoLazyLinkExitFrame() {
-        jitActivation_->setLazyLinkExitFrame(false);
-    }
-};
 
 void
 jit::LazyLink(JSContext* cx, HandleScript calleeScript)
