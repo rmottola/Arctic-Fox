@@ -119,7 +119,7 @@ nsresult EvaluateAdminConfigScript(const char *js_buffer, size_t length,
       convertedScript = NS_ConvertASCIItoUTF16(script);
     }
     rv = xpc->EvalInSandboxObject(convertedScript, filename, cx,
-                                  autoconfigSb, &v);
+                                  autoconfigSb, JSVERSION_LATEST, &v);
     NS_ENSURE_SUCCESS(rv, rv);
 
     return NS_OK;
