@@ -9803,6 +9803,9 @@ IonBuilder::jsop_length_fastPath()
 
     MDefinition* obj = current->peek(-1);
 
+    if (shouldAbortOnPreliminaryGroups(obj))
+        return false;
+
     if (obj->mightBeType(MIRType_String)) {
         if (obj->mightBeType(MIRType_Object))
             return false;
