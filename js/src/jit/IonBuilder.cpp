@@ -3698,7 +3698,7 @@ IonBuilder::improveTypesAtNullOrUndefinedCompare(MCompare* ins, bool trueBranch,
         if (altersUndefined) {
             base.addType(TypeSet::UndefinedType(), alloc_->lifoAlloc());
             // If TypeSet emulates undefined, then we cannot filter the objects.
-           if (inputTypes->maybeEmulatesUndefined(constraints()))
+            if (inputTypes->maybeEmulatesUndefined(constraints()))
                 base.addType(TypeSet::AnyObjectType(), alloc_->lifoAlloc());
         }
 
@@ -3742,7 +3742,7 @@ IonBuilder::improveTypesAtTest(MDefinition* ins, bool trueBranch, MTest* test)
         }
 
         if (oldType->unknown())
-	    return true;
+            return true;
 
         TemporaryTypeSet* type = nullptr;
         if (trueBranch)
@@ -3826,7 +3826,7 @@ IonBuilder::improveTypesAtTest(MDefinition* ins, bool trueBranch, MTest* test)
 
     // Decide either to set or remove.
     if (trueBranch) {
-	TemporaryTypeSet remove;
+        TemporaryTypeSet remove;
         remove.addType(TypeSet::UndefinedType(), alloc_->lifoAlloc());
         remove.addType(TypeSet::NullType(), alloc_->lifoAlloc());
         type = TypeSet::removeSet(oldType, &remove, alloc_->lifoAlloc());
@@ -8488,7 +8488,7 @@ IonBuilder::pushReferenceLoadFromTypedObject(MDefinition* typedObj,
         // MLoadUnboxedObjectOrNull, which avoids the need to box the result
         // for a type barrier instruction.
         MLoadUnboxedObjectOrNull::NullBehavior nullBehavior;
-        if (!observedTypes->hasType(TypeSet::NullType()) && !BarrierMustTestTypeTag(barrier))
+        if (barrier == BarrierKind::NoBarrier && !observedTypes->hasType(TypeSet::NullType()))
             nullBehavior = MLoadUnboxedObjectOrNull::BailOnNull;
         else
             nullBehavior = MLoadUnboxedObjectOrNull::HandleNull;
