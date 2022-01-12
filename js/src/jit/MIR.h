@@ -12343,7 +12343,7 @@ class MTypeBarrier
       : MUnaryInstruction(def),
         barrierKind_(kind)
     {
-        MOZ_ASSERT(kind != BarrierKind::NoBarrier);
+        MOZ_ASSERT(kind == BarrierKind::TypeTagOnly || kind == BarrierKind::TypeSet);
 
         MOZ_ASSERT(!types->unknown());
         setResultType(types->getKnownMIRType());
@@ -12409,7 +12409,7 @@ class MMonitorTypes
         typeSet_(types),
         barrierKind_(kind)
     {
-        MOZ_ASSERT(kind != BarrierKind::NoBarrier);
+        MOZ_ASSERT(kind == BarrierKind::TypeTagOnly || kind == BarrierKind::TypeSet);
 
         setGuard();
         MOZ_ASSERT(!types->unknown());
