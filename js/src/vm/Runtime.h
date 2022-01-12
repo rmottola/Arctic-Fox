@@ -2194,6 +2194,10 @@ class MOZ_STACK_CLASS AutoInitGCManagedObject
         return ptr_.get() != nullptr;
     }
 
+    T* get() {
+        return ptr_.get();
+    }
+
     T* release() {
         return ptr_.release();
     }
