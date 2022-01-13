@@ -6567,7 +6567,7 @@ nsGlobalWindow::SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen
                                     nsIWidget* aWidget, nsIScreen* aScreen)
 {
   MOZ_ASSERT(IsOuterWindow());
-  MOZ_ASSERT(this == GetTop(), "Only topmost window should call this");
+  MOZ_ASSERT(this == GetTopInternal(), "Only topmost window should call this");
   MOZ_ASSERT(!GetFrameElementInternal(), "Content window should not call this");
   MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
