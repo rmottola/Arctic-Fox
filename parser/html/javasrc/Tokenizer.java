@@ -392,7 +392,7 @@ public class Tokenizer implements Locator {
      * Buffer for characters that might form a character reference but may
      * end up not forming one.
      */
-    private @Auto char[] charRefBuf;
+    private final @Auto char[] charRefBuf;
 
     /**
      * Number of significant <code>char</code>s in <code>charRefBuf</code>.
@@ -512,6 +512,9 @@ public class Tokenizer implements Locator {
         this.tokenHandler = tokenHandler;
         this.encodingDeclarationHandler = null;
         this.newAttributesEachTime = newAttributesEachTime;
+        // &CounterClockwiseContourIntegral; is the longest valid char ref and
+        // the semicolon never gets appended to the buffer.
+        this.charRefBuf = new char[32];
         this.bmpChar = new char[1];
         this.astralChar = new char[2];
         this.tagName = null;
@@ -538,6 +541,9 @@ public class Tokenizer implements Locator {
         // [NOCPP[
         this.newAttributesEachTime = false;
         // ]NOCPP]
+        // &CounterClockwiseContourIntegral; is the longest valid char ref and
+        // the semicolon never gets appended to the buffer.
+        this.charRefBuf = new char[32];
         this.bmpChar = new char[1];
         this.astralChar = new char[2];
         this.tagName = null;
@@ -810,11 +816,6 @@ public class Tokenizer implements Locator {
     }
 
     @Inline private void appendCharRefBuf(char c) {
-        if (charRefBufLen == charRefBuf.length) {
-            char[] newBuf = new char[charRefBuf.length + Tokenizer.BUFFER_GROW_BY];
-            System.arraycopy(charRefBuf, 0, newBuf, 0, charRefBuf.length);
-            charRefBuf = newBuf;
-        }
         charRefBuf[charRefBufLen++] = c;
     }
 
@@ -6524,7 +6525,6 @@ public class Tokenizer implements Locator {
 
     public void end() throws SAXException {
         strBuf = null;
-        charRefBuf = null;
         doctypeName = null;
         if (systemIdentifier != null) {
             Portability.releaseString(systemIdentifier);
@@ -6643,9 +6643,6 @@ public class Tokenizer implements Locator {
         System.arraycopy(other.strBuf, 0, strBuf, 0, strBufLen);
 
         charRefBufLen = other.charRefBufLen;
-        if (charRefBufLen > charRefBuf.length) {
-            charRefBuf = new char[charRefBufLen];
-        }
         System.arraycopy(other.charRefBuf, 0, charRefBuf, 0, charRefBufLen);
 
         stateSave = other.stateSave;
@@ -6719,7 +6716,6 @@ public class Tokenizer implements Locator {
     public void initializeWithoutStarting() throws SAXException {
         confident = false;
         strBuf = new char[1024];
-        charRefBuf = new char[64];
         line = 1;
         // [NOCPP[
         html4 = false;
