@@ -7520,14 +7520,6 @@ var MousePosTracker = {
   }
 };
 
-function focusNextFrame(event) {
-  let fm = Services.focus;
-  let dir = event.shiftKey ? fm.MOVEFOCUS_BACKWARDDOC : fm.MOVEFOCUS_FORWARDDOC;
-  let element = fm.moveFocus(window, null, dir, fm.FLAG_BYKEY);
-  if (element.ownerDocument == document)
-    focusAndSelectUrlBar();
-}
-
 function BrowserOpenNewTabOrWindow(event) {
   if (event.shiftKey) {
     OpenBrowserWindow();
@@ -7535,7 +7527,6 @@ function BrowserOpenNewTabOrWindow(event) {
     BrowserOpenTab();
   }
 }
-
 
 let ToolbarIconColor = {
   init: function () {
