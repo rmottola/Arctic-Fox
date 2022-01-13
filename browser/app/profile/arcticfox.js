@@ -890,7 +890,7 @@ pref("app.support.baseURL", "https://github.com/wicknix/Arctic-Fox/wiki/");
 pref("security.alternate_certificate_error_page", "certerror");
 
 // Whether to start the private browsing mode at application startup
-pref("browser.privatebrowsing.autostart", true);
+pref("browser.privatebrowsing.autostart", false);
 
 // Don't try to alter this pref, it'll be reset the next time you use the
 // bookmarking dialog
@@ -1180,13 +1180,13 @@ pref("browser.newtabpage.columns", 4);
 // number of rows of newtab grid
 pref("browser.newtabpage.rows", 4);
 
-// Enable the DOM fullscreen API.
-pref("full-screen-api.enabled", true);
-
 // about:permissions
 // Maximum number of sites to return from the places database.
 // 0-100 (currently)
 pref("permissions.places-sites-limit", 50);
+
+// Enable the DOM fullscreen API.
+pref("full-screen-api.enabled", true);
 
 // True if the fullscreen API requires approval upon a domain entering fullscreen.
 // Domains that have already had fullscreen permission granted won't re-request
