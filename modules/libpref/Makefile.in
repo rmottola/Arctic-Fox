@@ -9,7 +9,7 @@ GARBAGE		+= $(addprefix $(DIST)/bin/defaults/pref/, \
 			mailnews.js editor.js \
 			aix.js unix.js winpref.js)
 
-GARBAGE		+= gecko.js
+GARBAGE		+= greprefs.js
 
 # TODO bug 813259 external files should be defined near their location in the source tree.
 grepref_files = $(topsrcdir)/netwerk/base/security-prefs.js $(srcdir)/init/all.js
@@ -26,8 +26,8 @@ grepref_files += $(topsrcdir)/mobile/android/chrome/content/healthreport-prefs.j
 endif
 endif
 
-gecko.js: $(grepref_files)
+greprefs.js: $(grepref_files)
 	$(call py_action,preprocessor,$(PREF_PPFLAGS) $(DEFINES) $(ACDEFINES) $(XULPPFLAGS) $^ -o $@)
 
-libs:: gecko.js
+libs:: greprefs.js
 	$(INSTALL) $^ $(DIST)/bin/

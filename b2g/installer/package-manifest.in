@@ -750,7 +750,7 @@
 @RESPATH@/@PREF_DIR@/b2g.js
 #endif
 @RESPATH@/@PREF_DIR@/channel-prefs.js
-@RESPATH@/gecko.js
+@RESPATH@/greprefs.js
 @RESPATH@/defaults/autoconfig/platform.js
 @RESPATH@/defaults/autoconfig/prefcalls.js
 @RESPATH@/defaults/profile/prefs.js
