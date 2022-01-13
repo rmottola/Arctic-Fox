@@ -478,14 +478,14 @@ XPC_WN_CannotModifyPropertyStub(JSContext* cx, HandleObject obj, HandleId id,
 
 static bool
 XPC_WN_CantDeletePropertyStub(JSContext* cx, HandleObject obj, HandleId id,
-                              ObjectOpResult &result)
+                              ObjectOpResult& result)
 {
     return Throw(NS_ERROR_XPC_CANT_MODIFY_PROP_ON_WN, cx);
 }
 
 static bool
-XPC_WN_CannotModifySetPropertyStub(JSContext *cx, HandleObject obj, HandleId id,
-                                   MutableHandleValue vp, ObjectOpResult &result)
+XPC_WN_CannotModifySetPropertyStub(JSContext* cx, HandleObject obj, HandleId id,
+                                   MutableHandleValue vp, ObjectOpResult& result)
 {
     return Throw(NS_ERROR_XPC_CANT_MODIFY_PROP_ON_WN, cx);
 }
@@ -687,16 +687,16 @@ XPC_WN_MaybeResolvingPropertyStub(JSContext* cx, HandleObject obj, HandleId id, 
 }
 
 static bool
-XPC_WN_MaybeResolvingSetPropertyStub(JSContext *cx, HandleObject obj, HandleId id,
-                                     MutableHandleValue vp, ObjectOpResult &result)
+XPC_WN_MaybeResolvingSetPropertyStub(JSContext* cx, HandleObject obj, HandleId id,
+                                     MutableHandleValue vp, ObjectOpResult& result)
 {
     result.succeed();
     return XPC_WN_MaybeResolvingPropertyStub(cx, obj, id, vp);
 }
 
 static bool
-XPC_WN_MaybeResolvingDeletePropertyStub(JSContext *cx, HandleObject obj, HandleId id,
-                                        ObjectOpResult &result)
+XPC_WN_MaybeResolvingDeletePropertyStub(JSContext* cx, HandleObject obj, HandleId id,
+                                        ObjectOpResult& result)
 {
     XPCCallContext ccx(JS_CALLER, cx, obj);
     XPCWrappedNative* wrapper = ccx.GetWrapper();
@@ -752,8 +752,8 @@ XPC_WN_Helper_GetProperty(JSContext* cx, HandleObject obj, HandleId id,
 }
 
 bool
-XPC_WN_Helper_SetProperty(JSContext *cx, HandleObject obj, HandleId id,
-                          MutableHandleValue vp, ObjectOpResult &result)
+XPC_WN_Helper_SetProperty(JSContext* cx, HandleObject obj, HandleId id,
+                          MutableHandleValue vp, ObjectOpResult& result)
 {
     PRE_HELPER_STUB
     SetProperty(wrapper, cx, obj, id, vp.address(), &retval);
@@ -1090,7 +1090,7 @@ FixUpThisIfBroken(JSObject* obj, JSObject* funobj)
         JSObject* parentObj =
             &js::GetFunctionNativeReserved(funobj,
                                            XPC_FUNCTION_PARENT_OBJECT_SLOT).toObject();
-        const js::Class *parentClass = js::GetObjectClass(parentObj);
+        const js::Class* parentClass = js::GetObjectClass(parentObj);
         if (MOZ_UNLIKELY((IS_NOHELPER_CLASS(parentClass) || IS_CU_CLASS(parentClass)) &&
                          (js::GetObjectClass(obj) != parentClass)))
         {
