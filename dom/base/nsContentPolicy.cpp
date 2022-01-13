@@ -180,7 +180,7 @@ nsContentPolicy::CheckPolicy(CPMethod          policyMethod,
 
         if (topFrameElement) {
 	    nsCOMPtr<nsPIDOMWindow> topWindow = window->GetScriptableTop();
-            isTopLevel = topWindow == static_cast<nsIDOMWindow*>(window);
+            isTopLevel = topWindow == window;
         } else {
             // If we don't have a top frame element, then requestingContext is
             // part of the top-level XUL document. Presumably it's the <browser>
