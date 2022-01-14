@@ -230,6 +230,7 @@ https://github.com/mozilla/newtab-dev/commit/567240287fa9fe6f94fb49d0675512d6aa1
 - Bug 1191236 - Remove extract() methods used by operation forwarding 
 - Bug 930414 - 22 parts
 - Bug 1167409 - 4/4 - Inititalize ScriptSourceObject even when off-main
+Bug 1191117 - Remove RootedGeneric and replace with normal Rooted usa
 Bug 1195866 - Make allocations log report whether an allocation was i
 - Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
 Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
