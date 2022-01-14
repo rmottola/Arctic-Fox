@@ -1271,7 +1271,7 @@ class nsCycleCollector : public nsIMemoryReporter
   ccPhase mIncrementalPhase;
   CCGraph mGraph;
   nsAutoPtr<CCGraphBuilder> mBuilder;
-  nsCOMPtr<nsICycleCollectorListener> mListener;
+  nsRefPtr<nsCycleCollectorLogger> mListener;
 
   DebugOnly<void*> mThread;
 
@@ -1976,6 +1976,12 @@ public:
     }
     return NS_OK;
   }
+  NS_IMETHOD AsLogger(nsCycleCollectorLogger** aRetVal) override
+  {
+    nsRefPtr<nsCycleCollectorLogger> rval = this;
+    rval.forget(aRetVal);
+    return NS_OK;
+  }
 private:
   void ClearDescribers()
   {
@@ -2040,7 +2046,7 @@ private:
   nsCycleCollectionParticipant* mJSParticipant;
   nsCycleCollectionParticipant* mJSZoneParticipant;
   nsCString mNextEdgeName;
-  nsCOMPtr<nsICycleCollectorListener> mListener;
+  nsRefPtr<nsCycleCollectorLogger> mListener;
   bool mMergeZones;
   nsAutoPtr<NodePool::Enumerator> mCurrNode;
 
@@ -2048,7 +2054,7 @@ public:
   CCGraphBuilder(CCGraph& aGraph,
                  CycleCollectorResults& aResults,
                  CycleCollectedJSRuntime* aJSRuntime,
-                 nsICycleCollectorListener* aListener,
+                 nsCycleCollectorLogger* aListener,
                  bool aMergeZones);
   virtual ~CCGraphBuilder();
 
@@ -2146,7 +2152,7 @@ private:
 CCGraphBuilder::CCGraphBuilder(CCGraph& aGraph,
                                CycleCollectorResults& aResults,
                                CycleCollectedJSRuntime* aJSRuntime,
-                               nsICycleCollectorListener* aListener,
+                               nsCycleCollectorLogger* aListener,
                                bool aMergeZones)
   : mGraph(aGraph)
   , mResults(aResults)
@@ -2959,7 +2965,7 @@ nsCycleCollector::ScanWeakMaps()
 class PurpleScanBlackVisitor
 {
 public:
-  PurpleScanBlackVisitor(CCGraph& aGraph, nsICycleCollectorListener* aListener,
+  PurpleScanBlackVisitor(CCGraph& aGraph, nsCycleCollectorLogger* aListener,
                          uint32_t& aCount, bool& aFailed)
     : mGraph(aGraph), mListener(aListener), mCount(aCount), mFailed(aFailed)
   {
@@ -2995,7 +3001,7 @@ public:
 
 private:
   CCGraph& mGraph;
-  nsCOMPtr<nsICycleCollectorListener> mListener;
+  nsRefPtr<nsCycleCollectorLogger> mListener;
   uint32_t& mCount;
   bool& mFailed;
 };
@@ -3761,7 +3767,11 @@ nsCycleCollector::BeginCollection(ccType aCCType,
   // Set up the listener for this CC.
   MOZ_ASSERT_IF(isShutdown, !aManualListener);
   MOZ_ASSERT(!mListener, "Forgot to clear a previous listener?");
-  mListener = aManualListener;
+
+  if (aManualListener) {
+    aManualListener->AsLogger(getter_AddRefs(mListener));
+  }
+
   aManualListener = nullptr;
   if (!mListener && mParams.LogThisCC(isShutdown)) {
     nsRefPtr<nsCycleCollectorLogger> logger = new nsCycleCollectorLogger();
