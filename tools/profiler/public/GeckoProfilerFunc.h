@@ -36,6 +36,9 @@ void  mozilla_sampler_add_marker(const char *aInfo,
 
 void mozilla_sampler_start(int aEntries, int aInterval, const char** aFeatures, uint32_t aFeatureCount);
 void mozilla_sampler_stop();
+
+void mozilla_sampler_get_backtrace_noalloc(char *output, size_t outputSize);
+
 bool mozilla_sampler_is_active();
 void mozilla_sampler_responsiveness(TimeStamp time);
 void mozilla_sampler_frame_number(int frameNumber);
