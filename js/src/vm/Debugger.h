@@ -290,7 +290,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     }
 
     void logTenurePromotion(JSRuntime* rt, JSObject& obj, double when);
-    static JSObject* getObjectAllocationSite(JSObject& obj);
+    static SavedFrame* getObjectAllocationSite(JSObject& obj);
 
   private:
     HeapPtrNativeObject object;         /* The Debugger object. Strong reference. */
