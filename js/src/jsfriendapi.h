@@ -2911,6 +2911,8 @@ class MemProfiler
     }
 
     static void SampleNative(void* addr, uint32_t size) {
+        JS::AutoSuppressGCAnalysis nogc;
+
         if (MOZ_LIKELY(!enabled()))
             return;
 
@@ -2920,6 +2922,8 @@ class MemProfiler
     }
 
     static void SampleTenured(void* addr, uint32_t size) {
+        JS::AutoSuppressGCAnalysis nogc;
+
         if (MOZ_LIKELY(!enabled()))
             return;
 
@@ -2929,6 +2933,8 @@ class MemProfiler
     }
 
     static void SampleNursery(void* addr, uint32_t size) {
+        JS::AutoSuppressGCAnalysis nogc;
+
         if (MOZ_LIKELY(!enabled()))
             return;
 
@@ -2938,6 +2944,8 @@ class MemProfiler
     }
 
     static void RemoveNative(void* addr) {
+        JS::AutoSuppressGCAnalysis nogc;
+
         if (MOZ_LIKELY(!enabled()))
             return;
 
@@ -2947,6 +2955,8 @@ class MemProfiler
     }
 
     static void MarkTenuredStart(JSRuntime* runtime) {
+        JS::AutoSuppressGCAnalysis nogc;
+
         if (MOZ_LIKELY(!enabled()))
             return;
 
@@ -2956,6 +2966,8 @@ class MemProfiler
     }
 
     static void MarkTenured(void* addr) {
+        JS::AutoSuppressGCAnalysis nogc;
+
         if (MOZ_LIKELY(!enabled()))
             return;
 
@@ -2965,6 +2977,8 @@ class MemProfiler
     }
 
     static void SweepTenured(JSRuntime* runtime) {
+        JS::AutoSuppressGCAnalysis nogc;
+
         if (MOZ_LIKELY(!enabled()))
             return;
 
@@ -2974,6 +2988,8 @@ class MemProfiler
     }
 
     static void SweepNursery(JSRuntime* runtime) {
+        JS::AutoSuppressGCAnalysis nogc;
+
         if (MOZ_LIKELY(!enabled()))
             return;
 
@@ -2983,6 +2999,8 @@ class MemProfiler
     }
 
     static void MoveNurseryToTenured(void* addrOld, void* addrNew) {
+        JS::AutoSuppressGCAnalysis nogc;
+
         if (MOZ_LIKELY(!enabled()))
             return;
 
