@@ -126,6 +126,7 @@ if CONFIG['MOZ_JPROF']:
 
 DIRS += [
     '/tools/profiler',
+    '/tools/memory-profiler',
     '/xpfe/components',
 ]
 
