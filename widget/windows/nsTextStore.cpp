@@ -804,6 +804,16 @@ public:
 
   bool EnsureInitActiveTIPKeyboard();
 
+  // Note that TIP name may depend on the language of the environment.
+  // For example, some TIP may use localized name for its target language
+  // environment but English name for the others.
+  bool IsGoogleJapaneseInputActive() const
+  {
+    return mActiveTIPKeyboardDescription.Equals(
+             NS_LITERAL_STRING("Google \x65E5\x672C\x8A9E\x5165\x529B")) ||
+           mActiveTIPKeyboardDescription.EqualsLiteral("Google Japanese Input");
+  }
+
 public: // ITfActiveLanguageProfileNotifySink
   STDMETHODIMP OnActivated(REFCLSID clsid, REFGUID guidProfile,
                            BOOL fActivated);
@@ -1151,17 +1161,6 @@ bool nsTextStore::sDoNotReturnNoLayoutErrorToGoogleJaInputAtCaret = false;
 #define TIP_NAME_EASY_CHANGJEI \
   (NS_LITERAL_STRING( \
      "\x4E2D\x6587 (\x7E41\x9AD4) - \x6613\x9821\x8F38\x5165\x6CD5"))
-#define TIP_NAME_GOOGLE_JA_INPUT_JA \
-  (NS_LITERAL_STRING("Google \x65E5\x672C\x8A9E\x5165\x529B"))
-#define TIP_NAME_GOOGLE_JA_INPUT_EN \
-  (NS_LITERAL_STRING("Google Japanese Input"))
-
-static bool
-IsGoogleJapaneseInput(const nsAString& aTIPName)
-{
-  return aTIPName.Equals(TIP_NAME_GOOGLE_JA_INPUT_JA) ||
-         aTIPName.Equals(TIP_NAME_GOOGLE_JA_INPUT_EN);
-}
 
 #define TEXTSTORE_DEFAULT_VIEW (1)
 
@@ -3321,8 +3320,9 @@ nsTextStore::GetTextExt(TsViewCookie vcView,
   // caller even if we return it.  It's converted to just E_FAIL.
   // However, this is fixed on Win 10.
 
+  const TSFStaticSink* kSink = TSFStaticSink::GetInstance();
   const nsString& activeTIPKeyboardDescription =
-    TSFStaticSink::GetInstance()->GetActiveTIPKeyboardDescription();
+    kSink->GetActiveTIPKeyboardDescription();
   if (mComposition.IsComposing() && mComposition.mStart < acpEnd &&
       mLockedContent.IsLayoutChangedAfter(acpEnd)) {
     const Selection& currentSel = CurrentSelection();
@@ -3337,7 +3337,7 @@ nsTextStore::GetTextExt(TsViewCookie vcView,
       if (!mLockedContent.IsLayoutChangedAfter(acpStart) &&
           acpStart < acpEnd &&
           sDoNotReturnNoLayoutErrorToGoogleJaInputAtFirstChar &&
-          IsGoogleJapaneseInput(activeTIPKeyboardDescription)) {
+          kSink->IsGoogleJapaneseInputActive()) {
         acpEnd = acpStart;
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
                ("TSF: 0x%p   nsTextStore::GetTextExt() hacked the offsets of "
@@ -3353,7 +3353,7 @@ nsTextStore::GetTextExt(TsViewCookie vcView,
       else if (acpStart == acpEnd &&
                currentSel.IsCollapsed() && currentSel.EndOffset() == acpEnd &&
                sDoNotReturnNoLayoutErrorToGoogleJaInputAtCaret &&
-               IsGoogleJapaneseInput(activeTIPKeyboardDescription)) {
+               kSink->IsGoogleJapaneseInputActive()) {
         acpEnd = acpStart = mLockedContent.MinOffsetOfLayoutChanged();
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
                ("TSF: 0x%p   nsTextStore::GetTextExt() hacked the offsets of "
