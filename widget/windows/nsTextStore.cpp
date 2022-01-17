@@ -5005,7 +5005,7 @@ nsTextStore::Initialize()
      "sCreateNativeCaretForATOK=%s, "
      "sDoNotReturnNoLayoutErrorToFreeChangJie=%s, "
      "sDoNotReturnNoLayoutErrorToEasyChangjei=%s, "
-     "sDoNotReturnNoLayoutErrorToGoogleJaInputAtFirstChar=%s, ",
+     "sDoNotReturnNoLayoutErrorToGoogleJaInputAtFirstChar=%s, "
      "sDoNotReturnNoLayoutErrorToGoogleJaInputAtCaret=%s",
      sThreadMgr.get(), sClientId, sDisplayAttrMgr.get(),
      sCategoryMgr.get(), sDisabledDocumentMgr.get(), sDisabledContext.get(),
