@@ -24,7 +24,6 @@
 #include "nsIDocShell.h"
 #include "nsILoadContext.h"
 
-
 #include <CoreFoundation/CoreFoundation.h>
 #include <ApplicationServices/ApplicationServices.h>
 
@@ -91,7 +90,7 @@ nsMacShellService::SetDefaultBrowser(bool aClaimAllTypes, bool aForAllUsers)
       return NS_ERROR_FAILURE;
     }
   }
-  
+
   return NS_OK;
 }
 
