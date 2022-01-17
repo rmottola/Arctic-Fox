@@ -75,7 +75,7 @@ if CONFIG['NS_PRINTING']:
 
 if CONFIG['NS_ENABLE_TSF']:
     SOURCES += [
-        'nsTextStore.cpp',
+        'TSFTextStore.cpp',
     ]
 
 include('/ipc/chromium/chromium-config.mozbuild')
