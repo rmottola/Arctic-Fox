@@ -1289,6 +1289,8 @@ TSFTextStore::Destroy()
     CommitCompositionInternal(false);
   }
 
+  MaybeDestroyNativeCaret();
+
   if (mSink) {
     MOZ_LOG(sTextStoreLog, LogLevel::Debug,
       ("TSF: 0x%p   TSFTextStore::Destroy(), calling "
@@ -1518,10 +1520,6 @@ TSFTextStore::RequestLock(DWORD dwLockFlags,
 void
 TSFTextStore::DidLockGranted()
 {
-  if (mNativeCaretIsCreated) {
-    ::DestroyCaret();
-    mNativeCaretIsCreated = false;
-  }
   if (IsReadWriteLocked()) {
     // FreeCJ (TIP for Traditional Chinese) calls SetSelection() to set caret
     // to the start of composition string and insert a full width space for
@@ -3456,10 +3454,6 @@ TSFTextStore::GetTextExt(TsViewCookie vcView,
       mComposition.IsComposing() &&
       mComposition.mStart <= acpStart && mComposition.EndOffset() >= acpStart &&
       mComposition.mStart <= acpEnd && mComposition.EndOffset() >= acpEnd) {
-    if (mNativeCaretIsCreated) {
-      ::DestroyCaret();
-      mNativeCaretIsCreated = false;
-    }
     CreateNativeCaret();
   }
 
@@ -4500,6 +4494,10 @@ TSFTextStore::NotifyTSFOfLayoutChange(bool aFlush)
     mLockedContent.OnLayoutChanged();
   }
 
+  // Now, the caret position is different from ours.  Destroy the native caret
+  // if there is.
+  MaybeDestroyNativeCaret();
+
   // This method should return true if either way succeeds.
   bool ret = false;
 
@@ -4623,6 +4621,8 @@ TSFTextStore::OnMouseButtonEventInternal(
 void
 TSFTextStore::CreateNativeCaret()
 {
+  MaybeDestroyNativeCaret();
+
   MOZ_LOG(sTextStoreLog, LogLevel::Debug,
          ("TSF: 0x%p   TSFTextStore::CreateNativeCaret(), "
           "mComposition.IsComposing()=%s",
@@ -4676,6 +4676,21 @@ TSFTextStore::CreateNativeCaret()
   }
 
   ::SetCaretPos(caretRect.x, caretRect.y);
+}
+
+void
+TSFTextStore::MaybeDestroyNativeCaret()
+{
+  if (!mNativeCaretIsCreated) {
+    return;
+  }
+
+  MOZ_LOG(sTextStoreLog, LogLevel::Debug,
+         ("TSF: 0x%p   TSFTextStore::MaybeDestroyNativeCaret(), "
+          "destroying native caret", this));
+
+  ::DestroyCaret();
+  mNativeCaretIsCreated = false;
 }
 
 void
