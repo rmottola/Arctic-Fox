@@ -3280,7 +3280,7 @@ nsTextStore::GetACPFromPoint(TsViewCookie vcView,
   }
 
   *pacp = static_cast<LONG>(offset);
-  MOZ_LOG(sTextStoreLog, LogLevel::Debug,
+  MOZ_LOG(sTextStoreLog, LogLevel::Info,
          ("TSF: 0x%p   nsTextStore::GetACPFromPoint() succeeded: *pacp=%d",
           this, *pacp));
   return S_OK;
@@ -5411,12 +5411,19 @@ nsTextStore::CurrentKeyboardLayoutHasIME()
     sInputProcessorProfiles->QueryInterface(IID_ITfInputProcessorProfileMgr,
                                             getter_AddRefs(profileMgr));
   if (FAILED(hr) || !profileMgr) {
+    // On Windows Vista or later, ImmIsIME() API always returns true.
     // If we failed to obtain the profile manager, we cannot know if current
     // keyboard layout has IME.
-    MOZ_LOG(sTextStoreLog, LogLevel::Error,
-      ("TSF:   nsTextStore::CurrentKeyboardLayoutHasIME() FAILED to query "
-       "ITfInputProcessorProfileMgr"));
-    return false;
+    if (IsVistaOrLater()) {
+      MOZ_LOG(sTextStoreLog, LogLevel::Error,
+        ("TSF:   nsTextStore::CurrentKeyboardLayoutHasIME() FAILED to query "
+         "ITfInputProcessorProfileMgr"));
+      return false;
+    }
+    // If the profiles instance doesn't have ITfInputProcessorProfileMgr
+    // interface, that means probably we're running on WinXP or WinServer2003
+    // (except WinServer2003 R2).  Then, we should use ImmIsIME().
+    return ::ImmIsIME(::GetKeyboardLayout(0));
   }
 
   TF_INPUTPROCESSORPROFILE profile;
