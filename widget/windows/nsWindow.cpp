@@ -3925,7 +3925,7 @@ bool nsWindow::DispatchMouseEvent(uint32_t aEventType, WPARAM wParam,
     return result;
   }
 
-  if (WinUtils::GetIsMouseFromTouch(aEventType) && mTouchWindow) {
+  if (mTouchWindow && WinUtils::GetIsMouseFromTouch(aEventType)) {
     // If mTouchWindow is true, then we must have APZ enabled and be
     // feeding it raw touch events. In that case we don't need to
     // send touch-generated mouse events to content.
@@ -3933,17 +3933,13 @@ bool nsWindow::DispatchMouseEvent(uint32_t aEventType, WPARAM wParam,
     return result;
   }
 
-  // Checking for NS_MOUSE_MOVE prevents a largest waterfall of unused initializations.
-  if (NS_MOUSE_MOVE != aEventType
-      // Since it is unclear whether a user will use the digitizer,
-      // Postpone initialization until first PEN message will be found.
-      && nsIDOMMouseEvent::MOZ_SOURCE_PEN == aInputSource
+  // Since it is unclear whether a user will use the digitizer,
+  // Postpone initialization until first PEN message will be found.
+  if (nsIDOMMouseEvent::MOZ_SOURCE_PEN == aInputSource
       // Messages should be only at topLevel window.
       && nsWindowType::eWindowType_toplevel == mWindowType
       // Currently this scheme is used only when pointer events is enabled.
-      && gfxPrefs::PointerEventsEnabled()
-      // NS_MOUSE_EXIT_WIDGET is received, when InkCollector has been already initialized.
-      && NS_MOUSE_EXIT_WIDGET != aEventType) {
+      && gfxPrefs::PointerEventsEnabled()) {
     InkCollector::sInkCollector->SetTarget(mWnd);
   }
 
