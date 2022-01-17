@@ -3021,7 +3021,7 @@ HTMLInputElement::NeedToInitializeEditorForEvent(
 }
 
 bool
-HTMLInputElement::IsDisabledForEvents(uint32_t aMessage)
+HTMLInputElement::IsDisabledForEvents(EventMessage aMessage)
 {
   return IsElementDisabledForEvents(aMessage, GetPrimaryFrame());
 }
@@ -3639,6 +3639,8 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           mForm->OnSubmitClickEnd();
         }
         break;
+      default:
+        break;
     }
   }
 
@@ -4119,6 +4121,9 @@ HTMLInputElement::PostHandleEventForRangeThumb(EventChainPostVisitor& aVisitor)
       if (mIsDraggingRange) {
         CancelRangeThumbDrag();
       }
+      break;
+
+    default:
       break;
   }
 }

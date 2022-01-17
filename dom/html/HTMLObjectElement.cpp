@@ -219,6 +219,8 @@ HTMLObjectElement::HandleFocusBlurPlugin(Element* aElement,
       OnFocusBlurPlugin(aElement, false);
       break;
     }
+    default:
+      break;
   }
 }
 

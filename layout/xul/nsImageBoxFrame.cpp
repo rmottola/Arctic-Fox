@@ -61,14 +61,14 @@ using namespace mozilla::layers;
 class nsImageBoxFrameEvent : public nsRunnable
 {
 public:
-  nsImageBoxFrameEvent(nsIContent *content, uint32_t message)
+  nsImageBoxFrameEvent(nsIContent *content, EventMessage message)
     : mContent(content), mMessage(message) {}
 
   NS_IMETHOD Run() override;
 
 private:
   nsCOMPtr<nsIContent> mContent;
-  uint32_t mMessage;
+  EventMessage mMessage;
 };
 
 NS_IMETHODIMP
@@ -101,7 +101,7 @@ nsImageBoxFrameEvent::Run()
 // asynchronously.
 
 void
-FireImageDOMEvent(nsIContent* aContent, uint32_t aMessage)
+FireImageDOMEvent(nsIContent* aContent, EventMessage aMessage)
 {
   NS_ASSERTION(aMessage == NS_LOAD || aMessage == NS_LOAD_ERROR,
                "invalid message");
