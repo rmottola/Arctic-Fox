@@ -821,6 +821,12 @@ public:
                             NS_LITERAL_STRING("ATOK "));
   }
 
+  bool IsFreeChangJieActive() const
+  {
+    // FYI: The TIP name is misspelled...
+    return mActiveTIPKeyboardDescription.EqualsLiteral("Free CangJie IME 10");
+  }
+
 public: // ITfActiveLanguageProfileNotifySink
   STDMETHODIMP OnActivated(REFCLSID clsid, REFGUID guidProfile,
                            BOOL fActivated);
@@ -1160,9 +1166,6 @@ bool nsTextStore::sDoNotReturnNoLayoutErrorToEasyChangjei = false;
 bool nsTextStore::sDoNotReturnNoLayoutErrorToGoogleJaInputAtFirstChar = false;
 bool nsTextStore::sDoNotReturnNoLayoutErrorToGoogleJaInputAtCaret = false;
 
-// NOTE: Free ChangJie 2010 missspells its name...
-#define TIP_NAME_FREE_CHANG_JIE_2010 \
-  (NS_LITERAL_STRING("Free CangJie IME 10"))
 #define TIP_NAME_EASY_CHANGJEI \
   (NS_LITERAL_STRING( \
      "\x4E2D\x6587 (\x7E41\x9AD4) - \x6613\x9821\x8F38\x5165\x6CD5"))
@@ -3371,8 +3374,7 @@ nsTextStore::GetTextExt(TsViewCookie vcView,
     // TSF.  We need to check if this is necessary on Windows 10 before
     // disabling this on Windows 10.
     else if ((sDoNotReturnNoLayoutErrorToFreeChangJie &&
-              activeTIPKeyboardDescription.Equals(
-                                             TIP_NAME_FREE_CHANG_JIE_2010)) ||
+              kSink->IsFreeChangJieActive()) ||
              (sDoNotReturnNoLayoutErrorToEasyChangjei &&
               activeTIPKeyboardDescription.Equals(TIP_NAME_EASY_CHANGJEI))) {
       acpEnd = mComposition.mStart;
