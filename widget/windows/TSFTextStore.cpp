@@ -4974,8 +4974,7 @@ TSFTextStore::Initialize()
 
   bool enableTsf =
     Preferences::GetBool(kPrefNameForceEnableTSF, false) ||
-    (IsVistaOrLater() && Preferences::GetBool(kPrefNameEnableTSF, false) &&
-     !BrowserTabsRemoteAutostart());
+    (IsVistaOrLater() && Preferences::GetBool(kPrefNameEnableTSF, false));
   MOZ_LOG(sTextStoreLog, LogLevel::Info,
     ("TSF:   TSFTextStore::Initialize(), TSF is %s",
      enableTsf ? "enabled" : "disabled"));
