@@ -124,10 +124,6 @@ static const GInterfaceInfo atk_if_infos[] = {
      (GInterfaceFinalizeFunc) nullptr, nullptr}
 };
 
-// This is or'd with the pointer in MaiAtkObject::accWrap if the wrap-ee is a
-// proxy.
-static const uintptr_t IS_PROXY = 1;
-
 static GQuark quark_mai_hyperlink = 0;
 
 AtkHyperlink*
@@ -137,7 +133,7 @@ MaiAtkObject::GetAtkHyperlink()
   MaiHyperlink* maiHyperlink =
     (MaiHyperlink*)g_object_get_qdata(G_OBJECT(this), quark_mai_hyperlink);
   if (!maiHyperlink) {
-    maiHyperlink = new MaiHyperlink(reinterpret_cast<Accessible*>(accWrap));
+    maiHyperlink = new MaiHyperlink(accWrap);
     g_object_set_qdata(G_OBJECT(this), quark_mai_hyperlink, maiHyperlink);
   }
 
