@@ -2692,9 +2692,8 @@ END_CASE(JSOP_MOD)
 
 CASE(JSOP_POW)
 {
-    RootedValue& lval = rootValue0, &rval = rootValue1;
-    lval = REGS.sp[-2];
-    rval = REGS.sp[-1];
+    ReservedRooted<Value> lval(&rootValue0, REGS.sp[-2]);
+    ReservedRooted<Value> rval(&rootValue1, REGS.sp[-1]);
     MutableHandleValue res = REGS.stackHandleAt(-2);
     if (!math_pow_handle(cx, lval, rval, res))
         goto error;
