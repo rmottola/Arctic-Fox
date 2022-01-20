@@ -3,8 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef NSTEXTSTORE_H_
-#define NSTEXTSTORE_H_
+#ifndef TSFTextStore_h_
+#define TSFTextStore_h_
 
 #include "nsAutoPtr.h"
 #include "nsString.h"
@@ -41,22 +41,21 @@ class nsWindow;
 
 namespace mozilla {
 namespace widget {
+
 struct MSGResult;
-} // namespace widget
-} // namespace mozilla
 
 /*
  * Text Services Framework text store
  */
 
-class nsTextStore final : public ITextStoreACP
-                        , public ITfContextOwnerCompositionSink
-                        , public ITfMouseTrackerACP
+class TSFTextStore final : public ITextStoreACP
+                         , public ITfContextOwnerCompositionSink
+                         , public ITfMouseTrackerACP
 {
 public: /*IUnknown*/
   STDMETHODIMP          QueryInterface(REFIID, void**);
 
-  NS_INLINE_DECL_IUNKNOWN_REFCOUNTING(nsTextStore)
+  NS_INLINE_DECL_IUNKNOWN_REFCOUNTING(TSFTextStore)
 
 public: /*ITextStoreACP*/
   STDMETHODIMP AdviseSink(REFIID, IUnknown*, DWORD);
@@ -100,12 +99,6 @@ public: /*ITfMouseTrackerACP*/
   STDMETHODIMP AdviseMouseSink(ITfRangeACP*, ITfMouseSink*, DWORD*);
   STDMETHODIMP UnadviseMouseSink(DWORD);
 
-protected:
-  typedef mozilla::widget::IMENotification IMENotification;
-  typedef mozilla::widget::IMEState IMEState;
-  typedef mozilla::widget::InputContext InputContext;
-  typedef mozilla::widget::InputContextAction InputContextAction;
-
 public:
   static void     Initialize(void);
   static void     Terminate(void);
@@ -113,7 +106,7 @@ public:
   static bool     ProcessRawKeyMessage(const MSG& aMsg);
   static void     ProcessMessage(nsWindowBase* aWindow, UINT aMessage,
                                  WPARAM& aWParam, LPARAM& aLParam,
-                                 mozilla::widget::MSGResult& aResult);
+                                 MSGResult& aResult);
 
 
   static void     SetIMEOpenState(bool);
@@ -227,8 +220,8 @@ public:
 #endif // #ifdef DEBUG
 
 protected:
-  nsTextStore();
-  ~nsTextStore();
+  TSFTextStore();
+  ~TSFTextStore();
 
   static bool CreateAndSetFocus(nsWindowBase* aFocusedWidget,
                                 const InputContext& aContext);
@@ -253,7 +246,7 @@ protected:
   // Note that mLock isn't cleared yet when this is called.
   void     DidLockGranted();
 
-  bool     GetScreenExtInternal(RECT &aScreenExt);
+  bool     GetScreenExtInternal(RECT& aScreenExt);
   // If aDispatchCompositionChangeEvent is true, this method will dispatch
   // compositionchange event if this is called during IME composing.
   // aDispatchCompositionChangeEvent should be true only when this is called
@@ -261,7 +254,7 @@ protected:
   // not be sent from here.
   HRESULT  SetSelectionInternal(const TS_SELECTION_ACP*,
                                 bool aDispatchCompositionChangeEvent = false);
-  bool     InsertTextAtSelectionInternal(const nsAString &aInsertStr,
+  bool     InsertTextAtSelectionInternal(const nsAString& aInsertStr,
                                          TS_TEXTCHANGE* aTextChange);
   void     CommitCompositionInternal(bool);
   nsresult OnTextChangeInternal(const IMENotification& aIMENotification);
@@ -289,7 +282,7 @@ protected:
   // DispatchEvent() dispatches the event and if it may not be handled
   // synchronously, this makes the instance not notify TSF of pending
   // notifications until next notification from content.
-  void     DispatchEvent(mozilla::WidgetGUIEvent& aEvent);
+  void     DispatchEvent(WidgetGUIEvent& aEvent);
   void     OnLayoutInformationAvaliable();
 
   // FlushPendingActions() performs pending actions recorded in mPendingActions
@@ -313,6 +306,8 @@ protected:
   // Creates native caret over our caret.  This method only works on desktop
   // application.  Otherwise, this does nothing.
   void     CreateNativeCaret();
+  // Destroys native caret if there is.
+  void     MaybeDestroyNativeCaret();
 
   // Holds the pointer to our current win32 widget
   nsRefPtr<nsWindowBase>       mWidget;
@@ -369,7 +364,7 @@ protected:
   // While the document is locked, we cannot dispatch any events which cause
   // DOM events since the DOM events' handlers may modify the locked document.
   // However, even while the document is locked, TSF may queries us.
-  // For that, nsTextStore modifies mComposition even while the document is
+  // For that, TSFTextStore modifies mComposition even while the document is
   // locked.  With mComposition, query methods can returns the text content
   // information.
   Composition mComposition;
@@ -401,8 +396,10 @@ protected:
       mACP.style.fInterimChar = FALSE;
     }
 
-    void SetSelection(uint32_t aStart, uint32_t aLength, bool aReversed,
-                      mozilla::WritingMode aWritingMode)
+    void SetSelection(uint32_t aStart,
+                      uint32_t aLength,
+                      bool aReversed,
+                      WritingMode aWritingMode)
     {
       mDirty = false;
       mACP.acpStart = static_cast<LONG>(aStart);
@@ -484,7 +481,7 @@ protected:
       return (mACP.style.fInterimChar != FALSE);
     }
 
-    mozilla::WritingMode GetWritingMode() const
+    WritingMode GetWritingMode() const
     {
       MOZ_ASSERT(!mDirty);
       return mWritingMode;
@@ -492,7 +489,7 @@ protected:
 
   private:
     TS_SELECTION_ACP mACP;
-    mozilla::WritingMode mWritingMode;
+    WritingMode mWritingMode;
     bool mDirty;
   };
   // Don't access mSelection directly except at calling MarkDirty().
@@ -523,7 +520,7 @@ protected:
     // For compositionupdate and compositionend
     nsString mData;
     // For compositionupdate
-    nsRefPtr<mozilla::TextRangeArray> mRanges;
+    nsRefPtr<TextRangeArray> mRanges;
     // For selectionset
     bool mSelectionReversed;
     // For compositionupdate
@@ -547,7 +544,7 @@ protected:
     }
     PendingAction* newAction = mPendingActions.AppendElement();
     newAction->mType = PendingAction::COMPOSITION_UPDATE;
-    newAction->mRanges = new mozilla::TextRangeArray();
+    newAction->mRanges = new TextRangeArray();
     newAction->mIncomplete = true;
     return newAction;
   }
@@ -576,7 +573,7 @@ protected:
   class MOZ_STACK_CLASS AutoPendingActionAndContentFlusher final
   {
   public:
-    AutoPendingActionAndContentFlusher(nsTextStore* aTextStore)
+    AutoPendingActionAndContentFlusher(TSFTextStore* aTextStore)
       : mTextStore(aTextStore)
     {
       MOZ_ASSERT(!mTextStore->mIsRecordingActionsWithoutLock);
@@ -597,14 +594,14 @@ protected:
   private:
     AutoPendingActionAndContentFlusher() {}
 
-    nsRefPtr<nsTextStore> mTextStore;
+    nsRefPtr<TSFTextStore> mTextStore;
   };
 
   class Content final
   {
   public:
-    Content(nsTextStore::Composition& aComposition,
-            nsTextStore::Selection& aSelection) :
+    Content(TSFTextStore::Composition& aComposition,
+            TSFTextStore::Selection& aSelection) :
       mComposition(aComposition), mSelection(aSelection)
     {
       Clear();
@@ -624,9 +621,16 @@ protected:
       mText = aText;
       if (mComposition.IsComposing()) {
         mLastCompositionString = mComposition.mString;
+      } else {
+        mLastCompositionString.Truncate();
       }
       mMinTextModifiedOffset = NOT_MODIFIED;
       mInitialized = true;
+    }
+
+    void OnLayoutChanged()
+    {
+      mMinTextModifiedOffset = NOT_MODIFIED;
     }
 
     const nsDependentSubstring GetSelectedText() const;
@@ -644,6 +648,16 @@ protected:
     {
       MOZ_ASSERT(mInitialized);
       return mText;
+    }
+    const nsString& LastCompositionString() const
+    {
+      MOZ_ASSERT(mInitialized);
+      return mLastCompositionString;
+    }
+    uint32_t MinTextModifiedOffset() const
+    {
+      MOZ_ASSERT(mInitialized);
+      return mMinTextModifiedOffset;
     }
 
     // Returns true if layout of the character at the aOffset has not been
@@ -664,16 +678,16 @@ protected:
       return mInitialized ? mMinTextModifiedOffset : NOT_MODIFIED;
     }
 
-    nsTextStore::Composition& Composition() { return mComposition; }
-    nsTextStore::Selection& Selection() { return mSelection; }
+    TSFTextStore::Composition& Composition() { return mComposition; }
+    TSFTextStore::Selection& Selection() { return mSelection; }
 
   private:
     nsString mText;
     // mLastCompositionString stores the composition string when the document
     // is locked. This is necessary to compute mMinTextModifiedOffset.
     nsString mLastCompositionString;
-    nsTextStore::Composition& mComposition;
-    nsTextStore::Selection& mSelection;
+    TSFTextStore::Composition& mComposition;
+    TSFTextStore::Selection& mSelection;
 
     // The minimum offset of modified part of the text.
     enum : uint32_t
@@ -684,9 +698,9 @@ protected:
 
     bool mInitialized;
   };
-  // mLockedContent caches content of the document ONLY while the document
-  // is locked.  I.e., the content is cleared at unlocking the document since
-  // we need to reduce the memory usage.  This is initialized by
+  // mLockedContent starts to cache content of the document at first query of
+  // the content during a document lock.  This is abandoned after document is
+  // unlocked and dispatched events are handled.  This is initialized by
   // LockedContent() automatically.  So, don't access this member directly
   // except at calling Clear(), IsInitialized(), IsLayoutChangedAfter() or
   // IsLayoutChanged().
@@ -705,8 +719,8 @@ protected:
 
     MouseTracker();
 
-    HRESULT Init(nsTextStore* aTextStore);
-    HRESULT AdviseSink(nsTextStore* aTextStore,
+    HRESULT Init(TSFTextStore* aTextStore);
+    HRESULT AdviseSink(TSFTextStore* aTextStore,
                        ITfRangeACP* aTextRange, ITfMouseSink* aMouseSink);
     void UnadviseSink();
 
@@ -779,6 +793,9 @@ protected:
   // During the documet is locked, we shouldn't destroy the instance.
   // If this is true, the instance will be destroyed after unlocked.
   bool                         mPendingDestroy;
+  // If this is true, MaybeFlushPendingNotifications() will clear the
+  // mLockedContent.
+  bool                         mPendingClearLockedContent;
   // While there is native caret, this is true.  Otherwise, false.
   bool                         mNativeCaretIsCreated;
   // While the instance is dispatching events, the event may not be handled
@@ -791,38 +808,42 @@ protected:
 
 
   // TSF thread manager object for the current application
-  static mozilla::StaticRefPtr<ITfThreadMgr> sThreadMgr;
+  static StaticRefPtr<ITfThreadMgr> sThreadMgr;
   // sMessagePump is QI'ed from sThreadMgr
-  static mozilla::StaticRefPtr<ITfMessagePump> sMessagePump;
+  static StaticRefPtr<ITfMessagePump> sMessagePump;
   // sKeystrokeMgr is QI'ed from sThreadMgr
-  static mozilla::StaticRefPtr<ITfKeystrokeMgr> sKeystrokeMgr;
+  static StaticRefPtr<ITfKeystrokeMgr> sKeystrokeMgr;
   // TSF display attribute manager
-  static mozilla::StaticRefPtr<ITfDisplayAttributeMgr> sDisplayAttrMgr;
+  static StaticRefPtr<ITfDisplayAttributeMgr> sDisplayAttrMgr;
   // TSF category manager
-  static mozilla::StaticRefPtr<ITfCategoryMgr> sCategoryMgr;
+  static StaticRefPtr<ITfCategoryMgr> sCategoryMgr;
 
   // Current text store which is managing a keyboard enabled editor (i.e.,
-  // editable editor).  Currently only ONE nsTextStore instance is ever used,
+  // editable editor).  Currently only ONE TSFTextStore instance is ever used,
   // although Create is called when an editor is focused and Destroy called
   // when the focused editor is blurred.
-  static mozilla::StaticRefPtr<nsTextStore> sEnabledTextStore;
+  static StaticRefPtr<TSFTextStore> sEnabledTextStore;
 
   // For IME (keyboard) disabled state:
-  static mozilla::StaticRefPtr<ITfDocumentMgr> sDisabledDocumentMgr;
-  static mozilla::StaticRefPtr<ITfContext> sDisabledContext;
+  static StaticRefPtr<ITfDocumentMgr> sDisabledDocumentMgr;
+  static StaticRefPtr<ITfContext> sDisabledContext;
 
-  static mozilla::StaticRefPtr<ITfInputProcessorProfiles>
-    sInputProcessorProfiles;
+  static StaticRefPtr<ITfInputProcessorProfiles> sInputProcessorProfiles;
 
   // TSF client ID for the current application
   static DWORD sClientId;
 
   // Enables/Disables hack for specific TIP.
   static bool sCreateNativeCaretForATOK;
+  static bool sDoNotReturnNoLayoutErrorToMSSimplifiedTIP;
+  static bool sDoNotReturnNoLayoutErrorToMSTraditionalTIP;
   static bool sDoNotReturnNoLayoutErrorToFreeChangJie;
   static bool sDoNotReturnNoLayoutErrorToEasyChangjei;
   static bool sDoNotReturnNoLayoutErrorToGoogleJaInputAtFirstChar;
   static bool sDoNotReturnNoLayoutErrorToGoogleJaInputAtCaret;
 };
 
-#endif /*NSTEXTSTORE_H_*/
+} // namespace widget
+} // namespace mozilla
+
+#endif // #ifndef TSFTextStore_h_

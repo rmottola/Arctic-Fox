@@ -19,8 +19,8 @@
 namespace mozilla {
 namespace psm {
 class SharedSSLState;
-}
-}
+} // namespace psm
+} // namespace mozilla
 
 class nsIObserver;
 
@@ -186,12 +186,9 @@ public:
   static PRIOMethods nsSSLPlaintextLayerMethods;
 
   bool mTreatUnsafeNegotiationAsBroken;
-  int32_t mWarnLevelMissingRFC5746;
 
   void setTreatUnsafeNegotiationAsBroken(bool broken);
   bool treatUnsafeNegotiationAsBroken();
-  void setWarnLevelMissingRFC5746(int32_t level);
-  int32_t getWarnLevelMissingRFC5746();
 
 private:
   struct IntoleranceEntry
@@ -220,7 +217,9 @@ public:
                                    PRErrorCode intoleranceReason);
   bool rememberStrongCiphersFailed(const nsACString& hostName, int16_t port,
                                    PRErrorCode intoleranceReason);
-  void forgetIntolerance(const nsACString& hostname, int16_t port);
+  // returns the known tolerant version
+  // or 0 if there is no known tolerant version
+  uint16_t forgetIntolerance(const nsACString& hostname, int16_t port);
   void adjustForTLSIntolerance(const nsACString& hostname, int16_t port,
                                /*in/out*/ SSLVersionRange& range,
                                /*out*/ StrongCipherStatus& strongCipherStatus);

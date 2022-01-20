@@ -171,7 +171,9 @@ struct EventFlags : public BaseEventFlags
 class WidgetEvent
 {
 protected:
-  WidgetEvent(bool aIsTrusted, uint32_t aMessage, EventClassID aEventClassID)
+  WidgetEvent(bool aIsTrusted,
+              EventMessage aMessage,
+              EventClassID aEventClassID)
     : mClass(aEventClassID)
     , mMessage(aMessage)
     , refPoint(0, 0)
@@ -193,7 +195,7 @@ protected:
   }
 
 public:
-  WidgetEvent(bool aIsTrusted, uint32_t aMessage)
+  WidgetEvent(bool aIsTrusted, EventMessage aMessage)
     : mClass(eBasicEventClass)
     , mMessage(aMessage)
     , refPoint(0, 0)
@@ -231,8 +233,7 @@ public:
   }
 
   EventClassID mClass;
-  // See GUI MESSAGES,
-  uint32_t mMessage;
+  EventMessage mMessage;
   // Relative to the widget of the event, or if there is no widget then it is
   // in screen coordinates. Not modified by layout code.
   LayoutDeviceIntPoint refPoint;
@@ -391,7 +392,7 @@ public:
 class WidgetGUIEvent : public WidgetEvent
 {
 protected:
-  WidgetGUIEvent(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget,
+  WidgetGUIEvent(bool aIsTrusted, EventMessage aMessage, nsIWidget* aWidget,
                  EventClassID aEventClassID)
     : WidgetEvent(aIsTrusted, aMessage, aEventClassID)
     , widget(aWidget)
@@ -405,9 +406,9 @@ protected:
 public:
   virtual WidgetGUIEvent* AsGUIEvent() override { return this; }
 
-  WidgetGUIEvent(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget) :
-    WidgetEvent(aIsTrusted, aMessage, eGUIEventClass),
-    widget(aWidget)
+  WidgetGUIEvent(bool aIsTrusted, EventMessage aMessage, nsIWidget* aWidget)
+    : WidgetEvent(aIsTrusted, aMessage, eGUIEventClass)
+    , widget(aWidget)
   {
   }
 
@@ -555,7 +556,7 @@ typedef uint16_t Modifiers;
 class WidgetInputEvent : public WidgetGUIEvent
 {
 protected:
-  WidgetInputEvent(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget,
+  WidgetInputEvent(bool aIsTrusted, EventMessage aMessage, nsIWidget* aWidget,
                    EventClassID aEventClassID)
     : WidgetGUIEvent(aIsTrusted, aMessage, aWidget, aEventClassID)
     , modifiers(0)
@@ -569,7 +570,7 @@ protected:
 public:
   virtual WidgetInputEvent* AsInputEvent() override { return this; }
 
-  WidgetInputEvent(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget)
+  WidgetInputEvent(bool aIsTrusted, EventMessage aMessage, nsIWidget* aWidget)
     : WidgetGUIEvent(aIsTrusted, aMessage, aWidget, eInputEventClass)
     , modifiers(0)
   {
@@ -719,29 +720,40 @@ class InternalUIEvent : public WidgetGUIEvent
 protected:
   InternalUIEvent()
     : detail(0)
+    , mCausedByUntrustedEvent(false)
   {
   }
 
-  InternalUIEvent(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget,
+  InternalUIEvent(bool aIsTrusted, EventMessage aMessage, nsIWidget* aWidget,
                   EventClassID aEventClassID)
     : WidgetGUIEvent(aIsTrusted, aMessage, aWidget, aEventClassID)
     , detail(0)
+    , mCausedByUntrustedEvent(false)
   {
   }
 
-  InternalUIEvent(bool aIsTrusted, uint32_t aMessage,
+  InternalUIEvent(bool aIsTrusted, EventMessage aMessage,
                   EventClassID aEventClassID)
     : WidgetGUIEvent(aIsTrusted, aMessage, nullptr, aEventClassID)
     , detail(0)
+    , mCausedByUntrustedEvent(false)
   {
   }
 
 public:
   virtual InternalUIEvent* AsUIEvent() override { return this; }
 
-  InternalUIEvent(bool aIsTrusted, uint32_t aMessage)
+  /**
+   * If the UIEvent is caused by another event (e.g., click event),
+   * aEventCausesThisEvent should be the event.  If there is no such event,
+   * this should be nullptr.
+   */
+  InternalUIEvent(bool aIsTrusted, EventMessage aMessage,
+                  const WidgetEvent* aEventCausesThisEvent)
     : WidgetGUIEvent(aIsTrusted, aMessage, nullptr, eUIEventClass)
     , detail(0)
+    , mCausedByUntrustedEvent(
+        aEventCausesThisEvent && !aEventCausesThisEvent->mFlags.mIsTrusted)
   {
   }
 
@@ -749,19 +761,29 @@ public:
   {
     MOZ_ASSERT(mClass == eUIEventClass,
                "Duplicate() must be overridden by sub class");
-    InternalUIEvent* result = new InternalUIEvent(false, mMessage);
+    InternalUIEvent* result = new InternalUIEvent(false, mMessage, nullptr);
     result->AssignUIEventData(*this, true);
     result->mFlags = mFlags;
     return result;
   }
 
   int32_t detail;
+  // mCausedByUntrustedEvent is true if the event is caused by untrusted event.
+  bool mCausedByUntrustedEvent;
+
+  // If you check the event is a trusted event and NOT caused by an untrusted
+  // event, IsTrustable() returns what you expected.
+  bool IsTrustable() const
+  {
+    return mFlags.mIsTrusted && !mCausedByUntrustedEvent;
+  }
 
   void AssignUIEventData(const InternalUIEvent& aEvent, bool aCopyTargets)
   {
     AssignGUIEventData(aEvent, aCopyTargets);
 
     detail = aEvent.detail;
+    mCausedByUntrustedEvent = aEvent.mCausedByUntrustedEvent;
   }
 };
 

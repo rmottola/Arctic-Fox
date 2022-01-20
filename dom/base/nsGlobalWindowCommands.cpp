@@ -526,16 +526,16 @@ nsClipboardCommand::DoCommand(const char *aCommandName, nsISupports *aContext)
   nsCOMPtr<nsIPresShell> presShell = docShell->GetPresShell();
   NS_ENSURE_TRUE(presShell, NS_ERROR_FAILURE);
 
-  int32_t eventType = NS_COPY;
+  EventMessage eventMessage = NS_COPY;
   if (strcmp(aCommandName, "cmd_cut") == 0) {
-    eventType = NS_CUT;
+    eventMessage = NS_CUT;
   } else if (strcmp(aCommandName, "cmd_paste") == 0) {
-    eventType = NS_PASTE;
+    eventMessage = NS_PASTE;
   }
 
   bool actionTaken = false;
   bool notCancelled =
-    nsCopySupport::FireClipboardEvent(eventType,
+    nsCopySupport::FireClipboardEvent(eventMessage,
                                       nsIClipboard::kGlobalClipboard,
                                       presShell, nullptr, &actionTaken);
 

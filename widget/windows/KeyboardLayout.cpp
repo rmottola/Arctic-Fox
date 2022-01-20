@@ -16,7 +16,6 @@
 #include "nsGkAtoms.h"
 #include "nsIDOMKeyEvent.h"
 #include "nsIIdleServiceInternal.h"
-#include "nsIMM32Handler.h"
 #include "nsMemory.h"
 #include "nsPrintfCString.h"
 #include "nsQuickSort.h"
@@ -1312,7 +1311,7 @@ NativeKey::HandleAppCommandMessage() const
   // supported.
   if (!consumed) {
     uint32_t appCommand = GET_APPCOMMAND_LPARAM(mMsg.lParam);
-    uint32_t contentCommandMessage = NS_EVENT_NULL;
+    EventMessage contentCommandMessage = NS_EVENT_NULL;
     switch (appCommand) {
       case APPCOMMAND_BROWSER_BACKWARD:
       case APPCOMMAND_BROWSER_FORWARD:

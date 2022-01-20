@@ -2045,6 +2045,8 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
         pluginEvent.lParam = 0;
         pPluginEvent = &pluginEvent;
         break;
+      default:
+        break;
     }
   }
 
@@ -2079,6 +2081,8 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
           case NS_MOUSE_DOUBLECLICK:
             // Button up/down events sent instead.
             return rv;
+          default:
+            break;
           }
 
         // Get reference point relative to plugin origin.
@@ -2171,6 +2175,8 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
               event.same_screen = True;
             }
             break;
+          default:
+            break;
           }
       }
       break;
@@ -2202,6 +2208,8 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
             case NS_KEY_UP:
               event.type = KeyRelease;
               break;
+            default:
+              break;
             }
 #endif
 
@@ -2225,8 +2233,7 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
       break;
 
     default:
-      switch (anEvent.mMessage)
-        {
+      switch (anEvent.mMessage) {
         case NS_FOCUS_CONTENT:
         case NS_BLUR_CONTENT:
           {
@@ -2238,7 +2245,9 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
             event.detail = NotifyDetailNone;
           }
           break;
-        }
+        default:
+          break;
+      }
     }
 
   if (!pluginEvent.type) {
@@ -2279,6 +2288,8 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
           case NS_MOUSE_DOUBLECLICK:
             // Button up/down events sent instead.
             return rv;
+          default:
+            break;
           }
 
         // Get reference point relative to plugin origin.
@@ -2319,6 +2330,8 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
               event.data.mouse.y = pluginPoint.y;
               mInstance->HandleEvent(&event, nullptr, NS_PLUGIN_CALL_SAFE_TO_REENTER_GECKO);
             }
+            break;
+          default:
             break;
           }
       }

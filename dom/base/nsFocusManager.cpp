@@ -97,25 +97,29 @@ PRLogModuleInfo* gFocusNavigationLog;
 
 struct nsDelayedBlurOrFocusEvent
 {
-  nsDelayedBlurOrFocusEvent(uint32_t aType,
+  nsDelayedBlurOrFocusEvent(EventMessage aEventMessage,
                             nsIPresShell* aPresShell,
                             nsIDocument* aDocument,
                             EventTarget* aTarget)
-   : mType(aType),
-     mPresShell(aPresShell),
-     mDocument(aDocument),
-     mTarget(aTarget) { }
+    : mPresShell(aPresShell)
+    , mDocument(aDocument)
+    , mTarget(aTarget)
+    , mEventMessage(aEventMessage)
+ {
+ }
 
   nsDelayedBlurOrFocusEvent(const nsDelayedBlurOrFocusEvent& aOther)
-   : mType(aOther.mType),
-     mPresShell(aOther.mPresShell),
-     mDocument(aOther.mDocument),
-     mTarget(aOther.mTarget) { }
+    : mPresShell(aOther.mPresShell)
+    , mDocument(aOther.mDocument)
+    , mTarget(aOther.mTarget)
+    , mEventMessage(aOther.mEventMessage)
+  {
+  }
 
-  uint32_t mType;
   nsCOMPtr<nsIPresShell> mPresShell;
   nsCOMPtr<nsIDocument> mDocument;
   nsCOMPtr<EventTarget> mTarget;
+  EventMessage mEventMessage;
 };
 
 inline void ImplCycleCollectionUnlink(nsDelayedBlurOrFocusEvent& aField)
@@ -1035,11 +1039,11 @@ nsFocusManager::FireDelayedEvents(nsIDocument* aDocument)
         mDelayedBlurFocusEvents.RemoveElementAt(i);
         --i;
       } else if (!aDocument->EventHandlingSuppressed()) {
-        uint32_t type = mDelayedBlurFocusEvents[i].mType;
+        EventMessage message = mDelayedBlurFocusEvents[i].mEventMessage;
         nsCOMPtr<EventTarget> target = mDelayedBlurFocusEvents[i].mTarget;
         nsCOMPtr<nsIPresShell> presShell = mDelayedBlurFocusEvents[i].mPresShell;
         mDelayedBlurFocusEvents.RemoveElementAt(i);
-        SendFocusOrBlurEvent(type, presShell, aDocument, target, 0, false);
+        SendFocusOrBlurEvent(message, presShell, aDocument, target, 0, false);
         --i;
       }
     }
@@ -1946,15 +1950,20 @@ nsFocusManager::Focus(nsPIDOMWindow* aWindow,
 class FocusBlurEvent : public nsRunnable
 {
 public:
-  FocusBlurEvent(nsISupports* aTarget, uint32_t aType,
+  FocusBlurEvent(nsISupports* aTarget, EventMessage aEventMessage,
                  nsPresContext* aContext, bool aWindowRaised,
                  bool aIsRefocus)
-  : mTarget(aTarget), mType(aType), mContext(aContext),
-    mWindowRaised(aWindowRaised), mIsRefocus(aIsRefocus) {}
+    : mTarget(aTarget)
+    , mContext(aContext)
+    , mEventMessage(aEventMessage)
+    , mWindowRaised(aWindowRaised)
+    , mIsRefocus(aIsRefocus)
+  {
+  }
 
   NS_IMETHOD Run()
   {
-    InternalFocusEvent event(true, mType);
+    InternalFocusEvent event(true, mEventMessage);
     event.mFlags.mBubbles = false;
     event.fromRaise = mWindowRaised;
     event.isRefocus = mIsRefocus;
@@ -1962,14 +1971,14 @@ public:
   }
 
   nsCOMPtr<nsISupports>   mTarget;
-  uint32_t                mType;
   nsRefPtr<nsPresContext> mContext;
+  EventMessage            mEventMessage;
   bool                    mWindowRaised;
   bool                    mIsRefocus;
 };
 
 void
-nsFocusManager::SendFocusOrBlurEvent(uint32_t aType,
+nsFocusManager::SendFocusOrBlurEvent(EventMessage aEventMessage,
                                      nsIPresShell* aPresShell,
                                      nsIDocument* aDocument,
                                      nsISupports* aTarget,
@@ -1977,7 +1986,8 @@ nsFocusManager::SendFocusOrBlurEvent(uint32_t aType,
                                      bool aWindowRaised,
                                      bool aIsRefocus)
 {
-  NS_ASSERTION(aType == NS_FOCUS_CONTENT || aType == NS_BLUR_CONTENT,
+  NS_ASSERTION(aEventMessage == NS_FOCUS_CONTENT ||
+               aEventMessage == NS_BLUR_CONTENT,
                "Wrong event type for SendFocusOrBlurEvent");
 
   nsCOMPtr<EventTarget> eventTarget = do_QueryInterface(aTarget);
@@ -2000,7 +2010,7 @@ nsFocusManager::SendFocusOrBlurEvent(uint32_t aType,
 
     for (uint32_t i = mDelayedBlurFocusEvents.Length(); i > 0; --i) {
       // if this event was already queued, remove it and append it to the end
-      if (mDelayedBlurFocusEvents[i - 1].mType == aType &&
+      if (mDelayedBlurFocusEvents[i - 1].mEventMessage == aEventMessage &&
           mDelayedBlurFocusEvents[i - 1].mPresShell == aPresShell &&
           mDelayedBlurFocusEvents[i - 1].mDocument == aDocument &&
           mDelayedBlurFocusEvents[i - 1].mTarget == eventTarget) {
@@ -2009,23 +2019,25 @@ nsFocusManager::SendFocusOrBlurEvent(uint32_t aType,
     }
 
     mDelayedBlurFocusEvents.AppendElement(
-      nsDelayedBlurOrFocusEvent(aType, aPresShell, aDocument, eventTarget));
+      nsDelayedBlurOrFocusEvent(aEventMessage, aPresShell,
+                                aDocument, eventTarget));
     return;
   }
 
 #ifdef ACCESSIBILITY
   nsAccessibilityService* accService = GetAccService();
   if (accService) {
-    if (aType == NS_FOCUS_CONTENT)
+    if (aEventMessage == NS_FOCUS_CONTENT) {
       accService->NotifyOfDOMFocus(aTarget);
-    else
+    } else {
       accService->NotifyOfDOMBlur(aTarget);
+    }
   }
 #endif
 
   if (!dontDispatchEvent) {
     nsContentUtils::AddScriptRunner(
-      new FocusBlurEvent(aTarget, aType, aPresShell->GetPresContext(),
+      new FocusBlurEvent(aTarget, aEventMessage, aPresShell->GetPresContext(),
                          aWindowRaised, aIsRefocus));
   }
 }

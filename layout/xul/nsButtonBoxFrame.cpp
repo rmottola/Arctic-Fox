@@ -117,6 +117,9 @@ nsButtonBoxFrame::HandleEvent(nsPresContext* aPresContext,
       }
       break;
     }
+
+    default:
+      break;
   }
 
   return nsBoxFrame::HandleEvent(aPresContext, aEvent, aEventStatus);

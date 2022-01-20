@@ -191,6 +191,9 @@ HTMLLabelElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           mouseEvent->mFlags.mMultipleActionsPrevented = true;
         }
         break;
+
+      default:
+        break;
     }
     mHandlingEvent = false;
   }
