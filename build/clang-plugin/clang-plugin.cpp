@@ -30,6 +30,14 @@ typedef ASTConsumer *ASTConsumerPtr;
 
 namespace {
 
+QualType GetCallReturnType(const CallExpr *expr) {
+#if CLANG_VERSION_FULL >= 307
+  return expr->getCallReturnType(expr->getCalleeDecl()->getASTContext());
+#else
+  return expr->getCallReturnType();
+#endif
+}
+
 using namespace clang::ast_matchers;
 class DiagnosticsMatcher {
 public:
@@ -1024,7 +1032,7 @@ void DiagnosticsMatcher::ScopeChecker::run(
     noteInferred(expr->getAllocatedType(), Diag);
   } else if (const CallExpr *expr =
       Result.Nodes.getNodeAs<CallExpr>("node")) {
-    QualType badType = expr->getCallReturnType()->getPointeeType();
+    QualType badType = GetCallReturnType(expr)->getPointeeType();
     Diag.Report(expr->getLocStart(), errorID) << badType;
     noteInferred(badType, Diag);
   }
@@ -1077,7 +1085,7 @@ void DiagnosticsMatcher::NonHeapClassChecker::run(
     Diag.Report(expr->getStartLoc(), stackID) << expr->getAllocatedType();
     noteInferred(expr->getAllocatedType(), Diag);
   } else if (const CallExpr *expr = Result.Nodes.getNodeAs<CallExpr>("node")) {
-    QualType badType = expr->getCallReturnType()->getPointeeType();
+    QualType badType = GetCallReturnType(expr)->getPointeeType();
     Diag.Report(expr->getLocStart(), stackID) << badType;
     noteInferred(badType, Diag);
   }
