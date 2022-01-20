@@ -1340,7 +1340,7 @@ checkHandshake(int32_t bytesTransfered, bool wasReading,
   return bytesTransfered;
 }
 
-}
+} // namespace
 
 static int16_t
 nsSSLIOLayerPoll(PRFileDesc* fd, int16_t in_flags, int16_t* out_flags)
