@@ -60,6 +60,9 @@
 #include "_psutil_common.h"
 #include "arch/bsd/process_info.h"
 
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+#define bzero(a, b) memset(a, 0, b)
+#endif
 
 // convert a timeval struct to a double
 #define TV2DOUBLE(t)    ((t).tv_sec + (t).tv_usec / 1000000.0)

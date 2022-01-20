@@ -9,6 +9,13 @@
 #include "nsPrintOptionsX.h"
 #include "nsPrintSettingsX.h"
 
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+NSString *const NSPrintJobSavingFileNameExtensionHidden = @"NSPrintJobSavingFileNameExtensionHidden";
+NSString *const NSPrintSelectionOnly = @"NSPrintSelectionOnly";
+NSString *const NSPrintJobSavingURL = @"NSPrintJobSavingURL";
+#endif
+
+
 using namespace mozilla::embedding;
 
 nsPrintOptionsX::nsPrintOptionsX()
