@@ -53,11 +53,12 @@ GetBase64HashSPKI(const CERTCertificate* cert, SECOidTag hashType,
  */
 static nsresult
 EvalCertWithHashType(const CERTCertificate* cert, SECOidTag hashType,
+                     const StaticFingerprints* fingerprints,
                      const nsTArray<nsCString>* dynamicFingerprints,
              /*out*/ bool& certMatchesPinset)
 {
   certMatchesPinset = false;
-  if (!dynamicFingerprints) {
+  if (!fingerprints && !dynamicFingerprints) {
     MOZ_LOG(gPublicKeyPinningLog, LogLevel::Debug,
            ("pkpin: No hashes found for hash type: %d\n", hashType));
     return NS_ERROR_INVALID_ARG;
@@ -71,15 +72,26 @@ EvalCertWithHashType(const CERTCertificate* cert, SECOidTag hashType,
     return rv;
   }
 
-  for (size_t i = 0; i < dynamicFingerprints->Length(); i++) {
-    if (base64Out.Equals((*dynamicFingerprints)[i])) {
+  if (fingerprints) {
+    for (size_t i = 0; i < fingerprints->size; i++) {
+      if (base64Out.Equals(fingerprints->data[i])) {
         MOZ_LOG(gPublicKeyPinningLog, LogLevel::Debug,
-             ("pkpin: found pin base_64 ='%s'\n", base64Out.get()));
-      certMatchesPinset = true;
-      return NS_OK;
+               ("pkpin: found pin base_64 ='%s'\n", base64Out.get()));
+        certMatchesPinset = true;
+        return NS_OK;
+      }
     }
   }
-  
+  if (dynamicFingerprints) {
+    for (size_t i = 0; i < dynamicFingerprints->Length(); i++) {
+      if (base64Out.Equals((*dynamicFingerprints)[i])) {
+        MOZ_LOG(gPublicKeyPinningLog, LogLevel::Debug,
+               ("pkpin: found pin base_64 ='%s'\n", base64Out.get()));
+        certMatchesPinset = true;
+        return NS_OK;
+      }
+    }
+  }
   return NS_OK;
 }
 
@@ -89,13 +101,24 @@ EvalCertWithHashType(const CERTCertificate* cert, SECOidTag hashType,
  */
 static nsresult
 EvalChainWithHashType(const CERTCertList* certList, SECOidTag hashType,
+                      const StaticPinset* pinset,
                       const nsTArray<nsCString>* dynamicFingerprints,
               /*out*/ bool& certListIntersectsPinset)
 {
   certListIntersectsPinset = false;
   CERTCertificate* currentCert;
 
-  if (!dynamicFingerprints) {
+  const StaticFingerprints* fingerprints = nullptr;
+  if (pinset) {
+    if (hashType == SEC_OID_SHA256) {
+      fingerprints = pinset->sha256;
+    } else if (hashType == SEC_OID_SHA1) {
+      fingerprints = pinset->sha1;
+    }
+  }
+  // This can happen if dynamicFingerprints is null and the static pinset
+  // doesn't have any pins of this hash type.
+  if (!fingerprints && !dynamicFingerprints) {
     return NS_OK;
   }
 
@@ -107,7 +130,7 @@ EvalChainWithHashType(const CERTCertList* certList, SECOidTag hashType,
            ("pkpin: certArray subject: '%s'\n", currentCert->subjectName));
     MOZ_LOG(gPublicKeyPinningLog, LogLevel::Debug,
            ("pkpin: certArray issuer: '%s'\n", currentCert->issuerName));
-    nsresult rv = EvalCertWithHashType(currentCert, hashType,
+    nsresult rv = EvalCertWithHashType(currentCert, hashType, fingerprints,
                                        dynamicFingerprints,
                                        certListIntersectsPinset);
     if (NS_FAILED(rv)) {
@@ -121,24 +144,62 @@ EvalChainWithHashType(const CERTCertList* certList, SECOidTag hashType,
   return NS_OK;
 }
 
+/**
+ * Given a pinset and certlist, return true if one of the certificates on
+ * the list matches a fingerprint in the pinset, false otherwise.
+ */
+static nsresult
+EvalChainWithPinset(const CERTCertList* certList,
+                    const StaticPinset* pinset,
+            /*out*/ bool& certListIntersectsPinset)
+{
+  certListIntersectsPinset = false;
+  // SHA256 is more trustworthy, try that first.
+  nsresult rv = EvalChainWithHashType(certList, SEC_OID_SHA256, pinset,
+                                      nullptr, certListIntersectsPinset);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  if (certListIntersectsPinset) {
+    return NS_OK;
+  }
+  return EvalChainWithHashType(certList, SEC_OID_SHA1, pinset, nullptr,
+                               certListIntersectsPinset);
+}
+
+/**
+  Comparator for the is public key pinned host.
+*/
+static int
+TransportSecurityPreloadCompare(const void *key, const void *entry) {
+  const char *keyStr = reinterpret_cast<const char *>(key);
+  const TransportSecurityPreload *preloadEntry =
+    reinterpret_cast<const TransportSecurityPreload *>(entry);
+
+  return strcmp(keyStr, preloadEntry->mHost);
+}
+
 nsresult
 PublicKeyPinningService::ChainMatchesPinset(const CERTCertList* certList,
                                             const nsTArray<nsCString>& aSHA256keys,
                                     /*out*/ bool& chainMatchesPinset)
 {
-  return EvalChainWithHashType(certList, SEC_OID_SHA256, &aSHA256keys,
+  return EvalChainWithHashType(certList, SEC_OID_SHA256, nullptr, &aSHA256keys,
                                chainMatchesPinset);
 }
 
-// Returns via the output parameter the pinning information that is
-// valid for the given host at the given time.
+// Returns via one of the output parameters the most relevant pinning
+// information that is valid for the given host at the given time.
+// Dynamic pins are prioritized over static pins.
 static nsresult
 FindPinningInformation(const char* hostname, mozilla::pkix::Time time,
-               /*out*/ nsTArray<nsCString>& dynamicFingerprints)
+               /*out*/ nsTArray<nsCString>& dynamicFingerprints,
+               /*out*/ TransportSecurityPreload*& staticFingerprints)
 {
   if (!hostname || hostname[0] == 0) {
     return NS_ERROR_INVALID_ARG;
   }
+  staticFingerprints = nullptr;
   dynamicFingerprints.Clear();
   nsCOMPtr<nsISiteSecurityService> sssService =
     do_GetService(NS_SSSERVICE_CONTRACTID);
@@ -146,13 +207,14 @@ FindPinningInformation(const char* hostname, mozilla::pkix::Time time,
     return NS_ERROR_FAILURE;
   }
   SiteHPKPState dynamicEntry;
+  TransportSecurityPreload *foundEntry = nullptr;
   char *evalHost = const_cast<char*>(hostname);
   char *evalPart;
   // Notice how the (xx = strchr) prevents pins for unqualified domain names.
-  while (evalPart = strchr(evalHost, '.')) {
+  while (!foundEntry && (evalPart = strchr(evalHost, '.'))) {
     MOZ_LOG(gPublicKeyPinningLog, LogLevel::Debug,
            ("pkpin: Querying pinsets for host: '%s'\n", evalHost));
-    // Look up dynamic pins
+    // Attempt dynamic pins first
     nsresult rv;
     bool found;
     bool includeSubdomains;
@@ -167,12 +229,36 @@ FindPinningInformation(const char* hostname, mozilla::pkix::Time time,
              ("pkpin: Found dyn match for host: '%s'\n", evalHost));
       dynamicFingerprints = pinArray;
       return NS_OK;
+    }
+
+    foundEntry = (TransportSecurityPreload *)bsearch(evalHost,
+      kPublicKeyPinningPreloadList,
+      sizeof(kPublicKeyPinningPreloadList) / sizeof(TransportSecurityPreload),
+      sizeof(TransportSecurityPreload),
+      TransportSecurityPreloadCompare);
+    if (foundEntry) {
+      MOZ_LOG(gPublicKeyPinningLog, LogLevel::Debug,
+             ("pkpin: Found pinset for host: '%s'\n", evalHost));
+      if (evalHost != hostname) {
+        if (!foundEntry->mIncludeSubdomains) {
+          // Does not apply to this host, continue iterating
+          foundEntry = nullptr;
+        }
+      }
     } else {
       MOZ_LOG(gPublicKeyPinningLog, LogLevel::Debug,
              ("pkpin: Didn't find pinset for host: '%s'\n", evalHost));
     }
     // Add one for '.'
     evalHost = evalPart + 1;
+  }
+
+  if (foundEntry && foundEntry->pinset) {
+    if (time > TimeFromEpochInSeconds(kPreloadPKPinsExpirationTime /
+                                      PR_USEC_PER_SEC)) {
+      return NS_OK;
+    }
+    staticFingerprints = foundEntry;
   }
   return NS_OK;
 }
@@ -196,15 +282,19 @@ CheckPinsForHostname(const CERTCertList* certList, const char* hostname,
   }
 
   nsTArray<nsCString> dynamicFingerprints;
-  nsresult rv = FindPinningInformation(hostname, time, dynamicFingerprints);
+  TransportSecurityPreload* staticFingerprints = nullptr;
+  nsresult rv = FindPinningInformation(hostname, time, dynamicFingerprints,
+                                       staticFingerprints);
   // If we have no pinning information, the certificate chain trivially
   // validates with respect to pinning.
-  if (dynamicFingerprints.Length() == 0) {
+  if (dynamicFingerprints.Length() == 0 && !staticFingerprints) {
     chainHasValidPins = true;
     return NS_OK;
   }
-  return EvalChainWithHashType(certList, SEC_OID_SHA256,
-                               &dynamicFingerprints, chainHasValidPins);
+  if (dynamicFingerprints.Length() > 0) {
+    return EvalChainWithHashType(certList, SEC_OID_SHA256, nullptr,
+                                 &dynamicFingerprints, chainHasValidPins);
+  }
 }
 
 nsresult
@@ -235,13 +325,16 @@ PublicKeyPinningService::HostHasPins(const char* hostname,
   hostHasPins = false;
   nsAutoCString canonicalizedHostname(CanonicalizeHostname(hostname));
   nsTArray<nsCString> dynamicFingerprints;
+  TransportSecurityPreload* staticFingerprints = nullptr;
   nsresult rv = FindPinningInformation(canonicalizedHostname.get(), time,
-                                       dynamicFingerprints);
+                                       dynamicFingerprints, staticFingerprints);
   if (NS_FAILED(rv)) {
     return rv;
   }
   if (dynamicFingerprints.Length() > 0) {
     hostHasPins = true;
+  } else if (staticFingerprints) {
+    hostHasPins = !staticFingerprints->mTestMode || enforceTestMode;
   }
   return NS_OK;
 }
