@@ -271,7 +271,8 @@ FindPinningInformation(const char* hostname, mozilla::pkix::Time time,
 static nsresult
 CheckPinsForHostname(const CERTCertList* certList, const char* hostname,
                      bool enforceTestMode, mozilla::pkix::Time time,
-             /*out*/ bool& chainHasValidPins)
+             /*out*/ bool& chainHasValidPins,
+    /*optional out*/ PinningTelemetryInfo* pinningTelemetryInfo)
 {
   chainHasValidPins = false;
   if (!certList) {
@@ -295,6 +296,64 @@ CheckPinsForHostname(const CERTCertList* certList, const char* hostname,
     return EvalChainWithHashType(certList, SEC_OID_SHA256, nullptr,
                                  &dynamicFingerprints, chainHasValidPins);
   }
+  if (staticFingerprints) {
+    bool enforceTestModeResult;
+    rv = EvalChainWithPinset(certList, staticFingerprints->pinset,
+                             enforceTestModeResult);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+    chainHasValidPins = enforceTestModeResult;
+    Telemetry::ID histogram = staticFingerprints->mIsMoz
+      ? Telemetry::CERT_PINNING_MOZ_RESULTS
+      : Telemetry::CERT_PINNING_RESULTS;
+    if (staticFingerprints->mTestMode) {
+      histogram = staticFingerprints->mIsMoz
+        ? Telemetry::CERT_PINNING_MOZ_TEST_RESULTS
+        : Telemetry::CERT_PINNING_TEST_RESULTS;
+      if (!enforceTestMode) {
+        chainHasValidPins = true;
+      }
+    }
+    // We can collect per-host pinning violations for this host because it is
+    // operationally critical to Firefox.
+    if (pinningTelemetryInfo) {
+      if (staticFingerprints->mId != kUnknownId) {
+        int32_t bucket = staticFingerprints->mId * 2
+                         + (enforceTestModeResult ? 1 : 0);
+        histogram = staticFingerprints->mTestMode
+          ? Telemetry::CERT_PINNING_MOZ_TEST_RESULTS_BY_HOST
+          : Telemetry::CERT_PINNING_MOZ_RESULTS_BY_HOST;
+        pinningTelemetryInfo->certPinningResultBucket = bucket;
+      } else {
+        pinningTelemetryInfo->certPinningResultBucket =
+            enforceTestModeResult ? 1 : 0;
+      }
+      pinningTelemetryInfo->accumulateResult = true;
+      pinningTelemetryInfo->certPinningResultHistogram = histogram;
+    }
+
+    // We only collect per-CA pinning statistics upon failures.
+    CERTCertListNode* rootNode = CERT_LIST_TAIL(certList);
+    // Only log telemetry if the certificate list is non-empty.
+    if (!CERT_LIST_END(rootNode, certList)) {
+      if (!enforceTestModeResult && pinningTelemetryInfo) {
+        int32_t binNumber = RootCABinNumber(&rootNode->cert->derCert);
+        if (binNumber != ROOT_CERTIFICATE_UNKNOWN ) {
+          pinningTelemetryInfo->accumulateForRoot = true;
+          pinningTelemetryInfo->rootBucket = binNumber;
+        }
+      }
+    }
+
+    MOZ_LOG(gPublicKeyPinningLog, LogLevel::Debug,
+           ("pkpin: Pin check %s for %s host '%s' (mode=%s)\n",
+            enforceTestModeResult ? "passed" : "failed",
+            staticFingerprints->mIsMoz ? "mozilla" : "non-mozilla",
+            hostname, staticFingerprints->mTestMode ? "test" : "production"));
+  }
+
+  return NS_OK;
 }
 
 nsresult
@@ -302,7 +361,8 @@ PublicKeyPinningService::ChainHasValidPins(const CERTCertList* certList,
                                            const char* hostname,
                                            mozilla::pkix::Time time,
                                            bool enforceTestMode,
-                                   /*out*/ bool& chainHasValidPins)
+                                   /*out*/ bool& chainHasValidPins,
+                          /*optional out*/ PinningTelemetryInfo* pinningTelemetryInfo)
 {
   chainHasValidPins = false;
   if (!certList) {
@@ -313,7 +373,8 @@ PublicKeyPinningService::ChainHasValidPins(const CERTCertList* certList,
   }
   nsAutoCString canonicalizedHostname(CanonicalizeHostname(hostname));
   return CheckPinsForHostname(certList, canonicalizedHostname.get(),
-                              enforceTestMode, time, chainHasValidPins);
+                              enforceTestMode, time, chainHasValidPins,
+                              pinningTelemetryInfo);
 }
 
 nsresult
