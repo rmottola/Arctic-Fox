@@ -41,7 +41,7 @@ private:
   assign_with_AddRef(T* aRawPtr)
   {
     if (aRawPtr) {
-      aRawPtr->AddRef();
+      AddRefTraits<T>::AddRef(aRawPtr);
     }
     assign_assuming_AddRef(aRawPtr);
   }
@@ -59,7 +59,7 @@ private:
     T* oldPtr = mRawPtr;
     mRawPtr = aNewPtr;
     if (oldPtr) {
-      oldPtr->Release();
+      AddRefTraits<T>::Release(oldPtr);
     }
   }
 
@@ -72,7 +72,7 @@ public:
   ~nsRefPtr()
   {
     if (mRawPtr) {
-      mRawPtr->Release();
+      AddRefTraits<T>::Release(mRawPtr);
     }
   }
 
@@ -89,7 +89,7 @@ public:
     // copy-constructor
   {
     if (mRawPtr) {
-      mRawPtr->AddRef();
+      AddRefTraits<T>::AddRef(mRawPtr);
     }
   }
 
@@ -105,7 +105,7 @@ public:
     : mRawPtr(aRawPtr)
   {
     if (mRawPtr) {
-      mRawPtr->AddRef();
+      AddRefTraits<T>::AddRef(mRawPtr);
     }
   }
 
@@ -121,6 +121,16 @@ public:
     : mRawPtr(aSmartPtr.take())
     // construct from |otherRefPtr.forget()|
   {
+  }
+
+  template <typename I>
+  MOZ_IMPLICIT nsRefPtr(const nsRefPtr<I>& aSmartPtr)
+    : mRawPtr(aSmartPtr.get())
+    // copy-construct from a smart pointer with a related pointer type
+  {
+    if (mRawPtr) {
+      AddRefTraits<T>::AddRef(mRawPtr);
+    }
   }
 
   template <typename I>
@@ -143,6 +153,15 @@ public:
   // copy assignment operator
   {
     assign_with_AddRef(aRhs.mRawPtr);
+    return *this;
+  }
+
+  template <typename I>
+  nsRefPtr<T>&
+  operator=(const nsRefPtr<I>& aRhs)
+  // assign from an nsRefPtr of a related pointer type
+  {
+    assign_with_AddRef(aRhs.get());
     return *this;
   }
 
@@ -334,6 +353,35 @@ public:
     assign_assuming_AddRef(0);
     return reinterpret_cast<T**>(&mRawPtr);
   }
+private:
+  // This helper class makes |nsRefPtr<const T>| possible by casting away
+  // the constness from the pointer when calling AddRef() and Release().
+  // This is necessary because AddRef() and Release() implementations can't
+  // generally expected to be const themselves (without heavy use of |mutable|
+  // and |const_cast| in their own implementations).
+  // This should be sound because while |nsRefPtr<const T>| provides a const
+  // view of an object, the object itself should be const (it would have to be
+  // allocated as |new const T| or similar to itself be const).
+  template<class U>
+  struct AddRefTraits
+  {
+    static void AddRef(U* aPtr) {
+      aPtr->AddRef();
+    }
+    static void Release(U* aPtr) {
+      aPtr->Release();
+    }
+  };
+  template<class U>
+  struct AddRefTraits<const U>
+  {
+    static void AddRef(const U* aPtr) {
+      const_cast<U*>(aPtr)->AddRef();
+    }
+    static void Release(const U* aPtr) {
+      const_cast<U*>(aPtr)->Release();
+    }
+  };
 };
 
 class nsCycleCollectionTraversalCallback;
