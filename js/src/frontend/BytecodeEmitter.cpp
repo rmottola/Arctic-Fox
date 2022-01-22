@@ -5493,7 +5493,7 @@ BytecodeEmitter::emitForIn(ParseNode* pn, ptrdiff_t top)
         return false;
 
     /* The stack should be balanced around the assignment opcode sequence. */
-    MOZ_ASSERT(stackDepth == loopDepth);
+    MOZ_ASSERT(this->stackDepth == loopDepth);
 
     /* Emit code for the loop body. */
     if (!emitTree(forBody))
@@ -5577,7 +5577,7 @@ BytecodeEmitter::emitNormalFor(ParseNode* pn, ptrdiff_t top)
         if (!emitTree(init))
             return false;
         emittingForInit = false;
-        
+
         op = JSOP_POP;
     }
 
