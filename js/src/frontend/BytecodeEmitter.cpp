@@ -5399,7 +5399,7 @@ BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn, ptrdiff_t top)
     if (!emitJump(JSOP_IFEQ, top - offset(), &beq))       // ... RESULT
         return false;
 
-    MOZ_ASSERT(stackDepth == loopDepth);
+    MOZ_ASSERT(this->stackDepth == loopDepth);
 
     // Let Ion know where the closing jump of this loop is.
     if (!setSrcNoteOffset(noteIndex, 0, beq - jmp))
@@ -5486,7 +5486,7 @@ BytecodeEmitter::emitForIn(ParseNode* pn, ptrdiff_t top)
         return false;
 
 #ifdef DEBUG
-    int loopDepth = stackDepth;
+    int loopDepth = this->stackDepth;
 #endif
 
     // Emit code to assign the enumeration value to the left hand side, but
