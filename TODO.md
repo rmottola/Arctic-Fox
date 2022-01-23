@@ -175,7 +175,6 @@
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 968923 - 2015-07-17 - part 6 - add use counters for deprecated operations; r=bz
-- Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
 
@@ -210,7 +209,7 @@ Check with Roy Tam:
 What with LightweightThemeConsumer.jsm 
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/567240287fa9fe6f94fb49d0675512d6aa1c162c
+https://github.com/mozilla/newtab-dev/commit/ac250f9d737362d0730b0897603ae379eca89ebf
 
 ## Breaking JS
 -  Bug 603201 - Enable primitive receivers in [[Get]]. r=jorendorff 
