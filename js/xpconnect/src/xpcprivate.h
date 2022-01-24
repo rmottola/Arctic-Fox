@@ -3830,9 +3830,9 @@ ObjectScope(JSObject* obj)
 JSObject* NewOutObject(JSContext* cx);
 bool IsOutObject(JSContext* cx, JSObject* obj);
 
-nsresult HasInstance(JSContext *cx, JS::HandleObject objArg, const nsID *iid, bool *bp);
+nsresult HasInstance(JSContext* cx, JS::HandleObject objArg, const nsID* iid, bool* bp);
 
-nsIPrincipal *GetObjectPrincipal(JSObject *obj);
+nsIPrincipal* GetObjectPrincipal(JSObject* obj);
 
 } // namespace xpc
 
