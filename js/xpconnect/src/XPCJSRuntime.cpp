@@ -53,6 +53,10 @@
 #include "nsIXULRuntime.h"
 #include "nsJSPrincipals.h"
 
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
+
 using namespace mozilla;
 using namespace xpc;
 using namespace JS;
