@@ -933,7 +933,7 @@ public:
   }
 
   void
-  DispatchDeferredDeletion(bool aContinuation) override
+  DispatchDeferredDeletion(bool aContinuation, bool aPurge) override
   {
     MOZ_ASSERT(!aContinuation);
 

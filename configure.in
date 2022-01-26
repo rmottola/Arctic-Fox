@@ -6791,7 +6791,7 @@ dnl ========================================================
 dnl = Jemalloc build setup
 dnl ========================================================
 if test -z "$MOZ_MEMORY"; then
-  if test -n "$MOZ_JEMALLOC3" -a -z "$MOZ_REPLACE_MALLOC"; then
+  if test -n "$MOZ_JEMALLOC4" -a -z "$MOZ_REPLACE_MALLOC"; then
     MOZ_NATIVE_JEMALLOC=1
     AC_CHECK_FUNCS(mallctl nallocx,,
       [MOZ_NATIVE_JEMALLOC=
@@ -6799,7 +6799,7 @@ if test -z "$MOZ_MEMORY"; then
     if test -n "$MOZ_NATIVE_JEMALLOC"; then
       MOZ_MEMORY=1
       AC_DEFINE(MOZ_MEMORY)
-      AC_DEFINE(MOZ_JEMALLOC3)
+      AC_DEFINE(MOZ_JEMALLOC4)
       AC_DEFINE(MOZ_NATIVE_JEMALLOC)
     fi
   fi
@@ -6812,8 +6812,8 @@ if test -z "$MOZ_MEMORY"; then
   esac
 else
   AC_DEFINE(MOZ_MEMORY)
-  if test -n "$MOZ_JEMALLOC3"; then
-    AC_DEFINE(MOZ_JEMALLOC3)
+  if test -n "$MOZ_JEMALLOC4"; then
+    AC_DEFINE(MOZ_JEMALLOC4)
   fi
   if test "x$MOZ_DEBUG" = "x1"; then
     AC_DEFINE(MOZ_MEMORY_DEBUG)
@@ -6862,7 +6862,7 @@ else
   esac
 fi # MOZ_MEMORY
 AC_SUBST(MOZ_MEMORY)
-AC_SUBST(MOZ_JEMALLOC3)
+AC_SUBST(MOZ_JEMALLOC4)
 AC_SUBST(MOZ_NATIVE_JEMALLOC)
 AC_SUBST(MOZ_CRT)
 export MOZ_CRT
@@ -8698,7 +8698,7 @@ esac
 
 # Run jemalloc configure script
 
-if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC3" -o -n "$MOZ_REPLACE_MALLOC"; then
+if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC4" -o -n "$MOZ_REPLACE_MALLOC"; then
   ac_configure_args="--build=$build --host=$target --enable-stats --with-jemalloc-prefix=je_ --disable-valgrind"
   # We're using memalign for _aligned_malloc in memory/build/mozmemory_wrap.c
   # on Windows, so just export memalign on all platforms.
@@ -8706,8 +8706,13 @@ if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC3" -
   if test -n "$MOZ_REPLACE_MALLOC"; then
     # When using replace_malloc, we always want valloc exported from jemalloc.
     ac_configure_args="$ac_configure_args ac_cv_func_valloc=yes"
+    if test "${OS_ARCH}" = Darwin; then
+      # We also need to enable pointer validation on Mac because jemalloc's
+      # zone allocator is not used.
+      ac_configure_args="$ac_configure_args --enable-ivsalloc"
+    fi
   fi
-  if test -n "$MOZ_JEMALLOC3"; then
+  if test -n "$MOZ_JEMALLOC4"; then
     case "${OS_ARCH}" in
       WINNT|Darwin)
         # We want jemalloc functions to be kept hidden on both Mac and Windows
@@ -8715,6 +8720,11 @@ if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC3" -
         ac_configure_args="$ac_configure_args --without-export"
         ;;
     esac
+    if test "${OS_ARCH}" = WINNT; then
+      # Lazy lock initialization doesn't play well with lazy linking of
+      # mozglue.dll on Windows XP (leads to startup crash), so disable it.
+      ac_configure_args="$ac_configure_args --disable-lazy-lock"
+    fi
   elif test "${OS_ARCH}" = Darwin; then
     # When building as a replace-malloc lib, disabling the zone allocator
     # forces to use pthread_atfork.
@@ -8728,7 +8738,7 @@ if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC3" -
         MANGLE=$_MANGLE
         ;;
     esac
-  elif test -z "$MOZ_JEMALLOC3"; then
+  elif test -z "$MOZ_JEMALLOC4"; then
     MANGLE=$_MANGLE
     JEMALLOC_WRAPPER=replace_
   fi
@@ -8751,20 +8761,27 @@ if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC3" -
   for var in AS CC CXX CPP LD AR RANLIB STRIP CPPFLAGS EXTRA_CFLAGS LDFLAGS; do
     ac_configure_args="$ac_configure_args $var='`eval echo \\${${var}}`'"
   done
-  if test "$CROSS_COMPILE"; then
-    ac_configure_args="$ac_configure_args je_cv_static_page_shift=12"
-  fi
   # Force disable DSS support in jemalloc.
   ac_configure_args="$ac_configure_args ac_cv_func_sbrk=false"
 
   # Make Linux builds munmap freed chunks instead of recycling them.
   ac_configure_args="$ac_configure_args --enable-munmap"
 
+  # Disable cache oblivious behavior that appears to have a performance
+  # impact on Firefox.
+  ac_configure_args="$ac_configure_args --disable-cache-oblivious"
+
   if ! test -e memory/jemalloc; then
     mkdir -p memory/jemalloc
   fi
 
+  # jemalloc's configure runs git to determine the version. But when building
+  # from a gecko git clone, the git commands it uses is going to pick gecko's
+  # information, not jemalloc's, which is useless. So pretend we don't have git
+  # at all. That will make jemalloc's configure pick the in-tree VERSION file.
+  (PATH="$srcdir/memory/jemalloc/helper:$PATH";
   AC_OUTPUT_SUBDIRS(memory/jemalloc/src)
+  ) || exit 1
   ac_configure_args="$_SUBDIR_CONFIG_ARGS"
 fi
 

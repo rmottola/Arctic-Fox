@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifdef MOZ_JEMALLOC3
+#ifdef MOZ_JEMALLOC4
 
 #define MOZ_JEMALLOC_IMPL
 
@@ -22,24 +22,15 @@
 #endif
 
 /* Override some jemalloc defaults */
-#ifdef MOZ_WIDGET_GONK
-/* we tolerate around 4MiB of dirty pages on most platforms, except for B2G,
- * where our limit is 1MiB
- */
-#define MOZ_MALLOC_PLATFORM_OPTIONS ",lg_dirty_mult:8"
-#else
-#define MOZ_MALLOC_PLATFORM_OPTIONS ",lg_dirty_mult:6"
-#endif
-
 #ifdef DEBUG
 #define MOZ_MALLOC_BUILD_OPTIONS ",junk:true"
 #else
 #define MOZ_MALLOC_BUILD_OPTIONS ",junk:free"
 #endif
 
-#define MOZ_MALLOC_OPTIONS "narenas:1,lg_chunk:20,tcache:false"
+#define MOZ_MALLOC_OPTIONS "narenas:1,tcache:false"
 MFBT_DATA const char* je_(malloc_conf) =
-  MOZ_MALLOC_OPTIONS MOZ_MALLOC_PLATFORM_OPTIONS MOZ_MALLOC_BUILD_OPTIONS;
+  MOZ_MALLOC_OPTIONS MOZ_MALLOC_BUILD_OPTIONS;
 
 #ifdef ANDROID
 #include <android/log.h>
@@ -121,7 +112,7 @@ private:
       reinterpret_cast<uintptr_t>(chunk) + static_cast<uintptr_t>(offset));
 
     if (!VirtualAlloc(addr, length, MEM_COMMIT, PAGE_READWRITE))
-      MOZ_CRASH();
+      return true;
 
     return false;
   }
@@ -161,7 +152,7 @@ JemallocInit gJemallocInit;
 
 #else
 #include <mozilla/Assertions.h>
-#endif /* MOZ_JEMALLOC3 */
+#endif /* MOZ_JEMALLOC4 */
 
 /* Provide an abort function for use in jemalloc code */
 extern "C" void moz_abort() {
