@@ -50,7 +50,7 @@ _SUBDIR_CONFIG_ARGS="$ac_configure_args"
 dnl Set the version number of the libs included in-tree
 dnl ========================================================
 MOZJPEG=62
-MOZPNG=10616
+MOZPNG=10628
 MOZWEBP=043
 NSPR_VERSION=4
 NSPR_MINVER=4.15.0
