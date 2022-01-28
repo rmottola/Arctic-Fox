@@ -203,11 +203,6 @@ Check with Roy Tam:
 # Patches that apply but break things:
 - Bug 1096294 - 2015-02-24 Display pseudo-arrays like arrays in the console; r=pbrosset
 
-# Not applicable - missing customizableUI
-- Bug 1170759 - Move detailed security information to a subpanel r=Gijs
-
-What with LightweightThemeConsumer.jsm 
-
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/ac250f9d737362d0730b0897603ae379eca89ebf
 
