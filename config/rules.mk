@@ -724,7 +724,7 @@ else
 endif # HOST_CPP_PROG_LINK
 endif
 ifndef CROSS_COMPILE
-       $(call CHECK_STDCXX,$@)
+	$(call CHECK_STDCXX,$@)
 endif
 
 #
@@ -769,7 +769,7 @@ else
 endif
 endif
 ifndef CROSS_COMPILE
-       $(call CHECK_STDCXX,$@)
+	$(call CHECK_STDCXX,$@)
 endif
 
 ifdef DTRACE_PROBE_OBJ
