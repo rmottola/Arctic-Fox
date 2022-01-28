@@ -43,7 +43,7 @@ const uint32_t POSSIBLE_VERSION_DOWNGRADE = 4;
 const uint32_t POSSIBLE_CIPHER_SUITE_DOWNGRADE = 2;
 const uint32_t KEA_NOT_SUPPORTED = 1;
 
-}
+} // namespace
 
 class nsHTTPDownloadEvent : public nsRunnable {
 public:
@@ -90,7 +90,7 @@ nsHTTPDownloadEvent::Run()
                    nullptr, // aLoadingNode
                    nsContentUtils::GetSystemPrincipal(),
                    nullptr, // aTriggeringPrincipal
-                   nsILoadInfo::SEC_NORMAL,
+                   nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
                    nsIContentPolicy::TYPE_OTHER,
                    getter_AddRefs(chan));
   NS_ENSURE_STATE(chan);
@@ -157,7 +157,7 @@ nsHTTPDownloadEvent::Run()
 
   if (NS_SUCCEEDED(rv)) {
     mStartTime = TimeStamp::Now();
-    rv = hchan->AsyncOpen(mListener->mLoader, nullptr);
+    rv = hchan->AsyncOpen2(mListener->mLoader);
   }
 
   if (NS_FAILED(rv)) {
@@ -1147,15 +1147,15 @@ void HandshakeCallback(PRFileDesc* fd, void* client_data) {
                                            infoObject->GetPort(),
                                            versions.max);
 
-  bool usesWeakProtocol = false;
   bool usesWeakCipher = false;
   SSLChannelInfo channelInfo;
   rv = SSL_GetChannelInfo(fd, &channelInfo, sizeof(channelInfo));
   MOZ_ASSERT(rv == SECSuccess);
   if (rv == SECSuccess) {
     // Get the protocol version for telemetry
-    // 0=ssl3, 1=tls1, 2=tls1.1, 3=tls1.2, 4=tls1.3
+    // 1=tls1, 2=tls1.1, 3=tls1.2, 4=tls1.3
     unsigned int versionEnum = channelInfo.protocolVersion & 0xFF;
+    MOZ_ASSERT(versionEnum > 0);
     Telemetry::Accumulate(Telemetry::SSL_HANDSHAKE_VERSION, versionEnum);
     AccumulateCipherSuite(
       infoObject->IsFullHandshake() ? Telemetry::SSL_CIPHER_SUITE_FULL
@@ -1167,8 +1167,6 @@ void HandshakeCallback(PRFileDesc* fd, void* client_data) {
                                 sizeof cipherInfo);
     MOZ_ASSERT(rv == SECSuccess);
     if (rv == SECSuccess) {
-      usesWeakProtocol =
-        channelInfo.protocolVersion <= SSL_LIBRARY_VERSION_3_0;
       usesWeakCipher = cipherInfo.symCipher == ssl_calg_rc4;
 
       // keyExchange null=0, rsa=1, dh=2, fortezza=3, ecdh=4
@@ -1251,11 +1249,8 @@ void HandshakeCallback(PRFileDesc* fd, void* client_data) {
                              ioLayerHelpers.treatUnsafeNegotiationAsBroken();
 
   uint32_t state;
-  if (usesWeakProtocol || usesWeakCipher || renegotiationUnsafe) {
+  if (usesWeakCipher || renegotiationUnsafe) {
     state = nsIWebProgressListener::STATE_IS_BROKEN;
-    if (usesWeakProtocol) {
-      state |= nsIWebProgressListener::STATE_USES_SSL_3;
-    }
     if (usesWeakCipher) {
       state |= nsIWebProgressListener::STATE_USES_WEAK_CRYPTO;
     }
@@ -1270,8 +1265,7 @@ void HandshakeCallback(PRFileDesc* fd, void* client_data) {
   // to log the warning. In particular, these warnings should go to the web
   // console instead of to the error console. Also, the warning is not
   // localized.
-  if (!siteSupportsSafeRenego &&
-      ioLayerHelpers.getWarnLevelMissingRFC5746() > 0) {
+  if (!siteSupportsSafeRenego) {
     nsXPIDLCString hostName;
     infoObject->GetHostName(getter_Copies(hostName));
 

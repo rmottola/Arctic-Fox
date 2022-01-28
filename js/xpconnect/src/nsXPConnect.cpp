@@ -729,7 +729,7 @@ nsXPConnect::SetFunctionThisTranslator(const nsIID & aIID,
 
 NS_IMETHODIMP
 nsXPConnect::CreateSandbox(JSContext* cx, nsIPrincipal* principal,
-                           nsIXPConnectJSObjectHolder** _retval)
+                           JSObject** _retval)
 {
     *_retval = nullptr;
 
@@ -740,9 +740,7 @@ nsXPConnect::CreateSandbox(JSContext* cx, nsIPrincipal* principal,
                "Bad return value from xpc_CreateSandboxObject()!");
 
     if (NS_SUCCEEDED(rv) && !rval.isPrimitive()) {
-        JSObject* obj = rval.toObjectOrNull();
-        nsRefPtr<XPCJSObjectHolder> rval = new XPCJSObjectHolder(obj);
-        rval.forget(_retval);
+        *_retval = rval.toObjectOrNull();
     }
 
     return rv;
@@ -751,8 +749,15 @@ nsXPConnect::CreateSandbox(JSContext* cx, nsIPrincipal* principal,
 NS_IMETHODIMP
 nsXPConnect::EvalInSandboxObject(const nsAString& source, const char* filename,
                                  JSContext* cx, JSObject* sandboxArg,
+                                 int32_t jsVersion,
                                  MutableHandleValue rval)
 {
+#ifdef DEBUG
+    {
+        const char *version = JS_VersionToString(JSVersion(jsVersion));
+        MOZ_ASSERT(version && strcmp(version, "unknown") != 0, "Illegal JS version passed");
+    }
+#endif
     if (!sandboxArg)
         return NS_ERROR_INVALID_ARG;
 
@@ -764,14 +769,15 @@ nsXPConnect::EvalInSandboxObject(const nsAString& source, const char* filename,
         filenameStr = NS_LITERAL_CSTRING("x-bogus://XPConnect/Sandbox");
     }
     return EvalInSandbox(cx, sandbox, source, filenameStr, 1,
-                         JSVERSION_DEFAULT, rval);
+                         JSVersion(jsVersion), rval);
 }
 
+/* JSObjectPtr getWrappedNativePrototype (in JSContextPtr aJSContext, in JSObjectPtr aScope); */
 NS_IMETHODIMP
-nsXPConnect::GetWrappedNativePrototype(JSContext * aJSContext,
-                                       JSObject * aScopeArg,
+nsXPConnect::GetWrappedNativePrototype(JSContext* aJSContext,
+                                       JSObject* aScopeArg,
                                        nsIClassInfo* aClassInfo,
-                                       nsIXPConnectJSObjectHolder** _retval)
+                                       JSObject** aRetVal)
 {
     RootedObject aScope(aJSContext, aScopeArg);
     JSAutoCompartment ac(aJSContext, aScope);
@@ -792,8 +798,7 @@ nsXPConnect::GetWrappedNativePrototype(JSContext * aJSContext,
     if (!protoObj)
         return UnexpectedFailure(NS_ERROR_FAILURE);
 
-    nsRefPtr<XPCJSObjectHolder> holder = new XPCJSObjectHolder(protoObj);
-    holder.forget(_retval);
+    *aRetVal = protoObj;
 
     return NS_OK;
 }
@@ -831,33 +836,30 @@ nsXPConnect::DebugDumpObject(nsISupports* p, int16_t depth)
         return NS_OK;
     }
 
-    nsIXPConnect* xpc;
-    nsIXPCWrappedJSClass* wjsc;
-    nsIXPConnectWrappedNative* wn;
-    nsIXPConnectWrappedJS* wjs;
+    nsCOMPtr<nsIXPConnect> xpc;
+    nsCOMPtr<nsIXPCWrappedJSClass> wjsc;
+    nsCOMPtr<nsIXPConnectWrappedNative> wn;
+    nsCOMPtr<nsIXPConnectWrappedJS> wjs;
 
     if (NS_SUCCEEDED(p->QueryInterface(NS_GET_IID(nsIXPConnect),
-                                       (void**)&xpc))) {
+                                       getter_AddRefs(xpc)))) {
         XPC_LOG_ALWAYS(("Dumping a nsIXPConnect..."));
         xpc->DebugDump(depth);
-        NS_RELEASE(xpc);
     } else if (NS_SUCCEEDED(p->QueryInterface(NS_GET_IID(nsIXPCWrappedJSClass),
-                                              (void**)&wjsc))) {
+                                              getter_AddRefs(wjsc)))) {
         XPC_LOG_ALWAYS(("Dumping a nsIXPCWrappedJSClass..."));
         wjsc->DebugDump(depth);
-        NS_RELEASE(wjsc);
     } else if (NS_SUCCEEDED(p->QueryInterface(NS_GET_IID(nsIXPConnectWrappedNative),
-                                              (void**)&wn))) {
+                                              getter_AddRefs(wn)))) {
         XPC_LOG_ALWAYS(("Dumping a nsIXPConnectWrappedNative..."));
         wn->DebugDump(depth);
-        NS_RELEASE(wn);
     } else if (NS_SUCCEEDED(p->QueryInterface(NS_GET_IID(nsIXPConnectWrappedJS),
-                                              (void**)&wjs))) {
+                                              getter_AddRefs(wjs)))) {
         XPC_LOG_ALWAYS(("Dumping a nsIXPConnectWrappedJS..."));
         wjs->DebugDump(depth);
-        NS_RELEASE(wjs);
-    } else
+    } else {
         XPC_LOG_ALWAYS(("*** Could not dump the nsISupports @ %x", p));
+    }
 #endif
     return NS_OK;
 }

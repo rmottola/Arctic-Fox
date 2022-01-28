@@ -77,8 +77,8 @@ protected:
   {
   }
 
-  WidgetMouseEventBase(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget,
-                       EventClassID aEventClassID)
+  WidgetMouseEventBase(bool aIsTrusted, EventMessage aMessage,
+                       nsIWidget* aWidget, EventClassID aEventClassID)
     : WidgetInputEvent(aIsTrusted, aMessage, aWidget, aEventClassID)
     , button(0)
     , buttons(0)
@@ -155,7 +155,7 @@ public:
    */
   bool IsLeftClickEvent() const
   {
-    return message == NS_MOUSE_CLICK && button == eLeftButton;
+    return mMessage == NS_MOUSE_CLICK && button == eLeftButton;
   }
 };
 
@@ -193,7 +193,7 @@ protected:
   {
   }
 
-  WidgetMouseEvent(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget,
+  WidgetMouseEvent(bool aIsTrusted, EventMessage aMessage, nsIWidget* aWidget,
                    EventClassID aEventClassID, reasonType aReason)
     : WidgetMouseEventBase(aIsTrusted, aMessage, aWidget, aEventClassID)
     , acceptActivation(false)
@@ -217,7 +217,7 @@ protected:
 public:
   virtual WidgetMouseEvent* AsMouseEvent() override { return this; }
 
-  WidgetMouseEvent(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget,
+  WidgetMouseEvent(bool aIsTrusted, EventMessage aMessage, nsIWidget* aWidget,
                    reasonType aReason, contextType aContext = eNormal) :
     WidgetMouseEventBase(aIsTrusted, aMessage, aWidget, eMouseEventClass),
     acceptActivation(false), ignoreRootScrollFrame(false),
@@ -240,7 +240,7 @@ public:
 #ifdef DEBUG
   virtual ~WidgetMouseEvent()
   {
-    NS_WARN_IF_FALSE(message != NS_CONTEXTMENU ||
+    NS_WARN_IF_FALSE(mMessage != NS_CONTEXTMENU ||
                      button ==
                        ((context == eNormal) ? eRightButton : eLeftButton),
                      "Wrong button set to NS_CONTEXTMENU event?");
@@ -253,7 +253,7 @@ public:
                "Duplicate() must be overridden by sub class");
     // Not copying widget, it is a weak reference.
     WidgetMouseEvent* result =
-      new WidgetMouseEvent(false, message, nullptr, reason, context);
+      new WidgetMouseEvent(false, mMessage, nullptr, reason, context);
     result->AssignMouseEventData(*this, true);
     result->mFlags = mFlags;
     return result;
@@ -287,7 +287,7 @@ public:
    */
   bool IsContextMenuKeyEvent() const
   {
-    return message == NS_CONTEXTMENU && context == eContextMenuKey;
+    return mMessage == NS_CONTEXTMENU && context == eContextMenuKey;
   }
 
   /**
@@ -316,7 +316,7 @@ protected:
 public:
   virtual WidgetDragEvent* AsDragEvent() override { return this; }
 
-  WidgetDragEvent(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget)
+  WidgetDragEvent(bool aIsTrusted, EventMessage aMessage, nsIWidget* aWidget)
     : WidgetMouseEvent(aIsTrusted, aMessage, aWidget, eDragEventClass, eReal)
     , userCancelled(false)
     , mDefaultPreventedOnContent(false)
@@ -332,7 +332,7 @@ public:
     MOZ_ASSERT(mClass == eDragEventClass,
                "Duplicate() must be overridden by sub class");
     // Not copying widget, it is a weak reference.
-    WidgetDragEvent* result = new WidgetDragEvent(false, message, nullptr);
+    WidgetDragEvent* result = new WidgetDragEvent(false, mMessage, nullptr);
     result->AssignDragEventData(*this, true);
     result->mFlags = mFlags;
     return result;
@@ -379,7 +379,7 @@ public:
     return this;
   }
 
-  WidgetMouseScrollEvent(bool aIsTrusted, uint32_t aMessage,
+  WidgetMouseScrollEvent(bool aIsTrusted, EventMessage aMessage,
                          nsIWidget* aWidget)
     : WidgetMouseEventBase(aIsTrusted, aMessage, aWidget,
                            eMouseScrollEventClass)
@@ -394,7 +394,7 @@ public:
                "Duplicate() must be overridden by sub class");
     // Not copying widget, it is a weak reference.
     WidgetMouseScrollEvent* result =
-      new WidgetMouseScrollEvent(false, message, nullptr);
+      new WidgetMouseScrollEvent(false, mMessage, nullptr);
     result->AssignMouseScrollEventData(*this, true);
     result->mFlags = mFlags;
     return result;
@@ -439,7 +439,7 @@ private:
 public:
   virtual WidgetWheelEvent* AsWheelEvent() override { return this; }
 
-  WidgetWheelEvent(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget)
+  WidgetWheelEvent(bool aIsTrusted, EventMessage aMessage, nsIWidget* aWidget)
     : WidgetMouseEventBase(aIsTrusted, aMessage, aWidget, eWheelEventClass)
     , deltaX(0.0)
     , deltaY(0.0)
@@ -462,7 +462,7 @@ public:
     MOZ_ASSERT(mClass == eWheelEventClass,
                "Duplicate() must be overridden by sub class");
     // Not copying widget, it is a weak reference.
-    WidgetWheelEvent* result = new WidgetWheelEvent(false, message, nullptr);
+    WidgetWheelEvent* result = new WidgetWheelEvent(false, mMessage, nullptr);
     result->AssignWheelEventData(*this, true);
     result->mFlags = mFlags;
     return result;
@@ -587,7 +587,7 @@ class WidgetPointerEvent : public WidgetMouseEvent
 public:
   virtual WidgetPointerEvent* AsPointerEvent() override { return this; }
 
-  WidgetPointerEvent(bool aIsTrusted, uint32_t aMsg, nsIWidget* w)
+  WidgetPointerEvent(bool aIsTrusted, EventMessage aMsg, nsIWidget* w)
     : WidgetMouseEvent(aIsTrusted, aMsg, w, ePointerEventClass, eReal)
     , width(0)
     , height(0)
@@ -608,7 +608,7 @@ public:
 
   void UpdateFlags()
   {
-    switch (message) {
+    switch (mMessage) {
       case NS_POINTER_ENTER:
       case NS_POINTER_LEAVE:
         mFlags.mBubbles = false;
@@ -630,7 +630,7 @@ public:
                "Duplicate() must be overridden by sub class");
     // Not copying widget, it is a weak reference.
     WidgetPointerEvent* result =
-      new WidgetPointerEvent(false, message, nullptr);
+      new WidgetPointerEvent(false, mMessage, nullptr);
     result->AssignPointerEventData(*this, true);
     result->mFlags = mFlags;
     return result;

@@ -434,15 +434,16 @@ fun_resolve(JSContext* cx, HandleObject obj, HandleId id, bool* resolvedp)
          * isBuiltin() test covers this case because bound functions are native
          * (and thus built-in) functions by definition/construction.
          *
-         * In ES6 9.2.8 MakeConstructor the .prototype property is only assigned
-         * to constructors.
+         * ES6 9.2.8 MakeConstructor defines the .prototype property on constructors.
+         * Generators are not constructors, but they have a .prototype property anyway,
+         * according to errata to ES6. See bug 1191486.
          *
          * Thus all of the following don't get a .prototype property:
          * - Methods (that are not class-constructors or generators)
          * - Arrow functions
          * - Function.prototype
          */
-        if (fun->isBuiltin() || !fun->isConstructor())
+        if (fun->isBuiltin() || (!fun->isConstructor() && !fun->isGenerator()))
             return true;
 
         if (!ResolveInterpretedFunctionPrototype(cx, fun, id))
@@ -626,6 +627,9 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope, Han
 
 template bool
 js::XDRInterpretedFunction(XDRState<XDR_ENCODE>*, HandleObject, HandleScript, MutableHandleFunction);
+
+template bool
+js::XDRInterpretedFunction(XDRState<XDR_DECODE>*, HandleObject, HandleScript, MutableHandleFunction);
 
 /* ES6 (04-25-16) 19.2.3.6 Function.prototype [ @@hasInstance ] */
 bool
@@ -814,7 +818,7 @@ CreateFunctionPrototype(JSContext* cx, JSProtoKey key)
      * Bizarrely, |Function.prototype| must be an interpreted function, so
      * give it the guts to be one.
      */
-    JSObject *functionProto_ =
+    JSObject* functionProto_ =
         NewFunctionWithProto(cx, nullptr, 0, JSFunction::INTERPRETED,
                              self, nullptr, objectProto, AllocKind::FUNCTION,
                              SingletonObject);
@@ -2068,7 +2072,7 @@ js::NewNativeConstructor(ExclusiveContext* cx, Native native, unsigned nargs, Ha
                                 nullptr, allocKind, newKind);
 }
 
-JSFunction* 
+JSFunction*
 js::NewScriptedFunction(ExclusiveContext* cx, unsigned nargs,
                         JSFunction::Flags flags, HandleAtom atom,
                         gc::AllocKind allocKind /* = AllocKind::FUNCTION */,

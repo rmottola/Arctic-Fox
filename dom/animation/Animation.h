@@ -13,6 +13,7 @@
 #include "mozilla/TimeStamp.h" // for TimeStamp, TimeDuration
 #include "mozilla/dom/AnimationBinding.h" // for AnimationPlayState
 #include "mozilla/dom/AnimationTimeline.h" // for AnimationTimeline
+#include "mozilla/DOMEventTargetHelper.h" // for DOMEventTargetHelper
 #include "mozilla/dom/KeyframeEffect.h" // for KeyframeEffectReadOnly
 #include "mozilla/dom/Promise.h" // for Promise
 #include "nsCSSProperty.h" // for nsCSSProperty
@@ -35,11 +36,10 @@ class nsIDocument;
 class nsPresContext;
 
 namespace mozilla {
+
 struct AnimationCollection;
-namespace css {
 class AnimValuesStyleRule;
 class CommonAnimationManager;
-} // namespace css
 
 namespace dom {
 
@@ -47,18 +47,17 @@ class CSSAnimation;
 class CSSTransition;
 
 class Animation
-  : public nsISupports
-  , public nsWrapperCache
+  : public DOMEventTargetHelper
 {
 protected:
   virtual ~Animation() {}
 
 public:
   explicit Animation(nsIGlobalObject* aGlobal)
-    : mGlobal(aGlobal)
+    : DOMEventTargetHelper(aGlobal)
     , mPlaybackRate(1.0)
     , mPendingState(PendingState::NotPending)
-    , mSequenceNum(kUnsequenced)
+    , mAnimationIndex(sNextAnimationIndex++)
     , mIsRunningOnCompositor(false)
     , mFinishedAtLastComposeStyle(false)
     , mIsRelevant(false)
@@ -66,8 +65,9 @@ public:
   {
   }
 
-  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
-  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(Animation)
+  NS_DECL_ISUPPORTS_INHERITED
+  NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(Animation,
+                                           DOMEventTargetHelper)
 
   AnimationTimeline* GetParentObject() const { return mTimeline; }
   virtual JSObject* WrapObject(JSContext* aCx,
@@ -108,7 +108,10 @@ public:
   virtual void Finish(ErrorResult& aRv);
   virtual void Play(ErrorResult& aRv, LimitBehavior aLimitBehavior);
   virtual void Pause(ErrorResult& aRv);
+  virtual void Reverse(ErrorResult& aRv);
   bool IsRunningOnCompositor() const { return mIsRunningOnCompositor; }
+  IMPL_EVENT_HANDLER(finish);
+  IMPL_EVENT_HANDLER(cancel);
 
   // Wrapper functions for Animation DOM methods when called
   // from script.
@@ -137,7 +140,7 @@ public:
 
   virtual void CancelFromStyle() { DoCancel(); }
 
-  void Tick();
+  virtual void Tick();
 
   /**
    * Set the time to use for starting or pausing a pending animation.
@@ -245,15 +248,16 @@ public:
    * "Playing" is different to "running". An animation in its delay phase is
    * still running but we only consider it playing when it is in its active
    * interval. This definition is used for fetching the animations that are
-   * are candidates for running on the compositor (since we don't ship
-   * animations to the compositor when they are in their delay phase or
-   * paused).
+   * candidates for running on the compositor (since we don't ship animations
+   * to the compositor when they are in their delay phase or paused including
+   * being effectively paused due to having a zero playback rate).
    */
   bool IsPlaying() const
   {
     // We need to have an effect in its active interval, and
-    // be either running or waiting to run.
+    // be either running or waiting to run with a non-zero playback rate.
     return HasInPlayEffect() &&
+           mPlaybackRate != 0.0 &&
            (PlayState() == AnimationPlayState::Running ||
             mPendingState == PendingState::PlayPending);
   }
@@ -264,14 +268,6 @@ public:
    * Returns true if this Animation has a lower composite order than aOther.
    */
   virtual bool HasLowerCompositeOrderThan(const Animation& aOther) const;
-  /**
-   * Returns true if this Animation is involved in some sort of
-   * custom composite ordering (such as the ordering defined for CSS
-   * animations or CSS transitions).
-   *
-   * When this is true, this class will not update the sequence number.
-   */
-  virtual bool IsUsingCustomCompositeOrder() const { return false; }
 
   void SetIsRunningOnCompositor() { mIsRunningOnCompositor = true; }
   void ClearIsRunningOnCompositor() { mIsRunningOnCompositor = false; }
@@ -290,9 +286,25 @@ public:
    * the style rule on the next refresh driver tick as well (because it
    * is running and has an effect to sample).
    */
-  void ComposeStyle(nsRefPtr<css::AnimValuesStyleRule>& aStyleRule,
+  void ComposeStyle(nsRefPtr<AnimValuesStyleRule>& aStyleRule,
                     nsCSSPropertySet& aSetProperties,
                     bool& aNeedsRefreshes);
+
+
+  // FIXME: Because we currently determine if we need refresh driver ticks
+  // during restyling (specifically ComposeStyle above) and not necessarily
+  // during a refresh driver tick, we can arrive at a situation where we
+  // have finished running an animation but are waiting until the next tick
+  // to queue the final end event. This method tells us when we are in that
+  // situation so we can avoid unregistering from the refresh driver until
+  // we've finished dispatching events.
+  //
+  // This is a temporary measure until bug 1195180 is done and we can do all
+  // our registering and unregistering within a tick callback.
+  virtual bool HasEndEventToQueue() const { return false; }
+
+  void NotifyEffectTimingUpdated();
+
 protected:
   void SilentlySetCurrentTime(const TimeDuration& aNewCurrentTime);
   void SilentlySetPlaybackRate(double aPlaybackRate);
@@ -326,8 +338,8 @@ protected:
     Async
   };
 
-  void UpdateTiming(SeekFlag aSeekFlag,
-                    SyncNotifyFlag aSyncNotifyFlag);
+  virtual void UpdateTiming(SeekFlag aSeekFlag,
+                            SyncNotifyFlag aSyncNotifyFlag);
   void UpdateFinishedState(SeekFlag aSeekFlag,
                            SyncNotifyFlag aSyncNotifyFlag);
   void UpdateEffect();
@@ -336,6 +348,8 @@ protected:
   void ResetFinishedPromise();
   void MaybeResolveFinishedPromise();
   void DoFinishNotification(SyncNotifyFlag aSyncNotifyFlag);
+  void DoFinishNotificationImmediately();
+  void DispatchPlaybackEvent(const nsAString& aName);
 
   /**
    * Remove this animation from the pending animation tracker and reset
@@ -349,10 +363,9 @@ protected:
 
   nsIDocument* GetRenderedDocument() const;
   nsPresContext* GetPresContext() const;
-  virtual css::CommonAnimationManager* GetAnimationManager() const = 0;
+  virtual CommonAnimationManager* GetAnimationManager() const = 0;
   AnimationCollection* GetCollection() const;
 
-  nsCOMPtr<nsIGlobalObject> mGlobal;
   nsRefPtr<AnimationTimeline> mTimeline;
   nsRefPtr<KeyframeEffectReadOnly> mEffect;
   // The beginning of the delay period.
@@ -384,13 +397,16 @@ protected:
   enum class PendingState { NotPending, PlayPending, PausePending };
   PendingState mPendingState;
 
-  static uint64_t sNextSequenceNum;
-  static const uint64_t kUnsequenced = UINT64_MAX;
+  static uint64_t sNextAnimationIndex;
 
-  // The sequence number assigned to this animation. This is kUnsequenced
-  // while the animation is in the idle state and is updated each time
-  // the animation transitions out of the idle state.
-  uint64_t mSequenceNum;
+  // The relative position of this animation within the global animation list.
+  // This is kNoIndex while the animation is in the idle state and is updated
+  // each time the animation transitions out of the idle state.
+  //
+  // Note that subclasses such as CSSTransition and CSSAnimation may repurpose
+  // this member to implement their own brand of sorting. As a result, it is
+  // possible for two different objects to have the same index.
+  uint64_t mAnimationIndex;
 
   bool mIsRunningOnCompositor;
   bool mFinishedAtLastComposeStyle;

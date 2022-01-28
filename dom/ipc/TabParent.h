@@ -144,8 +144,9 @@ public:
                                   const bool& aSizeSpecified,
                                   const nsString& aURI,
                                   const nsString& aName,
-                                  const nsString& aFeatures,
+                                  const nsCString& aFeatures,
                                   const nsString& aBaseURI,
+                                  nsresult* aResult,
                                   bool* aWindowIsNew,
                                   InfallibleTArray<FrameScriptInfo>* aFrameScripts,
                                   nsCString* aURLToLoad) override;
@@ -178,7 +179,7 @@ public:
                                                bool* aConsumedByIME) override;
     virtual bool RecvNotifyIMEPositionChange(const ContentCache& aContentCache,
                                              const widget::IMENotification& aEventMessage) override;
-    virtual bool RecvOnEventNeedingAckReceived(const uint32_t& aMessage) override;
+    virtual bool RecvOnEventNeedingAckHandled(const EventMessage& aMessage) override;
     virtual bool RecvEndIMEComposition(const bool& aCancel,
                                        bool* aNoCompositionEvent,
                                        nsString* aComposition) override;

@@ -3299,13 +3299,13 @@ NSEvent* gLastDragMouseDownEvent = nil;
   return [[self window] isOpaque];
 }
 
-- (void)sendFocusEvent:(uint32_t)eventType
+- (void)sendFocusEvent:(EventMessage)eventMessage
 {
   if (!mGeckoChild)
     return;
 
   nsEventStatus status = nsEventStatus_eIgnore;
-  WidgetGUIEvent focusGuiEvent(true, eventType, mGeckoChild);
+  WidgetGUIEvent focusGuiEvent(true, eventMessage, mGeckoChild);
   focusGuiEvent.time = PR_IntervalNow();
   mGeckoChild->DispatchEvent(&focusGuiEvent, status);
 }
@@ -4020,7 +4020,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
   float deltaZ = [anEvent deltaZ];
 
-  uint32_t msg;
+  EventMessage msg;
   switch (mGestureState) {
   case eGestureState_StartGesture:
     msg = NS_SIMPLE_GESTURE_MAGNIFY_START;
@@ -4087,7 +4087,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
   float rotation = [anEvent rotation];
 
-  uint32_t msg;
+  EventMessage msg;
   switch (mGestureState) {
   case eGestureState_StartGesture:
     msg = NS_SIMPLE_GESTURE_ROTATE_START;
@@ -4201,7 +4201,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
 #ifdef __LP64__
 - (bool)sendSwipeEvent:(NSEvent*)aEvent
-                withKind:(uint32_t)aMsg
+                withKind:(EventMessage)aMsg
        allowedDirections:(uint32_t*)aAllowedDirections
                direction:(uint32_t)aDirection
                    delta:(double)aDelta
@@ -4544,7 +4544,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
   else
     geckoEvent.button = WidgetMouseEvent::eLeftButton;
 
-  mGeckoChild->DispatchWindowEvent(geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
   mBlockedLastMouseDown = NO;
 
   // XXX maybe call markedTextSelectionChanged:client: here?
@@ -4570,7 +4570,8 @@ NSEvent* gLastDragMouseDownEvent = nil;
     geckoEvent.button = WidgetMouseEvent::eLeftButton;
 
   // This might destroy our widget (and null out mGeckoChild).
-  bool defaultPrevented = mGeckoChild->DispatchWindowEvent(geckoEvent);
+  bool defaultPrevented =
+    (mGeckoChild->DispatchInputEvent(&geckoEvent) == nsEventStatus_eConsumeNoDefault);
 
   // Check to see if we are double-clicking in the titlebar.
   CGFloat locationInTitlebar = [[self window] frame].size.height - [theEvent locationInWindow].y;
@@ -4601,7 +4602,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
   NSPoint windowEventLocation = nsCocoaUtils::EventLocationForWindow(aEvent, [self window]);
   NSPoint localEventLocation = [self convertPoint:windowEventLocation fromView:nil];
 
-  uint32_t msg = aEnter ? NS_MOUSE_ENTER_WIDGET : NS_MOUSE_EXIT_WIDGET;
+  EventMessage msg = aEnter ? NS_MOUSE_ENTER_WIDGET : NS_MOUSE_EXIT_WIDGET;
   WidgetMouseEvent event(true, msg, mGeckoChild, WidgetMouseEvent::eReal);
   event.refPoint = LayoutDeviceIntPoint::FromUntyped(
     mGeckoChild->CocoaPointsToDevPixels(localEventLocation));
@@ -4696,7 +4697,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
 
-  mGeckoChild->DispatchWindowEvent(geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
@@ -4714,7 +4715,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
 
-  mGeckoChild->DispatchWindowEvent(geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
 
   // Note, sending the above event might have destroyed our widget since we didn't retain.
   // Fine so long as we don't access any local variables from here on.
@@ -4742,7 +4743,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
   geckoEvent.button = WidgetMouseEvent::eRightButton;
   geckoEvent.clickCount = [theEvent clickCount];
 
-  mGeckoChild->DispatchWindowEvent(geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
   if (!mGeckoChild)
     return;
 
@@ -4766,7 +4767,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
   geckoEvent.clickCount = [theEvent clickCount];
 
   nsAutoRetainCocoaObject kungFuDeathGrip(self);
-  mGeckoChild->DispatchWindowEvent(geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
@@ -4783,7 +4784,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
 
   // send event into Gecko by going directly to the
   // the widget.
-  mGeckoChild->DispatchWindowEvent(geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
 }
 
 - (void)otherMouseDown:(NSEvent *)theEvent
@@ -4805,7 +4806,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
   geckoEvent.button = WidgetMouseEvent::eMiddleButton;
   geckoEvent.clickCount = [theEvent clickCount];
 
-  mGeckoChild->DispatchWindowEvent(geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
@@ -4821,7 +4822,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
   geckoEvent.button = WidgetMouseEvent::eMiddleButton;
 
   nsAutoRetainCocoaObject kungFuDeathGrip(self);
-  mGeckoChild->DispatchWindowEvent(geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
 }
 
 - (void)otherMouseDragged:(NSEvent*)theEvent
@@ -4836,7 +4837,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
 
   // send event into Gecko by going directly to the
   // the widget.
-  mGeckoChild->DispatchWindowEvent(geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
 }
 
 static int32_t RoundUp(double aDouble)
@@ -4845,15 +4846,18 @@ static int32_t RoundUp(double aDouble)
                        static_cast<int32_t>(ceil(aDouble));
 }
 
-- (void)sendWheelStartOrStop:(uint32_t)msg forEvent:(NSEvent *)theEvent
+- (void)sendWheelStartOrStop:(EventMessage)msg forEvent:(NSEvent *)theEvent
 {
   WidgetWheelEvent wheelEvent(true, msg, mGeckoChild);
   [self convertCocoaMouseWheelEvent:theEvent toGeckoEvent:&wheelEvent];
   mExpectingWheelStop = (msg == NS_WHEEL_START);
-  mGeckoChild->DispatchWindowEvent(wheelEvent);
+  mGeckoChild->DispatchAPZAwareEvent(wheelEvent.AsInputEvent());
 }
 
-- (void)sendWheelCondition:(BOOL)condition first:(uint32_t)first second:(uint32_t)second forEvent:(NSEvent *)theEvent
+- (void)sendWheelCondition:(BOOL)condition
+                     first:(EventMessage)first
+                    second:(EventMessage)second
+                  forEvent:(NSEvent *)theEvent
 {
   if (mExpectingWheelStop == condition) {
     [self sendWheelStartOrStop:first forEvent:theEvent];
@@ -5065,7 +5069,7 @@ static int32_t RoundUp(double aDouble)
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
   geckoEvent.button = WidgetMouseEvent::eRightButton;
-  mGeckoChild->DispatchWindowEvent(geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
   if (!mGeckoChild)
     return nil;
 
@@ -5513,7 +5517,7 @@ static int32_t RoundUp(double aDouble)
   WidgetMouseEvent geckoEvent(true, NS_MOUSE_ACTIVATE, mGeckoChild,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:aEvent toGeckoEvent:&geckoEvent];
-  return !mGeckoChild->DispatchWindowEvent(geckoEvent);
+  return (mGeckoChild->DispatchInputEvent(&geckoEvent) != nsEventStatus_eConsumeNoDefault);
 }
 
 // We must always call through to our superclass, even when mGeckoChild is
@@ -5590,15 +5594,13 @@ static int32_t RoundUp(double aDouble)
 // drag'n'drop stuff
 #define kDragServiceContractID "@mozilla.org/widget/dragservice;1"
 
-- (NSDragOperation)dragOperationForSession:(nsIDragSession*)aDragSession
+- (NSDragOperation)dragOperationFromDragAction:(int32_t)aDragAction
 {
-  uint32_t dragAction;
-  aDragSession->GetDragAction(&dragAction);
-  if (nsIDragService::DRAGDROP_ACTION_LINK & dragAction)
+  if (nsIDragService::DRAGDROP_ACTION_LINK & aDragAction)
     return NSDragOperationLink;
-  if (nsIDragService::DRAGDROP_ACTION_COPY & dragAction)
+  if (nsIDragService::DRAGDROP_ACTION_COPY & aDragAction)
     return NSDragOperationCopy;
-  if (nsIDragService::DRAGDROP_ACTION_MOVE & dragAction)
+  if (nsIDragService::DRAGDROP_ACTION_MOVE & aDragAction)
     return NSDragOperationGeneric;
   return NSDragOperationNone;
 }
@@ -5621,7 +5623,7 @@ static int32_t RoundUp(double aDouble)
 // This is a utility function used by NSView drag event methods
 // to send events. It contains all of the logic needed for Gecko
 // dragging to work. Returns the appropriate cocoa drag operation code.
-- (NSDragOperation)doDragAction:(uint32_t)aMessage sender:(id)aSender
+- (NSDragOperation)doDragAction:(EventMessage)aMessage sender:(id)aSender
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
 
@@ -5689,7 +5691,7 @@ static int32_t RoundUp(double aDouble)
     [self convertWindowCoordinates:draggingLoc]);
 
   nsAutoRetainCocoaObject kungFuDeathGrip(self);
-  mGeckoChild->DispatchWindowEvent(geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
   if (!mGeckoChild)
     return NSDragOperationNone;
 
@@ -5697,7 +5699,22 @@ static int32_t RoundUp(double aDouble)
     switch (aMessage) {
       case NS_DRAGDROP_ENTER:
       case NS_DRAGDROP_OVER:
-        return [self dragOperationForSession:dragSession];
+      {
+        uint32_t dragAction;
+        dragSession->GetDragAction(&dragAction);
+
+        // If TakeChildProcessDragAction returns something other than
+        // DRAGDROP_ACTION_UNINITIALIZED, it means that the last event was sent
+        // to the child process and this event is also being sent to the child
+        // process. In this case, use the last event's action instead.
+        nsDragService* dragService = static_cast<nsDragService *>(mDragService);
+        int32_t childDragAction = dragService->TakeChildProcessDragAction();
+        if (childDragAction != nsIDragService::DRAGDROP_ACTION_UNINITIALIZED) {
+          dragAction = childDragAction;
+        }
+
+        return [self dragOperationFromDragAction:dragAction];
+      }
       case NS_DRAGDROP_EXIT:
       case NS_DRAGDROP_DROP: {
         nsCOMPtr<nsIDOMNode> sourceNode;
@@ -5710,6 +5727,8 @@ static int32_t RoundUp(double aDouble)
           mDragService->EndDragSession(false);
         }
       }
+      default:
+        break;
     }
   }
 

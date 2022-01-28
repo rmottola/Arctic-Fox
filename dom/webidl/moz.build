@@ -678,6 +678,7 @@ if CONFIG['MOZ_B2G_BT']:
             'BluetoothGatt.webidl',
             'BluetoothGattCharacteristic.webidl',
             'BluetoothGattDescriptor.webidl',
+            'BluetoothGattServer.webidl',
             'BluetoothGattService.webidl',
             'BluetoothLeDeviceEvent.webidl',
             'BluetoothManager2.webidl',
@@ -736,6 +737,7 @@ if CONFIG['MOZ_B2G_FM']:
     ]
 
 GENERATED_EVENTS_WEBIDL_FILES = [
+    'AnimationPlaybackEvent.webidl',
     'AutocompleteErrorEvent.webidl',
     'BlobEvent.webidl',
     'CallEvent.webidl',

@@ -210,7 +210,7 @@ HTMLObjectElement::HandleFocusBlurPlugin(Element* aElement,
   if (!aEvent->mFlags.mIsTrusted) {
     return;
   }
-  switch (aEvent->message) {
+  switch (aEvent->mMessage) {
     case NS_FOCUS_CONTENT: {
       OnFocusBlurPlugin(aElement, true);
       break;
@@ -219,6 +219,8 @@ HTMLObjectElement::HandleFocusBlurPlugin(Element* aElement,
       OnFocusBlurPlugin(aElement, false);
       break;
     }
+    default:
+      break;
   }
 }
 

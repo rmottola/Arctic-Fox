@@ -9,11 +9,16 @@
 
 interface Principal;
 
-[JSImplementation="@mozilla.org/push/PushSubscription;1",
- Constructor(DOMString pushEndpoint, DOMString scope, Principal principal), ChromeOnly]
+[Exposed=(Window,Worker), Func="nsContentUtils::PushEnabled",
+ ChromeConstructor(DOMString pushEndpoint, DOMString scope)]
 interface PushSubscription
 {
     readonly attribute USVString endpoint;
-    readonly attribute DOMString subscriptionId;
+    [Throws]
     Promise<boolean> unsubscribe();
+    jsonifier;
+
+    // Used to set the principal from the JS implemented PushManager.
+    [Exposed=Window,ChromeOnly]
+    void setPrincipal(Principal principal);
 };

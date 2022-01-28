@@ -129,6 +129,14 @@ GetBuildConfiguration(JSContext* cx, unsigned argc, Value* vp)
     if (!JS_SetProperty(cx, info, "asan", value))
         return false;
 
+#ifdef MOZ_TSAN
+    value = BooleanValue(true);
+#else
+    value = BooleanValue(false);
+#endif
+    if (!JS_SetProperty(cx, info, "tsan", value))
+        return false;
+
 #ifdef JS_GC_ZEAL
     value = BooleanValue(true);
 #else
@@ -425,7 +433,7 @@ IsLazyFunction(JSContext* cx, unsigned argc, Value* vp)
     }
     if (!args[0].isObject() || !args[0].toObject().is<JSFunction>()) {
         JS_ReportError(cx, "The first argument should be a function.");
-        return true;
+        return false;
     }
     args.rval().setBoolean(args[0].toObject().as<JSFunction>().isInterpretedLazy());
     return true;
@@ -2017,6 +2025,9 @@ GetBacktrace(JSContext* cx, unsigned argc, Value* vp)
     }
 
     char* buf = JS::FormatStackDump(cx, nullptr, showArgs, showLocals, showThisProps);
+    if (!buf)
+        return false;
+
     RootedString str(cx);
     if (!(str = JS_NewStringCopyZ(cx, buf)))
         return false;

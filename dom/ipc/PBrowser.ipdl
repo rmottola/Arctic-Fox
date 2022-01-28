@@ -65,6 +65,7 @@ using mozilla::layers::TouchBehaviorFlags from "mozilla/layers/APZUtils.h";
 using nsIWidget::TouchPointerState from "nsIWidget.h";
 using struct LookAndFeelInt from "mozilla/widget/WidgetMessageUtils.h";
 using struct mozilla::OwningSerializedStructuredCloneBuffer from "ipc/IPCMessageUtils.h";
+using mozilla::EventMessage from "mozilla/EventForwards.h";
 using nsEventStatus from "mozilla/EventForwards.h";
 
 namespace mozilla {
@@ -160,9 +161,12 @@ parent:
                       bool aSizeSpecified,
                       nsString aURI,
                       nsString aName,
-                      nsString aFeatures,
+                      nsCString aFeatures,
                       nsString aBaseURI)
-      returns (bool windowOpened, FrameScriptInfo[] frameScripts, nsCString urlToLoad);
+      returns (nsresult rv,
+               bool windowOpened,
+               FrameScriptInfo[] frameScripts,
+               nsCString urlToLoad);
 
     sync SyncMessage(nsString aMessage, ClonedMessageData aData,
                      CpowEntry[] aCpows, Principal aPrincipal)
@@ -254,13 +258,13 @@ parent:
                         returns (bool noCompositionEvent, nsString composition);
 
     /**
-     * OnEventNeedingAckReceived() is called when a child process dispatches a
+     * OnEventNeedingAckHandled() is called after a child process dispatches a
      * composition event or a selection event which is sent from the parent
      * process.
      *
-     * message      The message value of the received event.
+     * message      The message value of the handled event.
      */
-    prio(urgent) async OnEventNeedingAckReceived(uint32_t message);
+    prio(urgent) async OnEventNeedingAckHandled(EventMessage message);
 
     /**
      * Tells chrome to start plugin IME.  If this results in a string getting

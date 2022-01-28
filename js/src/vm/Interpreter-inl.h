@@ -299,7 +299,7 @@ SetNameOperation(JSContext* cx, JSScript* script, jsbytecode* pc, HandleObject s
 }
 
 inline bool
-InitPropertyOperation(JSContext *cx, JSOp op, HandleObject obj, HandleId id, HandleValue rhs)
+InitPropertyOperation(JSContext* cx, JSOp op, HandleObject obj, HandleId id, HandleValue rhs)
 {
     if (obj->is<PlainObject>() || obj->is<JSFunction>()) {
         unsigned propAttrs = GetInitDataPropAttrs(op);
@@ -386,7 +386,7 @@ ToIdOperation(JSContext* cx, HandleScript script, jsbytecode* pc, HandleValue ob
         return false;
 
     RootedId id(cx);
-    if (!ValueToId<CanGC>(cx, idval, &id))
+    if (!ToPropertyKey(cx, idval, &id))
         return false;
 
     res.set(IdToValue(id));
@@ -411,14 +411,11 @@ GetObjectElementOperation(JSContext* cx, JSOp op, JS::HandleObject obj, JS::Hand
             break;
         }
 
-        if (IsSymbolOrSymbolWrapper(key)) {
-            RootedId id(cx, SYMBOL_TO_JSID(ToSymbolPrimitive(key)));
-            if (!GetProperty(cx, obj, receiver, id, res))
+        if (key.isString()) {
+            JSString* str = key.toString();
+            JSAtom* name = str->isAtom() ? &str->asAtom() : AtomizeString(cx, str);
+            if (!name)
                 return false;
-            break;
-        }
-
-        if (JSAtom* name = ToAtom<NoGC>(cx, key)) {
             if (name->isIndex(&index)) {
                 if (GetElementNoGC(cx, obj, receiver, index, res.address()))
                     break;
@@ -428,17 +425,11 @@ GetObjectElementOperation(JSContext* cx, JSOp op, JS::HandleObject obj, JS::Hand
             }
         }
 
-        JSAtom* name = ToAtom<CanGC>(cx, key);
-        if (!name)
+        RootedId id(cx);
+        if (!ToPropertyKey(cx, key, &id))
             return false;
-
-        if (name->isIndex(&index)) {
-            if (!GetElement(cx, obj, receiver, index, res))
-                return false;
-        } else {
-            if (!GetProperty(cx, obj, receiver, name->asPropertyName(), res))
-                return false;
-        }
+        if (!GetProperty(cx, obj, receiver, id, res))
+            return false;
     } while (false);
 
 #if JS_HAS_NO_SUCH_METHOD
@@ -458,8 +449,7 @@ GetPrimitiveElementOperation(JSContext* cx, JSOp op, JS::HandleValue receiver,
 {
     MOZ_ASSERT(op == JSOP_GETELEM || op == JSOP_CALLELEM);
 
-    // FIXME: We shouldn't be boxing here or exposing the boxed object as
-    //        receiver anywhere below (bug 603201).
+    // FIXME: Bug 1234324 We shouldn't be boxing here.
     RootedObject boxed(cx, ToObjectFromStack(cx, receiver));
     if (!boxed)
         return false;
@@ -467,42 +457,33 @@ GetPrimitiveElementOperation(JSContext* cx, JSOp op, JS::HandleValue receiver,
     do {
         uint32_t index;
         if (IsDefinitelyIndex(key, &index)) {
-            if (GetElementNoGC(cx, boxed, boxed, index, res.address()))
+            if (GetElementNoGC(cx, boxed, receiver, index, res.address()))
                 break;
 
-            if (!GetElement(cx, boxed, boxed, index, res))
+            if (!GetElement(cx, boxed, receiver, index, res))
                 return false;
             break;
         }
 
-        if (IsSymbolOrSymbolWrapper(key)) {
-            RootedId id(cx, SYMBOL_TO_JSID(ToSymbolPrimitive(key)));
-            if (!GetProperty(cx, boxed, boxed, id, res))
+        if (key.isString()) {
+            JSString* str = key.toString();
+            JSAtom* name = str->isAtom() ? &str->asAtom() : AtomizeString(cx, str);
+            if (!name)
                 return false;
-            break;
-        }
-
-        if (JSAtom* name = ToAtom<NoGC>(cx, key)) {
             if (name->isIndex(&index)) {
-                if (GetElementNoGC(cx, boxed, boxed, index, res.address()))
+                if (GetElementNoGC(cx, boxed, receiver, index, res.address()))
                     break;
             } else {
-                if (GetPropertyNoGC(cx, boxed, boxed, name->asPropertyName(), res.address()))
+                if (GetPropertyNoGC(cx, boxed, receiver, name->asPropertyName(), res.address()))
                     break;
             }
         }
 
-        JSAtom* name = ToAtom<CanGC>(cx, key);
-        if (!name)
+        RootedId id(cx);
+        if (!ToPropertyKey(cx, key, &id))
             return false;
-
-        if (name->isIndex(&index)) {
-            if (!GetElement(cx, boxed, boxed, index, res))
-                return false;
-        } else {
-            if (!GetProperty(cx, boxed, boxed, name->asPropertyName(), res))
-                return false;
-        }
+        if (!GetProperty(cx, boxed, receiver, id, res))
+            return false;
     } while (false);
 
     // Note: we don't call a __noSuchMethod__ hook when |this| was primitive.
@@ -555,8 +536,10 @@ GetElementOperation(JSContext* cx, JSOp op, MutableHandleValue lref, HandleValue
         }
     }
 
-    if (lref.isPrimitive())
-        return GetPrimitiveElementOperation(cx, op, lref, rref, res);
+    if (lref.isPrimitive()) {
+        RootedValue thisv(cx, lref);
+        return GetPrimitiveElementOperation(cx, op, thisv, rref, res);
+    }
 
     RootedObject thisv(cx, &lref.toObject());
     return GetObjectElementOperation(cx, op, thisv, thisv, rref, res);
@@ -584,7 +567,7 @@ InitElemOperation(JSContext* cx, HandleObject obj, HandleValue idval, HandleValu
     MOZ_ASSERT(!obj->getClass()->setProperty);
 
     RootedId id(cx);
-    if (!ValueToId<CanGC>(cx, idval, &id))
+    if (!ToPropertyKey(cx, idval, &id))
         return false;
 
     return DefineProperty(cx, obj, id, val, nullptr, nullptr, JSPROP_ENUMERATE);

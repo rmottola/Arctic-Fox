@@ -811,7 +811,7 @@ class PreliminaryObjectArray
 
 class PreliminaryObjectArrayWithTemplate : public PreliminaryObjectArray
 {
-    HeapPtrShape shape_;
+    RelocatablePtrShape shape_;
 
   public:
     explicit PreliminaryObjectArrayWithTemplate(Shape* shape)
@@ -1267,9 +1267,9 @@ enum SpewChannel {
 
 #ifdef DEBUG
 
-const char* InferSpewColorReset();
-const char* InferSpewColor(TypeConstraint* constraint);
-const char* InferSpewColor(TypeSet* types);
+const char * InferSpewColorReset();
+const char * InferSpewColor(TypeConstraint* constraint);
+const char * InferSpewColor(TypeSet* types);
 
 void InferSpew(SpewChannel which, const char* fmt, ...);
 
@@ -1278,9 +1278,9 @@ bool ObjectGroupHasProperty(JSContext* cx, ObjectGroup* group, jsid id, const Va
 
 #else
 
-inline const char* InferSpewColorReset() { return nullptr; }
-inline const char* InferSpewColor(TypeConstraint* constraint) { return nullptr; }
-inline const char* InferSpewColor(TypeSet* types) { return nullptr; }
+inline const char * InferSpewColorReset() { return nullptr; }
+inline const char * InferSpewColor(TypeConstraint* constraint) { return nullptr; }
+inline const char * InferSpewColor(TypeSet* types) { return nullptr; }
 inline void InferSpew(SpewChannel which, const char* fmt, ...) {}
 
 #endif

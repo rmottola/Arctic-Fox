@@ -28,9 +28,8 @@ namespace dom {
 class DocumentFragment;
 class DOMRect;
 class DOMRectList;
-class Selection;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 class nsRange final : public nsIDOMRange,
                       public nsStubMutationObserver,

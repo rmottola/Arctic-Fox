@@ -27,7 +27,11 @@ this.SitePermissions = {
   /* Returns an array of all permission IDs.
    */
   listPermissions: function () {
-    return Object.keys(gPermissionObject);
+    let array = Object.keys(gPermissionObject);
+    array.sort((a, b) => {
+      return this.getPermissionLabel(a).localeCompare(this.getPermissionLabel(b));
+    });
+    return array;
   },
 
   /* Returns an array of permission states to be exposed to the user for a
@@ -103,13 +107,6 @@ this.SitePermissions = {
    * a UI for managing permissions.
    */
   getStateLabel: function (aPermissionID, aState) {
-    if (aPermissionID in gPermissionObject &&
-        gPermissionObject[aPermissionID].getStateLabel) {
-      let label = gPermissionObject[aPermissionID].getStateLabel(aState);
-      if (label)
-        return label;
-    }
-
     switch (aState) {
       case this.UNKNOWN:
         return gStringBundle.GetStringFromName("alwaysAsk");
@@ -138,11 +135,6 @@ let gPermissionObject = {
    *    Called to get the permission's default state.
    *    Defaults to UNKNOWN, indicating that the user will be asked each time
    *    a page asks for that permissions.
-   *
-   *  - getStateLabel
-   *    Called to get the localized label for the given permission state, to be
-   *    used in a UI for managing permissions. May return null for states that
-   *    should use their default label.
    *
    *  - states
    *    Array of permission states to be exposed to the user.

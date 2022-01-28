@@ -58,6 +58,7 @@
         macanimationtype="document"
         screenX="4" screenY="4"
         fullscreenbutton="true"
+        retargetdocumentfocus="urlbar"
         persist="screenX screenY width height sizemode">
 
 # All JS files which are not content (only) dependent that browser.xul
@@ -439,6 +440,7 @@
             <image id="push-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="addons-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="indexedDB-notification-icon" class="notification-anchor-icon" role="button"/>
+            <image id="login-fill-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="password-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="webapps-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="plugins-notification-icon" class="notification-anchor-icon" role="button"/>

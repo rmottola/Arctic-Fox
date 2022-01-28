@@ -19,6 +19,25 @@ namespace IPC
 {
 
 template<>
+struct ParamTraits<mozilla::EventMessage>
+{
+  typedef mozilla::EventMessage paramType;
+
+  static void Write(Message* aMsg, const paramType& aParam)
+  {
+    WriteParam(aMsg, static_cast<const mozilla::EventMessageType&>(aParam));
+  }
+
+  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  {
+    mozilla::EventMessageType eventMessage = 0;
+    bool ret = ReadParam(aMsg, aIter, &eventMessage);
+    *aResult = static_cast<paramType>(eventMessage);
+    return ret;
+  }
+};
+
+template<>
 struct ParamTraits<mozilla::BaseEventFlags>
 {
   typedef mozilla::BaseEventFlags paramType;
@@ -48,7 +67,7 @@ struct ParamTraits<mozilla::WidgetEvent>
   {
     WriteParam(aMsg,
       static_cast<mozilla::EventClassIDType>(aParam.mClass));
-    WriteParam(aMsg, aParam.message);
+    WriteParam(aMsg, aParam.mMessage);
     WriteParam(aMsg, aParam.refPoint);
     WriteParam(aMsg, aParam.time);
     WriteParam(aMsg, aParam.timeStamp);
@@ -59,7 +78,7 @@ struct ParamTraits<mozilla::WidgetEvent>
   {
     mozilla::EventClassIDType eventClassID = 0;
     bool ret = ReadParam(aMsg, aIter, &eventClassID) &&
-               ReadParam(aMsg, aIter, &aResult->message) &&
+               ReadParam(aMsg, aIter, &aResult->mMessage) &&
                ReadParam(aMsg, aIter, &aResult->refPoint) &&
                ReadParam(aMsg, aIter, &aResult->time) &&
                ReadParam(aMsg, aIter, &aResult->timeStamp) &&
@@ -593,7 +612,6 @@ struct ParamTraits<mozilla::WidgetQueryContentEvent>
 
   static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
   {
-    aResult->mWasAsync = true;
     return ReadParam(aMsg, aIter,
                      static_cast<mozilla::WidgetGUIEvent*>(aResult)) &&
            ReadParam(aMsg, aIter, &aResult->mSucceeded) &&

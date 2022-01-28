@@ -20,15 +20,6 @@ ca_ext_text = ('basicConstraints = critical, CA:TRUE\n' +
                'keyUsage = keyCertSign, cRLSign\n')
 ee_ext_text = ''
 
-aia_prefix = 'authorityInfoAccess = OCSP;URI:http://www.example.com:8888/'
-aia_suffix = '/\n'
-
-mozilla_testing_ev_policy = ('certificatePolicies = @v3_ca_ev_cp\n\n' +
-                             '[ v3_ca_ev_cp ]\n' +
-                             'policyIdentifier = ' +
-                             '1.3.6.1.4.1.13769.666.666.666.1.500.9.1\n\n' +
-                             'CPS.1 = "http://mytestdomain.local/cps"')
-
 generated_ev_root_filenames = []
 generated_certs = []
 
@@ -73,8 +64,8 @@ def generate_and_maybe_import_cert(key_type, cert_name_prefix, cert_name_suffix,
                       (key_type, key_size))
     if generate_ev:
         cert_name = 'ev_' + cert_name
-        ev_ext_text = (aia_prefix + cert_name + aia_suffix +
-                       mozilla_testing_ev_policy)
+        ev_ext_text = (CertUtils.aia_prefix + cert_name + CertUtils.aia_suffix +
+                       CertUtils.mozilla_testing_ev_policy)
         subject_string += ' (EV)'
 
     # Use the organization field to store the cert nickname for easier debugging
@@ -106,7 +97,8 @@ def generate_and_maybe_import_cert(key_type, cert_name_prefix, cert_name_suffix,
         signer_key_filename,
         signer_cert_filename,
         subject_string,
-        key_size)
+        key_size,
+        3 * 365 + 3 * 31) # 39 months
     generated_certs.append([cert_name, key_filename, cert_filename])
 
     if generate_ev:
@@ -245,9 +237,6 @@ def generate_combination_chains():
 # Create a NSS DB for use by the OCSP responder.
 CertUtils.init_nss_db(srcdir)
 
-# TODO(bug 636807): SECKEY_PublicKeyStrengthInBits() rounds up the number of
-# bits to the next multiple of 8 - therefore the highest key size less than 1024
-# that can be tested is 1016, less than 2048 is 2040 and so on.
 generate_rsa_chains('1016', '1024', False)
 generate_rsa_chains('2040', '2048', True)
 generate_ecc_chains()

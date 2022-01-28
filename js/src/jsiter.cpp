@@ -511,8 +511,8 @@ Compare(T* a, T* b, size_t c)
 
 static bool legacy_iterator_next(JSContext* cx, unsigned argc, Value* vp);
 
-static inline PropertyIteratorObject *
-NewPropertyIteratorObject(JSContext *cx, unsigned flags)
+static inline PropertyIteratorObject*
+NewPropertyIteratorObject(JSContext* cx, unsigned flags)
 {
     if (flags & JSITER_ENUMERATE) {
         RootedObjectGroup group(cx, ObjectGroup::defaultNewGroup(cx, &PropertyIteratorObject::class_,
@@ -520,18 +520,18 @@ NewPropertyIteratorObject(JSContext *cx, unsigned flags)
         if (!group)
             return nullptr;
 
-        const Class *clasp = &PropertyIteratorObject::class_;
+        const Class* clasp = &PropertyIteratorObject::class_;
         RootedShape shape(cx, EmptyShape::getInitialShape(cx, clasp, TaggedProto(nullptr),
                                                           ITERATOR_FINALIZE_KIND));
         if (!shape)
             return nullptr;
 
-        JSObject *obj = JSObject::create(cx, ITERATOR_FINALIZE_KIND,
+        JSObject* obj = JSObject::create(cx, ITERATOR_FINALIZE_KIND,
                                          GetInitialHeap(GenericObject, clasp), shape, group);
         if (!obj)
             return nullptr;
 
-        PropertyIteratorObject *res = &obj->as<PropertyIteratorObject>();
+        PropertyIteratorObject* res = &obj->as<PropertyIteratorObject>();
 
         MOZ_ASSERT(res->numFixedSlots() == JSObject::ITER_CLASS_NFIXED_SLOTS);
         return res;

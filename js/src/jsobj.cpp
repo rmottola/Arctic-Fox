@@ -871,7 +871,7 @@ js::NewObjectWithGroupCommon(ExclusiveContext* cx, HandleObjectGroup group,
         return nullptr;
 
     if (isCachable && !obj->as<NativeObject>().hasDynamicSlots()) {
-        NewObjectCache &cache = cx->asJSContext()->runtime()->newObjectCache;
+        NewObjectCache& cache = cx->asJSContext()->runtime()->newObjectCache;
         NewObjectCache::EntryIndex entry = -1;
         cache.lookupGroup(group, allocKind, &entry);
         cache.fillGroup(entry, group, allocKind, &obj->as<NativeObject>());
@@ -915,7 +915,7 @@ js::CreateThis(JSContext* cx, const Class* newclasp, HandleObject callee)
     return NewObjectWithClassProto(cx, newclasp, proto, kind);
 }
 
-static inline JSObject* 
+static inline JSObject*
 CreateThisForFunctionWithGroup(JSContext* cx, HandleObjectGroup group,
                                NewObjectKind newKind)
 {
@@ -2445,6 +2445,13 @@ js::SetPrototype(JSContext* cx, HandleObject obj, HandleObject proto, JS::Object
         return false;
     }
 
+    /*
+     * ES6 9.1.2 step 3-4 if |obj.[[Prototype]]| has SameValue as |proto| return true.
+     * Since the values in question are objects, we can just compare pointers.
+     */
+    if (proto == obj->getProto())
+        return result.succeed();
+
     /* ES6 9.1.2 step 5 forbids changing [[Prototype]] if not [[Extensible]]. */
     bool extensible;
     if (!IsExtensible(cx, obj, &extensible))
@@ -2452,10 +2459,16 @@ js::SetPrototype(JSContext* cx, HandleObject obj, HandleObject proto, JS::Object
     if (!extensible)
         return result.fail(JSMSG_CANT_SET_PROTO);
 
-    /* ES6 9.1.2 step 6 forbids generating cyclical prototype chains. */
+    /*
+     * ES6 9.1.2 step 6 forbids generating cyclical prototype chains. But we
+     * have to do this comparison on the observable outer objects, not on the
+     * possibly-inner object we're setting the proto on.
+     */
+    RootedObject outerObj(cx, GetOuterObject(cx, obj));
     RootedObject obj2(cx);
     for (obj2 = proto; obj2; ) {
-        if (obj2 == obj)
+        MOZ_ASSERT(GetOuterObject(cx, obj2) == obj2);
+        if (obj2 == outerObj)
             return result.fail(JSMSG_CANT_SET_PROTO_CYCLE);
 
         if (!GetPrototype(cx, obj2, &obj2))
@@ -2577,8 +2590,10 @@ js::GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
     } else {
         // This is either a straight-up data property or (rarely) a
         // property with a JSGetterOp/JSSetterOp. The latter must be
-        // reported to the caller as a plain data property, so don't
-        // populate desc.getter/setter, and mask away the SHARED bit.
+        // reported to the caller as a plain data property, so clear
+        // desc.getter/setter, and mask away the SHARED bit.
+        desc.setGetter(nullptr);
+        desc.setSetter(nullptr);
         desc.attributesRef() &= ~JSPROP_SHARED;
 
         if (IsImplicitDenseOrTypedArrayElement(shape)) {
@@ -2678,7 +2693,7 @@ js::DefineProperty(ExclusiveContext* cx, HandleObject obj, PropertyName* name, H
 
 bool
 js::DefineElement(ExclusiveContext* cx, HandleObject obj, uint32_t index, HandleValue value,
-                   JSGetterOp getter, JSSetterOp setter, unsigned attrs)
+                  JSGetterOp getter, JSSetterOp setter, unsigned attrs)
 {
     MOZ_ASSERT(getter != JS_PropertyStub);
     MOZ_ASSERT(setter != JS_StrictPropertyStub);
@@ -2753,6 +2768,7 @@ js::WatchGuts(JSContext* cx, JS::HandleObject origObj, JS::HandleId id, JS::Hand
         wpmap = cx->runtime()->new_<WatchpointMap>();
         if (!wpmap || !wpmap->init()) {
             ReportOutOfMemory(cx);
+            js_delete(wpmap);
             return false;
         }
         cx->compartment()->watchpointMap = wpmap;
@@ -2838,13 +2854,16 @@ js::HasDataProperty(JSContext* cx, NativeObject* obj, jsid id, Value* vp)
     return false;
 }
 
+
+/*** ToPrimitive *************************************************************/
+
 /*
- * Gets |obj[id]|.  If that value's not callable, returns true and stores a
- * non-primitive value in *vp.  If it's callable, calls it with no arguments
- * and |obj| as |this|, returning the result in *vp.
+ * Gets |obj[id]|.  If that value's not callable, returns true and stores an
+ * object value in *vp.  If it's callable, calls it with no arguments and |obj|
+ * as |this|, returning the result in *vp.
  *
- * This is a mini-abstraction for ES5 8.12.8 [[DefaultValue]], either steps 1-2
- * or steps 3-4.
+ * This is a mini-abstraction for ES6 draft rev 36 (2015 Mar 17),
+ * 7.1.1, second algorithm (OrdinaryToPrimitive), steps 5.a-c.
  */
 static bool
 MaybeCallMethod(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp)
@@ -2856,6 +2875,29 @@ MaybeCallMethod(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue
         return true;
     }
     return Invoke(cx, ObjectValue(*obj), vp, 0, nullptr, vp);
+}
+
+static bool
+ReportCantConvert(JSContext* cx, unsigned errorNumber, HandleObject obj, JSType hint)
+{
+    const Class* clasp = obj->getClass();
+
+    // Avoid recursive death when decompiling in ReportValueError.
+    RootedString str(cx);
+    if (hint == JSTYPE_STRING) {
+        str = JS_AtomizeAndPinString(cx, clasp->name);
+        if (!str)
+            return false;
+    } else {
+        str = nullptr;
+    }
+
+    RootedValue val(cx, ObjectValue(*obj));
+    ReportValueError2(cx, errorNumber, JSDVG_SEARCH_STACK, val, str,
+                      hint == JSTYPE_VOID
+                      ? "primitive type"
+                      : hint == JSTYPE_STRING ? "string" : "number");
+    return false;
 }
 
 bool
@@ -2889,10 +2931,10 @@ JS::OrdinaryToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHan
         if (vp.isPrimitive())
             return true;
     } else {
+        id = NameToId(cx->names().valueOf);
 
         /* Optimize new String(...).valueOf(). */
         if (clasp == &StringObject::class_) {
-            id = NameToId(cx->names().valueOf);
             StringObject* nobj = &obj->as<StringObject>();
             if (ClassMethodIsNative(cx, nobj, &StringObject::class_, id, str_toString)) {
                 vp.setString(nobj->unbox());
@@ -2902,7 +2944,6 @@ JS::OrdinaryToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHan
 
         /* Optimize new Number(...).valueOf(). */
         if (clasp == &NumberObject::class_) {
-            id = NameToId(cx->names().valueOf);
             NumberObject* nobj = &obj->as<NumberObject>();
             if (ClassMethodIsNative(cx, nobj, &NumberObject::class_, id, num_valueOf)) {
                 vp.setNumber(nobj->unbox());
@@ -2910,7 +2951,6 @@ JS::OrdinaryToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHan
             }
         }
 
-        id = NameToId(cx->names().valueOf);
         if (!MaybeCallMethod(cx, obj, id, vp))
             return false;
         if (vp.isPrimitive())
@@ -2923,64 +2963,52 @@ JS::OrdinaryToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHan
             return true;
     }
 
-    /* Avoid recursive death when decompiling in ReportValueError. */
-    RootedString str(cx);
-    if (hint == JSTYPE_STRING) {
-        str = JS_AtomizeAndPinString(cx, clasp->name);
-        if (!str)
+    return ReportCantConvert(cx, JSMSG_CANT_CONVERT_TO, obj, hint);
+}
+
+bool
+js::ToPrimitiveSlow(JSContext* cx, JSType preferredType, MutableHandleValue vp)
+{
+    // Step numbers refer to the first algorithm listed in ES6 draft rev 36
+    // (2015 Mar 17) 7.1.1 ToPrimitive.
+    MOZ_ASSERT(preferredType == JSTYPE_VOID ||
+               preferredType == JSTYPE_STRING ||
+               preferredType == JSTYPE_NUMBER);
+    RootedObject obj(cx, &vp.toObject());
+
+    // Steps 4-5.
+    RootedId id(cx, SYMBOL_TO_JSID(cx->wellKnownSymbols().toPrimitive));
+    RootedValue method(cx);
+    if (!GetProperty(cx, obj, obj, id, &method))
+        return false;
+
+    // Step 6.
+    if (!method.isUndefined()) {
+        // Step 6 of GetMethod. Invoke() below would do this check and throw a
+        // TypeError anyway, but this produces a better error message.
+        if (!IsCallable(method))
+            return ReportCantConvert(cx, JSMSG_TOPRIMITIVE_NOT_CALLABLE, obj, preferredType);
+
+        // Steps 1-3.
+        RootedValue hint(cx, StringValue(preferredType == JSTYPE_STRING ? cx->names().string :
+                                         preferredType == JSTYPE_NUMBER ? cx->names().number :
+                                         cx->names().default_));
+
+        // Steps 6.a-b.
+        if (!Invoke(cx, vp, method, 1, hint.address(), vp))
             return false;
-    } else {
-        str = nullptr;
+
+        // Steps 6.c-d.
+        if (vp.isObject())
+            return ReportCantConvert(cx, JSMSG_TOPRIMITIVE_RETURNED_OBJECT, obj, preferredType);
+        return true;
     }
 
-    RootedValue val(cx, ObjectValue(*obj));
-    ReportValueError2(cx, JSMSG_CANT_CONVERT_TO, JSDVG_SEARCH_STACK, val, str,
-                      hint == JSTYPE_VOID
-                      ? "primitive type"
-                      : hint == JSTYPE_STRING ? "string" : "number");
-    return false;
+    return OrdinaryToPrimitive(cx, obj, preferredType, vp);
 }
 
-bool
-js::ToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHandleValue vp)
-{
-    bool ok;
-    if (JSConvertOp op = obj->getClass()->convert)
-        ok = op(cx, obj, hint, vp);
-    else
-        ok = JS::OrdinaryToPrimitive(cx, obj, hint, vp);
-    MOZ_ASSERT_IF(ok, vp.isPrimitive());
-    return ok;
-}
 
-bool
-js::ToPrimitiveSlow(JSContext* cx, MutableHandleValue vp)
-{
-    JSObject* obj = &vp.toObject();
-
-    /* Optimize new String(...).valueOf(). */
-    if (obj->is<StringObject>()) {
-        jsid id = NameToId(cx->names().valueOf);
-        StringObject* nobj = &obj->as<StringObject>();
-        if (ClassMethodIsNative(cx, nobj, &StringObject::class_, id, str_toString)) {
-            vp.setString(nobj->unbox());
-            return true;
-        }
-    }
-
-    /* Optimize new Number(...).valueOf(). */
-    if (obj->is<NumberObject>()) {
-        jsid id = NameToId(cx->names().valueOf);
-        NumberObject* nobj = &obj->as<NumberObject>();
-        if (ClassMethodIsNative(cx, nobj, &NumberObject::class_, id, num_valueOf)) {
-            vp.setNumber(nobj->unbox());
-            return true;
-        }
-    }
-
-    RootedObject objRoot(cx, obj);
-    return ToPrimitive(cx, objRoot, JSTYPE_VOID, vp);
-}
+/* * */
 
 bool
 js::IsDelegate(JSContext* cx, HandleObject obj, const js::Value& v, bool* result)
@@ -3224,7 +3252,7 @@ dumpValue(const Value& v)
 }
 
 JS_FRIEND_API(void)
-js::DumpValue(const Value &val)
+js::DumpValue(const Value& val)
 {
     dumpValue(val);
     fputc('\n', stderr);
@@ -3286,7 +3314,9 @@ void
 JSObject::dump()
 {
     JSObject* obj = this;
-    fprintf(stderr, "object %p\n", (void*) obj);
+    JSObject* globalObj = &global();
+    fprintf(stderr, "object %p from global %p [%s]\n", (void*) obj,
+            (void*) globalObj, globalObj->getClass()->name);
     const Class* clasp = obj->getClass();
     fprintf(stderr, "class %p %s\n", (const void*)clasp, clasp->name);
 
@@ -3622,17 +3652,17 @@ JSObject::sizeOfIncludingThisInNursery() const
 
     MOZ_ASSERT(!isTenured());
 
-    const Nursery &nursery = compartment()->runtimeFromAnyThread()->gc.nursery;
+    const Nursery& nursery = compartment()->runtimeFromAnyThread()->gc.nursery;
     size_t size = Arena::thingSize(allocKindForTenure(nursery));
 
     if (is<NativeObject>()) {
-        const NativeObject &native = as<NativeObject>();
+        const NativeObject& native = as<NativeObject>();
 
         size += native.numFixedSlots() * sizeof(Value);
         size += native.numDynamicSlots() * sizeof(Value);
 
         if (native.hasDynamicElements()) {
-            js::ObjectElements &elements = *native.getElementsHeader();
+            js::ObjectElements& elements = *native.getElementsHeader();
             if (!elements.isCopyOnWrite() || elements.ownerObject() == this)
                 size += elements.capacity * sizeof(HeapSlot);
         }
@@ -3647,7 +3677,7 @@ JSObject::sizeOfIncludingThisInNursery() const
 size_t
 JS::ubi::Concrete<JSObject>::size(mozilla::MallocSizeOf mallocSizeOf) const
 {
-    JSObject &obj = get();
+    JSObject& obj = get();
 
     if (!obj.isTenured())
         return obj.sizeOfIncludingThisInNursery();

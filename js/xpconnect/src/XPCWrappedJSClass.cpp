@@ -566,14 +566,13 @@ nsXPCWrappedJSClass::DelegatedQueryInterface(nsXPCWrappedJS* self,
         // Instead, simply do the nsXPCWrappedJS part of
         // XPConvert::JSObject2NativeInterface() here to make sure we
         // get a new (or used) nsXPCWrappedJS.
-        nsXPCWrappedJS* wrapper;
-        nsresult rv = nsXPCWrappedJS::GetNewOrUsed(jsobj, aIID, &wrapper);
+        nsRefPtr<nsXPCWrappedJS> wrapper;
+        nsresult rv = nsXPCWrappedJS::GetNewOrUsed(jsobj, aIID, getter_AddRefs(wrapper));
         if (NS_SUCCEEDED(rv) && wrapper) {
             // We need to go through the QueryInterface logic to make
             // this return the right thing for the various 'special'
             // interfaces; e.g.  nsIPropertyBag.
             rv = wrapper->QueryInterface(aIID, aInstancePtr);
-            NS_RELEASE(wrapper);
             return rv;
         }
     }
@@ -1307,21 +1306,9 @@ pre_call_clean_up:
                 break;
         }
 
-// see bug #961488
-#if (defined(XP_UNIX) && !defined(XP_MACOSX) && !defined(_AIX)) && \
-    ((defined(__sparc) && !defined(__sparcv9) && !defined(__sparcv9__)) || \
-    (defined(__powerpc__) && !defined (__powerpc64__)))
-        if (type_tag == nsXPTType::T_JSVAL) {
-            if (!XPCConvert::JSData2Native(*(void**)(&pv->val), val, type,
-                                           &param_iid, nullptr))
-                break;
-        } else
-#endif
-        {
-            if (!XPCConvert::JSData2Native(&pv->val, val, type,
-                                           &param_iid, nullptr))
-                break;
-        }
+        if (!XPCConvert::JSData2Native(&pv->val, val, type,
+                                       &param_iid, nullptr))
+            break;
     }
 
     // if any params were dependent, then we must iterate again to convert them.

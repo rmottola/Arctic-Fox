@@ -165,6 +165,8 @@ browser.jar:
   skin/classic/browser/tabbrowser/tab.png             (tabbrowser/tab.png)
   skin/classic/browser/tabbrowser/tab-overflow-border.png (tabbrowser/tab-overflow-border.png)
   skin/classic/browser/tabbrowser/tabDragIndicator.png (tabbrowser/tabDragIndicator.png)
+  skin/classic/browser/tabbrowser/tab-audio.svg       (../shared/tabbrowser/tab-audio.svg)
+  skin/classic/browser/tabbrowser/tab-audio-small.svg (../shared/tabbrowser/tab-audio-small.svg)
   skin/classic/browser/devtools/add.svg                               (../shared/devtools/images/add.svg)
   skin/classic/browser/devtools/filter-swatch.svg                     (../shared/devtools/images/filter-swatch.svg)
   skin/classic/browser/devtools/search-clear-failed.svg               (../shared/devtools/images/search-clear-failed.svg)

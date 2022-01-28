@@ -372,64 +372,6 @@ TextAlignUnsafeEnabledPrefChangeCallback(const char* aPrefName, void* aClosure)
 }
 
 bool
-nsLayoutUtils::GetAnimationContent(const nsIFrame* aFrame,
-                    nsIContent* &aContentResult,
-                    nsCSSPseudoElements::Type &aPseudoTypeResult)
-{
-  aPseudoTypeResult = nsCSSPseudoElements::ePseudo_NotPseudoElement;
-  aContentResult = aFrame->GetContent();
-  if (!aContentResult) {
-    return false;
-  }
-  if (aFrame->IsGeneratedContentFrame()) {
-    nsIFrame* parent = aFrame->GetParent();
-    if (parent->IsGeneratedContentFrame()) {
-      return false;
-    }
-    nsIAtom* name = aContentResult->NodeInfo()->NameAtom();
-    if (name == nsGkAtoms::mozgeneratedcontentbefore) {
-      aPseudoTypeResult = nsCSSPseudoElements::ePseudo_before;
-    } else if (name == nsGkAtoms::mozgeneratedcontentafter) {
-      aPseudoTypeResult = nsCSSPseudoElements::ePseudo_after;
-    } else {
-      return false;
-    }
-    aContentResult = aContentResult->GetParent();
-    if (!aContentResult) {
-      return false;
-    }
-  } else if (!aContentResult->MayHaveAnimations()) {
-    return false;
-  }
-  return true;
-}
-
-static AnimationCollection*
-GetAnimationCollection(nsIContent* aContent,
-                       nsCSSPseudoElements::Type aPseudoType,
-                       nsIAtom* aAnimationProperty)
-{
-  if (aPseudoType != nsCSSPseudoElements::ePseudo_NotPseudoElement) {
-    if (aAnimationProperty == nsGkAtoms::animationsProperty) {
-      aAnimationProperty =
-        aPseudoType == nsCSSPseudoElements::ePseudo_before ?
-          nsGkAtoms::animationsOfBeforeProperty :
-          nsGkAtoms::animationsOfAfterProperty;
-    } else if (aAnimationProperty == nsGkAtoms::transitionsProperty) {
-      aAnimationProperty =
-        aPseudoType == nsCSSPseudoElements::ePseudo_before ?
-          nsGkAtoms::transitionsOfBeforeProperty :
-          nsGkAtoms::transitionsOfAfterProperty;
-    } else {
-      MOZ_ASSERT(false, "unsupported animation property for pseudo-element");
-      return nullptr;
-    }
-  }
-  return static_cast<AnimationCollection*>(
-           aContent->GetProperty(aAnimationProperty));
-}
-
-bool
 nsLayoutUtils::HasAnimationsForCompositor(const nsIFrame* aFrame,
                                           nsCSSProperty aProperty)
 {
@@ -439,43 +381,43 @@ nsLayoutUtils::HasAnimationsForCompositor(const nsIFrame* aFrame,
 }
 
 bool
-nsLayoutUtils::HasAnimations(const nsIFrame* aFrame,
-                             nsCSSProperty aProperty)
+nsLayoutUtils::HasCurrentAnimationOfProperty(const nsIFrame* aFrame,
+                                             nsCSSProperty aProperty)
 {
-  nsIContent* content;
-  nsCSSPseudoElements::Type pseudoType;
-  if (!nsLayoutUtils::GetAnimationContent(aFrame, content, pseudoType)) {
-    return false;
+  nsPresContext* presContext = aFrame->PresContext();
+  AnimationCollection* collection =
+    presContext->AnimationManager()->GetAnimationCollection(aFrame);
+  if (collection &&
+      collection->HasCurrentAnimationOfProperty(aProperty)) {
+    return true;
   }
-
-  static nsIAtom* const sAnimProps[] = { nsGkAtoms::transitionsProperty,
-                                         nsGkAtoms::animationsProperty,
-                                         nullptr };
-  for (nsIAtom* const* animProp = sAnimProps; *animProp; animProp++) {
-    AnimationCollection* collection =
-      GetAnimationCollection(content, pseudoType, *animProp);
-    if (collection &&
-        collection->HasAnimationOfProperty(aProperty)) {
-      return true;
-    }
+  collection =
+    presContext->TransitionManager()->GetAnimationCollection(aFrame);
+  if (collection &&
+      collection->HasCurrentAnimationOfProperty(aProperty)) {
+    return true;
   }
-
   return false;
 }
 
 bool
-nsLayoutUtils::HasCurrentAnimations(const nsIFrame* aFrame,
-                                    nsIAtom* aAnimationProperty)
+nsLayoutUtils::HasCurrentAnimations(const nsIFrame* aFrame)
 {
-  nsIContent* content;
-  nsCSSPseudoElements::Type pseudoType;
-  if (!nsLayoutUtils::GetAnimationContent(aFrame, content, pseudoType)) {
-    return false;
-  }
-
+  nsPresContext* presContext = aFrame->PresContext();
   AnimationCollection* collection =
-    GetAnimationCollection(content, pseudoType, aAnimationProperty);
-  return (collection && collection->HasCurrentAnimations());
+    presContext->AnimationManager()->GetAnimationCollection(aFrame);
+  return collection &&
+         collection->HasCurrentAnimations();
+}
+
+bool
+nsLayoutUtils::HasCurrentTransitions(const nsIFrame* aFrame)
+{
+  nsPresContext* presContext = aFrame->PresContext();
+  AnimationCollection* collection =
+    presContext->TransitionManager()->GetAnimationCollection(aFrame);
+  return collection &&
+         collection->HasCurrentAnimations();
 }
 
 bool
@@ -483,25 +425,21 @@ nsLayoutUtils::HasCurrentAnimationsForProperties(const nsIFrame* aFrame,
                                                  const nsCSSProperty* aProperties,
                                                  size_t aPropertyCount)
 {
-  nsIContent* content;
-  nsCSSPseudoElements::Type pseudoType;
-  if (!nsLayoutUtils::GetAnimationContent(aFrame, content, pseudoType)) {
-    return false;
+  nsPresContext* presContext = aFrame->PresContext();
+  AnimationCollection* collection =
+    presContext->AnimationManager()->GetAnimationCollection(aFrame);
+  if (collection &&
+      collection->HasCurrentAnimationsForProperties(aProperties,
+                                                    aPropertyCount)) {
+    return true;
   }
-
-  static nsIAtom* const sAnimProps[] = { nsGkAtoms::transitionsProperty,
-                                         nsGkAtoms::animationsProperty,
-                                         nullptr };
-  for (nsIAtom* const* animProp = sAnimProps; *animProp; animProp++) {
-    AnimationCollection* collection =
-      GetAnimationCollection(content, pseudoType, *animProp);
-    if (collection &&
-        collection->HasCurrentAnimationsForProperties(aProperties,
-                                                      aPropertyCount)) {
-      return true;
-    }
+  collection =
+    presContext->TransitionManager()->GetAnimationCollection(aFrame);
+  if (collection &&
+      collection->HasCurrentAnimationsForProperties(aProperties,
+                                                    aPropertyCount)) {
+    return true;
   }
-
   return false;
 }
 
@@ -526,7 +464,7 @@ GetMinAndMaxScaleForAnimationProperty(const nsIFrame* aFrame,
 {
   for (size_t animIdx = aAnimations->mAnimations.Length(); animIdx-- != 0; ) {
     dom::Animation* anim = aAnimations->mAnimations[animIdx];
-    if (!anim->GetEffect() || anim->GetEffect()->IsFinishedTransition()) {
+    if (!anim->IsRelevant()) {
       continue;
     }
     dom::KeyframeEffectReadOnly* effect = anim->GetEffect();
@@ -967,6 +905,9 @@ GetDisplayPortFromMarginsData(nsIContent* aContent,
   ScreenRect screenRect = LayoutDeviceRect::FromAppUnits(base, auPerDevPixel)
                         * parentRes;
 
+  nsRect expandedScrollableRect =
+    nsLayoutUtils::CalculateExpandedScrollableRect(frame);
+
   if (gfxPrefs::LayersTilesEnabled()) {
     // Note on the correctness of applying the alignment in Screen space:
     //   The correct space to apply the alignment in would be Layer space, but
@@ -1002,12 +943,20 @@ GetDisplayPortFromMarginsData(nsIContent* aContent,
                                 * res;
 
     screenRect += scrollPosScreen;
+    // Round-out the display port to the nearest alignment (tiles)
     float x = alignmentX * floor(screenRect.x / alignmentX);
     float y = alignmentY * floor(screenRect.y / alignmentY);
-    float w = alignmentX * ceil(screenRect.XMost() / alignmentX) - x;
-    float h = alignmentY * ceil(screenRect.YMost() / alignmentY) - y;
+    float w = alignmentX * ceil(screenRect.width / alignmentX + 1);
+    float h = alignmentY * ceil(screenRect.height / alignmentY + 1);
     screenRect = ScreenRect(x, y, w, h);
     screenRect -= scrollPosScreen;
+
+    ScreenRect screenExpScrollableRect =
+      LayoutDeviceRect::FromAppUnits(expandedScrollableRect,
+                                     auPerDevPixel) * res;
+
+    // Make sure the displayport remains within the scrollable rect.
+    screenRect = screenRect.ForceInside(screenExpScrollableRect - scrollPosScreen);
   } else {
     nscoord maxSizeInAppUnits = GetMaxDisplayPortSize(aContent);
     if (maxSizeInAppUnits == nscoord_MAX) {
@@ -1046,7 +995,6 @@ GetDisplayPortFromMarginsData(nsIContent* aContent,
   result = ApplyRectMultiplier(result, aMultiplier);
 
   // Finally, clamp it to the expanded scrollable rect.
-  nsRect expandedScrollableRect = nsLayoutUtils::CalculateExpandedScrollableRect(frame);
   result = expandedScrollableRect.Intersect(result + scrollPos) - scrollPos;
 
   return result;
@@ -1756,7 +1704,8 @@ nsLayoutUtils::SetFixedPositionLayerData(Layer* aLayer,
                                          const nsRect& aAnchorRect,
                                          const nsIFrame* aFixedPosFrame,
                                          nsPresContext* aPresContext,
-                                         const ContainerLayerParameters& aContainerParameters) {
+                                         const ContainerLayerParameters& aContainerParameters,
+                                         bool aIsClipFixed) {
   // Find out the rect of the viewport frame relative to the reference frame.
   // This, in conjunction with the container scale, will correspond to the
   // coordinate-space of the built layer.
@@ -1785,17 +1734,6 @@ nsLayoutUtils::SetFixedPositionLayerData(Layer* aLayer,
   // corresponding side of its container should be the anchor point,
   // defaulting to top-left.
   LayerPoint anchor(anchorRect.x, anchorRect.y);
-  // Make sure the layer is aware of any fixed position margins that have
-  // been set.
-  nsMargin fixedMargins = aPresContext->PresShell()->GetContentDocumentFixedPositionMargins();
-  LayerMargin fixedLayerMargins(NSAppUnitsToFloatPixels(fixedMargins.top, factor) *
-                                  aContainerParameters.mYScale,
-                                NSAppUnitsToFloatPixels(fixedMargins.right, factor) *
-                                  aContainerParameters.mXScale,
-                                NSAppUnitsToFloatPixels(fixedMargins.bottom, factor) *
-                                  aContainerParameters.mYScale,
-                                NSAppUnitsToFloatPixels(fixedMargins.left, factor) *
-                                  aContainerParameters.mXScale);
 
   if (aFixedPosFrame != aViewportFrame) {
     const nsStylePosition* position = aFixedPosFrame->StylePosition();
@@ -1813,22 +1751,15 @@ nsLayoutUtils::SetFixedPositionLayerData(Layer* aLayer,
         anchor.y = anchorRect.YMost();
       }
     }
-
-    // If the frame is auto-positioned on either axis, set the top/left layer
-    // margins to -1, to indicate to the compositor that this layer is
-    // unaffected by fixed margins.
-    if (position->mOffset.GetLeftUnit() == eStyleUnit_Auto &&
-        position->mOffset.GetRightUnit() == eStyleUnit_Auto) {
-      fixedLayerMargins.left = -1;
-    }
-    if (position->mOffset.GetTopUnit() == eStyleUnit_Auto &&
-        position->mOffset.GetBottomUnit() == eStyleUnit_Auto) {
-      fixedLayerMargins.top = -1;
-    }
   }
 
-  aLayer->SetFixedPositionAnchor(anchor);
-  aLayer->SetFixedPositionMargins(fixedLayerMargins);
+  ViewID id = FrameMetrics::NULL_SCROLL_ID;
+  if (nsIFrame* rootScrollFrame = aPresContext->PresShell()->GetRootScrollFrame()) {
+    if (nsIContent* content = rootScrollFrame->GetContent()) {
+      id = FindOrCreateIDFor(content);
+    }
+  }
+  aLayer->SetFixedPositionData(id, anchor, aIsClipFixed);
 }
 
 bool
@@ -2403,7 +2334,7 @@ nsLayoutUtils::GetTransformToAncestor(nsIFrame *aFrame, const nsIFrame *aAncesto
   }
   ctm = aFrame->GetTransformMatrix(aAncestor, &parent);
   while (parent && parent != aAncestor) {
-    if (!parent->Preserves3DChildren()) {
+    if (!parent->Extend3DContext()) {
       ctm.ProjectTo2D();
     }
     ctm = ctm * parent->GetTransformMatrix(aAncestor, &parent);
@@ -2440,7 +2371,7 @@ GetTransformToAncestorExcludingAnimated(nsIFrame* aFrame,
     if (ActiveLayerTracker::IsScaleSubjectToAnimation(parent)) {
       return Matrix4x4();
     }
-    if (!parent->Preserves3DChildren()) {
+    if (!parent->Extend3DContext()) {
       ctm.ProjectTo2D();
     }
     ctm = ctm * parent->GetTransformMatrix(aAncestor, &parent);
@@ -2667,7 +2598,7 @@ nsLayoutUtils::GetLayerTransformForFrame(nsIFrame* aFrame,
 {
   // FIXME/bug 796690: we can sometimes compute a transform in these
   // cases, it just increases complexity considerably.  Punt for now.
-  if (aFrame->Preserves3DChildren() || aFrame->HasTransformGetter()) {
+  if (aFrame->Extend3DContext() || aFrame->HasTransformGetter()) {
     return false;
   }
 
@@ -3119,6 +3050,11 @@ nsLayoutUtils::PaintFrame(nsRenderingContext* aRenderingContext, nsIFrame* aFram
         nsLayoutUtils::CalculateCompositionSizeForFrame(rootScrollFrame));
     usingDisplayPort = nsLayoutUtils::GetOrMaybeCreateDisplayPort(
         builder, rootScrollFrame, displayportBase, &displayport);
+  }
+
+  nsDisplayList hoistedScrollItemStorage;
+  if (aFlags & (PAINT_WIDGET_LAYERS | PAINT_TO_WINDOW)) {
+    builder.SetCommittedScrollInfoItemList(&hoistedScrollItemStorage);
   }
 
   nsRegion visibleRegion;
@@ -4230,19 +4166,15 @@ GetPercentBSize(const nsStyleCoord& aStyle,
   MOZ_ASSERT(!aStyle.IsCalcUnit() || aStyle.CalcHasPercent(),
              "GetAbsoluteCoord should have handled this");
 
-  nsIFrame *f = aFrame->GetContainingBlock();
-  if (!f) {
-    NS_NOTREACHED("top of frame tree not a containing block");
-    return false;
-  }
-
   // During reflow, nsHTMLScrollFrame::ReflowScrolledFrame uses
   // SetComputedHeight on the reflow state for its child to propagate its
   // computed height to the scrolled content. So here we skip to the scroll
   // frame that contains this scrolled content in order to get the same
   // behavior as layout when computing percentage heights.
-  if (f->StyleContext()->GetPseudo() == nsCSSAnonBoxes::scrolledContent) {
-    f = f->GetParent();
+  nsIFrame *f = aFrame->GetContainingBlock(nsIFrame::SKIP_SCROLLED_FRAME);
+  if (!f) {
+    NS_NOTREACHED("top of frame tree not a containing block");
+    return false;
   }
 
   WritingMode wm = f->GetWritingMode();
@@ -4548,6 +4480,17 @@ AddIntrinsicSizeOffset(nsRenderingContext* aRenderingContext,
   return result;
 }
 
+static void
+AddStateBitToAncestors(nsIFrame* aFrame, nsFrameState aBit)
+{
+  for (nsIFrame* f = aFrame; f; f = f->GetParent()) {
+    if (f->HasAnyStateBits(aBit)) {
+      break;
+    }
+    f->AddStateBits(aBit);
+  }
+}
+
 /* static */ nscoord
 nsLayoutUtils::IntrinsicForAxis(PhysicalAxis        aAxis,
                                 nsRenderingContext* aRenderingContext,
@@ -4683,6 +4626,9 @@ nsLayoutUtils::IntrinsicForAxis(PhysicalAxis        aAxis,
       nscoord ratioISize = (horizontalAxis ? ratio.width  : ratio.height);
       nscoord ratioBSize = (horizontalAxis ? ratio.height : ratio.width);
       if (ratioBSize != 0) {
+        AddStateBitToAncestors(aFrame,
+            NS_FRAME_DESCENDANT_INTRINSIC_ISIZE_DEPENDS_ON_BSIZE);
+
         nscoord bSizeTakenByBoxSizing = 0;
         switch (boxSizing) {
         case NS_STYLE_BOX_SIZING_BORDER: {
@@ -6638,7 +6584,7 @@ nsLayoutUtils::GetReferenceFrame(nsIFrame* aFrame)
 {
   nsIFrame *f = aFrame;
   for (;;) {
-    if (f->IsTransformed() || IsPopup(f)) {
+    if (f->IsTransformed() || f->IsPreserve3DLeaf() || IsPopup(f)) {
       return f;
     }
     nsIFrame* parent = GetCrossDocParentFrame(f);
@@ -6647,16 +6593,6 @@ nsLayoutUtils::GetReferenceFrame(nsIFrame* aFrame)
     }
     f = parent;
   }
-}
-
-/* static */ nsIFrame*
-nsLayoutUtils::GetTransformRootFrame(nsIFrame* aFrame)
-{
-  nsIFrame *parent = nsLayoutUtils::GetCrossDocParentFrame(aFrame);
-  while (parent && parent->Preserves3DChildren()) {
-    parent = nsLayoutUtils::GetCrossDocParentFrame(parent);
-  }
-  return parent;
 }
 
 /* static */ uint32_t
@@ -8247,19 +8183,6 @@ nsLayoutUtils::SetBSizeFromFontMetrics(const nsIFrame* aFrame,
 }
 
 /* static */ bool
-nsLayoutUtils::HasApzAwareListeners(EventListenerManager* aElm)
-{
-  if (!aElm) {
-    return false;
-  }
-  return aElm->HasListenersFor(nsGkAtoms::ontouchstart) ||
-         aElm->HasListenersFor(nsGkAtoms::ontouchmove) ||
-         aElm->HasListenersFor(nsGkAtoms::onwheel) ||
-         aElm->HasListenersFor(nsGkAtoms::onDOMMouseScroll) ||
-         aElm->HasListenersFor(nsHtml5Atoms::onmousewheel);
-}
-
-/* static */ bool
 nsLayoutUtils::HasDocumentLevelListenersForApzAwareEvents(nsIPresShell* aShell)
 {
   if (nsIDocument* doc = aShell->GetDocument()) {
@@ -8269,7 +8192,7 @@ nsLayoutUtils::HasDocumentLevelListenersForApzAwareEvents(nsIPresShell* aShell)
         nullptr, nullptr, &targets);
     NS_ENSURE_SUCCESS(rv, false);
     for (size_t i = 0; i < targets.Length(); i++) {
-      if (HasApzAwareListeners(targets[i]->GetExistingListenerManager())) {
+      if (targets[i]->HasApzAwareListeners()) {
         return true;
       }
     }

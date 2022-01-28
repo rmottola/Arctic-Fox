@@ -51,6 +51,7 @@
 #include "mozilla/dom/TextDecoder.h"
 #include "mozilla/dom/TouchEvent.h"
 #include "mozilla/dom/ShadowRoot.h"
+#include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventListenerManager.h"
 #include "mozilla/EventStateManager.h"
@@ -663,9 +664,9 @@ nsContentUtils::InitializeModifierStrings()
 static bool
 ShouldAddEventToStringEventTable(const EventNameMapping& aMapping)
 {
-  switch(aMapping.mId) {
-#define ID_TO_EVENT(name_, id_, type_, struct_) \
-  case id_: return nsGkAtoms::on##name_ == aMapping.mAtom;
+  switch(aMapping.mMessage) {
+#define ID_TO_EVENT(name_, message_, type_, struct_) \
+  case message_: return nsGkAtoms::on##name_ == aMapping.mAtom;
 #include "mozilla/EventNameList.h"
 #undef ID_TO_EVENT
   default:
@@ -680,8 +681,8 @@ nsContentUtils::InitializeEventTable() {
   NS_ASSERTION(!sStringEventTable, "EventTable already initialized!");
 
   static const EventNameMapping eventArray[] = {
-#define EVENT(name_,  _id, _type, _class)          \
-    { nsGkAtoms::on##name_, _id, _type, _class },
+#define EVENT(name_,  _message, _type, _class)          \
+    { nsGkAtoms::on##name_, _type, _message, _class },
 #define WINDOW_ONLY_EVENT EVENT
 #define NON_IDL_EVENT EVENT
 #include "mozilla/EventNameList.h"
@@ -717,9 +718,9 @@ nsContentUtils::InitializeTouchEventTable()
   if (!sEventTableInitialized && sAtomEventTable && sStringEventTable) {
     sEventTableInitialized = true;
     static const EventNameMapping touchEventArray[] = {
-#define EVENT(name_,  _id, _type, _class)
-#define TOUCH_EVENT(name_,  _id, _type, _class)      \
-      { nsGkAtoms::on##name_, _id, _type, _class },
+#define EVENT(name_,  _message, _type, _class)
+#define TOUCH_EVENT(name_,  _message, _type, _class)      \
+      { nsGkAtoms::on##name_, _type, _message, _class },
 #include "mozilla/EventNameList.h"
 #undef TOUCH_EVENT
 #undef EVENT
@@ -3659,13 +3660,13 @@ nsContentUtils::IsEventAttributeName(nsIAtom* aName, int32_t aType)
 }
 
 // static
-uint32_t
-nsContentUtils::GetEventId(nsIAtom* aName)
+EventMessage
+nsContentUtils::GetEventMessage(nsIAtom* aName)
 {
   if (aName) {
     EventNameMapping mapping;
     if (sAtomEventTable->Get(aName, &mapping)) {
-      return mapping.mId;
+      return mapping.mMessage;
     }
   }
 
@@ -3684,14 +3685,15 @@ nsContentUtils::GetEventClassID(const nsAString& aName)
 }
 
 nsIAtom*
-nsContentUtils::GetEventIdAndAtom(const nsAString& aName,
-                                  mozilla::EventClassID aEventClassID,
-                                  uint32_t* aEventID)
+nsContentUtils::GetEventMessageAndAtom(const nsAString& aName,
+                                       mozilla::EventClassID aEventClassID,
+                                       EventMessage* aEventMessage)
 {
   EventNameMapping mapping;
   if (sStringEventTable->Get(aName, &mapping)) {
-    *aEventID = mapping.mEventClassID == aEventClassID ? mapping.mId :
-                                                         NS_USER_DEFINED_EVENT;
+    *aEventMessage =
+      mapping.mEventClassID == aEventClassID ? mapping.mMessage :
+                                               NS_USER_DEFINED_EVENT;
     return mapping.mAtom;
   }
 
@@ -3704,11 +3706,11 @@ nsContentUtils::GetEventIdAndAtom(const nsAString& aName,
     }
   }
 
-  *aEventID = NS_USER_DEFINED_EVENT;
+  *aEventMessage = NS_USER_DEFINED_EVENT;
   nsCOMPtr<nsIAtom> atom = do_GetAtom(NS_LITERAL_STRING("on") + aName);
   sUserDefinedEvents->AppendObject(atom);
   mapping.mAtom = atom;
-  mapping.mId = NS_USER_DEFINED_EVENT;
+  mapping.mMessage = NS_USER_DEFINED_EVENT;
   mapping.mType = EventNameType_None;
   mapping.mEventClassID = eBasicEventClass;
   sStringEventTable->Put(aName, mapping);
@@ -5398,8 +5400,8 @@ nsContentUtils::SetDataTransferInEvent(WidgetDragEvent* aDragEvent)
   // For draggesture and dragstart events, the data transfer object is
   // created before the event fires, so it should already be set. For other
   // drag events, get the object from the drag session.
-  NS_ASSERTION(aDragEvent->message != NS_DRAGDROP_GESTURE &&
-               aDragEvent->message != NS_DRAGDROP_START,
+  NS_ASSERTION(aDragEvent->mMessage != NS_DRAGDROP_GESTURE &&
+               aDragEvent->mMessage != NS_DRAGDROP_START,
                "draggesture event created without a dataTransfer");
 
   nsCOMPtr<nsIDragSession> dragSession = GetDragSession();
@@ -5418,20 +5420,22 @@ nsContentUtils::SetDataTransferInEvent(WidgetDragEvent* aDragEvent)
     // means, for instance calling the drag service directly, or a drag
     // from another application. In either case, a new dataTransfer should
     // be created that reflects the data.
-    initialDataTransfer = new DataTransfer(aDragEvent->target, aDragEvent->message, true, -1);
+    initialDataTransfer =
+      new DataTransfer(aDragEvent->target, aDragEvent->mMessage, true, -1);
 
     // now set it in the drag session so we don't need to create it again
     dragSession->SetDataTransfer(initialDataTransfer);
   }
 
   bool isCrossDomainSubFrameDrop = false;
-  if (aDragEvent->message == NS_DRAGDROP_DROP ||
-      aDragEvent->message == NS_DRAGDROP_DRAGDROP) {
+  if (aDragEvent->mMessage == NS_DRAGDROP_DROP ||
+      aDragEvent->mMessage == NS_DRAGDROP_DRAGDROP) {
     isCrossDomainSubFrameDrop = CheckForSubFrameDrop(dragSession, aDragEvent);
   }
 
   // each event should use a clone of the original dataTransfer.
-  initialDataTransfer->Clone(aDragEvent->target, aDragEvent->message, aDragEvent->userCancelled,
+  initialDataTransfer->Clone(aDragEvent->target, aDragEvent->mMessage,
+                             aDragEvent->userCancelled,
                              isCrossDomainSubFrameDrop,
                              getter_AddRefs(aDragEvent->dataTransfer));
   NS_ENSURE_TRUE(aDragEvent->dataTransfer, NS_ERROR_OUT_OF_MEMORY);
@@ -5439,16 +5443,16 @@ nsContentUtils::SetDataTransferInEvent(WidgetDragEvent* aDragEvent)
   // for the dragenter and dragover events, initialize the drop effect
   // from the drop action, which platform specific widget code sets before
   // the event is fired based on the keyboard state.
-  if (aDragEvent->message == NS_DRAGDROP_ENTER ||
-      aDragEvent->message == NS_DRAGDROP_OVER) {
+  if (aDragEvent->mMessage == NS_DRAGDROP_ENTER ||
+      aDragEvent->mMessage == NS_DRAGDROP_OVER) {
     uint32_t action, effectAllowed;
     dragSession->GetDragAction(&action);
     aDragEvent->dataTransfer->GetEffectAllowedInt(&effectAllowed);
     aDragEvent->dataTransfer->SetDropEffectInt(FilterDropEffect(action, effectAllowed));
   }
-  else if (aDragEvent->message == NS_DRAGDROP_DROP ||
-           aDragEvent->message == NS_DRAGDROP_DRAGDROP ||
-           aDragEvent->message == NS_DRAGDROP_END) {
+  else if (aDragEvent->mMessage == NS_DRAGDROP_DROP ||
+           aDragEvent->mMessage == NS_DRAGDROP_DRAGDROP ||
+           aDragEvent->mMessage == NS_DRAGDROP_END) {
     // For the drop and dragend events, set the drop effect based on the
     // last value that the dropEffect had. This will have been set in
     // EventStateManager::PostHandleEvent for the last dragenter or
@@ -7340,74 +7344,6 @@ nsContentUtils::CallOnAllRemoteChildren(nsIDOMWindow* aWindow,
   }
 }
 
-/* static */
-nsContentPolicyType
-nsContentUtils::InternalContentPolicyTypeToExternalOrMCBInternal(nsContentPolicyType aType)
-{
-  switch (aType) {
-  case nsIContentPolicy::TYPE_INTERNAL_SCRIPT:
-  case nsIContentPolicy::TYPE_INTERNAL_WORKER:
-  case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
-  case nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER:
-    return aType;
-
-  default:
-    return InternalContentPolicyTypeToExternalOrPreload(aType);
-  }
-}
-
-/* static */
-nsContentPolicyType
-nsContentUtils::InternalContentPolicyTypeToExternalOrPreload(nsContentPolicyType aType)
-{
-  if (aType == nsIContentPolicy::TYPE_INTERNAL_SCRIPT_PRELOAD ||
-      aType == nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD ||
-      aType == nsIContentPolicy::TYPE_INTERNAL_STYLESHEET_PRELOAD) {
-    return aType;
-  }
-  return InternalContentPolicyTypeToExternal(aType);
-}
-
-
-/* static */
-nsContentPolicyType
-nsContentUtils::InternalContentPolicyTypeToExternalOrWorker(nsContentPolicyType aType)
-{
-  switch (aType) {
-  case nsIContentPolicy::TYPE_INTERNAL_WORKER:
-  case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
-  case nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER:
-    return aType;
-
-  default:
-    return InternalContentPolicyTypeToExternal(aType);
-  }
-}
-
-/* static */
-bool
-nsContentUtils::IsPreloadType(nsContentPolicyType aType)
-{
-  if (aType == nsIContentPolicy::TYPE_INTERNAL_SCRIPT_PRELOAD ||
-      aType == nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD ||
-      aType == nsIContentPolicy::TYPE_INTERNAL_STYLESHEET_PRELOAD) {
-    return true;
-  }
-  return false;
-}
-
-/* static */
-nsContentPolicyType
-nsContentUtils::InternalContentPolicyTypeToExternalOrCSPInternal(nsContentPolicyType aType)
-{
-  if (aType == InternalContentPolicyTypeToExternalOrWorker(aType) ||
-      aType == InternalContentPolicyTypeToExternalOrPreload(aType)) {
-    return aType;
-  }
-  return InternalContentPolicyTypeToExternal(aType);
-}
-
-
 void
 nsContentUtils::TransferablesToIPCTransferables(nsISupportsArray* aTransferables,
                                                 nsTArray<IPCDataTransfer>& aIPC,
@@ -7710,7 +7646,7 @@ nsContentUtils::SendKeyEvent(nsCOMPtr<nsIWidget> aWidget,
   if (!aWidget)
     return NS_ERROR_FAILURE;
 
-  int32_t msg;
+  EventMessage msg;
   if (aType.EqualsLiteral("keydown"))
     msg = NS_KEY_DOWN;
   else if (aType.EqualsLiteral("keyup"))
@@ -7823,7 +7759,7 @@ nsContentUtils::SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
   if (!widget)
     return NS_ERROR_FAILURE;
 
-  int32_t msg;
+  EventMessage msg;
   bool contextMenuKey = false;
   if (aType.EqualsLiteral("mousedown"))
     msg = NS_MOUSE_BUTTON_DOWN;
@@ -7966,6 +7902,7 @@ nsContentUtils::InternalContentPolicyTypeToExternal(nsContentPolicyType aType)
   case nsIContentPolicy::TYPE_INTERNAL_SCRIPT:
   case nsIContentPolicy::TYPE_INTERNAL_WORKER:
   case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER:
     return nsIContentPolicy::TYPE_SCRIPT;
 
   case nsIContentPolicy::TYPE_INTERNAL_EMBED:
@@ -7988,6 +7925,73 @@ nsContentUtils::InternalContentPolicyTypeToExternal(nsContentPolicyType aType)
   default:
     return aType;
   }
+}
+
+/* static */
+nsContentPolicyType
+nsContentUtils::InternalContentPolicyTypeToExternalOrMCBInternal(nsContentPolicyType aType)
+{
+  switch (aType) {
+  case nsIContentPolicy::TYPE_INTERNAL_SCRIPT:
+  case nsIContentPolicy::TYPE_INTERNAL_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER:
+    return aType;
+
+  default:
+    return InternalContentPolicyTypeToExternalOrPreload(aType);
+  }
+}
+
+/* static */
+nsContentPolicyType
+nsContentUtils::InternalContentPolicyTypeToExternalOrPreload(nsContentPolicyType aType)
+{
+  if (aType == nsIContentPolicy::TYPE_INTERNAL_SCRIPT_PRELOAD ||
+      aType == nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD ||
+      aType == nsIContentPolicy::TYPE_INTERNAL_STYLESHEET_PRELOAD) {
+    return aType;
+  }
+  return InternalContentPolicyTypeToExternal(aType);
+}
+
+
+/* static */
+nsContentPolicyType
+nsContentUtils::InternalContentPolicyTypeToExternalOrWorker(nsContentPolicyType aType)
+{
+  switch (aType) {
+  case nsIContentPolicy::TYPE_INTERNAL_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER:
+    return aType;
+
+  default:
+    return InternalContentPolicyTypeToExternal(aType);
+  }
+}
+
+/* static */
+bool
+nsContentUtils::IsPreloadType(nsContentPolicyType aType)
+{
+  if (aType == nsIContentPolicy::TYPE_INTERNAL_SCRIPT_PRELOAD ||
+      aType == nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD ||
+      aType == nsIContentPolicy::TYPE_INTERNAL_STYLESHEET_PRELOAD) {
+    return true;
+  }
+  return false;
+}
+
+/* static */
+nsContentPolicyType
+nsContentUtils::InternalContentPolicyTypeToExternalOrCSPInternal(nsContentPolicyType aType)
+{
+  if (aType == InternalContentPolicyTypeToExternalOrWorker(aType) ||
+      aType == InternalContentPolicyTypeToExternalOrPreload(aType)) {
+    return aType;
+  }
+  return InternalContentPolicyTypeToExternal(aType);
 }
 
 nsresult
@@ -8038,4 +8042,23 @@ nsContentUtils::SetFetchReferrerURIWithPolicy(nsIPrincipal* aPrincipal,
 
   net::ReferrerPolicy referrerPolicy = aDoc->GetReferrerPolicy();
   return aChannel->SetReferrerWithPolicy(referrerURI, referrerPolicy);
+}
+
+// static
+bool
+nsContentUtils::PushEnabled(JSContext* aCx, JSObject* aObj)
+{
+  if (NS_IsMainThread()) {
+    return Preferences::GetBool("dom.push.enabled", false);
+  }
+
+  using namespace workers;
+
+  // Otherwise, check the pref via the WorkerPrivate
+  WorkerPrivate* workerPrivate = GetWorkerPrivateFromContext(aCx);
+  if (!workerPrivate) {
+    return false;
+  }
+
+  return workerPrivate->PushEnabled();
 }

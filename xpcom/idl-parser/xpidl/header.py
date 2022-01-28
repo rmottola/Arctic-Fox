@@ -7,7 +7,12 @@
 
 """Print a C++ header file for the IDL files specified on the command line"""
 
-import sys, os.path, re, xpidl, itertools, glob
+import sys
+import os.path
+import re
+import xpidl
+import itertools
+import glob
 
 printdoccomments = False
 
@@ -201,7 +206,8 @@ def print_header(idl, fd, filename):
     fd.write(header_end)
 
     for p in idl.productions:
-        if p.kind == 'include': continue
+        if p.kind == 'include':
+            continue
         if p.kind == 'cdata':
             fd.write(p.data)
             continue
@@ -236,7 +242,7 @@ uuid_decoder = re.compile(r"""(?P<m0>[a-f0-9]{8})-
                               (?P<m4>[a-f0-9]{12})$""", re.X)
 
 iface_prolog = """ {
- public: 
+ public:
 
   NS_DECLARE_STATIC_IID_ACCESSOR(%(defname)s_IID)
 
@@ -346,11 +352,11 @@ def write_interface(iface, fd):
 
         fd.write("  /* %s */\n" % m.toIDL())
         fd.write("  %s = 0;\n\n" % methodAsNative(m))
-                                                                           
+
     def write_attr_decl(a):
         printComments(fd, a.doccomments, '  ')
 
-        fd.write("  /* %s */\n" % a.toIDL());
+        fd.write("  /* %s */\n" % a.toIDL())
 
         fd.write("  %s = 0;\n" % attributeAsNative(a, True))
         if a.infallible:
@@ -442,7 +448,7 @@ def write_interface(iface, fd):
     fd.write(iface_forward % names)
 
     def emitTemplate(forward_infallible, tmpl, tmpl_notxpcom=None):
-        if tmpl_notxpcom == None:
+        if tmpl_notxpcom is None:
             tmpl_notxpcom = tmpl
         for member in iface.members:
             if isinstance(member, xpidl.Attribute):
@@ -484,7 +490,8 @@ def write_interface(iface, fd):
     fd.write(iface_template_prolog % names)
 
     for member in iface.members:
-        if isinstance(member, xpidl.ConstMember) or isinstance(member, xpidl.CDATA): continue
+        if isinstance(member, xpidl.ConstMember) or isinstance(member, xpidl.CDATA):
+            continue
         fd.write("/* %s */\n" % member.toIDL())
         if isinstance(member, xpidl.Attribute):
             fd.write(example_tmpl % {'implclass': implclass,

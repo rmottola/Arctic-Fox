@@ -560,7 +560,7 @@ public:
     void PrepareForForgetSkippable() override;
     void BeginCycleCollectionCallback() override;
     void EndCycleCollectionCallback(mozilla::CycleCollectorResults& aResults) override;
-    void DispatchDeferredDeletion(bool continuation) override;
+    void DispatchDeferredDeletion(bool aContinuation, bool aPurge = false) override;
 
     void CustomGCCallback(JSGCStatus status) override;
     void CustomOutOfMemoryCallback() override;
@@ -3830,9 +3830,9 @@ ObjectScope(JSObject* obj)
 JSObject* NewOutObject(JSContext* cx);
 bool IsOutObject(JSContext* cx, JSObject* obj);
 
-nsresult HasInstance(JSContext *cx, JS::HandleObject objArg, const nsID *iid, bool *bp);
+nsresult HasInstance(JSContext* cx, JS::HandleObject objArg, const nsID* iid, bool* bp);
 
-nsIPrincipal *GetObjectPrincipal(JSObject *obj);
+nsIPrincipal* GetObjectPrincipal(JSObject* obj);
 
 } // namespace xpc
 

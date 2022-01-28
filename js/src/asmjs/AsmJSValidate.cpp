@@ -476,6 +476,21 @@ NextNonEmptyStatement(ParseNode* pn)
 }
 
 static bool
+GetToken(AsmJSParser& parser, TokenKind* tkp)
+{
+    TokenStream& ts = parser.tokenStream;
+    TokenKind tk;
+    while (true) {
+        if (!ts.getToken(&tk, TokenStream::Operand))
+            return false;
+        if (tk != TOK_SEMI)
+            break;
+    }
+    *tkp = tk;
+    return true;
+}
+
+static bool
 PeekToken(AsmJSParser& parser, TokenKind* tkp)
 {
     TokenStream& ts = parser.tokenStream;
@@ -485,7 +500,7 @@ PeekToken(AsmJSParser& parser, TokenKind* tkp)
             return false;
         if (tk != TOK_SEMI)
             break;
-        ts.consumeKnownToken(TOK_SEMI);
+        ts.consumeKnownToken(TOK_SEMI, TokenStream::Operand);
     }
     *tkp = tk;
     return true;
@@ -1108,6 +1123,7 @@ class MOZ_STACK_CLASS ModuleCompiler
         Signature sig_;
         PropertyName* name_;
         Label* entry_;
+        uint32_t firstUseOffset_;
         uint32_t funcIndex_;
         uint32_t srcBegin_;
         uint32_t srcEnd_;
@@ -1115,12 +1131,14 @@ class MOZ_STACK_CLASS ModuleCompiler
         bool defined_;
 
       public:
-        Func(PropertyName* name, Signature&& sig, Label* entry, uint32_t funcIndex)
-          : sig_(Move(sig)), name_(name), entry_(entry), funcIndex_(funcIndex), srcBegin_(0),
-            srcEnd_(0), compileTime_(0), defined_(false)
+        Func(PropertyName* name, uint32_t firstUseOffset, Signature&& sig, Label* entry,
+             uint32_t funcIndex)
+          : sig_(Move(sig)), name_(name), entry_(entry), firstUseOffset_(firstUseOffset),
+            funcIndex_(funcIndex), srcBegin_(0), srcEnd_(0), compileTime_(0), defined_(false)
         {}
 
         PropertyName* name() const { return name_; }
+        uint32_t firstUseOffset() const { return firstUseOffset_; }
         bool defined() const { return defined_; }
         uint32_t funcIndex() const { return funcIndex_; }
 
@@ -1287,25 +1305,30 @@ class MOZ_STACK_CLASS ModuleCompiler
     class FuncPtrTable
     {
         Signature sig_;
+        FuncPtrVector elems_;
+        PropertyName* name_;
+        uint32_t firstUseOffset_;
         uint32_t mask_;
         uint32_t globalDataOffset_;
         uint32_t tableIndex_;
-        FuncPtrVector elems_;
 
       public:
-        FuncPtrTable(ExclusiveContext* cx, Signature&& sig, uint32_t mask, uint32_t gdo,
-                     uint32_t tableIndex)
-          : sig_(Move(sig)), mask_(mask), globalDataOffset_(gdo), tableIndex_(tableIndex),
-            elems_(cx)
+        FuncPtrTable(ExclusiveContext* cx, PropertyName* name, uint32_t firstUseOffset, Signature&& sig,
+                     uint32_t mask, uint32_t gdo, uint32_t tableIndex)
+          : sig_(Move(sig)), elems_(cx), name_(name), firstUseOffset_(firstUseOffset), mask_(mask),
+            globalDataOffset_(gdo), tableIndex_(tableIndex)
         {}
 
         FuncPtrTable(FuncPtrTable&& rhs)
-          : sig_(Move(rhs.sig_)), mask_(rhs.mask_), globalDataOffset_(rhs.globalDataOffset_),
-            elems_(Move(rhs.elems_))
+          : sig_(Move(rhs.sig_)), elems_(Move(rhs.elems_)), name_(rhs.name()),
+            firstUseOffset_(rhs.firstUseOffset()), mask_(rhs.mask_),
+            globalDataOffset_(rhs.globalDataOffset_)
         {}
 
         Signature& sig() { return sig_; }
         const Signature& sig() const { return sig_; }
+        PropertyName* name() const { return name_; }
+        uint32_t firstUseOffset() const { return firstUseOffset_; }
         unsigned mask() const { return mask_; }
         unsigned globalDataOffset() const { return globalDataOffset_; }
         unsigned tableIndex() const { return tableIndex_; }
@@ -1596,44 +1619,45 @@ class MOZ_STACK_CLASS ModuleCompiler
     }
 
     bool fail(ParseNode* pn, const char* str) {
-        if (pn)
-            return failOffset(pn->pn_pos.begin, str);
-
-        // The exact rooting static analysis does not perform dataflow analysis, so it believes
-        // that unrooted things on the stack during compilation may still be accessed after this.
-        // Since pn is typically only null under OOM, this suppression simply forces any GC to be
-        // delayed until the compilation is off the stack and more memory can be freed.
-        gc::AutoSuppressGC nogc(cx_);
-        TokenPos pos;
-        if (!tokenStream().peekTokenPos(&pos))
-            return false;
-        return failOffset(pos.begin, str);
+        return failOffset(pn->pn_pos.begin, str);
     }
 
-    bool failfVA(ParseNode* pn, const char* fmt, va_list ap) {
+    bool failfVAOffset(uint32_t offset, const char* fmt, va_list ap) {
         MOZ_ASSERT(!errorString_);
         MOZ_ASSERT(errorOffset_ == UINT32_MAX);
         MOZ_ASSERT(fmt);
-        errorOffset_ = pn ? pn->pn_pos.begin : tokenStream().currentToken().pos.end;
+        errorOffset_ = offset;
         errorString_.reset(JS_vsmprintf(fmt, ap));
+        return false;
+    }
+
+    bool failfOffset(uint32_t offset, const char* fmt, ...) {
+        va_list ap;
+        va_start(ap, fmt);
+        failfVAOffset(offset, fmt, ap);
+        va_end(ap);
         return false;
     }
 
     bool failf(ParseNode* pn, const char* fmt, ...) {
         va_list ap;
         va_start(ap, fmt);
-        failfVA(pn, fmt, ap);
+        failfVAOffset(pn->pn_pos.begin, fmt, ap);
         va_end(ap);
         return false;
     }
 
-    bool failName(ParseNode* pn, const char* fmt, PropertyName* name) {
+    bool failNameOffset(uint32_t offset, const char* fmt, PropertyName* name) {
         // This function is invoked without the caller properly rooting its locals.
         gc::AutoSuppressGC suppress(cx_);
         JSAutoByteString bytes;
         if (AtomToPrintableString(cx_, name, &bytes))
-            failf(pn, fmt, bytes.ptr());
+            failfOffset(offset, fmt, bytes.ptr());
         return false;
+    }
+
+    bool failName(ParseNode* pn, const char* fmt, PropertyName* name) {
+        return failNameOffset(pn->pn_pos.begin, fmt, name);
     }
 
     bool failOverRecursed() {
@@ -1766,7 +1790,8 @@ class MOZ_STACK_CLASS ModuleCompiler
         global->u.varOrConst.type_ = VarType(coercion).toType().which();
         return globalsVector_.append(global) && globals_.putNew(varName, global);
     }
-    bool addFunction(PropertyName* name, Signature&& sig, Func** func, uint32_t* outFuncIndex) {
+    bool addFunction(PropertyName* name, uint32_t firstUseOffset, Signature&& sig, Func** func,
+                     uint32_t* outFuncIndex) {
         MOZ_ASSERT(!finishedFunctionBodies_);
         uint32_t funcIndex = functions_.length();
         if (outFuncIndex)
@@ -1780,13 +1805,13 @@ class MOZ_STACK_CLASS ModuleCompiler
         Label* entry = moduleLifo_.new_<Label>();
         if (!entry)
             return false;
-        *func = moduleLifo_.new_<Func>(name, Move(sig), entry, funcIndex);
+        *func = moduleLifo_.new_<Func>(name, firstUseOffset, Move(sig), entry, funcIndex);
         if (!*func)
             return false;
         return functions_.append(*func);
     }
-    bool addFuncPtrTable(PropertyName* name, Signature&& sig, uint32_t mask, FuncPtrTable** table,
-                         uint32_t* tableIndexOut)
+    bool addFuncPtrTable(PropertyName* name, uint32_t offset, Signature&& sig, uint32_t mask,
+                         FuncPtrTable** table, uint32_t* tableIndexOut)
     {
         uint32_t tableIndex = funcPtrTables_.length();
         if (tableIndexOut)
@@ -1800,7 +1825,7 @@ class MOZ_STACK_CLASS ModuleCompiler
         uint32_t globalDataOffset;
         if (!module_->addFuncPtrTable(/* numElems = */ mask + 1, &globalDataOffset))
             return false;
-        FuncPtrTable tmpTable(cx_, Move(sig), mask, globalDataOffset, tableIndex);
+        FuncPtrTable tmpTable(cx_, name, offset, Move(sig), mask, globalDataOffset, tableIndex);
         if (!funcPtrTables_.append(Move(tmpTable)))
             return false;
         *table = &funcPtrTables_.back();
@@ -2096,6 +2121,9 @@ class MOZ_STACK_CLASS ModuleCompiler
             break;
           case JS::AsmJSCache_QuotaExceeded:
             cacheString = "not enough temporary storage quota to store in cache";
+            break;
+          case JS::AsmJSCache_StorageInitFailure:
+            cacheString = "storage initialization failed (consider filing a bug)";
             break;
           case JS::AsmJSCache_Disabled_Internal:
             cacheString = "caching disabled by internal configuration (consider filing a bug)";
@@ -2968,7 +2996,7 @@ class FunctionBuilder
     {
         va_list ap;
         va_start(ap, fmt);
-        m_.failfVA(pn, fmt, ap);
+        m_.failfVAOffset(pn->pn_pos.begin, fmt, ap);
         va_end(ap);
         return false;
     }
@@ -4717,6 +4745,11 @@ CheckNewArrayView(ModuleCompiler& m, PropertyName* varName, ParseNode* newExpr)
         shared = global->viewIsSharedView();
     }
 
+#if !defined(ENABLE_SHARED_ARRAY_BUFFER)
+    if (shared)
+        return m.fail(ctorExpr, "shared views not supported by this build");
+#endif
+
     if (!CheckNewArrayViewArgs(m, ctorExpr, bufferName))
         return false;
 
@@ -4861,6 +4894,11 @@ CheckGlobalDotImport(ModuleCompiler& m, PropertyName* varName, ParseNode* initNo
         Scalar::Type type;
         bool shared = false;
         if (IsArrayViewCtorName(m, field, &type, &shared)) {
+#if !defined(ENABLE_SHARED_ARRAY_BUFFER)
+            if (shared)
+                return m.fail(initNode, "shared views not supported by this build");
+#endif
+
             if (!m.module().isValidViewSharedness(shared))
                 return m.failName(initNode, "'%s' has different sharedness than previous view constructors", field);
             return m.addArrayViewCtor(varName, type, field, shared);
@@ -4916,18 +4954,21 @@ CheckModuleProcessingDirectives(ModuleCompiler& m)
     TokenStream& ts = m.parser().tokenStream;
     while (true) {
         bool matched;
-        if (!ts.matchToken(&matched, TOK_STRING))
+        if (!ts.matchToken(&matched, TOK_STRING, TokenStream::Operand))
             return false;
         if (!matched)
             return true;
 
         if (!IsIgnoredDirectiveName(m.cx(), ts.currentToken().atom()))
-            return m.fail(nullptr, "unsupported processing directive");
+            return m.failOffset(ts.currentToken().pos.begin, "unsupported processing directive");
 
-        if (!ts.matchToken(&matched, TOK_SEMI))
+        TokenKind tt;
+        if (!ts.getToken(&tt))
             return false;
-        if (!matched)
-            return m.fail(nullptr, "expected semicolon after string literal");
+        if (tt != TOK_SEMI) {
+            return m.failOffset(ts.currentToken().pos.begin,
+                                "expected semicolon after string literal");
+        }
     }
 }
 
@@ -6320,7 +6361,7 @@ CheckFunctionSignature(ModuleCompiler& m, ParseNode* usepn, Signature&& sig, Pro
     if (!existing) {
         if (!CheckModuleLevelName(m, usepn, name))
             return false;
-        return m.addFunction(name, Move(sig), func, funcIndex);
+        return m.addFunction(name, usepn->pn_pos.begin, Move(sig), func, funcIndex);
     }
 
     if (!CheckSignatureAgainstExisting(m, usepn, sig, existing->sig()))
@@ -6422,7 +6463,7 @@ CheckFuncPtrTableAgainstExisting(ModuleCompiler& m, ParseNode* usepn,
     if (!CheckModuleLevelName(m, usepn, name))
         return false;
 
-    return m.addFuncPtrTable(name, Move(sig), mask, tableOut, tableIndex);
+    return m.addFuncPtrTable(name, usepn->pn_pos.begin, Move(sig), mask, tableOut, tableIndex);
 }
 
 static bool
@@ -9654,12 +9695,12 @@ CheckHeapLengthCondition(ModuleCompiler& m, ParseNode* cond, PropertyName* newBu
 static bool
 CheckReturnBoolLiteral(ModuleCompiler& m, ParseNode* stmt, bool retval)
 {
-    if (!stmt)
-        return m.fail(stmt, "expected return statement");
-
     if (stmt->isKind(PNK_STATEMENTLIST)) {
-        stmt = SkipEmptyStatements(ListHead(stmt));
-        if (!stmt || NextNonEmptyStatement(stmt))
+        ParseNode* next = SkipEmptyStatements(ListHead(stmt));
+        if (!next)
+            return m.fail(stmt, "expected return statement");
+        stmt = next;
+        if (NextNonEmptyStatement(stmt))
             return m.fail(stmt, "expected single return statement");
     }
 
@@ -9676,7 +9717,7 @@ CheckReturnBoolLiteral(ModuleCompiler& m, ParseNode* stmt, bool retval)
 static bool
 CheckReassignmentTo(ModuleCompiler& m, ParseNode* stmt, PropertyName* lhsName, ParseNode** rhs)
 {
-    if (!stmt || !stmt->isKind(PNK_SEMI))
+    if (!stmt->isKind(PNK_SEMI))
         return m.fail(stmt, "missing reassignment");
 
     ParseNode* assign = UnaryKid(stmt);
@@ -9740,9 +9781,13 @@ CheckChangeHeap(ModuleCompiler& m, ParseNode* fn, bool* validated)
     if (!CheckReturnBoolLiteral(m, thenStmt, false))
         return false;
 
-    stmtIter = NextNonEmptyStatement(stmtIter);
+    ParseNode* next = NextNonEmptyStatement(stmtIter);
 
-    for (unsigned i = 0; i < m.numArrayViews(); i++, stmtIter = NextNonEmptyStatement(stmtIter)) {
+    for (unsigned i = 0; i < m.numArrayViews(); i++, next = NextNonEmptyStatement(stmtIter)) {
+        if (!next)
+            return m.failOffset(stmtIter->pn_pos.end, "missing reassignment");
+        stmtIter = next;
+
         const ModuleCompiler::ArrayView& view = m.arrayView(i);
 
         ParseNode* rhs;
@@ -9766,13 +9811,20 @@ CheckChangeHeap(ModuleCompiler& m, ParseNode* fn, bool* validated)
             return false;
     }
 
+    if (!next)
+        return m.failOffset(stmtIter->pn_pos.end, "missing reassignment");
+    stmtIter = next;
+
     ParseNode* rhs;
     if (!CheckReassignmentTo(m, stmtIter, bufferName, &rhs))
         return false;
     if (!IsUseOfName(rhs, newBufferName))
         return m.failName(stmtIter, "expecting assignment of new buffer to %s", bufferName);
 
-    stmtIter = NextNonEmptyStatement(stmtIter);
+    next = NextNonEmptyStatement(stmtIter);
+    if (!next)
+        return m.failOffset(stmtIter->pn_pos.end, "expected return statement");
+    stmtIter = next;
 
     if (!CheckReturnBoolLiteral(m, stmtIter, true))
         return false;
@@ -9789,12 +9841,12 @@ ParseFunction(ModuleCompiler& m, ParseNode** fnOut)
 {
     TokenStream& tokenStream = m.tokenStream();
 
-    tokenStream.consumeKnownToken(TOK_FUNCTION);
+    tokenStream.consumeKnownToken(TOK_FUNCTION, TokenStream::Operand);
 
     RootedPropertyName name(m.cx());
 
     TokenKind tk;
-    if (!tokenStream.getToken(&tk))
+    if (!tokenStream.getToken(&tk, TokenStream::Operand))
         return false;
     if (tk == TOK_NAME) {
         name = tokenStream.currentName();
@@ -9835,7 +9887,7 @@ ParseFunction(ModuleCompiler& m, ParseNode** fnOut)
         if (tokenStream.hadError() || directives == newDirectives)
             return false;
 
-        return m.fail(nullptr, "encountered new directive");
+        return m.fail(fn, "encountered new directive in function");
     }
 
     MOZ_ASSERT(!tokenStream.hadError());
@@ -10389,8 +10441,11 @@ static bool
 CheckAllFunctionsDefined(ModuleCompiler& m)
 {
     for (unsigned i = 0; i < m.numFunctions(); i++) {
-        if (!m.function(i).entry().bound())
-            return m.failName(nullptr, "missing definition of function %s", m.function(i).name());
+        if (!m.function(i).entry().bound()) {
+            ModuleCompiler::Func& f = m.function(i);
+            return m.failNameOffset(f.firstUseOffset(),
+                                    "missing definition of function %s", f.name());
+        }
     }
 
     return true;
@@ -10775,8 +10830,12 @@ CheckFuncPtrTables(ModuleCompiler& m)
     }
 
     for (unsigned i = 0; i < m.numFuncPtrTables(); i++) {
-        if (!m.funcPtrTable(i).initialized())
-            return m.fail(nullptr, "expecting function-pointer table");
+        ModuleCompiler::FuncPtrTable& funcPtrTable = m.funcPtrTable(i);
+        if (!funcPtrTable.initialized()) {
+            return m.failNameOffset(funcPtrTable.firstUseOffset(),
+                                    "function-pointer table %s wasn't defined",
+                                    funcPtrTable.name());
+        }
     }
 
     return true;
@@ -10828,13 +10887,16 @@ static bool
 CheckModuleReturn(ModuleCompiler& m)
 {
     TokenKind tk;
-    if (!PeekToken(m.parser(), &tk))
+    if (!GetToken(m.parser(), &tk))
         return false;
+    TokenStream& ts = m.parser().tokenStream;
     if (tk != TOK_RETURN) {
-        if (tk == TOK_RC || tk == TOK_EOF)
-            return m.fail(nullptr, "expecting return statement");
-        return m.fail(nullptr, "invalid asm.js statement");
+        const char* msg = (tk == TOK_RC || tk == TOK_EOF)
+                          ? "expecting return statement"
+                          : "invalid asm.js. statement";
+        return m.failOffset(ts.currentToken().pos.begin, msg);
     }
+    ts.ungetToken();
 
     ParseNode* returnStmt = m.parser().statement(YieldIsName);
     if (!returnStmt)
@@ -12031,8 +12093,7 @@ CheckModule(ExclusiveContext* cx, AsmJSParser& parser, ParseNode* stmtList,
     m.startFunctionBodies();
 
 #if !defined(ENABLE_SHARED_ARRAY_BUFFER)
-    if (m.module().hasArrayView() && m.module().isSharedView())
-        return m.fail(nullptr, "shared views not supported by this build");
+    MOZ_ASSERT(!m.module().hasArrayView() || !m.module().isSharedView());
 #endif
 
     if (!CheckFunctions(m))
@@ -12047,10 +12108,15 @@ CheckModule(ExclusiveContext* cx, AsmJSParser& parser, ParseNode* stmtList,
         return false;
 
     TokenKind tk;
-    if (!PeekToken(m.parser(), &tk))
+    if (!GetToken(m.parser(), &tk))
         return false;
-    if (tk != TOK_EOF && tk != TOK_RC)
-        return m.fail(nullptr, "top-level export (return) must be the last statement");
+    TokenStream& ts = m.parser().tokenStream;
+    if (tk == TOK_EOF || tk == TOK_RC) {
+        ts.ungetToken();
+    } else {
+        return m.failOffset(ts.currentToken().pos.begin,
+                            "top-level export (return) must be the last statement");
+    }
 
     // Delay flushing until dynamic linking. The inhibited range is set by the
     // masm.executableCopy() called transitively by FinishModule.

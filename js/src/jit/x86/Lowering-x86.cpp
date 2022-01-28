@@ -236,7 +236,7 @@ LIRGeneratorX86::visitAsmJSStoreHeap(MAsmJSStoreHeap* ins)
     switch (ins->accessType()) {
       case Scalar::Int8: case Scalar::Uint8:
         // See comment for LIRGeneratorX86::useByteOpRegister.
-	lir = new(alloc()) LAsmJSStoreHeap(ptrAlloc, useFixed(ins->value(), eax));
+        lir = new(alloc()) LAsmJSStoreHeap(ptrAlloc, useFixed(ins->value(), eax));
         break;
       case Scalar::Int16: case Scalar::Uint16:
       case Scalar::Int32: case Scalar::Uint32:
@@ -244,7 +244,7 @@ LIRGeneratorX86::visitAsmJSStoreHeap(MAsmJSStoreHeap* ins)
       case Scalar::Float32x4: case Scalar::Int32x4:
         // For now, don't allow constant values. The immediate operand
         // affects instruction layout which affects patching.
-	lir = new(alloc()) LAsmJSStoreHeap(ptrAlloc, useRegisterAtStart(ins->value()));
+        lir = new(alloc()) LAsmJSStoreHeap(ptrAlloc, useRegisterAtStart(ins->value()));
         break;
       case Scalar::Uint8Clamped:
       case Scalar::MaxTypedArrayViewType:

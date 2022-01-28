@@ -51,4 +51,56 @@ IsAtkVersionAtLeast(int aMajor, int aMinor)
          (aMajor == atkMajorVersion && aMinor <= atkMinorVersion);
 }
 
+// This is or'd with the pointer in MaiAtkObject::accWrap if the wrap-ee is a
+// proxy.
+static const uintptr_t IS_PROXY = 1;
+
+/**
+ * This MaiAtkObject is a thin wrapper, in the MAI namespace, for AtkObject
+ */
+struct MaiAtkObject
+{
+  AtkObject parent;
+  /*
+   * The AccessibleWrap whose properties and features are exported
+   * via this object instance.
+   */
+  uintptr_t accWrap;
+
+  /*
+   * Get the AtkHyperlink for this atk object.
+   */
+  AtkHyperlink* GetAtkHyperlink();
+
+  /*
+   * Shutdown this AtkObject.
+   */
+  void Shutdown();
+
+  /*
+   * Notify atk of a state change on this AtkObject.
+   */
+  void FireStateChangeEvent(uint64_t aState, bool aEnabled);
+
+  /*
+   * Notify ATK of a text change within this ATK object.
+   */
+  void FireTextChangeEvent(const nsString& aStr, int32_t aStart, uint32_t aLen,
+                           bool aIsInsert, bool aIsFromUser);
+
+private:
+  /*
+   * do we have text-remove and text-insert signals if not we need to use
+   * text-changed see AccessibleWrap::FireAtkTextChangedEvent() and
+   * bug 619002
+   */
+  enum EAvailableAtkSignals {
+    eUnknown,
+    eHaveNewAtkTextSignals,
+    eNoNewAtkSignals
+  };
+
+  static EAvailableAtkSignals gAvailableAtkSignals;
+};
+
 #endif /* __NS_MAI_H__ */

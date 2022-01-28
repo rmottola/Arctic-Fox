@@ -110,9 +110,7 @@
 #endif
 
 namespace mozilla {
-namespace dom {
 template<class T> class OwningNonNull;
-} // namespace dom
 } // namespace mozilla
 
 template<class T>
@@ -170,7 +168,7 @@ private:
   nsISupports* MOZ_OWNING_REF mRawPtr;
 };
 
-class nsQueryInterfaceWithError
+class nsQueryInterfaceWithError final
 {
 public:
   nsQueryInterfaceWithError(nsISupports* aRawPtr, nsresult* aError)
@@ -219,7 +217,7 @@ do_QueryInterface(already_AddRefed<T>&, nsresult*)
 
 ////////////////////////////////////////////////////////////////////////////
 // Using servicemanager with COMPtrs
-class nsGetServiceByCID
+class nsGetServiceByCID final
 {
 public:
   explicit nsGetServiceByCID(const nsCID& aCID) : mCID(aCID) {}
@@ -230,7 +228,7 @@ private:
   const nsCID& mCID;
 };
 
-class nsGetServiceByCIDWithError
+class nsGetServiceByCIDWithError final
 {
 public:
   nsGetServiceByCIDWithError(const nsCID& aCID, nsresult* aErrorPtr)
@@ -246,7 +244,7 @@ private:
   nsresult* mErrorPtr;
 };
 
-class nsGetServiceByContractID
+class nsGetServiceByContractID final
 {
 public:
   explicit nsGetServiceByContractID(const char* aContractID)
@@ -260,7 +258,7 @@ private:
   const char* mContractID;
 };
 
-class nsGetServiceByContractIDWithError
+class nsGetServiceByContractIDWithError final
 {
 public:
   nsGetServiceByContractIDWithError(const char* aContractID, nsresult* aErrorPtr)
@@ -535,7 +533,7 @@ public:
 
   // Defined in OwningNonNull.h
   template<class U>
-  MOZ_IMPLICIT nsCOMPtr(const mozilla::dom::OwningNonNull<U>& aOther);
+  MOZ_IMPLICIT nsCOMPtr(const mozilla::OwningNonNull<U>& aOther);
 
 
   // Assignment operators
@@ -630,7 +628,7 @@ public:
 
   // Defined in OwningNonNull.h
   template<class U>
-  nsCOMPtr<T>& operator=(const mozilla::dom::OwningNonNull<U>& aOther);
+  nsCOMPtr<T>& operator=(const mozilla::OwningNonNull<U>& aOther);
 
   // Exchange ownership with |aRhs|; can save a pair of refcount operations.
   void swap(nsCOMPtr<T>& aRhs)
@@ -1323,40 +1321,34 @@ operator!=(U* aLhs, const nsCOMPtr<T>& aRhs)
 
 
 
-// Comparing an |nsCOMPtr| to |0|
+// Comparing an |nsCOMPtr| to |nullptr|
 
-class NSCAP_Zero;
-
-// Specifically to allow |smartPtr == 0|.
 template<class T>
 inline bool
-operator==(const nsCOMPtr<T>& aLhs, NSCAP_Zero* aRhs)
+operator==(const nsCOMPtr<T>& aLhs, decltype(nullptr))
 {
-  return static_cast<const void*>(aLhs.get()) == reinterpret_cast<const void*>(aRhs);
+  return aLhs.get() == nullptr;
 }
 
-// Specifically to allow |0 == smartPtr|.
 template<class T>
 inline bool
-operator==(NSCAP_Zero* aLhs, const nsCOMPtr<T>& aRhs)
+operator==(decltype(nullptr), const nsCOMPtr<T>& aRhs)
 {
-  return reinterpret_cast<const void*>(aLhs) == static_cast<const void*>(aRhs.get());
+  return nullptr == aRhs.get();
 }
 
-// Specifically to allow |smartPtr != 0|.
 template<class T>
 inline bool
-operator!=(const nsCOMPtr<T>& aLhs, NSCAP_Zero* aRhs)
+operator!=(const nsCOMPtr<T>& aLhs, decltype(nullptr))
 {
-  return static_cast<const void*>(aLhs.get()) != reinterpret_cast<const void*>(aRhs);
+  return aLhs.get() != nullptr;
 }
 
-// Specifically to allow |0 != smartPtr|.
 template<class T>
 inline bool
-operator!=(NSCAP_Zero* aLhs, const nsCOMPtr<T>& aRhs)
+operator!=(decltype(nullptr), const nsCOMPtr<T>& aRhs)
 {
-  return reinterpret_cast<const void*>(aLhs) != static_cast<const void*>(aRhs.get());
+  return nullptr != aRhs.get();
 }
 
 

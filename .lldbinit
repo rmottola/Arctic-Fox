@@ -5,7 +5,7 @@
 # and in the accompanying Python scripts, see python/lldbutils/README.txt.
 # -----------------------------------------------------------------------------
 
-# Import the module that defines complex Goanna debugging commands.  This assumes
+# Import the module that defines complex Gecko debugging commands.  This assumes
 # you are either running lldb from the top level source directory, the objdir,
 # or the dist/bin directory.  (.lldbinit files in the objdir and dist/bin set
 # topsrcdir appropriately.)

@@ -455,6 +455,7 @@ CompositorD3D11::CreateRenderTarget(const gfx::IntRect& aRect,
   RefPtr<ID3D11Texture2D> texture;
   HRESULT hr = mDevice->CreateTexture2D(&desc, nullptr, byRef(texture));
   if (Failed(hr) || !texture) {
+    gfxCriticalError(gfxCriticalError::DefaultOptions(false)) << "Failed in CreateRenderTarget";
     return nullptr;
   }
 
@@ -488,6 +489,7 @@ CompositorD3D11::CreateRenderTargetFromSource(const gfx::IntRect &aRect,
   HRESULT hr = mDevice->CreateTexture2D(&desc, nullptr, byRef(texture));
   NS_ASSERTION(texture, "Could not create texture");
   if (Failed(hr) || !texture) {
+    gfxCriticalError(gfxCriticalError::DefaultOptions(false)) << "Failed in CreateRenderTargetFromSource";
     return nullptr;
   }
 
@@ -534,9 +536,20 @@ CompositorD3D11::SetRenderTarget(CompositingRenderTarget* aRenderTarget)
   MOZ_ASSERT(aRenderTarget);
   CompositingRenderTargetD3D11* newRT =
     static_cast<CompositingRenderTargetD3D11*>(aRenderTarget);
-  mCurrentRT = newRT;
-  mCurrentRT->BindRenderTarget(mContext);
-  PrepareViewport(newRT->GetSize());
+  if (mCurrentRT != newRT) {
+    mCurrentRT = newRT;
+    mCurrentRT->BindRenderTarget(mContext);
+  }
+
+  if (newRT->HasComplexProjection()) {
+    gfx::Matrix4x4 projection;
+    bool depthEnable;
+    float zNear, zFar;
+    newRT->GetProjection(projection, depthEnable, zNear, zFar);
+    PrepareViewport(newRT->GetSize(), projection, zNear, zFar);
+  } else {
+    PrepareViewport(newRT->GetSize());
+  }
 }
 
 void
@@ -625,7 +638,6 @@ CompositorD3D11::DrawVRDistortion(const gfx::Rect& aRect,
     static_cast<EffectVRDistortion*>(aEffectChain.mPrimaryEffect.get());
 
   TextureSourceD3D11* source = vrEffect->mTexture->AsSourceD3D11();
-  gfx::IntSize size = vrEffect->mRenderTarget->GetSize(); // XXX source->GetSize()
 
   VRHMDInfo* hmdInfo = vrEffect->mHMD;
   VRHMDType hmdType = hmdInfo->GetType();
@@ -682,27 +694,26 @@ CompositorD3D11::DrawVRDistortion(const gfx::Rect& aRect,
   mContext->PSSetShader(mAttachments->mVRDistortionPS[hmdType], nullptr, 0);
 
   // This is the source texture SRV for the pixel shader
-  // XXX, um should we cache this SRV on the source?
-  RefPtr<ID3D11ShaderResourceView> view;
-  mDevice->CreateShaderResourceView(source->GetD3D11Texture(), nullptr, byRef(view));
-  ID3D11ShaderResourceView* srView = view;
+  ID3D11ShaderResourceView* srView = source->GetShaderResourceView();
   mContext->PSSetShaderResources(0, 1, &srView);
 
-  gfx::IntSize vpSizeInt = mCurrentRT->GetSize();
-  gfx::Size vpSize(vpSizeInt.width, vpSizeInt.height);
+  Rect destRect = aTransform.TransformBounds(aRect);
+  gfx::IntSize preDistortionSize = vrEffect->mRenderTarget->GetSize(); // XXX source->GetSize()
+  gfx::Size vpSize = destRect.Size();
+
   ID3D11Buffer* vbuffer;
   UINT vsize, voffset;
 
   for (uint32_t eye = 0; eye < 2; eye++) {
     gfx::IntRect eyeViewport;
-    eyeViewport.x = eye * size.width / 2;
+    eyeViewport.x = eye * preDistortionSize.width / 2;
     eyeViewport.y = 0;
-    eyeViewport.width = size.width / 2;
-    eyeViewport.height = size.height;
+    eyeViewport.width = preDistortionSize.width / 2;
+    eyeViewport.height = preDistortionSize.height;
 
     hmdInfo->FillDistortionConstants(eye,
-                                     size, eyeViewport,
-                                     vpSize, aRect,
+                                     preDistortionSize, eyeViewport,
+                                     vpSize, destRect,
                                      shaderConstants);
 
     // D3D has clip space top-left as -1,1 so we need to flip the Y coordinate offset here
@@ -784,15 +795,7 @@ CompositorD3D11::DrawQuad(const gfx::Rect& aRect,
       return;
     }
 
-    RefPtr<ID3D11ShaderResourceView> view;
-    HRESULT hr = mDevice->CreateShaderResourceView(source->GetD3D11Texture(), nullptr, byRef(view));
-    if (Failed(hr)) {
-      // XXX - There's a chance we won't be able to render anything, should we
-      // just crash release builds?
-      return;
-    }
-
-    ID3D11ShaderResourceView* srView = view;
+    ID3D11ShaderResourceView* srView = source->GetShaderResourceView();
     mContext->PSSetShaderResources(3, 1, &srView);
 
     const gfx::Matrix4x4& maskTransform = maskEffect->mMaskTransform;
@@ -853,15 +856,7 @@ CompositorD3D11::DrawQuad(const gfx::Rect& aRect,
 
       SetPSForEffect(aEffectChain.mPrimaryEffect, maskType, texturedEffect->mTexture->GetFormat());
 
-      RefPtr<ID3D11ShaderResourceView> view;
-      HRESULT hr = mDevice->CreateShaderResourceView(source->GetD3D11Texture(), nullptr, byRef(view));
-      if (Failed(hr)) {
-        // XXX - There's a chance we won't be able to render anything, should we
-        // just crash release builds?
-        return;
-      }
-
-      ID3D11ShaderResourceView* srView = view;
+      ID3D11ShaderResourceView* srView = source->GetShaderResourceView();
       mContext->PSSetShaderResources(0, 1, &srView);
 
       if (!texturedEffect->mPremultiplied) {
@@ -900,29 +895,9 @@ CompositorD3D11::DrawQuad(const gfx::Rect& aRect,
       TextureSourceD3D11* sourceCb = source->GetSubSource(Cb)->AsSourceD3D11();
       TextureSourceD3D11* sourceCr = source->GetSubSource(Cr)->AsSourceD3D11();
 
-      HRESULT hr;
-
-      RefPtr<ID3D11ShaderResourceView> views[3];
-
-      hr = mDevice->CreateShaderResourceView(sourceY->GetD3D11Texture(),
-                                             nullptr, byRef(views[0]));
-      if (Failed(hr)) {
-        return;
-      }
-
-      hr = mDevice->CreateShaderResourceView(sourceCb->GetD3D11Texture(),
-                                             nullptr, byRef(views[1]));
-      if (Failed(hr)) {
-        return;
-      }
-
-      hr = mDevice->CreateShaderResourceView(sourceCr->GetD3D11Texture(),
-                                             nullptr, byRef(views[2]));
-      if (Failed(hr)) {
-        return;
-      }
-
-      ID3D11ShaderResourceView* srViews[3] = { views[0], views[1], views[2] };
+      ID3D11ShaderResourceView* srViews[3] = { sourceY->GetShaderResourceView(),
+                                               sourceCb->GetShaderResourceView(),
+                                               sourceCr->GetShaderResourceView() };
       mContext->PSSetShaderResources(0, 3, srViews);
     }
     break;
@@ -947,20 +922,8 @@ CompositorD3D11::DrawQuad(const gfx::Rect& aRect,
 
       pTexCoordRect = &effectComponentAlpha->mTextureCoords;
 
-      RefPtr<ID3D11ShaderResourceView> views[2];
-
-      HRESULT hr;
-
-      hr = mDevice->CreateShaderResourceView(sourceOnBlack->GetD3D11Texture(), nullptr, byRef(views[0]));
-      if (Failed(hr)) {
-        return;
-      }
-      hr = mDevice->CreateShaderResourceView(sourceOnWhite->GetD3D11Texture(), nullptr, byRef(views[1]));
-      if (Failed(hr)) {
-        return;
-      }
-
-      ID3D11ShaderResourceView* srViews[2] = { views[0], views[1] };
+      ID3D11ShaderResourceView* srViews[2] = { sourceOnBlack->GetShaderResourceView(),
+                                               sourceOnWhite->GetShaderResourceView() };
       mContext->PSSetShaderResources(0, 2, srViews);
 
       mContext->OMSetBlendState(mAttachments->mComponentBlendState, sBlendFactor, 0xFFFFFFFF);
@@ -1025,7 +988,7 @@ CompositorD3D11::BeginFrame(const nsIntRegion& aInvalidRegion,
 
   // Failed to create a render target or the view.
   if (!mDefaultRT || !mDefaultRT->mRTView ||
-      mSize.width == 0 || mSize.height == 0) {
+      mSize.width <= 0 || mSize.height <= 0) {
     *aRenderBoundsOut = Rect();
     return;
   }
@@ -1096,6 +1059,10 @@ CompositorD3D11::EndFrame()
 
   IntSize oldSize = mSize;
   EnsureSize();
+  if (mSize.width <= 0 || mSize.height <= 0) {
+    return;
+  }
+
   UINT presentInterval = 0;
 
   if (gfxWindowsPlatform::GetPlatform()->IsWARP()) {
@@ -1145,16 +1112,6 @@ CompositorD3D11::EndFrame()
 void
 CompositorD3D11::PrepareViewport(const gfx::IntSize& aSize)
 {
-  D3D11_VIEWPORT viewport;
-  viewport.MaxDepth = 1.0f;
-  viewport.MinDepth = 0.0f;
-  viewport.Width = aSize.width;
-  viewport.Height = aSize.height;
-  viewport.TopLeftX = 0;
-  viewport.TopLeftY = 0;
-
-  mContext->RSSetViewports(1, &viewport);
-
   // This view matrix translates coordinates from 0..width and 0..height to
   // -1..1 on the X axis, and -1..1 on the Y axis (flips the Y coordinate)
   Matrix viewMatrix = Matrix::Translation(-1.0, 1.0);
@@ -1164,7 +1121,25 @@ CompositorD3D11::PrepareViewport(const gfx::IntSize& aSize)
   Matrix4x4 projection = Matrix4x4::From2D(viewMatrix);
   projection._33 = 0.0f;
 
-  memcpy(&mVSConstants.projection, &projection, sizeof(mVSConstants.projection));
+  PrepareViewport(aSize, projection, 0.0f, 1.0f);
+}
+
+void
+CompositorD3D11::PrepareViewport(const gfx::IntSize& aSize,
+                                 const gfx::Matrix4x4& aProjection,
+                                 float aZNear, float aZFar)
+{
+  D3D11_VIEWPORT viewport;
+  viewport.MaxDepth = aZFar;
+  viewport.MinDepth = aZNear;
+  viewport.Width = aSize.width;
+  viewport.Height = aSize.height;
+  viewport.TopLeftX = 0;
+  viewport.TopLeftY = 0;
+
+  mContext->RSSetViewports(1, &viewport);
+
+  memcpy(&mVSConstants.projection, &aProjection._11, sizeof(mVSConstants.projection));
 }
 
 void
@@ -1184,6 +1159,7 @@ CompositorD3D11::VerifyBufferSize()
 
   hr = mSwapChain->GetDesc(&swapDesc);
   if (Failed(hr)) {
+    gfxCriticalError() << "Failed to get the description " << hexa(hr);
     return false;
   }
 
@@ -1214,9 +1190,17 @@ void
 CompositorD3D11::UpdateRenderTarget()
 {
   EnsureSize();
-  VerifyBufferSize();
+  if (!VerifyBufferSize()) {
+    gfxCriticalError(gfxCriticalError::DefaultOptions(false)) << "Failed VerifyBufferSize in UpdateRenderTarget " << mSize;
+    return;
+  }
 
   if (mDefaultRT) {
+    return;
+  }
+
+  if (mSize.width <= 0 || mSize.height <= 0) {
+    gfxCriticalError(gfxCriticalError::DefaultOptions(false)) << "Invalid size in UpdateRenderTarget " << mSize;
     return;
   }
 
@@ -1233,6 +1217,7 @@ CompositorD3D11::UpdateRenderTarget()
     }
   }
   if (Failed(hr)) {
+    gfxCriticalError(gfxCriticalError::DefaultOptions(false)) << "Failed in UpdateRenderTarget";
     return;
   }
 
@@ -1377,6 +1362,7 @@ CompositorD3D11::PaintToTarget()
 
   hr = mSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)backBuf.StartAssignment());
   if (Failed(hr)) {
+    gfxCriticalErrorOnce(gfxCriticalError::DefaultOptions(false)) << "Failed in PaintToTarget 1";
     return;
   }
 
@@ -1393,6 +1379,7 @@ CompositorD3D11::PaintToTarget()
 
   hr = mDevice->CreateTexture2D(&softDesc, nullptr, getter_AddRefs(readTexture));
   if (Failed(hr)) {
+    gfxCriticalErrorOnce(gfxCriticalError::DefaultOptions(false)) << "Failed in PaintToTarget 2";
     return;
   }
   mContext->CopyResource(readTexture, backBuf);
@@ -1400,6 +1387,7 @@ CompositorD3D11::PaintToTarget()
   D3D11_MAPPED_SUBRESOURCE map;
   hr = mContext->Map(readTexture, 0, D3D11_MAP_READ, 0, &map);
   if (Failed(hr)) {
+    gfxCriticalErrorOnce(gfxCriticalError::DefaultOptions(false)) << "Failed in PaintToTarget 3";
     return;
   }
   RefPtr<DataSourceSurface> sourceSurface =

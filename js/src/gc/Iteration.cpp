@@ -99,7 +99,7 @@ js::IterateScripts(JSRuntime* rt, JSCompartment* compartment,
 
     if (compartment) {
         for (ZoneCellIterUnderGC i(compartment->zone(), gc::AllocKind::SCRIPT); !i.done(); i.next()) {
-            JSScript *script = i.get<JSScript>();
+            JSScript* script = i.get<JSScript>();
             if (script->compartment() == compartment)
                 scriptCallback(rt, data, script);
         }
@@ -119,7 +119,7 @@ js::IterateGrayObjects(Zone* zone, GCThingCallback cellCallback, void* data)
 
     for (auto thingKind : ObjectAllocKinds()) {
         for (ZoneCellIterUnderGC i(zone, thingKind); !i.done(); i.next()) {
-            JSObject *obj = i.get<JSObject>();
+            JSObject* obj = i.get<JSObject>();
             if (obj->asTenured().isMarked(GRAY))
                 cellCallback(data, JS::GCCellPtr(obj));
         }

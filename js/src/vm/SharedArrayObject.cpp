@@ -6,8 +6,10 @@
 
 #include "vm/SharedArrayObject.h"
 
+#include "mozilla/Atomics.h"
+
+#include "jsfriendapi.h"
 #include "jsprf.h"
-#include "jsobjinlines.h"
 
 #ifdef XP_WIN
 # include "jswin.h"
@@ -20,10 +22,10 @@
 # include <valgrind/memcheck.h>
 #endif
 
-#include "mozilla/Atomics.h"
-
 #include "asmjs/AsmJSValidate.h"
 #include "vm/TypedArrayCommon.h"
+
+#include "jsobjinlines.h"
 
 using namespace js;
 
@@ -208,20 +210,24 @@ SharedArrayBufferObject::class_constructor(JSContext* cx, unsigned argc, Value* 
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (!args.isConstructing()) {
-        if (args.hasDefined(0) && IsObjectWithClass(args[0], ESClass_SharedArrayBuffer, cx)) {
-            args.rval().set(args[0]);
-            return true;
+        if (args.hasDefined(0)) {
+            ESClassValue cls;
+            if (!GetClassOfValue(cx, args[0], &cls))
+                return false;
+            if (cls == ESClass_SharedArrayBuffer) {
+                args.rval().set(args[0]);
+                return true;
+            }
         }
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_SHARED_ARRAY_BAD_OBJECT);
         return false;
     }
 
+    // Bugs 1068458, 1161298: Limit length to 2^31-1.
     uint32_t length;
-    bool overflow;
-    if (!ToLengthClamped(cx, args.get(0), &length, &overflow)) {
-        // Bug 1068458: Limit length to 2^31-1.
-        if (overflow || length > INT32_MAX)
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_SHARED_ARRAY_BAD_LENGTH);
+    bool overflow_unused;
+    if (!ToLengthClamped(cx, args.get(0), &length, &overflow_unused) || length > INT32_MAX) {
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_SHARED_ARRAY_BAD_LENGTH);
         return false;
     }
 

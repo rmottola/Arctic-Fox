@@ -50,7 +50,7 @@ _SUBDIR_CONFIG_ARGS="$ac_configure_args"
 dnl Set the version number of the libs included in-tree
 dnl ========================================================
 MOZJPEG=62
-MOZPNG=10616
+MOZPNG=10628
 MOZWEBP=043
 NSPR_VERSION=4
 NSPR_MINVER=4.15.0
@@ -356,6 +356,12 @@ else
     esac
 fi
 
+case "$target" in
+*-apple-darwin*)
+    MOZ_IOS_SDK
+    ;;
+esac
+
 AC_SUBST(ANDROID_SOURCE)
 AC_SUBST(ANDROID_PACKAGE_NAME)
 AC_SUBST(OBJCOPY)
@@ -530,6 +536,9 @@ case "$target" in
             # See http://blogs.msdn.com/b/vcblog/archive/2014/11/12/improvements-to-warnings-in-the-c-compiler.aspx
             CFLAGS="$CFLAGS -Wv:18"
             CXXFLAGS="$CXXFLAGS -Wv:18"
+
+            # -Zc:sizedDealloc- disables C++14 global sized deallocation (see bug 1160146)
+            CXXFLAGS="$CXXFLAGS -Zc:sizedDealloc-"
 
             # https://connect.microsoft.com/VisualStudio/feedback/details/888527/warnings-on-dbghelp-h
             # for dbghelp.h, imagehlp.h, and shobj.h
@@ -1511,9 +1520,11 @@ if test "$GNU_CC"; then
         _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=return-type"
         _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=sequence-point"
         _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=trigraphs"
+        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=uninitialized"
         _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=unknown-pragmas"
 
         MOZ_C_SUPPORTS_WARNING(-Werror=, non-literal-null-conversion, ac_c_has_werror_non_literal_null_conversion)
+        MOZ_C_SUPPORTS_WARNING(-Werror=, sometimes-uninitialized, ac_c_has_sometimes_uninitialized)
     fi
 
     # Turn off the following warnings that -Wall turns on:
@@ -1604,9 +1615,11 @@ if test "$GNU_CXX"; then
         _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=switch"
         _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=trigraphs"
         _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=type-limits"
+        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=uninitialized"
         _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=unused-label"
 
         MOZ_CXX_SUPPORTS_WARNING(-Werror=, non-literal-null-conversion, ac_cxx_has_werror_non_literal_null_conversion)
+        MOZ_CXX_SUPPORTS_WARNING(-Werror=, sometimes-uninitialized, ac_cxx_has_sometimes_uninitialized)
     fi
 
     # Turn off the following warnings that -Wall turns on:
@@ -1977,7 +1990,7 @@ case "$target" in
     DLL_SUFFIX=".dylib"
     DSO_LDOPTS=''
     STRIP_FLAGS="$STRIP_FLAGS -x -S"
-    # Check whether we're targeting OS X or iOS
+    # Ensure that if we're targeting iOS an SDK was provided.
     AC_CACHE_CHECK(for iOS target,
                    ac_cv_ios_target,
                    [AC_TRY_COMPILE([#include <TargetConditionals.h>
@@ -1987,7 +2000,10 @@ case "$target" in
                                    [],
                                    ac_cv_ios_target="yes",
                                    ac_cv_ios_target="no")])
-    if test "$ac_cv_ios_target" = "yes"; then
+    if test "$ac_cv_ios_target" = "yes" -a -z $MOZ_IOS; then
+       AC_MSG_ERROR([targeting iOS but not using an iOS SDK?])
+    fi
+    if test -n "$MOZ_IOS"; then
         AC_DEFINE(XP_IOS)
         AC_DEFINE(XP_DARWIN)
         _PLATFORM_DEFAULT_TOOLKIT='cairo-uikit'
@@ -2162,6 +2178,12 @@ ia64*-hpux*)
         WIN32_CONSOLE_EXE_LDFLAGS=-mconsole
         WIN32_GUI_EXE_LDFLAGS=-mwindows
 
+        # GCC/binutils can't link to a function if we try to include dllexport function
+        # in the same library as dllimport caller. To work around it, we build NSPR
+        # and NSS with -mnop-fun-dllimport flag. The drawback of this solution is that
+        # function thunks need to be generated for cross-DLL calls.
+        MOZ_FOLD_LIBS_FLAGS=-mnop-fun-dllimport
+
         # We use mix of both POSIX and Win32 printf format across the tree, so format
         # warnings are useless on mingw.
         MOZ_C_SUPPORTS_WARNING(-Wno-, format, ac_c_has_wno_format)
@@ -2304,22 +2326,6 @@ ia64*-hpux*)
     *-mingw*)
         if test -n "$L10NBASEDIR"; then
             L10NBASEDIR=`cd $L10NBASEDIR && pwd -W`
-        fi
-        ;;
-    esac
-
-    case "$host" in
-    *-mingw*)
-        if test -z "$MOZ_TOOLS"; then
-            AC_MSG_ERROR([MOZ_TOOLS is not set])
-        fi
-        MOZ_TOOLS_DIR=`cd $MOZ_TOOLS && pwd -W`
-        if test "$?" != "0" -o -z "$MOZ_TOOLS_DIR"; then
-            AC_MSG_ERROR([cd \$MOZ_TOOLS failed. MOZ_TOOLS ==? $MOZ_TOOLS])
-        fi
-        MOZ_TOOLS_BIN_DIR="$(cd "$MOZ_TOOLS_DIR/bin" && pwd)"
-        if test `echo ${PATH}: | grep -ic "$MOZ_TOOLS_BINDIR:"` = 0; then
-            AC_MSG_ERROR([\$MOZ_TOOLS\\bin must be in your path.])
         fi
         ;;
     esac
@@ -2612,7 +2618,7 @@ if test "$GNU_CC" -a "$OS_TARGET" != WINNT; then
   AC_DEFINE(HAVE_VISIBILITY_ATTRIBUTE)
   case "$OS_TARGET" in
   Darwin)
-    VISIBILITY_FLAGS='-fvisibility=hidden'
+    VISIBILITY_FLAGS='-fvisibility=hidden -fvisibility-inlines-hidden'
     ;;
   *)
     VISIBILITY_FLAGS='-I$(DIST)/system_wrappers -include $(MOZILLA_DIR)/config/gcc_hidden.h'
@@ -2638,8 +2644,6 @@ esac
 AC_SUBST(WRAP_SYSTEM_INCLUDES)
 AC_SUBST(VISIBILITY_FLAGS)
 
-MOZ_LLVM_PR8927
-
 dnl Checks for header files.
 dnl ========================================================
 AC_HEADER_DIRENT
@@ -2660,6 +2664,7 @@ MOZ_CHECK_HEADERS([linux/quota.h],,,[#include <sys/socket.h>])
 
 dnl SCTP support - needs various network include headers
 MOZ_CHECK_HEADERS([linux/if_addr.h linux/rtnetlink.h],,,[#include <sys/socket.h>])
+MOZ_CHECK_HEADERS(sys/queue.h)
 
 MOZ_CHECK_HEADERS(sys/types.h netinet/in.h byteswap.h)
 
@@ -3756,6 +3761,9 @@ MOZ_OFFICIAL_BRANDING=
 MC_OFFICIAL=1
 MOZ_FEEDS=1
 MOZ_AUTH_EXTENSION=1
+if test "$MOZ_IOS"; then
+   MOZ_AUTH_EXTENSION=
+fi
 MOZ_RAW=
 MOZ_VORBIS=
 MOZ_TREMOR=
@@ -3807,6 +3815,9 @@ MOZ_UNIVERSALCHARDET=1
 MOZ_XUL=1
 MOZ_ZIPWRITER=1
 NS_PRINTING=1
+if test "$MOZ_IOS"; then
+   NS_PRINTING=
+fi
 MOZ_PDF_PRINTING=
 MOZ_NO_SMART_CARDS=
 NSS_DISABLE_DBM=
@@ -4110,9 +4121,6 @@ cairo-windows)
     MOZ_WIDGET_TOOLKIT=windows
     MOZ_PDF_PRINTING=1
     MOZ_INSTRUMENT_EVENT_LOOP=1
-    if test -n "$GNU_CC"; then
-        MOZ_FOLD_LIBS=
-    fi
     ;;
 
 cairo-gtk3)
@@ -4184,7 +4192,10 @@ cairo-cocoa)
     CXXFLAGS="$CXXFLAGS $TK_CFLAGS"
     MOZ_USER_DIR="Mozilla"
     MOZ_FS_LAYOUT=bundle
-    MOZ_INSTRUMENT_EVENT_LOOP=1
+    # skip event loop instrumentation on UIKit for now
+    if test "$MOZ_WIDGET_TOOLKIT" == "cocoa"; then
+      MOZ_INSTRUMENT_EVENT_LOOP=1
+    fi
     ;;
 
 cairo-uikit)
@@ -4192,7 +4203,7 @@ cairo-uikit)
     AC_DEFINE(MOZ_WIDGET_UIKIT)
     LDFLAGS="$LDFLAGS -framework UIKit -lobjc"
     TK_CFLAGS="-DNO_X11"
-    TK_LIBS='-Wl,-framework,Foundation -Wl,-framework,CoreFoundation -Wl,-framework,CoreGraphics -Wl,-framework,CoreText'
+    TK_LIBS='-Wl,-framework,Foundation -Wl,-framework,CoreFoundation -Wl,-framework,CoreGraphics -Wl,-framework,CoreText -Wl,-framework,AVFoundation -Wl,-framework,AudioToolbox -Wl,-framework,CoreMedia -Wl,-framework,CoreVideo -Wl,-framework,OpenGLES -Wl,-framework,QuartzCore'
     CFLAGS="$CFLAGS $TK_CFLAGS"
     CXXFLAGS="$CXXFLAGS $TK_CFLAGS"
     MOZ_USER_DIR="Mozilla"
@@ -4237,7 +4248,7 @@ fi
 
 if test "$COMPILE_ENVIRONMENT"; then
   if test "$MOZ_ENABLE_GTK3"; then
-    PKG_CHECK_MODULES(MOZ_GTK3, gtk+-3.0 >= $GTK3_VERSION gtk+-unix-print-3.0 glib-2.0 gobject-2.0 atk-bridge-2.0 $GDK_PACKAGES)
+    PKG_CHECK_MODULES(MOZ_GTK3, gtk+-3.0 >= $GTK3_VERSION gtk+-unix-print-3.0 glib-2.0 gobject-2.0 $GDK_PACKAGES)
     MOZ_GTK3_CFLAGS="-I${_topsrcdir}/widget/gtk/compat-gtk3 $MOZ_GTK3_CFLAGS"
     dnl Contrary to MOZ_GTK2_LIBS, MOZ_GTK3_LIBS needs to be literally added to TK_LIBS instead
     dnl of a make reference because of how TK_LIBS is mangled in toolkit/library/moz.build
@@ -4315,6 +4326,10 @@ MOZ_ARG_DISABLE_BOOL(printing,
 [  --disable-printing      Disable printing support],
     NS_PRINTING=,
     NS_PRINTING=1)
+
+if test -n "$MOZ_IOS" -a -n "$NS_PRINTING"; then
+   AC_MSG_ERROR([Printing is not supported on iOS.])
+fi
 
 if test "$NS_PRINTING"; then
     AC_DEFINE(NS_PRINTING)
@@ -5512,10 +5527,15 @@ AC_SUBST(MOZ_CHILD_PERMISSIONS)
 dnl ========================================================
 dnl NegotiateAuth
 dnl ========================================================
+
 MOZ_ARG_DISABLE_BOOL(negotiateauth,
 [  --disable-negotiateauth Disable GSS-API negotiation ],
     MOZ_AUTH_EXTENSION=,
     MOZ_AUTH_EXTENSION=1 )
+
+if test -n "$MOZ_IOS" -a -n "$MOZ_AUTH_EXTENSION"; then
+   AC_MSG_ERROR([negotiateauth is not supported on iOS.])
+fi
 
 dnl ========================================================
 dnl Pref extensions (autoconfig)
@@ -5713,15 +5733,37 @@ dnl ========================================================
 MOZ_GAMEPAD=
 MOZ_GAMEPAD_BACKEND=stub
 
-MOZ_ARG_ENABLE_BOOL(gamepad,
-[  --enable-gamepad    Enable gamepad support],
-    MOZ_GAMEPAD=1,
-    MOZ_GAMEPAD=)
+
+# Gamepad DOM is built on supported platforms by default.
+case "$OS_TARGET" in
+     WINNT|Linux)
+       MOZ_GAMEPAD=1
+       ;;
+     Darwin)
+       if test -z "$MOZ_IOS"; then
+         MOZ_GAMEPAD=1
+       fi
+       ;;
+     Android)
+       if test "$MOZ_WIDGET_TOOLKIT" != "gonk"; then
+         MOZ_GAMEPAD=1
+       fi
+       ;;
+     *)
+       ;;
+esac
+
+MOZ_ARG_DISABLE_BOOL(gamepad,
+[  --disable-gamepad   Disable gamepad support],
+    MOZ_GAMEPAD=,
+    MOZ_GAMEPAD=1)
 
 if test "$MOZ_GAMEPAD"; then
     case "$OS_TARGET" in
     Darwin)
-        MOZ_GAMEPAD_BACKEND=cocoa
+        if test -z "$MOZ_IOS"; then
+            MOZ_GAMEPAD_BACKEND=cocoa
+        fi
         ;;
     WINNT)
         MOZ_GAMEPAD_BACKEND=windows
@@ -5774,6 +5816,8 @@ if test -n "$MOZ_LIBJPEG_TURBO"; then
   ;;
   Darwin:x86_64)
     LIBJPEG_TURBO_ASFLAGS="-f macho64 -rnasm -pnasm -D__x86_64__ -DPIC -DMACHO"
+  ;;
+  Darwin:arm*)
   ;;
   WINNT:x86)
     LIBJPEG_TURBO_ASFLAGS="-f win32 -rnasm -pnasm -DPIC -DWIN32"
@@ -5928,7 +5972,7 @@ dnl is not yet sufficient).
 if test "$OS_ARCH" = "WINNT"; then
     MIN_NSIS_MAJOR_VER=2
     MIN_NSIS_MINOR_VER=46
-    MOZ_PATH_PROGS(MAKENSISU, $MAKENSISU makensisu-3.0a2.exe makensisu-2.46.exe makensis)
+    MOZ_PATH_PROGS(MAKENSISU, $MAKENSISU makensis-3.0b1.exe makensisu-3.0a2.exe makensisu-2.46.exe makensis)
     if test -n "$MAKENSISU" -a "$MAKENSISU" != ":"; then
       AC_MSG_RESULT([yes])
       MAKENSISU_VER=`"$MAKENSISU" -version 2>/dev/null`
@@ -6033,6 +6077,10 @@ fi
 dnl ========================================================
 dnl Updater
 dnl ========================================================
+
+if test "$MOZ_IOS"; then
+  MOZ_UPDATER=
+fi
 
 MOZ_ARG_DISABLE_BOOL(updater,
 [  --disable-updater       Disable building of updater],
@@ -6526,13 +6574,10 @@ if test -z "$MOZ_ENABLE_WARNINGS_AS_ERRORS"; then
    WARNINGS_AS_ERRORS=''
 elif test "$GNU_CC"; then
     # Prevent the following GCC warnings from being treated as errors:
-    # -Wuninitialized - too many false positives
     # -Wmaybe-uninitialized - too many false positives
     # -Wdeprecated-declarations - we don't want our builds held hostage when a
     #   platform-specific API becomes deprecated.
     # -Warray-bounds - false positives depending on optimization
-    MOZ_C_SUPPORTS_WARNING(-W, no-error=uninitialized, ac_c_has_noerror_uninitialized)
-    MOZ_CXX_SUPPORTS_WARNING(-W, no-error=uninitialized, ac_cxx_has_noerror_uninitialized)
     MOZ_C_SUPPORTS_WARNING(-W, no-error=maybe-uninitialized, ac_c_has_noerror_maybe_uninitialized)
     MOZ_CXX_SUPPORTS_WARNING(-W, no-error=maybe-uninitialized, ac_cxx_has_noerror_maybe_uninitialized)
     MOZ_C_SUPPORTS_WARNING(-W, no-error=deprecated-declarations, ac_c_has_noerror_deprecated_declarations)
@@ -6651,6 +6696,7 @@ Android|WINNT|Darwin)
 *)
   dnl On !Android !Windows !OSX, we only want to link executables against mozglue
   MOZ_GLUE_IN_PROGRAM=1
+  AC_DEFINE(MOZ_GLUE_IN_PROGRAM)
   ;;
 esac
 
@@ -6746,7 +6792,7 @@ dnl ========================================================
 dnl = Jemalloc build setup
 dnl ========================================================
 if test -z "$MOZ_MEMORY"; then
-  if test -n "$MOZ_JEMALLOC3" -a -z "$MOZ_REPLACE_MALLOC"; then
+  if test -n "$MOZ_JEMALLOC4" -a -z "$MOZ_REPLACE_MALLOC"; then
     MOZ_NATIVE_JEMALLOC=1
     AC_CHECK_FUNCS(mallctl nallocx,,
       [MOZ_NATIVE_JEMALLOC=
@@ -6754,7 +6800,7 @@ if test -z "$MOZ_MEMORY"; then
     if test -n "$MOZ_NATIVE_JEMALLOC"; then
       MOZ_MEMORY=1
       AC_DEFINE(MOZ_MEMORY)
-      AC_DEFINE(MOZ_JEMALLOC3)
+      AC_DEFINE(MOZ_JEMALLOC4)
       AC_DEFINE(MOZ_NATIVE_JEMALLOC)
     fi
   fi
@@ -6767,8 +6813,8 @@ if test -z "$MOZ_MEMORY"; then
   esac
 else
   AC_DEFINE(MOZ_MEMORY)
-  if test -n "$MOZ_JEMALLOC3"; then
-    AC_DEFINE(MOZ_JEMALLOC3)
+  if test -n "$MOZ_JEMALLOC4"; then
+    AC_DEFINE(MOZ_JEMALLOC4)
   fi
   if test "x$MOZ_DEBUG" = "x1"; then
     AC_DEFINE(MOZ_MEMORY_DEBUG)
@@ -6817,7 +6863,7 @@ else
   esac
 fi # MOZ_MEMORY
 AC_SUBST(MOZ_MEMORY)
-AC_SUBST(MOZ_JEMALLOC3)
+AC_SUBST(MOZ_JEMALLOC4)
 AC_SUBST(MOZ_NATIVE_JEMALLOC)
 AC_SUBST(MOZ_CRT)
 export MOZ_CRT
@@ -7631,13 +7677,7 @@ dnl ========================================================
 dnl Check for pixman and cairo
 dnl ========================================================
 
-if test "$MOZ_WIDGET_TOOLKIT" = "gtk3" ; then
-  # cairo-gtk3 can be build with system-cairo only
-  MOZ_TREE_CAIRO=
-else
-  MOZ_TREE_CAIRO=1
-fi
-
+MOZ_TREE_CAIRO=1
 MOZ_ARG_ENABLE_BOOL(system-cairo,
 [  --enable-system-cairo   Use system cairo (located with pkgconfig)],
 MOZ_TREE_CAIRO=,
@@ -7728,9 +7768,6 @@ if test "$MOZ_TREE_CAIRO"; then
         if test -n "$WIN32_D2D_SURFACE_FEATURE"; then
           MOZ_CHECK_HEADER(d3d10.h, MOZ_ENABLE_D3D10_LAYER=1)
         fi
-        ;;
-      gtk3)
-        AC_MSG_ERROR([cairo-gtk3 toolkit is incompatible with in-tree cairo. Please add --enable-system-cairo to your build config.])
         ;;
     esac
     if test "$USE_FC_FREETYPE"; then
@@ -7881,7 +7918,12 @@ case "$OS_TARGET" in
       NECKO_WIFI=1
     fi
     ;;
-  Darwin|DragonFly|FreeBSD|SunOS|WINNT)
+  Darwin)
+    if test -z "$MOZ_IOS"; then
+      NECKO_WIFI=1
+    fi
+    ;;
+  DragonFly|FreeBSD|SunOS|WINNT)
     NECKO_WIFI=1
     ;;
   Linux)
@@ -8273,7 +8315,6 @@ fi
 
 dnl win32 options
 AC_SUBST(MOZ_BROWSE_INFO)
-AC_SUBST(MOZ_TOOLS_DIR)
 AC_SUBST(WIN32_REDIST_DIR)
 AC_SUBST(MAKENSISU)
 
@@ -8439,6 +8480,7 @@ AC_SUBST_LIST(LIBJPEG_TURBO_ASFLAGS)
 
 AC_SUBST(MOZ_PACKAGE_JSSHELL)
 AC_SUBST(MOZ_FOLD_LIBS)
+AC_SUBST(MOZ_FOLD_LIBS_FLAGS)
 AC_SUBST(SOCORRO_SYMBOL_UPLOAD_TOKEN_FILE)
 
 AC_SUBST(MOZ_ENABLE_SZIP)
@@ -8604,11 +8646,8 @@ dnl ========================================================
 # builds.  Bugs to enable:
 #
 #   Android:  bug 864843
-#   B2G:      bug 866301
 
-if test "$MOZ_WIDGET_TOOLKIT" = "android" ||
-   test "$MOZ_BUILD_APP" = "b2g" ||
-   test "$MOZ_BUILD_APP" = "b2g/dev"; then
+if test "$MOZ_WIDGET_TOOLKIT" = "android"; then
     _INTL_API=no
 else
     _INTL_API=yes
@@ -8633,25 +8672,9 @@ if test "$COMPILE_ENVIRONMENT" -a -z "$LIBXUL_SDK_DIR"; then
   MOZ_SUBCONFIGURE_FFI()
 fi
 
-# Hack around an Apple bug that affects the egrep that comes with OS X 10.7.
-# "env ARCHPREFERENCE=i386,x86_64 arch egrep" first tries to use the 32-bit
-# Intel part of the egrep fat binary, even on 64-bit systems, and falls back on
-# the 64-bit part if it's not a fat binary, as can happen with MacPorts. We
-# (apparently) only need this hack when egrep's "pattern" is particularly long
-# (as in the following code) and the first egrep on our $PATH is Apple's.  See
-# bug 655339.
-case "$host" in
-*-apple-darwin11*)
-    FIXED_EGREP="env ARCHPREFERENCE=i386,x86_64 arch egrep"
-    ;;
-*)
-    FIXED_EGREP="egrep"
-    ;;
-esac
-
 # Run jemalloc configure script
 
-if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC3" -o -n "$MOZ_REPLACE_MALLOC"; then
+if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC4" -o -n "$MOZ_REPLACE_MALLOC"; then
   ac_configure_args="--build=$build --host=$target --enable-stats --with-jemalloc-prefix=je_ --disable-valgrind"
   # We're using memalign for _aligned_malloc in memory/build/mozmemory_wrap.c
   # on Windows, so just export memalign on all platforms.
@@ -8659,8 +8682,13 @@ if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC3" -
   if test -n "$MOZ_REPLACE_MALLOC"; then
     # When using replace_malloc, we always want valloc exported from jemalloc.
     ac_configure_args="$ac_configure_args ac_cv_func_valloc=yes"
+    if test "${OS_ARCH}" = Darwin; then
+      # We also need to enable pointer validation on Mac because jemalloc's
+      # zone allocator is not used.
+      ac_configure_args="$ac_configure_args --enable-ivsalloc"
+    fi
   fi
-  if test -n "$MOZ_JEMALLOC3"; then
+  if test -n "$MOZ_JEMALLOC4"; then
     case "${OS_ARCH}" in
       WINNT|Darwin)
         # We want jemalloc functions to be kept hidden on both Mac and Windows
@@ -8668,6 +8696,11 @@ if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC3" -
         ac_configure_args="$ac_configure_args --without-export"
         ;;
     esac
+    if test "${OS_ARCH}" = WINNT; then
+      # Lazy lock initialization doesn't play well with lazy linking of
+      # mozglue.dll on Windows XP (leads to startup crash), so disable it.
+      ac_configure_args="$ac_configure_args --disable-lazy-lock"
+    fi
   elif test "${OS_ARCH}" = Darwin; then
     # When building as a replace-malloc lib, disabling the zone allocator
     # forces to use pthread_atfork.
@@ -8681,7 +8714,7 @@ if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC3" -
         MANGLE=$_MANGLE
         ;;
     esac
-  elif test -z "$MOZ_JEMALLOC3"; then
+  elif test -z "$MOZ_JEMALLOC4"; then
     MANGLE=$_MANGLE
     JEMALLOC_WRAPPER=replace_
   fi
@@ -8704,20 +8737,27 @@ if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC3" -
   for var in AS CC CXX CPP LD AR RANLIB STRIP CPPFLAGS EXTRA_CFLAGS LDFLAGS; do
     ac_configure_args="$ac_configure_args $var='`eval echo \\${${var}}`'"
   done
-  if test "$CROSS_COMPILE"; then
-    ac_configure_args="$ac_configure_args je_cv_static_page_shift=12"
-  fi
   # Force disable DSS support in jemalloc.
   ac_configure_args="$ac_configure_args ac_cv_func_sbrk=false"
 
   # Make Linux builds munmap freed chunks instead of recycling them.
   ac_configure_args="$ac_configure_args --enable-munmap"
 
+  # Disable cache oblivious behavior that appears to have a performance
+  # impact on Firefox.
+  ac_configure_args="$ac_configure_args --disable-cache-oblivious"
+
   if ! test -e memory/jemalloc; then
     mkdir -p memory/jemalloc
   fi
 
+  # jemalloc's configure runs git to determine the version. But when building
+  # from a gecko git clone, the git commands it uses is going to pick gecko's
+  # information, not jemalloc's, which is useless. So pretend we don't have git
+  # at all. That will make jemalloc's configure pick the in-tree VERSION file.
+  (PATH="$srcdir/memory/jemalloc/helper:$PATH";
   AC_OUTPUT_SUBDIRS(memory/jemalloc/src)
+  ) || exit 1
   ac_configure_args="$_SUBDIR_CONFIG_ARGS"
 fi
 

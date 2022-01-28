@@ -87,7 +87,8 @@ protected:
 public:
   virtual WidgetKeyboardEvent* AsKeyboardEvent() override { return this; }
 
-  WidgetKeyboardEvent(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget,
+  WidgetKeyboardEvent(bool aIsTrusted, EventMessage aMessage,
+                      nsIWidget* aWidget,
                       EventClassID aEventClassID = eKeyboardEventClass)
     : WidgetInputEvent(aIsTrusted, aMessage, aWidget, aEventClassID)
     , keyCode(0)
@@ -113,7 +114,7 @@ public:
                "Duplicate() must be overridden by sub class");
     // Not copying widget, it is a weak reference.
     WidgetKeyboardEvent* result =
-      new WidgetKeyboardEvent(false, message, nullptr);
+      new WidgetKeyboardEvent(false, mMessage, nullptr);
     result->AssignKeyEventData(*this, true);
     result->mFlags = mFlags;
     return result;
@@ -281,10 +282,10 @@ private:
  * This is extended from WidgetKeyboardEvent and is mapped to DOM event
  * "BeforeAfterKeyboardEvent".
  *
- * Event message: NS_KEY_BEFORE_DOWN
- *                NS_KEY_BEFORE_UP
- *                NS_KEY_AFTER_DOWN
- *                NS_KEY_AFTER_UP
+ * Event mMessage: NS_KEY_BEFORE_DOWN
+ *                 NS_KEY_BEFORE_UP
+ *                 NS_KEY_AFTER_DOWN
+ *                 NS_KEY_AFTER_UP
  ******************************************************************************/
 class InternalBeforeAfterKeyboardEvent : public WidgetKeyboardEvent
 {
@@ -306,9 +307,10 @@ public:
     return this;
   }
 
-  InternalBeforeAfterKeyboardEvent(bool aIsTrusted, uint32_t aMessage,
+  InternalBeforeAfterKeyboardEvent(bool aIsTrusted, EventMessage aMessage,
                                    nsIWidget* aWidget)
-    : WidgetKeyboardEvent(aIsTrusted, aMessage, aWidget, eBeforeAfterKeyboardEventClass)
+    : WidgetKeyboardEvent(aIsTrusted, aMessage, aWidget,
+                          eBeforeAfterKeyboardEventClass)
   {
   }
 
@@ -318,7 +320,7 @@ public:
                "Duplicate() must be overridden by sub class");
     // Not copying widget, it is a weak reference.
     InternalBeforeAfterKeyboardEvent* result =
-      new InternalBeforeAfterKeyboardEvent(false, message, nullptr);
+      new InternalBeforeAfterKeyboardEvent(false, mMessage, nullptr);
     result->AssignBeforeAfterKeyEventData(*this, true);
     result->mFlags = mFlags;
     return result;
@@ -360,7 +362,7 @@ public:
     return this;
   }
 
-  WidgetCompositionEvent(bool aIsTrusted, uint32_t aMessage,
+  WidgetCompositionEvent(bool aIsTrusted, EventMessage aMessage,
                          nsIWidget* aWidget)
     : WidgetGUIEvent(aIsTrusted, aMessage, aWidget, eCompositionEventClass)
   {
@@ -376,7 +378,7 @@ public:
                "Duplicate() must be overridden by sub class");
     // Not copying widget, it is a weak reference.
     WidgetCompositionEvent* result =
-      new WidgetCompositionEvent(false, message, nullptr);
+      new WidgetCompositionEvent(false, mMessage, nullptr);
     result->AssignCompositionEventData(*this, true);
     result->mFlags = mFlags;
     return result;
@@ -426,16 +428,16 @@ public:
 
   bool CausesDOMTextEvent() const
   {
-    return message == NS_COMPOSITION_CHANGE ||
-           message == NS_COMPOSITION_COMMIT ||
-           message == NS_COMPOSITION_COMMIT_AS_IS;
+    return mMessage == NS_COMPOSITION_CHANGE ||
+           mMessage == NS_COMPOSITION_COMMIT ||
+           mMessage == NS_COMPOSITION_COMMIT_AS_IS;
   }
 
   bool CausesDOMCompositionEndEvent() const
   {
-    return message == NS_COMPOSITION_END ||
-           message == NS_COMPOSITION_COMMIT ||
-           message == NS_COMPOSITION_COMMIT_AS_IS;
+    return mMessage == NS_COMPOSITION_END ||
+           mMessage == NS_COMPOSITION_COMMIT ||
+           mMessage == NS_COMPOSITION_COMMIT_AS_IS;
   }
 };
 
@@ -460,11 +462,10 @@ public:
     return this;
   }
 
-  WidgetQueryContentEvent(bool aIsTrusted, uint32_t aMessage,
+  WidgetQueryContentEvent(bool aIsTrusted, EventMessage aMessage,
                           nsIWidget* aWidget)
     : WidgetGUIEvent(aIsTrusted, aMessage, aWidget, eQueryContentEventClass)
     , mSucceeded(false)
-    , mWasAsync(false)
     , mUseNativeLineBreak(true)
     , mWithFontRanges(false)
   {
@@ -482,7 +483,7 @@ public:
   void InitForQueryTextContent(uint32_t aOffset, uint32_t aLength,
                                bool aUseNativeLineBreak = true)
   {
-    NS_ASSERTION(message == NS_QUERY_TEXT_CONTENT,
+    NS_ASSERTION(mMessage == NS_QUERY_TEXT_CONTENT,
                  "wrong initializer is called");
     mInput.mOffset = aOffset;
     mInput.mLength = aLength;
@@ -492,7 +493,7 @@ public:
   void InitForQueryCaretRect(uint32_t aOffset,
                              bool aUseNativeLineBreak = true)
   {
-    NS_ASSERTION(message == NS_QUERY_CARET_RECT,
+    NS_ASSERTION(mMessage == NS_QUERY_CARET_RECT,
                  "wrong initializer is called");
     mInput.mOffset = aOffset;
     mUseNativeLineBreak = aUseNativeLineBreak;
@@ -501,7 +502,7 @@ public:
   void InitForQueryTextRect(uint32_t aOffset, uint32_t aLength,
                             bool aUseNativeLineBreak = true)
   {
-    NS_ASSERTION(message == NS_QUERY_TEXT_RECT,
+    NS_ASSERTION(mMessage == NS_QUERY_TEXT_RECT,
                  "wrong initializer is called");
     mInput.mOffset = aOffset;
     mInput.mLength = aLength;
@@ -510,43 +511,42 @@ public:
 
   void InitForQueryDOMWidgetHittest(const mozilla::LayoutDeviceIntPoint& aPoint)
   {
-    NS_ASSERTION(message == NS_QUERY_DOM_WIDGET_HITTEST,
+    NS_ASSERTION(mMessage == NS_QUERY_DOM_WIDGET_HITTEST,
                  "wrong initializer is called");
     refPoint = aPoint;
   }
 
   void RequestFontRanges()
   {
-    NS_ASSERTION(message == NS_QUERY_TEXT_CONTENT,
+    NS_ASSERTION(mMessage == NS_QUERY_TEXT_CONTENT,
                  "not querying text content");
     mWithFontRanges = true;
   }
 
   uint32_t GetSelectionStart(void) const
   {
-    NS_ASSERTION(message == NS_QUERY_SELECTED_TEXT,
+    NS_ASSERTION(mMessage == NS_QUERY_SELECTED_TEXT,
                  "not querying selection");
     return mReply.mOffset + (mReply.mReversed ? mReply.mString.Length() : 0);
   }
 
   uint32_t GetSelectionEnd(void) const
   {
-    NS_ASSERTION(message == NS_QUERY_SELECTED_TEXT,
+    NS_ASSERTION(mMessage == NS_QUERY_SELECTED_TEXT,
                  "not querying selection");
     return mReply.mOffset + (mReply.mReversed ? 0 : mReply.mString.Length());
   }
 
   mozilla::WritingMode GetWritingMode(void) const
   {
-    NS_ASSERTION(message == NS_QUERY_SELECTED_TEXT ||
-                 message == NS_QUERY_CARET_RECT ||
-                 message == NS_QUERY_TEXT_RECT,
+    NS_ASSERTION(mMessage == NS_QUERY_SELECTED_TEXT ||
+                 mMessage == NS_QUERY_CARET_RECT ||
+                 mMessage == NS_QUERY_TEXT_RECT,
                  "not querying selection or text rect");
     return mReply.mWritingMode;
   }
 
   bool mSucceeded;
-  bool mWasAsync;
   bool mUseNativeLineBreak;
   bool mWithFontRanges;
   struct
@@ -626,7 +626,8 @@ public:
     return this;
   }
 
-  WidgetSelectionEvent(bool aIsTrusted, uint32_t aMessage, nsIWidget* aWidget)
+  WidgetSelectionEvent(bool aIsTrusted, EventMessage aMessage,
+                       nsIWidget* aWidget)
     : WidgetGUIEvent(aIsTrusted, aMessage, aWidget, eSelectionEventClass)
     , mOffset(0)
     , mLength(0)
@@ -678,7 +679,7 @@ public:
     return this;
   }
 
-  InternalEditorInputEvent(bool aIsTrusted, uint32_t aMessage,
+  InternalEditorInputEvent(bool aIsTrusted, EventMessage aMessage,
                            nsIWidget* aWidget)
     : InternalUIEvent(aIsTrusted, aMessage, aWidget, eEditorInputEventClass)
     , mIsComposing(false)
@@ -699,7 +700,7 @@ public:
                "Duplicate() must be overridden by sub class");
     // Not copying widget, it is a weak reference.
     InternalEditorInputEvent* result =
-      new InternalEditorInputEvent(false, message, nullptr);
+      new InternalEditorInputEvent(false, mMessage, nullptr);
     result->AssignEditorInputEventData(*this, true);
     result->mFlags = mFlags;
     return result;

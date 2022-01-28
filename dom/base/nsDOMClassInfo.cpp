@@ -72,7 +72,6 @@
 #include "nsMemory.h"
 
 // includes needed for the prototype chain interfaces
-#include "nsIDOMCSSCharsetRule.h"
 #include "nsIDOMCSSImportRule.h"
 #include "nsIDOMCSSMediaRule.h"
 #include "nsIDOMCSSFontFaceRule.h"
@@ -207,8 +206,6 @@ static nsDOMClassInfoData sClassInfoData[] = {
 
   // CSS classes
   NS_DEFINE_CLASSINFO_DATA(CSSStyleRule, nsDOMGenericSH,
-                           DOM_DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(CSSCharsetRule, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(CSSImportRule, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
@@ -598,10 +595,6 @@ nsDOMClassInfo::Init()
 
   DOM_CLASSINFO_MAP_BEGIN(CSSStyleRule, nsIDOMCSSStyleRule)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMCSSStyleRule)
-  DOM_CLASSINFO_MAP_END
-
-  DOM_CLASSINFO_MAP_BEGIN(CSSCharsetRule, nsIDOMCSSCharsetRule)
-    DOM_CLASSINFO_MAP_ENTRY(nsIDOMCSSCharsetRule)
   DOM_CLASSINFO_MAP_END
 
   DOM_CLASSINFO_MAP_BEGIN(CSSImportRule, nsIDOMCSSImportRule)
@@ -1737,13 +1730,10 @@ GetXPCProto(nsIXPConnect *aXPConnect, JSContext *cx, nsGlobalWindow *aWin,
   }
   NS_ENSURE_TRUE(ci, NS_ERROR_UNEXPECTED);
 
-  nsCOMPtr<nsIXPConnectJSObjectHolder> proto_holder;
   nsresult rv =
-    aXPConnect->GetWrappedNativePrototype(cx, aWin->GetGlobalJSObject(), ci,
-                                          getter_AddRefs(proto_holder));
+    aXPConnect->GetWrappedNativePrototype(cx, aWin->GetGlobalJSObject(), ci, aProto.address());
   NS_ENSURE_SUCCESS(rv, rv);
 
-  aProto.set(proto_holder->GetJSObject());
   return JS_WrapObject(cx, aProto) ? NS_OK : NS_ERROR_FAILURE;
 }
 
@@ -2616,6 +2606,5 @@ nsMessageManagerSH<Super>::Enumerate(nsIXPConnectWrappedNative* wrapper,
 
   // Don't call up to our superclass, since neither nsDOMGenericSH nor
   // nsEventTargetSH have WANT_ENUMERATE.
-  MOZ_ASSERT(!(this->GetScriptableFlags() & nsIXPCScriptable::WANT_ENUMERATE));
   return NS_OK;
 }

@@ -532,7 +532,7 @@ let gEditItemOverlay = {
 
     let itemId = this._paneInfo.itemId;
     let description = this._element("descriptionField").value;
-    if (description != PlacesUIUtils.getItemDescription(this._itemId)) {
+    if (description != PlacesUIUtils.getItemDescription(this._paneInfo.itemId)) {
       let annotation =
         { name: PlacesUIUtils.DESCRIPTION_ANNO, value: description };
       if (!PlacesUIUtils.useAsyncTransactions) {
@@ -565,7 +565,7 @@ let gEditItemOverlay = {
 
     if (!PlacesUIUtils.useAsyncTransactions) {
       let itemId = this._paneInfo.itemId;
-      let txn = new PlacesEditBookmarkURITransaction(this._itemId, newURI);
+      let txn = new PlacesEditBookmarkURITransaction(this._paneInfo.itemId, newURI);
       PlacesUtils.transactionManager.doTransaction(txn);
       return;
     }
@@ -680,7 +680,7 @@ let gEditItemOverlay = {
     if (aEvent.target.id == "editBMPanel_chooseFolderMenuItem") {
       // reset the selection back to where it was and expand the tree
       // (this menu-item is hidden when the tree is already visible
-      let containerId = PlacesUtils.bookmarks.getFolderIdForItem(this._itemId);
+      let containerId = PlacesUtils.bookmarks.getFolderIdForItem(this._paneInfo.itemId);
       let item = this._getFolderMenuItem(containerId);
       this._folderMenuList.selectedItem = item;
       // XXXmano HACK: setTimeout 100, otherwise focus goes back to the

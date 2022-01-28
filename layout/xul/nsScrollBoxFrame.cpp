@@ -83,8 +83,7 @@ nsAutoRepeatBoxFrame::HandleEvent(nsPresContext* aPresContext,
     return NS_OK;
   }
 
-  switch(aEvent->message)
-  {
+  switch(aEvent->mMessage) {
     // repeat mode may be "hover" for repeating while the mouse is hovering
     // over the element, otherwise repetition is done while the element is
     // active (pressed).
@@ -112,6 +111,9 @@ nsAutoRepeatBoxFrame::HandleEvent(nsPresContext* aPresContext,
       }
       break;
     }
+
+    default:
+      break;
   }
      
   return nsButtonBoxFrame::HandleEvent(aPresContext, aEvent, aEventStatus);

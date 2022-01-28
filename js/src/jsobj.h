@@ -349,7 +349,8 @@ class JSObject : public js::gc::Cell
      * is a proxy. In the lazy case, we store (JSObject*)0x1 in the proto field
      * of the object's group. We offer three ways of getting the prototype:
      *
-     * 1. obj->getProto() returns the prototype, but asserts if obj is a proxy.
+     * 1. obj->getProto() returns the prototype, but asserts if obj is a proxy
+     *    with a relevant getPrototype() handler.
      * 2. obj->getTaggedProto() returns a TaggedProto, which can be tested to
      *    check if the proto is an object, nullptr, or lazily computed.
      * 3. js::GetPrototype(cx, obj, &proto) computes the proto of an object.
@@ -366,7 +367,7 @@ class JSObject : public js::gc::Cell
     bool uninlinedIsProxy() const;
 
     JSObject* getProto() const {
-        MOZ_ASSERT(!uninlinedIsProxy());
+        MOZ_ASSERT(!hasLazyPrototype());
         return getTaggedProto().toObjectOrNull();
     }
 
@@ -535,7 +536,7 @@ class JSObject : public js::gc::Cell
      *
      * Note that X represents a low-level representation and does not query the
      * [[Class]] property of object defined by the spec (for this, see
-     * js::ObjectClassIs).
+     * js::GetBuiltinClass).
      */
 
     template <class T>
@@ -818,11 +819,11 @@ HasProperty(JSContext* cx, HandleObject obj, PropertyName* name, bool* foundp);
  * `receiver[id]`, and we've already searched the prototype chain up to `obj`.
  */
 inline bool
-GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleId id,
+GetProperty(JSContext* cx, HandleObject obj, HandleValue receiver, HandleId id,
             MutableHandleValue vp);
 
 inline bool
-GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, PropertyName* name,
+GetProperty(JSContext* cx, HandleObject obj, HandleValue receiver, PropertyName* name,
             MutableHandleValue vp)
 {
     RootedId id(cx, NameToId(name));
@@ -830,17 +831,52 @@ GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, PropertyName
 }
 
 inline bool
+GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleId id,
+            MutableHandleValue vp)
+{
+    RootedValue receiverValue(cx, ObjectValue(*receiver));
+    return GetProperty(cx, obj, receiverValue, id, vp);
+}
+
+inline bool
+GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, PropertyName* name,
+            MutableHandleValue vp)
+{
+    RootedValue receiverValue(cx, ObjectValue(*receiver));
+    return GetProperty(cx, obj, receiverValue, name, vp);
+}
+
+inline bool
+GetElement(JSContext* cx, HandleObject obj, HandleValue receiver, uint32_t index,
+           MutableHandleValue vp);
+
+inline bool
 GetElement(JSContext* cx, HandleObject obj, HandleObject receiver, uint32_t index,
            MutableHandleValue vp);
 
 inline bool
-GetPropertyNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, jsid id, Value* vp);
+GetPropertyNoGC(JSContext* cx, JSObject* obj, const Value& receiver, jsid id, Value* vp);
+
+inline bool
+GetPropertyNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, jsid id, Value* vp)
+{
+    return GetPropertyNoGC(cx, obj, ObjectValue(*receiver), id, vp);
+}
+
+inline bool
+GetPropertyNoGC(JSContext* cx, JSObject* obj, const Value& receiver, PropertyName* name, Value* vp)
+{
+    return GetPropertyNoGC(cx, obj, receiver, NameToId(name), vp);
+}
 
 inline bool
 GetPropertyNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, PropertyName* name, Value* vp)
 {
-    return GetPropertyNoGC(cx, obj, receiver, NameToId(name), vp);
+    return GetPropertyNoGC(cx, obj, ObjectValue(*receiver), name, vp);
 }
+
+inline bool
+GetElementNoGC(JSContext* cx, JSObject* obj, const Value& receiver, uint32_t index, Value* vp);
 
 inline bool
 GetElementNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, uint32_t index, Value* vp);
@@ -968,29 +1004,24 @@ WatchProperty(JSContext* cx, HandleObject obj, HandleId id, HandleObject callabl
 extern bool
 UnwatchProperty(JSContext* cx, HandleObject obj, HandleId id);
 
-/* ES6 draft rev 36 (2015 March 17) 7.1.1 ToPrimitive(vp, preferredType) */
+/* ES6 draft rev 36 (2015 March 17) 7.1.1 ToPrimitive(vp[, preferredType]) */
 extern bool
-ToPrimitiveSlow(JSContext* cx, MutableHandleValue vp);
+ToPrimitiveSlow(JSContext* cx, JSType hint, MutableHandleValue vp);
 
 inline bool
 ToPrimitive(JSContext* cx, MutableHandleValue vp)
 {
     if (vp.isPrimitive())
         return true;
-    return ToPrimitiveSlow(cx, vp);
+    return ToPrimitiveSlow(cx, JSTYPE_VOID, vp);
 }
-
-extern bool
-ToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHandleValue vp);
 
 inline bool
 ToPrimitive(JSContext* cx, JSType preferredType, MutableHandleValue vp)
 {
-    MOZ_ASSERT(preferredType != JSTYPE_VOID);  // Use the other ToPrimitive!
     if (vp.isPrimitive())
         return true;
-    RootedObject obj(cx, &vp.toObject());
-    return ToPrimitive(cx, obj, preferredType, vp);
+    return ToPrimitiveSlow(cx, preferredType, vp);
 }
 
 /*
@@ -1015,7 +1046,8 @@ GetObjectClassName(JSContext* cx, HandleObject obj);
  */
 
 /*
- * If obj a WindowProxy, return its current inner Window. Otherwise return obj.
+ * If obj is a WindowProxy, return its current inner Window. Otherwise return
+ * obj. This function can't fail and never returns nullptr.
  *
  * GetInnerObject is called when we need a scope chain; you never want a
  * WindowProxy on a scope chain.
@@ -1038,6 +1070,7 @@ GetInnerObject(JSObject* obj)
 
 /*
  * If obj is a Window object, return the WindowProxy. Otherwise return obj.
+ * This function can't fail; it never sets an exception or returns nullptr.
  *
  * This must be called before passing an object to script, if the object might
  * be a Window. (But usually those cases involve scope objects, and for those,

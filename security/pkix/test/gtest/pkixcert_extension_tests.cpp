@@ -42,12 +42,12 @@ CreateCertWithExtensions(const char* subjectCN,
   ByteString subjectDER(CNToDERName(subjectCN));
   EXPECT_FALSE(ENCODING_FAILED(subjectDER));
   ScopedTestKeyPair subjectKey(CloneReusedKeyPair());
-  return CreateEncodedCertificate(v3, sha256WithRSAEncryption,
+  return CreateEncodedCertificate(v3, sha256WithRSAEncryption(),
                                   serialNumber, issuerDER,
                                   oneDayBeforeNow, oneDayAfterNow,
                                   subjectDER, *subjectKey, extensions,
                                   *subjectKey,
-                                  sha256WithRSAEncryption);
+                                  sha256WithRSAEncryption());
 }
 
 // Creates a self-signed certificate with the given extension.
@@ -68,7 +68,7 @@ private:
     return Success;
   }
 
-  Result CheckRevocation(EndEntityOrCA, const CertID&, Time,
+  Result CheckRevocation(EndEntityOrCA, const CertID&, Time, Duration,
                          /*optional*/ const Input*, /*optional*/ const Input*)
                          override
   {

@@ -732,7 +732,7 @@ class RSimdBox final : public RInstruction
         return 1;
     }
 
-    bool recover(JSContext* cx, SnapshotIterator &iter) const;
+    bool recover(JSContext* cx, SnapshotIterator& iter) const;
 };
 
 class RObjectState final : public RInstruction
@@ -795,7 +795,7 @@ class RAssertRecoveredOnBailout final : public RInstruction
         return 1;
     }
 
-    bool recover(JSContext *cx, SnapshotIterator &iter) const;
+    bool recover(JSContext* cx, SnapshotIterator& iter) const;
 };
 
 #undef RINSTRUCTION_HEADER_

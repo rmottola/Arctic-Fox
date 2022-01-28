@@ -17,6 +17,7 @@
 #include "mozilla/Mutex.h"
 #include "mozilla/CondVar.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/ErrorNames.h"
 
 #include "mozIStorageAggregateFunction.h"
 #include "mozIStorageCompletionCallback.h"
@@ -66,6 +67,43 @@ namespace mozilla {
 namespace storage {
 
 namespace {
+
+int
+nsresultToSQLiteResult(nsresult aXPCOMResultCode)
+{
+  if (NS_SUCCEEDED(aXPCOMResultCode)) {
+    return SQLITE_OK;
+  }
+
+  switch (aXPCOMResultCode) {
+    case NS_ERROR_FILE_CORRUPTED:
+      return SQLITE_CORRUPT;
+    case NS_ERROR_FILE_ACCESS_DENIED:
+      return SQLITE_CANTOPEN;
+    case NS_ERROR_STORAGE_BUSY:
+      return SQLITE_BUSY;
+    case NS_ERROR_FILE_IS_LOCKED:
+      return SQLITE_LOCKED;
+    case NS_ERROR_FILE_READ_ONLY:
+      return SQLITE_READONLY;
+    case NS_ERROR_STORAGE_IOERR:
+      return SQLITE_IOERR;
+    case NS_ERROR_FILE_NO_DEVICE_SPACE:
+      return SQLITE_FULL;
+    case NS_ERROR_OUT_OF_MEMORY:
+      return SQLITE_NOMEM;
+    case NS_ERROR_UNEXPECTED:
+      return SQLITE_MISUSE;
+    case NS_ERROR_ABORT:
+      return SQLITE_ABORT;
+    case NS_ERROR_STORAGE_CONSTRAINT:
+      return SQLITE_CONSTRAINT;
+    default:
+      return SQLITE_ERROR;
+  }
+
+  MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE("Must return in switch above!");
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Variant Specialization Functions (variantToSQLiteT)
@@ -212,11 +250,17 @@ basicFunctionHelper(sqlite3_context *aCtx,
       return;
 
   nsCOMPtr<nsIVariant> result;
-  if (NS_FAILED(func->OnFunctionCall(arguments, getter_AddRefs(result)))) {
-    NS_WARNING("User function returned error code!");
-    ::sqlite3_result_error(aCtx,
-                           "User function returned error code",
-                           -1);
+  nsresult rv = func->OnFunctionCall(arguments, getter_AddRefs(result));
+  if (NS_FAILED(rv)) {
+    nsAutoCString errorMessage;
+    GetErrorName(rv, errorMessage);
+    errorMessage.InsertLiteral("User function returned ", 0);
+    errorMessage.Append('!');
+
+    NS_WARNING(errorMessage.get());
+
+    ::sqlite3_result_error(aCtx, errorMessage.get(), -1);
+    ::sqlite3_result_error_code(aCtx, nsresultToSQLiteResult(rv));
     return;
   }
   int retcode = variantToSQLiteT(aCtx, result);
@@ -331,7 +375,7 @@ WaitForUnlockNotify(sqlite3* aDatabase)
   return srv;
 }
 
-} // anonymous namespace
+} // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Local Classes
@@ -360,6 +404,10 @@ public:
     (void)mAsyncExecutionThread->IsOnCurrentThread(&onAsyncThread);
     MOZ_ASSERT(onAsyncThread);
 #endif // DEBUG
+
+    nsCOMPtr<nsIRunnable> event = NS_NewRunnableMethodWithArg<nsCOMPtr<nsIThread>>
+      (mConnection, &Connection::shutdownAsyncThread, mAsyncExecutionThread);
+    (void)NS_DispatchToMainThread(event);
 
     // Internal close.
     (void)mConnection->internalClose(mNativeConnection);
@@ -469,7 +517,7 @@ private:
   nsCOMPtr<mozIStorageCompletionCallback> mCallback;
 };
 
-} // anonymous namespace
+} // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Connection
@@ -482,6 +530,7 @@ Connection::Connection(Service *aService,
 , threadOpenedOn(do_GetCurrentThread())
 , mDBConn(nullptr)
 , mAsyncExecutionThreadShuttingDown(false)
+, mAsyncExecutionThreadIsAlive(false)
 , mConnectionClosed(false)
 , mTransactionInProgress(false)
 , mProgressHandler(nullptr)
@@ -498,6 +547,8 @@ Connection::~Connection()
 
   MOZ_ASSERT(!mAsyncExecutionThread,
              "AsyncClose has not been invoked on this connection!");
+  MOZ_ASSERT(!mAsyncExecutionThreadIsAlive,
+             "The async execution thread should have been shutdown!");
 }
 
 NS_IMPL_ADDREF(Connection)
@@ -565,6 +616,7 @@ Connection::getAsyncExecutionTarget()
                              mAsyncExecutionThread);
   }
 
+  mAsyncExecutionThreadIsAlive = true;
   return mAsyncExecutionThread;
 }
 
@@ -886,6 +938,17 @@ Connection::isClosed()
 {
   MutexAutoLock lockedScope(sharedAsyncExecutionMutex);
   return mConnectionClosed;
+}
+
+void
+Connection::shutdownAsyncThread(nsIThread *aThread) {
+  MOZ_ASSERT(!mAsyncExecutionThread);
+  MOZ_ASSERT(mAsyncExecutionThreadIsAlive);
+  MOZ_ASSERT(mAsyncExecutionThreadShuttingDown);
+
+  DebugOnly<nsresult> rv = aThread->Shutdown();
+  MOZ_ASSERT(NS_SUCCEEDED(rv));
+  mAsyncExecutionThreadIsAlive = false;
 }
 
 nsresult
@@ -1520,7 +1583,7 @@ Connection::ExecuteSimpleSQLAsync(const nsACString &aSQLStatement,
     return rv;
   }
 
-  NS_ADDREF(*_handle = pendingStatement);
+  pendingStatement.forget(_handle);
   return rv;
 }
 

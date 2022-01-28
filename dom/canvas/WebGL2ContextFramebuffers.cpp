@@ -6,10 +6,11 @@
 #include "WebGL2Context.h"
 
 #include "GLContext.h"
+#include "GLScreenBuffer.h"
 #include "WebGLContextUtils.h"
+#include "WebGLFramebuffer.h"
 
-using namespace mozilla;
-using namespace mozilla::dom;
+namespace mozilla {
 
 // Returns one of FLOAT, INT, UNSIGNED_INT.
 // Fixed-points (normalized ints) are considered FLOAT.
@@ -374,7 +375,7 @@ TranslateDefaultAttachments(const dom::Sequence<GLenum>& in, dom::Sequence<GLenu
 void
 WebGL2Context::InvalidateFramebuffer(GLenum target,
                                      const dom::Sequence<GLenum>& attachments,
-                                     ErrorResult& aRv)
+                                     ErrorResult& rv)
 {
     if (IsContextLost())
         return;
@@ -413,7 +414,7 @@ WebGL2Context::InvalidateFramebuffer(GLenum target,
     if (!fb && !isDefaultFB) {
         dom::Sequence<GLenum> tmpAttachments;
         if (!TranslateDefaultAttachments(attachments, &tmpAttachments)) {
-            aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
+            rv.Throw(NS_ERROR_OUT_OF_MEMORY);
             return;
         }
 
@@ -426,7 +427,7 @@ WebGL2Context::InvalidateFramebuffer(GLenum target,
 void
 WebGL2Context::InvalidateSubFramebuffer(GLenum target, const dom::Sequence<GLenum>& attachments,
                                         GLint x, GLint y, GLsizei width, GLsizei height,
-                                        ErrorResult& aRv)
+                                        ErrorResult& rv)
 {
     if (IsContextLost())
         return;
@@ -465,7 +466,7 @@ WebGL2Context::InvalidateSubFramebuffer(GLenum target, const dom::Sequence<GLenu
     if (!fb && !isDefaultFB) {
         dom::Sequence<GLenum> tmpAttachments;
         if (!TranslateDefaultAttachments(attachments, &tmpAttachments)) {
-            aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
+            rv.Throw(NS_ERROR_OUT_OF_MEMORY);
             return;
         }
 
@@ -483,31 +484,38 @@ WebGL2Context::ReadBuffer(GLenum mode)
     if (IsContextLost())
         return;
 
-    MakeContextCurrent();
+    const bool isColorAttachment = (mode >= LOCAL_GL_COLOR_ATTACHMENT0 &&
+                                    mode <= LastColorAttachment());
+
+    if (mode != LOCAL_GL_NONE && mode != LOCAL_GL_BACK && !isColorAttachment) {
+        ErrorInvalidEnum("readBuffer: `mode` must be one of NONE, BACK, or "
+                         "COLOR_ATTACHMENTi. Was %s",
+                         EnumName(mode));
+        return;
+    }
 
     if (mBoundReadFramebuffer) {
-        bool isColorAttachment = (mode >= LOCAL_GL_COLOR_ATTACHMENT0 &&
-                                  mode <= LastColorAttachment());
         if (mode != LOCAL_GL_NONE &&
             !isColorAttachment)
         {
-            ErrorInvalidEnumInfo("readBuffer: If READ_FRAMEBUFFER is non-null,"
-                                 " `mode` must be COLOR_ATTACHMENTN or NONE."
-                                 " Was:", mode);
+            ErrorInvalidOperation("readBuffer: If READ_FRAMEBUFFER is non-null, `mode` "
+                                  "must be COLOR_ATTACHMENTi or NONE. Was %s",
+                                  EnumName(mode));
             return;
         }
 
+        MakeContextCurrent();
         gl->fReadBuffer(mode);
         return;
     }
 
     // Operating on the default framebuffer.
-
     if (mode != LOCAL_GL_NONE &&
         mode != LOCAL_GL_BACK)
     {
-        ErrorInvalidEnumInfo("readBuffer: If READ_FRAMEBUFFER is null, `mode`"
-                             " must be BACK or NONE. Was:", mode);
+        ErrorInvalidOperation("readBuffer: If READ_FRAMEBUFFER is null, `mode`"
+                              " must be BACK or NONE. Was %s",
+                              EnumName(mode));
         return;
     }
 
@@ -522,3 +530,5 @@ WebGL2Context::RenderbufferStorageMultisample(GLenum target, GLsizei samples,
     RenderbufferStorage_base("renderbufferStorageMultisample", target, samples,
                               internalFormat, width, height);
 }
+
+} // namespace mozilla

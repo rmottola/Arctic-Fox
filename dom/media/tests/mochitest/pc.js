@@ -671,7 +671,6 @@ function PeerConnectionWrapper(label, configuration, h264) {
 
   this._local_ice_candidates = [];
   this._remote_ice_candidates = [];
-  this.holdIceCandidates = new Promise(r => this.releaseIceCandidates = r);
   this.localRequiresTrickleIce = false;
   this.remoteRequiresTrickleIce = false;
   this.localMediaElements = [];
@@ -985,7 +984,12 @@ PeerConnectionWrapper.prototype = {
     this.observedNegotiationNeeded = undefined;
     return this._pc.setRemoteDescription(desc).then(() => {
       info(this + ": Successfully set remote description");
-      this.releaseIceCandidates();
+      if (desc.type == "rollback") {
+        this.holdIceCandidates = new Promise(r => this.releaseIceCandidates = r);
+
+      } else {
+        this.releaseIceCandidates();
+      }
     });
   },
 
@@ -1218,10 +1222,15 @@ PeerConnectionWrapper.prototype = {
 
     var resolveEndOfTrickle;
     this.endOfTrickleIce = new Promise(r => resolveEndOfTrickle = r);
+    this.holdIceCandidates = new Promise(r => this.releaseIceCandidates = r);
 
     this.endOfTrickleIce.then(() => {
       this._pc.onicecandidate = () =>
         ok(false, this.label + " received ICE candidate after end of trickle");
+      var localSdp = this._pc.getLocalDescription();
+      ok(localSdp.includes("a=end-of-candidates"));
+      ok(localSdp.includes("a=rtcp:"));
+      ok(!localSdp.includes("c=IN IP4 0.0.0.0"));
     });
 
     this._pc.onicecandidate = anEvent => {

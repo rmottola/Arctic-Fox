@@ -7,6 +7,7 @@
 #ifndef jsfriendapi_h
 #define jsfriendapi_h
 
+#include "mozilla/Atomics.h"
 #include "mozilla/Casting.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/UniquePtr.h"
@@ -109,6 +110,7 @@ enum {
     JS_TELEMETRY_GC_MARK_ROOTS_MS,
     JS_TELEMETRY_GC_MARK_GRAY_MS,
     JS_TELEMETRY_GC_SLICE_MS,
+    JS_TELEMETRY_GC_SLOW_PHASE,
     JS_TELEMETRY_GC_MMU_50,
     JS_TELEMETRY_GC_RESET,
     JS_TELEMETRY_GC_INCREMENTAL_DISABLED,
@@ -176,7 +178,7 @@ JS_BasicObjectToString(JSContext* cx, JS::HandleObject obj);
 namespace js {
 
 JS_FRIEND_API(bool)
-ObjectClassIs(JSContext* cx, JS::HandleObject obj, ESClassValue classValue);
+GetBuiltinClass(JSContext* cx, JS::HandleObject obj, ESClassValue* classValue);
 
 JS_FRIEND_API(const char*)
 ObjectClassName(JSContext* cx, JS::HandleObject obj);
@@ -330,7 +332,7 @@ namespace js {
         nullptr,                 /* enumerate */                                        \
         nullptr,                 /* resolve */                                          \
         nullptr,                 /* mayResolve */                                       \
-        js::proxy_Convert,                                                              \
+        nullptr,                 /* convert */                                          \
         js::proxy_Finalize,      /* finalize    */                                      \
         nullptr,                 /* call        */                                      \
         js::proxy_HasInstance,   /* hasInstance */                                      \
@@ -369,26 +371,26 @@ namespace js {
  */
 
 extern JS_FRIEND_API(bool)
-proxy_LookupProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleObject objp,
+proxy_LookupProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleObject objp,
                     JS::MutableHandle<Shape*> propp);
 extern JS_FRIEND_API(bool)
-proxy_DefineProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+proxy_DefineProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                      JS::Handle<JSPropertyDescriptor> desc,
-                     JS::ObjectOpResult &result);
+                     JS::ObjectOpResult& result);
 extern JS_FRIEND_API(bool)
-proxy_HasProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, bool* foundp);
+proxy_HasProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* foundp);
 extern JS_FRIEND_API(bool)
-proxy_GetProperty(JSContext *cx, JS::HandleObject obj, JS::HandleObject receiver, JS::HandleId id,
+proxy_GetProperty(JSContext* cx, JS::HandleObject obj, JS::HandleValue receiver, JS::HandleId id,
                   JS::MutableHandleValue vp);
 extern JS_FRIEND_API(bool)
-proxy_SetProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue bp,
+proxy_SetProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue bp,
                   JS::HandleValue receiver, JS::ObjectOpResult &result);
 extern JS_FRIEND_API(bool)
-proxy_GetOwnPropertyDescriptor(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+proxy_GetOwnPropertyDescriptor(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                                JS::MutableHandle<JSPropertyDescriptor> desc);
 extern JS_FRIEND_API(bool)
-proxy_DeleteProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
-                     JS::ObjectOpResult &result);
+proxy_DeleteProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+                     JS::ObjectOpResult& result);
 
 extern JS_FRIEND_API(void)
 proxy_Trace(JSTracer* trc, JSObject* obj);
@@ -1262,15 +1264,12 @@ inline bool DOMProxyIsShadowing(DOMProxyShadowsResult result) {
 
 /* Implemented in jsdate.cpp. */
 
-/*
- * Detect whether the internal date value is NaN.  (Because failure is
- * out-of-band for js_DateGet*)
- */
+/* Detect whether the internal date value is NaN. */
 extern JS_FRIEND_API(bool)
-DateIsValid(JSContext* cx, JSObject* obj);
+DateIsValid(JSContext* cx, JS::HandleObject obj, bool* isValid);
 
-extern JS_FRIEND_API(double)
-DateGetMsecSinceEpoch(JSContext* cx, JSObject* obj);
+extern JS_FRIEND_API(bool)
+DateGetMsecSinceEpoch(JSContext* cx, JS::HandleObject obj, double* msecSinceEpoch);
 
 } /* namespace js */
 
@@ -2145,6 +2144,16 @@ JS_FRIEND_API(bool)
 JS_IsDataViewObject(JSObject* obj);
 
 /*
+ * Create a new DataView using the given ArrayBuffer for storage. The given
+ * buffer must be an ArrayBuffer (or a cross-compartment wrapper of an
+ * ArrayBuffer), and the offset and length must fit within the bounds of the
+ * arrayBuffer. Currently, nullptr will be returned and an exception will be
+ * thrown if these conditions do not hold, but do not depend on that behavior.
+ */
+JS_FRIEND_API(JSObject*)
+JS_NewDataView(JSContext* cx, JS::HandleObject arrayBuffer, uint32_t byteOffset, int32_t byteLength);
+
+/*
  * Return the byte offset of a data view into its array buffer. |obj| must be a
  * DataView.
  *
@@ -2842,5 +2851,163 @@ JS_StoreStringPostBarrierCallback(JSContext* cx,
  */
 extern JS_FRIEND_API(void)
 JS_ClearAllPostBarrierCallbacks(JSRuntime *rt);
+
+class NativeProfiler
+{
+  public:
+    virtual ~NativeProfiler() {};
+    virtual void sampleNative(void* addr, uint32_t size) = 0;
+    virtual void removeNative(void* addr) = 0;
+    virtual void reset() = 0;
+};
+
+class GCHeapProfiler
+{
+  public:
+    virtual ~GCHeapProfiler() {};
+    virtual void sampleTenured(void* addr, uint32_t size) = 0;
+    virtual void sampleNursery(void* addr, uint32_t size) = 0;
+    virtual void markTenuredStart() = 0;
+    virtual void markTenured(void* addr) = 0;
+    virtual void sweepTenured() = 0;
+    virtual void sweepNursery() = 0;
+    virtual void moveNurseryToTenured(void* addrOld, void* addrNew) = 0;
+    virtual void reset() = 0;
+};
+
+class MemProfiler
+{
+    static mozilla::Atomic<int> sActiveProfilerCount;
+    static NativeProfiler* sNativeProfiler;
+
+    static GCHeapProfiler* GetGCHeapProfiler(void* addr);
+    static GCHeapProfiler* GetGCHeapProfiler(JSRuntime* runtime);
+
+    static NativeProfiler* GetNativeProfiler() {
+        return sNativeProfiler;
+    }
+
+    GCHeapProfiler* mGCHeapProfiler;
+    JSRuntime* mRuntime;
+
+  public:
+    explicit MemProfiler(JSRuntime* aRuntime) : mGCHeapProfiler(nullptr), mRuntime(aRuntime) {}
+
+    void start(GCHeapProfiler* aGCHeapProfiler);
+    void stop();
+
+    GCHeapProfiler* getGCHeapProfiler() const {
+        return mGCHeapProfiler;
+    }
+
+    static bool enabled() {
+        return sActiveProfilerCount > 0;
+    }
+
+    static MemProfiler* GetMemProfiler(JSRuntime* runtime);
+
+    static void SetNativeProfiler(NativeProfiler* aProfiler) {
+        sNativeProfiler = aProfiler;
+    }
+
+    static void SampleNative(void* addr, uint32_t size) {
+        JS::AutoSuppressGCAnalysis nogc;
+
+        if (MOZ_LIKELY(!enabled()))
+            return;
+
+        NativeProfiler* profiler = GetNativeProfiler();
+        if (profiler)
+            profiler->sampleNative(addr, size);
+    }
+
+    static void SampleTenured(void* addr, uint32_t size) {
+        JS::AutoSuppressGCAnalysis nogc;
+
+        if (MOZ_LIKELY(!enabled()))
+            return;
+
+        GCHeapProfiler* profiler = GetGCHeapProfiler(addr);
+        if (profiler)
+            profiler->sampleTenured(addr, size);
+    }
+
+    static void SampleNursery(void* addr, uint32_t size) {
+        JS::AutoSuppressGCAnalysis nogc;
+
+        if (MOZ_LIKELY(!enabled()))
+            return;
+
+        GCHeapProfiler* profiler = GetGCHeapProfiler(addr);
+        if (profiler)
+            profiler->sampleNursery(addr, size);
+    }
+
+    static void RemoveNative(void* addr) {
+        JS::AutoSuppressGCAnalysis nogc;
+
+        if (MOZ_LIKELY(!enabled()))
+            return;
+
+        NativeProfiler* profiler = GetNativeProfiler();
+        if (profiler)
+            profiler->removeNative(addr);
+    }
+
+    static void MarkTenuredStart(JSRuntime* runtime) {
+        JS::AutoSuppressGCAnalysis nogc;
+
+        if (MOZ_LIKELY(!enabled()))
+            return;
+
+        GCHeapProfiler* profiler = GetGCHeapProfiler(runtime);
+        if (profiler)
+            profiler->markTenuredStart();
+    }
+
+    static void MarkTenured(void* addr) {
+        JS::AutoSuppressGCAnalysis nogc;
+
+        if (MOZ_LIKELY(!enabled()))
+            return;
+
+        GCHeapProfiler* profiler = GetGCHeapProfiler(addr);
+        if (profiler)
+            profiler->markTenured(addr);
+    }
+
+    static void SweepTenured(JSRuntime* runtime) {
+        JS::AutoSuppressGCAnalysis nogc;
+
+        if (MOZ_LIKELY(!enabled()))
+            return;
+
+        GCHeapProfiler* profiler = GetGCHeapProfiler(runtime);
+        if (profiler)
+            profiler->sweepTenured();
+    }
+
+    static void SweepNursery(JSRuntime* runtime) {
+        JS::AutoSuppressGCAnalysis nogc;
+
+        if (MOZ_LIKELY(!enabled()))
+            return;
+
+        GCHeapProfiler* profiler = GetGCHeapProfiler(runtime);
+        if (profiler)
+            profiler->sweepNursery();
+    }
+
+    static void MoveNurseryToTenured(void* addrOld, void* addrNew) {
+        JS::AutoSuppressGCAnalysis nogc;
+
+        if (MOZ_LIKELY(!enabled()))
+            return;
+
+        GCHeapProfiler* profiler = GetGCHeapProfiler(addrOld);
+        if (profiler)
+            profiler->moveNurseryToTenured(addrOld, addrNew);
+    }
+};
 
 #endif /* jsfriendapi_h */

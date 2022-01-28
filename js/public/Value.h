@@ -1651,7 +1651,7 @@ SameType(const Value& lhs, const Value& rhs)
 
 namespace JS {
 JS_PUBLIC_API(void) HeapValuePostBarrier(Value* valuep, const Value& prev, const Value& next);
-}
+} // namespace JS
 
 namespace js {
 

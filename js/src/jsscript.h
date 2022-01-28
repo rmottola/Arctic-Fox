@@ -66,7 +66,7 @@ CopyScript(JSContext* cx, HandleObject scriptStaticScope, HandleScript src, Hand
 
 } // namespace detail
 
-}
+} // namespace js
 
 /*
  * Type of try note associated with each catch or finally block, and also with
@@ -999,9 +999,6 @@ class JSScript : public js::gc::TenuredCell
     // Script came from eval(), and is in eval cache.
     bool isCachedEval_:1;
 
-    // Set for functions defined at the top level within an 'eval' script.
-    bool directlyInsideEval_:1;
-
     // 'this', 'arguments' and f.apply() are used. This is likely to be a wrapper.
     bool usesArgumentsApplyAndThis_:1;
 
@@ -1239,7 +1236,6 @@ class JSScript : public js::gc::TenuredCell
 
     bool isActiveEval() const { return isActiveEval_; }
     bool isCachedEval() const { return isCachedEval_; }
-    bool directlyInsideEval() const { return directlyInsideEval_; }
 
     void cacheForEval() {
         MOZ_ASSERT(isActiveEval() && !isCachedEval());
@@ -1258,7 +1254,6 @@ class JSScript : public js::gc::TenuredCell
     }
 
     void setActiveEval() { isActiveEval_ = true; }
-    void setDirectlyInsideEval() { directlyInsideEval_ = true; }
 
     bool usesArgumentsApplyAndThis() const {
         return usesArgumentsApplyAndThis_;
@@ -1964,7 +1959,7 @@ class LazyScript : public gc::TenuredCell
         uint32_t version : 8;
 
         uint32_t numFreeVariables : 24;
-        uint32_t numInnerFunctions : 21;
+        uint32_t numInnerFunctions : 20;
 
         uint32_t generatorKindBits : 2;
 
@@ -1975,11 +1970,11 @@ class LazyScript : public gc::TenuredCell
         uint32_t bindingsAccessedDynamically : 1;
         uint32_t hasDebuggerStatement : 1;
         uint32_t hasDirectEval : 1;
-        uint32_t directlyInsideEval : 1;
         uint32_t usesArgumentsApplyAndThis : 1;
         uint32_t hasBeenCloned : 1;
         uint32_t treatAsRunOnce : 1;
         uint32_t isDerivedClassConstructor : 1;
+        uint32_t needsHomeObject : 1;
     };
 
     union {
@@ -2123,13 +2118,6 @@ class LazyScript : public gc::TenuredCell
         p_.hasDirectEval = true;
     }
 
-    bool directlyInsideEval() const {
-        return p_.directlyInsideEval;
-    }
-    void setDirectlyInsideEval() {
-        p_.directlyInsideEval = true;
-    }
-
     bool usesArgumentsApplyAndThis() const {
         return p_.usesArgumentsApplyAndThis;
     }
@@ -2156,6 +2144,13 @@ class LazyScript : public gc::TenuredCell
     }
     void setIsDerivedClassConstructor() {
         p_.isDerivedClassConstructor = true;
+    }
+
+    bool needsHomeObject() const {
+        return p_.needsHomeObject;
+    }
+    void setNeedsHomeObject() {
+        p_.needsHomeObject = true;
     }
 
     const char* filename() const {

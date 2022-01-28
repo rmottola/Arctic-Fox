@@ -16,7 +16,7 @@ ClipboardEvent::ClipboardEvent(EventTarget* aOwner,
                                nsPresContext* aPresContext,
                                InternalClipboardEvent* aEvent)
   : Event(aOwner, aPresContext,
-          aEvent ? aEvent : new InternalClipboardEvent(false, 0))
+          aEvent ? aEvent : new InternalClipboardEvent(false, NS_EVENT_NULL))
 {
   if (aEvent) {
     mEventIsInternal = false;
@@ -108,8 +108,8 @@ ClipboardEvent::GetClipboardData()
         new DataTransfer(ToSupports(this), NS_COPY, false, -1);
     } else {
       event->clipboardData =
-        new DataTransfer(ToSupports(this), event->message,
-                         event->message == NS_PASTE,
+        new DataTransfer(ToSupports(this), event->mMessage,
+                         event->mMessage == NS_PASTE,
                          nsIClipboard::kGlobalClipboard);
     }
   }
@@ -123,14 +123,12 @@ ClipboardEvent::GetClipboardData()
 using namespace mozilla;
 using namespace mozilla::dom;
 
-nsresult
-NS_NewDOMClipboardEvent(nsIDOMEvent** aInstancePtrResult,
-                        EventTarget* aOwner,
+already_AddRefed<ClipboardEvent>
+NS_NewDOMClipboardEvent(EventTarget* aOwner,
                         nsPresContext* aPresContext,
                         InternalClipboardEvent* aEvent)
 {
-  ClipboardEvent* it = new ClipboardEvent(aOwner, aPresContext, aEvent);
-  NS_ADDREF(it);
-  *aInstancePtrResult = static_cast<Event*>(it);
-  return NS_OK;
+  nsRefPtr<ClipboardEvent> it =
+    new ClipboardEvent(aOwner, aPresContext, aEvent);
+  return it.forget();
 }

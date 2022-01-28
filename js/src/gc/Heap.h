@@ -17,6 +17,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "jsfriendapi.h"
 #include "jspubtd.h"
 #include "jstypes.h"
 #include "jsutil.h"
@@ -75,7 +76,9 @@ enum InitialHeap {
 };
 
 /* The GC allocation kinds. */
-enum class AllocKind : uint8_t {
+// FIXME: uint8_t would make more sense for the underlying type, but causes
+// miscompilations in GCC (fixed in 4.8.5 and 4.9.3). See also bug 1143966.
+enum class AllocKind {
     FIRST,
     OBJECT_FIRST = FIRST,
     FUNCTION = FIRST,
@@ -290,6 +293,9 @@ class TenuredCell : public Cell
     inline bool isAligned() const;
 #endif
 };
+
+/* Cells are aligned to CellShift, so the largest tagged null pointer is: */
+const uintptr_t LargestTaggedNullCellPointer = (1 << CellShift) - 1;
 
 /*
  * The mark bitmap has one bit per each GC cell. For multi-cell GC things this
@@ -568,6 +574,7 @@ class FreeList
         }
         head.checkSpan(thingSize);
         JS_EXTRA_POISON(reinterpret_cast<void*>(thing), JS_ALLOCATED_TENURED_PATTERN, thingSize);
+        MemProfiler::SampleTenured(reinterpret_cast<void*>(thing), thingSize);
         return reinterpret_cast<TenuredCell*>(thing);
     }
 };
@@ -636,14 +643,14 @@ struct ArenaHeader
                   "cover allocKind and hasDelayedMarking.");
 
     inline uintptr_t address() const;
-    inline Chunk *chunk() const;
+    inline Chunk* chunk() const;
 
     bool allocated() const {
         MOZ_ASSERT(IsAllocKind(AllocKind(allocKind)));
         return IsValidAllocKind(AllocKind(allocKind));
     }
 
-    void init(JS::Zone *zoneArg, AllocKind kind) {
+    void init(JS::Zone* zoneArg, AllocKind kind) {
         MOZ_ASSERT(!allocated());
         MOZ_ASSERT(!markOverflow);
         MOZ_ASSERT(!allocatedDuringIncremental);
@@ -802,6 +809,17 @@ ArenaHeader::getThingSize() const
  */
 struct ChunkTrailer
 {
+    /* Construct a Nursery ChunkTrailer. */
+    ChunkTrailer(JSRuntime* rt, StoreBuffer* sb)
+      : location(gc::ChunkLocationBitNursery), storeBuffer(sb), runtime(rt)
+    {}
+
+    /* Construct a Tenured heap ChunkTrailer. */
+    explicit ChunkTrailer(JSRuntime* rt)
+      : location(gc::ChunkLocationBitTenuredHeap), storeBuffer(nullptr), runtime(rt)
+    {}
+
+  public:
     /* The index the chunk in the nursery, or LocationTenuredHeap. */
     uint32_t        location;
     uint32_t        padding;
@@ -809,11 +827,12 @@ struct ChunkTrailer
     /* The store buffer for writes to things in this chunk or nullptr. */
     StoreBuffer*    storeBuffer;
 
+    /* This provides quick access to the runtime from absolutely anywhere. */
     JSRuntime*      runtime;
 };
 
-static_assert(sizeof(ChunkTrailer) == 2 * sizeof(uintptr_t) + sizeof(uint64_t),
-              "ChunkTrailer size is incorrect.");
+static_assert(sizeof(ChunkTrailer) == ChunkTrailerSize,
+              "ChunkTrailer size must match the API defined size.");
 
 /* The chunk header (located at the end of the chunk to preserve arena alignment). */
 struct ChunkInfo
@@ -1002,13 +1021,16 @@ struct Chunk
         return reinterpret_cast<Chunk*>(addr);
     }
 
-    static bool withinArenasRange(uintptr_t addr) {
+    static bool withinValidRange(uintptr_t addr) {
         uintptr_t offset = addr & ChunkMask;
-        return offset < ArenasPerChunk * ArenaSize;
+        return Chunk::fromAddress(addr)->isNurseryChunk()
+               ? offset < ChunkSize - sizeof(ChunkTrailer)
+               : offset < ArenasPerChunk * ArenaSize;
     }
 
     static size_t arenaIndex(uintptr_t addr) {
-        MOZ_ASSERT(withinArenasRange(addr));
+        MOZ_ASSERT(!Chunk::fromAddress(addr)->isNurseryChunk());
+        MOZ_ASSERT(withinValidRange(addr));
         return (addr & ChunkMask) >> ArenaShift;
     }
 
@@ -1024,6 +1046,10 @@ struct Chunk
 
     bool hasAvailableArenas() const {
         return info.numArenasFree != 0;
+    }
+
+    bool isNurseryChunk() const {
+        return info.trailer.storeBuffer;
     }
 
     ArenaHeader* allocateArena(JSRuntime* rt, JS::Zone* zone, AllocKind kind,
@@ -1125,7 +1151,7 @@ ArenaHeader::address() const
     uintptr_t addr = reinterpret_cast<uintptr_t>(this);
     MOZ_ASSERT(addr);
     MOZ_ASSERT(!(addr & ArenaMask));
-    MOZ_ASSERT(Chunk::withinArenasRange(addr));
+    MOZ_ASSERT(Chunk::withinValidRange(addr));
     return addr;
 }
 
@@ -1294,7 +1320,7 @@ Cell::address() const
 {
     uintptr_t addr = uintptr_t(this);
     MOZ_ASSERT(addr % CellSize == 0);
-    MOZ_ASSERT(Chunk::withinArenasRange(addr));
+    MOZ_ASSERT(Chunk::withinValidRange(addr));
     return addr;
 }
 

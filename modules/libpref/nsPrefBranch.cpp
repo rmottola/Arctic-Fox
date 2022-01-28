@@ -25,6 +25,10 @@
 
 #include "prefapi_private_data.h"
 
+#ifdef MOZ_CRASHREPORTER
+#include "nsICrashReporter.h"
+#endif
+
 #include "nsIConsoleService.h"
 
 #ifdef DEBUG
@@ -316,6 +320,16 @@ NS_IMETHODIMP nsPrefBranch::GetComplexValue(const char *aPrefName, const nsIID &
       // some addons, see bug 836263.
       nsAutoString wdata;
       if (!AppendUTF8toUTF16(utf8String, wdata, mozilla::fallible)) {
+#ifdef MOZ_CRASHREPORTER
+        nsCOMPtr<nsICrashReporter> cr =
+          do_GetService("@mozilla.org/toolkit/crash-reporter;1");
+        if (cr) {
+          cr->AnnotateCrashReport(NS_LITERAL_CSTRING("bug836263-size"),
+                                  nsPrintfCString("%x", utf8String.Length()));
+          cr->RegisterAppMemory(uint64_t(utf8String.BeginReading()),
+                                std::min(0x1000U, utf8String.Length()));
+        }
+#endif
         NS_RUNTIMEABORT("bug836263");
       }
       theString->SetData(wdata);
@@ -353,7 +367,7 @@ nsresult nsPrefBranch::CheckSanityOfStringLength(const char* aPrefName, const ui
   }
   nsAutoCString message(nsPrintfCString("Warning: attempting to write %d bytes to preference %s. This is bad for general performance and memory usage. Such an amount of data should rather be written to an external file.",
                                         aLength,
-                                        aPrefName));
+                                        getPrefName(aPrefName)));
   rv = console->LogStringMessage(NS_ConvertUTF8toUTF16(message).get());
   if (NS_FAILED(rv)) {
     return rv;

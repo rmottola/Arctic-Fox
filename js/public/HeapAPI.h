@@ -54,7 +54,8 @@ const size_t ChunkMarkBitmapOffset = 1032352;
 const size_t ChunkMarkBitmapBits = 129024;
 #endif
 const size_t ChunkRuntimeOffset = ChunkSize - sizeof(void*);
-const size_t ChunkLocationOffset = ChunkSize - 2 * sizeof(void*) - sizeof(uint64_t);
+const size_t ChunkTrailerSize = 2 * sizeof(uintptr_t) + sizeof(uint64_t);
+const size_t ChunkLocationOffset = ChunkSize - ChunkTrailerSize;
 const size_t ArenaZoneOffset = 0;
 
 /*
@@ -391,8 +392,8 @@ IsIncrementalBarrierNeededOnTenuredGCThing(JS::shadow::Runtime* rt, const JS::GC
  * of the current state of memory (both GC heap memory and GCthing-controlled
  * malloc memory.
  */
-extern JS_PUBLIC_API(JSObject *)
-NewMemoryInfoObject(JSContext *cx);
+extern JS_PUBLIC_API(JSObject*)
+NewMemoryInfoObject(JSContext* cx);
 
 } /* namespace gc */
 } /* namespace js */

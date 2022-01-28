@@ -109,17 +109,17 @@ MacroAssemblerX86::loadConstantDouble(double d, FloatRegister dest)
     Double* dbl = getDouble(d);
     if (!dbl)
         return;
-    masm.vmovsd_mr(reinterpret_cast<const void *>(dbl->uses.prev()), dest.encoding());
+    masm.vmovsd_mr(reinterpret_cast<const void*>(dbl->uses.prev()), dest.encoding());
     dbl->uses.setPrev(masm.size());
 }
 
 void
 MacroAssemblerX86::addConstantDouble(double d, FloatRegister dest)
 {
-    Double *dbl = getDouble(d);
+    Double* dbl = getDouble(d);
     if (!dbl)
         return;
-    masm.vaddsd_mr(reinterpret_cast<const void *>(dbl->uses.prev()), dest.encoding(), dest.encoding());
+    masm.vaddsd_mr(reinterpret_cast<const void*>(dbl->uses.prev()), dest.encoding(), dest.encoding());
     dbl->uses.setPrev(masm.size());
 }
 

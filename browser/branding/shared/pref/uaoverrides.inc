@@ -22,7 +22,7 @@
 #endif
 
 // Required to use PaleMoon extension repository
-pref("@GUAO_PREF@.addons.palemoon.org", "@Mozilla/5.0 (@OS_SLICE@ rv:@MOZILLA_UAVERSION_U@) @GK_SLICE@ @FX_SLICE@ PaleMoon/29.5");
+pref("@GUAO_PREF@.addons.palemoon.org", "Mozilla/5.0 (@OS_SLICE@ rv:@MOZILLA_UAVERSION_U@) @GK_SLICE@ @FX_SLICE@ PaleMoon/29.5");
 
 
 // Required for google to play nice with Arctic Fox
@@ -31,7 +31,7 @@ pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/2001
 pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/52.0 @PM_SLICE@");
 
 // Switch to mobile youtube to bypass CPU/JS hungry slow as molasses new polyfill interface
-pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (iPad; CPU OS 10_2_1 like Mac OS X) AppleWebKit/602.4.6 (KHTML, like Gecko) Version/10.0 Mobile/14D27 Safari/602.1);
+pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (iPad; CPU OS 10_2_1 like Mac OS X) AppleWebKit/602.4.6 (KHTML, like Gecko) Version/10.0 Mobile/14D27 Safari/602.1");
 
 // Trick these sites in to thinking we are using IE11
 pref("@GUAO_PREF@.dropbox.com","Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko");

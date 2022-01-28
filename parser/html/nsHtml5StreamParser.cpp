@@ -890,7 +890,10 @@ nsHtml5StreamParser::OnStartRequest(nsIRequest* aRequest, nsISupports* aContext)
     mTreeBuilder->StartPlainText();
     mTokenizer->StartPlainText();
   } else if (mMode == VIEW_SOURCE_PLAIN) {
-    mTreeBuilder->StartPlainTextViewSource(NS_ConvertUTF8toUTF16(mViewSourceTitle));
+    nsAutoString viewSourceTitle;
+    CopyUTF8toUTF16(mViewSourceTitle, viewSourceTitle);
+    mTreeBuilder->EnsureBufferSpace(viewSourceTitle.Length());
+    mTreeBuilder->StartPlainTextViewSource(viewSourceTitle);
     mTokenizer->StartPlainText();
   }
 
@@ -1315,7 +1318,11 @@ nsHtml5StreamParser::ParseAvailableData()
   if (IsTerminatedOrInterrupted()) {
     return;
   }
-  
+
+  if (mSpeculating && !IsSpeculationEnabled()) {
+    return;
+  }
+
   for (;;) {
     if (!mFirstBuffer->hasMore()) {
       if (mFirstBuffer == mLastBuffer) {
@@ -1360,10 +1367,12 @@ nsHtml5StreamParser::ParseAvailableData()
                                                         0);
               }
             }
-            mTokenizer->eof();
-            mTreeBuilder->StreamEnded();
-            if (mMode == VIEW_SOURCE_HTML || mMode == VIEW_SOURCE_XML) {
-              mTokenizer->EndViewSource();
+            if (NS_SUCCEEDED(mTreeBuilder->IsBroken())) {
+              mTokenizer->eof();
+              mTreeBuilder->StreamEnded();
+              if (mMode == VIEW_SOURCE_HTML || mMode == VIEW_SOURCE_XML) {
+                mTokenizer->EndViewSource();
+              }
             }
             FlushTreeOpsAndDisarmTimer();
             return; // no more data and not expecting more
@@ -1380,6 +1389,10 @@ nsHtml5StreamParser::ParseAvailableData()
     mFirstBuffer->adjust(mLastWasCR);
     mLastWasCR = false;
     if (mFirstBuffer->hasMore()) {
+      if (!mTokenizer->EnsureBufferSpace(mFirstBuffer->getLength())) {
+        MarkAsBroken(NS_ERROR_OUT_OF_MEMORY);
+        return;
+      }
       mLastWasCR = mTokenizer->tokenizeBuffer(mFirstBuffer);
       // At this point, internalEncodingDeclaration() may have called 
       // Terminate, but that never happens together with script.
@@ -1454,6 +1467,7 @@ nsHtml5StreamParser::ContinueAfterScripts(nsHtml5Tokenizer* aTokenizer,
         !aTreeBuilder->snapshotMatches(speculation->GetSnapshot())) {
       speculationFailed = true;
       // We've got a failed speculation :-(
+      MaybeDisableFutureSpeculation();
       Interrupt(); // Make the parser thread release the tokenizer mutex sooner
       // now fall out of the speculationAutoLock into the tokenizerAutoLock block
     } else {

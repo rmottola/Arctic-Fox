@@ -95,7 +95,7 @@ OpaqueCrossCompartmentWrapper::has(JSContext* cx, HandleObject wrapper, HandleId
 }
 
 bool
-OpaqueCrossCompartmentWrapper::get(JSContext* cx, HandleObject wrapper, HandleObject receiver,
+OpaqueCrossCompartmentWrapper::get(JSContext* cx, HandleObject wrapper, HandleValue receiver,
                                    HandleId id, MutableHandleValue vp) const
 {
     return BaseProxyHandler::get(cx, wrapper, receiver, id, vp);
@@ -151,10 +151,19 @@ OpaqueCrossCompartmentWrapper::getOwnEnumerablePropertyKeys(JSContext* cx, Handl
 }
 
 bool
-OpaqueCrossCompartmentWrapper::objectClassIs(HandleObject obj, ESClassValue classValue,
-                                             JSContext* cx) const
+OpaqueCrossCompartmentWrapper::getBuiltinClass(JSContext* cx, HandleObject wrapper,
+                                               ESClassValue* classValue) const
 {
-  return false;
+    *classValue = ESClass_Other;
+    return true;
+}
+
+bool
+OpaqueCrossCompartmentWrapper::isArray(JSContext* cx, HandleObject obj,
+                                       JS::IsArrayAnswer* answer) const
+{
+    *answer = JS::IsArrayAnswer::NotArray;
+    return true;
 }
 
 const char*

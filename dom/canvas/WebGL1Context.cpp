@@ -7,6 +7,7 @@
 
 #include "mozilla/dom/WebGLRenderingContextBinding.h"
 #include "mozilla/Telemetry.h"
+#include "WebGLFormats.h"
 
 namespace mozilla {
 
@@ -19,6 +20,7 @@ WebGL1Context::Create()
 WebGL1Context::WebGL1Context()
     : WebGLContext()
 {
+    mFormatUsage = Move(webgl::FormatUsageAuthority::CreateForWebGL1());
 }
 
 WebGL1Context::~WebGL1Context()
@@ -26,9 +28,9 @@ WebGL1Context::~WebGL1Context()
 }
 
 JSObject*
-WebGL1Context::WrapObject(JSContext* cx, JS::Handle<JSObject*> aGivenProto)
+WebGL1Context::WrapObject(JSContext* cx, JS::Handle<JSObject*> givenProto)
 {
-    return dom::WebGLRenderingContextBinding::Wrap(cx, this, aGivenProto);
+    return dom::WebGLRenderingContextBinding::Wrap(cx, this, givenProto);
 }
 
 bool

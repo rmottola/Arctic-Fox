@@ -19,6 +19,7 @@
 #include "mozilla/dom/DirectionalityUtils.h"
 #include "nsIDOMElement.h"
 #include "nsILinkHandler.h"
+#include "nsINodeList.h"
 #include "nsNodeUtils.h"
 #include "nsAttrAndChildArray.h"
 #include "mozFlushType.h"
@@ -125,8 +126,8 @@ class DestinationInsertionPointList;
 
 // IID for the dom::Element interface
 #define NS_ELEMENT_IID \
-{ 0x31d3f3fb, 0xcdf8, 0x4e40, \
- { 0xb7, 0x09, 0x1a, 0x11, 0x43, 0x93, 0x61, 0x71 } }
+{ 0xc67ed254, 0xfd3b, 0x4b10, \
+  { 0x96, 0xa2, 0xc5, 0x8b, 0x7b, 0x64, 0x97, 0xd1 } }
 
 class Element : public FragmentOrElement
 {
@@ -1340,7 +1341,7 @@ public:
   explicit DestinationInsertionPointList(Element* aElement);
 
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
-  NS_DECL_CYCLE_COLLECTION_CLASS(DestinationInsertionPointList)
+  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(DestinationInsertionPointList)
 
   // nsIDOMNodeList
   NS_DECL_NSIDOMNODELIST

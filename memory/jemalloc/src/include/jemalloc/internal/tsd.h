@@ -48,7 +48,7 @@ typedef enum {
  *   void example_tsd_set(example_t *val) {...}
  *
  * Note that all of the functions deal in terms of (a_type *) rather than
- * (a_type)  so that it is possible to support non-pointer types (unlike
+ * (a_type) so that it is possible to support non-pointer types (unlike
  * pthreads TSD).  example_tsd_cleanup() is passed an (a_type *) pointer that is
  * cast to (void *).  This means that the cleanup function needs to cast the
  * function argument to (a_type *), then dereference the resulting pointer to
@@ -277,9 +277,11 @@ a_name##tsd_set(a_type *val)						\
 a_attr bool								\
 a_name##tsd_cleanup_wrapper(void)					\
 {									\
-	a_name##tsd_wrapper_t *wrapper;					\
+	DWORD error = GetLastError();					\
+	a_name##tsd_wrapper_t *wrapper = (a_name##tsd_wrapper_t *)	\
+	    TlsGetValue(a_name##tsd_tsd);				\
+	SetLastError(error);						\
 									\
-	wrapper = (a_name##tsd_wrapper_t *)TlsGetValue(a_name##tsd_tsd);\
 	if (wrapper == NULL)						\
 		return (false);						\
 	if (a_cleanup != malloc_tsd_no_cleanup &&			\
@@ -307,8 +309,10 @@ a_name##tsd_wrapper_set(a_name##tsd_wrapper_t *wrapper)			\
 a_attr a_name##tsd_wrapper_t *						\
 a_name##tsd_wrapper_get(void)						\
 {									\
+	DWORD error = GetLastError();					\
 	a_name##tsd_wrapper_t *wrapper = (a_name##tsd_wrapper_t *)	\
 	    TlsGetValue(a_name##tsd_tsd);				\
+	SetLastError(error);						\
 									\
 	if (unlikely(wrapper == NULL)) {				\
 		wrapper = (a_name##tsd_wrapper_t *)			\

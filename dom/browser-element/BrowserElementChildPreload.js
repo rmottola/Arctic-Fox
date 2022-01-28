@@ -55,7 +55,9 @@ let CERTIFICATE_ERROR_PAGE_PREF = 'security.alternate_certificate_error_page';
 
 const OBSERVED_EVENTS = [
   'xpcom-shutdown',
-  'activity-done'
+  'audio-playback',
+  'activity-done',
+  'invalid-widget'
 ];
 
 const COMMAND_MAP = {
@@ -281,16 +283,27 @@ BrowserElementChild.prototype = {
   observe: function(subject, topic, data) {
     // Ignore notifications not about our document.  (Note that |content| /can/
     // be null; see bug 874900.)
-    if (topic !== 'activity-done' && (!content || subject != content.document))
+
+    if (topic !== 'activity-done' && topic !== 'audio-playback' &&
+        (!content || subject !== content.document)) {
       return;
+    }
     if (topic == 'activity-done' && docShell !== subject)
       return;
     switch (topic) {
       case 'activity-done':
         sendAsyncMsg('activitydone', { success: (data == 'activity-success') });
         break;
+      case 'audio-playback':
+        if (subject === content) {
+          sendAsyncMsg('audioplaybackchange', { _payload_: data });
+        }
+        break;
       case 'xpcom-shutdown':
         this._shuttingDown = true;
+        break;
+      case 'invalid-widget':
+        sendAsyncMsg('error', { type: 'invalid-widget' });
         break;
     }
   },

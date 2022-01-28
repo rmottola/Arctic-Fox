@@ -375,6 +375,9 @@ pref("browser.search.official", true);
 
 pref("browser.sessionhistory.max_entries", 50);
 
+// Built-in default permissions.
+pref("permissions.manager.defaultsUrl", "resource://app/defaults/permissions");
+
 // handle links targeting new windows
 // 1=current window/tab, 2=new window, 3=new tab in most recent window
 pref("browser.link.open_newwindow", 3);
@@ -435,6 +438,12 @@ pref("browser.tabs.closeButtons", 1);
 // true   return to the tab that opened this tab (its owner)
 // false  return to the adjacent tab (old default)
 pref("browser.tabs.selectOwnerOnClose", true);
+
+#ifdef RELEASE_BUILD
+pref("browser.tabs.showAudioPlayingIcon", false);
+#else
+pref("browser.tabs.showAudioPlayingIcon", true);
+#endif
 
 pref("browser.allTabs.previews", false);
 pref("browser.ctrlTab.previews", false);
@@ -881,7 +890,7 @@ pref("app.support.baseURL", "https://github.com/wicknix/Arctic-Fox/wiki/");
 pref("security.alternate_certificate_error_page", "certerror");
 
 // Whether to start the private browsing mode at application startup
-pref("browser.privatebrowsing.autostart", true);
+pref("browser.privatebrowsing.autostart", false);
 
 // Don't try to alter this pref, it'll be reset the next time you use the
 // bookmarking dialog
@@ -1171,13 +1180,13 @@ pref("browser.newtabpage.columns", 4);
 // number of rows of newtab grid
 pref("browser.newtabpage.rows", 4);
 
-// Enable the DOM fullscreen API.
-pref("full-screen-api.enabled", true);
-
 // about:permissions
 // Maximum number of sites to return from the places database.
 // 0-100 (currently)
 pref("permissions.places-sites-limit", 50);
+
+// Enable the DOM fullscreen API.
+pref("full-screen-api.enabled", true);
 
 // True if the fullscreen API requires approval upon a domain entering fullscreen.
 // Domains that have already had fullscreen permission granted won't re-request

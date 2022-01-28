@@ -154,7 +154,7 @@ class MachineState
     static MachineState FromBailout(RegisterDump::GPRArray& regs, RegisterDump::FPUArray& fpregs);
 
     void setRegisterLocation(Register reg, uintptr_t* up) {
-        regs_[reg.code()] = (Registers::RegisterContent* ) up;
+        regs_[reg.code()] = (Registers::RegisterContent*) up;
     }
     void setRegisterLocation(FloatRegister reg, float* fp) {
         MOZ_ASSERT(reg.isSingle());

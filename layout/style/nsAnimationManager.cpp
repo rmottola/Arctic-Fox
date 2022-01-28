@@ -7,7 +7,6 @@
 #include "nsTransitionManager.h"
 #include "mozilla/dom/CSSAnimationBinding.h"
 
-#include "mozilla/EventDispatcher.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/StyleAnimationValue.h"
 #include "mozilla/dom/DocumentTimeline.h"
@@ -30,6 +29,8 @@ using mozilla::dom::Animation;
 using mozilla::dom::AnimationPlayState;
 using mozilla::dom::KeyframeEffectReadOnly;
 using mozilla::dom::CSSAnimation;
+
+////////////////////////// CSSAnimation ////////////////////////////
 
 JSObject*
 CSSAnimation::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
@@ -113,6 +114,13 @@ CSSAnimation::PauseFromStyle()
   }
 }
 
+void
+CSSAnimation::Tick()
+{
+  Animation::Tick();
+  QueueEvents();
+}
+
 bool
 CSSAnimation::HasLowerCompositeOrderThan(const Animation& aOther) const
 {
@@ -133,36 +141,60 @@ CSSAnimation::HasLowerCompositeOrderThan(const Animation& aOther) const
     return false;
   }
 
-  // 2. CSS animations using custom composite ordering (i.e. those that
-  //    correspond to an animation-name property) sort lower than other CSS
-  //    animations (e.g. those created or kept-alive by script).
-  if (!IsUsingCustomCompositeOrder()) {
-    return !aOther.IsUsingCustomCompositeOrder() ?
+  // 2. CSS animations that correspond to an animation-name property sort lower
+  //    than other CSS animations (e.g. those created or kept-alive by script).
+  if (!IsTiedToMarkup()) {
+    return !otherAnimation->IsTiedToMarkup() ?
            Animation::HasLowerCompositeOrderThan(aOther) :
            false;
   }
-  if (!aOther.IsUsingCustomCompositeOrder()) {
+  if (!otherAnimation->IsTiedToMarkup()) {
     return true;
   }
 
   // 3. Sort by document order
-  MOZ_ASSERT(mOwningElement.IsSet() && otherAnimation->OwningElement().IsSet(),
-             "Animations using custom composite order should have an "
-             "owning element");
-  if (!mOwningElement.Equals(otherAnimation->OwningElement())) {
-    return mOwningElement.LessThan(otherAnimation->OwningElement());
+  if (!mOwningElement.Equals(otherAnimation->mOwningElement)) {
+    return mOwningElement.LessThan(otherAnimation->mOwningElement);
   }
 
   // 4. (Same element and pseudo): Sort by position in animation-name
-  return mSequenceNum < otherAnimation->mSequenceNum;
+  return mAnimationIndex < otherAnimation->mAnimationIndex;
 }
 
 void
-CSSAnimation::QueueEvents(EventArray& aEventsToDispatch)
+CSSAnimation::QueueEvents()
 {
   if (!mEffect) {
     return;
   }
+
+  // CSS animations dispatch events at their owning element. This allows
+  // script to repurpose a CSS animation to target a different element,
+  // to use a group effect (which has no obvious "target element"), or
+  // to remove the animation effect altogether whilst still getting
+  // animation events.
+  //
+  // It does mean, however, that for a CSS animation that has no owning
+  // element (e.g. it was created using the CSSAnimation constructor or
+  // disassociated from CSS) no events are fired. If it becomes desirable
+  // for these animations to still fire events we should spec the concept
+  // of the "original owning element" or "event target" and allow script
+  // to set it when creating a CSSAnimation object.
+  if (!mOwningElement.IsSet()) {
+    return;
+  }
+
+  dom::Element* owningElement;
+  nsCSSPseudoElements::Type owningPseudoType;
+  mOwningElement.GetElement(owningElement, owningPseudoType);
+  MOZ_ASSERT(owningElement, "Owning element should be set");
+
+  // Get the nsAnimationManager so we can queue events on it
+  nsPresContext* presContext = mOwningElement.GetRenderedPresContext();
+  if (!presContext) {
+    return;
+  }
+  nsAnimationManager* manager = presContext->AnimationManager();
 
   ComputedTiming computedTiming = mEffect->GetComputedTiming();
 
@@ -200,11 +232,7 @@ CSSAnimation::QueueEvents(EventArray& aEventsToDispatch)
     mPreviousPhaseOrIteration = PREVIOUS_PHASE_AFTER;
   }
 
-  dom::Element* target;
-  nsCSSPseudoElements::Type targetPseudoType;
-  mEffect->GetTarget(target, targetPseudoType);
-
-  uint32_t message;
+  EventMessage message;
 
   if (!wasActive && isActive) {
     message = NS_ANIMATION_START;
@@ -218,10 +246,9 @@ CSSAnimation::QueueEvents(EventArray& aEventsToDispatch)
     StickyTimeDuration elapsedTime =
       std::min(StickyTimeDuration(mEffect->InitialAdvance()),
                computedTiming.mActiveDuration);
-    AnimationEventInfo ei(target, mAnimationName, NS_ANIMATION_START,
-                          elapsedTime,
-                          PseudoTypeAsString(targetPseudoType));
-    aEventsToDispatch.AppendElement(ei);
+    manager->QueueEvent(
+      AnimationEventInfo(owningElement, mAnimationName, NS_ANIMATION_START,
+                         elapsedTime, owningPseudoType));
     // Then have the shared code below append an 'animationend':
     message = NS_ANIMATION_END;
   } else {
@@ -241,9 +268,24 @@ CSSAnimation::QueueEvents(EventArray& aEventsToDispatch)
     elapsedTime = computedTiming.mActiveDuration;
   }
 
-  AnimationEventInfo ei(target, mAnimationName, message, elapsedTime,
-                        PseudoTypeAsString(targetPseudoType));
-  aEventsToDispatch.AppendElement(ei);
+  manager->QueueEvent(
+    AnimationEventInfo(owningElement, mAnimationName, message, elapsedTime,
+                       owningPseudoType));
+}
+
+bool
+CSSAnimation::HasEndEventToQueue() const
+{
+  if (!mEffect) {
+    return false;
+  }
+
+  bool wasActive = mPreviousPhaseOrIteration != PREVIOUS_PHASE_BEFORE &&
+                   mPreviousPhaseOrIteration != PREVIOUS_PHASE_AFTER;
+  bool isActive = mEffect->GetComputedTiming().mPhase ==
+                    ComputedTiming::AnimationPhase_Active;
+
+  return wasActive && !isActive;
 }
 
 CommonAnimationManager*
@@ -257,38 +299,29 @@ CSSAnimation::GetAnimationManager() const
   return context->AnimationManager();
 }
 
-/* static */ nsString
-CSSAnimation::PseudoTypeAsString(nsCSSPseudoElements::Type aPseudoType)
+void
+CSSAnimation::UpdateTiming(SeekFlag aSeekFlag, SyncNotifyFlag aSyncNotifyFlag)
 {
-  switch (aPseudoType) {
-    case nsCSSPseudoElements::ePseudo_before:
-      return NS_LITERAL_STRING("::before");
-    case nsCSSPseudoElements::ePseudo_after:
-      return NS_LITERAL_STRING("::after");
-    default:
-      return EmptyString();
+  if (mNeedsNewAnimationIndexWhenRun &&
+      PlayState() != AnimationPlayState::Idle) {
+    mAnimationIndex = sNextAnimationIndex++;
+    mNeedsNewAnimationIndexWhenRun = false;
   }
+
+  Animation::UpdateTiming(aSeekFlag, aSyncNotifyFlag);
 }
 
-void
-nsAnimationManager::UpdateStyleAndEvents(AnimationCollection* aCollection,
-                                         TimeStamp aRefreshTime,
-                                         EnsureStyleRuleFlags aFlags)
-{
-  aCollection->EnsureStyleRuleFor(aRefreshTime, aFlags);
-  QueueEvents(aCollection, mPendingEvents);
-}
+////////////////////////// nsAnimationManager ////////////////////////////
 
-void
-nsAnimationManager::QueueEvents(AnimationCollection* aCollection,
-                                EventArray& aEventsToDispatch)
-{
-  for (size_t animIdx = aCollection->mAnimations.Length(); animIdx-- != 0; ) {
-    CSSAnimation* anim = aCollection->mAnimations[animIdx]->AsCSSAnimation();
-    MOZ_ASSERT(anim, "Expected a collection of CSS Animations");
-    anim->QueueEvents(aEventsToDispatch);
-  }
-}
+NS_IMPL_CYCLE_COLLECTION(nsAnimationManager, mEventDispatcher)
+
+NS_IMPL_CYCLE_COLLECTING_ADDREF(nsAnimationManager)
+NS_IMPL_CYCLE_COLLECTING_RELEASE(nsAnimationManager)
+
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsAnimationManager)
+  NS_INTERFACE_MAP_ENTRY(nsIStyleRuleProcessor)
+  NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIStyleRuleProcessor)
+NS_INTERFACE_MAP_END
 
 void
 nsAnimationManager::MaybeUpdateCascadeResults(AnimationCollection* aCollection)
@@ -321,7 +354,7 @@ nsAnimationManager::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
 
   // Measurement of the following members may be added later if DMD finds it is
   // worthwhile:
-  // - mPendingEvents
+  // - mEventDispatcher
 }
 
 /* virtual */ size_t
@@ -353,7 +386,7 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
     return nullptr;
   }
 
-  nsAutoAnimationMutationBatch mb(aElement);
+  nsAutoAnimationMutationBatch mb(aElement->OwnerDoc());
 
   // build the animations list
   dom::DocumentTimeline* timeline = aElement->OwnerDoc()->Timeline();
@@ -413,6 +446,13 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
           }
         }
         if (!oldAnim) {
+          // FIXME: Bug 1134163 - We shouldn't queue animationstart events
+          // until the animation is actually ready to run. However, we
+          // currently have some tests that assume that these events are
+          // dispatched within the same tick as the animation is added
+          // so we need to queue up any animationstart events from newly-created
+          // animations.
+          newAnim->AsCSSAnimation()->QueueEvents();
           continue;
         }
 
@@ -426,7 +466,7 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
           animationChanged =
             oldEffect->Timing() != newEffect->Timing() ||
             oldEffect->Properties() != newEffect->Properties();
-          oldEffect->Timing() = newEffect->Timing();
+          oldEffect->SetTiming(newEffect->Timing(), *oldAnim);
           oldEffect->Properties() = newEffect->Properties();
         }
 
@@ -455,7 +495,10 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
 
         oldAnim->CopyAnimationIndex(*newAnim->AsCSSAnimation());
 
-        if (animationChanged) {
+        // Updating the effect timing above might already have caused the
+        // animation to become irrelevant so only add a changed record if
+        // the animation is still relevant.
+        if (animationChanged && oldAnim->IsRelevant()) {
           nsNodeUtils::AnimationChanged(oldAnim);
         }
 
@@ -469,19 +512,20 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
         newAnim = nullptr;
         newAnimations.ReplaceElementAt(newIdx, oldAnim);
         collection->mAnimations.RemoveElementAt(oldIdx);
-
-        // We've touched the old animation's timing properties, so this
-        // could update the old animation's relevance.
-        oldAnim->UpdateRelevance();
       }
     }
   } else {
     collection =
       GetAnimations(aElement, aStyleContext->GetPseudoType(), true);
+    for (Animation* animation : newAnimations) {
+      // FIXME: Bug 1134163 - As above, we have shouldn't actually need to
+      // queue events here. (But we do for now since some tests expect
+      // animationstart events to be dispatched immediately.)
+      animation->AsCSSAnimation()->QueueEvents();
+    }
   }
   collection->mAnimations.SwapElements(newAnimations);
   collection->mNeedsRefreshes = true;
-  collection->Tick();
 
   // Cancel removed animations
   for (size_t newAnimIdx = newAnimations.Length(); newAnimIdx-- != 0; ) {
@@ -491,13 +535,12 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
   UpdateCascadeResults(aStyleContext, collection);
 
   TimeStamp refreshTime = mPresContext->RefreshDriver()->MostRecentRefresh();
-  UpdateStyleAndEvents(collection, refreshTime,
-                       EnsureStyleRule_IsNotThrottled);
-  // We don't actually dispatch the mPendingEvents now.  We'll either
+  collection->EnsureStyleRuleFor(refreshTime);
+  // We don't actually dispatch the pending events now.  We'll either
   // dispatch them the next time we get a refresh driver notification
   // or the next time somebody calls
   // nsPresShell::FlushPendingNotifications.
-  if (!mPendingEvents.IsEmpty()) {
+  if (mEventDispatcher.HasQueuedEvents()) {
     mPresContext->Document()->SetNeedStyleFlush();
   }
 
@@ -907,86 +950,9 @@ nsAnimationManager::UpdateCascadeResults(
     }
   }
 
+  // If there is any change in the cascade result, update animations on layers
+  // with the winning animations.
   if (changed) {
-    nsPresContext* presContext = aElementAnimations->mManager->PresContext();
-    presContext->RestyleManager()->IncrementAnimationGeneration();
-    aElementAnimations->UpdateAnimationGeneration(presContext);
-    aElementAnimations->PostUpdateLayerAnimations();
-
-    // Invalidate our style rule.
-    aElementAnimations->mNeedsRefreshes = true;
-    aElementAnimations->mStyleRuleRefreshTime = TimeStamp();
-  }
-}
-
-/* virtual */ void
-nsAnimationManager::WillRefresh(mozilla::TimeStamp aTime)
-{
-  MOZ_ASSERT(mPresContext,
-             "refresh driver should not notify additional observers "
-             "after pres context has been destroyed");
-  if (!mPresContext->GetPresShell()) {
-    // Someone might be keeping mPresContext alive past the point
-    // where it has been torn down; don't bother doing anything in
-    // this case.  But do get rid of all our transitions so we stop
-    // triggering refreshes.
-    RemoveAllElementCollections();
-    return;
-  }
-
-  FlushAnimations(Can_Throttle);
-}
-
-void
-nsAnimationManager::FlushAnimations(FlushFlags aFlags)
-{
-  TimeStamp now = mPresContext->RefreshDriver()->MostRecentRefresh();
-  bool didThrottle = false;
-  for (PRCList *l = PR_LIST_HEAD(&mElementCollections);
-       l != &mElementCollections;
-       l = PR_NEXT_LINK(l)) {
-    AnimationCollection* collection = static_cast<AnimationCollection*>(l);
-
-    nsAutoAnimationMutationBatch mb(collection->mElement);
-
-    collection->Tick();
-    bool canThrottleTick = aFlags == Can_Throttle &&
-      collection->CanPerformOnCompositorThread(
-        AnimationCollection::CanAnimateFlags(0)) &&
-      collection->CanThrottleAnimation(now);
-
-    nsRefPtr<css::AnimValuesStyleRule> oldStyleRule = collection->mStyleRule;
-    UpdateStyleAndEvents(collection, now, canThrottleTick
-                                          ? EnsureStyleRule_IsThrottled
-                                          : EnsureStyleRule_IsNotThrottled);
-    if (oldStyleRule != collection->mStyleRule) {
-      collection->PostRestyleForAnimation(mPresContext);
-    } else {
-      didThrottle = true;
-    }
-  }
-
-  if (didThrottle) {
-    mPresContext->Document()->SetNeedStyleFlush();
-  }
-
-  MaybeStartOrStopObservingRefreshDriver();
-
-  DispatchEvents(); // may destroy us
-}
-
-void
-nsAnimationManager::DoDispatchEvents()
-{
-  nsRefPtr<nsAnimationManager> kungFuDeathGrip(this);
-  EventArray events;
-  mPendingEvents.SwapElements(events);
-  for (uint32_t i = 0, i_end = events.Length(); i < i_end; ++i) {
-    AnimationEventInfo &info = events[i];
-    EventDispatcher::Dispatch(info.mElement, mPresContext, &info.mEvent);
-
-    if (!mPresContext) {
-      break;
-    }
+    aElementAnimations->RequestRestyle(AnimationCollection::RestyleType::Layer);
   }
 }

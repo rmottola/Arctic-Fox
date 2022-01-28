@@ -1375,7 +1375,7 @@ struct ClassMethod : public BinaryNode {
 };
 
 struct ClassNames : public BinaryNode {
-    ClassNames(ParseNode *outerBinding, ParseNode *innerBinding, const TokenPos &pos)
+    ClassNames(ParseNode* outerBinding, ParseNode* innerBinding, const TokenPos& pos)
       : BinaryNode(PNK_CLASSNAMES, JSOP_NOP, pos, outerBinding, innerBinding)
     {
         MOZ_ASSERT_IF(outerBinding, outerBinding->isKind(PNK_NAME));
@@ -1383,7 +1383,7 @@ struct ClassNames : public BinaryNode {
         MOZ_ASSERT_IF(outerBinding, innerBinding->pn_atom == outerBinding->pn_atom);
     }
 
-    static bool test(const ParseNode &node) {
+    static bool test(const ParseNode& node) {
         bool match = node.isKind(PNK_CLASSNAMES);
         MOZ_ASSERT_IF(match, node.isArity(PN_BINARY));
         return match;
@@ -1397,16 +1397,16 @@ struct ClassNames : public BinaryNode {
      * giving the methods access to the static members of the class even if
      * the outer binding has been overwritten.
      */
-    ParseNode *outerBinding() const {
+    ParseNode* outerBinding() const {
         return pn_u.binary.left;
     }
-    ParseNode *innerBinding() const {
+    ParseNode* innerBinding() const {
         return pn_u.binary.right;
     }
 };
 
 struct ClassNode : public TernaryNode {
-    ClassNode(ParseNode *names, ParseNode *heritage, ParseNode *methodsOrBlock)
+    ClassNode(ParseNode* names, ParseNode* heritage, ParseNode* methodsOrBlock)
       : TernaryNode(PNK_CLASS, JSOP_NOP, names, heritage, methodsOrBlock)
     {
         MOZ_ASSERT_IF(names, names->is<ClassNames>());
@@ -1414,28 +1414,28 @@ struct ClassNode : public TernaryNode {
                    methodsOrBlock->isKind(PNK_CLASSMETHODLIST));
     }
 
-    static bool test(const ParseNode &node) {
+    static bool test(const ParseNode& node) {
         bool match = node.isKind(PNK_CLASS);
         MOZ_ASSERT_IF(match, node.isArity(PN_TERNARY));
         return match;
     }
 
-    ClassNames *names() const {
+    ClassNames* names() const {
         return pn_kid1 ? &pn_kid1->as<ClassNames>() : nullptr;
     }
-    ParseNode *heritage() const {
+    ParseNode* heritage() const {
         return pn_kid2;
     }
-    ParseNode *methodList() const {
+    ParseNode* methodList() const {
         if (pn_kid3->isKind(PNK_CLASSMETHODLIST))
             return pn_kid3;
 
         MOZ_ASSERT(pn_kid3->is<LexicalScopeNode>());
-        ParseNode *list = pn_kid3->pn_expr;
+        ParseNode* list = pn_kid3->pn_expr;
         MOZ_ASSERT(list->isKind(PNK_CLASSMETHODLIST));
         return list;
     }
-    ObjectBox *scopeObject() const {
+    ObjectBox* scopeObject() const {
         MOZ_ASSERT(pn_kid3->is<LexicalScopeNode>());
         return pn_kid3->pn_objbox;
     }

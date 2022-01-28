@@ -477,16 +477,15 @@ nsPerformance::Timing()
 void
 nsPerformance::DispatchBufferFullEvent()
 {
-  nsCOMPtr<nsIDOMEvent> event;
-  nsresult rv = NS_NewDOMEvent(getter_AddRefs(event), this, nullptr, nullptr);
-  if (NS_SUCCEEDED(rv)) {
-    // it bubbles, and it isn't cancelable
-    rv = event->InitEvent(NS_LITERAL_STRING("resourcetimingbufferfull"), true, false);
-    if (NS_SUCCEEDED(rv)) {
-      event->SetTrusted(true);
-      DispatchDOMEvent(nullptr, event, nullptr, nullptr);
-    }
+  nsRefPtr<Event> event = NS_NewDOMEvent(this, nullptr, nullptr);
+  // it bubbles, and it isn't cancelable
+  nsresult rv = event->InitEvent(NS_LITERAL_STRING("resourcetimingbufferfull"),
+                                 true, false);
+  if (NS_FAILED(rv)) {
+    return;
   }
+  event->SetTrusted(true);
+  DispatchDOMEvent(nullptr, event, nullptr, nullptr);
 }
 
 nsPerformanceNavigation*
@@ -740,13 +739,7 @@ nsPerformance::InsertUserEntry(PerformanceEntry* aEntry)
       // If we have no URI, just put in "none".
       uri.AssignLiteral("none");
     }
-    PERFLOG("Performance Entry: %s|%s|%s|%f|%f|%" PRIu64 "\n",
-            uri.get(),
-            NS_ConvertUTF16toUTF8(aEntry->GetEntryType()).get(),
-            NS_ConvertUTF16toUTF8(aEntry->GetName()).get(),
-            aEntry->StartTime(),
-            aEntry->Duration(),
-            static_cast<uint64_t>(PR_Now() / PR_USEC_PER_MSEC));
+    PerformanceBase::LogEntry(aEntry, uri);
   }
 
   PerformanceBase::InsertUserEntry(aEntry);
@@ -973,6 +966,18 @@ void
 PerformanceBase::ClearMeasures(const Optional<nsAString>& aName)
 {
   ClearUserEntries(aName, NS_LITERAL_STRING("measure"));
+}
+
+void
+PerformanceBase::LogEntry(PerformanceEntry* aEntry, const nsACString& aOwner) const
+{
+  PERFLOG("Performance Entry: %s|%s|%s|%f|%f|%" PRIu64 "\n",
+          aOwner.BeginReading(),
+          NS_ConvertUTF16toUTF8(aEntry->GetEntryType()).get(),
+          NS_ConvertUTF16toUTF8(aEntry->GetName()).get(),
+          aEntry->StartTime(),
+          aEntry->Duration(),
+          static_cast<uint64_t>(PR_Now() / PR_USEC_PER_MSEC));
 }
 
 void

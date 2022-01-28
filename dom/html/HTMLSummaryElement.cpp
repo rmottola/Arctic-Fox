@@ -77,7 +77,7 @@ HTMLSummaryElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
     WidgetKeyboardEvent* keyboardEvent = event->AsKeyboardEvent();
     bool dispatchClick = false;
 
-    switch (event->message) {
+    switch (event->mMessage) {
       case NS_KEY_PRESS:
         if (keyboardEvent->charCode == nsIDOMKeyEvent::DOM_VK_SPACE) {
           // Consume 'space' key to prevent scrolling the page down.

@@ -12,7 +12,6 @@
 #include "jsexn.h"
 #include "jsfun.h"
 #include "jsnum.h"
-#include "jsiter.h"
 
 #include "builtin/RegExp.h"
 #include "js/Vector.h"
@@ -24,10 +23,7 @@
 namespace js {
 
 extern JSObject*
-InitSharedArrayBufferClass(JSContext *cx, HandleObject obj);
-
-extern JSObject*
-InitStopIterationClass(JSContext* cx, HandleObject obj);
+InitSharedArrayBufferClass(JSContext* cx, HandleObject obj);
 
 class Debugger;
 class TypedObjectModuleObject;

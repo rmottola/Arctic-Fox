@@ -225,7 +225,7 @@ GetNativeKeyEventType(NSEvent* aNativeEvent)
 static const char*
 GetGeckoKeyEventType(const WidgetEvent& aEvent)
 {
-  switch (aEvent.message) {
+  switch (aEvent.mMessage) {
     case NS_KEY_DOWN:    return "NS_KEY_DOWN";
     case NS_KEY_UP:      return "NS_KEY_UP";
     case NS_KEY_PRESS:   return "NS_KEY_PRESS";
@@ -761,7 +761,7 @@ TISInputSourceWrapper::InitKeyEvent(NSEvent *aNativeKeyEvent,
 
   MOZ_LOG(gLog, LogLevel::Info,
     ("%p TISInputSourceWrapper::InitKeyEvent, aNativeKeyEvent=%p, "
-     "aKeyEvent.message=%s, aInsertString=%p, IsOpenedIMEMode()=%s",
+     "aKeyEvent.mMessage=%s, aInsertString=%p, IsOpenedIMEMode()=%s",
      this, aNativeKeyEvent, GetGeckoKeyEventType(aKeyEvent), aInsertString,
      TrueOrFalse(IsOpenedIMEMode())));
 
@@ -948,7 +948,7 @@ TISInputSourceWrapper::InitKeyEvent(NSEvent *aNativeKeyEvent,
      this, OnOrOff(aKeyEvent.IsShift()), OnOrOff(aKeyEvent.IsControl()),
      OnOrOff(aKeyEvent.IsAlt()), OnOrOff(aKeyEvent.IsMeta())));
 
-  if (aKeyEvent.message == NS_KEY_PRESS &&
+  if (aKeyEvent.mMessage == NS_KEY_PRESS &&
       (isPrintableKey || !insertString.IsEmpty())) {
     InitKeyPressEvent(aNativeKeyEvent,
                       insertString.IsEmpty() ? 0 : insertString[0],
@@ -1038,7 +1038,7 @@ TISInputSourceWrapper::InitKeyPressEvent(NSEvent *aNativeKeyEvent,
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  NS_ASSERTION(aKeyEvent.message == NS_KEY_PRESS,
+  NS_ASSERTION(aKeyEvent.mMessage == NS_KEY_PRESS,
                "aKeyEvent must be NS_KEY_PRESS event");
 
   if (MOZ_LOG_TEST(gLog, LogLevel::Info)) {
@@ -1050,7 +1050,7 @@ TISInputSourceWrapper::InitKeyPressEvent(NSEvent *aNativeKeyEvent,
     MOZ_LOG(gLog, LogLevel::Info,
       ("%p TISInputSourceWrapper::InitKeyPressEvent, aNativeKeyEvent=%p, "
        "[aNativeKeyEvent characters]=\"%s\", aInsertChar=0x%X(%s), "
-       "aKeyEvent.message=%s, aKbType=0x%X, IsOpenedIMEMode()=%s",
+       "aKeyEvent.mMessage=%s, aKbType=0x%X, IsOpenedIMEMode()=%s",
        this, aNativeKeyEvent, utf8Chars.get(), aInsertChar,
        utf8ExpectedChar.get(), GetGeckoKeyEventType(aKeyEvent), aKbType,
        TrueOrFalse(IsOpenedIMEMode())));
@@ -2006,7 +2006,7 @@ TextInputHandler::DispatchKeyEventForFlagsChanged(NSEvent* aNativeEvent,
     return;
   }
 
-  uint32_t message = aDispatchKeyDown ? NS_KEY_DOWN : NS_KEY_UP;
+  EventMessage message = aDispatchKeyDown ? NS_KEY_DOWN : NS_KEY_UP;
 
   // Fire a key event.
   WidgetKeyboardEvent keyEvent(true, message, mWidget);
@@ -2740,7 +2740,7 @@ IMEInputHandler::DispatchCompositionCommitEvent(const nsAString* aCommitString)
 
   nsRefPtr<IMEInputHandler> kungFuDeathGrip(this);
 
-  uint32_t message =
+  EventMessage message =
     aCommitString ? NS_COMPOSITION_COMMIT : NS_COMPOSITION_COMMIT_AS_IS;
   WidgetCompositionEvent compositionCommitEvent(true, message, mWidget);
   compositionCommitEvent.time = PR_IntervalNow();
@@ -3777,7 +3777,7 @@ TextInputHandlerBase::OnDestroyWidget(nsChildView* aDestroyingWidget)
 bool
 TextInputHandlerBase::DispatchEvent(WidgetGUIEvent& aEvent)
 {
-  if (aEvent.message == NS_KEY_PRESS) {
+  if (aEvent.mMessage == NS_KEY_PRESS) {
     WidgetInputEvent& inputEvent = *aEvent.AsInputEvent();
     if (!inputEvent.IsMeta()) {
       MOZ_LOG(gLog, LogLevel::Info,
@@ -3919,7 +3919,7 @@ TextInputHandlerBase::AttachNativeKeyEvent(WidgetKeyboardEvent& aKeyEvent)
      aKeyEvent.modifiers));
 
   NSEventType eventType;
-  if (aKeyEvent.message == NS_KEY_UP) {
+  if (aKeyEvent.mMessage == NS_KEY_UP) {
     eventType = NSKeyUp;
   } else {
     eventType = NSKeyDown;

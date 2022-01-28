@@ -197,7 +197,7 @@ extern JS_FRIEND_DATA(const JSSrcNoteSpec) js_SrcNoteSpec[];
 namespace js {
 
 extern JS_FRIEND_API(unsigned)
-SrcNoteLength(jssrcnote *sn);
+SrcNoteLength(jssrcnote* sn);
 
 /*
  * Get and set the offset operand identified by which (0 for the first, etc.).

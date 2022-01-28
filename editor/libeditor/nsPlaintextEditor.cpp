@@ -362,7 +362,7 @@ nsPlaintextEditor::HandleKeyPressEvent(nsIDOMKeyEvent* aKeyEvent)
   WidgetKeyboardEvent* nativeKeyEvent =
     aKeyEvent->GetInternalNSEvent()->AsKeyboardEvent();
   NS_ENSURE_TRUE(nativeKeyEvent, NS_ERROR_UNEXPECTED);
-  NS_ASSERTION(nativeKeyEvent->message == NS_KEY_PRESS,
+  NS_ASSERTION(nativeKeyEvent->mMessage == NS_KEY_PRESS,
                "HandleKeyPressEvent gets non-keypress event");
 
   switch (nativeKeyEvent->keyCode) {
@@ -845,7 +845,7 @@ nsPlaintextEditor::UpdateIMEComposition(nsIDOMEvent* aDOMTextEvent)
   WidgetCompositionEvent* compositionChangeEvent =
     aDOMTextEvent->GetInternalNSEvent()->AsCompositionEvent();
   NS_ENSURE_TRUE(compositionChangeEvent, NS_ERROR_INVALID_ARG);
-  MOZ_ASSERT(compositionChangeEvent->message == NS_COMPOSITION_CHANGE,
+  MOZ_ASSERT(compositionChangeEvent->mMessage == NS_COMPOSITION_CHANGE,
              "The internal event should be NS_COMPOSITION_CHANGE");
 
   EnsureComposition(compositionChangeEvent);
@@ -1168,10 +1168,13 @@ nsPlaintextEditor::CanCutOrCopy(PasswordFieldAllowed aPasswordFieldAllowed)
 }
 
 bool
-nsPlaintextEditor::FireClipboardEvent(int32_t aType, int32_t aSelectionType, bool* aActionTaken)
+nsPlaintextEditor::FireClipboardEvent(EventMessage aEventMessage,
+                                      int32_t aSelectionType,
+                                      bool* aActionTaken)
 {
-  if (aType == NS_PASTE)
+  if (aEventMessage == NS_PASTE) {
     ForceCompositionEnd();
+  }
 
   nsCOMPtr<nsIPresShell> presShell = GetPresShell();
   NS_ENSURE_TRUE(presShell, false);
@@ -1181,8 +1184,10 @@ nsPlaintextEditor::FireClipboardEvent(int32_t aType, int32_t aSelectionType, boo
     return false;
   }
 
-  if (!nsCopySupport::FireClipboardEvent(aType, aSelectionType, presShell, selection, aActionTaken))
+  if (!nsCopySupport::FireClipboardEvent(aEventMessage, aSelectionType,
+                                         presShell, selection, aActionTaken)) {
     return false;
+  }
 
   // If the event handler caused the editor to be destroyed, return false.
   // Otherwise return true to indicate that the event was not cancelled.

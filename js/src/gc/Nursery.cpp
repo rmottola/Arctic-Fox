@@ -7,10 +7,12 @@
 
 #include "gc/Nursery-inl.h"
 
+#include "mozilla/DebugOnly.h"
 #include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/Move.h"
 
 #include "jscompartment.h"
+#include "jsfriendapi.h"
 #include "jsgc.h"
 #include "jsutil.h"
 
@@ -34,6 +36,7 @@ using namespace js;
 using namespace gc;
 
 using mozilla::ArrayLength;
+using mozilla::DebugOnly;
 using mozilla::PodCopy;
 using mozilla::PodZero;
 
@@ -62,6 +65,9 @@ js::Nursery::init(uint32_t maxNurseryBytes)
         return true;
 
     if (!mallocedBuffers.init())
+        return false;
+
+    if (!cellsWithUid_.init())
         return false;
 
     void* heap = MapAlignedPages(nurserySize(), Alignment);
@@ -232,6 +238,7 @@ js::Nursery::allocate(size_t size)
     position_ = position() + size;
 
     JS_EXTRA_POISON(thing, JS_ALLOCATED_NURSERY_PATTERN, size);
+    MemProfiler::SampleNursery(reinterpret_cast<void*>(thing), size);
     return thing;
 }
 
@@ -302,7 +309,11 @@ void
 Nursery::setForwardingPointer(void* oldData, void* newData, bool direct)
 {
     MOZ_ASSERT(isInside(oldData));
-    MOZ_ASSERT(!isInside(newData));
+
+    // Bug 1196210: If a zero-capacity header lands in the last 2 words of the
+    // jemalloc chunk abutting the start of the nursery, the (invalid) newData
+    // pointer will appear to be "inside" the nursery.
+    MOZ_ASSERT(!isInside(newData) || uintptr_t(newData) == heapStart_);
 
     if (direct) {
         *reinterpret_cast<void**>(oldData) = newData;
@@ -377,7 +388,6 @@ js::TenuringTracer::TenuringTracer(JSRuntime* rt, Nursery* nursery)
   , head(nullptr)
   , tail(&head)
 {
-    rt->gc.incGcNumber();
 }
 
 #define TIME_START(name) int64_t timestampStart_##name = enableProfiling_ ? PRMJ_Now() : 0
@@ -550,39 +560,45 @@ js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList
     TraceMinorGCEnd();
 
     if (enableProfiling_ && totalTime >= profileThreshold_) {
-        static bool printedHeader = false;
-        if (!printedHeader) {
-            fprintf(stderr,
-                    "MinorGC: Reason               PRate  Size Time   mkVals mkClls mkSlts mkWCll mkGnrc ckTbls mkRntm mkDbgr clrNOC collct swpABO updtIn runFin frSlts clrSB  sweep resize pretnr logPtT\n");
-            printedHeader = true;
+        struct {
+            const char* name;
+            int64_t time;
+        } PrintList[] = {
+            {"canIon", TIME_TOTAL(cancelIonCompilations)},
+            {"mkVals", TIME_TOTAL(traceValues)},
+            {"mkClls", TIME_TOTAL(traceCells)},
+            {"mkSlts", TIME_TOTAL(traceSlots)},
+            {"mcWCll", TIME_TOTAL(traceWholeCells)},
+            {"mkGnrc", TIME_TOTAL(traceGenericEntries)},
+            {"ckTbls", TIME_TOTAL(checkHashTables)},
+            {"mkRntm", TIME_TOTAL(markRuntime)},
+            {"mkDbgr", TIME_TOTAL(markDebugger)},
+            {"clrNOC", TIME_TOTAL(clearNewObjectCache)},
+            {"collct", TIME_TOTAL(collectToFP)},
+            {"swpABO", TIME_TOTAL(sweepArrayBufferViewList)},
+            {"updtIn", TIME_TOTAL(updateJitActivations)},
+            {"frSlts", TIME_TOTAL(freeMallocedBuffers)},
+            {" clrSB", TIME_TOTAL(clearStoreBuffer)},
+            {" sweep", TIME_TOTAL(sweep)},
+            {"resize", TIME_TOTAL(resize)},
+            {"pretnr", TIME_TOTAL(pretenure)},
+            {"logPtT", TIME_TOTAL(logPromotionsToTenured)}
+        };
+        static int printedHeader = 0;
+        if ((printedHeader++ % 200) == 0) {
+            fprintf(stderr, "MinorGC:               Reason  PRate Size    Time");
+            for (auto &entry : PrintList)
+                fprintf(stderr, " %s", entry.name);
+            fprintf(stderr, "\n");
         }
 
 #define FMT " %6" PRIu64
-        fprintf(stderr,
-                "MinorGC: %20s %5.1f%% %4d" FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT FMT "\n",
-                js::gcstats::ExplainReason(reason),
-                promotionRate * 100,
-                numActiveChunks_,
-                totalTime,
-                TIME_TOTAL(cancelIonCompilations),
-                TIME_TOTAL(traceValues),
-                TIME_TOTAL(traceCells),
-                TIME_TOTAL(traceSlots),
-                TIME_TOTAL(traceWholeCells),
-                TIME_TOTAL(traceGenericEntries),
-                TIME_TOTAL(checkHashTables),
-                TIME_TOTAL(markRuntime),
-                TIME_TOTAL(markDebugger),
-                TIME_TOTAL(clearNewObjectCache),
-                TIME_TOTAL(collectToFP),
-                TIME_TOTAL(sweepArrayBufferViewList),
-                TIME_TOTAL(updateJitActivations),
-                TIME_TOTAL(freeMallocedBuffers),
-                TIME_TOTAL(clearStoreBuffer),
-                TIME_TOTAL(sweep),
-                TIME_TOTAL(resize),
-                TIME_TOTAL(pretenure),
-                TIME_TOTAL(logPromotionsToTenured));
+        fprintf(stderr, "MinorGC: %20s %5.1f%% %4d " FMT, js::gcstats::ExplainReason(reason),
+                promotionRate * 100, numActiveChunks_, totalTime);
+        for (auto &entry : PrintList) {
+            fprintf(stderr, FMT, entry.time);
+        }
+        fprintf(stderr, "\n");
 #undef FMT
     }
 }
@@ -639,6 +655,16 @@ js::Nursery::waitBackgroundFreeEnd()
 void
 js::Nursery::sweep()
 {
+    /* Sweep unique id's in all in-use chunks. */
+    for (CellsWithUniqueIdSet::Enum e(cellsWithUid_); !e.empty(); e.popFront()) {
+        JSObject* obj = static_cast<JSObject*>(e.front());
+        if (!IsForwarded(obj))
+            obj->zone()->removeUniqueId(obj);
+        else
+            MOZ_ASSERT(Forwarded(obj)->zone()->hasUniqueId(Forwarded(obj)));
+    }
+    cellsWithUid_.clear();
+
 #ifdef JS_GC_ZEAL
     /* Poison the nursery contents so touching a freed object will crash. */
     JS_POISON((void*)start(), JS_SWEPT_NURSERY_PATTERN, nurserySize());
@@ -656,16 +682,15 @@ js::Nursery::sweep()
     {
 #ifdef JS_CRASH_DIAGNOSTICS
         JS_POISON((void*)start(), JS_SWEPT_NURSERY_PATTERN, allocationEnd() - start());
-        for (int i = 0; i < numActiveChunks_; ++i) {
-            chunk(i).trailer.location = gc::ChunkLocationBitNursery;
-            chunk(i).trailer.runtime = runtime();
-        }
+        for (int i = 0; i < numActiveChunks_; ++i)
+            initChunk(i);
 #endif
         setCurrentChunk(0);
     }
 
     /* Set current start position for isEmpty checks. */
     currentStart_ = position();
+    MemProfiler::SweepNursery(runtime());
 }
 
 void

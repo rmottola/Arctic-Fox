@@ -257,7 +257,7 @@ CodeGeneratorX86::visitAsmJSUInt32ToFloat32(LAsmJSUInt32ToFloat32* lir)
 }
 
 void
-CodeGeneratorX86::load(Scalar::Type accessType, const Operand &srcAddr, const LDefinition *out)
+CodeGeneratorX86::load(Scalar::Type accessType, const Operand& srcAddr, const LDefinition* out)
 {
     switch (accessType) {
       case Scalar::Int8:         masm.movsblWithPatch(srcAddr, ToRegister(out)); break;
@@ -345,7 +345,7 @@ CodeGeneratorX86::memoryBarrier(MemoryBarrierBits barrier)
 }
 
 void
-CodeGeneratorX86::loadSimd(Scalar::Type type, unsigned numElems, const Operand &srcAddr,
+CodeGeneratorX86::loadSimd(Scalar::Type type, unsigned numElems, const Operand& srcAddr,
                            FloatRegister out)
 {
     switch (type) {
@@ -386,12 +386,12 @@ CodeGeneratorX86::loadSimd(Scalar::Type type, unsigned numElems, const Operand &
 }
 
 void
-CodeGeneratorX86::emitSimdLoad(LAsmJSLoadHeap *ins)
+CodeGeneratorX86::emitSimdLoad(LAsmJSLoadHeap* ins)
 {
-    const MAsmJSLoadHeap *mir = ins->mir();
+    const MAsmJSLoadHeap* mir = ins->mir();
     Scalar::Type type = mir->accessType();
     FloatRegister out = ToFloatRegister(ins->output());
-    const LAllocation *ptr = ins->ptr();
+    const LAllocation* ptr = ins->ptr();
     Operand srcAddr = ptr->isBogus()
                       ? Operand(PatchedAbsoluteAddress(mir->offset()))
                       : Operand(ToRegister(ptr), mir->offset());
@@ -446,8 +446,8 @@ CodeGeneratorX86::visitAsmJSLoadHeap(LAsmJSLoadHeap* ins)
     if (Scalar::isSimdType(accessType))
         return emitSimdLoad(ins);
 
-    const LAllocation *ptr = ins->ptr();
-    const LDefinition *out = ins->output();
+    const LAllocation* ptr = ins->ptr();
+    const LDefinition* out = ins->output();
     Operand srcAddr = ptr->isBogus()
                       ? Operand(PatchedAbsoluteAddress(mir->offset()))
                       : Operand(ToRegister(ptr), mir->offset());
@@ -525,7 +525,7 @@ CodeGeneratorX86::visitStoreTypedArrayElementStatic(LStoreTypedArrayElementStati
 
 void
 CodeGeneratorX86::storeSimd(Scalar::Type type, unsigned numElems, FloatRegister in,
-                            const Operand &dstAddr)
+                            const Operand& dstAddr)
 {
     switch (type) {
       case Scalar::Float32x4: {
@@ -565,12 +565,12 @@ CodeGeneratorX86::storeSimd(Scalar::Type type, unsigned numElems, FloatRegister 
 }
 
 void
-CodeGeneratorX86::emitSimdStore(LAsmJSStoreHeap *ins)
+CodeGeneratorX86::emitSimdStore(LAsmJSStoreHeap* ins)
 {
-    const MAsmJSStoreHeap *mir = ins->mir();
+    const MAsmJSStoreHeap* mir = ins->mir();
     Scalar::Type type = mir->accessType();
     FloatRegister in = ToFloatRegister(ins->value());
-    const LAllocation *ptr = ins->ptr();
+    const LAllocation* ptr = ins->ptr();
     Operand dstAddr = ptr->isBogus()
                       ? Operand(PatchedAbsoluteAddress(mir->offset()))
                       : Operand(ToRegister(ptr), mir->offset());
@@ -590,7 +590,7 @@ CodeGeneratorX86::emitSimdStore(LAsmJSStoreHeap *ins)
             : Operand(ToRegister(ptr), 2 * sizeof(float) + mir->offset());
 
         // Store XY
-	uint32_t before = masm.size();
+        uint32_t before = masm.size();
         storeSimd(type, 2, in, dstAddr);
         uint32_t after = masm.size();
         masm.append(AsmJSHeapAccess(before, after, maybeCmpOffset));
@@ -618,14 +618,14 @@ CodeGeneratorX86::emitSimdStore(LAsmJSStoreHeap *ins)
 void
 CodeGeneratorX86::visitAsmJSStoreHeap(LAsmJSStoreHeap* ins)
 {
-    const MAsmJSStoreHeap *mir = ins->mir();
+    const MAsmJSStoreHeap* mir = ins->mir();
     Scalar::Type accessType = mir->accessType();
 
     if (Scalar::isSimdType(accessType))
         return emitSimdStore(ins);
 
-    const LAllocation *value = ins->value();
-    const LAllocation *ptr = ins->ptr();
+    const LAllocation* value = ins->value();
+    const LAllocation* ptr = ins->ptr();
     Operand dstAddr = ptr->isBogus()
                       ? Operand(PatchedAbsoluteAddress(mir->offset()))
                       : Operand(ToRegister(ptr), mir->offset());

@@ -324,9 +324,23 @@ Service::unregisterConnection(Connection *aConnection)
   {
     mRegistrationMutex.AssertNotCurrentThreadOwns();
     MutexAutoLock mutex(mRegistrationMutex);
-    DebugOnly<bool> removed = mConnections.RemoveElement(aConnection);
-    // Assert if we try to unregister a non-existent connection.
-    MOZ_ASSERT(removed);
+
+    for (uint32_t i = 0 ; i < mConnections.Length(); ++i) {
+      if (mConnections[i] == aConnection) {
+        nsCOMPtr<nsIThread> thread = mConnections[i]->threadOpenedOn;
+
+        // Ensure the connection is released on its opening thread.  Note, we
+        // must use .forget().take() so that we can manually cast to an
+        // unambiguous nsISupports type.
+        NS_ProxyRelease(thread,
+          static_cast<mozIStorageConnection*>(mConnections[i].forget().take()));
+
+        mConnections.RemoveElementAt(i);
+        return;
+      }
+    }
+
+    MOZ_ASSERT_UNREACHABLE("Attempt to unregister unknown storage connection!");
   }
 }
 
@@ -496,7 +510,7 @@ const sqlite3_mem_methods memMethods = {
   nullptr
 };
 
-} // anonymous namespace
+} // namespace
 
 #endif  // MOZ_STORAGE_MEMORY
 
@@ -518,6 +532,10 @@ Service::initialize()
   if (rc != SQLITE_OK)
     return convertResultCode(rc);
 #endif
+
+  // TODO (bug 1191405): do not preallocate the connections caches until we
+  // have figured the impact on our consumers and memory.
+  sqlite3_config(SQLITE_CONFIG_PAGECACHE, NULL, 0, 0);
 
   // Explicitly initialize sqlite3.  Although this is implicitly called by
   // various sqlite3 functions (and the sqlite3_open calls in our case),
@@ -740,7 +758,7 @@ private:
   nsRefPtr<mozIStorageCompletionCallback> mCallback;
 };
 
-} // anonymous namespace
+} // namespace
 
 NS_IMETHODIMP
 Service::OpenAsyncDatabase(nsIVariant *aDatabaseStore,

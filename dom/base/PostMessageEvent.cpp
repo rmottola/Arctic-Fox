@@ -18,6 +18,7 @@
 #include "nsGlobalWindow.h"
 #include "nsIPresShell.h"
 #include "nsIPrincipal.h"
+#include "nsPresContext.h"
 
 namespace mozilla {
 namespace dom {

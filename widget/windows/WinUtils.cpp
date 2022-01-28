@@ -47,7 +47,7 @@
 
 #ifdef NS_ENABLE_TSF
 #include <textstor.h>
-#include "nsTextStore.h"
+#include "TSFTextStore.h"
 #endif // #ifdef NS_ENABLE_TSF
 
 PRLogModuleInfo* gWindowsLog = nullptr;
@@ -572,7 +572,7 @@ WinUtils::PeekMessage(LPMSG aMsg, HWND aWnd, UINT aFirstMessage,
                       UINT aLastMessage, UINT aOption)
 {
 #ifdef NS_ENABLE_TSF
-  ITfMessagePump* msgPump = nsTextStore::GetMessagePump();
+  ITfMessagePump* msgPump = TSFTextStore::GetMessagePump();
   if (msgPump) {
     BOOL ret = FALSE;
     HRESULT hr = msgPump->PeekMessageW(aMsg, aWnd, aFirstMessage, aLastMessage,
@@ -590,7 +590,7 @@ WinUtils::GetMessage(LPMSG aMsg, HWND aWnd, UINT aFirstMessage,
                      UINT aLastMessage)
 {
 #ifdef NS_ENABLE_TSF
-  ITfMessagePump* msgPump = nsTextStore::GetMessagePump();
+  ITfMessagePump* msgPump = TSFTextStore::GetMessagePump();
   if (msgPump) {
     BOOL ret = FALSE;
     HRESULT hr = msgPump->GetMessageW(aMsg, aWnd, aFirstMessage, aLastMessage,
@@ -939,15 +939,17 @@ WinUtils::GetMouseInputSource()
   return static_cast<uint16_t>(inputSource);
 }
 
+/* static */
 bool
-WinUtils::GetIsMouseFromTouch(uint32_t aEventType)
+WinUtils::GetIsMouseFromTouch(EventMessage aEventMessage)
 {
-#define MOUSEEVENTF_FROMTOUCH 0xFF515700
-  return (aEventType == NS_MOUSE_BUTTON_DOWN ||
-          aEventType == NS_MOUSE_BUTTON_UP ||
-          aEventType == NS_MOUSE_MOVE ||
-          aEventType == NS_MOUSE_DOUBLECLICK) &&
-          (GetMessageExtraInfo() & MOUSEEVENTF_FROMTOUCH);
+  const uint32_t MOZ_T_I_SIGNATURE = TABLET_INK_TOUCH | TABLET_INK_SIGNATURE;
+  const uint32_t MOZ_T_I_CHECK_TCH = TABLET_INK_TOUCH | TABLET_INK_CHECK;
+  return ((aEventMessage == NS_MOUSE_MOVE ||
+           aEventMessage == NS_MOUSE_BUTTON_DOWN ||
+           aEventMessage == NS_MOUSE_BUTTON_UP ||
+           aEventMessage == NS_MOUSE_DOUBLECLICK) &&
+         (GetMessageExtraInfo() & MOZ_T_I_SIGNATURE) == MOZ_T_I_CHECK_TCH);
 }
 
 /* static */
@@ -1158,7 +1160,9 @@ AsyncFaviconDataReady::OnComplete(nsIURI *aFaviconURI,
   NS_ENSURE_SUCCESS(rv, rv);
 
   RefPtr<SourceSurface> surface =
-    container->GetFrame(imgIContainer::FRAME_FIRST, 0);
+    container->GetFrame(imgIContainer::FRAME_FIRST,
+                        imgIContainer::FLAG_SYNC_DECODE |
+                        imgIContainer::FLAG_ASYNC_NOTIFY);
   NS_ENSURE_TRUE(surface, NS_ERROR_FAILURE);
 
   RefPtr<DataSourceSurface> dataSurface;

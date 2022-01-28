@@ -43,6 +43,16 @@
 #endif
 
 
+#if (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+// Not in 10.4 or 10.5.
+@protocol NSApplicationDelegate
+- (void)applicationWillFinishLaunching:(NSNotification *)notification;
+- (void)applicationDidFinishLaunching:(NSNotification *)notification;
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender;
+@end
+#endif
+
+
 class AutoAutoreleasePool {
 public:
   AutoAutoreleasePool()

@@ -641,7 +641,7 @@ class ArenaLists
         return offset + size_t(thingKind) * sizeof(FreeList);
     }
 
-    const FreeList *getFreeList(AllocKind thingKind) const {
+    const FreeList* getFreeList(AllocKind thingKind) const {
         return &freeLists[thingKind];
     }
 
@@ -840,7 +840,7 @@ class ArenaLists
 
     enum ArenaAllocMode { HasFreeThings = true, IsEmpty = false };
     template <ArenaAllocMode hasFreeThings>
-    TenuredCell *allocateFromArenaInner(JS::Zone *zone, ArenaHeader *aheader, AllocKind kind);
+    TenuredCell* allocateFromArenaInner(JS::Zone* zone, ArenaHeader* aheader, AllocKind kind);
 
     inline void normalizeBackgroundFinalizeState(AllocKind thingKind);
 
@@ -1124,7 +1124,7 @@ class RelocationOverlay
         return magic_ == Relocated;
     }
 
-    Cell *forwardingAddress() const {
+    Cell* forwardingAddress() const {
         MOZ_ASSERT(isForwarded());
         return newLocation_;
     }
@@ -1155,31 +1155,23 @@ class RelocationOverlay
 
 /* Functions for checking and updating things that might be moved by compacting GC. */
 
-#define TYPE_MIGHT_BE_FORWARDED(T, value)                                     \
-    inline bool                                                               \
-    TypeMightBeForwarded(T *thing)                                            \
-    {                                                                         \
-        return value;                                                         \
-    }                                                                         \
+template <typename T>
+struct MightBeForwarded
+{
+    static_assert(mozilla::IsBaseOf<Cell, T>::value,
+                  "T must derive from Cell");
+    static_assert(!mozilla::IsSame<Cell, T>::value && !mozilla::IsSame<TenuredCell, T>::value,
+                  "T must not be Cell or TenuredCell");
 
-TYPE_MIGHT_BE_FORWARDED(JSObject, true)
-TYPE_MIGHT_BE_FORWARDED(JSString, false)
-TYPE_MIGHT_BE_FORWARDED(JS::Symbol, false)
-TYPE_MIGHT_BE_FORWARDED(JSScript, false)
-TYPE_MIGHT_BE_FORWARDED(Shape, false)
-TYPE_MIGHT_BE_FORWARDED(BaseShape, false)
-TYPE_MIGHT_BE_FORWARDED(jit::JitCode, false)
-TYPE_MIGHT_BE_FORWARDED(LazyScript, false)
-TYPE_MIGHT_BE_FORWARDED(ObjectGroup, false)
-
-#undef TYPE_MIGHT_BE_FORWARDED
+    static const bool value = mozilla::IsBaseOf<JSObject, T>::value;
+};
 
 template <typename T>
 inline bool
-IsForwarded(T *t)
+IsForwarded(T* t)
 {
-    RelocationOverlay *overlay = RelocationOverlay::fromCell(t);
-    if (!TypeMightBeForwarded(t)) {
+    RelocationOverlay* overlay = RelocationOverlay::fromCell(t);
+    if (!MightBeForwarded<T>::value) {
         MOZ_ASSERT(!overlay->isForwarded());
         return false;
     }
@@ -1237,6 +1229,13 @@ CheckGCThingAfterMovingGC(T* t)
     }
 }
 
+template <typename T>
+inline void
+CheckGCThingAfterMovingGC(const ReadBarriered<T*>& t)
+{
+    CheckGCThingAfterMovingGC(t.get());
+}
+
 struct CheckValueAfterMovingGCFunctor : public VoidDefaultAdaptor<Value> {
     template <typename T> void operator()(T* t) { CheckGCThingAfterMovingGC(t); }
 };
@@ -1269,11 +1268,11 @@ enum VerifierType {
 
 #ifdef JS_GC_ZEAL
 
-extern const char *ZealModeHelpText;
+extern const char* ZealModeHelpText;
 
 /* Check that write barriers have been used correctly. See jsgc.cpp. */
 void
-VerifyBarriers(JSRuntime *rt, VerifierType type);
+VerifyBarriers(JSRuntime* rt, VerifierType type);
 
 void
 MaybeVerifyBarriers(JSContext* cx, bool always = false);
@@ -1341,8 +1340,8 @@ class ZoneList
     ZoneList& operator=(const ZoneList& other) = delete;
 };
 
-JSObject *
-NewMemoryStatisticsObject(JSContext *cx);
+JSObject*
+NewMemoryStatisticsObject(JSContext* cx);
 
 } /* namespace gc */
 

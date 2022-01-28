@@ -117,6 +117,8 @@ private:
 
   /**
    * Fire BluetoothAttributeEvent to trigger onattributechanged event handler.
+   *
+   * @param aTypes [in] Array of changed attributes. Must be non-empty.
    */
   void DispatchAttributeEvent(const Sequence<nsString>& aTypes);
 
@@ -152,7 +154,7 @@ private:
    *
    * @param aAdvData [in] advertising data which provided by the LeScan result.
    */
-   void UpdatePropertiesFromAdvData(const nsTArray<uint8_t>& aAdvData);
+  void UpdatePropertiesFromAdvData(const nsTArray<uint8_t>& aAdvData);
 
   /****************************************************************************
    * Variables

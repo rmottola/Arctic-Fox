@@ -233,7 +233,7 @@ static inline char* js_strdup(const char* s)
  *   general SpiderMonkey idiom that a JSContext-taking function reports its
  *   own errors.)
  *
- * - Otherwise, use js_malloc/js_realloc/js_calloc/js_free/js_new
+ * - Otherwise, use js_malloc/js_realloc/js_calloc/js_new
  *
  * Deallocation:
  *
@@ -317,22 +317,22 @@ CalculateAllocSizeWithExtra(size_t numExtra, size_t* bytesOut)
 
 template <class T>
 static MOZ_ALWAYS_INLINE void
-js_delete(T* p)
+js_delete(const T* p)
 {
     if (p) {
         p->~T();
-        js_free(p);
+        js_free(const_cast<T*>(p));
     }
 }
 
 template<class T>
 static MOZ_ALWAYS_INLINE void
-js_delete_poison(T* p)
+js_delete_poison(const T* p)
 {
     if (p) {
         p->~T();
-        memset(p, 0x3B, sizeof(T));
-        js_free(p);
+        memset(const_cast<T*>(p), 0x3B, sizeof(T));
+        js_free(const_cast<T*>(p));
     }
 }
 

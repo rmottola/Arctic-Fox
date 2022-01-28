@@ -20,9 +20,6 @@ function checkCrossOrigin(a, b) {
   do_check_false(a.subsumesConsideringDomain(b));
   do_check_false(b.subsumes(a));
   do_check_false(b.subsumesConsideringDomain(a));
-  do_check_eq(a.cookieJar === b.cookieJar,
-              a.originAttributes.appId == b.originAttributes.appId &&
-              a.originAttributes.inBrowser == b.originAttributes.inBrowser);
 }
 
 function checkOriginAttributes(prin, attrs, suffix) {
@@ -50,7 +47,7 @@ function run_test() {
   var nullPrin = Cu.getObjectPrincipal(new Cu.Sandbox(null));
   do_check_true(/^moz-nullprincipal:\{([0-9]|[a-z]|\-){36}\}$/.test(nullPrin.origin));
   checkOriginAttributes(nullPrin);
-  var ep = Cu.getObjectPrincipal(new Cu.Sandbox([exampleCom, nullPrin, exampleOrg]));
+  var ep = ssm.createExpandedPrincipal([exampleCom, nullPrin, exampleOrg]);
   checkOriginAttributes(ep);
   checkCrossOrigin(exampleCom, exampleOrg);
   checkCrossOrigin(exampleOrg, nullPrin);
@@ -68,33 +65,37 @@ function run_test() {
   // Just app.
   var exampleOrg_app = ssm.createCodebasePrincipal(makeURI('http://example.org'), {appId: 42});
   var nullPrin_app = ssm.createNullPrincipal({appId: 42});
-  checkOriginAttributes(exampleOrg_app, {appId: 42}, '!appId=42');
-  checkOriginAttributes(nullPrin_app, {appId: 42}, '!appId=42');
-  do_check_eq(exampleOrg_app.origin, 'http://example.org!appId=42');
+  checkOriginAttributes(exampleOrg_app, {appId: 42}, '^appId=42');
+  checkOriginAttributes(nullPrin_app, {appId: 42}, '^appId=42');
+  do_check_eq(exampleOrg_app.origin, 'http://example.org^appId=42');
 
   // Just browser.
   var exampleOrg_browser = ssm.createCodebasePrincipal(makeURI('http://example.org'), {inBrowser: true});
   var nullPrin_browser = ssm.createNullPrincipal({inBrowser: true});
-  checkOriginAttributes(exampleOrg_browser, {inBrowser: true}, '!inBrowser=1');
-  checkOriginAttributes(nullPrin_browser, {inBrowser: true}, '!inBrowser=1');
-  do_check_eq(exampleOrg_browser.origin, 'http://example.org!inBrowser=1');
+  checkOriginAttributes(exampleOrg_browser, {inBrowser: true}, '^inBrowser=1');
+  checkOriginAttributes(nullPrin_browser, {inBrowser: true}, '^inBrowser=1');
+  do_check_eq(exampleOrg_browser.origin, 'http://example.org^inBrowser=1');
 
   // App and browser.
   var exampleOrg_appBrowser = ssm.createCodebasePrincipal(makeURI('http://example.org'), {inBrowser: true, appId: 42});
   var nullPrin_appBrowser = ssm.createNullPrincipal({inBrowser: true, appId: 42});
-  checkOriginAttributes(exampleOrg_appBrowser, {appId: 42, inBrowser: true}, '!appId=42&inBrowser=1');
-  checkOriginAttributes(nullPrin_appBrowser, {appId: 42, inBrowser: true}, '!appId=42&inBrowser=1');
-  do_check_eq(exampleOrg_appBrowser.origin, 'http://example.org!appId=42&inBrowser=1');
+  checkOriginAttributes(exampleOrg_appBrowser, {appId: 42, inBrowser: true}, '^appId=42&inBrowser=1');
+  checkOriginAttributes(nullPrin_appBrowser, {appId: 42, inBrowser: true}, '^appId=42&inBrowser=1');
+  do_check_eq(exampleOrg_appBrowser.origin, 'http://example.org^appId=42&inBrowser=1');
 
   // App and browser, different domain.
   var exampleCom_appBrowser = ssm.createCodebasePrincipal(makeURI('https://www.example.com:123'), {appId: 42, inBrowser: true});
-  checkOriginAttributes(exampleCom_appBrowser, {appId: 42, inBrowser: true}, '!appId=42&inBrowser=1');
-  do_check_eq(exampleCom_appBrowser.origin, 'https://www.example.com:123!appId=42&inBrowser=1');
+  checkOriginAttributes(exampleCom_appBrowser, {appId: 42, inBrowser: true}, '^appId=42&inBrowser=1');
+  do_check_eq(exampleCom_appBrowser.origin, 'https://www.example.com:123^appId=42&inBrowser=1');
 
   // Addon.
   var exampleOrg_addon = ssm.createCodebasePrincipal(makeURI('http://example.org'), {addonId: 'dummy'});
-  checkOriginAttributes(exampleOrg_addon, { addonId: "dummy" }, '!addonId=dummy');
-  do_check_eq(exampleOrg_addon.origin, 'http://example.org!addonId=dummy');
+  checkOriginAttributes(exampleOrg_addon, { addonId: "dummy" }, '^addonId=dummy');
+  do_check_eq(exampleOrg_addon.origin, 'http://example.org^addonId=dummy');
+
+  // Make sure that we refuse to create .origin for principals with UNKNOWN_APP_ID.
+  var simplePrin = ssm.getSimpleCodebasePrincipal(makeURI('http://example.com'));
+  try { simplePrin.origin; do_check_true(false); } catch (e) { do_check_true(true); }
 
   // Check that all of the above are cross-origin.
   checkCrossOrigin(exampleOrg_app, exampleOrg);

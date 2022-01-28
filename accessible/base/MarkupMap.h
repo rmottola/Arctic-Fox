@@ -103,6 +103,10 @@ MARKUPMAP(li,
           New_HTMLListitem,
           0)
 
+MARKUPMAP(map,
+          nullptr,
+          roles::TEXT_CONTAINER)
+
 MARKUPMAP(math,
           New_HyperText,
           roles::MATHML_MATH)
@@ -205,22 +209,22 @@ MARKUPMAP(mmultiscripts_,
           roles::MATHML_MULTISCRIPTS)
 
 MARKUPMAP(mtable_,
-          New_HyperText,
+          New_HTMLTableAccessible,
           roles::MATHML_TABLE,
           AttrFromDOM(align, align),
           AttrFromDOM(columnlines_, columnlines_),
           AttrFromDOM(rowlines_, rowlines_))
 
 MARKUPMAP(mlabeledtr_,
-          New_HyperText,
+          New_HTMLTableRowAccessible,
           roles::MATHML_LABELED_ROW)
 
 MARKUPMAP(mtr_,
-          New_HyperText,
+          New_HTMLTableRowAccessible,
           roles::MATHML_TABLE_ROW)
 
 MARKUPMAP(mtd_,
-          New_HyperText,
+          New_HTMLTableCellAccessible,
           roles::MATHML_CELL)
 
 MARKUPMAP(maction_,
@@ -232,18 +236,6 @@ MARKUPMAP(maction_,
 MARKUPMAP(merror_,
           New_HyperText,
           roles::MATHML_ERROR)
-
-MARKUPMAP(semantics_,
-          New_HyperText,
-          roles::MATHML_SEMANTICS)
-
-MARKUPMAP(annotation_,
-          New_HyperText,
-          roles::MATHML_ANNOTATION)
-
-MARKUPMAP(annotation_xml_,
-          New_HyperText,
-          roles::MATHML_XML_ANNOTATION)
 
 MARKUPMAP(mstack_,
           New_HyperText,
@@ -303,6 +295,10 @@ MARKUPMAP(output,
           New_HTMLOutput,
           roles::SECTION,
           Attr(live, polite))
+
+MARKUPMAP(p,
+          nullptr,
+          roles::PARAGRAPH)
 
 MARKUPMAP(progress,
           New_HTMLProgress,

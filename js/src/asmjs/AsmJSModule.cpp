@@ -289,7 +289,7 @@ AsmJSModule::finish(ExclusiveContext* cx, TokenStream& tokenStream, MacroAssembl
 
     uint32_t endBeforeCurly = tokenStream.currentToken().pos.end;
     TokenPos pos;
-    if (!tokenStream.peekTokenPos(&pos))
+    if (!tokenStream.peekTokenPos(&pos, TokenStream::Operand))
         return false;
     uint32_t endAfterCurly = pos.end;
     MOZ_ASSERT(endBeforeCurly >= srcBodyStart_);
@@ -538,6 +538,12 @@ TryEnablingJit(JSContext* cx, AsmJSModule& module, HandleFunction fun, uint32_t 
         MOZ_ASSERT(!script->hasIonScript());
         return true;
     }
+
+    // Don't enable jit entry when we have a pending ion builder.
+    // Take the interpreter path which will link it and enable
+    // the fast path on the next call.
+    if (script->baselineScript()->hasPendingIonBuilder())
+        return true;
 
     // Currently we can't rectify arguments. Therefore disabling if argc is too low.
     if (fun->nargs() > size_t(argc))
@@ -2054,7 +2060,7 @@ class ModuleChars
 
     static uint32_t endOffset(AsmJSParser& parser) {
         TokenPos pos(0, 0);  // initialize to silence GCC warning
-        MOZ_ALWAYS_TRUE(parser.tokenStream.peekTokenPos(&pos));
+        MOZ_ALWAYS_TRUE(parser.tokenStream.peekTokenPos(&pos, TokenStream::Operand));
         return pos.end;
     }
 };

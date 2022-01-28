@@ -93,6 +93,16 @@ add_task(function*() {
     blocklistURL: "http://example.com/addon9@tests.mozilla.org",
     name: "Test add-on 9",
     blocklistState: Ci.nsIBlocklistService.STATE_VULNERABLE_NO_UPDATE,
+  }, {
+    id: "addon10@tests.mozilla.org",
+    name: "Test add-on 10",
+    signedState: AddonManager.SIGNEDSTATE_MISSING,
+  }, {
+    id: "addon11@tests.mozilla.org",
+    name: "Test add-on 11",
+    signedState: AddonManager.SIGNEDSTATE_MISSING,
+    isActive: false,
+    appDisabled: true,
   }]);
 
   gManagerWindow = yield open_manager(null);
@@ -674,6 +684,44 @@ add_test(function() {
     is(a2.pendingOperations, 0, "Add-on 1 should not have any pending operations");
     is(a4.pendingOperations, 0, "Add-on 1 should not have any pending operations");
 
+    info("Addon 10");
+    addon = items["Test add-on 10"];
+    addon.parentNode.ensureElementIsVisible(addon);
+    is(get_node(addon, "name").value, "Test add-on 10", "Name should be correct");
+
+    is_element_hidden(get_node(addon, "preferences-btn"), "Preferences button should be hidden");
+    is_element_hidden(get_node(addon, "enable-btn"), "Enable button should be hidden");
+    is_element_visible(get_node(addon, "disable-btn"), "Disable button should be visible");
+    is_element_visible(get_node(addon, "remove-btn"), "Remove button should be visible");
+
+    is_element_visible(get_node(addon, "warning"), "Warning message should be visible");
+    is(get_node(addon, "warning").textContent, "Test add-on 10 could not be verified for use in " + gApp + ". Proceed with caution.", "Warning message should be correct");
+    is_element_visible(get_node(addon, "warning-link"), "Warning link should be visible");
+    is(get_node(addon, "warning-link").value, "More Information", "Warning link text should be correct");
+    is(get_node(addon, "warning-link").href, Services.prefs.getCharPref("xpinstall.signatures.infoURL"), "Warning link should be correct");
+    is_element_hidden(get_node(addon, "error"), "Error message should be hidden");
+    is_element_hidden(get_node(addon, "error-link"), "Error link should be hidden");
+    is_element_hidden(get_node(addon, "pending"), "Pending message should be hidden");
+
+    info("Addon 11");
+    addon = items["Test add-on 11"];
+    addon.parentNode.ensureElementIsVisible(addon);
+    is(get_node(addon, "name").value, "Test add-on 11", "Name should be correct");
+
+    is_element_hidden(get_node(addon, "preferences-btn"), "Preferences button should be hidden");
+    is_element_hidden(get_node(addon, "enable-btn"), "Enable button should be hidden");
+    is_element_hidden(get_node(addon, "disable-btn"), "Disable button should be hidden");
+    is_element_visible(get_node(addon, "remove-btn"), "Remove button should be visible");
+
+    is_element_hidden(get_node(addon, "warning"), "Warning message should be hidden");
+    is_element_hidden(get_node(addon, "warning-link"), "Warning link should be hidden");
+    is_element_visible(get_node(addon, "error"), "Error message should be visible");
+    is(get_node(addon, "error").textContent, "Test add-on 11 could not be verified for use in " + gApp + " and has been disabled.", "Error message should be correct");
+    is_element_visible(get_node(addon, "error-link"), "Error link should be visible");
+    is(get_node(addon, "error-link").value, "More Information", "Error link text should be correct");
+    is(get_node(addon, "error-link").href, Services.prefs.getCharPref("xpinstall.signatures.infoURL"), "Error link should be correct");
+    is_element_hidden(get_node(addon, "pending"), "Pending message should be hidden");
+
     run_next_test();
   });
 });
@@ -701,7 +749,7 @@ add_task(function*() {
   }]);
 
   let items = get_test_items();
-  is(Object.keys(items).length, 9, "Should be nine add-ons installed");
+  is(Object.keys(items).length, 11, "Should be the right number of add-ons installed");
 
   let addon = items["Test add-on replacement"];
   addon.parentNode.ensureElementIsVisible(addon);

@@ -33,15 +33,15 @@ class Symbol : public js::gc::TenuredCell
     // the minimum size on both.
     uint64_t unused2_;
 
-    Symbol(SymbolCode code, JSAtom *desc)
+    Symbol(SymbolCode code, JSAtom* desc)
         : code_(code), description_(desc)
     {
         // Silence warnings about unused2 being... unused.
         (void)unused2_;
     }
 
-    Symbol(const Symbol &) = delete;
-    void operator=(const Symbol &) = delete;
+    Symbol(const Symbol&) = delete;
+    void operator=(const Symbol&) = delete;
 
     static Symbol*
     newInternal(js::ExclusiveContext* cx, SymbolCode code, JSAtom* description);
@@ -50,7 +50,7 @@ class Symbol : public js::gc::TenuredCell
     static Symbol* new_(js::ExclusiveContext* cx, SymbolCode code, JSString* description);
     static Symbol* for_(js::ExclusiveContext* cx, js::HandleString description);
 
-    JSAtom *description() const { return description_; }
+    JSAtom* description() const { return description_; }
     SymbolCode code() const { return code_; }
 
     bool isWellKnownSymbol() const { return uint32_t(code_) < WellKnownSymbolLimit; }

@@ -104,15 +104,21 @@
 #include "nsDOMMutationObserver.h"
 #include "GeometryUtils.h"
 #include "nsIAnimationObserver.h"
+#include "nsChildContentList.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
+
+nsINode::nsSlots::nsSlots()
+  : mWeakReference(nullptr),
+    mEditableDescendantCount(0)
+{
+}
 
 nsINode::nsSlots::~nsSlots()
 {
   if (mChildNodes) {
     mChildNodes->DropReference();
-    NS_RELEASE(mChildNodes);
   }
 
   if (mWeakReference) {
@@ -132,7 +138,6 @@ nsINode::nsSlots::Unlink()
 {
   if (mChildNodes) {
     mChildNodes->DropReference();
-    NS_RELEASE(mChildNodes);
   }
 }
 
@@ -370,9 +375,6 @@ nsINode::ChildNodes()
   nsSlots* slots = Slots();
   if (!slots->mChildNodes) {
     slots->mChildNodes = new nsChildContentList(this);
-    if (slots->mChildNodes) {
-      NS_ADDREF(slots->mChildNodes);
-    }
   }
 
   return slots->mChildNodes;
@@ -419,6 +421,36 @@ nsINode::IsInAnonymousSubtree() const
   }
 
   return AsContent()->IsInAnonymousSubtree();
+}
+
+std::ostream&
+operator<<(std::ostream& aStream, const nsINode& aNode)
+{
+  nsAutoString elemDesc;
+  const nsINode* curr = &aNode;
+  while (curr) {
+    const nsString& localName = curr->LocalName();
+    nsString id;
+    if (curr->IsElement()) {
+      curr->AsElement()->GetId(id);
+    }
+
+    if (!elemDesc.IsEmpty()) {
+      elemDesc = elemDesc + NS_LITERAL_STRING(".");
+    }
+
+    elemDesc = elemDesc + localName;
+
+    if (!id.IsEmpty()) {
+      elemDesc = elemDesc + NS_LITERAL_STRING("['") + id +
+                 NS_LITERAL_STRING("']");
+    }
+
+    curr = curr->GetParentNode();
+  }
+
+  NS_ConvertUTF16toUTF8 str(elemDesc);
+  return aStream << str.get();
 }
 
 bool
@@ -2994,4 +3026,13 @@ nsINode::AddAnimationObserverUnlessExists(
 {
   AddMutationObserverUnlessExists(aAnimationObserver);
   OwnerDoc()->SetMayHaveAnimationObservers();
+}
+
+bool
+nsINode::HasApzAwareListeners() const
+{
+  if (NodeMayHaveApzAwareListeners()) {
+    return EventTarget::HasApzAwareListeners();
+  }
+  return false;
 }

@@ -106,7 +106,7 @@ Event::ConstructorInit(EventTarget* aOwner,
           ...
         }
      */
-    mEvent = new WidgetEvent(false, 0);
+    mEvent = new WidgetEvent(false, NS_EVENT_NULL);
     mEvent->time = PR_Now();
   }
 
@@ -265,12 +265,12 @@ Event::GetType(nsAString& aType)
     aType = mEvent->typeString;
     return NS_OK;
   }
-  const char* name = GetEventName(mEvent->message);
+  const char* name = GetEventName(mEvent->mMessage);
 
   if (name) {
     CopyASCIItoUTF16(name, aType);
     return NS_OK;
-  } else if (mEvent->message == NS_USER_DEFINED_EVENT && mEvent->userType) {
+  } else if (mEvent->mMessage == NS_USER_DEFINED_EVENT && mEvent->userType) {
     aType = Substring(nsDependentAtomString(mEvent->userType), 2); // Remove "on"
     mEvent->typeString = aType;
     return NS_OK;
@@ -482,6 +482,13 @@ Event::StopImmediatePropagation()
 }
 
 NS_IMETHODIMP
+Event::StopCrossProcessForwarding()
+{
+  mEvent->mFlags.mNoCrossProcessBoundaryForwarding = true;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 Event::GetIsTrusted(bool* aIsTrusted)
 {
   *aIsTrusted = IsTrusted();
@@ -556,11 +563,11 @@ Event::SetEventType(const nsAString& aEventTypeArg)
   if (mIsMainThreadEvent) {
     mEvent->typeString.Truncate();
     mEvent->userType =
-      nsContentUtils::GetEventIdAndAtom(aEventTypeArg, mEvent->mClass,
-                                        &(mEvent->message));
+      nsContentUtils::GetEventMessageAndAtom(aEventTypeArg, mEvent->mClass,
+                                             &(mEvent->mMessage));
   } else {
     mEvent->userType = nullptr;
-    mEvent->message = NS_USER_DEFINED_EVENT;
+    mEvent->mMessage = NS_USER_DEFINED_EVENT;
     mEvent->typeString = aEventTypeArg;
   }
 }
@@ -708,7 +715,7 @@ Event::GetEventPopupControlState(WidgetEvent* aEvent, nsIDOMEvent* aDOMEvent)
     // triggered while handling user input. See
     // nsPresShell::HandleEventInternal() for details.
     if (EventStateManager::IsHandlingUserInput()) {
-      switch(aEvent->message) {
+      switch(aEvent->mMessage) {
       case NS_FORM_SELECTED :
         if (PopupAllowedForEvent("select")) {
           abuse = openControlled;
@@ -719,6 +726,8 @@ Event::GetEventPopupControlState(WidgetEvent* aEvent, nsIDOMEvent* aDOMEvent)
           abuse = openControlled;
         }
         break;
+      default:
+        break;
       }
     }
     break;
@@ -727,11 +736,13 @@ Event::GetEventPopupControlState(WidgetEvent* aEvent, nsIDOMEvent* aDOMEvent)
     // while handling user input. See
     // nsPresShell::HandleEventInternal() for details.
     if (EventStateManager::IsHandlingUserInput()) {
-      switch(aEvent->message) {
+      switch(aEvent->mMessage) {
       case NS_EDITOR_INPUT:
         if (PopupAllowedForEvent("input")) {
           abuse = openControlled;
         }
+        break;
+      default:
         break;
       }
     }
@@ -741,7 +752,7 @@ Event::GetEventPopupControlState(WidgetEvent* aEvent, nsIDOMEvent* aDOMEvent)
     // while handling user input. See
     // nsPresShell::HandleEventInternal() for details.
     if (EventStateManager::IsHandlingUserInput()) {
-      switch(aEvent->message) {
+      switch(aEvent->mMessage) {
       case NS_FORM_CHANGE :
         if (PopupAllowedForEvent("change")) {
           abuse = openControlled;
@@ -750,13 +761,15 @@ Event::GetEventPopupControlState(WidgetEvent* aEvent, nsIDOMEvent* aDOMEvent)
       case NS_XUL_COMMAND:
         abuse = openControlled;
         break;
+      default:
+        break;
       }
     }
     break;
   case eKeyboardEventClass:
     if (aEvent->mFlags.mIsTrusted) {
       uint32_t key = aEvent->AsKeyboardEvent()->keyCode;
-      switch(aEvent->message) {
+      switch(aEvent->mMessage) {
       case NS_KEY_PRESS :
         // return key on focused button. see note at NS_MOUSE_CLICK.
         if (key == nsIDOMKeyEvent::DOM_VK_RETURN) {
@@ -778,12 +791,14 @@ Event::GetEventPopupControlState(WidgetEvent* aEvent, nsIDOMEvent* aDOMEvent)
           abuse = openControlled;
         }
         break;
+      default:
+        break;
       }
     }
     break;
   case eTouchEventClass:
     if (aEvent->mFlags.mIsTrusted) {
-      switch (aEvent->message) {
+      switch (aEvent->mMessage) {
       case NS_TOUCH_START :
         if (PopupAllowedForEvent("touchstart")) {
           abuse = openControlled;
@@ -794,13 +809,15 @@ Event::GetEventPopupControlState(WidgetEvent* aEvent, nsIDOMEvent* aDOMEvent)
           abuse = openControlled;
         }
         break;
+      default:
+        break;
       }
     }
     break;
   case eMouseEventClass:
     if (aEvent->mFlags.mIsTrusted &&
         aEvent->AsMouseEvent()->button == WidgetMouseEvent::eLeftButton) {
-      switch(aEvent->message) {
+      switch(aEvent->mMessage) {
       case NS_MOUSE_BUTTON_UP :
         if (PopupAllowedForEvent("mouseup")) {
           abuse = openControlled;
@@ -825,6 +842,8 @@ Event::GetEventPopupControlState(WidgetEvent* aEvent, nsIDOMEvent* aDOMEvent)
           abuse = openControlled;
         }
         break;
+      default:
+        break;
       }
     }
     break;
@@ -833,7 +852,7 @@ Event::GetEventPopupControlState(WidgetEvent* aEvent, nsIDOMEvent* aDOMEvent)
     // triggered while handling user input. See
     // nsPresShell::HandleEventInternal() for details.
     if (EventStateManager::IsHandlingUserInput()) {
-      switch(aEvent->message) {
+      switch(aEvent->mMessage) {
       case NS_FORM_SUBMIT :
         if (PopupAllowedForEvent("submit")) {
           abuse = openControlled;
@@ -843,6 +862,8 @@ Event::GetEventPopupControlState(WidgetEvent* aEvent, nsIDOMEvent* aDOMEvent)
         if (PopupAllowedForEvent("reset")) {
           abuse = openControlled;
         }
+        break;
+      default:
         break;
       }
     }
@@ -1031,7 +1052,7 @@ Event::GetOffsetCoords(nsPresContext* aPresContext,
 // logic for handling user-defined events).
 // static
 const char*
-Event::GetEventName(uint32_t aEventType)
+Event::GetEventName(EventMessage aEventType)
 {
   switch(aEventType) {
 #define ID_TO_EVENT(name_, _id, _type, _struct) \
@@ -1277,14 +1298,11 @@ Event::SetCancelBubble(bool aCancelBubble)
 using namespace mozilla;
 using namespace mozilla::dom;
 
-nsresult
-NS_NewDOMEvent(nsIDOMEvent** aInstancePtrResult,
-               EventTarget* aOwner,
+already_AddRefed<Event>
+NS_NewDOMEvent(EventTarget* aOwner,
                nsPresContext* aPresContext,
                WidgetEvent* aEvent) 
 {
-  Event* it = new Event(aOwner, aPresContext, aEvent);
-  NS_ADDREF(it);
-  *aInstancePtrResult = static_cast<Event*>(it);
-  return NS_OK;
+  nsRefPtr<Event> it = new Event(aOwner, aPresContext, aEvent);
+  return it.forget();
 }

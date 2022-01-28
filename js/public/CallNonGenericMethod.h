@@ -24,8 +24,7 @@ namespace detail {
 
 // DON'T CALL THIS DIRECTLY.  It's for use only by CallNonGenericMethod!
 extern JS_PUBLIC_API(bool)
-CallMethodIfWrapped(JSContext* cx, IsAcceptableThis test, NativeImpl impl,
-                    const CallArgs& args);
+CallMethodIfWrapped(JSContext* cx, IsAcceptableThis test, NativeImpl impl, const CallArgs& args);
 
 } // namespace detail
 
@@ -104,8 +103,7 @@ CallNonGenericMethod(JSContext* cx, const CallArgs& args)
 }
 
 MOZ_ALWAYS_INLINE bool
-CallNonGenericMethod(JSContext* cx, IsAcceptableThis Test, NativeImpl Impl,
-                     const CallArgs& args)
+CallNonGenericMethod(JSContext* cx, IsAcceptableThis Test, NativeImpl Impl, const CallArgs& args)
 {
     HandleValue thisv = args.thisv();
     if (Test(thisv))

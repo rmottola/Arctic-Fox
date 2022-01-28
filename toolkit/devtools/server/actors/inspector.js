@@ -1411,6 +1411,7 @@ var WalkerActor = protocol.ActorClass({
     // Create the observer on the node's actor.  The node will make sure
     // the observer is cleaned up when the actor is released.
     actor.observer = new actor.rawNode.defaultView.MutationObserver(this.onMutations);
+    actor.observer.mergeAttributeRecords = true;
     actor.observer.observe(node, {
       attributes: true,
       characterData: true,

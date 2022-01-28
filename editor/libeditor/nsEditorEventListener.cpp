@@ -369,7 +369,7 @@ nsEditorEventListener::HandleEvent(nsIDOMEvent* aEvent)
   //       calling it, this queries the specific interface.  If it would fail,
   //       each event handler would just ignore the event.  So, in this method,
   //       you don't need to check if the QI succeeded before each call.
-  switch (internalEvent->message) {
+  switch (internalEvent->mMessage) {
     // dragenter
     case NS_DRAGDROP_ENTER: {
       nsCOMPtr<nsIDOMDragEvent> dragEvent = do_QueryInterface(aEvent);
@@ -469,6 +469,8 @@ nsEditorEventListener::HandleEvent(nsIDOMEvent* aEvent)
     case NS_COMPOSITION_END:
       HandleEndComposition(aEvent);
       return NS_OK;
+    default:
+      break;
   }
 
   nsAutoString eventType;

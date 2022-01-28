@@ -25,6 +25,7 @@
 #include "mozilla/RefPtr.h"             // for already_AddRefed
 #include "mozilla/StyleAnimationValue.h" // for StyleAnimationValue, etc
 #include "mozilla/TimeStamp.h"          // for TimeStamp, TimeDuration
+#include "mozilla/UniquePtr.h"          // for UniquePtr
 #include "mozilla/gfx/BaseMargin.h"     // for BaseMargin
 #include "mozilla/gfx/BasePoint.h"      // for BasePoint
 #include "mozilla/gfx/Point.h"          // for IntSize
@@ -60,15 +61,15 @@ class StyleAnimationValue;
 
 namespace gl {
 class GLContext;
-}
+} // namespace gl
 
 namespace gfx {
 class DrawTarget;
-}
+} // namespace gfx
 
 namespace dom {
 class OverfillCallback;
-}
+} // namespace dom
 
 namespace layers {
 
@@ -784,7 +785,7 @@ public:
      * If this is set then this layer is part of a preserve-3d group, and should
      * be sorted with sibling layers that are also part of the same group.
      */
-    CONTENT_PRESERVE_3D = 0x08,
+    CONTENT_EXTEND_3D_CONTEXT = 0x08,
     /**
      * This indicates that the transform may be changed on during an empty
      * transaction where there is no possibility of redrawing the content, so the
@@ -796,7 +797,21 @@ public:
      * Disable subpixel AA for this layer. This is used if the display isn't suited
      * for subpixel AA like hidpi or rotated content.
      */
-    CONTENT_DISABLE_SUBPIXEL_AA = 0x20
+    CONTENT_DISABLE_SUBPIXEL_AA = 0x20,
+
+    /**
+     * If this is set then the layer contains content that may look objectionable
+     * if not handled as an active layer (such as text with an animated transform).
+     * This is for internal layout/FrameLayerBuilder usage only until flattening
+     * code is obsoleted. See bug 633097
+     */
+    CONTENT_DISABLE_FLATTENING = 0x40,
+
+    /**
+     * This layer is hidden if the backface of the layer is visible
+     * to user.
+     */
+    CONTENT_BACKFACE_HIDDEN = 0x80
   };
   /**
    * CONSTRUCTION PHASE ONLY
@@ -1143,36 +1158,37 @@ public:
 
   /**
    * CONSTRUCTION PHASE ONLY
-   * If a layer is "fixed position", this determines which point on the layer
-   * is considered the "anchor" point, that is, the point which remains in the
-   * same position when compositing the layer tree with a transformation
-   * (such as when asynchronously scrolling and zooming).
+   * If a layer represents a fixed position element, this data is stored on the
+   * layer for use by the compositor.
+   *
+   *   - |aScrollId| identifies the scroll frame that this element is fixed
+   *     with respect to.
+   *
+   *   - |aAnchor| is the point on the layer that is considered the "anchor"
+   *     point, that is, the point which remains in the same position when
+   *     compositing the layer tree with a transformation (such as when
+   *     asynchronously scrolling and zooming).
+   *
+   *   - |aIsClipFixed| is true if this layer's clip rect and mask layer
+   *     should also remain fixed during async scrolling/animations.
+   *     This is the case for fixed position layers, but not for
+   *     fixed background layers.
    */
-  void SetFixedPositionAnchor(const LayerPoint& aAnchor)
+  void SetFixedPositionData(FrameMetrics::ViewID aScrollId,
+                            const LayerPoint& aAnchor,
+                            bool aIsClipFixed)
   {
-    if (mAnchor != aAnchor) {
-      MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) FixedPositionAnchor", this));
-      mAnchor = aAnchor;
-      Mutated();
-    }
-  }
-
-  /**
-   * CONSTRUCTION PHASE ONLY
-   * If a layer represents a fixed position element or elements that are on
-   * a document that has had fixed position element margins set on it, these
-   * will be mirrored here. This allows for asynchronous animation of the
-   * margins by reconciling the difference between this value and a value that
-   * is updated more frequently.
-   * If the left or top margins are negative, it means that the elements this
-   * layer represents are auto-positioned, and so fixed position margins should
-   * not have an effect on the corresponding axis.
-   */
-  void SetFixedPositionMargins(const LayerMargin& aMargins)
-  {
-    if (mMargins != aMargins) {
-      MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) FixedPositionMargins", this));
-      mMargins = aMargins;
+    if (!mFixedPositionData ||
+        mFixedPositionData->mScrollId != aScrollId ||
+        mFixedPositionData->mAnchor != aAnchor ||
+        mFixedPositionData->mIsClipFixed != aIsClipFixed) {
+      MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) FixedPositionData", this));
+      if (!mFixedPositionData) {
+        mFixedPositionData = MakeUnique<FixedPositionData>();
+      }
+      mFixedPositionData->mScrollId = aScrollId;
+      mFixedPositionData->mAnchor = aAnchor;
+      mFixedPositionData->mIsClipFixed = aIsClipFixed;
       Mutated();
     }
   }
@@ -1264,8 +1280,9 @@ public:
   virtual float GetPostYScale() const { return mPostYScale; }
   bool GetIsFixedPosition() { return mIsFixedPosition; }
   bool GetIsStickyPosition() { return mStickyPositionData; }
-  LayerPoint GetFixedPositionAnchor() { return mAnchor; }
-  const LayerMargin& GetFixedPositionMargins() { return mMargins; }
+  FrameMetrics::ViewID GetFixedPositionScrollContainerId() { return mFixedPositionData ? mFixedPositionData->mScrollId : FrameMetrics::NULL_SCROLL_ID; }
+  LayerPoint GetFixedPositionAnchor() { return mFixedPositionData ? mFixedPositionData->mAnchor : LayerPoint(); }
+  bool IsClipFixed() { return mFixedPositionData ? mFixedPositionData->mIsClipFixed : false; }
   FrameMetrics::ViewID GetStickyScrollContainerId() { return mStickyPositionData->mScrollId; }
   const LayerRect& GetStickyScrollRangeOuter() { return mStickyPositionData->mOuter; }
   const LayerRect& GetStickyScrollRangeInner() { return mStickyPositionData->mInner; }
@@ -1452,6 +1469,26 @@ public:
   // accounting for this layer possibly being a shadow.
   const Maybe<ParentLayerIntRect>& GetEffectiveClipRect();
   const nsIntRegion& GetEffectiveVisibleRegion();
+
+  bool Extend3DContext() {
+    return GetContentFlags() & CONTENT_EXTEND_3D_CONTEXT;
+  }
+  bool Is3DContextLeaf() {
+    return !Extend3DContext() && GetParent() &&
+      reinterpret_cast<Layer*>(GetParent())->Extend3DContext();
+  }
+  /**
+   * It is true if the user can see the back of the layer and the
+   * backface is hidden.  The compositor should skip the layer if the
+   * result is true.
+   */
+  bool IsBackfaceHidden();
+  bool IsVisible() {
+    // For containers extending 3D context, visible region
+    // is meaningless, since they are just intermediate result of
+    // content.
+    return !GetEffectiveVisibleRegion().IsEmpty() || Extend3DContext();
+  }
 
   /**
    * Returns the product of the opacities of this layer and all ancestors up
@@ -1670,6 +1707,20 @@ public:
 #endif
   }
 
+  /**
+   * Replace the current effective transform with the given one,
+   * returning the old one.  This is currently added as a hack for VR
+   * rendering, and might go away if we find a better way to do this.
+   * If you think you have a need for this method, talk with
+   * vlad/mstange/mwoodrow first.
+   */
+  virtual gfx::Matrix4x4 ReplaceEffectiveTransform(const gfx::Matrix4x4& aNewEffectiveTransform) {
+    gfx::Matrix4x4 old = mEffectiveTransform;
+    mEffectiveTransform = aNewEffectiveTransform;
+    ComputeEffectiveTransformForMaskLayers(mEffectiveTransform);
+    return old;
+  }
+
 protected:
   Layer(LayerManager* aManager, void* aImplData);
 
@@ -1752,8 +1803,12 @@ protected:
   uint32_t mContentFlags;
   bool mUseTileSourceRect;
   bool mIsFixedPosition;
-  LayerPoint mAnchor;
-  LayerMargin mMargins;
+  struct FixedPositionData {
+    FrameMetrics::ViewID mScrollId;
+    LayerPoint mAnchor;
+    bool mIsClipFixed;
+  };
+  UniquePtr<FixedPositionData> mFixedPositionData;
   struct StickyPositionData {
     FrameMetrics::ViewID mScrollId;
     LayerRect mOuter;
@@ -1833,8 +1888,16 @@ public:
                  "Residual transform can only be a translation");
     if (!gfx::ThebesPoint(residual.GetTranslation()).WithinEpsilonOf(mResidualTranslation, 1e-3f)) {
       mResidualTranslation = gfx::ThebesPoint(residual.GetTranslation());
-      NS_ASSERTION(-0.5 <= mResidualTranslation.x && mResidualTranslation.x < 0.5 &&
-                   -0.5 <= mResidualTranslation.y && mResidualTranslation.y < 0.5,
+      DebugOnly<mozilla::gfx::Point> transformedOrig =
+        idealTransform * mozilla::gfx::Point();
+#ifdef DEBUG
+      DebugOnly<mozilla::gfx::Point> transformed =
+        idealTransform * mozilla::gfx::Point(mResidualTranslation.x,
+                                             mResidualTranslation.y) -
+        *&transformedOrig;
+#endif
+      NS_ASSERTION(-0.5 <= (&transformed)->x && (&transformed)->x < 0.5 &&
+                   -0.5 <= (&transformed)->y && (&transformed)->y < 0.5,
                    "Residual translation out of range");
       mValidRegion.SetEmpty();
     }
@@ -2058,11 +2121,28 @@ public:
   void SetVRHMDInfo(gfx::VRHMDInfo* aHMD) { mHMDInfo = aHMD; }
   gfx::VRHMDInfo* GetVRHMDInfo() { return mHMDInfo; }
 
+  /**
+   * Replace the current effective transform with the given one,
+   * returning the old one.  This is currently added as a hack for VR
+   * rendering, and might go away if we find a better way to do this.
+   * If you think you have a need for this method, talk with
+   * vlad/mstange/mwoodrow first.
+   */
+  gfx::Matrix4x4 ReplaceEffectiveTransform(const gfx::Matrix4x4& aNewEffectiveTransform) override {
+    gfx::Matrix4x4 old = mEffectiveTransform;
+    mEffectiveTransform = aNewEffectiveTransform;
+    ComputeEffectiveTransformsForChildren(mEffectiveTransform);
+    ComputeEffectiveTransformForMaskLayers(mEffectiveTransform);
+    return old;
+  }
+
 protected:
   friend class ReadbackProcessor;
 
   void DidInsertChild(Layer* aLayer);
   void DidRemoveChild(Layer* aLayer);
+
+  void Collect3DContextLeaves(nsTArray<Layer*>& aToSort);
 
   ContainerLayer(LayerManager* aManager, void* aImplData);
 
@@ -2088,6 +2168,12 @@ protected:
   virtual void PrintInfo(std::stringstream& aStream, const char* aPrefix) override;
 
   virtual void DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent) override;
+
+  /**
+   * True for if the container start a new 3D context extended by one
+   * or more children.
+   */
+  bool Creates3DContextWithExtendingChildren();
 
   Layer* mFirstChild;
   Layer* mLastChild;
@@ -2262,6 +2348,8 @@ public:
     mPreTransCallback = callback;
     mPreTransCallbackData = closureData;
   }
+
+  const nsIntRect& GetBounds() const { return mBounds; }
 
 protected:
   void FirePreTransactionCallback()

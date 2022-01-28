@@ -1383,12 +1383,11 @@ nsNSSCertificateDB::FindCertByEmailAddress(nsISupports *aToken, const char *aEma
   }
 
   // node now contains the first valid certificate with correct usage 
-  nsNSSCertificate *nssCert = nsNSSCertificate::Create(node->cert);
+  nsRefPtr<nsNSSCertificate> nssCert = nsNSSCertificate::Create(node->cert);
   if (!nssCert)
     return NS_ERROR_OUT_OF_MEMORY;
 
-  NS_ADDREF(nssCert);
-  *_retval = static_cast<nsIX509Cert*>(nssCert);
+  nssCert.forget(_retval);
   return NS_OK;
 }
 
@@ -1693,8 +1692,7 @@ nsNSSCertificateDB::GetCerts(nsIX509CertList **_retval)
   // (returns an empty list) 
   nssCertList = new nsNSSCertList(certList, locker);
 
-  *_retval = nssCertList;
-  NS_ADDREF(*_retval);
+  nssCertList.forget(_retval);
   return NS_OK;
 }
 
@@ -1702,16 +1700,17 @@ NS_IMETHODIMP
 nsNSSCertificateDB::VerifyCertNow(nsIX509Cert* aCert,
                                   int64_t /*SECCertificateUsage*/ aUsage,
                                   uint32_t aFlags,
-                                  nsIX509CertList** verifiedChain,
+                                  const char* aHostname,
+                                  nsIX509CertList** aVerifiedChain,
                                   bool* aHasEVPolicy,
                                   int32_t* /*PRErrorCode*/ _retval )
 {
   NS_ENSURE_ARG_POINTER(aCert);
   NS_ENSURE_ARG_POINTER(aHasEVPolicy);
-  NS_ENSURE_ARG_POINTER(verifiedChain);
+  NS_ENSURE_ARG_POINTER(aVerifiedChain);
   NS_ENSURE_ARG_POINTER(_retval);
 
-  *verifiedChain = nullptr;
+  *aVerifiedChain = nullptr;
   *aHasEVPolicy = false;
   *_retval = PR_UNKNOWN_ERROR;
 
@@ -1736,13 +1735,25 @@ nsNSSCertificateDB::VerifyCertNow(nsIX509Cert* aCert,
   SECOidTag evOidPolicy;
   SECStatus srv;
 
-  srv = certVerifier->VerifyCert(nssCert, aUsage, mozilla::pkix::Now(),
-                                 nullptr, // Assume no context
-                                 nullptr, // hostname
-                                 aFlags,
-                                 nullptr, // stapledOCSPResponse
-                                 &resultChain,
-                                 &evOidPolicy);
+  if (aHostname && aUsage == certificateUsageSSLServer) {
+    srv = certVerifier->VerifySSLServerCert(nssCert,
+                                            nullptr, // stapledOCSPResponse
+                                            mozilla::pkix::Now(),
+                                            nullptr, // Assume no context
+                                            aHostname,
+                                            false, // don't save intermediates
+                                            aFlags,
+                                            &resultChain,
+                                            &evOidPolicy);
+  } else {
+    srv = certVerifier->VerifyCert(nssCert, aUsage, mozilla::pkix::Now(),
+                                   nullptr, // Assume no context
+                                   aHostname,
+                                   aFlags,
+                                   nullptr, // stapledOCSPResponse
+                                   &resultChain,
+                                   &evOidPolicy);
+  }
 
   PRErrorCode error = PR_GetError();
 
@@ -1761,7 +1772,7 @@ nsNSSCertificateDB::VerifyCertNow(nsIX509Cert* aCert,
     NS_ENSURE_TRUE(error != 0, NS_ERROR_FAILURE);
     *_retval = error;
   }
-  nssCertList.forget(verifiedChain);
+  nssCertList.forget(aVerifiedChain);
 
   return NS_OK;
 }

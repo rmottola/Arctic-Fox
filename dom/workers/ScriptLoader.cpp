@@ -121,21 +121,18 @@ ChannelFromScriptURL(nsIPrincipal* principal,
     return NS_ERROR_DOM_SYNTAX_ERR;
   }
 
-  // If we're part of a document then check the content load policy.
-  if (parentDoc) {
-    int16_t shouldLoad = nsIContentPolicy::ACCEPT;
-    rv = NS_CheckContentLoadPolicy(aContentPolicyType, uri,
-                                   principal, parentDoc,
-                                   NS_LITERAL_CSTRING("text/javascript"),
-                                   nullptr, &shouldLoad,
-                                   nsContentUtils::GetContentPolicy(),
-                                   secMan);
-    if (NS_FAILED(rv) || NS_CP_REJECTED(shouldLoad)) {
-      if (NS_FAILED(rv) || shouldLoad != nsIContentPolicy::REJECT_TYPE) {
-        return rv = NS_ERROR_CONTENT_BLOCKED;
-      }
-      return rv = NS_ERROR_CONTENT_BLOCKED_SHOW_ALT;
+  int16_t shouldLoad = nsIContentPolicy::ACCEPT;
+  rv = NS_CheckContentLoadPolicy(aContentPolicyType, uri,
+                                 principal, parentDoc,
+                                 NS_LITERAL_CSTRING("text/javascript"),
+                                 nullptr, &shouldLoad,
+                                 nsContentUtils::GetContentPolicy(),
+                                 secMan);
+  if (NS_FAILED(rv) || NS_CP_REJECTED(shouldLoad)) {
+    if (NS_FAILED(rv) || shouldLoad != nsIContentPolicy::REJECT_TYPE) {
+      return rv = NS_ERROR_CONTENT_BLOCKED;
     }
+    return rv = NS_ERROR_CONTENT_BLOCKED_SHOW_ALT;
   }
 
   if (aWorkerScriptType == DebuggerScript) {
@@ -1255,13 +1252,13 @@ CacheCreator::CreateCacheStorage(nsIPrincipal* aPrincipal)
   MOZ_ASSERT(xpc, "This should never be null!");
 
   mozilla::AutoSafeJSContext cx;
-  nsCOMPtr<nsIXPConnectJSObjectHolder> sandbox;
-  nsresult rv = xpc->CreateSandbox(cx, aPrincipal, getter_AddRefs(sandbox));
+  JS::Rooted<JSObject*> sandbox(cx);
+  nsresult rv = xpc->CreateSandbox(cx, aPrincipal, sandbox.address());
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
 
-  mSandboxGlobalObject = xpc::NativeGlobal(sandbox->GetJSObject());
+  mSandboxGlobalObject = xpc::NativeGlobal(sandbox);
   if (NS_WARN_IF(!mSandboxGlobalObject)) {
     return NS_ERROR_FAILURE;
   }

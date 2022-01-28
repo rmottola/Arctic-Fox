@@ -30,6 +30,29 @@ enum nsEventStatus
 
 namespace mozilla {
 
+/**
+ * Event messages
+ */
+
+typedef uint16_t EventMessageType;
+
+enum EventMessage : EventMessageType
+{
+
+#define NS_EVENT_MESSAGE(aMessage, aValue) aMessage = aValue,
+
+#include "mozilla/EventMessageList.h"
+
+#undef NS_EVENT_MESSAGE
+
+  // For preventing bustage due to "," after the last item.
+  eEventMessage_MaxValue
+};
+
+/**
+ * Event class IDs
+ */
+
 typedef uint8_t EventClassIDType;
 
 enum EventClassID : EventClassIDType

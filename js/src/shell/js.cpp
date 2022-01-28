@@ -92,6 +92,7 @@ using namespace js::cli;
 using namespace js::shell;
 
 using mozilla::ArrayLength;
+using mozilla::Atomic;
 using mozilla::MakeUnique;
 using mozilla::Maybe;
 using mozilla::NumberEqualsInt32;
@@ -124,7 +125,7 @@ static size_t gMaxStackSize = 128 * sizeof(size_t) * 1024;
  */
 static double MAX_TIMEOUT_INTERVAL = 1800.0;
 static double gTimeoutInterval = -1.0;
-static volatile bool gServiceInterrupt = false;
+static Atomic<bool> gServiceInterrupt;
 static JS::PersistentRootedValue gInterruptFunc;
 
 static bool gLastWarningEnabled = false;
@@ -228,7 +229,7 @@ class ShellPrincipals: public JSPrincipals {
     static void destroy(JSPrincipals* principals) {
         MOZ_ASSERT(principals != &fullyTrusted);
         MOZ_ASSERT(principals->refcount == 0);
-        js_free(static_cast<ShellPrincipals*>(principals));
+        js_delete(static_cast<const ShellPrincipals*>(principals));
     }
 
     static bool subsumes(JSPrincipals* first, JSPrincipals* second) {
@@ -571,7 +572,7 @@ Process(JSContext* cx, const char* filename, bool forceTTY)
             return;
         }
     }
-    AutoCloseInputFile autoClose(file);
+    AutoCloseFile autoClose(file);
 
     if (!forceTTY && !isatty(fileno(file))) {
         // It's not interactive - just execute it.
@@ -662,7 +663,7 @@ CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
                              JSSMSG_CANT_OPEN, filename.ptr(), strerror(errno));
         return false;
     }
-    AutoCloseInputFile autoClose(file);
+    AutoCloseFile autoClose(file);
 
     if (!sizeGiven) {
         struct stat st;
@@ -1292,7 +1293,7 @@ js::shell::FileAsString(JSContext* cx, const char* pathname)
         JS_ReportError(cx, "can't open %s: %s", pathname, strerror(errno));
         return nullptr;
     }
-    AutoCloseInputFile autoClose(file);
+    AutoCloseFile autoClose(file);
 
     if (fseek(file, 0, SEEK_END) != 0) {
         JS_ReportError(cx, "can't seek end of %s", pathname);
@@ -4129,7 +4130,7 @@ ReflectTrackedOptimizations(JSContext* cx, unsigned argc, Value* vp)
     if (!sp.init())
         return false;
 
-    const jit::IonTrackedOptimizationsRegionTable *regions =
+    const jit::IonTrackedOptimizationsRegionTable* regions =
         entry.ionEntry().trackedOptimizationsRegionTable();
 
     Sprint(&sp, "{\"regions\": [");
@@ -5857,6 +5858,15 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
             return OptionFailure("ion-loop-unrolling", str);
     }
 
+    if (const char* str = op.getStringOption("ion-instruction-reordering")) {
+        if (strcmp(str, "on") == 0)
+            jit::js_JitOptions.disableInstructionReordering = false;
+        else if (strcmp(str, "off") == 0)
+            jit::js_JitOptions.disableInstructionReordering = true;
+        else
+            return OptionFailure("ion-instruction-reordering", str);
+    }
+
     if (op.getBoolOption("ion-check-range-analysis"))
         jit::js_JitOptions.checkRangeAnalysis = true;
 
@@ -6172,6 +6182,8 @@ main(int argc, char** argv, char** envp)
                                "Sink code motion (default: off, on to enable)")
         || !op.addStringOption('\0', "ion-loop-unrolling", "on/off",
                                "Loop unrolling (default: off, on to enable)")
+        || !op.addStringOption('\0', "ion-instruction-reordering", "on/off",
+                               "Instruction reordering (default: off, on to enable)")
         || !op.addBoolOption('\0', "ion-check-range-analysis",
                                "Range analysis checking")
         || !op.addBoolOption('\0', "ion-extra-checks",
@@ -6255,7 +6267,7 @@ main(int argc, char** argv, char** envp)
     op.setArgCapturesRest("scriptArgs");
 
     switch (op.parseArgs(argc, argv)) {
-      case OptionParser::ParseHelp:
+      case OptionParser::EarlyExit:
         return EXIT_SUCCESS;
       case OptionParser::ParseError:
         op.printHelp(argv[0]);

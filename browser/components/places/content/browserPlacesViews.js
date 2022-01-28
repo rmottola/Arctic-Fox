@@ -18,11 +18,17 @@ function PlacesViewBase(aPlace) {
 PlacesViewBase.prototype = {
   // The xul element that holds the entire view.
   _viewElt: null,
-  get viewElt() this._viewElt,
+  get viewElt() {
+    return this._viewElt;
+  },
 
-  get associatedElement() this._viewElt,
+  get associatedElement() {
+    return this._viewElt;
+  },
 
-  get controllers() this._viewElt.controllers,
+  get controllers() {
+    return this._viewElt.controllers;
+  },
 
   // The xul element that represents the root container.
   _rootElt: null,
@@ -36,7 +42,9 @@ PlacesViewBase.prototype = {
      Components.interfaces.nsISupportsWeakReference]),
 
   _place: "",
-  get place() this._place,
+  get place() {
+    return this._place;
+  },
   set place(val) {
     this._place = val;
 
@@ -53,7 +61,9 @@ PlacesViewBase.prototype = {
   },
 
   _result: null,
-  get result() this._result,
+  get result() {
+    return this._result;
+  },
   set result(val) {
     if (this._result == val)
       return val;
@@ -101,21 +111,34 @@ PlacesViewBase.prototype = {
     return node;
   },
 
-  get controller() this._controller,
+  get controller() {
+    return this._controller;
+  },
 
-  get selType() "single",
+  get selType() {
+    return "single";
+  },
   selectItems: function() { },
   selectAll: function() { },
 
   get selectedNode() {
     if (this._contextMenuShown) {
-      let popup = document.popupNode;
-      return popup._placesNode || popup.parentNode._placesNode || null;
+      let anchor = this._contextMenuShown.triggerNode;
+      if (!anchor)
+        return null;
+
+      if (anchor._placesNode)
+        return this._rootElt == anchor ? null : anchor._placesNode;
+
+      anchor = anchor.parentNode;
+      return this._rootElt == anchor ? null : (anchor._placesNode || null);
     }
     return null;
   },
 
-  get hasSelection() this.selectedNode != null,
+  get hasSelection() {
+    return this.selectedNode != null;
+  },
 
   get selectedNodes() {
     let selectedNode = this.selectedNode;
@@ -133,7 +156,9 @@ PlacesViewBase.prototype = {
     return [this.selectedNodes];
   },
 
-  get draggableSelection() [this._draggedElt],
+  get draggableSelection() {
+    return [this._draggedElt];
+  },
 
   get insertionPoint() {
     // There is no insertion point for history queries, so bail out now and
@@ -176,13 +201,13 @@ PlacesViewBase.prototype = {
   },
 
   buildContextMenu: function PVB_buildContextMenu(aPopup) {
-    this._contextMenuShown = true;
+    this._contextMenuShown = aPopup;
     window.updateCommands("places");
     return this.controller.buildContextMenu(aPopup);
   },
 
   destroyContextMenu: function PVB_destroyContextMenu(aPopup) {
-    this._contextMenuShown = false;
+    this._contextMenuShown = null;
   },
 
   _cleanPopup: function PVB_cleanPopup(aPopup, aDelay) {
@@ -713,7 +738,9 @@ PlacesViewBase.prototype = {
                                  .direction == "rtl";
   },
 
-  get ownerWindow() window,
+  get ownerWindow() {
+    return window;
+  },
 
   /**
    * Adds an "Open All in Tabs" menuitem to the bottom of the popup.

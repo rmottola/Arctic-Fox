@@ -21,7 +21,7 @@ InitJSONClass(JSContext* cx, HandleObject obj);
 
 extern bool
 Stringify(JSContext* cx, js::MutableHandleValue vp, JSObject* replacer,
-             Value space, StringBuffer& sb);
+          Value space, StringBuffer& sb);
 
 template <typename CharT>
 extern bool

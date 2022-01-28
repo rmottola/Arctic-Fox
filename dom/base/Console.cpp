@@ -37,6 +37,10 @@
 #include "nsIWebNavigation.h"
 #include "nsIXPConnect.h"
 
+#ifdef MOZ_ENABLE_PROFILER_SPS
+#include "nsIProfiler.h"
+#endif
+
 // The maximum allowed number of concurrent timers per page.
 #define MAX_PAGE_TIMERS 10000
 
@@ -322,13 +326,7 @@ private:
 
     AutoSafeJSContext cx;
 
-    nsCOMPtr<nsIXPConnectJSObjectHolder> sandbox =
-      mConsole->GetOrCreateSandbox(cx, wp->GetPrincipal());
-    if (NS_WARN_IF(!sandbox)) {
-       return;
-    }
-
-    JS::Rooted<JSObject*> global(cx, sandbox->GetJSObject());
+    JS::Rooted<JSObject*> global(cx, mConsole->GetOrCreateSandbox(cx, wp->GetPrincipal()));
     if (NS_WARN_IF(!global)) {
       return;
     }
@@ -534,7 +532,6 @@ private:
 
     MOZ_ASSERT(argumentsValue.isObject());
     JS::Rooted<JSObject*> argumentsObj(aCx, &argumentsValue.toObject());
-    MOZ_ASSERT(JS_IsArrayObject(aCx, argumentsObj));
 
     uint32_t length;
     if (!JS_GetArrayLength(aCx, argumentsObj, &length)) {
@@ -629,7 +626,6 @@ private:
 
     MOZ_ASSERT(argumentsValue.isObject());
     JS::Rooted<JSObject*> argumentsObj(aCx, &argumentsValue.toObject());
-    MOZ_ASSERT(JS_IsArrayObject(aCx, argumentsObj));
 
     uint32_t length;
     if (!JS_GetArrayLength(aCx, argumentsObj, &length)) {
@@ -659,7 +655,7 @@ private:
 
 NS_IMPL_CYCLE_COLLECTION_CLASS(Console)
 
-// We don't need to traverse/unlink mStorage and mSanbox because they are not
+// We don't need to traverse/unlink mStorage and mSandbox because they are not
 // CCed objects and they are only used on the main thread, even when this
 // Console object is used on workers.
 
@@ -713,19 +709,12 @@ Console::Console(nsPIDOMWindow* aWindow)
 Console::~Console()
 {
   if (!NS_IsMainThread()) {
-    nsCOMPtr<nsIThread> mainThread;
-    NS_GetMainThread(getter_AddRefs(mainThread));
-
     if (mStorage) {
-      nsIConsoleAPIStorage* storage;
-      mStorage.forget(&storage);
-      NS_ProxyRelease(mainThread, storage, false);
+      NS_ReleaseOnMainThread(mStorage);
     }
 
     if (mSandbox) {
-      nsIXPConnectJSObjectHolder* sandbox;
-      mSandbox.forget(&sandbox);
-      NS_ProxyRelease(mainThread, sandbox, false);
+      NS_ReleaseOnMainThread(mSandbox);
     }
   }
 
@@ -792,6 +781,7 @@ Console::Trace(JSContext* aCx)
 
 // Displays an interactive listing of all the properties of an object.
 METHOD(Dir, "dir");
+METHOD(Dirxml, "dirxml");
 
 METHOD(Group, "group")
 METHOD(GroupCollapsed, "groupCollapsed")
@@ -832,6 +822,23 @@ Console::TimeStamp(JSContext* aCx, const JS::Handle<JS::Value> aData)
   if (aData.isString() && !data.AppendElement(aData, fallible)) {
     return;
   }
+
+#ifdef MOZ_ENABLE_PROFILER_SPS
+  if (aData.isString() && NS_IsMainThread()) {
+    if (!mProfiler) {
+      mProfiler = do_GetService("@mozilla.org/tools/profiler;1");
+    }
+    if (mProfiler) {
+      bool active = false;
+      if (NS_SUCCEEDED(mProfiler->IsActive(&active)) && active) {
+        nsAutoJSString stringValue;
+        if (stringValue.init(aCx, aData)) {
+          mProfiler->AddMarker(NS_ConvertUTF16toUTF8(stringValue).get());
+        }
+      }
+    }
+  }
+#endif
 
   Method(aCx, MethodTimeStamp, NS_LITERAL_STRING("timeStamp"), data);
 }
@@ -1137,7 +1144,7 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
 
         mozilla::UniquePtr<TimelineMarker> marker =
           MakeUnique<TimestampTimelineMarker>(docShell, TRACING_TIMESTAMP, key);
-        docShell->AddProfileTimelineMarker(Move(marker));
+        TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
       }
       // For `console.time(foo)` and `console.timeEnd(foo)`
       else if (isTimelineRecording && aData.Length() == 1) {
@@ -1150,7 +1157,7 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
               MakeUnique<ConsoleTimelineMarker>(docShell,
                                                 aMethodName == MethodTime ? TRACING_INTERVAL_START : TRACING_INTERVAL_END,
                                                 key);
-            docShell->AddProfileTimelineMarker(Move(marker));
+            TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
           }
         }
       }
@@ -1856,7 +1863,7 @@ Console::ShouldIncludeStackTrace(MethodName aMethodName)
   }
 }
 
-nsIXPConnectJSObjectHolder*
+JSObject*
 Console::GetOrCreateSandbox(JSContext* aCx, nsIPrincipal* aPrincipal)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -1865,14 +1872,16 @@ Console::GetOrCreateSandbox(JSContext* aCx, nsIPrincipal* aPrincipal)
     nsIXPConnect* xpc = nsContentUtils::XPConnect();
     MOZ_ASSERT(xpc, "This should never be null!");
 
-    nsresult rv = xpc->CreateSandbox(aCx, aPrincipal,
-                                     getter_AddRefs(mSandbox));
+    JS::Rooted<JSObject*> sandbox(aCx);
+    nsresult rv = xpc->CreateSandbox(aCx, aPrincipal, sandbox.address());
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return nullptr;
     }
+
+    mSandbox = new JSObjectHolder(aCx, sandbox);
   }
 
-  return mSandbox;
+  return mSandbox->GetJSObject();
 }
 
 } // namespace dom

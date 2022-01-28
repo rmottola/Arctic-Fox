@@ -99,15 +99,18 @@ ConvertToNSArray(nsTArray<Accessible*>& aArray)
 
 @implementation mozAccessible
  
-- (id)initWithAccessible:(AccessibleWrap*)geckoAccessible
+- (id)initWithAccessible:(uintptr_t)aGeckoAccessible
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   if ((self = [super init])) {
-    mGeckoAccessible = reinterpret_cast<uintptr_t>(geckoAccessible);
-    mRole = geckoAccessible->Role();
+    mGeckoAccessible = aGeckoAccessible;
+    if (aGeckoAccessible & IS_PROXY)
+      mRole = [self getProxyAccessible]->Role();
+    else
+      mRole = [self getGeckoAccessible]->Role();
   }
-   
+
   return self;
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
@@ -130,6 +133,15 @@ ConvertToNSArray(nsTArray<Accessible*>& aArray)
     return nil;
 
   return reinterpret_cast<AccessibleWrap*>(mGeckoAccessible);
+}
+
+- (mozilla::a11y::ProxyAccessible*)getProxyAccessible
+{
+  // Check if mGeckoAccessible points at a proxy
+  if (!(mGeckoAccessible & IS_PROXY))
+    return nil;
+
+  return reinterpret_cast<ProxyAccessible*>(mGeckoAccessible & ~IS_PROXY);
 }
 
 #pragma mark -

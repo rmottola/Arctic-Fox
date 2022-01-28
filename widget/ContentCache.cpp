@@ -24,7 +24,7 @@ GetBoolName(bool aBool)
 }
 
 static const char*
-GetEventMessageName(uint32_t aMessage)
+GetEventMessageName(EventMessage aMessage)
 {
   switch (aMessage) {
     case NS_COMPOSITION_START:
@@ -513,14 +513,13 @@ ContentCacheInParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent,
   MOZ_ASSERT(aWidget);
 
   aEvent.mSucceeded = false;
-  aEvent.mWasAsync = false;
   aEvent.mReply.mFocusedWidget = aWidget;
 
-  switch (aEvent.message) {
+  switch (aEvent.mMessage) {
     case NS_QUERY_SELECTED_TEXT:
       MOZ_LOG(sContentCacheLog, LogLevel::Info,
         ("ContentCacheInParent: 0x%p HandleQueryContentEvent("
-         "aEvent={ message=NS_QUERY_SELECTED_TEXT }, aWidget=0x%p)",
+         "aEvent={ mMessage=NS_QUERY_SELECTED_TEXT }, aWidget=0x%p)",
          this, aWidget));
       if (NS_WARN_IF(!IsSelectionValid())) {
         // If content cache hasn't been initialized properly, make the query
@@ -561,7 +560,7 @@ ContentCacheInParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent,
     case NS_QUERY_TEXT_CONTENT: {
       MOZ_LOG(sContentCacheLog, LogLevel::Info,
         ("ContentCacheInParent: 0x%p HandleQueryContentEvent("
-         "aEvent={ message=NS_QUERY_TEXT_CONTENT, mInput={ mOffset=%u, "
+         "aEvent={ mMessage=NS_QUERY_TEXT_CONTENT, mInput={ mOffset=%u, "
          "mLength=%u } }, aWidget=0x%p), mText.Length()=%u",
          this, aEvent.mInput.mOffset,
          aEvent.mInput.mLength, aWidget, mText.Length()));
@@ -587,7 +586,7 @@ ContentCacheInParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent,
     case NS_QUERY_TEXT_RECT:
       MOZ_LOG(sContentCacheLog, LogLevel::Info,
         ("ContentCacheInParent: 0x%p HandleQueryContentEvent("
-         "aEvent={ message=NS_QUERY_TEXT_RECT, mInput={ mOffset=%u, "
+         "aEvent={ mMessage=NS_QUERY_TEXT_RECT, mInput={ mOffset=%u, "
          "mLength=%u } }, aWidget=0x%p), mText.Length()=%u",
          this, aEvent.mInput.mOffset, aEvent.mInput.mLength, aWidget,
          mText.Length()));
@@ -642,7 +641,7 @@ ContentCacheInParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent,
     case NS_QUERY_CARET_RECT:
       MOZ_LOG(sContentCacheLog, LogLevel::Info,
         ("ContentCacheInParent: 0x%p HandleQueryContentEvent("
-         "aEvent={ message=NS_QUERY_CARET_RECT, mInput={ mOffset=%u } }, "
+         "aEvent={ mMessage=NS_QUERY_CARET_RECT, mInput={ mOffset=%u } }, "
          "aWidget=0x%p), mText.Length()=%u",
          this, aEvent.mInput.mOffset, aWidget, mText.Length()));
       if (NS_WARN_IF(!IsSelectionValid())) {
@@ -669,13 +668,15 @@ ContentCacheInParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent,
     case NS_QUERY_EDITOR_RECT:
       MOZ_LOG(sContentCacheLog, LogLevel::Info,
         ("ContentCacheInParent: 0x%p HandleQueryContentEvent("
-         "aEvent={ message=NS_QUERY_EDITOR_RECT }, aWidget=0x%p)",
+         "aEvent={ mMessage=NS_QUERY_EDITOR_RECT }, aWidget=0x%p)",
          this, aWidget));
       aEvent.mReply.mRect = mEditorRect;
       MOZ_LOG(sContentCacheLog, LogLevel::Info,
         ("ContentCacheInParent: 0x%p HandleQueryContentEvent(), "
          "Succeeded, aEvent={ mReply={ mRect=%s } }",
          this, GetRectText(aEvent.mReply.mRect).get()));
+      break;
+    default:
       break;
   }
   aEvent.mSucceeded = true;
@@ -847,17 +848,17 @@ ContentCacheInParent::OnCompositionEvent(const WidgetCompositionEvent& aEvent)
 {
   MOZ_LOG(sContentCacheLog, LogLevel::Info,
     ("ContentCacheInParent: 0x%p OnCompositionEvent(aEvent={ "
-     "message=%s, mData=\"%s\" (Length()=%u), mRanges->Length()=%u }), "
+     "mMessage=%s, mData=\"%s\" (Length()=%u), mRanges->Length()=%u }), "
      "mPendingEventsNeedingAck=%u, mIsComposing=%s, "
      "mRequestedToCommitOrCancelComposition=%s",
-     this, GetEventMessageName(aEvent.message),
+     this, GetEventMessageName(aEvent.mMessage),
      NS_ConvertUTF16toUTF8(aEvent.mData).get(), aEvent.mData.Length(),
      aEvent.mRanges ? aEvent.mRanges->Length() : 0, mPendingEventsNeedingAck,
      GetBoolName(mIsComposing),
      GetBoolName(mRequestedToCommitOrCancelComposition)));
 
   if (!aEvent.CausesDOMTextEvent()) {
-    MOZ_ASSERT(aEvent.message == NS_COMPOSITION_START);
+    MOZ_ASSERT(aEvent.mMessage == NS_COMPOSITION_START);
     mIsComposing = !aEvent.CausesDOMCompositionEndEvent();
     mCompositionStart = mSelection.StartOffset();
     // XXX What's this case??
@@ -901,10 +902,10 @@ ContentCacheInParent::OnSelectionEvent(
 {
   MOZ_LOG(sContentCacheLog, LogLevel::Info,
     ("ContentCacheInParent: 0x%p OnSelectionEvent(aEvent={ "
-     "message=%s, mOffset=%u, mLength=%u, mReversed=%s, "
+     "mMessage=%s, mOffset=%u, mLength=%u, mReversed=%s, "
      "mExpandToClusterBoundary=%s, mUseNativeLineBreak=%s }), "
      "mPendingEventsNeedingAck=%u, mIsComposing=%s",
-     this, GetEventMessageName(aSelectionEvent.message),
+     this, GetEventMessageName(aSelectionEvent.mMessage),
      aSelectionEvent.mOffset, aSelectionEvent.mLength,
      GetBoolName(aSelectionEvent.mReversed),
      GetBoolName(aSelectionEvent.mExpandToClusterBoundary),
@@ -915,14 +916,14 @@ ContentCacheInParent::OnSelectionEvent(
 }
 
 void
-ContentCacheInParent::OnEventNeedingAckReceived(nsIWidget* aWidget,
-                                                uint32_t aMessage)
+ContentCacheInParent::OnEventNeedingAckHandled(nsIWidget* aWidget,
+                                                EventMessage aMessage)
 {
   // This is called when the child process receives WidgetCompositionEvent or
   // WidgetSelectionEvent.
 
   MOZ_LOG(sContentCacheLog, LogLevel::Info,
-    ("ContentCacheInParent: 0x%p OnEventNeedingAckReceived(aWidget=0x%p, "
+    ("ContentCacheInParent: 0x%p OnEventNeedingAckHandled(aWidget=0x%p, "
      "aMessage=%s), mPendingEventsNeedingAck=%u",
      this, aWidget, GetEventMessageName(aMessage), mPendingEventsNeedingAck));
 

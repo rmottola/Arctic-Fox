@@ -17,23 +17,43 @@
 #ifndef nsScreenManagerGonk_h___
 #define nsScreenManagerGonk_h___
 
-#include "mozilla/Hal.h"
-#include "nsCOMPtr.h"
+#include "cutils/properties.h"
+#include "hardware/hwcomposer.h"
 
+#include "libdisplay/GonkDisplay.h"
+#include "mozilla/Hal.h"
+#include "mozilla/Mutex.h"
 #include "nsBaseScreen.h"
+#include "nsCOMPtr.h"
 #include "nsIScreenManager.h"
+#include "nsProxyRelease.h"
 
 #include <android/native_window.h>
 
 class nsRunnable;
 class nsWindow;
 
+namespace android {
+    class DisplaySurface;
+    class IGraphicBufferProducer;
+};
+
+namespace mozilla {
+namespace gl {
+    class GLContext;
+}
+}
+
 class nsScreenGonk : public nsBaseScreen
 {
     typedef mozilla::hal::ScreenConfiguration ScreenConfiguration;
+    typedef mozilla::GonkDisplay GonkDisplay;
 
 public:
-    nsScreenGonk();
+    nsScreenGonk(uint32_t aId,
+                 GonkDisplay::DisplayType aDisplayType,
+                 const GonkDisplay::NativeData& aNativeData);
+
     ~nsScreenGonk();
 
     NS_IMETHOD GetId(uint32_t* aId);
@@ -44,9 +64,21 @@ public:
     NS_IMETHOD GetRotation(uint32_t* aRotation);
     NS_IMETHOD SetRotation(uint32_t  aRotation);
 
+    uint32_t GetId();
+    nsIntRect GetRect();
+    float GetDpi();
+    int32_t GetSurfaceFormat();
+    ANativeWindow* GetNativeWindow();
     nsIntRect GetNaturalBounds();
     uint32_t EffectiveScreenRotation();
     ScreenConfiguration GetConfiguration();
+    bool IsPrimaryScreen();
+
+#if ANDROID_VERSION >= 17
+    android::DisplaySurface* GetDisplaySurface();
+    int GetPrevDispAcquireFd();
+#endif
+    GonkDisplay::DisplayType GetDisplayType();
 
     void RegisterWindow(nsWindow* aWindow);
     void UnregisterWindow(nsWindow* aWindow);
@@ -57,16 +89,56 @@ public:
         return mTopWindows;
     }
 
+    // Non-primary screen only
+    bool EnableMirroring();
+    bool DisableMirroring();
+    bool IsMirroring()
+    {
+        return mIsMirroring;
+    }
+
+    // Primary screen only
+    bool SetMirroringScreen(nsScreenGonk* aScreen);
+    bool ClearMirroringScreen(nsScreenGonk* aScreen);
+
+    // Called only on compositor thread
+    void SetEGLInfo(hwc_display_t aDisplay, hwc_surface_t aSurface,
+                    mozilla::gl::GLContext* aGLContext);
+    hwc_display_t GetEGLDisplay();
+    hwc_surface_t GetEGLSurface();
+    void UpdateMirroringWidget(already_AddRefed<nsWindow>& aWindow); // Primary screen only
+    nsWindow* GetMirroringWidget(); // Primary screen only
+
 protected:
-    nsIntRect mScreenBounds;
-    nsIntRect mVirtualBounds;
+    uint32_t mId;
+    int32_t mColorDepth;
+    android::sp<ANativeWindow> mNativeWindow;
+    float mDpi;
+    int32_t mSurfaceFormat;
+    nsIntRect mNaturalBounds; // Screen bounds w/o rotation taken into account.
+    nsIntRect mVirtualBounds; // Screen bounds w/ rotation taken into account.
     uint32_t mScreenRotation;
     uint32_t mPhysicalScreenRotation;
     nsTArray<nsWindow*> mTopWindows;
+#if ANDROID_VERSION >= 17
+    android::sp<android::DisplaySurface> mDisplaySurface;
+#endif
+    bool mIsMirroring; // Non-primary screen only
+    nsRefPtr<nsScreenGonk> mMirroringScreen; // Primary screen only
+
+    // Accessed and updated only on compositor thread
+    GonkDisplay::DisplayType mDisplayType;
+    hwc_display_t mEGLDisplay;
+    hwc_surface_t mEGLSurface;
+    nsRefPtr<mozilla::gl::GLContext> mGLContext;
+    nsRefPtr<nsWindow> mMirroringWidget; // Primary screen only
 };
 
 class nsScreenManagerGonk final : public nsIScreenManager
 {
+public:
+    typedef mozilla::GonkDisplay GonkDisplay;
+
 public:
     nsScreenManagerGonk();
 
@@ -79,11 +151,19 @@ public:
     void Initialize();
     void DisplayEnabled(bool aEnabled);
 
+    nsresult AddScreen(GonkDisplay::DisplayType aDisplayType,
+                       android::IGraphicBufferProducer* aSink = nullptr);
+
+    nsresult RemoveScreen(GonkDisplay::DisplayType aDisplayType);
+
 protected:
     ~nsScreenManagerGonk();
+    void VsyncControl(bool aEnabled);
+    uint32_t GetIdFromType(GonkDisplay::DisplayType aDisplayType);
+    bool IsScreenConnected(uint32_t aId);
 
     bool mInitialized;
-    nsCOMPtr<nsIScreen> mOneScreen;
+    nsTArray<nsRefPtr<nsScreenGonk>> mScreens;
     nsRefPtr<nsRunnable> mScreenOnEvent;
     nsRefPtr<nsRunnable> mScreenOffEvent;
 };

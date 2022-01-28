@@ -993,40 +993,40 @@ namespace details {
         size_t numDefs() const final override {
             return Defs;
         }
-        LDefinition *getDef(size_t index) final override {
+        LDefinition* getDef(size_t index) final override {
             return &defs_[index];
         }
         size_t numTemps() const final override {
             return Temps;
         }
-        LDefinition *getTemp(size_t index) final override {
+        LDefinition* getTemp(size_t index) final override {
             return &temps_[index];
         }
 
-        void setDef(size_t index, const LDefinition &def) final override {
+        void setDef(size_t index, const LDefinition& def) final override {
             defs_[index] = def;
         }
-        void setTemp(size_t index, const LDefinition &a) final override {
+        void setTemp(size_t index, const LDefinition& a) final override {
             temps_[index] = a;
         }
 
         size_t numSuccessors() const override {
             return 0;
         }
-        MBasicBlock *getSuccessor(size_t i) const override {
+        MBasicBlock* getSuccessor(size_t i) const override {
             MOZ_ASSERT(false);
             return nullptr;
         }
-        void setSuccessor(size_t i, MBasicBlock *successor) override {
+        void setSuccessor(size_t i, MBasicBlock* successor) override {
             MOZ_ASSERT(false);
         }
 
         // Default accessors, assuming a single input and output, respectively.
-        const LAllocation *input() {
+        const LAllocation* input() {
             MOZ_ASSERT(numOperands() == 1);
             return getOperand(0);
         }
-        const LDefinition *output() {
+        const LDefinition* output() {
             MOZ_ASSERT(numDefs() == 1);
             return getDef(0);
         }
@@ -1042,10 +1042,10 @@ class LInstructionHelper : public details::LInstructionFixedDefsTempsHelper<Defs
     size_t numOperands() const final override {
         return Operands;
     }
-    LAllocation *getOperand(size_t index) final override {
+    LAllocation* getOperand(size_t index) final override {
         return &operands_[index];
     }
-    void setOperand(size_t index, const LAllocation &a) final override {
+    void setOperand(size_t index, const LAllocation& a) final override {
         operands_[index] = a;
     }
 };
@@ -1056,16 +1056,16 @@ class LVariadicInstruction : public details::LInstructionFixedDefsTempsHelper<De
     FixedList<LAllocation> operands_;
 
   public:
-    bool init(TempAllocator &alloc, size_t length) {
+    bool init(TempAllocator& alloc, size_t length) {
         return operands_.init(alloc, length);
     }
     size_t numOperands() const final override {
         return operands_.length();
     }
-    LAllocation *getOperand(size_t index) final override {
+    LAllocation* getOperand(size_t index) final override {
         return &operands_[index];
     }
-    void setOperand(size_t index, const LAllocation &a) final override {
+    void setOperand(size_t index, const LAllocation& a) final override {
         operands_[index] = a;
     }
 };
@@ -1364,7 +1364,7 @@ class LSafepoint : public TempObject
         liveRegs_.addUnchecked(reg);
         assertInvariants();
     }
-    const LiveRegisterSet &liveRegs() const {
+    const LiveRegisterSet& liveRegs() const {
         return liveRegs_;
     }
 #ifdef CHECK_OSIPOINT_REGISTERS
@@ -1372,7 +1372,7 @@ class LSafepoint : public TempObject
         clobberedRegs_.addUnchecked(reg);
         assertInvariants();
     }
-    const LiveRegisterSet &clobberedRegs() const {
+    const LiveRegisterSet& clobberedRegs() const {
         return clobberedRegs_;
     }
 #endif
@@ -1389,11 +1389,11 @@ class LSafepoint : public TempObject
             assertInvariants();
         return result;
     }
-    SlotList &gcSlots() {
+    SlotList& gcSlots() {
         return gcSlots_;
     }
 
-    SlotList &slotsOrElementsSlots() {
+    SlotList& slotsOrElementsSlots() {
         return slotsOrElementsSlots_;
     }
     LiveGeneralRegisterSet slotsOrElementsRegs() const {

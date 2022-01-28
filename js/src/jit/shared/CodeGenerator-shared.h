@@ -65,7 +65,7 @@ class CodeGeneratorShared : public LElementVisitor
 {
     js::Vector<OutOfLineCode*, 0, SystemAllocPolicy> outOfLineCode_;
 
-    MacroAssembler &ensureMasm(MacroAssembler* masm);
+    MacroAssembler& ensureMasm(MacroAssembler* masm);
     mozilla::Maybe<MacroAssembler> maybeMasm_;
 
   public:
@@ -414,13 +414,13 @@ class CodeGeneratorShared : public LElementVisitor
     // any modifications of the stack.  Modification of the stack made after
     // these calls should update the framePushed variable, needed by the exit
     // frame produced by callVM.
-    inline void saveLive(LInstruction *ins);
-    inline void restoreLive(LInstruction *ins);
-    inline void restoreLiveIgnore(LInstruction *ins, LiveRegisterSet reg);
+    inline void saveLive(LInstruction* ins);
+    inline void restoreLive(LInstruction* ins);
+    inline void restoreLiveIgnore(LInstruction* ins, LiveRegisterSet reg);
 
     // Save/restore all registers that are both live and volatile.
-    inline void saveLiveVolatile(LInstruction *ins);
-    inline void restoreLiveVolatile(LInstruction *ins);
+    inline void saveLiveVolatile(LInstruction* ins);
+    inline void restoreLiveVolatile(LInstruction* ins);
 
     template <typename T>
     void pushArg(const T& t) {

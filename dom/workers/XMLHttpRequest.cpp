@@ -1399,7 +1399,7 @@ EventRunnable::WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
 
   MOZ_ASSERT(target);
 
-  nsCOMPtr<nsIDOMEvent> event;
+  nsRefPtr<Event> event;
   if (mProgressEvent) {
     ProgressEventInit init;
     init.mBubbles = false;
@@ -1411,7 +1411,7 @@ EventRunnable::WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
     event = ProgressEvent::Constructor(target, mType, init);
   }
   else {
-    NS_NewDOMEvent(getter_AddRefs(event), target, nullptr, nullptr);
+    event = NS_NewDOMEvent(target, nullptr, nullptr);
 
     if (event) {
       event->InitEvent(mType, false, false);
@@ -1802,13 +1802,10 @@ XMLHttpRequest::DispatchPrematureAbortEvent(EventTarget* aTarget,
     return;
   }
 
-  nsCOMPtr<nsIDOMEvent> event;
+  nsRefPtr<Event> event;
   if (aEventType.EqualsLiteral("readystatechange")) {
-    NS_NewDOMEvent(getter_AddRefs(event), aTarget, nullptr, nullptr);
-
-    if (event) {
-      event->InitEvent(aEventType, false, false);
-    }
+    event = NS_NewDOMEvent(aTarget, nullptr, nullptr);
+    event->InitEvent(aEventType, false, false);
   }
   else {
     ProgressEventInit init;

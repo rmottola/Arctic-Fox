@@ -57,7 +57,7 @@
 #include "nsRefreshDriver.h"
 #include "Layers.h"
 #include "ClientLayerManager.h"
-#include "nsIDOMEvent.h"
+#include "mozilla/dom/NotifyPaintEvent.h"
 #include "gfxPrefs.h"
 #include "nsIDOMChromeWindow.h"
 #include "nsFrameLoader.h"
@@ -360,6 +360,7 @@ nsPresContext::LastRelease()
 NS_IMPL_CYCLE_COLLECTION_CLASS(nsPresContext)
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsPresContext)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mAnimationManager);
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDocument);
   // NS_IMPL_CYCLE_COLLECTION_TRAVERSE_RAWPTR(mDeviceContext); // not xpcom
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mEventManager);
@@ -372,6 +373,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsPresContext)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsPresContext)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mAnimationManager);
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDocument);
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDeviceContext); // worth bothering?
   // NS_RELEASE(tmp->mLanguage); // an atom
@@ -2215,23 +2217,21 @@ nsPresContext::FireDOMPaintEvent(nsInvalidateRequestList* aList)
   }
   // Events sent to the window get propagated to the chrome event handler
   // automatically.
-  nsCOMPtr<nsIDOMEvent> event;
+  //
   // This will empty our list in case dispatching the event causes more damage
   // (hopefully it won't, or we're likely to get an infinite loop! At least
   // it won't be blocking app execution though).
-  NS_NewDOMNotifyPaintEvent(getter_AddRefs(event), eventTarget, this, nullptr,
-                            NS_AFTERPAINT, aList);
-  if (!event) {
-    return;
-  }
+  nsRefPtr<NotifyPaintEvent> event =
+    NS_NewDOMNotifyPaintEvent(eventTarget, this, nullptr, NS_AFTERPAINT,
+                              aList);
 
   // Even if we're not telling the window about the event (so eventTarget is
   // the chrome event handler, not the window), the window is still
   // logically the event target.
   event->SetTarget(eventTarget);
   event->SetTrusted(true);
-  EventDispatcher::DispatchDOMEvent(dispatchTarget, nullptr, event, this,
-                                    nullptr);
+  EventDispatcher::DispatchDOMEvent(dispatchTarget, nullptr,
+                                    static_cast<Event*>(event), this, nullptr);
 }
 
 static bool

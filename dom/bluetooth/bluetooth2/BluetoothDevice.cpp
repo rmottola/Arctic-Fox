@@ -54,9 +54,8 @@ class FetchUuidsTask final : public BluetoothReplyRunnable
 {
 public:
   FetchUuidsTask(Promise* aPromise,
-                 const nsAString& aName,
                  BluetoothDevice* aDevice)
-    : BluetoothReplyRunnable(nullptr /* DOMRequest */, aPromise, aName)
+    : BluetoothReplyRunnable(nullptr, aPromise)
     , mDevice(aDevice)
   {
     MOZ_ASSERT(aPromise);
@@ -185,16 +184,14 @@ BluetoothDevice::FetchUuids(ErrorResult& aRv)
   nsRefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
+  // Ensure BluetoothService is available
   BluetoothService* bs = BluetoothService::Get();
   BT_ENSURE_TRUE_REJECT(bs, promise, NS_ERROR_NOT_AVAILABLE);
 
-  nsRefPtr<BluetoothReplyRunnable> result =
-    new FetchUuidsTask(promise,
-                       NS_LITERAL_STRING("FetchUuids"),
-                       this);
-
-  nsresult rv = bs->FetchUuidsInternal(mAddress, result);
-  BT_ENSURE_TRUE_REJECT(NS_SUCCEEDED(rv), promise, NS_ERROR_DOM_OPERATION_ERR);
+  BT_ENSURE_TRUE_REJECT(
+    NS_SUCCEEDED(
+      bs->FetchUuidsInternal(mAddress, new FetchUuidsTask(promise, this))),
+    promise, NS_ERROR_DOM_OPERATION_ERR);
 
   return promise.forget();
 }
@@ -292,8 +289,13 @@ BluetoothDevice::HandlePropertyChanged(const BluetoothValue& aValue)
     // BluetoothDeviceAttribute properties
     if (IsDeviceAttributeChanged(type, arr[i].value())) {
       SetPropertyByValue(arr[i]);
-      BT_APPEND_ENUM_STRING(types, BluetoothDeviceAttribute, type);
+      BT_APPEND_ENUM_STRING_FALLIBLE(types, BluetoothDeviceAttribute, type);
     }
+  }
+
+  if (types.IsEmpty()) {
+    // No device attribute changed
+    return;
   }
 
   DispatchAttributeEvent(types);
@@ -302,7 +304,7 @@ BluetoothDevice::HandlePropertyChanged(const BluetoothValue& aValue)
 void
 BluetoothDevice::DispatchAttributeEvent(const Sequence<nsString>& aTypes)
 {
-  NS_ENSURE_TRUE_VOID(aTypes.Length());
+  MOZ_ASSERT(!aTypes.IsEmpty());
 
   BluetoothAttributeEventInit init;
   init.mAttrs = aTypes;

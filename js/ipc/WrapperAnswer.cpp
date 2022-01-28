@@ -11,6 +11,7 @@
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "xpcprivate.h"
+#include "js/Class.h"
 #include "jsfriendapi.h"
 
 using namespace JS;
@@ -63,7 +64,7 @@ WrapperAnswer::ok(ReturnStatus* rs)
 }
 
 bool
-WrapperAnswer::ok(ReturnStatus *rs, const JS::ObjectOpResult &result)
+WrapperAnswer::ok(ReturnStatus* rs, const JS::ObjectOpResult& result)
 {
     *rs = result
           ? ReturnStatus(ReturnSuccess())
@@ -72,7 +73,7 @@ WrapperAnswer::ok(ReturnStatus *rs, const JS::ObjectOpResult &result)
 }
 
 bool
-WrapperAnswer::RecvPreventExtensions(const ObjectId &objId, ReturnStatus *rs)
+WrapperAnswer::RecvPreventExtensions(const ObjectId& objId, ReturnStatus* rs)
 {
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(scopeForTargetObjects())))
@@ -103,8 +104,8 @@ EmptyDesc(PPropertyDescriptor* desc)
 }
 
 bool
-WrapperAnswer::RecvGetPropertyDescriptor(const ObjectId &objId, const JSIDVariant &idVar,
-                                         ReturnStatus *rs, PPropertyDescriptor *out)
+WrapperAnswer::RecvGetPropertyDescriptor(const ObjectId& objId, const JSIDVariant& idVar,
+                                         ReturnStatus* rs, PPropertyDescriptor* out)
 {
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(scopeForTargetObjects())))
@@ -195,7 +196,7 @@ WrapperAnswer::RecvDefineProperty(const ObjectId& objId, const JSIDVariant& idVa
 }
 
 bool
-WrapperAnswer::RecvDelete(const ObjectId &objId, const JSIDVariant &idVar, ReturnStatus *rs)
+WrapperAnswer::RecvDelete(const ObjectId& objId, const JSIDVariant& idVar, ReturnStatus* rs)
 {
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(scopeForTargetObjects())))
@@ -272,7 +273,7 @@ WrapperAnswer::RecvHasOwn(const ObjectId& objId, const JSIDVariant& idVar, Retur
 }
 
 bool
-WrapperAnswer::RecvGet(const ObjectId& objId, const ObjectVariant& receiverVar,
+WrapperAnswer::RecvGet(const ObjectId& objId, const JSVariant& receiverVar,
                        const JSIDVariant& idVar, ReturnStatus* rs, JSVariant* result)
 {
     // We may run scripted getters.
@@ -289,8 +290,8 @@ WrapperAnswer::RecvGet(const ObjectId& objId, const ObjectVariant& receiverVar,
     if (!obj)
         return fail(aes, rs);
 
-    RootedObject receiver(cx, fromObjectVariant(cx, receiverVar));
-    if (!receiver)
+    RootedValue receiver(cx);
+    if (!fromVariant(cx, receiverVar, &receiver))
         return fail(aes, rs);
 
     RootedId id(cx);
@@ -310,8 +311,8 @@ WrapperAnswer::RecvGet(const ObjectId& objId, const ObjectVariant& receiverVar,
 }
 
 bool
-WrapperAnswer::RecvSet(const ObjectId &objId, const JSIDVariant &idVar, const JSVariant &value,
-                       const JSVariant &receiverVar, ReturnStatus *rs)
+WrapperAnswer::RecvSet(const ObjectId& objId, const JSIDVariant& idVar, const JSVariant& value,
+                       const JSVariant& receiverVar, ReturnStatus* rs)
 {
     // We may run scripted setters.
     AutoEntryScript aes(xpc::NativeGlobal(scopeForTargetObjects()),
@@ -499,9 +500,11 @@ WrapperAnswer::RecvHasInstance(const ObjectId& objId, const JSVariant& vVar, Ret
 }
 
 bool
-WrapperAnswer::RecvObjectClassIs(const ObjectId& objId, const uint32_t& classValue,
-                                 bool* result)
+WrapperAnswer::RecvGetBuiltinClass(const ObjectId& objId, ReturnStatus* rs,
+                                   uint32_t* classValue)
 {
+    *classValue = js::ESClass_Other;
+
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(scopeForTargetObjects())))
         return false;
@@ -509,20 +512,47 @@ WrapperAnswer::RecvObjectClassIs(const ObjectId& objId, const uint32_t& classVal
     JSContext* cx = jsapi.cx();
 
     RootedObject obj(cx, findObjectById(cx, objId));
-    if (!obj) {
-        // This is very unfortunate, but we have no choice.
-        *result = false;
-        return true;
-    }
+    if (!obj)
+        return fail(jsapi, rs);
 
-    LOG("%s.objectClassIs()", ReceiverObj(objId));
+    LOG("%s.getBuiltinClass()", ReceiverObj(objId));
 
-    *result = js::ObjectClassIs(cx, obj, (js::ESClassValue)classValue);
-    return true;
+    js::ESClassValue cls;
+    if (!js::GetBuiltinClass(cx, obj, &cls))
+        return fail(jsapi, rs);
+
+    *classValue = cls;
+    return ok(rs);
 }
 
 bool
-WrapperAnswer::RecvClassName(const ObjectId& objId, nsString* name)
+WrapperAnswer::RecvIsArray(const ObjectId& objId, ReturnStatus* rs,
+                           uint32_t* ans)
+{
+    *ans = uint32_t(IsArrayAnswer::NotArray);
+
+    AutoJSAPI jsapi;
+    if (NS_WARN_IF(!jsapi.Init(scopeForTargetObjects())))
+        return false;
+    jsapi.TakeOwnershipOfErrorReporting();
+    JSContext* cx = jsapi.cx();
+
+    RootedObject obj(cx, findObjectById(cx, objId));
+    if (!obj)
+        return fail(jsapi, rs);
+
+    LOG("%s.isArray()", ReceiverObj(objId));
+
+    IsArrayAnswer answer;
+    if (!JS::IsArray(cx, obj, &answer))
+        return fail(jsapi, rs);
+
+    *ans = uint32_t(answer);
+    return ok(rs);
+}
+
+bool
+WrapperAnswer::RecvClassName(const ObjectId& objId, nsCString* name)
 {
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(scopeForTargetObjects())))
@@ -538,12 +568,12 @@ WrapperAnswer::RecvClassName(const ObjectId& objId, nsString* name)
 
     LOG("%s.className()", ReceiverObj(objId));
 
-    *name = NS_ConvertASCIItoUTF16(js::ObjectClassName(cx, obj));
+    *name = js::ObjectClassName(cx, obj);
     return true;
 }
 
 bool
-WrapperAnswer::RecvGetPrototype(const ObjectId &objId, ReturnStatus *rs, ObjectOrNullVariant *result)
+WrapperAnswer::RecvGetPrototype(const ObjectId& objId, ReturnStatus* rs, ObjectOrNullVariant* result)
 {
     *result = NullVariant();
 
@@ -583,7 +613,6 @@ WrapperAnswer::RecvRegExpToShared(const ObjectId& objId, ReturnStatus* rs,
     if (!obj)
         return fail(jsapi, rs);
 
-    MOZ_RELEASE_ASSERT(JS_ObjectIsRegExp(cx, obj));
     RootedString sourceJSStr(cx, JS_GetRegExpSource(cx, obj));
     if (!sourceJSStr)
         return fail(jsapi, rs);

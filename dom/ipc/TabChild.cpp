@@ -251,7 +251,16 @@ TabChildBase::InitializeRootMetrics()
   // This is the root layer, so the cumulative resolution is the same
   // as the resolution.
   mLastRootMetrics.SetPresShellResolution(mLastRootMetrics.GetCumulativeResolution().ToScaleFactor().scale);
-  mLastRootMetrics.SetScrollOffset(CSSPoint(0, 0));
+
+  nsCOMPtr<nsIPresShell> shell = GetPresShell();
+  if (shell && shell->GetRootScrollFrameAsScrollable()) {
+    // The session history code might restore a scroll position when navigating
+    // back or forward, and we don't want to clobber that.
+    nsPoint pos = shell->GetRootScrollFrameAsScrollable()->GetScrollPosition();
+    mLastRootMetrics.SetScrollOffset(CSSPoint::FromAppUnits(pos));
+  } else {
+    mLastRootMetrics.SetScrollOffset(CSSPoint(0, 0));
+  }
 
   TABC_LOG("After InitializeRootMetrics, mLastRootMetrics is %s\n",
     Stringify(mLastRootMetrics).c_str());
@@ -1590,19 +1599,22 @@ TabChild::ProvideWindowCommon(nsIDOMWindow* aOpener,
     nsAutoCString baseURIString;
     baseURI->GetSpec(baseURIString);
 
-    // We can assume that if content is requesting to open a window from a remote
-    // tab, then we want to enforce that the new window is also a remote tab.
-    features.AppendLiteral(",remote");
+    nsresult rv;
 
     if (!SendCreateWindow(newChild,
                           aChromeFlags, aCalledFromJS, aPositionSpecified,
                           aSizeSpecified, url,
-                          name, NS_ConvertUTF8toUTF16(features),
+                          name, features,
                           NS_ConvertUTF8toUTF16(baseURIString),
+                          &rv,
                           aWindowIsNew,
                           &frameScripts,
                           &urlToLoad)) {
       return NS_ERROR_NOT_AVAILABLE;
+    }
+
+    if (NS_FAILED(rv)) {
+      return rv;
     }
   }
   if (!*aWindowIsNew) {
@@ -2212,6 +2224,13 @@ TabChild::RecvNotifyAPZStateChange(const ViewID& aViewId,
                                    const int& aArg)
 {
   mAPZEventState->ProcessAPZStateChange(GetDocument(), aViewId, aChange, aArg);
+  if (aChange == APZStateChange::TransformEnd) {
+    // This is used by tests to determine when the APZ is done doing whatever
+    // it's doing. XXX generify this as needed when writing additional tests.
+    DispatchMessageManagerMessage(
+      NS_LITERAL_STRING("APZ:TransformEnd"),
+      NS_LITERAL_STRING("{}"));
+  }
   return true;
 }
 
@@ -2356,7 +2375,7 @@ TabChild::UpdateTapState(const WidgetTouchEvent& aEvent, nsEventStatus aStatus)
   }
 
   bool currentlyTrackingTouch = (mActivePointerId >= 0);
-  if (aEvent.message == NS_TOUCH_START) {
+  if (aEvent.mMessage == NS_TOUCH_START) {
     if (currentlyTrackingTouch || aEvent.touches.Length() > 1) {
       // We're tracking a possible tap for another point, or we saw a
       // touchstart for a later pointer after we canceled tracking of
@@ -2396,7 +2415,7 @@ TabChild::UpdateTapState(const WidgetTouchEvent& aEvent, nsEventStatus aStatus)
 
   LayoutDevicePoint currentPoint = LayoutDevicePoint(trackedTouch->mRefPoint.x, trackedTouch->mRefPoint.y);
   int64_t time = aEvent.time;
-  switch (aEvent.message) {
+  switch (aEvent.mMessage) {
   case NS_TOUCH_MOVE:
     if (std::abs(currentPoint.x - mGestureDownPoint.x) > sDragThreshold.width ||
         std::abs(currentPoint.y - mGestureDownPoint.y) > sDragThreshold.height) {
@@ -2473,7 +2492,7 @@ TabChild::RecvRealTouchEvent(const WidgetTouchEvent& aEvent,
                              const uint64_t& aInputBlockId,
                              const nsEventStatus& aApzResponse)
 {
-  TABC_LOG("Receiving touch event of type %d\n", aEvent.message);
+  TABC_LOG("Receiving touch event of type %d\n", aEvent.mMessage);
 
   WidgetTouchEvent localEvent(aEvent);
   localEvent.widget = mPuppetWidget;
@@ -2481,7 +2500,7 @@ TabChild::RecvRealTouchEvent(const WidgetTouchEvent& aEvent,
   APZCCallbackHelper::ApplyCallbackTransform(localEvent, aGuid,
       mPuppetWidget->GetDefaultScale());
 
-  if (localEvent.message == NS_TOUCH_START && AsyncPanZoomEnabled()) {
+  if (localEvent.mMessage == NS_TOUCH_START && AsyncPanZoomEnabled()) {
     if (gfxPrefs::TouchActionEnabled()) {
       APZCCallbackHelper::SendSetAllowedTouchBehaviorNotification(mPuppetWidget,
           localEvent, aInputBlockId, mSetAllowedTouchBehaviorCallback);
@@ -2530,13 +2549,13 @@ TabChild::RecvRealDragEvent(const WidgetDragEvent& aEvent,
     }
   }
 
-  if (aEvent.message == NS_DRAGDROP_DROP) {
+  if (aEvent.mMessage == NS_DRAGDROP_DROP) {
     bool canDrop = true;
     if (!dragSession || NS_FAILED(dragSession->GetCanDrop(&canDrop)) ||
         !canDrop) {
-      localEvent.message = NS_DRAGDROP_EXIT;
+      localEvent.mMessage = NS_DRAGDROP_EXIT;
     }
-  } else if (aEvent.message == NS_DRAGDROP_OVER) {
+  } else if (aEvent.mMessage == NS_DRAGDROP_OVER) {
     nsCOMPtr<nsIDragService> dragService =
       do_GetService("@mozilla.org/widget/dragservice;1");
     if (dragService) {
@@ -2583,7 +2602,7 @@ TabChild::RecvRealKeyEvent(const WidgetKeyboardEvent& event,
 {
   AutoCacheNativeKeyCommands autoCache(mPuppetWidget);
 
-  if (event.message == NS_KEY_PRESS) {
+  if (event.mMessage == NS_KEY_PRESS) {
     // If content code called preventDefault() on a keydown event, then we don't
     // want to process any following keypress events.
     if (mIgnoreKeyPressEvent) {
@@ -2603,7 +2622,7 @@ TabChild::RecvRealKeyEvent(const WidgetKeyboardEvent& event,
   localEvent.widget = mPuppetWidget;
   nsEventStatus status = APZCCallbackHelper::DispatchWidgetEvent(localEvent);
 
-  if (event.message == NS_KEY_DOWN) {
+  if (event.mMessage == NS_KEY_DOWN) {
     mIgnoreKeyPressEvent = status == nsEventStatus_eConsumeNoDefault;
   }
 
@@ -2637,20 +2656,20 @@ TabChild::RecvKeyEvent(const nsString& aType,
 bool
 TabChild::RecvCompositionEvent(const WidgetCompositionEvent& event)
 {
-  unused << SendOnEventNeedingAckReceived(event.message);
   WidgetCompositionEvent localEvent(event);
   localEvent.widget = mPuppetWidget;
   APZCCallbackHelper::DispatchWidgetEvent(localEvent);
+  unused << SendOnEventNeedingAckHandled(event.mMessage);
   return true;
 }
 
 bool
 TabChild::RecvSelectionEvent(const WidgetSelectionEvent& event)
 {
-  unused << SendOnEventNeedingAckReceived(event.message);
   WidgetSelectionEvent localEvent(event);
   localEvent.widget = mPuppetWidget;
   APZCCallbackHelper::DispatchWidgetEvent(localEvent);
+  unused << SendOnEventNeedingAckHandled(event.mMessage);
   return true;
 }
 
@@ -3510,6 +3529,10 @@ TabChildGlobal::MarkForCC()
 {
   if (mTabChild) {
     mTabChild->MarkScopesForCC();
+  }
+  EventListenerManager* elm = GetExistingListenerManager();
+  if (elm) {
+    elm->MarkForCC();
   }
   return mMessageManager ? mMessageManager->MarkForCC() : false;
 }

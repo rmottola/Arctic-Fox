@@ -357,7 +357,7 @@ static const uint32_t EscapeChars[256] =
 {
      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // 0x
      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // 1x
-     0,1023,   0, 512,1023,   0,1023,   0,1023,1023,1023,1023,1023,1023, 953, 784,  // 2x   !"#$%&'()*+,-./
+     0,1023,   0, 512,1023,   0,1023, 112,1023,1023,1023,1023,1023,1023, 953, 784,  // 2x   !"#$%&'()*+,-./
   1023,1023,1023,1023,1023,1023,1023,1023,1023,1023,1008,1008,   0,1008,   0, 768,  // 3x  0123456789:;<=>?
   1008,1023,1023,1023,1023,1023,1023,1023,1023,1023,1023,1023,1023,1023,1023,1023,  // 4x  @ABCDEFGHIJKLMNO
   1023,1023,1023,1023,1023,1023,1023,1023,1023,1023,1023, 896, 896, 896, 896,1023,  // 5x  PQRSTUVWXYZ[\]^_
@@ -470,7 +470,7 @@ NS_EscapeURL(const char* aPart, int32_t aPartLen, uint32_t aFlags,
 const nsSubstring&
 NS_EscapeURL(const nsSubstring& aStr, uint32_t aFlags, nsSubstring& aResult)
 {
-  if (T_EscapeURL(aStr.Data(), aStr.Length(), aFlags, aResult)) {
+  if (T_EscapeURL<nsSubstring>(aStr.Data(), aStr.Length(), aFlags, aResult)) {
     return aResult;
   }
   return aStr;

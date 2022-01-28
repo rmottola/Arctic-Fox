@@ -978,7 +978,7 @@
         # The Mac SDK is set for iOS builds and passed through to Mac
         # sub-builds. This allows the Mac sub-build SDK in an iOS build to be
         # overridden from the command line the same way it is for a Mac build.
-        'mac_sdk%': '<!(<(PYTHON) <(DEPTH)/build/mac/find_sdk.py 10.6)',
+        'mac_sdk%': '<!(<(PYTHON) <(DEPTH)/build/mac/find_sdk.py 10.5)',
 
         # iOS SDK and deployment target support.  The iOS 5.0 SDK is actually
         # what is required, but the value is left blank so when it is set in
@@ -1135,10 +1135,10 @@
           # someplace that Xcode doesn't know about, set mac_sdk_path to the
           # path to the SDK; when set to a non-empty string, SDK detection
           # based on mac_sdk_min will be bypassed entirely.
-          'mac_sdk_min%': '10.6',
+          'mac_sdk_min%': '10.5',
           'mac_sdk_path%': '',
 
-          'mac_deployment_target%': '10.6',
+          'mac_deployment_target%': '10.5',
         },
 
         'mac_sdk_min': '<(mac_sdk_min)',

@@ -945,20 +945,22 @@ Debugger::unwrapPropertyDescriptor(JSContext *cx, HandleObject obj,
 
     if (desc.hasGetterObject()) {
         RootedObject get(cx, desc.getterObject());
-        if (!unwrapDebuggeeObject(cx, &get) ||
-            !CheckArgCompartment(cx, obj, get, "defineProperty", "get"))
-        {
-            return false;
+        if (get) {
+            if (!unwrapDebuggeeObject(cx, &get))
+                return false;
+            if (!CheckArgCompartment(cx, obj, get, "defineProperty", "get"))
+                return false;
         }
         desc.setGetterObject(get);
     }
 
     if (desc.hasSetterObject()) {
         RootedObject set(cx, desc.setterObject());
-        if (!unwrapDebuggeeObject(cx, &set) ||
-            !CheckArgCompartment(cx, obj, set, "defineProperty", "set"))
-        {
-            return false;
+        if (set) {
+            if (!unwrapDebuggeeObject(cx, &set))
+                return false;
+            if (!CheckArgCompartment(cx, obj, set, "defineProperty", "set"))
+                return false;
         }
         desc.setSetterObject(set);
     }
@@ -1994,6 +1996,7 @@ Debugger::updateExecutionObservabilityOfFrames(JSContext* cx, const ExecutionObs
         }
     }
 
+    AbstractFramePtr oldestEnabledFrame;
     for (ScriptFrameIter iter(cx, ScriptFrameIter::ALL_CONTEXTS,
                               ScriptFrameIter::GO_THROUGH_SAVED);
          !iter.done();
@@ -2001,7 +2004,10 @@ Debugger::updateExecutionObservabilityOfFrames(JSContext* cx, const ExecutionObs
     {
         if (obs.shouldMarkAsDebuggee(iter)) {
             if (observing) {
-                iter.abstractFramePtr().setIsDebuggee();
+                if (!iter.abstractFramePtr().isDebuggee()) {
+                    oldestEnabledFrame = iter.abstractFramePtr();
+                    oldestEnabledFrame.setIsDebuggee();
+                }
             } else {
 #ifdef DEBUG
                 // Debugger.Frame lifetimes are managed by the debug epilogue,
@@ -2014,6 +2020,13 @@ Debugger::updateExecutionObservabilityOfFrames(JSContext* cx, const ExecutionObs
             }
         }
     }
+
+    // See comment in unsetPrevUpToDateUntil.
+    if (oldestEnabledFrame) {
+        AutoCompartment ac(cx, oldestEnabledFrame.compartment());
+        DebugScopes::unsetPrevUpToDateUntil(cx, oldestEnabledFrame);
+    }
+
     return true;
 }
 
@@ -6986,7 +6999,7 @@ null(CallArgs& args)
     return true;
 }
 
-/* static */ JSObject*
+/* static */ SavedFrame*
 Debugger::getObjectAllocationSite(JSObject& obj)
 {
     JSObject* metadata = GetObjectMetadata(&obj);
@@ -6995,7 +7008,7 @@ Debugger::getObjectAllocationSite(JSObject& obj)
 
     MOZ_ASSERT(!metadata->is<WrapperObject>());
     return SavedFrame::isSavedFrameAndNotProto(*metadata)
-        ? metadata
+        ? &metadata->as<SavedFrame>()
         : nullptr;
 }
 

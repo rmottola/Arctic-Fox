@@ -30,18 +30,14 @@
  * Messages sent:
  *
  *   Printing:Print
- *     This message is sent to kick off a print job for a particular content
- *     window (which is passed along with the message). We also pass print
- *     settings with this message - though bug 1088070 will have us gather
- *     those settings from the content process instead.
+ *     Kick off a print job for a nsIDOMWindow, passing the outer window ID as
+ *     windowID.
  *
  *   Printing:Preview:Enter
  *     This message is sent to put content into print preview mode. We pass
  *     the content window of the browser we're showing the preview of, and
  *     the target of the message is the browser that we'll be showing the
- *     preview in. We also pass print settings in this message, but
- *     bug 1088070 will have us gather those settings from the content process
- *     instead.
+ *     preview in.
  *
  *   Printing:Preview:Exit
  *     This message is sent to take content out of print preview mode.
@@ -69,22 +65,6 @@ var gSavePrintSettings = false;
 var gFocusedElement = null;
 
 var PrintUtils = {
-  bailOut: function () {
-    let pref = Components.classes["@mozilla.org/preferences-service;1"]
-                         .getService(Components.interfaces.nsIPrefBranch);
-    let allow_for_testing = false;
-    try {
-      allow_for_testing = pref.getBoolPref("print.enable_e10s_testing");
-    } catch(e) {
-      // The pref wasn't set, so I guess we're not overriding.
-    }
-    if (this.usingRemoteTabs && !allow_for_testing) {
-      alert("e10s printing is not implemented yet. Bug 927188.");
-      return true;
-    }
-    return false;
-  },
-
   /**
    * Shows the page setup dialog, and saves any settings changed in
    * that dialog if print.save_print_settings is set to true.
@@ -92,9 +72,6 @@ var PrintUtils = {
    * @return true on success, false on failure
    */
   showPageSetup: function () {
-    if (this.bailOut()) {
-      return;
-    }
     try {
       var printSettings = this.getPrintSettings();
       var PRINTPROMPTSVC = Components.classes["@mozilla.org/embedcomp/printingprompt-service;1"]
@@ -114,63 +91,58 @@ var PrintUtils = {
   },
 
   /**
-   * Starts printing the contents of aWindow.
+   * Starts the process of printing the contents of a window.
    *
-   * @param aWindow
-   *        An nsIDOMWindow to initiate the printing of. If the chrome window
-   *        is not running with remote tabs, this defaults to window.content if
-   *        omitted. If running with remote tabs, the caller must pass in the
-   *        content window to be printed. This function throws if that invariant
-   *        is violated.
-   * @param aBrowser (optional for non-remote browsers)
-   *        The remote <xul:browser> that contains aWindow. This argument is
-   *        not necessary if aWindow came from a non-remote browser, but is
-   *        strictly required otherwise. This function will throw if aWindow
-   *        comes from a remote browser and aBrowser is not provided. This
-   *        browser must have its type attribute set to "content",
-   *        "content-targetable", or "content-primary".
+   * @param aWindowID
+   *        The outer window ID of the nsIDOMWindow to print.
+   * @param aBrowser
+   *        The <xul:browser> that the nsIDOMWindow for aWindowID belongs to.
    */
-  print: function (aWindow, aBrowser)
+  printWindow: function (aWindowID, aBrowser)
   {
-    if (this.bailOut()) {
-      return;
+    let mm = aBrowser.messageManager;
+    mm.sendAsyncMessage("Printing:Print", {
+      windowID: aWindowID,
+    });
+  },
+
+  /**
+   * Deprecated.
+   *
+   * Starts the process of printing the contents of window.content.
+   *
+   */
+  print: function ()
+  {
+    if (gBrowser) {
+      return this.printWindow(gBrowser.selectedBrowser.outerWindowID,
+                              gBrowser.selectedBrowser);
     }
 
-    if (!aWindow) {
-      // If we're using remote browsers, chances are that window.content will
-      // not be defined.
-      if (this.usingRemoteTabs) {
-        throw new Error("Windows running with remote tabs must explicitly pass " +
-                        "a content window to PrintUtils.print.");
-      }
-      // Otherwise, we should have access to window.content.
-      aWindow = window.content;
+    if (this.usingRemoteTabs) {
+      throw new Error("PrintUtils.print cannot be run in windows running with " +
+                      "remote tabs. Use PrintUtils.printWindow instead.");
     }
 
-    if (Components.utils.isCrossProcessWrapper(aWindow)) {
-      if (!aBrowser) {
-        throw new Error("PrintUtils.print expects a remote browser passed as " +
-                        "an argument if the content window is a CPOW.");
-      }
-    } else {
-      // For content windows coming from non-remote browsers, the browser can
-      // be resolved as the chromeEventHandler.
-      aBrowser = aWindow.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-                        .getInterface(Components.interfaces.nsIWebNavigation)
-                        .QueryInterface(Components.interfaces.nsIDocShell)
-                        .chromeEventHandler;
-    }
-
-    if (!aBrowser) {
+    let domWindow = window.content;
+    let ifReq = domWindow.QueryInterface(Components.interfaces.nsIInterfaceRequestor);
+    let browser = ifReq.getInterface(Components.interfaces.nsIWebNavigation)
+                       .QueryInterface(Components.interfaces.nsIDocShell)
+                       .chromeEventHandler;
+    if (!browser) {
       throw new Error("PrintUtils.print could not resolve content window " +
                       "to a browser.");
     }
 
-    let mm = aBrowser.messageManager;
+    let windowID = ifReq.getInterface(Components.interfaces.nsIDOMWindowUtils)
+                        .outerWindowID;
 
-    mm.sendAsyncMessage("Printing:Print", null, {
-      contentWindow: aWindow,
-    });
+    let Deprecated = Components.utils.import("resource://gre/modules/Deprecated.jsm", {}).Deprecated;
+    let msg = "PrintUtils.print is now deprecated. Please use PrintUtils.printWindow.";
+    let url = "https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XUL/Printing";
+    Deprecated.warning(msg, url);
+
+    this.printWindow(windowID, browser);
   },
 
   /**
@@ -205,9 +177,6 @@ var PrintUtils = {
    */
   printPreview: function (aListenerObj)
   {
-    if (this.bailOut()) {
-      return;
-    }
     // if we're already in PP mode, don't set the listener; chances
     // are it is null because someone is calling printPreview() to
     // get us to refresh the display.
@@ -436,9 +405,8 @@ var PrintUtils = {
     // listener.
     let ppBrowser = this._listener.getPrintPreviewBrowser();
     let mm = ppBrowser.messageManager;
-    mm.sendAsyncMessage("Printing:Preview:Enter", null, {
-      contentWindow: this._sourceBrowser.contentWindowAsCPOW ||
-                     this._sourceBrowser.contentWindow,
+    mm.sendAsyncMessage("Printing:Preview:Enter", {
+      windowID: this._sourceBrowser.outerWindowID,
     });
 
     if (this._webProgressPP.value) {

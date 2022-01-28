@@ -33,11 +33,18 @@ CompositingRenderTargetOGL::BindTexture(GLenum aTextureUnit, GLenum aTextureTarg
 void
 CompositingRenderTargetOGL::BindRenderTarget()
 {
+  bool needsClear = false;
+
   if (mInitParams.mStatus != InitParams::INITIALIZED) {
     InitializeImpl();
+    if (mInitParams.mInit == INIT_MODE_CLEAR) {
+      needsClear = true;
+      mClearOnBind = false;
+    }
   } else {
     MOZ_ASSERT(mInitParams.mStatus == InitParams::INITIALIZED);
-    mGL->fBindFramebuffer(LOCAL_GL_FRAMEBUFFER, mFBO);
+    GLuint fbo = mFBO == 0 ? mGL->GetDefaultFramebuffer() : mFBO;
+    mGL->fBindFramebuffer(LOCAL_GL_FRAMEBUFFER, fbo);
     GLenum result = mGL->fCheckFramebufferStatus(LOCAL_GL_FRAMEBUFFER);
     if (result != LOCAL_GL_FRAMEBUFFER_COMPLETE) {
       // The main framebuffer (0) of non-offscreen contexts
@@ -57,14 +64,14 @@ CompositingRenderTargetOGL::BindRenderTarget()
       }
     }
 
-    mCompositor->PrepareViewport(mInitParams.mSize);
+    needsClear = mClearOnBind;
   }
 
-  if (mClearOnBind) {
+  if (needsClear) {
     mGL->fScissor(0, 0, mInitParams.mSize.width, mInitParams.mSize.height);
     mGL->fClearColor(0.0, 0.0, 0.0, 0.0);
-    mGL->fClear(LOCAL_GL_COLOR_BUFFER_BIT);
-    mClearOnBind = false;
+    mGL->fClearDepth(0.0);
+    mGL->fClear(LOCAL_GL_COLOR_BUFFER_BIT | LOCAL_GL_DEPTH_BUFFER_BIT);
   }
 }
 
@@ -83,7 +90,9 @@ CompositingRenderTargetOGL::InitializeImpl()
 {
   MOZ_ASSERT(mInitParams.mStatus == InitParams::READY);
 
-  mGL->fBindFramebuffer(LOCAL_GL_FRAMEBUFFER, mFBO);
+  //TODO: call mGL->GetBackbufferFB(), use that
+  GLuint fbo = mFBO == 0 ? mGL->GetDefaultFramebuffer() : mFBO;
+  mGL->fBindFramebuffer(LOCAL_GL_FRAMEBUFFER, fbo);
   mGL->fFramebufferTexture2D(LOCAL_GL_FRAMEBUFFER,
                               LOCAL_GL_COLOR_ATTACHMENT0,
                               mInitParams.mFBOTextureTarget,
@@ -101,15 +110,6 @@ CompositingRenderTargetOGL::InitializeImpl()
   }
 
   mInitParams.mStatus = InitParams::INITIALIZED;
-
-  mCompositor->PrepareViewport(mInitParams.mSize);
-  mGL->fScissor(0, 0, mInitParams.mSize.width, mInitParams.mSize.height);
-  if (mInitParams.mInit == INIT_MODE_CLEAR) {
-    mGL->fClearColor(0.0, 0.0, 0.0, 0.0);
-    mGL->fClear(LOCAL_GL_COLOR_BUFFER_BIT);
-    mClearOnBind = false;
-  }
-
 }
 
 } // namespace layers

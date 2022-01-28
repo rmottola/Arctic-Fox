@@ -168,7 +168,7 @@ class MIRGenerator
 
     // When abortReason() == AbortReason_PreliminaryObjects, all groups with
     // preliminary objects which haven't been analyzed yet.
-    const ObjectGroupVector &abortedPreliminaryGroups() const {
+    const ObjectGroupVector& abortedPreliminaryGroups() const {
         return abortedPreliminaryGroups_;
     }
 

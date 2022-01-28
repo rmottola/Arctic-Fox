@@ -229,8 +229,8 @@ js::Allocate(ExclusiveContext* cx)
     macro(js::jit::JitCode)
 
 #define DECL_ALLOCATOR_INSTANCES(type) \
-    template type *js::Allocate<type, NoGC>(ExclusiveContext *cx);\
-    template type *js::Allocate<type, CanGC>(ExclusiveContext *cx);
+    template type* js::Allocate<type, NoGC>(ExclusiveContext* cx);\
+    template type* js::Allocate<type, CanGC>(ExclusiveContext* cx);
 FOR_ALL_NON_OBJECT_GC_LAYOUTS(DECL_ALLOCATOR_INSTANCES)
 #undef DECL_ALLOCATOR_INSTANCES
 
@@ -320,8 +320,8 @@ ArenaLists::allocateFromArena(JS::Zone* zone, AllocKind thingKind,
     if (backgroundFinalizeState[thingKind] != BFS_DONE)
         maybeLock.emplace(rt);
 
-    ArenaList &al = arenaLists[thingKind];
-    ArenaHeader *aheader = al.takeNextArena();
+    ArenaList& al = arenaLists[thingKind];
+    ArenaHeader* aheader = al.takeNextArena();
     if (aheader) {
         // Empty arenas should be immediately freed.
         MOZ_ASSERT(!aheader->isEmpty());

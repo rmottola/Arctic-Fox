@@ -154,11 +154,18 @@ DirectProxyHandler::isExtensible(JSContext *cx, HandleObject proxy, bool *extens
 }
 
 bool
-DirectProxyHandler::objectClassIs(HandleObject proxy, ESClassValue classValue,
-                                  JSContext* cx) const
+DirectProxyHandler::getBuiltinClass(JSContext* cx, HandleObject proxy,
+                                    ESClassValue* classValue) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
-    return ObjectClassIs(target, classValue, cx);
+    return GetBuiltinClass(cx, target, classValue);
+}
+
+bool
+DirectProxyHandler::isArray(JSContext* cx, HandleObject proxy, JS::IsArrayAnswer* answer) const
+{
+    RootedObject target(cx, proxy->as<ProxyObject>().target());
+    return IsArray(cx, target, answer);
 }
 
 const char*
@@ -217,7 +224,7 @@ DirectProxyHandler::hasOwn(JSContext* cx, HandleObject proxy, HandleId id, bool*
 }
 
 bool
-DirectProxyHandler::get(JSContext* cx, HandleObject proxy, HandleObject receiver,
+DirectProxyHandler::get(JSContext* cx, HandleObject proxy, HandleValue receiver,
                         HandleId id, MutableHandleValue vp) const
 {
     assertEnteredPolicy(cx, proxy, id, GET);

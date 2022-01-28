@@ -517,8 +517,7 @@ Preferences::Init()
 {
   nsresult rv;
 
-  rv = PREF_Init();
-  NS_ENSURE_SUCCESS(rv, rv);
+  PREF_Init();
 
   rv = pref_InitInitialObjects();
   NS_ENSURE_SUCCESS(rv, rv);
@@ -638,8 +637,7 @@ Preferences::ResetPrefs()
   NotifyServiceObservers(NS_PREFSERVICE_RESET_TOPIC_ID);
   PREF_CleanupPrefs();
 
-  nsresult rv = PREF_Init();
-  NS_ENSURE_SUCCESS(rv, rv);
+  PREF_Init();
 
   return pref_InitInitialObjects();
 }
@@ -801,7 +799,6 @@ nsresult
 Preferences::UseDefaultPrefFile()
 {
   nsCOMPtr<nsIFile> aFile;
-
   nsresult rv = NS_GetSpecialDirectory(NS_APP_PREFS_50_FILE, getter_AddRefs(aFile));
 
   if (NS_SUCCEEDED(rv)) {
@@ -1208,10 +1205,10 @@ static nsresult pref_InitInitialObjects()
   nsresult rv;
 
   // In omni.jar case, we load the following prefs:
-  // - jar:$gre/omni.jar!/gecko.js
+  // - jar:$gre/omni.jar!/greprefs.js
   // - jar:$gre/omni.jar!/defaults/pref/*.js
   // In non omni.jar case, we load:
-  // - $gre/gecko.js
+  // - $gre/greprefs.js
   //
   // In both cases, we also load:
   // - $gre/defaults/pref/*.js
@@ -1238,8 +1235,8 @@ static nsresult pref_InitInitialObjects()
 
   nsRefPtr<nsZipArchive> jarReader = mozilla::Omnijar::GetReader(mozilla::Omnijar::GRE);
   if (jarReader) {
-    // Load jar:$gre/omni.jar!/gecko.js
-    rv = pref_ReadPrefFromJar(jarReader, "gecko.js");
+    // Load jar:$gre/omni.jar!/greprefs.js
+    rv = pref_ReadPrefFromJar(jarReader, "greprefs.js");
     NS_ENSURE_SUCCESS(rv, rv);
 
     // Load jar:$gre/omni.jar!/defaults/pref/*.js
@@ -1258,12 +1255,12 @@ static nsresult pref_InitInitialObjects()
         NS_WARNING("Error parsing preferences.");
     }
   } else {
-    // Load $gre/gecko.js
+    // Load $gre/greprefs.js
     nsCOMPtr<nsIFile> greprefsFile;
     rv = NS_GetSpecialDirectory(NS_GRE_DIR, getter_AddRefs(greprefsFile));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    rv = greprefsFile->AppendNative(NS_LITERAL_CSTRING("gecko.js"));
+    rv = greprefsFile->AppendNative(NS_LITERAL_CSTRING("greprefs.js"));
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = openPrefFile(greprefsFile);

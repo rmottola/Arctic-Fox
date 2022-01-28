@@ -303,13 +303,14 @@ protected:
    * if it goes away during the event).
    */
   nsIFrame* DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
-                                        uint32_t aMessage,
+                                        EventMessage aMessage,
                                         nsIContent* aTargetContent,
                                         nsIContent* aRelatedContent);
   /**
    * Synthesize DOM pointerover and pointerout events
    */
-  void GeneratePointerEnterExit(uint32_t aMessage, WidgetMouseEvent* aEvent);
+  void GeneratePointerEnterExit(EventMessage aMessage,
+                                WidgetMouseEvent* aEvent);
   /**
    * Synthesize DOM and frame mouseover and mouseout events from this
    * MOUSE_MOVE or MOUSE_EXIT event.
@@ -351,7 +352,7 @@ protected:
    */
   void FireDragEnterOrExit(nsPresContext* aPresContext,
                            WidgetDragEvent* aDragEvent,
-                           uint32_t aMsg,
+                           EventMessage aMessage,
                            nsIContent* aRelatedTarget,
                            nsIContent* aTargetContent,
                            nsWeakFrame& aTargetFrame);
@@ -363,7 +364,7 @@ protected:
 
   static nsresult InitAndDispatchClickEvent(WidgetMouseEvent* aEvent,
                                             nsEventStatus* aStatus,
-                                            uint32_t aType,
+                                            EventMessage aMessage,
                                             nsIPresShell* aPresShell,
                                             nsIContent* aMouseTarget,
                                             nsWeakFrame aCurrentTarget,
@@ -964,7 +965,7 @@ private:
 // has no frame. This is required for Web compatibility.
 #define NS_EVENT_NEEDS_FRAME(event) \
     (!(event)->HasPluginActivationEventMessage() && \
-     (event)->message != NS_MOUSE_CLICK && \
-     (event)->message != NS_MOUSE_DOUBLECLICK)
+     (event)->mMessage != NS_MOUSE_CLICK && \
+     (event)->mMessage != NS_MOUSE_DOUBLECLICK)
 
 #endif // mozilla_EventStateManager_h_

@@ -626,7 +626,7 @@ public:
   virtual bool has(JSContext *cx, JS::Handle<JSObject*> proxy,
                    JS::Handle<jsid> id, bool *bp) const override;
   virtual bool get(JSContext *cx, JS::Handle<JSObject*> proxy,
-                   JS::Handle<JSObject*> receiver,
+                   JS::Handle<JS::Value> receiver,
                    JS::Handle<jsid> id,
                    JS::MutableHandle<JS::Value> vp) const override;
   virtual bool set(JSContext *cx, JS::Handle<JSObject*> proxy,
@@ -871,7 +871,7 @@ nsOuterWindowProxy::hasOwn(JSContext *cx, JS::Handle<JSObject*> proxy,
 
 bool
 nsOuterWindowProxy::get(JSContext *cx, JS::Handle<JSObject*> proxy,
-                        JS::Handle<JSObject*> receiver,
+                        JS::Handle<JS::Value> receiver,
                         JS::Handle<jsid> id,
                         JS::MutableHandle<JS::Value> vp) const
 {
@@ -3050,7 +3050,7 @@ nsGlobalWindow::PreHandleEvent(EventChainPreVisitor& aVisitor)
 {
   NS_PRECONDITION(IsInnerWindow(), "PreHandleEvent is used on outer window!?");
   static uint32_t count = 0;
-  uint32_t msg = aVisitor.mEvent->message;
+  EventMessage msg = aVisitor.mEvent->mMessage;
 
   aVisitor.mCanHandle = true;
   aVisitor.mForceContentDispatch = true; //FIXME! Bug 329119
@@ -3258,7 +3258,7 @@ nsGlobalWindow::PostHandleEvent(EventChainPostVisitor& aVisitor)
   NS_PRECONDITION(IsInnerWindow(), "PostHandleEvent is used on outer window!?");
 
   // Return early if there is nothing to do.
-  switch (aVisitor.mEvent->message) {
+  switch (aVisitor.mEvent->mMessage) {
     case NS_RESIZE_EVENT:
     case NS_PAGE_UNLOAD:
     case NS_LOAD:
@@ -3273,9 +3273,9 @@ nsGlobalWindow::PostHandleEvent(EventChainPostVisitor& aVisitor)
   nsCOMPtr<nsIDOMEventTarget> kungFuDeathGrip1(mChromeEventHandler);
   nsCOMPtr<nsIScriptContext> kungFuDeathGrip2(GetContextInternal());
 
-  if (aVisitor.mEvent->message == NS_RESIZE_EVENT) {
+  if (aVisitor.mEvent->mMessage == NS_RESIZE_EVENT) {
     mIsHandlingResizeEvent = false;
-  } else if (aVisitor.mEvent->message == NS_PAGE_UNLOAD &&
+  } else if (aVisitor.mEvent->mMessage == NS_PAGE_UNLOAD &&
              aVisitor.mEvent->mFlags.mIsTrusted) {
     // Execute bindingdetached handlers before we tear ourselves
     // down.
@@ -3283,7 +3283,7 @@ nsGlobalWindow::PostHandleEvent(EventChainPostVisitor& aVisitor)
       mDoc->BindingManager()->ExecuteDetachedHandlers();
     }
     mIsDocumentLoaded = false;
-  } else if (aVisitor.mEvent->message == NS_LOAD &&
+  } else if (aVisitor.mEvent->mMessage == NS_LOAD &&
              aVisitor.mEvent->mFlags.mIsTrusted) {
     // This is page load event since load events don't propagate to |window|.
     // @see nsDocument::PreHandleEvent.
@@ -6302,11 +6302,18 @@ public:
     , mDuration(aDuration)
     , mStage(eBeforeToggle)
     , mFullscreen(aFullscreen)
-  {}
+  {
+    MOZ_COUNT_CTOR(FullscreenTransitionTask);
+  }
 
   NS_IMETHOD Run() override;
 
 private:
+  virtual ~FullscreenTransitionTask()
+  {
+    MOZ_COUNT_DTOR(FullscreenTransitionTask);
+  }
+
   enum Stage {
     // BeforeToggle stage happens before we enter or leave fullscreen
     // state. In this stage, the task triggers the pre-toggle fullscreen
@@ -6379,7 +6386,8 @@ FullscreenTransitionTask::Run()
       mWindow->mFullScreen = mFullscreen;
     }
     // Toggle the fullscreen state on the widget
-    mWidget->MakeFullScreen(mFullscreen, mScreen);
+    mWindow->SetWidgetFullscreen(nsPIDOMWindow::eForFullscreenAPI,
+                                 mFullscreen, mWidget, mScreen);
     // Set observer for the next content paint.
     nsCOMPtr<nsIObserver> observer = new Observer(this);
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
@@ -6458,13 +6466,7 @@ MakeWidgetFullscreen(nsGlobalWindow* aWindow, gfx::VRHMDInfo* aHMD,
   }
   nsCOMPtr<nsIScreen> screen = aHMD ? aHMD->GetScreen() : nullptr;
   if (!performTransition) {
-    if (aReason == nsPIDOMWindow::eForFullscreenMode) {
-      // If we enter fullscreen for fullscreen mode, we want
-      // the native system behavior.
-      widget->MakeFullScreenWithNativeTransition(aFullscreen, screen);
-    } else {
-      widget->MakeFullScreen(aFullscreen, screen);
-    }
+    aWindow->SetWidgetFullscreen(aReason, aFullscreen, widget, screen);
   } else {
     nsCOMPtr<nsIRunnable> task =
       new FullscreenTransitionTask(duration, aWindow, aFullscreen,
@@ -6480,8 +6482,15 @@ nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
                                       gfx::VRHMDInfo* aHMD)
 {
   MOZ_ASSERT(IsOuterWindow());
+  MOZ_ASSERT(nsContentUtils::IsSafeToRunScript(),
+             "Requires safe to run script as it "
+             "may call FinishDOMFullscreenChange");
 
   NS_ENSURE_TRUE(mDocShell, NS_ERROR_FAILURE);
+
+  MOZ_ASSERT(aReason != eForForceExitFullscreen || !aFullScreen,
+             "FullscreenReason::eForForceExitFullscreen can "
+             "only be used with exiting fullscreen");
 
   // Only chrome can change our fullscreen mode. Otherwise, the state
   // can only be changed for DOM fullscreen.
@@ -6553,6 +6562,27 @@ nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
   return NS_OK;
 }
 
+void
+nsGlobalWindow::SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen,
+                                    nsIWidget* aWidget, nsIScreen* aScreen)
+{
+  MOZ_ASSERT(IsOuterWindow());
+  MOZ_ASSERT(this == GetTopInternal(), "Only topmost window should call this");
+  MOZ_ASSERT(!GetFrameElementInternal(), "Content window should not call this");
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+
+  if (nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell()) {
+    presShell->SetIsInFullscreenChange(true);
+  }
+  if (aReason == nsPIDOMWindow::eForFullscreenMode) {
+    // If we enter fullscreen for fullscreen mode, we want
+    // the native system behavior.
+    aWidget->MakeFullScreenWithNativeTransition(aIsFullscreen, aScreen);
+  } else {
+    aWidget->MakeFullScreen(aIsFullscreen, aScreen);
+  }
+}
+
 /* virtual */ void
 nsGlobalWindow::FinishFullscreenChange(bool aIsFullscreen)
 {
@@ -6584,6 +6614,11 @@ nsGlobalWindow::FinishFullscreenChange(bool aIsFullscreen)
   // dispatch a "fullscreen" DOM event so that XUL apps can
   // respond visually if we are kicked into full screen mode
   DispatchCustomEvent(NS_LITERAL_STRING("fullscreen"));
+
+  if (nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell()) {
+    MOZ_ASSERT(presShell->IsInFullscreenChange());
+    presShell->SetIsInFullscreenChange(false);
+  }
 
   if (!mWakeLock && mFullScreen) {
     nsRefPtr<power::PowerManagerService> pmService =
@@ -9082,8 +9117,7 @@ nsGlobalWindow::LeaveModalState()
     inner->mLastDialogQuitTime = TimeStamp::Now();
 
   if (topWin->mModalStateDepth == 0) {
-    nsCOMPtr<nsIDOMEvent> event;
-    NS_NewDOMEvent(getter_AddRefs(event), topWin, nullptr, nullptr);
+    nsRefPtr<Event> event = NS_NewDOMEvent(topWin, nullptr, nullptr);
     event->InitEvent(NS_LITERAL_STRING("endmodalstate"), true, false);
     event->SetTrusted(true);
     event->GetInternalNSEvent()->mFlags.mOnlyChromeDispatch = true;
@@ -11888,8 +11922,7 @@ nsGlobalWindow::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    nsCOMPtr<nsIDOMEvent> event;
-    NS_NewDOMEvent(getter_AddRefs(event), this, nullptr, nullptr);
+    nsRefPtr<Event> event = NS_NewDOMEvent(this, nullptr, nullptr);
     nsresult rv = event->InitEvent(
       !nsCRT::strcmp(aTopic, NS_NETWORK_ACTIVITY_BLIP_UPLOAD_TOPIC)
         ? NETWORK_UPLOAD_EVENT_NAME
@@ -11925,8 +11958,7 @@ nsGlobalWindow::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    nsCOMPtr<nsIDOMEvent> event;
-    NS_NewDOMEvent(getter_AddRefs(event), this, nullptr, nullptr);
+    nsRefPtr<Event> event = NS_NewDOMEvent(this, nullptr, nullptr);
     nsresult rv = event->InitEvent(NS_LITERAL_STRING("languagechange"), false, false);
     NS_ENSURE_SUCCESS(rv, rv);
 
@@ -14539,7 +14571,7 @@ nsGlobalWindow::GetIsPrerendered()
 
 #ifdef MOZ_B2G
 void
-nsGlobalWindow::EnableNetworkEvent(uint32_t aType)
+nsGlobalWindow::EnableNetworkEvent(EventMessage aEventMessage)
 {
   MOZ_ASSERT(IsInnerWindow());
 
@@ -14564,7 +14596,7 @@ nsGlobalWindow::EnableNetworkEvent(uint32_t aType)
     return;
   }
 
-  switch (aType) {
+  switch (aEventMessage) {
     case NS_NETWORK_UPLOAD_EVENT:
       if (!mNetworkUploadObserverEnabled) {
         mNetworkUploadObserverEnabled = true;
@@ -14577,11 +14609,13 @@ nsGlobalWindow::EnableNetworkEvent(uint32_t aType)
         os->AddObserver(mObserver, NS_NETWORK_ACTIVITY_BLIP_DOWNLOAD_TOPIC, false);
       }
       break;
+    default:
+      break;
   }
 }
 
 void
-nsGlobalWindow::DisableNetworkEvent(uint32_t aType)
+nsGlobalWindow::DisableNetworkEvent(EventMessage aEventMessage)
 {
   MOZ_ASSERT(IsInnerWindow());
 
@@ -14590,7 +14624,7 @@ nsGlobalWindow::DisableNetworkEvent(uint32_t aType)
     return;
   }
 
-  switch (aType) {
+  switch (aEventMessage) {
     case NS_NETWORK_UPLOAD_EVENT:
       if (mNetworkUploadObserverEnabled) {
         mNetworkUploadObserverEnabled = false;
@@ -14602,6 +14636,8 @@ nsGlobalWindow::DisableNetworkEvent(uint32_t aType)
         mNetworkDownloadObserverEnabled = false;
         os->RemoveObserver(mObserver, NS_NETWORK_ACTIVITY_BLIP_DOWNLOAD_TOPIC);
       }
+      break;
+    default:
       break;
   }
 }

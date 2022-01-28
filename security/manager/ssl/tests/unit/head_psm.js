@@ -32,21 +32,20 @@ const SEC_ERROR_BASE = Ci.nsINSSErrorsService.NSS_SEC_ERROR_BASE;
 const SSL_ERROR_BASE = Ci.nsINSSErrorsService.NSS_SSL_ERROR_BASE;
 const MOZILLA_PKIX_ERROR_BASE = Ci.nsINSSErrorsService.MOZILLA_PKIX_ERROR_BASE;
 
+// This isn't really a valid PRErrorCode, but is useful for signalling that
+// a test is expected to succeed.
+const PRErrorCodeSuccess = 0;
+
 // Sort in numerical order
-const SEC_ERROR_INVALID_ARGS                            = SEC_ERROR_BASE +   5; // -8187
 const SEC_ERROR_INVALID_TIME                            = SEC_ERROR_BASE +   8;
 const SEC_ERROR_BAD_DER                                 = SEC_ERROR_BASE +   9;
 const SEC_ERROR_EXPIRED_CERTIFICATE                     = SEC_ERROR_BASE +  11;
 const SEC_ERROR_REVOKED_CERTIFICATE                     = SEC_ERROR_BASE +  12; // -8180
 const SEC_ERROR_UNKNOWN_ISSUER                          = SEC_ERROR_BASE +  13;
-const SEC_ERROR_BAD_DATABASE                            = SEC_ERROR_BASE +  18;
 const SEC_ERROR_UNTRUSTED_ISSUER                        = SEC_ERROR_BASE +  20; // -8172
 const SEC_ERROR_UNTRUSTED_CERT                          = SEC_ERROR_BASE +  21; // -8171
 const SEC_ERROR_EXPIRED_ISSUER_CERTIFICATE              = SEC_ERROR_BASE +  30; // -8162
-const SEC_ERROR_EXTENSION_VALUE_INVALID                 = SEC_ERROR_BASE +  34; // -8158
-const SEC_ERROR_EXTENSION_NOT_FOUND                     = SEC_ERROR_BASE +  35; // -8157
 const SEC_ERROR_CA_CERT_INVALID                         = SEC_ERROR_BASE +  36;
-const SEC_ERROR_INVALID_KEY                             = SEC_ERROR_BASE +  40; // -8152
 const SEC_ERROR_UNKNOWN_CRITICAL_EXTENSION              = SEC_ERROR_BASE +  41;
 const SEC_ERROR_INADEQUATE_KEY_USAGE                    = SEC_ERROR_BASE +  90; // -8102
 const SEC_ERROR_INADEQUATE_CERT_TYPE                    = SEC_ERROR_BASE +  91; // -8101
@@ -66,7 +65,6 @@ const SEC_ERROR_OCSP_INVALID_SIGNING_CERT               = SEC_ERROR_BASE + 144;
 const SEC_ERROR_POLICY_VALIDATION_FAILED                = SEC_ERROR_BASE + 160; // -8032
 const SEC_ERROR_OCSP_BAD_SIGNATURE                      = SEC_ERROR_BASE + 157;
 const SEC_ERROR_CERT_SIGNATURE_ALGORITHM_DISABLED       = SEC_ERROR_BASE + 176;
-const SEC_ERROR_APPLICATION_CALLBACK_ERROR              = SEC_ERROR_BASE + 178;
 
 const SSL_ERROR_BAD_CERT_DOMAIN                         = SSL_ERROR_BASE +  12;
 const SSL_ERROR_BAD_CERT_ALERT                          = SSL_ERROR_BASE +  17;
@@ -78,6 +76,7 @@ const MOZILLA_PKIX_ERROR_INADEQUATE_KEY_SIZE            = MOZILLA_PKIX_ERROR_BAS
 const MOZILLA_PKIX_ERROR_V1_CERT_USED_AS_CA             = MOZILLA_PKIX_ERROR_BASE +   3;
 const MOZILLA_PKIX_ERROR_NOT_YET_VALID_CERTIFICATE      = MOZILLA_PKIX_ERROR_BASE +   5;
 const MOZILLA_PKIX_ERROR_NOT_YET_VALID_ISSUER_CERTIFICATE = MOZILLA_PKIX_ERROR_BASE + 6;
+const MOZILLA_PKIX_ERROR_OCSP_RESPONSE_FOR_CERT_MISSING = MOZILLA_PKIX_ERROR_BASE +   8;
 
 // Supported Certificate Usages
 const certificateUsageSSLClient              = 0x0001;
@@ -91,6 +90,23 @@ const certificateUsageStatusResponder        = 0x0400;
 
 const NO_FLAGS = 0;
 
+// Commonly certificates are represented as PEM. The format is roughly as
+// follows:
+//
+// -----BEGIN CERTIFICATE-----
+// [some lines of base64, each typically 64 characters long]
+// -----END CERTIFICATE-----
+//
+// However, nsIX509CertDB.constructX509FromBase64 and related functions do not
+// handle input of this form. Instead, they require a single string of base64
+// with no newlines or BEGIN/END headers. This is a helper function to convert
+// PEM to the format that nsIX509CertDB requires.
+function pemToBase64(pem) {
+  return pem.replace(/-----BEGIN CERTIFICATE-----/, "")
+            .replace(/-----END CERTIFICATE-----/, "")
+            .replace(/[\r\n]/g, "");
+}
+
 function readFile(file) {
   let fstream = Cc["@mozilla.org/network/file-input-stream;1"]
                   .createInstance(Ci.nsIFileInputStream);
@@ -102,8 +118,16 @@ function readFile(file) {
 
 function addCertFromFile(certdb, filename, trustString) {
   let certFile = do_get_file(filename, false);
-  let der = readFile(certFile);
-  certdb.addCert(der, trustString, null);
+  let certBytes = readFile(certFile);
+  let successful = false;
+  try {
+    certdb.addCert(certBytes, trustString, null);
+    successful = true;
+  } catch (e) {}
+  if (!successful) {
+    // It might be PEM instead of DER.
+    certdb.addCertFromBase64(pemToBase64(certBytes), trustString, null);
+  }
 }
 
 function constructCertFromFile(filename) {
@@ -126,17 +150,27 @@ function getXPCOMStatusFromNSS(statusNSS) {
   return nssErrorsService.getXPCOMFromNSSError(statusNSS);
 }
 
-function checkCertErrorGeneric(certdb, cert, expectedError, usage) {
-  let hasEVPolicy = {};
+// certdb implements nsIX509CertDB. See nsIX509CertDB.idl for documentation.
+// In particular, hostname is optional.
+function checkCertErrorGeneric(certdb, cert, expectedError, usage,
+                               /*optional*/ hasEVPolicy,
+                               /*optional*/ hostname) {
+  do_print(`cert cn=${cert.commonName}`);
+  do_print(`cert issuer cn=${cert.issuerCommonName}`);
   let verifiedChain = {};
-  let error = certdb.verifyCertNow(cert, usage, NO_FLAGS, verifiedChain,
-                                   hasEVPolicy);
-  // expected error == -1 is a special marker for any error is OK
-  if (expectedError != -1 ) {
-    do_check_eq(error, expectedError);
-  } else {
-    do_check_neq (error, 0);
-  }
+  let error = certdb.verifyCertNow(cert, usage, NO_FLAGS, hostname,
+                                   verifiedChain, hasEVPolicy || {});
+  Assert.equal(error, expectedError,
+               "Actual and expected error should match");
+}
+
+function checkEVStatus(certDB, cert, usage, isEVExpected) {
+  do_print(`cert o=${cert.organization}`);
+  do_print(`cert issuer o=${cert.issuerOrganization}`);
+  let hasEVPolicy = {};
+  checkCertErrorGeneric(certDB, cert, PRErrorCodeSuccess, usage, hasEVPolicy);
+  Assert.equal(hasEVPolicy.value, isEVExpected,
+               "Actual and expected EV status should match");
 }
 
 function _getLibraryFunctionWithNoArguments(functionName, libraryName) {
@@ -219,12 +253,12 @@ function run_test() {
   add_tls_server_setup("<test-server-name>");
 
   add_connection_test("<test-name-1>.example.com",
-                      getXPCOMStatusFromNSS(SEC_ERROR_xxx),
+                      SEC_ERROR_xxx,
                       function() { ... },
                       function(aTransportSecurityInfo) { ... },
                       function(aTransport) { ... });
   [...]
-  add_connection_test("<test-name-n>.example.com", Cr.NS_OK);
+  add_connection_test("<test-name-n>.example.com", PRErrorCodeSuccess);
 
   run_next_test();
 }
@@ -236,15 +270,25 @@ function add_tls_server_setup(serverBinName) {
   });
 }
 
-// Add a TLS connection test case. aHost is the hostname to pass in the SNI TLS
-// extension; this should unambiguously identifiy which test is being run.
-// aExpectedResult is the expected nsresult of the connection.
-// aBeforeConnect is a callback function that takes no arguments that will be
-// called before the connection is attempted.
-// aWithSecurityInfo is a callback function that takes an
-// nsITransportSecurityInfo, which is called after the TLS handshake succeeds.
-// aAfterStreamOpen is a callback function that is called with the
-// nsISocketTransport once the output stream is ready.
+/**
+ * Add a TLS connection test case.
+ *
+ * @param {String} aHost
+ *   The hostname to pass in the SNI TLS extension; this should unambiguously
+ *   identify which test is being run.
+ * @param {PRErrorCode} aExpectedResult
+ *   The expected result of the connection. If an error is not expected, pass
+ *   in PRErrorCodeSuccess.
+ * @param {Function} aBeforeConnect
+ *   A callback function that takes no arguments that will be called before the
+ *   connection is attempted.
+ * @param {Function} aWithSecurityInfo
+ *   A callback function that takes an nsITransportSecurityInfo, which is called
+ *   after the TLS handshake succeeds.
+ * @param {Function} aAfterStreamOpen
+ *   A callback function that is called with the nsISocketTransport once the
+ *   output stream is ready.
+ */
 function add_connection_test(aHost, aExpectedResult,
                              aBeforeConnect, aWithSecurityInfo,
                              aAfterStreamOpen) {
@@ -282,7 +326,8 @@ function add_connection_test(aHost, aExpectedResult,
       try {
         // this will throw if the stream has been closed by an error
         let str = NetUtil.readInputStreamToString(aStream, aStream.available());
-        do_check_eq(str, "0");
+        Assert.equal(str, "0",
+                     "Should have received ASCII '0' from server");
         this.inputStream.close();
         this.outputStream.close();
         this.result = Cr.NS_OK;
@@ -328,7 +373,11 @@ function add_connection_test(aHost, aExpectedResult,
     }
     connectTo(aHost).then(function(conn) {
       do_print("handling " + aHost);
-      do_check_eq(conn.result, aExpectedResult);
+      let expectedNSResult = aExpectedResult == PRErrorCodeSuccess
+                           ? Cr.NS_OK
+                           : getXPCOMStatusFromNSS(aExpectedResult);
+      Assert.equal(conn.result, expectedNSResult,
+                   "Actual and expected connection result should match");
       if (aWithSecurityInfo) {
         aWithSecurityInfo(conn.transport.securityInfo
                               .QueryInterface(Ci.nsITransportSecurityInfo));
@@ -359,7 +408,7 @@ function _getBinaryUtil(binaryUtilName) {
     utilBin.initWithPath("/data/local/xpcb/");
     utilBin.append(binaryUtilName);
   }
-  do_check_true(utilBin.exists());
+  Assert.ok(utilBin.exists(), `Binary util ${binaryUtilName} should exist`);
   return utilBin;
 }
 
@@ -379,8 +428,8 @@ function _setupTLSServerTest(serverBinName)
                  .getService(Ci.nsIEnvironment);
   let greBinDir = directoryService.get("GreBinD", Ci.nsIFile);
   envSvc.set("DYLD_LIBRARY_PATH", greBinDir.path);
-  // Android libraries are in /data/local/xpcb, but "GreBinD" does not return
-  // this path on Android, so hard code it here.
+  // TODO(bug 1107794): Android libraries are in /data/local/xpcb, but "GreBinD"
+  // does not return this path on Android, so hard code it here.
   envSvc.set("LD_LIBRARY_PATH", greBinDir.path + ":/data/local/xpcb");
   envSvc.set("MOZ_TLS_SERVER_DEBUG_LEVEL", "3");
   envSvc.set("MOZ_TLS_SERVER_CALLBACK_PORT", CALLBACK_PORT);
@@ -403,7 +452,7 @@ function _setupTLSServerTest(serverBinName)
   process.init(serverBin);
   let certDir = directoryService.get("CurWorkD", Ci.nsILocalFile);
   certDir.append("tlsserver");
-  do_check_true(certDir.exists());
+  Assert.ok(certDir.exists(), "tlsserver folder should exist");
   // Using "sql:" causes the SQL DB to be used so we can run tests on Android.
   process.run(false, [ "sql:" + certDir.path ], 1);
 
@@ -438,7 +487,7 @@ function generateOCSPResponses(ocspRespArray, nssDBlocation)
                     .createInstance(Ci.nsIProcess);
     process.init(ocspGenBin);
     process.run(true, argArray, 5);
-    do_check_eq(0, process.exitValue);
+    Assert.equal(0, process.exitValue, "Process exit value should be 0");
     let ocspFile = do_get_file(i.toString() + ".ocsp", false);
     retArray.push(readFile(ocspFile));
     ocspFile.remove(false);
@@ -452,7 +501,7 @@ function generateOCSPResponses(ocspRespArray, nssDBlocation)
 function getFailingHttpServer(serverPort, serverIdentities) {
   let httpServer = new HttpServer();
   httpServer.registerPrefixHandler("/", function(request, response) {
-    do_check_true(false);
+    Assert.ok(false, "HTTP responder should not have been queried");
   });
   httpServer.identity.setPrimary("http", serverIdentities.shift(), serverPort);
   serverIdentities.forEach(function(identity) {
@@ -476,7 +525,7 @@ function getFailingHttpServer(serverPort, serverIdentities) {
 // identity is the http hostname that will answer the OCSP requests
 // invalidIdentities is an array of identities that if used an
 //   will cause a test failure
-// nssDBlocaion is the location of the NSS database from where the OCSP
+// nssDBLocation is the location of the NSS database from where the OCSP
 //   responses will be generated (assumes appropiate keys are present)
 // expectedCertNames is an array of nicks of the certs to be responsed
 // expectedBasePaths is an optional array that is used to indicate
@@ -500,16 +549,20 @@ function startOCSPResponder(serverPort, identity, invalidIdentities,
   httpServer.registerPrefixHandler("/",
     function handleServerCallback(aRequest, aResponse) {
       invalidIdentities.forEach(function(identity) {
-        do_check_neq(aRequest.host, identity)
+        Assert.notEqual(aRequest.host, identity,
+                        "Request host and invalid identity should not match")
       });
       do_print("got request for: " + aRequest.path);
       let basePath = aRequest.path.slice(1).split("/")[0];
       if (expectedBasePaths.length >= 1) {
-        do_check_eq(basePath, expectedBasePaths.shift());
+        Assert.equal(basePath, expectedBasePaths.shift(),
+                     "Actual and expected base path should match");
       }
-      do_check_true(expectedCertNames.length >= 1);
+      Assert.ok(expectedCertNames.length >= 1,
+                "expectedCertNames should contain >= 1 entries");
       if (expectedMethods && expectedMethods.length >= 1) {
-        do_check_eq(aRequest.method, expectedMethods.shift());
+        Assert.equal(aRequest.method, expectedMethods.shift(),
+                     "Actual and expected fetch method should match");
       }
       aResponse.setStatusLine(aRequest.httpVersion, 200, "OK");
       aResponse.setHeader("Content-Type", "application/ocsp-response");
@@ -523,15 +576,19 @@ function startOCSPResponder(serverPort, identity, invalidIdentities,
   return {
     stop: function(callback) {
       // make sure we consumed each expected response
-      do_check_eq(ocspResponses.length, 0);
+      Assert.equal(ocspResponses.length, 0,
+                   "Should have 0 remaining expected OCSP responses");
       if (expectedMethods) {
-        do_check_eq(expectedMethods.length, 0);
+        Assert.equal(expectedMethods.length, 0,
+                     "Should have 0 remaining expected fetch methods");
       }
       if (expectedBasePaths) {
-        do_check_eq(expectedBasePaths.length, 0);
+        Assert.equal(expectedBasePaths.length, 0,
+                     "Should have 0 remaining expected base paths");
       }
       if (expectedResponseTypes) {
-        do_check_eq(expectedResponseTypes.length, 0);
+        Assert.equal(expectedResponseTypes.length, 0,
+                     "Should have 0 remaining expected response types");
       }
       httpServer.stop(callback);
     }
