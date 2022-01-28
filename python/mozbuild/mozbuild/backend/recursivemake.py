@@ -461,6 +461,7 @@ class RecursiveMakeBackend(CommonBackend):
                 '.m': 'CMSRCS',
                 '.mm': 'CMMSRCS',
                 '.cpp': 'CPPSRCS',
+                '.rs': 'RSSRCS',
                 '.S': 'SSRCS',
             }
             variables = [suffix_map[obj.canonical_suffix]]
