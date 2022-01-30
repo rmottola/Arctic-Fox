@@ -71,6 +71,7 @@
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
+- 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu
 - 1245241 remaining 4 parts
 - Bug 1245241 - 2016-02-18 - part 1 - Close Shmem file handles after mapping them wh
@@ -155,12 +156,7 @@
 - Bug 909154. Remove the prefixed mozRequestAnimationFrame and its acco
 - Bug 1184429 - 2015-07-17 P1. & P2
 - Bug 1123386 - Part 4: Update the tooltool manifests for the OSX an
-- Bug 1182316: Part 3 - Add assertions to most other WebIDL entry point
-- Bug 1182316 - 2015-07-12 - Part 2 - Rework FORWARD_TO_OUTER_OR_THROW. r=peterv
-- Bug 1179110 - 2015-07-02 Use a Maybe<> to store start time, rather than using -1
 - Bug 1184201 - Disable fullscreen transition on Windows
-- 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
-- Bug 1160014 - part 1 to 4
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
 - Bug 1181869 [provokes crashing] - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
