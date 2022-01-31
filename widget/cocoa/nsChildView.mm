@@ -73,6 +73,9 @@
 #include "nsAccessibilityService.h"
 #include "mozilla/a11y/Platform.h"
 #endif
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
 
 #include "mozilla/Preferences.h"
 
@@ -3213,7 +3216,10 @@ NSEvent* gLastDragMouseDownEvent = nil;
   if (mGeckoChild) {
     nsIWidgetListener* listener = mGeckoChild->GetWidgetListener();
     if (listener) {
-      listener->GetPresShell()->ReconstructFrames();
+      nsIPresShell* presShell = listener->GetPresShell();
+      if (presShell) {
+        presShell->ReconstructFrames();
+      }
     }
   }
 }
