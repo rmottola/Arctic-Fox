@@ -2593,8 +2593,8 @@ nsChildView::EnsureVibrancyManager()
   return *mVibrancyManager;
 }
 
-void
-nsChildView::MaybeTrackScrollEventAsSwipe(const mozilla::PanGestureInput& aSwipeStartEvent)
+nsChildView::SwipeInfo
+nsChildView::SendMayStartSwipe(const mozilla::PanGestureInput& aSwipeStartEvent)
 {
   nsCOMPtr<nsIWidget> kungFuDeathGrip(this);
 
@@ -2614,10 +2614,14 @@ nsChildView::MaybeTrackScrollEventAsSwipe(const mozilla::PanGestureInput& aSwipe
   geckoEvent.allowedDirections = 0;
   bool shouldStartSwipe = DispatchWindowEvent(geckoEvent); // event cancelled == swipe should start
 
-  if (!shouldStartSwipe) {
-    return;
-  }
+  SwipeInfo result = { shouldStartSwipe, geckoEvent.allowedDirections };
+  return result;
+}
 
+void
+nsChildView::TrackScrollEventAsSwipe(const mozilla::PanGestureInput& aSwipeStartEvent,
+                                     uint32_t aAllowedDirections)
+{
   // If a swipe is currently being tracked kill it -- it's been interrupted
   // by another gesture event.
   if (mSwipeTracker) {
@@ -2626,8 +2630,12 @@ nsChildView::MaybeTrackScrollEventAsSwipe(const mozilla::PanGestureInput& aSwipe
     mSwipeTracker = nullptr;
   }
 
+  uint32_t direction = (aSwipeStartEvent.mPanDisplacement.x > 0.0)
+    ? (uint32_t)nsIDOMSimpleGestureEvent::DIRECTION_RIGHT
+    : (uint32_t)nsIDOMSimpleGestureEvent::DIRECTION_LEFT;
+
   mSwipeTracker = new SwipeTracker(*this, aSwipeStartEvent,
-                                   geckoEvent.allowedDirections, direction);
+                                   aAllowedDirections, direction);
 }
 
 void
@@ -2800,8 +2808,10 @@ nsChildView::DispatchAPZWheelInputEvent(InputData& aEvent, bool aCanTriggerSwipe
       event = panInput.ToWidgetWheelEvent(this);
       if (aCanTriggerSwipe) {
         DispatchEvent(&event, status);
-        if (IsPotentialSwipeStartEventOverscrollingViewport(event)) {
-          MaybeTrackScrollEventAsSwipe(panInput);
+        SwipeInfo swipeInfo = SendMayStartSwipe(panInput);
+        if (swipeInfo.wantsSwipe &&
+            IsPotentialSwipeStartEventOverscrollingViewport(event)) {
+          TrackScrollEventAsSwipe(panInput, swipeInfo.allowedDirections);
         }
         return;
       }
