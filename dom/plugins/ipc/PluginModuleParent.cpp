@@ -35,6 +35,7 @@
 #include "nsNPAPIPlugin.h"
 #include "nsPrintfCString.h"
 #include "prsystem.h"
+#include "PluginQuirks.h"
 #include "GeckoProfiler.h"
 #include "nsPluginTags.h"
 #include "nsUnicharUtils.h"
@@ -596,7 +597,8 @@ PluginModuleChromeParent::WaitForIPCConnection()
 }
 
 PluginModuleParent::PluginModuleParent(bool aIsChrome)
-    : mIsChrome(aIsChrome)
+    : mQuirks(QUIRKS_NOT_INITIALIZED)
+    , mIsChrome(aIsChrome)
     , mShutdown(false)
     , mHadLocalInstance(false)
     , mClearSiteDataSupported(false)
@@ -1135,8 +1137,19 @@ PluginModuleParent::GetPluginDetails()
     }
     mPluginName = pluginTag->Name();
     mPluginVersion = pluginTag->Version();
+    mPluginFilename = pluginTag->FileName();
     mIsFlashPlugin = pluginTag->mIsFlashPlugin;
     return true;
+}
+
+void
+PluginModuleParent::InitQuirksModes(const nsCString& aMimeType)
+{
+    if (mQuirks != QUIRKS_NOT_INITIALIZED) {
+      return;
+    }
+
+    mQuirks = GetQuirksFromMimeTypeAndFilename(aMimeType, mPluginFilename);
 }
 
 #ifdef XP_WIN
@@ -2226,6 +2239,7 @@ PluginModuleParent::NPP_New(NPMIMEType pluginType, NPP instance,
 
     if (mPluginName.IsEmpty()) {
         GetPluginDetails();
+        InitQuirksModes(nsDependentCString(pluginType));
         /** mTimeBlocked measures the time that the main thread has been blocked
          *  on plugin module initialization. As implemented, this is the sum of
          *  plugin-container launch + toolhelp32 snapshot + NP_Initialize.
