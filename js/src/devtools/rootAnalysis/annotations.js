@@ -291,7 +291,8 @@ function isRootedGCPointerTypeName(name)
         name == "WrappableJSErrorResult" ||
         name == "frontend::TokenStream" ||
         name == "frontend::TokenStream::Position" ||
-        name == "ModuleCompiler")
+        name == "ModuleCompiler" ||
+        name == "ModuleValidator")
     {
         return true;
     }
