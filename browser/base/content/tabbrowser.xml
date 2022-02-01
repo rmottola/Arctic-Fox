@@ -3926,7 +3926,10 @@
           this.mCurrentBrowser.permanentKey = {};
 
           this.mCurrentTab = this.tabContainer.firstChild;
-          let els = Cc["@mozilla.org/eventlistenerservice;1"].getService(Ci.nsIEventListenerService);
+          const nsIEventListenerService =
+            Components.interfaces.nsIEventListenerService;
+          let els = Components.classes["@mozilla.org/eventlistenerservice;1"]
+                              .getService(nsIEventListenerService);
           els.addSystemEventListener(document, "keydown", this, false);
           if (this.AppConstants.platform == "macosx") {
             els.addSystemEventListener(document, "keypress", this, false);
