@@ -3071,7 +3071,6 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
 #ifdef __LP64__
     mCancelSwipeAnimation = nil;
-    mCurrentSwipeDir = 0;
 #endif
 
     mTopLeftCornerMask = NULL;
@@ -4350,8 +4349,6 @@ NSEvent* gLastDragMouseDownEvent = nil;
     return;
   }
 
-  uint32_t vDirs = (uint32_t)nsIDOMSimpleGestureEvent::DIRECTION_DOWN |
-                   (uint32_t)nsIDOMSimpleGestureEvent::DIRECTION_UP;
   uint32_t direction = 0;
 
   // Only initiate horizontal tracking for events whose horizontal element is
@@ -4374,34 +4371,9 @@ NSEvent* gLastDragMouseDownEvent = nil;
     } else {
       direction = (uint32_t)nsIDOMSimpleGestureEvent::DIRECTION_LEFT;
     }
-  }
-  // Only initiate vertical tracking for events whose vertical element is
-  // at least two times larger than its horizontal element. This minimizes
-  // performance problems. The number '2' was arrived at by trial and error.
-  else if (anOverflowY != 0.0 && deltaY != 0.0 &&
-           std::abs(deltaY) > std::abs(deltaX) * 2) {
-    if (deltaY < 0.0) {
-      direction = (uint32_t)nsIDOMSimpleGestureEvent::DIRECTION_DOWN;
-    } else {
-      direction = (uint32_t)nsIDOMSimpleGestureEvent::DIRECTION_UP;
-    }
-
-    if ((mCurrentSwipeDir & vDirs) && (mCurrentSwipeDir != direction)) {
-      // If a swipe is currently being tracked kill it -- it's been interrupted
-      // by another gesture event.
-      if (mCancelSwipeAnimation && *mCancelSwipeAnimation == NO) {
-        *mCancelSwipeAnimation = YES;
-        mCancelSwipeAnimation = nil;
-        [self sendSwipeEndEvent:anEvent allowedDirections:0];
-      }
-      return;
-    }
   } else {
     return;
   }
-
-  // Track the direction we're going in.
-  mCurrentSwipeDir = direction;
 
   uint32_t allowedDirections = 0;
   // We're ready to start the animation. Tell Gecko about it, and at the same
@@ -4424,14 +4396,8 @@ NSEvent* gLastDragMouseDownEvent = nil;
     mCancelSwipeAnimation = nil;
   }
 
-  CGFloat min = 0.0;
-  CGFloat max = 0.0;
-  if (!(direction & vDirs)) {
-    min = (allowedDirections & nsIDOMSimpleGestureEvent::DIRECTION_RIGHT) ?
-          -1.0 : 0.0;
-    max = (allowedDirections & nsIDOMSimpleGestureEvent::DIRECTION_LEFT) ?
-          1.0 : 0.0;
-  }
+  CGFloat min = (allowedDirections & nsIDOMSimpleGestureEvent::DIRECTION_RIGHT) ? -1.0 : 0.0;
+  CGFloat max = (allowedDirections & nsIDOMSimpleGestureEvent::DIRECTION_LEFT) ? 1.0 : 0.0;
 
   __block BOOL animationCanceled = NO;
   __block BOOL geckoSwipeEventSent = NO;
@@ -4469,15 +4435,13 @@ NSEvent* gLastDragMouseDownEvent = nil;
     if (animationCanceled || !mGeckoChild || gestureAmount == 0.0) {
       *stop = YES;
       animationCanceled = YES;
-      if (gestureAmount == 0.0 ||
-          ((direction & vDirs) && (direction != mCurrentSwipeDir))) {
+      if (gestureAmount == 0.0) {
         if (mCancelSwipeAnimation)
           *mCancelSwipeAnimation = YES;
         mCancelSwipeAnimation = nil;
         [self sendSwipeEndEvent:anEvent
               allowedDirections:allowedDirectionsCopy];
       }
-      mCurrentSwipeDir = 0;
       return;
     }
 
@@ -4511,7 +4475,6 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
     if (isComplete) {
       [self sendSwipeEndEvent:anEvent allowedDirections:allowedDirectionsCopy];
-      mCurrentSwipeDir = 0;
       mCancelSwipeAnimation = nil;
     }
   }];
