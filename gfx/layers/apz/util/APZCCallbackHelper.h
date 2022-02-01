@@ -166,6 +166,10 @@ public:
 
     /* Notify content that the repaint flush is complete. */
     static void NotifyFlushComplete();
+
+    /* Temporarily ignore the Displayport for better paint performance. */
+    static void SuppressDisplayport(const bool& aEnabled);
+    static bool IsDisplayportSuppressed();
 };
 
 } // namespace layers

@@ -534,6 +534,8 @@ protected:
 
     virtual bool RecvRequestNotifyAfterRemotePaint() override;
 
+    virtual bool RecvSuppressDisplayport(const bool& aEnabled) override;
+
     virtual bool RecvParentActivated(const bool& aActivated) override;
 
     virtual bool RecvStopIMEStateManagement() override;
@@ -630,6 +632,7 @@ private:
     RenderFrameChild* mRemoteFrame;
     nsRefPtr<nsIContentChild> mManager;
     uint32_t mChromeFlags;
+    int32_t mActiveSuppressDisplayport;
     uint64_t mLayersId;
     CSSRect mUnscaledOuterRect;
     // When we're tracking a possible tap gesture, this is the "down"
