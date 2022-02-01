@@ -1004,6 +1004,9 @@ nsBaseWidget::ProcessUntransformedAPZEvent(WidgetInputEvent* aEvent,
       if (wheelEvent->mFlags.mHandledByAPZ) {
         APZCCallbackHelper::SendSetTargetAPZCNotification(this, GetDocument(), *aEvent,
                   aGuid, aInputBlockId);
+        if (wheelEvent->mCanTriggerSwipe) {
+          ReportSwipeStarted(aInputBlockId, wheelEvent->TriggersSwipe());
+        }
         mAPZEventState->ProcessWheelEvent(*wheelEvent, aGuid, aInputBlockId);
       }
     }

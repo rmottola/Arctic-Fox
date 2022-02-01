@@ -1917,6 +1917,9 @@ TabChild::RecvMouseWheelEvent(const WidgetWheelEvent& aEvent,
   APZCCallbackHelper::DispatchWidgetEvent(event);
 
   if (aEvent.mFlags.mHandledByAPZ) {
+    if (event.mCanTriggerSwipe) {
+      SendRespondStartSwipeEvent(aInputBlockId, event.TriggersSwipe());
+    }
     mAPZEventState->ProcessWheelEvent(event, aGuid, aInputBlockId);
   }
   return true;
