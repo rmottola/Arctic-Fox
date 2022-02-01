@@ -913,14 +913,15 @@ APZCTreeManager::ProcessWheelEvent(WidgetWheelEvent& aEvent,
                                    uint64_t* aOutInputBlockId)
 {
   ScrollWheelInput::ScrollMode scrollMode = ScrollWheelInput::SCROLLMODE_INSTANT;
-  if (gfxPrefs::SmoothScrollEnabled() && gfxPrefs::WheelSmoothScrollEnabled()) {
+  if (aEvent.deltaMode == nsIDOMWheelEvent::DOM_DELTA_LINE &&
+      gfxPrefs::SmoothScrollEnabled() && gfxPrefs::WheelSmoothScrollEnabled()) {
     scrollMode = ScrollWheelInput::SCROLLMODE_SMOOTH;
   }
 
   ScreenPoint origin(aEvent.refPoint.x, aEvent.refPoint.y);
   ScrollWheelInput input(aEvent.time, aEvent.timeStamp, 0,
                          scrollMode,
-                         ScrollWheelInput::SCROLLDELTA_LINE,
+                         ScrollWheelInput::DeltaTypeForDeltaMode(aEvent.deltaMode),
                          origin,
                          aEvent.deltaX,
                          aEvent.deltaY);
@@ -941,8 +942,15 @@ APZCTreeManager::ProcessWheelEvent(WidgetWheelEvent& aEvent,
 static bool
 WillHandleWheelEvent(WidgetWheelEvent* aEvent)
 {
+  // Only support pixel units on OS X for now because it causes more test
+  // failures when APZ is turned on, and we want to do that on Windows very
+  // soon.
   return EventStateManager::WheelEventIsScrollAction(aEvent) &&
-         aEvent->deltaMode == nsIDOMWheelEvent::DOM_DELTA_LINE &&
+         (aEvent->deltaMode == nsIDOMWheelEvent::DOM_DELTA_LINE
+#ifdef XP_MACOSX
+            || aEvent->deltaMode == nsIDOMWheelEvent::DOM_DELTA_PIXEL
+#endif
+           ) &&
          !EventStateManager::WheelEventNeedsDeltaMultipliers(aEvent);
 }
 

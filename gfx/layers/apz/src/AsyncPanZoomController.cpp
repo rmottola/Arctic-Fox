@@ -1447,6 +1447,10 @@ AsyncPanZoomController::GetScrollWheelDelta(const ScrollWheelInput& aEvent) cons
       delta.y *= scrollAmount.height;
       break;
     }
+    case ScrollWheelInput::SCROLLDELTA_PIXEL: {
+      // aOutDeltaX is already in CSS pixels.
+      break;
+    }
     default:
       MOZ_ASSERT_UNREACHABLE("unexpected scroll delta type");
   }
