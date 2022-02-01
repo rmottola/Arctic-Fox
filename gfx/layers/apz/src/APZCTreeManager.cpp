@@ -1290,10 +1290,9 @@ APZCTreeManager::DispatchFling(AsyncPanZoomController* aPrev,
 
     transformedVelocity = endPoint - startPoint;
 
-    bool handoff = (startIndex < 1) ? aHandoff : true;
     if (current->AttemptFling(transformedVelocity,
                               aOverscrollHandoffChain,
-                              handoff)) {
+                              aHandoff)) {
       return true;
     }
   }
