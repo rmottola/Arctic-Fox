@@ -150,9 +150,9 @@ OverscrollHandoffChain::HasOverscrolledApzc() const
 }
 
 bool
-OverscrollHandoffChain::HasFastMovingApzc() const
+OverscrollHandoffChain::HasFastFlungApzc() const
 {
-  return AnyApzc(&AsyncPanZoomController::IsMovingFast);
+  return AnyApzc(&AsyncPanZoomController::IsFlingingFast);
 }
 
 nsRefPtr<AsyncPanZoomController>
