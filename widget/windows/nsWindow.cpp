@@ -5273,7 +5273,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
           result = !Preferences::GetBool("mouse.button5.enabled", true);
           break;
         default:
-          break
+          break;
       }
       break;
 
