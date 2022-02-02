@@ -589,6 +589,7 @@ let gHistorySwipeAnimation = {
     this.active = false;
     this.isLTR = document.documentElement.matches(":-moz-locale-dir(ltr)");
     this._trackedSnapshots = [];
+    this._startingIndex = -1;
     this._historyIndex = -1;
     this._boxWidth = -1;
     this._boxHeight = -1;
@@ -603,6 +604,7 @@ let gHistorySwipeAnimation = {
       gBrowser.addEventListener("pagehide", this, false);
       gBrowser.addEventListener("pageshow", this, false);
       gBrowser.addEventListener("popstate", this, false);
+      gBrowser.addEventListener("DOMModalDialogClosed", this, false);
       gBrowser.tabContainer.addEventListener("TabClose", this, false);
     }
   },
@@ -614,6 +616,7 @@ let gHistorySwipeAnimation = {
     gBrowser.removeEventListener("pagehide", this, false);
     gBrowser.removeEventListener("pageshow", this, false);
     gBrowser.removeEventListener("popstate", this, false);
+    gBrowser.removeEventListener("DOMModalDialogClosed", this, false);
     gBrowser.tabContainer.removeEventListener("TabClose", this, false);
 
     this.active = false;
@@ -647,7 +650,8 @@ let gHistorySwipeAnimation = {
       }
     }
     else {
-      this._historyIndex = gBrowser.webNavigation.sessionHistory.index;
+      this._startingIndex = gBrowser.webNavigation.sessionHistory.index;
+      this._historyIndex = this._startingIndex;
       this._canGoBack = this.canGoBack();
       this._canGoForward = this.canGoForward();
       if (this.active) {
@@ -735,13 +739,14 @@ let gHistorySwipeAnimation = {
         let browser = gBrowser.getBrowserForTab(aEvent.target);
         this._removeTrackedSnapshot(-1, browser);
         break;
+      case "DOMModalDialogClosed":
+        this.stopAnimation();
+        break;
       case "pageshow":
       case "popstate":
-        if (this.isAnimationRunning()) {
-          if (aEvent.target != gBrowser.selectedBrowser.contentDocument)
-            break;
-          this.stopAnimation();
-        }
+        if (aEvent.target != gBrowser.selectedBrowser.contentDocument)
+          break;
+        this.stopAnimation();
         this._historyIndex = gBrowser.webNavigation.sessionHistory.index;
         break;
       case "pagehide":
@@ -809,7 +814,7 @@ let gHistorySwipeAnimation = {
    * any. This will also result in the animation overlay to be torn down.
    */
   swipeEndEventReceived: function HSA_swipeEndEventReceived() {
-    if (this._lastSwipeDir != "")
+    if (this._lastSwipeDir != "" && this._historyIndex != this._startingIndex)
       this._navigateToHistoryIndex();
     else
       this.stopAnimation();
@@ -837,9 +842,10 @@ let gHistorySwipeAnimation = {
    * |this|.
    */
   _navigateToHistoryIndex: function HSA__navigateToHistoryIndex() {
-    if (this._doesIndexExistInHistory(this._historyIndex)) {
+    if (this._doesIndexExistInHistory(this._historyIndex))
       gBrowser.webNavigation.gotoIndex(this._historyIndex);
-    }
+    else
+      this.stopAnimation();
   },
 
   /**
@@ -1088,12 +1094,17 @@ let gHistorySwipeAnimation = {
       return aBlob;
 
     let img = new Image();
-    let url = URL.createObjectURL(aBlob);
-    img.onload = function() {
-      URL.revokeObjectURL(url);
-    };
-    img.src = url;
-    return img;
+    let url = "";
+    try {
+      url = URL.createObjectURL(aBlob);
+      img.onload = function() {
+        URL.revokeObjectURL(url);
+      };
+    }
+    finally {
+      img.src = url;
+      return img;
+    }
   },
 
   /**
