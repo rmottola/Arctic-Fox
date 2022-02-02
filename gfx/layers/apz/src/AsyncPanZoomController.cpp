@@ -1628,11 +1628,7 @@ nsEventStatus AsyncPanZoomController::OnPanMayBegin(const PanGestureInput& aEven
 
   mX.StartTouch(aEvent.mLocalPanStartPoint.x, aEvent.mTime);
   mY.StartTouch(aEvent.mLocalPanStartPoint.y, aEvent.mTime);
-  if (mPanGestureState) {
-    mPanGestureState->GetOverscrollHandoffChain()->CancelAnimations();
-  } else {
-    CancelAnimation();
-  }
+  CurrentPanGestureBlock()->GetOverscrollHandoffChain()->CancelAnimations();
 
   return nsEventStatus_eConsumeNoDefault;
 }
@@ -1654,8 +1650,6 @@ nsEventStatus AsyncPanZoomController::OnPanBegin(const PanGestureInput& aEvent) 
     // SMOOTH_SCROLL scrolls are cancelled by pan gestures.
     CancelAnimation();
   }
-
-  mPanGestureState = MakeUnique<InputBlockState>(this, true);
 
   mX.StartTouch(aEvent.mLocalPanStartPoint.x, aEvent.mTime);
   mY.StartTouch(aEvent.mLocalPanStartPoint.y, aEvent.mTime);
@@ -1700,25 +1694,20 @@ nsEventStatus AsyncPanZoomController::OnPan(const PanGestureInput& aEvent, Scrol
 
   HandlePanningUpdate(aEvent.mPanDisplacement);
 
-  // TODO: Handle pan events sent without pan begin / pan end events properly.
-  if (mPanGestureState) {
-    ScreenPoint panDistance(fabs(aEvent.mPanDisplacement.x), fabs(aEvent.mPanDisplacement.y));
-    OverscrollHandoffState handoffState(
-        *mPanGestureState->GetOverscrollHandoffChain(),
-        panDistance,
-        aSource);
-    CallDispatchScroll(aEvent.mLocalPanStartPoint,
-                       aEvent.mLocalPanStartPoint + aEvent.mLocalPanDisplacement,
-                       handoffState);
-  }
+  ScreenPoint panDistance(fabs(aEvent.mPanDisplacement.x), fabs(aEvent.mPanDisplacement.y));
+  OverscrollHandoffState handoffState(
+      *CurrentPanGestureBlock()->GetOverscrollHandoffChain(),
+      panDistance,
+      aSource);
+  CallDispatchScroll(aEvent.mLocalPanStartPoint,
+                     aEvent.mLocalPanStartPoint + aEvent.mLocalPanDisplacement,
+                     handoffState);
 
   return nsEventStatus_eConsumeNoDefault;
 }
 
 nsEventStatus AsyncPanZoomController::OnPanEnd(const PanGestureInput& aEvent) {
   APZC_LOG("%p got a pan-end in state %d\n", this, mState);
-
-  mPanGestureState = nullptr;
 
   mX.EndTouch(aEvent.mTime);
   mY.EndTouch(aEvent.mTime);
@@ -1736,7 +1725,6 @@ nsEventStatus AsyncPanZoomController::OnPanMomentumStart(const PanGestureInput& 
     CancelAnimation();
   }
 
-  mPanGestureState = MakeUnique<InputBlockState>(this, true);
   SetState(PAN_MOMENTUM);
 
   return nsEventStatus_eConsumeNoDefault;
@@ -1745,7 +1733,6 @@ nsEventStatus AsyncPanZoomController::OnPanMomentumStart(const PanGestureInput& 
 nsEventStatus AsyncPanZoomController::OnPanMomentumEnd(const PanGestureInput& aEvent) {
   APZC_LOG("%p got a pan-momentumend in state %d\n", this, mState);
 
-  mPanGestureState = nullptr;
 
   // We need to reset the velocity to zero. We don't really have a "touch"
   // here because the touch has already ended long before the momentum
