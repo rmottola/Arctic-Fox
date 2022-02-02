@@ -2736,6 +2736,22 @@ nsChildView::UpdateWindowDraggingRegion(const nsIntRegion& aRegion)
 }
 
 void
+nsChildView::ReportSwipeStarted(uint64_t aInputBlockId,
+                                bool aStartSwipe)
+{
+  if (mSwipeEventQueue && mSwipeEventQueue->inputBlockId == aInputBlockId) {
+    if (aStartSwipe) {
+      PanGestureInput& startEvent = mSwipeEventQueue->queuedEvents[0];
+      TrackScrollEventAsSwipe(startEvent, mSwipeEventQueue->allowedDirections);
+      for (size_t i = 1; i < mSwipeEventQueue->queuedEvents.Length(); i++) {
+        mSwipeTracker->ProcessEvent(mSwipeEventQueue->queuedEvents[i]);
+      }
+    }
+    mSwipeEventQueue = nullptr;
+  }
+}
+
+void
 nsChildView::DispatchAPZWheelInputEvent(InputData& aEvent, bool aCanTriggerSwipe)
 {
   if (mSwipeTracker && aEvent.mInputType == PANGESTURE_INPUT) {
