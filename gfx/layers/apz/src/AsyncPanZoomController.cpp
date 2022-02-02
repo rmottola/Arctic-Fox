@@ -1267,9 +1267,7 @@ nsEventStatus AsyncPanZoomController::OnTouchEnd(const MultiTouchInput& aEvent) 
 nsEventStatus AsyncPanZoomController::OnTouchCancel(const MultiTouchInput& aEvent) {
   APZC_LOG("%p got a touch-cancel in state %d\n", this, mState);
   OnTouchEndOrCancel();
-  mX.CancelTouch();
-  mY.CancelTouch();
-  CancelAnimation();
+  CancelAnimationAndGestureState();
   return nsEventStatus_eConsumeNoDefault;
 }
 
@@ -1641,8 +1639,8 @@ nsEventStatus AsyncPanZoomController::OnPanMayBegin(const PanGestureInput& aEven
 nsEventStatus AsyncPanZoomController::OnPanCancelled(const PanGestureInput& aEvent) {
   APZC_LOG("%p got a pan-cancelled in state %d\n", this, mState);
 
-  mX.CancelTouch();
-  mY.CancelTouch();
+  mX.CancelGesture();
+  mY.CancelGesture();
 
   return nsEventStatus_eConsumeNoDefault;
 }
@@ -1769,8 +1767,8 @@ nsEventStatus AsyncPanZoomController::OnPanMomentumEnd(const PanGestureInput& aE
   // We need to reset the velocity to zero. We don't really have a "touch"
   // here because the touch has already ended long before the momentum
   // animation started, but I guess it doesn't really matter for now.
-  mX.CancelTouch();
-  mY.CancelTouch();
+  mX.CancelGesture();
+  mY.CancelGesture();
   SetState(NOTHING);
 
   RequestContentRepaint();
@@ -3145,12 +3143,23 @@ AsyncPanZoomController::CurrentPanGestureBlock()
 void
 AsyncPanZoomController::ResetInputState()
 {
+  // This may be called during non-touch input blocks as well. We send
+  // a fake cancel touch event here but on the assumption that none of the
+  // code in GEL assumes a CurrentTouchBlock()
   MultiTouchInput cancel(MultiTouchInput::MULTITOUCH_CANCEL, 0, TimeStamp::Now(), 0);
   nsRefPtr<GestureEventListener> listener = GetGestureEventListener();
   if (listener) {
     listener->HandleInputEvent(cancel);
   }
-  OnTouchCancel(cancel);
+  CancelAnimationAndGestureState();
+}
+
+void
+AsyncPanZoomController::CancelAnimationAndGestureState()
+{
+  mX.CancelGesture();
+  mY.CancelGesture();
+  CancelAnimation();
 }
 
 bool
