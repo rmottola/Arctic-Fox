@@ -585,8 +585,7 @@ let gHistorySwipeAnimation = {
       return;
 
     this.active = false;
-    this.isLTR = document.documentElement.mozMatchesSelector(
-                                            ":-moz-locale-dir(ltr)");
+    this.isLTR = document.documentElement.matches(":-moz-locale-dir(ltr)");
     this._trackedSnapshots = [];
     this._historyIndex = -1;
     this._boxWidth = -1;
