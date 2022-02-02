@@ -47,7 +47,7 @@ public:
   bool IsTargetConfirmed() const;
 
 protected:
-  void UpdateTargetApzc(const nsRefPtr<AsyncPanZoomController>& aTargetApzc);
+  virtual void UpdateTargetApzc(const nsRefPtr<AsyncPanZoomController>& aTargetApzc);
 
 private:
   nsRefPtr<AsyncPanZoomController> mTargetApzc;
@@ -240,6 +240,9 @@ public:
    * Update the wheel transaction state for a new event.
    */
   void Update(const ScrollWheelInput& aEvent);
+
+protected:
+  void UpdateTargetApzc(const nsRefPtr<AsyncPanZoomController>& aTargetApzc) override;
 
 private:
   nsTArray<ScrollWheelInput> mEvents;
