@@ -187,6 +187,15 @@ WheelBlockState::WheelBlockState(const nsRefPtr<AsyncPanZoomController>& aTarget
   }
 }
 
+bool
+WheelBlockState::SetContentResponse(bool aPreventDefault)
+{
+  if (aPreventDefault) {
+    EndTransaction();
+  }
+  return CancelableBlockState::SetContentResponse(aPreventDefault);
+}
+
 void
 WheelBlockState::Update(const ScrollWheelInput& aEvent)
 {
