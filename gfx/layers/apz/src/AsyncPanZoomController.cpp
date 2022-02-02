@@ -3104,6 +3104,12 @@ AsyncPanZoomController::CurrentTouchBlock()
   return GetInputQueue()->CurrentTouchBlock();
 }
 
+PanGestureBlockState*
+AsyncPanZoomController::CurrentPanGestureBlock()
+{
+  return GetInputQueue()->CurrentPanGestureBlock();
+}
+
 void
 AsyncPanZoomController::ResetInputState()
 {
