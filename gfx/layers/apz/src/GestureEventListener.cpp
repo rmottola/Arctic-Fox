@@ -10,6 +10,7 @@
 #include "AsyncPanZoomController.h"     // for AsyncPanZoomController
 #include "base/task.h"                  // for CancelableTask, etc
 #include "gfxPrefs.h"                   // for gfxPrefs
+#include "mozilla/SizePrintfMacros.h"   // for PRIuSIZE
 #include "nsDebug.h"                    // for NS_WARNING
 #include "nsMathUtils.h"                // for NS_hypot
 
@@ -76,7 +77,7 @@ GestureEventListener::~GestureEventListener()
 
 nsEventStatus GestureEventListener::HandleInputEvent(const MultiTouchInput& aEvent)
 {
-  GEL_LOG("Receiving event type %d with %lu touches in state %d\n", aEvent.mType, aEvent.mTouches.Length(), mState);
+  GEL_LOG("Receiving event type %d with %" PRIuSIZE " touches in state %d\n", aEvent.mType, aEvent.mTouches.Length(), mState);
 
   nsEventStatus rv = nsEventStatus_eIgnore;
 

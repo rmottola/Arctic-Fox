@@ -31,7 +31,7 @@
 #include "mozilla/TouchEvents.h"
 
 #define APZES_LOG(...)
-// #define APZES_LOG(...) printf_stderr("APZCCH: " __VA_ARGS__)
+// #define APZES_LOG(...) printf_stderr("APZES: " __VA_ARGS__)
 
 // Static helper functions
 namespace {
