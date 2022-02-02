@@ -305,7 +305,8 @@ public:
       mPanStartPoint(aPanStartPoint),
       mPanDisplacement(aPanDisplacement),
       mLineOrPageDeltaX(0),
-      mLineOrPageDeltaY(0)
+      mLineOrPageDeltaY(0),
+      mHandledByAPZ(false)
   {
   }
 
@@ -329,6 +330,8 @@ public:
   // See lineOrPageDeltaX/Y on WidgetWheelEvent.
   int32_t mLineOrPageDeltaX;
   int32_t mLineOrPageDeltaY;
+
+  bool mHandledByAPZ;
 };
 
 /**
@@ -508,6 +511,7 @@ public:
      mDeltaType(aDeltaType),
      mScrollMode(aScrollMode),
      mOrigin(aOrigin),
+     mHandledByAPZ(false),
      mDeltaX(aDeltaX),
      mDeltaY(aDeltaY),
      mLineOrPageDeltaX(0),
@@ -521,6 +525,8 @@ public:
   ScrollDeltaType mDeltaType;
   ScrollMode mScrollMode;
   ScreenPoint mOrigin;
+
+  bool mHandledByAPZ;
 
   // Deltas are in units corresponding to the delta type. For line deltas, they
   // are the number of line units to scroll. The number of device pixels for a
