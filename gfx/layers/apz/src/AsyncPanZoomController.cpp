@@ -1966,11 +1966,19 @@ void AsyncPanZoomController::HandlePanningWithTouchAction(double aAngle) {
 
 void AsyncPanZoomController::HandlePanning(double aAngle) {
   ReentrantMonitorAutoEnter lock(mMonitor);
-  if (!gfxPrefs::APZCrossSlideEnabled() && (!mX.CanScrollNow() || !mY.CanScrollNow())) {
+  nsRefPtr<const OverscrollHandoffChain> overscrollHandoffChain =
+    GetInputQueue()->CurrentBlock()->GetOverscrollHandoffChain();
+  bool canScrollHorizontal = !mX.IsAxisLocked() &&
+    overscrollHandoffChain->CanScrollInDirection(this, Layer::HORIZONTAL);
+  bool canScrollVertical = !mY.IsAxisLocked() &&
+    overscrollHandoffChain->CanScrollInDirection(this, Layer::VERTICAL);
+
+  if (!gfxPrefs::APZCrossSlideEnabled() &&
+      (!canScrollHorizontal || !canScrollVertical)) {
     SetState(PANNING);
   } else if (IsCloseToHorizontal(aAngle, gfxPrefs::APZAxisLockAngle())) {
     mY.SetAxisLocked(true);
-    if (mX.CanScrollNow()) {
+    if (canScrollHorizontal) {
       SetState(PANNING_LOCKED_X);
     } else {
       SetState(CROSS_SLIDING_X);
@@ -1978,7 +1986,7 @@ void AsyncPanZoomController::HandlePanning(double aAngle) {
     }
   } else if (IsCloseToVertical(aAngle, gfxPrefs::APZAxisLockAngle())) {
     mX.SetAxisLocked(true);
-    if (mY.CanScrollNow()) {
+    if (canScrollVertical) {
       SetState(PANNING_LOCKED_Y);
     } else {
       SetState(CROSS_SLIDING_Y);
