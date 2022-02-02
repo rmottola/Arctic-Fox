@@ -194,10 +194,14 @@ let gGestureSupport = {
       isVerticalSwipe = true;
     } else if (aEvent.direction == aEvent.DIRECTION_DOWN) {
       if (content.pageYOffset < content.scrollMaxY) {
-          return false;
-        }
-        isVerticalSwipe = true;
+        return false;
       }
+      isVerticalSwipe = true;
+    }
+    if (isVerticalSwipe) {
+      // Vertical overscroll has been temporarily disabled until bug 939480 is
+      // fixed.
+      return false;
     }
 
     let canGoBack = gHistorySwipeAnimation.canGoBack();
