@@ -173,7 +173,8 @@ let gGestureSupport = {
   },
 
   /**
-   * Sets up the history swipe animations for a swipe gesture event, if enabled.
+   * Sets up swipe gestures. This includes setting up swipe animations for the
+   * gesture, if enabled.
    *
    * @param aEvent
    *        The swipe gesture start event.
@@ -186,14 +187,13 @@ let gGestureSupport = {
     }
 
     let isVerticalSwipe = false;
-    if (gHistorySwipeAnimation.active) {
-      if (aEvent.direction == aEvent.DIRECTION_UP) {
-        if (content.pageYOffset > 0) {
-          return false;
-        }
-        isVerticalSwipe = true;
-      } else if (aEvent.direction == aEvent.DIRECTION_DOWN) {
-        if (content.pageYOffset < content.scrollMaxY) {
+    if (aEvent.direction == aEvent.DIRECTION_UP) {
+      if (content.pageYOffset > 0) {
+        return false;
+      }
+      isVerticalSwipe = true;
+    } else if (aEvent.direction == aEvent.DIRECTION_DOWN) {
+      if (content.pageYOffset < content.scrollMaxY) {
           return false;
         }
         isVerticalSwipe = true;
