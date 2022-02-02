@@ -196,6 +196,22 @@ WheelBlockState::SetContentResponse(bool aPreventDefault)
   return CancelableBlockState::SetContentResponse(aPreventDefault);
 }
 
+bool
+WheelBlockState::SetConfirmedTargetApzc(const nsRefPtr<AsyncPanZoomController>& aTargetApzc)
+{
+  // The APZC that we find via APZCCallbackHelpers may not be the same APZC
+  // ESM or OverscrollHandoff would have computed. Make sure we get the right
+  // one by looking for the first apzc the next pending event can scroll.
+  nsRefPtr<AsyncPanZoomController> apzc = aTargetApzc;
+  if (apzc && mEvents.Length() > 0) {
+    const ScrollWheelInput& event = mEvents.ElementAt(0);
+    apzc = apzc->BuildOverscrollHandoffChain()->FindFirstScrollable(event);
+  }
+
+  InputBlockState::SetConfirmedTargetApzc(apzc);
+  return true;
+}
+
 void
 WheelBlockState::Update(const ScrollWheelInput& aEvent)
 {

@@ -455,8 +455,6 @@ InputQueue::SetConfirmedTargetApzc(uint64_t aInputBlockId, const nsRefPtr<AsyncP
   }
   if (success) {
     ProcessInputBlocks();
-  } else {
-    NS_WARNING("INPQ received useless SetConfirmedTargetApzc");
   }
 }
 
@@ -479,8 +477,6 @@ InputQueue::SetAllowedTouchBehavior(uint64_t aInputBlockId, const nsTArray<Touch
   }
   if (success) {
     ProcessInputBlocks();
-  } else {
-    NS_WARNING("INPQ received useless SetAllowedTouchBehavior");
   }
 }
 
