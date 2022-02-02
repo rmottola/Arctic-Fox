@@ -171,12 +171,14 @@ public:
                   bool aTargetConfirmed,
                   const ScrollWheelInput& aEvent);
 
+  bool SetContentResponse(bool aPreventDefault) override;
   bool IsReadyForHandling() const override;
   bool HasEvents() const override;
   void DropEvents() override;
   void HandleEvents() override;
   bool MustStayActive() override;
   const char* Type() override;
+  bool SetConfirmedTargetApzc(const nsRefPtr<AsyncPanZoomController>& aTargetApzc) override;
 
   void AddEvent(const ScrollWheelInput& aEvent);
 
