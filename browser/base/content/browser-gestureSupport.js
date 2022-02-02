@@ -59,8 +59,9 @@ let gGestureSupport = {
 
     switch (aEvent.type) {
       case "MozSwipeGestureStart":
-        aEvent.preventDefault();
-        this._setupSwipeGesture(aEvent);
+        if (this._setupSwipeGesture(aEvent)) {
+          aEvent.preventDefault();
+        }
         break;
       case "MozSwipeGestureUpdate":
         aEvent.preventDefault();
@@ -176,23 +177,43 @@ let gGestureSupport = {
    *
    * @param aEvent
    *        The swipe gesture start event.
+   * @return true if swipe gestures could successfully be set up, false
+   *         othwerwise.
    */
   _setupSwipeGesture: function GS__setupSwipeGesture(aEvent) {
-    if (!this._swipeNavigatesHistory(aEvent))
-      return;
+    if (!this._swipeNavigatesHistory(aEvent)) {
+      return false;
+    }
+
+    let isVerticalSwipe = false;
+    if (gHistorySwipeAnimation.active) {
+      if (aEvent.direction == aEvent.DIRECTION_UP) {
+        if (content.pageYOffset > 0) {
+          return false;
+        }
+        isVerticalSwipe = true;
+      } else if (aEvent.direction == aEvent.DIRECTION_DOWN) {
+        if (content.pageYOffset < content.scrollMaxY) {
+          return false;
+        }
+        isVerticalSwipe = true;
+      }
+    }
 
     let canGoBack = gHistorySwipeAnimation.canGoBack();
     let canGoForward = gHistorySwipeAnimation.canGoForward();
     let isLTR = gHistorySwipeAnimation.isLTR;
 
-    if (canGoBack)
+    if (canGoBack) {
       aEvent.allowedDirections |= isLTR ? aEvent.DIRECTION_LEFT :
                                           aEvent.DIRECTION_RIGHT;
-    if (canGoForward)
+    }
+    if (canGoForward) {
       aEvent.allowedDirections |= isLTR ? aEvent.DIRECTION_RIGHT :
                                           aEvent.DIRECTION_LEFT;
+    }
 
-    gHistorySwipeAnimation.startAnimation();
+    gHistorySwipeAnimation.startAnimation(isVerticalSwipe);
 
     this._doUpdate = function GS__doUpdate(aEvent) {
       gHistorySwipeAnimation.updateAnimation(aEvent.delta);
@@ -204,6 +225,8 @@ let gGestureSupport = {
       this._doUpdate = function (aEvent) {};
       this._doEnd = function (aEvent) {};
     }
+
+    return true;
   },
 
   /**
@@ -548,8 +571,10 @@ let gHistorySwipeAnimation = {
     this._trackedSnapshots = [];
     this._historyIndex = -1;
     this._boxWidth = -1;
+    this._boxHeight = -1;
     this._maxSnapshots = this._getMaxSnapshots();
     this._lastSwipeDir = "";
+    this._direction = "horizontal";
 
     // We only want to activate history swipe animations if we store snapshots.
     // If we don't store any, we handle horizontal swipes without animations.
@@ -578,14 +603,28 @@ let gHistorySwipeAnimation = {
   /**
    * Starts the swipe animation and handles fast swiping (i.e. a swipe animation
    * is already in progress when a new one is initiated).
+   *
+   * @param aIsVerticalSwipe
+   *        Whether we're dealing with a vertical swipe or not.
    */
-  startAnimation: function HSA_startAnimation() {
+  startAnimation: function HSA_startAnimation(aIsVerticalSwipe) {
+    this._direction = aIsVerticalSwipe ? "vertical" : "horizontal";
+
     if (this.isAnimationRunning()) {
-      gBrowser.stop();
-      this._lastSwipeDir = "RELOAD"; // just ensure that != ""
-      this._canGoBack = this.canGoBack();
-      this._canGoForward = this.canGoForward();
-      this._handleFastSwiping();
+      // If this is a horizontal scroll, or if this is a vertical scroll that
+      // was started while a horizontal scroll was still running, handle it as
+      // as a fast swipe. In the case of the latter scenario, this allows us to
+      // start the vertical animation without first loading the final page, or
+      // taking another snapshot. If vertical scrolls are initiated repeatedly
+      // without prior horizontal scroll we skip this and restart the animation
+      // from 0.
+      if (this._direction == "horizontal" || this._lastSwipeDir != "") {
+        gBrowser.stop();
+        this._lastSwipeDir = "RELOAD"; // just ensure that != ""
+        this._canGoBack = this.canGoBack();
+        this._canGoForward = this.canGoForward();
+        this._handleFastSwiping();
+      }
     }
     else {
       this._historyIndex = gBrowser.webNavigation.sessionHistory.index;
@@ -616,31 +655,36 @@ let gHistorySwipeAnimation = {
    *        swipe gesture.
    */
   updateAnimation: function HSA_updateAnimation(aVal) {
-    if (!this.isAnimationRunning())
+    if (!this.isAnimationRunning()) {
       return;
+    }
 
-    if ((aVal >= 0 && this.isLTR) ||
-        (aVal <= 0 && !this.isLTR)) {
-      if (aVal > 1)
-        aVal = 1; // Cap value to avoid sliding the page further than allowed.
-
-      if (this._canGoBack)
+    // We use the following value to decrease the bounce effect when scrolling
+    // to the top or bottom of the page, or when swiping back/forward past the
+    // browsing history. This value was determined experimentally.
+    let dampValue = 4;
+    if (this._direction == "vertical") {
+      this._prevBox.collapsed = true;
+      this._nextBox.collapsed = true;
+      this._positionBox(this._curBox, -1 * aVal / dampValue);
+    } else if ((aVal >= 0 && this.isLTR) ||
+               (aVal <= 0 && !this.isLTR)) {
+      let tempDampValue = 1;
+      if (this._canGoBack) {
         this._prevBox.collapsed = false;
-      else
+      } else {
+        tempDampValue = dampValue;
         this._prevBox.collapsed = true;
+      }
 
       // The current page is pushed to the right (LTR) or left (RTL),
       // the intention is to go back.
       // If there is a page to go back to, it should show in the background.
-      this._positionBox(this._curBox, aVal);
+      this._positionBox(this._curBox, aVal / tempDampValue);
 
       // The forward page should be pushed offscreen all the way to the right.
       this._positionBox(this._nextBox, 1);
-    }
-    else {
-      if (aVal < -1)
-        aVal = -1; // Cap value to avoid sliding the page further than allowed.
-
+    } else {
       // The intention is to go forward. If there is a page to go forward to,
       // it should slide in from the right (LTR) or left (RTL).
       // Otherwise, the current page should slide to the left (LTR) or
@@ -648,13 +692,13 @@ let gHistorySwipeAnimation = {
       // For the backdrop to be visible in that case, the previous page needs
       // to be hidden (if it exists).
       if (this._canGoForward) {
+        this._nextBox.collapsed = false;
         let offset = this.isLTR ? 1 : -1;
         this._positionBox(this._curBox, 0);
-        this._positionBox(this._nextBox, offset + aVal); // aVal is negative
-      }
-      else {
+        this._positionBox(this._nextBox, offset + aVal);
+      } else {
         this._prevBox.collapsed = true;
-        this._positionBox(this._curBox, aVal);
+        this._positionBox(this._curBox, aVal / dampValue);
       }
     }
   },
@@ -821,7 +865,9 @@ let gHistorySwipeAnimation = {
                                         "box");
     this._container.appendChild(this._nextBox);
 
-    this._boxWidth = this._curBox.getBoundingClientRect().width; // cache width
+    // Cache width and height.
+    this._boxWidth = this._curBox.getBoundingClientRect().width;
+    this._boxHeight = this._curBox.getBoundingClientRect().height;
   },
 
   /**
@@ -835,6 +881,7 @@ let gHistorySwipeAnimation = {
       this._container.parentNode.removeChild(this._container);
     this._container = null;
     this._boxWidth = -1;
+    this._boxHeight = -1;
   },
 
   /**
@@ -862,7 +909,14 @@ let gHistorySwipeAnimation = {
    *        The position (in X coordinates) to move the box element to.
    */
   _positionBox: function HSA__positionBox(aBox, aPosition) {
-    aBox.style.transform = "translateX(" + this._boxWidth * aPosition + "px)";
+    let transform = "";
+
+    if (this._direction == "vertical")
+      transform = "translateY(" + this._boxHeight * aPosition + "px)";
+    else
+      transform = "translateX(" + this._boxWidth * aPosition + "px)";
+
+    aBox.style.transform = transform;
   },
 
   /**
