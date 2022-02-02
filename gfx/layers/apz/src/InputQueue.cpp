@@ -64,6 +64,7 @@ InputQueue::MaybeHandleCurrentBlock(CancelableBlockState *block,
     if (!target || block->IsDefaultPrevented()) {
       return true;
     }
+    UpdateActiveApzc(block->GetTargetApzc());
     block->DispatchImmediate(aEvent);
     return true;
   }
@@ -270,7 +271,8 @@ InputQueue::StartNewTouchBlock(const nsRefPtr<AsyncPanZoomController>& aTarget,
                                bool aTargetConfirmed,
                                bool aCopyPropertiesFromCurrent)
 {
-  TouchBlockState* newBlock = new TouchBlockState(aTarget, aTargetConfirmed);
+  TouchBlockState* newBlock = new TouchBlockState(aTarget, aTargetConfirmed,
+      mTouchCounter);
   if (aCopyPropertiesFromCurrent) {
     newBlock->CopyPropertiesFrom(*CurrentTouchBlock());
   }
@@ -441,6 +443,7 @@ InputQueue::ProcessInputBlocks() {
       curBlock->DropEvents();
       target->ResetInputState();
     } else {
+      UpdateActiveApzc(curBlock->GetTargetApzc());
       curBlock->HandleEvents();
     }
     MOZ_ASSERT(!curBlock->HasEvents());
@@ -461,11 +464,21 @@ InputQueue::ProcessInputBlocks() {
 }
 
 void
+InputQueue::UpdateActiveApzc(const nsRefPtr<AsyncPanZoomController>& aNewActive) {
+  if (mLastActiveApzc && mLastActiveApzc != aNewActive
+      && mTouchCounter.GetActiveTouchCount() > 0) {
+    mLastActiveApzc->ResetInputState();
+  }
+  mLastActiveApzc = aNewActive;
+}
+
+void
 InputQueue::Clear()
 {
   APZThreadUtils::AssertOnControllerThread();
 
   mInputBlockQueue.Clear();
+  mLastActiveApzc = nullptr;
 }
 
 } // namespace layers

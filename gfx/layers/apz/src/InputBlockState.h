@@ -113,6 +113,12 @@ public:
   void DispatchImmediate(const InputData& aEvent) const;
 
   /**
+   * Dispatch the event to the target APZC. Mostly this is a hook for
+   * subclasses to do any per-event processing they need to.
+   */
+  virtual void DispatchEvent(const InputData& aEvent) const;
+
+  /**
    * @return true iff this block has received all the information needed
    *         to properly dispatch the events in the block.
    */
@@ -258,7 +264,7 @@ class TouchBlockState : public CancelableBlockState
 {
 public:
   explicit TouchBlockState(const nsRefPtr<AsyncPanZoomController>& aTargetApzc,
-                           bool aTargetConfirmed);
+                           bool aTargetConfirmed, TouchCounter& aTouchCounter);
 
   TouchBlockState *AsTouchBlock() override {
     return this;
@@ -334,6 +340,7 @@ public:
   bool HasEvents() const override;
   void DropEvents() override;
   void HandleEvents() override;
+  void DispatchEvent(const InputData& aEvent) const override;
   bool MustStayActive() override;
   const char* Type() override;
 
@@ -343,6 +350,8 @@ private:
   bool mDuringFastFling;
   bool mSingleTapOccurred;
   nsTArray<MultiTouchInput> mEvents;
+  // A reference to the InputQueue's touch counter
+  TouchCounter& mTouchCounter;
 };
 
 } // namespace layers
