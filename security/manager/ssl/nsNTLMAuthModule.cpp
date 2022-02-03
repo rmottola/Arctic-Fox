@@ -539,7 +539,7 @@ GenerateType3Msg(const nsString &domain,
                  uint32_t       *outLen)
 {
   // inBuf contains Type-2 msg (the challenge) from server
-
+  MOZ_ASSERT(NS_IsMainThread());
   nsresult rv;
   Type2Msg msg;
 
@@ -557,6 +557,7 @@ GenerateType3Msg(const nsString &domain,
 #ifdef IS_BIG_ENDIAN
   nsAutoString ucsDomainBuf, ucsUserBuf;
 #endif
+  nsAutoCString hostBuf;
   nsAutoString ucsHostBuf; 
   // temporary buffers for oem strings
   nsAutoCString oemDomainBuf, oemUserBuf, oemHostBuf;
@@ -615,16 +616,18 @@ GenerateType3Msg(const nsString &domain,
   }
 
   //
-  // get workstation name (use local machine's hostname)
+  // get workstation name
+  // (do not use local machine's hostname after bug 1046421)
   //
-  char hostBuf[SYS_INFO_BUFFER_LENGTH];
-  if (PR_GetSystemInfo(PR_SI_HOSTNAME, hostBuf, sizeof(hostBuf)) == PR_FAILURE)
-    return NS_ERROR_UNEXPECTED;
-  hostLen = strlen(hostBuf);
+  rv = mozilla::Preferences::GetCString("network.generic-ntlm-auth.workstation",
+                                        &hostBuf);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
   if (unicode)
   {
-    // hostname is ASCII, so we can do a simple zero-pad expansion:
-    CopyASCIItoUTF16(nsDependentCString(hostBuf, hostLen), ucsHostBuf);
+    ucsHostBuf = NS_ConvertUTF8toUTF16(hostBuf);
     hostPtr = ucsHostBuf.get();
     hostLen = ucsHostBuf.Length() * 2;
 #ifdef IS_BIG_ENDIAN
@@ -633,7 +636,10 @@ GenerateType3Msg(const nsString &domain,
 #endif
   }
   else
-    hostPtr = hostBuf;
+  {
+    hostPtr = hostBuf.get();
+    hostLen = hostBuf.Length();
+  }
 
   //
   // now that we have generated all of the strings, we can allocate outBuf.
@@ -989,6 +995,7 @@ nsNTLMAuthModule::Init(const char      *serviceName,
   mDomain = domain;
   mUsername = username;
   mPassword = password;
+  mNTLMNegotiateSent = false;
 
   static bool sTelemetrySent = false;
   if (!sTelemetrySent) {
@@ -1017,16 +1024,29 @@ nsNTLMAuthModule::GetNextToken(const void *inToken,
   if (PK11_IsFIPS())
     return NS_ERROR_NOT_AVAILABLE;
 
-  // if inToken is non-null, then assume it contains a type 2 message...
-  if (inToken)
-  {
-    LogToken("in-token", inToken, inTokenLen);
-    rv = GenerateType3Msg(mDomain, mUsername, mPassword, inToken,
-                          inTokenLen, outToken, outTokenLen);
-  }
-  else
-  {
-    rv = GenerateType1Msg(outToken, outTokenLen);
+  if (mNTLMNegotiateSent) {
+    // if inToken is non-null, and we have sent the NTLMSSP_NEGOTIATE (type 1),
+    // then the NTLMSSP_CHALLENGE (type 2) is expected
+    if (inToken) {
+      LogToken("in-token", inToken, inTokenLen);
+      // Now generate the NTLMSSP_AUTH (type 3)
+      rv = GenerateType3Msg(mDomain, mUsername, mPassword, inToken,
+			    inTokenLen, outToken, outTokenLen);
+    } else {
+      LOG(("NTLMSSP_NEGOTIATE already sent and presumably "
+	   "rejected by the server, refusing to send another"));
+      rv = NS_ERROR_UNEXPECTED;
+    }
+  } else {
+    if (inToken) {
+      LOG(("NTLMSSP_NEGOTIATE not sent but NTLM reply already received?!?"));
+      rv = NS_ERROR_UNEXPECTED;
+    } else {
+      rv = GenerateType1Msg(outToken, outTokenLen);
+      if (NS_SUCCEEDED(rv)) {
+	mNTLMNegotiateSent = true;
+      }
+    }
   }
 
   if (NS_SUCCEEDED(rv))

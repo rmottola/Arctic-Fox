@@ -15,13 +15,15 @@
 #include "mozilla/EnumeratedArray.h"
 
 #include "gfxVR.h"
+//#include <OVR_CAPI.h>
+//#include <OVR_CAPI_D3D.h>
 #include "ovr_capi_dynamic.h"
 
 namespace mozilla {
 namespace gfx {
 namespace impl {
 
-class HMDInfoOculus : public VRHMDInfo {
+class HMDInfoOculus : public VRHMDInfo, public VRHMDRenderingSupport {
 public:
   explicit HMDInfoOculus(ovrHmd aHMD);
 
@@ -38,9 +40,27 @@ public:
                                const Size& destViewport, const Rect& destRect,
                                VRDistortionConstants& values) override;
 
+  VRHMDRenderingSupport* GetRenderingSupport() override { return this; }
+  
   void Destroy();
 
+  /* VRHMDRenderingSupport */
+  already_AddRefed<RenderTargetSet> CreateRenderTargetSet(layers::Compositor *aCompositor, const IntSize& aSize) override;
+  void DestroyRenderTargetSet(RenderTargetSet *aRTSet) override;
+  void SubmitFrame(RenderTargetSet *aRTSet) override;
+
+  ovrHmd GetOculusHMD() const { return mHMD; }
+
 protected:
+  // must match the size of VRDistortionVertex
+  struct DistortionVertex {
+    float pos[2];
+    float texR[2];
+    float texG[2];
+    float texB[2];
+    float genericAttribs[4];
+  };
+
   virtual ~HMDInfoOculus() {
       Destroy();
       MOZ_COUNT_DTOR_INHERITED(HMDInfoOculus, VRHMDInfo);
@@ -49,6 +69,7 @@ protected:
   ovrHmd mHMD;
   ovrFovPort mFOVPort[2];
   uint32_t mStartCount;
+  ovrTrackingState mLastTrackingState;
 };
 
 } // namespace impl

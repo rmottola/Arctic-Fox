@@ -99,7 +99,7 @@ ArithPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 }
 
 bool
-AllDoublePolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+AllDoublePolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
     for (size_t i = 0, e = ins->numOperands(); i < e; i++) {
         MDefinition* in = ins->getOperand(i);
@@ -119,7 +119,7 @@ AllDoublePolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
 }
 
 bool
-ComparePolicy::adjustInputs(TempAllocator &alloc, MInstruction *def)
+ComparePolicy::adjustInputs(TempAllocator& alloc, MInstruction* def)
 {
     MOZ_ASSERT(def->isCompare());
     MCompare* compare = def->toCompare();
@@ -264,7 +264,7 @@ ComparePolicy::adjustInputs(TempAllocator &alloc, MInstruction *def)
 }
 
 bool
-TypeBarrierPolicy::adjustInputs(TempAllocator &alloc, MInstruction *def)
+TypeBarrierPolicy::adjustInputs(TempAllocator& alloc, MInstruction* def)
 {
     MTypeBarrier* ins = def->toTypeBarrier();
     MIRType inputType = ins->getOperand(0)->type();
@@ -319,7 +319,7 @@ TypeBarrierPolicy::adjustInputs(TempAllocator &alloc, MInstruction *def)
 }
 
 bool
-TestPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+TestPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
     MDefinition* op = ins->getOperand(0);
     switch (op->type()) {
@@ -760,10 +760,10 @@ template bool ObjectPolicy<2>::staticAdjustInputs(TempAllocator& alloc, MInstruc
 template bool ObjectPolicy<3>::staticAdjustInputs(TempAllocator& alloc, MInstruction* ins);
 
 static bool
-MaybeSimdUnbox(TempAllocator &alloc, MInstruction *ins, MIRType type, unsigned op)
+MaybeSimdUnbox(TempAllocator& alloc, MInstruction* ins, MIRType type, unsigned op)
 {
     MOZ_ASSERT(IsSimdType(type));
-    MDefinition *in = ins->getOperand(op);
+    MDefinition* in = ins->getOperand(op);
     if (in->type() == type)
         return true;
 
@@ -773,7 +773,6 @@ MaybeSimdUnbox(TempAllocator &alloc, MInstruction *ins, MIRType type, unsigned o
 
     return replace->typePolicy()->adjustInputs(alloc, replace);
 }
-
 
 template <unsigned Op>
 bool
@@ -855,7 +854,7 @@ SimdSelectPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 }
 
 bool
-CallPolicy::adjustInputs(TempAllocator &alloc, MInstruction *ins)
+CallPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
     MCall* call = ins->toCall();
 

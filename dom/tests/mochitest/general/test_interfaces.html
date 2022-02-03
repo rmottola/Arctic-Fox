@@ -64,7 +64,7 @@ var ecmaGlobals =
     "Int32Array",
     "Int8Array",
     "InternalError",
-    {name: "Intl", desktop: true},
+    {name: "Intl", android: false},
     "Iterator",
     "JSON",
     "Map",
@@ -140,6 +140,8 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "AnimationEvent",
 // IMPORTANT: Do not change this list without review from a DOM peer!
+    "AnimationPlaybackEvent",
+// IMPORTANT: Do not change this list without review from a DOM peer!
     {name: "AnimationTimeline", release: false},
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Attr",
@@ -206,6 +208,8 @@ var interfaceNamesInGlobalScope =
      permission: ["bluetooth"]},
 // IMPORTANT: Do not change this list without review from a DOM peer!
     {name: "BluetoothGattDescriptor", b2g: true, permission: ["bluetooth"]},
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    {name: "BluetoothGattServer", b2g: true, permission: ["bluetooth"]},
 // IMPORTANT: Do not change this list without review from a DOM peer!
     {name: "BluetoothGattService", b2g: true, permission: ["bluetooth"]},
 // IMPORTANT: Do not change this list without review from a DOM peer!
@@ -303,8 +307,6 @@ var interfaceNamesInGlobalScope =
     "CSS2Properties",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     {name: "CSSAnimation", release: false},
-// IMPORTANT: Do not change this list without review from a DOM peer!
-    "CSSCharsetRule",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "CSSConditionRule",
 // IMPORTANT: Do not change this list without review from a DOM peer!
@@ -934,6 +936,8 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     {name: "PushManager", b2g: false, android: false, release: false},
 // IMPORTANT: Do not change this list without review from a DOM peer!
+    {name: "PushSubscription", b2g: false, android: false, release: false},
+// IMPORTANT: Do not change this list without review from a DOM peer!
     "RadioNodeList",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Range",
@@ -1458,6 +1462,7 @@ function createInterfaceMap(isXBLScope) {
   var isRelease = !version.includes("a");
   var isDesktop = !/Mobile|Tablet/.test(navigator.userAgent);
   var isB2G = !isDesktop && !navigator.userAgent.includes("Android");
+  var isAndroid = navigator.userAgent.contains("Android");
   var hasPermission = function (aPermissions) {
     var result = false;
     for (var p of aPermissions) {

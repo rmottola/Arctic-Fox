@@ -3712,7 +3712,7 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
         if (!InitArrayElemOperation(cx, pc, obj, index.toInt32(), rhs))
             return false;
     } else {
-        if (!SetObjectElement(cx, obj, index, rhs, JSOp(*pc) == JSOP_STRICTSETELEM, script, pc))
+        if (!SetObjectElement(cx, obj, index, rhs, objv, JSOp(*pc) == JSOP_STRICTSETELEM, script, pc))
             return false;
     }
 
@@ -4598,7 +4598,7 @@ DoInFallback(JSContext* cx, BaselineFrame* frame, ICIn_Fallback* stub_,
     return true;
 }
 
-typedef bool (*DoInFallbackFn)(JSContext* , BaselineFrame* , ICIn_Fallback* , HandleValue,
+typedef bool (*DoInFallbackFn)(JSContext*, BaselineFrame*, ICIn_Fallback*, HandleValue,
                                HandleValue, MutableHandleValue);
 static const VMFunction DoInFallbackInfo =
     FunctionInfo<DoInFallbackFn>(DoInFallback, TailCall, PopValues(2));
@@ -4624,7 +4624,7 @@ ICIn_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICInNativeCompiler::generateStubCode(MacroAssembler &masm)
+ICInNativeCompiler::generateStubCode(MacroAssembler& masm)
 {
     MOZ_ASSERT(engine_ == Engine::Baseline);
 
@@ -4701,7 +4701,7 @@ ICInNativeDoesNotExistCompiler::getStub(ICStubSpace* space)
 }
 
 bool
-ICInNativeDoesNotExistCompiler::generateStubCode(MacroAssembler &masm)
+ICInNativeDoesNotExistCompiler::generateStubCode(MacroAssembler& masm)
 {
     MOZ_ASSERT(engine_ == Engine::Baseline);
 
@@ -4760,7 +4760,7 @@ ICInNativeDoesNotExistCompiler::generateStubCode(MacroAssembler &masm)
 }
 
 bool
-ICIn_Dense::Compiler::generateStubCode(MacroAssembler &masm)
+ICIn_Dense::Compiler::generateStubCode(MacroAssembler& masm)
 {
     MOZ_ASSERT(engine_ == Engine::Baseline);
 
@@ -5425,20 +5425,8 @@ TryAttachMagicArgumentsGetPropStub(JSContext* cx, JSScript* script, ICGetProp_Fa
         // Unlike ICGetProp_ArgumentsLength, only magic argument stubs are
         // supported at the moment.
         ICStub* monitorStub = stub->fallbackMonitorStub()->firstMonitorStub();
-
-        // XXXshu the compiler really should be stack allocated, but stack
-        // allocating it causes the test_temporary_storage indexedDB test to
-        // fail on GCC 4.7-compiled ARMv6 optimized builds on Android 2.3 and
-        // below with a NotFoundError, despite that test never exercising this
-        // code.
-        //
-        // Instead of tracking down the GCC bug, I've opted to heap allocate
-        // instead.
-        ScopedJSDeletePtr<ICGetProp_ArgumentsCallee::Compiler> compiler;
-        compiler = js_new<ICGetProp_ArgumentsCallee::Compiler>(cx, monitorStub);
-        if (!compiler)
-            return false;
-        ICStub* newStub = compiler->getStub(compiler->getStubSpace(script));
+        ICGetProp_ArgumentsCallee::Compiler compiler(cx, monitorStub);
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
         if (!newStub)
             return false;
         stub->addNewStub(newStub);
@@ -6897,8 +6885,9 @@ ICGetProp_DOMProxyShadowed::Compiler::getStub(ICStubSpace* space)
 static bool
 ProxyGet(JSContext* cx, HandleObject proxy, HandlePropertyName name, MutableHandleValue vp)
 {
+    RootedValue receiver(cx, ObjectValue(*proxy));
     RootedId id(cx, NameToId(name));
-    return Proxy::get(cx, proxy, proxy, id, vp);
+    return Proxy::get(cx, proxy, receiver, id, vp);
 }
 
 typedef bool (*ProxyGetFn)(JSContext* cx, HandleObject proxy, HandlePropertyName name,
@@ -7518,6 +7507,7 @@ DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_
     RootedReceiverGuard oldGuard(cx, ReceiverGuard(obj));
 
     if (obj->is<UnboxedPlainObject>()) {
+        MOZ_ASSERT(!oldShape);
         if (UnboxedExpandoObject* expando = obj->as<UnboxedPlainObject>().maybeExpando())
             oldShape = expando->lastProperty();
     }
@@ -7554,9 +7544,12 @@ DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_
     } else {
         MOZ_ASSERT(op == JSOP_SETPROP || op == JSOP_STRICTSETPROP);
 
-        RootedValue v(cx, rhs);
-        if (!PutProperty(cx, obj, id, v, op == JSOP_STRICTSETPROP))
+        ObjectOpResult result;
+        if (!SetProperty(cx, obj, id, rhs, lhs, result) ||
+            !result.checkStrictErrorOrWarning(cx, obj, id, op == JSOP_STRICTSETPROP))
+        {
             return false;
+        }
     }
 
     // Leave the RHS on the stack.
@@ -9082,7 +9075,7 @@ ICCallStubCompiler::pushSpreadCallArguments(MacroAssembler& masm,
     masm.unboxObject(Address(masm.getStackPointer(),
                              (isConstructing * sizeof(Value)) + STUB_FRAME_SIZE), startReg);
     masm.loadPtr(Address(startReg, NativeObject::offsetOfElements()), startReg);
- 
+
     // Align the stack such that the JitFrameLayout is aligned on the
     // JitStackAlignment.
     if (isJitCall) {
@@ -9338,15 +9331,15 @@ ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
         // Use BaselineFrameReg instead of BaselineStackReg, because
         // BaselineFrameReg and BaselineStackReg hold the same value just after
         // calling enterStubFrame.
- 
+
         // newTarget
         if (isConstructing_)
             masm.pushValue(Address(BaselineFrameReg, STUB_FRAME_SIZE));
- 
+
         // array
         uint32_t valueOffset = isConstructing_;
         masm.pushValue(Address(BaselineFrameReg, valueOffset++ * sizeof(Value) + STUB_FRAME_SIZE));
- 
+
         // this
         masm.pushValue(Address(BaselineFrameReg, valueOffset++ * sizeof(Value) + STUB_FRAME_SIZE));
 
@@ -11174,7 +11167,7 @@ ICGetElem_Dense::Clone(JSContext* cx, ICStubSpace* space, ICStub* firstMonitorSt
 }
 
 ICGetElem_UnboxedArray::ICGetElem_UnboxedArray(JitCode* stubCode, ICStub* firstMonitorStub,
-                                               ObjectGroup* group)
+                                               ObjectGroup *group)
   : ICMonitoredStub(GetElem_UnboxedArray, stubCode, firstMonitorStub),
     group_(group)
 { }

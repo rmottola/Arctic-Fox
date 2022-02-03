@@ -9,6 +9,7 @@
 
 #include "mozilla/Atomics.h"
 
+#include "jsfriendapi.h"
 #include "jsgc.h"
 
 #include "gc/Heap.h"
@@ -654,6 +655,11 @@ class GCRuntime
 
     size_t maxMallocBytesAllocated() { return maxMallocBytes; }
 
+    uint64_t nextCellUniqueId() {
+        MOZ_ASSERT(nextCellUniqueId_ > 0);
+        return nextCellUniqueId_++;
+    }
+
   public:
     // Internal public interface
     js::gc::State state() const { return incrementalState; }
@@ -767,13 +773,12 @@ class GCRuntime
     void setFoundBlackGrayEdges() { foundBlackGrayEdges = true; }
 
     uint64_t gcNumber() const { return number; }
-    void incGcNumber() { ++number; }
 
     uint64_t minorGCCount() const { return minorGCNumber; }
-    void incMinorGcNumber() { ++minorGCNumber; }
+    void incMinorGcNumber() { ++minorGCNumber; ++number; }
 
     uint64_t majorGCCount() const { return majorGCNumber; }
-    void incMajorGcNumber() { ++majorGCNumber; }
+    void incMajorGcNumber() { ++majorGCNumber; ++number; }
 
     int64_t defaultSliceBudget() const { return defaultTimeBudget_; }
 
@@ -831,19 +836,20 @@ class GCRuntime
     void releaseArena(ArenaHeader* aheader, const AutoLockGC& lock);
 
     void releaseHeldRelocatedArenas();
+    void releaseHeldRelocatedArenasWithoutUnlocking(const AutoLockGC& lock);
 
     // Allocator
     template <AllowGC allowGC>
-    bool checkAllocatorState(JSContext *cx, AllocKind kind);
+    bool checkAllocatorState(JSContext* cx, AllocKind kind);
     template <AllowGC allowGC>
-    JSObject *tryNewNurseryObject(JSContext *cx, size_t thingSize, size_t nDynamicSlots,
-                                  const Class *clasp);
+    JSObject* tryNewNurseryObject(JSContext* cx, size_t thingSize, size_t nDynamicSlots,
+                                  const Class* clasp);
     template <AllowGC allowGC>
-    static JSObject *tryNewTenuredObject(ExclusiveContext *cx, AllocKind kind, size_t thingSize,
+    static JSObject* tryNewTenuredObject(ExclusiveContext* cx, AllocKind kind, size_t thingSize,
                                          size_t nDynamicSlots);
     template <typename T, AllowGC allowGC>
-    static T *tryNewTenuredThing(ExclusiveContext *cx, AllocKind kind, size_t thingSize);
-    static void *refillFreeListInGC(Zone *zone, AllocKind thingKind);
+    static T* tryNewTenuredThing(ExclusiveContext* cx, AllocKind kind, size_t thingSize);
+    static void* refillFreeListInGC(Zone* zone, AllocKind thingKind);
 
   private:
     enum IncrementalProgress
@@ -862,7 +868,7 @@ class GCRuntime
     void arenaAllocatedDuringGC(JS::Zone* zone, ArenaHeader* arena);
 
     // Allocator internals
-    bool gcIfNeededPerAllocation(JSContext *cx);
+    bool gcIfNeededPerAllocation(JSContext* cx);
     template <typename T>
     static void checkIncrementalZoneState(ExclusiveContext* cx, T* t);
     static void* refillFreeListFromAnyThread(ExclusiveContext* cx, AllocKind thingKind,
@@ -902,7 +908,7 @@ class GCRuntime
     template <class CompartmentIterT> void markWeakReferences(gcstats::Phase phase);
     void markWeakReferencesInCurrentGroup(gcstats::Phase phase);
     template <class ZoneIterT, class CompartmentIterT> void markGrayReferences(gcstats::Phase phase);
-    void markBufferedGrayRoots(JS::Zone *zone);
+    void markBufferedGrayRoots(JS::Zone* zone);
     void markGrayReferencesInCurrentGroup(gcstats::Phase phase);
     void markAllWeakReferences(gcstats::Phase phase);
     void markAllGrayReferences(gcstats::Phase phase);
@@ -915,31 +921,30 @@ class GCRuntime
     void beginSweepingZoneGroup();
     bool shouldReleaseObservedTypes();
     void endSweepingZoneGroup();
-    IncrementalProgress sweepPhase(SliceBudget &sliceBudget);
+    IncrementalProgress sweepPhase(SliceBudget& sliceBudget);
     void endSweepPhase(bool lastGC);
     void sweepZones(FreeOp* fop, bool lastGC);
     void decommitAllWithoutUnlocking(const AutoLockGC& lock);
-    void decommitArenas(AutoLockGC &lock);
-    void expireChunksAndArenas(bool shouldShrink, AutoLockGC &lock);
-    void queueZonesForBackgroundSweep(ZoneList &zones);
-    void sweepBackgroundThings(ZoneList &zones, LifoAlloc &freeBlocks, ThreadType threadType);
+    void decommitArenas(AutoLockGC& lock);
+    void expireChunksAndArenas(bool shouldShrink, AutoLockGC& lock);
+    void queueZonesForBackgroundSweep(ZoneList& zones);
+    void sweepBackgroundThings(ZoneList& zones, LifoAlloc& freeBlocks, ThreadType threadType);
     void assertBackgroundSweepingFinished();
     bool shouldCompact();
     IncrementalProgress beginCompactPhase();
-    IncrementalProgress compactPhase(JS::gcreason::Reason reason, SliceBudget &sliceBudget);
+    IncrementalProgress compactPhase(JS::gcreason::Reason reason, SliceBudget& sliceBudget);
     void endCompactPhase(JS::gcreason::Reason reason);
-    void sweepTypesAfterCompacting(Zone *zone);
-    void sweepZoneAfterCompacting(Zone *zone);
-    bool relocateArenas(Zone *zone, JS::gcreason::Reason reason, SliceBudget &sliceBudget);
-    void updateAllCellPointersParallel(MovingTracer *trc, Zone *zone);
-    void updateAllCellPointersSerial(MovingTracer *trc, Zone *zone);
-    void updatePointersToRelocatedCells(Zone *zone);
-    void releaseRelocatedArenas();
-    void releaseRelocatedArenasWithoutUnlocking(const AutoLockGC& lock);
-#ifdef DEBUG
-    void protectRelocatedArenas();
-    void unprotectRelocatedArenas();
-#endif
+    void sweepTypesAfterCompacting(Zone* zone);
+    void sweepZoneAfterCompacting(Zone* zone);
+    bool relocateArenas(Zone* zone, JS::gcreason::Reason reason, ArenaHeader*& relocatedListOut,
+                        SliceBudget& sliceBudget);
+    void updateAllCellPointersParallel(MovingTracer* trc, Zone* zone);
+    void updateAllCellPointersSerial(MovingTracer* trc, Zone* zone);
+    void updatePointersToRelocatedCells(Zone* zone);
+    void protectAndHoldArenas(ArenaHeader* arenaList);
+    void unprotectHeldRelocatedArenas();
+    void releaseRelocatedArenas(ArenaHeader* arenaList);
+    void releaseRelocatedArenasWithoutUnlocking(ArenaHeader* arenaList, const AutoLockGC& lock);
     void finishCollection(JS::gcreason::Reason reason);
 
     void computeNonIncrementalMarkingForValidation();
@@ -976,6 +981,8 @@ class GCRuntime
     GCSchedulingTunables tunables;
     GCSchedulingState schedulingState;
 
+    MemProfiler mMemProfiler;
+
   private:
     // When empty, chunks reside in the emptyChunks pool and are re-used as
     // needed or eventually expired if not re-used. The emptyChunks pool gets
@@ -998,6 +1005,9 @@ class GCRuntime
     RootedValueMap rootsHash;
 
     size_t maxMallocBytes;
+
+    // An incrementing id used to assign unique ids to cells that require one.
+    uint64_t nextCellUniqueId_;
 
     /*
      * Number of the committed arenas in all GC chunks including empty chunks.

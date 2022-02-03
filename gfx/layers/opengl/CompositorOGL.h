@@ -173,6 +173,7 @@ struct CompositorOGLVRObjects {
   GLint mUTexture[2];
   GLint mUVREyeToSource[2];
   GLint mUVRDestionatinScaleAndOffset[2];
+  GLint mUHeight[2];
 };
 
 // If you want to make this class not final, first remove calls to virtual
@@ -182,6 +183,7 @@ class CompositorOGL final : public Compositor
   typedef mozilla::gl::GLContext GLContext;
 
   friend class GLManagerCompositor;
+  friend class CompositingRenderTargetOGL;
 
   std::map<ShaderConfigOGL, ShaderProgramOGL*> mPrograms;
 public:
@@ -232,7 +234,7 @@ public:
                         const gfx::Rect& aVisibleRect) override;
 
   virtual void EndFrame() override;
-  virtual void SetDispAcquireFence(Layer* aLayer) override;
+  virtual void SetDispAcquireFence(Layer* aLayer, nsIWidget* aWidget) override;
   virtual FenceHandle GetReleaseFence() override;
   virtual void EndFrameForExternalComposition(const gfx::Matrix& aTransform) override;
 
@@ -259,9 +261,6 @@ public:
   }
 
   virtual void MakeCurrent(MakeCurrentFlags aFlags = 0) override;
-
-  virtual void PrepareViewport(const gfx::IntSize& aSize) override;
-
 
 #ifdef MOZ_DUMP_PAINTING
   virtual const char* Name() const override { return "OGL"; }
@@ -326,6 +325,8 @@ private:
                         const EffectChain& aEffectChain,
                         gfx::Float aOpacity,
                         const gfx::Matrix4x4& aTransform);
+
+  void PrepareViewport(CompositingRenderTargetOGL *aRenderTarget);
 
   /** Widget associated with this compositor */
   nsIWidget *mWidget;
@@ -455,6 +456,8 @@ private:
 
   FenceHandle mReleaseFenceHandle;
   ShaderProgramOGL *mCurrentProgram;
+
+  gfx::Rect mRenderBound;
 
   CompositorOGLVRObjects mVR;
 };

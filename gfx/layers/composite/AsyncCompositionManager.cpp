@@ -243,22 +243,17 @@ GetLayerFixedMarginsOffset(Layer* aLayer,
   // layer, we can just take the difference between these values.
   LayerPoint translation;
   const LayerPoint& anchor = aLayer->GetFixedPositionAnchor();
-  const LayerMargin& fixedMargins = aLayer->GetFixedPositionMargins();
 
-  if (fixedMargins.left >= 0) {
-    if (anchor.x > 0) {
-      translation.x -= aFixedLayerMargins.right - fixedMargins.right;
-    } else {
-      translation.x += aFixedLayerMargins.left - fixedMargins.left;
-    }
+  if (anchor.x > 0) {
+    translation.x -= aFixedLayerMargins.right;
+  } else {
+    translation.x += aFixedLayerMargins.left;
   }
 
-  if (fixedMargins.top >= 0) {
-    if (anchor.y > 0) {
-      translation.y -= aFixedLayerMargins.bottom - fixedMargins.bottom;
-    } else {
-      translation.y += aFixedLayerMargins.top - fixedMargins.top;
-    }
+  if (anchor.y > 0) {
+    translation.y -= aFixedLayerMargins.bottom;
+  } else {
+    translation.y += aFixedLayerMargins.top;
   }
 
   return translation;
@@ -460,7 +455,8 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
 
     MOZ_ASSERT(!animation.startTime().IsNull(),
                "Failed to resolve start time of pending animations");
-    TimeDuration elapsedDuration = aPoint - animation.startTime();
+    TimeDuration elapsedDuration =
+      (aPoint - animation.startTime()).MultDouble(animation.playbackRate());
     // Skip animations that are yet to start.
     //
     // Currently, this should only happen when the refresh driver is under test
@@ -491,19 +487,19 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
       dom::KeyframeEffectReadOnly::GetComputedTimingAt(
         Nullable<TimeDuration>(elapsedDuration), timing);
 
-    MOZ_ASSERT(0.0 <= computedTiming.mTimeFraction &&
-               computedTiming.mTimeFraction <= 1.0,
-               "time fraction should be in [0-1]");
+    MOZ_ASSERT(0.0 <= computedTiming.mProgress &&
+               computedTiming.mProgress <= 1.0,
+               "iteration progress should be in [0-1]");
 
     int segmentIndex = 0;
     AnimationSegment* segment = animation.segments().Elements();
-    while (segment->endPortion() < computedTiming.mTimeFraction) {
+    while (segment->endPortion() < computedTiming.mProgress) {
       ++segment;
       ++segmentIndex;
     }
 
     double positionInSegment =
-      (computedTiming.mTimeFraction - segment->startPortion()) /
+      (computedTiming.mProgress - segment->startPortion()) /
       (segment->endPortion() - segment->startPortion());
 
     double portion =

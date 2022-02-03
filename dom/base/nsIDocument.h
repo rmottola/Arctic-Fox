@@ -97,6 +97,7 @@ class ErrorResult;
 class EventStates;
 class PendingAnimationTracker;
 class SVGAttrAnimationRuleProcessor;
+template<typename> class OwningNonNull;
 
 namespace css {
 class Loader;
@@ -146,7 +147,6 @@ class XPathEvaluator;
 class XPathExpression;
 class XPathNSResolver;
 class XPathResult;
-template<typename> class OwningNonNull;
 template<typename> class Sequence;
 
 template<typename, typename> class CallbackObjectHolder;
@@ -156,8 +156,8 @@ typedef CallbackObjectHolder<NodeFilter, nsIDOMNodeFilter> NodeFilterHolder;
 } // namespace mozilla
 
 #define NS_IDOCUMENT_IID \
-{ 0x6d18ec0b, 0x1f68, 0x4ae6, \
-  { 0x8b, 0x3d, 0x8d, 0x7d, 0x8b, 0x8e, 0x28, 0xd4 } }
+{ 0x72391609, 0x673d, 0x4bec, \
+  { 0xbd, 0x75, 0x64, 0xbf, 0x1f, 0x6a, 0x6b, 0x5e } }
 
 // Enum for requesting a particular type of document when creating a doc
 enum DocumentFlavor {
@@ -1384,10 +1384,11 @@ public:
 
   /**
    * Create an element with the specified name, prefix and namespace ID.
+   * Returns null if element name parsing failed.
    */
-  virtual nsresult CreateElem(const nsAString& aName, nsIAtom *aPrefix,
-                              int32_t aNamespaceID,
-                              nsIContent** aResult) = 0;
+  virtual already_AddRefed<Element> CreateElem(const nsAString& aName,
+                                               nsIAtom* aPrefix,
+                                               int32_t aNamespaceID) = 0;
 
   /**
    * Get the security info (i.e. SSL state etc) that the document got
@@ -2558,9 +2559,9 @@ public:
   already_AddRefed<mozilla::dom::TouchList> CreateTouchList();
   already_AddRefed<mozilla::dom::TouchList>
     CreateTouchList(mozilla::dom::Touch& aTouch,
-                    const mozilla::dom::Sequence<mozilla::dom::OwningNonNull<mozilla::dom::Touch> >& aTouches);
+                    const mozilla::dom::Sequence<mozilla::OwningNonNull<mozilla::dom::Touch> >& aTouches);
   already_AddRefed<mozilla::dom::TouchList>
-    CreateTouchList(const mozilla::dom::Sequence<mozilla::dom::OwningNonNull<mozilla::dom::Touch> >& aTouches);
+    CreateTouchList(const mozilla::dom::Sequence<mozilla::OwningNonNull<mozilla::dom::Touch> >& aTouches);
 
   void SetStyleSheetChangeEventsEnabled(bool aValue)
   {

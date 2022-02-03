@@ -40,7 +40,7 @@ CodeGeneratorShared::ensureMasm(MacroAssembler* masmArg)
     return *maybeMasm_;
 }
 
-CodeGeneratorShared::CodeGeneratorShared(MIRGenerator *gen, LIRGraph *graph, MacroAssembler *masmArg)
+CodeGeneratorShared::CodeGeneratorShared(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masmArg)
   : maybeMasm_(),
     masm(ensureMasm(masmArg)),
     gen(gen),
@@ -1161,7 +1161,7 @@ class StoreOp
 };
 
 static void
-StoreAllLiveRegs(MacroAssembler &masm, LiveRegisterSet liveRegs)
+StoreAllLiveRegs(MacroAssembler& masm, LiveRegisterSet liveRegs)
 {
     // Store a copy of all live registers before performing the call.
     // When we reach the OsiPoint, we can use this to check nothing

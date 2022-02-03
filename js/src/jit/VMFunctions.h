@@ -57,7 +57,7 @@ enum MaybeTailCall {
 // specified. In this case, the return type must be boolean to indicate
 // failure.
 //
-// All functions described by VMFunction take a JSContext* as a first
+// All functions described by VMFunction take a JSContext * as a first
 // argument, and are treated as re-entrant into the VM and therefore fallible.
 struct VMFunction
 {
@@ -68,7 +68,7 @@ struct VMFunction
     // Address of the C function.
     void* wrapped;
 
-    // Number of arguments expected, excluding JSContext* as an implicit
+    // Number of arguments expected, excluding JSContext * as an implicit
     // first argument and an outparam as a possible implicit final argument.
     uint32_t explicitArgs;
 

@@ -41,33 +41,34 @@ let exercisePrefs = Task.async(function* (source, highlightable) {
   yield checkStyle(win, "white-space", "pre");
 
   // Next, test that the Wrap Long Lines menu item works.
+  let prefReady = waitForPrefChange("view_source.wrap_long_lines");
   simulateClick(wrapMenuItem);
   is(wrapMenuItem.hasAttribute("checked"), true, "Wrap menu item checked");
+  yield prefReady;
   is(SpecialPowers.getBoolPref("view_source.wrap_long_lines"), true, "Wrap pref set");
 
   yield checkStyle(win, "white-space", "pre-wrap");
 
+  prefReady = waitForPrefChange("view_source.wrap_long_lines");
   simulateClick(wrapMenuItem);
   is(wrapMenuItem.hasAttribute("checked"), false, "Wrap menu item unchecked");
+  yield prefReady;
   is(SpecialPowers.getBoolPref("view_source.wrap_long_lines"), false, "Wrap pref set");
   yield checkStyle(win, "white-space", "pre");
 
   // Check that the Syntax Highlighting menu item works.
-  let pageShowPromise = BrowserTestUtils.waitForEvent(win.gBrowser, "pageshow");
+  prefReady = waitForPrefChange("view_source.syntax_highlight");
   simulateClick(syntaxMenuItem);
-  yield pageShowPromise;
-
   is(syntaxMenuItem.hasAttribute("checked"), false, "Syntax menu item unchecked");
+  yield prefReady;
   is(SpecialPowers.getBoolPref("view_source.syntax_highlight"), false, "Syntax highlighting pref set");
   yield checkHighlight(win, false);
 
-  pageShowPromise = BrowserTestUtils.waitForEvent(win.gBrowser, "pageshow");
+  prefReady = waitForPrefChange("view_source.syntax_highlight");
   simulateClick(syntaxMenuItem);
-  yield pageShowPromise;
-
   is(syntaxMenuItem.hasAttribute("checked"), true, "Syntax menu item checked");
+  yield prefReady;
   is(SpecialPowers.getBoolPref("view_source.syntax_highlight"), true, "Syntax highlighting pref set");
-
   yield checkHighlight(win, highlightable);
   yield BrowserTestUtils.closeWindow(win);
 
@@ -127,7 +128,8 @@ let checkHighlight = Task.async(function* (win, expected) {
   let highlighted = yield ContentTask.spawn(browser, {}, function* () {
     let spans = content.document.getElementsByTagName("span");
     return Array.some(spans, (span) => {
-      return span.className != "";
+      let style = content.getComputedStyle(span, null);
+      return style.getPropertyValue("color") !== "rgb(0, 0, 0)";
     });
   });
   is(highlighted, expected, "Syntax highlighting " + (expected ? "on" : "off"));

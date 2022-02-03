@@ -22,6 +22,7 @@
 #include "mozilla/StaticPtr.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "WindowIdentifier.h"
+#include "nsJSUtils.h"
 #include "mozilla/dom/ScreenOrientation.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/ContentParent.h"
@@ -486,6 +487,7 @@ UnregisterSystemTimezoneChangeObserver(SystemTimezoneChangeObserver* aObserver)
 void
 NotifySystemTimezoneChange(const SystemTimezoneChangeInformation& aSystemTimezoneChangeInfo)
 {
+  nsJSUtils::ResetTimeZone();
   sSystemTimezoneChangeObservers.BroadcastInformation(aSystemTimezoneChangeInfo);
 }
 

@@ -272,8 +272,11 @@ static EventRegions
 GetEventRegions(const LayerMetricsWrapper& aLayer)
 {
   if (aLayer.IsScrollInfoLayer()) {
-    return EventRegions(nsIntRegion(ParentLayerIntRect::ToUntyped(
-      RoundedToInt(aLayer.Metrics().GetCompositionBounds()))));
+    ParentLayerIntRect compositionBounds(RoundedToInt(aLayer.Metrics().GetCompositionBounds()));
+    nsIntRegion hitRegion(ParentLayerIntRect::ToUntyped(compositionBounds));
+    EventRegions eventRegions(hitRegion);
+    eventRegions.mDispatchToContentHitRegion = eventRegions.mHitRegion;
+    return eventRegions;
   }
   return aLayer.GetEventRegions();
 }
@@ -845,7 +848,7 @@ APZCTreeManager::UpdateWheelTransaction(WidgetInputEvent& aEvent)
     return;
   }
 
-  switch (aEvent.message) {
+  switch (aEvent.mMessage) {
    case NS_MOUSE_MOVE:
    case NS_DRAGDROP_OVER: {
      WidgetMouseEvent* mouseEvent = aEvent.AsMouseEvent();
@@ -869,6 +872,8 @@ APZCTreeManager::UpdateWheelTransaction(WidgetInputEvent& aEvent)
    case NS_DRAGDROP_DROP:
      txn->EndTransaction();
      return;
+   default:
+     break;
   }
 }
 

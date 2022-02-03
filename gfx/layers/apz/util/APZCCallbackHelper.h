@@ -68,6 +68,10 @@ public:
                                              uint32_t* aPresShellIdOut,
                                              FrameMetrics::ViewID* aViewIdOut);
 
+    /* Initialize a zero-margin displayport on the root document element of the
+       given presShell. */
+    static void InitializeRootDisplayport(nsIPresShell* aPresShell);
+
     /* Tell layout to perform scroll snapping for the scrollable frame with the
      * given scroll id. aDestination specifies the expected landing position of
      * a current fling or scrolling animation that should be used to select
@@ -112,7 +116,7 @@ public:
 
     /* Synthesize a mouse event with the given parameters, and dispatch it
      * via the given widget. */
-    static nsEventStatus DispatchSynthesizedMouseEvent(uint32_t aMsg,
+    static nsEventStatus DispatchSynthesizedMouseEvent(EventMessage aMsg,
                                                        uint64_t aTime,
                                                        const LayoutDevicePoint& aRefPoint,
                                                        Modifiers aModifiers,

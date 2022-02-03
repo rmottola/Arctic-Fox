@@ -182,7 +182,7 @@ class ExclusiveContext : public ContextFriendFields,
     JSAtomState& names() { return *runtime_->commonNames; }
     StaticStrings& staticStrings() { return *runtime_->staticStrings; }
     bool isPermanentAtomsInitialized() { return !!runtime_->permanentAtoms; }
-    FrozenAtomSet &permanentAtoms() { return *runtime_->permanentAtoms; }
+    FrozenAtomSet& permanentAtoms() { return *runtime_->permanentAtoms; }
     WellKnownSymbols& wellKnownSymbols() { return *runtime_->wellKnownSymbols; }
     const JS::AsmJSCacheOps& asmJSCacheOps() { return runtime_->asmJSCacheOps; }
     PropertyName* emptyString() { return runtime_->emptyString; }
@@ -609,10 +609,10 @@ void
 CallErrorReporter(JSContext* cx, const char* message, JSErrorReport* report);
 
 extern bool
-ReportIsNotDefined(JSContext *cx, HandlePropertyName name);
+ReportIsNotDefined(JSContext* cx, HandlePropertyName name);
 
 extern bool
-ReportIsNotDefined(JSContext *cx, HandleId id);
+ReportIsNotDefined(JSContext* cx, HandleId id);
 
 /*
  * Report an attempt to access the property of a null or undefined value (v).

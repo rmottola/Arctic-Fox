@@ -3698,7 +3698,7 @@ IonBuilder::improveTypesAtNullOrUndefinedCompare(MCompare* ins, bool trueBranch,
         if (altersUndefined) {
             base.addType(TypeSet::UndefinedType(), alloc_->lifoAlloc());
             // If TypeSet emulates undefined, then we cannot filter the objects.
-           if (inputTypes->maybeEmulatesUndefined(constraints()))
+            if (inputTypes->maybeEmulatesUndefined(constraints()))
                 base.addType(TypeSet::AnyObjectType(), alloc_->lifoAlloc());
         }
 
@@ -3742,7 +3742,7 @@ IonBuilder::improveTypesAtTest(MDefinition* ins, bool trueBranch, MTest* test)
         }
 
         if (oldType->unknown())
-	    return true;
+            return true;
 
         TemporaryTypeSet* type = nullptr;
         if (trueBranch)
@@ -3826,7 +3826,7 @@ IonBuilder::improveTypesAtTest(MDefinition* ins, bool trueBranch, MTest* test)
 
     // Decide either to set or remove.
     if (trueBranch) {
-	TemporaryTypeSet remove;
+        TemporaryTypeSet remove;
         remove.addType(TypeSet::UndefinedType(), alloc_->lifoAlloc());
         remove.addType(TypeSet::NullType(), alloc_->lifoAlloc());
         type = TypeSet::removeSet(oldType, &remove, alloc_->lifoAlloc());
@@ -4963,6 +4963,8 @@ IonBuilder::inlineScriptedCall(CallInfo& callInfo, JSFunction* target)
         // the inlining was aborted for a non-exception reason.
         if (inlineBuilder.abortReason_ == AbortReason_Disable) {
             calleeScript->setUninlineable();
+            abortReason_ = AbortReason_Inlining;
+        } else if (inlineBuilder.abortReason_ == AbortReason_Inlining) {
             abortReason_ = AbortReason_Inlining;
         } else if (inlineBuilder.abortReason_ == AbortReason_PreliminaryObjects) {
             const ObjectGroupVector& groups = inlineBuilder.abortedPreliminaryGroups();
@@ -9794,6 +9796,9 @@ IonBuilder::jsop_length_fastPath()
         return false;
 
     MDefinition* obj = current->peek(-1);
+
+    if (shouldAbortOnPreliminaryGroups(obj))
+        return false;
 
     if (obj->mightBeType(MIRType_String)) {
         if (obj->mightBeType(MIRType_Object))

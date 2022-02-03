@@ -2,6 +2,9 @@
  * http://creativecommons.org/publicdomain/zero/1.0/
  */
 
+Cu.import("resource://gre/modules/PromiseUtils.jsm");
+Cu.import("resource://gre/modules/Preferences.jsm");
+
 function openViewSourceWindow(aURI, aCallback) {
   let viewSourceWindow = openDialog("chrome://global/content/viewSource.xul", null, null, aURI);
   viewSourceWindow.addEventListener("pageshow", function pageShowHandler(event) {
@@ -37,17 +40,29 @@ function testViewSourceWindow(aURI, aTestCallback, aCloseCallback) {
   });
 }
 
-function openViewPartialSourceWindow(aReference, aCallback) {
-  let viewSourceWindow = openDialog("chrome://global/content/viewPartialSource.xul",
-                                    null, null, null, null, aReference, "selection");
-  viewSourceWindow.addEventListener("pageshow", function pageShowHandler(event) {
-    // Wait for the inner window to load, not viewSourceWindow.
-    if (/^view-source:/.test(event.target.location)) {
-      info("View source window opened: " + event.target.location);
-      viewSourceWindow.removeEventListener("pageshow", pageShowHandler, false);
-      aCallback(viewSourceWindow);
-    }
-  }, false);
+/**
+ * Opens a view source tab for a selection (View Selection Source) within the
+ * currently selected browser in gBrowser.
+ *
+ * @param aCSSSelector - used to specify a node within the selection to
+ *                       view the source of. It is expected that this node is
+ *                       within an existing selection.
+ * @returns the new tab which shows the source.
+ */
+function* openViewPartialSourceWindow(aCSSSelector) {
+  var contentAreaContextMenu = document.getElementById("contentAreaContextMenu");
+  let popupShownPromise = BrowserTestUtils.waitForEvent(contentAreaContextMenu, "popupshown");
+  yield BrowserTestUtils.synthesizeMouseAtCenter(aCSSSelector,
+          { type: "contextmenu", button: 2}, gBrowser.selectedBrowser);
+  yield popupShownPromise;
+
+  let newTabPromise = BrowserTestUtils.waitForNewTab(gBrowser, null);
+
+  let popupHiddenPromise = BrowserTestUtils.waitForEvent(contentAreaContextMenu, "popuphidden");
+  EventUtils.synthesizeMouseAtCenter(document.getElementById("context-viewpartialsource-selection"), {});
+  yield popupHiddenPromise;
+
+  return (yield newTabPromise);
 }
 
 registerCleanupFunction(function() {
@@ -57,24 +72,46 @@ registerCleanupFunction(function() {
     windows.getNext().close();
 });
 
-function openDocument(aURI, aCallback) {
-  let tab = gBrowser.addTab(aURI);
-  let browser = tab.linkedBrowser;
-  browser.addEventListener("DOMContentLoaded", function pageLoadedListener() {
-    browser.removeEventListener("DOMContentLoaded", pageLoadedListener, false);
-    aCallback(tab);
-  }, false);
+/**
+ * Open a new document in a new tab, select part of it, and view the source of
+ * that selection. The document is not closed afterwards.
+ *
+ * @param aURI - url to load
+ * @param aCSSSelector - used to specify a node to select. All of this node's
+ *                       children will be selected.
+ * @returns the new tab which shows the source.
+ */ 
+function* openDocumentSelect(aURI, aCSSSelector) {
+  let tab = yield BrowserTestUtils.openNewForegroundTab(gBrowser, aURI);
   registerCleanupFunction(function() {
     gBrowser.removeTab(tab);
   });
+
+  yield ContentTask.spawn(gBrowser.selectedBrowser, { selector: aCSSSelector }, function* (arg) {
+    let element = content.document.querySelector(arg.selector);
+    content.getSelection().selectAllChildren(element);
+  });
+
+  let newtab = yield openViewPartialSourceWindow(aCSSSelector);
+
+  // Wait until the source has been loaded.
+  yield new Promise(resolve => {
+    let mm = newtab.linkedBrowser.messageManager;
+    mm.addMessageListener("ViewSource:SourceLoaded", function selectionDrawn() {
+      mm.removeMessageListener("ViewSource:SourceLoaded", selectionDrawn);
+      setTimeout(resolve, 0);
+    });
+  });
+
+  return newtab;
 }
 
-function openDocumentSelect(aURI, aCSSSelector, aCallback) {
-  openDocument(aURI, function(aTab) {
-    let element = aTab.linkedBrowser.contentDocument.querySelector(aCSSSelector);
-    let selection = aTab.linkedBrowser.contentWindow.getSelection();
-    selection.selectAllChildren(element);
-
-    openViewPartialSourceWindow(selection, aCallback);
-  });
+function waitForPrefChange(pref) {
+  let deferred = PromiseUtils.defer();
+  let observer = () => {
+    Preferences.ignore(pref, observer);
+    deferred.resolve();
+  };
+  Preferences.observe(pref, observer);
+  return deferred.promise;
 }

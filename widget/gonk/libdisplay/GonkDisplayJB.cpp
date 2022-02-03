@@ -26,11 +26,14 @@
 #include <hardware/power.h>
 #include <suspend/autosuspend.h>
 
+#include "BootAnimation.h"
 #include "FramebufferSurface.h"
 #if ANDROID_VERSION == 17
 #include "GraphicBufferAlloc.h"
 #endif
-#include "BootAnimation.h"
+#include "mozilla/Assertions.h"
+
+#define DEFAULT_XDPI 75.0
 
 using namespace android;
 
@@ -45,6 +48,8 @@ GonkDisplayJB::GonkDisplayJB()
     , mFBDevice(nullptr)
     , mPowerModule(nullptr)
     , mList(nullptr)
+    , mWidth(0)
+    , mHeight(0)
     , mEnabledCallback(nullptr)
 {
     int err = hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &mFBModule);
@@ -106,49 +111,21 @@ GonkDisplayJB::GonkDisplayJB()
 
     mAlloc = new GraphicBufferAlloc();
 
-#if ANDROID_VERSION >= 21
-    sp<IGraphicBufferProducer> producer;
-    sp<IGraphicBufferConsumer> consumer;
-    BufferQueue::createBufferQueue(&producer, &consumer, mAlloc);
-#elif ANDROID_VERSION >= 19
-    sp<BufferQueue> consumer = new BufferQueue(mAlloc);
-    sp<IGraphicBufferProducer> producer = consumer;
-#elif ANDROID_VERSION >= 18
-    sp<BufferQueue> consumer = new BufferQueue(true, mAlloc);
-    sp<IGraphicBufferProducer> producer = consumer;
-#else
-    sp<BufferQueue> consumer = new BufferQueue(true, mAlloc);
-#endif
+    CreateSurface(mSTClient, mDispSurface, mWidth, mHeight);
 
-    mDispSurface = new FramebufferSurface(0, mWidth, mHeight, surfaceformat, consumer);
+    mList = (hwc_display_contents_1_t *)calloc(1, sizeof(*mList) + (sizeof(hwc_layer_1_t)*2));
 
-#if ANDROID_VERSION == 17
-    sp<SurfaceTextureClient> stc = new SurfaceTextureClient(
-        static_cast<sp<ISurfaceTexture> >(mDispSurface->getBufferQueue()));
-#else
-    sp<Surface> stc = new Surface(producer);
-#endif
-
-    mSTClient = stc;
-    mSTClient->perform(mSTClient.get(), NATIVE_WINDOW_SET_BUFFER_COUNT, 2);
-    mSTClient->perform(mSTClient.get(), NATIVE_WINDOW_SET_USAGE,
-                                        GRALLOC_USAGE_HW_FB |
-                                        GRALLOC_USAGE_HW_RENDER |
-                                        GRALLOC_USAGE_HW_COMPOSER);
-
-    mList = (hwc_display_contents_1_t *)malloc(sizeof(*mList) + (sizeof(hwc_layer_1_t)*2));
-    if (mHwc) {
-#if ANDROID_VERSION >= 21
-        if (mHwc->common.version >= HWC_DEVICE_API_VERSION_1_4) {
-            mHwc->setPowerMode(mHwc, HWC_DISPLAY_PRIMARY, HWC_POWER_MODE_NORMAL);
-        } else {
-            mHwc->blank(mHwc, HWC_DISPLAY_PRIMARY, 0);
-        }
-#else
-        mHwc->blank(mHwc, HWC_DISPLAY_PRIMARY, 0);
-#endif
+    uint32_t usage = GRALLOC_USAGE_HW_FB | GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_COMPOSER;
+    if (mFBDevice) {
+        // If device uses fb, they can not use single buffer for boot animation
+        mSTClient->perform(mSTClient.get(), NATIVE_WINDOW_SET_BUFFER_COUNT, 2);
+        mSTClient->perform(mSTClient.get(), NATIVE_WINDOW_SET_USAGE, usage);
+    } else if (mHwc) {
+        PowerOnDisplay(HWC_DISPLAY_PRIMARY);
+        // For devices w/ hwc v1.0 or no hwc, this buffer can not be created,
+        // only create this buffer for devices w/ hwc version > 1.0.
+        CreateSurface(mBootAnimSTClient, mBootAnimDispSurface, mWidth, mHeight);
     }
-
 
     ALOGI("Starting bootanimation with (%d) format framebuffer", surfaceformat);
     StartBootAnimation();
@@ -163,11 +140,33 @@ GonkDisplayJB::~GonkDisplayJB()
     free(mList);
 }
 
-ANativeWindow*
-GonkDisplayJB::GetNativeWindow()
+void
+GonkDisplayJB::CreateSurface(android::sp<ANativeWindow>& aNativeWindow,
+                             android::sp<android::DisplaySurface>& aDisplaySurface,
+                             uint32_t aWidth, uint32_t aHeight)
 {
-    StopBootAnimation();
-    return mSTClient.get();
+#if ANDROID_VERSION >= 21
+    sp<IGraphicBufferProducer> producer;
+    sp<IGraphicBufferConsumer> consumer;
+    BufferQueue::createBufferQueue(&producer, &consumer, mAlloc);
+#elif ANDROID_VERSION >= 19
+    sp<BufferQueue> consumer = new BufferQueue(mAlloc);
+    sp<IGraphicBufferProducer> producer = consumer;
+#elif ANDROID_VERSION >= 18
+    sp<BufferQueue> consumer = new BufferQueue(true, mAlloc);
+    sp<IGraphicBufferProducer> producer = consumer;
+#else
+    sp<BufferQueue> consumer = new BufferQueue(true, mAlloc);
+#endif
+
+    aDisplaySurface = new FramebufferSurface(0, aWidth, aHeight, surfaceformat, consumer);
+
+#if ANDROID_VERSION == 17
+    aNativeWindow = new SurfaceTextureClient(
+        static_cast<sp<ISurfaceTexture>>(aDisplaySurface->getBufferQueue()));
+#else
+    aNativeWindow = new Surface(producer);
+#endif
 }
 
 void
@@ -223,15 +222,11 @@ GonkDisplayJB::GetHWCDevice()
     return mHwc;
 }
 
-void*
-GonkDisplayJB::GetDispSurface()
-{
-    return mDispSurface.get();
-}
-
 bool
 GonkDisplayJB::SwapBuffers(EGLDisplay dpy, EGLSurface sur)
 {
+    StopBootAnim();
+
     // Should be called when composition rendering is complete for a frame.
     // Only HWC v1.0 needs this call.
     // HWC > v1.0 case, do not call compositionComplete().
@@ -307,16 +302,37 @@ GonkDisplayJB::Post(buffer_handle_t buf, int fence)
 ANativeWindowBuffer*
 GonkDisplayJB::DequeueBuffer()
 {
+    // Check for bootAnim or normal display flow.
+    sp<ANativeWindow> nativeWindow =
+        !mBootAnimSTClient.get() ? mSTClient : mBootAnimSTClient;
+
     ANativeWindowBuffer *buf;
-    mSTClient->dequeueBuffer(mSTClient.get(), &buf, &mFence);
+    int fenceFd = -1;
+    nativeWindow->dequeueBuffer(nativeWindow.get(), &buf, &fenceFd);
+    sp<Fence> fence(new Fence(fenceFd));
+#if ANDROID_VERSION == 17
+    fence->waitForever(1000, "GonkDisplayJB_DequeueBuffer");
+    // 1000 is what Android uses. It is a warning timeout in ms.
+    // This timeout was removed in ANDROID_VERSION 18.
+#else
+    fence->waitForever("GonkDisplayJB_DequeueBuffer");
+#endif
     return buf;
 }
 
 bool
 GonkDisplayJB::QueueBuffer(ANativeWindowBuffer* buf)
 {
-    bool success = Post(buf->handle, -1);
-    int error = mSTClient->queueBuffer(mSTClient.get(), buf, mFence);
+    int error = 0;
+    bool success = false;
+    // Check for bootAnim or normal display flow.
+    if (!mBootAnimSTClient.get()) {
+        error = mSTClient->queueBuffer(mSTClient.get(), buf, -1);
+        success = Post(mDispSurface->lastHandle, mDispSurface->GetPrevDispAcquireFd());
+    } else {
+        error = mBootAnimSTClient->queueBuffer(mBootAnimSTClient.get(), buf, -1);
+        success = Post(mBootAnimDispSurface->lastHandle, mBootAnimDispSurface->GetPrevDispAcquireFd());
+    }
 
     return error == 0 && success;
 }
@@ -324,19 +340,70 @@ GonkDisplayJB::QueueBuffer(ANativeWindowBuffer* buf)
 void
 GonkDisplayJB::UpdateDispSurface(EGLDisplay dpy, EGLSurface sur)
 {
+    StopBootAnim();
+
     eglSwapBuffers(dpy, sur);
 }
 
 void
-GonkDisplayJB::SetDispReleaseFd(int fd)
+GonkDisplayJB::StopBootAnim()
 {
-    mDispSurface->setReleaseFenceFd(fd);
+    StopBootAnimation();
+    if (mBootAnimSTClient.get()) {
+        mBootAnimSTClient = nullptr;
+        mBootAnimDispSurface = nullptr;
+    }
 }
 
-int
-GonkDisplayJB::GetPrevDispAcquireFd()
+void
+GonkDisplayJB::PowerOnDisplay(int aDpy)
 {
-    return mDispSurface->GetPrevDispAcquireFd();
+    MOZ_ASSERT(mHwc);;
+#if ANDROID_VERSION >= 21
+    if (mHwc->common.version >= HWC_DEVICE_API_VERSION_1_4) {
+        mHwc->setPowerMode(mHwc, aDpy, HWC_POWER_MODE_NORMAL);
+    } else {
+        mHwc->blank(mHwc, aDpy, 0);
+    }
+#else
+    mHwc->blank(mHwc, aDpy, 0);
+#endif
+}
+
+GonkDisplay::NativeData
+GonkDisplayJB::GetNativeData(GonkDisplay::DisplayType aDisplayType,
+                             android::IGraphicBufferProducer* aProducer)
+{
+    NativeData data;
+
+    if (aDisplayType == DISPLAY_PRIMARY) {
+        StopBootAnim();
+        data.mNativeWindow = mSTClient;
+        data.mDisplaySurface = mDispSurface;
+        data.mXdpi = xdpi;
+    } else if (aDisplayType == DISPLAY_EXTERNAL) {
+        int32_t values[3];
+        const uint32_t attrs[] = {
+            HWC_DISPLAY_WIDTH,
+            HWC_DISPLAY_HEIGHT,
+            HWC_DISPLAY_DPI_X,
+            HWC_DISPLAY_NO_ATTRIBUTE
+        };
+        mHwc->getDisplayAttributes(mHwc, aDisplayType, 0, attrs, values);
+        int width = values[0];
+        int height = values[1];
+        // FIXME!! values[2] returns 0 for external display, which doesn't
+        // sound right, Bug 1169176 is the follow-up bug for this issue.
+        data.mXdpi = values[2] ? values[2] / 1000.f : DEFAULT_XDPI;
+        PowerOnDisplay(HWC_DISPLAY_EXTERNAL);
+        CreateSurface(data.mNativeWindow, data.mDisplaySurface, width, height);
+    } else if (aDisplayType == DISPLAY_VIRTUAL) {
+        // TODO: Bug 1161874 (the support of WifiDisplay) should fill up the
+        // implementation of virtual display.
+        MOZ_CRASH("Display type of virtual is not supported yet.");
+    }
+
+    return data;
 }
 
 __attribute__ ((visibility ("default")))

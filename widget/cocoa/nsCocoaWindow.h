@@ -48,7 +48,14 @@ typedef struct NSEdgeInsets {
     CGFloat right;
 } NSEdgeInsets;
 
+#if (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+// Not in 10.4 or 10.5.
+@protocol NSAnimationDelegate
+@end
 #endif
+
+
+#endif // 10.7
 
 typedef struct _nsCocoaWindowList {
   _nsCocoaWindowList() : prev(nullptr), window(nullptr) {}
@@ -295,6 +302,14 @@ public:
       bool aFullScreen, nsIScreen* aTargetScreen = nullptr) override final;
     NS_IMETHOD MakeFullScreenWithNativeTransition(
       bool aFullScreen, nsIScreen* aTargetScreen = nullptr) override final;
+    NSAnimation* FullscreenTransitionAnimation() const { return mFullscreenTransitionAnimation; }
+    void ReleaseFullscreenTransitionAnimation()
+    {
+      MOZ_ASSERT(mFullscreenTransitionAnimation,
+                 "Should only be called when there is animation");
+      [mFullscreenTransitionAnimation release];
+      mFullscreenTransitionAnimation = nil;
+    }
 
     NS_IMETHOD              Resize(double aWidth, double aHeight, bool aRepaint) override;
     NS_IMETHOD              Resize(double aX, double aY, double aWidth, double aHeight, bool aRepaint) override;
@@ -413,6 +428,9 @@ protected:
   nsRefPtr<nsMenuBarX> mMenuBar;
   NSWindow*            mSheetWindowParent; // if this is a sheet, this is the NSWindow it's attached to
   nsChildView*         mPopupContentView; // if this is a popup, this is its content widget
+  // if this is a toplevel window, and there is any ongoing fullscreen
+  // transition, it is the animation object.
+  NSAnimation*         mFullscreenTransitionAnimation;
   int32_t              mShadowStyle;
 
   CGFloat              mBackingScaleFactor;

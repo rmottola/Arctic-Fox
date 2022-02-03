@@ -304,6 +304,13 @@
     "n_buckets": 50,
     "description": "Time spent running a JS GC slice (ms)"
   },
+  "GC_SLOW_PHASE": {
+    "alert_emails": ["dev-telemetry-gc-alerts@mozilla.org"],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 75,
+    "description": "The longest phase in any slice that goes over 2x the budget"
+  },
   "GC_MMU_50": {
     "expires_in_version": "never",
     "kind": "linear",
@@ -519,8 +526,7 @@
     "high": "1024",
     "n_buckets": 10,
     "extended_statistics_ok": true,
-    "description": "Time(ms) to purge MADV_FREE'd heap pages.",
-    "cpp_guard": "XP_MACOSX"
+    "description": "Time(ms) to purge dirty heap pages."
   },
   "LOW_MEMORY_EVENTS_VIRTUAL": {
     "alert_emails": ["memshrink-telemetry-alerts@mozilla.com"],
@@ -1263,7 +1269,7 @@
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 16,
-    "description": "SSL Version (0=ssl3, 1=tls1, 2=tls1.1, 3=tls1.2, 4=tls1.3)"
+    "description": "SSL Version (1=tls1, 2=tls1.1, 3=tls1.2, 4=tls1.3)"
   },
   "SSL_TIME_UNTIL_READY": {
     "expires_in_version": "never",
@@ -5511,6 +5517,14 @@
     "n_buckets": "29",
     "description": "The number of times AddIceCandidate failed on a given PeerConnection, given that ICE failed."
   },
+  "PERF_MONITORING_TEST_CPU_RESCHEDULING_PROPORTION_MOVED": {
+    "alert_emails": ["dteller@mozilla.com"],
+    "expires_in_version": "44",
+    "kind": "linear",
+    "high": "100",
+    "n_buckets": "20",
+    "description": "Proportion (%) of reschedulings of the main process to another CPU during the execution of code inside a JS compartment. Updated while we are measuring jank."
+  },
   "COOKIES_3RDPARTY_NUM_SITES_ACCEPTED": {
     "expires_in_version": "40",
     "kind": "linear",
@@ -5693,6 +5707,34 @@
     "high": "101",
     "n_buckets": "100",
     "description": "The mean number of pinned tabs (app tabs) in all windows for a session for devtools users."
+  },
+  "DEVTOOLS_SAVE_HEAP_SNAPSHOT_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "100000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took to save a heap snapshot in mozilla::devtools::ChromeUtils::SaveHeapSnapshot."
+  },
+  "DEVTOOLS_READ_HEAP_SNAPSHOT_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "100000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took to read a heap snapshot in mozilla::devtools::ChromeUtils::ReadHeapSnapshot."
+  },
+  "DEVTOOLS_HEAP_SNAPSHOT_NODE_COUNT": {
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "10000000",
+    "n_buckets": "10000",
+    "description": "The number of nodes serialized into a heap snapshot."
+  },
+  "DEVTOOLS_HEAP_SNAPSHOT_EDGE_COUNT": {
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "10000000",
+    "n_buckets": "10000",
+    "description": "The number of edges serialized into a heap snapshot."
   },
   "BROWSER_IS_USER_DEFAULT": {
     "expires_in_version": "never",
@@ -5959,23 +6001,17 @@
     "n_values": 64,
     "description": "Detected symptom of TLS 1.0 intolerance, after considering historical info"
   },
-  "SSL_SSL30_INTOLERANCE_REASON_PRE": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 64,
-    "description": "Detected symptom of SSL 3.0 intolerance, before considering historical info"
-  },
-  "SSL_SSL30_INTOLERANCE_REASON_POST": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 64,
-    "description": "Detected symptom of SSL 3.0 intolerance, after considering historical info"
-  },
   "SSL_VERSION_FALLBACK_INAPPROPRIATE": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 64,
     "description": "TLS/SSL version intolerance was falsely detected, server rejected handshake"
+  },
+  "SSL_FALLBACK_LIMIT_REACHED": {
+    "expires_in_version": "default",
+    "kind": "enumerated",
+    "n_values": 16,
+    "description": "TLS/SSL version fallback reached the fallback limit (1=TLS 1.0, 2=TLS 1.1, 3=TLS 1.2) or the minimum version (4=TLS 1.0, 8=TLS 1.1, 12=TLS 1.2), stopped the fallback"
   },
   "SSL_WEAK_CIPHERS_FALLBACK": {
     "expires_in_version": "never",
@@ -6195,6 +6231,12 @@
     "kind": "enumerated",
     "n_values": 4,
     "description": "Does enforcing a larger minimum RSA key size cause verification failures? 1 = no, 2 = yes, 3 = another error prevented finding a verified chain"
+  },
+  "CERT_CHAIN_SIGNATURE_DIGEST_STATUS": {
+    "expires_in_version": "default",
+    "kind": "enumerated",
+    "n_values": 6,
+    "description": "Information on weak signature digest algorithms in the chain: 1 = Only good algorithms, 2 = a weak algorithm was present in an end entity, 3 = a weak algorithm was present in a CA cert, 4 = a weak algorithm was present in both EE and CA certs, 5 = another error prevented signature algorithm from being determined"
   },
   "WEAVE_CONFIGURED": {
     "expires_in_version": "default",
@@ -6991,5 +7033,15 @@
     "n_values": 20,
     "releaseChannelCollection": "opt-out",
     "description": "Reports whether or not graphics drivers crashed during startup."
+  },
+  "PERMISSIONS_SQL_CORRUPTED": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Record the permissions.sqlite init failure"
+  },
+  "DEFECTIVE_PERMISSIONS_SQL_REMOVED": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Record the removal of defective permissions.sqlite"
   }
 }

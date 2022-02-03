@@ -72,6 +72,7 @@ UNIFIED_SOURCES += [
     'WebGL2ContextTransformFeedback.cpp',
     'WebGL2ContextUniforms.cpp',
     'WebGL2ContextVAOs.cpp',
+    'WebGL2ContextVertices.cpp',
     'WebGLActiveInfo.cpp',
     'WebGLBuffer.cpp',
     'WebGLContext.cpp',
@@ -81,7 +82,6 @@ UNIFIED_SOURCES += [
     'WebGLContextFramebufferOperations.cpp',
     'WebGLContextGL.cpp',
     'WebGLContextLossHandler.cpp',
-    'WebGLContextReporter.cpp',
     'WebGLContextState.cpp',
     'WebGLContextUnchecked.cpp',
     'WebGLContextUtils.cpp',
@@ -115,8 +115,10 @@ UNIFIED_SOURCES += [
     'WebGLExtensionTextureHalfFloat.cpp',
     'WebGLExtensionTextureHalfFloatLinear.cpp',
     'WebGLExtensionVertexArray.cpp',
+    'WebGLFormats.cpp',
     'WebGLFramebuffer.cpp',
     'WebGLFramebufferAttachable.cpp',
+    'WebGLMemoryTracker.cpp',
     'WebGLObjectModel.cpp',
     'WebGLProgram.cpp',
     'WebGLQuery.cpp',
@@ -137,7 +139,9 @@ UNIFIED_SOURCES += [
     'WebGLVertexArrayGL.cpp',
     'WebGLVertexArrayObject.cpp',
 ]
+
 LOCAL_INCLUDES += [
+    '../..', # Support `#include "mfbt/RefPtr.h"`
     '/js/xpconnect/wrappers',
 ]
 

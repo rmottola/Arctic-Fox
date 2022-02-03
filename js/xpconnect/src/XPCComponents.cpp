@@ -58,20 +58,15 @@ JSValIsInterfaceOfType(JSContext* cx, HandleValue v, REFNSIID iid)
 
     nsCOMPtr<nsIXPConnectWrappedNative> wn;
     nsCOMPtr<nsISupports> sup;
-    nsISupports* iface;
+    nsCOMPtr<nsISupports> iface;
 
     if (v.isPrimitive())
         return false;
 
     nsXPConnect* xpc = nsXPConnect::XPConnect();
     RootedObject obj(cx, &v.toObject());
-    if (NS_SUCCEEDED(xpc->GetWrappedNativeOfJSObject(cx, obj, getter_AddRefs(wn))) && wn &&
-        NS_SUCCEEDED(wn->Native()->QueryInterface(iid, (void**)&iface)) && iface)
-    {
-        NS_RELEASE(iface);
-        return true;
-    }
-    return false;
+    return NS_SUCCEEDED(xpc->GetWrappedNativeOfJSObject(cx, obj, getter_AddRefs(wn))) && wn &&
+        NS_SUCCEEDED(wn->Native()->QueryInterface(iid, getter_AddRefs(iface))) && iface;
 }
 
 char*
@@ -2550,8 +2545,16 @@ nsXPCComponents_Utils::ImportGlobalProperties(HandleValue aPropertyList,
 
     GlobalProperties options;
     NS_ENSURE_TRUE(aPropertyList.isObject(), NS_ERROR_INVALID_ARG);
+
     RootedObject propertyList(cx, &aPropertyList.toObject());
-    NS_ENSURE_TRUE(JS_IsArrayObject(cx, propertyList), NS_ERROR_INVALID_ARG);
+    bool isArray;
+    if (NS_WARN_IF(!JS_IsArrayObject(cx, propertyList, &isArray))) {
+        return NS_ERROR_FAILURE;
+    }
+    if (NS_WARN_IF(!isArray)) {
+        return NS_ERROR_INVALID_ARG;
+    }
+
     if (!options.Parse(cx, propertyList) ||
         !options.Define(cx, global))
     {
@@ -2643,9 +2646,11 @@ class PreciseGCRunnable : public nsRunnable
             }
         }
 
-        PrepareForFullGC(rt);
-        JSGCInvocationKind gckind = mShrinking ? GC_SHRINK : GC_NORMAL;
-        GCForReason(rt, gckind, gcreason::COMPONENT_UTILS);
+        nsJSContext::GarbageCollectNow(gcreason::COMPONENT_UTILS,
+                                       nsJSContext::NonIncrementalGC,
+                                       mShrinking ?
+                                         nsJSContext::ShrinkingGC :
+                                         nsJSContext::NonShrinkingGC);
 
         mCallback->Callback();
         return NS_OK;
@@ -2713,9 +2718,9 @@ nsXPCComponents_Utils::GetJSTestingFunctions(JSContext* cx,
                                in AString asyncCause); */
 NS_IMETHODIMP
 nsXPCComponents_Utils::CallFunctionWithAsyncStack(HandleValue function,
-                                                  nsIStackFrame *stack,
-                                                  const nsAString &asyncCause,
-                                                  JSContext *cx,
+                                                  nsIStackFrame* stack,
+                                                  const nsAString& asyncCause,
+                                                  JSContext* cx,
                                                   MutableHandleValue retval)
 {
     nsresult rv;

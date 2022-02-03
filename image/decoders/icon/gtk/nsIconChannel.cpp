@@ -207,6 +207,7 @@ ScaleIconBuf(GdkPixbuf** aBuf, int32_t iconSize)
   }
   return NS_OK;
 }
+
 nsresult
 nsIconChannel::InitWithGIO(nsIMozIconURI* aIconURI)
 {

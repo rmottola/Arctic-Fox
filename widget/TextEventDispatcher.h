@@ -207,7 +207,7 @@ public:
    * @param aDispatchTo     See comments of DispatchTo.
    * @return                true if an event is dispatched.  Otherwise, false.
    */
-  bool DispatchKeyboardEvent(uint32_t aMessage,
+  bool DispatchKeyboardEvent(EventMessage aMessage,
                              const WidgetKeyboardEvent& aKeyboardEvent,
                              nsEventStatus& aStatus,
                              DispatchTo aDispatchTo = eDispatchToParentProcess);
@@ -346,7 +346,7 @@ private:
    *                            sending only one character per event.
    * @return                true if an event is dispatched.  Otherwise, false.
    */
-  bool DispatchKeyboardEventInternal(uint32_t aMessage,
+  bool DispatchKeyboardEventInternal(EventMessage aMessage,
                                      const WidgetKeyboardEvent& aKeyboardEvent,
                                      nsEventStatus& aStatus,
                                      DispatchTo aDispatchTo =

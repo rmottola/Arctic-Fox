@@ -242,7 +242,7 @@ private:
 
     void DispatchKeyDownEvent();
     void DispatchKeyUpEvent();
-    nsEventStatus DispatchKeyEventInternal(uint32_t aEventMessage);
+    nsEventStatus DispatchKeyEventInternal(EventMessage aEventMessage);
 };
 
 KeyEventDispatcher::KeyEventDispatcher(const UserInputData& aData,
@@ -294,7 +294,7 @@ KeyEventDispatcher::PrintableKeyValue() const
 }
 
 nsEventStatus
-KeyEventDispatcher::DispatchKeyEventInternal(uint32_t aEventMessage)
+KeyEventDispatcher::DispatchKeyEventInternal(EventMessage aEventMessage)
 {
     WidgetKeyboardEvent event(true, aEventMessage, nullptr);
     if (aEventMessage == NS_KEY_PRESS) {
@@ -315,7 +315,7 @@ KeyEventDispatcher::DispatchKeyEventInternal(uint32_t aEventMessage)
     event.modifiers = getDOMModifiers(mData.metaState);
     event.location = mDOMKeyLocation;
     event.time = mData.timeMs;
-    return nsWindow::DispatchInputEvent(event);
+    return nsWindow::DispatchKeyInput(event);
 }
 
 void

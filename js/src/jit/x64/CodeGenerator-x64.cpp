@@ -305,7 +305,7 @@ CodeGeneratorX64::emitSimdLoad(LAsmJSLoadHeap* ins)
     const MAsmJSLoadHeap* mir = ins->mir();
     Scalar::Type type = mir->accessType();
     FloatRegister out = ToFloatRegister(ins->output());
-    const LAllocation *ptr = ins->ptr();
+    const LAllocation* ptr = ins->ptr();
     Operand srcAddr = ptr->isBogus()
                       ? Operand(HeapReg, mir->offset())
                       : Operand(HeapReg, ToRegister(ptr), TimesOne, mir->offset());
@@ -359,14 +359,14 @@ CodeGeneratorX64::emitSimdLoad(LAsmJSLoadHeap* ins)
 void
 CodeGeneratorX64::visitAsmJSLoadHeap(LAsmJSLoadHeap* ins)
 {
-    const MAsmJSLoadHeap *mir = ins->mir();
+    const MAsmJSLoadHeap* mir = ins->mir();
     Scalar::Type accessType = mir->accessType();
 
     if (Scalar::isSimdType(accessType))
         return emitSimdLoad(ins);
 
-    const LAllocation *ptr = ins->ptr();
-    const LDefinition *out = ins->output();
+    const LAllocation* ptr = ins->ptr();
+    const LDefinition* out = ins->output();
     Operand srcAddr = ptr->isBogus()
                       ? Operand(HeapReg, mir->offset())
                       : Operand(HeapReg, ToRegister(ptr), TimesOne, mir->offset());
@@ -459,7 +459,7 @@ CodeGeneratorX64::emitSimdStore(LAsmJSStoreHeap* ins)
     const MAsmJSStoreHeap* mir = ins->mir();
     Scalar::Type type = mir->accessType();
     FloatRegister in = ToFloatRegister(ins->value());
-    const LAllocation *ptr = ins->ptr();
+    const LAllocation* ptr = ins->ptr();
     Operand dstAddr = ptr->isBogus()
                       ? Operand(HeapReg, mir->offset())
                       : Operand(HeapReg, ToRegister(ptr), TimesOne, mir->offset());
@@ -511,14 +511,14 @@ CodeGeneratorX64::emitSimdStore(LAsmJSStoreHeap* ins)
 void
 CodeGeneratorX64::visitAsmJSStoreHeap(LAsmJSStoreHeap* ins)
 {
-    const MAsmJSStoreHeap *mir = ins->mir();
+    const MAsmJSStoreHeap* mir = ins->mir();
     Scalar::Type accessType = mir->accessType();
 
     if (Scalar::isSimdType(accessType))
         return emitSimdStore(ins);
 
-    const LAllocation *value = ins->value();
-    const LAllocation *ptr = ins->ptr();
+    const LAllocation* value = ins->value();
+    const LAllocation* ptr = ins->ptr();
     Operand dstAddr = ptr->isBogus()
                       ? Operand(HeapReg, mir->offset())
                       : Operand(HeapReg, ToRegister(ptr), TimesOne, mir->offset());

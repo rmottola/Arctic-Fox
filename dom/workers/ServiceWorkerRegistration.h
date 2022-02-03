@@ -22,6 +22,7 @@ namespace dom {
 
 class Promise;
 class PushManager;
+class WorkerPushManager;
 class WorkerListener;
 
 namespace workers {
@@ -69,8 +70,6 @@ class ServiceWorkerRegistrationBase : public DOMEventTargetHelper
 {
 public:
   NS_DECL_ISUPPORTS_INHERITED
-  NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(ServiceWorkerRegistrationBase,
-                                           DOMEventTargetHelper)
 
   IMPL_EVENT_HANDLER(updatefound)
 
@@ -94,8 +93,6 @@ protected:
   { }
 
   const nsString mScope;
-private:
-  nsCOMPtr<nsISupports> mCCDummy;
 };
 
 class ServiceWorkerRegistrationMainThread final : public ServiceWorkerRegistrationBase,
@@ -133,10 +130,10 @@ public:
 
   already_AddRefed<workers::ServiceWorker>
   GetWaiting() override;
-  
+
   already_AddRefed<workers::ServiceWorker>
   GetActive() override;
-  
+
   already_AddRefed<PushManager>
   GetPushManager(ErrorResult& aRv);
 
@@ -235,6 +232,9 @@ public:
   bool
   Notify(JSContext* aCx, workers::Status aStatus) override;
 
+  already_AddRefed<WorkerPushManager>
+  GetPushManager(ErrorResult& aRv);
+
 private:
   enum Reason
   {
@@ -252,6 +252,10 @@ private:
 
   workers::WorkerPrivate* mWorkerPrivate;
   nsRefPtr<WorkerListener> mListener;
+
+#ifndef MOZ_SIMPLEPUSH
+  nsRefPtr<WorkerPushManager> mPushManager;
+#endif
 };
 
 } // namespace dom

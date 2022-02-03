@@ -188,7 +188,7 @@
     macro(MULASSIGN,    "'*='") \
     macro(DIVASSIGN,    "'/='") \
     macro(MODASSIGN,    "'%='") \
-    macro(POWASSIGN,    "'*='") \
+    macro(POWASSIGN,    "'**='") \
     range(ASSIGNMENT_LAST, POWASSIGN)
 
 #define TOKEN_KIND_RANGE_EMIT_NONE(name, value)

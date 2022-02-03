@@ -36,6 +36,7 @@
 #include "nsIDOMStorage.h"
 #include "nsIContentViewer.h"
 #include "nsIDocumentLoaderFactory.h"
+#include "nsIMozBrowserFrame.h"
 #include "nsCURILoader.h"
 #include "nsDocShellCID.h"
 #include "nsDOMCID.h"
@@ -2821,29 +2822,17 @@ nsDocShell::HistoryTransactionRemoved(int32_t aIndex)
   return NS_OK;
 }
 
-unsigned long nsDocShell::gProfileTimelineRecordingsCount = 0;
-
-mozilla::LinkedList<nsDocShell::ObservedDocShell>* nsDocShell::gObservedDocShells = nullptr;
-
 NS_IMETHODIMP
 nsDocShell::SetRecordProfileTimelineMarkers(bool aValue)
 {
   bool currentValue = nsIDocShell::GetRecordProfileTimelineMarkers();
   if (currentValue != aValue) {
     if (aValue) {
-      ++gProfileTimelineRecordingsCount;
+      TimelineConsumers::AddConsumer(this);
       UseEntryScriptProfiling();
-
-      MOZ_ASSERT(!mObserved);
-      mObserved.reset(new ObservedDocShell(this));
-      GetOrCreateObservedDocShells().insertFront(mObserved.get());
     } else {
-      --gProfileTimelineRecordingsCount;
+      TimelineConsumers::RemoveConsumer(this);
       UnuseEntryScriptProfiling();
-
-      mObserved.reset(nullptr);
-
-      ClearProfileTimelineMarkers();
     }
   }
 
@@ -2874,13 +2863,23 @@ nsDocShell::PopProfileTimelineMarkers(
   SequenceRooter<mozilla::dom::ProfileTimelineMarker> rooter(
     aCx, &profileTimelineMarkers);
 
+  if (!IsObserved()) {
+    if (!ToJSValue(aCx, profileTimelineMarkers, aProfileTimelineMarkers)) {
+      JS_ClearPendingException(aCx);
+      return NS_ERROR_UNEXPECTED;
+    }
+    return NS_OK;
+  }
+
+  nsTArray<UniquePtr<TimelineMarker>>& markersStore = mObserved.get()->mTimelineMarkers;
+
   // If we see an unpaired START, we keep it around for the next call
   // to PopProfileTimelineMarkers.  We store the kept START objects in
   // this array.
   nsTArray<UniquePtr<TimelineMarker>> keptMarkers;
 
-  for (uint32_t i = 0; i < mProfileTimelineMarkers.Length(); ++i) {
-    UniquePtr<TimelineMarker>& startPayload = mProfileTimelineMarkers[i];
+  for (uint32_t i = 0; i < markersStore.Length(); ++i) {
+    UniquePtr<TimelineMarker>& startPayload = markersStore[i];
     const char* startMarkerName = startPayload->GetName();
 
     bool hasSeenPaintedLayer = false;
@@ -2916,8 +2915,8 @@ nsDocShell::PopProfileTimelineMarkers(
       // The assumption is that the devtools timeline flushes markers frequently
       // enough for the amount of markers to always be small enough that the
       // nested for loop isn't going to be a performance problem.
-      for (uint32_t j = i + 1; j < mProfileTimelineMarkers.Length(); ++j) {
-        UniquePtr<TimelineMarker>& endPayload = mProfileTimelineMarkers[j];
+      for (uint32_t j = i + 1; j < markersStore.Length(); ++j) {
+        UniquePtr<TimelineMarker>& endPayload = markersStore[j];
         const char* endMarkerName = endPayload->GetName();
 
         // Look for Layer markers to stream out paint markers.
@@ -2963,14 +2962,14 @@ nsDocShell::PopProfileTimelineMarkers(
 
       // If we did not see the corresponding END, keep the START.
       if (!hasSeenEnd) {
-        keptMarkers.AppendElement(Move(mProfileTimelineMarkers[i]));
-        mProfileTimelineMarkers.RemoveElementAt(i);
+        keptMarkers.AppendElement(Move(markersStore[i]));
+        markersStore.RemoveElementAt(i);
         --i;
       }
     }
   }
 
-  mProfileTimelineMarkers.SwapElements(keptMarkers);
+  markersStore.SwapElements(keptMarkers);
 
   if (!ToJSValue(aCx, profileTimelineMarkers, aProfileTimelineMarkers)) {
     JS_ClearPendingException(aCx);
@@ -2987,24 +2986,6 @@ nsDocShell::Now(DOMHighResTimeStamp* aWhen)
   *aWhen =
     (TimeStamp::Now() - TimeStamp::ProcessCreation(ignore)).ToMilliseconds();
   return NS_OK;
-}
-
-void
-nsDocShell::AddProfileTimelineMarker(const char* aName,
-                                     TracingMetadata aMetaData)
-{
-  if (IsObserved()) {
-    TimelineMarker* marker = new TimelineMarker(this, aName, aMetaData);
-    mProfileTimelineMarkers.AppendElement(marker);
-  }
-}
-
-void
-nsDocShell::AddProfileTimelineMarker(UniquePtr<TimelineMarker>&& aMarker)
-{
-  if (IsObserved()) {
-    mProfileTimelineMarkers.AppendElement(Move(aMarker));
-  }
 }
 
 NS_IMETHODIMP
@@ -3034,12 +3015,6 @@ nsDocShell::GetWindowDraggingAllowed(bool* aValue)
     *aValue = mWindowDraggingAllowed;
   }
   return NS_OK;
-}
-
-void
-nsDocShell::ClearProfileTimelineMarkers()
-{
-  mProfileTimelineMarkers.Clear();
 }
 
 nsIDOMStorageManager*
@@ -9769,15 +9744,11 @@ nsDocShell::InternalLoad(nsIURI* aURI,
       if (aURI) {
         aURI->GetSpec(spec);
       }
-      nsAutoString features;
-      if (mInPrivateBrowsing) {
-        features.AssignLiteral("private");
-      }
       // RM 2018-12-03 We miss all loadInfo setting up here 
       // so we cannot set aIsFromProcessingFrameAttributes
       rv = win->OpenNoNavigate(NS_ConvertUTF8toUTF16(spec),
                                name,          // window name
-                               features,
+                               EmptyString(), // Features
                                getter_AddRefs(newWin));
 
       // In some cases the Open call doesn't actually result in a new
@@ -10485,6 +10456,36 @@ nsDocShell::DoURILoad(nsIURI* aURI,
       }
       nestedURI->GetInnerURI(getter_AddRefs(tempURI));
       nestedURI = do_QueryInterface(tempURI);
+    }
+  }
+
+  // For mozWidget, display a load error if we navigate to a page which is not
+  // claimed in |widgetPages|.
+  if (mScriptGlobal) {
+    // When we go to display a load error for an invalid mozWidget page, we will
+    // try to load an about:neterror page, which is also an invalid mozWidget
+    // page. To avoid recursion, we skip this check if aURI's scheme is "about".
+
+    // The goal is to prevent leaking sensitive information of an invalid page of
+    // an app, so allowing about:blank would not be conflict to the goal.
+    bool isAbout = false;
+    rv = aURI->SchemeIs("about", &isAbout);
+    if (NS_SUCCEEDED(rv) && !isAbout &&
+        nsIDocShell::GetIsApp()) {
+      nsCOMPtr<Element> frameElement = mScriptGlobal->GetFrameElementInternal();
+      if (frameElement) {
+        nsCOMPtr<nsIMozBrowserFrame> browserFrame = do_QueryInterface(frameElement);
+        // |GetReallyIsApp| indicates the browser frame is a valid app or widget.
+        // Here we prevent navigating to an app or widget which loses its validity
+        // by loading invalid page or other way.
+        if (browserFrame && !browserFrame->GetReallyIsApp()) {
+          nsCOMPtr<nsIObserverService> serv = services::GetObserverService();
+          if (serv) {
+              serv->NotifyObservers(GetDocument(), "invalid-widget", nullptr);
+          }
+          return NS_ERROR_MALFORMED_URI;
+        }
+      }
     }
   }
 
@@ -14019,7 +14020,7 @@ nsDocShell::NotifyJSRunToCompletionStart(const char* aReason,
       MakeUnique<JavascriptTimelineMarker>(this, "Javascript", aReason,
                                            aFunctionName, aFilename,
                                            aLineNumber);
-    AddProfileTimelineMarker(Move(marker));
+    TimelineConsumers::AddMarkerForDocShell(this, Move(marker));
   }
   mJSRunToCompletionDepth++;
 }
@@ -14032,7 +14033,7 @@ nsDocShell::NotifyJSRunToCompletionStop()
   // If last stop, mark interval end.
   mJSRunToCompletionDepth--;
   if (timelineOn && mJSRunToCompletionDepth == 0) {
-    AddProfileTimelineMarker("Javascript", TRACING_INTERVAL_END);
+    TimelineConsumers::AddMarkerForDocShell(this, "Javascript", TRACING_INTERVAL_END);
   }
 }
 

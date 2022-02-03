@@ -25,6 +25,7 @@
 
 #include "nsGtkKeyUtils.h"
 #include "nsGtkCursors.h"
+#include "nsScreenGtk.h"
 
 #include <gtk/gtk.h>
 #if (MOZ_WIDGET_GTK == 3)
@@ -102,10 +103,6 @@ using namespace mozilla::widget;
 #include "nsAutoPtr.h"
 #include "ClientLayerManager.h"
 
-extern "C" {
-#define PIXMAN_DONT_DEFINE_STDINT
-#include "pixman.h"
-}
 #include "gfxPlatformGtk.h"
 #include "gfxContext.h"
 #include "gfxImageSurface.h"
@@ -117,7 +114,6 @@ extern "C" {
 
 #ifdef MOZ_X11
 #include "gfxXlibSurface.h"
-#include "cairo-xlib.h"
 #endif
   
 #include "nsShmImage.h"
@@ -295,25 +291,6 @@ static GtkWidget *gInvisibleContainer = nullptr;
 // only the button state bits are used.
 static guint gButtonState;
 
-// nsAutoRef<pixman_region32> uses nsSimpleRef<> to know how to automatically
-// destroy regions.
-template <>
-class nsSimpleRef<pixman_region32> : public pixman_region32 {
-protected:
-    typedef pixman_region32 RawRef;
-
-    nsSimpleRef() { data = nullptr; }
-    explicit nsSimpleRef(const RawRef &aRawRef) : pixman_region32(aRawRef) { }
-
-    static void Release(pixman_region32& region) {
-        pixman_region32_fini(&region);
-    }
-    // Whether this needs to be released:
-    bool HaveResource() const { return data != nullptr; }
-
-    pixman_region32& get() { return *this; }
-};
-
 static inline int32_t
 GetBitmapStride(int32_t width)
 {
@@ -353,8 +330,6 @@ nsWindow::nsWindow()
 {
     mIsTopLevel       = false;
     mIsDestroyed      = false;
-    mNeedsResize      = false;
-    mNeedsMove        = false;
     mListenForResizes = false;
     mIsShown          = false;
     mNeedsShow        = false;
@@ -375,6 +350,11 @@ nsWindow::nsWindow()
 
 #ifdef MOZ_X11
     mOldFocusWindow      = 0;
+
+    mXDisplay = nullptr;
+    mXWindow  = None;
+    mXVisual  = nullptr;
+    mXDepth   = 0;
 #endif /* MOZ_X11 */
     mPluginType          = PluginType_NONE;
 
@@ -656,8 +636,8 @@ nsWindow::Destroy(void)
 
     NativeShow(false);
 
-    if (mIMModule) {
-        mIMModule->OnDestroyWindow(this);
+    if (mIMContext) {
+        mIMContext->OnDestroyWindow(this);
     }
 
     // make sure that we remove ourself as the focus window
@@ -672,10 +652,6 @@ nsWindow::Destroy(void)
         gPluginFocusWindow->LoseNonXEmbedPluginFocus();
     }
 #endif /* MOZ_X11 && MOZ_WIDGET_GTK2 */
-  
-    // Destroy thebes surface now. Badness can happen if we destroy
-    // the surface after its X Window.
-    mThebesSurface = nullptr;
 
     GtkWidget *owningWidget = GetMozContainerWidget();
     if (mShell) {
@@ -996,17 +972,6 @@ nsWindow::Show(bool aState)
     if (!aState)
         mNeedsShow = false;
 
-    // If someone is showing this window and it needs a resize then
-    // resize the widget.
-    if (aState) {
-        if (mNeedsMove) {
-            NativeResize(mBounds.x, mBounds.y, mBounds.width, mBounds.height,
-                         false);
-        } else if (mNeedsResize) {
-            NativeResize(mBounds.width, mBounds.height, false);
-        }
-    }
-
 #ifdef ACCESSIBILITY
     if (aState && a11y::ShouldA11yBeEnabled())
         CreateRootAccessible();
@@ -1035,57 +1000,7 @@ nsWindow::Resize(double aWidth, double aHeight, bool aRepaint)
     if (!mCreated)
         return NS_OK;
 
-    // There are several cases here that we need to handle, based on a
-    // matrix of the visibility of the widget, the sanity of this resize
-    // and whether or not the widget was previously sane.
-
-    // Has this widget been set to visible?
-    if (mIsShown) {
-        // Are the bounds sane?
-        if (AreBoundsSane()) {
-            // Yep?  Resize the window
-            //Maybe, the toplevel has moved
-
-            // Note that if the widget needs to be positioned because its
-            // size was previously insane in Resize(x,y,w,h), then we need
-            // to set the x and y here too, because the widget wasn't
-            // moved back then
-            if (mNeedsMove)
-                NativeResize(mBounds.x, mBounds.y,
-                             mBounds.width, mBounds.height, aRepaint);
-            else
-                NativeResize(mBounds.width, mBounds.height, aRepaint);
-
-            // Does it need to be shown because it was previously insane?
-            if (mNeedsShow)
-                NativeShow(true);
-        }
-        else {
-            // If someone has set this so that the needs show flag is false
-            // and it needs to be hidden, update the flag and hide the
-            // window.  This flag will be cleared the next time someone
-            // hides the window or shows it.  It also prevents us from
-            // calling NativeShow(false) excessively on the window which
-            // causes unneeded X traffic.
-            if (!mNeedsShow) {
-                mNeedsShow = true;
-                NativeShow(false);
-            }
-        }
-    }
-    // If the widget hasn't been shown, mark the widget as needing to be
-    // resized before it is shown.
-    else {
-        if (AreBoundsSane() && mListenForResizes) {
-            // For widgets that we listen for resizes for (widgets created
-            // with native parents) we apparently _always_ have to resize.  I
-            // dunno why, but apparently we're lame like that.
-            NativeResize(width, height, aRepaint);
-        }
-        else {
-            mNeedsResize = true;
-        }
-    }
+    NativeResize();
 
     NotifyRollupGeometryChange();
     ResizePluginSocketWidget();
@@ -1114,51 +1029,10 @@ nsWindow::Resize(double aX, double aY, double aWidth, double aHeight,
     mBounds.y = y;
     mBounds.SizeTo(width, height);
 
-    mNeedsMove = true;
-
     if (!mCreated)
         return NS_OK;
 
-    // There are several cases here that we need to handle, based on a
-    // matrix of the visibility of the widget, the sanity of this resize
-    // and whether or not the widget was previously sane.
-
-    // Has this widget been set to visible?
-    if (mIsShown) {
-        // Are the bounds sane?
-        if (AreBoundsSane()) {
-            // Yep?  Resize the window
-            NativeResize(x, y, width, height, aRepaint);
-            // Does it need to be shown because it was previously insane?
-            if (mNeedsShow)
-                NativeShow(true);
-        }
-        else {
-            // If someone has set this so that the needs show flag is false
-            // and it needs to be hidden, update the flag and hide the
-            // window.  This flag will be cleared the next time someone
-            // hides the window or shows it.  It also prevents us from
-            // calling NativeShow(false) excessively on the window which
-            // causes unneeded X traffic.
-            if (!mNeedsShow) {
-                mNeedsShow = true;
-                NativeShow(false);
-            }
-        }
-    }
-    // If the widget hasn't been shown, mark the widget as needing to be
-    // resized before it is shown
-    else {
-        if (AreBoundsSane() && mListenForResizes){
-            // For widgets that we listen for resizes for (widgets created
-            // with native parents) we apparently _always_ have to resize.  I
-            // dunno why, but apparently we're lame like that.
-            NativeResize(x, y, width, height, aRepaint);
-        }
-        else {
-            mNeedsResize = true;
-        }
-    }
+    NativeMoveResize();
 
     NotifyRollupGeometryChange();
     ResizePluginSocketWidget();
@@ -1234,9 +1108,17 @@ nsWindow::Move(double aX, double aY)
     if (!mCreated)
         return NS_OK;
 
-    mNeedsMove = false;
+    NativeMove();
 
-    GdkPoint point = DevicePixelsToGdkPointRoundDown(nsIntPoint(x, y));
+    NotifyRollupGeometryChange();
+    return NS_OK;
+}
+
+
+void
+nsWindow::NativeMove()
+{
+    GdkPoint point = DevicePixelsToGdkPointRoundDown(mBounds.TopLeft());
 
     if (mIsTopLevel) {
         gtk_window_move(GTK_WINDOW(mShell), point.x, point.y);
@@ -1244,9 +1126,6 @@ nsWindow::Move(double aX, double aY)
     else if (mGdkWindow) {
         gdk_window_move(mGdkWindow, point.x, point.y);
     }
-
-    NotifyRollupGeometryChange();
-    return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -1492,8 +1371,8 @@ nsWindow::SetFocus(bool aRaise)
     // Set this window to be the focused child window
     gFocusWindow = this;
 
-    if (mIMModule) {
-        mIMModule->OnFocusWindow(this);
+    if (mIMContext) {
+        mIMContext->OnFocusWindow(this);
     }
 
     LOGFOCUS(("  widget now has focus in SetFocus() [%p]\n",
@@ -2220,7 +2099,7 @@ nsWindow::OnExposeEvent(cairo_t *cr)
         return TRUE;
     }
 
-    RefPtr<DrawTarget> dt = StartRemoteDrawing();
+    RefPtr<DrawTarget> dt = GetDrawTarget(region);
     if(!dt) {
         return FALSE;
     }
@@ -2299,7 +2178,7 @@ nsWindow::OnExposeEvent(cairo_t *cr)
     }
 #  ifdef MOZ_HAVE_SHMIMAGE
     if (mShmImage && MOZ_LIKELY(!mIsDestroyed)) {
-        mShmImage->Put(mGdkWindow, exposeRegion);
+      mShmImage->Put(mXDisplay, mXWindow, region);
     }
 #  endif  // MOZ_HAVE_SHMIMAGE
 #endif // MOZ_X11
@@ -2925,8 +2804,8 @@ nsWindow::OnContainerFocusOutEvent(GdkEventFocus *aEvent)
 
     if (gFocusWindow) {
         nsRefPtr<nsWindow> kungFuDeathGrip = gFocusWindow;
-        if (gFocusWindow->mIMModule) {
-            gFocusWindow->mIMModule->OnBlurWindow(gFocusWindow);
+        if (gFocusWindow->mIMContext) {
+            gFocusWindow->mIMContext->OnBlurWindow(gFocusWindow);
         }
         gFocusWindow = nullptr;
     }
@@ -2946,7 +2825,7 @@ nsWindow::DispatchCommandEvent(nsIAtom* aCommand)
 }
 
 bool
-nsWindow::DispatchContentCommandEvent(int32_t aMsg)
+nsWindow::DispatchContentCommandEvent(EventMessage aMsg)
 {
   nsEventStatus status;
   WidgetContentCommandEvent event(true, aMsg, this);
@@ -2989,9 +2868,9 @@ nsWindow::OnKeyPressEvent(GdkEventKey *aEvent)
     // if we are in the middle of composing text, XIM gets to see it
     // before mozilla does.
     bool IMEWasEnabled = false;
-    if (mIMModule) {
-        IMEWasEnabled = mIMModule->IsEnabled();
-        if (mIMModule->OnKeyEvent(this, aEvent)) {
+    if (mIMContext) {
+        IMEWasEnabled = mIMContext->IsEnabled();
+        if (mIMContext->OnKeyEvent(this, aEvent)) {
             return TRUE;
         }
     }
@@ -3020,10 +2899,10 @@ nsWindow::OnKeyPressEvent(GdkEventKey *aEvent)
     // If a keydown event handler causes to enable IME, i.e., it moves
     // focus from IME unusable content to IME usable editor, we should
     // send the native key event to IME for the first input on the editor.
-    if (!IMEWasEnabled && mIMModule && mIMModule->IsEnabled()) {
+    if (!IMEWasEnabled && mIMContext && mIMContext->IsEnabled()) {
         // Notice our keydown event was already dispatched.  This prevents
         // unnecessary DOM keydown event in the editor.
-        if (mIMModule->OnKeyEvent(this, aEvent, true)) {
+        if (mIMContext->OnKeyEvent(this, aEvent, true)) {
             return TRUE;
         }
     }
@@ -3121,7 +3000,7 @@ nsWindow::OnKeyReleaseEvent(GdkEventKey *aEvent)
 {
     LOGFOCUS(("OnKeyReleaseEvent [%p]\n", (void *)this));
 
-    if (mIMModule && mIMModule->OnKeyEvent(this, aEvent)) {
+    if (mIMContext && mIMContext->OnKeyEvent(this, aEvent)) {
         return TRUE;
     }
 
@@ -3342,7 +3221,7 @@ nsWindow::ThemeChanged()
 }
 
 void
-nsWindow::DispatchDragEvent(uint32_t aMsg, const nsIntPoint& aRefPoint,
+nsWindow::DispatchDragEvent(EventMessage aMsg, const nsIntPoint& aRefPoint,
                             guint aTime)
 {
     WidgetDragEvent event(true, aMsg, this);
@@ -3505,16 +3384,24 @@ nsWindow::Create(nsIWidget        *aParent,
     case eWindowType_invisible: {
         mIsTopLevel = true;
 
+        // Popups that are not noautohide are only temporary. The are used
+        // for menus and the like and disappear when another window is used.
+        // For most popups, use the standard GtkWindowType GTK_WINDOW_POPUP,
+        // which will use a Window with the override-redirect attribute
+        // (for temporary windows).
+        // For long-lived windows, their stacking order is managed by the
+        // window manager, as indicated by GTK_WINDOW_TOPLEVEL ...
+        GtkWindowType type =
+            mWindowType != eWindowType_popup || aInitData->mNoAutoHide ?
+              GTK_WINDOW_TOPLEVEL : GTK_WINDOW_POPUP;
+        mShell = gtk_window_new(type);
+
         // We only move a general managed toplevel window if someone has
         // actually placed the window somewhere.  If no placement has taken
         // place, we just let the window manager Do The Right Thing.
-        //
-        // Indicate that if we're shown, we at least need to have our size set.
-        // If we get explicitly moved, the position will also be set.
-        mNeedsResize = true;
+        NativeResize();
 
         if (mWindowType == eWindowType_dialog) {
-            mShell = gtk_window_new(GTK_WINDOW_TOPLEVEL);
             SetDefaultIcon();
             gtk_window_set_wmclass(GTK_WINDOW(mShell), "Dialog", 
                                    gdk_get_program_class());
@@ -3527,18 +3414,8 @@ nsWindow::Create(nsIWidget        *aParent,
             // With popup windows, we want to control their position, so don't
             // wait for the window manager to place them (which wouldn't
             // happen with override-redirect windows anyway).
-            mNeedsMove = true;
+            NativeMove();
 
-            // Popups that are not noautohide are only temporary. The are used
-            // for menus and the like and disappear when another window is used.
-            // For most popups, use the standard GtkWindowType GTK_WINDOW_POPUP,
-            // which will use a Window with the override-redirect attribute
-            // (for temporary windows).
-            // For long-lived windows, their stacking order is managed by the
-            // window manager, as indicated by GTK_WINDOW_TOPLEVEL ...
-            GtkWindowType type = aInitData->mNoAutoHide ?
-                                     GTK_WINDOW_TOPLEVEL : GTK_WINDOW_POPUP;
-            mShell = gtk_window_new(type);
             gtk_window_set_wmclass(GTK_WINDOW(mShell), "Popup",
                                    gdk_get_program_class());
 
@@ -3611,7 +3488,6 @@ nsWindow::Create(nsIWidget        *aParent,
             }
         }
         else { // must be eWindowType_toplevel
-            mShell = gtk_window_new(GTK_WINDOW_TOPLEVEL);
             SetDefaultIcon();
             gtk_window_set_wmclass(GTK_WINDOW(mShell), "Toplevel", 
                                    gdk_get_program_class());
@@ -3794,12 +3670,12 @@ nsWindow::Create(nsIWidget        *aParent,
         // We create input contexts for all containers, except for
         // toplevel popup windows
         if (mWindowType != eWindowType_popup) {
-            mIMModule = new nsGtkIMModule(this);
+            mIMContext = new IMContextWrapper(this);
         }
-    } else if (!mIMModule) {
+    } else if (!mIMContext) {
         nsWindow *container = GetContainerWindow();
         if (container) {
-            mIMModule = container->mIMModule;
+            mIMContext = container->mIMContext;
         }
     }
 
@@ -3843,6 +3719,17 @@ nsWindow::Create(nsIWidget        *aParent,
     // resize so that everything is set to the right dimensions
     if (!mIsTopLevel)
         Resize(mBounds.x, mBounds.y, mBounds.width, mBounds.height, false);
+
+#ifdef MOZ_X11
+    if (mGdkWindow) {
+      mXDisplay = GDK_WINDOW_XDISPLAY(mGdkWindow);
+      mXWindow = gdk_x11_window_get_xid(mGdkWindow);
+
+      GdkVisual* gdkVisual = gdk_window_get_visual(mGdkWindow);
+      mXVisual = gdk_x11_visual_get_xvisual(gdkVisual);
+      mXDepth = gdk_visual_get_depth(gdkVisual);
+    }
+#endif
 
     return NS_OK;
 }
@@ -3907,19 +3794,29 @@ nsWindow::SetWindowClass(const nsAString &xulWinType)
 }
 
 void
-nsWindow::NativeResize(int32_t aWidth, int32_t aHeight, bool    aRepaint)
+nsWindow::NativeResize()
 {
-    gint width = DevicePixelsToGdkCoordRoundUp(aWidth);
-    gint height = DevicePixelsToGdkCoordRoundUp(aHeight);
+    if (!AreBoundsSane()) {
+        // If someone has set this so that the needs show flag is false
+        // and it needs to be hidden, update the flag and hide the
+        // window.  This flag will be cleared the next time someone
+        // hides the window or shows it.  It also prevents us from
+        // calling NativeShow(false) excessively on the window which
+        // causes unneeded X traffic.
+        if (!mNeedsShow && mIsShown) {
+            mNeedsShow = true;
+            NativeShow(false);
+        }
+        return;
+    }
+
+    GdkRectangle size = DevicePixelsToGdkSizeRoundUp(mBounds.Size());
     
     LOG(("nsWindow::NativeResize [%p] %d %d\n", (void *)this,
-         width, height));
-
-    // clear our resize flag
-    mNeedsResize = false;
+         size.width, size.height));
 
     if (mIsTopLevel) {
-        gtk_window_resize(GTK_WINDOW(mShell), width, height);
+        gtk_window_resize(GTK_WINDOW(mShell), size.width, size.height);
     }
     else if (mContainer) {
         GtkWidget *widget = GTK_WIDGET(mContainer);
@@ -3927,47 +3824,65 @@ nsWindow::NativeResize(int32_t aWidth, int32_t aHeight, bool    aRepaint)
         gtk_widget_get_allocation(widget, &prev_allocation);
         allocation.x = prev_allocation.x;
         allocation.y = prev_allocation.y;
-        allocation.width = width;
-        allocation.height = height;
+        allocation.width = size.width;
+        allocation.height = size.height;
         gtk_widget_size_allocate(widget, &allocation);
     }
     else if (mGdkWindow) {
-        gdk_window_resize(mGdkWindow, width, height);
+        gdk_window_resize(mGdkWindow, size.width, size.height);
+    }
+
+    // Does it need to be shown because bounds were previously insane?
+    if (mNeedsShow && mIsShown) {
+        NativeShow(true);
     }
 }
 
 void
-nsWindow::NativeResize(int32_t aX, int32_t aY,
-                       int32_t aWidth, int32_t aHeight,
-                       bool    aRepaint)
+nsWindow::NativeMoveResize()
 {
-    gint width = DevicePixelsToGdkCoordRoundUp(aWidth);
-    gint height = DevicePixelsToGdkCoordRoundUp(aHeight);
-    gint x = DevicePixelsToGdkCoordRoundDown(aX);
-    gint y = DevicePixelsToGdkCoordRoundDown(aY);
+    if (!AreBoundsSane()) {
+        // If someone has set this so that the needs show flag is false
+        // and it needs to be hidden, update the flag and hide the
+        // window.  This flag will be cleared the next time someone
+        // hides the window or shows it.  It also prevents us from
+        // calling NativeShow(false) excessively on the window which
+        // causes unneeded X traffic.
+        if (!mNeedsShow && mIsShown) {
+            mNeedsShow = true;
+            NativeShow(false);
+        }
+        NativeMove();
+    }
 
-    mNeedsResize = false;
-    mNeedsMove = false;
+    GdkRectangle size = DevicePixelsToGdkSizeRoundUp(mBounds.Size());
+    GdkPoint topLeft = DevicePixelsToGdkPointRoundDown(mBounds.TopLeft());
 
-    LOG(("nsWindow::NativeResize [%p] %d %d %d %d\n", (void *)this,
-         x, y, width, height));
+    LOG(("nsWindow::NativeMoveResize [%p] %d %d %d %d\n", (void *)this,
+         topLeft.x, topLeft.y, size.width, size.height));
 
     if (mIsTopLevel) {
         // x and y give the position of the window manager frame top-left.
-        gtk_window_move(GTK_WINDOW(mShell), x, y);
+        gtk_window_move(GTK_WINDOW(mShell), topLeft.x, topLeft.y);
         // This sets the client window size.
-        gtk_window_resize(GTK_WINDOW(mShell), width, height);
+        gtk_window_resize(GTK_WINDOW(mShell), size.width, size.height);
     }
     else if (mContainer) {
         GtkAllocation allocation;
-        allocation.x = x;
-        allocation.y = y;
-        allocation.width = width;
-        allocation.height = height;
+        allocation.x = topLeft.x;
+        allocation.y = topLeft.y;
+        allocation.width = size.width;
+        allocation.height = size.height;
         gtk_widget_size_allocate(GTK_WIDGET(mContainer), &allocation);
     }
     else if (mGdkWindow) {
-        gdk_window_move_resize(mGdkWindow, x, y, width, height);
+        gdk_window_move_resize(mGdkWindow,
+                               topLeft.x, topLeft.y, size.width, size.height);
+    }
+
+    // Does it need to be shown because bounds were previously insane?
+    if (mNeedsShow && mIsShown) {
+        NativeShow(true);
     }
 }
 
@@ -4175,55 +4090,6 @@ nsWindow::ConfigureChildren(const nsTArray<Configuration>& aConfigurations)
     return NS_OK;
 }
 
-static pixman_box32
-ToPixmanBox(const nsIntRect& aRect)
-{
-    pixman_box32_t result;
-    result.x1 = aRect.x;
-    result.y1 = aRect.y;
-    result.x2 = aRect.XMost();
-    result.y2 = aRect.YMost();
-    return result;
-}
-
-static nsIntRect
-ToIntRect(const pixman_box32& aBox)
-{
-    nsIntRect result;
-    result.x = aBox.x1;
-    result.y = aBox.y1;
-    result.width = aBox.x2 - aBox.x1;
-    result.height = aBox.y2 - aBox.y1;
-    return result;
-}
-
-static void
-InitRegion(pixman_region32* aRegion,
-           const nsTArray<nsIntRect>& aRects)
-{
-    nsAutoTArray<pixman_box32,10> rects;
-    rects.SetCapacity(aRects.Length());
-    for (uint32_t i = 0; i < aRects.Length (); ++i) {
-        if (!aRects[i].IsEmpty()) {
-            rects.AppendElement(ToPixmanBox(aRects[i]));
-        }
-    }
-
-    pixman_region32_init_rects(aRegion,
-                               rects.Elements(), rects.Length());
-}
-
-static void
-GetIntRects(pixman_region32& aRegion, nsTArray<nsIntRect>* aRects)
-{
-    int nRects;
-    pixman_box32* boxes = pixman_region32_rectangles(&aRegion, &nRects);
-    aRects->SetCapacity(aRects->Length() + nRects);
-    for (int i = 0; i < nRects; ++i) {
-        aRects->AppendElement(ToIntRect(boxes[i]));
-    }
-}
-
 nsresult
 nsWindow::SetWindowClipRegion(const nsTArray<nsIntRect>& aRects,
                               bool aIntersectWithExisting)
@@ -4235,24 +4101,19 @@ nsWindow::SetWindowClipRegion(const nsTArray<nsIntRect>& aRects,
         nsAutoTArray<nsIntRect,1> existingRects;
         GetWindowClipRegion(&existingRects);
 
-        nsAutoRef<pixman_region32> existingRegion;
-        InitRegion(&existingRegion, existingRects);
-        nsAutoRef<pixman_region32> newRegion;
-        InitRegion(&newRegion, aRects);
-        nsAutoRef<pixman_region32> intersectRegion;
-        pixman_region32_init(&intersectRegion);
-        pixman_region32_intersect(&intersectRegion,
-                                  &newRegion, &existingRegion);
+        nsIntRegion existingRegion = RegionFromArray(existingRects);
+        nsIntRegion newRegion = RegionFromArray(aRects);
+        nsIntRegion intersectRegion;
+        intersectRegion.And(newRegion, existingRegion);
 
         // If mClipRects is null we haven't set a clip rect yet, so we
         // need to set the clip even if it is equal.
-        if (mClipRects &&
-            pixman_region32_equal(&intersectRegion, &existingRegion)) {
+        if (mClipRects && intersectRegion.IsEqual(existingRegion)) {
             return NS_OK;
         }
 
-        if (!pixman_region32_equal(&intersectRegion, &newRegion)) {
-            GetIntRects(intersectRegion, &intersectRects);
+        if (!intersectRegion.IsEqual(newRegion)) {
+            ArrayFromRegion(intersectRegion, intersectRects);
             newRects = &intersectRects;
         }
     }
@@ -6127,27 +5988,27 @@ nsChildWindow::~nsChildWindow()
 nsresult
 nsWindow::NotifyIMEInternal(const IMENotification& aIMENotification)
 {
-    if (MOZ_UNLIKELY(!mIMModule)) {
+    if (MOZ_UNLIKELY(!mIMContext)) {
         return NS_ERROR_NOT_AVAILABLE;
     }
     switch (aIMENotification.mMessage) {
         case REQUEST_TO_COMMIT_COMPOSITION:
         case REQUEST_TO_CANCEL_COMPOSITION:
-            return mIMModule->EndIMEComposition(this);
+            return mIMContext->EndIMEComposition(this);
         case NOTIFY_IME_OF_FOCUS:
-            mIMModule->OnFocusChangeInGecko(true);
+            mIMContext->OnFocusChangeInGecko(true);
             return NS_OK;
         case NOTIFY_IME_OF_BLUR:
-            mIMModule->OnFocusChangeInGecko(false);
+            mIMContext->OnFocusChangeInGecko(false);
             return NS_OK;
         case NOTIFY_IME_OF_POSITION_CHANGE:
-            mIMModule->OnLayoutChange();
+            mIMContext->OnLayoutChange();
             return NS_OK;
         case NOTIFY_IME_OF_COMPOSITION_UPDATE:
-            mIMModule->OnUpdateComposition();
+            mIMContext->OnUpdateComposition();
             return NS_OK;
         case NOTIFY_IME_OF_SELECTION_CHANGE:
-            mIMModule->OnSelectionChange(this, aIMENotification);
+            mIMContext->OnSelectionChange(this, aIMENotification);
             return NS_OK;
         default:
             return NS_ERROR_NOT_IMPLEMENTED;
@@ -6158,17 +6019,17 @@ NS_IMETHODIMP_(void)
 nsWindow::SetInputContext(const InputContext& aContext,
                           const InputContextAction& aAction)
 {
-    if (!mIMModule) {
+    if (!mIMContext) {
         return;
     }
-    mIMModule->SetInputContext(this, &aContext, &aAction);
+    mIMContext->SetInputContext(this, &aContext, &aAction);
 }
 
 NS_IMETHODIMP_(InputContext)
 nsWindow::GetInputContext()
 {
   InputContext context;
-  if (!mIMModule) {
+  if (!mIMContext) {
       context.mIMEState.mEnabled = IMEState::DISABLED;
       context.mIMEState.mOpen = IMEState::OPEN_STATE_NOT_SUPPORTED;
       // If IME context isn't available on this widget, we should set |this|
@@ -6176,8 +6037,8 @@ nsWindow::GetInputContext()
       // context per process.
       context.mNativeIMEContext = this;
   } else {
-      context = mIMModule->GetInputContext();
-      context.mNativeIMEContext = mIMModule;
+      context = mIMContext->GetInputContext();
+      context.mNativeIMEContext = mIMContext;
   }
   return context;
 }
@@ -6185,14 +6046,10 @@ nsWindow::GetInputContext()
 nsIMEUpdatePreference
 nsWindow::GetIMEUpdatePreference()
 {
-    nsIMEUpdatePreference updatePreference(
-        nsIMEUpdatePreference::NOTIFY_SELECTION_CHANGE |
-        nsIMEUpdatePreference::NOTIFY_POSITION_CHANGE);
-    // We shouldn't notify IME of selection change caused by changes of
-    // composition string.  Therefore, we don't need to be notified selection
-    // changes which are caused by compositionchange events handled.
-    updatePreference.DontNotifyChangesCausedByComposition();
-    return updatePreference;
+    if (!mIMContext) {
+        return nsIMEUpdatePreference();
+    }
+    return mIMContext->GetIMEUpdatePreference();
 }
 
 bool
@@ -6333,31 +6190,43 @@ nsWindow::GetSurfaceForGdkDrawable(GdkDrawable* aDrawable,
 #endif
 
 already_AddRefed<DrawTarget>
-nsWindow::StartRemoteDrawing()
+nsWindow::GetDrawTarget(const nsIntRegion& aRegion)
 {
-  gfxASurface *surf = GetThebesSurface();
-  if (!surf) {
+  if (!mGdkWindow) {
     return nullptr;
   }
 
-  nsIntSize size = surf->GetSize();
+  nsIntRect bounds = aRegion.GetBounds();
+  IntSize size(bounds.XMost(), bounds.YMost());
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
 
-  gfxPlatform *platform = gfxPlatform::GetPlatform();
-  if (platform->SupportsAzureContentForType(BackendType::CAIRO) ||
-      surf->GetType() == gfxSurfaceType::Xlib) {
-    return platform->CreateDrawTargetForSurface(surf, size);
-  } else if (platform->SupportsAzureContentForType(BackendType::SKIA) &&
-             surf->GetType() == gfxSurfaceType::Image) {
-    gfxImageSurface* imgSurf = static_cast<gfxImageSurface*>(surf);
-    SurfaceFormat format = ImageFormatToSurfaceFormat(imgSurf->Format());
-    return platform->CreateDrawTargetForData(
-                     imgSurf->Data(), size, imgSurf->Stride(), format);
-  } else {
-    return nullptr;
+  RefPtr<DrawTarget> dt;
+
+#ifdef MOZ_X11
+#  ifdef MOZ_HAVE_SHMIMAGE
+  if (nsShmImage::UseShm()) {
+    dt = nsShmImage::EnsureShmImage(size,
+                                    mXDisplay, mXVisual, mXDepth,
+                                    mShmImage);
   }
+#  endif  // MOZ_HAVE_SHMIMAGE
+  if (!dt) {
+    RefPtr<gfxXlibSurface> surf = new gfxXlibSurface(mXDisplay, mXWindow, mXVisual, size);
+    if (!surf->CairoStatus()) {
+      dt = gfxPlatform::GetPlatform()->CreateDrawTargetForSurface(surf.get(), surf->GetSize());
+    }
+  }
+#endif // MOZ_X11
+
+  return dt.forget();
+}
+
+already_AddRefed<DrawTarget>
+nsWindow::StartRemoteDrawingInRegion(nsIntRegion& aInvalidRegion)
+{
+  return GetDrawTarget(aInvalidRegion);
 }
 
 void
@@ -6365,76 +6234,13 @@ nsWindow::EndRemoteDrawingInRegion(DrawTarget* aDrawTarget, nsIntRegion& aInvali
 {
 #ifdef MOZ_X11
 #  ifdef MOZ_HAVE_SHMIMAGE
-  if (!mGdkWindow || mIsFullyObscured || !mHasMappedToplevel || mIsDestroyed ||
-      !mShmImage)
+  if (!mGdkWindow || !mShmImage) {
     return;
-
-  gint scale = GdkScaleFactor();
-  if (scale != 1) {
-    aInvalidRegion.ScaleInverseRoundOut(scale, scale);
   }
 
-  mShmImage->Put(mGdkWindow, aInvalidRegion);
-
+  mShmImage->Put(mXDisplay, mXWindow, aInvalidRegion);
 #  endif // MOZ_HAVE_SHMIMAGE
 #endif // MOZ_X11
-}
-
-// return the gfxASurface for rendering to this widget
-gfxASurface*
-nsWindow::GetThebesSurface()
-{
-    if (!mGdkWindow)
-        return nullptr;
-
-#ifdef MOZ_X11
-    gint width, height;
-
-#if (MOZ_WIDGET_GTK == 2)
-    gdk_drawable_get_size(GDK_DRAWABLE(mGdkWindow), &width, &height);
-#else
-    width = GdkCoordToDevicePixels(gdk_window_get_width(mGdkWindow));
-    height = GdkCoordToDevicePixels(gdk_window_get_height(mGdkWindow));
-#endif
-
-    // Owen Taylor says this is the right thing to do!
-    width = std::min(32767, width);
-    height = std::min(32767, height);
-    gfxIntSize size(width, height);
-
-    GdkVisual *gdkVisual = gdk_window_get_visual(mGdkWindow);
-    Visual* visual = gdk_x11_visual_get_xvisual(gdkVisual);
-
-#  ifdef MOZ_HAVE_SHMIMAGE
-    bool usingShm = false;
-    if (nsShmImage::UseShm()) {
-        // EnsureShmImage() is a dangerous interface, but we guarantee
-        // that the thebes surface and the shmimage have the same
-        // lifetime
-        mThebesSurface =
-            nsShmImage::EnsureShmImage(size,
-                                       visual, gdk_visual_get_depth(gdkVisual),
-                                       mShmImage);
-        usingShm = mThebesSurface != nullptr;
-    }
-    if (!usingShm)
-#  endif  // MOZ_HAVE_SHMIMAGE
-    {
-        mThebesSurface = new gfxXlibSurface
-            (GDK_WINDOW_XDISPLAY(mGdkWindow),
-             gdk_x11_window_get_xid(mGdkWindow),
-             visual,
-             size);
-    }
-#endif // MOZ_X11
-
-    // if the surface creation is reporting an error, then
-    // we don't have a surface to give back
-    if (mThebesSurface && mThebesSurface->CairoStatus() != 0) {
-        mThebesSurface = nullptr;
-    }
-
-    return mThebesSurface;
 }
 
 // Code shared begin BeginMoveDrag and BeginResizeDrag
@@ -6567,6 +6373,11 @@ nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
                           LayerManagerPersistence aPersistence,
                           bool* aAllowRetaining)
 {
+    if (mIsDestroyed) {
+      // Prevent external code from triggering the re-creation of the LayerManager/Compositor
+      // during shutdown. Just return what we currently have, which is most likely null.
+      return mLayerManager;
+    }
     if (!mLayerManager && eTransparencyTransparent == GetTransparencyMode()) {
         mLayerManager = CreateBasicLayerManager();
     }
@@ -6599,10 +6410,10 @@ nsWindow::GdkScaleFactor()
     // Available as of GTK 3.10+
     static auto sGdkWindowGetScaleFactorPtr = (gint (*)(GdkWindow*))
         dlsym(RTLD_DEFAULT, "gdk_window_get_scale_factor");
-    if (sGdkWindowGetScaleFactorPtr)
+    if (sGdkWindowGetScaleFactorPtr && mGdkWindow)
         return (*sGdkWindowGetScaleFactorPtr)(mGdkWindow);
 #endif
-    return 1;
+    return nsScreenGtk::GetGtkMonitorScaleFactor();
 }
 
 
@@ -6632,6 +6443,14 @@ nsWindow::DevicePixelsToGdkRectRoundOut(nsIntRect rect) {
     int right = (rect.x + rect.width + scale - 1) / scale;
     int bottom = (rect.y + rect.height + scale - 1) / scale;
     return { x, y, right - x, bottom - y };
+}
+
+GdkRectangle
+nsWindow::DevicePixelsToGdkSizeRoundUp(nsIntSize pixelSize) {
+    gint scale = GdkScaleFactor();
+    gint width = (pixelSize.width + scale - 1) / scale;
+    gint height = (pixelSize.height + scale - 1) / scale;
+    return { 0, 0, width, height };
 }
 
 int
@@ -6758,4 +6577,10 @@ nsWindow::SynthesizeNativeMouseScrollEvent(mozilla::LayoutDeviceIntPoint aPoint,
   gdk_event_put(&event);
 
   return NS_OK;
+}
+
+int32_t
+nsWindow::RoundsWidgetCoordinatesTo()
+{
+    return GdkScaleFactor();
 }

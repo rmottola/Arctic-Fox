@@ -1052,14 +1052,14 @@ bool
 RRegExpReplace::recover(JSContext* cx, SnapshotIterator& iter) const
 {
     RootedString string(cx, iter.read().toString());
-    RootedObject regexp(cx, &iter.read().toObject());
+    Rooted<RegExpObject*> regexp(cx, &iter.read().toObject().as<RegExpObject>());
     RootedString repl(cx, iter.read().toString());
-    RootedValue result(cx);
 
-    if (!js::str_replace_regexp_raw(cx, string, regexp, repl, &result))
+    JSString* result = js::str_replace_regexp_raw(cx, string, regexp, repl);
+    if (!result)
         return false;
 
-    iter.storeInstructionResult(result);
+    iter.storeInstructionResult(StringValue(result));
     return true;
 }
 
@@ -1308,23 +1308,23 @@ RLambda::recover(JSContext* cx, SnapshotIterator& iter) const
 }
 
 bool
-MSimdBox::writeRecoverData(CompactBufferWriter &writer) const
+MSimdBox::writeRecoverData(CompactBufferWriter& writer) const
 {
     MOZ_ASSERT(canRecoverOnBailout());
     writer.writeUnsigned(uint32_t(RInstruction::Recover_SimdBox));
-    SimdTypeDescr &simdTypeDescr = templateObject()->typeDescr().as<SimdTypeDescr>();
+    SimdTypeDescr& simdTypeDescr = templateObject()->typeDescr().as<SimdTypeDescr>();
     SimdTypeDescr::Type type = simdTypeDescr.type();
     writer.writeByte(uint8_t(type));
     return true;
 }
 
-RSimdBox::RSimdBox(CompactBufferReader &reader)
+RSimdBox::RSimdBox(CompactBufferReader& reader)
 {
     type_ = reader.readByte();
 }
 
 bool
-RSimdBox::recover(JSContext* cx, SnapshotIterator &iter) const
+RSimdBox::recover(JSContext* cx, SnapshotIterator& iter) const
 {
     JSObject* resultObject = nullptr;
     RValueAllocation a = iter.readAllocation();
@@ -1494,12 +1494,12 @@ bool RStringReplace::recover(JSContext* cx, SnapshotIterator& iter) const
     RootedString string(cx, iter.read().toString());
     RootedString pattern(cx, iter.read().toString());
     RootedString replace(cx, iter.read().toString());
-    RootedValue result(cx);
 
-    if (!js::str_replace_string_raw(cx, string, pattern, replace, &result))
+    JSString* result = js::str_replace_string_raw(cx, string, pattern, replace);
+    if (!result)
         return false;
 
-    iter.storeInstructionResult(result);
+    iter.storeInstructionResult(StringValue(result));
     return true;
 }
 

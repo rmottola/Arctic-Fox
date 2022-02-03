@@ -349,8 +349,8 @@ class IonBuilder
     // Improve the type information at tests
     bool improveTypesAtTest(MDefinition* ins, bool trueBranch, MTest* test);
     bool improveTypesAtCompare(MCompare* ins, bool trueBranch, MTest* test);
-    bool improveTypesAtNullOrUndefinedCompare(MCompare *ins, bool trueBranch, MTest *test);
-    bool improveTypesAtTypeOfCompare(MCompare *ins, bool trueBranch, MTest *test);
+    bool improveTypesAtNullOrUndefinedCompare(MCompare* ins, bool trueBranch, MTest* test);
+    bool improveTypesAtTypeOfCompare(MCompare* ins, bool trueBranch, MTest* test);
 
     // Used to detect triangular structure at test.
     bool detectAndOrStructure(MPhi* ins, bool* branchIsTrue);

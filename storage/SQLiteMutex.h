@@ -107,15 +107,15 @@ public:
   void assertCurrentThreadOwns()
   {
     NS_ASSERTION(mMutex, "No mutex associated with this wrapper!");
-//    NS_ASSERTION(sqlite3_mutex_held(mMutex),
-//                 "Mutex is not held, but we expect it to be!");
+    NS_ASSERTION(sqlite3_mutex_held(mMutex),
+                 "Mutex is not held, but we expect it to be!");
   }
 
   void assertNotCurrentThreadOwns()
   {
     NS_ASSERTION(mMutex, "No mutex associated with this wrapper!");
-//    NS_ASSERTION(sqlite3_mutex_notheld(mMutex),
-//                 "Mutex is held, but we expect it to not be!");
+    NS_ASSERTION(sqlite3_mutex_notheld(mMutex),
+                 "Mutex is held, but we expect it to not be!");
   }
 #endif // ifndef DEBUG
 

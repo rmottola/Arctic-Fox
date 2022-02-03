@@ -265,7 +265,14 @@ public:
 
   void AppendImageCompositeNotification(const ImageCompositeNotification& aNotification)
   {
-    mImageCompositeNotifications.AppendElement(aNotification);
+    // Only send composite notifications when we're drawing to the screen,
+    // because that's what they mean.
+    // Also when we're not drawing to the screen, DidComposite will not be
+    // called to extract and send these notifications, so they might linger
+    // and contain stale ImageContainerParent pointers.
+    if (!mCompositor->GetTargetContext()) {
+      mImageCompositeNotifications.AppendElement(aNotification);
+    }
   }
   void ExtractImageCompositeNotifications(nsTArray<ImageCompositeNotification>* aNotifications)
   {
@@ -295,7 +302,7 @@ private:
    * Render the current layer tree to the active target.
    */
   void Render();
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
   void RenderToPresentationSurface();
 #endif
 

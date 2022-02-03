@@ -247,7 +247,7 @@ public:
     const NetAddr& GetPeerAddr() { return mPeerAddr; }
 
     nsresult OverrideSecurityInfo(nsISupports* aSecurityInfo);
-    void OverrideURI(nsIURI* aRedirectedURI);
+    nsresult OverrideURI(nsIURI* aRedirectedURI);
 
 public: /* Necko internal use only... */
     bool IsNavigation();
@@ -385,6 +385,9 @@ protected:
   // If true, we behave as if the LOAD_FROM_CACHE flag has been set.
   // Used to enforce that flag's behavior but not expose it externally.
   uint32_t                          mAllowStaleCacheContent : 1;
+
+  // True if this channel was intercepted and could receive a synthesized response.
+  uint32_t                          mResponseCouldBeSynthesized : 1;
 
   // Current suspension depth for this channel object
   uint32_t                          mSuspendCount;

@@ -46,6 +46,37 @@ template <typename T>
 class AutoVectorRooter;
 typedef AutoVectorRooter<jsid> AutoIdVector;
 
+// The answer to a successful query as to whether an object is an Array per
+// ES6's internal |IsArray| operation (as exposed by |Array.isArray|).
+enum class IsArrayAnswer
+{
+    Array,
+    NotArray,
+    RevokedProxy
+};
+
+// ES6 7.2.2.
+//
+// Returns false on failure, otherwise returns true and sets |*isArray|
+// indicating whether the object passes ECMAScript's IsArray test.  This is the
+// same test performed by |Array.isArray|.
+//
+// This is NOT the same as asking whether |obj| is an Array or a wrapper around
+// one.  If |obj| is a proxy created by |Proxy.revocable()| and has been
+// revoked, or if |obj| is a proxy whose target (at any number of hops) is a
+// revoked proxy, this method throws a TypeError and returns false.
+extern JS_PUBLIC_API(bool)
+IsArray(JSContext* cx, HandleObject obj, bool* isArray);
+
+// Identical to IsArray above, but the nature of the object (if successfully
+// determined) is communicated via |*answer|.  In particular this method
+// returns true and sets |*answer = IsArrayAnswer::RevokedProxy| when called on
+// a revoked proxy.
+//
+// Most users will want the overload above, not this one.
+extern JS_PUBLIC_API(bool)
+IsArray(JSContext* cx, HandleObject obj, IsArrayAnswer* answer);
+
 /*
  * Per ES6, the [[DefineOwnProperty]] internal method has three different
  * possible outcomes:
@@ -349,26 +380,26 @@ typedef void
 namespace js {
 
 typedef bool
-(* LookupPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+(* LookupPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                      JS::MutableHandleObject objp, JS::MutableHandle<Shape*> propp);
 typedef bool
-(* DefinePropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+(* DefinePropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                      JS::Handle<JSPropertyDescriptor> desc,
-                     JS::ObjectOpResult &result);
+                     JS::ObjectOpResult& result);
 typedef bool
-(* HasPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id, bool *foundp);
+(* HasPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* foundp);
 typedef bool
-(* GetPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleObject receiver, JS::HandleId id,
+(* GetPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleValue receiver, JS::HandleId id,
                   JS::MutableHandleValue vp);
 typedef bool
-(* SetPropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue v,
-                  JS::HandleValue receiver, JS::ObjectOpResult &result);
+(* SetPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue v,
+                  JS::HandleValue receiver, JS::ObjectOpResult& result);
 typedef bool
 (* GetOwnPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                      JS::MutableHandle<JSPropertyDescriptor> desc);
 typedef bool
-(* DeletePropertyOp)(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
-                     JS::ObjectOpResult &result);
+(* DeletePropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+                     JS::ObjectOpResult& result);
 
 typedef bool
 (* WatchOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleObject callable);
@@ -610,7 +641,7 @@ typedef void (*JSClassInternal)();
 struct JSClass {
     JS_CLASS_MEMBERS(JSFinalizeOp);
 
-    void                *reserved[25];
+    void*               reserved[25];
 };
 
 #define JSCLASS_HAS_PRIVATE             (1<<0)  // objects have private slot
@@ -803,23 +834,9 @@ enum ESClassValue {
     ESClass_Boolean, ESClass_RegExp, ESClass_ArrayBuffer, ESClass_SharedArrayBuffer,
     ESClass_Date, ESClass_Set, ESClass_Map,
 
-    // Special snowflake for the ES6 IsArray method.
-    // Please don't use it without calling that function.
-    ESClass_IsArray
+    // None of the above.
+    ESClass_Other
 };
-
-/*
- * Return whether the given object has the given [[Class]] internal property
- * value. Beware, this query says nothing about the js::Class of the JSObject
- * so the caller must not assume anything about obj's representation (e.g., obj
- * may be a proxy).
- */
-inline bool
-ObjectClassIs(JSObject& obj, ESClassValue classValue, JSContext* cx);
-
-/* Just a helper that checks v.isObject before calling ObjectClassIs. */
-inline bool
-IsObjectWithClass(const JS::Value& v, ESClassValue classValue, JSContext* cx);
 
 /* Fills |vp| with the unboxed value for boxed types, or undefined otherwise. */
 inline bool

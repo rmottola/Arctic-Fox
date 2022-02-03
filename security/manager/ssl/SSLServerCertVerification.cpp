@@ -433,7 +433,9 @@ DetermineCertOverrideErrors(CERTCertificate* cert, const char* hostName,
       return SECFailure;
     }
     result = CheckCertHostname(certInput, hostnameInput);
-    if (result == Result::ERROR_BAD_CERT_DOMAIN) {
+    // Treat malformed name information as a domain mismatch.
+    if (result == Result::ERROR_BAD_DER ||
+        result == Result::ERROR_BAD_CERT_DOMAIN) {
       collectedErrors |= nsICertOverrideService::ERROR_MISMATCH;
       errorCodeMismatch = SSL_ERROR_BAD_CERT_DOMAIN;
     } else if (result != Success) {
@@ -1183,13 +1185,16 @@ AuthCertificate(CertVerifier& certVerifier,
   CertVerifier::OCSPStaplingStatus ocspStaplingStatus =
     CertVerifier::OCSP_STAPLING_NEVER_CHECKED;
   KeySizeStatus keySizeStatus = KeySizeStatus::NeverChecked;
+  SignatureDigestStatus sigDigestStatus = SignatureDigestStatus::NeverChecked;
+  PinningTelemetryInfo pinningTelemetryInfo;
 
   rv = certVerifier.VerifySSLServerCert(cert, stapledOCSPResponse,
                                         time, infoObject,
                                         infoObject->GetHostNameRaw(),
                                         saveIntermediates, 0, &certList,
                                         &evOidPolicy, &ocspStaplingStatus,
-                                        &keySizeStatus);
+                                        &keySizeStatus, &sigDigestStatus,
+                                        &pinningTelemetryInfo);
   PRErrorCode savedErrorCode;
   if (rv != SECSuccess) {
     savedErrorCode = PR_GetError();
@@ -1201,6 +1206,20 @@ AuthCertificate(CertVerifier& certVerifier,
   if (keySizeStatus != KeySizeStatus::NeverChecked) {
     Telemetry::Accumulate(Telemetry::CERT_CHAIN_KEY_SIZE_STATUS,
                           static_cast<uint32_t>(keySizeStatus));
+  }
+  if (sigDigestStatus != SignatureDigestStatus::NeverChecked) {
+    Telemetry::Accumulate(Telemetry::CERT_CHAIN_SIGNATURE_DIGEST_STATUS,
+                          static_cast<uint32_t>(sigDigestStatus));
+  }
+
+  if (pinningTelemetryInfo.accumulateForRoot) {
+    Telemetry::Accumulate(Telemetry::CERT_PINNING_FAILURES_BY_CA,
+                          pinningTelemetryInfo.rootBucket);
+  }
+
+  if (pinningTelemetryInfo.accumulateResult) {
+    Telemetry::Accumulate(pinningTelemetryInfo.certPinningResultHistogram,
+                          pinningTelemetryInfo.certPinningResultBucket);
   }
 
   // We want to remember the CA certs in the temp db, so that the application can find the

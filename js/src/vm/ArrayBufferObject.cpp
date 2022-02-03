@@ -24,6 +24,7 @@
 #include "jsarray.h"
 #include "jscntxt.h"
 #include "jscpucfg.h"
+#include "jsfriendapi.h"
 #include "jsnum.h"
 #include "jsobj.h"
 #include "jstypes.h"
@@ -254,6 +255,7 @@ ReleaseAsmJSMappedData(void* base)
     }
 #   endif
 #  endif
+    MemProfiler::RemoveNative(base);
 }
 #else
 static void
@@ -300,6 +302,7 @@ TransferAsmJSMappedBuffer(JSContext* cx, const CallArgs& args, Handle<ArrayBuffe
             return false;
         }
 #  endif
+        MemProfiler::SampleNative(diffStart, diffLength);
     } else if (newByteLength < oldByteLength) {
         void* diffStart = data + newByteLength;
         size_t diffLength = oldByteLength - newByteLength;
@@ -352,7 +355,10 @@ ArrayBufferObject::fun_transfer(JSContext* cx, unsigned argc, Value* vp)
     }
 
     RootedObject oldBufferObj(cx, &oldBufferArg.toObject());
-    if (!ObjectClassIs(oldBufferObj, ESClass_ArrayBuffer, cx)) {
+    ESClassValue cls;
+    if (!GetBuiltinClass(cx, oldBufferObj, &cls))
+        return false;
+    if (cls != ESClass_ArrayBuffer) {
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_TYPED_ARRAY_BAD_ARGS);
         return false;
     }
@@ -363,8 +369,8 @@ ArrayBufferObject::fun_transfer(JSContext* cx, unsigned argc, Value* vp)
     if (oldBufferObj->is<ArrayBufferObject>()) {
         oldBuffer = &oldBufferObj->as<ArrayBufferObject>();
     } else {
-        JSObject* unwrapped = CheckedUnwrap(oldBuffer);
-        if (!unwrapped->is<ArrayBufferObject>()) {
+        JSObject* unwrapped = CheckedUnwrap(oldBufferObj);
+        if (!unwrapped || !unwrapped->is<ArrayBufferObject>()) {
             JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_TYPED_ARRAY_BAD_ARGS);
             return false;
         }
@@ -664,12 +670,14 @@ ArrayBufferObject::prepareForAsmJS(JSContext* cx, Handle<ArrayBufferObject*> buf
 # ifdef XP_WIN
     if (!VirtualAlloc(data, buffer->byteLength(), MEM_COMMIT, PAGE_READWRITE)) {
         VirtualFree(data, 0, MEM_RELEASE);
+        MemProfiler::RemoveNative(data);
         return false;
     }
 # else
     size_t validLength = buffer->byteLength();
     if (mprotect(data, validLength, PROT_READ | PROT_WRITE)) {
         munmap(data, AsmJSMappedSize);
+        MemProfiler::RemoveNative(data);
         return false;
     }
 #   if defined(MOZ_VALGRIND) && defined(VALGRIND_DISABLE_ADDR_ERROR_REPORTING_IN_RANGE)
@@ -705,6 +713,7 @@ ArrayBufferObject::BufferContents
 ArrayBufferObject::createMappedContents(int fd, size_t offset, size_t length)
 {
     void* data = AllocateMappedContent(fd, offset, length, ARRAY_BUFFER_ALIGNMENT);
+    MemProfiler::SampleNative(data, length);
     return BufferContents::create<MAPPED>(data);
 }
 
@@ -731,6 +740,7 @@ ArrayBufferObject::releaseData(FreeOp* fop)
         fop->free_(dataPointer());
         break;
       case MAPPED:
+        MemProfiler::RemoveNative(dataPointer());
         DeallocateMappedContent(dataPointer(), byteLength());
         break;
       case ASMJS_MAPPED:
@@ -1450,6 +1460,7 @@ JS_CreateMappedArrayBufferContents(int fd, size_t offset, size_t length)
 JS_PUBLIC_API(void)
 JS_ReleaseMappedArrayBufferContents(void* contents, size_t length)
 {
+    MemProfiler::RemoveNative(contents);
     DeallocateMappedContent(contents, length);
 }
 

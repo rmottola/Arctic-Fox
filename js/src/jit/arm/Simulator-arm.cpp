@@ -967,8 +967,9 @@ GetCachePageLocked(Simulator::ICacheMap& i_cache, void* page)
         return p->value();
 
     CachePage* new_page = js_new<CachePage>();
-    if (!i_cache.add(p, page, new_page))
-        return nullptr;
+    if (!new_page || !i_cache.add(p, page, new_page))
+        CrashAtUnhandlableOOM("Simulator CachePage");
+
     return new_page;
 }
 
@@ -1196,11 +1197,8 @@ class Redirection
         }
 
         Redirection* redir = (Redirection*)js_malloc(sizeof(Redirection));
-        if (!redir) {
-            MOZ_ReportAssertionFailure("[unhandlable oom] Simulator redirection",
-                                       __FILE__, __LINE__);
-            MOZ_CRASH();
-        }
+        if (!redir)
+            CrashAtUnhandlableOOM("Simulator redirection");
         new(redir) Redirection(nativeFunction, type, sim);
         return redir;
     }
@@ -3117,6 +3115,19 @@ Simulator::decodeType3(SimInstruction* instr)
                             uint32_t rm_val = rotateBytes(get_register(instr->rmValue()),
                                                           instr->bits(11, 10));
                             set_register(rd, rn_val + (rm_val & 0xFF));
+                        }
+                    } else if ((instr->bit(20) == 1) && (instr->bits(9, 6) == 1)) {
+                        if (instr->bits(19, 16) == 0xF) {
+                            // Uxth.
+                            uint32_t rm_val = rotateBytes(get_register(instr->rmValue()),
+                                                          instr->bits(11, 10));
+                            set_register(rd, (rm_val & 0xFFFF));
+                        } else {
+                            // Uxtah.
+                            uint32_t rn_val = get_register(rn);
+                            uint32_t rm_val = rotateBytes(get_register(instr->rmValue()),
+                                                          instr->bits(11, 10));
+                            set_register(rd, rn_val + (rm_val & 0xFFFF));
                         }
                     } else {
                         MOZ_CRASH();

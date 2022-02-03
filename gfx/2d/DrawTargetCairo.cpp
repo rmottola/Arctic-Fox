@@ -413,6 +413,8 @@ class AutoClearDeviceOffset
 public:
   explicit AutoClearDeviceOffset(SourceSurface* aSurface)
     : mSurface(nullptr)
+    , mX(0)
+    , mY(0)
   {
     Init(aSurface);
   }
@@ -455,6 +457,17 @@ private:
   double mY;
 };
 
+static inline void
+CairoPatternAddGradientStop(cairo_pattern_t* aPattern,
+                            const GradientStop &aStop,
+                            Float aNudge = 0)
+{
+  cairo_pattern_add_color_stop_rgba(aPattern, aStop.offset + aNudge,
+                                    aStop.color.r, aStop.color.g, aStop.color.b,
+                                    aStop.color.a);
+
+}
+
 // Never returns nullptr. As such, you must always pass in Cairo-compatible
 // patterns, most notably gradients with a GradientStopCairo.
 // The pattern returned must have cairo_pattern_destroy() called on it by the
@@ -463,7 +476,9 @@ private:
 // lifetime of the cairo_pattern_t returned must not exceed the lifetime of the
 // Pattern passed in.
 static cairo_pattern_t*
-GfxPatternToCairoPattern(const Pattern& aPattern, Float aAlpha)
+GfxPatternToCairoPattern(const Pattern& aPattern,
+                         Float aAlpha,
+                         const Matrix& aTransform)
 {
   cairo_pattern_t* pat;
   const Matrix* matrix = nullptr;
@@ -511,10 +526,7 @@ GfxPatternToCairoPattern(const Pattern& aPattern, Float aAlpha)
 
       const std::vector<GradientStop>& stops = cairoStops->GetStops();
       for (size_t i = 0; i < stops.size(); ++i) {
-        const GradientStop& stop = stops[i];
-        cairo_pattern_add_color_stop_rgba(pat, stop.offset, stop.color.r,
-                                          stop.color.g, stop.color.b,
-                                          stop.color.a);
+        CairoPatternAddGradientStop(pat, stops[i]);
       }
 
       break;
@@ -534,10 +546,7 @@ GfxPatternToCairoPattern(const Pattern& aPattern, Float aAlpha)
 
       const std::vector<GradientStop>& stops = cairoStops->GetStops();
       for (size_t i = 0; i < stops.size(); ++i) {
-        const GradientStop& stop = stops[i];
-        cairo_pattern_add_color_stop_rgba(pat, stop.offset, stop.color.r,
-                                          stop.color.g, stop.color.b,
-                                          stop.color.a);
+        CairoPatternAddGradientStop(pat, stops[i]);
       }
 
       break;
@@ -649,6 +658,23 @@ DrawTargetCairo::GetSize()
   return mSize;
 }
 
+SurfaceFormat
+GfxFormatForCairoSurface(cairo_surface_t* surface)
+{
+  cairo_surface_type_t type = cairo_surface_get_type(surface);
+  if (type == CAIRO_SURFACE_TYPE_IMAGE) {
+    return CairoFormatToGfxFormat(cairo_image_surface_get_format(surface));
+  }
+#ifdef CAIRO_HAS_XLIB_SURFACE
+  // xlib is currently the only Cairo backend that creates 16bpp surfaces
+  if (type == CAIRO_SURFACE_TYPE_XLIB &&
+      cairo_xlib_surface_get_depth(surface) == 16) {
+    return SurfaceFormat::R5G6B5;
+  }
+#endif
+  return CairoContentToGfxFormat(cairo_surface_get_content(surface));
+}
+
 already_AddRefed<SourceSurface>
 DrawTargetCairo::Snapshot()
 {
@@ -673,6 +699,7 @@ DrawTargetCairo::LockBits(uint8_t** aData, IntSize* aSize,
 {
   if (cairo_surface_get_type(mSurface) == CAIRO_SURFACE_TYPE_IMAGE) {
     WillChange();
+    Flush();
 
     mLockedBits = cairo_image_surface_get_data(mSurface);
     *aData = mLockedBits;
@@ -690,6 +717,7 @@ DrawTargetCairo::ReleaseBits(uint8_t* aData)
 {
   MOZ_ASSERT(mLockedBits == aData);
   mLockedBits = nullptr;
+  cairo_surface_mark_dirty(mSurface);
 }
 
 void
@@ -715,6 +743,27 @@ DrawTargetCairo::GetDummySurface()
   mDummySurface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1);
 
   return mDummySurface;
+}
+
+static void
+PaintWithAlpha(cairo_t* aContext, const DrawOptions& aOptions)
+{
+  if (aOptions.mCompositionOp == CompositionOp::OP_SOURCE) {
+    // Cairo treats the source operator like a lerp when alpha is < 1.
+    // Approximate the desired operator by: out = 0; out += src*alpha;
+    if (aOptions.mAlpha == 1) {
+      cairo_set_operator(aContext, CAIRO_OPERATOR_SOURCE);
+      cairo_paint(aContext);
+    } else {
+      cairo_set_operator(aContext, CAIRO_OPERATOR_CLEAR);
+      cairo_paint(aContext);
+      cairo_set_operator(aContext, CAIRO_OPERATOR_ADD);
+      cairo_paint_with_alpha(aContext, aOptions.mAlpha);
+    }
+  } else {
+    cairo_set_operator(aContext, GfxOpToCairoOp(aOptions.mCompositionOp));
+    cairo_paint_with_alpha(aContext, aOptions.mAlpha);
+  }
 }
 
 void
@@ -765,9 +814,7 @@ DrawTargetCairo::DrawSurface(SourceSurface *aSurface,
     cairo_set_source(mContext, pat);
   }
 
-  cairo_set_operator(mContext, GfxOpToCairoOp(aOptions.mCompositionOp));
-
-  cairo_paint_with_alpha(mContext, aOptions.mAlpha);
+  PaintWithAlpha(mContext, aOptions);
 
   cairo_pattern_destroy(pat);
 }
@@ -868,7 +915,7 @@ DrawTargetCairo::DrawPattern(const Pattern& aPattern,
 
   AutoClearDeviceOffset clear(aPattern);
 
-  cairo_pattern_t* pat = GfxPatternToCairoPattern(aPattern, aOptions.mAlpha);
+  cairo_pattern_t* pat = GfxPatternToCairoPattern(aPattern, aOptions.mAlpha, GetTransform());
   if (!pat) {
     return;
   }
@@ -899,8 +946,7 @@ DrawTargetCairo::DrawPattern(const Pattern& aPattern,
     cairo_pop_group_to_source(mContext);
 
     // Now draw the content using the desired operator
-    cairo_set_operator(mContext, GfxOpToCairoOp(aOptions.mCompositionOp));
-    cairo_paint_with_alpha(mContext, aOptions.mAlpha);
+    PaintWithAlpha(mContext, aOptions);
   } else {
     cairo_set_operator(mContext, GfxOpToCairoOp(aOptions.mCompositionOp));
 
@@ -1151,7 +1197,7 @@ DrawTargetCairo::FillGlyphs(ScaledFont *aFont,
   ScaledFontBase* scaledFont = static_cast<ScaledFontBase*>(aFont);
   cairo_set_scaled_font(mContext, scaledFont->GetCairoScaledFont());
 
-  cairo_pattern_t* pat = GfxPatternToCairoPattern(aPattern, aOptions.mAlpha);
+  cairo_pattern_t* pat = GfxPatternToCairoPattern(aPattern, aOptions.mAlpha, GetTransform());
   if (!pat)
     return;
 
@@ -1190,12 +1236,12 @@ DrawTargetCairo::Mask(const Pattern &aSource,
 
   cairo_set_antialias(mContext, GfxAntialiasToCairoAntialias(aOptions.mAntialiasMode));
 
-  cairo_pattern_t* source = GfxPatternToCairoPattern(aSource, aOptions.mAlpha);
+  cairo_pattern_t* source = GfxPatternToCairoPattern(aSource, aOptions.mAlpha, GetTransform());
   if (!source) {
     return;
   }
 
-  cairo_pattern_t* mask = GfxPatternToCairoPattern(aMask, aOptions.mAlpha);
+  cairo_pattern_t* mask = GfxPatternToCairoPattern(aMask, aOptions.mAlpha, GetTransform());
   if (!mask) {
     cairo_pattern_destroy(source);
     return;
@@ -1231,7 +1277,7 @@ DrawTargetCairo::MaskSurface(const Pattern &aSource,
 
   cairo_set_antialias(mContext, GfxAntialiasToCairoAntialias(aOptions.mAntialiasMode));
 
-  cairo_pattern_t* pat = GfxPatternToCairoPattern(aSource, aOptions.mAlpha);
+  cairo_pattern_t* pat = GfxPatternToCairoPattern(aSource, aOptions.mAlpha, GetTransform());
   if (!pat) {
     return;
   }
@@ -1513,7 +1559,7 @@ DrawTargetCairo::CreateSimilarDrawTarget(const IntSize &aSize, SurfaceFormat aFo
     }
   }
 
-  gfxCriticalError(CriticalLog::DefaultOptions(Factory::ReasonableSurfaceSize(aSize))) << "Failed to create similar cairo surface! Size: " << aSize << " Status: " << cairo_surface_status(similar);
+  gfxCriticalError(CriticalLog::DefaultOptions(Factory::ReasonableSurfaceSize(aSize))) << "Failed to create similar cairo surface! Size: " << aSize << " Status: " << cairo_surface_status(similar) << " format " << (int)aFormat;
 
   return nullptr;
 }
@@ -1733,6 +1779,7 @@ BorrowedXlibDrawable::Init(DrawTarget* aDT)
   if (cairo_surface_get_type(surf) != CAIRO_SURFACE_TYPE_XLIB) {
     return false;
   }
+  cairo_surface_flush(surf);
 
   cairoDT->WillChange();
 
@@ -1751,6 +1798,9 @@ BorrowedXlibDrawable::Init(DrawTarget* aDT)
 void
 BorrowedXlibDrawable::Finish()
 {
+  DrawTargetCairo* cairoDT = static_cast<DrawTargetCairo*>(mDT);
+  cairo_surface_t* surf = cairoDT->mSurface;
+  cairo_surface_mark_dirty(surf);
   if (mDrawable) {
     mDrawable = None;
   }

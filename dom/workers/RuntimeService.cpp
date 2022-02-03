@@ -158,6 +158,7 @@ static_assert(MAX_WORKERS_PER_DOMAIN >= 1,
 
 #define PREF_DOM_CACHES_ENABLED        "dom.caches.enabled"
 #define PREF_DOM_CACHES_TESTING_ENABLED "dom.caches.testing.enabled"
+#define PREF_WORKERS_PERFORMANCE_LOGGING_ENABLED "dom.performance.enable_user_timing_logging"
 #define PREF_DOM_WORKERNOTIFICATION_ENABLED  "dom.webnotifications.enabled"
 #define PREF_WORKERS_LATEST_JS_VERSION "dom.workers.latestJSVersion"
 #define PREF_INTL_ACCEPT_LANGUAGES     "intl.accept_languages"
@@ -165,6 +166,8 @@ static_assert(MAX_WORKERS_PER_DOMAIN >= 1,
 #define PREF_SERVICEWORKERS_TESTING_ENABLED "dom.serviceWorkers.testing.enabled"
 #define PREF_INTERCEPTION_ENABLED      "dom.serviceWorkers.interception.enabled"
 #define PREF_INTERCEPTION_OPAQUE_ENABLED "dom.serviceWorkers.interception.opaque.enabled"
+#define PREF_PUSH_ENABLED              "dom.push.enabled"
+#define PREF_REQUESTCONTEXT_ENABLED    "dom.requestcontext.enabled"
 
 namespace {
 
@@ -930,7 +933,7 @@ public:
   }
 
   void
-  DispatchDeferredDeletion(bool aContinuation) override
+  DispatchDeferredDeletion(bool aContinuation, bool aPurge) override
   {
     MOZ_ASSERT(!aContinuation);
 
@@ -1901,8 +1904,20 @@ RuntimeService::Init()
                                   reinterpret_cast<void *>(WORKERPREF_DOM_CACHES_TESTING))) ||
       NS_FAILED(Preferences::RegisterCallbackAndCall(
                                   WorkerPrefChanged,
+                                  PREF_WORKERS_PERFORMANCE_LOGGING_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_PERFORMANCE_LOGGING_ENABLED))) ||
+      NS_FAILED(Preferences::RegisterCallbackAndCall(
+                                  WorkerPrefChanged,
                                   PREF_SERVICEWORKERS_TESTING_ENABLED,
                                   reinterpret_cast<void *>(WORKERPREF_SERVICEWORKERS_TESTING))) ||
+      NS_FAILED(Preferences::RegisterCallbackAndCall(
+                                  WorkerPrefChanged,
+                                  PREF_PUSH_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_PUSH))) ||
+      NS_FAILED(Preferences::RegisterCallbackAndCall(
+                                  WorkerPrefChanged,
+                                  PREF_REQUESTCONTEXT_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_REQUESTCONTEXT))) ||
       NS_FAILED(Preferences::RegisterCallback(LoadRuntimeOptions,
                                               PREF_JS_OPTIONS_PREFIX,
                                               nullptr)) ||
@@ -2108,6 +2123,10 @@ RuntimeService::Cleanup()
                                   reinterpret_cast<void *>(WORKERPREF_DOM_CACHES_TESTING))) ||
         NS_FAILED(Preferences::UnregisterCallback(
                                   WorkerPrefChanged,
+                                  PREF_WORKERS_PERFORMANCE_LOGGING_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_PERFORMANCE_LOGGING_ENABLED))) ||
+        NS_FAILED(Preferences::UnregisterCallback(
+                                  WorkerPrefChanged,
                                   PREF_INTERCEPTION_OPAQUE_ENABLED,
                                   reinterpret_cast<void *>(WORKERPREF_INTERCEPTION_OPAQUE_ENABLED))) ||
         NS_FAILED(Preferences::UnregisterCallback(
@@ -2126,6 +2145,14 @@ RuntimeService::Cleanup()
                                   WorkerPrefChanged,
                                   PREF_DOM_WORKERNOTIFICATION_ENABLED,
                                   reinterpret_cast<void *>(WORKERPREF_DOM_WORKERNOTIFICATION))) ||
+        NS_FAILED(Preferences::UnregisterCallback(
+                                  WorkerPrefChanged,
+                                  PREF_PUSH_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_PUSH))) ||
+        NS_FAILED(Preferences::UnregisterCallback(
+                                  WorkerPrefChanged,
+                                  PREF_REQUESTCONTEXT_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_REQUESTCONTEXT))) ||
 #if DUMP_CONTROLLED_BY_PREF
         NS_FAILED(Preferences::UnregisterCallback(
                                   WorkerPrefChanged,
@@ -2659,6 +2686,7 @@ RuntimeService::WorkerPrefChanged(const char* aPrefName, void* aClosure)
     case WORKERPREF_DOM_CACHES:
     case WORKERPREF_DOM_CACHES_TESTING:
     case WORKERPREF_DOM_WORKERNOTIFICATION:
+    case WORKERPREF_PERFORMANCE_LOGGING_ENABLED:
 #ifdef DUMP_CONTROLLED_BY_PREF
     case WORKERPREF_DUMP:
 #endif
@@ -2666,6 +2694,8 @@ RuntimeService::WorkerPrefChanged(const char* aPrefName, void* aClosure)
     case WORKERPREF_INTERCEPTION_OPAQUE_ENABLED:
     case WORKERPREF_SERVICEWORKERS:
     case WORKERPREF_SERVICEWORKERS_TESTING:
+    case WORKERPREF_PUSH:
+    case WORKERPREF_REQUESTCONTEXT:
       sDefaultPreferences[key] = Preferences::GetBool(aPrefName, false);
       break;
 

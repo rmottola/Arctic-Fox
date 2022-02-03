@@ -14,6 +14,7 @@
 #include "nsContentPolicyUtils.h"
 #include "nsIObjectLoadingContent.h"
 #include "mozilla/ArrayUtils.h"
+#include "nsContentUtils.h"
 
 // Possible behavior pref values
 // Those map to the nsIPermissionManager values where possible
@@ -56,7 +57,8 @@ static const char *kTypeString[] = {
                                     "", // TYPE_INTERNAL_VIDEO
                                     "", // TYPE_INTERNAL_TRACK
                                     "", // TYPE_INTERNAL_XMLHTTPREQUEST
-                                    ""  // TYPE_INTERNAL_EVENTSOURCE
+                                    "", // TYPE_INTERNAL_EVENTSOURCE
+                                    "", // TYPE_INTERNAL_SERVICE_WORKER
 };
 
 #define NUMBER_OF_TYPES MOZ_ARRAY_LENGTH(kTypeString)

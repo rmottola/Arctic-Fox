@@ -1548,6 +1548,8 @@ HttpChannelChild::AsyncOpen(nsIStreamListener *listener, nsISupports *aContext)
   }
 
   if (ShouldIntercept()) {
+    mResponseCouldBeSynthesized = true;
+
     nsCOMPtr<nsINetworkInterceptController> controller;
     GetCallback(controller);
 
@@ -1624,6 +1626,11 @@ HttpChannelChild::ContinueAsyncOpen()
     openArgs.synthesizedResponseHead() = *mResponseHead;
   } else {
     openArgs.synthesizedResponseHead() = mozilla::void_t();
+  }
+
+  nsCOMPtr<nsISerializable> secInfoSer = do_QueryInterface(mSecurityInfo);
+  if (secInfoSer) {
+    NS_SerializeToString(secInfoSer, openArgs.synthesizedSecurityInfoSerialization());
   }
 
   OptionalFileDescriptorSet optionalFDs;
@@ -2184,6 +2191,14 @@ HttpChannelChild::ResetInterception()
   // Continue with the original cross-process request
   nsresult rv = ContinueAsyncOpen();
   NS_ENSURE_SUCCESS_VOID(rv);
+}
+
+NS_IMETHODIMP
+HttpChannelChild::GetResponseSynthesized(bool* aSynthesized)
+{
+  NS_ENSURE_ARG_POINTER(aSynthesized);
+  *aSynthesized = mSynthesizedResponse;
+  return NS_OK;
 }
 
 void

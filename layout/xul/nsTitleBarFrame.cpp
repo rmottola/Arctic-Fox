@@ -66,7 +66,7 @@ nsTitleBarFrame::HandleEvent(nsPresContext* aPresContext,
 
   bool doDefault = true;
 
-  switch (aEvent->message) {
+  switch (aEvent->mMessage) {
 
    case NS_MOUSE_BUTTON_DOWN:  {
        if (aEvent->AsMouseEvent()->button == WidgetMouseEvent::eLeftButton) {
@@ -154,6 +154,9 @@ nsTitleBarFrame::HandleEvent(nsPresContext* aPresContext,
       }
       break;
     }
+
+    default:
+      break;
   }
 
   if ( doDefault )

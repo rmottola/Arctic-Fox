@@ -189,7 +189,6 @@ asm/signal.h
 ASRegistry.h
 assert.h
 atk/atk.h
-atk-bridge.h
 atlcom.h
 atlconv.h
 atlctl.cpp
@@ -239,10 +238,6 @@ bstring.h
 builtin.h
 Button.h
 byteswap.h
-#if MOZ_TREE_CAIRO!=1
-#define WRAP_CAIRO_HEADERS
-#endif
-#ifdef WRAP_CAIRO_HEADERS
 pixman.h
 cairo.h
 cairo-atsui.h
@@ -259,7 +254,6 @@ cairo-xlib-xrender.h
 cairo-directfb.h
 cairo-qpainter.h
 cairo-qt.h
-#endif
 complex
 dfiff.h
 exception
@@ -1269,6 +1263,9 @@ X11/Xutil.h
 zmouse.h
 soundtouch/SoundTouch.h
 soundtouch/SoundTouchFactory.h
+#if MOZ_LIBAV_FFT==1
+libavcodec/avfft.h
+#endif
 #if MOZ_NATIVE_PNG==1
 png.h
 #endif
@@ -1356,11 +1353,13 @@ xlocale.h
 unicode/locid.h
 unicode/numsys.h
 unicode/ucal.h
+unicode/uchar.h
 unicode/uclean.h
 unicode/ucol.h
 unicode/udat.h
 unicode/udatpg.h
 unicode/uenum.h
+unicode/unorm.h
 unicode/unum.h
 unicode/ustring.h
 unicode/utypes.h

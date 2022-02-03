@@ -432,11 +432,18 @@ PatchBaselineFramesForDebugMode(JSContext* cx, const Debugger::ExecutionObservab
                 // invocation, on a pc without an ICEntry. This means the
                 // frame must have an override pc.
                 //
-                // Patch the resume address to nullptr, to ensure the old
-                // address is not used anywhere.
+                // If profiling is off, patch the resume address to nullptr,
+                // to ensure the old address is not used anywhere.
+                //
+                // If profiling is on, JitProfilingFrameIterator requires a
+                // valid return address.
                 MOZ_ASSERT(iter.baselineFrame()->isHandlingException());
                 MOZ_ASSERT(iter.baselineFrame()->overridePc() == pc);
-                uint8_t* retAddr = nullptr;
+                uint8_t* retAddr;
+                if (cx->runtime()->spsProfiler.enabled())
+                    retAddr = bl->nativeCodeForPC(script, pc);
+                else
+                    retAddr = nullptr;
                 SpewPatchBaselineFrameFromExceptionHandler(prev->returnAddress(), retAddr,
                                                            script, pc);
                 DebugModeOSRVolatileJitFrameIterator::forwardLiveIterators(
@@ -794,8 +801,10 @@ InvalidateScriptsInZone(JSContext* cx, Zone* zone, const Vector<DebugModeOSREntr
             continue;
 
         if (script->hasIonScript()) {
-            if (!invalid.append(script->ionScript()->recompileInfo()))
+            if (!invalid.append(script->ionScript()->recompileInfo())) {
+                ReportOutOfMemory(cx);
                 return false;
+            }
         }
 
         // Cancel off-thread Ion compile for anything that has a

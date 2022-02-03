@@ -457,10 +457,12 @@ static nsresult
 ResidentDistinguishedAmountHelper(int64_t* aN, bool aDoPurge)
 {
 #ifdef HAVE_JEMALLOC_STATS
+#ifndef MOZ_JEMALLOC4
   if (aDoPurge) {
     Telemetry::AutoTimer<Telemetry::MEMORY_FREE_PURGED_PAGES_MS> timer;
     jemalloc_purge_freed_pages();
   }
+#endif
 #endif
 
   task_basic_info ti;
@@ -1367,11 +1369,13 @@ nsMemoryReporterManager::~nsMemoryReporterManager()
   NS_ASSERTION(!mSavedWeakReporters, "failed to restore weak reporters");
 }
 
-//#define DEBUG_CHILD_PROCESS_MEMORY_REPORTING 1
+#ifdef MOZ_WIDGET_GONK
+#define DEBUG_CHILD_PROCESS_MEMORY_REPORTING 1
+#endif
 
 #ifdef DEBUG_CHILD_PROCESS_MEMORY_REPORTING
 #define MEMORY_REPORTING_LOG(format, ...) \
-  fprintf(stderr, "++++ MEMORY REPORTING: " format, ##__VA_ARGS__);
+  printf_stderr("++++ MEMORY REPORTING: " format, ##__VA_ARGS__);
 #else
 #define MEMORY_REPORTING_LOG(...)
 #endif

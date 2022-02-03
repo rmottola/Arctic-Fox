@@ -9,6 +9,7 @@
 
 #include "mozilla/dom/BindingDeclarations.h"
 #include "mozilla/ErrorResult.h"
+#include "mozilla/JSObjectHolder.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsDataHashtable.h"
 #include "nsHashKeys.h"
@@ -18,7 +19,8 @@
 #include "nsPIDOMWindow.h"
 
 class nsIConsoleAPIStorage;
-class nsIXPConnectJSObjectHolder;
+class nsIPrincipal;
+class nsIProfiler;
 
 namespace mozilla {
 namespace dom {
@@ -75,6 +77,9 @@ public:
   Dir(JSContext* aCx, const Sequence<JS::Value>& aData);
 
   void
+  Dirxml(JSContext* aCx, const Sequence<JS::Value>& aData);
+
+  void
   Group(JSContext* aCx, const Sequence<JS::Value>& aData);
 
   void
@@ -119,6 +124,7 @@ private:
     MethodTable,
     MethodTrace,
     MethodDir,
+    MethodDirxml,
     MethodGroup,
     MethodGroupCollapsed,
     MethodGroupEnd,
@@ -193,12 +199,15 @@ private:
   bool
   ShouldIncludeStackTrace(MethodName aMethodName);
 
-  nsIXPConnectJSObjectHolder*
+  JSObject*
   GetOrCreateSandbox(JSContext* aCx, nsIPrincipal* aPrincipal);
 
   nsCOMPtr<nsPIDOMWindow> mWindow;
   nsCOMPtr<nsIConsoleAPIStorage> mStorage;
-  nsCOMPtr<nsIXPConnectJSObjectHolder> mSandbox;
+  nsRefPtr<JSObjectHolder> mSandbox;
+#ifdef MOZ_ENABLE_PROFILER_SPS
+  nsCOMPtr<nsIProfiler> mProfiler;
+#endif
 
   nsDataHashtable<nsStringHashKey, DOMHighResTimeStamp> mTimerRegistry;
   nsDataHashtable<nsStringHashKey, uint32_t> mCounterRegistry;

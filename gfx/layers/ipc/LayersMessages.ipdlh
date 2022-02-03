@@ -198,6 +198,7 @@ struct Animation {
   int32_t direction;
   nsCSSProperty property;
   AnimationData data;
+  float playbackRate;
 };
 
 // Change a layer's attributes
@@ -213,8 +214,9 @@ struct CommonLayerAttributes {
   bool useClipRect;
   ParentLayerIntRect clipRect;
   bool isFixedPosition;
+  uint64_t fixedPositionScrollContainerId;
   LayerPoint fixedPositionAnchor;
-  LayerMargin fixedPositionMargin;
+  bool isClipFixed;
   bool isStickyPosition;
   uint64_t stickyScrollContainerId;
   LayerRect stickyScrollRangeOuter;

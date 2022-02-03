@@ -5,7 +5,11 @@
 
 Components.utils.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
 Components.utils.import("resource://gre/modules/InlineSpellChecker.jsm");
+Components.utils.import("resource://gre/modules/LoginManagerContextMenu.jsm");
 Components.utils.import("resource://gre/modules/BrowserUtils.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
+  "resource://gre/modules/LoginHelper.jsm");
 
 var gContextMenuContentData = null;
 
@@ -54,6 +58,7 @@ nsContextMenu.prototype = {
     InlineSpellCheckerUI.clearSuggestionsFromMenu();
     InlineSpellCheckerUI.clearDictionaryListFromMenu();
     InlineSpellCheckerUI.uninit();
+    LoginManagerContextMenu.clearLoginsFromMenu(document);
   },
 
   initItems: function CM_initItems() {
@@ -68,6 +73,7 @@ nsContextMenu.prototype = {
     this.initMediaPlayerItems();
     this.initLeaveDOMFullScreenItems();
     this.initClickToPlayItems();
+    this.initPasswordManagerItems();
   },
 
   initPageMenuSeparator: function CM_initPageMenuSeparator() {
@@ -427,6 +433,33 @@ nsContextMenu.prototype = {
     this.showItem("context-sep-ctp", this.onCTPPlugin);
   },
 
+  initPasswordManagerItems: function() {
+    let showFillPassword = this.onPassword;
+    let disableFillPassword = !Services.logins.isLoggedIn || this.target.disabled || this.target.readOnly;
+    this.showItem("fill-login-separator", showFillPassword);
+    this.showItem("fill-login", showFillPassword);
+    this.setItemAttr("fill-login", "disabled", disableFillPassword);
+
+    if (!showFillPassword || disableFillPassword) {
+      return;
+    }
+    let documentURI = gContextMenuContentData.documentURIObject;
+    let fragment = LoginManagerContextMenu.addLoginsToMenu(this.target, this.browser, documentURI);
+
+    this.showItem("fill-login-no-logins", !fragment);
+
+    if (!fragment) {
+      return;
+    }
+    let popup = document.getElementById("fill-login-popup");
+    let insertBeforeElement = document.getElementById("fill-login-no-logins");
+    popup.insertBefore(fragment, insertBeforeElement);
+  },
+
+  openPasswordManager: function() {
+    LoginHelper.openPasswordManager(window, gContextMenuContentData.documentURIObject.host);
+  },
+
   inspectNode: function CM_inspectNode() {
     let {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
     let gBrowser = this.browser.ownerDocument.defaultView.gBrowser;
@@ -489,6 +522,7 @@ nsContextMenu.prototype = {
     this.isDesignMode      = false;
     this.onCTPPlugin       = false;
     this.canSpellCheck     = false;
+    this.onPassword        = false;
 
     if (this.isRemote) {
       this.selectionInfo = gContextMenuContentData.selectionInfo;
@@ -578,6 +612,7 @@ nsContextMenu.prototype = {
       else if (editFlags & (SpellCheckHelper.INPUT | SpellCheckHelper.TEXTAREA)) {
         this.onTextInput = (editFlags & SpellCheckHelper.TEXTINPUT) !== 0;
         this.onEditableArea = (editFlags & SpellCheckHelper.EDITABLE) !== 0;
+        this.onPassword = (editFlags & SpellCheckHelper.PASSWORD) !== 0;
         if (this.onEditableArea) {
           if (this.isRemote) {
             InlineSpellCheckerUI.initFromRemote(gContextMenuContentData.spellInfo);
@@ -881,27 +916,8 @@ nsContextMenu.prototype = {
 
   // View Partial Source
   viewPartialSource: function(aContext) {
-    var focusedWindow = document.commandDispatcher.focusedWindow;
-    if (focusedWindow == window)
-      focusedWindow = gBrowser.selectedBrowser.contentWindowAsCPOW;
-
-    var docCharset = null;
-    if (focusedWindow)
-      docCharset = "charset=" + focusedWindow.document.characterSet;
-
-    // "View Selection Source" and others such as "View MathML Source"
-    // are mutually exclusive, with the precedence given to the selection
-    // when there is one
-    var reference = null;
-    if (aContext == "selection")
-      reference = focusedWindow.getSelection();
-    else if (aContext == "mathml")
-      reference = this.target;
-    else
-      throw "not reached";
-
-    let inTab = Services.prefs.getBoolPref("view_source.tab");
-    if (inTab) {
+    let inWindow = !Services.prefs.getBoolPref("view_source.tab");
+    let openSelectionFn = inWindow ? null : function() {
       let tabBrowser = gBrowser;
       // In the case of sidebars and chat windows, gBrowser is defined but null,
       // because no #content element exists.  For these cases, we need to find
@@ -916,22 +932,11 @@ nsContextMenu.prototype = {
         relatedToCurrent: true,
         inBackground: false
       });
-      let viewSourceBrowser = tabBrowser.getBrowserForTab(tab);
-      if (aContext == "selection") {
-        top.gViewSourceUtils
-           .viewSourceFromSelectionInBrowser(reference, viewSourceBrowser);
-      } else {
-        top.gViewSourceUtils
-           .viewSourceFromFragmentInBrowser(reference, aContext,
-                                            viewSourceBrowser);
-      }
-    } else {
-      // unused (and play nice for fragments generated via XSLT too)
-      var docUrl = null;
-      window.openDialog("chrome://global/content/viewPartialSource.xul",
-                        "_blank", "scrollbars,resizable,chrome,dialog=no",
-                        docUrl, docCharset, reference, aContext);
+      return tabBrowser.getBrowserForTab(tab);
     }
+
+    let target = aContext == "mathml" ? this.target : null;
+    top.gViewSourceUtils.viewPartialSourceInBrowser(gBrowser.selectedBrowser, target, openSelectionFn);
   },
 
   // Open new "view source" window with the frame's URL.
@@ -1209,12 +1214,18 @@ nsContextMenu.prototype = {
       }
     }
 
-    // set up a channel to do the saving
+    // setting up a new channel for 'right click - save link as ...'
+    // ideally we should use:
+    // * doc            - as the loadingNode, and/or
+    // * this.principal - as the loadingPrincipal
+    // for now lets use systemPrincipal to bypass mixedContentBlocker
+    // checks after redirects, see bug: 1136055
     var ioService = Cc["@mozilla.org/network/io-service;1"].
                     getService(Ci.nsIIOService);
+    var principal = Services.scriptSecurityManager.getSystemPrincipal();
     var channel = ioService.newChannelFromURI2(makeURI(linkURL),
                                                null, // aLoadingNode
-                                               this.principal, // aLoadingPrincipal
+                                               principal, // aLoadingPrincipal
                                                null, // aTriggeringPrincipal
                                                Ci.nsILoadInfo.SEC_NORMAL,
                                                Ci.nsIContentPolicy.TYPE_OTHER);
@@ -1549,25 +1560,11 @@ nsContextMenu.prototype = {
     let onMessage = (message) => {
       mm.removeMessageListener("ContextMenu:BookmarkFrame:Result", onMessage);
 
-      let itemId = PlacesUtils.getMostRecentBookmarkForURI(uri);
-      if (itemId == -1) {
-        PlacesUIUtils.showBookmarkDialog({ action: "add"
-                                         , type: "bookmark"
-                                         , uri: uri
-                                         , title: message.data.title
-                                         , description: message.data.description
-                                         , hiddenRows: [ "description"
-                                                       , "location"
-                                                       , "loadInSidebar"
-                                                       , "keyword" ]
-                                         }, window.top);
-      }
-      else {
-        PlacesUIUtils.showBookmarkDialog({ action: "edit"
-                                         , type: "bookmark"
-                                         , itemId: itemId
-                                         }, window.top);
-      }
+      window.top.PlacesCommandHook.bookmarkLink(PlacesUtils.bookmarksMenuFolderId,
+                                                uri.spec,
+                                                message.data.title,
+                                                message.data.description)
+                                  .catch(Components.utils.reportError);
     };
     mm.addMessageListener("ContextMenu:BookmarkFrame:Result", onMessage);
 
@@ -1583,7 +1580,7 @@ nsContextMenu.prototype = {
   },
 
   printFrame: function CM_printFrame() {
-    PrintUtils.print(this.target.ownerDocument.defaultView);
+    PrintUtils.printWindow(this.frameOuterWindowID, this.browser);
   },
 
   switchPageDirection: function CM_switchPageDirection() {

@@ -11,12 +11,18 @@
 
 using namespace js;
 
+static void
+ReportUnwrapDenied(JSContext *cx)
+{
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNWRAP_DENIED);
+}
+
 template <class Base>
 bool
 SecurityWrapper<Base>::enter(JSContext* cx, HandleObject wrapper, HandleId id,
                              Wrapper::Action act, bool* bp) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNWRAP_DENIED);
+    ReportUnwrapDenied(cx);
     *bp = false;
     return false;
 }
@@ -26,16 +32,16 @@ bool
 SecurityWrapper<Base>::nativeCall(JSContext* cx, IsAcceptableThis test, NativeImpl impl,
                                   const CallArgs& args) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNWRAP_DENIED);
+    ReportUnwrapDenied(cx);
     return false;
 }
 
 template <class Base>
 bool
-SecurityWrapper<Base>::setPrototype(JSContext *cx, HandleObject wrapper, HandleObject proto,
-                                    ObjectOpResult &result) const
+SecurityWrapper<Base>::setPrototype(JSContext* cx, HandleObject wrapper, HandleObject proto,
+                                    ObjectOpResult& result) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNWRAP_DENIED);
+    ReportUnwrapDenied(cx);
     return false;
 }
 
@@ -44,14 +50,14 @@ bool
 SecurityWrapper<Base>::setImmutablePrototype(JSContext* cx, HandleObject wrapper,
                                              bool* succeeded) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNWRAP_DENIED);
+    ReportUnwrapDenied(cx);
     return false;
 }
 
 template <class Base>
 bool
-SecurityWrapper<Base>::preventExtensions(JSContext *cx, HandleObject wrapper,
-                                         ObjectOpResult &result) const
+SecurityWrapper<Base>::preventExtensions(JSContext* cx, HandleObject wrapper,
+                                         ObjectOpResult& result) const
 {
     // Just like BaseProxyHandler, SecurityWrappers claim by default to always
     // be extensible, so as not to leak information about the state of the
@@ -81,9 +87,20 @@ SecurityWrapper<Base>::defaultValue(JSContext* cx, HandleObject wrapper,
 
 template <class Base>
 bool
-SecurityWrapper<Base>::objectClassIs(HandleObject obj, ESClassValue classValue, JSContext* cx) const
+SecurityWrapper<Base>::getBuiltinClass(JSContext* cx, HandleObject wrapper,
+                                       ESClassValue* classValue) const
 {
-    return false;
+    *classValue = ESClass_Other;
+    return true;
+}
+
+template <class Base>
+bool
+SecurityWrapper<Base>::isArray(JSContext* cx, HandleObject obj, JS::IsArrayAnswer* answer) const
+{
+    // This should ReportUnwrapDenied(cx), but bug 849730 disagrees.  :-(
+    *answer = JS::IsArrayAnswer::NotArray;
+    return true;
 }
 
 template <class Base>
@@ -129,7 +146,7 @@ bool
 SecurityWrapper<Base>::watch(JSContext* cx, HandleObject proxy,
                              HandleId id, HandleObject callable) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNWRAP_DENIED);
+    ReportUnwrapDenied(cx);
     return false;
 }
 
@@ -138,7 +155,7 @@ bool
 SecurityWrapper<Base>::unwatch(JSContext* cx, HandleObject proxy,
                                HandleId id) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNWRAP_DENIED);
+    ReportUnwrapDenied(cx);
     return false;
 }
 

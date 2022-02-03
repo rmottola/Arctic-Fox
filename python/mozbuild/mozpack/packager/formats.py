@@ -286,7 +286,7 @@ class OmniJarFormatter(JarFormatter):
                      path[1] in ['pref', 'preferences'])
         return path[0] in [
             'modules',
-            'gecko.js',
+            'greprefs.js',
             'hyphenation',
             'update.locale',
         ] or path[0] in STARTUP_CACHE_PATHS

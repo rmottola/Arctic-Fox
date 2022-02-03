@@ -140,6 +140,7 @@ ifdef MOZ_FOLD_LIBS
 DEFAULT_GMAKE_FLAGS += SQLITE_LIB_NAME=nss3
 else
 DEFAULT_GMAKE_FLAGS += SQLITE_LIB_NAME=mozsqlite3
+DEFAULT_GMAKE_FLAGS += SQLITE_LIB_DIR=$(ABS_DIST)/../config/external/sqlite
 endif # MOZ_FOLD_LIBS
 DEFAULT_GMAKE_FLAGS += SQLITE_INCLUDE_DIR=$(ABS_DIST)/include
 endif
@@ -270,6 +271,10 @@ DEFAULT_GMAKE_FLAGS += MAKE_OBJDIR='$$(INSTALL) -D $$(OBJDIR)'
 # it, creating race conditions. See bug #836220
 DEFAULT_GMAKE_FLAGS += TARGETS='$$(LIBRARY) $$(SHARED_LIBRARY) $$(PROGRAM)'
 
+ifdef MOZ_FOLD_LIBS_FLAGS
+DEFAULT_GMAKE_FLAGS += XCFLAGS='$(MOZ_FOLD_LIBS_FLAGS)'
+endif
+
 ifndef WARNINGS_AS_ERRORS
 DEFAULT_GMAKE_FLAGS += NSS_ENABLE_WERROR=0
 endif
@@ -372,6 +377,11 @@ GARBAGE += \
 endif # GCC_USE_GNU_LD
 endif # WINNT
 
+IMPORT_LIB_FILES = $(IMPORT_LIBRARY)
+IMPORT_LIB_DEST ?= $(DIST)/lib
+IMPORT_LIB_TARGET = target
+INSTALL_TARGETS += IMPORT_LIB
+
 endif # MOZ_FOLD_LIBS
 
 include $(topsrcdir)/config/rules.mk
@@ -383,7 +393,7 @@ ifdef MOZ_CRT
 # OS_LIBS comes from having mozcrt as a dependency in moz.build.
 DLLFLAGS := $(OS_LIBS)
 else
-DLLFLAGS := -LIBPATH:$(ABS_DIST)/lib -DEFAULTLIB:mozglue
+DLLFLAGS := -LIBPATH:$(ABS_DIST)/../mozglue/build -DEFAULTLIB:mozglue
 endif
 export DLLFLAGS
 endif

@@ -56,7 +56,7 @@ ReportIsNotFunction(JSContext* cx, HandleValue v, int numToSkip,
 
 /* See ReportIsNotFunction comment for the meaning of numToSkip. */
 extern JSObject*
-ValueToCallable(JSContext* cx, HandleValue v, int numToSkip,
+ValueToCallable(JSContext* cx, HandleValue v, int numToSkip = -1,
                 MaybeConstruct construct = NO_CONSTRUCT);
 
 /*
@@ -80,7 +80,7 @@ Invoke(JSContext* cx, const Value& thisv, const Value& fval, unsigned argc, cons
  * getter/setter calls.
  */
 extern bool
-InvokeGetter(JSContext* cx, JSObject* obj, Value fval, MutableHandleValue rval);
+InvokeGetter(JSContext* cx, const Value& thisv, Value fval, MutableHandleValue rval);
 
 extern bool
 InvokeSetter(JSContext* cx, const Value& thisv, Value fval, HandleValue v);
@@ -341,7 +341,7 @@ class MOZ_STACK_CLASS TryNoteIter
 };
 
 bool
-HandleClosingGeneratorReturn(JSContext *cx, AbstractFramePtr frame, bool ok);
+HandleClosingGeneratorReturn(JSContext* cx, AbstractFramePtr frame, bool ok);
 
 /************************************************************************/
 
@@ -383,6 +383,10 @@ SetObjectElement(JSContext* cx, HandleObject obj, HandleValue index, HandleValue
 bool
 SetObjectElement(JSContext* cx, HandleObject obj, HandleValue index, HandleValue value,
                  bool strict, HandleScript script, jsbytecode* pc);
+
+bool
+SetObjectElement(JSContext* cx, HandleObject obj, HandleValue index, HandleValue value,
+                 HandleValue receiver, bool strict, HandleScript script, jsbytecode* pc);
 
 bool
 InitElementArray(JSContext* cx, jsbytecode* pc,
@@ -441,12 +445,12 @@ bool
 InitGetterSetterOperation(JSContext* cx, jsbytecode* pc, HandleObject obj, HandleId id,
                           HandleObject val);
 
-unsigned
-GetInitDataPropAttrs(JSOp op);
-
 bool
 InitGetterSetterOperation(JSContext* cx, jsbytecode* pc, HandleObject obj, HandlePropertyName name,
                           HandleObject val);
+
+unsigned
+GetInitDataPropAttrs(JSOp op);
 
 bool
 EnterWithOperation(JSContext* cx, AbstractFramePtr frame, HandleValue val, HandleObject staticWith);

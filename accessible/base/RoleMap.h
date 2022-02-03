@@ -754,7 +754,7 @@ ROLE(TERMINAL,
 
 ROLE(TEXT_CONTAINER,
      "text container",
-     ATK_ROLE_TEXT,
+     ATK_ROLE_SECTION,
      NSAccessibilityGroupRole,
      USE_ROLE_STRING,
      IA2_ROLE_TEXT_FRAME,
@@ -1280,30 +1280,6 @@ ROLE(MATHML_ERROR,
      IA2_ROLE_UNKNOWN,
      eNoNameRule)
 
-ROLE(MATHML_SEMANTICS,
-     "mathml semantics",
-     ATK_ROLE_UNKNOWN,
-     NSAccessibilityUnknownRole,
-     0,
-     IA2_ROLE_UNKNOWN,
-     eNoNameRule)
-
-ROLE(MATHML_ANNOTATION,
-     "mathml annotation",
-     ATK_ROLE_UNKNOWN,
-     NSAccessibilityUnknownRole,
-     0,
-     IA2_ROLE_UNKNOWN,
-     eNoNameRule)
-
-ROLE(MATHML_XML_ANNOTATION,
-     "mathml xml annotation",
-     ATK_ROLE_UNKNOWN,
-     NSAccessibilityUnknownRole,
-     0,
-     IA2_ROLE_UNKNOWN,
-     eNoNameRule)
-
 ROLE(MATHML_STACK,
      "mathml stack",
      ATK_ROLE_UNKNOWN,
@@ -1359,3 +1335,20 @@ ROLE(MATHML_STACK_LINE,
      0,
      IA2_ROLE_UNKNOWN,
      eNoNameRule)
+
+ROLE(RADIO_GROUP,
+     "grouping",
+     ATK_ROLE_PANEL,
+     NSAccessibilityRadioGroupRole,
+     ROLE_SYSTEM_GROUPING,
+     ROLE_SYSTEM_GROUPING,
+     eNoNameRule)
+
+ROLE(TEXT,
+     "text",
+     ATK_ROLE_STATIC,
+     NSAccessibilityGroupRole,
+     USE_ROLE_STRING,
+     IA2_ROLE_TEXT_FRAME,
+     eNameFromSubtreeIfReqRule)
+

@@ -1468,12 +1468,8 @@ nsXMLHttpRequest::GetLoadGroup() const
 nsresult
 nsXMLHttpRequest::CreateReadystatechangeEvent(nsIDOMEvent** aDOMEvent)
 {
-  nsresult rv = EventDispatcher::CreateEvent(this, nullptr, nullptr,
-                                             NS_LITERAL_STRING("Events"),
-                                             aDOMEvent);
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
+  nsRefPtr<Event> event = NS_NewDOMEvent(this, nullptr, nullptr);
+  event.forget(aDOMEvent);
 
   (*aDOMEvent)->InitEvent(NS_LITERAL_STRING(READYSTATE_STR),
                           false, false);

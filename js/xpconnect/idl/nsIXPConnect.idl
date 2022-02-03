@@ -266,7 +266,7 @@ interface nsIXPCFunctionThisTranslator : nsISupports
     { 0xbd, 0xd6, 0x0, 0x0, 0x64, 0x65, 0x73, 0x74 } }
 %}
 
-[noscript, uuid(8bc1230e-036b-4749-8763-768ed65df143)]
+[noscript, uuid(f339ea52-10ce-4103-b1f2-fd9659040e3c)]
 interface nsIXPConnect : nsISupports
 {
 %{ C++
@@ -458,7 +458,7 @@ interface nsIXPConnect : nsISupports
     setFunctionThisTranslator(in nsIIDRef aIID,
                               in nsIXPCFunctionThisTranslator aTranslator);
 
-    nsIXPConnectJSObjectHolder
+    JSObjectPtr
     getWrappedNativePrototype(in JSContextPtr aJSContext,
                               in JSObjectPtr  aScope,
                               in nsIClassInfo aClassInfo);
@@ -474,8 +474,7 @@ interface nsIXPConnect : nsISupports
      * @param principal The principal (or NULL to use the null principal)
      *                  to use when evaluating code in this sandbox.
      */
-    [noscript] nsIXPConnectJSObjectHolder createSandbox(in JSContextPtr cx,
-                                                        in nsIPrincipal principal);
+    [noscript] JSObjectPtr createSandbox(in JSContextPtr cx, in nsIPrincipal principal);
 
     /**
      * Evaluate script in a sandbox, completely isolated from all
@@ -487,6 +486,8 @@ interface nsIXPConnect : nsISupports
      *           the script. The actual evaluation will happen on a new
      *           temporary context.
      * @param sandbox The sandbox object to evaluate the script in.
+     * @param version The JavaScript version to use for evaluating the script.
+     *                Should be a valid JSVersion from jspubtd.h.
      * @return The result of the evaluation as a jsval. If the caller
      *         intends to use the return value from this call the caller
      *         is responsible for rooting the jsval before making a call
@@ -494,7 +495,8 @@ interface nsIXPConnect : nsISupports
      */
     [noscript] jsval evalInSandboxObject(in AString source, in string filename,
                                          in JSContextPtr cx,
-                                         in JSObjectPtr sandbox);
+                                         in JSObjectPtr sandbox,
+                                         in int32_t version);
 
     /**
      * Whether or not XPConnect should report all JS exceptions when returning

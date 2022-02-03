@@ -3028,9 +3028,7 @@ CSSParserImpl::ParseCharsetRule(RuleAppendFunc aAppendFunc,
     return false;
   }
 
-  nsRefPtr<css::CharsetRule> rule = new css::CharsetRule(charset,
-                                                         linenum, colnum);
-  (*aAppendFunc)(rule, aData);
+  // It's intentional that we don't create a rule object for @charset rules.
 
   return true;
 }
@@ -11291,10 +11289,14 @@ CSSParserImpl::ParseBorderImage()
   nsCSSValue imageSourceValue;
   while (!CheckEndProperty()) {
     // <border-image-source>
-    if (!foundSource && ParseVariant(imageSourceValue, VARIANT_IMAGE, nullptr)) {
-      AppendValue(eCSSProperty_border_image_source, imageSourceValue);
-      foundSource = true;
-      continue;
+    if (!foundSource) {
+      nsAutoCSSParserInputStateRestorer stateRestorer(this);
+      if (ParseVariant(imageSourceValue, VARIANT_IMAGE, nullptr)) {
+        AppendValue(eCSSProperty_border_image_source, imageSourceValue);
+        foundSource = true;
+        stateRestorer.DoNotRestore();
+        continue;
+      }
     }
 
     // <border-image-slice>

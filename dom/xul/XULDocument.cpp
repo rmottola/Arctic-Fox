@@ -942,8 +942,6 @@ XULDocument::AttributeChanged(nsIDocument* aDocument,
         AddElementToRefMap(aElement);
     }
 
-    nsresult rv;
-
     // Synchronize broadcast listeners
     if (mBroadcasterMap &&
         CanBroadcast(aNameSpaceID, aAttribute)) {
@@ -1009,8 +1007,10 @@ XULDocument::AttributeChanged(nsIDocument* aDocument,
     if (!persist.IsEmpty()) {
         // XXXldb This should check that it's a token, not just a substring.
         if (persist.Find(nsDependentAtomString(aAttribute)) >= 0) {
-            rv = Persist(aElement, kNameSpaceID_None, aAttribute);
-            if (NS_FAILED(rv)) return;
+            nsContentUtils::AddScriptRunner(NS_NewRunnableMethodWithArgs
+              <nsIContent*, int32_t, nsIAtom*>
+              (this, &XULDocument::DoPersist, aElement, kNameSpaceID_None,
+               aAttribute));
         }
     }
 }
@@ -3269,7 +3269,8 @@ XULDocument::LoadScript(nsXULPrototypeScript* aScriptProto, bool* aBlock)
                             this,
                             static_cast<nsIDocument*>(this),
                             aScriptProto->mSrcURI,
-                            NS_LITERAL_STRING("application/x-javascript"));
+                            NS_LITERAL_STRING("application/x-javascript"),
+                            false);
     if (NS_FAILED(rv)) {
       *aBlock = false;
       return rv;
@@ -3735,11 +3736,9 @@ XULDocument::CreateTemplateBuilder(nsIContent* aElement)
                                           getter_AddRefs(bodyContent));
 
         if (! bodyContent) {
-            nsresult rv =
+            bodyContent =
                 document->CreateElem(nsDependentAtomString(nsGkAtoms::treechildren),
-                                     nullptr, kNameSpaceID_XUL,
-                                     getter_AddRefs(bodyContent));
-            NS_ENSURE_SUCCESS(rv, rv);
+                                     nullptr, kNameSpaceID_XUL);
 
             aElement->AppendChildTo(bodyContent, false);
         }
@@ -4398,13 +4397,11 @@ XULDocument::CachedChromeStreamListener::CachedChromeStreamListener(XULDocument*
     : mDocument(aDocument),
       mProtoLoaded(aProtoLoaded)
 {
-    NS_ADDREF(mDocument);
 }
 
 
 XULDocument::CachedChromeStreamListener::~CachedChromeStreamListener()
 {
-    NS_RELEASE(mDocument);
 }
 
 

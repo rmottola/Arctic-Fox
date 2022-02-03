@@ -167,6 +167,11 @@ public:
   nsresult internalClose(sqlite3 *aDBConn);
 
   /**
+   * Shuts down the passed-in async thread.
+   */
+  void shutdownAsyncThread(nsIThread *aAsyncThread);
+
+  /**
    * Obtains the filename of the connection.  Useful for logging.
    */
   nsCString getFilename();
@@ -310,6 +315,12 @@ private:
    * sharedAsyncExecutionMutex.
    */
   bool mAsyncExecutionThreadShuttingDown;
+
+  /**
+   * Tracks whether the async thread has been initialized and Shutdown() has
+   * not yet been invoked on it.
+   */
+  DebugOnly<bool> mAsyncExecutionThreadIsAlive;
 
   /**
    * Set to true just prior to calling sqlite3_close on the

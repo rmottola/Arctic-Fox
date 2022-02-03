@@ -460,13 +460,6 @@ HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame, ResumeFromEx
             uint32_t retval = ExceptionHandlerBailout(cx, frame, rfe, propagateInfo, overrecursed);
             if (retval == BAILOUT_RETURN_OK)
                 return;
-
-            // If bailout failed (e.g., due to overrecursion), clean up any
-            // Debugger.Frame instances here. Normally this should happen
-            // inside the debug epilogue, but due to bailout failure, we
-            // cannot honor any Debugger hooks.
-            if (rematFrame)
-                Debugger::handleUnrecoverableIonBailoutError(cx, rematFrame);
         }
 
         MOZ_ASSERT_IF(rematFrame, !Debugger::inFrameMaps(rematFrame));
@@ -1401,7 +1394,6 @@ MarkJitExitFrame(JSTracer* trc, const JitFrameIterator& frame)
         TraceRoot(trc, oolproxy->vp(), "ion-ool-proxy-vp");
         TraceRoot(trc, oolproxy->id(), "ion-ool-proxy-id");
         TraceRoot(trc, oolproxy->proxy(), "ion-ool-proxy-proxy");
-        TraceRoot(trc, oolproxy->receiver(), "ion-ool-proxy-receiver");
         return;
     }
 
@@ -3024,6 +3016,35 @@ JitProfilingFrameIterator::JitProfilingFrameIterator(void* exitFrame)
         fp_ = ((uint8_t*) stubFrame->reverseSavedFramePtr())
                 + jit::BaselineFrame::FramePointerOffset;
         type_ = JitFrame_BaselineJS;
+        return;
+    }
+
+    if (prevType == JitFrame_Unwound_Rectifier) {
+        // Unwound rectifier exit frames still keep their 'JS' format (with
+        // the target function and actual-args included in the frame and not
+        // counted in the frame size).
+        RectifierFrameLayout* rectFrame =
+            GetPreviousRawFrame<JitFrameLayout, RectifierFrameLayout*>((JitFrameLayout*) frame);
+
+        MOZ_ASSERT(rectFrame->prevType() == JitFrame_BaselineStub ||
+                   rectFrame->prevType() == JitFrame_IonJS);
+
+        if (rectFrame->prevType() == JitFrame_BaselineStub) {
+            // Unwind past stub frame.
+            BaselineStubFrameLayout* stubFrame =
+                GetPreviousRawFrame<RectifierFrameLayout, BaselineStubFrameLayout*>(rectFrame);
+            MOZ_ASSERT(stubFrame->prevType() == JitFrame_BaselineJS);
+            returnAddressToFp_ = stubFrame->returnAddress();
+            fp_ = ((uint8_t*) stubFrame->reverseSavedFramePtr())
+                    + jit::BaselineFrame::FramePointerOffset;
+            type_ = JitFrame_BaselineJS;
+            return;
+        }
+
+        // else, prior frame was ion frame.
+        returnAddressToFp_ = rectFrame->returnAddress();
+        fp_ = GetPreviousRawFrame<RectifierFrameLayout, uint8_t*>(rectFrame);
+        type_ = JitFrame_IonJS;
         return;
     }
 

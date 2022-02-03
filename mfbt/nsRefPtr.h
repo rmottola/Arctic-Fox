@@ -30,9 +30,7 @@
 class nsCOMPtr_helper;
 
 namespace mozilla {
-namespace dom {
 template<class T> class OwningNonNull;
-} // namespace dom
 } // namespace mozilla
 
 template <class T>
@@ -43,7 +41,7 @@ private:
   assign_with_AddRef(T* aRawPtr)
   {
     if (aRawPtr) {
-      aRawPtr->AddRef();
+      AddRefTraits<T>::AddRef(aRawPtr);
     }
     assign_assuming_AddRef(aRawPtr);
   }
@@ -61,7 +59,7 @@ private:
     T* oldPtr = mRawPtr;
     mRawPtr = aNewPtr;
     if (oldPtr) {
-      oldPtr->Release();
+      AddRefTraits<T>::Release(oldPtr);
     }
   }
 
@@ -74,7 +72,7 @@ public:
   ~nsRefPtr()
   {
     if (mRawPtr) {
-      mRawPtr->Release();
+      AddRefTraits<T>::Release(mRawPtr);
     }
   }
 
@@ -91,7 +89,7 @@ public:
     // copy-constructor
   {
     if (mRawPtr) {
-      mRawPtr->AddRef();
+      AddRefTraits<T>::AddRef(mRawPtr);
     }
   }
 
@@ -107,7 +105,7 @@ public:
     : mRawPtr(aRawPtr)
   {
     if (mRawPtr) {
-      mRawPtr->AddRef();
+      AddRefTraits<T>::AddRef(mRawPtr);
     }
   }
 
@@ -126,6 +124,16 @@ public:
   }
 
   template <typename I>
+  MOZ_IMPLICIT nsRefPtr(const nsRefPtr<I>& aSmartPtr)
+    : mRawPtr(aSmartPtr.get())
+    // copy-construct from a smart pointer with a related pointer type
+  {
+    if (mRawPtr) {
+      AddRefTraits<T>::AddRef(mRawPtr);
+    }
+  }
+
+  template <typename I>
   MOZ_IMPLICIT nsRefPtr(nsRefPtr<I>&& aSmartPtr)
     : mRawPtr(aSmartPtr.forget().take())
     // construct from |Move(nsRefPtr<SomeSubclassOfT>)|.
@@ -136,7 +144,7 @@ public:
 
   // Defined in OwningNonNull.h
   template<class U>
-  MOZ_IMPLICIT nsRefPtr(const mozilla::dom::OwningNonNull<U>& aOther);
+  MOZ_IMPLICIT nsRefPtr(const mozilla::OwningNonNull<U>& aOther);
 
   // Assignment operators
 
@@ -145,6 +153,15 @@ public:
   // copy assignment operator
   {
     assign_with_AddRef(aRhs.mRawPtr);
+    return *this;
+  }
+
+  template <typename I>
+  nsRefPtr<T>&
+  operator=(const nsRefPtr<I>& aRhs)
+  // assign from an nsRefPtr of a related pointer type
+  {
+    assign_with_AddRef(aRhs.get());
     return *this;
   }
 
@@ -187,7 +204,7 @@ public:
   // Defined in OwningNonNull.h
   template<class U>
   nsRefPtr<T>&
-  operator=(const mozilla::dom::OwningNonNull<U>& aOther);
+  operator=(const mozilla::OwningNonNull<U>& aOther);
 
   // Other pointer operators
 
@@ -279,19 +296,31 @@ public:
     return get();
   }
 
-  // This operator is needed for gcc <= 4.0.* and for Sun Studio; it
-  // causes internal compiler errors for some MSVC versions.  (It's not
-  // clear to me whether it should be needed.)
-#ifndef _MSC_VER
-  template <class U, class V>
-  U&
-  operator->*(U V::* aMember)
+  template <typename R, typename... Args>
+  class Proxy
+  {
+    typedef R (T::*member_function)(Args...);
+    T* mRawPtr;
+    member_function mFunction;
+  public:
+    Proxy(T* aRawPtr, member_function aFunction)
+      : mRawPtr(aRawPtr),
+        mFunction(aFunction)
+    {
+    }
+    R operator()(Args... aArgs)
+    {
+      return ((*mRawPtr).*mFunction)(mozilla::Forward<Args>(aArgs)...);
+    }
+  };
+
+  template <typename R, typename... Args>
+  Proxy<R, Args...> operator->*(R (T::*aFptr)(Args...)) const
   {
     MOZ_ASSERT(mRawPtr != 0,
                "You can't dereference a NULL nsRefPtr with operator->*().");
-    return get()->*aMember;
+    return Proxy<R, Args...>(get(), aFptr);
   }
-#endif
 
   nsRefPtr<T>*
   get_address()
@@ -324,6 +353,35 @@ public:
     assign_assuming_AddRef(0);
     return reinterpret_cast<T**>(&mRawPtr);
   }
+private:
+  // This helper class makes |nsRefPtr<const T>| possible by casting away
+  // the constness from the pointer when calling AddRef() and Release().
+  // This is necessary because AddRef() and Release() implementations can't
+  // generally expected to be const themselves (without heavy use of |mutable|
+  // and |const_cast| in their own implementations).
+  // This should be sound because while |nsRefPtr<const T>| provides a const
+  // view of an object, the object itself should be const (it would have to be
+  // allocated as |new const T| or similar to itself be const).
+  template<class U>
+  struct AddRefTraits
+  {
+    static void AddRef(U* aPtr) {
+      aPtr->AddRef();
+    }
+    static void Release(U* aPtr) {
+      aPtr->Release();
+    }
+  };
+  template<class U>
+  struct AddRefTraits<const U>
+  {
+    static void AddRef(const U* aPtr) {
+      const_cast<U*>(aPtr)->AddRef();
+    }
+    static void Release(const U* aPtr) {
+      const_cast<U*>(aPtr)->Release();
+    }
+  };
 };
 
 class nsCycleCollectionTraversalCallback;

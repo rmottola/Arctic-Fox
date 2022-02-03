@@ -13,6 +13,7 @@
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/FloatingPoint.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/PodOperations.h"
 #include "mozilla/UniquePtr.h"
 
@@ -48,6 +49,8 @@ using namespace js;
 using namespace js::gc;
 using namespace js::frontend;
 
+using mozilla::Maybe;
+using mozilla::Some;
 using mozilla::DebugOnly;
 using mozilla::NumberIsInt32;
 using mozilla::PodCopy;
@@ -335,12 +338,10 @@ BytecodeEmitter::emitCall(JSOp op, uint16_t argc, ParseNode* pn)
 }
 
 bool
-BytecodeEmitter::emitDupAt(unsigned slot)
+BytecodeEmitter::emitDupAt(unsigned slotFromTop)
 {
-    MOZ_ASSERT(slot < unsigned(stackDepth));
+    MOZ_ASSERT(slotFromTop < unsigned(stackDepth));
 
-    // The slot's position on the operand stack, measured from the top.
-    unsigned slotFromTop = stackDepth - 1 - slot;
     if (slotFromTop >= JS_BIT(24)) {
         reportError(nullptr, JSMSG_TOO_MANY_LOCALS);
         return false;
@@ -1504,57 +1505,65 @@ BytecodeEmitter::tryConvertFreeName(ParseNode* pn)
                 return true;
         }
 
-        size_t hops = 0;
+        // Walk the static scope chain and look for an aliased binding with
+        // the name pn->pn_atom.
+        uint32_t hops = 0;
+        Maybe<uint32_t> slot;
         FunctionBox* funbox = sc->asFunctionBox();
-        if (funbox->hasExtensibleScope())
-            return false;
-        if (funbox->function()->isNamedLambda() && funbox->function()->atom() == pn->pn_atom)
-            return false;
-        if (funbox->isHeavyweight()) {
-            hops++;
-            if (funbox->function()->isNamedLambda())
-                hops++;
-        }
-        if (script->directlyInsideEval())
-            return false;
-        RootedObject outerScope(cx, script->enclosingStaticScope());
-        for (StaticScopeIter<CanGC> ssi(cx, outerScope); !ssi.done(); ssi++) {
-            if (ssi.type() != StaticScopeIter<CanGC>::Function) {
-                if (ssi.type() == StaticScopeIter<CanGC>::Block) {
-                    // Use generic ops if a catch block is encountered.
-                    return false;
-                }
-                if (ssi.hasSyntacticDynamicScopeObject())
-                    hops++;
+        PropertyName* name = pn->pn_atom->asPropertyName();
+        for (StaticScopeIter<NoGC> ssi(funbox->staticScope()); !ssi.done(); ssi++) {
+            // Don't optimize names through eval.
+            if (ssi.type() == StaticScopeIter<NoGC>::Eval)
+                return false;
+
+            if (!ssi.hasSyntacticDynamicScopeObject())
                 continue;
-            }
-            RootedScript script(cx, ssi.funScript());
-            if (script->functionNonDelazifying()->atom() == pn->pn_atom)
-                return false;
-            if (ssi.hasSyntacticDynamicScopeObject()) {
-                uint32_t slot;
-                if (lookupAliasedName(script, pn->pn_atom->asPropertyName(), &slot, pn)) {
-                    JSOp op;
-                    switch (pn->getOp()) {
-                      case JSOP_GETNAME: op = JSOP_GETALIASEDVAR; break;
-                      case JSOP_SETNAME: op = JSOP_SETALIASEDVAR; break;
-                      default: return false;
+
+            // Look up for name in function and block scopes.
+            if (ssi.type() == StaticScopeIter<NoGC>::Function) {
+                RootedScript funScript(cx, ssi.funScript());
+                if (funScript->funHasExtensibleScope() || ssi.fun().atom() == pn->pn_atom)
+                    return false;
+
+                // Skip the current function, since we're trying to convert a
+                // free name.
+                if (script != funScript) {
+                    uint32_t slot_;
+                    if (lookupAliasedName(funScript, name, &slot_, pn)) {
+                        slot = Some(slot_);
+                        break;
                     }
-
-                    pn->setOp(op);
-                    MOZ_ALWAYS_TRUE(pn->pn_scopecoord.set(parser->tokenStream, hops, slot));
-                    return true;
                 }
-                hops++;
+            } else if (ssi.type() == StaticScopeIter<NoGC>::Block) {
+                RootedShape shape(cx, ssi.block().lookupAliasedName(name));
+                if (shape) {
+                    // Don't optimize setting a 'const' binding. Let the slow
+                    // path do the error checking.
+                    if (!shape->writable() && pn->getOp() == JSOP_SETNAME)
+                        return false;
+                    slot = Some(shape->slot());
+                    pn->pn_dflags |= PND_LEXICAL;
+                    break;
+                }
+            } else {
+                MOZ_ASSERT(ssi.type() != StaticScopeIter<NoGC>::With);
             }
 
-            // If this walk up and check for directlyInsideEval is ever removed,
-            // we'll need to adjust CompileLazyFunction to better communicate
-            // whether we're inside eval to the BytecodeEmitter.  For now, this
-            // walk is why CompileLazyFunction can claim that it's never inside
-            // eval.
-            if (script->funHasExtensibleScope() || script->directlyInsideEval())
-                return false;
+            hops++;
+        }
+
+        // If we found a scope binding name, convert the name op to an aliased
+        // var op.
+        if (slot.isSome()) {
+            JSOp op;
+            switch (pn->getOp()) {
+              case JSOP_GETNAME: op = JSOP_GETALIASEDVAR; break;
+              case JSOP_SETNAME: op = JSOP_SETALIASEDVAR; break;
+              default: return false;
+            }
+            pn->setOp(op);
+            MOZ_ALWAYS_TRUE(pn->pn_scopecoord.set(parser->tokenStream, hops, *slot));
+            return true;
         }
     }
 
@@ -2785,7 +2794,7 @@ BytecodeEmitter::emitSuperElemOperands(ParseNode* pn, SuperElemOptions opts)
             return false;
 
         // We need another |this| on top, also
-        if (!emitDupAt(this->stackDepth - 1 - 1))
+        if (!emitDupAt(1))
             return false;
     }
 
@@ -2896,11 +2905,11 @@ BytecodeEmitter::emitSuperElemIncDec(ParseNode* pn)
 
     // There's no such thing as JSOP_DUP3, so we have to be creative.
     // Note that pushing things again is no fewer JSOps.
-    if (!emitDupAt(this->stackDepth - 1 - 2))       // KEY THIS OBJ KEY
+    if (!emitDupAt(2))                              // KEY THIS OBJ KEY
         return false;
-    if (!emitDupAt(this->stackDepth - 1 - 2))       // KEY THIS OBJ KEY THIS
+    if (!emitDupAt(2))                              // KEY THIS OBJ KEY THIS
         return false;
-    if (!emitDupAt(this->stackDepth - 1 - 2))       // KEY THIS OBJ KEY THIS OBJ
+    if (!emitDupAt(2))                              // KEY THIS OBJ KEY THIS OBJ
         return false;
     if (!emitElemOpBase(JSOP_GETELEM_SUPER))        // KEY THIS OBJ V
         return false;
@@ -4464,11 +4473,11 @@ BytecodeEmitter::emitAssignment(ParseNode* lhs, JSOp op, ParseNode* rhs)
                 return false;
             break;
           case PNK_SUPERELEM:
-            if (!emitDupAt(this->stackDepth - 1 - 2))
+            if (!emitDupAt(2))
                 return false;
-            if (!emitDupAt(this->stackDepth - 1 - 2))
+            if (!emitDupAt(2))
                 return false;
-            if (!emitDupAt(this->stackDepth - 1 - 2))
+            if (!emitDupAt(2))
                 return false;
             if (!emitElemOpBase(JSOP_GETELEM_SUPER))
                 return false;
@@ -5374,7 +5383,7 @@ BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn, ptrdiff_t top)
         if (!emit1(JSOP_DUP))                             // ITER ITER
             return false;
     } else {
-        if (!emitDupAt(stackDepth - 1 - 2))          // ITER ARR I ITER
+        if (!emitDupAt(2))                                // ITER ARR I ITER
             return false;
     }
     if (!emitIteratorNext(forHead))                       // ... RESULT
@@ -5388,7 +5397,7 @@ BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn, ptrdiff_t top)
     if (!emitJump(JSOP_IFEQ, top - offset(), &beq))       // ... RESULT
         return false;
 
-    MOZ_ASSERT(stackDepth == loopDepth);
+    MOZ_ASSERT(this->stackDepth == loopDepth);
 
     // Let Ion know where the closing jump of this loop is.
     if (!setSrcNoteOffset(noteIndex, 0, beq - jmp))
@@ -5475,7 +5484,7 @@ BytecodeEmitter::emitForIn(ParseNode* pn, ptrdiff_t top)
         return false;
 
 #ifdef DEBUG
-    int loopDepth = stackDepth;
+    int loopDepth = this->stackDepth;
 #endif
 
     // Emit code to assign the enumeration value to the left hand side, but
@@ -5484,7 +5493,7 @@ BytecodeEmitter::emitForIn(ParseNode* pn, ptrdiff_t top)
         return false;
 
     /* The stack should be balanced around the assignment opcode sequence. */
-    MOZ_ASSERT(stackDepth == loopDepth);
+    MOZ_ASSERT(this->stackDepth == loopDepth);
 
     /* Emit code for the loop body. */
     if (!emitTree(forBody))
@@ -5568,7 +5577,7 @@ BytecodeEmitter::emitNormalFor(ParseNode* pn, ptrdiff_t top)
         if (!emitTree(init))
             return false;
         emittingForInit = false;
-        
+
         op = JSOP_POP;
     }
 
@@ -6724,7 +6733,7 @@ BytecodeEmitter::emitCallOrNew(ParseNode* pn)
 
         if (isNewOp) {
             // Repush the callee as new.target
-            if (!emitDupAt(this->stackDepth - 1 - (argc + 1)))
+            if (!emitDupAt(argc + 1))
                 return false;
         }
     } else {
@@ -6732,7 +6741,7 @@ BytecodeEmitter::emitCallOrNew(ParseNode* pn)
             return false;
 
         if (isNewOp) {
-            if (!emitDupAt(this->stackDepth - 1 - 2))
+            if (!emitDupAt(2))
                 return false;
         }
     }
@@ -7870,7 +7879,7 @@ BytecodeEmitter::emitTree(ParseNode* pn)
          */
         if (!emitTree(pn->pn_kid))
             return false;
-        if (!emitDupAt(arrayCompDepth))
+        if (!emitDupAt(this->stackDepth - 1 - arrayCompDepth))
             return false;
         if (!emit1(JSOP_ARRAYPUSH))
             return false;

@@ -31,10 +31,10 @@ class NativeObject;
 class ObjectGroup;
 namespace gc {
 struct ArenaHeader;
-}
+} // namespace gc
 namespace jit {
 class JitCode;
-}
+} // namespace jit
 
 static const size_t NON_INCREMENTAL_MARK_STACK_BASE_CAPACITY = 4096;
 static const size_t INCREMENTAL_MARK_STACK_BASE_CAPACITY = 32768;
@@ -426,7 +426,7 @@ ToMarkable(Cell* cell)
 MOZ_ALWAYS_INLINE bool
 IsNullTaggedPointer(void* p)
 {
-    return uintptr_t(p) < 32;
+    return uintptr_t(p) <= LargestTaggedNullCellPointer;
 }
 
 // HashKeyRef represents a reference to a HashMap key. This should normally

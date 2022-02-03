@@ -52,9 +52,9 @@ class MoveEmitterX86
     void completeCycle(const MoveOperand& to, MoveOp::Type type);
 
   public:
-    explicit MoveEmitterX86(MacroAssembler &masm);
+    explicit MoveEmitterX86(MacroAssembler& masm);
     ~MoveEmitterX86();
-    void emit(const MoveResolver &moves);
+    void emit(const MoveResolver& moves);
     void finish();
 
     void setScratchRegister(Register reg) {
@@ -68,7 +68,7 @@ class MoveEmitterX86
 
 typedef MoveEmitterX86 MoveEmitter;
 
-} // ion
-} // js
+} // namespace jit
+} // namespace js
 
 #endif /* jit_MoveEmitter_x86_shared_h */

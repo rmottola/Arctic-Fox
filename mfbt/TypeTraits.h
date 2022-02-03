@@ -637,7 +637,7 @@ public:
  * For obscure reasons, you can't use IsConvertible when the types being tested
  * are related through private inheritance, and you'll get a compile error if
  * you try.  Just don't do it!
- * 
+ *
  * Note - we need special handling for void, which ConvertibleTester doesn't
  * handle. The void handling here doesn't handle const/volatile void correctly,
  * which could be easily fixed if the need arises.

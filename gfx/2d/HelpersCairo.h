@@ -140,8 +140,7 @@ GfxFormatToCairoFormat(SurfaceFormat format)
     case SurfaceFormat::R5G6B5:
       return CAIRO_FORMAT_RGB16_565;
     default:
-      gfxWarning() << "Unknown image format";
-      MOZ_ASSERT(false, "Unknown image format");
+      gfxCriticalError() << "Unknown image format " << (int)format;
       return CAIRO_FORMAT_ARGB32;
   }
 }
@@ -159,8 +158,7 @@ GfxFormatToCairoContent(SurfaceFormat format)
     case SurfaceFormat::A8:
       return CAIRO_CONTENT_ALPHA;
     default:
-      gfxWarning() << "Unknown image format";
-      MOZ_ASSERT(false, "Unknown image format");
+      gfxCriticalError() << "Unknown image content format " << (int)format;
       return CAIRO_CONTENT_COLOR_ALPHA;
   }
 }
@@ -235,15 +233,7 @@ CairoFormatToGfxFormat(cairo_format_t format)
   }
 }
 
-static inline SurfaceFormat
-GfxFormatForCairoSurface(cairo_surface_t* surface)
-{
-  if (cairo_surface_get_type(surface) == CAIRO_SURFACE_TYPE_IMAGE) {
-    return CairoFormatToGfxFormat(cairo_image_surface_get_format(surface));
-  }
-
-  return CairoContentToGfxFormat(cairo_surface_get_content(surface));
-}
+SurfaceFormat GfxFormatForCairoSurface(cairo_surface_t* surface);
 
 static inline void
 GfxMatrixToCairoMatrix(const Matrix& mat, cairo_matrix_t& retval)

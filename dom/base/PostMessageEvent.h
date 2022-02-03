@@ -11,9 +11,11 @@
 #include "nsCOMPtr.h"
 #include "mozilla/nsRefPtr.h"
 #include "nsTArray.h"
+#include "nsThreadUtils.h"
 
 class nsGlobalWindow;
 class nsIPrincipal;
+class nsPIDOMWindow;
 
 namespace mozilla {
 namespace dom {

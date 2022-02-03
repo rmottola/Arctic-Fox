@@ -504,6 +504,9 @@ nsHTMLScrollFrame::ReflowScrolledFrame(ScrollReflowState* aState,
   kidReflowState.SetComputedBSize(computedBSize);
   kidReflowState.ComputedMinBSize() = computedMinBSize;
   kidReflowState.ComputedMaxBSize() = computedMaxBSize;
+  if (aState->mReflowState.IsBResize()) {
+    kidReflowState.SetBResize(true);
+  }
 
   // Temporarily set mHasHorizontalScrollbar/mHasVerticalScrollbar to
   // reflect our assumptions while we reflow the child.
@@ -2424,7 +2427,7 @@ ScrollFrameHelper::ScrollToImpl(nsPoint aPt, const nsRect& aRange, nsIAtom* aOri
   if (mOuter->ChildrenHavePerspective()) {
     // The overflow areas of descendants may depend on the scroll position,
     // so ensure they get updated.
-    mOuter->RecomputePerspectiveChildrenOverflow(mOuter->StyleContext(), nullptr);
+    mOuter->RecomputePerspectiveChildrenOverflow(mOuter, nullptr);
   }
 
   ScheduleSyntheticMouseMove();

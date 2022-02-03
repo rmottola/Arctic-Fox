@@ -407,28 +407,43 @@ Element::GetBindingURL(nsIDocument *aDocument, css::URLValue **aResult)
 JSObject*
 Element::WrapObject(JSContext *aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  JS::Rooted<JSObject*> obj(aCx, nsINode::WrapObject(aCx, aGivenProto));
+  JS::Rooted<JSObject*> givenProto(aCx, aGivenProto);
+  JS::Rooted<JSObject*> customProto(aCx);
+
+  if (!givenProto) {
+    // Custom element prototype swizzling.
+    CustomElementData* data = GetCustomElementData();
+    if (data) {
+      // If this is a registered custom element then fix the prototype.
+      nsDocument* document = static_cast<nsDocument*>(OwnerDoc());
+      document->GetCustomPrototype(NodeInfo()->NamespaceID(), data->mType, &customProto);
+      if (customProto &&
+          NodePrincipal()->SubsumesConsideringDomain(nsContentUtils::ObjectPrincipal(customProto))) {
+        // Just go ahead and create with the right proto up front.  Set
+        // customProto to null to flag that we don't need to do any post-facto
+        // proto fixups here.
+        givenProto = customProto;
+        customProto = nullptr;
+      }
+    }
+  }
+
+  JS::Rooted<JSObject*> obj(aCx, nsINode::WrapObject(aCx, givenProto));
   if (!obj) {
     return nullptr;
   }
 
-  // Custom element prototype swizzling.
-  CustomElementData* data = GetCustomElementData();
-  if (obj && data) {
-    // If this is a registered custom element then fix the prototype.
-    nsDocument* document = static_cast<nsDocument*>(OwnerDoc());
-    JS::Rooted<JSObject*> prototype(aCx);
-    document->GetCustomPrototype(NodeInfo()->NamespaceID(), data->mType, &prototype);
-    if (prototype) {
-      // We want to set the custom prototype in the compartment where it was
-      // registered. In the case that |obj| and |prototype| are in different
-      // compartments, this will set the prototype on the |obj|'s wrapper and
-      // thus only visible in the wrapper's compartment.
-      JSAutoCompartment ac(aCx, prototype);
-      if (!JS_WrapObject(aCx, &obj) || !JS_SetPrototype(aCx, obj, prototype)) {
-        dom::Throw(aCx, NS_ERROR_FAILURE);
-        return nullptr;
-      }
+  if (customProto) {
+    // We want to set the custom prototype in the compartment where it was
+    // registered. In the case that |obj| and |prototype| are in different
+    // compartments, this will set the prototype on the |obj|'s wrapper and
+    // thus only visible in the wrapper's compartment, since we know obj's
+    // principal does not subsume customProto's in this case.
+    JSAutoCompartment ac(aCx, customProto);
+    JS::Rooted<JSObject*> wrappedObj(aCx, obj);
+    if (!JS_WrapObject(aCx, &wrappedObj) ||
+        !JS_SetPrototype(aCx, wrappedObj, customProto)) {
+      return nullptr;
     }
   }
 
@@ -1045,10 +1060,12 @@ Element::CreateShadowRoot(ErrorResult& aError)
   return shadowRoot.forget();
 }
 
-NS_IMPL_CYCLE_COLLECTION(DestinationInsertionPointList, mParent, mDestinationPoints)
+NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(DestinationInsertionPointList, mParent,
+                                      mDestinationPoints)
 
 NS_INTERFACE_TABLE_HEAD(DestinationInsertionPointList)
-  NS_INTERFACE_TABLE(DestinationInsertionPointList, nsINodeList)
+  NS_WRAPPERCACHE_INTERFACE_TABLE_ENTRY
+  NS_INTERFACE_TABLE(DestinationInsertionPointList, nsINodeList, nsIDOMNodeList)
   NS_INTERFACE_TABLE_TO_MAP_SEGUE_CYCLE_COLLECTION(DestinationInsertionPointList)
 NS_INTERFACE_MAP_END
 
@@ -2835,9 +2852,9 @@ Element::CheckHandleEventForLinksPrecondition(EventChainVisitor& aVisitor,
 {
   if (aVisitor.mEventStatus == nsEventStatus_eConsumeNoDefault ||
       (!aVisitor.mEvent->mFlags.mIsTrusted &&
-       (aVisitor.mEvent->message != NS_MOUSE_CLICK) &&
-       (aVisitor.mEvent->message != NS_KEY_PRESS) &&
-       (aVisitor.mEvent->message != NS_UI_ACTIVATE)) ||
+       (aVisitor.mEvent->mMessage != NS_MOUSE_CLICK) &&
+       (aVisitor.mEvent->mMessage != NS_KEY_PRESS) &&
+       (aVisitor.mEvent->mMessage != NS_UI_ACTIVATE)) ||
       !aVisitor.mPresContext ||
       aVisitor.mEvent->mFlags.mMultipleActionsPrevented) {
     return false;
@@ -2852,7 +2869,7 @@ Element::PreHandleEventForLinks(EventChainPreVisitor& aVisitor)
 {
   // Optimisation: return early if this event doesn't interest us.
   // IMPORTANT: this switch and the switch below it must be kept in sync!
-  switch (aVisitor.mEvent->message) {
+  switch (aVisitor.mEvent->mMessage) {
   case NS_MOUSE_OVER:
   case NS_FOCUS_CONTENT:
   case NS_MOUSE_OUT:
@@ -2872,7 +2889,7 @@ Element::PreHandleEventForLinks(EventChainPreVisitor& aVisitor)
 
   // We do the status bar updates in PreHandleEvent so that the status bar gets
   // updated even if the event is consumed before we have a chance to set it.
-  switch (aVisitor.mEvent->message) {
+  switch (aVisitor.mEvent->mMessage) {
   // Set the status bar similarly for mouseover and focus
   case NS_MOUSE_OVER:
     aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
@@ -2913,7 +2930,7 @@ Element::PostHandleEventForLinks(EventChainPostVisitor& aVisitor)
 {
   // Optimisation: return early if this event doesn't interest us.
   // IMPORTANT: this switch and the switch below it must be kept in sync!
-  switch (aVisitor.mEvent->message) {
+  switch (aVisitor.mEvent->mMessage) {
   case NS_MOUSE_BUTTON_DOWN:
   case NS_MOUSE_CLICK:
   case NS_UI_ACTIVATE:
@@ -2931,7 +2948,7 @@ Element::PostHandleEventForLinks(EventChainPostVisitor& aVisitor)
 
   nsresult rv = NS_OK;
 
-  switch (aVisitor.mEvent->message) {
+  switch (aVisitor.mEvent->mMessage) {
   case NS_MOUSE_BUTTON_DOWN:
     {
       if (aVisitor.mEvent->AsMouseEvent()->button ==
@@ -2968,7 +2985,9 @@ Element::PostHandleEventForLinks(EventChainPostVisitor& aVisitor)
       if (shell) {
         // single-click
         nsEventStatus status = nsEventStatus_eIgnore;
-        InternalUIEvent actEvent(mouseEvent->mFlags.mIsTrusted, NS_UI_ACTIVATE);
+        // DOMActive event should be trusted since the activation is actually
+        // occurred even if the cause is an untrusted click event.
+        InternalUIEvent actEvent(true, NS_UI_ACTIVATE, mouseEvent);
         actEvent.detail = 1;
 
         rv = shell->HandleDOMEventWithTarget(this, &actEvent, &status);
@@ -2984,9 +3003,10 @@ Element::PostHandleEventForLinks(EventChainPostVisitor& aVisitor)
       if (aVisitor.mEvent->originalTarget == this) {
         nsAutoString target;
         GetLinkTarget(target);
+        const InternalUIEvent* activeEvent = aVisitor.mEvent->AsUIEvent();
+        MOZ_ASSERT(activeEvent);
         nsContentUtils::TriggerLink(this, aVisitor.mPresContext, absURI, target,
-                                    true, true,
-                                    aVisitor.mEvent->mFlags.mIsTrusted);
+                                    true, true, activeEvent->IsTrustable());
         aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
       }
     }
@@ -3239,14 +3259,22 @@ Element::MozRequestFullScreen(JSContext* aCx, JS::Handle<JS::Value> aOptions,
   // We need to check if options is convertible to a dict first before
   // trying to init fsOptions; otherwise Init() would throw, and we want to
   // silently ignore non-dictionary values
-  if (aCx && IsConvertibleToDictionary(aCx, aOptions)) {
-    if (!fsOptions.Init(aCx, aOptions)) {
+  if (aCx) {
+    bool convertible;
+    if (!IsConvertibleToDictionary(aCx, aOptions, &convertible)) {
       aError.Throw(NS_ERROR_FAILURE);
       return;
     }
 
-    if (fsOptions.mVrDisplay) {
-      request->mVRHMDDevice = fsOptions.mVrDisplay->GetHMD();
+    if (convertible) {
+      if (!fsOptions.Init(aCx, aOptions)) {
+        aError.Throw(NS_ERROR_FAILURE);
+        return;
+      }
+
+      if (fsOptions.mVrDisplay) {
+        request->mVRHMDDevice = fsOptions.mVrDisplay->GetHMD();
+      }
     }
   }
 

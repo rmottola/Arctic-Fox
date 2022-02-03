@@ -36,7 +36,7 @@ LIRGeneratorShared::use(MDefinition* mir, LUse policy)
 }
 
 template <size_t X> void
-LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X> *lir, MDefinition *mir,
+LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X>* lir, MDefinition* mir,
                            LDefinition::Policy policy)
 {
     LDefinition::Type type = LDefinition::TypeFrom(mir->type());
@@ -44,8 +44,8 @@ LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X> *lir,
 }
 
 template <size_t X> void
-LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X> *lir, MDefinition *mir,
-                           const LDefinition &def)
+LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X>* lir, MDefinition* mir,
+                           const LDefinition& def)
 {
     // Call instructions should use defineReturn.
     MOZ_ASSERT(!lir->isCall());
@@ -62,7 +62,7 @@ LIRGeneratorShared::define(details::LInstructionFixedDefsTempsHelper<1, X> *lir,
 }
 
 template <size_t X, size_t Y> void
-LIRGeneratorShared::defineFixed(LInstructionHelper<1, X, Y> *lir, MDefinition *mir, const LAllocation &output)
+LIRGeneratorShared::defineFixed(LInstructionHelper<1, X, Y>* lir, MDefinition* mir, const LAllocation& output)
 {
     LDefinition::Type type = LDefinition::TypeFrom(mir->type());
 
@@ -236,12 +236,12 @@ LIRGeneratorShared::redefine(MDefinition* def, MDefinition* as)
               case MIRType_ObjectOrNull:
               case MIRType_String:
               case MIRType_Symbol: {
-                LAssertResultT *check = new(alloc()) LAssertResultT(useRegister(def));
+                LAssertResultT* check = new(alloc()) LAssertResultT(useRegister(def));
                 add(check, def->toInstruction());
                 break;
               }
               case MIRType_Value: {
-                LAssertResultV *check = new(alloc()) LAssertResultV();
+                LAssertResultV* check = new(alloc()) LAssertResultV();
                 useBox(check, LAssertRangeV::Input, def);
                 add(check, def->toInstruction());
                 break;
@@ -320,7 +320,7 @@ LIRGeneratorShared::useRegisterOrConstantAtStart(MDefinition* mir)
 }
 
 LAllocation
-LIRGeneratorShared::useRegisterOrZeroAtStart(MDefinition *mir)
+LIRGeneratorShared::useRegisterOrZeroAtStart(MDefinition* mir)
 {
     if (mir->isConstant() && mir->toConstant()->value().isInt32(0))
         return LAllocation();
@@ -550,7 +550,7 @@ LIRGeneratorShared::useRegisterForTypedLoad(MDefinition* mir, MIRType type)
 }
 
 void
-LIRGeneratorShared::useBox(LInstruction *lir, size_t n, MDefinition *mir,
+LIRGeneratorShared::useBox(LInstruction* lir, size_t n, MDefinition* mir,
                            LUse::Policy policy, bool useAtStart)
 {
     MOZ_ASSERT(mir->type() == MIRType_Value);

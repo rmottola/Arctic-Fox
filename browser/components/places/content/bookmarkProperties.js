@@ -236,14 +236,11 @@ var BookmarkPropertiesPanel = {
     }
     else { // edit
       this._node = dialogInfo.node;
-      switch (dialogInfo.type) {
-        case "bookmark":
-          this._itemType = BOOKMARK_ITEM;
-          break;
-        case "folder":
-          this._itemType = BOOKMARK_FOLDER;
-          break;
-      }
+      this._title = this._node.title;
+      if (PlacesUtils.nodeIsFolder(this._node))
+        this._itemType = BOOKMARK_FOLDER;
+      else if (PlacesUtils.nodeIsURI(this._node))
+        this._itemType = BOOKMARK_ITEM;
     }
   },
 

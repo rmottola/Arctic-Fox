@@ -906,7 +906,7 @@ nsTextInputListener::HandleEvent(nsIDOMEvent* aEvent)
     return NS_ERROR_UNEXPECTED;
   }
 
-  if (keyEvent->message != NS_KEY_PRESS) {
+  if (keyEvent->mMessage != NS_KEY_PRESS) {
     return NS_OK;
   }
 
@@ -933,6 +933,12 @@ nsTextInputListener::HandleEvent(nsIDOMEvent* aEvent)
 NS_IMETHODIMP
 nsTextInputListener::EditAction()
 {
+  if (!mFrame) {
+    // We've been disconnected from the nsTextEditorState object, nothing to do
+    // here.
+    return NS_OK;
+  }
+
   nsWeakFrame weakFrame = mFrame;
 
   nsITextControlFrame* frameBase = do_QueryFrame(mFrame);

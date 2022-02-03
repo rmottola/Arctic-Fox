@@ -24,8 +24,8 @@ namespace js {
         class JitActivation;
         class JitProfilingFrameIterator;
         class JitcodeGlobalEntry;
-    }
-}
+    } // namespace jit
+} // namespace js
 
 namespace JS {
 
@@ -87,7 +87,7 @@ class JS_PUBLIC_API(ProfilingFrameIterator)
         void* lr;
     };
 
-    ProfilingFrameIterator(JSRuntime* rt, const RegisterState &state,
+    ProfilingFrameIterator(JSRuntime* rt, const RegisterState& state,
                            uint32_t sampleBufferGen = UINT32_MAX);
     ~ProfilingFrameIterator();
     void operator++();

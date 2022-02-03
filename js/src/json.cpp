@@ -8,6 +8,7 @@
 
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/Range.h"
+#include "mozilla/ScopeExit.h"
 
 #include "jsarray.h"
 #include "jsatom.h"
@@ -258,17 +259,22 @@ PreprocessValue(JSContext* cx, HandleObject holder, KeyType key, MutableHandleVa
     /* Step 4. */
     if (vp.get().isObject()) {
         RootedObject obj(cx, &vp.get().toObject());
-        if (ObjectClassIs(obj, ESClass_Number, cx)) {
+
+        ESClassValue cls;
+        if (!GetBuiltinClass(cx, obj, &cls))
+            return false;
+
+        if (cls == ESClass_Number) {
             double d;
             if (!ToNumber(cx, vp, &d))
                 return false;
             vp.setNumber(d);
-        } else if (ObjectClassIs(obj, ESClass_String, cx)) {
+        } else if (cls == ESClass_String) {
             JSString* str = ToStringSlow<CanGC>(cx, vp);
             if (!str)
                 return false;
             vp.setString(str);
-        } else if (ObjectClassIs(obj, ESClass_Boolean, cx)) {
+        } else if (cls == ESClass_Boolean) {
             if (!Unbox(cx, obj, vp))
                 return false;
         }
@@ -321,7 +327,11 @@ JO(JSContext* cx, HandleObject obj, StringifyContext* scx)
     Maybe<AutoIdVector> ids;
     const AutoIdVector* props;
     if (scx->replacer && !scx->replacer->isCallable()) {
-        MOZ_ASSERT(IsArray(scx->replacer, cx));
+        // NOTE: We can't assert |IsArray(scx->replacer)| because the replacer
+        //       might have been a revocable proxy to an array.  Such a proxy
+        //       satisfies |IsArray|, but any side effect of JSON.stringify
+        //       could revoke the proxy so that |!IsArray(scx->replacer)|.  See
+        //       bug 1196497.
         props = &scx->propertyList;
     } else {
         MOZ_ASSERT_IF(scx->replacer, scx->propertyList.length() == 0);
@@ -505,14 +515,13 @@ Str(JSContext* cx, const Value& v, StringifyContext* scx)
     RootedObject obj(cx, &v.toObject());
 
     scx->depth++;
-    bool ok;
-    if (IsArray(obj, cx))
-        ok = JA(cx, obj, scx);
-    else
-        ok = JO(cx, obj, scx);
-    scx->depth--;
+    auto dec = mozilla::MakeScopeExit([&] { scx->depth--; });
 
-    return ok;
+    bool isArray;
+    if (!IsArray(cx, obj, &isArray))
+        return false;
+
+    return isArray ? JA(cx, obj, scx) : JO(cx, obj, scx);
 }
 
 /* ES5 15.12.3. */
@@ -526,9 +535,12 @@ js::Stringify(JSContext* cx, MutableHandleValue vp, JSObject* replacer_, Value s
     /* Step 4. */
     AutoIdVector propertyList(cx);
     if (replacer) {
+        bool isArray;
         if (replacer->isCallable()) {
             /* Step 4a(i): use replacer to transform values.  */
-        } else if (IsArray(replacer, cx)) {
+        } else if (!IsArray(cx, replacer, &isArray)) {
+            return false;
+        } else if (isArray) {
             /*
              * Step 4b: The spec algorithm is unhelpfully vague about the exact
              * steps taken when the replacer is an array, regarding the exact
@@ -596,15 +608,22 @@ js::Stringify(JSContext* cx, MutableHandleValue vp, JSObject* replacer_, Value s
                         if (!ValueToId<CanGC>(cx, v, &id))
                             return false;
                     }
-                } else if (v.isString() ||
-                           IsObjectWithClass(v, ESClass_String, cx) ||
-                           IsObjectWithClass(v, ESClass_Number, cx))
-                {
-                    /* Step 4b(iv)(3), 4b(iv)(5). */
-                    if (!ValueToId<CanGC>(cx, v, &id))
-                        return false;
                 } else {
-                    continue;
+                    bool shouldAdd = v.isString();
+                    if (!shouldAdd) {
+                        ESClassValue cls;
+                        if (!GetClassOfValue(cx, v, &cls))
+                            return false;
+                        shouldAdd = cls == ESClass_String || cls == ESClass_Number;
+                    }
+
+                    if (shouldAdd) {
+                        /* Step 4b(iv)(3), 4b(iv)(5). */
+                        if (!ValueToId<CanGC>(cx, v, &id))
+                            return false;
+                    } else {
+                        continue;
+                    }
                 }
 
                 /* Step 4b(iv)(6). */
@@ -623,12 +642,17 @@ js::Stringify(JSContext* cx, MutableHandleValue vp, JSObject* replacer_, Value s
     /* Step 5. */
     if (space.isObject()) {
         RootedObject spaceObj(cx, &space.toObject());
-        if (ObjectClassIs(spaceObj, ESClass_Number, cx)) {
+
+        ESClassValue cls;
+        if (!GetBuiltinClass(cx, spaceObj, &cls))
+            return false;
+
+        if (cls == ESClass_Number) {
             double d;
             if (!ToNumber(cx, space, &d))
                 return false;
             space = NumberValue(d);
-        } else if (ObjectClassIs(spaceObj, ESClass_String, cx)) {
+        } else if (cls == ESClass_String) {
             JSString* str = ToStringSlow<CanGC>(cx, space);
             if (!str)
                 return false;
@@ -693,7 +717,11 @@ Walk(JSContext* cx, HandleObject holder, HandleId name, HandleValue reviver, Mut
     if (val.isObject()) {
         RootedObject obj(cx, &val.toObject());
 
-        if (IsArray(obj, cx)) {
+        bool isArray;
+        if (!IsArray(cx, obj, &isArray))
+            return false;
+
+        if (isArray) {
             /* Step 2a(ii). */
             uint32_t length;
             if (!GetLengthProperty(cx, obj, &length))

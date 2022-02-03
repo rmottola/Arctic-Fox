@@ -323,7 +323,7 @@ class IonTrackedOptimizationsRegion
 
     // Find the index of tracked optimization info (e.g., type info and
     // attempts) at a native code offset.
-    mozilla::Maybe<uint8_t> findIndex(uint32_t offset, uint32_t *entryOffsetOut) const;
+    mozilla::Maybe<uint8_t> findIndex(uint32_t offset, uint32_t* entryOffsetOut) const;
 
     // For the variants below, S stands for startDelta, L for length, and I
     // for index. These were automatically generated from training on the
@@ -503,14 +503,14 @@ class IonTrackedOptimizationsTypeInfo
 
     class ForEachOpAdapter : public ForEachOp
     {
-        JS::ForEachTrackedOptimizationTypeInfoOp &op_;
+        JS::ForEachTrackedOptimizationTypeInfoOp& op_;
 
       public:
-        explicit ForEachOpAdapter(JS::ForEachTrackedOptimizationTypeInfoOp &op)
+        explicit ForEachOpAdapter(JS::ForEachTrackedOptimizationTypeInfoOp& op)
           : op_(op)
         { }
 
-        void readType(const IonTrackedTypeWithAddendum &tracked) override;
+        void readType(const IonTrackedTypeWithAddendum& tracked) override;
         void operator()(JS::TrackedTypeSite site, MIRType mirType) override;
     };
 

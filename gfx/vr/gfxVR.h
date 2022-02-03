@@ -8,13 +8,20 @@
 
 #include "nsTArray.h"
 #include "nsIScreen.h"
+#include "nsString.h"
 #include "nsCOMPtr.h"
 #include "mozilla/nsRefPtr.h"
 
 #include "mozilla/gfx/2D.h"
 #include "mozilla/EnumeratedArray.h"
+#include "mozilla/Atomics.h"
 
 namespace mozilla {
+namespace layers {
+class Compositor;
+class CompositingRenderTarget;
+}
+
 namespace gfx {
 
 enum class VRHMDType : uint16_t {
@@ -56,6 +63,8 @@ struct VRFieldOfView {
       leftDegrees == 0.0;
   }
 
+  Matrix4x4 ConstructProjectionMatrix(float zNear, float zFar, bool rightHanded);
+
   double upDegrees;
   double rightDegrees;
   double downDegrees;
@@ -70,11 +79,7 @@ struct VRDistortionConstants {
 };
 
 struct VRDistortionVertex {
-  float pos[2];
-  float texR[2];
-  float texG[2];
-  float texB[2];
-  float genericAttribs[4];
+  float values[12];
 };
 
 struct VRDistortionMesh {
@@ -127,6 +132,30 @@ struct VRHMDConfiguration {
   VRFieldOfView fov[2];
 };
 
+class VRHMDRenderingSupport {
+public:
+  struct RenderTargetSet {
+    RenderTargetSet();
+    
+    NS_INLINE_DECL_REFCOUNTING(RenderTargetSet)
+
+    nsRefPtr<layers::Compositor> compositor;
+    IntSize size;
+    nsTArray<nsRefPtr<layers::CompositingRenderTarget>> renderTargets;
+    int32_t currentRenderTarget;
+
+    virtual already_AddRefed<layers::CompositingRenderTarget> GetNextRenderTarget() = 0;
+  protected:
+    virtual ~RenderTargetSet();
+  };
+
+  virtual already_AddRefed<RenderTargetSet> CreateRenderTargetSet(layers::Compositor *aCompositor, const IntSize& aSize) = 0;
+  virtual void DestroyRenderTargetSet(RenderTargetSet *aRTSet) = 0;
+  virtual void SubmitFrame(RenderTargetSet *aRTSet) = 0;
+protected:
+  VRHMDRenderingSupport() { }
+};
+
 class VRHMDInfo {
 public:
   enum Eye {
@@ -144,6 +173,8 @@ public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(VRHMDInfo)
 
   VRHMDType GetType() const { return mType; }
+  uint32_t GetDeviceIndex() const { return mDeviceIndex; }
+  const nsCString& GetDeviceName() const { return mDeviceName; }
 
   virtual const VRFieldOfView& GetRecommendedEyeFOV(uint32_t whichEye) { return mRecommendedEyeFOV[whichEye]; }
   virtual const VRFieldOfView& GetMaximumEyeFOV(uint32_t whichEye) { return mMaximumEyeFOV[whichEye]; }
@@ -170,6 +201,11 @@ public:
 
   virtual void ZeroSensor() = 0;
 
+
+  // if rendering is offloaded
+  virtual VRHMDRenderingSupport *GetRenderingSupport() { return nullptr; }
+
+  // distortion mesh stuff; we should implement renderingsupport for this
   virtual void FillDistortionConstants(uint32_t whichEye,
                                        const IntSize& textureSize, // the full size of the texture
                                        const IntRect& eyeViewport, // the viewport within the texture for the current eye
@@ -183,11 +219,13 @@ public:
   virtual nsIScreen* GetScreen() { return mScreen; }
 
 protected:
-  explicit VRHMDInfo(VRHMDType aType) : mType(aType) { MOZ_COUNT_CTOR(VRHMDInfo); }
+  explicit VRHMDInfo(VRHMDType aType);
   virtual ~VRHMDInfo() { MOZ_COUNT_DTOR(VRHMDInfo); }
 
   VRHMDType mType;
   VRHMDConfiguration mConfiguration;
+  uint32_t mDeviceIndex;
+  nsCString mDeviceName;
 
   VRFieldOfView mEyeFOV[NumEyes];
   IntSize mEyeResolution;
@@ -207,10 +245,13 @@ public:
   static void ManagerInit();
   static void ManagerDestroy();
   static void GetAllHMDs(nsTArray<nsRefPtr<VRHMDInfo>>& aHMDResult);
+  static uint32_t AllocateDeviceIndex();
+  static already_AddRefed<nsIScreen> MakeFakeScreen(int32_t x, int32_t y, uint32_t width, uint32_t height);
 
 protected:
   typedef nsTArray<nsRefPtr<VRHMDManager>> VRHMDManagerArray;
   static VRHMDManagerArray *sManagers;
+  static Atomic<uint32_t> sDeviceBase;
 
 public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(VRHMDManager)

@@ -34,12 +34,14 @@ public:
   virtual Result CheckRevocation(mozilla::pkix::EndEntityOrCA endEntityOrCA,
                                  const mozilla::pkix::CertID& certID,
                                  mozilla::pkix::Time time,
+                                 mozilla::pkix::Duration validityDuration,
                     /*optional*/ const mozilla::pkix::Input* stapledOCSPresponse,
                     /*optional*/ const mozilla::pkix::Input* aiaExtension) override;
   virtual Result IsChainValid(const mozilla::pkix::DERArray& certChain,
                               mozilla::pkix::Time time) override;
   virtual Result CheckSignatureDigestAlgorithm(
-                   mozilla::pkix::DigestAlgorithm digestAlg) override;
+                   mozilla::pkix::DigestAlgorithm digestAlg,
+                   mozilla::pkix::EndEntityOrCA endEntityOrCA) override;
   virtual Result CheckRSAPublicKeyModulusSizeInBits(
                    mozilla::pkix::EndEntityOrCA endEntityOrCA,
                    unsigned int modulusSizeInBits) override;
@@ -52,6 +54,10 @@ public:
   virtual Result VerifyECDSASignedDigest(
                    const mozilla::pkix::SignedDigest& signedDigest,
                    mozilla::pkix::Input subjectPublicKeyInfo) override;
+  virtual Result CheckValidityIsAcceptable(
+                   mozilla::pkix::Time notBefore, mozilla::pkix::Time notAfter,
+                   mozilla::pkix::EndEntityOrCA endEntityOrCA,
+                   mozilla::pkix::KeyPurposeId keyPurpose) override;
   virtual Result DigestBuf(mozilla::pkix::Input item,
                            mozilla::pkix::DigestAlgorithm digestAlg,
                            /*out*/ uint8_t* digestBuf,
@@ -61,7 +67,7 @@ private:
   /*out*/ ScopedCERTCertList& mCertChain;
   void* mPinArg; // non-owning!
   ScopedCERTCertificate mTrustedRoot;
-  unsigned int mMinimumNonECCBits;
+  unsigned int mMinRSABits;
 };
 
 } } // namespace mozilla::psm

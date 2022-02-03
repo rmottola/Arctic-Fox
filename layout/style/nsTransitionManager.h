@@ -9,10 +9,12 @@
 #define nsTransitionManager_h_
 
 #include "mozilla/Attributes.h"
+#include "mozilla/ContentEvents.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/dom/Animation.h"
 #include "mozilla/dom/KeyframeEffect.h"
 #include "AnimationCommon.h"
+#include "nsCSSProps.h"
 #include "nsCSSPseudoElements.h"
 
 class nsIGlobalObject;
@@ -82,6 +84,8 @@ class CSSTransition final : public Animation
 public:
  explicit CSSTransition(nsIGlobalObject* aGlobal)
     : dom::Animation(aGlobal)
+    , mWasFinishedOnLastTick(false)
+    , mNeedsNewAnimationIndexWhenRun(false)
   {
   }
 
@@ -111,27 +115,62 @@ public:
   void CancelFromStyle() override
   {
     mOwningElement = OwningElementRef();
+
+    // The animation index to use for compositing will be established when
+    // this transition next transitions out of the idle state but we still
+    // update it now so that the sort order of this transition remains
+    // defined until that moment.
+    //
+    // See longer explanation in CSSAnimation::CancelFromStyle.
+    mAnimationIndex = sNextAnimationIndex++;
+    mNeedsNewAnimationIndexWhenRun = true;
+
     Animation::CancelFromStyle();
-    MOZ_ASSERT(mSequenceNum == kUnsequenced);
   }
+
+  void Tick() override;
 
   nsCSSProperty TransitionProperty() const;
 
   bool HasLowerCompositeOrderThan(const Animation& aOther) const override;
-  bool IsUsingCustomCompositeOrder() const override
-  {
-    return mOwningElement.IsSet();
-  }
-
   void SetCreationSequence(uint64_t aIndex)
   {
-    MOZ_ASSERT(IsUsingCustomCompositeOrder());
-    mSequenceNum = aIndex;
+    MOZ_ASSERT(IsTiedToMarkup());
+    mAnimationIndex = aIndex;
   }
 
-  // Returns the element or pseudo-element whose transition-property property
-  // this CSSTransition corresponds to (if any). This is used for determining
-  // the relative composite order of transitions generated from CSS markup.
+  // Sets the owning element which is used for determining the composite
+  // oder of CSSTransition objects generated from CSS markup.
+  //
+  // @see mOwningElement
+  void SetOwningElement(const OwningElementRef& aElement)
+  {
+    mOwningElement = aElement;
+  }
+  // True for transitions that are generated from CSS markup and continue to
+  // reflect changes to that markup.
+  bool IsTiedToMarkup() const { return mOwningElement.IsSet(); }
+
+protected:
+  virtual ~CSSTransition()
+  {
+    MOZ_ASSERT(!mOwningElement.IsSet(), "Owning element should be cleared "
+                                        "before a CSS transition is destroyed");
+  }
+
+  // Animation overrides
+  CommonAnimationManager* GetAnimationManager() const override;
+  void UpdateTiming(SeekFlag aSeekFlag,
+                    SyncNotifyFlag aSyncNotifyFlag) override;
+
+  void QueueEvents();
+  bool HasEndEventToQueue() const override;
+
+  // The (pseudo-)element whose computed transition-property refers to this
+  // transition (if any).
+  //
+  // This is used for determining the relative composite order of transitions
+  // generated from CSS markup.
   //
   // Typically this will be the same as the target element of the keyframe
   // effect associated with this transition. However, it can differ in the
@@ -143,44 +182,59 @@ public:
   // c) If this object is generated from script using the CSSTransition
   //    constructor.
   //
-  // For (b) and (c) the returned owning element will return !IsSet().
-  const OwningElementRef& OwningElement() const { return mOwningElement; }
-
-  // Sets the owning element which is used for determining the composite
-  // oder of CSSTransition objects generated from CSS markup.
-  //
-  // @see OwningElement()
-  void SetOwningElement(const OwningElementRef& aElement)
-  {
-    mOwningElement = aElement;
-  }
-
-protected:
-  virtual ~CSSTransition()
-  {
-    MOZ_ASSERT(!mOwningElement.IsSet(), "Owning element should be cleared "
-                                        "before a CSS transition is destroyed");
-  }
-
-  virtual css::CommonAnimationManager* GetAnimationManager() const override;
-
-  // The (pseudo-)element whose computed transition-property refers to this
-  // transition (if any).
+  // For (b) and (c) the owning element will return !IsSet().
   OwningElementRef mOwningElement;
+
+  bool mWasFinishedOnLastTick;
+
+  // When true, indicates that when this transition next leaves the idle state,
+  // its animation index should be updated.
+  bool mNeedsNewAnimationIndexWhenRun;
 };
 
 } // namespace dom
+
+struct TransitionEventInfo {
+  nsCOMPtr<nsIContent> mElement;
+  InternalTransitionEvent mEvent;
+
+  TransitionEventInfo(nsIContent *aElement, nsCSSProperty aProperty,
+                      TimeDuration aDuration,
+                      nsCSSPseudoElements::Type aPseudoType)
+    : mElement(aElement)
+    , mEvent(true, NS_TRANSITION_END)
+  {
+    // XXX Looks like nobody initialize WidgetEvent::time
+    mEvent.propertyName =
+      NS_ConvertUTF8toUTF16(nsCSSProps::GetStringValue(aProperty));
+    mEvent.elapsedTime = aDuration.ToSeconds();
+    mEvent.pseudoElement = AnimationCollection::PseudoTypeAsString(aPseudoType);
+  }
+
+  // InternalTransitionEvent doesn't support copy-construction, so we need
+  // to ourselves in order to work with nsTArray
+  TransitionEventInfo(const TransitionEventInfo &aOther)
+    : mElement(aOther.mElement)
+    , mEvent(true, NS_TRANSITION_END)
+  {
+    mEvent.AssignTransitionEventData(aOther.mEvent, false);
+  }
+};
+
 } // namespace mozilla
 
 class nsTransitionManager final
-  : public mozilla::css::CommonAnimationManager
+  : public mozilla::CommonAnimationManager
 {
 public:
   explicit nsTransitionManager(nsPresContext *aPresContext)
-    : mozilla::css::CommonAnimationManager(aPresContext)
+    : mozilla::CommonAnimationManager(aPresContext)
     , mInAnimationOnlyStyleUpdate(false)
   {
   }
+
+  NS_DECL_CYCLE_COLLECTION_CLASS(nsTransitionManager)
+  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
 
   typedef mozilla::AnimationCollection AnimationCollection;
 
@@ -234,12 +288,18 @@ public:
   virtual size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
     MOZ_MUST_OVERRIDE override;
 
-  // nsARefreshObserver
-  virtual void WillRefresh(mozilla::TimeStamp aTime) override;
+  void QueueEvent(mozilla::TransitionEventInfo&& aEventInfo)
+  {
+    mEventDispatcher.QueueEvent(
+      mozilla::Forward<mozilla::TransitionEventInfo>(aEventInfo));
+  }
 
-  void FlushTransitions(FlushFlags aFlags);
+  void DispatchEvents()  { mEventDispatcher.DispatchEvents(mPresContext); }
+  void ClearEventQueue() { mEventDispatcher.ClearEventQueue(); }
 
 protected:
+  virtual ~nsTransitionManager() {}
+
   virtual nsIAtom* GetAnimationsAtom() override {
     return nsGkAtoms::transitionsProperty;
   }
@@ -262,6 +322,9 @@ private:
                              nsCSSPropertySet* aWhichStarted);
 
   bool mInAnimationOnlyStyleUpdate;
+
+  mozilla::DelayedEventDispatcher<mozilla::TransitionEventInfo>
+      mEventDispatcher;
 };
 
 #endif /* !defined(nsTransitionManager_h_) */

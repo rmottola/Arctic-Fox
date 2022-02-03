@@ -54,9 +54,9 @@ ComputedTimingFunction::GetValue(double aPortion) const
   }
 }
 
-// In the Web Animations model, the time fraction can be outside the range
+// In the Web Animations model, the iteration progress can be outside the range
 // [0.0, 1.0] but it shouldn't be Infinity.
-const double ComputedTiming::kNullTimeFraction = PositiveInfinity<double>();
+const double ComputedTiming::kNullProgress = PositiveInfinity<double>();
 
 namespace dom {
 
@@ -85,6 +85,17 @@ void
 KeyframeEffectReadOnly::SetParentTime(Nullable<TimeDuration> aParentTime)
 {
   mParentTime = aParentTime;
+}
+
+void
+KeyframeEffectReadOnly::SetTiming(const AnimationTiming& aTiming,
+                                  Animation& aOwningAnimation)
+{
+  if (mTiming == aTiming) {
+    return;
+  }
+  mTiming = aTiming;
+  aOwningAnimation.NotifyEffectTimingUpdated();
 }
 
 ComputedTiming
@@ -125,7 +136,7 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
     result.mPhase = ComputedTiming::AnimationPhase_After;
     if (!aTiming.FillsForwards()) {
       // The animation isn't active or filling at this time.
-      result.mTimeFraction = ComputedTiming::kNullTimeFraction;
+      result.mProgress = ComputedTiming::kNullProgress;
       return result;
     }
     activeTime = result.mActiveDuration;
@@ -138,7 +149,7 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
     result.mPhase = ComputedTiming::AnimationPhase_Before;
     if (!aTiming.FillsBackwards()) {
       // The animation isn't active or filling at this time.
-      result.mTimeFraction = ComputedTiming::kNullTimeFraction;
+      result.mProgress = ComputedTiming::kNullProgress;
       return result;
     }
     // activeTime is zero
@@ -180,19 +191,18 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
 
   // Normalize the iteration time into a fraction of the iteration duration.
   if (result.mPhase == ComputedTiming::AnimationPhase_Before) {
-    result.mTimeFraction = 0.0;
+    result.mProgress = 0.0;
   } else if (result.mPhase == ComputedTiming::AnimationPhase_After) {
-    result.mTimeFraction = isEndOfFinalIteration
-                         ? 1.0
-                         : fmod(aTiming.mIterationCount, 1.0f);
+    result.mProgress = isEndOfFinalIteration
+                       ? 1.0
+                       : fmod(aTiming.mIterationCount, 1.0f);
   } else {
     // We are in the active phase so the iteration duration can't be zero.
     MOZ_ASSERT(aTiming.mIterationDuration != zeroDuration,
                "In the active phase of a zero-duration animation?");
-    result.mTimeFraction =
-      aTiming.mIterationDuration == TimeDuration::Forever()
-      ? 0.0
-      : iterationTime / aTiming.mIterationDuration;
+    result.mProgress = aTiming.mIterationDuration == TimeDuration::Forever()
+                       ? 0.0
+                       : iterationTime / aTiming.mIterationDuration;
   }
 
   bool thisIterationReverse = false;
@@ -211,7 +221,7 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
       break;
   }
   if (thisIterationReverse) {
-    result.mTimeFraction = 1.0 - result.mTimeFraction;
+    result.mProgress = 1.0 - result.mProgress;
   }
 
   return result;
@@ -233,24 +243,22 @@ KeyframeEffectReadOnly::ActiveDuration(const AnimationTiming& aTiming)
     aTiming.mIterationDuration.MultDouble(aTiming.mIterationCount));
 }
 
-// http://w3c.github.io/web-animations/#in-play
+// https://w3c.github.io/web-animations/#in-play
 bool
 KeyframeEffectReadOnly::IsInPlay(const Animation& aAnimation) const
 {
-  if (IsFinishedTransition() ||
-      aAnimation.PlayState() == AnimationPlayState::Finished) {
+  if (aAnimation.PlayState() == AnimationPlayState::Finished) {
     return false;
   }
 
   return GetComputedTiming().mPhase == ComputedTiming::AnimationPhase_Active;
 }
 
-// http://w3c.github.io/web-animations/#current
+// https://w3c.github.io/web-animations/#current
 bool
 KeyframeEffectReadOnly::IsCurrent(const Animation& aAnimation) const
 {
-  if (IsFinishedTransition() ||
-      aAnimation.PlayState() == AnimationPlayState::Finished) {
+  if (aAnimation.PlayState() == AnimationPlayState::Finished) {
     return false;
   }
 
@@ -259,15 +267,12 @@ KeyframeEffectReadOnly::IsCurrent(const Animation& aAnimation) const
          computedTiming.mPhase == ComputedTiming::AnimationPhase_Active;
 }
 
+// https://w3c.github.io/web-animations/#in-effect
 bool
 KeyframeEffectReadOnly::IsInEffect() const
 {
-  if (IsFinishedTransition()) {
-    return false;
-  }
-
   ComputedTiming computedTiming = GetComputedTiming();
-  return computedTiming.mTimeFraction != ComputedTiming::kNullTimeFraction;
+  return computedTiming.mProgress != ComputedTiming::kNullProgress;
 }
 
 const AnimationProperty*
@@ -300,21 +305,20 @@ KeyframeEffectReadOnly::HasAnimationOfProperties(
 }
 
 void
-KeyframeEffectReadOnly::ComposeStyle(
-                          nsRefPtr<css::AnimValuesStyleRule>& aStyleRule,
-                          nsCSSPropertySet& aSetProperties)
+KeyframeEffectReadOnly::ComposeStyle(nsRefPtr<AnimValuesStyleRule>& aStyleRule,
+                                     nsCSSPropertySet& aSetProperties)
 {
   ComputedTiming computedTiming = GetComputedTiming();
 
-  // If the time fraction is null, we don't have fill data for the current
+  // If the progress is null, we don't have fill data for the current
   // time so we shouldn't animate.
-  if (computedTiming.mTimeFraction == ComputedTiming::kNullTimeFraction) {
+  if (computedTiming.mProgress == ComputedTiming::kNullProgress) {
     return;
   }
 
-  MOZ_ASSERT(0.0 <= computedTiming.mTimeFraction &&
-             computedTiming.mTimeFraction <= 1.0,
-             "timing fraction should be in [0-1]");
+  MOZ_ASSERT(0.0 <= computedTiming.mProgress &&
+             computedTiming.mProgress <= 1.0,
+             "iteration progress should be in [0-1]");
 
   for (size_t propIdx = 0, propEnd = mProperties.Length();
        propIdx != propEnd; ++propIdx)
@@ -351,11 +355,11 @@ KeyframeEffectReadOnly::ComposeStyle(
     // FIXME: Maybe cache the current segment?
     const AnimationPropertySegment *segment = prop.mSegments.Elements(),
                                 *segmentEnd = segment + prop.mSegments.Length();
-    while (segment->mToKey < computedTiming.mTimeFraction) {
+    while (segment->mToKey < computedTiming.mProgress) {
       MOZ_ASSERT(segment->mFromKey < segment->mToKey, "incorrect keys");
       ++segment;
       if (segment == segmentEnd) {
-        MOZ_ASSERT_UNREACHABLE("incorrect time fraction");
+        MOZ_ASSERT_UNREACHABLE("incorrect iteration progress");
         break; // in order to continue in outer loop (just below)
       }
       MOZ_ASSERT(segment->mFromKey == (segment-1)->mToKey, "incorrect keys");
@@ -371,11 +375,11 @@ KeyframeEffectReadOnly::ComposeStyle(
 
     if (!aStyleRule) {
       // Allocate the style rule now that we know we have animation data.
-      aStyleRule = new css::AnimValuesStyleRule();
+      aStyleRule = new AnimValuesStyleRule();
     }
 
     double positionInSegment =
-      (computedTiming.mTimeFraction - segment->mFromKey) /
+      (computedTiming.mProgress - segment->mFromKey) /
       (segment->mToKey - segment->mFromKey);
     double valuePosition =
       segment->mTimingFunction.GetValue(positionInSegment);

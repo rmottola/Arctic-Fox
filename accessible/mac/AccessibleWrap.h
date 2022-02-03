@@ -59,10 +59,7 @@ public: // construction, destruction
    * for it.
    */
   bool IsIgnored();
-  
-  inline bool HasPopup () 
-    { return (NativeState() & mozilla::a11y::states::HASPOPUP); }
-  
+
   /**
    * Returns this accessible's all children, adhering to "flat" accessibles by 
    * not returning their children.
@@ -107,6 +104,14 @@ private:
    */
   bool mNativeInited;
 };
+
+#if defined(__OBJC__)
+  void FireNativeEvent(mozAccessible* aNativeAcc, uint32_t aEventType);
+#else
+  void FireNativeEvent(id aNativeAcc, uint32_t aEventType);
+#endif
+
+Class GetTypeFromRole(roles::Role aRole);
 
 } // namespace a11y
 } // namespace mozilla

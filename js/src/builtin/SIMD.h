@@ -505,7 +505,7 @@ INT32X4_FUNCTION_LIST(DECLARE_SIMD_INT32x4_FUNCTION)
 #undef DECLARE_SIMD_INT32x4_FUNCTION
 
 JSObject*
-InitSIMDClass(JSContext *cx, HandleObject obj);
+InitSIMDClass(JSContext* cx, HandleObject obj);
 
 }  /* namespace js */
 

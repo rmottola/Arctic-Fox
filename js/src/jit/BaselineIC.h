@@ -1893,7 +1893,7 @@ class ICIn_NativePrototype : public ICInNativeStub
     HeapPtrObject& holder() {
         return holder_;
     }
-    HeapPtrShape &holderShape() {
+    HeapPtrShape& holderShape() {
         return holderShape_;
     }
     static size_t offsetOfHolder() {
@@ -2962,7 +2962,7 @@ class ICGetPropCallGetter : public ICMonitoredStub
                   (HeapReceiverGuard::keyBits(receiver_) << 17) |
                   (static_cast<int32_t>(!!outerClass_) << 19) |
                   (static_cast<int32_t>(receiver_ != holder_) << 20);
-	}
+        }
 
       public:
         Compiler(JSContext* cx, ICStub::Kind kind, ICStub* firstMonitorStub,
@@ -3436,7 +3436,7 @@ class ICSetProp_NativeAdd : public ICUpdatedStub
     HeapPtrShape& newShape() {
         return newShape_;
     }
-    HeapPtrObjectGroup &newGroup() {
+    HeapPtrObjectGroup& newGroup() {
         return newGroup_;
     }
 

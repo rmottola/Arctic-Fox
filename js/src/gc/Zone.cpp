@@ -27,6 +27,7 @@ JS::Zone::Zone(JSRuntime* rt)
     debuggers(nullptr),
     arenas(rt),
     types(this),
+    gcWeakMapList(nullptr),
     compartments(),
     gcGrayRoots(),
     gcMallocBytes(0),
@@ -65,7 +66,7 @@ Zone::~Zone()
 bool Zone::init(bool isSystemArg)
 {
     isSystem = isSystemArg;
-    return gcZoneGroupEdges.init();
+    return uniqueIds_.init() && gcZoneGroupEdges.init();
 }
 
 void
@@ -155,7 +156,6 @@ Zone::logPromotionsToTenured()
     awaitingTenureLogging.clear();
 }
 
-
 void
 Zone::sweepBreakpoints(FreeOp* fop)
 {
@@ -204,6 +204,13 @@ Zone::sweepBreakpoints(FreeOp* fop)
 }
 
 void
+Zone::sweepWeakMaps()
+{
+    /* Finalize unreachable (key,value) pairs in all weak maps. */
+    WeakMapBase::sweepZone(this);
+}
+
+void
 Zone::discardJitCode(FreeOp* fop)
 {
     if (!jitZone())
@@ -216,7 +223,7 @@ Zone::discardJitCode(FreeOp* fop)
 #ifdef DEBUG
         /* Assert no baseline scripts are marked as active. */
         for (ZoneCellIterUnderGC i(this, AllocKind::SCRIPT); !i.done(); i.next()) {
-            JSScript *script = i.get<JSScript>();
+            JSScript* script = i.get<JSScript>();
             MOZ_ASSERT_IF(script->hasBaselineScript(), !script->baselineScript()->active());
         }
 #endif
@@ -228,7 +235,7 @@ Zone::discardJitCode(FreeOp* fop)
         jit::InvalidateAll(fop, this);
 
         for (ZoneCellIterUnderGC i(this, AllocKind::SCRIPT); !i.done(); i.next()) {
-            JSScript *script = i.get<JSScript>();
+            JSScript* script = i.get<JSScript>();
             jit::FinishInvalidation(fop, script);
 
             /*
@@ -248,6 +255,15 @@ Zone::discardJitCode(FreeOp* fop)
         jitZone()->optimizedStubSpace()->free();
     }
 }
+
+#ifdef JSGC_HASH_TABLE_CHECKS
+void
+JS::Zone::checkUniqueIdTableAfterMovingGC()
+{
+    for (UniqueIdMap::Enum e(uniqueIds_); !e.empty(); e.popFront())
+        js::gc::CheckGCThingAfterMovingGC(e.front().key());
+}
+#endif
 
 uint64_t
 Zone::gcNumber()
@@ -300,7 +316,7 @@ Zone::notifyObservingDebuggers()
         if (!global)
             continue;
 
-        GlobalObject::DebuggerVector *dbgs = global->getDebuggers();
+        GlobalObject::DebuggerVector* dbgs = global->getDebuggers();
         if (!dbgs)
             continue;
 

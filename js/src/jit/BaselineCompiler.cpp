@@ -820,7 +820,7 @@ BaselineCompiler::emitCoverage(jsbytecode* pc)
 bool
 BaselineCompiler::emitTraceLoggerEnter()
 {
-    TraceLoggerThread *logger = TraceLoggerForMainThread(cx->runtime());
+    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
     AllocatableRegisterSet regs(RegisterSet::Volatile());
     Register loggerReg = regs.takeAnyGeneral();
     Register scriptReg = regs.takeAnyGeneral();
@@ -854,7 +854,7 @@ BaselineCompiler::emitTraceLoggerEnter()
 bool
 BaselineCompiler::emitTraceLoggerExit()
 {
-    TraceLoggerThread *logger = TraceLoggerForMainThread(cx->runtime());
+    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
     AllocatableRegisterSet regs(RegisterSet::Volatile());
     Register loggerReg = regs.takeAnyGeneral();
 
@@ -1392,7 +1392,7 @@ BaselineCompiler::emit_JSOP_SYMBOL()
     return true;
 }
 
-typedef JSObject *(*DeepCloneObjectLiteralFn)(JSContext *, HandleObject, NewObjectKind);
+typedef JSObject* (*DeepCloneObjectLiteralFn)(JSContext*, HandleObject, NewObjectKind);
 static const VMFunction DeepCloneObjectLiteralInfo =
     FunctionInfo<DeepCloneObjectLiteralFn>(DeepCloneObjectLiteral);
 
@@ -1970,7 +1970,7 @@ BaselineCompiler::emit_JSOP_INITHIDDENPROP()
     return emit_JSOP_INITPROP();
 }
 
-typedef bool (*NewbornArrayPushFn)(JSContext *, HandleObject, const Value &);
+typedef bool (*NewbornArrayPushFn)(JSContext*, HandleObject, const Value&);
 static const VMFunction NewbornArrayPushInfo = FunctionInfo<NewbornArrayPushFn>(NewbornArrayPush);
 
 bool
@@ -3116,7 +3116,7 @@ BaselineCompiler::emit_JSOP_POPBLOCKSCOPE()
     return callVM(PopBlockScopeInfo);
 }
 
-typedef bool (*FreshenBlockScopeFn)(JSContext *, BaselineFrame *);
+typedef bool (*FreshenBlockScopeFn)(JSContext*, BaselineFrame*);
 static const VMFunction FreshenBlockScopeInfo =
     FunctionInfo<FreshenBlockScopeFn>(jit::FreshenBlockScope);
 
@@ -3619,23 +3619,11 @@ BaselineCompiler::emit_JSOP_YIELD()
 
     MOZ_ASSERT(frame.stackDepth() >= 1);
 
-    if (frame.stackDepth() == 1) {
-        // If the expression stack is empty, we can inline the YIELD. For legacy
-        // generators we normally check if we're in the closing state and throw
-        // an exception, but we don't have to do anything here as the expression
-        // stack is never empty in finally blocks. In debug builds, we assert
-        // we're not in the closing state.
-#ifdef DEBUG
-        if (script->isLegacyGenerator()) {
-            Label ok;
-            masm.unboxInt32(Address(genObj, GeneratorObject::offsetOfYieldIndexSlot()),
-                            R0.scratchReg());
-            masm.branch32(Assembler::NotEqual, R0.scratchReg(),
-                          Imm32(GeneratorObject::YIELD_INDEX_CLOSING), &ok);
-            masm.assumeUnreachable("Inline yield with closing generator");
-            masm.bind(&ok);
-        }
-#endif
+    if (frame.stackDepth() == 1 && !script->isLegacyGenerator()) {
+        // If the expression stack is empty, we can inline the YIELD. Don't do
+        // this for legacy generators: we have to throw an exception if the
+        // generator is in the closing state, see GeneratorObject::suspend.
+
         masm.storeValue(Int32Value(GET_UINT24(pc)),
                         Address(genObj, GeneratorObject::offsetOfYieldIndexSlot()));
 

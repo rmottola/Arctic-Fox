@@ -57,13 +57,13 @@ extern bool gBluetoothDebugFlag;
  */
 #define BT_LOGR(msg, ...)                                            \
   __android_log_print(ANDROID_LOG_INFO, "GeckoBluetooth",            \
-                      "%s: " msg, __FUNCTION__, ##__VA_ARGS__)       \
+                      "%s: " msg, __FUNCTION__, ##__VA_ARGS__)
 
 /**
  * Prints DEBUG build warnings, which show in DEBUG build only.
  */
 #define BT_WARNING(args...)                                          \
-  NS_WARNING(nsPrintfCString(args).get())                            \
+  NS_WARNING(nsPrintfCString(args).get())
 
 #else
 #define BT_LOGD(msg, ...)                                            \
@@ -78,12 +78,6 @@ extern bool gBluetoothDebugFlag;
 #endif
 
 /**
- * Prints 'R'ELEASE build logs for WebBluetooth API v2.
- */
-#define BT_API2_LOGR(msg, ...)                                       \
-  BT_LOGR("[WEBBT-API2] " msg, ##__VA_ARGS__)
-
-/**
  * Wrap literal name and value into a BluetoothNamedValue
  * and append it to the array.
  */
@@ -94,10 +88,24 @@ extern bool gBluetoothDebugFlag;
 /**
  * Wrap literal name and value into a BluetoothNamedValue
  * and insert it to the array.
+ *
+ * TODO: remove with bluetooth1
  */
 #define BT_INSERT_NAMED_VALUE(array, index, name, value)                      \
   array.InsertElementAt(index, BluetoothNamedValue(NS_LITERAL_STRING(name),   \
                                                    BluetoothValue(value)))
+
+/**
+ * Convert an enum value to string and append it to a fallible array.
+ */
+#define BT_APPEND_ENUM_STRING_FALLIBLE(array, enumType, enumValue)   \
+  do {                                                               \
+    uint32_t index = uint32_t(enumValue);                            \
+    nsAutoString name;                                               \
+    name.AssignASCII(enumType##Values::strings[index].value,         \
+                     enumType##Values::strings[index].length);       \
+    array.AppendElement(name, mozilla::fallible);                    \
+  } while(0)
 
 /**
  * Ensure success of system message broadcast with void return.
@@ -112,24 +120,12 @@ extern bool gBluetoothDebugFlag;
   } while(0)
 
 /**
- * Convert an enum value to string then append it to an array.
- */
-#define BT_APPEND_ENUM_STRING(array, enumType, enumValue)            \
-  do {                                                               \
-    uint32_t index = uint32_t(enumValue);                            \
-    nsAutoString name;                                               \
-    name.AssignASCII(enumType##Values::strings[index].value,         \
-                     enumType##Values::strings[index].length);       \
-    array.AppendElement(name);                                       \
-  } while(0)                                                         \
-
-/**
  * Resolve |promise| with |ret| if |x| is false.
  */
 #define BT_ENSURE_TRUE_RESOLVE(x, promise, ret)                      \
   do {                                                               \
     if (MOZ_UNLIKELY(!(x))) {                                        \
-      BT_API2_LOGR("BT_ENSURE_TRUE_RESOLVE(" #x ") failed");         \
+      BT_LOGR("BT_ENSURE_TRUE_RESOLVE(" #x ") failed");              \
       (promise)->MaybeResolve(ret);                                  \
       return (promise).forget();                                     \
     }                                                                \
@@ -141,11 +137,17 @@ extern bool gBluetoothDebugFlag;
 #define BT_ENSURE_TRUE_REJECT(x, promise, ret)                       \
   do {                                                               \
     if (MOZ_UNLIKELY(!(x))) {                                        \
-      BT_API2_LOGR("BT_ENSURE_TRUE_REJECT(" #x ") failed");          \
+      BT_LOGR("BT_ENSURE_TRUE_REJECT(" #x ") failed");               \
       (promise)->MaybeReject(ret);                                   \
       return (promise).forget();                                     \
     }                                                                \
   } while(0)
+
+/**
+ * Reject |promise| with |ret| if nsresult |rv| is not successful.
+ */
+#define BT_ENSURE_SUCCESS_REJECT(rv, promise, ret)                   \
+  BT_ENSURE_TRUE_REJECT(NS_SUCCEEDED(rv), promise, ret)
 
 #define BEGIN_BLUETOOTH_NAMESPACE \
   namespace mozilla { namespace dom { namespace bluetooth {
@@ -214,11 +216,12 @@ extern bool gBluetoothDebugFlag;
 #define BLUETOOTH_APP_ORIGIN                  "app://bluetooth.gaiamobile.org"
 
 /**
- * When a remote device gets paired / unpaired with local bluetooth adapter,
- * we'll dispatch an event.
+ * When a remote device gets paired / unpaired with local bluetooth adapter or
+ * pairing process is aborted, we'll dispatch an event.
  */
 #define DEVICE_PAIRED_ID                     "devicepaired"
 #define DEVICE_UNPAIRED_ID                   "deviceunpaired"
+#define PAIRING_ABORTED_ID                   "pairingaborted"
 
 /**
  * When receiving a query about current play status from remote device, we'll
@@ -688,6 +691,27 @@ enum BluetoothGattCharPropBit {
 typedef uint8_t BluetoothGattCharProp;
 #define BLUETOOTH_EMPTY_GATT_CHAR_PROP  static_cast<BluetoothGattCharProp>(0x00)
 
+/*
+ * Bluetooth GATT Attribute Permissions bit field
+ */
+enum BluetoothGattAttrPermBit {
+  GATT_ATTR_PERM_BIT_READ                 = (1 << 0),
+  GATT_ATTR_PERM_BIT_READ_ENCRYPTED       = (1 << 1),
+  GATT_ATTR_PERM_BIT_READ_ENCRYPTED_MITM  = (1 << 2),
+  GATT_ATTR_PERM_BIT_WRITE                = (1 << 4),
+  GATT_ATTR_PERM_BIT_WRITE_ENCRYPTED      = (1 << 5),
+  GATT_ATTR_PERM_BIT_WRITE_ENCRYPTED_MITM = (1 << 6),
+  GATT_ATTR_PERM_BIT_WRITE_SIGNED         = (1 << 7),
+  GATT_ATTR_PERM_BIT_WRITE_SIGNED_MITM    = (1 << 8)
+};
+
+/*
+ * BluetoothGattAttrPerm is used to store a bit mask value which contains
+ * each corresponding bit value of each BluetoothGattAttrPermBit.
+ */
+typedef int32_t BluetoothGattAttrPerm;
+#define BLUETOOTH_EMPTY_GATT_ATTR_PERM  static_cast<BluetoothGattAttrPerm>(0x00)
+
 struct BluetoothGattAdvData {
   uint8_t mAdvData[62];
 };
@@ -729,9 +753,9 @@ struct BluetoothGattReadParam {
   BluetoothGattServiceId mServiceId;
   BluetoothGattId mCharId;
   BluetoothGattId mDescriptorId;
-  uint8_t mValue[BLUETOOTH_GATT_MAX_ATTR_LEN];
-  uint16_t mValueLength;
   uint16_t mValueType;
+  uint16_t mValueLength;
+  uint8_t mValue[BLUETOOTH_GATT_MAX_ATTR_LEN];
   uint8_t mStatus;
 };
 
@@ -743,12 +767,30 @@ struct BluetoothGattWriteParam {
 };
 
 struct BluetoothGattNotifyParam {
-  uint8_t mValue[BLUETOOTH_GATT_MAX_ATTR_LEN];
   nsString mBdAddr;
   BluetoothGattServiceId mServiceId;
   BluetoothGattId mCharId;
   uint16_t mLength;
+  uint8_t mValue[BLUETOOTH_GATT_MAX_ATTR_LEN];
   bool mIsNotify;
+};
+
+struct BluetoothGattTestParam {
+  nsString mBdAddr;
+  BluetoothUuid mUuid;
+  uint16_t mU1;
+  uint16_t mU2;
+  uint16_t mU3;
+  uint16_t mU4;
+  uint16_t mU5;
+};
+
+struct BluetoothGattResponse {
+  uint16_t mHandle;
+  uint16_t mOffset;
+  uint16_t mLength;
+  BluetoothGattAuthReq mAuthReq;
+  uint8_t mValue[BLUETOOTH_GATT_MAX_ATTR_LEN];
 };
 
 /**

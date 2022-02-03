@@ -2251,7 +2251,7 @@ nsresult
 nsGenericHTMLFormElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
 {
   if (aVisitor.mEvent->mFlags.mIsTrusted) {
-    switch (aVisitor.mEvent->message) {
+    switch (aVisitor.mEvent->mMessage) {
       case NS_FOCUS_CONTENT:
       {
         // Check to see if focus has bubbled up from a form control's
@@ -2270,6 +2270,8 @@ nsGenericHTMLFormElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
           formControlFrame->SetFocus(false, false);
         break;
       }
+      default:
+        break;
     }
   }
 
@@ -2455,8 +2457,8 @@ nsGenericHTMLFormElement::FormIdUpdated(Element* aOldElement,
 }
 
 bool 
-nsGenericHTMLFormElement::IsElementDisabledForEvents(uint32_t aMessage, 
-                                                    nsIFrame* aFrame)
+nsGenericHTMLFormElement::IsElementDisabledForEvents(EventMessage aMessage,
+                                                     nsIFrame* aFrame)
 {
   switch (aMessage) {
     case NS_MOUSE_MOVE:

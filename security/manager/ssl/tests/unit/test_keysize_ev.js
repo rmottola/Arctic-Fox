@@ -29,19 +29,6 @@ function loadCert(certName, trustString) {
   return certFromFile(certFilename);
 }
 
-function checkEVStatus(cert, usage, isEVExpected) {
-  do_print("cert cn=" + cert.commonName);
-  do_print("cert o=" + cert.organization);
-  do_print("cert issuer cn=" + cert.issuerCommonName);
-  do_print("cert issuer o=" + cert.issuerOrganization);
-  let hasEVPolicy = {};
-  let verifiedChain = {};
-  let error = certDB.verifyCertNow(cert, usage, NO_FLAGS, verifiedChain,
-                                   hasEVPolicy);
-  equal(hasEVPolicy.value, isEVExpected);
-  equal(0, error);
-}
-
 /**
  * Adds a single EV key size test.
  *
@@ -69,7 +56,7 @@ function addKeySizeTestForEV(expectedNamesForOCSP,
     for (let intCertFileName of intCertFileNames) {
       loadCert(intCertFileName, ",,");
     }
-    checkEVStatus(certFromFile(endEntityCertFileName + ".der"),
+    checkEVStatus(certDB, certFromFile(endEntityCertFileName + ".der"),
                   certificateUsageSSLServer, expectedResult);
 
     ocspResponder.stop(run_next_test);
@@ -85,7 +72,7 @@ function addKeySizeTestForEV(expectedNamesForOCSP,
  * none of the chains validate as EV.
  *
  * Note: This function assumes that the key size requirements for EV are greater
- * than or equal to the requirements for DV.
+ * than the requirements for DV.
  *
  * @param {Number} inadequateKeySize
  *        The inadequate key size of the generated certs.
@@ -145,6 +132,7 @@ function checkRSAChains(inadequateKeySize, adequateKeySize) {
 
 function run_test() {
   Services.prefs.setCharPref("network.dns.localDomains", "www.example.com");
+  Services.prefs.setIntPref("security.OCSP.enabled", 1);
 
   checkRSAChains(2040, 2048);
 

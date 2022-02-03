@@ -122,12 +122,12 @@ struct FloatRegister
     bool equiv(FloatRegister) const { MOZ_CRASH(); }
     uint32_t size() const { MOZ_CRASH(); }
     uint32_t numAlignedAliased() const { MOZ_CRASH(); }
-    void alignedAliased(uint32_t, FloatRegister *) { MOZ_CRASH(); }
+    void alignedAliased(uint32_t, FloatRegister*) { MOZ_CRASH(); }
     SetType alignedOrDominatedAliasedSet() const { MOZ_CRASH(); }
     template <typename T> static T ReduceSetForPush(T) { MOZ_CRASH(); }
     uint32_t getRegisterDumpOffsetInBytes() { MOZ_CRASH(); }
     static uint32_t SetSize(SetType x) { MOZ_CRASH(); }
-    static Code FromName(const char *name) { MOZ_CRASH(); }
+    static Code FromName(const char* name) { MOZ_CRASH(); }
 
     // This is used in static initializers, so produce a bogus value instead of crashing.
     static uint32_t GetPushSizeInBytes(const TypedRegisterSet<FloatRegister>&) { return 0; }

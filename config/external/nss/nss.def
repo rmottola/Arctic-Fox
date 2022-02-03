@@ -112,6 +112,7 @@ CERT_GetCountryName
 CERT_GetDefaultCertDB
 CERT_GetFirstEmailAddress
 CERT_GetGeneralNameTypeFromString
+CERT_GetImposedNameConstraints
 CERT_GetLocalityName
 CERT_GetNextEmailAddress
 CERT_GetNextGeneralName
@@ -529,7 +530,6 @@ SECKEY_ExtractPublicKey
 SECKEY_GetPublicKeyType
 SECKEY_ImportDERPublicKey
 SECKEY_PublicKeyStrength
-SECKEY_PublicKeyStrengthInBits
 SECKEY_RSAPSSParamsTemplate DATA
 SECKEY_SignatureLen
 SECMIME_DecryptionAllowed

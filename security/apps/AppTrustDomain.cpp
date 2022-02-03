@@ -31,14 +31,14 @@ using namespace mozilla::pkix;
 
 extern PRLogModuleInfo* gPIPNSSLog;
 
-static const unsigned int DEFAULT_MINIMUM_NON_ECC_BITS = 2048;
+static const unsigned int DEFAULT_MIN_RSA_BITS = 2048;
 
 namespace mozilla { namespace psm {
 
 AppTrustDomain::AppTrustDomain(ScopedCERTCertList& certChain, void* pinArg)
   : mCertChain(certChain)
   , mPinArg(pinArg)
-  , mMinimumNonECCBits(DEFAULT_MINIMUM_NON_ECC_BITS)
+  , mMinRSABits(DEFAULT_MIN_RSA_BITS)
 {
 }
 
@@ -76,7 +76,7 @@ AppTrustDomain::SetTrustedRoot(AppTrustedRoot trustedRoot)
       trustedDER.data = const_cast<uint8_t*>(marketplaceStageRoot);
       trustedDER.len = mozilla::ArrayLength(marketplaceStageRoot);
       // The staging root was generated with a 1024-bit key.
-      mMinimumNonECCBits = 1024u;
+      mMinRSABits = 1024u;
       break;
 
     case nsIX509CertDB::AppXPCShellRoot:
@@ -234,7 +234,7 @@ AppTrustDomain::DigestBuf(Input item,
 }
 
 Result
-AppTrustDomain::CheckRevocation(EndEntityOrCA, const CertID&, Time,
+AppTrustDomain::CheckRevocation(EndEntityOrCA, const CertID&, Time, Duration,
                                 /*optional*/ const Input*,
                                 /*optional*/ const Input*)
 {
@@ -255,7 +255,7 @@ AppTrustDomain::IsChainValid(const DERArray& certChain, Time time)
 }
 
 Result
-AppTrustDomain::CheckSignatureDigestAlgorithm(DigestAlgorithm)
+AppTrustDomain::CheckSignatureDigestAlgorithm(DigestAlgorithm, EndEntityOrCA)
 {
   // TODO: We should restrict signatures to SHA-256 or better.
   return Success;
@@ -265,7 +265,7 @@ Result
 AppTrustDomain::CheckRSAPublicKeyModulusSizeInBits(
   EndEntityOrCA /*endEntityOrCA*/, unsigned int modulusSizeInBits)
 {
-  if (modulusSizeInBits < mMinimumNonECCBits) {
+  if (modulusSizeInBits < mMinRSABits) {
     return Result::ERROR_INADEQUATE_KEY_SIZE;
   }
   return Success;
@@ -300,6 +300,14 @@ AppTrustDomain::VerifyECDSASignedDigest(const SignedDigest& signedDigest,
 {
   return VerifyECDSASignedDigestNSS(signedDigest, subjectPublicKeyInfo,
                                     mPinArg);
+}
+
+Result
+AppTrustDomain::CheckValidityIsAcceptable(Time /*notBefore*/, Time /*notAfter*/,
+                                          EndEntityOrCA /*endEntityOrCA*/,
+                                          KeyPurposeId /*keyPurpose*/)
+{
+  return Success;
 }
 
 } } // namespace mozilla::psm

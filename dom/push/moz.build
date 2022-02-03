@@ -6,14 +6,19 @@
 EXTRA_COMPONENTS += [
     'Push.js',
     'Push.manifest',
+    'PushClient.js',
     'PushNotificationService.js',
 ]
 
 EXTRA_PP_JS_MODULES += [
+    'PushServiceWebSocket.jsm',
+]
+
+EXTRA_JS_MODULES += [
     'PushDB.jsm',
+    'PushRecord.jsm',
     'PushService.jsm',
     'PushServiceHttp2.jsm',
-    'PushServiceWebSocket.jsm',
 ]
 
 MOCHITEST_MANIFESTS += [
@@ -23,3 +28,17 @@ MOCHITEST_MANIFESTS += [
 XPCSHELL_TESTS_MANIFESTS += [
     'test/xpcshell/xpcshell.ini',
 ]
+
+EXPORTS.mozilla.dom += [
+    'PushManager.h',
+]
+
+UNIFIED_SOURCES += [
+    'PushManager.cpp',
+]
+
+LOCAL_INCLUDES += [
+    '../workers',
+]
+
+FINAL_LIBRARY = 'xul'

@@ -66,7 +66,7 @@ FilterPropertyDescriptor(JSContext* cx, HandleObject wrapper, HandleId id, JS::M
 
 template <typename Base, typename Policy>
 bool
-FilteringWrapper<Base, Policy>::getPropertyDescriptor(JSContext *cx, HandleObject wrapper,
+FilteringWrapper<Base, Policy>::getPropertyDescriptor(JSContext* cx, HandleObject wrapper,
                                                       HandleId id,
                                                       JS::MutableHandle<JSPropertyDescriptor> desc) const
 {
@@ -164,7 +164,7 @@ FilteringWrapper<Base, Policy>::defaultValue(JSContext* cx, HandleObject obj,
 
 template <typename Base, typename Policy>
 bool
-FilteringWrapper<Base, Policy>::getPrototype(JSContext *cx, JS::HandleObject wrapper,
+FilteringWrapper<Base, Policy>::getPrototype(JSContext* cx, JS::HandleObject wrapper,
                                              JS::MutableHandleObject protop) const
 {
     // Filtering wrappers do not allow access to the prototype.
@@ -235,7 +235,7 @@ bool
 CrossOriginXrayWrapper::defineProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
                                        JS::Handle<jsid> id,
                                        JS::Handle<JSPropertyDescriptor> desc,
-                                       JS::ObjectOpResult &result) const
+                                       JS::ObjectOpResult& result) const
 {
     JS_ReportError(cx, "Permission denied to define property on cross-origin object");
     return false;
@@ -243,7 +243,7 @@ CrossOriginXrayWrapper::defineProperty(JSContext* cx, JS::Handle<JSObject*> wrap
 
 bool
 CrossOriginXrayWrapper::delete_(JSContext* cx, JS::Handle<JSObject*> wrapper,
-                                JS::Handle<jsid> id, JS::ObjectOpResult &result) const
+                                JS::Handle<jsid> id, JS::ObjectOpResult& result) const
 {
     JS_ReportError(cx, "Permission denied to delete property on cross-origin object");
     return false;

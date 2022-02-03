@@ -1567,6 +1567,9 @@ public:
   nsresult HasRuleProcessorUsedByMultipleStyleSets(uint32_t aSheetType,
                                                    bool* aRetVal);
 
+  bool IsInFullscreenChange() const { return mIsInFullscreenChange; }
+  void SetIsInFullscreenChange(bool aValue);
+
   /**
    * Refresh observer management.
    */
@@ -1626,11 +1629,6 @@ public:
   nsSize GetScrollPositionClampingScrollPortSize() {
     NS_ASSERTION(mScrollPositionClampingScrollPortSizeSet, "asking for scroll port when its not set?");
     return mScrollPositionClampingScrollPortSize;
-  }
-
-  void SetContentDocumentFixedPositionMargins(const nsMargin& aMargins);
-  const nsMargin& GetContentDocumentFixedPositionMargins() {
-    return mContentDocumentFixedPositionMargins;
   }
 
   virtual void WindowSizeMoveDone() = 0;
@@ -1725,12 +1723,6 @@ protected:
 
   nsSize                    mScrollPositionClampingScrollPortSize;
 
-  // This margin is intended to be used when laying out fixed position children
-  // on this PresShell's viewport frame. See the documentation of
-  // nsIDOMWindowUtils.setContentDocumentFixedPositionMargins for details of
-  // their use.
-  nsMargin                  mContentDocumentFixedPositionMargins;
-
   // A list of weak frames. This is a pointer to the last item in the list.
   nsWeakFrame*              mWeakFrames;
 
@@ -1758,6 +1750,11 @@ protected:
   bool                      mIsDestroying : 1;
   bool                      mIsZombie : 1;
   bool                      mIsReflowing : 1;
+
+  // Indicates that the whole document is performing fullscreen change,
+  // in which case, we need to defer dispatching resize event and freeze
+  // the refresh driver to avoid unnecessary reflow.
+  bool                      mIsInFullscreenChange : 1;
 
   // For all documents we initially lock down painting.
   bool                      mPaintingSuppressed : 1;

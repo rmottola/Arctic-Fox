@@ -196,14 +196,20 @@ ReportWrapperDenial(JSContext* cx, HandleId id, WrapperDenialType type, const ch
 #endif
 
     nsAutoJSString propertyName;
-    if (!propertyName.init(cx, id))
+    RootedValue idval(cx);
+    if (!JS_IdToValue(cx, id, &idval))
+        return false;
+    JSString* str = JS_ValueToSource(cx, idval);
+    if (!str)
+        return false;
+    if (!propertyName.init(cx, str))
         return false;
     AutoFilename filename;
     unsigned line = 0, column = 0;
     DescribeScriptedCaller(cx, &filename, &line, &column);
 
     // Warn to the terminal for the logs.
-    NS_WARNING(nsPrintfCString("Silently denied access to property |%s|: %s (@%s:%u:%u)",
+    NS_WARNING(nsPrintfCString("Silently denied access to property %s: %s (@%s:%u:%u)",
                                NS_LossyConvertUTF16toASCII(propertyName).get(), reason,
                                filename.get(), line, column).get());
 
@@ -2081,13 +2087,18 @@ XrayWrapper<Base, Traits>::delete_(JSContext* cx, HandleObject wrapper,
 template <typename Base, typename Traits>
 bool
 XrayWrapper<Base, Traits>::get(JSContext* cx, HandleObject wrapper,
-                               HandleObject receiver, HandleId id,
+                               HandleValue receiver, HandleId id,
                                MutableHandleValue vp) const
 {
     // Skip our Base if it isn't already ProxyHandler.
     // NB: None of the functions we call are prepared for the receiver not
     // being the wrapper, so ignore the receiver here.
-    return js::BaseProxyHandler::get(cx, wrapper, Traits::HasPrototype ? receiver : wrapper, id, vp);
+    RootedValue thisv(cx);
+    if (Traits::HasPrototype)
+      thisv = receiver;
+    else
+      thisv.setObject(*wrapper);
+    return js::BaseProxyHandler::get(cx, wrapper, thisv, id, vp);
 }
 
 template <typename Base, typename Traits>

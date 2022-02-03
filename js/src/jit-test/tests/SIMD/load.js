@@ -121,4 +121,3 @@ print('Testing range checks...');
 testBailout(-1);
 testBailout(-15);
 testBailout(12 * 4 + 1);
-

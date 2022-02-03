@@ -565,6 +565,7 @@ pref("apz.fling_stopped_threshold", "0.01");
 pref("apz.max_velocity_inches_per_ms", "-1.0");
 pref("apz.max_velocity_queue_size", 5);
 pref("apz.min_skate_speed", "1.0");
+pref("apz.minimap.enabled", false);
 pref("apz.num_paint_duration_samples", 3);
 pref("apz.overscroll.enabled", false);
 pref("apz.overscroll.min_pan_distance_ratio", "1.0");
@@ -2032,6 +2033,16 @@ pref("network.automatic-ntlm-auth.allow-proxies", true);
 pref("network.automatic-ntlm-auth.allow-non-fqdn", false);
 pref("network.automatic-ntlm-auth.trusted-uris", "");
 
+// The string to return to the server as the 'workstation' that the
+// user is using.  Bug 1046421 notes that the previous default, of the
+// system hostname, could be used for user fingerprinting.
+//
+// However, in some network environments where allowedWorkstations is in use
+// to provide a level of host-based access control, it must be set to a string
+// that is listed in allowedWorkstations for the user's account in their
+// AD Domain.
+pref("network.generic-ntlm-auth.workstation", "WORKSTATION");
+
 // Sub-resources HTTP-authentication:
 //   0 - don't allow sub-resources to open HTTP authentication credentials
 //       dialogs
@@ -3392,6 +3403,10 @@ pref("intl.tsf.hack.atok.create_native_caret", true);
 // composition start offset.
 // For Free ChangJie 2010
 pref("intl.tsf.hack.free_chang_jie.do_not_return_no_layout_error", true);
+// For Microsoft Pinyin and Microsoft Wubi
+pref("intl.tsf.hack.ms_simplified_chinese.do_not_return_no_layout_error", true);
+// For Microsoft ChangJie and Microsoft Quick
+pref("intl.tsf.hack.ms_traditional_chinese.do_not_return_no_layout_error", true);
 // For Easy Changjei
 pref("intl.tsf.hack.easy_changjei.do_not_return_no_layout_error", true);
 // Whether use previous character rect for the result of
@@ -4168,6 +4183,7 @@ pref("signon.rememberSignons",              true);
 pref("signon.autofillForms",                false);
 pref("signon.autologin.proxy",              false);
 pref("signon.storeWhenAutocompleteOff",     true);
+pref("signon.ui.experimental",              false);
 pref("signon.debug",                        false);
 
 // Satchel (Form Manager) prefs
@@ -4535,6 +4551,7 @@ pref("browser.history.maxStateObjectSize", 655360);
 pref("xpinstall.whitelist.required", true);
 // Only Firefox requires add-on signatures
 pref("xpinstall.signatures.required", false);
+pref("xpinstall.signatures.infoURL", "https://wiki.mozilla.org/Addons/Extension_Signing");
 pref("extensions.alwaysUnpack", false);
 pref("extensions.minCompatiblePlatformVersion", "1.8");
 
@@ -4612,6 +4629,10 @@ pref("dom.push.debug", false);
 pref("dom.push.serverURL", "wss://push.services.mozilla.com/");
 pref("dom.push.userAgentID", "");
 
+// The maximum number of notifications that a service worker can receive
+// without user interaction.
+pref("dom.push.maxQuotaPerSubscription", 16);
+
 // Is the network connection allowed to be up?
 // This preference should be used in UX to enable/disable push.
 pref("dom.push.connection.enabled", true);
@@ -4670,6 +4691,11 @@ pref("dom.imagecapture.enabled", false);
 
 // W3C touch-action css property (related to touch and pointer events)
 pref("layout.css.touch_action.enabled", false);
+
+// Enables some assertions in nsStyleContext that are too expensive
+// for general use, but might be useful to enable for specific tests.
+// This only has an effect in DEBUG-builds.
+pref("layout.css.expensive-style-struct-assertions.enabed", false);
 
 // enable JS dump() function.
 pref("browser.dom.window.dump.enabled", false);
@@ -4778,6 +4804,9 @@ pref("dom.placeholder.show_on_focus", true);
 pref("dom.vr.enabled", false);
 // 0 = never; 1 = only if real devices aren't there; 2 = always
 pref("dom.vr.add-test-devices", 1);
+// true = show the VR textures in our compositing output; false = don't.
+// true might have performance impact
+pref("gfx.vr.mirror-textures", false);
 
 // MMS UA Profile settings
 pref("wap.UAProf.url", "");
@@ -5211,3 +5240,5 @@ pref("media.useAudioChannelAPI", false);
 // Turn rewriting of youtube embeds on/off
 pref("plugins.rewrite_youtube_embeds", true);
 
+// Expose Request.context. Currently disabled since the spec is in flux.
+pref("dom.requestcontext.enabled", false);

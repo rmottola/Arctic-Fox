@@ -53,6 +53,7 @@ CompositorOGL::InitializeVR()
 
   vs << "uniform vec4 uVREyeToSource;\n";
   vs << "uniform vec4 uVRDestinationScaleAndOffset;\n";
+  vs << "uniform float uHeight;\n";
   vs << "attribute vec2 aPosition;\n";
   vs << "attribute vec2 aTexCoord0;\n";
   vs << "attribute vec2 aTexCoord1;\n";
@@ -64,12 +65,12 @@ CompositorOGL::InitializeVR()
   vs << "varying vec4 vGenericAttribs;\n";
   vs << "void main() {\n";
   vs << "  gl_Position = vec4(aPosition.xy * uVRDestinationScaleAndOffset.zw + uVRDestinationScaleAndOffset.xy, 0.5, 1.0);\n";
-  vs << "  vTexCoord0 = uVREyeToSource.xy * aTexCoord0 + uVREyeToSource.zw;\n";
-  vs << "  vTexCoord1 = uVREyeToSource.xy * aTexCoord1 + uVREyeToSource.zw;\n";
-  vs << "  vTexCoord2 = uVREyeToSource.xy * aTexCoord2 + uVREyeToSource.zw;\n";
-  vs << "  vTexCoord0.y = 1.0 - vTexCoord0.y;\n";
-  vs << "  vTexCoord1.y = 1.0 - vTexCoord1.y;\n";
-  vs << "  vTexCoord2.y = 1.0 - vTexCoord2.y;\n";
+  vs << "  vTexCoord0 = uVREyeToSource.zw * aTexCoord0 + uVREyeToSource.xy;\n";
+  vs << "  vTexCoord1 = uVREyeToSource.zw * aTexCoord1 + uVREyeToSource.xy;\n";
+  vs << "  vTexCoord2 = uVREyeToSource.zw * aTexCoord2 + uVREyeToSource.xy;\n";
+  vs << "  vTexCoord0.y = uHeight - vTexCoord0.y;\n";
+  vs << "  vTexCoord1.y = uHeight - vTexCoord1.y;\n";
+  vs << "  vTexCoord2.y = uHeight - vTexCoord2.y;\n";
   vs << "  vGenericAttribs = aGenericAttribs;\n";
   vs << "}\n";
 
@@ -95,7 +96,6 @@ CompositorOGL::InitializeVR()
     }
 
     fs << "uniform " << sampler2D << " uTexture;\n";
-
     fs << "varying vec2 vTexCoord0;\n";
     fs << "varying vec2 vTexCoord1;\n";
     fs << "varying vec2 vTexCoord2;\n";
@@ -177,6 +177,7 @@ CompositorOGL::InitializeVR()
     mVR.mUTexture[programIndex] = gl()->fGetUniformLocation(prog, "uTexture");
     mVR.mUVREyeToSource[programIndex] = gl()->fGetUniformLocation(prog, "uVREyeToSource");
     mVR.mUVRDestionatinScaleAndOffset[programIndex] = gl()->fGetUniformLocation(prog, "uVRDestinationScaleAndOffset");
+    mVR.mUHeight[programIndex] = gl()->fGetUniformLocation(prog, "uHeight");
 
     mVR.mDistortionProgram[programIndex] = prog;
 
@@ -228,8 +229,6 @@ CompositorOGL::DrawVRDistortion(const gfx::Rect& aRect,
   RefPtr<CompositingRenderTargetOGL> surface =
     static_cast<CompositingRenderTargetOGL*>(vrEffect->mRenderTarget.get());
 
-  gfx::IntSize size = surface->GetInitSize(); // XXX source->GetSize()
-
   VRHMDInfo* hmdInfo = vrEffect->mHMD;
   VRDistortionConstants shaderConstants;
 
@@ -265,6 +264,10 @@ CompositorOGL::DrawVRDistortion(const gfx::Rect& aRect,
   gl()->fClearColor(0.0, 0.0, 0.0, 1.0);
   gl()->fClear(LOCAL_GL_COLOR_BUFFER_BIT | LOCAL_GL_DEPTH_BUFFER_BIT);
 
+  // Make sure that the cached current program is reset for the
+  // rest of the compositor, since we're using a custom program here
+  ResetProgram();
+
   gl()->fUseProgram(mVR.mDistortionProgram[programIndex]);
 
   gl()->fEnableVertexAttribArray(mVR.mAPosition);
@@ -276,36 +279,48 @@ CompositorOGL::DrawVRDistortion(const gfx::Rect& aRect,
   surface->BindTexture(LOCAL_GL_TEXTURE0, mFBOTextureTarget);
   gl()->fUniform1i(mVR.mUTexture[programIndex], 0);
 
-  gfx::IntSize vpSizeInt = mCurrentRenderTarget->GetInitSize();
-  gfx::Size vpSize(vpSizeInt.width, vpSizeInt.height);
+  Rect destRect = aTransform.TransformBounds(aRect);
+  gfx::IntSize preDistortionSize = surface->GetInitSize(); // XXX source->GetSize()
+  gfx::Size vpSize = destRect.Size();
 
   for (uint32_t eye = 0; eye < 2; eye++) {
     gfx::IntRect eyeViewport;
-    eyeViewport.x = eye * size.width / 2;
+    eyeViewport.x = eye * preDistortionSize.width / 2;
     eyeViewport.y = 0;
-    eyeViewport.width = size.width / 2;
-    eyeViewport.height = size.height;
+    eyeViewport.width = preDistortionSize.width / 2;
+    eyeViewport.height = preDistortionSize.height;
 
     hmdInfo->FillDistortionConstants(eye,
-                                     size, eyeViewport,
-                                     vpSize, aRect,
+                                     preDistortionSize, eyeViewport,
+                                     vpSize, destRect,
                                      shaderConstants);
 
+    float height = 1.0f;
+    float texScaleAndOffset[4] = { shaderConstants.eyeToSourceScaleAndOffset[0],
+                                   shaderConstants.eyeToSourceScaleAndOffset[1],
+                                   shaderConstants.eyeToSourceScaleAndOffset[2],
+                                   shaderConstants.eyeToSourceScaleAndOffset[3] };
+    if (textureTarget == LOCAL_GL_TEXTURE_RECTANGLE_ARB) {
+      texScaleAndOffset[0] *= preDistortionSize.width;
+      texScaleAndOffset[1] *= preDistortionSize.height;
+      texScaleAndOffset[2] *= preDistortionSize.width;
+      texScaleAndOffset[3] *= preDistortionSize.height;
+      height = preDistortionSize.height;
+    }
+
     gl()->fUniform4fv(mVR.mUVRDestionatinScaleAndOffset[programIndex], 1, shaderConstants.destinationScaleAndOffset);
-    gl()->fUniform4fv(mVR.mUVREyeToSource[programIndex], 1, shaderConstants.eyeToSourceScaleAndOffset);
+    gl()->fUniform4fv(mVR.mUVREyeToSource[programIndex], 1, texScaleAndOffset);
+    gl()->fUniform1f(mVR.mUHeight[programIndex], height);
 
     gl()->fBindBuffer(LOCAL_GL_ARRAY_BUFFER, mVR.mDistortionVertices[eye]);
 
-    gl()->fVertexAttribPointer(mVR.mAPosition, 2, LOCAL_GL_FLOAT, LOCAL_GL_FALSE, sizeof(gfx::VRDistortionVertex),
-                               (void*) offsetof(gfx::VRDistortionVertex, pos));
-    gl()->fVertexAttribPointer(mVR.mATexCoord0, 2, LOCAL_GL_FLOAT, LOCAL_GL_FALSE, sizeof(gfx::VRDistortionVertex),
-                               (void*) offsetof(gfx::VRDistortionVertex, texR));
-    gl()->fVertexAttribPointer(mVR.mATexCoord1, 2, LOCAL_GL_FLOAT, LOCAL_GL_FALSE, sizeof(gfx::VRDistortionVertex),
-                               (void*) offsetof(gfx::VRDistortionVertex, texG));
-    gl()->fVertexAttribPointer(mVR.mATexCoord2, 2, LOCAL_GL_FLOAT, LOCAL_GL_FALSE, sizeof(gfx::VRDistortionVertex),
-                               (void*) offsetof(gfx::VRDistortionVertex, texB));
-    gl()->fVertexAttribPointer(mVR.mAGenericAttribs, 4, LOCAL_GL_FLOAT, LOCAL_GL_FALSE, sizeof(gfx::VRDistortionVertex),
-                               (void*) offsetof(gfx::VRDistortionVertex, genericAttribs));
+    /* This is for Oculus DistortionVertex */
+
+    gl()->fVertexAttribPointer(mVR.mAPosition,  2, LOCAL_GL_FLOAT, LOCAL_GL_FALSE, sizeof(gfx::VRDistortionVertex), (void*) (sizeof(float) * 0));
+    gl()->fVertexAttribPointer(mVR.mATexCoord0, 2, LOCAL_GL_FLOAT, LOCAL_GL_FALSE, sizeof(gfx::VRDistortionVertex), (void*) (sizeof(float) * 2));
+    gl()->fVertexAttribPointer(mVR.mATexCoord1, 2, LOCAL_GL_FLOAT, LOCAL_GL_FALSE, sizeof(gfx::VRDistortionVertex), (void*) (sizeof(float) * 4));
+    gl()->fVertexAttribPointer(mVR.mATexCoord2, 2, LOCAL_GL_FLOAT, LOCAL_GL_FALSE, sizeof(gfx::VRDistortionVertex), (void*) (sizeof(float) * 6));
+    gl()->fVertexAttribPointer(mVR.mAGenericAttribs, 4, LOCAL_GL_FLOAT, LOCAL_GL_FALSE, sizeof(gfx::VRDistortionVertex),  (void*) (sizeof(float) * 8));
 
     gl()->fBindBuffer(LOCAL_GL_ELEMENT_ARRAY_BUFFER, mVR.mDistortionIndices[eye]);
     gl()->fDrawElements(LOCAL_GL_TRIANGLES, mVR.mDistortionIndexCount[eye], LOCAL_GL_UNSIGNED_SHORT, 0);

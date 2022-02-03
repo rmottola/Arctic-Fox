@@ -12,6 +12,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "BrowserUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "DeferredTask",
   "resource://gre/modules/DeferredTask.jsm");
 
+const NS_XHTML = "http://www.w3.org/1999/xhtml";
 const BUNDLE_URL = "chrome://global/locale/viewSource.properties";
 
 // These are markers used to delimit the selection during processing. They
@@ -43,11 +44,11 @@ let ViewSourceContent = {
   messages: [
     "ViewSource:LoadSource",
     "ViewSource:LoadSourceDeprecated",
+    "ViewSource:LoadSourceWithSelection",
     "ViewSource:GoToLine",
     "ViewSource:ToggleWrapping",
     "ViewSource:ToggleSyntaxHighlighting",
     "ViewSource:SetCharacterSet",
-    "ViewSource:ScheduleDrawSelection",
   ],
 
   /**
@@ -134,6 +135,9 @@ let ViewSourceContent = {
         this.viewSourceDeprecated(data.URL, objects.pageDescriptor, data.lineNumber,
                                   data.forcedCharSet);
         break;
+      case "ViewSource:LoadSourceWithSelection":
+        this.viewSourceWithSelection(data.URL, data.drawSelection, data.baseURI);
+        break;
       case "ViewSource:GoToLine":
         this.goToLine(data.lineNumber);
         break;
@@ -145,9 +149,6 @@ let ViewSourceContent = {
         break;
       case "ViewSource:SetCharacterSet":
         this.setCharacterSet(data.charset, data.doPageLoad);
-        break;
-      case "ViewSource:ScheduleDrawSelection":
-        this.scheduleDrawSelection();
         break;
     }
   },
@@ -349,16 +350,28 @@ let ViewSourceContent = {
   },
 
   /**
-   * This handler is specifically for click events bubbling up from
-   * error page content, which can show up if the user attempts to
-   * view the source of an attack page.
+   * This handler is for click events from:
+   *   * error page content, which can show up if the user attempts to view the
+   *     source of an attack page.
+   *   * in-page context menu actions
    */
   onClick(event) {
+    let target = event.originalTarget;
+    // Check for content menu actions
+    if (target.id) {
+      this.contextMenuItems.forEach(itemSpec => {
+        if (itemSpec.id !== target.id) {
+          return;
+        }
+        itemSpec.handler.call(this, event);
+        event.stopPropagation();
+      });
+    }
+
     // Don't trust synthetic events
     if (!event.isTrusted || event.target.localName != "button")
       return;
 
-    let target = event.originalTarget;
     let errorDoc = target.ownerDocument;
 
     if (/^about:blocked/.test(errorDoc.documentURI)) {
@@ -404,6 +417,10 @@ let ViewSourceContent = {
         content.document.documentURI.startsWith("view-source:")) {
       this.needsDrawSelection = false;
       this.drawSelection();
+    }
+
+    if (content.document.body) {
+      this.injectContextMenu();
     }
 
     sendAsyncMessage("ViewSource:SourceLoaded");
@@ -655,21 +672,23 @@ let ViewSourceContent = {
 
   /**
    * Toggles the "wrap" class on the document body, which sets whether
-   * or not long lines are wrapped.
+   * or not long lines are wrapped.  Notifies parent to update the pref.
    */
   toggleWrapping() {
     let body = content.document.body;
-    body.classList.toggle("wrap");
+    let state = body.classList.toggle("wrap");
+    sendAsyncMessage("ViewSource:StoreWrapping", { state });
   },
 
   /**
-   * Called when the parent has changed the syntax highlighting pref.
+   * Toggles the "highlight" class on the document body, which sets whether
+   * or not syntax highlighting is displayed.  Notifies parent to update the
+   * pref.
    */
   toggleSyntaxHighlighting() {
-    // The parent process should have set the view_source.syntax_highlight
-    // pref to the desired value. The reload brings that setting into
-    // effect.
-    this.reload();
+    let body = content.document.body;
+    let state = body.classList.toggle("highlight");
+    sendAsyncMessage("ViewSource:StoreSyntaxHighlighting", { state });
   },
 
   /**
@@ -741,6 +760,28 @@ let ViewSourceContent = {
   },
 
   /**
+   * Loads a view source selection showing the given view-source url and
+   * highlight the selection.
+   *
+   * @param uri view-source uri to show
+   * @param drawSelection true to highlight the selection
+   * @param baseURI base URI of the original document
+   */
+  viewSourceWithSelection(uri, drawSelection, baseURI)
+  {
+    this.needsDrawSelection = drawSelection;
+
+    // all our content is held by the data:URI and URIs are internally stored as utf-8 (see nsIURI.idl)
+    let loadFlags = Ci.nsIWebNavigation.LOAD_FLAGS_NONE;
+    let referrerPolicy = Ci.nsIHttpChannel.REFERRER_POLICY_DEFAULT;
+    let webNav = docShell.QueryInterface(Ci.nsIWebNavigation);
+    webNav.loadURIWithOptions(uri, loadFlags,
+                              null, referrerPolicy,  // referrer
+                              null, null,  // postData, headers
+                              Services.io.newURI(baseURI, null, null));
+  },
+
+  /**
    * nsISelectionListener
    */
 
@@ -757,15 +798,6 @@ let ViewSourceContent = {
     }
 
     this.updateStatusTask.arm();
-  },
-
-  /**
-   * Chrome has requested that we draw a selection once the content loads.
-   * We set a flag, and wait for the load event, where drawSelection() will be
-   * called to do the real work.
-   */
-  scheduleDrawSelection() {
-    this.needsDrawSelection = true;
   },
 
   /**
@@ -861,6 +893,87 @@ let ViewSourceContent = {
     findInst.wrapFind      = wrapFind;
     findInst.findBackwards = findBackwards;
     findInst.searchString  = searchString;
+  },
+
+  /**
+   * In-page context menu items that are injected after page load.
+   */
+  contextMenuItems: [
+    {
+      id: "goToLine",
+      accesskey: true,
+      handler() {
+        sendAsyncMessage("ViewSource:PromptAndGoToLine");
+      }
+    },
+    {
+      id: "wrapLongLines",
+      get checked() {
+        return Services.prefs.getBoolPref("view_source.wrap_long_lines");
+      },
+      handler() {
+        this.toggleWrapping();
+      }
+    },
+    {
+      id: "highlightSyntax",
+      get checked() {
+        return Services.prefs.getBoolPref("view_source.syntax_highlight");
+      },
+      handler() {
+        this.toggleSyntaxHighlighting();
+      }
+    },
+  ],
+
+  /**
+   * Add context menu items for view source specific actions.
+   */
+  injectContextMenu() {
+    let doc = content.document;
+
+    let menu = doc.createElementNS(NS_XHTML, "menu");
+    menu.setAttribute("type", "context");
+    menu.setAttribute("id", "actions");
+    doc.body.appendChild(menu);
+    doc.body.setAttribute("contextmenu", "actions");
+
+    this.contextMenuItems.forEach(itemSpec => {
+      let item = doc.createElementNS(NS_XHTML, "menuitem");
+      item.setAttribute("id", itemSpec.id);
+      let labelName = `context_${itemSpec.id}_label`;
+      let label = this.bundle.GetStringFromName(labelName);
+      item.setAttribute("label", label);
+      if ("checked" in itemSpec) {
+        item.setAttribute("type", "checkbox");
+      }
+      if (itemSpec.accesskey) {
+        let accesskeyName = `context_${itemSpec.id}_accesskey`;
+        item.setAttribute("accesskey",
+                          this.bundle.GetStringFromName(accesskeyName))
+      }
+      menu.appendChild(item);
+    });
+
+    this.updateContextMenu();
+  },
+
+  /**
+   * Update state of checkbox-style context menu items.
+   */
+  updateContextMenu() {
+    let doc = content.document;
+    this.contextMenuItems.forEach(itemSpec => {
+      if (!("checked" in itemSpec)) {
+        return;
+      }
+      let item = doc.getElementById(itemSpec.id);
+      if (itemSpec.checked) {
+        item.setAttribute("checked", true);
+      } else {
+        item.removeAttribute("checked");
+      }
+    });
   },
 };
 ViewSourceContent.init();

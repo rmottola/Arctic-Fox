@@ -273,6 +273,7 @@
     macro(match, match, "match") \
     macro(species, species, "species") \
     macro(hasInstance, hasInstance, "hasInstance") \
+    macro(toPrimitive, toPrimitive, "toPrimtive") \
     macro(unscopables, unscopables, "unscopables") \
     /* Same goes for the descriptions of the well-known symbols. */ \
     macro(Symbol_create, Symbol_create, "Symbol.create") \

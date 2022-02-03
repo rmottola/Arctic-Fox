@@ -463,7 +463,7 @@ class SnapshotIterator
 
   private:
     friend class RSimdBox;
-    const FloatRegisters::RegisterContent* floatAllocationPointer(const RValueAllocation &a) const;
+    const FloatRegisters::RegisterContent* floatAllocationPointer(const RValueAllocation& a) const;
 
   public:
     // Handle iterating over RValueAllocations of the snapshots.

@@ -26,9 +26,8 @@ struct JSContext;
 class nsCSSPropertySet;
 
 namespace mozilla {
-namespace css {
+
 class AnimValuesStyleRule;
-} // namespace css
 
 /**
  * Input timing parameters.
@@ -72,24 +71,25 @@ struct AnimationTiming
 struct ComputedTiming
 {
   ComputedTiming()
-    : mTimeFraction(kNullTimeFraction)
+    : mProgress(kNullProgress)
     , mCurrentIteration(0)
     , mPhase(AnimationPhase_Null)
   { }
 
-  static const double kNullTimeFraction;
+  static const double kNullProgress;
 
   // The total duration of the animation including all iterations.
   // Will equal StickyTimeDuration::Forever() if the animation repeats
   // indefinitely.
   StickyTimeDuration mActiveDuration;
 
-  // Will be kNullTimeFraction if the animation is neither animating nor
+  // Progress towards the end of the current iteration. If the effect is
+  // being sampled backwards, this will go from 1.0 to 0.0.
+  // Will be kNullProgress if the animation is neither animating nor
   // filling at the sampled time.
-  double mTimeFraction;
+  double mProgress;
 
-  // Zero-based iteration index (meaningless if mTimeFraction is
-  // kNullTimeFraction).
+  // Zero-based iteration index (meaningless if mProgress is kNullProgress).
   uint64_t mCurrentIteration;
 
   enum {
@@ -196,7 +196,6 @@ public:
     : AnimationEffectReadOnly(aDocument)
     , mTarget(aTarget)
     , mTiming(aTiming)
-    , mIsFinishedTransition(false)
     , mPseudoType(aPseudoType)
   {
     MOZ_ASSERT(aTarget, "null animation target is not yet supported");
@@ -243,6 +242,10 @@ public:
     return mTiming;
   }
 
+  // FIXME: Drop |aOwningAnimation| once we make AnimationEffects track their
+  // owning animation.
+  void SetTiming(const AnimationTiming& aTiming, Animation& aOwningAnimtion);
+
   // Return the duration from the start the active interval to the point where
   // the animation begins playback. This is zero unless the animation has
   // a negative delay in which case it is the absolute value of the delay.
@@ -264,9 +267,9 @@ public:
   // active duration are calculated. All other members of the returned object
   // are given a null/initial value.
   //
-  // This function returns ComputedTiming::kNullTimeFraction for the
-  // mTimeFraction member of the return value if the animation should not be
-  // run (because it is not currently active and is not filling at this time).
+  // This function returns ComputedTiming::kNullProgress for the mProgress
+  // member of the return value if the animation should not be run
+  // (because it is not currently active and is not filling at this time).
   static ComputedTiming
   GetComputedTimingAt(const Nullable<TimeDuration>& aLocalTime,
                       const AnimationTiming& aTiming);
@@ -281,20 +284,6 @@ public:
   // Return the duration of the active interval for the given timing parameters.
   static StickyTimeDuration
   ActiveDuration(const AnimationTiming& aTiming);
-
-  // After transitions finish they need to be retained in order to
-  // address the issue described in
-  // https://lists.w3.org/Archives/Public/www-style/2015Jan/0444.html .
-  // However, finished transitions are ignored for many purposes.
-  bool IsFinishedTransition() const {
-    return mIsFinishedTransition;
-  }
-
-  void SetIsFinishedTransition(bool aIsFinished) {
-    MOZ_ASSERT(AsTransition(),
-               "Calling SetIsFinishedTransition but it's not a transition");
-    mIsFinishedTransition = aIsFinished;
-  }
 
   bool IsInPlay(const Animation& aAnimation) const;
   bool IsCurrent(const Animation& aAnimation) const;
@@ -318,7 +307,7 @@ public:
   // Animation for the current time except any properties already contained
   // in |aSetProperties|.
   // Any updated properties are added to |aSetProperties|.
-  void ComposeStyle(nsRefPtr<css::AnimValuesStyleRule>& aStyleRule,
+  void ComposeStyle(nsRefPtr<AnimValuesStyleRule>& aStyleRule,
                     nsCSSPropertySet& aSetProperties);
 
 protected:
@@ -328,9 +317,6 @@ protected:
   Nullable<TimeDuration> mParentTime;
 
   AnimationTiming mTiming;
-  // A flag to mark transitions that have finished and are due to
-  // be removed on the next throttle-able cycle.
-  bool mIsFinishedTransition;
   nsCSSPseudoElements::Type mPseudoType;
 
   InfallibleTArray<AnimationProperty> mProperties;

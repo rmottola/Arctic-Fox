@@ -297,9 +297,10 @@ public:
                                 NrIceCtx::ConnectionState state);
   void IceGatheringStateChange(NrIceCtx* ctx,
                                NrIceCtx::GatheringState state);
-  // TODO(bug 1096795): Need a |component| id here for rtcp.
   void EndOfLocalCandidates(const std::string& defaultAddr,
                             uint16_t defaultPort,
+                            const std::string& defaultRtcpAddr,
+                            uint16_t defaultRtcpPort,
                             uint16_t level);
   void IceStreamReady(NrIceMediaStream *aStream);
 
@@ -405,7 +406,7 @@ public:
 
   NS_IMETHODIMP_TO_ERRORRESULT(AddTrack, ErrorResult &rv,
       mozilla::dom::MediaStreamTrack& aTrack,
-      const mozilla::dom::Sequence<mozilla::dom::OwningNonNull<DOMMediaStream>>& aStreams)
+      const mozilla::dom::Sequence<mozilla::OwningNonNull<DOMMediaStream>>& aStreams)
   {
     rv = AddTrack(aTrack, aStreams);
   }
@@ -574,10 +575,11 @@ public:
   const std::vector<std::string> &GetSdpParseErrors();
 
   // Sets the RTC Signaling State
-  void SetSignalingState_m(mozilla::dom::PCImplSignalingState aSignalingState);
+  void SetSignalingState_m(mozilla::dom::PCImplSignalingState aSignalingState,
+                           bool rollback = false);
 
   // Updates the RTC signaling state based on the JsepSession state
-  void UpdateSignalingState();
+  void UpdateSignalingState(bool rollback = false);
 
   bool IsClosed() const;
   // called when DTLS connects; we only need this once

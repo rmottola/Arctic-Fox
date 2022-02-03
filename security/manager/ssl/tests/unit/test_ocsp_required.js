@@ -14,6 +14,7 @@ let gOCSPRequestCount = 0;
 function run_test() {
   do_get_profile();
   Services.prefs.setBoolPref("security.OCSP.require", true);
+  Services.prefs.setIntPref("security.OCSP.enabled", 1);
 
   // We don't actually make use of stapling in this test. This is just how we
   // get a TLS connection.
@@ -42,9 +43,9 @@ function run_test() {
 function add_tests()
 {
   add_connection_test("ocsp-stapling-none.example.com",
-                      getXPCOMStatusFromNSS(SEC_ERROR_OCSP_BAD_SIGNATURE));
+                      SEC_ERROR_OCSP_BAD_SIGNATURE);
   add_connection_test("ocsp-stapling-none.example.com",
-                      getXPCOMStatusFromNSS(SEC_ERROR_OCSP_BAD_SIGNATURE));
+                      SEC_ERROR_OCSP_BAD_SIGNATURE);
   add_test(function () {
     do_check_eq(gOCSPRequestCount, 1);
     gOCSPRequestCount = 0;

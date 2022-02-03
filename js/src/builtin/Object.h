@@ -23,7 +23,7 @@ bool
 obj_construct(JSContext* cx, unsigned argc, JS::Value* vp);
 
 bool
-obj_propertyIsEnumerable(JSContext* cx, unsigned argc, JS::Value* vp);
+obj_propertyIsEnumerable(JSContext* cx, unsigned argc, Value* vp);
 
 bool
 obj_valueOf(JSContext* cx, unsigned argc, JS::Value* vp);

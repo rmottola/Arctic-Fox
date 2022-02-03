@@ -39,18 +39,11 @@ NS_IMPL_CYCLE_COLLECTION_CLASS(XPCWrappedNative)
 // collected then its mFlatJSObject will be cycle collected too and
 // finalization of the mFlatJSObject will unlink the JS objects (see
 // XPC_WN_NoHelper_Finalize and FlatJSObjectFinalized).
-NS_IMETHODIMP_(void)
-NS_CYCLE_COLLECTION_CLASSNAME(XPCWrappedNative)::Unlink(void* p)
-{
-    XPCWrappedNative* tmp = static_cast<XPCWrappedNative*>(p);
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(XPCWrappedNative)
     tmp->ExpireWrapper();
-}
+NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
-NS_IMETHODIMP
-NS_CYCLE_COLLECTION_CLASSNAME(XPCWrappedNative)::Traverse
-   (void* p, nsCycleCollectionTraversalCallback& cb)
-{
-    XPCWrappedNative* tmp = static_cast<XPCWrappedNative*>(p);
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(XPCWrappedNative)
     if (!tmp->IsValid())
         return NS_OK;
 
@@ -91,8 +84,7 @@ NS_CYCLE_COLLECTION_CLASSNAME(XPCWrappedNative)::Traverse
 
     tmp->NoteTearoffs(cb);
 
-    return NS_OK;
-}
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 void
 XPCWrappedNative::Suspect(nsCycleCollectionNoteRootCallback& cb)
@@ -784,7 +776,6 @@ XPCWrappedNative::Init(const XPCNativeScriptableCreateInfo* sci)
                jsclazz->name &&
                jsclazz->flags &&
                jsclazz->resolve &&
-               jsclazz->convert &&
                jsclazz->finalize, "bad class");
 
     // XXXbz JS_GetObjectPrototype wants an object, even though it then asserts
@@ -1507,7 +1498,10 @@ CallMethodHelper::GetArraySizeFromParam(uint8_t paramIndex,
         MOZ_ASSERT(mMethodInfo->GetParam(paramIndex).IsOptional());
         RootedObject arrayOrNull(mCallContext, maybeArray.isObject() ? &maybeArray.toObject()
                                                                      : nullptr);
-        if (!JS_IsArrayObject(mCallContext, maybeArray) ||
+
+        bool isArray;
+        if (!JS_IsArrayObject(mCallContext, maybeArray, &isArray) ||
+            !isArray ||
             !JS_GetArrayLength(mCallContext, arrayOrNull, &GetDispatchParam(paramIndex)->val.u32))
         {
             return Throw(NS_ERROR_XPC_CANT_CONVERT_OBJECT_TO_ARRAY, mCallContext);

@@ -127,9 +127,15 @@ PlacesController.prototype = {
   isCommandEnabled: function PC_isCommandEnabled(aCommand) {
     switch (aCommand) {
     case "cmd_undo":
-      return PlacesUtils.transactionManager.numberOfUndoItems > 0;
+      if (!PlacesUIUtils.useAsyncTransactions)
+        return PlacesUtils.transactionManager.numberOfUndoItems > 0;
+
+      return PlacesTransactions.topUndoEntry != null;
     case "cmd_redo":
-      return PlacesUtils.transactionManager.numberOfRedoItems > 0;
+      if (!PlacesUIUtils.useAsyncTransactions)
+        return PlacesUtils.transactionManager.numberOfRedoItems > 0;
+
+      return PlacesTransactions.topRedoEntry != null;
     case "cmd_cut":
     case "placesCmd_cut":
     case "placesCmd_moveBookmarks":
@@ -202,10 +208,18 @@ PlacesController.prototype = {
   doCommand: function PC_doCommand(aCommand) {
     switch (aCommand) {
     case "cmd_undo":
-      PlacesUtils.transactionManager.undoTransaction();
+      if (!PlacesUIUtils.useAsyncTransactions) {
+        PlacesUtils.transactionManager.undoTransaction();
+        return;
+      }
+      PlacesTransactions.undo().then(null, Components.utils.reportError);
       break;
     case "cmd_redo":
-      PlacesUtils.transactionManager.redoTransaction();
+      if (!PlacesUIUtils.useAsyncTransactions) {
+        PlacesUtils.transactionManager.redoTransaction();
+        return;
+      }
+      PlacesTransactions.redo().then(null, Components.utils.reportError);
       break;
     case "cmd_cut":
     case "placesCmd_cut":
@@ -337,20 +351,6 @@ PlacesController.prototype = {
   },
 
   /**
-   * Determines whether or not the root node for the view is selected
-   */
-  rootNodeIsSelected: function PC_rootNodeIsSelected() {
-    var nodes = this._view.selectedNodes;
-    var root = this._view.result.root;
-    for (var i = 0; i < nodes.length; ++i) {
-      if (nodes[i] == root)
-        return true;
-    }
-
-    return false;
-  },
-
-  /**
    * Looks at the data on the clipboard to see if it is paste-able.
    * Paste-able data is:
    *   - in a format that the view can receive
@@ -403,7 +403,7 @@ PlacesController.prototype = {
    * Gathers information about the selected nodes according to the following
    * rules:
    *    "link"              node is a URI
-   *    "bookmark"          node is a bookamrk
+   *    "bookmark"          node is a bookmark
    *    "livemarkChild"     node is a child of a livemark
    *    "tagChild"          node is a child of a tag
    *    "folder"            node is a folder
@@ -417,15 +417,10 @@ PlacesController.prototype = {
    *          node are set on its corresponding object as properties.
    * Notes:
    *   1) This can be slow, so don't call it anywhere performance critical!
-   *   2) A single-object array corresponding the root node is returned if
-   *      there's no selection.
    */
   _buildSelectionMetadata: function PC__buildSelectionMetadata() {
     var metadata = [];
-    var root = this._view.result.root;
     var nodes = this._view.selectedNodes;
-    if (nodes.length == 0)
-      nodes.push(root); // See the second note above
 
     for (var i = 0; i < nodes.length; i++) {
       var nodeData = {};
@@ -506,10 +501,23 @@ PlacesController.prototype = {
    */
   _shouldShowMenuItem: function PC__shouldShowMenuItem(aMenuItem, aMetaData) {
     var selectiontype = aMenuItem.getAttribute("selectiontype");
-    if (selectiontype == "multiple" && aMetaData.length == 1)
+    if (!selectiontype) {
+      selectiontype = "single|multiple";
+    }
+    var selectionTypes = selectiontype.split("|");
+    if (selectionTypes.indexOf("any") != -1) {
+      return true;
+    }
+    var count = aMetaData.length;
+    if (count > 1 && selectionTypes.indexOf("multiple") == -1)
       return false;
-    if (selectiontype == "single" && aMetaData.length != 1)
+    if (count == 1 && selectionTypes.indexOf("single") == -1)
       return false;
+    // NB: if there is no selection, we show the item if and only if
+    // the selectiontype includes 'none' - the metadata list will be
+    // empty so none of the other criteria will apply anyway.
+    if (count == 0)
+      return selectionTypes.indexOf("none") != -1;
 
     var forceHideAttr = aMenuItem.getAttribute("forcehideselection");
     if (forceHideAttr) {
@@ -556,9 +564,11 @@ PlacesController.prototype = {
    *  1) The "selectiontype" attribute may be set on a menu-item to "single"
    *     if the menu-item should be visible only if there is a single node
    *     selected, or to "multiple" if the menu-item should be visible only if
-   *     multiple nodes are selected. If the attribute is not set or if it is
-   *     set to an invalid value, the menu-item may be visible for both types of
-   *     selection.
+   *     multiple nodes are selected, or to "none" if the menuitems should be
+   *     visible for if there are no selected nodes, or to a |-separated
+   *     combination of these.
+   *     If the attribute is not set or set to an invalid value, the menu-item
+   *     may be visible irrespective of the selection.
    *  2) The "selection" attribute may be set on a menu-item to the various
    *     meta-data rules for which it may be visible. The rules should be
    *     separated with the | character.
@@ -589,26 +599,22 @@ PlacesController.prototype = {
 
     var separator = null;
     var visibleItemsBeforeSep = false;
-    var anyVisible = false;
+    var usableItemCount = 0;
     for (var i = 0; i < aPopup.childNodes.length; ++i) {
       var item = aPopup.childNodes[i];
       if (item.localName != "menuseparator") {
         // We allow pasting into tag containers, so special case that.
         var hideIfNoIP = item.getAttribute("hideifnoinsertionpoint") == "true" &&
                          noIp && !(ip && ip.isTag && item.id == "placesContext_paste");
-        // Show the "Open Containing Folder" menu-item only when the context is
-        // in the Library or in the Sidebar, and only when there's no insertion
-        // point.
-        var hideParentFolderItem = item.id == "placesContext_openParentFolder" &&
-                                   (!/tree/i.test(this._view.localName) || ip);
         var hideIfPrivate = item.getAttribute("hideifprivatebrowsing") == "true" &&
                             PrivateBrowsingUtils.isWindowPrivate(window);
-        item.hidden = hideIfNoIP || hideIfPrivate || hideParentFolderItem ||
-                      !this._shouldShowMenuItem(item, metadata);
+        var shouldHideItem = hideIfNoIP || hideIfPrivate ||
+                             !this._shouldShowMenuItem(item, metadata);
+        item.hidden = item.disabled = shouldHideItem;
 
         if (!item.hidden) {
           visibleItemsBeforeSep = true;
-          anyVisible = true;
+          usableItemCount++;
 
           // Show the separator above the menu-item if any
           if (separator) {
@@ -632,21 +638,21 @@ PlacesController.prototype = {
     }
 
     // Set Open Folder/Links In Tabs items enabled state if they're visible
-    if (anyVisible) {
+    if (usableItemCount > 0) {
       var openContainerInTabsItem = document.getElementById("placesContext_openContainer:tabs");
-      if (!openContainerInTabsItem.hidden && this._view.selectedNode &&
-          PlacesUtils.nodeIsContainer(this._view.selectedNode)) {
-        openContainerInTabsItem.disabled =
-          !PlacesUtils.hasChildURIs(this._view.selectedNode);
-      }
-      else {
-        // see selectiontype rule in the overlay
-        var openLinksInTabsItem = document.getElementById("placesContext_openLinks:tabs");
-        openLinksInTabsItem.disabled = openLinksInTabsItem.hidden;
+      if (!openContainerInTabsItem.hidden) {
+        var containerToUse = this._view.selectedNode || this._view.result.root;
+        if (PlacesUtils.nodeIsContainer(containerToUse)) {
+          if (!PlacesUtils.hasChildURIs(containerToUse)) {
+            openContainerInTabsItem.disabled = true;
+            // Ensure that we don't display the menu if nothing is enabled:
+            usableItemCount--;
+          }
+        }
       }
     }
 
-    return anyVisible;
+    return usableItemCount > 0;
   },
 
   /**
@@ -665,7 +671,7 @@ PlacesController.prototype = {
       return;
 
     PlacesUIUtils.showBookmarkDialog({ action: "edit"
-				     , node
+                                     , node
                                      , hiddenRows: [ "folderPicker" ]
                                      }, window.top);
   },
@@ -698,10 +704,15 @@ PlacesController.prototype = {
    */
   openSelectionInTabs: function PC_openLinksInTabs(aEvent) {
     var node = this._view.selectedNode;
+    var nodes = this._view.selectedNodes;
+    // In the case of no selection, open the root node:
+    if (!node && !nodes.length) {
+      node = this._view.result.root;
+    }
     if (node && PlacesUtils.nodeIsContainer(node))
-      PlacesUIUtils.openContainerNodeInTabs(this._view.selectedNode, aEvent, this._view);
+      PlacesUIUtils.openContainerNodeInTabs(node, aEvent, this._view);
     else
-      PlacesUIUtils.openURINodesInTabs(this._view.selectedNodes, aEvent, this._view);
+      PlacesUIUtils.openURINodesInTabs(nodes, aEvent, this._view);
   },
 
   /**

@@ -15,7 +15,8 @@ KeyboardEvent::KeyboardEvent(EventTarget* aOwner,
                              nsPresContext* aPresContext,
                              WidgetKeyboardEvent* aEvent)
   : UIEvent(aOwner, aPresContext,
-            aEvent ? aEvent : new WidgetKeyboardEvent(false, 0, nullptr))
+            aEvent ? aEvent :
+                     new WidgetKeyboardEvent(false, NS_EVENT_NULL, nullptr))
   , mInitializedByCtor(false)
   , mInitializedWhichValue(0)
 {
@@ -151,7 +152,7 @@ KeyboardEvent::CharCode()
     return mEvent->AsKeyboardEvent()->charCode;
   }
 
-  switch (mEvent->message) {
+  switch (mEvent->mMessage) {
   case NS_KEY_BEFORE_DOWN:
   case NS_KEY_DOWN:
   case NS_KEY_AFTER_DOWN:
@@ -161,6 +162,8 @@ KeyboardEvent::CharCode()
     return 0;
   case NS_KEY_PRESS:
     return mEvent->AsKeyboardEvent()->charCode;
+  default:
+    break;
   }
   return 0;
 }
@@ -195,7 +198,7 @@ KeyboardEvent::Which()
     return mInitializedWhichValue;
   }
 
-  switch (mEvent->message) {
+  switch (mEvent->mMessage) {
     case NS_KEY_BEFORE_DOWN:
     case NS_KEY_DOWN:
     case NS_KEY_AFTER_DOWN:
@@ -213,6 +216,8 @@ KeyboardEvent::Which()
         }
         return CharCode();
       }
+    default:
+      break;
   }
 
   return 0;
@@ -309,14 +314,11 @@ KeyboardEvent::InitKeyEvent(const nsAString& aType,
 using namespace mozilla;
 using namespace mozilla::dom;
 
-nsresult
-NS_NewDOMKeyboardEvent(nsIDOMEvent** aInstancePtrResult,
-                       EventTarget* aOwner,
+already_AddRefed<KeyboardEvent>
+NS_NewDOMKeyboardEvent(EventTarget* aOwner,
                        nsPresContext* aPresContext,
                        WidgetKeyboardEvent* aEvent)
 {
-  KeyboardEvent* it = new KeyboardEvent(aOwner, aPresContext, aEvent);
-  NS_ADDREF(it);
-  *aInstancePtrResult = static_cast<Event*>(it);
-  return NS_OK;
+  nsRefPtr<KeyboardEvent> it = new KeyboardEvent(aOwner, aPresContext, aEvent);
+  return it.forget();
 }

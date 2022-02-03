@@ -791,7 +791,7 @@ class AsmJSHeapAccess
     uint32_t insnOffset() const { return insnOffset_; }
     void setInsnOffset(uint32_t insnOffset) { insnOffset_ = insnOffset; }
 #if defined(JS_CODEGEN_X86)
-    void *patchHeapPtrImmAt(uint8_t *code) const { return code + (insnOffset_ + opLength_); }
+    void* patchHeapPtrImmAt(uint8_t* code) const { return code + (insnOffset_ + opLength_); }
 #endif
 #if defined(JS_CODEGEN_X64)
     bool throwOnOOB() const { return throwOnOOB_; }
@@ -799,7 +799,7 @@ class AsmJSHeapAccess
 #endif
 #if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
     bool hasLengthCheck() const { return cmpDelta_ > 0; }
-    void *patchLengthAt(uint8_t *code) const {
+    void* patchLengthAt(uint8_t* code) const {
         MOZ_ASSERT(hasLengthCheck());
         return code + (insnOffset_ - cmpDelta_);
     }

@@ -30,8 +30,8 @@ struct JSCompartment;
 namespace JS {
 namespace dbg {
 class AutoEntryMonitor;
-}
-}
+} // namespace dbg
+} // namespace JS
 
 namespace js {
 
@@ -255,6 +255,11 @@ class AbstractFramePtr
 
     inline void popBlock(JSContext* cx) const;
     inline void popWith(JSContext* cx) const;
+
+    friend void GDBTestInitAbstractFramePtr(AbstractFramePtr&, void*);
+    friend void GDBTestInitAbstractFramePtr(AbstractFramePtr&, InterpreterFrame*);
+    friend void GDBTestInitAbstractFramePtr(AbstractFramePtr&, jit::BaselineFrame*);
+    friend void GDBTestInitAbstractFramePtr(AbstractFramePtr&, jit::RematerializedFrame*);
 };
 
 class NullFramePtr : public AbstractFramePtr
@@ -562,7 +567,7 @@ class InterpreterFrame
     unsigned numActualArgs() const { MOZ_ASSERT(hasArgs()); return u.nactual; }
 
     /* Watch out, this exposes a pointer to the unaliased formal arg array. */
-    Value* argv() const { return argv_; }
+    Value* argv() const { MOZ_ASSERT(hasArgs()); return argv_; }
 
     /*
      * Arguments object
@@ -608,7 +613,7 @@ class InterpreterFrame
 
     inline void pushOnScopeChain(ScopeObject& scope);
     inline void popOffScopeChain();
-    inline void replaceInnermostScope(ScopeObject &scope);
+    inline void replaceInnermostScope(ScopeObject& scope);
 
     /*
      * For blocks with aliased locals, these interfaces push and pop entries on
@@ -619,7 +624,7 @@ class InterpreterFrame
 
     bool pushBlock(JSContext* cx, StaticBlockObject& block);
     void popBlock(JSContext* cx);
-    bool freshenBlock(JSContext *cx);
+    bool freshenBlock(JSContext* cx);
 
     /*
      * With
@@ -1007,6 +1012,9 @@ class InterpreterRegs
     HandleValue stackHandleAt(int i) const {
         return HandleValue::fromMarkedLocation(&sp[i]);
     }
+
+    friend void GDBTestInitInterpreterRegs(InterpreterRegs&, js::InterpreterFrame*,
+                                           JS::Value*, uint8_t*);
 };
 
 /*****************************************************************************/
@@ -1306,7 +1314,7 @@ class Activation
     //
     // Usually this is nullptr, meaning that normal stack capture will occur.
     // When this is set, the stack of any previous activation is ignored.
-    Rooted<SavedFrame *> asyncStack_;
+    Rooted<SavedFrame*> asyncStack_;
 
     // Value of asyncCause to be attached to asyncStack_.
     RootedString asyncCause_;
@@ -1392,11 +1400,11 @@ class Activation
         return offsetof(Activation, prevProfiling_);
     }
 
-    SavedFrame *asyncStack() {
+    SavedFrame* asyncStack() {
         return asyncStack_;
     }
 
-    JSString *asyncCause() {
+    JSString* asyncCause() {
         return asyncCause_;
     }
 
@@ -1592,6 +1600,9 @@ class JitActivation : public Activation
     uint8_t* prevJitTop() const {
         return prevJitTop_;
     }
+    JitActivation* prevJitActivation() const {
+        return prevJitActivation_;
+    }
     static size_t offsetOfPrevJitTop() {
         return offsetof(JitActivation, prevJitTop_);
     }
@@ -1630,6 +1641,10 @@ class JitActivation : public Activation
     // Look up a rematerialized frame by the fp. If inlineDepth is out of
     // bounds of what has been rematerialized, nullptr is returned.
     RematerializedFrame* lookupRematerializedFrame(uint8_t* top, size_t inlineDepth = 0);
+
+    // Remove all rematerialized frames associated with the fp top from the
+    // Debugger.
+    void removeRematerializedFramesFromDebugger(JSContext* cx, uint8_t* top);
 
     bool hasRematerializedFrame(uint8_t* top, size_t inlineDepth = 0) {
         return !!lookupRematerializedFrame(top, inlineDepth);

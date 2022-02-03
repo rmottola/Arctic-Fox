@@ -55,6 +55,8 @@
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1266391 - 2016-04-21 Introduce an enum class mozilla::unicode::Script, and u
 - Bug 1209100 - 2016-03-21 - Back out bug 1165185 on inbound.
+- Bug 1296851 - 2016-10-27 Always allow SetPrototype with the same value as the cu
+- Bug 1263778 - 2016-03-19 Rename a bunch of low-level [[Prototype]] access method
 - Bug 1255511 - 2016-03-15 Skip beforeunload prompts once nsIAppStartup shuttingDo
 - Bug 1258905 - 2016-03-28 Remove a bunch of dead IPC code.
 - Bug 1252262 - 2016-03-08 - Don't combine the client offset into the outer rect for
@@ -69,6 +71,7 @@
 - 1219392 - Capitalize mozilla::unused to avoid conflicts
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
+- 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu
 - 1245241 remaining 4 parts
 - Bug 1245241 - 2016-02-18 - part 1 - Close Shmem file handles after mapping them wh
@@ -88,6 +91,7 @@
 - Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
 - Bug 1223916 - 2015-11-14 Prohibit direct method calls at the parser level in 
 - Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
+- Bug 1211546 - Unbreak the non-unified build. (r=sfink, r=nbp, r=shu) 
 - Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
 - Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
@@ -96,6 +100,7 @@
 - Bug 1214126 - 5 Parts
 - Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
+- Bug 1208385 part 1 - Store a pointer to the owning animation on each ¿ 
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - Bug 1214508: SharedStubs - Part 1: Move the getprop stubs in to share
 - Bug 1158111 - "Add caching and control updating tab offset values in 
@@ -129,9 +134,9 @@
 - Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
+- Bug 895274 - 1 to 270 parts
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
 -  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
-- Bug 1167409 - for parts
 - Bug 1192667 - Trigger fullscreen transition when exiting fullscreen
 - Bug 1198563
 - Bug 1190316 - Apply fullscreen transition on only the target monitor
@@ -147,44 +152,27 @@
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - Bug 1203857 - Allow to build standalone js against jemalloc4. r=gps 
 - 1185106 - at least part 0 to 4 for TFF
-- Bug 1160014 - 2015-07-24 - Implement fullscreen part 4-6
 - Bug 1171379 - and check all related on bugzilla
 - Bug 909154. Remove the prefixed mozRequestAnimationFrame and its acco
 - Bug 1184429 - 2015-07-17 P1. & P2
 - Bug 1123386 - Part 4: Update the tooltool manifests for the OSX an
-- Bug 1182316: Part 3 - Add assertions to most other WebIDL entry point
-- Bug 1182316 - 2015-07-12 - Part 2 - Rework FORWARD_TO_OUTER_OR_THROW. r=peterv
-- Bug 1179110 - 2015-07-02 Use a Maybe<> to store start time, rather than using -1
 - Bug 1184201 - Disable fullscreen transition on Windows
-- 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
-- Bug 1160014 - part 1 to 4
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
 - Bug 1181869 [provokes crashing] - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
-- Bug 905127 - Part 2 - remove unnecessary nsNetUtil.h includes r=jduell
-- Bug 905127 - 2015-07-07 - Part 1 - Make some functions from nsNetUtil not inline.
-- Bug 1172785 - 2016-07-06 remaining parts of RTCCertificate
-- 1178938 - 2015-07-02 5 parts
-- Bug 1175622 - Use the right API when transitively marking object grou	
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
 - Bug 1051052 - Made mid an outparam in JsepSession::AddLocalIceCandida
 - Bug 1204872 - 2015-09
-- Bug 1198861 - (1 of 2) Improve aliasing information and type barrier handling 
-- Bug 1200099. Add a test that captured cross-origin video
+- bug 1181823 - convert test_ev_certs.js, test_keysize_ev.js, a
 - Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
 --Bug 1194422 - Expose census traversals to SpiderMonkey embedders; r=s
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
-- Bug 830801 - Part 1. Set NOMINMAX define as default. r=mshal 
+- Bug 1195545 - 2015-08-27 - Add instruction reordering pass to IonMonkey, r=sunfish. 
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
-- Bug 1179569: Remove use of decoder's monitor in ResetDecode(). r=bholley
-- Bug 1178437 - Do the dormant-enabled tracking on the main thread. 
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 968923 - 2015-07-17 - part 6 - add use counters for deprecated operations; r=bz
-- Bug 1109354  (2015-06-15) - prefer Firefox default engines over profile-installed p
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
-- 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
-- Bug 1170081 - Add a tag to run only mochitests that use HTML
 
 
 impacting download and shutdown:
@@ -199,10 +187,9 @@ More session store stuff to check:
 ARM fixes to check
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1179514
 
-Lightweight themes stuff:
-
-- Bug 1148996 - Install a devedition lightweight theme on startup, then
-
+# Build System - not working
+Bug 706103 - replace chrome copy of files by overrides in browser/the
+Bug 1137364 - part 2 - move browser themes icon installation to FINAL
 
 Check with Roy Tam:
 - Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 
@@ -218,14 +205,27 @@ Check with Roy Tam:
 What with LightweightThemeConsumer.jsm 
 
 Parents of:
-https://github.com/mozilla/newtab-dev/commit/567240287fa9fe6f94fb49d0675512d6aa1c162c
+https://github.com/mozilla/newtab-dev/commit/ac250f9d737362d0730b0897603ae379eca89ebf
 
 ## Breaking JS
+-  Bug 603201 - Enable primitive receivers in [[Get]]. r=jorendorff 
+- Bug 1191570 - Use ToPropertyKey everywhere ES6 says to use it. r=Wald
+- Bug 1208747 - Move most of Stopwatch-related code to XPCOM-land (JSAP
+- Bug 1206290 - Part 1: Implement a JS::ubi::PostOrder depth first trav
+- Bug 1209704 - Part 2: Share storage and mixins between Read and Wri
+- Bug 1187062 - Part 2: Implement a concrete JS::ubi::StackFrame clas
+- Bug 1187062 - Part 1: Add the JS::ubi::StackFrame interface; r=sfink
+-  Bug 1187062 - Part 0: Make js::Debugger::getObjectAllocationSite retu
+- 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
 - Bug 1054756, part 5 - Remove Class::convert. 
 - Bug 1054756, part 4 - Remove BaseProxyHandler::defaultValue. r=jandem
 - Bug 1054756, part 3 - Implement Symbol.toPrimitive. Replace existing 
 - Bug 1088214 - Remove JSCLASS_IMPLEMENTS_BARRIERS now this is implemen
+- Bug 1193583 - Fix eval to always execute under a non-extensible lexi
+- Bug 1191236 - Remove extract() methods used by operation forwarding 
 - Bug 930414 - 22 parts
+- Bug 1167409 - 4/4 - Inititalize ScriptSourceObject even when off-main
+Bug 1191117 - Remove RootedGeneric and replace with normal Rooted usa
 Bug 1195866 - Make allocations log report whether an allocation was i
 - Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
 Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
@@ -240,9 +240,6 @@ Specifically check for duplicates:
 Shell Service not working? present but fails.
 Check TelemetryEnvironment.jsm _isDefaultBrowser
 
-
-Analyze all:
-https://bugzilla.mozilla.org/show_bug.cgi?id=1139700
 
 Remove hack of parserequestcontenttype in nsNetUtil.cpp
 
@@ -267,9 +264,6 @@ media/libstagefright/frameworks/av/media/libstagefright/MPEG4Extractor.cpp
 - move SharedThreadPool from domi/media to xpcom/threads
 - complete 1487964 port
 - check bugs: bug 1275755, bug 1352874, bug 1440824 as prerequisites for Bug 529808
-
-- Bug 1172609 - 8 part ICU update
-
 
 
 ### Further Further ToDo:

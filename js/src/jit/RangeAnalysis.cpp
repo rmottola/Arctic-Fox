@@ -1022,7 +1022,32 @@ Range::rsh(TempAllocator& alloc, const Range* lhs, const Range* rhs)
 {
     MOZ_ASSERT(lhs->isInt32());
     MOZ_ASSERT(rhs->isInt32());
-    return Range::NewInt32Range(alloc, Min(lhs->lower(), 0), Max(lhs->upper(), 0));
+
+    // Canonicalize the shift range to 0 to 31.
+    int32_t shiftLower = rhs->lower();
+    int32_t shiftUpper = rhs->upper();
+    if ((int64_t(shiftUpper) - int64_t(shiftLower)) >= 31) {
+        shiftLower = 0;
+        shiftUpper = 31;
+    } else {
+        shiftLower &= 0x1f;
+        shiftUpper &= 0x1f;
+        if (shiftLower > shiftUpper) {
+            shiftLower = 0;
+            shiftUpper = 31;
+        }
+    }
+    MOZ_ASSERT(shiftLower >= 0 && shiftUpper <= 31);
+
+    // The lhs bounds are signed, thus the minimum is either the lower bound
+    // shift by the smallest shift if negative or the lower bound shifted by the
+    // biggest shift otherwise.  And the opposite for the maximum.
+    int32_t lhsLower = lhs->lower();
+    int32_t min = lhsLower < 0 ? lhsLower >> shiftLower : lhsLower >> shiftUpper;
+    int32_t lhsUpper = lhs->upper();
+    int32_t max = lhsUpper >= 0 ? lhsUpper >> shiftLower : lhsUpper >> shiftUpper;
+
+    return Range::NewInt32Range(alloc, min, max);
 }
 
 Range*
@@ -1883,6 +1908,16 @@ RangeAnalysis::analyzeLoop(MBasicBlock* header)
     return true;
 }
 
+// Unbox beta nodes in order to hoist instruction properly, and not be limited
+// by the beta nodes which are added after each branch.
+static inline MDefinition*
+DefinitionOrBetaInputDefinition(MDefinition* ins)
+{
+    while (ins->isBeta())
+        ins = ins->toBeta()->input();
+    return ins;
+}
+
 LoopIterationBound*
 RangeAnalysis::analyzeLoopIterationCount(MBasicBlock* header,
                                          MTest* test, BranchDirection direction)
@@ -1928,9 +1963,8 @@ RangeAnalysis::analyzeLoopIterationCount(MBasicBlock* header,
 
     // The second operand of the phi should be a value written by an add/sub
     // in every loop iteration, i.e. in a block which dominates the backedge.
-    MDefinition* lhsWrite = lhs.term->toPhi()->getLoopBackedgeOperand();
-    if (lhsWrite->isBeta())
-        lhsWrite = lhsWrite->getOperand(0);
+    MDefinition* lhsWrite =
+        DefinitionOrBetaInputDefinition(lhs.term->toPhi()->getLoopBackedgeOperand());
     if (!lhsWrite->isAdd() && !lhsWrite->isSub())
         return nullptr;
     if (!lhsWrite->block()->isMarked())
@@ -2095,7 +2129,8 @@ bool
 RangeAnalysis::tryHoistBoundsCheck(MBasicBlock* header, MBoundsCheck* ins)
 {
     // The bounds check's length must be loop invariant.
-    if (ins->length()->block()->isMarked())
+    MDefinition *length = DefinitionOrBetaInputDefinition(ins->length());
+    if (length->block()->isMarked())
         return false;
 
     // The bounds check's index should not be loop invariant (else we would
@@ -2148,20 +2183,22 @@ RangeAnalysis::tryHoistBoundsCheck(MBasicBlock* header, MBoundsCheck* ins)
     if (!SafeAdd(upper->sum.constant(), upperConstant, &upperConstant))
         return false;
 
+    // Hoist the loop invariant lower bounds checks.
     MBoundsCheckLower* lowerCheck = MBoundsCheckLower::New(alloc(), lowerTerm);
     lowerCheck->setMinimum(lowerConstant);
     lowerCheck->computeRange(alloc());
     lowerCheck->collectRangeInfoPreTrunc();
-
-    MBoundsCheck* upperCheck = MBoundsCheck::New(alloc(), upperTerm, ins->length());
-    upperCheck->setMinimum(upperConstant);
-    upperCheck->setMaximum(upperConstant);
-    upperCheck->computeRange(alloc());
-    upperCheck->collectRangeInfoPreTrunc();
-
-    // Hoist the loop invariant upper and lower bounds checks.
     preLoop->insertBefore(preLoop->lastIns(), lowerCheck);
-    preLoop->insertBefore(preLoop->lastIns(), upperCheck);
+
+    // Hoist the loop invariant upper bounds checks.
+    if (upperTerm != length || upperConstant >= 0) {
+        MBoundsCheck* upperCheck = MBoundsCheck::New(alloc(), upperTerm, length);
+        upperCheck->setMinimum(upperConstant);
+        upperCheck->setMaximum(upperConstant);
+        upperCheck->computeRange(alloc());
+        upperCheck->collectRangeInfoPreTrunc();
+        preLoop->insertBefore(preLoop->lastIns(), upperCheck);
+    }
 
     return true;
 }

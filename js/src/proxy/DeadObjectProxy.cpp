@@ -14,20 +14,26 @@
 using namespace js;
 using namespace js::gc;
 
+static void
+ReportDead(JSContext *cx)
+{
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+}
+
 bool
 DeadObjectProxy::getOwnPropertyDescriptor(JSContext* cx, HandleObject wrapper, HandleId id,
                                           MutableHandle<PropertyDescriptor> desc) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 
 bool
-DeadObjectProxy::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
+DeadObjectProxy::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
                                 Handle<PropertyDescriptor> desc,
-                                ObjectOpResult &result) const
+                                ObjectOpResult& result) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 
@@ -35,41 +41,41 @@ bool
 DeadObjectProxy::ownPropertyKeys(JSContext* cx, HandleObject wrapper,
                                  AutoIdVector& props) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 
 bool
-DeadObjectProxy::delete_(JSContext *cx, HandleObject wrapper, HandleId id,
-                         ObjectOpResult &result) const
+DeadObjectProxy::delete_(JSContext* cx, HandleObject wrapper, HandleId id,
+                         ObjectOpResult& result) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 
 bool
-DeadObjectProxy::enumerate(JSContext *cx, HandleObject wrapper, MutableHandleObject objp) const
+DeadObjectProxy::enumerate(JSContext* cx, HandleObject wrapper, MutableHandleObject objp) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 
 bool
-DeadObjectProxy::getPrototype(JSContext *cx, HandleObject proxy, MutableHandleObject protop) const
+DeadObjectProxy::getPrototype(JSContext* cx, HandleObject proxy, MutableHandleObject protop) const
 {
     protop.set(nullptr);
     return true;
 }
 
 bool
-DeadObjectProxy::preventExtensions(JSContext *cx, HandleObject proxy, ObjectOpResult &result) const
+DeadObjectProxy::preventExtensions(JSContext* cx, HandleObject proxy, ObjectOpResult& result) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 
 bool
-DeadObjectProxy::isExtensible(JSContext *cx, HandleObject proxy, bool *extensible) const
+DeadObjectProxy::isExtensible(JSContext* cx, HandleObject proxy, bool* extensible) const
 {
     // This is kind of meaningless, but dead-object semantics aside,
     // [[Extensible]] always being true is consistent with other proxy types.
@@ -80,14 +86,14 @@ DeadObjectProxy::isExtensible(JSContext *cx, HandleObject proxy, bool *extensibl
 bool
 DeadObjectProxy::call(JSContext* cx, HandleObject wrapper, const CallArgs& args) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 
 bool
 DeadObjectProxy::construct(JSContext* cx, HandleObject wrapper, const CallArgs& args) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 
@@ -95,7 +101,7 @@ bool
 DeadObjectProxy::nativeCall(JSContext* cx, IsAcceptableThis test, NativeImpl impl,
                             const CallArgs& args) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 
@@ -103,14 +109,22 @@ bool
 DeadObjectProxy::hasInstance(JSContext* cx, HandleObject proxy, MutableHandleValue v,
                              bool* bp) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 
 bool
-DeadObjectProxy::objectClassIs(HandleObject obj, ESClassValue classValue, JSContext* cx) const
+DeadObjectProxy::getBuiltinClass(JSContext* cx, HandleObject proxy,
+                                 ESClassValue* classValue) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
+    return false;
+}
+
+bool
+DeadObjectProxy::isArray(JSContext* cx, HandleObject obj, JS::IsArrayAnswer* answer) const
+{
+    ReportDead(cx);
     return false;
 }
 
@@ -123,13 +137,14 @@ DeadObjectProxy::className(JSContext* cx, HandleObject wrapper) const
 JSString*
 DeadObjectProxy::fun_toString(JSContext* cx, HandleObject proxy, unsigned indent) const
 {
+    ReportDead(cx);
     return nullptr;
 }
 
 bool
 DeadObjectProxy::regexp_toShared(JSContext* cx, HandleObject proxy, RegExpGuard* g) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 
@@ -137,7 +152,7 @@ bool
 DeadObjectProxy::defaultValue(JSContext* cx, HandleObject obj, JSType hint,
                               MutableHandleValue vp) const
 {
-    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    ReportDead(cx);
     return false;
 }
 

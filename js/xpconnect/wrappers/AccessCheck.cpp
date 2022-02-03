@@ -110,13 +110,11 @@ IsPermitted(CrossOriginObjectType type, JSFlatString* prop, bool set)
 }
 
 static bool
-IsFrameId(JSContext* cx, JSObject* objArg, jsid idArg)
+IsFrameId(JSContext* cx, JSObject* obj, jsid idArg)
 {
-    RootedObject obj(cx, objArg);
+    MOZ_ASSERT(!js::IsWrapper(obj));
     RootedId id(cx, idArg);
 
-    obj = JS_ObjectToInnerObject(cx, obj);
-    MOZ_ASSERT(!js::IsWrapper(obj));
     nsGlobalWindow* win = WindowOrNull(obj);
     if (!win) {
         return false;
@@ -174,8 +172,7 @@ AccessCheck::isCrossOriginAccessPermitted(JSContext* cx, HandleObject wrapper, H
                isCrossOriginAccessPermitted(cx, wrapper, id, Wrapper::SET);
     }
 
-    RootedObject obj(cx, Wrapper::wrappedObject(wrapper));
-
+    RootedObject obj(cx, js::UncheckedUnwrap(wrapper, /* stopAtOuter = */ false));
     CrossOriginObjectType type = IdentifyCrossOriginObject(obj);
     if (JSID_IS_STRING(id)) {
         if (IsPermitted(type, JSID_TO_FLAT_STRING(id), act == Wrapper::SET))
@@ -312,7 +309,11 @@ ExposedPropertiesOnly::check(JSContext* cx, HandleObject wrapper, HandleId id, W
         // Previously we automatically granted access to indexed properties and
         // .length for Array COWs. We're not doing that anymore, so make sure to
         // let people know what's going on.
-        bool isArray = JS_IsArrayObject(cx, wrappedObject) || JS_IsTypedArrayObject(wrappedObject);
+        bool isArray;
+        if (!JS_IsArrayObject(cx, wrappedObject, &isArray))
+            return false;
+        if (!isArray)
+            isArray = JS_IsTypedArrayObject(wrappedObject);
         bool isIndexedAccessOnArray = isArray && JSID_IS_INT(id) && JSID_TO_INT(id) >= 0;
         bool isLengthAccessOnArray = isArray && JSID_IS_STRING(id) &&
                                      JS_FlatStringEqualsAscii(JSID_TO_FLAT_STRING(id), "length");

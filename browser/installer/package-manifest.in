@@ -38,7 +38,7 @@
 @APPNAME@/Contents/PkgInfo
 @RESPATH@/firefox.icns
 @RESPATH@/document.icns
-@RESPATH@/@AB@.lproj/*
+@RESPATH@/@LPROJ_ROOT@.lproj/*
 #endif
 
 [@AB_CD@]
@@ -134,7 +134,7 @@
 #endif
 #endif
 #ifdef MOZ_REPLACE_MALLOC
-#ifndef MOZ_JEMALLOC3
+#ifndef MOZ_JEMALLOC4
 @BINPATH@/@DLL_PREFIX@replace_jemalloc@DLL_SUFFIX@
 #endif
 #endif
@@ -288,6 +288,9 @@
 @RESPATH@/components/layout_xul.xpt
 @RESPATH@/components/locale.xpt
 @RESPATH@/components/lwbrk.xpt
+#ifdef MOZ_ENABLE_PROFILER_SPS
+@RESPATH@/components/memory_profiler.xpt
+#endif
 @RESPATH@/browser/components/migration.xpt
 @RESPATH@/components/mimetype.xpt
 @RESPATH@/components/mozfind.xpt
@@ -573,6 +576,7 @@
 @RESPATH@/components/AlarmsManager.manifest
 @RESPATH@/components/Push.js
 @RESPATH@/components/Push.manifest
+@RESPATH@/components/PushClient.js
 @RESPATH@/components/PushNotificationService.js
 
 @RESPATH@/components/SlowScriptDebug.manifest
@@ -691,7 +695,7 @@
 ; All the pref files must be part of base to prevent migration bugs
 @RESPATH@/browser/@PREF_DIR@/arcticfox.js
 @RESPATH@/browser/@PREF_DIR@/palemoon-branding.js
-@RESPATH@/gecko.js
+@RESPATH@/greprefs.js
 @RESPATH@/defaults/autoconfig/platform.js
 @RESPATH@/defaults/autoconfig/prefcalls.js
 @RESPATH@/browser/defaults/profile/prefs.js
@@ -847,4 +851,8 @@ bin/libfreebl_32int64_3.so
 
 #if defined(MOZ_ASAN) && defined(CLANG_CL)
 @BINPATH@/clang_rt.asan_dynamic-i386.dll
+#endif
+
+#ifdef MOZ_MULET
+#include ../../b2g/installer/package-manifest.in
 #endif

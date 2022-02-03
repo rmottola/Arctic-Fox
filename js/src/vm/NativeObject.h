@@ -87,7 +87,7 @@ class ArrayObject;
  */
 extern bool
 ArraySetLength(JSContext* cx, Handle<ArrayObject*> obj, HandleId id,
-               unsigned attrs, HandleValue value, ObjectOpResult &result);
+               unsigned attrs, HandleValue value, ObjectOpResult& result);
 
 /*
  * Elements header used for native objects. The elements component of such objects
@@ -188,7 +188,7 @@ class ObjectElements
 
     friend bool
     ArraySetLength(JSContext* cx, Handle<ArrayObject*> obj, HandleId id,
-                   unsigned attrs, HandleValue value, ObjectOpResult &result);
+                   unsigned attrs, HandleValue value, ObjectOpResult& result);
 
     /* See Flags enum above. */
     uint32_t flags;
@@ -370,7 +370,7 @@ class NativeObject : public JSObject
     }
 
   public:
-    Shape *lastProperty() const {
+    Shape* lastProperty() const {
         MOZ_ASSERT(shape_);
         return shape_;
     }
@@ -626,15 +626,15 @@ class NativeObject : public JSObject
         return lookup(cx, shape->propid()) == shape;
     }
 
-    bool containsShapeOrElement(ExclusiveContext *cx, jsid id) {
+    bool containsShapeOrElement(ExclusiveContext* cx, jsid id) {
         if (JSID_IS_INT(id) && containsDenseElement(JSID_TO_INT(id)))
             return true;
         return contains(cx, id);
     }
 
     /* Contextless; can be called from other pure code. */
-    Shape *lookupPure(jsid id);
-    Shape *lookupPure(PropertyName *name) {
+    Shape* lookupPure(jsid id);
+    Shape* lookupPure(PropertyName* name) {
         return lookupPure(NameToId(name));
     }
 
@@ -666,39 +666,39 @@ class NativeObject : public JSObject
 
   public:
     /* Add a property whose id is not yet in this scope. */
-    static Shape *addProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
+    static Shape* addProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
                               JSGetterOp getter, JSSetterOp setter,
                               uint32_t slot, unsigned attrs, unsigned flags,
                               bool allowDictionary = true);
 
     /* Add a data property whose id is not yet in this scope. */
-    Shape* addDataProperty(ExclusiveContext *cx,
+    Shape* addDataProperty(ExclusiveContext* cx,
                            jsid id_, uint32_t slot, unsigned attrs);
-    Shape* addDataProperty(ExclusiveContext *cx, HandlePropertyName name,
+    Shape* addDataProperty(ExclusiveContext* cx, HandlePropertyName name,
                            uint32_t slot, unsigned attrs);
 
     /* Add or overwrite a property for id in this scope. */
-    static Shape *
-    putProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
+    static Shape*
+    putProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
                 JSGetterOp getter, JSSetterOp setter,
                 uint32_t slot, unsigned attrs,
                 unsigned flags);
-    static inline Shape *
-    putProperty(ExclusiveContext *cx, HandleObject obj, PropertyName *name,
+    static inline Shape*
+    putProperty(ExclusiveContext* cx, HandleObject obj, PropertyName* name,
                 JSGetterOp getter, JSSetterOp setter,
                 uint32_t slot, unsigned attrs,
                 unsigned flags);
 
     /* Change the given property into a sibling with the same id in this scope. */
-    static Shape *
-    changeProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleShape shape,
+    static Shape*
+    changeProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleShape shape,
                    unsigned attrs, JSGetterOp getter, JSSetterOp setter);
 
     /* Remove the property named by id from this object. */
-    bool removeProperty(ExclusiveContext *cx, jsid id);
+    bool removeProperty(ExclusiveContext* cx, jsid id);
 
     /* Clear the scope, making it empty. */
-    static void clear(ExclusiveContext *cx, HandleNativeObject obj);
+    static void clear(ExclusiveContext* cx, HandleNativeObject obj);
 
   protected:
     /*
@@ -708,8 +708,8 @@ class NativeObject : public JSObject
      * 1. getter and setter must be normalized based on flags (see jsscope.cpp).
      * 2. Checks for non-extensibility must be done by callers.
      */
-    static Shape *
-    addPropertyInternal(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
+    static Shape*
+    addPropertyInternal(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
                         JSGetterOp getter, JSSetterOp setter,
                         uint32_t slot, unsigned attrs, unsigned flags, ShapeTable::Entry* entry,
                         bool allowDictionary);
@@ -876,8 +876,8 @@ class NativeObject : public JSObject
      * capacity is not stored explicitly, and the allocated size of the slot
      * array is kept in sync with this count.
      */
-    static uint32_t dynamicSlotsCount(uint32_t nfixed, uint32_t span, const Class *clasp);
-    static uint32_t dynamicSlotsCount(Shape *shape) {
+    static uint32_t dynamicSlotsCount(uint32_t nfixed, uint32_t span, const Class* clasp);
+    static uint32_t dynamicSlotsCount(Shape* shape) {
         return dynamicSlotsCount(shape->numFixedSlots(), shape->slotSpan(), shape->getObjectClass());
     }
 
@@ -1256,68 +1256,70 @@ IsObjectValueInCompartment(Value v, JSCompartment* comp)
  */
 
 extern bool
-NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
+NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
                      Handle<PropertyDescriptor> desc,
-                     ObjectOpResult &result);
+                     ObjectOpResult& result);
 
 extern bool
-NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id, HandleValue value,
-                     GetterOp getter, SetterOp, unsigned attrs,
-                     ObjectOpResult &result);
+NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id, HandleValue value,
+                     JSGetterOp getter, JSSetterOp setter, unsigned attrs,
+                     ObjectOpResult& result);
 
 extern bool
-NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, PropertyName *name,
+NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, PropertyName* name,
                      HandleValue value, GetterOp getter, SetterOp setter,
-                     unsigned attrs, ObjectOpResult &result);
+                     unsigned attrs, ObjectOpResult& result);
 
 extern bool
-NativeDefineElement(ExclusiveContext *cx, HandleNativeObject obj, uint32_t index, HandleValue value,
+NativeDefineElement(ExclusiveContext* cx, HandleNativeObject obj, uint32_t index, HandleValue value,
                     JSGetterOp getter, JSSetterOp setter, unsigned attrs,
-                    ObjectOpResult &result);
+                    ObjectOpResult& result);
 
 /* If the result out-param is omitted, throw on failure. */
 extern bool
-NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, HandleId id, HandleValue value,
-                     GetterOp getter, SetterOp setter, unsigned attrs);
+NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id, HandleValue value,
+                     JSGetterOp getter, JSSetterOp setter, unsigned attrs);
 
 extern bool
-NativeDefineProperty(ExclusiveContext *cx, HandleNativeObject obj, PropertyName *name,
-                     HandleValue value, GetterOp getter, SetterOp setter,
+NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, PropertyName* name,
+                     HandleValue value, JSGetterOp getter, JSSetterOp setter,
                      unsigned attrs);
 
 extern bool
-NativeHasProperty(JSContext *cx, HandleNativeObject obj, HandleId id, bool *foundp);
+NativeHasProperty(JSContext* cx, HandleNativeObject obj, HandleId id, bool* foundp);
 
 extern bool
-NativeGetProperty(JSContext *cx, HandleNativeObject obj, HandleObject receiver, HandleId id,
+NativeGetProperty(JSContext* cx, HandleNativeObject obj, HandleValue receiver, HandleId id,
                   MutableHandleValue vp);
 
 extern bool
-NativeGetPropertyNoGC(JSContext* cx, NativeObject* obj, JSObject* receiver, jsid id, Value* vp);
+NativeGetPropertyNoGC(JSContext* cx, NativeObject* obj, const Value& receiver, jsid id, Value* vp);
 
 extern bool
-NativeGetElement(JSContext* cx, HandleNativeObject obj, HandleObject receiver, uint32_t index,
+NativeGetElement(JSContext* cx, HandleNativeObject obj, HandleValue receiver, uint32_t index,
                  MutableHandleValue vp);
 
 inline bool
 NativeGetProperty(JSContext* cx, HandleNativeObject obj, HandleId id, MutableHandleValue vp)
 {
-    return NativeGetProperty(cx, obj, obj, id, vp);
+    RootedValue receiver(cx, ObjectValue(*obj));
+    return NativeGetProperty(cx, obj, receiver, id, vp);
 }
 
 inline bool
 NativeGetElement(JSContext* cx, HandleNativeObject obj, uint32_t index, MutableHandleValue vp)
 {
-    return NativeGetElement(cx, obj, obj, index, vp);
+    RootedValue receiver(cx, ObjectValue(*obj));
+    return NativeGetElement(cx, obj, receiver, index, vp);
 }
 
 bool
-SetPropertyByDefining(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                      HandleValue receiver, bool objHasOwn, ObjectOpResult &result);
+SetPropertyByDefining(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
+                      HandleValue receiver, ObjectOpResult& result);
 
 bool
-SetPropertyOnProto(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                   HandleValue receiver, ObjectOpResult &result);
+SetPropertyOnProto(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
+                   HandleValue receiver, ObjectOpResult& result);
 
 /*
  * Indicates whether an assignment operation is qualified (`x.y = 0`) or
@@ -1332,15 +1334,15 @@ enum QualifiedBool {
 };
 
 extern bool
-NativeSetProperty(JSContext *cx, HandleNativeObject obj, HandleId id, HandleValue v,
-                  HandleValue receiver, QualifiedBool qualified, ObjectOpResult &result);
+NativeSetProperty(JSContext* cx, HandleNativeObject obj, HandleId id, HandleValue v,
+                  HandleValue receiver, QualifiedBool qualified, ObjectOpResult& result);
 
 extern bool
-NativeSetElement(JSContext *cx, HandleNativeObject obj, uint32_t index, HandleValue v,
-                 HandleValue receiver, ObjectOpResult &result);
+NativeSetElement(JSContext* cx, HandleNativeObject obj, uint32_t index, HandleValue v,
+                 HandleValue receiver, ObjectOpResult& result);
 
 extern bool
-NativeDeleteProperty(JSContext *cx, HandleNativeObject obj, HandleId id, ObjectOpResult &result);
+NativeDeleteProperty(JSContext* cx, HandleNativeObject obj, HandleId id, ObjectOpResult& result);
 
 
 /*** SpiderMonkey nonstandard internal methods ***************************************************/
@@ -1410,7 +1412,7 @@ js::HasProperty(JSContext* cx, HandleObject obj, HandleId id, bool* foundp)
 }
 
 inline bool
-js::GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleId id,
+js::GetProperty(JSContext* cx, HandleObject obj, HandleValue receiver, HandleId id,
                 MutableHandleValue vp)
 {
     if (GetPropertyOp op = obj->getOps()->getProperty)
@@ -1419,7 +1421,7 @@ js::GetProperty(JSContext* cx, HandleObject obj, HandleObject receiver, HandleId
 }
 
 inline bool
-js::GetPropertyNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, jsid id, Value* vp)
+js::GetPropertyNoGC(JSContext* cx, JSObject* obj, const Value& receiver, jsid id, Value* vp)
 {
     if (obj->getOps()->getProperty)
         return false;
@@ -1427,8 +1429,8 @@ js::GetPropertyNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, jsid id, V
 }
 
 inline bool
-js::SetProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
-                HandleValue receiver, ObjectOpResult &result)
+js::SetProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
+                HandleValue receiver, ObjectOpResult& result)
 {
     if (obj->getOps()->setProperty)
         return JSObject::nonNativeSetProperty(cx, obj, id, v, receiver, result);
@@ -1436,8 +1438,8 @@ js::SetProperty(JSContext *cx, HandleObject obj, HandleId id, HandleValue v,
 }
 
 inline bool
-js::SetElement(JSContext *cx, HandleObject obj, uint32_t index, HandleValue v,
-               HandleValue receiver, ObjectOpResult &result)
+js::SetElement(JSContext* cx, HandleObject obj, uint32_t index, HandleValue v,
+               HandleValue receiver, ObjectOpResult& result)
 {
     if (obj->getOps()->setProperty)
         return JSObject::nonNativeSetElement(cx, obj, index, v, receiver, result);

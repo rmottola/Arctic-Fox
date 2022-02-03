@@ -388,16 +388,19 @@ nsSplitterFrame::HandleEvent(nsPresContext* aPresContext,
 
   nsWeakFrame weakFrame(this);
   nsRefPtr<nsSplitterFrameInner> kungFuDeathGrip(mInner);
-  switch (aEvent->message) {
+  switch (aEvent->mMessage) {
     case NS_MOUSE_MOVE: 
       mInner->MouseDrag(aPresContext, aEvent);
-    break;
+      break;
   
     case NS_MOUSE_BUTTON_UP:
       if (aEvent->AsMouseEvent()->button == WidgetMouseEvent::eLeftButton) {
         mInner->MouseUp(aPresContext, aEvent);
       }
-    break;
+      break;
+
+    default:
+      break;
   }
 
   NS_ENSURE_STATE(weakFrame.IsAlive());

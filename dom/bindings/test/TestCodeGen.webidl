@@ -129,6 +129,8 @@ interface OnlyForUseInConstructor {
  Constructor(TestInterface? iface),
  Constructor(long arg1, IndirectlyImplementedInterface iface),
  Constructor(Date arg1),
+ Constructor(ArrayBuffer arrayBuf),
+ Constructor(Uint8Array typedArr),
  // Constructor(long arg1, long arg2, (TestInterface or OnlyForUseInConstructor) arg3),
  AvailableIn=CertifiedApps,
  NamedConstructor=Test,
@@ -674,6 +676,17 @@ interface TestInterface {
   void passDateMozMap(MozMap<Date> arg);
   Date receiveDate();
   Date? receiveNullableDate();
+
+  // Promise types
+  void passPromise(Promise<any> arg);
+  void passNullablePromise(Promise<any>? arg);
+  void passOptionalPromise(optional Promise<any> arg);
+  void passOptionalNullablePromise(optional Promise<any>? arg);
+  void passOptionalNullablePromiseWithDefaultValue(optional Promise<any>? arg = null);
+  void passPromiseSequence(sequence<Promise<any>> arg);
+  void passNullablePromiseSequence(sequence<Promise<any>?> arg);
+  Promise<any> receivePromise();
+  Promise<any> receiveAddrefedPromise();
 
   // binaryNames tests
   void methodRenamedFrom();

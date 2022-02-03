@@ -15,7 +15,6 @@ if toolkit == 'windows':
     DIRS += ['windows']
 
     XPIDL_SOURCES += [
-        'nsIGfxInfo2.idl',
         'nsIJumpListBuilder.idl',
         'nsIJumpListItem.idl',
         'nsIPrintSettingsWin.idl',
@@ -30,7 +29,6 @@ if toolkit == 'windows':
     ]
 elif toolkit == 'cocoa':
     XPIDL_SOURCES += [
-        'nsIGfxInfo2.idl',
         'nsIMacDockSupport.idl',
         'nsIMacWebAppUtils.idl',
         'nsIStandaloneNativeMenu.idl',
@@ -66,6 +64,7 @@ XPIDL_SOURCES += [
     'nsIClipboardHelper.idl',
     'nsIClipboardOwner.idl',
     'nsIColorPicker.idl',
+    'nsIDisplayInfo.idl',
     'nsIDragService.idl',
     'nsIDragSession.idl',
     'nsIFilePicker.idl',
@@ -113,6 +112,7 @@ EXPORTS.mozilla += [
     'ContentEvents.h',
     'EventClassList.h',
     'EventForwards.h',
+    'EventMessageList.h',
     'FontRange.h',
     'LookAndFeel.h',
     'MiscEvents.h',

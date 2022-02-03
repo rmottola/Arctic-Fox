@@ -53,6 +53,7 @@ EXPORTS += [
     'nsAttrValue.h',
     'nsAttrValueInlines.h',
     'nsCaseTreatment.h',
+    'nsChildContentList.h',
     'nsContentCID.h',
     'nsContentCreatorFunctions.h',
     'nsContentList.h',
@@ -383,8 +384,6 @@ EXTRA_COMPONENTS += [
     'contentAreaDropListener.manifest',
     'messageWakeupService.js',
     'messageWakeupService.manifest',
-    'SiteSpecificUserAgent.js',
-    'SiteSpecificUserAgent.manifest',
     'SlowScriptDebug.js',
     'SlowScriptDebug.manifest',
 ]

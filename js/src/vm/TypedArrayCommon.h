@@ -13,6 +13,10 @@
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/PodOperations.h"
 
+#include "jsarray.h"
+#include "jscntxt.h"
+#include "jsnum.h"
+
 #include "js/Conversions.h"
 #include "js/Value.h"
 
@@ -686,8 +690,7 @@ class TypedArrayMethods
 
             if (offset < 0 || uint32_t(offset) > target->length()) {
                 // the given offset is bogus
-                JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
-                                     JSMSG_TYPED_ARRAY_BAD_INDEX, "2");
+                JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_INDEX);
                 return false;
             }
         }

@@ -38,16 +38,16 @@ IsValidPutRequestURL(const nsAString& aUrl, ErrorResult& aRv)
   bool validScheme = false;
 
   // make a copy because ProcessURL strips the fragmet
-  nsAutoString url(aUrl);
+  NS_ConvertUTF16toUTF8 url(aUrl);
 
-  TypeUtils::ProcessURL(url, &validScheme, nullptr, aRv);
+  TypeUtils::ProcessURL(url, &validScheme, nullptr, nullptr, aRv);
   if (aRv.Failed()) {
     return false;
   }
 
   if (!validScheme) {
     NS_NAMED_LITERAL_STRING(label, "Request");
-    aRv.ThrowTypeError(MSG_INVALID_URL_SCHEME, &label, &url);
+    aRv.ThrowTypeError(MSG_INVALID_URL_SCHEME, &label, &aUrl);
     return false;
   }
 
@@ -117,7 +117,8 @@ public:
     nsAutoTArray<nsRefPtr<Response>, 256> responseList;
     responseList.SetCapacity(mRequestList.Length());
 
-    if (NS_WARN_IF(!JS_IsArrayObject(aCx, aValue))) {
+    bool isArray;
+    if (NS_WARN_IF(!JS_IsArrayObject(aCx, aValue, &isArray) || !isArray)) {
       Fail();
       return;
     }

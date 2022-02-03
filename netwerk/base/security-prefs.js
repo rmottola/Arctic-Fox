@@ -18,7 +18,6 @@ pref("security.tls.enable_0rtt_data", false);
 
 pref("security.ssl.treat_unsafe_negotiation_as_broken", false);
 pref("security.ssl.require_safe_negotiation",  false);
-pref("security.ssl.warn_missing_rfc5746",  1);
 pref("security.ssl.enable_ocsp_stapling", true);
 pref("security.ssl.enable_false_start", false);
 pref("security.ssl.false_start.require-npn", false);

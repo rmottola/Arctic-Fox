@@ -7,7 +7,7 @@
 #define __editor_h__
 
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc.
-#include "mozilla/dom/OwningNonNull.h"  // for OwningNonNull
+#include "mozilla/OwningNonNull.h"      // for OwningNonNull
 #include "mozilla/dom/Text.h"
 #include "nsAutoPtr.h"                  // for nsRefPtr
 #include "nsCOMPtr.h"                   // for already_AddRefed, nsCOMPtr
@@ -824,6 +824,13 @@ public:
   void FindBetterInsertionPoint(nsCOMPtr<nsINode>& aNode,
                                 int32_t& aOffset);
 
+  /**
+   * HideCaret() hides caret with nsCaret::AddForceHide() or may show carent
+   * with nsCaret::RemoveForceHide().  This does NOT set visibility of
+   * nsCaret.  Therefore, this is stateless.
+   */
+  void HideCaret(bool aHide);
+
 protected:
   enum Tristate {
     eTriUnset,
@@ -852,11 +859,11 @@ protected:
 
   // various listeners
   // Listens to all low level actions on the doc
-  nsTArray<mozilla::dom::OwningNonNull<nsIEditActionListener>> mActionListeners;
+  nsTArray<mozilla::OwningNonNull<nsIEditActionListener>> mActionListeners;
   // Just notify once per high level change
-  nsTArray<mozilla::dom::OwningNonNull<nsIEditorObserver>> mEditorObservers;
+  nsTArray<mozilla::OwningNonNull<nsIEditorObserver>> mEditorObservers;
   // Listen to overall doc state (dirty or not, just created, etc)
-  nsTArray<mozilla::dom::OwningNonNull<nsIDocumentStateListener>> mDocStateListeners;
+  nsTArray<mozilla::OwningNonNull<nsIDocumentStateListener>> mDocStateListeners;
 
   nsSelectionState  mSavedSel;           // cached selection for nsAutoSelectionReset
   nsRangeUpdater    mRangeUpdater;       // utility class object for maintaining preserved ranges
@@ -883,6 +890,7 @@ protected:
   bool mDidPostCreate;    // whether PostCreate has been called
   bool mDispatchInputEvent;
   bool mIsInEditAction;   // true while the instance is handling an edit action
+  bool mHidingCaret;      // whether caret is hidden forcibly.
 
   friend bool NSCanUnload(nsISupports* serviceMgr);
   friend class nsAutoTxnsConserveSelection;

@@ -1723,8 +1723,8 @@ GCMarker::enterWeakMarkingMode()
     if (weakMapAction() == ExpandWeakMaps) {
         tag_ = TracerKindTag::WeakMarking;
 
-        for (GCCompartmentGroupIter c(runtime()); !c.done(); c.next()) {
-            for (WeakMapBase* m = c->gcWeakMapList; m; m = m->next) {
+        for (GCZoneGroupIter zone(runtime()); !zone.done(); zone.next()) {
+            for (WeakMapBase* m = zone->gcWeakMapList; m; m = m->next) {
                 if (m->marked)
                     m->markEphemeronEntries(this);
             }
@@ -1988,7 +1988,6 @@ js::TenuringTracer::moveToTenured(JSObject* src)
             CrashAtUnhandlableOOM("Failed to allocate object while tenuring.");
     }
     JSObject* dst = reinterpret_cast<JSObject*>(t);
-
     tenuredSize += moveObjectToTenured(dst, src, dstKind);
 
     RelocationOverlay* overlay = RelocationOverlay::fromCell(src);
@@ -2000,6 +1999,7 @@ js::TenuringTracer::moveToTenured(JSObject* src)
     }
 
     TracePromoteToTenured(src, dst);
+    MemProfiler::MoveNurseryToTenured(src, dst);
     return dst;
 }
 
@@ -2086,7 +2086,13 @@ js::TenuringTracer::moveObjectToTenured(JSObject* dst, JSObject* src, AllocKind 
     if (src->is<ArrayObject>())
         tenuredSize = srcSize = sizeof(NativeObject);
 
+    // Copy the Cell contents.
     js_memcpy(dst, src, srcSize);
+
+    // Move any hash code attached to the object.
+    src->zone()->transferUniqueId(dst, src);
+
+    // Move the slots and elements, if we need to.
     if (src->isNative()) {
         NativeObject* ndst = &dst->as<NativeObject>();
         NativeObject* nsrc = &src->as<NativeObject>();

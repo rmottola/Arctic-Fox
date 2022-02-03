@@ -648,8 +648,9 @@ TabParent::RecvCreateWindow(PBrowserParent* aNewTab,
                             const bool& aSizeSpecified,
                             const nsString& aURI,
                             const nsString& aName,
-                            const nsString& aFeatures,
+                            const nsCString& aFeatures,
                             const nsString& aBaseURI,
+                            nsresult* aResult,
                             bool* aWindowIsNew,
                             InfallibleTArray<FrameScriptInfo>* aFrameScripts,
                             nsCString* aURLToLoad)
@@ -657,14 +658,21 @@ TabParent::RecvCreateWindow(PBrowserParent* aNewTab,
   // We always expect to open a new window here. If we don't, it's an error.
   *aWindowIsNew = true;
 
-  if (IsBrowserOrApp()) {
-    return false;
-  }
+  // The content process should never be in charge of computing whether or
+  // not a window should be private or remote - the parent will do that.
+  MOZ_ASSERT(!(aChromeFlags & nsIWebBrowserChrome::CHROME_PRIVATE_WINDOW));
+  MOZ_ASSERT(!(aChromeFlags & nsIWebBrowserChrome::CHROME_NON_PRIVATE_WINDOW));
+  MOZ_ASSERT(!(aChromeFlags & nsIWebBrowserChrome::CHROME_PRIVATE_LIFETIME));
+  MOZ_ASSERT(!(aChromeFlags & nsIWebBrowserChrome::CHROME_REMOTE_WINDOW));
 
-  nsresult rv;
+  if (NS_WARN_IF(IsBrowserOrApp()))
+    return false;
+
   nsCOMPtr<nsPIWindowWatcher> pwwatch =
-    do_GetService(NS_WINDOWWATCHER_CONTRACTID, &rv);
-  NS_ENSURE_SUCCESS(rv, false);
+    do_GetService(NS_WINDOWWATCHER_CONTRACTID, aResult);
+
+  if (NS_WARN_IF(NS_FAILED(*aResult)))
+    return true;
 
   TabParent* newTab = TabParent::GetFrom(aNewTab);
   MOZ_ASSERT(newTab);
@@ -695,8 +703,9 @@ TabParent::RecvCreateWindow(PBrowserParent* aNewTab,
   // opened one.
   if (!parent) {
     parent = FindMostRecentOpenWindow();
-    if (!parent) {
-      return false;
+    if (NS_WARN_IF(!parent)) {
+      *aResult = NS_ERROR_FAILURE;
+      return true;
     }
 
     nsCOMPtr<nsIDOMChromeWindow> rootChromeWin = do_QueryInterface(parent);
@@ -714,7 +723,10 @@ TabParent::RecvCreateWindow(PBrowserParent* aNewTab,
 
   // Opening new tabs is the easy case...
   if (openLocation == nsIBrowserDOMWindow::OPEN_NEWTAB) {
-    NS_ENSURE_TRUE(browserDOMWin, false);
+    if (NS_WARN_IF(!browserDOMWin)) {
+      *aResult = NS_ERROR_FAILURE;
+      return true;
+    }
 
     bool isPrivate;
     nsCOMPtr<nsILoadContext> loadContext = GetLoadContext();
@@ -746,45 +758,67 @@ TabParent::RecvCreateWindow(PBrowserParent* aNewTab,
   // TabChild has sent us a baseURI with which we can ensure that
   // the URI we pass to WindowWatcher is valid.
   nsCOMPtr<nsIURI> baseURI;
-  rv = NS_NewURI(getter_AddRefs(baseURI), aBaseURI);
-  NS_ENSURE_SUCCESS(rv, false);
+  *aResult = NS_NewURI(getter_AddRefs(baseURI), aBaseURI);
 
-  nsCOMPtr<nsIURI> finalURI;
-  rv = NS_NewURI(getter_AddRefs(finalURI), NS_ConvertUTF16toUTF8(aURI).get(), baseURI);
-  NS_ENSURE_SUCCESS(rv, false);
+  if (NS_WARN_IF(NS_FAILED(*aResult)))
+    return true;
 
   nsAutoCString finalURIString;
-  finalURI->GetSpec(finalURIString);
+  if (!aURI.IsEmpty()) {
+    nsCOMPtr<nsIURI> finalURI;
+    *aResult = NS_NewURI(getter_AddRefs(finalURI), NS_ConvertUTF16toUTF8(aURI).get(), baseURI);
+
+    if (NS_WARN_IF(NS_FAILED(*aResult)))
+      return true;
+
+    finalURI->GetSpec(finalURIString);
+  }
 
   nsCOMPtr<nsIDOMWindow> window;
 
   AutoUseNewTab aunt(newTab, aWindowIsNew, aURLToLoad);
 
-  rv = pwwatch->OpenWindow2(parent, finalURIString.get(),
-                            NS_ConvertUTF16toUTF8(aName).get(),
-                            NS_ConvertUTF16toUTF8(aFeatures).get(), aCalledFromJS,
-                            false, false, this, nullptr, nullptr, getter_AddRefs(window));
-  NS_ENSURE_SUCCESS(rv, false);
+  const char* features = aFeatures.Length() ? aFeatures.get() : nullptr;
+
+  *aResult = pwwatch->OpenWindow2(parent, finalURIString.get(),
+                                  NS_ConvertUTF16toUTF8(aName).get(),
+                                  features, aCalledFromJS,
+                                  false, false, this, nullptr, nullptr, getter_AddRefs(window));
+
+  if (NS_WARN_IF(NS_FAILED(*aResult)))
+    return true;
+
+  *aResult = NS_ERROR_FAILURE;
 
   nsCOMPtr<nsPIDOMWindow> pwindow = do_QueryInterface(window);
-  NS_ENSURE_TRUE(pwindow, false);
+  if (NS_WARN_IF(!pwindow)) {
+    return true;
+  }
 
   nsCOMPtr<nsIDocShell> windowDocShell = pwindow->GetDocShell();
-  NS_ENSURE_TRUE(windowDocShell, false);
+  if (NS_WARN_IF(!windowDocShell)) {
+    return true;
+  }
 
   nsCOMPtr<nsIDocShellTreeOwner> treeOwner;
   windowDocShell->GetTreeOwner(getter_AddRefs(treeOwner));
 
   nsCOMPtr<nsIXULWindow> xulWin = do_GetInterface(treeOwner);
-  NS_ENSURE_TRUE(xulWin, false);
+  if (NS_WARN_IF(!xulWin)) {
+    return true;
+  }
 
   nsCOMPtr<nsIXULBrowserWindow> xulBrowserWin;
   xulWin->GetXULBrowserWindow(getter_AddRefs(xulBrowserWin));
-  NS_ENSURE_TRUE(xulBrowserWin, false);
+  if (NS_WARN_IF(!xulBrowserWin)) {
+    return true;
+  }
 
   nsCOMPtr<nsITabParent> newRemoteTab;
-  rv = xulBrowserWin->ForceInitialBrowserRemote(getter_AddRefs(newRemoteTab));
-  NS_ENSURE_SUCCESS(rv, false);
+  *aResult = xulBrowserWin->ForceInitialBrowserRemote(getter_AddRefs(newRemoteTab));
+
+  if (NS_WARN_IF(NS_FAILED(*aResult)))
+    return true;
 
   MOZ_ASSERT(TabParent::GetFrom(newRemoteTab) == newTab);
 
@@ -1344,25 +1378,21 @@ bool TabParent::SendRealMouseEvent(WidgetMouseEvent& event)
 
   nsCOMPtr<nsIWidget> widget = GetWidget();
   if (widget) {
-    // When we mouseenter the tab, the tab's cursor should become the current
-    // cursor.  When we mouseexit, we stop.
-    if (event.message == NS_MOUSE_ENTER_WIDGET ||
-        event.message == NS_MOUSE_OVER) {
+    // When we mouseenter the tab, the tab's cursor should
+    // become the current cursor.  When we mouseexit, we stop.
+    if (NS_MOUSE_ENTER_WIDGET == event.mMessage) {
       mTabSetsCursor = true;
       if (mCustomCursor) {
         widget->SetCursor(mCustomCursor, mCustomCursorHotspotX, mCustomCursorHotspotY);
       } else if (mCursor != nsCursor(-1)) {
         widget->SetCursor(mCursor);
       }
-      // We don't actually want to forward NS_MOUSE_ENTER_WIDGET messages.
-      return true;
-    } else if (event.message == NS_MOUSE_EXIT_WIDGET ||
-               event.message == NS_MOUSE_OUT) {
+    } else if (NS_MOUSE_EXIT_WIDGET == event.mMessage) {
       mTabSetsCursor = false;
     }
   }
 
-  if (event.message == NS_MOUSE_MOVE) {
+  if (NS_MOUSE_MOVE == event.mMessage) {
     return SendRealMouseMoveEvent(event);
   }
   return SendRealMouseButtonEvent(event);
@@ -1704,7 +1734,7 @@ bool TabParent::SendRealKeyEvent(WidgetKeyboardEvent& event)
 
   MaybeNativeKeyBinding bindings;
   bindings = void_t();
-  if (event.message == NS_KEY_PRESS) {
+  if (event.mMessage == NS_KEY_PRESS) {
     nsCOMPtr<nsIWidget> widget = GetWidget();
 
     AutoInfallibleTArray<mozilla::CommandInt, 4> singleLine;
@@ -1736,7 +1766,7 @@ bool TabParent::SendRealTouchEvent(WidgetTouchEvent& event)
   // confuses remote content and the panning and zooming logic into thinking
   // that the added touches are part of the touchend/cancel, when actually
   // they're not.
-  if (event.message == NS_TOUCH_END || event.message == NS_TOUCH_CANCEL) {
+  if (event.mMessage == NS_TOUCH_END || event.mMessage == NS_TOUCH_CANCEL) {
     for (int i = event.touches.Length() - 1; i >= 0; i--) {
       if (!event.touches[i]->mChanged) {
         event.touches.RemoveElementAt(i);
@@ -1758,7 +1788,7 @@ bool TabParent::SendRealTouchEvent(WidgetTouchEvent& event)
     event.touches[i]->mRefPoint += offset;
   }
 
-  return (event.message == NS_TOUCH_MOVE) ?
+  return (event.mMessage == NS_TOUCH_MOVE) ?
     PBrowserParent::SendRealTouchMoveEvent(event, guid, blockId, apzResponse) :
     PBrowserParent::SendRealTouchEvent(event, guid, blockId, apzResponse);
 }
@@ -2092,7 +2122,7 @@ TabParent::RecvNotifyIMEPositionChange(const ContentCache& aContentCache,
 }
 
 bool
-TabParent::RecvOnEventNeedingAckReceived(const uint32_t& aMessage)
+TabParent::RecvOnEventNeedingAckHandled(const EventMessage& aMessage)
 {
   // This is called when the child process receives WidgetCompositionEvent or
   // WidgetSelectionEvent.
@@ -2101,10 +2131,10 @@ TabParent::RecvOnEventNeedingAckReceived(const uint32_t& aMessage)
     return true;
   }
 
-  // While calling OnEventNeedingAckReceived(), TabParent *might* be destroyed
+  // While calling OnEventNeedingAckHandled(), TabParent *might* be destroyed
   // since it may send notifications to IME.
   nsRefPtr<TabParent> kungFuDeathGrip(this);
-  mContentCache.OnEventNeedingAckReceived(widget, aMessage);
+  mContentCache.OnEventNeedingAckHandled(widget, aMessage);
   return true;
 }
 
@@ -2238,8 +2268,7 @@ TabParent::RecvDispatchAfterKeyboardEvent(const WidgetKeyboardEvent& aEvent)
 
   if (mFrameElement &&
       PresShell::BeforeAfterKeyboardEventEnabled() &&
-      localEvent.message != NS_KEY_PRESS) {
-    nsCOMPtr<nsINode> node(do_QueryInterface(mFrameElement));
+      localEvent.mMessage != NS_KEY_PRESS) {
     presShell->DispatchAfterKeyboardEvent(mFrameElement, localEvent,
                                           aEvent.mFlags.mDefaultPrevented);
   }
@@ -2258,7 +2287,7 @@ TabParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent)
       NS_WARN_IF(!aEvent.mSucceeded)) {
     return true;
   }
-  switch (aEvent.message) {
+  switch (aEvent.mMessage) {
     case NS_QUERY_TEXT_RECT:
     case NS_QUERY_CARET_RECT:
     case NS_QUERY_EDITOR_RECT:
@@ -2844,8 +2873,8 @@ TabParent::InjectTouchEvent(const nsAString& aType,
                             uint32_t aCount,
                             int32_t aModifiers)
 {
-  uint32_t msg;
-  nsContentUtils::GetEventIdAndAtom(aType, eTouchEventClass, &msg);
+  EventMessage msg;
+  nsContentUtils::GetEventMessageAndAtom(aType, eTouchEventClass, &msg);
   if (msg != NS_TOUCH_START && msg != NS_TOUCH_MOVE &&
       msg != NS_TOUCH_END && msg != NS_TOUCH_CANCEL) {
     return NS_ERROR_FAILURE;
@@ -3002,8 +3031,7 @@ TabParent::LayerTreeUpdate(bool aActive)
     return true;
   }
 
-  nsCOMPtr<nsIDOMEvent> event;
-  NS_NewDOMEvent(getter_AddRefs(event), mFrameElement, nullptr, nullptr);
+  nsRefPtr<Event> event = NS_NewDOMEvent(mFrameElement, nullptr, nullptr);
   if (aActive) {
     event->InitEvent(NS_LITERAL_STRING("MozLayerTreeReady"), true, false);
   } else {
@@ -3042,8 +3070,7 @@ TabParent::RecvRemotePaintIsReady()
     return true;
   }
 
-  nsCOMPtr<nsIDOMEvent> event;
-  NS_NewDOMEvent(getter_AddRefs(event), mFrameElement, nullptr, nullptr);
+  nsRefPtr<Event> event = NS_NewDOMEvent(mFrameElement, nullptr, nullptr);
   event->InitEvent(NS_LITERAL_STRING("MozAfterRemotePaint"), false, false);
   event->SetTrusted(true);
   event->GetInternalNSEvent()->mFlags.mOnlyChromeDispatch = true;

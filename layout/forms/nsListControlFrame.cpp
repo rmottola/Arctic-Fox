@@ -898,11 +898,11 @@ nsListControlFrame::HandleEvent(nsPresContext* aPresContext,
                           "NS_MOUSE_LEFT_CLICK",
                           "NS_MOUSE_MIDDLE_CLICK",
                           "NS_MOUSE_RIGHT_CLICK"};
-  int inx = aEvent->message-NS_MOUSE_MESSAGE_START;
+  int inx = aEvent->mMessage-NS_MOUSE_MESSAGE_START;
   if (inx >= 0 && inx <= (NS_MOUSE_RIGHT_CLICK-NS_MOUSE_MESSAGE_START)) {
-    printf("Mouse in ListFrame %s [%d]\n", desc[inx], aEvent->message);
+    printf("Mouse in ListFrame %s [%d]\n", desc[inx], aEvent->mMessage);
   } else {
-    printf("Mouse in ListFrame <UNKNOWN> [%d]\n", aEvent->message);
+    printf("Mouse in ListFrame <UNKNOWN> [%d]\n", aEvent->mMessage);
   }*/
 
   if (nsEventStatus_eConsumeNoDefault == *aEventStatus)
@@ -2120,6 +2120,9 @@ nsListControlFrame::KeyDown(nsIDOMEvent* aKeyEvent)
 
   // Don't check defaultPrevented value because other browsers don't prevent
   // the key navigation of list control even if preventDefault() is called.
+  // XXXmats 2015-04-16: the above is not true anymore, Chrome prevents all
+  // XXXmats keyboard events, even tabbing, when preventDefault() is called
+  // XXXmats in onkeydown. That seems sub-optimal though.
 
   const WidgetKeyboardEvent* keyEvent =
     aKeyEvent->GetInternalNSEvent()->AsKeyboardEvent();
@@ -2477,16 +2480,33 @@ nsListEventListener::HandleEvent(nsIDOMEvent* aEvent)
 
   nsAutoString eventType;
   aEvent->GetType(eventType);
-  if (eventType.EqualsLiteral("keydown"))
+  if (eventType.EqualsLiteral("keydown")) {
     return mFrame->nsListControlFrame::KeyDown(aEvent);
-  if (eventType.EqualsLiteral("keypress"))
+  }
+  if (eventType.EqualsLiteral("keypress")) {
     return mFrame->nsListControlFrame::KeyPress(aEvent);
-  if (eventType.EqualsLiteral("mousedown"))
+  }
+  if (eventType.EqualsLiteral("mousedown")) {
+    bool defaultPrevented = false;
+    aEvent->GetDefaultPrevented(&defaultPrevented);
+    if (defaultPrevented) {
+      return NS_OK;
+    }
     return mFrame->nsListControlFrame::MouseDown(aEvent);
-  if (eventType.EqualsLiteral("mouseup"))
+  }
+  if (eventType.EqualsLiteral("mouseup")) {
+    bool defaultPrevented = false;
+    aEvent->GetDefaultPrevented(&defaultPrevented);
+    if (defaultPrevented) {
+      return NS_OK;
+    }
     return mFrame->nsListControlFrame::MouseUp(aEvent);
-  if (eventType.EqualsLiteral("mousemove"))
+  }
+  if (eventType.EqualsLiteral("mousemove")) {
+    // I don't think we want to honor defaultPrevented on mousemove
+    // in general, and it would only prevent highlighting here.
     return mFrame->nsListControlFrame::MouseMove(aEvent);
+  }
 
   NS_ABORT();
   return NS_OK;

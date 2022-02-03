@@ -11,6 +11,8 @@
 #include "jsobjinlines.h"
 
 using namespace js;
+
+using JS::IsArrayAnswer;
 using mozilla::ArrayLength;
 
 static inline bool
@@ -29,8 +31,8 @@ IsAccessorDescriptor(const PropertyDescriptor& desc)
 // Since we are actually performing 9.1.6.2 IsCompatiblePropertyDescriptor(Extensible, Desc,
 // Current), some parameters are omitted.
 static bool
-ValidatePropertyDescriptor(JSContext *cx, bool extensible, Handle<PropertyDescriptor> desc,
-                           Handle<PropertyDescriptor> current, bool *bp)
+ValidatePropertyDescriptor(JSContext* cx, bool extensible, Handle<PropertyDescriptor> desc,
+                           Handle<PropertyDescriptor> current, bool* bp)
 {
     // step 2
     if (!current.object()) {
@@ -149,7 +151,7 @@ ReportInvalidTrapResult(JSContext* cx, JSObject* proxy, JSAtom* atom)
 // ES6 implements both getPrototype and setPrototype traps. We don't have them yet (see bug
 // 888969). For now, use these, to account for proxy revocation.
 bool
-ScriptedDirectProxyHandler::getPrototype(JSContext *cx, HandleObject proxy,
+ScriptedDirectProxyHandler::getPrototype(JSContext* cx, HandleObject proxy,
                                          MutableHandleObject protop) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
@@ -163,8 +165,8 @@ ScriptedDirectProxyHandler::getPrototype(JSContext *cx, HandleObject proxy,
 }
 
 bool
-ScriptedDirectProxyHandler::setPrototype(JSContext *cx, HandleObject proxy, HandleObject proto,
-                                         ObjectOpResult &result) const
+ScriptedDirectProxyHandler::setPrototype(JSContext* cx, HandleObject proxy, HandleObject proto,
+                                         ObjectOpResult& result) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     if (!target) {
@@ -178,8 +180,8 @@ ScriptedDirectProxyHandler::setPrototype(JSContext *cx, HandleObject proxy, Hand
 // Not yet part of ES6, but hopefully to be standards-tracked -- and needed to
 // handle revoked proxies in any event.
 bool
-ScriptedDirectProxyHandler::setImmutablePrototype(JSContext *cx, HandleObject proxy,
-                                                  bool *succeeded) const
+ScriptedDirectProxyHandler::setImmutablePrototype(JSContext* cx, HandleObject proxy,
+                                                  bool* succeeded) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     if (!target) {
@@ -192,8 +194,8 @@ ScriptedDirectProxyHandler::setImmutablePrototype(JSContext *cx, HandleObject pr
 
 // ES6 draft rev 32 (2 Feb 2015) 9.5.4 Proxy.[[PreventExtensions]]()
 bool
-ScriptedDirectProxyHandler::preventExtensions(JSContext *cx, HandleObject proxy,
-                                              ObjectOpResult &result) const
+ScriptedDirectProxyHandler::preventExtensions(JSContext* cx, HandleObject proxy,
+                                              ObjectOpResult& result) const
 {
     // Steps 1-3.
     RootedObject handler(cx, GetDirectProxyHandlerObject(proxy));
@@ -412,11 +414,11 @@ ScriptedDirectProxyHandler::getOwnPropertyDescriptor(JSContext* cx, HandleObject
 
 // ES6 draft rev 31 (15 Jan 2015) 9.5.6 Proxy.[[DefineOwnProperty]](P, Desc)
 bool
-ScriptedDirectProxyHandler::defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
+ScriptedDirectProxyHandler::defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
                                            Handle<PropertyDescriptor> desc,
-                                           ObjectOpResult &result) const
+                                           ObjectOpResult& result) const
 {
-    // step 2-4
+    // steps 2-4
     RootedObject handler(cx, GetDirectProxyHandlerObject(proxy));
     if (!handler) {
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_PROXY_REVOKED);
@@ -675,8 +677,8 @@ ScriptedDirectProxyHandler::ownPropertyKeys(JSContext* cx, HandleObject proxy,
 
 // ES6 draft rev 32 (2 Feb 2014) 9.5.10 Proxy.[[Delete]](P)
 bool
-ScriptedDirectProxyHandler::delete_(JSContext *cx, HandleObject proxy, HandleId id,
-                                    ObjectOpResult &result) const
+ScriptedDirectProxyHandler::delete_(JSContext* cx, HandleObject proxy, HandleId id,
+                                    ObjectOpResult& result) const
 {
     // step 2
     RootedObject handler(cx, GetDirectProxyHandlerObject(proxy));
@@ -846,7 +848,7 @@ ScriptedDirectProxyHandler::has(JSContext* cx, HandleObject proxy, HandleId id, 
 
 // ES6 (22 May, 2014) 9.5.8 Proxy.[[GetP]](P, Receiver)
 bool
-ScriptedDirectProxyHandler::get(JSContext* cx, HandleObject proxy, HandleObject receiver,
+ScriptedDirectProxyHandler::get(JSContext* cx, HandleObject proxy, HandleValue receiver,
                                 HandleId id, MutableHandleValue vp) const
 {
     // step 2
@@ -877,7 +879,7 @@ ScriptedDirectProxyHandler::get(JSContext* cx, HandleObject proxy, HandleObject 
     Value argv[] = {
         ObjectOrNullValue(target),
         value,
-        ObjectOrNullValue(receiver)
+        receiver
     };
     RootedValue trapResult(cx);
     if (!Invoke(cx, ObjectValue(*handler), trap, ArrayLength(argv), argv, &trapResult))
@@ -915,8 +917,8 @@ ScriptedDirectProxyHandler::get(JSContext* cx, HandleObject proxy, HandleObject 
 
 // ES6 draft rev 32 (2015 Feb 2) 9.5.9 Proxy.[[Set]](P, V, Receiver)
 bool
-ScriptedDirectProxyHandler::set(JSContext *cx, HandleObject proxy, HandleId id, HandleValue v,
-                                HandleValue receiver, ObjectOpResult &result) const
+ScriptedDirectProxyHandler::set(JSContext* cx, HandleObject proxy, HandleId id, HandleValue v,
+                                HandleValue receiver, ObjectOpResult& result) const
 {
     // step 2-3 (Steps 1 and 4 are irrelevant assertions.)
     RootedObject handler(cx, GetDirectProxyHandlerObject(proxy));
@@ -1100,23 +1102,23 @@ ScriptedDirectProxyHandler::hasInstance(JSContext* cx, HandleObject proxy, Mutab
 }
 
 bool
-ScriptedDirectProxyHandler::objectClassIs(HandleObject proxy, ESClassValue classValue,
-                                          JSContext* cx) const
+ScriptedDirectProxyHandler::getBuiltinClass(JSContext* cx, HandleObject proxy,
+                                            ESClassValue* classValue) const
 {
-    // Special case IsArray. In every other instance ES wants to have exactly
-    // one object type and not a proxy around it, so return false.
-    if (classValue != ESClass_IsArray)
-        return false;
+    *classValue = ESClass_Other;
+    return true;
+}
 
-    // In ES6 IsArray is supposed to poke at the Proxy target, instead we do this here.
-    // The reason for this is that we have proxies for which looking at the target might
-    // be impossible. So instead we use our little objectClassIs function that just works
-    // already across different wrappers.
+bool
+ScriptedDirectProxyHandler::isArray(JSContext* cx, HandleObject proxy,
+                                    IsArrayAnswer* answer) const
+{
     RootedObject target(cx, proxy->as<ProxyObject>().target());
-    if (!target)
-        return false;
+    if (target)
+        return JS::IsArray(cx, target, answer);
 
-    return IsArray(target, cx);
+    *answer = IsArrayAnswer::RevokedProxy;
+    return true;
 }
 
 const char*

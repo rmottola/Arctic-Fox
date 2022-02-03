@@ -20,6 +20,7 @@
 #endif
 
 #include "nsProxyRelease.h"
+#include "nsContentUtils.h"
 
 class nsIInterceptedChannel;
 
@@ -90,7 +91,7 @@ public:
   }
 
   void
-  RespondWith(const ResponseOrPromise& aArg, ErrorResult& aRv);
+  RespondWith(Promise& aArg, ErrorResult& aRv);
 
   already_AddRefed<Promise>
   ForwardTo(const nsAString& aUrl);

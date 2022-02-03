@@ -863,7 +863,7 @@ static bool
 IsThisSlotDefinition(LDefinition* def)
 {
     return IsArgumentSlotDefinition(def) &&
-         def->output()->toArgument()->index() < THIS_FRAME_ARGSLOT + sizeof(Value);
+        def->output()->toArgument()->index() < THIS_FRAME_ARGSLOT + sizeof(Value);
 }
 
 bool
@@ -2042,21 +2042,26 @@ BacktrackingAllocator::populateSafepoints()
 
                 switch (reg.type()) {
                   case LDefinition::OBJECT:
-                    safepoint->addGcPointer(a);
+                    if (!safepoint->addGcPointer(a))
+                        return false;
                     break;
                   case LDefinition::SLOTS:
-                    safepoint->addSlotsOrElementsPointer(a);
+                    if (!safepoint->addSlotsOrElementsPointer(a))
+                        return false;
                     break;
 #ifdef JS_NUNBOX32
                   case LDefinition::TYPE:
-                    safepoint->addNunboxType(i, a);
+                    if (!safepoint->addNunboxType(i, a))
+                        return false;
                     break;
                   case LDefinition::PAYLOAD:
-                    safepoint->addNunboxPayload(i, a);
+                    if (!safepoint->addNunboxPayload(i, a))
+                        return false;
                     break;
 #else
                   case LDefinition::BOX:
-                    safepoint->addBoxedValue(a);
+                    if (!safepoint->addBoxedValue(a))
+                        return false;
                     break;
 #endif
                   default:

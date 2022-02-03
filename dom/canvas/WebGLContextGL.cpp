@@ -4,6 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "WebGLContext.h"
+
+#include "WebGLActiveInfo.h"
 #include "WebGLContextUtils.h"
 #include "WebGLBuffer.h"
 #include "WebGLVertexAttribData.h"
@@ -17,9 +19,9 @@
 #include "WebGLExtensions.h"
 #include "WebGLVertexArray.h"
 
-#include "nsString.h"
 #include "nsDebug.h"
 #include "nsReadableUtils.h"
+#include "nsString.h"
 
 #include "gfxContext.h"
 #include "gfxPlatform.h"
@@ -50,7 +52,8 @@
 #include "mozilla/Endian.h"
 #include "mozilla/nsRefPtr.h"
 
-using namespace mozilla;
+namespace mozilla {
+
 using namespace mozilla::dom;
 using namespace mozilla::gfx;
 using namespace mozilla::gl;
@@ -460,7 +463,8 @@ WebGLContext::CopyTexSubImage2D_base(TexImageTarget texImageTarget, GLint level,
             tex->SetImageInfo(texImageTarget, level, width, height, 1,
                       effectiveInternalFormat,
                       WebGLImageDataStatus::UninitializedImageData);
-            tex->EnsureNoUninitializedImageData(texImageTarget, level);
+            if (!tex->EnsureInitializedImageData(texImageTarget, level))
+                return;
         }
 
         // if we are completely outside of the framebuffer, we can exit now with our black texture
@@ -608,7 +612,8 @@ WebGLContext::CopyTexSubImage2D(GLenum rawTexImgTarget,
         if (coversWholeImage) {
             tex->SetImageDataStatus(texImageTarget, level, WebGLImageDataStatus::InitializedImageData);
         } else {
-            tex->EnsureNoUninitializedImageData(texImageTarget, level);
+            if (!tex->EnsureInitializedImageData(texImageTarget, level))
+                return;
         }
     }
 
@@ -1022,7 +1027,7 @@ WebGLContext::GetActiveUniform(WebGLProgram* prog, GLuint index)
 
 void
 WebGLContext::GetAttachedShaders(WebGLProgram* prog,
-                                 Nullable<nsTArray<nsRefPtr<WebGLShader>>>& retval)
+                                 dom::Nullable<nsTArray<nsRefPtr<WebGLShader>>>& retval)
 {
     retval.SetNull();
     if (IsContextLost())
@@ -1135,7 +1140,7 @@ WebGLContext::GetFramebufferAttachmentParameter(JSContext* cx,
 
     MakeContextCurrent();
 
-    const WebGLFramebuffer::AttachPoint& fba = fb->GetAttachPoint(attachment);
+    const WebGLFBAttachPoint& fba = fb->GetAttachPoint(attachment);
 
     if (fba.Renderbuffer()) {
         switch (pname) {
@@ -1960,7 +1965,7 @@ IsFormatAndTypeUnpackable(GLenum format, GLenum type)
 void
 WebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
                          GLsizei height, GLenum format,
-                         GLenum type, const Nullable<ArrayBufferView> &pixels,
+                         GLenum type, const dom::Nullable<ArrayBufferView>& pixels,
                          ErrorResult& rv)
 {
     if (IsContextLost())
@@ -2034,7 +2039,7 @@ WebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
     }
 
     const ArrayBufferView& pixbuf = pixels.Value();
-    int dataType = JS_GetArrayBufferViewType(pixbuf.Obj());
+    int dataType = pixbuf.Type();
 
     // Check the pixels param type
     if (dataType != requiredDataType)
@@ -2075,9 +2080,9 @@ WebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
             return;
 
         MOZ_ASSERT(srcFormat != LOCAL_GL_NONE);
-        TexType type = TypeFromInternalFormat(srcFormat);
-        isSourceTypeFloat = (type == LOCAL_GL_FLOAT ||
-                             type == LOCAL_GL_HALF_FLOAT);
+        TexType texType = TypeFromInternalFormat(srcFormat);
+        isSourceTypeFloat = (texType == LOCAL_GL_FLOAT ||
+                             texType == LOCAL_GL_HALF_FLOAT);
     } else {
         ClearBackbufferIfNeeded();
 
@@ -2474,20 +2479,6 @@ WebGLContext::SurfaceFromElementResultToImageSurface(nsLayoutUtils::SurfaceFromE
     if (!data) {
         // SurfaceFromElement lied!
         return NS_OK;
-    }
-
-    if (!mPixelStorePremultiplyAlpha && res.mIsPremultiplied) {
-        switch (data->GetFormat()) {
-        case SurfaceFormat::B8G8R8X8:
-            // No alpha, so de-facto premult'd.
-            break;
-        case SurfaceFormat::B8G8R8A8:
-            data = gfxUtils::CreateUnpremultipliedDataSurface(data);
-            break;
-        default:
-            MOZ_ASSERT(false, "Format unsupported.");
-            break;
-        }
     }
 
     // We disallow loading cross-domain images and videos that have not been validated
@@ -3063,7 +3054,8 @@ WebGLContext::CompressedTexSubImage2D(GLenum rawTexImgTarget, GLint level, GLint
         if (coversWholeImage) {
             tex->SetImageDataStatus(texImageTarget, level, WebGLImageDataStatus::InitializedImageData);
         } else {
-            tex->EnsureNoUninitializedImageData(texImageTarget, level);
+            if (!tex->EnsureInitializedImageData(texImageTarget, level))
+                return;
         }
     }
 
@@ -3394,7 +3386,8 @@ void
 WebGLContext::TexImage2D(GLenum rawTarget, GLint level,
                          GLenum internalformat, GLsizei width,
                          GLsizei height, GLint border, GLenum format,
-                         GLenum type, const Nullable<ArrayBufferView> &pixels, ErrorResult& rv)
+                         GLenum type, const dom::Nullable<ArrayBufferView>& pixels,
+                         ErrorResult& rv)
 {
     if (IsContextLost())
         return;
@@ -3412,7 +3405,7 @@ WebGLContext::TexImage2D(GLenum rawTarget, GLint level,
 
         data = view.Data();
         length = view.Length();
-        jsArrayType = JS_GetArrayBufferViewType(view.Obj());
+        jsArrayType = view.Type();
     }
 
     if (!ValidateTexImageTarget(rawTarget, WebGLTexImageFunc::TexImage, WebGLTexDimensions::Tex2D))
@@ -3455,7 +3448,7 @@ WebGLContext::TexImage2D(GLenum rawTarget, GLint level,
 
 
 void
-WebGLContext::TexSubImage2D_base(TexImageTarget texImageTarget, GLint level,
+WebGLContext::TexSubImage2D_base(GLenum rawImageTarget, GLint level,
                                  GLint xoffset, GLint yoffset,
                                  GLsizei width, GLsizei height, GLsizei srcStrideOrZero,
                                  GLenum format, GLenum type,
@@ -3468,6 +3461,11 @@ WebGLContext::TexSubImage2D_base(TexImageTarget texImageTarget, GLint level,
 
     if (type == LOCAL_GL_HALF_FLOAT_OES)
         type = LOCAL_GL_HALF_FLOAT;
+
+    if (!ValidateTexImageTarget(rawImageTarget, func, dims))
+        return;
+
+    TexImageTarget texImageTarget(rawImageTarget);
 
     WebGLTexture* tex = ActiveBoundTextureForTexImageTarget(texImageTarget);
     if (!tex)
@@ -3531,7 +3529,8 @@ WebGLContext::TexSubImage2D_base(TexImageTarget texImageTarget, GLint level,
         if (coversWholeImage) {
             tex->SetImageDataStatus(texImageTarget, level, WebGLImageDataStatus::InitializedImageData);
         } else {
-            tex->EnsureNoUninitializedImageData(texImageTarget, level);
+            if (!tex->EnsureInitializedImageData(texImageTarget, level))
+                return;
         }
     }
     MakeContextCurrent();
@@ -3589,7 +3588,7 @@ WebGLContext::TexSubImage2D(GLenum rawTarget, GLint level,
                             GLint xoffset, GLint yoffset,
                             GLsizei width, GLsizei height,
                             GLenum format, GLenum type,
-                            const Nullable<ArrayBufferView> &pixels,
+                            const dom::Nullable<ArrayBufferView>& pixels,
                             ErrorResult& rv)
 {
     if (IsContextLost())
@@ -3606,8 +3605,7 @@ WebGLContext::TexSubImage2D(GLenum rawTarget, GLint level,
 
     return TexSubImage2D_base(rawTarget, level, xoffset, yoffset,
                               width, height, 0, format, type,
-                              view.Data(), view.Length(),
-                              JS_GetArrayBufferViewType(view.Obj()),
+                              view.Data(), view.Length(), view.Type(),
                               WebGLTexelFormat::Auto, false);
 }
 
@@ -3666,7 +3664,7 @@ WebGLContext::RestoreContext()
 }
 
 WebGLTexelFormat
-mozilla::GetWebGLTexelFormat(TexInternalFormat effectiveInternalFormat)
+GetWebGLTexelFormat(TexInternalFormat effectiveInternalFormat)
 {
     switch (effectiveInternalFormat.get()) {
         case LOCAL_GL_RGBA8:                  return WebGLTexelFormat::RGBA8;
@@ -3750,3 +3748,5 @@ WebGLContext::SampleCoverage(GLclampf value, WebGLboolean invert) {
     MakeContextCurrent();
     gl->fSampleCoverage(value, invert);
 }
+
+} // namespace mozilla

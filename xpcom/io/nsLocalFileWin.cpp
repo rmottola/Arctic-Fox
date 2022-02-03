@@ -1179,8 +1179,8 @@ NS_IMETHODIMP
 nsLocalFile::Clone(nsIFile** aFile)
 {
   // Just copy-construct ourselves
-  *aFile = new nsLocalFile(*this);
-  NS_ADDREF(*aFile);
+  nsRefPtr<nsLocalFile> file = new nsLocalFile(*this);
+  file.forget(aFile);
 
   return NS_OK;
 }
@@ -1742,7 +1742,7 @@ nsLocalFile::GetVersionInfoField(const char* aField, nsAString& aResult)
       }
     }
   }
-  moz_free(ver);
+  free(ver);
 
   return rv;
 }
@@ -1896,18 +1896,21 @@ nsLocalFile::CopySingleFile(nsIFile* aSourceFile, nsIFile* aDestParent,
 
   // Pass the flag COPY_FILE_NO_BUFFERING to CopyFileEx as we may be copying
   // to a SMBV2 remote drive. Without this parameter subsequent append mode
-  // file writes can cause the resultant file to become corrupt. With a 7200RPM
-  // hard drive:
+  // file writes can cause the resultant file to become corrupt. We only need to do
+  // this if the major version of Windows is > 5(Only Windows Vista and above
+  // can support SMBV2).  With a 7200RPM hard drive:
   // Copying a 1KB file with COPY_FILE_NO_BUFFERING takes about 30-60ms.
   // Copying a 1KB file without COPY_FILE_NO_BUFFERING takes < 1ms.
   // So we only use COPY_FILE_NO_BUFFERING when we have a remote drive.
   int copyOK;
   DWORD dwCopyFlags = COPY_FILE_ALLOW_DECRYPTED_DESTINATION;
-  bool path1Remote, path2Remote;
-  if (!IsRemoteFilePath(filePath.get(), path1Remote) ||
-      !IsRemoteFilePath(destPath.get(), path2Remote) ||
-      path1Remote || path2Remote) {
-    dwCopyFlags |= COPY_FILE_NO_BUFFERING;
+  if (IsVistaOrLater()) {
+    bool path1Remote, path2Remote;
+    if (!IsRemoteFilePath(filePath.get(), path1Remote) ||
+        !IsRemoteFilePath(destPath.get(), path2Remote) ||
+        path1Remote || path2Remote) {
+      dwCopyFlags |= COPY_FILE_NO_BUFFERING;
+    }
   }
 
   if (!move) {
@@ -3211,14 +3214,12 @@ nsLocalFile::GetDirectoryEntries(nsISimpleEnumerator** aEntries)
 
   *aEntries = nullptr;
   if (mWorkingPath.EqualsLiteral("\\\\.")) {
-    nsDriveEnumerator* drives = new nsDriveEnumerator;
-    NS_ADDREF(drives);
+    nsRefPtr<nsDriveEnumerator> drives = new nsDriveEnumerator;
     rv = drives->Init();
     if (NS_FAILED(rv)) {
-      NS_RELEASE(drives);
       return rv;
     }
-    *aEntries = drives;
+    drives.forget(aEntries);
     return NS_OK;
   }
 
@@ -3357,20 +3358,18 @@ nsLocalFile::Launch()
 nsresult
 NS_NewLocalFile(const nsAString& aPath, bool aFollowLinks, nsIFile** aResult)
 {
-  nsLocalFile* file = new nsLocalFile();
-  NS_ADDREF(file);
+  nsRefPtr<nsLocalFile> file = new nsLocalFile();
 
   file->SetFollowLinks(aFollowLinks);
 
   if (!aPath.IsEmpty()) {
     nsresult rv = file->InitWithPath(aPath);
     if (NS_FAILED(rv)) {
-      NS_RELEASE(file);
       return rv;
     }
   }
 
-  *aResult = file;
+  file.forget(aResult);
   return NS_OK;
 }
 

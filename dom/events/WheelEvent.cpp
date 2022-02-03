@@ -16,7 +16,8 @@ WheelEvent::WheelEvent(EventTarget* aOwner,
                        WidgetWheelEvent* aWheelEvent)
   : MouseEvent(aOwner, aPresContext,
                aWheelEvent ? aWheelEvent :
-                             new WidgetWheelEvent(false, 0, nullptr))
+                             new WidgetWheelEvent(false, NS_EVENT_NULL,
+                                                  nullptr))
   , mAppUnitsPerDevPixel(0)
 {
   if (aWheelEvent) {
@@ -206,14 +207,11 @@ WheelEvent::Constructor(const GlobalObject& aGlobal,
 using namespace mozilla;
 using namespace mozilla::dom;
 
-nsresult
-NS_NewDOMWheelEvent(nsIDOMEvent** aInstancePtrResult,
-                    EventTarget* aOwner,
+already_AddRefed<WheelEvent>
+NS_NewDOMWheelEvent(EventTarget* aOwner,
                     nsPresContext* aPresContext,
                     WidgetWheelEvent* aEvent)
 {
-  WheelEvent* it = new WheelEvent(aOwner, aPresContext, aEvent);
-  NS_ADDREF(it);
-  *aInstancePtrResult = static_cast<Event*>(it);
-  return NS_OK;
+  nsRefPtr<WheelEvent> it = new WheelEvent(aOwner, aPresContext, aEvent);
+  return it.forget();
 }

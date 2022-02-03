@@ -10,6 +10,7 @@
 #include "nsAutoPtr.h"
 #include "nsCOMPtr.h"
 #include "nsIPipe.h"
+#include "nsICloneableInputStream.h"
 #include "nsIEventTarget.h"
 #include "nsIRunnable.h"
 #include "nsISafeOutputStream.h"
@@ -273,7 +274,6 @@ public:
       return;
     }
 
-    nsresult sourceCondition, sinkCondition;
     nsresult cancelStatus;
     bool canceled;
     {
@@ -281,6 +281,13 @@ public:
       canceled = mCanceled;
       cancelStatus = mCancelStatus;
     }
+
+    // If the copy was canceled before Process() was even called, then
+    // sourceCondition and sinkCondition should be set to error results to
+    // ensure we don't call Finish() on a canceled nsISafeOutputStream.
+    MOZ_ASSERT(NS_FAILED(cancelStatus) == canceled, "cancel needs an error");
+    nsresult sourceCondition = cancelStatus;
+    nsresult sinkCondition = cancelStatus;
 
     // Copy data from the source to the sink until we hit failure or have
     // copied all the data.
@@ -494,9 +501,10 @@ public:
   {
   }
 
-  struct ReadSegmentsState
+  struct MOZ_STACK_CLASS ReadSegmentsState
   {
-    nsIOutputStream* mSink;
+    // the nsIOutputStream will outlive the ReadSegmentsState on the stack
+    nsIOutputStream* MOZ_NON_OWNING_REF mSink;
     nsresult         mSinkCondition;
   };
 
@@ -543,9 +551,10 @@ public:
   {
   }
 
-  struct WriteSegmentsState
+  struct MOZ_STACK_CLASS WriteSegmentsState
   {
-    nsIInputStream* mSource;
+    // the nsIInputStream will outlive the WriteSegmentsState on the stack
+    nsIInputStream* MOZ_NON_OWNING_REF mSource;
     nsresult        mSourceCondition;
   };
 

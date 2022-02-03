@@ -121,7 +121,6 @@ Convert(const bt_uuid_t& aIn, BluetoothUuid& aOut)
   return NS_OK;
 }
 
-#ifdef MOZ_B2G_BT_API_V2
 nsresult
 Convert(const BluetoothUuid& aIn, bt_uuid_t& aOut)
 {
@@ -133,9 +132,6 @@ Convert(const BluetoothUuid& aIn, bt_uuid_t& aOut)
 
   return NS_OK;
 }
-#else
-// TODO: Support GATT
-#endif
 
 nsresult
 Convert(const nsAString& aIn, bt_pin_code_t& aOut)
@@ -201,6 +197,13 @@ Convert(const bt_service_record_t& aIn, BluetoothServiceRecord& aOut)
   return NS_OK;
 }
 
+nsresult
+Convert(const uint8_t* aIn, BluetoothGattAdvData& aOut)
+{
+  memcpy(aOut.mAdvData, aIn, sizeof(aOut.mAdvData));
+  return NS_OK;
+}
+
 #if ANDROID_VERSION >= 18
 nsresult
 Convert(const BluetoothAvrcpElementAttribute& aIn, btrc_element_attr_val_t& aOut)
@@ -225,14 +228,6 @@ Convert(const btrc_player_settings_t& aIn, BluetoothAvrcpPlayerSettings& aOut)
   return NS_OK;
 }
 #endif // ANDROID_VERSION >= 18
-
-#ifdef MOZ_B2G_BT_API_V2
-nsresult
-Convert(const uint8_t* aIn, BluetoothGattAdvData& aOut)
-{
-  memcpy(aOut.mAdvData, aIn, sizeof(aOut.mAdvData));
-  return NS_OK;
-}
 
 #if ANDROID_VERSION >= 19
 nsresult
@@ -266,16 +261,20 @@ Convert(const btgatt_srvc_id_t& aIn, BluetoothGattServiceId& aOut)
 nsresult
 Convert(const btgatt_read_params_t& aIn, BluetoothGattReadParam& aOut)
 {
-  nsresult rv;
-
-  rv = Convert(aIn.srvc_id, aOut.mServiceId);
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsresult rv = Convert(aIn.srvc_id, aOut.mServiceId);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   rv = Convert(aIn.char_id, aOut.mCharId);
-  NS_ENSURE_SUCCESS(rv, rv);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   rv = Convert(aIn.descr_id, aOut.mDescriptorId);
-  NS_ENSURE_SUCCESS(rv, rv);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   memcpy(aOut.mValue, aIn.value.value, aIn.value.len);
   aOut.mValueLength = aIn.value.len;
@@ -288,16 +287,20 @@ Convert(const btgatt_read_params_t& aIn, BluetoothGattReadParam& aOut)
 nsresult
 Convert(const btgatt_write_params_t& aIn, BluetoothGattWriteParam& aOut)
 {
-  nsresult rv;
-
-  rv = Convert(aIn.srvc_id, aOut.mServiceId);
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsresult rv = Convert(aIn.srvc_id, aOut.mServiceId);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   rv = Convert(aIn.char_id, aOut.mCharId);
-  NS_ENSURE_SUCCESS(rv, rv);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   rv = Convert(aIn.descr_id, aOut.mDescriptorId);
-  NS_ENSURE_SUCCESS(rv, rv);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   aOut.mStatus = aIn.status;
 
@@ -307,20 +310,89 @@ Convert(const btgatt_write_params_t& aIn, BluetoothGattWriteParam& aOut)
 nsresult
 Convert(const btgatt_notify_params_t& aIn, BluetoothGattNotifyParam& aOut)
 {
-  nsresult rv;
-
-  rv = Convert(aIn.bda, aOut.mBdAddr);
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsresult rv = Convert(aIn.bda, aOut.mBdAddr);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   rv = Convert(aIn.srvc_id, aOut.mServiceId);
-  NS_ENSURE_SUCCESS(rv, rv);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   rv = Convert(aIn.char_id, aOut.mCharId);
-  NS_ENSURE_SUCCESS(rv, rv);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   memcpy(aOut.mValue, aIn.value, aIn.len);
   aOut.mLength = aIn.len;
   aOut.mIsNotify = (aIn.is_notify != 0);
+
+  return NS_OK;
+}
+
+nsresult
+Convert(const BluetoothGattTestParam& aIn, btgatt_test_params_t& aOut)
+{
+  nsresult rv = Convert(aIn.mBdAddr, *aOut.bda1);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  rv = Convert(aIn.mUuid, *aOut.uuid1);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  rv = Convert(aIn.mU1, aOut.u1);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  rv = Convert(aIn.mU2, aOut.u2);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  rv = Convert(aIn.mU3, aOut.u3);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  rv = Convert(aIn.mU4, aOut.u4);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  rv = Convert(aIn.mU5, aOut.u5);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  return NS_OK;
+}
+
+nsresult
+Convert(const BluetoothGattResponse& aIn, btgatt_response_t& aOut)
+{
+  // Only the read response format is used in bluedroid.
+  nsresult rv = Convert(
+    ConvertArray<uint8_t>(aIn.mValue, sizeof(aIn.mValue)),
+    aOut.attr_value.value);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  rv = Convert(aIn.mHandle, aOut.attr_value.handle);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  rv = Convert(aIn.mOffset, aOut.attr_value.offset);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  rv = Convert(aIn.mLength, aOut.attr_value.len);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  rv = Convert(aIn.mAuthReq, aOut.attr_value.auth_req);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   return NS_OK;
 }
@@ -342,12 +414,7 @@ Convert(const BluetoothTransport& aIn, btgatt_transport_t& aOut)
   aOut = sTransport[aIn];
   return NS_OK;
 }
-#endif
-#else
-// TODO: Support GATT
-#endif
 
-#if ANDROID_VERSION >= 21
 nsresult
 Convert(const bt_activity_energy_info& aIn, BluetoothActivityEnergyInfo& aOut)
 {
