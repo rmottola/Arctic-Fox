@@ -801,9 +801,10 @@ AsyncPanZoomController::AsyncPanZoomController(uint64_t aLayersId,
                                                APZCTreeManager* aTreeManager,
                                                const nsRefPtr<InputQueue>& aInputQueue,
                                                GeckoContentController* aGeckoContentController,
+                                               TaskThrottler* aPaintThrottler,
                                                GestureBehavior aGestures)
   :  mLayersId(aLayersId),
-     mPaintThrottler(GetFrameTime(), TimeDuration::FromMilliseconds(500)),
+     mPaintThrottler(aPaintThrottler),
      mGeckoContentController(aGeckoContentController),
      mRefPtrMonitor("RefPtrMonitor"),
      // mTreeManager must be initialized before GetFrameTime() is called
@@ -2468,7 +2469,7 @@ void AsyncPanZoomController::ScheduleComposite() {
 void AsyncPanZoomController::ScheduleCompositeAndMaybeRepaint() {
   ScheduleComposite();
 
-  TimeDuration timePaintDelta = mPaintThrottler.TimeSinceLastRequest(GetFrameTime());
+  TimeDuration timePaintDelta = mPaintThrottler->TimeSinceLastRequest(GetFrameTime());
   if (timePaintDelta.ToMilliseconds() > gfxPrefs::APZPanRepaintInterval()) {
     RequestContentRepaint();
   }
@@ -2489,7 +2490,7 @@ void AsyncPanZoomController::FlushRepaintForNewInputBlock() {
   // Therefore we should clear out the pending task and restore the
   // state of mLastPaintRequestMetrics to what it was before the
   // pending task was queued.
-  mPaintThrottler.CancelPendingTask();
+  mPaintThrottler->CancelPendingTask();
   mLastPaintRequestMetrics = mLastDispatchedPaintMetrics;
 
   RequestContentRepaint(mFrameMetrics, false /* not throttled */);
@@ -2500,7 +2501,7 @@ void AsyncPanZoomController::FlushRepaintIfPending() {
   // Just tell the paint throttler to send the pending repaint request if
   // there is one.
   ReentrantMonitorAutoEnter lock(mMonitor);
-  mPaintThrottler.TaskComplete(GetFrameTime());
+  mPaintThrottler->TaskComplete(GetFrameTime());
 }
 
 bool AsyncPanZoomController::SnapBackIfOverscrolled() {
@@ -2543,7 +2544,7 @@ void AsyncPanZoomController::RequestContentRepaint(FrameMetrics& aFrameMetrics, 
   aFrameMetrics.SetDisplayPortMargins(
     CalculatePendingDisplayPort(aFrameMetrics,
                                 GetVelocityVector(),
-                                mPaintThrottler.AverageDuration().ToSeconds()));
+                                mPaintThrottler->AverageDuration().ToSeconds()));
   aFrameMetrics.SetUseDisplayPortMargins();
 
   // If we're trying to paint what we already think is painted, discard this
@@ -2566,7 +2567,7 @@ void AsyncPanZoomController::RequestContentRepaint(FrameMetrics& aFrameMetrics, 
 
   SendAsyncScrollEvent();
   if (aThrottled) {
-    mPaintThrottler.PostTask(
+    mPaintThrottler->PostTask(
       FROM_HERE,
       UniquePtr<CancelableTask>(NewRunnableMethod(this,
                         &AsyncPanZoomController::DispatchRepaintRequest,
@@ -2637,7 +2638,7 @@ bool AsyncPanZoomController::UpdateAnimation(const TimeStamp& aSampleTime,
     bool continueAnimation = mAnimation->Sample(mFrameMetrics, sampleTimeDelta);
     *aOutDeferredTasks = mAnimation->TakeDeferredTasks();
     if (continueAnimation) {
-      if (mPaintThrottler.TimeSinceLastRequest(aSampleTime) >
+      if (mPaintThrottler->TimeSinceLastRequest(aSampleTime) >
           mAnimation->mRepaintInterval) {
         RequestContentRepaint();
       }
@@ -2866,7 +2867,7 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
       aLayerMetrics.GetCriticalDisplayPort() + aLayerMetrics.GetScrollOffset());
   }
 
-  mPaintThrottler.TaskComplete(GetFrameTime());
+  mPaintThrottler->TaskComplete(GetFrameTime());
   bool needContentRepaint = false;
   bool viewportUpdated = false;
   if (FuzzyEqualsAdditive(aLayerMetrics.GetCompositionBounds().width, mFrameMetrics.GetCompositionBounds().width) &&
@@ -2894,8 +2895,8 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
   if (aIsFirstPaint || isDefault) {
     // Initialize our internal state to something sane when the content
     // that was just painted is something we knew nothing about previously
-    mPaintThrottler.ClearHistory();
-    mPaintThrottler.SetMaxDurations(gfxPrefs::APZNumPaintDurationSamples());
+    mPaintThrottler->ClearHistory();
+    mPaintThrottler->SetMaxDurations(gfxPrefs::APZNumPaintDurationSamples());
 
     CancelAnimation();
 
