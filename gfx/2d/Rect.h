@@ -13,6 +13,7 @@
 #include "Tools.h"
 
 #include <cmath>
+#include <limits>
 
 namespace mozilla {
 
