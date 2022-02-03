@@ -138,7 +138,7 @@ private:
 
 class TestAPZCTreeManager : public APZCTreeManager {
 public:
-  TestAPZCTreeManager() {}
+  explicit TestAPZCTreeManager(MockContentControllerDelayed* aMcc) : mcc(aMcc) {}
 
   nsRefPtr<InputQueue> GetInputQueue() const {
     return mInputQueue;
@@ -146,6 +146,13 @@ public:
 
 protected:
   AsyncPanZoomController* MakeAPZCInstance(uint64_t aLayersId, GeckoContentController* aController) override;
+
+  TimeStamp GetFrameTime() override {
+    return mcc->Time();
+  }
+
+private:
+  nsRefPtr<MockContentControllerDelayed> mcc;
 };
 
 class TestAsyncPanZoomController : public AsyncPanZoomController {
@@ -228,10 +235,6 @@ public:
     mWaitForMainThread = true;
   }
 
-  TimeStamp GetFrameTime() const {
-    return mcc->Time();
-  }
-
   static TimeStamp GetStartupTime() {
     static TimeStamp sStartupTime = TimeStamp::Now();
     return sStartupTime;
@@ -278,7 +281,7 @@ protected:
     APZThreadUtils::SetControllerThread(MessageLoop::current());
 
     mcc = new NiceMock<MockContentControllerDelayed>();
-    tm = new TestAPZCTreeManager();
+    tm = new TestAPZCTreeManager(mcc);
     apzc = new TestAsyncPanZoomController(0, mcc, tm, mGestureBehavior);
     apzc->SetFrameMetrics(TestFrameMetrics());
   }
@@ -1880,7 +1883,7 @@ protected:
     APZThreadUtils::SetControllerThread(MessageLoop::current());
 
     mcc = new NiceMock<MockContentControllerDelayed>();
-    manager = new TestAPZCTreeManager();
+    manager = new TestAPZCTreeManager(mcc);
   }
 
   virtual void TearDown() {

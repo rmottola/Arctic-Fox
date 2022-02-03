@@ -388,7 +388,8 @@ static uint32_t sAsyncPanZoomControllerCount = 0;
 TimeStamp
 AsyncPanZoomController::GetFrameTime() const
 {
-  return TimeStamp::Now();
+  APZCTreeManager* treeManagerLocal = GetApzcTreeManager();
+  return treeManagerLocal ? treeManagerLocal->GetFrameTime() : TimeStamp::Now();
 }
 
 class MOZ_STACK_CLASS StateChangeNotificationBlocker {
@@ -805,6 +806,8 @@ AsyncPanZoomController::AsyncPanZoomController(uint64_t aLayersId,
      mPaintThrottler(GetFrameTime(), TimeDuration::FromMilliseconds(500)),
      mGeckoContentController(aGeckoContentController),
      mRefPtrMonitor("RefPtrMonitor"),
+     // mTreeManager must be initialized before GetFrameTime() is called
+     mTreeManager(aTreeManager),
      mSharingFrameMetricsAcrossProcesses(false),
      mMonitor("AsyncPanZoomController"),
      mX(this),
@@ -819,7 +822,6 @@ AsyncPanZoomController::AsyncPanZoomController(uint64_t aLayersId,
      mState(NOTHING),
      mNotificationBlockers(0),
      mInputQueue(aInputQueue),
-     mTreeManager(aTreeManager),
      mAPZCId(sAsyncPanZoomControllerCount++),
      mSharedLock(nullptr),
      mAsyncTransformAppliedToContent(false)
