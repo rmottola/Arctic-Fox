@@ -11,6 +11,7 @@
 #include <time.h>
 #include <execinfo.h>
 #include <asl.h>
+#include <unistd.h>
 
 static char gProcPath[PROC_PIDPATHINFO_MAXSIZE] = {0};
 static char gBundleID[MAXPATHLEN] = {0};
