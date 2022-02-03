@@ -3273,6 +3273,11 @@ bool AsyncPanZoomController::Matches(const ScrollableLayerGuid& aGuid)
   return aGuid == GetGuid();
 }
 
+bool AsyncPanZoomController::HasTreeManager(const APZCTreeManager* aTreeManager) const
+{
+  return GetApzcTreeManager() == aTreeManager;
+}
+
 void AsyncPanZoomController::GetGuid(ScrollableLayerGuid* aGuidOut) const
 {
   if (aGuidOut) {
