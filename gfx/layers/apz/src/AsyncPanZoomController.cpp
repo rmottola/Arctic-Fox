@@ -1280,10 +1280,6 @@ nsEventStatus AsyncPanZoomController::OnScaleBegin(const PinchGestureInput& aEve
     return nsEventStatus_eIgnore;
   }
 
-  if (!mZoomConstraints.mAllowZoom) {
-    return nsEventStatus_eConsumeNoDefault;
-  }
-
   SetState(PINCHING);
   mX.SetVelocity(0);
   mY.SetVelocity(0);
@@ -1350,6 +1346,10 @@ nsEventStatus AsyncPanZoomController::OnScale(const PinchGestureInput& aEvent) {
 
     bool doScale = (spanRatio > 1.0 && userZoom < realMaxZoom) ||
                    (spanRatio < 1.0 && userZoom > realMinZoom);
+
+    if (!mZoomConstraints.mAllowZoom) {
+      doScale = false;
+    }
 
     if (doScale) {
       spanRatio = clamped(spanRatio,
