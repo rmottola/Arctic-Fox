@@ -400,11 +400,10 @@
  * MOZ_NONHEAP_CLASS: Applies to all classes. Any class with this annotation is
  *   expected to live on the stack or in static storage, so it is a compile-time
  *   error to use it, or an array of such objects, as the type of a new
- *   expression (unless placement new is being used). If a member of another
- *   class uses this class, or if another class inherits from this class, then
- *   it is considered to be a non-heap class as well, although this attribute
- *   need not be provided in such cases.
-* MOZ_HEAP_CLASS: Applies to all classes. Any class with this annotation is
+ *   expression. If a member of another class uses this class, or if another
+ *   class inherits from this class, then it is considered to be a non-heap class
+ *   as well, although this attribute need not be provided in such cases.
+ * MOZ_HEAP_CLASS: Applies to all classes. Any class with this annotation is
  *   expected to live on the heap, so it is a compile-time error to use it, or
  *   an array of such objects, as the type of a variable declaration, or as a
  *   temporary object. If a member of another class uses this class, or if
