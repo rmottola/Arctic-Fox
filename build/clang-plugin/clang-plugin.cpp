@@ -149,6 +149,7 @@ bool isInIgnoredNamespaceForImplicitCtor(const Decl *decl) {
     return false;
   }
 
+
   return name == "std" ||               // standard C++ lib
          name == "__gnu_cxx" ||         // gnu C++ lib
          name == "boost" ||             // boost
@@ -854,7 +855,11 @@ void CustomTypeAnnotation::dumpAnnotationReason(DiagnosticsEngine &Diag, QualTyp
 }
 
 bool CustomTypeAnnotation::hasLiteralAnnotation(QualType T) const {
+#if CLANG_VERSION_FULL >= 306
   if (const TagDecl *D = T->getAsTagDecl()) {
+#else
+  if (const CXXRecordDecl *D = T->getAsCXXRecordDecl()) {
+#endif
     return MozChecker::hasCustomAnnotation(D, Spelling);
   }
   return false;
