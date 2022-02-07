@@ -7609,7 +7609,7 @@ private:
   RecvDeleteMe() override;
 
   virtual bool
-  RecvContinue(const CursorRequestParams& aParams) override;
+  RecvContinue(const CursorRequestParams& aParams, const Key& key) override;
 };
 
 class Cursor::CursorOpBase
@@ -7695,12 +7695,16 @@ class Cursor::ContinueOp final
   friend class Cursor;
 
   const CursorRequestParams mParams;
+  const Key mKey;
 
 private:
   // Only created by Cursor.
-  ContinueOp(Cursor* aCursor, const CursorRequestParams& aParams)
+  ContinueOp(Cursor* aCursor,
+             const CursorRequestParams& aParams,
+             const Key& aKey)
     : CursorOpBase(aCursor)
     , mParams(aParams)
+    , mKey(aKey)
   {
     MOZ_ASSERT(aParams.type() != CursorRequestParams::T__None);
   }
@@ -14874,7 +14878,7 @@ Cursor::RecvDeleteMe()
 }
 
 bool
-Cursor::RecvContinue(const CursorRequestParams& aParams)
+Cursor::RecvContinue(const CursorRequestParams& aParams, const Key& aKey)
 {
   AssertIsOnBackgroundThread();
   MOZ_ASSERT(aParams.type() != CursorRequestParams::T__None);
@@ -14892,6 +14896,8 @@ Cursor::RecvContinue(const CursorRequestParams& aParams)
     mIsSameProcessActor
 #endif
     ;
+
+  MOZ_ASSERT(aKey.IsUnset());
 
   if (!trustParams && !VerifyRequestParams(aParams)) {
     ASSERT_UNLESS_FUZZING();
@@ -14912,7 +14918,7 @@ Cursor::RecvContinue(const CursorRequestParams& aParams)
     return true;
   }
 
-  nsRefPtr<ContinueOp> continueOp = new ContinueOp(this, aParams);
+  nsRefPtr<ContinueOp> continueOp = new ContinueOp(this, aParams, aKey);
   if (NS_WARN_IF(!continueOp->Init(mTransaction))) {
     continueOp->Cleanup();
     return false;
