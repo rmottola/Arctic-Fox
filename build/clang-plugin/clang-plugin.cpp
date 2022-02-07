@@ -74,8 +74,8 @@ private:
   };
 
   class RefCountedInsideLambdaChecker : public MatchFinder::MatchCallback {
-    public:
-      virtual void run(const MatchFinder::MatchResult &Result);
+  public:
+    virtual void run(const MatchFinder::MatchResult &Result);
   };
 
   class ExplicitOperatorBoolChecker : public MatchFinder::MatchCallback {
@@ -1012,7 +1012,7 @@ DiagnosticsMatcher::DiagnosticsMatcher() {
   // lambda, where the declaration they reference is not inside the lambda.
   // This excludes arguments and local variables, leaving only captured
   // variables.
-    astMatcher.addMatcher(lambdaExpr(
+  astMatcher.addMatcher(lambdaExpr(
             hasDescendant(declRefExpr(hasType(pointerType(pointee(isRefCounted()))),
                                       to(decl().bind("decl"))).bind("declref")),
             unless(hasDescendant(decl(equalsBoundNode("decl"))))
