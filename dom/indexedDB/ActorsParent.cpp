@@ -19450,7 +19450,18 @@ void
 OpenDatabaseOp::NoteDatabaseClosed(Database* aDatabase)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_WaitingForOtherDatabasesToClose);
+  MOZ_ASSERT(aDatabase);
+  MOZ_ASSERT(mState == State_WaitingForOtherDatabasesToClose ||
+             mState == State_DatabaseWorkVersionChange);
+
+  if (mState == State_DatabaseWorkVersionChange) {
+    MOZ_ASSERT(mMaybeBlockedDatabases.IsEmpty());
+    MOZ_ASSERT(mRequestedVersion >
+                 aDatabase->Metadata()->mCommonMetadata.version(),
+               "Must only be closing databases for a previous version!");
+    return;
+  }
+
   MOZ_ASSERT(!mMaybeBlockedDatabases.IsEmpty());
 
   bool actorDestroyed = IsActorDestroyed() || mDatabase->IsActorDestroyed();
