@@ -783,6 +783,7 @@ nsDocShell::nsDocShell()
   , mUseRemoteTabs(false)
   , mDeviceSizeIsPageSize(false)
   , mWindowDraggingAllowed(false)
+  , mInFrameSwap(false)
   , mCanExecuteScripts(false)
   , mFiredUnloadEvent(false)
   , mEODForCurrentDocument(false)
@@ -14206,4 +14207,17 @@ nsDocShell::GetPaymentRequestId(nsAString& aPaymentRequestId)
 {
   aPaymentRequestId = GetInheritedPaymentRequestId();
   return NS_OK;
+}
+
+bool
+nsDocShell::InFrameSwap()
+{
+  nsRefPtr<nsDocShell> shell = this;
+  do {
+    if (shell->mInFrameSwap) {
+      return true;
+    }
+    shell = shell->GetParentDocshell();
+  } while (shell);
+  return false;
 }
