@@ -3800,11 +3800,21 @@
             event.preventDefault();
             return;
           }
-          event.target.setAttribute("label",
-                                    tab.mOverCloseButton ?
-                                    tab.getAttribute("closetabtext") :
-                                    tab.getAttribute("label") +
-                                      (this.AppConstants.E10S_TESTING_ONLY && tab.linkedBrowser && tab.linkedBrowser.isRemoteBrowser ? " - e10s" : ""));
+          var stringID, label;
+          if (tab.mOverCloseButton) {
+            stringID = "tabs.closeTab.tooltip";
+          } else if (tab._overPlayingIcon) {
+            stringID = tab.linkedBrowser.audioMuted ?
+              "tabs.mutedAudio.tooltip" :
+              "tabs.playingAudio.tooltip";
+          } else {
+            label = tab.getAttribute("label") +
+                      (this.AppConstants.E10S_TESTING_ONLY && tab.linkedBrowser && tab.linkedBrowser.isRemoteBrowser ? " - e10s" : "");
+          }
+          if (stringID && !label) {
+            label = this.mStringBundle.getString(stringID);
+          }
+          event.target.setAttribute("label", label);
         ]]></body>
       </method>
 
@@ -5646,7 +5656,7 @@
       <stylesheet src="chrome://browser/content/tabbrowser.css"/>
     </resources>
 
-    <content context="tabContextMenu" closetabtext="&closeTab.label;">
+    <content context="tabContextMenu">
       <xul:stack class="tab-stack" flex="1">
         <xul:hbox xbl:inherits="pinned,selected,visuallyselected,titlechanged,fadein"
                   class="tab-background">
@@ -5746,6 +5756,7 @@
       </property>
 
       <field name="mOverCloseButton">false</field>
+      <field name="_overPlayingIcon">false</field>
       <field name="mCorrespondingMenuitem">null</field>
       <field name="closing">false</field>
       <field name="lastAccessed">0</field>
@@ -5800,6 +5811,9 @@
         let anonid = event.originalTarget.getAttribute("anonid");
         if (anonid == "close-button")
           this.mOverCloseButton = true;
+        else if ((anonid == "soundplaying-icon") ||
+                 ((anonid == "overlay-icon") && this.hasAttribute("soundplaying")))
+          this._overPlayingIcon = true;
 
         this._mouseenter();
       ]]></handler>
@@ -5807,6 +5821,9 @@
         let anonid = event.originalTarget.getAttribute("anonid");
         if (anonid == "close-button")
           this.mOverCloseButton = false;
+        else if ((anonid == "soundplaying-icon") ||
+                 ((anonid == "overlay-icon") && this.hasAttribute("soundplaying")))
+          this._overPlayingIcon = false;
 
         this._mouseleave();
       ]]></handler>
