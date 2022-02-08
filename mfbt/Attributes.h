@@ -93,7 +93,7 @@
 #    if MOZ_GCC_VERSION_AT_LEAST(4, 8, 0)
 #      define MOZ_HAVE_CXX11_CONSTEXPR_IN_TEMPLATES
 #    endif
-# define MOZ_HAVE_EXPLICIT_CONVERSION
+#    define MOZ_HAVE_EXPLICIT_CONVERSION
 #  endif
 #  define MOZ_HAVE_NEVER_INLINE          __attribute__((noinline))
 #  define MOZ_HAVE_NORETURN              __attribute__((noreturn))
@@ -316,7 +316,6 @@
 #else
 #  define MOZ_ALLOCATOR
 #endif
-
 
 /**
  * MOZ_WARN_UNUSED_RESULT tells the compiler to emit a warning if a function's
