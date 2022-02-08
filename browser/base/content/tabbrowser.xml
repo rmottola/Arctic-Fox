@@ -4410,7 +4410,7 @@
       <field name="_afterSelectedTab">null</field>
       <field name="_beforeHoveredTab">null</field>
       <field name="_afterHoveredTab">null</field>
-
+      <field name="_hoveredTab">null</field>
       <method name="_setPositionalAttributes">
         <body><![CDATA[
           let visibleTabs = this.tabbrowser.visibleTabs;
@@ -4440,6 +4440,12 @@
             this._lastTab.removeAttribute("last-visible-tab");
           this._lastTab = visibleTabs[lastVisible];
           this._lastTab.setAttribute("last-visible-tab", "true");
+
+          let hoveredTab = this._hoveredTab;
+          if (hoveredTab) {
+            hoveredTab._mouseleave();
+            hoveredTab._mouseenter();
+          }
         ]]></body>
       </method>
 
@@ -5743,6 +5749,50 @@
       <field name="mCorrespondingMenuitem">null</field>
       <field name="closing">false</field>
       <field name="lastAccessed">0</field>
+
+      <method name="_mouseenter">
+        <body><![CDATA[
+          if (this.closing)
+            return;
+          let tabContainer = this.parentNode;
+          let visibleTabs = tabContainer.tabbrowser.visibleTabs;
+          let tabIndex = visibleTabs.indexOf(this);
+          if (tabIndex == 0) {
+            tabContainer._beforeHoveredTab = null;
+          } else {
+            let candidate = visibleTabs[tabIndex - 1];
+            if (!candidate.selected) {
+              tabContainer._beforeHoveredTab = candidate;
+              candidate.setAttribute("beforehovered", "true");
+            }
+          }
+          if (tabIndex == visibleTabs.length - 1) {
+            tabContainer._afterHoveredTab = null;
+          } else {
+            let candidate = visibleTabs[tabIndex + 1];
+            if (!candidate.selected) {
+              tabContainer._afterHoveredTab = candidate;
+              candidate.setAttribute("afterhovered", "true");
+            }
+          }
+          tabContainer._hoveredTab = this;
+        ]]></body>
+      </method>
+
+      <method name="_mouseleave">
+        <body><![CDATA[
+          let tabContainer = this.parentNode;
+          if (tabContainer._beforeHoveredTab) {
+            tabContainer._beforeHoveredTab.removeAttribute("beforehovered");
+            tabContainer._beforeHoveredTab = null;
+          }
+          if (tabContainer._afterHoveredTab) {
+            tabContainer._afterHoveredTab.removeAttribute("afterhovered");
+            tabContainer._afterHoveredTab = null;
+          }
+          tabContainer._hoveredTab = null;
+        ]]></body>
+      </method>
     </implementation>
 
     <handlers>
@@ -5751,47 +5801,14 @@
         if (anonid == "close-button")
           this.mOverCloseButton = true;
 
-        let tab = event.target;
-        if (tab.closing)
-          return;
-
-        let tabContainer = this.parentNode;
-        let visibleTabs = tabContainer.tabbrowser.visibleTabs;
-        let tabIndex = visibleTabs.indexOf(tab);
-        if (tabIndex == 0) {
-          tabContainer._beforeHoveredTab = null;
-        } else {
-          let candidate = visibleTabs[tabIndex - 1];
-          if (!candidate.selected) {
-            tabContainer._beforeHoveredTab = candidate;
-            candidate.setAttribute("beforehovered", "true");
-          }
-        }
-
-        if (tabIndex == visibleTabs.length - 1) {
-          tabContainer._afterHoveredTab = null;
-        } else {
-          let candidate = visibleTabs[tabIndex + 1];
-          if (!candidate.selected) {
-            tabContainer._afterHoveredTab = candidate;
-            candidate.setAttribute("afterhovered", "true");
-          }
-        }
+        this._mouseenter();
       ]]></handler>
       <handler event="mouseout"><![CDATA[
         let anonid = event.originalTarget.getAttribute("anonid");
         if (anonid == "close-button")
           this.mOverCloseButton = false;
 
-        let tabContainer = this.parentNode;
-        if (tabContainer._beforeHoveredTab) {
-          tabContainer._beforeHoveredTab.removeAttribute("beforehovered");
-          tabContainer._beforeHoveredTab = null;
-        }
-        if (tabContainer._afterHoveredTab) {
-          tabContainer._afterHoveredTab.removeAttribute("afterhovered");
-          tabContainer._afterHoveredTab = null;
-        }
+        this._mouseleave();
       ]]></handler>
       <handler event="dragstart" phase="capturing">
         this.style.MozUserFocus = '';
