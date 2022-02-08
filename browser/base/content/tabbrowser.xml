@@ -3814,19 +3814,19 @@
             event.preventDefault();
             return;
           }
-          var stringID, label;
+          var label;
           if (tab.mOverCloseButton) {
-            stringID = "tabs.closeTab.tooltip";
+            label = this.mStringBundle.getString("tabs.closeTab.tooltip");
           } else if (tab._overPlayingIcon) {
-            stringID = tab.linkedBrowser.audioMuted ?
+            var stringID = tab.linkedBrowser.audioMuted ?
               "tabs.unmuteAudio.tooltip" :
               "tabs.muteAudio.tooltip";
+            var key = document.getElementById("key_toggleMute");
+            var shortcut = ShortcutUtils.prettifyShortcut(key);
+            label = this.mStringBundle.getFormattedString(stringID, [shortcut]);
           } else {
             label = tab.getAttribute("label") +
                       (this.AppConstants.E10S_TESTING_ONLY && tab.linkedBrowser && tab.linkedBrowser.isRemoteBrowser ? " - e10s" : "");
-          }
-          if (stringID && !label) {
-            label = this.mStringBundle.getString(stringID);
           }
           event.target.setAttribute("label", label);
         ]]></body>
@@ -5815,8 +5815,26 @@
             tabContainer._afterHoveredTab.removeAttribute("afterhovered");
             tabContainer._afterHoveredTab = null;
           }
+
           tabContainer._hoveredTab = null;
         ]]></body>
+      </method>
+
+      <method name="toggleMuteAudio">
+        <body>
+        <![CDATA[
+          let tabContainer = this.parentNode;
+          let browser = this.linkedBrowser;
+          if (browser.audioMuted) {
+            browser.unmute();
+            this.removeAttribute("muted");
+          } else {
+            browser.mute();
+            this.setAttribute("muted", "true");
+          }
+          tabContainer.tabbrowser._tabAttrModified(this, ["muted"]);
+        ]]>
+        </body>
       </method>
     </implementation>
 
@@ -5873,7 +5891,7 @@
                           this.hasAttribute("muted");
         if ((anonid == "soundplaying-icon") ||
             ((anonid == "overlay-icon") && iconVisible)) {
-          this._toggleMuteAudio();
+          this.toggleMuteAudio();
         }
       ]]>
       </handler>
@@ -5983,23 +6001,6 @@
           else
             aMenuitem.removeAttribute("selected");
         ]]></body>
-      </method>
-
-      <method name="_toggleMuteAudio">
-        <body>
-        <![CDATA[
-          let tabContainer = this.parentNode;
-          let browser = this.linkedBrowser;
-          if (browser.audioMuted) {
-            browser.unmute();
-            this.removeAttribute("muted");
-          } else {
-            browser.mute();
-            this.setAttribute("muted", "true");
-          }
-          tabContainer.tabbrowser._tabAttrModified(this, ["muted"]);
-        ]]>
-        </body>
       </method>
     </implementation>
 
