@@ -4,6 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 // IWYU pragma: private, include "GeckoProfiler.h"
 
+#ifndef TOOLS_SPS_SAMPLER_H_
+#define TOOLS_SPS_SAMPLER_H_
+
 #include <stdlib.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -39,9 +42,9 @@ class GeckoSampler;
 
 namespace mozilla {
 class TimeStamp;
-}
+} // namespace mozilla
 
-extern mozilla::ThreadLocal<ProfileStack *> tlsStack;
+extern mozilla::ThreadLocal<PseudoStack *> tlsPseudoStack;
 extern mozilla::ThreadLocal<GeckoSampler *> tlsTicker;
 extern mozilla::ThreadLocal<void *> tlsStackTop;
 extern bool stack_key_initialized;
@@ -228,7 +231,7 @@ void profiler_sleep_end()
 static inline
 void profiler_js_operation_callback()
 {
-  ProfileStack *stack = tlsStack.get();
+  PseudoStack *stack = tlsPseudoStack.get();
   if (!stack) {
     return;
   }
@@ -252,7 +255,7 @@ double profiler_time(const mozilla::TimeStamp& aTime)
 static inline
 bool profiler_in_privacy_mode()
 {
-  ProfileStack *stack = tlsStack.get();
+  PseudoStack *stack = tlsPseudoStack.get();
   if (!stack) {
     return false;
   }
@@ -380,8 +383,6 @@ static inline void profiler_tracing(const char* aCategory, const char* aInfo,
 
 namespace mozilla {
 
-class ProfilerBacktrace;
-
 class MOZ_STACK_CLASS GeckoProfilerTracingRAII {
 public:
   GeckoProfilerTracingRAII(const char* aCategory, const char* aInfo,
@@ -454,13 +455,13 @@ private:
   void* mHandle;
 };
 
-} //mozilla
+} // namespace mozilla
 
-inline ProfileStack* mozilla_profile_stack(void)
+inline PseudoStack* mozilla_get_pseudo_stack(void)
 {
   if (!stack_key_initialized)
     return nullptr;
-  return tlsStack.get();
+  return tlsPseudoStack.get();
 }
 
 inline void* mozilla_sampler_call_enter(const char *aInfo,
@@ -471,7 +472,7 @@ inline void* mozilla_sampler_call_enter(const char *aInfo,
   if (!stack_key_initialized)
     return nullptr;
 
-  ProfileStack *stack = tlsStack.get();
+  PseudoStack *stack = tlsPseudoStack.get();
   // we can't infer whether 'stack' has been initialized
   // based on the value of stack_key_intiailized because
   // 'stack' is only intialized when a thread is being
@@ -494,7 +495,7 @@ inline void mozilla_sampler_call_exit(void *aHandle)
   if (!aHandle)
     return;
 
-  ProfileStack *stack = (ProfileStack*)aHandle;
+  PseudoStack *stack = (PseudoStack*)aHandle;
   stack->popAndMaybeDelete();
 }
 
@@ -512,3 +513,4 @@ void profiler_log(const char *fmt, va_list args)
   mozilla_sampler_log(fmt, args);
 }
 
+#endif /* ndef TOOLS_SPS_SAMPLER_H_ */

@@ -263,6 +263,4 @@ public:
   }
 };
 
-
-
 #endif // ifndef SAMPLER_H
