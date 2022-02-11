@@ -328,7 +328,7 @@ CodeGeneratorX86Shared::visitOutOfLineLoadTypedArrayOutOfBounds(OutOfLineLoadTyp
 }
 
 void
-CodeGeneratorX86Shared::visitOffsetBoundsCheck(OffsetBoundsCheck *oolCheck)
+CodeGeneratorX86Shared::visitOffsetBoundsCheck(OffsetBoundsCheck* oolCheck)
 {
     // The access is heap[ptr + offset]. The inline code checks that
     // ptr < heap.length - offset. We get here when that fails. We need to check
@@ -350,22 +350,22 @@ CodeGeneratorX86Shared::visitOffsetBoundsCheck(OffsetBoundsCheck *oolCheck)
 }
 
 uint32_t
-CodeGeneratorX86Shared::emitAsmJSBoundsCheckBranch(const MAsmJSHeapAccess *access,
-                                                   const MInstruction *mir,
-                                                   Register ptr, Label *fail)
+CodeGeneratorX86Shared::emitAsmJSBoundsCheckBranch(const MAsmJSHeapAccess* access,
+                                                   const MInstruction* mir,
+                                                   Register ptr, Label* fail)
 {
     // Emit a bounds-checking branch for |access|.
 
     MOZ_ASSERT(gen->needsAsmJSBoundsCheckBranch(access));
 
-    Label *pass = nullptr;
+    Label* pass = nullptr;
 
     // If we have a non-zero offset, it's possible that |ptr| itself is out of
     // bounds, while adding the offset computes an in-bounds address. To catch
     // this case, we need a second branch, which we emit out of line since it's
     // unlikely to be needed in normal programs.
     if (access->offset() != 0) {
-        OffsetBoundsCheck *oolCheck = new(alloc()) OffsetBoundsCheck(fail, ptr, access->offset());
+        OffsetBoundsCheck* oolCheck = new(alloc()) OffsetBoundsCheck(fail, ptr, access->offset());
         fail = oolCheck->entry();
         pass = oolCheck->rejoin();
         addOutOfLineCode(oolCheck, mir);
@@ -386,7 +386,7 @@ CodeGeneratorX86Shared::emitAsmJSBoundsCheckBranch(const MAsmJSHeapAccess *acces
 }
 
 void
-CodeGeneratorX86Shared::cleanupAfterAsmJSBoundsCheckBranch(const MAsmJSHeapAccess *access,
+CodeGeneratorX86Shared::cleanupAfterAsmJSBoundsCheckBranch(const MAsmJSHeapAccess* access,
                                                            Register ptr)
 {
     // Clean up after performing a heap access checked by a branch.
@@ -2370,6 +2370,27 @@ CodeGeneratorX86Shared::visitSimdSplatX4(LSimdSplatX4* ins)
 }
 
 void
+CodeGeneratorX86Shared::visitSimdReinterpretCast(LSimdReinterpretCast* ins)
+{
+    FloatRegister input = ToFloatRegister(ins->input());
+    FloatRegister output = ToFloatRegister(ins->output());
+
+    if (input.aliases(output))
+        return;
+
+    switch (ins->mir()->type()) {
+      case MIRType_Int32x4:
+        masm.vmovdqa(input, output);
+        break;
+      case MIRType_Float32x4:
+        masm.vmovaps(input, output);
+        break;
+      default:
+        MOZ_CRASH("Unknown SIMD kind");
+    }
+}
+
+void
 CodeGeneratorX86Shared::visitSimdExtractElementI(LSimdExtractElementI* ins)
 {
     FloatRegister input = ToFloatRegister(ins->input());
@@ -2441,27 +2462,6 @@ CodeGeneratorX86Shared::visitSimdInsertElementI(LSimdInsertElementI* ins)
 }
 
 void
-CodeGeneratorX86Shared::visitSimdReinterpretCast(LSimdReinterpretCast *ins)
-{
-    FloatRegister input = ToFloatRegister(ins->input());
-    FloatRegister output = ToFloatRegister(ins->output());
-
-    if (input.aliases(output))
-        return;
-
-    switch (ins->mir()->type()) {
-      case MIRType_Int32x4:
-        masm.vmovdqa(input, output);
-        break;
-      case MIRType_Float32x4:
-        masm.vmovaps(input, output);
-        break;
-      default:
-        MOZ_CRASH("Unknown SIMD kind");
-    }
-}
-
-void
 CodeGeneratorX86Shared::visitSimdInsertElementF(LSimdInsertElementF* ins)
 {
     FloatRegister vector = ToFloatRegister(ins->vector());
@@ -2504,7 +2504,7 @@ CodeGeneratorX86Shared::visitSimdSignMaskX4(LSimdSignMaskX4* ins)
 template <class T, class Reg> void
 CodeGeneratorX86Shared::visitSimdGeneralShuffle(LSimdGeneralShuffleBase* ins, Reg tempRegister)
 {
-    MSimdGeneralShuffle *mir = ins->mir();
+    MSimdGeneralShuffle* mir = ins->mir();
     unsigned numVectors = mir->numVectors();
 
     Register laneTemp = ToRegister(ins->temp());
