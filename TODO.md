@@ -221,6 +221,7 @@ Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
 Bug 1181869 - Update Bindings to use normal Rooted primitives
 
 ### FIXME / TODO
+- Reapply Bug 486262 - Part 2 with removal of tabbrowser.dtd - breaks browser currently
 - fix devtools structure, from browser/themes/osx/devtools to browser/devtools
 Specifically check for duplicates:
   browser/themes/osx/devtools/server
