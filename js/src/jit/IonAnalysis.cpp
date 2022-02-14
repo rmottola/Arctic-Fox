@@ -2091,6 +2091,7 @@ IsResumableMIRType(MIRType type)
       case MIRType_Shape:
       case MIRType_ObjectGroup:
       case MIRType_Doublex2: // NYI, see also RSimdBox::recover
+      case MIRType_SinCosDouble:
         return false;
     }
     MOZ_CRASH("Unknown MIRType.");
