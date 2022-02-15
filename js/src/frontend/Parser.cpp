@@ -1329,7 +1329,7 @@ Parser<ParseHandler>::newFunction(HandleAtom atom, FunctionSyntaxKind kind,
 static bool
 MatchOrInsertSemicolon(TokenStream& ts, TokenStream::Modifier modifier = TokenStream::None)
 {
-    TokenKind tt;
+    TokenKind tt = TOK_EOF;
     if (!ts.peekTokenSameLine(&tt, modifier))
         return false;
     if (tt != TOK_EOF && tt != TOK_EOL && tt != TOK_SEMI && tt != TOK_RC) {
@@ -2954,9 +2954,9 @@ Parser<ParseHandler>::statements(YieldHandling yieldHandling)
     bool canHaveDirectives = pc->atBodyLevel();
     bool afterReturn = false;
     bool warnedAboutStatementsAfterReturn = false;
-    uint32_t statementBegin;
+    uint32_t statementBegin = 0;
     for (;;) {
-        TokenKind tt;
+        TokenKind tt = TOK_EOF;
         if (!tokenStream.peekToken(&tt, TokenStream::Operand)) {
             if (tokenStream.isEOF())
                 isUnexpectedEOF_ = true;
@@ -3032,7 +3032,7 @@ template <typename ParseHandler>
 bool
 Parser<ParseHandler>::matchLabel(YieldHandling yieldHandling, MutableHandle<PropertyName*> label)
 {
-    TokenKind tt;
+    TokenKind tt = TOK_EOF;
     if (!tokenStream.peekTokenSameLine(&tt, TokenStream::Operand))
         return false;
 
@@ -5337,7 +5337,7 @@ Parser<ParseHandler>::switchStatement(YieldHandling yieldHandling)
 
         bool afterReturn = false;
         bool warnedAboutStatementsAfterReturn = false;
-        uint32_t statementBegin;
+        uint32_t statementBegin = 0;
         while (true) {
             if (!tokenStream.peekToken(&tt, TokenStream::Operand))
                 return null();
@@ -5500,7 +5500,7 @@ Parser<ParseHandler>::returnStatement(YieldHandling yieldHandling)
     //
     // This is ugly, but we don't want to require a semicolon.
     Node exprNode;
-    TokenKind tt;
+    TokenKind tt = TOK_EOF;
     if (!tokenStream.peekTokenSameLine(&tt, TokenStream::Operand))
         return null();
     TokenStream::Modifier modifier = TokenStream::Operand;
@@ -5580,7 +5580,7 @@ Parser<ParseHandler>::yieldExpression(InHandling inHandling)
 
         Node exprNode;
         ParseNodeKind kind = PNK_YIELD;
-        TokenKind tt;
+        TokenKind tt = TOK_EOF;
         if (!tokenStream.peekTokenSameLine(&tt, TokenStream::Operand))
             return null();
         switch (tt) {
@@ -5651,7 +5651,7 @@ Parser<ParseHandler>::yieldExpression(InHandling inHandling)
 
         // Legacy generators do not require a value.
         Node exprNode;
-        TokenKind tt;
+        TokenKind tt = TOK_EOF;
         if (!tokenStream.peekTokenSameLine(&tt, TokenStream::Operand))
             return null();
         switch (tt) {
@@ -5784,7 +5784,7 @@ Parser<ParseHandler>::throwStatement(YieldHandling yieldHandling)
     uint32_t begin = pos().begin;
 
     /* ECMA-262 Edition 3 says 'throw [no LineTerminator here] Expr'. */
-    TokenKind tt;
+    TokenKind tt = TOK_EOF;
     if (!tokenStream.peekTokenSameLine(&tt, TokenStream::Operand))
         return null();
     if (tt == TOK_EOF || tt == TOK_SEMI || tt == TOK_RC) {
@@ -6628,7 +6628,7 @@ Parser<ParseHandler>::assignExpr(InHandling inHandling, YieldHandling yieldHandl
       case TOK_ARROW: {
         // A line terminator between ArrowParameters and the => should trigger a SyntaxError.
         tokenStream.ungetToken();
-        TokenKind next;
+        TokenKind next = TOK_EOF;
         if (!tokenStream.peekTokenSameLine(&next) || next != TOK_ARROW) {
             report(ParseError, false, null(), JSMSG_UNEXPECTED_TOKEN,
                    "expression", TokenKindToDesc(TOK_ARROW));
@@ -6738,7 +6738,7 @@ Parser<ParseHandler>::reportIfNotValidSimpleAssignmentTarget(Node target, Assign
             return false;
     }
 
-    unsigned errnum;
+    unsigned errnum = 0;
     const char* extra = nullptr;
 
     switch (flavor) {
