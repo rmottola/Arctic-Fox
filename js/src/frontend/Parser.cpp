@@ -6189,6 +6189,10 @@ Parser<FullParseHandler>::classDefinition(YieldHandling yieldHandling,
           case PropertyType::Setter:
             funName = nullptr;
             break;
+          case PropertyType::Constructor:
+          case PropertyType::DerivedConstructor:
+            funName = name;
+            break;
           default:
             if (tokenStream.isCurrentTokenType(TOK_NAME))
                 funName = tokenStream.currentName();
