@@ -337,13 +337,13 @@ class FullParseHandler
         return literal;
     }
 
-    ParseNode *newClass(ParseNode *name, ParseNode *heritage, ParseNode *methodBlock) {
+    ParseNode* newClass(ParseNode* name, ParseNode* heritage, ParseNode* methodBlock) {
         return new_<ClassNode>(name, heritage, methodBlock);
     }
-    ParseNode *newClassMethodList(uint32_t begin) {
+    ParseNode* newClassMethodList(uint32_t begin) {
         return new_<ListNode>(PNK_CLASSMETHODLIST, TokenPos(begin, begin + 1));
     }
-    ParseNode *newClassNames(ParseNode *outer, ParseNode *inner, const TokenPos &pos) {
+    ParseNode* newClassNames(ParseNode* outer, ParseNode* inner, const TokenPos& pos) {
         return new_<ClassNames>(outer, inner, pos);
     }
     ParseNode* newSuperProperty(JSAtom* atom, const TokenPos& pos) {
@@ -401,7 +401,7 @@ class FullParseHandler
         return true;
     }
 
-    bool addObjectMethodDefinition(ParseNode *literal, ParseNode *key, ParseNode *fn, JSOp op)
+    bool addObjectMethodDefinition(ParseNode* literal, ParseNode* key, ParseNode* fn, JSOp op)
     {
         MOZ_ASSERT(literal->isArity(PN_LIST));
         MOZ_ASSERT(key->isKind(PNK_NUMBER) ||
@@ -417,7 +417,7 @@ class FullParseHandler
         return true;
     }
 
-    bool addClassMethodDefinition(ParseNode *methodList, ParseNode *key, ParseNode *fn, JSOp op,
+    bool addClassMethodDefinition(ParseNode* methodList, ParseNode* key, ParseNode* fn, JSOp op,
                                   bool isStatic)
     {
         MOZ_ASSERT(methodList->isKind(PNK_CLASSMETHODLIST));
@@ -426,7 +426,7 @@ class FullParseHandler
                    key->isKind(PNK_STRING) ||
                    key->isKind(PNK_COMPUTED_NAME));
 
-        ParseNode *classMethod = new_<ClassMethod>(key, fn, op, isStatic);
+        ParseNode* classMethod = new_<ClassMethod>(key, fn, op, isStatic);
         if (!classMethod)
             return false;
         methodList->append(classMethod);
@@ -571,7 +571,7 @@ class FullParseHandler
         return new_<TernaryNode>(kind, JSOP_NOP, pn1, pn2, pn3, pos);
     }
 
-    ParseNode* newFreshenBlock(const TokenPos &pos) {
+    ParseNode* newFreshenBlock(const TokenPos& pos) {
         return new_<NullaryNode>(PNK_FRESHENBLOCK, pos);
     }
 
