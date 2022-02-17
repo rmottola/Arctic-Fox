@@ -355,13 +355,13 @@ ContextToPC(CONTEXT* context)
 
 #if defined(JS_CODEGEN_X64)
 MOZ_COLD static void
-SetFPRegToNaN(size_t size, void *fp_reg)
+SetFPRegToNaN(size_t size, void* fp_reg)
 {
     MOZ_RELEASE_ASSERT(size <= Simd128DataSize);
     memset(fp_reg, 0, Simd128DataSize);
     switch (size) {
-      case 4: *static_cast<float *>(fp_reg) = GenericNaN(); break;
-      case 8: *static_cast<double *>(fp_reg) = GenericNaN(); break;
+      case 4: *static_cast<float*>(fp_reg) = GenericNaN(); break;
+      case 8: *static_cast<double*>(fp_reg) = GenericNaN(); break;
       default:
         // All SIMD accesses throw on OOB.
         MOZ_CRASH("unexpected size in SetFPRegToNaN");
@@ -369,13 +369,13 @@ SetFPRegToNaN(size_t size, void *fp_reg)
 }
 
 MOZ_COLD static void
-SetGPRegToZero(void *gp_reg)
+SetGPRegToZero(void* gp_reg)
 {
     memset(gp_reg, 0, sizeof(intptr_t));
 }
 
 MOZ_COLD static void
-SetFPRegToLoadedValue(const void *addr, size_t size, void *fp_reg)
+SetFPRegToLoadedValue(const void* addr, size_t size, void* fp_reg)
 {
     MOZ_RELEASE_ASSERT(size <= Simd128DataSize);
     memset(fp_reg, 0, Simd128DataSize);
@@ -383,49 +383,47 @@ SetFPRegToLoadedValue(const void *addr, size_t size, void *fp_reg)
 }
 
 MOZ_COLD static void
-SetGPRegToLoadedValue(const void *addr, size_t size, void *gp_reg)
+SetGPRegToLoadedValue(const void* addr, size_t size, void* gp_reg)
 {
-    MOZ_RELEASE_ASSERT(size <= sizeof(void *));
-    memset(gp_reg, 0, sizeof(void *));
+    MOZ_RELEASE_ASSERT(size <= sizeof(void*));
+    memset(gp_reg, 0, sizeof(void*));
     memcpy(gp_reg, addr, size);
 }
 
 MOZ_COLD static void
-SetGPRegToLoadedValueSext32(const void *addr, size_t size, void *gp_reg)
+SetGPRegToLoadedValueSext32(const void* addr, size_t size, void* gp_reg)
 {
     MOZ_RELEASE_ASSERT(size <= sizeof(int32_t));
-    int8_t msb = static_cast<const int8_t *>(addr)[size - 1];
-    memset(gp_reg, 0, sizeof(void *));
+    int8_t msb = static_cast<const int8_t*>(addr)[size - 1];
+    memset(gp_reg, 0, sizeof(void*));
     memset(gp_reg, msb >> 7, sizeof(int32_t));
     memcpy(gp_reg, addr, size);
 }
 
 MOZ_COLD static void
-StoreValueFromFPReg(void *addr, size_t size, const void *fp_reg)
+StoreValueFromFPReg(void* addr, size_t size, const void* fp_reg)
 {
     MOZ_RELEASE_ASSERT(size <= Simd128DataSize);
     memcpy(addr, fp_reg, size);
 }
 
 MOZ_COLD static void
-StoreValueFromGPReg(void *addr, size_t size, const void *gp_reg)
+StoreValueFromGPReg(void* addr, size_t size, const void* gp_reg)
 {
-    MOZ_RELEASE_ASSERT(size <= sizeof(void *));
+    MOZ_RELEASE_ASSERT(size <= sizeof(void*));
     memcpy(addr, gp_reg, size);
 }
 
 MOZ_COLD static void
-StoreValueFromGPImm(void *addr, size_t size, int32_t imm)
+StoreValueFromGPImm(void* addr, size_t size, int32_t imm)
 {
     MOZ_RELEASE_ASSERT(size <= sizeof(imm));
     memcpy(addr, &imm, size);
 }
 
-
-
 # if !defined(XP_MACOSX)
-MOZ_COLD static void *
-AddressOfFPRegisterSlot(CONTEXT *context, FloatRegisters::Encoding encoding)
+MOZ_COLD static void*
+AddressOfFPRegisterSlot(CONTEXT* context, FloatRegisters::Encoding encoding)
 {
     switch (encoding) {
       case X86Encoding::xmm0:  return &XMM_sig(context, 0);
@@ -449,8 +447,8 @@ AddressOfFPRegisterSlot(CONTEXT *context, FloatRegisters::Encoding encoding)
     MOZ_CRASH();
 }
 
-MOZ_COLD static void *
-AddressOfGPRegisterSlot(EMULATOR_CONTEXT *context, Registers::Code code)
+MOZ_COLD static void*
+AddressOfGPRegisterSlot(EMULATOR_CONTEXT* context, Registers::Code code)
 {
     switch (code) {
       case X86Encoding::rax: return &RAX_sig(context);
@@ -474,8 +472,8 @@ AddressOfGPRegisterSlot(EMULATOR_CONTEXT *context, Registers::Code code)
     MOZ_CRASH();
 }
 # else
-MOZ_COLD static void *
-AddressOfFPRegisterSlot(EMULATOR_CONTEXT *context, FloatRegisters::Encoding encoding)
+MOZ_COLD static void*
+AddressOfFPRegisterSlot(EMULATOR_CONTEXT* context, FloatRegisters::Encoding encoding)
 {
     switch (encoding) {
       case X86Encoding::xmm0:  return &context->float_.__fpu_xmm0;
@@ -499,8 +497,8 @@ AddressOfFPRegisterSlot(EMULATOR_CONTEXT *context, FloatRegisters::Encoding enco
     MOZ_CRASH();
 }
 
-MOZ_COLD static void *
-AddressOfGPRegisterSlot(EMULATOR_CONTEXT *context, Registers::Code code)
+MOZ_COLD static void*
+AddressOfGPRegisterSlot(EMULATOR_CONTEXT* context, Registers::Code code)
 {
     switch (code) {
       case X86Encoding::rax: return &context->thread.__rax;
@@ -527,8 +525,8 @@ AddressOfGPRegisterSlot(EMULATOR_CONTEXT *context, Registers::Code code)
 #endif // JS_CODEGEN_X64
 
 MOZ_COLD static void
-SetRegisterToCoercedUndefined(EMULATOR_CONTEXT *context, size_t size,
-                              const Disassembler::OtherOperand &value)
+SetRegisterToCoercedUndefined(EMULATOR_CONTEXT* context, size_t size,
+                              const Disassembler::OtherOperand& value)
 {
     if (value.kind() == Disassembler::OtherOperand::FPR)
         SetFPRegToNaN(size, AddressOfFPRegisterSlot(context, value.fpr()));
@@ -537,8 +535,8 @@ SetRegisterToCoercedUndefined(EMULATOR_CONTEXT *context, size_t size,
 }
 
 MOZ_COLD static void
-SetRegisterToLoadedValue(EMULATOR_CONTEXT *context, const void *addr, size_t size,
-                         const Disassembler::OtherOperand &value)
+SetRegisterToLoadedValue(EMULATOR_CONTEXT* context, const void* addr, size_t size,
+                         const Disassembler::OtherOperand& value)
 {
     if (value.kind() == Disassembler::OtherOperand::FPR)
         SetFPRegToLoadedValue(addr, size, AddressOfFPRegisterSlot(context, value.fpr()));
@@ -547,15 +545,15 @@ SetRegisterToLoadedValue(EMULATOR_CONTEXT *context, const void *addr, size_t siz
 }
 
 MOZ_COLD static void
-SetRegisterToLoadedValueSext32(EMULATOR_CONTEXT *context, const void *addr, size_t size,
-                               const Disassembler::OtherOperand &value)
+SetRegisterToLoadedValueSext32(EMULATOR_CONTEXT* context, const void* addr, size_t size,
+                               const Disassembler::OtherOperand& value)
 {
     SetGPRegToLoadedValueSext32(addr, size, AddressOfGPRegisterSlot(context, value.gpr()));
 }
 
 MOZ_COLD static void
-StoreValueFromRegister(EMULATOR_CONTEXT *context, void *addr, size_t size,
-                       const Disassembler::OtherOperand &value)
+StoreValueFromRegister(EMULATOR_CONTEXT* context, void* addr, size_t size,
+                       const Disassembler::OtherOperand& value)
 {
     if (value.kind() == Disassembler::OtherOperand::FPR)
         StoreValueFromFPReg(addr, size, AddressOfFPRegisterSlot(context, value.fpr()));
@@ -565,8 +563,8 @@ StoreValueFromRegister(EMULATOR_CONTEXT *context, void *addr, size_t size,
         StoreValueFromGPImm(addr, size, value.imm());
 }
 
-MOZ_COLD static uint8_t *
-ComputeAccessAddress(EMULATOR_CONTEXT *context, const Disassembler::ComplexAddress &address)
+MOZ_COLD static uint8_t*
+ComputeAccessAddress(EMULATOR_CONTEXT* context, const Disassembler::ComplexAddress& address)
 {
     MOZ_RELEASE_ASSERT(!address.isPCRelative(), "PC-relative addresses not supported yet");
 
@@ -586,12 +584,12 @@ ComputeAccessAddress(EMULATOR_CONTEXT *context, const Disassembler::ComplexAddre
         result += index * (1 << address.scale());
     }
 
-    return reinterpret_cast<uint8_t *>(result);
+    return reinterpret_cast<uint8_t*>(result);
 }
 
-MOZ_COLD static uint8_t *
-EmulateHeapAccess(EMULATOR_CONTEXT *context, uint8_t *pc, uint8_t *faultingAddress,
-                  const AsmJSHeapAccess *heapAccess, const AsmJSModule &module)
+MOZ_COLD static uint8_t*
+EmulateHeapAccess(EMULATOR_CONTEXT* context, uint8_t* pc, uint8_t* faultingAddress,
+                  const AsmJSHeapAccess* heapAccess, const AsmJSModule& module)
 {
     MOZ_RELEASE_ASSERT(module.containsFunctionPC(pc));
     MOZ_RELEASE_ASSERT(module.usesSignalHandlersForOOB());
@@ -601,8 +599,8 @@ EmulateHeapAccess(EMULATOR_CONTEXT *context, uint8_t *pc, uint8_t *faultingAddre
     // Disassemble the instruction which caused the trap so that we can extract
     // information about it and decide what to do.
     Disassembler::HeapAccess access;
-    uint8_t *end = Disassembler::DisassembleHeapAccess(pc, &access);
-    const Disassembler::ComplexAddress &address = access.address();
+    uint8_t* end = Disassembler::DisassembleHeapAccess(pc, &access);
+    const Disassembler::ComplexAddress& address = access.address();
     MOZ_RELEASE_ASSERT(end > pc);
     MOZ_RELEASE_ASSERT(module.containsFunctionPC(end));
 
@@ -673,7 +671,7 @@ EmulateHeapAccess(EMULATOR_CONTEXT *context, uint8_t *pc, uint8_t *faultingAddre
         // We now know that this is an access that is actually in bounds when
         // properly wrapped. Complete the load or store with the wrapped
         // address.
-        uint8_t *wrappedAddress = module.maybeHeap() + wrappedOffset;
+        uint8_t* wrappedAddress = module.maybeHeap() + wrappedOffset;
         MOZ_RELEASE_ASSERT(wrappedAddress >= module.maybeHeap());
         MOZ_RELEASE_ASSERT(wrappedAddress + size > wrappedAddress);
         MOZ_RELEASE_ASSERT(wrappedAddress + size <= module.maybeHeap() + module.heapLength());
@@ -750,7 +748,7 @@ HandleFault(PEXCEPTION_POINTERS exception)
 
     // These checks aren't necessary, but, since we can, check anyway to make
     // sure we aren't covering up a real bug.
-    uint8_t *faultingAddress = reinterpret_cast<uint8_t *>(record->ExceptionInformation[1]);
+    uint8_t* faultingAddress = reinterpret_cast<uint8_t*>(record->ExceptionInformation[1]);
     if (!module.maybeHeap() ||
         faultingAddress < module.maybeHeap() ||
         faultingAddress >= module.maybeHeap() + AsmJSMappedSize)
@@ -799,7 +797,7 @@ AsmJSFaultHandler(LPEXCEPTION_POINTERS exception)
 # include <mach/exc.h>
 
 static uint8_t**
-ContextToPC(EMULATOR_CONTEXT *context)
+ContextToPC(EMULATOR_CONTEXT* context)
 {
 # if defined(JS_CPU_X64)
     static_assert(sizeof(context->thread.__rip) == sizeof(void*),
@@ -870,7 +868,7 @@ HandleMachException(JSRuntime* rt, const ExceptionRequest& request)
     if (kret != KERN_SUCCESS)
         return false;
 
-    uint8_t **ppc = ContextToPC(&context);
+    uint8_t** ppc = ContextToPC(&context);
     uint8_t* pc = *ppc;
 
     if (request.body.exception != EXC_BAD_ACCESS || request.body.codeCnt != 2)
@@ -886,7 +884,7 @@ HandleMachException(JSRuntime* rt, const ExceptionRequest& request)
 
     // These checks aren't necessary, but, since we can, check anyway to make
     // sure we aren't covering up a real bug.
-    uint8_t *faultingAddress = reinterpret_cast<uint8_t *>(request.body.code[1]);
+    uint8_t* faultingAddress = reinterpret_cast<uint8_t*>(request.body.code[1]);
     if (!module.maybeHeap() ||
         faultingAddress < module.maybeHeap() ||
         faultingAddress >= module.maybeHeap() + AsmJSMappedSize)
@@ -1096,7 +1094,7 @@ HandleFault(int signum, siginfo_t* info, void* ctx)
 
     // These checks aren't necessary, but, since we can, check anyway to make
     // sure we aren't covering up a real bug.
-    uint8_t *faultingAddress = reinterpret_cast<uint8_t *>(info->si_addr);
+    uint8_t* faultingAddress = reinterpret_cast<uint8_t*>(info->si_addr);
     if (!module.maybeHeap() ||
         faultingAddress < module.maybeHeap() ||
         faultingAddress >= module.maybeHeap() + AsmJSMappedSize)
