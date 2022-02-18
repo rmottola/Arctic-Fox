@@ -134,6 +134,7 @@
 - Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
+- Bug 1181612 - 2015-09-16 - Split AsmJSValidate into AsmJS{Validate,Compile} and dif
 - Bug 895274 - 1 to 270 parts
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
 -  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
@@ -160,11 +161,9 @@
 - Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
 --Bug 1194422 - Expose census traversals to SpiderMonkey embedders; r=s
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
-- Bug 1195545 - 2015-08-27 - Add instruction reordering pass to IonMonkey, r=sunfish. 
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
-- Bug 968923 - 2015-07-17 - part 6 - add use counters for deprecated operations; r=bz
 - Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
 
