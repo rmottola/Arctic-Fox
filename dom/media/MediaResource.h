@@ -435,6 +435,8 @@ public:
     return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
   }
 
+  const nsCString& GetContentURL() const { return EmptyCString(); }
+
 protected:
   virtual ~MediaResource() {};
 
@@ -467,6 +469,12 @@ public:
     return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
   }
 
+  // Returns the url of the resource. Safe to call from any thread?
+  const nsCString& GetContentURL() const
+  {
+    return mContentURL;
+  }
+
 protected:
   BaseMediaResource(MediaDecoder* aDecoder,
                     nsIChannel* aChannel,
@@ -480,6 +488,7 @@ protected:
   {
     MOZ_COUNT_CTOR(BaseMediaResource);
     NS_ASSERTION(!mContentType.IsEmpty(), "Must know content type");
+    mURI->GetSpec(mContentURL);
   }
   virtual ~BaseMediaResource()
   {
@@ -517,6 +526,9 @@ protected:
   // MediaResource is created. This is constant, so accessing from any thread
   // is safe.
   const nsAutoCString mContentType;
+
+  // Copy of the url of the channel resource.
+  nsAutoCString mContentURL;
 
   // True if SetLoadInBackground() has been called with
   // aLoadInBackground = true, i.e. when the document load event is not
