@@ -1244,6 +1244,10 @@ nsStandardURL::SetSpec(const nsACString &input)
     if (!spec || !*spec)
         return NS_ERROR_MALFORMED_URI;
 
+    if (input.Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
+    }
+
     int32_t refPos = input.FindChar('#');
     if (refPos != kNotFound) {
         const nsCSubstring& sub = Substring(input, refPos, input.Length());
@@ -1251,10 +1255,6 @@ nsStandardURL::SetSpec(const nsACString &input)
         if (NS_FAILED(rv)) {
             return rv;
         }
-    }
-
-    if (input.Length() > (uint32_t) net_GetURLMaxLength()) {
-        return NS_ERROR_MALFORMED_URI;
     }
 
     // Make a backup of the curent URL
