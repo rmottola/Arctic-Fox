@@ -744,11 +744,11 @@ nsCookieService::Init()
 
   RegisterWeakMemoryReporter(this);
 
-  mObserverService = mozilla::services::GetObserverService();
-  NS_ENSURE_STATE(mObserverService);
-  mObserverService->AddObserver(this, "profile-before-change", true);
-  mObserverService->AddObserver(this, "profile-do-change", true);
-  mObserverService->AddObserver(this, "last-pb-context-exited", true);
+  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+  NS_ENSURE_STATE(os);
+  os->AddObserver(this, "profile-before-change", true);
+  os->AddObserver(this, "profile-do-change", true);
+  os->AddObserver(this, "last-pb-context-exited", true);
 
   mPermissionService = do_GetService(NS_COOKIEPERMISSION_CONTRACTID);
   if (!mPermissionService) {
@@ -1351,10 +1351,14 @@ nsCookieService::HandleDBClosed(DBState* aDBState)
   COOKIE_LOGSTRING(LogLevel::Debug,
     ("HandleDBClosed(): DBState %x closed", aDBState));
 
+  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+
   switch (aDBState->corruptFlag) {
   case DBState::OK: {
     // Database is healthy. Notify of closure.
-    mObserverService->NotifyObservers(nullptr, "cookie-db-closed", nullptr);
+    if (os) {
+      os->NotifyObservers(nullptr, "cookie-db-closed", nullptr);
+    }
     break;
   }
   case DBState::CLOSING_FOR_REBUILD: {
@@ -1375,7 +1379,9 @@ nsCookieService::HandleDBClosed(DBState* aDBState)
     COOKIE_LOGSTRING(LogLevel::Warning,
       ("HandleDBClosed(): DBState %x encountered error rebuilding db; move to "
        "'cookies.sqlite.bak-rebuild' gave rv 0x%x", aDBState, rv));
-    mObserverService->NotifyObservers(nullptr, "cookie-db-closed", nullptr);
+    if (os) {
+      os->NotifyObservers(nullptr, "cookie-db-closed", nullptr);
+    }
     break;
   }
   }
@@ -1443,6 +1449,8 @@ nsCookieService::RebuildCorruptDB(DBState* aDBState)
   NS_ASSERTION(aDBState->corruptFlag == DBState::CLOSING_FOR_REBUILD,
     "should be in CLOSING_FOR_REBUILD state");
 
+  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+
   aDBState->corruptFlag = DBState::REBUILDING;
 
   if (mDefaultDBState != aDBState) {
@@ -1452,7 +1460,9 @@ nsCookieService::RebuildCorruptDB(DBState* aDBState)
     // do so now.
     COOKIE_LOGSTRING(LogLevel::Warning,
       ("RebuildCorruptDB(): DBState %x is stale, aborting", aDBState));
-    mObserverService->NotifyObservers(nullptr, "cookie-db-closed", nullptr);
+    if (os) {
+      os->NotifyObservers(nullptr, "cookie-db-closed", nullptr);
+    }
     return;
   }
 
@@ -1470,12 +1480,16 @@ nsCookieService::RebuildCorruptDB(DBState* aDBState)
     CleanupCachedStatements();
     CleanupDefaultDBConnection();
     mDefaultDBState->corruptFlag = DBState::OK;
-    mObserverService->NotifyObservers(nullptr, "cookie-db-closed", nullptr);
+    if (os) {
+      os->NotifyObservers(nullptr, "cookie-db-closed", nullptr);
+    }
     return;
   }
 
   // Notify observers that we're beginning the rebuild.
-  mObserverService->NotifyObservers(nullptr, "cookie-db-rebuilding", nullptr);
+  if (os) {
+    os->NotifyObservers(nullptr, "cookie-db-rebuilding", nullptr);
+  }
 
   // Enumerate the hash, and add cookies to the params array.
   mozIStorageAsyncStatement* stmt = aDBState->stmtInsert;
@@ -1769,8 +1783,9 @@ nsCookieService::SetCookieStringInternal(nsIURI             *aHostURI,
 void
 nsCookieService::NotifyRejected(nsIURI *aHostURI)
 {
-  if (mObserverService) {
-    mObserverService->NotifyObservers(aHostURI, "cookie-rejected", nullptr);
+  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+  if (os) {
+    os->NotifyObservers(aHostURI, "cookie-rejected", nullptr);
   }
 }
 
@@ -1779,7 +1794,8 @@ nsCookieService::NotifyRejected(nsIURI *aHostURI)
 void
 nsCookieService::NotifyThirdParty(nsIURI *aHostURI, bool aIsAccepted, nsIChannel *aChannel)
 {
-  if (!mObserverService) {
+  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+  if (!os) {
     return;
   }
 
@@ -1819,16 +1835,12 @@ nsCookieService::NotifyThirdParty(nsIURI *aHostURI, bool aIsAccepted, nsIChannel
     }
 
     nsAutoString referringHostUTF16 = NS_ConvertUTF8toUTF16(referringHost);
-    mObserverService->NotifyObservers(aHostURI,
-                                      topic,
-                                      referringHostUTF16.get());
+    os->NotifyObservers(aHostURI, topic, referringHostUTF16.get());
     return;
   } while (0);
 
   // This can fail for a number of reasons, in which kind we fallback to "?"
-  mObserverService->NotifyObservers(aHostURI,
-                                    topic,
-                                    MOZ_UTF16("?"));
+  os->NotifyObservers(aHostURI, topic, MOZ_UTF16("?"));
 }
 
 // notify observers that the cookie list changed. there are five possible
@@ -1845,8 +1857,10 @@ nsCookieService::NotifyChanged(nsISupports     *aSubject,
 {
   const char* topic = mDBState == mPrivateDBState ?
       "private-cookie-changed" : "cookie-changed";
-  if (mObserverService)
-    mObserverService->NotifyObservers(aSubject, topic, aData);
+  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+  if (os) {
+    os->NotifyObservers(aSubject, topic, aData);
+  }
 }
 
 already_AddRefed<nsIArray>
@@ -2191,7 +2205,10 @@ nsCookieService::AsyncReadComplete()
   COOKIE_LOGSTRING(LogLevel::Debug, ("Read(): %ld cookies read",
                                   mDefaultDBState->cookieCount));
 
-  mObserverService->NotifyObservers(nullptr, "cookie-db-read", nullptr);
+  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+  if (os) {
+    os->NotifyObservers(nullptr, "cookie-db-read", nullptr);
+  }
 }
 
 void
