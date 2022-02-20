@@ -11,7 +11,6 @@
 #include "nsIServiceManager.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIDOMWindow.h"
-#include "nsPIDOMWindow.h" // rmottola - HACK - get build again, not needed in FF tree
 #include "nsILoadContext.h"
 #include "nsIPrincipal.h"
 #include "nsIScriptObjectPrincipal.h"
