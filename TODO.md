@@ -233,9 +233,6 @@ Check TelemetryEnvironment.jsm _isDefaultBrowser
 Remove hack of parserequestcontenttype in nsNetUtil.cpp
 
 
-Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
-And why #include "nsIFrameInlines.h" in layout/style/nsStyleTransformMatrix.cpp ?
-
 Fallible hacks:
 appendElements made fallible when not so in original FF:
 media/libstagefright/frameworks/av/media/libstagefright/MPEG4Extractor.cpp
