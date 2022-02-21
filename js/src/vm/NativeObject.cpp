@@ -252,7 +252,7 @@ js::NativeObject::dynamicSlotsCount(uint32_t nfixed, uint32_t span, const Class*
 }
 
 inline bool
-NativeObject::updateSlotsForSpan(ExclusiveContext *cx, size_t oldSpan, size_t newSpan)
+NativeObject::updateSlotsForSpan(ExclusiveContext* cx, size_t oldSpan, size_t newSpan)
 {
     MOZ_ASSERT(oldSpan != newSpan);
 
@@ -965,7 +965,7 @@ NativeObject::addDataProperty(ExclusiveContext* cx, HandlePropertyName name,
 
 template <AllowGC allowGC>
 bool
-js::NativeLookupOwnProperty(ExclusiveContext *cx,
+js::NativeLookupOwnProperty(ExclusiveContext* cx,
                             typename MaybeRooted<NativeObject*, allowGC>::HandleType obj,
                             typename MaybeRooted<jsid, allowGC>::HandleType id,
                             typename MaybeRooted<Shape*, allowGC>::MutableHandleType propp)
@@ -975,11 +975,11 @@ js::NativeLookupOwnProperty(ExclusiveContext *cx,
 }
 
 template bool
-js::NativeLookupOwnProperty<CanGC>(ExclusiveContext *cx, HandleNativeObject obj, HandleId id,
+js::NativeLookupOwnProperty<CanGC>(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
                                    MutableHandleShape propp);
 
 template bool
-js::NativeLookupOwnProperty<NoGC>(ExclusiveContext *cx, NativeObject *obj, jsid id,
+js::NativeLookupOwnProperty<NoGC>(ExclusiveContext* cx, NativeObject* obj, jsid id,
                                   FakeMutableHandle<Shape*> propp);
 
 /*** [[DefineOwnProperty]] ***********************************************************************/
@@ -1862,7 +1862,7 @@ GeneralizedGetProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue
                        IsNameLookup nameLookup, MutableHandleValue vp)
 {
     JS_CHECK_RECURSION(cx, return false);
-   if (nameLookup) {
+    if (nameLookup) {
         // When nameLookup is true, GetProperty implements ES6 rev 34 (2015 Feb
         // 20) 8.1.1.2.6 GetBindingValue, with step 3 (the call to HasProperty)
         // and step 6 (the call to Get) fused so that only a single lookup is
