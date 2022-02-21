@@ -46,7 +46,7 @@ WeakMapBase::~WeakMapBase()
 }
 
 void
-WeakMapBase::trace(JSTracer *tracer)
+WeakMapBase::trace(JSTracer* tracer)
 {
     MOZ_ASSERT(isInList());
     if (tracer->isMarkingTracer()) {
@@ -668,7 +668,7 @@ InitWeakMapClass(JSContext* cx, HandleObject obj, bool defineMembers)
 }
 
 JSObject*
-js::InitWeakMapClass(JSContext *cx, HandleObject obj)
+js::InitWeakMapClass(JSContext* cx, HandleObject obj)
 {
     return InitWeakMapClass(cx, obj, true);
 }
@@ -679,7 +679,7 @@ js::InitBareWeakMapCtor(JSContext* cx, HandleObject obj)
     return InitWeakMapClass(cx, obj, false);
 }
 
-ObjectWeakMap::ObjectWeakMap(JSContext *cx)
+ObjectWeakMap::ObjectWeakMap(JSContext* cx)
   : map(cx, nullptr)
 {
     if (!map.init())
@@ -691,16 +691,16 @@ ObjectWeakMap::~ObjectWeakMap()
     WeakMapBase::removeWeakMapFromList(&map);
 }
 
-JSObject *
-ObjectWeakMap::lookup(const JSObject *obj)
+JSObject*
+ObjectWeakMap::lookup(const JSObject* obj)
 {
-    if (ObjectValueMap::Ptr p = map.lookup(const_cast<JSObject *>(obj)))
+    if (ObjectValueMap::Ptr p = map.lookup(const_cast<JSObject*>(obj)))
         return &p->value().toObject();
     return nullptr;
 }
 
 bool
-ObjectWeakMap::add(JSContext *cx, JSObject *obj, JSObject *target)
+ObjectWeakMap::add(JSContext* cx, JSObject* obj, JSObject* target)
 {
     MOZ_ASSERT(obj && target);
 
@@ -722,7 +722,7 @@ ObjectWeakMap::clear()
 }
 
 void
-ObjectWeakMap::trace(JSTracer *trc)
+ObjectWeakMap::trace(JSTracer* trc)
 {
     map.trace(trc);
 }
