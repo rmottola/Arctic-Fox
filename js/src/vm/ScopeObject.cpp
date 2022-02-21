@@ -1920,7 +1920,7 @@ DebugScopes::~DebugScopes()
 bool
 DebugScopes::init()
 {
-    return liveScopes.init() && missingScopes.init();
+    return proxiedScopes.init() && missingScopes.init() && liveScopes.init();
 }
 
 void
