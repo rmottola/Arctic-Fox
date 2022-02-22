@@ -2875,7 +2875,7 @@ class GCHeapProfiler
 
 class MemProfiler
 {
-    static mozilla::Atomic<int> sActiveProfilerCount;
+    static mozilla::Atomic<uint32_t, mozilla::Relaxed> sActiveProfilerCount;
     static NativeProfiler* sNativeProfiler;
 
     static GCHeapProfiler* GetGCHeapProfiler(void* addr);
@@ -2898,7 +2898,7 @@ class MemProfiler
         return mGCHeapProfiler;
     }
 
-    static bool enabled() {
+    static MOZ_ALWAYS_INLINE bool enabled() {
         return sActiveProfilerCount > 0;
     }
 
@@ -2908,7 +2908,7 @@ class MemProfiler
         sNativeProfiler = aProfiler;
     }
 
-    static void SampleNative(void* addr, uint32_t size) {
+    static MOZ_ALWAYS_INLINE void SampleNative(void* addr, uint32_t size) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2919,7 +2919,7 @@ class MemProfiler
             profiler->sampleNative(addr, size);
     }
 
-    static void SampleTenured(void* addr, uint32_t size) {
+    static MOZ_ALWAYS_INLINE void SampleTenured(void* addr, uint32_t size) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2930,7 +2930,7 @@ class MemProfiler
             profiler->sampleTenured(addr, size);
     }
 
-    static void SampleNursery(void* addr, uint32_t size) {
+    static MOZ_ALWAYS_INLINE void SampleNursery(void* addr, uint32_t size) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2941,7 +2941,7 @@ class MemProfiler
             profiler->sampleNursery(addr, size);
     }
 
-    static void RemoveNative(void* addr) {
+    static MOZ_ALWAYS_INLINE void RemoveNative(void* addr) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2952,7 +2952,7 @@ class MemProfiler
             profiler->removeNative(addr);
     }
 
-    static void MarkTenuredStart(JSRuntime* runtime) {
+    static MOZ_ALWAYS_INLINE void MarkTenuredStart(JSRuntime* runtime) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2963,7 +2963,7 @@ class MemProfiler
             profiler->markTenuredStart();
     }
 
-    static void MarkTenured(void* addr) {
+    static MOZ_ALWAYS_INLINE void MarkTenured(void* addr) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2974,7 +2974,7 @@ class MemProfiler
             profiler->markTenured(addr);
     }
 
-    static void SweepTenured(JSRuntime* runtime) {
+    static MOZ_ALWAYS_INLINE void SweepTenured(JSRuntime* runtime) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2985,7 +2985,7 @@ class MemProfiler
             profiler->sweepTenured();
     }
 
-    static void SweepNursery(JSRuntime* runtime) {
+    static MOZ_ALWAYS_INLINE void SweepNursery(JSRuntime* runtime) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2996,7 +2996,7 @@ class MemProfiler
             profiler->sweepNursery();
     }
 
-    static void MoveNurseryToTenured(void* addrOld, void* addrNew) {
+    static MOZ_ALWAYS_INLINE void MoveNurseryToTenured(void* addrOld, void* addrNew) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
