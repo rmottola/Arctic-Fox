@@ -5951,7 +5951,8 @@ class MPow
     }
     bool writeRecoverData(CompactBufferWriter& writer) const override;
     bool canRecoverOnBailout() const override {
-        return true;
+        // Temporarily disable recovery to relieve fuzzer pressure. See bug 1188586.
+        return false;
     }
 
     ALLOW_CLONE(MPow)
