@@ -1721,7 +1721,7 @@ class MSimdSignMask
       : MUnaryInstruction(obj)
     {
         setResultType(MIRType_Int32);
-	specialization_ = type;
+        specialization_ = type;
         setMovable();
     }
 
@@ -8417,7 +8417,7 @@ class MNot
             cacheOperandMightEmulateUndefined(constraints);
     }
 
-    void cacheOperandMightEmulateUndefined(CompilerConstraintList *constraints);
+    void cacheOperandMightEmulateUndefined(CompilerConstraintList* constraints);
 
   public:
     static MNot* New(TempAllocator& alloc, MDefinition* elements,
