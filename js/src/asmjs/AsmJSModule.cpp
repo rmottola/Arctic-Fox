@@ -837,7 +837,7 @@ AsmJSModule::initHeap(Handle<ArrayBufferObjectMaybeShared*> heap, JSContext* cx)
         // so we just have to add the heap length here.
         if (access.hasLengthCheck())
             X86Encoding::AddInt32(access.patchLengthAt(code_), heapLength);
-        void *addr = access.patchHeapPtrImmAt(code_);
+        void* addr = access.patchHeapPtrImmAt(code_);
         uint32_t disp = reinterpret_cast<uint32_t>(X86Encoding::GetPointer(addr));
         MOZ_ASSERT(disp <= INT32_MAX);
         X86Encoding::SetPointer(addr, (void*)(heapOffset + disp));
@@ -879,7 +879,7 @@ AsmJSModule::restoreHeapToInitialState(ArrayBufferObjectMaybeShared* maybePrevBu
             // Subtract the heap length back out, leaving the raw displacement in place.
             if (access.hasLengthCheck())
                 X86Encoding::AddInt32(access.patchLengthAt(code_), -heapLength);
-            void *addr = access.patchHeapPtrImmAt(code_);
+            void* addr = access.patchHeapPtrImmAt(code_);
             uint8_t* ptr = reinterpret_cast<uint8_t*>(X86Encoding::GetPointer(addr));
             MOZ_ASSERT(ptr >= ptrBase);
             X86Encoding::SetPointer(addr, (void*)(ptr - ptrBase));
@@ -889,7 +889,7 @@ AsmJSModule::restoreHeapToInitialState(ArrayBufferObjectMaybeShared* maybePrevBu
     if (maybePrevBuffer) {
         uint32_t heapLength = maybePrevBuffer->byteLength();
         for (unsigned i = 0; i < heapAccesses_.length(); i++) {
-            const jit::AsmJSHeapAccess &access = heapAccesses_[i];
+            const jit::AsmJSHeapAccess& access = heapAccesses_[i];
             // See comment above for x86 codegen.
             if (access.hasLengthCheck())
                 X86Encoding::AddInt32(access.patchLengthAt(code_), -heapLength);
@@ -951,7 +951,7 @@ class MOZ_STACK_CLASS AutoMutateCode
     }
 };
 
-}; // anonymous namespace
+} // namespace
 
 bool
 AsmJSModule::detachHeap(JSContext* cx)
