@@ -370,12 +370,12 @@ double stream_to_mix_samplerate_ratio(cubeb_stream * stream)
   return double(stream->stream_params.rate) / stream->mix_params.rate;
 }
 
-/* Channel upmix function, copies a mono channel into L and R */
+/* Upmix function, copies a mono channel into L and R */
 template<typename T>
 void
 mono_to_stereo(T * in, long insamples, T * out, int32_t out_channels)
 {
-  for (long i = 0, j = 0; i < insamples; ++i, j += out_channels) {
+  for (int i = 0, j = 0; i < insamples; ++i, j += out_channels) {
     out[j] = out[j + 1] = in[i];
   }
 }
@@ -385,14 +385,15 @@ void
 upmix(T * in, long inframes, T * out, int32_t in_channels, int32_t out_channels)
 {
   XASSERT(out_channels >= in_channels && in_channels > 0);
-  /* If we have 2 or more channels, the first two are always L and R. */
+
+  /* Either way, if we have 2 or more channels, the first two are L and R. */
   /* If we are playing a mono stream over stereo speakers, copy the data over. */
   if (in_channels == 1 && out_channels >= 2) {
     mono_to_stereo(in, inframes, out, out_channels);
   } else {
     /* Copy through. */
-    for (long i = 0, o = 0; i < inframes * in_channels;
-         i += in_channels, o += out_channels) {
+    for (int i = 0, o = 0; i < inframes * in_channels;
+        i += in_channels, o += out_channels) {
       for (int j = 0; j < in_channels; ++j) {
         out[o + j] = in[i + j];
       }
