@@ -701,9 +701,9 @@ current_stream_delay(cubeb_stream * stm)
 {
   stm->stream_reset_lock->assert_current_thread_owns();
 
-  /* If the default audio device went away during playback and we weren't
+  /* If the default audio endpoint went away during playback and we weren't
      able to configure a new one, it's possible the caller may call this
-     function before the error callback prevents it. */
+     before the error callback has propogated back. */
   if (!stm->audio_clock) {
     return 0;
   }
@@ -723,7 +723,7 @@ current_stream_delay(cubeb_stream * stm)
   }
 
   double cur_pos = static_cast<double>(pos) / freq;
-  double max_pos = static_cast<double>(stm->frames_written) / stm->mix_params.rate;
+  double max_pos = static_cast<double>(stm->frames_written)  / stm->mix_params.rate;
   double delay = max_pos - cur_pos;
   XASSERT(delay >= 0);
 
@@ -734,6 +734,10 @@ int
 stream_set_volume(cubeb_stream * stm, float volume)
 {
   stm->stream_reset_lock->assert_current_thread_owns();
+
+  if (!stm->audio_stream_volume) {
+    return CUBEB_ERROR;
+  }
 
   uint32_t channels;
   HRESULT hr = stm->audio_stream_volume->GetChannelCount(&channels);
