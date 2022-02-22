@@ -1267,10 +1267,16 @@ class AsmFunction
 
 struct ModuleCompileInputs
 {
+    CompileCompartment* compartment;
+    CompileRuntime* runtime;
     bool usesSignalHandlersForOOB;
 
-    ModuleCompileInputs(bool usesSignalHandlersForOOB)
-      : usesSignalHandlersForOOB(usesSignalHandlersForOOB)
+    ModuleCompileInputs(CompileCompartment* compartment,
+                        CompileRuntime* runtime,
+                        bool usesSignalHandlersForOOB)
+      : compartment(compartment),
+        runtime(runtime),
+        usesSignalHandlersForOOB(usesSignalHandlersForOOB)
     {}
 };
 
@@ -1289,19 +1295,24 @@ class ModuleCompileResults
         unsigned column;
     };
 
-    typedef Vector<SlowFunction> SlowFunctionVector;
-    typedef Vector<Label*> LabelVector;
+    typedef Vector<SlowFunction                  , 0, SystemAllocPolicy> SlowFunctionVector;
+    typedef Vector<Label*                        , 8, SystemAllocPolicy> LabelVector;
+    typedef Vector<AsmJSModule::FunctionCodeRange, 8, SystemAllocPolicy> FunctionCodeRangeVector;
+    typedef Vector<jit::IonScriptCounts*         , 0, SystemAllocPolicy> ScriptCountVector;
+#if defined(MOZ_VTUNE) || defined(JS_ION_PERF)
+    typedef Vector<AsmJSModule::ProfiledFunction , 0, SystemAllocPolicy> ProfiledFunctionVector;
+#endif // defined(MOZ_VTUNE) || defined(JS_ION_PERF)
 
   private:
     LifoAlloc           lifo_;
     MacroAssembler      masm_;
 
-    SlowFunctionVector slowFunctions_;
-    LabelVector functionEntries_;
-    Vector<AsmJSModule::FunctionCodeRange> codeRanges_;
-    Vector<jit::IonScriptCounts*> functionCounts_;
+    SlowFunctionVector      slowFunctions_;
+    LabelVector             functionEntries_;
+    FunctionCodeRangeVector codeRanges_;
+    ScriptCountVector       functionCounts_;
 #if defined(MOZ_VTUNE) || defined(JS_ION_PERF)
-    Vector<AsmJSModule::ProfiledFunction> profiledFunctions_;
+    ProfiledFunctionVector  profiledFunctions_;
 #endif // defined(MOZ_VTUNE) || defined(JS_ION_PERF)
 #if defined(JS_ION_PERF)
     Vector<AsmJSModule::ProfiledBlocksFunction> perfProfiledBlocksFunctions_;
@@ -1316,19 +1327,9 @@ class ModuleCompileResults
     int64_t             usecBefore_;
 
   public:
-    explicit ModuleCompileResults(ExclusiveContext* cx)
+    ModuleCompileResults()
       : lifo_(LIFO_ALLOC_PRIMARY_CHUNK_SIZE),
         masm_(MacroAssembler::AsmJSToken()),
-        slowFunctions_(cx),
-        functionEntries_(cx),
-        codeRanges_(cx),
-        functionCounts_(cx),
-#if defined(MOZ_VTUNE) || defined(JS_ION_PERF)
-        profiledFunctions_(cx),
-#endif // defined(MOZ_VTUNE) || defined(JS_ION_PERF)
-#if defined(JS_ION_PERF)
-        perfProfiledBlocksFunctions_(cx),
-#endif // defined(JS_ION_PERF)
         usecBefore_(PRMJ_Now())
     {}
 
@@ -2412,7 +2413,10 @@ class MOZ_STACK_CLASS ModuleValidator
     }
 
     ModuleCompileInputs compileInputs() const {
-        return ModuleCompileInputs(module().usesSignalHandlersForOOB());
+        CompileCompartment* compartment = CompileCompartment::get(cx()->compartment());
+        return ModuleCompileInputs(compartment,
+                                   compartment->runtime(),
+                                   module().usesSignalHandlersForOOB());
     }
 };
 
@@ -2471,21 +2475,16 @@ class MOZ_STACK_CLASS ModuleValidator
 // well.
 class MOZ_STACK_CLASS ModuleCompiler
 {
-    ExclusiveContext*                       cx_;
-
     ModuleCompileInputs                     compileInputs_;
     ScopedJSDeletePtr<ModuleCompileResults> compileResults_;
 
   public:
-    ModuleCompiler(ExclusiveContext* cx, const ModuleCompileInputs& inputs)
-      : cx_(cx),
-        compileInputs_(inputs),
-        compileResults_(js_new<ModuleCompileResults>(cx))
+    explicit ModuleCompiler(const ModuleCompileInputs& inputs)
+      : compileInputs_(inputs),
+        compileResults_(js_new<ModuleCompileResults>())
     {}
 
     /*************************************************** Read-only interface */
-
-    ExclusiveContext* cx() const     { return cx_; }
 
     MacroAssembler& masm()          { return compileResults_->masm(); }
     Label& stackOverflowLabel()     { return compileResults_->stackOverflowLabel(); }
@@ -2495,9 +2494,9 @@ class MOZ_STACK_CLASS ModuleCompiler
     Label& onConversionErrorLabel() { return compileResults_->onConversionErrorLabel(); }
     int64_t usecBefore()            { return compileResults_->usecBefore(); }
 
-    bool usesSignalHandlersForOOB() const {
-        return compileInputs_.usesSignalHandlersForOOB;
-    }
+    bool usesSignalHandlersForOOB() const   { return compileInputs_.usesSignalHandlersForOOB; }
+    CompileRuntime* runtime() const         { return compileInputs_.runtime; }
+    CompileCompartment* compartment() const { return compileInputs_.compartment; }
 
     /***************************************************** Mutable interface */
 
@@ -3465,8 +3464,8 @@ NoExceptionPending(ExclusiveContext* cx)
     return !cx->isJSContext() || !cx->asJSContext()->isExceptionPending();
 }
 
-typedef Vector<size_t,1> LabelVector;
-typedef Vector<MBasicBlock*,8> BlockVector;
+typedef Vector<size_t, 1, SystemAllocPolicy> LabelVector;
+typedef Vector<MBasicBlock*, 8, SystemAllocPolicy> BlockVector;
 
 // Encapsulates the compilation of a single function in an asm.js module. The
 // function compiler handles the creation and final backend compilation of the
@@ -3474,34 +3473,34 @@ typedef Vector<MBasicBlock*,8> BlockVector;
 class FunctionCompiler
 {
   private:
-    typedef HashMap<uint32_t, BlockVector> LabeledBlockMap;
-    typedef HashMap<size_t, BlockVector> UnlabeledBlockMap;
-    typedef Vector<size_t, 4> PositionStack;
-    typedef Vector<Type, 4> LocalVarTypes;
+    typedef HashMap<uint32_t, BlockVector, DefaultHasher<uint32_t>, SystemAllocPolicy> LabeledBlockMap;
+    typedef HashMap<size_t, BlockVector, DefaultHasher<uint32_t>, SystemAllocPolicy> UnlabeledBlockMap;
+    typedef Vector<size_t, 4, SystemAllocPolicy> PositionStack;
+    typedef Vector<Type, 4, SystemAllocPolicy> LocalVarTypes;
 
-    ModuleCompiler &       m_;
-    LifoAlloc &            lifo_;
-    RetType                retType_;
+    ModuleCompiler &         m_;
+    LifoAlloc &              lifo_;
+    RetType                  retType_;
 
-    const AsmFunction &    func_;
-    size_t                 pc_;
+    const AsmFunction &      func_;
+    size_t                   pc_;
 
-    TempAllocator *        alloc_;
-    MIRGraph *             graph_;
-    CompileInfo *          info_;
-    MIRGenerator *         mirGen_;
-    Maybe<JitContext>      jitContext_;
+    TempAllocator *          alloc_;
+    MIRGraph *               graph_;
+    CompileInfo *            info_;
+    MIRGenerator *           mirGen_;
+    Maybe<JitContext>        jitContext_;
 
-    MBasicBlock *          curBlock_;
+    MBasicBlock *            curBlock_;
 
-    PositionStack          loopStack_;
-    PositionStack          breakableStack_;
-    UnlabeledBlockMap      unlabeledBreaks_;
-    UnlabeledBlockMap      unlabeledContinues_;
-    LabeledBlockMap        labeledBreaks_;
-    LabeledBlockMap        labeledContinues_;
+    PositionStack            loopStack_;
+    PositionStack            breakableStack_;
+    UnlabeledBlockMap        unlabeledBreaks_;
+    UnlabeledBlockMap        unlabeledContinues_;
+    LabeledBlockMap          labeledBreaks_;
+    LabeledBlockMap          labeledContinues_;
 
-    LocalVarTypes          localVarTypes_;
+    LocalVarTypes            localVarTypes_;
 
   public:
     FunctionCompiler(ModuleCompiler& m, const AsmFunction& func, LifoAlloc& lifo)
@@ -3514,21 +3513,13 @@ class FunctionCompiler
         graph_(nullptr),
         info_(nullptr),
         mirGen_(nullptr),
-        curBlock_(nullptr),
-        loopStack_(m.cx()),
-        breakableStack_(m.cx()),
-        unlabeledBreaks_(m.cx()),
-        unlabeledContinues_(m.cx()),
-        labeledBreaks_(m.cx()),
-        labeledContinues_(m.cx()),
-        localVarTypes_(m.cx())
+        curBlock_(nullptr)
     {}
 
     ModuleCompiler &        m() const            { return m_; }
     TempAllocator &         alloc() const        { return *alloc_; }
     LifoAlloc &             lifo() const         { return lifo_; }
     RetType                 returnedType() const { return retType_; }
-    ExclusiveContext *      cx() const           { return m_.cx(); }
 
     bool init()
     {
@@ -4026,7 +4017,7 @@ class FunctionCompiler
         uint32_t maxChildStackBytes_;
         uint32_t spIncrement_;
         MAsmJSCall::Args regArgs_;
-        Vector<MAsmJSPassStackArg*> stackArgs_;
+        Vector<MAsmJSPassStackArg*, 0, SystemAllocPolicy> stackArgs_;
         bool childClobbers_;
 
         friend class FunctionCompiler;
@@ -4038,8 +4029,6 @@ class FunctionCompiler
             prevMaxStackBytes_(0),
             maxChildStackBytes_(0),
             spIncrement_(0),
-            regArgs_(f.cx()),
-            stackArgs_(f.cx()),
             childClobbers_(false)
         { }
     };
@@ -4537,18 +4526,17 @@ class FunctionCompiler
         alloc_  = lifo_.new_<TempAllocator>(&lifo_);
         if (!alloc_)
             return false;
-        jitContext_.emplace(m_.cx(), alloc_);
-
-        MOZ_ASSERT(numLocals == argTypes.length() + varInitializers.length());
+        jitContext_.emplace(m().runtime(), /* CompileCompartment = */ nullptr, alloc_);
         graph_  = lifo_.new_<MIRGraph>(alloc_);
         if (!graph_)
             return false;
+        MOZ_ASSERT(numLocals == argTypes.length() + varInitializers.length());
         info_   = lifo_.new_<CompileInfo>(numLocals);
         if (!info_)
             return false;
         const OptimizationInfo* optimizationInfo = js_IonOptimizations.get(Optimization_AsmJS);
         const JitCompileOptions options;
-        mirGen_ = lifo_.new_<MIRGenerator>(CompileCompartment::get(cx()->compartment()),
+        mirGen_ = lifo_.new_<MIRGenerator>(m().compartment(),
                                            options, alloc_,
                                            graph_, info_, optimizationInfo,
                                            &m().onOutOfBoundsLabel(),
@@ -4691,7 +4679,7 @@ class FunctionCompiler
             return true;
         typename Map::AddPtr p = map->lookupForAdd(key);
         if (!p) {
-            BlockVector empty(m().cx());
+            BlockVector empty;
             if (!map->add(p, key, Move(empty)))
                 return false;
         }
@@ -8578,7 +8566,7 @@ EmitConditional(FunctionCompiler& f, AsmType type, MDefinition** def)
     if (!EmitExpr(f, type, &ifTrue))
         return false;
 
-    BlockVector thenBlocks(f.cx());
+    BlockVector thenBlocks;
     if (!f.appendThenBlock(&thenBlocks))
         return false;
 
@@ -9438,7 +9426,7 @@ EmitLabel(FunctionCompiler& f, LabelVector* maybeLabels)
         return EmitStatement(f, maybeLabels);
     }
 
-    LabelVector labels(f.cx());
+    LabelVector labels;
     if (!labels.append(labelId))
         return false;
 
@@ -9496,7 +9484,7 @@ EmitIfElse(FunctionCompiler& f, bool hasElse)
     // avoids blowing the C stack quota for long if/else-if chains and also
     // creates fewer MBasicBlocks at join points (by creating one join block
     // for the entire if/else-if chain).
-    BlockVector thenBlocks(f.cx());
+    BlockVector thenBlocks;
 
   recurse:
     MDefinition* condition;
@@ -9712,7 +9700,7 @@ EmitSwitch(FunctionCompiler& f)
     if (!hasDefault && numCases == 0)
         return true;
 
-    BlockVector cases(f.cx());
+    BlockVector cases;
     if (!cases.resize(high - low + 1))
         return false;
 
@@ -10817,7 +10805,7 @@ CheckFunctionsSequential(ModuleValidator& m, ScopedJSDeletePtr<ModuleCompileResu
     // function by the LifoAllocScope inside the loop.
     LifoAlloc lifo(LIFO_ALLOC_PRIMARY_CHUNK_SIZE);
 
-    ModuleCompiler mc(m.cx(), m.compileInputs());
+    ModuleCompiler mc(m.compileInputs());
 
     while (true) {
         TokenKind tk;
@@ -10947,7 +10935,7 @@ GetUsedTask(ModuleCompiler& m, ParallelGroupState& group, AsmJSParallelTask** ou
 
     {
         // Perform code generation on the main thread.
-        JitContext jitContext(m.cx(), &task->mir->alloc());
+        JitContext jitContext(m.runtime(), /* CompileCompartment = */ nullptr, &task->mir->alloc());
         if (!GenerateCode(m, func, *task->mir, *task->lir))
             return false;
     }
@@ -10988,7 +10976,7 @@ CheckFunctionsParallel(ModuleValidator& m, ParallelGroupState& group,
 #endif
     HelperThreadState().resetAsmJSFailureState();
 
-    ModuleCompiler mc(m.cx(), m.compileInputs());
+    ModuleCompiler mc(m.compileInputs());
 
     AsmJSParallelTask* task = nullptr;
     for (unsigned i = 0;; i++) {
