@@ -2862,11 +2862,6 @@ bool
 IonCompilationCanUseNurseryPointers();
 #endif
 
-#ifdef DEBUG
-bool
-IonCompilationCanUseNurseryPointers();
-#endif
-
 // Helper class to check that GC pointers embedded in MIR instructions are in
 // in the nursery only when the store buffer has been marked as needing to
 // cancel all ion compilations. Otherwise, off-thread Ion compilation and
