@@ -1667,8 +1667,8 @@ MFilterTypeSet::computeRange(TempAllocator& alloc)
     setRange(new(alloc) Range(getOperand(0)));
 }
 
-static Range *
-GetTypedArrayRange(TempAllocator &alloc, Scalar::Type type)
+static Range*
+GetTypedArrayRange(TempAllocator& alloc, Scalar::Type type)
 {
     switch (type) {
       case Scalar::Uint8Clamped:
@@ -1697,7 +1697,7 @@ GetTypedArrayRange(TempAllocator &alloc, Scalar::Type type)
 }
 
 void
-MLoadUnboxedScalar::computeRange(TempAllocator &alloc)
+MLoadUnboxedScalar::computeRange(TempAllocator& alloc)
 {
     // We have an Int32 type and if this is a UInt32 load it may produce a value
     // outside of our range, but we have a bailout to handle those cases.
@@ -1705,7 +1705,7 @@ MLoadUnboxedScalar::computeRange(TempAllocator &alloc)
 }
 
 void
-MLoadTypedArrayElementStatic::computeRange(TempAllocator &alloc)
+MLoadTypedArrayElementStatic::computeRange(TempAllocator& alloc)
 {
     // We don't currently use MLoadTypedArrayElementStatic for uint32, so we
     // don't have to worry about it returning a value outside our type.
@@ -3328,7 +3328,7 @@ bool RangeAnalysis::tryRemovingGuards()
     // bailout-paths which are used to shrink the input range of the
     // operands of the condition.
     for (size_t i = 0; i < guards.length(); i++) {
-        MDefinition *guard = guards[i];
+        MDefinition* guard = guards[i];
 
 #ifdef DEBUG
         // There is no need to mark an instructions if there is
