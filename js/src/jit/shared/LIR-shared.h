@@ -6755,6 +6755,7 @@ class LAsmJSAtomicBinopHeap : public LInstructionHelper<1, 2, 3>
         return getOperand(0);
     }
     const LAllocation* value() {
+        MOZ_ASSERT(valueOp == 1);
         return getOperand(1);
     }
     const LDefinition* temp() {
