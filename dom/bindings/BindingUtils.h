@@ -454,14 +454,21 @@ public:
     }                                                \
   } while(0)
 
+  // Return the JSObject stored in slot i, if that slot exists.  If
+  // the slot does not exist, return null.
   JSObject* EntrySlotIfExists(size_t i) {
     FORWARD_OPERATION(EntrySlotIfExists, (i));
   }
 
+  // Return a reference to slot i, creating it if necessary.  There
+  // may not be an object in the returned slot.
   JS::Heap<JSObject*>& EntrySlotOrCreate(size_t i) {
     FORWARD_OPERATION(EntrySlotOrCreate, (i));
   }
 
+  // Return a reference to slot i, which is guaranteed to already
+  // exist.  There may not be an object in the slot, if prototype and
+  // constructor initialization for one of our bindings failed.
   JS::Heap<JSObject*>& EntrySlotMustExist(size_t i) {
     FORWARD_OPERATION(EntrySlotMustExist, (i));
   }
