@@ -20,9 +20,9 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=469304
 
 /** Test for Bug 469304 **/
 function testGetAttribute() {
-  var a1 = document.createAttribute("aa");
+  var a1 = document.createAttributeNS("", "aa");
   a1.nodeValue = "lowercase";
-  var a2 = document.createAttribute("AA");
+  var a2 = document.createAttributeNS("", "AA");
   a2.nodeValue = "UPPERCASE";
   document.body.setAttributeNode(a1);
   document.body.setAttributeNode(a2);
@@ -72,7 +72,7 @@ is(testGetAttributeCaseInsensitive(), "x", "(1)");
 
 function testGetAttributeNodeMixedCase() {
   var div = document.createElement('div');
-  var a = div.ownerDocument.createAttribute("mixedCaseAttrib");
+  var a = div.ownerDocument.createAttributeNS("", "mixedCaseAttrib");
   a.nodeValue = "x";
   div.setAttributeNode(a);
   return div.getAttributeNS("", "mixedCaseAttrib");
@@ -114,7 +114,7 @@ function testAttribNodeNamePreservesCaseGetNode() {
   var a = body.ownerDocument.createAttribute("A");
   a.nodeValue = "x";
   body.setAttributeNode(a);
-  a = document.body.getAttributeNodeNS("", "A");
+  a = document.body.getAttributeNodeNS("", "a");
   if (!a)
       return "FAIL";
   var result = [ a.name, a.nodeName ];
@@ -127,14 +127,14 @@ function testAttribNodeNamePreservesCaseGetNode2() {
   var a = body.ownerDocument.createAttribute("B");
   a.nodeValue = "x";
   body.setAttributeNode(a);
-  a = document.body.getAttributeNodeNS("", "B");
+  a = document.body.getAttributeNodeNS("", "b");
   if (!a)
       return "FAIL";
   // Now create node second time
   a = body.ownerDocument.createAttribute("B");
   a.nodeValue = "x";
   body.setAttributeNode(a);
-  a = document.body.getAttributeNodeNS("", "B");
+  a = document.body.getAttributeNodeNS("", "b");
   var result = [ a.name, a.nodeName ];
   return result.join(",");
 }
@@ -158,10 +158,10 @@ attrib.nodeValue = "XXX";
 node.setAttributeNode(attrib);
 // Note, this is different to what WebKit does
 is((new XMLSerializer).serializeToString(node),
-   "<div xmlns=\"http://www.w3.org/1999/xhtml\" myAttrib=\"XXX\"></div>", "(9)");
-is(node.getAttributeNodeNS("", "myAttrib").name, "myAttrib", "(10)");
-is(node.getAttributeNodeNS("", "myattrib"), null, "(11)");
-is(attrib.name, "myAttrib", "(12)");
+   "<div xmlns=\"http://www.w3.org/1999/xhtml\" myattrib=\"XXX\"></div>", "(9)");
+is(node.getAttributeNode('myAttrib').name, "myattrib", "(10)");
+is(node.getAttributeNode('myattrib').name, "myattrib", "(11)");
+is(attrib.name, "myattrib", "(12)");
 
 var o = document.createElement("div");
 o.setAttribute("myAttrib","htmlattr");
