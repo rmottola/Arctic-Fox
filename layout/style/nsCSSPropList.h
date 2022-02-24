@@ -96,7 +96,9 @@
 
 // Callers may define CSS_PROP_LIST_EXCLUDE_INTERNAL if they want to
 // exclude internal properties that are not represented in the DOM (only
-// the DOM style code defines this).
+// the DOM style code defines this).  All properties defined in an
+// #ifndef CSS_PROP_LIST_EXCLUDE_INTERNAL section must have the
+// CSS_PROPERTY_INTERNAL flag set.
 
 // When capturing all properties by defining CSS_PROP, callers must also
 // define one of the following three macros:
@@ -417,7 +419,8 @@ CSS_PROP_FONT(
     -x-system-font,
     _x_system_font,
     CSS_PROP_DOMPROP_PREFIXED(SystemFont),
-    CSS_PROPERTY_PARSE_INACCESSIBLE |
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_INACCESSIBLE |
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER_AND_FIRST_LINE |
         CSS_PROPERTY_APPLIES_TO_PLACEHOLDER,
     "",
@@ -1515,7 +1518,8 @@ CSS_PROP_TEXT(
     -moz-control-character-visibility,
     _moz_control_character_visibility,
     CSS_PROP_DOMPROP_PREFIXED(ControlCharacterVisibility),
-    CSS_PROPERTY_PARSE_VALUE,
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_VALUE,
     "",
     VARIANT_HK,
     kControlCharacterVisibilityKTable,
@@ -3752,7 +3756,8 @@ CSS_PROP_FONT(
     // REVIEW: no range restriction?
     // NOTE: CSSParserImpl::ParseSingleValueProperty only accepts this
     // property when mUnsafeRulesEnabled is set.
-    CSS_PROPERTY_PARSE_VALUE,
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_VALUE,
     "",
     // script-level can take Auto, Integer and Number values, but only Auto
     // ("increment if parent is not in displaystyle") and Integer
@@ -3766,7 +3771,8 @@ CSS_PROP_FONT(
     script_size_multiplier,
     ScriptSizeMultiplier,
     // REVIEW: no range restriction?
-    CSS_PROPERTY_PARSE_INACCESSIBLE,
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_INACCESSIBLE,
     "",
     0,
     nullptr,
@@ -3777,7 +3783,8 @@ CSS_PROP_FONT(
     script_min_size,
     ScriptMinSize,
     // REVIEW: no range restriction?
-    CSS_PROPERTY_PARSE_INACCESSIBLE,
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_INACCESSIBLE,
     "",
     0,
     nullptr,
@@ -3787,7 +3794,8 @@ CSS_PROP_FONT(
     -moz-math-variant,
     math_variant,
     MathVariant,
-    CSS_PROPERTY_PARSE_INACCESSIBLE,
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_INACCESSIBLE,
     "",
     VARIANT_HK,
     kMathVariantKTable,
@@ -3799,7 +3807,8 @@ CSS_PROP_FONT(
     MathDisplay,
     // NOTE: CSSParserImpl::ParseSingleValueProperty only accepts this
     // property when mUnsafeRulesEnabled is set.
-    CSS_PROPERTY_PARSE_VALUE,
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_VALUE,
     "",
     VARIANT_HK,
     kMathDisplayKTable,
@@ -4183,7 +4192,8 @@ CSS_PROP_FONT(
     -x-lang,
     _x_lang,
     Lang,
-    CSS_PROPERTY_PARSE_INACCESSIBLE,
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_INACCESSIBLE,
     "",
     0,
     nullptr,
@@ -4193,7 +4203,8 @@ CSS_PROP_TABLE(
     -x-span,
     _x_span,
     Span,
-    CSS_PROPERTY_PARSE_INACCESSIBLE,
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_INACCESSIBLE,
     "",
     0,
     nullptr,
@@ -4203,7 +4214,8 @@ CSS_PROP_FONT(
     -x-text-zoom,
     _x_text_zoom,
     TextZoom,
-    CSS_PROPERTY_PARSE_INACCESSIBLE,
+    CSS_PROPERTY_INTERNAL |
+        CSS_PROPERTY_PARSE_INACCESSIBLE,
     "",
     0,
     nullptr,
