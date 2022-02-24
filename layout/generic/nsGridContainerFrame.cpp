@@ -655,7 +655,8 @@ nsGridContainerFrame::ResolveAbsPosLineRange(
   uint32_t GridNamedArea::* aAreaStart,
   uint32_t GridNamedArea::* aAreaEnd,
   uint32_t aExplicitGridEnd,
-  uint32_t aGridEnd,
+  int32_t aGridStart,
+  int32_t aGridEnd,
   const nsStylePosition* aStyle)
 {
   if (aStart.IsAuto()) {
@@ -668,7 +669,7 @@ nsGridContainerFrame::ResolveAbsPosLineRange(
     if (aEnd.mHasSpan) {
       ++end;
     }
-    return LineRange(kAutoLine, clamped(end, 1, int32_t(aGridEnd)));
+    return LineRange(kAutoLine, clamped(end, aGridStart, aGridEnd));
   }
 
   if (aEnd.IsAuto()) {
@@ -676,9 +677,9 @@ nsGridContainerFrame::ResolveAbsPosLineRange(
       ResolveLine(aStart, aStart.mInteger, 0, aLineNameList, aAreaStart,
                   aAreaEnd, aExplicitGridEnd, eLineRangeSideStart, aStyle);
     if (aStart.mHasSpan) {
-      start = std::max(int32_t(aGridEnd) - start, 1);
+      start = std::max(aGridEnd - start, aGridStart);
     }
-    return LineRange(clamped(start, 1, int32_t(aGridEnd)), kAutoLine);
+    return LineRange(clamped(start, aGridStart, aGridEnd), kAutoLine);
   }
 
   LineRange r = ResolveLineRange(aStart, aEnd, aLineNameList, aAreaStart,
@@ -686,8 +687,8 @@ nsGridContainerFrame::ResolveAbsPosLineRange(
   MOZ_ASSERT(!r.IsAuto(), "resolving definite lines shouldn't result in auto");
   // Clamp definite lines to be within the implicit grid.
   // Note that this implies mStart may be equal to mEnd.
-  r.mStart = clamped(r.mStart, 1, int32_t(aGridEnd));
-  r.mEnd = clamped(r.mEnd, 1, int32_t(aGridEnd));
+  r.mStart = clamped(r.mStart, aGridStart, aGridEnd);
+  r.mEnd = clamped(r.mEnd, aGridStart, aGridEnd);
   MOZ_ASSERT(r.mStart <= r.mEnd);
   return r;
 }
@@ -738,19 +739,23 @@ nsGridContainerFrame::PlaceAbsPos(nsIFrame* aChild,
                                   const nsStylePosition* aStyle)
 {
   const nsStylePosition* itemStyle = aChild->StylePosition();
+  int32_t gridColStart = 1 - mExplicitGridOffsetCol;
+  int32_t gridRowStart = 1 - mExplicitGridOffsetRow;
   return GridArea(
     ResolveAbsPosLineRange(itemStyle->mGridColumnStart,
                            itemStyle->mGridColumnEnd,
                            aStyle->mGridTemplateColumns.mLineNameLists,
                            &GridNamedArea::mColumnStart,
                            &GridNamedArea::mColumnEnd,
-                           mExplicitGridColEnd, mGridColEnd, aStyle),
+                           mExplicitGridColEnd, gridColStart, mGridColEnd,
+                           aStyle),
     ResolveAbsPosLineRange(itemStyle->mGridRowStart,
                            itemStyle->mGridRowEnd,
                            aStyle->mGridTemplateRows.mLineNameLists,
                            &GridNamedArea::mRowStart,
                            &GridNamedArea::mRowEnd,
-                           mExplicitGridRowEnd, mGridRowEnd, aStyle));
+                           mExplicitGridRowEnd, gridRowStart, mGridRowEnd,
+                           aStyle));
 }
 
 void
