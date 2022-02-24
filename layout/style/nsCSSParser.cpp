@@ -309,10 +309,6 @@ public:
                                            uint32_t aLineNumber,
                                            uint32_t aLineOffset);
 
-  bool ChromeOrCertifiedAppRulesEnabled() const {
-    return mIsChromeOrCertifiedApp;
-  }
-
   nsCSSProps::EnabledState PropertyEnabledState() const {
     static_assert(nsCSSProps::eEnabledForAllContent == 0,
                   "nsCSSProps::eEnabledForAllContent should be zero for "
@@ -5549,10 +5545,7 @@ CSSParserImpl::ParsePseudoSelector(int32_t&       aDataMask,
       ((pseudoElementType < nsCSSPseudoElements::ePseudo_PseudoElementCount &&
         nsCSSPseudoElements::PseudoElementIsUASheetOnly(pseudoElementType)) ||
        (pseudoClassType != nsCSSPseudoClasses::ePseudoClass_NotPseudoClass &&
-        nsCSSPseudoClasses::PseudoClassIsUASheetOnly(pseudoClassType)) ||
-       (!ChromeOrCertifiedAppRulesEnabled() &&
-        (pseudoClassType != nsCSSPseudoClasses::ePseudoClass_NotPseudoClass &&
-         nsCSSPseudoClasses::PseudoClassIsUASheetAndChromeOnly(pseudoClassType))))) {
+        nsCSSPseudoClasses::PseudoClassIsUASheetOnly(pseudoClassType)))) {
     // This pseudo-element or pseudo-class is not exposed to content.
     REPORT_UNEXPECTED_TOKEN(PEPseudoSelUnknown);
     UngetToken();
