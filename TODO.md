@@ -110,8 +110,9 @@
 - Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
 - Bug 1226909 multipart AsyncOpen2 
 - Bug 1213646: Allow URI_IS_UI_RESOURCE and safe about: URIs when SEC_A
+- 1185106 - at least part 0 to 4 for TFF
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
-- Bug 1182571 - 2051-10-19 Fix nsILoadInfo->GetContentPolicyType API to be less am
+- Bug 1182571 - 2015-10-19 Fix nsILoadInfo->GetContentPolicyType API to be less am
 - Bug 1170958 - 2015-09-30 - Allow MediaInputPort to lock to a specific input track
 - Bug 1205533 - 2015-09-18 - Fix and disallow warnings in gfx/qcms/
 - Bug 1191148 - Don't count fullscreen request handled if we don't chanyesy
@@ -119,7 +120,7 @@
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
 - Bug 901633
 - Bug 1155618 - Fix more out of memory handling issues r=terrence 
-- Bug 1186424- Refactor AsmJSValidate.cpp in preparation for paralleliz
+- Bug 1193583 - 2015-08-31 Change the semantics of Debugger.evalInGlobal
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
@@ -136,6 +137,7 @@
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1181612 - 2015-09-16 - Split AsmJSValidate into AsmJS{Validate,Compile} and dif
 - Bug 895274 - 1 to 270 parts
+- Bug 1051052 - Made mid an outparam in JsepSession::AddLocalIceCandida
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
 -  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
 - Bug 1198563
@@ -147,15 +149,12 @@
 - Bug 1181142 - Part 2: Make the minimum jemalloc4 allocation size 16 b
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
-- 1185106 - at least part 0 to 4 for TFF
 - Bug 1171379 - and check all related on bugzilla
-- Bug 1184429 - 2015-07-17 P1. & P2
 - Bug 1123386 - Part 4: Update the tooltool manifests for the OSX an
 - Bug 1184201 - Disable fullscreen transition on Windows
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
 - Bug 1181869 [provokes crashing] - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
-- Bug 1051052 - Made mid an outparam in JsepSession::AddLocalIceCandida
 - Bug 1204872 - 2015-09
 - bug 1181823 - convert test_ev_certs.js, test_keysize_ev.js, a
 - Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
