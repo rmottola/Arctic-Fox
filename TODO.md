@@ -132,7 +132,6 @@
 - Bug 1188347  - 5 parts
 - Bug 1188643 2015-09-30 - Buffer more audio in audio capture mode to avoid glitche
 - Bug 1205870 - 2015-09-22 - Make sure all possible unboxed array inline capacities 
-- Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1181612 - 2015-09-16 - Split AsmJSValidate into AsmJS{Validate,Compile} and dif
@@ -141,8 +140,6 @@
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
 -  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
 - Bug 1198563
-- 1190669 - 4 parts
-- Bug 1191112 - 3 parts
 - Bug 1189809 - 2015-07-31 Remove the ill-fated DynamicTraceable
 - Bug 1181142 - Part 2: Make the minimum jemalloc4 allocation size 16 b
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
