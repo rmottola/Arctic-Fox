@@ -138,7 +138,7 @@ static int do_main(int argc, char* argv[], nsIFile *xreDirectory)
   }
   
 #endif
-  // Allow palemoon.exe to launch XULRunner apps via -app <application.ini>
+  // Allow firefox.exe to launch XULRunner apps via -app <application.ini>
   // Note that -app must be the *first* argument.
   const char *appDataFile = getenv("XUL_APP_FILE");
   if (appDataFile && *appDataFile) {
@@ -185,7 +185,6 @@ static int do_main(int argc, char* argv[], nsIFile *xreDirectory)
     return result;
   }
 
-  // Desktop browser launch
   ScopedAppData appData(&sAppData);
   nsCOMPtr<nsIFile> exeFile;
   rv = mozilla::BinaryPath::GetFile(argv[0], getter_AddRefs(exeFile));
