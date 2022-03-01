@@ -43,6 +43,7 @@
 
 #include "nsXPCOMPrivate.h" // for MAXPATHLEN and XPCOM_DLL
 #include "mozilla/StartupTimeline.h"
+#include "mozilla/WindowsDllBlocklist.h"
 
 using namespace mozilla;
 
@@ -114,9 +115,6 @@ static bool IsArg(const char* arg, const char* s)
 XRE_GetFileFromPathType XRE_GetFileFromPath;
 XRE_CreateAppDataType XRE_CreateAppData;
 XRE_FreeAppDataType XRE_FreeAppData;
-#ifdef XRE_HAS_DLL_BLOCKLIST
-XRE_SetupDllBlocklistType XRE_SetupDllBlocklist;
-#endif
 XRE_StartupTimelineRecordType XRE_StartupTimelineRecord;
 XRE_mainType XRE_main;
 XRE_StopLateWriteChecksType XRE_StopLateWriteChecks;
@@ -125,9 +123,6 @@ static const nsDynamicFunctionLoad kXULFuncs[] = {
     { "XRE_GetFileFromPath", (NSFuncPtr*) &XRE_GetFileFromPath },
     { "XRE_CreateAppData", (NSFuncPtr*) &XRE_CreateAppData },
     { "XRE_FreeAppData", (NSFuncPtr*) &XRE_FreeAppData },
-#ifdef XRE_HAS_DLL_BLOCKLIST
-    { "XRE_SetupDllBlocklist", (NSFuncPtr*) &XRE_SetupDllBlocklist },
-#endif
     { "XRE_StartupTimelineRecord", (NSFuncPtr*) &XRE_StartupTimelineRecord },
     { "XRE_main", (NSFuncPtr*) &XRE_main },
     { "XRE_StopLateWriteChecks", (NSFuncPtr*) &XRE_StopLateWriteChecks },
@@ -346,6 +341,18 @@ int main(int argc, char* argv[])
 
   nsIFile *xreDirectory;
 
+#ifdef HAS_DLL_BLOCKLIST
+  DllBlocklist_Initialize();
+
+#ifdef DEBUG
+  // In order to be effective against AppInit DLLs, the blocklist must be
+  // initialized before user32.dll is loaded into the process (bug 932100).
+  if (GetModuleHandleA("user32.dll")) {
+    fprintf(stderr, "DLL blocklist was unable to intercept AppInit DLLs.\n");
+  }
+#endif
+#endif
+
   nsresult rv = InitXPCOMGlue(argv[0], &xreDirectory);
   if (NS_FAILED(rv)) {
     return 255;
@@ -353,9 +360,6 @@ int main(int argc, char* argv[])
 
   XRE_StartupTimelineRecord(mozilla::StartupTimeline::START, start);
 
-#ifdef XRE_HAS_DLL_BLOCKLIST
-  XRE_SetupDllBlocklist();
-#endif
 
   int result = do_main(argc, argv, xreDirectory);
 
