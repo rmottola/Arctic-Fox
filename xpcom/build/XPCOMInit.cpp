@@ -138,6 +138,18 @@ extern nsresult nsStringInputStreamConstructor(nsISupports*, REFNSIID, void**);
 #include "mozilla/ipc/GeckoChildProcessHost.h"
 
 #include "ogg/ogg.h"
+#if defined(MOZ_VPX) && !defined(MOZ_VPX_NO_MEM_REPORTING)
+#if defined(HAVE_STDINT_H)
+// mozilla-config.h defines HAVE_STDINT_H, and then it's defined *again* in
+// vpx_config.h (which we include via vpx_mem.h, below). This redefinition
+// triggers a build warning on MSVC, so we have to #undef it first.
+#undef HAVE_STDINT_H
+#endif
+#include "vpx_mem/vpx_mem.h"
+#endif
+#ifdef MOZ_WEBM
+#include "nestegg/nestegg.h"
+#endif
 
 #include "GeckoProfiler.h"
 
@@ -660,6 +672,16 @@ NS_InitXPCOM2(nsIServiceManager** aResult,
                         OggReporter::CountingRealloc,
                         OggReporter::CountingFree);
 
+#if defined(MOZ_VPX) && !defined(MOZ_VPX_NO_MEM_REPORTING)
+  // And for VPX.
+  vpx_mem_set_functions(VPXReporter::CountingMalloc,
+                        VPXReporter::CountingCalloc,
+                        VPXReporter::CountingRealloc,
+                        VPXReporter::CountingFree,
+                        memcpy,
+                        memset,
+                        memmove);
+#endif
 
   // Initialize the JS engine.
   if (!JS_Init()) {
@@ -716,6 +738,9 @@ NS_InitXPCOM2(nsIServiceManager** aResult,
   RegisterStrongMemoryReporter(new OggReporter());
 #ifdef MOZ_VPX
   RegisterStrongMemoryReporter(new VPXReporter());
+#endif
+#ifdef MOZ_WEBM
+  RegisterStrongMemoryReporter(new NesteggReporter());
 #endif
 
   mozilla::Telemetry::Init();
