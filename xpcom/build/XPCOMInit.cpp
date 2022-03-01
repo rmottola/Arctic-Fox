@@ -596,17 +596,6 @@ NS_InitXPCOM2(nsIServiceManager** aResult,
   xpcomLib->GetPath(path);
   gGREBinPath = ToNewUnicode(path);
 
-#ifdef XP_MACOSX
-  nsCOMPtr<nsIFile> parent;
-  xpcomLib->GetParent(getter_AddRefs(parent));
-  parent->AppendNative(NS_LITERAL_CSTRING("MacOS"));
-  bool pathExists = false;
-  parent->Exists(&pathExists);
-  if (pathExists) {
-      xpcomLib = parent.forget();
-  }
-#endif
-
   xpcomLib->AppendNative(nsDependentCString(XPCOM_DLL));
   nsDirectoryService::gService->Set(NS_XPCOM_LIBRARY_FILE, xpcomLib);
 
