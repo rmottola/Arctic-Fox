@@ -26,7 +26,7 @@
 #include "nsIScriptNameSpaceManager.h"
 #include "nsString.h"
 #include "nsID.h"
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "nsDOMClassInfo.h"
 #include "nsIObserver.h"
 #include "nsWeakReference.h"
