@@ -523,7 +523,7 @@ public:
     return NS_OK;
   }
 };
-} // anonymous namespace
+} // namespace
 
 void
 ServiceWorkerRegistrationMainThread::Update()
