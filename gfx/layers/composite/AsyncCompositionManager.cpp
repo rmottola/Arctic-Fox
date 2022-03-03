@@ -974,7 +974,7 @@ ApplyAsyncTransformToScrollbarForContent(Layer* aScrollbar,
     scrollbarTransform.PostTranslate(xTranslation, 0, 0);
   }
 
-  Matrix4x4 transform = scrollbarTransform * aScrollbar->GetTransform();
+  Matrix4x4 transform = aScrollbar->GetLocalTransform() * scrollbarTransform;
 
   Matrix4x4 compensation;
   // If the scrollbar layer is for the root then the content's resolution
