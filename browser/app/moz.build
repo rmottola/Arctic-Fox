@@ -91,3 +91,6 @@ if CONFIG['HAVE_CLOCK_MONOTONIC']:
     OS_LIBS += CONFIG['REALTIME_LIBS']
 
 JAR_MANIFESTS += ['jar.mn']
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wshadow']
