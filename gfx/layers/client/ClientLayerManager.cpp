@@ -802,6 +802,12 @@ ClientLayerManager::AsyncPanZoomEnabled() const
   return mWidget && mWidget->AsyncPanZoomEnabled();
 }
 
+void
+ClientLayerManager::SetNextPaintSyncId(int32_t aSyncId)
+{
+  mForwarder->SetPaintSyncId(aSyncId);
+}
+
 ClientLayer::~ClientLayer()
 {
   if (HasShadow()) {
