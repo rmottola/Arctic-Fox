@@ -662,7 +662,6 @@ AsyncCompositionManager::ApplyAsyncContentTransformToTree(Layer *aLayer)
     }
 
     const FrameMetrics& metrics = aLayer->GetFrameMetrics(i);
-    ScreenPoint offset(0, 0);
     // TODO: When we enable APZ on Fennec, we'll need to call SyncFrameMetrics here.
     // When doing so, it might be useful to look at how it was called here before
     // bug 1036967 removed the (dead) call.
@@ -680,9 +679,6 @@ AsyncCompositionManager::ApplyAsyncContentTransformToTree(Layer *aLayer)
 
     mIsFirstPaint = false;
     mLayersUpdated = false;
-
-    // Apply the render offset
-    mLayerManager->GetCompositor()->SetScreenRenderOffset(offset);
 
     // Transform the current local clip by this APZC's async transform. If we're
     // using containerful scrolling, then the clip is not part of the scrolled
@@ -1041,7 +1037,6 @@ AsyncCompositionManager::TransformScrollableLayer(Layer* aLayer)
   displayPort += scrollOffsetLayerPixels;
 
   LayerMargin fixedLayerMargins(0, 0, 0, 0);
-  ScreenPoint offset(0, 0);
 
   // Ideally we would initialize userZoom to AsyncPanZoomController::CalculateResolution(metrics)
   // but this causes a reftest-ipc test to fail (see bug 883646 comment 27). The reason for this
@@ -1055,12 +1050,8 @@ AsyncCompositionManager::TransformScrollableLayer(Layer* aLayer)
                                * LayerToParentLayerScale(1));
   ParentLayerPoint userScroll = metrics.GetScrollOffset() * userZoom;
   SyncViewportInfo(displayPort, geckoZoom, mLayersUpdated,
-                   userScroll, userZoom, fixedLayerMargins,
-                   offset);
+                   userScroll, userZoom, fixedLayerMargins);
   mLayersUpdated = false;
-
-  // Apply the render offset
-  mLayerManager->GetCompositor()->SetScreenRenderOffset(offset);
 
   // Handle transformations for asynchronous panning and zooming. We determine the
   // zoom used by Gecko from the transformation set on the root layer, and we
@@ -1213,8 +1204,7 @@ AsyncCompositionManager::SyncViewportInfo(const LayerIntRect& aDisplayPort,
                                           bool aLayersUpdated,
                                           ParentLayerPoint& aScrollOffset,
                                           CSSToParentLayerScale& aScale,
-                                          LayerMargin& aFixedLayerMargins,
-                                          ScreenPoint& aOffset)
+                                          LayerMargin& aFixedLayerMargins)
 {
 #ifdef MOZ_WIDGET_ANDROID
   AndroidBridge::Bridge()->SyncViewportInfo(aDisplayPort,
@@ -1222,8 +1212,7 @@ AsyncCompositionManager::SyncViewportInfo(const LayerIntRect& aDisplayPort,
                                             aLayersUpdated,
                                             aScrollOffset,
                                             aScale,
-                                            aFixedLayerMargins,
-                                            aOffset);
+                                            aFixedLayerMargins);
 #endif
 }
 
@@ -1235,14 +1224,13 @@ AsyncCompositionManager::SyncFrameMetrics(const ParentLayerPoint& aScrollOffset,
                                           const CSSRect& aDisplayPort,
                                           const CSSToLayerScale& aDisplayResolution,
                                           bool aIsFirstPaint,
-                                          LayerMargin& aFixedLayerMargins,
-                                          ScreenPoint& aOffset)
+                                          LayerMargin& aFixedLayerMargins)
 {
 #ifdef MOZ_WIDGET_ANDROID
   AndroidBridge::Bridge()->SyncFrameMetrics(aScrollOffset, aZoom, aCssPageRect,
                                             aLayersUpdated, aDisplayPort,
                                             aDisplayResolution, aIsFirstPaint,
-                                            aFixedLayerMargins, aOffset);
+                                            aFixedLayerMargins);
 #endif
 }
 
