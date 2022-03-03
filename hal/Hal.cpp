@@ -712,7 +712,7 @@ NotifyScreenConfigurationChange(const ScreenConfiguration& aScreenConfiguration)
 }
 
 bool
-LockScreenOrientation(const dom::ScreenOrientation& aOrientation)
+LockScreenOrientation(const dom::ScreenOrientationInternal& aOrientation)
 {
   AssertMainThread();
   RETURN_PROXY_IF_SANDBOXED(LockScreenOrientation(aOrientation), false);
