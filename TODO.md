@@ -121,6 +121,7 @@
 - Bug 901633
 - Bug 1155618 - Fix more out of memory handling issues r=terrence 
 - Bug 1193583 - 2015-08-31 Change the semantics of Debugger.evalInGlobal
+- Bug 1131470 - Part 3, 4, 5
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
