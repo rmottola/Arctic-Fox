@@ -3751,9 +3751,11 @@ SearchService.prototype = {
 
     if (rebuildCache) {
       LOG("_loadEngines: Absent or outdated cache. Loading engines from disk.");
-      loadDirs.forEach(this._loadEnginesFromDir, this);
+      distDirs.forEach(this._loadEnginesFromDir, this);
 
       this._loadFromChromeURLs(chromeURIs);
+
+      otherDirs.forEach(this._loadEnginesFromDir, this);
 
       this._buildCache();
       return;
