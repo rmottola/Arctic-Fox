@@ -28,8 +28,8 @@ namespace mozilla {
 namespace browser {
 
 NS_IMPL_ISUPPORTS(DirectoryProvider,
-                   nsIDirectoryServiceProvider,
-                   nsIDirectoryServiceProvider2)
+                  nsIDirectoryServiceProvider,
+                  nsIDirectoryServiceProvider2)
 
 NS_IMETHODIMP
 DirectoryProvider::GetFile(const char *aKey, bool *aPersist, nsIFile* *aResult)
