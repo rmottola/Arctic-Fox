@@ -1525,7 +1525,6 @@ RopeMatch(JSContext* cx, JSRope* text, JSLinearString* pat, int* match)
     return true;
 }
 
-
 /* ES6 draft rc4 21.1.3.7. */
 static bool
 str_includes(JSContext* cx, unsigned argc, Value* vp)
@@ -2279,8 +2278,8 @@ DoMatchLocal(JSContext* cx, const CallArgs& args, RegExpStatics* res, HandleLine
 
 /* ES5 15.5.4.10 step 8. */
 static bool
-DoMatchGlobal(JSContext* cx, const CallArgs& args, RegExpStatics* res,
-              HandleLinearString input, StringRegExpGuard& g)
+DoMatchGlobal(JSContext* cx, const CallArgs& args, RegExpStatics* res, HandleLinearString input,
+              StringRegExpGuard& g)
 {
     // Step 8a.
     //
