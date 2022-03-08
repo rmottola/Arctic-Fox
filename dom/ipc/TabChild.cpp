@@ -1893,6 +1893,12 @@ TabChild::RecvRealMouseMoveEvent(const WidgetMouseEvent& event)
 }
 
 bool
+TabChild::RecvSynthMouseMoveEvent(const WidgetMouseEvent& event)
+{
+  return RecvRealMouseButtonEvent(event);
+}
+
+bool
 TabChild::RecvRealMouseButtonEvent(const WidgetMouseEvent& event)
 {
   WidgetMouseEvent localEvent(event);
