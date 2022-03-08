@@ -108,18 +108,20 @@ this.BrowserTestUtils = {
    * @resolves The tab switched to.
    */
   switchTab(tabbrowser, tab) {
+    let promise = new Promise(resolve => {
+      tabbrowser.addEventListener("TabSwitchDone", function onSwitch() {
+        tabbrowser.removeEventListener("TabSwitchDone", onSwitch);
+        TestUtils.executeSoon(() => resolve(tabbrowser.selectedTab));
+      });
+    });
+
     if (typeof tab == "function") {
       tab();
     }
     else {
       tabbrowser.selectedTab = tab;
     }
-
-    //XXX this is esr38, we do not have e10s, this is never async, we do not pass go
-    // and do not collect, err, I mean, we continue without waiting for an event:
-    return new Promise(resolve => {
-      TestUtils.executeSoon(() => resolve(tabbrowser.selectedTab));
-    });
+    return promise;
   },
 
   /**
