@@ -204,6 +204,7 @@ nsJARChannel::nsJARChannel()
     , mOpeningRemote(false)
     , mEnsureChildFd(false)
     , mSynthesizedStreamLength(0)
+    , mForceNoIntercept(false)
 {
     if (!gJarProtocolLog)
         gJarProtocolLog = PR_NewLogModule("nsJarProtocol");
@@ -888,7 +889,7 @@ nsJARChannel::ShouldIntercept()
                                   NS_GET_IID(nsINetworkInterceptController),
                                   getter_AddRefs(controller));
     bool shouldIntercept = false;
-    if (controller) {
+    if (controller && !mForceNoIntercept) {
       bool isNavigation = mLoadFlags & LOAD_DOCUMENT_URI;
       nsresult rv = controller->ShouldPrepareForIntercept(mAppURI,
                                                           isNavigation,
@@ -1117,6 +1118,13 @@ NS_IMETHODIMP
 nsJARChannel::EnsureChildFd()
 {
     mEnsureChildFd = true;
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsJARChannel::ForceNoIntercept()
+{
+    mForceNoIntercept = true;
     return NS_OK;
 }
 
