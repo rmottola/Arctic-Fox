@@ -8,7 +8,6 @@
 
 #include "TabChild.h"
 
-#include "AudioChannelService.h"
 #include "gfxPrefs.h"
 #ifdef ACCESSIBILITY
 #include "mozilla/a11y/DocAccessibleChild.h"
@@ -604,7 +603,6 @@ TabChild::TabChild(nsIContentChild* aManager,
   , mDefaultScale(0)
   , mIPCOpen(true)
   , mParentIsActive(false)
-  , mAudioChannelActive(false)
 {
   // In the general case having the TabParent tell us if APZ is enabled or not
   // doesn't really work because the TabParent itself may not have a reference
@@ -633,6 +631,10 @@ TabChild::TabChild(nsIContentChild* aManager,
 
       observerService->AddObserver(this, topic.get(), false);
     }
+  }
+
+  for (uint32_t idx = 0; idx < NUMBER_OF_AUDIO_CHANNELS; idx++) {
+    mAudioChannelsActive.AppendElement(false);
   }
 }
 
@@ -717,8 +719,8 @@ TabChild::Observe(nsISupports *aSubject,
 
     nsAutoString activeStr(aData);
     bool active = activeStr.EqualsLiteral("active");
-    if (active != mAudioChannelActive) {
-      mAudioChannelActive = active;
+    if (active != mAudioChannelsActive[audioChannel]) {
+      mAudioChannelsActive[audioChannel] = active;
       unused << SendAudioChannelActivityNotification(audioChannel, active);
     }
   }
@@ -758,7 +760,7 @@ TabChild::Init()
 
   nsCOMPtr<nsIDocShellTreeItem> docShellItem(do_QueryInterface(WebNavigation()));
   docShellItem->SetItemType(nsIDocShellTreeItem::typeContentWrapper);
-  
+
   nsCOMPtr<nsIBaseWindow> baseWindow = do_QueryInterface(WebNavigation());
   if (!baseWindow) {
     NS_ERROR("mWebNav doesn't QI to nsIBaseWindow");
@@ -1893,6 +1895,12 @@ TabChild::RecvRealMouseMoveEvent(const WidgetMouseEvent& event)
 }
 
 bool
+TabChild::RecvSynthMouseMoveEvent(const WidgetMouseEvent& event)
+{
+  return RecvRealMouseButtonEvent(event);
+}
+
+bool
 TabChild::RecvRealMouseButtonEvent(const WidgetMouseEvent& event)
 {
   WidgetMouseEvent localEvent(event);
@@ -2971,12 +2979,12 @@ TabChild::RecvRequestNotifyAfterRemotePaint()
 }
 
 bool
-TabChild::RecvUIResolutionChanged()
+TabChild::RecvUIResolutionChanged(const float& aDpi, const double& aScale)
 {
   ScreenIntSize oldScreenSize = GetInnerSize();
   mDPI = 0;
   mDefaultScale = 0;
-  static_cast<PuppetWidget*>(mPuppetWidget.get())->ClearBackingScaleCache();
+  static_cast<PuppetWidget*>(mPuppetWidget.get())->UpdateBackingScaleCache(aDpi, aScale);
   nsCOMPtr<nsIDocument> document(GetDocument());
   nsCOMPtr<nsIPresShell> presShell = document->GetShell();
   if (presShell) {

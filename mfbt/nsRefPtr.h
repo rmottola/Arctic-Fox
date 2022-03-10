@@ -7,18 +7,6 @@
 #ifndef mozilla_nsRefPtr_h
 #define mozilla_nsRefPtr_h
 
-#if defined(_MSC_VER) && _MSC_VER >= 1900
-#  define MOZ_HAVE_REF_QUALIFIERS
-#elif defined(__clang__)
-// All supported Clang versions
-#  define MOZ_HAVE_REF_QUALIFIERS
-#elif defined(__GNUC__)
-#  include "mozilla/Compiler.h"
-#  if MOZ_GCC_VERSION_AT_LEAST(4, 8, 1)
-#    define MOZ_HAVE_REF_QUALIFIERS
-#  endif
-#endif
-
 #include "mozilla/AlreadyAddRefed.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
@@ -31,6 +19,7 @@ class nsCOMPtr_helper;
 
 namespace mozilla {
 template<class T> class OwningNonNull;
+template<class T> class RefPtr;
 } // namespace mozilla
 
 template <class T>
@@ -44,13 +33,6 @@ private:
       AddRefTraits<T>::AddRef(aRawPtr);
     }
     assign_assuming_AddRef(aRawPtr);
-  }
-
-  void**
-  begin_assignment()
-  {
-    assign_assuming_AddRef(0);
-    return reinterpret_cast<void**>(&mRawPtr);
   }
 
   void
@@ -146,6 +128,10 @@ public:
   template<class U>
   MOZ_IMPLICIT nsRefPtr(const mozilla::OwningNonNull<U>& aOther);
 
+  // Defined in RefPtr.h
+  template<class U>
+  MOZ_IMPLICIT nsRefPtr(mozilla::RefPtr<U>&& aOther);
+
   // Assignment operators
 
   nsRefPtr<T>&
@@ -205,6 +191,11 @@ public:
   template<class U>
   nsRefPtr<T>&
   operator=(const mozilla::OwningNonNull<U>& aOther);
+
+  // Defined in RefPtr.h
+  template<class U>
+  nsRefPtr<T>&
+  operator=(mozilla::RefPtr<U>&& aOther);
 
   // Other pointer operators
 
@@ -308,9 +299,10 @@ public:
         mFunction(aFunction)
     {
     }
-    R operator()(Args... aArgs)
+    template<typename... ActualArgs>
+    R operator()(ActualArgs&&... aArgs)
     {
-      return ((*mRawPtr).*mFunction)(mozilla::Forward<Args>(aArgs)...);
+      return ((*mRawPtr).*mFunction)(mozilla::Forward<ActualArgs>(aArgs)...);
     }
   };
 
@@ -557,42 +549,34 @@ operator!=(U* aLhs, const nsRefPtr<T>& aRhs)
   return const_cast<const U*>(aLhs) != static_cast<const T*>(aRhs.get());
 }
 
-namespace detail {
-class nsRefPtrZero;
-}
-
-// Comparing an |nsRefPtr| to |0|
+// Comparing an |nsRefPtr| to |nullptr|
 
 template <class T>
 inline bool
-operator==(const nsRefPtr<T>& aLhs, ::detail::nsRefPtrZero* aRhs)
-// specifically to allow |smartPtr == 0|
+operator==(const nsRefPtr<T>& aLhs, decltype(nullptr))
 {
-  return static_cast<const void*>(aLhs.get()) == reinterpret_cast<const void*>(aRhs);
+  return aLhs.get() == nullptr;
 }
 
 template <class T>
 inline bool
-operator==(::detail::nsRefPtrZero* aLhs, const nsRefPtr<T>& aRhs)
-// specifically to allow |0 == smartPtr|
+operator==(decltype(nullptr), const nsRefPtr<T>& aRhs)
 {
-  return reinterpret_cast<const void*>(aLhs) == static_cast<const void*>(aRhs.get());
+  return nullptr == aRhs.get();
 }
 
 template <class T>
 inline bool
-operator!=(const nsRefPtr<T>& aLhs, ::detail::nsRefPtrZero* aRhs)
-// specifically to allow |smartPtr != 0|
+operator!=(const nsRefPtr<T>& aLhs, decltype(nullptr))
 {
-  return static_cast<const void*>(aLhs.get()) != reinterpret_cast<const void*>(aRhs);
+  return aLhs.get() != nullptr;
 }
 
 template <class T>
 inline bool
-operator!=(::detail::nsRefPtrZero* aLhs, const nsRefPtr<T>& aRhs)
-// specifically to allow |0 != smartPtr|
+operator!=(decltype(nullptr), const nsRefPtr<T>& aRhs)
 {
-  return reinterpret_cast<const void*>(aLhs) != static_cast<const void*>(aRhs.get());
+  return nullptr != aRhs.get();
 }
 
 /*****************************************************************************/
@@ -605,8 +589,25 @@ do_AddRef(T*&& aObj)
   return ref.forget();
 }
 
-#ifdef MOZ_HAVE_REF_QUALIFIERS
-#undef MOZ_HAVE_REF_QUALIFIERS
-#endif
+namespace mozilla {
+
+/**
+ * Helper function to be able to conveniently write things like:
+ *
+ *   already_AddRefed<T>
+ *   f(...)
+ *   {
+ *     return MakeAndAddRef<T>(...);
+ *   }
+ */
+template<typename T, typename... Args>
+already_AddRefed<T>
+MakeAndAddRef(Args&&... aArgs)
+{
+  nsRefPtr<T> p(new T(Forward<Args>(aArgs)...));
+  return p.forget();
+}
+
+} // namespace mozilla
 
 #endif /* mozilla_nsRefPtr_h */

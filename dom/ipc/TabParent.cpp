@@ -1095,7 +1095,11 @@ TabParent::UIResolutionChanged()
     // mDPI being greater than 0, so this invalidates it.
     mDPI = -1;
     TryCacheDPIAndScale();
-    unused << SendUIResolutionChanged();
+    // If mDPI was set to -1 to invalidate it and then TryCacheDPIAndScale
+    // fails to cache the values, then mDefaultScale.scale might be invalid.
+    // We don't want to send that value to content. Just send -1 for it too in
+    // that case.
+    unused << SendUIResolutionChanged(mDPI, mDPI < 0 ? -1.0 : mDefaultScale.scale);
   }
 }
 
@@ -1394,7 +1398,11 @@ bool TabParent::SendRealMouseEvent(WidgetMouseEvent& event)
   }
 
   if (NS_MOUSE_MOVE == event.mMessage) {
-    return SendRealMouseMoveEvent(event);
+    if (event.reason == WidgetMouseEvent::eSynthesized) {
+      return SendSynthMouseMoveEvent(event);
+    } else {
+      return SendRealMouseMoveEvent(event);
+    }
   }
   return SendRealMouseButtonEvent(event);
 }

@@ -34,6 +34,7 @@
 #include "mozilla/layers/CompositorTypes.h"
 #include "nsIWebBrowserChrome3.h"
 #include "mozilla/dom/ipc/IdType.h"
+#include "AudioChannelService.h"
 #include "PuppetWidget.h"
 
 class nsICachedFileDescriptorListener;
@@ -42,22 +43,22 @@ class nsIDOMWindowUtils;
 namespace mozilla {
 namespace layout {
 class RenderFrameChild;
-}
+} // namespace layout
 
 namespace layers {
 class APZEventState;
 class ImageCompositeNotification;
 struct SetTargetAPZCCallback;
 struct SetAllowedTouchBehaviorCallback;
-}
+} // namespace layers
 
 namespace widget {
 struct AutoCacheNativeKeyCommands;
-}
+} // namespace widget
 
 namespace plugins {
 class PluginWidgetChild;
-}
+} // namespace plugins
 
 namespace dom {
 
@@ -241,7 +242,7 @@ public:
     static already_AddRefed<TabChild> FindTabChild(const TabId& aTabId);
 
 public:
-    /** 
+    /**
      * This is expected to be called off the critical path to content
      * startup.  This is an opportunity to load things that are slow
      * on the critical path.
@@ -333,6 +334,7 @@ public:
                                 const int32_t&  aModifiers,
                                 const bool&     aIgnoreRootScrollFrame) override;
     virtual bool RecvRealMouseMoveEvent(const mozilla::WidgetMouseEvent& event) override;
+    virtual bool RecvSynthMouseMoveEvent(const mozilla::WidgetMouseEvent& event) override;
     virtual bool RecvRealMouseButtonEvent(const mozilla::WidgetMouseEvent& event) override;
     virtual bool RecvRealDragEvent(const WidgetDragEvent& aEvent,
                                    const uint32_t& aDragAction,
@@ -471,7 +473,7 @@ public:
       return GetFrom(docShell);
     }
 
-    virtual bool RecvUIResolutionChanged() override;
+    virtual bool RecvUIResolutionChanged(const float& aDpi, const double& aScale) override;
 
     virtual bool RecvThemeChanged(nsTArray<LookAndFeelInt>&& aLookAndFeelIntCache) override;
 
@@ -645,9 +647,10 @@ private:
     double mDefaultScale;
     bool mIPCOpen;
     bool mParentIsActive;
-    bool mAudioChannelActive;
     bool mAsyncPanZoomEnabled;
     CSSSize mUnscaledInnerSize;
+
+    nsAutoTArray<bool, NUMBER_OF_AUDIO_CHANNELS> mAudioChannelsActive;
 
     DISALLOW_EVIL_CONSTRUCTORS(TabChild);
 };
