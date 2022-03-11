@@ -117,7 +117,7 @@ GetXrayType(JSObject* obj)
 }
 
 JSObject*
-XrayAwareCalleeGlobal(JSObject *fun)
+XrayAwareCalleeGlobal(JSObject* fun)
 {
   MOZ_ASSERT(js::IsFunctionObject(fun));
 
@@ -137,7 +137,7 @@ XrayAwareCalleeGlobal(JSObject *fun)
       js::GetFunctionNativeReserved(fun, XRAY_DOM_FUNCTION_PARENT_WRAPPER_SLOT);
   MOZ_ASSERT(IsXrayWrapper(&v.toObject()));
 
-  JSObject *xrayTarget = js::UncheckedUnwrap(&v.toObject());
+  JSObject* xrayTarget = js::UncheckedUnwrap(&v.toObject());
   return js::GetGlobalForObjectCrossCompartment(xrayTarget);
 }
 
@@ -588,7 +588,7 @@ JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
 }
 
 bool
-JSXrayTraits::delete_(JSContext *cx, HandleObject wrapper, HandleId id, ObjectOpResult &result)
+JSXrayTraits::delete_(JSContext* cx, HandleObject wrapper, HandleId id, ObjectOpResult& result)
 {
     RootedObject holder(cx, ensureHolder(cx, wrapper));
 
@@ -611,11 +611,11 @@ JSXrayTraits::delete_(JSContext *cx, HandleObject wrapper, HandleId id, ObjectOp
 }
 
 bool
-JSXrayTraits::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
+JSXrayTraits::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
                              Handle<JSPropertyDescriptor> desc,
                              Handle<JSPropertyDescriptor> existingDesc,
-                             ObjectOpResult &result,
-                             bool *defined)
+                             ObjectOpResult& result,
+                             bool* defined)
 {
     *defined = false;
     RootedObject holder(cx, ensureHolder(cx, wrapper));
@@ -1054,7 +1054,7 @@ XrayTraits::cloneExpandoChain(JSContext* cx, HandleObject dst, HandleObject src)
     // preserved when expandos were originally added to |src|. Assert the
     // wrapper for |src| has been preserved if it has expandos set.
     if (oldHead) {
-        nsISupports *identity = mozilla::dom::UnwrapDOMObjectToISupports(src);
+        nsISupports* identity = mozilla::dom::UnwrapDOMObjectToISupports(src);
         if (identity) {
             nsWrapperCache* cache = nullptr;
             CallQueryInterface(identity, &cache);
@@ -1235,7 +1235,7 @@ XPCWrappedNativeXrayTraits::resolveNativeProperty(JSContext* cx, HandleObject wr
         if (id != nsXPConnect::GetRuntimeInstance()->GetStringID(XPCJSRuntime::IDX_TO_STRING))
             return true;
 
-        JSFunction *toString = JS_NewFunction(cx, XrayToString, 0, 0, "toString");
+        JSFunction* toString = JS_NewFunction(cx, XrayToString, 0, 0, "toString");
         if (!toString)
             return false;
 
@@ -1433,10 +1433,10 @@ XPCWrappedNativeXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsW
 }
 
 bool
-XPCWrappedNativeXrayTraits::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
+XPCWrappedNativeXrayTraits::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
                                            Handle<JSPropertyDescriptor> desc,
                                            Handle<JSPropertyDescriptor> existingDesc,
-                                           JS::ObjectOpResult &result, bool *defined)
+                                           JS::ObjectOpResult& result, bool* defined)
 {
     *defined = false;
     RootedObject holder(cx, singleton.ensureHolder(cx, wrapper));
@@ -1593,10 +1593,10 @@ DOMXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper, Handl
 }
 
 bool
-DOMXrayTraits::defineProperty(JSContext *cx, HandleObject wrapper, HandleId id,
+DOMXrayTraits::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
                               Handle<JSPropertyDescriptor> desc,
                               Handle<JSPropertyDescriptor> existingDesc,
-                              JS::ObjectOpResult &result, bool *defined)
+                              JS::ObjectOpResult& result, bool* defined)
 {
     // Check for an indexed property on a Window.  If that's happening, do
     // nothing but claim we defined it so it won't get added as an expando.
@@ -1676,7 +1676,7 @@ DOMXrayTraits::construct(JSContext* cx, HandleObject wrapper,
 }
 
 bool
-DOMXrayTraits::getPrototype(JSContext *cx, JS::HandleObject wrapper,
+DOMXrayTraits::getPrototype(JSContext* cx, JS::HandleObject wrapper,
                             JS::HandleObject target,
                             JS::MutableHandleObject protop)
 {
@@ -1807,8 +1807,8 @@ XrayToString(JSContext* cx, unsigned argc, Value* vp)
 
 template <typename Base, typename Traits>
 bool
-XrayWrapper<Base, Traits>::preventExtensions(JSContext *cx, HandleObject wrapper,
-                                             ObjectOpResult &result) const
+XrayWrapper<Base, Traits>::preventExtensions(JSContext* cx, HandleObject wrapper,
+                                             ObjectOpResult& result) const
 {
     // Xray wrappers are supposed to provide a clean view of the target
     // reflector, hiding any modifications by script in the target scope.  So
@@ -1948,7 +1948,7 @@ XrayWrapper<Base, Traits>::getOwnPropertyDescriptor(JSContext* cx, HandleObject 
 // to the content object. This is ok, because the the expando object is only
 // ever accessed by code across the compartment boundary.
 static bool
-RecreateLostWaivers(JSContext *cx, const JSPropertyDescriptor *orig,
+RecreateLostWaivers(JSContext* cx, const JSPropertyDescriptor* orig,
                     MutableHandle<JSPropertyDescriptor> wrapped)
 {
     // Compute whether the original objects were waived, and implicitly, whether
@@ -1992,9 +1992,9 @@ RecreateLostWaivers(JSContext *cx, const JSPropertyDescriptor *orig,
 
 template <typename Base, typename Traits>
 bool
-XrayWrapper<Base, Traits>::defineProperty(JSContext *cx, HandleObject wrapper,
+XrayWrapper<Base, Traits>::defineProperty(JSContext* cx, HandleObject wrapper,
                                           HandleId id, Handle<JSPropertyDescriptor> desc,
-                                          ObjectOpResult &result) const
+                                          ObjectOpResult& result) const
 {
     assertEnteredPolicy(cx, wrapper, id, BaseProxyHandler::SET);
 
@@ -2066,7 +2066,7 @@ XrayWrapper<Base, Traits>::ownPropertyKeys(JSContext* cx, HandleObject wrapper,
 template <typename Base, typename Traits>
 bool
 XrayWrapper<Base, Traits>::delete_(JSContext* cx, HandleObject wrapper,
-                                   HandleId id, ObjectOpResult &result) const
+                                   HandleId id, ObjectOpResult& result) const
 {
     assertEnteredPolicy(cx, wrapper, id, BaseProxyHandler::SET);
 
@@ -2191,7 +2191,7 @@ XrayWrapper<Base, Traits>::defaultValue(JSContext* cx, HandleObject wrapper,
 
 template <typename Base, typename Traits>
 bool
-XrayWrapper<Base, Traits>::getPrototype(JSContext *cx, JS::HandleObject wrapper,
+XrayWrapper<Base, Traits>::getPrototype(JSContext* cx, JS::HandleObject wrapper,
                                         JS::MutableHandleObject protop) const
 {
     // We really only want this override for non-SecurityWrapper-inheriting
@@ -2224,8 +2224,8 @@ XrayWrapper<Base, Traits>::getPrototype(JSContext *cx, JS::HandleObject wrapper,
 
 template <typename Base, typename Traits>
 bool
-XrayWrapper<Base, Traits>::setPrototype(JSContext *cx, JS::HandleObject wrapper,
-                                        JS::HandleObject proto, JS::ObjectOpResult &result) const
+XrayWrapper<Base, Traits>::setPrototype(JSContext* cx, JS::HandleObject wrapper,
+                                        JS::HandleObject proto, JS::ObjectOpResult& result) const
 {
     // Do this only for non-SecurityWrapper-inheriting |Base|. See the comment
     // in getPrototype().
