@@ -1158,7 +1158,7 @@ public:
     nsresult rv =
       event->InitMessageEvent(NS_LITERAL_STRING("message"),
                               false /* non-bubbling */,
-                              true /* cancelable */,
+                              false /* non-cancelable */,
                               messageData,
                               EmptyString(),
                               EmptyString(),
