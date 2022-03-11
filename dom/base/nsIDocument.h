@@ -135,7 +135,9 @@ class MediaQueryList;
 class GlobalObject;
 class NodeFilter;
 class NodeIterator;
+enum class OrientationType : uint32_t;
 class ProcessingInstruction;
+class Promise;
 class Selection;
 class StyleSheetList;
 class SVGDocument;
@@ -1213,6 +1215,14 @@ public:
 
   static void UnlockPointer(nsIDocument* aDoc = nullptr);
 
+  // ScreenOrientation related APIs
+
+  virtual void SetCurrentOrientation(mozilla::dom::OrientationType aType,
+                                     uint16_t aAngle) = 0;
+  virtual uint16_t CurrentOrientationAngle() const = 0;
+  virtual mozilla::dom::OrientationType CurrentOrientationType() const = 0;
+  virtual void SetOrientationPendingPromise(mozilla::dom::Promise* aPromise) = 0;
+  virtual mozilla::dom::Promise* GetOrientationPendingPromise() const = 0;
 
   //----------------------------------------------------------------------
 
