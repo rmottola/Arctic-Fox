@@ -1950,11 +1950,10 @@ WebSocketImpl::ParseURL(const nsAString& aURL)
     }
   }
 
-  mWebSocket->mOriginalURL = aURL;
-
   rv = parsedURL->GetSpec(mURI);
   MOZ_ASSERT(NS_SUCCEEDED(rv));
 
+  CopyUTF8toUTF16(mURI, mWebSocket->mURI);
   return NS_OK;
 }
 
@@ -2213,7 +2212,7 @@ WebSocket::GetUrl(nsAString& aURL)
   AssertIsOnTargetThread();
 
   if (mEffectiveURL.IsEmpty()) {
-    aURL = mOriginalURL;
+    aURL = mURI;
   } else {
     aURL = mEffectiveURL;
   }
@@ -2444,7 +2443,7 @@ WebSocketImpl::GetName(nsACString& aName)
 {
   AssertIsOnMainThread();
 
-  CopyUTF16toUTF8(mWebSocket->mOriginalURL, aName);
+  CopyUTF16toUTF8(mWebSocket->mURI, aName);
   return NS_OK;
 }
 
