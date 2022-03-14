@@ -27,6 +27,7 @@
 #include "nsString.h"
 #include "nsTArray.h"
 #include "nsThreadUtils.h"
+#include "nsTObserverArray.h"
 #include "mozilla/dom/StructuredCloneTags.h"
 
 #include "Queue.h"
@@ -927,7 +928,7 @@ class WorkerPrivate : public WorkerPrivateParent<WorkerPrivate>
   nsRefPtr<WorkerGlobalScope> mScope;
   nsRefPtr<WorkerDebuggerGlobalScope> mDebuggerScope;
   nsTArray<ParentType*> mChildWorkers;
-  nsTArray<WorkerFeature*> mFeatures;
+  nsTObserverArray<WorkerFeature*> mFeatures;
   nsTArray<nsAutoPtr<TimeoutInfo>> mTimeouts;
   uint32_t mDebuggerEventLoopLevel;
 
