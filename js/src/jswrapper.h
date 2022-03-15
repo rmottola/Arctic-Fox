@@ -239,7 +239,7 @@ class JS_FRIEND_API(SecurityWrapper) : public Base
     virtual bool defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
                                 Handle<JSPropertyDescriptor> desc,
                                 ObjectOpResult& result) const override;
-    virtual bool isExtensible(JSContext* cx, HandleObject wrapper, bool *extensible) const override;
+    virtual bool isExtensible(JSContext* cx, HandleObject wrapper, bool* extensible) const override;
     virtual bool preventExtensions(JSContext* cx, HandleObject wrapper,
                                    ObjectOpResult& result) const override;
     virtual bool setPrototype(JSContext* cx, HandleObject proxy, HandleObject proto,

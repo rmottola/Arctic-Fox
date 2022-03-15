@@ -42,7 +42,6 @@ RegionAtAddr(const JitcodeGlobalEntry::IonEntry& entry, void* ptr,
     return entry.regionTable()->regionEntry(regionIdx);
 }
 
-
 void*
 JitcodeGlobalEntry::IonEntry::canonicalNativeAddrFor(JSRuntime* rt, void* ptr) const
 {
@@ -242,7 +241,6 @@ JitcodeGlobalEntry::IonCacheEntry::callStackAtAddr(JSRuntime* rt, void* ptr,
                                                    uint32_t* depth) const
 {
     JitcodeGlobalEntry entry;
-
     RejoinEntry(rt, *this, ptr, &entry);
     return entry.callStackAtAddr(rt, rejoinAddr(), results, depth);
 }
@@ -253,7 +251,6 @@ JitcodeGlobalEntry::IonCacheEntry::callStackAtAddr(JSRuntime* rt, void* ptr,
                                                    uint32_t maxResults) const
 {
     JitcodeGlobalEntry entry;
-
     RejoinEntry(rt, *this, ptr, &entry);
     return entry.callStackAtAddr(rt, rejoinAddr(), results, maxResults);
 }
@@ -267,6 +264,7 @@ JitcodeGlobalEntry::IonCacheEntry::youngestFrameLocationAtAddr(JSRuntime* rt, vo
     RejoinEntry(rt, *this, ptr, &entry);
     return entry.youngestFrameLocationAtAddr(rt, rejoinAddr(), script, pc);
 }
+
 
 static int ComparePointers(const void* a, const void* b) {
     const uint8_t* a_ptr = reinterpret_cast<const uint8_t*>(a);

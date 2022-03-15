@@ -1098,7 +1098,7 @@ class TypedRegisterIterator
     { }
     explicit TypedRegisterIterator(LiveSet<TypedRegisterSet<T>> regset) : regset_(regset)
     { }
-    TypedRegisterIterator(const TypedRegisterIterator &other) : regset_(other.regset_)
+    TypedRegisterIterator(const TypedRegisterIterator& other) : regset_(other.regset_)
     { }
 
     bool more() const {

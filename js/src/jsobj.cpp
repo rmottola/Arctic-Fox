@@ -271,7 +271,6 @@ js::Throw(JSContext* cx, JSObject* obj, unsigned errorNumber)
 }
 
 
-
 /*** PropertyDescriptor operations and DefineProperties ******************************************/
 
 bool
