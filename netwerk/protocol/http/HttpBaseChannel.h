@@ -138,6 +138,7 @@ public:
   NS_IMETHOD GetRequestHeader(const nsACString& aHeader, nsACString& aValue) override;
   NS_IMETHOD SetRequestHeader(const nsACString& aHeader,
                               const nsACString& aValue, bool aMerge) override;
+  NS_IMETHOD SetEmptyRequestHeader(const nsACString& aHeader) override;
   NS_IMETHOD VisitRequestHeaders(nsIHttpHeaderVisitor *visitor) override;
   NS_IMETHOD GetResponseHeader(const nsACString &header, nsACString &value) override;
   NS_IMETHOD SetResponseHeader(const nsACString& header,
@@ -262,6 +263,10 @@ public: /* Necko internal use only... */
     nsresult DoApplyContentConversions(nsIStreamListener *aNextListener,
                                        nsIStreamListener **aNewNextListener);
 
+    // Callback on main thread when NS_AsyncCopy() is finished populating
+    // the new mUploadStream.
+    void EnsureUploadStreamIsCloneableComplete(nsresult aStatus);
+
 protected:
   nsCOMArray<nsISecurityConsoleMessage> mSecurityConsoleMessages;
 
@@ -323,6 +328,7 @@ protected:
 
   nsHttpRequestHead                 mRequestHead;
   nsCOMPtr<nsIInputStream>          mUploadStream;
+  nsCOMPtr<nsIRunnable>             mUploadCloneableCallback;
   nsAutoPtr<nsHttpResponseHead>     mResponseHead;
   nsRefPtr<nsHttpConnectionInfo>    mConnectionInfo;
   nsCOMPtr<nsIProxyInfo>            mProxyInfo;

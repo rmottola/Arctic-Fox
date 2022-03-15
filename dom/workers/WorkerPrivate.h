@@ -27,6 +27,7 @@
 #include "nsString.h"
 #include "nsTArray.h"
 #include "nsThreadUtils.h"
+#include "nsTObserverArray.h"
 #include "mozilla/dom/StructuredCloneTags.h"
 
 #include "Queue.h"
@@ -927,7 +928,7 @@ class WorkerPrivate : public WorkerPrivateParent<WorkerPrivate>
   nsRefPtr<WorkerGlobalScope> mScope;
   nsRefPtr<WorkerDebuggerGlobalScope> mDebuggerScope;
   nsTArray<ParentType*> mChildWorkers;
-  nsTArray<WorkerFeature*> mFeatures;
+  nsTObserverArray<WorkerFeature*> mFeatures;
   nsTArray<nsAutoPtr<TimeoutInfo>> mTimeouts;
   uint32_t mDebuggerEventLoopLevel;
 
@@ -1519,10 +1520,7 @@ enum WorkerStructuredDataType
 };
 
 const JSStructuredCloneCallbacks*
-WorkerStructuredCloneCallbacks(bool aMainRuntime);
-
-const JSStructuredCloneCallbacks*
-ChromeWorkerStructuredCloneCallbacks(bool aMainRuntime);
+WorkerStructuredCloneCallbacks();
 
 class AutoSyncLoopHolder
 {
@@ -1564,6 +1562,30 @@ public:
   {
     return mTarget;
   }
+};
+
+class TimerThreadEventTarget final : public nsIEventTarget
+{
+  ~TimerThreadEventTarget();
+
+  WorkerPrivate* mWorkerPrivate;
+  nsRefPtr<WorkerRunnable> mWorkerRunnable;
+public:
+  NS_DECL_THREADSAFE_ISUPPORTS
+
+  TimerThreadEventTarget(WorkerPrivate* aWorkerPrivate,
+                         WorkerRunnable* aWorkerRunnable);
+
+protected:
+  NS_IMETHOD
+  DispatchFromScript(nsIRunnable* aRunnable, uint32_t aFlags) override;
+
+
+  NS_IMETHOD
+  Dispatch(already_AddRefed<nsIRunnable>&& aRunnable, uint32_t aFlags) override;
+
+  NS_IMETHOD
+  IsOnCurrentThread(bool* aIsOnCurrentThread) override;
 };
 
 END_WORKERS_NAMESPACE

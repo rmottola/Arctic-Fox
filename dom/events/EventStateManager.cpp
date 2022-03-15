@@ -3140,12 +3140,31 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
         }
         case WheelPrefs::ACTION_NONE:
         default:
-          // If we don't handle the wheel event, all of the delta values must
-          // be overflown delta values.
+          bool allDeltaOverflown = false;
+          if (wheelEvent->mFlags.mHandledByAPZ) {
+            if (wheelEvent->mCanTriggerSwipe) {
+              // For events that can trigger swipes, APZ needs to know whether
+              // scrolling is possible in the requested direction. It does this
+              // by looking at the scroll overflow values on mCanTriggerSwipe
+              // events after they have been processed.
+              allDeltaOverflown =
+                !ComputeScrollTarget(aTargetFrame, wheelEvent,
+                                     COMPUTE_DEFAULT_ACTION_TARGET);
+            }
+          } else {
+            // The event was processed neither by APZ nor by us, so all of the
+            // delta values must be overflown delta values.
+            allDeltaOverflown = true;
+          }
+
+          if (!allDeltaOverflown) {
+            break;
+          }
           wheelEvent->overflowDeltaX = wheelEvent->deltaX;
           wheelEvent->overflowDeltaY = wheelEvent->deltaY;
           WheelPrefs::GetInstance()->
             CancelApplyingUserPrefsFromOverflowDelta(wheelEvent);
+          wheelEvent->mViewPortIsOverscrolled = true;
           break;
       }
       *aStatus = nsEventStatus_eConsumeNoDefault;
@@ -5617,7 +5636,8 @@ EventStateManager::WheelPrefs::HasUserPrefsForDelta(WidgetWheelEvent* aEvent)
 bool
 EventStateManager::WheelEventIsScrollAction(WidgetWheelEvent* aEvent)
 {
-  return WheelPrefs::GetInstance()->ComputeActionFor(aEvent) == WheelPrefs::ACTION_SCROLL;
+  return aEvent->mMessage == NS_WHEEL_WHEEL &&
+         WheelPrefs::GetInstance()->ComputeActionFor(aEvent) == WheelPrefs::ACTION_SCROLL;
 }
 
 bool

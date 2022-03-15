@@ -118,7 +118,7 @@ public:
     }
 
     already_AddRefed<nsILoadContext> GetLoadContext();
-
+    already_AddRefed<nsIWidget> GetTopLevelWidget();
     nsIXULBrowserWindow* GetXULBrowserWindow();
 
     void Destroy();
@@ -220,12 +220,16 @@ public:
     virtual bool RecvGetDefaultScale(double* aValue) override;
     virtual bool RecvGetMaxTouchPoints(uint32_t* aTouchPoints) override;
     virtual bool RecvGetWidgetNativeData(WindowsHandle* aValue) override;
+    virtual bool RecvSetNativeChildOfShareableWindow(const uintptr_t& childWindow) override;
+    virtual bool RecvDispatchFocusToTopLevelWindow() override;
     virtual bool RecvZoomToRect(const uint32_t& aPresShellId,
                                 const ViewID& aViewId,
                                 const CSSRect& aRect) override;
     virtual bool RecvUpdateZoomConstraints(const uint32_t& aPresShellId,
                                            const ViewID& aViewId,
                                            const MaybeZoomConstraints& aConstraints) override;
+    virtual bool RecvRespondStartSwipeEvent(const uint64_t& aInputBlockId,
+                                            const bool& aStartSwipe) override;
     virtual bool RecvContentReceivedInputBlock(const ScrollableLayerGuid& aGuid,
                                                const uint64_t& aInputBlockId,
                                                const bool& aPreventDefault) override;
@@ -479,7 +483,7 @@ protected:
 
     nsIntRect mRect;
     ScreenIntSize mDimensions;
-    ScreenOrientation mOrientation;
+    ScreenOrientationInternal mOrientation;
     float mDPI;
     CSSToLayoutDeviceScale mDefaultScale;
     bool mUpdatedDimensions;
@@ -607,6 +611,8 @@ private:
     nsRefPtr<nsIPresShell> mPresShellWithRefreshListener;
 
     bool mHasContentOpener;
+
+    DebugOnly<int32_t> mActiveSupressDisplayportCount;
 private:
     // This is used when APZ needs to find the TabParent associated with a layer
     // to dispatch events.

@@ -317,7 +317,9 @@ static const DWORD kEventTimeHalfRange = kEventTimeRange / 2;
  *
  **************************************************************/
 
-nsWindow::nsWindow() : nsWindowBase()
+nsWindow::nsWindow()
+  : nsWindowBase()
+  , mResizeState(NOT_RESIZING)
 {
   mIconSmall            = nullptr;
   mIconBig              = nullptr;
@@ -1629,7 +1631,8 @@ NS_METHOD nsWindow::PlaceBehind(nsTopLevelWidgetZPlacement aPlacement,
 }
 
 // Maximize, minimize or restore the window.
-NS_IMETHODIMP nsWindow::SetSizeMode(int32_t aMode) {
+NS_IMETHODIMP
+nsWindow::SetSizeMode(nsSizeMode aMode) {
 
   nsresult rv;
 
@@ -2959,8 +2962,16 @@ nsWindow::PrepareForFullscreenTransition(nsISupports** aData)
 {
   FullscreenTransitionInitData initData;
   nsCOMPtr<nsIScreen> screen = GetWidgetScreen();
-  screen->GetRectDisplayPix(&initData.mBounds.x, &initData.mBounds.y,
-                            &initData.mBounds.width, &initData.mBounds.height);
+  int32_t x, y, width, height;
+  screen->GetRectDisplayPix(&x, &y, &width, &height);
+  MOZ_ASSERT(BoundsUseDisplayPixels(),
+             "Should only be called on top-level window");
+  CSSToLayoutDeviceScale scale = GetDefaultScale();
+  initData.mBounds.x = NSToIntRound(x * scale.scale);
+  initData.mBounds.y = NSToIntRound(y * scale.scale);
+  initData.mBounds.width = NSToIntRound(width * scale.scale);
+  initData.mBounds.height = NSToIntRound(height * scale.scale);
+
   // Create a semaphore for synchronizing the window handle which will
   // be created by the transition thread and used by the main thread for
   // posting the transition messages.
@@ -3104,24 +3115,31 @@ void* nsWindow::GetNativeData(uint32_t aDataType)
   return nullptr;
 }
 
+static void
+SetChildStyleAndParent(HWND aChildWindow, HWND aParentWindow)
+{
+    // Make sure the window is styled to be a child window.
+    LONG_PTR style = GetWindowLongPtr(aChildWindow, GWL_STYLE);
+    style |= WS_CHILD;
+    style &= ~WS_POPUP;
+    SetWindowLongPtr(aChildWindow, GWL_STYLE, style);
+
+    // Do the reparenting. Note that this call will probably cause a sync native
+    // message to the process that owns the child window.
+    ::SetParent(aChildWindow, aParentWindow);
+}
+
 void
 nsWindow::SetNativeData(uint32_t aDataType, uintptr_t aVal)
 {
   switch (aDataType) {
     case NS_NATIVE_CHILD_WINDOW:
-      {
-        HWND childWindow = reinterpret_cast<HWND>(aVal);
-
-        // Make sure the window is styled to be a child window.
-        LONG_PTR style = GetWindowLongPtr(childWindow, GWL_STYLE);
-        style |= WS_CHILD;
-        style &= ~WS_POPUP;
-        SetWindowLongPtr(childWindow, GWL_STYLE, style);
-
-        // Do the reparenting.
-        ::SetParent(childWindow, mWnd);
-        break;
-      }
+      SetChildStyleAndParent(reinterpret_cast<HWND>(aVal), mWnd);
+      break;
+    case NS_NATIVE_CHILD_OF_SHAREABLE_WINDOW:
+      SetChildStyleAndParent(reinterpret_cast<HWND>(aVal),
+                             WinUtils::GetTopLevelHWND(mWnd));
+      break;
     default:
       NS_ERROR("SetNativeData called with unsupported data type.");
   }
@@ -4465,7 +4483,7 @@ inline static mozilla::HangMonitor::ActivityType ActivityTypeForMessage(UINT msg
 // and http://msdn.microsoft.com/en-us/library/ms633573%28VS.85%29.aspx
 LRESULT CALLBACK nsWindow::WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-  MOZ_RELEASE_ASSERT(!ipc::ParentProcessIsBlocked());
+  ipc::CancelCPOWs();
 
   HangMonitor::NotifyActivity(ActivityTypeForMessage(msg));
 
@@ -5268,11 +5286,49 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
       }
       break;
 
+    case WM_SIZING:
+    {
+      // When we get WM_ENTERSIZEMOVE we don't know yet if we're in a live
+      // resize or move event. Instead we wait for first VM_SIZING message
+      // within a ENTERSIZEMOVE to consider this a live resize event.
+      if (mResizeState == IN_SIZEMOVE) {
+        mResizeState = RESIZING;
+        nsCOMPtr<nsIObserverService> observerService =
+          mozilla::services::GetObserverService();
+
+        if (observerService) {
+          observerService->NotifyObservers(nullptr, "live-resize-start",
+                                           nullptr);
+        }
+      }
+      break;
+    }
+
+    case WM_ENTERSIZEMOVE:
+    {
+      if (mResizeState == NOT_RESIZING) {
+        mResizeState = IN_SIZEMOVE;
+      }
+      break;
+    }
+
     case WM_EXITSIZEMOVE:
+    {
+      if (mResizeState == RESIZING) {
+        mResizeState = NOT_RESIZING;
+        nsCOMPtr<nsIObserverService> observerService = mozilla::services::GetObserverService();
+
+        if (observerService) {
+          observerService->NotifyObservers(nullptr, "live-resize-end", nullptr);
+        }
+      }
+
       if (!sIsInMouseCapture) {
         NotifySizeMoveDone();
       }
+
       break;
+    }
 
     case WM_NCLBUTTONDBLCLK:
       DispatchMouseEvent(NS_MOUSE_DOUBLECLICK, 0, lParamToClient(lParam),
@@ -7572,7 +7628,6 @@ nsWindow::DealWithPopups(HWND aWnd, UINT aMessage,
       return false;
 
     case WM_MOVING:
-    case WM_SIZING:
     case WM_MENUSELECT:
       break;
 

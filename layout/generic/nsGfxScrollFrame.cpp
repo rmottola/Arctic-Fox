@@ -1469,7 +1469,8 @@ public:
                        const nsPoint &aInitialDestination,
                        const nsSize &aInitialVelocity,
                        const nsRect &aRange,
-                       const mozilla::TimeStamp &aStartTime)
+                       const mozilla::TimeStamp &aStartTime,
+                       nsPresContext* aPresContext)
     : mXAxisModel(aInitialPosition.x, aInitialDestination.x,
                   aInitialVelocity.width,
                   gfxPrefs::ScrollBehaviorSpringConstant(),
@@ -1481,6 +1482,7 @@ public:
     , mRange(aRange)
     , mLastRefreshTime(aStartTime)
     , mCallee(nullptr)
+    , mOneDevicePixelInAppUnits(aPresContext->DevPixelsToAppUnits(1))
   {
   }
 
@@ -1537,7 +1539,8 @@ public:
 
   bool IsFinished()
   {
-    return mXAxisModel.IsFinished() && mYAxisModel.IsFinished();
+    return mXAxisModel.IsFinished(mOneDevicePixelInAppUnits) &&
+           mYAxisModel.IsFinished(mOneDevicePixelInAppUnits);
   }
 
   virtual void WillRefresh(mozilla::TimeStamp aTime) override {
@@ -1590,6 +1593,7 @@ private:
   nsRect mRange;
   mozilla::TimeStamp mLastRefreshTime;
   ScrollFrameHelper *mCallee;
+  nscoord mOneDevicePixelInAppUnits;
 };
 
 // AsyncScroll has ref counting.
@@ -2064,7 +2068,7 @@ ScrollFrameHelper::ScrollToWithOrigin(nsPoint aScrollPosition,
         mAsyncSmoothMSDScroll =
           new AsyncSmoothMSDScroll(GetScrollPosition(), mDestination,
                                    currentVelocity, GetScrollRangeForClamping(),
-                                   now);
+                                   now, presContext);
 
         if (!mAsyncSmoothMSDScroll->SetRefreshObserver(this)) {
           // Observer setup failed. Scroll the normal way.

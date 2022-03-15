@@ -349,7 +349,6 @@ public:
       mSegmentSize(aSegmentSize), mLogicalCursor(0),
       mStatus(NS_OK)
   {
-    NS_ADDREF(mStorageStream);
   }
 
   NS_DECL_THREADSAFE_ISUPPORTS
@@ -361,7 +360,6 @@ public:
 private:
   ~nsStorageInputStream()
   {
-    NS_IF_RELEASE(mStorageStream);
   }
 
 protected:
@@ -370,7 +368,7 @@ protected:
   friend class nsStorageStream;
 
 private:
-  nsStorageStream* mStorageStream;
+  nsRefPtr<nsStorageStream> mStorageStream;
   uint32_t         mReadCursor;    // Next memory location to read byte, or 0
   uint32_t         mSegmentEnd;    // One byte past end of current buffer segment
   uint32_t         mSegmentNum;    // Segment number containing read cursor
@@ -462,7 +460,15 @@ nsStorageInputStream::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
         goto out;
       }
 
-      mSegmentNum++;
+      // We have data in the stream, but if mSegmentEnd is zero, then we
+      // were likely constructed prior to any data being written into
+      // the stream.  Therefore, if mSegmentEnd is non-zero, we should
+      // move into the next segment; otherwise, we should stay in this
+      // segment so our input state can be updated and we can properly
+      // perform the initial read.
+      if (mSegmentEnd > 0) {
+        mSegmentNum++;
+      }
       mReadCursor = 0;
       mSegmentEnd = XPCOM_MIN(mSegmentSize, available);
       availableInSegment = mSegmentEnd;

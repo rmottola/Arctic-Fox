@@ -248,12 +248,7 @@ EventQueue::CoalesceReorderEvents(AccEvent* aTailEvent)
 
     // Coalesce earlier event of the same target.
     if (thisEvent->mAccessible == aTailEvent->mAccessible) {
-      if (thisEvent->mEventRule == AccEvent::eDoNotEmit) {
-        AccReorderEvent* tailReorder = downcast_accEvent(aTailEvent);
-        tailReorder->DoNotEmitAll();
-      } else {
-        thisEvent->mEventRule = AccEvent::eDoNotEmit;
-      }
+      thisEvent->mEventRule = AccEvent::eDoNotEmit;
 
       return;
     }
@@ -551,8 +546,10 @@ EventQueue::ProcessEventQueue()
       }
     }
 
-    if (event->mEventType == nsIAccessibleEvent::EVENT_HIDE)
+    AccHideEvent* hideEvent = downcast_accEvent(event);
+    if (hideEvent && hideEvent->NeedsShutdown()) {
       mDocument->ShutdownChildrenInSubtree(event->mAccessible);
+    }
 
     if (!mDocument)
       return;

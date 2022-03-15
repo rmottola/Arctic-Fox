@@ -38,7 +38,7 @@ function indirectCallCannotGC(fullCaller, fullVariable)
     if (name == "op" && /GetWeakmapKeyDelegate/.test(caller))
         return true;
 
-    var CheckCallArgs = "AsmJSValidate.cpp:uint8 CheckCallArgs(FunctionBuilder*, js::frontend::ParseNode*, (uint8)(FunctionBuilder*,js::frontend::ParseNode*,Type)*, Signature*)";
+    var CheckCallArgs = "AsmJSValidate.cpp:uint8 CheckCallArgs(FunctionValidator*, js::frontend::ParseNode*, (uint8)(FunctionValidator*,js::frontend::ParseNode*,Type)*, Signature*)";
     if (name == "checkArg" && caller == CheckCallArgs)
         return true;
 
@@ -179,7 +179,7 @@ var ignoreFunctions = {
     "void js::AutoCompartment::AutoCompartment(js::ExclusiveContext*, JSCompartment*)": true,
 
     // The nsScriptNameSpaceManager functions can't actually GC.  They
-    // just use a pldhash which has function pointers, which makes the
+    // just use a PLDHashTable which has function pointers, which makes the
     // analysis think maybe they can.
     "nsGlobalNameStruct* nsScriptNameSpaceManager::LookupNavigatorName(nsAString_internal*)": true,
     "nsGlobalNameStruct* nsScriptNameSpaceManager::LookupName(nsAString_internal*, uint16**)": true,
@@ -291,7 +291,8 @@ function isRootedGCPointerTypeName(name)
         name == "WrappableJSErrorResult" ||
         name == "frontend::TokenStream" ||
         name == "frontend::TokenStream::Position" ||
-        name == "ModuleCompiler")
+        name == "ModuleCompiler" ||
+        name == "ModuleValidator")
     {
         return true;
     }
@@ -349,6 +350,7 @@ function isOverridableField(initialCSU, csu, field)
 
 function listGCTypes() {
     return [
+        'js::gc::Cell',
         'JSObject',
         'JSString',
         'JSFatInlineString',

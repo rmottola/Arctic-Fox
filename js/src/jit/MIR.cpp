@@ -609,6 +609,30 @@ MDefinition::justReplaceAllUsesWith(MDefinition* dom)
 }
 
 void
+MDefinition::justReplaceAllUsesWithExcept(MDefinition* dom)
+{
+    MOZ_ASSERT(dom != nullptr);
+    MOZ_ASSERT(dom != this);
+
+    // Move all uses to new dom. Save the use of the dominating instruction.
+    MUse *exceptUse = nullptr;
+    for (MUseIterator i(usesBegin()), e(usesEnd()); i != e; ++i) {
+        if (i->consumer() != dom) {
+            i->setProducerUnchecked(dom);
+        } else {
+            MOZ_ASSERT(!exceptUse);
+            exceptUse = *i;
+        }
+    }
+    dom->uses_.takeElements(uses_);
+
+    // Restore the use to the original definition.
+    dom->uses_.remove(exceptUse);
+    exceptUse->setProducerUnchecked(this);
+    uses_.pushFront(exceptUse);
+}
+
+void
 MDefinition::optimizeOutAllUses(TempAllocator& alloc)
 {
     for (MUseIterator i(usesBegin()), e(usesEnd()); i != e;) {
@@ -622,6 +646,22 @@ MDefinition::optimizeOutAllUses(TempAllocator& alloc)
 
     // Remove dangling pointers.
     this->uses_.clear();
+}
+
+void
+MDefinition::replaceAllLiveUsesWith(MDefinition* dom)
+{
+    for (MUseIterator i(usesBegin()), e(usesEnd()); i != e; ) {
+        MUse* use = *i++;
+        MNode* consumer = use->consumer();
+        if (consumer->isResumePoint())
+            continue;
+        if (consumer->isDefinition() && consumer->toDefinition()->isRecoveredOnBailout())
+            continue;
+
+        // Update the operand to use the dominating definition.
+        use->replaceProducer(dom);
+    }
 }
 
 bool
@@ -1699,12 +1739,55 @@ MPhi::operandIfRedundant()
 }
 
 MDefinition*
+MPhi::foldsFilterTypeSet()
+{
+    // Fold phi with as operands a combination of 'subject' and
+    // MFilterTypeSet(subject) to 'subject'.
+
+    if (inputs_.length() == 0)
+        return nullptr;
+
+    MDefinition* subject = getOperand(0);
+    if (subject->isFilterTypeSet())
+        subject = subject->toFilterTypeSet()->input();
+
+    // Not same type, don't fold.
+    if (subject->type() != type())
+        return nullptr;
+
+    // Phi is better typed (has typeset). Don't fold.
+    if (resultTypeSet() && !subject->resultTypeSet())
+        return nullptr;
+
+    // Phi is better typed (according to typeset). Don't fold.
+    if (subject->resultTypeSet() && resultTypeSet()) {
+        if (!subject->resultTypeSet()->isSubset(resultTypeSet()))
+            return nullptr;
+    }
+
+    for (size_t i = 1, e = numOperands(); i < e; i++) {
+        MDefinition* op = getOperand(i);
+        if (op == subject)
+            continue;
+        if (op->isFilterTypeSet() && op->toFilterTypeSet()->input() == subject)
+            continue;
+
+        return nullptr;
+    }
+
+    return subject;
+}
+
+MDefinition*
 MPhi::foldsTo(TempAllocator& alloc)
 {
     if (MDefinition* def = operandIfRedundant())
         return def;
 
     if (MDefinition* def = foldsTernary())
+        return def;
+
+    if (MDefinition* def = foldsFilterTypeSet())
         return def;
 
     return this;
@@ -2713,7 +2796,7 @@ MCompare::inputType()
       case Compare_Object:
         return MIRType_Object;
       case Compare_Unknown:
-      case Compare_Value:
+      case Compare_Bitwise:
         return MIRType_Value;
       default:
         MOZ_CRASH("No known conversion");
@@ -3363,7 +3446,7 @@ MCompare::tryFoldEqualOperands(bool* result)
                compareType_ == Compare_Double || compareType_ == Compare_DoubleMaybeCoerceLHS ||
                compareType_ == Compare_DoubleMaybeCoerceRHS || compareType_ == Compare_Float32 ||
                compareType_ == Compare_String || compareType_ == Compare_StrictString ||
-               compareType_ == Compare_Object || compareType_ == Compare_Value);
+               compareType_ == Compare_Object || compareType_ == Compare_Bitwise);
 
     if (isDoubleComparison() || isFloat32Comparison()) {
         if (!operandsAreNeverNaN())

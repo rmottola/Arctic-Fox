@@ -504,7 +504,7 @@ CodeGeneratorMIPS::visitMulI(LMulI* ins)
             // Result is -0 if lhs or rhs is negative.
             // In that case result must be double value so bailout
             Register scratch = SecondScratchReg;
-            masm.ma_or(scratch, ToRegister(lhs), ToRegister(rhs));
+            masm.as_or(scratch, ToRegister(lhs), ToRegister(rhs));
             bailoutCmp32(Assembler::Signed, scratch, scratch, ins->snapshot());
 
             masm.bind(&done);
@@ -795,19 +795,19 @@ CodeGeneratorMIPS::visitBitOpI(LBitOpI* ins)
         if (rhs->isConstant())
             masm.ma_or(ToRegister(dest), ToRegister(lhs), Imm32(ToInt32(rhs)));
         else
-            masm.ma_or(ToRegister(dest), ToRegister(lhs), ToRegister(rhs));
+            masm.as_or(ToRegister(dest), ToRegister(lhs), ToRegister(rhs));
         break;
       case JSOP_BITXOR:
         if (rhs->isConstant())
             masm.ma_xor(ToRegister(dest), ToRegister(lhs), Imm32(ToInt32(rhs)));
         else
-            masm.ma_xor(ToRegister(dest), ToRegister(lhs), ToRegister(rhs));
+            masm.as_xor(ToRegister(dest), ToRegister(lhs), ToRegister(rhs));
         break;
       case JSOP_BITAND:
         if (rhs->isConstant())
             masm.ma_and(ToRegister(dest), ToRegister(lhs), Imm32(ToInt32(rhs)));
         else
-            masm.ma_and(ToRegister(dest), ToRegister(lhs), ToRegister(rhs));
+            masm.as_and(ToRegister(dest), ToRegister(lhs), ToRegister(rhs));
         break;
       default:
         MOZ_CRASH("unexpected binary opcode");
@@ -1599,12 +1599,12 @@ CodeGeneratorMIPS::visitCompareBAndBranch(LCompareBAndBranch* lir)
 }
 
 void
-CodeGeneratorMIPS::visitCompareV(LCompareV* lir)
+CodeGeneratorMIPS::visitCompareBitwise(LCompareBitwise* lir)
 {
     MCompare* mir = lir->mir();
     Assembler::Condition cond = JSOpToCondition(mir->compareType(), mir->jsop());
-    const ValueOperand lhs = ToValue(lir, LCompareV::LhsInput);
-    const ValueOperand rhs = ToValue(lir, LCompareV::RhsInput);
+    const ValueOperand lhs = ToValue(lir, LCompareBitwise::LhsInput);
+    const ValueOperand rhs = ToValue(lir, LCompareBitwise::RhsInput);
     const Register output = ToRegister(lir->output());
 
     MOZ_ASSERT(IsEqualityOp(mir->jsop()));
@@ -1624,12 +1624,12 @@ CodeGeneratorMIPS::visitCompareV(LCompareV* lir)
 }
 
 void
-CodeGeneratorMIPS::visitCompareVAndBranch(LCompareVAndBranch* lir)
+CodeGeneratorMIPS::visitCompareBitwiseAndBranch(LCompareBitwiseAndBranch* lir)
 {
     MCompare* mir = lir->cmpMir();
     Assembler::Condition cond = JSOpToCondition(mir->compareType(), mir->jsop());
-    const ValueOperand lhs = ToValue(lir, LCompareVAndBranch::LhsInput);
-    const ValueOperand rhs = ToValue(lir, LCompareVAndBranch::RhsInput);
+    const ValueOperand lhs = ToValue(lir, LCompareBitwiseAndBranch::LhsInput);
+    const ValueOperand rhs = ToValue(lir, LCompareBitwiseAndBranch::RhsInput);
 
     MOZ_ASSERT(mir->jsop() == JSOP_EQ || mir->jsop() == JSOP_STRICTEQ ||
                mir->jsop() == JSOP_NE || mir->jsop() == JSOP_STRICTNE);
@@ -1646,7 +1646,7 @@ CodeGeneratorMIPS::visitBitAndAndBranch(LBitAndAndBranch* lir)
     if (lir->right()->isConstant())
         masm.ma_and(ScratchRegister, ToRegister(lir->left()), Imm32(ToInt32(lir->right())));
     else
-        masm.ma_and(ScratchRegister, ToRegister(lir->left()), ToRegister(lir->right()));
+        masm.as_and(ScratchRegister, ToRegister(lir->left()), ToRegister(lir->right()));
     emitBranch(ScratchRegister, ScratchRegister, Assembler::NonZero, lir->ifTrue(),
                lir->ifFalse());
 }

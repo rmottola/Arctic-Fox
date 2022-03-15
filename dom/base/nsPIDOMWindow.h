@@ -386,7 +386,7 @@ public:
   /**
    * Get the docshell in this window.
    */
-  nsIDocShell *GetDocShell()
+  nsIDocShell *GetDocShell() const
   {
     if (mOuterWindow) {
       return mOuterWindow->mDocShell;

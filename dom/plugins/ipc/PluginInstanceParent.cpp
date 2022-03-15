@@ -51,6 +51,7 @@
 #include "nsHashKeys.h"
 #include "nsIWidget.h"
 #include "nsPluginNativeWindow.h"
+#include "PluginQuirks.h"
 extern const wchar_t* kFlashFullscreenClass;
 #elif defined(MOZ_WIDGET_GTK)
 #include <gdk/gdk.h>
@@ -117,6 +118,8 @@ PluginInstanceParent::PluginInstanceParent(PluginModuleParent* parent,
     , mDrawingModel(kDefaultDrawingModel)
 #if defined(OS_WIN)
     , mPluginHWND(nullptr)
+    , mChildPluginHWND(nullptr)
+    , mChildPluginsParentHWND(nullptr)
     , mPluginWndProc(nullptr)
     , mNestedEventState(false)
 #endif // defined(XP_WIN)
@@ -677,6 +680,11 @@ PluginInstanceParent::AsyncSetWindow(NPWindow* aWindow)
     mNPNIface->getvalue(mNPP, NPNVcontentsScaleFactor, &scaleFactor);
     window.contentsScaleFactor = scaleFactor;
 #endif
+
+#if defined(OS_WIN)
+    MaybeCreateChildPopupSurrogate();
+#endif
+
     if (!SendAsyncSetWindow(gfxPlatform::GetPlatform()->ScreenReferenceSurface()->GetType(),
                             window))
         return NS_ERROR_FAILURE;
@@ -965,9 +973,16 @@ PluginInstanceParent::NPP_SetWindow(const NPWindow* aWindow)
         if (!SharedSurfaceSetWindow(aWindow, window)) {
           return NPERR_OUT_OF_MEMORY_ERROR;
         }
-    }
-    else {
+
+        MaybeCreateChildPopupSurrogate();
+    } else {
         SubclassPluginWindow(reinterpret_cast<HWND>(aWindow->window));
+
+        // Skip SetWindow call for hidden QuickTime plugins.
+        if ((mParent->GetQuirks() & QUIRK_QUICKTIME_AVOID_SETWINDOW) &&
+            aWindow->width == 0 && aWindow->height == 0) {
+            return NPERR_NO_ERROR;
+        }
 
         window.window = reinterpret_cast<uint64_t>(aWindow->window);
         window.x = aWindow->x;
@@ -975,6 +990,12 @@ PluginInstanceParent::NPP_SetWindow(const NPWindow* aWindow)
         window.width = aWindow->width;
         window.height = aWindow->height;
         window.type = aWindow->type;
+
+        // On Windows we need to create and set the parent before we set the
+        // window on the plugin, or keyboard interaction will not work.
+        if (!MaybeCreateAndParentChildPluginWindow()) {
+            return NPERR_GENERIC_ERROR;
+        }
     }
 #else
     window.window = reinterpret_cast<uint64_t>(aWindow->window);
@@ -1025,30 +1046,9 @@ PluginInstanceParent::NPP_SetWindow(const NPWindow* aWindow)
     window.colormap = ws_info->colormap;
 #endif
 
-    NPRemoteWindow childWindow;
-    if (!CallNPP_SetWindow(window, &childWindow)) {
+    if (!CallNPP_SetWindow(window)) {
         return NPERR_GENERIC_ERROR;
     }
-
-#if defined(XP_WIN)
-    // If a child window is returned it means that we need to re-parent it.
-    if (childWindow.window) {
-        nsCOMPtr<nsIWidget> widget;
-        static_cast<const nsPluginNativeWindow*>(aWindow)->
-            GetPluginWidget(getter_AddRefs(widget));
-        if (widget) {
-            widget->SetNativeData(NS_NATIVE_CHILD_WINDOW,
-                                  static_cast<uintptr_t>(childWindow.window));
-        }
-
-        // Now it has got the correct parent, make sure it is visible.
-        // In subsequent calls to SetWindow these calls happen in the Child.
-        HWND childHWND = reinterpret_cast<HWND>(childWindow.window);
-        ShowWindow(childHWND, SW_SHOWNA);
-        SetWindowPos(childHWND, nullptr, 0, 0, window.width, window.height,
-                     SWP_NOZORDER | SWP_NOREPOSITION);
-    }
-#endif
 
     return NPERR_NO_ERROR;
 }
@@ -1785,6 +1785,22 @@ PluginInstanceParent::RecvAsyncNPP_NewResult(const NPError& aResult)
     return true;
 }
 
+bool
+PluginInstanceParent::RecvSetNetscapeWindowAsParent(const NativeWindowHandle& childWindow)
+{
+#if defined(XP_WIN)
+    nsPluginInstanceOwner* owner = GetOwner();
+    if (!owner || NS_FAILED(owner->SetNetscapeWindowAsParent(childWindow))) {
+        NS_WARNING("Failed to set Netscape window as parent.");
+    }
+
+    return true;
+#else
+    NS_NOTREACHED("PluginInstanceParent::RecvSetNetscapeWindowAsParent not implemented!");
+    return false;
+#endif
+}
+
 #if defined(OS_WIN)
 
 /*
@@ -2027,6 +2043,65 @@ PluginInstanceParent::SharedSurfaceAfterPaint(NPEvent* npevent)
              dirtyRect.x,
              dirtyRect.y,
              SRCCOPY);
+}
+
+bool
+PluginInstanceParent::MaybeCreateAndParentChildPluginWindow()
+{
+    // On Windows we need to create and set the parent before we set the
+    // window on the plugin, or keyboard interaction will not work.
+    if (!mChildPluginHWND) {
+        if (!CallCreateChildPluginWindow(&mChildPluginHWND) ||
+            !mChildPluginHWND) {
+            return false;
+        }
+    }
+
+    // It's not clear if the parent window would ever change, but when this
+    // was done in the NPAPI child it used to allow for this.
+    if (mPluginHWND == mChildPluginsParentHWND) {
+        return true;
+    }
+
+    nsPluginInstanceOwner* owner = GetOwner();
+    if (!owner) {
+        // We can't reparent without an owner, the plugin is probably shutting
+        // down, just return true to allow any calls to continue.
+        return true;
+    }
+
+    // Note that this call will probably cause a sync native message to the
+    // process that owns the child window.
+    owner->SetWidgetWindowAsParent(mChildPluginHWND);
+    mChildPluginsParentHWND = mPluginHWND;
+    return true;
+}
+
+void
+PluginInstanceParent::MaybeCreateChildPopupSurrogate()
+{
+    // Already created or not required for this plugin.
+    if (mChildPluginHWND || mWindowType != NPWindowTypeDrawable ||
+        !(mParent->GetQuirks() & QUIRK_WINLESS_TRACKPOPUP_HOOK)) {
+        return;
+    }
+
+    // We need to pass the netscape window down to be cached as part of the call
+    // to create the surrogate, because the reparenting of the surrogate in the
+    // main process can cause sync Windows messages to the plugin process, which
+    // then cause sync messages from the plugin child for the netscape window
+    // which causes a deadlock.
+    NativeWindowHandle netscapeWindow;
+    NPError result = mNPNIface->getvalue(mNPP, NPNVnetscapeWindow,
+                                         &netscapeWindow);
+    if (NPERR_NO_ERROR != result) {
+        NS_WARNING("Can't get netscape window to pass to plugin child.");
+        return;
+    }
+
+    if (!SendCreateChildPopupSurrogate(netscapeWindow)) {
+        NS_WARNING("Failed to create popup surrogate in child.");
+    }
 }
 
 #endif // defined(OS_WIN)

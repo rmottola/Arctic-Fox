@@ -31,7 +31,7 @@
 #include "mozilla/TouchEvents.h"
 
 #define APZES_LOG(...)
-// #define APZES_LOG(...) printf_stderr("APZCCH: " __VA_ARGS__)
+// #define APZES_LOG(...) printf_stderr("APZES: " __VA_ARGS__)
 
 // Static helper functions
 namespace {
@@ -319,7 +319,11 @@ APZEventState::ProcessWheelEvent(const WidgetWheelEvent& aEvent,
                                  const ScrollableLayerGuid& aGuid,
                                  uint64_t aInputBlockId)
 {
-  mContentReceivedInputBlockCallback->Run(aGuid, aInputBlockId, aEvent.mFlags.mDefaultPrevented);
+  // If this event starts a swipe, indicate that it shouldn't result in a
+  // scroll by setting defaultPrevented to true.
+  bool defaultPrevented =
+    aEvent.mFlags.mDefaultPrevented || aEvent.TriggersSwipe();
+  mContentReceivedInputBlockCallback->Run(aGuid, aInputBlockId, defaultPrevented);
 }
 
 void

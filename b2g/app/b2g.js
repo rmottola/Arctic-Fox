@@ -4,6 +4,8 @@
 
 #filter substitution
 
+// For the all MOZ_MULET ifdef conditions in this file: see bug 1174234
+
 #ifndef MOZ_MULET
 pref("toolkit.defaultChromeURI", "chrome://b2g/content/shell.html");
 pref("browser.chromeURL", "chrome://b2g/content/");
@@ -385,7 +387,9 @@ pref("dom.ipc.processCount", 100000);
 
 pref("dom.ipc.browser_frames.oop_by_default", false);
 
+#ifndef MOZ_MULET
 pref("dom.meta-viewport.enabled", true);
+#endif
 
 // SMS/MMS
 pref("dom.sms.enabled", true);
@@ -956,7 +960,10 @@ pref("security.exthelperapp.disable_background_handling", true);
 pref("osfile.reset_worker_delay", 5000);
 
 // APZC preferences.
-//
+#ifdef MOZ_WIDGET_GONK
+pref("apz.allow_zooming", true);
+#endif
+
 // Gaia relies heavily on scroll events for now, so lets fire them
 // more often than the default value (100).
 pref("apz.asyncscroll.throttle", 40);

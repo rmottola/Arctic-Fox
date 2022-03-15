@@ -501,9 +501,9 @@ nsContentUtils::Init()
   if (!sEventListenerManagersHash) {
     static const PLDHashTableOps hash_table_ops =
     {
-      PL_DHashVoidPtrKeyStub,
-      PL_DHashMatchEntryStub,
-      PL_DHashMoveEntryStub,
+      PLDHashTable::HashVoidPtrKeyStub,
+      PLDHashTable::MatchEntryStub,
+      PLDHashTable::MoveEntryStub,
       EventListenerManagerHashClearEntry,
       EventListenerManagerHashInitEntry
     };
@@ -1334,6 +1334,7 @@ nsContentUtils::ParseSandboxAttributeToFlags(const nsAttrValue* sandboxAttr)
                | SANDBOXED_SCRIPTS
                | SANDBOXED_AUTOMATIC_FEATURES
                | SANDBOXED_POINTER_LOCK
+               | SANDBOXED_ORIENTATION_LOCK
                | SANDBOXED_DOMAIN;
 
 // Macro for updating the flag according to the keywords
@@ -1345,6 +1346,7 @@ nsContentUtils::ParseSandboxAttributeToFlags(const nsAttrValue* sandboxAttr)
   IF_KEYWORD(allowscripts, SANDBOXED_SCRIPTS | SANDBOXED_AUTOMATIC_FEATURES)
   IF_KEYWORD(allowtopnavigation, SANDBOXED_TOPLEVEL_NAVIGATION)
   IF_KEYWORD(allowpointerlock, SANDBOXED_POINTER_LOCK)
+  IF_KEYWORD(alloworientationlock, SANDBOXED_ORIENTATION_LOCK)
   IF_KEYWORD(allowpopups, SANDBOXED_AUXILIARY_NAVIGATION)
 
   return out;
@@ -1736,7 +1738,7 @@ nsContentUtils::GetOfflineAppManifest(nsIDocument *aDocument, nsIURI **aURI)
 
   // Manifest URIs can't have fragment identifiers.
   if (manifestSpec.IsEmpty() ||
-      manifestSpec.FindChar('#') != kNotFound) {
+      manifestSpec.Contains('#')) {
     return;
   }
 

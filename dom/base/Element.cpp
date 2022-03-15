@@ -1746,9 +1746,8 @@ Element::UnbindFromTree(bool aDeep, bool aNullParent)
     }
 
     if (GetParent()) {
-      nsINode* p = mParent;
-      mParent = nullptr;
-      NS_RELEASE(p);
+      nsRefPtr<nsINode> p;
+      p.swap(mParent);
     } else {
       mParent = nullptr;
     }

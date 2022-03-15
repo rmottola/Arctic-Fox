@@ -327,7 +327,6 @@ class nsCookieService final : public nsICookieService
 
   protected:
     // cached members.
-    nsCOMPtr<nsIObserverService>     mObserverService;
     nsCOMPtr<nsICookiePermission>    mPermissionService;
     nsCOMPtr<mozIThirdPartyUtil>     mThirdPartyUtil;
     nsCOMPtr<nsIEffectiveTLDService> mTLDService;

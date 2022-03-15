@@ -115,8 +115,8 @@
     _(CompareStrictS)               \
     _(CompareB)                     \
     _(CompareBAndBranch)            \
-    _(CompareV)                     \
-    _(CompareVAndBranch)            \
+    _(CompareBitwise)               \
+    _(CompareBitwiseAndBranch)      \
     _(CompareVM)                    \
     _(BitAndAndBranch)              \
     _(IsNullOrLikeUndefinedV)       \
@@ -162,6 +162,7 @@
     _(Concat)                       \
     _(CharCodeAt)                   \
     _(FromCharCode)                 \
+    _(SinCos)                       \
     _(StringSplit)                  \
     _(Int32ToDouble)                \
     _(Float32ToDouble)              \

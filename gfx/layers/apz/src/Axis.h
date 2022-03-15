@@ -8,6 +8,7 @@
 #define mozilla_layers_Axis_h
 
 #include <sys/types.h>                  // for int32_t
+#include "APZUtils.h"
 #include "Units.h"
 #include "mozilla/TimeStamp.h"          // for TimeDuration
 #include "nsTArray.h"                   // for nsTArray
@@ -16,14 +17,6 @@ namespace mozilla {
 namespace layers {
 
 const float EPSILON = 0.0001f;
-
-// Epsilon to be used when comparing 'float' coordinate values
-// with FuzzyEqualsAdditive. The rationale is that 'float' has 7 decimal
-// digits of precision, and coordinate values should be no larger than in the
-// ten thousands. Note also that the smallest legitimate difference in page
-// coordinates is 1 app unit, which is 1/60 of a (CSS pixel), so this epsilon
-// isn't too large.
-const float COORDINATE_EPSILON = 0.01f;
 
 /**
  * Compare two coordinates for equality, accounting for rounding error.
@@ -51,7 +44,7 @@ public:
    * Notify this Axis that a new touch has been received, including a timestamp
    * for when the touch was received. This triggers a recalculation of velocity.
    */
-  void UpdateWithTouchAtDevicePoint(ParentLayerCoord aPos, uint32_t aTimestampMs);
+  void UpdateWithTouchAtDevicePoint(ParentLayerCoord aPos, ParentLayerCoord aAdditionalDelta, uint32_t aTimestampMs);
 
   /**
    * Notify this Axis that a touch has begun, i.e. the user has put their finger
@@ -66,12 +59,12 @@ public:
   void EndTouch(uint32_t aTimestampMs);
 
   /**
-   * Notify this Axis that a touch has ended forcefully. Useful for stopping
+   * Notify this Axis that the gesture has ended forcefully. Useful for stopping
    * flings when a user puts their finger down in the middle of one (i.e. to
    * stop a previous touch including its fling so that a new one can take its
    * place).
    */
-  void CancelTouch();
+  void CancelGesture();
 
   /**
    * Takes a requested displacement to the position of this axis, and adjusts it
@@ -86,7 +79,7 @@ public:
   bool AdjustDisplacement(ParentLayerCoord aDisplacement,
                           /* ParentLayerCoord */ float& aDisplacementOut,
                           /* ParentLayerCoord */ float& aOverscrollAmountOut,
-                          bool forceOverscroll = false);
+                          bool aForceOverscroll = false);
 
   /**
    * Overscrolls this axis by the requested amount in the requested direction.
@@ -106,10 +99,20 @@ public:
   ParentLayerCoord GetOverscroll() const;
 
   /**
+   * Start an overscroll animation with the given initial velocity.
+   */
+  void StartOverscrollAnimation(float aVelocity);
+
+  /**
    * Sample the snap-back animation to relieve overscroll.
    * |aDelta| is the time since the last sample.
    */
   bool SampleOverscrollAnimation(const TimeDuration& aDelta);
+
+  /**
+   * Stop an overscroll animation.
+   */
+  void EndOverscrollAnimation();
 
   /**
    * Return whether this axis is overscrolled in either direction.
@@ -160,13 +163,19 @@ public:
   /**
    * Returns whether this axis can scroll any more in a particular direction.
    */
-  bool CanScroll(double aDelta) const;
+  bool CanScroll(ParentLayerCoord aDelta) const;
 
   /**
    * Returns true if the page has room to be scrolled along this axis
    * and this axis is not scroll-locked.
    */
   bool CanScrollNow() const;
+
+  /**
+   * Clamp a point to the page's scrollable bounds. That is, a scroll
+   * destination to the returned point will not contain any overscroll.
+   */
+  CSSCoord ClampOriginToScrollableRect(CSSCoord aOrigin) const;
 
   void SetAxisLocked(bool aAxisLocked) { mAxisLocked = aAxisLocked; }
 
@@ -214,6 +223,11 @@ public:
    */
   bool ScaleWillOverscrollBothSides(float aScale) const;
 
+  /**
+   * Returns true if movement on this axis is locked.
+   */
+  bool IsAxisLocked() const;
+
   ParentLayerCoord GetOrigin() const;
   ParentLayerCoord GetCompositionLength() const;
   ParentLayerCoord GetPageStart() const;
@@ -226,6 +240,7 @@ public:
   virtual ParentLayerCoord GetPointOffset(const ParentLayerPoint& aPoint) const = 0;
   virtual ParentLayerCoord GetRectLength(const ParentLayerRect& aRect) const = 0;
   virtual ParentLayerCoord GetRectOffset(const ParentLayerRect& aRect) const = 0;
+  virtual CSSToParentLayerScale GetScaleForAxis(const CSSToParentLayerScale2D& aScale) const = 0;
 
   virtual ScreenPoint MakePoint(ScreenCoord aCoord) const = 0;
 
@@ -268,10 +283,6 @@ protected:
   // actual overscroll amount.
   ParentLayerCoord ApplyResistance(ParentLayerCoord aOverscroll) const;
 
-  // Helper function to disable overscroll transformations triggered by
-  // SampleOverscrollAnimation().
-  void StopSamplingOverscrollAnimation();
-
   // Helper function for SampleOverscrollAnimation().
   void StepOverscrollAnimation(double aStepDurationMilliseconds);
 
@@ -285,6 +296,7 @@ public:
   virtual ParentLayerCoord GetPointOffset(const ParentLayerPoint& aPoint) const override;
   virtual ParentLayerCoord GetRectLength(const ParentLayerRect& aRect) const override;
   virtual ParentLayerCoord GetRectOffset(const ParentLayerRect& aRect) const override;
+  virtual CSSToParentLayerScale GetScaleForAxis(const CSSToParentLayerScale2D& aScale) const override;
   virtual ScreenPoint MakePoint(ScreenCoord aCoord) const override;
   virtual const char* Name() const override;
 };
@@ -295,6 +307,7 @@ public:
   virtual ParentLayerCoord GetPointOffset(const ParentLayerPoint& aPoint) const override;
   virtual ParentLayerCoord GetRectLength(const ParentLayerRect& aRect) const override;
   virtual ParentLayerCoord GetRectOffset(const ParentLayerRect& aRect) const override;
+  virtual CSSToParentLayerScale GetScaleForAxis(const CSSToParentLayerScale2D& aScale) const override;
   virtual ScreenPoint MakePoint(ScreenCoord aCoord) const override;
   virtual const char* Name() const override;
 };

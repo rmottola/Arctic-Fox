@@ -32,6 +32,7 @@ class nsSubDocumentFrame;
 class nsView;
 class nsIInProcessContentFrameMessageManager;
 class AutoResetInShow;
+class AutoResetInFrameSwap;
 class nsITabParent;
 class nsIDocShellTreeItem;
 class nsIDocShellTreeOwner;
@@ -60,6 +61,7 @@ class nsFrameLoader final : public nsIFrameLoader,
                             public mozilla::dom::ipc::MessageManagerCallback
 {
   friend class AutoResetInShow;
+  friend class AutoResetInFrameSwap;
   typedef mozilla::dom::PBrowserParent PBrowserParent;
   typedef mozilla::dom::TabParent TabParent;
   typedef mozilla::layout::RenderFrameParent RenderFrameParent;

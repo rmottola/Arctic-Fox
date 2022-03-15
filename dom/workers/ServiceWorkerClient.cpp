@@ -29,8 +29,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ServiceWorkerClient)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-ServiceWorkerClientInfo::ServiceWorkerClientInfo(nsIDocument* aDoc,
-                                                 nsPIDOMWindow* aWindow)
+ServiceWorkerClientInfo::ServiceWorkerClientInfo(nsIDocument* aDoc)
   : mWindowId(0)
 {
   MOZ_ASSERT(aDoc);
@@ -55,7 +54,7 @@ ServiceWorkerClientInfo::ServiceWorkerClientInfo(nsIDocument* aDoc,
     NS_WARNING("Failed to get focus information.");
   }
 
-  nsRefPtr<nsGlobalWindow> outerWindow = static_cast<nsGlobalWindow*>(aWindow);
+  nsRefPtr<nsGlobalWindow> outerWindow = static_cast<nsGlobalWindow*>(aDoc->GetWindow());
   MOZ_ASSERT(outerWindow);
   if (!outerWindow->IsTopLevelWindow()) {
     mFrameType = FrameType::Nested;
@@ -135,7 +134,7 @@ private:
 
     JS::Rooted<JS::Value> messageData(aCx);
     if (!mBuffer.read(aCx, &messageData,
-                      WorkerStructuredCloneCallbacks(true), &closure)) {
+                      WorkerStructuredCloneCallbacks(), &closure)) {
       xpc::Throw(aCx, NS_ERROR_DOM_DATA_CLONE_ERR);
       return NS_ERROR_FAILURE;
     }
@@ -195,7 +194,7 @@ ServiceWorkerClient::PostMessage(JSContext* aCx, JS::Handle<JS::Value> aMessage,
     transferable.setObject(*array);
   }
 
-  const JSStructuredCloneCallbacks* callbacks = WorkerStructuredCloneCallbacks(false);
+  const JSStructuredCloneCallbacks* callbacks = WorkerStructuredCloneCallbacks();
 
   WorkerStructuredCloneClosure closure;
 

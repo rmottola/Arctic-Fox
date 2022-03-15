@@ -38,6 +38,7 @@
 #include "nsQueryObject.h"
 #include "nsDOMClassInfo.h"
 #include "mozilla/Services.h"
+#include "nsScreen.h"
 
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/BasicEvents.h"
@@ -1922,6 +1923,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsDocument)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFirstBaseNodeWithHref)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDOMImplementation)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mImageMaps)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mOrientationPendingPromise)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mOriginalDocument)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCachedEncoder)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mStateObjectCached)
@@ -2022,6 +2024,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsDocument)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mChildrenCollection)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mRegistry)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mMasterDocument)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mOrientationPendingPromise)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mImportManager)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSubImportLinks)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFontFaceSet)
@@ -3943,9 +3946,9 @@ nsDocument::SetSubDocumentFor(Element* aElement, nsIDocument* aSubDoc)
 
       static const PLDHashTableOps hash_table_ops =
       {
-        PL_DHashVoidPtrKeyStub,
-        PL_DHashMatchEntryStub,
-        PL_DHashMoveEntryStub,
+        PLDHashTable::HashVoidPtrKeyStub,
+        PLDHashTable::MatchEntryStub,
+        PLDHashTable::MoveEntryStub,
         SubDocClearEntry,
         SubDocInitEntry
       };
@@ -7852,14 +7855,14 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
     return nsViewportInfo(aDisplaySize,
                           defaultScale,
                           /*allowZoom*/false,
-                          /*allowDoubleTapZoom*/ true);
+                          /*allowDoubleTapZoom*/ false);
   }
 
   if (!gfxPrefs::MetaViewportEnabled()) {
     return nsViewportInfo(aDisplaySize,
                           defaultScale,
                           /*allowZoom*/ false,
-                          /*allowDoubleTapZoom*/ true);
+                          /*allowDoubleTapZoom*/ false);
   }
 
   // In cases where the width of the CSS viewport is less than or equal to the width
@@ -11952,6 +11955,38 @@ nsDocument::IsFullScreenEnabled(bool aCallerIsChrome, bool aLogFailure)
   }
 
   return allowed;
+}
+
+uint16_t
+nsDocument::CurrentOrientationAngle() const
+{
+  return mCurrentOrientationAngle;
+}
+
+OrientationType
+nsDocument::CurrentOrientationType() const
+{
+  return mCurrentOrientationType;
+}
+
+void
+nsDocument::SetCurrentOrientation(mozilla::dom::OrientationType aType,
+                                  uint16_t aAngle)
+{
+  mCurrentOrientationType = aType;
+  mCurrentOrientationAngle = aAngle;
+}
+
+Promise*
+nsDocument::GetOrientationPendingPromise() const
+{
+  return mOrientationPendingPromise;
+}
+
+void
+nsDocument::SetOrientationPendingPromise(Promise* aPromise)
+{
+  mOrientationPendingPromise = aPromise;
 }
 
 static void

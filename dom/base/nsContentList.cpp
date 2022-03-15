@@ -30,7 +30,7 @@
 // Form related includes
 #include "nsIDOMHTMLFormElement.h"
 
-#include "pldhash.h"
+#include "PLDHashTable.h"
 
 #ifdef DEBUG_CONTENT_LIST
 #include "nsIContentIterator.h"
@@ -210,8 +210,8 @@ NS_GetContentList(nsINode* aRootNode,
   {
     ContentListHashtableHashKey,
     ContentListHashtableMatchEntry,
-    PL_DHashMoveEntryStub,
-    PL_DHashClearEntryStub
+    PLDHashTable::MoveEntryStub,
+    PLDHashTable::ClearEntryStub
   };
 
   // Initialize the hashtable if needed.
@@ -313,8 +313,8 @@ GetFuncStringContentList(nsINode* aRootNode,
   {
     FuncStringContentListHashtableHashKey,
     FuncStringContentListHashtableMatchEntry,
-    PL_DHashMoveEntryStub,
-    PL_DHashClearEntryStub
+    PLDHashTable::MoveEntryStub,
+    PLDHashTable::ClearEntryStub
   };
 
   // Initialize the hashtable if needed.

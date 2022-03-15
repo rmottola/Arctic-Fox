@@ -588,9 +588,9 @@ nsStandardURL::BuildNormalizedSpec(const char *spec)
     if (mHost.mLen > 0) {
         const nsCSubstring& tempHost =
             Substring(spec + mHost.mPos, spec + mHost.mPos + mHost.mLen);
-        if (tempHost.FindChar('\0') != kNotFound)
+        if (tempHost.Contains('\0'))
             return NS_ERROR_MALFORMED_URI;  // null embedded in hostname
-        if (tempHost.FindChar(' ') != kNotFound)
+        if (tempHost.Contains(' '))
             return NS_ERROR_MALFORMED_URI;  // don't allow spaces in the hostname
         if ((useEncHost = NormalizeIDN(tempHost, encHost)))
             approxLen += encHost.Length();
@@ -1047,6 +1047,7 @@ NS_INTERFACE_MAP_BEGIN(nsStandardURL)
     NS_INTERFACE_MAP_ENTRY(nsIClassInfo)
     NS_INTERFACE_MAP_ENTRY(nsIMutable)
     NS_INTERFACE_MAP_ENTRY(nsIIPCSerializableURI)
+    NS_INTERFACE_MAP_ENTRY(nsISensitiveInfoHiddenURI)
     // see nsStandardURL::Equals
     if (aIID.Equals(kThisImplCID))
         foundInterface = static_cast<nsIURI *>(this);
@@ -1063,6 +1064,17 @@ NS_IMETHODIMP
 nsStandardURL::GetSpec(nsACString &result)
 {
     result = mSpec;
+    return NS_OK;
+}
+
+// result may contain unescaped UTF-8 characters
+NS_IMETHODIMP
+nsStandardURL::GetSensitiveInfoHiddenSpec(nsACString &result)
+{
+    result = mSpec;
+    if (mPassword.mLen >= 0) {
+      result.Replace(mPassword.mPos, mPassword.mLen, "****");
+    }
     return NS_OK;
 }
 
@@ -1244,16 +1256,13 @@ nsStandardURL::SetSpec(const nsACString &input)
     if (!spec || !*spec)
         return NS_ERROR_MALFORMED_URI;
 
-    int32_t refPos = input.FindChar('#');
-    if (refPos != kNotFound) {
-        const nsCSubstring& sub = Substring(input, refPos, input.Length());
-        nsresult rv = CheckRefCharacters(sub);
-        if (NS_FAILED(rv)) {
-            return rv;
-        }
+    if (input.Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
     }
 
-    if (input.Length() > (uint32_t) net_GetURLMaxLength()) {
+    // NUL characters aren't allowed
+    // \r\n\t are stripped out instead of returning error(see below)
+    if (input.Contains('\0')) {
         return NS_ERROR_MALFORMED_URI;
     }
 
@@ -2529,27 +2538,6 @@ nsStandardURL::SetQuery(const nsACString &input)
     return NS_OK;
 }
 
-nsresult
-nsStandardURL::CheckRefCharacters(const nsACString &input)
-{
-    nsACString::const_iterator start, end;
-    input.BeginReading(start);
-    input.EndReading(end);
-    for (; start != end; ++start) {
-        switch (*start) {
-            case 0x00:
-            case 0x09:
-            case 0x0A:
-            case 0x0D:
-                // These characters are not allowed in the Ref part.
-                return NS_ERROR_MALFORMED_URI;
-            default:
-                continue;
-        }
-    }
-    return NS_OK;
-}
-
 NS_IMETHODIMP
 nsStandardURL::SetRef(const nsACString &input)
 {
@@ -2560,9 +2548,8 @@ nsStandardURL::SetRef(const nsACString &input)
 
     LOG(("nsStandardURL::SetRef [ref=%s]\n", ref));
 
-    nsresult rv = CheckRefCharacters(input);
-    if (NS_FAILED(rv)) {
-        return rv;
+    if (input.Contains('\0')) {
+        return NS_ERROR_MALFORMED_URI;
     }
 
     if (mPath.mLen < 0)

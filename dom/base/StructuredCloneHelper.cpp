@@ -7,11 +7,18 @@
 #include "StructuredCloneHelper.h"
 
 #include "ImageContainer.h"
+#include "mozilla/AutoRestore.h"
 #include "mozilla/dom/BlobBinding.h"
+#include "mozilla/dom/File.h"
+#include "mozilla/dom/FileList.h"
 #include "mozilla/dom/FileListBinding.h"
 #include "mozilla/dom/ImageBitmap.h"
 #include "mozilla/dom/ImageBitmapBinding.h"
+#include "mozilla/dom/MessagePort.h"
+#include "mozilla/dom/MessagePortBinding.h"
+#include "mozilla/dom/PMessagePort.h"
 #include "mozilla/dom/StructuredCloneTags.h"
+#include "mozilla/dom/ToJSValue.h"
 
 namespace mozilla {
 namespace dom {
@@ -125,7 +132,6 @@ void
 StructuredCloneHelperInternal::Shutdown()
 {
 #ifdef DEBUG
-  MOZ_ASSERT(!mShutdownCalled, "Shutdown already called!");
   mShutdownCalled = true;
 #endif
 
@@ -163,7 +169,6 @@ StructuredCloneHelperInternal::Read(JSContext* aCx,
   MOZ_ASSERT(!mShutdownCalled, "This method cannot be called after Shutdown.");
 
   bool ok = mBuffer->read(aCx, aValue, &gCallbacks, this);
-  mBuffer = nullptr;
   return ok;
 }
 
@@ -247,7 +252,11 @@ StructuredCloneHelper::Read(nsISupports* aParent,
     aRv.Throw(NS_ERROR_DOM_DATA_CLONE_ERR);
   }
 
-  mBlobImplArray.Clear();
+  // If we are tranferring something, we cannot call 'Read()' more than once.
+  if (mSupportsTransferring) {
+    mBlobImplArray.Clear();
+    Shutdown();
+  }
 }
 
 void
@@ -258,15 +267,27 @@ StructuredCloneHelper::ReadFromBuffer(nsISupports* aParent,
                                       JS::MutableHandle<JS::Value> aValue,
                                       ErrorResult& aRv)
 {
+  ReadFromBuffer(aParent, aCx, aBuffer, aBufferLength,
+                 JS_STRUCTURED_CLONE_VERSION, aValue, aRv);
+}
+
+void
+StructuredCloneHelper::ReadFromBuffer(nsISupports* aParent,
+                                      JSContext* aCx,
+                                      uint64_t* aBuffer,
+                                      size_t aBufferLength,
+                                      uint32_t aAlgorithmVersion,
+                                      JS::MutableHandle<JS::Value> aValue,
+                                      ErrorResult& aRv)
+{
   MOZ_ASSERT(!mBuffer, "ReadFromBuffer() must be called without a Write().");
   MOZ_ASSERT(aBuffer);
 
   mozilla::AutoRestore<nsISupports*> guard(mParent);
   mParent = aParent;
 
-  if (!JS_ReadStructuredClone(aCx, aBuffer, aBufferLength,
-                              JS_STRUCTURED_CLONE_VERSION, aValue,
-                              &gCallbacks, this)) {
+  if (!JS_ReadStructuredClone(aCx, aBuffer, aBufferLength, aAlgorithmVersion,
+                              aValue, &gCallbacks, this)) {
     JS_ClearPendingException(aCx);
     aRv.Throw(NS_ERROR_DOM_DATA_CLONE_ERR);
   }

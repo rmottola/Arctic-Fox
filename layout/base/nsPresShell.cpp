@@ -86,7 +86,7 @@
 #include "nsXPCOM.h"
 #include "nsILayoutHistoryState.h"
 #include "nsILineIterator.h" // for ScrollContentIntoView
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "mozilla/dom/BeforeAfterKeyboardEventBinding.h"
 #include "mozilla/dom/Touch.h"
 #include "mozilla/dom/PointerEventBinding.h"
@@ -984,6 +984,12 @@ PresShell::Init(nsIDocument* aDocument,
   if (mPresContext->IsRootContentDocument()) {
     mZoomConstraintsClient = new ZoomConstraintsClient();
     mZoomConstraintsClient->Init(this, mDocument);
+#ifndef MOZ_WIDGET_ANDROID
+    // Fennec will need some work to use this code; see bug 1180267.
+    if (gfxPrefs::MetaViewportEnabled() || gfxPrefs::APZAllowZooming()) {
+      mMobileViewportManager = new MobileViewportManager(this, mDocument);
+    }
+#endif
   }
 }
 
@@ -1101,6 +1107,10 @@ PresShell::Destroy()
   if (mZoomConstraintsClient) {
     mZoomConstraintsClient->Destroy();
     mZoomConstraintsClient = nullptr;
+  }
+  if (mMobileViewportManager) {
+    mMobileViewportManager->Destroy();
+    mMobileViewportManager = nullptr;
   }
 
 #ifdef ACCESSIBILITY
@@ -1757,6 +1767,19 @@ nsresult
 PresShell::ResizeReflowOverride(nscoord aWidth, nscoord aHeight)
 {
   mViewportOverridden = true;
+
+  if (mMobileViewportManager) {
+    // Once the viewport is explicitly overridden, we don't need the
+    // MobileViewportManager any more (in this presShell at least). Destroying
+    // it simplifies things because then it can maintain an invariant that any
+    // time it gets a meta-viewport change (for example) it knows it must
+    // recompute the CSS viewport and do a reflow. If we didn't destroy it here
+    // then there would be times where a meta-viewport change would have no
+    // effect.
+    mMobileViewportManager->Destroy();
+    mMobileViewportManager = nullptr;
+  }
+
   return ResizeReflowIgnoreOverride(aWidth, aHeight);
 }
 
@@ -1768,6 +1791,15 @@ PresShell::ResizeReflow(nscoord aWidth, nscoord aHeight)
     // didn't ask to ignore the override.  Pretend it didn't happen.
     return NS_OK;
   }
+
+  if (mMobileViewportManager) {
+    // If we have a mobile viewport manager, request a reflow from it. It can
+    // recompute the final CSS viewport and trigger a call to
+    // ResizeReflowIgnoreOverride if it changed.
+    mMobileViewportManager->RequestReflow();
+    return NS_OK;
+  }
+
   return ResizeReflowIgnoreOverride(aWidth, aHeight);
 }
 

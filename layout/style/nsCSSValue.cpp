@@ -1961,7 +1961,7 @@ AppendGridTemplateToString(const nsCSSValueList* val,
     } else if (unit == eCSSUnit_Null) {
       // Empty or omitted <line-names>.
       if (isSubgrid) {
-        aResult.AppendLiteral("()");
+        aResult.AppendLiteral("[]");
       } else {
         // Serializes to nothing.
         addSpaceSeparator = false;  // Avoid a double space.
@@ -1969,10 +1969,10 @@ AppendGridTemplateToString(const nsCSSValueList* val,
 
     } else if (unit == eCSSUnit_List || unit == eCSSUnit_ListDep) {
       // Non-empty <line-names>
-      aResult.Append('(');
+      aResult.Append('[');
       AppendValueListToString(val->mValue.GetListValue(), aProperty,
                               aResult, aSerialization);
-      aResult.Append(')');
+      aResult.Append(']');
 
     } else {
       // <track-size>

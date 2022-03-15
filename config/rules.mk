@@ -250,8 +250,9 @@ CPPOBJS = $(notdir $(addsuffix .$(OBJ_SUFFIX),$(basename $(CPPSRCS))))
 CMOBJS = $(notdir $(CMSRCS:.m=.$(OBJ_SUFFIX)))
 CMMOBJS = $(notdir $(CMMSRCS:.mm=.$(OBJ_SUFFIX)))
 ASOBJS = $(notdir $(ASFILES:.$(ASM_SUFFIX)=.$(OBJ_SUFFIX)))
+RSOBJS = $(addprefix lib,$(notdir $(RSSRCS:.rs=.$(LIB_SUFFIX))))
 ifndef OBJS
-_OBJS = $(COBJS) $(SOBJS) $(CPPOBJS) $(CMOBJS) $(CMMOBJS) $(ASOBJS)
+_OBJS = $(COBJS) $(SOBJS) $(CPPOBJS) $(CMOBJS) $(CMMOBJS) $(ASOBJS) $(RSOBJS)
 OBJS = $(strip $(_OBJS))
 endif
 
@@ -723,7 +724,7 @@ else
 endif # HOST_CPP_PROG_LINK
 endif
 ifndef CROSS_COMPILE
-       $(call CHECK_STDCXX,$@)
+	$(call CHECK_STDCXX,$@)
 endif
 
 #
@@ -768,7 +769,7 @@ else
 endif
 endif
 ifndef CROSS_COMPILE
-       $(call CHECK_STDCXX,$@)
+	$(call CHECK_STDCXX,$@)
 endif
 
 ifdef DTRACE_PROBE_OBJ
@@ -888,6 +889,12 @@ endef
 $(foreach f,$(CSRCS) $(SSRCS) $(CPPSRCS) $(CMSRCS) $(CMMSRCS) $(ASFILES),$(eval $(call src_objdep,$(f))))
 $(foreach f,$(HOST_CSRCS) $(HOST_CPPSRCS) $(HOST_CMSRCS) $(HOST_CMMSRCS),$(eval $(call src_objdep,$(f),host_)))
 
+# The Rust compiler only outputs library objects, and so we need different
+# mangling to generate dependency rules for it.
+mk_libname = $(basename lib$(notdir $1)).$(LIB_SUFFIX)
+src_libdep = $(call mk_libname,$1): $1 $$(call mkdir_deps,$$(MDDEPDIR))
+$(foreach f,$(RSSRCS),$(eval $(call src_libdep,$(f))))
+
 $(OBJS) $(HOST_OBJS) $(PROGOBJS) $(HOST_PROGOBJS): $(GLOBAL_DEPS)
 
 # Rules for building native targets must come first because of the host_ prefix
@@ -933,6 +940,14 @@ ifdef ASFILES
 $(ASOBJS):
 	$(REPORT_BUILD)
 	$(AS) $(ASOUTOPTION)$@ $(ASFLAGS) $($(notdir $<)_FLAGS) $(AS_DASH_C_FLAG) $(_VPATH_SRCS)
+endif
+
+ifdef MOZ_RUST
+# Assume any system libraries rustc links against are already
+# in the target's LIBS.
+$(RSOBJS):
+	$(REPORT_BUILD)
+	$(RUSTC) $(RUSTFLAGS) --crate-type staticlib -o $(call mk_libname,$<) $(_VPATH_SRCS)
 endif
 
 $(SOBJS):
@@ -1272,7 +1287,7 @@ ifneq ($(DIST_FILES),)
 DIST_FILES_PATH := $(FINAL_TARGET)
 # We preprocess these, but they don't necessarily have preprocessor directives,
 # so tell them preprocessor to not complain about that.
-DIST_FILES_FLAGS := $(XULAPP_DEFINES) --silence-missing-directive-warnings
+DIST_FILES_FLAGS := --silence-missing-directive-warnings
 PP_TARGETS += DIST_FILES
 endif
 
@@ -1310,7 +1325,7 @@ ifndef MOZ_DEBUG
 endif
 endif
 	@echo 'Packaging $(XPI_PKGNAME).xpi...'
-	cd $(FINAL_TARGET) && $(ZIP) -qr ../$(XPI_PKGNAME).xpi *
+	$(call py_action,zip,-C $(FINAL_TARGET) ../$(XPI_PKGNAME).xpi '*')
 endif
 
 # See comment above about moving this out of the tools tier.

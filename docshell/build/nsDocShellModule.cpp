@@ -1,6 +1,6 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-
- *
- * This Source Code Form is subject to the terms of the Mozilla Public
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
+/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
@@ -155,6 +155,9 @@ const mozilla::Module::ContractIDEntry kDocShellContracts[] = {
   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "about", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "config", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+#ifdef MOZ_CRASHREPORTER
+  { NS_ABOUT_MODULE_CONTRACTID_PREFIX "crashes", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
+#endif
   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "credits", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "plugins", &kNS_ABOUT_REDIRECTOR_MODULE_CID },
   { NS_ABOUT_MODULE_CONTRACTID_PREFIX "mozilla", &kNS_ABOUT_REDIRECTOR_MODULE_CID },

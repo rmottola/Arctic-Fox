@@ -23,7 +23,7 @@
 #endif /* _WIN32 */
 
 #include "plstr.h"
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "plbase64.h"
 #include "mozilla/Logging.h"
 #include "prprf.h"
@@ -80,9 +80,9 @@ static bool         gShouldCleanupDeadNodes = false;
 
 
 static PLDHashTableOps     pref_HashTableOps = {
-    PL_DHashStringKey,
+    PLDHashTable::HashStringKey,
     matchPrefEntry,
-    PL_DHashMoveEntryStub,
+    PLDHashTable::MoveEntryStub,
     clearPrefEntry,
     nullptr,
 };

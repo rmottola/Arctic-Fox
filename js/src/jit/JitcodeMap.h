@@ -45,7 +45,7 @@ class JitcodeSkiplistTower
   private:
     uint8_t height_;
     bool isFree_;
-    JitcodeGlobalEntry *ptrs_[1];
+    JitcodeGlobalEntry* ptrs_[1];
 
   public:
     explicit JitcodeSkiplistTower(unsigned height)
@@ -60,16 +60,16 @@ class JitcodeSkiplistTower
         return height_;
     }
 
-    JitcodeGlobalEntry **ptrs(unsigned level) {
+    JitcodeGlobalEntry** ptrs(unsigned level) {
         return ptrs_;
     }
 
-    JitcodeGlobalEntry *next(unsigned level) const {
+    JitcodeGlobalEntry* next(unsigned level) const {
         MOZ_ASSERT(!isFree_);
         MOZ_ASSERT(level < height());
         return ptrs_[level];
     }
-    void setNext(unsigned level, JitcodeGlobalEntry *entry) {
+    void setNext(unsigned level, JitcodeGlobalEntry* entry) {
         MOZ_ASSERT(!isFree_);
         MOZ_ASSERT(level < height());
         ptrs_[level] = entry;
@@ -78,26 +78,26 @@ class JitcodeSkiplistTower
     //
     // When stored in a free-list, towers use 'ptrs_[0]' to store a
     // pointer to the next tower.  In this context only, 'ptrs_[0]'
-    // may refer to a |JitcodeSkiplistTower *| instead of a
-    // |JitcodeGlobalEntry *|.
+    // may refer to a |JitcodeSkiplistTower*| instead of a
+    // |JitcodeGlobalEntry*|.
     //
 
-    void addToFreeList(JitcodeSkiplistTower **freeList) {
-        JitcodeSkiplistTower *nextFreeTower = *freeList;
+    void addToFreeList(JitcodeSkiplistTower** freeList) {
+        JitcodeSkiplistTower* nextFreeTower = *freeList;
         MOZ_ASSERT_IF(nextFreeTower, nextFreeTower->isFree_ &&
                                      nextFreeTower->height() == height_);
-        ptrs_[0] = (JitcodeGlobalEntry *) nextFreeTower;
+        ptrs_[0] = (JitcodeGlobalEntry*) nextFreeTower;
         isFree_ = true;
         *freeList = this;
     }
 
-    static JitcodeSkiplistTower *PopFromFreeList(JitcodeSkiplistTower **freeList) {
+    static JitcodeSkiplistTower* PopFromFreeList(JitcodeSkiplistTower** freeList) {
         if (!*freeList)
             return nullptr;
 
-        JitcodeSkiplistTower *tower = *freeList;
+        JitcodeSkiplistTower* tower = *freeList;
         MOZ_ASSERT(tower->isFree_);
-        JitcodeSkiplistTower *nextFreeTower = (JitcodeSkiplistTower *) tower->ptrs_[0];
+        JitcodeSkiplistTower* nextFreeTower = (JitcodeSkiplistTower*) tower->ptrs_[0];
         tower->clearPtrs();
         tower->isFree_ = false;
         *freeList = nextFreeTower;
@@ -107,7 +107,7 @@ class JitcodeSkiplistTower
     static size_t CalculateSize(unsigned height) {
         MOZ_ASSERT(height >= 1);
         return sizeof(JitcodeSkiplistTower) +
-               (sizeof(JitcodeGlobalEntry *) * (height - 1));
+               (sizeof(JitcodeGlobalEntry*) * (height - 1));
     }
 
   private:
@@ -143,31 +143,31 @@ class JitcodeGlobalEntry
 
     struct BaseEntry
     {
-	JitCode *jitcode_;
+        JitCode* jitcode_;
         void* nativeStartAddr_;
         void* nativeEndAddr_;
         uint32_t gen_;
         Kind kind_ : 7;
 
         void init() {
-	    jitcode_ = nullptr;
+            jitcode_ = nullptr;
             nativeStartAddr_ = nullptr;
             nativeEndAddr_ = nullptr;
-	    gen_ = UINT32_MAX;
+            gen_ = UINT32_MAX;
             kind_ = INVALID;
         }
 
-        void init(Kind kind, JitCode *code,
-                  void *nativeStartAddr, void *nativeEndAddr)
+        void init(Kind kind, JitCode* code,
+                  void* nativeStartAddr, void* nativeEndAddr)
         {
             MOZ_ASSERT_IF(kind != Query, code);
             MOZ_ASSERT(nativeStartAddr);
             MOZ_ASSERT(nativeEndAddr);
             MOZ_ASSERT(kind > INVALID && kind < LIMIT);
-	    jitcode_ = code;
+            jitcode_ = code;
             nativeStartAddr_ = nativeStartAddr;
             nativeEndAddr_ = nativeEndAddr;
-	    gen_ = UINT32_MAX;
+            gen_ = UINT32_MAX;
             kind_ = kind;
         }
 
@@ -187,7 +187,7 @@ class JitcodeGlobalEntry
         Kind kind() const {
             return kind_;
         }
-        JitCode *jitcode() const {
+        JitCode* jitcode() const {
             return jitcode_;
         }
         void* nativeStartAddr() const {
@@ -260,8 +260,8 @@ class JitcodeGlobalEntry
 
         SizedScriptList* scriptList_;
 
-        void init(JitCode *code, void *nativeStartAddr, void *nativeEndAddr,
-                  SizedScriptList *scriptList, JitcodeIonTable *regionTable)
+        void init(JitCode* code, void* nativeStartAddr, void* nativeEndAddr,
+                  SizedScriptList* scriptList, JitcodeIonTable* regionTable)
         {
             MOZ_ASSERT(scriptList);
             MOZ_ASSERT(regionTable);
@@ -369,7 +369,7 @@ class JitcodeGlobalEntry
                                          IonTrackedOptimizationsTypeInfo::ForEachOpAdapter& op);
 
         template <class ShouldMarkProvider> bool mark(JSTracer* trc);
-        void sweep();
+        void sweepChildren();
         bool isMarkedFromAnyThread();
     };
 
@@ -427,7 +427,7 @@ class JitcodeGlobalEntry
                                          JSScript** script, jsbytecode** pc) const;
 
         template <class ShouldMarkProvider> bool mark(JSTracer* trc);
-        void sweep();
+        void sweepChildren();
         bool isMarkedFromAnyThread();
     };
 
@@ -476,7 +476,7 @@ class JitcodeGlobalEntry
                                          IonTrackedOptimizationsTypeInfo::ForEachOpAdapter& op);
 
         template <class ShouldMarkProvider> bool mark(JSTracer* trc);
-        void sweep(JSRuntime* rt);
+        void sweepChildren(JSRuntime* rt);
         bool isMarkedFromAnyThread(JSRuntime* rt);
     };
 
@@ -688,7 +688,7 @@ class JitcodeGlobalEntry
         return kind() == Query;
     }
 
-    BaseEntry &baseEntry() {
+    BaseEntry& baseEntry() {
         MOZ_ASSERT(isValid());
         return base_;
     }
@@ -713,7 +713,7 @@ class JitcodeGlobalEntry
         return query_;
     }
 
-    const BaseEntry &baseEntry() const {
+    const BaseEntry& baseEntry() const {
         MOZ_ASSERT(isValid());
         return base_;
     }
@@ -795,7 +795,6 @@ class JitcodeGlobalEntry
         return false;
     }
 
-
     void youngestFrameLocationAtAddr(JSRuntime* rt, void* ptr,
                                      JSScript** script, jsbytecode** pc) const
     {
@@ -819,7 +818,7 @@ class JitcodeGlobalEntry
 
     // Compare two global entries.
     static int compare(const JitcodeGlobalEntry& ent1, const JitcodeGlobalEntry& ent2);
-    int compareTo(const JitcodeGlobalEntry &other) {
+    int compareTo(const JitcodeGlobalEntry& other) {
         return compare(*this, other);
     }
 
@@ -932,16 +931,16 @@ class JitcodeGlobalEntry
         return markedAny;
     }
 
-    void sweep(JSRuntime* rt) {
+    void sweepChildren(JSRuntime* rt) {
         switch (kind()) {
           case Ion:
-            ionEntry().sweep();
+            ionEntry().sweepChildren();
             break;
           case Baseline:
-            baselineEntry().sweep();
+            baselineEntry().sweepChildren();
             break;
           case IonCache:
-            ionCacheEntry().sweep(rt);
+            ionCacheEntry().sweepChildren(rt);
           case Dummy:
             break;
           default:
@@ -970,8 +969,8 @@ class JitcodeGlobalEntry
     //
     // When stored in a free-list, entries use 'tower_' to store a
     // pointer to the next entry.  In this context only, 'tower_'
-    // may refer to a |JitcodeGlobalEntry *| instead of a
-    // |JitcodeSkiplistTower *|.
+    // may refer to a |JitcodeGlobalEntry*| instead of a
+    // |JitcodeSkiplistTower*|.
     //
 
     void addToFreeList(JitcodeGlobalEntry** freeList) {
@@ -1025,7 +1024,7 @@ class JitcodeGlobalTable
     ~JitcodeGlobalTable() {}
 
     bool empty() const {
-	return skiplistSize_ == 0;
+        return skiplistSize_ == 0;
     }
 
     bool lookup(void* ptr, JitcodeGlobalEntry* result, JSRuntime* rt);
@@ -1090,11 +1089,11 @@ class JitcodeGlobalTable
     class Range
     {
       protected:
-        JitcodeGlobalTable &table_;
+        JitcodeGlobalTable& table_;
         JitcodeGlobalEntry* cur_;
 
       public:
-        explicit Range(JitcodeGlobalTable &table)
+        explicit Range(JitcodeGlobalTable& table)
           : table_(table),
             cur_(table.startTower_[0])
         { }

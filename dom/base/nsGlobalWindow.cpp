@@ -6217,7 +6217,7 @@ nsGlobalWindow::GetMainWidget()
 }
 
 nsIWidget*
-nsGlobalWindow::GetNearestWidget()
+nsGlobalWindow::GetNearestWidget() const
 {
   nsIDocShell* docShell = GetDocShell();
   NS_ENSURE_TRUE(docShell, nullptr);
@@ -6522,7 +6522,15 @@ nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
   // consequential calls to this method, those calls will be skipped
   // at the condition above.
   if (aReason == eForFullscreenMode) {
-    mFullscreenMode = aFullScreen;
+    if (!aFullScreen && !mFullscreenMode) {
+      // If we are exiting fullscreen mode, but we actually didn't
+      // entered fullscreen mode, the fullscreen state was only for
+      // the Fullscreen API. Change the reason here so that we can
+      // perform transition for it.
+      aReason = eForFullscreenAPI;
+    } else {
+      mFullscreenMode = aFullScreen;
+    }
   } else {
     // If we are exiting from DOM fullscreen while we initially make
     // the window fullscreen because of fullscreen mode, don't restore
@@ -6650,8 +6658,16 @@ nsGlobalWindow::FullScreen() const
   nsCOMPtr<nsIDocShellTreeItem> rootItem;
   mDocShell->GetRootTreeItem(getter_AddRefs(rootItem));
   if (rootItem == mDocShell) {
-    // We are the root window. Return our internal value.
-    return mFullScreen;
+    if (!XRE_IsContentProcess()) {
+      // We are the root window. Return our internal value.
+      return mFullScreen;
+    }
+    if (nsCOMPtr<nsIWidget> widget = GetNearestWidget()) {
+      // We are in content process, figure out the value from
+      // the sizemode of the puppet widget.
+      return widget->SizeMode() == nsSizeMode_Fullscreen;
+    }
+    return false;
   }
 
   nsCOMPtr<nsIDOMWindow> window = rootItem->GetWindow();

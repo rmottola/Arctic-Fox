@@ -1313,7 +1313,9 @@ nsDOMWindowUtils::SendSimpleGestureEvent(const nsAString& aType,
     return NS_ERROR_FAILURE;
 
   EventMessage msg;
-  if (aType.EqualsLiteral("MozSwipeGestureStart"))
+  if (aType.EqualsLiteral("MozSwipeGestureMayStart"))
+    msg = NS_SIMPLE_GESTURE_SWIPE_MAY_START;
+  else if (aType.EqualsLiteral("MozSwipeGestureStart"))
     msg = NS_SIMPLE_GESTURE_SWIPE_START;
   else if (aType.EqualsLiteral("MozSwipeGestureUpdate"))
     msg = NS_SIMPLE_GESTURE_SWIPE_UPDATE;
@@ -4020,6 +4022,21 @@ nsDOMWindowUtils::HasRuleProcessorUsedByMultipleStyleSets(uint32_t aSheetType,
 
   return presShell->HasRuleProcessorUsedByMultipleStyleSets(aSheetType,
                                                             aRetVal);
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::SetNextPaintSyncId(int32_t aSyncId)
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+  if (nsIWidget* widget = GetWidget()) {
+    nsRefPtr<LayerManager> lm = widget->GetLayerManager();
+    if (lm && lm->GetBackendType() == LayersBackend::LAYERS_CLIENT) {
+      ClientLayerManager* clm = static_cast<ClientLayerManager*>(lm.get());
+      clm->SetNextPaintSyncId(aSyncId);
+    }
+  }
+
+  return NS_OK;
 }
 
 NS_INTERFACE_MAP_BEGIN(nsTranslationNodeList)

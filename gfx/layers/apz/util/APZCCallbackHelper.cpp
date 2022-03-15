@@ -7,8 +7,10 @@
 
 #include "ContentHelper.h"
 #include "gfxPlatform.h" // For gfxPlatform::UseTiling
+#include "gfxPrefs.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/TabParent.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/layers/LayerTransactionChild.h"
 #include "mozilla/layers/ShadowLayers.h"
 #include "mozilla/TouchEvents.h"
@@ -30,6 +32,8 @@ namespace mozilla {
 namespace layers {
 
 using dom::TabParent;
+
+uint64_t APZCCallbackHelper::sLastTargetAPZCNotificationInputBlock = uint64_t(-1);
 
 static void
 AdjustDisplayPortForScrollDelta(mozilla::layers::FrameMetrics& aFrameMetrics,
@@ -194,33 +198,40 @@ APZCCallbackHelper::UpdateRootFrame(FrameMetrics& aMetrics)
 
   MOZ_ASSERT(aMetrics.GetUseDisplayPortMargins());
 
-  float presShellResolution = nsLayoutUtils::GetResolution(shell);
+  if (gfxPrefs::APZAllowZooming()) {
+    // If zooming is disabled then we don't really want to let APZ fiddle
+    // with these things. In theory setting the resolution here should be a
+    // no-op, but setting the SPCSPS is bad because it can cause a stale value
+    // to be returned by window.innerWidth/innerHeight (see bug 1187792).
 
-  // If the pres shell resolution has changed on the content side side
-  // the time this repaint request was fired, consider this request out of date
-  // and drop it; setting a zoom based on the out-of-date resolution can have
-  // the effect of getting us stuck with the stale resolution.
-  if (presShellResolution != aMetrics.GetPresShellResolution()) {
-    return;
+    float presShellResolution = nsLayoutUtils::GetResolution(shell);
+
+    // If the pres shell resolution has changed on the content side side
+    // the time this repaint request was fired, consider this request out of date
+    // and drop it; setting a zoom based on the out-of-date resolution can have
+    // the effect of getting us stuck with the stale resolution.
+    if (presShellResolution != aMetrics.GetPresShellResolution()) {
+      return;
+    }
+
+    // Set the scroll port size, which determines the scroll range. For example if
+    // a 500-pixel document is shown in a 100-pixel frame, the scroll port length would
+    // be 100, and gecko would limit the maximum scroll offset to 400 (so as to prevent
+    // overscroll). Note that if the content here was zoomed to 2x, the document would
+    // be 1000 pixels long but the frame would still be 100 pixels, and so the maximum
+    // scroll range would be 900. Therefore this calculation depends on the zoom applied
+    // to the content relative to the container.
+    // Note that this needs to happen before scrolling the frame (in UpdateFrameCommon),
+    // otherwise the scroll position may get clamped incorrectly.
+    CSSSize scrollPort = aMetrics.CalculateCompositedSizeInCssPixels();
+    nsLayoutUtils::SetScrollPositionClampingScrollPortSize(shell, scrollPort);
+
+    // The pres shell resolution is updated by the the async zoom since the
+    // last paint.
+    presShellResolution = aMetrics.GetPresShellResolution()
+                        * aMetrics.GetAsyncZoom().scale;
+    nsLayoutUtils::SetResolutionAndScaleTo(shell, presShellResolution);
   }
-
-  // Set the scroll port size, which determines the scroll range. For example if
-  // a 500-pixel document is shown in a 100-pixel frame, the scroll port length would
-  // be 100, and gecko would limit the maximum scroll offset to 400 (so as to prevent
-  // overscroll). Note that if the content here was zoomed to 2x, the document would
-  // be 1000 pixels long but the frame would still be 100 pixels, and so the maximum
-  // scroll range would be 900. Therefore this calculation depends on the zoom applied
-  // to the content relative to the container.
-  // Note that this needs to happen before scrolling the frame (in UpdateFrameCommon),
-  // otherwise the scroll position may get clamped incorrectly.
-  CSSSize scrollPort = aMetrics.CalculateCompositedSizeInCssPixels();
-  nsLayoutUtils::SetScrollPositionClampingScrollPortSize(shell, scrollPort);
-
-  // The pres shell resolution is updated by the the async zoom since the
-  // last paint.
-  presShellResolution = aMetrics.GetPresShellResolution()
-                      * aMetrics.GetAsyncZoom().scale;
-  nsLayoutUtils::SetResolutionAndScaleTo(shell, presShellResolution);
 
   // Do this as late as possible since scrolling can flush layout. It also
   // adjusts the display port margins, so do it before we set those.
@@ -718,6 +729,16 @@ APZCCallbackHelper::SendSetTargetAPZCNotification(nsIWidget* aWidget,
   if (!aWidget || !aDocument) {
     return;
   }
+  if (aInputBlockId == sLastTargetAPZCNotificationInputBlock) {
+    // We have already confirmed the target APZC for a previous event of this
+    // input block. If we activated a scroll frame for this input block,
+    // sending another target APZC confirmation would be harmful, as it might
+    // race the original confirmation (which needs to go through a layers
+    // transaction).
+    APZCCH_LOG("Not resending target APZC confirmation for input block %" PRIu64 "\n", aInputBlockId);
+    return;
+  }
+  sLastTargetAPZCNotificationInputBlock = aInputBlockId;
   if (nsIPresShell* shell = aDocument->GetShell()) {
     if (nsIFrame* rootFrame = shell->GetRootFrame()) {
       bool waitForRefresh = false;
@@ -752,13 +773,13 @@ APZCCallbackHelper::SendSetAllowedTouchBehaviorNotification(
         nsIWidget* aWidget,
         const WidgetTouchEvent& aEvent,
         uint64_t aInputBlockId,
-        const nsRefPtr<SetAllowedTouchBehaviorCallback>& aCallback)
+        const SetAllowedTouchBehaviorCallback& aCallback)
 {
   nsTArray<TouchBehaviorFlags> flags;
   for (uint32_t i = 0; i < aEvent.touches.Length(); i++) {
     flags.AppendElement(widget::ContentHelper::GetAllowedTouchBehavior(aWidget, aEvent.touches[i]->mRefPoint));
   }
-  aCallback->Run(aInputBlockId, flags);
+  aCallback(aInputBlockId, flags);
 }
 
 void
@@ -787,6 +808,27 @@ APZCCallbackHelper::NotifyFlushComplete()
   MOZ_ASSERT(observerService);
   observerService->NotifyObservers(nullptr, "apz-repaints-flushed", nullptr);
 }
+
+static int32_t sActiveSuppressDisplayport = 0;
+
+void
+APZCCallbackHelper::SuppressDisplayport(const bool& aEnabled)
+{
+  if (aEnabled) {
+    sActiveSuppressDisplayport++;
+  } else {
+    sActiveSuppressDisplayport--;
+  }
+
+  MOZ_ASSERT(sActiveSuppressDisplayport >= 0);
+}
+
+bool
+APZCCallbackHelper::IsDisplayportSuppressed()
+{
+  return sActiveSuppressDisplayport > 0;
+}
+
 
 } // namespace layers
 } // namespace mozilla

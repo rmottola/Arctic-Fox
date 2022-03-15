@@ -48,15 +48,6 @@ enum UseCounter : int16_t;
 namespace dom {
 template<typename DataType> class MozMap;
 
-struct SelfRef
-{
-  SelfRef() : ptr(nullptr) {}
-  explicit SelfRef(nsISupports *p) : ptr(p) {}
-  ~SelfRef() { NS_IF_RELEASE(ptr); }
-
-  nsISupports* ptr;
-};
-
 nsresult
 UnwrapArgImpl(JS::Handle<JSObject*> src, const nsIID& iid, void** ppArg);
 
@@ -100,27 +91,8 @@ ThrowInvalidThis(JSContext* aCx, const JS::CallArgs& aArgs,
                  const ErrNum aErrorNumber,
                  prototypes::ID aProtoId);
 
-inline bool
-ThrowMethodFailed(JSContext* cx, ErrorResult& rv)
-{
-  if (rv.IsUncatchableException()) {
-    // Nuke any existing exception on aCx, to make sure we're uncatchable.
-    JS_ClearPendingException(cx);
-    // Don't do any reporting.  Just return false, to create an
-    // uncatchable exception.
-    return false;
-  }
-  if (rv.IsErrorWithMessage()) {
-    rv.ReportErrorWithMessage(cx);
-    return false;
-  }
-  if (rv.IsJSException()) {
-    rv.ReportJSException(cx);
-    return false;
-  }
-  rv.ReportGenericError(cx);
-  return false;
-}
+bool
+ThrowMethodFailed(JSContext* cx, ErrorResult& rv);
 
 // Returns true if the JSClass is used for DOM objects.
 inline bool
@@ -359,7 +331,6 @@ class ProtoAndIfaceCache
     }
 
     JS::Heap<JSObject*>& EntrySlotMustExist(size_t i) {
-      MOZ_ASSERT((*this)[i]);
       return (*this)[i];
     }
 
@@ -483,14 +454,21 @@ public:
     }                                                \
   } while(0)
 
+  // Return the JSObject stored in slot i, if that slot exists.  If
+  // the slot does not exist, return null.
   JSObject* EntrySlotIfExists(size_t i) {
     FORWARD_OPERATION(EntrySlotIfExists, (i));
   }
 
+  // Return a reference to slot i, creating it if necessary.  There
+  // may not be an object in the returned slot.
   JS::Heap<JSObject*>& EntrySlotOrCreate(size_t i) {
     FORWARD_OPERATION(EntrySlotOrCreate, (i));
   }
 
+  // Return a reference to slot i, which is guaranteed to already
+  // exist.  There may not be an object in the slot, if prototype and
+  // constructor initialization for one of our bindings failed.
   JS::Heap<JSObject*>& EntrySlotMustExist(size_t i) {
     FORWARD_OPERATION(EntrySlotMustExist, (i));
   }
@@ -1627,8 +1605,10 @@ struct WrapNativeParentHelper<T, false>
     JSObject* obj;
     if (cache && (obj = cache->GetWrapper())) {
 #ifdef DEBUG
-      NS_ASSERTION(WrapNativeISupportsParent(cx, parent, cache) == obj,
+      JS::Rooted<JSObject*> rootedObj(cx, obj);
+      NS_ASSERTION(WrapNativeISupportsParent(cx, parent, cache) == rootedObj,
                    "Unexpected object in nsWrapperCache");
+      obj = rootedObj;
 #endif
       return obj;
     }
@@ -2696,15 +2676,6 @@ InterfaceHasInstance(JSContext* cx, int prototypeID, int depth,
 // returns false, we couldn't even get a global.
 bool
 ReportLenientThisUnwrappingFailure(JSContext* cx, JSObject* obj);
-
-inline JSObject*
-GetUnforgeableHolder(JSObject* aGlobal, prototypes::ID aId)
-{
-  ProtoAndIfaceCache& protoAndIfaceCache = *GetProtoAndIfaceCache(aGlobal);
-  JSObject* interfaceProto = protoAndIfaceCache.EntrySlotMustExist(aId);
-  return &js::GetReservedSlot(interfaceProto,
-                              DOM_INTERFACE_PROTO_SLOTS_BASE).toObject();
-}
 
 // Given a JSObject* that represents the chrome side of a JS-implemented WebIDL
 // interface, get the nsIGlobalObject corresponding to the content side, if any.

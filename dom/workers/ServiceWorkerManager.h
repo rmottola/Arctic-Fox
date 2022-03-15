@@ -31,6 +31,8 @@
 #include "nsTArrayForwardDeclare.h"
 #include "nsTObserverArray.h"
 
+class mozIApplicationClearPrivateDataParams;
+
 namespace mozilla {
 
 class OriginAttributes;
@@ -126,6 +128,28 @@ public:
   void
   FinishActivate(bool aSuccess);
 
+};
+
+class ServiceWorkerUpdateFinishCallback
+{
+protected:
+  virtual ~ServiceWorkerUpdateFinishCallback()
+  { }
+
+public:
+  NS_INLINE_DECL_REFCOUNTING(ServiceWorkerUpdateFinishCallback)
+
+  virtual
+  void UpdateSucceeded(ServiceWorkerRegistrationInfo* aInfo)
+  { }
+
+  virtual
+  void UpdateFailed(nsresult aStatus)
+  { }
+
+  virtual
+  void UpdateFailed(JSExnType aExnType, const ErrorEventInit& aDesc)
+  { }
 };
 
 /*
@@ -299,10 +323,14 @@ public:
                      ErrorResult& aRv);
 
   void
-  SoftUpdate(nsIPrincipal* aPrincipal, const nsACString& aScope);
+  SoftUpdate(nsIPrincipal* aPrincipal,
+             const nsACString& aScope,
+             ServiceWorkerUpdateFinishCallback* aCallback = nullptr);
 
   void
-  SoftUpdate(const OriginAttributes& aOriginAttributes, const nsACString& aScope);
+  SoftUpdate(const OriginAttributes& aOriginAttributes,
+             const nsACString& aScope,
+             ServiceWorkerUpdateFinishCallback* aCallback = nullptr);
 
   void
   PropagateSoftUpdate(const OriginAttributes& aOriginAttributes,
@@ -347,7 +375,8 @@ public:
               nsString aLine,
               uint32_t aLineNumber,
               uint32_t aColumnNumber,
-              uint32_t aFlags);
+              uint32_t aFlags,
+              JSExnType aExnType);
 
   void
   GetAllClients(nsIPrincipal* aPrincipal,
@@ -402,7 +431,9 @@ private:
   MaybeRemoveRegistrationInfo(const nsACString& aScopeKey);
 
   void
-  SoftUpdate(const nsACString& aScopeKey, const nsACString& aScope);
+  SoftUpdate(const nsACString& aScopeKey,
+             const nsACString& aScope,
+             ServiceWorkerUpdateFinishCallback* aCallback = nullptr);
 
   already_AddRefed<ServiceWorkerRegistrationInfo>
   GetRegistration(const nsACString& aScopeKey,
@@ -547,9 +578,10 @@ private:
   void
   RemoveRegistrationInternal(ServiceWorkerRegistrationInfo* aRegistration);
 
-  // Removes all service worker registrations for a given principal.
+  // Removes all service worker registrations that matches the given
+  // mozIApplicationClearPrivateDataParams.
   void
-  RemoveAllRegistrations(nsIPrincipal* aPrincipal);
+  RemoveAllRegistrations(mozIApplicationClearPrivateDataParams* aParams);
 
   nsRefPtr<ServiceWorkerManagerChild> mActor;
 

@@ -74,20 +74,16 @@ function dumpn(text)
 /**
  * Configure preferences to load engines from
  * chrome://testsearchplugin/locale/searchplugins/
- * unless the loadFromJars parameter is set to false.
  */
-function configureToLoadJarEngines(loadFromJars = true)
+function configureToLoadJarEngines()
 {
   let defaultBranch = Services.prefs.getDefaultBranch(null);
 
   let url = "chrome://testsearchplugin/locale/searchplugins/";
-  defaultBranch.setCharPref("browser.search.jarURIs", url);
-
-  defaultBranch.setBoolPref("browser.search.loadFromJars", loadFromJars);
-
-  // Give the pref a user set value that is the opposite of the default,
-  // to ensure user set values are ignored.
-  Services.prefs.setBoolPref("browser.search.loadFromJars", !loadFromJars)
+  let resProt = Services.io.getProtocolHandler("resource")
+                        .QueryInterface(Ci.nsIResProtocolHandler);
+  resProt.setSubstitution("search-plugins",
+                          Services.io.newURI(url, null, null));
 
   // Ensure a test engine exists in the app dir anyway.
   let dir = Services.dirsvc.get(NS_APP_SEARCH_DIR, Ci.nsIFile);
@@ -209,6 +205,34 @@ function getSearchMetadata()
   return readJSONFile(metadata);
 }
 
+function promiseGlobalMetadata() {
+  return new Promise(resolve => Task.spawn(function* () {
+    let path = OS.Path.join(OS.Constants.Path.profileDir, "search-metadata.json");
+    let bytes = yield OS.File.read(path);
+    resolve(JSON.parse(new TextDecoder().decode(bytes))["[global]"]);
+  }));
+}
+
+function promiseSaveGlobalMetadata(globalData) {
+  return new Promise(resolve => Task.spawn(function* () {
+    let path = OS.Path.join(OS.Constants.Path.profileDir, "search-metadata.json");
+    let bytes = yield OS.File.read(path);
+    let data = JSON.parse(new TextDecoder().decode(bytes));
+    data["[global]"] = globalData;
+    yield OS.File.writeAtomic(path,
+                              new TextEncoder().encode(JSON.stringify(data)));
+    resolve();
+  }));
+}
+
+let forceExpiration = Task.async(function* () {
+  let metadata = yield promiseGlobalMetadata();
+
+  // Make the current geodefaults expire 1s ago.
+  metadata.searchdefaultexpir = Date.now() - 1000;
+  yield promiseSaveGlobalMetadata(metadata);
+});
+
 function removeCacheFile()
 {
   let file = gProfD.clone();
@@ -249,6 +273,22 @@ function isUSTimezone() {
 
   let UTCOffset = (new Date()).getTimezoneOffset();
   return UTCOffset >= 150 && UTCOffset <= 600;
+}
+
+const kDefaultenginenamePref = "browser.search.defaultenginename";
+const kTestEngineName = "Test search engine";
+const kLocalePref = "general.useragent.locale";
+
+function getDefaultEngineName(isUS) {
+  const nsIPLS = Ci.nsIPrefLocalizedString;
+  // Copy the logic from nsSearchService
+  let pref = kDefaultenginenamePref;
+  if (isUS === undefined)
+    isUS = Services.prefs.getCharPref(kLocalePref) == "en-US" && isUSTimezone();
+  if (isUS) {
+    pref += ".US";
+  }
+  return Services.prefs.getComplexValue(pref, nsIPLS).data;
 }
 
 /**
@@ -334,6 +374,8 @@ if (!isChild) {
   Services.prefs.setIntPref("browser.search.geoip.timeout", 2000);
   // But still disable geoip lookups - tests that need it will re-configure this.
   Services.prefs.setCharPref("browser.search.geoip.url", "");
+  // Also disable region defaults - tests using it will also re-configure it.
+  Services.prefs.getDefaultBranch(BROWSER_SEARCH_PREF).setCharPref("geoSpecificDefaults.url", "");
 }
 
 /**
@@ -504,6 +546,24 @@ function waitForSearchNotification(aExpectedData) {
       resolve(aSubject);
     }, SEARCH_SERVICE_TOPIC, false);
   });
+}
+
+function asyncInit() {
+  return new Promise(resolve => {
+    Services.search.init(function() {
+      do_check_true(Services.search.isInitialized);
+      resolve();
+    });
+  });
+}
+
+function asyncReInit() {
+  let promise = waitForSearchNotification("reinit-complete");
+
+  Services.search.QueryInterface(Ci.nsIObserver)
+          .observe(null, "nsPref:changed", kLocalePref);
+
+  return promise;
 }
 
 // This "enum" from nsSearchService.js

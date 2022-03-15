@@ -289,6 +289,7 @@ TabParent::TabParent(nsIContentParent* aManager,
   , mCursor(nsCursor(-1))
   , mTabSetsCursor(false)
   , mHasContentOpener(false)
+  , mActiveSupressDisplayportCount(0)
 {
   MOZ_ASSERT(aManager);
 }
@@ -1040,7 +1041,7 @@ TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size)
   }
   hal::ScreenConfiguration config;
   hal::GetCurrentScreenConfiguration(&config);
-  ScreenOrientation orientation = config.orientation();
+  ScreenOrientationInternal orientation = config.orientation();
   LayoutDeviceIntPoint chromeOffset = -GetChildProcessOffset();
 
   nsCOMPtr<nsIWidget> widget = GetWidget();
@@ -1074,7 +1075,9 @@ TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size)
 
     CSSRect unscaledRect = devicePixelRect / widgetScale;
     CSSSize unscaledSize = devicePixelSize / widgetScale;
-    unused << SendUpdateDimensions(unscaledRect, unscaledSize, orientation, chromeOffset);
+    unused << SendUpdateDimensions(unscaledRect, unscaledSize,
+                                   widget->SizeMode(),
+                                   orientation, chromeOffset);
   }
 }
 
@@ -1094,7 +1097,11 @@ TabParent::UIResolutionChanged()
     // mDPI being greater than 0, so this invalidates it.
     mDPI = -1;
     TryCacheDPIAndScale();
-    unused << SendUIResolutionChanged();
+    // If mDPI was set to -1 to invalidate it and then TryCacheDPIAndScale
+    // fails to cache the values, then mDefaultScale.scale might be invalid.
+    // We don't want to send that value to content. Just send -1 for it too in
+    // that case.
+    unused << SendUIResolutionChanged(mDPI, mDPI < 0 ? -1.0 : mDefaultScale.scale);
   }
 }
 
@@ -1393,7 +1400,11 @@ bool TabParent::SendRealMouseEvent(WidgetMouseEvent& event)
   }
 
   if (NS_MOUSE_MOVE == event.mMessage) {
-    return SendRealMouseMoveEvent(event);
+    if (event.reason == WidgetMouseEvent::eSynthesized) {
+      return SendSynthMouseMoveEvent(event);
+    } else {
+      return SendRealMouseMoveEvent(event);
+    }
   }
   return SendRealMouseButtonEvent(event);
 }
@@ -2523,10 +2534,9 @@ TabParent::RecvGetMaxTouchPoints(uint32_t* aTouchPoints)
   return true;
 }
 
-bool
-TabParent::RecvGetWidgetNativeData(WindowsHandle* aValue)
+already_AddRefed<nsIWidget>
+TabParent::GetTopLevelWidget()
 {
-  *aValue = 0;
   nsCOMPtr<nsIContent> content = do_QueryInterface(mFrameElement);
   if (content) {
     nsIPresShell* shell = content->OwnerDoc()->GetShell();
@@ -2534,11 +2544,48 @@ TabParent::RecvGetWidgetNativeData(WindowsHandle* aValue)
       nsViewManager* vm = shell->GetViewManager();
       nsCOMPtr<nsIWidget> widget;
       vm->GetRootWidget(getter_AddRefs(widget));
-      if (widget) {
-        *aValue = reinterpret_cast<WindowsHandle>(
-          widget->GetNativeData(NS_NATIVE_SHAREABLE_WINDOW));
-      }
+      return widget.forget();
     }
+  }
+  return nullptr;
+}
+
+bool
+TabParent::RecvGetWidgetNativeData(WindowsHandle* aValue)
+{
+  *aValue = 0;
+  nsCOMPtr<nsIWidget> widget = GetTopLevelWidget();
+  if (widget) {
+    *aValue = reinterpret_cast<WindowsHandle>(
+      widget->GetNativeData(NS_NATIVE_SHAREABLE_WINDOW));
+  }
+  return true;
+}
+
+bool
+TabParent::RecvSetNativeChildOfShareableWindow(const uintptr_t& aChildWindow)
+{
+#if defined(XP_WIN)
+  nsCOMPtr<nsIWidget> widget = GetTopLevelWidget();
+  if (widget) {
+    // Note that this call will probably cause a sync native message to the
+    // process that owns the child window.
+    widget->SetNativeData(NS_NATIVE_CHILD_OF_SHAREABLE_WINDOW, aChildWindow);
+  }
+  return true;
+#else
+  NS_NOTREACHED(
+    "TabParent::RecvSetNativeChildOfShareableWindow not implemented!");
+  return false;
+#endif
+}
+
+bool
+TabParent::RecvDispatchFocusToTopLevelWindow()
+{
+  nsCOMPtr<nsIWidget> widget = GetTopLevelWidget();
+  if (widget) {
+    widget->SetFocus(false);
   }
   return true;
 }
@@ -2813,6 +2860,16 @@ TabParent::RecvUpdateZoomConstraints(const uint32_t& aPresShellId,
 }
 
 bool
+TabParent::RecvRespondStartSwipeEvent(const uint64_t& aInputBlockId,
+                                      const bool& aStartSwipe)
+{
+  if (nsCOMPtr<nsIWidget> widget = GetWidget()) {
+    widget->ReportSwipeStarted(aInputBlockId, aStartSwipe);
+  }
+  return true;
+}
+
+bool
 TabParent::RecvContentReceivedInputBlock(const ScrollableLayerGuid& aGuid,
                                          const uint64_t& aInputBlockId,
                                          const bool& aPreventDefault)
@@ -2935,6 +2992,25 @@ NS_IMETHODIMP
 TabParent::SetIsDocShellActive(bool isActive)
 {
   unused << SendSetIsDocShellActive(isActive);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+TabParent::SuppressDisplayport(bool aEnabled)
+{
+  if (IsDestroyed()) {
+    return NS_OK;
+  }
+
+  if (aEnabled) {
+    mActiveSupressDisplayportCount++;
+  } else {
+    mActiveSupressDisplayportCount--;
+  }
+
+  MOZ_ASSERT(mActiveSupressDisplayportCount >= 0);
+
+  unused << SendSuppressDisplayport(aEnabled);
   return NS_OK;
 }
 

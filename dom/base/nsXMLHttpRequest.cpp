@@ -2928,26 +2928,22 @@ nsXMLHttpRequest::Send(nsIVariant* aVariant, const Nullable<RequestBody>& aBody)
   NS_ASSERTION(listener != this,
                "Using an object as a listener that can't be exposed to JS");
 
-  // Bypass the network cache in cases where it makes no sense:
-  // POST responses are always unique, and we provide no API that would
-  // allow our consumers to specify a "cache key" to access old POST
-  // responses, so they are not worth caching.
-  if (method.EqualsLiteral("POST")) {
-    AddLoadFlags(mChannel,
-        nsIRequest::LOAD_BYPASS_CACHE | nsIRequest::INHIBIT_CACHING);
-  } else {
-    // When we are sync loading, we need to bypass the local cache when it would
-    // otherwise block us waiting for exclusive access to the cache.  If we don't
-    // do this, then we could dead lock in some cases (see bug 309424).
-    //
-    // Also don't block on the cache entry on async if it is busy - favoring parallelism
-    // over cache hit rate for xhr. This does not disable the cache everywhere -
-    // only in cases where more than one channel for the same URI is accessed
-    // simultanously.
+  // When we are sync loading, we need to bypass the local cache when it would
+  // otherwise block us waiting for exclusive access to the cache.  If we don't
+  // do this, then we could dead lock in some cases (see bug 309424).
+  //
+  // Also don't block on the cache entry on async if it is busy - favoring parallelism
+  // over cache hit rate for xhr. This does not disable the cache everywhere -
+  // only in cases where more than one channel for the same URI is accessed
+  // simultanously.
 
-    AddLoadFlags(mChannel,
-                 nsICachingChannel::LOAD_BYPASS_LOCAL_CACHE_IF_BUSY);
-  }
+  AddLoadFlags(mChannel,
+               nsICachingChannel::LOAD_BYPASS_LOCAL_CACHE_IF_BUSY);
+
+  // While it would be optimal to bypass the cache in case of POST requests
+  // since they are never cached, our ServiceWorker interception implementation
+  // on single-process systems is implemented via the HTTP cache, so DO NOT
+  // bypass the cache based on method!
 
   // Since we expect XML data, set the type hint accordingly
   // if the channel doesn't know any content type.
@@ -2988,14 +2984,6 @@ nsXMLHttpRequest::Send(nsIVariant* aVariant, const Nullable<RequestBody>& aBody)
         if (scheme.LowerCaseEqualsLiteral("app") ||
             scheme.LowerCaseEqualsLiteral("jar")) {
           mIsMappedArrayBuffer = true;
-          if (!XRE_IsParentProcess()) {
-            nsCOMPtr<nsIJARChannel> jarChannel = do_QueryInterface(mChannel);
-            // For memory mapping from child process, we need to get file
-            // descriptor of the JAR file opened remotely on the parent proess.
-            // Set this to make sure that file descriptor can be obtained by
-            // child process.
-            jarChannel->EnsureChildFd();
-          }
         }
       }
     }
@@ -3168,8 +3156,13 @@ nsXMLHttpRequest::SetRequestHeader(const nsACString& header,
     mergeHeaders = false;
   }
 
-  // Merge headers depending on what we decided above.
-  nsresult rv = httpChannel->SetRequestHeader(header, value, mergeHeaders);
+  nsresult rv;
+  if (value.IsEmpty()) {
+    rv = httpChannel->SetEmptyRequestHeader(header);
+  } else {
+    // Merge headers depending on what we decided above.
+    rv = httpChannel->SetRequestHeader(header, value, mergeHeaders);
+  }
   if (rv == NS_ERROR_INVALID_ARG) {
     return NS_ERROR_DOM_SYNTAX_ERR;
   }
@@ -3502,9 +3495,13 @@ nsXMLHttpRequest::OnRedirectVerifyCallback(nsresult result)
       // Ensure all original headers are duplicated for the new channel (bug #553888)
       for (uint32_t i = mModifiedRequestHeaders.Length(); i > 0; ) {
         --i;
-        httpChannel->SetRequestHeader(mModifiedRequestHeaders[i].header,
-                                      mModifiedRequestHeaders[i].value,
-                                      false);
+        if (mModifiedRequestHeaders[i].value.IsEmpty()) {
+          httpChannel->SetEmptyRequestHeader(mModifiedRequestHeaders[i].header);
+        } else {
+          httpChannel->SetRequestHeader(mModifiedRequestHeaders[i].header,
+                                        mModifiedRequestHeaders[i].value,
+                                        false);
+        }
       }
     }
   } else {

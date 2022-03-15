@@ -534,6 +534,7 @@ pref("layout.event-regions.enabled", false);
 // APZ preferences. For documentation/details on what these prefs do, check
 // gfx/layers/apz/src/AsyncPanZoomController.cpp.
 pref("apz.allow_checkerboarding", true);
+pref("apz.allow_zooming", false);
 pref("apz.asyncscroll.throttle", 100);
 pref("apz.asyncscroll.timeout", 300);
 
@@ -1418,6 +1419,11 @@ pref("javascript.options.mem.log", false);
 pref("javascript.options.mem.notify", false);
 pref("javascript.options.gc_on_memory_pressure", true);
 pref("javascript.options.compact_on_user_inactive", true);
+#ifdef NIGHTLY_BUILD
+pref("javascript.options.compact_on_user_inactive_delay", 15000); // ms
+#else
+pref("javascript.options.compact_on_user_inactive_delay", 300000); // ms
+#endif
 
 pref("javascript.options.mem.gc_high_frequency_time_limit_ms", 1000);
 pref("javascript.options.mem.gc_high_frequency_low_limit_mb", 100);
@@ -2510,9 +2516,6 @@ pref("layout.css.clip-path-shapes.enabled", false);
 // Is support for CSS sticky positioning enabled?
 pref("layout.css.sticky.enabled", true);
 
-// Is support for CSS "will-change" enabled?
-pref("layout.css.will-change.enabled", true);
-
 // Is support for DOMPoint enabled?
 pref("layout.css.DOMPoint.enabled", true);
 
@@ -2557,10 +2560,17 @@ pref("layout.css.prefixes.transitions", true);
 pref("layout.css.prefixes.animations", true);
 pref("layout.css.prefixes.box-sizing", true);
 pref("layout.css.prefixes.font-features", true);
+pref("layout.css.prefixes.gradients", true);
 
 // Is the CSS Unprefixing Service enabled? (This service emulates support
 // for certain vendor-prefixed properties & values, for sites on a "fixlist".)
-pref("layout.css.unprefixing-service.enabled", false);
+pref("layout.css.unprefixing-service.enabled", true);
+#ifdef NIGHTLY_BUILD
+// Is the CSS Unprefixing Service whitelisted for all domains?
+// (This pref is only honored in Nightly builds and can be removed when
+// Bug 1177263 is fixed.)
+pref("layout.css.unprefixing-service.globally-whitelisted", false);
+#endif
 
 // Is support for the :scope selector enabled?
 pref("layout.css.scope-pseudo.enabled", true);
@@ -4988,6 +4998,12 @@ pref("caret.manages-android-actionbar", false);
 // New implementation to unify touch-caret and selection-carets.
 pref("layout.accessiblecaret.enabled", false);
 
+// CSS attributes of the AccessibleCaret in CSS pixels.
+pref("layout.accessiblecaret.width", "44.0");
+pref("layout.accessiblecaret.height", "47.0");
+pref("layout.accessiblecaret.margin-left", "-23.5");
+pref("layout.accessiblecaret.bar.width", "2.0");
+
 // Timeout in milliseconds to hide the accessiblecaret under cursor mode while
 // no one touches it. Set the value to 0 to disable this feature.
 pref("layout.accessiblecaret.timeout_ms", 3000);
@@ -5045,11 +5061,23 @@ pref("dom.beforeAfterKeyboardEvent.enabled", false);
 
 // Presentation API
 pref("dom.presentation.enabled", false);
+pref("dom.presentation.tcp_server.debug", false);
 
-// Use raw ICU instead of CoreServices API in Unicode collation
 #ifdef XP_MACOSX
+// Use raw ICU instead of CoreServices API in Unicode collation
 pref("intl.collation.mac.use_icu", true);
+
+// Enable NSTextInput protocol for use with IMEs that have not
+// been updated to use the NSTextInputClient protocol.
+pref("intl.ime.nstextinput.enable", false);
+
+#if !defined(RELEASE_BUILD) || defined(DEBUG)
+// In non-release builds we crash by default on insecure text input (when a
+// password editor has focus but secure event input isn't enabled).  The
+// following pref, when turned on, disables this behavior.  See bug 1188425.
+pref("intl.allow-insecure-text-input", false);
 #endif
+#endif // XP_MACOSX
 
 // Enable meta-viewport support in remote APZ-enabled frames.
 pref("dom.meta-viewport.enabled", false);

@@ -26,7 +26,7 @@
 #include "gfxFont.h"
 #include "nsCSSPseudoElements.h"
 #include "nsThemeConstants.h"
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "nsStyleContext.h"
 #include "nsStyleSet.h"
 #include "nsStyleStruct.h"
@@ -104,7 +104,7 @@ nsRuleNode::ChildrenHashHashKey(PLDHashTable *aTable, const void *aKey)
     static_cast<const nsRuleNode::Key*>(aKey);
   // Disagreement on importance and level for the same rule is extremely
   // rare, so hash just on the rule.
-  return PL_DHashVoidPtrKeyStub(aTable, key->mRule);
+  return PLDHashTable::HashVoidPtrKeyStub(aTable, key->mRule);
 }
 
 /* static */ bool
@@ -127,8 +127,8 @@ nsRuleNode::ChildrenHashOps = {
   // large size allocations.
   ChildrenHashHashKey,
   ChildrenHashMatchEntry,
-  PL_DHashMoveEntryStub,
-  PL_DHashClearEntryStub,
+  PLDHashTable::MoveEntryStub,
+  PLDHashTable::ClearEntryStub,
   nullptr
 };
 

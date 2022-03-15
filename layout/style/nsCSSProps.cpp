@@ -184,13 +184,11 @@ nsCSSProps::AddRefTable(void)
 
 #ifdef DEBUG
     {
-      // Assert that if CSS_PROPERTY_ALWAYS_ENABLED_IN_UA_SHEETS or
-      // CSS_PROPERTY_ALWAYS_ENABLED_IN_CHROME_OR_CERTIFIED_APP is used on
-      // a shorthand property that all of its component longhands also
-      // has the flag.
+      // Assert that if CSS_PROPERTY_ALWAYS_ENABLED_IN_UA_SHEETS is used
+      // on a shorthand property that all of its component longhands
+      // also has the flag.
       static uint32_t flagsToCheck[] = {
-        CSS_PROPERTY_ALWAYS_ENABLED_IN_UA_SHEETS,
-        CSS_PROPERTY_ALWAYS_ENABLED_IN_CHROME_OR_CERTIFIED_APP
+        CSS_PROPERTY_ALWAYS_ENABLED_IN_UA_SHEETS
       };
       for (nsCSSProperty shorthand = eCSSProperty_COUNT_no_shorthands;
            shorthand < eCSSProperty_COUNT;
@@ -209,6 +207,42 @@ nsCSSProps::AddRefTable(void)
                        "CSS_PROPERTY_ALWAYS_ENABLED_* flag must also have "
                        "the flag");
           }
+        }
+      }
+
+      // Assert that CSS_PROPERTY_INTERNAL is used on properties in
+      // #ifndef CSS_PROP_LIST_EXCLUDE_INTERNAL sections of nsCSSPropList.h
+      // and on no others.
+      static nsCSSProperty nonInternalProperties[] = {
+        #define CSS_PROP(name_, id_, ...)           eCSSProperty_##id_,
+        #define CSS_PROP_SHORTHAND(name_, id_, ...) eCSSProperty_##id_,
+        #define CSS_PROP_LIST_INCLUDE_LOGICAL
+        #define CSS_PROP_LIST_EXCLUDE_INTERNAL
+        #include "nsCSSPropList.h"
+        #undef CSS_PROP_LIST_EXCLUDE_INTERNAL
+        #undef CSS_PROP_LIST_INCLUDE_LOGICAL
+        #undef CSS_PROP_SHORTHAND
+        #undef CSS_PROP
+      };
+      MOZ_ASSERT(ArrayLength(nonInternalProperties) <= eCSSProperty_COUNT);
+
+      bool found[eCSSProperty_COUNT];
+      PodArrayZero(found);
+      for (nsCSSProperty p : nonInternalProperties) {
+        MOZ_ASSERT(!nsCSSProps::PropHasFlags(p, CSS_PROPERTY_INTERNAL),
+                   "properties defined outside of #ifndef "
+                   "CSS_PROP_LIST_EXCLUDE_INTERNAL sections must not have "
+                   "the CSS_PROPERTY_INTERNAL flag");
+        found[p] = true;
+      }
+
+      for (size_t i = 0; i < ArrayLength(found); ++i) {
+        if (!found[i]) {
+          auto p = static_cast<nsCSSProperty>(i);
+          MOZ_ASSERT(nsCSSProps::PropHasFlags(p, CSS_PROPERTY_INTERNAL),
+                     "properties defined in #ifndef "
+                     "CSS_PROP_LIST_EXCLUDE_INTERNAL sections must have "
+                     "the CSS_PROPERTY_INTERNAL flag");
         }
       }
     }
@@ -2370,12 +2404,12 @@ static const nsCSSProperty gBorderColorSubpropTable[] = {
   eCSSProperty_UNKNOWN
 };
 
-static const nsCSSProperty gBorderEndSubpropTable[] = {
+static const nsCSSProperty gBorderInlineEndSubpropTable[] = {
   // Declaration.cpp output the subproperties in this order.
   // It also depends on the color being third.
-  eCSSProperty_border_end_width,
-  eCSSProperty_border_end_style,
-  eCSSProperty_border_end_color,
+  eCSSProperty_border_inline_end_width,
+  eCSSProperty_border_inline_end_style,
+  eCSSProperty_border_inline_end_color,
   eCSSProperty_UNKNOWN
 };
 
@@ -2397,12 +2431,12 @@ static const nsCSSProperty gBorderRightSubpropTable[] = {
   eCSSProperty_UNKNOWN
 };
 
-static const nsCSSProperty gBorderStartSubpropTable[] = {
+static const nsCSSProperty gBorderInlineStartSubpropTable[] = {
   // Declaration.cpp outputs the subproperties in this order.
   // It also depends on the color being third.
-  eCSSProperty_border_start_width,
-  eCSSProperty_border_start_style,
-  eCSSProperty_border_start_color,
+  eCSSProperty_border_inline_start_width,
+  eCSSProperty_border_inline_start_style,
+  eCSSProperty_border_inline_start_color,
   eCSSProperty_UNKNOWN
 };
 
