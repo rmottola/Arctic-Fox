@@ -80,7 +80,6 @@ class TabParent final : public PBrowserParent
                       , public nsIWebBrowserPersistable
 {
     typedef mozilla::dom::ClonedMessageData ClonedMessageData;
-    typedef mozilla::OwningSerializedStructuredCloneBuffer OwningSerializedStructuredCloneBuffer;
 
     virtual ~TabParent();
 
@@ -154,12 +153,12 @@ public:
                                  const ClonedMessageData& aData,
                                  InfallibleTArray<CpowEntry>&& aCpows,
                                  const IPC::Principal& aPrincipal,
-                                 nsTArray<OwningSerializedStructuredCloneBuffer>* aRetVal) override;
+                                 nsTArray<StructuredCloneIPCHelper>* aRetVal) override;
     virtual bool RecvRpcMessage(const nsString& aMessage,
                                 const ClonedMessageData& aData,
                                 InfallibleTArray<CpowEntry>&& aCpows,
                                 const IPC::Principal& aPrincipal,
-                                nsTArray<OwningSerializedStructuredCloneBuffer>* aRetVal) override;
+                                nsTArray<StructuredCloneIPCHelper>* aRetVal) override;
     virtual bool RecvAsyncMessage(const nsString& aMessage,
                                   const ClonedMessageData& aData,
                                   InfallibleTArray<CpowEntry>&& aCpows,
@@ -445,7 +444,7 @@ protected:
                         StructuredCloneIPCHelper* aHelper,
                         mozilla::jsipc::CpowHolder* aCpows,
                         nsIPrincipal* aPrincipal,
-                        nsTArray<OwningSerializedStructuredCloneBuffer>* aJSONRetVal = nullptr);
+                        nsTArray<StructuredCloneIPCHelper>* aJSONRetVal = nullptr);
 
     virtual bool RecvAsyncAuthPrompt(const nsCString& aUri,
                                      const nsString& aRealm,

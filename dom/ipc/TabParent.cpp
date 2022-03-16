@@ -1809,7 +1809,7 @@ TabParent::RecvSyncMessage(const nsString& aMessage,
                            const ClonedMessageData& aData,
                            InfallibleTArray<CpowEntry>&& aCpows,
                            const IPC::Principal& aPrincipal,
-                           nsTArray<OwningSerializedStructuredCloneBuffer>* aRetVal)
+                           nsTArray<StructuredCloneIPCHelper>* aRetVal)
 {
   // FIXME Permission check for TabParent in Content process
   nsIPrincipal* principal = aPrincipal;
@@ -1833,7 +1833,7 @@ TabParent::RecvRpcMessage(const nsString& aMessage,
                           const ClonedMessageData& aData,
                           InfallibleTArray<CpowEntry>&& aCpows,
                           const IPC::Principal& aPrincipal,
-                          nsTArray<OwningSerializedStructuredCloneBuffer>* aRetVal)
+                          nsTArray<StructuredCloneIPCHelper>* aRetVal)
 {
   // FIXME Permission check for TabParent in Content process
   nsIPrincipal* principal = aPrincipal;
@@ -2602,7 +2602,7 @@ TabParent::ReceiveMessage(const nsString& aMessage,
                           StructuredCloneIPCHelper* aHelper,
                           CpowHolder* aCpows,
                           nsIPrincipal* aPrincipal,
-                          nsTArray<OwningSerializedStructuredCloneBuffer>* aRetVal)
+                          nsTArray<StructuredCloneIPCHelper>* aRetVal)
 {
   nsRefPtr<nsFrameLoader> frameLoader = GetFrameLoader(true);
   if (frameLoader && frameLoader->GetFrameMessageManager()) {
