@@ -703,7 +703,7 @@ nsIndexedToHTML::OnIndexAvailable(nsIRequest *aRequest,
     if (loc.IsEmpty()) {
         return NS_ERROR_ILLEGAL_VALUE;
     }
-    if (loc.First() == PRUnichar('.'))
+    if (loc.First() == char16_t('.'))
         pushBuffer.AppendLiteral(" class=\"hidden-object\"");
 
     pushBuffer.AppendLiteral(">\n <td sortable-data=\"");
