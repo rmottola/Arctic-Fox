@@ -614,7 +614,8 @@ public:
                        TargetAndBusyBehavior aBehavior,
                        bool aToMessagePort, uint64_t aMessagePortSerial)
   : WorkerRunnable(aWorkerPrivate, aBehavior)
-  , StructuredCloneHelper(CloningSupported, TransferringSupported)
+  , StructuredCloneHelper(CloningSupported, TransferringSupported,
+                          SameProcessDifferentThread)
   , mMessagePortSerial(aMessagePortSerial)
   , mToMessagePort(aToMessagePort)
   {
@@ -2800,7 +2801,7 @@ WorkerPrivateParent<Derived>::PostMessageInternal(
                              WorkerRunnable::WorkerThreadModifyBusyCount,
                              aToMessagePort, aMessagePortSerial);
 
-  runnable->Write(aCx, aMessage, transferable, true, aRv);
+  runnable->Write(aCx, aMessage, transferable, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
@@ -5538,7 +5539,7 @@ WorkerPrivate::PostMessageToParentInternal(
                              WorkerRunnable::ParentThreadUnchangedBusyCount,
                              aToMessagePort, aMessagePortSerial);
 
-  runnable->Write(aCx, aMessage, transferable, true, aRv);
+  runnable->Write(aCx, aMessage, transferable, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
