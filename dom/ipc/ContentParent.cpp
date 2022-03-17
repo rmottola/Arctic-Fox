@@ -149,7 +149,6 @@
 #include "SandboxHal.h"
 #include "ScreenManagerParent.h"
 #include "SourceSurfaceRawData.h"
-#include "StructuredCloneIPCHelper.h"
 #include "TabParent.h"
 #include "URIUtils.h"
 #include "nsIWebBrowserChrome.h"
@@ -160,6 +159,7 @@
 #include "prio.h"
 #include "private/pprio.h"
 #include "ContentProcessManager.h"
+#include "mozilla/dom/ipc/StructuredCloneData.h"
 #include "mozilla/psm/PSMContentListener.h"
 #include "nsPluginHost.h"
 #include "nsPluginTags.h"
@@ -2905,7 +2905,7 @@ ContentParent::OnNewProcessCreated(uint32_t aPid,
     InfallibleTArray<nsString> unusedDictionaries;
     ClipboardCapabilities clipboardCaps;
     DomainPolicyClone domainPolicy;
-    StructuredCloneIPCHelper initialData;
+    StructuredCloneData initialData;
 
     RecvGetXPCOMProcessAttributes(&isOffline, &isConnected,
                                   &isLangRTL, &unusedDictionaries,
@@ -3225,7 +3225,7 @@ ContentParent::RecvGetXPCOMProcessAttributes(bool* aIsOffline,
                                              InfallibleTArray<nsString>* dictionaries,
                                              ClipboardCapabilities* clipboardCaps,
                                              DomainPolicyClone* domainPolicy,
-                                             StructuredCloneIPCHelper* aInitialData)
+                                             StructuredCloneData* aInitialData)
 {
     nsCOMPtr<nsIIOService> io(do_GetIOService());
     MOZ_ASSERT(io, "No IO service?");
@@ -4103,7 +4103,7 @@ ContentParent::RecvSyncMessage(const nsString& aMsg,
                                const ClonedMessageData& aData,
                                InfallibleTArray<CpowEntry>&& aCpows,
                                const IPC::Principal& aPrincipal,
-                               nsTArray<StructuredCloneIPCHelper>* aRetvals)
+                               nsTArray<StructuredCloneData>* aRetvals)
 {
     return nsIContentParent::RecvSyncMessage(aMsg, aData, Move(aCpows),
                                              aPrincipal, aRetvals);
@@ -4114,7 +4114,7 @@ ContentParent::RecvRpcMessage(const nsString& aMsg,
                               const ClonedMessageData& aData,
                               InfallibleTArray<CpowEntry>&& aCpows,
                               const IPC::Principal& aPrincipal,
-                              nsTArray<StructuredCloneIPCHelper>* aRetvals)
+                              nsTArray<StructuredCloneData>* aRetvals)
 {
     return nsIContentParent::RecvRpcMessage(aMsg, aData, Move(aCpows), aPrincipal,
                                             aRetvals);
@@ -4347,7 +4347,7 @@ ContentParent::DoLoadMessageManagerScript(const nsAString& aURL,
 bool
 ContentParent::DoSendAsyncMessage(JSContext* aCx,
                                   const nsAString& aMessage,
-                                  StructuredCloneIPCHelper& aHelper,
+                                  StructuredCloneData& aHelper,
                                   JS::Handle<JSObject *> aCpows,
                                   nsIPrincipal* aPrincipal)
 {
