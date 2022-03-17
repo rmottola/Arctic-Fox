@@ -47,6 +47,10 @@
 #include "nsQueryObject.h"
 #include <algorithm>
 
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
+
 #ifdef ANDROID
 #include <android/log.h>
 #endif
