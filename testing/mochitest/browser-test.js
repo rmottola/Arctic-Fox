@@ -260,6 +260,7 @@ Tester.prototype = {
       this.nextTest();
     }
     else{
+      TabDestroyObserver.destroy();
       Services.console.unregisterListener(this);
       Services.obs.removeObserver(this, "chrome-document-global-created");
       Services.obs.removeObserver(this, "content-document-global-created");

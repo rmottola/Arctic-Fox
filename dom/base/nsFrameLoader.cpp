@@ -2776,6 +2776,10 @@ nsFrameLoader::RequestNotifyLayerTreeReady()
     return mRemoteBrowser->RequestNotifyLayerTreeReady() ? NS_OK : NS_ERROR_NOT_AVAILABLE;
   }
 
+  if (!mOwnerContent) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
   nsRefPtr<AsyncEventDispatcher> event =
     new AsyncEventDispatcher(mOwnerContent,
                              NS_LITERAL_STRING("MozLayerTreeReady"),
@@ -2790,6 +2794,10 @@ nsFrameLoader::RequestNotifyLayerTreeCleared()
 {
   if (mRemoteBrowser) {
     return mRemoteBrowser->RequestNotifyLayerTreeCleared() ? NS_OK : NS_ERROR_NOT_AVAILABLE;
+  }
+
+  if (!mOwnerContent) {
+    return NS_ERROR_NOT_AVAILABLE;
   }
 
   nsRefPtr<AsyncEventDispatcher> event =
