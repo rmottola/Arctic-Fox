@@ -64,29 +64,6 @@ DispatchBluetoothGattClientHALResult(
   return rv;
 }
 
-static nsresult
-DispatchBluetoothGattServerHALResult(
-  BluetoothGattServerResultHandler* aRes,
-  void (BluetoothGattServerResultHandler::*aMethod)(),
-  BluetoothStatus aStatus)
-{
-  MOZ_ASSERT(aRes);
-
-  nsRunnable* runnable;
-
-  if (aStatus == STATUS_SUCCESS) {
-    runnable = new BluetoothGattServerHALResultRunnable(aRes, aMethod);
-  } else {
-    runnable = new BluetoothGattServerHALErrorRunnable(aRes,
-      &BluetoothGattServerResultHandler::OnError, aStatus);
-  }
-  nsresult rv = NS_DispatchToMainThread(runnable);
-  if (NS_FAILED(rv)) {
-    BT_WARNING("NS_DispatchToMainThread failed: %X", rv);
-  }
-  return rv;
-}
-
 template <typename ResultRunnable, typename Tin1, typename Arg1>
 static nsresult
 DispatchBluetoothGattClientHALResult(
@@ -108,6 +85,29 @@ DispatchBluetoothGattClientHALResult(
       &BluetoothGattClientResultHandler::OnError, STATUS_PARM_INVALID);
   } else {
     runnable = new ResultRunnable(aRes, aMethod, arg1);
+  }
+  nsresult rv = NS_DispatchToMainThread(runnable);
+  if (NS_FAILED(rv)) {
+    BT_WARNING("NS_DispatchToMainThread failed: %X", rv);
+  }
+  return rv;
+}
+
+static nsresult
+DispatchBluetoothGattServerHALResult(
+  BluetoothGattServerResultHandler* aRes,
+  void (BluetoothGattServerResultHandler::*aMethod)(),
+  BluetoothStatus aStatus)
+{
+  MOZ_ASSERT(aRes);
+
+  nsRunnable* runnable;
+
+  if (aStatus == STATUS_SUCCESS) {
+    runnable = new BluetoothGattServerHALResultRunnable(aRes, aMethod);
+  } else {
+    runnable = new BluetoothGattServerHALErrorRunnable(aRes,
+      &BluetoothGattServerResultHandler::OnError, aStatus);
   }
   nsresult rv = NS_DispatchToMainThread(runnable);
   if (NS_FAILED(rv)) {
