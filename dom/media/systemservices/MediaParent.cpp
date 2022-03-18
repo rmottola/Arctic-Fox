@@ -544,11 +544,12 @@ DeallocPMediaParent(media::PMediaParent *aActor)
 {
   MOZ_ASSERT(sIPCServingParent == static_cast<Parent<PMediaParent>*>(aActor));
   delete sIPCServingParent;
+  sIPCServingParent = nullptr;
   return true;
 }
 
-}
-}
+} // namespace media
+} // namespace mozilla
 
 // Instantiate templates to satisfy linker
 template class mozilla::media::Parent<mozilla::media::NonE10s>;
