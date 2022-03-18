@@ -93,7 +93,7 @@ DispatchBluetoothHALResult(BluetoothResultHandler* aRes,
 {
   MOZ_ASSERT(aRes);
 
-  nsRunnable* runnable;
+  nsRefPtr<nsRunnable> runnable;
 
   if (aStatus == STATUS_SUCCESS) {
     runnable = new BluetoothHALResultRunnable(aRes, aMethod);
