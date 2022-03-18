@@ -218,6 +218,39 @@ Convert(const BluetoothAvrcpElementAttribute& aIn, btrc_element_attr_val_t& aOut
   return NS_OK;
 }
 
+#if ANDROID_VERSION >= 21
+nsresult
+Convert(const bt_activity_energy_info& aIn, BluetoothActivityEnergyInfo& aOut)
+{
+  nsresult rv = Convert(aIn.status, aOut.mStatus);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  rv = Convert(aIn.ctrl_state, aOut.mStackState);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  rv = Convert(aIn.tx_time, aOut.mTxTime);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  rv = Convert(aIn.rx_time, aOut.mRxTime);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  rv = Convert(aIn.idle_time, aOut.mIdleTime);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  rv = Convert(aIn.energy_used, aOut.mEnergyUsed);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  return NS_OK;
+}
+#endif // ANDROID_VERSION >= 21
+
 nsresult
 Convert(const btrc_player_settings_t& aIn, BluetoothAvrcpPlayerSettings& aOut)
 {
