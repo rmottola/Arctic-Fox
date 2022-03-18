@@ -1638,13 +1638,15 @@ BluetoothGattManager::GetCharacteristicNotification(
       aCharId,
       new DiscoverResultHandler(client));
   } else { // all characteristics of this service are discovered
-    // Notify BluetoothGattService to create characteristics then proceed
-    nsString path;
-    GeneratePathFromGattId(aServiceId.mId, path);
+    // Notify BluetoothGatt to make BluetoothGattService create characteristics
+    // then proceed
+    nsTArray<BluetoothNamedValue> values;
+    BT_APPEND_NAMED_VALUE(values, "serviceId", aServiceId);
+    BT_APPEND_NAMED_VALUE(values, "characteristics", client->mCharacteristics);
 
     bs->DistributeSignal(NS_LITERAL_STRING("CharacteristicsDiscovered"),
-                         path,
-                         BluetoothValue(client->mCharacteristics));
+                         client->mAppUuid,
+                         BluetoothValue(values));
 
     ProceedDiscoverProcess(client, aServiceId);
   }
@@ -1682,13 +1684,16 @@ BluetoothGattManager::GetDescriptorNotification(
       aDescriptorId,
       new DiscoverResultHandler(client));
   } else { // all descriptors of this characteristic are discovered
-    // Notify BluetoothGattCharacteristic to create descriptors then proceed
-    nsString path;
-    GeneratePathFromGattId(aCharId, path);
+    // Notify BluetoothGatt to make BluetoothGattCharacteristic create
+    // descriptors then proceed
+    nsTArray<BluetoothNamedValue> values;
+    BT_APPEND_NAMED_VALUE(values, "serviceId", aServiceId);
+    BT_APPEND_NAMED_VALUE(values, "characteristicId", aCharId);
+    BT_APPEND_NAMED_VALUE(values, "descriptors", client->mDescriptors);
 
     bs->DistributeSignal(NS_LITERAL_STRING("DescriptorsDiscovered"),
-                         path,
-                         BluetoothValue(client->mDescriptors));
+                         client->mAppUuid,
+                         BluetoothValue(values));
     client->mDescriptors.Clear();
 
     ProceedDiscoverProcess(client, aServiceId);
@@ -1725,13 +1730,16 @@ BluetoothGattManager::GetIncludedServiceNotification(
       aIncludedServId,
       new DiscoverResultHandler(client));
   } else { // all included services of this service are discovered
-    // Notify BluetoothGattService to create included services
-    nsString path;
-    GeneratePathFromGattId(aServiceId.mId, path);
+    // Notify BluetoothGatt to make BluetoothGattService create included
+    // services
+    nsTArray<BluetoothNamedValue> values;
+    BT_APPEND_NAMED_VALUE(values, "serviceId", aServiceId);
+    BT_APPEND_NAMED_VALUE(values, "includedServices",
+                          client->mIncludedServices);
 
     bs->DistributeSignal(NS_LITERAL_STRING("IncludedServicesDiscovered"),
-                         path,
-                         BluetoothValue(client->mIncludedServices));
+                         client->mAppUuid,
+                         BluetoothValue(values));
     client->mIncludedServices.Clear();
 
     // Start to discover characteristics of this service
