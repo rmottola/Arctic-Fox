@@ -134,15 +134,6 @@ BluetoothServiceBluedroid::PlayStatusStringToControlPlayStatus(
 /**
  *  Static functions
  */
-bool
-BluetoothServiceBluedroid::EnsureBluetoothHalLoad()
-{
-  sBtInterface = BluetoothInterface::GetInstance();
-  NS_ENSURE_TRUE(sBtInterface, false);
-
-  return true;
-}
-
 class BluetoothServiceBluedroid::EnableResultHandler final
   : public BluetoothResultHandler
 {
@@ -293,9 +284,9 @@ BluetoothServiceBluedroid::StopGonkBluetooth()
  */
 BluetoothServiceBluedroid::BluetoothServiceBluedroid()
 {
-  if (!EnsureBluetoothHalLoad()) {
-    BT_LOGR("Error! Failed to load bluedroid library.");
-    return;
+  sBtInterface = BluetoothInterface::GetInstance();
+  if (!sBtInterface) {
+    BT_LOGR("Error! Failed to get instance of bluetooth interface");
   }
 }
 
@@ -738,15 +729,6 @@ BluetoothServiceBluedroid::PlayStatusStringToControlPlayStatus(
 /**
  *  Static functions
  */
-bool
-BluetoothServiceBluedroid::EnsureBluetoothHalLoad()
-{
-  sBtInterface = BluetoothInterface::GetInstance();
-  NS_ENSURE_TRUE(sBtInterface, false);
-
-  return true;
-}
-
 class BluetoothServiceBluedroid::EnableResultHandler final
   : public BluetoothResultHandler
 {
@@ -924,9 +906,9 @@ ReplyStatusError(BluetoothReplyRunnable* aBluetoothReplyRunnable,
  */
 BluetoothServiceBluedroid::BluetoothServiceBluedroid()
 {
-  if (!EnsureBluetoothHalLoad()) {
-    BT_LOGR("Error! Failed to load bluedroid library.");
-    return;
+  sBtInterface = BluetoothInterface::GetInstance();
+  if (!sBtInterface) {
+    BT_LOGR("Error! Failed to get instance of bluetooth interface");
   }
 }
 

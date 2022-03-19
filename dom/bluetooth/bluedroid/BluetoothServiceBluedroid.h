@@ -317,7 +317,6 @@ public:
 protected:
   static nsresult StartGonkBluetooth();
   static nsresult StopGonkBluetooth();
-  static bool EnsureBluetoothHalLoad();
 
   static void ConnectDisconnect(bool aConnect,
                                 const nsAString& aDeviceAddress,
