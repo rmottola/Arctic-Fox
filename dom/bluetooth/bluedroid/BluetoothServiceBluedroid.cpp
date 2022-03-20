@@ -1764,9 +1764,8 @@ BluetoothServiceBluedroid::DiscoveryStateChangedNotification(bool aState)
 }
 
 void
-BluetoothServiceBluedroid::PinRequestNotification(const nsAString& aRemoteBdAddr,
-                                                  const nsAString& aBdName,
-                                                  uint32_t aCod)
+BluetoothServiceBluedroid::PinRequestNotification(
+  const nsAString& aRemoteBdAddr, const nsAString& aBdName, uint32_t aCod)
 {
   MOZ_ASSERT(NS_IsMainThread());
 

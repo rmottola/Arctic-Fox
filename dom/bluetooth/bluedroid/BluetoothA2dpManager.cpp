@@ -534,14 +534,16 @@ BluetoothA2dpManager::Disconnect(BluetoothProfileController* aController)
   BluetoothService* bs = BluetoothService::Get();
   if (!bs) {
     if (aController) {
-      aController->NotifyCompletion(NS_LITERAL_STRING(ERR_NO_AVAILABLE_RESOURCE));
+      aController->NotifyCompletion(
+        NS_LITERAL_STRING(ERR_NO_AVAILABLE_RESOURCE));
     }
     return;
   }
 
   if (!mA2dpConnected) {
     if (aController) {
-      aController->NotifyCompletion(NS_LITERAL_STRING(ERR_ALREADY_DISCONNECTED));
+      aController->NotifyCompletion(
+        NS_LITERAL_STRING(ERR_ALREADY_DISCONNECTED));
     }
     return;
   }
@@ -553,7 +555,8 @@ BluetoothA2dpManager::Disconnect(BluetoothProfileController* aController)
   if (!sBtA2dpInterface) {
     BT_LOGR("sBluetoothA2dpInterface is null");
     if (aController) {
-      aController->NotifyCompletion(NS_LITERAL_STRING(ERR_NO_AVAILABLE_RESOURCE));
+      aController->NotifyCompletion(
+        NS_LITERAL_STRING(ERR_NO_AVAILABLE_RESOURCE));
     }
     return;
   }
@@ -988,8 +991,8 @@ BluetoothA2dpManager::GetArtist(nsAString& aArtist)
  */
 
 void
-BluetoothA2dpManager::ConnectionStateNotification(BluetoothA2dpConnectionState aState,
-                                                  const nsAString& aBdAddr)
+BluetoothA2dpManager::ConnectionStateNotification(
+  BluetoothA2dpConnectionState aState, const nsAString& aBdAddr)
 {
   MOZ_ASSERT(NS_IsMainThread());
 

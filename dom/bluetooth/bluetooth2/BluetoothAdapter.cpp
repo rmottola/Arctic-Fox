@@ -792,7 +792,8 @@ BluetoothAdapter::GetConnectedDevices(uint16_t aServiceUuid, ErrorResult& aRv)
 }
 
 void
-BluetoothAdapter::GetPairedDevices(nsTArray<nsRefPtr<BluetoothDevice> >& aDevices)
+BluetoothAdapter::GetPairedDevices(
+  nsTArray<nsRefPtr<BluetoothDevice> >& aDevices)
 {
   for (uint32_t i = 0; i < mDevices.Length(); ++i) {
     if (mDevices[i]->Paired()) {
@@ -1337,7 +1338,8 @@ BluetoothAdapter::SendFile(const nsAString& aDeviceAddress,
 }
 
 already_AddRefed<DOMRequest>
-BluetoothAdapter::StopSendingFile(const nsAString& aDeviceAddress, ErrorResult& aRv)
+BluetoothAdapter::StopSendingFile(
+  const nsAString& aDeviceAddress, ErrorResult& aRv)
 {
   nsCOMPtr<nsPIDOMWindow> win = GetOwner();
   if (!win) {
@@ -1537,7 +1539,8 @@ BluetoothAdapter::ToggleCalls(ErrorResult& aRv)
 }
 
 already_AddRefed<DOMRequest>
-BluetoothAdapter::SendMediaMetaData(const MediaMetaData& aMediaMetaData, ErrorResult& aRv)
+BluetoothAdapter::SendMediaMetaData(
+  const MediaMetaData& aMediaMetaData, ErrorResult& aRv)
 {
   nsCOMPtr<nsPIDOMWindow> win = GetOwner();
   if (!win) {
@@ -1566,7 +1569,8 @@ BluetoothAdapter::SendMediaMetaData(const MediaMetaData& aMediaMetaData, ErrorRe
 }
 
 already_AddRefed<DOMRequest>
-BluetoothAdapter::SendMediaPlayStatus(const MediaPlayStatus& aMediaPlayStatus, ErrorResult& aRv)
+BluetoothAdapter::SendMediaPlayStatus(
+  const MediaPlayStatus& aMediaPlayStatus, ErrorResult& aRv)
 {
   nsCOMPtr<nsPIDOMWindow> win = GetOwner();
   if (!win) {
