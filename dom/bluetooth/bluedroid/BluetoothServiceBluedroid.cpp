@@ -100,8 +100,6 @@ static nsTArray<nsRefPtr<BluetoothReplyRunnable> > sGetDeviceRunnableArray;
 
 static nsTArray<nsRefPtr<BluetoothReplyRunnable> > sBondingRunnableArray;
 static nsTArray<nsRefPtr<BluetoothReplyRunnable> > sUnbondingRunnableArray;
-static bool sIsRestart(false);
-static bool sIsFirstTimeToggleOffBt(false);
 
 #ifndef MOZ_B2G_BT_API_V1
 // Static hash table to map device name from address
@@ -426,6 +424,8 @@ BluetoothServiceBluedroid::BluetoothServiceBluedroid()
 #else
   , mDiscoverableTimeout(0)
 #endif
+  , mIsRestart(false)
+  , mIsFirstTimeToggleOffBt(false)
 {
   sBtInterface = BluetoothInterface::GetInstance();
   if (!sBtInterface) {
@@ -1764,8 +1764,9 @@ class BluetoothServiceBluedroid::ProfileDeinitResultHandler final
   : public BluetoothProfileResultHandler
 {
 public:
-  ProfileDeinitResultHandler(unsigned char aNumProfiles)
+  ProfileDeinitResultHandler(unsigned char aNumProfiles, bool aIsRestart)
     : mNumProfiles(aNumProfiles)
+    , mIsRestart(aIsRestart)
   {
     MOZ_ASSERT(mNumProfiles);
   }
@@ -1787,14 +1788,16 @@ public:
 private:
   void Proceed() const
   {
-    if (!sIsRestart) {
-      sBtInterface->Cleanup(new CleanupResultHandler());
-    } else {
+    if (mIsRestart) {
       BT_LOGR("ProfileDeinitResultHandler::Proceed cancel cleanup() ");
+      return;
     }
+
+    sBtInterface->Cleanup(new CleanupResultHandler());
   }
 
   unsigned char mNumProfiles;
+  bool mIsRestart;
 };
 
 class BluetoothServiceBluedroid::SetAdapterPropertyDiscoverableResultHandler
@@ -1816,11 +1819,11 @@ BluetoothServiceBluedroid::AdapterStateChangedNotification(bool aState)
 
   BT_LOGR("BT_STATE: %d", aState);
 
-  if (sIsRestart && aState) {
+  if (mIsRestart && aState) {
     // daemon restarted, reset flag
     BT_LOGR("daemon restarted, reset flag");
-    sIsRestart = false;
-    sIsFirstTimeToggleOffBt = false;
+    mIsRestart = false;
+    mIsFirstTimeToggleOffBt = false;
   }
 
   mEnabled = aState;
@@ -1859,7 +1862,8 @@ BluetoothServiceBluedroid::AdapterStateChangedNotification(bool aState)
     // Cleanup Bluetooth interfaces after state becomes BT_STATE_OFF. This
     // will also stop the Bluetooth daemon and disable the adapter.
     nsRefPtr<ProfileDeinitResultHandler> res =
-      new ProfileDeinitResultHandler(MOZ_ARRAY_LENGTH(sDeinitManager));
+      new ProfileDeinitResultHandler(MOZ_ARRAY_LENGTH(sDeinitManager),
+                                     mIsRestart);
 
     for (size_t i = 0; i < MOZ_ARRAY_LENGTH(sDeinitManager); ++i) {
       sDeinitManager[i](res);
@@ -1909,9 +1913,9 @@ BluetoothServiceBluedroid::AdapterStateChangedNotification(bool aState)
     sChangeAdapterStateRunnableArray.RemoveElementAt(0);
   }
 
-  // After ProfileManagers deinit and cleanup, now restarts bluetooth daemon
-  if (sIsRestart && !aState) {
-    BT_LOGR("sIsRestart and off, now restart");
+  // After ProfileManagers deinit and cleanup, now restart bluetooth daemon
+  if (mIsRestart && !aState) {
+    BT_LOGR("mIsRestart and off, now restart");
     StartBluetooth(false, nullptr);
   }
 
@@ -1920,11 +1924,11 @@ BluetoothServiceBluedroid::AdapterStateChangedNotification(bool aState)
 
   BT_LOGR("BT_STATE: %d", aState);
 
-  if (sIsRestart && aState) {
+  if (mIsRestart && aState) {
     // daemon restarted, reset flag
     BT_LOGR("daemon restarted, reset flag");
-    sIsRestart = false;
-    sIsFirstTimeToggleOffBt = false;
+    mIsRestart = false;
+    mIsFirstTimeToggleOffBt = false;
   }
   bool isBtEnabled = (aState == true);
 
@@ -1986,18 +1990,17 @@ BluetoothServiceBluedroid::AdapterStateChangedNotification(bool aState)
   }
 
   // After ProfileManagers deinit and cleanup, now restarts bluetooth daemon
-  if (sIsRestart && !aState) {
-    BT_LOGR("sIsRestart and off, now restart");
+  if (mIsRestart && !aState) {
+    BT_LOGR("mIsRestart and off, now restart");
     StartBluetooth(false);
   }
 #endif
 }
 
 /**
- * AdapterPropertiesNotification will be called after enable() but
- * before AdapterStateChangeCallback is called. At that moment, both
- * BluetoothManager and BluetoothAdapter, do not register observer
- * yet.
+ * AdapterPropertiesNotification will be called after enable() but before
+ * AdapterStateChangeCallback is called. At that moment, both BluetoothManager
+ * and BluetoothAdapter have not registered observer yet.
  */
 void
 BluetoothServiceBluedroid::AdapterPropertiesNotification(
@@ -2821,7 +2824,7 @@ BluetoothServiceBluedroid::BackendErrorNotification(bool aCrashed)
   NS_ENSURE_TRUE_VOID(a2dp);
   a2dp->HandleBackendError();
 
-  sIsRestart = true;
+  mIsRestart = true;
   BT_LOGR("Recovery step2: stop bluetooth");
 #ifndef MOZ_B2G_BT_API_V1
   StopBluetooth(false, nullptr);
@@ -2835,13 +2838,13 @@ BluetoothServiceBluedroid::CompleteToggleBt(bool aEnabled)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (sIsRestart && !aEnabled && sIsFirstTimeToggleOffBt) {
+  if (mIsRestart && !aEnabled && mIsFirstTimeToggleOffBt) {
     // Both StopBluetooth and AdapterStateChangedNotification
     // trigger CompleteToggleBt. We don't need to call CompleteToggleBt again
-  } else if (sIsRestart && !aEnabled && !sIsFirstTimeToggleOffBt) {
+  } else if (mIsRestart && !aEnabled && !mIsFirstTimeToggleOffBt) {
     // Recovery step 3: cleanup and deinit Profile managers
-    BT_LOGR("CompleteToggleBt set sIsFirstTimeToggleOffBt = true");
-    sIsFirstTimeToggleOffBt = true;
+    BT_LOGR("CompleteToggleBt set mIsFirstTimeToggleOffBt = true");
+    mIsFirstTimeToggleOffBt = true;
     BluetoothService::CompleteToggleBt(aEnabled);
     AdapterStateChangedNotification(false);
   } else {
