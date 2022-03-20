@@ -126,7 +126,7 @@ public:
 class ObexHeaderSet
 {
 public:
-  ObexHeaderSet(uint8_t aOpcode) : mOpcode(aOpcode)
+  ObexHeaderSet()
   {
   }
 
@@ -314,7 +314,6 @@ public:
   }
 
 private:
-  uint8_t mOpcode;
   nsTArray<nsAutoPtr<ObexHeader> > mHeaders;
 };
 
