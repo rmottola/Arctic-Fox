@@ -1948,6 +1948,11 @@ BluetoothServiceBluedroid::AdapterStateChangedNotification(bool aState)
       BluetoothA2dpManager::DeinitA2dpInterface
     };
 
+    // Set discoverable cache to default value after state becomes BT_STATE_OFF.
+    if (sAdapterDiscoverable) {
+      sAdapterDiscoverable = false;
+    }
+
     // Cleanup bluetooth interfaces after BT state becomes BT_STATE_OFF.
     nsRefPtr<ProfileDeinitResultHandler> res =
       new ProfileDeinitResultHandler(MOZ_ARRAY_LENGTH(sDeinitManager));
@@ -2031,11 +2036,16 @@ BluetoothServiceBluedroid::AdapterPropertiesNotification(
       BT_APPEND_NAMED_VALUE(propertiesArray, "Name", sAdapterBdName);
 
     } else if (p.mType == PROPERTY_ADAPTER_SCAN_MODE) {
-      sAdapterDiscoverable =
-        (p.mScanMode == SCAN_MODE_CONNECTABLE_DISCOVERABLE);
-      BT_APPEND_NAMED_VALUE(propertiesArray, "Discoverable",
-                            sAdapterDiscoverable);
 
+      // If BT is not enabled, Bluetooth scan mode should be non-discoverable
+      // by defalut. 'AdapterStateChangedNotification' would set the default
+      // properties to bluetooth backend once Bluetooth is enabled.
+      if (IsEnabled()) {
+        sAdapterDiscoverable =
+          (p.mScanMode == SCAN_MODE_CONNECTABLE_DISCOVERABLE);
+        BT_APPEND_NAMED_VALUE(propertiesArray, "Discoverable",
+                              sAdapterDiscoverable);
+      }
     } else if (p.mType == PROPERTY_ADAPTER_BONDED_DEVICES) {
       // We have to cache addresses of bonded devices. Unlike BlueZ,
       // Bluedroid would not send another PROPERTY_ADAPTER_BONDED_DEVICES
@@ -2091,7 +2101,10 @@ BluetoothServiceBluedroid::AdapterPropertiesNotification(
     } else if (p.mType == PROPERTY_ADAPTER_SCAN_MODE) {
       BluetoothScanMode newMode = p.mScanMode;
 
-      if (newMode == SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
+      // If BT is not enabled, Bluetooth scan mode should be non-discoverable
+      // by defalut. 'AdapterStateChangedNotification' would set the default
+      // properties to bluetooth backend once Bluetooth is enabled.
+      if (newMode == SCAN_MODE_CONNECTABLE_DISCOVERABLE && IsEnabled()) {
         propertyValue = sAdapterDiscoverable = true;
       } else {
         propertyValue = sAdapterDiscoverable = false;
@@ -2139,7 +2152,6 @@ BluetoothServiceBluedroid::AdapterPropertiesNotification(
                                    BluetoothValue(props)));
 
   // Send reply for SetProperty
-
   if (!sSetPropertyRunnableArray.IsEmpty()) {
     DispatchReplySuccess(sSetPropertyRunnableArray[0]);
     sSetPropertyRunnableArray.RemoveElementAt(0);
