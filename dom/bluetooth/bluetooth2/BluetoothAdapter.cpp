@@ -28,6 +28,7 @@
 #include "mozilla/dom/bluetooth/BluetoothDiscoveryHandle.h"
 #include "mozilla/dom/bluetooth/BluetoothGattServer.h"
 #include "mozilla/dom/bluetooth/BluetoothPairingListener.h"
+#include "mozilla/dom/bluetooth/BluetoothPbapRequestHandle.h"
 #include "mozilla/dom/bluetooth/BluetoothTypes.h"
 
 using namespace mozilla;
@@ -1215,6 +1216,8 @@ BluetoothAdapter::HandlePullPhonebookReq(const BluetoothValue& aValue)
     }
   }
 
+  init.mHandle = BluetoothPbapRequestHandle::Create(GetOwner());
+
   nsRefPtr<BluetoothPhonebookPullingEvent> event =
     BluetoothPhonebookPullingEvent::Constructor(this,
       NS_LITERAL_STRING(PULL_PHONEBOOK_REQ_ID), init);
@@ -1246,6 +1249,8 @@ BluetoothAdapter::HandlePullVCardEntryReq(const BluetoothValue& aValue)
       init.mPropSelector = getVCardProperties(value);
     }
   }
+
+  init.mHandle = BluetoothPbapRequestHandle::Create(GetOwner());
 
   nsRefPtr<BluetoothVCardPullingEvent> event =
     BluetoothVCardPullingEvent::Constructor(this,
@@ -1288,6 +1293,8 @@ BluetoothAdapter::HandlePullVCardListingReq(const BluetoothValue& aValue)
       init.mVcardSelectorOperator = vCardSelectorOp::OR;
     }
   }
+
+  init.mHandle = BluetoothPbapRequestHandle::Create(GetOwner());
 
   nsRefPtr<BluetoothVCardListingEvent> event =
     BluetoothVCardListingEvent::Constructor(this,
