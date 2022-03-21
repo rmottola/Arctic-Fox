@@ -1440,12 +1440,12 @@ BluetoothOppManager::FileTransferComplete()
   NS_NAMED_LITERAL_STRING(type, "bluetooth-opp-transfer-complete");
   InfallibleTArray<BluetoothNamedValue> parameters;
 
-  BT_APPEND_NAMED_VALUE(parameters, "address", mDeviceAddress);
-  BT_APPEND_NAMED_VALUE(parameters, "success", mSuccessFlag);
-  BT_APPEND_NAMED_VALUE(parameters, "received", mIsServer);
-  BT_APPEND_NAMED_VALUE(parameters, "fileName", mFileName);
-  BT_APPEND_NAMED_VALUE(parameters, "fileLength", mSentFileLength);
-  BT_APPEND_NAMED_VALUE(parameters, "contentType", mContentType);
+  AppendNamedValue(parameters, "address", mDeviceAddress);
+  AppendNamedValue(parameters, "success", mSuccessFlag);
+  AppendNamedValue(parameters, "received", mIsServer);
+  AppendNamedValue(parameters, "fileName", mFileName);
+  AppendNamedValue(parameters, "fileLength", mSentFileLength);
+  AppendNamedValue(parameters, "contentType", mContentType);
 
   BT_ENSURE_TRUE_VOID_BROADCAST_SYSMSG(type, parameters);
 
@@ -1458,11 +1458,11 @@ BluetoothOppManager::StartFileTransfer()
   NS_NAMED_LITERAL_STRING(type, "bluetooth-opp-transfer-start");
   InfallibleTArray<BluetoothNamedValue> parameters;
 
-  BT_APPEND_NAMED_VALUE(parameters, "address", mDeviceAddress);
-  BT_APPEND_NAMED_VALUE(parameters, "received", mIsServer);
-  BT_APPEND_NAMED_VALUE(parameters, "fileName", mFileName);
-  BT_APPEND_NAMED_VALUE(parameters, "fileLength", mFileLength);
-  BT_APPEND_NAMED_VALUE(parameters, "contentType", mContentType);
+  AppendNamedValue(parameters, "address", mDeviceAddress);
+  AppendNamedValue(parameters, "received", mIsServer);
+  AppendNamedValue(parameters, "fileName", mFileName);
+  AppendNamedValue(parameters, "fileLength", mFileLength);
+  AppendNamedValue(parameters, "contentType", mContentType);
 
   BT_ENSURE_TRUE_VOID_BROADCAST_SYSMSG(type, parameters);
 
@@ -1475,10 +1475,10 @@ BluetoothOppManager::UpdateProgress()
   NS_NAMED_LITERAL_STRING(type, "bluetooth-opp-update-progress");
   InfallibleTArray<BluetoothNamedValue> parameters;
 
-  BT_APPEND_NAMED_VALUE(parameters, "address", mDeviceAddress);
-  BT_APPEND_NAMED_VALUE(parameters, "received", mIsServer);
-  BT_APPEND_NAMED_VALUE(parameters, "processedLength", mSentFileLength);
-  BT_APPEND_NAMED_VALUE(parameters, "fileLength", mFileLength);
+  AppendNamedValue(parameters, "address", mDeviceAddress);
+  AppendNamedValue(parameters, "received", mIsServer);
+  AppendNamedValue(parameters, "processedLength", mSentFileLength);
+  AppendNamedValue(parameters, "fileLength", mFileLength);
 
   BT_ENSURE_TRUE_VOID_BROADCAST_SYSMSG(type, parameters);
 }
@@ -1489,10 +1489,10 @@ BluetoothOppManager::ReceivingFileConfirmation()
   NS_NAMED_LITERAL_STRING(type, "bluetooth-opp-receiving-file-confirmation");
   InfallibleTArray<BluetoothNamedValue> parameters;
 
-  BT_APPEND_NAMED_VALUE(parameters, "address", mDeviceAddress);
-  BT_APPEND_NAMED_VALUE(parameters, "fileName", mFileName);
-  BT_APPEND_NAMED_VALUE(parameters, "fileLength", mFileLength);
-  BT_APPEND_NAMED_VALUE(parameters, "contentType", mContentType);
+  AppendNamedValue(parameters, "address", mDeviceAddress);
+  AppendNamedValue(parameters, "fileName", mFileName);
+  AppendNamedValue(parameters, "fileLength", mFileLength);
+  AppendNamedValue(parameters, "contentType", mContentType);
 
   BT_ENSURE_TRUE_VOID_BROADCAST_SYSMSG(type, parameters);
 }
