@@ -137,11 +137,12 @@ AvStatusToSinkString(BluetoothA2dpConnectionState aState, nsAString& aString)
   }
 }
 
-class InitAvrcpResultHandler final : public BluetoothAvrcpResultHandler
+class BluetoothA2dpManager::InitAvrcpResultHandler final
+  : public BluetoothAvrcpResultHandler
 {
 public:
   InitAvrcpResultHandler(BluetoothProfileResultHandler* aRes)
-  : mRes(aRes)
+    : mRes(aRes)
   { }
 
   void OnError(BluetoothStatus aStatus) override
@@ -172,11 +173,12 @@ private:
   nsRefPtr<BluetoothProfileResultHandler> mRes;
 };
 
-class InitA2dpResultHandler final : public BluetoothA2dpResultHandler
+class BluetoothA2dpManager::InitA2dpResultHandler final
+  : public BluetoothA2dpResultHandler
 {
 public:
   InitA2dpResultHandler(BluetoothProfileResultHandler* aRes)
-  : mRes(aRes)
+    : mRes(aRes)
   { }
 
   void OnError(BluetoothStatus aStatus) override
@@ -210,13 +212,14 @@ private:
   nsRefPtr<BluetoothProfileResultHandler> mRes;
 };
 
-class OnErrorProfileResultHandlerRunnable final : public nsRunnable
+class BluetoothA2dpManager::OnErrorProfileResultHandlerRunnable final
+  : public nsRunnable
 {
 public:
   OnErrorProfileResultHandlerRunnable(BluetoothProfileResultHandler* aRes,
                                       nsresult aRv)
-  : mRes(aRes)
-  , mRv(aRv)
+    : mRes(aRes)
+    , mRv(aRv)
   {
     MOZ_ASSERT(mRes);
   }
@@ -345,11 +348,12 @@ BluetoothA2dpManager::Get()
   return sBluetoothA2dpManager;
 }
 
-class CleanupAvrcpResultHandler final : public BluetoothAvrcpResultHandler
+class BluetoothA2dpManager::CleanupAvrcpResultHandler final
+  : public BluetoothAvrcpResultHandler
 {
 public:
   CleanupAvrcpResultHandler(BluetoothProfileResultHandler* aRes)
-  : mRes(aRes)
+    : mRes(aRes)
   { }
 
   void OnError(BluetoothStatus aStatus) override
@@ -381,11 +385,12 @@ private:
   nsRefPtr<BluetoothProfileResultHandler> mRes;
 };
 
-class CleanupA2dpResultHandler final : public BluetoothA2dpResultHandler
+class BluetoothA2dpManager::CleanupA2dpResultHandler final
+  : public BluetoothA2dpResultHandler
 {
 public:
   CleanupA2dpResultHandler(BluetoothProfileResultHandler* aRes)
-  : mRes(aRes)
+    : mRes(aRes)
   { }
 
   void OnError(BluetoothStatus aStatus) override
@@ -414,11 +419,12 @@ private:
   nsRefPtr<BluetoothProfileResultHandler> mRes;
 };
 
-class CleanupA2dpResultHandlerRunnable final : public nsRunnable
+class BluetoothA2dpManager::CleanupA2dpResultHandlerRunnable final
+  : public nsRunnable
 {
 public:
   CleanupA2dpResultHandlerRunnable(BluetoothProfileResultHandler* aRes)
-  : mRes(aRes)
+    : mRes(aRes)
   { }
 
   NS_IMETHOD Run() override
@@ -478,7 +484,8 @@ BluetoothA2dpManager::OnConnectError()
   mDeviceAddress.Truncate();
 }
 
-class ConnectResultHandler final : public BluetoothA2dpResultHandler
+class BluetoothA2dpManager::ConnectResultHandler final
+  : public BluetoothA2dpResultHandler
 {
 public:
   void OnError(BluetoothStatus aStatus) override
@@ -530,7 +537,8 @@ BluetoothA2dpManager::OnDisconnectError()
   mController->NotifyCompletion(NS_LITERAL_STRING(ERR_DISCONNECTION_FAILED));
 }
 
-class DisconnectResultHandler final : public BluetoothA2dpResultHandler
+class BluetoothA2dpManager::DisconnectResultHandler final
+  : public BluetoothA2dpResultHandler
 {
 public:
   void OnError(BluetoothStatus aStatus) override
