@@ -42,8 +42,7 @@ EXPORTS.mozilla.dom += [
 LOCAL_INCLUDES += [
     '/dom/base',
     '/dom/battery',
-    '/dom/bluetooth',
-    '/dom/bluetooth/common',
+    '/dom/bluetooth/common/webapi',
     '/dom/camera',
     '/dom/canvas',
     '/dom/geolocation',
