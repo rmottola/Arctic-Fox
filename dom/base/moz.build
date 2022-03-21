@@ -404,7 +404,7 @@ EXTRA_JS_MODULES += [
 LOCAL_INCLUDES += [
     '../battery',
     '../bluetooth',
-    '../bluetooth/bluetooth2',
+    '../bluetooth/common',
     '../events',
     '../media',
     '../network',

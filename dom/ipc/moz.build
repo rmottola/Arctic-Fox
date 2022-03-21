@@ -120,7 +120,7 @@ LOCAL_INCLUDES += [
     '/docshell/base',
     '/dom/base',
     '/dom/bluetooth',
-    '/dom/bluetooth/bluetooth2',
+    '/dom/bluetooth/common',
     '/dom/bluetooth/ipc',
     '/dom/devicestorage',
     '/dom/filesystem',
