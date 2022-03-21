@@ -139,15 +139,15 @@ public:
 
   void Init(
     BluetoothA2dpNotificationHandler* aNotificationHandler,
-    BluetoothA2dpResultHandler* aRes);
-  void Cleanup(BluetoothA2dpResultHandler* aRes);
+    BluetoothA2dpResultHandler* aRes) override;
+  void Cleanup(BluetoothA2dpResultHandler* aRes) override;
 
   /* Connect / Disconnect */
 
   void Connect(const nsAString& aBdAddr,
-               BluetoothA2dpResultHandler* aRes);
+               BluetoothA2dpResultHandler* aRes) override;
   void Disconnect(const nsAString& aBdAddr,
-                  BluetoothA2dpResultHandler* aRes);
+                  BluetoothA2dpResultHandler* aRes) override;
 
 private:
   void DispatchError(BluetoothA2dpResultHandler* aRes,
