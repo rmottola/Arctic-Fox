@@ -372,8 +372,6 @@ BluetoothServiceBluedroid::StopLeScanInternal(
   MOZ_ASSERT(NS_IsMainThread());
   ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
 
-}
-
   BluetoothGattManager* gatt = BluetoothGattManager::Get();
   ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
 
@@ -392,8 +390,6 @@ BluetoothServiceBluedroid::ConnectGattClientInternal(
   BluetoothGattManager* gatt = BluetoothGattManager::Get();
   ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
 
-
-  }
   gatt->Connect(aAppUuid, aDeviceAddress, aRunnable);
 }
 
@@ -438,7 +434,6 @@ BluetoothServiceBluedroid::GattClientStartNotificationsInternal(
   BluetoothGattManager* gatt = BluetoothGattManager::Get();
   ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
 
-luetoothServiceBluedroid::StopGonkBluetooth()
   gatt->RegisterNotifications(aAppUuid, aServId, aCharId, aRunnable);
 }
 
