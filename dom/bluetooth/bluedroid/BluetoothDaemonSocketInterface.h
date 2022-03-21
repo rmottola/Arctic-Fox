@@ -30,13 +30,13 @@ public:
 
   nsresult ListenCmd(BluetoothSocketType aType,
                      const nsAString& aServiceName,
-                     const uint8_t aServiceUuid[16],
+                     const BluetoothUuid& aServiceUuid,
                      int aChannel, bool aEncrypt, bool aAuth,
                      BluetoothSocketResultHandler* aRes);
 
   nsresult ConnectCmd(const nsAString& aBdAddr,
                       BluetoothSocketType aType,
-                      const uint8_t aUuid[16],
+                      const BluetoothUuid& aServiceUuid,
                       int aChannel, bool aEncrypt, bool aAuth,
                       BluetoothSocketResultHandler* aRes);
 
@@ -98,13 +98,13 @@ public:
 
   void Listen(BluetoothSocketType aType,
               const nsAString& aServiceName,
-              const uint8_t aServiceUuid[16],
+              const BluetoothUuid& aServiceUuid,
               int aChannel, bool aEncrypt, bool aAuth,
               BluetoothSocketResultHandler* aRes) override;
 
   void Connect(const nsAString& aBdAddr,
                BluetoothSocketType aType,
-               const uint8_t aUuid[16],
+               const BluetoothUuid& aServiceUuid,
                int aChannel, bool aEncrypt, bool aAuth,
                BluetoothSocketResultHandler* aRes) override;
 
