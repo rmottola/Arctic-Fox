@@ -200,6 +200,9 @@ public:
   NS_IMETHOD SetRedirectMode(uint32_t aRedirectMode) override;
   NS_IMETHOD GetTopWindowURI(nsIURI **aTopWindowURI) override;
   NS_IMETHOD GetProxyURI(nsIURI **proxyURI) override;
+  NS_IMETHOD SetCorsPreflightParameters(const nsTArray<nsCString>& unsafeHeaders,
+                                        bool aWithCredentials,
+                                        nsIPrincipal* aPrincipal) override;
 
   inline void CleanRedirectCacheChainIfNecessary()
   {
@@ -453,6 +456,11 @@ protected:
 
   nsID mSchedulingContextID;
   bool EnsureSchedulingContextID();
+
+  bool                              mRequireCORSPreflight;
+  bool                              mWithCredentials;
+  nsTArray<nsCString>               mUnsafeHeaders;
+  nsCOMPtr<nsIPrincipal>            mPreflightPrincipal;
 };
 
 // Share some code while working around C++'s absurd inability to handle casting
