@@ -618,6 +618,9 @@ if CONFIG['OS_ARCH'] == 'SunOS':
         'socket',
     ]
 
+CFLAGS += CONFIG['MOZ_ICU_CFLAGS']
+CXXFLAGS += CONFIG['MOZ_ICU_CFLAGS']
+
 if not CONFIG['GNU_CXX']:
     ALLOW_COMPILER_WARNINGS = True
 
