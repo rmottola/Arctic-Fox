@@ -76,7 +76,6 @@ private:
   BluetoothOppManager();
   bool Init();
   void HandleShutdown();
-
   void HandleVolumeStateChanged(nsISupports* aSubject);
 
   void StartFileTransfer();
@@ -151,6 +150,12 @@ private:
    * refreshing SDP records is necessary.
    */
   bool mNeedsUpdatingSdpRecords;
+
+  /**
+   * This holds the time when OPP manager fail to get service channel and
+   * prepare to refresh SDP records.
+   */
+  mozilla::TimeStamp mLastServiceChannelCheck;
 
   /**
    * Set when StopSendingFile() is called.
