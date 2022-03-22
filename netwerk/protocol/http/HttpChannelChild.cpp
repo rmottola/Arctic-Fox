@@ -496,9 +496,6 @@ HttpChannelChild::DoOnStartRequest(nsIRequest* aRequest, nsISupports* aContext)
     return;
   }
 
-  if (mResponseHead)
-    SetCookie(mResponseHead->PeekHeader(nsHttp::Set_Cookie));
-
   if (mDivertingToParent) {
     mListener = nullptr;
     mListenerContext = nullptr;
@@ -1115,7 +1112,6 @@ HttpChannelChild::Redirect1Begin(const uint32_t& newChannelId,
 
   // We won't get OnStartRequest, set cookies here.
   mResponseHead = new nsHttpResponseHead(responseHead);
-  SetCookie(mResponseHead->PeekHeader(nsHttp::Set_Cookie));
 
   if (!securityInfoSerialization.IsEmpty()) {
     NS_DeserializeObject(securityInfoSerialization,
