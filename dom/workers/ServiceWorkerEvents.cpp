@@ -130,7 +130,8 @@ public:
       return rv;
     }
 
-    mChannel->SynthesizeStatus(mInternalResponse->GetStatus(), mInternalResponse->GetStatusText());
+    mChannel->SynthesizeStatus(mInternalResponse->GetUnfilteredStatus(),
+                               mInternalResponse->GetUnfilteredStatusText());
 
     nsAutoTArray<InternalHeaders::Entry, 5> entries;
     mInternalResponse->UnfilteredHeaders()->GetEntries(entries);
@@ -148,18 +149,21 @@ class RespondWithHandler final : public PromiseNativeHandler
 {
   nsMainThreadPtrHandle<nsIInterceptedChannel> mInterceptedChannel;
   nsMainThreadPtrHandle<ServiceWorker> mServiceWorker;
-  RequestMode mRequestMode;
-  bool mIsClientRequest;
+  const RequestMode mRequestMode;
+  const bool mIsClientRequest;
+  const bool mIsNavigationRequest;
 public:
   NS_DECL_ISUPPORTS
 
   RespondWithHandler(nsMainThreadPtrHandle<nsIInterceptedChannel>& aChannel,
                      nsMainThreadPtrHandle<ServiceWorker>& aServiceWorker,
-                     RequestMode aRequestMode, bool aIsClientRequest)
+                     RequestMode aRequestMode, bool aIsClientRequest,
+                     bool aIsNavigationRequest)
     : mInterceptedChannel(aChannel)
     , mServiceWorker(aServiceWorker)
     , mRequestMode(aRequestMode)
     , mIsClientRequest(aIsClientRequest)
+    , mIsNavigationRequest(aIsNavigationRequest)
   {
   }
 
@@ -263,12 +267,14 @@ RespondWithHandler::ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValu
     return;
   }
 
-  // Section 4.2, step 2.2:
+  // Section "HTTP Fetch", step 2.2:
   //  If one of the following conditions is true, return a network error:
   //    * response's type is "error".
   //    * request's mode is not "no-cors" and response's type is "opaque".
   //    * request is a client request and response's type is neither "basic"
   //      nor "default".
+  //    * request is not a navigation request and response's type is
+  //      "opaqueredirect".
 
   if (response->Type() == ResponseType::Error) {
     autoCancel.SetCancelStatus(NS_ERROR_INTERCEPTED_ERROR_RESPONSE);
@@ -280,9 +286,16 @@ RespondWithHandler::ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValu
     return;
   }
 
+  // TODO: remove this case as its no longer in the spec (bug 1184967)
   if (mIsClientRequest && response->Type() != ResponseType::Basic &&
-      response->Type() != ResponseType::Default) {
+      response->Type() != ResponseType::Default &&
+      response->Type() != ResponseType::Opaqueredirect) {
     autoCancel.SetCancelStatus(NS_ERROR_CLIENT_REQUEST_OPAQUE_INTERCEPTION);
+    return;
+  }
+
+  if (!mIsNavigationRequest && response->Type() == ResponseType::Opaqueredirect) {
+    autoCancel.SetCancelStatus(NS_ERROR_BAD_OPAQUE_REDIRECT_INTERCEPTION);
     return;
   }
 
@@ -299,7 +312,7 @@ RespondWithHandler::ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValu
   nsAutoPtr<RespondWithClosure> closure(
       new RespondWithClosure(mInterceptedChannel, ir, worker->GetChannelInfo()));
   nsCOMPtr<nsIInputStream> body;
-  ir->GetInternalBody(getter_AddRefs(body));
+  ir->GetUnfilteredBody(getter_AddRefs(body));
   // Errors and redirects may not have a body.
   if (body) {
     response->SetBodyUsed();
@@ -358,7 +371,7 @@ FetchEvent::RespondWith(Promise& aArg, ErrorResult& aRv)
   mWaitToRespond = true;
   nsRefPtr<RespondWithHandler> handler =
     new RespondWithHandler(mChannel, mServiceWorker, mRequest->Mode(),
-                           ir->IsClientRequest());
+                           ir->IsClientRequest(), ir->IsNavigationRequest());
   aArg.AppendNativeHandler(handler);
 }
 
