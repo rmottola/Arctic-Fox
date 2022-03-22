@@ -140,13 +140,6 @@ static int do_main(int argc, char* argv[], nsIFile *xreDirectory)
   nsresult rv;
   uint32_t mainFlags = 0;
 
-#ifdef XP_WIN
-  if (!IsWindowsVistaOrGreater()) {
-    Output("Couldn't load valid PE image.\n");
-    return 255;
-  }
-  
-#endif
   // Allow firefox.exe to launch XULRunner apps via -app <application.ini>
   // Note that -app must be the *first* argument.
   const char *appDataFile = getenv("XUL_APP_FILE");
