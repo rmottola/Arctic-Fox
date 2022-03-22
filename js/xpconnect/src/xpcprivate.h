@@ -3422,6 +3422,7 @@ struct GlobalProperties {
     bool crypto : 1;
     bool rtcIdentityProvider : 1;
     bool fetch : 1;
+    bool caches : 1;
 };
 
 // Infallible.
