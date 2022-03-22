@@ -5047,7 +5047,7 @@ nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
 
     if (ShouldIntercept()) {
         mInterceptCache = MAYBE_INTERCEPT;
-        mResponseCouldBeSynthesized = true;
+        SetCouldBeSynthesized();
     }
 
     // Remember the cookie header that was set, if any
@@ -6999,6 +6999,12 @@ nsHttpChannel::OnPush(const nsACString &url, Http2PushedStream *pushedStream)
     channel->SetPushedStream(pushedStream);
     rv = pushListener->OnPush(this, pushHttpChannel);
     return rv;
+}
+
+void
+nsHttpChannel::SetCouldBeSynthesized()
+{
+  mResponseCouldBeSynthesized = true;
 }
 
 } // namespace net

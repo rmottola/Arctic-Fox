@@ -159,6 +159,8 @@ protected:
                                  const nsAString& aMessageCategory) override;
 
 private:
+  void UpdateAndSerializeSecurityInfo(nsACString& aSerializedSecurityInfoOut);
+
   nsRefPtr<nsHttpChannel>       mChannel;
   nsCOMPtr<nsICacheEntry>       mCacheEntry;
   nsCOMPtr<nsIAssociatedContentSecurity>  mAssociatedContentSecurity;

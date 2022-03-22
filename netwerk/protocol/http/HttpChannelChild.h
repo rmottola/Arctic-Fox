@@ -136,7 +136,8 @@ protected:
   bool RecvRedirect1Begin(const uint32_t& newChannel,
                           const URIParams& newURI,
                           const uint32_t& redirectFlags,
-                          const nsHttpResponseHead& responseHead) override;
+                          const nsHttpResponseHead& responseHead,
+                          const nsCString& securityInfoSerialization) override;
   bool RecvRedirect3Complete() override;
   bool RecvAssociateApplicationCache(const nsCString& groupID,
                                      const nsCString& clientID) override;
@@ -240,7 +241,8 @@ private:
   void Redirect1Begin(const uint32_t& newChannelId,
                       const URIParams& newUri,
                       const uint32_t& redirectFlags,
-                      const nsHttpResponseHead& responseHead);
+                      const nsHttpResponseHead& responseHead,
+                      const nsACString& securityInfoSerialization);
   void Redirect3Complete();
   void DeleteSelf();
 
