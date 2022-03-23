@@ -4039,6 +4039,18 @@
     "kind": "count",
     "description": "Count of messages sent by SessionRestore from child frames to the parent and that cannot be transmitted as they eat up too much memory."
   },
+  "FX_URLBAR_SELECTED_RESULT_INDEX": {
+    "expires_in_version": "45",
+    "kind": "enumerated",
+    "n_values": 17,
+    "description": "Firefox: The index of the selected result in the URL bar popup"
+  },
+  "FX_URLBAR_SELECTED_RESULT_TYPE": {
+    "expires_in_version": "45",
+    "kind": "enumerated",
+    "n_values": 14,
+    "description": "Firefox: The type of the selected result in the URL bar popup"
+  },
   "INNERWINDOWS_WITH_MUTATION_LISTENERS": {
     "expires_in_version": "never",
     "kind": "boolean",
