@@ -409,6 +409,10 @@ BrowserGlue.prototype = {
       case "test-initialize-sanitizer":
         this._sanitizer.onStartup();
         break;
+      case "xpi-signature-changed":
+        if (JSON.parse(data).disabled.length)
+          this._notifyUnsignedAddonsDisabled();
+        break;
     }
   },
 
@@ -454,6 +458,7 @@ BrowserGlue.prototype = {
     os.addObserver(this, "browser-search-service", false);
     os.addObserver(this, "restart-in-safe-mode", false);
     os.addObserver(this, "flash-plugin-hang", false);
+    os.addObserver(this, "xpi-signature-changed", false);
 
     this._flashHangCount = 0;
   },
@@ -495,6 +500,7 @@ BrowserGlue.prototype = {
       // may have already been removed by the observer
     } catch (ex) {}
     os.removeObserver(this, "flash-plugin-hang");
+    os.removeObserver(this, "xpi-signature-changed");
   },
 
   _onAppDefaults: function BG__onAppDefaults() {
@@ -774,6 +780,27 @@ BrowserGlue.prototype = {
     nb.appendNotification(message, "reset-unused-profile",
                           "chrome://global/skin/icons/question-16.png",
                           nb.PRIORITY_INFO_LOW, buttons);
+  },
+
+  _notifyUnsignedAddonsDisabled: function () {
+    let win = this.getMostRecentBrowserWindow();
+    if (!win)
+      return;
+
+    let message = win.gNavigatorBundle.getString("unsignedAddonsDisabled.message");
+    let buttons = [
+      {
+        label:     win.gNavigatorBundle.getString("unsignedAddonsDisabled.learnMore.label"),
+        accessKey: win.gNavigatorBundle.getString("unsignedAddonsDisabled.learnMore.accesskey"),
+        callback: function () {
+          win.BrowserOpenAddonsMgr("addons://list/extension?unsigned=true");
+        }
+      },
+    ];
+
+    let nb = win.document.getElementById("high-priority-global-notificationbox");
+    nb.appendNotification(message, "unsigned-addons-disabled", "",
+                          nb.PRIORITY_WARNING_MEDIUM, buttons);
   },
 
   // the first browser window has finished initializing
