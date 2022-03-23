@@ -3484,6 +3484,17 @@ AC_SUBST(NIGHTLY_BUILD)
 AC_SUBST(RELEASE_BUILD)
 
 dnl ========================================================
+dnl Multiprocess Firefox Testing UI - Nightly and Aurora
+dnl To be removed in Bug 1003313
+dnl ========================================================
+if test -z "$RELEASE_BUILD"; then
+    E10S_TESTING_ONLY=1
+    AC_DEFINE(E10S_TESTING_ONLY)
+fi
+
+AC_SUBST(E10S_TESTING_ONLY)
+
+dnl ========================================================
 dnl system libevent Support
 dnl ========================================================
 MOZ_ARG_WITH_STRING(system-libevent,
