@@ -1573,6 +1573,8 @@ DebuggerServerConnection.prototype = {
     this._extraPools.map(function(p) { p.cleanup(); });
     this._extraPools = null;
 
+    this.rootActor = null;
+    this._transport = null;
     DebuggerServer._connectionClosed(this);
   },
 
