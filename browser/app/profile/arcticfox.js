@@ -1220,6 +1220,9 @@ pref("security.csp.speccompliant", true);
 // Block insecure active content on https pages
 pref("security.mixed_content.block_active_content", true);
 
+// ID (a UUID when set by gecko) that is used as a per profile suffix to a low
+// integrity temp directory.
+pref("security.sandbox.content.tempDirSuffix", "");
 
 // Required blocklist freshness for OneCRL OCSP bypass
 // (default should be at least as large as extensions.blocklist.interval)
