@@ -3601,3 +3601,7 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     background-image: none;
   }
 }
+
+.browser-action-panel > .panel-arrowcontainer > .panel-arrowcontent {
+  padding: 0;
+}
