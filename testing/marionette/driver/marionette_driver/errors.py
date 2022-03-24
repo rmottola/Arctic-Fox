@@ -173,7 +173,7 @@ class UnexpectedAlertOpen(MarionetteException):
     status = "unexpected alert open"
 
 excs = [
-    MarionetteException,
+  MarionetteException,
   TimeoutException,
   InvalidResponseException,
   JavascriptException,
