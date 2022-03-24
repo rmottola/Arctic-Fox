@@ -4565,6 +4565,8 @@ this.XPIProvider = {
     let uri = getURIForResourceInFile(aFile, "bootstrap.js").spec;
     if (aType == "dictionary")
       uri = "resource://gre/modules/addons/SpellCheckDictionaryBootstrap.js"
+    else if (aType == "webextension")
+      uri = "resource://gre/modules/addons/WebExtensionBootstrap.js"
 
     this.bootstrapScopes[aId] =
       new Cu.Sandbox(principal, { sandboxName: uri,
