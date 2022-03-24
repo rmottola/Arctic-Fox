@@ -894,6 +894,7 @@ this.DOMApplicationRegistry = {
       if (SystemMessagePermissionsChecker
             .isSystemMessagePermittedToRegister(messageName,
                                                 aApp.manifestURL,
+                                                aApp.origin,
                                                 aManifest)) {
         msgmgr.registerPage(messageName, handlerPageURI, manifestURI);
       }
@@ -949,6 +950,7 @@ this.DOMApplicationRegistry = {
       if (SystemMessagePermissionsChecker
             .isSystemMessagePermittedToRegister("connection",
                                                 aApp.manifestURL,
+                                                aApp.origin,
                                                 aManifest)) {
         msgmgr.registerPage("connection", handlerPageURI, manifestURI);
       }
@@ -1050,6 +1052,7 @@ this.DOMApplicationRegistry = {
         if (SystemMessagePermissionsChecker
               .isSystemMessagePermittedToRegister("activity",
                                                   aApp.manifestURL,
+                                                  aApp.origin,
                                                   aManifest)) {
           msgmgr.registerPage("activity", launchPathURI, manifestURI);
         }
