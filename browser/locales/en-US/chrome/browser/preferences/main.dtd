@@ -38,3 +38,4 @@
 <!ENTITY zoneInfo.always      "Always">
 <!ENTITY zoneInfo.system      "Use system setting">
 
+<!ENTITY e10sEnabled.label                "Enable multi-process &brandShortName;">
