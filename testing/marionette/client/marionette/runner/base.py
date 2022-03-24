@@ -331,6 +331,10 @@ class BaseMarionetteOptions(OptionParser):
                         action='store',
                         help='profile to use when launching the gecko process. if not passed, then a profile will be '
                              'constructed and used')
+        self.add_option('--addon',
+                        dest='addons',
+                        action='append',
+                        help="addon to install; repeat for multiple addons.")
         self.add_option('--repeat',
                         dest='repeat',
                         action='store',
@@ -508,7 +512,7 @@ class BaseMarionetteTestRunner(object):
                  server_root=None, gecko_log=None, result_callbacks=None,
                  adb_host=None, adb_port=None, prefs=None, test_tags=None,
                  socket_timeout=BaseMarionetteOptions.socket_timeout_default,
-                 startup_timeout=None, **kwargs):
+                 startup_timeout=None, addons=None, **kwargs):
         self.address = address
         self.emulator = emulator
         self.emulator_binary = emulator_binary
@@ -519,6 +523,7 @@ class BaseMarionetteTestRunner(object):
         self.app_args = app_args or []
         self.bin = binary
         self.profile = profile
+        self.addons = addons
         self.logger = logger
         self.no_window = no_window
         self.httpd = None
@@ -681,6 +686,7 @@ class BaseMarionetteTestRunner(object):
                 'app_args': self.app_args,
                 'bin': self.bin,
                 'profile': self.profile,
+                'addons': self.addons,
                 'gecko_log': self.gecko_log,
             })
 
