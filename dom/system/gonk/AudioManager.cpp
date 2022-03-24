@@ -792,10 +792,6 @@ AudioManager::SetVolumeByCategory(uint32_t aCategory, uint32_t aIndex)
         }
       }
       status = SetStreamVolumeIndex(AUDIO_STREAM_MUSIC, aIndex);
-      if (NS_WARN_IF(NS_FAILED(status))) {
-        return status;
-      }
-      status = SetStreamVolumeIndex(AUDIO_STREAM_SYSTEM, aIndex);
       break;
     case VOLUME_NOTIFICATION:
       status = SetStreamVolumeIndex(AUDIO_STREAM_NOTIFICATION, aIndex);
@@ -803,6 +799,10 @@ AudioManager::SetVolumeByCategory(uint32_t aCategory, uint32_t aIndex)
         return status;
       }
       status = SetStreamVolumeIndex(AUDIO_STREAM_RING, aIndex);
+      if (NS_WARN_IF(NS_FAILED(status))) {
+        return status;
+      }
+      status = SetStreamVolumeIndex(AUDIO_STREAM_SYSTEM, aIndex);
       break;
     case VOLUME_ALARM:
       status = SetStreamVolumeIndex(AUDIO_STREAM_ALARM, aIndex);
@@ -823,12 +823,12 @@ AudioManager::GetVolumeByCategory(uint32_t aCategory) const
 {
   switch (static_cast<AudioVolumeCategories>(aCategory)) {
     case VOLUME_MEDIA:
-      MOZ_ASSERT(mCurrentStreamVolumeTbl[AUDIO_STREAM_MUSIC] ==
-                 mCurrentStreamVolumeTbl[AUDIO_STREAM_SYSTEM]);
       return mCurrentStreamVolumeTbl[AUDIO_STREAM_MUSIC];
     case VOLUME_NOTIFICATION:
       MOZ_ASSERT(mCurrentStreamVolumeTbl[AUDIO_STREAM_NOTIFICATION] ==
                  mCurrentStreamVolumeTbl[AUDIO_STREAM_RING]);
+      MOZ_ASSERT(mCurrentStreamVolumeTbl[AUDIO_STREAM_NOTIFICATION] ==
+                 mCurrentStreamVolumeTbl[AUDIO_STREAM_SYSTEM]);
       return mCurrentStreamVolumeTbl[AUDIO_STREAM_NOTIFICATION];
     case VOLUME_ALARM:
       return mCurrentStreamVolumeTbl[AUDIO_STREAM_ALARM];
@@ -847,12 +847,12 @@ AudioManager::GetMaxVolumeByCategory(uint32_t aCategory) const
 {
   switch (static_cast<AudioVolumeCategories>(aCategory)) {
     case VOLUME_MEDIA:
-      MOZ_ASSERT(sMaxStreamVolumeTbl[AUDIO_STREAM_MUSIC] ==
-                 sMaxStreamVolumeTbl[AUDIO_STREAM_SYSTEM]);
       return sMaxStreamVolumeTbl[AUDIO_STREAM_MUSIC];
     case VOLUME_NOTIFICATION:
       MOZ_ASSERT(sMaxStreamVolumeTbl[AUDIO_STREAM_NOTIFICATION] ==
                  sMaxStreamVolumeTbl[AUDIO_STREAM_RING]);
+      MOZ_ASSERT(sMaxStreamVolumeTbl[AUDIO_STREAM_NOTIFICATION] ==
+                 sMaxStreamVolumeTbl[AUDIO_STREAM_SYSTEM]);
       return sMaxStreamVolumeTbl[AUDIO_STREAM_NOTIFICATION];
     case VOLUME_ALARM:
       return sMaxStreamVolumeTbl[AUDIO_STREAM_ALARM];
@@ -880,6 +880,7 @@ AudioManager::SetAudioChannelVolume(uint32_t aChannel, uint32_t aIndex)
     case AudioChannel::Notification:
     case AudioChannel::Ringer:
     case AudioChannel::Publicnotification:
+    case AudioChannel::System:
       status = SetVolumeByCategory(VOLUME_NOTIFICATION, aIndex);
       break;
     case AudioChannel::Alarm:
@@ -910,6 +911,7 @@ AudioManager::GetAudioChannelVolume(uint32_t aChannel, uint32_t* aIndex)
     case AudioChannel::Notification:
     case AudioChannel::Ringer:
     case AudioChannel::Publicnotification:
+    case AudioChannel::System:
       *aIndex = GetVolumeByCategory(VOLUME_NOTIFICATION);
       break;
     case AudioChannel::Alarm:
@@ -940,6 +942,7 @@ AudioManager::GetMaxAudioChannelVolume(uint32_t aChannel, uint32_t* aMaxIndex)
     case AudioChannel::Notification:
     case AudioChannel::Ringer:
     case AudioChannel::Publicnotification:
+    case AudioChannel::System:
       *aMaxIndex = GetMaxVolumeByCategory(VOLUME_NOTIFICATION);
       break;
     case AudioChannel::Alarm:
