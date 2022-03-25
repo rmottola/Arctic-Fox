@@ -20,7 +20,7 @@ let {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 this.DevToolsUtils = devtools.require("devtools/toolkit/DevToolsUtils.js");
 
 XPCOMUtils.defineLazyServiceGetter(
-    this, "cookieManager", "@mozilla.org/cookiemanager;1", "nsICookieManager");
+    this, "cookieManager", "@mozilla.org/cookiemanager;1", "nsICookieManager2");
 
 Cu.import("chrome://marionette/content/actions.js");
 Cu.import("chrome://marionette/content/elements.js");
@@ -2967,9 +2967,9 @@ GeckoDriver.prototype.receiveMessage = function(message) {
       let isForCurrentPath = path => currentPath.indexOf(path) != -1;
       let results = [];
 
-      let en = cookieManager.enumerator;
+      let en = cookieManager.getCookiesFromHost(host);
       while (en.hasMoreElements()) {
-        let cookie = en.getNext().QueryInterface(Ci.nsICookie);
+        let cookie = en.getNext().QueryInterface(Ci.nsICookie2);
         // take the hostname and progressively shorten
         let hostname = host;
         do {
@@ -2981,7 +2981,8 @@ GeckoDriver.prototype.receiveMessage = function(message) {
               "path": cookie.path,
               "host": cookie.host,
               "secure": cookie.isSecure,
-              "expiry": cookie.expires
+              "expiry": cookie.expires,
+              "httpOnly": cookie.isHttpOnly
             });
             break;
           }
@@ -2998,7 +2999,7 @@ GeckoDriver.prototype.receiveMessage = function(message) {
           cookieToAdd.name,
           cookieToAdd.value,
           cookieToAdd.secure,
-          false,
+          cookieToAdd.httpOnly,
           false,
           cookieToAdd.expiry);
       return true;
