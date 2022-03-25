@@ -1587,7 +1587,6 @@ GeckoDriver.prototype.switchToWindow = function(cmd, resp) {
             win: win,
             outerId: outerId,
             tabIndex: i,
-            contentId: contentWindowId
           };
           break;
         }
@@ -1606,7 +1605,7 @@ GeckoDriver.prototype.switchToWindow = function(cmd, resp) {
     // content browser.
     if (!(found.outerId in this.browsers)) {
       let registerBrowsers, browserListening;
-      if (found.contentId) {
+      if ("tabIndex" in found) {
         registerBrowsers = this.registerPromise();
         browserListening = this.listeningPromise();
       }
@@ -1621,8 +1620,8 @@ GeckoDriver.prototype.switchToWindow = function(cmd, resp) {
       utils.window = found.win;
       this.curBrowser = this.browsers[found.outerId];
 
-      if (found.contentId) {
-        this.curBrowser.switchToTab(found.tabIndex);
+      if ("tabIndex" in found) {
+        this.curBrowser.switchToTab(found.tabIndex, found.win);
       }
     }
   } else {
@@ -3219,12 +3218,17 @@ BrowserObj.prototype.addTab = function(uri) {
 
 /**
  * Re-sets this BrowserObject's current tab and updates remoteness tracking.
+ * If a window is provided, this BrowserObj's internal reference is updated
+ * before proceeding.
  */
-BrowserObj.prototype.switchToTab = function(ind) {
-  if (this.browser) {
-    this.browser.selectTabAtIndex(ind);
-    this.tab = this.browser.selectedTab;
+BrowserObj.prototype.switchToTab = function(ind, win) {
+  if (win) {
+    this.window = win;
+    this.setBrowser(win);
   }
+
+  this.browser.selectTabAtIndex(ind);
+  this.tab = this.browser.selectedTab;
   this._browserWasRemote = this.browserForTab.isRemoteBrowser;
   this._hasRemotenessChange = false;
 };
