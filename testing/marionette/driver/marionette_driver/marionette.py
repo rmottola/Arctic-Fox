@@ -1371,9 +1371,9 @@ class Marionette(object):
         return unwrapped
 
     def execute_js_script(self, script, script_args=None, async=True,
-                          new_sandbox=True, special_powers=False,
-                          script_timeout=None, inactivity_timeout=None,
-                          filename=None, sandbox='default'):
+                          new_sandbox=True, script_timeout=None,
+                          inactivity_timeout=None, filename=None,
+                          sandbox='default'):
         if script_args is None:
             script_args = []
         args = self.wrapArguments(script_args)
@@ -1383,7 +1383,6 @@ class Marionette(object):
                                       args=args,
                                       async=async,
                                       newSandbox=new_sandbox,
-                                      specialPowers=special_powers,
                                       scriptTimeout=script_timeout,
                                       inactivityTimeout=inactivity_timeout,
                                       filename=filename,
@@ -1391,7 +1390,7 @@ class Marionette(object):
         return self.unwrapValue(response)
 
     def execute_script(self, script, script_args=None, new_sandbox=True,
-                       special_powers=False, sandbox='default', script_timeout=None):
+                       sandbox='default', script_timeout=None):
         '''
         Executes a synchronous JavaScript script, and returns the result (or None if the script does return a value).
 
@@ -1401,11 +1400,6 @@ class Marionette(object):
 
         :param script: A string containing the JavaScript to execute.
         :param script_args: A list of arguments to pass to the script.
-        :param special_powers: Whether or not you want access to SpecialPowers
-         in your script. Set to False by default because it shouldn't really
-         be used, since you already have access to chrome-level commands if you
-         set context to chrome and do an execute_script. This method was added
-         only to help us run existing Mochitests.
         :param sandbox: A tag referring to the sandbox you wish to use; if
          you specify a new tag, a new sandbox will be created.  If you use the
          special tag 'system', the sandbox will be created using the system
@@ -1468,7 +1462,6 @@ class Marionette(object):
                                       args=args,
                                       newSandbox=new_sandbox,
                                       sandbox=sandbox,
-                                      specialPowers=special_powers,
                                       scriptTimeout=script_timeout,
                                       line=int(frame[1]),
                                       filename=os.path.basename(frame[0]))
@@ -1476,7 +1469,7 @@ class Marionette(object):
 
     def execute_async_script(self, script, script_args=None, new_sandbox=True,
                              sandbox='default', script_timeout=None,
-                             special_powers=False, debug_script=False):
+                             debug_script=False):
         '''
         Executes an asynchronous JavaScript script, and returns the result (or None if the script does return a value).
 
@@ -1486,11 +1479,6 @@ class Marionette(object):
 
         :param script: A string containing the JavaScript to execute.
         :param script_args: A list of arguments to pass to the script.
-        :param special_powers: Whether or not you want access to SpecialPowers
-         in your script. Set to False by default because it shouldn't really
-         be used, since you already have access to chrome-level commands if you
-         set context to chrome and do an execute_script. This method was added
-         only to help us run existing Mochitests.
         :param sandbox: A tag referring to the sandbox you wish to use; if
          you specify a new tag, a new sandbox will be created.  If you use the
          special tag 'system', the sandbox will be created using the system
@@ -1525,7 +1513,6 @@ class Marionette(object):
                                       args=args,
                                       newSandbox=new_sandbox,
                                       sandbox=sandbox,
-                                      specialPowers=special_powers,
                                       scriptTimeout=script_timeout,
                                       line=int(frame[1]),
                                       filename=os.path.basename(frame[0]),
