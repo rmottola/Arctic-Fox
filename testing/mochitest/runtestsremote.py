@@ -596,10 +596,10 @@ def main(args):
                 "-e",
                 "class"]
             options.browserArgs.append(
-                "org.mozilla.goanna.tests.%s" %
+                "org.mozilla.gecko.tests.%s" %
                 test['name'])
             options.browserArgs.append(
-                "org.mozilla.roboexample.test/org.mozilla.goanna.FennecInstrumentationTestRunner")
+                "org.mozilla.roboexample.test/org.mozilla.gecko.FennecInstrumentationTestRunner")
             mochitest.nsprLogName = "nspr-%s.log" % test['name']
 
             # If the test is for checking the import from bookmarks then make
