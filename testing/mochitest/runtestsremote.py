@@ -538,9 +538,11 @@ def main(args):
 
         # sut may wait up to 300 s for a robocop am process before returning
         dm.default_timeout = 320
-        mp = TestManifest(strict=False)
-        # TODO: pull this in dynamically
-        mp.read(options.robocopIni)
+        if isinstance(options.manifestFile, TestManifest):
+            mp = options.manifestFile
+        else:
+            mp = TestManifest(strict=False)
+            mp.read(options.robocopIni)
 
         filters = []
         if options.totalChunks:
