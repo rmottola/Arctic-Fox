@@ -24,6 +24,10 @@ fennecLogcatFilters = [ "The character encoding of the HTML document was not dec
 class RemoteAutomation(Automation):
     _devicemanager = None
 
+    # Part of a hack for Robocop: "am COMMAND" is handled specially if COMMAND
+    # is in this set. See usages below.
+    _specialAmCommands = ('instrument', 'start')
+
     def __init__(self, deviceManager, appName = '', remoteLog = None,
                  processArgs=None):
         self._devicemanager = deviceManager
@@ -188,7 +192,7 @@ class RemoteAutomation(Automation):
 
         # Hack for robocop, if app & testURL == None and extraArgs contains the rest of the stuff, lets
         # assume extraArgs is all we need
-        if app == "am" and extraArgs[0] == "instrument":
+        if app == "am" and extraArgs[0] in RemoteAutomation._specialAmCommands:
             return app, extraArgs
 
         cmd, args = Automation.buildCommandLine(self, app, debuggerInfo, profileDir, testURL, extraArgs)
@@ -226,7 +230,7 @@ class RemoteAutomation(Automation):
                 else:
                     raise Exception("unable to launch process")
             self.procName = cmd[0].split('/')[-1]
-            if cmd[0] == 'am' and cmd[1] == "instrument":
+            if cmd[0] == 'am' and cmd[1] in RemoteAutomation._specialAmCommands:
                 self.procName = app
                 print "Robocop process name: "+self.procName
 
