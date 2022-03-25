@@ -198,6 +198,7 @@ let getElementSizeFn = dispatch(getElementSize);
 let getPageSourceFn = dispatch(getPageSource);
 let getActiveElementFn = dispatch(getActiveElement);
 let clickElementFn = dispatch(clickElement);
+let goBackFn = dispatch(goBack);
 let getElementAttributeFn = dispatch(getElementAttribute);
 let getElementTextFn = dispatch(getElementText);
 let getElementTagNameFn = dispatch(getElementTagName);
@@ -224,7 +225,7 @@ function startListeners() {
   addMessageListenerId("Marionette:getCurrentUrl", getCurrentUrlFn);
   addMessageListenerId("Marionette:getTitle", getTitleFn);
   addMessageListenerId("Marionette:getPageSource", getPageSourceFn);
-  addMessageListenerId("Marionette:goBack", goBack);
+  addMessageListenerId("Marionette:goBack", goBackFn);
   addMessageListenerId("Marionette:goForward", goForward);
   addMessageListenerId("Marionette:refresh", refresh);
   addMessageListenerId("Marionette:findElementContent", findElementContent);
@@ -330,7 +331,7 @@ function deleteSession(msg) {
   removeMessageListenerId("Marionette:getTitle", getTitleFn);
   removeMessageListenerId("Marionette:getPageSource", getPageSourceFn);
   removeMessageListenerId("Marionette:getCurrentUrl", getCurrentUrlFn);
-  removeMessageListenerId("Marionette:goBack", goBack);
+  removeMessageListenerId("Marionette:goBack", goBackFn);
   removeMessageListenerId("Marionette:goForward", goForward);
   removeMessageListenerId("Marionette:refresh", refresh);
   removeMessageListenerId("Marionette:findElementContent", findElementContent);
@@ -1323,11 +1324,11 @@ function getPageSource() {
 }
 
 /**
- * Go back in history
+ * Cause the browser to traverse one step backward in the joint history
+ * of the current top-level browsing context.
  */
-function goBack(msg) {
+function goBack() {
   curFrame.history.back();
-  sendOk(msg.json.command_id);
 }
 
 /**
