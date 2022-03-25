@@ -2198,7 +2198,7 @@ GeckoDriver.prototype.isElementDisplayed = function(cmd, resp) {
       break;
 
     case Context.CONTENT:
-      resp.value = yield this.listener.isElementDisplayed({id: id});
+      resp.value = yield this.listener.isElementDisplayed(id);
       break;
   }
 };
