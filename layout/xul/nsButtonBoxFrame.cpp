@@ -73,7 +73,7 @@ nsButtonBoxFrame::HandleEvent(nsPresContext* aPresContext,
 
 // On mac, Return fires the default button, not the focused one.
 #ifndef XP_MACOSX
-    case NS_KEY_PRESS: {
+    case eKeyPress: {
       WidgetKeyboardEvent* keyEvent = aEvent->AsKeyboardEvent();
       if (!keyEvent) {
         break;

@@ -671,7 +671,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     GenerateDragDropEnterExit(aPresContext, aEvent->AsDragEvent());
     break;
 
-  case NS_KEY_PRESS:
+  case eKeyPress:
     {
       WidgetKeyboardEvent* keyEvent = aEvent->AsKeyboardEvent();
 
@@ -3338,7 +3338,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
   case NS_KEY_AFTER_UP:
     break;
 
-  case NS_KEY_PRESS:
+  case eKeyPress:
     {
       WidgetKeyboardEvent* keyEvent = aEvent->AsKeyboardEvent();
       PostHandleKeyboardEvent(keyEvent, *aStatus, dispatchedToContentProcess);

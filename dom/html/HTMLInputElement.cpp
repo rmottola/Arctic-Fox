@@ -3699,7 +3699,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
   if (NS_SUCCEEDED(rv)) {
     WidgetKeyboardEvent* keyEvent = aVisitor.mEvent->AsKeyboardEvent();
     if (mType ==  NS_FORM_INPUT_NUMBER &&
-        keyEvent && keyEvent->mMessage == NS_KEY_PRESS &&
+        keyEvent && keyEvent->mMessage == eKeyPress &&
         aVisitor.mEvent->mFlags.mIsTrusted &&
         (keyEvent->keyCode == NS_VK_UP || keyEvent->keyCode == NS_VK_DOWN) &&
         !(keyEvent->IsShift() || keyEvent->IsControl() ||
@@ -3751,13 +3751,13 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           break;
         }
 
-        case NS_KEY_PRESS:
+        case eKeyPress:
         case NS_KEY_UP:
         {
           // For backwards compat, trigger checks/radios/buttons with
           // space or enter (bug 25300)
           WidgetKeyboardEvent* keyEvent = aVisitor.mEvent->AsKeyboardEvent();
-          if ((aVisitor.mEvent->mMessage == NS_KEY_PRESS &&
+          if ((aVisitor.mEvent->mMessage == eKeyPress &&
                keyEvent->keyCode == NS_VK_RETURN) ||
               (aVisitor.mEvent->mMessage == NS_KEY_UP &&
                keyEvent->keyCode == NS_VK_SPACE)) {
@@ -3785,7 +3785,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
               } // case
             } // switch
           }
-          if (aVisitor.mEvent->mMessage == NS_KEY_PRESS &&
+          if (aVisitor.mEvent->mMessage == eKeyPress &&
               mType == NS_FORM_INPUT_RADIO && !keyEvent->IsAlt() &&
               !keyEvent->IsControl() && !keyEvent->IsMeta()) {
             bool isMovingBack = false;
@@ -3831,7 +3831,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
            *     not submit, period.
            */
 
-          if (aVisitor.mEvent->mMessage == NS_KEY_PRESS &&
+          if (aVisitor.mEvent->mMessage == eKeyPress &&
               keyEvent->keyCode == NS_VK_RETURN &&
                (IsSingleLineTextControl(false, mType) ||
                 mType == NS_FORM_INPUT_NUMBER ||
@@ -3841,7 +3841,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
             NS_ENSURE_SUCCESS(rv, rv);
           }
 
-          if (aVisitor.mEvent->mMessage == NS_KEY_PRESS &&
+          if (aVisitor.mEvent->mMessage == eKeyPress &&
               mType == NS_FORM_INPUT_RANGE && !keyEvent->IsAlt() &&
               !keyEvent->IsControl() && !keyEvent->IsMeta() &&
               (keyEvent->keyCode == NS_VK_LEFT ||
@@ -3900,7 +3900,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
             }
           }
 
-        } break; // NS_KEY_PRESS || NS_KEY_UP
+        } break; // eKeyPress || NS_KEY_UP
 
         case NS_MOUSE_BUTTON_DOWN:
         case NS_MOUSE_BUTTON_UP:
@@ -4110,7 +4110,7 @@ HTMLInputElement::PostHandleEventForRangeThumb(EventChainPostVisitor& aVisitor)
       aVisitor.mEvent->mFlags.mMultipleActionsPrevented = true;
       break;
 
-    case NS_KEY_PRESS:
+    case eKeyPress:
       if (mIsDraggingRange &&
           aVisitor.mEvent->AsKeyboardEvent()->keyCode == NS_VK_ESCAPE) {
         CancelRangeThumbDrag();
