@@ -1146,7 +1146,7 @@ NativeKey::InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
       sUniqueKeyEventId++;
       aKeyEvent.mUniqueId = sUniqueKeyEventId;
       break;
-    case NS_KEY_UP:
+    case eKeyUp:
       aKeyEvent.keyCode = mDOMKeyCode;
       // Set defaultPrevented of the key event if the VK_MENU is not a system
       // key release, so that the menu bar does not trigger.  This helps avoid
@@ -1373,7 +1373,7 @@ NativeKey::HandleAppCommandMessage() const
   // Dispatch a keyup event if the command is caused by pressing a key and
   // the key isn't mapped to a virtual keycode.
   if (dispatchKeyEvent && !mVirtualKeyCode) {
-    WidgetKeyboardEvent keyupEvent(true, NS_KEY_UP, mWidget);
+    WidgetKeyboardEvent keyupEvent(true, eKeyUp, mWidget);
     InitKeyEvent(keyupEvent, mModKeyState);
     // NOTE: Ignore if the keyup event is consumed because keyup event
     //       represents just a physical key event state change.
@@ -1651,7 +1651,7 @@ NativeKey::HandleKeyUpMessage(bool* aEventDispatched) const
     return false;
   }
 
-  WidgetKeyboardEvent keyupEvent(true, NS_KEY_UP, mWidget);
+  WidgetKeyboardEvent keyupEvent(true, eKeyUp, mWidget);
   InitKeyEvent(keyupEvent, mModKeyState);
   if (aEventDispatched) {
     *aEventDispatched = true;
