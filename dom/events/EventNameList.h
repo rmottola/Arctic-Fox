@@ -708,7 +708,7 @@ NON_IDL_EVENT(command,
               EventNameType_XUL,
               eInputEventClass)
 NON_IDL_EVENT(close,
-              NS_XUL_CLOSE,
+              eWindowClose,
               EventNameType_XUL,
               eBasicEventClass)
 NON_IDL_EVENT(popupshowing,
