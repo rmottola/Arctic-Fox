@@ -1231,7 +1231,7 @@ EventListenerManager::AddListenerForAllEvents(nsIDOMEventListener* aDOMListener,
   flags.mAllowUntrustedEvents = aWantsUntrusted;
   flags.mInSystemGroup = aSystemEventGroup;
   EventListenerHolder listenerHolder(aDOMListener);
-  AddEventListenerInternal(listenerHolder, NS_EVENT_ALL, nullptr, EmptyString(),
+  AddEventListenerInternal(listenerHolder, eAllEvents, nullptr, EmptyString(),
                            flags, false, true);
 }
 
@@ -1245,7 +1245,7 @@ EventListenerManager::RemoveListenerForAllEvents(
   flags.mCapture = aUseCapture;
   flags.mInSystemGroup = aSystemEventGroup;
   EventListenerHolder listenerHolder(aDOMListener);
-  RemoveEventListenerInternal(listenerHolder, NS_EVENT_ALL, nullptr,
+  RemoveEventListenerInternal(listenerHolder, eAllEvents, nullptr,
                               EmptyString(), flags, true);
 }
 
