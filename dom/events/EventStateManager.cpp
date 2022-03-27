@@ -515,7 +515,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
 
     nsCOMPtr<nsINode> node = do_QueryInterface(aTargetContent);
     if (node &&
-        (aEvent->mMessage == NS_KEY_UP || aEvent->mMessage == NS_MOUSE_BUTTON_UP ||
+        (aEvent->mMessage == eKeyUp || aEvent->mMessage == NS_MOUSE_BUTTON_UP ||
          aEvent->mMessage == NS_WHEEL_WHEEL || aEvent->mMessage == NS_TOUCH_END ||
          aEvent->mMessage == NS_POINTER_UP)) {
       nsIDocument* doc = node->OwnerDoc();
