@@ -185,6 +185,8 @@ public:
    */
   void SetRemoteBrowser(nsITabParent* aTabParent);
 
+  nsresult SwapRemoteBrowser(nsITabParent* aTabParent);
+
   /**
    * Stashes a detached nsIFrame on the frame loader. We do this when we're
    * destroying the nsSubDocumentFrame. If the nsSubdocumentFrame is
