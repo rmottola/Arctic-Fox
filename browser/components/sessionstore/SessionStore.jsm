@@ -2147,7 +2147,6 @@ let SessionStoreInternal = {
 
     // default to the most-recently closed tab
     aIndex = aIndex || 0;
-    aIndex = aIndex || 0;
     if (!(aIndex in closedTabs)) {
       throw Components.Exception("Invalid index: not in the closed tabs", Cr.NS_ERROR_INVALID_ARG);
     }
@@ -2242,7 +2241,8 @@ let SessionStoreInternal = {
 
     if (!("__SSi" in aWindow)) {
       throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
-    } if (!this._windows[aWindow.__SSi].extData) {
+    }
+    if (!this._windows[aWindow.__SSi].extData) {
       this._windows[aWindow.__SSi].extData = {};
     }
     this._windows[aWindow.__SSi].extData[aKey] = aStringValue;
