@@ -186,7 +186,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "AsyncShutdown",
  * |true| if we are in debug mode, |false| otherwise.
  * Debug mode is controlled by preference browser.sessionstore.debug
  */
-let gDebuggingEnabled = false;
+var gDebuggingEnabled = false;
 function debug(aMsg) {
   if (gDebuggingEnabled) {
     aMsg = ("SessionStore: " + aMsg).replace(/\S{80}/g, "$&\n");
@@ -361,7 +361,7 @@ this.SessionStore = {
 // Freeze the SessionStore object. We don't want anyone to modify it.
 Object.freeze(SessionStore);
 
-let SessionStoreInternal = {
+var SessionStoreInternal = {
   QueryInterface: XPCOMUtils.generateQI([
     Ci.nsIDOMEventListener,
     Ci.nsIObserver,
@@ -655,7 +655,7 @@ let SessionStoreInternal = {
     // If we got here, that means we're dealing with a frame message
     // manager message, so the target will be a <xul:browser>.
     var browser = aMessage.target;
-    let win = browser.ownerDocument.defaultView;
+    var win = browser.ownerDocument.defaultView;
     let tab = win ? win.gBrowser.getTabForBrowser(browser) : null;
 
     // Ensure we receive only specific messages from <xul:browser>s that
@@ -1844,7 +1844,6 @@ let SessionStoreInternal = {
       if (tab.linkedBrowser.__SS_restoreState &&
           tab.linkedBrowser.__SS_restoreState == TAB_STATE_NEEDS_RESTORE)
         this.restoreTabContent(tab);
-
     }
   },
 
@@ -2117,7 +2116,6 @@ let SessionStoreInternal = {
       return this._windows[aWindow.__SSi]._closedTabs.length;
     }
 
-
     if (!DyingWindowCache.has(aWindow)) {
       throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
     }
@@ -2348,7 +2346,6 @@ let SessionStoreInternal = {
 
     let lastSessionState = LastSession.getState();
 
-    // This shouldn't ever be the case...
     // This shouldn't ever be the case...
     if (!lastSessionState.windows.length) {
       throw Components.Exception("lastSessionState has no windows", Cr.NS_ERROR_UNEXPECTED);
@@ -3070,7 +3067,6 @@ let SessionStoreInternal = {
       delete this._windows[aWindow.__SSi]._restoring;
     }
 
-
     let numTabsToRestore = aTabs.length;
     let numTabsInWindow = tabbrowser.tabs.length;
     let tabsDataArray = this._windows[aWindow.__SSi].tabs;
@@ -3091,7 +3087,6 @@ let SessionStoreInternal = {
     // If provided, set the selected tab.
     if (aSelectTab > 0 && aSelectTab <= aTabs.length) {
       tabbrowser.selectedTab = aTabs[aSelectTab - 1];
-
 
       // Update the window state in case we shut down without being notified.
       this._windows[aWindow.__SSi].selected = aSelectTab;
@@ -3149,6 +3144,7 @@ let SessionStoreInternal = {
     } else {
       tabbrowser.unpinTab(tab);
     }
+
     if (tabData.hidden) {
       tabbrowser.hideTab(tab);
     } else {
@@ -3474,7 +3470,6 @@ let SessionStoreInternal = {
     if (aWindow) {
       DirtyWindows.add(aWindow);
     }
-
 
     SessionSaver.runDelayed();
   },
@@ -4150,7 +4145,7 @@ let SessionStoreInternal = {
  * pinned, visible and hidden tabs in that and FIFO order. Hidden tabs are only
  * restored with restore_hidden_tabs=true.
  */
-let TabRestoreQueue = {
+var TabRestoreQueue = {
   // The separate buckets used to store tabs.
   tabs: {priority: [], visible: [], hidden: []},
 
@@ -4283,7 +4278,7 @@ let TabRestoreQueue = {
 // A map storing a closed window's state data until it goes aways (is GC'ed).
 // This ensures that API clients can still read (but not write) states of
 // windows they still hold a reference to but we don't.
-let DyingWindowCache = {
+var DyingWindowCache = {
   _data: new WeakMap(),
 
   has: function (window) {
@@ -4305,7 +4300,7 @@ let DyingWindowCache = {
 
 // A weak set of dirty windows. We use it to determine which windows we need to
 // recollect data for when getCurrentState() is called.
-let DirtyWindows = {
+var DirtyWindows = {
   _data: new WeakMap(),
 
   has: function (window) {
@@ -4342,7 +4337,7 @@ function TabData(obj = null) {
 // state is persisted and passed through to the next session during an app
 // restart to make the third party add-on warning not trash the deferred
 // session
-let LastSession = {
+var LastSession = {
   _state: null,
 
   get canRestore() {
