@@ -382,14 +382,14 @@ var SessionStoreInternal = {
   // they get restored).
   _crashedBrowsers: new WeakSet(),
 
+  // A map (xul:browser -> nsIFrameLoader) that maps a browser to the last
+  // associated frameLoader we heard about.
+  _lastKnownFrameLoader: new WeakMap(),
+
   // A map (xul:browser -> object) that maps a browser associated with a
   // recently closed tab to all its necessary state information we need to
   // properly handle final update message.
   _closedTabs: new WeakMap(),
-
-  // A map (xul:browser -> nsIFrameLoader) that maps a browser to the last
-  // associated frameLoader we heard about.
-  _lastKnownFrameLoader: new WeakMap(),
 
   // A map (xul:browser -> object) that maps a browser associated with a
   // recently closed tab due to a window closure to the tab state information
@@ -565,7 +565,6 @@ var SessionStoreInternal = {
         this._prefBranch.getBoolPref("sessionstore.resume_session_once"))
       this._prefBranch.setBoolPref("sessionstore.resume_session_once", false);
 
-    this._sessionInitialized = true;
     TelemetryStopwatch.finish("FX_SESSION_RESTORE_STARTUP_INIT_SESSION_MS");
     return state;
   },
@@ -581,7 +580,7 @@ var SessionStoreInternal = {
 
     this._max_tabs_undo = this._prefBranch.getIntPref("sessionstore.max_tabs_undo");
     this._prefBranch.addObserver("sessionstore.max_tabs_undo", this, true);
-    
+
     this._max_windows_undo = this._prefBranch.getIntPref("sessionstore.max_windows_undo");
     this._prefBranch.addObserver("sessionstore.max_windows_undo", this, true);
   },
