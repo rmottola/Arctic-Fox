@@ -2970,6 +2970,8 @@ var SessionStoreInternal = {
     // set smoothScroll back to the original value
     tabstrip.smoothScroll = smoothScroll;
 
+    TelemetryStopwatch.finish("FX_SESSION_RESTORE_RESTORE_WINDOW_MS");
+
     this._setWindowStateReady(aWindow);
     this._sendRestoreCompletedNotifications();
   },
