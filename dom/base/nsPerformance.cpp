@@ -350,7 +350,7 @@ nsPerformanceTiming::ResponseStart()
 DOMHighResTimeStamp
 nsPerformanceTiming::ResponseEndHighRes()
 {
-  if (!IsInitialized()) {
+  if (!nsContentUtils::IsPerformanceTimingEnabled() || !IsInitialized()) {
     return mZeroTime;
   }
   if (mResponseEnd.IsNull() ||
