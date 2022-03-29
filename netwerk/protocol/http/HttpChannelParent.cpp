@@ -124,7 +124,8 @@ HttpChannelParent::Init(const HttpChannelCreationArgs& aArgs)
                        a.appCacheClientID(), a.allowSpdy(), a.allowAltSvc(), a.fds(),
                        a.loadInfo(), a.synthesizedResponseHead(),
                        a.synthesizedSecurityInfoSerialization(),
-                       a.cacheKey(), a.schedulingContextID(), a.allowStaleCacheContent());
+                       a.cacheKey(), a.schedulingContextID(), a.preflightArgs(),
+                       a.allowStaleCacheContent());
   }
   case HttpChannelCreationArgs::THttpChannelConnectArgs:
   {
@@ -283,6 +284,7 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
                                  const nsCString&           aSecurityInfoSerialization,
                                  const uint32_t&            aCacheKey,
                                  const nsCString&           aSchedulingContextID,
+                                 const OptionalCorsPreflightArgs& aCorsPreflightArgs,
                                  const bool&                aAllowStaleCacheContent)
 {
   nsCOMPtr<nsIURI> uri = DeserializeURI(aURI);
@@ -388,6 +390,18 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
   } else if (aFds.type() == OptionalFileDescriptorSet::TArrayOfFileDescriptor) {
     const_cast<OptionalFileDescriptorSet&>(aFds).
       get_ArrayOfFileDescriptor().SwapElements(fds);
+  }
+
+  if (aCorsPreflightArgs.type() == OptionalCorsPreflightArgs::TCorsPreflightArgs) {
+    const CorsPreflightArgs& args = aCorsPreflightArgs.get_CorsPreflightArgs();
+    nsCOMPtr<nsIPrincipal> preflightPrincipal =
+      PrincipalInfoToPrincipal(args.preflightPrincipal());
+    rv = mChannel->SetCorsPreflightParameters(args.unsafeHeaders(),
+                                              args.withCredentials(),
+                                              preflightPrincipal);
+    if (NS_FAILED(rv)) {
+      return SendFailedAsyncOpen(rv);
+    }
   }
 
   nsCOMPtr<nsIInputStream> stream = DeserializeInputStream(uploadStream, fds);

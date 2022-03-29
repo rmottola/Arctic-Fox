@@ -121,6 +121,7 @@ protected:
                    const nsCString&           aSecurityInfoSerialization,
                    const uint32_t&            aCacheKey,
                    const nsCString&           aSchedulingContextID,
+                   const OptionalCorsPreflightArgs& aCorsPreflightArgs,
                    const bool&                aAllowStaleCacheContent);
 
   virtual bool RecvSetPriority(const uint16_t& priority) override;
