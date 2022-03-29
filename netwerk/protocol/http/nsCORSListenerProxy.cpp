@@ -1229,8 +1229,6 @@ nsCORSPreflightListener::OnStartRequest(nsIRequest *aRequest,
     mCallback->OnPreflightSucceeded();
   } else {
     mCallback->OnPreflightFailed(rv);
-    mOuterListener->OnStartRequest(mOuterChannel, mOuterContext);
-    mOuterListener->OnStopRequest(mOuterChannel, mOuterContext, rv);
   }
 
   return rv;

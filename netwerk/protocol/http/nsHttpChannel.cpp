@@ -7079,6 +7079,8 @@ nsHttpChannel::OnPreflightFailed(nsresult aError)
     mIsCorsPreflightDone = 1;
 
     Cancel(aError);
+    mListener->OnStartRequest(this, mListenerContext);
+    mListener->OnStopRequest(this, mListenerContext, aError);
 
     CloseCacheEntry(true);
     return NS_OK;
