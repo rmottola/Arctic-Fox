@@ -283,6 +283,12 @@ nsHttpHandler::Init()
         PrefsChanged(prefBranch, nullptr);
     }
 
+    rv = Preferences::AddBoolVarCache(&mPackagedAppsEnabled,
+        "network.http.enable-packaged-apps", false);
+    if (NS_FAILED(rv)) {
+        mPackagedAppsEnabled = false;
+    }
+
     nsHttpChannelAuthProvider::InitializePrefs();
 
     if (mCompatFirefoxEnabled) {
