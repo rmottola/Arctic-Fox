@@ -7084,11 +7084,8 @@ nsHttpChannel::OnPreflightFailed(nsresult aError)
     mIsCorsPreflightDone = 1;
     mPreflightChannel = nullptr;
 
-    Cancel(aError);
-    mListener->OnStartRequest(this, mListenerContext);
-    mListener->OnStopRequest(this, mListenerContext, aError);
-
     CloseCacheEntry(true);
+    AsyncAbort(aError);
     return NS_OK;
 }
 
