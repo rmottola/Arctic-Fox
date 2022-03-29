@@ -173,7 +173,6 @@ nsHttpHandler::nsHttpHandler()
     , mLegacyAppVersion("5.0")
     , mProduct("Gecko")
     , mUserAgentIsDirty(true)
-    , mUseCache(true)
     , mPromptTempRedirect(true)
     , mSendSecureXSiteReferrer(true)
     , mEnablePersistentHttpsCaching(false)
@@ -1213,20 +1212,13 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
             SetAcceptEncodings(acceptEncodings, false);
         }
     }
-    
+
     if (PREF_CHANGED(HTTP_PREF("accept-encoding.secure"))) {
         nsXPIDLCString acceptEncodings;
         rv = prefs->GetCharPref(HTTP_PREF("accept-encoding.secure"),
                                   getter_Copies(acceptEncodings));
         if (NS_SUCCEEDED(rv)) {
             SetAcceptEncodings(acceptEncodings, true);
-        }
-    }
-
-    if (PREF_CHANGED(HTTP_PREF("use-cache"))) {
-        rv = prefs->GetBoolPref(HTTP_PREF("use-cache"), &cVar);
-        if (NS_SUCCEEDED(rv)) {
-            mUseCache = cVar;
         }
     }
 

@@ -166,7 +166,6 @@ public:
     nsHttpConnectionMgr *ConnMgr()   { return mConnMgr; }
 
     // cache support
-    bool UseCache() const { return mUseCache; }
     uint32_t GenerateUniqueID() { return ++mLastUniqueID; }
     uint32_t SessionStartTime() { return mSessionStartTime; }
 
@@ -457,7 +456,6 @@ private:
     nsXPIDLCString mUserAgentOverride;
     bool           mUserAgentIsDirty; // true if mUserAgent should be rebuilt
 
-    bool           mUseCache;
 
     bool           mPromptTempRedirect;
     // mSendSecureXSiteReferrer: default is false,
