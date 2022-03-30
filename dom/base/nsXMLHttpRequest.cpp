@@ -3563,7 +3563,7 @@ nsXMLHttpRequest::OnProgress(nsIRequest *aRequest, nsISupports *aContext, int64_
     mUploadTransferred = loaded;
     mProgressSinceLastProgressEvent = true;
 
-    MaybeDispatchProgressEvents(false);
+    MaybeDispatchProgressEvents((mUploadTransferred == mUploadTotal));
   } else {
     mLoadLengthComputable = lengthComputable;
     mLoadTotal = lengthComputable ? aProgressMax : 0;
