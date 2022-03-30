@@ -813,7 +813,7 @@ nsIContent::PreHandleEvent(EventChainPreVisitor& aVisitor)
       case NS_LOAD:
       case NS_FORM_RESET:
       case eResize:
-      case NS_SCROLL_EVENT:
+      case eScroll:
       case NS_SELECT_START:
         stopEvent = true;
         break;
