@@ -9772,7 +9772,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
       // RM 2018-12-03 We miss all loadInfo setting up here 
       // so we cannot set aIsFromProcessingFrameAttributes
       rv = win->OpenNoNavigate(NS_ConvertUTF8toUTF16(spec),
-                               name,          // window name
+                               name,  // window name
                                EmptyString(), // Features
                                getter_AddRefs(newWin));
 
@@ -9823,7 +9823,6 @@ nsDocShell::InternalLoad(nsIURI* aURI,
                                         aBaseURI,
                                         aDocShell,
                                         aRequest);
-
       if (rv == NS_ERROR_NO_CONTENT) {
         // XXXbz except we never reach this code!
         if (isNewWindow) {
@@ -11729,8 +11728,7 @@ nsDocShell::AddState(JS::Handle<JS::Value> aData, const nsAString& aTitle,
   GetRootSessionHistory(getter_AddRefs(rootSH));
   NS_ENSURE_TRUE(rootSH, NS_ERROR_UNEXPECTED);
 
-  nsCOMPtr<nsISHistoryInternal> internalSH =
-      do_QueryInterface(rootSH);
+  nsCOMPtr<nsISHistoryInternal> internalSH = do_QueryInterface(rootSH);
   NS_ENSURE_TRUE(internalSH, NS_ERROR_UNEXPECTED);
 
   if (!aReplace) {
