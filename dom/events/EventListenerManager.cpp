@@ -298,7 +298,7 @@ EventListenerManager::AddEventListenerInternal(
     if (window) {
       window->SetHasPaintEventListeners();
     }
-  } else if (aEventMessage >= NS_MUTATION_START &&
+  } else if (aEventMessage >= eLegacyMutationEventFirst &&
              aEventMessage <= NS_MUTATION_END) {
     // For mutation listeners, we need to update the global bit on the DOM window.
     // Otherwise we won't actually fire the mutation event.
@@ -1256,7 +1256,7 @@ EventListenerManager::HasMutationListeners()
     uint32_t count = mListeners.Length();
     for (uint32_t i = 0; i < count; ++i) {
       Listener* listener = &mListeners.ElementAt(i);
-      if (listener->mEventMessage >= NS_MUTATION_START &&
+      if (listener->mEventMessage >= eLegacyMutationEventFirst &&
           listener->mEventMessage <= NS_MUTATION_END) {
         return true;
       }
@@ -1274,7 +1274,7 @@ EventListenerManager::MutationListenerBits()
     uint32_t count = mListeners.Length();
     for (uint32_t i = 0; i < count; ++i) {
       Listener* listener = &mListeners.ElementAt(i);
-      if (listener->mEventMessage >= NS_MUTATION_START &&
+      if (listener->mEventMessage >= eLegacyMutationEventFirst &&
           listener->mEventMessage <= NS_MUTATION_END) {
         if (listener->mEventMessage == NS_MUTATION_SUBTREEMODIFIED) {
           return kAllMutationBits;
