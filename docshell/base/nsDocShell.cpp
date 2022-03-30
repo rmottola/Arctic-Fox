@@ -14114,6 +14114,7 @@ nsDocShell::MaybeNotifyKeywordSearchLoading(const nsString& aProvider,
 
 NS_IMETHODIMP
 nsDocShell::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNavigate,
+                                      nsContentPolicyType aLoadContentType,
                                       bool* aShouldIntercept)
 {
   *aShouldIntercept = false;
@@ -14166,7 +14167,7 @@ nsDocShell::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNavigate,
     }
   }
 
-  if (aIsNavigate) {
+  if (aIsNavigate || nsContentUtils::IsWorkerLoad(aLoadContentType)) {
     OriginAttributes attrs(GetAppId(), GetIsInBrowserElement());
     *aShouldIntercept = swm->IsAvailable(attrs, aURI);
     return NS_OK;
@@ -14246,9 +14247,15 @@ nsDocShell::ChannelIntercepted(nsIInterceptedChannel* aChannel,
   nsresult rv = aChannel->GetIsNavigation(&isNavigation);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  nsContentPolicyType loadType;
+  rv = aChannel->GetInternalContentPolicyType(&loadType);
+  NS_ENSURE_SUCCESS(rv, rv);
+
   nsCOMPtr<nsIDocument> doc;
 
-  if (!isNavigation) {
+  bool isSubresourceLoad = !isNavigation &&
+                           !nsContentUtils::IsWorkerLoad(loadType);
+  if (isSubresourceLoad) {
     doc = GetDocument();
     if (!doc) {
       return NS_ERROR_NOT_AVAILABLE;
@@ -14261,7 +14268,7 @@ nsDocShell::ChannelIntercepted(nsIInterceptedChannel* aChannel,
 
   ErrorResult error;
   nsCOMPtr<nsIRunnable> runnable =
-    swm->PrepareFetchEvent(attrs, doc, aChannel, isReload, error);
+    swm->PrepareFetchEvent(attrs, doc, aChannel, isReload, isSubresourceLoad, error);
   if (NS_WARN_IF(error.Failed())) {
     return error.StealNSResult();
   }
