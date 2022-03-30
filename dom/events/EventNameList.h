@@ -623,7 +623,7 @@ NON_IDL_EVENT(DOMNodeRemoved,
               EventNameType_HTMLXUL,
               eMutationEventClass)
 NON_IDL_EVENT(DOMNodeInsertedIntoDocument,
-              NS_MUTATION_NODEINSERTEDINTODOCUMENT,
+              eLegacyNodeInsertedIntoDocument,
               EventNameType_HTMLXUL,
               eMutationEventClass)
 NON_IDL_EVENT(DOMNodeRemovedFromDocument,
