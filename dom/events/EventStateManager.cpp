@@ -701,7 +701,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
   case eAfterKeyDown:
   case eBeforeKeyUp:
   case eKeyUp:
-  case NS_KEY_AFTER_UP:
+  case eAfterKeyUp:
     {
       nsIContent* content = GetFocusedContent();
       if (content)
@@ -3335,7 +3335,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
 
   case eBeforeKeyUp:
   case eKeyUp:
-  case NS_KEY_AFTER_UP:
+  case eAfterKeyUp:
     break;
 
   case eKeyPress:
