@@ -7716,7 +7716,7 @@ nsContentUtils::SendKeyEvent(nsCOMPtr<nsIWidget> aWidget,
 
   EventMessage msg;
   if (aType.EqualsLiteral("keydown"))
-    msg = NS_KEY_DOWN;
+    msg = eKeyDown;
   else if (aType.EqualsLiteral("keyup"))
     msg = eKeyUp;
   else if (aType.EqualsLiteral("keypress"))
