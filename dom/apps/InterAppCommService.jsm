@@ -463,11 +463,13 @@ this.InterAppCommService = {
 
   _dispatchMessagePorts: function(aKeyword, aPubAppManifestURL,
                                   aAllowedSubAppManifestURLs,
-                                  aTarget, aOuterWindowID, aRequestID) {
+                                  aTarget, aOuterWindowID, aRequestID,
+                                  aPubPageURL) {
     if (DEBUG) {
       debug("_dispatchMessagePorts: aKeyword: " + aKeyword +
             " aPubAppManifestURL: " + aPubAppManifestURL +
-            " aAllowedSubAppManifestURLs: " + aAllowedSubAppManifestURLs);
+            " aAllowedSubAppManifestURLs: " + aAllowedSubAppManifestURLs +
+            " aPubPageURL: " + aPubPageURL);
     }
 
     if (aAllowedSubAppManifestURLs.length == 0) {
@@ -514,7 +516,8 @@ this.InterAppCommService = {
       // Fire system message to deliver the message port to the subscriber.
       messenger.sendMessage("connection",
         { keyword: aKeyword,
-          messagePortID: messagePortID },
+          messagePortID: messagePortID,
+          pubPageURL: aPubPageURL},
         Services.io.newURI(subscribedInfo.pageURL, null, null),
         Services.io.newURI(subscribedInfo.manifestURL, null, null));
 
@@ -600,6 +603,7 @@ this.InterAppCommService = {
   _connect: function(aMessage, aTarget) {
     let keyword = aMessage.keyword;
     let pubRules = aMessage.rules;
+    let pubPageURL = aMessage.pubPageURL;
     let pubAppManifestURL = aMessage.manifestURL;
     let outerWindowID = aMessage.outerWindowID;
     let requestID = aMessage.requestID;
@@ -610,7 +614,7 @@ this.InterAppCommService = {
         debug("No apps are subscribed for this connection. Returning.");
       }
       this._dispatchMessagePorts(keyword, pubAppManifestURL, [],
-                                 aTarget, outerWindowID, requestID);
+                                 aTarget, outerWindowID, requestID, pubPageURL);
       return;
     }
 
@@ -659,7 +663,7 @@ this.InterAppCommService = {
 
       this._dispatchMessagePorts(keyword, pubAppManifestURL,
                                  allowedSubAppManifestURLs,
-                                 aTarget, outerWindowID, requestID);
+                                 aTarget, outerWindowID, requestID, pubPageURL);
       return;
     }
 
@@ -677,17 +681,19 @@ this.InterAppCommService = {
     if (glue) {
       glue.selectApps(callerID, pubAppManifestURL, keyword, appsToSelect).then(
         function(aData) {
+          aData.pubPageURL = pubPageURL;
           this._handleSelectedApps(aData);
         }.bind(this),
         function(aError) {
           if (DEBUG) {
-            debug("Error occurred in the UI glue component. " + aError)
+            debug("Error occurred in the UI glue component. " + aError);
           }
 
           // Resolve the caller as if there were no selected apps.
           this._handleSelectedApps({ callerID: callerID,
                                      keyword: keyword,
                                      manifestURL: pubAppManifestURL,
+                                     pubPageURL: pubPageURL,
                                      selectedApps: [] });
         }.bind(this)
       );
@@ -700,6 +706,7 @@ this.InterAppCommService = {
       this._handleSelectedApps({ callerID: callerID,
                                  keyword: keyword,
                                  manifestURL: pubAppManifestURL,
+                                 pubPageURL: pubPageURL,
                                  selectedApps: [] });
     }
   },
@@ -936,6 +943,7 @@ this.InterAppCommService = {
     let target = caller.target;
 
     let pubAppManifestURL = aData.manifestURL;
+    let pubPageURL = aData.pubPageURL;
     let keyword = aData.keyword;
     let selectedApps = aData.selectedApps;
 
@@ -960,7 +968,7 @@ this.InterAppCommService = {
     // including the old connections and the newly selected connection.
     this._dispatchMessagePorts(keyword, pubAppManifestURL,
                                allowedSubAppManifestURLs,
-                               target, outerWindowID, requestID);
+                               target, outerWindowID, requestID, pubPageURL);
   },
 
   receiveMessage: function(aMessage) {
