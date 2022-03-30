@@ -231,12 +231,11 @@ using namespace mozilla;
 using namespace mozilla::dom;
 using mozilla::dom::workers::ServiceWorkerManager;
 
-// True means sUseErrorPages and sInterceptionEnabled has been added to
+// True means sUseErrorPages has been added to
 // preferences var cache.
 static bool gAddedPreferencesVarCache = false;
 
 bool nsDocShell::sUseErrorPages = false;
-bool nsDocShell::sInterceptionEnabled = false;
 
 // Number of documents currently loading
 static int32_t gNumberOfDocumentsLoading = 0;
@@ -5655,9 +5654,6 @@ nsDocShell::Create()
     Preferences::AddBoolVarCache(&sUseErrorPages,
                                  "browser.xul.error_pages.enabled",
                                  mUseErrorPages);
-    Preferences::AddBoolVarCache(&sInterceptionEnabled,
-                                 "dom.serviceWorkers.interception.enabled",
-                                 false);
     gAddedPreferencesVarCache = true;
   }
 
@@ -14126,7 +14122,7 @@ nsDocShell::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNavigate,
 {
   *aShouldIntercept = false;
   // Preffed off.
-  if (!sInterceptionEnabled) {
+  if (!nsContentUtils::ServiceWorkerInterceptionEnabled()) {
     return NS_OK;
   }
 
