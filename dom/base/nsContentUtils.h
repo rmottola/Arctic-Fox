@@ -948,7 +948,7 @@ public:
    */
   static nsIContentPolicy *GetContentPolicy();
 
-/**
+  /**
    * Map internal content policy types to external ones.
    */
   static nsContentPolicyType InternalContentPolicyTypeToExternal(nsContentPolicyType aType);
