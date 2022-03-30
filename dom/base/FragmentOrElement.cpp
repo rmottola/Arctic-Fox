@@ -817,7 +817,7 @@ nsIContent::PreHandleEvent(EventChainPreVisitor& aVisitor)
       case NS_SELECT_START:
         stopEvent = true;
         break;
-      case NS_USER_DEFINED_EVENT:
+      case eUnidentifiedEvent:
         if (aVisitor.mDOMEvent) {
           nsAutoString eventType;
           aVisitor.mDOMEvent->GetType(eventType);
