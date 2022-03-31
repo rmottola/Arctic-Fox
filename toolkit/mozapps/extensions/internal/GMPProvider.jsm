@@ -18,6 +18,7 @@ Cu.import("resource://gre/modules/osfile.jsm");
 Cu.import("resource://gre/modules/Log.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/GMPUtils.jsm");
+Cu.import("resource://gre/modules/AppConstants.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(
   this, "GMPInstallManager", "resource://gre/modules/GMPInstallManager.jsm");
@@ -64,11 +65,13 @@ XPCOMUtils.defineLazyGetter(this, "pluginsBundle",
 XPCOMUtils.defineLazyGetter(this, "gmpService",
   () => Cc["@mozilla.org/gecko-media-plugin-service;1"].getService(Ci.mozIGeckoMediaPluginChromeService));
 
-let messageManager = Cc["@mozilla.org/globalmessagemanager;1"]
+XPCOMUtils.defineLazyGetter(this, "telemetryService", () => Services.telemetry);
+
+var messageManager = Cc["@mozilla.org/globalmessagemanager;1"]
                        .getService(Ci.nsIMessageListenerManager);
 
-let gLogger;
-let gLogAppenderDump = null;
+var gLogger;
+var gLogAppenderDump = null;
 
 function configureLogging() {
   if (!gLogger) {
@@ -441,9 +444,72 @@ GMPWrapper.prototype = {
     }
     return this._updateTask;
   },
+
+  _arePluginFilesOnDisk: function () {
+    let fileExists = function(aGmpPath, aFileName) {
+      let f = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+      let path = OS.Path.join(aGmpPath, aFileName);
+      f.initWithPath(path);
+      return f.exists();
+    };
+
+    let id = this._plugin.id.substring(4);
+    let libName = AppConstants.DLL_PREFIX + id + AppConstants.DLL_SUFFIX;
+
+    return {
+      libraryMissing: !fileExists(this.gmpPath, libName),
+      infoMissing: !fileExists(this.gmpPath, id + ".info"),
+      voucherMissing: this._plugin.id == EME_ADOBE_ID
+                      && !fileExists(this.gmpPath, id + ".voucher"),
+    };
+  },
+
+  validate: function() {
+    if (!this.isInstalled) {
+      // Not installed -> Valid.
+      return { installed: false, valid: true };
+    }
+
+    let abi = GMPPrefs.get(GMPPrefs.KEY_PLUGIN_ABI, GMPUtils.ABI(), this._plugin.id);
+    if (abi != GMPUtils.ABI()) {
+      // ABI doesn't match. Possibly this is a profile migrated across platforms
+      // or from 32 -> 64 bit.
+      return {
+        installed: true,
+        mismatchedABI: true,
+        valid: false
+      };
+    }
+
+    // Installed -> Check if files are missing.
+    let status = this._arePluginFilesOnDisk();
+    status.installed = true;
+    status.mismatchedABI = false;
+    status.valid = true;
+    status.missing = [];
+    status.telemetry = 0;
+
+    if (status.libraryMissing) {
+      status.valid = false;
+      status.missing.push('library');
+      status.telemetry += 1;
+    }
+    if (status.infoMissing) {
+      status.valid = false;
+      status.missing.push('info');
+      status.telemetry += 2;
+    }
+    if (status.voucherMissing) {
+      status.valid = false;
+      status.missing.push('voucher');
+      status.telemetry += 4;
+    }
+
+    return status;
+  },
 };
 
-let GMPProvider = {
+var GMPProvider = {
   get name() { return "GMPProvider"; },
 
   _plugins: null,
@@ -484,7 +550,8 @@ let GMPProvider = {
       }
     }
 
-    if (Preferences.get(GMPPrefs.KEY_EME_ENABLED, false)) {
+    var emeEnabled = Preferences.get(GMPPrefs.KEY_EME_ENABLED, false);
+    if (emeEnabled) {
       try {
         let greDir = Services.dirsvc.get(NS_GRE_DIR,
                                          Ci.nsILocalFile);
