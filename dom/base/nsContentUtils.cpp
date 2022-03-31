@@ -7961,13 +7961,13 @@ nsContentUtils::GetWindowRoot(nsIDocument* aDoc)
   return nullptr;
 }
 
-
 /* static */
 nsContentPolicyType
 nsContentUtils::InternalContentPolicyTypeToExternal(nsContentPolicyType aType)
 {
   switch (aType) {
   case nsIContentPolicy::TYPE_INTERNAL_SCRIPT:
+  case nsIContentPolicy::TYPE_INTERNAL_SCRIPT_PRELOAD:
   case nsIContentPolicy::TYPE_INTERNAL_WORKER:
   case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
   case nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER:
@@ -7989,6 +7989,14 @@ nsContentUtils::InternalContentPolicyTypeToExternal(nsContentPolicyType aType)
   case nsIContentPolicy::TYPE_INTERNAL_XMLHTTPREQUEST:
   case nsIContentPolicy::TYPE_INTERNAL_EVENTSOURCE:
     return nsIContentPolicy::TYPE_XMLHTTPREQUEST;
+
+  case nsIContentPolicy::TYPE_INTERNAL_IMAGE:
+  case nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD:
+    return nsIContentPolicy::TYPE_IMAGE;
+
+  case nsIContentPolicy::TYPE_INTERNAL_STYLESHEET:
+  case nsIContentPolicy::TYPE_INTERNAL_STYLESHEET_PRELOAD:
+    return nsIContentPolicy::TYPE_STYLESHEET;
 
   default:
     return aType;
