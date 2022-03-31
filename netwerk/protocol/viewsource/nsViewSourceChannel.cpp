@@ -733,6 +733,7 @@ NS_IMETHODIMP
 nsViewSourceChannel::GetRequestHeader(const nsACString & aHeader,
                                       nsACString & aValue)
 {
+    aValue.Truncate();
     return !mHttpChannel ? NS_ERROR_NULL_POINTER :
         mHttpChannel->GetRequestHeader(aHeader, aValue);
 }
@@ -834,6 +835,7 @@ NS_IMETHODIMP
 nsViewSourceChannel::GetResponseHeader(const nsACString & aHeader,
                                        nsACString & aValue)
 {
+    aValue.Truncate();
     if (!mHttpChannel)
         return NS_ERROR_NULL_POINTER;
 
@@ -845,10 +847,9 @@ nsViewSourceChannel::GetResponseHeader(const nsACString & aHeader,
                         nsCaseInsensitiveCStringComparator()) &&
         !aHeader.Equals(NS_LITERAL_CSTRING("X-Frame-Options"),
                         nsCaseInsensitiveCStringComparator())) {
-        aValue.Truncate();
         return NS_OK;
     }
-        
+
     return mHttpChannel->GetResponseHeader(aHeader, aValue);
 }
 
