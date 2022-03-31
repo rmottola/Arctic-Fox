@@ -221,8 +221,10 @@ BroadcastSystemMessage(const nsAString& aType,
     return false;
   }
 
+  nsCOMPtr<nsISupports> promise;
   systemMessenger->BroadcastMessage(aType, value,
-                                    JS::UndefinedHandleValue);
+                                    JS::UndefinedHandleValue,
+                                    getter_AddRefs(promise));
 
   return true;
 }
@@ -251,8 +253,10 @@ BroadcastSystemMessage(const nsAString& aType,
   NS_ENSURE_TRUE(systemMessenger, false);
 
   JS::Rooted<JS::Value> value(cx, JS::ObjectValue(*obj));
+  nsCOMPtr<nsISupports> promise;
   systemMessenger->BroadcastMessage(aType, value,
-                                    JS::UndefinedHandleValue);
+                                    JS::UndefinedHandleValue,
+                                    getter_AddRefs(promise));
 
   return true;
 }
