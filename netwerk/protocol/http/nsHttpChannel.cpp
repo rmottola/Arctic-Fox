@@ -483,7 +483,10 @@ nsHttpChannel::ContinueConnect()
                 event->Revoke();
             }
 
-            AccumulateCacheHitTelemetry(kCacheHit);
+            // Don't accumulate the cache hit telemetry for intercepted channels.
+            if (mInterceptCache != INTERCEPTED) {
+                AccumulateCacheHitTelemetry(kCacheHit);
+            }
 
             return rv;
         }
