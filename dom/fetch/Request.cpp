@@ -152,6 +152,7 @@ Request::Constructor(const GlobalObject& aGlobal,
                      const RequestInit& aInit, ErrorResult& aRv)
 {
   nsRefPtr<InternalRequest> request;
+  bool inputRequestHasBody = false;
 
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
 
@@ -160,6 +161,7 @@ Request::Constructor(const GlobalObject& aGlobal,
     nsCOMPtr<nsIInputStream> body;
     inputReq->GetBody(getter_AddRefs(body));
     if (body) {
+      inputRequestHasBody = true;
       if (inputReq->BodyUsed()) {
         aRv.ThrowTypeError(MSG_FETCH_BODY_CONSUMED_ERROR);
         return nullptr;
@@ -304,7 +306,7 @@ Request::Constructor(const GlobalObject& aGlobal,
     return nullptr;
   }
 
-  if (aInit.mBody.WasPassed()) {
+  if (aInit.mBody.WasPassed() || inputRequestHasBody) {
     // HEAD and GET are not allowed to have a body.
     nsAutoCString method;
     request->GetMethod(method);
@@ -313,7 +315,9 @@ Request::Constructor(const GlobalObject& aGlobal,
       aRv.ThrowTypeError(MSG_NO_BODY_ALLOWED_FOR_GET_AND_HEAD);
       return nullptr;
     }
+  }
 
+  if (aInit.mBody.WasPassed()) {
     const OwningArrayBufferOrArrayBufferViewOrBlobOrFormDataOrUSVStringOrURLSearchParams& bodyInit = aInit.mBody.Value();
     nsCOMPtr<nsIInputStream> stream;
     nsAutoCString contentType;
