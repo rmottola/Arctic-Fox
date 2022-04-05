@@ -1194,7 +1194,7 @@ function TabClient(aClient, aForm) {
   this.thread = null;
   this.request = this.client.request;
   this.traits = aForm.traits || {};
-  this.events = [];
+  this.events = ["workerListChanged"];
 }
 
 TabClient.prototype = {
@@ -1289,7 +1289,15 @@ TabClient.prototype = {
   reconfigure: DebuggerClient.requester({
     type: "reconfigure",
     options: args(0)
-  }, { }),
+  }, {
+    telemetry: "RECONFIGURETAB"
+  }),
+
+  listWorkers: DebuggerClient.requester({
+    type: "listWorkers"
+  }, {
+    telemetry: "LISTWORKERS"
+  })
 };
 
 eventSource(TabClient.prototype);
