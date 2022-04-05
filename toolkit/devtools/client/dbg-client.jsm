@@ -224,7 +224,6 @@ const UnsolicitedNotifications = {
   "networkEventUpdate": "networkEventUpdate",
   "newGlobal": "newGlobal",
   "newScript": "newScript",
-  "newSource": "newSource",
   "tabDetached": "tabDetached",
   "tabListChanged": "tabListChanged",
   "reflowActivity": "reflowActivity",
@@ -1548,7 +1547,6 @@ function ThreadClient(aClient, aActor) {
   this._pauseGrips = {};
   this._threadGrips = {};
   this.request = this.client.request;
-  this.events = [];
 }
 
 ThreadClient.prototype = {
@@ -2076,7 +2074,11 @@ ThreadClient.prototype = {
   getPrototypesAndProperties: DebuggerClient.requester({
     type: "prototypesAndProperties",
     actors: args(0)
-  }, { })
+  }, {
+    telemetry: "PROTOTYPESANDPROPERTIES"
+  }),
+
+  events: ["newSource"]
 };
 
 eventSource(ThreadClient.prototype);
