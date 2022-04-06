@@ -5097,7 +5097,10 @@ nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
     MOZ_ASSERT(NS_IsMainThread());
     if (gHttpHandler->PackagedAppsEnabled()) {
         nsAutoCString path;
-        mURI->GetPath(path);
+        nsCOMPtr<nsIURL> url(do_QueryInterface(mURI));
+        if (url) {
+            url->GetFilePath(path);
+        }
         mIsPackagedAppResource = path.Find(PACKAGED_APP_TOKEN) != kNotFound;
     }
 
