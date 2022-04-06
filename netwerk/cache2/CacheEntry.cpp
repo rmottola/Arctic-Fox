@@ -163,7 +163,8 @@ NS_IMPL_ISUPPORTS(CacheEntry,
 CacheEntry::CacheEntry(const nsACString& aStorageID,
                        nsIURI* aURI,
                        const nsACString& aEnhanceID,
-                       bool aUseDisk)
+                       bool aUseDisk,
+                       bool aSkipSizeCheck)
 : mFrecency(0)
 , mSortingExpirationTime(uint32_t(-1))
 , mLock("CacheEntry")
@@ -172,6 +173,7 @@ CacheEntry::CacheEntry(const nsACString& aStorageID,
 , mEnhanceID(aEnhanceID)
 , mStorageID(aStorageID)
 , mUseDisk(aUseDisk)
+, mSkipSizeCheck(aSkipSizeCheck)
 , mIsDoomed(false)
 , mSecurityInfoLoaded(false)
 , mPreventCallbacks(false)
@@ -381,6 +383,7 @@ bool CacheEntry::Load(bool aTruncate, bool aPriority)
       rv = mFile->Init(fileKey,
                        aTruncate,
                        !mUseDisk,
+                       mSkipSizeCheck,
                        aPriority,
                        directLoad ? nullptr : this);
     }
@@ -476,6 +479,7 @@ already_AddRefed<CacheEntryHandle> CacheEntry::ReopenTruncated(bool aMemoryOnly,
     nsresult rv = CacheStorageService::Self()->AddStorageEntry(
       GetStorageID(), GetURI(), GetEnhanceID(),
       mUseDisk && !aMemoryOnly,
+      mSkipSizeCheck,
       true, // always create
       true, // truncate existing (this one)
       getter_AddRefs(handle));
@@ -1132,7 +1136,7 @@ NS_IMETHODIMP CacheEntry::SetPredictedDataSize(int64_t aPredictedDataSize)
 {
   mPredictedDataSize = aPredictedDataSize;
 
-  if (CacheObserver::EntryIsTooBig(mPredictedDataSize, mUseDisk)) {
+  if (!mSkipSizeCheck && CacheObserver::EntryIsTooBig(mPredictedDataSize, mUseDisk)) {
     LOG(("CacheEntry::SetPredictedDataSize [this=%p] too big, dooming", this));
     AsyncDoom(nullptr);
 
