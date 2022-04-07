@@ -182,6 +182,7 @@ class RefTest(object):
 
     locations = mozprofile.permissions.ServerLocations()
     locations.add_host(server, port=0)
+    locations.add_host('<file>', port=0)
 
     # Set preferences for communication between our command line arguments
     # and the reftest harness.  Preferences that are required for reftest
@@ -392,9 +393,23 @@ class RefTest(object):
     if dump_screen:
       self.dumpScreen(utilityPath)
 
-    try:
-      process.kill(sig=signal.SIGABRT)
-    return
+    if mozinfo.info.get('crashreporter', True) and not debuggerInfo:
+      if mozinfo.isWin:
+        # We should have a "crashinject" program in our utility path
+        crashinject = os.path.normpath(os.path.join(utilityPath, "crashinject.exe"))
+        if os.path.exists(crashinject):
+          status = subprocess.Popen([crashinject, str(process.pid)]).wait()
+          printstatus(status, "crashinject")
+          if status == 0:
+            return
+      else:
+        try:
+          process.kill(sig=signal.SIGABRT)
+        except OSError:
+          # https://bugzilla.mozilla.org/show_bug.cgi?id=921509
+          log.info("Can't trigger Breakpad, process no longer exists")
+        return
+    log.info("Can't trigger Breakpad, just killing process")
     process.kill()
 
   ### output processing
