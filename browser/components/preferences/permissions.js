@@ -1,4 +1,3 @@
-/* -*- indent-tabs-mode: nil; js-indent-level: 4 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -168,7 +167,7 @@ var gPermissionManager = {
     // Re-do the sort, if the status changed from Block to Allow
     // or vice versa, since if we're sorted on status, we may no
     // longer be in order.
-    if (this._lastPermissionSortColumn.id == "statusCol") {
+    if (this._lastPermissionSortColumn == "statusCol") {
       this._resortPermissions();
     }
     this._tree.treeBoxObject.invalidate();
@@ -186,9 +185,10 @@ var gPermissionManager = {
   _resortPermissions: function()
   {
     gTreeUtils.sort(this._tree, this._view, this._permissions,
+                    this._lastPermissionSortColumn,
                     this._permissionsComparator,
                     this._lastPermissionSortColumn,
-                    this._lastPermissionSortAscending);
+                    !this._lastPermissionSortAscending); // keep sort direction
   },
 
   onHostInput: function (aSiteField)
@@ -443,4 +443,3 @@ function initWithParams(aParams)
 {
   gPermissionManager.init(aParams);
 }
-
