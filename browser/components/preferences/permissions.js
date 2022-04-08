@@ -249,6 +249,20 @@ var gPermissionManager = {
     var urlLabel = document.getElementById("urlLabel");
     urlLabel.hidden = !urlFieldVisible;
 
+    let treecols = document.getElementsByTagName("treecols")[0];
+    treecols.addEventListener("click", event => {
+      if (event.target.nodeName != "treecol" || event.button != 0) {
+        return;
+      }
+
+      let sortField = event.target.getAttribute("data-field-name");
+      if (!sortField) {
+        return;
+      }
+
+      gPermissionManager.onPermissionSort(sortField);
+    });
+
     Services.obs.notifyObservers(null, NOTIFICATION_FLUSH_PERMISSIONS, this._type);
     Services.obs.addObserver(this, "perm-changed", false);
 
