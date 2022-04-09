@@ -99,9 +99,9 @@ AccessibleCaretManager::HideCarets()
 void
 AccessibleCaretManager::UpdateCarets(UpdateCaretsHint aHint)
 {
-  mCaretMode = GetCaretMode();
+  mLastUpdateCaretMode = GetCaretMode();
 
-  switch (mCaretMode) {
+  switch (mLastUpdateCaretMode) {
   case CaretMode::None:
     HideCarets();
     break;
@@ -399,7 +399,7 @@ AccessibleCaretManager::OnScrollStart()
 void
 AccessibleCaretManager::OnScrollEnd()
 {
-  if (mCaretMode != GetCaretMode()) {
+  if (mLastUpdateCaretMode != GetCaretMode()) {
     return;
   }
 
@@ -431,7 +431,7 @@ AccessibleCaretManager::OnScrolling()
 void
 AccessibleCaretManager::OnScrollPositionChanged()
 {
-  if (mCaretMode != GetCaretMode()) {
+  if (mLastUpdateCaretMode != GetCaretMode()) {
     return;
   }
 
@@ -442,7 +442,7 @@ AccessibleCaretManager::OnScrollPositionChanged()
 void
 AccessibleCaretManager::OnReflow()
 {
-  if (mCaretMode != GetCaretMode()) {
+  if (mLastUpdateCaretMode != GetCaretMode()) {
     return;
   }
 
