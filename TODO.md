@@ -146,7 +146,6 @@
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
 - Bug 1181869 [provokes crashing] - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
-- Bug 1204872 - 2015-09
 - bug 1181823 - convert test_ev_certs.js, test_keysize_ev.js, a
 - Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
 --Bug 1194422 - Expose census traversals to SpiderMonkey embedders; r=s
@@ -154,7 +153,6 @@
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
-- Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
 
 
