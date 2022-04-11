@@ -3568,7 +3568,7 @@ CacheIndex::SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf)
   return mallocSizeOf(gInstance) + SizeOfExcludingThis(mallocSizeOf);
 }
 
-namespace { 
+namespace {
 
 class HashComparator
 {
@@ -3614,7 +3614,7 @@ ReportHashSizeMatch(const SHA1Sum::Hash *aHash1, const SHA1Sum::Hash *aHash2)
   MOZ_ASSERT(false, "Found a collision in the index!");
 }
 
-} // namespace anonymous
+} // namespace
 
 void
 CacheIndex::ReportHashStats()
