@@ -85,8 +85,16 @@ GetRequestURLFromDocument(nsIDocument* aDocument, const nsAString& aInput,
       return;
   }
 
+  nsCOMPtr<nsIURI> resolvedURIClone;
+  // We use CloneIgnoringRef to strip away the fragment even if the original URI
+  // is immutable.
+  aRv = resolvedURI->CloneIgnoringRef(getter_AddRefs(resolvedURIClone));
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
   nsAutoCString spec;
-  aRv = resolvedURI->GetSpec(spec);
+  aRv = resolvedURIClone->GetSpec(spec);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
@@ -100,23 +108,27 @@ GetRequestURLFromChrome(const nsAString& aInput, nsAString& aRequestURL,
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-#ifdef DEBUG
   nsCOMPtr<nsIURI> uri;
   aRv = NS_NewURI(getter_AddRefs(uri), aInput, nullptr, nullptr);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
 
+  nsCOMPtr<nsIURI> uriClone;
+  // We use CloneIgnoringRef to strip away the fragment even if the original URI
+  // is immutable.
+  aRv = uri->CloneIgnoringRef(getter_AddRefs(uriClone));
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
   nsAutoCString spec;
-  aRv = uri->GetSpec(spec);
+  aRv = uriClone->GetSpec(spec);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
 
   CopyUTF8toUTF16(spec, aRequestURL);
-#else
-  aRequestURL = aInput;
-#endif
 }
 
 void
@@ -130,6 +142,11 @@ GetRequestURLFromWorker(const GlobalObject& aGlobal, const nsAString& aInput,
   NS_ConvertUTF8toUTF16 baseURL(worker->GetLocationInfo().mHref);
   nsRefPtr<workers::URL> url =
     workers::URL::Constructor(aGlobal, aInput, baseURL, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
+  url->SetHash(EmptyString(), aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
