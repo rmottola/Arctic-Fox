@@ -31,8 +31,8 @@ static int32_t sAutoDeleteCacheVersion = kAutoDeleteCacheVersion;
 static int32_t const kDefaultHalfLifeExperiment = -1; // Disabled
 int32_t CacheObserver::sHalfLifeExperiment = kDefaultHalfLifeExperiment;
 
-static uint32_t const kDefaultHalfLifeHours = 6; // 6 hours
-uint32_t CacheObserver::sHalfLifeHours = kDefaultHalfLifeHours;
+static float const kDefaultHalfLifeHours = 1.0F; // 1 hour
+float CacheObserver::sHalfLifeHours = kDefaultHalfLifeHours;
 
 static bool const kDefaultUseDiskCache = true;
 bool CacheObserver::sUseDiskCache = kDefaultUseDiskCache;
@@ -63,11 +63,11 @@ bool CacheObserver::sSmartCacheSizeEnabled = kDefaultSmartCacheSizeEnabled;
 static uint32_t const kDefaultPreloadChunkCount = 4;
 uint32_t CacheObserver::sPreloadChunkCount = kDefaultPreloadChunkCount;
 
-static uint32_t const kDefaultMaxMemoryEntrySize = 4 * 1024; // 4 MB
-uint32_t CacheObserver::sMaxMemoryEntrySize = kDefaultMaxMemoryEntrySize;
+static int32_t const kDefaultMaxMemoryEntrySize = 4 * 1024; // 4 MB
+int32_t CacheObserver::sMaxMemoryEntrySize = kDefaultMaxMemoryEntrySize;
 
-static uint32_t const kDefaultMaxDiskEntrySize = 50 * 1024; // 50 MB
-uint32_t CacheObserver::sMaxDiskEntrySize = kDefaultMaxDiskEntrySize;
+static int32_t const kDefaultMaxDiskEntrySize = 50 * 1024; // 50 MB
+int32_t CacheObserver::sMaxDiskEntrySize = kDefaultMaxDiskEntrySize;
 
 static uint32_t const kDefaultMaxDiskChunksMemoryUsage = 10 * 1024; // 10MB
 uint32_t CacheObserver::sMaxDiskChunksMemoryUsage = kDefaultMaxDiskChunksMemoryUsage;
@@ -166,9 +166,9 @@ CacheObserver::AttachToPreferences()
   mozilla::Preferences::AddUintVarCache(
     &sPreloadChunkCount, "browser.cache.disk.preload_chunk_count", kDefaultPreloadChunkCount);
 
-  mozilla::Preferences::AddUintVarCache(
+  mozilla::Preferences::AddIntVarCache(
     &sMaxDiskEntrySize, "browser.cache.disk.max_entry_size", kDefaultMaxDiskEntrySize);
-  mozilla::Preferences::AddUintVarCache(
+  mozilla::Preferences::AddIntVarCache(
     &sMaxMemoryEntrySize, "browser.cache.memory.max_entry_size", kDefaultMaxMemoryEntrySize);
 
   mozilla::Preferences::AddUintVarCache(
@@ -210,22 +210,22 @@ CacheObserver::AttachToPreferences()
 
   switch (sHalfLifeExperiment) {
   case 1: // The experiment is engaged
-    sHalfLifeHours = 6;
+    sHalfLifeHours = 0.083F; // ~5 mintues
     break;
   case 2:
-    sHalfLifeHours = 24;
+    sHalfLifeHours = 0.25F; // 15 mintues
     break;
   case 3:
-    sHalfLifeHours = 7 * 24;
+    sHalfLifeHours = 1.0F;
     break;
   case 4:
-    sHalfLifeHours = 50 * 24;
+    sHalfLifeHours = 6.0F;
     break;
 
   case -1:
   default: // The experiment is off or broken
     sHalfLifeExperiment = -1;
-    sHalfLifeHours = std::max(1U, std::min(1440U, mozilla::Preferences::GetUint(
+    sHalfLifeHours = std::max(0.01F, std::min(1440.0F, mozilla::Preferences::GetFloat(
       "browser.cache.frecency_half_life_hours", kDefaultHalfLifeHours)));
     break;
   }
@@ -465,9 +465,12 @@ CacheStorageEvictHelper::ClearStorage(bool const aPrivate,
 bool const CacheObserver::EntryIsTooBig(int64_t aSize, bool aUsingDisk)
 {
   // If custom limit is set, check it.
-  int64_t preferredLimit = aUsingDisk
-    ? static_cast<int64_t>(sMaxDiskEntrySize) << 10
-    : static_cast<int64_t>(sMaxMemoryEntrySize) << 10;
+  int64_t preferredLimit = aUsingDisk ? sMaxDiskEntrySize : sMaxMemoryEntrySize;
+
+  // do not convert to bytes when the limit is -1, which means no limit
+  if (preferredLimit > 0) {
+    preferredLimit <<= 10;
+  }
 
   if (preferredLimit != -1 && aSize > preferredLimit)
     return true;

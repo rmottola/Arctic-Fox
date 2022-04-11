@@ -130,7 +130,7 @@ AccumulateCacheHitTelemetry(CacheDisposition hitOrMiss)
 
         int32_t experiment = CacheObserver::HalfLifeExperiment();
         if (experiment > 0 && hitOrMiss == kCacheMissed) {
-            Telemetry::Accumulate(Telemetry::HTTP_CACHE_MISS_HALFLIFE_EXPERIMENT,
+            Telemetry::Accumulate(Telemetry::HTTP_CACHE_MISS_HALFLIFE_EXPERIMENT_2,
                                   experiment - 1);
         }
     }
@@ -5294,24 +5294,29 @@ nsHttpChannel::BeginConnect()
     nsRefPtr<nsChannelClassifier> channelClassifier = new nsChannelClassifier();
     if (mLoadFlags & LOAD_CLASSIFY_URI) {
         nsCOMPtr<nsIURIClassifier> classifier = do_GetService(NS_URICLASSIFIERSERVICE_CONTRACTID);
-        if (classifier) {
-            bool tp = false;
-            channelClassifier->ShouldEnableTrackingProtection(this, &tp);
+        bool tpEnabled = false;
+        channelClassifier->ShouldEnableTrackingProtection(this, &tpEnabled);
+        if (classifier && tpEnabled) {
             // We skip speculative connections by setting mLocalBlocklist only
             // when tracking protection is enabled. Though we could do this for
             // both phishing and malware, it is not necessary for correctness,
             // since no network events will be received while the
             // nsChannelClassifier is in progress. See bug 1122691.
-            if (tp) {
-                nsCOMPtr<nsIPrincipal> principal = GetURIPrincipal();
-                nsresult response = NS_OK;
-                classifier->ClassifyLocal(principal, tp, &response);
-                if (NS_FAILED(response)) {
-                    LOG(("nsHttpChannel::ClassifyLocal found principal on local "
-                         "blocklist [this=%p]", this));
+            nsCOMPtr<nsIURI> uri;
+            rv = GetURI(getter_AddRefs(uri));
+            if (NS_SUCCEEDED(rv) && uri) {
+                nsAutoCString tables;
+                Preferences::GetCString("urlclassifier.trackingTable", &tables);
+                nsAutoCString results;
+                rv = classifier->ClassifyLocalWithTables(uri, tables, results);
+                if (NS_SUCCEEDED(rv) && !results.IsEmpty()) {
+                    LOG(("nsHttpChannel::ClassifyLocalWithTables found "
+                         "uri on local tracking blocklist [this=%p]",
+                         this));
                     mLocalBlocklist = true;
                 } else {
-                    LOG(("nsHttpChannel::ClassifyLocal no result found [this=%p]", this));
+                    LOG(("nsHttpChannel::ClassifyLocalWithTables no result "
+                         "found [this=%p]", this));
                 }
             }
         }
@@ -5327,12 +5332,6 @@ nsHttpChannel::BeginConnect()
         // by the packaged app service into the cache, and the cache entry will
         // be passed to OnCacheEntryAvailable.
 
-        // Pass the original load flags to the packaged app request.
-        uint32_t loadFlags = mLoadFlags;
-
-        mLoadFlags |= LOAD_ONLY_FROM_CACHE;
-        mLoadFlags |= LOAD_FROM_CACHE;
-        mLoadFlags &= ~VALIDATE_ALWAYS;
         nsCOMPtr<nsIPackagedAppService> pas =
             do_GetService("@mozilla.org/network/packaged-app-service;1", &rv);
         if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -5340,12 +5339,18 @@ nsHttpChannel::BeginConnect()
             return rv;
         }
 
-        nsCOMPtr<nsIPrincipal> principal = GetURIPrincipal();
-        nsCOMPtr<nsILoadContextInfo> loadInfo = GetLoadContextInfo(this);
-        rv = pas->GetResource(principal, loadFlags, loadInfo, this);
+        rv = pas->GetResource(this, this);
         if (NS_FAILED(rv)) {
             AsyncAbort(rv);
         }
+
+        // We need to alter the flags so the cache entry returned by the
+        // packaged app service is always accepted. Revalidation is handled
+        // by the service.
+        mLoadFlags |= LOAD_ONLY_FROM_CACHE;
+        mLoadFlags |= LOAD_FROM_CACHE;
+        mLoadFlags &= ~VALIDATE_ALWAYS;
+
         return rv;
     }
 

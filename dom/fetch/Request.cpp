@@ -17,6 +17,7 @@
 #include "mozilla/dom/URL.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/workers/bindings/URL.h"
+#include "mozilla/unused.h"
 
 #include "WorkerPrivate.h"
 
@@ -72,30 +73,44 @@ Request::GetInternalRequest()
 
 namespace {
 void
-GetRequestURLFromWindow(const GlobalObject& aGlobal, nsPIDOMWindow* aWindow,
-                        const nsAString& aInput, nsAString& aRequestURL,
-                        ErrorResult& aRv)
+GetRequestURLFromDocument(nsIDocument* aDocument, const nsAString& aInput,
+                          nsAString& aRequestURL, ErrorResult& aRv)
 {
-  MOZ_ASSERT(aWindow);
+  MOZ_ASSERT(aDocument);
   MOZ_ASSERT(NS_IsMainThread());
 
-  nsCOMPtr<nsIURI> docURI = aWindow->GetDocumentURI();
+  nsCOMPtr<nsIURI> baseURI = aDocument->GetBaseURI();
+  nsCOMPtr<nsIURI> resolvedURI;
+  aRv = NS_NewURI(getter_AddRefs(resolvedURI), aInput, nullptr, baseURI);
+  if (NS_WARN_IF(aRv.Failed())) {
+    aRv.ThrowTypeError(MSG_INVALID_URL, &aInput);
+    return;
+  }
+
+  // This fails with URIs with weird protocols, even when they are valid,
+  // so we ignore the failure
+  nsAutoCString credentials;
+  unused << resolvedURI->GetUserPass(credentials);
+  if (!credentials.IsEmpty()) {
+    aRv.ThrowTypeError(MSG_URL_HAS_CREDENTIALS, &aInput);
+    return;
+  }
+
+  nsCOMPtr<nsIURI> resolvedURIClone;
+  // We use CloneIgnoringRef to strip away the fragment even if the original URI
+  // is immutable.
+  aRv = resolvedURI->CloneIgnoringRef(getter_AddRefs(resolvedURIClone));
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
   nsAutoCString spec;
-  aRv = docURI->GetSpec(spec);
+  aRv = resolvedURIClone->GetSpec(spec);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
 
-  nsRefPtr<dom::URL> url =
-    dom::URL::Constructor(aGlobal, aInput, NS_ConvertUTF8toUTF16(spec), aRv);
-  if (NS_WARN_IF(aRv.Failed())) {
-    return;
-  }
-
-  url->Stringify(aRequestURL, aRv);
-  if (NS_WARN_IF(aRv.Failed())) {
-    return;
-  }
+  CopyUTF8toUTF16(spec, aRequestURL);
 }
 
 void
@@ -104,23 +119,37 @@ GetRequestURLFromChrome(const nsAString& aInput, nsAString& aRequestURL,
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-#ifdef DEBUG
   nsCOMPtr<nsIURI> uri;
   aRv = NS_NewURI(getter_AddRefs(uri), aInput, nullptr, nullptr);
+  if (NS_WARN_IF(aRv.Failed())) {
+    aRv.ThrowTypeError(MSG_INVALID_URL, &aInput);
+    return;
+  }
+
+  // This fails with URIs with weird protocols, even when they are valid,
+  // so we ignore the failure
+  nsAutoCString credentials;
+  unused << uri->GetUserPass(credentials);
+  if (!credentials.IsEmpty()) {
+    aRv.ThrowTypeError(MSG_URL_HAS_CREDENTIALS, &aInput);
+    return;
+  }
+
+  nsCOMPtr<nsIURI> uriClone;
+  // We use CloneIgnoringRef to strip away the fragment even if the original URI
+  // is immutable.
+  aRv = uri->CloneIgnoringRef(getter_AddRefs(uriClone));
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
 
   nsAutoCString spec;
-  aRv = uri->GetSpec(spec);
+  aRv = uriClone->GetSpec(spec);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
 
   CopyUTF8toUTF16(spec, aRequestURL);
-#else
-  aRequestURL = aInput;
-#endif
 }
 
 void
@@ -134,6 +163,29 @@ GetRequestURLFromWorker(const GlobalObject& aGlobal, const nsAString& aInput,
   NS_ConvertUTF8toUTF16 baseURL(worker->GetLocationInfo().mHref);
   nsRefPtr<workers::URL> url =
     workers::URL::Constructor(aGlobal, aInput, baseURL, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    aRv.ThrowTypeError(MSG_INVALID_URL, &aInput);
+    return;
+  }
+
+  nsString username;
+  url->GetUsername(username, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
+  nsString password;
+  url->GetPassword(password, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
+  if (!username.IsEmpty() || !password.IsEmpty()) {
+    aRv.ThrowTypeError(MSG_URL_HAS_CREDENTIALS, &aInput);
+    return;
+  }
+
+  url->SetHash(EmptyString(), aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
@@ -187,11 +239,11 @@ Request::Constructor(const GlobalObject& aGlobal,
 
     nsAutoString requestURL;
     if (NS_IsMainThread()) {
-      nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(global);
-      if (window) {
-        GetRequestURLFromWindow(aGlobal, window, input, requestURL, aRv);
+      nsIDocument* doc = GetEntryDocument();
+      if (doc) {
+        GetRequestURLFromDocument(doc, input, requestURL, aRv);
       } else {
-        // If we don't have a window, we must assume that this is a full URL.
+        // If we don't have a document, we must assume that this is a full URL.
         GetRequestURLFromChrome(input, requestURL, aRv);
       }
     } else {

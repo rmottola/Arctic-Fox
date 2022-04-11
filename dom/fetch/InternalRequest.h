@@ -388,6 +388,7 @@ private:
   MapContentPolicyTypeToRequestContext(nsContentPolicyType aContentPolicyType);
 
   nsCString mMethod;
+  // mURL always stores the url with the ref stripped
   nsCString mURL;
   nsRefPtr<InternalHeaders> mHeaders;
   nsCOMPtr<nsIInputStream> mBodyStream;
