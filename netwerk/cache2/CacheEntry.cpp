@@ -802,7 +802,7 @@ void CacheEntry::InvokeAvailableCallback(Callback const & aCallback)
     return;
   }
 
-  // Read-Only callbacks may do revalidation, so let them fall through
+  // R/O callbacks may do revalidation, let them fall through
   if (aCallback.mReadOnly && !aCallback.mRevalidating) {
     LOG(("  r/o and not ready, notifying OCEA with NS_ERROR_CACHE_KEY_NOT_FOUND"));
     aCallback.mCallback->OnCacheEntryAvailable(
