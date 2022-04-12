@@ -2639,6 +2639,13 @@ nsCacheService::LockReleased()
 }
 
 void
+nsCacheService::Lock()
+{
+    gService->mLock.Lock();
+    gService->LockAcquired();
+}
+
+void
 nsCacheService::Lock(mozilla::Telemetry::ID mainThreadLockerID)
 {
     mozilla::Telemetry::ID lockerID;
@@ -2654,8 +2661,7 @@ nsCacheService::Lock(mozilla::Telemetry::ID mainThreadLockerID)
 
     TimeStamp start(TimeStamp::Now());
 
-    gService->mLock.Lock();
-    gService->LockAcquired();
+    nsCacheService::Lock();
 
     TimeStamp stop(TimeStamp::Now());
 
@@ -3170,7 +3176,7 @@ IsEntryPrivate(nsCacheEntry* entry)
 void
 nsCacheService::LeavePrivateBrowsing()
 {
-    nsCacheServiceAutoLock lock(LOCK_TELEM(NSCACHESERVICE_LEAVEPRIVATEBROWSING));
+    nsCacheServiceAutoLock lock;
 
     gService->DoomActiveEntries(IsEntryPrivate);
 
