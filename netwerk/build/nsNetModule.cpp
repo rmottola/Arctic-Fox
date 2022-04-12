@@ -268,8 +268,8 @@ namespace mozilla {
 namespace net {
   NS_GENERIC_FACTORY_CONSTRUCTOR(Dashboard)
   NS_GENERIC_FACTORY_CONSTRUCTOR(PackagedAppService)
-}
-}
+} // namespace net
+} // namespace mozilla
 #include "AppProtocolHandler.h"
 
 #ifdef NECKO_PROTOCOL_res
