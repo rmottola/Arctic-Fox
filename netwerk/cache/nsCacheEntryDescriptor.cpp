@@ -1398,12 +1398,6 @@ nsCompressOutputStreamWrapper::Close()
     }
     // Do not allow to initialize stream after calling Close().
     mStreamEnded = true;
-    
-    // In some rare cases, flushing the zlib stream can take too long
-    // and we lose our cache entry in the meantime. Do another check
-    // and bail if so.
-    if (!mDescriptor)
-        return NS_ERROR_NOT_AVAILABLE;
 
     if (mDescriptor->CacheEntry()) {
         nsAutoCString uncompressedLenStr;
