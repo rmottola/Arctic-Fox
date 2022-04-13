@@ -1973,6 +1973,11 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
     // finish waiting in the xpcom-shutdown/profile-before-change observer.
     mIPCOpen = false;
 
+    if (mHangMonitorActor) {
+        ProcessHangMonitor::RemoveProcess(mHangMonitorActor);
+        mHangMonitorActor = nullptr;
+    }
+
     if (why == NormalShutdown && !mCalledClose) {
         // If we shut down normally but haven't called Close, assume somebody
         // else called Close on us. In that case, we still need to call
@@ -1983,11 +1988,6 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
     // Make sure we always clean up.
     ShutDownProcess(why == NormalShutdown ? CLOSE_CHANNEL
                                           : CLOSE_CHANNEL_WITH_ERROR);
-
-    if (mHangMonitorActor) {
-        ProcessHangMonitor::RemoveProcess(mHangMonitorActor);
-        mHangMonitorActor = nullptr;
-    }
 
     nsRefPtr<ContentParent> kungFuDeathGrip(this);
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
