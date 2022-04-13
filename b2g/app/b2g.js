@@ -1085,6 +1085,9 @@ pref("dom.serviceWorkers.enabled", false);
 // Retain at most 10 processes' layers buffers
 pref("layers.compositor-lru-size", 10);
 
+// In B2G by deafult any AudioChannelAgent is muted when created.
+pref("dom.audiochannel.mutedByDefault", true);
+
 // The app origin of bluetooth app, which is responsible for listening pairing
 // requests.
 pref("dom.bluetooth.app-origin", "app://bluetooth.gaiamobile.org");
