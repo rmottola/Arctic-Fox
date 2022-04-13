@@ -700,8 +700,12 @@ ContentParent::RunNuwaProcess()
                           /* aOpener = */ nullptr,
                           /* aIsForBrowser = */ false,
                           /* aIsForPreallocated = */ true,
-                          PROCESS_PRIORITY_BACKGROUND,
                           /* aIsNuwaProcess = */ true);
+
+    if (!nuwaProcess->LaunchSubprocess(PROCESS_PRIORITY_BACKGROUND)) {
+        return nullptr;
+    }
+
     nuwaProcess->Init();
 #ifdef MOZ_NUWA_PROCESS
     sNuwaPid = nuwaProcess->Pid();
@@ -720,8 +724,12 @@ ContentParent::PreallocateAppProcess()
         new ContentParent(/* app = */ nullptr,
                           /* aOpener = */ nullptr,
                           /* isForBrowserElement = */ false,
-                          /* isForPreallocated = */ true,
-                          PROCESS_PRIORITY_PREALLOC);
+                          /* isForPreallocated = */ true);
+
+    if (!process->LaunchSubprocess(PROCESS_PRIORITY_PREALLOC)) {
+        return nullptr;
+    }
+
     process->Init();
     return process.forget();
 }
@@ -764,8 +772,12 @@ ContentParent::GetNewOrPreallocatedAppProcess(mozIApplication* aApp,
     process = new ContentParent(aApp,
                                 /* aOpener = */ aOpener,
                                 /* isForBrowserElement = */ false,
-                                /* isForPreallocated = */ false,
-                                aInitialPriority);
+                                /* isForPreallocated = */ false);
+
+    if (!process->LaunchSubprocess(aInitialPriority)) {
+        return nullptr;
+    }
+
     process->Init();
     process->ForwardKnownInfo();
 
@@ -909,8 +921,12 @@ ContentParent::GetNewOrUsedBrowserProcess(bool aForBrowserElement,
         p = new ContentParent(/* app = */ nullptr,
                               aOpener,
                               aForBrowserElement,
-                              /* isForPreallocated = */ false,
-                              aPriority);
+                              /* isForPreallocated = */ false);
+
+        if (!p->LaunchSubprocess(aPriority)) {
+            return nullptr;
+        }
+
         p->Init();
     }
     p->ForwardKnownInfo();
@@ -1179,6 +1195,9 @@ ContentParent::CreateBrowserOrApp(const TabContext& aContext,
                 constructorSender =
                     GetNewOrUsedBrowserProcess(aContext.IsBrowserElement(),
                                                initialPriority);
+                if (!constructorSender) {
+                    return nullptr;
+                }
             }
             tabId = AllocateTabId(openerTabId,
                                   aContext.AsIPCTabContext(),
@@ -2219,11 +2238,40 @@ ContentParent::InitializeMembers()
     mHangMonitorActor = nullptr;
 }
 
+bool
+ContentParent::LaunchSubprocess(ProcessPriority aInitialPriority /* = PROCESS_PRIORITY_FOREGROUND */)
+{
+    std::vector<std::string> extraArgs;
+    if (mIsNuwaProcess) {
+        extraArgs.push_back("-nuwa");
+    }
+
+    if (!mSubprocess->LaunchAndWaitForProcessHandle(extraArgs)) {
+        MarkAsDead();
+        return false;
+    }
+
+    Open(mSubprocess->GetChannel(),
+         base::GetProcId(mSubprocess->GetChildProcessHandle()));
+
+    InitInternal(aInitialPriority,
+                 true, /* Setup off-main thread compositing */
+                 true  /* Send registered chrome */);
+
+    ContentProcessManager::GetSingleton()->AddContentProcess(this);
+
+    ProcessHangMonitor::AddProcess(this);
+
+    // Set a reply timeout for CPOWs.
+    SetReplyTimeoutMs(Preferences::GetInt("dom.ipc.cpow.timeout", 0));
+
+    return true;
+}
+
 ContentParent::ContentParent(mozIApplication* aApp,
                              ContentParent* aOpener,
                              bool aIsForBrowser,
                              bool aIsForPreallocated,
-                             ProcessPriority aInitialPriority /* = PROCESS_PRIORITY_FOREGROUND */,
                              bool aIsNuwaProcess /* = false */)
     : nsIContentParent()
     , mOpener(aOpener)
@@ -2277,26 +2325,6 @@ ContentParent::ContentParent(mozIApplication* aApp,
     mSubprocess = new GeckoChildProcessHost(GeckoProcessType_Content, privs);
 
     IToplevelProtocol::SetTransport(mSubprocess->GetChannel());
-
-    std::vector<std::string> extraArgs;
-    if (aIsNuwaProcess) {
-        extraArgs.push_back("-nuwa");
-    }
-    mSubprocess->LaunchAndWaitForProcessHandle(extraArgs);
-
-    Open(mSubprocess->GetChannel(),
-         base::GetProcId(mSubprocess->GetChildProcessHandle()));
-
-    InitInternal(aInitialPriority,
-                 true, /* Setup off-main thread compositing */
-                 true  /* Send registered chrome */);
-
-    ContentProcessManager::GetSingleton()->AddContentProcess(this);
-
-    ProcessHangMonitor::AddProcess(this);
-
-    // Set a reply timeout for CPOWs.
-    SetReplyTimeoutMs(Preferences::GetInt("dom.ipc.cpow.timeout", 0));
 }
 
 #ifdef MOZ_NUWA_PROCESS
