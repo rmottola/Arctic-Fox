@@ -248,6 +248,9 @@ using base::KillProcess;
 using mozilla::ProfileGatherer;
 #endif
 
+#ifdef MOZ_CRASHREPORTER
+using namespace CrashReporter;
+#endif
 using namespace mozilla::dom::bluetooth;
 using namespace mozilla::dom::cellbroadcast;
 using namespace mozilla::dom::devicestorage;
@@ -2027,6 +2030,35 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
 
             props->SetPropertyAsBool(NS_LITERAL_STRING("abnormal"), true);
 
+#ifdef MOZ_CRASHREPORTER
+            // There's a window in which child processes can crash
+            // after IPC is established, but before a crash reporter
+            // is created.
+            if (ManagedPCrashReporterParent().Length() > 0) {
+                CrashReporterParent* crashReporter =
+                    static_cast<CrashReporterParent*>(ManagedPCrashReporterParent()[0]);
+
+                // If we're an app process, always stomp the latest URI
+                // loaded in the child process with our manifest URL.  We
+                // would rather associate the crashes with apps than
+                // random child windows loaded in them.
+                //
+                // XXX would be nice if we could get both ...
+                if (!mAppManifestURL.IsEmpty()) {
+                    crashReporter->AnnotateCrashReport(NS_LITERAL_CSTRING("URL"),
+                                                       NS_ConvertUTF16toUTF8(mAppManifestURL));
+                }
+
+                // if mCreatedPairedMinidumps is true, we've already generated
+                // parent/child dumps for dekstop crashes.
+                if (!mCreatedPairedMinidumps) {
+                    crashReporter->GenerateCrashReport(this, nullptr);
+                }
+
+                nsAutoString dumpID(crashReporter->ChildDumpID());
+                props->SetPropertyAsAString(NS_LITERAL_STRING("dumpID"), dumpID);
+            }
+#endif
         }
         nsAutoString cpId;
         cpId.AppendInt(static_cast<uint64_t>(this->ChildID()));
@@ -3467,6 +3499,36 @@ ContentParent::KillHard(const char* aReason)
     mCalledKillHard = true;
     mForceKillTimer = nullptr;
 
+#if defined(MOZ_CRASHREPORTER) && !defined(MOZ_B2G)
+    // We're about to kill the child process associated with this content.
+    // Something has gone wrong to get us here, so we generate a minidump
+    // of the parent and child for submission to the crash server.
+    if (ManagedPCrashReporterParent().Length() > 0) {
+        CrashReporterParent* crashReporter =
+            static_cast<CrashReporterParent*>(ManagedPCrashReporterParent()[0]);
+        // GeneratePairedMinidump creates two minidumps for us - the main
+        // one is for the content process we're about to kill, and the other
+        // one is for the main browser process. That second one is the extra
+        // minidump tagging along, so we have to tell the crash reporter that
+        // it exists and is being appended.
+        nsAutoCString additionalDumps("browser");
+        crashReporter->AnnotateCrashReport(
+            NS_LITERAL_CSTRING("additional_minidumps"),
+            additionalDumps);
+        if (IsKillHardAnnotationSet()) {
+          crashReporter->AnnotateCrashReport(
+              NS_LITERAL_CSTRING("kill_hard"),
+              GetKillHardAnnotation());
+        }
+        nsDependentCString reason(aReason);
+        crashReporter->AnnotateCrashReport(
+            NS_LITERAL_CSTRING("ipc_channel_error"),
+            reason);
+
+        // Generate the report and insert into the queue for submittal.
+        mCreatedPairedMinidumps = crashReporter->GenerateCompleteMinidump(this);
+    }
+#endif
     ProcessHandle otherProcessHandle;
     if (!base::OpenProcessHandle(OtherPid(), &otherProcessHandle)) {
         NS_ERROR("Failed to open child process when attempting kill.");
