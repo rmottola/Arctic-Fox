@@ -129,22 +129,24 @@ GMPParent::LoadProcess()
   if (!mProcess) {
     mProcess = new GMPProcessParent(NS_ConvertUTF16toUTF8(path).get());
     if (!mProcess->Launch(30 * 1000)) {
+      LOGD("%s: Failed to launch new child process", __FUNCTION__);
       mProcess->Delete();
       mProcess = nullptr;
       return NS_ERROR_FAILURE;
     }
 
     mChildPid = base::GetProcId(mProcess->GetChildProcessHandle());
+    LOGD("%s: Launched new child process", __FUNCTION__);
 
     bool opened = Open(mProcess->GetChannel(),
                        base::GetProcId(mProcess->GetChildProcessHandle()));
     if (!opened) {
-      LOGD("%s: Failed to create new child process", __FUNCTION__);
+      LOGD("%s: Failed to open channel to new child process", __FUNCTION__);
       mProcess->Delete();
       mProcess = nullptr;
       return NS_ERROR_FAILURE;
     }
-    LOGD("%s: Created new child process", __FUNCTION__);
+    LOGD("%s: Opened channel to new child process", __FUNCTION__);
 
     bool ok = SendSetNodeId(mNodeId);
     if (!ok) {
