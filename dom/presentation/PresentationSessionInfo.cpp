@@ -335,7 +335,7 @@ PresentationSessionInfo::NotifyData(const nsACString& aData)
 }
 
 /*
- * Implementation of PresentationRequesterInfo
+ * Implementation of PresentationControllingInfo
  *
  * During presentation session establishment, the sender expects the following
  * after trying to establish the control channel: (The order between step 3 and
@@ -356,12 +356,12 @@ PresentationSessionInfo::NotifyData(const nsACString& aData)
  *    So notify the listener of CONNECTED state.
  */
 
-NS_IMPL_ISUPPORTS_INHERITED(PresentationRequesterInfo,
+NS_IMPL_ISUPPORTS_INHERITED(PresentationControllingInfo,
                             PresentationSessionInfo,
                             nsIServerSocketListener)
 
 nsresult
-PresentationRequesterInfo::Init(nsIPresentationControlChannel* aControlChannel)
+PresentationControllingInfo::Init(nsIPresentationControlChannel* aControlChannel)
 {
   PresentationSessionInfo::Init(aControlChannel);
 
@@ -386,7 +386,7 @@ PresentationRequesterInfo::Init(nsIPresentationControlChannel* aControlChannel)
 }
 
 void
-PresentationRequesterInfo::Shutdown(nsresult aReason)
+PresentationControllingInfo::Shutdown(nsresult aReason)
 {
   PresentationSessionInfo::Shutdown(aReason);
 
@@ -398,7 +398,7 @@ PresentationRequesterInfo::Shutdown(nsresult aReason)
 }
 
 nsresult
-PresentationRequesterInfo::GetAddress(nsACString& aAddress)
+PresentationControllingInfo::GetAddress(nsACString& aAddress)
 {
 #ifdef MOZ_WIDGET_GONK
   nsCOMPtr<nsINetworkManager> networkManager =
@@ -444,14 +444,14 @@ PresentationRequesterInfo::GetAddress(nsACString& aAddress)
 
 // nsIPresentationControlChannelListener
 NS_IMETHODIMP
-PresentationRequesterInfo::OnOffer(nsIPresentationChannelDescription* aDescription)
+PresentationControllingInfo::OnOffer(nsIPresentationChannelDescription* aDescription)
 {
   MOZ_ASSERT(false, "Sender side should not receive offer.");
   return NS_ERROR_FAILURE;
 }
 
 NS_IMETHODIMP
-PresentationRequesterInfo::OnAnswer(nsIPresentationChannelDescription* aDescription)
+PresentationControllingInfo::OnAnswer(nsIPresentationChannelDescription* aDescription)
 {
   mIsResponderReady = true;
 
@@ -471,7 +471,7 @@ PresentationRequesterInfo::OnAnswer(nsIPresentationChannelDescription* aDescript
 }
 
 NS_IMETHODIMP
-PresentationRequesterInfo::NotifyOpened()
+PresentationControllingInfo::NotifyOpened()
 {
   // Prepare and send the offer.
   int32_t port;
@@ -492,7 +492,7 @@ PresentationRequesterInfo::NotifyOpened()
 }
 
 NS_IMETHODIMP
-PresentationRequesterInfo::NotifyClosed(nsresult aReason)
+PresentationControllingInfo::NotifyClosed(nsresult aReason)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -517,7 +517,7 @@ PresentationRequesterInfo::NotifyClosed(nsresult aReason)
 
 // nsIServerSocketListener
 NS_IMETHODIMP
-PresentationRequesterInfo::OnSocketAccepted(nsIServerSocket* aServerSocket,
+PresentationControllingInfo::OnSocketAccepted(nsIServerSocket* aServerSocket,
                                             nsISocketTransport* aTransport)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -537,7 +537,7 @@ PresentationRequesterInfo::OnSocketAccepted(nsIServerSocket* aServerSocket,
 }
 
 NS_IMETHODIMP
-PresentationRequesterInfo::OnStopListening(nsIServerSocket* aServerSocket,
+PresentationControllingInfo::OnStopListening(nsIServerSocket* aServerSocket,
                                            nsresult aStatus)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -563,7 +563,7 @@ PresentationRequesterInfo::OnStopListening(nsIServerSocket* aServerSocket,
 }
 
 /*
- * Implementation of PresentationResponderInfo
+ * Implementation of PresentationPresentingInfo
  *
  * During presentation session establishment, the receiver expects the following
  * after trying to launch the app by notifying "presentation-launch-receiver":
@@ -581,12 +581,12 @@ PresentationRequesterInfo::OnStopListening(nsIServerSocket* aServerSocket,
  *    of CONNECTED state.
  */
 
-NS_IMPL_ISUPPORTS_INHERITED(PresentationResponderInfo,
+NS_IMPL_ISUPPORTS_INHERITED(PresentationPresentingInfo,
                             PresentationSessionInfo,
                             nsITimerCallback)
 
 nsresult
-PresentationResponderInfo::Init(nsIPresentationControlChannel* aControlChannel)
+PresentationPresentingInfo::Init(nsIPresentationControlChannel* aControlChannel)
 {
   PresentationSessionInfo::Init(aControlChannel);
 
@@ -608,7 +608,7 @@ PresentationResponderInfo::Init(nsIPresentationControlChannel* aControlChannel)
 }
 
 void
-PresentationResponderInfo::Shutdown(nsresult aReason)
+PresentationPresentingInfo::Shutdown(nsresult aReason)
 {
   PresentationSessionInfo::Shutdown(aReason);
 
@@ -622,7 +622,7 @@ PresentationResponderInfo::Shutdown(nsresult aReason)
 }
 
 nsresult
-PresentationResponderInfo::InitTransportAndSendAnswer()
+PresentationPresentingInfo::InitTransportAndSendAnswer()
 {
   // Establish a data transport channel |mTransport| to the sender and use
   // |this| as the callback.
@@ -659,7 +659,7 @@ PresentationResponderInfo::InitTransportAndSendAnswer()
 }
 
 nsresult
-PresentationResponderInfo::UntrackFromService()
+PresentationPresentingInfo::UntrackFromService()
 {
   // Remove the OOP responding info (if it has never been used).
   if (mContentParent) {
@@ -678,7 +678,7 @@ PresentationResponderInfo::UntrackFromService()
 }
 
 bool
-PresentationResponderInfo::IsAccessible(base::ProcessId aProcessId)
+PresentationPresentingInfo::IsAccessible(base::ProcessId aProcessId)
 {
   // Only the specific content process should access the responder info.
   return (mContentParent) ?
@@ -687,7 +687,7 @@ PresentationResponderInfo::IsAccessible(base::ProcessId aProcessId)
 }
 
 nsresult
-PresentationResponderInfo::NotifyResponderReady()
+PresentationPresentingInfo::NotifyResponderReady()
 {
   if (mTimer) {
     mTimer->Cancel();
@@ -710,7 +710,7 @@ PresentationResponderInfo::NotifyResponderReady()
 
 // nsIPresentationControlChannelListener
 NS_IMETHODIMP
-PresentationResponderInfo::OnOffer(nsIPresentationChannelDescription* aDescription)
+PresentationPresentingInfo::OnOffer(nsIPresentationChannelDescription* aDescription)
 {
   if (NS_WARN_IF(!aDescription)) {
     return ReplyError(NS_ERROR_DOM_OPERATION_ERR);
@@ -731,21 +731,21 @@ PresentationResponderInfo::OnOffer(nsIPresentationChannelDescription* aDescripti
 }
 
 NS_IMETHODIMP
-PresentationResponderInfo::OnAnswer(nsIPresentationChannelDescription* aDescription)
+PresentationPresentingInfo::OnAnswer(nsIPresentationChannelDescription* aDescription)
 {
   MOZ_ASSERT(false, "Receiver side should not receive answer.");
   return NS_ERROR_FAILURE;
 }
 
 NS_IMETHODIMP
-PresentationResponderInfo::NotifyOpened()
+PresentationPresentingInfo::NotifyOpened()
 {
   // Do nothing.
   return NS_OK;
 }
 
 NS_IMETHODIMP
-PresentationResponderInfo::NotifyClosed(nsresult aReason)
+PresentationPresentingInfo::NotifyClosed(nsresult aReason)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -770,7 +770,7 @@ PresentationResponderInfo::NotifyClosed(nsresult aReason)
 
 // nsITimerCallback
 NS_IMETHODIMP
-PresentationResponderInfo::Notify(nsITimer* aTimer)
+PresentationPresentingInfo::Notify(nsITimer* aTimer)
 {
   MOZ_ASSERT(NS_IsMainThread());
   NS_WARNING("The receiver page fails to become ready before timeout.");
@@ -781,7 +781,7 @@ PresentationResponderInfo::Notify(nsITimer* aTimer)
 
 // PromiseNativeHandler
 void
-PresentationResponderInfo::ResolvedCallback(JSContext* aCx,
+PresentationPresentingInfo::ResolvedCallback(JSContext* aCx,
                                             JS::Handle<JS::Value> aValue)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -845,7 +845,7 @@ PresentationResponderInfo::ResolvedCallback(JSContext* aCx,
 }
 
 void
-PresentationResponderInfo::RejectedCallback(JSContext* aCx,
+PresentationPresentingInfo::RejectedCallback(JSContext* aCx,
                                             JS::Handle<JS::Value> aValue)
 {
   MOZ_ASSERT(NS_IsMainThread());
