@@ -18,6 +18,7 @@
 #include "nsInterfaceHashtable.h"
 #include "nsString.h"
 #include "nsTArray.h"
+#include "nsWeakPtr.h"
 
 class nsPluginArray;
 class nsMimeTypeArray;
@@ -218,14 +219,18 @@ public:
   already_AddRefed<WakeLock> RequestWakeLock(const nsAString &aTopic,
                                              ErrorResult& aRv);
   DeviceStorageAreaListener* GetDeviceStorageAreaListener(ErrorResult& aRv);
-  nsDOMDeviceStorage* GetDeviceStorage(const nsAString& aType,
-                                       ErrorResult& aRv);
+
+  already_AddRefed<nsDOMDeviceStorage> GetDeviceStorage(const nsAString& aType,
+                                                        ErrorResult& aRv);
+
   void GetDeviceStorages(const nsAString& aType,
                          nsTArray<nsRefPtr<nsDOMDeviceStorage> >& aStores,
                          ErrorResult& aRv);
-  nsDOMDeviceStorage* GetDeviceStorageByNameAndType(const nsAString& aName,
-                                                    const nsAString& aType,
-                                                    ErrorResult& aRv);
+
+  already_AddRefed<nsDOMDeviceStorage>
+  GetDeviceStorageByNameAndType(const nsAString& aName, const nsAString& aType,
+                                ErrorResult& aRv);
+
   DesktopNotificationCenter* GetMozNotification(ErrorResult& aRv);
   CellBroadcast* GetMozCellBroadcast(ErrorResult& aRv);
   IccManager* GetMozIccManager(ErrorResult& aRv);
@@ -346,6 +351,9 @@ private:
   bool CheckPermission(const char* type);
   static bool CheckPermission(nsPIDOMWindow* aWindow, const char* aType);
 
+  already_AddRefed<nsDOMDeviceStorage> FindDeviceStorage(const nsAString& aName,
+                                                         const nsAString& aType);
+
   nsRefPtr<nsMimeTypeArray> mMimeTypes;
   nsRefPtr<nsPluginArray> mPlugins;
   nsRefPtr<Permissions> mPermissions;
@@ -377,7 +385,7 @@ private:
   nsRefPtr<nsDOMCameraManager> mCameraManager;
   nsRefPtr<MediaDevices> mMediaDevices;
   nsCOMPtr<nsIDOMNavigatorSystemMessages> mMessagesManager;
-  nsTArray<nsRefPtr<nsDOMDeviceStorage> > mDeviceStorageStores;
+  nsTArray<nsWeakPtr> mDeviceStorageStores;
   nsRefPtr<time::TimeManager> mTimeManager;
   nsRefPtr<ServiceWorkerContainer> mServiceWorkerContainer;
   nsCOMPtr<nsPIDOMWindow> mWindow;

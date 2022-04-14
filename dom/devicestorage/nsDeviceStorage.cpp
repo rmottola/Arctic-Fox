@@ -2897,6 +2897,12 @@ NS_IMPL_CYCLE_COLLECTION(DeviceStorageRequest,
 
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(nsDOMDeviceStorage)
+  NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
+  /* nsISupports is an ambiguous base of nsDOMDeviceStorage
+     so we have to work around that. */
+  if ( aIID.Equals(NS_GET_IID(nsDOMDeviceStorage)) )
+    foundInterface = static_cast<nsISupports*>(static_cast<void*>(this));
+  else
 NS_INTERFACE_MAP_END_INHERITING(DOMEventTargetHelper)
 
 NS_IMPL_ADDREF_INHERITED(nsDOMDeviceStorage, DOMEventTargetHelper)
@@ -2996,6 +3002,7 @@ nsDOMDeviceStorage::~nsDOMDeviceStorage()
 {
   MOZ_ASSERT(NS_IsMainThread());
   sInstanceCount--;
+  DeviceStorageStatics::RemoveListener(this);
 }
 
 void
@@ -3027,7 +3034,20 @@ void nsDOMDeviceStorage::InvalidateVolumeCaches()
 // static
 void
 nsDOMDeviceStorage::GetOrderedVolumeNames(
-  nsDOMDeviceStorage::VolumeNameArray &aVolumeNames)
+  const nsAString& aType,
+  nsDOMDeviceStorage::VolumeNameArray& aVolumeNames)
+{
+  if (!DeviceStorageTypeChecker::IsVolumeBased(aType)) {
+    aVolumeNames.Clear();
+    return;
+  }
+  GetOrderedVolumeNames(aVolumeNames);
+}
+
+// static
+void
+nsDOMDeviceStorage::GetOrderedVolumeNames(
+  nsDOMDeviceStorage::VolumeNameArray& aVolumeNames)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -3076,12 +3096,7 @@ nsDOMDeviceStorage::CreateDeviceStorageFor(nsPIDOMWindow* aWin,
                                            nsDOMDeviceStorage** aStore)
 {
   nsString storageName;
-  if (!DeviceStorageTypeChecker::IsVolumeBased(aType)) {
-    // The storage name will be the empty string
-    storageName.Truncate();
-  } else {
-    GetDefaultStorageName(aType, storageName);
-  }
+  GetDefaultStorageName(aType, storageName);
 
   nsRefPtr<nsDOMDeviceStorage> ds = new nsDOMDeviceStorage(aWin);
   if (NS_FAILED(ds->Init(aWin, aType, storageName))) {
@@ -3089,37 +3104,6 @@ nsDOMDeviceStorage::CreateDeviceStorageFor(nsPIDOMWindow* aWin,
     return;
   }
   ds.forget(aStore);
-}
-
-// static
-void
-nsDOMDeviceStorage::CreateDeviceStoragesFor(
-  nsPIDOMWindow* aWin,
-  const nsAString &aType,
-  nsTArray<nsRefPtr<nsDOMDeviceStorage> > &aStores)
-{
-  nsresult rv;
-
-  if (!DeviceStorageTypeChecker::IsVolumeBased(aType)) {
-    nsRefPtr<nsDOMDeviceStorage> storage = new nsDOMDeviceStorage(aWin);
-    rv = storage->Init(aWin, aType, EmptyString());
-    if (NS_SUCCEEDED(rv)) {
-      aStores.AppendElement(storage);
-    }
-    return;
-  }
-  VolumeNameArray volNames;
-  GetOrderedVolumeNames(volNames);
-
-  VolumeNameArray::size_type numVolumeNames = volNames.Length();
-  for (VolumeNameArray::index_type i = 0; i < numVolumeNames; i++) {
-    nsRefPtr<nsDOMDeviceStorage> storage = new nsDOMDeviceStorage(aWin);
-    rv = storage->Init(aWin, aType, volNames[i]);
-    if (NS_FAILED(rv)) {
-      break;
-    }
-    aStores.AppendElement(storage);
-  }
 }
 
 // static
@@ -3148,6 +3132,19 @@ nsDOMDeviceStorage::CreateDeviceStorageByNameAndType(
     return;
   }
   NS_ADDREF(*aStore = storage.get());
+}
+
+bool
+nsDOMDeviceStorage::Equals(nsPIDOMWindow* aWin,
+                           const nsAString& aName,
+                           const nsAString& aType)
+{
+  MOZ_ASSERT(aWin);
+
+  nsCOMPtr<nsPIDOMWindow> window = GetOwner();
+  return aWin && aWin == window &&
+         mStorageName.Equals(aName) &&
+         mStorageType.Equals(aType);
 }
 
 // static
@@ -3245,6 +3242,12 @@ void
 nsDOMDeviceStorage::GetDefaultStorageName(const nsAString& aStorageType,
                                           nsAString& aStorageName)
 {
+  if (!DeviceStorageTypeChecker::IsVolumeBased(aStorageType)) {
+    // The storage name will be the empty string
+    aStorageName.Truncate();
+    return;
+  }
+
   // See if the preferred volume is available.
   nsString prefStorageName;
   DeviceStorageStatics::GetWritableName(prefStorageName);
