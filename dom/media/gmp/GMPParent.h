@@ -159,6 +159,9 @@ private:
 #endif
   virtual void ActorDestroy(ActorDestroyReason aWhy) override;
 
+  virtual PCrashReporterParent* AllocPCrashReporterParent(const NativeThreadId& aThread) override;
+  virtual bool DeallocPCrashReporterParent(PCrashReporterParent* aCrashReporter) override;
+
   virtual bool RecvPGMPStorageConstructor(PGMPStorageParent* actor) override;
   virtual PGMPStorageParent* AllocPGMPStorageParent() override;
   virtual bool DeallocPGMPStorageParent(PGMPStorageParent* aActor) override;

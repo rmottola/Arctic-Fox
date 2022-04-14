@@ -14,6 +14,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/ContentChild.h"
+#include "mozilla/dom/PCrashReporterParent.h"
 #include "mozilla/ipc/GeckoChildProcessHost.h"
 #include "mozilla/ipc/MessageChannel.h"
 #include "mozilla/plugins/BrowserStreamParent.h"
@@ -61,10 +62,18 @@ using mozilla::ProfileGatherer;
 #endif
 using mozilla::ipc::MessageChannel;
 using mozilla::ipc::GeckoChildProcessHost;
+using mozilla::dom::PCrashReporterParent;
+using mozilla::dom::CrashReporterParent;
 
 using namespace mozilla;
 using namespace mozilla::plugins;
 using namespace mozilla::plugins::parent;
+
+#ifdef MOZ_CRASHREPORTER
+#include "mozilla/dom/CrashReporterParent.h"
+
+using namespace CrashReporter;
+#endif
 
 static const char kContentTimeoutPref[] = "dom.ipc.plugins.contentTimeoutSecs";
 static const char kChildTimeoutPref[] = "dom.ipc.plugins.timeoutSecs";
@@ -1290,6 +1299,9 @@ void
 PluginModuleChromeParent::ActorDestroy(ActorDestroyReason why)
 {
     if (why == AbnormalShutdown) {
+#ifdef MOZ_CRASHREPORTER
+        ProcessFirstMinidump();
+#endif
         Telemetry::Accumulate(Telemetry::SUBPROCESS_ABNORMAL_ABORT,
                               NS_LITERAL_CSTRING("plugin"), 1);
     }
@@ -2514,6 +2526,45 @@ PluginModuleParent::RecvPluginHideWindow(const uint32_t& aWindowId)
         "PluginInstanceParent::RecvPluginHideWindow not implemented!");
     return false;
 #endif
+}
+
+PCrashReporterParent*
+PluginModuleParent::AllocPCrashReporterParent(mozilla::dom::NativeThreadId* id,
+                                              uint32_t* processType)
+{
+    MOZ_CRASH("unreachable");
+}
+
+bool
+PluginModuleParent::DeallocPCrashReporterParent(PCrashReporterParent* actor)
+{
+    MOZ_CRASH("unreachable");
+}
+
+PCrashReporterParent*
+PluginModuleChromeParent::AllocPCrashReporterParent(mozilla::dom::NativeThreadId* id,
+                                                    uint32_t* processType)
+{
+#ifdef MOZ_CRASHREPORTER
+    return new CrashReporterParent();
+#else
+    return nullptr;
+#endif
+}
+
+bool
+PluginModuleChromeParent::DeallocPCrashReporterParent(PCrashReporterParent* actor)
+{
+#ifdef MOZ_CRASHREPORTER
+#ifdef XP_WIN
+    mozilla::MutexAutoLock lock(mCrashReporterMutex);
+    if (actor == static_cast<PCrashReporterParent*>(mCrashReporter)) {
+        mCrashReporter = nullptr;
+    }
+#endif
+#endif
+    delete actor;
+    return true;
 }
 
 bool

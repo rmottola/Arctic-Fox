@@ -30,6 +30,8 @@ EXPORTS.mozilla.dom += [
     'ContentProcess.h',
     'ContentProcessManager.h',
     'CPOWManagerGetter.h',
+    'CrashReporterChild.h',
+    'CrashReporterParent.h',
     'FilePickerParent.h',
     'nsIContentChild.h',
     'nsIContentParent.h',
@@ -58,6 +60,7 @@ UNIFIED_SOURCES += [
     'ContentParent.cpp',
     'ContentProcess.cpp',
     'ContentProcessManager.cpp',
+    'CrashReporterParent.cpp',
     'FilePickerParent.cpp',
     'nsIContentChild.cpp',
     'nsIContentParent.cpp',
@@ -75,10 +78,13 @@ UNIFIED_SOURCES += [
 ]
 
 # Blob.cpp cannot be compiled in unified mode because it triggers a fatal gcc warning.
+# CrashReporterChild.cpp cannot be compiled in unified mode because of name clashes
+# in OS X headers.
 # ContentChild.cpp cannot be compiled in unified mode on  linux due to Time conflict
 SOURCES += [
     'Blob.cpp',
     'ContentChild.cpp',
+    'CrashReporterChild.cpp',
     'ProcessHangMonitor.cpp',
 ]
 
@@ -94,6 +100,7 @@ IPDL_SOURCES += [
     'PContentBridge.ipdl',
     'PContentPermission.ipdlh',
     'PContentPermissionRequest.ipdl',
+    'PCrashReporter.ipdl',
     'PCycleCollectWithLogs.ipdl',
     'PDocumentRenderer.ipdl',
     'PFilePicker.ipdl',

@@ -13,6 +13,7 @@ include protocol PCompositor;
 include protocol PContentBridge;
 include protocol PContentPermissionRequest;
 include protocol PCycleCollectWithLogs;
+include protocol PCrashReporter;
 include protocol PPSMContentDownloader;
 include protocol PExternalHelperApp;
 include protocol PDeviceStorageRequest;
@@ -80,6 +81,7 @@ using struct IPC::Permission from "mozilla/net/NeckoMessageUtils.h";
 using class IPC::Principal from "mozilla/dom/PermissionMessageUtils.h";
 using struct mozilla::null_t from "ipc/IPCMessageUtils.h";
 using struct mozilla::void_t from "ipc/IPCMessageUtils.h";
+using mozilla::dom::NativeThreadId from "mozilla/dom/TabMessageUtils.h";
 using mozilla::dom::quota::PersistenceType from "mozilla/dom/quota/PersistenceType.h";
 using mozilla::hal::ProcessPriority from "mozilla/HalTypes.h";
 using gfxIntSize from "nsSize.h";
@@ -422,6 +424,7 @@ prio(normal upto urgent) sync protocol PContent
     manages PBrowser;
     manages PCellBroadcast;
     manages PContentPermissionRequest;
+    manages PCrashReporter;
     manages PCycleCollectWithLogs;
     manages PDeviceStorageRequest;
     manages PFileSystemRequest;
@@ -645,7 +648,6 @@ child:
      */
     GamepadUpdate(GamepadChangeEvent aGamepadEvent);
 
-
     /**
      * Tell the child that for testing purposes, a graphics device reset has
      * occurred.
@@ -732,6 +734,8 @@ parent:
 
     PFileSystemRequest(FileSystemParams params);
 
+    sync PCrashReporter(NativeThreadId tid, uint32_t processType);
+
     prio(urgent) sync GetRandomValues(uint32_t length)
         returns (uint8_t[] randomValues);
 
@@ -777,7 +781,7 @@ parent:
     PFMRadio();
 
     PWebrtcGlobal();
-    
+
     PPresentation();
 
     // Services remoting

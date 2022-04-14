@@ -12,6 +12,10 @@
 #include "nsIDOMEvent.h"
 #include "nsCOMPtr.h"
 
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
+
 namespace mozilla {
 namespace dom {
 struct RemoteDOMEvent
@@ -22,6 +26,13 @@ struct RemoteDOMEvent
 
 bool ReadRemoteEvent(const IPC::Message* aMsg, void** aIter,
                      mozilla::dom::RemoteDOMEvent* aResult);
+
+#ifdef MOZ_CRASHREPORTER
+typedef CrashReporter::ThreadId NativeThreadId;
+#else
+// unused in this case
+typedef int32_t NativeThreadId;
+#endif
 
 } // namespace dom
 } // namespace mozilla

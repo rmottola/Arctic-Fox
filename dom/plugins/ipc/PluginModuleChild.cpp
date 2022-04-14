@@ -37,6 +37,7 @@
 #include "mozilla/plugins/StreamNotifyChild.h"
 #include "mozilla/plugins/BrowserStreamChild.h"
 #include "mozilla/plugins/PluginStreamChild.h"
+#include "mozilla/dom/CrashReporterChild.h"
 #include "mozilla/unused.h"
 
 #include "nsNPAPIPlugin.h"
@@ -55,6 +56,9 @@
 
 using namespace mozilla;
 using namespace mozilla::plugins;
+using namespace mozilla::widget;
+using mozilla::dom::CrashReporterChild;
+using mozilla::dom::PCrashReporterChild;
 
 #if defined(XP_WIN)
 const wchar_t * kFlashFullscreenClass = L"ShockwaveFlashFullScreen";
@@ -64,7 +68,7 @@ const wchar_t * kMozillaWindowClass = L"MozillaWindowClass";
 namespace {
 // see PluginModuleChild::GetChrome()
 PluginModuleChild* gChromeInstance = nullptr;
-}
+} // namespace
 
 #ifdef MOZ_WIDGET_QT
 typedef void (*_gtk_init_fn)(int argc, char **argv);
@@ -793,6 +797,33 @@ PluginModuleChild::AllocPPluginModuleChild(mozilla::ipc::Transport* aTransport,
                                            base::ProcessId aOtherPid)
 {
     return PluginModuleChild::CreateForContentProcess(aTransport, aOtherPid);
+}
+
+PCrashReporterChild*
+PluginModuleChild::AllocPCrashReporterChild(mozilla::dom::NativeThreadId* id,
+                                            uint32_t* processType)
+{
+    return new CrashReporterChild();
+}
+
+bool
+PluginModuleChild::DeallocPCrashReporterChild(PCrashReporterChild* actor)
+{
+    delete actor;
+    return true;
+}
+
+bool
+PluginModuleChild::AnswerPCrashReporterConstructor(
+        PCrashReporterChild* actor,
+        mozilla::dom::NativeThreadId* id,
+        uint32_t* processType)
+{
+#ifdef MOZ_CRASHREPORTER
+    *id = CrashReporter::CurrentThreadId();
+    *processType = XRE_GetProcessType();
+#endif
+    return true;
 }
 
 void

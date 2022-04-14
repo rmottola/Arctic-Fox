@@ -27,6 +27,7 @@
 #include "AppProcessChecker.h"
 #include "AudioChannelService.h"
 #include "BlobParent.h"
+#include "CrashReporterParent.h"
 #include "GMPServiceParent.h"
 #include "IHistory.h"
 #include "imgIContainer.h"
@@ -3550,6 +3551,33 @@ ContentParent::FriendlyName(nsAString& aName, bool aAnonymize)
     } else {
         aName.AssignLiteral("???");
     }
+}
+
+PCrashReporterParent*
+ContentParent::AllocPCrashReporterParent(const NativeThreadId& tid,
+                                         const uint32_t& processType)
+{
+#ifdef MOZ_CRASHREPORTER
+    return new CrashReporterParent();
+#else
+    return nullptr;
+#endif
+}
+
+bool
+ContentParent::RecvPCrashReporterConstructor(PCrashReporterParent* actor,
+                                             const NativeThreadId& tid,
+                                             const uint32_t& processType)
+{
+    static_cast<CrashReporterParent*>(actor)->SetChildData(tid, processType);
+    return true;
+}
+
+bool
+ContentParent::DeallocPCrashReporterParent(PCrashReporterParent* crashreporter)
+{
+    delete crashreporter;
+    return true;
 }
 
 hal_sandbox::PHalParent*
