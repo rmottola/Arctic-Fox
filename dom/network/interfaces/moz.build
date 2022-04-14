@@ -10,6 +10,7 @@ XPIDL_SOURCES += [
     'nsIMozNavigatorNetwork.idl',
     'nsITCPServerSocketChild.idl',
     'nsITCPServerSocketParent.idl',
+    'nsITCPSocketCallback.idl',
     'nsITCPSocketChild.idl',
     'nsITCPSocketParent.idl',
     'nsIUDPSocketChild.idl',
