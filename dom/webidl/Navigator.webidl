@@ -435,6 +435,11 @@ partial interface Navigator {
   readonly attribute Presentation? presentation;
 };
 
+partial interface Navigator {
+  [NewObject, Pref="dom.mozTCPSocket.enabled", CheckAnyPermissions="tcp-socket"]
+  readonly attribute LegacyMozTCPSocket mozTCPSocket;
+};
+
 #ifdef NIGHTLY_BUILD
 partial interface Navigator {
   [Func="Navigator::IsE10sEnabled"]

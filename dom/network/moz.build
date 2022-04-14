@@ -6,17 +6,14 @@
 
 DIRS += ['interfaces']
 
-XPCSHELL_TESTS_MANIFESTS += [
-    'tests/unit/xpcshell.ini',
-    'tests/unit_ipc/xpcshell.ini',
-]
-
 if CONFIG['MOZ_B2G_RIL']:
     XPCSHELL_TESTS_MANIFESTS += ['tests/unit_stats/xpcshell.ini']
 
 MOCHITEST_MANIFESTS += ['tests/mochitest.ini']
 
 EXPORTS.mozilla.dom += [
+    'TCPServerSocket.h',
+    'TCPSocket.h',
     'UDPSocket.h',
 ]
 
@@ -34,8 +31,10 @@ EXPORTS.mozilla.dom.network += [
 
 UNIFIED_SOURCES += [
     'Connection.cpp',
+    'TCPServerSocket.cpp',
     'TCPServerSocketChild.cpp',
     'TCPServerSocketParent.cpp',
+    'TCPSocket.cpp',
     'TCPSocketChild.cpp',
     'TCPSocketParent.cpp',
     'UDPSocket.cpp',
