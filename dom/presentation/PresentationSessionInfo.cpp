@@ -164,6 +164,14 @@ PresentationSessionInfo::SetListener(nsIPresentationSessionListener* aListener)
   mListener = aListener;
 
   if (mListener) {
+    // Enable data notification for the transport channel if it's available.
+    if (mTransport) {
+      nsresult rv = mTransport->EnableDataNotification();
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        return rv;
+      }
+    }
+
     // The transport might become ready, or might become un-ready again, before
     // the listener has registered. So notify the listener of the state change.
     uint16_t state = IsSessionReady() ?
@@ -533,6 +541,11 @@ PresentationControllingInfo::OnSocketAccepted(nsIServerSocket* aServerSocket,
     return rv;
   }
 
+  // Enable data notification if the listener has been registered.
+  if (mListener) {
+    return mTransport->EnableDataNotification();
+  }
+
   return NS_OK;
 }
 
@@ -634,6 +647,14 @@ PresentationPresentingInfo::InitTransportAndSendAnswer()
   nsresult rv = mTransport->InitWithChannelDescription(mRequesterDescription, this);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
+  }
+
+  // Enable data notification if the listener has been registered.
+  if (mListener) {
+    rv = mTransport->EnableDataNotification();
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
   }
 
   // Prepare and send the answer.
