@@ -36,6 +36,11 @@
 #include "mozilla/ChaosMode.h"
 #include "mozilla/TimeStamp.h"
 
+#ifdef MOZ_CRASHREPORTER
+#include "nsServiceManagerUtils.h"
+#include "nsICrashReporter.h"
+#endif
+
 #ifdef XP_LINUX
 #include <sys/time.h>
 #include <sys/resource.h>
