@@ -444,6 +444,7 @@ nsThread::nsThread(MainThreadFlag aMainThread, uint32_t aStackSize)
   : mLock("nsThread.mLock")
   , mScriptObserver(nullptr)
   , mEvents(&mEventsRoot)
+  , mEventsRoot(mLock)
   , mPriority(PRIORITY_NORMAL)
   , mThread(nullptr)
   , mNestedEventLoopDepth(0)
@@ -1074,7 +1075,7 @@ nsThread::PushEventQueue(nsIEventTarget** aResult)
     return NS_ERROR_NOT_SAME_THREAD;
   }
 
-  nsChainedEventQueue* queue = new nsChainedEventQueue();
+  nsChainedEventQueue* queue = new nsChainedEventQueue(mLock);
   queue->mEventTarget = new nsNestedEventTarget(this, queue);
 
   {
