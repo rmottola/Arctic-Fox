@@ -445,8 +445,8 @@ Moof::ParseTraf(Box& aBox, Trex& aTrex, Mvhd& aMvhd, Mdhd& aMdhd, Edts& aEdts, S
     if (box.IsType("trun")) {
       if (ParseTrun(box, tfhd, aMvhd, aMdhd, aEdts, &decodeTime, aIsAudio)) {
         mValid = true;
-        } else {
-          mValid = false;
+      } else {
+        mValid = false;
         break;
       }
     }
