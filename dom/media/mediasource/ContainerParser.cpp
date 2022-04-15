@@ -137,7 +137,7 @@ public:
                   // elements that follow)
     // 0x1549a966 // -> Segment Info
     // 0x1654ae6b // -> One or more Tracks
-    
+
     // 0x1a45dfa3 // EBML
     if (aData->Length() >= 4 &&
         (*aData)[0] == 0x1a && (*aData)[1] == 0x45 && (*aData)[2] == 0xdf &&
@@ -160,7 +160,7 @@ public:
     // 0x18538067 // Segment (must be "unknown" size)
     // 0x1549a966 // -> Segment Info
     // 0x1654ae6b // -> One or more Tracks
-    
+
     // 0x1f43b675 // Cluster
     if (aData->Length() >= 4 &&
         (*aData)[0] == 0x1f && (*aData)[1] == 0x43 && (*aData)[2] == 0xb6 &&
@@ -367,8 +367,9 @@ private:
         uint64_t size = reader.ReadU32();
         const uint8_t* typec = reader.Peek(4);
         uint32_t type = reader.ReadU32();
-        MSE_DEBUGV(AtomParser ,"Checking atom:'%c%c%c%c'",
-                   typec[0], typec[1], typec[2], typec[3]);
+        MSE_DEBUGV(AtomParser ,"Checking atom:'%c%c%c%c' @ %u",
+                   typec[0], typec[1], typec[2], typec[3],
+                   (uint32_t)reader.Offset() - 8);
         if (mInitOffset.isNothing() &&
             mp4_demuxer::AtomType(type) == initAtom) {
           mInitOffset = Some(reader.Offset());
