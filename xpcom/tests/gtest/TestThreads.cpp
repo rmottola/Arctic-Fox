@@ -13,7 +13,7 @@
 #include "nsXPCOM.h"
 #include "gtest/gtest.h"
 
-class nsRunner MOZ_FINAL : public nsIRunnable {
+class nsRunner final : public nsIRunnable {
   ~nsRunner() {}
 public:
     NS_DECL_THREADSAFE_ISUPPORTS
@@ -61,7 +61,7 @@ TEST(Threads, Main)
     PR_Sleep(PR_MillisecondsToInterval(100));       // hopefully the runner will quit here
 }
 
-class nsStressRunner MOZ_FINAL : public nsIRunnable {
+class nsStressRunner final : public nsIRunnable {
 public:
     NS_DECL_THREADSAFE_ISUPPORTS
 
