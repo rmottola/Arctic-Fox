@@ -2857,7 +2857,7 @@ public:
     return NS_OK;
   }
 
-  NS_IMETHODIMP GetRequester(nsIContentPermissionRequester** aRequester)
+  NS_IMETHOD GetRequester(nsIContentPermissionRequester** aRequester) override
   {
     NS_ENSURE_ARG_POINTER(aRequester);
 
