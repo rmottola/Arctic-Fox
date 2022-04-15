@@ -35,6 +35,8 @@ ContainerParser::ContainerParser(const nsACString& aType)
 {
 }
 
+ContainerParser::~ContainerParser() = default;
+
 bool
 ContainerParser::IsInitSegmentPresent(MediaByteBuffer* aData)
 {
