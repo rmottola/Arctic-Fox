@@ -137,11 +137,6 @@ public:
   }
 
   size_t Count();
-
-  MonitorType& GetReentrantMonitor()
-  {
-    return mMonitor;
-  }
 };
 
 #endif  // nsEventQueue_h__
