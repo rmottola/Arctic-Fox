@@ -231,6 +231,7 @@ public:
   nsTArray<nsRefPtr<DeviceStorageFile> > mFiles;
   bool mOkToCallContinue;
   PRTime mSince;
+  size_t mIndex;
 
   void GetStorageType(nsAString & aType);
 
