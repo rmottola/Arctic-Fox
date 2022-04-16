@@ -11,6 +11,7 @@ dump("###################################### forms.js loaded\n");
 let Ci = Components.interfaces;
 let Cc = Components.classes;
 let Cu = Components.utils;
+let Cr = Components.results;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import('resource://gre/modules/XPCOMUtils.jsm');
@@ -650,7 +651,7 @@ let FormAssistant = {
         break;
 
       case "keydown":
-        if (!this.focusedElement) {
+        if (!this.focusedElement || this._editing) {
           break;
         }
 
@@ -658,7 +659,7 @@ let FormAssistant = {
         break;
 
       case "keyup":
-        if (!this.focusedElement) {
+        if (!this.focusedElement || this._editing) {
           break;
         }
 
@@ -733,55 +734,100 @@ let FormAssistant = {
           break;
         }
 
-        // The naive way to figure out if the key to dispatch is printable.
-        let printable = !!json.charCode;
+        // If we receive a keyboardEventDict from json, that means the user
+        // is calling the method with the new arguments.
+        // Otherwise, we would have to construct our own keyboardEventDict
+        // based on legacy values we have received.
+        let keyboardEventDict = json.keyboardEventDict;
+        let flags = 0;
 
-        let keyboardEventDict = {
+        if (keyboardEventDict) {
+          if ('flags' in keyboardEventDict) {
+            flags = keyboardEventDict.flags;
+          }
+        } else {
+          // The naive way to figure out if the key to dispatch is printable.
+          let printable = !!json.charCode;
+
           // For printable keys, the value should be the actual character.
           // For non-printable keys, it should be a value in the D3E spec.
           // Here we make some educated guess for it.
-          key: printable ?
-            String.fromCharCode(json.charCode) :
-            guessKeyNameFromKeyCode(win.KeyboardEvent, json.keyCode),
-          // We don't have any information to tell the virtual key the
-          // user have interacted with.
-          code: "",
-          // We violate the spec here and ask TextInputProcessor not to infer
-          // this value from value of key nor code so we could keep the original
+          let key = printable ?
+              String.fromCharCode(json.charCode) :
+              guessKeyNameFromKeyCode(win.KeyboardEvent, json.keyCode);
+
+          // keyCode from content is only respected when the key is not an
+          // an alphanumeric character. We also ask TextInputProcessor not to
+          // infer this value for non-printable keys to keep the original
           // behavior.
-          keyCode: json.keyCode,
-          // We do not have the information to infer location of the virtual key
-          // either (and we would need TextInputProcessor not to compute it).
-          location: 0,
-          // This indicates the key is triggered for repeats.
-          repeat: json.repeat
-        };
+          let keyCode = (printable && /^[a-zA-Z0-9]$/.test(key)) ?
+              key.toUpperCase().charCodeAt(0) :
+              json.keyCode;
+
+          keyboardEventDict = {
+            key: key,
+            keyCode: keyCode,
+            // We don't have any information to tell the virtual key the
+            // user have interacted with.
+            code: "",
+            // We do not have the information to infer location of the virtual key
+            // either (and we would need TextInputProcessor not to compute it).
+            location: 0,
+            // This indicates the key is triggered for repeats.
+            repeat: json.repeat
+          };
+
+          flags = tip.KEY_KEEP_KEY_LOCATION_STANDARD;
+          if (!printable) {
+            flags |= tip.KEY_NON_PRINTABLE_KEY;
+          }
+          if (!keyboardEventDict.keyCode) {
+            flags |= tip.KEY_KEEP_KEYCODE_ZERO;
+          }
+        }
 
         let keyboardEvent = new win.KeyboardEvent("", keyboardEventDict);
-        let flags = tip.KEY_KEEP_KEY_LOCATION_STANDARD;
-        if (!printable) {
-          flags |= tip.KEY_NON_PRINTABLE_KEY;
-        }
-        if (!json.keyCode) {
-          flags |= tip.KEY_KEEP_KEYCODE_ZERO;
-        }
 
-        let keydownDefaultPrevented;
+        let keydownDefaultPrevented = false;
         try {
-          let consumedFlags = tip.keydown(keyboardEvent, flags);
-          keydownDefaultPrevented =
-            !!(tip.KEYDOWN_IS_CONSUMED & consumedFlags);
-          if (!json.repeat) {
-            tip.keyup(keyboardEvent, flags);
+          switch (json.method) {
+            case 'sendKey': {
+              let consumedFlags = tip.keydown(keyboardEvent, flags);
+              keydownDefaultPrevented =
+                !!(tip.KEYDOWN_IS_CONSUMED & consumedFlags);
+              if (!keyboardEventDict.repeat) {
+                tip.keyup(keyboardEvent, flags);
+              }
+              break;
+            }
+            case 'keydown': {
+              let consumedFlags = tip.keydown(keyboardEvent, flags);
+              keydownDefaultPrevented =
+                !!(tip.KEYDOWN_IS_CONSUMED & consumedFlags);
+              break;
+            }
+            case 'keyup': {
+              tip.keyup(keyboardEvent, flags);
+
+              break;
+            }
           }
-        } catch (e) {
-          dump("forms.js:" + e.toString() + "\n");
+        } catch (err) {
+          dump("forms.js:" + err.toString() + "\n");
 
           if (json.requestId) {
-            sendAsyncMessage("Forms:SendKey:Result:Error", {
-              requestId: json.requestId,
-              error: "Unable to type into destoryed input."
-            });
+            if (err instanceof Ci.nsIException &&
+                err.result == Cr.NS_ERROR_ILLEGAL_VALUE) {
+              sendAsyncMessage("Forms:SendKey:Result:Error", {
+                requestId: json.requestId,
+                error: "The values specified are illegal."
+              });
+            } else {
+              sendAsyncMessage("Forms:SendKey:Result:Error", {
+                requestId: json.requestId,
+                error: "Unable to type into destroyed input."
+              });
+            }
           }
 
           break;
@@ -913,7 +959,7 @@ let FormAssistant = {
 
       case "Forms:SetComposition": {
         CompositionManager.setComposition(target, json.text, json.cursor,
-                                          json.clauses);
+                                          json.clauses, json.keyboardEventDict);
         sendAsyncMessage("Forms:SetComposition:Result:OK", {
           requestId: json.requestId,
           selectioninfo: this.getSelectionInfo()
@@ -922,7 +968,7 @@ let FormAssistant = {
       }
 
       case "Forms:EndComposition": {
-        CompositionManager.endComposition(json.text);
+        CompositionManager.endComposition(json.text, json.keyboardEventDict);
         sendAsyncMessage("Forms:EndComposition:Result:OK", {
           requestId: json.requestId,
           selectioninfo: this.getSelectionInfo()
@@ -1442,6 +1488,7 @@ function replaceSurroundingText(element, text, offset, length) {
 let CompositionManager =  {
   _isStarted: false,
   _tip: null,
+  _KeyboardEventForWin: null,
   _clauseAttrMap: {
     'raw-input':
       Ci.nsITextInputProcessor.ATTR_RAW_CLAUSE,
@@ -1453,7 +1500,7 @@ let CompositionManager =  {
       Ci.nsITextInputProcessor.ATTR_SELECTED_CLAUSE
   },
 
-  setComposition: function cm_setComposition(element, text, cursor, clauses) {
+  setComposition: function cm_setComposition(element, text, cursor, clauses, dict) {
     // Check parameters.
     if (!element) {
       return;
@@ -1506,13 +1553,22 @@ let CompositionManager =  {
     if (cursor >= 0) {
       tip.setCaretInPendingComposition(cursor);
     }
-    this._isStarted = tip.flushPendingComposition();
+
+    if (!dict) {
+      this._isStarted = tip.flushPendingComposition();
+    } else {
+      let keyboardEvent = new win.KeyboardEvent("", dict);
+      let flags = dict.flags;
+      this._isStarted = tip.flushPendingComposition(keyboardEvent, flags);
+    }
+
     if (this._isStarted) {
       this._tip = tip;
+      this._KeyboardEventForWin = win.KeyboardEvent;
     }
   },
 
-  endComposition: function cm_endComposition(text) {
+  endComposition: function cm_endComposition(text, dict) {
     if (!this._isStarted) {
       return;
     }
@@ -1521,9 +1577,18 @@ let CompositionManager =  {
       return;
     }
 
-    tip.commitCompositionWith(text ? text : "");
+    text = text || "";
+    if (!dict) {
+      tip.commitCompositionWith(text);
+    } else {
+      let keyboardEvent = new this._KeyboardEventForWin("", dict);
+      let flags = dict.flags;
+      tip.commitCompositionWith(text, keyboardEvent, flags);
+    }
+
     this._isStarted = false;
     this._tip = null;
+    this._KeyboardEventForWin = null;
   },
 
   // Composition ends due to external actions.
@@ -1534,5 +1599,6 @@ let CompositionManager =  {
 
     this._isStarted = false;
     this._tip = null;
+    this._KeyboardEventForWin = null;
   }
 };
