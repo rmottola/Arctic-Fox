@@ -7833,7 +7833,7 @@ nsContentUtils::SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
   else if (aType.EqualsLiteral("mousemove"))
     msg = eMouseMove;
   else if (aType.EqualsLiteral("mouseover"))
-    msg = NS_MOUSE_ENTER_WIDGET;
+    msg = eMouseEnterIntoWidget;
   else if (aType.EqualsLiteral("mouseout"))
     msg = NS_MOUSE_EXIT_WIDGET;
   else if (aType.EqualsLiteral("contextmenu")) {
