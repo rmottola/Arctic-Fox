@@ -1425,7 +1425,7 @@ bool TabParent::SendRealMouseEvent(WidgetMouseEvent& event)
       } else if (mCursor != nsCursor(-1)) {
         widget->SetCursor(mCursor);
       }
-    } else if (NS_MOUSE_EXIT_WIDGET == event.mMessage) {
+    } else if (eMouseExitFromWidget == event.mMessage) {
       mTabSetsCursor = false;
     }
   }
