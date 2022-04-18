@@ -3208,7 +3208,7 @@ HTMLInputElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
         if (stopSpin) {
           StopNumberControlSpinnerSpin();
         }
-      } else if (aVisitor.mEvent->mMessage == NS_MOUSE_BUTTON_UP) {
+      } else if (aVisitor.mEvent->mMessage == eMouseUp) {
         StopNumberControlSpinnerSpin();
       }
     }
@@ -3903,7 +3903,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
         } break; // eKeyPress || eKeyUp
 
         case NS_MOUSE_BUTTON_DOWN:
-        case NS_MOUSE_BUTTON_UP:
+        case eMouseUp:
         case NS_MOUSE_DOUBLECLICK:
         {
           // cancel all of these events for buttons
@@ -4097,7 +4097,7 @@ HTMLInputElement::PostHandleEventForRangeThumb(EventChainPostVisitor& aVisitor)
       aVisitor.mEvent->mFlags.mMultipleActionsPrevented = true;
       break;
 
-    case NS_MOUSE_BUTTON_UP:
+    case eMouseUp:
     case NS_TOUCH_END:
       if (!mIsDraggingRange) {
         break;
