@@ -4684,7 +4684,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
   if (!mGeckoChild)
     return;
 
-  WidgetMouseEvent geckoEvent(true, NS_MOUSE_MOVE, mGeckoChild,
+  WidgetMouseEvent geckoEvent(true, eMouseMove, mGeckoChild,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
 
@@ -4702,7 +4702,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
 
   gLastDragView = self;
 
-  WidgetMouseEvent geckoEvent(true, NS_MOUSE_MOVE, mGeckoChild,
+  WidgetMouseEvent geckoEvent(true, eMouseMove, mGeckoChild,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
 
@@ -4768,7 +4768,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
   if (!mGeckoChild)
     return;
 
-  WidgetMouseEvent geckoEvent(true, NS_MOUSE_MOVE, mGeckoChild,
+  WidgetMouseEvent geckoEvent(true, eMouseMove, mGeckoChild,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
   geckoEvent.button = WidgetMouseEvent::eRightButton;
@@ -4821,7 +4821,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
   if (!mGeckoChild)
     return;
 
-  WidgetMouseEvent geckoEvent(true, NS_MOUSE_MOVE, mGeckoChild,
+  WidgetMouseEvent geckoEvent(true, eMouseMove, mGeckoChild,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
   geckoEvent.button = WidgetMouseEvent::eMiddleButton;
