@@ -1536,6 +1536,9 @@ EventStateManager::BeginTrackingDragGesture(nsPresContext* aPresContext,
                                     getter_AddRefs(mGestureDownContent));
 
     mGestureDownFrameOwner = inDownFrame->GetContent();
+    if (!mGestureDownFrameOwner) {
+      mGestureDownFrameOwner = mGestureDownContent;
+    }
   }
   mGestureModifiers = inDownEvent->modifiers;
   mGestureDownButtons = inDownEvent->buttons;
