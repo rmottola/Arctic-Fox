@@ -4038,7 +4038,7 @@ nsWindow::DispatchMouseEvent(EventMessage aEventMessage, WPARAM wParam,
   LONG curMsgTime = ::GetMessageTime();
 
   switch (aEventMessage) {
-    case NS_MOUSE_DOUBLECLICK:
+    case eMouseDoubleClick:
       event.mMessage = eMouseDown;
       event.button = aButton;
       sLastClickCount = 2;
@@ -4115,7 +4115,7 @@ nsWindow::DispatchMouseEvent(EventMessage aEventMessage, WPARAM wParam,
           break;
       }
       break;
-    case NS_MOUSE_DOUBLECLICK:
+    case eMouseDoubleClick:
       switch (aButton) {
         case WidgetMouseEvent::eLeftButton:
           pluginEvent.event = WM_LBUTTONDBLCLK;
@@ -5162,7 +5162,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
     break;
 
     case WM_LBUTTONDBLCLK:
-      result = DispatchMouseEvent(NS_MOUSE_DOUBLECLICK, wParam,
+      result = DispatchMouseEvent(eMouseDoubleClick, wParam,
                                   lParam, false,
                                   WidgetMouseEvent::eLeftButton,
                                   MOUSE_INPUT_SOURCE());
@@ -5186,7 +5186,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
       break;
 
     case WM_MBUTTONDBLCLK:
-      result = DispatchMouseEvent(NS_MOUSE_DOUBLECLICK, wParam,
+      result = DispatchMouseEvent(eMouseDoubleClick, wParam,
                                   lParam, false,
                                   WidgetMouseEvent::eMiddleButton,
                                   MOUSE_INPUT_SOURCE());
@@ -5210,7 +5210,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
       break;
 
     case WM_NCMBUTTONDBLCLK:
-      result = DispatchMouseEvent(NS_MOUSE_DOUBLECLICK, 0,
+      result = DispatchMouseEvent(eMouseDoubleClick, 0,
                                   lParamToClient(lParam), false,
                                   WidgetMouseEvent::eMiddleButton,
                                   MOUSE_INPUT_SOURCE());
@@ -5234,7 +5234,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
       break;
 
     case WM_RBUTTONDBLCLK:
-      result = DispatchMouseEvent(NS_MOUSE_DOUBLECLICK, wParam,
+      result = DispatchMouseEvent(eMouseDoubleClick, wParam,
                                   lParam, false,
                                   WidgetMouseEvent::eRightButton,
                                   MOUSE_INPUT_SOURCE());
@@ -5258,7 +5258,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
       break;
 
     case WM_NCRBUTTONDBLCLK:
-      result = DispatchMouseEvent(NS_MOUSE_DOUBLECLICK, 0,
+      result = DispatchMouseEvent(eMouseDoubleClick, 0,
                                   lParamToClient(lParam), false,
                                   WidgetMouseEvent::eRightButton,
                                   MOUSE_INPUT_SOURCE());
@@ -5334,7 +5334,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
     }
 
     case WM_NCLBUTTONDBLCLK:
-      DispatchMouseEvent(NS_MOUSE_DOUBLECLICK, 0, lParamToClient(lParam),
+      DispatchMouseEvent(eMouseDoubleClick, 0, lParamToClient(lParam),
                          false, WidgetMouseEvent::eLeftButton,
                          MOUSE_INPUT_SOURCE());
       result = 

@@ -4595,8 +4595,8 @@ EventStateManager::CheckForAndDispatchClick(nsPresContext* aPresContext,
 
       if (NS_SUCCEEDED(ret) && aEvent->clickCount == 2 &&
           mouseContent && mouseContent->IsInComposedDoc()) {
-        //fire double click
-        ret = InitAndDispatchClickEvent(aEvent, aStatus, NS_MOUSE_DOUBLECLICK,
+        // fire double click
+        ret = InitAndDispatchClickEvent(aEvent, aStatus, eMouseDoubleClick,
                                         presShell, mouseContent, currentTarget,
                                         notDispatchToContents);
       }

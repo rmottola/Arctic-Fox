@@ -3904,8 +3904,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
 
         case eMouseDown:
         case eMouseUp:
-        case NS_MOUSE_DOUBLECLICK:
-        {
+        case eMouseDoubleClick: {
           // cancel all of these events for buttons
           //XXXsmaug Why?
           WidgetMouseEvent* mouseEvent = aVisitor.mEvent->AsMouseEvent();
