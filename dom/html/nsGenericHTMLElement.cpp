@@ -2463,7 +2463,7 @@ nsGenericHTMLFormElement::IsElementDisabledForEvents(EventMessage aMessage,
   switch (aMessage) {
     case eMouseMove:
     case eMouseOver:
-    case NS_MOUSE_OUT:
+    case eMouseOut:
     case NS_MOUSEENTER:
     case NS_MOUSELEAVE:
     case NS_POINTER_MOVE:

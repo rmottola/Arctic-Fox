@@ -3776,7 +3776,7 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
       (aMessage == NS_MOUSELEAVE ||
        aMessage == NS_MOUSEENTER ||
        aMessage == eMouseOver ||
-       aMessage == NS_MOUSE_OUT)) {
+       aMessage == eMouseOut)) {
     mCurrentTargetContent = nullptr;
     nsCOMPtr<Element> pointerLockedElement =
       do_QueryReferent(EventStateManager::sPointerLockedElement);
@@ -3821,7 +3821,7 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
     // If we are entering/leaving remote content, dispatch a mouse enter/exit
     // event to the remote frame.
     if (IsRemoteTarget(aTargetContent)) {
-      if (aMessage == NS_MOUSE_OUT) {
+      if (aMessage == eMouseOut) {
         // For remote content, send a "top-level" widget mouse exit event.
         nsAutoPtr<WidgetMouseEvent> remoteEvent;
         CreateMouseOrPointerWidgetEvent(aMouseEvent, eMouseExitFromWidget,
@@ -3962,7 +3962,7 @@ EventStateManager::NotifyMouseOut(WidgetMouseEvent* aMouseEvent,
                                                    NS_MOUSELEAVE);
 
   // Fire mouseout
-  DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? NS_POINTER_OUT : NS_MOUSE_OUT,
+  DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? NS_POINTER_OUT : eMouseOut,
                               wrapper->mLastOverElement, aMovingInto);
 
   wrapper->mLastOverFrame = nullptr;
