@@ -1788,7 +1788,7 @@ CocoaEventTypeForEvent(const WidgetGUIEvent& anEvent, nsIFrame* aObjectFrame)
   }
 
   switch (anEvent.mMessage) {
-    case NS_MOUSE_OVER:
+    case eMouseOver:
       return NPCocoaEventMouseEntered;
     case NS_MOUSE_OUT:
       return NPCocoaEventMouseExited;
@@ -1831,7 +1831,7 @@ TranslateToNPCocoaEvent(WidgetGUIEvent* anEvent, nsIFrame* aObjectFrame)
       anEvent->mMessage == eMouseDown ||
       anEvent->mMessage == eMouseUp ||
       anEvent->mMessage == NS_MOUSE_SCROLL ||
-      anEvent->mMessage == NS_MOUSE_OVER ||
+      anEvent->mMessage == eMouseOver ||
       anEvent->mMessage == NS_MOUSE_OUT)
   {
     nsPoint pt = nsLayoutUtils::GetEventCoordinatesRelativeTo(anEvent, aObjectFrame) -
@@ -2087,7 +2087,7 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
       NS_ASSERTION(anEvent.mMessage == eMouseDown ||
                    anEvent.mMessage == eMouseUp ||
                    anEvent.mMessage == eMouseDoubleClick ||
-                   anEvent.mMessage == NS_MOUSE_OVER ||
+                   anEvent.mMessage == eMouseOver ||
                    anEvent.mMessage == NS_MOUSE_OUT ||
                    anEvent.mMessage == eMouseMove,
                    "Incorrect event type for coordinate translation");
@@ -2174,13 +2174,12 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
         Window root = None; // Could XQueryTree, but this is not important.
 #endif
 
-        switch (anEvent.mMessage)
-          {
-          case NS_MOUSE_OVER:
+        switch (anEvent.mMessage) {
+          case eMouseOver:
           case NS_MOUSE_OUT:
             {
               XCrossingEvent& event = pluginEvent.xcrossing;
-              event.type = anEvent.mMessage == NS_MOUSE_OVER ?
+              event.type = anEvent.mMessage == eMouseOver ?
                 EnterNotify : LeaveNotify;
               event.root = root;
               event.time = anEvent.time;

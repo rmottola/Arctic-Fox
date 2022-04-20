@@ -3775,7 +3775,7 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
   if (sIsPointerLocked &&
       (aMessage == NS_MOUSELEAVE ||
        aMessage == NS_MOUSEENTER ||
-       aMessage == NS_MOUSE_OVER ||
+       aMessage == eMouseOver ||
        aMessage == NS_MOUSE_OUT)) {
     mCurrentTargetContent = nullptr;
     nsCOMPtr<Element> pointerLockedElement =
@@ -3834,7 +3834,7 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
         // proper target via GetEventTarget which will return mCurrentTarget.
         mCurrentTarget = targetFrame;
         HandleCrossProcessEvent(remoteEvent, &status);
-      } else if (aMessage == NS_MOUSE_OVER) {
+      } else if (aMessage == eMouseOver) {
         nsAutoPtr<WidgetMouseEvent> remoteEvent;
         CreateMouseOrPointerWidgetEvent(aMouseEvent, eMouseEnterIntoWidget,
                                         aRelatedContent, remoteEvent);
@@ -4036,7 +4036,7 @@ EventStateManager::NotifyMouseOver(WidgetMouseEvent* aMouseEvent,
     // Fire mouseover
     wrapper->mLastOverFrame = 
       DispatchMouseOrPointerEvent(aMouseEvent,
-                                  isPointer ? NS_POINTER_OVER : NS_MOUSE_OVER,
+                                  isPointer ? NS_POINTER_OVER : eMouseOver,
                                   aContent, lastOverElement);
     wrapper->mLastOverElement = aContent;
   } else {
