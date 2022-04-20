@@ -502,7 +502,7 @@ nsWindow::Create(nsIWidget *aParent,
       parent = nullptr;
     }
 
-    if (!IsWin8OrLater() &&
+    if (IsVistaOrLater() && !IsWin8OrLater() &&
         HasBogusPopupsDropShadowOnMultiMonitor()) {
       extendedStyle |= WS_EX_COMPOSITED;
     }
@@ -1258,11 +1258,11 @@ bool nsWindow::IsVisible() const
  *
  **************************************************************/
 
-// Visual styles sometimes require window clipping regions to be applied for proper
+// XP and Vista visual styles sometimes require window clipping regions to be applied for proper
 // transparency. These routines are called on size and move operations.
 void nsWindow::ClearThemeRegion()
 {
-  if (!HasGlass() &&
+  if (IsVistaOrLater() && !HasGlass() &&
       (mWindowType == eWindowType_popup && !IsPopupWithTitleBar() &&
        (mPopupType == ePopupTypeTooltip || mPopupType == ePopupTypePanel))) {
     SetWindowRgn(mWnd, nullptr, false);
@@ -1276,7 +1276,7 @@ void nsWindow::SetThemeRegion()
   // so default constants are used for part and state. At some point we might need part and
   // state values from nsNativeThemeWin's GetThemePartAndState, but currently windows that
   // change shape based on state haven't come up.
-  if (!HasGlass() &&
+  if (IsVistaOrLater() && !HasGlass() &&
       (mWindowType == eWindowType_popup && !IsPopupWithTitleBar() &&
        (mPopupType == ePopupTypeTooltip || mPopupType == ePopupTypePanel))) {
     HRGN hRgn = nullptr;
@@ -3593,13 +3593,17 @@ nsWindow::OverrideSystemMouseScrollSpeed(double aOriginalDeltaX,
     return NS_OK;
   }
 
-  if (!::SystemParametersInfo(SPI_GETWHEELSCROLLCHARS, 0, &systemSpeed, 0)) {
-    return NS_ERROR_FAILURE;
-  }
-  // The default horizontal scrolling speed is 3, this is defined on the
-  // document of SystemParametersInfo in MSDN.
-  if (systemSpeed != kSystemDefaultScrollingSpeed) {
-    return NS_OK;
+  // Only Vista and later, Windows has the system setting of horizontal
+  // scrolling by the mouse wheel.
+  if (IsVistaOrLater()) {
+    if (!::SystemParametersInfo(SPI_GETWHEELSCROLLCHARS, 0, &systemSpeed, 0)) {
+      return NS_ERROR_FAILURE;
+    }
+    // The default horizontal scrolling speed is 3, this is defined on the
+    // document of SystemParametersInfo in MSDN.
+    if (systemSpeed != kSystemDefaultScrollingSpeed) {
+      return NS_OK;
+    }
   }
 
   // Limit the overridden delta value from the system settings.  The mouse
@@ -6827,16 +6831,16 @@ bool nsWindow::AutoErase(HDC dc)
   return false;
 }
 
-bool
-nsWindow::IsPopup()
-{
-  return mWindowType == eWindowType_popup;
-}
-
 void
 nsWindow::ClearCompositor(nsWindow* aWindow)
 {
   aWindow->DestroyLayerManager();
+}
+
+bool
+nsWindow::IsPopup()
+{
+  return mWindowType == eWindowType_popup;
 }
 
 bool
