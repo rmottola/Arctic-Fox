@@ -8,4 +8,5 @@ Program('updater')
 
 updater_rel_path = ''
 include('updater-common.build')
-DIRS += ['updater-xpcshell']
+if CONFIG['ENABLE_TESTS']:
+    DIRS += ['updater-xpcshell']
