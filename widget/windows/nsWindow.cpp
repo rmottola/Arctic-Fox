@@ -3690,25 +3690,25 @@ nsWindow::UpdateThemeGeometries(const nsTArray<ThemeGeometry>& aThemeGeometries)
   if (!layerManager) {
     return;
   }
-    
+
   nsIntRegion clearRegion;
-  // No glass or compositor -> classic metrics, so return.
   if (!HasGlass() || !nsUXThemeData::CheckForCompositor()) {
     // Make sure and clear old regions we've set previously. Note HasGlass can be false
     // for glass desktops if the window we are rendering to doesn't make use of glass
     // (e.g. fullscreen browsing).
-    layerManager->SetRegionToClear(clearRegion);  
+    layerManager->SetRegionToClear(clearRegion);
     return;
   }
 
-  // On Win10, force show the top border on normal windows:
+  // On Win10, force show the top border:
   if (IsWin10OrLater() && mCustomNonClient && mSizeMode == nsSizeMode_Normal) {
     RECT rect;
     ::GetWindowRect(mWnd, &rect);
-    clearRegion.Or(clearRegion, nsIntRect(0, 0, rect.right - rect.left, 1.0));
+    // We want 1 pixel of border for every whole 100% of scaling
+    double borderSize = RoundDown(GetDefaultScale().scale);
+    clearRegion.Or(clearRegion, nsIntRect(0, 0, rect.right - rect.left, borderSize));
   }
-  
-  // We draw our own buttons on Win10 or later. Prevent the windows cutout for events.
+
   if (!IsWin10OrLater()) {
     for (size_t i = 0; i < aThemeGeometries.Length(); i++) {
       if (aThemeGeometries[i].mType == nsNativeThemeWin::eThemeGeometryTypeWindowButtons)
