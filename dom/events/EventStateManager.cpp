@@ -4589,7 +4589,7 @@ EventStateManager::CheckForAndDispatchClick(nsPresContext* aPresContext,
 
       // HandleEvent clears out mCurrentTarget which we might need again
       nsWeakFrame currentTarget = mCurrentTarget;
-      ret = InitAndDispatchClickEvent(aEvent, aStatus, NS_MOUSE_CLICK,
+      ret = InitAndDispatchClickEvent(aEvent, aStatus, eMouseClick,
                                       presShell, mouseContent, currentTarget,
                                       notDispatchToContents);
 

@@ -110,7 +110,7 @@ nsButtonBoxFrame::HandleEvent(nsPresContext* aPresContext,
       break;
     }
 
-    case NS_MOUSE_CLICK: {
+    case eMouseClick: {
       WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
       if (mouseEvent->IsLeftClickEvent()) {
         MouseClicked(aPresContext, mouseEvent);
