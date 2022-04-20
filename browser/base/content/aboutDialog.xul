@@ -43,9 +43,9 @@
       <vbox id="PMleftBox" flex="1"/>
       <vbox id="PMrightBox" flex="1">
 #ifdef HAVE_64BIT_BUILD
-#expand <label id="PMversion">Version: __MOZ_APP_VERSION_ABOUT__ (64-bit)</label>
+#expand <label id="PMversion">Version: __MOZ_APP_VERSION_DISPLAY__ (64-bit)</label>
 #else
-#expand <label id="PMversion">Version: __MOZ_APP_VERSION_ABOUT__ (32-bit)</label>
+#expand <label id="PMversion">Version: __MOZ_APP_VERSION_DISPLAY__ (32-bit)</label>
 #endif
         <label id="distribution" class="text-blurb"/>
         <label id="distributionId" class="text-blurb"/>
