@@ -3836,7 +3836,10 @@ else
   MOZ_FMP4=
 fi
 MOZ_FFMPEG=
-MOZ_WEBRTC=
+MOZ_WEBRTC=1
+MOZ_WEBRTC_SIGNALING=
+MOZ_WEBRTC_ASSERT_ALWAYS=1
+MOZ_WEBRTC_HARDWARE_AEC_NS=
 MOZ_ANDROID_OMX=
 MOZ_MEDIA_NAVIGATOR=
 MOZ_OMX_PLUGIN=
@@ -5004,13 +5007,46 @@ if test "${MOZ_WIDGET_TOOLKIT}" = "linuxgl" -a "$ACCESSIBILITY" != "1"; then
     AC_MSG_ERROR(["Accessibility is required for the linuxgl widget backend"])
 fi
 
+dnl Turn off webrtc for OS's we don't handle yet, but allow
+dnl --enable-webrtc to override.  Can disable for everything in
+dnl the master list above.
+if test -n "$MOZ_WEBRTC"; then
+    case "$target" in
+    *-linux*|*-mingw*|*-darwin*|*-android*|*-linuxandroid*|*-dragonfly*|*-freebsd*|*-netbsd*|*-openbsd*)
+        dnl Leave enabled
+        ;;
+    *)
+        dnl default to disabled for all others
+        MOZ_WEBRTC=
+        ;;
+    esac
+fi
+
+AC_TRY_COMPILE([#include <linux/ethtool.h>],
+               [ struct ethtool_cmd cmd; cmd.speed_hi = 0; ],
+               MOZ_WEBRTC_HAVE_ETHTOOL_SPEED_HI=1)
+
+AC_SUBST(MOZ_WEBRTC_HAVE_ETHTOOL_SPEED_HI)
+
+# target_arch is from {ia32|x64|arm|ppc}
+case "$CPU_ARCH" in
+x86_64 | arm | x86 | ppc* | ia64)
+    :
+    ;;
+*)
+# unsupported arch for webrtc
+    MOZ_WEBRTC=
+    ;;
+
+esac
+
 dnl ========================================================
-dnl = Enable WebRTC code
+dnl = Disable WebRTC code
 dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(webrtc,
-[  --enable-webrtc        Enable support for WebRTC],
-    MOZ_WEBRTC=1,
-    MOZ_WEBRTC=)
+MOZ_ARG_DISABLE_BOOL(webrtc,
+[  --disable-webrtc        Disable support for WebRTC],
+    MOZ_WEBRTC=,
+    MOZ_WEBRTC=1)
 
 if test -n "$MOZ_WEBRTC"; then
     AC_DEFINE(MOZ_WEBRTC)
@@ -5038,15 +5074,27 @@ else
     MOZ_SYNTH_PICO=
 fi
 
+dnl ========================================================
+dnl = Force hardware AEC, disable webrtc.org AEC
+dnl ========================================================
+MOZ_ARG_ENABLE_BOOL(hardware-aec-ns,
+[  --enable-hardware-aec-ns   Enable support for hardware AEC and noise suppression],
+    MOZ_WEBRTC_HARDWARE_AEC_NS=1,
+    MOZ_WEBRTC_HARDWARE_AEC_NS=)
+
+if test -n "$MOZ_WEBRTC_HARDWARE_AEC_NS"; then
+    AC_DEFINE(MOZ_WEBRTC_HARDWARE_AEC_NS)
+fi
+
 AC_SUBST(MOZ_WEBRTC)
+AC_SUBST(MOZ_WEBRTC_LEAKING_TESTS)
 AC_SUBST(MOZ_WEBRTC_SIGNALING)
 AC_SUBST(MOZ_PEERCONNECTION)
 AC_SUBST(MOZ_WEBRTC_ASSERT_ALWAYS)
+AC_SUBST(MOZ_WEBRTC_HARDWARE_AEC_NS)
 AC_SUBST(MOZ_SCTP)
 AC_SUBST(MOZ_SRTP)
 AC_SUBST_LIST(MOZ_WEBRTC_X11_LIBS)
-
-dnl ========================================================
 
 dnl Use integers over floats for audio on B2G and Android
 dnl (regarless of the CPU architecture, because audio
