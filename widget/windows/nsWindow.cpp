@@ -988,6 +988,12 @@ nsIWidget* nsWindow::GetParent(void)
   return GetParentWindow(false);
 }
 
+static int32_t RoundDown(double aDouble)
+{
+  return aDouble > 0 ? static_cast<int32_t>(floor(aDouble)) :
+                       static_cast<int32_t>(ceil(aDouble));
+}
+
 float nsWindow::GetDPI()
 {
   HDC dc = ::GetDC(mWnd);
@@ -3711,8 +3717,7 @@ nsWindow::UpdateThemeGeometries(const nsTArray<ThemeGeometry>& aThemeGeometries)
 
   if (!IsWin10OrLater()) {
     for (size_t i = 0; i < aThemeGeometries.Length(); i++) {
-      if (aThemeGeometries[i].mType == nsNativeThemeWin::eThemeGeometryTypeWindowButtons)
-      {
+      if (aThemeGeometries[i].mType == nsNativeThemeWin::eThemeGeometryTypeWindowButtons) {
         nsIntRect bounds = aThemeGeometries[i].mRect;
         clearRegion.Or(clearRegion, nsIntRect(bounds.X(), bounds.Y(), bounds.Width(), bounds.Height() - 2.0));
         clearRegion.Or(clearRegion, nsIntRect(bounds.X() + 1.0, bounds.YMost() - 2.0, bounds.Width() - 1.0, 1.0));
@@ -6516,12 +6521,6 @@ bool nsWindow::OnTouch(WPARAM wParam, LPARAM lParam)
   delete [] pInputs;
   mGesture.CloseTouchInputHandle((HTOUCHINPUT)lParam);
   return true;
-}
-
-static int32_t RoundDown(double aDouble)
-{
-  return aDouble > 0 ? static_cast<int32_t>(floor(aDouble)) :
-                       static_cast<int32_t>(ceil(aDouble));
 }
 
 // Gesture event processing. Handles WM_GESTURE events.
