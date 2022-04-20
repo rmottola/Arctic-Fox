@@ -17,9 +17,14 @@
 
 // These are generated at compile time based on the DER file for the channel
 // being used
+#ifdef MOZ_VERIFY_MAR_SIGNATURE
+#ifdef TEST_UPDATER
+#include "../xpcshellCert.h"
+#else
 #include "primaryCert.h"
 #include "secondaryCert.h"
-#include "xpcshellCert.h"
+#endif
+#endif
 
 #define UPDATER_NO_STRING_GLUE_STL
 #include "nsVersionComparator.cpp"
@@ -77,21 +82,19 @@ ArchiveReader::VerifySignature()
     return ARCHIVE_NOT_OPEN;
   }
 
-  // If the fallback key exists we're running an XPCShell test and we should
-  // use the XPCShell specific cert for the signed MAR.
-  int rv = OK;
-#ifdef XP_WIN
-  if (DoesFallbackKeyExist()) {
-    rv = VerifyLoadedCert(mArchive, xpcshellCertData);
-  } else
-#endif
-  {
-    rv = VerifyLoadedCert(mArchive, primaryCertData);
-    if (rv != OK) {
-      rv = VerifyLoadedCert(mArchive, secondaryCertData);
-    }
+#ifndef MOZ_VERIFY_MAR_SIGNATURE
+  return OK;
+#else
+#ifdef TEST_UPDATER
+  int rv = VerifyLoadedCert(mArchive, xpcshellCertData);
+#else
+  int rv = VerifyLoadedCert(mArchive, primaryCertData);
+  if (rv != OK) {
+    rv = VerifyLoadedCert(mArchive, secondaryCertData);
   }
+#endif
   return rv;
+#endif
 }
 
 /**
