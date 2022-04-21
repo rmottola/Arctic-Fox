@@ -2342,24 +2342,18 @@ nsXULPrototypeElement::Deserialize(nsIObjectInputStream* aStream,
             switch (childType) {
             case eType_Element:
                 child = new nsXULPrototypeElement();
-                child->mType = childType;
-
                 rv = child->Deserialize(aStream, aProtoDoc, aDocumentURI,
                                         aNodeInfos);
                 if (NS_WARN_IF(NS_FAILED(rv))) return rv;
                 break;
             case eType_Text:
                 child = new nsXULPrototypeText();
-                child->mType = childType;
-
                 rv = child->Deserialize(aStream, aProtoDoc, aDocumentURI,
                                         aNodeInfos);
                 if (NS_WARN_IF(NS_FAILED(rv))) return rv;
                 break;
             case eType_PI:
                 child = new nsXULPrototypePI();
-                child->mType = childType;
-
                 rv = child->Deserialize(aStream, aProtoDoc, aDocumentURI,
                                         aNodeInfos);
                 if (NS_WARN_IF(NS_FAILED(rv))) return rv;
@@ -2368,7 +2362,6 @@ nsXULPrototypeElement::Deserialize(nsIObjectInputStream* aStream,
                 // language version/options obtained during deserialization.
                 nsXULPrototypeScript* script = new nsXULPrototypeScript(0, 0);
                 child = script;
-                child->mType = childType;
 
                 rv = aStream->ReadBoolean(&script->mOutOfLine);
                 if (NS_WARN_IF(NS_FAILED(rv))) return rv;
@@ -2394,6 +2387,7 @@ nsXULPrototypeElement::Deserialize(nsIObjectInputStream* aStream,
             }
 
             MOZ_ASSERT(child, "Don't append null to mChildren");
+            MOZ_ASSERT(child->mType == childType);
             mChildren.AppendElement(child);
 
             // Oh dear. Something failed during the deserialization.
