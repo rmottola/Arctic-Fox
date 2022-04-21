@@ -3966,7 +3966,7 @@ EventStateManager::NotifyMouseOut(WidgetMouseEvent* aMouseEvent,
                                        isPointer ? ePointerLeave : eMouseLeave);
 
   // Fire mouseout
-  DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? ePointerLeave : eMouseOut,
+  DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? ePointerOut : eMouseOut,
                               wrapper->mLastOverElement, aMovingInto);
 
   wrapper->mLastOverFrame = nullptr;
