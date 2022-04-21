@@ -3774,7 +3774,7 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
   // of a mouse cursor must not be dispatched (for example: mouseover, mouseout).
   if (sIsPointerLocked &&
       (aMessage == NS_MOUSELEAVE ||
-       aMessage == NS_MOUSEENTER ||
+       aMessage == eMouseEnter ||
        aMessage == eMouseOver ||
        aMessage == eMouseOut)) {
     mCurrentTargetContent = nullptr;
@@ -3885,7 +3885,7 @@ public:
 
   ~EnterLeaveDispatcher()
   {
-    if (mEventMessage == NS_MOUSEENTER ||
+    if (mEventMessage == eMouseEnter ||
         mEventMessage == NS_POINTER_ENTER) {
       for (int32_t i = mTargets.Count() - 1; i >= 0; --i) {
         mESM->DispatchMouseOrPointerEvent(mMouseEvent, mEventMessage,
@@ -4019,7 +4019,7 @@ EventStateManager::NotifyMouseOver(WidgetMouseEvent* aMouseEvent,
   Maybe<EnterLeaveDispatcher> enterDispatcher;
   if (dispatch) {
     enterDispatcher.emplace(this, aContent, lastOverElement, aMouseEvent,
-                            isPointer ? NS_POINTER_ENTER : NS_MOUSEENTER);
+                            isPointer ? NS_POINTER_ENTER : eMouseEnter);
   }
 
   NotifyMouseOut(aMouseEvent, aContent);
