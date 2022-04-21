@@ -292,10 +292,6 @@ nsXULElement::Create(nsXULPrototypeElement* aPrototype,
 
     nsRefPtr<nsXULElement> element = Create(aPrototype, nodeInfo,
                                             aIsScriptable, aIsRoot);
-    if (!element) {
-        return NS_ERROR_OUT_OF_MEMORY;
-    }
-
     element.forget(aResult);
 
     return NS_OK;
@@ -2356,8 +2352,6 @@ nsXULPrototypeElement::Deserialize(nsIObjectInputStream* aStream,
             switch (childType) {
             case eType_Element:
                 child = new nsXULPrototypeElement();
-                if (! child)
-                    return NS_ERROR_OUT_OF_MEMORY;
                 child->mType = childType;
 
                 tmp = child->Deserialize(aStream, aProtoDoc, aDocumentURI,
@@ -2368,8 +2362,6 @@ nsXULPrototypeElement::Deserialize(nsIObjectInputStream* aStream,
                 break;
             case eType_Text:
                 child = new nsXULPrototypeText();
-                if (! child)
-                    return NS_ERROR_OUT_OF_MEMORY;
                 child->mType = childType;
 
                 tmp = child->Deserialize(aStream, aProtoDoc, aDocumentURI,
@@ -2380,8 +2372,6 @@ nsXULPrototypeElement::Deserialize(nsIObjectInputStream* aStream,
                 break;
             case eType_PI:
                 child = new nsXULPrototypePI();
-                if (! child)
-                    return NS_ERROR_OUT_OF_MEMORY;
                 child->mType = childType;
 
                 tmp = child->Deserialize(aStream, aProtoDoc, aDocumentURI,
@@ -2393,8 +2383,6 @@ nsXULPrototypeElement::Deserialize(nsIObjectInputStream* aStream,
             case eType_Script: {
                 // language version/options obtained during deserialization.
                 nsXULPrototypeScript* script = new nsXULPrototypeScript(0, 0);
-                if (! script)
-                    return NS_ERROR_OUT_OF_MEMORY;
                 child = script;
                 child->mType = childType;
 
