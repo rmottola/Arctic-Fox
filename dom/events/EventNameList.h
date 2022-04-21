@@ -589,7 +589,7 @@ TOUCH_EVENT(touchcancel,
             eTouchEventClass)
 
 DOCUMENT_ONLY_EVENT(readystatechange,
-                    NS_READYSTATECHANGE,
+                    eReadyStateChange,
                     EventNameType_HTMLXUL,
                     eBasicEventClass)
 DOCUMENT_ONLY_EVENT(selectionchange,
