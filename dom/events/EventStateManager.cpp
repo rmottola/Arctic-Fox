@@ -556,7 +556,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
   *aStatus = nsEventStatus_eIgnore;
 
   switch (aEvent->mMessage) {
-  case NS_CONTEXTMENU:
+  case eContextMenu:
     if (sIsPointerLocked) {
       return NS_ERROR_DOM_INVALID_STATE_ERR;
     }
@@ -1187,7 +1187,7 @@ CrossProcessSafeEvent(const WidgetEvent& aEvent)
     case eMouseDown:
     case eMouseUp:
     case eMouseMove:
-    case NS_CONTEXTMENU:
+    case eContextMenu:
     case eMouseEnterIntoWidget:
     case eMouseExitFromWidget:
       return true;
@@ -1465,7 +1465,7 @@ EventStateManager::FireContextClick()
 
     if (allowedToDispatch) {
       // init the event while mCurrentTarget is still good
-      WidgetMouseEvent event(true, NS_CONTEXTMENU, targetWidget,
+      WidgetMouseEvent event(true, eContextMenu, targetWidget,
                              WidgetMouseEvent::eReal);
       event.clickCount = 1;
       FillInEventFromGestureDown(&event);
@@ -1491,7 +1491,7 @@ EventStateManager::FireContextClick()
                                 nullptr, &status);
 
       // We don't need to dispatch to frame handling because no frames
-      // watch NS_CONTEXTMENU except for nsMenuFrame and that's only for
+      // watch eContextMenu except for nsMenuFrame and that's only for
       // dismissal. That's just as well since we don't really know
       // which frame to send it to.
     }
