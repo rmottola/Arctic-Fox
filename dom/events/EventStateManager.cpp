@@ -3956,11 +3956,15 @@ EventStateManager::NotifyMouseOut(WidgetMouseEvent* aMouseEvent,
     SetContentState(nullptr, NS_EVENT_STATE_HOVER);
   }
 
-  EnterLeaveDispatcher leaveDispatcher(this, wrapper->mLastOverElement,
-                                       aMovingInto, aMouseEvent,
-                                       isPointer ? NS_POINTER_LEAVE :
-                                                   eMouseLeave);
+  // In case we go out from capturing element (retargetedByPointerCapture is true)
+  // we should dispatch ePointerLeave event and only for capturing element.
+  nsRefPtr<nsIContent> movingInto = aMouseEvent->retargetedByPointerCapture
+                                    ? wrapper->mLastOverElement->GetParent()
+                                    : aMovingInto;
 
+  EnterLeaveDispatcher leaveDispatcher(this, wrapper->mLastOverElement,
+                                       movingInto, aMouseEvent,
+                                       isPointer ? NS_POINTER_LEAVE : eMouseLeave);
   // Fire mouseout
   DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? NS_POINTER_OUT : eMouseOut,
                               wrapper->mLastOverElement, aMovingInto);
