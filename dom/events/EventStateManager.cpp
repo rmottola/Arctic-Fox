@@ -635,7 +635,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     } else {
       if (sPointerEventEnabled) {
         // We should synthetize corresponding pointer events
-        GeneratePointerEnterExit(NS_POINTER_LEAVE, mouseEvent);
+        GeneratePointerEnterExit(ePointerLeave, mouseEvent);
       }
       GenerateMouseEnterExit(mouseEvent);
       //This is a window level mouse exit event and should stop here
@@ -3964,9 +3964,10 @@ EventStateManager::NotifyMouseOut(WidgetMouseEvent* aMouseEvent,
 
   EnterLeaveDispatcher leaveDispatcher(this, wrapper->mLastOverElement,
                                        movingInto, aMouseEvent,
-                                       isPointer ? NS_POINTER_LEAVE : eMouseLeave);
+                                       isPointer ? ePointerLeave : eMouseLeave);
+
   // Fire mouseout
-  DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? NS_POINTER_OUT : eMouseOut,
+  DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? ePointerLeave : eMouseOut,
                               wrapper->mLastOverElement, aMovingInto);
 
   wrapper->mLastOverFrame = nullptr;
@@ -4197,7 +4198,7 @@ EventStateManager::GenerateMouseEnterExit(WidgetMouseEvent* aMouseEvent)
       }
     }
     break;
-  case NS_POINTER_LEAVE:
+  case ePointerLeave:
   case ePointerCancel:
   case eMouseExitFromWidget:
     {
