@@ -2763,18 +2763,24 @@ nsGenericHTMLElement::RegUnRegAccessKey(bool aDoReg)
   }
 }
 
-void
+bool
 nsGenericHTMLElement::PerformAccesskey(bool aKeyCausesActivation,
                                        bool aIsTrustedEvent)
 {
   nsPresContext* presContext = GetPresContext(eForUncomposedDoc);
-  if (!presContext)
-    return;
+  if (!presContext) {
+    return false;
+  }
 
   // It's hard to say what HTML4 wants us to do in all cases.
-  nsIFocusManager* fm = nsFocusManager::GetFocusManager();
+  bool focused = true;
+  nsFocusManager* fm = nsFocusManager::GetFocusManager();
   if (fm) {
     fm->SetFocus(this, nsIFocusManager::FLAG_BYKEY);
+
+    // Return true if the element became the current focus within its window.
+    nsPIDOMWindow* window = OwnerDoc()->GetWindow();
+    focused = (window && window->GetFocusedNode());
   }
 
   if (aKeyCausesActivation) {
@@ -2783,6 +2789,8 @@ nsGenericHTMLElement::PerformAccesskey(bool aKeyCausesActivation,
                                             openAllowed : openAbused);
     DispatchSimulatedClick(this, aIsTrustedEvent, presContext);
   }
+
+  return focused;
 }
 
 nsresult
