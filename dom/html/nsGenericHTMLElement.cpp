@@ -2469,7 +2469,7 @@ nsGenericHTMLFormElement::IsElementDisabledForEvents(EventMessage aMessage,
     case NS_POINTER_MOVE:
     case NS_POINTER_OVER:
     case NS_POINTER_OUT:
-    case NS_POINTER_ENTER:
+    case ePointerEnter:
     case ePointerLeave:
     case NS_WHEEL_WHEEL:
     case NS_MOUSE_SCROLL:

@@ -3885,8 +3885,7 @@ public:
 
   ~EnterLeaveDispatcher()
   {
-    if (mEventMessage == eMouseEnter ||
-        mEventMessage == NS_POINTER_ENTER) {
+    if (mEventMessage == eMouseEnter || mEventMessage == ePointerEnter) {
       for (int32_t i = mTargets.Count() - 1; i >= 0; --i) {
         mESM->DispatchMouseOrPointerEvent(mMouseEvent, mEventMessage,
                                           mTargets[i], mRelatedTarget);
@@ -4024,7 +4023,7 @@ EventStateManager::NotifyMouseOver(WidgetMouseEvent* aMouseEvent,
   Maybe<EnterLeaveDispatcher> enterDispatcher;
   if (dispatch) {
     enterDispatcher.emplace(this, aContent, lastOverElement, aMouseEvent,
-                            isPointer ? NS_POINTER_ENTER : eMouseEnter);
+                            isPointer ? ePointerEnter : eMouseEnter);
   }
 
   NotifyMouseOut(aMouseEvent, aContent);
