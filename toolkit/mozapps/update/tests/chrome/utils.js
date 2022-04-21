@@ -215,6 +215,7 @@ var gPrefToCheck;
 var gDisableNoUpdateAddon = false;
 var gDisableUpdateCompatibilityAddon = false;
 var gDisableUpdateVersionAddon = false;
+var gUseTestUpdater = false;
 
 // Set to true to log additional information for debugging. To log additional
 // information for an individual test set DEBUG_AUS_TEST to true in the test's
@@ -329,9 +330,10 @@ function runTestDefaultWaitForWindowClosed() {
 
     setupFiles();
     setupPrefs();
+    gEnv.set("MOZ_TEST_SKIP_UPDATE_STAGE", "1");
     removeUpdateDirsAndFiles();
     reloadUpdateManagerData();
-    setupAddons(runTest);
+    setupAddons(setupTestUpdater);
   }
 }
 
@@ -357,6 +359,7 @@ function finishTestDefault() {
   verifyTestsRan();
 
   resetPrefs();
+  gEnv.set("MOZ_TEST_SKIP_UPDATE_STAGE", "");
   resetFiles();
   removeUpdateDirsAndFiles();
   reloadUpdateManagerData();
@@ -366,7 +369,7 @@ function finishTestDefault() {
     gDocElem.removeEventListener("pageshow", onPageShowDefault, false);
   }
 
-  finishTestDefaultWaitForWindowClosed();
+  finishTestRestoreUpdaterBackup();
 }
 
 /**
@@ -390,6 +393,28 @@ function finishTestTimeout(aTimer) {
 }
 
 /**
+ * When a test finishes this will repeatedly attempt to restore the real updater
+ * for tests that use the test updater and then call
+ * finishTestDefaultWaitForWindowClosed after the restore is successful.
+ */
+function finishTestRestoreUpdaterBackup() {
+  if (gUseTestUpdater) {
+    try {
+      // Windows debug builds keep the updater file in use for a short period of
+      // time after the updater process exits.
+      restoreUpdaterBackup();
+    } catch (e) {
+      logTestInfo("Attempt to restore the backed up updater failed... " +
+                  "will try again, Exception: " + e);
+      SimpleTest.executeSoon(finishTestRestoreUpdaterBackup);
+      return;
+    }
+  }
+
+  finishTestDefaultWaitForWindowClosed();
+}
+
+/**
  * If an update window is found SimpleTest.executeSoon can callback before the
  * update window is fully closed especially with debug builds. If an update
  * window is found this function will call itself using SimpleTest.executeSoon
@@ -399,6 +424,7 @@ function finishTestTimeout(aTimer) {
 function finishTestDefaultWaitForWindowClosed() {
   gCloseWindowTimeoutCounter++;
   if (gCloseWindowTimeoutCounter > CLOSE_WINDOW_TIMEOUT_MAXCOUNT) {
+    SimpleTest.requestCompleteLog();
     SimpleTest.finish();
     return;
   }
@@ -751,7 +777,7 @@ function checkIncompatbleList() {
   for (let i = 0; i < gIncompatibleListbox.itemCount; i++) {
     let label = gIncompatibleListbox.getItemAtIndex(i).label;
     // Use indexOf since locales can change the text displayed
-    ok(label.indexOf("noupdate") != -1, "Checking that only incompatible " + 
+    ok(label.indexOf("noupdate") != -1, "Checking that only incompatible " +
        "add-ons that don't have an update are listed in the incompatible list");
   }
 }
@@ -875,26 +901,6 @@ function verifyTestsRan() {
 }
 
 /**
- * Restore the updater that was backed up.  This is called both in setupFiles
- * and resetFiles.  It is called in setupFiles before the backup is done in
- * case the previous test failed.  It is called in resetFiles to put things
- * back to its original state.
- */
-function resetUpdaterBackup() {
-  let baseAppDir = getAppBaseDir();
-  let updater = baseAppDir.clone();
-  let updaterBackup = baseAppDir.clone();
-  updater.append(FILE_UPDATER_BIN);
-  updaterBackup.append(FILE_UPDATER_BIN_BAK);
-  if (updaterBackup.exists()) {
-    if (updater.exists()) {
-      updater.remove(true);
-    }
-    updaterBackup.moveTo(baseAppDir, FILE_UPDATER_BIN);
-  }
-}
-
-/**
  * Creates a backup of files the tests need to modify so they can be restored to
  * the original file when the test has finished and then modifies the files.
  */
@@ -909,30 +915,101 @@ function setupFiles() {
   updateSettingsIni = baseAppDir.clone();
   updateSettingsIni.append(FILE_UPDATE_SETTINGS_INI);
   writeFile(updateSettingsIni, UPDATE_SETTINGS_CONTENTS);
+}
 
-  // Just in case the last test failed, try to reset.
-  resetUpdaterBackup();
-
-  // Move away the real updater
-  let updater = baseAppDir.clone();
-  updater.append(FILE_UPDATER_BIN);
-  updater.moveTo(baseAppDir, FILE_UPDATER_BIN_BAK);
-
-  // Move in the test only updater
-  let testUpdaterDir = Cc["@mozilla.org/file/directory_service;1"].
-    getService(Ci.nsIProperties).
-    get("CurWorkD", Ci.nsILocalFile);
-
-  let relPath = REL_PATH_DATA;
-  let pathParts = relPath.split("/");
-  for (let i = 0; i < pathParts.length; ++i) {
-    testUpdaterDir.append(pathParts[i]);
+/**
+ * For tests that use the test updater restores the backed up real updater if
+ * it exists and tries again on failure since Windows debug builds at times
+ * leave the file in use. After success moveRealUpdater is called to continue
+ * the setup of the test updater. For tests that don't use the test updater
+ * runTest will be called.
+ */
+function setupTestUpdater() {
+  if (!gUseTestUpdater) {
+    runTest();
+    return;
   }
 
-  let testUpdater = testUpdaterDir.clone();
-  testUpdater.append(FILE_UPDATER_BIN);
-  if (testUpdater.exists()) {
+  try {
+    restoreUpdaterBackup();
+  } catch (e) {
+    logTestInfo("Attempt to restore the backed up updater failed... " +
+                "will try again, Exception: " + e);
+    SimpleTest.executeSoon(setupTestUpdater);
+    return;
+  }
+  moveRealUpdater();
+}
+
+/**
+ * Backs up the real updater and tries again on failure since Windows debug
+ * builds at times leave the file in use. After success it will call
+ * copyTestUpdater to continue the setup of the test updater.
+ */
+function moveRealUpdater() {
+  try {
+    // Move away the real updater
+    let baseAppDir = getAppBaseDir();
+    let updater = baseAppDir.clone();
+    updater.append(FILE_UPDATER_BIN);
+    updater.moveTo(baseAppDir, FILE_UPDATER_BIN_BAK);
+  } catch (e) {
+    logTestInfo("Attempt to move the real updater out of the way failed... " +
+                "will try again, Exception: " + e);
+    SimpleTest.executeSoon(moveRealUpdater);
+    return;
+  }
+
+  copyTestUpdater();
+}
+
+/**
+ * Copies the test updater so it can be used by tests and tries again on failure
+ * since Windows debug builds at times leave the file in use. After success it
+ * will call runTest to continue the test.
+ */
+function copyTestUpdater() {
+  try {
+    // Copy the test updater
+    let baseAppDir = getAppBaseDir();
+    let testUpdaterDir = Services.dirsvc.get("CurWorkD", Ci.nsILocalFile);
+    let relPath = REL_PATH_DATA;
+    let pathParts = relPath.split("/");
+    for (let i = 0; i < pathParts.length; ++i) {
+      testUpdaterDir.append(pathParts[i]);
+    }
+
+    let testUpdater = testUpdaterDir.clone();
+    testUpdater.append(FILE_UPDATER_BIN);
     testUpdater.copyToFollowingLinks(baseAppDir, FILE_UPDATER_BIN);
+  } catch (e) {
+    logTestInfo("Attempt to copy the test updater failed... " +
+                "will try again, Exception: " + e);
+    SimpleTest.executeSoon(copyTestUpdater);
+    return;
+  }
+
+  runTest();
+}
+
+/**
+ * Restores the updater that was backed up. This is called in setupTestUpdater
+ * before the backup of the real updater is done in case the previous test
+ * failed to restore the updater, in finishTestDefaultWaitForWindowClosed when
+ * the test has finished, and in test_9999_cleanup.xul after all tests have
+ * finished.
+ */
+function restoreUpdaterBackup() {
+  let baseAppDir = getAppBaseDir();
+  let updater = baseAppDir.clone();
+  let updaterBackup = baseAppDir.clone();
+  updater.append(FILE_UPDATER_BIN);
+  updaterBackup.append(FILE_UPDATER_BIN_BAK);
+  if (updaterBackup.exists()) {
+    if (updater.exists()) {
+      updater.remove(true);
+    }
+    updaterBackup.moveTo(baseAppDir, FILE_UPDATER_BIN);
   }
 }
 
@@ -1019,7 +1096,6 @@ function resetFiles() {
                   ", Exception: " + e);
     }
   }
-  resetUpdaterBackup();
 }
 
 /**
