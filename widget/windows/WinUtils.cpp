@@ -948,7 +948,7 @@ WinUtils::GetIsMouseFromTouch(EventMessage aEventMessage)
   return ((aEventMessage == eMouseMove ||
            aEventMessage == eMouseDown ||
            aEventMessage == eMouseUp ||
-           aEventMessage == NS_MOUSE_DOUBLECLICK) &&
+           aEventMessage == eMouseDoubleClick) &&
          (GetMessageExtraInfo() & MOZ_T_I_SIGNATURE) == MOZ_T_I_CHECK_TCH);
 }
 
