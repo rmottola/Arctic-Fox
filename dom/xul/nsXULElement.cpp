@@ -1055,9 +1055,9 @@ nsXULElement::BeforeSetAttr(int32_t aNamespaceID, nsIAtom* aName,
         if (GetAttr(aNamespaceID, aName, oldValue)) {
             UnregisterAccessKey(oldValue);
         }
-    } 
-    else if (aNamespaceID == kNameSpaceID_None && (aName ==
-             nsGkAtoms::command || aName == nsGkAtoms::observes) && IsInDoc()) {
+    } else if (aNamespaceID == kNameSpaceID_None &&
+               (aName == nsGkAtoms::command || aName == nsGkAtoms::observes) &&
+               IsInDoc()) {
 //         XXX sXBL/XBL2 issue! Owner or current document?
         nsAutoString oldValue;
         GetAttr(kNameSpaceID_None, nsGkAtoms::observes, oldValue);
