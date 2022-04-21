@@ -517,7 +517,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     if (node &&
         (aEvent->mMessage == eKeyUp || aEvent->mMessage == eMouseUp ||
          aEvent->mMessage == NS_WHEEL_WHEEL || aEvent->mMessage == NS_TOUCH_END ||
-         aEvent->mMessage == NS_POINTER_UP)) {
+         aEvent->mMessage == ePointerUp)) {
       nsIDocument* doc = node->OwnerDoc();
       while (doc && !doc->UserHasInteracted()) {
         doc->SetUserHasInteracted(true);
@@ -3021,7 +3021,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     // This break was commented specially
     // break;
   }
-  case NS_POINTER_UP: {
+  case ePointerUp: {
     WidgetPointerEvent* pointerEvent = aEvent->AsPointerEvent();
     // After UP/Cancel Touch pointers become invalid so we can remove relevant helper from Table
     // Mouse/Pen pointers are valid all the time (not only between down/up)
@@ -4178,7 +4178,7 @@ EventStateManager::GenerateMouseEnterExit(WidgetMouseEvent* aMouseEvent)
       }
     }
     break;
-  case NS_POINTER_UP:
+  case ePointerUp:
     {
       // Get the target content target (mousemove target == mouseover target)
       nsCOMPtr<nsIContent> targetElement = GetEventTargetContent(aMouseEvent);
