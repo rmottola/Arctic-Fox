@@ -464,7 +464,7 @@ FORWARDED_EVENT(focus,
                 EventNameType_HTMLXUL,
                 eFocusEventClass)
 FORWARDED_EVENT(load,
-                NS_LOAD,
+                eLoad,
                 EventNameType_All,
                 eBasicEventClass)
 FORWARDED_EVENT(resize,
