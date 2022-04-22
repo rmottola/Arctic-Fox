@@ -636,7 +636,7 @@ NON_IDL_EVENT(DOMSubtreeModified,
               eMutationEventClass)
 
 NON_IDL_EVENT(DOMActivate,
-              NS_UI_ACTIVATE,
+              eLegacyDOMActivate,
               EventNameType_HTMLXUL,
               eUIEventClass)
 NON_IDL_EVENT(DOMFocusIn,
