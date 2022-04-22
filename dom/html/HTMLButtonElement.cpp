@@ -354,7 +354,7 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
             SetContentState(nullptr, NS_EVENT_STATE_HOVER);
           aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
         }
-	break;
+        break;
 
       default:
         break;
