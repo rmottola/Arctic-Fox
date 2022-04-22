@@ -530,7 +530,7 @@ WINDOW_EVENT(popstate,
 // Not supported yet
 // WINDOW_EVENT(undo)
 WINDOW_EVENT(unload,
-             NS_PAGE_UNLOAD,
+             eUnload,
              (EventNameType_XUL | EventNameType_SVGSVG |
               EventNameType_HTMLBodyOrFramesetOnly),
              eBasicEventClass)
