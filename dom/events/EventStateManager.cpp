@@ -1650,7 +1650,7 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
         return;
 
       nsRefPtr<DataTransfer> dataTransfer =
-        new DataTransfer(window, NS_DRAGDROP_START, false, -1);
+        new DataTransfer(window, eDragStart, false, -1);
 
       nsCOMPtr<nsISelection> selection;
       nsCOMPtr<nsIContent> eventContent, targetContent;
@@ -1676,7 +1676,7 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
 
       // get the widget from the target frame
       WidgetDragEvent startEvent(aEvent->mFlags.mIsTrusted,
-                                 NS_DRAGDROP_START, widget);
+                                 eDragStart, widget);
       FillInEventFromGestureDown(&startEvent);
 
       WidgetDragEvent gestureEvent(aEvent->mFlags.mIsTrusted,
