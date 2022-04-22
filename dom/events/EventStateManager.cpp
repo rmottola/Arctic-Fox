@@ -667,8 +667,8 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     }
     break;
   case NS_DRAGDROP_OVER:
-    // NS_DRAGDROP_DROP is fired before NS_DRAGDROP_DRAGDROP so send
-    // the enter/exit events before NS_DRAGDROP_DROP.
+    // eDrop is fired before NS_DRAGDROP_DRAGDROP so send
+    // the enter/exit events before eDrop.
     GenerateDragDropEnterExit(aPresContext, aEvent->AsDragEvent());
     break;
 
@@ -1208,7 +1208,7 @@ CrossProcessSafeEvent(const WidgetEvent& aEvent)
     switch (aEvent.mMessage) {
     case NS_DRAGDROP_OVER:
     case NS_DRAGDROP_EXIT:
-    case NS_DRAGDROP_DROP:
+    case eDrop:
       return true;
     default:
       break;
@@ -3299,7 +3299,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     }
     break;
 
-  case NS_DRAGDROP_DROP:
+  case eDrop:
     {
       // now fire the dragdrop event, for compatibility with XUL
       if (mCurrentTarget && nsEventStatus_eConsumeNoDefault != *aStatus) {
