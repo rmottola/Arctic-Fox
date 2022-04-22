@@ -4634,8 +4634,7 @@ already_AddRefed<nsIContent>
 EventStateManager::GetEventTargetContent(WidgetEvent* aEvent)
 {
   if (aEvent &&
-      (aEvent->mMessage == NS_FOCUS_CONTENT ||
-       aEvent->mMessage == NS_BLUR_CONTENT)) {
+      (aEvent->mMessage == eFocus || aEvent->mMessage == NS_BLUR_CONTENT)) {
     nsCOMPtr<nsIContent> content = GetFocusedContent();
     return content.forget();
   }
