@@ -666,7 +666,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
       KillClickHoldTimer();
     }
     break;
-  case NS_DRAGDROP_OVER:
+  case eDragOver:
     // eDrop is fired before NS_DRAGDROP_DRAGDROP so send
     // the enter/exit events before eDrop.
     GenerateDragDropEnterExit(aPresContext, aEvent->AsDragEvent());
@@ -1206,7 +1206,7 @@ CrossProcessSafeEvent(const WidgetEvent& aEvent)
     }
   case eDragEventClass:
     switch (aEvent.mMessage) {
-    case NS_DRAGDROP_OVER:
+    case eDragOver:
     case NS_DRAGDROP_EXIT:
     case eDrop:
       return true;
@@ -3185,7 +3185,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     break;
 
   case NS_DRAGDROP_ENTER:
-  case NS_DRAGDROP_OVER:
+  case eDragOver:
     {
       NS_ASSERTION(aEvent->mClass == eDragEventClass, "Expected a drag event");
 
@@ -3274,13 +3274,13 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
 
         // For now, do this only for dragover.
         //XXXsmaug dragenter needs some more work.
-        if (aEvent->mMessage == NS_DRAGDROP_OVER && !isChromeDoc) {
+        if (aEvent->mMessage == eDragOver && !isChromeDoc) {
           // Someone has called preventDefault(), check whether is was on
           // content or chrome.
           dragSession->SetOnlyChromeDrop(
             !dragEvent->mDefaultPreventedOnContent);
         }
-      } else if (aEvent->mMessage == NS_DRAGDROP_OVER && !isChromeDoc) {
+      } else if (aEvent->mMessage == eDragOver && !isChromeDoc) {
         // No one called preventDefault(), so handle drop only in chrome.
         dragSession->SetOnlyChromeDrop(true);
       }
@@ -4313,7 +4313,7 @@ EventStateManager::GenerateDragDropEnterExit(nsPresContext* aPresContext,
   nsCOMPtr<nsIContent> targetBeforeEvent = mCurrentTargetContent;
 
   switch(aDragEvent->mMessage) {
-  case NS_DRAGDROP_OVER:
+  case eDragOver:
     {
       // when dragging from one frame to another, events are fired in the
       // order: dragexit, dragenter, dragleave
