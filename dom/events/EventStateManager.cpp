@@ -3184,7 +3184,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     }
     break;
 
-  case NS_DRAGDROP_ENTER:
+  case eDragEnter:
   case eDragOver:
     {
       NS_ASSERTION(aEvent->mClass == eDragEventClass, "Expected a drag event");
@@ -4334,7 +4334,7 @@ EventStateManager::GenerateDragDropEnterExit(nsPresContext* aPresContext,
                               targetContent, lastContent, sLastDragOverFrame);
         }
 
-        FireDragEnterOrExit(aPresContext, aDragEvent, NS_DRAGDROP_ENTER,
+        FireDragEnterOrExit(aPresContext, aDragEvent, eDragEnter,
                             lastContent, targetContent, mCurrentTarget);
 
         if (sLastDragOverFrame) {
@@ -4409,15 +4409,14 @@ EventStateManager::FireDragEnterOrExit(nsPresContext* aPresContext,
     // adjust the drag hover if the dragenter event was cancelled or this is a drag exit
     if (status == nsEventStatus_eConsumeNoDefault ||
         aMessage == NS_DRAGDROP_EXIT) {
-      SetContentState((aMessage == NS_DRAGDROP_ENTER) ?
-                        aTargetContent : nullptr,
+      SetContentState((aMessage == eDragEnter) ? aTargetContent : nullptr,
                       NS_EVENT_STATE_DRAGOVER);
     }
 
     // collect any changes to moz cursor settings stored in the event's
     // data transfer.
     if (aMessage == eDragLeave || aMessage == NS_DRAGDROP_EXIT ||
-        aMessage == NS_DRAGDROP_ENTER) {
+        aMessage == eDragEnter) {
       UpdateDragDataTransfer(&event);
     }
   }
