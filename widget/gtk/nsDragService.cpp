@@ -1991,7 +1991,7 @@ nsDragService::DispatchMotionEvents()
 {
     mCanDrop = false;
 
-    FireDragEventAtSource(NS_DRAGDROP_DRAG);
+    FireDragEventAtSource(eDrag);
 
     mTargetWindow->
         DispatchDragEvent(NS_DRAGDROP_OVER, mTargetWindowPoint, mTargetTime);
