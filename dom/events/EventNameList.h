@@ -758,7 +758,7 @@ NON_IDL_EVENT(underflow,
 
 // Various SVG events
 NON_IDL_EVENT(SVGLoad,
-              NS_SVG_LOAD,
+              eSVGLoad,
               EventNameType_None,
               eBasicEventClass)
 NON_IDL_EVENT(SVGUnload,
