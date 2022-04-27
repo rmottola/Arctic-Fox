@@ -50,6 +50,9 @@ int wasapi_init(cubeb ** context, char const * context_name);
 #if defined(USE_SNDIO)
 int sndio_init(cubeb ** context, char const * context_name);
 #endif
+#if defined(USE_SUN)
+int sun_init(cubeb ** context, char const * context_name);
+#endif
 #if defined(USE_OPENSL)
 int opensl_init(cubeb ** context, char const * context_name);
 #endif
@@ -115,6 +118,9 @@ cubeb_init(cubeb ** context, char const * context_name)
 #endif
 #if defined(USE_SNDIO)
     sndio_init,
+#endif
+#if defined(USE_SUN)
+    sun_init,
 #endif
 #if defined(USE_OPENSL)
     opensl_init,
