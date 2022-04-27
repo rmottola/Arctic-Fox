@@ -530,7 +530,7 @@ nsClipboardCommand::DoCommand(const char *aCommandName, nsISupports *aContext)
   if (strcmp(aCommandName, "cmd_cut") == 0) {
     eventMessage = eCut;
   } else if (strcmp(aCommandName, "cmd_paste") == 0) {
-    eventMessage = NS_PASTE;
+    eventMessage = ePaste;
   }
 
   bool actionTaken = false;

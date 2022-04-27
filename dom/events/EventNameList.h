@@ -438,7 +438,7 @@ EVENT(cut,
       EventNameType_HTMLXUL,
       eClipboardEventClass)
 EVENT(paste,
-      NS_PASTE,
+      ePaste,
       EventNameType_HTMLXUL,
       eClipboardEventClass)
 // Gecko-specific extensions that apply to elements
