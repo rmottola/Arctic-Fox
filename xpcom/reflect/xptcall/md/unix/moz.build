@@ -215,13 +215,14 @@ if CONFIG['OS_TEST'] in ('powerpc64', 'powerpc64le'):
               'xptcstubs_ppc64_linux.cpp',
           ]
 
-if CONFIG['OS_TEST'] in ('macppc', 'bebox', 'ofppc', 'prep', 'amigappc'):
+# OpenBSD/powerpc MD code is up to date and fits NetBSD
+if CONFIG['OS_TEST'] in ('powerpc', 'macppc', 'bebox', 'ofppc', 'prep', 'amigappc'):
     if CONFIG['OS_ARCH'] == 'NetBSD':
         SOURCES += [
-            'xptcinvoke_asm_ppc_netbsd.s',
-            'xptcinvoke_ppc_netbsd.cpp',
-            'xptcstubs_asm_ppc_netbsd.s',
-            'xptcstubs_ppc_netbsd.cpp',
+            'xptcinvoke_asm_ppc_openbsd.S',
+            'xptcinvoke_ppc_openbsd.cpp',
+            'xptcstubs_asm_ppc_openbsd.S',
+            'xptcstubs_ppc_openbsd.cpp',
         ]
 
 if CONFIG['OS_ARCH'] == 'OpenBSD' and CONFIG['OS_TEST'] == 'powerpc':
