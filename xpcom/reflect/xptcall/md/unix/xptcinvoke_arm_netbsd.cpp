@@ -101,7 +101,8 @@ struct my_params_struct {
     uint32_t fn_copy;      
 };
 
-XPTC_PUBLIC_API(nsresult)
+
+EXPORT_XPCOM_API(nsresult)
 XPTC_InvokeByIndex(nsISupports* that, uint32_t methodIndex,
                    uint32_t paramCount, nsXPTCVariant* params)
 {
