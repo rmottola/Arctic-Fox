@@ -430,7 +430,7 @@ EVENT(wheel,
       EventNameType_All,
       eWheelEventClass)
 EVENT(copy,
-      NS_COPY,
+      eCopy,
       EventNameType_HTMLXUL,
       eClipboardEventClass)
 EVENT(cut,

@@ -635,7 +635,7 @@ nsCopySupport::FireClipboardEvent(EventMessage aEventMessage,
     *aActionTaken = false;
   }
 
-  NS_ASSERTION(aEventMessage == NS_CUT || aEventMessage == NS_COPY ||
+  NS_ASSERTION(aEventMessage == NS_CUT || aEventMessage == eCopy ||
                aEventMessage == NS_PASTE,
                "Invalid clipboard event type");
 
