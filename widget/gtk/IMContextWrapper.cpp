@@ -1670,8 +1670,7 @@ IMContextWrapper::GetCurrentParagraph(nsAString& aText,
     }
 
     // Get all text contents of the focused editor
-    WidgetQueryContentEvent queryTextContentEvent(true,
-                                                  NS_QUERY_TEXT_CONTENT,
+    WidgetQueryContentEvent queryTextContentEvent(true, eQueryTextContent,
                                                   mLastFocusedWindow);
     queryTextContentEvent.InitForQueryTextContent(0, UINT32_MAX);
     mLastFocusedWindow->DispatchEvent(&queryTextContentEvent, status);
@@ -1767,8 +1766,7 @@ IMContextWrapper::DeleteText(GtkIMContext* aContext,
     }
 
     // Get all text contents of the focused editor
-    WidgetQueryContentEvent queryTextContentEvent(true,
-                                                  NS_QUERY_TEXT_CONTENT,
+    WidgetQueryContentEvent queryTextContentEvent(true, eQueryTextContent,
                                                   mLastFocusedWindow);
     queryTextContentEvent.InitForQueryTextContent(0, UINT32_MAX);
     mLastFocusedWindow->DispatchEvent(&queryTextContentEvent, status);
