@@ -810,7 +810,7 @@ EventStateManager::HandleQueryContentEvent(WidgetQueryContentEvent* aEvent)
       GetCrossProcessTarget()->HandleQueryContentEvent(*aEvent);
       return;
     // Following events have not been supported in e10s mode yet.
-    case NS_QUERY_CONTENT_STATE:
+    case eQueryContentState:
     case eQuerySelectionAsTransferable:
     case NS_QUERY_CHARACTER_AT_POINT:
     case NS_QUERY_DOM_WIDGET_HITTEST:
