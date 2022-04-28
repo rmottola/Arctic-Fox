@@ -410,7 +410,7 @@ EVENT(suspend,
       EventNameType_HTML,
       eBasicEventClass)
 EVENT(timeupdate,
-      NS_TIMEUPDATE,
+      eTimeUpdate,
       EventNameType_HTML,
       eBasicEventClass)
 EVENT(toggle,
