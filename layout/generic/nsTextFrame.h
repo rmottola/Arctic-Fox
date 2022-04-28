@@ -274,8 +274,7 @@ public:
                                        TextOffsetType aOffsetType =
                                            TextOffsetType::OFFSETS_IN_CONTENT_TEXT) override;
 
-  nsOverflowAreas
-    RecomputeOverflow(const nsHTMLReflowState& aBlockReflowState);
+  nsOverflowAreas RecomputeOverflow(nsIFrame* aBlockFrame);
 
   enum TextRunType {
     // Anything in reflow (but not intrinsic width calculation) or
