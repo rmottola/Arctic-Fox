@@ -3009,6 +3009,7 @@ nsFrame::HandlePress(nsPresContext* aPresContext,
       if (curDetail->mType != nsISelectionController::SELECTION_SPELLCHECK &&
           curDetail->mType != nsISelectionController::SELECTION_FIND &&
           curDetail->mType != nsISelectionController::SELECTION_URLSECONDARY &&
+          curDetail->mType != nsISelectionController::SELECTION_URLSTRIKEOUT &&
           curDetail->mStart <= offsets.StartOffset() &&
           offsets.EndOffset() <= curDetail->mEnd)
       {
