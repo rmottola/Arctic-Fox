@@ -358,7 +358,7 @@ EVENT(selectstart,
 // Not supported yet; probably never because "wheel" is a better idea.
 // EVENT(mousewheel)
 EVENT(pause,
-      NS_PAUSE,
+      ePause,
       EventNameType_HTML,
       eBasicEventClass)
 EVENT(play,
