@@ -235,7 +235,7 @@ CSSAnimation::QueueEvents()
   EventMessage message;
 
   if (!wasActive && isActive) {
-    message = NS_ANIMATION_START;
+    message = eAnimationStart;
   } else if (wasActive && !isActive) {
     message = NS_ANIMATION_END;
   } else if (wasActive && isActive && !isSameIteration) {
@@ -247,7 +247,7 @@ CSSAnimation::QueueEvents()
       std::min(StickyTimeDuration(mEffect->InitialAdvance()),
                computedTiming.mActiveDuration);
     manager->QueueEvent(
-      AnimationEventInfo(owningElement, mAnimationName, NS_ANIMATION_START,
+      AnimationEventInfo(owningElement, mAnimationName, eAnimationStart,
                          elapsedTime, owningPseudoType));
     // Then have the shared code below append an 'animationend':
     message = NS_ANIMATION_END;
@@ -257,7 +257,7 @@ CSSAnimation::QueueEvents()
 
   StickyTimeDuration elapsedTime;
 
-  if (message == NS_ANIMATION_START ||
+  if (message == eAnimationStart ||
       message == NS_ANIMATION_ITERATION) {
     TimeDuration iterationStart = mEffect->Timing().mIterationDuration *
                                     computedTiming.mCurrentIteration;

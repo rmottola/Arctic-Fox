@@ -925,7 +925,7 @@ NON_IDL_EVENT(transitionend,
               EventNameType_None,
               eTransitionEventClass)
 NON_IDL_EVENT(animationstart,
-              NS_ANIMATION_START,
+              eAnimationStart,
               EventNameType_None,
               eAnimationEventClass)
 NON_IDL_EVENT(animationend,
