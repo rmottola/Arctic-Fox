@@ -760,7 +760,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     IMEStateManager::HandleSelectionEvent(aPresContext, GetFocusedContent(),
                                           aEvent->AsSelectionEvent());
     break;
-  case NS_CONTENT_COMMAND_CUT:
+  case eContentCommandCut:
   case NS_CONTENT_COMMAND_COPY:
   case NS_CONTENT_COMMAND_PASTE:
   case NS_CONTENT_COMMAND_DELETE:
@@ -5055,7 +5055,7 @@ EventStateManager::DoContentCommandEvent(WidgetContentCommandEvent* aEvent)
   NS_ENSURE_TRUE(root, NS_ERROR_FAILURE);
   const char* cmd;
   switch (aEvent->mMessage) {
-    case NS_CONTENT_COMMAND_CUT:
+    case eContentCommandCut:
       cmd = "cmd_cut";
       break;
     case NS_CONTENT_COMMAND_COPY:
