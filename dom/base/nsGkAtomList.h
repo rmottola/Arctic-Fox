@@ -2185,6 +2185,11 @@ GK_ATOM(physical_home_button, "physical-home-button")
 GK_ATOM(windows_classic, "windows-classic")
 GK_ATOM(windows_theme_aero, "windows-theme-aero")
 GK_ATOM(windows_theme_aero_lite, "windows-theme-aero-lite")
+GK_ATOM(windows_theme_luna_blue, "windows-theme-luna-blue")
+GK_ATOM(windows_theme_luna_olive, "windows-theme-luna-olive")
+GK_ATOM(windows_theme_luna_silver, "windows-theme-luna-silver")
+GK_ATOM(windows_theme_royale, "windows-theme-royale")
+GK_ATOM(windows_theme_zune, "windows-theme-zune")
 GK_ATOM(windows_theme_generic, "windows-theme-generic")
 
 // And the same again, as media query keywords.
