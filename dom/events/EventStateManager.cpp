@@ -802,7 +802,7 @@ EventStateManager::HandleQueryContentEvent(WidgetQueryContentEvent* aEvent)
     case eQueryTextContent:
     case eQueryCaretRect:
     case NS_QUERY_TEXT_RECT:
-    case NS_QUERY_EDITOR_RECT:
+    case eQueryEditorRect:
       if (!IsTargetCrossProcess(aEvent)) {
         break;
       }
