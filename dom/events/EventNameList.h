@@ -382,7 +382,7 @@ EVENT(reset,
       EventNameType_HTMLXUL,
       eBasicEventClass)
 EVENT(seeked,
-      NS_SEEKED,
+      eSeeked,
       EventNameType_HTML,
       eBasicEventClass)
 EVENT(seeking,
