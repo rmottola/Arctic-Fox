@@ -769,10 +769,8 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
   case eContentCommandPasteTransferable:
     DoContentCommandEvent(aEvent->AsContentCommandEvent());
     break;
-  case NS_CONTENT_COMMAND_SCROLL:
-    {
-      DoContentCommandScrollEvent(aEvent->AsContentCommandEvent());
-    }
+  case eContentCommandScroll:
+    DoContentCommandScrollEvent(aEvent->AsContentCommandEvent());
     break;
   case NS_COMPOSITION_START:
     if (aEvent->mFlags.mIsTrusted) {
