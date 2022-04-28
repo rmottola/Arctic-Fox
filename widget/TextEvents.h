@@ -593,7 +593,7 @@ public:
     bool mWidgetIsHit;
     // mozilla::WritingMode value at the end (focus) of the selection
     mozilla::WritingMode mWritingMode;
-    // used by NS_QUERY_SELECTION_AS_TRANSFERABLE
+    // Used by eQuerySelectionAsTransferable
     nsCOMPtr<nsITransferable> mTransferable;
     // used by NS_QUERY_TEXT_CONTENT with font ranges requested
     nsAutoTArray<mozilla::FontRange, 1> mFontRanges;
