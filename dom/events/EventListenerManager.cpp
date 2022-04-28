@@ -292,7 +292,7 @@ EventListenerManager::AddEventListenerInternal(
     mMayHaveCapturingListeners = true;
   }
 
-  if (aEventMessage == NS_AFTERPAINT) {
+  if (aEventMessage == eAfterPaint) {
     mMayHavePaintEventListener = true;
     nsPIDOMWindow* window = GetInnerWindowForTarget();
     if (window) {
