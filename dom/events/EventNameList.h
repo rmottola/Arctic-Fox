@@ -398,7 +398,7 @@ EVENT(show,
       EventNameType_HTML,
       eBasicEventClass)
 EVENT(stalled,
-      NS_STALLED,
+      eStalled,
       EventNameType_HTML,
       eBasicEventClass)
 EVENT(submit,
