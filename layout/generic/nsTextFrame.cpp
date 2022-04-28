@@ -4794,6 +4794,18 @@ LazyGetLineBaselineOffset(nsIFrame* aChildFrame, nsBlockFrame* aBlockFrame)
   }
 }
 
+static bool IsUnderlineRight(nsIFrame* aFrame)
+{
+  nsIAtom* langAtom = aFrame->StyleFont()->mLanguage;
+  if (!langAtom) {
+    return false;
+  }
+  nsAtomString langStr(langAtom);
+  return (StringBeginsWith(langStr, NS_LITERAL_STRING("ja")) ||
+          StringBeginsWith(langStr, NS_LITERAL_STRING("ko"))) &&
+         (langStr.Length() == 2 || langStr[2] == '-');
+}
+
 void
 nsTextFrame::GetTextDecorations(
                     nsPresContext* aPresContext,
@@ -4892,11 +4904,19 @@ nsTextFrame::GetTextDecorations(
         color = nsLayoutUtils::GetColor(f, eCSSProperty_text_decoration_color);
       }
 
-      if (textDecorations & NS_STYLE_TEXT_DECORATION_LINE_UNDERLINE) {
+      bool swapUnderlineAndOverline = vertical && IsUnderlineRight(f);
+      const uint8_t kUnderline =
+        swapUnderlineAndOverline ? NS_STYLE_TEXT_DECORATION_LINE_OVERLINE :
+                                   NS_STYLE_TEXT_DECORATION_LINE_UNDERLINE;
+      const uint8_t kOverline =
+        swapUnderlineAndOverline ? NS_STYLE_TEXT_DECORATION_LINE_UNDERLINE :
+                                   NS_STYLE_TEXT_DECORATION_LINE_OVERLINE;
+
+      if (textDecorations & kUnderline) {
         aDecorations.mUnderlines.AppendElement(
           nsTextFrame::LineDecoration(f, baselineOffset, color, style));
       }
-      if (textDecorations & NS_STYLE_TEXT_DECORATION_LINE_OVERLINE) {
+      if (textDecorations & kOverline) {
         aDecorations.mOverlines.AppendElement(
           nsTextFrame::LineDecoration(f, baselineOffset, color, style));
       }
@@ -5256,7 +5276,7 @@ static void DrawSelectionDecorations(gfxContext* aContext,
     const gfxPoint& aPt, gfxFloat aICoordInFrame, gfxFloat aWidth,
     gfxFloat aAscent, const gfxFont::Metrics& aFontMetrics,
     nsTextFrame::DrawPathCallbacks* aCallbacks,
-    bool aVertical)
+    bool aVertical, uint8_t aDecoration)
 {
   gfxPoint pt(aPt);
   gfxSize size(aWidth,
@@ -5334,8 +5354,10 @@ static void DrawSelectionDecorations(gfxContext* aContext,
   size.height *= relativeSize;
   PaintDecorationLine(aFrame, aContext, aDirtyRect, color, nullptr, pt,
     (aVertical ? (pt.y - aPt.y) : (pt.x - aPt.x)) + aICoordInFrame,
-    size, aAscent, aFontMetrics.underlineOffset,
-    NS_STYLE_TEXT_DECORATION_LINE_UNDERLINE, style, eSelectionDecoration,
+    size, aAscent, 
+    aDecoration == NS_STYLE_TEXT_DECORATION_LINE_UNDERLINE ?
+      aFontMetrics.underlineOffset : aFontMetrics.maxAscent,
+    aDecoration, style, eSelectionDecoration,
     aCallbacks, aVertical, descentLimit);
 }
 
@@ -5797,6 +5819,10 @@ nsTextFrame::PaintTextSelectionDecorations(gfxContext* aCtx,
 
   gfxFont* firstFont = aProvider.GetFontGroup()->GetFirstValidFont();
   bool verticalRun = mTextRun->IsVertical();
+  bool rightUnderline = verticalRun && IsUnderlineRight(this);
+  const uint8_t kDecoration =
+    rightUnderline ? NS_STYLE_TEXT_DECORATION_LINE_OVERLINE :
+                     NS_STYLE_TEXT_DECORATION_LINE_UNDERLINE;
   bool useVerticalMetrics = verticalRun && mTextRun->UseCenterBaseline();
   gfxFont::Metrics
     decorationMetrics(firstFont->GetMetrics(useVerticalMetrics ?
@@ -5843,7 +5869,7 @@ nsTextFrame::PaintTextSelectionDecorations(gfxContext* aCtx,
       DrawSelectionDecorations(aCtx, dirtyRect, aSelectionType, this,
                                aTextPaintStyle, selectedStyle, pt, xInFrame,
                                width, mAscent / app, decorationMetrics,
-                               aCallbacks, verticalRun);
+                               aCallbacks, verticalRun, kDecoration);
     }
     iterator.UpdateWithAdvance(advance);
   }
