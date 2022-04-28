@@ -809,7 +809,7 @@ IMContextWrapper::OnSelectionChange(nsWindow* aCaller,
         return;
     }
 
-    const IMENotification::SelectionChangeData& selectionChangeData =
+    const IMENotification::SelectionChangeDataBase& selectionChangeData =
         aIMENotification.mSelectionChangeData;
 
     MOZ_LOG(gGtkIMLog, LogLevel::Info,
