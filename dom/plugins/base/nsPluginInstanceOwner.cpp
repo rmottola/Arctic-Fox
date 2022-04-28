@@ -1812,7 +1812,7 @@ CocoaEventTypeForEvent(const WidgetGUIEvent& anEvent, nsIFrame* aObjectFrame)
     case eFocus:
     case eBlur:
       return NPCocoaEventFocusChanged;
-    case NS_MOUSE_SCROLL:
+    case eLegacyMouseLineOrPageScroll:
       return NPCocoaEventScrollWheel;
     default:
       return (NPCocoaEventType)0;
@@ -1829,7 +1829,7 @@ TranslateToNPCocoaEvent(WidgetGUIEvent* anEvent, nsIFrame* aObjectFrame)
   if (anEvent->mMessage == eMouseMove ||
       anEvent->mMessage == eMouseDown ||
       anEvent->mMessage == eMouseUp ||
-      anEvent->mMessage == NS_MOUSE_SCROLL ||
+      anEvent->mMessage == eLegacyMouseLineOrPageScroll ||
       anEvent->mMessage == eMouseOver ||
       anEvent->mMessage == eMouseOut)
   {
@@ -1871,14 +1871,14 @@ TranslateToNPCocoaEvent(WidgetGUIEvent* anEvent, nsIFrame* aObjectFrame)
       }
       break;
     }
-    case NS_MOUSE_SCROLL:
-    {
+    case eLegacyMouseLineOrPageScroll: {
       WidgetWheelEvent* wheelEvent = anEvent->AsWheelEvent();
       if (wheelEvent) {
         cocoaEvent.data.mouse.deltaX = wheelEvent->lineOrPageDeltaX;
         cocoaEvent.data.mouse.deltaY = wheelEvent->lineOrPageDeltaY;
       } else {
-        NS_WARNING("NS_MOUSE_SCROLL is not a WidgetWheelEvent? (could be, haven't checked)");
+        NS_WARNING("eLegacyMouseLineOrPageScroll is not a WidgetWheelEvent? "
+                   "(could be, haven't checked)");
       }
       break;
     }
