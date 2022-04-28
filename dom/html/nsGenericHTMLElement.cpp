@@ -2471,7 +2471,7 @@ nsGenericHTMLFormElement::IsElementDisabledForEvents(EventMessage aMessage,
     case ePointerLeave:
     case NS_WHEEL_WHEEL:
     case eLegacyMouseLineOrPageScroll:
-    case NS_MOUSE_PIXEL_SCROLL:
+    case eLegacyMousePixelScroll:
       return false;
     default:
       break;
