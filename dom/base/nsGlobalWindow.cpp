@@ -1431,7 +1431,7 @@ nsGlobalWindow::CleanUp()
     }
 
 #ifdef MOZ_B2G
-    DisableNetworkEvent(NS_NETWORK_UPLOAD_EVENT);
+    DisableNetworkEvent(eNetworkUpload);
     DisableNetworkEvent(eNetworkDownload);
 #endif // MOZ_B2G
 
@@ -14613,7 +14613,7 @@ nsGlobalWindow::EnableNetworkEvent(EventMessage aEventMessage)
   }
 
   switch (aEventMessage) {
-    case NS_NETWORK_UPLOAD_EVENT:
+    case eNetworkUpload:
       if (!mNetworkUploadObserverEnabled) {
         mNetworkUploadObserverEnabled = true;
         os->AddObserver(mObserver, NS_NETWORK_ACTIVITY_BLIP_UPLOAD_TOPIC, false);
@@ -14641,7 +14641,7 @@ nsGlobalWindow::DisableNetworkEvent(EventMessage aEventMessage)
   }
 
   switch (aEventMessage) {
-    case NS_NETWORK_UPLOAD_EVENT:
+    case eNetworkUpload:
       if (mNetworkUploadObserverEnabled) {
         mNetworkUploadObserverEnabled = false;
         os->RemoveObserver(mObserver, NS_NETWORK_ACTIVITY_BLIP_UPLOAD_TOPIC);
