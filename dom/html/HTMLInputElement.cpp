@@ -3012,7 +3012,7 @@ HTMLInputElement::NeedToInitializeEditorForEvent(
   case eMouseOver:
   case eMouseOut:
   case NS_SCROLLPORT_UNDERFLOW:
-  case NS_SCROLLPORT_OVERFLOW:
+  case eScrollPortOverflow:
     return false;
   default:
     return true;
