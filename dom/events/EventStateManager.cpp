@@ -725,7 +725,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     }
     break;
   case eWheel:
-  case NS_WHEEL_START:
+  case eWheelOperationStart:
   case NS_WHEEL_STOP:
     {
       NS_ASSERTION(aEvent->mFlags.mIsTrusted,
@@ -3035,7 +3035,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     }
     break;
   case eWheel:
-  case NS_WHEEL_START:
+  case eWheelOperationStart:
     {
       MOZ_ASSERT(aEvent->mFlags.mIsTrusted);
 
