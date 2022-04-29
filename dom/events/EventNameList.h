@@ -827,7 +827,7 @@ NON_IDL_EVENT(MozAfterPaint,
               eBasicEventClass)
 
 NON_IDL_EVENT(MozScrolledAreaChanged,
-              NS_SCROLLEDAREACHANGED,
+              eScrolledAreaChanged,
               EventNameType_None,
               eScrollAreaEventClass)
 
