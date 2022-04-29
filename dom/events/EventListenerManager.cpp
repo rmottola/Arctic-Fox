@@ -338,7 +338,7 @@ EventListenerManager::AddEventListenerInternal(
   } else if (aTypeAtom == nsGkAtoms::onmoznetworkdownload) {
     nsCOMPtr<nsPIDOMWindow> window = GetTargetAsInnerWindow();
     if (window) {
-      window->EnableNetworkEvent(NS_NETWORK_DOWNLOAD_EVENT);
+      window->EnableNetworkEvent(eNetworkDownload);
     }
 #endif // MOZ_B2G
   } else if (aTypeAtom == nsGkAtoms::ontouchstart ||
@@ -518,7 +518,7 @@ EventListenerManager::RemoveEventListenerInternal(
 #ifdef MOZ_B2G
   bool timeChangeEvent = (aEventMessage == eTimeChange);
   bool networkEvent = (aEventMessage == NS_NETWORK_UPLOAD_EVENT ||
-                       aEventMessage == NS_NETWORK_DOWNLOAD_EVENT);
+                       aEventMessage == eNetworkDownload);
 #endif // MOZ_B2G
 
   for (uint32_t i = 0; i < count; ++i) {
