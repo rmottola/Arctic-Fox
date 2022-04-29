@@ -2336,7 +2336,7 @@ TabParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent)
     return true;
   }
   switch (aEvent.mMessage) {
-    case NS_QUERY_TEXT_RECT:
+    case eQueryTextRect:
     case eQueryCaretRect:
     case eQueryEditorRect:
       aEvent.mReply.mRect -= GetChildProcessOffset();
