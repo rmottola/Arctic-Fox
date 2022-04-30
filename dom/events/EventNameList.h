@@ -552,7 +552,7 @@ WINDOW_ONLY_EVENT(userproximity,
                   EventNameType_None,
                   eBasicEventClass)
 WINDOW_ONLY_EVENT(devicelight,
-                  NS_DEVICE_LIGHT,
+                  eDeviceLight,
                   EventNameType_None,
                   eBasicEventClass)
 

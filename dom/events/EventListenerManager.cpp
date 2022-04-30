@@ -321,7 +321,7 @@ EventListenerManager::AddEventListenerInternal(
   } else if (aTypeAtom == nsGkAtoms::ondeviceproximity || aTypeAtom == nsGkAtoms::onuserproximity) {
     EnableDevice(eDeviceProximity);
   } else if (aTypeAtom == nsGkAtoms::ondevicelight) {
-    EnableDevice(NS_DEVICE_LIGHT);
+    EnableDevice(eDeviceLight);
   } else if (aTypeAtom == nsGkAtoms::ondevicemotion) {
     EnableDevice(eDeviceMotion);
 #ifdef MOZ_B2G
@@ -427,7 +427,7 @@ EventListenerManager::IsDeviceType(EventMessage aEventMessage)
   switch (aEventMessage) {
     case eDeviceOrientation:
     case eDeviceMotion:
-    case NS_DEVICE_LIGHT:
+    case eDeviceLight:
     case eDeviceProximity:
     case eUserProximity:
       return true;
@@ -453,7 +453,7 @@ EventListenerManager::EnableDevice(EventMessage aEventMessage)
     case eUserProximity:
       window->EnableDeviceSensor(SENSOR_PROXIMITY);
       break;
-    case NS_DEVICE_LIGHT:
+    case eDeviceLight:
       window->EnableDeviceSensor(SENSOR_LIGHT);
       break;
     case eDeviceMotion:
@@ -488,7 +488,7 @@ EventListenerManager::DisableDevice(EventMessage aEventMessage)
     case eUserProximity:
       window->DisableDeviceSensor(SENSOR_PROXIMITY);
       break;
-    case NS_DEVICE_LIGHT:
+    case eDeviceLight:
       window->DisableDeviceSensor(SENSOR_LIGHT);
       break;
     default:
