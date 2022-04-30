@@ -323,7 +323,7 @@ EventListenerManager::AddEventListenerInternal(
   } else if (aTypeAtom == nsGkAtoms::ondevicelight) {
     EnableDevice(NS_DEVICE_LIGHT);
   } else if (aTypeAtom == nsGkAtoms::ondevicemotion) {
-    EnableDevice(NS_DEVICE_MOTION);
+    EnableDevice(eDeviceMotion);
 #ifdef MOZ_B2G
   } else if (aTypeAtom == nsGkAtoms::onmoztimechange) {
     nsCOMPtr<nsPIDOMWindow> window = GetTargetAsInnerWindow();
@@ -426,7 +426,7 @@ EventListenerManager::IsDeviceType(EventMessage aEventMessage)
 {
   switch (aEventMessage) {
     case eDeviceOrientation:
-    case NS_DEVICE_MOTION:
+    case eDeviceMotion:
     case NS_DEVICE_LIGHT:
     case NS_DEVICE_PROXIMITY:
     case NS_USER_PROXIMITY:
@@ -456,7 +456,7 @@ EventListenerManager::EnableDevice(EventMessage aEventMessage)
     case NS_DEVICE_LIGHT:
       window->EnableDeviceSensor(SENSOR_LIGHT);
       break;
-    case NS_DEVICE_MOTION:
+    case eDeviceMotion:
       window->EnableDeviceSensor(SENSOR_ACCELERATION);
       window->EnableDeviceSensor(SENSOR_LINEAR_ACCELERATION);
       window->EnableDeviceSensor(SENSOR_GYROSCOPE);
@@ -479,7 +479,7 @@ EventListenerManager::DisableDevice(EventMessage aEventMessage)
     case eDeviceOrientation:
       window->DisableDeviceSensor(SENSOR_ORIENTATION);
       break;
-    case NS_DEVICE_MOTION:
+    case eDeviceMotion:
       window->DisableDeviceSensor(SENSOR_ACCELERATION);
       window->DisableDeviceSensor(SENSOR_LINEAR_ACCELERATION);
       window->DisableDeviceSensor(SENSOR_GYROSCOPE);
