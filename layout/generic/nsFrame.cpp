@@ -2606,8 +2606,7 @@ nsFrame::HandleEvent(nsPresContext* aPresContext,
   if ((aEvent->mClass == eMouseEventClass &&
        aEvent->AsMouseEvent()->button == WidgetMouseEvent::eLeftButton) ||
       aEvent->mClass == eTouchEventClass) {
-    if (aEvent->mMessage == eMouseDown ||
-        aEvent->mMessage == NS_TOUCH_START) {
+    if (aEvent->mMessage == eMouseDown || aEvent->mMessage == eTouchStart) {
       HandlePress(aPresContext, aEvent, aEventStatus);
     } else if (aEvent->mMessage == eMouseUp ||
                aEvent->mMessage == NS_TOUCH_END) {

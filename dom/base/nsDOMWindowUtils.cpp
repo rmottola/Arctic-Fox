@@ -979,7 +979,7 @@ nsDOMWindowUtils::SendTouchEventCommon(const nsAString& aType,
   }
   EventMessage msg;
   if (aType.EqualsLiteral("touchstart")) {
-    msg = NS_TOUCH_START;
+    msg = eTouchStart;
   } else if (aType.EqualsLiteral("touchmove")) {
     msg = NS_TOUCH_MOVE;
   } else if (aType.EqualsLiteral("touchend")) {
