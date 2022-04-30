@@ -289,7 +289,7 @@ APZEventState::ProcessTouchEvent(const WidgetTouchEvent& aEvent,
     }
     // fall through
   case NS_TOUCH_CANCEL:
-    mActiveElementManager->HandleTouchEnd(mEndTouchIsClick);
+    mActiveElementManager->HandleTouchEndEvent(mEndTouchIsClick);
     // fall through
   case NS_TOUCH_MOVE: {
     sentContentResponse = SendPendingTouchPreventedResponse(isTouchPrevented, aGuid);
@@ -391,6 +391,7 @@ APZEventState::ProcessAPZStateChange(const nsCOMPtr<nsIDocument>& aDocument,
   case APZStateChange::EndTouch:
   {
     mEndTouchIsClick = aArg;
+    mActiveElementManager->HandleTouchEnd();
     break;
   }
   default:
