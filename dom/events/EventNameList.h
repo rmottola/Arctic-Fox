@@ -668,7 +668,7 @@ NON_IDL_EVENT(dataavailable,
               eBasicEventClass)
 
 NON_IDL_EVENT(stop,
-              NS_MEDIARECORDER_STOP,
+              eMediaRecorderStop,
               EventNameType_None,
               eBasicEventClass)
 
