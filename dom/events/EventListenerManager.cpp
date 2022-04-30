@@ -429,7 +429,7 @@ EventListenerManager::IsDeviceType(EventMessage aEventMessage)
     case eDeviceMotion:
     case NS_DEVICE_LIGHT:
     case eDeviceProximity:
-    case NS_USER_PROXIMITY:
+    case eUserProximity:
       return true;
     default:
       break;
@@ -450,7 +450,7 @@ EventListenerManager::EnableDevice(EventMessage aEventMessage)
       window->EnableDeviceSensor(SENSOR_ORIENTATION);
       break;
     case eDeviceProximity:
-    case NS_USER_PROXIMITY:
+    case eUserProximity:
       window->EnableDeviceSensor(SENSOR_PROXIMITY);
       break;
     case NS_DEVICE_LIGHT:
@@ -485,7 +485,7 @@ EventListenerManager::DisableDevice(EventMessage aEventMessage)
       window->DisableDeviceSensor(SENSOR_GYROSCOPE);
       break;
     case eDeviceProximity:
-    case NS_USER_PROXIMITY:
+    case eUserProximity:
       window->DisableDeviceSensor(SENSOR_PROXIMITY);
       break;
     case NS_DEVICE_LIGHT:
