@@ -504,7 +504,7 @@ nsSliderFrame::HandleEvent(nsPresContext* aPresContext,
     }
     break;
 
-    case NS_TOUCH_END:
+    case eTouchEnd:
     case eMouseUp:
       if (ShouldScrollForEvent(aEvent)) {
         StopDrag();
@@ -1012,7 +1012,7 @@ nsSliderFrame::ShouldScrollForEvent(WidgetGUIEvent* aEvent)
 {
   switch (aEvent->mMessage) {
     case eTouchStart:
-    case NS_TOUCH_END:
+    case eTouchEnd:
       return true;
     case eMouseDown:
     case eMouseUp: {
