@@ -597,7 +597,7 @@ DOCUMENT_ONLY_EVENT(selectionchange,
                     EventNameType_HTMLXUL,
                     eBasicEventClass)
 DOCUMENT_ONLY_EVENT(visibilitychange,
-                    NS_VISIBILITY_CHANGE,
+                    eVisibilityChange,
                     EventNameType_HTMLXUL,
                     eBasicEventClass)
 
