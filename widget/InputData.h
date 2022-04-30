@@ -81,7 +81,10 @@ public:
   INPUTDATA_AS_CHILD_TYPE(TapGestureInput, TAPGESTURE_INPUT)
   INPUTDATA_AS_CHILD_TYPE(ScrollWheelInput, SCROLLWHEEL_INPUT)
 
-  InputData()
+  InputData(InputType aInputType)
+    : mInputType(aInputType),
+      mTime(0),
+      modifiers(0)
   {
   }
 
@@ -208,6 +211,7 @@ public:
   }
 
   MultiTouchInput()
+    : InputData(MULTITOUCH_INPUT)
   {
   }
 
