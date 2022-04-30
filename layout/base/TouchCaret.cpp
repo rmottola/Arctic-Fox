@@ -780,7 +780,7 @@ TouchCaret::HandleEvent(WidgetEvent* aEvent)
     case eMouseMove:
       status = HandleMouseMoveEvent(aEvent->AsMouseEvent());
       break;
-    case NS_TOUCH_CANCEL:
+    case eTouchCancel:
       mTouchesId.Clear();
       SetState(TOUCHCARET_NONE);
       LaunchExpirationTimer();

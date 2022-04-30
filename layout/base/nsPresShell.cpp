@@ -6677,7 +6677,7 @@ DispatchPointerFromMouseOrTouch(PresShell* aShell,
     case eTouchStart:
       pointerMessage = ePointerDown;
       break;
-    case NS_TOUCH_CANCEL:
+    case eTouchCancel:
       pointerMessage = ePointerCancel;
       break;
     default:
@@ -7456,7 +7456,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
         static_cast<PresShell*>(frame->PresContext()->PresShell());
     switch (aEvent->mMessage) {
       case eTouchMove:
-      case NS_TOUCH_CANCEL:
+      case eTouchCancel:
       case eTouchEnd: {
         // get the correct shell to dispatch to
         WidgetTouchEvent* touchEvent = aEvent->AsTouchEvent();
