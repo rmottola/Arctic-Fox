@@ -912,7 +912,7 @@ NON_IDL_EVENT(MozEdgeUIStarted,
               EventNameType_None,
               eSimpleGestureEventClass)
 NON_IDL_EVENT(MozEdgeUICanceled,
-              NS_SIMPLE_GESTURE_EDGE_CANCELED,
+              eEdgeUICanceled,
               EventNameType_None,
               eSimpleGestureEventClass)
 NON_IDL_EVENT(MozEdgeUICompleted,
