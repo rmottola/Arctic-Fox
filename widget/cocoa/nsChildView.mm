@@ -4301,7 +4301,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
   EventMessage msg;
   switch (mGestureState) {
   case eGestureState_StartGesture:
-    msg = NS_SIMPLE_GESTURE_ROTATE_START;
+    msg = eRotateGestureStart;
     mGestureState = eGestureState_RotateGesture;
     break;
 
