@@ -677,6 +677,7 @@ DataTransfer::MozGetDataAt(JSContext* aCx, const nsAString& aFormat,
   }
 
   if (!data) {
+    aRetval.setNull();
     return;
   }
 
