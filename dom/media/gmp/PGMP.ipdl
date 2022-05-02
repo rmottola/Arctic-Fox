@@ -3,9 +3,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+include protocol PCrashReporter;
 include protocol PGMPContent;
 include protocol PGMPTimer;
 include protocol PGMPStorage;
+
+using mozilla::dom::NativeThreadId from "mozilla/dom/TabMessageUtils.h";
 
 namespace mozilla {
 namespace gmp {
@@ -14,10 +17,12 @@ intr protocol PGMP
 {
   parent opens PGMPContent;
 
+  manages PCrashReporter;
   manages PGMPTimer;
   manages PGMPStorage;
 
 parent:
+  async PCrashReporter(NativeThreadId tid);
   async PGMPTimer();
   async PGMPStorage();
 
@@ -29,7 +34,7 @@ parent:
 child:
   async BeginAsyncShutdown();
   async CrashPluginNow();
-  async StartPlugin();
+  intr StartPlugin();
   async SetNodeId(nsCString nodeId);
   async CloseActive();
 };

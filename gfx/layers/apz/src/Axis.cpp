@@ -63,7 +63,7 @@ float Axis::ToLocalVelocity(float aVelocityInchesPerMs) const {
   return localVelocity.Length();
 }
 
-void Axis::UpdateWithTouchAtDevicePoint(ParentLayerCoord aPos, uint32_t aTimestampMs) {
+void Axis::UpdateWithTouchAtDevicePoint(ParentLayerCoord aPos, ParentLayerCoord aAdditionalDelta, uint32_t aTimestampMs) {
   // mVelocityQueue is controller-thread only
   APZThreadUtils::AssertOnControllerThread();
 
@@ -76,7 +76,7 @@ void Axis::UpdateWithTouchAtDevicePoint(ParentLayerCoord aPos, uint32_t aTimesta
     return;
   }
 
-  float newVelocity = mAxisLocked ? 0.0f : (float)(mPos - aPos) / (float)(aTimestampMs - mPosTimeMs);
+  float newVelocity = mAxisLocked ? 0.0f : (float)(mPos - aPos + aAdditionalDelta) / (float)(aTimestampMs - mPosTimeMs);
   if (gfxPrefs::APZMaxVelocity() > 0.0f) {
     bool velocityIsNegative = (newVelocity < 0);
     newVelocity = fabs(newVelocity);
@@ -125,22 +125,21 @@ void Axis::StartTouch(ParentLayerCoord aPos, uint32_t aTimestampMs) {
 
 bool Axis::AdjustDisplacement(ParentLayerCoord aDisplacement,
                               /* ParentLayerCoord */ float& aDisplacementOut,
-                              /* ParentLayerCoord */ float&
-                              aOverscrollAmountOut,
-                              bool forceOverscroll /* = false */)
+                              /* ParentLayerCoord */ float& aOverscrollAmountOut,
+                              bool aForceOverscroll /* = false */)
 {
   if (mAxisLocked) {
     aOverscrollAmountOut = 0;
     aDisplacementOut = 0;
     return false;
   }
-  if (forceOverscroll) {
+  if (aForceOverscroll) {
     aOverscrollAmountOut = aDisplacement;
     aDisplacementOut = 0;
     return false;
   }
 
-  StopSamplingOverscrollAnimation();
+  EndOverscrollAnimation();
 
   ParentLayerCoord displacement = aDisplacement;
 
@@ -182,7 +181,12 @@ ParentLayerCoord Axis::ApplyResistance(ParentLayerCoord aRequestedOverscroll) co
 
 void Axis::OverscrollBy(ParentLayerCoord aOverscroll) {
   MOZ_ASSERT(CanScroll());
-  StopSamplingOverscrollAnimation();
+  // We can get some spurious calls to OverscrollBy() with near-zero values
+  // due to rounding error. Ignore those (they might trip the asserts below.)
+  if (FuzzyEqualsAdditive(aOverscroll.value, 0.0f, COORDINATE_EPSILON)) {
+    return;
+  }
+  EndOverscrollAnimation();
   aOverscroll = ApplyResistance(aOverscroll);
   if (aOverscroll > 0) {
 #ifdef DEBUG
@@ -212,14 +216,32 @@ ParentLayerCoord Axis::GetOverscroll() const {
   ParentLayerCoord result = (mOverscroll - mLastOverscrollPeak) / mOverscrollScale;
 
   // Assert that we return overscroll in the correct direction
-  MOZ_ASSERT((result.value * mFirstOverscrollAnimationSample.value) >= 0.0f);
+#ifdef DEBUG
+  if ((result.value * mFirstOverscrollAnimationSample.value) < 0.0f) {
+    nsPrintfCString message("GetOverscroll() (%f) and first overscroll animation sample (%f) have different signs\n",
+                            result.value, mFirstOverscrollAnimationSample.value);
+    NS_ASSERTION(false, message.get());
+    MOZ_CRASH();
+  }
+#endif
 
   return result;
 }
 
-void Axis::StopSamplingOverscrollAnimation() {
+void Axis::StartOverscrollAnimation(float aVelocity) {
+  // Make sure any state from a previous animation has been cleared.
+  MOZ_ASSERT(mFirstOverscrollAnimationSample == 0 &&
+             mLastOverscrollPeak == 0 &&
+             mOverscrollScale == 1);
+
+  SetVelocity(aVelocity);
+}
+
+void Axis::EndOverscrollAnimation() {
   ParentLayerCoord overscroll = GetOverscroll();
-  ClearOverscroll();
+  mFirstOverscrollAnimationSample = 0;
+  mLastOverscrollPeak = 0;
+  mOverscrollScale = 1.0f;
   mOverscroll = overscroll;
 }
 
@@ -256,7 +278,9 @@ void Axis::StepOverscrollAnimation(double aStepDurationMilliseconds) {
   // overscroll, to ensure that GetOverscroll always returns a value of the
   // same sign, and that this value is correctly adjusted as the spring is
   // dampened.
-  bool velocitySignChange = (oldVelocity * mVelocity) < 0;
+  // To handle the case where one of the velocity samples is exaclty zero,
+  // consider a sign change to have occurred when the outgoing velocity is zero.
+  bool velocitySignChange = (oldVelocity * mVelocity) < 0 || mVelocity == 0;
   if (mFirstOverscrollAnimationSample == 0.0f) {
     mFirstOverscrollAnimationSample = mOverscroll;
 
@@ -338,10 +362,8 @@ bool Axis::IsOverscrolled() const {
 }
 
 void Axis::ClearOverscroll() {
+  EndOverscrollAnimation();
   mOverscroll = 0;
-  mFirstOverscrollAnimationSample = 0;
-  mLastOverscrollPeak = 0;
-  mOverscrollScale = 1.0f;
 }
 
 ParentLayerCoord Axis::PanStart() const {
@@ -377,7 +399,7 @@ void Axis::EndTouch(uint32_t aTimestampMs) {
     mAsyncPanZoomController, Name(), mVelocity);
 }
 
-void Axis::CancelTouch() {
+void Axis::CancelGesture() {
   // mVelocityQueue is controller-thread only
   APZThreadUtils::AssertOnControllerThread();
 
@@ -393,14 +415,30 @@ bool Axis::CanScroll() const {
   return GetPageLength() - GetCompositionLength() > COORDINATE_EPSILON;
 }
 
-bool Axis::CanScroll(double aDelta) const
+bool Axis::CanScroll(ParentLayerCoord aDelta) const
 {
   if (!CanScroll() || mAxisLocked) {
     return false;
   }
 
-  ParentLayerCoord delta = aDelta;
-  return DisplacementWillOverscrollAmount(delta) != delta;
+  return DisplacementWillOverscrollAmount(aDelta) != aDelta;
+}
+
+CSSCoord Axis::ClampOriginToScrollableRect(CSSCoord aOrigin) const
+{
+  CSSToParentLayerScale zoom = GetScaleForAxis(GetFrameMetrics().GetZoom());
+  ParentLayerCoord origin = aOrigin * zoom;
+
+  ParentLayerCoord result;
+  if (origin < GetPageStart()) {
+    result = GetPageStart();
+  } else if (origin + GetCompositionLength() > GetPageEnd()) {
+    result = GetPageEnd() - GetCompositionLength();
+  } else {
+    result = origin;
+  }
+
+  return result / zoom;
 }
 
 bool Axis::CanScrollNow() const {
@@ -470,6 +508,10 @@ CSSCoord Axis::ScaleWillOverscrollAmount(float aScale, CSSCoord aFocus) const {
     return (originAfterScale + (GetCompositionLength() / aScale) - GetPageEnd()) / zoom;
   }
   return 0;
+}
+
+bool Axis::IsAxisLocked() const {
+  return mAxisLocked;
 }
 
 float Axis::GetVelocity() const {
@@ -542,6 +584,11 @@ ParentLayerCoord AxisX::GetRectOffset(const ParentLayerRect& aRect) const
   return aRect.x;
 }
 
+CSSToParentLayerScale AxisX::GetScaleForAxis(const CSSToParentLayerScale2D& aScale) const
+{
+  return CSSToParentLayerScale(aScale.xScale);
+}
+
 ScreenPoint AxisX::MakePoint(ScreenCoord aCoord) const
 {
   return ScreenPoint(aCoord, 0);
@@ -571,6 +618,11 @@ ParentLayerCoord AxisY::GetRectLength(const ParentLayerRect& aRect) const
 ParentLayerCoord AxisY::GetRectOffset(const ParentLayerRect& aRect) const
 {
   return aRect.y;
+}
+
+CSSToParentLayerScale AxisY::GetScaleForAxis(const CSSToParentLayerScale2D& aScale) const
+{
+  return CSSToParentLayerScale(aScale.yScale);
 }
 
 ScreenPoint AxisY::MakePoint(ScreenCoord aCoord) const

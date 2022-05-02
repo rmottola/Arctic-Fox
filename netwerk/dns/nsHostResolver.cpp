@@ -24,7 +24,7 @@
 #include "prerror.h"
 #include "prtime.h"
 #include "mozilla/Logging.h"
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "plstr.h"
 #include "nsURLHelper.h"
 #include "nsThreadUtils.h"
@@ -522,13 +522,13 @@ nsHostResolver::nsHostResolver(uint32_t maxCacheEntries,
     , mDefaultGracePeriod(defaultGracePeriod)
     , mLock("nsHostResolver.mLock")
     , mIdleThreadCV(mLock, "nsHostResolver.mIdleThreadCV")
+    , mDB(&gHostDB_ops, sizeof(nsHostDBEnt), 0)
+    , mEvictionQSize(0)
+    , mShutdown(true)
     , mNumIdleThreads(0)
     , mThreadCount(0)
     , mActiveAnyThreadCount(0)
-    , mDB(&gHostDB_ops, sizeof(nsHostDBEnt), 0)
-    , mEvictionQSize(0)
     , mPendingCount(0)
-    , mShutdown(true)
 {
     mCreationTime = PR_Now();
     PR_INIT_CLIST(&mHighQ);
@@ -1068,10 +1068,10 @@ nsHostResolver::IssueLookup(nsHostRecord *rec)
     rv = ConditionallyCreateThread(rec);
     
     LOG (("  DNS thread counters: total=%d any-live=%d idle=%d pending=%d\n",
-          mThreadCount,
-          mActiveAnyThreadCount,
-          mNumIdleThreads,
-          mPendingCount));
+          static_cast<uint32_t>(mThreadCount),
+          static_cast<uint32_t>(mActiveAnyThreadCount),
+          static_cast<uint32_t>(mNumIdleThreads),
+          static_cast<uint32_t>(mPendingCount)));
 
     return rv;
 }
@@ -1109,7 +1109,7 @@ nsHostResolver::GetHostToLookup(nsHostRecord **result)
 {
     bool timedOut = false;
     PRIntervalTime epoch, now, timeout;
-    
+
     MutexAutoLock lock(mLock);
 
     timeout = (mNumIdleThreads >= HighThreadThreshold) ? mShortIdleTimeout : mLongIdleTimeout;
@@ -1177,7 +1177,6 @@ nsHostResolver::GetHostToLookup(nsHostRecord **result)
     }
     
     // tell thread to exit...
-    mThreadCount--;
     return false;
 }
 
@@ -1400,37 +1399,39 @@ nsHostResolver::ThreadFunc(void *arg)
         bool getTtl = false;
 #endif
 
-        // We need to remove IPv4 records manually
-        // because PR_GetAddrInfoByName doesn't support PR_AF_INET6.
-        bool disableIPv4 = rec->af == PR_AF_INET6;
-        uint16_t af = disableIPv4 ? PR_AF_UNSPEC : rec->af;
-        nsresult status = GetAddrInfo(rec->host, af, rec->flags, rec->netInterface,
+        nsresult status = GetAddrInfo(rec->host, rec->af, rec->flags, rec->netInterface,
                                       &ai, getTtl);
 #if defined(RES_RETRY_ON_FAILURE)
         if (NS_FAILED(status) && rs.Reset()) {
-            status = GetAddrInfo(rec->host, af, rec->flags, rec->netInterface, &ai,
+            status = GetAddrInfo(rec->host, rec->af, rec->flags, rec->netInterface, &ai,
                                  getTtl);
         }
 #endif
 
-        TimeDuration elapsed = TimeStamp::Now() - startTime;
-        uint32_t millis = static_cast<uint32_t>(elapsed.ToMilliseconds());
+        {   // obtain lock to check shutdown and manage inter-module telemetry
+            MutexAutoLock lock(resolver->mLock);
 
-        if (NS_SUCCEEDED(status)) {
-            Telemetry::ID histogramID;
-            if (!rec->addr_info_gencnt) {
-                // Time for initial lookup.
-                histogramID = Telemetry::DNS_LOOKUP_TIME;
-            } else if (!getTtl) {
-                // Time for renewal; categorized by expiration strategy.
-                histogramID = Telemetry::DNS_RENEWAL_TIME;
-            } else {
-                // Time to get TTL; categorized by expiration strategy.
-                histogramID = Telemetry::DNS_RENEWAL_TIME_FOR_TTL;
+            if (!resolver->mShutdown) {
+                TimeDuration elapsed = TimeStamp::Now() - startTime;
+                uint32_t millis = static_cast<uint32_t>(elapsed.ToMilliseconds());
+
+                if (NS_SUCCEEDED(status)) {
+                    Telemetry::ID histogramID;
+                    if (!rec->addr_info_gencnt) {
+                        // Time for initial lookup.
+                        histogramID = Telemetry::DNS_LOOKUP_TIME;
+                    } else if (!getTtl) {
+                        // Time for renewal; categorized by expiration strategy.
+                        histogramID = Telemetry::DNS_RENEWAL_TIME;
+                    } else {
+                        // Time to get TTL; categorized by expiration strategy.
+                        histogramID = Telemetry::DNS_RENEWAL_TIME_FOR_TTL;
+                    }
+                    Telemetry::Accumulate(histogramID, millis);
+                } else {
+                    Telemetry::Accumulate(Telemetry::DNS_FAILED_LOOKUP_TIME, millis);
+                }
             }
-            Telemetry::Accumulate(histogramID, millis);
-        } else {
-            Telemetry::Accumulate(Telemetry::DNS_FAILED_LOOKUP_TIME, millis);
         }
 
         // OnLookupComplete may release "rec", long before we lose it.
@@ -1446,6 +1447,7 @@ nsHostResolver::ThreadFunc(void *arg)
             rec = nullptr;
         }
     }
+    resolver->mThreadCount--;
     NS_RELEASE(resolver);
     LOG(("DNS lookup thread - queue empty, thread finished.\n"));
 }

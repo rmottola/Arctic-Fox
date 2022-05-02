@@ -86,7 +86,7 @@
 #include "nsXPCOM.h"
 #include "nsILayoutHistoryState.h"
 #include "nsILineIterator.h" // for ScrollContentIntoView
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "mozilla/dom/BeforeAfterKeyboardEventBinding.h"
 #include "mozilla/dom/Touch.h"
 #include "mozilla/dom/PointerEventBinding.h"
@@ -468,15 +468,15 @@ public:
   virtual void HandleEvent(EventChainPostVisitor& aVisitor) override
   {
     if (aVisitor.mPresContext && aVisitor.mEvent->mClass != eBasicEventClass) {
-      if (aVisitor.mEvent->mMessage == NS_MOUSE_BUTTON_DOWN ||
-          aVisitor.mEvent->mMessage == NS_MOUSE_BUTTON_UP) {
+      if (aVisitor.mEvent->mMessage == eMouseDown ||
+          aVisitor.mEvent->mMessage == eMouseUp) {
         // Mouse-up and mouse-down events call nsFrame::HandlePress/Release
         // which call GetContentOffsetsFromPoint which requires up-to-date layout.
         // Bring layout up-to-date now so that GetCurrentEventFrame() below
         // will return a real frame and we don't have to worry about
         // destroying it by flushing later.
         mPresShell->FlushPendingNotifications(Flush_Layout);
-      } else if (aVisitor.mEvent->mMessage == NS_WHEEL_WHEEL &&
+      } else if (aVisitor.mEvent->mMessage == eWheel &&
                  aVisitor.mEventStatus != nsEventStatus_eConsumeNoDefault) {
         nsIFrame* frame = mPresShell->GetCurrentEventFrame();
         if (frame) {
@@ -493,8 +493,8 @@ public:
       }
       nsIFrame* frame = mPresShell->GetCurrentEventFrame();
       if (!frame &&
-          (aVisitor.mEvent->mMessage == NS_MOUSE_BUTTON_UP ||
-           aVisitor.mEvent->mMessage == NS_TOUCH_END)) {
+          (aVisitor.mEvent->mMessage == eMouseUp ||
+           aVisitor.mEvent->mMessage == eTouchEnd)) {
         // Redirect BUTTON_UP and TOUCH_END events to the root frame to ensure
         // that capturing is released.
         frame = mPresShell->GetRootFrame();
@@ -984,6 +984,12 @@ PresShell::Init(nsIDocument* aDocument,
   if (mPresContext->IsRootContentDocument()) {
     mZoomConstraintsClient = new ZoomConstraintsClient();
     mZoomConstraintsClient->Init(this, mDocument);
+#ifndef MOZ_WIDGET_ANDROID
+    // Fennec will need some work to use this code; see bug 1180267.
+    if (gfxPrefs::MetaViewportEnabled() || gfxPrefs::APZAllowZooming()) {
+      mMobileViewportManager = new MobileViewportManager(this, mDocument);
+    }
+#endif
   }
 }
 
@@ -1101,6 +1107,10 @@ PresShell::Destroy()
   if (mZoomConstraintsClient) {
     mZoomConstraintsClient->Destroy();
     mZoomConstraintsClient = nullptr;
+  }
+  if (mMobileViewportManager) {
+    mMobileViewportManager->Destroy();
+    mMobileViewportManager = nullptr;
   }
 
 #ifdef ACCESSIBILITY
@@ -1690,7 +1700,7 @@ PresShell::Initialize(nscoord aWidth, nscoord aHeight)
                                NS_FRAME_HAS_DIRTY_CHILDREN);
     NS_ASSERTION(!mDirtyRoots.Contains(rootFrame),
                  "Why is the root in mDirtyRoots already?");
-    FrameNeedsReflow(rootFrame, eResize, NS_FRAME_IS_DIRTY);
+    FrameNeedsReflow(rootFrame, nsIPresShell::eResize, NS_FRAME_IS_DIRTY);
     NS_ASSERTION(mDirtyRoots.Contains(rootFrame),
                  "Should be in mDirtyRoots now");
     NS_ASSERTION(mReflowScheduled, "Why no reflow scheduled?");
@@ -1757,6 +1767,19 @@ nsresult
 PresShell::ResizeReflowOverride(nscoord aWidth, nscoord aHeight)
 {
   mViewportOverridden = true;
+
+  if (mMobileViewportManager) {
+    // Once the viewport is explicitly overridden, we don't need the
+    // MobileViewportManager any more (in this presShell at least). Destroying
+    // it simplifies things because then it can maintain an invariant that any
+    // time it gets a meta-viewport change (for example) it knows it must
+    // recompute the CSS viewport and do a reflow. If we didn't destroy it here
+    // then there would be times where a meta-viewport change would have no
+    // effect.
+    mMobileViewportManager->Destroy();
+    mMobileViewportManager = nullptr;
+  }
+
   return ResizeReflowIgnoreOverride(aWidth, aHeight);
 }
 
@@ -1768,6 +1791,15 @@ PresShell::ResizeReflow(nscoord aWidth, nscoord aHeight)
     // didn't ask to ignore the override.  Pretend it didn't happen.
     return NS_OK;
   }
+
+  if (mMobileViewportManager) {
+    // If we have a mobile viewport manager, request a reflow from it. It can
+    // recompute the final CSS viewport and trigger a call to
+    // ResizeReflowIgnoreOverride if it changed.
+    mMobileViewportManager->RequestReflow();
+    return NS_OK;
+  }
+
   return ResizeReflowIgnoreOverride(aWidth, aHeight);
 }
 
@@ -1875,7 +1907,7 @@ PresShell::FireResizeEvent()
     return;
 
   //Send resize event from here.
-  WidgetEvent event(true, NS_RESIZE_EVENT);
+  WidgetEvent event(true, mozilla::eResize);
   nsEventStatus status = nsEventStatus_eIgnore;
 
   nsPIDOMWindow *window = mDocument->GetWindow();
@@ -2584,7 +2616,7 @@ PresShell::FrameNeedsReflow(nsIFrame *aFrame, IntrinsicDirty aIntrinsicDirty,
     // Mark the intrinsic widths as dirty on the frame, all of its ancestors,
     // and all of its descendants, if needed:
 
-    if (aIntrinsicDirty != eResize) {
+    if (aIntrinsicDirty != nsIPresShell::eResize) {
       // Mark argument and all ancestors dirty. (Unless we hit a reflow
       // root that should contain the reflow.  That root could be
       // subtreeRoot itself if it's not dirty, or it could be some
@@ -2617,9 +2649,7 @@ PresShell::FrameNeedsReflow(nsIFrame *aFrame, IntrinsicDirty aIntrinsicDirty,
 
         nsIFrame::ChildListIterator lists(f);
         for (; !lists.IsDone(); lists.Next()) {
-          nsFrameList::Enumerator childFrames(lists.CurrentList());
-          for (; !childFrames.AtEnd(); childFrames.Next()) {
-            nsIFrame* kid = childFrames.get();
+          for (nsIFrame* kid : lists.CurrentList()) {
             kid->MarkIntrinsicISizesDirty();
             stack.AppendElement(kid);
           }
@@ -4432,8 +4462,7 @@ nsIPresShell::ReconstructStyleDataInternal()
     restyleManager->PostRestyleEvent(root, eRestyle_Subtree,
                                      NS_STYLE_HINT_NONE);
   } else {
-    for (uint32_t i = 0; i < scopeRoots.Length(); i++) {
-      Element* scopeRoot = scopeRoots[i];
+    for (Element* scopeRoot : scopeRoots) {
       restyleManager->PostRestyleEvent(scopeRoot, eRestyle_Subtree,
                                        NS_STYLE_HINT_NONE);
     }
@@ -5010,9 +5039,7 @@ PresShell::PaintRangePaintInfo(nsTArray<nsAutoPtr<RangePaintInfo> >* aItems,
   frameSelection->SetDisplaySelection(nsISelectionController::SELECTION_HIDDEN);
 
   // next, paint each range in the selection
-  int32_t count = aItems->Length();
-  for (int32_t i = 0; i < count; i++) {
-    RangePaintInfo* rangeInfo = (*aItems)[i];
+  for (RangePaintInfo* rangeInfo : *aItems) {
     // the display lists paint relative to the offset from the reference
     // frame, so account for that translation too:
     gfxPoint rootOffset =
@@ -5532,7 +5559,7 @@ PresShell::ProcessSynthMouseMoveEvent(bool aFromScroll)
     refpoint += view->ViewToWidgetOffset();
   }
   NS_ASSERTION(view->GetWidget(), "view should have a widget here");
-  WidgetMouseEvent event(true, NS_MOUSE_MOVE, view->GetWidget(),
+  WidgetMouseEvent event(true, eMouseMove, view->GetWidget(),
                          WidgetMouseEvent::eSynthesized);
   event.refPoint = LayoutDeviceIntPoint::FromAppUnitsToNearest(refpoint, viewAPD);
   event.time = PR_IntervalNow();
@@ -5684,10 +5711,7 @@ PresShell::MarkImagesInSubtreeVisible(nsIFrame* aFrame, const nsRect& aRect)
       continue;
     }
 
-    nsFrameList children = childLists.CurrentList();
-    for (nsFrameList::Enumerator e(children); !e.AtEnd(); e.Next()) {
-      nsIFrame* child = e.get();
-
+    for (nsIFrame* child : childLists.CurrentList()) {
       nsRect r = rect - child->GetPosition();
       if (!r.IntersectRect(r, child->GetVisualOverflowRect())) {
         continue;
@@ -6291,21 +6315,21 @@ void
 PresShell::UpdateActivePointerState(WidgetGUIEvent* aEvent)
 {
   switch (aEvent->mMessage) {
-  case NS_MOUSE_ENTER_WIDGET:
+  case eMouseEnterIntoWidget:
     // In this case we have to know information about available mouse pointers
     if (WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent()) {
       gActivePointersIds->Put(mouseEvent->pointerId,
                               new PointerInfo(false, mouseEvent->inputSource, true));
     }
     break;
-  case NS_POINTER_DOWN:
+  case ePointerDown:
     // In this case we switch pointer to active state
     if (WidgetPointerEvent* pointerEvent = aEvent->AsPointerEvent()) {
       gActivePointersIds->Put(pointerEvent->pointerId,
                               new PointerInfo(true, pointerEvent->inputSource, pointerEvent->isPrimary));
     }
     break;
-  case NS_POINTER_UP:
+  case ePointerUp:
     // In this case we remove information about pointer or turn off active state
     if (WidgetPointerEvent* pointerEvent = aEvent->AsPointerEvent()) {
       if(pointerEvent->inputSource != nsIDOMMouseEvent::MOZ_SOURCE_TOUCH) {
@@ -6316,7 +6340,7 @@ PresShell::UpdateActivePointerState(WidgetGUIEvent* aEvent)
       }
     }
     break;
-  case NS_MOUSE_EXIT_WIDGET:
+  case eMouseExitFromWidget:
     // In this case we have to remove information about disappeared mouse pointers
     if (WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent()) {
       gActivePointersIds->Remove(mouseEvent->pointerId);
@@ -6512,11 +6536,11 @@ PresShell::RecordMouseLocation(WidgetGUIEvent* aEvent)
     return;
   }
 
-  if ((aEvent->mMessage == NS_MOUSE_MOVE &&
+  if ((aEvent->mMessage == eMouseMove &&
        aEvent->AsMouseEvent()->reason == WidgetMouseEvent::eReal) ||
-      aEvent->mMessage == NS_MOUSE_ENTER_WIDGET ||
-      aEvent->mMessage == NS_MOUSE_BUTTON_DOWN ||
-      aEvent->mMessage == NS_MOUSE_BUTTON_UP) {
+      aEvent->mMessage == eMouseEnterIntoWidget ||
+      aEvent->mMessage == eMouseDown ||
+      aEvent->mMessage == eMouseUp) {
     nsIFrame* rootFrame = GetRootFrame();
     if (!rootFrame) {
       nsView* rootView = mViewManager->GetRootView();
@@ -6527,17 +6551,17 @@ PresShell::RecordMouseLocation(WidgetGUIEvent* aEvent)
         nsLayoutUtils::GetEventCoordinatesRelativeTo(aEvent, rootFrame);
     }
 #ifdef DEBUG_MOUSE_LOCATION
-    if (aEvent->mMessage == NS_MOUSE_ENTER_WIDGET) {
+    if (aEvent->mMessage == eMouseEnterIntoWidget) {
       printf("[ps=%p]got mouse enter for %p\n",
              this, aEvent->widget);
     }
     printf("[ps=%p]setting mouse location to (%d,%d)\n",
            this, mMouseLocation.x, mMouseLocation.y);
 #endif
-    if (aEvent->mMessage == NS_MOUSE_ENTER_WIDGET) {
+    if (aEvent->mMessage == eMouseEnterIntoWidget) {
       SynthesizeMouseMove(false);
     }
-  } else if (aEvent->mMessage == NS_MOUSE_EXIT_WIDGET) {
+  } else if (aEvent->mMessage == eMouseExitFromWidget) {
     // Although we only care about the mouse moving into an area for which this
     // pres shell doesn't receive mouse move events, we don't check which widget
     // the mouse exit was for since this seems to vary by platform.  Hopefully
@@ -6606,7 +6630,7 @@ DispatchPointerFromMouseOrTouch(PresShell* aShell,
                                 nsEventStatus* aStatus,
                                 nsIContent** aTargetContent)
 {
-  EventMessage pointerMessage = NS_EVENT_NULL;
+  EventMessage pointerMessage = eVoidEvent;
   if (aEvent->mClass == eMouseEventClass) {
     WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
     // if it is not mouse then it is likely will come as touch event
@@ -6615,17 +6639,17 @@ DispatchPointerFromMouseOrTouch(PresShell* aShell,
     }
     int16_t button = mouseEvent->button;
     switch (mouseEvent->mMessage) {
-    case NS_MOUSE_MOVE:
+    case eMouseMove:
       if (mouseEvent->buttons == 0) {
         button = -1;
       }
-      pointerMessage = NS_POINTER_MOVE;
+      pointerMessage = ePointerMove;
       break;
-    case NS_MOUSE_BUTTON_UP:
-      pointerMessage = NS_POINTER_UP;
+    case eMouseUp:
+      pointerMessage = ePointerUp;
       break;
-    case NS_MOUSE_BUTTON_DOWN:
-      pointerMessage = NS_POINTER_DOWN;
+    case eMouseDown:
+      pointerMessage = ePointerDown;
       break;
     default:
       return NS_OK;
@@ -6644,17 +6668,17 @@ DispatchPointerFromMouseOrTouch(PresShell* aShell,
     // loop over all touches and dispatch pointer events on each touch
     // copy the event
     switch (touchEvent->mMessage) {
-    case NS_TOUCH_MOVE:
-      pointerMessage = NS_POINTER_MOVE;
+    case eTouchMove:
+      pointerMessage = ePointerMove;
       break;
-    case NS_TOUCH_END:
-      pointerMessage = NS_POINTER_UP;
+    case eTouchEnd:
+      pointerMessage = ePointerUp;
       break;
-    case NS_TOUCH_START:
-      pointerMessage = NS_POINTER_DOWN;
+    case eTouchStart:
+      pointerMessage = ePointerDown;
       break;
-    case NS_TOUCH_CANCEL:
-      pointerMessage = NS_POINTER_CANCEL;
+    case eTouchCancel:
+      pointerMessage = ePointerCancel;
       break;
     default:
       return NS_OK;
@@ -6792,7 +6816,7 @@ PresShell::DispatchBeforeKeyboardEventInternal(const nsTArray<nsCOMPtr<Element> 
   }
 
   EventMessage message =
-    (aEvent.mMessage == NS_KEY_DOWN) ? NS_KEY_BEFORE_DOWN : NS_KEY_BEFORE_UP;
+    (aEvent.mMessage == eKeyDown) ? eBeforeKeyDown : eBeforeKeyUp;
   nsCOMPtr<EventTarget> eventTarget;
   // Dispatch before events from the outermost element.
   for (int32_t i = length - 1; i >= 0; i--) {
@@ -6826,7 +6850,7 @@ PresShell::DispatchAfterKeyboardEventInternal(const nsTArray<nsCOMPtr<Element> >
   }
 
   EventMessage message =
-    (aEvent.mMessage == NS_KEY_DOWN) ? NS_KEY_AFTER_DOWN : NS_KEY_AFTER_UP;
+    (aEvent.mMessage == eKeyDown) ? eAfterKeyDown : eAfterKeyUp;
   bool embeddedCancelled = aEmbeddedCancelled;
   nsCOMPtr<EventTarget> eventTarget;
   // Dispatch after events from the innermost element.
@@ -6853,8 +6877,7 @@ PresShell::DispatchAfterKeyboardEvent(nsINode* aTarget,
   MOZ_ASSERT(aTarget);
   MOZ_ASSERT(BeforeAfterKeyboardEventEnabled());
 
-  if (NS_WARN_IF(aEvent.mMessage != NS_KEY_DOWN &&
-                 aEvent.mMessage != NS_KEY_UP)) {
+  if (NS_WARN_IF(aEvent.mMessage != eKeyDown && aEvent.mMessage != eKeyUp)) {
     return;
   }
 
@@ -6883,7 +6906,7 @@ PresShell::HandleKeyboardEvent(nsINode* aTarget,
                                nsEventStatus* aStatus,
                                EventDispatchingCallback* aEventCB)
 {
-  if (aEvent.mMessage == NS_KEY_PRESS ||
+  if (aEvent.mMessage == eKeyPress ||
       !BeforeAfterKeyboardEventEnabled()) {
     EventDispatcher::Dispatch(aTarget, mPresContext,
                               &aEvent, nullptr, aStatus, aEventCB);
@@ -6891,7 +6914,7 @@ PresShell::HandleKeyboardEvent(nsINode* aTarget,
   }
 
   MOZ_ASSERT(aTarget);
-  MOZ_ASSERT(aEvent.mMessage == NS_KEY_DOWN || aEvent.mMessage == NS_KEY_UP);
+  MOZ_ASSERT(aEvent.mMessage == eKeyDown || aEvent.mMessage == eKeyUp);
 
   // Build up a target chain. Each item in the chain will receive a before event.
   nsAutoTArray<nsCOMPtr<Element>, 5> chain;
@@ -7125,7 +7148,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
       if (presShell != this) {
         nsIFrame* frame = presShell->GetRootFrame();
         if (!frame) {
-          if (aEvent->mMessage == NS_QUERY_TEXT_CONTENT ||
+          if (aEvent->mMessage == eQueryTextContent ||
               aEvent->IsContentCommandEvent()) {
             return NS_OK;
           }
@@ -7144,7 +7167,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
 
   if (aEvent->mClass == eKeyboardEventClass &&
       mDocument && mDocument->EventHandlingSuppressed()) {
-    if (aEvent->mMessage == NS_KEY_DOWN) {
+    if (aEvent->mMessage == eKeyDown) {
       mNoDelayedKeyEvents = true;
     } else if (!mNoDelayedKeyEvents) {
       DelayedEvent* event = new DelayedKeyEvent(aEvent->AsKeyboardEvent());
@@ -7250,13 +7273,12 @@ PresShell::HandleEvent(nsIFrame* aFrame,
     }
 
     // all touch events except for touchstart use a captured target
-    if (aEvent->mClass == eTouchEventClass &&
-        aEvent->mMessage != NS_TOUCH_START) {
+    if (aEvent->mClass == eTouchEventClass && aEvent->mMessage != eTouchStart) {
       captureRetarget = true;
     }
 
     WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
-    bool isWindowLevelMouseExit = (aEvent->mMessage == NS_MOUSE_EXIT_WIDGET) &&
+    bool isWindowLevelMouseExit = (aEvent->mMessage == eMouseExitFromWidget) &&
       (mouseEvent && mouseEvent->exit == WidgetMouseEvent::eTopLevel);
 
     // Get the frame at the event point. However, don't do this if we're
@@ -7267,7 +7289,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
     if (!captureRetarget && !isWindowLevelMouseExit) {
       nsPoint eventPoint;
       uint32_t flags = 0;
-      if (aEvent->mMessage == NS_TOUCH_START) {
+      if (aEvent->mMessage == eTouchStart) {
         flags |= INPUT_IGNORE_ROOT_SCROLL_FRAME;
         WidgetTouchEvent* touchEvent = aEvent->AsTouchEvent();
         // if this is a continuing session, ensure that all these events are
@@ -7388,7 +7410,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
     }
 
     if (aEvent->mClass == ePointerEventClass &&
-        aEvent->mMessage != NS_POINTER_DOWN) {
+        aEvent->mMessage != ePointerDown) {
       if (WidgetPointerEvent* pointerEvent = aEvent->AsPointerEvent()) {
         uint32_t pointerId = pointerEvent->pointerId;
         nsIContent* pointerCapturingContent = GetPointerCapturingContent(pointerId);
@@ -7403,10 +7425,11 @@ PresShell::HandleEvent(nsIFrame* aFrame,
             frame = capturingFrame;
           }
 
-          if (pointerEvent->mMessage == NS_POINTER_UP ||
-              pointerEvent->mMessage == NS_POINTER_CANCEL) {
+          if (pointerEvent->mMessage == ePointerUp ||
+              pointerEvent->mMessage == ePointerCancel) {
             // Implicitly releasing capture for given pointer.
-            // LOST_POINTER_CAPTURE should be send after NS_POINTER_UP or NS_POINTER_CANCEL.
+            // ePointerLostCapture should be send after ePointerUp or
+            // ePointerCancel.
             releasePointerCaptureCaller.SetTarget(pointerId, pointerCapturingContent);
           }
         }
@@ -7417,10 +7440,9 @@ PresShell::HandleEvent(nsIFrame* aFrame,
     // a document which needs events suppressed
     if (aEvent->mClass == eMouseEventClass &&
         frame->PresContext()->Document()->EventHandlingSuppressed()) {
-      if (aEvent->mMessage == NS_MOUSE_BUTTON_DOWN) {
+      if (aEvent->mMessage == eMouseDown) {
         mNoDelayedMouseEvents = true;
-      } else if (!mNoDelayedMouseEvents &&
-                 aEvent->mMessage == NS_MOUSE_BUTTON_UP) {
+      } else if (!mNoDelayedMouseEvents && aEvent->mMessage == eMouseUp) {
         DelayedEvent* event = new DelayedMouseEvent(aEvent->AsMouseEvent());
         if (!mDelayedEvents.AppendElement(event)) {
           delete event;
@@ -7433,14 +7455,12 @@ PresShell::HandleEvent(nsIFrame* aFrame,
     PresShell* shell =
         static_cast<PresShell*>(frame->PresContext()->PresShell());
     switch (aEvent->mMessage) {
-      case NS_TOUCH_MOVE:
-      case NS_TOUCH_CANCEL:
-      case NS_TOUCH_END: {
+      case eTouchMove:
+      case eTouchCancel:
+      case eTouchEnd: {
         // get the correct shell to dispatch to
         WidgetTouchEvent* touchEvent = aEvent->AsTouchEvent();
-        WidgetTouchEvent::TouchArray& touches = touchEvent->touches;
-        for (uint32_t i = 0; i < touches.Length(); ++i) {
-          dom::Touch* touch = touches[i];
+        for (dom::Touch* touch : touchEvent->touches) {
           if (!touch) {
             break;
           }
@@ -7566,12 +7586,12 @@ PresShell::HandleEvent(nsIFrame* aFrame,
         }
       }
 
-      if (aEvent->mMessage == NS_KEY_DOWN) {
+      if (aEvent->mMessage == eKeyDown) {
         NS_IF_RELEASE(gKeyDownTarget);
         NS_IF_ADDREF(gKeyDownTarget = eventTarget);
       }
-      else if ((aEvent->mMessage == NS_KEY_PRESS ||
-                aEvent->mMessage == NS_KEY_UP) &&
+      else if ((aEvent->mMessage == eKeyPress ||
+                aEvent->mMessage == eKeyUp) &&
                gKeyDownTarget) {
         // If a different element is now focused for the keypress/keyup event
         // than what was focused during the keydown event, check if the new
@@ -7587,7 +7607,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
           }
         }
 
-        if (aEvent->mMessage == NS_KEY_UP) {
+        if (aEvent->mMessage == eKeyUp) {
           NS_RELEASE(gKeyDownTarget);
         }
       }
@@ -7776,9 +7796,9 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent, nsEventStatus* aStatus)
     // XXX How about IME events and input events for plugins?
     if (aEvent->mFlags.mIsTrusted) {
       switch (aEvent->mMessage) {
-      case NS_KEY_PRESS:
-      case NS_KEY_DOWN:
-      case NS_KEY_UP: {
+      case eKeyPress:
+      case eKeyDown:
+      case eKeyUp: {
         nsIDocument* doc = GetCurrentEventContent() ?
                            mCurrentEventContent->OwnerDoc() : nullptr;
         auto keyCode = aEvent->AsKeyboardEvent()->keyCode;
@@ -7795,7 +7815,7 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent, nsEventStatus* aStatus)
             // The event listeners in chrome can prevent this ESC behavior by
             // calling prevent default on the preceding keydown/press events.
             if (!mIsLastChromeOnlyEscapeKeyConsumed &&
-                aEvent->mMessage == NS_KEY_UP) {
+                aEvent->mMessage == eKeyUp) {
               // ESC key released while in DOM fullscreen mode.
               // Fully exit all browser windows and documents from
               // fullscreen mode.
@@ -7807,7 +7827,7 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent, nsEventStatus* aStatus)
           if (!mIsLastChromeOnlyEscapeKeyConsumed && pointerLockedDoc) {
             aEvent->mFlags.mDefaultPrevented = true;
             aEvent->mFlags.mOnlyChromeDispatch = true;
-            if (aEvent->mMessage == NS_KEY_UP) {
+            if (aEvent->mMessage == eKeyUp) {
               nsIDocument::UnlockPointer();
             }
           }
@@ -7822,12 +7842,12 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent, nsEventStatus* aStatus)
         }
         break;
       }
-      case NS_MOUSE_BUTTON_DOWN:
-      case NS_MOUSE_BUTTON_UP:
+      case eMouseDown:
+      case eMouseUp:
         isHandlingUserInput = true;
         break;
 
-      case NS_DRAGDROP_DROP: {
+      case eDrop: {
         nsCOMPtr<nsIDragSession> session = nsContentUtils::GetDragSession();
         if (session) {
           bool onlyChromeDrop = false;
@@ -7850,7 +7870,7 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent, nsEventStatus* aStatus)
       }
     }
 
-    if (aEvent->mMessage == NS_CONTEXTMENU) {
+    if (aEvent->mMessage == eContextMenu) {
       WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
       if (mouseEvent->context == WidgetMouseEvent::eContextMenuKey &&
           !AdjustContextMenuKeyEvent(mouseEvent)) {
@@ -7865,7 +7885,7 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent, nsEventStatus* aStatus)
     AutoHandlingUserInputStatePusher userInpStatePusher(isHandlingUserInput,
                                                         aEvent, mDocument);
 
-    if (aEvent->mFlags.mIsTrusted && aEvent->mMessage == NS_MOUSE_MOVE) {
+    if (aEvent->mFlags.mIsTrusted && aEvent->mMessage == eMouseMove) {
       nsIPresShell::AllowMouseCapture(
         EventStateManager::GetActiveEventStateManager() == manager);
     }
@@ -7911,11 +7931,11 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent, nsEventStatus* aStatus)
     }
 
     switch (aEvent->mMessage) {
-    case NS_KEY_PRESS:
-    case NS_KEY_DOWN:
-    case NS_KEY_UP: {
+    case eKeyPress:
+    case eKeyDown:
+    case eKeyUp: {
       if (aEvent->AsKeyboardEvent()->keyCode == NS_VK_ESCAPE) {
-        if (aEvent->mMessage == NS_KEY_UP) {
+        if (aEvent->mMessage == eKeyUp) {
           // Reset this flag after key up is handled.
           mIsLastChromeOnlyEscapeKeyConsumed = false;
         } else {
@@ -7927,11 +7947,11 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent, nsEventStatus* aStatus)
       }
       break;
     }
-    case NS_MOUSE_BUTTON_UP:
+    case eMouseUp:
       // reset the capturing content now that the mouse button is up
       SetCapturingContent(nullptr, 0);
       break;
-    case NS_MOUSE_MOVE:
+    case eMouseMove:
       nsIPresShell::AllowMouseCapture(false);
       break;
     default:
@@ -8019,16 +8039,15 @@ PresShell::DispatchTouchEventToDOM(WidgetEvent* aEvent,
   // calling preventDefault on touchstart or the first touchmove for a
   // point prevents mouse events. calling it on the touchend should
   // prevent click dispatching.
-  bool canPrevent = (aEvent->mMessage == NS_TOUCH_START) ||
-                    (aEvent->mMessage == NS_TOUCH_MOVE && aTouchIsNew) ||
-                    (aEvent->mMessage == NS_TOUCH_END);
+  bool canPrevent = (aEvent->mMessage == eTouchStart) ||
+                    (aEvent->mMessage == eTouchMove && aTouchIsNew) ||
+                    (aEvent->mMessage == eTouchEnd);
   bool preventDefault = false;
   nsEventStatus tmpStatus = nsEventStatus_eIgnore;
   WidgetTouchEvent* touchEvent = aEvent->AsTouchEvent();
 
   // loop over all touches and dispatch events on any that have changed
-  for (uint32_t i = 0; i < touchEvent->touches.Length(); ++i) {
-    dom::Touch* touch = touchEvent->touches[i];
+  for (dom::Touch* touch : touchEvent->touches) {
     if (!touch || !touch->mChanged) {
       continue;
     }
@@ -10694,8 +10713,8 @@ nsIPresShell::MarkFixedFramesForReflow(IntrinsicDirty aIntrinsicDirty)
   nsIFrame* rootFrame = mFrameConstructor->GetRootFrame();
   if (rootFrame) {
     const nsFrameList& childList = rootFrame->GetChildList(nsIFrame::kFixedList);
-    for (nsFrameList::Enumerator e(childList); !e.AtEnd(); e.Next()) {
-      FrameNeedsReflow(e.get(), aIntrinsicDirty, NS_FRAME_IS_DIRTY);
+    for (nsIFrame* childFrame : childList) {
+      FrameNeedsReflow(childFrame, aIntrinsicDirty, NS_FRAME_IS_DIRTY);
     }
   }
 }
@@ -10713,7 +10732,7 @@ nsIPresShell::SetScrollPositionClampingScrollPortSize(nscoord aWidth, nscoord aH
     if (nsIScrollableFrame* rootScrollFrame = GetRootScrollFrameAsScrollable()) {
       rootScrollFrame->MarkScrollbarsDirtyForReflow();
     }
-    MarkFixedFramesForReflow(eResize);
+    MarkFixedFramesForReflow(nsIPresShell::eResize);
   }
 }
 
@@ -10820,7 +10839,8 @@ nsIPresShell::SetMaxLineBoxWidth(nscoord aMaxLineBoxWidth)
   if (mMaxLineBoxWidth != aMaxLineBoxWidth) {
     mMaxLineBoxWidth = aMaxLineBoxWidth;
     mReflowOnZoomPending = true;
-    FrameNeedsReflow(GetRootFrame(), eResize, NS_FRAME_HAS_DIRTY_CHILDREN);
+    FrameNeedsReflow(GetRootFrame(), nsIPresShell::eResize,
+                     NS_FRAME_HAS_DIRTY_CHILDREN);
   }
 }
 

@@ -243,6 +243,7 @@ typedef struct _nsCocoaWindowList {
 - (void)setTitlebarNeedsDisplayInRect:(NSRect)aRect sync:(BOOL)aSync;
 - (void)setTitlebarNeedsDisplayInRect:(NSRect)aRect;
 - (void)setDrawsContentsIntoWindowFrame:(BOOL)aState;
+- (void)setSheetAttachmentPosition:(CGFloat)aY;
 - (void)placeWindowButtons:(NSRect)aRect;
 - (void)placeFullScreenButton:(NSRect)aRect;
 - (NSPoint)windowButtonsPositionWithDefaultPosition:(NSPoint)aDefaultPosition;
@@ -289,7 +290,7 @@ public:
     NS_IMETHOD              Move(double aX, double aY) override;
     NS_IMETHOD              PlaceBehind(nsTopLevelWidgetZPlacement aPlacement,
                                         nsIWidget *aWidget, bool aActivate) override;
-    NS_IMETHOD              SetSizeMode(int32_t aMode) override;
+    NS_IMETHOD              SetSizeMode(nsSizeMode aMode) override;
     NS_IMETHOD              HideWindowChrome(bool aShouldHide) override;
 
     void EnteredFullScreen(bool aFullScreen, bool aNativeMode = true);

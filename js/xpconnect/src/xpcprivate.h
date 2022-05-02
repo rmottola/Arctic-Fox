@@ -96,7 +96,7 @@
 #include "xpcpublic.h"
 #include "js/TracingAPI.h"
 #include "js/WeakMapPtr.h"
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "nscore.h"
 #include "nsXPCOM.h"
 #include "nsAutoPtr.h"
@@ -3422,6 +3422,7 @@ struct GlobalProperties {
     bool crypto : 1;
     bool rtcIdentityProvider : 1;
     bool fetch : 1;
+    bool caches : 1;
 };
 
 // Infallible.

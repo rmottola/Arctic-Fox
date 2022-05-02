@@ -140,6 +140,7 @@ public:
         return r;
     }
     void SetPushedStream(Http2PushedStream *push) { mPushedStream = push; }
+    uint32_t InitialRwin() const { return mInitialRwin; };
 
     // Locked methods to get and set timing info
     const TimingStruct Timings();
@@ -250,6 +251,7 @@ private:
     uint32_t                        mInvalidResponseBytesRead;
 
     Http2PushedStream               *mPushedStream;
+    uint32_t                        mInitialRwin;
 
     nsHttpChunkedDecoder            *mChunkedDecoder;
 
@@ -275,6 +277,7 @@ private:
     Atomic<uint32_t>                mCapsToClear;
 
     nsHttpVersion                   mHttpVersion;
+    uint16_t                        mHttpResponseCode;
 
     // state flags, all logically boolean, but not packed together into a
     // bitfield so as to avoid bitfield-induced races.  See bug 560579.
@@ -299,6 +302,7 @@ private:
     bool                            mReuseOnRestart;
     bool                            mContentDecoding;
     bool                            mContentDecodingCheck;
+    bool                            mDeferredSendProgress;
 
     // mClosed           := transaction has been explicitly closed
     // mTransactionDone  := transaction ran to completion or was interrupted

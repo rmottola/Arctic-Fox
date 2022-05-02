@@ -1979,9 +1979,9 @@ nsImageFrame::HandleEvent(nsPresContext* aPresContext,
 {
   NS_ENSURE_ARG_POINTER(aEventStatus);
 
-  if ((aEvent->mMessage == NS_MOUSE_BUTTON_UP && 
+  if ((aEvent->mMessage == eMouseUp && 
        aEvent->AsMouseEvent()->button == WidgetMouseEvent::eLeftButton) ||
-      aEvent->mMessage == NS_MOUSE_MOVE) {
+      aEvent->mMessage == eMouseMove) {
     nsImageMap* map = GetImageMap();
     bool isServerMap = IsServerImageMap();
     if ((nullptr != map) || isServerMap) {
@@ -2019,7 +2019,7 @@ nsImageFrame::HandleEvent(nsPresContext* aPresContext,
           uri->SetSpec(spec);                
           
           bool clicked = false;
-          if (aEvent->mMessage == NS_MOUSE_BUTTON_UP) {
+          if (aEvent->mMessage == eMouseUp) {
             *aEventStatus = nsEventStatus_eConsumeDoDefault; 
             clicked = true;
           }
@@ -2173,7 +2173,7 @@ nsImageFrame::LoadIcon(const nsAString& aSpec,
 
   // For icon loads, we don't need to merge with the loadgroup flags
   nsLoadFlags loadFlags = nsIRequest::LOAD_NORMAL;
-  nsContentPolicyType contentPolicyType = nsIContentPolicy::TYPE_IMAGE;
+  nsContentPolicyType contentPolicyType = nsIContentPolicy::TYPE_INTERNAL_IMAGE;
 
   return il->LoadImage(realURI,     /* icon URI */
                        nullptr,      /* initial document URI; this is only

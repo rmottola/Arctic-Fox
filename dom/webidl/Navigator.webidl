@@ -47,6 +47,7 @@ interface NavigatorID {
   readonly attribute DOMString product; // constant "Gecko"
 
   // Everyone but WebKit/Blink supports this.  See bug 679971.
+  [Exposed=Window]
   boolean taintEnabled(); // constant false
 };
 
@@ -431,8 +432,13 @@ partial interface Navigator {
 };
 
 partial interface Navigator {
-  [Throws, Pref="dom.presentation.enabled", CheckAnyPermissions="presentation", AvailableIn="PrivilegedApps"]
+  [Throws, Pref="dom.presentation.enabled", CheckAnyPermissions="presentation", AvailableIn="PrivilegedApps", SameObject]
   readonly attribute Presentation? presentation;
+};
+
+partial interface Navigator {
+  [NewObject, Pref="dom.mozTCPSocket.enabled", CheckAnyPermissions="tcp-socket"]
+  readonly attribute LegacyMozTCPSocket mozTCPSocket;
 };
 
 #ifdef NIGHTLY_BUILD

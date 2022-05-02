@@ -12,6 +12,7 @@
 #include "nsIChannelEventSink.h"
 #include "nsIInterfaceRequestor.h"
 #include "nsIStreamListener.h"
+#include "nsIThreadRetargetableStreamListener.h"
 #include "mozilla/nsRefPtr.h"
 
 #include "mozilla/DebugOnly.h"
@@ -31,20 +32,34 @@ class InternalResponse;
 class FetchDriverObserver
 {
 public:
+  FetchDriverObserver() : mGotResponseAvailable(false)
+  { }
+
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(FetchDriverObserver);
-  virtual void OnResponseAvailable(InternalResponse* aResponse) = 0;
+  void OnResponseAvailable(InternalResponse* aResponse)
+  {
+    MOZ_ASSERT(!mGotResponseAvailable);
+    mGotResponseAvailable = true;
+    OnResponseAvailableInternal(aResponse);
+  }
   virtual void OnResponseEnd()
   { };
 
 protected:
   virtual ~FetchDriverObserver()
   { };
+
+  virtual void OnResponseAvailableInternal(InternalResponse* aResponse) = 0;
+
+private:
+  bool mGotResponseAvailable;
 };
 
 class FetchDriver final : public nsIStreamListener,
                           public nsIChannelEventSink,
                           public nsIInterfaceRequestor,
-                          public nsIAsyncVerifyRedirectCallback
+                          public nsIAsyncVerifyRedirectCallback,
+                          public nsIThreadRetargetableStreamListener
 {
 public:
   NS_DECL_ISUPPORTS
@@ -53,6 +68,7 @@ public:
   NS_DECL_NSICHANNELEVENTSINK
   NS_DECL_NSIINTERFACEREQUESTOR
   NS_DECL_NSIASYNCVERIFYREDIRECTCALLBACK
+  NS_DECL_NSITHREADRETARGETABLESTREAMLISTENER
 
   explicit FetchDriver(InternalRequest* aRequest, nsIPrincipal* aPrincipal,
                        nsILoadGroup* aLoadGroup);
@@ -74,6 +90,7 @@ private:
   nsCOMPtr<nsIChannel> mNewRedirectChannel;
   nsCOMPtr<nsIDocument> mDocument;
   uint32_t mFetchRecursionCount;
+  bool mCORSFlagEverSet;
 
   DebugOnly<bool> mResponseAvailableCalled;
 
@@ -82,7 +99,29 @@ private:
   FetchDriver& operator=(const FetchDriver&) = delete;
   ~FetchDriver();
 
+  enum MainFetchOpType
+  {
+    NETWORK_ERROR,
+    BASIC_FETCH,
+    HTTP_FETCH,
+    NUM_MAIN_FETCH_OPS
+  };
+
+  struct MainFetchOp
+  {
+    explicit MainFetchOp(MainFetchOpType aType, bool aCORSFlag = false,
+                         bool aCORSPreflightFlag = false)
+      : mType(aType), mCORSFlag(aCORSFlag),
+        mCORSPreflightFlag(aCORSPreflightFlag)
+    { }
+
+    MainFetchOpType mType;
+    bool mCORSFlag;
+    bool mCORSPreflightFlag;
+  };
+
   nsresult Fetch(bool aCORSFlag);
+  MainFetchOp SetTaintingAndGetNextOp(bool aCORSFlag);
   nsresult ContinueFetch(bool aCORSFlag);
   nsresult BasicFetch();
   nsresult HttpFetch(bool aCORSFlag = false, bool aCORSPreflightFlag = false, bool aAuthenticationFlag = false);

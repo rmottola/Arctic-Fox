@@ -275,6 +275,7 @@ GetIndexFromSelectionType(SelectionType aType)
     case nsISelectionController::SELECTION_ACCESSIBILITY: return 6; break;
     case nsISelectionController::SELECTION_FIND: return 7; break;
     case nsISelectionController::SELECTION_URLSECONDARY: return 8; break;
+    case nsISelectionController::SELECTION_URLSTRIKEOUT: return 9; break;
     default:
       return -1; break;
     }
@@ -296,6 +297,7 @@ GetSelectionTypeFromIndex(int8_t aIndex)
     case 6: return nsISelectionController::SELECTION_ACCESSIBILITY; break;
     case 7: return nsISelectionController::SELECTION_FIND; break;
     case 8: return nsISelectionController::SELECTION_URLSECONDARY; break;
+    case 9: return nsISelectionController::SELECTION_URLSTRIKEOUT; break;
     default:
       return nsISelectionController::SELECTION_NORMAL; break;
   }
@@ -1749,7 +1751,7 @@ nsFrameSelection::TakeFocus(nsIContent*        aNewFocus,
 #ifdef DEBUG_TABLE_SELECTION
 printf(" * TakeFocus - moving into new cell\n");
 #endif
-        WidgetMouseEvent event(false, NS_EVENT_NULL, nullptr,
+        WidgetMouseEvent event(false, eVoidEvent, nullptr,
                                WidgetMouseEvent::eReal);
 
         // Start selecting in the cell we were in before

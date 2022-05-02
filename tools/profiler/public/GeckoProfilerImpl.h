@@ -4,6 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 // IWYU pragma: private, include "GeckoProfiler.h"
 
+#ifndef TOOLS_SPS_SAMPLER_H_
+#define TOOLS_SPS_SAMPLER_H_
+
 #include <stdlib.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -39,9 +42,9 @@ class GeckoSampler;
 
 namespace mozilla {
 class TimeStamp;
-}
+} // namespace mozilla
 
-extern mozilla::ThreadLocal<ProfileStack *> tlsStack;
+extern mozilla::ThreadLocal<PseudoStack *> tlsPseudoStack;
 extern mozilla::ThreadLocal<GeckoSampler *> tlsTicker;
 extern mozilla::ThreadLocal<void *> tlsStackTop;
 extern bool stack_key_initialized;
@@ -182,12 +185,6 @@ const char** profiler_get_features()
 }
 
 static inline
-void profiler_print_location()
-{
-  return mozilla_sampler_print_location();
-}
-
-static inline
 void profiler_get_buffer_info(uint32_t *aCurrentPosition, uint32_t *aTotalSize,
                               uint32_t *aGeneration)
 {
@@ -234,7 +231,7 @@ void profiler_sleep_end()
 static inline
 void profiler_js_operation_callback()
 {
-  ProfileStack *stack = tlsStack.get();
+  PseudoStack *stack = tlsPseudoStack.get();
   if (!stack) {
     return;
   }
@@ -258,7 +255,7 @@ double profiler_time(const mozilla::TimeStamp& aTime)
 static inline
 bool profiler_in_privacy_mode()
 {
-  ProfileStack *stack = tlsStack.get();
+  PseudoStack *stack = tlsPseudoStack.get();
   if (!stack) {
     return false;
   }
@@ -294,6 +291,10 @@ static inline void profiler_tracing(const char* aCategory, const char* aInfo,
   mozilla_sampler_tracing(aCategory, aInfo, aMetaData);
 }
 
+#define SAMPLER_APPEND_LINE_NUMBER_PASTE(id, line) id ## line
+#define SAMPLER_APPEND_LINE_NUMBER_EXPAND(id, line) SAMPLER_APPEND_LINE_NUMBER_PASTE(id, line)
+#define SAMPLER_APPEND_LINE_NUMBER(id) SAMPLER_APPEND_LINE_NUMBER_EXPAND(id, __LINE__)
+
 // Uncomment this to turn on systrace or build with
 // ac_add_options --enable-systace
 //#define MOZ_USE_SYSTRACE
@@ -315,7 +316,7 @@ static inline void profiler_tracing(const char* aCategory, const char* aInfo,
 // atrace_end with defined HAVE_ANDROID_OS again. Then there is no build-break.
 # undef _LIBS_CUTILS_TRACE_H
 # include <utils/Trace.h>
-# define MOZ_PLATFORM_TRACING(name) ATRACE_NAME(name);
+# define MOZ_PLATFORM_TRACING(name) android::ScopedTrace SAMPLER_APPEND_LINE_NUMBER(scopedTrace)(ATRACE_TAG, name);
 # ifdef REMOVE_HAVE_ANDROID_OS
 #  undef HAVE_ANDROID_OS
 #  undef REMOVE_HAVE_ANDROID_OS
@@ -326,10 +327,6 @@ static inline void profiler_tracing(const char* aCategory, const char* aInfo,
 
 // we want the class and function name but can't easily get that using preprocessor macros
 // __func__ doesn't have the class name and __PRETTY_FUNCTION__ has the parameters
-
-#define SAMPLER_APPEND_LINE_NUMBER_PASTE(id, line) id ## line
-#define SAMPLER_APPEND_LINE_NUMBER_EXPAND(id, line) SAMPLER_APPEND_LINE_NUMBER_PASTE(id, line)
-#define SAMPLER_APPEND_LINE_NUMBER(id) SAMPLER_APPEND_LINE_NUMBER_EXPAND(id, __LINE__)
 
 #define PROFILER_LABEL(name_space, info, category) MOZ_PLATFORM_TRACING(name_space "::" info) mozilla::SamplerStackFrameRAII SAMPLER_APPEND_LINE_NUMBER(sampler_raii)(name_space "::" info, category, __LINE__)
 #define PROFILER_LABEL_FUNC(category) MOZ_PLATFORM_TRACING(SAMPLE_FUNCTION_NAME) mozilla::SamplerStackFrameRAII SAMPLER_APPEND_LINE_NUMBER(sampler_raii)(SAMPLE_FUNCTION_NAME, category, __LINE__)
@@ -385,8 +382,6 @@ static inline void profiler_tracing(const char* aCategory, const char* aInfo,
 #define PROFILE_DEFAULT_FEATURE_COUNT 0
 
 namespace mozilla {
-
-class ProfilerBacktrace;
 
 class MOZ_STACK_CLASS GeckoProfilerTracingRAII {
 public:
@@ -460,13 +455,13 @@ private:
   void* mHandle;
 };
 
-} //mozilla
+} // namespace mozilla
 
-inline ProfileStack* mozilla_profile_stack(void)
+inline PseudoStack* mozilla_get_pseudo_stack(void)
 {
   if (!stack_key_initialized)
     return nullptr;
-  return tlsStack.get();
+  return tlsPseudoStack.get();
 }
 
 inline void* mozilla_sampler_call_enter(const char *aInfo,
@@ -477,7 +472,7 @@ inline void* mozilla_sampler_call_enter(const char *aInfo,
   if (!stack_key_initialized)
     return nullptr;
 
-  ProfileStack *stack = tlsStack.get();
+  PseudoStack *stack = tlsPseudoStack.get();
   // we can't infer whether 'stack' has been initialized
   // based on the value of stack_key_intiailized because
   // 'stack' is only intialized when a thread is being
@@ -500,7 +495,7 @@ inline void mozilla_sampler_call_exit(void *aHandle)
   if (!aHandle)
     return;
 
-  ProfileStack *stack = (ProfileStack*)aHandle;
+  PseudoStack *stack = (PseudoStack*)aHandle;
   stack->popAndMaybeDelete();
 }
 
@@ -518,3 +513,4 @@ void profiler_log(const char *fmt, va_list args)
   mozilla_sampler_log(fmt, args);
 }
 
+#endif /* ndef TOOLS_SPS_SAMPLER_H_ */

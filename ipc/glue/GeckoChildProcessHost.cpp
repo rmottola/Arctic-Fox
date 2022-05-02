@@ -145,11 +145,7 @@ GeckoChildProcessHost::GetPathToBinary(FilePath& exePath)
     NS_NewLocalFile(nsDependentString(gGREBinPath), false,
                     getter_AddRefs(childProcPath));
     // We need to use an App Bundle on OS X so that we can hide
-    // the dock icon. See Bug 557225. 
-    nsCOMPtr<nsIFile> tempPath;
-    childProcPath->GetParent(getter_AddRefs(tempPath));
-    childProcPath = tempPath.forget();
-    childProcPath->AppendNative(NS_LITERAL_CSTRING("MacOS"));
+    // the dock icon. See Bug 557225.
     childProcPath->AppendNative(NS_LITERAL_CSTRING("plugin-container.app"));
     childProcPath->AppendNative(NS_LITERAL_CSTRING("Contents"));
     childProcPath->AppendNative(NS_LITERAL_CSTRING("MacOS"));

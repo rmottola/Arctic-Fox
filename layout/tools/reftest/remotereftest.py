@@ -342,7 +342,7 @@ class RemoteReftest(RefTest):
         self.server.stop()
 
     def createReftestProfile(self, options, reftestlist):
-        profile = RefTest.createReftestProfile(self, options, reftestlist, server=options.remoteWebServer)
+        profile = RefTest.createReftestProfile(self, options, reftestlist, server=options.remoteWebServer, port=options.httpPort)
         profileDir = profile.profile
 
         prefs = {}
@@ -427,6 +427,13 @@ class RemoteReftest(RefTest):
 
     def environment(self, **kwargs):
         return self.automation.environment(**kwargs)
+
+    def buildBrowserEnv(self, options, profileDir):
+        browserEnv = RefTest.buildBrowserEnv(self, options, profileDir)
+        # remove desktop environment not used on device
+        if "XPCOM_MEM_BLOAT_LOG" in browserEnv:
+            del browserEnv["XPCOM_MEM_BLOAT_LOG"]
+        return browserEnv
 
     def runApp(self, profile, binary, cmdargs, env,
                timeout=None, debuggerInfo=None,

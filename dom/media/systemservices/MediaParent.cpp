@@ -15,8 +15,9 @@
 #include "nsThreadUtils.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
-#include "nsIOutputStream.h"
+#include "nsIInputStream.h"
 #include "nsILineInputStream.h"
+#include "nsIOutputStream.h"
 #include "nsISafeOutputStream.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsISupportsImpl.h"
@@ -48,7 +49,7 @@ class OriginKeyStore : public nsISupports
     static const size_t DecodedLength = 18;
     static const size_t EncodedLength = DecodedLength * 4 / 3;
 
-    OriginKey(const nsACString& aKey, int64_t aSecondsStamp = 0) // 0 = temporal
+    explicit OriginKey(const nsACString& aKey, int64_t aSecondsStamp = 0) // 0 = temporal
     : mKey(aKey)
     , mSecondsStamp(aSecondsStamp) {}
 
@@ -474,7 +475,8 @@ Parent<Super>::RecvGetOriginKey(const uint32_t& aRequestId,
 }
 
 template<class Super> bool
-Parent<Super>::RecvSanitizeOriginKeys(const uint64_t& aSinceWhen)
+Parent<Super>::RecvSanitizeOriginKeys(const uint64_t& aSinceWhen,
+                                      const bool& aOnlyPrivateBrowsing)
 {
   MOZ_ASSERT(NS_IsMainThread());
   nsCOMPtr<nsIFile> profileDir;
@@ -489,11 +491,14 @@ Parent<Super>::RecvSanitizeOriginKeys(const uint64_t& aSinceWhen)
   MOZ_ASSERT(sts);
   nsRefPtr<OriginKeyStore> store(mOriginKeyStore);
 
-  rv = sts->Dispatch(NewRunnableFrom([profileDir, store, aSinceWhen]() -> nsresult {
+  rv = sts->Dispatch(NewRunnableFrom([profileDir, store, aSinceWhen,
+                                      aOnlyPrivateBrowsing]() -> nsresult {
     MOZ_ASSERT(!NS_IsMainThread());
-    store->mOriginKeys.SetProfileDir(profileDir);
     store->mPrivateBrowsingOriginKeys.Clear(aSinceWhen);
-    store->mOriginKeys.Clear(aSinceWhen);
+    if (!aOnlyPrivateBrowsing) {
+      store->mOriginKeys.SetProfileDir(profileDir);
+      store->mOriginKeys.Clear(aSinceWhen);
+    }
     return NS_OK;
   }), NS_DISPATCH_NORMAL);
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -540,11 +545,12 @@ DeallocPMediaParent(media::PMediaParent *aActor)
 {
   MOZ_ASSERT(sIPCServingParent == static_cast<Parent<PMediaParent>*>(aActor));
   delete sIPCServingParent;
+  sIPCServingParent = nullptr;
   return true;
 }
 
-}
-}
+} // namespace media
+} // namespace mozilla
 
 // Instantiate templates to satisfy linker
 template class mozilla::media::Parent<mozilla::media::NonE10s>;

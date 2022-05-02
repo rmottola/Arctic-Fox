@@ -121,7 +121,6 @@ private:
     bool                            mIsPending;
     bool                            mIsUnsafe;
     bool                            mOpeningRemote;
-    bool                            mEnsureChildFd;
 
     mozilla::net::MemoryDownloader::Data mTempMem;
     nsCOMPtr<nsIInputStreamPump>    mPump;
@@ -133,8 +132,11 @@ private:
     nsCString                       mJarEntry;
     nsCString                       mInnerJarEntry;
 
-    nsRefPtr<nsInputStreamPump> mSynthesizedResponsePump;
-    int64_t mSynthesizedStreamLength;
+    nsRefPtr<nsInputStreamPump>     mSynthesizedResponsePump;
+    int64_t                         mSynthesizedStreamLength;
+
+    // True if this channel should skip any interception checks.
+    bool                            mForceNoIntercept;
 
     friend class mozilla::net::InterceptedJARChannel;
 };

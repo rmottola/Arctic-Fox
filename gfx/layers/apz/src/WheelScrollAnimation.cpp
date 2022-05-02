@@ -10,7 +10,8 @@ namespace mozilla {
 namespace layers {
 
 WheelScrollAnimation::WheelScrollAnimation(AsyncPanZoomController& aApzc, const nsPoint& aInitialPosition)
-  : AsyncScrollBase(aInitialPosition)
+  : AsyncPanZoomAnimation(TimeDuration::FromMilliseconds(gfxPrefs::APZSmoothScrollRepaintInterval()))
+  , AsyncScrollBase(aInitialPosition)
   , mApzc(aApzc)
   , mFinalDestination(aInitialPosition)
 {
@@ -20,23 +21,33 @@ void
 WheelScrollAnimation::Update(TimeStamp aTime, nsPoint aDelta, const nsSize& aCurrentVelocity)
 {
   InitPreferences(aTime);
+
   mFinalDestination += aDelta;
+
+  // Clamp the final destination to the scrollable area.
+  CSSPoint clamped = CSSPoint::FromAppUnits(mFinalDestination);
+  clamped.x = mApzc.mX.ClampOriginToScrollableRect(clamped.x);
+  clamped.y = mApzc.mY.ClampOriginToScrollableRect(clamped.y);
+  mFinalDestination = CSSPoint::ToAppUnits(clamped);
+
   AsyncScrollBase::Update(aTime, mFinalDestination, aCurrentVelocity);
 }
 
 bool
 WheelScrollAnimation::DoSample(FrameMetrics& aFrameMetrics, const TimeDuration& aDelta)
 {
-  TimeStamp now = AsyncPanZoomController::GetFrameTime();
-  if (IsFinished(now)) {
-    return false;
-  }
-
+  TimeStamp now = mApzc.GetFrameTime();
   CSSToParentLayerScale2D zoom = aFrameMetrics.GetZoom();
 
-  nsPoint position = PositionAt(now);
+  // If the animation is finished, make sure the final position is correct by
+  // using one last displacement. Otherwise, compute the delta via the timing
+  // function as normal.
+  bool finished = IsFinished(now);
+  nsPoint sampledDest = finished
+                        ? mDestination
+                        : PositionAt(now);
   ParentLayerPoint displacement =
-    (CSSPoint::FromAppUnits(position) - aFrameMetrics.GetScrollOffset()) * zoom;
+    (CSSPoint::FromAppUnits(sampledDest) - aFrameMetrics.GetScrollOffset()) * zoom;
 
   // Note: we ignore overscroll for wheel animations.
   ParentLayerPoint adjustedOffset, overscroll;
@@ -44,8 +55,17 @@ WheelScrollAnimation::DoSample(FrameMetrics& aFrameMetrics, const TimeDuration& 
   mApzc.mY.AdjustDisplacement(displacement.y, adjustedOffset.y, overscroll.y,
                               !aFrameMetrics.AllowVerticalScrollWithWheel());
 
+  // If we expected to scroll, but there's no more scroll range on either axis,
+  // then end the animation early. Note that the initial displacement could be 0
+  // if the compositor ran very quickly (<1ms) after the animation was created.
+  // When that happens we want to make sure the animation continues.
+  if (!IsZero(displacement) && IsZero(adjustedOffset)) {
+    // Nothing more to do - end the animation.
+    return false;
+  }
+
   aFrameMetrics.ScrollBy(adjustedOffset / zoom);
-  return true;
+  return !finished;
 }
 
 void
@@ -61,9 +81,7 @@ WheelScrollAnimation::InitPreferences(TimeStamp aTime)
   mIntervalRatio = (gfxPrefs::SmoothScrollDurationToIntervalRatio() * 100) / 100.0;
   mIntervalRatio = std::max(1.0, mIntervalRatio);
 
-  if (mIsFirstIteration) {
-    InitializeHistory(aTime);
-  }
+  InitializeHistory(aTime);
 }
 
 } // namespace layers

@@ -24,3 +24,6 @@ LOCAL_INCLUDES += [
 DEFINES['NOMINMAX'] = True
 
 FINAL_LIBRARY = 'xul'
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wshadow']

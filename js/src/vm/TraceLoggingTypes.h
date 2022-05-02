@@ -48,6 +48,7 @@
     _(AliasAnalysis)                                  \
     _(GVN)                                            \
     _(LICM)                                           \
+    _(Sincos)                                         \
     _(RangeAnalysis)                                  \
     _(LoopUnrolling)                                  \
     _(EffectiveAddressAnalysis)                       \

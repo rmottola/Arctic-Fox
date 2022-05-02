@@ -175,6 +175,9 @@ pref("dom.enable_user_timing", true);
 // Enable printing performance marks/measures to log
 pref("dom.performance.enable_user_timing_logging", false);
 
+// Enable notification of performance timing
+pref("dom.performance.enable_notify_performance_timing", false);
+
 // Whether the Gamepad API is enabled
 pref("dom.gamepad.enabled", true);
 #ifdef RELEASE_BUILD
@@ -534,6 +537,7 @@ pref("layout.event-regions.enabled", false);
 // APZ preferences. For documentation/details on what these prefs do, check
 // gfx/layers/apz/src/AsyncPanZoomController.cpp.
 pref("apz.allow_checkerboarding", true);
+pref("apz.allow_zooming", false);
 pref("apz.asyncscroll.throttle", 100);
 pref("apz.asyncscroll.timeout", 300);
 
@@ -1418,6 +1422,11 @@ pref("javascript.options.mem.log", false);
 pref("javascript.options.mem.notify", false);
 pref("javascript.options.gc_on_memory_pressure", true);
 pref("javascript.options.compact_on_user_inactive", true);
+#ifdef NIGHTLY_BUILD
+pref("javascript.options.compact_on_user_inactive_delay", 15000); // ms
+#else
+pref("javascript.options.compact_on_user_inactive_delay", 300000); // ms
+#endif
 
 pref("javascript.options.mem.gc_high_frequency_time_limit_ms", 1000);
 pref("javascript.options.mem.gc_high_frequency_low_limit_mb", 100);
@@ -1527,9 +1536,6 @@ pref("network.http.version", "1.1");      // default
 pref("network.http.proxy.version", "1.1");    // default
 // pref("network.http.proxy.version", "1.0"); // uncomment this out in case of problems
                                               // (required if using junkbuster proxy)
-
-// enable caching of http documents
-pref("network.http.use-cache", true);
 
 // this preference can be set to override the socket type used for normal
 // HTTP traffic.  an empty value indicates the normal TCP/IP socket type.
@@ -1682,13 +1688,12 @@ pref("network.http.spdy.ping-threshold", 58);
 pref("network.http.spdy.ping-timeout", 8);
 pref("network.http.spdy.send-buffer-size", 131072);
 pref("network.http.spdy.allow-push", true);
-pref("network.http.spdy.push-allowance", 131072);
+pref("network.http.spdy.push-allowance", 131072);   // 128KB
+pref("network.http.spdy.pull-allowance", 12582912); // 12MB
 pref("network.http.spdy.default-concurrent", 100);
 
 // alt-svc allows separation of transport routing from
 // the origin host without using a proxy.
-pref("network.http.atsvc.enabled", false);
-pref("network.http.atsvc.oe", false);
 pref("network.http.altsvc.enabled", false);
 pref("network.http.altsvc.oe", false);
 
@@ -1711,6 +1716,17 @@ pref("network.http.tcp_keepalive.long_lived_idle_time", 600);
 
 pref("network.http.enforce-framing.http1", false); // should be named "strict"
 pref("network.http.enforce-framing.soft", true);
+
+// Whether nsHttpChannel should use the PackagedAppService to load
+// resources from a package when directed to a URL
+// such as http://domain.com/package.pak!//resource.html
+// See http://www.w3.org/TR/web-packaging/#streamable-package-format
+pref("network.http.enable-packaged-apps", false);
+
+// Enable this pref to skip verification process. The packaged app
+// will be considered signed no matter the package has a valid/invalid
+// signature or no signature.
+pref("network.http.packaged-apps-developer-mode", false);
 
 // default values for FTP
 // in a DSCP environment this should be 40 (0x28, or AF11), per RFC-4594,
@@ -2186,7 +2202,10 @@ pref("intl.hyphenation-alias.no-*", "nb");
 pref("intl.hyphenation-alias.nb-*", "nb");
 pref("intl.hyphenation-alias.nn-*", "nn");
 
-pref("font.mathfont-family", "Latin Modern Math, XITS Math, STIX Math, Cambria Math, Asana Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Termes Math, Neo Euler, Lucida Bright Math, MathJax_Main, STIXNonUnicode, STIXSizeOneSym, STIXGeneral, Standard Symbols L, DejaVu Sans");
+pref("font.name.serif.x-math", "Latin Modern Math");
+pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, MathJax_Main, STIXGeneral, DejaVu Serif, DejaVu Sans, Standard Symbols L, serif");
+pref("font.name.sans-serif.x-math", "sans-serif");
+pref("font.name.monospace.x-math", "monospace");
 
 // Some CJK fonts have bad underline offset, their CJK character glyphs are overlapped (or adjoined)  to its underline.
 // These fonts are ignored the underline offset, instead of it, the underline is lowered to bottom of its em descent.
@@ -2510,9 +2529,6 @@ pref("layout.css.clip-path-shapes.enabled", false);
 // Is support for CSS sticky positioning enabled?
 pref("layout.css.sticky.enabled", true);
 
-// Is support for CSS "will-change" enabled?
-pref("layout.css.will-change.enabled", true);
-
 // Is support for DOMPoint enabled?
 pref("layout.css.DOMPoint.enabled", true);
 
@@ -2557,10 +2573,17 @@ pref("layout.css.prefixes.transitions", true);
 pref("layout.css.prefixes.animations", true);
 pref("layout.css.prefixes.box-sizing", true);
 pref("layout.css.prefixes.font-features", true);
+pref("layout.css.prefixes.gradients", true);
 
 // Is the CSS Unprefixing Service enabled? (This service emulates support
 // for certain vendor-prefixed properties & values, for sites on a "fixlist".)
-pref("layout.css.unprefixing-service.enabled", false);
+pref("layout.css.unprefixing-service.enabled", true);
+#ifdef NIGHTLY_BUILD
+// Is the CSS Unprefixing Service whitelisted for all domains?
+// (This pref is only honored in Nightly builds and can be removed when
+// Bug 1177263 is fixed.)
+pref("layout.css.unprefixing-service.globally-whitelisted", false);
+#endif
 
 // Is support for the :scope selector enabled?
 pref("layout.css.scope-pseudo.enabled", true);
@@ -2965,6 +2988,10 @@ pref("font.minimum-size.zh-TW", 0);
 pref("font.size.variable.zh-TW", 16);
 pref("font.size.fixed.zh-TW", 16);
 
+// mathml.css sets font-size to "inherit" and font-family to "serif" so only
+// font.name.*.x-math and font.minimum-size.x-math are really relevant.
+pref("font.minimum-size.x-math", 0);
+
 /*
  * A value greater than zero enables font size inflation for
  * pan-and-zoom UIs, so that the fonts in a block are at least the size
@@ -3287,8 +3314,12 @@ pref("font.name-list.monospace.x-tibt", "Tibetan Machine Uni, Jomolhari, Microso
 pref("font.minimum-size.th", 10);
 
 pref("font.default.x-devanagari", "sans-serif");
+pref("font.name.serif.x-math", "Latin Modern Math");
 // We have special support for Monotype Symbol on Windows.
-pref("font.mathfont-family", "MathJax_Main, STIXNonUnicode, STIXSizeOneSym, STIXGeneral, Asana Math, Symbol, DejaVu Sans, Cambria Math");
+pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, MathJax_Main, STIXGeneral, DejaVu Serif, DejaVu Sans, Symbol, Times New Roman");
+pref("font.name.sans-serif.x-math", "Arial");
+pref("font.name.monospace.x-math", "Courier New");
+pref("font.name.cursive.x-math", "Comic Sans MS");
 
 // cleartype settings - false implies default system settings
 
@@ -3721,8 +3752,13 @@ pref("font.size.variable.zh-CN", 15);
 pref("font.size.variable.zh-HK", 15);
 pref("font.size.variable.zh-TW", 15);
 
+pref("font.name.serif.x-math", "Latin Modern Math");
 // Apple's Symbol is Unicode so use it
-pref("font.mathfont-family", "Latin Modern Math, XITS Math, STIX Math, Cambria Math, Asana Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Termes Math, Neo Euler, Lucida Bright Math, MathJax_Main, STIXNonUnicode, STIXSizeOneSym, STIXGeneral, Symbol, DejaVu Sans");
+pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, MathJax_Main, STIXGeneral, DejaVu Serif, DejaVu Sans, Symbol, Times");
+pref("font.name.sans-serif.x-math", "Helvetica");
+pref("font.name.monospace.x-math", "Courier");
+pref("font.name.cursive.x-math", "Apple Chancery");
+pref("font.name.fantasy.x-math", "Papyrus");
 
 // individual font faces to be treated as independent families
 // names are Postscript names of each face
@@ -4075,6 +4111,11 @@ pref("font.name.sans-serif.zh-TW", "Fira Sans");
 pref("font.name.monospace.zh-TW", "Fira Mono");
 pref("font.name-list.sans-serif.zh-TW", "Fira Sans,Droid Sans Fallback");
 
+pref("font.name.serif.x-math", "Latin Modern Math");
+pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, MathJax_Main, STIXGeneral, DejaVu Serif, DejaVu Sans, Charis SIL Compact");
+pref("font.name.sans-serif.x-math", "Fira Sans");
+pref("font.name.monospace.x-math", "Fira Mono");
+
 #elif defined(ANDROID)
 // We use the bundled fonts for Firefox for Android
 
@@ -4147,6 +4188,11 @@ pref("font.name.monospace.zh-TW", "Droid Sans Mono");
 pref("font.name-list.serif.zh-TW", "Droid Serif, Droid Sans Fallback");
 pref("font.name-list.sans-serif.zh-TW", "Roboto, Droid Sans, Noto Sans TC, Noto Sans SC, Droid Sans Fallback");
 pref("font.name-list.monospace.zh-TW", "Droid Sans Fallback");
+
+pref("font.name.serif.x-math", "Latin Modern Math");
+pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, MathJax_Main, STIXGeneral, DejaVu Serif, DejaVu Sans, Charis SIL Compact");
+pref("font.name.sans-serif.x-math", "Clear Sans");
+pref("font.name.monospace.x-math", "Droid Sans Mono");
 
 #endif
 
@@ -4764,6 +4810,9 @@ pref("dom.idle-observers-api.fuzz_time.disabled", true);
 // Lowest localId for apps.
 pref("dom.mozApps.maxLocalId", 1000);
 
+// Reset apps permissions
+pref("dom.apps.reset-permissions", false);
+
 // XXX Security: You CANNOT safely add a new app store for
 // installing privileged apps just by modifying this pref and
 // adding the signing cert for that store to the cert trust
@@ -4801,7 +4850,14 @@ pref("dom.browserElement.maxScreenshotDelayMS", 2000);
 // Whether we should show the placeholder when the element is focused but empty.
 pref("dom.placeholder.show_on_focus", true);
 
+// VR is disabled by default
 pref("dom.vr.enabled", false);
+// Oculus > 0.5
+pref("dom.vr.oculus.enabled", true);
+// Oculus <= 0.5; will only trigger if > 0.5 is not used or found
+pref("dom.vr.oculus050.enabled", true);
+// Cardboard VR device is disabled by default
+pref("dom.vr.cardboard.enabled", false);
 // 0 = never; 1 = only if real devices aren't there; 2 = always
 pref("dom.vr.add-test-devices", 1);
 // true = show the VR textures in our compositing output; false = don't.
@@ -4939,14 +4995,14 @@ pref("urlclassifier.malwareTable", "goog-malware-shavar,goog-unwanted-shavar,tes
 pref("urlclassifier.phishTable", "goog-phish-shavar,test-phish-simple");
 pref("urlclassifier.downloadBlockTable", "");
 pref("urlclassifier.downloadAllowTable", "");
-pref("urlclassifier.disallow_completions", "test-malware-simple,test-phish-simple,test-unwanted-simple,goog-downloadwhite-digest256,mozpub-track-digest256");
+pref("urlclassifier.disallow_completions", "test-malware-simple,test-phish-simple,test-unwanted-simple,test-track-simple,test-trackwhite-simple,goog-downloadwhite-digest256,mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256");
 
 // The table and update/gethash URLs for Safebrowsing phishing and malware
 // checks.
-pref("urlclassifier.trackingTable", "mozpub-track-digest256");
+pref("urlclassifier.trackingTable", "test-track-simple,mozpub-track-digest256");
+pref("urlclassifier.trackingWhitelistTable", "test-trackwhite-simple,mozpub-trackwhite-digest256");
 pref("browser.trackingprotection.updateURL", "https://tracking.services.mozilla.com/downloads?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
 pref("browser.trackingprotection.gethashURL", "https://tracking.services.mozilla.com/gethash?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
-
 // Turn off Spatial navigation by default.
 pref("snav.enabled", false);
 
@@ -4987,6 +5043,12 @@ pref("caret.manages-android-actionbar", false);
 
 // New implementation to unify touch-caret and selection-carets.
 pref("layout.accessiblecaret.enabled", false);
+
+// CSS attributes of the AccessibleCaret in CSS pixels.
+pref("layout.accessiblecaret.width", "44.0");
+pref("layout.accessiblecaret.height", "47.0");
+pref("layout.accessiblecaret.margin-left", "-23.5");
+pref("layout.accessiblecaret.bar.width", "2.0");
 
 // Timeout in milliseconds to hide the accessiblecaret under cursor mode while
 // no one touches it. Set the value to 0 to disable this feature.
@@ -5045,11 +5107,25 @@ pref("dom.beforeAfterKeyboardEvent.enabled", false);
 
 // Presentation API
 pref("dom.presentation.enabled", false);
+pref("dom.presentation.tcp_server.debug", false);
+pref("dom.presentation.discovery.enabled", true);
+pref("dom.presentation.discoverable", false);
 
-// Use raw ICU instead of CoreServices API in Unicode collation
 #ifdef XP_MACOSX
+// Use raw ICU instead of CoreServices API in Unicode collation
 pref("intl.collation.mac.use_icu", true);
+
+// Enable NSTextInput protocol for use with IMEs that have not
+// been updated to use the NSTextInputClient protocol.
+pref("intl.ime.nstextinput.enable", false);
+
+#if !defined(RELEASE_BUILD) || defined(DEBUG)
+// In non-release builds we crash by default on insecure text input (when a
+// password editor has focus but secure event input isn't enabled).  The
+// following pref, when turned on, disables this behavior.  See bug 1188425.
+pref("intl.allow-insecure-text-input", false);
 #endif
+#endif // XP_MACOSX
 
 // Enable meta-viewport support in remote APZ-enabled frames.
 pref("dom.meta-viewport.enabled", false);

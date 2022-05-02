@@ -1167,7 +1167,7 @@ nsWindow::SetZIndex(int32_t aZIndex)
 }
 
 NS_IMETHODIMP
-nsWindow::SetSizeMode(int32_t aMode)
+nsWindow::SetSizeMode(nsSizeMode aMode)
 {
     nsresult rv;
 
@@ -2375,7 +2375,8 @@ nsWindow::OnEnterNotifyEvent(GdkEventCrossing *aEvent)
     if (is_parent_ungrab_enter(aEvent))
         return;
 
-    WidgetMouseEvent event(true, NS_MOUSE_ENTER_WIDGET, this, WidgetMouseEvent::eReal);
+    WidgetMouseEvent event(true, eMouseEnterIntoWidget, this,
+                           WidgetMouseEvent::eReal);
 
     event.refPoint.x = nscoord(aEvent->x);
     event.refPoint.y = nscoord(aEvent->y);
@@ -2416,7 +2417,8 @@ nsWindow::OnLeaveNotifyEvent(GdkEventCrossing *aEvent)
     if (aEvent->subwindow != nullptr)
         return;
 
-    WidgetMouseEvent event(true, NS_MOUSE_EXIT_WIDGET, this, WidgetMouseEvent::eReal);
+    WidgetMouseEvent event(true, eMouseExitFromWidget, this,
+                           WidgetMouseEvent::eReal);
 
     event.refPoint.x = nscoord(aEvent->x);
     event.refPoint.y = nscoord(aEvent->y);
@@ -2463,7 +2465,7 @@ nsWindow::OnMotionNotifyEvent(GdkEventMotion *aEvent)
     }
 #endif /* MOZ_X11 */
 
-    WidgetMouseEvent event(true, NS_MOUSE_MOVE, this, WidgetMouseEvent::eReal);
+    WidgetMouseEvent event(true, eMouseMove, this, WidgetMouseEvent::eReal);
 
     gdouble pressure = 0;
     gdk_event_get_axis ((GdkEvent*)aEvent, GDK_AXIS_PRESSURE, &pressure);
@@ -2556,7 +2558,7 @@ nsWindow::DispatchMissedButtonReleases(GdkEventCrossing *aGdkEvent)
             // change in state.  This event is marked as synthesized so that
             // it is not dispatched as a DOM event, because we don't know the
             // position, widget, modifiers, or time/order.
-            WidgetMouseEvent synthEvent(true, NS_MOUSE_BUTTON_UP, this,
+            WidgetMouseEvent synthEvent(true, eMouseUp, this,
                                         WidgetMouseEvent::eSynthesized);
             synthEvent.button = buttonType;
             DispatchInputEvent(&synthEvent);
@@ -2581,7 +2583,7 @@ nsWindow::InitButtonEvent(WidgetMouseEvent& aEvent,
     guint modifierState = aGdkEvent->state;
     // aEvent's state doesn't include this event's information.  Therefore,
     // if aEvent is mouse button down event, we need to set it manually.
-    // Note that we cannot do same thing for NS_MOUSE_BUTTON_UP because
+    // Note that we cannot do same thing for eMouseUp because
     // system may have two or more mice and same button of another mouse
     // may be still pressed.
     if (aGdkEvent->type != GDK_BUTTON_RELEASE) {
@@ -2681,8 +2683,7 @@ nsWindow::OnButtonPressEvent(GdkEventButton *aEvent)
 
     gButtonState |= ButtonMaskFromGDKButton(aEvent->button);
 
-    WidgetMouseEvent event(true, NS_MOUSE_BUTTON_DOWN, this,
-                           WidgetMouseEvent::eReal);
+    WidgetMouseEvent event(true, eMouseDown, this, WidgetMouseEvent::eReal);
     event.button = domButton;
     InitButtonEvent(event, aEvent);
     event.pressure = mLastMotionPressure;
@@ -2692,7 +2693,7 @@ nsWindow::OnButtonPressEvent(GdkEventButton *aEvent)
     // right menu click on linux should also pop up a context menu
     if (domButton == WidgetMouseEvent::eRightButton &&
         MOZ_LIKELY(!mIsDestroyed)) {
-        WidgetMouseEvent contextMenuEvent(true, NS_CONTEXTMENU, this,
+        WidgetMouseEvent contextMenuEvent(true, eContextMenu, this,
                                           WidgetMouseEvent::eReal);
         InitButtonEvent(contextMenuEvent, aEvent);
         contextMenuEvent.pressure = mLastMotionPressure;
@@ -2722,7 +2723,7 @@ nsWindow::OnButtonReleaseEvent(GdkEventButton *aEvent)
 
     gButtonState &= ~ButtonMaskFromGDKButton(aEvent->button);
 
-    WidgetMouseEvent event(true, NS_MOUSE_BUTTON_UP, this,
+    WidgetMouseEvent event(true, eMouseUp, this,
                            WidgetMouseEvent::eReal);
     event.button = domButton;
     InitButtonEvent(event, aEvent);
@@ -2853,7 +2854,7 @@ nsWindow::DispatchKeyDownEvent(GdkEventKey *aEvent, bool *aCancelled)
     }
 
     // send the key down event
-    WidgetKeyboardEvent downEvent(true, NS_KEY_DOWN, this);
+    WidgetKeyboardEvent downEvent(true, eKeyDown, this);
     KeymapWrapper::InitKeyEvent(downEvent, aEvent);
     nsEventStatus status = DispatchInputEvent(&downEvent);
     *aCancelled = (status == nsEventStatus_eConsumeNoDefault);
@@ -2907,8 +2908,8 @@ nsWindow::OnKeyPressEvent(GdkEventKey *aEvent)
         }
     }
 
-    // Don't pass modifiers as NS_KEY_PRESS events.
-    // TODO: Instead of selectively excluding some keys from NS_KEY_PRESS events,
+    // Don't pass modifiers as eKeyPress events.
+    // TODO: Instead of selectively excluding some keys from eKeyPress events,
     //       we should instead selectively include (as per MSDN spec; no official
     //       spec covers KeyPress events).
     if (!KeymapWrapper::IsKeyPressEventNecessary(aEvent)) {
@@ -2935,29 +2936,29 @@ nsWindow::OnKeyPressEvent(GdkEventKey *aEvent)
             return DispatchCommandEvent(nsGkAtoms::Home);
         case XF86XK_Copy:
         case GDK_F16:  // F16, F20, F18, F14 are old keysyms for Copy Cut Paste Undo
-            return DispatchContentCommandEvent(NS_CONTENT_COMMAND_COPY);
+            return DispatchContentCommandEvent(eContentCommandCopy);
         case XF86XK_Cut:
         case GDK_F20:
-            return DispatchContentCommandEvent(NS_CONTENT_COMMAND_CUT);
+            return DispatchContentCommandEvent(eContentCommandCut);
         case XF86XK_Paste:
         case GDK_F18:
-            return DispatchContentCommandEvent(NS_CONTENT_COMMAND_PASTE);
+            return DispatchContentCommandEvent(eContentCommandPaste);
         case GDK_Redo:
-            return DispatchContentCommandEvent(NS_CONTENT_COMMAND_REDO);
+            return DispatchContentCommandEvent(eContentCommandRedo);
         case GDK_Undo:
         case GDK_F14:
-            return DispatchContentCommandEvent(NS_CONTENT_COMMAND_UNDO);
+            return DispatchContentCommandEvent(eContentCommandUndo);
     }
 #endif /* ! AIX */
 #endif /* MOZ_X11 */
 
-    WidgetKeyboardEvent event(true, NS_KEY_PRESS, this);
+    WidgetKeyboardEvent event(true, eKeyPress, this);
     KeymapWrapper::InitKeyEvent(event, aEvent);
 
     // before we dispatch a key, check if it's the context menu key.
     // If so, send a context menu key event instead.
     if (is_context_menu_key(event)) {
-        WidgetMouseEvent contextMenuEvent(true, NS_CONTEXTMENU, this,
+        WidgetMouseEvent contextMenuEvent(true, eContextMenu, this,
                                           WidgetMouseEvent::eReal,
                                           WidgetMouseEvent::eContextMenuKey);
 
@@ -2976,7 +2977,7 @@ nsWindow::OnKeyPressEvent(GdkEventKey *aEvent)
         }
         else {
             WidgetCompositionEvent compositionChangeEvent(
-                                     true, NS_COMPOSITION_CHANGE, this);
+                                     true, eCompositionChange, this);
             char16_t textString[3];
             textString[0] = H_SURROGATE(event.charCode);
             textString[1] = L_SURROGATE(event.charCode);
@@ -3005,7 +3006,7 @@ nsWindow::OnKeyReleaseEvent(GdkEventKey *aEvent)
     }
 
     // send the key event as a key up event
-    WidgetKeyboardEvent event(true, NS_KEY_UP, this);
+    WidgetKeyboardEvent event(true, eKeyUp, this);
     KeymapWrapper::InitKeyEvent(event, aEvent);
 
     nsEventStatus status = DispatchInputEvent(&event);
@@ -3026,10 +3027,11 @@ nsWindow::OnScrollEvent(GdkEventScroll *aEvent)
         return;
 #if GTK_CHECK_VERSION(3,4,0)
     // check for duplicate legacy scroll event, see GNOME bug 726878
-    if (mLastScrollEventTime == aEvent->time)
+    if (aEvent->direction != GDK_SCROLL_SMOOTH &&
+        mLastScrollEventTime == aEvent->time)
         return; 
 #endif
-    WidgetWheelEvent wheelEvent(true, NS_WHEEL_WHEEL, this);
+    WidgetWheelEvent wheelEvent(true, eWheel, this);
     wheelEvent.deltaMode = nsIDOMWheelEvent::DOM_DELTA_LINE;
     switch (aEvent->direction) {
 #if GTK_CHECK_VERSION(3,4,0)
@@ -3226,7 +3228,7 @@ nsWindow::DispatchDragEvent(EventMessage aMsg, const nsIntPoint& aRefPoint,
 {
     WidgetDragEvent event(true, aMsg, this);
 
-    if (aMsg == NS_DRAGDROP_OVER) {
+    if (aMsg == eDragOver) {
         InitDragEvent(event);
     }
 
@@ -6080,7 +6082,7 @@ nsWindow::ExecuteNativeKeyBinding(NativeKeyBindingsType aType,
 
         // Check if we're targeting content with vertical writing mode,
         // and if so remap the arrow keys.
-        WidgetQueryContentEvent query(true, NS_QUERY_SELECTED_TEXT, this);
+        WidgetQueryContentEvent query(true, eQuerySelectedText, this);
         nsEventStatus status;
         DispatchEvent(&query, status);
 

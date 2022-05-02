@@ -1374,8 +1374,6 @@ gfxTextRun::FetchGlyphExtents(gfxContext *aRefContext)
   
         for (j = start; j < end; ++j) {
             const gfxTextRun::CompressedGlyph *glyphData = &charGlyphs[j];
-            gfxFont::Orientation orientation =
-                IsVertical() ? gfxFont::eVertical : gfxFont::eHorizontal;
             if (glyphData->IsSimpleGlyph()) {
                 // If we're in speed mode, don't set up glyph extents here; we'll
                 // just return "optimistic" glyph bounds later
@@ -1392,7 +1390,7 @@ gfxTextRun::FetchGlyphExtents(gfxContext *aRefContext)
 #ifdef DEBUG_TEXT_RUN_STORAGE_METRICS
                         ++gGlyphExtentsSetupEagerSimple;
 #endif
-                        font->SetupGlyphExtents(aRefContext, orientation,
+                        font->SetupGlyphExtents(aRefContext,
                                                 glyphIndex, false, extents);
                     }
                 }
@@ -1418,7 +1416,7 @@ gfxTextRun::FetchGlyphExtents(gfxContext *aRefContext)
 #ifdef DEBUG_TEXT_RUN_STORAGE_METRICS
                         ++gGlyphExtentsSetupEagerTight;
 #endif
-                        font->SetupGlyphExtents(aRefContext, orientation,
+                        font->SetupGlyphExtents(aRefContext,
                                                 glyphIndex, true, extents);
                     }
                 }
@@ -3220,7 +3218,7 @@ gfxMissingFontRecorder::Flush()
             }
             mNotifiedFonts[i] |= (1 << j);
             if (!fontNeeded.IsEmpty()) {
-                fontNeeded.Append(PRUnichar(','));
+                fontNeeded.Append(char16_t(','));
             }
             uint32_t tag = GetScriptTagForCode(i * 32 + j);
             fontNeeded.Append(char16_t(tag >> 24));

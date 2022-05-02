@@ -282,10 +282,10 @@ private:
  * This is extended from WidgetKeyboardEvent and is mapped to DOM event
  * "BeforeAfterKeyboardEvent".
  *
- * Event mMessage: NS_KEY_BEFORE_DOWN
- *                 NS_KEY_BEFORE_UP
- *                 NS_KEY_AFTER_DOWN
- *                 NS_KEY_AFTER_UP
+ * Event mMessage: eBeforeKeyDown
+ *                 eBeforeKeyUp
+ *                 eAfterKeyDown
+ *                 eAfterKeyUp
  ******************************************************************************/
 class InternalBeforeAfterKeyboardEvent : public WidgetKeyboardEvent
 {
@@ -365,6 +365,7 @@ public:
   WidgetCompositionEvent(bool aIsTrusted, EventMessage aMessage,
                          nsIWidget* aWidget)
     : WidgetGUIEvent(aIsTrusted, aMessage, aWidget, eCompositionEventClass)
+    , mOriginalMessage(eVoidEvent)
   {
     // XXX compositionstart is cancelable in draft of DOM3 Events.
     //     However, it doesn't make sense for us, we cannot cancel composition
@@ -391,12 +392,17 @@ public:
 
   nsRefPtr<TextRangeArray> mRanges;
 
+  // If the instance is a clone of another event, mOriginalMessage stores
+  // the another event's mMessage.
+  EventMessage mOriginalMessage;
+
   void AssignCompositionEventData(const WidgetCompositionEvent& aEvent,
                                   bool aCopyTargets)
   {
     AssignGUIEventData(aEvent, aCopyTargets);
 
     mData = aEvent.mData;
+    mOriginalMessage = aEvent.mOriginalMessage;
 
     // Currently, we don't need to copy the other members because they are
     // for internal use only (not available from JS).
@@ -428,16 +434,22 @@ public:
 
   bool CausesDOMTextEvent() const
   {
-    return mMessage == NS_COMPOSITION_CHANGE ||
-           mMessage == NS_COMPOSITION_COMMIT ||
-           mMessage == NS_COMPOSITION_COMMIT_AS_IS;
+    return mMessage == eCompositionChange ||
+           mMessage == eCompositionCommit ||
+           mMessage == eCompositionCommitAsIs;
   }
 
   bool CausesDOMCompositionEndEvent() const
   {
-    return mMessage == NS_COMPOSITION_END ||
-           mMessage == NS_COMPOSITION_COMMIT ||
-           mMessage == NS_COMPOSITION_COMMIT_AS_IS;
+    return mMessage == eCompositionEnd ||
+           mMessage == eCompositionCommit ||
+           mMessage == eCompositionCommitAsIs;
+  }
+
+  bool IsFollowedByCompositionEnd() const
+  {
+    return mOriginalMessage == eCompositionCommit ||
+           mOriginalMessage == eCompositionCommitAsIs;
   }
 };
 
@@ -483,7 +495,7 @@ public:
   void InitForQueryTextContent(uint32_t aOffset, uint32_t aLength,
                                bool aUseNativeLineBreak = true)
   {
-    NS_ASSERTION(mMessage == NS_QUERY_TEXT_CONTENT,
+    NS_ASSERTION(mMessage == eQueryTextContent,
                  "wrong initializer is called");
     mInput.mOffset = aOffset;
     mInput.mLength = aLength;
@@ -493,7 +505,7 @@ public:
   void InitForQueryCaretRect(uint32_t aOffset,
                              bool aUseNativeLineBreak = true)
   {
-    NS_ASSERTION(mMessage == NS_QUERY_CARET_RECT,
+    NS_ASSERTION(mMessage == eQueryCaretRect,
                  "wrong initializer is called");
     mInput.mOffset = aOffset;
     mUseNativeLineBreak = aUseNativeLineBreak;
@@ -502,7 +514,7 @@ public:
   void InitForQueryTextRect(uint32_t aOffset, uint32_t aLength,
                             bool aUseNativeLineBreak = true)
   {
-    NS_ASSERTION(mMessage == NS_QUERY_TEXT_RECT,
+    NS_ASSERTION(mMessage == eQueryTextRect,
                  "wrong initializer is called");
     mInput.mOffset = aOffset;
     mInput.mLength = aLength;
@@ -511,37 +523,37 @@ public:
 
   void InitForQueryDOMWidgetHittest(const mozilla::LayoutDeviceIntPoint& aPoint)
   {
-    NS_ASSERTION(mMessage == NS_QUERY_DOM_WIDGET_HITTEST,
+    NS_ASSERTION(mMessage == eQueryDOMWidgetHittest,
                  "wrong initializer is called");
     refPoint = aPoint;
   }
 
   void RequestFontRanges()
   {
-    NS_ASSERTION(mMessage == NS_QUERY_TEXT_CONTENT,
+    NS_ASSERTION(mMessage == eQueryTextContent,
                  "not querying text content");
     mWithFontRanges = true;
   }
 
   uint32_t GetSelectionStart(void) const
   {
-    NS_ASSERTION(mMessage == NS_QUERY_SELECTED_TEXT,
+    NS_ASSERTION(mMessage == eQuerySelectedText,
                  "not querying selection");
     return mReply.mOffset + (mReply.mReversed ? mReply.mString.Length() : 0);
   }
 
   uint32_t GetSelectionEnd(void) const
   {
-    NS_ASSERTION(mMessage == NS_QUERY_SELECTED_TEXT,
+    NS_ASSERTION(mMessage == eQuerySelectedText,
                  "not querying selection");
     return mReply.mOffset + (mReply.mReversed ? 0 : mReply.mString.Length());
   }
 
   mozilla::WritingMode GetWritingMode(void) const
   {
-    NS_ASSERTION(mMessage == NS_QUERY_SELECTED_TEXT ||
-                 mMessage == NS_QUERY_CARET_RECT ||
-                 mMessage == NS_QUERY_TEXT_RECT,
+    NS_ASSERTION(mMessage == eQuerySelectedText ||
+                 mMessage == eQueryCaretRect ||
+                 mMessage == eQueryTextRect,
                  "not querying selection or text rect");
     return mReply.mWritingMode;
   }
@@ -565,7 +577,7 @@ public:
   {
     void* mContentsRoot;
     uint32_t mOffset;
-    // mTentativeCaretOffset is used by only NS_QUERY_CHARACTER_AT_POINT.
+    // mTentativeCaretOffset is used by only eQueryCharacterAtPoint.
     // This is the offset where caret would be if user clicked at the refPoint.
     uint32_t mTentativeCaretOffset;
     nsString mString;
@@ -581,9 +593,9 @@ public:
     bool mWidgetIsHit;
     // mozilla::WritingMode value at the end (focus) of the selection
     mozilla::WritingMode mWritingMode;
-    // used by NS_QUERY_SELECTION_AS_TRANSFERABLE
+    // Used by eQuerySelectionAsTransferable
     nsCOMPtr<nsITransferable> mTransferable;
-    // used by NS_QUERY_TEXT_CONTENT with font ranges requested
+    // Used by eQueryTextContent with font ranges requested
     nsAutoTArray<mozilla::FontRange, 1> mFontRanges;
   } mReply;
 

@@ -152,10 +152,6 @@ AsmJSModule::trace(JSTracer* trc)
     for (unsigned i = 0; i < profiledFunctions_.length(); i++)
         profiledFunctions_[i].trace(trc);
 #endif
-#if defined(JS_ION_PERF)
-    for (unsigned i = 0; i < perfProfiledBlocksFunctions_.length(); i++)
-        perfProfiledBlocksFunctions_[i].trace(trc);
-#endif
     if (globalArgumentName_)
         TraceManuallyBarrieredEdge(trc, &globalArgumentName_, "asm.js global argument name");
     if (importArgumentName_)
@@ -184,9 +180,6 @@ AsmJSModule::addSizeOfMisc(mozilla::MallocSizeOf mallocSizeOf, size_t* asmJSModu
                         functionCounts_.sizeOfExcludingThis(mallocSizeOf) +
 #if defined(MOZ_VTUNE) || defined(JS_ION_PERF)
                         profiledFunctions_.sizeOfExcludingThis(mallocSizeOf) +
-#endif
-#if defined(JS_ION_PERF)
-                        perfProfiledBlocksFunctions_.sizeOfExcludingThis(mallocSizeOf) +
 #endif
                         staticLinkData_.sizeOfExcludingThis(mallocSizeOf);
 }
@@ -433,20 +426,6 @@ AsmJSModule::finish(ExclusiveContext* cx, TokenStream& tokenStream, MacroAssembl
         ProfiledFunction& pf = profiledFunctions_[i];
         pf.pod.startCodeOffset = masm.actualOffset(pf.pod.startCodeOffset);
         pf.pod.endCodeOffset = masm.actualOffset(pf.pod.endCodeOffset);
-    }
-#endif
-#ifdef JS_ION_PERF
-    for (size_t i = 0; i < perfProfiledBlocksFunctions_.length(); i++) {
-        ProfiledBlocksFunction& pbf = perfProfiledBlocksFunctions_[i];
-        pbf.pod.startCodeOffset = masm.actualOffset(pbf.pod.startCodeOffset);
-        pbf.endInlineCodeOffset = masm.actualOffset(pbf.endInlineCodeOffset);
-        pbf.pod.endCodeOffset = masm.actualOffset(pbf.pod.endCodeOffset);
-        BasicBlocksVector& basicBlocks = pbf.blocks;
-        for (uint32_t i = 0; i < basicBlocks.length(); i++) {
-            Record& r = basicBlocks[i];
-            r.startOffset = masm.actualOffset(r.startOffset);
-            r.endOffset = masm.actualOffset(r.endOffset);
-        }
     }
 #endif
 
@@ -858,7 +837,7 @@ AsmJSModule::initHeap(Handle<ArrayBufferObjectMaybeShared*> heap, JSContext* cx)
         // so we just have to add the heap length here.
         if (access.hasLengthCheck())
             X86Encoding::AddInt32(access.patchLengthAt(code_), heapLength);
-        void *addr = access.patchHeapPtrImmAt(code_);
+        void* addr = access.patchHeapPtrImmAt(code_);
         uint32_t disp = reinterpret_cast<uint32_t>(X86Encoding::GetPointer(addr));
         MOZ_ASSERT(disp <= INT32_MAX);
         X86Encoding::SetPointer(addr, (void*)(heapOffset + disp));
@@ -900,7 +879,7 @@ AsmJSModule::restoreHeapToInitialState(ArrayBufferObjectMaybeShared* maybePrevBu
             // Subtract the heap length back out, leaving the raw displacement in place.
             if (access.hasLengthCheck())
                 X86Encoding::AddInt32(access.patchLengthAt(code_), -heapLength);
-            void *addr = access.patchHeapPtrImmAt(code_);
+            void* addr = access.patchHeapPtrImmAt(code_);
             uint8_t* ptr = reinterpret_cast<uint8_t*>(X86Encoding::GetPointer(addr));
             MOZ_ASSERT(ptr >= ptrBase);
             X86Encoding::SetPointer(addr, (void*)(ptr - ptrBase));
@@ -910,7 +889,7 @@ AsmJSModule::restoreHeapToInitialState(ArrayBufferObjectMaybeShared* maybePrevBu
     if (maybePrevBuffer) {
         uint32_t heapLength = maybePrevBuffer->byteLength();
         for (unsigned i = 0; i < heapAccesses_.length(); i++) {
-            const jit::AsmJSHeapAccess &access = heapAccesses_[i];
+            const jit::AsmJSHeapAccess& access = heapAccesses_[i];
             // See comment above for x86 codegen.
             if (access.hasLengthCheck())
                 X86Encoding::AddInt32(access.patchLengthAt(code_), -heapLength);
@@ -972,7 +951,7 @@ class MOZ_STACK_CLASS AutoMutateCode
     }
 };
 
-}; // anonymous namespace
+} // namespace
 
 bool
 AsmJSModule::detachHeap(JSContext* cx)
@@ -1459,7 +1438,9 @@ AsmJSModule::CodeRange::CodeRange(AsmJSExit::BuiltinKind builtin, uint32_t begin
 void
 AsmJSModule::CodeRange::updateOffsets(jit::MacroAssembler& masm)
 {
-    uint32_t entryBefore, profilingJumpBefore, profilingEpilogueBefore;
+    uint32_t entryBefore = 0;
+    uint32_t profilingJumpBefore = 0;
+    uint32_t profilingEpilogueBefore = 0;
     if (isFunction()) {
         entryBefore = entry();
         profilingJumpBefore = profilingJump();

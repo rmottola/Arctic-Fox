@@ -8,8 +8,7 @@
        noautofocus="true"
        onpopupshown="if (event.target == this)
                        gIdentityHandler.onPopupShown(event);"
-       orient="vertical"
-       level="top">
+       orient="vertical">
   <hbox id="identity-popup-container" align="top">
     <image id="identity-popup-icon"/>
     <vbox id="identity-popup-content-box">

@@ -739,10 +739,19 @@ class MDefinition : public MNode
     // Like replaceAllUsesWith, but doesn't set UseRemoved on |this|'s operands.
     void justReplaceAllUsesWith(MDefinition* dom);
 
+    // Like justReplaceAllUsesWith, but doesn't replace its own use to the
+    // dominating instruction (which would introduce a circular dependency).
+    void justReplaceAllUsesWithExcept(MDefinition* dom);
+
     // Replace the current instruction by an optimized-out constant in all uses
     // of the current instruction. Note, that optimized-out constant should not
     // be observed, and thus they should not flow in any computation.
     void optimizeOutAllUses(TempAllocator& alloc);
+
+    // Replace the current instruction by a dominating instruction |dom| in all
+    // instruction, but keep the current instruction for resume point and
+    // instruction which are recovered on bailouts.
+    void replaceAllLiveUsesWith(MDefinition* dom);
 
     // Mark this instruction as having replaced all uses of ins, as during GVN,
     // returning false if the replacement should not be performed. For use when
@@ -786,7 +795,7 @@ class MDefinition : public MNode
     MIR_OPCODE_LIST(OPCODE_CASTS)
 #   undef OPCODE_CASTS
 
-    bool isConstantValue() {
+    bool isConstantValue() const {
         return isConstant() || (isBox() && getOperand(0)->isConstant());
     }
     const Value& constantValue();
@@ -1712,7 +1721,7 @@ class MSimdSignMask
       : MUnaryInstruction(obj)
     {
         setResultType(MIRType_Int32);
-	specialization_ = type;
+        specialization_ = type;
         setMovable();
     }
 
@@ -2847,11 +2856,6 @@ EqualTypes(MIRType type1, TemporaryTypeSet* typeset1,
 bool
 CanStoreUnboxedType(TempAllocator& alloc,
                     JSValueType unboxedType, MIRType input, TypeSet* inputTypes);
-
-#ifdef DEBUG
-bool
-IonCompilationCanUseNurseryPointers();
-#endif
 
 #ifdef DEBUG
 bool
@@ -4172,7 +4176,7 @@ class MCompare
         Compare_Object,
 
         // Compare 2 values bitwise
-        Compare_Value,
+        Compare_Bitwise,
 
         // All other possible compares
         Compare_Unknown
@@ -4258,7 +4262,7 @@ class MCompare
             return AliasSet::None();
         if (compareType_ == Compare_Unknown)
             return AliasSet::Store(AliasSet::Any);
-        MOZ_ASSERT(compareType_ <= Compare_Value);
+        MOZ_ASSERT(compareType_ <= Compare_Bitwise);
         return AliasSet::None();
     }
 
@@ -4361,7 +4365,7 @@ class MUnbox final : public MUnaryInstruction, public BoxInputsPolicy::Data
     Mode mode_;
     BailoutKind bailoutKind_;
 
-    MUnbox(MDefinition* ins, MIRType type, Mode mode, BailoutKind kind)
+    MUnbox(MDefinition* ins, MIRType type, Mode mode, BailoutKind kind, TempAllocator& alloc)
       : MUnaryInstruction(ins),
         mode_(mode)
     {
@@ -4377,8 +4381,12 @@ class MUnbox final : public MUnaryInstruction, public BoxInputsPolicy::Data
                    type == MIRType_Symbol  ||
                    type == MIRType_Object);
 
+        TemporaryTypeSet* resultSet = ins->resultTypeSet();
+        if (resultSet && type == MIRType_Object)
+            resultSet = resultSet->cloneObjectsOnly(alloc.lifoAlloc());
+
         setResultType(type);
-        setResultTypeSet(ins->resultTypeSet());
+        setResultTypeSet(resultSet);
         setMovable();
 
         if (mode_ == TypeBarrier || mode_ == Fallible)
@@ -4416,13 +4424,13 @@ class MUnbox final : public MUnaryInstruction, public BoxInputsPolicy::Data
             MOZ_CRASH("Given MIRType cannot be unboxed.");
         }
 
-        return new(alloc) MUnbox(ins, type, mode, kind);
+        return new(alloc) MUnbox(ins, type, mode, kind, alloc);
     }
 
     static MUnbox* New(TempAllocator& alloc, MDefinition* ins, MIRType type, Mode mode,
                        BailoutKind kind)
     {
-        return new(alloc) MUnbox(ins, type, mode, kind);
+        return new(alloc) MUnbox(ins, type, mode, kind, alloc);
     }
 
     Mode mode() const {
@@ -5943,7 +5951,8 @@ class MPow
     }
     bool writeRecoverData(CompactBufferWriter& writer) const override;
     bool canRecoverOnBailout() const override {
-        return true;
+        // Temporarily disable recovery to relieve fuzzer pressure. See bug 1188586.
+        return false;
     }
 
     ALLOW_CLONE(MPow)
@@ -6112,6 +6121,8 @@ class MMathFunction
     void computeRange(TempAllocator& alloc) override;
     bool writeRecoverData(CompactBufferWriter& writer) const override;
     bool canRecoverOnBailout() const override {
+        if (input()->type() == MIRType_SinCosDouble)
+            return false;
         switch(function_) {
           case Sin:
           case Log:
@@ -6619,6 +6630,40 @@ class MFromCharCode
     ALLOW_CLONE(MFromCharCode)
 };
 
+class MSinCos
+  : public MUnaryInstruction,
+    public FloatingPointPolicy<0>::Data
+{
+    const MathCache* cache_;
+
+    MSinCos(MDefinition *input, const MathCache *cache) : MUnaryInstruction(input), cache_(cache)
+    {
+        setResultType(MIRType_SinCosDouble);
+        specialization_ = MIRType_Double;
+        setMovable();
+    }
+
+  public:
+    INSTRUCTION_HEADER(SinCos)
+
+    static MSinCos *New(TempAllocator &alloc, MDefinition *input, const MathCache *cache)
+    {
+        return new (alloc) MSinCos(input, cache);
+    }
+    AliasSet getAliasSet() const override {
+        return AliasSet::None();
+    }
+    bool congruentTo(const MDefinition *ins) const override {
+        return congruentIfOperandsEqual(ins);
+    }
+    bool possiblyCalls() const override {
+        return true;
+    }
+    const MathCache* cache() const {
+        return cache_;
+    }
+};
+
 class MStringSplit
   : public MTernaryInstruction,
     public MixPolicy<StringPolicy<0>, StringPolicy<1> >::Data
@@ -6895,6 +6940,7 @@ class MPhi final
 
     MDefinition* foldsTo(TempAllocator& alloc) override;
     MDefinition* foldsTernary();
+    MDefinition* foldsFilterTypeSet();
 
     bool congruentTo(const MDefinition* ins) const override;
 
@@ -8372,7 +8418,7 @@ class MNot
             cacheOperandMightEmulateUndefined(constraints);
     }
 
-    void cacheOperandMightEmulateUndefined(CompilerConstraintList *constraints);
+    void cacheOperandMightEmulateUndefined(CompilerConstraintList* constraints);
 
   public:
     static MNot* New(TempAllocator& alloc, MDefinition* elements,
@@ -13658,7 +13704,7 @@ class MAsmJSCall final
         MDefinition* def;
         Arg(AnyRegister reg, MDefinition* def) : reg(reg), def(def) {}
     };
-    typedef Vector<Arg, 8> Args;
+    typedef Vector<Arg, 8, SystemAllocPolicy> Args;
 
     static MAsmJSCall* New(TempAllocator& alloc, const CallSiteDesc& desc, Callee callee,
                            const Args& args, MIRType resultType, size_t spIncrement);

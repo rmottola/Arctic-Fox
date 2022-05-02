@@ -107,9 +107,6 @@ this.PermissionsInstaller = {
         break;
       case Ci.nsIPrincipal.APP_STATUS_INSTALLED:
         appStatus = "app";
-        if (aApp.kind == "hosted-trusted") {
-          appStatus = "trusted";
-        }
         break;
       default:
         // Cannot determine app type, abort install by throwing an error.
@@ -178,7 +175,8 @@ this.PermissionsInstaller = {
       }
     }
     catch (ex) {
-      dump("Caught webapps install permissions error for " + aApp.origin);
+      dump("Caught webapps install permissions error for " + aApp.origin +
+        " : " + ex + "\n");
       Cu.reportError(ex);
       if (aOnError) {
         aOnError();

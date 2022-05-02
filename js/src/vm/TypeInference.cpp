@@ -919,7 +919,6 @@ TypeSet::removeSet(TemporaryTypeSet* input, TemporaryTypeSet* removal, LifoAlloc
     return res;
 }
 
-
 /* static */ TemporaryTypeSet*
 TypeSet::intersectSets(TemporaryTypeSet* a, TemporaryTypeSet* b, LifoAlloc* alloc)
 {
@@ -1852,7 +1851,7 @@ class ConstraintDataFreezeObjectForTypedArrayData
     uint32_t length;
 
   public:
-    explicit ConstraintDataFreezeObjectForTypedArrayData(TypedArrayObject &tarray)
+    explicit ConstraintDataFreezeObjectForTypedArrayData(TypedArrayObject& tarray)
       : obj(&tarray),
         viewData(tarray.viewData()),
         length(tarray.length())
@@ -1866,7 +1865,7 @@ class ConstraintDataFreezeObjectForTypedArrayData
     bool invalidateOnNewPropertyState(TypeSet* property) { return false; }
     bool invalidateOnNewObjectState(ObjectGroup* group) {
         MOZ_ASSERT(obj->group() == group);
-        TypedArrayObject &tarr = obj->as<TypedArrayObject>();
+        TypedArrayObject& tarr = obj->as<TypedArrayObject>();
         return tarr.viewData() != viewData || tarr.length() != length;
     }
 
@@ -2883,7 +2882,7 @@ ObjectGroup::detachNewScript(bool writeBarrier, ObjectGroup* replacement)
     MOZ_ASSERT(newScript);
 
     if (newScript->analyzed()) {
-        ObjectGroupCompartment &objectGroups = newScript->function()->compartment()->objectGroups;
+        ObjectGroupCompartment& objectGroups = newScript->function()->compartment()->objectGroups;
         if (replacement) {
             MOZ_ASSERT(replacement->newScript()->function() == newScript->function());
             objectGroups.replaceDefaultNewGroup(nullptr, proto(), newScript->function(),

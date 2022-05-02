@@ -6,7 +6,7 @@
 #ifndef nsTemplateMap_h__
 #define nsTemplateMap_h__
 
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "nsXULElement.h"
 
 class nsTemplateMap {
@@ -19,7 +19,7 @@ protected:
     PLDHashTable mTable;
 
 public:
-    nsTemplateMap() : mTable(PL_DHashGetStubOps(), sizeof(Entry)) { }
+    nsTemplateMap() : mTable(PLDHashTable::StubOps(), sizeof(Entry)) { }
 
     ~nsTemplateMap() { }
 

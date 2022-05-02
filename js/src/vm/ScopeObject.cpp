@@ -1299,7 +1299,7 @@ class DebugScopeProxy : public BaseProxyHandler
      *  - ACCESS_LOST      if the value has been lost to the debugger
      */
     bool handleUnaliasedAccess(JSContext* cx, Handle<DebugScopeObject*> debugScope,
-                               Handle<ScopeObject*> scope, jsid id, Action action,
+                               Handle<ScopeObject*> scope, HandleId id, Action action,
                                MutableHandleValue vp, AccessResult* accessResult) const
     {
         MOZ_ASSERT(&debugScope->scope() == scope);
@@ -1920,7 +1920,7 @@ DebugScopes::~DebugScopes()
 bool
 DebugScopes::init()
 {
-    return liveScopes.init() && missingScopes.init();
+    return proxiedScopes.init() && missingScopes.init() && liveScopes.init();
 }
 
 void

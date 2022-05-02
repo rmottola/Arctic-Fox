@@ -18,6 +18,7 @@
 #include "nsInterfaceHashtable.h"
 #include "nsString.h"
 #include "nsTArray.h"
+#include "nsWeakPtr.h"
 
 class nsPluginArray;
 class nsMimeTypeArray;
@@ -95,6 +96,7 @@ class TVManager;
 class InputPortManager;
 class DeviceStorageAreaListener;
 class Presentation;
+class LegacyMozTCPSocket;
 
 namespace time {
 class TimeManager;
@@ -218,14 +220,18 @@ public:
   already_AddRefed<WakeLock> RequestWakeLock(const nsAString &aTopic,
                                              ErrorResult& aRv);
   DeviceStorageAreaListener* GetDeviceStorageAreaListener(ErrorResult& aRv);
-  nsDOMDeviceStorage* GetDeviceStorage(const nsAString& aType,
-                                       ErrorResult& aRv);
+
+  already_AddRefed<nsDOMDeviceStorage> GetDeviceStorage(const nsAString& aType,
+                                                        ErrorResult& aRv);
+
   void GetDeviceStorages(const nsAString& aType,
                          nsTArray<nsRefPtr<nsDOMDeviceStorage> >& aStores,
                          ErrorResult& aRv);
-  nsDOMDeviceStorage* GetDeviceStorageByNameAndType(const nsAString& aName,
-                                                    const nsAString& aType,
-                                                    ErrorResult& aRv);
+
+  already_AddRefed<nsDOMDeviceStorage>
+  GetDeviceStorageByNameAndType(const nsAString& aName, const nsAString& aType,
+                                ErrorResult& aRv);
+
   DesktopNotificationCenter* GetMozNotification(ErrorResult& aRv);
   CellBroadcast* GetMozCellBroadcast(ErrorResult& aRv);
   IccManager* GetMozIccManager(ErrorResult& aRv);
@@ -234,6 +240,7 @@ public:
   Voicemail* GetMozVoicemail(ErrorResult& aRv);
   TVManager* GetTv();
   InputPortManager* GetInputPortManager(ErrorResult& aRv);
+  already_AddRefed<LegacyMozTCPSocket> MozTCPSocket();
   network::Connection* GetConnection(ErrorResult& aRv);
   nsDOMCameraManager* GetMozCameras(ErrorResult& aRv);
   MediaDevices* GetMediaDevices(ErrorResult& aRv);
@@ -315,8 +322,6 @@ public:
                                   JSObject* /* unused */);
 #endif // MOZ_MEDIA_NAVIGATOR
 
-  static bool HasInputMethodSupport(JSContext* /* unused */, JSObject* aGlobal);
-
   static bool HasDataStoreSupport(nsIPrincipal* aPrincipal);
 
   static bool HasDataStoreSupport(JSContext* cx, JSObject* aGlobal);
@@ -345,6 +350,9 @@ private:
 
   bool CheckPermission(const char* type);
   static bool CheckPermission(nsPIDOMWindow* aWindow, const char* aType);
+
+  already_AddRefed<nsDOMDeviceStorage> FindDeviceStorage(const nsAString& aName,
+                                                         const nsAString& aType);
 
   nsRefPtr<nsMimeTypeArray> mMimeTypes;
   nsRefPtr<nsPluginArray> mPlugins;
@@ -377,7 +385,7 @@ private:
   nsRefPtr<nsDOMCameraManager> mCameraManager;
   nsRefPtr<MediaDevices> mMediaDevices;
   nsCOMPtr<nsIDOMNavigatorSystemMessages> mMessagesManager;
-  nsTArray<nsRefPtr<nsDOMDeviceStorage> > mDeviceStorageStores;
+  nsTArray<nsWeakPtr> mDeviceStorageStores;
   nsRefPtr<time::TimeManager> mTimeManager;
   nsRefPtr<ServiceWorkerContainer> mServiceWorkerContainer;
   nsCOMPtr<nsPIDOMWindow> mWindow;

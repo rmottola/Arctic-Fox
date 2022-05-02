@@ -4,15 +4,28 @@
 
 import sys
 
-from marionette_test import MarionetteTestCase, MarionetteJSTestCase
+from marionette import __version__
+from marionette.marionette_test import MarionetteTestCase, MarionetteJSTestCase
 from mozlog import structured
-from runner import BaseMarionetteTestRunner, BaseMarionetteOptions
+from marionette.runner import (
+    BaseMarionetteTestRunner,
+    BaseMarionetteOptions,
+    BrowserMobProxyOptionsMixin
+    )
 
 
 class MarionetteTestRunner(BaseMarionetteTestRunner):
     def __init__(self, **kwargs):
         BaseMarionetteTestRunner.__init__(self, **kwargs)
         self.test_handlers = [MarionetteTestCase, MarionetteJSTestCase]
+
+
+class MarionetteOptions(BaseMarionetteOptions,
+                        BrowserMobProxyOptionsMixin):
+    def __init__(self, **kwargs):
+        BaseMarionetteOptions.__init__(self, **kwargs)
+        BrowserMobProxyOptionsMixin.__init__(self, **kwargs)
+
 
 def startTestRunner(runner_class, options, tests):
     if options.pydebugger:
@@ -22,9 +35,9 @@ def startTestRunner(runner_class, options, tests):
     runner.run_tests(tests)
     return runner
 
-
-def cli(runner_class=MarionetteTestRunner, parser_class=BaseMarionetteOptions):
-    parser = parser_class(usage='%prog [options] test_file_or_dir <test_file_or_dir> ...')
+def cli(runner_class=MarionetteTestRunner, parser_class=MarionetteOptions):
+    parser = parser_class(usage='%prog [options] test_file_or_dir <test_file_or_dir> ...',
+                          version='%prog ' + __version__)
     structured.commandline.add_logging_group(parser)
     options, tests = parser.parse_args()
     parser.verify_usage(options, tests)

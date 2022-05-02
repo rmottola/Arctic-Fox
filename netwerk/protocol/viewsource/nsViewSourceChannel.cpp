@@ -733,6 +733,7 @@ NS_IMETHODIMP
 nsViewSourceChannel::GetRequestHeader(const nsACString & aHeader,
                                       nsACString & aValue)
 {
+    aValue.Truncate();
     return !mHttpChannel ? NS_ERROR_NULL_POINTER :
         mHttpChannel->GetRequestHeader(aHeader, aValue);
 }
@@ -747,10 +748,24 @@ nsViewSourceChannel::SetRequestHeader(const nsACString & aHeader,
 }
 
 NS_IMETHODIMP
+nsViewSourceChannel::SetEmptyRequestHeader(const nsACString & aHeader)
+{
+    return !mHttpChannel ? NS_ERROR_NULL_POINTER :
+        mHttpChannel->SetEmptyRequestHeader(aHeader);
+}
+
+NS_IMETHODIMP
 nsViewSourceChannel::VisitRequestHeaders(nsIHttpHeaderVisitor *aVisitor)
 {
     return !mHttpChannel ? NS_ERROR_NULL_POINTER :
         mHttpChannel->VisitRequestHeaders(aVisitor);
+}
+
+NS_IMETHODIMP
+nsViewSourceChannel::VisitNonDefaultRequestHeaders(nsIHttpHeaderVisitor *aVisitor)
+{
+    return !mHttpChannel ? NS_ERROR_NULL_POINTER :
+        mHttpChannel->VisitNonDefaultRequestHeaders(aVisitor);
 }
 
 NS_IMETHODIMP
@@ -820,6 +835,7 @@ NS_IMETHODIMP
 nsViewSourceChannel::GetResponseHeader(const nsACString & aHeader,
                                        nsACString & aValue)
 {
+    aValue.Truncate();
     if (!mHttpChannel)
         return NS_ERROR_NULL_POINTER;
 
@@ -831,10 +847,9 @@ nsViewSourceChannel::GetResponseHeader(const nsACString & aHeader,
                         nsCaseInsensitiveCStringComparator()) &&
         !aHeader.Equals(NS_LITERAL_CSTRING("X-Frame-Options"),
                         nsCaseInsensitiveCStringComparator())) {
-        aValue.Truncate();
         return NS_OK;
     }
-        
+
     return mHttpChannel->GetResponseHeader(aHeader, aValue);
 }
 

@@ -78,17 +78,17 @@ bool
 WidgetEvent::HasMouseEventMessage() const
 {
   switch (mMessage) {
-    case NS_MOUSE_BUTTON_DOWN:
-    case NS_MOUSE_BUTTON_UP:
-    case NS_MOUSE_CLICK:
-    case NS_MOUSE_DOUBLECLICK:
-    case NS_MOUSE_ENTER_WIDGET:
-    case NS_MOUSE_EXIT_WIDGET:
-    case NS_MOUSE_ACTIVATE:
-    case NS_MOUSE_OVER:
-    case NS_MOUSE_OUT:
-    case NS_MOUSE_MOZHITTEST:
-    case NS_MOUSE_MOVE:
+    case eMouseDown:
+    case eMouseUp:
+    case eMouseClick:
+    case eMouseDoubleClick:
+    case eMouseEnterIntoWidget:
+    case eMouseExitFromWidget:
+    case eMouseActivate:
+    case eMouseOver:
+    case eMouseOut:
+    case eMouseHitTest:
+    case eMouseMove:
       return true;
     default:
       return false;
@@ -99,16 +99,16 @@ bool
 WidgetEvent::HasDragEventMessage() const
 {
   switch (mMessage) {
-    case NS_DRAGDROP_ENTER:
-    case NS_DRAGDROP_OVER:
-    case NS_DRAGDROP_EXIT:
-    case NS_DRAGDROP_DRAGDROP:
-    case NS_DRAGDROP_GESTURE:
-    case NS_DRAGDROP_DRAG:
-    case NS_DRAGDROP_END:
-    case NS_DRAGDROP_START:
-    case NS_DRAGDROP_DROP:
-    case NS_DRAGDROP_LEAVE:
+    case eDragEnter:
+    case eDragOver:
+    case eDragExit:
+    case eLegacyDragDrop:
+    case eLegacyDragGesture:
+    case eDrag:
+    case eDragEnd:
+    case eDragStart:
+    case eDrop:
+    case eDragLeave:
       return true;
     default:
       return false;
@@ -119,13 +119,13 @@ bool
 WidgetEvent::HasKeyEventMessage() const
 {
   switch (mMessage) {
-    case NS_KEY_DOWN:
-    case NS_KEY_PRESS:
-    case NS_KEY_UP:
-    case NS_KEY_BEFORE_DOWN:
-    case NS_KEY_BEFORE_UP:
-    case NS_KEY_AFTER_DOWN:
-    case NS_KEY_AFTER_UP:
+    case eKeyDown:
+    case eKeyPress:
+    case eKeyUp:
+    case eBeforeKeyDown:
+    case eBeforeKeyUp:
+    case eAfterKeyDown:
+    case eAfterKeyUp:
       return true;
     default:
       return false;
@@ -136,12 +136,12 @@ bool
 WidgetEvent::HasIMEEventMessage() const
 {
   switch (mMessage) {
-    case NS_COMPOSITION_START:
-    case NS_COMPOSITION_END:
-    case NS_COMPOSITION_UPDATE:
-    case NS_COMPOSITION_CHANGE:
-    case NS_COMPOSITION_COMMIT_AS_IS:
-    case NS_COMPOSITION_COMMIT:
+    case eCompositionStart:
+    case eCompositionEnd:
+    case eCompositionUpdate:
+    case eCompositionChange:
+    case eCompositionCommitAsIs:
+    case eCompositionCommit:
       return true;
     default:
       return false;
@@ -151,8 +151,8 @@ WidgetEvent::HasIMEEventMessage() const
 bool
 WidgetEvent::HasPluginActivationEventMessage() const
 {
-  return mMessage == NS_PLUGIN_ACTIVATE ||
-         mMessage == NS_PLUGIN_FOCUS;
+  return mMessage == ePluginActivate ||
+         mMessage == ePluginFocus;
 }
 
 /******************************************************************************

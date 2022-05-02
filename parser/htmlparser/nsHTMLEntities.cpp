@@ -9,7 +9,7 @@
 
 #include "nsString.h"
 #include "nsCRT.h"
-#include "pldhash.h"
+#include "PLDHashTable.h"
 
 using namespace mozilla;
 
@@ -50,18 +50,18 @@ static PLDHashNumber
 
 
 static const PLDHashTableOps EntityToUnicodeOps = {
-  PL_DHashStringKey,
+  PLDHashTable::HashStringKey,
   matchNodeString,
-  PL_DHashMoveEntryStub,
-  PL_DHashClearEntryStub,
+  PLDHashTable::MoveEntryStub,
+  PLDHashTable::ClearEntryStub,
   nullptr,
 }; 
 
 static const PLDHashTableOps UnicodeToEntityOps = {
   hashUnicodeValue,
   matchNodeUnicode,
-  PL_DHashMoveEntryStub,
-  PL_DHashClearEntryStub,
+  PLDHashTable::MoveEntryStub,
+  PLDHashTable::ClearEntryStub,
   nullptr,
 };
 
@@ -109,8 +109,8 @@ nsHTMLEntities::AddRefTable(void)
         entry->node = node;
     }
 #ifdef DEBUG
-    PL_DHashMarkTableImmutable(gUnicodeToEntity);
-    PL_DHashMarkTableImmutable(gEntityToUnicode);
+    gUnicodeToEntity->MarkImmutable();
+    gEntityToUnicode->MarkImmutable();
 #endif
   }
   ++gTableRefCnt;

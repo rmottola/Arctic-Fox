@@ -43,7 +43,7 @@ namespace dom {
  * frame             | TYPE_INTERNAL_FRAME
  * hyperlink         |
  * iframe            | TYPE_INTERNAL_IFRAME
- * image             | TYPE_IMAGE
+ * image             | TYPE_INTERNAL_IMAGE, TYPE_INTERNAL_IMAGE_PRELOAD
  * imageset          | TYPE_IMAGESET
  * import            | Not supported by Gecko
  * internal          | TYPE_DOCUMENT, TYPE_XBL, TYPE_OTHER
@@ -53,10 +53,10 @@ namespace dom {
  * ping              | TYPE_PING
  * plugin            | TYPE_OBJECT_SUBREQUEST
  * prefetch          |
- * script            | TYPE_INTERNAL_SCRIPT
+ * script            | TYPE_INTERNAL_SCRIPT, TYPE_INTERNAL_SCRIPT_PRELOAD
  * sharedworker      | TYPE_INTERNAL_SHARED_WORKER
  * subresource       | Not supported by Gecko
- * style             | TYPE_STYLESHEET
+ * style             | TYPE_INTERNAL_STYLESHEET, TYPE_INTERNAL_STYLESHEET_PRELOAD
  * track             | TYPE_INTERNAL_TRACK
  * video             | TYPE_INTERNAL_VIDEO
  * worker            | TYPE_INTERNAL_WORKER
@@ -92,6 +92,7 @@ public:
     RESPONSETAINT_BASIC,
     RESPONSETAINT_CORS,
     RESPONSETAINT_OPAQUE,
+    RESPONSETAINT_OPAQUEREDIRECT,
   };
 
   explicit InternalRequest()
@@ -102,6 +103,7 @@ public:
     , mCredentialsMode(RequestCredentials::Omit)
     , mResponseTainting(RESPONSETAINT_BASIC)
     , mCacheMode(RequestCache::Default)
+    , mRedirectMode(RequestRedirect::Follow)
     , mAuthenticationFlag(false)
     , mForceOriginHeader(false)
     , mPreserveContentCodings(false)
@@ -264,6 +266,18 @@ public:
     mCacheMode = aCacheMode;
   }
 
+  RequestRedirect
+  GetRedirectMode() const
+  {
+    return mRedirectMode;
+  }
+
+  void
+  SetRedirectMode(RequestRedirect aRedirectMode)
+  {
+    mRedirectMode = aRedirectMode;
+  }
+
   nsContentPolicyType
   ContentPolicyType() const
   {
@@ -319,7 +333,7 @@ public:
   SetBody(nsIInputStream* aStream)
   {
     // A request's body may not be reset once set.
-    MOZ_ASSERT(!mBodyStream);
+    MOZ_ASSERT_IF(aStream, !mBodyStream);
     mBodyStream = aStream;
   }
 
@@ -363,6 +377,8 @@ public:
   bool
   IsClientRequest() const;
 
+  static RequestMode
+  MapChannelToRequestMode(nsIChannel* aChannel);
 
 private:
   // Does not copy mBodyStream.  Use fallible Clone() for complete copy.
@@ -373,7 +389,14 @@ private:
   static RequestContext
   MapContentPolicyTypeToRequestContext(nsContentPolicyType aContentPolicyType);
 
+  static bool
+  IsNavigationContentPolicy(nsContentPolicyType aContentPolicyType);
+
+  static bool
+  IsWorkerContentPolicy(nsContentPolicyType aContentPolicyType);
+
   nsCString mMethod;
+  // mURL always stores the url with the ref stripped
   nsCString mURL;
   nsRefPtr<InternalHeaders> mHeaders;
   nsCOMPtr<nsIInputStream> mBodyStream;
@@ -389,6 +412,7 @@ private:
   RequestCredentials mCredentialsMode;
   ResponseTainting mResponseTainting;
   RequestCache mCacheMode;
+  RequestRedirect mRedirectMode;
 
   bool mAuthenticationFlag;
   bool mForceOriginHeader;

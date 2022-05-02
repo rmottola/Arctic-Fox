@@ -23,8 +23,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "appsService",
                                    "@mozilla.org/AppsService;1",
                                    "nsIAppsService");
 
-// Shared code for AppsServiceChild.jsm, TrustedHostedAppsUtils.jsm,
-// Webapps.jsm and Webapps.js
+// Shared code for AppsServiceChild.jsm, Webapps.jsm and Webapps.js
 
 this.EXPORTED_SYMBOLS =
   ["AppsUtils", "ManifestHelper", "isAbsoluteURI", "mozIApplication"];
@@ -49,14 +48,7 @@ mozIApplication.prototype = {
     // This helper checks an URI inside |aApp|'s origin and part of |aApp| has a
     // specific permission. It is not checking if browsers inside |aApp| have such
     // permission.
-    let principal = this.principal;
-    if (this.installerIsBrowser) {
-      let uri = Services.io.newURI(this.origin, null, null);
-      principal =
-        Services.scriptSecurityManager.getAppCodebasePrincipal(uri, this.localId,
-                                                               /*mozbrowser*/false);
-    }
-    let perm = Services.perms.testExactPermissionFromPrincipal(principal,
+    let perm = Services.perms.testExactPermissionFromPrincipal(this.principal,
                                                                aPermission);
     return (perm === Ci.nsIPermissionManager.ALLOW_ACTION);
   },
@@ -78,11 +70,9 @@ mozIApplication.prototype = {
     this._principal = null;
 
     try {
-      this._principal = Services.scriptSecurityManager.getAppCodebasePrincipal(
+      this._principal = Services.scriptSecurityManager.createCodebasePrincipal(
         Services.io.newURI(this.origin, null, null),
-        this.localId,
-        this.installerIsBrowser
-      );
+        {appId: this.localId});
     } catch(e) {
       dump("Could not create app principal " + e + "\n");
     }
@@ -304,9 +294,7 @@ this.AppsUtils = {
               return Services.prefs.getCharPref("security.apps.privileged.CSP.default");
               break;
             case Ci.nsIPrincipal.APP_STATUS_INSTALLED:
-              return app.kind == "hosted-trusted"
-                ? Services.prefs.getCharPref("security.apps.trusted.CSP.default")
-                : "";
+              return "";
               break;
           }
         } catch(e) {}
@@ -523,20 +511,19 @@ this.AppsUtils = {
    * Checks if the app role is allowed:
    * Only certified apps can be themes.
    * Only privileged or certified apps can be addons.
-   * Langpacks need to be privileged.
    * @param aRole   : the role assigned to this app.
    * @param aStatus : the APP_STATUS_* for this app.
    */
   checkAppRole: function(aRole, aStatus) {
+    try {
+      // Anything is possible in developer mode.
+      if (Services.prefs.getBoolPref("dom.apps.developer_mode")) {
+        return true;
+      }
+    } catch(e) {}
+
     if (aRole == "theme" && aStatus !== Ci.nsIPrincipal.APP_STATUS_CERTIFIED) {
       return false;
-    }
-    if (aRole == "langpack" && aStatus !== Ci.nsIPrincipal.APP_STATUS_PRIVILEGED) {
-      let allow = false;
-      try  {
-        allow = Services.prefs.getBoolPref("dom.apps.allow_unsigned_langpacks");
-      } catch(e) {}
-      return allow;
     }
     if (!this.allowUnsignedAddons &&
         (aRole == "addon" &&
@@ -605,7 +592,6 @@ this.AppsUtils = {
 
     switch(type) {
     case "web":
-    case "trusted":
       return Ci.nsIPrincipal.APP_STATUS_INSTALLED;
     case "privileged":
       return Ci.nsIPrincipal.APP_STATUS_PRIVILEGED;
@@ -637,7 +623,12 @@ this.AppsUtils = {
     aPrefBranch.setCharPref("gecko.mstone", mstone);
     aPrefBranch.setCharPref("gecko.buildID", buildID);
 
-    return ((mstone != savedmstone) || (buildID != savedBuildID));
+    if ((mstone != savedmstone) || (buildID != savedBuildID)) {
+      aPrefBranch.setBoolPref("dom.apps.reset-permissions", false);
+      return true;
+    } else {
+      return false;
+    }
   },
 
   /**
@@ -707,14 +698,10 @@ this.AppsUtils = {
       let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
       file.initWithPath(aPath);
 
-      let channel = NetUtil.newChannel2(file,
-                                        null,
-                                        null,
-                                        null,      // aLoadingNode
-                                        Services.scriptSecurityManager.getSystemPrincipal(),
-                                        null,      // aTriggeringPrincipal
-                                        Ci.nsILoadInfo.SEC_NORMAL,
-                                        Ci.nsIContentPolicy.TYPE_OTHER);
+      let channel = NetUtil.newChannel({
+        uri: NetUtil.newURI(file),
+        loadUsingSystemPrincipal: true});
+
       channel.contentType = "application/json";
 
       NetUtil.asyncFetch(channel, function(aStream, aResult) {

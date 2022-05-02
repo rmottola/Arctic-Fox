@@ -8,7 +8,7 @@
 interface nsIFile;
 interface nsIZipEntry;
 
-[scriptable, builtinclass, uuid(6b438dc3-9ba0-4f5f-b83f-82e1d7b98604)]
+[scriptable, builtinclass, uuid(1adea16e-aa6c-4201-8f71-e9ff0acfb52e)]
 interface nsIJARChannel : nsIChannel
 {
     /**
@@ -36,16 +36,8 @@ interface nsIJARChannel : nsIChannel
     readonly attribute nsIZipEntry zipEntry;
 
     /**
-     * For child process, set this to make sure that a valid file descriptor of
-     * JAR file is always provided when calling NSPRFileDesc().
-     * Must be set before Open() or AsyncOpen() to be effective.
-     *
-     * Note that the file descriptor returned by NSPRFileDesc() is duplicated
-     * from the original, which shares its file offset with the original.  If
-     * the file offset is modified (ex: by lseek/read/write) on one of the
-     * shared descriptors, the offset is also changed for the other.
-     * It can be safely used only with operations that take absolute offsets,
-     * such as mmap/pread/pwrite.
+     * Force the channel to skip any chack for possible interception and
+     * proceed immediately to the network.
      */
-    void ensureChildFd();
+    void forceNoIntercept();
 };

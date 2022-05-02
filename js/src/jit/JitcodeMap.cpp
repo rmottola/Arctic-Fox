@@ -42,7 +42,6 @@ RegionAtAddr(const JitcodeGlobalEntry::IonEntry& entry, void* ptr,
     return entry.regionTable()->regionEntry(regionIdx);
 }
 
-
 void*
 JitcodeGlobalEntry::IonEntry::canonicalNativeAddrFor(JSRuntime* rt, void* ptr) const
 {
@@ -242,7 +241,6 @@ JitcodeGlobalEntry::IonCacheEntry::callStackAtAddr(JSRuntime* rt, void* ptr,
                                                    uint32_t* depth) const
 {
     JitcodeGlobalEntry entry;
-
     RejoinEntry(rt, *this, ptr, &entry);
     return entry.callStackAtAddr(rt, rejoinAddr(), results, depth);
 }
@@ -253,7 +251,6 @@ JitcodeGlobalEntry::IonCacheEntry::callStackAtAddr(JSRuntime* rt, void* ptr,
                                                    uint32_t maxResults) const
 {
     JitcodeGlobalEntry entry;
-
     RejoinEntry(rt, *this, ptr, &entry);
     return entry.callStackAtAddr(rt, rejoinAddr(), results, maxResults);
 }
@@ -267,6 +264,7 @@ JitcodeGlobalEntry::IonCacheEntry::youngestFrameLocationAtAddr(JSRuntime* rt, vo
     RejoinEntry(rt, *this, ptr, &entry);
     return entry.youngestFrameLocationAtAddr(rt, rejoinAddr(), script, pc);
 }
+
 
 static int ComparePointers(const void* a, const void* b) {
     const uint8_t* a_ptr = reinterpret_cast<const uint8_t*>(a);
@@ -860,7 +858,7 @@ JitcodeGlobalTable::sweep(JSRuntime* rt)
         if (entry->baseEntry().isJitcodeAboutToBeFinalized())
             e.removeFront();
         else
-            entry->sweep(rt);
+            entry->sweepChildren(rt);
     }
 }
 
@@ -900,7 +898,7 @@ JitcodeGlobalEntry::BaselineEntry::mark(JSTracer* trc)
 }
 
 void
-JitcodeGlobalEntry::BaselineEntry::sweep()
+JitcodeGlobalEntry::BaselineEntry::sweepChildren()
 {
     MOZ_ALWAYS_FALSE(IsAboutToBeFinalizedUnbarriered(&script_));
 }
@@ -951,7 +949,7 @@ JitcodeGlobalEntry::IonEntry::mark(JSTracer* trc)
 }
 
 void
-JitcodeGlobalEntry::IonEntry::sweep()
+JitcodeGlobalEntry::IonEntry::sweepChildren()
 {
     for (unsigned i = 0; i < numScripts(); i++)
         MOZ_ALWAYS_FALSE(IsAboutToBeFinalizedUnbarriered(&sizedScriptList()->pairs[i].script));
@@ -1009,11 +1007,11 @@ JitcodeGlobalEntry::IonCacheEntry::mark(JSTracer* trc)
 }
 
 void
-JitcodeGlobalEntry::IonCacheEntry::sweep(JSRuntime* rt)
+JitcodeGlobalEntry::IonCacheEntry::sweepChildren(JSRuntime* rt)
 {
     JitcodeGlobalEntry entry;
     RejoinEntry(rt, *this, nativeStartAddr(), &entry);
-    entry.sweep(rt);
+    entry.sweepChildren(rt);
 }
 
 bool

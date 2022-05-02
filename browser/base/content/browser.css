@@ -743,8 +743,8 @@ toolbarbutton[pmkit-button="true"] > .toolbarbutton-badge-container > .toolbarbu
 }
 
 /* Combobox dropdown renderer */
-#ContentSelectDropdown {
-  max-height: 400px;
+#ContentSelectDropdown > menupopup {
+  max-height: 350px;
 }
 
 .contentSelectDropdown-optgroup {

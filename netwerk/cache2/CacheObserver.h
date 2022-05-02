@@ -56,7 +56,7 @@ class CacheObserver : public nsIObserver
   static uint32_t const CompressionLevel()
     { return sCompressionLevel; }
   static uint32_t const HalfLifeSeconds()
-    { return sHalfLifeHours * 60 * 60; }
+    { return sHalfLifeHours * 60.0F * 60.0F; }
   static int32_t const HalfLifeExperiment()
     { return sHalfLifeExperiment; }
   static bool const ClearCacheOnShutdown()
@@ -90,12 +90,12 @@ private:
   static uint32_t sDiskFreeSpaceHardLimit;
   static bool sSmartCacheSizeEnabled;
   static uint32_t sPreloadChunkCount;
-  static uint32_t sMaxMemoryEntrySize;
-  static uint32_t sMaxDiskEntrySize;
+  static int32_t sMaxMemoryEntrySize;
+  static int32_t sMaxDiskEntrySize;
   static uint32_t sMaxDiskChunksMemoryUsage;
   static uint32_t sMaxDiskPriorityChunksMemoryUsage;
   static uint32_t sCompressionLevel;
-  static uint32_t sHalfLifeHours;
+  static float sHalfLifeHours;
   static int32_t sHalfLifeExperiment;
   static bool sSanitizeOnShutdown;
   static bool sClearCacheOnShutdown;

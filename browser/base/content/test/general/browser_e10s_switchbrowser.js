@@ -155,7 +155,7 @@ add_task(function* test_synchronous() {
   info("3");
   // Load the remote page again
   info("Loading http://example.org/" + DUMMY_PATH);
-  gBrowser.loadURI("http://example.org/" + DUMMY_PATH);
+  yield BrowserTestUtils.loadURI(gBrowser.selectedBrowser, "http://example.org/" + DUMMY_PATH);
   is(gBrowser.selectedBrowser.isRemoteBrowser, expectedRemote, "Remote attribute should be correct");
   is(gBrowser.selectedBrowser.permanentKey, permanentKey, "browser.permanentKey is still the same");
 

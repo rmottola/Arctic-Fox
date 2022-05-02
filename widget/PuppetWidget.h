@@ -119,6 +119,9 @@ public:
 
   // PuppetWidgets don't have native data, as they're purely nonnative.
   virtual void* GetNativeData(uint32_t aDataType) override;
+#if defined(XP_WIN)
+  void SetNativeData(uint32_t aDataType, uintptr_t aVal) override;
+#endif
   NS_IMETHOD ReparentNativeWidget(nsIWidget* aNewParent) override
   { return NS_ERROR_UNEXPECTED; }
 
@@ -193,10 +196,11 @@ public:
   virtual bool NeedsPaint() override;
 
   virtual TabChild* GetOwningTabChild() override { return mTabChild; }
-  virtual void ClearBackingScaleCache()
+
+  void UpdateBackingScaleCache(float aDpi, double aScale)
   {
-    mDPI = -1;
-    mDefaultScale = -1;
+    mDPI = aDpi;
+    mDefaultScale = aScale;
   }
 
   nsIntSize GetScreenDimensions();

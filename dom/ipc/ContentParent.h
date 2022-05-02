@@ -82,7 +82,6 @@ class ContentParent final : public PContentParent
     typedef mozilla::ipc::TestShellParent TestShellParent;
     typedef mozilla::ipc::URIParams URIParams;
     typedef mozilla::dom::ClonedMessageData ClonedMessageData;
-    typedef mozilla::OwningSerializedStructuredCloneBuffer OwningSerializedStructuredCloneBuffer;
 
 public:
 #ifdef MOZ_NUWA_PROCESS
@@ -198,7 +197,7 @@ public:
                                             bool aRunInGlobalScope) override;
     virtual bool DoSendAsyncMessage(JSContext* aCx,
                                     const nsAString& aMessage,
-                                    const mozilla::dom::StructuredCloneData& aData,
+                                    StructuredCloneData& aData,
                                     JS::Handle<JSObject *> aCpows,
                                     nsIPrincipal* aPrincipal) override;
     virtual bool CheckPermission(const nsAString& aPermission) override;
@@ -256,6 +255,15 @@ public:
     bool IsNuwaProcess();
 #endif
 
+    // A shorthand for checking if the Nuwa process is ready.
+    bool IsReadyNuwaProcess() {
+#ifdef MOZ_NUWA_PROCESS
+        return IsNuwaProcess() && IsNuwaReady();
+#else
+        return false;
+#endif
+    }
+
     GeckoChildProcessHost* Process() {
         return mSubprocess;
     }
@@ -307,6 +315,14 @@ public:
     virtual void OnChannelError() override;
 
     virtual void OnBeginSyncTransaction() override;
+
+    virtual PCrashReporterParent*
+    AllocPCrashReporterParent(const NativeThreadId& tid,
+                              const uint32_t& processType) override;
+    virtual bool
+    RecvPCrashReporterConstructor(PCrashReporterParent* actor,
+                                  const NativeThreadId& tid,
+                                  const uint32_t& processType) override;
 
     virtual PNeckoParent* AllocPNeckoParent() override;
     virtual bool RecvPNeckoConstructor(PNeckoParent* aActor) override {
@@ -450,7 +466,6 @@ private:
                   ContentParent* aOpener,
                   bool aIsForBrowser,
                   bool aIsForPreallocated,
-                  hal::ProcessPriority aInitialPriority = hal::PROCESS_PRIORITY_FOREGROUND,
                   bool aIsNuwaProcess = false);
 
 #ifdef MOZ_NUWA_PROCESS
@@ -463,7 +478,11 @@ private:
     // The common initialization for the constructors.
     void InitializeMembers();
 
-    // The common initialization logic shared by all constuctors.
+    // Launch the subprocess and associated initialization.
+    // Returns false if the process fails to start.
+    bool LaunchSubprocess(hal::ProcessPriority aInitialPriority = hal::PROCESS_PRIORITY_FOREGROUND);
+
+    // Common initialization after sub process launch or adoption.
     void InitInternal(ProcessPriority aPriority,
                       bool aSetupOffMainThreadCompositing,
                       bool aSendRegisteredChrome);
@@ -568,7 +587,7 @@ private:
                                                InfallibleTArray<nsString>* dictionaries,
                                                ClipboardCapabilities* clipboardCaps,
                                                DomainPolicyClone* domainPolicy,
-                                               OwningSerializedStructuredCloneBuffer* initialData) override;
+                                               StructuredCloneData* initialData) override;
 
     virtual bool DeallocPJavaScriptParent(mozilla::jsipc::PJavaScriptParent*) override;
 
@@ -594,6 +613,8 @@ private:
     virtual PBlobParent* AllocPBlobParent(const BlobConstructorParams& aParams)
                                           override;
     virtual bool DeallocPBlobParent(PBlobParent* aActor) override;
+
+    virtual bool DeallocPCrashReporterParent(PCrashReporterParent* crashreporter) override;
 
     virtual bool RecvGetRandomValues(const uint32_t& length,
                                      InfallibleTArray<uint8_t>* randomValues) override;
@@ -727,12 +748,12 @@ private:
                                  const ClonedMessageData& aData,
                                  InfallibleTArray<CpowEntry>&& aCpows,
                                  const IPC::Principal& aPrincipal,
-                                 nsTArray<OwningSerializedStructuredCloneBuffer>* aRetvals) override;
+                                 nsTArray<StructuredCloneData>* aRetvals) override;
     virtual bool RecvRpcMessage(const nsString& aMsg,
                                 const ClonedMessageData& aData,
                                 InfallibleTArray<CpowEntry>&& aCpows,
                                 const IPC::Principal& aPrincipal,
-                                nsTArray<OwningSerializedStructuredCloneBuffer>* aRetvals) override;
+                                nsTArray<StructuredCloneData>* aRetvals) override;
     virtual bool RecvAsyncMessage(const nsString& aMsg,
                                   const ClonedMessageData& aData,
                                   InfallibleTArray<CpowEntry>&& aCpows,
@@ -927,6 +948,8 @@ private:
     bool mCreatedPairedMinidumps;
     bool mShutdownPending;
     bool mIPCOpen;
+
+    friend class CrashReporterParent;
 
     // Allows NuwaParent to access OnNuwaReady() and OnNewProcessCreated().
     friend class NuwaParent;

@@ -34,6 +34,7 @@
 #include "nsITheme.h"
 #include "nsLayoutUtils.h"
 #include "nsQueryFrame.h"
+#include "nsStringGlue.h"
 #include "nsStyleContext.h"
 #include "nsStyleStruct.h"
 
@@ -3238,6 +3239,11 @@ public:
     fputs(t.get(), out);
   }
   void ListTag(nsACString& aTo) const;
+  nsAutoCString ListTag() const {
+    nsAutoCString tag;
+    ListTag(tag);
+    return tag;
+  }
   static void ListTag(nsACString& aTo, const nsIFrame* aFrame);
   void ListGeneric(nsACString& aTo, const char* aPrefix = "", uint32_t aFlags = 0) const;
   enum {

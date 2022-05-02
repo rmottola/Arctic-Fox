@@ -14,7 +14,6 @@ import traceback
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here)
 
-from automationutils import processLeakLog
 from runtests import Mochitest
 from runtests import MochitestUtilsMixin
 from mochitest_options import MochitestArgumentParser
@@ -22,6 +21,7 @@ from marionette import Marionette
 from mozprofile import Profile, Preferences
 from mozlog import structured
 import mozinfo
+import mozleak
 
 
 class B2GMochitest(MochitestUtilsMixin):
@@ -121,6 +121,8 @@ class B2GMochitest(MochitestUtilsMixin):
     def run_tests(self, options):
         """ Prepare, configure, run tests and cleanup """
 
+        self.setTestRoot(options)
+
         manifest = self.build_profile(options)
         self.logPreamble(self.getActiveTests(options))
 
@@ -217,6 +219,21 @@ class B2GMochitest(MochitestUtilsMixin):
                 Services.io.offline = false;
                 """)
 
+            self.marionette.execute_script("""
+                let SECURITY_PREF = "security.turn_off_all_security_so_that_viruses_can_take_over_this_computer";
+                Services.prefs.setBoolPref(SECURITY_PREF, true);
+
+                if (!testUtils.hasOwnProperty("specialPowersObserver")) {
+                  let loader = Components.classes["@mozilla.org/moz/jssubscript-loader;1"]
+                    .getService(Components.interfaces.mozIJSSubScriptLoader);
+                  loader.loadSubScript("chrome://specialpowers/content/SpecialPowersObserver.js",
+                    testUtils);
+                  testUtils.specialPowersObserver = new testUtils.SpecialPowersObserver();
+                  testUtils.specialPowersObserver.init();
+                  testUtils.specialPowersObserver._loadFrameScript();
+                }
+                """)
+
             if options.chrome:
                 self.app_ctx.dm.removeDir(self.remote_chrome_test_dir)
                 self.app_ctx.dm.mkDir(self.remote_chrome_test_dir)
@@ -249,7 +266,12 @@ class B2GMochitest(MochitestUtilsMixin):
                 local_leak_file.name)
             self.app_ctx.dm.removeFile(self.leak_report_file)
 
-            processLeakLog(local_leak_file.name, options)
+            mozleak.process_leak_log(
+                local_leak_file.name,
+                leak_thresholds=options.leakThresholds,
+                ignore_missing_leaks=options.ignoreMissingLeaks,
+                log=self.log,
+            )
         except KeyboardInterrupt:
             self.log.info("runtests.py | Received keyboard interrupt.\n")
             status = -1

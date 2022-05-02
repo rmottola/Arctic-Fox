@@ -10,6 +10,7 @@
 #include "DataSocket.h"
 #include "ListenSocketConsumer.h"
 #include "mozilla/RefPtr.h"
+#include "nsISupportsImpl.h" // for MOZ_COUNT_CTOR, MOZ_COUNT_DTOR
 #include "nsXULAppAPI.h"
 #include "UnixSocketConnector.h"
 
@@ -27,7 +28,8 @@ class ListenSocketIO final
 public:
   class ListenTask;
 
-  ListenSocketIO(MessageLoop* mIOLoop,
+  ListenSocketIO(MessageLoop* aConsumerLoop,
+                 MessageLoop* aIOLoop,
                  ListenSocket* aListenSocket,
                  UnixSocketConnector* aConnector);
   ~ListenSocketIO();
@@ -55,21 +57,21 @@ public:
 
   SocketBase* GetSocketBase() override;
 
-  bool IsShutdownOnMainThread() const override;
+  bool IsShutdownOnConsumerThread() const override;
   bool IsShutdownOnIOThread() const override;
 
-  void ShutdownOnMainThread() override;
+  void ShutdownOnConsumerThread() override;
   void ShutdownOnIOThread() override;
 
 private:
   void FireSocketError();
 
   /**
-   * Consumer pointer. Non-thread safe RefPtr, so should only be manipulated
-   * directly from main thread. All non-main-thread accesses should happen with
-   * mIO as container.
+   * Consumer pointer. Non-thread-safe pointer, so should only be manipulated
+   * directly from consumer thread. All non-consumer-thread accesses should
+   * happen with mIO as container.
    */
-  RefPtr<ListenSocket> mListenSocket;
+  ListenSocket* mListenSocket;
 
   /**
    * Connector object used to create the connection we are currently using.
@@ -94,11 +96,12 @@ private:
   ConnectionOrientedSocketIO* mCOSocketIO;
 };
 
-ListenSocketIO::ListenSocketIO(MessageLoop* mIOLoop,
+ListenSocketIO::ListenSocketIO(MessageLoop* aConsumerLoop,
+                               MessageLoop* aIOLoop,
                                ListenSocket* aListenSocket,
                                UnixSocketConnector* aConnector)
-  : UnixSocketWatcher(mIOLoop)
-  , SocketIOBase()
+  : UnixSocketWatcher(aIOLoop)
+  , SocketIOBase(aConsumerLoop)
   , mListenSocket(aListenSocket)
   , mConnector(aConnector)
   , mShuttingDownOnIOThread(false)
@@ -107,12 +110,16 @@ ListenSocketIO::ListenSocketIO(MessageLoop* mIOLoop,
 {
   MOZ_ASSERT(mListenSocket);
   MOZ_ASSERT(mConnector);
+
+  MOZ_COUNT_CTOR_INHERITED(ListenSocketIO, SocketIOBase);
 }
 
 ListenSocketIO::~ListenSocketIO()
 {
-  MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(IsShutdownOnMainThread());
+  MOZ_ASSERT(IsConsumerThread());
+  MOZ_ASSERT(IsShutdownOnConsumerThread());
+
+  MOZ_COUNT_DTOR_INHERITED(ListenSocketIO, SocketIOBase);
 }
 
 UnixSocketConnector*
@@ -166,8 +173,8 @@ ListenSocketIO::OnListening()
   AddWatchers(READ_WATCHER, true);
 
   /* We signal a successful 'connection' to a local address for listening. */
-  NS_DispatchToMainThread(
-    new SocketIOEventRunnable(this, SocketIOEventRunnable::CONNECT_SUCCESS));
+  GetConsumerThread()->PostTask(
+    FROM_HERE, new SocketEventTask(this, SocketEventTask::CONNECT_SUCCESS));
 }
 
 void
@@ -187,9 +194,9 @@ ListenSocketIO::FireSocketError()
   // Clean up watchers, statuses, fds
   Close();
 
-  // Tell the main thread we've errored
-  NS_DispatchToMainThread(
-    new SocketIOEventRunnable(this, SocketIOEventRunnable::CONNECT_ERROR));
+  // Tell the consumer thread we've errored
+  GetConsumerThread()->PostTask(
+    FROM_HERE, new SocketEventTask(this, SocketEventTask::CONNECT_ERROR));
 }
 
 void
@@ -224,13 +231,13 @@ ListenSocketIO::OnSocketCanAcceptWithoutBlocking()
 SocketBase*
 ListenSocketIO::GetSocketBase()
 {
-  return mListenSocket.get();
+  return mListenSocket;
 }
 
 bool
-ListenSocketIO::IsShutdownOnMainThread() const
+ListenSocketIO::IsShutdownOnConsumerThread() const
 {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(IsConsumerThread());
 
   return mListenSocket == nullptr;
 }
@@ -242,10 +249,10 @@ ListenSocketIO::IsShutdownOnIOThread() const
 }
 
 void
-ListenSocketIO::ShutdownOnMainThread()
+ListenSocketIO::ShutdownOnConsumerThread()
 {
-  MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(!IsShutdownOnMainThread());
+  MOZ_ASSERT(IsConsumerThread());
+  MOZ_ASSERT(!IsShutdownOnConsumerThread());
 
   mListenSocket = nullptr;
 }
@@ -253,7 +260,7 @@ ListenSocketIO::ShutdownOnMainThread()
 void
 ListenSocketIO::ShutdownOnIOThread()
 {
-  MOZ_ASSERT(!NS_IsMainThread());
+  MOZ_ASSERT(!IsConsumerThread());
   MOZ_ASSERT(!mShuttingDownOnIOThread);
 
   Close(); // will also remove fd from I/O loop
@@ -264,20 +271,26 @@ ListenSocketIO::ShutdownOnIOThread()
 // Socket tasks
 //
 
-class ListenSocketIO::ListenTask final
-  : public SocketIOTask<ListenSocketIO>
+class ListenSocketIO::ListenTask final : public SocketIOTask<ListenSocketIO>
 {
 public:
   ListenTask(ListenSocketIO* aIO, ConnectionOrientedSocketIO* aCOSocketIO)
-  : SocketIOTask<ListenSocketIO>(aIO)
-  , mCOSocketIO(aCOSocketIO)
+    : SocketIOTask<ListenSocketIO>(aIO)
+    , mCOSocketIO(aCOSocketIO)
   {
     MOZ_ASSERT(mCOSocketIO);
+
+    MOZ_COUNT_CTOR(ListenTask);
+  }
+
+  ~ListenTask()
+  {
+    MOZ_COUNT_DTOR(ListenTask);
   }
 
   void Run() override
   {
-    MOZ_ASSERT(!NS_IsMainThread());
+    MOZ_ASSERT(!GetIO()->IsConsumerThread());
 
     if (!IsCanceled()) {
       GetIO()->Listen(mCOSocketIO);
@@ -289,30 +302,35 @@ private:
 };
 
 //
-// UnixSocketConsumer
+// ListenSocket
 //
 
 ListenSocket::ListenSocket(ListenSocketConsumer* aConsumer, int aIndex)
-  : mConsumer(aConsumer)
+  : mIO(nullptr)
+  , mConsumer(aConsumer)
   , mIndex(aIndex)
-  , mIO(nullptr)
 {
   MOZ_ASSERT(mConsumer);
+
+  MOZ_COUNT_CTOR_INHERITED(ListenSocket, SocketBase);
 }
 
 ListenSocket::~ListenSocket()
 {
   MOZ_ASSERT(!mIO);
+
+  MOZ_COUNT_DTOR_INHERITED(ListenSocket, SocketBase);
 }
 
 nsresult
 ListenSocket::Listen(UnixSocketConnector* aConnector,
+                     MessageLoop* aConsumerLoop,
+                     MessageLoop* aIOLoop,
                      ConnectionOrientedSocket* aCOSocket)
 {
-  MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!mIO);
 
-  mIO = new ListenSocketIO(XRE_GetIOMessageLoop(), this, aConnector);
+  mIO = new ListenSocketIO(aConsumerLoop, aIOLoop, this, aConnector);
 
   // Prepared I/O object, now start listening.
   nsresult rv = Listen(aCOSocket);
@@ -326,9 +344,16 @@ ListenSocket::Listen(UnixSocketConnector* aConnector,
 }
 
 nsresult
+ListenSocket::Listen(UnixSocketConnector* aConnector,
+                     ConnectionOrientedSocket* aCOSocket)
+{
+  return Listen(aConnector, MessageLoop::current(), XRE_GetIOMessageLoop(),
+                aCOSocket);
+}
+
+nsresult
 ListenSocket::Listen(ConnectionOrientedSocket* aCOSocket)
 {
-  MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aCOSocket);
   MOZ_ASSERT(mIO);
 
@@ -342,7 +367,9 @@ ListenSocket::Listen(ConnectionOrientedSocket* aCOSocket)
   }
 
   nsAutoPtr<ConnectionOrientedSocketIO> io;
-  rv = aCOSocket->PrepareAccept(connector, *io.StartAssignment());
+  rv = aCOSocket->PrepareAccept(connector,
+                                mIO->GetConsumerThread(), mIO->GetIOLoop(),
+                                *io.StartAssignment());
   if (NS_FAILED(rv)) {
     return rv;
   }
@@ -352,7 +379,7 @@ ListenSocket::Listen(ConnectionOrientedSocket* aCOSocket)
 
   SetConnectionStatus(SOCKET_LISTENING);
 
-  XRE_GetIOMessageLoop()->PostTask(
+  mIO->GetIOLoop()->PostTask(
     FROM_HERE, new ListenSocketIO::ListenTask(mIO, io.forget()));
 
   return NS_OK;
@@ -363,19 +390,17 @@ ListenSocket::Listen(ConnectionOrientedSocket* aCOSocket)
 void
 ListenSocket::Close()
 {
-  MOZ_ASSERT(NS_IsMainThread());
-
   if (!mIO) {
     return;
   }
 
+  MOZ_ASSERT(mIO->IsConsumerThread());
+
   // From this point on, we consider mIO as being deleted. We sever
   // the relationship here so any future calls to listen or connect
   // will create a new implementation.
-  mIO->ShutdownOnMainThread();
-
-  XRE_GetIOMessageLoop()->PostTask(FROM_HERE, new SocketIOShutdownTask(mIO));
-
+  mIO->ShutdownOnConsumerThread();
+  mIO->GetIOLoop()->PostTask(FROM_HERE, new SocketIOShutdownTask(mIO));
   mIO = nullptr;
 
   NotifyDisconnect();
@@ -384,24 +409,18 @@ ListenSocket::Close()
 void
 ListenSocket::OnConnectSuccess()
 {
-  MOZ_ASSERT(NS_IsMainThread());
-
   mConsumer->OnConnectSuccess(mIndex);
 }
 
 void
 ListenSocket::OnConnectError()
 {
-  MOZ_ASSERT(NS_IsMainThread());
-
   mConsumer->OnConnectError(mIndex);
 }
 
 void
 ListenSocket::OnDisconnect()
 {
-  MOZ_ASSERT(NS_IsMainThread());
-
   mConsumer->OnDisconnect(mIndex);
 }
 

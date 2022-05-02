@@ -288,7 +288,7 @@ protected:
 
   /**
    * InitKeyPressEvent() initializes aKeyEvent for aNativeKeyEvent.
-   * Don't call this method when aKeyEvent isn't NS_KEY_PRESS.
+   * Don't call this method when aKeyEvent isn't eKeyPress.
    *
    * @param aNativeKeyEvent       A native key event for which you want to
    *                              dispatch a Gecko key event.
@@ -296,7 +296,7 @@ protected:
    *                              event.
    * @param aKeyEvent             The result -- a Gecko key event initialized
    *                              from the native key event.  This must be
-   *                              NS_KEY_PRESS event.
+   *                              eKeyPress event.
    * @param aKbType               A native Keyboard Type value.  Typically,
    *                              this is a result of ::LMGetKbdType().
    */
@@ -356,7 +356,7 @@ public:
   bool DispatchEvent(WidgetGUIEvent& aEvent);
 
   /**
-   * SetSelection() dispatches NS_SELECTION_SET event for the aRange.
+   * SetSelection() dispatches eSetSelection event for the aRange.
    *
    * @param aRange                The range which will be selected.
    * @return                      TRUE if setting selection is succeeded and
@@ -1046,7 +1046,7 @@ public:
   /**
    * Insert the string to content.  I.e., this is a text input event handler.
    * If this is called during keydown event handling, this may dispatch a
-   * NS_KEY_PRESS event.  If this is called during composition, this commits
+   * eKeyPress event.  If this is called during composition, this commits
    * the composition by the aAttrString.
    *
    * @param aAttrString           An inserted string.

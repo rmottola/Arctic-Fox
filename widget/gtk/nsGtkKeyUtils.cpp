@@ -150,6 +150,15 @@ KeymapWrapper::GetInstance()
     return sInstance;
 }
 
+/* static */ void
+KeymapWrapper::Shutdown()
+{
+    if (sInstance) {
+        delete sInstance;
+        sInstance = nullptr;
+    }
+}
+
 KeymapWrapper::KeymapWrapper() :
     mInitialized(false), mGdkKeymap(gdk_keymap_get_default()),
     mXKBBaseEventCode(0)
@@ -161,12 +170,9 @@ KeymapWrapper::KeymapWrapper() :
         ("KeymapWrapper(%p): Constructor, mGdkKeymap=%p",
          this, mGdkKeymap));
 
+    g_object_ref(mGdkKeymap);
     g_signal_connect(mGdkKeymap, "keys-changed",
                      (GCallback)OnKeysChanged, this);
-
-    // This is necessary for catching the destroying timing.
-    g_object_weak_ref(G_OBJECT(mGdkKeymap),
-                      (GWeakNotify)OnDestroyKeymap, this);
 
     if (GDK_IS_X11_DISPLAY(gdk_display_get_default()))
         InitXKBExtension();
@@ -437,6 +443,9 @@ KeymapWrapper::InitBySystemSettings()
 KeymapWrapper::~KeymapWrapper()
 {
     gdk_window_remove_filter(nullptr, FilterEvents, this);
+    g_signal_handlers_disconnect_by_func(mGdkKeymap,
+                                         FuncToGpointer(OnKeysChanged), this);
+    g_object_unref(mGdkKeymap);
     NS_IF_RELEASE(sBidiKeyboard);
     MOZ_LOG(gKeymapWrapperLog, LogLevel::Info,
         ("KeymapWrapper(%p): Destructor", this));
@@ -511,19 +520,6 @@ KeymapWrapper::FilterEvents(GdkXEvent* aXEvent,
     }
 
     return GDK_FILTER_CONTINUE;
-}
-
-/* static */ void
-KeymapWrapper::OnDestroyKeymap(KeymapWrapper* aKeymapWrapper,
-                               GdkKeymap *aGdkKeymap)
-{
-    MOZ_LOG(gKeymapWrapperLog, LogLevel::Info,
-        ("KeymapWrapper: OnDestroyKeymap, aGdkKeymap=%p, aKeymapWrapper=%p",
-         aGdkKeymap, aKeymapWrapper));
-    MOZ_ASSERT(aKeymapWrapper == sInstance,
-               "Desroying unexpected instance");
-    delete sInstance;
-    sInstance = nullptr;
 }
 
 /* static */ void
@@ -987,13 +983,12 @@ KeymapWrapper::InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
          aGdkKeyEvent->keyval, aGdkKeyEvent->state,
          aGdkKeyEvent->hardware_keycode,
          GetBoolName(aGdkKeyEvent->is_modifier),
-         ((aKeyEvent.mMessage == NS_KEY_DOWN) ? "NS_KEY_DOWN" :
-               (aKeyEvent.mMessage == NS_KEY_PRESS) ? "NS_KEY_PRESS" :
-                                                      "NS_KEY_UP"),
+         ((aKeyEvent.mMessage == eKeyDown) ? "eKeyDown" :
+              (aKeyEvent.mMessage == eKeyPress) ? "eKeyPress" : "eKeyUp"),
          GetBoolName(aKeyEvent.IsShift()), GetBoolName(aKeyEvent.IsControl()),
          GetBoolName(aKeyEvent.IsAlt()), GetBoolName(aKeyEvent.IsMeta())));
 
-    if (aKeyEvent.mMessage == NS_KEY_PRESS) {
+    if (aKeyEvent.mMessage == eKeyPress) {
         keymapWrapper->InitKeypressEvent(aKeyEvent, aGdkKeyEvent);
     }
 
@@ -1327,7 +1322,7 @@ void
 KeymapWrapper::InitKeypressEvent(WidgetKeyboardEvent& aKeyEvent,
                                  GdkEventKey* aGdkKeyEvent)
 {
-    NS_ENSURE_TRUE_VOID(aKeyEvent.mMessage == NS_KEY_PRESS);
+    NS_ENSURE_TRUE_VOID(aKeyEvent.mMessage == eKeyPress);
 
     aKeyEvent.charCode = GetCharCodeFor(aGdkKeyEvent);
     if (!aKeyEvent.charCode) {

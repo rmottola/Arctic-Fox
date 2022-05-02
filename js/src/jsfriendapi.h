@@ -54,21 +54,24 @@ JS_GetObjectFunction(JSObject* obj);
 extern JS_FRIEND_API(bool)
 JS_SplicePrototype(JSContext* cx, JS::HandleObject obj, JS::HandleObject proto);
 
-extern JS_FRIEND_API(JSObject *)
-JS_NewObjectWithUniqueType(JSContext *cx, const JSClass *clasp, JS::HandleObject proto);
+extern JS_FRIEND_API(JSObject*)
+JS_NewObjectWithUniqueType(JSContext* cx, const JSClass* clasp, JS::HandleObject proto);
 
 // Allocate an object in exactly the same way as JS_NewObjectWithGivenProto, but
 // without invoking the metadata callback on it.  This allows creation of
 // internal bookkeeping objects that are guaranteed to not have metadata
 // attached to them.
-extern JS_FRIEND_API(JSObject *)
-JS_NewObjectWithoutMetadata(JSContext *cx, const JSClass *clasp, JS::Handle<JSObject*> proto);
+extern JS_FRIEND_API(JSObject*)
+JS_NewObjectWithoutMetadata(JSContext* cx, const JSClass* clasp, JS::Handle<JSObject*> proto);
 
 extern JS_FRIEND_API(uint32_t)
 JS_ObjectCountDynamicSlots(JS::HandleObject obj);
 
 extern JS_FRIEND_API(size_t)
 JS_SetProtoCalled(JSContext* cx);
+
+extern JS_FRIEND_API(bool)
+JS_ImmutablePrototypesEnabled();
 
 extern JS_FRIEND_API(size_t)
 JS_GetCustomIteratorCount(JSContext* cx);
@@ -78,7 +81,7 @@ JS_NondeterministicGetWeakMapKeys(JSContext* cx, JS::HandleObject obj, JS::Mutab
 
 // Raw JSScript* because this needs to be callable from a signal handler.
 extern JS_FRIEND_API(unsigned)
-JS_PCToLineNumber(JSScript *script, jsbytecode *pc, unsigned *columnp = nullptr);
+JS_PCToLineNumber(JSScript* script, jsbytecode* pc, unsigned* columnp = nullptr);
 
 /*
  * Determine whether the given object is backed by a DeadObjectProxy.
@@ -167,10 +170,9 @@ JS_CloneObject(JSContext* cx, JS::HandleObject obj, JS::HandleObject proto);
  * preserve the existing metadata on dst, if any.
  */
 extern JS_FRIEND_API(bool)
-JS_InitializePropertiesFromCompatibleNativeObject(JSContext *cx,
+JS_InitializePropertiesFromCompatibleNativeObject(JSContext* cx,
                                                   JS::HandleObject dst,
                                                   JS::HandleObject src);
-
 
 extern JS_FRIEND_API(JSString*)
 JS_BasicObjectToString(JSContext* cx, JS::HandleObject obj);
@@ -204,37 +206,36 @@ GetPropertyNameFromPC(JSScript* script, jsbytecode* pc);
  */
 
 extern JS_FRIEND_API(void)
-DumpString(JSString *str);
+DumpString(JSString* str);
 
 extern JS_FRIEND_API(void)
-DumpAtom(JSAtom *atom);
+DumpAtom(JSAtom* atom);
 
 extern JS_FRIEND_API(void)
-DumpObject(JSObject *obj);
+DumpObject(JSObject* obj);
 
 extern JS_FRIEND_API(void)
-DumpChars(const char16_t *s, size_t n);
+DumpChars(const char16_t* s, size_t n);
 
 extern JS_FRIEND_API(void)
-DumpValue(const JS::Value &val);
+DumpValue(const JS::Value& val);
 
 extern JS_FRIEND_API(void)
 DumpId(jsid id);
 
 extern JS_FRIEND_API(void)
-DumpInterpreterFrame(JSContext *cx, InterpreterFrame *start = nullptr);
+DumpInterpreterFrame(JSContext* cx, InterpreterFrame* start = nullptr);
 
 extern JS_FRIEND_API(bool)
-DumpPC(JSContext *cx);
+DumpPC(JSContext* cx);
 
 extern JS_FRIEND_API(bool)
-DumpScript(JSContext *cx, JSScript *scriptArg);
+DumpScript(JSContext* cx, JSScript* scriptArg);
 
 #endif
 
 extern JS_FRIEND_API(void)
-DumpBacktrace(JSContext *cx);
-
+DumpBacktrace(JSContext* cx);
 
 } // namespace js
 
@@ -384,7 +385,7 @@ proxy_GetProperty(JSContext* cx, JS::HandleObject obj, JS::HandleValue receiver,
                   JS::MutableHandleValue vp);
 extern JS_FRIEND_API(bool)
 proxy_SetProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue bp,
-                  JS::HandleValue receiver, JS::ObjectOpResult &result);
+                  JS::HandleValue receiver, JS::ObjectOpResult& result);
 extern JS_FRIEND_API(bool)
 proxy_GetOwnPropertyDescriptor(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                                JS::MutableHandle<JSPropertyDescriptor> desc);
@@ -548,14 +549,14 @@ GetAnyCompartmentInZone(JS::Zone* zone);
 namespace shadow {
 
 struct ObjectGroup {
-    const Class *clasp;
-    JSObject    *proto;
-    JSCompartment *compartment;
+    const Class* clasp;
+    JSObject*   proto;
+    JSCompartment* compartment;
 };
 
 struct BaseShape {
-    const js::Class *clasp_;
-    JSObject *parent;
+    const js::Class* clasp_;
+    JSObject* parent;
 };
 
 class Shape {
@@ -571,10 +572,10 @@ public:
 // group may always be accessed safely, and other members may be as well,
 // depending on the object's specific layout.
 struct Object {
-    shadow::ObjectGroup *group;
-    shadow::Shape       *shape;
-    JS::Value           *slots;
-    void                *_1;
+    shadow::ObjectGroup* group;
+    shadow::Shape*      shape;
+    JS::Value*          slots;
+    void*               _1;
 
     size_t numFixedSlots() const { return shape->slotInfo >> Shape::FIXED_SLOTS_SHIFT; }
     JS::Value* fixedSlots() const {
@@ -725,7 +726,7 @@ DefineFunctionWithReserved(JSContext* cx, JSObject* obj, const char* name, JSNat
 
 JS_FRIEND_API(JSFunction*)
 NewFunctionWithReserved(JSContext* cx, JSNative call, unsigned nargs, unsigned flags,
-                        const char *name);
+                        const char* name);
 
 JS_FRIEND_API(JSFunction*)
 NewFunctionByIdWithReserved(JSContext* cx, JSNative native, unsigned nargs, unsigned flags,
@@ -2729,11 +2730,11 @@ typedef JSObject*
  * object.
  */
 JS_FRIEND_API(void)
-SetObjectMetadataCallback(JSContext *cx, ObjectMetadataCallback callback);
+SetObjectMetadataCallback(JSContext* cx, ObjectMetadataCallback callback);
 
 /* Get the metadata associated with an object. */
-JS_FRIEND_API(JSObject *)
-GetObjectMetadata(JSObject *obj);
+JS_FRIEND_API(JSObject*)
+GetObjectMetadata(JSObject* obj);
 
 JS_FRIEND_API(bool)
 GetElementsWithAdder(JSContext* cx, JS::HandleObject obj, JS::HandleObject receiver,
@@ -2763,10 +2764,10 @@ ForwardToNative(JSContext* cx, JSNative native, const JS::CallArgs& args);
  * Implemented in proxy/BaseProxyHandler.cpp.
  */
 JS_FRIEND_API(bool)
-SetPropertyIgnoringNamedGetter(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+SetPropertyIgnoringNamedGetter(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                                JS::HandleValue v, JS::HandleValue receiver,
                                JS::Handle<JSPropertyDescriptor> ownDesc,
-                               JS::ObjectOpResult &result);
+                               JS::ObjectOpResult& result);
 
 JS_FRIEND_API(void)
 ReportErrorWithId(JSContext* cx, const char* msg, JS::HandleId id);
@@ -2877,7 +2878,7 @@ class GCHeapProfiler
 
 class MemProfiler
 {
-    static mozilla::Atomic<int> sActiveProfilerCount;
+    static mozilla::Atomic<uint32_t, mozilla::Relaxed> sActiveProfilerCount;
     static NativeProfiler* sNativeProfiler;
 
     static GCHeapProfiler* GetGCHeapProfiler(void* addr);
@@ -2900,7 +2901,7 @@ class MemProfiler
         return mGCHeapProfiler;
     }
 
-    static bool enabled() {
+    static MOZ_ALWAYS_INLINE bool enabled() {
         return sActiveProfilerCount > 0;
     }
 
@@ -2910,7 +2911,7 @@ class MemProfiler
         sNativeProfiler = aProfiler;
     }
 
-    static void SampleNative(void* addr, uint32_t size) {
+    static MOZ_ALWAYS_INLINE void SampleNative(void* addr, uint32_t size) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2921,7 +2922,7 @@ class MemProfiler
             profiler->sampleNative(addr, size);
     }
 
-    static void SampleTenured(void* addr, uint32_t size) {
+    static MOZ_ALWAYS_INLINE void SampleTenured(void* addr, uint32_t size) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2932,7 +2933,7 @@ class MemProfiler
             profiler->sampleTenured(addr, size);
     }
 
-    static void SampleNursery(void* addr, uint32_t size) {
+    static MOZ_ALWAYS_INLINE void SampleNursery(void* addr, uint32_t size) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2943,7 +2944,7 @@ class MemProfiler
             profiler->sampleNursery(addr, size);
     }
 
-    static void RemoveNative(void* addr) {
+    static MOZ_ALWAYS_INLINE void RemoveNative(void* addr) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2954,7 +2955,7 @@ class MemProfiler
             profiler->removeNative(addr);
     }
 
-    static void MarkTenuredStart(JSRuntime* runtime) {
+    static MOZ_ALWAYS_INLINE void MarkTenuredStart(JSRuntime* runtime) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2965,7 +2966,7 @@ class MemProfiler
             profiler->markTenuredStart();
     }
 
-    static void MarkTenured(void* addr) {
+    static MOZ_ALWAYS_INLINE void MarkTenured(void* addr) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2976,7 +2977,7 @@ class MemProfiler
             profiler->markTenured(addr);
     }
 
-    static void SweepTenured(JSRuntime* runtime) {
+    static MOZ_ALWAYS_INLINE void SweepTenured(JSRuntime* runtime) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2987,7 +2988,7 @@ class MemProfiler
             profiler->sweepTenured();
     }
 
-    static void SweepNursery(JSRuntime* runtime) {
+    static MOZ_ALWAYS_INLINE void SweepNursery(JSRuntime* runtime) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))
@@ -2998,7 +2999,7 @@ class MemProfiler
             profiler->sweepNursery();
     }
 
-    static void MoveNurseryToTenured(void* addrOld, void* addrNew) {
+    static MOZ_ALWAYS_INLINE void MoveNurseryToTenured(void* addrOld, void* addrNew) {
         JS::AutoSuppressGCAnalysis nogc;
 
         if (MOZ_LIKELY(!enabled()))

@@ -590,7 +590,8 @@ BluetoothHfpManager::HandleVolumeChanged(nsISupports* aSubject)
   //  {"key":"volumeup", "value":10}
   //  {"key":"volumedown", "value":2}
 
-  RootedDictionary<dom::SettingChangeNotification> setting(nsContentUtils::RootingCx());
+  RootedDictionary<dom::SettingChangeNotification>
+    setting(nsContentUtils::RootingCx());
 
   if (!WrappedJSToDictionary(aSubject, setting)) {
     return;
@@ -651,9 +652,10 @@ BluetoothHfpManager::HandleVoiceConnectionChanged(uint32_t aClientId)
 
   JS::Rooted<JS::Value> value(nsContentUtils::RootingCxForThread());
   voiceInfo->GetRelSignalStrength(&value);
-  NS_ENSURE_TRUE_VOID(value.isNumber());
-  uint8_t signal = ceil(value.toNumber() / 20.0);
-  UpdateCIND(CINDType::SIGNAL, signal);
+  if (value.isNumber()) {
+    uint8_t signal = ceil(value.toNumber() / 20.0);
+    UpdateCIND(CINDType::SIGNAL, signal);
+  }
 
   /**
    * Possible return values for mode are:
@@ -667,7 +669,10 @@ BluetoothHfpManager::HandleVoiceConnectionChanged(uint32_t aClientId)
 
   nsCOMPtr<nsIMobileNetworkInfo> network;
   voiceInfo->GetNetwork(getter_AddRefs(network));
-  NS_ENSURE_TRUE_VOID(network);
+  if (!network) {
+    BT_LOGD("Unable to get network information");
+    return;
+  }
   network->GetLongName(mOperatorName);
 
   // According to GSM 07.07, "<format> indicates if the format is alphanumeric
@@ -839,7 +844,8 @@ BluetoothHfpManager::ReceiveSocketData(BluetoothSocket* aSocket,
     if (!atCommandValues[0].EqualsLiteral("3") ||
         !atCommandValues[1].EqualsLiteral("0")) {
       if (mCMEE) {
-        SendCommand(RESPONSE_CME_ERROR, BluetoothCmeError::OPERATION_NOT_SUPPORTED);
+        SendCommand(RESPONSE_CME_ERROR,
+                    BluetoothCmeError::OPERATION_NOT_SUPPORTED);
       } else {
         SendLine("ERROR");
       }
@@ -1221,7 +1227,8 @@ BluetoothHfpManager::Disconnect(BluetoothProfileController* aController)
 
   if (!mSocket) {
     if (aController) {
-      aController->NotifyCompletion(NS_LITERAL_STRING(ERR_ALREADY_DISCONNECTED));
+      aController->NotifyCompletion(
+        NS_LITERAL_STRING(ERR_ALREADY_DISCONNECTED));
     }
     return;
   }
@@ -1503,8 +1510,10 @@ BluetoothHfpManager::HandleCallStateChanged(uint32_t aCallIndex,
     case nsITelephonyService::CALL_STATE_HELD:
       switch (prevCallState) {
         case nsITelephonyService::CALL_STATE_CONNECTED: {
-          uint32_t numActive = GetNumberOfCalls(nsITelephonyService::CALL_STATE_CONNECTED);
-          uint32_t numHeld = GetNumberOfCalls(nsITelephonyService::CALL_STATE_HELD);
+          uint32_t numActive =
+            GetNumberOfCalls(nsITelephonyService::CALL_STATE_CONNECTED);
+          uint32_t numHeld =
+            GetNumberOfCalls(nsITelephonyService::CALL_STATE_HELD);
           uint32_t numConCalls = GetNumberOfConCalls();
 
           /**
@@ -1526,20 +1535,24 @@ BluetoothHfpManager::HandleCallStateChanged(uint32_t aCallIndex,
           if (!aIsConference) {
             if (numActive + numHeld == 1) {
               // A single active call is put on hold.
-              sCINDItems[CINDType::CALLHELD].value = CallHeldState::ONHOLD_NOACTIVE;
+              sCINDItems[CINDType::CALLHELD].value =
+                CallHeldState::ONHOLD_NOACTIVE;
             } else {
               // An active call is placed on hold or active/held calls swapped.
-              sCINDItems[CINDType::CALLHELD].value = CallHeldState::ONHOLD_ACTIVE;
+              sCINDItems[CINDType::CALLHELD].value =
+                CallHeldState::ONHOLD_ACTIVE;
             }
             SendCommand(RESPONSE_CIEV, CINDType::CALLHELD);
           } else if (GetNumberOfConCalls(nsITelephonyService::CALL_STATE_HELD)
                      == numConCalls) {
             if (numActive + numHeld == numConCalls) {
               // An active conference call is put on hold.
-              sCINDItems[CINDType::CALLHELD].value = CallHeldState::ONHOLD_NOACTIVE;
+              sCINDItems[CINDType::CALLHELD].value =
+                CallHeldState::ONHOLD_NOACTIVE;
             } else {
               // Active calls are placed on hold or active/held calls swapped.
-              sCINDItems[CINDType::CALLHELD].value = CallHeldState::ONHOLD_ACTIVE;
+              sCINDItems[CINDType::CALLHELD].value =
+                CallHeldState::ONHOLD_ACTIVE;
             }
             SendCommand(RESPONSE_CIEV, CINDType::CALLHELD);
           }
@@ -2099,6 +2112,15 @@ BluetoothHfpManager::OnDisconnect(const nsAString& aErrorStr)
 
   nsRefPtr<BluetoothProfileController> controller = mController.forget();
   controller->NotifyCompletion(aErrorStr);
+}
+
+bool
+BluetoothHfpManager::IsNrecEnabled()
+{
+  // Add this function and return default value to avoid build break
+  // since NREC function isn't developed in bluez yet.
+  // Please see Bug 825149 for more information.
+  return HFP_NREC_STARTED;
 }
 
 NS_IMPL_ISUPPORTS(BluetoothHfpManager, nsIObserver)

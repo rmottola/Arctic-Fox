@@ -16,7 +16,7 @@
 #include "nsStaticAtom.h"
 #include "nsString.h"
 #include "nsCRT.h"
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "prenv.h"
 #include "nsThreadUtils.h"
 #include "nsDataHashtable.h"
@@ -289,7 +289,7 @@ AtomTableInitEntry(PLDHashEntryHdr* aEntry, const void* aKey)
 static const PLDHashTableOps AtomTableOps = {
   AtomTableGetHash,
   AtomTableMatchKey,
-  PL_DHashMoveEntryStub,
+  PLDHashTable::MoveEntryStub,
   AtomTableClearEntry,
   AtomTableInitEntry
 };

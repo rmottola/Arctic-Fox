@@ -107,23 +107,10 @@ OverscrollHandoffChain::SnapBackOverscrolledApzc(const AsyncPanZoomController* a
   uint32_t i = IndexOf(aStart);
   for (; i < Length(); ++i) {
     AsyncPanZoomController* apzc = mChain[i];
-    if (!apzc->IsDestroyed() && apzc->SnapBackIfOverscrolled()) {
-      // At most one APZC from |aStart| onwards can be overscrolled.
-      break;
-    }
-  }
-
-  // In debug builds, verify our assumption that only one APZC from |aStart|
-  // onwards is overscrolled.
-#ifdef DEBUG
-  ++i;
-  for (; i < Length(); ++i) {
-    AsyncPanZoomController* apzc = mChain[i];
     if (!apzc->IsDestroyed()) {
-      MOZ_ASSERT(!apzc->IsOverscrolled());
+      apzc->SnapBackIfOverscrolled();
     }
   }
-#endif
 }
 
 bool
@@ -144,19 +131,37 @@ OverscrollHandoffChain::CanBePanned(const AsyncPanZoomController* aApzc) const
 }
 
 bool
-OverscrollHandoffChain::HasOverscrolledApzc() const
+OverscrollHandoffChain::CanScrollInDirection(const AsyncPanZoomController* aApzc,
+                                             Layer::ScrollDirection aDirection) const
 {
-  return AnyApzc(&AsyncPanZoomController::IsOverscrolled);
+  // Find |aApzc| in the handoff chain.
+  uint32_t i = IndexOf(aApzc);
+
+  // See whether any APZC in the handoff chain starting from |aApzc|
+  // has room to scroll in the given direction.
+  for (uint32_t j = i; j < Length(); ++j) {
+    if (mChain[j]->CanScroll(aDirection)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 bool
-OverscrollHandoffChain::HasFastMovingApzc() const
+OverscrollHandoffChain::HasApzcPannedIntoOverscroll() const
 {
-  return AnyApzc(&AsyncPanZoomController::IsMovingFast);
+  return AnyApzc(&AsyncPanZoomController::IsPannedIntoOverscroll);
+}
+
+bool
+OverscrollHandoffChain::HasFastFlungApzc() const
+{
+  return AnyApzc(&AsyncPanZoomController::IsFlingingFast);
 }
 
 nsRefPtr<AsyncPanZoomController>
-OverscrollHandoffChain::FindFirstScrollable(const ScrollWheelInput& aInput) const
+OverscrollHandoffChain::FindFirstScrollable(const InputData& aInput) const
 {
   for (size_t i = 0; i < Length(); i++) {
     if (mChain[i]->CanScroll(aInput)) {

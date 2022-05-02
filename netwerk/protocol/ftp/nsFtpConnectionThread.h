@@ -3,8 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef __nsFtpState__h_
-#define __nsFtpState__h_
+#ifndef __nsFtpConnectionThread__h_
+#define __nsFtpConnectionThread__h_
 
 #include "nsBaseContentStream.h"
 
@@ -205,8 +205,6 @@ private:
     bool                    mServerIsIPv6;
     bool                    mUseUTF8;
 
-    static uint32_t         mSessionStartTime;
-
     mozilla::net::NetAddr   mServerAddress;
 
     // ***** control read gvars
@@ -232,4 +230,4 @@ private:
     }
 };
 
-#endif //__nsFtpState__h_
+#endif //__nsFtpConnectionThread__h_

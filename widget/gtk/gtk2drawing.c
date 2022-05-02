@@ -831,7 +831,7 @@ moz_gtk_get_focus_outline_size(gint* focus_h_width, gint* focus_v_width)
     return MOZ_GTK_SUCCESS;
 }
 
-gint
+static gint
 moz_gtk_widget_get_focus(GtkWidget* widget, gboolean* interior_focus,
                          gint* focus_width, gint* focus_pad) 
 {
@@ -928,7 +928,7 @@ moz_gtk_splitter_get_metrics(gint orientation, gint* size)
     return MOZ_GTK_SUCCESS;
 }
 
-gint
+static gint
 moz_gtk_button_get_inner_border(GtkWidget* widget, GtkBorder* inner_border)
 {
     static const GtkBorder default_inner_border = { 1, 1, 1, 1 };
@@ -3142,6 +3142,14 @@ moz_gtk_get_menu_separator_height(gint *size)
     return MOZ_GTK_SUCCESS;
 }
 
+void
+moz_gtk_get_scale_metrics(GtkOrientation orient, gint* scale_width,
+                          gint* scale_height)
+{
+  moz_gtk_get_scalethumb_metrics(orient, scale_width, scale_height);
+}
+
+
 gint
 moz_gtk_get_scalethumb_metrics(GtkOrientation orient, gint* thumb_length, gint* thumb_height)
 {
@@ -3407,6 +3415,20 @@ GtkWidget* moz_gtk_get_scrollbar_widget(void)
     MOZ_ASSERT(is_initialized, "Forgot to call moz_gtk_init()");
     ensure_scrollbar_widget();
     return gHorizScrollbarWidget;
+}
+
+gboolean moz_gtk_has_scrollbar_buttons(void)
+{
+    gboolean backward, forward, secondary_backward, secondary_forward;
+    MOZ_ASSERT(is_initialized, "Forgot to call moz_gtk_init()");
+    ensure_scrollbar_widget();
+    gtk_widget_style_get (gHorizScrollbarWidget,
+                          "has-backward-stepper", &backward,
+                          "has-forward-stepper", &forward,
+                          "has-secondary-backward-stepper", &secondary_backward,
+                          "has-secondary-forward-stepper", &secondary_forward,
+                          NULL);
+    return backward | forward | secondary_forward | secondary_forward;
 }
 
 gint

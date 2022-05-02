@@ -53,7 +53,7 @@ using struct nsRect from "nsRect.h";
 using class mozilla::WidgetSelectionEvent from "ipc/nsGUIEventIPC.h";
 using class mozilla::WidgetTouchEvent from "ipc/nsGUIEventIPC.h";
 using struct mozilla::dom::RemoteDOMEvent from "mozilla/dom/TabMessageUtils.h";
-using mozilla::dom::ScreenOrientation from "mozilla/dom/ScreenOrientation.h";
+using mozilla::dom::ScreenOrientationInternal from "mozilla/dom/ScreenOrientation.h";
 using struct mozilla::layers::TextureFactoryIdentifier from "mozilla/layers/CompositorTypes.h";
 using mozilla::CSSPoint from "Units.h";
 using mozilla::CSSToScreenScale from "Units.h";
@@ -64,9 +64,10 @@ using mozilla::WritingMode from "mozilla/WritingModes.h";
 using mozilla::layers::TouchBehaviorFlags from "mozilla/layers/APZUtils.h";
 using nsIWidget::TouchPointerState from "nsIWidget.h";
 using struct LookAndFeelInt from "mozilla/widget/WidgetMessageUtils.h";
-using struct mozilla::OwningSerializedStructuredCloneBuffer from "ipc/IPCMessageUtils.h";
+using class mozilla::dom::ipc::StructuredCloneData from "ipc/IPCMessageUtils.h";
 using mozilla::EventMessage from "mozilla/EventForwards.h";
 using nsEventStatus from "mozilla/EventForwards.h";
+using nsSizeMode from "nsIWidgetListener.h";
 
 namespace mozilla {
 namespace dom {
@@ -145,6 +146,19 @@ parent:
      */
     sync GetWidgetNativeData() returns (WindowsHandle value);
 
+    /**
+     * Sends an NS_NATIVE_CHILD_OF_SHAREABLE_WINDOW to be adopted by the
+     * widget's shareable window on the chrome side. Only used on Windows.
+     */
+    async SetNativeChildOfShareableWindow(uintptr_t childWindow);
+
+    /**
+     * When content moves focus from a native plugin window that's a child
+     * of the native browser window we need to move native focus to the
+     * browser. Otherwise the plugin window will never relinquish focus.
+     */
+    sync DispatchFocusToTopLevelWindow();
+
 parent:
     /**
      * When child sends this message, parent should move focus to
@@ -170,11 +184,11 @@ parent:
 
     sync SyncMessage(nsString aMessage, ClonedMessageData aData,
                      CpowEntry[] aCpows, Principal aPrincipal)
-      returns (OwningSerializedStructuredCloneBuffer[] retval);
+      returns (StructuredCloneData[] retval);
 
     prio(high) sync RpcMessage(nsString aMessage, ClonedMessageData aData,
                                CpowEntry[] aCpows, Principal aPrincipal)
-      returns (OwningSerializedStructuredCloneBuffer[] retval);
+      returns (StructuredCloneData[] retval);
 
     /**
      * Notifies chrome that there is a focus change involving an editable
@@ -454,6 +468,13 @@ parent:
                           MaybeZoomConstraints aConstraints);
 
     /**
+     * Tells the containing widget whether the given input block results in a
+     * swipe. Should be called in response to a WidgetWheelEvent that has
+     * mFlags.mCanTriggerSwipe set on it.
+     */
+    RespondStartSwipeEvent(uint64_t aInputBlockId, bool aStartSwipe);
+
+    /**
      * Brings up the auth prompt dialog.
      * Called when this is the PBrowserParent for a nested remote iframe.
      * aCallbackId corresponds to an nsIAuthPromptCallback that lives in the
@@ -558,7 +579,8 @@ child:
 
     CacheFileDescriptor(nsString path, FileDescriptor fd);
 
-    UpdateDimensions(CSSRect rect, CSSSize size, ScreenOrientation orientation,
+    UpdateDimensions(CSSRect rect, CSSSize size, nsSizeMode sizeMode,
+                     ScreenOrientationInternal orientation,
                      LayoutDeviceIntPoint chromeDisp) compressall;
 
     UpdateFrame(FrameMetrics frame);
@@ -612,6 +634,14 @@ child:
      * they are 'compressed' by dumping the oldest one.
      */
     RealMouseMoveEvent(WidgetMouseEvent event) compress;
+    /**
+     * Mouse move events with |reason == eSynthesized| are sent via a separate
+     * message because they do not generate DOM 'mousemove' events, and the
+     * 'compress' attribute on RealMouseMoveEvent() could result in a
+     * |reason == eReal| event being dropped in favour of an |eSynthesized|
+     * event, and thus a DOM 'mousemove' event to be lost.
+     */
+    SynthMouseMoveEvent(WidgetMouseEvent event);
     RealMouseButtonEvent(WidgetMouseEvent event);
     RealKeyEvent(WidgetKeyboardEvent event, MaybeNativeKeyBinding keyBinding);
     MouseWheelEvent(WidgetWheelEvent event, ScrollableLayerGuid aGuid, uint64_t aInputBlockId);
@@ -684,9 +714,20 @@ child:
     SetUpdateHitRegion(bool aEnabled);
 
     /**
-     * Tell the child to update its docShell's active state.
+     * Update the child side docShell active (resource use) state.
      */
-    SetIsDocShellActive(bool aIsActive);
+    SetDocShellIsActive(bool aIsActive);
+
+    /**
+     * Notify the child that it shouldn't paint the offscreen displayport.
+     * This is useful to speed up interactive operations over async
+     * scrolling performance like resize, tabswitch, pageload.
+     *
+     * Each enable call must be matched with a disable call. The child
+     * will remain in the suppress mode as long as there's
+     * a single unmatched call.
+     */
+    async SuppressDisplayport(bool aEnabled);
 
     /**
      * Navigate by key (Tab/Shift+Tab/F6/Shift+f6).
@@ -704,8 +745,13 @@ child:
     /**
      * Tell the child that the UI resolution changed for the containing
      * window.
+     * To avoid some sync messages from child to parent, we also send the dpi
+     * and default scale with the notification.
+     * If we don't know the dpi and default scale, we just pass in a negative
+     * value (-1) but in the majority of the cases this saves us from two
+     * sync requests from the child to the parent.
      */
-    UIResolutionChanged();
+    UIResolutionChanged(float dpi, double scale);
 
     /**
      * Tell the child that the system theme has changed, and that a repaint

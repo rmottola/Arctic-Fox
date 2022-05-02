@@ -13,11 +13,6 @@
 #if defined(MOZ_FMP4)
 extern PRLogModuleInfo* GetDemuxerLog();
 
-/* Polyfill __func__ on MSVC to pass to the log. */
-#ifdef _MSC_VER
-#define __func__ __FUNCTION__
-#endif
-
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #define LOG(name, arg, ...) MOZ_LOG(GetDemuxerLog(), mozilla::LogLevel::Debug, (TOSTRING(name) "(%p)::%s: " arg, this, __func__, ##__VA_ARGS__))
@@ -450,8 +445,8 @@ Moof::ParseTraf(Box& aBox, Trex& aTrex, Mvhd& aMvhd, Mdhd& aMdhd, Edts& aEdts, S
     if (box.IsType("trun")) {
       if (ParseTrun(box, tfhd, aMvhd, aMdhd, aEdts, &decodeTime, aIsAudio)) {
         mValid = true;
-        } else {
-          mValid = false;
+      } else {
+        mValid = false;
         break;
       }
     }

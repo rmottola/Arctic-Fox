@@ -226,9 +226,9 @@ static const char*
 GetGeckoKeyEventType(const WidgetEvent& aEvent)
 {
   switch (aEvent.mMessage) {
-    case NS_KEY_DOWN:    return "NS_KEY_DOWN";
-    case NS_KEY_UP:      return "NS_KEY_UP";
-    case NS_KEY_PRESS:   return "NS_KEY_PRESS";
+    case eKeyDown:       return "eKeyDown";
+    case eKeyUp:         return "eKeyUp";
+    case eKeyPress:      return "eKeyPress";
     default:             return "not key event";
   }
 }
@@ -948,7 +948,7 @@ TISInputSourceWrapper::InitKeyEvent(NSEvent *aNativeKeyEvent,
      this, OnOrOff(aKeyEvent.IsShift()), OnOrOff(aKeyEvent.IsControl()),
      OnOrOff(aKeyEvent.IsAlt()), OnOrOff(aKeyEvent.IsMeta())));
 
-  if (aKeyEvent.mMessage == NS_KEY_PRESS &&
+  if (aKeyEvent.mMessage == eKeyPress &&
       (isPrintableKey || !insertString.IsEmpty())) {
     InitKeyPressEvent(aNativeKeyEvent,
                       insertString.IsEmpty() ? 0 : insertString[0],
@@ -1038,8 +1038,8 @@ TISInputSourceWrapper::InitKeyPressEvent(NSEvent *aNativeKeyEvent,
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  NS_ASSERTION(aKeyEvent.mMessage == NS_KEY_PRESS,
-               "aKeyEvent must be NS_KEY_PRESS event");
+  NS_ASSERTION(aKeyEvent.mMessage == eKeyPress,
+               "aKeyEvent must be eKeyPress event");
 
   if (MOZ_LOG_TEST(gLog, LogLevel::Info)) {
     nsAutoString chars;
@@ -1521,7 +1521,7 @@ TextInputHandler::HandleKeyDownEvent(NSEvent* aNativeEvent)
     nsAutoString committed;
     ctiPanel->InterpretKeyEvent(aNativeEvent, committed);
     if (!committed.IsEmpty()) {
-      WidgetKeyboardEvent imeEvent(true, NS_KEY_DOWN, mWidget);
+      WidgetKeyboardEvent imeEvent(true, eKeyDown, mWidget);
       InitKeyEvent(aNativeEvent, imeEvent);
       imeEvent.mPluginTextEventString.Assign(committed);
       DispatchEvent(imeEvent);
@@ -1532,7 +1532,7 @@ TextInputHandler::HandleKeyDownEvent(NSEvent* aNativeEvent)
   if (mWidget->IsPluginFocused() || !IsIMEComposing()) {
     NSResponder* firstResponder = [[mView window] firstResponder];
 
-    WidgetKeyboardEvent keydownEvent(true, NS_KEY_DOWN, mWidget);
+    WidgetKeyboardEvent keydownEvent(true, eKeyDown, mWidget);
     InitKeyEvent(aNativeEvent, keydownEvent);
 
     currentKeyEvent->mKeyDownHandled = DispatchEvent(keydownEvent);
@@ -1597,7 +1597,7 @@ TextInputHandler::HandleKeyDownEvent(NSEvent* aNativeEvent)
 
   if (currentKeyEvent->CanDispatchKeyPressEvent() &&
       !wasComposing && !IsIMEComposing()) {
-    WidgetKeyboardEvent keypressEvent(true, NS_KEY_PRESS, mWidget);
+    WidgetKeyboardEvent keypressEvent(true, eKeyPress, mWidget);
     InitKeyEvent(aNativeEvent, keypressEvent);
 
     // If we called interpretKeyEvents and this isn't normal character input
@@ -1662,7 +1662,7 @@ TextInputHandler::HandleKeyUpEvent(NSEvent* aNativeEvent)
     return;
   }
 
-  WidgetKeyboardEvent keyupEvent(true, NS_KEY_UP, mWidget);
+  WidgetKeyboardEvent keyupEvent(true, eKeyUp, mWidget);
   InitKeyEvent(aNativeEvent, keyupEvent);
 
   DispatchEvent(keyupEvent);
@@ -2006,7 +2006,7 @@ TextInputHandler::DispatchKeyEventForFlagsChanged(NSEvent* aNativeEvent,
     return;
   }
 
-  EventMessage message = aDispatchKeyDown ? NS_KEY_DOWN : NS_KEY_UP;
+  EventMessage message = aDispatchKeyDown ? eKeyDown : eKeyUp;
 
   // Fire a key event.
   WidgetKeyboardEvent keyEvent(true, message, mWidget);
@@ -2099,8 +2099,7 @@ TextInputHandler::InsertText(NSAttributedString* aAttrString,
     }
     // Delete the selected range.
     nsRefPtr<TextInputHandler> kungFuDeathGrip(this);
-    WidgetContentCommandEvent deleteCommandEvent(true,
-                                                 NS_CONTENT_COMMAND_DELETE,
+    WidgetContentCommandEvent deleteCommandEvent(true, eContentCommandDelete,
                                                  mWidget);
     DispatchEvent(deleteCommandEvent);
     NS_ENSURE_TRUE_VOID(deleteCommandEvent.mSucceeded);
@@ -2130,7 +2129,7 @@ TextInputHandler::InsertText(NSAttributedString* aAttrString,
   }
 
   // Dispatch keypress event with char instead of compositionchange event
-  WidgetKeyboardEvent keypressEvent(true, NS_KEY_PRESS, mWidget);
+  WidgetKeyboardEvent keypressEvent(true, eKeyPress, mWidget);
   keypressEvent.isChar = IsPrintableChar(str.CharAt(0));
 
   // Don't set other modifiers from the current event, because here in
@@ -2193,7 +2192,7 @@ TextInputHandler::DoCommandBySelector(const char* aSelector)
        TrueOrFalse(currentKeyEvent->mCausedOtherKeyEvents) : "N/A"));
 
   if (currentKeyEvent && currentKeyEvent->CanDispatchKeyPressEvent()) {
-    WidgetKeyboardEvent keypressEvent(true, NS_KEY_PRESS, mWidget);
+    WidgetKeyboardEvent keypressEvent(true, eKeyPress, mWidget);
     InitKeyEvent(currentKeyEvent->mKeyEvent, keypressEvent);
     currentKeyEvent->mKeyPressHandled = DispatchEvent(keypressEvent);
     currentKeyEvent->mKeyPressDispatched = true;
@@ -2715,7 +2714,7 @@ IMEInputHandler::DispatchCompositionChangeEvent(const nsString& aText,
 
   nsRefPtr<IMEInputHandler> kungFuDeathGrip(this);
 
-  WidgetCompositionEvent compositionChangeEvent(true, NS_COMPOSITION_CHANGE,
+  WidgetCompositionEvent compositionChangeEvent(true, eCompositionChange,
                                                 mWidget);
   compositionChangeEvent.time = PR_IntervalNow();
   compositionChangeEvent.mData = aText;
@@ -2741,7 +2740,7 @@ IMEInputHandler::DispatchCompositionCommitEvent(const nsAString* aCommitString)
   nsRefPtr<IMEInputHandler> kungFuDeathGrip(this);
 
   EventMessage message =
-    aCommitString ? NS_COMPOSITION_COMMIT : NS_COMPOSITION_COMMIT_AS_IS;
+    aCommitString ? eCompositionCommit : eCompositionCommitAsIs;
   WidgetCompositionEvent compositionCommitEvent(true, message, mWidget);
   compositionCommitEvent.time = PR_IntervalNow();
   if (aCommitString) {
@@ -2814,7 +2813,7 @@ IMEInputHandler::InsertTextAsCommittingComposition(
 
     // XXXmnakano Probably, we shouldn't emulate composition in this case.
     // I think that we should just fire DOM3 textInput event if we implement it.
-    WidgetCompositionEvent compStart(true, NS_COMPOSITION_START, mWidget);
+    WidgetCompositionEvent compStart(true, eCompositionStart, mWidget);
     InitCompositionEvent(compStart);
 
     DispatchEvent(compStart);
@@ -2904,7 +2903,7 @@ IMEInputHandler::SetMarkedText(NSAttributedString* aAttrString,
 
     mMarkedRange.location = SelectedRange().location;
 
-    WidgetCompositionEvent compStart(true, NS_COMPOSITION_START, mWidget);
+    WidgetCompositionEvent compStart(true, eCompositionStart, mWidget);
     InitCompositionEvent(compStart);
 
     DispatchEvent(compStart);
@@ -2969,7 +2968,7 @@ IMEInputHandler::ConversationIdentifier()
   nsRefPtr<IMEInputHandler> kungFuDeathGrip(this);
 
   // NOTE: The size of NSInteger is same as pointer size.
-  WidgetQueryContentEvent textContent(true, NS_QUERY_TEXT_CONTENT, mWidget);
+  WidgetQueryContentEvent textContent(true, eQueryTextContent, mWidget);
   textContent.InitForQueryTextContent(0, 0);
   DispatchEvent(textContent);
   if (!textContent.mSucceeded) {
@@ -3005,7 +3004,7 @@ IMEInputHandler::GetAttributedSubstringFromRange(NSRange& aRange,
   nsRefPtr<IMEInputHandler> kungFuDeathGrip(this);
 
   nsAutoString str;
-  WidgetQueryContentEvent textContent(true, NS_QUERY_TEXT_CONTENT, mWidget);
+  WidgetQueryContentEvent textContent(true, eQueryTextContent, mWidget);
   textContent.InitForQueryTextContent(aRange.location, aRange.length);
   textContent.RequestFontRanges();
   DispatchEvent(textContent);
@@ -3098,7 +3097,7 @@ IMEInputHandler::SelectedRange()
 
   nsRefPtr<IMEInputHandler> kungFuDeathGrip(this);
 
-  WidgetQueryContentEvent selection(true, NS_QUERY_SELECTED_TEXT, mWidget);
+  WidgetQueryContentEvent selection(true, eQuerySelectedText, mWidget);
   DispatchEvent(selection);
 
   MOZ_LOG(gLog, LogLevel::Info,
@@ -3187,7 +3186,7 @@ IMEInputHandler::FirstRectForCharacterRange(NSRange& aRange,
   LayoutDeviceIntRect r;
   bool useCaretRect = (aRange.length == 0);
   if (!useCaretRect) {
-    WidgetQueryContentEvent charRect(true, NS_QUERY_TEXT_RECT, mWidget);
+    WidgetQueryContentEvent charRect(true, eQueryTextRect, mWidget);
     charRect.InitForQueryTextRect(aRange.location, 1);
     DispatchEvent(charRect);
     if (charRect.mSucceeded) {
@@ -3202,7 +3201,7 @@ IMEInputHandler::FirstRectForCharacterRange(NSRange& aRange,
   }
 
   if (useCaretRect) {
-    WidgetQueryContentEvent caretRect(true, NS_QUERY_CARET_RECT, mWidget);
+    WidgetQueryContentEvent caretRect(true, eQueryCaretRect, mWidget);
     caretRect.InitForQueryCaretRect(aRange.location);
     DispatchEvent(caretRect);
     if (!caretRect.mSucceeded) {
@@ -3258,7 +3257,7 @@ IMEInputHandler::CharacterIndexForPoint(NSPoint& aPoint)
     return NSNotFound;
   }
 
-  WidgetQueryContentEvent charAt(true, NS_QUERY_CHARACTER_AT_POINT, mWidget);
+  WidgetQueryContentEvent charAt(true, eQueryCharacterAtPoint, mWidget);
   NSPoint ptInWindow = [mainWindow convertScreenToBase:aPoint];
   NSPoint ptInView = [mView convertPoint:ptInWindow fromView:nil];
   charAt.refPoint.x =
@@ -3777,7 +3776,7 @@ TextInputHandlerBase::OnDestroyWidget(nsChildView* aDestroyingWidget)
 bool
 TextInputHandlerBase::DispatchEvent(WidgetGUIEvent& aEvent)
 {
-  if (aEvent.mMessage == NS_KEY_PRESS) {
+  if (aEvent.mMessage == eKeyPress) {
     WidgetInputEvent& inputEvent = *aEvent.AsInputEvent();
     if (!inputEvent.IsMeta()) {
       MOZ_LOG(gLog, LogLevel::Info,
@@ -3919,7 +3918,7 @@ TextInputHandlerBase::AttachNativeKeyEvent(WidgetKeyboardEvent& aKeyEvent)
      aKeyEvent.modifiers));
 
   NSEventType eventType;
-  if (aKeyEvent.mMessage == NS_KEY_UP) {
+  if (aKeyEvent.mMessage == eKeyUp) {
     eventType = NSKeyUp;
   } else {
     eventType = NSKeyDown;
@@ -3978,7 +3977,7 @@ TextInputHandlerBase::SetSelection(NSRange& aRange)
   MOZ_ASSERT(!Destroyed());
 
   nsRefPtr<TextInputHandlerBase> kungFuDeathGrip(this);
-  WidgetSelectionEvent selectionEvent(true, NS_SELECTION_SET, mWidget);
+  WidgetSelectionEvent selectionEvent(true, eSetSelection, mWidget);
   selectionEvent.mOffset = aRange.location;
   selectionEvent.mLength = aRange.length;
   selectionEvent.mReversed = false;

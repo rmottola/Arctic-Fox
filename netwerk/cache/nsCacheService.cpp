@@ -1224,6 +1224,7 @@ nsCacheService::Shutdown()
         // Make sure to wait for any pending cache-operations before
         // proceeding with destructive actions (bug #620660)
         (void) SyncWithCacheIOThread();
+        mActiveEntries.Shutdown();
 
         // obtain the disk cache directory in case we need to sanitize it
         parentDir = mObserver->DiskCacheParentDirectory();
@@ -2639,6 +2640,13 @@ nsCacheService::LockReleased()
 }
 
 void
+nsCacheService::Lock()
+{
+    gService->mLock.Lock();
+    gService->LockAcquired();
+}
+
+void
 nsCacheService::Lock(mozilla::Telemetry::ID mainThreadLockerID)
 {
     mozilla::Telemetry::ID lockerID;
@@ -2654,8 +2662,7 @@ nsCacheService::Lock(mozilla::Telemetry::ID mainThreadLockerID)
 
     TimeStamp start(TimeStamp::Now());
 
-    gService->mLock.Lock();
-    gService->LockAcquired();
+    nsCacheService::Lock();
 
     TimeStamp stop(TimeStamp::Now());
 
@@ -3170,7 +3177,7 @@ IsEntryPrivate(nsCacheEntry* entry)
 void
 nsCacheService::LeavePrivateBrowsing()
 {
-    nsCacheServiceAutoLock lock(LOCK_TELEM(NSCACHESERVICE_LEAVEPRIVATEBROWSING));
+    nsCacheServiceAutoLock lock;
 
     gService->DoomActiveEntries(IsEntryPrivate);
 

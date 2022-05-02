@@ -821,7 +821,7 @@ nsTextInputListener::NotifySelectionChanged(nsIDOMDocument* aDoc, nsISelection* 
         if (presShell) 
         {
           nsEventStatus status = nsEventStatus_eIgnore;
-          WidgetEvent event(true, NS_FORM_SELECTED);
+          WidgetEvent event(true, eFormSelect);
 
           presShell->HandleEventWithTarget(&event, mFrame, content, &status);
         }
@@ -906,7 +906,7 @@ nsTextInputListener::HandleEvent(nsIDOMEvent* aEvent)
     return NS_ERROR_UNEXPECTED;
   }
 
-  if (keyEvent->mMessage != NS_KEY_PRESS) {
+  if (keyEvent->mMessage != eKeyPress) {
     return NS_OK;
   }
 

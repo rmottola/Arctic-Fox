@@ -1922,7 +1922,7 @@ TypedObject::obj_setProperty(JSContext* cx, HandleObject obj, HandleId id, Handl
         uint32_t index;
         if (IdIsIndex(id, &index)) {
             if (!receiver.isObject() || obj != &receiver.toObject())
-                return SetPropertyByDefining(cx, obj, id, v, receiver, result);
+                return SetPropertyByDefining(cx, id, v, receiver, result);
 
             if (index >= uint32_t(typedObj->length())) {
                 JS_ReportErrorNumber(cx, GetErrorMessage,
@@ -1948,7 +1948,7 @@ TypedObject::obj_setProperty(JSContext* cx, HandleObject obj, HandleId id, Handl
             break;
 
         if (!receiver.isObject() || obj != &receiver.toObject())
-            return SetPropertyByDefining(cx, obj, id, v, receiver, result);
+            return SetPropertyByDefining(cx, id, v, receiver, result);
 
         size_t offset = descr->fieldOffset(fieldIndex);
         Rooted<TypeDescr*> fieldType(cx, &descr->fieldDescr(fieldIndex));
@@ -2189,7 +2189,7 @@ InlineTransparentTypedObject::getOrCreateBuffer(JSContext* cx)
     ObjectWeakMap*& table = cx->compartment()->lazyArrayBuffers;
     if (!table) {
         table = cx->new_<ObjectWeakMap>(cx);
-        if (!table)
+        if (!table || !table->init())
             return nullptr;
     }
 

@@ -32,6 +32,7 @@ class nsSubDocumentFrame;
 class nsView;
 class nsIInProcessContentFrameMessageManager;
 class AutoResetInShow;
+class AutoResetInFrameSwap;
 class nsITabParent;
 class nsIDocShellTreeItem;
 class nsIDocShellTreeOwner;
@@ -42,8 +43,11 @@ namespace dom {
 class ContentParent;
 class PBrowserParent;
 class TabParent;
-struct StructuredCloneData;
 } // namespace dom
+
+namespace ipc {
+class StructuredCloneData;
+} // namespace ipc
 
 namespace layout {
 class RenderFrameParent;
@@ -60,6 +64,7 @@ class nsFrameLoader final : public nsIFrameLoader,
                             public mozilla::dom::ipc::MessageManagerCallback
 {
   friend class AutoResetInShow;
+  friend class AutoResetInFrameSwap;
   typedef mozilla::dom::PBrowserParent PBrowserParent;
   typedef mozilla::dom::TabParent TabParent;
   typedef mozilla::layout::RenderFrameParent RenderFrameParent;
@@ -89,7 +94,7 @@ public:
                                           bool aRunInGlobalScope) override;
   virtual bool DoSendAsyncMessage(JSContext* aCx,
                                   const nsAString& aMessage,
-                                  const mozilla::dom::StructuredCloneData& aData,
+                                  mozilla::dom::ipc::StructuredCloneData& aData,
                                   JS::Handle<JSObject *> aCpows,
                                   nsIPrincipal* aPrincipal) override;
   virtual bool CheckPermission(const nsAString& aPermission) override;
@@ -179,6 +184,8 @@ public:
    * or ReallyStartLoading().
    */
   void SetRemoteBrowser(nsITabParent* aTabParent);
+
+  nsresult SwapRemoteBrowser(nsITabParent* aTabParent);
 
   /**
    * Stashes a detached nsIFrame on the frame loader. We do this when we're

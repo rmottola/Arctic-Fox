@@ -491,13 +491,13 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
   mCurrentTarget = aTargetFrame;
   mCurrentTargetContent = nullptr;
 
-  // Do not take account NS_MOUSE_ENTER_WIDGET/EXIT_WIDGET so that loading a page
-  // when user is not active doesn't change the state to active.
+  // Do not take account eMouseEnterIntoWidget/ExitFromWidget so that loading
+  // a page when user is not active doesn't change the state to active.
   WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
   if (aEvent->mFlags.mIsTrusted &&
       ((mouseEvent && mouseEvent->IsReal() &&
-        mouseEvent->mMessage != NS_MOUSE_ENTER_WIDGET &&
-        mouseEvent->mMessage != NS_MOUSE_EXIT_WIDGET) ||
+        mouseEvent->mMessage != eMouseEnterIntoWidget &&
+        mouseEvent->mMessage != eMouseExitFromWidget) ||
        aEvent->mClass == eWheelEventClass ||
        aEvent->mClass == ePointerEventClass ||
        aEvent->mClass == eTouchEventClass ||
@@ -515,9 +515,9 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
 
     nsCOMPtr<nsINode> node = do_QueryInterface(aTargetContent);
     if (node &&
-        (aEvent->mMessage == NS_KEY_UP || aEvent->mMessage == NS_MOUSE_BUTTON_UP ||
-         aEvent->mMessage == NS_WHEEL_WHEEL || aEvent->mMessage == NS_TOUCH_END ||
-         aEvent->mMessage == NS_POINTER_UP)) {
+        (aEvent->mMessage == eKeyUp || aEvent->mMessage == eMouseUp ||
+         aEvent->mMessage == eWheel || aEvent->mMessage == eTouchEnd ||
+         aEvent->mMessage == ePointerUp)) {
       nsIDocument* doc = node->OwnerDoc();
       while (doc && !doc->UserHasInteracted()) {
         doc->SetUserHasInteracted(true);
@@ -555,13 +555,18 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
 
   *aStatus = nsEventStatus_eIgnore;
 
+  if (aEvent->mClass == eQueryContentEventClass) {
+    HandleQueryContentEvent(aEvent->AsQueryContentEvent());
+    return NS_OK;
+  }
+
   switch (aEvent->mMessage) {
-  case NS_CONTEXTMENU:
+  case eContextMenu:
     if (sIsPointerLocked) {
       return NS_ERROR_DOM_INVALID_STATE_ERR;
     }
     break;
-  case NS_MOUSE_BUTTON_DOWN: {
+  case eMouseDown: {
     switch (mouseEvent->button) {
     case WidgetMouseEvent::eLeftButton:
       BeginTrackingDragGesture(aPresContext, mouseEvent, aTargetFrame);
@@ -580,7 +585,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     }
     break;
   }
-  case NS_MOUSE_BUTTON_UP: {
+  case eMouseUp: {
     switch (mouseEvent->button) {
       case WidgetMouseEvent::eLeftButton:
         if (Prefs::ClickHoldContextMenu()) {
@@ -596,8 +601,8 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     }
     break;
   }
-  case NS_MOUSE_ENTER_WIDGET:
-    // In some cases on e10s NS_MOUSE_ENTER_WIDGET
+  case eMouseEnterIntoWidget:
+    // In some cases on e10s eMouseEnterIntoWidget
     // event was sent twice into child process of content.
     // (From specific widget code (sending is not permanent) and
     // from ESM::DispatchMouseOrPointerEvent (sending is permanent)).
@@ -605,20 +610,21 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     // suppress sending accidental event from widget code.
     aEvent->mFlags.mNoCrossProcessBoundaryForwarding = true;
     break;
-  case NS_MOUSE_EXIT_WIDGET:
-    // If this is a remote frame, we receive NS_MOUSE_EXIT_WIDGET from the parent
-    // the mouse exits our content. Since the parent may update the cursor
-    // while the mouse is outside our frame, and since PuppetWidget caches the
-    // current cursor internally, re-entering our content (say from over a
-    // window edge) wont update the cursor if the cached value and the current
-    // cursor match. So when the mouse exits a remote frame, clear the cached
-    // widget cursor so a proper update will occur when the mouse re-enters.
+  case eMouseExitFromWidget:
+    // If this is a remote frame, we receive eMouseExitFromWidget from the
+    // parent the mouse exits our content. Since the parent may update the
+    // cursor while the mouse is outside our frame, and since PuppetWidget
+    // caches the current cursor internally, re-entering our content (say from
+    // over a window edge) wont update the cursor if the cached value and the
+    // current cursor match. So when the mouse exits a remote frame, clear the
+    // cached widget cursor so a proper update will occur when the mouse
+    // re-enters.
     if (XRE_IsContentProcess()) {
       ClearCachedWidgetCursor(mCurrentTarget);
     }
 
     // Flag helps to suppress double event sending into process of content.
-    // For more information see comment above, at NS_MOUSE_ENTER_WIDGET case.
+    // For more information see comment above, at eMouseEnterIntoWidget case.
     aEvent->mFlags.mNoCrossProcessBoundaryForwarding = true;
 
     // If the event is not a top-level window exit, then it's not
@@ -628,22 +634,22 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
       // Treat it as a synthetic move so we don't generate spurious
       // "exit" or "move" events.  Any necessary "out" or "over" events
       // will be generated by GenerateMouseEnterExit
-      mouseEvent->mMessage = NS_MOUSE_MOVE;
+      mouseEvent->mMessage = eMouseMove;
       mouseEvent->reason = WidgetMouseEvent::eSynthesized;
       // then fall through...
     } else {
       if (sPointerEventEnabled) {
         // We should synthetize corresponding pointer events
-        GeneratePointerEnterExit(NS_POINTER_LEAVE, mouseEvent);
+        GeneratePointerEnterExit(ePointerLeave, mouseEvent);
       }
       GenerateMouseEnterExit(mouseEvent);
       //This is a window level mouse exit event and should stop here
-      aEvent->mMessage = NS_EVENT_NULL;
+      aEvent->mMessage = eVoidEvent;
       break;
     }
-  case NS_MOUSE_MOVE:
-  case NS_POINTER_DOWN:
-  case NS_POINTER_MOVE: {
+  case eMouseMove:
+  case ePointerDown:
+  case ePointerMove: {
     // on the Mac, GenerateDragGesture() may not return until the drag
     // has completed and so |aTargetFrame| may have been deleted (moving
     // a bookmark, for example).  If this is the case, however, we know
@@ -658,20 +664,20 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     FlushPendingEvents(aPresContext);
     break;
   }
-  case NS_DRAGDROP_GESTURE:
+  case eLegacyDragGesture:
     if (Prefs::ClickHoldContextMenu()) {
       // an external drag gesture event came in, not generated internally
       // by Gecko. Make sure we get rid of the click-hold timer.
       KillClickHoldTimer();
     }
     break;
-  case NS_DRAGDROP_OVER:
-    // NS_DRAGDROP_DROP is fired before NS_DRAGDROP_DRAGDROP so send
-    // the enter/exit events before NS_DRAGDROP_DROP.
+  case eDragOver:
+    // eDrop is fired before eLegacyDragDrop so send the enter/exit events
+    // before eDrop.
     GenerateDragDropEnterExit(aPresContext, aEvent->AsDragEvent());
     break;
 
-  case NS_KEY_PRESS:
+  case eKeyPress:
     {
       WidgetKeyboardEvent* keyEvent = aEvent->AsKeyboardEvent();
 
@@ -696,12 +702,12 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
       }
     }
     // then fall through...
-  case NS_KEY_BEFORE_DOWN:
-  case NS_KEY_DOWN:
-  case NS_KEY_AFTER_DOWN:
-  case NS_KEY_BEFORE_UP:
-  case NS_KEY_UP:
-  case NS_KEY_AFTER_UP:
+  case eBeforeKeyDown:
+  case eKeyDown:
+  case eAfterKeyDown:
+  case eBeforeKeyUp:
+  case eKeyUp:
+  case eAfterKeyUp:
     {
       nsIContent* content = GetFocusedContent();
       if (content)
@@ -718,9 +724,9 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
       keyEvent->mIsComposing = !!composition;
     }
     break;
-  case NS_WHEEL_WHEEL:
-  case NS_WHEEL_START:
-  case NS_WHEEL_STOP:
+  case eWheel:
+  case eWheelOperationStart:
+  case eWheelOperationEnd:
     {
       NS_ASSERTION(aEvent->mFlags.mIsTrusted,
                    "Untrusted wheel event shouldn't be here");
@@ -730,7 +736,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
         mCurrentTargetContent = content;
       }
 
-      if (aEvent->mMessage != NS_WHEEL_WHEEL) {
+      if (aEvent->mMessage != eWheel) {
         break;
       }
 
@@ -750,101 +756,30 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
         InitLineOrPageDelta(aTargetFrame, this, wheelEvent);
     }
     break;
-  case NS_QUERY_SELECTED_TEXT:
-    DoQuerySelectedText(aEvent->AsQueryContentEvent());
-    break;
-  case NS_QUERY_TEXT_CONTENT:
-    {
-      if (RemoteQueryContentEvent(aEvent)) {
-        break;
-      }
-      ContentEventHandler handler(mPresContext);
-      handler.OnQueryTextContent(aEvent->AsQueryContentEvent());
-    }
-    break;
-  case NS_QUERY_CARET_RECT:
-    {
-      if (RemoteQueryContentEvent(aEvent)) {
-        break;
-      }
-      ContentEventHandler handler(mPresContext);
-      handler.OnQueryCaretRect(aEvent->AsQueryContentEvent());
-    }
-    break;
-  case NS_QUERY_TEXT_RECT:
-    {
-      if (RemoteQueryContentEvent(aEvent)) {
-        break;
-      }
-      ContentEventHandler handler(mPresContext);
-      handler.OnQueryTextRect(aEvent->AsQueryContentEvent());
-    }
-    break;
-  case NS_QUERY_EDITOR_RECT:
-    {
-      if (RemoteQueryContentEvent(aEvent)) {
-        break;
-      }
-      ContentEventHandler handler(mPresContext);
-      handler.OnQueryEditorRect(aEvent->AsQueryContentEvent());
-    }
-    break;
-  case NS_QUERY_CONTENT_STATE:
-    {
-      // XXX remote event
-      ContentEventHandler handler(mPresContext);
-      handler.OnQueryContentState(aEvent->AsQueryContentEvent());
-    }
-    break;
-  case NS_QUERY_SELECTION_AS_TRANSFERABLE:
-    {
-      // XXX remote event
-      ContentEventHandler handler(mPresContext);
-      handler.OnQuerySelectionAsTransferable(aEvent->AsQueryContentEvent());
-    }
-    break;
-  case NS_QUERY_CHARACTER_AT_POINT:
-    {
-      // XXX remote event
-      ContentEventHandler handler(mPresContext);
-      handler.OnQueryCharacterAtPoint(aEvent->AsQueryContentEvent());
-    }
-    break;
-  case NS_QUERY_DOM_WIDGET_HITTEST:
-    {
-      // XXX remote event
-      ContentEventHandler handler(mPresContext);
-      handler.OnQueryDOMWidgetHittest(aEvent->AsQueryContentEvent());
-    }
-    break;
-  case NS_SELECTION_SET:
+  case eSetSelection:
     IMEStateManager::HandleSelectionEvent(aPresContext, GetFocusedContent(),
                                           aEvent->AsSelectionEvent());
     break;
-  case NS_CONTENT_COMMAND_CUT:
-  case NS_CONTENT_COMMAND_COPY:
-  case NS_CONTENT_COMMAND_PASTE:
-  case NS_CONTENT_COMMAND_DELETE:
-  case NS_CONTENT_COMMAND_UNDO:
-  case NS_CONTENT_COMMAND_REDO:
-  case NS_CONTENT_COMMAND_PASTE_TRANSFERABLE:
-    {
-      DoContentCommandEvent(aEvent->AsContentCommandEvent());
-    }
+  case eContentCommandCut:
+  case eContentCommandCopy:
+  case eContentCommandPaste:
+  case eContentCommandDelete:
+  case eContentCommandUndo:
+  case eContentCommandRedo:
+  case eContentCommandPasteTransferable:
+    DoContentCommandEvent(aEvent->AsContentCommandEvent());
     break;
-  case NS_CONTENT_COMMAND_SCROLL:
-    {
-      DoContentCommandScrollEvent(aEvent->AsContentCommandEvent());
-    }
+  case eContentCommandScroll:
+    DoContentCommandScrollEvent(aEvent->AsContentCommandEvent());
     break;
-  case NS_COMPOSITION_START:
+  case eCompositionStart:
     if (aEvent->mFlags.mIsTrusted) {
       // If the event is trusted event, set the selected text to data of
       // composition event.
       WidgetCompositionEvent* compositionEvent = aEvent->AsCompositionEvent();
-      WidgetQueryContentEvent selectedText(true, NS_QUERY_SELECTED_TEXT,
+      WidgetQueryContentEvent selectedText(true, eQuerySelectedText,
                                            compositionEvent->widget);
-      DoQuerySelectedText(&selectedText);
+      HandleQueryContentEvent(&selectedText);
       NS_ASSERTION(selectedText.mSucceeded, "Failed to get selected text");
       compositionEvent->mData = selectedText.mReply.mString;
     }
@@ -853,6 +788,42 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     break;
   }
   return NS_OK;
+}
+
+void
+EventStateManager::HandleQueryContentEvent(WidgetQueryContentEvent* aEvent)
+{
+  switch (aEvent->mMessage) {
+    case eQuerySelectedText:
+    case eQueryTextContent:
+    case eQueryCaretRect:
+    case eQueryTextRect:
+    case eQueryEditorRect:
+      if (!IsTargetCrossProcess(aEvent)) {
+        break;
+      }
+      // Will not be handled locally, remote the event
+      GetCrossProcessTarget()->HandleQueryContentEvent(*aEvent);
+      return;
+    // Following events have not been supported in e10s mode yet.
+    case eQueryContentState:
+    case eQuerySelectionAsTransferable:
+    case eQueryCharacterAtPoint:
+    case eQueryDOMWidgetHittest:
+      break;
+    default:
+      return;
+  }
+
+  // If there is an IMEContentObserver, we need to handle QueryContentEvent
+  // with it.
+  if (mIMEContentObserver) {
+    mIMEContentObserver->HandleQueryContentEvent(aEvent);
+    return;
+  }
+
+  ContentEventHandler handler(mPresContext);
+  handler.HandleQueryContentEvent(aEvent);
 }
 
 // static
@@ -1183,31 +1154,31 @@ CrossProcessSafeEvent(const WidgetEvent& aEvent)
     return true;
   case eMouseEventClass:
     switch (aEvent.mMessage) {
-    case NS_MOUSE_BUTTON_DOWN:
-    case NS_MOUSE_BUTTON_UP:
-    case NS_MOUSE_MOVE:
-    case NS_CONTEXTMENU:
-    case NS_MOUSE_ENTER_WIDGET:
-    case NS_MOUSE_EXIT_WIDGET:
+    case eMouseDown:
+    case eMouseUp:
+    case eMouseMove:
+    case eContextMenu:
+    case eMouseEnterIntoWidget:
+    case eMouseExitFromWidget:
       return true;
     default:
       return false;
     }
   case eTouchEventClass:
     switch (aEvent.mMessage) {
-    case NS_TOUCH_START:
-    case NS_TOUCH_MOVE:
-    case NS_TOUCH_END:
-    case NS_TOUCH_CANCEL:
+    case eTouchStart:
+    case eTouchMove:
+    case eTouchEnd:
+    case eTouchCancel:
       return true;
     default:
       return false;
     }
   case eDragEventClass:
     switch (aEvent.mMessage) {
-    case NS_DRAGDROP_OVER:
-    case NS_DRAGDROP_EXIT:
-    case NS_DRAGDROP_DROP:
+    case eDragOver:
+    case eDragExit:
+    case eDrop:
       return true;
     default:
       break;
@@ -1231,8 +1202,7 @@ EventStateManager::HandleCrossProcessEvent(WidgetEvent* aEvent,
   //
   // NB: the elements of |targets| must be unique, for correctness.
   nsAutoTArray<nsCOMPtr<nsIContent>, 1> targets;
-  if (aEvent->mClass != eTouchEventClass ||
-      aEvent->mMessage == NS_TOUCH_START) {
+  if (aEvent->mClass != eTouchEventClass || aEvent->mMessage == eTouchStart) {
     // If this event only has one target, and it's remote, add it to
     // the array.
     nsIFrame* frame = GetEventTarget();
@@ -1464,7 +1434,7 @@ EventStateManager::FireContextClick()
 
     if (allowedToDispatch) {
       // init the event while mCurrentTarget is still good
-      WidgetMouseEvent event(true, NS_CONTEXTMENU, targetWidget,
+      WidgetMouseEvent event(true, eContextMenu, targetWidget,
                              WidgetMouseEvent::eReal);
       event.clickCount = 1;
       FillInEventFromGestureDown(&event);
@@ -1490,7 +1460,7 @@ EventStateManager::FireContextClick()
                                 nullptr, &status);
 
       // We don't need to dispatch to frame handling because no frames
-      // watch NS_CONTEXTMENU except for nsMenuFrame and that's only for
+      // watch eContextMenu except for nsMenuFrame and that's only for
       // dismissal. That's just as well since we don't really know
       // which frame to send it to.
     }
@@ -1535,6 +1505,9 @@ EventStateManager::BeginTrackingDragGesture(nsPresContext* aPresContext,
                                     getter_AddRefs(mGestureDownContent));
 
     mGestureDownFrameOwner = inDownFrame->GetContent();
+    if (!mGestureDownFrameOwner) {
+      mGestureDownFrameOwner = mGestureDownContent;
+    }
   }
   mGestureModifiers = inDownEvent->modifiers;
   mGestureDownButtons = inDownEvent->buttons;
@@ -1593,7 +1566,7 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
   if (IsTrackingDragGesture()) {
     mCurrentTarget = mGestureDownFrameOwner->GetPrimaryFrame();
 
-    if (!mCurrentTarget) {
+    if (!mCurrentTarget || !mCurrentTarget->GetNearestWidget()) {
       StopTrackingDragGesture();
       return;
     }
@@ -1646,7 +1619,7 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
         return;
 
       nsRefPtr<DataTransfer> dataTransfer =
-        new DataTransfer(window, NS_DRAGDROP_START, false, -1);
+        new DataTransfer(window, eDragStart, false, -1);
 
       nsCOMPtr<nsISelection> selection;
       nsCOMPtr<nsIContent> eventContent, targetContent;
@@ -1672,11 +1645,11 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
 
       // get the widget from the target frame
       WidgetDragEvent startEvent(aEvent->mFlags.mIsTrusted,
-                                 NS_DRAGDROP_START, widget);
+                                 eDragStart, widget);
       FillInEventFromGestureDown(&startEvent);
 
       WidgetDragEvent gestureEvent(aEvent->mFlags.mIsTrusted,
-                                   NS_DRAGDROP_GESTURE, widget);
+                                   eLegacyDragGesture, widget);
       FillInEventFromGestureDown(&gestureEvent);
 
       startEvent.dataTransfer = gestureEvent.dataTransfer = dataTransfer;
@@ -1735,7 +1708,7 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
         }
       }
 
-      // Note that frame event handling doesn't care about NS_DRAGDROP_GESTURE,
+      // Note that frame event handling doesn't care about eLegacyDragGesture,
       // which is just as well since we don't really know which frame to
       // send it to
 
@@ -2228,8 +2201,8 @@ EventStateManager::SendLineScrollEvent(nsIFrame* aTargetFrame,
     targetContent = targetContent->GetParent();
   }
 
-  WidgetMouseScrollEvent event(aEvent->mFlags.mIsTrusted, NS_MOUSE_SCROLL,
-                               aEvent->widget);
+  WidgetMouseScrollEvent event(aEvent->mFlags.mIsTrusted,
+                               eLegacyMouseLineOrPageScroll, aEvent->widget);
   event.mFlags.mDefaultPrevented = aState.mDefaultPrevented;
   event.mFlags.mDefaultPreventedByContent = aState.mDefaultPreventedByContent;
   event.refPoint = aEvent->refPoint;
@@ -2268,8 +2241,8 @@ EventStateManager::SendPixelScrollEvent(nsIFrame* aTargetFrame,
     targetContent = targetContent->GetParent();
   }
 
-  WidgetMouseScrollEvent event(aEvent->mFlags.mIsTrusted, NS_MOUSE_PIXEL_SCROLL,
-                               aEvent->widget);
+  WidgetMouseScrollEvent event(aEvent->mFlags.mIsTrusted,
+                               eLegacyMousePixelScroll, aEvent->widget);
   event.mFlags.mDefaultPrevented = aState.mDefaultPrevented;
   event.mFlags.mDefaultPreventedByContent = aState.mDefaultPreventedByContent;
   event.refPoint = aEvent->refPoint;
@@ -2602,7 +2575,7 @@ EventStateManager::DecideGestureEvent(WidgetGestureNotifyEvent* aEvent,
                                       nsIFrame* targetFrame)
 {
 
-  NS_ASSERTION(aEvent->mMessage == NS_GESTURENOTIFY_EVENT_START,
+  NS_ASSERTION(aEvent->mMessage == eGestureNotify,
                "DecideGestureEvent called with a non-gesture event");
 
   /* Check the ancestor tree to decide if any frame is willing* to receive
@@ -2742,6 +2715,8 @@ EventStateManager::PostHandleKeyboardEvent(WidgetKeyboardEvent* aKeyboardEvent,
     case NS_VK_F6:
       // This is to prevent keyboard scrolling while alt modifier in use.
       if (!aKeyboardEvent->IsAlt()) {
+        aStatus = nsEventStatus_eConsumeNoDefault;
+
         // Handling the tab event after it was sent to content is bad,
         // because to the FocusManager the remote-browser looks like one
         // element, so we would just move the focus to the next element
@@ -2765,7 +2740,6 @@ EventStateManager::PostHandleKeyboardEvent(WidgetKeyboardEvent* aKeyboardEvent,
                         nsIFocusManager::FLAG_BYKEY,
                         getter_AddRefs(result));
         }
-        aStatus = nsEventStatus_eConsumeNoDefault;
       }
       return;
     case 0:
@@ -2804,8 +2778,8 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
 
   // Most of the events we handle below require a frame.
   // Add special cases here.
-  if (!mCurrentTarget && aEvent->mMessage != NS_MOUSE_BUTTON_UP &&
-      aEvent->mMessage != NS_MOUSE_BUTTON_DOWN) {
+  if (!mCurrentTarget && aEvent->mMessage != eMouseUp &&
+      aEvent->mMessage != eMouseDown) {
     return NS_OK;
   }
 
@@ -2814,7 +2788,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
   nsresult ret = NS_OK;
 
   switch (aEvent->mMessage) {
-  case NS_MOUSE_BUTTON_DOWN:
+  case eMouseDown:
     {
       WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
       if (mouseEvent->button == WidgetMouseEvent::eLeftButton &&
@@ -3009,14 +2983,14 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
       SetActiveManager(this, activeContent);
     }
     break;
-  case NS_POINTER_CANCEL: {
+  case ePointerCancel: {
     if(WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent()) {
       GenerateMouseEnterExit(mouseEvent);
     }
     // This break was commented specially
     // break;
   }
-  case NS_POINTER_UP: {
+  case ePointerUp: {
     WidgetPointerEvent* pointerEvent = aEvent->AsPointerEvent();
     // After UP/Cancel Touch pointers become invalid so we can remove relevant helper from Table
     // Mouse/Pen pointers are valid all the time (not only between down/up)
@@ -3026,7 +3000,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     }
     break;
   }
-  case NS_MOUSE_BUTTON_UP:
+  case eMouseUp:
     {
       ClearGlobalActiveContent(this);
       WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
@@ -3046,7 +3020,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
       }
     }
     break;
-  case NS_WHEEL_STOP:
+  case eWheelOperationEnd:
     {
       MOZ_ASSERT(aEvent->mFlags.mIsTrusted);
       ScrollbarsForWheel::MayInactivate();
@@ -3059,8 +3033,8 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
       }
     }
     break;
-  case NS_WHEEL_WHEEL:
-  case NS_WHEEL_START:
+  case eWheel:
+  case eWheelOperationStart:
     {
       MOZ_ASSERT(aEvent->mFlags.mIsTrusted);
 
@@ -3086,7 +3060,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
 
           ScrollbarsForWheel::PrepareToScrollText(this, aTargetFrame, wheelEvent);
 
-          if (aEvent->mMessage != NS_WHEEL_WHEEL ||
+          if (aEvent->mMessage != eWheel ||
               (!wheelEvent->deltaX && !wheelEvent->deltaY)) {
             break;
           }
@@ -3119,8 +3093,8 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
           break;
         }
         case WheelPrefs::ACTION_HISTORY: {
-          // If this event doesn't cause NS_MOUSE_SCROLL event or the direction
-          // is oblique, don't perform history back/forward.
+          // If this event doesn't cause eLegacyMouseLineOrPageScroll event or
+          // the direction is oblique, don't perform history back/forward.
           int32_t intDelta = wheelEvent->GetPreferredIntDelta();
           if (!intDelta) {
             break;
@@ -3129,8 +3103,8 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
           break;
         }
         case WheelPrefs::ACTION_ZOOM: {
-          // If this event doesn't cause NS_MOUSE_SCROLL event or the direction
-          // is oblique, don't perform zoom in/out.
+          // If this event doesn't cause eLegacyMouseLineOrPageScroll event or
+          // the direction is oblique, don't perform zoom in/out.
           int32_t intDelta = wheelEvent->GetPreferredIntDelta();
           if (!intDelta) {
             break;
@@ -3140,19 +3114,38 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
         }
         case WheelPrefs::ACTION_NONE:
         default:
-          // If we don't handle the wheel event, all of the delta values must
-          // be overflown delta values.
+          bool allDeltaOverflown = false;
+          if (wheelEvent->mFlags.mHandledByAPZ) {
+            if (wheelEvent->mCanTriggerSwipe) {
+              // For events that can trigger swipes, APZ needs to know whether
+              // scrolling is possible in the requested direction. It does this
+              // by looking at the scroll overflow values on mCanTriggerSwipe
+              // events after they have been processed.
+              allDeltaOverflown =
+                !ComputeScrollTarget(aTargetFrame, wheelEvent,
+                                     COMPUTE_DEFAULT_ACTION_TARGET);
+            }
+          } else {
+            // The event was processed neither by APZ nor by us, so all of the
+            // delta values must be overflown delta values.
+            allDeltaOverflown = true;
+          }
+
+          if (!allDeltaOverflown) {
+            break;
+          }
           wheelEvent->overflowDeltaX = wheelEvent->deltaX;
           wheelEvent->overflowDeltaY = wheelEvent->deltaY;
           WheelPrefs::GetInstance()->
             CancelApplyingUserPrefsFromOverflowDelta(wheelEvent);
+          wheelEvent->mViewPortIsOverscrolled = true;
           break;
       }
       *aStatus = nsEventStatus_eConsumeNoDefault;
     }
     break;
 
-  case NS_GESTURENOTIFY_EVENT_START:
+  case eGestureNotify:
     {
       if (nsEventStatus_eConsumeNoDefault != *aStatus) {
         DecideGestureEvent(aEvent->AsGestureNotifyEvent(), mCurrentTarget);
@@ -3160,8 +3153,8 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     }
     break;
 
-  case NS_DRAGDROP_ENTER:
-  case NS_DRAGDROP_OVER:
+  case eDragEnter:
+  case eDragOver:
     {
       NS_ASSERTION(aEvent->mClass == eDragEventClass, "Expected a drag event");
 
@@ -3250,13 +3243,13 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
 
         // For now, do this only for dragover.
         //XXXsmaug dragenter needs some more work.
-        if (aEvent->mMessage == NS_DRAGDROP_OVER && !isChromeDoc) {
+        if (aEvent->mMessage == eDragOver && !isChromeDoc) {
           // Someone has called preventDefault(), check whether is was on
           // content or chrome.
           dragSession->SetOnlyChromeDrop(
             !dragEvent->mDefaultPreventedOnContent);
         }
-      } else if (aEvent->mMessage == NS_DRAGDROP_OVER && !isChromeDoc) {
+      } else if (aEvent->mMessage == eDragOver && !isChromeDoc) {
         // No one called preventDefault(), so handle drop only in chrome.
         dragSession->SetOnlyChromeDrop(true);
       }
@@ -3275,7 +3268,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     }
     break;
 
-  case NS_DRAGDROP_DROP:
+  case eDrop:
     {
       // now fire the dragdrop event, for compatibility with XUL
       if (mCurrentTarget && nsEventStatus_eConsumeNoDefault != *aStatus) {
@@ -3285,7 +3278,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
 
         nsCOMPtr<nsIWidget> widget = mCurrentTarget->GetNearestWidget();
         WidgetDragEvent event(aEvent->mFlags.mIsTrusted,
-                              NS_DRAGDROP_DRAGDROP, widget);
+                              eLegacyDragDrop, widget);
 
         WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
         event.refPoint = mouseEvent->refPoint;
@@ -3308,25 +3301,25 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
       ClearGlobalActiveContent(this);
       break;
     }
-  case NS_DRAGDROP_EXIT:
+  case eDragExit:
      // make sure to fire the enter and exit_synth events after the
-     // NS_DRAGDROP_EXIT event, otherwise we'll clean up too early
+     // eDragExit event, otherwise we'll clean up too early
     GenerateDragDropEnterExit(presContext, aEvent->AsDragEvent());
     break;
 
-  case NS_KEY_BEFORE_UP:
-  case NS_KEY_UP:
-  case NS_KEY_AFTER_UP:
+  case eBeforeKeyUp:
+  case eKeyUp:
+  case eAfterKeyUp:
     break;
 
-  case NS_KEY_PRESS:
+  case eKeyPress:
     {
       WidgetKeyboardEvent* keyEvent = aEvent->AsKeyboardEvent();
       PostHandleKeyboardEvent(keyEvent, *aStatus, dispatchedToContentProcess);
     }
     break;
 
-  case NS_MOUSE_ENTER_WIDGET:
+  case eMouseEnterIntoWidget:
     if (mCurrentTarget) {
       nsCOMPtr<nsIContent> targetContent;
       mCurrentTarget->GetContentForEvent(aEvent, getter_AddRefs(targetContent));
@@ -3335,7 +3328,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     break;
 
 #ifdef XP_MACOSX
-  case NS_MOUSE_ACTIVATE:
+  case eMouseActivate:
     if (mCurrentTarget) {
       nsCOMPtr<nsIContent> targetContent;
       mCurrentTarget->GetContentForEvent(aEvent, getter_AddRefs(targetContent));
@@ -3355,18 +3348,6 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
   mCurrentTargetContent = nullptr;
 
   return ret;
-}
-
-bool
-EventStateManager::RemoteQueryContentEvent(WidgetEvent* aEvent)
-{
-  WidgetQueryContentEvent* queryEvent = aEvent->AsQueryContentEvent();
-  if (!IsTargetCrossProcess(queryEvent)) {
-    return false;
-  }
-  // Will not be handled locally, remote the event
-  GetCrossProcessTarget()->HandleQueryContentEvent(*queryEvent);
-  return true;
 }
 
 TabParent*
@@ -3749,10 +3730,10 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
   // "[When the mouse is locked on an element...e]vents that require the concept
   // of a mouse cursor must not be dispatched (for example: mouseover, mouseout).
   if (sIsPointerLocked &&
-      (aMessage == NS_MOUSELEAVE ||
-       aMessage == NS_MOUSEENTER ||
-       aMessage == NS_MOUSE_OVER ||
-       aMessage == NS_MOUSE_OUT)) {
+      (aMessage == eMouseLeave ||
+       aMessage == eMouseEnter ||
+       aMessage == eMouseOver ||
+       aMessage == eMouseOut)) {
     mCurrentTargetContent = nullptr;
     nsCOMPtr<Element> pointerLockedElement =
       do_QueryReferent(EventStateManager::sPointerLockedElement);
@@ -3797,10 +3778,10 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
     // If we are entering/leaving remote content, dispatch a mouse enter/exit
     // event to the remote frame.
     if (IsRemoteTarget(aTargetContent)) {
-      if (aMessage == NS_MOUSE_OUT) {
+      if (aMessage == eMouseOut) {
         // For remote content, send a "top-level" widget mouse exit event.
         nsAutoPtr<WidgetMouseEvent> remoteEvent;
-        CreateMouseOrPointerWidgetEvent(aMouseEvent, NS_MOUSE_EXIT_WIDGET,
+        CreateMouseOrPointerWidgetEvent(aMouseEvent, eMouseExitFromWidget,
                                         aRelatedContent, remoteEvent);
         remoteEvent->exit = WidgetMouseEvent::eTopLevel;
 
@@ -3810,9 +3791,9 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
         // proper target via GetEventTarget which will return mCurrentTarget.
         mCurrentTarget = targetFrame;
         HandleCrossProcessEvent(remoteEvent, &status);
-      } else if (aMessage == NS_MOUSE_OVER) {
+      } else if (aMessage == eMouseOver) {
         nsAutoPtr<WidgetMouseEvent> remoteEvent;
-        CreateMouseOrPointerWidgetEvent(aMouseEvent, NS_MOUSE_ENTER_WIDGET,
+        CreateMouseOrPointerWidgetEvent(aMouseEvent, eMouseEnterIntoWidget,
                                         aRelatedContent, remoteEvent);
         HandleCrossProcessEvent(remoteEvent, &status);
       }
@@ -3861,8 +3842,7 @@ public:
 
   ~EnterLeaveDispatcher()
   {
-    if (mEventMessage == NS_MOUSEENTER ||
-        mEventMessage == NS_POINTER_ENTER) {
+    if (mEventMessage == eMouseEnter || mEventMessage == ePointerEnter) {
       for (int32_t i = mTargets.Count() - 1; i >= 0; --i) {
         mESM->DispatchMouseOrPointerEvent(mMouseEvent, mEventMessage,
                                           mTargets[i], mRelatedTarget);
@@ -3932,13 +3912,18 @@ EventStateManager::NotifyMouseOut(WidgetMouseEvent* aMouseEvent,
     SetContentState(nullptr, NS_EVENT_STATE_HOVER);
   }
 
+  // In case we go out from capturing element (retargetedByPointerCapture is true)
+  // we should dispatch ePointerLeave event and only for capturing element.
+  nsRefPtr<nsIContent> movingInto = aMouseEvent->retargetedByPointerCapture
+                                    ? wrapper->mLastOverElement->GetParent()
+                                    : aMovingInto;
+
   EnterLeaveDispatcher leaveDispatcher(this, wrapper->mLastOverElement,
-                                       aMovingInto, aMouseEvent,
-                                       isPointer ? NS_POINTER_LEAVE :
-                                                   NS_MOUSELEAVE);
+                                       movingInto, aMouseEvent,
+                                       isPointer ? ePointerLeave : eMouseLeave);
 
   // Fire mouseout
-  DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? NS_POINTER_OUT : NS_MOUSE_OUT,
+  DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? ePointerOut : eMouseOut,
                               wrapper->mLastOverElement, aMovingInto);
 
   wrapper->mLastOverFrame = nullptr;
@@ -3995,7 +3980,7 @@ EventStateManager::NotifyMouseOver(WidgetMouseEvent* aMouseEvent,
   Maybe<EnterLeaveDispatcher> enterDispatcher;
   if (dispatch) {
     enterDispatcher.emplace(this, aContent, lastOverElement, aMouseEvent,
-                            isPointer ? NS_POINTER_ENTER : NS_MOUSEENTER);
+                            isPointer ? ePointerEnter : eMouseEnter);
   }
 
   NotifyMouseOut(aMouseEvent, aContent);
@@ -4012,7 +3997,7 @@ EventStateManager::NotifyMouseOver(WidgetMouseEvent* aMouseEvent,
     // Fire mouseover
     wrapper->mLastOverFrame = 
       DispatchMouseOrPointerEvent(aMouseEvent,
-                                  isPointer ? NS_POINTER_OVER : NS_MOUSE_OVER,
+                                  isPointer ? ePointerOver : eMouseOver,
                                   aContent, lastOverElement);
     wrapper->mLastOverElement = aContent;
   } else {
@@ -4087,7 +4072,7 @@ EventStateManager::GenerateMouseEnterExit(WidgetMouseEvent* aMouseEvent)
   nsCOMPtr<nsIContent> targetBeforeEvent = mCurrentTargetContent;
 
   switch(aMouseEvent->mMessage) {
-  case NS_MOUSE_MOVE:
+  case eMouseMove:
     {
       // Mouse movement is reported on the MouseEvent.movement{X,Y} fields.
       // Movement is calculated in UIEvent::GetMovementPoint() as:
@@ -4134,8 +4119,8 @@ EventStateManager::GenerateMouseEnterExit(WidgetMouseEvent* aMouseEvent)
       sLastRefPoint = aMouseEvent->refPoint;
 
     }
-  case NS_POINTER_MOVE:
-  case NS_POINTER_DOWN:
+  case ePointerMove:
+  case ePointerDown:
     {
       // Get the target content target (mousemove target == mouseover target)
       nsCOMPtr<nsIContent> targetElement = GetEventTargetContent(aMouseEvent);
@@ -4150,7 +4135,7 @@ EventStateManager::GenerateMouseEnterExit(WidgetMouseEvent* aMouseEvent)
       }
     }
     break;
-  case NS_POINTER_UP:
+  case ePointerUp:
     {
       // Get the target content target (mousemove target == mouseover target)
       nsCOMPtr<nsIContent> targetElement = GetEventTargetContent(aMouseEvent);
@@ -4169,9 +4154,9 @@ EventStateManager::GenerateMouseEnterExit(WidgetMouseEvent* aMouseEvent)
       }
     }
     break;
-  case NS_POINTER_LEAVE:
-  case NS_POINTER_CANCEL:
-  case NS_MOUSE_EXIT_WIDGET:
+  case ePointerLeave:
+  case ePointerCancel:
+  case eMouseExitFromWidget:
     {
       // This is actually the window mouse exit or pointer leave event. We're not moving
       // into any new element.
@@ -4285,7 +4270,7 @@ EventStateManager::GenerateDragDropEnterExit(nsPresContext* aPresContext,
   nsCOMPtr<nsIContent> targetBeforeEvent = mCurrentTargetContent;
 
   switch(aDragEvent->mMessage) {
-  case NS_DRAGDROP_OVER:
+  case eDragOver:
     {
       // when dragging from one frame to another, events are fired in the
       // order: dragexit, dragenter, dragleave
@@ -4302,16 +4287,16 @@ EventStateManager::GenerateDragDropEnterExit(nsPresContext* aPresContext,
                                                  getter_AddRefs(lastContent));
 
           FireDragEnterOrExit(sLastDragOverFrame->PresContext(),
-                              aDragEvent, NS_DRAGDROP_EXIT,
+                              aDragEvent, eDragExit,
                               targetContent, lastContent, sLastDragOverFrame);
         }
 
-        FireDragEnterOrExit(aPresContext, aDragEvent, NS_DRAGDROP_ENTER,
+        FireDragEnterOrExit(aPresContext, aDragEvent, eDragEnter,
                             lastContent, targetContent, mCurrentTarget);
 
         if (sLastDragOverFrame) {
           FireDragEnterOrExit(sLastDragOverFrame->PresContext(),
-                              aDragEvent, NS_DRAGDROP_LEAVE,
+                              aDragEvent, eDragLeave,
                               targetContent, lastContent, sLastDragOverFrame);
         }
 
@@ -4320,7 +4305,7 @@ EventStateManager::GenerateDragDropEnterExit(nsPresContext* aPresContext,
     }
     break;
 
-  case NS_DRAGDROP_EXIT:
+  case eDragExit:
     {
       //This is actually the window mouse exit event.
       if (sLastDragOverFrame) {
@@ -4330,10 +4315,10 @@ EventStateManager::GenerateDragDropEnterExit(nsPresContext* aPresContext,
 
         nsRefPtr<nsPresContext> lastDragOverFramePresContext = sLastDragOverFrame->PresContext();
         FireDragEnterOrExit(lastDragOverFramePresContext,
-                            aDragEvent, NS_DRAGDROP_EXIT,
+                            aDragEvent, eDragExit,
                             nullptr, lastContent, sLastDragOverFrame);
         FireDragEnterOrExit(lastDragOverFramePresContext,
-                            aDragEvent, NS_DRAGDROP_LEAVE,
+                            aDragEvent, eDragLeave,
                             nullptr, lastContent, sLastDragOverFrame);
 
         sLastDragOverFrame = nullptr;
@@ -4379,17 +4364,15 @@ EventStateManager::FireDragEnterOrExit(nsPresContext* aPresContext,
     }
 
     // adjust the drag hover if the dragenter event was cancelled or this is a drag exit
-    if (status == nsEventStatus_eConsumeNoDefault ||
-        aMessage == NS_DRAGDROP_EXIT) {
-      SetContentState((aMessage == NS_DRAGDROP_ENTER) ?
-                        aTargetContent : nullptr,
+    if (status == nsEventStatus_eConsumeNoDefault || aMessage == eDragExit) {
+      SetContentState((aMessage == eDragEnter) ? aTargetContent : nullptr,
                       NS_EVENT_STATE_DRAGOVER);
     }
 
     // collect any changes to moz cursor settings stored in the event's
     // data transfer.
-    if (aMessage == NS_DRAGDROP_LEAVE || aMessage == NS_DRAGDROP_EXIT ||
-        aMessage == NS_DRAGDROP_ENTER) {
+    if (aMessage == eDragLeave || aMessage == eDragExit ||
+        aMessage == eDragEnter) {
       UpdateDragDataTransfer(&event);
     }
   }
@@ -4443,10 +4426,10 @@ EventStateManager::SetClickCount(nsPresContext* aPresContext,
 
   switch (aEvent->button) {
   case WidgetMouseEvent::eLeftButton:
-    if (aEvent->mMessage == NS_MOUSE_BUTTON_DOWN) {
+    if (aEvent->mMessage == eMouseDown) {
       mLastLeftMouseDownContent = mouseContent;
       mLastLeftMouseDownContentParent = mouseContentParent;
-    } else if (aEvent->mMessage == NS_MOUSE_BUTTON_UP) {
+    } else if (aEvent->mMessage == eMouseUp) {
       if (mLastLeftMouseDownContent == mouseContent ||
           mLastLeftMouseDownContentParent == mouseContent ||
           mLastLeftMouseDownContent == mouseContentParent) {
@@ -4461,10 +4444,10 @@ EventStateManager::SetClickCount(nsPresContext* aPresContext,
     break;
 
   case WidgetMouseEvent::eMiddleButton:
-    if (aEvent->mMessage == NS_MOUSE_BUTTON_DOWN) {
+    if (aEvent->mMessage == eMouseDown) {
       mLastMiddleMouseDownContent = mouseContent;
       mLastMiddleMouseDownContentParent = mouseContentParent;
-    } else if (aEvent->mMessage == NS_MOUSE_BUTTON_UP) {
+    } else if (aEvent->mMessage == eMouseUp) {
       if (mLastMiddleMouseDownContent == mouseContent ||
           mLastMiddleMouseDownContentParent == mouseContent ||
           mLastMiddleMouseDownContent == mouseContentParent) {
@@ -4479,10 +4462,10 @@ EventStateManager::SetClickCount(nsPresContext* aPresContext,
     break;
 
   case WidgetMouseEvent::eRightButton:
-    if (aEvent->mMessage == NS_MOUSE_BUTTON_DOWN) {
+    if (aEvent->mMessage == eMouseDown) {
       mLastRightMouseDownContent = mouseContent;
       mLastRightMouseDownContentParent = mouseContentParent;
-    } else if (aEvent->mMessage == NS_MOUSE_BUTTON_UP) {
+    } else if (aEvent->mMessage == eMouseUp) {
       if (mLastRightMouseDownContent == mouseContent ||
           mLastRightMouseDownContentParent == mouseContent ||
           mLastRightMouseDownContent == mouseContentParent) {
@@ -4565,14 +4548,14 @@ EventStateManager::CheckForAndDispatchClick(nsPresContext* aPresContext,
 
       // HandleEvent clears out mCurrentTarget which we might need again
       nsWeakFrame currentTarget = mCurrentTarget;
-      ret = InitAndDispatchClickEvent(aEvent, aStatus, NS_MOUSE_CLICK,
+      ret = InitAndDispatchClickEvent(aEvent, aStatus, eMouseClick,
                                       presShell, mouseContent, currentTarget,
                                       notDispatchToContents);
 
       if (NS_SUCCEEDED(ret) && aEvent->clickCount == 2 &&
           mouseContent && mouseContent->IsInComposedDoc()) {
-        //fire double click
-        ret = InitAndDispatchClickEvent(aEvent, aStatus, NS_MOUSE_DOUBLECLICK,
+        // fire double click
+        ret = InitAndDispatchClickEvent(aEvent, aStatus, eMouseDoubleClick,
                                         presShell, mouseContent, currentTarget,
                                         notDispatchToContents);
       }
@@ -4606,8 +4589,7 @@ already_AddRefed<nsIContent>
 EventStateManager::GetEventTargetContent(WidgetEvent* aEvent)
 {
   if (aEvent &&
-      (aEvent->mMessage == NS_FOCUS_CONTENT ||
-       aEvent->mMessage == NS_BLUR_CONTENT)) {
+      (aEvent->mMessage == eFocus || aEvent->mMessage == eBlur)) {
     nsCOMPtr<nsIContent> content = GetFocusedContent();
     return content.forget();
   }
@@ -4973,7 +4955,7 @@ EventStateManager::ContentRemoved(nsIDocument* aDocument, nsIContent* aContent)
 bool
 EventStateManager::EventStatusOK(WidgetGUIEvent* aEvent)
 {
-  return !(aEvent->mMessage == NS_MOUSE_BUTTON_DOWN &&
+  return !(aEvent->mMessage == eMouseDown &&
            aEvent->AsMouseEvent()->button == WidgetMouseEvent::eLeftButton &&
            !sNormalLMouseEventInProcess);
 }
@@ -5070,25 +5052,25 @@ EventStateManager::DoContentCommandEvent(WidgetContentCommandEvent* aEvent)
   NS_ENSURE_TRUE(root, NS_ERROR_FAILURE);
   const char* cmd;
   switch (aEvent->mMessage) {
-    case NS_CONTENT_COMMAND_CUT:
+    case eContentCommandCut:
       cmd = "cmd_cut";
       break;
-    case NS_CONTENT_COMMAND_COPY:
+    case eContentCommandCopy:
       cmd = "cmd_copy";
       break;
-    case NS_CONTENT_COMMAND_PASTE:
+    case eContentCommandPaste:
       cmd = "cmd_paste";
       break;
-    case NS_CONTENT_COMMAND_DELETE:
+    case eContentCommandDelete:
       cmd = "cmd_delete";
       break;
-    case NS_CONTENT_COMMAND_UNDO:
+    case eContentCommandUndo:
       cmd = "cmd_undo";
       break;
-    case NS_CONTENT_COMMAND_REDO:
+    case eContentCommandRedo:
       cmd = "cmd_redo";
       break;
-    case NS_CONTENT_COMMAND_PASTE_TRANSFERABLE:
+    case eContentCommandPasteTransferable:
       cmd = "cmd_pasteTransferable";
       break;
     default:
@@ -5108,7 +5090,7 @@ EventStateManager::DoContentCommandEvent(WidgetContentCommandEvent* aEvent)
     aEvent->mIsEnabled = canDoIt;
     if (canDoIt && !aEvent->mOnlyEnabledCheck) {
       switch (aEvent->mMessage) {
-        case NS_CONTENT_COMMAND_PASTE_TRANSFERABLE: {
+        case eContentCommandPasteTransferable: {
           nsCOMPtr<nsICommandController> commandController = do_QueryInterface(controller);
           NS_ENSURE_STATE(commandController);
 
@@ -5180,16 +5162,6 @@ EventStateManager::DoContentCommandScrollEvent(
   // The caller may want synchronous scrolling.
   sf->ScrollBy(pt, scrollUnit, nsIScrollableFrame::INSTANT);
   return NS_OK;
-}
-
-void
-EventStateManager::DoQuerySelectedText(WidgetQueryContentEvent* aEvent)
-{
-  if (RemoteQueryContentEvent(aEvent)) {
-    return;
-  }
-  ContentEventHandler handler(mPresContext);
-  handler.OnQuerySelectedText(aEvent);
 }
 
 void
@@ -5617,7 +5589,8 @@ EventStateManager::WheelPrefs::HasUserPrefsForDelta(WidgetWheelEvent* aEvent)
 bool
 EventStateManager::WheelEventIsScrollAction(WidgetWheelEvent* aEvent)
 {
-  return WheelPrefs::GetInstance()->ComputeActionFor(aEvent) == WheelPrefs::ACTION_SCROLL;
+  return aEvent->mMessage == eWheel &&
+         WheelPrefs::GetInstance()->ComputeActionFor(aEvent) == WheelPrefs::ACTION_SCROLL;
 }
 
 bool
@@ -5761,7 +5734,7 @@ AutoHandlingUserInputStatePusher::AutoHandlingUserInputStatePusher(
                                     WidgetEvent* aEvent,
                                     nsIDocument* aDocument) :
   mIsHandlingUserInput(aIsHandlingUserInput),
-  mIsMouseDown(aEvent && aEvent->mMessage == NS_MOUSE_BUTTON_DOWN),
+  mIsMouseDown(aEvent && aEvent->mMessage == eMouseDown),
   mResetFMMouseButtonHandlingState(false)
 {
   if (!aIsHandlingUserInput) {
@@ -5776,8 +5749,7 @@ AutoHandlingUserInputStatePusher::AutoHandlingUserInputStatePusher(
     return;
   }
   mResetFMMouseButtonHandlingState =
-    (aEvent->mMessage == NS_MOUSE_BUTTON_DOWN ||
-     aEvent->mMessage == NS_MOUSE_BUTTON_UP);
+    (aEvent->mMessage == eMouseDown || aEvent->mMessage == eMouseUp);
   if (mResetFMMouseButtonHandlingState) {
     nsFocusManager* fm = nsFocusManager::GetFocusManager();
     NS_ENSURE_TRUE_VOID(fm);

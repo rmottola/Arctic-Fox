@@ -40,7 +40,7 @@
 
 #include "jsobjinlines.h"
 
-#if defined(ANDROID) || defined(XP_MACOSX) || defined(__DragonFly__) || \
+#if defined(ANDROID) || defined(XP_DARWIN) || defined(__DragonFly__) || \
     defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 # include <stdlib.h>
 # define HAVE_ARC4RANDOM
@@ -974,6 +974,40 @@ js::math_sin(JSContext* cx, unsigned argc, Value* vp)
     }
 
     return math_sin_handle(cx, args[0], args.rval());
+}
+
+void
+js::math_sincos_uncached(double x, double *sin, double *cos)
+{
+#if defined(__GLIBC__)
+    sincos(x, sin, cos);
+#elif defined(HAVE_SINCOS)
+    __sincos(x, sin, cos);
+#else
+    *sin = js::math_sin_uncached(x);
+    *cos = js::math_cos_uncached(x);
+#endif
+}
+
+void
+js::math_sincos_impl(MathCache* mathCache, double x, double *sin, double *cos)
+{
+    unsigned indexSin;
+    unsigned indexCos;
+    bool hasSin = mathCache->isCached(x, MathCache::Sin, sin, &indexSin);
+    bool hasCos = mathCache->isCached(x, MathCache::Cos, cos, &indexCos);
+    if (!(hasSin || hasCos)) {
+        js::math_sincos_uncached(x, sin, cos);
+        mathCache->store(MathCache::Sin, x, *sin, indexSin);
+        mathCache->store(MathCache::Cos, x, *cos, indexCos);
+        return;
+    }
+
+    if (!hasSin)
+        *sin = js::math_sin_impl(mathCache, x);
+
+    if (!hasCos)
+        *cos = js::math_cos_impl(mathCache, x);
 }
 
 bool

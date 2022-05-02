@@ -222,7 +222,7 @@ HTMLButtonElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
   WidgetMouseEvent* mouseEvent = aVisitor.mEvent->AsMouseEvent();
   bool outerActivateEvent =
     ((mouseEvent && mouseEvent->IsLeftClickEvent()) ||
-     (aVisitor.mEvent->mMessage == NS_UI_ACTIVATE &&
+     (aVisitor.mEvent->mMessage == eLegacyDOMActivate &&
       !mInInternalActivate));
 
   if (outerActivateEvent) {
@@ -252,7 +252,7 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
     if (mouseEvent && mouseEvent->IsLeftClickEvent()) {
       // DOMActive event should be trusted since the activation is actually
       // occurred even if the cause is an untrusted click event.
-      InternalUIEvent actEvent(true, NS_UI_ACTIVATE, mouseEvent);
+      InternalUIEvent actEvent(true, eLegacyDOMActivate, mouseEvent);
       actEvent.detail = 1;
 
       nsCOMPtr<nsIPresShell> shell = aVisitor.mPresContext->GetPresShell();
@@ -282,24 +282,24 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
 
   if (nsEventStatus_eIgnore == aVisitor.mEventStatus) {
     switch (aVisitor.mEvent->mMessage) {
-      case NS_KEY_PRESS:
-      case NS_KEY_UP:
+      case eKeyPress:
+      case eKeyUp:
         {
           // For backwards compat, trigger buttons with space or enter
           // (bug 25300)
           WidgetKeyboardEvent* keyEvent = aVisitor.mEvent->AsKeyboardEvent();
           if ((keyEvent->keyCode == NS_VK_RETURN &&
-               NS_KEY_PRESS == aVisitor.mEvent->mMessage) ||
+               eKeyPress == aVisitor.mEvent->mMessage) ||
               (keyEvent->keyCode == NS_VK_SPACE &&
-               NS_KEY_UP == aVisitor.mEvent->mMessage)) {
+               eKeyUp == aVisitor.mEvent->mMessage)) {
             DispatchSimulatedClick(this, aVisitor.mEvent->mFlags.mIsTrusted,
                                    aVisitor.mPresContext);
             aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
           }
         }
-        break;// NS_KEY_PRESS
+        break;
 
-      case NS_MOUSE_BUTTON_DOWN:
+      case eMouseDown:
         {
           WidgetMouseEvent* mouseEvent = aVisitor.mEvent->AsMouseEvent();
           if (mouseEvent->button == WidgetMouseEvent::eLeftButton) {
@@ -327,8 +327,8 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
 
       // cancel all of these events for buttons
       //XXXsmaug What to do with these events? Why these should be cancelled?
-      case NS_MOUSE_BUTTON_UP:
-      case NS_MOUSE_DOUBLECLICK:
+      case eMouseUp:
+      case eMouseDoubleClick:
         {
           WidgetMouseEvent* mouseEvent = aVisitor.mEvent->AsMouseEvent();
           if (aVisitor.mDOMEvent &&
@@ -339,7 +339,7 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
         }
         break;
 
-      case NS_MOUSE_OVER:
+      case eMouseOver:
         {
           aVisitor.mPresContext->EventStateManager()->
             SetContentState(this, NS_EVENT_STATE_HOVER);
@@ -348,13 +348,13 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
         break;
 
         // XXX this doesn't seem to do anything yet
-      case NS_MOUSE_OUT:
+      case eMouseOut:
         {
           aVisitor.mPresContext->EventStateManager()->
             SetContentState(nullptr, NS_EVENT_STATE_HOVER);
           aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
         }
-	break;
+        break;
 
       default:
         break;
@@ -363,7 +363,7 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
       if (mForm && (mType == NS_FORM_BUTTON_SUBMIT ||
                     mType == NS_FORM_BUTTON_RESET)) {
         InternalFormEvent event(true,
-          (mType == NS_FORM_BUTTON_RESET) ? NS_FORM_RESET : NS_FORM_SUBMIT);
+          (mType == NS_FORM_BUTTON_RESET) ? eFormReset : eFormSubmit);
         event.originator     = this;
         nsEventStatus status = nsEventStatus_eIgnore;
 
@@ -375,7 +375,7 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
         //
         // Using presShell to dispatch the event. It makes sure that
         // event is not handled if the window is being destroyed.
-        if (presShell && (event.mMessage != NS_FORM_SUBMIT ||
+        if (presShell && (event.mMessage != eFormSubmit ||
                           mForm->HasAttr(kNameSpaceID_None, nsGkAtoms::novalidate) ||
                           // We know the element is a submit control, if this check is moved,
                           // make sure formnovalidate is used only if it's a submit control.

@@ -162,11 +162,6 @@ NS_IMETHODIMP DummyChannel::GetZipEntry(nsIZipEntry* *aEntry)
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
-NS_IMETHODIMP DummyChannel::EnsureChildFd()
-{
-  return NS_ERROR_NOT_IMPLEMENTED;
-}
-
 NS_IMETHODIMP DummyChannel::Run()
 {
   nsresult rv = mListener->OnStartRequest(this, mListenerContext);
@@ -319,6 +314,11 @@ NS_IMETHODIMP DummyChannel::SetContentDispositionFilename(nsAString const &)
 NS_IMETHODIMP DummyChannel::GetContentDispositionHeader(nsACString&)
 {
   return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+NS_IMETHODIMP DummyChannel::ForceNoIntercept()
+{
+  return NS_OK;
 }
 
 /**

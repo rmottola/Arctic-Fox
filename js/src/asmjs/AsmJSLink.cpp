@@ -806,7 +806,7 @@ NewExportedFunction(JSContext* cx, const AsmJSModule::ExportedFunction& func,
 {
     RootedPropertyName name(cx, func.name());
     unsigned numArgs = func.isChangeHeap() ? 1 : func.numArgs();
-    JSFunction *fun =
+    JSFunction* fun =
         NewNativeConstructor(cx, CallAsmJS, numArgs, name,
                              gc::AllocKind::FUNCTION_EXTENDED, GenericObject,
                              JSFunction::ASMJS_CTOR);
@@ -819,7 +819,8 @@ NewExportedFunction(JSContext* cx, const AsmJSModule::ExportedFunction& func,
 }
 
 static bool
-HandleDynamicLinkFailure(JSContext* cx, const CallArgs& args, AsmJSModule& module, HandlePropertyName name)
+HandleDynamicLinkFailure(JSContext* cx, const CallArgs& args, AsmJSModule& module,
+                         HandlePropertyName name)
 {
     if (cx->isExceptionPending())
         return false;
@@ -953,32 +954,6 @@ SendFunctionsToPerf(JSContext* cx, AsmJSModule& module)
 
     return true;
 }
-
-static bool
-SendBlocksToPerf(JSContext* cx, AsmJSModule& module)
-{
-    if (!PerfBlockEnabled())
-        return true;
-
-    unsigned long funcBaseAddress = (unsigned long) module.codeBase();
-    const char* filename = module.scriptSource()->filename();
-
-    for (unsigned i = 0; i < module.numPerfBlocksFunctions(); i++) {
-        const AsmJSModule::ProfiledBlocksFunction& func = module.perfProfiledBlocksFunction(i);
-
-        size_t size = func.pod.endCodeOffset - func.pod.startCodeOffset;
-
-        JSAutoByteString bytes;
-        const char* name = AtomToPrintableString(cx, func.name, &bytes);
-        if (!name)
-            return false;
-
-        writePerfSpewerAsmJSBlocksMap(funcBaseAddress, func.pod.startCodeOffset,
-                                      func.endInlineCodeOffset, size, filename, name, func.blocks);
-    }
-
-    return true;
-}
 #endif
 
 static bool
@@ -994,8 +969,6 @@ SendModuleToAttachedProfiler(JSContext* cx, AsmJSModule& module)
         size_t firstEntryCode = size_t(module.codeBase() + module.functionBytes());
         writePerfSpewerAsmJSEntriesAndExits(firstEntryCode, module.codeBytes() - module.functionBytes());
     }
-    if (!SendBlocksToPerf(cx, module))
-        return false;
     if (!SendFunctionsToPerf(cx, module))
         return false;
 #endif
@@ -1102,7 +1075,7 @@ js::NewAsmJSModuleFunction(ExclusiveContext* cx, JSFunction* origFun, HandleObje
 
     JSFunction::Flags flags = origFun->isLambda() ? JSFunction::ASMJS_LAMBDA_CTOR
                                                   : JSFunction::ASMJS_CTOR;
-    JSFunction *moduleFun =
+    JSFunction* moduleFun =
         NewNativeConstructor(cx, LinkAsmJS, origFun->nargs(), name,
                              gc::AllocKind::FUNCTION_EXTENDED, TenuredObject,
                              flags);

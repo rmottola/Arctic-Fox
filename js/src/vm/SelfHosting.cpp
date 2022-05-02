@@ -1262,6 +1262,16 @@ intrinsic_RuntimeDefaultLocale(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
+intrinsic_LocalTZA(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 0, "the LocalTZA intrinsic takes no arguments");
+
+    args.rval().setDouble(cx->runtime()->dateTimeInfo.localTZA());
+    return true;
+}
+
+static bool
 intrinsic_IsConstructing(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -1382,6 +1392,7 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("_ConstructorForTypedArray", intrinsic_ConstructorForTypedArray, 1,0),
     JS_FN("DecompileArg",            intrinsic_DecompileArg,            2,0),
     JS_FN("RuntimeDefaultLocale",    intrinsic_RuntimeDefaultLocale,    0,0),
+    JS_FN("LocalTZA",                intrinsic_LocalTZA,                0,0),
 
     JS_INLINABLE_FN("_IsConstructing", intrinsic_IsConstructing,        0,0,
                     IntrinsicIsConstructing),
@@ -1943,16 +1954,21 @@ JSRuntime::cloneSelfHostedFunctionScript(JSContext* cx, HandlePropertyName name,
     // aren't any.
     MOZ_ASSERT(!sourceFun->isGenerator());
     MOZ_ASSERT(sourceFun->nargs() == targetFun->nargs());
-    // The target function might have been relazified after it's flags changed.
-    targetFun->setFlags((targetFun->flags() & ~JSFunction::INTERPRETED_LAZY) |
-                        sourceFun->flags() | JSFunction::EXTENDED);
     MOZ_ASSERT(targetFun->isExtended());
+    MOZ_ASSERT(targetFun->isInterpretedLazy());
+    MOZ_ASSERT(targetFun->isSelfHostedBuiltin());
 
     RootedScript sourceScript(cx, sourceFun->getOrCreateScript(cx));
     if (!sourceScript)
         return false;
     MOZ_ASSERT(!sourceScript->enclosingStaticScope());
-    return !!CloneScriptIntoFunction(cx, /* enclosingScope = */ nullptr, targetFun, sourceScript);
+    if (!CloneScriptIntoFunction(cx, /* enclosingScope = */ nullptr, targetFun, sourceScript))
+        return false;
+    MOZ_ASSERT(!targetFun->isInterpretedLazy());
+
+    // The target function might have been relazified after its flags changed.
+    targetFun->setFlags(targetFun->flags() | sourceFun->flags());
+    return true;
 }
 
 bool

@@ -1262,14 +1262,26 @@ BackgroundFactoryRequestChild::HandleResponse(
     static_cast<BackgroundDatabaseChild*>(aResponse.databaseChild());
   MOZ_ASSERT(databaseActor);
 
-  databaseActor->EnsureDOMObject();
-
   IDBDatabase* database = databaseActor->GetDOMObject();
-  MOZ_ASSERT(database);
+  if (!database) {
+    databaseActor->EnsureDOMObject();
 
-  ResultHelper helper(mRequest, nullptr, database);
+    database = databaseActor->GetDOMObject();
+    MOZ_ASSERT(database);
 
-  DispatchSuccessEvent(&helper);
+    MOZ_ASSERT(!database->IsClosed());
+  }
+
+  if (database->IsClosed()) {
+    // If the database was closed already, which is only possible if we fired an
+    // "upgradeneeded" event, then we shouldn't fire a "success" event here.
+    // Instead we fire an error event with AbortErr.
+    DispatchErrorEvent(mRequest, NS_ERROR_DOM_INDEXEDDB_ABORT_ERR);
+  } else {
+    ResultHelper helper(mRequest, nullptr, database);
+
+    DispatchSuccessEvent(&helper);
+  }
 
   databaseActor->ReleaseDOMObject();
 
@@ -2337,28 +2349,33 @@ BackgroundRequestChild::Recv__delete__(const RequestResponse& aResponse)
  * BackgroundCursorChild
  ******************************************************************************/
 
-class BackgroundCursorChild::DelayedDeleteRunnable final
+class BackgroundCursorChild::DelayedActionRunnable final
   : public nsICancelableRunnable
 {
+  using ActionFunc = void (BackgroundCursorChild::*)();
+
   BackgroundCursorChild* mActor;
   nsRefPtr<IDBRequest> mRequest;
+  ActionFunc mActionFunc;
 
 public:
   explicit
-  DelayedDeleteRunnable(BackgroundCursorChild* aActor)
+  DelayedActionRunnable(BackgroundCursorChild* aActor, ActionFunc aActionFunc)
     : mActor(aActor)
     , mRequest(aActor->mRequest)
+    , mActionFunc(aActionFunc)
   {
     MOZ_ASSERT(aActor);
     aActor->AssertIsOnOwningThread();
     MOZ_ASSERT(mRequest);
+    MOZ_ASSERT(mActionFunc);
   }
 
   // Does not need to be threadsafe since this only runs on one thread.
   NS_DECL_ISUPPORTS
 
 private:
-  ~DelayedDeleteRunnable()
+  ~DelayedActionRunnable()
   { }
 
   NS_DECL_NSIRUNNABLE
@@ -2427,7 +2444,8 @@ BackgroundCursorChild::AssertIsOnOwningThread() const
 #endif // DEBUG
 
 void
-BackgroundCursorChild::SendContinueInternal(const CursorRequestParams& aParams)
+BackgroundCursorChild::SendContinueInternal(const CursorRequestParams& aParams,
+                                            const Key& aKey)
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(mRequest);
@@ -2444,7 +2462,66 @@ BackgroundCursorChild::SendContinueInternal(const CursorRequestParams& aParams)
 
   mTransaction->OnNewRequest();
 
-  MOZ_ALWAYS_TRUE(PBackgroundIDBCursorChild::SendContinue(aParams));
+  CursorRequestParams params = aParams;
+  Key key = aKey;
+
+  switch (params.type()) {
+    case CursorRequestParams::TContinueParams: {
+      if (key.IsUnset()) {
+        break;
+      }
+      while (!mCachedResponses.IsEmpty()) {
+        if (mCachedResponses[0].mKey == key) {
+          break;
+        }
+        mCachedResponses.RemoveElementAt(0);
+      }
+      break;
+    }
+
+    case CursorRequestParams::TAdvanceParams: {
+      uint32_t& advanceCount = params.get_AdvanceParams().count();
+      while (advanceCount > 1 && !mCachedResponses.IsEmpty()) {
+        key = mCachedResponses[0].mKey;
+        mCachedResponses.RemoveElementAt(0);
+        --advanceCount;
+      }
+      break;
+    }
+
+    default:
+      MOZ_CRASH("Should never get here!");
+  }
+
+  if (!mCachedResponses.IsEmpty()) {
+    nsCOMPtr<nsIRunnable> continueRunnable = new DelayedActionRunnable(
+      this, &BackgroundCursorChild::SendDelayedContinueInternal);
+    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToCurrentThread(continueRunnable)));
+  } else {
+    MOZ_ALWAYS_TRUE(PBackgroundIDBCursorChild::SendContinue(params, key));
+  }
+}
+
+void
+BackgroundCursorChild::SendDelayedContinueInternal()
+{
+  AssertIsOnOwningThread();
+  MOZ_ASSERT(mTransaction);
+  MOZ_ASSERT(mCursor);
+  MOZ_ASSERT(mStrongCursor);
+  MOZ_ASSERT(!mCachedResponses.IsEmpty());
+
+  nsRefPtr<IDBCursor> cursor;
+  mStrongCursor.swap(cursor);
+
+  auto& item = mCachedResponses[0];
+  mCursor->Reset(Move(item.mKey), Move(item.mCloneInfo));
+  mCachedResponses.RemoveElementAt(0);
+
+  ResultHelper helper(mRequest, mTransaction, mCursor);
+  DispatchSuccessEvent(&helper);
+
+  mTransaction->OnRequestFinished(/* aActorDestroyedNormally */ true);
 }
 
 void
@@ -2465,6 +2542,14 @@ BackgroundCursorChild::SendDeleteMeInternal()
 
     MOZ_ALWAYS_TRUE(PBackgroundIDBCursorChild::SendDeleteMe());
   }
+}
+
+void
+BackgroundCursorChild::InvalidateCachedResponses()
+{
+  AssertIsOnOwningThread();
+
+  mCachedResponses.Clear();
 }
 
 void
@@ -2498,14 +2583,15 @@ BackgroundCursorChild::HandleResponse(const void_t& aResponse)
   DispatchSuccessEvent(&helper);
 
   if (!mCursor) {
-    nsCOMPtr<nsIRunnable> deleteRunnable = new DelayedDeleteRunnable(this);
+    nsCOMPtr<nsIRunnable> deleteRunnable = new DelayedActionRunnable(
+      this, &BackgroundCursorChild::SendDeleteMeInternal);
     MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToCurrentThread(deleteRunnable)));
   }
 }
 
 void
 BackgroundCursorChild::HandleResponse(
-                                     const ObjectStoreCursorResponse& aResponse)
+    const nsTArray<ObjectStoreCursorResponse>& aResponses)
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(mRequest);
@@ -2514,24 +2600,37 @@ BackgroundCursorChild::HandleResponse(
   MOZ_ASSERT(!mStrongRequest);
   MOZ_ASSERT(!mStrongCursor);
 
+  MOZ_ASSERT(aResponses.Length() == 1);
+
   // XXX Fix this somehow...
-  auto& response = const_cast<ObjectStoreCursorResponse&>(aResponse);
+  auto& responses =
+    const_cast<nsTArray<ObjectStoreCursorResponse>&>(aResponses);
 
-  StructuredCloneReadInfo cloneReadInfo(Move(response.cloneInfo()));
+  for (ObjectStoreCursorResponse& response : responses) {
+    StructuredCloneReadInfo cloneReadInfo(Move(response.cloneInfo()));
+    cloneReadInfo.mDatabase = mTransaction->Database();
 
-  ConvertActorsToBlobs(mTransaction->Database(),
-                       response.cloneInfo(),
-                       cloneReadInfo.mFiles);
+    ConvertActorsToBlobs(mTransaction->Database(),
+                         response.cloneInfo(),
+                         cloneReadInfo.mFiles);
 
-  nsRefPtr<IDBCursor> newCursor;
+    nsRefPtr<IDBCursor> newCursor;
 
-  if (mCursor) {
-    mCursor->Reset(Move(response.key()), Move(cloneReadInfo));
-  } else {
-    newCursor = IDBCursor::Create(this,
-                                  Move(response.key()),
-                                  Move(cloneReadInfo));
-    mCursor = newCursor;
+    if (mCursor) {
+      if (mCursor->IsContinueCalled()) {
+        mCursor->Reset(Move(response.key()), Move(cloneReadInfo));
+      } else {
+        CachedResponse cachedResponse;
+        cachedResponse.mKey = Move(response.key());
+        cachedResponse.mCloneInfo = Move(cloneReadInfo);
+        mCachedResponses.AppendElement(Move(cachedResponse));
+      }
+    } else {
+      newCursor = IDBCursor::Create(this,
+                                    Move(response.key()),
+                                    Move(cloneReadInfo));
+      mCursor = newCursor;
+    }
   }
 
   ResultHelper helper(mRequest, mTransaction, mCursor);
@@ -2579,6 +2678,7 @@ BackgroundCursorChild::HandleResponse(const IndexCursorResponse& aResponse)
   auto& response = const_cast<IndexCursorResponse&>(aResponse);
 
   StructuredCloneReadInfo cloneReadInfo(Move(response.cloneInfo()));
+  cloneReadInfo.mDatabase = mTransaction->Database();
 
   ConvertActorsToBlobs(mTransaction->Database(),
                        aResponse.cloneInfo(),
@@ -2686,8 +2786,8 @@ BackgroundCursorChild::RecvResponse(const CursorResponse& aResponse)
       HandleResponse(aResponse.get_void_t());
       break;
 
-    case CursorResponse::TObjectStoreCursorResponse:
-      HandleResponse(aResponse.get_ObjectStoreCursorResponse());
+    case CursorResponse::TArrayOfObjectStoreCursorResponse:
+      HandleResponse(aResponse.get_ArrayOfObjectStoreCursorResponse());
       break;
 
     case CursorResponse::TObjectStoreKeyCursorResponse:
@@ -2731,19 +2831,20 @@ DispatchMutableFileResult(IDBRequest* aRequest,
   }
 }
 
-NS_IMPL_ISUPPORTS(BackgroundCursorChild::DelayedDeleteRunnable,
+NS_IMPL_ISUPPORTS(BackgroundCursorChild::DelayedActionRunnable,
                   nsIRunnable,
                   nsICancelableRunnable)
 
 NS_IMETHODIMP
 BackgroundCursorChild::
-DelayedDeleteRunnable::Run()
+DelayedActionRunnable::Run()
 {
   MOZ_ASSERT(mActor);
   mActor->AssertIsOnOwningThread();
   MOZ_ASSERT(mRequest);
+  MOZ_ASSERT(mActionFunc);
 
-  mActor->SendDeleteMeInternal();
+  (mActor->*mActionFunc)();
 
   mActor = nullptr;
   mRequest = nullptr;
@@ -2753,7 +2854,7 @@ DelayedDeleteRunnable::Run()
 
 NS_IMETHODIMP
 BackgroundCursorChild::
-DelayedDeleteRunnable::Cancel()
+DelayedActionRunnable::Cancel()
 {
   if (NS_WARN_IF(!mActor)) {
     return NS_ERROR_UNEXPECTED;
@@ -2763,6 +2864,16 @@ DelayedDeleteRunnable::Cancel()
   Run();
 
   return NS_OK;
+}
+
+BackgroundCursorChild::CachedResponse::CachedResponse()
+{
+}
+
+BackgroundCursorChild::CachedResponse::CachedResponse(CachedResponse&& aOther)
+  : mKey(Move(aOther.mKey))
+{
+  mCloneInfo = Move(aOther.mCloneInfo);
 }
 
 } // namespace indexedDB

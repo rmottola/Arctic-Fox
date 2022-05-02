@@ -13,6 +13,7 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/AppsUtils.jsm");
 Cu.import("resource://gre/modules/Promise.jsm");
 Cu.import("resource://gre/modules/Webapps.jsm");
+Cu.import("resource://gre/modules/MessageBroadcaster.jsm");
 
 Cu.importGlobalProperties(['File']);
 
@@ -43,9 +44,9 @@ const PR_CREATE_FILE = 0x08;
 const PR_TRUNCATE    = 0x20;
 
 function debug(aMsg) {
-//#ifdef DEBUG
+#ifdef DEBUG
   dump("-*- ImportExport.jsm : " + aMsg + "\n");
-//#endif
+#endif
 }
 
 /*
@@ -104,7 +105,12 @@ this.ImportExport = {
 
     // Exporting certified apps is forbidden, as it is to import them.
     // We *have* to do this check in the parent process.
-    if (aApp.appStatus == Ci.nsIPrincipal.APP_STATUS_CERTIFIED) {
+    let devMode = false;
+    try {
+      devMode = Services.prefs.getBoolPref("dom.apps.developer_mode");
+    } catch(e) {};
+
+    if (aApp.appStatus == Ci.nsIPrincipal.APP_STATUS_CERTIFIED && !devMode) {
       throw "CertifiedAppExportForbidden";
     }
 
@@ -393,6 +399,12 @@ this.ImportExport = {
           yield DOMApplicationRegistry._openPackage(appFile, meta, false);
         let maxStatus = isSigned ? Ci.nsIPrincipal.APP_STATUS_PRIVILEGED
                                  : Ci.nsIPrincipal.APP_STATUS_INSTALLED;
+        try {
+          // Anything is possible in developer mode.
+          if (Services.prefs.getBoolPref("dom.apps.developer_mode")) {
+            maxStatus = Ci.nsIPrincipal.APP_STATUS_CERTIFIED;
+          }
+        } catch(e) {};
         meta.appStatus = AppsUtils.getAppManifestStatus(manifest);
         debug("Signed app? " + isSigned);
         if (meta.appStatus > maxStatus) {
@@ -456,10 +468,10 @@ this.ImportExport = {
 
       app = AppsUtils.cloneAppObject(meta);
       app.manifest = manifest;
-      DOMApplicationRegistry.broadcastMessage("Webapps:AddApp",
-                                              { id: meta.id, app: app });
-      DOMApplicationRegistry.broadcastMessage("Webapps:Install:Return:OK",
-                                              { app: app });
+      MessageBroadcaster.broadcastMessage("Webapps:AddApp",
+                                          { id: meta.id, app: app });
+      MessageBroadcaster.broadcastMessage("Webapps:Install:Return:OK",
+                                          { app: app });
       Services.obs.notifyObservers(null, "webapps-installed",
         JSON.stringify({ manifestURL: meta.manifestURL }));
 

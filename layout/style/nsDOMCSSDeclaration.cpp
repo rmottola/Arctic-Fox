@@ -332,14 +332,14 @@ nsDOMCSSDeclaration::ParsePropertyValue(const nsCSSProperty aPropID,
 
   nsCSSParser cssParser(env.mCSSLoader);
   bool changed;
-  nsresult result = cssParser.ParseProperty(aPropID, aPropValue, env.mSheetURI,
-                                            env.mBaseURI, env.mPrincipal, decl,
-                                            &changed, aIsImportant);
-  if (NS_FAILED(result) || !changed) {
+  cssParser.ParseProperty(aPropID, aPropValue, env.mSheetURI, env.mBaseURI,
+                          env.mPrincipal, decl, &changed, aIsImportant);
+  if (!changed) {
     if (decl != olddecl) {
       delete decl;
     }
-    return result;
+    // Parsing failed -- but we don't throw an exception for that.
+    return NS_OK;
   }
 
   return SetCSSDeclaration(decl);
@@ -373,17 +373,17 @@ nsDOMCSSDeclaration::ParseCustomPropertyValue(const nsAString& aPropertyName,
 
   nsCSSParser cssParser(env.mCSSLoader);
   bool changed;
-  nsresult result =
-    cssParser.ParseVariable(Substring(aPropertyName,
-                                      CSS_CUSTOM_NAME_PREFIX_LENGTH),
-                            aPropValue, env.mSheetURI,
-                            env.mBaseURI, env.mPrincipal, decl,
-                            &changed, aIsImportant);
-  if (NS_FAILED(result) || !changed) {
+  cssParser.ParseVariable(Substring(aPropertyName,
+                                    CSS_CUSTOM_NAME_PREFIX_LENGTH),
+                          aPropValue, env.mSheetURI,
+                          env.mBaseURI, env.mPrincipal, decl,
+                          &changed, aIsImportant);
+  if (!changed) {
     if (decl != olddecl) {
       delete decl;
     }
-    return result;
+    // Parsing failed -- but we don't throw an exception for that.
+    return NS_OK;
   }
 
   return SetCSSDeclaration(decl);
@@ -435,21 +435,8 @@ nsDOMCSSDeclaration::RemoveCustomProperty(const nsAString& aPropertyName)
 
 bool IsCSSPropertyExposedToJS(nsCSSProperty aProperty, JSContext* cx, JSObject* obj)
 {
+  MOZ_ASSERT_UNREACHABLE("This is currently not used anywhere, "
+                         "but should be reused soon in bug 1069192");
   nsCSSProps::EnabledState enabledState = nsCSSProps::eEnabledForAllContent;
-
-  // Optimization: we skip checking properties of the JSContext
-  // in the majority case where the property does not have the
-  // CSS_PROPERTY_ALWAYS_ENABLED_IN_PRIVILEGED_CONTENT flag.
-  bool isEnabledInChromeOrCertifiedApp
-    = nsCSSProps::PropHasFlags(aProperty,
-                               CSS_PROPERTY_ALWAYS_ENABLED_IN_CHROME_OR_CERTIFIED_APP);
-
-  if (isEnabledInChromeOrCertifiedApp) {
-    if (dom::IsInCertifiedApp(cx, obj) ||
-        nsContentUtils::ThreadsafeIsCallerChrome())
-    {
-      enabledState |= nsCSSProps::eEnabledInChromeOrCertifiedApp;
-    }
-  }
   return nsCSSProps::IsEnabled(aProperty, enabledState);
 }

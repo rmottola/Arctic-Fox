@@ -200,6 +200,14 @@ ChannelFromScriptURL(nsIPrincipal* principal,
 
   NS_ENSURE_SUCCESS(rv, rv);
 
+  if (nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(channel)) {
+    rv = nsContentUtils::SetFetchReferrerURIWithPolicy(principal, parentDoc,
+                                                       httpChannel);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
   channel.forget(aChannel);
   return rv;
 }
@@ -1010,9 +1018,7 @@ private:
       mWorkerPrivate->SetBaseURI(finalURI);
 
       // Store the channel info if needed.
-      if (mWorkerPrivate->IsServiceWorker()) {
-        mWorkerPrivate->InitChannelInfo(channel);
-      }
+      mWorkerPrivate->InitChannelInfo(channel);
 
       // Now to figure out which principal to give this worker.
       WorkerPrivate* parent = mWorkerPrivate->GetParent();
@@ -1665,27 +1671,24 @@ ScriptExecutorRunnable::WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
     }
   }
 
-  JS::Rooted<JSObject*> global(aCx, JS::CurrentGlobalOrNull(aCx));
-  NS_ASSERTION(global, "Must have a global by now!");
+  JS::Rooted<JSObject*> global(aCx);
 
-  // Determine whether we want to be discarding source on this global to save
-  // memory. It would make more sense to do this when we create the global, but
-  // the information behind UsesSystemPrincipal() et al isn't finalized until
-  // the call to SetPrincipal during the first script load. After that, however,
-  // it never changes. So we can just idempotently set the bits here.
-  //
-  // Note that we read a pref that is cached on the main thread. This is benignly
-  // racey.
-  if (xpc::ShouldDiscardSystemSource()) {
-    bool discard = aWorkerPrivate->UsesSystemPrincipal() ||
-                   aWorkerPrivate->IsInPrivilegedApp();
-    JS::CompartmentOptionsRef(global).setDiscardSource(discard);
+  if (mIsWorkerScript) {
+    WorkerGlobalScope* globalScope =
+      aWorkerPrivate->GetOrCreateGlobalScope(aCx);
+    if (NS_WARN_IF(!globalScope)) {
+      NS_WARNING("Failed to make global!");
+      return false;
+    }
+
+    global.set(globalScope->GetWrapper());
+  } else {
+    global.set(JS::CurrentGlobalOrNull(aCx));
   }
 
-  // Similar to the above.
-  if (xpc::ExtraWarningsForSystemJS() && aWorkerPrivate->UsesSystemPrincipal()) {
-      JS::CompartmentOptionsRef(global).extraWarningsOverride().set(true);
-  }
+  MOZ_ASSERT(global);
+
+  JSAutoCompartment ac(aCx, global);
 
   for (uint32_t index = mFirstIndex; index <= mLastIndex; index++) {
     ScriptLoadInfo& loadInfo = loadInfos.ElementAt(index);

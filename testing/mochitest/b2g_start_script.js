@@ -29,21 +29,25 @@ if (cm) {
   cm.deleteCategoryEntry("update-timer", "nsUpdateService", false);
 }
 
+let SECURITY_PREF = "security.turn_off_all_security_so_that_viruses_can_take_over_this_computer";
+Components.utils.import("resource://gre/modules/Services.jsm");
+Services.prefs.setBoolPref(SECURITY_PREF, true);
+
 function openWindow(aEvent) {
   var popupIframe = aEvent.detail.frameElement;
-  popupIframe.style = 'position: absolute; left: 0; top: 0px; background: white;';
+  popupIframe.id = 'popupiframe';
 
   // This is to size the iframe to what is requested in the window.open call,
   // e.g. window.open("", "", "width=600,height=600");
   if (aEvent.detail.features.indexOf('width') != -1) {
     let width = aEvent.detail.features.substr(aEvent.detail.features.indexOf('width')+6);
     width = width.substr(0,width.indexOf(',') == -1 ? width.length : width.indexOf(','));
-    popupIframe.style.width = width + 'px';
+    popupIframe.setAttribute('width', width);
   }
   if (aEvent.detail.features.indexOf('height') != -1) {
     let height = aEvent.detail.features.substr(aEvent.detail.features.indexOf('height')+7);
     height = height.substr(0, height.indexOf(',') == -1 ? height.length : height.indexOf(','));
-    popupIframe.style.height = height + 'px';
+    popupIframe.setAttribute('height', height);
   }
 
   popupIframe.addEventListener('mozbrowserclose', function(e) {
@@ -97,6 +101,11 @@ if (outOfProcess) {
 
 if (chrome) {
   let loader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
+  if (typeof(SpecialPowers) == 'undefined') {
+    loader.loadSubScript("chrome://specialpowers/content/specialpowersAPI.js");
+    loader.loadSubScript("chrome://specialpowers/content/SpecialPowersObserverAPI.js");
+    loader.loadSubScript("chrome://specialpowers/content/ChromePowers.js");
+  }
   loader.loadSubScript("chrome://mochikit/content/browser-test.js");
   b2gStart();
 }

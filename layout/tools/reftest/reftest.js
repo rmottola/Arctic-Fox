@@ -282,7 +282,6 @@ this.OnRefTestLoad = function OnRefTestLoad(win)
     gBrowser.setAttribute("id", "browser");
     gBrowser.setAttribute("type", "content-primary");
     gBrowser.setAttribute("remote", gBrowserIsRemote ? "true" : "false");
-    gBrowser.setAttribute("mozasyncpanzoom", "true");
     // Make sure the browser element is exactly 800x1000, no matter
     // what size our window is
     gBrowser.setAttribute("style", "padding: 0px; margin: 0px; border:none; min-width: 800px; min-height: 1000px; max-width: 800px; max-height: 1000px");
@@ -1185,6 +1184,9 @@ function ServeFiles(manifestPrincipal, depth, aURL, files)
 
     var testbase = gIOService.newURI("http://localhost:" + gHttpServerPort +
                                      path + dirPath, null, null);
+
+    // Give the testbase URI access to XUL and XBL
+    Services.perms.add(testbase, "allowXULXBL", Services.perms.ALLOW_ACTION);
 
     function FileToURI(file)
     {

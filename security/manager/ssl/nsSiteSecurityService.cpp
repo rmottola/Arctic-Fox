@@ -724,6 +724,13 @@ nsSiteSecurityService::ProcessPKPHeader(nsIURI* aSourceURI,
     return NS_ERROR_FAILURE;
   }
 
+  if (!isBuiltIn && !mProcessPKPHeadersFromNonBuiltInRoots) {
+    if (aFailureResult) {
+      *aFailureResult = nsISiteSecurityService::ERROR_ROOT_NOT_BUILT_IN;
+    }
+    return NS_ERROR_FAILURE;
+  }
+
   // if maxAge == 0 we must delete all state, for now no hole-punching
   if (maxAge == 0) {
     return RemoveState(aType, aSourceURI, aFlags);

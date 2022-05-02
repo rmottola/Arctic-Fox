@@ -105,7 +105,7 @@ struct RunnableMethodTraits<mozilla::ipc::MessageChannel>
             DebugAbort(__FILE__, __LINE__, #_cond,## __VA_ARGS__);  \
     } while (0)
 
-static bool gParentIsBlocked;
+static MessageChannel* gParentProcessBlocker;
 
 namespace mozilla {
 namespace ipc {
@@ -166,7 +166,7 @@ public:
 
     InterruptFrame& operator=(InterruptFrame&& aOther)
     {
-        MOZ_ASSERT(&aOther != this);
+        MOZ_RELEASE_ASSERT(&aOther != this);
         this->~InterruptFrame();
         new (this) InterruptFrame(mozilla::Move(aOther));
         return *this;
@@ -403,6 +403,10 @@ MessageChannel::Clear()
     // In practice, mListener owns the channel, so the channel gets deleted
     // before mListener.  But just to be safe, mListener is a weak pointer.
 
+    if (gParentProcessBlocker == this) {
+        gParentProcessBlocker = nullptr;
+    }
+
     mDequeueOneTask->Cancel();
 
     mWorkerLoop = nullptr;
@@ -527,7 +531,7 @@ MessageChannel::Echo(Message* aMsg)
     MonitorAutoLock lock(*mMonitor);
 
     if (!Connected()) {
-        ReportConnectionError("MessageChannel");
+        ReportConnectionError("MessageChannel", msg);
         return false;
     }
 
@@ -550,12 +554,27 @@ MessageChannel::Send(Message* aMsg)
 
     MonitorAutoLock lock(*mMonitor);
     if (!Connected()) {
-        ReportConnectionError("MessageChannel");
+        ReportConnectionError("MessageChannel", msg);
         return false;
     }
     mLink->SendMessage(msg.forget());
     return true;
 }
+
+class CancelMessage : public IPC::Message
+{
+public:
+    CancelMessage() :
+        IPC::Message(MSG_ROUTING_NONE, CANCEL_MESSAGE_TYPE, PRIORITY_NORMAL)
+    {
+    }
+    static bool Read(const Message* msg) {
+        return true;
+    }
+    void Log(const std::string& aPrefix, FILE* aOutf) const {
+        fputs("(special `Cancel' message)", aOutf);
+    }
+};
 
 bool
 MessageChannel::MaybeInterceptSpecialIOMessage(const Message& aMsg)
@@ -777,8 +796,50 @@ MessageChannel::ProcessPendingRequests()
 }
 
 bool
+MessageChannel::WasTransactionCanceled(int transaction, int prio)
+{
+    if (transaction == mCurrentTransaction) {
+        return false;
+    }
+
+    // This isn't an assert so much as an intentional crash because we're in a
+    // situation that we don't know how to recover from: The child is awaiting
+    // a reply to a normal-priority sync message. The transaction that this
+    // message initiated has now been canceled. That could only happen if a CPOW
+    // raced with the sync message and was dispatched by the child while the
+    // child was awaiting the sync reply; at some point while dispatching the
+    // CPOW, the transaction was canceled.
+    //
+    // Notes:
+    //
+    // 1. We don't want to cancel the normal-priority sync message along with
+    // the CPOWs because the browser relies on these messages working
+    // reliably.
+    //
+    // 2. Ideally we would like to avoid dispatching CPOWs while awaiting a sync
+    // response. This isn't possible though. To avoid deadlock, the parent would
+    // have to dispatch the sync message while waiting for the CPOW
+    // response. However, it wouldn't have dispatched async messages at that
+    // time, so we would have a message ordering bug. Dispatching the async
+    // messages first causes other hard-to-handle situations (what if they send
+    // CPOWs?).
+    //
+    // 3. We would like to be able to cancel the CPOWs but not the sync
+    // message. However, that would leave both the parent and the child running
+    // code at the same time, all while the sync message is still
+    // outstanding. That can cause a problem where message replies are received
+    // out of order.
+    IPC_ASSERT(prio != IPC::Message::PRIORITY_NORMAL,
+               "Intentional crash: We canceled a CPOW that was racing with a sync message.");
+
+    return true;
+}
+
+bool
 MessageChannel::Send(Message* aMsg, Message* aReply)
 {
+    nsAutoPtr<Message> msg(aMsg);
+
     // See comment in DispatchSyncMessage.
     MaybeScriptBlocker scriptBlocker(this, true);
 
@@ -791,9 +852,10 @@ MessageChannel::Send(Message* aMsg, Message* aReply)
 
 #ifdef OS_WIN
     SyncStackFrame frame(this, false);
+    NeuteredWindowRegion neuteredRgn(mFlags & REQUIRE_DEFERRED_MESSAGE_PROTECTION);
 #endif
 
-    CxxStackFrame f(*this, OUT_MESSAGE, aMsg);
+    CxxStackFrame f(*this, OUT_MESSAGE, msg);
 
     MonitorAutoLock lock(*mMonitor);
 
@@ -806,17 +868,27 @@ MessageChannel::Send(Message* aMsg, Message* aReply)
     }
 
     if (DispatchingSyncMessagePriority() == IPC::Message::PRIORITY_NORMAL &&
-        aMsg->priority() > IPC::Message::PRIORITY_NORMAL)
+        msg->priority() > IPC::Message::PRIORITY_NORMAL)
     {
         // Don't allow sending CPOWs while we're dispatching a sync message.
         // If you want to do that, use sendRpcMessage instead.
         return false;
     }
 
-    IPC_ASSERT(aMsg->is_sync(), "can only Send() sync messages here");
-    IPC_ASSERT(aMsg->priority() >= DispatchingSyncMessagePriority(),
+    if (mCurrentTransaction &&
+        (msg->priority() < DispatchingSyncMessagePriority() ||
+         mAwaitingSyncReplyPriority > msg->priority() ||
+         DispatchingSyncMessagePriority() == IPC::Message::PRIORITY_URGENT ||
+         DispatchingAsyncMessagePriority() == IPC::Message::PRIORITY_URGENT))
+    {
+        CancelCurrentTransactionInternal();
+        mLink->SendMessage(new CancelMessage());
+    }
+
+    IPC_ASSERT(msg->is_sync(), "can only Send() sync messages here");
+    IPC_ASSERT(msg->priority() >= DispatchingSyncMessagePriority(),
                "can't send sync message of a lesser priority than what's being dispatched");
-    IPC_ASSERT(AwaitingSyncReplyPriority() <= aMsg->priority(),
+    IPC_ASSERT(AwaitingSyncReplyPriority() <= msg->priority(),
                "nested sync message sends must be of increasing priority");
 
     IPC_ASSERT(DispatchingSyncMessagePriority() != IPC::Message::PRIORITY_URGENT,
@@ -824,10 +896,8 @@ MessageChannel::Send(Message* aMsg, Message* aReply)
     IPC_ASSERT(DispatchingAsyncMessagePriority() != IPC::Message::PRIORITY_URGENT,
                "not allowed to send messages while dispatching urgent messages");
 
-    nsAutoPtr<Message> msg(aMsg);
-
     if (!Connected()) {
-        ReportConnectionError("MessageChannel::SendAndWait");
+        ReportConnectionError("MessageChannel::SendAndWait", msg);
         return false;
     }
 
@@ -845,8 +915,7 @@ MessageChannel::Send(Message* aMsg, Message* aReply)
     msg->set_transaction_id(transaction);
 
     ProcessPendingRequests();
-    if (mCurrentTransaction != transaction) {
-        // Transaction was canceled when dispatching.
+    if (WasTransactionCanceled(transaction, prio)) {
         return false;
     }
 
@@ -854,8 +923,7 @@ MessageChannel::Send(Message* aMsg, Message* aReply)
 
     while (true) {
         ProcessPendingRequests();
-        if (mCurrentTransaction != transaction) {
-            // Transaction was canceled when dispatching.
+        if (WasTransactionCanceled(transaction, prio)) {
             return false;
         }
 
@@ -878,8 +946,7 @@ MessageChannel::Send(Message* aMsg, Message* aReply)
             return false;
         }
 
-        if (mCurrentTransaction != transaction) {
-            // Transaction was canceled by other side.
+        if (WasTransactionCanceled(transaction, prio)) {
             return false;
         }
 
@@ -933,7 +1000,7 @@ MessageChannel::Call(Message* aMsg, Message* aReply)
 
     MonitorAutoLock lock(*mMonitor);
     if (!Connected()) {
-        ReportConnectionError("MessageChannel::Call");
+        ReportConnectionError("MessageChannel::Call", aMsg);
         return false;
     }
 
@@ -962,6 +1029,19 @@ MessageChannel::Call(Message* aMsg, Message* aReply)
             ReportConnectionError("MessageChannel::Call");
             return false;
         }
+
+#ifdef OS_WIN
+        // We need to limit the scoped of neuteredRgn to this spot in the code.
+        // Window neutering can't be enabled during some plugin calls because
+        // we then risk the neutered window procedure being subclassed by a
+        // plugin.
+        {
+            NeuteredWindowRegion neuteredRgn(mFlags & REQUIRE_DEFERRED_MESSAGE_PROTECTION);
+            /* We should pump messages at this point to ensure that the IPC peer
+               does not become deadlocked on a pending inter-thread SendMessage() */
+            neuteredRgn.PumpOnce();
+        }
+#endif
 
         // Now might be the time to process a message deferred because of race
         // resolution.
@@ -1079,6 +1159,7 @@ MessageChannel::WaitForIncomingMessage()
 {
 #ifdef OS_WIN
     SyncStackFrame frame(this, true);
+    NeuteredWindowRegion neuteredRgn(mFlags & REQUIRE_DEFERRED_MESSAGE_PROTECTION);
 #endif
 
     { // Scope for lock
@@ -1254,8 +1335,8 @@ MessageChannel::DispatchSyncMessage(const Message& aMsg, Message*& aReply)
     IPC_ASSERT(prio >= mAwaitingSyncReplyPriority,
                "dispatching a message of lower priority while waiting for a response");
 
-    bool dummy;
-    bool& blockingVar = ShouldBlockScripts() ? gParentIsBlocked : dummy;
+    MessageChannel* dummy;
+    MessageChannel*& blockingVar = ShouldBlockScripts() ? gParentProcessBlocker : dummy;
 
     Result rv;
     if (mTimedOutMessageSeqno && mTimedOutMessagePriority >= prio) {
@@ -1274,7 +1355,7 @@ MessageChannel::DispatchSyncMessage(const Message& aMsg, Message*& aReply)
         // for a response to its urgent message).
         rv = MsgNotAllowed;
     } else {
-        AutoSetValue<bool> blocked(blockingVar, true);
+        AutoSetValue<MessageChannel*> blocked(blockingVar, this);
         AutoSetValue<bool> sync(mDispatchingSyncMessage, true);
         AutoSetValue<int> prioSet(mDispatchingSyncMessagePriority, prio);
         rv = mListener->OnMessageReceived(aMsg, aReply);
@@ -1588,7 +1669,7 @@ MessageChannel::ReportMessageRouteError(const char* channelName) const
 }
 
 void
-MessageChannel::ReportConnectionError(const char* aChannelName) const
+MessageChannel::ReportConnectionError(const char* aChannelName, Message* aMsg) const
 {
     AssertWorkerThread();
     mMonitor->AssertCurrentThreadOwns();
@@ -1615,7 +1696,16 @@ MessageChannel::ReportConnectionError(const char* aChannelName) const
         NS_RUNTIMEABORT("unreached");
     }
 
-    PrintErrorMessage(mSide, aChannelName, errorMsg);
+    if (aMsg) {
+        char reason[512];
+        PR_snprintf(reason, sizeof(reason),
+                    "(msgtype=0x%lX,name=%s) %s",
+                    aMsg->type(), aMsg->name(), errorMsg);
+
+        PrintErrorMessage(mSide, aChannelName, reason);
+    } else {
+        PrintErrorMessage(mSide, aChannelName, errorMsg);
+    }
 
     MonitorAutoUnlock unlock(*mMonitor);
     mListener->OnProcessingError(MsgDropped, errorMsg);
@@ -1935,21 +2025,6 @@ MessageChannel::GetTopmostMessageRoutingId() const
     return frame.GetRoutingId();
 }
 
-class CancelMessage : public IPC::Message
-{
-public:
-    CancelMessage() :
-        IPC::Message(MSG_ROUTING_NONE, CANCEL_MESSAGE_TYPE, PRIORITY_NORMAL)
-    {
-    }
-    static bool Read(const Message* msg) {
-        return true;
-    }
-    void Log(const std::string& aPrefix, FILE* aOutf) const {
-        fputs("(special `Cancel' message)", aOutf);
-    }
-};
-
 void
 MessageChannel::CancelCurrentTransactionInternal()
 {
@@ -1975,10 +2050,12 @@ MessageChannel::CancelCurrentTransaction()
     mLink->SendMessage(new CancelMessage());
 }
 
-bool
-ParentProcessIsBlocked()
+void
+CancelCPOWs()
 {
-    return gParentIsBlocked;
+    if (gParentProcessBlocker) {
+        gParentProcessBlocker->CancelCurrentTransaction();
+    }
 }
 
 } // namespace ipc

@@ -27,6 +27,10 @@
 #include "nsWindowsHelpers.h"
 #endif
 
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
+
 class nsIProfileSaveEvent;
 class nsPluginTag;
 
@@ -34,6 +38,11 @@ namespace mozilla {
 #ifdef MOZ_ENABLE_PROFILER_SPS
 class ProfileGatherer;
 #endif
+namespace dom {
+class PCrashReporterParent;
+class CrashReporterParent;
+} // namespace dom
+
 namespace plugins {
 //-----------------------------------------------------------------------------
 
@@ -71,6 +80,8 @@ class PluginModuleParent
 {
 protected:
     typedef mozilla::PluginLibrary PluginLibrary;
+    typedef mozilla::dom::PCrashReporterParent PCrashReporterParent;
+    typedef mozilla::dom::CrashReporterParent CrashReporterParent;
 
     PPluginInstanceParent*
     AllocPPluginInstanceParent(const nsCString& aMimeType,
@@ -123,6 +134,8 @@ public:
         mHadLocalInstance = true;
     }
 
+    int GetQuirks() { return mQuirks; }
+
 protected:
     virtual mozilla::ipc::RacyInterruptPolicy
     MediateInterruptRace(const Message& parent, const Message& child) override
@@ -145,6 +158,12 @@ protected:
 
     virtual bool
     RecvPluginHideWindow(const uint32_t& aWindowId) override;
+
+    virtual PCrashReporterParent*
+    AllocPCrashReporterParent(mozilla::dom::NativeThreadId* id,
+                              uint32_t* processType) override;
+    virtual bool
+    DeallocPCrashReporterParent(PCrashReporterParent* actor) override;
 
     virtual bool
     RecvSetCursor(const NSCursorInfo& aCursorInfo) override;
@@ -258,6 +277,10 @@ private:
     std::map<uint64_t, nsCOMPtr<nsIClearSiteDataCallback>> mClearSiteDataCallbacks;
     std::map<uint64_t, nsCOMPtr<nsIGetSitesWithDataCallback>> mSitesWithDataCallbacks;
 
+    nsCString mPluginFilename;
+    int mQuirks;
+    void InitQuirksModes(const nsCString& aMimeType);
+
 public:
 
 #if defined(XP_MACOSX)
@@ -304,6 +327,7 @@ protected:
     bool
     GetPluginDetails();
 
+    friend class mozilla::dom::CrashReporterParent;
     friend class mozilla::plugins::PluginAsyncSurrogate;
 
     bool              mIsStartingAsync;
@@ -438,6 +462,17 @@ private:
 
     virtual bool ShouldContinueFromReplyTimeout() override;
 
+#ifdef MOZ_CRASHREPORTER
+    void ProcessFirstMinidump();
+    void WriteExtraDataForMinidump(CrashReporter::AnnotationTable& notes);
+#endif
+
+    virtual PCrashReporterParent*
+    AllocPCrashReporterParent(mozilla::dom::NativeThreadId* id,
+                              uint32_t* processType) override;
+    virtual bool
+    DeallocPCrashReporterParent(PCrashReporterParent* actor) override;
+
     PluginProcessParent* Process() const { return mSubprocess; }
     base::ProcessHandle ChildProcessHandle() { return mSubprocess->GetChildProcessHandle(); }
 
@@ -456,6 +491,8 @@ private:
     // aFilePath is UTF8, not native!
     explicit PluginModuleChromeParent(const char* aFilePath, uint32_t aPluginId,
                                       int32_t aSandboxLevel);
+
+    CrashReporterParent* CrashReporter();
 
     void CleanupFromTimeout(const bool aByHangUI);
 
@@ -494,6 +531,17 @@ private:
     bool mHangUIEnabled;
     bool mIsTimerReset;
     int32_t mSandboxLevel;
+#ifdef MOZ_CRASHREPORTER
+    /**
+     * This mutex protects the crash reporter when the Plugin Hang UI event
+     * handler is executing off main thread. It is intended to protect both
+     * the mCrashReporter variable in addition to the CrashReporterParent object
+     * that mCrashReporter refers to.
+     */
+    mozilla::Mutex mCrashReporterMutex;
+    CrashReporterParent* mCrashReporter;
+#endif // MOZ_CRASHREPORTER
+
 
     /**
      * Launches the Plugin Hang UI.
@@ -512,6 +560,7 @@ private:
     FinishHangUI();
 #endif
 
+    friend class mozilla::dom::CrashReporterParent;
     friend class mozilla::plugins::PluginAsyncSurrogate;
 
 #ifdef MOZ_CRASHREPORTER_INJECTOR

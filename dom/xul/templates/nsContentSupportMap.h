@@ -6,7 +6,7 @@
 #ifndef nsContentSupportMap_h__
 #define nsContentSupportMap_h__
 
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "nsTemplateMatch.h"
 
 /**
@@ -21,7 +21,7 @@
  */
 class nsContentSupportMap {
 public:
-    nsContentSupportMap() : mMap(PL_DHashGetStubOps(), sizeof(Entry)) { }
+    nsContentSupportMap() : mMap(PLDHashTable::StubOps(), sizeof(Entry)) { }
     ~nsContentSupportMap() { }
 
     nsresult Put(nsIContent* aElement, nsTemplateMatch* aMatch) {

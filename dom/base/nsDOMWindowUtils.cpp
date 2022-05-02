@@ -700,15 +700,15 @@ nsDOMWindowUtils::SendPointerEventCommon(const nsAString& aType,
 
   EventMessage msg;
   if (aType.EqualsLiteral("pointerdown")) {
-    msg = NS_POINTER_DOWN;
+    msg = ePointerDown;
   } else if (aType.EqualsLiteral("pointerup")) {
-    msg = NS_POINTER_UP;
+    msg = ePointerUp;
   } else if (aType.EqualsLiteral("pointermove")) {
-    msg = NS_POINTER_MOVE;
+    msg = ePointerMove;
   } else if (aType.EqualsLiteral("pointerover")) {
-    msg = NS_POINTER_OVER;
+    msg = ePointerOver;
   } else if (aType.EqualsLiteral("pointerout")) {
-    msg = NS_POINTER_OUT;
+    msg = ePointerOut;
   } else {
     return NS_ERROR_FAILURE;
   }
@@ -842,7 +842,7 @@ nsDOMWindowUtils::SendWheelEvent(float aX,
     return NS_ERROR_NULL_POINTER;
   }
 
-  WidgetWheelEvent wheelEvent(true, NS_WHEEL_WHEEL, widget);
+  WidgetWheelEvent wheelEvent(true, eWheel, widget);
   wheelEvent.modifiers = nsContentUtils::GetWidgetModifiers(aModifiers);
   wheelEvent.deltaX = aDeltaX;
   wheelEvent.deltaY = aDeltaY;
@@ -979,13 +979,13 @@ nsDOMWindowUtils::SendTouchEventCommon(const nsAString& aType,
   }
   EventMessage msg;
   if (aType.EqualsLiteral("touchstart")) {
-    msg = NS_TOUCH_START;
+    msg = eTouchStart;
   } else if (aType.EqualsLiteral("touchmove")) {
-    msg = NS_TOUCH_MOVE;
+    msg = eTouchMove;
   } else if (aType.EqualsLiteral("touchend")) {
-    msg = NS_TOUCH_END;
+    msg = eTouchEnd;
   } else if (aType.EqualsLiteral("touchcancel")) {
-    msg = NS_TOUCH_CANCEL;
+    msg = eTouchCancel;
   } else {
     return NS_ERROR_UNEXPECTED;
   }
@@ -1313,39 +1313,42 @@ nsDOMWindowUtils::SendSimpleGestureEvent(const nsAString& aType,
     return NS_ERROR_FAILURE;
 
   EventMessage msg;
-  if (aType.EqualsLiteral("MozSwipeGestureStart"))
-    msg = NS_SIMPLE_GESTURE_SWIPE_START;
-  else if (aType.EqualsLiteral("MozSwipeGestureUpdate"))
-    msg = NS_SIMPLE_GESTURE_SWIPE_UPDATE;
-  else if (aType.EqualsLiteral("MozSwipeGestureEnd"))
-    msg = NS_SIMPLE_GESTURE_SWIPE_END;
-  else if (aType.EqualsLiteral("MozSwipeGesture"))
-    msg = NS_SIMPLE_GESTURE_SWIPE;
-  else if (aType.EqualsLiteral("MozMagnifyGestureStart"))
-    msg = NS_SIMPLE_GESTURE_MAGNIFY_START;
-  else if (aType.EqualsLiteral("MozMagnifyGestureUpdate"))
-    msg = NS_SIMPLE_GESTURE_MAGNIFY_UPDATE;
-  else if (aType.EqualsLiteral("MozMagnifyGesture"))
-    msg = NS_SIMPLE_GESTURE_MAGNIFY;
-  else if (aType.EqualsLiteral("MozRotateGestureStart"))
-    msg = NS_SIMPLE_GESTURE_ROTATE_START;
-  else if (aType.EqualsLiteral("MozRotateGestureUpdate"))
-    msg = NS_SIMPLE_GESTURE_ROTATE_UPDATE;
-  else if (aType.EqualsLiteral("MozRotateGesture"))
-    msg = NS_SIMPLE_GESTURE_ROTATE;
-  else if (aType.EqualsLiteral("MozTapGesture"))
-    msg = NS_SIMPLE_GESTURE_TAP;
-  else if (aType.EqualsLiteral("MozPressTapGesture"))
-    msg = NS_SIMPLE_GESTURE_PRESSTAP;
-  else if (aType.EqualsLiteral("MozEdgeUIStarted"))
-    msg = NS_SIMPLE_GESTURE_EDGE_STARTED;
-  else if (aType.EqualsLiteral("MozEdgeUICanceled"))
-    msg = NS_SIMPLE_GESTURE_EDGE_CANCELED;
-  else if (aType.EqualsLiteral("MozEdgeUICompleted"))
-    msg = NS_SIMPLE_GESTURE_EDGE_COMPLETED;
-  else
+  if (aType.EqualsLiteral("MozSwipeGestureMayStart")) {
+    msg = eSwipeGestureMayStart;
+  } else if (aType.EqualsLiteral("MozSwipeGestureStart")) {
+    msg = eSwipeGestureStart;
+  } else if (aType.EqualsLiteral("MozSwipeGestureUpdate")) {
+    msg = eSwipeGestureUpdate;
+  } else if (aType.EqualsLiteral("MozSwipeGestureEnd")) {
+    msg = eSwipeGestureEnd;
+  } else if (aType.EqualsLiteral("MozSwipeGesture")) {
+    msg = eSwipeGesture;
+  } else if (aType.EqualsLiteral("MozMagnifyGestureStart")) {
+    msg = eMagnifyGestureStart;
+  } else if (aType.EqualsLiteral("MozMagnifyGestureUpdate")) {
+    msg = eMagnifyGestureUpdate;
+  } else if (aType.EqualsLiteral("MozMagnifyGesture")) {
+    msg = eMagnifyGesture;
+  } else if (aType.EqualsLiteral("MozRotateGestureStart")) {
+    msg = eRotateGestureStart;
+  } else if (aType.EqualsLiteral("MozRotateGestureUpdate")) {
+    msg = eRotateGestureUpdate;
+  } else if (aType.EqualsLiteral("MozRotateGesture")) {
+    msg = eRotateGesture;
+  } else if (aType.EqualsLiteral("MozTapGesture")) {
+    msg = eTapGesture;
+  } else if (aType.EqualsLiteral("MozPressTapGesture")) {
+    msg = ePressTapGesture;
+  } else if (aType.EqualsLiteral("MozEdgeUIStarted")) {
+    msg = eEdgeUIStarted;
+  } else if (aType.EqualsLiteral("MozEdgeUICanceled")) {
+    msg = eEdgeUICanceled;
+  } else if (aType.EqualsLiteral("MozEdgeUICompleted")) {
+    msg = eEdgeUICompleted;
+  } else {
     return NS_ERROR_FAILURE;
- 
+  }
+
   WidgetSimpleGestureEvent event(true, msg, widget);
   event.modifiers = nsContentUtils::GetWidgetModifiers(aModifiers);
   event.direction = aDirection;
@@ -1934,22 +1937,22 @@ nsDOMWindowUtils::SendQueryContentEvent(uint32_t aType,
   EventMessage message;
   switch (aType) {
     case QUERY_SELECTED_TEXT:
-      message = NS_QUERY_SELECTED_TEXT;
+      message = eQuerySelectedText;
       break;
     case QUERY_TEXT_CONTENT:
-      message = NS_QUERY_TEXT_CONTENT;
+      message = eQueryTextContent;
       break;
     case QUERY_CARET_RECT:
-      message = NS_QUERY_CARET_RECT;
+      message = eQueryCaretRect;
       break;
     case QUERY_TEXT_RECT:
-      message = NS_QUERY_TEXT_RECT;
+      message = eQueryTextRect;
       break;
     case QUERY_EDITOR_RECT:
-      message = NS_QUERY_EDITOR_RECT;
+      message = eQueryEditorRect;
       break;
     case QUERY_CHARACTER_AT_POINT:
-      message = NS_QUERY_CHARACTER_AT_POINT;
+      message = eQueryCharacterAtPoint;
       break;
     default:
       return NS_ERROR_INVALID_ARG;
@@ -1961,9 +1964,9 @@ nsDOMWindowUtils::SendQueryContentEvent(uint32_t aType,
   bool useNativeLineBreak =
     !(aAdditionalFlags & QUERY_CONTENT_FLAG_USE_XP_LINE_BREAK);
 
-  if (message == NS_QUERY_CHARACTER_AT_POINT) {
+  if (message == eQueryCharacterAtPoint) {
     // Looking for the widget at the point.
-    WidgetQueryContentEvent dummyEvent(true, NS_QUERY_CONTENT_STATE, widget);
+    WidgetQueryContentEvent dummyEvent(true, eQueryContentState, widget);
     dummyEvent.mUseNativeLineBreak = useNativeLineBreak;
     InitEvent(dummyEvent, &pt);
     nsIFrame* popupFrame =
@@ -1992,13 +1995,13 @@ nsDOMWindowUtils::SendQueryContentEvent(uint32_t aType,
   InitEvent(queryEvent, &pt);
 
   switch (message) {
-    case NS_QUERY_TEXT_CONTENT:
+    case eQueryTextContent:
       queryEvent.InitForQueryTextContent(aOffset, aLength, useNativeLineBreak);
       break;
-    case NS_QUERY_CARET_RECT:
+    case eQueryCaretRect:
       queryEvent.InitForQueryCaretRect(aOffset, useNativeLineBreak);
       break;
-    case NS_QUERY_TEXT_RECT:
+    case eQueryTextRect:
       queryEvent.InitForQueryTextRect(aOffset, aLength, useNativeLineBreak);
       break;
     default:
@@ -2033,7 +2036,7 @@ nsDOMWindowUtils::SendSelectionSetEvent(uint32_t aOffset,
     return NS_ERROR_FAILURE;
   }
 
-  WidgetSelectionEvent selectionEvent(true, NS_SELECTION_SET, widget);
+  WidgetSelectionEvent selectionEvent(true, eSetSelection, widget);
   InitEvent(selectionEvent);
 
   selectionEvent.mOffset = aOffset;
@@ -2062,25 +2065,26 @@ nsDOMWindowUtils::SendContentCommandEvent(const nsAString& aType,
     return NS_ERROR_FAILURE;
 
   EventMessage msg;
-  if (aType.EqualsLiteral("cut"))
-    msg = NS_CONTENT_COMMAND_CUT;
-  else if (aType.EqualsLiteral("copy"))
-    msg = NS_CONTENT_COMMAND_COPY;
-  else if (aType.EqualsLiteral("paste"))
-    msg = NS_CONTENT_COMMAND_PASTE;
-  else if (aType.EqualsLiteral("delete"))
-    msg = NS_CONTENT_COMMAND_DELETE;
-  else if (aType.EqualsLiteral("undo"))
-    msg = NS_CONTENT_COMMAND_UNDO;
-  else if (aType.EqualsLiteral("redo"))
-    msg = NS_CONTENT_COMMAND_REDO;
-  else if (aType.EqualsLiteral("pasteTransferable"))
-    msg = NS_CONTENT_COMMAND_PASTE_TRANSFERABLE;
-  else
+  if (aType.EqualsLiteral("cut")) {
+    msg = eContentCommandCut;
+  } else if (aType.EqualsLiteral("copy")) {
+    msg = eContentCommandCopy;
+  } else if (aType.EqualsLiteral("paste")) {
+    msg = eContentCommandPaste;
+  } else if (aType.EqualsLiteral("delete")) {
+    msg = eContentCommandDelete;
+  } else if (aType.EqualsLiteral("undo")) {
+    msg = eContentCommandUndo;
+  } else if (aType.EqualsLiteral("redo")) {
+    msg = eContentCommandRedo;
+  } else if (aType.EqualsLiteral("pasteTransferable")) {
+    msg = eContentCommandPasteTransferable;
+  } else {
     return NS_ERROR_FAILURE;
+  }
 
   WidgetContentCommandEvent event(true, msg, widget);
-  if (msg == NS_CONTENT_COMMAND_PASTE_TRANSFERABLE) {
+  if (msg == eContentCommandPasteTransferable) {
     event.mTransferable = aTransferable;
   }
 
@@ -3556,7 +3560,7 @@ nsDOMWindowUtils::IsNodeDisabledForEvents(nsIDOMNode* aNode, bool* aRetVal)
   while (node) {
     if (node->IsNodeOfType(nsINode::eHTML_FORM_CONTROL)) {
       nsCOMPtr<nsIFormControl> fc = do_QueryInterface(node);
-      if (fc && fc->IsDisabledForEvents(NS_EVENT_NULL)) {
+      if (fc && fc->IsDisabledForEvents(eVoidEvent)) {
         *aRetVal = true;
         break;
       }
@@ -4020,6 +4024,21 @@ nsDOMWindowUtils::HasRuleProcessorUsedByMultipleStyleSets(uint32_t aSheetType,
 
   return presShell->HasRuleProcessorUsedByMultipleStyleSets(aSheetType,
                                                             aRetVal);
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::SetNextPaintSyncId(int32_t aSyncId)
+{
+  MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
+  if (nsIWidget* widget = GetWidget()) {
+    nsRefPtr<LayerManager> lm = widget->GetLayerManager();
+    if (lm && lm->GetBackendType() == LayersBackend::LAYERS_CLIENT) {
+      ClientLayerManager* clm = static_cast<ClientLayerManager*>(lm.get());
+      clm->SetNextPaintSyncId(aSyncId);
+    }
+  }
+
+  return NS_OK;
 }
 
 NS_INTERFACE_MAP_BEGIN(nsTranslationNodeList)

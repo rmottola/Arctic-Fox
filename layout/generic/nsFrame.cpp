@@ -2597,7 +2597,7 @@ nsFrame::HandleEvent(nsPresContext* aPresContext,
                      nsEventStatus* aEventStatus)
 {
 
-  if (aEvent->mMessage == NS_MOUSE_MOVE) {
+  if (aEvent->mMessage == eMouseMove) {
     // XXX If the second argument of HandleDrag() is WidgetMouseEvent,
     //     the implementation becomes simpler.
     return HandleDrag(aPresContext, aEvent, aEventStatus);
@@ -2606,11 +2606,9 @@ nsFrame::HandleEvent(nsPresContext* aPresContext,
   if ((aEvent->mClass == eMouseEventClass &&
        aEvent->AsMouseEvent()->button == WidgetMouseEvent::eLeftButton) ||
       aEvent->mClass == eTouchEventClass) {
-    if (aEvent->mMessage == NS_MOUSE_BUTTON_DOWN ||
-        aEvent->mMessage == NS_TOUCH_START) {
+    if (aEvent->mMessage == eMouseDown || aEvent->mMessage == eTouchStart) {
       HandlePress(aPresContext, aEvent, aEventStatus);
-    } else if (aEvent->mMessage == NS_MOUSE_BUTTON_UP ||
-               aEvent->mMessage == NS_TOUCH_END) {
+    } else if (aEvent->mMessage == eMouseUp || aEvent->mMessage == eTouchEnd) {
       HandleRelease(aPresContext, aEvent, aEventStatus);
     }
   }
@@ -2643,8 +2641,8 @@ nsFrame::GetDataForTableSelection(const nsFrameSelection* aFrameSelection,
   //  (Mouse down does normal selection unless Ctrl/Cmd is pressed)
   bool doTableSelection =
      displaySelection == nsISelectionDisplay::DISPLAY_ALL && selectingTableCells &&
-     (aMouseEvent->mMessage == NS_MOUSE_MOVE ||
-      (aMouseEvent->mMessage == NS_MOUSE_BUTTON_UP &&
+     (aMouseEvent->mMessage == eMouseMove ||
+      (aMouseEvent->mMessage == eMouseUp &&
        aMouseEvent->button == WidgetMouseEvent::eLeftButton) ||
       aMouseEvent->IsShift());
 
@@ -3009,6 +3007,7 @@ nsFrame::HandlePress(nsPresContext* aPresContext,
       if (curDetail->mType != nsISelectionController::SELECTION_SPELLCHECK &&
           curDetail->mType != nsISelectionController::SELECTION_FIND &&
           curDetail->mType != nsISelectionController::SELECTION_URLSECONDARY &&
+          curDetail->mType != nsISelectionController::SELECTION_URLSTRIKEOUT &&
           curDetail->mStart <= offsets.StartOffset() &&
           offsets.EndOffset() <= curDetail->mEnd)
       {

@@ -121,16 +121,29 @@ struct Token
     {
         NoException,
 
-        // If an yield expression operand is omitted and yield expression is
-        // followed by non-EOL, the next token is already gotten with Operand,
-        // but we expect operator (None).
+        // Used in following 2 cases:
+        // a) After |yield| we look for a token on the same line that starts an
+        // expression (Operand): |yield <expr>|.  If no token is found, the
+        // |yield| stands alone, and the next token on a subsequent line must
+        // be: a comma continuing a comma expression, a semicolon terminating
+        // the statement that ended with |yield|, or the start of another
+        // statement (possibly an expression statement).  The comma/semicolon
+        // cases are gotten as operators (None), contrasting with Operand
+        // earlier.
+        // b) After an arrow function with a block body in an expression
+        // statement, the next token must be: a colon in a conditional
+        // expression, a comma continuing a comma expression, a semicolon
+        // terminating the statement, or the token on a subsequent line that is
+        // the start of another statement (possibly an expression statement).
+        // Colon is gotten as operator (None), and it should only be gotten in
+        // conditional expression and missing it results in SyntaxError.
+        // Comma/semicolon cases are also gotten as operators (None), and 4th
+        // case is gotten after them.  If no comma/semicolon found but EOL,
+        // the next token should be gotten as operand in 4th case (especially if
+        // '/' is the first character).  So we should peek the token as
+        // operand before try getting colon/comma/semicolon.
+        // See also the comment in Parser::assignExpr().
         NoneIsOperand,
-
-        // If an yield expression operand is omitted and yield expression is
-        // followed by EOL, the next token is already gotten with Operand, and
-        // we expect Operand in next statement, but MatchOrInsertSemicolon
-        // after expression statement expects operator (None).
-        NoneIsOperandYieldEOL,
 
         // If a semicolon is inserted automatically, the next token is already
         // gotten with None, but we expect Operand.
@@ -437,25 +450,19 @@ class MOZ_STACK_CLASS TokenStream
     typedef Token::ModifierException ModifierException;
     static MOZ_CONSTEXPR_VAR ModifierException NoException = Token::NoException;
     static MOZ_CONSTEXPR_VAR ModifierException NoneIsOperand = Token::NoneIsOperand;
-    static MOZ_CONSTEXPR_VAR ModifierException NoneIsOperandYieldEOL = Token::NoneIsOperandYieldEOL;
     static MOZ_CONSTEXPR_VAR ModifierException OperandIsNone = Token::OperandIsNone;
     static MOZ_CONSTEXPR_VAR ModifierException NoneIsKeywordIsName = Token::NoneIsKeywordIsName;
 
     void addModifierException(ModifierException modifierException) {
 #ifdef DEBUG
         const Token& next = nextToken();
-        if (next.modifierException == NoneIsOperand ||
-            next.modifierException == NoneIsOperandYieldEOL)
+        if (next.modifierException == NoneIsOperand)
         {
             // Token after yield expression without operand already has
-            // NoneIsOperand or NoneIsOperandYieldEOL exception.
+            // NoneIsOperand exception.
             MOZ_ASSERT(modifierException == OperandIsNone);
-            if (next.modifierException == NoneIsOperand)
-                MOZ_ASSERT(next.type != TOK_DIV && next.type != TOK_REGEXP,
-                           "next token requires contextual specifier to be parsed unambiguously");
-            else
-                MOZ_ASSERT(next.type != TOK_DIV,
-                           "next token requires contextual specifier to be parsed unambiguously");
+            MOZ_ASSERT(next.type != TOK_DIV,
+                       "next token requires contextual specifier to be parsed unambiguously");
 
             // Do not update modifierException.
             return;
@@ -464,11 +471,6 @@ class MOZ_STACK_CLASS TokenStream
         MOZ_ASSERT(next.modifierException == NoException);
         switch (modifierException) {
           case NoneIsOperand:
-            MOZ_ASSERT(next.modifier == Operand);
-            MOZ_ASSERT(next.type != TOK_DIV && next.type != TOK_REGEXP,
-                       "next token requires contextual specifier to be parsed unambiguously");
-            break;
-          case NoneIsOperandYieldEOL:
             MOZ_ASSERT(next.modifier == Operand);
             MOZ_ASSERT(next.type != TOK_DIV,
                        "next token requires contextual specifier to be parsed unambiguously");
@@ -502,9 +504,7 @@ class MOZ_STACK_CLASS TokenStream
                 return;
         }
 
-        if (lookaheadToken.modifierException == NoneIsOperand ||
-            lookaheadToken.modifierException == NoneIsOperandYieldEOL)
-        {
+        if (lookaheadToken.modifierException == NoneIsOperand) {
             // getToken() permissibly following getToken(Operand).
             if (modifier == None && lookaheadToken.modifier == Operand)
                 return;

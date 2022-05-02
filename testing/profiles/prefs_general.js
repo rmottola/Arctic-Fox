@@ -69,6 +69,7 @@ user_pref("experiments.manifest.uri", "http://%(server)s/experiments-dummy/manif
 // Only load extensions from the application and user profile
 // AddonManager.SCOPE_PROFILE + AddonManager.SCOPE_APPLICATION
 user_pref("extensions.enabledScopes", 5);
+user_pref("extensions.autoDisableScopes", 0);
 // Disable metadata caching for installed add-ons by default
 user_pref("extensions.getAddons.cache.enabled", false);
 // Disable intalling any distribution add-ons
@@ -214,6 +215,9 @@ user_pref("general.useragent.updates.enabled", false);
 // Disable webapp updates.  Yes, it is supposed to be an integer.
 user_pref("browser.webapps.checkForUpdates", 0);
 
+// Enable debug logging in the tcp presentation server.
+user_pref("dom.presentation.tcp_server.debug", true);
+
 // Don't connect to Yahoo! for RSS feed tests.
 // en-US only uses .types.0.uri, but set all of them just to be sure.
 user_pref('browser.contentHandlers.types.0.uri', 'http://test1.example.org/rss?url=%%s')
@@ -288,6 +292,8 @@ user_pref("browser.uitour.url", "http://%(server)s/uitour-dummy/tour");
 // side-effect of preventing our geoip lookup.
 user_pref("browser.search.isUS", true);
 user_pref("browser.search.countryCode", "US");
+// This will prevent HTTP requests for region defaults.
+user_pref("browser.search.geoSpecificDefaults", false);
 
 // Make sure the self support tab doesn't hit the network.
 user_pref("browser.selfsupport.url", "https://%(server)s/selfsupport-dummy/");
@@ -327,3 +333,9 @@ user_pref("dom.serviceWorkers.periodic-updates.enabled", false);
 
 // Enable speech synth test service, and disable built in platform services.
 user_pref("media.webspeech.synth.test", true);
+
+// Turn off search suggestions in the location bar so as not to trigger network
+// connections.
+user_pref("browser.urlbar.suggest.searches", false);
+
+user_pref("dom.audiochannel.mutedByDefault", false);

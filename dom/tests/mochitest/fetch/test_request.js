@@ -23,7 +23,7 @@ function testDefaultCtor() {
 function testClone() {
   var orig = new Request("./cloned_request.txt", {
               method: 'POST',
-              headers: { "Content-Length": 5 },
+              headers: { "Sample-Header": "5" },
               body: "Sample body",
               mode: "same-origin",
               credentials: "same-origin",
@@ -33,9 +33,9 @@ function testClone() {
   ok(clone.method === "POST", "Request method is POST");
   ok(clone.headers instanceof Headers, "Request should have non-null Headers object");
 
-  is(clone.headers.get('content-length'), "5", "Response content-length should be 5.");
-  orig.headers.set('content-length', 6);
-  is(clone.headers.get('content-length'), "5", "Request content-length should be 5.");
+  is(clone.headers.get('sample-header'), "5", "Request sample-header should be 5.");
+  orig.headers.set('sample-header', 6);
+  is(clone.headers.get('sample-header'), "5", "Cloned Request sample-header should continue to be 5.");
 
   ok(clone.url === (new URL("./cloned_request.txt", self.location.href)).href,
        "URL should be resolved with entry settings object's API base URL");
@@ -124,6 +124,20 @@ function testBug1109574() {
   var r3 = new Request(r1);
 }
 
+function testHeaderGuard() {
+  var headers = {
+    "Cookie": "Custom cookie",
+    "Non-Simple-Header": "value",
+  };
+  var r1 = new Request("", { headers: headers });
+  ok(!r1.headers.has("Cookie"), "Default Request header should have guard request and prevent setting forbidden header.");
+  ok(r1.headers.has("Non-Simple-Header"), "Default Request header should have guard request and allow setting non-simple header.");
+
+  var r2 = new Request("", { mode: "no-cors", headers: headers });
+  ok(!r2.headers.has("Cookie"), "no-cors Request header should have guard request-no-cors and prevent setting non-simple header.");
+  ok(!r2.headers.has("Non-Simple-Header"), "no-cors Request header should have guard request-no-cors and prevent setting non-simple header.");
+}
+
 function testMethod() {
   // These get normalized.
   var allowed = ["delete", "get", "head", "options", "post", "put" ];
@@ -202,7 +216,32 @@ function testMethod() {
 
 function testUrlFragment() {
   var req = new Request("./request#withfragment");
-  ok(req.url, (new URL("./request", self.location.href)).href, "request.url should be serialized with exclude fragment flag set");
+  is(req.url, (new URL("./request", self.location.href)).href, "request.url should be serialized with exclude fragment flag set");
+}
+
+function testUrlMalformed() {
+  try {
+    var req = new Request("http:// example.com");
+    ok(false, "Creating a Request with a malformed URL should throw a TypeError");
+  } catch(e) {
+    is(e.name, "TypeError", "Creating a Request with a malformed URL should throw a TypeError");
+  }
+}
+
+function testUrlCredentials() {
+  try {
+    var req = new Request("http://user@example.com");
+    ok(false, "URLs with credentials should be rejected");
+  } catch(e) {
+    is(e.name, "TypeError", "URLs with credentials should be rejected");
+  }
+
+  try {
+    var req = new Request("http://user:password@example.com");
+    ok(false, "URLs with credentials should be rejected");
+  } catch(e) {
+    is(e.name, "TypeError", "URLs with credentials should be rejected");
+  }
 }
 
 function testBodyUsed() {
@@ -428,13 +467,43 @@ function testModeCorsPreflightEnumValue() {
   }
 }
 
+// HEAD/GET Requests are not allowed to have a body even when copying another
+// Request.
+function testBug1154268() {
+  var r1 = new Request("/index.html", { method: "POST", body: "Hi there" });
+  ["HEAD", "GET"].forEach(function(method) {
+    try {
+      var r2 = new Request(r1, { method: method });
+      ok(false, method + " Request copied from POST Request with body should fail.");
+    } catch (e) {
+      is(e.name, "TypeError", method + " Request copied from POST Request with body should fail.");
+    }
+  });
+}
+
+function testRequestConsumedByFailedConstructor(){
+  var r1 = new Request('http://example.com', { method: 'POST', body: 'hello world' });
+  try{
+    var r2 = new Request(r1, { method: 'GET' });
+    ok(false, 'GET Request copied from POST Request with body should fail.');
+  } catch(e) {
+    ok(true, 'GET Request copied from POST Request with body should fail.');
+  }
+  ok(!r1.bodyUsed, 'Initial request should not be consumed by failed Request constructor');
+}
+
 function runTest() {
   testDefaultCtor();
   testSimpleUrlParse();
   testUrlFragment();
+  testUrlCredentials();
+  testUrlMalformed();
   testMethod();
   testBug1109574();
+  testHeaderGuard();
   testModeCorsPreflightEnumValue();
+  testBug1154268();
+  testRequestConsumedByFailedConstructor();
 
   return Promise.resolve()
     .then(testBodyCreation)

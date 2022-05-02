@@ -39,6 +39,8 @@ pref("extensions.minCompatibleAppVersion", "1.5");
 
 pref("xpinstall.customConfirmationUI", true);
 
+pref("extensions.getAddons.link.url", "https://addons.mozilla.org/%LOCALE%/firefox/");
+
 // Blocklist preferences
 pref("extensions.blocklist.enabled", true);
 pref("extensions.blocklist.interval", 86400);
@@ -58,6 +60,7 @@ pref("extensions.autoDisableScopes", 15);
 
 // Don't require signed add-ons by default
 pref("xpinstall.signatures.required", false);
+pref("xpinstall.signatures.devInfoURL", "https://wiki.mozilla.org/Addons/Extension_Signing");
 
 // Dictionary download preference
 pref("browser.dictionaries.download.url", "http://repository.binaryoutcast.com/dicts/");
@@ -292,6 +295,7 @@ pref("browser.urlbar.match.url", "@");
 pref("browser.urlbar.suggest.history",              true);
 pref("browser.urlbar.suggest.bookmark",             true);
 pref("browser.urlbar.suggest.openpage",             true);
+pref("browser.urlbar.suggest.searches",             true);
 
 // Restrictions to current suggestions can also be applied (intersection).
 // Typed suggestion works only if history is set to true.
@@ -331,10 +335,6 @@ pref("browser.download.panel.shown", false);
 // search engines URL
 pref("browser.search.searchEnginesURL",      "https://addons.palemoon.org/search-plugins/");
 
-// Tell the search service to load search plugins from the locale JAR
-pref("browser.search.loadFromJars", true);
-pref("browser.search.jarURIs", "chrome://browser/locale/searchplugins/");
-
 // pointer to the default engine name
 pref("browser.search.defaultenginename",      "chrome://browser-region/locale/region.properties");
 
@@ -346,6 +346,18 @@ pref("browser.search.order.1",                "chrome://browser-region/locale/re
 pref("browser.search.order.2",                "chrome://browser-region/locale/region.properties");
 pref("browser.search.order.3",                "chrome://browser-region/locale/region.properties");
 pref("browser.search.order.4",                "chrome://browser-region/locale/region.properties");
+
+// Market-specific search defaults
+// This is disabled globally, and then enabled for individual locales
+// in firefox-l10n.js (eg. it's enabled for en-US).
+pref("browser.search.geoSpecificDefaults", false);
+pref("browser.search.geoSpecificDefaults.url", "https://search.services.mozilla.com/1/%APP%/%VERSION%/%CHANNEL%/%LOCALE%/%REGION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%");
+
+// US specific default (used as a fallback if the geoSpecificDefaults request fails).
+pref("browser.search.defaultenginename.US",      "data:text/plain,browser.search.defaultenginename.US=Yahoo");
+pref("browser.search.order.US.1",                "data:text/plain,browser.search.order.US.1=Yahoo");
+pref("browser.search.order.US.2",                "data:text/plain,browser.search.order.US.2=Google");
+pref("browser.search.order.US.3",                "data:text/plain,browser.search.order.US.3=Bing");
 
 // search bar results always open in a new tab
 pref("browser.search.openintab", false);
@@ -1109,6 +1121,29 @@ pref("devtools.command-button-eyedropper.enabled", false);
 pref("devtools.command-button-screenshot.enabled", false);
 pref("devtools.command-button-rulers.enabled", false);
 
+// Enable the Debugger
+pref("devtools.debugger.enabled", true);
+pref("devtools.debugger.chrome-debugging-host", "localhost");
+pref("devtools.debugger.chrome-debugging-port", 6080);
+pref("devtools.debugger.remote-host", "localhost");
+pref("devtools.debugger.remote-timeout", 20000);
+pref("devtools.debugger.pause-on-exceptions", false);
+pref("devtools.debugger.ignore-caught-exceptions", true);
+pref("devtools.debugger.source-maps-enabled", true);
+pref("devtools.debugger.pretty-print-enabled", true);
+pref("devtools.debugger.auto-pretty-print", false);
+pref("devtools.debugger.auto-black-box", true);
+pref("devtools.debugger.tracer", false);
+pref("devtools.debugger.workers", false);
+
+// The default Debugger UI settings
+pref("devtools.debugger.ui.panes-workers-and-sources-width", 200);
+pref("devtools.debugger.ui.panes-instruments-width", 300);
+pref("devtools.debugger.ui.panes-visible-on-startup", false);
+pref("devtools.debugger.ui.variables-sorting-enabled", true);
+pref("devtools.debugger.ui.variables-only-enum-visible", false);
+pref("devtools.debugger.ui.variables-searchbox-visible", false);
+
 // Enable the Performance tools
 pref("devtools.performance.enabled", true);
 
@@ -1209,6 +1244,9 @@ pref("security.csp.speccompliant", true);
 // Block insecure active content on https pages
 pref("security.mixed_content.block_active_content", true);
 
+// ID (a UUID when set by gecko) that is used as a per profile suffix to a low
+// integrity temp directory.
+pref("security.sandbox.content.tempDirSuffix", "");
 
 // Required blocklist freshness for OneCRL OCSP bypass
 // (default should be at least as large as extensions.blocklist.interval)
@@ -1323,7 +1361,7 @@ pref("status4evar.status.toolbar.maxLength", 0);
 pref("status4evar.status.popup.invertMirror", false);
 pref("status4evar.status.popup.mouseMirror", true);
 
-#ifdef E10S_TESTING_ONLY
+#ifdef NIGHTLY_BUILD
 // At the moment, autostart.2 is used, while autostart.1 is unused.
 // We leave it here set to false to reset users' defaults and allow
 // us to change everybody to true in the future, when desired.
