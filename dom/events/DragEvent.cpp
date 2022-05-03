@@ -149,6 +149,7 @@ DragEvent::Constructor(const GlobalObject& aGlobal,
                          aParam.mCtrlKey, aParam.mAltKey, aParam.mShiftKey,
                          aParam.mMetaKey, aParam.mButton, aParam.mRelatedTarget,
                          aParam.mDataTransfer);
+  e->InitializeExtraMouseEventDictionaryMembers(aParam);
   e->SetTrusted(trusted);
   return e.forget();
 }
