@@ -405,8 +405,8 @@ NS_EVENT_MESSAGE(eSelectionChange)
 // Visibility change
 NS_EVENT_MESSAGE(eVisibilityChange)
 
-// Details and Summary events.
-NS_EVENT_MESSAGE(NS_TOGGLE)
+// Details element events.
+NS_EVENT_MESSAGE(eToggle)
 
 #ifdef UNDEF_NS_EVENT_MESSAGE_FIRST_LAST
 #undef UNDEF_NS_EVENT_MESSAGE_FIRST_LAST
