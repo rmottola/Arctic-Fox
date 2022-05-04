@@ -11,12 +11,6 @@ Cu.import("resource://gre/modules/FxAccountsProfile.jsm");
 const URL_STRING = "https://example.com";
 Services.prefs.setCharPref("identity.fxaccounts.settings.uri", "https://example.com/settings");
 
-const PROFILE_CLIENT_OPTIONS = {
-  token: "123ABC",
-  serverURL: "http://127.0.0.1:1111/v1",
-  profileServerUrl: "http://127.0.0.1:1111/v1"
-};
-
 const STATUS_SUCCESS = 200;
 
 /**
@@ -25,7 +19,7 @@ const STATUS_SUCCESS = 200;
  *        Mocked raw response from the server
  * @returns {Function}
  */
-let mockResponse = function (response) {
+var mockResponse = function (response) {
   let Request = function (requestUri) {
     // Store the request uri so tests can inspect it
     Request._requestUri = requestUri;
@@ -47,7 +41,7 @@ let mockResponse = function (response) {
  *        Error object
  * @returns {Function}
  */
-let mockResponseError = function (error) {
+var mockResponseError = function (error) {
   return function () {
     return {
       setHeader: function () {},
@@ -58,35 +52,53 @@ let mockResponseError = function (error) {
   };
 };
 
-let mockClient = function () {
-  let client = new FxAccountsProfileClient(PROFILE_CLIENT_OPTIONS);
-  return client;
+var mockClient = function (fxa) {
+  let options = {
+    serverURL: "http://127.0.0.1:1111/v1",
+    fxa: fxa,
+  }
+  return new FxAccountsProfileClient(options);
 };
 
 const ACCOUNT_DATA = {
   uid: "abc123"
 };
 
-function AccountData () {
+function FxaMock() {
 }
-AccountData.prototype = {
-  getUserAccountData: function () {
+FxaMock.prototype = {
+  currentAccountState: {
+    profile: null,
+    get isCurrent() true,
+  },
+
+  getSignedInUser: function () {
     return Promise.resolve(ACCOUNT_DATA);
   }
 };
 
-let mockAccountData = function () {
-  return new AccountData();
+var mockFxa = function() {
+  return new FxaMock();
 };
 
+function CreateFxAccountsProfile(fxa = null, client = null) {
+  if (!fxa) {
+    fxa = mockFxa();
+  }
+  let options = {
+    fxa: fxa,
+    profileServerUrl: "http://127.0.0.1:1111/v1"
+  }
+  if (client) {
+    options.profileClient = client;
+  }
+  return new FxAccountsProfile(options);
+}
+
 add_test(function getCachedProfile() {
-  let accountData = mockAccountData();
-  accountData.getUserAccountData = function () {
-    return Promise.resolve({
-      profile: { avatar: "myurl" }
-    });
-  };
-  let profile = new FxAccountsProfile(accountData, PROFILE_CLIENT_OPTIONS);
+  let profile = CreateFxAccountsProfile();
+  // a little pointless until bug 1157529 is fixed...
+  profile._cachedProfile = { avatar: "myurl" };
 
   return profile._getCachedProfile()
     .then(function (cached) {
@@ -96,18 +108,20 @@ add_test(function getCachedProfile() {
 });
 
 add_test(function cacheProfile_change() {
-  let accountData = mockAccountData();
+  let fxa = mockFxa();
+/* Saving profile data disabled - bug 1157529
   let setUserAccountDataCalled = false;
-  accountData.setUserAccountData = function (data) {
+  fxa.setUserAccountData = function (data) {
     setUserAccountDataCalled = true;
     do_check_eq(data.profile.avatar, "myurl");
     return Promise.resolve();
   };
-  let profile = new FxAccountsProfile(accountData, PROFILE_CLIENT_OPTIONS);
+*/
+  let profile = CreateFxAccountsProfile(fxa);
 
   makeObserver(ON_PROFILE_CHANGE_NOTIFICATION, function (subject, topic, data) {
     do_check_eq(data, ACCOUNT_DATA.uid);
-    do_check_true(setUserAccountDataCalled);
+//    do_check_true(setUserAccountDataCalled); - bug 1157529
     run_next_test();
   });
 
@@ -115,16 +129,14 @@ add_test(function cacheProfile_change() {
 });
 
 add_test(function cacheProfile_no_change() {
-  let accountData = mockAccountData();
-  accountData.getUserAccountData = function () {
-    return Promise.resolve({
-      profile: { avatar: "myurl" }
-    });
-  };
-  accountData.setUserAccountData = function (data) {
+  let fxa = mockFxa();
+  let profile = CreateFxAccountsProfile(fxa)
+  profile._cachedProfile = { avatar: "myurl" };
+// XXX - saving is disabled (but we can leave that in for now as we are
+// just checking it is *not* called)
+  fxa.setSignedInUser = function (data) {
     throw new Error("should not update account data");
   };
-  let profile = new FxAccountsProfile(accountData, PROFILE_CLIENT_OPTIONS);
 
   return profile._cacheProfile({ avatar: "myurl" })
     .then((result) => {
@@ -134,13 +146,11 @@ add_test(function cacheProfile_no_change() {
 });
 
 add_test(function fetchAndCacheProfile_ok() {
-  let client = mockClient();
+  let client = mockClient(mockFxa());
   client.fetchProfile = function () {
     return Promise.resolve({ avatar: "myimg"});
   };
-  let profile = new FxAccountsProfile(mockAccountData(), {
-    profileClient: client
-  });
+  let profile = CreateFxAccountsProfile(null, client);
 
   profile._cacheProfile = function (toCache) {
     do_check_eq(toCache.avatar, "myimg");
@@ -169,13 +179,13 @@ add_test(function profile_channel() {
 });
 
 add_test(function tearDown_ok() {
-  let profile = new FxAccountsProfile(mockAccountData(), PROFILE_CLIENT_OPTIONS);
+  let profile = CreateFxAccountsProfile();
 
   do_check_true(!!profile.client);
-  do_check_true(!!profile.currentAccountState);
+  do_check_true(!!profile.fxa);
 
   profile.tearDown();
-  do_check_null(profile.currentAccountState);
+  do_check_null(profile.fxa);
   do_check_null(profile.client);
 
   run_next_test();
@@ -238,23 +248,23 @@ add_test(function getProfile_has_cached_fetch_deleted() {
   let didFetch = false;
   let didListen = false;
 
-  let client = mockClient();
+  let fxa = mockFxa();
+  let client = mockClient(fxa);
   client.fetchProfile = function () {
     return Promise.resolve({ avatar: null });
   };
 
-  let accountData = mockAccountData();
-  accountData.getUserAccountData = function () {
-    return Promise.resolve({ profile: { avatar: cachedUrl } });
-  };
-  accountData.setUserAccountData = function (data) {
-    do_check_null(data.profile.avatar);
-    run_next_test();
-    return Promise.resolve();
-  };
+  let profile = CreateFxAccountsProfile(fxa, client);
+  profile._cachedProfile = { avatar: cachedUrl };
 
-  let profile = new FxAccountsProfile(accountData, {
-    profileClient: client
+// instead of checking this in a mocked "save" function, just check after the
+// observer
+  makeObserver(ON_PROFILE_CHANGE_NOTIFICATION, function (subject, topic, data) {
+    profile.getProfile()
+      .then(profileData => {
+        do_check_null(profileData.avatar);
+        run_next_test();
+      });
   });
 
   return profile.getProfile()
