@@ -181,6 +181,20 @@ let gSyncPane = {
     }
   },
 
+  verifyFirefoxAccount: function() {
+    fxAccounts.resendVerificationEmail().then(() => {
+      fxAccounts.getSignedInUser().then(data => {
+        let sb = Services.strings.createBundle("chrome://browser/locale/accounts.properties");
+        let title = sb.GetStringFromName("verificationSentTitle");
+        let heading = sb.formatStringFromName("verificationSentHeading",
+                                              [data.email], 1);
+        let description = sb.GetStringFromName("verificationSentDescription");
+
+        Services.prompt.alert(window, title, heading + "\n\n" + description);
+      });
+    });
+  },
+
   openQuotaDialog: function () {
     let win = Services.wm.getMostRecentWindow("Sync:ViewQuota");
     if (win) {
