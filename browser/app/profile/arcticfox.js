@@ -1306,6 +1306,9 @@ pref("dom.serviceWorkers.interception.enabled", true);
 // Disable reader mode by default.
 pref("reader.parse-on-load.enabled", false);
 
+// Token server used by the FxA Sync identity.
+pref("identity.sync.tokenserver.uri", "https://token.services.mozilla.com/1.0/sync/1.5");
+
 // ****************** domain-specific UAs ******************
 
 // AMO needs "Firefox", obviously - pass on the OS (determined at build time)
