@@ -7381,5 +7381,12 @@
     "expires_in_version": "never",
     "kind": "count",
     "description": "Record the removal of defective permissions.sqlite"
+  },
+  "WEAVE_FXA_KEY_FETCH_ERRORS": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "count",
+    "releaseChannelCollection": "opt-out",
+    "description": "Errors encountered fetching Sync keys, including network errors."
   }
 }
