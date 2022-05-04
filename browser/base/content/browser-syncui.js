@@ -106,9 +106,11 @@ let gSyncUI = {
     // We want to treat "account needs verification" as "needs setup". So
     // "reach in" to Weave.Status._authManager to check whether we the signed-in
     // user is verified.
-    // Referencing Weave.Status spins a nested event loop to initialize the
-    // authManager, so this should always return a value directly.
-    // This only applies to fxAccounts-based Sync.
+    // NOTE: We used to have this _authManager hack to avoid a nested
+    // event-loop from querying Weave.Status.checkSetup() - while that's no
+    // longer true, we do still have the FxA-specific requirement of checking
+    // the verified state - so the hack remains. We should consider refactoring
+    // Sync's "check setup" capabilities to take this into account at some point...
     if (Weave.Status._authManager._signedInUser !== undefined) {
       // So we are using Firefox accounts - in this world, checking Sync isn't
       // enough as reading list may be configured but not Sync.
