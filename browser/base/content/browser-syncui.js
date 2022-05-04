@@ -14,10 +14,10 @@ let CloudSync = null;
 XPCOMUtils.defineLazyModuleGetter(this, "ReadingListScheduler",
                                   "resource:///modules/readinglist/Scheduler.jsm");
 
-// gSyncUI handles updating the tools menu
+// gSyncUI handles updating the tools menu and displaying notifications.
 let gSyncUI = {
   _obs: ["weave:service:sync:start",
-	 "weave:service:sync:finish",
+         "weave:service:sync:finish",
          "weave:service:sync:error",
          "weave:service:quota:remaining",
          "weave:service:setup-complete",
@@ -40,7 +40,9 @@ let gSyncUI = {
   // The number of "active" syncs - while this is non-zero, our button will spin
   _numActiveSyncTasks: 0,
 
-  init: function SUI_init() {
+  init: function () {
+    Cu.import("resource://services-common/stringbundle.js");
+
     // Proceed to set up the UI if Sync has already started up.
     // Otherwise we'll do it when Sync is firing up.
     let xps = Components.classes["@mozilla.org/weave/service;1"]
@@ -288,6 +290,11 @@ let gSyncUI = {
 
   onStartOver: function SUI_onStartOver() {
     this.clearError();
+  },
+
+  _getAppName: function () {
+    let brand = new StringBundle("chrome://branding/locale/brand.properties");
+    return brand.get("brandShortName");
   },
 
   onQuotaNotice: function onQuotaNotice(subject, data) {
@@ -576,6 +583,13 @@ let gSyncUI = {
     if (this._unloaded) {
       Cu.reportError("SyncUI observer called after unload: " + topic);
       return;
+    }
+
+    // Unwrap, just like Svc.Obs, but without pulling in that dependency.
+    if (subject && typeof subject == "object" &&
+        ("wrappedJSObject" in subject) &&
+        ("observersModuleSubjectWrapper" in subject.wrappedJSObject)) {
+      subject = subject.wrappedJSObject.object;
     }
 
     // First handle "activity" only.
