@@ -8,15 +8,14 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "CloudSync",
                                   "resource://gre/modules/CloudSync.jsm");
 #else
-let CloudSync = null;
+var CloudSync = null;
 #endif
 
 // gSyncUI handles updating the tools menu and displaying notifications.
-let gSyncUI = {
+var gSyncUI = {
   _obs: ["weave:service:sync:start",
          "weave:service:sync:finish",
          "weave:service:sync:error",
-         "weave:service:quota:remaining",
          "weave:service:setup-complete",
          "weave:service:login:start",
 	 "weave:service:login:error",
@@ -122,6 +121,9 @@ let gSyncUI = {
            firstSync == "notReady";
   },
 
+  // Note that we don't show login errors in a notification bar here, but do
+  // still need to track a login-failed state so the "Tools" menu updates
+  // with the correct state.
   _loginFailed: function () {
     this.log.debug("_loginFailed has sync state=${sync}",
                    { sync: Weave.Status.login});
@@ -140,8 +142,8 @@ let gSyncUI = {
     if (CloudSync && CloudSync.ready && CloudSync().adapters.count) {
       document.getElementById("sync-syncnow-state").hidden = false;
     } else if (loginFailed) {
+      // unhiding this element makes the menubar show the login failure state.
       document.getElementById("sync-reauth-state").hidden = false;
-      this.showLoginError();
     } else if (needsSetup) {
       document.getElementById("sync-setup-state").hidden = false;
     } else {
@@ -157,7 +159,6 @@ let gSyncUI = {
 
     this._updateLastSyncTime();
   },
-
 
   // Functions called by observers
   onActivityStart() {
@@ -175,6 +176,7 @@ let gSyncUI = {
         button.setAttribute("syncstatus", "active");
       }
     }
+    this.updateUI();
   },
 
   onActivityStop() {
@@ -197,77 +199,20 @@ let gSyncUI = {
     if (syncButton) {
       syncButton.removeAttribute("status");
     }
-    let panelHorizontalButton = document.getElementById("PanelUI-fxa-status");
-    if (panelHorizontalButton) {
-      panelHorizontalButton.removeAttribute("syncstatus");
+    let fxaContainer = document.getElementById("PanelUI-footer-fxa");
+    if (fxaContainer) {
+      fxaContainer.removeAttribute("syncstatus");
     }
-  },
-
-  onSyncDelay: function SUI_onSyncDelay() {
-    // basically, we want to just inform users that stuff is going to take a while
-    let title = this._stringBundle.GetStringFromName("error.sync.no_node_found.title");
-    let description = this._stringBundle.GetStringFromName("error.sync.no_node_found");
-    let buttons = [new Weave.NotificationButton(
-      this._stringBundle.GetStringFromName("error.sync.serverStatusButton.label"),
-      this._stringBundle.GetStringFromName("error.sync.serverStatusButton.accesskey"),
-      function() { gSyncUI.openServerStatus(); return true; }
-    )];
-    let notification = new Weave.Notification(
-      title, description, null, Weave.Notifications.PRIORITY_INFO, buttons);
-    Weave.Notifications.replaceTitle(notification);
-    this._wasDelayed = true;
-  },
-
-  onLoginFinish: function SUI_onLoginFinish() {
-    // Clear out any login failure notifications
-    let title = this._stringBundle.GetStringFromName("error.login.title");
-    this.clearError(title);
-  },
-
-  onSetupComplete: function SUI_onSetupComplete() {
-    this.onLoginFinish();
-  },
-
-  onLoginError: function SUI_onLoginError() {
-    Weave.Notifications.removeAll();
-
-    // if we haven't set up the client, don't show errors
-    if (this._needsSetup()) {
-      this.updateUI();
-      return;
-    }
-    this.showLoginError();
     this.updateUI();
   },
 
-  showLoginError() {
-    let title = this._stringBundle.GetStringFromName("error.login.title");
+  onLoginError: function SUI_onLoginError() {
+    this.log.debug("onLoginError: login=${login}, sync=${sync}", Weave.Status);
+    Weave.Notifications.removeAll();
 
-    let description;
-    if (Weave.Status.sync == Weave.PROLONGED_SYNC_FAILURE) {
-      this.log.debug("showLoginError has a prolonged login error");
-      // Convert to days
-      let lastSync =
-        Services.prefs.getIntPref("services.sync.errorhandler.networkFailureReportTimeout") / 86400;
-      description =
-        this._stringBundle.formatStringFromName("error.sync.prolonged_failure", [lastSync], 1);
-    } else {
-      let reason = Weave.Utils.getErrorString(Weave.Status.login);
-      description =
-        this._stringBundle.formatStringFromName("error.sync.description", [reason], 1);
-      this.log.debug("showLoginError has a non-prolonged error", reason);
-    }
-
-    let buttons = [];
-    buttons.push(new Weave.NotificationButton(
-      this._stringBundle.GetStringFromName("error.login.prefs.label"),
-      this._stringBundle.GetStringFromName("error.login.prefs.accesskey"),
-      function() { gSyncUI.openPrefs(); return true; }
-    ));
-
-    let notification = new Weave.Notification(title, description, null,
-                                              Weave.Notifications.PRIORITY_WARNING, buttons);
-    Weave.Notifications.replaceTitle(notification);
+    // We don't show any login errors here; browser-fxaccounts shows them in
+    // the hamburger menu.
+    this.updateUI();
   },
 
   onLogout: function SUI_onLogout() {
@@ -283,26 +228,6 @@ let gSyncUI = {
     return brand.get("brandShortName");
   },
 
-  onQuotaNotice: function onQuotaNotice(subject, data) {
-    let title = this._stringBundle.GetStringFromName("warning.sync.quota.label");
-    let description = this._stringBundle.GetStringFromName("warning.sync.quota.description");
-    let buttons = [];
-    buttons.push(new Weave.NotificationButton(
-      this._stringBundle.GetStringFromName("error.sync.viewQuotaButton.label"),
-      this._stringBundle.GetStringFromName("error.sync.viewQuotaButton.accesskey"),
-      function() { gSyncUI.openQuotaDialog(); return true; }
-    ));
-
-    let notification = new Weave.Notification(
-      title, description, null, Weave.Notifications.PRIORITY_WARNING, buttons);
-    Weave.Notifications.replaceTitle(notification);
-  },
-
-  openServerStatus: function () {
-    let statusURL = Services.prefs.getCharPref("services.sync.statusURL");
-    window.openUILinkIn(statusURL, "tab");
-  },
-
   // Commands
   doSync: function SUI_doSync() {
     setTimeout(function() Weave.Service.errorHandler.syncAndReportErrors(), 0);
@@ -314,9 +239,6 @@ let gSyncUI = {
     else
       this.doSync();
   },
-
-  //XXXzpao should be part of syncCommon.js - which we might want to make a module...
-  //        To be fixed in a followup (bug 583366)
 
   /**
    * Invoke the Sync setup wizard.
@@ -349,16 +271,6 @@ let gSyncUI = {
     else
       window.openDialog("chrome://browser/content/sync/addDevice.xul",
                         "syncAddDevice", "centerscreen,chrome,resizable=no");
-  },
-
-  openQuotaDialog: function SUI_openQuotaDialog() {
-    let win = Services.wm.getMostRecentWindow("Sync:ViewQuota");
-    if (win)
-      win.focus();
-    else
-      Services.ww.activeWindow.openDialog(
-        "chrome://browser/content/sync/quota.xul", "",
-        "centerscreen,chrome,dialog,modal");
   },
 
   openPrefs: function SUI_openPrefs() {
@@ -411,90 +323,6 @@ let gSyncUI = {
     }
   },
 
-  onSyncError: function SUI_onSyncError() {
-    this.log.debug("onSyncError");
-    let title = this._stringBundle.GetStringFromName("error.sync.title");
-
-    if (Weave.Status.login != Weave.LOGIN_SUCCEEDED) {
-      this.onLoginError();
-      return;
-    }
-
-    let description;
-    if (Weave.Status.sync == Weave.PROLONGED_SYNC_FAILURE) {
-      // Convert to days
-      let lastSync =
-        Services.prefs.getIntPref("services.sync.errorhandler.networkFailureReportTimeout") / 86400;
-      description =
-        this._stringBundle.formatStringFromName("error.sync.prolonged_failure", [lastSync], 1);
-    } else {
-      let error = Weave.Utils.getErrorString(Weave.Status.sync);
-      description =
-        this._stringBundle.formatStringFromName("error.sync.description", [error], 1);
-    }
-    let priority = Weave.Notifications.PRIORITY_WARNING;
-    let buttons = [];
-
-    // Check if the client is outdated in some way (but note: we've never in the
-    // past, and probably never will, bump the relevent version numbers, so
-    // this is effectively dead code!)
-    let outdated = Weave.Status.sync == Weave.VERSION_OUT_OF_DATE;
-    for (let [engine, reason] in Iterator(Weave.Status.engines))
-      outdated = outdated || reason == Weave.VERSION_OUT_OF_DATE;
-
-    if (outdated) {
-      description = this._stringBundle.GetStringFromName(
-        "error.sync.needUpdate.description");
-      buttons.push(new Weave.NotificationButton(
-        this._stringBundle.GetStringFromName("error.sync.needUpdate.label"),
-        this._stringBundle.GetStringFromName("error.sync.needUpdate.accesskey"),
-        function() {
-          window.openUILinkIn(Services.prefs.getCharPref("services.sync.outdated.url"), "tab");
-          return true;
-        }
-      ));
-    }
-    else if (Weave.Status.sync == Weave.OVER_QUOTA) {
-      description = this._stringBundle.GetStringFromName(
-        "error.sync.quota.description");
-      buttons.push(new Weave.NotificationButton(
-        this._stringBundle.GetStringFromName(
-          "error.sync.viewQuotaButton.label"),
-        this._stringBundle.GetStringFromName(
-          "error.sync.viewQuotaButton.accesskey"),
-        function() { gSyncUI.openQuotaDialog(); return true; } )
-      );
-    }
-    else if (Weave.Status.enforceBackoff) {
-      priority = Weave.Notifications.PRIORITY_INFO;
-      buttons.push(new Weave.NotificationButton(
-        this._stringBundle.GetStringFromName("error.sync.serverStatusButton.label"),
-        this._stringBundle.GetStringFromName("error.sync.serverStatusButton.accesskey"),
-        function() { gSyncUI.openServerStatus(); return true; }
-      ));
-    }
-    else {
-      priority = Weave.Notifications.PRIORITY_INFO;
-      buttons.push(new Weave.NotificationButton(
-        this._stringBundle.GetStringFromName("error.sync.tryAgainButton.label"),
-        this._stringBundle.GetStringFromName("error.sync.tryAgainButton.accesskey"),
-        function() { gSyncUI.doSync(); return true; }
-      ));
-    }
-
-    let notification =
-      new Weave.Notification(title, description, null, priority, buttons);
-    Weave.Notifications.replaceTitle(notification);
-
-    if (this._wasDelayed && Weave.Status.sync != Weave.NO_SYNC_NODE_FOUND) {
-      title = this._stringBundle.GetStringFromName("error.sync.no_node_found.title");
-      Weave.Notifications.removeAll(title);
-      this._wasDelayed = false;
-    }
-
-    this.updateUI();
-  },
-
   observe: function SUI_observe(subject, topic, data) {
     this.log.debug("observed", topic);
     if (this._unloaded) {
@@ -529,19 +357,11 @@ let gSyncUI = {
         this.onSyncFinish();
         break;
       case "weave:ui:sync:error":
-        this.onSyncError();
-        break;
       case "weave:service:sync:delayed":
         this.onSyncDelay();
         break;
-      case "weave:service:quota:remaining":
-        this.onQuotaNotice();
-        break;
       case "weave:service:setup-complete":
-        this.onSetupComplete();
-        break;
-      case "weave:service:login:finish":
-        this.onLoginFinish();
+        this.updateUI();
         break;
       case "weave:ui:login:error":
         this.onLoginError();
