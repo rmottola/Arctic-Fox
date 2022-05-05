@@ -3,9 +3,9 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-let Ci = Components.interfaces;
-let Cu = Components.utils;
-let Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
+var Cc = Components.classes;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/NotificationDB.jsm");
@@ -208,7 +208,6 @@ let gInitialPages = [
 #include browser-places.js
 #include browser-plugins.js
 #include browser-tabPreviews.js
-#include browser-readinglist.js
 #include browser-sidebar.js
 #include browser-thumbnails.js
 #include browser-gestureSupport.js
@@ -1384,8 +1383,6 @@ var gBrowserInit = {
       }, false);
     }
 
-    ReadingListUI.init();
-
     window.addEventListener("mousemove", MousePosTracker, false);
     window.addEventListener("dragover", MousePosTracker, false);
 
@@ -1492,8 +1489,6 @@ var gBrowserInit = {
     BrowserOnClick.uninit();
 
     DevEdition.uninit();
-
-    ReadingListUI.uninit();
 
     SidebarUI.uninit();
 
@@ -2497,8 +2492,6 @@ function UpdatePageProxyState()
 function SetPageProxyState(aState)
 {
   BookmarkingUI.onPageProxyStateChanged(aState);
-  ReadingListUI.onPageProxyStateChanged(aState);
-
   if (!gURLBar)
     return;
 

@@ -1280,12 +1280,6 @@ pref("network.disable.ipc.security", true);
 // Whether we display profile images in the UI or not.
 pref("identity.fxaccounts.profile_image.enabled", true);
 
-// Disable ReadingList browser UI by default.
-pref("browser.readinglist.enabled", false);
-// Enable the readinglist engine by default.
-pref("readinglist.scheduler.enabled", true);
-pref("readinglist.server", "https://readinglist.services.mozilla.com/v1");
-
 pref("browser.translation.detectLanguage", false);
 pref("browser.translation.neverForLanguages", "");
 

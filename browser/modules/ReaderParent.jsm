@@ -71,24 +71,6 @@ let ReaderParent = {
         }
         break;
       }
-      case "Reader:ListStatusRequest":
-        ReadingList.hasItemForURL(message.data.url).then(inList => {
-          let mm = message.target.messageManager
-          // Make sure the target browser is still alive before trying to send data back.
-          if (mm) {
-            mm.sendAsyncMessage("Reader:ListStatusData",
-                                { inReadingList: inList, url: message.data.url });
-          }
-        });
-        break;
-
-      case "Reader:RemoveFromList":
-        // We need to get the "real" item to delete it.
-        ReadingList.itemForURL(message.data.url).then(item => {
-          ReadingList.deleteItem(item)
-        });
-        break;
-
       case "Reader:Share":
         // XXX: To implement.
         break;
