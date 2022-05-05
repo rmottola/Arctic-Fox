@@ -5273,6 +5273,13 @@ if test -n "$MOZ_OMX_PLUGIN"; then
     fi
 fi
 
+dnl If SunOS or NetBSD, assume that Sun Audio is available
+case "$OS_TARGET" in
+SunOS|NetBSD)
+    MOZ_SUN=1
+    ;;
+esac
+
 dnl system libvpx Support
 dnl ========================================================
 MOZ_ARG_WITH_BOOL(system-libvpx,
@@ -5442,6 +5449,8 @@ if test -n "$MOZ_WEBM_ENCODER"; then
     AC_DEFINE(MOZ_WEBM_ENCODER)
 fi
 AC_SUBST(MOZ_WEBM_ENCODER)
+
+AC_SUBST(MOZ_SUN)
 
 dnl ==================================
 dnl = Check alsa availability on Linux
@@ -8852,7 +8861,8 @@ ac_configure_args="$_SUBDIR_CONFIG_ARGS"
 
 # --with-system-nspr will have been converted into the relevant $NSPR_CFLAGS
 # and $NSPR_LIBS.
-ac_configure_args="`echo $ac_configure_args | sed -e 's/--with-system-nspr\S* *//'`"
+ac_configure_args="`echo $ac_configure_args | sed -e 's/--with-system-nspr[[^[:
+space:]]]* *//'`"
 
 ac_configure_args="$ac_configure_args --enable-threadsafe"
 
