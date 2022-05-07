@@ -182,7 +182,6 @@ var gSyncUI = {
   onActivityStop() {
     if (!gBrowser)
       return;
-
     this.log.debug("onActivityStop with numActive", this._numActiveSyncTasks);
     if (--this._numActiveSyncTasks) {
       if (this._numActiveSyncTasks < 0) {
