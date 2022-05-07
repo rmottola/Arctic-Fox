@@ -192,7 +192,7 @@ LinksStorage.prototype = {
 /**
  * Singleton that serves as a registry for all open 'New Tab Page's.
  */
-let AllPages = {
+var AllPages = {
   /**
    * The array containing all active pages.
    */
@@ -324,7 +324,7 @@ let AllPages = {
 /**
  * Singleton that keeps Grid preferences
  */
-let GridPrefs = {
+var GridPrefs = {
   /**
    * Cached value that tells the number of rows of newtab grid.
    */
@@ -379,7 +379,7 @@ GridPrefs.init();
  * Singleton that keeps track of all pinned links and their positions in the
  * grid.
  */
-let PinnedLinks = {
+var PinnedLinks = {
   /**
    * The cached list of pinned links.
    */
@@ -469,7 +469,7 @@ let PinnedLinks = {
 /**
  * Singleton that keeps track of all blocked links in the grid.
  */
-let BlockedLinks = {
+var BlockedLinks = {
   /**
    * The cached list of blocked links.
    */
@@ -543,7 +543,7 @@ let BlockedLinks = {
  * Singleton that serves as the default link provider for the grid. It queries
  * the history to retrieve the most frequently visited sites.
  */
-let PlacesProvider = {
+var PlacesProvider = {
   /**
    * Set this to change the maximum number of links the provider will provide.
    */
@@ -708,7 +708,7 @@ let PlacesProvider = {
  *   lastVisitDate: 1394678824766431,
  * }
  */
-let Links = {
+var Links = {
   /**
    * The maximum number of links returned by getLinks.
    */
@@ -1075,7 +1075,7 @@ Links.compareLinks = Links.compareLinks.bind(Links);
  * Singleton used to collect telemetry data.
  *
  */
-let Telemetry = {
+var Telemetry = {
   /**
    * Initializes object.
    */
@@ -1115,7 +1115,7 @@ let Telemetry = {
  * or if we should rather not do it for security reasons. URIs that inherit
  * their caller's principal will be filtered.
  */
-let LinkChecker = {
+var LinkChecker = {
   _cache: {},
 
   get flags() {
@@ -1142,7 +1142,7 @@ let LinkChecker = {
   }
 };
 
-let ExpirationFilter = {
+var ExpirationFilter = {
   init: function ExpirationFilter_init() {
     PageThumbs.addExpirationFilter(this);
   },
