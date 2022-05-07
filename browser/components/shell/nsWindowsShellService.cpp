@@ -724,9 +724,8 @@ nsWindowsShellService::SetDefaultBrowser(bool aClaimAllTypes, bool aForAllUsers)
         rv = LaunchHTTPHandlerPane();
       }
     } else {
-      // Windows 10 blocks attempts to load the HTTP Handler
-      // association dialog, so the modern Settings dialog
-      // is opened with the Default Apps view loaded.
+      // Windows 10 blocks attempts to load the
+      // HTTP Handler association dialog.
       if (IsWin10OrLater()) {
         rv = LaunchModernSettingsDialogDefaultApps();
       } else {
@@ -739,6 +738,11 @@ nsWindowsShellService::SetDefaultBrowser(bool aClaimAllTypes, bool aForAllUsers)
         rv = LaunchControlPanelDefaultPrograms();
       }
     }
+  }
+
+  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID));
+  if (prefs) {
+    (void) prefs->SetBoolPref(PREF_CHECKDEFAULTBROWSER, true);
   }
 
   return rv;
