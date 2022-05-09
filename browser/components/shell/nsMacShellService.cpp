@@ -408,8 +408,7 @@ nsMacShellService::OpenApplication(int32_t aApplication)
       if (!exists)
         return NS_ERROR_FILE_NOT_FOUND;
       return lf->Launch();
-    }  
-    break;
+    }
   case nsIMacShellService::APPLICATION_DESKTOP:
     {
       nsCOMPtr<nsIFile> lf;
@@ -420,8 +419,7 @@ nsMacShellService::OpenApplication(int32_t aApplication)
       if (!exists)
         return NS_ERROR_FILE_NOT_FOUND;
       return lf->Launch();
-    }  
-    break;
+    }
   }
 
   if (appURL && err == noErr) {
