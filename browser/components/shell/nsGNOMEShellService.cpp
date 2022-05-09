@@ -153,7 +153,8 @@ nsGNOMEShellService::KeyMatchesAppName(const char *aKeyValue) const
 
   gchar *commandPath;
   if (mUseLocaleFilenames) {
-    gchar *nativePath = g_filename_from_utf8(aKeyValue, -1, nullptr, nullptr, nullptr);
+    gchar *nativePath = g_filename_from_utf8(aKeyValue, -1,
+                                             nullptr, nullptr, nullptr);
     if (!nativePath) {
       NS_ERROR("Error converting path to filesystem encoding");
       return false;
@@ -311,6 +312,11 @@ nsGNOMEShellService::SetDefaultBrowser(bool aClaimAllTypes,
         appInfo->SetAsDefaultForFileExtensions(nsDependentCString(appTypes[i].extensions));
       }
     }
+  }
+
+  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID));
+  if (prefs) {
+    (void) prefs->SetBoolPref(PREF_CHECKDEFAULTBROWSER, true);
   }
 
   return NS_OK;
