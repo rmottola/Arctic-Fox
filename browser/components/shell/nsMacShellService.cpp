@@ -49,7 +49,8 @@ nsMacShellService::IsDefaultBrowser(bool aStartupCheck,
     return NS_ERROR_FAILURE;
   }
 
-  // Get the default http handler's bundle ID (or nullptr if it has not been explicitly set)
+  // Get the default http handler's bundle ID (or nullptr if it has not been
+  // explicitly set)
   CFStringRef defaultBrowserID = ::LSCopyDefaultHandlerForURLScheme(CFSTR("http"));
   if (defaultBrowserID) {
     *aIsDefaultBrowser = ::CFStringCompare(firefoxID, defaultBrowserID, 0) == kCFCompareEqualTo;
@@ -261,8 +262,10 @@ nsMacShellService::SetDesktopBackground(nsIDOMElement* aElement,
     loadContext = do_QueryInterface(docShell);
   }
 
-  return wbp->SaveURI(imageURI, nullptr, docURI, content->OwnerDoc()->GetReferrerPolicy(),
-                      nullptr, nullptr, mBackgroundFile, loadContext);
+  return wbp->SaveURI(imageURI, nullptr,
+                      docURI, content->OwnerDoc()->GetReferrerPolicy(),
+                      nullptr, nullptr,
+                      mBackgroundFile, loadContext);
 }
 
 NS_IMETHODIMP
@@ -328,7 +331,8 @@ nsMacShellService::OnStateChange(nsIWebProgress* aWebProgress,
     OSStatus status;
 
     // Convert the path into a FSRef
-    status = ::FSPathMakeRef((const UInt8*)nativePath.get(), &pictureRef, nullptr);
+    status = ::FSPathMakeRef((const UInt8*)nativePath.get(), &pictureRef,
+                             nullptr);
     if (status == noErr) {
       err = ::FSNewAlias(nil, &pictureRef, &aliasHandle);
       if (err == noErr && aliasHandle == nil)
@@ -395,8 +399,8 @@ nsMacShellService::OpenApplication(int32_t aApplication)
     }
     break;
   case nsIMacShellService::APPLICATION_KEYCHAIN_ACCESS:
-    err = ::LSGetApplicationForInfo('APPL', 'kcmr', nullptr, kLSRolesAll, nullptr,
-                                    &appURL);
+    err = ::LSGetApplicationForInfo('APPL', 'kcmr', nullptr, kLSRolesAll,
+                                    nullptr, &appURL);
     break;
   case nsIMacShellService::APPLICATION_NETWORK:
     {
