@@ -243,6 +243,19 @@ input[type=button] {
   margin-bottom: 10px; /* 32 - 16 tiles top margin - 6 logo bottom "padding" */
 }
 
+#newtab-search-logo.magnifier {
+  width: 38px; /* 26 image width + 6 left "padding" + 6 right "padding" */
+  -moz-margin-end: 5px;
+  background-size: 26px;
+  background-image: url("chrome://browser/skin/magnifier.png");
+}
+
+@media not all and (max-resolution: 1dppx) {
+  #newtab-search-icon.magnifier {
+    background-image: url("chrome://browser/skin/magnifier@2x.png");
+  }
+}
+
 #newtab-search-logo {
   display: -moz-box;
   width: 77px; /* 65 image width + 6 left "padding" + 6 right "padding" */
@@ -266,7 +279,7 @@ input[type=button] {
 }
 
 #newtab-search-text {
-  height: 32px;
+  height: 38px; /* same height as #newtab-search-logo */
   -moz-box-flex: 1;
 
   padding: 0 8px;
@@ -289,7 +302,7 @@ input[type=button] {
 }
 
 #newtab-search-submit {
-  height: 32px;
+  height: 38px; /* same height as #newtab-search-logo */
 
   -moz-margin-start: -1px;
   background: linear-gradient(hsla(0,0%,100%,.8), hsla(0,0%,100%,.1)) padding-box;
