@@ -4,9 +4,9 @@
 
 "use strict";
 
-let Cc = Components.classes;
-let Ci = Components.interfaces;
-let Cu = Components.utils;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
 
 this.EXPORTED_SYMBOLS = [ "AboutHomeUtils", "AboutHome" ];
 
@@ -17,6 +17,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
   "resource://gre/modules/AppConstants.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
   "resource://gre/modules/PrivateBrowsingUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "fxAccounts",
+  "resource://gre/modules/FxAccounts.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Promise",
   "resource://gre/modules/Promise.jsm");
 
@@ -87,7 +89,7 @@ XPCOMUtils.defineLazyGetter(AboutHomeUtils, "snippetsURL", function() {
  * about:home needs to do something chrome-privileged, it sends a
  * message that's handled here.
  */
-let AboutHome = {
+var AboutHome = {
   MESSAGES: [
     "AboutHome:RestorePreviousSession",
     "AboutHome:Downloads",
@@ -152,7 +154,21 @@ let AboutHome = {
         break;
 
       case "AboutHome:Sync":
-        window.openPreferences("paneSync");
+        let weave = Cc["@mozilla.org/weave/service;1"]
+                      .getService(Ci.nsISupports)
+                      .wrappedJSObject;
+
+        if (weave.fxAccountsEnabled) {
+          fxAccounts.getSignedInUser().then(userData => {
+            if (userData) {
+              window.openPreferences("paneSync");
+            } else {
+              window.loadURI("about:accounts?entrypoint=abouthome");
+            }
+          });
+        } else {
+          window.openPreferences("paneSync");
+        }
         break;
 
       case "AboutHome:Settings":
@@ -232,14 +248,14 @@ let AboutHome = {
         Services.prefs.setBoolPref("browser.rights." + currentVersion + ".shown", true);
       }
 
-     if (target && target.messageManager) {
+      if (target && target.messageManager) {
         target.messageManager.sendAsyncMessage("AboutHome:Update", data);
       } else {
         let mm = Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageListenerManager);
         mm.broadcastAsyncMessage("AboutHome:Update", data);
       }
     }).then(null, function onError(x) {
-      Cu.reportError("Error in AboutHome.sendAboutHomeData " + x);
+      Cu.reportError("Error in AboutHome.sendAboutHomeData: " + x);
     });
   },
 
