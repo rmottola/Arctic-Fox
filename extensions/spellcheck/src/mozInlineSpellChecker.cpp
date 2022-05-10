@@ -1999,7 +1999,7 @@ NS_IMETHODIMP mozInlineSpellChecker::UpdateCurrentDictionary()
   nsresult rv = spellCheck->UpdateCurrentDictionary(cb);
   if (NS_FAILED(rv)) {
     cb = nullptr;
-    NS_ENSURE_SUCCESS(rv, rv);
+    return rv;
   }
   mNumPendingUpdateCurrentDictionary++;
   ChangeNumPendingSpellChecks(1);
