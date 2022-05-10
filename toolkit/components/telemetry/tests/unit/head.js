@@ -279,7 +279,7 @@ function fakeSchedulerTimer(set, clear) {
   session.Policy.clearSchedulerTickTimeout = clear;
 }
 
-**
+/**
  * Fake the current date.
  * This passes all received arguments to a new Date constructor and
  * uses the resulting date to fake the time in Telemetry modules.
