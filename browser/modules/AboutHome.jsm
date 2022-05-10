@@ -146,7 +146,7 @@ var AboutHome = {
         break;
 
       case "AboutHome:Apps":
-        window.openUILinkIn("https://marketplace.mozilla.org/", "tab");
+        window.BrowserOpenApps();
         break;
 
       case "AboutHome:Addons":
