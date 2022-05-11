@@ -1822,8 +1822,6 @@ ScrollFrameHelper::ScrollFrameHelper(nsContainerFrame* aOuter,
   , mResolution(1.0)
   , mScrollPosForLayerPixelAlignment(-1, -1)
   , mLastUpdateImagesPos(-1, -1)
-  , mAncestorClip(nullptr)
-  , mAncestorClipForCaret(nullptr)
   , mNeverHasVerticalScrollbar(false)
   , mNeverHasHorizontalScrollbar(false)
   , mHasVerticalScrollbar(false)
@@ -2803,8 +2801,8 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   }
 
   // Clear the scroll port clip that was set during the last paint.
-  mAncestorClip = nullptr;
-  mAncestorClipForCaret = nullptr;
+  mAncestorClip = Nothing();
+  mAncestorClipForCaret = Nothing();
 
   // We put non-overlay scrollbars in their own layers when this is the root
   // scroll frame and we are a toplevel content document. In this situation,
@@ -3045,7 +3043,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
       // Capture the clip state of the parent scroll frame. This will be saved
       // on FrameMetrics for layers with this frame as their animated geoemetry
       // root.
-      mAncestorClipForCaret = aBuilder->ClipState().GetCurrentCombinedClip(aBuilder);
+      mAncestorClipForCaret = ToMaybe(aBuilder->ClipState().GetCurrentCombinedClip(aBuilder));
 
       // Add the non-caret content box clip here so that it gets picked up by
       // mAncestorClip.
@@ -3058,7 +3056,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
           clipStateNonCaret->ClipContainingBlockDescendants(*contentBoxClipForNonCaretContent);
         }
       }
-      mAncestorClip = aBuilder->ClipState().GetCurrentCombinedClip(aBuilder);
+      mAncestorClip = ToMaybe(aBuilder->ClipState().GetCurrentCombinedClip(aBuilder));
 
       // If we are using a display port, then ignore any pre-existing clip
       // passed down from our parents. The pre-existing clip would just defeat
@@ -3138,12 +3136,12 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   scrolledContent.MoveTo(aLists);
 }
 
-const DisplayItemClip*
+Maybe<DisplayItemClip>
 ScrollFrameHelper::ComputeScrollClip(bool aIsForCaret) const
 {
-  const DisplayItemClip* ancestorClip = aIsForCaret ? mAncestorClipForCaret : mAncestorClip;
+  const Maybe<DisplayItemClip>& ancestorClip = aIsForCaret ? mAncestorClipForCaret : mAncestorClip;
   if (!mShouldBuildScrollableLayer || mIsScrollableLayerInRootContainer) {
-    return nullptr;
+    return Nothing();
   }
 
   return ancestorClip;
@@ -3165,7 +3163,7 @@ ScrollFrameHelper::ComputeFrameMetrics(Layer* aLayer,
     needsParentLayerClip = false;
   }
 
-  const DisplayItemClip* ancestorClip = aIsForCaret ? mAncestorClipForCaret : mAncestorClip;
+  const Maybe<DisplayItemClip>& ancestorClip = aIsForCaret ? mAncestorClipForCaret : mAncestorClip;
 
   nsPoint toReferenceFrame = mOuter->GetOffsetToCrossDoc(aContainerReferenceFrame);
   bool isRootContent = mIsRoot && mOuter->PresContext()->IsRootContentDocument();
