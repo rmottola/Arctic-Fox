@@ -79,8 +79,8 @@ struct RectCornerRadii;
 } // namespace gfx
 namespace layers {
 class Layer;
-}
-}
+} // namespace layers
+} // namespace mozilla
 
 namespace mozilla {
 
@@ -1323,6 +1323,18 @@ public:
                                        nsIFrame*           aFrame,
                                        IntrinsicISizeType  aType,
                                        uint32_t            aFlags = 0);
+
+  /**
+   * Get the contribution of aFrame for the given physical axis.
+   * This considers the child's 'min-width' property (or 'min-height' if the
+   * given axis is vertical), and its padding, border, and margin in the
+   * corresponding dimension.
+   */
+  static nscoord MinSizeContributionForAxis(mozilla::PhysicalAxis aAxis,
+                                            nsRenderingContext*   aRC,
+                                            nsIFrame*             aFrame,
+                                            IntrinsicISizeType    aType,
+                                            uint32_t              aFlags = 0);
 
   /*
    * Convert nsStyleCoord to nscoord when percentages depend on the
