@@ -5,7 +5,7 @@
 browser.jar:
 % skin browser classic/1.0 %skin/classic/browser/
   skin/classic/browser/sanitizeDialog.css
-* skin/classic/browser/aboutSessionRestore.cs
+* skin/classic/browser/aboutSessionRestore.css
   skin/classic/browser/aboutSessionRestore-window-icon.png
   skin/classic/browser/aboutWelcomeBack.css                    (../shared/aboutWelcomeBack.css)
   skin/classic/browser/aboutCertError.css
@@ -87,9 +87,8 @@ browser.jar:
   skin/classic/browser/Toolbar.png
   skin/classic/browser/Toolbar-glass.png
   skin/classic/browser/Toolbar-inverted.png
-  skin/classic/browser/Toolbar-XP.png
   skin/classic/browser/toolbarbutton-dropdown-arrow.png
-  skin/classic/browser/toolbarbutton-dropdown-arrow-XPVista7.png  skin/classic/browser/toolbarbutton-dropdown-arrow-inverted.png
+  skin/classic/browser/toolbarbutton-dropdown-arrow-inverted.png
   skin/classic/browser/urlbar-arrow.png
   skin/classic/browser/urlbar-arrow@2x.png
   skin/classic/browser/urlbar-popup-blocked.png
