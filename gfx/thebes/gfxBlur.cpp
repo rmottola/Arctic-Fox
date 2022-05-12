@@ -249,7 +249,7 @@ class BlurCache final : public nsExpirationTracker<BlurCacheData,4>
 {
   public:
     BlurCache()
-      : nsExpirationTracker<BlurCacheData, 4>(GENERATION_MS)
+      : nsExpirationTracker<BlurCacheData, 4>(GENERATION_MS, "BlurCache")
     {
     }
 
