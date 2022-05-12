@@ -342,7 +342,7 @@ nsTimerImpl::Shutdown()
 
 
 nsresult
-nsTimerImpl::InitCommon(uint32_t aType, uint32_t aDelay)
+nsTimerImpl::InitCommon(uint32_t aDelay, uint32_t aType)
 {
   nsresult rv;
 
@@ -401,7 +401,7 @@ nsTimerImpl::InitWithFuncCallback(nsTimerCallbackFunc aFunc,
   mCallback.c = aFunc;
   mClosure = aClosure;
 
-  return InitCommon(aType, aDelay);
+  return InitCommon(aDelay, aType);
 }
 
 NS_IMETHODIMP
@@ -418,7 +418,7 @@ nsTimerImpl::InitWithCallback(nsITimerCallback* aCallback,
   mCallback.i = aCallback;
   NS_ADDREF(mCallback.i);
 
-  return InitCommon(aType, aDelay);
+  return InitCommon(aDelay, aType);
 }
 
 NS_IMETHODIMP
@@ -433,7 +433,7 @@ nsTimerImpl::Init(nsIObserver* aObserver, uint32_t aDelay, uint32_t aType)
   mCallback.o = aObserver;
   NS_ADDREF(mCallback.o);
 
-  return InitCommon(aType, aDelay);
+  return InitCommon(aDelay, aType);
 }
 
 NS_IMETHODIMP
