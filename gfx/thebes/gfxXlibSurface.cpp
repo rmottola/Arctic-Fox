@@ -619,9 +619,3 @@ gfxXlibSurface::BindGLXPixmap(GLXPixmap aPixmap)
 }
 
 #endif
-
-gfxMemoryLocation
-gfxXlibSurface::GetMemoryLocation() const
-{
-    return gfxMemoryLocation::OUT_OF_PROCESS;
-}
