@@ -289,10 +289,6 @@ private:
 
   nsIntRect GetFirstFrameRect();
 
-  size_t
-    SizeOfDecodedWithComputedFallbackIfHeap(gfxMemoryLocation aLocation,
-                                            MallocSizeOf aMallocSizeOf) const;
-
   Pair<DrawResult, nsRefPtr<layers::Image>>
     GetCurrentImage(layers::ImageContainer* aContainer, uint32_t aFlags);
 
