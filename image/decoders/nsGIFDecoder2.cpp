@@ -1140,7 +1140,9 @@ nsGIFDecoder2::WriteInternal(const char* aBuffer, uint32_t aCount)
 
     // We shouldn't ever get here.
     default:
-      break;
+      MOZ_ASSERT_UNREACHABLE("Unexpected mGIFStruct.state");
+      PostDecoderError(NS_ERROR_UNEXPECTED);
+      return;
     }
   }
 
@@ -1177,8 +1179,6 @@ done:
     mLastFlushedRow = mCurrentRow;
     mLastFlushedPass = mCurrentPass;
   }
-
-  return;
 }
 
 bool
@@ -1210,7 +1210,6 @@ nsGIFDecoder2::SpeedHistogram()
 {
   return Telemetry::IMAGE_DECODE_SPEED_GIF;
 }
-
 
 } // namespace image
 } // namespace mozilla
