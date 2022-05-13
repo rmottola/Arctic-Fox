@@ -10,6 +10,7 @@
 #include <ctime>
 #include "gfxPrefs.h"
 #include "image_operations.h"
+#include "mozilla/SSE.h"
 #include "convolver.h"
 #include "skia/include/core/SkTypes.h"
 
@@ -162,7 +163,7 @@ Downscaler::CommitRow()
     if (mCurrentInLine == inLineToRead) {
       skia::ConvolveHorizontally(mRowBuffer.get(), *mXFilter,
                                  mWindow[mLinesInBuffer++], mHasAlpha,
-                                 /* use_sse2 = */ true);
+                                 supports_sse2());
     }
 
     MOZ_ASSERT(mCurrentOutLine < mTargetSize.height,
@@ -222,7 +223,7 @@ Downscaler::DownscaleInputLine()
     &mOutputBuffer[mCurrentOutLine * mTargetSize.width * sizeof(uint32_t)];
   skia::ConvolveVertically(static_cast<const FilterValue*>(filterValues),
                            filterLength, mWindow.get(), mXFilter->num_values(),
-                           outputLine, mHasAlpha, /* use_sse2 = */ true);
+                           outputLine, mHasAlpha, supports_sse2());
 
   mCurrentOutLine += 1;
 
