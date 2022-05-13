@@ -264,6 +264,15 @@ function testModeCors() {
                  headers: { "myheader": "" },
                  allowMethods: "myheader",
                },
+               { pass: 1,
+                 method: "GET",
+                 headers: { "User-Agent": "myValue" },
+                 allowHeaders: "User-Agent",
+               },
+               { pass: 0,
+                 method: "GET",
+                 headers: { "User-Agent": "myValue" },
+               },
 
                // Multiple custom headers
                { pass: 1,
@@ -739,10 +748,13 @@ function testModeCors() {
     if (test.preflightBody)
       req.url += "&preflightBody=" + escape(test.preflightBody);
 
-    var request = new Request(req.url, { method: req.method, mode: "cors",
-                                         headers: req.headers, body: req.body });
-    fetches.push((function(test, request) {
-      return fetch(request).then(function(res) {
+    fetches.push((function(test) {
+      return new Promise(function(resolve) {
+        resolve(new Request(req.url, { method: req.method, mode: "cors",
+                                         headers: req.headers, body: req.body }));
+      }).then(function(request) {
+        return fetch(request);
+      }).then(function(res) {
         ok(test.pass, "Expected test to pass for " + test.toSource());
         if (test.status) {
           is(res.status, test.status, "wrong status in test for " + test.toSource());
@@ -767,21 +779,21 @@ function testModeCors() {
           }
         }
 
-        return res.text().then(function(v) {
-          if (test.method !== "HEAD") {
-            is(v, "<res>hello pass</res>\n",
-               "wrong responseText in test for " + test.toSource());
-          }
-          else {
-            is(v, "",
-               "wrong responseText in HEAD test for " + test.toSource());
-          }
-        });
-      }, function(e) {
-          ok(!test.pass, "Expected test failure for " + test.toSource());
-          ok(e instanceof TypeError, "Exception should be TypeError for " + test.toSource());
+        return res.text();
+      }).then(function(v) {
+        if (test.method !== "HEAD") {
+          is(v, "<res>hello pass</res>\n",
+             "wrong responseText in test for " + test.toSource());
+        }
+        else {
+          is(v, "",
+             "wrong responseText in HEAD test for " + test.toSource());
+        }
+      }).catch(function(e) {
+        ok(!test.pass, "Expected test failure for " + test.toSource());
+        ok(e instanceof TypeError, "Exception should be TypeError for " + test.toSource());
       });
-    })(test, request));
+    })(test));
   }
 
   return Promise.all(fetches);
@@ -1122,7 +1134,7 @@ function testRedirects() {
                     },
                     ],
            },
-           { pass: 0,
+           { pass: 1,
              method: "POST",
              body: "hi there",
              headers: { "Content-Type": "text/plain",
@@ -1137,10 +1149,40 @@ function testRedirects() {
                     ],
            },
            { pass: 0,
+             method: "POST",
+             body: "hi there",
+             headers: { "Content-Type": "text/plain",
+                        "my-header": "myValue",
+                      },
+             hops: [{ server: "http://mochi.test:8888",
+                    },
+                    { server: "http://test1.example.com",
+                      allowOrigin: origin,
+                      allowHeaders: "my-header",
+                    },
+                    { server: "http://test2.example.com",
+                      allowOrigin: origin,
+                      allowHeaders: "my-header",
+                    }
+                    ],
+           },
+           { pass: 1,
              method: "DELETE",
              hops: [{ server: "http://mochi.test:8888",
                     },
                     { server: "http://example.com",
+                      allowOrigin: origin,
+                    },
+                    ],
+           },
+           { pass: 0,
+             method: "DELETE",
+             hops: [{ server: "http://mochi.test:8888",
+                    },
+                    { server: "http://test1.example.com",
+                      allowOrigin: origin,
+                    },
+                    { server: "http://test2.example.com",
                       allowOrigin: origin,
                     },
                     ],

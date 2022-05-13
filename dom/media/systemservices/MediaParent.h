@@ -24,12 +24,15 @@ class NonE10s
 {
   typedef mozilla::ipc::IProtocolManager<mozilla::ipc::IProtocol>::ActorDestroyReason
       ActorDestroyReason;
+public:
+  virtual ~NonE10s() {}
 protected:
   virtual bool RecvGetOriginKey(const uint32_t& aRequestId,
                                 const nsCString& aOrigin,
                                 const bool& aPrivateBrowsing,
                                 const bool& aPersist) = 0;
-  virtual bool RecvSanitizeOriginKeys(const uint64_t& aSinceWhen) = 0;
+  virtual bool RecvSanitizeOriginKeys(const uint64_t& aSinceWhen,
+                                      const bool& aOnlyPrivateBrowsing) = 0;
   virtual void
   ActorDestroy(ActorDestroyReason aWhy) = 0;
 };
@@ -48,7 +51,8 @@ public:
                                 const nsCString& aOrigin,
                                 const bool& aPrivateBrowsing,
                                 const bool& aPersist) override;
-  virtual bool RecvSanitizeOriginKeys(const uint64_t& aSinceWhen) override;
+  virtual bool RecvSanitizeOriginKeys(const uint64_t& aSinceWhen,
+                                      const bool& aOnlyPrivateBrowsing) override;
   virtual void ActorDestroy(ActorDestroyReason aWhy) override;
 
   explicit Parent(bool aSameProcess = false);

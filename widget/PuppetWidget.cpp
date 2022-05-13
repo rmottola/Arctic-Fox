@@ -573,8 +573,7 @@ PuppetWidget::IMEEndComposition(bool aCancel)
 
   nsEventStatus status;
   bool noCompositionEvent = true;
-  WidgetCompositionEvent compositionCommitEvent(true, NS_COMPOSITION_COMMIT,
-                                                this);
+  WidgetCompositionEvent compositionCommitEvent(true, eCompositionCommit, this);
   InitEvent(compositionCommitEvent, nullptr);
   // SendEndIMEComposition is always called since ResetInputState
   // should always be called even if we aren't composing something.
@@ -1076,6 +1075,23 @@ PuppetWidget::GetNativeData(uint32_t aDataType)
   }
   return nullptr;
 }
+
+#if defined(XP_WIN)
+void
+PuppetWidget::SetNativeData(uint32_t aDataType, uintptr_t aVal)
+{
+  switch (aDataType) {
+  case NS_NATIVE_CHILD_OF_SHAREABLE_WINDOW:
+    MOZ_ASSERT(mTabChild, "Need TabChild to send the message.");
+    if (mTabChild) {
+      mTabChild->SendSetNativeChildOfShareableWindow(aVal);
+    }
+    break;
+  default:
+    NS_WARNING("SetNativeData called with unsupported data type.");
+  }
+}
+#endif
 
 nsIntPoint
 PuppetWidget::GetChromeDimensions()

@@ -78,7 +78,7 @@
 #include "nsWindowWatcher.h"
 #include "private/pprio.h"
 #include "PermissionMessageUtils.h"
-#include "StructuredCloneUtils.h"
+#include "StructuredCloneData.h"
 #include "ColorPickerParent.h"
 #include "FilePickerParent.h"
 #include "TabChild.h"
@@ -275,8 +275,10 @@ TabParent::TabParent(nsIContentParent* aManager,
   , mDefaultScale(0)
   , mUpdatedDimensions(false)
   , mManager(aManager)
+  , mDocShellIsActive(false)
   , mMarkedDestroying(false)
   , mIsDestroyed(false)
+  , mIsDetached(true)
   , mAppPackageFileDescriptorSent(false)
   , mSendOfflineStatus(true)
   , mChromeFlags(aChromeFlags)
@@ -289,6 +291,7 @@ TabParent::TabParent(nsIContentParent* aManager,
   , mCursor(nsCursor(-1))
   , mTabSetsCursor(false)
   , mHasContentOpener(false)
+  , mActiveSupressDisplayportCount(0)
 {
   MOZ_ASSERT(aManager);
 }
@@ -477,6 +480,35 @@ TabParent::Destroy()
   }
 
   mMarkedDestroying = true;
+}
+
+void
+TabParent::Detach()
+{
+  if (mIsDetached) {
+    return;
+  }
+  RemoveWindowListeners();
+  if (RenderFrameParent* frame = GetRenderFrame()) {
+    RemoveTabParentFromTable(frame->GetLayersId());
+  }
+  mIsDetached = true;
+}
+
+void
+TabParent::Attach(nsFrameLoader* aFrameLoader)
+{
+  MOZ_ASSERT(mIsDetached);
+  if (!mIsDetached) {
+    return;
+  }
+  Element* ownerElement = aFrameLoader->GetOwnerContent();
+  SetOwnerElement(ownerElement);
+  if (RenderFrameParent* frame = GetRenderFrame()) {
+    AddTabParentToTable(frame->GetLayersId(), this);
+    frame->OwnerContentChanged(ownerElement);
+  }
+  mIsDetached = false;
 }
 
 bool
@@ -1040,7 +1072,7 @@ TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size)
   }
   hal::ScreenConfiguration config;
   hal::GetCurrentScreenConfiguration(&config);
-  ScreenOrientation orientation = config.orientation();
+  ScreenOrientationInternal orientation = config.orientation();
   LayoutDeviceIntPoint chromeOffset = -GetChildProcessOffset();
 
   nsCOMPtr<nsIWidget> widget = GetWidget();
@@ -1074,7 +1106,9 @@ TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size)
 
     CSSRect unscaledRect = devicePixelRect / widgetScale;
     CSSSize unscaledSize = devicePixelSize / widgetScale;
-    unused << SendUpdateDimensions(unscaledRect, unscaledSize, orientation, chromeOffset);
+    unused << SendUpdateDimensions(unscaledRect, unscaledSize,
+                                   widget->SizeMode(),
+                                   orientation, chromeOffset);
   }
 }
 
@@ -1094,7 +1128,11 @@ TabParent::UIResolutionChanged()
     // mDPI being greater than 0, so this invalidates it.
     mDPI = -1;
     TryCacheDPIAndScale();
-    unused << SendUIResolutionChanged();
+    // If mDPI was set to -1 to invalidate it and then TryCacheDPIAndScale
+    // fails to cache the values, then mDefaultScale.scale might be invalid.
+    // We don't want to send that value to content. Just send -1 for it too in
+    // that case.
+    unused << SendUIResolutionChanged(mDPI, mDPI < 0 ? -1.0 : mDefaultScale.scale);
   }
 }
 
@@ -1380,20 +1418,24 @@ bool TabParent::SendRealMouseEvent(WidgetMouseEvent& event)
   if (widget) {
     // When we mouseenter the tab, the tab's cursor should
     // become the current cursor.  When we mouseexit, we stop.
-    if (NS_MOUSE_ENTER_WIDGET == event.mMessage) {
+    if (eMouseEnterIntoWidget == event.mMessage) {
       mTabSetsCursor = true;
       if (mCustomCursor) {
         widget->SetCursor(mCustomCursor, mCustomCursorHotspotX, mCustomCursorHotspotY);
       } else if (mCursor != nsCursor(-1)) {
         widget->SetCursor(mCursor);
       }
-    } else if (NS_MOUSE_EXIT_WIDGET == event.mMessage) {
+    } else if (eMouseExitFromWidget == event.mMessage) {
       mTabSetsCursor = false;
     }
   }
 
-  if (NS_MOUSE_MOVE == event.mMessage) {
-    return SendRealMouseMoveEvent(event);
+  if (eMouseMove == event.mMessage) {
+    if (event.reason == WidgetMouseEvent::eSynthesized) {
+      return SendSynthMouseMoveEvent(event);
+    } else {
+      return SendRealMouseMoveEvent(event);
+    }
   }
   return SendRealMouseButtonEvent(event);
 }
@@ -1734,7 +1776,7 @@ bool TabParent::SendRealKeyEvent(WidgetKeyboardEvent& event)
 
   MaybeNativeKeyBinding bindings;
   bindings = void_t();
-  if (event.mMessage == NS_KEY_PRESS) {
+  if (event.mMessage == eKeyPress) {
     nsCOMPtr<nsIWidget> widget = GetWidget();
 
     AutoInfallibleTArray<mozilla::CommandInt, 4> singleLine;
@@ -1766,7 +1808,7 @@ bool TabParent::SendRealTouchEvent(WidgetTouchEvent& event)
   // confuses remote content and the panning and zooming logic into thinking
   // that the added touches are part of the touchend/cancel, when actually
   // they're not.
-  if (event.mMessage == NS_TOUCH_END || event.mMessage == NS_TOUCH_CANCEL) {
+  if (event.mMessage == eTouchEnd || event.mMessage == eTouchCancel) {
     for (int i = event.touches.Length() - 1; i >= 0; i--) {
       if (!event.touches[i]->mChanged) {
         event.touches.RemoveElementAt(i);
@@ -1788,7 +1830,7 @@ bool TabParent::SendRealTouchEvent(WidgetTouchEvent& event)
     event.touches[i]->mRefPoint += offset;
   }
 
-  return (event.mMessage == NS_TOUCH_MOVE) ?
+  return (event.mMessage == eTouchMove) ?
     PBrowserParent::SendRealTouchMoveEvent(event, guid, blockId, apzResponse) :
     PBrowserParent::SendRealTouchEvent(event, guid, blockId, apzResponse);
 }
@@ -1798,7 +1840,7 @@ TabParent::RecvSyncMessage(const nsString& aMessage,
                            const ClonedMessageData& aData,
                            InfallibleTArray<CpowEntry>&& aCpows,
                            const IPC::Principal& aPrincipal,
-                           nsTArray<OwningSerializedStructuredCloneBuffer>* aRetVal)
+                           nsTArray<StructuredCloneData>* aRetVal)
 {
   // FIXME Permission check for TabParent in Content process
   nsIPrincipal* principal = aPrincipal;
@@ -1810,9 +1852,11 @@ TabParent::RecvSyncMessage(const nsString& aMessage,
     }
   }
 
-  StructuredCloneData cloneData = ipc::UnpackClonedMessageDataForParent(aData);
+  StructuredCloneData data;
+  ipc::UnpackClonedMessageDataForParent(aData, data);
+
   CrossProcessCpowHolder cpows(Manager(), aCpows);
-  return ReceiveMessage(aMessage, true, &cloneData, &cpows, aPrincipal, aRetVal);
+  return ReceiveMessage(aMessage, true, &data, &cpows, aPrincipal, aRetVal);
 }
 
 bool
@@ -1820,7 +1864,7 @@ TabParent::RecvRpcMessage(const nsString& aMessage,
                           const ClonedMessageData& aData,
                           InfallibleTArray<CpowEntry>&& aCpows,
                           const IPC::Principal& aPrincipal,
-                          nsTArray<OwningSerializedStructuredCloneBuffer>* aRetVal)
+                          nsTArray<StructuredCloneData>* aRetVal)
 {
   // FIXME Permission check for TabParent in Content process
   nsIPrincipal* principal = aPrincipal;
@@ -1832,9 +1876,11 @@ TabParent::RecvRpcMessage(const nsString& aMessage,
     }
   }
 
-  StructuredCloneData cloneData = ipc::UnpackClonedMessageDataForParent(aData);
+  StructuredCloneData data;
+  ipc::UnpackClonedMessageDataForParent(aData, data);
+
   CrossProcessCpowHolder cpows(Manager(), aCpows);
-  return ReceiveMessage(aMessage, true, &cloneData, &cpows, aPrincipal, aRetVal);
+  return ReceiveMessage(aMessage, true, &data, &cpows, aPrincipal, aRetVal);
 }
 
 bool
@@ -1853,9 +1899,11 @@ TabParent::RecvAsyncMessage(const nsString& aMessage,
     }
   }
 
-  StructuredCloneData cloneData = ipc::UnpackClonedMessageDataForParent(aData);
+  StructuredCloneData data;
+  ipc::UnpackClonedMessageDataForParent(aData, data);
+
   CrossProcessCpowHolder cpows(Manager(), aCpows);
-  return ReceiveMessage(aMessage, false, &cloneData, &cpows, aPrincipal, nullptr);
+  return ReceiveMessage(aMessage, false, &data, &cpows, aPrincipal, nullptr);
 }
 
 bool
@@ -2268,7 +2316,7 @@ TabParent::RecvDispatchAfterKeyboardEvent(const WidgetKeyboardEvent& aEvent)
 
   if (mFrameElement &&
       PresShell::BeforeAfterKeyboardEventEnabled() &&
-      localEvent.mMessage != NS_KEY_PRESS) {
+      localEvent.mMessage != eKeyPress) {
     presShell->DispatchAfterKeyboardEvent(mFrameElement, localEvent,
                                           aEvent.mFlags.mDefaultPrevented);
   }
@@ -2288,9 +2336,9 @@ TabParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent)
     return true;
   }
   switch (aEvent.mMessage) {
-    case NS_QUERY_TEXT_RECT:
-    case NS_QUERY_CARET_RECT:
-    case NS_QUERY_EDITOR_RECT:
+    case eQueryTextRect:
+    case eQueryCaretRect:
+    case eQueryEditorRect:
       aEvent.mReply.mRect -= GetChildProcessOffset();
       break;
     default:
@@ -2523,10 +2571,9 @@ TabParent::RecvGetMaxTouchPoints(uint32_t* aTouchPoints)
   return true;
 }
 
-bool
-TabParent::RecvGetWidgetNativeData(WindowsHandle* aValue)
+already_AddRefed<nsIWidget>
+TabParent::GetTopLevelWidget()
 {
-  *aValue = 0;
   nsCOMPtr<nsIContent> content = do_QueryInterface(mFrameElement);
   if (content) {
     nsIPresShell* shell = content->OwnerDoc()->GetShell();
@@ -2534,11 +2581,48 @@ TabParent::RecvGetWidgetNativeData(WindowsHandle* aValue)
       nsViewManager* vm = shell->GetViewManager();
       nsCOMPtr<nsIWidget> widget;
       vm->GetRootWidget(getter_AddRefs(widget));
-      if (widget) {
-        *aValue = reinterpret_cast<WindowsHandle>(
-          widget->GetNativeData(NS_NATIVE_SHAREABLE_WINDOW));
-      }
+      return widget.forget();
     }
+  }
+  return nullptr;
+}
+
+bool
+TabParent::RecvGetWidgetNativeData(WindowsHandle* aValue)
+{
+  *aValue = 0;
+  nsCOMPtr<nsIWidget> widget = GetTopLevelWidget();
+  if (widget) {
+    *aValue = reinterpret_cast<WindowsHandle>(
+      widget->GetNativeData(NS_NATIVE_SHAREABLE_WINDOW));
+  }
+  return true;
+}
+
+bool
+TabParent::RecvSetNativeChildOfShareableWindow(const uintptr_t& aChildWindow)
+{
+#if defined(XP_WIN)
+  nsCOMPtr<nsIWidget> widget = GetTopLevelWidget();
+  if (widget) {
+    // Note that this call will probably cause a sync native message to the
+    // process that owns the child window.
+    widget->SetNativeData(NS_NATIVE_CHILD_OF_SHAREABLE_WINDOW, aChildWindow);
+  }
+  return true;
+#else
+  NS_NOTREACHED(
+    "TabParent::RecvSetNativeChildOfShareableWindow not implemented!");
+  return false;
+#endif
+}
+
+bool
+TabParent::RecvDispatchFocusToTopLevelWindow()
+{
+  nsCOMPtr<nsIWidget> widget = GetTopLevelWidget();
+  if (widget) {
+    widget->SetFocus(false);
   }
   return true;
 }
@@ -2546,10 +2630,10 @@ TabParent::RecvGetWidgetNativeData(WindowsHandle* aValue)
 bool
 TabParent::ReceiveMessage(const nsString& aMessage,
                           bool aSync,
-                          const StructuredCloneData* aCloneData,
+                          StructuredCloneData* aData,
                           CpowHolder* aCpows,
                           nsIPrincipal* aPrincipal,
-                          nsTArray<OwningSerializedStructuredCloneBuffer>* aRetVal)
+                          nsTArray<StructuredCloneData>* aRetVal)
 {
   nsRefPtr<nsFrameLoader> frameLoader = GetFrameLoader(true);
   if (frameLoader && frameLoader->GetFrameMessageManager()) {
@@ -2560,7 +2644,7 @@ TabParent::ReceiveMessage(const nsString& aMessage,
                             frameLoader,
                             aMessage,
                             aSync,
-                            aCloneData,
+                            aData,
                             aCpows,
                             aPrincipal,
                             aRetVal);
@@ -2813,6 +2897,16 @@ TabParent::RecvUpdateZoomConstraints(const uint32_t& aPresShellId,
 }
 
 bool
+TabParent::RecvRespondStartSwipeEvent(const uint64_t& aInputBlockId,
+                                      const bool& aStartSwipe)
+{
+  if (nsCOMPtr<nsIWidget> widget = GetWidget()) {
+    widget->ReportSwipeStarted(aInputBlockId, aStartSwipe);
+  }
+  return true;
+}
+
+bool
 TabParent::RecvContentReceivedInputBlock(const ScrollableLayerGuid& aGuid,
                                          const uint64_t& aInputBlockId,
                                          const bool& aPreventDefault)
@@ -2875,8 +2969,8 @@ TabParent::InjectTouchEvent(const nsAString& aType,
 {
   EventMessage msg;
   nsContentUtils::GetEventMessageAndAtom(aType, eTouchEventClass, &msg);
-  if (msg != NS_TOUCH_START && msg != NS_TOUCH_MOVE &&
-      msg != NS_TOUCH_END && msg != NS_TOUCH_CANCEL) {
+  if (msg != eTouchStart && msg != eTouchMove &&
+      msg != eTouchEnd && msg != eTouchCancel) {
     return NS_ERROR_FAILURE;
   }
 
@@ -2931,10 +3025,38 @@ TabParent::GetUseAsyncPanZoom(bool* useAsyncPanZoom)
   return NS_OK;
 }
 
+// defined in nsITabParent
 NS_IMETHODIMP
-TabParent::SetIsDocShellActive(bool isActive)
+TabParent::SetDocShellIsActive(bool isActive)
 {
-  unused << SendSetIsDocShellActive(isActive);
+  mDocShellIsActive = isActive;
+  unused << SendSetDocShellIsActive(isActive);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+TabParent::GetDocShellIsActive(bool* aIsActive)
+{
+  *aIsActive = mDocShellIsActive;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+TabParent::SuppressDisplayport(bool aEnabled)
+{
+  if (IsDestroyed()) {
+    return NS_OK;
+  }
+
+  if (aEnabled) {
+    mActiveSupressDisplayportCount++;
+  } else {
+    mActiveSupressDisplayportCount--;
+  }
+
+  MOZ_ASSERT(mActiveSupressDisplayportCount >= 0);
+
+  unused << SendSuppressDisplayport(aEnabled);
   return NS_OK;
 }
 

@@ -78,7 +78,7 @@ HTMLSummaryElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
     bool dispatchClick = false;
 
     switch (event->mMessage) {
-      case NS_KEY_PRESS:
+      case eKeyPress:
         if (keyboardEvent->charCode == nsIDOMKeyEvent::DOM_VK_SPACE) {
           // Consume 'space' key to prevent scrolling the page down.
           aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
@@ -87,7 +87,7 @@ HTMLSummaryElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
         dispatchClick = keyboardEvent->keyCode == nsIDOMKeyEvent::DOM_VK_RETURN;
         break;
 
-      case NS_KEY_UP:
+      case eKeyUp:
         dispatchClick = keyboardEvent->keyCode == nsIDOMKeyEvent::DOM_VK_SPACE;
         break;
 

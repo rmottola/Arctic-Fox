@@ -58,6 +58,13 @@ class MochitestArguments(ArgumentContainer):
     LEVEL_STRING = ", ".join(LOG_LEVELS)
 
     args = [
+        [["test_paths"],
+         {"nargs": "*",
+          "metavar": "TEST",
+          "default": [],
+          "help": "Test to run. Can be a single test file or a directory of tests "
+                  "(to run recursively). If omitted, the entire suite is run.",
+          }],
         [["--keep-open"],
          {"action": "store_false",
           "dest": "closeWhenDone",
@@ -157,13 +164,6 @@ class MochitestArguments(ArgumentContainer):
           "help": "Run ipcplugins mochitests.",
           "default": False,
           "suppress": True,
-          }],
-        [["--test-path"],
-         {"dest": "testPath",
-          "default": "",
-          "help": "Run the given test or recursively run the given directory of tests.",
-          # if running from mach, a test_paths arg is exposed instead
-          "suppress": build_obj is not None,
           }],
         [["--bisect-chunk"],
          {"dest": "bisectChunk",
@@ -552,6 +552,9 @@ class MochitestArguments(ArgumentContainer):
             options.gmp_path = os.pathsep.join(
                 os.path.join(build_obj.bindir, *p) for p in gmp_modules)
 
+        if options.ipcplugins:
+            options.test_paths.append('dom/plugins/test/mochitest')
+
         if options.totalChunks is not None and options.thisChunk is None:
             parser.error(
                 "thisChunk must be specified when totalChunks is specified")
@@ -658,7 +661,9 @@ class MochitestArguments(ArgumentContainer):
                     options.testingModulesDir = possible
 
         if build_obj:
-            options.extraProfileFiles.append(os.path.join(build_obj.distdir, 'plugins'))
+            plugins_dir = os.path.join(build_obj.distdir, 'plugins')
+            if plugins_dir not in options.extraProfileFiles:
+                options.extraProfileFiles.append(plugins_dir)
 
         # Even if buildbot is updated, we still want this, as the path we pass in
         # to the app must be absolute and have proper slashes.
@@ -718,7 +723,7 @@ class MochitestArguments(ArgumentContainer):
 
         options.leakThresholds = {
             "default": options.defaultLeakThreshold,
-            "tab": 25000,  # See dependencies of bug 1051230.
+            "tab": 10000,  # See dependencies of bug 1051230.
             # GMP rarely gets a log, but when it does, it leaks a little.
             "geckomediaplugin": 20000,
         }
@@ -728,9 +733,14 @@ class MochitestArguments(ArgumentContainer):
         if mozinfo.isWin:
             options.ignoreMissingLeaks.append("tab")
 
-        # Bug 1121539 - OSX-only intermittent tab process leak in test_ipc.html
-        if mozinfo.isMac:
-            options.leakThresholds["tab"] = 100000
+        # XXX We can't normalize test_paths in the non build_obj case here,
+        # because testRoot depends on the flavor, which is determined by the
+        # mach command and therefore not finalized yet. Conversely, test paths
+        # need to be normalized here for the mach case.
+        if options.test_paths and build_obj:
+            # Normalize test paths so they are relative to test root
+            options.test_paths = [build_obj._wrap_path_argument(p).relpath()
+                for p in options.test_paths]
 
         return options
 

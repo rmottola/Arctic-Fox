@@ -11,6 +11,9 @@ GeckoCppUnitTests([
     'TestWebGLElementArrayCache',
 ])
 
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wshadow']
+
 LOCAL_INCLUDES += [
     '../',
 ]

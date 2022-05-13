@@ -52,7 +52,6 @@
 
 #include "nsIContentPolicy.h"
 #include "nsContentPolicyUtils.h"
-#include "nsCORSListenerProxy.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsICachingChannel.h"
 #include "nsLayoutUtils.h"
@@ -102,6 +101,7 @@ static PRLogModuleInfo* gMediaElementEventsLog;
 
 #include "nsIPermissionManager.h"
 #include "nsContentTypeParser.h"
+#include "nsDocShell.h"
 
 #include "mozilla/EventStateManager.h"
 
@@ -544,6 +544,30 @@ HTMLMediaElement::GetMozMediaSourceObject() const
   nsRefPtr<MediaSource> source = mMediaSource;
   return source.forget();
 }
+
+already_AddRefed<DOMMediaStream>
+HTMLMediaElement::GetSrcObject() const
+{
+  NS_ASSERTION(!mSrcAttrStream || mSrcAttrStream->GetStream(),
+               "MediaStream should have been set up properly");
+  nsRefPtr<DOMMediaStream> stream = mSrcAttrStream;
+  return stream.forget();
+}
+
+void
+HTMLMediaElement::SetSrcObject(DOMMediaStream& aValue)
+{
+  SetMozSrcObject(&aValue);
+}
+
+void
+HTMLMediaElement::SetSrcObject(DOMMediaStream* aValue)
+{
+  mSrcAttrStream = aValue;
+  DoLoad();
+}
+
+// TODO: Remove prefixed versions soon (1183495)
 
 already_AddRefed<DOMMediaStream>
 HTMLMediaElement::GetMozSrcObject() const
@@ -4012,7 +4036,14 @@ void HTMLMediaElement::NotifyOwnerDocumentActivityChanged()
   if (pauseElement && mAudioChannelAgent) {
     // If the element is being paused since we are navigating away from the
     // document, notify the audio channel agent.
-    NotifyAudioChannelAgent(false);
+    // Be careful to ignore this event during a docshell frame swap.
+    auto docShell = static_cast<nsDocShell*>(OwnerDoc()->GetDocShell());
+    if (!docShell) {
+      return;
+    }
+    if (!docShell->InFrameSwap()) {
+      NotifyAudioChannelAgent(false);
+    }
   }
 }
 

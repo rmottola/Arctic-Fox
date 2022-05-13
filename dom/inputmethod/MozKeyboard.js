@@ -19,11 +19,33 @@ XPCOMUtils.defineLazyServiceGetter(this, "tm",
   "@mozilla.org/thread-manager;1", "nsIThreadManager");
 
 /*
- * A WeakMap to map input method iframe window to its active status and kbID.
+ * A WeakMap to map input method iframe window to
+ * it's active status, kbID, and ipcHelper.
  */
 let WindowMap = {
   // WeakMap of <window, object> pairs.
   _map: null,
+
+  /*
+   * Set the object associated to the window and return it.
+   */
+  _getObjForWin: function(win) {
+    if (!this._map) {
+      this._map = new WeakMap();
+    }
+    if (this._map.has(win)) {
+      return this._map.get(win);
+    } else {
+      let obj = {
+        active: false,
+        kbID: undefined,
+        ipcHelper: null
+      };
+      this._map.set(win, obj);
+
+      return obj;
+    }
+  },
 
   /*
    * Check if the given window is active.
@@ -33,12 +55,7 @@ let WindowMap = {
       return false;
     }
 
-    let obj = this._map.get(win);
-    if (obj && 'active' in obj) {
-      return obj.active;
-    }else{
-      return false;
-    }
+    return this._getObjForWin(win).active;
   },
 
   /*
@@ -48,45 +65,59 @@ let WindowMap = {
     if (!win) {
       return;
     }
-    if (!this._map) {
-      this._map = new WeakMap();
-    }
-    if (!this._map.has(win)) {
-      this._map.set(win, {});
-    }
-    this._map.get(win).active = isActive;
+    let obj = this._getObjForWin(win);
+    obj.active = isActive;
   },
 
   /*
-   * Get the keyboard ID (assigned by Keyboard.ksm) of the given window.
+   * Get the keyboard ID (assigned by Keyboard.jsm) of the given window.
    */
   getKbID: function(win) {
     if (!this._map || !win) {
-      return null;
+      return undefined;
     }
 
-    let obj = this._map.get(win);
-    if (obj && 'kbID' in obj) {
-      return obj.kbID;
-    }else{
-      return null;
-    }
+    let obj = this._getObjForWin(win);
+    return obj.kbID;
   },
 
   /*
-   * Set the keyboard ID (assigned by Keyboard.ksm) of the given window.
+   * Set the keyboard ID (assigned by Keyboard.jsm) of the given window.
    */
   setKbID: function(win, kbID) {
     if (!win) {
       return;
     }
-    if (!this._map) {
-      this._map = new WeakMap();
+    let obj = this._getObjForWin(win);
+    obj.kbID = kbID;
+  },
+
+  /*
+   * Get InputContextDOMRequestIpcHelper instance attached to this window.
+   */
+  getInputContextIpcHelper: function(win) {
+    if (!win) {
+      return;
     }
-    if (!this._map.has(win)) {
-      this._map.set(win, {});
+    let obj = this._getObjForWin(win);
+    if (!obj.ipcHelper) {
+      obj.ipcHelper = new InputContextDOMRequestIpcHelper(win);
     }
-    this._map.get(win).kbID = kbID;
+    return obj.ipcHelper;
+  },
+
+  /*
+   * Unset InputContextDOMRequestIpcHelper instance.
+   */
+  unsetInputContextIpcHelper: function(win) {
+    if (!win) {
+      return;
+    }
+    let obj = this._getObjForWin(win);
+    if (!obj.ipcHelper) {
+      return;
+    }
+    obj.ipcHelper = null;
   }
 };
 
@@ -182,14 +213,8 @@ MozInputMethod.prototype = {
       this._isSystem = true;
     }
 
-    // Check if we can use keyboard related APIs.
-    let testing = false;
-    try {
-      testing = Services.prefs.getBoolPref("dom.mozInputMethod.testing");
-    } catch (e) {
-    }
     perm = Services.perms.testExactPermissionFromPrincipal(principal, "input");
-    if (!testing && perm !== Ci.nsIPermissionManager.ALLOW_ACTION) {
+    if (perm !== Ci.nsIPermissionManager.ALLOW_ACTION) {
       this._isKeyboard = false;
       return;
     }
@@ -332,9 +357,9 @@ MozInputMethod.prototype = {
       // Note: if we need to get it from Keyboard.jsm,
       // we have to use a synchronous message
       var kbID = WindowMap.getKbID(this._window);
-      if (kbID !== null) {
+      if (kbID) {
         cpmmSendAsyncMessageWithKbID(this, 'Keyboard:Register', {});
-      }else{
+      } else {
         let res = cpmm.sendSyncMessage('Keyboard:Register', {});
         WindowMap.setKbID(this._window, res[0]);
       }
@@ -350,7 +375,7 @@ MozInputMethod.prototype = {
   },
 
   addInput: function(inputId, inputManifest) {
-    return this._sendPromise(function(resolverId) {
+    return this.createPromiseWithId(function(resolverId) {
       let appId = this._window.document.nodePrincipal.appId;
 
       cpmm.sendAsyncMessage('InputRegistry:Add', {
@@ -363,7 +388,7 @@ MozInputMethod.prototype = {
   },
 
   removeInput: function(inputId) {
-    return this._sendPromise(function(resolverId) {
+    return this.createPromiseWithId(function(resolverId) {
       let appId = this._window.document.nodePrincipal.appId;
 
       cpmm.sendAsyncMessage('InputRegistry:Remove', {
@@ -404,14 +429,61 @@ MozInputMethod.prototype = {
     if (!this._isSystem) {
       throw new this._window.Error("Should have 'input-manage' permssion.");
     }
+  }
+};
+
+ /**
+ * ==============================================
+ * InputContextDOMRequestIpcHelper
+ * ==============================================
+ */
+function InputContextDOMRequestIpcHelper(win) {
+  this.initDOMRequestHelper(win,
+    ["Keyboard:GetText:Result:OK",
+     "Keyboard:GetText:Result:Error",
+     "Keyboard:SetSelectionRange:Result:OK",
+     "Keyboard:ReplaceSurroundingText:Result:OK",
+     "Keyboard:SendKey:Result:OK",
+     "Keyboard:SendKey:Result:Error",
+     "Keyboard:SetComposition:Result:OK",
+     "Keyboard:EndComposition:Result:OK",
+     "Keyboard:SequenceError"]);
+}
+
+InputContextDOMRequestIpcHelper.prototype = {
+  __proto__: DOMRequestIpcHelper.prototype,
+  _inputContext: null,
+
+  attachInputContext: function(inputCtx) {
+    if (this._inputContext) {
+      throw new Error("InputContextDOMRequestIpcHelper: detach the context first.");
+    }
+
+    this._inputContext = inputCtx;
   },
 
-  _sendPromise: function(callback) {
-    let self = this;
-    return this.createPromise(function(resolve, reject) {
-      let resolverId = self.getPromiseResolverId({ resolve: resolve, reject: reject });
-      callback(resolverId);
+  // Unset ourselves when the window is destroyed.
+  uninit: function() {
+    WindowMap.unsetInputContextIpcHelper(this._window);
+  },
+
+  detachInputContext: function() {
+    // All requests that are still pending need to be invalidated
+    // because the context is no longer valid.
+    this.forEachPromiseResolver(k => {
+      this.takePromiseResolver(k).reject("InputContext got destroyed");
     });
+
+    this._inputContext = null;
+  },
+
+  receiveMessage: function(msg) {
+    if (!this._inputContext) {
+      dump('InputContextDOMRequestIpcHelper received message without context attached.\n');
+      return;
+    }
+
+    this._inputContext.receiveMessage(msg);
   }
 };
 
@@ -438,11 +510,10 @@ function MozInputContext(ctx) {
 }
 
 MozInputContext.prototype = {
-  __proto__: DOMRequestIpcHelper.prototype,
-
   _window: null,
   _context: null,
   _contextId: -1,
+  _ipcHelper: null,
 
   classID: Components.ID("{1e38633d-d08b-4867-9944-afa5c648adb6}"),
 
@@ -453,30 +524,12 @@ MozInputContext.prototype = {
 
   init: function ic_init(win) {
     this._window = win;
-    this._utils = win.QueryInterface(Ci.nsIInterfaceRequestor)
-                     .getInterface(Ci.nsIDOMWindowUtils);
-    this.initDOMRequestHelper(win,
-      ["Keyboard:GetText:Result:OK",
-       "Keyboard:GetText:Result:Error",
-       "Keyboard:SetSelectionRange:Result:OK",
-       "Keyboard:ReplaceSurroundingText:Result:OK",
-       "Keyboard:SendKey:Result:OK",
-       "Keyboard:SendKey:Result:Error",
-       "Keyboard:SetComposition:Result:OK",
-       "Keyboard:EndComposition:Result:OK",
-       "Keyboard:SequenceError"]);
+
+    this._ipcHelper = WindowMap.getInputContextIpcHelper(win);
+    this._ipcHelper.attachInputContext(this);
   },
 
   destroy: function ic_destroy() {
-    let self = this;
-
-    // All requests that are still pending need to be invalidated
-    // because the context is no longer valid.
-    this.forEachPromiseResolver(function(k) {
-      self.takePromiseResolver(k).reject("InputContext got destroyed");
-    });
-    this.destroyDOMRequestHelper();
-
     // A consuming application might still hold a cached version of
     // this object. After destroying all methods will throw because we
     // cannot create new promises anymore, but we still hold
@@ -486,6 +539,9 @@ MozInputContext.prototype = {
         this._context[k] = null;
       }
     }
+
+    this._ipcHelper.detachInputContext();
+    this._ipcHelper = null;
 
     this._window = null;
   },
@@ -497,9 +553,10 @@ MozInputContext.prototype = {
     }
 
     let json = msg.json;
-    let resolver = this.takePromiseResolver(json.requestId);
+    let resolver = this._ipcHelper.takePromiseResolver(json.requestId);
 
     if (!resolver) {
+      dump('InputContext received invalid requestId.\n');
       return;
     }
 
@@ -510,7 +567,7 @@ MozInputContext.prototype = {
 
     switch (msg.name) {
       case "Keyboard:SendKey:Result:OK":
-        resolver.resolve();
+        resolver.resolve(true);
         break;
       case "Keyboard:SendKey:Result:Error":
         resolver.reject(json.error);
@@ -533,7 +590,7 @@ MozInputContext.prototype = {
         break;
       case "Keyboard:SetComposition:Result:OK": // Fall through.
       case "Keyboard:EndComposition:Result:OK":
-        resolver.resolve();
+        resolver.resolve(true);
         break;
       default:
         dump("Could not find a handler for " + msg.name);
@@ -675,55 +732,130 @@ MozInputContext.prototype = {
     return this.replaceSurroundingText(null, offset, length);
   },
 
-  sendKey: function ic_sendKey(keyCode, charCode, modifiers, repeat) {
-    let self = this;
-    return this._sendPromise(function(resolverId) {
-      cpmmSendAsyncMessageWithKbID(self, 'Keyboard:SendKey', {
-        contextId: self._contextId,
+  sendKey: function ic_sendKey(dictOrKeyCode, charCode, modifiers, repeat) {
+    if (typeof dictOrKeyCode === 'number') {
+      // XXX: modifiers are ignored in this API method.
+
+      return this._sendPromise((resolverId) => {
+        cpmmSendAsyncMessageWithKbID(this, 'Keyboard:SendKey', {
+          contextId: this._contextId,
+          requestId: resolverId,
+          method: 'sendKey',
+          keyCode: dictOrKeyCode,
+          charCode: charCode,
+          repeat: repeat
+        });
+      });
+    } else if (typeof dictOrKeyCode === 'object') {
+      return this._sendPromise((resolverId) => {
+        cpmmSendAsyncMessageWithKbID(this, 'Keyboard:SendKey', {
+          contextId: this._contextId,
+          requestId: resolverId,
+          method: 'sendKey',
+          keyboardEventDict: this._getkeyboardEventDict(dictOrKeyCode)
+        });
+      });
+    } else {
+      // XXX: Should not reach here; implies WebIDL binding error.
+      throw new TypeError('Unknown argument passed.');
+    }
+  },
+
+  keydown: function ic_keydown(dict) {
+    return this._sendPromise((resolverId) => {
+      cpmmSendAsyncMessageWithKbID(this, 'Keyboard:SendKey', {
+        contextId: this._contextId,
+         requestId: resolverId,
+        method: 'keydown',
+        keyboardEventDict: this._getkeyboardEventDict(dict)
+       });
+     });
+   },
+
+  keyup: function ic_keyup(dict) {
+    return this._sendPromise((resolverId) => {
+      cpmmSendAsyncMessageWithKbID(this, 'Keyboard:SendKey', {
+        contextId: this._contextId,
         requestId: resolverId,
-        keyCode: keyCode,
-        charCode: charCode,
-        modifiers: modifiers,
-        repeat: repeat
+        method: 'keyup',
+        keyboardEventDict: this._getkeyboardEventDict(dict)
       });
     });
   },
 
-  setComposition: function ic_setComposition(text, cursor, clauses) {
+  setComposition: function ic_setComposition(text, cursor, clauses, dict) {
     let self = this;
-    return this._sendPromise(function(resolverId) {
+    return this._sendPromise((resolverId) => {
       cpmmSendAsyncMessageWithKbID(self, 'Keyboard:SetComposition', {
         contextId: self._contextId,
         requestId: resolverId,
         text: text,
         cursor: (typeof cursor !== 'undefined') ? cursor : text.length,
-        clauses: clauses || null
+        clauses: clauses || null,
+        keyboardEventDict: this._getkeyboardEventDict(dict)
       });
     });
   },
 
-  endComposition: function ic_endComposition(text) {
+  endComposition: function ic_endComposition(text, dict) {
     let self = this;
-    return this._sendPromise(function(resolverId) {
+    return this._sendPromise((resolverId) => {
       cpmmSendAsyncMessageWithKbID(self, 'Keyboard:EndComposition', {
         contextId: self._contextId,
         requestId: resolverId,
-        text: text || ''
+        text: text || '',
+        keyboardEventDict: this._getkeyboardEventDict(dict)
       });
     });
   },
 
   _sendPromise: function(callback) {
     let self = this;
-    return this.createPromise(function(resolve, reject) {
-      let resolverId = self.getPromiseResolverId({ resolve: resolve, reject: reject });
+    return this._ipcHelper.createPromiseWithId(function(aResolverId) {
       if (!WindowMap.isActive(self._window)) {
-        self.removePromiseResolver(resolverId);
+        self._ipcHelper.removePromiseResolver(aResolverId);
         reject('Input method is not active.');
         return;
       }
-      callback(resolverId);
+      callback(aResolverId);
     });
+  },
+
+  // Take a MozInputMethodKeyboardEventDict dict, creates a keyboardEventDict
+  // object that can be sent to forms.js
+  _getkeyboardEventDict: function(dict) {
+    if (typeof dict !== 'object' || !dict.key) {
+      return;
+    }
+
+    var keyboardEventDict = {
+      key: dict.key,
+      code: dict.code,
+      repeat: dict.repeat,
+      flags: 0
+    };
+
+    if (dict.printable) {
+      keyboardEventDict.flags |=
+        Ci.nsITextInputProcessor.KEY_FORCE_PRINTABLE_KEY;
+    }
+
+    if (/^[a-zA-Z0-9]$/.test(dict.key)) {
+      // keyCode must follow the key value in this range;
+      // disregard the keyCode from content.
+      keyboardEventDict.keyCode = dict.key.toUpperCase().charCodeAt(0);
+    } else if (typeof dict.keyCode === 'number') {
+      // Allow keyCode to be specified for other key values.
+      keyboardEventDict.keyCode = dict.keyCode;
+
+      // Allow keyCode to be explicitly set to zero.
+      if (dict.keyCode === 0) {
+        keyboardEventDict.flags |=
+          Ci.nsITextInputProcessor.KEY_KEEP_KEYCODE_ZERO;
+      }
+    }
+
+    return keyboardEventDict;
   }
 };
 

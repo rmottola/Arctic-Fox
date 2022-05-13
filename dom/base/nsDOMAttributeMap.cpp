@@ -306,8 +306,7 @@ nsDOMAttributeMap::SetNamedItemInternal(Attr& aAttr,
     nsAutoString name;
     aAttr.GetName(name);
     oldNi = mContent->GetExistingAttrNameFromQName(name);
-  }
-  else {
+  } else {
     uint32_t i, count = mContent->GetAttrCount();
     for (i = 0; i < count; ++i) {
       const nsAttrName* name = mContent->GetAttrNameAt(i);
@@ -337,6 +336,25 @@ nsDOMAttributeMap::SetNamedItemInternal(Attr& aAttr,
       attr = RemoveNamedItem(oldNi, aError);
       NS_ASSERTION(attr->NodeInfo()->NameAndNamespaceEquals(oldNi),
         "RemoveNamedItem() called, attr->NodeInfo() should be equal to oldNi!");
+
+      // That might have run mutation event listeners, so re-verify
+      // our assumptions.
+      nsDOMAttributeMap* newOwner = aAttr.GetMap();
+      if (newOwner) {
+        if (newOwner == this) {
+          // OK, we're just done here.
+          return attr.forget();
+        }
+
+        // The attr we're trying to set got stuck on some other
+        // element.  Just throw, for lack of anything better to do.
+        aError.Throw(NS_ERROR_DOM_INUSE_ATTRIBUTE_ERR);
+        return nullptr;
+      } else if (mContent->OwnerDoc() != aAttr.OwnerDoc()) {
+        // Got moved into a different document, boo.
+        aError.Throw(NS_ERROR_DOM_HIERARCHY_REQUEST_ERR);
+        return nullptr;
+      }
     }
   }
 

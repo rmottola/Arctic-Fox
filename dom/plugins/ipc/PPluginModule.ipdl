@@ -5,10 +5,12 @@
 
 include protocol PPluginInstance;
 include protocol PPluginScriptableObject;
+include protocol PCrashReporter;
 include protocol PContent;
 
 using NPError from "npapi.h";
 using NPNVariable from "npapi.h";
+using mozilla::dom::NativeThreadId from "mozilla/dom/TabMessageUtils.h";
 using class mac_plugin_interposing::NSCursorInfo from "mozilla/plugins/PluginMessageUtils.h";
 using struct nsID from "nsID.h";
 
@@ -35,6 +37,7 @@ intr protocol PPluginModule
   bridges PContent, PPluginModule;
 
   manages PPluginInstance;
+  manages PCrashReporter;
 
 both:
   // Window-specific message which instructs the interrupt mechanism to enter
@@ -83,6 +86,9 @@ child:
                             nsString aIconPath);
 
   async SetParentHangTimeout(uint32_t seconds);
+
+  intr PCrashReporter()
+    returns (NativeThreadId tid, uint32_t processType);
 
   /**
    * Control the Gecko Profiler in the plugin process.

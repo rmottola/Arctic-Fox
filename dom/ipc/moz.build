@@ -19,6 +19,7 @@ EXPORTS.mozilla.dom.ipc += [
     'BlobParent.h',
     'IdType.h',
     'nsIRemoteBlob.h',
+    'StructuredCloneData.h',
 ]
 
 EXPORTS.mozilla.dom += [
@@ -29,13 +30,14 @@ EXPORTS.mozilla.dom += [
     'ContentProcess.h',
     'ContentProcessManager.h',
     'CPOWManagerGetter.h',
+    'CrashReporterChild.h',
+    'CrashReporterParent.h',
     'FilePickerParent.h',
     'nsIContentChild.h',
     'nsIContentParent.h',
     'NuwaChild.h',
     'NuwaParent.h',
     'PermissionMessageUtils.h',
-    'StructuredCloneUtils.h',
     'TabChild.h',
     'TabContext.h',
     'TabMessageUtils.h',
@@ -58,6 +60,7 @@ UNIFIED_SOURCES += [
     'ContentParent.cpp',
     'ContentProcess.cpp',
     'ContentProcessManager.cpp',
+    'CrashReporterParent.cpp',
     'FilePickerParent.cpp',
     'nsIContentChild.cpp',
     'nsIContentParent.cpp',
@@ -67,7 +70,7 @@ UNIFIED_SOURCES += [
     'PreallocatedProcessManager.cpp',
     'ProcessPriorityManager.cpp',
     'ScreenManagerParent.cpp',
-    'StructuredCloneUtils.cpp',
+    'StructuredCloneData.cpp',
     'TabChild.cpp',
     'TabContext.cpp',
     'TabMessageUtils.cpp',
@@ -75,10 +78,13 @@ UNIFIED_SOURCES += [
 ]
 
 # Blob.cpp cannot be compiled in unified mode because it triggers a fatal gcc warning.
+# CrashReporterChild.cpp cannot be compiled in unified mode because of name clashes
+# in OS X headers.
 # ContentChild.cpp cannot be compiled in unified mode on  linux due to Time conflict
 SOURCES += [
     'Blob.cpp',
     'ContentChild.cpp',
+    'CrashReporterChild.cpp',
     'ProcessHangMonitor.cpp',
 ]
 
@@ -94,6 +100,7 @@ IPDL_SOURCES += [
     'PContentBridge.ipdl',
     'PContentPermission.ipdlh',
     'PContentPermissionRequest.ipdl',
+    'PCrashReporter.ipdl',
     'PCycleCollectWithLogs.ipdl',
     'PDocumentRenderer.ipdl',
     'PFilePicker.ipdl',
@@ -119,7 +126,8 @@ LOCAL_INCLUDES += [
     '/chrome',
     '/docshell/base',
     '/dom/base',
-    '/dom/bluetooth',
+    '/dom/bluetooth/common',
+    '/dom/bluetooth/ipc',
     '/dom/devicestorage',
     '/dom/filesystem',
     '/dom/fmradio/ipc',
@@ -157,17 +165,6 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gonk', 'qt'):
 
 if CONFIG['MOZ_TOOLKIT_SEARCH']:
     DEFINES['MOZ_TOOLKIT_SEARCH'] = True
-
-if CONFIG['MOZ_B2G_BT_API_V1']:
-    LOCAL_INCLUDES += [
-        '/dom/bluetooth/bluetooth1',
-        '/dom/bluetooth/bluetooth1/ipc',
-    ]
-else:
-    LOCAL_INCLUDES += [
-        '/dom/bluetooth/bluetooth2',
-        '/dom/bluetooth/bluetooth2/ipc',
-    ]
 
 JAR_MANIFESTS += ['jar.mn']
 

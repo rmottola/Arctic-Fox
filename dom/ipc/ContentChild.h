@@ -158,6 +158,12 @@ public:
                                         override;
     virtual bool DeallocPBlobChild(PBlobChild* aActor) override;
 
+    virtual PCrashReporterChild*
+    AllocPCrashReporterChild(const mozilla::dom::NativeThreadId& id,
+                             const uint32_t& processType) override;
+    virtual bool
+    DeallocPCrashReporterChild(PCrashReporterChild*) override;
+
     virtual PHalChild* AllocPHalChild() override;
     virtual bool DeallocPHalChild(PHalChild*) override;
 
@@ -270,6 +276,7 @@ public:
     virtual bool DeallocPPresentationChild(PPresentationChild* aActor) override;
     virtual bool RecvNotifyPresentationReceiverLaunched(PBrowserChild* aIframe,
                                                         const nsString& aSessionId) override;
+    virtual bool RecvNotifyPresentationReceiverCleanUp(const nsString& aSessionId) override;
 
     virtual PSpeechSynthesisChild* AllocPSpeechSynthesisChild() override;
     virtual bool DeallocPSpeechSynthesisChild(PSpeechSynthesisChild* aActor) override;

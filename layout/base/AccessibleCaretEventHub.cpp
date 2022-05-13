@@ -66,11 +66,6 @@ public:
     aContext->SetState(aContext->ScrollState());
   }
 
-  virtual void OnScrolling(AccessibleCaretEventHub* aContext) override
-  {
-    aContext->mManager->OnScrolling();
-  }
-
   virtual void OnScrollPositionChanged(AccessibleCaretEventHub* aContext) override
   {
     aContext->mManager->OnScrollPositionChanged();
@@ -501,30 +496,30 @@ AccessibleCaretEventHub::HandleMouseEvent(WidgetMouseEvent* aEvent)
   nsPoint point = GetMouseEventPosition(aEvent);
 
   switch (aEvent->mMessage) {
-  case NS_MOUSE_BUTTON_DOWN:
-    AC_LOGV("Before NS_MOUSE_BUTTON_DOWN, state: %s", mState->Name());
+  case eMouseDown:
+    AC_LOGV("Before eMouseDown, state: %s", mState->Name());
     rv = mState->OnPress(this, point, id);
-    AC_LOGV("After NS_MOUSE_BUTTON_DOWN, state: %s, consume: %d",
+    AC_LOGV("After eMouseDown, state: %s, consume: %d",
             mState->Name(), rv);
     break;
 
-  case NS_MOUSE_MOVE:
-    AC_LOGV("Before NS_MOUSE_MOVE, state: %s", mState->Name());
+  case eMouseMove:
+    AC_LOGV("Before eMouseMove, state: %s", mState->Name());
     rv = mState->OnMove(this, point);
-    AC_LOGV("After NS_MOUSE_MOVE, state: %s, consume: %d", mState->Name(), rv);
+    AC_LOGV("After eMouseMove, state: %s, consume: %d", mState->Name(), rv);
     break;
 
-  case NS_MOUSE_BUTTON_UP:
-    AC_LOGV("Before NS_MOUSE_BUTTON_UP, state: %s", mState->Name());
+  case eMouseUp:
+    AC_LOGV("Before eMouseUp, state: %s", mState->Name());
     rv = mState->OnRelease(this);
-    AC_LOGV("After NS_MOUSE_BUTTON_UP, state: %s, consume: %d", mState->Name(),
+    AC_LOGV("After eMouseUp, state: %s, consume: %d", mState->Name(),
             rv);
     break;
 
-  case NS_MOUSE_MOZLONGTAP:
-    AC_LOGV("Before NS_MOUSE_MOZLONGTAP, state: %s", mState->Name());
+  case eMouseLongTap:
+    AC_LOGV("Before eMouseLongTap, state: %s", mState->Name());
     rv = mState->OnLongTap(this, point);
-    AC_LOGV("After NS_MOUSE_MOZLONGTAP, state: %s, consume: %d", mState->Name(),
+    AC_LOGV("After eMouseLongTap, state: %s, consume: %d", mState->Name(),
             rv);
     break;
 
@@ -539,19 +534,19 @@ nsEventStatus
 AccessibleCaretEventHub::HandleWheelEvent(WidgetWheelEvent* aEvent)
 {
   switch (aEvent->mMessage) {
-  case NS_WHEEL_WHEEL:
-    AC_LOGV("NS_WHEEL_WHEEL, isMomentum %d, state: %s", aEvent->isMomentum,
+  case eWheel:
+    AC_LOGV("eWheel, isMomentum %d, state: %s", aEvent->isMomentum,
             mState->Name());
     mState->OnScrolling(this);
     break;
 
-  case NS_WHEEL_START:
-    AC_LOGV("NS_WHEEL_START, state: %s", mState->Name());
+  case eWheelOperationStart:
+    AC_LOGV("eWheelOperationStart, state: %s", mState->Name());
     mState->OnScrollStart(this);
     break;
 
-  case NS_WHEEL_STOP:
-    AC_LOGV("NS_WHEEL_STOP, state: %s", mState->Name());
+  case eWheelOperationEnd:
+    AC_LOGV("eWheelOperationEnd, state: %s", mState->Name());
     mState->OnScrollEnd(this);
     break;
 
@@ -574,28 +569,28 @@ AccessibleCaretEventHub::HandleTouchEvent(WidgetTouchEvent* aEvent)
   nsPoint point = GetTouchEventPosition(aEvent, id);
 
   switch (aEvent->mMessage) {
-  case NS_TOUCH_START:
-    AC_LOGV("Before NS_TOUCH_START, state: %s", mState->Name());
+  case eTouchStart:
+    AC_LOGV("Before eTouchStart, state: %s", mState->Name());
     rv = mState->OnPress(this, point, id);
-    AC_LOGV("After NS_TOUCH_START, state: %s, consume: %d", mState->Name(), rv);
+    AC_LOGV("After eTouchStart, state: %s, consume: %d", mState->Name(), rv);
     break;
 
-  case NS_TOUCH_MOVE:
-    AC_LOGV("Before NS_TOUCH_MOVE, state: %s", mState->Name());
+  case eTouchMove:
+    AC_LOGV("Before eTouchMove, state: %s", mState->Name());
     rv = mState->OnMove(this, point);
-    AC_LOGV("After NS_TOUCH_MOVE, state: %s, consume: %d", mState->Name(), rv);
+    AC_LOGV("After eTouchMove, state: %s, consume: %d", mState->Name(), rv);
     break;
 
-  case NS_TOUCH_END:
-    AC_LOGV("Before NS_TOUCH_END, state: %s", mState->Name());
+  case eTouchEnd:
+    AC_LOGV("Before eTouchEnd, state: %s", mState->Name());
     rv = mState->OnRelease(this);
-    AC_LOGV("After NS_TOUCH_END, state: %s, consume: %d", mState->Name(), rv);
+    AC_LOGV("After eTouchEnd, state: %s, consume: %d", mState->Name(), rv);
     break;
 
-  case NS_TOUCH_CANCEL:
-    AC_LOGV("Before NS_TOUCH_CANCEL, state: %s", mState->Name());
+  case eTouchCancel:
+    AC_LOGV("Before eTouchCancel, state: %s", mState->Name());
     rv = mState->OnRelease(this);
-    AC_LOGV("After NS_TOUCH_CANCEL, state: %s, consume: %d", mState->Name(),
+    AC_LOGV("After eTouchCancel, state: %s, consume: %d", mState->Name(),
             rv);
     break;
 
@@ -610,9 +605,9 @@ nsEventStatus
 AccessibleCaretEventHub::HandleKeyboardEvent(WidgetKeyboardEvent* aEvent)
 {
   switch (aEvent->mMessage) {
-  case NS_KEY_UP:
-  case NS_KEY_DOWN:
-  case NS_KEY_PRESS:
+  case eKeyUp:
+  case eKeyDown:
+  case eKeyPress:
     mManager->OnKeyboardEvent();
     break;
 

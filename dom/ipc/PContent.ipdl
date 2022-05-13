@@ -13,6 +13,7 @@ include protocol PCompositor;
 include protocol PContentBridge;
 include protocol PContentPermissionRequest;
 include protocol PCycleCollectWithLogs;
+include protocol PCrashReporter;
 include protocol PPSMContentDownloader;
 include protocol PExternalHelperApp;
 include protocol PDeviceStorageRequest;
@@ -80,13 +81,14 @@ using struct IPC::Permission from "mozilla/net/NeckoMessageUtils.h";
 using class IPC::Principal from "mozilla/dom/PermissionMessageUtils.h";
 using struct mozilla::null_t from "ipc/IPCMessageUtils.h";
 using struct mozilla::void_t from "ipc/IPCMessageUtils.h";
+using mozilla::dom::NativeThreadId from "mozilla/dom/TabMessageUtils.h";
 using mozilla::dom::quota::PersistenceType from "mozilla/dom/quota/PersistenceType.h";
 using mozilla::hal::ProcessPriority from "mozilla/HalTypes.h";
 using gfxIntSize from "nsSize.h";
 using mozilla::dom::TabId from "mozilla/dom/ipc/IdType.h";
 using mozilla::dom::ContentParentId from "mozilla/dom/ipc/IdType.h";
 using struct LookAndFeelInt from "mozilla/widget/WidgetMessageUtils.h";
-using struct mozilla::OwningSerializedStructuredCloneBuffer from "ipc/IPCMessageUtils.h";
+using class mozilla::dom::ipc::StructuredCloneData from "ipc/IPCMessageUtils.h";
 
 union ChromeRegistryItem
 {
@@ -422,6 +424,7 @@ prio(normal upto urgent) sync protocol PContent
     manages PBrowser;
     manages PCellBroadcast;
     manages PContentPermissionRequest;
+    manages PCrashReporter;
     manages PCycleCollectWithLogs;
     manages PDeviceStorageRequest;
     manages PFileSystemRequest;
@@ -645,7 +648,6 @@ child:
      */
     GamepadUpdate(GamepadChangeEvent aGamepadEvent);
 
-
     /**
      * Tell the child that for testing purposes, a graphics device reset has
      * occurred.
@@ -657,6 +659,12 @@ child:
      * correspondent iframe.
      */
     async NotifyPresentationReceiverLaunched(PBrowser aIframe, nsString aSessionId);
+
+    /**
+     * Notify the child that the info about a presentation receiver needs to be
+     * cleaned up.
+     */
+    async NotifyPresentationReceiverCleanUp(nsString aSessionId);
 
 parent:
     /**
@@ -678,7 +686,7 @@ parent:
         returns (bool isOffline, bool isConnected, bool isLangRTL, nsString[] dictionaries,
                  ClipboardCapabilities clipboardCaps,
                  DomainPolicyClone domainPolicy,
-                 OwningSerializedStructuredCloneBuffer initialData);
+                 StructuredCloneData initialData);
 
     sync CreateChildProcess(IPCTabContext context,
                             ProcessPriority priority,
@@ -732,6 +740,8 @@ parent:
 
     PFileSystemRequest(FileSystemParams params);
 
+    sync PCrashReporter(NativeThreadId tid, uint32_t processType);
+
     prio(urgent) sync GetRandomValues(uint32_t length)
         returns (uint8_t[] randomValues);
 
@@ -777,7 +787,7 @@ parent:
     PFMRadio();
 
     PWebrtcGlobal();
-    
+
     PPresentation();
 
     // Services remoting
@@ -795,11 +805,11 @@ parent:
 
     sync SyncMessage(nsString aMessage, ClonedMessageData aData,
                      CpowEntry[] aCpows, Principal aPrincipal)
-      returns (OwningSerializedStructuredCloneBuffer[] retval);
+      returns (StructuredCloneData[] retval);
 
     prio(high) sync RpcMessage(nsString aMessage, ClonedMessageData aData,
                                CpowEntry[] aCpows, Principal aPrincipal)
-      returns (OwningSerializedStructuredCloneBuffer[] retval);
+      returns (StructuredCloneData[] retval);
 
     ShowAlertNotification(nsString imageUrl,
                           nsString title,

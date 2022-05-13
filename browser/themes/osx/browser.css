@@ -2203,3 +2203,7 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     height: 16px;
 }
 
+
+.browser-action-panel > .panel-arrowcontainer > .panel-arrowcontent {
+  padding: 0;
+}

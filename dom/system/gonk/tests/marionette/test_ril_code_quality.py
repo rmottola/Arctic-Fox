@@ -107,8 +107,8 @@ class ResourceUriFileReader:
     }
 
     CODE_OPEN_CHANNEL_BY_URI = '''
-    var Cc = SpecialPowers.Cc;
-    var Ci = SpecialPowers.Ci;
+    var Cc = Components.classes;
+    var Ci = Components.interfaces;
     var ios = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
     var secMan = Cc["@mozilla.org/scriptsecuritymanager;1"].getService(Ci.nsIScriptSecurityManager);
     global.uri = '%(uri)s';
@@ -127,8 +127,8 @@ class ResourceUriFileReader:
     '''
 
     CODE_READ_CONTENT = '''
-    var Cc = SpecialPowers.Cc;
-    var Ci = SpecialPowers.Ci;
+    var Cc = Components.classes;
+    var Ci = Components.interfaces;
 
     var zipReader = Cc["@mozilla.org/libjar/zip-reader;1"].createInstance(Ci.nsIZipReader);
     var inputStream = Cc["@mozilla.org/scriptableinputstream;1"].createInstance(Ci.nsIScriptableInputStream);
@@ -153,7 +153,9 @@ class ResourceUriFileReader:
             return cls.URI_PREFIX + cls.URI_PATH[filename]
 
     def __init__(self, marionette):
-        self.runjs = lambda x: marionette.execute_script(x, new_sandbox=False)
+        self.runjs = lambda x: marionette.execute_script(x,
+                                                         new_sandbox=False,
+                                                         sandbox='system')
 
     def read_file(self, filename):
         """Read file and return the contents as string."""
@@ -208,7 +210,9 @@ class JSHintEngine:
                             for line in config.splitlines()])
 
         # Set global (JSHINT, options, global) in js environment.
-        self.runjs = lambda x: marionette.execute_script(x, new_sandbox=False)
+        self.runjs = lambda x: marionette.execute_script(x,
+                                                         new_sandbox=False,
+                                                         sandbox='system')
         self.runjs(self.CODE_INIT_JSHINT %
                    {'script': script, 'config_string': repr(config)})
 

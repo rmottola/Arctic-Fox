@@ -367,7 +367,6 @@ BluetoothOppManager::StartSendingNextFile()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  MOZ_ASSERT(!IsConnected());
   MOZ_ASSERT(!mBatches.IsEmpty());
   MOZ_ASSERT((int)mBatches[0].mBlobs.Length() > mCurrentBlobIndex + 1);
 
@@ -460,6 +459,7 @@ bool
 BluetoothOppManager::ProcessNextBatch()
 {
   MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(!IsConnected());
 
   // Remove the processed batch.
   // A batch is processed if we've incremented mCurrentBlobIndex for it.
@@ -592,9 +592,11 @@ BluetoothOppManager::AfterOppDisconnected()
     mOutputStream = nullptr;
   }
 
-  if (mReadFileThread) {
-    mReadFileThread->Shutdown();
-    mReadFileThread = nullptr;
+  // Store local pointer of |mReadFileThread| to avoid shutdown reentry crash
+  // See bug 1191715 comment 19 for more details.
+  nsCOMPtr<nsIThread> thread = mReadFileThread.forget();
+  if (thread) {
+    thread->Shutdown();
   }
 
   // Release the mount lock if file transfer completed
@@ -783,7 +785,7 @@ BluetoothOppManager::RetrieveSentFileName()
   }
 
   /**
-   * We try our best to get the file extention to avoid interoperability issues.
+   * We try our best to get the file extension to avoid interoperability issues.
    * However, once we found that we are unable to get suitable extension or
    * information about the content type, sending a pre-defined file name without
    * extension would be fine.
@@ -894,10 +896,19 @@ BluetoothOppManager::ServerDataHandler(UnixSocketBuffer* aMessage)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  uint8_t opCode;
+  /**
+   * Ensure
+   * - valid access to data[0], i.e., opCode
+   * - received packet length smaller than max packet length
+   */
   int receivedLength = aMessage->GetSize();
-  const uint8_t* data = aMessage->GetData();
+  if (receivedLength < 1 || receivedLength > MAX_PACKET_LENGTH) {
+    ReplyError(ObexResponseCode::BadRequest);
+    return;
+  }
 
+  uint8_t opCode;
+  const uint8_t* data = aMessage->GetData();
   if (mPutPacketReceivedLength > 0) {
     opCode = mPutFinalFlag ? ObexRequestCode::PutFinal : ObexRequestCode::Put;
   } else {
@@ -913,12 +924,13 @@ BluetoothOppManager::ServerDataHandler(UnixSocketBuffer* aMessage)
     }
   }
 
-  ObexHeaderSet pktHeaders(opCode);
+  ObexHeaderSet pktHeaders;
   if (opCode == ObexRequestCode::Connect) {
     // Section 3.3.1 "Connect", IrOBEX 1.2
     // [opcode:1][length:2][version:1][flags:1][MaxPktSizeWeCanReceive:2]
     // [Headers:var]
-    if (!ParseHeaders(&data[7], receivedLength - 7, &pktHeaders)) {
+    if (receivedLength < 7 ||
+        !ParseHeaders(&data[7], receivedLength - 7, &pktHeaders)) {
       ReplyError(ObexResponseCode::BadRequest);
       return;
     }
@@ -928,7 +940,8 @@ BluetoothOppManager::ServerDataHandler(UnixSocketBuffer* aMessage)
   } else if (opCode == ObexRequestCode::Abort) {
     // Section 3.3.5 "Abort", IrOBEX 1.2
     // [opcode:1][length:2][Headers:var]
-    if (!ParseHeaders(&data[3], receivedLength - 3, &pktHeaders)) {
+    if (receivedLength < 3 ||
+        !ParseHeaders(&data[3], receivedLength - 3, &pktHeaders)) {
       ReplyError(ObexResponseCode::BadRequest);
       return;
     }
@@ -938,7 +951,8 @@ BluetoothOppManager::ServerDataHandler(UnixSocketBuffer* aMessage)
   } else if (opCode == ObexRequestCode::Disconnect) {
     // Section 3.3.2 "Disconnect", IrOBEX 1.2
     // [opcode:1][length:2][Headers:var]
-    if (!ParseHeaders(&data[3], receivedLength - 3, &pktHeaders)) {
+    if (receivedLength < 3 ||
+        !ParseHeaders(&data[3], receivedLength - 3, &pktHeaders)) {
       ReplyError(ObexResponseCode::BadRequest);
       return;
     }
@@ -1021,6 +1035,13 @@ BluetoothOppManager::ClientDataHandler(UnixSocketBuffer* aMessage)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
+  // Ensure valid access to data[0], i.e., opCode
+  int receivedLength = aMessage->GetSize();
+  if (receivedLength < 1) {
+    BT_LOGR("Receive empty response packet");
+    return;
+  }
+
   const uint8_t* data = aMessage->GetData();
   uint8_t opCode = data[0];
 
@@ -1077,6 +1098,13 @@ BluetoothOppManager::ClientDataHandler(UnixSocketBuffer* aMessage)
     MOZ_ASSERT(mBlob);
 
     AfterOppConnected();
+
+    // Ensure valid access to remote information
+    if (receivedLength < 7) {
+      BT_LOGR("The length of connect response packet is invalid");
+      SendDisconnectRequest();
+      return;
+    }
 
     // Keep remote information
     mRemoteObexVersion = data[3];

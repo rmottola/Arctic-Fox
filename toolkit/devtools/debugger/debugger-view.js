@@ -53,10 +53,9 @@ let DebuggerView = {
     this.Toolbar.initialize();
     this.Options.initialize();
     this.Filtering.initialize();
-    this.FilteredSources.initialize();
-    this.FilteredFunctions.initialize();
     this.StackFrames.initialize();
     this.StackFramesClassicList.initialize();
+    this.Workers.initialize();
     this.Sources.initialize();
     this.VariableBubble.initialize();
     this.Tracer.initialize();
@@ -88,8 +87,6 @@ let DebuggerView = {
     this.Toolbar.destroy();
     this.Options.destroy();
     this.Filtering.destroy();
-    this.FilteredSources.destroy();
-    this.FilteredFunctions.destroy();
     this.StackFrames.destroy();
     this.StackFramesClassicList.destroy();
     this.Sources.destroy();
@@ -112,7 +109,7 @@ let DebuggerView = {
 
     this._body = document.getElementById("body");
     this._editorDeck = document.getElementById("editor-deck");
-    this._sourcesPane = document.getElementById("sources-pane");
+    this._workersAndSourcesPane = document.getElementById("workers-and-sources-pane");
     this._instrumentsPane = document.getElementById("instruments-pane");
     this._instrumentsPaneToggleButton = document.getElementById("instruments-pane-toggle");
 
@@ -127,7 +124,7 @@ let DebuggerView = {
     this._collapsePaneString = L10N.getStr("collapsePanes");
     this._expandPaneString = L10N.getStr("expandPanes");
 
-    this._sourcesPane.setAttribute("width", Prefs.sourcesWidth);
+    this._workersAndSourcesPane.setAttribute("width", Prefs.workersAndSourcesWidth);
     this._instrumentsPane.setAttribute("width", Prefs.instrumentsWidth);
     this.toggleInstrumentsPane({ visible: Prefs.panesVisibleOnStartup });
 
@@ -144,11 +141,11 @@ let DebuggerView = {
     dumpn("Destroying the DebuggerView panes");
 
     if (gHostType != "side") {
-      Prefs.sourcesWidth = this._sourcesPane.getAttribute("width");
+      Prefs.workersAndSourcesWidth = this._workersAndSourcesPane.getAttribute("width");
       Prefs.instrumentsWidth = this._instrumentsPane.getAttribute("width");
     }
 
-    this._sourcesPane = null;
+    this._workersAndSourcesPane = null;
     this._instrumentsPane = null;
     this._instrumentsPaneToggleButton = null;
   },
@@ -517,15 +514,17 @@ let DebuggerView = {
    * Gets the visibility state of the instruments pane.
    * @return boolean
    */
-  get instrumentsPaneHidden()
-    this._instrumentsPane.hasAttribute("pane-collapsed"),
+  get instrumentsPaneHidden() {
+    return this._instrumentsPane.hasAttribute("pane-collapsed");
+  },
 
   /**
    * Gets the currently selected tab in the instruments pane.
    * @return string
    */
-  get instrumentsPaneTab()
-    this._instrumentsPane.selectedTab.id,
+  get instrumentsPaneTab() {
+    return this._instrumentsPane.selectedTab.id;
+  },
 
   /**
    * Sets the instruments pane hidden or visible.
@@ -613,7 +612,7 @@ let DebuggerView = {
 
     // Move the soruces and instruments panes in a different container.
     let splitter = document.getElementById("sources-and-instruments-splitter");
-    vertContainer.insertBefore(this._sourcesPane, splitter);
+    vertContainer.insertBefore(this._workersAndSourcesPane, splitter);
     vertContainer.appendChild(this._instrumentsPane);
 
     // Make sure the vertical layout container's height doesn't repeatedly
@@ -632,12 +631,12 @@ let DebuggerView = {
     // The sources and instruments pane need to be inserted at their
     // previous locations in their normal container.
     let splitter = document.getElementById("sources-and-editor-splitter");
-    normContainer.insertBefore(this._sourcesPane, splitter);
+    normContainer.insertBefore(this._workersAndSourcesPane, splitter);
     normContainer.appendChild(this._instrumentsPane);
 
     // Revert to the preferred sources and instruments widths, because
     // they flexed in the vertical layout.
-    this._sourcesPane.setAttribute("width", Prefs.sourcesWidth);
+    this._workersAndSourcesPane.setAttribute("width", Prefs.workersAndSourcesWidth);
     this._instrumentsPane.setAttribute("width", Prefs.instrumentsWidth);
   },
 
@@ -648,8 +647,6 @@ let DebuggerView = {
     dumpn("Handling tab navigation in the DebuggerView");
 
     this.Filtering.clearSearch();
-    this.FilteredSources.clearView();
-    this.FilteredFunctions.clearView();
     this.GlobalSearch.clearView();
     this.StackFrames.empty();
     this.Sources.empty();
@@ -671,8 +668,6 @@ let DebuggerView = {
   Toolbar: null,
   Options: null,
   Filtering: null,
-  FilteredSources: null,
-  FilteredFunctions: null,
   GlobalSearch: null,
   StackFrames: null,
   Sources: null,
@@ -686,7 +681,7 @@ let DebuggerView = {
   _loadingText: "",
   _body: null,
   _editorDeck: null,
-  _sourcesPane: null,
+  _workersAndSourcesPane: null,
   _instrumentsPane: null,
   _instrumentsPaneToggleButton: null,
   _collapsePaneString: "",
@@ -760,9 +755,10 @@ ResultsPanelContainer.prototype = Heritage.extend(WidgetMethods, {
    * Gets this container's visibility state.
    * @return boolean
    */
-  get hidden()
-    this._panel.state == "closed" ||
-    this._panel.state == "hiding",
+  get hidden() {
+    return this._panel.state == "closed" ||
+           this._panel.state == "hiding";
+  },
 
   /**
    * Removes all items from this container and hides it.

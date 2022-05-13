@@ -8,7 +8,7 @@
 #include "HttpLog.h"
 
 #include "nsHttp.h"
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/HashFunctions.h"
 #include "nsCRT.h"
@@ -85,8 +85,8 @@ StringCompare(PLDHashTable *table, const PLDHashEntryHdr *entry,
 static const PLDHashTableOps ops = {
     StringHash,
     StringCompare,
-    PL_DHashMoveEntryStub,
-    PL_DHashClearEntryStub,
+    PLDHashTable::MoveEntryStub,
+    PLDHashTable::ClearEntryStub,
     nullptr
 };
 

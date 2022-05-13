@@ -537,7 +537,7 @@ Accessible::ChildAtPoint(int32_t aX, int32_t aY,
   nsIntRect rootRect;
   rootWidget->GetScreenBounds(rootRect);
 
-  WidgetMouseEvent dummyEvent(true, NS_MOUSE_MOVE, rootWidget,
+  WidgetMouseEvent dummyEvent(true, eMouseMove, rootWidget,
                               WidgetMouseEvent::eSynthesized);
   dummyEvent.refPoint = LayoutDeviceIntPoint(aX - rootRect.x, aY - rootRect.y);
 
@@ -1831,10 +1831,14 @@ Accessible::DispatchClickEvent(nsIContent *aContent, uint32_t aActionIndex)
   int32_t y = presContext->AppUnitsToDevPixels(point.y + size.height / 2);
 
   // Simulate a touch interaction by dispatching touch events with mouse events.
-  nsCoreUtils::DispatchTouchEvent(NS_TOUCH_START, x, y, aContent, frame, presShell, widget);
-  nsCoreUtils::DispatchMouseEvent(NS_MOUSE_BUTTON_DOWN, x, y, aContent, frame, presShell, widget);
-  nsCoreUtils::DispatchTouchEvent(NS_TOUCH_END, x, y, aContent, frame, presShell, widget);
-  nsCoreUtils::DispatchMouseEvent(NS_MOUSE_BUTTON_UP, x, y, aContent, frame, presShell, widget);
+  nsCoreUtils::DispatchTouchEvent(eTouchStart, x, y, aContent, frame,
+                                  presShell, widget);
+  nsCoreUtils::DispatchMouseEvent(eMouseDown, x, y, aContent, frame,
+                                  presShell, widget);
+  nsCoreUtils::DispatchTouchEvent(eTouchEnd, x, y, aContent, frame,
+                                  presShell, widget);
+  nsCoreUtils::DispatchMouseEvent(eMouseUp, x, y, aContent, frame,
+                                  presShell, widget);
 }
 
 void
@@ -1967,8 +1971,8 @@ Accessible::BindToParent(Accessible* aParent, uint32_t aIndexInParent)
   if (mParent) {
     if (mParent != aParent) {
       NS_ERROR("Adopting child!");
-      mParent->RemoveChild(this);
       mParent->InvalidateChildrenGroupInfo();
+      mParent->RemoveChild(this);
     } else {
       NS_ERROR("Binding to the same parent!");
       return;

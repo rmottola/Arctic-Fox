@@ -65,8 +65,14 @@ class PluginInstanceChild : public PPluginInstanceChild
 #endif
 
 protected:
-    bool AnswerNPP_SetWindow(const NPRemoteWindow& window,
-                             NPRemoteWindow* aChildWindowToBeAdopted) override;
+    virtual bool
+    AnswerCreateChildPluginWindow(NativeWindowHandle* aChildPluginWindow) override;
+
+    virtual bool
+    RecvCreateChildPopupSurrogate(const NativeWindowHandle& aNetscapeWindow) override;
+
+    virtual bool
+    AnswerNPP_SetWindow(const NPRemoteWindow& window) override;
 
     virtual bool
     AnswerNPP_GetValue_NPPVpluginWantsAllNetworkStreams(bool* wantsAllStreams, NPError* rv) override;

@@ -186,7 +186,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "AsyncShutdown",
  * |true| if we are in debug mode, |false| otherwise.
  * Debug mode is controlled by preference browser.sessionstore.debug
  */
-let gDebuggingEnabled = false;
+var gDebuggingEnabled = false;
 function debug(aMsg) {
   if (gDebuggingEnabled) {
     aMsg = ("SessionStore: " + aMsg).replace(/\S{80}/g, "$&\n");
@@ -235,7 +235,7 @@ this.SessionStore = {
     SessionStoreInternal.setTabState(aTab, aState);
   },
 
-  duplicateTab: function ss_duplicateTab(aWindow, aTab, aDelta) {
+  duplicateTab: function ss_duplicateTab(aWindow, aTab, aDelta = 0) {
     return SessionStoreInternal.duplicateTab(aWindow, aTab, aDelta);
   },
 
@@ -361,7 +361,7 @@ this.SessionStore = {
 // Freeze the SessionStore object. We don't want anyone to modify it.
 Object.freeze(SessionStore);
 
-let SessionStoreInternal = {
+var SessionStoreInternal = {
   QueryInterface: XPCOMUtils.generateQI([
     Ci.nsIDOMEventListener,
     Ci.nsIObserver,
@@ -382,14 +382,14 @@ let SessionStoreInternal = {
   // they get restored).
   _crashedBrowsers: new WeakSet(),
 
+  // A map (xul:browser -> nsIFrameLoader) that maps a browser to the last
+  // associated frameLoader we heard about.
+  _lastKnownFrameLoader: new WeakMap(),
+
   // A map (xul:browser -> object) that maps a browser associated with a
   // recently closed tab to all its necessary state information we need to
   // properly handle final update message.
   _closedTabs: new WeakMap(),
-
-  // A map (xul:browser -> nsIFrameLoader) that maps a browser to the last
-  // associated frameLoader we heard about.
-  _lastKnownFrameLoader: new WeakMap(),
 
   // A map (xul:browser -> object) that maps a browser associated with a
   // recently closed tab due to a window closure to the tab state information
@@ -565,7 +565,6 @@ let SessionStoreInternal = {
         this._prefBranch.getBoolPref("sessionstore.resume_session_once"))
       this._prefBranch.setBoolPref("sessionstore.resume_session_once", false);
 
-    this._sessionInitialized = true;
     TelemetryStopwatch.finish("FX_SESSION_RESTORE_STARTUP_INIT_SESSION_MS");
     return state;
   },
@@ -581,7 +580,7 @@ let SessionStoreInternal = {
 
     this._max_tabs_undo = this._prefBranch.getIntPref("sessionstore.max_tabs_undo");
     this._prefBranch.addObserver("sessionstore.max_tabs_undo", this, true);
-    
+
     this._max_windows_undo = this._prefBranch.getIntPref("sessionstore.max_windows_undo");
     this._prefBranch.addObserver("sessionstore.max_windows_undo", this, true);
   },
@@ -655,7 +654,7 @@ let SessionStoreInternal = {
     // If we got here, that means we're dealing with a frame message
     // manager message, so the target will be a <xul:browser>.
     var browser = aMessage.target;
-    let win = browser.ownerDocument.defaultView;
+    var win = browser.ownerDocument.defaultView;
     let tab = win ? win.gBrowser.getTabForBrowser(browser) : null;
 
     // Ensure we receive only specific messages from <xul:browser>s that
@@ -1844,7 +1843,6 @@ let SessionStoreInternal = {
       if (tab.linkedBrowser.__SS_restoreState &&
           tab.linkedBrowser.__SS_restoreState == TAB_STATE_NEEDS_RESTORE)
         this.restoreTabContent(tab);
-
     }
   },
 
@@ -2057,7 +2055,7 @@ let SessionStoreInternal = {
     this.restoreTab(aTab, tabState);
   },
 
-  duplicateTab: function ssi_duplicateTab(aWindow, aTab, aDelta) {
+  duplicateTab: function ssi_duplicateTab(aWindow, aTab, aDelta = 0) {
     if (!aTab.ownerDocument.defaultView.__SSi) {
       throw Components.Exception("Default view is not tracked", Cr.NS_ERROR_INVALID_ARG);
     }
@@ -2117,7 +2115,6 @@ let SessionStoreInternal = {
       return this._windows[aWindow.__SSi]._closedTabs.length;
     }
 
-
     if (!DyingWindowCache.has(aWindow)) {
       throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
     }
@@ -2146,7 +2143,6 @@ let SessionStoreInternal = {
     var closedTabs = this._windows[aWindow.__SSi]._closedTabs;
 
     // default to the most-recently closed tab
-    aIndex = aIndex || 0;
     aIndex = aIndex || 0;
     if (!(aIndex in closedTabs)) {
       throw Components.Exception("Invalid index: not in the closed tabs", Cr.NS_ERROR_INVALID_ARG);
@@ -2242,7 +2238,8 @@ let SessionStoreInternal = {
 
     if (!("__SSi" in aWindow)) {
       throw Components.Exception("Window is not tracked", Cr.NS_ERROR_INVALID_ARG);
-    } if (!this._windows[aWindow.__SSi].extData) {
+    }
+    if (!this._windows[aWindow.__SSi].extData) {
       this._windows[aWindow.__SSi].extData = {};
     }
     this._windows[aWindow.__SSi].extData[aKey] = aStringValue;
@@ -2348,7 +2345,6 @@ let SessionStoreInternal = {
 
     let lastSessionState = LastSession.getState();
 
-    // This shouldn't ever be the case...
     // This shouldn't ever be the case...
     if (!lastSessionState.windows.length) {
       throw Components.Exception("lastSessionState has no windows", Cr.NS_ERROR_UNEXPECTED);
@@ -2973,6 +2969,8 @@ let SessionStoreInternal = {
     // set smoothScroll back to the original value
     tabstrip.smoothScroll = smoothScroll;
 
+    TelemetryStopwatch.finish("FX_SESSION_RESTORE_RESTORE_WINDOW_MS");
+
     this._setWindowStateReady(aWindow);
     this._sendRestoreCompletedNotifications();
   },
@@ -3070,7 +3068,6 @@ let SessionStoreInternal = {
       delete this._windows[aWindow.__SSi]._restoring;
     }
 
-
     let numTabsToRestore = aTabs.length;
     let numTabsInWindow = tabbrowser.tabs.length;
     let tabsDataArray = this._windows[aWindow.__SSi].tabs;
@@ -3091,7 +3088,6 @@ let SessionStoreInternal = {
     // If provided, set the selected tab.
     if (aSelectTab > 0 && aSelectTab <= aTabs.length) {
       tabbrowser.selectedTab = aTabs[aSelectTab - 1];
-
 
       // Update the window state in case we shut down without being notified.
       this._windows[aWindow.__SSi].selected = aSelectTab;
@@ -3149,6 +3145,7 @@ let SessionStoreInternal = {
     } else {
       tabbrowser.unpinTab(tab);
     }
+
     if (tabData.hidden) {
       tabbrowser.hideTab(tab);
     } else {
@@ -3474,7 +3471,6 @@ let SessionStoreInternal = {
     if (aWindow) {
       DirtyWindows.add(aWindow);
     }
-
 
     SessionSaver.runDelayed();
   },
@@ -4150,7 +4146,7 @@ let SessionStoreInternal = {
  * pinned, visible and hidden tabs in that and FIFO order. Hidden tabs are only
  * restored with restore_hidden_tabs=true.
  */
-let TabRestoreQueue = {
+var TabRestoreQueue = {
   // The separate buckets used to store tabs.
   tabs: {priority: [], visible: [], hidden: []},
 
@@ -4283,7 +4279,7 @@ let TabRestoreQueue = {
 // A map storing a closed window's state data until it goes aways (is GC'ed).
 // This ensures that API clients can still read (but not write) states of
 // windows they still hold a reference to but we don't.
-let DyingWindowCache = {
+var DyingWindowCache = {
   _data: new WeakMap(),
 
   has: function (window) {
@@ -4305,7 +4301,7 @@ let DyingWindowCache = {
 
 // A weak set of dirty windows. We use it to determine which windows we need to
 // recollect data for when getCurrentState() is called.
-let DirtyWindows = {
+var DirtyWindows = {
   _data: new WeakMap(),
 
   has: function (window) {
@@ -4342,7 +4338,7 @@ function TabData(obj = null) {
 // state is persisted and passed through to the next session during an app
 // restart to make the third party add-on warning not trash the deferred
 // session
-let LastSession = {
+var LastSession = {
   _state: null,
 
   get canRestore() {

@@ -1181,12 +1181,15 @@ function getTestDirPath() {
  *          The relative path to the file or directory to get from the root of
  *          the test's data directory. If not specified the test's data
  *          directory will be returned.
+ * @param   aAllowNonExists (optional)
+ *          Whether or not to throw an error if the path exists.
+ *          If not specified, then false is used.
  * @return  The nsIFile for the file in the test data directory.
  * @throws  If the file or directory does not exist.
  */
-function getTestDirFile(aRelPath) {
+function getTestDirFile(aRelPath, aAllowNonExists) {
   let relpath = getTestDirPath() + (aRelPath ? aRelPath : "");
-  return do_get_file(relpath, false);
+  return do_get_file(relpath, !!aAllowNonExists);
 }
 
 /**
@@ -1484,8 +1487,7 @@ function runUpdate(aExpectedExitValue, aExpectedStatus, aCallback) {
   let updater = binDir.clone();
   updater.append("updater.app");
   if (!updater.exists()) {
-    updater = binDir.clone();
-    updater.append(FILE_UPDATER_BIN);
+    updater = getTestDirFile(FILE_UPDATER_BIN);
     if (!updater.exists()) {
       do_throw("Unable to find updater binary!");
     }
@@ -1759,8 +1761,6 @@ function setupAppFiles() {
   // dependentlibs.list file.
   let appFiles = [ { relPath  : FILE_APP_BIN,
                      inGreDir : false },
-                   { relPath  : FILE_UPDATER_BIN,
-                     inGreDir : false },
                    { relPath  : FILE_APPLICATION_INI,
                      inGreDir : true },
                    { relPath  : "dependentlibs.list",
@@ -1795,8 +1795,19 @@ function setupAppFiles() {
     copyFileToTestAppDir(aAppFile.relPath, aAppFile.inGreDir);
   });
 
-  logTestInfo("finish - copying or creating symlinks to application files " +
-              "for the test");
+  // Copy the xpcshell updater binary
+  let updater = getTestDirFile("updater.app", true);
+  if (!updater.exists()) {
+    updater = getTestDirFile(FILE_UPDATER_BIN);
+    if (!updater.exists()) {
+      do_throw("Unable to find the updater binary!");
+    }
+  }
+  let testBinDir = getGREBinDir();
+  updater.copyToFollowingLinks(testBinDir, updater.leafName);
+
+  debugDump("finish - copying or creating symlinks to application files " +
+            "for the test");
 }
 
 /**
@@ -2094,10 +2105,13 @@ function runUpdateUsingService(aInitialStatus, aExpectedStatus, aCheckSvcLog) {
 
   setEnvironment();
 
-  // There is a security check done by the service to make sure the updater
-  // we are executing is the same as the one in the apply-to dir.
-  // To make sure they match from tests we copy updater.exe to the apply-to dir.
-  copyFileToTestAppDir(FILE_UPDATER_BIN, false);
+  let updater = getTestDirFile(FILE_UPDATER_BIN);
+  if (!updater.exists()) {
+    do_throw("Unable to find updater binary!");
+  }
+  let testBinDir = getGREBinDir()
+  updater.copyToFollowingLinks(testBinDir, updater.leafName);
+  updater.copyToFollowingLinks(updatesDir, updater.leafName);
 
   // The service will execute maintenanceservice_installer.exe and
   // will copy maintenanceservice.exe out of the same directory from

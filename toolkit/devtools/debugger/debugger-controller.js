@@ -125,6 +125,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "DevToolsUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "ShortcutUtils",
   "resource://gre/modules/ShortcutUtils.jsm");
 
+XPCOMUtils.defineLazyServiceGetter(this, "clipboardHelper",
+  "@mozilla.org/widget/clipboardhelper;1", "nsIClipboardHelper");
+
 Object.defineProperty(this, "NetworkHelper", {
   get: function() {
     return devtools.require("devtools/toolkit/webconsole/network-helper");
@@ -179,6 +182,9 @@ let DebuggerController = {
     this.SourceScripts.disconnect();
     this.StackFrames.disconnect();
     this.ThreadState.disconnect();
+    if (this._target.isTabActor) {
+      this.Workers.disconnect();
+    }
     this.Tracer.disconnect();
     this.disconnect();
 
@@ -316,6 +322,7 @@ let DebuggerController = {
         return;
       }
       this.activeThread = aThreadClient;
+      this.Workers.connect();
       this.ThreadState.connect();
       this.StackFrames.connect();
       this.SourceScripts.connect();
@@ -443,6 +450,87 @@ let DebuggerController = {
   activeThread: null
 };
 
+function Workers() {
+  this._workerClients = new Map();
+  this._onWorkerListChanged = this._onWorkerListChanged.bind(this);
+  this._onWorkerFreeze = this._onWorkerFreeze.bind(this);
+  this._onWorkerThaw = this._onWorkerThaw.bind(this);
+  this._onWorkerSelect = this._onWorkerSelect.bind(this);
+}
+
+Workers.prototype = {
+  get _tabClient() {
+    return DebuggerController._target.activeTab;
+  },
+
+  connect: function () {
+    if (!Prefs.workersEnabled) {
+      return;
+    }
+
+    this._updateWorkerList();
+    this._tabClient.addListener("workerListChanged", this._onWorkerListChanged);
+  },
+
+  disconnect: function () {
+    this._tabClient.removeListener("workerListChanged", this._onWorkerListChanged);
+  },
+
+  _updateWorkerList: function () {
+    if (!this._tabClient.listWorkers) {
+      return;
+    }
+
+    this._tabClient.listWorkers((response) => {
+      let workerActors = new Set();
+      for (let worker of response.workers) {
+        workerActors.add(worker.actor);
+      }
+
+      for (let [workerActor, workerClient] of this._workerClients) {
+        if (!workerActors.has(workerActor)) {
+          workerClient.removeListener("freeze", this._onWorkerFreeze);
+          workerClient.removeListener("thaw", this._onWorkerThaw);
+          this._workerClients.delete(workerActor);
+          DebuggerView.Workers.removeWorker(workerActor);
+        }
+      }
+
+      for (let actor of workerActors) {
+        let workerActor = actor
+        if (!this._workerClients.has(workerActor)) {
+          this._tabClient.attachWorker(workerActor, (response, workerClient) => {
+            workerClient.addListener("freeze", this._onWorkerFreeze);
+            workerClient.addListener("thaw", this._onWorkerThaw);
+            this._workerClients.set(workerActor, workerClient);
+            DebuggerView.Workers.addWorker(workerActor, workerClient.url);
+          });
+        }
+      }
+    });
+  },
+
+  _onWorkerListChanged: function () {
+    this._updateWorkerList();
+  },
+
+  _onWorkerFreeze: function (type, packet) {
+    DebuggerView.Workers.removeWorker(packet.from);
+  },
+
+  _onWorkerThaw: function (type, packet) {
+    let workerClient = this._workerClients.get(packet.from);
+    DebuggerView.Workers.addWorker(packet.from, workerClient.url);
+  },
+
+  _onWorkerSelect: function (workerActor) {
+    let workerClient = this._workerClients.get(workerActor);
+    gDevTools.showToolbox(devtools.TargetFactory.forWorker(workerClient),
+                          "jsdebugger",
+                          devtools.Toolbox.HostType.WINDOW);
+  }
+};
+
 /**
  * ThreadState keeps the UI up to date with the state of the
  * thread (paused/attached/etc.).
@@ -453,7 +541,9 @@ function ThreadState() {
 }
 
 ThreadState.prototype = {
-  get activeThread() DebuggerController.activeThread,
+  get activeThread() {
+    return DebuggerController.activeThread;
+  },
 
   /**
    * Connect to the current thread client.
@@ -539,7 +629,10 @@ function StackFrames() {
 }
 
 StackFrames.prototype = {
-  get activeThread() DebuggerController.activeThread,
+  get activeThread() {
+    return DebuggerController.activeThread;
+  },
+
   currentFrameDepth: -1,
   _currentFrameDescription: FRAME_TYPE.NORMAL,
   _syncedWatchExpressions: null,
@@ -1113,8 +1206,14 @@ function SourceScripts() {
 }
 
 SourceScripts.prototype = {
-  get activeThread() DebuggerController.activeThread,
-  get debuggerClient() DebuggerController.client,
+  get activeThread() {
+    return DebuggerController.activeThread;
+  },
+
+  get debuggerClient() {
+    return DebuggerController.client;
+  },
+
   _cache: new Map(),
 
   /**
@@ -1123,7 +1222,7 @@ SourceScripts.prototype = {
   connect: function() {
     dumpn("SourceScripts is connecting...");
     this.debuggerClient.addListener("newGlobal", this._onNewGlobal);
-    this.debuggerClient.addListener("newSource", this._onNewSource);
+    this.activeThread.addListener("newSource", this._onNewSource);
     this.activeThread.addListener("blackboxchange", this._onBlackBoxChange);
     this.activeThread.addListener("prettyprintchange", this._onPrettyPrintChange);
     this.handleTabNavigation();
@@ -1138,7 +1237,7 @@ SourceScripts.prototype = {
     }
     dumpn("SourceScripts is disconnecting...");
     this.debuggerClient.removeListener("newGlobal", this._onNewGlobal);
-    this.debuggerClient.removeListener("newSource", this._onNewSource);
+    this.activeThread.removeListener("newSource", this._onNewSource);
     this.activeThread.removeListener("blackboxchange", this._onBlackBoxChange);
     this.activeThread.addListener("prettyprintchange", this._onPrettyPrintChange);
   },
@@ -2372,7 +2471,7 @@ let L10N = new ViewHelpers.L10N(DBG_STRINGS_URI);
  * Shortcuts for accessing various debugger preferences.
  */
 let Prefs = new ViewHelpers.Prefs("devtools", {
-  sourcesWidth: ["Int", "debugger.ui.panes-sources-width"],
+  workersAndSourcesWidth: ["Int", "debugger.ui.panes-workers-and-sources-width"],
   instrumentsWidth: ["Int", "debugger.ui.panes-instruments-width"],
   panesVisibleOnStartup: ["Bool", "debugger.ui.panes-visible-on-startup"],
   variablesSortingEnabled: ["Bool", "debugger.ui.variables-sorting-enabled"],
@@ -2384,6 +2483,7 @@ let Prefs = new ViewHelpers.Prefs("devtools", {
   prettyPrintEnabled: ["Bool", "debugger.pretty-print-enabled"],
   autoPrettyPrint: ["Bool", "debugger.auto-pretty-print"],
   tracerEnabled: ["Bool", "debugger.tracer"],
+  workersEnabled: ["Bool", "debugger.workers"],
   editorTabSize: ["Int", "editor.tabsize"],
   autoBlackBox: ["Bool", "debugger.auto-black-box"]
 });
@@ -2398,6 +2498,7 @@ EventEmitter.decorate(this);
  */
 DebuggerController.initialize();
 DebuggerController.Parser = new Parser();
+DebuggerController.Workers = new Workers();
 DebuggerController.ThreadState = new ThreadState();
 DebuggerController.StackFrames = new StackFrames();
 DebuggerController.SourceScripts = new SourceScripts();
@@ -2411,23 +2512,33 @@ DebuggerController.HitCounts = new HitCounts();
  */
 Object.defineProperties(window, {
   "gTarget": {
-    get: function() DebuggerController._target,
+    get: function() {
+      return DebuggerController._target;
+    },
     configurable: true
   },
   "gHostType": {
-    get: function() DebuggerView._hostType,
+    get: function() {
+      return DebuggerView._hostType;
+    },
     configurable: true
   },
   "gClient": {
-    get: function() DebuggerController.client,
+    get: function() {
+      return DebuggerController.client;
+    },
     configurable: true
   },
   "gThreadClient": {
-    get: function() DebuggerController.activeThread,
+    get: function() {
+      return DebuggerController.activeThread;
+    },
     configurable: true
   },
   "gCallStackPageSize": {
-    get: function() CALL_STACK_PAGE_SIZE,
+    get: function() {
+      return CALL_STACK_PAGE_SIZE;
+    },
     configurable: true
   }
 });

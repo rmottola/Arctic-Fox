@@ -59,7 +59,14 @@ InterceptedChannelBase::EnsureSynthesizedResponse()
 void
 InterceptedChannelBase::DoNotifyController()
 {
-    nsresult rv = mController->ChannelIntercepted(this);
+    nsCOMPtr<nsIFetchEventDispatcher> dispatcher;
+    nsresult rv = mController->ChannelIntercepted(this,
+                                                  getter_AddRefs(dispatcher));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      rv = ResetInterception();
+      NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "Failed to resume intercepted network request");
+    }
+    rv = dispatcher->Dispatch();
     if (NS_WARN_IF(NS_FAILED(rv))) {
       rv = ResetInterception();
       NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "Failed to resume intercepted network request");
@@ -255,6 +262,18 @@ InterceptedChannelChrome::SetChannelInfo(dom::ChannelInfo* aChannelInfo)
   return aChannelInfo->ResurrectInfoOnChannel(mChannel);
 }
 
+NS_IMETHODIMP
+InterceptedChannelChrome::GetInternalContentPolicyType(nsContentPolicyType* aPolicyType)
+{
+  NS_ENSURE_ARG(aPolicyType);
+  nsCOMPtr<nsILoadInfo> loadInfo;
+  nsresult rv = mChannel->GetLoadInfo(getter_AddRefs(loadInfo));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  *aPolicyType = loadInfo->InternalContentPolicyType();
+  return NS_OK;
+}
+
 InterceptedChannelContent::InterceptedChannelContent(HttpChannelChild* aChannel,
                                                      nsINetworkInterceptController* aController,
                                                      nsIStreamListener* aListener)
@@ -362,6 +381,19 @@ InterceptedChannelContent::SetChannelInfo(dom::ChannelInfo* aChannelInfo)
   }
 
   return aChannelInfo->ResurrectInfoOnChannel(mChannel);
+}
+
+NS_IMETHODIMP
+InterceptedChannelContent::GetInternalContentPolicyType(nsContentPolicyType* aPolicyType)
+{
+  NS_ENSURE_ARG(aPolicyType);
+
+  nsCOMPtr<nsILoadInfo> loadInfo;
+  nsresult rv = mChannel->GetLoadInfo(getter_AddRefs(loadInfo));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  *aPolicyType = loadInfo->InternalContentPolicyType();
+  return NS_OK;
 }
 
 } // namespace net

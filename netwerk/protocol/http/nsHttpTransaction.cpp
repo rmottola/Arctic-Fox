@@ -98,6 +98,7 @@ nsHttpTransaction::nsHttpTransaction()
     , mContentRead(0)
     , mInvalidResponseBytesRead(0)
     , mPushedStream(nullptr)
+    , mInitialRwin(0)
     , mChunkedDecoder(nullptr)
     , mStatus(NS_OK)
     , mPriority(0)
@@ -107,6 +108,7 @@ nsHttpTransaction::nsHttpTransaction()
     , mPipelinePosition(0)
     , mCapsToClear(0)
     , mHttpVersion(NS_HTTP_VERSION_UNKNOWN)
+    , mHttpResponseCode(0)
     , mClosed(false)
     , mConnected(false)
     , mHaveStatusLine(false)
@@ -128,6 +130,7 @@ nsHttpTransaction::nsHttpTransaction()
     , mReuseOnRestart(false)
     , mContentDecoding(false)
     , mContentDecodingCheck(false)
+    , mDeferredSendProgress(false)
     , mReportedStart(false)
     , mReportedResponseHeader(false)
     , mForTakeResponseHead(nullptr)
@@ -270,15 +273,14 @@ nsHttpTransaction::Init(uint32_t caps,
         if (NS_WARN_IF(NS_FAILED(rv))) {
             return rv;
         }
+        httpChannelInternal->GetInitialRwin(&mInitialRwin);
     }
 
-    // create transport event sink proxy. it coalesces all events if and only
-    // if the activity observer is not active. when the observer is active
-    // we need not to coalesce any events to get all expected notifications
-    // of the transaction state, necessary for correct debugging and logging.
+    // create transport event sink proxy. it coalesces consecutive
+    // events of the same status type.
     rv = net_NewTransportEventSinkProxy(getter_AddRefs(mTransportSink),
-                                        eventsink, target,
-                                        !activityDistributorActive);
+                                        eventsink, target);
+
     if (NS_FAILED(rv)) return rv;
 
     mConnInfo = cinfo;
@@ -346,9 +348,17 @@ nsHttpTransaction::Init(uint32_t caps,
                                mReqHeaderBuf.Length());
     if (NS_FAILED(rv)) return rv;
 
-    if (requestBody) {
-        mHasRequestBody = true;
+    mHasRequestBody = !!requestBody;
+    if (mHasRequestBody) {
+        // some non standard methods set a 0 byte content-length for
+        // clarity, we can avoid doing the mulitplexed request stream for them
+        uint64_t size;
+        if (NS_SUCCEEDED(requestBody->Available(&size)) && !size) {
+            mHasRequestBody = false;
+        }
+    }
 
+    if (mHasRequestBody) {
         // wrap the headers and request body in a multiplexed input stream.
         nsCOMPtr<nsIMultiplexInputStream> multi =
             do_CreateInstance(kMultiplexInputStream, &rv);
@@ -630,6 +640,15 @@ nsHttpTransaction::OnTransportStatus(nsITransport* transport,
             return;
         }
 
+        if (mReader) {
+            // A mRequestStream method is on the stack - wait.
+            LOG(("nsHttpTransaction::OnSocketStatus [this=%p] "
+                 "Skipping Re-Entrant NS_NET_STATUS_SENDING_TO\n", this));
+            // its ok to coalesce several of these into one deferred event
+            mDeferredSendProgress = true;
+            return;
+        }
+
         nsCOMPtr<nsISeekableStream> seekable = do_QueryInterface(mRequestStream);
         if (!seekable) {
             LOG(("nsHttpTransaction::OnTransportStatus %p "
@@ -725,11 +744,28 @@ nsHttpTransaction::ReadSegments(nsAHttpSegmentReader *reader,
         mConnection->GetSecurityInfo(getter_AddRefs(mSecurityInfo));
     }
 
+    mDeferredSendProgress = false;
     mReader = reader;
-
     nsresult rv = mRequestStream->ReadSegments(ReadRequestSegment, this, count, countRead);
-
     mReader = nullptr;
+
+    if (mDeferredSendProgress && mConnection && mConnection->Transport()) {
+        // to avoid using mRequestStream concurrently, OnTransportStatus()
+        // did not report upload status off the ReadSegments() stack from nsSocketTransport
+        // do it now.
+        OnTransportStatus(mConnection->Transport(), NS_NET_STATUS_SENDING_TO, 0);
+    }
+    mDeferredSendProgress = false;
+
+    if (mForceRestart) {
+        // The forceRestart condition was dealt with on the stack, but it did not
+        // clear the flag because nsPipe in the readsegment stack clears out
+        // return codes, so we need to use the flag here as a cue to return ERETARGETED
+        if (NS_SUCCEEDED(rv)) {
+            rv = NS_BINDING_RETARGETED;
+        }
+        mForceRestart = false;
+    }
 
     // if read would block then we need to AsyncWait on the request stream.
     // have callback occur on socket thread so we stay synchronized.
@@ -804,6 +840,8 @@ nsHttpTransaction::WriteSegments(nsAHttpSegmentWriter *writer,
                                  uint32_t count, uint32_t *countWritten)
 {
     static bool reentrantFlag = false;
+    LOG(("nsHttpTransaction::WriteSegments %p reentrantFlag=%d",
+         this, reentrantFlag));
     MOZ_DIAGNOSTIC_ASSERT(!reentrantFlag);
     reentrantFlag = true;
     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
@@ -829,6 +867,16 @@ nsHttpTransaction::WriteSegments(nsAHttpSegmentWriter *writer,
     nsresult rv = mPipeOut->WriteSegments(WritePipeSegment, this, count, countWritten);
 
     mWriter = nullptr;
+
+    if (mForceRestart) {
+        // The forceRestart condition was dealt with on the stack, but it did not
+        // clear the flag because nsPipe in the writesegment stack clears out
+        // return codes, so we need to use the flag here as a cue to return ERETARGETED
+        if (NS_SUCCEEDED(rv)) {
+            rv = NS_BINDING_RETARGETED;
+        }
+        mForceRestart = false;
+    }
 
     // if pipe would block then we need to AsyncWait on it.  have callback
     // occur on socket thread so we stay synchronized.
@@ -892,6 +940,10 @@ nsHttpTransaction::Close(nsresult reason)
     LOG(("nsHttpTransaction::Close [this=%p reason=%x]\n", this, reason));
 
     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
+    if (reason == NS_BINDING_RETARGETED) {
+        LOG(("  close %p skipped due to ERETARGETED\n", this));
+        return;
+    }
 
     if (mClosed) {
         LOG(("  already closed\n"));
@@ -950,6 +1002,21 @@ nsHttpTransaction::Close(nsresult reason)
     if (reason == NS_ERROR_NET_RESET || reason == NS_OK) {
 
         if (mForceRestart && NS_SUCCEEDED(Restart())) {
+            if (mResponseHead) {
+                mResponseHead->Reset();
+            }
+            mContentRead = 0;
+            mContentLength = -1;
+            delete mChunkedDecoder;
+            mChunkedDecoder = nullptr;
+            mHaveStatusLine = false;
+            mHaveAllHeaders = false;
+            mHttpResponseMatched = false;
+            mResponseIsComplete = false;
+            mDidContentStart = false;
+            mNoContent = false;
+            mSentData = false;
+            mReceivedData = false;
             LOG(("transaction force restarted\n"));
             return;
         }
@@ -990,7 +1057,8 @@ nsHttpTransaction::Close(nsresult reason)
 
         NS_WARNING("Partial transfer, incomplete HTTP response received");
 
-        if (mHttpVersion >= NS_HTTP_VERSION_1_1) {
+        if ((mHttpResponseCode / 100 == 2) &&
+            (mHttpVersion >= NS_HTTP_VERSION_1_1)) {
             FrameCheckLevel clevel = gHttpHandler->GetEnforceH1Framing();
             if (clevel >= FRAMECHECK_BARELY) {
                 if ((clevel == FRAMECHECK_STRICT) ||
@@ -1253,9 +1321,6 @@ nsHttpTransaction::Restart()
             mRequestHead->SetHeader(nsHttp::Alternate_Service_Used, NS_LITERAL_CSTRING("0"));
         }
     }
-    mForceRestart = false;
-
-    mTransportStatus = NS_OK;
 
     return gHttpHandler->InitiateTransaction(this, mPriority);
 }
@@ -1546,6 +1611,7 @@ nsHttpTransaction::HandleContentStart()
         // Save http version, mResponseHead isn't available anymore after
         // TakeResponseHead() is called
         mHttpVersion = mResponseHead->Version();
+        mHttpResponseCode = mResponseHead->Status();
 
         // notify the connection, give it a chance to cause a reset.
         bool reset = false;
@@ -1580,8 +1646,11 @@ nsHttpTransaction::HandleContentStart()
             gHttpHandler->ConnMgr()->ClearHostMapping(mConnInfo);
 
             // retry on a new connection - just in case
-            mCaps &= ~NS_HTTP_ALLOW_KEEPALIVE;
-            mForceRestart = true; // force restart has built in loop protection
+            if (!mRestartCount) {
+                mCaps &= ~NS_HTTP_ALLOW_KEEPALIVE;
+                mForceRestart = true; // force restart has built in loop protection
+                return NS_ERROR_NET_RESET;
+            }
             break;
         }
 
@@ -2176,6 +2245,7 @@ NS_IMETHODIMP
 nsHttpTransaction::OnOutputStreamReady(nsIAsyncOutputStream *out)
 {
     if (mConnection) {
+        mConnection->TransactionHasDataToRecv(this);
         nsresult rv = mConnection->ResumeRecv();
         if (NS_FAILED(rv))
             NS_ERROR("ResumeRecv failed");
@@ -2240,36 +2310,41 @@ nsHttpTransaction::RestartVerifier::Set(int64_t contentLength,
     // forbidden
 
     // Only RestartInProgress with 200 response code
-    if (head->Status() != 200)
+    if (!head || (head->Status() != 200)) {
         return;
+    }
 
     mContentLength = contentLength;
 
-    if (head) {
-        const char *val;
-        val = head->PeekHeader(nsHttp::ETag);
-        if (val)
-            mETag.Assign(val);
-        val = head->PeekHeader(nsHttp::Last_Modified);
-        if (val)
-            mLastModified.Assign(val);
-        val = head->PeekHeader(nsHttp::Content_Range);
-        if (val)
-            mContentRange.Assign(val);
-        val = head->PeekHeader(nsHttp::Content_Encoding);
-        if (val)
-            mContentEncoding.Assign(val);
-        val = head->PeekHeader(nsHttp::Transfer_Encoding);
-        if (val)
-            mTransferEncoding.Assign(val);
-
-        // We can only restart with any confidence if we have a stored etag or
-        // last-modified header
-        if (mETag.IsEmpty() && mLastModified.IsEmpty())
-            return;
-
-        mSetup = true;
+    const char *val;
+    val = head->PeekHeader(nsHttp::ETag);
+    if (val) {
+        mETag.Assign(val);
     }
+    val = head->PeekHeader(nsHttp::Last_Modified);
+    if (val) {
+        mLastModified.Assign(val);
+    }
+    val = head->PeekHeader(nsHttp::Content_Range);
+    if (val) {
+        mContentRange.Assign(val);
+    }
+    val = head->PeekHeader(nsHttp::Content_Encoding);
+    if (val) {
+        mContentEncoding.Assign(val);
+    }
+    val = head->PeekHeader(nsHttp::Transfer_Encoding);
+    if (val) {
+        mTransferEncoding.Assign(val);
+    }
+
+    // We can only restart with any confidence if we have a stored etag or
+    // last-modified header
+    if (mETag.IsEmpty() && mLastModified.IsEmpty()) {
+        return;
+    }
+
+    mSetup = true;
 }
 
 void

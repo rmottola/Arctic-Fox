@@ -73,9 +73,7 @@ class FullParseHandler
     typedef Definition* DefinitionNode;
 
     bool isPropertyAccess(ParseNode* node) {
-        if (node->isKind(PNK_DOT) || node->isKind(PNK_ELEM))
-            return true;
-        return node->isKind(PNK_SUPERPROP) || node->isKind(PNK_SUPERELEM);
+        return node->isKind(PNK_DOT) || node->isKind(PNK_ELEM);
     }
 
     bool isFunctionCall(ParseNode* node) {
@@ -225,13 +223,9 @@ class FullParseHandler
 
         if (expr->isKind(PNK_DOT))
             return newUnary(PNK_DELETEPROP, JSOP_NOP, begin, expr);
-        if (expr->isKind(PNK_SUPERPROP))
-            return newUnary(PNK_DELETESUPERPROP, JSOP_NOP, begin, expr);
 
         if (expr->isKind(PNK_ELEM))
             return newUnary(PNK_DELETEELEM, JSOP_NOP, begin, expr);
-        if (expr->isKind(PNK_SUPERELEM))
-            return newUnary(PNK_DELETESUPERELEM, JSOP_NOP, begin, expr);
 
         return newUnary(PNK_DELETEEXPR, JSOP_NOP, begin, expr);
     }
@@ -337,26 +331,29 @@ class FullParseHandler
         return literal;
     }
 
-    ParseNode *newClass(ParseNode *name, ParseNode *heritage, ParseNode *methodBlock) {
+    ParseNode* newClass(ParseNode* name, ParseNode* heritage, ParseNode* methodBlock) {
         return new_<ClassNode>(name, heritage, methodBlock);
     }
-    ParseNode *newClassMethodList(uint32_t begin) {
+    ParseNode* newClassMethodList(uint32_t begin) {
         return new_<ListNode>(PNK_CLASSMETHODLIST, TokenPos(begin, begin + 1));
     }
-    ParseNode *newClassNames(ParseNode *outer, ParseNode *inner, const TokenPos &pos) {
+    ParseNode* newClassNames(ParseNode* outer, ParseNode* inner, const TokenPos& pos) {
         return new_<ClassNames>(outer, inner, pos);
-    }
-    ParseNode* newSuperProperty(JSAtom* atom, const TokenPos& pos) {
-        return new_<SuperProperty>(atom, pos);
-    }
-    ParseNode* newSuperElement(ParseNode* expr, const TokenPos& pos) {
-        return new_<SuperElement>(expr, pos);
     }
     ParseNode* newNewTarget(ParseNode* newHolder, ParseNode* targetHolder) {
         return new_<BinaryNode>(PNK_NEWTARGET, JSOP_NOP, newHolder, targetHolder);
     }
     ParseNode* newPosHolder(const TokenPos& pos) {
         return new_<NullaryNode>(PNK_POSHOLDER, pos);
+    }
+    ParseNode* newSuperBase(const TokenPos& pos, ExclusiveContext* cx) {
+        ParseNode* node = newPosHolder(pos);
+#ifdef DEBUG
+        // Set the atom for assertion purposes
+        if (node)
+            node->pn_atom = cx->names().super;
+#endif
+        return node;
     }
 
     bool addPrototypeMutation(ParseNode* literal, uint32_t begin, ParseNode* expr) {
@@ -401,7 +398,7 @@ class FullParseHandler
         return true;
     }
 
-    bool addObjectMethodDefinition(ParseNode *literal, ParseNode *key, ParseNode *fn, JSOp op)
+    bool addObjectMethodDefinition(ParseNode* literal, ParseNode* key, ParseNode* fn, JSOp op)
     {
         MOZ_ASSERT(literal->isArity(PN_LIST));
         MOZ_ASSERT(key->isKind(PNK_NUMBER) ||
@@ -417,7 +414,7 @@ class FullParseHandler
         return true;
     }
 
-    bool addClassMethodDefinition(ParseNode *methodList, ParseNode *key, ParseNode *fn, JSOp op,
+    bool addClassMethodDefinition(ParseNode* methodList, ParseNode* key, ParseNode* fn, JSOp op,
                                   bool isStatic)
     {
         MOZ_ASSERT(methodList->isKind(PNK_CLASSMETHODLIST));
@@ -426,7 +423,7 @@ class FullParseHandler
                    key->isKind(PNK_STRING) ||
                    key->isKind(PNK_COMPUTED_NAME));
 
-        ParseNode *classMethod = new_<ClassMethod>(key, fn, op, isStatic);
+        ParseNode* classMethod = new_<ClassMethod>(key, fn, op, isStatic);
         if (!classMethod)
             return false;
         methodList->append(classMethod);
@@ -571,7 +568,7 @@ class FullParseHandler
         return new_<TernaryNode>(kind, JSOP_NOP, pn1, pn2, pn3, pos);
     }
 
-    ParseNode* newFreshenBlock(const TokenPos &pos) {
+    ParseNode* newFreshenBlock(const TokenPos& pos) {
         return new_<NullaryNode>(PNK_FRESHENBLOCK, pos);
     }
 
@@ -704,6 +701,11 @@ class FullParseHandler
         ParseNodeKind kind = node->getKind();
         return kind == PNK_FUNCTION || kind == PNK_VAR || kind == PNK_BREAK || kind == PNK_THROW ||
                (kind == PNK_SEMI && !node->pn_kid);
+    }
+
+    bool isSuperBase(ParseNode* node, ExclusiveContext* cx) {
+        MOZ_ASSERT_IF(node->isKind(PNK_POSHOLDER), node->pn_atom == cx->names().super);
+        return node->isKind(PNK_POSHOLDER);
     }
 
     inline bool finishInitializerAssignment(ParseNode* pn, ParseNode* init, JSOp op);

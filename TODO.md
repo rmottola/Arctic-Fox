@@ -90,36 +90,35 @@
 - Bug 1235656 - Followup: Allow extended functions with guessed atoms i
 - Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
 - Bug 1223916 - 2015-11-14 Prohibit direct method calls at the parser level in 
+- Bug 1223647: CSP erroneously inherited into dedicated workers. r=cke
 - Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
 - Bug 1211546 - Unbreak the non-unified build. (r=sfink, r=nbp, r=shu) 
 - Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
-- Bug 1218882 - 2015-10-28 - lz4.js should be usable outside of workers, r=Yoric.
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
 - Bug 1039986 - 2015-10-27 - (Fix cloudflare?)  Make Function.prototype.toString work on Web IDL interfa
 - Bug 1238935 - r=jonco 
 - Bug 1214126 - 5 Parts
-- Bug 1214408 - 2015-10-16 - Telemetry on SessionStore:update OOM;r=ttaubert 
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
 - Bug 1208385 part 1 - Store a pointer to the owning animation on each ¿ 
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - Bug 1214508: SharedStubs - Part 1: Move the getprop stubs in to share
 - Bug 1158111 - "Add caching and control updating tab offset values in 
-- Bug 1089695 - Fixing wrong dependency in Places shutdown. r=mak 
 - Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or
 - Bug 1257650 - 2016-03-19 Skip Security checks if triggeringPrincipal is System
 - Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
 - Bug 1226909 multipart AsyncOpen2 
 - Bug 1213646: Allow URI_IS_UI_RESOURCE and safe about: URIs when SEC_A
+- 1185106 - at least part 0 to 4 for TFF
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
-- Bug 1182571 - 2051-10-19 Fix nsILoadInfo->GetContentPolicyType API to be less am
+- Bug 1182571 - 2015-10-19 Fix nsILoadInfo->GetContentPolicyType API to be less am
 - Bug 1170958 - 2015-09-30 - Allow MediaInputPort to lock to a specific input track
-- Bug 1205533 - 2015-09-18 - Fix and disallow warnings in gfx/qcms/
 - Bug 1191148 - Don't count fullscreen request handled if we don't chanyesy
 - Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
 - Bug 901633
 - Bug 1155618 - Fix more out of memory handling issues r=terrence 
-- Bug 1186424- Refactor AsmJSValidate.cpp in preparation for paralleliz
+- Bug 1193583 - 2015-08-31 Change the semantics of Debugger.evalInGlobal
+- Bug 1131470 - Part 3, 4, 5
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
@@ -128,50 +127,32 @@
 - Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1169268 - Don't crash when pasting files. r=ndeakin
 - Bug 1202085 2015-10-26 - Part 0 to 6
-- Bug 1188347  - 5 parts
 - Bug 1188643 2015-09-30 - Buffer more audio in audio capture mode to avoid glitche
 - Bug 1205870 - 2015-09-22 - Make sure all possible unboxed array inline capacities 
-- Bug 1204722 - 2015-09-22 - Make sure that unboxed arrays created from literals are
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
+- Bug 1181612 - 2015-09-16 - Split AsmJSValidate into AsmJS{Validate,Compile} and dif
 - Bug 895274 - 1 to 270 parts
+- Bug 1051052 - Made mid an outparam in JsepSession::AddLocalIceCandida
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
 -  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
-- Bug 1192667 - Trigger fullscreen transition when exiting fullscreen
 - Bug 1198563
-- Bug 1190316 - Apply fullscreen transition on only the target monitor
-- 1190669 - 4 parts
-- Bug 1191112 - 3 parts
-- Bug 1189588: [MSE] Remove MediaSourceDemuxer::NotifyTimeRangesChanged
-- Bug 1189138 Video corruption when seeking backward on YouTube
-- Bug 1184867 - 2015-07-31 : new MSE- 3 parts
 - Bug 1189809 - 2015-07-31 Remove the ill-fated DynamicTraceable
-- Bug 1186384 - Consider device pixel scale on fullscreen transition wi
 - Bug 1181142 - Part 2: Make the minimum jemalloc4 allocation size 16 b
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
-- Bug 1203857 - Allow to build standalone js against jemalloc4. r=gps 
-- 1185106 - at least part 0 to 4 for TFF
 - Bug 1171379 - and check all related on bugzilla
-- Bug 909154. Remove the prefixed mozRequestAnimationFrame and its acco
-- Bug 1184429 - 2015-07-17 P1. & P2
-- Bug 1123386 - Part 4: Update the tooltool manifests for the OSX an
 - Bug 1184201 - Disable fullscreen transition on Windows
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
 - Bug 1181869 [provokes crashing] - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
-- Bug 1051052 - Made mid an outparam in JsepSession::AddLocalIceCandida
-- Bug 1204872 - 2015-09
 - bug 1181823 - convert test_ev_certs.js, test_keysize_ev.js, a
 - Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
 --Bug 1194422 - Expose census traversals to SpiderMonkey embedders; r=s
 - Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
-- Bug 1195545 - 2015-08-27 - Add instruction reordering pass to IonMonkey, r=sunfish. 
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
-- Bug 968923 - 2015-07-17 - part 6 - add use counters for deprecated operations; r=bz
-- Bug 1149975 - Part 1 of 2 - Handle visibility of the login fill doo
 - Bug 1242578
 
 
@@ -198,11 +179,6 @@ Check with Roy Tam:
 
 # Patches that apply but break things:
 - Bug 1096294 - 2015-02-24 Display pseudo-arrays like arrays in the console; r=pbrosset
-
-# Not applicable - missing customizableUI
-- Bug 1170759 - Move detailed security information to a subpanel r=Gijs
-
-What with LightweightThemeConsumer.jsm 
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/ac250f9d737362d0730b0897603ae379eca89ebf
@@ -232,6 +208,7 @@ Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
 Bug 1181869 - Update Bindings to use normal Rooted primitives
 
 ### FIXME / TODO
+- Reapply Bug 486262 - Part 2 with removal of tabbrowser.dtd - breaks browser currently
 - fix devtools structure, from browser/themes/osx/devtools to browser/devtools
 Specifically check for duplicates:
   browser/themes/osx/devtools/server
@@ -243,9 +220,6 @@ Check TelemetryEnvironment.jsm _isDefaultBrowser
 
 Remove hack of parserequestcontenttype in nsNetUtil.cpp
 
-
-Why is "hack" in  dom/base/ThirdPartyUtil.cpp needed to import nsPIDOMWindow ?
-And why #include "nsIFrameInlines.h" in layout/style/nsStyleTransformMatrix.cpp ?
 
 Fallible hacks:
 appendElements made fallible when not so in original FF:

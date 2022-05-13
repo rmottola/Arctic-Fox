@@ -69,10 +69,10 @@ PlaceholderMapMatchEntry(PLDHashTable *table, const PLDHashEntryHdr *hdr,
 }
 
 static const PLDHashTableOps PlaceholderMapOps = {
-  PL_DHashVoidPtrKeyStub,
+  PLDHashTable::HashVoidPtrKeyStub,
   PlaceholderMapMatchEntry,
-  PL_DHashMoveEntryStub,
-  PL_DHashClearEntryStub,
+  PLDHashTable::MoveEntryStub,
+  PLDHashTable::ClearEntryStub,
   nullptr
 };
 
@@ -90,7 +90,7 @@ nsFrameManagerBase::nsFrameManagerBase()
 //----------------------------------------------------------------------
 
 // XXXldb This seems too complicated for what I think it's doing, and it
-// should also be using pldhash rather than plhash to use less memory.
+// should also be using PLDHashTable rather than plhash to use less memory.
 
 class nsFrameManagerBase::UndisplayedMap {
 public:

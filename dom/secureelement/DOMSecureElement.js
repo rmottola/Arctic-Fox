@@ -52,12 +52,8 @@ PromiseHelpersSubclass.prototype = {
       callback(resolverId);
     };
 
-    return this.createPromise((resolve, reject) => {
-      let resolverId = this.getPromiseResolverId({
-        resolve: resolve,
-        reject: reject
-      });
-      ctxCallback(resolverId);
+    return this.createPromiseWithId((aResolverId) => {
+      ctxCallback(aResolverId);
     });
   },
 

@@ -171,7 +171,7 @@ MappedAttrTable_MatchEntry(PLDHashTable *table, const PLDHashEntryHdr *hdr,
 static const PLDHashTableOps MappedAttrTable_Ops = {
   MappedAttrTable_HashKey,
   MappedAttrTable_MatchEntry,
-  PL_DHashMoveEntryStub,
+  PLDHashTable::MoveEntryStub,
   MappedAttrTable_ClearEntry,
   nullptr
 };
@@ -222,7 +222,7 @@ LangRuleTable_InitEntry(PLDHashEntryHdr *hdr, const void *key)
 static const PLDHashTableOps LangRuleTable_Ops = {
   LangRuleTable_HashKey,
   LangRuleTable_MatchEntry,
-  PL_DHashMoveEntryStub,
+  PLDHashTable::MoveEntryStub,
   LangRuleTable_ClearEntry,
   LangRuleTable_InitEntry
 };
@@ -296,6 +296,13 @@ nsHTMLStyleSheet::RulesMatching(ElementRuleProcessorData* aData)
   // so we need to do this after WalkContentStyleRules.
   nsString lang;
   if (aData->mElement->GetAttr(kNameSpaceID_XML, nsGkAtoms::lang, lang)) {
+    ruleWalker->Forward(LangRuleFor(lang));
+  }
+
+  // Set the language to "x-math" on the <math> element, so that appropriate
+  // font settings are used for MathML.
+  if (aData->mElement->IsMathMLElement(nsGkAtoms::math)) {
+    nsGkAtoms::x_math->ToString(lang);
     ruleWalker->Forward(LangRuleFor(lang));
   }
 }

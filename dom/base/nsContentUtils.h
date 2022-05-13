@@ -624,7 +624,7 @@ public:
    * @param aContext the context the image is loaded in (eg an element)
    * @param aLoadingDocument the document we belong to
    * @param aLoadingPrincipal the principal doing the load
-   * @param [aContentPolicyType=nsIContentPolicy::TYPE_IMAGE] (Optional)
+   * @param [aContentPolicyType=nsIContentPolicy::TYPE_INTERNAL_IMAGE] (Optional)
    *        The CP content type to use
    * @param aImageBlockingStatus the nsIContentPolicy blocking status for this
    *        image.  This will be set even if a security check fails for the
@@ -640,7 +640,7 @@ public:
                            nsIDocument* aLoadingDocument,
                            nsIPrincipal* aLoadingPrincipal,
                            int16_t* aImageBlockingStatus = nullptr,
-                           uint32_t aContentPolicyType = nsIContentPolicy::TYPE_IMAGE);
+                           uint32_t aContentPolicyType = nsIContentPolicy::TYPE_INTERNAL_IMAGE);
 
   /**
    * Returns true if objects in aDocument shouldn't initiate image loads.
@@ -660,7 +660,7 @@ public:
    *         creation
    * @param aObserver the observer for the image load
    * @param aLoadFlags the load flags to use.  See nsIRequest
-   * @param [aContentPolicyType=nsIContentPolicy::TYPE_IMAGE] (Optional)
+   * @param [aContentPolicyType=nsIContentPolicy::TYPE_INTERNAL_IMAGE] (Optional)
    *        The CP content type to use
    * @return the imgIRequest for the image load
    */
@@ -673,7 +673,7 @@ public:
                             int32_t aLoadFlags,
                             const nsAString& initiatorType,
                             imgRequestProxy** aRequest,
-                            uint32_t aContentPolicyType = nsIContentPolicy::TYPE_IMAGE);
+                            uint32_t aContentPolicyType = nsIContentPolicy::TYPE_INTERNAL_IMAGE);
 
   /**
    * Obtain an image loader that respects the given document/channel's privacy status.
@@ -948,7 +948,7 @@ public:
    */
   static nsIContentPolicy *GetContentPolicy();
 
-/**
+  /**
    * Map internal content policy types to external ones.
    */
   static nsContentPolicyType InternalContentPolicyTypeToExternal(nsContentPolicyType aType);
@@ -1156,7 +1156,7 @@ public:
 
   /**
    * Return the event message for the event with the given name. The name is
-   * the event name with the 'on' prefix. Returns NS_USER_DEFINED_EVENT if the
+   * the event name with the 'on' prefix. Returns eUnidentifiedEvent if the
    * event doesn't match a known event name.
    *
    * @param aName the event name to look up
@@ -1175,7 +1175,7 @@ public:
   /**
    * Return the event message and atom for the event with the given name.
    * The name is the event name *without* the 'on' prefix.
-   * Returns NS_USER_DEFINED_EVENT on the aEventID if the
+   * Returns eUnidentifiedEvent on the aEventID if the
    * event doesn't match a known event name in the category.
    *
    * @param aName the event name to look up
@@ -1719,16 +1719,12 @@ public:
 
   /**
    * Convert ASCII A-Z to a-z.
-   * @return NS_OK on success, or NS_ERROR_OUT_OF_MEMORY if making the string
-   * writable needs to allocate memory and that allocation fails.
    */
   static void ASCIIToLower(nsAString& aStr);
   static void ASCIIToLower(const nsAString& aSource, nsAString& aDest);
 
   /**
    * Convert ASCII a-z to A-Z.
-   * @return NS_OK on success, or NS_ERROR_OUT_OF_MEMORY if making the string
-   * writable needs to allocate memory and that allocation fails.
    */
   static void ASCIIToUpper(nsAString& aStr);
   static void ASCIIToUpper(const nsAString& aSource, nsAString& aDest);
@@ -1993,6 +1989,27 @@ public:
   }
 
   /*
+   * Returns true if notification should be sent for peformance timing events.
+   */
+  static bool SendPerformanceTimingNotifications()
+  {
+    return sSendPerformanceTimingNotifications;
+  }
+
+  /*
+   * Returns true if ServiceWorker Interception is enabled by pref.
+   */
+  static bool ServiceWorkerInterceptionEnabled()
+  {
+    return sSWInterceptionEnabled;
+  }
+
+  /*
+   * Returns true if the frame timing APIs are enabled.
+   */
+  static bool IsFrameTimingEnabled();
+
+  /*
    * Returns true if URL setters should percent encode the Hash/Ref segment
    * and getters should return the percent decoded value of the segment
    */
@@ -2026,6 +2043,11 @@ public:
    * control? This always returns false on MacOSX.
    */
   static bool HasPluginWithUncontrolledEventDispatch(nsIDocument* aDoc);
+
+  /**
+   * Return true if this doc is controlled by a ServiceWorker.
+   */
+  static bool IsControlledByServiceWorker(nsIDocument* aDocument);
 
   /**
    * Fire mutation events for changes caused by parsing directly into a
@@ -2424,7 +2446,7 @@ public:
    * Synthesize a key event to the given widget
    * (see nsIDOMWindowUtils.sendKeyEvent).
    */
-  static nsresult SendKeyEvent(nsCOMPtr<nsIWidget> aWidget,
+  static nsresult SendKeyEvent(nsIWidget* aWidget,
                                const nsAString& aType,
                                int32_t aKeyCode,
                                int32_t aCharCode,
@@ -2480,6 +2502,40 @@ public:
 
   static bool PushEnabled(JSContext* aCx, JSObject* aObj);
 
+  static bool IsWorkerLoad(nsContentPolicyType aLoadType);
+
+  // The order of these entries matters, as we use std::min for total ordering
+  // of permissions. Private Browsing is considered to be more limiting
+  // then session scoping
+  enum class StorageAccess {
+    // Don't allow access to the storage
+    eDeny = 0,
+    // Allow access to the storage, but only if it is secure to do so in a
+    // private browsing context.
+    ePrivateBrowsing = 1,
+    // Allow access to the storage, but only persist it for the current session
+    eSessionScoped = 2,
+    // Allow access to the storage
+    eAllow = 3,
+  };
+
+  /*
+   * Checks if storage for the given window is permitted by a combination of
+   * the user's preferences, and whether the window is a third-party iframe.
+   *
+   * This logic is intended to be shared between the different forms of
+   * persistent storage which are available to web pages. Cookies don't use
+   * this logic, and security logic related to them must be updated separately.
+   */
+  static StorageAccess StorageAllowedForWindow(nsPIDOMWindow* aWindow);
+
+  /*
+   * Checks if storage for the given principal is permitted by the user's
+   * preferences. The caller is assumed to not be a third-party iframe.
+   * (if that is possible, the caller should use StorageAllowedForWindow)
+   */
+  static StorageAccess StorageAllowedForPrincipal(nsIPrincipal* aPrincipal);
+
 private:
   static bool InitializeEventTable();
 
@@ -2519,6 +2575,18 @@ private:
   static void CallOnAllRemoteChildren(nsIMessageBroadcaster* aManager,
                                       CallOnRemoteChildFunction aCallback,
                                       void* aArg);
+
+  /*
+   * Checks if storage for a given principal is permitted by the user's
+   * preferences. If aWindow is non-null, its principal must be passed as
+   * aPrincipal, and the third-party iframe and sandboxing status of the window
+   * are also checked.
+   *
+   * Used in the implementation of StorageAllowedForWindow and
+   * StorageAllowedForPrincipal.
+   */
+  static StorageAccess InternalStorageAllowedForPrincipal(nsIPrincipal* aPrincipal,
+                                                          nsPIDOMWindow* aWindow);
 
   static nsIXPConnect *sXPConnect;
 
@@ -2579,10 +2647,15 @@ private:
   static bool sIsPerformanceTimingEnabled;
   static bool sIsResourceTimingEnabled;
   static bool sIsUserTimingLoggingEnabled;
+  static bool sIsFrameTimingPrefEnabled;
   static bool sIsExperimentalAutocompleteEnabled;
   static bool sEncodeDecodeURLHash;
   static bool sGettersDecodeURLHash;
   static bool sPrivacyResistFingerprinting;
+  static bool sSendPerformanceTimingNotifications;
+  static bool sSWInterceptionEnabled;
+  static uint32_t sCookiesLifetimePolicy;
+  static uint32_t sCookiesBehavior;
 
   static nsHtml5StringParser* sHTMLFragmentParser;
   static nsIParser* sXMLFragmentParser;

@@ -1026,9 +1026,11 @@ add_task(function* test_defaultSearchEngine() {
 
   // Load the engines definitions from a custom JAR file: that's needed so that
   // the search provider reports an engine identifier.
-  let defaultBranch = Services.prefs.getDefaultBranch(null);
-  defaultBranch.setCharPref("browser.search.jarURIs", "chrome://testsearchplugin/locale/searchplugins/");
-  defaultBranch.setBoolPref("browser.search.loadFromJars", true);
+  let url = "chrome://testsearchplugin/locale/searchplugins/";
+  let resProt = Services.io.getProtocolHandler("resource")
+                        .QueryInterface(Ci.nsIResProtocolHandler);
+  resProt.setSubstitution("search-plugins",
+                          Services.io.newURI(url, null, null));
 
   // Initialize the search service and disable geoip lookup, so we don't get unwanted
   // network connections.
@@ -1042,8 +1044,7 @@ add_task(function* test_defaultSearchEngine() {
   Assert.equal(data.settings.defaultSearchEngine, "telemetrySearchIdentifier");
   let expectedSearchEngineData = {
     name: "telemetrySearchIdentifier",
-    loadPath: "jar:[other]/searchTest.jar!testsearchplugin/telemetrySearchIdentifier.xml",
-    submissionURL: "http://ar.wikipedia.org/wiki/%D8%AE%D8%A7%D8%B5:%D8%A8%D8%AD%D8%AB?search=&sourceid=Mozilla-search"
+    loadPath: "jar:[other]/searchTest.jar!testsearchplugin/telemetrySearchIdentifier.xml"
   };
   Assert.deepEqual(data.settings.defaultSearchEngineData, expectedSearchEngineData);
 

@@ -556,10 +556,10 @@ XDRRelazificationInfo(XDRState<mode>* xdr, HandleFunction fun, HandleScript scri
 }
 
 static inline uint32_t
-FindScopeObjectIndex(JSScript *script, NestedScopeObject& scope)
+FindScopeObjectIndex(JSScript* script, NestedScopeObject& scope)
 {
-    ObjectArray *objects = script->objects();
-    HeapPtrObject *vector = objects->vector;
+    ObjectArray* objects = script->objects();
+    HeapPtrObject* vector = objects->vector;
     unsigned length = objects->length;
     for (unsigned i = 0; i < length; ++i) {
         if (vector[i] == &scope)
@@ -965,11 +965,11 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
      * after the enclosing block has been XDR'd.
      */
     for (i = 0; i != nobjects; ++i) {
-        HeapPtrObject *objp = &script->objects()->vector[i];
+        HeapPtrObject* objp = &script->objects()->vector[i];
         XDRClassKind classk;
 
         if (mode == XDR_ENCODE) {
-            JSObject *obj = *objp;
+            JSObject* obj = *objp;
             if (obj->is<BlockObject>())
                 classk = CK_BlockObject;
             else if (obj->is<StaticWithObject>())
@@ -2655,19 +2655,19 @@ JSScript::partiallyInit(ExclusiveContext* cx, HandleScript script, uint32_t ncon
 
     if (nobjects != 0) {
         script->objects()->length = nobjects;
-        script->objects()->vector = (HeapPtrObject *)cursor;
+        script->objects()->vector = (HeapPtrObject*)cursor;
         cursor += nobjects * sizeof(script->objects()->vector[0]);
     }
 
     if (nregexps != 0) {
         script->regexps()->length = nregexps;
-        script->regexps()->vector = (HeapPtrObject *)cursor;
+        script->regexps()->vector = (HeapPtrObject*)cursor;
         cursor += nregexps * sizeof(script->regexps()->vector[0]);
     }
 
     if (ntrynotes != 0) {
         script->trynotes()->length = ntrynotes;
-        script->trynotes()->vector = reinterpret_cast<JSTryNote *>(cursor);
+        script->trynotes()->vector = reinterpret_cast<JSTryNote*>(cursor);
         size_t vectorSize = ntrynotes * sizeof(script->trynotes()->vector[0]);
 #ifdef DEBUG
         memset(cursor, 0, vectorSize);
@@ -3250,7 +3250,7 @@ js::detail::CopyScript(JSContext* cx, HandleObject scriptStaticScope, HandleScri
 
     AutoObjectVector objects(cx);
     if (nobjects != 0) {
-        HeapPtrObject *vector = src->objects()->vector;
+        HeapPtrObject* vector = src->objects()->vector;
         for (unsigned i = 0; i < nobjects; i++) {
             RootedObject obj(cx, vector[i]);
             RootedObject clone(cx);
@@ -3360,13 +3360,13 @@ js::detail::CopyScript(JSContext* cx, HandleObject scriptStaticScope, HandleScri
             MOZ_ASSERT_IF(vector[i].isMarkable(), vector[i].toString()->isAtom());
     }
     if (nobjects != 0) {
-        HeapPtrObject *vector = Rebase<HeapPtrObject>(dst, src, src->objects()->vector);
+        HeapPtrObject* vector = Rebase<HeapPtrObject>(dst, src, src->objects()->vector);
         dst->objects()->vector = vector;
         for (unsigned i = 0; i < nobjects; ++i)
             vector[i].init(&objects[i]->as<NativeObject>());
     }
     if (nregexps != 0) {
-        HeapPtrObject *vector = Rebase<HeapPtrObject>(dst, src, src->regexps()->vector);
+        HeapPtrObject* vector = Rebase<HeapPtrObject>(dst, src, src->regexps()->vector);
         dst->regexps()->vector = vector;
         for (unsigned i = 0; i < nregexps; ++i)
             vector[i].init(&regexps[i]->as<NativeObject>());
@@ -3467,13 +3467,19 @@ js::CloneScriptIntoFunction(JSContext* cx, HandleObject enclosingScope, HandleFu
         return nullptr;
 
     dst->setFunction(fun);
-    if (fun->isInterpretedLazy())
+    Rooted<LazyScript*> lazy(cx);
+    if (fun->isInterpretedLazy()) {
+        lazy = fun->lazyScriptOrNull();
         fun->setUnlazifiedScript(dst);
-    else
+    } else {
         fun->initScript(dst);
+    }
 
     if (!detail::CopyScript(cx, fun, src, dst)) {
-        fun->setScript(nullptr);
+        if (lazy)
+            fun->initLazyScript(lazy);
+        else
+            fun->setScript(nullptr);
         return nullptr;
     }
 
@@ -3677,7 +3683,7 @@ JSScript::traceChildren(JSTracer* trc)
     // fullyInitFromEmitter() or fullyInitTrivial().
 
     MOZ_ASSERT_IF(trc->isMarkingTracer() &&
-                  static_cast<GCMarker *>(trc)->shouldCheckCompartments(),
+                  static_cast<GCMarker*>(trc)->shouldCheckCompartments(),
                   zone()->isCollecting());
 
     for (uint32_t i = 0; i < natoms(); ++i) {
@@ -4064,8 +4070,8 @@ LazyScript::CreateRaw(ExclusiveContext* cx, HandleFunction fun,
     return new (res) LazyScript(fun, table.forget(), packed, begin, end, lineno, column);
 }
 
-/* static */ LazyScript *
-LazyScript::CreateRaw(ExclusiveContext *cx, HandleFunction fun,
+/* static */ LazyScript*
+LazyScript::CreateRaw(ExclusiveContext* cx, HandleFunction fun,
                       uint32_t numFreeVariables, uint32_t numInnerFunctions, JSVersion version,
                       uint32_t begin, uint32_t end, uint32_t lineno, uint32_t column)
 {

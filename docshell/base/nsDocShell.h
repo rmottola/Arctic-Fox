@@ -62,8 +62,9 @@
 namespace mozilla {
 namespace dom {
 class EventTarget;
-}
-}
+typedef uint32_t ScreenOrientationInternal;
+} // namespace dom
+} // namespace mozilla
 
 class nsDocShell;
 class nsDOMNavigationTiming;
@@ -257,6 +258,12 @@ public:
   // Notify Scroll observers when an async panning/zooming transform
   // is no longer applied
   void NotifyAsyncPanZoomStopped();
+
+  void SetInFrameSwap(bool aInSwap)
+  {
+    mInFrameSwap = aInSwap;
+  }
+  bool InFrameSwap();
 
 private:
   // An observed docshell wrapper is created when recording markers is enabled.
@@ -875,11 +882,12 @@ protected:
   };
   FullscreenAllowedState mFullscreenAllowed;
 
+  // The orientation lock as described by
+  // https://w3c.github.io/screen-orientation/
+  mozilla::dom::ScreenOrientationInternal mOrientationLock;
+
   // Cached value of the "browser.xul.error_pages.enabled" preference.
   static bool sUseErrorPages;
-
-  // Cached value of the "dom.serviceWorkers.interception.enabled" preference.
-  static bool sInterceptionEnabled;
 
   bool mCreated;
   bool mAllowSubframes;
@@ -906,6 +914,7 @@ protected:
   bool mUseRemoteTabs;
   bool mDeviceSizeIsPageSize;
   bool mWindowDraggingAllowed;
+  bool mInFrameSwap;
 
   // Because scriptability depends on the mAllowJavascript values of our
   // ancestors, we cache the effective scriptability and recompute it when

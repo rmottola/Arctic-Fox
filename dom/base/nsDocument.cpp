@@ -38,6 +38,7 @@
 #include "nsQueryObject.h"
 #include "nsDOMClassInfo.h"
 #include "mozilla/Services.h"
+#include "nsScreen.h"
 
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/BasicEvents.h"
@@ -91,6 +92,7 @@
 #include "nsIAuthPrompt2.h"
 
 #include "nsIScriptSecurityManager.h"
+#include "nsIPermissionManager.h"
 #include "nsIPrincipal.h"
 
 #include "nsIDOMWindow.h"
@@ -1922,6 +1924,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsDocument)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFirstBaseNodeWithHref)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDOMImplementation)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mImageMaps)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mOrientationPendingPromise)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mOriginalDocument)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCachedEncoder)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mStateObjectCached)
@@ -2022,6 +2025,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsDocument)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mChildrenCollection)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mRegistry)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mMasterDocument)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mOrientationPendingPromise)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mImportManager)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSubImportLinks)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFontFaceSet)
@@ -3943,9 +3947,9 @@ nsDocument::SetSubDocumentFor(Element* aElement, nsIDocument* aSubDoc)
 
       static const PLDHashTableOps hash_table_ops =
       {
-        PL_DHashVoidPtrKeyStub,
-        PL_DHashMatchEntryStub,
-        PL_DHashMoveEntryStub,
+        PLDHashTable::HashVoidPtrKeyStub,
+        PLDHashTable::MatchEntryStub,
+        PLDHashTable::MoveEntryStub,
         SubDocClearEntry,
         SubDocInitEntry
       };
@@ -5799,8 +5803,32 @@ bool
 nsDocument::IsWebComponentsEnabled(JSContext* aCx, JSObject* aObject)
 {
   JS::Rooted<JSObject*> obj(aCx, aObject);
-  return Preferences::GetBool("dom.webcomponents.enabled") ||
-    IsInCertifiedApp(aCx, obj);
+
+  if (Preferences::GetBool("dom.webcomponents.enabled")) {
+    return true;
+  }
+
+  // Check for the webcomponents permission. See Bug 1181555.
+  JSAutoCompartment ac(aCx, obj);
+  JS::Rooted<JSObject*> global(aCx, JS_GetGlobalForObject(aCx, obj));
+  nsCOMPtr<nsPIDOMWindow> window =
+    do_QueryInterface(nsJSUtils::GetStaticScriptGlobal(global));
+
+  if (window) {
+    nsresult rv;
+    nsCOMPtr<nsIPermissionManager> permMgr =
+      do_GetService(NS_PERMISSIONMANAGER_CONTRACTID, &rv);
+    NS_ENSURE_SUCCESS(rv, false);
+
+    uint32_t perm;
+    rv = permMgr->TestPermissionFromWindow(
+      window, "moz-extremely-unstable-and-will-change-webcomponents", &perm);
+    NS_ENSURE_SUCCESS(rv, false);
+
+    return perm == nsIPermissionManager::ALLOW_ACTION;
+  }
+
+  return false;
 }
 
 nsresult
@@ -5839,29 +5867,6 @@ nsDocument::RegisterUnresolvedElement(Element* aElement, nsIAtom* aTypeName)
 
   return NS_OK;
 }
-
-namespace {
-
-class ProcessStackRunner final : public nsIRunnable
-{
-  ~ProcessStackRunner() {}
-public:
-  explicit ProcessStackRunner(bool aIsBaseQueue = false)
-    : mIsBaseQueue(aIsBaseQueue)
-  {
-  }
-  NS_DECL_ISUPPORTS
-  NS_IMETHOD Run() override
-  {
-    nsDocument::ProcessTopElementQueue(mIsBaseQueue);
-    return NS_OK;
-  }
-  bool mIsBaseQueue;
-};
-
-NS_IMPL_ISUPPORTS(ProcessStackRunner, nsIRunnable);
-
-} // namespace
 
 void
 nsDocument::EnqueueLifecycleCallback(nsIDocument::ElementCallbackType aType,
@@ -5964,10 +5969,7 @@ nsDocument::EnqueueLifecycleCallback(nsIDocument::ElementCallbackType aType,
 
     // A new element queue needs to be pushed if the queue at the
     // top of the stack is associated with another microtask level.
-    // Don't push a queue for the level 0 microtask (base element queue)
-    // because we don't want to process the queue until the
-    // microtask checkpoint.
-    bool shouldPushElementQueue = nsContentUtils::MicroTaskLevel() > 0 &&
+    bool shouldPushElementQueue =
       (!lastData || lastData->mAssociatedMicroTask <
          static_cast<int32_t>(nsContentUtils::MicroTaskLevel()));
 
@@ -5990,38 +5992,21 @@ nsDocument::EnqueueLifecycleCallback(nsIDocument::ElementCallbackType aType,
       // should be invoked prior to returning control back to script.
       // Create a script runner to process the top of the processing
       // stack as soon as it is safe to run script.
-      nsContentUtils::AddScriptRunner(new ProcessStackRunner());
+      nsCOMPtr<nsIRunnable> runnable =
+        NS_NewRunnableFunction(&nsDocument::ProcessTopElementQueue);
+      nsContentUtils::AddScriptRunner(runnable);
     }
   }
 }
 
 // static
 void
-nsDocument::ProcessBaseElementQueue()
-{
-  // Prevent re-entrance. Also, if a microtask checkpoint is reached
-  // and there is no processing stack to process, then we are done.
-  if (sProcessingBaseElementQueue || !sProcessingStack) {
-    return;
-  }
-
-  MOZ_ASSERT(nsContentUtils::MicroTaskLevel() == 0);
-  sProcessingBaseElementQueue = true;
-  nsContentUtils::AddScriptRunner(new ProcessStackRunner(true));
-}
-
-// static
-void
-nsDocument::ProcessTopElementQueue(bool aIsBaseQueue)
+nsDocument::ProcessTopElementQueue()
 {
   MOZ_ASSERT(nsContentUtils::IsSafeToRunScript());
 
   nsTArray<nsRefPtr<CustomElementData>>& stack = *sProcessingStack;
   uint32_t firstQueue = stack.LastIndexOf((CustomElementData*) nullptr);
-
-  if (aIsBaseQueue && firstQueue != 0) {
-    return;
-  }
 
   for (uint32_t i = firstQueue + 1; i < stack.Length(); ++i) {
     // Callback queue may have already been processed in an earlier
@@ -6040,7 +6025,6 @@ nsDocument::ProcessTopElementQueue(bool aIsBaseQueue)
   } else {
     // Don't pop sentinel for base element queue.
     stack.SetLength(1);
-    sProcessingBaseElementQueue = false;
   }
 }
 
@@ -6055,10 +6039,6 @@ nsDocument::RegisterEnabled()
 // static
 Maybe<nsTArray<nsRefPtr<mozilla::dom::CustomElementData>>>
 nsDocument::sProcessingStack;
-
-// static
-bool
-nsDocument::sProcessingBaseElementQueue;
 
 void
 nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
@@ -7852,14 +7832,14 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
     return nsViewportInfo(aDisplaySize,
                           defaultScale,
                           /*allowZoom*/false,
-                          /*allowDoubleTapZoom*/ true);
+                          /*allowDoubleTapZoom*/ false);
   }
 
   if (!gfxPrefs::MetaViewportEnabled()) {
     return nsViewportInfo(aDisplaySize,
                           defaultScale,
                           /*allowZoom*/ false,
-                          /*allowDoubleTapZoom*/ true);
+                          /*allowDoubleTapZoom*/ false);
   }
 
   // In cases where the width of the CSS viewport is less than or equal to the width
@@ -8083,7 +8063,7 @@ nsDocument::PreHandleEvent(EventChainPreVisitor& aVisitor)
   aVisitor.mForceContentDispatch = true;
 
   // Load events must not propagate to |window| object, see bug 335251.
-  if (aVisitor.mEvent->mMessage != NS_LOAD) {
+  if (aVisitor.mEvent->mMessage != eLoad) {
     nsGlobalWindow* window = static_cast<nsGlobalWindow*>(GetWindow());
     aVisitor.mParentTarget =
       window ? window->GetTargetForEventTargetChain() : nullptr;
@@ -8523,9 +8503,6 @@ nsDocument::RetrieveRelevantHeaders(nsIChannel *aChannel)
     // The misspelled key 'referer' is as per the HTTP spec
     rv = httpChannel->GetRequestHeader(NS_LITERAL_CSTRING("referer"),
                                        mReferrer);
-    if (NS_FAILED(rv)) {
-      mReferrer.Truncate();
-    }
 
     static const char *const headers[] = {
       "default-style",
@@ -9358,7 +9335,7 @@ nsDocument::MutationEventDispatched(nsINode* aTarget)
 
     int32_t realTargetCount = realTargets.Count();
     for (int32_t k = 0; k < realTargetCount; ++k) {
-      InternalMutationEvent mutation(true, NS_MUTATION_SUBTREEMODIFIED);
+      InternalMutationEvent mutation(true, eLegacySubtreeModified);
       (new AsyncEventDispatcher(realTargets[k], mutation))->
         RunDOMEventWhenSafe();
     }
@@ -9709,7 +9686,8 @@ nsDocument::MaybePreLoadImage(nsIURI* uri, const nsAString &aCrossOriginAttr,
   int16_t blockingStatus;
   if (nsContentUtils::IsImageInCache(uri, static_cast<nsIDocument *>(this)) ||
       !nsContentUtils::CanLoadImage(uri, static_cast<nsIDocument *>(this),
-                                    this, NodePrincipal(), &blockingStatus)) {
+                                    this, NodePrincipal(), &blockingStatus,
+                                    nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD)) {
     return;
   }
 
@@ -9739,7 +9717,8 @@ nsDocument::MaybePreLoadImage(nsIURI* uri, const nsAString &aCrossOriginAttr,
                               nullptr,       // no observer
                               loadFlags,
                               NS_LITERAL_STRING("img"),
-                              getter_AddRefs(request));
+                              getter_AddRefs(request),
+                              nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD);
 
   // Pin image-reference to avoid evicting it from the img-cache before
   // the "real" load occurs. Unpinned in DispatchContentLoadedEvents and
@@ -9853,7 +9832,7 @@ nsDocument::PreloadStyle(nsIURI* uri, const nsAString& charset,
   nsCOMPtr<nsICSSLoaderObserver> obs = new StubCSSLoaderObserver();
 
   // Charset names are always ASCII.
-  CSSLoader()->LoadSheet(uri, NodePrincipal(),
+  CSSLoader()->LoadSheet(uri, true, NodePrincipal(),
                          NS_LossyConvertUTF16toASCII(charset),
                          obs,
                          Element::StringToCORSMode(aCrossOriginAttr),
@@ -11952,6 +11931,38 @@ nsDocument::IsFullScreenEnabled(bool aCallerIsChrome, bool aLogFailure)
   }
 
   return allowed;
+}
+
+uint16_t
+nsDocument::CurrentOrientationAngle() const
+{
+  return mCurrentOrientationAngle;
+}
+
+OrientationType
+nsDocument::CurrentOrientationType() const
+{
+  return mCurrentOrientationType;
+}
+
+void
+nsDocument::SetCurrentOrientation(mozilla::dom::OrientationType aType,
+                                  uint16_t aAngle)
+{
+  mCurrentOrientationType = aType;
+  mCurrentOrientationAngle = aAngle;
+}
+
+Promise*
+nsDocument::GetOrientationPendingPromise() const
+{
+  return mOrientationPendingPromise;
+}
+
+void
+nsDocument::SetOrientationPendingPromise(Promise* aPromise)
+{
+  mOrientationPendingPromise = aPromise;
 }
 
 static void

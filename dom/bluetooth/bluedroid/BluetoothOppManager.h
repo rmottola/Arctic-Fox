@@ -4,8 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef mozilla_dom_bluetooth_bluetoothoppmanager_h__
-#define mozilla_dom_bluetooth_bluetoothoppmanager_h__
+#ifndef mozilla_dom_bluetooth_bluedroid_BluetoothOppManager_h
+#define mozilla_dom_bluetooth_bluedroid_BluetoothOppManager_h
 
 #include "BluetoothCommon.h"
 #include "BluetoothProfileManagerBase.h"
@@ -76,12 +76,7 @@ private:
   BluetoothOppManager();
   bool Init();
   void HandleShutdown();
-
-#ifdef MOZ_B2G_BT_API_V2
-  // Removed in bluetooth2
-#else
   void HandleVolumeStateChanged(nsISupports* aSubject);
-#endif
 
   void StartFileTransfer();
   void StartSendingNextFile();
@@ -157,6 +152,12 @@ private:
   bool mNeedsUpdatingSdpRecords;
 
   /**
+   * This holds the time when OPP manager fail to get service channel and
+   * prepare to refresh SDP records.
+   */
+  mozilla::TimeStamp mLastServiceChannelCheck;
+
+  /**
    * Set when StopSendingFile() is called.
    */
   bool mAbortFlag;
@@ -230,4 +231,4 @@ private:
 
 END_BLUETOOTH_NAMESPACE
 
-#endif
+#endif // mozilla_dom_bluetooth_bluedroid_BluetoothOppManager_h

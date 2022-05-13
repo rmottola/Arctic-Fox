@@ -26,6 +26,7 @@ namespace mozilla {
 class ErrorResult;
 namespace dom {
   class PerformanceEntry;
+  class PerformanceObserver;
 } // namespace dom
 } // namespace mozilla
 
@@ -300,6 +301,7 @@ public:
   explicit PerformanceBase(nsPIDOMWindow* aWindow);
 
   typedef mozilla::dom::PerformanceEntry PerformanceEntry;
+  typedef mozilla::dom::PerformanceObserver PerformanceObserver;
 
   void GetEntries(nsTArray<nsRefPtr<PerformanceEntry>>& aRetval);
   void GetEntriesByType(const nsAString& aEntryType,
@@ -320,6 +322,11 @@ public:
   void ClearMeasures(const mozilla::dom::Optional<nsAString>& aName);
 
   void SetResourceTimingBufferSize(uint64_t aMaxSize);
+
+  void AddObserver(PerformanceObserver* aObserver);
+  void RemoveObserver(PerformanceObserver* aObserver);
+  void NotifyObservers();
+  void CancelNotificationObservers();
 
 protected:
   virtual ~PerformanceBase();
@@ -351,6 +358,12 @@ protected:
   }
 
   void LogEntry(PerformanceEntry* aEntry, const nsACString& aOwner) const;
+  void TimingNotification(PerformanceEntry* aEntry, const nsACString& aOwner, uint64_t epoch);
+
+  void RunNotificationObserversTask();
+  void QueueEntry(PerformanceEntry* aEntry);
+
+  nsTObserverArray<PerformanceObserver*> mObservers;
 
 private:
   nsTArray<nsRefPtr<PerformanceEntry>> mUserEntries;
@@ -358,6 +371,7 @@ private:
 
   uint64_t mResourceTimingBufferSize;
   static const uint64_t kDefaultResourceTimingBufferSize = 150;
+  bool mPendingNotificationObserversTask;
 };
 
 // Script "performance" object
@@ -374,6 +388,8 @@ public:
                                                          PerformanceBase)
 
   static bool IsEnabled(JSContext* aCx, JSObject* aGlobal);
+
+  static bool IsObserverEnabled(JSContext* aCx, JSObject* aGlobal);
 
   nsDOMNavigationTiming* GetDOMTiming() const
   {
@@ -425,7 +441,7 @@ private:
     return this;
   }
 
-  void InsertUserEntry(PerformanceEntry* aEntry);
+  void InsertUserEntry(PerformanceEntry* aEntry) override;
 
   bool IsPerformanceTimingAttribute(const nsAString& aName) override;
 

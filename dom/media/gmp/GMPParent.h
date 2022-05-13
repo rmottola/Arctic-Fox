@@ -24,6 +24,17 @@
 
 class nsIThread;
 
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+
+namespace mozilla {
+namespace dom {
+class PCrashReporterParent;
+class CrashReporterParent;
+}
+}
+#endif
+
 namespace mozilla {
 namespace gmp {
 
@@ -142,7 +153,14 @@ private:
   nsRefPtr<GeckoMediaPluginServiceParent> mService;
   bool EnsureProcessLoaded();
   nsresult ReadGMPMetaData();
+#ifdef MOZ_CRASHREPORTER
+  void WriteExtraDataForMinidump(CrashReporter::AnnotationTable& notes);
+  void GetCrashID(nsString& aResult);
+#endif
   virtual void ActorDestroy(ActorDestroyReason aWhy) override;
+
+  virtual PCrashReporterParent* AllocPCrashReporterParent(const NativeThreadId& aThread) override;
+  virtual bool DeallocPCrashReporterParent(PCrashReporterParent* aCrashReporter) override;
 
   virtual bool RecvPGMPStorageConstructor(PGMPStorageParent* actor) override;
   virtual PGMPStorageParent* AllocPGMPStorageParent() override;
@@ -199,6 +217,12 @@ private:
   bool mAsyncShutdownInProgress;
 
   int mChildPid;
+
+  // We hold a self reference to ourself while the child process is alive.
+  // This ensures that if the GMPService tries to shut us down and drops
+  // its reference to us, we stay alive long enough for the child process
+  // to terminate gracefully.
+  bool mHoldingSelfRef;
 };
 
 } // namespace gmp

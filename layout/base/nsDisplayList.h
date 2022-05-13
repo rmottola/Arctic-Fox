@@ -49,11 +49,11 @@ namespace layers {
 class Layer;
 class ImageLayer;
 class ImageContainer;
-} //namespace
+} // namespace layers
 namespace gfx {
 class VRHMDInfo;
-} //namespace
-} //namespace
+} // namespace gfx
+} // namespace mozilla
 
 // A set of blend modes, that never includes OP_OVER (since it's
 // considered the default, rather than a specific blend mode).
@@ -166,8 +166,7 @@ public:
   /**
    * @param aReferenceFrame the frame at the root of the subtree; its origin
    * is the origin of the reference coordinate system for this display list
-   * @param aIsForEvents true if we're creating this list in order to
-   * determine which frame is under the mouse position
+   * @param aMode encodes what the builder is being used for.
    * @param aBuildCaret whether or not we should include the caret in any
    * display lists that we make.
    */
@@ -1983,9 +1982,6 @@ public:
    * otherwise we will use a temporary BasicLayerManager and ctx must
    * not be null.
    * 
-   * If PAINT_FLUSH_LAYERS is set, we'll force a completely new layer
-   * tree to be created for this paint *and* the next paint.
-   * 
    * If PAINT_EXISTING_TRANSACTION is set, the reference frame's widget's
    * layer manager has already had BeginTransaction() called on it and
    * we should not call it again.
@@ -2002,7 +1998,6 @@ public:
   enum {
     PAINT_DEFAULT = 0,
     PAINT_USE_WIDGET_LAYERS = 0x01,
-    PAINT_FLUSH_LAYERS = 0x02,
     PAINT_EXISTING_TRANSACTION = 0x04,
     PAINT_NO_COMPOSITE = 0x08,
     PAINT_COMPRESSED = 0x10
@@ -2412,40 +2407,11 @@ protected:
  * is not yet a frame tree to go in the frame/iframe so we use the subdoc
  * frame of the parent document as a standin.
  */
-class nsDisplaySolidColor : public nsDisplayItem {
+class nsDisplaySolidColorBase : public nsDisplayItem {
 public:
-  nsDisplaySolidColor(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
-                      const nsRect& aBounds, nscolor aColor)
-    : nsDisplayItem(aBuilder, aFrame), mBounds(aBounds), mColor(aColor)
-  {
-    NS_ASSERTION(NS_GET_A(aColor) > 0, "Don't create invisible nsDisplaySolidColors!");
-    MOZ_COUNT_CTOR(nsDisplaySolidColor);
-  }
-#ifdef NS_BUILD_REFCNT_LOGGING
-  virtual ~nsDisplaySolidColor() {
-    MOZ_COUNT_DTOR(nsDisplaySolidColor);
-  }
-#endif
-
-  virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap) override;
-
-  virtual nsRegion GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
-                                   bool* aSnap) override {
-    *aSnap = false;
-    nsRegion result;
-    if (NS_GET_A(mColor) == 255) {
-      result = GetBounds(aBuilder, aSnap);
-    }
-    return result;
-  }
-
-  virtual bool IsUniform(nsDisplayListBuilder* aBuilder, nscolor* aColor) override
-  {
-    *aColor = mColor;
-    return true;
-  }
-
-  virtual void Paint(nsDisplayListBuilder* aBuilder, nsRenderingContext* aCtx) override;
+  nsDisplaySolidColorBase(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame, nscolor aColor)
+    : nsDisplayItem(aBuilder, aFrame), mColor(aColor)
+  {}
 
   virtual nsDisplayItemGeometry* AllocateGeometry(nsDisplayListBuilder* aBuilder) override
   {
@@ -2466,13 +2432,51 @@ public:
     ComputeInvalidationRegionDifference(aBuilder, geometry, aInvalidRegion);
   }
 
+  virtual nsRegion GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
+                                   bool* aSnap) override {
+    *aSnap = false;
+    nsRegion result;
+    if (NS_GET_A(mColor) == 255) {
+      result = GetBounds(aBuilder, aSnap);
+    }
+    return result;
+  }
+
+  virtual bool IsUniform(nsDisplayListBuilder* aBuilder, nscolor* aColor) override
+  {
+    *aColor = mColor;
+    return true;
+  }
+
+protected:
+  nscolor mColor;
+};
+
+class nsDisplaySolidColor : public nsDisplaySolidColorBase {
+public:
+  nsDisplaySolidColor(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
+                      const nsRect& aBounds, nscolor aColor)
+    : nsDisplaySolidColorBase(aBuilder, aFrame, aColor), mBounds(aBounds)
+  {
+    NS_ASSERTION(NS_GET_A(aColor) > 0, "Don't create invisible nsDisplaySolidColors!");
+    MOZ_COUNT_CTOR(nsDisplaySolidColor);
+  }
+#ifdef NS_BUILD_REFCNT_LOGGING
+  virtual ~nsDisplaySolidColor() {
+    MOZ_COUNT_DTOR(nsDisplaySolidColor);
+  }
+#endif
+
+  virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap) override;
+
+  virtual void Paint(nsDisplayListBuilder* aBuilder, nsRenderingContext* aCtx) override;
+
   virtual void WriteDebugInfo(std::stringstream& aStream) override;
 
   NS_DISPLAY_DECL_NAME("SolidColor", TYPE_SOLID_COLOR)
 
 private:
   nsRect  mBounds;
-  nscolor mColor;
 };
 
 /**
@@ -2566,6 +2570,7 @@ protected:
   bool IsSingleFixedPositionImage(nsDisplayListBuilder* aBuilder,
                                   const nsRect& aClipRect,
                                   gfxRect* aDestRect);
+  bool IsNonEmptyFixedImage() const;
   nsRect GetBoundsInternal(nsDisplayListBuilder* aBuilder);
 
   void PaintInternal(nsDisplayListBuilder* aBuilder, nsRenderingContext* aCtx,
@@ -3884,11 +3889,12 @@ private:
 };
 
 /**
- * This class adds basic support for limiting the rendering to the part inside
- * the specified edges.  It's a base class for the display item classes that
- * does the actual work.  The two members, mLeftEdge and mRightEdge, are
- * relative to the edges of the frame's scrollable overflow rectangle and is
- * the amount to suppress on each side.
+ * This class adds basic support for limiting the rendering (in the inline axis
+ * of the writing mode) to the part inside the specified edges.  It's a base
+ * class for the display item classes that do the actual work.
+ * The two members, mVisIStartEdge and mVisIEndEdge, are relative to the edges
+ * of the frame's scrollable overflow rectangle and are the amount to suppress
+ * on each side.
  *
  * Setting none, both or only one edge is allowed.
  * The values must be non-negative.
@@ -3897,7 +3903,7 @@ private:
 class nsCharClipDisplayItem : public nsDisplayItem {
 public:
   nsCharClipDisplayItem(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame)
-    : nsDisplayItem(aBuilder, aFrame), mLeftEdge(0), mRightEdge(0) {}
+    : nsDisplayItem(aBuilder, aFrame), mVisIStartEdge(0), mVisIEndEdge(0) {}
 
   explicit nsCharClipDisplayItem(nsIFrame* aFrame)
     : nsDisplayItem(aFrame) {}
@@ -3910,27 +3916,33 @@ public:
 
   struct ClipEdges {
     ClipEdges(const nsDisplayItem& aItem,
-              nscoord aLeftEdge, nscoord aRightEdge) {
+              nscoord aVisIStartEdge, nscoord aVisIEndEdge) {
       nsRect r = aItem.Frame()->GetScrollableOverflowRect() +
                  aItem.ToReferenceFrame();
       if (aItem.Frame()->GetWritingMode().IsVertical()) {
-        mX = aLeftEdge > 0 ? r.y + aLeftEdge : nscoord_MIN;
-        mXMost = aRightEdge > 0 ? std::max(r.YMost() - aRightEdge, mX) : nscoord_MAX;
+        mVisIStart = aVisIStartEdge > 0 ? r.y + aVisIStartEdge : nscoord_MIN;
+        mVisIEnd =
+          aVisIEndEdge > 0 ? std::max(r.YMost() - aVisIEndEdge, mVisIStart)
+                           : nscoord_MAX;
       } else {
-        mX = aLeftEdge > 0 ? r.x + aLeftEdge : nscoord_MIN;
-        mXMost = aRightEdge > 0 ? std::max(r.XMost() - aRightEdge, mX) : nscoord_MAX;
+        mVisIStart = aVisIStartEdge > 0 ? r.x + aVisIStartEdge : nscoord_MIN;
+        mVisIEnd =
+          aVisIEndEdge > 0 ? std::max(r.XMost() - aVisIEndEdge, mVisIStart)
+                           : nscoord_MAX;
       }
     }
-    void Intersect(nscoord* aX, nscoord* aWidth) const {
-      nscoord xmost1 = *aX + *aWidth;
-      *aX = std::max(*aX, mX);
-      *aWidth = std::max(std::min(xmost1, mXMost) - *aX, 0);
+    void Intersect(nscoord* aVisIStart, nscoord* aVisISize) const {
+      nscoord end = *aVisIStart + *aVisISize;
+      *aVisIStart = std::max(*aVisIStart, mVisIStart);
+      *aVisISize = std::max(std::min(end, mVisIEnd) - *aVisIStart, 0);
     }
-    nscoord mX;
-    nscoord mXMost;
+    nscoord mVisIStart;
+    nscoord mVisIEnd;
   };
 
-  ClipEdges Edges() const { return ClipEdges(*this, mLeftEdge, mRightEdge); }
+  ClipEdges Edges() const {
+    return ClipEdges(*this, mVisIStartEdge, mVisIEndEdge);
+  }
 
   static nsCharClipDisplayItem* CheckCast(nsDisplayItem* aItem) {
     nsDisplayItem::Type t = aItem->GetType();
@@ -3940,8 +3952,11 @@ public:
       ? static_cast<nsCharClipDisplayItem*>(aItem) : nullptr;
   }
 
-  nscoord mLeftEdge;  // length from the left side
-  nscoord mRightEdge; // length from the right side
+  // Lengths measured from the visual inline start and end sides
+  // (i.e. left and right respectively in horizontal writing modes,
+  // regardless of bidi directionality; top and bottom in vertical modes).
+  nscoord mVisIStartEdge;
+  nscoord mVisIEndEdge;
 };
 
 /**

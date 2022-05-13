@@ -9,6 +9,7 @@ DIRS += [
     'certerror',
     'dirprovider',
     'downloads',
+    'extensions',
     'feeds',
     'fuel',
     'places',

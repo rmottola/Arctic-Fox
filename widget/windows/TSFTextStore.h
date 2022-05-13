@@ -335,7 +335,7 @@ protected:
     // Current copy of the active composition string. Only mString is
     // changed during a InsertTextAtSelection call if we have a composition.
     // mString acts as a buffer until OnUpdateComposition is called
-    // and mString is flushed to editor through NS_COMPOSITION_CHANGE.
+    // and mString is flushed to editor through eCompositionChange.
     // This way all changes are updated in batches to avoid
     // inconsistencies/artifacts.
     nsString mString;
@@ -511,7 +511,7 @@ protected:
       COMPOSITION_START,
       COMPOSITION_UPDATE,
       COMPOSITION_END,
-      SELECTION_SET
+      SET_SELECTION
     };
     ActionType mType;
     // For compositionstart and selectionset
@@ -793,9 +793,9 @@ protected:
   // During the documet is locked, we shouldn't destroy the instance.
   // If this is true, the instance will be destroyed after unlocked.
   bool                         mPendingDestroy;
-  // If this is true, MaybeFlushPendingNotifications() will clear the
+  // If this is false, MaybeFlushPendingNotifications() will clear the
   // mLockedContent.
-  bool                         mPendingClearLockedContent;
+  bool                         mDeferClearingLockedContent;
   // While there is native caret, this is true.  Otherwise, false.
   bool                         mNativeCaretIsCreated;
   // While the instance is dispatching events, the event may not be handled

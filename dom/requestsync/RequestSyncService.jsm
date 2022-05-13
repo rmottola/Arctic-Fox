@@ -20,6 +20,7 @@ const RSYNC_STATE_ENABLED = "enabled";
 const RSYNC_STATE_DISABLED = "disabled";
 const RSYNC_STATE_WIFIONLY = "wifiOnly";
 
+Cu.import("resource://gre/modules/BrowserUtils.jsm");
 Cu.import('resource://gre/modules/IndexedDBHelper.jsm');
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -84,7 +85,7 @@ this.RequestSyncService = {
     }).bind(this));
 
     Services.obs.addObserver(this, 'xpcom-shutdown', false);
-    Services.obs.addObserver(this, 'webapps-clear-data', false);
+    Services.obs.addObserver(this, 'clear-origin-data', false);
     Services.obs.addObserver(this, 'wifi-state-changed', false);
 
     this.initDBHelper("requestSync", RSYNCDB_VERSION, [RSYNCDB_NAME]);
@@ -120,7 +121,7 @@ this.RequestSyncService = {
     }).bind(this));
 
     Services.obs.removeObserver(this, 'xpcom-shutdown');
-    Services.obs.removeObserver(this, 'webapps-clear-data');
+    Services.obs.removeObserver(this, 'clear-origin-data');
     Services.obs.removeObserver(this, 'wifi-state-changed');
 
     this.close();
@@ -141,8 +142,8 @@ this.RequestSyncService = {
         this.shutdown();
         break;
 
-      case 'webapps-clear-data':
-        this.clearData(aSubject);
+      case 'clear-origin-data':
+        this.clearData(aData);
         break;
 
       case 'wifi-state-changed':
@@ -163,19 +164,12 @@ this.RequestSyncService = {
       return;
     }
 
-    let params =
-      aData.QueryInterface(Ci.mozIApplicationClearPrivateDataParams);
-    if (!params) {
-      return;
-    }
-
-    // At this point we don't have the origin, so we cannot create the full
-    // key. Using the partial one is enough to detect the uninstalled app.
-    let partialKey = params.appId + '|' + params.browserOnly + '|';
+    let pattern = JSON.parse(aData);
     let dbKeys = [];
 
-    for (let key  in this._registrations) {
-      if (key.indexOf(partialKey) != 0) {
+    for (let key in this._registrations) {
+      let prin = BrowserUtils.principalFromOrigin(key);
+      if (!ChromeUtils.originAttributesMatchPattern(prin.originAttributes, pattern)) {
         continue;
       }
 
@@ -210,9 +204,7 @@ this.RequestSyncService = {
 
   // This method generates the key for the indexedDB object storage.
   principalToKey: function(aPrincipal) {
-    return aPrincipal.appId + '|' +
-           aPrincipal.isInBrowserElement + '|' +
-           aPrincipal.originNoSuffix;
+    return aPrincipal.origin;
   },
 
   // Add a task to the _registrations map and create the timer if it's needed.
@@ -252,9 +244,8 @@ this.RequestSyncService = {
     debug('removeRegistrationInternal');
 
     let obj = this._registrations[aKey][aTaskName];
-    if (obj.timer) {
-      obj.timer.cancel();
-    }
+
+    this.removeTimer(obj);
 
     // It can be that this task has been already schedulated.
     this.removeTaskFromQueue(obj);
@@ -386,10 +377,7 @@ this.RequestSyncService = {
 
     aData.params.overwrittenMinInterval = 0;
 
-    let dbKey = aData.task + "|" +
-                aPrincipal.appId + '|' +
-                aPrincipal.isInBrowserElement + '|' +
-                aPrincipal.originNoSuffix;
+    let dbKey = aData.task + "|" + key;
 
     let data = { principal: aPrincipal,
                  dbKey: dbKey,
@@ -805,7 +793,7 @@ this.RequestSyncService = {
     this._pendingOperation = false;
 
     // managing the pending messages now that the initialization is completed.
-    while (this._pendingMessages.length) {
+    while (this._pendingMessages.length && !this._pendingOperation) {
       this.receiveMessage(this._pendingMessages.shift());
     }
   },

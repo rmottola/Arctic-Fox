@@ -538,10 +538,10 @@ static const char*
 GetEventMessageName(uint32_t aMessage)
 {
   switch (aMessage) {
-    case NS_MOUSE_BUTTON_DOWN:
-      return "NS_MOUSE_BUTTON_DOWN";
-    case NS_MOUSE_BUTTON_UP:
-      return "NS_MOUSE_BUTTON_UP";
+    case eMouseDown:
+      return "eMouseDown";
+    case eMouseUp:
+      return "eMouseUp";
     default:
       return "Unknown";
   }
@@ -1240,7 +1240,7 @@ TSFTextStore::TSFTextStore()
   , mPendingOnSelectionChange(false)
   , mPendingOnLayoutChange(false)
   , mPendingDestroy(false)
-  , mPendingClearLockedContent(false)
+  , mDeferClearingLockedContent(false)
   , mNativeCaretIsCreated(false)
   , mDeferNotifyingTSF(false)
 {
@@ -1613,11 +1613,6 @@ TSFTextStore::FlushPendingActions()
     return;
   }
 
-  // If dispatching event causes NOTIFY_IME_OF_COMPOSITION_UPDATE, we should
-  // wait to abandon mLockedContent until it's notified because the dispatched
-  // event may be handled asynchronously in e10s mode.
-  mPendingClearLockedContent = !mPendingActions.Length();
-
   nsRefPtr<nsWindowBase> kungFuDeathGrip(mWidget);
   for (uint32_t i = 0; i < mPendingActions.Length(); i++) {
     PendingAction& action = mPendingActions[i];
@@ -1631,7 +1626,7 @@ TSFTextStore::FlushPendingActions()
 
         if (action.mAdjustSelection) {
           // Select composition range so the new composition replaces the range
-          WidgetSelectionEvent selectionSet(true, NS_SELECTION_SET, mWidget);
+          WidgetSelectionEvent selectionSet(true, eSetSelection, mWidget);
           mWidget->InitEvent(selectionSet);
           selectionSet.mOffset = static_cast<uint32_t>(action.mSelectionStart);
           selectionSet.mLength = static_cast<uint32_t>(action.mSelectionLength);
@@ -1640,18 +1635,20 @@ TSFTextStore::FlushPendingActions()
           if (!selectionSet.mSucceeded) {
             MOZ_LOG(sTextStoreLog, LogLevel::Error,
                    ("TSF: 0x%p   TSFTextStore::FlushPendingActions() "
-                    "FAILED due to NS_SELECTION_SET failure", this));
+                    "FAILED due to eSetSelection failure", this));
             break;
           }
         }
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
                ("TSF: 0x%p   TSFTextStore::FlushPendingActions() "
                 "dispatching compositionstart event...", this));
-        WidgetCompositionEvent compositionStart(true, NS_COMPOSITION_START,
+        WidgetCompositionEvent compositionStart(true, eCompositionStart,
                                                 mWidget);
         mWidget->InitEvent(compositionStart);
-        // NS_COMPOSITION_START always causes NOTIFY_IME_OF_COMPOSITION_UPDATE.
-        mPendingClearLockedContent = true;
+        // eCompositionStart always causes NOTIFY_IME_OF_COMPOSITION_UPDATE.
+        // Therefore, we should wait to clear the locked content until it's
+        // notified.
+        mDeferClearingLockedContent = true;
         DispatchEvent(compositionStart);
         if (!mWidget || mWidget->Destroyed()) {
           break;
@@ -1703,7 +1700,7 @@ TSFTextStore::FlushPendingActions()
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
                ("TSF: 0x%p   TSFTextStore::FlushPendingActions(), "
                 "dispatching compositionchange event...", this));
-        WidgetCompositionEvent compositionChange(true, NS_COMPOSITION_CHANGE,
+        WidgetCompositionEvent compositionChange(true, eCompositionChange,
                                                  mWidget);
         mWidget->InitEvent(compositionChange);
         compositionChange.mData = action.mData;
@@ -1715,10 +1712,12 @@ TSFTextStore::FlushPendingActions()
           action.mRanges->AppendElement(wholeRange);
         }
         compositionChange.mRanges = action.mRanges;
-        // When the NS_COMPOSITION_CHANGE causes a DOM text event,
-        // NOTIFY_IME_OF_COMPOSITION_UPDATE will be notified.
+        // When the eCompositionChange causes a DOM text event,
+        // the IME will be notified of NOTIFY_IME_OF_COMPOSITION_UPDATE.  In
+        // such case, we should not clear the locked content until we notify
+        // the IME of the composition update.
         if (compositionChange.CausesDOMTextEvent()) {
-          mPendingClearLockedContent = true;
+          mDeferClearingLockedContent = true;
         }
         DispatchEvent(compositionChange);
         // Be aware, the mWidget might already have been destroyed.
@@ -1736,14 +1735,16 @@ TSFTextStore::FlushPendingActions()
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
                ("TSF: 0x%p   TSFTextStore::FlushPendingActions(), "
                 "dispatching compositioncommit event...", this));
-        WidgetCompositionEvent compositionCommit(true, NS_COMPOSITION_COMMIT,
+        WidgetCompositionEvent compositionCommit(true, eCompositionCommit,
                                                  mWidget);
         mWidget->InitEvent(compositionCommit);
         compositionCommit.mData = action.mData;
-        // When the NS_COMPOSITION_COMMIT causes a DOM text event,
-        // NOTIFY_IME_OF_COMPOSITION_UPDATE will be notified.
+        // When the eCompositionCommit causes a DOM text event,
+        // the IME will be notified of NOTIFY_IME_OF_COMPOSITION_UPDATE.  In
+        // such case, we should not clear the locked content until we notify
+        // the IME of the composition update.
         if (compositionCommit.CausesDOMTextEvent()) {
-          mPendingClearLockedContent = true;
+          mDeferClearingLockedContent = true;
         }
         DispatchEvent(compositionCommit);
         if (!mWidget || mWidget->Destroyed()) {
@@ -1751,15 +1752,15 @@ TSFTextStore::FlushPendingActions()
         }
         break;
       }
-      case PendingAction::SELECTION_SET: {
+      case PendingAction::SET_SELECTION: {
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
                ("TSF: 0x%p   TSFTextStore::FlushPendingActions() "
-                "flushing SELECTION_SET={ mSelectionStart=%d, "
+                "flushing SET_SELECTION={ mSelectionStart=%d, "
                 "mSelectionLength=%d, mSelectionReversed=%s }",
                 this, action.mSelectionStart, action.mSelectionLength,
                 GetBoolName(action.mSelectionReversed)));
 
-        WidgetSelectionEvent selectionSet(true, NS_SELECTION_SET, mWidget);
+        WidgetSelectionEvent selectionSet(true, eSetSelection, mWidget);
         selectionSet.mOffset = 
           static_cast<uint32_t>(action.mSelectionStart);
         selectionSet.mLength =
@@ -1807,9 +1808,11 @@ TSFTextStore::MaybeFlushPendingNotifications()
     return;
   }
 
-  if (mPendingClearLockedContent) {
-    mPendingClearLockedContent = false;
+  if (!mDeferClearingLockedContent && mLockedContent.IsInitialized()) {
     mLockedContent.Clear();
+    MOZ_LOG(sTextStoreLog, LogLevel::Debug,
+           ("TSF: 0x%p   TSFTextStore::MaybeFlushPendingNotifications(), "
+            "mLockedContent is cleared", this));
   }
 
   if (mPendingOnLayoutChange) {
@@ -1936,12 +1939,21 @@ TSFTextStore::LockedContent()
   // This should be called when the document is locked or the content hasn't
   // been abandoned yet.
   if (NS_WARN_IF(!IsReadLocked() && !mLockedContent.IsInitialized())) {
+    MOZ_LOG(sTextStoreLog, LogLevel::Error,
+           ("TSF: 0x%p   TSFTextStore::LockedContent(), FAILED, due to "
+            "called wrong timing, IsReadLocked()=%s, "
+            "mLockedContent.IsInitialized()=%s",
+            this, GetBoolName(IsReadLocked()),
+            GetBoolName(mLockedContent.IsInitialized())));
     mLockedContent.Clear();
     return mLockedContent;
   }
 
   Selection& currentSel = CurrentSelection();
   if (currentSel.IsDirty()) {
+    MOZ_LOG(sTextStoreLog, LogLevel::Error,
+           ("TSF: 0x%p   TSFTextStore::LockedContent(), FAILED, due to "
+            "CurrentSelection() failure", this));
     mLockedContent.Clear();
     return mLockedContent;
   }
@@ -1949,19 +1961,31 @@ TSFTextStore::LockedContent()
   if (!mLockedContent.IsInitialized()) {
     nsAutoString text;
     if (NS_WARN_IF(!GetCurrentText(text))) {
+      MOZ_LOG(sTextStoreLog, LogLevel::Error,
+             ("TSF: 0x%p   TSFTextStore::LockedContent(), FAILED, due to "
+              "GetCurrentText() failure", this));
       mLockedContent.Clear();
       return mLockedContent;
     }
 
     mLockedContent.Init(text);
+    // Basically, the locked content should be cleared after the document is
+    // unlocked.  However, in e10s mode, content will be modified
+    // asynchronously.  In such case, mDeferClearingLockedContent may be
+    // true even after the document is unlocked.
+    mDeferClearingLockedContent = false;
   }
 
   MOZ_LOG(sTextStoreLog, LogLevel::Debug,
          ("TSF: 0x%p   TSFTextStore::LockedContent(): "
-          "mLockedContent={ mText.Length()=%d, mLastCompositionString=\"%s\", "
+          "mLockedContent={ mText=\"%s\" (Length()=%u), "
+          "mLastCompositionString=\"%s\" (Length()=%u), "
           "mMinTextModifiedOffset=%u }",
-          this, mLockedContent.Text().Length(),
+          this, mLockedContent.Text().Length() <= 20 ?
+            NS_ConvertUTF16toUTF8(mLockedContent.Text()).get() : "<omitted>",
+          mLockedContent.Text().Length(),
           NS_ConvertUTF16toUTF8(mLockedContent.LastCompositionString()).get(),
+          mLockedContent.LastCompositionString().Length(),
           mLockedContent.MinTextModifiedOffset()));
 
   return mLockedContent;
@@ -1977,11 +2001,18 @@ TSFTextStore::GetCurrentText(nsAString& aTextContent)
 
   MOZ_ASSERT(mWidget && !mWidget->Destroyed());
 
-  WidgetQueryContentEvent queryText(true, NS_QUERY_TEXT_CONTENT, mWidget);
+  MOZ_LOG(sTextStoreLog, LogLevel::Debug,
+         ("TSF: 0x%p   TSFTextStore::GetCurrentText(): "
+          "retrieving text from the content...", this));
+
+  WidgetQueryContentEvent queryText(true, eQueryTextContent, mWidget);
   queryText.InitForQueryTextContent(0, UINT32_MAX);
   mWidget->InitEvent(queryText);
   DispatchEvent(queryText);
   if (NS_WARN_IF(!queryText.mSucceeded)) {
+    MOZ_LOG(sTextStoreLog, LogLevel::Error,
+           ("TSF: 0x%p   TSFTextStore::GetCurrentText(), FAILED, due to "
+            "eQueryTextContent failure", this));
     aTextContent.Truncate();
     return false;
   }
@@ -2000,8 +2031,7 @@ TSFTextStore::CurrentSelection()
       MOZ_CRASH();
     }
 
-    WidgetQueryContentEvent querySelection(true, NS_QUERY_SELECTED_TEXT,
-                                           mWidget);
+    WidgetQueryContentEvent querySelection(true, eQuerySelectedText, mWidget);
     mWidget->InitEvent(querySelection);
     DispatchEvent(querySelection);
     NS_ENSURE_TRUE(querySelection.mSucceeded, mSelection);
@@ -2368,7 +2398,7 @@ TSFTextStore::RecordCompositionUpdateAction()
   // the attribute, we have to find out all the ranges that have distinct
   // attribute values. Then we query for what the value represents through
   // the display attribute manager and translate that to TextRange to be
-  // sent in NS_COMPOSITION_CHANGE
+  // sent in eCompositionChange
 
   nsRefPtr<ITfProperty> attrPropetry;
   HRESULT hr = mContext->GetProperty(GUID_PROP_ATTRIBUTE,
@@ -2417,7 +2447,7 @@ TSFTextStore::RecordCompositionUpdateAction()
 
   TextRange newRange;
   // No matter if we have display attribute info or not,
-  // we always pass in at least one range to NS_COMPOSITION_CHANGE
+  // we always pass in at least one range to eCompositionChange
   newRange.mStartOffset = 0;
   newRange.mEndOffset = action->mData.Length();
   newRange.mRangeType = NS_TEXTRANGE_RAWINPUT;
@@ -2603,7 +2633,7 @@ TSFTextStore::SetSelectionInternal(const TS_SELECTION_ACP* pSelection,
 
   CompleteLastActionIfStillIncomplete();
   PendingAction* action = mPendingActions.AppendElement();
-  action->mType = PendingAction::SELECTION_SET;
+  action->mType = PendingAction::SET_SELECTION;
   action->mSelectionStart = pSelection->acpStart;
   action->mSelectionLength = pSelection->acpEnd - pSelection->acpStart;
   action->mSelectionReversed = (pSelection->style.ase == TS_AE_START);
@@ -3256,7 +3286,7 @@ TSFTextStore::GetACPFromPoint(TsViewCookie vcView,
   // NOTE: Don't check if the point is in the widget since the point can be
   //       outside of the widget if focused editor is in a XUL <panel>.
 
-  WidgetQueryContentEvent charAtPt(true, NS_QUERY_CHARACTER_AT_POINT, mWidget);
+  WidgetQueryContentEvent charAtPt(true, eQueryCharacterAtPoint, mWidget);
   mWidget->InitEvent(charAtPt, &ourPt);
 
   // FYI: WidgetQueryContentEvent may cause flushing pending layout and it
@@ -3266,7 +3296,7 @@ TSFTextStore::GetACPFromPoint(TsViewCookie vcView,
   if (!mWidget || mWidget->Destroyed()) {
     MOZ_LOG(sTextStoreLog, LogLevel::Error,
            ("TSF: 0x%p   TSFTextStore::GetACPFromPoint() FAILED due to "
-            "mWidget was destroyed during NS_QUERY_CHARACTER_AT_POINT", this));
+            "mWidget was destroyed during eQueryCharacterAtPoint", this));
     return E_FAIL;
   }
 
@@ -3279,7 +3309,7 @@ TSFTextStore::GetACPFromPoint(TsViewCookie vcView,
   if (NS_WARN_IF(!charAtPt.mSucceeded)) {
     MOZ_LOG(sTextStoreLog, LogLevel::Error,
            ("TSF: 0x%p   TSFTextStore::GetACPFromPoint() FAILED due to "
-            "NS_QUERY_CHARACTER_AT_POINT failure", this));
+            "eQueryCharacterAtPoint failure", this));
     return E_FAIL;
   }
 
@@ -3316,7 +3346,7 @@ TSFTextStore::GetACPFromPoint(TsViewCookie vcView,
     // offset since there is no inexpensive API to check it strictly.
     // XXX If we retrieve 2 bounding boxes, one is before the offset and
     //     the other is after the offset, we could resolve the offset.
-    //     However, dispatching 2 NS_QUERY_TEXT_RECT may be expensive.
+    //     However, dispatching 2 eQueryTextRect may be expensive.
 
     // So, use tentative offset for now.
     offset = charAtPt.mReply.mTentativeCaretOffset;
@@ -3475,15 +3505,15 @@ TSFTextStore::GetTextExt(TsViewCookie vcView,
     return TS_E_NOLAYOUT;
   }
 
-  // use NS_QUERY_TEXT_RECT to get rect in system, screen coordinates
-  WidgetQueryContentEvent event(true, NS_QUERY_TEXT_RECT, mWidget);
+  // use eQueryTextRect to get rect in system, screen coordinates
+  WidgetQueryContentEvent event(true, eQueryTextRect, mWidget);
   mWidget->InitEvent(event);
   event.InitForQueryTextRect(acpStart, acpEnd - acpStart);
   DispatchEvent(event);
   if (!event.mSucceeded) {
     MOZ_LOG(sTextStoreLog, LogLevel::Error,
            ("TSF: 0x%p   TSFTextStore::GetTextExt() FAILED due to "
-            "NS_QUERY_TEXT_RECT failure", this));
+            "eQueryTextRect failure", this));
     return TS_E_INVALIDPOS; // but unexpected failure, maybe.
   }
   // IMEs don't like empty rects, fix here
@@ -3587,13 +3617,13 @@ TSFTextStore::GetScreenExtInternal(RECT& aScreenExt)
          ("TSF: 0x%p   TSFTextStore::GetScreenExtInternal()", this));
 
   // use NS_QUERY_EDITOR_RECT to get rect in system, screen coordinates
-  WidgetQueryContentEvent event(true, NS_QUERY_EDITOR_RECT, mWidget);
+  WidgetQueryContentEvent event(true, eQueryEditorRect, mWidget);
   mWidget->InitEvent(event);
   DispatchEvent(event);
   if (!event.mSucceeded) {
     MOZ_LOG(sTextStoreLog, LogLevel::Error,
            ("TSF: 0x%p   TSFTextStore::GetScreenExtInternal() FAILED due to "
-            "NS_QUERY_EDITOR_RECT failure", this));
+            "eQueryEditorRect failure", this));
     return false;
   }
 
@@ -4447,7 +4477,7 @@ TSFTextStore::NotifyTSFOfTextChange(const TS_TEXTCHANGE& aTextChange)
 nsresult
 TSFTextStore::OnSelectionChangeInternal(const IMENotification& aIMENotification)
 {
-  const IMENotification::SelectionChangeData& selectionChangeData =
+  const IMENotification::SelectionChangeDataBase& selectionChangeData =
     aIMENotification.mSelectionChangeData;
   MOZ_LOG(sTextStoreLog, LogLevel::Debug,
          ("TSF: 0x%p   TSFTextStore::OnSelectionChangeInternal("
@@ -4615,7 +4645,9 @@ TSFTextStore::OnUpdateCompositionInternal()
      "mDeferNotifyingTSF=%s",
      this, GetBoolName(mDeferNotifyingTSF)));
 
-  mPendingClearLockedContent = true;
+  // Now, all sent composition events are handled by the content even in
+  // e10s mode.
+  mDeferClearingLockedContent = false;
   mDeferNotifyingTSF = false;
   MaybeFlushPendingNotifications();
   return NS_OK;
@@ -4663,7 +4695,7 @@ TSFTextStore::OnMouseButtonEventInternal(
   ULONG edge = quadrant < 2 ? offset + 1 : offset;
   DWORD buttonStatus = 0;
   bool isMouseUp =
-    aIMENotification.mMouseButtonEventData.mEventMessage == NS_MOUSE_BUTTON_UP;
+    aIMENotification.mMouseButtonEventData.mEventMessage == eMouseUp;
   if (!isMouseUp) {
     switch (aIMENotification.mMouseButtonEventData.mButton) {
       case WidgetMouseEventBase::eLeftButton:
@@ -4718,14 +4750,14 @@ TSFTextStore::CreateNativeCaret()
   //     collapsed, is it OK?
   uint32_t caretOffset = currentSel.MaxOffset();
 
-  WidgetQueryContentEvent queryCaretRect(true, NS_QUERY_CARET_RECT, mWidget);
+  WidgetQueryContentEvent queryCaretRect(true, eQueryCaretRect, mWidget);
   queryCaretRect.InitForQueryCaretRect(caretOffset);
   mWidget->InitEvent(queryCaretRect);
   DispatchEvent(queryCaretRect);
   if (!queryCaretRect.mSucceeded) {
     MOZ_LOG(sTextStoreLog, LogLevel::Error,
            ("TSF: 0x%p   TSFTextStore::CreateNativeCaret() FAILED due to "
-            "NS_QUERY_CARET_RECT failure (offset=%d)", this, caretOffset));
+            "eQueryCaretRect failure (offset=%d)", this, caretOffset));
     return;
   }
 
@@ -5319,8 +5351,8 @@ TSFTextStore::Content::ReplaceTextWith(LONG aStart,
     if (mComposition.IsComposing()) {
       // Emulate text insertion during compositions, because during a
       // composition, editor expects the whole composition string to
-      // be sent in NS_COMPOSITION_CHANGE, not just the inserted part.
-      // The actual NS_COMPOSITION_CHANGE will be sent in SetSelection
+      // be sent in eCompositionChange, not just the inserted part.
+      // The actual eCompositionChange will be sent in SetSelection
       // or OnUpdateComposition.
       MOZ_ASSERT(aStart >= mComposition.mStart);
       MOZ_ASSERT(aStart + aLength <= mComposition.EndOffset());

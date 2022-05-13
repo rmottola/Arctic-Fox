@@ -1,4 +1,3 @@
-/* -*- indent-tabs-mode: nil; js-indent-level: 4 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -86,14 +85,25 @@ var gPermissionManager = {
     var input_url = textbox.value.replace(/^\s*/, ""); // trim any leading space
     let principal;
     try {
-      // If the uri doesn't successfully parse, try adding a http:// and parsing again
+      // The origin accessor on the principal object will throw if the
+      // principal doesn't have a canonical origin representation. This will
+      // help catch cases where the URI parser parsed something like
+      // `localhost:8080` as having the scheme `localhost`, rather than being
+      // an invalid URI. A canonical origin representation is required by the
+      // permission manager for storage, so this won't prevent any valid
+      // permissions from being entered by the user.
       let uri;
       try {
-        let uri = Services.io.newURI(input_url, null, null);
+        uri = Services.io.newURI(input_url, null, null);
+        principal = Services.scriptSecurityManager.createCodebasePrincipal(uri, {});
+        // If we have ended up with an unknown scheme, the following will throw.
+        principal.origin;
       } catch(ex) {
         uri = Services.io.newURI("http://" + input_url, null, null);
+        principal = Services.scriptSecurityManager.createCodebasePrincipal(uri, {});
+        // If we have ended up with an unknown scheme, the following will throw.
+        principal.origin;
       }
-      principal = Services.scriptSecurityManager.getNoAppCodebasePrincipal(uri);
     } catch(ex) {
       var message = this._bundle.getString("invalidURI");
       var title = this._bundle.getString("invalidURITitle");
@@ -157,7 +167,7 @@ var gPermissionManager = {
     // Re-do the sort, if the status changed from Block to Allow
     // or vice versa, since if we're sorted on status, we may no
     // longer be in order.
-    if (this._lastPermissionSortColumn.id == "statusCol") {
+    if (this._lastPermissionSortColumn == "statusCol") {
       this._resortPermissions();
     }
     this._tree.treeBoxObject.invalidate();
@@ -175,9 +185,10 @@ var gPermissionManager = {
   _resortPermissions: function()
   {
     gTreeUtils.sort(this._tree, this._view, this._permissions,
+                    this._lastPermissionSortColumn,
                     this._permissionsComparator,
                     this._lastPermissionSortColumn,
-                    this._lastPermissionSortAscending);
+                    !this._lastPermissionSortAscending); // keep sort direction
   },
 
   onHostInput: function (aSiteField)
@@ -237,6 +248,20 @@ var gPermissionManager = {
 
     var urlLabel = document.getElementById("urlLabel");
     urlLabel.hidden = !urlFieldVisible;
+
+    let treecols = document.getElementsByTagName("treecols")[0];
+    treecols.addEventListener("click", event => {
+      if (event.target.nodeName != "treecol" || event.button != 0) {
+        return;
+      }
+
+      let sortField = event.target.getAttribute("data-field-name");
+      if (!sortField) {
+        return;
+      }
+
+      gPermissionManager.onPermissionSort(sortField);
+    });
 
     Services.obs.notifyObservers(null, NOTIFICATION_FLUSH_PERMISSIONS, this._type);
     Services.obs.addObserver(this, "perm-changed", false);
@@ -432,4 +457,3 @@ function initWithParams(aParams)
 {
   gPermissionManager.init(aParams);
 }
-

@@ -73,7 +73,7 @@ config = {
                 "--quiet",
                 "--log-raw=%(raw_log_file)s",
                 "--certificate-path=%(certificate_path)s",
-                "--test-path=%(test_path)s"
+                "%(test_path)s"
             ],
             "run_filename": "runtestsb2g.py",
             "testsdir": "mochitest"
@@ -94,7 +94,7 @@ config = {
                 "--chrome",
                 "--log-raw=%(raw_log_file)s",
                 "--certificate-path=%(certificate_path)s",
-                "--test-path=%(test_path)s"
+                "%(test_path)s"
             ],
             "run_filename": "runtestsb2g.py",
             "testsdir": "mochitest"

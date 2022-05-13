@@ -626,30 +626,6 @@ struct GCMethods<JSFunction*>
     }
 };
 
-inline RootLists&
-RootListsForRootingContext(JSContext* cx)
-{
-    return ContextFriendFields::get(cx)->roots;
-}
-
-inline RootLists&
-RootListsForRootingContext(js::ContextFriendFields* cx)
-{
-    return cx->roots;
-}
-
-inline RootLists&
-RootListsForRootingContext(JSRuntime* rt)
-{
-    return PerThreadDataFriendFields::getMainThread(rt)->roots;
-}
-
-inline RootLists&
-RootListsForRootingContext(js::PerThreadDataFriendFields* pt)
-{
-    return pt->roots;
-}
-
 } /* namespace js */
 
 namespace JS {
@@ -714,6 +690,30 @@ class DispatchWrapper
         wrapper->tracer(&wrapper->storage, trc);
     }
 };
+
+inline RootLists&
+RootListsForRootingContext(JSContext* cx)
+{
+    return ContextFriendFields::get(cx)->roots;
+}
+
+inline RootLists&
+RootListsForRootingContext(js::ContextFriendFields* cx)
+{
+    return cx->roots;
+}
+
+inline RootLists&
+RootListsForRootingContext(JSRuntime* rt)
+{
+    return PerThreadDataFriendFields::getMainThread(rt)->roots;
+}
+
+inline RootLists&
+RootListsForRootingContext(js::PerThreadDataFriendFields* pt)
+{
+    return pt->roots;
+}
 
 } /* namespace js */
 

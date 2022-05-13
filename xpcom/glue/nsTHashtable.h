@@ -8,7 +8,7 @@
 #define nsTHashtable_h__
 
 #include "nscore.h"
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "nsDebug.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/MemoryChecking.h"
@@ -38,8 +38,8 @@
  *     // this should either be a simple datatype (uint32_t, nsISupports*) or
  *     // a const reference (const nsAString&)
  *     typedef something KeyType;
- *     // KeyTypePointer is the pointer-version of KeyType, because pldhash.h
- *     // requires keys to cast to <code>const void*</code>
+ *     // KeyTypePointer is the pointer-version of KeyType, because
+ *     // PLDHashTable.h requires keys to cast to <code>const void*</code>
  *     typedef const something* KeyTypePointer;
  *
  *     EntryType(KeyTypePointer aKey);
@@ -282,7 +282,7 @@ public:
    */
   void MarkImmutable()
   {
-    PL_DHashMarkTableImmutable(&mTable);
+    mTable.MarkImmutable();
   }
 #endif
 
@@ -345,7 +345,7 @@ nsTHashtable<EntryType>::Ops()
   {
     s_HashKey,
     s_MatchEntry,
-    EntryType::ALLOW_MEMMOVE ? ::PL_DHashMoveEntryStub : s_CopyEntry,
+    EntryType::ALLOW_MEMMOVE ? PLDHashTable::MoveEntryStub : s_CopyEntry,
     s_ClearEntry,
     s_InitEntry
   };

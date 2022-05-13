@@ -53,7 +53,7 @@ namespace mozilla {
 namespace dom {
 class Blob;
 class BlobSet;
-}
+} // namespace dom
 
 // A helper for building up an ArrayBuffer object's data
 // before creating the ArrayBuffer itself.  Will do doubling
@@ -643,7 +643,6 @@ protected:
   nsCOMPtr<nsIPrincipal> mPrincipal;
   nsCOMPtr<nsIChannel> mChannel;
   nsCOMPtr<nsIDocument> mResponseXML;
-  nsCOMPtr<nsIChannel> mCORSPreflightChannel;
   nsTArray<nsCString> mCORSUnsafeHeaders;
 
   nsCOMPtr<nsIStreamListener> mXMLParserStreamListener;

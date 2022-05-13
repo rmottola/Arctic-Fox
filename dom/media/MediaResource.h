@@ -25,7 +25,11 @@
 // For HTTP seeking, if number of bytes needing to be
 // seeked forward is less than this value then a read is
 // done rather than a byte range request.
-static const int64_t SEEK_VS_READ_THRESHOLD = 32*1024;
+//
+// If we assume a 100Mbit connection, and assume reissuing an HTTP seek causes
+// a delay of 200ms, then in that 200ms we could have simply read ahead 2MB. So
+// setting SEEK_VS_READ_THRESHOLD to 1MB sounds reasonable.
+static const int64_t SEEK_VS_READ_THRESHOLD = 1 * 1024 * 1024;
 
 static const uint32_t HTTP_REQUESTED_RANGE_NOT_SATISFIABLE_CODE = 416;
 
@@ -435,6 +439,8 @@ public:
     return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
   }
 
+  const nsCString& GetContentURL() const { return EmptyCString(); }
+
 protected:
   virtual ~MediaResource() {};
 
@@ -467,6 +473,12 @@ public:
     return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
   }
 
+  // Returns the url of the resource. Safe to call from any thread?
+  const nsCString& GetContentURL() const
+  {
+    return mContentURL;
+  }
+
 protected:
   BaseMediaResource(MediaDecoder* aDecoder,
                     nsIChannel* aChannel,
@@ -480,6 +492,7 @@ protected:
   {
     MOZ_COUNT_CTOR(BaseMediaResource);
     NS_ASSERTION(!mContentType.IsEmpty(), "Must know content type");
+    mURI->GetSpec(mContentURL);
   }
   virtual ~BaseMediaResource()
   {
@@ -517,6 +530,9 @@ protected:
   // MediaResource is created. This is constant, so accessing from any thread
   // is safe.
   const nsAutoCString mContentType;
+
+  // Copy of the url of the channel resource.
+  nsAutoCString mContentURL;
 
   // True if SetLoadInBackground() has been called with
   // aLoadInBackground = true, i.e. when the document load event is not

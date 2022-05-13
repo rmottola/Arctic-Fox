@@ -17,8 +17,6 @@
 #include "nsIResponseHeadProvider.h"
 #include "nsHttpResponseHead.h"
 
-using mozilla::net::nsHttpResponseHead;
-
 #define NS_MULTIMIXEDCONVERTER_CID                         \
 { /* 7584CE90-5B25-11d3-A175-0050041CAF44 */         \
     0x7584ce90,                                      \
@@ -45,6 +43,7 @@ public:
 
   void InitializeByteRange(int64_t aStart, int64_t aEnd);
   void SetIsLastPart() { mIsLastPart = true; }
+  void SetPreamble(const nsACString& aPreamble);
   nsresult SendOnStartRequest(nsISupports* aContext);
   nsresult SendOnDataAvailable(nsISupports* aContext, nsIInputStream* aStream,
                                uint64_t aOffset, uint32_t aLen);
@@ -52,7 +51,7 @@ public:
   /* SetContentDisposition expects the full value of the Content-Disposition
    * header */
   void SetContentDisposition(const nsACString& aContentDispositionHeader);
-  void SetResponseHead(nsHttpResponseHead * head) { mResponseHead = head; }
+  void SetResponseHead(mozilla::net::nsHttpResponseHead * head) { mResponseHead = head; }
 
   NS_DECL_ISUPPORTS
   NS_DECL_NSIREQUEST
@@ -67,7 +66,7 @@ protected:
 protected:
   nsCOMPtr<nsIChannel>    mMultipartChannel;
   nsCOMPtr<nsIStreamListener> mListener;
-  nsAutoPtr<nsHttpResponseHead> mResponseHead;
+  nsAutoPtr<mozilla::net::nsHttpResponseHead> mResponseHead;
 
   nsresult                mStatus;
   nsLoadFlags             mLoadFlags;
@@ -88,6 +87,8 @@ protected:
   uint32_t                mPartID; // unique ID that can be used to identify
                                    // this part of the multipart document
   bool                    mIsLastPart;
+
+  nsCString               mPreamble;
 };
 
 // The nsMultiMixedConv stream converter converts a stream of type "multipart/x-mixed-replace"
@@ -147,6 +148,7 @@ protected:
     int32_t  PushOverLine(char *&aPtr, uint32_t &aLen);
     char *FindToken(char *aCursor, uint32_t aLen);
     nsresult BufferData(char *aData, uint32_t aLen);
+    char* ProbeToken(char* aBuffer, uint32_t& aTokenLen);
 
     // member data
     bool                mNewPart;        // Are we processing the beginning of a part?
@@ -184,7 +186,16 @@ protected:
     // Streamable packages don't require the boundary in the header
     // as it can be ascertained from the package file.
     bool                mPackagedApp;
-    nsAutoPtr<nsHttpResponseHead> mResponseHead;
+    nsAutoPtr<mozilla::net::nsHttpResponseHead> mResponseHead;
+    // It is necessary to know if the content is coming from the cache
+    // for packaged apps, in the case that only metadata is saved in the cache
+    // entry and OnDataAvailable never gets called.
+    bool                mIsFromCache;
+
+    // Preamble is defined as the ASCII-encoding string which appears before the
+    // first boundary. It's only supported by 'application/package' content type
+    // and requires the boundary is defined in the HTTP header.
+    nsCString           mPreamble;
 };
 
 #endif /* __nsmultimixedconv__h__ */

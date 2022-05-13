@@ -123,6 +123,9 @@ XPCOMUtils.defineLazyGetter(this, "ShellService", function() {
 XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
                                   "resource://gre/modules/LightweightThemeManager.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "ExtensionManagement",
+                                  "resource://gre/modules/ExtensionManagement.jsm");
+
 const PREF_PLUGINS_NOTIFYUSER = "plugins.update.notifyUser";
 const PREF_PLUGINS_UPDATEURL  = "plugins.update.url";
 
@@ -409,6 +412,69 @@ BrowserGlue.prototype = {
       case "test-initialize-sanitizer":
         this._sanitizer.onStartup();
         break;
+      case "xpi-signature-changed":
+        if (JSON.parse(data).disabled.length)
+          this._notifyUnsignedAddonsDisabled();
+        break;
+      case "autocomplete-did-enter-text":
+        this._handleURLBarTelemetry(subject.QueryInterface(Ci.nsIAutoCompleteInput));
+        break;
+    }
+  },
+
+  _handleURLBarTelemetry(input) {
+    if (!input ||
+        input.id != "urlbar" ||
+        input.inPrivateContext ||
+        input.popup.selectedIndex < 0) {
+      return;
+    }
+    let controller =
+      input.popup.view.QueryInterface(Ci.nsIAutoCompleteController);
+    let idx = input.popup.selectedIndex;
+    let value = controller.getValueAt(idx);
+    let action = input._parseActionUrl(value);
+    let actionType;
+    if (action) {
+      actionType =
+        action.type == "searchengine" && action.params.searchSuggestion ?
+          "searchsuggestion" :
+        action.type;
+    }
+    if (!actionType) {
+      let styles = controller.getStyleAt(idx).split(/\s+/);
+      let style = ["autofill", "tag", "bookmark"].find(s => styles.includes(s));
+      actionType = style || "history";
+    }
+
+    Services.telemetry
+            .getHistogramById("FX_URLBAR_SELECTED_RESULT_INDEX")
+            .add(idx);
+
+    // Ideally this would be a keyed histogram and we'd just add(actionType),
+    // but keyed histograms aren't currently shown on the telemetry dashboard
+    // (bug 1151756).
+    //
+    // You can add values but don't change any of the existing values.
+    // Otherwise you'll break our data.
+    let buckets = {
+      autofill: 0,
+      bookmark: 1,
+      history: 2,
+      keyword: 3,
+      searchengine: 4,
+      searchsuggestion: 5,
+      switchtab: 6,
+      tag: 7,
+      visiturl: 8,
+    };
+    if (actionType in buckets) {
+      Services.telemetry
+              .getHistogramById("FX_URLBAR_SELECTED_RESULT_TYPE")
+              .add(buckets[actionType]);
+    } else {
+      Cu.reportError("Unknown FX_URLBAR_SELECTED_RESULT_TYPE type: " +
+                     actionType);
     }
   },
 
@@ -454,6 +520,14 @@ BrowserGlue.prototype = {
     os.addObserver(this, "browser-search-service", false);
     os.addObserver(this, "restart-in-safe-mode", false);
     os.addObserver(this, "flash-plugin-hang", false);
+    os.addObserver(this, "xpi-signature-changed", false);
+    os.addObserver(this, "autocomplete-did-enter-text", false);
+
+    ExtensionManagement.registerScript("chrome://browser/content/ext-utils.js");
+    ExtensionManagement.registerScript("chrome://browser/content/ext-browserAction.js");
+    ExtensionManagement.registerScript("chrome://browser/content/ext-contextMenus.js");
+    ExtensionManagement.registerScript("chrome://browser/content/ext-tabs.js");
+    ExtensionManagement.registerScript("chrome://browser/content/ext-windows.js");
 
     this._flashHangCount = 0;
   },
@@ -495,6 +569,8 @@ BrowserGlue.prototype = {
       // may have already been removed by the observer
     } catch (ex) {}
     os.removeObserver(this, "flash-plugin-hang");
+    os.removeObserver(this, "xpi-signature-changed");
+    os.removeObserver(this, "autocomplete-did-enter-text");
   },
 
   _onAppDefaults: function BG__onAppDefaults() {
@@ -776,6 +852,27 @@ BrowserGlue.prototype = {
                           nb.PRIORITY_INFO_LOW, buttons);
   },
 
+  _notifyUnsignedAddonsDisabled: function () {
+    let win = this.getMostRecentBrowserWindow();
+    if (!win)
+      return;
+
+    let message = win.gNavigatorBundle.getString("unsignedAddonsDisabled.message");
+    let buttons = [
+      {
+        label:     win.gNavigatorBundle.getString("unsignedAddonsDisabled.learnMore.label"),
+        accessKey: win.gNavigatorBundle.getString("unsignedAddonsDisabled.learnMore.accesskey"),
+        callback: function () {
+          win.BrowserOpenAddonsMgr("addons://list/extension?unsigned=true");
+        }
+      },
+    ];
+
+    let nb = win.document.getElementById("high-priority-global-notificationbox");
+    nb.appendNotification(message, "unsigned-addons-disabled", "",
+                          nb.PRIORITY_WARNING_MEDIUM, buttons);
+  },
+
   // the first browser window has finished initializing
   _onFirstWindowLoaded: function BG__onFirstWindowLoaded(aWindow) {
 #ifdef XP_WIN
@@ -902,6 +999,10 @@ BrowserGlue.prototype = {
         }.bind(this), Ci.nsIThread.DISPATCH_NORMAL);
       }
     }
+
+#ifdef E10S_TESTING_ONLY
+    E10SUINotification.checkStatus();
+#endif
   },
 
   _onQuitRequest: function BG__onQuitRequest(aCancelQuit, aQuitType) {
@@ -2502,6 +2603,211 @@ let DefaultBrowserCheck = {
     }
   },
 };
+
+#ifdef E10S_TESTING_ONLY
+let E10SUINotification = {
+  // Increase this number each time we want to roll out an
+  // e10s testing period to Nightly users.
+  CURRENT_NOTICE_COUNT: 0,
+
+  checkStatus: function() {
+    let skipE10sChecks = false;
+    try {
+      let updateChannel = UpdateChannel.get();
+      let channelAuthorized = updateChannel == "nightly" || updateChannel == "aurora";
+
+      skipE10sChecks = !channelAuthorized ||
+                       Services.prefs.getBoolPref("browser.tabs.remote.disabled-for-a11y");
+    } catch(e) {}
+
+    if (skipE10sChecks) {
+      return;
+    }
+
+    if (Services.appinfo.browserTabsRemoteAutostart) {
+      let notice = 0;
+      try {
+        notice = Services.prefs.getIntPref("browser.displayedE10SNotice");
+      } catch(e) {}
+      let activationNoticeShown = notice >= this.CURRENT_NOTICE_COUNT;
+
+      if (!activationNoticeShown) {
+        this._showE10sActivatedNotice();
+      }
+
+      // e10s doesn't work with accessibility, so we prompt to disable
+      // e10s if a11y is enabled, now or in the future.
+      Services.obs.addObserver(this, "a11y-init-or-shutdown", true);
+      if (Services.appinfo.accessibilityEnabled) {
+        this._showE10sAccessibilityWarning();
+      }
+    } else {
+      let e10sPromptShownCount = 0;
+      try {
+        e10sPromptShownCount = Services.prefs.getIntPref("browser.displayedE10SPrompt");
+      } catch(e) {}
+
+      if (!Services.appinfo.inSafeMode &&
+          !Services.appinfo.accessibilityEnabled &&
+          e10sPromptShownCount < 5) {
+        Services.tm.mainThread.dispatch(() => {
+          try {
+            this._showE10SPrompt();
+            Services.prefs.setIntPref("browser.displayedE10SPrompt", e10sPromptShownCount + 1);
+          } catch (ex) {
+            Cu.reportError("Failed to show e10s prompt: " + ex);
+          }
+        }, Ci.nsIThread.DISPATCH_NORMAL);
+      }
+    }
+  },
+
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver, Ci.nsISupportsWeakReference]),
+
+  observe: function(subject, topic, data) {
+    if (topic == "a11y-init-or-shutdown"
+        && data == "1" &&
+        Services.appinfo.accessibilityIsBlacklistedForE10S) {
+      this._showE10sAccessibilityWarning();
+    }
+  },
+
+  _showE10sActivatedNotice: function() {
+    let win = RecentWindow.getMostRecentBrowserWindow();
+    if (!win)
+      return;
+
+    Services.prefs.setIntPref("browser.displayedE10SNotice", this.CURRENT_NOTICE_COUNT);
+
+    let nb = win.document.getElementById("high-priority-global-notificationbox");
+    let message = win.gNavigatorBundle.getFormattedString(
+                    "e10s.postActivationInfobar.message",
+                    [gBrandBundle.GetStringFromName("brandShortName")]
+                  );
+    let buttons = [
+      {
+        label: win.gNavigatorBundle.getString("e10s.postActivationInfobar.learnMore.label"),
+        accessKey: win.gNavigatorBundle.getString("e10s.postActivationInfobar.learnMore.accesskey"),
+        callback: function () {
+          win.openUILinkIn("https://wiki.mozilla.org/Electrolysis", "tab");
+        }
+      }
+    ];
+    nb.appendNotification(message, "e10s-activated-noticed",
+                          null, nb.PRIORITY_WARNING_MEDIUM, buttons);
+
+  },
+
+  _showE10SPrompt: function BG__showE10SPrompt() {
+    let win = RecentWindow.getMostRecentBrowserWindow();
+    if (!win)
+      return;
+
+    let browser = win.gBrowser.selectedBrowser;
+
+    let promptMessage = win.gNavigatorBundle.getFormattedString(
+                          "e10s.offerPopup.mainMessage",
+                          [gBrandBundle.GetStringFromName("brandShortName")]
+                        );
+    let mainAction = {
+      label: win.gNavigatorBundle.getString("e10s.offerPopup.enableAndRestart.label"),
+      accessKey: win.gNavigatorBundle.getString("e10s.offerPopup.enableAndRestart.accesskey"),
+      callback: function () {
+        Services.prefs.setBoolPref("browser.tabs.remote.autostart", true);
+        Services.prefs.setBoolPref("browser.enabledE10SFromPrompt", true);
+        // Restart the app
+        let cancelQuit = Cc["@mozilla.org/supports-PRBool;1"].createInstance(Ci.nsISupportsPRBool);
+        Services.obs.notifyObservers(cancelQuit, "quit-application-requested", "restart");
+        if (cancelQuit.data)
+          return; // somebody canceled our quit request
+        Services.startup.quit(Services.startup.eAttemptQuit | Services.startup.eRestart);
+      }
+    };
+    let secondaryActions = [
+      {
+        label: win.gNavigatorBundle.getString("e10s.offerPopup.noThanks.label"),
+        accessKey: win.gNavigatorBundle.getString("e10s.offerPopup.noThanks.accesskey"),
+        callback: function () {
+          Services.prefs.setIntPref("browser.displayedE10SPrompt", 5);
+        }
+      }
+    ];
+    let options = {
+      popupIconURL: "chrome://browser/skin/e10s-64@2x.png",
+      learnMoreURL: "https://wiki.mozilla.org/Electrolysis",
+      persistWhileVisible: true
+    };
+
+    win.PopupNotifications.show(browser, "enable_e10s", promptMessage, null, mainAction, secondaryActions, options);
+
+    let highlights = [
+      win.gNavigatorBundle.getString("e10s.offerPopup.highlight1"),
+      win.gNavigatorBundle.getString("e10s.offerPopup.highlight2")
+    ];
+  },
+
+  _warnedAboutAccessibility: false,
+
+  _showE10sAccessibilityWarning: function() {
+    try {
+      if (!Services.prefs.getBoolPref("browser.tabs.remote.disabled-for-a11y")) {
+        // Only return if the pref exists and was set to false, but not
+        // if the pref didn't exist (which will throw).
+        return;
+      }
+    } catch (e) { }
+
+    Services.prefs.setBoolPref("browser.tabs.remote.disabled-for-a11y", true);
+
+    if (this._warnedAboutAccessibility) {
+      return;
+    }
+    this._warnedAboutAccessibility = true;
+
+    let win = RecentWindow.getMostRecentBrowserWindow();
+    if (!win) {
+      // Just restart immediately.
+      Services.startup.quit(Services.startup.eAttemptQuit | Services.startup.eRestart);
+      return;
+    }
+
+    let browser = win.gBrowser.selectedBrowser;
+
+    let promptMessage = win.gNavigatorBundle.getFormattedString(
+                          "e10s.accessibilityNotice.mainMessage",
+                          [gBrandBundle.GetStringFromName("brandShortName")]
+                        );
+    let mainAction = {
+      label: win.gNavigatorBundle.getString("e10s.accessibilityNotice.disableAndRestart.label"),
+      accessKey: win.gNavigatorBundle.getString("e10s.accessibilityNotice.disableAndRestart.accesskey"),
+      callback: function () {
+        // Restart the app
+        let cancelQuit = Cc["@mozilla.org/supports-PRBool;1"].createInstance(Ci.nsISupportsPRBool);
+        Services.obs.notifyObservers(cancelQuit, "quit-application-requested", "restart");
+        if (cancelQuit.data)
+          return; // somebody canceled our quit request
+        Services.startup.quit(Services.startup.eAttemptQuit | Services.startup.eRestart);
+      }
+    };
+    let secondaryActions = [
+      {
+        label: win.gNavigatorBundle.getString("e10s.accessibilityNotice.dontDisable.label"),
+        accessKey: win.gNavigatorBundle.getString("e10s.accessibilityNotice.dontDisable.accesskey"),
+        callback: function () {
+          Services.prefs.setBoolPref("browser.tabs.remote.disabled-for-a11y", false);
+        }
+      }
+    ];
+    let options = {
+      popupIconURL: "chrome://browser/skin/e10s-64@2x.png",
+      learnMoreURL: "https://wiki.mozilla.org/Electrolysis",
+      persistWhileVisible: true
+    };
+
+    win.PopupNotifications.show(browser, "a11y_enabled_with_e10s", promptMessage, null, mainAction, secondaryActions, options);
+  },
+};
+#endif
 
 var components = [BrowserGlue, ContentPermissionPrompt];
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory(components);

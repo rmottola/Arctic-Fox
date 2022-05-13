@@ -570,8 +570,7 @@ js::ExpandErrorArgumentsVA(ExclusiveContext* cx, JSErrorCallback callback,
                            ErrorArgumentsType argumentsType, va_list ap)
 {
     const JSErrorFormatString* efs;
-    int i;
-    int argCount;
+    uint16_t argCount;
     bool messageArgsPassed = !!reportp->messageArgs;
 
     *messagep = nullptr;
@@ -588,9 +587,9 @@ js::ExpandErrorArgumentsVA(ExclusiveContext* cx, JSErrorCallback callback,
         reportp->exnType = efs->exnType;
 
         size_t totalArgsLength = 0;
-        size_t argLengths[10]; /* only {0} thru {9} supported */
+        size_t argLengths[JS::MaxNumErrorArguments]; /* only {0} thru {9} supported */
         argCount = efs->argCount;
-        MOZ_ASSERT(argCount <= 10);
+        MOZ_ASSERT(argCount <= JS::MaxNumErrorArguments);
         if (argCount > 0) {
             /*
              * Gather the arguments into an array, and accumulate
@@ -607,7 +606,7 @@ js::ExpandErrorArgumentsVA(ExclusiveContext* cx, JSErrorCallback callback,
                 /* nullptr-terminate for easy copying. */
                 reportp->messageArgs[argCount] = nullptr;
             }
-            for (i = 0; i < argCount; i++) {
+            for (uint16_t i = 0; i < argCount; i++) {
                 if (messageArgsPassed) {
                     /* Do nothing. */
                 } else if (argumentsType == ArgumentsAreASCII) {
@@ -713,7 +712,7 @@ error:
     if (!messageArgsPassed && reportp->messageArgs) {
         /* free the arguments only if we allocated them */
         if (argumentsType == ArgumentsAreASCII) {
-            i = 0;
+            uint16_t i = 0;
             while (reportp->messageArgs[i])
                 js_free((void*)reportp->messageArgs[i++]);
         }
@@ -953,7 +952,7 @@ ExclusiveContext::recoverFromOutOfMemory()
 JSContext::JSContext(JSRuntime* rt)
   : ExclusiveContext(rt, &rt->mainThread, Context_JS),
     throwing(false),
-    unwrappedException_(UndefinedValue()),
+    unwrappedException_(this),
     options_(),
     overRecursed_(false),
     propagatingForcedReturn_(false),
@@ -1141,10 +1140,6 @@ void
 JSContext::mark(JSTracer* trc)
 {
     /* Stack frames and slots are traced by StackSpace::mark. */
-
-    /* Mark other roots-by-definition in the JSContext. */
-    if (isExceptionPending())
-        TraceRoot(trc, &unwrappedException_, "unwrapped exception");
 
     TraceCycleDetectionSet(trc, cycleDetectorSet);
 

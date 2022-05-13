@@ -1407,6 +1407,7 @@ MediaManager::Get() {
     nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
     if (obs) {
       obs->AddObserver(sSingleton, "xpcom-will-shutdown", false);
+      obs->AddObserver(sSingleton, "last-pb-context-exited", false);
       obs->AddObserver(sSingleton, "getUserMedia:privileged:allow", false);
       obs->AddObserver(sSingleton, "getUserMedia:response:allow", false);
       obs->AddObserver(sSingleton, "getUserMedia:response:deny", false);
@@ -2289,6 +2290,7 @@ MediaManager::Observe(nsISupports* aSubject, const char* aTopic,
     sInShutdown = true;
 
     obs->RemoveObserver(this, "xpcom-will-shutdown");
+    obs->RemoveObserver(this, "last-pb-context-exited");
     obs->RemoveObserver(this, "getUserMedia:privileged:allow");
     obs->RemoveObserver(this, "getUserMedia:response:allow");
     obs->RemoveObserver(this, "getUserMedia:response:deny");
@@ -2371,6 +2373,10 @@ MediaManager::Observe(nsISupports* aSubject, const char* aTopic,
     })));
     return NS_OK;
 
+  } else if (!strcmp(aTopic, "last-pb-context-exited")) {
+    // Clear memory of private-browsing-specific deviceIds. Fire and forget.
+    media::SanitizeOriginKeys(0, true);
+    return NS_OK;
   } else if (!strcmp(aTopic, "getUserMedia:privileged:allow") ||
              !strcmp(aTopic, "getUserMedia:response:allow")) {
     nsString key(aData);
@@ -2620,7 +2626,7 @@ MediaManager::SanitizeDeviceIds(int64_t aSinceWhen)
   NS_ASSERTION(NS_IsMainThread(), "Only call on main thread");
   LOG(("%s: sinceWhen = %llu", __FUNCTION__, aSinceWhen));
 
-  media::SanitizeOriginKeys(aSinceWhen); // we fire and forget
+  media::SanitizeOriginKeys(aSinceWhen, false); // we fire and forget
   return NS_OK;
 }
 

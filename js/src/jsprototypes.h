@@ -97,7 +97,7 @@
 IF_SAB(real,imaginary)(SharedArrayBuffer,       37,     InitSharedArrayBufferClass, &js::SharedArrayBufferObject::protoClass) \
 IF_INTL(real,imaginary) (Intl,                  38,     InitIntlClass,          CLASP(Intl)) \
 IF_BDATA(real,imaginary)(TypedObject,           39,     InitTypedObjectModuleObject,   OCLASP(TypedObjectModule)) \
-    real(SavedFrame,            40,     InitViaClassSpec,       &js::SavedFrame::class_) \
+    real(Reflect,               40,      InitReflect,           nullptr) \
 IF_BDATA(real,imaginary)(SIMD,                  41,     InitSIMDClass, OCLASP(SIMD)) \
     real(WeakSet,               42,     InitWeakSetClass,       OCLASP(WeakSet)) \
 IF_SAB(real,imaginary)(SharedInt8Array,         43,     InitViaClassSpec,       SHARED_TYPED_ARRAY_CLASP(Int8)) \
@@ -109,9 +109,9 @@ IF_SAB(real,imaginary)(SharedUint32Array,       48,     InitViaClassSpec,       
 IF_SAB(real,imaginary)(SharedFloat32Array,      49,     InitViaClassSpec,       SHARED_TYPED_ARRAY_CLASP(Float32)) \
 IF_SAB(real,imaginary)(SharedFloat64Array,      50,     InitViaClassSpec,       SHARED_TYPED_ARRAY_CLASP(Float64)) \
 IF_SAB(real,imaginary)(SharedUint8ClampedArray, 51,     InitViaClassSpec,       SHARED_TYPED_ARRAY_CLASP(Uint8Clamped)) \
-    real(TypedArray,            52,     InitViaClassSpec,       &js::TypedArrayObject::sharedTypedArrayPrototypeClass) \
+    real(TypedArray,            52,      InitViaClassSpec,      &js::TypedArrayObject::sharedTypedArrayPrototypeClass) \
 IF_SAB(real,imaginary)(Atomics,                 53,     InitAtomicsClass, OCLASP(Atomics)) \
-    real(Reflect,               54,      InitReflect,           nullptr) \
+    real(SavedFrame,            54,      InitViaClassSpec,      &js::SavedFrame::class_) \
 
 
 

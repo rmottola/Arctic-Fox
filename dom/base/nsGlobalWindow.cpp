@@ -97,7 +97,6 @@
 #include "nsThreadUtils.h"
 #include "nsILoadContext.h"
 #include "nsIPresShell.h"
-#include "nsIScriptSecurityManager.h"
 #include "nsIScrollableFrame.h"
 #include "nsView.h"
 #include "nsViewManager.h"
@@ -194,6 +193,7 @@
 #include "nsRefreshDriver.h"
 
 #include "mozilla/AddonPathService.h"
+#include "mozilla/BasePrincipal.h"
 #include "mozilla/Services.h"
 #include "mozilla/Telemetry.h"
 #include "nsLocation.h"
@@ -258,6 +258,8 @@ static const char kStorageEnabled[] = "dom.storage.enabled";
 using namespace mozilla;
 using namespace mozilla::dom;
 using namespace mozilla::dom::ipc;
+using mozilla::BasePrincipal;
+using mozilla::OriginAttributes;
 using mozilla::TimeStamp;
 using mozilla::TimeDuration;
 using mozilla::dom::cache::CacheStorage;
@@ -1429,8 +1431,8 @@ nsGlobalWindow::CleanUp()
     }
 
 #ifdef MOZ_B2G
-    DisableNetworkEvent(NS_NETWORK_UPLOAD_EVENT);
-    DisableNetworkEvent(NS_NETWORK_DOWNLOAD_EVENT);
+    DisableNetworkEvent(eNetworkUpload);
+    DisableNetworkEvent(eNetworkDownload);
 #endif // MOZ_B2G
 
     if (mIdleService) {
@@ -3054,7 +3056,7 @@ nsGlobalWindow::PreHandleEvent(EventChainPreVisitor& aVisitor)
 
   aVisitor.mCanHandle = true;
   aVisitor.mForceContentDispatch = true; //FIXME! Bug 329119
-  if ((msg == NS_MOUSE_MOVE) && gEntropyCollector) {
+  if (msg == eMouseMove && gEntropyCollector) {
     //Chances are this counter will overflow during the life of the
     //process, but that's OK for our case. Means we get a little
     //more entropy.
@@ -3069,7 +3071,7 @@ nsGlobalWindow::PreHandleEvent(EventChainPreVisitor& aVisitor)
       gEntropyCollector->RandomUpdate((void*)&(aVisitor.mEvent->time),
                                       sizeof(uint32_t));
     }
-  } else if (msg == NS_RESIZE_EVENT && aVisitor.mEvent->mFlags.mIsTrusted) {
+  } else if (msg == eResize && aVisitor.mEvent->mFlags.mIsTrusted) {
     // QIing to window so that we can keep the old behavior also in case
     // a child window is handling resize.
     nsCOMPtr<nsPIDOMWindow> window =
@@ -3077,11 +3079,9 @@ nsGlobalWindow::PreHandleEvent(EventChainPreVisitor& aVisitor)
     if (window) {
       mIsHandlingResizeEvent = true;
     }
-  } else if (msg == NS_MOUSE_BUTTON_DOWN &&
-             aVisitor.mEvent->mFlags.mIsTrusted) {
+  } else if (msg == eMouseDown && aVisitor.mEvent->mFlags.mIsTrusted) {
     gMouseDown = true;
-  } else if ((msg == NS_MOUSE_BUTTON_UP ||
-              msg == NS_DRAGDROP_END) &&
+  } else if ((msg == eMouseUp || msg == eDragEnd) &&
              aVisitor.mEvent->mFlags.mIsTrusted) {
     gMouseDown = false;
     if (gDragServiceDisabled) {
@@ -3259,9 +3259,9 @@ nsGlobalWindow::PostHandleEvent(EventChainPostVisitor& aVisitor)
 
   // Return early if there is nothing to do.
   switch (aVisitor.mEvent->mMessage) {
-    case NS_RESIZE_EVENT:
-    case NS_PAGE_UNLOAD:
-    case NS_LOAD:
+    case eResize:
+    case eUnload:
+    case eLoad:
       break;
     default:
       return NS_OK;
@@ -3273,9 +3273,9 @@ nsGlobalWindow::PostHandleEvent(EventChainPostVisitor& aVisitor)
   nsCOMPtr<nsIDOMEventTarget> kungFuDeathGrip1(mChromeEventHandler);
   nsCOMPtr<nsIScriptContext> kungFuDeathGrip2(GetContextInternal());
 
-  if (aVisitor.mEvent->mMessage == NS_RESIZE_EVENT) {
+  if (aVisitor.mEvent->mMessage == eResize) {
     mIsHandlingResizeEvent = false;
-  } else if (aVisitor.mEvent->mMessage == NS_PAGE_UNLOAD &&
+  } else if (aVisitor.mEvent->mMessage == eUnload &&
              aVisitor.mEvent->mFlags.mIsTrusted) {
     // Execute bindingdetached handlers before we tear ourselves
     // down.
@@ -3283,7 +3283,7 @@ nsGlobalWindow::PostHandleEvent(EventChainPostVisitor& aVisitor)
       mDoc->BindingManager()->ExecuteDetachedHandlers();
     }
     mIsDocumentLoaded = false;
-  } else if (aVisitor.mEvent->mMessage == NS_LOAD &&
+  } else if (aVisitor.mEvent->mMessage == eLoad &&
              aVisitor.mEvent->mFlags.mIsTrusted) {
     // This is page load event since load events don't propagate to |window|.
     // @see nsDocument::PreHandleEvent.
@@ -3297,7 +3297,7 @@ nsGlobalWindow::PostHandleEvent(EventChainPostVisitor& aVisitor)
       // onload event for the frame element.
 
       nsEventStatus status = nsEventStatus_eIgnore;
-      WidgetEvent event(aVisitor.mEvent->mFlags.mIsTrusted, NS_LOAD);
+      WidgetEvent event(aVisitor.mEvent->mFlags.mIsTrusted, eLoad);
       event.mFlags.mBubbles = false;
 
       // Most of the time we could get a pres context to pass in here,
@@ -6217,7 +6217,7 @@ nsGlobalWindow::GetMainWidget()
 }
 
 nsIWidget*
-nsGlobalWindow::GetNearestWidget()
+nsGlobalWindow::GetNearestWidget() const
 {
   nsIDocShell* docShell = GetDocShell();
   NS_ENSURE_TRUE(docShell, nullptr);
@@ -6522,7 +6522,15 @@ nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
   // consequential calls to this method, those calls will be skipped
   // at the condition above.
   if (aReason == eForFullscreenMode) {
-    mFullscreenMode = aFullScreen;
+    if (!aFullScreen && !mFullscreenMode) {
+      // If we are exiting fullscreen mode, but we actually didn't
+      // entered fullscreen mode, the fullscreen state was only for
+      // the Fullscreen API. Change the reason here so that we can
+      // perform transition for it.
+      aReason = eForFullscreenAPI;
+    } else {
+      mFullscreenMode = aFullScreen;
+    }
   } else {
     // If we are exiting from DOM fullscreen while we initially make
     // the window fullscreen because of fullscreen mode, don't restore
@@ -6650,8 +6658,16 @@ nsGlobalWindow::FullScreen() const
   nsCOMPtr<nsIDocShellTreeItem> rootItem;
   mDocShell->GetRootTreeItem(getter_AddRefs(rootItem));
   if (rootItem == mDocShell) {
-    // We are the root window. Return our internal value.
-    return mFullScreen;
+    if (!XRE_IsContentProcess()) {
+      // We are the root window. Return our internal value.
+      return mFullScreen;
+    }
+    if (nsCOMPtr<nsIWidget> widget = GetNearestWidget()) {
+      // We are in content process, figure out the value from
+      // the sizemode of the puppet widget.
+      return widget->SizeMode() == nsSizeMode_Fullscreen;
+    }
+    return false;
   }
 
   nsCOMPtr<nsIDOMWindow> window = rootItem->GetWindow();
@@ -8596,21 +8612,14 @@ nsGlobalWindow::PostMessageMozOuter(JSContext* aCx, JS::Handle<JS::Value> aMessa
       return;
     }
 
-    nsCOMPtr<nsIScriptSecurityManager> ssm =
-      nsContentUtils::GetSecurityManager();
-    MOZ_ASSERT(ssm);
-
     nsCOMPtr<nsIPrincipal> principal = nsContentUtils::SubjectPrincipal();
     MOZ_ASSERT(principal);
 
-    uint32_t appId = principal->GetAppId();
-    bool isInBrowser = principal->GetIsInBrowserElement();
-
+    OriginAttributes attrs = BasePrincipal::Cast(principal)->OriginAttributesRef();
     // Create a nsIPrincipal inheriting the app/browser attributes from the
     // caller.
-    nsresult rv = ssm->GetAppCodebasePrincipal(originURI, appId, isInBrowser,
-                                             getter_AddRefs(providedPrincipal));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
+    providedPrincipal = BasePrincipal::CreateCodebasePrincipal(originURI, attrs);
+    if (NS_WARN_IF(!providedPrincipal)) {
       return;
     }
   }
@@ -11109,9 +11118,16 @@ nsGlobalWindow::GetCaches(ErrorResult& aRv)
     bool forceTrustedOrigin =
       GetOuterWindowInternal()->GetServiceWorkersTestingEnabled();
 
+    nsContentUtils::StorageAccess access =
+      nsContentUtils::StorageAllowedForWindow(this);
+
+    // We don't block the cache API when being told to only allow storage for the
+    // current session.
+    bool storageBlocked = access <= nsContentUtils::StorageAccess::ePrivateBrowsing;
+
     mCacheStorage = CacheStorage::CreateOnMainThread(cache::DEFAULT_NAMESPACE,
                                                      this, GetPrincipal(),
-                                                     IsPrivateBrowsing(),
+                                                     storageBlocked,
                                                      forceTrustedOrigin, aRv);
   }
 
@@ -14597,13 +14613,13 @@ nsGlobalWindow::EnableNetworkEvent(EventMessage aEventMessage)
   }
 
   switch (aEventMessage) {
-    case NS_NETWORK_UPLOAD_EVENT:
+    case eNetworkUpload:
       if (!mNetworkUploadObserverEnabled) {
         mNetworkUploadObserverEnabled = true;
         os->AddObserver(mObserver, NS_NETWORK_ACTIVITY_BLIP_UPLOAD_TOPIC, false);
       }
       break;
-    case NS_NETWORK_DOWNLOAD_EVENT:
+    case eNetworkDownload:
       if (!mNetworkDownloadObserverEnabled) {
         mNetworkDownloadObserverEnabled = true;
         os->AddObserver(mObserver, NS_NETWORK_ACTIVITY_BLIP_DOWNLOAD_TOPIC, false);
@@ -14625,13 +14641,13 @@ nsGlobalWindow::DisableNetworkEvent(EventMessage aEventMessage)
   }
 
   switch (aEventMessage) {
-    case NS_NETWORK_UPLOAD_EVENT:
+    case eNetworkUpload:
       if (mNetworkUploadObserverEnabled) {
         mNetworkUploadObserverEnabled = false;
         os->RemoveObserver(mObserver, NS_NETWORK_ACTIVITY_BLIP_UPLOAD_TOPIC);
       }
       break;
-    case NS_NETWORK_DOWNLOAD_EVENT:
+    case eNetworkDownload:
       if (mNetworkDownloadObserverEnabled) {
         mNetworkDownloadObserverEnabled = false;
         os->RemoveObserver(mObserver, NS_NETWORK_ACTIVITY_BLIP_DOWNLOAD_TOPIC);

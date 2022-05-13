@@ -26,7 +26,7 @@ namespace dom {
 class SpeakerManagerService;
 #endif
 
-#define NUMBER_OF_AUDIO_CHANNELS (uint32_t)AudioChannel::Publicnotification + 1
+#define NUMBER_OF_AUDIO_CHANNELS (uint32_t)AudioChannel::EndGuard_
 
 class AudioChannelService final : public nsIAudioChannelService
                                 , public nsIObserver
@@ -42,11 +42,6 @@ public:
    * Only to be called from main thread.
    */
   static already_AddRefed<AudioChannelService> GetOrCreate();
-
-  /**
-   * Shutdown the singleton.
-   */
-  static void Shutdown();
 
   static bool IsAudioChannelMutedByDefault();
 
@@ -144,6 +139,11 @@ private:
   AudioChannelService();
   ~AudioChannelService();
 
+  /**
+   * Shutdown the singleton.
+   */
+  static void Shutdown();
+
   void MaybeSendStatusUpdate();
 
   bool ContentOrNormalChannelIsActive();
@@ -211,8 +211,6 @@ private:
 #ifdef MOZ_WIDGET_GONK
   nsTArray<SpeakerManagerService*>  mSpeakerManager;
 #endif
-
-  bool mDisabled;
 
   nsCOMPtr<nsIRunnable> mRunnable;
 

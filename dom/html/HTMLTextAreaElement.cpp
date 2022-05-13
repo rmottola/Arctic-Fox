@@ -137,7 +137,7 @@ HTMLTextAreaElement::Select()
   }
 
   nsEventStatus status = nsEventStatus_eIgnore;
-  WidgetGUIEvent event(true, NS_FORM_SELECTED, nullptr);
+  WidgetGUIEvent event(true, eFormSelect, nullptr);
   // XXXbz HTMLInputElement guards against this reentering; shouldn't we?
   EventDispatcher::Dispatch(static_cast<nsIContent*>(this), presContext,
                             &event, nullptr, &status);
@@ -484,7 +484,7 @@ HTMLTextAreaElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
 
   // Don't dispatch a second select event if we are already handling
   // one.
-  if (aVisitor.mEvent->mMessage == NS_FORM_SELECTED) {
+  if (aVisitor.mEvent->mMessage == eFormSelect) {
     if (mHandlingSelect) {
       return NS_OK;
     }
@@ -497,14 +497,14 @@ HTMLTextAreaElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
   if (aVisitor.mEvent->mFlags.mNoContentDispatch) {
     aVisitor.mItemFlags |= NS_NO_CONTENT_DISPATCH;
   }
-  if (aVisitor.mEvent->mMessage == NS_MOUSE_CLICK &&
+  if (aVisitor.mEvent->mMessage == eMouseClick &&
       aVisitor.mEvent->AsMouseEvent()->button ==
         WidgetMouseEvent::eMiddleButton) {
     aVisitor.mEvent->mFlags.mNoContentDispatch = false;
   }
 
   // Fire onchange (if necessary), before we do the blur, bug 370521.
-  if (aVisitor.mEvent->mMessage == NS_BLUR_CONTENT) {
+  if (aVisitor.mEvent->mMessage == eBlur) {
     FireChangeEventIfNeeded();
   }
 
@@ -532,13 +532,13 @@ HTMLTextAreaElement::FireChangeEventIfNeeded()
 nsresult
 HTMLTextAreaElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
 {
-  if (aVisitor.mEvent->mMessage == NS_FORM_SELECTED) {
+  if (aVisitor.mEvent->mMessage == eFormSelect) {
     mHandlingSelect = false;
   }
 
-  if (aVisitor.mEvent->mMessage == NS_FOCUS_CONTENT ||
-      aVisitor.mEvent->mMessage == NS_BLUR_CONTENT) {
-    if (aVisitor.mEvent->mMessage == NS_FOCUS_CONTENT) {
+  if (aVisitor.mEvent->mMessage == eFocus ||
+      aVisitor.mEvent->mMessage == eBlur) {
+    if (aVisitor.mEvent->mMessage == eFocus) {
       // If the invalid UI is shown, we should show it while focusing (and
       // update). Otherwise, we should not.
       GetValueInternal(mFocusedValue, true);
@@ -547,7 +547,7 @@ HTMLTextAreaElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
       // If neither invalid UI nor valid UI is shown, we shouldn't show the valid
       // UI while typing.
       mCanShowValidUI = ShouldShowValidityUI();
-    } else { // NS_BLUR_CONTENT
+    } else { // eBlur
       mCanShowInvalidUI = true;
       mCanShowValidUI = true;
     }

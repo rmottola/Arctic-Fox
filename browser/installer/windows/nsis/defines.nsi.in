@@ -42,7 +42,7 @@
 !define MinSupportedVer "Microsoft Windows XP x64"
 #else
 !define ARCH "x86"
-!define MinSupportedVer "Microsoft Windows XP"
+!define MinSupportedVer "Microsoft Windows XP SP2"
 #endif
 
 # File details shared by both the installer and uninstaller
@@ -57,6 +57,12 @@ VIAddVersionKey "FileVersion"     "${AppVersion}"
 VIAddVersionKey "ProductVersion"  "${AppVersion}"
 # Comments is not used but left below commented out for future reference
 # VIAddVersionKey "Comments"        "Comments"
+
+# It isn't possible to get the size of the installation prior to downloading
+# so the stub installer uses an estimate. The size is derived from the size of
+# the complete installer, the size of the extracted complete installer, and at
+# least 15 MB additional for working room.
+!define APPROXIMATE_REQUIRED_SPACE_MB "145"
 
 # Control positions in Dialog Units so they are placed correctly with
 # non-default DPI settings

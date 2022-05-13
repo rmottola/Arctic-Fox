@@ -220,6 +220,7 @@ BluetoothHfpManager::Cleanup()
   mService = HFP_NETWORK_STATE_NOT_AVAILABLE;
   mRoam = HFP_SERVICE_TYPE_HOME;
   mSignal = 0;
+  mNrecEnabled = HFP_NREC_STARTED;
 
   mController = nullptr;
 }
@@ -442,6 +443,9 @@ public:
   void OnError(BluetoothStatus aStatus) override
   {
     BT_WARNING("BluetoothHandsfreeInterface::Cleanup failed: %d", (int)aStatus);
+
+    sBluetoothHfpInterface = nullptr;
+
     if (mRes) {
       mRes->OnError(NS_ERROR_FAILURE);
     }
@@ -605,7 +609,7 @@ BluetoothHfpManager::NotifyDialer(const nsAString& aCommand)
   NS_NAMED_LITERAL_STRING(type, "bluetooth-dialer-command");
   InfallibleTArray<BluetoothNamedValue> parameters;
 
-  BT_APPEND_NAMED_VALUE(parameters, "command", nsString(aCommand));
+  AppendNamedValue(parameters, "command", nsString(aCommand));
 
   BT_ENSURE_TRUE_VOID_BROADCAST_SYSMSG(type, parameters);
 }
@@ -697,15 +701,19 @@ BluetoothHfpManager::HandleVoiceConnectionChanged(uint32_t aClientId)
   // Signal
   JS::Rooted<JS::Value> value(nsContentUtils::RootingCxForThread());
   voiceInfo->GetRelSignalStrength(&value);
-  NS_ENSURE_TRUE_VOID(value.isNumber());
-  mSignal = (int)ceil(value.toNumber() / 20.0);
+  if (value.isNumber()) {
+    mSignal = (int)ceil(value.toNumber() / 20.0);
+  }
 
   UpdateDeviceCIND();
 
   // Operator name
   nsCOMPtr<nsIMobileNetworkInfo> network;
   voiceInfo->GetNetwork(getter_AddRefs(network));
-  NS_ENSURE_TRUE_VOID(network);
+  if (!network) {
+    BT_LOGD("Unable to get network information");
+    return;
+  }
   network->GetLongName(mOperatorName);
 
   // According to GSM 07.07, "<format> indicates if the format is alphanumeric
@@ -1198,6 +1206,12 @@ BluetoothHfpManager::IsConnected()
   return (mConnectionState == HFP_CONNECTION_STATE_SLC_CONNECTED);
 }
 
+bool
+BluetoothHfpManager::IsNrecEnabled()
+{
+  return mNrecEnabled;
+}
+
 void
 BluetoothHfpManager::OnConnectError()
 {
@@ -1259,6 +1273,7 @@ void
 BluetoothHfpManager::OnDisconnectError()
 {
   MOZ_ASSERT(NS_IsMainThread());
+  NS_ENSURE_TRUE_VOID(mController);
 
   mController->NotifyCompletion(NS_LITERAL_STRING(ERR_CONNECTION_FAILED));
 }
@@ -1381,6 +1396,10 @@ BluetoothHfpManager::ConnectionStateNotification(
     DisconnectSco();
     NotifyConnectionStateChanged(
       NS_LITERAL_STRING(BLUETOOTH_HFP_STATUS_CHANGED_ID));
+
+  } else if (aState == HFP_CONNECTION_STATE_CONNECTED) {
+    // Once RFCOMM is connected, enable NREC before each new SLC connection
+    NRECNotification(HFP_NREC_STARTED, mDeviceAddress);
   }
 }
 
@@ -1455,6 +1474,33 @@ BluetoothHfpManager::DtmfNotification(char aDtmf, const nsAString& aBdAddress)
   nsAutoCString message("VTS=");
   message += aDtmf;
   NotifyDialer(NS_ConvertUTF8toUTF16(message));
+}
+
+/**
+ * NREC status will be set when:
+ * 1. Get an AT command from HF device.
+ *    (Bluetooth HFP spec v1.6 merely defines for the "Disable" part.)
+ * 2. Once RFCOMM is connected, enable NREC before each new SLC connection.
+ */
+void
+BluetoothHfpManager::NRECNotification(BluetoothHandsfreeNRECState aNrec,
+                                      const nsAString& aBdAddr)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  // Notify Gecko observers
+  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+  NS_ENSURE_TRUE_VOID(obs);
+
+  mNrecEnabled = static_cast<bool>(aNrec);
+
+  // Notify audio manager
+  if (NS_FAILED(obs->NotifyObservers(this,
+                                     BLUETOOTH_HFP_NREC_STATUS_CHANGED_ID,
+                                     mDeviceAddress.get()))) {
+    BT_WARNING("Failed to notify bluetooth-hfp-nrec-status-changed observsers!");
+  }
+
 }
 
 void

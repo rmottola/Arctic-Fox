@@ -4,6 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+window.performance.mark('gecko-shell-loadstart');
+
 Cu.import('resource://gre/modules/ContactService.jsm');
 Cu.import('resource://gre/modules/DataStoreChangeNotifier.jsm');
 Cu.import('resource://gre/modules/AlarmService.jsm');
@@ -30,6 +32,7 @@ Cu.import('resource://gre/modules/FxAccountsMgmtService.jsm');
 Cu.import('resource://gre/modules/DownloadsAPI.jsm');
 Cu.import('resource://gre/modules/MobileIdentityManager.jsm');
 Cu.import('resource://gre/modules/PresentationDeviceInfoManager.jsm');
+Cu.import('resource://gre/modules/AboutServiceWorkers.jsm');
 
 XPCOMUtils.defineLazyModuleGetter(this, "SystemAppProxy",
                                   "resource://gre/modules/SystemAppProxy.jsm");
@@ -71,6 +74,8 @@ XPCOMUtils.defineLazyGetter(this, "libcutils", function () {
 XPCOMUtils.defineLazyServiceGetter(Services, 'captivePortalDetector',
                                   '@mozilla.org/toolkit/captive-detector;1',
                                   'nsICaptivePortalDetector');
+
+window.performance.measure('gecko-shell-jsm-loaded', 'gecko-shell-loadstart');
 
 function getContentWindow() {
   return shell.contentBrowser.contentWindow;
@@ -213,6 +218,12 @@ var shell = {
   },
 
   bootstrap: function() {
+#ifdef MOZ_B2GDROID
+    Cc["@mozilla.org/b2g/b2gdroid-setup;1"]
+      .getService(Ci.nsIObserver).observe(window, "shell-startup", null);
+#endif
+
+    window.performance.mark('gecko-shell-bootstrap');
     let startManifestURL =
       Cc['@mozilla.org/commandlinehandler/general-startup;1?type=b2gbootstrap']
         .getService(Ci.nsISupports).wrappedJSObject.startManifestURL;
@@ -227,6 +238,7 @@ var shell = {
   },
 
   start: function shell_start() {
+    window.performance.mark('gecko-shell-start');
     this._started = true;
 
     // This forces the initialization of the cookie service before we hit the
@@ -357,6 +369,8 @@ var shell = {
 
     this.contentBrowser.src = homeURL;
     this.isHomeLoaded = false;
+
+    window.performance.mark('gecko-shell-system-frame-set');
 
     ppmm.addMessageListener("content-handler", this);
     ppmm.addMessageListener("dial-handler", this);
@@ -636,6 +650,7 @@ var shell = {
   },
 
   notifyContentStart: function shell_notifyContentStart() {
+    window.performance.mark('gecko-shell-notify-content-start');
     this.contentBrowser.removeEventListener('mozbrowserloadstart', this, true);
     this.contentBrowser.removeEventListener('mozbrowserlocationchange', this, true);
 
@@ -673,7 +688,28 @@ var shell = {
       }
       delete shell.pendingChromeEvents;
     });
-  }
+
+    shell.handleCmdLine();
+  },
+
+  handleCmdLine: function shell_handleCmdLine() {
+  // This isn't supported on devices.
+#ifndef ANDROID
+    let b2gcmds = Cc["@mozilla.org/commandlinehandler/general-startup;1?type=b2gcmds"]
+                    .getService(Ci.nsISupports);
+    let args = b2gcmds.wrappedJSObject.cmdLine;
+    try {
+      // Returns null if -url is not present
+      let url = args.handleFlagWithParam("url", false);
+      if (url) {
+        this.sendChromeEvent({type: "mozbrowseropenwindow", url});
+        args.preventDefault = true;
+      }
+    } catch(e) {
+      // Throws if -url is present with no params
+    }
+#endif
+  },
 };
 
 Services.obs.addObserver(function onFullscreenOriginChange(subject, topic, data) {
@@ -990,6 +1026,7 @@ window.addEventListener('ContentStart', function update_onContentStart() {
   Cu.import('resource://gre/modules/WebappsUpdater.jsm');
   WebappsUpdater.handleContentStart(shell);
 
+#ifdef MOZ_UPDATER
   let promptCc = Cc["@mozilla.org/updates/update-prompt;1"];
   if (!promptCc) {
     return;
@@ -1001,6 +1038,7 @@ window.addEventListener('ContentStart', function update_onContentStart() {
   }
 
   updatePrompt.wrappedJSObject.handleContentStart(shell);
+#endif
 });
 
 (function geolocationStatusTracker() {

@@ -15,6 +15,9 @@ const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 const { promiseInvoke } = devtools.require("devtools/async-utils");
 
 const Services = devtools.require("Services");
+// Always log packets when running tests. runxpcshelltests.py will throw
+// the output away anyway, unless you give it the --verbose flag.
+Services.prefs.setBoolPref("devtools.debugger.log", true);
 // Enable remote debugging for the relevant tests.
 Services.prefs.setBoolPref("devtools.debugger.remote-enabled", true);
 
@@ -72,9 +75,9 @@ function attachTab(client, tab) {
   return rdpRequest(client, client.attachTab, tab.actor);
 }
 
-function waitForNewSource(client, url) {
+function waitForNewSource(threadClient, url) {
   dump("Waiting for new source with url '" + url + "'.\n");
-  return waitForEvent(client, "newSource", function (packet) {
+  return waitForEvent(threadClient, "newSource", function (packet) {
     return packet.source.url === url;
   });
 }

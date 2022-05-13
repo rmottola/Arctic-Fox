@@ -316,9 +316,8 @@ nsComboboxControlFrame::ShowPopup(bool aShowPopup)
 
   // fire a popup dom event
   nsEventStatus status = nsEventStatus_eIgnore;
-  WidgetMouseEvent event(true, aShowPopup ?
-                         NS_XUL_POPUP_SHOWING : NS_XUL_POPUP_HIDING, nullptr,
-                         WidgetMouseEvent::eReal);
+  WidgetMouseEvent event(true, aShowPopup ? eXULPopupShowing : eXULPopupHiding,
+                         nullptr, WidgetMouseEvent::eReal);
 
   nsCOMPtr<nsIPresShell> shell = PresContext()->GetPresShell();
   if (shell)
@@ -1137,7 +1136,7 @@ nsComboboxControlFrame::HandleEvent(nsPresContext* aPresContext,
   }
 
 #if COMBOBOX_ROLLUP_CONSUME_EVENT == 0
-  if (aEvent->mMessage == NS_MOUSE_BUTTON_DOWN) {
+  if (aEvent->mMessage == eMouseDown) {
     nsIWidget* widget = GetNearestWidget();
     if (widget && GetContent() == widget->GetLastRollup()) {
       // This event did a Rollup on this control - prevent it from opening

@@ -45,7 +45,7 @@
 #include "nsIApplicationCache.h"
 #include "nsIApplicationCacheContainer.h"
 #include "nsStyleSet.h"
-#include "pldhash.h"
+#include "PLDHashTable.h"
 #include "nsAttrAndChildArray.h"
 #include "nsDOMAttributeMap.h"
 #include "nsIContentViewer.h"
@@ -1278,6 +1278,13 @@ public:
   bool SetPointerLock(Element* aElement, int aCursorStyle);
   static void UnlockPointer(nsIDocument* aDoc = nullptr);
 
+  void SetCurrentOrientation(mozilla::dom::OrientationType aType,
+                             uint16_t aAngle) override;
+  uint16_t CurrentOrientationAngle() const override;
+  mozilla::dom::OrientationType CurrentOrientationType() const override;
+  void SetOrientationPendingPromise(mozilla::dom::Promise* aPromise) override;
+  mozilla::dom::Promise* GetOrientationPendingPromise() const override;
+
   // This method may fire a DOM event; if it does so it will happen
   // synchronously.
   void UpdateVisibilityState();
@@ -1294,7 +1301,7 @@ public:
                                         mozilla::dom::LifecycleCallbackArgs* aArgs = nullptr,
                                         mozilla::dom::CustomElementDefinition* aDefinition = nullptr) override;
 
-  static void ProcessTopElementQueue(bool aIsBaseQueue = false);
+  static void ProcessTopElementQueue();
 
   void GetCustomPrototype(int32_t aNamespaceID,
                           nsIAtom* aAtom,
@@ -1515,6 +1522,8 @@ protected:
   virtual nsIScriptGlobalObject* GetScriptHandlingObjectInternal() const override;
   virtual bool InternalAllowXULXBL() override;
 
+  void UpdateScreenOrientation();
+
 #define NS_DOCUMENT_NOTIFY_OBSERVERS(func_, params_)                        \
   NS_OBSERVER_ARRAY_NOTIFY_XPCOM_OBSERVERS(mObservers, nsIDocumentObserver, \
                                            func_, params_);
@@ -1585,15 +1594,9 @@ private:
   // queue in the stack is the base element queue.
   static mozilla::Maybe<nsTArray<nsRefPtr<mozilla::dom::CustomElementData>>> sProcessingStack;
 
-  // Flag to prevent re-entrance into base element queue as described in the
-  // custom elements speicification.
-  static bool sProcessingBaseElementQueue;
-
   static bool CustomElementConstructor(JSContext* aCx, unsigned aArgc, JS::Value* aVp);
 
 public:
-  static void ProcessBaseElementQueue();
-
   // Enqueue created callback or register upgrade candidate for
   // newly created custom elements, possibly extending an existing type.
   // ex. <x-button>, <button is="x-button> (type extension)
@@ -1661,6 +1664,13 @@ public:
   // When set, trying to lock the pointer doesn't require permission from the
   // user.
   bool mAllowRelocking:1;
+
+  // ScreenOrientation "pending promise" as described by
+  // http://www.w3.org/TR/screen-orientation/
+  nsRefPtr<mozilla::dom::Promise> mOrientationPendingPromise;
+
+  uint16_t mCurrentOrientationAngle;
+  mozilla::dom::OrientationType mCurrentOrientationType;
 
   // Whether we're observing the "app-theme-changed" observer service
   // notification.  We need to keep track of this because we might get multiple

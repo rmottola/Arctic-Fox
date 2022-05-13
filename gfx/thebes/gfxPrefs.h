@@ -135,6 +135,7 @@ private:
 
   // The apz prefs are explained in AsyncPanZoomController.cpp
   DECL_GFX_PREF(Live, "apz.allow_checkerboarding",             APZAllowCheckerboarding, bool, true);
+  DECL_GFX_PREF(Live, "apz.allow_zooming",                     APZAllowZooming, bool, false);
   DECL_GFX_PREF(Live, "apz.asyncscroll.throttle",              APZAsyncScrollThrottleTime, int32_t, 100);
   DECL_GFX_PREF(Live, "apz.asyncscroll.timeout",               APZAsyncScrollTimeout, int32_t, 300);
   DECL_GFX_PREF(Live, "apz.axis_lock.breakout_angle",          APZAxisBreakoutAngle, float, float(M_PI / 8.0) /* 22.5 degrees */);
@@ -187,6 +188,9 @@ private:
 
   DECL_GFX_PREF(Live, "dom.meta-viewport.enabled",             MetaViewportEnabled, bool, false);
   DECL_GFX_PREF(Once, "dom.vr.enabled",                        VREnabled, bool, false);
+  DECL_GFX_PREF(Once, "dom.vr.oculus.enabled",                 VROculusEnabled, bool, true);
+  DECL_GFX_PREF(Once, "dom.vr.oculus050.enabled",              VROculus050Enabled, bool, true);
+  DECL_GFX_PREF(Once, "dom.vr.cardboard.enabled",              VRCardboardEnabled, bool, false);
   DECL_GFX_PREF(Once, "dom.vr.add-test-devices",               VRAddTestDevices, int32_t, 1);
   DECL_GFX_PREF(Live, "dom.w3c_pointer_events.enabled",        PointerEventsEnabled, bool, false);
 

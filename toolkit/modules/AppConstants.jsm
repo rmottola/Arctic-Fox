@@ -70,17 +70,6 @@ this.AppConstants = Object.freeze({
   false,
 #endif
 
-  MOZ_SHARK:
-#ifdef XP_MACOSX
-#ifdef MOZ_SHARK
-  true,
-#else
-  false,
-#endif
-#else
-  false,
-#endif
-
   MOZ_TELEMETRY_REPORTING:
 #ifdef MOZ_TELEMETRY_REPORTING
   true,
@@ -151,8 +140,26 @@ this.AppConstants = Object.freeze({
   false,
 #endif
 
+  MOZ_B2G:
+#ifdef MOZ_B2G
+  true,
+#else
+  false,
+#endif
+
+  MOZ_B2GDROID:
+#ifdef MOZ_B2GDROID
+  true,
+#else
+  false,
+#endif
+
+  DLL_PREFIX: "@DLL_PREFIX@",
+  DLL_SUFFIX: "@DLL_SUFFIX@",
+
   MOZ_APP_NAME: "@MOZ_APP_NAME@",
   MOZ_APP_VERSION: "@MOZ_APP_VERSION@",
+  MOZ_APP_VERSION_DISPLAY: "@MOZ_APP_VERSION_DISPLAY@",
   MOZ_BUILD_APP: "@MOZ_BUILD_APP@",
   MOZ_UPDATE_CHANNEL: "@MOZ_UPDATE_CHANNEL@",
   MOZ_WIDGET_TOOLKIT: "@MOZ_WIDGET_TOOLKIT@",

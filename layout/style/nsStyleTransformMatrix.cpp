@@ -17,8 +17,6 @@
 #include "mozilla/StyleAnimationValue.h"
 #include "gfxMatrix.h"
 
-#include "nsIFrameInlines.h"
-
 using namespace mozilla;
 using namespace mozilla::gfx;
 

@@ -25,7 +25,7 @@ using mozilla::DebugOnly;
 using JS::GenericNaN;
 
 void
-LIRGenerator::useBoxAtStart(LInstruction *lir, size_t n, MDefinition *mir, LUse::Policy policy)
+LIRGenerator::useBoxAtStart(LInstruction* lir, size_t n, MDefinition* mir, LUse::Policy policy)
 {
     return useBox(lir, n, mir, policy, true);
 }
@@ -563,7 +563,7 @@ LIRGenerator::visitAssertFloat32(MAssertFloat32* assertion)
 }
 
 void
-LIRGenerator::visitAssertRecoveredOnBailout(MAssertRecoveredOnBailout *assertion)
+LIRGenerator::visitAssertRecoveredOnBailout(MAssertRecoveredOnBailout* assertion)
 {
     MOZ_CRASH("AssertRecoveredOnBailout nodes are always recovered on bailouts.");
 }
@@ -799,10 +799,11 @@ LIRGenerator::visitTest(MTest* test)
         }
 
         // Compare values.
-        if (comp->compareType() == MCompare::Compare_Value) {
-            LCompareVAndBranch* lir = new(alloc()) LCompareVAndBranch(comp, ifTrue, ifFalse);
-            useBoxAtStart(lir, LCompareVAndBranch::LhsInput, left);
-            useBoxAtStart(lir, LCompareVAndBranch::RhsInput, right);
+        if (comp->compareType() == MCompare::Compare_Bitwise) {
+            LCompareBitwiseAndBranch* lir =
+                new(alloc()) LCompareBitwiseAndBranch(comp, ifTrue, ifFalse);
+            useBoxAtStart(lir, LCompareBitwiseAndBranch::LhsInput, left);
+            useBoxAtStart(lir, LCompareBitwiseAndBranch::RhsInput, right);
             add(lir, test);
             return;
         }
@@ -1023,10 +1024,10 @@ LIRGenerator::visitCompare(MCompare* comp)
     }
 
     // Compare values.
-    if (comp->compareType() == MCompare::Compare_Value) {
-        LCompareV* lir = new(alloc()) LCompareV();
-        useBoxAtStart(lir, LCompareV::LhsInput, left);
-        useBoxAtStart(lir, LCompareV::RhsInput, right);
+    if (comp->compareType() == MCompare::Compare_Bitwise) {
+        LCompareBitwise* lir = new(alloc()) LCompareBitwise();
+        useBoxAtStart(lir, LCompareBitwise::LhsInput, left);
+        useBoxAtStart(lir, LCompareBitwise::RhsInput, right);
         define(lir, comp);
         return;
     }
@@ -1392,7 +1393,14 @@ void
 LIRGenerator::visitMathFunction(MMathFunction* ins)
 {
     MOZ_ASSERT(IsFloatingPointType(ins->type()));
-    MOZ_ASSERT(ins->type() == ins->input()->type());
+    MOZ_ASSERT_IF(ins->input()->type() != MIRType_SinCosDouble,
+                  ins->type() == ins->input()->type());
+
+    if (ins->input()->type() == MIRType_SinCosDouble) {
+        MOZ_ASSERT(ins->type() == MIRType_Double);
+        redefine(ins, ins->input(), ins->function());
+        return;
+    }
 
     LInstruction* lir;
     if (ins->type() == MIRType_Double) {
@@ -2981,6 +2989,20 @@ LIRGenerator::visitArrayJoin(MArrayJoin* ins)
 }
 
 void
+LIRGenerator::visitSinCos(MSinCos *ins)
+{
+    MOZ_ASSERT(ins->type() == MIRType_SinCosDouble);
+    MOZ_ASSERT(ins->input()->type() == MIRType_Double  ||
+               ins->input()->type() == MIRType_Float32 ||
+               ins->input()->type() == MIRType_Int32);
+
+    LSinCos *lir = new (alloc()) LSinCos(useRegisterAtStart(ins->input()),
+                                         tempFixed(CallTempReg0),
+                                         temp());
+    defineSinCos(lir, ins);
+}
+
+void
 LIRGenerator::visitStringSplit(MStringSplit* ins)
 {
     MOZ_ASSERT(ins->type() == MIRType_Object);
@@ -2994,7 +3016,7 @@ LIRGenerator::visitStringSplit(MStringSplit* ins)
 }
 
 void
-LIRGenerator::visitLoadUnboxedScalar(MLoadUnboxedScalar *ins)
+LIRGenerator::visitLoadUnboxedScalar(MLoadUnboxedScalar* ins)
 {
     MOZ_ASSERT(IsValidElementsType(ins->elements(), ins->offsetAdjustment()));
     MOZ_ASSERT(ins->index()->type() == MIRType_Int32);
@@ -3011,15 +3033,15 @@ LIRGenerator::visitLoadUnboxedScalar(MLoadUnboxedScalar *ins)
         tempDef = temp();
 
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarBeforeLoad);
+        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarBeforeLoad);
         add(fence, ins);
     }
-    LLoadUnboxedScalar *lir = new(alloc()) LLoadUnboxedScalar(elements, index, tempDef);
+    LLoadUnboxedScalar* lir = new(alloc()) LLoadUnboxedScalar(elements, index, tempDef);
     if (ins->fallible())
         assignSnapshot(lir, Bailout_Overflow);
     define(lir, ins);
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarAfterLoad);
+        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarAfterLoad);
         add(fence, ins);
     }
 }
@@ -3120,12 +3142,12 @@ LIRGenerator::visitStoreUnboxedScalar(MStoreUnboxedScalar* ins)
     // barriers, and we could use that instead of separate barrier and
     // store instructions.  See bug #1077027.
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarBeforeStore);
+        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarBeforeStore);
         add(fence, ins);
     }
     add(new(alloc()) LStoreUnboxedScalar(elements, index, value), ins);
     if (ins->requiresMemoryBarrier()) {
-        LMemoryBarrier *fence = new(alloc()) LMemoryBarrier(MembarAfterStore);
+        LMemoryBarrier* fence = new(alloc()) LMemoryBarrier(MembarAfterStore);
         add(fence, ins);
     }
 }
@@ -3352,12 +3374,12 @@ LIRGenerator::visitPolyInlineGuard(MPolyInlineGuard* ins)
 }
 
 void
-LIRGenerator::visitGuardReceiverPolymorphic(MGuardReceiverPolymorphic *ins)
+LIRGenerator::visitGuardReceiverPolymorphic(MGuardReceiverPolymorphic* ins)
 {
     MOZ_ASSERT(ins->obj()->type() == MIRType_Object);
     MOZ_ASSERT(ins->type() == MIRType_Object);
 
-    LGuardReceiverPolymorphic *guard =
+    LGuardReceiverPolymorphic* guard =
         new(alloc()) LGuardReceiverPolymorphic(useRegister(ins->obj()), temp());
     assignSnapshot(guard, Bailout_ShapeGuard);
     add(guard, ins);
@@ -4011,7 +4033,7 @@ void
 LIRGenerator::visitSimdReinterpretCast(MSimdReinterpretCast* ins)
 {
     MOZ_ASSERT(IsSimdType(ins->type()) && IsSimdType(ins->input()->type()));
-    MDefinition *input = ins->input();
+    MDefinition* input = ins->input();
     LUse use = useRegisterAtStart(input);
     // :TODO: (Bug 1132894) We have to allocate a different register as redefine
     // and/or defineReuseInput are not yet capable of reusing the same register
@@ -4217,9 +4239,9 @@ LIRGenerator::visitSimdShift(MSimdShift* ins)
 void
 LIRGenerator::visitLexicalCheck(MLexicalCheck* ins)
 {
-    MDefinition *input = ins->input();
+    MDefinition* input = ins->input();
     MOZ_ASSERT(input->type() == MIRType_Value);
-    LLexicalCheck *lir = new(alloc()) LLexicalCheck();
+    LLexicalCheck* lir = new(alloc()) LLexicalCheck();
     useBox(lir, LLexicalCheck::Input, input);
     assignSnapshot(lir, Bailout_UninitializedLexical);
     add(lir, ins);

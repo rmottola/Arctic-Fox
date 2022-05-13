@@ -15,6 +15,7 @@ let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
 let { dbg_assert } = DevToolsUtils;
 let { TabSources } = require("./utils/TabSources");
 let makeDebugger = require("./utils/make-debugger");
+let { WorkerActorList } = require("devtools/server/actors/worker");
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
@@ -587,6 +588,10 @@ function TabActor(aConnection)
   this.listenForNewDocShells = Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT;
 
   this.traits = { reconfigure: true, frames: true };
+
+  this._workerActorList = null;
+  this._workerActorPool = null;
+  this._onWorkerActorListChanged = this._onWorkerActorListChanged.bind(this);
 }
 
 // XXX (bug 710213): TabActor attach/detach/exit/disconnect is a
@@ -799,10 +804,7 @@ TabActor.prototype = {
    * Called when the actor is removed from the connection.
    */
   disconnect: function BTA_disconnect() {
-    this._detach();
-    this._extraActors = null;
-    this._styleSheetActors.clear();
-    this._exited = true;
+    this.exit();
   },
 
   /**
@@ -823,6 +825,14 @@ TabActor.prototype = {
       this.conn.send({ from: this.actorID,
                        type: "tabDetached" });
     }
+
+    Object.defineProperty(this, "docShell", {
+      value: null,
+      configurable: true
+    });
+
+    this._extraActors = null;
+    this._styleSheetActors.clear();
 
     this._exited = true;
   },
@@ -931,6 +941,38 @@ TabActor.prototype = {
   onListFrames: function BTA_onListFrames(aRequest) {
     let windows = this._docShellsToWindows(this.docShells);
     return { frames: windows };
+  },
+
+  onListWorkers: function BTA_onListWorkers(aRequest) {
+    if (this._workerActorList === null) {
+      this._workerActorList = new WorkerActorList({
+        type: Ci.nsIWorkerDebugger.TYPE_DEDICATED,
+        window: this.window
+      });
+    }
+
+    return this._workerActorList.getList().then((actors) => {
+      let pool = new ActorPool(this.conn);
+      for (let actor of actors) {
+        pool.addActor(actor);
+      }
+
+      this.conn.removeActorPool(this._workerActorPool);
+      this._workerActorPool = pool;
+      this.conn.addActorPool(this._workerActorPool);
+
+      this._workerActorList.onListChanged = this._onWorkerActorListChanged;
+
+      return {
+        "from": this.actorID,
+        "workers": actors.map((actor) => actor.form())
+      };
+    });
+  },
+
+  _onWorkerActorListChanged: function () {
+    this._workerActorList.onListChanged = null;
+    this.conn.sendActorEvent(this.actorID, "workerListChanged");
   },
 
   observe: function (aSubject, aTopic, aData) {
@@ -1614,7 +1656,8 @@ TabActor.prototype.requestTypes = {
   "navigateTo": TabActor.prototype.onNavigateTo,
   "reconfigure": TabActor.prototype.onReconfigure,
   "switchToFrame": TabActor.prototype.onSwitchToFrame,
-  "listFrames": TabActor.prototype.onListFrames
+  "listFrames": TabActor.prototype.onListFrames,
+  "listWorkers": TabActor.prototype.onListWorkers
 };
 
 exports.TabActor = TabActor;
@@ -1635,23 +1678,16 @@ function BrowserTabActor(aConnection, aBrowser, aTabBrowser)
   TabActor.call(this, aConnection, aBrowser);
   this._browser = aBrowser;
   this._tabbrowser = aTabBrowser;
+
+  Object.defineProperty(this, "docShell", {
+    value: this._browser.docShell,
+    configurable: true
+  });
 }
 
 BrowserTabActor.prototype = Object.create(TabActor.prototype);
 
 BrowserTabActor.prototype.constructor = BrowserTabActor;
-
-Object.defineProperty(BrowserTabActor.prototype, "docShell", {
-  get: function() {
-    if (this._browser) {
-      return this._browser.docShell;
-    }
-    // The tab is closed.
-    return null;
-  },
-  enumerable: true,
-  configurable: true
-});
 
 Object.defineProperty(BrowserTabActor.prototype, "title", {
   get: function() {
@@ -1735,7 +1771,10 @@ function RemoteBrowserTabActor(aConnection, aBrowser)
 
 RemoteBrowserTabActor.prototype = {
   connect: function() {
-    let connect = DebuggerServer.connectToChild(this._conn, this._browser);
+    let onDestroy = () => {
+      this._form = null;
+    };
+    let connect = DebuggerServer.connectToChild(this._conn, this._browser, onDestroy);
     return connect.then(form => {
       this._form = form;
       return this;
@@ -1748,15 +1787,21 @@ RemoteBrowserTabActor.prototype = {
   },
 
   update: function() {
-    let deferred = promise.defer();
-    let onFormUpdate = msg => {
-      this._mm.removeMessageListener("debug:form", onFormUpdate);
-      this._form = msg.json;
-      deferred.resolve(this);
-    };
-    this._mm.addMessageListener("debug:form", onFormUpdate);
-    this._mm.sendAsyncMessage("debug:form");
-    return deferred.promise;
+    // If the child happens to be crashed/close/detach, it won't have _form set,
+    // so only request form update if some code is still listening on the other side.
+    if (this._form) {
+      let deferred = promise.defer();
+      let onFormUpdate = msg => {
+        this._mm.removeMessageListener("debug:form", onFormUpdate);
+        this._form = msg.json;
+        deferred.resolve(this);
+      };
+      this._mm.addMessageListener("debug:form", onFormUpdate);
+      this._mm.sendAsyncMessage("debug:form");
+      return deferred.promise;
+    } else {
+      return this.connect();
+    }
   },
 
   form: function() {

@@ -1252,10 +1252,12 @@ if test "$GNU_CC"; then
     # Turn off the following warnings that -Wall turns on:
     # -Wno-unused - lots of violations in third-party code
     # -Wno-inline-new-delete - we inline 'new' and 'delete' in mozalloc
+    # -Wno-unused-local-typedef - catches unused typedefs, which are commonly used in assertion macros
     #
     _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wno-unused"
 
     MOZ_CXX_SUPPORTS_WARNING(-Wno-, inline-new-delete, ac_cxx_has_wno_inline_new_delete)
+    MOZ_CXX_SUPPORTS_WARNING(-Wno-, unused-local-typedef, ac_cxx_has_wno_unused_local_typedef)
 
     if test -z "$INTEL_CC" -a -z "$CLANG_CC"; then
        # Don't use -Wcast-align with ICC or clang
@@ -1314,6 +1316,7 @@ if test "$GNU_CXX"; then
     # -Wparentheses - catches `if (a=b)` and operator precedence bugs
     # -Wpointer-arith - catches pointer arithmetic using NULL or sizeof(void)
     # -Wpointer-to-int-cast - catches casts from pointer to different sized int
+    # -Wrange-loop-analysis - catches copies during range-based for loops.
     # -Wreorder - catches ctor initializer list not matching class definition order
     # -Wreturn-type - catches missing returns, zero false positives
     # -Wsequence-point - catches undefined order behavior like `a = a++`
@@ -1354,13 +1357,17 @@ if test "$GNU_CXX"; then
 
         MOZ_CXX_SUPPORTS_WARNING(-Werror=, conversion-null, ac_cxx_has_werror_conversion_null)
         MOZ_CXX_SUPPORTS_WARNING(-Werror=, non-literal-null-conversion, ac_cxx_has_werror_non_literal_null_conversion)
+        MOZ_CXX_SUPPORTS_WARNING(-Werror=, range-loop-analysis, ac_cxx_has_range_loop_analysis)
         MOZ_CXX_SUPPORTS_WARNING(-Werror=, sometimes-uninitialized, ac_cxx_has_sometimes_uninitialized)
     fi
 
     # Turn off the following warnings that -Wall turns on:
     # -Wno-invalid-offsetof - we use offsetof on non-POD types frequently
+    # -Wno-unused-local-typedef - catches unused typedefs, which are commonly used in assertion macros
     #
     _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wno-invalid-offsetof"
+
+    MOZ_CXX_SUPPORTS_WARNING(-Wno-, unused-local-typedef, ac_cxx_has_wno_unused_local_typedef)
 
     if test -z "$INTEL_CXX" -a -z "$CLANG_CXX"; then
        # Don't use -Wcast-align with ICC or clang
@@ -1783,6 +1790,13 @@ ia64*-hpux*)
         _DEFINES_CXXFLAGS='-FI $(DEPTH)/js/src/js-confdefs.h -DMOZILLA_CLIENT'
         CFLAGS="$CFLAGS -W3 -Gy"
         CXXFLAGS="$CXXFLAGS -W3 -Gy"
+        if test "$CPU_ARCH" = "x86" -a -z "$CLANG_CL"; then
+            dnl VS2012+ defaults to -arch:SSE2.
+            dnl Clang-cl gets confused by -arch:IA32, so don't add it.
+            dnl (See https://llvm.org/bugs/show_bug.cgi?id=24335)
+            CFLAGS="$CFLAGS -arch:IA32"
+            CXXFLAGS="$CXXFLAGS -arch:IA32"
+        fi
         dnl VS2013+ requires -FS when parallel building by make -jN.
         dnl If nothing, compiler sometimes causes C1041 error.
         CFLAGS="$CFLAGS -FS"
@@ -1832,6 +1846,7 @@ ia64*-hpux*)
         dnl Probably also a compiler bug, but what can you do?
         PROFILE_USE_LDFLAGS="-LTCG:PGUPDATE"
         LDFLAGS="$LDFLAGS -DYNAMICBASE"
+        RCFLAGS="-nologo"
     fi
     AC_DEFINE(HAVE_SNPRINTF)
     AC_DEFINE(HAVE__MSIZE)
@@ -2467,6 +2482,7 @@ fi
 dnl Checks for math functions.
 dnl ========================================================
 AC_CHECK_LIB(m, sin)
+AC_CHECK_LIB(m, __sincos, AC_DEFINE(HAVE_SINCOS))
 AC_CHECK_FUNCS([log2 log1p expm1 sqrt1pm1 acosh asinh atanh cbrt])
 
 
@@ -2947,6 +2963,7 @@ elif test "$GNU_CC"; then
     # -Wmaybe-uninitialized - too many false positives
     # -Wdeprecated-declarations - we don't want our builds held hostage when a
     #   platform-specific API becomes deprecated.
+    # -Wfree-nonheap-object - false positives during PGO
     # -Warray-bounds - false positives depending on optimization
     MOZ_C_SUPPORTS_WARNING(-W, no-error=maybe-uninitialized, ac_c_has_noerror_maybe_uninitialized)
     MOZ_CXX_SUPPORTS_WARNING(-W, no-error=maybe-uninitialized, ac_cxx_has_noerror_maybe_uninitialized)
@@ -2958,6 +2975,8 @@ elif test "$GNU_CC"; then
     if test -n "$MOZ_PGO"; then
         MOZ_C_SUPPORTS_WARNING(-W, no-error=coverage-mismatch, ac_c_has_noerror_coverage_mismatch)
         MOZ_CXX_SUPPORTS_WARNING(-W, no-error=coverage-mismatch, ac_cxx_has_noerror_coverage_mismatch)
+        MOZ_C_SUPPORTS_WARNING(-W, no-error=free-nonheap-object, ac_c_has_noerror_free_nonheap_object)
+        MOZ_CXX_SUPPORTS_WARNING(-W, no-error=free-nonheap-object, ac_cxx_has_noerror_free_nonheap_object)
     fi
 fi
 
@@ -3043,6 +3062,10 @@ if test "$MOZ_MEMORY"; then
   esac
 fi
 AC_SUBST(MOZ_MEMORY)
+AC_SUBST(MOZ_JEMALLOC4)
+if test -n "$MOZ_JEMALLOC4"; then
+  AC_DEFINE(MOZ_JEMALLOC4)
+fi
 AC_SUBST(MOZ_CRT)
 AC_SUBST(MOZ_GLUE_IN_PROGRAM)
 AC_SUBST_LIST(MOZ_GLUE_WRAP_LDFLAGS)
@@ -3214,18 +3237,6 @@ MOZ_ARG_ENABLE_BOOL(jprof,
 if test -n "$MOZ_JPROF"; then
     MOZ_PROFILING=1
     AC_DEFINE(MOZ_JPROF)
-fi
-
-dnl ========================================================
-dnl shark
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(shark,
-[  --enable-shark          Enable shark remote profiling. Implies --enable-profiling.],
-    MOZ_SHARK=1,
-    MOZ_SHARK= )
-if test -n "$MOZ_SHARK"; then
-    MOZ_PROFILING=1
-    AC_DEFINE(MOZ_SHARK)
 fi
 
 dnl ========================================================
@@ -3677,7 +3688,6 @@ AC_SUBST(MOZ_DEBUG_DISABLE_DEFS)
 AC_SUBST(MOZ_DEBUG_LDFLAGS)
 AC_SUBST(WARNINGS_AS_ERRORS)
 AC_SUBST(MOZ_JPROF)
-AC_SUBST(MOZ_SHARK)
 AC_SUBST(MOZ_INSTRUMENTS)
 AC_SUBST(MOZ_CALLGRIND)
 AC_SUBST(MOZ_VTUNE)
@@ -3820,7 +3830,12 @@ dnl Set various defines and substitutions
 dnl ========================================================
 
 if test "$OS_ARCH" = "Darwin"; then
-  AC_DEFINE(XP_MACOSX)
+  if test -n "$MOZ_IOS"; then
+    AC_DEFINE(XP_IOS)
+  else
+    AC_DEFINE(XP_MACOSX)
+  fi
+  AC_DEFINE(XP_DARWIN)
   AC_DEFINE(XP_UNIX)
 elif test "$OS_ARCH" != "WINNT"; then
   AC_DEFINE(XP_UNIX)
@@ -3889,6 +3904,7 @@ if test -n "$MOZ_BUILD_NSPR"; then
     MOZ_SUBCONFIGURE_NSPR()
 fi
 MOZ_SUBCONFIGURE_FFI()
+MOZ_SUBCONFIGURE_JEMALLOC()
 
 dnl Spit out some output
 dnl ========================================================

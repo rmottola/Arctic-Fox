@@ -2025,7 +2025,7 @@ DataViewObject::neuter(void* newData)
 }
 
 JSObject*
-js::InitDataViewClass(JSContext *cx, HandleObject obj)
+js::InitDataViewClass(JSContext* cx, HandleObject obj)
 {
     if (!DataViewObject::initClass(cx))
         return nullptr;

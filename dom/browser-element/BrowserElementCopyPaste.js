@@ -69,7 +69,8 @@ let CopyPasteAssistent = {
       reason: e.reason,
       collapsed: e.collapsed,
       caretVisible: e.caretVisible,
-      selectionVisible: e.selectionVisible
+      selectionVisible: e.selectionVisible,
+      selectionEditable: e.selectionEditable
     };
 
     // Get correct geometry information if we have nested iframe.

@@ -22,6 +22,7 @@
 #include "RootAccessible.h"
 #include "nsAccessiblePivot.h"
 #include "nsAccUtils.h"
+#include "nsArrayUtils.h"
 #include "nsAttrName.h"
 #include "nsEventShell.h"
 #include "nsIURI.h"
@@ -50,6 +51,10 @@
 
 #ifdef A11Y_LOG
 #include "Logging.h"
+#endif
+
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
 #endif
 
 #include "nsImageFrame.h"
@@ -270,6 +275,64 @@ nsAccessibilityService::~nsAccessibilityService()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// nsIListenerChangeListener
+
+NS_IMETHODIMP
+nsAccessibilityService::ListenersChanged(nsIArray* aEventChanges)
+{
+  uint32_t targetCount;
+  nsresult rv = aEventChanges->GetLength(&targetCount);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  for (uint32_t i = 0 ; i < targetCount ; i++) {
+    nsCOMPtr<nsIEventListenerChange> change = do_QueryElementAt(aEventChanges, i);
+
+    nsCOMPtr<nsIDOMEventTarget> target;
+    change->GetTarget(getter_AddRefs(target));
+    nsCOMPtr<nsIContent> node(do_QueryInterface(target));
+    if (!node || !node->IsHTMLElement()) {
+      continue;
+    }
+    nsCOMPtr<nsIArray> listenerNames;
+    change->GetChangedListenerNames(getter_AddRefs(listenerNames));
+
+    uint32_t changeCount;
+    rv = listenerNames->GetLength(&changeCount);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    for (uint32_t i = 0 ; i < changeCount ; i++) {
+      nsCOMPtr<nsIAtom> listenerName = do_QueryElementAt(listenerNames, i);
+
+      // We are only interested in event listener changes which may
+      // make an element accessible or inaccessible.
+      if (listenerName != nsGkAtoms::onclick &&
+          listenerName != nsGkAtoms::onmousedown &&
+          listenerName != nsGkAtoms::onmouseup) {
+        continue;
+      }
+
+      nsIDocument* ownerDoc = node->OwnerDoc();
+      DocAccessible* document = GetExistingDocAccessible(ownerDoc);
+
+      // Always recreate for onclick changes.
+      if (document) {
+        if (nsCoreUtils::HasClickListener(node)) {
+          if (!document->GetAccessible(node)) {
+            document->RecreateAccessible(node);
+          }
+        } else {
+          if (document->GetAccessible(node)) {
+            document->RecreateAccessible(node);
+          }
+        }
+        break;
+      }
+    }
+  }
+  return NS_OK;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // nsISupports
 
 NS_IMPL_ISUPPORTS_INHERITED(nsAccessibilityService,
@@ -277,6 +340,7 @@ NS_IMPL_ISUPPORTS_INHERITED(nsAccessibilityService,
                             nsIAccessibilityService,
                             nsIAccessibleRetrieval,
                             nsIObserver,
+                            nsIListenerChangeListener,
                             nsISelectionListener) // from SelectionManager
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -529,8 +593,9 @@ nsAccessibilityService::ContentRemoved(nsIPresShell* aPresShell,
     // accessibles in subtree then we don't care about the change.
     Accessible* child = document->GetAccessible(aChildNode);
     if (!child) {
-      a11y::TreeWalker walker(document->GetContainerAccessible(aChildNode),
-                              aChildNode, a11y::TreeWalker::eWalkCache);
+      Accessible* container = document->GetContainerAccessible(aChildNode);
+      a11y::TreeWalker walker(container ? container : document, aChildNode,
+                              a11y::TreeWalker::eWalkCache);
       child = walker.NextChild();
     }
 
@@ -1252,6 +1317,14 @@ nsAccessibilityService::Init()
   static const char16_t kInitIndicator[] = { '1', 0 };
   observerService->NotifyObservers(nullptr, "a11y-init-or-shutdown", kInitIndicator);
 
+  // Subscribe to EventListenerService.
+  nsCOMPtr<nsIEventListenerService> eventListenerService =
+    do_GetService("@mozilla.org/eventlistenerservice;1");
+  if (!eventListenerService)
+    return false;
+
+  eventListenerService->AddListenerChangeListener(this);
+
   for (uint32_t i = 0; i < ArrayLength(sMarkupMapList); i++)
     mMarkupMaps.Put(*sMarkupMapList[i].tag, &sMarkupMapList[i]);
 
@@ -1265,6 +1338,12 @@ nsAccessibilityService::Init()
     gApplicationAccessible = new ApplicationAccessible();
 
   NS_ADDREF(gApplicationAccessible); // will release in Shutdown()
+
+#ifdef MOZ_CRASHREPORTER
+  CrashReporter::
+    AnnotateCrashReport(NS_LITERAL_CSTRING("Accessibility"),
+                        NS_LITERAL_CSTRING("Active"));
+#endif
 
 #ifdef XP_WIN
   sPendingPlugins = new nsTArray<nsCOMPtr<nsIContent> >;

@@ -33,6 +33,16 @@ extern PRLogModuleInfo* GetMediaSourceLog();
 #define MSE_DEBUGV(...)
 #endif
 
+PRLogModuleInfo* GetMediaSourceSamplesLog()
+{
+  static PRLogModuleInfo* sLogModule = nullptr;
+  if (!sLogModule) {
+    sLogModule = PR_NewLogModule("MediaSourceSamples");
+  }
+  return sLogModule;
+}
+#define SAMPLE_DEBUG(arg, ...) MOZ_LOG(GetMediaSourceSamplesLog(), mozilla::LogLevel::Debug, ("TrackBuffersManager(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
+
 namespace mozilla {
 
 using dom::SourceBufferAppendMode;
@@ -1281,7 +1291,7 @@ TrackBuffersManager::ProcessFrames(TrackBuffer& aSamples, TrackData& aTrackData)
   bool needDiscontinuityCheck = true;
 
   for (auto& sample : aSamples) {
-    MSE_DEBUGV("Processing %s frame(pts:%lld end:%lld, dts:%lld, duration:%lld, "
+    SAMPLE_DEBUG("Processing %s frame(pts:%lld end:%lld, dts:%lld, duration:%lld, "
                "kf:%d)",
                aTrackData.mInfo->mMimeType.get(),
                sample->mTime,
@@ -2017,3 +2027,4 @@ TrackBuffersManager::AddSizeOfResources(MediaSourceDecoder::ResourceSizes* aSize
 } // namespace mozilla
 #undef MSE_DEBUG
 #undef MSE_DEBUGV
+#undef SAMPLE_DEBUG

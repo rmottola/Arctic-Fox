@@ -1173,6 +1173,11 @@ IDBObjectStore::AddOrPut(JSContext* aCx,
   MOZ_ASSERT(aCx);
   MOZ_ASSERT_IF(aFromCursor, aOverwrite);
 
+  if (mDeletedSpec) {
+    aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
+    return nullptr;
+  }
+
   if (!mTransaction->IsOpen()) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
     return nullptr;
@@ -1332,6 +1337,11 @@ IDBObjectStore::GetAllInternal(bool aKeysOnly,
 {
   AssertIsOnOwningThread();
 
+  if (mDeletedSpec) {
+    aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
+    return nullptr;
+  }
+
   if (!mTransaction->IsOpen()) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
     return nullptr;
@@ -1403,6 +1413,11 @@ already_AddRefed<IDBRequest>
 IDBObjectStore::Clear(ErrorResult& aRv)
 {
   AssertIsOnOwningThread();
+
+  if (mDeletedSpec) {
+    aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
+    return nullptr;
+  }
 
   if (!mTransaction->IsOpen()) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
@@ -1590,6 +1605,11 @@ IDBObjectStore::Get(JSContext* aCx,
 {
   AssertIsOnOwningThread();
 
+  if (mDeletedSpec) {
+    aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
+    return nullptr;
+  }
+
   if (!mTransaction->IsOpen()) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
     return nullptr;
@@ -1637,6 +1657,11 @@ IDBObjectStore::DeleteInternal(JSContext* aCx,
                                ErrorResult& aRv)
 {
   AssertIsOnOwningThread();
+
+  if (mDeletedSpec) {
+    aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
+    return nullptr;
+  }
 
   if (!mTransaction->IsOpen()) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
@@ -1735,7 +1760,8 @@ IDBObjectStore::CreateIndexInternal(
 
   if (!transaction ||
       transaction != mTransaction ||
-      mTransaction->GetMode() != IDBTransaction::VERSION_CHANGE) {
+      mTransaction->GetMode() != IDBTransaction::VERSION_CHANGE ||
+      mDeletedSpec) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
     return nullptr;
   }
@@ -1815,7 +1841,8 @@ IDBObjectStore::DeleteIndex(const nsAString& aName, ErrorResult& aRv)
 
   if (!transaction ||
       transaction != mTransaction ||
-      mTransaction->GetMode() != IDBTransaction::VERSION_CHANGE) {
+      mTransaction->GetMode() != IDBTransaction::VERSION_CHANGE ||
+      mDeletedSpec) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
     return;
   }
@@ -1884,6 +1911,13 @@ IDBObjectStore::Count(JSContext* aCx,
                       JS::Handle<JS::Value> aKey,
                       ErrorResult& aRv)
 {
+  AssertIsOnOwningThread();
+
+  if (mDeletedSpec) {
+    aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
+    return nullptr;
+  }
+
   if (!mTransaction->IsOpen()) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
     return nullptr;
@@ -1933,6 +1967,11 @@ IDBObjectStore::OpenCursorInternal(bool aKeysOnly,
                                    ErrorResult& aRv)
 {
   AssertIsOnOwningThread();
+
+  if (mDeletedSpec) {
+    aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
+    return nullptr;
+  }
 
   if (!mTransaction->IsOpen()) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);

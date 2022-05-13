@@ -1924,3 +1924,7 @@ toolbar[iconsize="small"] .toolbarbutton-badge-container {
   background: url("chrome://browser/skin/privatebrowsing-mask.png") center no-repeat;
   width: 40px;
 }
+
+.browser-action-panel > .panel-arrowcontainer > .panel-arrowcontent {
+  padding: 0;
+}

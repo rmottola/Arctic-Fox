@@ -228,7 +228,7 @@ OnSourceGrabEventAfter(GtkWidget *widget, GdkEvent *event, gpointer user_data)
         sMotionEvent = gdk_event_copy(event);
 
         // Update the cursor position.  The last of these recorded gets used for
-        // the NS_DRAGDROP_END event.
+        // the eDragEnd event.
         nsDragService *dragService = static_cast<nsDragService*>(user_data);
         dragService->SetDragEndPoint(nsIntPoint(event->motion.x_root,
                                                 event->motion.y_root));
@@ -1819,8 +1819,7 @@ nsDragService::RunScheduledTask()
         MOZ_LOG(sDragLm, LogLevel::Debug,
                ("nsDragService: dispatch drag leave (%p)\n",
                 mTargetWindow.get()));
-        mTargetWindow->
-            DispatchDragEvent(NS_DRAGDROP_EXIT, mTargetWindowPoint, 0);
+        mTargetWindow->DispatchDragEvent(eDragExit, mTargetWindowPoint, 0);
 
         if (!mSourceNode) {
             // The drag that was initiated in a different app. End the drag
@@ -1991,10 +1990,10 @@ nsDragService::DispatchMotionEvents()
 {
     mCanDrop = false;
 
-    FireDragEventAtSource(NS_DRAGDROP_DRAG);
+    FireDragEventAtSource(eDrag);
 
-    mTargetWindow->
-        DispatchDragEvent(NS_DRAGDROP_OVER, mTargetWindowPoint, mTargetTime);
+    mTargetWindow->DispatchDragEvent(eDragOver, mTargetWindowPoint,
+                                     mTargetTime);
 }
 
 // Returns true if the drop was successful
@@ -2007,7 +2006,7 @@ nsDragService::DispatchDropEvent()
     if (mTargetWindow->IsDestroyed())
         return FALSE;
 
-    EventMessage msg = mCanDrop ? NS_DRAGDROP_DROP : NS_DRAGDROP_EXIT;
+    EventMessage msg = mCanDrop ? eDrop : eDragExit;
 
     mTargetWindow->DispatchDragEvent(msg, mTargetWindowPoint, mTargetTime);
 

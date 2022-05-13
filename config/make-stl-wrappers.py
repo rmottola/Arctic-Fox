@@ -30,6 +30,7 @@ def main(outdir, compiler, template_file, header_list_file):
         os.mkdir(outdir)
 
     template = open(template_file, 'r').read()
+    path_to_new = header_path('new', compiler)
 
     for header in open(header_list_file, 'r'):
         header = header.rstrip()
@@ -39,7 +40,8 @@ def main(outdir, compiler, template_file, header_list_file):
         path = header_path(header, compiler)
         with FileAvoidWrite(os.path.join(outdir, header)) as f:
             f.write(string.Template(template).substitute(HEADER=header,
-                                                         HEADER_PATH=path))
+                                                         HEADER_PATH=path,
+                                                         NEW_HEADER_PATH=path_to_new))
 
 
 if __name__ == '__main__':

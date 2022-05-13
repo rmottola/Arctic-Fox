@@ -52,6 +52,7 @@
 #include "mozilla/dom/TouchEvent.h"
 #include "mozilla/dom/ShadowRoot.h"
 #include "mozilla/dom/WorkerPrivate.h"
+#include "mozilla/dom/workers/ServiceWorkerManager.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventListenerManager.h"
 #include "mozilla/EventStateManager.h"
@@ -94,7 +95,6 @@
 #include "nsHostObjectProtocolHandler.h"
 #include "nsHtml5Module.h"
 #include "nsHtml5StringParser.h"
-#include "nsIAppShell.h"
 #include "nsIAsyncVerifyRedirectCallback.h"
 #include "nsICategoryManager.h"
 #include "nsIChannelEventSink.h"
@@ -193,6 +193,10 @@
 #include "xpcprivate.h" // nsXPConnect
 #include "HTMLSplitOnSpacesTokenizer.h"
 #include "nsContentTypeParser.h"
+#include "nsICookiePermission.h"
+#include "mozIThirdPartyUtil.h"
+#include "nsICookieService.h"
+#include "mozilla/EnumSet.h"
 
 #include "nsIBidiKeyboard.h"
 
@@ -255,6 +259,7 @@ bool nsContentUtils::sInitialized = false;
 bool nsContentUtils::sIsFullScreenApiEnabled = false;
 bool nsContentUtils::sTrustedFullScreenOnly = true;
 bool nsContentUtils::sIsCutCopyAllowed = true;
+bool nsContentUtils::sIsFrameTimingPrefEnabled = false;
 bool nsContentUtils::sIsPerformanceTimingEnabled = false;
 bool nsContentUtils::sIsResourceTimingEnabled = false;
 bool nsContentUtils::sIsUserTimingLoggingEnabled = false;
@@ -262,8 +267,13 @@ bool nsContentUtils::sIsExperimentalAutocompleteEnabled = false;
 bool nsContentUtils::sEncodeDecodeURLHash = false;
 bool nsContentUtils::sGettersDecodeURLHash = false;
 bool nsContentUtils::sPrivacyResistFingerprinting = false;
+bool nsContentUtils::sSendPerformanceTimingNotifications = false;
+bool nsContentUtils::sSWInterceptionEnabled = false;
 
 uint32_t nsContentUtils::sHandlingInputTimeout = 1000;
+
+uint32_t nsContentUtils::sCookiesLifetimePolicy = nsICookieService::ACCEPT_NORMALLY;
+uint32_t nsContentUtils::sCookiesBehavior = nsICookieService::BEHAVIOR_ACCEPT;
 
 nsHtml5StringParser* nsContentUtils::sHTMLFragmentParser = nullptr;
 nsIParser* nsContentUtils::sXMLFragmentParser = nullptr;
@@ -345,7 +355,6 @@ namespace {
 
 static NS_DEFINE_CID(kParserServiceCID, NS_PARSERSERVICE_CID);
 static NS_DEFINE_CID(kCParserCID, NS_PARSER_CID);
-static NS_DEFINE_CID(kAppShellCID, NS_APPSHELL_CID);
 
 static PLDHashTable* sEventListenerManagersHash;
 
@@ -501,9 +510,9 @@ nsContentUtils::Init()
   if (!sEventListenerManagersHash) {
     static const PLDHashTableOps hash_table_ops =
     {
-      PL_DHashVoidPtrKeyStub,
-      PL_DHashMatchEntryStub,
-      PL_DHashMoveEntryStub,
+      PLDHashTable::HashVoidPtrKeyStub,
+      PLDHashTable::MatchEntryStub,
+      PLDHashTable::MoveEntryStub,
       EventListenerManagerHashClearEntry,
       EventListenerManagerHashInitEntry
     };
@@ -537,6 +546,9 @@ nsContentUtils::Init()
   Preferences::AddBoolVarCache(&sIsUserTimingLoggingEnabled,
                                "dom.performance.enable_user_timing_logging", false);
 
+  Preferences::AddBoolVarCache(&sIsFrameTimingPrefEnabled,
+                               "dom.enable_frame_timing", true);
+
   Preferences::AddBoolVarCache(&sIsExperimentalAutocompleteEnabled,
                                "dom.forms.autocomplete.experimental", false);
 
@@ -549,9 +561,24 @@ nsContentUtils::Init()
   Preferences::AddBoolVarCache(&sPrivacyResistFingerprinting,
                                "privacy.resistFingerprinting", false);
 
+  Preferences::AddBoolVarCache(&sSWInterceptionEnabled,
+                               "dom.serviceWorkers.interception.enabled",
+                               false);
+
   Preferences::AddUintVarCache(&sHandlingInputTimeout,
                                "dom.event.handling-user-input-time-limit",
                                1000);
+
+  Preferences::AddBoolVarCache(&sSendPerformanceTimingNotifications,
+                               "dom.performance.enable_notify_performance_timing", false);
+
+  Preferences::AddUintVarCache(&sCookiesLifetimePolicy,
+                               "network.cookie.lifetimePolicy",
+                               nsICookieService::ACCEPT_NORMALLY);
+
+  Preferences::AddUintVarCache(&sCookiesBehavior,
+                               "network.cookie.cookieBehavior",
+                               nsICookieService::BEHAVIOR_ACCEPT);
 
 #if !(defined(DEBUG) || defined(MOZ_ENABLE_JS_DUMP))
   Preferences::AddBoolVarCache(&sDOMWindowDumpEnabled,
@@ -660,15 +687,15 @@ nsContentUtils::InitializeModifierStrings()
 }
 
 // Because of SVG/SMIL we have several atoms mapped to the same
-// id, but we can rely on ID_TO_EVENT to map id to only one atom.
+// id, but we can rely on MESSAGE_TO_EVENT to map id to only one atom.
 static bool
 ShouldAddEventToStringEventTable(const EventNameMapping& aMapping)
 {
   switch(aMapping.mMessage) {
-#define ID_TO_EVENT(name_, message_, type_, struct_) \
+#define MESSAGE_TO_EVENT(name_, message_, type_, struct_) \
   case message_: return nsGkAtoms::on##name_ == aMapping.mAtom;
 #include "mozilla/EventNameList.h"
-#undef ID_TO_EVENT
+#undef MESSAGE_TO_EVENT
   default:
     break;
   }
@@ -1334,6 +1361,7 @@ nsContentUtils::ParseSandboxAttributeToFlags(const nsAttrValue* sandboxAttr)
                | SANDBOXED_SCRIPTS
                | SANDBOXED_AUTOMATIC_FEATURES
                | SANDBOXED_POINTER_LOCK
+               | SANDBOXED_ORIENTATION_LOCK
                | SANDBOXED_DOMAIN;
 
 // Macro for updating the flag according to the keywords
@@ -1345,6 +1373,7 @@ nsContentUtils::ParseSandboxAttributeToFlags(const nsAttrValue* sandboxAttr)
   IF_KEYWORD(allowscripts, SANDBOXED_SCRIPTS | SANDBOXED_AUTOMATIC_FEATURES)
   IF_KEYWORD(allowtopnavigation, SANDBOXED_TOPLEVEL_NAVIGATION)
   IF_KEYWORD(allowpointerlock, SANDBOXED_POINTER_LOCK)
+  IF_KEYWORD(alloworientationlock, SANDBOXED_ORIENTATION_LOCK)
   IF_KEYWORD(allowpopups, SANDBOXED_AUXILIARY_NAVIGATION)
 
   return out;
@@ -1723,9 +1752,37 @@ nsContentUtils::ParseLegacyFontSize(const nsAString& aValue)
 }
 
 /* static */
+bool
+nsContentUtils::IsControlledByServiceWorker(nsIDocument* aDocument)
+{
+  if (!ServiceWorkerInterceptionEnabled() ||
+      nsContentUtils::IsInPrivateBrowsing(aDocument)) {
+    return false;
+  }
+
+  nsRefPtr<workers::ServiceWorkerManager> swm =
+    workers::ServiceWorkerManager::GetInstance();
+  MOZ_ASSERT(swm);
+
+  ErrorResult rv;
+  bool controlled = swm->IsControlled(aDocument, rv);
+  NS_WARN_IF(rv.Failed());
+
+  return !rv.Failed() && controlled;
+}
+
+/* static */
 void
 nsContentUtils::GetOfflineAppManifest(nsIDocument *aDocument, nsIURI **aURI)
 {
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(aDocument);
+  *aURI = nullptr;
+
+  if (IsControlledByServiceWorker(aDocument)) {
+    return;
+  }
+
   Element* docElement = aDocument->GetRootElement();
   if (!docElement) {
     return;
@@ -1736,7 +1793,7 @@ nsContentUtils::GetOfflineAppManifest(nsIDocument *aDocument, nsIURI **aURI)
 
   // Manifest URIs can't have fragment identifiers.
   if (manifestSpec.IsEmpty() ||
-      manifestSpec.FindChar('#') != kNotFound) {
+      manifestSpec.Contains('#')) {
     return;
   }
 
@@ -3444,6 +3501,8 @@ nsContentUtils::MaybeReportInterceptionErrorToConsole(nsIDocument* aDocument,
     messageName = "InterceptedUsedResponse";
   } else if (aError == NS_ERROR_CLIENT_REQUEST_OPAQUE_INTERCEPTION) {
     messageName = "ClientRequestOpaqueInterception";
+  } else if (aError == NS_ERROR_BAD_OPAQUE_REDIRECT_INTERCEPTION) {
+    messageName = "BadOpaqueRedirectInterception";
   }
 
   if (messageName) {
@@ -3557,14 +3616,14 @@ nsContentUtils::IsPlainTextType(const nsACString& aContentType)
   return aContentType.EqualsLiteral(TEXT_PLAIN) ||
          aContentType.EqualsLiteral(TEXT_CSS) ||
          aContentType.EqualsLiteral(TEXT_CACHE_MANIFEST) ||
-         aContentType.EqualsLiteral(TEXT_VTT) ||
          aContentType.EqualsLiteral(APPLICATION_JAVASCRIPT) ||
          aContentType.EqualsLiteral(APPLICATION_XJAVASCRIPT) ||
          aContentType.EqualsLiteral(TEXT_ECMASCRIPT) ||
          aContentType.EqualsLiteral(APPLICATION_ECMASCRIPT) ||
          aContentType.EqualsLiteral(TEXT_JAVASCRIPT) ||
          aContentType.EqualsLiteral(APPLICATION_JSON) ||
-         aContentType.EqualsLiteral(TEXT_JSON);
+         aContentType.EqualsLiteral(TEXT_JSON) ||
+         aContentType.EqualsLiteral(TEXT_VTT);
 }
 
 bool
@@ -3670,7 +3729,7 @@ nsContentUtils::GetEventMessage(nsIAtom* aName)
     }
   }
 
-  return NS_USER_DEFINED_EVENT;
+  return eUnidentifiedEvent;
 }
 
 // static
@@ -3693,7 +3752,7 @@ nsContentUtils::GetEventMessageAndAtom(const nsAString& aName,
   if (sStringEventTable->Get(aName, &mapping)) {
     *aEventMessage =
       mapping.mEventClassID == aEventClassID ? mapping.mMessage :
-                                               NS_USER_DEFINED_EVENT;
+                                               eUnidentifiedEvent;
     return mapping.mAtom;
   }
 
@@ -3706,11 +3765,11 @@ nsContentUtils::GetEventMessageAndAtom(const nsAString& aName,
     }
   }
 
-  *aEventMessage = NS_USER_DEFINED_EVENT;
+  *aEventMessage = eUnidentifiedEvent;
   nsCOMPtr<nsIAtom> atom = do_GetAtom(NS_LITERAL_STRING("on") + aName);
   sUserDefinedEvents->AppendObject(atom);
   mapping.mAtom = atom;
-  mapping.mMessage = NS_USER_DEFINED_EVENT;
+  mapping.mMessage = eUnidentifiedEvent;
   mapping.mType = EventNameType_None;
   mapping.mEventClassID = eBasicEventClass;
   sStringEventTable->Put(aName, mapping);
@@ -4073,7 +4132,7 @@ nsContentUtils::MaybeFireNodeRemoved(nsINode* aChild, nsINode* aParent,
 
   if (HasMutationListeners(aChild,
         NS_EVENT_BITS_MUTATION_NODEREMOVED, aParent)) {
-    InternalMutationEvent mutation(true, NS_MUTATION_NODEREMOVED);
+    InternalMutationEvent mutation(true, eLegacyNodeRemoved);
     mutation.mRelatedNode = do_QueryInterface(aParent);
 
     mozAutoSubtreeModified subtree(aOwnerDoc, aParent);
@@ -5216,7 +5275,6 @@ nsContentUtils::LeaveMicroTask()
   MOZ_ASSERT(NS_IsMainThread());
   if (--sMicroTaskLevel == 0) {
     PerformMainThreadMicroTaskCheckpoint();
-    nsDocument::ProcessBaseElementQueue();
   }
 }
 
@@ -5400,8 +5458,8 @@ nsContentUtils::SetDataTransferInEvent(WidgetDragEvent* aDragEvent)
   // For draggesture and dragstart events, the data transfer object is
   // created before the event fires, so it should already be set. For other
   // drag events, get the object from the drag session.
-  NS_ASSERTION(aDragEvent->mMessage != NS_DRAGDROP_GESTURE &&
-               aDragEvent->mMessage != NS_DRAGDROP_START,
+  NS_ASSERTION(aDragEvent->mMessage != eLegacyDragGesture &&
+               aDragEvent->mMessage != eDragStart,
                "draggesture event created without a dataTransfer");
 
   nsCOMPtr<nsIDragSession> dragSession = GetDragSession();
@@ -5428,8 +5486,8 @@ nsContentUtils::SetDataTransferInEvent(WidgetDragEvent* aDragEvent)
   }
 
   bool isCrossDomainSubFrameDrop = false;
-  if (aDragEvent->mMessage == NS_DRAGDROP_DROP ||
-      aDragEvent->mMessage == NS_DRAGDROP_DRAGDROP) {
+  if (aDragEvent->mMessage == eDrop ||
+      aDragEvent->mMessage == eLegacyDragDrop) {
     isCrossDomainSubFrameDrop = CheckForSubFrameDrop(dragSession, aDragEvent);
   }
 
@@ -5443,16 +5501,15 @@ nsContentUtils::SetDataTransferInEvent(WidgetDragEvent* aDragEvent)
   // for the dragenter and dragover events, initialize the drop effect
   // from the drop action, which platform specific widget code sets before
   // the event is fired based on the keyboard state.
-  if (aDragEvent->mMessage == NS_DRAGDROP_ENTER ||
-      aDragEvent->mMessage == NS_DRAGDROP_OVER) {
+  if (aDragEvent->mMessage == eDragEnter || aDragEvent->mMessage == eDragOver) {
     uint32_t action, effectAllowed;
     dragSession->GetDragAction(&action);
     aDragEvent->dataTransfer->GetEffectAllowedInt(&effectAllowed);
     aDragEvent->dataTransfer->SetDropEffectInt(FilterDropEffect(action, effectAllowed));
   }
-  else if (aDragEvent->mMessage == NS_DRAGDROP_DROP ||
-           aDragEvent->mMessage == NS_DRAGDROP_DRAGDROP ||
-           aDragEvent->mMessage == NS_DRAGDROP_END) {
+  else if (aDragEvent->mMessage == eDrop ||
+           aDragEvent->mMessage == eLegacyDragDrop ||
+           aDragEvent->mMessage == eDragEnd) {
     // For the drop and dragend events, set the drop effect based on the
     // last value that the dropEffect had. This will have been set in
     // EventStateManager::PostHandleEvent for the last dragenter or
@@ -6734,6 +6791,13 @@ nsContentUtils::IsCutCopyAllowed()
 
 /* static */
 bool
+nsContentUtils::IsFrameTimingEnabled()
+{
+  return sIsFrameTimingPrefEnabled;
+}
+
+/* static */
+bool
 nsContentUtils::HaveEqualPrincipals(nsIDocument* aDoc1, nsIDocument* aDoc2)
 {
   if (!aDoc1 || !aDoc2) {
@@ -7109,7 +7173,7 @@ nsContentUtils::IsForbiddenSystemRequestHeader(const nsACString& aHeader)
     "access-control-request-method", "connection", "content-length",
     "cookie", "cookie2", "content-transfer-encoding", "date", "dnt",
     "expect", "host", "keep-alive", "origin", "referer", "te", "trailer",
-    "transfer-encoding", "upgrade", "user-agent", "via"
+    "transfer-encoding", "upgrade", "via"
   };
   for (uint32_t i = 0; i < ArrayLength(kInvalidHeaders); ++i) {
     if (aHeader.LowerCaseEqualsASCII(kInvalidHeaders[i])) {
@@ -7634,7 +7698,7 @@ nsContentUtils::GetViewToDispatchEvent(nsPresContext* presContext,
 }
 
 nsresult
-nsContentUtils::SendKeyEvent(nsCOMPtr<nsIWidget> aWidget,
+nsContentUtils::SendKeyEvent(nsIWidget* aWidget,
                              const nsAString& aType,
                              int32_t aKeyCode,
                              int32_t aCharCode,
@@ -7648,18 +7712,18 @@ nsContentUtils::SendKeyEvent(nsCOMPtr<nsIWidget> aWidget,
 
   EventMessage msg;
   if (aType.EqualsLiteral("keydown"))
-    msg = NS_KEY_DOWN;
+    msg = eKeyDown;
   else if (aType.EqualsLiteral("keyup"))
-    msg = NS_KEY_UP;
+    msg = eKeyUp;
   else if (aType.EqualsLiteral("keypress"))
-    msg = NS_KEY_PRESS;
+    msg = eKeyPress;
   else
     return NS_ERROR_FAILURE;
 
   WidgetKeyboardEvent event(true, msg, aWidget);
   event.modifiers = GetWidgetModifiers(aModifiers);
 
-  if (msg == NS_KEY_PRESS) {
+  if (msg == eKeyPress) {
     event.keyCode = aCharCode ? 0 : aKeyCode;
     event.charCode = aCharCode;
   } else {
@@ -7762,20 +7826,20 @@ nsContentUtils::SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
   EventMessage msg;
   bool contextMenuKey = false;
   if (aType.EqualsLiteral("mousedown"))
-    msg = NS_MOUSE_BUTTON_DOWN;
+    msg = eMouseDown;
   else if (aType.EqualsLiteral("mouseup"))
-    msg = NS_MOUSE_BUTTON_UP;
+    msg = eMouseUp;
   else if (aType.EqualsLiteral("mousemove"))
-    msg = NS_MOUSE_MOVE;
+    msg = eMouseMove;
   else if (aType.EqualsLiteral("mouseover"))
-    msg = NS_MOUSE_ENTER_WIDGET;
+    msg = eMouseEnterIntoWidget;
   else if (aType.EqualsLiteral("mouseout"))
-    msg = NS_MOUSE_EXIT_WIDGET;
+    msg = eMouseExitFromWidget;
   else if (aType.EqualsLiteral("contextmenu")) {
-    msg = NS_CONTEXTMENU;
+    msg = eContextMenu;
     contextMenuKey = (aButton == 0);
   } else if (aType.EqualsLiteral("MozMouseHittest"))
-    msg = NS_MOUSE_MOZHITTEST;
+    msg = eMouseHitTest;
   else
     return NS_ERROR_FAILURE;
 
@@ -7893,13 +7957,13 @@ nsContentUtils::GetWindowRoot(nsIDocument* aDoc)
   return nullptr;
 }
 
-
 /* static */
 nsContentPolicyType
 nsContentUtils::InternalContentPolicyTypeToExternal(nsContentPolicyType aType)
 {
   switch (aType) {
   case nsIContentPolicy::TYPE_INTERNAL_SCRIPT:
+  case nsIContentPolicy::TYPE_INTERNAL_SCRIPT_PRELOAD:
   case nsIContentPolicy::TYPE_INTERNAL_WORKER:
   case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
   case nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER:
@@ -7921,6 +7985,14 @@ nsContentUtils::InternalContentPolicyTypeToExternal(nsContentPolicyType aType)
   case nsIContentPolicy::TYPE_INTERNAL_XMLHTTPREQUEST:
   case nsIContentPolicy::TYPE_INTERNAL_EVENTSOURCE:
     return nsIContentPolicy::TYPE_XMLHTTPREQUEST;
+
+  case nsIContentPolicy::TYPE_INTERNAL_IMAGE:
+  case nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD:
+    return nsIContentPolicy::TYPE_IMAGE;
+
+  case nsIContentPolicy::TYPE_INTERNAL_STYLESHEET:
+  case nsIContentPolicy::TYPE_INTERNAL_STYLESHEET_PRELOAD:
+    return nsIContentPolicy::TYPE_STYLESHEET;
 
   default:
     return aType;
@@ -8061,4 +8133,131 @@ nsContentUtils::PushEnabled(JSContext* aCx, JSObject* aObj)
   }
 
   return workerPrivate->PushEnabled();
+}
+
+// static
+bool
+nsContentUtils::IsWorkerLoad(nsContentPolicyType aType)
+{
+  return aType == nsIContentPolicy::TYPE_INTERNAL_WORKER ||
+         aType == nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER;
+}
+
+// static, public
+nsContentUtils::StorageAccess
+nsContentUtils::StorageAllowedForWindow(nsPIDOMWindow* aWindow)
+{
+  MOZ_ASSERT(aWindow->IsInnerWindow());
+
+  nsIDocument* document = aWindow->GetExtantDoc();
+  if (document) {
+    nsCOMPtr<nsIPrincipal> principal = document->NodePrincipal();
+    return InternalStorageAllowedForPrincipal(principal, aWindow);
+  }
+
+  return StorageAccess::eDeny;
+}
+
+// static, public
+nsContentUtils::StorageAccess
+nsContentUtils::StorageAllowedForPrincipal(nsIPrincipal* aPrincipal)
+{
+  return InternalStorageAllowedForPrincipal(aPrincipal, nullptr);
+}
+
+// static, private
+nsContentUtils::StorageAccess
+nsContentUtils::InternalStorageAllowedForPrincipal(nsIPrincipal* aPrincipal,
+                                                   nsPIDOMWindow* aWindow)
+{
+  MOZ_ASSERT(aPrincipal);
+  MOZ_ASSERT(!aWindow || aWindow->IsInnerWindow());
+
+  StorageAccess access = StorageAccess::eAllow;
+
+  // We don't allow storage on the null principal, in general. Even if the
+  // calling context is chrome.
+  bool isNullPrincipal;
+  if (NS_WARN_IF(NS_FAILED(aPrincipal->GetIsNullPrincipal(&isNullPrincipal))) ||
+      isNullPrincipal) {
+    return StorageAccess::eDeny;
+  }
+
+  if (aWindow) {
+    // If the document is sandboxed, then it is not permitted to use storage
+    nsIDocument* document = aWindow->GetExtantDoc();
+    if (document->GetSandboxFlags() & SANDBOXED_ORIGIN) {
+      return StorageAccess::eDeny;
+    }
+
+    // Check if we are in private browsing, and record that fact
+    if (IsInPrivateBrowsing(document)) {
+      access = StorageAccess::ePrivateBrowsing;
+    }
+  }
+
+  // Check if we should only allow storage for the session, and record that fact
+  if (sCookiesLifetimePolicy == nsICookieService::ACCEPT_SESSION) {
+    // Storage could be StorageAccess::ePrivateBrowsing or StorageAccess::eAllow
+    // so perform a std::min comparison to make sure we preserve ePrivateBrowsing
+    // if it has been set.
+    access = std::min(StorageAccess::eSessionScoped, access);
+  }
+
+  // About URIs are allowed to access storage, even if they don't have chrome
+  // privileges. If this is not desired, than the consumer will have to
+  // implement their own restriction functionality.
+  nsCOMPtr<nsIURI> uri;
+  nsresult rv = aPrincipal->GetURI(getter_AddRefs(uri));
+  if (NS_SUCCEEDED(rv) && uri) {
+    bool isAbout = false;
+    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(uri->SchemeIs("about", &isAbout)));
+    if (isAbout) {
+      return access;
+    }
+  }
+
+  nsCOMPtr<nsIPermissionManager> permissionManager =
+    services::GetPermissionManager();
+  if (!permissionManager) {
+    return StorageAccess::eDeny;
+  }
+
+  // check the permission manager for any allow or deny permissions
+  // for cookies for the window.
+  uint32_t perm;
+  permissionManager->TestPermissionFromPrincipal(aPrincipal, "cookie", &perm);
+  if (perm == nsIPermissionManager::DENY_ACTION) {
+    return StorageAccess::eDeny;
+  } else if (perm == nsICookiePermission::ACCESS_SESSION) {
+    return std::min(access, StorageAccess::eSessionScoped);
+  } else if (perm == nsIPermissionManager::ALLOW_ACTION) {
+    return access;
+  }
+
+  // We don't want to prompt for every attempt to access permissions.
+  if (sCookiesBehavior == nsICookieService::BEHAVIOR_REJECT) {
+    return StorageAccess::eDeny;
+  }
+
+  // In the absense of a window, we assume that we are first-party.
+  if (aWindow && (sCookiesBehavior == nsICookieService::BEHAVIOR_REJECT_FOREIGN ||
+                  sCookiesBehavior == nsICookieService::BEHAVIOR_LIMIT_FOREIGN)) {
+    nsCOMPtr<mozIThirdPartyUtil> thirdPartyUtil =
+      do_GetService(THIRDPARTYUTIL_CONTRACTID);
+    MOZ_ASSERT(thirdPartyUtil);
+
+    bool thirdPartyWindow = false;
+    if (NS_SUCCEEDED(thirdPartyUtil->IsThirdPartyWindow(
+          aWindow, nullptr, &thirdPartyWindow)) && thirdPartyWindow) {
+      // XXX For non-cookie forms of storage, we handle BEHAVIOR_LIMIT_FOREIGN by
+      // simply rejecting the request to use the storage. In the future, if we
+      // change the meaning of BEHAVIOR_LIMIT_FOREIGN to be one which makes sense
+      // for non-cookie storage types, this may change.
+
+      return StorageAccess::eDeny;
+    }
+  }
+
+  return access;
 }

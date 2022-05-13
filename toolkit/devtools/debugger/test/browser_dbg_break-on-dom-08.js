@@ -14,7 +14,7 @@ function test() {
     let gView = gDebugger.DebuggerView;
     let gEvents = gView.EventListeners;
 
-    Task.spawn(function() {
+    Task.spawn(function*() {
       yield waitForSourceShown(aPanel, ".html");
       yield callInTab(gTab, "addBodyClickEventListener");
 
@@ -34,7 +34,7 @@ function test() {
       yield ensureThreadClientState(aPanel, "resumed");
 
       let paused = waitForCaretAndScopes(aPanel, 48);
-      sendMouseClickToTab(gTab, content.document.body);
+      generateMouseClickInTab(gTab, "content.document.body");
       yield paused;
       yield ensureThreadClientState(aPanel, "paused");
 

@@ -137,8 +137,7 @@ public:
   void FailConnection(uint16_t reasonCode,
                       const nsACString& aReasonString = EmptyCString());
   nsresult CloseConnection(uint16_t reasonCode,
-                           const nsACString& aReasonString = EmptyCString(),
-                           bool aCanceling = false);
+                           const nsACString& aReasonString = EmptyCString());
   nsresult Disconnect();
   void DisconnectInternal();
 
@@ -399,38 +398,6 @@ WebSocketImpl::PrintErrorOnConsole(const char *aBundleURI,
 
 namespace {
 
-class CloseRunnable final : public WorkerMainThreadRunnable
-{
-public:
-  CloseRunnable(WebSocketImpl* aImpl, uint16_t aReasonCode,
-                const nsACString& aReasonString)
-    : WorkerMainThreadRunnable(aImpl->mWorkerPrivate)
-    , mImpl(aImpl)
-    , mReasonCode(aReasonCode)
-    , mReasonString(aReasonString)
-    , mRv(NS_ERROR_FAILURE)
-  { }
-
-  bool MainThreadRun() override
-  {
-    mRv = mImpl->mChannel->Close(mReasonCode, mReasonString);
-    return true;
-  }
-
-  nsresult ErrorCode() const
-  {
-    return mRv;
-  }
-
-private:
-  // A raw pointer because this runnable is sync.
-  WebSocketImpl* mImpl;
-
-  uint16_t mReasonCode;
-  const nsACString& mReasonString;
-  nsresult mRv;
-};
-
 class CancelWebSocketRunnable final : public nsRunnable
 {
 public:
@@ -505,8 +472,7 @@ private:
 
 nsresult
 WebSocketImpl::CloseConnection(uint16_t aReasonCode,
-                               const nsACString& aReasonString,
-                               bool aCanceling)
+                               const nsACString& aReasonString)
 {
   if (!IsTargetThread()) {
     nsRefPtr<nsRunnable> runnable =
@@ -515,7 +481,6 @@ WebSocketImpl::CloseConnection(uint16_t aReasonCode,
   }
 
   AssertIsOnTargetThread();
-  MOZ_ASSERT(!NS_IsMainThread() || !aCanceling);
 
   if (mDisconnectingOrDisconnected) {
     return NS_OK;
@@ -542,16 +507,9 @@ WebSocketImpl::CloseConnection(uint16_t aReasonCode,
       return mChannel->Close(aReasonCode, aReasonString);
     }
 
-    if (aCanceling) {
-      nsRefPtr<CancelWebSocketRunnable> runnable =
-        new CancelWebSocketRunnable(mChannel, aReasonCode, aReasonString);
-      return NS_DispatchToMainThread(runnable);
-    }
-
-    nsRefPtr<CloseRunnable> runnable =
-      new CloseRunnable(this, aReasonCode, aReasonString);
-    runnable->Dispatch(mWorkerPrivate->GetJSContext());
-    return runnable->ErrorCode();
+    nsRefPtr<CancelWebSocketRunnable> runnable =
+      new CancelWebSocketRunnable(mChannel, aReasonCode, aReasonString);
+    return NS_DispatchToMainThread(runnable);
   }
 
   // No channel, but not disconnected: canceled or failed early
@@ -652,10 +610,6 @@ WebSocketImpl::Disconnect()
 
   AssertIsOnTargetThread();
 
-  // DontKeepAliveAnyMore() can release the object. So hold a reference to this
-  // until the end of the method.
-  nsRefPtr<WebSocketImpl> kungfuDeathGrip = this;
-
   // Disconnect can be called from some control event (such as Notify() of
   // WorkerFeature). This will be schedulated before any other sync/async
   // runnable. In order to prevent some double Disconnect() calls, we use this
@@ -672,6 +626,10 @@ WebSocketImpl::Disconnect()
       new DisconnectInternalRunnable(this);
     runnable->Dispatch(mWorkerPrivate->GetJSContext());
   }
+
+  // DontKeepAliveAnyMore() can release the object. So hold a reference to this
+  // until the end of the method.
+  nsRefPtr<WebSocketImpl> kungfuDeathGrip = this;
 
   nsCOMPtr<nsIThread> mainThread;
   if (NS_FAILED(NS_GetMainThread(getter_AddRefs(mainThread))) ||
@@ -1930,9 +1888,9 @@ WebSocketImpl::ParseURL(const nsAString& aURL)
   nsCOMPtr<nsIURL> parsedURL = do_QueryInterface(uri, &rv);
   NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_SYNTAX_ERR);
 
-  nsAutoCString fragment;
-  rv = parsedURL->GetRef(fragment);
-  NS_ENSURE_TRUE(NS_SUCCEEDED(rv) && fragment.IsEmpty(),
+  bool hasRef;
+  rv = parsedURL->GetHasRef(&hasRef);
+  NS_ENSURE_TRUE(NS_SUCCEEDED(rv) && !hasRef,
                  NS_ERROR_DOM_SYNTAX_ERR);
 
   nsAutoCString scheme;
@@ -1949,7 +1907,7 @@ WebSocketImpl::ParseURL(const nsAString& aURL)
   NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_SYNTAX_ERR);
 
   rv = NS_CheckPortSafety(port, scheme.get());
-  NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_SYNTAX_ERR);
+  NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_SECURITY_ERR);
 
   nsAutoCString filePath;
   rv = parsedURL->GetFilePath(filePath);
@@ -1992,11 +1950,10 @@ WebSocketImpl::ParseURL(const nsAString& aURL)
     }
   }
 
-  mWebSocket->mOriginalURL = aURL;
-
   rv = parsedURL->GetSpec(mURI);
   MOZ_ASSERT(NS_SUCCEEDED(rv));
 
+  CopyUTF8toUTF16(mURI, mWebSocket->mURI);
   return NS_OK;
 }
 
@@ -2099,7 +2056,7 @@ public:
       }
 
       mWebSocketImpl->CloseConnection(nsIWebSocketChannel::CLOSE_GOING_AWAY,
-                                      EmptyCString(), true);
+                                      EmptyCString());
     }
 
     return true;
@@ -2255,7 +2212,7 @@ WebSocket::GetUrl(nsAString& aURL)
   AssertIsOnTargetThread();
 
   if (mEffectiveURL.IsEmpty()) {
-    aURL = mOriginalURL;
+    aURL = mURI;
   } else {
     aURL = mEffectiveURL;
   }
@@ -2486,7 +2443,7 @@ WebSocketImpl::GetName(nsACString& aName)
 {
   AssertIsOnMainThread();
 
-  CopyUTF16toUTF8(mWebSocket->mOriginalURL, aName);
+  CopyUTF16toUTF8(mWebSocket->mURI, aName);
   return NS_OK;
 }
 

@@ -59,7 +59,8 @@ using mozilla::ipc::PrincipalInfo;
 BEGIN_WORKERS_NAMESPACE
 
 WorkerGlobalScope::WorkerGlobalScope(WorkerPrivate* aWorkerPrivate)
-: mWorkerPrivate(aWorkerPrivate)
+: mWindowInteractionsAllowed(0)
+, mWorkerPrivate(aWorkerPrivate)
 {
   mWorkerPrivate->AssertIsOnWorkerThread();
 }
@@ -357,8 +358,9 @@ WorkerGlobalScope::GetIndexedDB(ErrorResult& aErrorResult)
   nsRefPtr<IDBFactory> indexedDB = mIndexedDB;
 
   if (!indexedDB) {
-    if (!mWorkerPrivate->IsIndexedDBAllowed()) {
+    if (!mWorkerPrivate->IsStorageAllowed()) {
       NS_WARNING("IndexedDB is not allowed in this worker!");
+      aErrorResult = NS_ERROR_DOM_SECURITY_ERR;
       return nullptr;
     }
 
@@ -416,6 +418,20 @@ DedicatedWorkerGlobalScope::WrapGlobalObject(JSContext* aCx,
 
   JS::CompartmentOptions options;
   mWorkerPrivate->CopyJSCompartmentOptions(options);
+
+  const bool usesSystemPrincipal = mWorkerPrivate->UsesSystemPrincipal();
+
+  // Note that xpc::ShouldDiscardSystemSource() and
+  // xpc::ExtraWarningsForSystemJS() read prefs that are cached on the main
+  // thread. This is benignly racey.
+  const bool discardSource = (usesSystemPrincipal ||
+                              mWorkerPrivate->IsInPrivilegedApp()) &&
+                             xpc::ShouldDiscardSystemSource();
+  const bool extraWarnings = usesSystemPrincipal &&
+                             xpc::ExtraWarningsForSystemJS();
+
+  options.setDiscardSource(discardSource)
+         .extraWarningsOverride().set(extraWarnings);
 
   return DedicatedWorkerGlobalScopeBinding_workers::Wrap(aCx, this, this,
                                                          options,

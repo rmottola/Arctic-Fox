@@ -442,6 +442,12 @@ function waitForClientEvents(aPanel, aEventName, aEventRepeat = 1) {
   return deferred.promise;
 }
 
+function waitForClipboardPromise(setup, expected) {
+  return new Promise((resolve, reject) => {
+    SimpleTest.waitForClipboard(expected, setup, resolve, reject);
+  });
+}
+
 function ensureThreadClientState(aPanel, aState) {
   let thread = aPanel.panelWin.gThreadClient;
   let state = thread.state;
@@ -507,9 +513,13 @@ function getTab(aTarget, aWindow) {
 }
 
 function getSources(aClient) {
+  info("Getting sources.");
+
   let deferred = promise.defer();
 
-  aClient.getSources(({sources}) => deferred.resolve(sources));
+  aClient.getSources((packet) => {
+    deferred.resolve(packet.sources);
+  });
 
   return deferred.promise;
 }
@@ -722,8 +732,8 @@ function prepareDebugger(aDebugger) {
     let view = aDebugger.panelWin.DebuggerView;
     view.Variables.lazyEmpty = false;
     view.Variables.lazySearch = false;
-    view.FilteredSources._autoSelectFirstItem = true;
-    view.FilteredFunctions._autoSelectFirstItem = true;
+    view.Filtering.FilteredSources._autoSelectFirstItem = true;
+    view.Filtering.FilteredFunctions._autoSelectFirstItem = true;
   } else {
     // Nothing to do here yet.
   }
@@ -954,51 +964,6 @@ function popPrefs() {
   return deferred.promise;
 }
 
-function sendMessageToTab(tab, name, data, objects) {
-  info("Sending message with name " + name + " to tab.");
-
-  tab.linkedBrowser.messageManager.sendAsyncMessage(name, data, objects);
-}
-
-function waitForMessageFromTab(tab, name) {
-  info("Waiting for message with name " + name + " from tab.");
-
-  return new Promise(function (resolve) {
-    let messageManager = tab.linkedBrowser.messageManager;
-    messageManager.addMessageListener(name, function listener(message) {
-      messageManager.removeMessageListener(name, listener);
-      resolve(message);
-    });
-  });
-}
-
-function callInTab(tab, name) {
-  info("Calling function with name " + name + " in tab.");
-
-  sendMessageToTab(tab, "test:call", {
-    name: name,
-    args: Array.prototype.slice.call(arguments, 2)
-  });
-  waitForMessageFromTab(tab, "test:call");
-}
-
-function evalInTab(tab, string) {
-  info("Evalling string " + string + " in tab.");
-
-  sendMessageToTab(tab, "test:eval", {
-    string: string,
-  });
-  waitForMessageFromTab(tab, "test:eval");
-}
-
-function sendMouseClickToTab(tab, target) {
-  info("Sending mouse click to tab.");
-
-  sendMessageToTab(tab, "test:click", undefined, {
-    target: target
-  });
-}
-
 // Source helpers
 
 function getSelectedSourceURL(aSources) {
@@ -1019,4 +984,238 @@ function getSourceActor(aSources, aURL) {
 function getSourceForm(aSources, aURL) {
   let item = aSources.getItemByValue(getSourceActor(gSources, aURL));
   return item.attachment.source;
+}
+
+let nextId = 0;
+
+function jsonrpc(tab, method, params) {
+  return new Promise(function (resolve, reject) {
+    let currentId = nextId++;
+    let messageManager = tab.linkedBrowser.messageManager;
+    messageManager.sendAsyncMessage("jsonrpc", {
+      method: method,
+      params: params,
+      id: currentId
+    });
+    messageManager.addMessageListener("jsonrpc", function listener({
+      data: { result, error, id }
+    }) {
+      if (id !== currentId) {
+        return;
+      }
+
+      messageManager.removeMessageListener("jsonrpc", listener);
+      if (error != null) {
+         reject(error);
+      }
+
+      resolve(result);
+    });
+  });
+}
+
+function callInTab(tab, name) {
+  info("Calling function with name '" + name + "' in tab.");
+
+  return jsonrpc(tab, "call", [name, Array.prototype.slice.call(arguments, 2)]);
+}
+
+function evalInTab(tab, string) {
+  info("Evalling string in tab.");
+
+  return jsonrpc(tab, "_eval", [string]);
+}
+
+function createWorkerInTab(tab, url) {
+  info("Creating worker with url '" + url + "' in tab.");
+
+  return jsonrpc(tab, "createWorker", [url]);
+}
+
+function terminateWorkerInTab(tab, url) {
+  info("Terminating worker with url '" + url + "' in tab.");
+
+  return jsonrpc(tab, "terminateWorker", [url]);
+}
+
+function postMessageToWorkerInTab(tab, url, message) {
+  info("Posting message to worker with url '" + url + "' in tab.");
+
+  return jsonrpc(tab, "postMessageToWorker", [url, message]);
+}
+
+function generateMouseClickInTab(tab, path) {
+  info("Generating mouse click in tab.");
+
+  return jsonrpc(tab, "generateMouseClick", [path]);
+}
+
+function connect(client) {
+  info("Connecting client.");
+  return new Promise(function (resolve) {
+    client.connect(function () {
+      resolve();
+    });
+  });
+}
+
+function close(client) {
+  info("Closing client.\n");
+  return new Promise(function (resolve) {
+    client.close(() => {
+      resolve();
+    });
+  });
+}
+
+function listTabs(client) {
+  info("Listing tabs.");
+  return new Promise(function (resolve) {
+    client.listTabs(function (response) {
+      resolve(response);
+    });
+  });
+}
+
+function findTab(tabs, url) {
+  info("Finding tab with url '" + url + "'.");
+  for (let tab of tabs) {
+    if (tab.url === url) {
+      return tab;
+    }
+  }
+  return null;
+}
+
+function attachTab(client, tab) {
+  info("Attaching to tab with url '" + tab.url + "'.");
+  return new Promise(function (resolve) {
+    client.attachTab(tab.actor, function (response, tabClient) {
+      resolve([response, tabClient]);
+    });
+  });
+}
+
+function listWorkers(tabClient) {
+  info("Listing workers.");
+  return new Promise(function (resolve) {
+    tabClient.listWorkers(function (response) {
+      resolve(response);
+    });
+  });
+}
+
+function findWorker(workers, url) {
+  info("Finding worker with url '" + url + "'.");
+  for (let worker of workers) {
+    if (worker.url === url) {
+      return worker;
+    }
+  }
+  return null;
+}
+
+function attachWorker(tabClient, worker) {
+  info("Attaching to worker with url '" + worker.url + "'.");
+  return new Promise(function(resolve, reject) {
+    tabClient.attachWorker(worker.actor, function (response, workerClient) {
+      resolve([response, workerClient]);
+    });
+  });
+}
+
+function waitForWorkerListChanged(tabClient) {
+  info("Waiting for worker list to change.");
+  return new Promise(function (resolve) {
+    tabClient.addListener("workerListChanged", function listener() {
+      tabClient.removeListener("workerListChanged", listener);
+      resolve();
+    });
+  });
+}
+
+function attachThread(workerClient, options) {
+  info("Attaching to thread.");
+  return new Promise(function(resolve, reject) {
+    workerClient.attachThread(options, function (response, threadClient) {
+      resolve([response, threadClient]);
+    });
+  });
+}
+
+function waitForWorkerClose(workerClient) {
+  info("Waiting for worker to close.");
+  return new Promise(function (resolve) {
+    workerClient.addOneTimeListener("close", function () {
+      info("Worker did close.");
+      resolve();
+    });
+  });
+}
+
+function waitForWorkerFreeze(workerClient) {
+  info("Waiting for worker to freeze.");
+  return new Promise(function (resolve) {
+    workerClient.addOneTimeListener("freeze", function () {
+      resolve();
+    });
+  });
+}
+
+function waitForWorkerThaw(workerClient) {
+  info("Waiting for worker to thaw.");
+  return new Promise(function (resolve) {
+    workerClient.addOneTimeListener("thaw", function () {
+      resolve();
+    });
+  });
+}
+
+function resume(threadClient) {
+  info("Resuming thread.");
+  return rdpInvoke(threadClient, threadClient.resume);
+}
+
+function findSource(sources, url) {
+  info("Finding source with url '" + url + "'.\n");
+  for (let source of sources) {
+    if (source.url === url) {
+      return source;
+    }
+  }
+  return null;
+}
+
+function setBreakpoint(sourceClient, location) {
+  info("Setting breakpoint.\n");
+  return new Promise(function (resolve) {
+    sourceClient.setBreakpoint(location, function (response, breakpointClient) {
+      resolve([response, breakpointClient]);
+    });
+  });
+}
+
+function waitForEvent(client, type, predicate) {
+  return new Promise(function (resolve) {
+    function listener(type, packet) {
+      if (!predicate(packet)) {
+        return;
+      }
+      client.removeListener(listener);
+      resolve(packet);
+    }
+
+    if (predicate) {
+      client.addListener(type, listener);
+    } else {
+      client.addOneTimeListener(type, function (type, packet) {
+        resolve(packet);
+      });
+    }
+  });
+}
+
+function waitForPause(threadClient) {
+  info("Waiting for pause.\n");
+  return waitForEvent(threadClient, "paused");
 }

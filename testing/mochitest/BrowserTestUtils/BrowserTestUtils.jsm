@@ -28,6 +28,9 @@ Cc["@mozilla.org/globalmessagemanager;1"]
   .loadFrameScript(
     "chrome://mochikit/content/tests/BrowserTestUtils/content-utils.js", true);
 
+XPCOMUtils.defineLazyModuleGetter(this, "E10SUtils",
+  "resource:///modules/E10SUtils.jsm");
+
 this.BrowserTestUtils = {
   /**
    * Loads a page in a new tab, executes a Task and closes the tab.
@@ -105,18 +108,20 @@ this.BrowserTestUtils = {
    * @resolves The tab switched to.
    */
   switchTab(tabbrowser, tab) {
+    let promise = new Promise(resolve => {
+      tabbrowser.addEventListener("TabSwitchDone", function onSwitch() {
+        tabbrowser.removeEventListener("TabSwitchDone", onSwitch);
+        TestUtils.executeSoon(() => resolve(tabbrowser.selectedTab));
+      });
+    });
+
     if (typeof tab == "function") {
       tab();
     }
     else {
       tabbrowser.selectedTab = tab;
     }
-
-    //XXX this is esr38, we do not have e10s, this is never async, we do not pass go
-    // and do not collect, err, I mean, we continue without waiting for an event:
-    return new Promise(resolve => {
-      TestUtils.executeSoon(() => resolve(tabbrowser.selectedTab));
-    });
+    return promise;
   },
 
   /**
@@ -147,6 +152,55 @@ this.BrowserTestUtils = {
       });
     });
   },
+
+  /**
+   * Waits for the next browser window to open and be fully loaded.
+   *
+   * @return {Promise}
+   *         A Promise which resolves the next time that a DOM window
+   *         opens and the delayed startup observer notification fires.
+   */
+  waitForNewWindow: Task.async(function* (delayedStartup=true) {
+    let win = yield this.domWindowOpened();
+
+    yield TestUtils.topicObserved("browser-delayed-startup-finished",
+                                   subject => subject == win);
+    return win;
+  }),
+
+  /**
+   * Loads a new URI in the given browser and waits until we really started
+   * loading. In e10s browser.loadURI() can be an asynchronous operation due
+   * to having to switch the browser's remoteness and keep its shistory data.
+   *
+   * @param {xul:browser} browser
+   *        A xul:browser.
+   * @param {string} uri
+   *        The URI to load.
+   *
+   * @return {Promise}
+   * @resolves When we started loading the given URI.
+   */
+  loadURI: Task.async(function* (browser, uri) {
+    // Load the new URI.
+    browser.loadURI(uri);
+
+    // Nothing to do in non-e10s mode.
+    if (!browser.ownerDocument.defaultView.gMultiProcessBrowser) {
+      return;
+    }
+
+    // Retrieve the given browser's current process type.
+    let process = browser.isRemoteBrowser ? Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT
+                                          : Ci.nsIXULRuntime.PROCESS_TYPE_DEFAULT;
+
+    // If the new URI can't load in the browser's current process then we
+    // should wait for the new frameLoader to be created. This will happen
+    // asynchronously when the browser's remoteness changes.
+    if (!E10SUtils.canLoadURIInProcess(uri, process)) {
+      yield this.waitForEvent(browser, "XULFrameLoaderCreated");
+    }
+  }),
 
   /**
    * @return {Promise}

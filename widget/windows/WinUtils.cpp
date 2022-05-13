@@ -945,10 +945,10 @@ WinUtils::GetIsMouseFromTouch(EventMessage aEventMessage)
 {
   const uint32_t MOZ_T_I_SIGNATURE = TABLET_INK_TOUCH | TABLET_INK_SIGNATURE;
   const uint32_t MOZ_T_I_CHECK_TCH = TABLET_INK_TOUCH | TABLET_INK_CHECK;
-  return ((aEventMessage == NS_MOUSE_MOVE ||
-           aEventMessage == NS_MOUSE_BUTTON_DOWN ||
-           aEventMessage == NS_MOUSE_BUTTON_UP ||
-           aEventMessage == NS_MOUSE_DOUBLECLICK) &&
+  return ((aEventMessage == eMouseMove ||
+           aEventMessage == eMouseDown ||
+           aEventMessage == eMouseUp ||
+           aEventMessage == eMouseDoubleClick) &&
          (GetMessageExtraInfo() & MOZ_T_I_SIGNATURE) == MOZ_T_I_CHECK_TCH);
 }
 
@@ -1108,8 +1108,8 @@ nsresult AsyncFaviconDataReady::OnFaviconDataNotAvailable(void)
   rv = NS_NewChannel(getter_AddRefs(channel),
                      mozIconURI,
                      nsContentUtils::GetSystemPrincipal(),
-                     nsILoadInfo::SEC_NORMAL,
-                     nsIContentPolicy::TYPE_IMAGE);
+                     nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                     nsIContentPolicy::TYPE_INTERNAL_IMAGE);
 
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -1118,8 +1118,7 @@ nsresult AsyncFaviconDataReady::OnFaviconDataNotAvailable(void)
   rv = NS_NewDownloader(getter_AddRefs(listener), downloadObserver, icoFile);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  channel->AsyncOpen(listener, nullptr);
-  return NS_OK;
+  return channel->AsyncOpen2(listener);
 }
 
 NS_IMETHODIMP
