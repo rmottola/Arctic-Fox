@@ -1585,6 +1585,7 @@ RasterImage::CanDownscaleDuringDecode(const IntSize& aSize, uint32_t aFlags)
   // image, we have all the source data and know our size, the flags allow us to
   // do it, and a 'good' filter is being used.
   if (!mDownscaleDuringDecode || !mHasSize ||
+      !gfxPrefs::ImageHQDownscalingEnabled() ||
       !(aFlags & imgIContainer::FLAG_HIGH_QUALITY_SCALING)) {
     return false;
   }
