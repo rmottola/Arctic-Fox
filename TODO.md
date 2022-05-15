@@ -143,7 +143,6 @@
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - Bug 1171379 - and check all related on bugzilla
-- Bug 1184201 - Disable fullscreen transition on Windows
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
 - Bug 1181869 [provokes crashing] - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
