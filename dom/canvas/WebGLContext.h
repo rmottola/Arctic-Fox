@@ -1076,6 +1076,8 @@ protected:
     uint32_t  mGLMaxTransformFeedbackSeparateAttribs;
     GLuint  mGLMaxUniformBufferBindings;
     GLsizei mGLMaxSamples;
+    GLuint  mGLMax3DTextureSize;
+    GLuint  mGLMaxArrayTextureLayers;
 
 public:
     GLuint MaxVertexAttribs() const {
