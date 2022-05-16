@@ -80,7 +80,7 @@ private:
   // XXX(seth): nsICODecoder is temporarily an exception to this rule.
   explicit nsPNGDecoder(RasterImage* aImage);
 
-  void PostPartialInvalidation(const IntRect& aInvalidRegion);
+  void PostPartialInvalidation(const gfx::IntRect& aInvalidRegion);
   void PostFullInvalidation();
 
 public:
