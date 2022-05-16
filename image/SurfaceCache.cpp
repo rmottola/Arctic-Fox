@@ -282,7 +282,7 @@ public:
 
   Pair<already_AddRefed<CachedSurface>, MatchType>
   LookupBestMatch(const SurfaceKey&      aSurfaceKey,
-                  const Maybe<uint32_t>& aAlternateFlags)
+                  const Maybe<SurfaceFlags>& aAlternateFlags)
   {
     // Try for an exact match first.
     nsRefPtr<CachedSurface> exactMatch;
@@ -334,13 +334,13 @@ private:
   struct MatchContext
   {
     MatchContext(const SurfaceKey& aIdealKey,
-                 const Maybe<uint32_t>& aAlternateFlags)
+                 const Maybe<SurfaceFlags>& aAlternateFlags)
       : mIdealKey(aIdealKey)
       , mAlternateFlags(aAlternateFlags)
     { }
 
     const SurfaceKey& mIdealKey;
-    const Maybe<uint32_t> mAlternateFlags;
+    const Maybe<SurfaceFlags> mAlternateFlags;
     nsRefPtr<CachedSurface> mBestMatch;
   };
 
@@ -640,7 +640,7 @@ public:
 
   LookupResult LookupBestMatch(const ImageKey         aImageKey,
                                const SurfaceKey&      aSurfaceKey,
-                               const Maybe<uint32_t>& aAlternateFlags)
+                               const Maybe<SurfaceFlags>& aAlternateFlags)
   {
     nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
     if (!cache) {
@@ -1048,7 +1048,8 @@ SurfaceCache::Shutdown()
 /* static */ LookupResult
 SurfaceCache::Lookup(const ImageKey         aImageKey,
                      const SurfaceKey&      aSurfaceKey,
-                     const Maybe<uint32_t>& aAlternateFlags /* = Nothing() */)
+                     const Maybe<SurfaceFlags>& aAlternateFlags
+                       /* = Nothing() */)
 {
   if (!sInstance) {
     return LookupResult(MatchType::NOT_FOUND);
@@ -1068,7 +1069,7 @@ SurfaceCache::Lookup(const ImageKey         aImageKey,
 /* static */ LookupResult
 SurfaceCache::LookupBestMatch(const ImageKey         aImageKey,
                               const SurfaceKey&      aSurfaceKey,
-                              const Maybe<uint32_t>& aAlternateFlags
+                              const Maybe<SurfaceFlags>& aAlternateFlags
                                 /* = Nothing() */)
 {
   if (!sInstance) {

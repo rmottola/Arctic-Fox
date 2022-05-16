@@ -365,10 +365,8 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
     if (mIsPNG) {
       mContainedDecoder = new nsPNGDecoder(mImage);
       mContainedDecoder->SetMetadataDecode(IsMetadataDecode());
-      mContainedDecoder->SetSendPartialInvalidations(mSendPartialInvalidations);
-      if (mFirstFrameDecode) {
-        mContainedDecoder->SetIsFirstFrameDecode();
-      }
+      mContainedDecoder->SetDecoderFlags(GetDecoderFlags());
+      mContainedDecoder->SetSurfaceFlags(GetSurfaceFlags());
       mContainedDecoder->Init();
       if (!WriteToContainedDecoder(mSignature, PNGSIGNATURESIZE)) {
         return;
@@ -445,10 +443,8 @@ nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
     mContainedDecoder = bmpDecoder;
     bmpDecoder->SetUseAlphaData(true);
     mContainedDecoder->SetMetadataDecode(IsMetadataDecode());
-    mContainedDecoder->SetSendPartialInvalidations(mSendPartialInvalidations);
-    if (mFirstFrameDecode) {
-      mContainedDecoder->SetIsFirstFrameDecode();
-    }
+    mContainedDecoder->SetDecoderFlags(GetDecoderFlags());
+    mContainedDecoder->SetSurfaceFlags(GetSurfaceFlags());
     mContainedDecoder->Init();
 
     // The ICO format when containing a BMP does not include the 14 byte
