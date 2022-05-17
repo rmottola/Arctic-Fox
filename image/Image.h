@@ -214,8 +214,7 @@ public:
                                        bool aLastPart) = 0;
 
   /**
-   * Called when the SurfaceCache discards a persistent surface belonging to
-   * this image.
+   * Called when the SurfaceCache discards a surface belonging to this image.
    */
   virtual void OnSurfaceDiscarded() = 0;
 
