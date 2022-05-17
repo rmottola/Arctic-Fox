@@ -150,6 +150,9 @@ public:
    * INIT_FLAG_DOWNSCALE_DURING_DECODE: The container should attempt to
    * downscale images during decoding instead of decoding them to their
    * intrinsic size.
+   *
+   * INIT_FLAG_SYNC_LOAD: The container is being loaded synchronously, so
+   * it should avoid relying on async workers to get the container ready.
    */
   static const uint32_t INIT_FLAG_NONE                     = 0x0;
   static const uint32_t INIT_FLAG_DISCARDABLE              = 0x1;
