@@ -205,7 +205,7 @@ imgFrame::InitForDecoder(const nsIntSize& aImageSize,
       static_cast<uint8_t*>(malloc(PaletteDataLength() +
                                    (mSize.width * mSize.height)));
     if (!mPalettedImageData) {
-      NS_WARNING("Call to malloc for paletted image data should succeed");
+      NS_WARNING("malloc for paletted image data should succeed");
     }
     NS_ENSURE_TRUE(mPalettedImageData, NS_ERROR_OUT_OF_MEMORY);
   } else {
