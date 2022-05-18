@@ -796,6 +796,7 @@ imgFrame::LockImageData()
     return NS_OK;
   }
 
+  MOZ_ASSERT_UNREACHABLE("It's illegal to re-lock an optimized imgFrame");
   return NS_ERROR_FAILURE;
 }
 
