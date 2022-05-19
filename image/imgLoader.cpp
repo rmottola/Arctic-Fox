@@ -726,6 +726,8 @@ NewImageChannel(nsIChannel** aResult,
                 nsIPrincipal* aLoadingPrincipal,
                 nsISupports* aRequestingContext)
 {
+  MOZ_ASSERT(aResult);
+
   nsresult rv;
   nsCOMPtr<nsIHttpChannel> newHttpChannel;
 
