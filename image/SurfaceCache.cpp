@@ -35,6 +35,7 @@
 #include "nsSize.h"
 #include "nsTArray.h"
 #include "prsystem.h"
+#include "ShutdownTracker.h"
 #include "SVGImageContext.h"
 
 using std::max;
@@ -582,7 +583,8 @@ public:
       } else {
         // Our call to AddObject must have failed in StartTracking; most likely
         // we're in XPCOM shutdown right now.
-        NS_WARNING("Not expiration-tracking an unlocked surface!");
+        NS_WARN_IF_FALSE(ShutdownTracker::ShutdownHasStarted(),
+                         "Not expiration-tracking an unlocked surface!");
       }
 
       DebugOnly<bool> foundInCosts = mCosts.RemoveElementSorted(costEntry);
