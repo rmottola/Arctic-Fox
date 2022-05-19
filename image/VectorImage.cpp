@@ -49,6 +49,8 @@ namespace image {
 // Helper-class: SVGRootRenderingObserver
 class SVGRootRenderingObserver final : public nsSVGRenderingObserver {
 public:
+  NS_DECL_ISUPPORTS
+
   SVGRootRenderingObserver(SVGDocumentWrapper* aDocWrapper,
                            VectorImage*        aVectorImage)
     : nsSVGRenderingObserver()
@@ -67,10 +69,6 @@ public:
     mInObserverList = true;
   }
 
-  virtual ~SVGRootRenderingObserver()
-  {
-    StopListening();
-  }
 
   void ResumeHonoringInvalidations()
   {
@@ -78,6 +76,11 @@ public:
   }
 
 protected:
+  virtual ~SVGRootRenderingObserver()
+  {
+    StopListening();
+  }
+
   virtual Element* GetTarget() override
   {
     return mDocWrapper->GetRootSVGElem();
@@ -114,6 +117,8 @@ protected:
   VectorImage* const mVectorImage;   // Raw pointer because it owns me.
   bool mHonoringInvalidations;
 };
+
+NS_IMPL_ISUPPORTS(SVGRootRenderingObserver, nsIMutationObserver)
 
 class SVGParseCompleteListener final : public nsStubDocumentObserver {
 public:
