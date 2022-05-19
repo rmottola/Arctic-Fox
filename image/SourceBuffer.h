@@ -120,7 +120,8 @@ public:
   /// If at the end, returns the status passed to SourceBuffer::Complete().
   nsresult CompletionStatus() const
   {
-    MOZ_ASSERT(mState == COMPLETE, "Calling CompletionStatus() in the wrong state");
+    MOZ_ASSERT(mState == COMPLETE,
+               "Calling CompletionStatus() in the wrong state");
     return mState == COMPLETE ? mData.mAtEnd.mStatus : NS_OK;
   }
 
