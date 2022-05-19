@@ -437,6 +437,7 @@ public:
     , mMaxCost(aSurfaceCacheSize)
     , mAvailableCost(aSurfaceCacheSize)
     , mLockedCost(0)
+    , mOverflowCount(0)
   {
     nsCOMPtr<nsIObserverService> os = services::GetObserverService();
     if (os) {
@@ -484,6 +485,7 @@ public:
     // If this is bigger than we can hold after discarding everything we can,
     // refuse to cache it.
     if (MOZ_UNLIKELY(!CanHoldAfterDiscarding(aCost))) {
+      mOverflowCount++;
       return InsertOutcome::FAILURE;
     }
 
@@ -865,6 +867,14 @@ public:
                             "imagelib surface cache.");
     NS_ENSURE_SUCCESS(rv, rv);
 
+    rv = MOZ_COLLECT_REPORT("imagelib-surface-cache-overflow-count",
+                            KIND_OTHER, UNITS_COUNT,
+                            mOverflowCount,
+                            "Count of how many times the surface cache has hit "
+                            "its capacity and been unable to insert a new "
+                            "surface.");
+    NS_ENSURE_SUCCESS(rv, rv);
+
     return NS_OK;
   }
 
@@ -964,6 +974,7 @@ private:
   const Cost                              mMaxCost;
   Cost                                    mAvailableCost;
   Cost                                    mLockedCost;
+  size_t                                  mOverflowCount;
 };
 
 NS_IMPL_ISUPPORTS(SurfaceCacheImpl, nsIMemoryReporter)
