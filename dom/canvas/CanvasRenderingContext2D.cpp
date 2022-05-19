@@ -101,6 +101,7 @@
 #include "nsCCUncollectableMarker.h"
 #include "nsWrapperCacheInlines.h"
 #include "mozilla/dom/CanvasRenderingContext2DBinding.h"
+#include "mozilla/dom/CanvasPath.h"
 #include "mozilla/dom/HTMLImageElement.h"
 #include "mozilla/dom/HTMLVideoElement.h"
 #include "mozilla/dom/SVGMatrix.h"
@@ -5598,12 +5599,7 @@ CanvasRenderingContext2D::GetBufferProvider(LayerManager* aManager)
     return nullptr;
   }
 
-  mBufferProvider = aManager->CreatePersistentBufferProvider(mTarget->GetSize(), mTarget->GetFormat());
-
-  RefPtr<SourceSurface> surf = mTarget->Snapshot();
-
-  mTarget = mBufferProvider->GetDT(IntRect(IntPoint(), mTarget->GetSize()));
-  mTarget->CopySurface(surf, IntRect(IntPoint(), mTarget->GetSize()), IntPoint());
+  mBufferProvider = new PersistentBufferProviderBasic(mTarget);
 
   return mBufferProvider;
 }
