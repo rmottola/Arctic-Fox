@@ -718,6 +718,13 @@ imgRequest::GetMultipart() const
   return mIsMultiPartChannel;
 }
 
+bool
+imgRequest::HadInsecureRedirect() const
+{
+  MutexAutoLock lock(mMutex);
+  return mHadInsecureRedirect;
+}
+
 /** nsIRequestObserver methods **/
 
 NS_IMETHODIMP
@@ -1269,6 +1276,7 @@ imgRequest::OnRedirectVerifyCallback(nsresult result)
                                     nsIProtocolHandler::URI_IS_LOCAL_RESOURCE,
                                     &schemeLocal))  ||
       (!isHttps && !isChrome && !schemeLocal)) {
+    MutexAutoLock lock(mMutex);
     mHadInsecureRedirect = true;
   }
 
