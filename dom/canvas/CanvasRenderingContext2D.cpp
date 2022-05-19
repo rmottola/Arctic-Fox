@@ -1402,9 +1402,9 @@ CanvasRenderingContext2D::EnsureTarget(RenderingMode aRenderingMode)
         DemoteOldestContextIfNecessary();
         mBufferProvider = nullptr;
 
+#if USE_SKIA_GPU
         SkiaGLGlue* glue = gfxPlatform::GetPlatform()->GetSkiaGLGlue();
 
-#if USE_SKIA_GPU
         if (glue && glue->GetGrContext() && glue->GetGLContext()) {
           mTarget = Factory::CreateDrawTargetSkiaWithGrContext(glue->GetGrContext(), size, format);
           if (mTarget) {

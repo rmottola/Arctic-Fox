@@ -82,10 +82,14 @@ static const uint32_t sMaxStreamVolumeTbl[AUDIO_STREAM_CNT] = {
 };
 // A bitwise variable for recording what kind of headset is attached.
 static int sHeadsetState;
+#if defined(MOZ_B2G_BT) || ANDROID_VERSION >= 17
 static bool sBluetoothA2dpEnabled;
+#endif
 static const int kBtSampleRate = 8000;
 static bool sSwitchDone = true;
+#ifdef MOZ_B2G_BT
 static bool sA2dpSwitchDone = true;
+#endif
 
 namespace mozilla {
 namespace dom {
@@ -249,6 +253,7 @@ static void ProcessDelayedAudioRoute(SwitchState aState)
   sSwitchDone = true;
 }
 
+#ifdef MOZ_B2G_BT
 static void ProcessDelayedA2dpRoute(audio_policy_dev_state_t aState, const nsCString aAddress)
 {
   if (sA2dpSwitchDone)
@@ -261,6 +266,7 @@ static void ProcessDelayedA2dpRoute(audio_policy_dev_state_t aState, const nsCSt
   AudioSystem::setParameters(0, cmd);
   sA2dpSwitchDone = true;
 }
+#endif
 
 NS_IMPL_ISUPPORTS(AudioManager, nsIAudioManager, nsIObserver)
 

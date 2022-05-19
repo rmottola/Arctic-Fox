@@ -1104,6 +1104,7 @@ void
 gfxPlatform::InitializeSkiaCacheLimits()
 {
   if (UseAcceleratedSkiaCanvas()) {
+#ifdef USE_SKIA_GPU
     bool usingDynamicCache = gfxPrefs::CanvasSkiaGLDynamicCache();
     int cacheItemLimit = gfxPrefs::CanvasSkiaGLCacheItems();
     int cacheSizeLimit = gfxPrefs::CanvasSkiaGLCacheSize();
@@ -1125,7 +1126,6 @@ gfxPlatform::InitializeSkiaCacheLimits()
     printf_stderr("Determined SkiaGL cache limits: Size %i, Items: %i\n", cacheSizeLimit, cacheItemLimit);
   #endif
 
-#ifdef USE_SKIA_GPU
     mSkiaGlue->GetGrContext()->setResourceCacheLimits(cacheItemLimit, cacheSizeLimit);
 #endif
   }
