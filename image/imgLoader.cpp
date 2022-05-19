@@ -1766,7 +1766,7 @@ imgLoader::ValidateEntry(imgCacheEntry* aEntry,
   // XXX: nullptr seems to be a 'special' key value that indicates that NO
   //      validation is required.
   //
-  void *key = (void*)aCX;
+  void *key = (void*) aCX;
   if (request->LoadId() != key) {
     // If we would need to revalidate this entry, but we're being told to
     // bypass the cache, we don't allow this entry to be used.
@@ -3043,14 +3043,19 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
   return mDestListener->OnStartRequest(aRequest, ctxt);
 }
 
-/* void onStopRequest (in nsIRequest request, in nsISupports ctxt, in nsresult status); */
-NS_IMETHODIMP imgCacheValidator::OnStopRequest(nsIRequest *aRequest, nsISupports *ctxt, nsresult status)
+/* void onStopRequest (in nsIRequest request, in nsISupports ctxt,
+                       in nsresult status); */
+NS_IMETHODIMP
+imgCacheValidator::OnStopRequest(nsIRequest* aRequest,
+                                 nsISupports* ctxt,
+                                 nsresult status)
 {
   // Be sure we've released the document that we may have been holding on to.
   mContext = nullptr;
 
-  if (!mDestListener)
+  if (!mDestListener) {
     return NS_OK;
+  }
 
   return mDestListener->OnStopRequest(aRequest, ctxt, status);
 }
@@ -3133,7 +3138,9 @@ imgCacheValidator::
   if (NS_FAILED(oldChannel->GetURI(getter_AddRefs(oldURI))) ||
       NS_FAILED(oldURI->SchemeIs("https", &isHttps)) ||
       NS_FAILED(oldURI->SchemeIs("chrome", &isChrome)) ||
-      NS_FAILED(NS_URIChainHasFlags(oldURI, nsIProtocolHandler::URI_IS_LOCAL_RESOURCE , &schemeLocal))  ||
+      NS_FAILED(NS_URIChainHasFlags(oldURI,
+                                    nsIProtocolHandler::URI_IS_LOCAL_RESOURCE,
+                                    &schemeLocal))  ||
       (!isHttps && !isChrome && !schemeLocal)) {
     mHadInsecureRedirect = true;
   }
