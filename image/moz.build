@@ -19,7 +19,6 @@ MOCHITEST_CHROME_MANIFESTS += ['test/mochitest/chrome.ini']
 
 XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']
 
-
 XPIDL_SOURCES += [
     'imgICache.idl',
     'imgIContainer.idl',
@@ -35,7 +34,6 @@ XPIDL_SOURCES += [
 ]
 
 XPIDL_MODULE = 'imglib2'
-
 
 EXPORTS += [
     'ImageCacheKey.h',

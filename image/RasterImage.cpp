@@ -1077,7 +1077,7 @@ RasterImage::NotifyForLoadEvent(Progress aProgress)
   if (mError) {
     aProgress |= FLAG_HAS_ERROR;
   }
-  
+
   // Notify our listeners, which will fire this image's load event.
   NotifyProgress(aProgress);
 }

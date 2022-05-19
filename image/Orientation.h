@@ -56,7 +56,7 @@ struct Orientation
   Flip  flip;
 };
 
-}
-}
+} // namespace image
+} // namespace mozilla
 
 #endif // mozilla_image_Orientation_h
