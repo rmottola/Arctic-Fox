@@ -219,6 +219,8 @@ private:
                               const char* aPathPrefix,
                               const ImageMemoryCounter& aCounter)
   {
+    nsresult rv;
+
     nsAutoCString pathPrefix(NS_LITERAL_CSTRING("explicit/"));
     pathPrefix.Append(aPathPrefix);
     pathPrefix.Append(aCounter.Type() == imgIContainer::TYPE_RASTER
@@ -239,7 +241,13 @@ private:
 
     pathPrefix.Append(")/");
 
-    return ReportSurfaces(aHandleReport, aData, pathPrefix, aCounter);
+    rv = ReportSurfaces(aHandleReport, aData, pathPrefix, aCounter);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = ReportSourceValue(aHandleReport, aData, pathPrefix, aCounter.Values());
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    return NS_OK;
   }
 
   static nsresult ReportSurfaces(nsIHandleReportCallback* aHandleReport,
@@ -344,10 +352,7 @@ private:
   {
     nsresult rv;
 
-    rv = ReportValue(aHandleReport, aData, KIND_HEAP, aPathPrefix,
-                     "source",
-                     "Raster image source data and vector image documents.",
-                     aCounter.Source());
+    rv = ReportSourceValue(aHandleReport, aData, aPathPrefix, aCounter);
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = ReportValue(aHandleReport, aData, KIND_HEAP, aPathPrefix,
@@ -363,6 +368,21 @@ private:
     NS_ENSURE_SUCCESS(rv, rv);
 
     return NS_OK;
+  }
+
+  static nsresult ReportSourceValue(nsIHandleReportCallback* aHandleReport,
+                                    nsISupports* aData,
+                                    const nsACString& aPathPrefix,
+                                    const MemoryCounter& aCounter)
+  {
+    nsresult rv;
+
+    rv = ReportValue(aHandleReport, aData, KIND_HEAP, aPathPrefix,
+                     "source",
+                     "Raster image source data and vector image documents.",
+                     aCounter.Source());
+
+    return rv;
   }
 
   static nsresult ReportValue(nsIHandleReportCallback* aHandleReport,
