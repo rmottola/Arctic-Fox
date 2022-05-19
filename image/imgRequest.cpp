@@ -744,7 +744,7 @@ imgRequest::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
     mIsMultiPartChannel = bool(multiPartChannel);
   }
 
-  // If we're not multipart, we shouldn't have an image yet
+  // If we're not multipart, we shouldn't have an image yet.
   if (image && !multiPartChannel) {
     MOZ_ASSERT_UNREACHABLE("Already have an image for a non-multipart request");
     Cancel(NS_IMAGELIB_ERROR_FAILURE);
@@ -759,7 +759,6 @@ imgRequest::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
    * https://bugzilla.mozilla.org/show_bug.cgi?id=339610
    */
   if (!mRequest) {
-    nsCOMPtr<nsIMultiPartChannel> multiPartChannel = do_QueryInterface(aRequest);
     MOZ_ASSERT(multiPartChannel, "Should have mRequest unless we're multipart");
     nsCOMPtr<nsIChannel> baseChannel;
     multiPartChannel->GetBaseChannel(getter_AddRefs(baseChannel));
