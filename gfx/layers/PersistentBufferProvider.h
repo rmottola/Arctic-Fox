@@ -7,7 +7,7 @@
 #define MOZILLA_GFX_PersistentBUFFERPROVIDER_H
 
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc
-#include "mozilla/RefPtr.h"             // for RefPtr, TemporaryRef, etc
+#include "mozilla/RefPtr.h"             // for RefPtr, already_AddRefed, etc
 #include "mozilla/layers/LayersTypes.h"
 #include "mozilla/layers/CompositableForwarder.h"
 #include "mozilla/gfx/Types.h"
@@ -70,6 +70,7 @@ private:
   RefPtr<gfx::DrawTarget> mDrawTarget;
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
+
 #endif
