@@ -4,28 +4,32 @@
 
 /**
  * Test that the reader mode button appears and works properly on
- * reader-able content, and that ReadingList button can open and close
- * its Sidebar UI.
+ * reader-able content.
  */
-const READER_PREF = "reader.parse-on-load.enabled";
-const READING_LIST_PREF = "browser.readinglist.enabled";
+const TEST_PREFS = [
+  ["reader.parse-on-load.enabled", true],
+];
 
 const TEST_PATH = "http://example.com/browser/browser/base/content/test/general/";
 
-let readerButton = document.getElementById("reader-mode-button");
+var readerButton = document.getElementById("reader-mode-button");
 
-add_task(function* () {
+add_task(function* test_reader_button() {
   registerCleanupFunction(function() {
-    Services.prefs.clearUserPref(READER_PREF);
-    Services.prefs.clearUserPref(READING_LIST_PREF);
+    // Reset test prefs.
+    TEST_PREFS.forEach(([name, value]) => {
+      Services.prefs.clearUserPref(name);
+    });
     while (gBrowser.tabs.length > 1) {
       gBrowser.removeCurrentTab();
     }
   });
 
-  // Enable the reader mode and ReadingList buttons.
-  Services.prefs.setBoolPref(READER_PREF, true);
-  Services.prefs.setBoolPref(READING_LIST_PREF, true);
+  // Set required test prefs.
+  TEST_PREFS.forEach(([name, value]) => {
+    Services.prefs.setBoolPref(name, value);
+  });
+  Services.prefs.setBoolPref("browser.reader.detectedFirstArticle", false);
 
   let tab = gBrowser.selectedTab = gBrowser.addTab();
   is_element_hidden(readerButton, "Reader mode button is not present on a new tab");
@@ -46,32 +50,15 @@ add_task(function* () {
   is(gURLBar.value, readerUrl, "gURLBar value is about:reader URL");
   is(gURLBar.textValue, url.substring("http://".length), "gURLBar is displaying original article URL");
 
-  // Readinglist button should be present, and status should be "closed".
-  let listButton;
-  yield promiseWaitForCondition(() =>
-    listButton = gBrowser.contentDocument.getElementById("list-button"));
-  is_element_visible(listButton, "List button is present on a reader-able page");
-  yield promiseWaitForCondition(() => !listButton.classList.contains("on"));
-  ok(!listButton.classList.contains("on"),
-    "List button should not indicate SideBar-ReadingList open.");
-  ok(!ReadingListUI.isSidebarOpen,
-    "The ReadingListUI should not indicate SideBar-ReadingList open.");
-
-  // After we click ReadingList button, status should be "open".
-  listButton.click();
-  yield promiseWaitForCondition(() => listButton.classList.contains("on"));
-  ok(listButton.classList.contains("on"),
-    "List button should now indicate SideBar-ReadingList open.");
-  ok(ReadingListUI.isSidebarOpen,
-    "The ReadingListUI should now indicate SideBar-ReadingList open.");
-
+  // Switch page back out of reader mode.
   readerButton.click();
   yield promiseTabLoadEvent(tab);
-  is(gBrowser.selectedBrowser.currentURI.spec, url, "Original page loaded after clicking active reader mode button");
+  is(gBrowser.selectedBrowser.currentURI.spec, url,
+    "Original page loaded after clicking active reader mode button");
 
   // Load a new tab that is NOT reader-able.
   let newTab = gBrowser.selectedTab = gBrowser.addTab();
-  yield promiseTabLoadEvent(newTab, TEST_PATH + "download_page.html");
+  yield promiseTabLoadEvent(newTab, "about:robots");
   yield promiseWaitForCondition(() => readerButton.hidden);
   is_element_hidden(readerButton, "Reader mode button is not present on a non-reader-able page");
 
@@ -79,4 +66,17 @@ add_task(function* () {
   gBrowser.removeCurrentTab();
   yield promiseWaitForCondition(() => !readerButton.hidden);
   is_element_visible(readerButton, "Reader mode button is present on a reader-able page");
+});
+
+add_task(function* test_getOriginalUrl() {
+  let { ReaderMode } = Cu.import("resource://gre/modules/ReaderMode.jsm", {});
+  let url = "http://foo.com/article.html";
+
+  is(ReaderMode.getOriginalUrl("about:reader?url=" + encodeURIComponent(url)), url, "Found original URL from encoded URL");
+  is(ReaderMode.getOriginalUrl("about:reader?foobar"), null, "Did not find original URL from malformed reader URL");
+  is(ReaderMode.getOriginalUrl(url), null, "Did not find original URL from non-reader URL");
+
+  let badUrl = "http://foo.com/?;$%^^";
+  is(ReaderMode.getOriginalUrl("about:reader?url=" + encodeURIComponent(badUrl)), badUrl, "Found original URL from encoded malformed URL");
+  is(ReaderMode.getOriginalUrl("about:reader?url=" + badUrl), badUrl, "Found original URL from non-encoded malformed URL");
 });

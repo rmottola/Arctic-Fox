@@ -17,17 +17,12 @@ this.EXPORTED_SYMBOLS = ["FxAccountsProfile"];
 const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Log.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/FxAccountsCommon.js");
+Cu.import("resource://gre/modules/FxAccounts.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "FxAccountsProfileClient",
   "resource://gre/modules/FxAccountsProfileClient.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "FxAccountsProfileChannel",
-  "resource://gre/modules/FxAccountsProfileChannel.jsm");
-
-let fxAccountProfileChannel = null;
 
 // Based off of deepEqual from Assert.jsm
 function deepEqual(actual, expected) {
@@ -76,11 +71,12 @@ function hasChanged(oldData, newData) {
   return !deepEqual(oldData, newData);
 }
 
-this.FxAccountsProfile = function (accountState, options = {}) {
-  this.currentAccountState = accountState;
+this.FxAccountsProfile = function (options = {}) {
+  this._cachedProfile = null;
+  this.fxa = options.fxa || fxAccounts;
   this.client = options.profileClient || new FxAccountsProfileClient({
+    fxa: this.fxa,
     serverURL: options.profileServerUrl,
-    token: options.token
   });
 
   // for testing
@@ -92,14 +88,15 @@ this.FxAccountsProfile = function (accountState, options = {}) {
 this.FxAccountsProfile.prototype = {
 
   tearDown: function () {
-    this.currentAccountState = null;
+    this.fxa = null;
     this.client = null;
+    this._cachedProfile = null;
   },
 
   _getCachedProfile: function () {
-    let currentState = this.currentAccountState;
-    return currentState.getUserAccountData()
-      .then(cachedData => cachedData.profile);
+    // The cached profile will end up back in the generic accountData
+    // once bug 1157529 is fixed.
+    return Promise.resolve(this._cachedProfile);
   },
 
   _notifyProfileChange: function (uid) {
@@ -109,18 +106,16 @@ this.FxAccountsProfile.prototype = {
   // Cache fetched data if it is different from what's in the cache.
   // Send out a notification if it has changed so that UI can update.
   _cacheProfile: function (profileData) {
-    let currentState = this.currentAccountState;
-    if (!currentState) {
-      return;
+    if (!hasChanged(this._cachedProfile, profileData)) {
+      log.debug("fetched profile matches cached copy");
+      return Promise.resolve(null); // indicates no change (but only tests care)
     }
-    return currentState.getUserAccountData()
-      .then(data => {
-        if (!hasChanged(data.profile, profileData)) {
-          return;
-        }
-        data.profile = profileData;
-        return currentState.setUserAccountData(data)
-          .then(() => this._notifyProfileChange(data.uid));
+    this._cachedProfile = profileData;
+    return this.fxa.getSignedInUser()
+      .then(userData => {
+        log.debug("notifying profile changed for user ${uid}", userData);
+        this._notifyProfileChange(userData.uid);
+        return profileData;
       });
   },
 
@@ -131,29 +126,18 @@ this.FxAccountsProfile.prototype = {
       });
   },
 
-  // Initialize a profile channel to listen for account changes.
-  _listenForProfileChanges: function () {
-    if (! fxAccountProfileChannel) {
-      let contentUri = Services.urlFormatter.formatURLPref("identity.fxaccounts.settings.uri");
-
-      fxAccountProfileChannel = new FxAccountsProfileChannel({
-        content_uri: contentUri
-      });
-    }
-
-    return fxAccountProfileChannel;
-  },
-
   // Returns cached data right away if available, then fetches the latest profile
   // data in the background. After data is fetched a notification will be sent
   // out if the profile has changed.
   getProfile: function () {
-    this._listenForProfileChanges();
-
     return this._getCachedProfile()
       .then(cachedProfile => {
         if (cachedProfile) {
-          this._fetchAndCacheProfile();
+          // Note that _fetchAndCacheProfile isn't returned, so continues
+          // in the background.
+          this._fetchAndCacheProfile().catch(err => {
+            log.error("Background refresh of profile failed", err);
+          });
           return cachedProfile;
         }
         return this._fetchAndCacheProfile();

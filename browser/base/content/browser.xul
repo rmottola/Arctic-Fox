@@ -507,10 +507,6 @@
                    class="urlbar-icon"
                    tooltiptext="&goEndCap.tooltip;"
                    onclick="gURLBar.handleCommand(event);"/>
-                <toolbarbutton id="readinglist-addremove-button"
-                               class="tabbable urlbar-icon"
-                               hidden="true"
-                               oncommand="ReadingListUI.togglePageByBrowser(gBrowser.selectedBrowser);"/>
                 <toolbarbutton id="reader-mode-button"
                                class="tabbable"
                                hidden="true"
@@ -616,22 +612,6 @@
                        onpopupshowing="if (!this.parentNode._placesView)
                                          new PlacesMenu(event, 'place:folder=TOOLBAR');"/>
           </menu>
-            <menuseparator>
-              <observes element="readingListSidebar" attribute="hidden"/>
-            </menuseparator>
-            <menu id="BMB_readingList"
-                  class="menu-iconic bookmark-item subviewbutton"
-                  label="&readingList.label;"
-                  container="true">
-              <observes element="readingListSidebar" attribute="hidden"/>
-              <menupopup id="BMB_readingListPopup"
-                         placespopup="true"
-                         onpopupshowing="ReadingListUI.onReadingListPopupShowing(this);">
-                <menuitem id="BMB_viewReadingListSidebar" class="subviewbutton"
-                          oncommand="SidebarUI.show('readingListSidebar');"
-                          label="&readingList.showSidebar.label;"/>
-              </menupopup>
-            </menu>
           <menuseparator/>
           <!-- Bookmarks menu items -->
           <menuseparator builder="end"

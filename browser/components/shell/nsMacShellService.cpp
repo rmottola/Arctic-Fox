@@ -49,7 +49,8 @@ nsMacShellService::IsDefaultBrowser(bool aStartupCheck,
     return NS_ERROR_FAILURE;
   }
 
-  // Get the default http handler's bundle ID (or nullptr if it has not been explicitly set)
+  // Get the default http handler's bundle ID (or nullptr if it has not been
+  // explicitly set)
   CFStringRef defaultBrowserID = ::LSCopyDefaultHandlerForURLScheme(CFSTR("http"));
   if (defaultBrowserID) {
     *aIsDefaultBrowser = ::CFStringCompare(firefoxID, defaultBrowserID, 0) == kCFCompareEqualTo;
@@ -91,7 +92,56 @@ nsMacShellService::SetDefaultBrowser(bool aClaimAllTypes, bool aForAllUsers)
     }
   }
 
+  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID));
+  if (prefs) {
+    (void) prefs->SetBoolPref(PREF_CHECKDEFAULTBROWSER, true);
+    // Reset the number of times the dialog should be shown
+    // before it is silenced.
+    (void) prefs->SetIntPref(PREF_DEFAULTBROWSERCHECKCOUNT, 0);
+  }
+
   return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMacShellService::GetShouldSkipCheckDefaultBrowser(bool* aResult)
+{
+  NS_ENSURE_ARG_POINTER(aResult);
+
+  nsresult rv;
+  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  rv = prefs->GetBoolPref(PREF_SKIPDEFAULTBROWSERCHECK, aResult);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  if (*aResult) {
+    // Only skip the default browser check once. The next attempt in
+    // a new session should proceed.
+    return prefs->SetBoolPref(PREF_SKIPDEFAULTBROWSERCHECK, false);
+  }
+
+  int32_t defaultBrowserCheckCount;
+  rv = prefs->GetIntPref(PREF_DEFAULTBROWSERCHECKCOUNT,
+                         &defaultBrowserCheckCount);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  if (defaultBrowserCheckCount < 3) {
+    *aResult = false;
+    return prefs->SetIntPref(PREF_DEFAULTBROWSERCHECKCOUNT,
+                             defaultBrowserCheckCount + 1);
+  }
+
+  // Disable the default browser check after three attempts.
+  // Don't modify PREF_CHECKDEFAULTBROWSER since that is a
+  // user-initiated action and it shouldn't get re-enabled
+  // if it has been user disabled.
+  *aResult = true;
+  return rv;
 }
 
 NS_IMETHODIMP
@@ -104,27 +154,37 @@ nsMacShellService::GetShouldCheckDefaultBrowser(bool* aResult)
     return NS_OK;
   }
 
-  nsCOMPtr<nsIPrefBranch> prefs;
-  nsCOMPtr<nsIPrefService> pserve(do_GetService(NS_PREFSERVICE_CONTRACTID));
-  if (pserve)
-    pserve->GetBranch("", getter_AddRefs(prefs));
+  nsresult rv;
+#ifndef RELEASE_BUILD
+  bool skipDefaultBrowserCheck;
+  rv = GetShouldSkipCheckDefaultBrowser(&skipDefaultBrowserCheck);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  if (skipDefaultBrowserCheck) {
+    *aResult = false;
+    return rv;
+  }
+#endif
 
-  prefs->GetBoolPref(PREF_CHECKDEFAULTBROWSER, aResult);
+  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
 
-  return NS_OK;
+  return prefs->GetBoolPref(PREF_CHECKDEFAULTBROWSER, aResult);
 }
 
 NS_IMETHODIMP
 nsMacShellService::SetShouldCheckDefaultBrowser(bool aShouldCheck)
 {
-  nsCOMPtr<nsIPrefBranch> prefs;
-  nsCOMPtr<nsIPrefService> pserve(do_GetService(NS_PREFSERVICE_CONTRACTID));
-  if (pserve)
-    pserve->GetBranch("", getter_AddRefs(prefs));
+  nsresult rv;
+  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
 
-  prefs->SetBoolPref(PREF_CHECKDEFAULTBROWSER, aShouldCheck);
-
-  return NS_OK;
+  return prefs->SetBoolPref(PREF_CHECKDEFAULTBROWSER, aShouldCheck);
 }
 
 NS_IMETHODIMP
@@ -202,8 +262,10 @@ nsMacShellService::SetDesktopBackground(nsIDOMElement* aElement,
     loadContext = do_QueryInterface(docShell);
   }
 
-  return wbp->SaveURI(imageURI, nullptr, docURI, content->OwnerDoc()->GetReferrerPolicy(),
-                      nullptr, nullptr, mBackgroundFile, loadContext);
+  return wbp->SaveURI(imageURI, nullptr,
+                      docURI, content->OwnerDoc()->GetReferrerPolicy(),
+                      nullptr, nullptr,
+                      mBackgroundFile, loadContext);
 }
 
 NS_IMETHODIMP
@@ -269,7 +331,8 @@ nsMacShellService::OnStateChange(nsIWebProgress* aWebProgress,
     OSStatus status;
 
     // Convert the path into a FSRef
-    status = ::FSPathMakeRef((const UInt8*)nativePath.get(), &pictureRef, nullptr);
+    status = ::FSPathMakeRef((const UInt8*)nativePath.get(), &pictureRef,
+                             nullptr);
     if (status == noErr) {
       err = ::FSNewAlias(nil, &pictureRef, &aliasHandle);
       if (err == noErr && aliasHandle == nil)
@@ -336,8 +399,8 @@ nsMacShellService::OpenApplication(int32_t aApplication)
     }
     break;
   case nsIMacShellService::APPLICATION_KEYCHAIN_ACCESS:
-    err = ::LSGetApplicationForInfo('APPL', 'kcmr', nullptr, kLSRolesAll, nullptr,
-                                    &appURL);
+    err = ::LSGetApplicationForInfo('APPL', 'kcmr', nullptr, kLSRolesAll,
+                                    nullptr, &appURL);
     break;
   case nsIMacShellService::APPLICATION_NETWORK:
     {
@@ -349,8 +412,7 @@ nsMacShellService::OpenApplication(int32_t aApplication)
       if (!exists)
         return NS_ERROR_FILE_NOT_FOUND;
       return lf->Launch();
-    }  
-    break;
+    }
   case nsIMacShellService::APPLICATION_DESKTOP:
     {
       nsCOMPtr<nsIFile> lf;
@@ -361,8 +423,7 @@ nsMacShellService::OpenApplication(int32_t aApplication)
       if (!exists)
         return NS_ERROR_FILE_NOT_FOUND;
       return lf->Launch();
-    }  
-    break;
+    }
   }
 
   if (appURL && err == noErr) {

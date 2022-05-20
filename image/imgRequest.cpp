@@ -64,6 +64,7 @@ imgRequest::imgRequest(imgLoader* aLoader, const ImageCacheKey& aCacheKey)
  : mLoader(aLoader)
  , mCacheKey(aCacheKey)
  , mLoadId(nullptr)
+ , mFirstProxy(nullptr)
  , mValidator(nullptr)
  , mInnerWindowId(0)
  , mCORSMode(imgIRequest::CORS_NONE)
@@ -217,6 +218,12 @@ imgRequest::AddProxy(imgRequestProxy* proxy)
 {
   NS_PRECONDITION(proxy, "null imgRequestProxy passed in");
   LOG_SCOPE_WITH_PARAM(GetImgLog(), "imgRequest::AddProxy", "proxy", proxy);
+
+  if (!mFirstProxy) {
+    // Save a raw pointer to the first proxy we see, for use in the network
+    // priority logic.
+    mFirstProxy = proxy;
+  }
 
   // If we're empty before adding, we have to tell the loader we now have
   // proxies.
@@ -535,8 +542,7 @@ imgRequest::AdjustPriority(imgRequestProxy* proxy, int32_t delta)
   // concern though is that image loads remain lower priority than other pieces
   // of content such as link clicks, CSS, and JS.
   //
-  nsRefPtr<ProgressTracker> progressTracker = GetProgressTracker();
-  if (!progressTracker->FirstObserverIs(proxy)) {
+  if (!mFirstProxy || proxy != mFirstProxy) {
     return;
   }
 
@@ -628,17 +634,6 @@ imgRequest::SetCacheValidation(imgCacheEntry* aCacheEntry, nsIRequest* aRequest)
         aCacheEntry->SetMustValidate(bMustRevalidate);
       }
     }
-
-    // We always need to validate file URIs.
-    nsCOMPtr<nsIChannel> channel = do_QueryInterface(aRequest);
-    if (channel) {
-      nsCOMPtr<nsIURI> uri;
-      channel->GetURI(getter_AddRefs(uri));
-      bool isfile = false;
-      uri->SchemeIs("file", &isfile);
-      if (isfile)
-        aCacheEntry->SetMustValidate(isfile);
-    }
   }
 }
 
@@ -712,6 +707,13 @@ imgRequest::GetMultipart() const
   return mIsMultiPartChannel;
 }
 
+bool
+imgRequest::HadInsecureRedirect() const
+{
+  MutexAutoLock lock(mMutex);
+  return mHadInsecureRedirect;
+}
+
 /** nsIRequestObserver methods **/
 
 NS_IMETHODIMP
@@ -731,7 +733,7 @@ imgRequest::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
     mIsMultiPartChannel = bool(multiPartChannel);
   }
 
-  // If we're not multipart, we shouldn't have an image yet
+  // If we're not multipart, we shouldn't have an image yet.
   if (image && !multiPartChannel) {
     MOZ_ASSERT_UNREACHABLE("Already have an image for a non-multipart request");
     Cancel(NS_IMAGELIB_ERROR_FAILURE);
@@ -746,7 +748,6 @@ imgRequest::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
    * https://bugzilla.mozilla.org/show_bug.cgi?id=339610
    */
   if (!mRequest) {
-    nsCOMPtr<nsIMultiPartChannel> multiPartChannel = do_QueryInterface(aRequest);
     MOZ_ASSERT(multiPartChannel, "Should have mRequest unless we're multipart");
     nsCOMPtr<nsIChannel> baseChannel;
     multiPartChannel->GetBaseChannel(getter_AddRefs(baseChannel));
@@ -944,18 +945,18 @@ PrepareForNewPart(nsIRequest* aRequest, nsIInputStream* aInStr, uint32_t aCount,
 
   nsCOMPtr<nsIChannel> chan(do_QueryInterface(aRequest));
   if (result.mContentType.IsEmpty()) {
-    nsresult rv = NS_ERROR_FAILURE;
-    if (chan) {
-      rv = chan->GetContentType(result.mContentType);
-      chan->GetContentDispositionHeader(result.mContentDisposition);
-    }
-
+    nsresult rv = chan ? chan->GetContentType(result.mContentType)
+                       : NS_ERROR_FAILURE;
     if (NS_FAILED(rv)) {
       MOZ_LOG(GetImgLog(),
-             LogLevel::Error, ("imgRequest::PrepareForNewPart "
-                            "-- Content type unavailable from the channel\n"));
+              LogLevel::Error, ("imgRequest::PrepareForNewPart -- "
+                                "Content type unavailable from the channel\n"));
       return result;
     }
+  }
+
+  if (chan) {
+    chan->GetContentDispositionHeader(result.mContentDisposition);
   }
 
   MOZ_LOG(GetImgLog(), LogLevel::Debug,
@@ -1263,7 +1264,18 @@ imgRequest::OnRedirectVerifyCallback(nsresult result)
                                     nsIProtocolHandler::URI_IS_LOCAL_RESOURCE,
                                     &schemeLocal))  ||
       (!isHttps && !isChrome && !schemeLocal)) {
-    mHadInsecureRedirect = true;
+    MutexAutoLock lock(mMutex);
+
+    // The csp directive upgrade-insecure-requests performs an internal redirect
+    // to upgrade all requests from http to https before any data is fetched from
+    // the network. Do not pollute mHadInsecureRedirect in case of such an internal
+    // redirect.
+    nsCOMPtr<nsILoadInfo> loadInfo = mChannel->GetLoadInfo();
+    bool upgradeInsecureRequests = loadInfo ? loadInfo->GetUpgradeInsecureRequests()
+                                            : false;
+    if (!upgradeInsecureRequests) {
+      mHadInsecureRedirect = true;
+    }
   }
 
   // Update the current URI.

@@ -21,8 +21,8 @@
             helpTopic="prefs-weave"
             onpaneload="gSyncPane.init()">
 
-    <preferences>
-<!--      <preference id="engine.addons"    name="services.sync.engine.addons"    type="bool"/> -->
+    <preferences id="syncEnginePrefs">
+      <preference id="engine.addons"    name="services.sync.engine.addons"    type="bool"/>
       <preference id="engine.bookmarks" name="services.sync.engine.bookmarks" type="bool"/>
       <preference id="engine.history"   name="services.sync.engine.history"   type="bool"/>
       <preference id="engine.tabs"      name="services.sync.engine.tabs"      type="bool"/>
@@ -67,9 +67,6 @@
                       label="&manageAccount.label;"
                       accesskey="&manageAccount.accesskey;">
                 <menupopup>
-                  <menuitem label="&viewQuota.label;"
-                            oncommand="gSyncPane.openQuotaDialog();"/>
-                  <menuseparator/>
                   <menuitem label="&changePassword2.label;"
                             oncommand="gSyncUtils.changePassword();"/>
                   <menuitem label="&myRecoveryKey.label;"

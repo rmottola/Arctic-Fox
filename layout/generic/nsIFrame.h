@@ -149,6 +149,12 @@ typedef uint32_t nsSplittableType;
 //       if any are changed to be a value other than NS_UNCONSTRAINEDSIZE
 //       at least update AdjustComputedHeight/Width and test ad nauseum
 
+// 1 million CSS pixels less than our max app unit measure.
+// For reflowing with an "infinite" available inline space per [css-sizing].
+// (reflowing with an NS_UNCONSTRAINEDSIZE available inline size isn't allowed
+//  and leads to assertions)
+#define INFINITE_ISIZE_COORD nscoord(NS_MAXSIZE - (1000000*60))
+
 //----------------------------------------------------------------------
 
 enum nsSelectionAmount {
@@ -737,21 +743,39 @@ public:
   }
 
   /**
-   * Set this frame's size from a logical size in its own writing direction
+   * Set this frame's size from a logical size in its own writing direction.
+   * This leaves the frame's logical position unchanged, which means its
+   * physical position may change (for right-to-left modes).
    */
   void SetSize(const mozilla::LogicalSize& aSize) {
     SetSize(GetWritingMode(), aSize);
   }
   /*
-   * Set this frame's size from a logical size in a different writing direction
+   * Set this frame's size from a logical size in a different writing direction.
+   * This leaves the frame's logical position in the given mode unchanged,
+   * which means its physical position may change (for right-to-left modes).
    */
   void SetSize(mozilla::WritingMode aWritingMode,
-               const mozilla::LogicalSize& aSize) {
-    SetSize(aSize.GetPhysicalSize(aWritingMode));
+               const mozilla::LogicalSize& aSize)
+  {
+    if ((!aWritingMode.IsVertical() && !aWritingMode.IsBidiLTR()) ||
+        aWritingMode.IsVerticalRL()) {
+      nscoord oldWidth = mRect.width;
+      SetSize(aSize.GetPhysicalSize(aWritingMode));
+      mRect.x -= mRect.width - oldWidth;
+    } else {
+      SetSize(aSize.GetPhysicalSize(aWritingMode));
+    }
   }
+
+  /**
+   * Set this frame's physical size. This leaves the frame's physical position
+   * (topLeft) unchanged.
+   */
   void SetSize(const nsSize& aSize) {
     SetRect(nsRect(mRect.TopLeft(), aSize));
   }
+
   void SetPosition(const nsPoint& aPt) { mRect.MoveTo(aPt); }
   void SetPosition(mozilla::WritingMode aWritingMode,
                    const mozilla::LogicalPoint& aPt,
@@ -1287,18 +1311,20 @@ public:
   // Note that the primary offset can be after the secondary offset; for places
   // that need the beginning and end of the object, the StartOffset and 
   // EndOffset helpers can be used.
-  struct MOZ_STACK_CLASS ContentOffsets {
-    ContentOffsets();
-    ContentOffsets(const ContentOffsets&);
-    ~ContentOffsets();
-    nsCOMPtr<nsIContent> content;
+  struct MOZ_STACK_CLASS ContentOffsets
+  {
+    ContentOffsets() : offset(0)
+                     , secondaryOffset(0)
+                     , associate(mozilla::CARET_ASSOCIATE_BEFORE) {}
     bool IsNull() { return !content; }
-    int32_t offset;
-    int32_t secondaryOffset;
     // Helpers for places that need the ends of the offsets and expect them in
     // numerical order, as opposed to wanting the primary and secondary offsets
     int32_t StartOffset() { return std::min(offset, secondaryOffset); }
     int32_t EndOffset() { return std::max(offset, secondaryOffset); }
+
+    nsCOMPtr<nsIContent> content;
+    int32_t offset;
+    int32_t secondaryOffset;
     // This value indicates whether the associated content is before or after
     // the offset; the most visible use is to allow the caret to know which line
     // to display on.
@@ -3256,8 +3282,8 @@ public:
    */
   static void RootFrameList(nsPresContext* aPresContext,
                             FILE* out = stderr, const char* aPrefix = "");
-  virtual void DumpFrameTree();
-  void DumpFrameTreeLimited();
+  virtual void DumpFrameTree() const;
+  void DumpFrameTreeLimited() const;
 
   virtual nsresult  GetFrameName(nsAString& aResult) const = 0;
 #endif

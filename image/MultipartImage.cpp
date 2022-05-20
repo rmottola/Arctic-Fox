@@ -38,10 +38,16 @@ public:
   void BlockUntilDecodedAndFinishObserving()
   {
     // Use GetFrame() to block until our image finishes decoding.
-    mImage->GetFrame(imgIContainer::FRAME_CURRENT,
-                     imgIContainer::FLAG_SYNC_DECODE);
+    nsRefPtr<SourceSurface> surface =
+      mImage->GetFrame(imgIContainer::FRAME_CURRENT,
+                       imgIContainer::FLAG_SYNC_DECODE);
 
-    FinishObserving();
+    // GetFrame() should've sent synchronous notifications that would have
+    // caused us to call FinishObserving() (and null out mImage) already. If for
+    // some reason it didn't, we should do so here.
+    if (mImage) {
+      FinishObserving();
+    }
   }
 
   virtual void Notify(int32_t aType,
@@ -129,9 +135,7 @@ MultipartImage::~MultipartImage()
   mTracker->ResetImage();
 }
 
-NS_IMPL_QUERY_INTERFACE_INHERITED0(MultipartImage, ImageWrapper)
-NS_IMPL_ADDREF(MultipartImage)
-NS_IMPL_RELEASE(MultipartImage)
+NS_IMPL_ISUPPORTS_INHERITED0(MultipartImage, ImageWrapper)
 
 void
 MultipartImage::BeginTransitionToPart(Image* aNextPart)
@@ -154,7 +158,16 @@ MultipartImage::BeginTransitionToPart(Image* aNextPart)
   mNextPart->IncrementAnimationConsumers();
 }
 
-void MultipartImage::FinishTransition()
+static Progress
+FilterProgress(Progress aProgress)
+{
+  // Filter out onload blocking notifications, since we don't want to block
+  // onload for multipart images.
+  return aProgress & ~(FLAG_ONLOAD_BLOCKED | FLAG_ONLOAD_UNBLOCKED);
+}
+
+void
+MultipartImage::FinishTransition()
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(mNextPart, "Should have a next part here");
@@ -169,7 +182,8 @@ void MultipartImage::FinishTransition()
     mTracker->ResetForNewRequest();
     nsRefPtr<ProgressTracker> currentPartTracker =
       InnerImage()->GetProgressTracker();
-    mTracker->SyncNotifyProgress(currentPartTracker->GetProgress());
+    mTracker
+      ->SyncNotifyProgress(FilterProgress(currentPartTracker->GetProgress()));
 
     return;
   }
@@ -189,8 +203,9 @@ void MultipartImage::FinishTransition()
 
   // Finally, send all the notifications for the new current part and send a
   // FRAME_UPDATE notification so that observers know to redraw.
-  mTracker->SyncNotifyProgress(newCurrentPartTracker->GetProgress(),
-                               GetMaxSizedIntRect());
+  mTracker
+    ->SyncNotifyProgress(FilterProgress(newCurrentPartTracker->GetProgress()),
+                         GetMaxSizedIntRect());
 }
 
 already_AddRefed<imgIContainer>

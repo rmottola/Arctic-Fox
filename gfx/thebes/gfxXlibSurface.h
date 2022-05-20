@@ -17,6 +17,12 @@
 
 #include "nsSize.h"
 
+// Although the dimension parameters in the xCreatePixmapReq wire protocol are
+// 16-bit unsigned integers, the server's CreatePixmap returns BadAlloc if
+// either dimension cannot be represented by a 16-bit *signed* integer.
+#define XLIB_IMAGE_SIDE_SIZE_LIMIT 0x7fff
+
+
 class gfxXlibSurface final : public gfxASurface {
 public:
     // construct a wrapper around the specified drawable with dpy/visual.
@@ -78,10 +84,6 @@ public:
 
     // Find a visual and colormap pair suitable for rendering to this surface.
     bool GetColormapAndVisual(Colormap* colormap, Visual **visual);
-
-    // This surface is a wrapper around X pixmaps, which are stored in the X
-    // server, not the main application.
-    virtual gfxMemoryLocation GetMemoryLocation() const override;
 
 #if defined(GL_PROVIDER_GLX)
     GLXPixmap GetGLXPixmap();

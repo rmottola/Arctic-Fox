@@ -101,6 +101,7 @@
 #include "nsCCUncollectableMarker.h"
 #include "nsWrapperCacheInlines.h"
 #include "mozilla/dom/CanvasRenderingContext2DBinding.h"
+#include "mozilla/dom/CanvasPath.h"
 #include "mozilla/dom/HTMLImageElement.h"
 #include "mozilla/dom/HTMLVideoElement.h"
 #include "mozilla/dom/SVGMatrix.h"
@@ -949,7 +950,9 @@ CanvasRenderingContext2D::CanvasRenderingContext2D()
   , mIPC(false)
   , mDrawObserver(nullptr)
   , mIsEntireFrameInvalid(false)
-  , mPredictManyRedrawCalls(false), mPathTransformWillUpdate(false)
+  , mPredictManyRedrawCalls(false)
+  , mIsCapturedFrameInvalid(false)
+  , mPathTransformWillUpdate(false)
   , mInvalidateCount(0)
 {
   sNumLivingContexts++;
@@ -1054,6 +1057,7 @@ CanvasRenderingContext2D::Reset()
   // no longer be valid.
   mIsEntireFrameInvalid = false;
   mPredictManyRedrawCalls = false;
+  mIsCapturedFrameInvalid = false;
 
   return NS_OK;
 }
@@ -1112,6 +1116,8 @@ CanvasRenderingContext2D::StyleColorToString(const nscolor& aColor, nsAString& a
 nsresult
 CanvasRenderingContext2D::Redraw()
 {
+  mIsCapturedFrameInvalid = true;
+
   if (mIsEntireFrameInvalid) {
     return NS_OK;
   }
@@ -1133,6 +1139,8 @@ CanvasRenderingContext2D::Redraw()
 void
 CanvasRenderingContext2D::Redraw(const mgfx::Rect &r)
 {
+  mIsCapturedFrameInvalid = true;
+
   ++mInvalidateCount;
 
   if (mIsEntireFrameInvalid) {
@@ -1170,6 +1178,8 @@ CanvasRenderingContext2D::DidRefresh()
 void
 CanvasRenderingContext2D::RedrawUser(const gfxRect& r)
 {
+  mIsCapturedFrameInvalid = true;
+
   if (mIsEntireFrameInvalid) {
     ++mInvalidateCount;
     return;
@@ -1393,13 +1403,14 @@ CanvasRenderingContext2D::EnsureTarget(RenderingMode aRenderingMode)
         DemoteOldestContextIfNecessary();
         mBufferProvider = nullptr;
 
+#if USE_SKIA_GPU
         SkiaGLGlue* glue = gfxPlatform::GetPlatform()->GetSkiaGLGlue();
 
-#if USE_SKIA_GPU
         if (glue && glue->GetGrContext() && glue->GetGLContext()) {
           mTarget = Factory::CreateDrawTargetSkiaWithGrContext(glue->GetGrContext(), size, format);
           if (mTarget) {
             AddDemotableContext(this);
+            mBufferProvider = new PersistentBufferProviderBasic(mTarget);
           } else {
             printf_stderr("Failed to create a SkiaGL DrawTarget, falling back to software\n");
             mode = RenderingMode::SoftwareBackendMode;
@@ -3351,15 +3362,24 @@ CanvasRenderingContext2D::MeasureText(const nsAString& rawText,
 void
 CanvasRenderingContext2D::AddHitRegion(const HitRegionOptions& options, ErrorResult& error)
 {
-  // check if the path is valid
-  EnsureUserSpacePath(CanvasWindingRule::Nonzero);
-  if(!mPath) {
+  RefPtr<gfx::Path> path;
+  if (options.mPath) {
+    path = options.mPath->GetPath(CanvasWindingRule::Nonzero, mTarget);
+  }
+
+  if (!path) {
+    // check if the path is valid
+    EnsureUserSpacePath(CanvasWindingRule::Nonzero);
+    path = mPath;
+  }
+
+  if(!path) {
     error.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
     return;
   }
 
   // get the bounds of the current path. They are relative to the canvas
-  mgfx::Rect bounds(mPath->GetBounds(mTarget->GetTransform()));
+  mgfx::Rect bounds(path->GetBounds(mTarget->GetTransform()));
   if ((bounds.width == 0) || (bounds.height == 0) || !bounds.IsFinite()) {
     // The specified region has no pixels.
     error.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
@@ -3388,7 +3408,7 @@ CanvasRenderingContext2D::AddHitRegion(const HitRegionOptions& options, ErrorRes
   RegionInfo info;
   info.mId = options.mId;
   info.mElement = options.mControl;
-  RefPtr<PathBuilder> pathBuilder = mPath->TransformedCopyToBuilder(mTarget->GetTransform());
+  RefPtr<PathBuilder> pathBuilder = path->TransformedCopyToBuilder(mTarget->GetTransform());
   info.mPath = pathBuilder->Finish();
 
   mHitRegionsOptions.InsertElementAt(0, info);
@@ -4006,16 +4026,16 @@ gfxFontGroup *CanvasRenderingContext2D::GetCurrentFontStyle()
     if (err.Failed() || !fontUpdated) {
       gfxFontStyle style;
       style.size = kDefaultFontSize;
+      gfxTextPerfMetrics* tp = nullptr;
+      if (presShell && !presShell->IsDestroying()) {
+        tp = presShell->GetPresContext()->GetTextPerfMetrics();
+      }
       CurrentState().fontGroup =
         gfxPlatform::GetPlatform()->CreateFontGroup(FontFamilyList(eFamily_sans_serif),
-                                                    &style,
+                                                    &style, tp,
                                                     nullptr);
       if (CurrentState().fontGroup) {
         CurrentState().font = kDefaultFontStyle;
-        if (presShell && !presShell->IsDestroying()) {
-          CurrentState().fontGroup->SetTextPerfMetrics(
-            presShell->GetPresContext()->GetTextPerfMetrics());
-        }
       } else {
         NS_ERROR("Default canvas font is invalid");
       }
@@ -5589,12 +5609,7 @@ CanvasRenderingContext2D::GetBufferProvider(LayerManager* aManager)
     return nullptr;
   }
 
-  mBufferProvider = aManager->CreatePersistentBufferProvider(mTarget->GetSize(), mTarget->GetFormat());
-
-  RefPtr<SourceSurface> surf = mTarget->Snapshot();
-
-  mTarget = mBufferProvider->GetDT(IntRect(IntPoint(), mTarget->GetSize()));
-  mTarget->CopySurface(surf, IntRect(IntPoint(), mTarget->GetSize()), IntPoint());
+  mBufferProvider = new PersistentBufferProviderBasic(mTarget);
 
   return mBufferProvider;
 }
@@ -5710,6 +5725,17 @@ CanvasRenderingContext2D::MarkContextClean()
   mInvalidateCount = 0;
 }
 
+void
+CanvasRenderingContext2D::MarkContextCleanForFrameCapture()
+{
+  mIsCapturedFrameInvalid = false;
+}
+
+bool
+CanvasRenderingContext2D::IsContextCleanForFrameCapture()
+{
+  return !mIsCapturedFrameInvalid;
+}
 
 bool
 CanvasRenderingContext2D::ShouldForceInactiveLayer(LayerManager *aManager)

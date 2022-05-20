@@ -139,6 +139,15 @@ MouseEvent::InitMouseEvent(const nsAString& aType,
   }
 }
 
+void
+MouseEvent::InitializeExtraMouseEventDictionaryMembers(const MouseEventInit& aParam)
+{
+  InitModifiers(aParam);
+  mEvent->AsMouseEventBase()->buttons = aParam.mButtons;
+  mMovementPoint.x = aParam.mMovementX;
+  mMovementPoint.y = aParam.mMovementY;
+}
+
 already_AddRefed<MouseEvent>
 MouseEvent::Constructor(const GlobalObject& aGlobal,
                         const nsAString& aType,
@@ -154,20 +163,8 @@ MouseEvent::Constructor(const GlobalObject& aGlobal,
                     aParam.mCtrlKey, aParam.mAltKey, aParam.mShiftKey,
                     aParam.mMetaKey, aParam.mButton, aParam.mRelatedTarget,
                     aRv);
+  e->InitializeExtraMouseEventDictionaryMembers(aParam);
   e->SetTrusted(trusted);
-
-  switch (e->mEvent->mClass) {
-    case eMouseEventClass:
-    case eMouseScrollEventClass:
-    case eWheelEventClass:
-    case eDragEventClass:
-    case ePointerEventClass:
-    case eSimpleGestureEventClass:
-      e->mEvent->AsMouseEventBase()->buttons = aParam.mButtons;
-      break;
-    default:
-      break;
-  }
 
   return e.forget();
 }
@@ -315,7 +312,7 @@ NS_IMETHODIMP
 MouseEvent::GetMozMovementX(int32_t* aMovementX)
 {
   NS_ENSURE_ARG_POINTER(aMovementX);
-  *aMovementX = MozMovementX();
+  *aMovementX = MovementX();
 
   return NS_OK;
 }
@@ -324,7 +321,7 @@ NS_IMETHODIMP
 MouseEvent::GetMozMovementY(int32_t* aMovementY)
 {
   NS_ENSURE_ARG_POINTER(aMovementY);
-  *aMovementY = MozMovementY();
+  *aMovementY = MovementY();
 
   return NS_OK;
 }

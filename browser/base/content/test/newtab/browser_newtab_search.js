@@ -106,35 +106,6 @@ function runTests() {
     promiseClick(logoImg()),
   ]).then(TestRunner.next);
 
-  // In the search panel, click the no-logo engine.  It should become the
-  // current engine.
-  let noLogoBox = null;
-  for (let box of panel.childNodes) {
-    if (box.getAttribute("engine") == noLogoEngine.name) {
-      noLogoBox = box;
-      break;
-    }
-  }
-  ok(noLogoBox, "Search panel should contain the no-logo engine");
-  yield Promise.all([
-    promiseSearchEvents(["CurrentEngine"]),
-    promiseClick(noLogoBox),
-  ]).then(TestRunner.next);
-
-  yield checkCurrentEngine(ENGINE_NO_LOGO, false, false);
-
-  // Switch back to the 1x-and-2x logo engine.
-  Services.search.currentEngine = logo1x2xEngine;
-  yield promiseSearchEvents(["CurrentEngine"]).then(TestRunner.next);
-  yield checkCurrentEngine(ENGINE_1X_2X_LOGO, true, true);
-
-  // Open the panel again.
-  yield Promise.all([
-    promisePanelShown(panel),
-    promiseClick(logoImg()),
-  ]).then(TestRunner.next);
-
-  // In the search panel, click the Manage Engines box.
   let manageBox = $("manage");
   ok(!!manageBox, "The Manage Engines box should be present in the document");
   yield Promise.all([
@@ -149,8 +120,10 @@ function runTests() {
     TestRunner.next();
   });
   Services.search.currentEngine = suggestionEngine;
-  yield promiseSearchEvents(["CurrentEngine"]).then(TestRunner.next);
-  yield checkCurrentEngine(ENGINE_SUGGESTIONS, false, false);
+  is(panel.childNodes.length, 1, "Search panel should only contain the Manage Engines entry");
+  is(panel.childNodes[0], manageBox, "Search panel should contain the Manage Engines entry");
+
+  panel.hidePopup();
 
   // Avoid intermittent failures.
   gSearch()._suggestionController.remoteTimeout = 5000;

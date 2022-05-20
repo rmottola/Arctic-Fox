@@ -15,7 +15,6 @@
 #include "mozilla/UniquePtr.h"
 #include "nsRect.h"
 
-#ifdef MOZ_ENABLE_SKIA
 
 namespace skia {
   class ConvolutionFilter1D;
@@ -23,6 +22,18 @@ namespace skia {
 
 namespace mozilla {
 namespace image {
+
+/**
+ * DownscalerInvalidRect wraps two invalidation rects: one in terms of the
+ * original image size, and one in terms of the target size.
+ */
+struct DownscalerInvalidRect
+{
+  nsIntRect mOriginalSizeRect;
+  nsIntRect mTargetSizeRect;
+};
+
+#ifdef MOZ_ENABLE_SKIA
 
 /**
  * Downscaler is a high-quality, streaming image downscaler based upon Skia's
@@ -47,6 +58,7 @@ public:
 
   const nsIntSize& OriginalSize() const { return mOriginalSize; }
   const nsIntSize& TargetSize() const { return mTargetSize; }
+  const gfxSize& Scale() const { return mScale; }
 
   /**
    * Begins a new frame and reinitializes the Downscaler.
@@ -58,13 +70,20 @@ public:
    *                      decode.
    * @param aHasAlpha Whether or not this frame has an alpha channel.
    *                  Performance is a little better if it doesn't have one.
+   * @param aFlipVertically If true, output rows will be written to the output
+   *                        buffer in reverse order vertically, which matches
+   *                        the way they are stored in some image formats.
    */
   nsresult BeginFrame(const nsIntSize& aOriginalSize,
                       uint8_t* aOutputBuffer,
-                      bool aHasAlpha);
+                      bool aHasAlpha,
+                      bool aFlipVertically = false);
 
   /// Retrieves the buffer into which the Decoder should write each row.
   uint8_t* RowBuffer() { return mRowBuffer.get(); }
+
+  /// Clears the current row buffer (optionally starting at @aStartingAtCol).
+  void ClearRow(uint32_t aStartingAtCol = 0);
 
   /// Signals that the decoder has finished writing a row into the row buffer.
   void CommitRow();
@@ -73,7 +92,7 @@ public:
   bool HasInvalidation() const;
 
   /// Takes the Downscaler's current invalid rect and resets it.
-  nsIntRect TakeInvalidRect();
+  DownscalerInvalidRect TakeInvalidRect();
 
   /**
    * Resets the Downscaler's position in the image, for a new progressive pass
@@ -88,6 +107,7 @@ private:
 
   nsIntSize mOriginalSize;
   nsIntSize mTargetSize;
+  gfxSize mScale;
 
   uint8_t* mOutputBuffer;
 
@@ -104,23 +124,16 @@ private:
   int32_t mCurrentOutLine;
   int32_t mCurrentInLine;
 
-  bool mHasAlpha;
+  bool mHasAlpha : 1;
+  bool mFlipVertically : 1;
 };
 
-} // namespace image
-} // namespace mozilla
-
-
 #else
-
 
 /**
  * Downscaler requires Skia to work, so we provide a dummy implementation if
  * Skia is disabled that asserts if constructed.
  */
-
-namespace mozilla {
-namespace image {
 
 class Downscaler
 {
@@ -132,23 +145,26 @@ public:
 
   const nsIntSize& OriginalSize() const { return nsIntSize(); }
   const nsIntSize& TargetSize() const { return nsIntSize(); }
+  const gfxSize& Scale() const { return gfxSize(1.0, 1.0); }
 
-  nsresult BeginFrame(const nsIntSize&, uint8_t*, bool)
+  nsresult BeginFrame(const nsIntSize&, uint8_t*, bool, bool = false)
   {
     return NS_ERROR_FAILURE;
   }
 
   uint8_t* RowBuffer() { return nullptr; }
+  void ClearRow(uint32_t = 0) { }
   void CommitRow() { }
   bool HasInvalidation() const { return false; }
-  nsIntRect TakeInvalidRect() { return nsIntRect(); }
+  DownscalerInvalidRect TakeInvalidRect() { return DownscalerInvalidRect(); }
   void ResetForNextProgressivePass() { }
 };
+
+#endif // MOZ_ENABLE_SKIA
+
 
 
 } // namespace image
 } // namespace mozilla
-
-#endif // MOZ_ENABLE_SKIA
 
 #endif // mozilla_image_Downscaler_h

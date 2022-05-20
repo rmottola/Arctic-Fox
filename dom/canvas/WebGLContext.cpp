@@ -220,6 +220,7 @@ WebGLContext::WebGLContext()
 {
     mGeneration = 0;
     mInvalidated = false;
+    mCapturedFrameInvalidated = false;
     mShouldPresent = true;
     mResetLayer = true;
     mOptionsFrozen = false;
@@ -271,6 +272,8 @@ WebGLContext::WebGLContext()
     mGLMaxDrawBuffers = 1;
     mGLMaxTransformFeedbackSeparateAttribs = 0;
     mGLMaxUniformBufferBindings = 0;
+    mGLMax3DTextureSize = 0;
+    mGLMaxArrayTextureLayers = 0;
 
     // See OpenGL ES 2.0.25 spec, 6.2 State Tables, table 6.13
     mPixelStorePackAlignment = 4;
@@ -411,10 +414,12 @@ WebGLContext::DestroyResourcesAndContext()
 void
 WebGLContext::Invalidate()
 {
-    if (mInvalidated)
+    if (!mCanvasElement)
         return;
 
-    if (!mCanvasElement)
+    mCapturedFrameInvalidated = true;
+
+    if (mInvalidated)
         return;
 
     nsSVGEffects::InvalidateDirectRenderingObservers(mCanvasElement);
@@ -667,6 +672,7 @@ PopulateCapFallbackQueue(const SurfaceCaps& baseCaps,
 static bool
 CreateOffscreen(GLContext* gl, const WebGLContextOptions& options,
                 const nsCOMPtr<nsIGfxInfo>& gfxInfo, WebGLContext* webgl,
+                layers::LayersBackend layersBackend,
                 layers::ISurfaceAllocator* surfAllocator)
 {
     SurfaceCaps baseCaps;
@@ -682,10 +688,14 @@ CreateOffscreen(GLContext* gl, const WebGLContextOptions& options,
     if (!baseCaps.alpha)
         baseCaps.premultAlpha = true;
 
-    if (gl->IsANGLE() || gl->GetContextType() == GLContextType::GLX) {
+    if (gl->IsANGLE() ||
+        (gl->GetContextType() == GLContextType::GLX &&
+         layersBackend == LayersBackend::LAYERS_OPENGL))
+    {
         // We can't use no-alpha formats on ANGLE yet because of:
         // https://code.google.com/p/angleproject/issues/detail?id=764
-        // GLX only supports GL_RGBA pixmaps as well.
+        // GLX only supports GL_RGBA pixmaps as well. Since we can't blit from
+        // an RGB FB to GLX's RGBA FB, force RGBA when surface sharing.
         baseCaps.alpha = true;
     }
 
@@ -754,7 +764,8 @@ WebGLContext::CreateOffscreenGL(bool forceEnabled)
         if (!gl)
             break;
 
-        if (!CreateOffscreen(gl, mOptions, gfxInfo, this, surfAllocator))
+        if (!CreateOffscreen(gl, mOptions, gfxInfo, this,
+                             GetCompositorBackendType(), surfAllocator))
             break;
 
         if (!InitAndValidateGL())
@@ -1272,6 +1283,17 @@ WebGLContext::GetCanvasLayer(nsDisplayListBuilder* builder,
     return canvasLayer.forget();
 }
 
+layers::LayersBackend
+WebGLContext::GetCompositorBackendType() const
+{
+    nsIWidget* docWidget = nsContentUtils::WidgetForDocument(mCanvasElement->OwnerDoc());
+    if (docWidget) {
+        layers::LayerManager* layerManager = docWidget->GetLayerManager();
+        return layerManager->GetCompositorBackendType();
+    }
+    return LayersBackend::LAYERS_NONE;
+}
+
 void
 WebGLContext::GetContextAttributes(dom::Nullable<dom::WebGLContextAttributes>& retval)
 {
@@ -1350,6 +1372,7 @@ WebGLContext::ForceClearFramebufferWithDefaultValues(bool fakeNoAlpha, GLbitfiel
     bool initializeStencilBuffer = 0 != (mask & LOCAL_GL_STENCIL_BUFFER_BIT);
     bool drawBuffersIsEnabled = IsExtensionEnabled(WebGLExtensionID::WEBGL_draw_buffers);
     bool shouldOverrideDrawBuffers = false;
+    bool usingDefaultFrameBuffer = !mBoundDrawFramebuffer;
 
     GLenum currentDrawBuffers[WebGLContext::kMaxColorAttachments];
 
@@ -1367,7 +1390,7 @@ WebGLContext::ForceClearFramebufferWithDefaultValues(bool fakeNoAlpha, GLbitfiel
 
             GLenum drawBuffersCommand[WebGLContext::kMaxColorAttachments] = { LOCAL_GL_NONE };
 
-            for(int32_t i = 0; i < mGLMaxDrawBuffers; i++) {
+            for (int32_t i = 0; i < mGLMaxDrawBuffers; i++) {
                 GLint temp;
                 gl->fGetIntegerv(LOCAL_GL_DRAW_BUFFER0 + i, &temp);
                 currentDrawBuffers[i] = temp;
@@ -1377,6 +1400,16 @@ WebGLContext::ForceClearFramebufferWithDefaultValues(bool fakeNoAlpha, GLbitfiel
                 }
                 if (currentDrawBuffers[i] != drawBuffersCommand[i])
                     shouldOverrideDrawBuffers = true;
+            }
+
+            // When clearing the default framebuffer, we must be clearing only
+            // GL_BACK, and nothing else, or else gl may return an error. We will
+            // only use the first element of currentDrawBuffers in this case.
+            if (usingDefaultFrameBuffer) {
+                gl->Screen()->SetDrawBuffer(LOCAL_GL_BACK);
+                if (currentDrawBuffers[0] == LOCAL_GL_COLOR_ATTACHMENT0)
+                    currentDrawBuffers[0] = LOCAL_GL_BACK;
+                shouldOverrideDrawBuffers = false;
             }
             // calling draw buffers can cause resolves on adreno drivers so
             // we try to avoid calling it
@@ -1423,8 +1456,13 @@ WebGLContext::ForceClearFramebufferWithDefaultValues(bool fakeNoAlpha, GLbitfiel
 
     // Restore GL state after clearing.
     if (initializeColorBuffer) {
-        if (shouldOverrideDrawBuffers) {
-            gl->fDrawBuffers(mGLMaxDrawBuffers, currentDrawBuffers);
+
+        if (drawBuffersIsEnabled) {
+            if (usingDefaultFrameBuffer) {
+                gl->Screen()->SetDrawBuffer(currentDrawBuffers[0]);
+            } else if (shouldOverrideDrawBuffers) {
+                gl->fDrawBuffers(mGLMaxDrawBuffers, currentDrawBuffers);
+            }
         }
 
         gl->fColorMask(mColorWriteMask[0],
@@ -1806,163 +1844,17 @@ WebGLContext::DidRefresh()
     }
 }
 
-bool
-WebGLContext::TexImageFromVideoElement(const TexImageTarget texImageTarget,
-                                       GLint level, GLenum internalFormat,
-                                       GLenum format, GLenum type,
-                                       mozilla::dom::Element& elt)
-{
-    if (type == LOCAL_GL_HALF_FLOAT_OES &&
-        !gl->IsExtensionSupported(gl::GLContext::OES_texture_half_float))
-    {
-        type = LOCAL_GL_HALF_FLOAT;
-    }
-
-    if (!ValidateTexImageFormatAndType(format, type,
-                                       WebGLTexImageFunc::TexImage,
-                                       WebGLTexDimensions::Tex2D))
-    {
-        return false;
-    }
-
-    HTMLVideoElement* video = HTMLVideoElement::FromContentOrNull(&elt);
-    if (!video)
-        return false;
-
-    uint16_t readyState;
-    if (NS_SUCCEEDED(video->GetReadyState(&readyState)) &&
-        readyState < nsIDOMHTMLMediaElement::HAVE_CURRENT_DATA)
-    {
-        //No frame inside, just return
-        return false;
-    }
-
-    // If it doesn't have a principal, just bail
-    nsCOMPtr<nsIPrincipal> principal = video->GetCurrentPrincipal();
-    if (!principal)
-        return false;
-
-    mozilla::layers::ImageContainer* container = video->GetImageContainer();
-    if (!container)
-        return false;
-
-    if (video->GetCORSMode() == CORS_NONE) {
-        bool subsumes;
-        nsresult rv = mCanvasElement->NodePrincipal()->Subsumes(principal, &subsumes);
-        if (NS_FAILED(rv) || !subsumes) {
-            GenerateWarning("It is forbidden to load a WebGL texture from a cross-domain element that has not been validated with CORS. "
-                                "See https://developer.mozilla.org/en/WebGL/Cross-Domain_Textures");
-            return false;
-        }
-    }
-
-    AutoLockImage lockedImage(container);
-    Image* srcImage = lockedImage.GetImage();
-    if (!srcImage) {
-      return false;
-    }
-
-    gl->MakeCurrent();
-
-    WebGLTexture* tex = ActiveBoundTextureForTexImageTarget(texImageTarget);
-
-    const WebGLTexture::ImageInfo& info = tex->ImageInfoAt(texImageTarget, 0);
-    bool dimensionsMatch = info.Width() == srcImage->GetSize().width &&
-                           info.Height() == srcImage->GetSize().height;
-    if (!dimensionsMatch) {
-        // we need to allocation
-        gl->fTexImage2D(texImageTarget.get(), level, internalFormat,
-                        srcImage->GetSize().width, srcImage->GetSize().height,
-                        0, format, type, nullptr);
-    }
-
-    const gl::OriginPos destOrigin = mPixelStoreFlipY ? gl::OriginPos::BottomLeft
-                                                      : gl::OriginPos::TopLeft;
-    bool ok = gl->BlitHelper()->BlitImageToTexture(srcImage,
-                                                   srcImage->GetSize(),
-                                                   tex->mGLName,
-                                                   texImageTarget.get(),
-                                                   destOrigin);
-    if (ok) {
-        TexInternalFormat effectiveInternalFormat =
-            EffectiveInternalFormatFromInternalFormatAndType(internalFormat,
-                                                             type);
-        MOZ_ASSERT(effectiveInternalFormat != LOCAL_GL_NONE);
-        tex->SetImageInfo(texImageTarget, level, srcImage->GetSize().width,
-                          srcImage->GetSize().height, 1,
-                          effectiveInternalFormat,
-                          WebGLImageDataStatus::InitializedImageData);
-        tex->Bind(TexImageTargetToTexTarget(texImageTarget));
-    }
-    return ok;
-}
-
-void
-WebGLContext::TexSubImage2D(GLenum rawTexImageTarget, GLint level, GLint xoffset,
-                            GLint yoffset, GLenum format, GLenum type,
-                            dom::Element* elt, ErrorResult* const out_rv)
-{
-    // TODO: Consolidate all the parameter validation
-    // checks. Instead of spreading out the cheks in multple
-    // places, consolidate into one spot.
-
-    if (IsContextLost())
-        return;
-
-    if (!ValidateTexImageTarget(rawTexImageTarget,
-                                WebGLTexImageFunc::TexSubImage,
-                                WebGLTexDimensions::Tex2D))
-    {
-        ErrorInvalidEnumInfo("texSubImage2D: target", rawTexImageTarget);
-        return;
-    }
-
-    const TexImageTarget texImageTarget(rawTexImageTarget);
-
-    if (level < 0)
-        return ErrorInvalidValue("texSubImage2D: level is negative");
-
-    const int32_t maxLevel = MaxTextureLevelForTexImageTarget(texImageTarget);
-    if (level > maxLevel) {
-        ErrorInvalidValue("texSubImage2D: level %d is too large, max is %d",
-                          level, maxLevel);
-        return;
-    }
-
-    WebGLTexture* tex = ActiveBoundTextureForTexImageTarget(texImageTarget);
-    if (!tex)
-        return ErrorInvalidOperation("texSubImage2D: no texture bound on active texture unit");
-
-    const WebGLTexture::ImageInfo& imageInfo = tex->ImageInfoAt(texImageTarget, level);
-    const TexInternalFormat internalFormat = imageInfo.EffectiveInternalFormat();
-
-    // Trying to handle the video by GPU directly first
-    if (TexImageFromVideoElement(texImageTarget, level,
-                                 internalFormat.get(), format, type, *elt))
-    {
-        return;
-    }
-
-    RefPtr<gfx::DataSourceSurface> data;
-    WebGLTexelFormat srcFormat;
-    nsLayoutUtils::SurfaceFromElementResult res = SurfaceFromElement(*elt);
-    *out_rv = SurfaceFromElementResultToImageSurface(res, data, &srcFormat);
-    if (out_rv->Failed() || !data)
-        return;
-
-    gfx::IntSize size = data->GetSize();
-    uint32_t byteLength = data->Stride() * size.height;
-    TexSubImage2D_base(texImageTarget.get(), level, xoffset, yoffset, size.width,
-                       size.height, data->Stride(), format, type, data->GetData(),
-                       byteLength, js::Scalar::MaxTypedArrayViewType, srcFormat,
-                       res.mIsPremultiplied);
-}
-
 size_t
 RoundUpToMultipleOf(size_t value, size_t multiple)
 {
     size_t overshoot = value + multiple - 1;
     return overshoot - (overshoot % multiple);
+}
+
+CheckedUint32
+RoundedToNextMultipleOf(CheckedUint32 x, CheckedUint32 y)
+{
+    return ((x + y - 1) / y) * y;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

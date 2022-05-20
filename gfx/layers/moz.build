@@ -102,6 +102,7 @@ EXPORTS.mozilla.layers += [
     'apz/util/APZEventState.h',
     'apz/util/APZThreadUtils.h',
     'apz/util/ChromeProcessController.h',
+    'apz/util/DoubleTapToZoom.h',
     'apz/util/InputAPZContext.h',
     'AtomicRefCountedWithFinalize.h',
     'AxisPhysicsModel.h',
@@ -246,6 +247,7 @@ UNIFIED_SOURCES += [
     'apz/util/APZEventState.cpp',
     'apz/util/APZThreadUtils.cpp',
     'apz/util/ChromeProcessController.cpp',
+    'apz/util/DoubleTapToZoom.cpp',
     'apz/util/InputAPZContext.cpp',
     'AxisPhysicsModel.cpp',
     'AxisPhysicsMSDModel.cpp',
@@ -381,6 +383,7 @@ include('/ipc/chromium/chromium-config.mozbuild')
 LOCAL_INCLUDES += [
     '/docshell/base',  # for nsDocShell.h
     '/layout/base',    # for TouchManager.h
+    '/layout/generic', # for nsTextFrame.h
 ]
 
 FINAL_LIBRARY = 'xul'

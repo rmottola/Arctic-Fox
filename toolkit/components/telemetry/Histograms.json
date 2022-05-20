@@ -6079,6 +6079,13 @@
     "kind": "boolean",
     "description": "The result of the startup default desktop browser check."
   },
+  "WIN_10_DEFAULT_BROWSER_AB_TEST": {
+    "alert_emails": ["jwein@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "enumerated",
+    "n_values": 4,
+    "description": "A/B test of different default browser dialogs on Windows 10 (0=openas-notdefault, 1=openas-default, 2=modernsettings-notdefault, 3=modernsettings-default)."
+  },
   "BROWSER_IS_ASSIST_DEFAULT": {
     "expires_in_version": "never",
     "kind": "boolean",
@@ -7372,6 +7379,14 @@
     "releaseChannelCollection": "opt-out",
     "description": "Reports whether or not graphics drivers crashed during startup."
   },
+  "GRAPHICS_SANITY_TEST_OS_SNAPSHOT": {
+    "alert_emails": ["danderson@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 10,
+    "releaseChannelCollection": "opt-out",
+    "description": "Reports whether the graphics sanity test passed an OS snapshot test. 0=Pass, 1=Fail, 2=Error, 3=Timed out."
+  },
   "PERMISSIONS_SQL_CORRUPTED": {
     "expires_in_version": "never",
     "kind": "count",
@@ -7381,5 +7396,97 @@
     "expires_in_version": "never",
     "kind": "count",
     "description": "Record the removal of defective permissions.sqlite"
+  },
+  "FXA_CONFIGURED": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "flag",
+    "releaseChannelCollection": "opt-out",
+    "description": "If the user is signed in to a Firefox Account on this device"
+  },
+  "FXA_UNVERIFIED_ACCOUNT_ERRORS": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "count",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "FxA key fetch and certificate signing errors caused by an unverified account. Keyed on the FxA auth server endpoint."
+  },
+  "FXA_HAWK_ERRORS": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "count",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "FxA error responses caused by invalid Hawk credentials. Keyed on the FxA auth server endpoint."
+  },
+  "FXA_SERVER_ERRORS": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "count",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "400 and 500-class server errors returned by the FxA auth server. Keyed on the endpoint."
+  },
+  "TOKENSERVER_AUTH_ERRORS": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "count",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "Token server errors caused by invalid BrowserID assertions. Keyed on the token server error cause."
+  },
+  "WEAVE_ENGINE_APPLY_NEW_FAILURES": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "count",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "Number of records that a Sync engine failed to apply. Keyed on the engine name."
+  },
+  "WEAVE_ENGINE_APPLY_FAILURES": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "count",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "Failures encountered applying incoming records. Keyed on the engine name."
+  },
+  "WEAVE_ENGINE_SYNC_ERRORS": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "count",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "Exceptions thrown by a Sync engine. Keyed on the engine name."
+  },
+  "WEAVE_CAN_FETCH_KEYS": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "flag",
+    "releaseChannelCollection": "opt-out",
+    "description": "Whether Sync keys are present in account storage."
+  },
+  "WEAVE_FXA_KEY_FETCH_ERRORS": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "count",
+    "releaseChannelCollection": "opt-out",
+    "description": "Errors encountered fetching Sync keys, including network errors."
+  },
+  "WEAVE_STORAGE_AUTH_ERRORS": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "count",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "Sync storage server authentication errors. Keyed on the Sync record name."
+  },
+  "WEAVE_HMAC_ERRORS": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "expires_in_version": "45",
+    "kind": "count",
+    "releaseChannelCollection": "opt-out",
+    "description": "Sync cryptoKeys collection HMAC mismatches."
   }
 }

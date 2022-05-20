@@ -62,7 +62,6 @@ pref("browser.cache.memory_limit", 2048); // 2 MB
 
 /* image cache prefs */
 pref("image.cache.size", 1048576); // bytes
-pref("image.high_quality_downscaling.enabled", false);
 pref("canvas.image.cache.limit", 20971520); // 20 MB
 
 /* offline cache prefs */
@@ -326,6 +325,7 @@ pref("media.gonk.enabled", true);
 pref("media.video-queue.default-size", 3);
 
 // optimize images' memory usage
+pref("image.downscale-during-decode.enabled", true);
 pref("image.decode-only-on-draw.enabled", true);
 pref("image.mem.allow_locking_in_content_processes", false); /* don't allow image locking */
 // Limit the surface cache to 1/8 of main memory or 128MB, whichever is smaller.
@@ -904,7 +904,7 @@ pref("devtools.debugger.unix-domain-socket", "/data/local/debugger-socket");
 // falling back to Skia/software for smaller canvases
 #ifdef MOZ_WIDGET_GONK
 pref("gfx.canvas.azure.backends", "skia");
-pref("gfx.canvas.azure.accelerated", true);
+pref("gfx.canvas.azure.accelerated", false);
 #endif
 
 // Turn on dynamic cache size for Skia

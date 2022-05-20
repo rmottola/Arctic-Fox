@@ -41,6 +41,7 @@ from .data import (
     ExternalStaticLibrary,
     ExternalSharedLibrary,
     HeaderFileSubstitution,
+    HostDefines,
     HostLibrary,
     HostProgram,
     HostSimpleProgram,
@@ -572,7 +573,7 @@ class TreeMetadataEmitter(LoggingMixin):
             context['OS_LIBS'].append('delayimp')
 
         for v in ['CFLAGS', 'CXXFLAGS', 'CMFLAGS', 'CMMFLAGS', 'ASFLAGS',
-                  'LDFLAGS']:
+                  'LDFLAGS', 'HOST_CFLAGS', 'HOST_CXXFLAGS']:
             if v in context and context[v]:
                 passthru.variables['MOZBUILD_' + v] = context[v]
 
@@ -606,6 +607,10 @@ class TreeMetadataEmitter(LoggingMixin):
         defines = context.get('DEFINES')
         if defines:
             yield Defines(context, defines)
+
+        host_defines = context.get('HOST_DEFINES')
+        if host_defines:
+            yield HostDefines(context, host_defines)
 
         resources = context.get('RESOURCE_FILES')
         if resources:

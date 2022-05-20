@@ -7,7 +7,7 @@
 #define MOZILLA_GFX_PersistentBUFFERPROVIDER_H
 
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc
-#include "mozilla/RefPtr.h"             // for RefPtr, TemporaryRef, etc
+#include "mozilla/RefPtr.h"             // for RefPtr, already_AddRefed, etc
 #include "mozilla/layers/LayersTypes.h"
 #include "mozilla/layers/CompositableForwarder.h"
 #include "mozilla/gfx/Types.h"
@@ -57,8 +57,9 @@ class PersistentBufferProviderBasic : public PersistentBufferProvider
 public:
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(PersistentBufferProviderBasic)
 
-  PersistentBufferProviderBasic(LayerManager* aManager, gfx::IntSize aSize,
-                                gfx::SurfaceFormat aFormat, gfx::BackendType aBackend);
+  PersistentBufferProviderBasic(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
+                                gfx::BackendType aBackend);
+  explicit PersistentBufferProviderBasic(gfx::DrawTarget* aTarget) : mDrawTarget(aTarget) {}
 
   bool IsValid() { return !!mDrawTarget; }
   virtual LayersBackend GetType() { return LayersBackend::LAYERS_BASIC; }
@@ -69,6 +70,7 @@ private:
   RefPtr<gfx::DrawTarget> mDrawTarget;
 };
 
-}
-}
+} // namespace layers
+} // namespace mozilla
+
 #endif

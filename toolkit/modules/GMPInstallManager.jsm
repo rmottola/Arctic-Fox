@@ -15,6 +15,13 @@ const DOWNLOAD_INTERVAL  = 0;
 // 1 day default
 const DEFAULT_SECONDS_BETWEEN_CHECKS = 60 * 60 * 24;
 
+var GMPInstallFailureReason = {
+  GMP_INVALID: 1,
+  GMP_HIDDEN: 2,
+  GMP_DISABLED: 3,
+  GMP_UPDATE_DISABLED: 4,
+};
+
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
@@ -78,7 +85,7 @@ XPCOMUtils.defineLazyGetter(this, "gOSVersion", function aus_gOSVersion() {
       const DWORD = ctypes.uint32_t;
       const WCHAR = ctypes.char16_t;
       const BOOL = ctypes.int;
-  
+
       // This structure is described at:
       // http://msdn.microsoft.com/en-us/library/ms724833%28v=vs.85%29.aspx
       const SZCSDVERSIONLENGTH = 128;
@@ -96,7 +103,7 @@ XPCOMUtils.defineLazyGetter(this, "gOSVersion", function aus_gOSVersion() {
           {wProductType: BYTE},
           {wReserved: BYTE}
           ]);
-  
+
       // This structure is described at:
       // http://msdn.microsoft.com/en-us/library/ms724958%28v=vs.85%29.aspx
       const SYSTEM_INFO = new ctypes.StructType('SYSTEM_INFO',
@@ -113,7 +120,7 @@ XPCOMUtils.defineLazyGetter(this, "gOSVersion", function aus_gOSVersion() {
           {wProcessorLevel: WORD},
           {wProcessorRevision: WORD}
           ]);
-  
+
       let kernel32 = false;
       try {
         kernel32 = ctypes.open("Kernel32");
@@ -121,7 +128,7 @@ XPCOMUtils.defineLazyGetter(this, "gOSVersion", function aus_gOSVersion() {
         LOG("gOSVersion - Unable to open kernel32! " + e);
         osVersion += ".unknown (unknown)";
       }
-  
+
       if(kernel32) {
         try {
           // Get Service pack info
@@ -132,7 +139,7 @@ XPCOMUtils.defineLazyGetter(this, "gOSVersion", function aus_gOSVersion() {
                                                 OSVERSIONINFOEXW.ptr);
             let winVer = OSVERSIONINFOEXW();
             winVer.dwOSVersionInfoSize = OSVERSIONINFOEXW.size;
-  
+
             if(0 !== GetVersionEx(winVer.address())) {
               osVersion += "." + winVer.wServicePackMajor
                         +  "." + winVer.wServicePackMinor;
@@ -144,7 +151,7 @@ XPCOMUtils.defineLazyGetter(this, "gOSVersion", function aus_gOSVersion() {
             LOG("gOSVersion - error getting service pack information. Exception: " + e);
             osVersion += ".unknown";
           }
-  
+
           // Get processor architecture
           let arch = "unknown";
           try {
@@ -155,7 +162,7 @@ XPCOMUtils.defineLazyGetter(this, "gOSVersion", function aus_gOSVersion() {
             let sysInfo = SYSTEM_INFO();
             // Default to unknown
             sysInfo.wProcessorArchitecture = 0xffff;
-  
+
             GetNativeSystemInfo(sysInfo.address());
             switch(sysInfo.wProcessorArchitecture) {
               case 9:
@@ -345,8 +352,11 @@ GMPInstallManager.prototype = {
   get _isEMEEnabled() {
     return GMPPrefs.get(GMPPrefs.KEY_EME_ENABLED, true);
   },
+  _isAddonEnabled: function(aAddon) {
+    return GMPPrefs.get(GMPPrefs.KEY_PLUGIN_ENABLED, true, aAddon);
+  },
   _isAddonUpdateEnabled: function(aAddon) {
-    return GMPPrefs.get(GMPPrefs.KEY_PLUGIN_ENABLED, true, aAddon) &&
+    return this._isAddonEnabled(aAddon) &&
            GMPPrefs.get(GMPPrefs.KEY_PLUGIN_AUTOUPDATE, true, aAddon);
   },
   _updateLastCheck: function() {
@@ -396,18 +406,20 @@ GMPInstallManager.prototype = {
       let addonsToInstall = gmpAddons.filter(function(gmpAddon) {
         log.info("Found addon: " + gmpAddon.toString());
 
-        if (!gmpAddon.isValid || GMPUtils.isPluginHidden(gmpAddon) ||
-            gmpAddon.isInstalled) {
-          log.info("Addon invalid, hidden or already installed.");
+        if (gmpAddon.isInstalled) {
+          log.info("Addon |" + gmpAddon.id + "| already installed.");
           return false;
         }
 
         let addonUpdateEnabled = false;
         if (GMP_PLUGIN_IDS.indexOf(gmpAddon.id) >= 0) {
-          addonUpdateEnabled = this._isAddonUpdateEnabled(gmpAddon.id);
-          if (!addonUpdateEnabled) {
+          if (!this._isAddonEnabled(gmpAddon.id)) {
+            log.info("GMP |" + gmpAddon.id + "| has been disabled; skipping check.");
+          } else if (!this._isAddonUpdateEnabled(gmpAddon.id)) {
             log.info("Auto-update is off for " + gmpAddon.id +
                      ", skipping check.");
+          } else {
+            addonUpdateEnabled = true;
           }
         } else {
           // Currently, we only support installs of OpenH264 and EME plugins.

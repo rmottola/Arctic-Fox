@@ -21,6 +21,16 @@ const OPEN_H264_ID  = "gmp-gmpopenh264";
 const EME_ADOBE_ID  = "gmp-eme-adobe";
 const GMP_PLUGIN_IDS = [ OPEN_H264_ID, EME_ADOBE_ID ];
 
+var GMPPluginUnsupportedReason = {
+  NOT_WINDOWS: 1,
+  WINDOWS_VERSION: 2,
+};
+
+var GMPPluginHiddenReason = {
+  UNSUPPORTED: 1,
+  EME_DISABLED: 2,
+};
+
 this.GMPUtils = {
   /**
    * Checks whether or not a given plugin is hidden. Hidden plugins are neither
@@ -29,14 +39,15 @@ this.GMPUtils = {
    *          The plugin to check.
    */
   isPluginHidden: function(aPlugin) {
-    if (aPlugin.isEME) {
-      if (this._isPluginSupported(aPlugin) ||
-          this._isPluginForcedVisible(aPlugin)) {
-        return !GMPPrefs.get(GMPPrefs.KEY_EME_ENABLED, true);
-      } else {
-        return true;
-      }
+    if (!aPlugin.isEME) {
+      return false;
     }
+
+    if (!this._isPluginSupported(aPlugin) &&
+        !this._isPluginForcedVisible(aPlugin)) {
+      return true;
+    }
+
     return false;
   },
 
@@ -46,13 +57,21 @@ this.GMPUtils = {
    *          The plugin to check.
    */
   _isPluginSupported: function(aPlugin) {
-    if (aPlugin.id == EME_ADOBE_ID) {
-      if (Services.appinfo.OS == "WINNT") {
-        return Services.sysinfo.getPropertyAsInt32("version") >= 6;
-      } else {
-        return false;
-      }
+    if (aPlugin.id != EME_ADOBE_ID) {
+      // Only checking Adobe EME at the moment.
+      return true;
     }
+
+    if (Services.appinfo.OS != "WINNT") {
+      // Non-Windows OSes currently unsupported.
+      return false;
+    }
+
+    if (Services.sysinfo.getPropertyAsInt32("version") < 6) {
+      // Windows versions before Vista are unsupported.
+      return false;
+    }
+
     return true;
   },
 
@@ -65,6 +84,52 @@ this.GMPUtils = {
   _isPluginForcedVisible: function(aPlugin) {
     return GMPPrefs.get(GMPPrefs.KEY_PLUGIN_FORCEVISIBLE, false, aPlugin.id);
   },
+
+  /**
+   * Report telemetry value, but only for Adobe CDM and only once per key
+   * per session.
+   */
+  maybeReportTelemetry: function(aPluginId, key, value) {
+    if (aPluginId != EME_ADOBE_ID) {
+      // Only report for Adobe CDM.
+      return;
+    }
+
+    if (!this.reportedKeys) {
+      this.reportedKeys = [];
+    }
+    if (this.reportedKeys.indexOf(key) >= 0) {
+      // Only report each key once per session.
+      return;
+    }
+    this.reportedKeys.push(key);
+
+    let hist = Services.telemetry.getHistogramById(key);
+    if (hist) {
+      hist.add(value);
+    }
+  },
+
+  ABI: function() {
+    // This is copied directly from nsUpdateService.js
+    let abi = null;
+    try {
+      abi = Services.appinfo.XPCOMABI;
+    }
+    catch (e) {
+      return "unknown";
+    }
+    if (AppConstants.platform == "macosx") {
+      // Mac universal build should report a different ABI than either macppc
+      // or mactel.
+      let macutils = Cc["@mozilla.org/xpcom/mac-utils;1"].
+                     getService(Ci.nsIMacUtils);
+
+      if (macutils.isUniversalBinary)
+        abi += "-u-" + macutils.architecturesInBinary;
+    }
+    return abi;
+  }
 };
 
 /**

@@ -222,7 +222,7 @@ public:
    * @note This method might destroy the frame, pres shell and other objects.
    */
   void ScrollToImpl(nsPoint aScrollPosition, const nsRect& aRange, nsIAtom* aOrigin = nullptr);
-  void ScrollVisual(nsPoint aOldScrolledFramePosition);
+  void ScrollVisual();
   /**
    * @note This method might destroy the frame, pres shell and other objects.
    */
@@ -304,7 +304,8 @@ public:
   }
   nsMargin GetActualScrollbarSizes() const;
   nsMargin GetDesiredScrollbarSizes(nsBoxLayoutState* aState);
-  nscoord GetNondisappearingScrollbarWidth(nsBoxLayoutState* aState);
+  nscoord GetNondisappearingScrollbarWidth(nsBoxLayoutState* aState,
+                                           mozilla::WritingMode aVerticalWM);
   bool IsLTR() const;
   bool IsScrollbarOnRight() const;
   bool IsScrollingActive(nsDisplayListBuilder* aBuilder) const;
@@ -359,6 +360,8 @@ public:
   bool IsTransformingByAPZ() const {
     return mTransformingByAPZ;
   }
+  void SetZoomableByAPZ(bool aZoomable);
+
   bool UsesContainerScrolling() const;
 
   void ScheduleSyntheticMouseMove();
@@ -381,7 +384,7 @@ public:
     Layer* aLayer, nsIFrame* aContainerReferenceFrame,
     const ContainerLayerParameters& aParameters,
     bool aIsForCaret) const;
-  virtual const mozilla::DisplayItemClip* ComputeScrollClip(bool aIsForCaret) const;
+  virtual mozilla::Maybe<mozilla::DisplayItemClip> ComputeScrollClip(bool aIsForCaret) const;
 
   // nsIScrollbarMediator
   void ScrollByPage(nsScrollbarFrame* aScrollbar, int32_t aDirection,
@@ -460,9 +463,9 @@ public:
 
   FrameMetrics::ViewID mScrollParentID;
 
-  // The scroll port clip. Only valid during painting.
-  const DisplayItemClip* mAncestorClip;
-  const DisplayItemClip* mAncestorClipForCaret;
+  // The scroll port clip.
+  Maybe<DisplayItemClip> mAncestorClip;
+  Maybe<DisplayItemClip> mAncestorClipForCaret;
 
   bool mNeverHasVerticalScrollbar:1;
   bool mNeverHasHorizontalScrollbar:1;
@@ -532,6 +535,9 @@ public:
   // True if the APZ is in the process of async-transforming this scrollframe,
   // (as best as we can tell on the main thread, anyway).
   bool mTransformingByAPZ:1;
+
+  // True if the APZ is allowed to zoom this scrollframe.
+  bool mZoomableByAPZ:1;
 
   mozilla::layout::ScrollVelocityQueue mVelocityQueue;
 
@@ -691,9 +697,9 @@ public:
     return GetDesiredScrollbarSizes(&bls);
   }
   virtual nscoord GetNondisappearingScrollbarWidth(nsPresContext* aPresContext,
-          nsRenderingContext* aRC) override {
+          nsRenderingContext* aRC, mozilla::WritingMode aWM) override {
     nsBoxLayoutState bls(aPresContext, aRC, 0);
-    return mHelper.GetNondisappearingScrollbarWidth(&bls);
+    return mHelper.GetNondisappearingScrollbarWidth(&bls, aWM);
   }
   virtual nsRect GetScrolledRect() const override {
     return mHelper.GetScrolledRect();
@@ -844,7 +850,7 @@ public:
   {
     return mHelper.ComputeFrameMetrics(aLayer, aContainerReferenceFrame, aParameters, aIsForCaret);
   }
-  virtual const mozilla::DisplayItemClip* ComputeScrollClip(bool aIsForCaret) const
+  virtual mozilla::Maybe<mozilla::DisplayItemClip> ComputeScrollClip(bool aIsForCaret) const override
   {
     return mHelper.ComputeScrollClip(aIsForCaret);
   }
@@ -920,6 +926,9 @@ public:
   }
   bool IsTransformingByAPZ() const override {
     return mHelper.IsTransformingByAPZ();
+  }
+  void SetZoomableByAPZ(bool aZoomable) override {
+    mHelper.SetZoomableByAPZ(aZoomable);
   }
   
 #ifdef DEBUG_FRAME_DUMP
@@ -1095,9 +1104,9 @@ public:
     return GetDesiredScrollbarSizes(&bls);
   }
   virtual nscoord GetNondisappearingScrollbarWidth(nsPresContext* aPresContext,
-          nsRenderingContext* aRC) override {
+          nsRenderingContext* aRC, mozilla::WritingMode aWM) override {
     nsBoxLayoutState bls(aPresContext, aRC, 0);
-    return mHelper.GetNondisappearingScrollbarWidth(&bls);
+    return mHelper.GetNondisappearingScrollbarWidth(&bls, aWM);
   }
   virtual nsRect GetScrolledRect() const override {
     return mHelper.GetScrolledRect();
@@ -1244,7 +1253,7 @@ public:
   {
     return mHelper.ComputeFrameMetrics(aLayer, aContainerReferenceFrame, aParameters, aIsForCaret);
   }
-  virtual const mozilla::DisplayItemClip* ComputeScrollClip(bool aIsForCaret) const
+  virtual mozilla::Maybe<mozilla::DisplayItemClip> ComputeScrollClip(bool aIsForCaret) const override
   {
     return mHelper.ComputeScrollClip(aIsForCaret);
   }
@@ -1328,6 +1337,9 @@ public:
   }
   bool IsTransformingByAPZ() const override {
     return mHelper.IsTransformingByAPZ();
+  }
+  void SetZoomableByAPZ(bool aZoomable) override {
+    mHelper.SetZoomableByAPZ(aZoomable);
   }
 
 #ifdef DEBUG_FRAME_DUMP

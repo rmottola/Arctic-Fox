@@ -168,15 +168,19 @@ ImageOperations::ResizeMethod ResizeMethodToAlgorithmMethod(
   // GPU-acceleration in the cases where it is possible. So now we just
   // pick the appropriate software method for each resize quality.
   switch (method) {
+    // Users of RESIZE_GOOD are willing to trade a lot of quality to
+    // get speed, allowing the use of linear resampling to get hardware
+    // acceleration (SRB). Hence any of our "good" software filters
+    // will be acceptable, and we use the fastest one, Hamming-1.
     case ImageOperations::RESIZE_GOOD:
-      // In visual tests we see that Hamming-1 is not as good as
-      // Lanczos-2, however it is about 40% faster, and Lanczos-2 itself is
+      // Users of RESIZE_BETTER are willing to trade some quality in order
+      // to improve performance, but are guaranteed not to devolve to a linear
+      // resampling. In visual tests we see that Hamming-1 is not as good as
+      // Lanczos-2, however it is about 40% faster and Lanczos-2 itself is
       // about 30% faster than Lanczos-3. The use of Hamming-1 has been deemed
-      // an unacceptable trade-off between quality and speed due to the limited
-      // pixel space it operates in (<50%) before switching to HQ scaling
-      // becomes necessary to retain the fidelity of images.
+      // an acceptable trade-off between quality and speed.
     case ImageOperations::RESIZE_BETTER:
-      return ImageOperations::RESIZE_LANCZOS2;
+      return ImageOperations::RESIZE_HAMMING1;
     default:
       return ImageOperations::RESIZE_LANCZOS3;
   }

@@ -371,11 +371,6 @@ toolbarbutton.bookmark-item > menupopup {
   height: 16px;
 }
 
-/* #menu_readingList, svg icons don't work in the mac native menubar */
-#BMB_readingList {
-  list-style-image: url("chrome://browser/skin/readinglist/readinglist-icon.svg");
-}
-
 /* ::::: primary toolbar buttons ::::: */
 
 .toolbarbutton-1 {
@@ -1272,8 +1267,6 @@ richlistitem[type~="action"][actiontype="switchtab"][selected="true"] > .ac-url-
 #page-report-button[open="true"] {
     -moz-image-region: rect(0, 48px, 16px, 32px);
 }
-
-%include ../shared/readinglist.inc.css
 
 /* Reader mode button */
 
