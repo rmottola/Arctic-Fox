@@ -105,7 +105,6 @@ public:
   virtual void EndObservingDocument() override;
   virtual nsresult Initialize(nscoord aWidth, nscoord aHeight) override;
   virtual nsresult ResizeReflow(nscoord aWidth, nscoord aHeight) override;
-  virtual nsresult ResizeReflowOverride(nscoord aWidth, nscoord aHeight) override;
   virtual nsresult ResizeReflowIgnoreOverride(nscoord aWidth, nscoord aHeight) override;
   virtual nsIPageSequenceFrame* GetPageSequenceFrame() const override;
   virtual nsCanvasFrame* GetCanvasFrame() const override;
@@ -355,7 +354,7 @@ public:
   virtual nsresult SetIsActive(bool aIsActive) override;
 
   virtual bool GetIsViewportOverridden() override {
-    return mViewportOverridden || (mMobileViewportManager != nullptr);
+    return (mMobileViewportManager != nullptr);
   }
 
   virtual bool IsLayoutFlushObserver() override
@@ -853,7 +852,6 @@ protected:
   bool                      mDocumentLoading : 1;
   bool                      mIgnoreFrameDestruction : 1;
   bool                      mHaveShutDown : 1;
-  bool                      mViewportOverridden : 1;
   bool                      mLastRootReflowHadUnconstrainedBSize : 1;
   bool                      mNoDelayedMouseEvents : 1;
   bool                      mNoDelayedKeyEvents : 1;
