@@ -4403,7 +4403,7 @@ CanvasRenderingContext2D::DrawImage(const CanvasImageSource& image,
   RefPtr<SourceSurface> srcSurf;
   gfx::IntSize imgSize;
 
-  Element* element;
+  Element* element = nullptr;
 
   EnsureTarget();
   if (image.IsHTMLCanvasElement()) {
