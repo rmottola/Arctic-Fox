@@ -10,10 +10,12 @@
 #define mozilla_Tuple_h
 
 #include "mozilla/Move.h"
+#include "mozilla/Pair.h"
 #include "mozilla/TemplateLib.h"
 #include "mozilla/TypeTraits.h"
 
 #include <stddef.h>
+#include <utility>
 
 namespace mozilla {
 
@@ -142,7 +144,30 @@ struct TupleImpl<Index, HeadT, TailT...>
     , mHead(Head(aOther)) {}
   TupleImpl(TupleImpl&& aOther)
     : Base(Move(Tail(aOther)))
-    , mHead(Move(Head(aOther))) {}
+    , mHead(Forward<HeadT>(Head(aOther))) {}
+
+  // Assign from a tuple whose elements are convertible to the elements
+  // of this tuple.
+  template <typename... OtherElements,
+            typename = typename EnableIf<
+                sizeof...(OtherElements) == sizeof...(TailT) + 1>::Type>
+  TupleImpl& operator=(const TupleImpl<Index, OtherElements...>& aOther)
+  {
+    typedef TupleImpl<Index, OtherElements...> OtherT;
+    Head(*this) = OtherT::Head(aOther);
+    Tail(*this) = OtherT::Tail(aOther);
+    return *this;
+  }
+  template <typename... OtherElements,
+            typename = typename EnableIf<
+                sizeof...(OtherElements) == sizeof...(TailT) + 1>::Type>
+  TupleImpl& operator=(TupleImpl<Index, OtherElements...>&& aOther)
+  {
+    typedef TupleImpl<Index, OtherElements...> OtherT;
+    Head(*this) = Move(OtherT::Head(aOther));
+    Tail(*this) = Move(OtherT::Tail(aOther));
+    return *this;
+  }
 
   // Copy and move assignment operators.
   TupleImpl& operator=(const TupleImpl& aOther)
@@ -195,6 +220,22 @@ public:
   Tuple(const Tuple& aOther) : Impl(aOther) { }
   Tuple(Tuple&& aOther) : Impl(Move(aOther)) { }
 
+  template <typename... OtherElements,
+            typename = typename EnableIf<
+                sizeof...(OtherElements) == sizeof...(Elements)>::Type>
+  Tuple& operator=(const Tuple<OtherElements...>& aOther)
+  {
+    static_cast<Impl&>(*this) = aOther;
+    return *this;
+  }
+  template <typename... OtherElements,
+            typename = typename EnableIf<
+                sizeof...(OtherElements) == sizeof...(Elements)>::Type>
+  Tuple& operator=(Tuple<OtherElements...>&& aOther)
+  {
+    static_cast<Impl&>(*this) = Move(aOther);
+    return *this;
+  }
   Tuple& operator=(const Tuple& aOther)
   {
     static_cast<Impl&>(*this) = aOther;
@@ -203,6 +244,91 @@ public:
   Tuple& operator=(Tuple&& aOther)
   {
     static_cast<Impl&>(*this) = Move(aOther);
+    return *this;
+  }
+};
+
+/**
+ * Specialization of Tuple for two elements.
+ * This is created to support construction and assignment from a Pair or std::pair.
+ */
+template <typename A, typename B>
+class Tuple<A, B> : public detail::TupleImpl<0, A, B>
+{
+  typedef detail::TupleImpl<0, A, B> Impl;
+
+public:
+  // The constructors and assignment operators here are simple wrappers
+  // around those in TupleImpl.
+
+  Tuple() : Impl() { }
+  explicit Tuple(const A& aA, const B& aB) : Impl(aA, aB) { }
+  template <typename AArg, typename BArg,
+            typename = typename EnableIf<
+                detail::CheckConvertibility<
+                    detail::Group<AArg, BArg>,
+                    detail::Group<A, B>>::value>::Type>
+  explicit Tuple(AArg&& aA, BArg&& aB)
+    : Impl(Forward<AArg>(aA), Forward<BArg>(aB)) { }
+  Tuple(const Tuple& aOther) : Impl(aOther) { }
+  Tuple(Tuple&& aOther) : Impl(Move(aOther)) { }
+  explicit Tuple(const Pair<A, B>& aOther)
+    : Impl(aOther.first(), aOther.second()) { }
+  explicit Tuple(Pair<A, B>&& aOther) : Impl(Forward<A>(aOther.first()),
+                                    Forward<B>(aOther.second())) { }
+  explicit Tuple(const std::pair<A, B>& aOther)
+    : Impl(aOther.first, aOther.second) { }
+  explicit Tuple(std::pair<A, B>&& aOther) : Impl(Forward<A>(aOther.first),
+                                    Forward<B>(aOther.second)) { }
+
+  template <typename AArg, typename BArg>
+  Tuple& operator=(const Tuple<AArg, BArg>& aOther)
+  {
+    static_cast<Impl&>(*this) = aOther;
+    return *this;
+  }
+  template <typename AArg, typename BArg>
+  Tuple& operator=(Tuple<AArg, BArg>&& aOther)
+  {
+    static_cast<Impl&>(*this) = Move(aOther);
+    return *this;
+  }
+  Tuple& operator=(const Tuple& aOther)
+  {
+    static_cast<Impl&>(*this) = aOther;
+    return *this;
+  }
+  Tuple& operator=(Tuple&& aOther)
+  {
+    static_cast<Impl&>(*this) = Move(aOther);
+    return *this;
+  }
+  template <typename AArg, typename BArg>
+  Tuple& operator=(const Pair<AArg, BArg>& aOther)
+  {
+    Impl::Head(*this) = aOther.first();
+    Impl::Tail(*this).Head(*this) = aOther.second();
+    return *this;
+  }
+  template <typename AArg, typename BArg>
+  Tuple& operator=(Pair<AArg, BArg>&& aOther)
+  {
+    Impl::Head(*this) = Forward<AArg>(aOther.first());
+    Impl::Tail(*this).Head(*this) = Forward<BArg>(aOther.second());
+    return *this;
+  }
+  template <typename AArg, typename BArg>
+  Tuple& operator=(const std::pair<AArg, BArg>& aOther)
+  {
+    Impl::Head(*this) = aOther.first;
+    Impl::Tail(*this).Head(*this) = aOther.second;
+    return *this;
+  }
+  template <typename AArg, typename BArg>
+  Tuple& operator=(std::pair<AArg, BArg>&& aOther)
+  {
+    Impl::Head(*this) = Forward<AArg>(aOther.first);
+    Impl::Tail(*this).Head(*this) = Forward<BArg>(aOther.second);
     return *this;
   }
 };
@@ -294,6 +420,25 @@ template<typename... Elements>
 Tuple<Elements...> MakeTuple(Elements&&... aElements)
 {
   return Tuple<Elements...>(Forward<Elements>(aElements)...);
+}
+
+/**
+ * A convenience function for constructing a tuple of references to a
+ * sequence of variables. Since assignments to the elements of the tuple
+ * "go through" to the referenced variables, this can be used to "unpack"
+ * a tuple into individual variables.
+ *
+ * Example:
+ *
+ * int i;
+ * float f;
+ * char c;
+ * Tie(i, f, c) = FunctionThatReturnsATuple();
+ */
+template<typename... Elements>
+Tuple<Elements&...> Tie(Elements&... aVariables)
+{
+  return Tuple<Elements&...>(aVariables...);
 }
 
 } // namespace mozilla

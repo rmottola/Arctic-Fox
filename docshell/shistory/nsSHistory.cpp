@@ -1,6 +1,6 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-
- *
- * This Source Code Form is subject to the terms of the Mozilla Public
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
+/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
@@ -227,7 +227,7 @@ EvictContentViewerForTransaction(nsISHTransaction* aTrans)
   }
 }
 
-} // anonymous namespace
+} // namespace
 
 nsSHistory::nsSHistory()
   : mIndex(-1)
@@ -1046,7 +1046,7 @@ public:
   int32_t mDistance;
 };
 
-} // anonymous namespace
+} // namespace
 
 // static
 void
@@ -1315,7 +1315,9 @@ nsSHistory::RemoveDuplicate(int32_t aIndex, bool aKeepNext)
     nsCOMPtr<nsISHTransaction> txToRemove, txToKeep, txNext, txPrev;
     GetTransactionAtIndex(aIndex, getter_AddRefs(txToRemove));
     GetTransactionAtIndex(compareIndex, getter_AddRefs(txToKeep));
-    NS_ENSURE_TRUE(txToRemove, false);
+    if (!txToRemove) {
+      return false;
+    }
     NS_ENSURE_TRUE(txToKeep, false);
     txToRemove->GetNext(getter_AddRefs(txNext));
     txToRemove->GetPrev(getter_AddRefs(txPrev));

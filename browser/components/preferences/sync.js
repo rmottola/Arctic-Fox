@@ -34,6 +34,26 @@ let gSyncPane = {
   },
 
   init: function () {
+    // We use a preference observer to notice changes to the Sync engines
+    // enabled state - other techniques are problematic due to the window
+    // being instant-apply on Mac etc but modal on Windows.
+    let prefObserver = () => {
+      // If all our Sync engines are disabled we flip the "master" Sync-enabled pref.
+      let prefElts = document.querySelectorAll("#syncEnginePrefs > preference");
+      let syncEnabled = false;
+      for (let elt of prefElts) {
+        if (elt.name.startsWith("services.sync.") && elt.value) {
+          syncEnabled = true;
+          break;
+        }
+      }
+      Services.prefs.setBoolPref("services.sync.enabled", syncEnabled);
+    }
+    Services.prefs.addObserver("services.sync.engine.", prefObserver, false);
+    window.addEventListener("unload", () => {
+      Services.prefs.removeObserver("services.sync.engine.", prefObserver);
+    }, false);
+
     // If the Service hasn't finished initializing, wait for it.
     let xps = Components.classes["@mozilla.org/weave/service;1"]
                                 .getService(Components.interfaces.nsISupports)
@@ -161,14 +181,18 @@ let gSyncPane = {
     }
   },
 
-  openQuotaDialog: function () {
-    let win = Services.wm.getMostRecentWindow("Sync:ViewQuota");
-    if (win) {
-      win.focus();
-    } else {
-      window.openDialog("chrome://browser/content/sync/quota.xul", "",
-                        "centerscreen,chrome,dialog,modal");
-    }
+  verifyFirefoxAccount: function() {
+    fxAccounts.resendVerificationEmail().then(() => {
+      fxAccounts.getSignedInUser().then(data => {
+        let sb = Services.strings.createBundle("chrome://browser/locale/accounts.properties");
+        let title = sb.GetStringFromName("verificationSentTitle");
+        let heading = sb.formatStringFromName("verificationSentHeading",
+                                              [data.email], 1);
+        let description = sb.GetStringFromName("verificationSentDescription");
+
+        Services.prompt.alert(window, title, heading + "\n\n" + description);
+      });
+    });
   },
 
   openAddDevice: function () {

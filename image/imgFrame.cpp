@@ -205,7 +205,7 @@ imgFrame::InitForDecoder(const nsIntSize& aImageSize,
       static_cast<uint8_t*>(malloc(PaletteDataLength() +
                                    (mSize.width * mSize.height)));
     if (!mPalettedImageData) {
-      NS_WARNING("Call to malloc for paletted image data should succeed");
+      NS_WARNING("malloc for paletted image data should succeed");
     }
     NS_ENSURE_TRUE(mPalettedImageData, NS_ERROR_OUT_OF_MEMORY);
   } else {
@@ -796,94 +796,8 @@ imgFrame::LockImageData()
     return NS_OK;
   }
 
-  double imgPixelSize = mSize.width * mSize.height;
-  if (imgPixelSize < (8092 * 8092)) {
-    // We should be safe to Deoptimize at this size (<64Mpix)
-    return Deoptimize();
-  }
-  
+  MOZ_ASSERT_UNREACHABLE("It's illegal to re-lock an optimized imgFrame");
   return NS_ERROR_FAILURE;
-}
-
-nsresult
-imgFrame::Deoptimize()
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  mMonitor.AssertCurrentThreadOwns();
-  MOZ_ASSERT(!mImageSurface);
-
-  if (!mImageSurface) {
-    if (mVBuf) {
-      VolatileBufferPtr<uint8_t> ref(mVBuf);
-      if (ref.WasBufferPurged()) {
-        return NS_ERROR_FAILURE;
-      }
-
-      mImageSurface = CreateLockedSurface(mVBuf, mSize, mFormat);
-      if (!mImageSurface) {
-        return NS_ERROR_OUT_OF_MEMORY;
-      }
-    }
-    if (mOptSurface || mSinglePixel || mFormat == SurfaceFormat::R5G6B5) {
-      SurfaceFormat format = mFormat;
-      if (mFormat == SurfaceFormat::R5G6B5) {
-        format = SurfaceFormat::B8G8R8A8;
-      }
-
-      // Recover the pixels
-      RefPtr<VolatileBuffer> buf =
-        AllocateBufferForImage(mSize, format);
-      if (!buf) {
-        return NS_ERROR_OUT_OF_MEMORY;
-      }
-
-      RefPtr<DataSourceSurface> surf =
-        CreateLockedSurface(buf, mSize, format);
-      if (!surf) {
-        return NS_ERROR_OUT_OF_MEMORY;
-      }
-
-      DataSourceSurface::MappedSurface mapping;
-      if (!surf->Map(DataSourceSurface::MapType::WRITE, &mapping)) {
-        gfxCriticalError() << "imgFrame::Deoptimize failed to map surface";
-        return NS_ERROR_FAILURE;
-      }
-
-      RefPtr<DrawTarget> target =
-        Factory::CreateDrawTargetForData(BackendType::CAIRO,
-                                         mapping.mData,
-                                         mSize,
-                                         mapping.mStride,
-                                         format);
-      if (!target) {
-        gfxWarning() <<
-          "imgFrame::Deoptimize failed in CreateDrawTargetForData";
-        return NS_ERROR_OUT_OF_MEMORY;
-      }
-
-      Rect rect(0, 0, mSize.width, mSize.height);
-      if (mSinglePixel) {
-        target->FillRect(rect, ColorPattern(mSinglePixelColor),
-                         DrawOptions(1.0f, CompositionOp::OP_SOURCE));
-      } else if (mFormat == SurfaceFormat::R5G6B5) {
-        target->DrawSurface(mImageSurface, rect, rect);
-      } else {
-        target->DrawSurface(mOptSurface, rect, rect,
-                            DrawSurfaceOptions(),
-                            DrawOptions(1.0f, CompositionOp::OP_SOURCE));
-      }
-      target->Flush();
-      surf->Unmap();
-
-      mFormat = format;
-      mVBuf = buf;
-      mImageSurface = surf;
-      mOptSurface = nullptr;
-    }
-  }
-
-  mVBufPtr = mVBuf;
-  return NS_OK;
 }
 
 void
@@ -1121,42 +1035,28 @@ imgFrame::SetCompositingFailed(bool val)
   mCompositingFailed = val;
 }
 
-size_t
-imgFrame::SizeOfExcludingThis(gfxMemoryLocation aLocation,
-                              MallocSizeOf aMallocSizeOf) const
+void
+imgFrame::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
+                                 size_t& aHeapSizeOut,
+                                 size_t& aNonHeapSizeOut) const
 {
   MonitorAutoLock lock(mMonitor);
 
-  // aMallocSizeOf is only used if aLocation is
-  // gfxMemoryLocation::IN_PROCESS_HEAP.  It
-  // should be nullptr otherwise.
-  MOZ_ASSERT(
-    (aLocation == gfxMemoryLocation::IN_PROCESS_HEAP &&  aMallocSizeOf) ||
-    (aLocation != gfxMemoryLocation::IN_PROCESS_HEAP && !aMallocSizeOf),
-    "mismatch between aLocation and aMallocSizeOf");
-
-  size_t n = 0;
-
-  if (mPalettedImageData && aLocation == gfxMemoryLocation::IN_PROCESS_HEAP) {
-    n += aMallocSizeOf(mPalettedImageData);
+  if (mPalettedImageData) {
+    aHeapSizeOut += aMallocSizeOf(mPalettedImageData);
   }
-  if (mImageSurface && aLocation == gfxMemoryLocation::IN_PROCESS_HEAP) {
-    n += aMallocSizeOf(mImageSurface);
+  if (mImageSurface) {
+    aHeapSizeOut += aMallocSizeOf(mImageSurface);
   }
-  if (mOptSurface && aLocation == gfxMemoryLocation::IN_PROCESS_HEAP) {
-    n += aMallocSizeOf(mOptSurface);
+  if (mOptSurface) {
+    aHeapSizeOut += aMallocSizeOf(mOptSurface);
   }
 
-  if (mVBuf && aLocation == gfxMemoryLocation::IN_PROCESS_HEAP) {
-    n += aMallocSizeOf(mVBuf);
-    n += mVBuf->HeapSizeOfExcludingThis(aMallocSizeOf);
+  if (mVBuf) {
+    aHeapSizeOut += aMallocSizeOf(mVBuf);
+    aHeapSizeOut += mVBuf->HeapSizeOfExcludingThis(aMallocSizeOf);
+    aNonHeapSizeOut += mVBuf->NonHeapSizeOfExcludingThis();
   }
-
-  if (mVBuf && aLocation == gfxMemoryLocation::IN_PROCESS_NONHEAP) {
-    n += mVBuf->NonHeapSizeOfExcludingThis();
-  }
-
-  return n;
 }
 
 } // namespace image

@@ -126,6 +126,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
 XPCOMUtils.defineLazyModuleGetter(this, "ExtensionManagement",
                                   "resource://gre/modules/ExtensionManagement.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
+                                  "resource://gre/modules/AppConstants.jsm");
+
 const PREF_PLUGINS_NOTIFYUSER = "plugins.update.notifyUser";
 const PREF_PLUGINS_UPDATEURL  = "plugins.update.url";
 
@@ -992,6 +995,17 @@ BrowserGlue.prototype = {
 
       // startup check, check all assoc
       let isDefault = ShellService.isDefaultBrowser(true, false);
+
+      if (Services.prefs.getIntPref("browser.shell.windows10DefaultBrowserABTest") == -1) {
+        let abTest = Math.round(Math.random());
+        Services.prefs.setIntPref("browser.shell.windows10DefaultBrowserABTest", abTest);
+      }
+
+      if (AppConstants.isPlatformAndVersionAtLeast("win", "10")) {
+        let abTest = Services.prefs.getIntPref("browser.shell.windows10DefaultBrowserABTest");
+        let result = abTest * 2 + Number(isDefault);
+        Services.telemetry.getHistogramById("WIN_10_DEFAULT_BROWSER_AB_TEST").add(result);
+      }
 
       if (shouldCheck && !isDefault && !willRecoverSession) {
         Services.tm.mainThread.dispatch(function() {

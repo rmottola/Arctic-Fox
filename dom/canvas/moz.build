@@ -28,6 +28,7 @@ EXPORTS.mozilla.ipc += [
 
 EXPORTS.mozilla.dom += [
     'CanvasGradient.h',
+    'CanvasPath.h',
     'CanvasPattern.h',
     'CanvasRenderingContext2D.h',
     'CanvasUtils.h',
@@ -65,6 +66,7 @@ UNIFIED_SOURCES += [
     'WebGL2ContextMRTs.cpp',
     'WebGL2ContextPrograms.cpp',
     'WebGL2ContextQueries.cpp',
+    'WebGL2ContextRenderbuffers.cpp',
     'WebGL2ContextSamplers.cpp',
     'WebGL2ContextState.cpp',
     'WebGL2ContextSync.cpp',
@@ -83,6 +85,7 @@ UNIFIED_SOURCES += [
     'WebGLContextGL.cpp',
     'WebGLContextLossHandler.cpp',
     'WebGLContextState.cpp',
+    'WebGLContextTextures.cpp',
     'WebGLContextUnchecked.cpp',
     'WebGLContextUtils.cpp',
     'WebGLContextValidate.cpp',
@@ -130,6 +133,7 @@ UNIFIED_SOURCES += [
     'WebGLSync.cpp',
     'WebGLTexelConversions.cpp',
     'WebGLTexture.cpp',
+    'WebGLTextureUpload.cpp',
     'WebGLTimerQuery.cpp',
     'WebGLTransformFeedback.cpp',
     'WebGLUniformLocation.cpp',

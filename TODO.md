@@ -96,6 +96,7 @@
 - Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
 - Bug 1039986 - 2015-10-27 - (Fix cloudflare?)  Make Function.prototype.toString work on Web IDL interfa
+- Bug 930414 - Replace |thisObject| object op with |thisValue| and us
 - Bug 1238935 - r=jonco 
 - Bug 1214126 - 5 Parts
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
@@ -116,11 +117,11 @@
 - Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
 - Bug 901633
+- 1203427
 - Bug 1155618 - Fix more out of memory handling issues r=terrence 
 - Bug 1193583 - 2015-08-31 Change the semantics of Debugger.evalInGlobal
 - Bug 1131470 - Part 3, 4, 5
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
-- Bug 1184005 - 2015-08-04  Remove readinglist. r=MattN,jaws,adw 
 - remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
 - Bug 1192130 - Part 1: Add MOZ_NON_AUTOABLE to restrict using auto in
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
@@ -142,7 +143,6 @@
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - Bug 1171379 - and check all related on bugzilla
-- Bug 1184201 - Disable fullscreen transition on Windows
 - Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
 - Bug 1181869 [provokes crashing] - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
@@ -169,7 +169,6 @@ ARM fixes to check
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1179514
 
 # Build System - not working
-Bug 706103 - replace chrome copy of files by overrides in browser/the
 Bug 1137364 - part 2 - move browser themes icon installation to FINAL
 
 Check with Roy Tam:
@@ -246,7 +245,6 @@ media/libstagefright/frameworks/av/media/libstagefright/MPEG4Extractor.cpp
 - flatten out security manager ssl
 - factor out dom/base/nsGlobalWindowInner.cpp
 - NekcoOriginAttributes
-- 529808 - Remove the static atom table. - if all the rest has been added... remove it again
 - see if window.requestIdleCallback can be backported
 
 ### last checked TFF backport commit

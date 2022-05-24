@@ -44,10 +44,10 @@ class ProgressTracker;
 struct NewPartResult;
 
 class imgRequest final : public nsIStreamListener,
-                             public nsIThreadRetargetableStreamListener,
-                             public nsIChannelEventSink,
-                             public nsIInterfaceRequestor,
-                             public nsIAsyncVerifyRedirectCallback
+                         public nsIThreadRetargetableStreamListener,
+                         public nsIChannelEventSink,
+                         public nsIInterfaceRequestor,
+                         public nsIAsyncVerifyRedirectCallback
 {
   typedef mozilla::image::Image Image;
   typedef mozilla::image::ImageCacheKey ImageCacheKey;
@@ -118,7 +118,7 @@ public:
 
   // Returns whether we went through an insecure (non-HTTPS) redirect at some
   // point during loading. This does not consider the current URI.
-  bool HadInsecureRedirect() const { return mHadInsecureRedirect; }
+  bool HadInsecureRedirect() const;
 
   // The CORS mode for which we loaded this image.
   int32_t GetCORSMode() const { return mCORSMode; }
@@ -255,6 +255,10 @@ private:
   ImageCacheKey mCacheKey;
 
   void* mLoadId;
+
+  /// Raw pointer to the first proxy that was added to this imgRequest. Use only
+  /// pointer comparisons; there's no guarantee this will remain valid.
+  void* mFirstProxy;
 
   imgCacheValidator* mValidator;
   nsCOMPtr<nsIAsyncVerifyRedirectCallback> mRedirectCallback;

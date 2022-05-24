@@ -16,7 +16,6 @@
 <!-- Manage Account -->
 <!ENTITY manageAccount.label          "Manage Account">
 <!ENTITY manageAccount.accesskey      "n">
-<!ENTITY viewQuota.label              "View Quota">
 <!ENTITY changePassword2.label        "Change Password…">
 <!ENTITY myRecoveryKey.label          "My Recovery Key">
 <!ENTITY resetSync2.label             "Reset Sync…">
@@ -26,8 +25,6 @@
 <!ENTITY syncMy.label               "Sync My">
 <!ENTITY engine.bookmarks.label     "Bookmarks">
 <!ENTITY engine.bookmarks.accesskey "m">
-<!ENTITY engine.readinglist.label   "Reading List">
-<!ENTITY engine.readinglist.accesskey "L">
 <!ENTITY engine.tabs.label          "Tabs">
 <!ENTITY engine.tabs.accesskey      "T">
 <!ENTITY engine.history.label       "History">

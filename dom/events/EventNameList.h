@@ -414,7 +414,7 @@ EVENT(timeupdate,
       EventNameType_HTML,
       eBasicEventClass)
 EVENT(toggle,
-      NS_TOGGLE,
+      eToggle,
       EventNameType_HTML,
       eBasicEventClass)
 EVENT(volumechange,

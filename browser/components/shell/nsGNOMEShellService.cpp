@@ -153,7 +153,8 @@ nsGNOMEShellService::KeyMatchesAppName(const char *aKeyValue) const
 
   gchar *commandPath;
   if (mUseLocaleFilenames) {
-    gchar *nativePath = g_filename_from_utf8(aKeyValue, -1, nullptr, nullptr, nullptr);
+    gchar *nativePath = g_filename_from_utf8(aKeyValue, -1,
+                                             nullptr, nullptr, nullptr);
     if (!nativePath) {
       NS_ERROR("Error converting path to filesystem encoding");
       return false;
@@ -313,7 +314,56 @@ nsGNOMEShellService::SetDefaultBrowser(bool aClaimAllTypes,
     }
   }
 
+  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID));
+  if (prefs) {
+    (void) prefs->SetBoolPref(PREF_CHECKDEFAULTBROWSER, true);
+    // Reset the number of times the dialog should be shown
+    // before it is silenced.
+    (void) prefs->SetIntPref(PREF_DEFAULTBROWSERCHECKCOUNT, 0);
+  }
+
   return NS_OK;
+}
+
+NS_IMETHODIMP
+nsGNOMEShellService::GetShouldSkipCheckDefaultBrowser(bool* aResult)
+{
+  NS_ENSURE_ARG_POINTER(aResult);
+
+  nsresult rv;
+  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  rv = prefs->GetBoolPref(PREF_SKIPDEFAULTBROWSERCHECK, aResult);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  if (*aResult) {
+    // Only skip the default browser check once. The next attempt in
+    // a new session should proceed.
+    return prefs->SetBoolPref(PREF_SKIPDEFAULTBROWSERCHECK, false);
+  }
+
+  int32_t defaultBrowserCheckCount;
+  rv = prefs->GetIntPref(PREF_DEFAULTBROWSERCHECKCOUNT,
+                         &defaultBrowserCheckCount);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  if (defaultBrowserCheckCount < 3) {
+    *aResult = false;
+    return prefs->SetIntPref(PREF_DEFAULTBROWSERCHECKCOUNT,
+                             defaultBrowserCheckCount + 1);
+  }
+
+  // Disable the default browser check after three attempts.
+  // Don't modify PREF_CHECKDEFAULTBROWSER since that is a
+  // user-initiated action and it shouldn't get re-enabled
+  // if it has been user disabled.
+  *aResult = true;
+  return rv;
 }
 
 NS_IMETHODIMP
@@ -326,29 +376,37 @@ nsGNOMEShellService::GetShouldCheckDefaultBrowser(bool* aResult)
     return NS_OK;
   }
 
-  nsCOMPtr<nsIPrefBranch> prefs;
-  nsCOMPtr<nsIPrefService> pserve(do_GetService(NS_PREFSERVICE_CONTRACTID));
-  if (pserve)
-    pserve->GetBranch("", getter_AddRefs(prefs));
+  nsresult rv;
+#ifndef RELEASE_BUILD
+  bool skipDefaultBrowserCheck;
+  rv = GetShouldSkipCheckDefaultBrowser(&skipDefaultBrowserCheck);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  if (skipDefaultBrowserCheck) {
+    *aResult = false;
+    return rv;
+  }
+#endif
 
-  if (prefs)
-    prefs->GetBoolPref(PREF_CHECKDEFAULTBROWSER, aResult);
+  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
 
-  return NS_OK;
+  return prefs->GetBoolPref(PREF_CHECKDEFAULTBROWSER, aResult);
 }
 
 NS_IMETHODIMP
 nsGNOMEShellService::SetShouldCheckDefaultBrowser(bool aShouldCheck)
 {
-  nsCOMPtr<nsIPrefBranch> prefs;
-  nsCOMPtr<nsIPrefService> pserve(do_GetService(NS_PREFSERVICE_CONTRACTID));
-  if (pserve)
-    pserve->GetBranch("", getter_AddRefs(prefs));
+  nsresult rv;
+  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
 
-  if (prefs)
-    prefs->SetBoolPref(PREF_CHECKDEFAULTBROWSER, aShouldCheck);
-
-  return NS_OK;
+  return prefs->SetBoolPref(PREF_CHECKDEFAULTBROWSER, aShouldCheck);
 }
 
 NS_IMETHODIMP
@@ -408,15 +466,15 @@ nsGNOMEShellService::SetDesktopBackground(nsIDOMElement* aElement,
   // Set desktop wallpaper filling style
   nsAutoCString options;
   if (aPosition == BACKGROUND_TILE)
-    options.Assign("wallpaper");
+    options.AssignLiteral("wallpaper");
   else if (aPosition == BACKGROUND_STRETCH)
-    options.Assign("stretched");
+    options.AssignLiteral("stretched");
   else if (aPosition == BACKGROUND_FILL)
-    options.Assign("zoom");
+    options.AssignLiteral("zoom");
   else if (aPosition == BACKGROUND_FIT)
-    options.Assign("scaled");
+    options.AssignLiteral("scaled");
   else
-    options.Assign("centered");
+    options.AssignLiteral("centered");
 
   // Write the background file to the home directory.
   nsAutoCString filePath(PR_GetEnv("HOME"));
@@ -439,7 +497,7 @@ nsGNOMEShellService::SetDesktopBackground(nsIDOMElement* aElement,
   // build the file name
   filePath.Append('/');
   filePath.Append(NS_ConvertUTF16toUTF8(brandName));
-  filePath.Append("_wallpaper.png");
+  filePath.AppendLiteral("_wallpaper.png");
 
   // write the image to a file in the home dir
   rv = WriteImage(filePath, container);
@@ -581,9 +639,9 @@ nsGNOMEShellService::OpenApplication(int32_t aApplication)
 {
   nsAutoCString scheme;
   if (aApplication == APPLICATION_MAIL)
-    scheme.Assign("mailto");
+    scheme.AssignLiteral("mailto");
   else if (aApplication == APPLICATION_NEWS)
-    scheme.Assign("news");
+    scheme.AssignLiteral("news");
   else
     return NS_ERROR_NOT_AVAILABLE;
 

@@ -195,11 +195,11 @@ function setupViewport(contentRootElement) {
         return;
     }
 
-    var vw = attrOrDefault(contentRootElement, "reftest-viewport-w", 0);
-    var vh = attrOrDefault(contentRootElement, "reftest-viewport-h", 0);
-    if (vw !== 0 || vh !== 0) {
-        LogInfo("Setting viewport to <w="+ vw +", h="+ vh +">");
-        windowUtils().setCSSViewport(vw, vh);
+    var sw = attrOrDefault(contentRootElement, "reftest-scrollport-w", 0);
+    var sh = attrOrDefault(contentRootElement, "reftest-scrollport-h", 0);
+    if (sw !== 0 || sh !== 0) {
+        LogInfo("Setting scrollport to <w=" + sw + ", h=" + sh + ">");
+        windowUtils().setScrollPositionClampingScrollPortSize(sw, sh);
     }
 
     // XXX support resolution when needed

@@ -15,11 +15,10 @@ Cu.import("resource://gre/modules/Task.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils","resource://gre/modules/PlacesUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ReaderMode", "resource://gre/modules/ReaderMode.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "ReadingList", "resource:///modules/readinglist/ReadingList.jsm");
 
 const gStringBundle = Services.strings.createBundle("chrome://global/locale/aboutReader.properties");
 
-let ReaderParent = {
+var ReaderParent = {
 
   MESSAGES: [
     "Reader:AddToList",
@@ -43,10 +42,6 @@ let ReaderParent = {
 
   receiveMessage: function(message) {
     switch (message.name) {
-      case "Reader:AddToList":
-        ReadingList.addItem(message.data.article);
-        break;
-
       case "Reader:ArticleGet":
         this._getArticle(message.data.url, message.target).then((article) => {
           // Make sure the target browser is still alive before trying to send data back.
@@ -71,24 +66,6 @@ let ReaderParent = {
         }
         break;
       }
-      case "Reader:ListStatusRequest":
-        ReadingList.hasItemForURL(message.data.url).then(inList => {
-          let mm = message.target.messageManager
-          // Make sure the target browser is still alive before trying to send data back.
-          if (mm) {
-            mm.sendAsyncMessage("Reader:ListStatusData",
-                                { inReadingList: inList, url: message.data.url });
-          }
-        });
-        break;
-
-      case "Reader:RemoveFromList":
-        // We need to get the "real" item to delete it.
-        ReadingList.itemForURL(message.data.url).then(item => {
-          ReadingList.deleteItem(item)
-        });
-        break;
-
       case "Reader:Share":
         // XXX: To implement.
         break;

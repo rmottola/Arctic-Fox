@@ -219,6 +219,8 @@ private:
                               const char* aPathPrefix,
                               const ImageMemoryCounter& aCounter)
   {
+    nsresult rv;
+
     nsAutoCString pathPrefix(NS_LITERAL_CSTRING("explicit/"));
     pathPrefix.Append(aPathPrefix);
     pathPrefix.Append(aCounter.Type() == imgIContainer::TYPE_RASTER
@@ -239,7 +241,13 @@ private:
 
     pathPrefix.Append(")/");
 
-    return ReportSurfaces(aHandleReport, aData, pathPrefix, aCounter);
+    rv = ReportSurfaces(aHandleReport, aData, pathPrefix, aCounter);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = ReportSourceValue(aHandleReport, aData, pathPrefix, aCounter.Values());
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    return NS_OK;
   }
 
   static nsresult ReportSurfaces(nsIHandleReportCallback* aHandleReport,
@@ -268,9 +276,10 @@ private:
         surfacePathPrefix.Append("@");
         surfacePathPrefix.AppendFloat(counter.Key().AnimationTime());
 
-        if (counter.Key().Flags() != imgIContainer::DECODE_FLAGS_DEFAULT) {
+        if (counter.Key().Flags() != DefaultSurfaceFlags()) {
           surfacePathPrefix.Append(", flags:");
-          surfacePathPrefix.AppendInt(counter.Key().Flags(), /* aRadix = */ 16);
+          surfacePathPrefix.AppendInt(uint32_t(counter.Key().Flags()),
+                                      /* aRadix = */ 16);
         }
       } else if (counter.Type() == SurfaceMemoryCounterType::COMPOSITING) {
         surfacePathPrefix.Append(", compositing frame");
@@ -343,10 +352,7 @@ private:
   {
     nsresult rv;
 
-    rv = ReportValue(aHandleReport, aData, KIND_HEAP, aPathPrefix,
-                     "source",
-                     "Raster image source data and vector image documents.",
-                     aCounter.Source());
+    rv = ReportSourceValue(aHandleReport, aData, aPathPrefix, aCounter);
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = ReportValue(aHandleReport, aData, KIND_HEAP, aPathPrefix,
@@ -362,6 +368,21 @@ private:
     NS_ENSURE_SUCCESS(rv, rv);
 
     return NS_OK;
+  }
+
+  static nsresult ReportSourceValue(nsIHandleReportCallback* aHandleReport,
+                                    nsISupports* aData,
+                                    const nsACString& aPathPrefix,
+                                    const MemoryCounter& aCounter)
+  {
+    nsresult rv;
+
+    rv = ReportValue(aHandleReport, aData, KIND_HEAP, aPathPrefix,
+                     "source",
+                     "Raster image source data and vector image documents.",
+                     aCounter.Source());
+
+    return rv;
   }
 
   static nsresult ReportValue(nsIHandleReportCallback* aHandleReport,
@@ -705,6 +726,8 @@ NewImageChannel(nsIChannel** aResult,
                 nsIPrincipal* aLoadingPrincipal,
                 nsISupports* aRequestingContext)
 {
+  MOZ_ASSERT(aResult);
+
   nsresult rv;
   nsCOMPtr<nsIHttpChannel> newHttpChannel;
 
@@ -767,7 +790,9 @@ NewImageChannel(nsIChannel** aResult,
     // we should always have a requestingNode, or we are loading something
     // outside a document, in which case the triggeringPrincipal
     // should always be the systemPrincipal.
-    MOZ_ASSERT(nsContentUtils::IsSystemPrincipal(triggeringPrincipal));
+    // However, there are two exceptions: one is Notifications and the
+    // other one is Favicons which create a channel in the parent prcoess
+    // in which case we can't get a requestingNode.
     rv = NS_NewChannel(aResult,
                        aURI,
                        triggeringPrincipal,
@@ -1044,7 +1069,8 @@ protected:
 };
 
 imgCacheExpirationTracker::imgCacheExpirationTracker()
- : nsExpirationTracker<imgCacheEntry, 3>(TIMEOUT_SECONDS * 1000)
+ : nsExpirationTracker<imgCacheEntry, 3>(TIMEOUT_SECONDS * 1000,
+                                         "imgCacheExpirationTracker")
 { }
 
 void
@@ -1404,9 +1430,8 @@ imgLoader::PutIntoCache(const ImageCacheKey& aKey, imgCacheEntry* entry)
   LOG_STATIC_FUNC_WITH_PARAM(GetImgLog(),
                              "imgLoader::PutIntoCache", "uri", aKey.Spec());
 
-  // Check to see if this request already exists in the cache and is being
-  // loaded on a different thread. If so, don't allow this entry to be added to
-  // the cache.
+  // Check to see if this request already exists in the cache. If so, we'll
+  // replace the old version.
   nsRefPtr<imgCacheEntry> tmpCacheEntry;
   if (cache.Get(aKey, getter_AddRefs(tmpCacheEntry)) && tmpCacheEntry) {
     MOZ_LOG(GetImgLog(), LogLevel::Debug,
@@ -1764,7 +1789,7 @@ imgLoader::ValidateEntry(imgCacheEntry* aEntry,
   // XXX: nullptr seems to be a 'special' key value that indicates that NO
   //      validation is required.
   //
-  void *key = (void*)aCX;
+  void *key = (void*) aCX;
   if (request->LoadId() != key) {
     // If we would need to revalidate this entry, but we're being told to
     // bypass the cache, we don't allow this entry to be used.
@@ -2921,6 +2946,9 @@ imgCacheValidator::RemoveProxy(imgRequestProxy* aProxy)
 NS_IMETHODIMP
 imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
 {
+  // We may be holding on to a document, so ensure that it's released.
+  nsCOMPtr<nsISupports> context = mContext.forget();
+
   // If for some reason we don't still have an existing request (probably
   // because OnStartRequest got delivered more than once), just bail.
   if (!mRequest) {
@@ -2969,7 +2997,7 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
       // We don't need to load this any more.
       aRequest->Cancel(NS_BINDING_ABORTED);
 
-      mRequest->SetLoadId(mContext);
+      mRequest->SetLoadId(context);
       mRequest->SetValidator(nullptr);
 
       mRequest = nullptr;
@@ -3012,7 +3040,7 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
   nsCOMPtr<nsIURI> originalURI;
   channel->GetOriginalURI(getter_AddRefs(originalURI));
   mNewRequest->Init(originalURI, uri, mHadInsecureRedirect, aRequest, channel,
-                    mNewEntry, mContext, loadingPrincipal, corsmode, refpol);
+                    mNewEntry, context, loadingPrincipal, corsmode, refpol);
 
   mDestListener = new ProxyListener(mNewRequest);
 
@@ -3038,11 +3066,19 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
   return mDestListener->OnStartRequest(aRequest, ctxt);
 }
 
-/* void onStopRequest (in nsIRequest request, in nsISupports ctxt, in nsresult status); */
-NS_IMETHODIMP imgCacheValidator::OnStopRequest(nsIRequest *aRequest, nsISupports *ctxt, nsresult status)
+/* void onStopRequest (in nsIRequest request, in nsISupports ctxt,
+                       in nsresult status); */
+NS_IMETHODIMP
+imgCacheValidator::OnStopRequest(nsIRequest* aRequest,
+                                 nsISupports* ctxt,
+                                 nsresult status)
 {
-  if (!mDestListener)
+  // Be sure we've released the document that we may have been holding on to.
+  mContext = nullptr;
+
+  if (!mDestListener) {
     return NS_OK;
+  }
 
   return mDestListener->OnStopRequest(aRequest, ctxt, status);
 }
@@ -3125,7 +3161,9 @@ imgCacheValidator::
   if (NS_FAILED(oldChannel->GetURI(getter_AddRefs(oldURI))) ||
       NS_FAILED(oldURI->SchemeIs("https", &isHttps)) ||
       NS_FAILED(oldURI->SchemeIs("chrome", &isChrome)) ||
-      NS_FAILED(NS_URIChainHasFlags(oldURI, nsIProtocolHandler::URI_IS_LOCAL_RESOURCE , &schemeLocal))  ||
+      NS_FAILED(NS_URIChainHasFlags(oldURI,
+                                    nsIProtocolHandler::URI_IS_LOCAL_RESOURCE,
+                                    &schemeLocal))  ||
       (!isHttps && !isChrome && !schemeLocal)) {
     mHadInsecureRedirect = true;
   }

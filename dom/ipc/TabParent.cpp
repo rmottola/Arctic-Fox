@@ -1150,6 +1150,16 @@ TabParent::ThemeChanged()
 }
 
 void
+TabParent::HandleAccessKey(nsTArray<uint32_t>& aCharCodes,
+                           const bool& aIsTrusted,
+                           const int32_t& aModifierMask)
+{
+  if (!mIsDestroyed) {
+    unused << SendHandleAccessKey(aCharCodes, aIsTrusted, aModifierMask);
+  }
+}
+
+void
 TabParent::RequestFlingSnap(const FrameMetrics::ViewID& aScrollId,
                             const mozilla::CSSPoint& aDestination)
 {
@@ -2708,18 +2718,16 @@ TabParent::AllocPRenderFrameParent()
   TextureFactoryIdentifier textureFactoryIdentifier;
   uint64_t layersId = 0;
   bool success = false;
-  if(frameLoader) {
-    PRenderFrameParent* renderFrame = 
-      new RenderFrameParent(frameLoader,
-                            &textureFactoryIdentifier,
-                            &layersId,
-                            &success);
-    MOZ_ASSERT(success);
+
+  PRenderFrameParent* renderFrame =
+    new RenderFrameParent(frameLoader,
+                          &textureFactoryIdentifier,
+                          &layersId,
+                          &success);
+  if (success) {
     AddTabParentToTable(layersId, this);
-    return renderFrame;
-  } else {
-    return nullptr;
   }
+  return renderFrame;
 }
 
 bool
@@ -3470,26 +3478,18 @@ TabParent::AsyncPanZoomEnabled() const
   return widget && widget->AsyncPanZoomEnabled();
 }
 
-PWebBrowserPersistDocumentParent*
-TabParent::AllocPWebBrowserPersistDocumentParent(const uint64_t& aOuterWindowID)
-{
-  return new WebBrowserPersistDocumentParent();
-}
-
-bool
-TabParent::DeallocPWebBrowserPersistDocumentParent(PWebBrowserPersistDocumentParent* aActor)
-{
-  delete aActor;
-  return true;
-}
-
 NS_IMETHODIMP
 TabParent::StartPersistence(uint64_t aOuterWindowID,
                             nsIWebBrowserPersistDocumentReceiver* aRecv)
 {
+  nsCOMPtr<nsIContentParent> manager = Manager();
+  if (!manager->IsContentParent()) {
+    return NS_ERROR_UNEXPECTED;
+  }
   auto* actor = new WebBrowserPersistDocumentParent();
   actor->SetOnReady(aRecv);
-  return SendPWebBrowserPersistDocumentConstructor(actor, aOuterWindowID)
+  return manager->AsContentParent()
+    ->SendPWebBrowserPersistDocumentConstructor(actor, this, aOuterWindowID)
     ? NS_OK : NS_ERROR_FAILURE;
   // (The actor will be destroyed on constructor failure.)
 }

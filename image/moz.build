@@ -19,7 +19,6 @@ MOCHITEST_CHROME_MANIFESTS += ['test/mochitest/chrome.ini']
 
 XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']
 
-
 XPIDL_SOURCES += [
     'imgICache.idl',
     'imgIContainer.idl',
@@ -36,7 +35,6 @@ XPIDL_SOURCES += [
 
 XPIDL_MODULE = 'imglib2'
 
-
 EXPORTS += [
     'ImageCacheKey.h',
     'ImageLogging.h',
@@ -48,6 +46,7 @@ EXPORTS += [
     'IProgressObserver.h',
     'Orientation.h',
     'SurfaceCache.h',
+    'SurfaceFlags.h',
 ]
 
 UNIFIED_SOURCES += [
@@ -55,13 +54,13 @@ UNIFIED_SOURCES += [
     'DecodePool.cpp',
     'Decoder.cpp',
     'DecoderFactory.cpp',
+    'Deinterlacer.cpp',
     'DynamicImage.cpp',
     'FrameAnimator.cpp',
     'FrozenImage.cpp',
     'Image.cpp',
     'ImageCacheKey.cpp',
     'ImageFactory.cpp',
-    'ImageMetadata.cpp',
     'ImageOps.cpp',
     'ImageWrapper.cpp',
     'imgFrame.cpp',
