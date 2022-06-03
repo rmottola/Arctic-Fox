@@ -504,12 +504,13 @@ var LightWeightThemeWebInstaller = {
   },
 
   _install: function (newLWTheme) {
-    var previousLWTheme = this._manager.currentTheme;
+    let previousLWTheme = this._manager.currentTheme;
 
-    var listener = {
+    let listener = {
       onEnabling: function(aAddon, aRequiresRestart) {
-        if (!aRequiresRestart)
+        if (!aRequiresRestart) {
           return;
+        }
 
         let messageString = gNavigatorBundle.getFormattedString("lwthemeNeedsRestart.message",
           [aAddon.name], 1);

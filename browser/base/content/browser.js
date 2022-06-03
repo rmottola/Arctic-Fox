@@ -142,13 +142,13 @@ XPCOMUtils.defineLazyGetter(this, "PopupNotifications", function () {
 #ifdef MOZ_DEVTOOLS
 XPCOMUtils.defineLazyGetter(this, "DeveloperToolbar", function() {
   let tmp = {};
-  Cu.import("resource://gre/modules/devtools/DeveloperToolbar.jsm", tmp);
+  Cu.import("resource:///modules/devtools/client/shared/DeveloperToolbar.jsm", tmp);
   return new tmp.DeveloperToolbar(window, document.getElementById("developer-toolbar"));
 });
 
 XPCOMUtils.defineLazyGetter(this, "BrowserToolboxProcess", function() {
   let tmp = {};
-  Cu.import("resource://gre/modules/devtools/ToolboxProcess.jsm", tmp);
+  Cu.import("resource:///modules/devtools/client/framework/ToolboxProcess.jsm", tmp);
   return tmp.BrowserToolboxProcess;
 });
 #endif
@@ -190,7 +190,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "SimpleServiceDiscovery",
 XPCOMUtils.defineLazyModuleGetter(this, "UITour",
   "resource:///modules/UITour.jsm");
 
-let gInitialPages = [
+var gInitialPages = [
   "about:blank",
   "about:newtab",
   "about:home",
@@ -7301,10 +7301,10 @@ var TabContextMenu = {
 
 #ifdef MOZ_DEVTOOLS
 XPCOMUtils.defineLazyModuleGetter(this, "gDevTools",
-                                  "resource://gre/modules/devtools/gDevTools.jsm");
+                                  "resource:///modules/devtools/gDevTools.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "gDevToolsBrowser",
-                                  "resource://gre/modules/devtools/gDevTools.jsm");
+                                  "resource:///modules/devtools/gDevTools.jsm");
 
 Object.defineProperty(this, "HUDService", {
   get: function HUDService_getter() {

@@ -230,14 +230,14 @@ chrome/toolkit/skin/classic/global/arrow/arrow-lft-hov.gif
 chrome/toolkit/skin/classic/global/arrow/arrow-lft.gif
 chrome/toolkit/skin/classic/global/arrow/arrow-rit-hov.gif
 chrome/toolkit/skin/classic/global/arrow/arrow-rit.gif
-modules/devtools/scratchpad/scratchpad-commands.js
-chrome/toolkit/content/global/devtools/scratchpad-commands.js
+browser/modules/devtools/scratchpad/scratchpad-commands.js
+browser/chrome/browser/content/global/devtools/scratchpad-commands.js
 chrome/toolkit/skin/classic/global/devtools/profiler-stopwatch.svg
 chrome/toolkit/skin/classic/global/devtools/tool-profiler.svg
 browser/chrome/browser/skin/classic/browser/webapps-16.png
 chrome/toolkit/skin/classic/global/icons/webapps-16.png
-modules/devtools/commandline/commands-index.js
-chrome/toolkit/content/global/devtools/commandline/commands-index.js
+browser/modules/devtools/commandline/commands-index.js
+browser/chrome/browser/content/global/devtools/commandline/commands-index.js
 chrome/toolkit/skin/classic/mozapps/plugins/notifyPluginCrashed.png
 chrome/toolkit/skin/classic/mozapps/plugins/notifyPluginGeneric.png
 chrome/toolkit/skin/classic/mozapps/plugins/pluginGeneric-16.png
@@ -247,10 +247,10 @@ browser/chrome/browser/skin/classic/browser/feeds/audioFeedIcon16.png
 browser/chrome/browser/skin/classic/browser/feeds/feedIcon16.png
 browser/chrome/browser/skin/classic/browser/feeds/videoFeedIcon16.png
 browser/chrome/browser/skin/classic/browser/page-livemarks.png
-modules/devtools/resize-commands.js
-chrome/toolkit/content/global/devtools/responsivedesign/resize-commands.js
-modules/devtools/projecteditor/helpers/readdir.js
-chrome/toolkit/content/global/devtools/readdir.js
+browser/modules/devtools/resize-commands.js
+browser/chrome/browser/content/global/devtools/responsivedesign/resize-commands.js
+browser/modules/devtools/projecteditor/helpers/readdir.js
+browser/chrome/browser/content/global/devtools/readdir.js
 modules/devtools/shared/theme-switching.js
 chrome/toolkit/content/global/devtools/theme-switching.js
 modules/devtools/shared/frame-script-utils.js
@@ -276,8 +276,8 @@ browser/chrome/browser/skin/classic/browser/webapps-64.png
 chrome/toolkit/skin/classic/global/icons/webapps-64.png
 browser/chrome/browser/content/browser/abouthome/noise.png
 chrome/toolkit/skin/classic/global/media/imagedoc-lightnoise.png
-modules/devtools/framework/toolbox-options.js
-chrome/toolkit/content/global/devtools/framework/toolbox-options.js
+browser/modules/devtools/framework/toolbox-options.js
+browser/chrome/browser/content/global/devtools/framework/toolbox-options.js
 modules/devtools/shared/d3.js
 chrome/toolkit/content/global/devtools/d3.js
 #MacOS ArcticFox exceptions

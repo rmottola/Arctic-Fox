@@ -1,0 +1,55 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+DIRS += [
+    'acorn',
+    'apps',
+    'client',
+    'discovery',
+    'gcli',
+    'heapsnapshot',
+    'jsbeautify',
+    'pretty-fast',
+    'qrcode',
+    'security',
+    'sourcemap',
+    'shared',
+    'styleinspector',
+    'tern',
+    'transport',
+    'webconsole'
+]
+
+MOCHITEST_CHROME_MANIFESTS += ['tests/mochitest/chrome.ini']
+XPCSHELL_TESTS_MANIFESTS += ['tests/unit/xpcshell.ini']
+
+if CONFIG['MOZ_DEVTOOLS']:
+    DIRS += [
+        'performance',
+        'profiler',
+    ]
+
+EXTRA_JS_MODULES.devtools += [
+    'async-utils.js',
+    'Console.jsm',
+    'content-observer.js',
+    'css-color.js',
+    'deprecated-sync-thenables.js',
+    'DevToolsUtils.js',
+    'DevToolsUtils.jsm',
+    'event-emitter.js',
+    'event-parsers.js',
+    'LayoutHelpers.jsm',
+    'Loader.jsm',
+    'output-parser.js',
+    'path.js',
+    'Require.jsm',
+    'touch-events.js',
+    'worker-loader.js',
+]
+
+

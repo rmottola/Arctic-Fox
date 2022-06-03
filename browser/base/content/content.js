@@ -6,7 +6,7 @@
 /* This content script should work in any browser or iframe and should not
  * depend on the frame being contained in tabbrowser. */
 
-let {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -49,8 +49,8 @@ XPCOMUtils.defineLazyGetter(this, "PageMenuChild", function() {
   Cu.import("resource://gre/modules/PageMenu.jsm", tmp);
   return new tmp.PageMenuChild();
 });
-
-XPCOMUtils.defineLazyModuleGetter(this, "Feeds", "resource:///modules/Feeds.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Feeds",
+  "resource:///modules/Feeds.jsm");
 
 // TabChildGlobal
 var global = this;
@@ -110,7 +110,7 @@ if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
 } else {
 }
 
-let handleContentContextMenu = function (event) {
+var handleContentContextMenu = function (event) {
   let defaultPrevented = event.defaultPrevented;
   if (!Services.prefs.getBoolPref("dom.event.contextmenu.enabled")) {
     let plugin = null;
@@ -768,7 +768,7 @@ addMessageListener("ContextMenu:SetAsDesktopBackground", (message) => {
     sendAsyncMessage("ContextMenu:SetAsDesktopBackground:Result", { disable });
 });
 
-let pageInfoListener = {
+var pageInfoListener = {
 
   init: function(chromeGlobal) {
     chromeGlobal.addMessageListener("PageInfo:getData", this, false, true);
