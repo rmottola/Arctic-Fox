@@ -11,7 +11,6 @@ if CONFIG['MOZ_EXTENSIONS']:
 
 DIRS += ['/%s' % CONFIG['MOZ_BRANDING_DIRECTORY']]
 
-# Never add tier dirs after browser because they apparently won't get
+# Never add dirs after browser because they apparently won't get
 # packaged properly on Mac.
 DIRS += ['/browser']
-
