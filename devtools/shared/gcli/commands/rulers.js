@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* globals getBrowserForTab */
 
 "use strict";
 
@@ -11,7 +12,7 @@ const events = require("sdk/event/core");
 const gcli = require("gcli/index");
 const l10n = require("gcli/l10n");
 require("devtools/server/actors/inspector");
-const { RulersHighlighter } = require("devtools/server/actors/highlighter");
+const { RulersHighlighter } = require("devtools/server/actors/highlighters");
 
 const highlighters = new WeakMap();
 

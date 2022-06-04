@@ -7,7 +7,7 @@
 const {Cc, Ci, Cu} = require("chrome");
 const l10n = require("gcli/l10n");
 require("devtools/server/actors/inspector");
-const {BoxModelHighlighter} = require("devtools/server/actors/highlighter");
+const {BoxModelHighlighter} = require("devtools/server/actors/highlighters");
 
 XPCOMUtils.defineLazyGetter(this, "nodesSelected", function() {
   return Services.strings.createBundle("chrome://global/locale/devtools/gclicommands.properties");

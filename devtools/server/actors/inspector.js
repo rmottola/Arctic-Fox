@@ -66,7 +66,7 @@ const {
   HighlighterActor,
   CustomHighlighterActor,
   isTypeRegistered,
-} = require("devtools/server/actors/highlighter");
+} = require("devtools/server/actors/highlighters");
 const {getLayoutChangesObserver, releaseLayoutChangesObserver} =
   require("devtools/server/actors/layout");
 

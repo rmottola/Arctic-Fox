@@ -13,6 +13,7 @@ DIRS += [
     'gcli',
     'heapsnapshot',
     'jsbeautify',
+    'layout',
     'pretty-fast',
     'qrcode',
     'security',
@@ -51,5 +52,4 @@ EXTRA_JS_MODULES.devtools += [
     'touch-events.js',
     'worker-loader.js',
 ]
-
 
