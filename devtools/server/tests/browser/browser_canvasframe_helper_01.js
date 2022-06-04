@@ -32,8 +32,9 @@ add_task(function*() {
   };
 
   info("Building the helper");
-  let helper = new CanvasFrameAnonymousContentHelper(
-    getMockTabActor(doc.defaultView), nodeBuilder);
+  let env = new HighlighterEnvironment();
+  env.initFromWindow(doc.defaultView);
+  let helper = new CanvasFrameAnonymousContentHelper(env, nodeBuilder);
 
   ok(helper.content instanceof AnonymousContent,
     "The helper owns the AnonymousContent object");
@@ -75,6 +76,7 @@ add_task(function*() {
 
   info("Destroying the helper");
   helper.destroy();
+  env.destroy();
 
   ok(!helper.getTextContentForElement("child-element"),
     "No text content was retrieved after the helper was destroyed");

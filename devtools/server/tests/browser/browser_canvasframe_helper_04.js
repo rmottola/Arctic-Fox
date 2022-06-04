@@ -24,8 +24,6 @@ const TEST_URL_2 = "data:text/html;charset=utf-8,CanvasFrameAnonymousContentHelp
 add_task(function*() {
   let doc = yield addTab(TEST_URL_2);
 
-  let tabActor = getMockTabActor(doc.defaultView);
-
   let nodeBuilder = () => {
     let root = doc.createElement("div");
     let child = doc.createElement("div");
@@ -38,7 +36,9 @@ add_task(function*() {
   };
 
   info("Building the helper");
-  let helper = new CanvasFrameAnonymousContentHelper(tabActor, nodeBuilder);
+  let env = new HighlighterEnvironment();
+  env.initFromWindow(doc.defaultView);
+  let helper = new CanvasFrameAnonymousContentHelper(env, nodeBuilder);
 
   info("Get an element from the helper");
   let el = helper.getElement("child-element");
@@ -85,6 +85,7 @@ add_task(function*() {
   is(mouseDownHandled, 1, "The mousedown event was not handled after navigation");
 
   info("Destroying the helper");
+  env.destroy();
   helper.destroy();
 
   gBrowser.removeCurrentTab();

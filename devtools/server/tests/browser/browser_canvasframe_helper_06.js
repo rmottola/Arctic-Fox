@@ -39,8 +39,9 @@ add_task(function*() {
   };
 
   info("Building the helper");
-  let helper = new CanvasFrameAnonymousContentHelper(
-    getMockTabActor(doc.defaultView), nodeBuilder);
+  let env = new HighlighterEnvironment();
+  env.initFromWindow(doc.defaultView);
+  let helper = new CanvasFrameAnonymousContentHelper(env, nodeBuilder);
 
   info("Getting the parent and child elements");
   let parentEl = helper.getElement("parent-element");
@@ -82,6 +83,9 @@ add_task(function*() {
   info("Removing the event listener");
   parentEl.removeEventListener("mousedown", onParentMouseDown);
   childEl.removeEventListener("mousedown", onChildMouseDown);
+
+  env.destroy();
+  helper.destroy();
 
   gBrowser.removeCurrentTab();
 });

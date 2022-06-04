@@ -100,7 +100,9 @@ const GcliActor = ActorClass({
     request: {
       customProps: Arg(0, "nullable:array:string")
     },
-    response: RetVal("json")
+    response: {
+      value: RetVal("array:json")
+    }
   }),
 
   /**
@@ -266,10 +268,6 @@ const GcliActor = ActorClass({
 
         get document() {
           return tabActor.window.document;
-        },
-
-        get __deprecatedTabActor() {
-          return tabActor;
         }
       };
 
@@ -290,7 +288,7 @@ const GcliActor = ActorClass({
 exports.GcliActor = GcliActor;
 
 /**
- * 
+ *
  */
 const GcliFront = exports.GcliFront = FrontClass(GcliActor, {
   initialize: function(client, tabForm) {

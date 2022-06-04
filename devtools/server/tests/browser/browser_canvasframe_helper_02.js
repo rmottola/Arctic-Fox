@@ -32,12 +32,16 @@ add_task(function*() {
   };
 
   info("Building the helper");
-  let helper = new CanvasFrameAnonymousContentHelper(
-    getMockTabActor(doc.defaultView), nodeBuilder);
+  let env = new HighlighterEnvironment();
+  env.initFromWindow(doc.defaultView);
+  let helper = new CanvasFrameAnonymousContentHelper(env, nodeBuilder);
 
   ok(!helper.content, "The AnonymousContent was not inserted in the window");
   ok(!helper.getTextContentForElement("child-element"),
     "No text content is returned");
+
+  env.destroy();
+  helper.destroy();
 
   gBrowser.removeCurrentTab();
 });

@@ -5,18 +5,22 @@
 
 "use strict";
 
-const EventEmitter = require("devtools/toolkit/event-emitter");
+const EventEmitter = require("devtools/shared/event-emitter");
 const eventEmitter = new EventEmitter();
 const events = require("sdk/event/core");
 
-const gcli = require("gcli/index");
 const l10n = require("gcli/l10n");
 require("devtools/server/actors/inspector");
-const { RulersHighlighter } = require("devtools/server/actors/highlighters");
+const { RulersHighlighter, HighlighterEnvironment } =
+  require("devtools/server/actors/highlighters");
 
 const highlighters = new WeakMap();
+let isRulersVisible = false;
 
 exports.items = [
+  // The client rulers command is used to maintain the toolbar button state only
+  // and redirects to the server command to actually toggle the rulers (see
+  // rulers_server below).
   {
     name: "rulers",
     description: l10n.lookup("rulersDesc"),
@@ -25,68 +29,76 @@ exports.items = [
     buttonClass: "command-button command-button-invertable",
     tooltipText: l10n.lookup("rulersTooltip"),
     state: {
-      isChecked: function(aTarget) {
-        if (aTarget.isLocalTab) {
-          let window = aTarget.tab.linkedBrowser.contentWindow;
-
-          if (window) {
-            return highlighters.has(window.document);
-          }
-
-          return false;
-        } else {
-          throw new Error("Unsupported target");
-        }
-      },
-      onChange: function(aTarget, aChangeHandler) {
-        eventEmitter.on("changed", aChangeHandler);
-      },
-      offChange: function(aTarget, aChangeHandler) {
-        eventEmitter.off("changed", aChangeHandler);
-      },
+      isChecked: ({_tab}) => isCheckedFor(_tab),
+      onChange: (target, handler) => eventEmitter.on("changed", handler),
+      offChange: (target, handler) => eventEmitter.off("changed", handler)
     },
-    exec: function(args, context) {
-      let env = context.environment;
-      let { target } = env;
+    exec: function*(args, context) {
+      let { target } = context.environment;
 
-      if (highlighters.has(env.document)) {
-        highlighters.get(env.document).highlighter.destroy();
-        return;
+      // Pipe the call to the server command.
+      let response = yield context.updateExec("rulers_server");
+      let { visible, id } = response.data;
+
+      if (visible) {
+        visibleHighlighters.add(id);
+      } else {
+        visibleHighlighters.delete(id);
       }
 
-      // Build a tab context for the highlighter (which normally takes a
-      // TabActor as parameter to its constructor)
-      let tabContext = {
-        browser: env.chromeWindow.gBrowser.getBrowserForDocument(env.document),
-        window: env.window
+      eventEmitter.emit("changed", { target });
+
+      // Toggle off the button when the page navigates because the rulers are
+      // removed automatically by the RulersHighlighter on the server then.
+      let onNavigate = () => {
+        visibleHighlighters.delete(id);
+        eventEmitter.emit("changed", { target });
       };
+      target.off("will-navigate", onNavigate);
+      target.once("will-navigate", onNavigate);
+    }
+  },
+  // The server rulers command is hidden by default, it's just used by the
+  // client command.
+  {
+    name: "rulers_server",
+    runAt: "server",
+    hidden: true,
+    returnType: "highlighterVisibility",
+    exec: function(args, context) {
+      let env = context.environment;
 
-      let emitToContext = (type, data) =>
-        events.emit(tabContext, type, Object.assign({isTopLevel: true}, data))
+      // Calling the command again after the rulers have been shown once hides
+      // them.
+      if (highlighters.has(env.document)) {
+        let { highlighter, environment } = highlighters.get(env.document);
+        highlighter.destroy();
+        environment.destroy();
+        return false;
+      }
 
-      target.once("navigate", emitToContext);
-      target.once("will-navigate", emitToContext);
+      // Otherwise, display the rulers.
+      let environment = new HighlighterEnvironment();
+      environment.initFromWindow(env.window);
+      let highlighter = new RulersHighlighter(environment);
 
-      let highlighter = new RulersHighlighter(tabContext);
+      // Store the instance of the rulers highlighter for this document so we
+      // can hide it later.
+      highlighters.set(document, { highlighter, environment });
 
-      highlighters.set(env.document, { highlighter, listener: emitToContext });
-
+      // Listen to the highlighter's destroy event which may happen if the
+      // window is refreshed or closed with the rulers shown.
       events.once(highlighter, "destroy", () => {
         if (highlighters.has(env.document)) {
-          let { highlighter, listener } = highlighters.get(env.document);
 
-          target.off("navigate", listener);
-          target.off("will-navigate", listener);
-
+          let { environment } = highlighters.get(env.document);
+          environment.destroy();
           highlighters.delete(env.document);
         }
-
-        eventEmitter.emit("changed", { target });
       });
 
       highlighter.show();
-
-      eventEmitter.emit("changed", { target });
+      return true;
     }
   }
 ];
