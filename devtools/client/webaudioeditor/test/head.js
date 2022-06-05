@@ -22,7 +22,7 @@ let { WebAudioFront } = devtools.require("devtools/server/actors/webaudio");
 let TargetFactory = devtools.TargetFactory;
 let mm = null;
 
-const FRAME_SCRIPT_UTILS_URL = "chrome://global/content/devtools/frame-script-utils.js";
+const FRAME_SCRIPT_UTILS_URL = "chrome://devtools/content/shared/frame-script-utils.js";
 const EXAMPLE_URL = "http://example.com/browser/browser/devtools/webaudioeditor/test/";
 const SIMPLE_CONTEXT_URL = EXAMPLE_URL + "doc_simple-context.html";
 const COMPLEX_CONTEXT_URL = EXAMPLE_URL + "doc_complex-context.html";

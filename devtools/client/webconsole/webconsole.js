@@ -50,7 +50,7 @@ const WEAK_SIGNATURE_ALGORITHM_LEARN_MORE = "https://developer.mozilla.org/docs/
 
 const HELP_URL = "https://developer.mozilla.org/docs/Tools/Web_Console/Helpers";
 
-const VARIABLES_VIEW_URL = "chrome://global/content/devtools/widgets/VariablesView.xul";
+const VARIABLES_VIEW_URL = "chrome://devtools/content/shared/widgets/VariablesView.xul";
 
 const CONSOLE_DIR_VIEW_HEIGHT = 0.6;
 

@@ -23,7 +23,7 @@ let TargetFactory = devtools.TargetFactory;
 let Toolbox = devtools.Toolbox;
 let mm = null;
 
-const FRAME_SCRIPT_UTILS_URL = "chrome://global/content/devtools/frame-script-utils.js"
+const FRAME_SCRIPT_UTILS_URL = "chrome://devtools/content/shared/frame-script-utils.js"
 const EXAMPLE_URL = "http://example.com/browser/browser/devtools/shadereditor/test/";
 const SIMPLE_CANVAS_URL = EXAMPLE_URL + "doc_simple-canvas.html";
 const SHADER_ORDER_URL = EXAMPLE_URL + "doc_shader-order.html";

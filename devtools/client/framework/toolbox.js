@@ -171,7 +171,7 @@ Toolbox.HostType = {
 };
 
 Toolbox.prototype = {
-  _URL: "chrome://global/content/devtools/framework/toolbox.xul",
+  _URL: "chrome://devtools/content/framework/toolbox.xul",
 
   _prefs: {
     LAST_HOST: "devtools.toolbox.host",

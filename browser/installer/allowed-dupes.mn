@@ -237,7 +237,7 @@ chrome/toolkit/skin/classic/global/devtools/tool-profiler.svg
 browser/chrome/browser/skin/classic/browser/webapps-16.png
 chrome/toolkit/skin/classic/global/icons/webapps-16.png
 browser/modules/devtools/commandline/commands-index.js
-browser/chrome/browser/content/global/devtools/commandline/commands-index.js
+browser/chrome/devtools/content/commandline/commands-index.js
 chrome/toolkit/skin/classic/mozapps/plugins/notifyPluginCrashed.png
 chrome/toolkit/skin/classic/mozapps/plugins/notifyPluginGeneric.png
 chrome/toolkit/skin/classic/mozapps/plugins/pluginGeneric-16.png

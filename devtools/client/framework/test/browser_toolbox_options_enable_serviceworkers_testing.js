@@ -4,12 +4,19 @@
 // Test that enabling Service Workers testing option enables the
 // mServiceWorkersTestingEnabled attribute added to nsPIDOMWindow.
 
+const COMMON_FRAME_SCRIPT_URL =
+  "chrome://devtools/content/shared/frame-script-utils.js";
+const ROOT_TEST_DIR =
+  getRootDirectory(gTestPath);
+const FRAME_SCRIPT_URL =
+  ROOT_TEST_DIR +
+  "browser_toolbox_options_enable_serviceworkers_testing_frame_script.js";
 const TEST_URI = URL_ROOT +
                  "browser_toolbox_options_enable_serviceworkers_testing.html";
 
 const ELEMENT_ID = "devtools-enable-serviceWorkersTesting";
 
-let toolbox;
+var toolbox;
 let doc;
 
 function test() {

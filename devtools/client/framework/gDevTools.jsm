@@ -700,7 +700,7 @@ let gDevToolsBrowser = {
    * Open a tab to allow connects to a remote browser
    */
   openConnectScreen: function(gBrowser) {
-    gBrowser.selectedTab = gBrowser.addTab("chrome://global/content/devtools/connect.xhtml");
+    gBrowser.selectedTab = gBrowser.addTab("chrome://devtools/content/framework/connect/connect.xhtml");
   },
 
   /**

@@ -43,7 +43,7 @@ window.addEventListener("unload", function onUnload() {
   UI.destroy();
 });
 
-let UI = {
+var UI = {
   init: function() {
     this.showFooterIfNeeded();
     this.setTab("apps");
@@ -71,7 +71,7 @@ let UI = {
     if (window.parent == window) {
       // We're alone. Let's add a footer.
       footer.removeAttribute("hidden");
-      footer.src = "chrome://global/content/devtools/app-manager/connection-footer.xhtml";
+      footer.src = "chrome://devtools/content/app-manager/content/connection-footer.xhtml";
     } else {
       footer.setAttribute("hidden", "true");
     }

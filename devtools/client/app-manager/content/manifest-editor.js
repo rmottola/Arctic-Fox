@@ -8,7 +8,7 @@ const {VariablesView} =
   Cu.import("resource://gre/modules/devtools/VariablesView.jsm", {});
 
 const VARIABLES_VIEW_URL =
-  "chrome://global/content/devtools/widgets/VariablesView.xul";
+  "chrome://devtools/content/shared/widgets/VariablesView.xul";
 
 function ManifestEditor(project) {
   this.project = project;

@@ -48,7 +48,7 @@ registerCleanupFunction(function*() {
 
 const TEST_URL_ROOT = "http://mochi.test:8888/browser/browser/devtools/markupview/test/";
 const CHROME_BASE = "chrome://mochitests/content/browser/browser/devtools/markupview/test/";
-const COMMON_FRAME_SCRIPT_URL = "chrome://browser/content/devtools/frame-script-utils.js";
+const COMMON_FRAME_SCRIPT_URL = "chrome://devtools/content/shared/frame-script-utils.js";
 
 /**
  * Add a new test tab in the browser and load the given url.

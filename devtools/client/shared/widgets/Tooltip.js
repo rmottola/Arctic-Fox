@@ -38,9 +38,11 @@ const GRADIENT_RE = /\b(repeating-)?(linear|radial)-gradient\(((rgb|hsl)a?\(.+?\
 const BORDERCOLOR_RE = /^border-[-a-z]*color$/ig;
 const BORDER_RE = /^border(-(top|bottom|left|right))?$/ig;
 const XHTML_NS = "http://www.w3.org/1999/xhtml";
-const SPECTRUM_FRAME = "chrome://global/content/devtools/spectrum-frame.xhtml";
-const CUBIC_BEZIER_FRAME = "chrome://global/content/devtools/cubic-bezier-frame.xhtml";
-const FILTER_FRAME = "chrome://global/content/devtools/filter-frame.xhtml";
+const SPECTRUM_FRAME = "chrome://devtools/content/shared/widgets/spectrum-frame.xhtml";
+const CUBIC_BEZIER_FRAME =
+      "chrome://devtools/content/shared/widgets/cubic-bezier-frame.xhtml";
+const MDN_DOCS_FRAME = "chrome://devtools/content/shared/widgets/mdn-docs-frame.xhtml";
+const FILTER_FRAME = "chrome://devtools/content/shared/widgets/filter-frame.xhtml";
 const ESCAPE_KEYCODE = Ci.nsIDOMKeyEvent.DOM_VK_ESCAPE;
 const RETURN_KEYCODE = Ci.nsIDOMKeyEvent.DOM_VK_RETURN;
 const POPUP_EVENTS = ["shown", "hidden", "showing", "hiding"];

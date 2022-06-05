@@ -4,11 +4,11 @@
 
 const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
-let { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
+var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
 
 // Disable logging for all the tests. Both the debugger server and frontend will
 // be affected by this pref.
-let gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
+var gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
 Services.prefs.setBoolPref("devtools.debugger.log", false);
 
 let { generateUUID } = Cc['@mozilla.org/uuid-generator;1'].getService(Ci.nsIUUIDGenerator);
@@ -26,7 +26,7 @@ let TargetFactory = devtools.TargetFactory;
 let Toolbox = devtools.Toolbox;
 let mm = null
 
-const FRAME_SCRIPT_UTILS_URL = "chrome://global/content/devtools/frame-script-utils.js";
+const FRAME_SCRIPT_UTILS_URL = "chrome://devtools/content/shared/frame-script-utils.js";
 const EXAMPLE_URL = "http://example.com/browser/browser/devtools/canvasdebugger/test/";
 const SET_TIMEOUT_URL = EXAMPLE_URL + "doc_settimeout.html";
 const NO_CANVAS_URL = EXAMPLE_URL + "doc_no-canvas.html";

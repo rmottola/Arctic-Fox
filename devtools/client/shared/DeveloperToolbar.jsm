@@ -809,7 +809,7 @@ OutputPanel.prototype._init = function(devtoolbar) {
          class="gcli-panel">
     <html:iframe xmlns:html="http://www.w3.org/1999/xhtml"
                  id="gcli-output-frame"
-                 src="chrome://global/content/devtools/commandlineoutput.xhtml"
+                 src="chrome://devtools/content/commandline/commandlineoutput.xhtml"
                  sandbox="allow-same-origin"/>
   </tooltip|panel>
   */
@@ -840,7 +840,7 @@ OutputPanel.prototype._init = function(devtoolbar) {
 
   this._frame = this._devtoolbar._doc.createElementNS(NS_XHTML, "iframe");
   this._frame.id = "gcli-output-frame";
-  this._frame.setAttribute("src", "chrome://global/content/devtools/commandlineoutput.xhtml");
+  this._frame.setAttribute("src", "chrome://devtools/content/commandline/commandlineoutput.xhtml");
   this._frame.setAttribute("sandbox", "allow-same-origin");
   this._panel.appendChild(this._frame);
 
@@ -1134,7 +1134,7 @@ TooltipPanel.prototype._init = function(devtoolbar) {
          class="gcli-panel">
     <html:iframe xmlns:html="http://www.w3.org/1999/xhtml"
                  id="gcli-tooltip-frame"
-                 src="chrome://global/content/devtools/commandlinetooltip.xhtml"
+                 src="chrome://devtools/content/commandline/commandlinetooltip.xhtml"
                  flex="1"
                  sandbox="allow-same-origin"/>
   </tooltip|panel>
@@ -1166,7 +1166,7 @@ TooltipPanel.prototype._init = function(devtoolbar) {
 
   this._frame = devtoolbar._doc.createElementNS(NS_XHTML, "iframe");
   this._frame.id = "gcli-tooltip-frame";
-  this._frame.setAttribute("src", "chrome://global/content/devtools/commandlinetooltip.xhtml");
+  this._frame.setAttribute("src", "chrome://devtools/content/commandline/commandlinetooltip.xhtml");
   this._frame.setAttribute("flex", "1");
   this._frame.setAttribute("sandbox", "allow-same-origin");
   this._panel.appendChild(this._frame);
