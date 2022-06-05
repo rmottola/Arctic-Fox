@@ -7,9 +7,10 @@ const { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {})
 
 let {devtools} = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
 let TargetFactory = devtools.TargetFactory;
+let DevToolsUtils = devtools.require("devtools/toolkit/DevToolsUtils");
 
 // Import the GCLI test helper
-let testDir = gTestPath.substr(0, gTestPath.lastIndexOf("/"));
+var testDir = gTestPath.substr(0, gTestPath.lastIndexOf("/"));
 Services.scriptloader.loadSubScript(testDir + "../../../commandline/test/helpers.js", this);
 
 DevToolsUtils.testing = true;
@@ -24,7 +25,7 @@ registerCleanupFunction(() => {
  * Open the toolbox, with the inspector tool visible.
  * @return a promise that resolves when the inspector is ready
  */
-let openInspector = Task.async(function*() {
+var openInspector = Task.async(function*() {
   info("Opening the inspector");
   let target = TargetFactory.forTab(gBrowser.selectedTab);
 
@@ -78,7 +79,7 @@ function waitForToolboxFrameFocus(toolbox) {
  * @return a promise that resolves when the inspector is ready and the sidebar
  * view is visible and ready
  */
-let openInspectorSideBar = Task.async(function*(id) {
+var openInspectorSideBar = Task.async(function*(id) {
   let {toolbox, inspector} = yield openInspector();
 
   if (!hasSideBarTab(inspector, id)) {
@@ -133,7 +134,7 @@ function openRuleView() {
  * @param {String} url The url to be loaded in the new tab
  * @return a promise that resolves to the tab object when the url is loaded
  */
-let addTab = Task.async(function* (url) {
+var addTab = Task.async(function* (url) {
   info("Adding a new tab with URL: '" + url + "'");
 
   window.focus();

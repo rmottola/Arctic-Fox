@@ -1575,7 +1575,7 @@ Toolbox.prototype = {
           this.walker.on("highlighter-ready", this._highlighterReady);
           this.walker.on("highlighter-hide", this._highlighterHidden);
 
-          let autohide = !gDevTools.testing;
+          let autohide = !DevToolsUtils.testing;
           this._highlighter = yield this._inspector.getHighlighter(autohide);
         }
       }.bind(this));
@@ -1794,7 +1794,7 @@ Toolbox.prototype = {
 
       // Force GC to prevent long GC pauses when running tests and to free up
       // memory in general when the toolbox is closed.
-      if (gDevTools.testing) {
+      if (DevToolsUtils.testing) {
         win.QueryInterface(Ci.nsIInterfaceRequestor)
            .getInterface(Ci.nsIDOMWindowUtils)
            .garbageCollect();

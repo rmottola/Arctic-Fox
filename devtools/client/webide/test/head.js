@@ -14,9 +14,10 @@ const {gDevTools} = Cu.import("resource:///modules/devtools/gDevTools.jsm", {});
 const {require} = devtools;
 const promise = require("promise");
 const {AppProjects} = require("devtools/app-manager/app-projects");
-gDevTools.testing = true;
+const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+DevToolsUtils.testing = true;
 
-let TEST_BASE;
+var TEST_BASE;
 if (window.location === "chrome://browser/content/browser.xul") {
   TEST_BASE = "chrome://mochitests/content/browser/browser/devtools/webide/test/";
 } else {
@@ -34,10 +35,10 @@ Services.prefs.setCharPref("devtools.webide.adaptersAddonURL", TEST_BASE + "addo
 Services.prefs.setCharPref("devtools.webide.templatesURL", TEST_BASE + "templates.json");
 Services.prefs.setCharPref("devtools.devices.url", TEST_BASE + "browser_devices.json");
 
-let registerCleanupFunction = registerCleanupFunction ||
+var registerCleanupFunction = registerCleanupFunction ||
                               SimpleTest.registerCleanupFunction;
 registerCleanupFunction(() => {
-  gDevTools.testing = false;
+  DevToolsUtils.testing = false;
   Services.prefs.clearUserPref("devtools.webide.enabled");
   Services.prefs.clearUserPref("devtools.webide.enableLocalRuntime");
   Services.prefs.clearUserPref("devtools.webide.autoinstallADBHelper");

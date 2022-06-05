@@ -7,7 +7,7 @@
 
 const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
-const NET_STRINGS_URI = "chrome://global/locale/devtools/netmonitor.properties";
+const NET_STRINGS_URI = "chrome://browser/locale/devtools/netmonitor.properties";
 const PKI_STRINGS_URI = "chrome://pippki/locale/pippki.properties";
 const LISTENERS = [ "NetworkActivity" ];
 const NET_PREFS = { "NetworkMonitor.saveRequestAndResponseBodies": true };
@@ -120,6 +120,7 @@ const EventEmitter = require("devtools/toolkit/event-emitter");
 const Editor = require("devtools/sourceeditor/editor");
 const {Tooltip} = require("devtools/shared/widgets/Tooltip");
 const {ToolSidebar} = require("devtools/framework/sidebar");
+const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Chart",
   "resource://gre/modules/devtools/Chart.jsm");
@@ -135,9 +136,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "Task",
 
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
   "resource://gre/modules/PluralForm.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "DevToolsUtils",
-  "resource://gre/modules/devtools/DevToolsUtils.jsm");
 
 XPCOMUtils.defineLazyServiceGetter(this, "clipboardHelper",
   "@mozilla.org/widget/clipboardhelper;1", "nsIClipboardHelper");
@@ -156,7 +154,7 @@ Object.defineProperty(this, "NetworkHelper", {
 /**
  * Object defining the network monitor controller components.
  */
-let NetMonitorController = {
+var NetMonitorController = {
   /**
    * Initializes the view.
    *
@@ -733,13 +731,13 @@ NetworkEventsHandler.prototype = {
 /**
  * Localization convenience methods.
  */
-let L10N = new ViewHelpers.L10N(NET_STRINGS_URI);
-let PKI_L10N = new ViewHelpers.L10N(PKI_STRINGS_URI);
+var L10N = new ViewHelpers.L10N(NET_STRINGS_URI);
+var PKI_L10N = new ViewHelpers.L10N(PKI_STRINGS_URI);
 
 /**
  * Shortcuts for accessing various network monitor preferences.
  */
-let Prefs = new ViewHelpers.Prefs("devtools.netmonitor", {
+var Prefs = new ViewHelpers.Prefs("devtools.netmonitor", {
   networkDetailsWidth: ["Int", "panes-network-details-width"],
   networkDetailsHeight: ["Int", "panes-network-details-height"],
   statistics: ["Bool", "statistics"],
@@ -813,7 +811,7 @@ const WDA_DEFAULT_VERIFY_INTERVAL = 50; // ms
 // and two seconds is quite short on slow debug builds. The timeout here should
 // be at least equal to the general mochitest timeout of 45 seconds so that this
 // never gets hit during testing.
-const WDA_DEFAULT_GIVE_UP_TIMEOUT = gDevTools.testing ? 45000 : 2000; // ms
+const WDA_DEFAULT_GIVE_UP_TIMEOUT = DevToolsUtils.testing ? 45000 : 2000; // ms
 
 /**
  * Helper method for debugging.
@@ -825,4 +823,4 @@ function dumpn(str) {
   }
 }
 
-let wantLogging = Services.prefs.getBoolPref("devtools.debugger.log");
+var wantLogging = Services.prefs.getBoolPref("devtools.debugger.log");

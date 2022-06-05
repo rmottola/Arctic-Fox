@@ -12,6 +12,7 @@ let TargetFactory = devtools.TargetFactory;
 let {LoadContextInfo} = Cu.import("resource://gre/modules/LoadContextInfo.jsm", {});
 let {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
 let {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
+let DevToolsUtils = devtools.require("devtools/toolkit/DevToolsUtils");
 
 let gPanelWindow;
 let cache = Cc["@mozilla.org/netwerk/cache-storage-service;1"]
@@ -22,9 +23,9 @@ let cache = Cc["@mozilla.org/netwerk/cache-storage-service;1"]
 let testDir = gTestPath.substr(0, gTestPath.lastIndexOf("/"));
 Services.scriptloader.loadSubScript(testDir + "../../../commandline/test/helpers.js", this);
 
-gDevTools.testing = true;
+DevToolsUtils.testing = true;
 SimpleTest.registerCleanupFunction(() => {
-  gDevTools.testing = false;
+  DevToolsUtils.testing = false;
 });
 
 /**

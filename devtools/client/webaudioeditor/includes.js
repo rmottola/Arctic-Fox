@@ -21,6 +21,8 @@ const { Class } = require("sdk/core/heritage");
 const EventEmitter = require("devtools/toolkit/event-emitter");
 const STRINGS_URI = "chrome://global/locale/devtools/webaudioeditor.properties"
 const L10N = new ViewHelpers.L10N(STRINGS_URI);
+const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+
 devtools.lazyImporter(this, "LineGraphWidget",
   "resource://gre/modules/devtools/Graphs.jsm");
 

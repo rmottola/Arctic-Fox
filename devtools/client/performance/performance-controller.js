@@ -182,7 +182,7 @@ let shutdownPerformance = Task.async(function*() {
  * Functions handling target-related lifetime events and
  * UI interaction.
  */
-let PerformanceController = {
+var PerformanceController = {
   _recordings: [],
   _currentRecording: null,
 
@@ -531,7 +531,7 @@ let PerformanceController = {
     // have realtime rendering tests in non-e10s. This function is
     // overridden wholesale in tests when we want to test multiprocess support
     // specifically.
-    if (gDevTools.testing) {
+    if (DevToolsUtils.testing) {
       return { supported: true, enabled: true };
     }
     let supported = SYSTEM.MULTIPROCESS_SUPPORTED;

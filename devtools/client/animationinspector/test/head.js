@@ -10,7 +10,8 @@ const {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 const {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
 const TargetFactory = devtools.TargetFactory;
 const {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
-const {ViewHelpers} = Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm", {});
+const {ViewHelpers} = Cu.import("resource://modules/devtools/ViewHelpers.jsm", {});
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 // All tests are asynchronous
 waitForExplicitFinish();
@@ -39,9 +40,9 @@ Services.prefs.setBoolPref(NEW_UI_PREF, false);
 // Uncomment this pref to dump all devtools protocol traffic
 // Services.prefs.setBoolPref("devtools.debugger.log", true);
 
-// Set the testing flag on gDevTools and reset it when the test ends
-gDevTools.testing = true;
-registerCleanupFunction(() => gDevTools.testing = false);
+// Set the testing flag on DevToolsUtils and reset it when the test ends
+DevToolsUtils.testing = true;
+registerCleanupFunction(() => DevToolsUtils.testing = false);
 
 // Clean-up all prefs that might have been changed during a test run
 // (safer here because if the test fails, then the pref is never reverted)
@@ -119,7 +120,7 @@ function getNodeFront(selector, {walker}) {
  *        to highlight the node upon selection
  * @return {Promise} Resolves when the inspector is updated with the new node
  */
-let selectNode = Task.async(function*(data, inspector, reason="test") {
+var selectNode = Task.async(function*(data, inspector, reason="test") {
   info("Selecting the node for '" + data + "'");
   let nodeFront = data;
   if (!data._form) {
@@ -157,13 +158,14 @@ function assertAnimationsDisplayed(panel, nbAnimations, msg="") {
  * @param {InspectorPanel} inspector
  * @return {Promise}
  */
-let waitForAnimationInspectorReady = Task.async(function*(inspector) {
+var waitForAnimationInspectorReady = Task.async(function*(inspector) {
   let win = inspector.sidebar.getWindowForTab("animationinspector");
   let updated = inspector.once("inspector-updated");
 
-  // In e10s, if we wait for underlying toolbox actors to load (by setting
-  // gDevTools.testing to true), we miss the "animationinspector-ready" event on
-  // the sidebar, so check to see if the iframe is already loaded.
+  // In e10s, if we wait for underlying toolbox actors to
+  // load (by setting DevToolsUtils.testing to true), we miss the
+  // "animationinspector-ready" event on the sidebar, so check to see if the
+  // iframe is already loaded.
   let tabReady = win.document.readyState === "complete" ?
                  promise.resolve() :
                  inspector.sidebar.once("animationinspector-ready");
@@ -176,7 +178,7 @@ let waitForAnimationInspectorReady = Task.async(function*(inspector) {
  * sidebar selected.
  * @return a promise that resolves when the inspector is ready.
  */
-let openAnimationInspector = Task.async(function*() {
+var openAnimationInspector = Task.async(function*() {
   let target = TargetFactory.forTab(gBrowser.selectedTab);
 
   info("Opening the toolbox with the inspector selected");
@@ -218,7 +220,7 @@ let openAnimationInspector = Task.async(function*() {
  * Close the toolbox.
  * @return a promise that resolves when the toolbox has closed.
  */
-let closeAnimationInspector = Task.async(function*() {
+var closeAnimationInspector = Task.async(function*() {
   let target = TargetFactory.forTab(gBrowser.selectedTab);
   yield gDevTools.closeToolbox(target);
 });
@@ -350,7 +352,7 @@ function onceNextPlayerRefresh(player) {
 /**
  * Simulate a click on the playPause button of a playerWidget.
  */
-let togglePlayPauseButton = Task.async(function*(widget) {
+var togglePlayPauseButton = Task.async(function*(widget) {
   let nextState = widget.player.state.playState === "running"
                   ? "paused"
                   : "running";
@@ -383,7 +385,7 @@ let togglePlayPauseButton = Task.async(function*(widget) {
  * time the state is refreshed, until the condition passes.
  * @return {Promise} Resolves when the condition passes.
  */
-let waitForStateCondition = Task.async(function*(player, conditionCheck, desc="") {
+var waitForStateCondition = Task.async(function*(player, conditionCheck, desc="") {
   if (desc) {
     desc = "(" + desc + ")";
   }
@@ -420,7 +422,7 @@ function waitForPlayState(player, playState) {
  * @param {Numer} time.
  * @return {Promise} Resolves when the animation is paused and tests have ran.
  */
-let checkPausedAt = Task.async(function*(widget, time) {
+var checkPausedAt = Task.async(function*(widget, time) {
   info("Wait for the next auto-refresh");
 
   yield waitForStateCondition(widget.player, state => {
@@ -436,7 +438,7 @@ let checkPausedAt = Task.async(function*(widget, time) {
 /**
  * Get the current playState of an animation player on a given node.
  */
-let getAnimationPlayerState = Task.async(function*(selector, animationIndex=0) {
+var getAnimationPlayerState = Task.async(function*(selector, animationIndex=0) {
   let playState = yield executeInContent("Test:GetAnimationPlayerState",
                                          {selector, animationIndex});
   return playState;

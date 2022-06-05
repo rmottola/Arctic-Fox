@@ -64,7 +64,7 @@ const FREETEXT_FILTER_SEARCH_DELAY = 200; // ms
 /**
  * Object defining the network monitor view components.
  */
-let NetMonitorView = {
+var NetMonitorView = {
   /**
    * Initializes the network monitor view.
    */

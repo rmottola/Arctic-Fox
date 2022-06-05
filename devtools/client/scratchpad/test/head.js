@@ -11,11 +11,12 @@ const {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
 const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {}).devtools;
 const {DevToolsUtils} = Cu.import("resource://gre/modules/devtools/DevToolsUtils.jsm", {});
 
-let gScratchpadWindow; // Reference to the Scratchpad chrome window object
 
-gDevTools.testing = true;
+var gScratchpadWindow; // Reference to the Scratchpad chrome window object
+
+DevToolsUtils.testing = true;
 SimpleTest.registerCleanupFunction(() => {
-  gDevTools.testing = false;
+  DevToolsUtils.testing = false;
 });
 
 /**

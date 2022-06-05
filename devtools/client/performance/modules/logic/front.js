@@ -509,7 +509,7 @@ PerformanceFront.prototype = {
    * Interacts with the connection's actors. Should only be used in tests.
    */
   _request: function (actorName, method, ...args) {
-    if (!gDevTools.testing) {
+    if (!DevToolsUtils.testing) {
       throw new Error("PerformanceFront._request may only be used in tests.");
     }
     let actor = this._connection[`_${actorName}`];

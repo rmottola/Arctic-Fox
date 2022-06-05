@@ -668,3 +668,41 @@ exports.settleAll = values => {
 
   return deferred.promise;
 };
+
+/**
+ * When the testing flag is set, various behaviors may be altered from
+ * production mode, typically to enable easier testing or enhanced debugging.
+ */
+var testing = false;
+Object.defineProperty(exports, "testing", {
+  get: function() {
+    return testing;
+  },
+  set: function(state) {
+    testing = state;
+  }
+});
+
+/**
+ * Open the file at the given path for reading.
+ *
+ * @param {String} filePath
+ *
+ * @returns Promise<nsIInputStream>
+ */
+exports.openFileStream = function (filePath) {
+  return new Promise((resolve, reject) => {
+    const uri = NetUtil.newURI(new FileUtils.File(filePath));
+    NetUtil.asyncFetch(
+      { uri, loadUsingSystemPrincipal: true },
+      (stream, result) => {
+        if (!components.isSuccessCode(result)) {
+          reject(new Error(`Could not open "${filePath}": result = ${result}`));
+          return;
+        }
+
+        resolve(stream);
+      }
+    );
+  });
+}
