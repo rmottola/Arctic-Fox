@@ -14,6 +14,8 @@ let {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 let TargetFactory = devtools.TargetFactory;
 const DevToolsUtils = devtools.require("devtools/toolkit/DevToolsUtils");
 
+const BASE_URI = "http://mochi.test:8888/browser/browser/devtools/fontinspector/test/"
+
 // All test are asynchronous
 waitForExplicitFinish();
 
@@ -56,7 +58,7 @@ function loadTab(url) {
  * promise
  * @return a promise that resolves when the inspector is ready
  */
-let openInspector = Task.async(function*(cb) {
+var openInspector = Task.async(function*(cb) {
   info("Opening the inspector");
   let target = TargetFactory.forTab(gBrowser.selectedTab);
 
@@ -100,9 +102,55 @@ let openInspector = Task.async(function*(cb) {
 });
 
 /**
+ * Adds a new tab with the given URL, opens the inspector and selects the
+ * font-inspector tab.
+ *
+ * @return Object
+ *  {
+ *    toolbox,
+ *    inspector,
+ *    fontInspector
+ *  }
+ */
+var openFontInspectorForURL = Task.async(function* (url) {
+  info("Opening tab " + url);
+  yield addTab(url);
+
+  let { toolbox, inspector } = yield openInspector();
+
+  /**
+   * Call selectNode to trigger font-inspector update so that we don't timeout
+   * if following conditions hold
+   * a) the initial 'fontinspector-updated' was emitted while we were waiting
+   *    for openInspector to resolve
+   * b) the font-inspector tab was selected by default which means the call to
+   *    select will not trigger another update.
+   *
+   * selectNode calls setNodeFront which always emits 'new-node' which calls
+   * FontInspector.update that emits the 'fontinspector-updated' event.
+   */
+  let onUpdated = inspector.once("fontinspector-updated");
+
+  yield selectNode("body", inspector);
+  inspector.sidebar.select("fontinspector");
+
+  info("Waiting for font-inspector to update.");
+  yield onUpdated;
+
+  info("Font Inspector ready.");
+
+  let { fontInspector } = inspector.sidebar.getWindowForTab("fontinspector");
+  return {
+    fontInspector,
+    inspector,
+    toolbox
+  };
+});
+
+/**
  * Select a node in the inspector given its selector.
  */
-let selectNode = Task.async(function*(selector, inspector, reason="test") {
+var selectNode = Task.async(function*(selector, inspector, reason="test") {
   info("Selecting the node for '" + selector + "'");
   let nodeFront = yield getNodeFront(selector, inspector);
   let updated = inspector.once("inspector-updated");
