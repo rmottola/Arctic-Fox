@@ -21,6 +21,7 @@ DIRS += [
     'shared',
     'styleinspector',
     'tern',
+    'touch',
     'transport',
     'webconsole'
 ]
@@ -49,7 +50,6 @@ EXTRA_JS_MODULES.devtools += [
     'output-parser.js',
     'path.js',
     'Require.jsm',
-    'touch-events.js',
     'worker-loader.js',
 ]
 
