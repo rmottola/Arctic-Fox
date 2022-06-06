@@ -8,7 +8,7 @@
 
 const TEST_URI = "chrome://devtools/content/shared/widgets/cubic-bezier-frame.xhtml";
 const {CubicBezierWidget} =
-  devtools.require("devtools/shared/widgets/CubicBezierWidget");
+  require("devtools/shared/widgets/CubicBezierWidget");
 
 add_task(function*() {
   yield promiseTab("about:blank");

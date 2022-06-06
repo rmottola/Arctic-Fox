@@ -8,7 +8,7 @@
 
 const TEST_URI = "chrome://devtools/content/shared/widgets/cubic-bezier-frame.xhtml";
 const {CubicBezierPresetWidget} =
-  devtools.require("devtools/shared/widgets/CubicBezierWidget");
+  require("devtools/shared/widgets/CubicBezierWidget");
 const {PREDEFINED, PRESETS, DEFAULT_PRESET_CATEGORY} =
   require("devtools/shared/widgets/CubicBezierPresets");
 

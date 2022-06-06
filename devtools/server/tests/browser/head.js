@@ -8,7 +8,7 @@ const Cu = Components.utils;
 
 Cu.import("resource://gre/modules/Services.jsm");
 const {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
-const {devtools: {require}} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 const {DebuggerClient} = Cu.import("resource://gre/modules/devtools/dbg-client.jsm", {});
 const {DebuggerServer} = Cu.import("resource://gre/modules/devtools/dbg-server.jsm", {});
 
@@ -25,7 +25,7 @@ waitForExplicitFinish();
  * @param {String} url The url to be loaded in the new tab
  * @return a promise that resolves to the document when the url is loaded
  */
-let addTab = Task.async(function* (url) {
+var addTab = Task.async(function* (url) {
   info("Adding a new tab with URL: '" + url + "'");
   let tab = gBrowser.selectedTab = gBrowser.addTab();
   let loaded = once(gBrowser.selectedBrowser, "load", true);

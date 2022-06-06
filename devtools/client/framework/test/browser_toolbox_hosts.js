@@ -2,6 +2,11 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
+"use strict";
+
+let {Toolbox} = require("devtools/framework/toolbox");
+let {SIDE, BOTTOM, WINDOW} = Toolbox.HostType;
+
 let temp = {}
 Cu.import("resource://gre/modules/devtools/gDevTools.jsm", temp);
 let DevTools = temp.DevTools;

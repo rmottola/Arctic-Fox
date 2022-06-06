@@ -7,14 +7,13 @@ const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm");
-Cu.import("resource://gre/modules/devtools/gDevTools.jsm");
+Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
+Cu.import("resource:///modules/devtools/gDevTools.jsm");
 
-const devtools = Cu.import("resource://gre/modules/devtools/Loader.jsm", {}).devtools;
-const { require } = devtools;
+const { devtools: loader, require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 
 let { console } = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
-let { EventTarget } = require("sdk/event/target");
+var { EventTarget } = require("sdk/event/target");
 
 const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 const { Class } = require("sdk/core/heritage");
@@ -23,8 +22,8 @@ const STRINGS_URI = "chrome://global/locale/devtools/webaudioeditor.properties"
 const L10N = new ViewHelpers.L10N(STRINGS_URI);
 const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
 
-devtools.lazyImporter(this, "LineGraphWidget",
-  "resource://gre/modules/devtools/Graphs.jsm");
+loader.lazyRequireGetter(this, "LineGraphWidget",
+  "devtools/shared/widgets/LineGraphWidget");
 
 // `AUDIO_NODE_DEFINITION` defined in the controller's initialization,
 // which describes all the properties of an AudioNode

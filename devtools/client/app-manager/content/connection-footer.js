@@ -5,12 +5,11 @@
 const Cu = Components.utils;
 const Ci = Components.interfaces;
 Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/devtools/gDevTools.jsm");
+Cu.import("resource:///modules/devtools/gDevTools.jsm");
 
 const {Simulator} = Cu.import("resource://gre/modules/devtools/Simulator.jsm")
 const {Devices} = Cu.import("resource://gre/modules/devtools/Devices.jsm");
-const {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const {require} = devtools;
+const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 
 const {ConnectionManager, Connection} = require("devtools/client/connection-manager");
 const {getDeviceFront} = require("devtools/server/actors/device");
@@ -24,7 +23,7 @@ window.addEventListener("unload", function onUnload() {
   UI.destroy();
 });
 
-let UI = {
+var UI = {
   init: function() {
     this.useFloatingScrollbarsIfNeeded();
     let connections = ConnectionManager.connections;

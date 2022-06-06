@@ -12,9 +12,9 @@ const Cc = Components.classes;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
-Cu.import("resource://gre/modules/devtools/Loader.jsm");
+const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 Cu.import("resource://gre/modules/devtools/Console.jsm");
-Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm");
+Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
 
 const {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
 const {InplaceEditor, editableItem} = devtools.require("devtools/shared/inplace-editor");

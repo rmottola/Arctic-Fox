@@ -8,6 +8,7 @@
  */
 
 const Profiler = Cc["@mozilla.org/tools/profiler;1"].getService(Ci.nsIProfiler);
+const { ProfilerFront } = require("devtools/server/actors/profiler");
 
 function run_test()
 {

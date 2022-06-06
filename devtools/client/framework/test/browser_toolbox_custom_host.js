@@ -10,8 +10,7 @@ function test() {
   Cu.import("resource://gre/modules/devtools/LayoutHelpers.jsm", temp);
   let LayoutHelpers = temp.LayoutHelpers;
 
-  Cu.import("resource://gre/modules/devtools/Loader.jsm", temp);
-  let devtools = temp.devtools;
+  let {Toolbox} = require("devtools/framework/toolbox");
 
   let Toolbox = devtools.Toolbox;
 

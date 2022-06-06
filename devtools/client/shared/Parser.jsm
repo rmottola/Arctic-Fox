@@ -9,7 +9,8 @@ const Ci = Components.interfaces;
 const Cu = Components.utils;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-const { DevToolsUtils } = Cu.import("resource://gre/modules/devtools/DevToolsUtils.jsm", {});
+const { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
 
 XPCOMUtils.defineLazyModuleGetter(this,
   "Reflect", "resource://gre/modules/reflect.jsm");
@@ -726,7 +727,7 @@ let ParserHelpers = {
  *   loc: SourceLocation | null;
  * }
  */
-let SyntaxTreeVisitor = {
+var SyntaxTreeVisitor = {
   /**
    * Walks a syntax tree.
    *

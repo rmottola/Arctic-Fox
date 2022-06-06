@@ -61,14 +61,14 @@ function testPause() {
   is(gFocusedWindow, window,
     "Main window is the top level window before pause.");
 
-  if (gToolbox.hostType == devtools.Toolbox.HostType.WINDOW) {
+  if (gToolbox.hostType == Toolbox.HostType.WINDOW) {
     gToolbox._host._window.onfocus = () => {
       gFocusedWindow = gToolbox._host._window;
     };
   }
 
   gDebugger.gThreadClient.addOneTimeListener("paused", () => {
-    if (gToolbox.hostType == devtools.Toolbox.HostType.WINDOW) {
+    if (gToolbox.hostType == Toolbox.HostType.WINDOW) {
       is(gFocusedWindow, gToolbox._host._window,
          "Toolbox window is the top level window on pause.");
     } else {
@@ -115,19 +115,19 @@ function testResume() {
 }
 
 function maybeEndTest() {
-  if (gToolbox.hostType == devtools.Toolbox.HostType.BOTTOM) {
+ if (gToolbox.hostType == Toolbox.HostType.BOTTOM) {
     info("Switching to a toolbox window host.");
-    gToolbox.switchHost(devtools.Toolbox.HostType.WINDOW).then(focusMainWindow);
+   gToolbox.switchHost(Toolbox.HostType.WINDOW).then(focusMainWindow);
   } else {
     info("Switching to main window host.");
-    gToolbox.switchHost(devtools.Toolbox.HostType.BOTTOM).then(() => closeDebuggerAndFinish(gPanel));
+  gToolbox.switchHost(Toolbox.HostType.BOTTOM).then(() => closeDebuggerAndFinish(gPanel));
   }
 }
 
 registerCleanupFunction(function() {
   // Revert to the default toolbox host, so that the following tests proceed
   // normally and not inside a non-default host.
-  Services.prefs.setCharPref("devtools.toolbox.host", devtools.Toolbox.HostType.BOTTOM);
+  Services.prefs.setCharPref("devtools.toolbox.host", Toolbox.HostType.BOTTOM);
 
   gTab = null;
   gPanel = null;

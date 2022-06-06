@@ -6,11 +6,9 @@
 
 const {Cc, Ci, Cu} = require("chrome");
 
-loader.lazyImporter(this, "devtools", "resource://gre/modules/devtools/Loader.jsm");
 loader.lazyImporter(this, "promise", "resource://gre/modules/Promise.jsm", "Promise");
 loader.lazyRequireGetter(this, "HUDService", "devtools/webconsole/hudservice", true);
 loader.lazyGetter(this, "EventEmitter", () => require("devtools/shared/event-emitter"));
-loader.lazyImporter(this, "gDevTools", "resource://gre/modules/devtools/shared/gDevTools.jsm");
 
 /**
  * A DevToolPanel that controls the Web Console.

@@ -3,16 +3,16 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 const {utils: Cu, interfaces: Ci} = Components;
-Cu.import("resource://gre/modules/devtools/gDevTools.jsm");
-const {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const {require} = devtools;
+Cu.import("resource:///modules/devtools/gDevTools.jsm");
+const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {Toolbox} = require("devtools/framework/toolbox");
 const {ConnectionManager, Connection} = require("devtools/client/connection-manager");
 const promise = require("devtools/toolkit/deprecated-sync-thenables");
 const prefs = require("sdk/preferences/service");
 const Services = require("Services");
 const Strings = Services.strings.createBundle("chrome://global/locale/devtools/app-manager.properties");
 
-let UI = {
+var UI = {
   _toolboxTabCursor: 0,
   _handledTargets: new Map(),
 
@@ -164,7 +164,7 @@ let UI = {
   },
 
   openAndShowToolboxForTarget: function(target, name, icon) {
-    let host = devtools.Toolbox.HostType.CUSTOM;
+    let host = Toolbox.HostType.CUSTOM;
     let toolbox = gDevTools.getToolbox(target);
     if (!toolbox) {
       let uid = "uid" + this._toolboxTabCursor++;

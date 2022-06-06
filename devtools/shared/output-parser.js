@@ -66,8 +66,9 @@ loader.lazyGetter(this, "REGEX_ALL_CSS_PROPERTIES", function () {
  * border radius, cubic-bezier etc.).
  *
  * Usage:
- *   const {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
- *   const {OutputParser} = devtools.require("devtools/output-parser");
+ *   const {require} =
+ *      Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+ *   const {OutputParser} = require("devtools/output-parser");
  *
  *   let parser = new OutputParser();
  *

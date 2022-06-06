@@ -40,7 +40,7 @@ const FALLBACK_CHARSET_LIST = "intl.fallbackCharsetList.ISO-8859-1";
 
 const VARIABLES_VIEW_URL = "chrome://devtools/content/shared/widgets/VariablesView.xul";
 
-const require   = Cu.import("resource://gre/modules/devtools/Loader.jsm", {}).devtools.require;
+const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 
 const Editor    = require("devtools/sourceeditor/editor");
 const TargetFactory = require("devtools/framework/target").TargetFactory;

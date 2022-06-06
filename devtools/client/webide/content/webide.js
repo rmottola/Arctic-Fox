@@ -6,11 +6,11 @@ const Cc = Components.classes;
 const Cu = Components.utils;
 const Ci = Components.interfaces;
 
-Cu.import("resource://gre/modules/devtools/gDevTools.jsm");
+Cu.import("resource:///modules/devtools/gDevTools.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 
-const {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const {require} = devtools;
+const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {Toolbox} = require("devtools/framework/toolbox");
 const {Services} = Cu.import("resource://gre/modules/Services.jsm");
 const {AppProjects} = require("devtools/app-manager/app-projects");
 const {Connection} = require("devtools/client/connection-manager");
@@ -949,7 +949,7 @@ let UI = {
     iframe.uid = new Date().getTime();
 
     document.querySelector("notificationbox").insertBefore(iframe, splitter.nextSibling);
-    let host = devtools.Toolbox.HostType.CUSTOM;
+    let host = Toolbox.HostType.CUSTOM;
     let options = { customIframe: iframe, zoom: false, uid: iframe.uid };
     this.toolboxIframe = iframe;
 

@@ -14,13 +14,14 @@ Services.prefs.setBoolPref("devtools.debugger.log", false);
 let { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 let { Promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
 let { gDevTools } = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
-let { devtools } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+let { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+let { TargetFactory } = require("devtools/framework/target");
 let { DebuggerServer } = Cu.import("resource://gre/modules/devtools/dbg-server.jsm", {});
 let { generateUUID } = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
 
-let { WebAudioFront } = devtools.require("devtools/server/actors/webaudio");
-let DevToolsUtils = devtools.require("devtools/toolkit/DevToolsUtils");
-let TargetFactory = devtools.TargetFactory;
+let { WebAudioFront } = require("devtools/server/actors/webaudio");
+let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+let audioNodes = require("devtools/server/actors/utils/audionodes.json");
 let mm = null;
 
 const FRAME_SCRIPT_UTILS_URL = "chrome://devtools/content/shared/frame-script-utils.js";

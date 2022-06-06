@@ -12,7 +12,7 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource:///modules/devtools/gDevTools.jsm");
 Cu.import("resource://gre/modules/devtools/event-emitter.js");
 Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
-let { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
+let { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 XPCOMUtils.defineLazyModuleGetter(this, "SystemAppProxy",
                                   "resource://gre/modules/SystemAppProxy.jsm");
 

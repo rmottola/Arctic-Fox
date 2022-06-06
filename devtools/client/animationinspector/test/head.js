@@ -6,9 +6,9 @@
 
 const Cu = Components.utils;
 const {gDevTools} = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
-const {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 const {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
-const TargetFactory = devtools.TargetFactory;
+const {TargetFactory} = require("devtools/framework/target");
 const {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
 const {ViewHelpers} = Cu.import("resource://modules/devtools/ViewHelpers.jsm", {});
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");

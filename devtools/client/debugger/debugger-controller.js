@@ -96,14 +96,16 @@ const FRAME_TYPE = {
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/devtools/event-emitter.js");
-Cu.import("resource://gre/modules/devtools/SimpleListWidget.jsm");
-Cu.import("resource://gre/modules/devtools/BreadcrumbsWidget.jsm");
-Cu.import("resource://gre/modules/devtools/SideMenuWidget.jsm");
-Cu.import("resource://gre/modules/devtools/VariablesView.jsm");
-Cu.import("resource://gre/modules/devtools/VariablesViewController.jsm");
-Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm");
+Cu.import("resource:///modules/devtools/SimpleListWidget.jsm");
+Cu.import("resource:///modules/devtools/BreadcrumbsWidget.jsm");
+Cu.import("resource:///modules/devtools/SideMenuWidget.jsm");
+Cu.import("resource:///modules/devtools/VariablesView.jsm");
+Cu.import("resource:///modules/devtools/VariablesViewController.jsm");
+Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
 
-const require = Cu.import("resource://gre/modules/devtools/Loader.jsm", {}).devtools.require;
+const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {TargetFactory} = require("devtools/framework/target");
+const {Toolbox} = require("devtools/framework/toolbox")
 const promise = require("devtools/toolkit/deprecated-sync-thenables");
 const Editor = require("devtools/sourceeditor/editor");
 const DebuggerEditor = require("devtools/sourceeditor/debugger.js");
@@ -130,7 +132,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "clipboardHelper",
 
 Object.defineProperty(this, "NetworkHelper", {
   get: function() {
-    return devtools.require("devtools/toolkit/webconsole/network-helper");
+    return require("devtools/shared/webconsole/network-helper");
   },
   configurable: true,
   enumerable: true
@@ -139,7 +141,7 @@ Object.defineProperty(this, "NetworkHelper", {
 /**
  * Object defining the debugger controller components.
  */
-let DebuggerController = {
+var DebuggerController = {
   /**
    * Initializes the debugger controller.
    */
@@ -525,9 +527,9 @@ Workers.prototype = {
 
   _onWorkerSelect: function (workerActor) {
     let workerClient = this._workerClients.get(workerActor);
-    gDevTools.showToolbox(devtools.TargetFactory.forWorker(workerClient),
+    gDevTools.showToolbox(TargetFactory.forWorker(workerClient),
                           "jsdebugger",
-                          devtools.Toolbox.HostType.WINDOW);
+                          Toolbox.HostType.WINDOW);
   }
 };
 

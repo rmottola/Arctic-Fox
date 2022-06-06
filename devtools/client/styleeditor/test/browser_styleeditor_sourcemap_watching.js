@@ -3,7 +3,6 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 Components.utils.import("resource://gre/modules/Task.jsm");
-let {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 let {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
 
 const TESTCASE_URI_HTML = TEST_BASE + "sourcemaps-watching.html";
@@ -20,14 +19,13 @@ const CSS_TEXT = "* { color: blue }";
 const Cc = Components.classes;
 const Ci = Components.interfaces;
 
-let tempScope = {};
+var tempScope = {};
 Components.utils.import("resource://gre/modules/FileUtils.jsm", tempScope);
 Components.utils.import("resource://gre/modules/NetUtil.jsm", tempScope);
-let FileUtils = tempScope.FileUtils;
-let NetUtil = tempScope.NetUtil;
+var FileUtils = tempScope.FileUtils;
+var NetUtil = tempScope.NetUtil;
 
-function test()
-{
+function test() {
   waitForExplicitFinish();
 
   Services.prefs.setBoolPref(TRANSITIONS_PREF, false);

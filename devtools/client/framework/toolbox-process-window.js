@@ -6,7 +6,9 @@
 const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 let { gDevTools } = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
-let { devtools } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+let { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+let { TargetFactory } = require("devtools/framework/target");
+let { Toolbox } = require("devtools/framework/toolbox");
 let { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
 let { DebuggerClient } =
   Cu.import("resource://gre/modules/devtools/dbg-client.jsm", {});
@@ -17,14 +19,14 @@ let { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 /**
  * Shortcuts for accessing various debugger preferences.
  */
-let Prefs = new ViewHelpers.Prefs("devtools.debugger", {
+var Prefs = new ViewHelpers.Prefs("devtools.debugger", {
   chromeDebuggingHost: ["Char", "chrome-debugging-host"],
   chromeDebuggingPort: ["Int", "chrome-debugging-port"]
 });
 
-let gToolbox, gClient;
+var gToolbox, gClient;
 
-let connect = Task.async(function*() {
+var connect = Task.async(function*() {
   window.removeEventListener("load", connect);
   // Initiate the connection
   let transport = yield DebuggerClient.socketConnect({
@@ -74,7 +76,7 @@ function openToolbox({ form, chrome, isTabActor }) {
     chrome: chrome,
     isTabActor: isTabActor
   };
-  devtools.TargetFactory.forRemoteTab(options).then(target => {
+  TargetFactory.forRemoteTab(options).then(target => {
     let frame = document.getElementById("toolbox-iframe");
     let selectedTool = "jsdebugger";
 
@@ -91,7 +93,7 @@ function openToolbox({ form, chrome, isTabActor }) {
     let options = { customIframe: frame };
     gDevTools.showToolbox(target,
                           selectedTool,
-                          devtools.Toolbox.HostType.CUSTOM,
+                          Toolbox.HostType.CUSTOM,
                           options)
              .then(onNewToolbox);
   });

@@ -3,8 +3,10 @@
 
 // Tests that canvas graphs can have their selection linked.
 
-let {LineGraphWidget, BarGraphWidget, CanvasGraphUtils} = Cu.import("resource://gre/modules/devtools/Graphs.jsm", {});
-let {Promise} = devtools.require("resource://gre/modules/Promise.jsm");
+let LineGraphWidget = require("devtools/shared/widgets/LineGraphWidget");
+let BarGraphWidget = require("devtools/shared/widgets/BarGraphWidget");
+let {CanvasGraphUtils} = require("devtools/shared/widgets/Graphs");
+let {Promise} = require("resource://gre/modules/Promise.jsm");
 
 add_task(function*() {
   yield promiseTab("about:blank");

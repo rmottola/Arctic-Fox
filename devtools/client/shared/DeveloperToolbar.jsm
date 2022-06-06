@@ -39,6 +39,8 @@ XPCOMUtils.defineLazyGetter(this, "toolboxStrings", function () {
   return Services.strings.createBundle("chrome://global/locale/devtools/toolbox.properties");
 });
 
+const Telemetry = require("devtools/client/shared/telemetry");
+
 XPCOMUtils.defineLazyGetter(this, "gcliInit", function() {
   try {
     return require("devtools/commandline/commands-index");
@@ -65,7 +67,7 @@ const promise = Cu.import("resource://gre/modules/Promise.jsm", {}).Promise;
 /**
  * A collection of utilities to help working with commands
  */
-let CommandUtils = {
+var CommandUtils = {
   /**
    * Utility to ensure that things are loaded in the correct order
    */
@@ -264,6 +266,7 @@ this.DeveloperToolbar = function DeveloperToolbar(aChromeWindow, aToolbarElement
   this._element.hidden = true;
   this._doc = this._element.ownerDocument;
 
+  this._telemetry = new Telemetry();
   this._errorsCount = {};
   this._warningsCount = {};
   this._errorListeners = {};
@@ -305,7 +308,7 @@ Object.defineProperty(DeveloperToolbar.prototype, "visible", {
   enumerable: true
 });
 
-let _gSequenceId = 0;
+var _gSequenceId = 0;
 
 /**
  * Getter for a unique ID.
@@ -384,6 +387,8 @@ DeveloperToolbar.prototype.show = function(focus) {
 
   this._showPromise = waitPromise.then(() => {
     Services.prefs.setBoolPref("devtools.toolbar.visible", true);
+
+    this._telemetry.toolOpened("developertoolbar");
 
     this._notify(NOTIFICATIONS.LOAD);
 
@@ -505,6 +510,7 @@ DeveloperToolbar.prototype.hide = function() {
     this._doc.getElementById("Tools:DevToolbar").setAttribute("checked", "false");
     this.destroy();
 
+    this._telemetry.toolClosed("developertoolbar");
     this._notify(NOTIFICATIONS.HIDE);
 
     this._hidePromise = null;

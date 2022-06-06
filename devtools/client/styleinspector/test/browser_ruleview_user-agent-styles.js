@@ -8,7 +8,7 @@
 // it is preffed on.
 
 let PREF_UA_STYLES = "devtools.inspector.showUserAgentStyles";
-const { PrefObserver } = devtools.require("devtools/styleeditor/utils");
+const { PrefObserver } = require("devtools/styleeditor/utils");
 const TEST_URI = "data:text/html;charset=utf-8," +
   "<blockquote type=cite>" +
   " <pre _moz_quote=true>" +
