@@ -7,8 +7,8 @@ const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/devtools/SideMenuWidget.jsm");
-Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm");
+Cu.import("resource:///modules/devtools/SideMenuWidget.jsm");
+Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
 Cu.import("resource://gre/modules/devtools/Console.jsm");
 
 const devtools = Cu.import("resource://gre/modules/devtools/Loader.jsm", {}).devtools;
@@ -100,7 +100,7 @@ const CALLS_LIST_SLOW_SAVE_DELAY = 100; // ms
 /**
  * The current target and the Canvas front, set by this tool's host.
  */
-let gToolbox, gTarget, gFront;
+var gToolbox, gTarget, gFront;
 
 /**
  * Initializes the canvas debugger controller and views.
@@ -127,7 +127,7 @@ function shutdownCanvasDebugger() {
 /**
  * Functions handling target-related lifetime events.
  */
-let EventsHandler = {
+var EventsHandler = {
   /**
    * Listen for events emitted by the current tab target.
    */
@@ -180,8 +180,8 @@ let EventsHandler = {
 /**
  * Localization convenience methods.
  */
-let L10N = new ViewHelpers.L10N(STRINGS_URI);
-let SHARED_L10N = new ViewHelpers.L10N(SHARED_STRINGS_URI);
+var L10N = new ViewHelpers.L10N(STRINGS_URI);
+var SHARED_L10N = new ViewHelpers.L10N(SHARED_STRINGS_URI);
 
 /**
  * Convenient way of emitting events from the panel window.
@@ -191,8 +191,8 @@ EventEmitter.decorate(this);
 /**
  * DOM query helpers.
  */
-function $(selector, target = document) target.querySelector(selector);
-function $all(selector, target = document) target.querySelectorAll(selector);
+var $ = (selector, target = document) => target.querySelector(selector);
+var $all = (selector, target = document) => target.querySelectorAll(selector);
 
 /**
  * Gets the fileName part of a string which happens to be an URL.

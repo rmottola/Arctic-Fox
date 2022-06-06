@@ -5,7 +5,7 @@
  * Tests if screenshots are properly displayed in the UI.
  */
 
-function ifTestingSupported() {
+function* ifTestingSupported() {
   let { target, panel } = yield initCanvasDebuggerFrontend(SIMPLE_CANVAS_URL);
   let { window, $, EVENTS, SnapshotsListView } = panel.panelWin;
 
@@ -26,7 +26,7 @@ function ifTestingSupported() {
   is($("#screenshot-image").getAttribute("flipped"), "false",
     "The screenshot element should not be flipped vertically.");
 
-  ok(window.getComputedStyle($("#screenshot-image")).backgroundImage.contains("#screenshot-rendering"),
+  ok(window.getComputedStyle($("#screenshot-image")).backgroundImage.includes("#screenshot-rendering"),
     "The screenshot element should have an offscreen canvas element as a background.");
 
   yield teardown(panel);

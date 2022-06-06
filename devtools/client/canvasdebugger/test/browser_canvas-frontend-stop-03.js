@@ -2,11 +2,12 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 /**
- * Tests that you can stop a recording that does not have a rAF cycle.
+ * Tests that a recording that has a rAF cycle, but no draw calls, fails
+ * after timeout.
  */
 
 function* ifTestingSupported() {
-  let { target, panel } = yield initCanvasDebuggerFrontend(NO_CANVAS_URL);
+  let { target, panel } = yield initCanvasDebuggerFrontend(RAF_NO_CANVAS_URL);
   let { window, EVENTS, $, SnapshotsListView } = panel.panelWin;
 
   yield reload(target);
@@ -21,7 +22,6 @@ function* ifTestingSupported() {
 
   let recordingFinished = once(window, EVENTS.SNAPSHOT_RECORDING_FINISHED);
   let recordingCancelled = once(window, EVENTS.SNAPSHOT_RECORDING_CANCELLED);
-  SnapshotsListView._onRecordButtonClick();
 
   yield promise.all([recordingFinished, recordingCancelled]);
 
