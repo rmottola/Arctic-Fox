@@ -20,9 +20,7 @@ loader.lazyRequireGetter(this, "L10N",
 loader.lazyRequireGetter(this, "TIMELINE_BLUEPRINT",
   "devtools/performance/markers", true);
 loader.lazyRequireGetter(this, "RecordingUtils",
-  "devtools/performance/recording-utils");
-loader.lazyRequireGetter(this, "RecordingModel",
-  "devtools/performance/recording-model", true);
+  "devtools/toolkit/performance/utils");
 loader.lazyRequireGetter(this, "GraphsController",
   "devtools/performance/graphs", true);
 loader.lazyRequireGetter(this, "WaterfallHeader",
@@ -87,15 +85,15 @@ const EVENTS = {
   UI_STOP_RECORDING: "Performance:UI:StopRecording",
 
   // Emitted by the PerformanceView on import button click
-  UI_IMPORT_RECORDING: "Performance:UI:ImportRecording",
+  UI_RECORDING_IMPORTED: "Performance:UI:ImportRecording",
   // Emitted by the RecordingsView on export button click
   UI_EXPORT_RECORDING: "Performance:UI:ExportRecording",
 
-  // When a recording is started or stopped via the PerformanceController
-  RECORDING_STARTED: "Performance:RecordingStarted",
-  RECORDING_STOPPED: "Performance:RecordingStopped",
-  RECORDING_WILL_START: "Performance:RecordingWillStart",
-  RECORDING_WILL_STOP: "Performance:RecordingWillStop",
+  // When a new recording is being tracked in the panel.
+  NEW_RECORDING: "Performance:NewRecording",
+
+  // When a recording is started or stopped or stopping via the PerformanceController
+  RECORDING_STATE_CHANGE: "Performance:RecordingStateChange",
 
   // Emitted by the PerformanceController or RecordingView
   // when a recording model is selected
@@ -104,8 +102,7 @@ const EVENTS = {
   // When recordings have been cleared out
   RECORDINGS_CLEARED: "Performance:RecordingsCleared",
 
-  // When a recording is imported or exported via the PerformanceController
-  RECORDING_IMPORTED: "Performance:RecordingImported",
+  // When a recording is exported via the PerformanceController
   RECORDING_EXPORTED: "Performance:RecordingExported",
 
   // When the front has updated information on the profiler's circular buffer
@@ -149,7 +146,25 @@ const EVENTS = {
   MEMORY_FLAMEGRAPH_RENDERED: "Performance:UI:MemoryFlameGraphRendered",
 
   // When a source is shown in the JavaScript Debugger at a specific location.
-  SOURCE_SHOWN_IN_JS_DEBUGGER: "Performance:UI:SourceShownInJsDebugger",
+  SOURCE_NOT_FOUND_IN_JS_DEBUGGER: "Performance:UI:SourceNotFoundInJsDebugger",
+
+  // These are short hands for the RECORDING_STATE_CHANGE event to make refactoring
+  // tests easier. UI components should use RECORDING_STATE_CHANGE, and these are
+  // deprecated for test usage only.
+  RECORDING_STARTED: "Performance:RecordingStarted",
+  RECORDING_WILL_STOP: "Performance:RecordingWillStop",
+  RECORDING_STOPPED: "Performance:RecordingStopped",
+
+  // Fired by the PerformanceController when `populateWithRecordings` is finished.
+  RECORDINGS_SEEDED: "Performance:RecordingsSeeded",
+
+  // Emitted by the PerformanceController when `PerformanceController.stopRecording()`
+  // is completed; used in tests, to know when a manual UI click is finished.
+  CONTROLLER_STOPPED_RECORDING: "Performance:Controller:StoppedRecording",
+
+  // Emitted by the PerformanceController when a recording is imported. Used
+  // only in tests. Should use the normal RECORDING_STATE_CHANGE in the UI.
+  RECORDING_IMPORTED: "Performance:ImportedRecording",
   SOURCE_NOT_FOUND_IN_JS_DEBUGGER: "Performance:UI:SourceNotFoundInJsDebugger"
 };
 
@@ -161,21 +176,17 @@ let gToolbox, gTarget, gFront;
 /**
  * Initializes the profiler controller and views.
  */
-let startupPerformance = Task.async(function*() {
-  yield promise.all([
-    PerformanceController.initialize(),
-    PerformanceView.initialize()
-  ]);
+var startupPerformance = Task.async(function*() {
+  yield PerformanceController.initialize();
+  yield PerformanceView.initialize();
 });
 
 /**
  * Destroys the profiler controller and views.
  */
-let shutdownPerformance = Task.async(function*() {
-  yield promise.all([
-    PerformanceController.destroy(),
-    PerformanceView.destroy()
-  ]);
+var shutdownPerformance = Task.async(function*() {
+  yield PerformanceController.destroy();
+  yield PerformanceView.destroy();
 });
 
 /**
@@ -199,9 +210,7 @@ var PerformanceController = {
     this._onRecordingSelectFromView = this._onRecordingSelectFromView.bind(this);
     this._onPrefChanged = this._onPrefChanged.bind(this);
     this._onThemeChanged = this._onThemeChanged.bind(this);
-    this._onRecordingStateChange = this._onRecordingStateChange.bind(this);
-    this._onProfilerStatusUpdated = this._onProfilerStatusUpdated.bind(this);
-
+    this._onFrontEvent = this._onFrontEvent.bind(this);
     // Store data regarding if e10s is enabled.
     this._e10s = Services.appinfo.browserTabsRemoteAutostart;
     this._setMultiprocessAttributes();
@@ -209,15 +218,11 @@ var PerformanceController = {
     this._prefs = require("devtools/performance/global").PREFS;
     this._prefs.on("pref-changed", this._onPrefChanged);
 
-    gFront.on("recording-starting", this._onRecordingStateChange);
-    gFront.on("recording-started", this._onRecordingStateChange);
-    gFront.on("recording-stopping", this._onRecordingStateChange);
-    gFront.on("recording-stopped", this._onRecordingStateChange);
-    gFront.on("profiler-status", this._onProfilerStatusUpdated);
+    gFront.on("*", this._onFrontEvent);
     ToolbarView.on(EVENTS.PREF_CHANGED, this._onPrefChanged);
     PerformanceView.on(EVENTS.UI_START_RECORDING, this.startRecording);
     PerformanceView.on(EVENTS.UI_STOP_RECORDING, this.stopRecording);
-    PerformanceView.on(EVENTS.UI_IMPORT_RECORDING, this.importRecording);
+     PerformanceView.on(EVENTS.UI_RECORDING_IMPORTED, this.importRecording);
     PerformanceView.on(EVENTS.UI_CLEAR_RECORDINGS, this.clearRecordings);
     RecordingsView.on(EVENTS.UI_EXPORT_RECORDING, this.exportRecording);
     RecordingsView.on(EVENTS.RECORDING_SELECTED, this._onRecordingSelectFromView);
@@ -231,15 +236,11 @@ var PerformanceController = {
   destroy: function() {
     this._prefs.off("pref-changed", this._onPrefChanged);
 
-    gFront.off("recording-starting", this._onRecordingStateChange);
-    gFront.off("recording-started", this._onRecordingStateChange);
-    gFront.off("recording-stopping", this._onRecordingStateChange);
-    gFront.off("recording-stopped", this._onRecordingStateChange);
-    gFront.on("profiler-status", this._onProfilerStatusUpdated);
+    gFront.off("*", this._onFrontEvent);
     ToolbarView.off(EVENTS.PREF_CHANGED, this._onPrefChanged);
     PerformanceView.off(EVENTS.UI_START_RECORDING, this.startRecording);
     PerformanceView.off(EVENTS.UI_STOP_RECORDING, this.stopRecording);
-    PerformanceView.off(EVENTS.UI_IMPORT_RECORDING, this.importRecording);
+    PerformanceView.off(EVENTS.UI_RECORDING_IMPORTED, this.importRecording);
     PerformanceView.off(EVENTS.UI_CLEAR_RECORDINGS, this.clearRecordings);
     RecordingsView.off(EVENTS.UI_EXPORT_RECORDING, this.exportRecording);
     RecordingsView.off(EVENTS.RECORDING_SELECTED, this._onRecordingSelectFromView);
@@ -289,8 +290,7 @@ var PerformanceController = {
   },
 
   /**
-   * Starts recording with the PerformanceFront. Emits `EVENTS.RECORDING_STARTED`
-   * when the front has started to record.
+   * Starts recording with the PerformanceFront.
    */
   startRecording: Task.async(function *() {
     let options = {
@@ -308,19 +308,25 @@ var PerformanceController = {
   }),
 
   /**
-   * Stops recording with the PerformanceFront. Emits `EVENTS.RECORDING_STOPPED`
-   * when the front has stopped recording.
+   * Stops recording with the PerformanceFront.
    */
   stopRecording: Task.async(function *() {
     let recording = this.getLatestManualRecording();
     yield gFront.stopRecording(recording);
+
+    // Emit another stop event here, as a lot of tests use
+    // the RECORDING_STOPPED event, but in the case of a UI click on a button,
+    // the RECORDING_STOPPED event happens from the server, where this request may
+    // not have yet finished, so listen to this in tests that fail because the `stopRecording`
+    // request is not yet completed. Should only be used in that scenario.
+    this.emit(EVENTS.CONTROLLER_STOPPED_RECORDING);
   }),
 
   /**
    * Saves the given recording to a file. Emits `EVENTS.RECORDING_EXPORTED`
    * when the file was saved.
    *
-   * @param RecordingModel recording
+   * @param PerformanceRecording recording
    *        The model that holds the recording data.
    * @param nsILocalFile file
    *        The file to stream the data into.
@@ -358,18 +364,22 @@ var PerformanceController = {
    *        The file to import the data from.
    */
   importRecording: Task.async(function*(_, file) {
-    let recording = new RecordingModel();
-    this._recordings.push(recording);
-    yield recording.importRecording(file);
+    let recording = yield gFront.importRecording(file);
+    this._addNewRecording(recording);
 
-    this.emit(EVENTS.RECORDING_IMPORTED, recording);
+    // Only emit in tests for legacy purposes for shorthand --
+    // other things in UI should handle the generic NEW_RECORDING
+    // event to handle lazy recordings.
+    if (DevToolsUtils.testing) {
+      this.emit(EVENTS.RECORDING_IMPORTED, recording);
+    }
   }),
 
   /**
-   * Sets the currently active RecordingModel. Should rarely be called directly,
+   * Sets the currently active PerformanceRecording. Should rarely be called directly,
    * as RecordingsView handles this when manually selected a recording item. Exceptions
    * are when clearing the view.
-   * @param RecordingModel recording
+   * @param PerformanceRecording recording
    */
   setCurrentRecording: function (recording) {
     if (this._currentRecording !== recording) {
@@ -379,8 +389,8 @@ var PerformanceController = {
   },
 
   /**
-   * Gets the currently active RecordingModel.
-   * @return RecordingModel
+   * Gets the currently active PerformanceRecording.
+   * @return PerformanceRecording
    */
   getCurrentRecording: function () {
     return this._currentRecording;
@@ -388,7 +398,7 @@ var PerformanceController = {
 
   /**
    * Get most recently added recording that was triggered manually (via UI).
-   * @return RecordingModel
+   * @return PerformanceRecording
    */
   getLatestManualRecording: function () {
     for (let i = this._recordings.length - 1; i >= 0; i--) {
@@ -440,36 +450,62 @@ var PerformanceController = {
   },
 
   /**
-   * Emitted when the front updates RecordingModel's buffer status.
+   * Fired from the front on any event. Propagates to other handlers from here.
    */
-  _onProfilerStatusUpdated: function (_, data) {
+  _onFrontEvent: function (eventName, ...data) {
+    if (eventName === "profiler-status") {
+      this._onProfilerStatusUpdated(...data);
+      return;
+    }
+
+    if (["recording-started", "recording-stopped", "recording-stopping"].indexOf(eventName) !== -1) {
+      this._onRecordingStateChange(eventName, ...data);
+    }
+  },
+
+  /**
+   * Emitted when the front updates PerformanceRecording's buffer status.
+   */
+  _onProfilerStatusUpdated: function (data) {
     this.emit(EVENTS.PROFILER_STATUS_UPDATED, data);
+  },
+
+  /**
+   * Stores a recording internally.
+   *
+   * @param {PerformanceRecordingFront} recording
+   */
+  _addNewRecording: function (recording) {
+    if (this._recordings.indexOf(recording) === -1) {
+      this._recordings.push(recording);
+      this.emit(EVENTS.NEW_RECORDING, recording);
+    }
   },
 
   /**
    * Fired when a recording model changes state.
    *
    * @param {string} state
-   * @param {RecordingModel} model
+   *        Can be "recording-started", "recording-stopped" or "recording-stopping".
+   * @param {PerformanceRecording} model
    */
   _onRecordingStateChange: function (state, model) {
+    this._addNewRecording(model);
+
+    this.emit(EVENTS.RECORDING_STATE_CHANGE, state, model);
+
+    // Emit the state specific events for tests that I'm too
+    // lazy and frusterated to change right now. These events
+    // should only be used in tests and specific rare cases (telemetry),
+    // as the rest of the UI should react to general RECORDING_STATE_CHANGE
+    // events and NEW_RECORDING events to handle lazy recordings.
     switch (state) {
-      // Fired when a RecordingModel was just created from the front
-      case "recording-starting":
-        // When a recording is just starting, store it internally
-        this._recordings.push(model);
-        this.emit(EVENTS.RECORDING_WILL_START, model);
-        break;
-      // Fired when a RecordingModel has started recording
       case "recording-started":
         this.emit(EVENTS.RECORDING_STARTED, model);
         break;
-      // Fired when a RecordingModel is no longer recording, and
-      // starting to fetch all the profiler data
       case "recording-stopping":
         this.emit(EVENTS.RECORDING_WILL_STOP, model);
         break;
-      // Fired when a RecordingModel is finished fetching all of its data
       case "recording-stopped":
         this.emit(EVENTS.RECORDING_STOPPED, model);
         break;
@@ -477,10 +513,32 @@ var PerformanceController = {
   },
 
   /**
+   * Takes a recording and returns a value between 0 and 1 indicating how much
+   * of the buffer is used.
+   */
+  getBufferUsageForRecording: function (recording) {
+    return gFront.getBufferUsageForRecording(recording);
+  },
+
+  /**
+   * Returns a boolean indicating if any recordings are currently in progress or not.
+   */
+  isRecording: function () {
+    return this._recordings.some(r => r.isRecording());
+  },
+
+  /**
    * Returns the internal store of recording models.
    */
   getRecordings: function () {
     return this._recordings;
+  },
+
+  /**
+   * Returns traits from the front.
+   */
+  getTraits: function () {
+    return gFront.traits;
   },
 
   /**
@@ -527,10 +585,7 @@ var PerformanceController = {
     for (let recording of recordings) {
       PerformanceController._addNewRecording(recording);
     }
-    if (features && !features.every(f => recordingConfig[f])) {
-      return false;
-    }
-    return true;
+    this.emit(EVENTS.RECORDINGS_SEEDED);
   },
 
   /**
@@ -554,6 +609,25 @@ var PerformanceController = {
     let enabled = this._e10s;
     return { supported, enabled };
   },
+
+  /**
+   * Takes a PerformanceRecording and a state, and waits for
+   * the event to be emitted from the front for that recording.
+   *
+   * @param {PerformanceRecordingFront} recording
+   * @param {string} expectedState
+   * @return {Promise}
+   */
+  waitForStateChangeOnRecording: Task.async(function *(recording, expectedState) {
+    let deferred = promise.defer();
+    this.on(EVENTS.RECORDING_STATE_CHANGE, function handler (state, model) {
+      if (state === expectedState && model === recording) {
+        this.off(EVENTS.RECORDING_STATE_CHANGE, handler);
+        deferred.resolve();
+      }
+    });
+    yield deferred.promise;
+  }),
 
   /**
    * Called on init, sets an `e10s` attribute on the main view container with

@@ -4,15 +4,8 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 EXTRA_JS_MODULES.devtools.performance += [
-    'actors.js',
-    'compatibility.js',
-    'logic/frame-utils.js',
-    'front.js',
-    'io.js',
-    'jit.js',
+    'frame-utils.js',
     'marker-utils.js',
-    'recording-model.js',
-    'recording-utils.js',
     'tree-model.js',
     'waterfall-utils.js',
 ]
