@@ -1,4 +1,4 @@
-# -*- Mode: JavaScript; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+# -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -12,7 +12,7 @@
 #
 #  - Dashes are delimiters; use underscores instead.
 #  - The first character after a period must be alphabetic.
-#  - Computed values (e.g. 50 * 1024) dont work.
+#  - Computed values (e.g. 50 * 1024) don't work.
 #
 
 #ifdef XP_UNIX
@@ -1164,6 +1164,17 @@ pref("devtools.performance.ui.experimental", true);
 #else
 pref("devtools.performance.ui.experimental", false);
 #endif
+
+// The default Network monitor HAR export setting
+pref("devtools.netmonitor.har.defaultLogDir", "");
+pref("devtools.netmonitor.har.defaultFileName", "Archive %y-%m-%d %H-%M-%S");
+pref("devtools.netmonitor.har.jsonp", false);
+pref("devtools.netmonitor.har.jsonpCallback", "");
+pref("devtools.netmonitor.har.includeResponseBodies", true);
+pref("devtools.netmonitor.har.compress", false);
+pref("devtools.netmonitor.har.forceExport", false);
+pref("devtools.netmonitor.har.pageLoadedTimeout", 1500);
+pref("devtools.netmonitor.har.enableAutoExportToFile", false);
 
 // Default theme ("dark" or "light")
 #ifdef MOZ_DEV_EDITION

@@ -36,6 +36,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "FileUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
   "resource://gre/modules/NetUtil.jsm");
 
+XPCOMUtils.defineLazyGetter(this, "NetworkHelper", function() {
+  return require("devtools/shared/webconsole/network-helper");
+});
 
 // The panel's window global is an EventEmitter firing the following events:
 const EVENTS = {
@@ -192,26 +195,11 @@ function $(selector, target = document) target.querySelector(selector);
 function $all(selector, target = document) target.querySelectorAll(selector);
 
 /**
- * Helper for getting an nsIURL instance out of a string.
- */
-function nsIURL(url, store = nsIURL.store) {
-  if (store.has(url)) {
-    return store.get(url);
-  }
-  let uri = Services.io.newURI(url, null, null).QueryInterface(Ci.nsIURL);
-  store.set(url, uri);
-  return uri;
-}
-
-// The cache used in the `nsIURL` function.
-nsIURL.store = new Map();
-
-/**
  * Gets the fileName part of a string which happens to be an URL.
  */
 function getFileName(url) {
   try {
-    let { fileName } = nsIURL(url);
+    let { fileName } = NetworkHelper.nsIURL(url);
     return fileName || "/";
   } catch (e) {
     // This doesn't look like a url, or nsIURL can't handle it.
