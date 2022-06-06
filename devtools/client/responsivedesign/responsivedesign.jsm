@@ -9,17 +9,18 @@ const Cu = Components.utils;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/devtools/gDevTools.jsm");
+Cu.import("resource:///modules/devtools/gDevTools.jsm");
 Cu.import("resource://gre/modules/devtools/event-emitter.js");
-Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm");
+Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
 let { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
 XPCOMUtils.defineLazyModuleGetter(this, "SystemAppProxy",
                                   "resource://gre/modules/SystemAppProxy.jsm");
 
 var require = Cu.import("resource://gre/modules/devtools/Loader.jsm", {}).devtools.require;
-let { showDoorhanger } = require("devtools/shared/doorhanger");
-let { TouchEventSimulator } = require("devtools/toolkit/touch/simulator");
-let { Task } = require("resource://gre/modules/Task.jsm");
+var Telemetry = require("devtools/shared/telemetry");
+var { showDoorhanger } = require("devtools/shared/doorhanger");
+var { TouchEventSimulator } = require("devtools/toolkit/touch/simulator");
+var { Task } = require("resource://gre/modules/Task.jsm");
 
 this.EXPORTED_SYMBOLS = ["ResponsiveUIManager"];
 
@@ -34,7 +35,7 @@ const ROUND_RATIO = 10;
 
 const INPUT_PARSER = /(\d+)[^\d]+(\d+)/;
 
-const SHARED_L10N = new ViewHelpers.L10N("chrome://global/locale/devtools/shared.properties");
+const SHARED_L10N = new ViewHelpers.L10N("chrome://browser/locale/devtools/shared.properties");
 
 var ActiveTabs = new Map();
 
@@ -106,7 +107,7 @@ this.ResponsiveUIManager = {
 
 EventEmitter.decorate(ResponsiveUIManager);
 
-let presets = [
+var presets = [
   // Phones
   {key: "320x480", width: 320, height: 480},    // iPhone, B2G, with <meta viewport>
   {key: "360x640", width: 360, height: 640},    // Android 4, phones, with <meta viewport>
@@ -133,6 +134,7 @@ function ResponsiveUI(aWindow, aTab)
   this.chromeDoc = aWindow.document;
   this.container = aWindow.gBrowser.getBrowserContainer(this.browser);
   this.stack = this.container.querySelector(".browserStack");
+  this._telemetry = new Telemetry();
 
   let childOn = () => {
     this.mm.removeMessageListener("ResponsiveMode:Start:Done", childOn);
@@ -141,7 +143,7 @@ function ResponsiveUI(aWindow, aTab)
   this.mm.addMessageListener("ResponsiveMode:Start:Done", childOn);
 
   let requiresFloatingScrollbars = !this.mainWindow.matchMedia("(-moz-overlay-scrollbars)").matches;
-  this.mm.loadFrameScript("resource://gre/modules/devtools/responsivedesign-child.js", true);
+  this.mm.loadFrameScript("resource:///modules/devtools/responsivedesign-child.js", true);
   this.mm.addMessageListener("ResponsiveMode:ChildScriptReady", () => {
     this.mm.sendAsyncMessage("ResponsiveMode:Start", {
       requiresFloatingScrollbars: requiresFloatingScrollbars
@@ -214,6 +216,8 @@ function ResponsiveUI(aWindow, aTab)
   } catch(e) {}
 
   ActiveTabs.set(aTab, this);
+
+  this._telemetry.toolOpened("responsive");
 
   // Touch events support
   this.touchEnableBefore = false;
@@ -290,6 +294,7 @@ ResponsiveUI.prototype = {
     if (this.touchEventSimulator) {
       this.touchEventSimulator.stop();
     }
+    this._telemetry.toolClosed("responsive");
     let childOff = () => {
       this.mm.removeMessageListener("ResponsiveMode:Stop:Done", childOff);
       ResponsiveUIManager.emit("off", { tab: this.tab });
@@ -1010,5 +1015,5 @@ ResponsiveUI.prototype = {
 }
 
 XPCOMUtils.defineLazyGetter(ResponsiveUI.prototype, "strings", function () {
-  return Services.strings.createBundle("chrome://global/locale/devtools/responsiveUI.properties");
+  return Services.strings.createBundle("chrome://browser/locale/devtools/responsiveUI.properties");
 });
