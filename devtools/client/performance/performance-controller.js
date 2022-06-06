@@ -484,12 +484,12 @@ var PerformanceController = {
   },
 
   /**
-   * Utility method taking the currently selected recording item's features, or optionally passed
-   * in recording item, as well as the actor support on the server, returning a boolean
-   * indicating if the requirements pass or not. Used to toggle features' visibility mostly.
+   * Utility method taking a string or an array of strings of feature names (like
+   * "withAllocations" or "withMarkers"), and returns whether or not the current
+   * recording supports that feature, based off of UI preferences and server support.
    *
-   * @option {Array<string>} features
-   *         An array of strings indicating what configuration is needed on the recording
+   * @option {Array<string>|string} features
+   *         A string or array of strings indicating what configuration is needed on the recording
    *         model, like `withTicks`, or `withMemory`.
    * @option {Array<string>} actors
    *         An array of strings indicating what actors must exist.
@@ -501,17 +501,31 @@ var PerformanceController = {
    *
    * @return boolean
    */
-  isFeatureSupported: function ({ features, actors, mustBeCompleted }, recording) {
-    recording = recording || this.getCurrentRecording();
-    let recordingConfig = recording ? recording.getConfiguration() : {};
-    let currentCompletedState = recording ? recording.isCompleted() : void 0;
-    let actorsSupported = gFront.getActorSupport();
+  isFeatureSupported: function (features) {
+    if (!features) {
+      return true;
+    }
 
-    if (mustBeCompleted != null && mustBeCompleted !== currentCompletedState) {
+    let recording = this.getCurrentRecording();
+    if (!recording) {
       return false;
     }
-    if (actors && !actors.every(a => actorsSupported[a])) {
-      return false;
+
+    let config = recording.getConfiguration();
+    return [].concat(features).every(f => config[f]);
+  },
+
+  /**
+   * Takes an array of PerformanceRecordingFronts and adds them to the internal
+   * store of the UI. Used by the toolbox to lazily seed recordings that
+   * were observed before the panel was loaded in the scenario where `console.profile()`
+   * is used before the tool is loaded.
+   *
+   * @param {Array<PerformanceRecordingFront>} recordings
+   */
+  populateWithRecordings: function (recordings=[]) {
+    for (let recording of recordings) {
+      PerformanceController._addNewRecording(recording);
     }
     if (features && !features.every(f => recordingConfig[f])) {
       return false;
