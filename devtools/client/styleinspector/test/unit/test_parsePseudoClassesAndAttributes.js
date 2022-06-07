@@ -6,13 +6,13 @@
 "use strict";
 
 const Cu = Components.utils;
-const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+Cu.import("resource://gre/modules/devtools/Loader.jsm");
 const {
   parsePseudoClassesAndAttributes,
   SELECTOR_ATTRIBUTE,
   SELECTOR_ELEMENT,
   SELECTOR_PSEUDO_CLASS
-} = require("devtools/client/styleinspector/css-parsing-utils");
+} = devtools.require("devtools/styleinspector/css-parsing-utils");
 
 const TEST_DATA = [
   // Test that a null input throws an exception
@@ -211,3 +211,4 @@ function assertOutput(actual, expected) {
     equal(actual.length, expected.length);
   }
 }
+
