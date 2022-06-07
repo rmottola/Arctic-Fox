@@ -6,10 +6,10 @@
 "use strict";
 
 const { Cc, Ci, Cu, Cr } = require("chrome");
-const promise = Cu.import("resource://gre/modules/Promise.jsm", {}).Promise;
+const promise = require("promise");
 const EventEmitter = require("devtools/toolkit/event-emitter");
 const { WebGLFront } = require("devtools/server/actors/webgl");
-const { DevToolsUtils } = Cu.import("resource://gre/modules/devtools/DevToolsUtils.jsm", {});
+const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
 
 function ShaderEditorPanel(iframeWindow, toolbox) {
   this.panelWin = iframeWindow;

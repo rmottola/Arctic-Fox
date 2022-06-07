@@ -5,8 +5,8 @@
 "use strict";
 
 const {Cc, Ci, Cu} = require("chrome");
+const promise = require("promise");
 
-loader.lazyImporter(this, "promise", "resource://gre/modules/Promise.jsm", "Promise");
 loader.lazyRequireGetter(this, "HUDService", "devtools/webconsole/hudservice", true);
 loader.lazyGetter(this, "EventEmitter", () => require("devtools/shared/event-emitter"));
 

@@ -11,12 +11,12 @@ let gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
 Services.prefs.setBoolPref("devtools.debugger.log", false);
 
 let { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
-let { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
-let { gDevTools } = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
+let { gDevTools } = Cu.import("resource:///modules/devtools/gDevTools.jsm", {});
 let { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let { DebuggerServer } = Cu.import("resource://gre/modules/devtools/dbg-server.jsm", {});
-let { DebuggerClient } = Cu.import("resource://gre/modules/devtools/dbg-client.jsm", {});
 
+let promise = require("promise");
+let { DebuggerClient } = require("devtools/toolkit/client/main");
+let { DebuggerServer } = require("devtools/server/main");
 let { WebGLFront } = require("devtools/server/actors/webgl");
 let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
 let TiltGL = require("devtools/tilt/tilt-gl");

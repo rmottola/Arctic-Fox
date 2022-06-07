@@ -62,8 +62,6 @@ Object.defineProperty(this, "ConsoleServiceListener", {
   enumerable: true
 });
 
-const promise = Cu.import("resource://gre/modules/Promise.jsm", {}).Promise;
-
 /**
  * A collection of utilities to help working with commands
  */

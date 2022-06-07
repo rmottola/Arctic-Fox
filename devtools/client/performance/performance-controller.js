@@ -225,7 +225,7 @@ var PerformanceController = {
     ToolbarView.on(EVENTS.PREF_CHANGED, this._onPrefChanged);
     PerformanceView.on(EVENTS.UI_START_RECORDING, this.startRecording);
     PerformanceView.on(EVENTS.UI_STOP_RECORDING, this.stopRecording);
-     PerformanceView.on(EVENTS.UI_RECORDING_IMPORTED, this.importRecording);
+    PerformanceView.on(EVENTS.UI_RECORDING_IMPORTED, this.importRecording);
     PerformanceView.on(EVENTS.UI_CLEAR_RECORDINGS, this.clearRecordings);
     RecordingsView.on(EVENTS.UI_EXPORT_RECORDING, this.exportRecording);
     RecordingsView.on(EVENTS.RECORDING_SELECTED, this._onRecordingSelectFromView);

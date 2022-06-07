@@ -11,8 +11,7 @@ const CC = Components.Constructor;
 const { devtools } =
 const { require } =
   Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const { Promise: promise } =
-  Cu.import("resource://gre/modules/Promise.jsm", {});
+const promise = require("promise");
 const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 
 const Services = require("Services");

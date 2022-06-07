@@ -4,15 +4,14 @@
 
 "use strict";
 
-let {Cu, Cc, Ci} = require("chrome");
+var {Cu, Cc, Ci} = require("chrome");
 
 Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
 
-let {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
-
+let promise = require("promise");
 let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
 let { ActorPool } = require("devtools/server/actors/common");
 let { DebuggerServer } = require("devtools/server/main");
@@ -21,7 +20,7 @@ let Services = require("Services");
 // Comma separated list of permissions that a sideloaded app can't ask for
 const UNSAFE_PERMISSIONS = Services.prefs.getCharPref("devtools.apps.forbidden-permissions");
 
-let FramesMock = null;
+var FramesMock = null;
 
 exports.setFramesMock = function (mock) {
   FramesMock = mock;

@@ -12,10 +12,10 @@ let WebConsoleUtils = require("devtools/toolkit/webconsole/utils").Utils;
 let Heritage = require("sdk/core/heritage");
 let {TargetFactory} = require("devtools/framework/target");
 let {Tools} = require("definitions");
+let promise = require("promise");
 
 loader.lazyGetter(this, "WebConsoleFrame", () => require("devtools/webconsole/webconsole").WebConsoleFrame);
-loader.lazyImporter(this, "promise", "resource://gre/modules/Promise.jsm", "Promise");
-loader.lazyImporter(this, "gDevTools", "resource://gre/modules/devtools/gDevTools.jsm");
+loader.lazyImporter(this, "gDevTools", "resource:///modules/devtools/gDevTools.jsm");
 loader.lazyImporter(this, "Services", "resource://gre/modules/Services.jsm");
 loader.lazyImporter(this, "DebuggerServer", "resource://gre/modules/devtools/dbg-server.jsm");
 loader.lazyImporter(this, "DebuggerClient", "resource://gre/modules/devtools/dbg-client.jsm");

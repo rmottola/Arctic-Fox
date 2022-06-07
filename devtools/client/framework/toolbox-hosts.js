@@ -6,7 +6,7 @@
 
 const {Cu} = require("chrome");
 const EventEmitter = require("devtools/toolkit/event-emitter");
-const {Promise: promise} = require("resource://gre/modules/Promise.jsm");
+const promise = require("promise");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/devtools/DOMHelpers.jsm");
 

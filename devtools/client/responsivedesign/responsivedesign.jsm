@@ -21,6 +21,7 @@ var Telemetry = require("devtools/shared/telemetry");
 var { showDoorhanger } = require("devtools/shared/doorhanger");
 var { TouchEventSimulator } = require("devtools/toolkit/touch/simulator");
 var { Task } = require("resource://gre/modules/Task.jsm");
+let promise = require("promise");
 
 this.EXPORTED_SYMBOLS = ["ResponsiveUIManager"];
 

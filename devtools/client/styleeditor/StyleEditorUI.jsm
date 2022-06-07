@@ -16,12 +16,12 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
-Cu.import("resource://gre/modules/devtools/event-emitter.js");
-Cu.import("resource://gre/modules/devtools/gDevTools.jsm");
-Cu.import("resource://gre/modules/devtools/StyleEditorUtil.jsm");
-Cu.import("resource://gre/modules/devtools/SplitView.jsm");
-Cu.import("resource://gre/modules/devtools/StyleSheetEditor.jsm");
-const { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
+Cu.import("resource:///modules/devtools/event-emitter.js");
+Cu.import("resource:///modules/devtools/gDevTools.jsm");
+Cu.import("resource:///modules/devtools/StyleEditorUtil.jsm");
+Cu.import("resource:///modules/devtools/SplitView.jsm");
+Cu.import("resource:///modules/devtools/StyleSheetEditor.jsm");
+const promise = require("promise");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
                                   "resource://gre/modules/PluralForm.jsm");

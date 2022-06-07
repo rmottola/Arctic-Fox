@@ -11,7 +11,7 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/devtools/DOMHelpers.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm");
-const {Promise: promise} = require("resource://gre/modules/Promise.jsm");
+const promise = require("promise");
 XPCOMUtils.defineLazyGetter(this, "DOMUtils", function () {
   return Cc["@mozilla.org/inspector/dom-utils;1"].getService(Ci.inIDOMUtils);
 });

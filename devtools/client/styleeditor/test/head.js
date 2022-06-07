@@ -11,7 +11,7 @@ let {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 let {TargetFactory} = require("devtools/framework/target");
 let {LoadContextInfo} = Cu.import("resource://gre/modules/LoadContextInfo.jsm", {});
 let {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
-let {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
+let promise = require("promise");
 let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
 
 let gPanelWindow;

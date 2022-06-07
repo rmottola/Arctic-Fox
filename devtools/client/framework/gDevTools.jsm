@@ -12,11 +12,10 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 const { require, loader } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 // Load target and toolbox lazily as they need gDevTools to be fully initialized
+const promise = require("promise");
 loader.lazyRequireGetter(this, "TargetFactory", "devtools/framework/target", true);
 loader.lazyRequireGetter(this, "Toolbox", "devtools/framework/toolbox", true);
 
-XPCOMUtils.defineLazyModuleGetter(this, "promise",
-                                  "resource://gre/modules/Promise.jsm", "Promise");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
                                   "resource://gre/modules/devtools/Console.jsm");
 //XPCOMUtils.defineLazyModuleGetter(this, "CustomizableUI",

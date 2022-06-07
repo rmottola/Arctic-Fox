@@ -13,8 +13,9 @@ const Cu = Components.utils;
 
 const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 const Editor  = require("devtools/sourceeditor/editor");
-const {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
+const promise = require("promise");
 const {CssLogic} = require("devtools/styleinspector/css-logic");
+const {console} = require("resource://gre/modules/devtools/Console.jsm");
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
@@ -22,7 +23,7 @@ Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/devtools/event-emitter.js");
-Cu.import("resource://gre/modules/devtools/StyleEditorUtil.jsm");
+Cu.import("resource:///modules/devtools/StyleEditorUtil.jsm");
 
 const LOAD_ERROR = "error-load";
 const SAVE_ERROR = "error-save";
