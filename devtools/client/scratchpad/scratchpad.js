@@ -40,7 +40,7 @@ const FALLBACK_CHARSET_LIST = "intl.fallbackCharsetList.ISO-8859-1";
 
 const VARIABLES_VIEW_URL = "chrome://devtools/content/shared/widgets/VariablesView.xul";
 
-const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {require, loader} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 
 const Editor    = require("devtools/sourceeditor/editor");
 const TargetFactory = require("devtools/framework/target").TargetFactory;
@@ -55,7 +55,7 @@ Cu.import("resource://gre/modules/devtools/scratchpad-manager.jsm");
 Cu.import("resource://gre/modules/jsdebugger.jsm");
 Cu.import("resource://gre/modules/devtools/gDevTools.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
-Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm");
+Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
 Cu.import("resource://gre/modules/reflect.jsm");
 Cu.import("resource://gre/modules/devtools/DevToolsUtils.jsm");
 

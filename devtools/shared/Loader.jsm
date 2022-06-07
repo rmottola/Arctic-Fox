@@ -17,11 +17,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "NetUtil", "resource://gre/modules/NetUt
 XPCOMUtils.defineLazyModuleGetter(this, "FileUtils", "resource://gre/modules/FileUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "OS", "resource://gre/modules/osfile.jsm");
 
-var loader = Cu.import("resource://gre/modules/commonjs/toolkit/loader.js", {}).Loader;
+let { Loader } = Cu.import("resource://gre/modules/commonjs/toolkit/loader.js", {});
 var promise = Cu.import("resource://gre/modules/Promise.jsm", {}).Promise;
 
 this.EXPORTED_SYMBOLS = ["DevToolsLoader", "devtools", "BuiltinProvider",
-                         "SrcdirProvider"];
+                         "SrcdirProvider", "require", "loader"];
 
 /**
  * Providers are different strategies for loading the devtools.
@@ -29,7 +29,7 @@ this.EXPORTED_SYMBOLS = ["DevToolsLoader", "devtools", "BuiltinProvider",
 
 var loaderModules = {
   "Services": Object.create(Services),
-  "toolkit/loader": loader,
+  "toolkit/loader": Loader,
   "PromiseDebugging": PromiseDebugging
 };
 XPCOMUtils.defineLazyGetter(loaderModules, "Debugger", () => {
@@ -70,7 +70,7 @@ var sharedGlobalBlacklist = ["sdk/indexed-db"];
 function BuiltinProvider() {}
 BuiltinProvider.prototype = {
   load: function() {
-    this.loader = new loader.Loader({
+    this.loader = new Loader.Loader({
       id: "fx-devtools",
       modules: loaderModules,
       paths: {
@@ -119,7 +119,7 @@ BuiltinProvider.prototype = {
   },
 
   unload: function(reason) {
-    loader.unload(this.loader, reason);
+    Loader.unload(this.loader, reason);
     delete this.loader;
   },
 };
@@ -201,7 +201,7 @@ SrcdirProvider.prototype = {
   },
 
   unload: function(reason) {
-    loader.unload(this.loader, reason);
+    Loader.unload(this.loader, reason);
     delete this.loader;
   },
 
@@ -342,8 +342,8 @@ DevToolsLoader.prototype = {
    * @returns The module's exports.
    */
   loadURI: function(id, uri) {
-    let module = loader.Module(id, uri);
-    return loader.load(this.provider.loader, module).exports;
+    let module = Loader.Module(id, uri);
+    return Loader.load(this.provider.loader, module).exports;
   },
 
   /**
@@ -362,7 +362,7 @@ DevToolsLoader.prototype = {
       return;
     }
     this._mainid = id;
-    this._main = loader.main(this.provider.loader, id);
+    this._main = Loader.main(this.provider.loader, id);
 
     // Mirror the main module's exports on this object.
     Object.getOwnPropertyNames(this._main).forEach(key => {
@@ -406,7 +406,7 @@ DevToolsLoader.prototype = {
     });
 
     this._provider.load();
-    this.require = loader.Require(this._provider.loader, { id: "devtools" });
+    this.require = Loader.Require(this._provider.loader, { id: "devtools" });
 
     if (this._mainid) {
       this.main(this._mainid);
@@ -450,6 +450,6 @@ DevToolsLoader.prototype = {
 };
 
 // Export the standard instance of DevToolsLoader used by the tools.
-this.devtools = new DevToolsLoader();
+this.devtools = this.loader = new DevToolsLoader();
 
 this.require = this.devtools.require.bind(this.devtools);
