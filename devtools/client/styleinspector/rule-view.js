@@ -14,7 +14,14 @@ const {ELEMENT_STYLE, PSEUDO_ELEMENTS} = require("devtools/server/actors/styles"
 const {gDevTools} = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
 const {OutputParser} = require("devtools/output-parser");
 const {PrefObserver, PREF_ORIG_SOURCES} = require("devtools/styleeditor/utils");
-const {parseSingleValue, parseDeclarations} = require("devtools/styleinspector/css-parsing-utils");
+const {
+  parseDeclarations,
+  parseSingleValue,
+  parsePseudoClassesAndAttributes,
+  SELECTOR_ATTRIBUTE,
+  SELECTOR_ELEMENT,
+  SELECTOR_PSEUDO_CLASS
+} = require("devtools/styleinspector/css-parsing-utils");
 const overlays = require("devtools/styleinspector/style-inspector-overlays");
 
 Cu.import("resource://gre/modules/Services.jsm");
@@ -1477,6 +1484,16 @@ CssRuleView.prototype = {
     });
   },
 
+  /**
+   * Disables add rule button when needed
+   */
+  refreshAddRuleButtonState: function() {
+    let shouldBeDisabled = !this._viewedElement ||
+                           !this.inspector.selection.isElementNode() ||
+                           this.inspector.selection.isAnonymousNode();
+    this.addRuleButton.disabled = shouldBeDisabled;
+  },
+
   setPageStyle: function(aPageStyle) {
     this.pageStyle = aPageStyle;
   },
@@ -1657,6 +1674,7 @@ CssRuleView.prototype = {
     this.clear();
 
     this._viewedElement = aElement;
+    this.refreshAddRuleButtonState();
     if (!this._viewedElement) {
       this._showEmpty();
       return promise.resolve(undefined);
