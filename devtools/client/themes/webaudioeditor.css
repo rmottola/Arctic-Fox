@@ -85,10 +85,10 @@ g.edgePath.param-connection {
  */
 
 .theme-light .nodes g.bypassed rect {
-  fill: url(chrome://global/skin/devtools/filters.svg#bypass-light);
+  fill: url(chrome://devtools/skin/themes/images/filters.svg#bypass-light);
 }
 .theme-dark .nodes g.bypassed rect {
-  fill: url(chrome://global/skin/devtools/filters.svg#bypass-dark);
+  fill: url(chrome://devtools/skin/themes/images/filters.svg#bypass-dark);
 }
 .nodes g.bypassed.selected rect {
   stroke: var(--theme-selection-background);
@@ -189,12 +189,12 @@ text {
 
 @media (min-resolution: 1.25dppx) {
   #inspector-pane-toggle {
-    list-style-image: url(debugger-collapse@2x.png);
+    list-style-image: url(images/debugger-collapse@2x.png);
     -moz-image-region: rect(0px,32px,32px,0px);
   }
 
   #inspector-pane-toggle[pane-collapsed] {
-    list-style-image: url(debugger-expand@2x.png);
+    list-style-image: url(images/debugger-expand@2x.png);
   }
 
   #inspector-pane-toggle:active {
@@ -202,7 +202,7 @@ text {
   }
 
   .web-audio-inspector .error {
-    background-image: url(alerticon-warning@2x.png);
+    background-image: url(images/alerticon-warning@2x.png);
   }
 }
 
@@ -211,7 +211,7 @@ text {
  */
 
 #audio-node-toolbar .bypass {
-  list-style-image: url(power.svg);
+  list-style-image: url(images/power.svg);
 }
 
 #audio-node-toolbar toolbarbutton[disabled] {

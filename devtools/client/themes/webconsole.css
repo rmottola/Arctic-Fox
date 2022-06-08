@@ -43,7 +43,7 @@ a {
 
 .message > .icon::before {
   content: "";
-  background-image: url(chrome://global/skin/devtools/webconsole.png);
+  background-image: url(chrome://devtools/skin/themes/images/webconsole.png);
   background-position: 8px 8px;
   background-repeat: no-repeat;
   background-size: 48px 40px;
@@ -54,7 +54,7 @@ a {
 
 @media (min-resolution: 1.25dppx) {
   .message > .icon::before {
-    background-image: url(chrome://global/skin/devtools/webconsole@2x.png);
+    background-image: url(chrome://devtools/skin/themes/images/webconsole@2x.png);
   }
 }
 
@@ -356,14 +356,14 @@ a {
 }
 
 .jsterm-input-node {
-  background-image: -moz-image-rect(url("chrome://global/skin/devtools/commandline-icon.png"), 0, 32, 16, 16);
+  background-image: -moz-image-rect(url("chrome://devtools/skin/themes/images/commandline-icon.png"), 0, 32, 16, 16);
   background-repeat: no-repeat;
   background-size: 16px 16px;
 }
 
 @media (min-resolution: 1.25dppx) {
   .jsterm-input-node {
-    background-image: -moz-image-rect(url('chrome://global/skin/devtools/commandline-icon@2x.png'), 0, 64, 32, 32);
+    background-image: -moz-image-rect(url('chrome://devtools/skin/themes/images/commandline-icon@2x.png'), 0, 64, 32, 32);
   }
 }
 
@@ -483,7 +483,7 @@ a {
 
 /* Open DOMNode in inspector button */
 .open-inspector {
-  background: url("chrome://global/skin/devtools/vview-open-inspector.png") no-repeat 0 0;
+  background: url("chrome://devtools/skin/themes/images/vview-open-inspector.png") no-repeat 0 0;
   padding-left: 16px;
   margin-left: 5px;
   cursor: pointer;
@@ -579,3 +579,14 @@ a {
     margin-top: 5px;
   }
 }
+
+%ifdef XP_WIN
+/*
+ * This hardcoded width likely due to a toolkit Windows specific bug.
+ * See http://hg.mozilla.org/mozilla-central/annotate/f38d6df93cad/toolkit/themes/winstripe/global/textbox-aero.css#l7
+ */
+
+.hud-filter-box {
+  width: 200px;
+}
+%endif

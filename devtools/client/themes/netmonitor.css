@@ -17,7 +17,7 @@
   min-width: 30px;
   min-height: 26px;
   margin: 0;
-  list-style-image: url(profiler-stopwatch.svg);
+  list-style-image: url(images/profiler-stopwatch.svg);
 }
 
 #requests-menu-perf-notice-button .button-text {
@@ -108,12 +108,12 @@
 }
 
 .requests-menu-header-button[sorted=ascending] {
-  background-image: url("chrome://global/skin/devtools/sort-arrows.svg#ascending");
+  background-image: url("chrome://devtools/skin/themes/images/sort-arrows.svg#ascending");
   background-repeat: no-repeat;
 }
  
 .requests-menu-header-button[sorted=descending] {
-  background-image: url("chrome://global/skin/devtools/sort-arrows.svg#descending");
+  background-image: url("chrome://devtools/skin/themes/images/sort-arrows.svg#descending");
   background-repeat: no-repeat;
 }
 
@@ -460,7 +460,7 @@ label.requests-menu-status-code {
   background: none;
   box-shadow: none;
   border-color: transparent;
-  list-style-image: url("chrome://global/skin/devtools/debugger-collapse.png");
+  list-style-image: url("chrome://devtools/skin/themes/images/debugger-collapse.png");
   -moz-image-region: rect(0px,16px,16px,0px);
 }
 
@@ -470,7 +470,7 @@ label.requests-menu-status-code {
 }
 
 #details-pane-toggle[pane-collapsed] {
-  list-style-image: url("chrome://global/skin/devtools/debugger-expand.png");
+  list-style-image: url("chrome://devtools/skin/themes/images/debugger-expand.png");
 }
 
 #details-pane-toggle:active {
@@ -479,12 +479,12 @@ label.requests-menu-status-code {
 
 @media (min-resolution: 1.25dppx) {
   #details-pane-toggle {
-    list-style-image: url("chrome://global/skin/devtools/debugger-collapse@2x.png");
+    list-style-image: url("chrome://devtools/skin/themes/images/debugger-collapse@2x.png");
     -moz-image-region: rect(0px,32px,32px,0px);
   }
 
   #details-pane-toggle[pane-collapsed] {
-    list-style-image: url("chrome://global/skin/devtools/debugger-expand@2x.png");
+    list-style-image: url("chrome://devtools/skin/themes/images/debugger-expand@2x.png");
   }
 
   #details-pane-toggle:active {

@@ -232,8 +232,8 @@ chrome/toolkit/skin/classic/global/arrow/arrow-rit-hov.gif
 chrome/toolkit/skin/classic/global/arrow/arrow-rit.gif
 browser/modules/devtools/scratchpad/scratchpad-commands.js
 browser/chrome/browser/content/global/devtools/scratchpad-commands.js
-chrome/toolkit/skin/classic/global/devtools/profiler-stopwatch.svg
-chrome/toolkit/skin/classic/global/devtools/tool-profiler.svg
+browser/chrome/devtools/skin/themes/images/profiler-stopwatch.svg
+browser/chrome/devtools/skin/themes/images/tool-profiler.svg
 browser/chrome/browser/skin/classic/browser/webapps-16.png
 chrome/toolkit/skin/classic/global/icons/webapps-16.png
 browser/modules/devtools/commandline/commands-index.js
@@ -268,9 +268,9 @@ chrome/toolkit/skin/classic/mozapps/extensions/localeGeneric.png
 chrome/toolkit/skin/classic/mozapps/extensions/category-extensions.png
 chrome/toolkit/skin/classic/mozapps/extensions/extensionGeneric.png
 chrome/toolkit/skin/classic/mozapps/xpinstall/xpinstallItemGeneric.png
+browser/chrome/devtools/skin/themes/images/noise.png
 browser/chrome/browser/skin/classic/browser/newtab/noise.png
 chrome/toolkit/skin/classic/global/devtools/noise.png
-browser/chrome/browser/skin/classic/browser/newtab/noise.png
 browser/chrome/browser/skin/classic/browser/imagedocument.png
 browser/chrome/browser/skin/classic/browser/webapps-64.png
 chrome/toolkit/skin/classic/global/icons/webapps-64.png
