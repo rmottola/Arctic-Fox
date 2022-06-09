@@ -9,8 +9,7 @@ const promise = require("promise");
 const EventEmitter = require("devtools/toolkit/event-emitter");
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "DebuggerServer",
-  "resource://gre/modules/devtools/dbg-server.jsm");
+loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
 XPCOMUtils.defineLazyModuleGetter(this, "DebuggerClient",
   "resource://gre/modules/devtools/dbg-client.jsm");
 

@@ -18,6 +18,7 @@
       const Telemetry = require("devtools/shared/telemetry");
       const { USBRuntime, WiFiRuntime, SimulatorRuntime, gRemoteRuntime,
               gLocalRuntime } = require("devtools/webide/runtimes");
+      const { DebuggerServer } = require("devtools/server/main");
 
       // Because we need to gather stats for the period of time that a tool has
       // been opened we make use of setTimeout() to create tool active times.
@@ -213,8 +214,6 @@
         });
 
         Task.spawn(function*() {
-          Cu.import("resource://gre/modules/devtools/dbg-server.jsm");
-
           if (!DebuggerServer.initialized) {
             DebuggerServer.init(function () { return true; });
             DebuggerServer.addBrowserActors();

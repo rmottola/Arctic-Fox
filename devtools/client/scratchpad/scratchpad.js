@@ -40,7 +40,7 @@ const FALLBACK_CHARSET_LIST = "intl.fallbackCharsetList.ISO-8859-1";
 
 const VARIABLES_VIEW_URL = "chrome://devtools/content/shared/widgets/VariablesView.xul";
 
-const {require, loader} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {require, devtools: loader} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 
 const Editor    = require("devtools/sourceeditor/editor");
 const TargetFactory = require("devtools/framework/target").TargetFactory;
@@ -71,8 +71,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "EnvironmentClient",
 XPCOMUtils.defineLazyModuleGetter(this, "ObjectClient",
   "resource://gre/modules/devtools/dbg-client.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "DebuggerServer",
-  "resource://gre/modules/devtools/dbg-server.jsm");
+loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
 
 XPCOMUtils.defineLazyModuleGetter(this, "DebuggerClient",
   "resource://gre/modules/devtools/dbg-client.jsm");
