@@ -36,7 +36,7 @@ const TABS_PINNED_AVG_HISTOGRAM = "DEVTOOLS_TABS_PINNED_AVERAGE_LINEAR";
 const FORBIDDEN_IDS = new Set(["toolbox", ""]);
 const MAX_ORDINAL = 99;
 
-const bundle = Services.strings.createBundle("chrome://global/locale/devtools/toolbox.properties");
+const bundle = Services.strings.createBundle("chrome://browser/locale/devtools/toolbox.properties");
 
 /**
  * DevTools is a class that represents a set of developer tools, it holds a
@@ -602,16 +602,16 @@ var gDevToolsBrowser = {
     let appMgrEnabled = Services.prefs.getBoolPref("devtools.appmanager.enabled");
     toggleCmd("Tools:DevAppMgr", !webIDEEnabled && appMgrEnabled);
 
+    // Enable Browser Toolbox?
+    let chromeEnabled = Services.prefs.getBoolPref("devtools.chrome.enabled");
+    let devtoolsRemoteEnabled = Services.prefs.getBoolPref("devtools.debugger.remote-enabled");
+    let remoteEnabled = chromeEnabled && devtoolsRemoteEnabled;
+    toggleCmd("Tools:BrowserToolbox", remoteEnabled);
+    toggleCmd("Tools:BrowserContentToolbox", remoteEnabled && win.gMultiProcessBrowser);
+
     // Enable Error Console?
     let consoleEnabled = Services.prefs.getBoolPref("devtools.errorconsole.enabled");
     toggleCmd("Tools:ErrorConsole", consoleEnabled);
-
-    // Enable Browser Debugger?
-    let chromeEnabled = Services.prefs.getBoolPref("devtools.chrome.enabled");
-    let devtoolsRemoteEnabled = Services.prefs.getBoolPref("devtools.debugger.remote-enabled");
-    let remoteEnabled = chromeEnabled && devtoolsRemoteEnabled &&
-                        Services.prefs.getBoolPref("devtools.debugger.chrome-enabled");
-    toggleCmd("Tools:ChromeDebugger", remoteEnabled);
 
     // Enable DevTools connection screen, if the preference allows this.
     toggleCmd("Tools:DevToolsConnect", devtoolsRemoteEnabled);

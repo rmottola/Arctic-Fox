@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* globals gDevTools, DOMHelpers, toolboxStrings, InspectorFront, Selection,
+   CommandUtils, DevToolsUtils, Hosts, osString, showDoorhanger,
    getHighlighterUtils, createPerformanceFront */
 
 "use strict";
@@ -1491,7 +1493,7 @@ Toolbox.prototype = {
     this._host.setTitle(title);
   },
 
-  _listFrames: function (event) {
+  _listFrames: function(event) {
     if (!this._target.activeTab || !this._target.activeTab.traits.frames) {
       // We are not targetting a regular TabActor
       // it can be either an addon or browser toolbox actor
