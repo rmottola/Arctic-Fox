@@ -36,9 +36,8 @@ function tryImport(url) {
   }
 }
 
-tryImport("resource://gre/modules/devtools/dbg-server.jsm");
-tryImport("resource://gre/modules/devtools/dbg-client.jsm");
-tryImport("resource://gre/modules/devtools/Loader.jsm");
+const { DebuggerServer } = require("devtools/server/main");
+const { DebuggerClient } = require("devtools/toolkit/client/main");
 
 function testExceptionHook(ex) {
   try {

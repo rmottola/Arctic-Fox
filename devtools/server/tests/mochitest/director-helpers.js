@@ -1,9 +1,8 @@
 var Cu = Components.utils;
-Cu.import("resource://gre/modules/devtools/dbg-client.jsm");
-Cu.import("resource://gre/modules/devtools/dbg-server.jsm");
+const {DebuggerClient} = require("devtools/toolkit/client/main");
+const {DebuggerServer} = require("devtools/server/main");
 const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-
-const Services = .require("Services");
+const Services = require("Services");
 
 // Always log packets when running tests.
 Services.prefs.setBoolPref("devtools.debugger.log", true);

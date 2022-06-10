@@ -18,7 +18,7 @@ loader.lazyGetter(this, "WebConsoleFrame", () => require("devtools/webconsole/we
 loader.lazyImporter(this, "gDevTools", "resource:///modules/devtools/gDevTools.jsm");
 loader.lazyImporter(this, "Services", "resource://gre/modules/Services.jsm");
 loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
-loader.lazyImporter(this, "DebuggerClient", "resource://gre/modules/devtools/dbg-client.jsm");
+loader.lazyRequireGetter(this, "DebuggerClient", "devtools/toolkit/client/main", true);
 loader.lazyGetter(this, "showDoorhanger", () => require("devtools/shared/doorhanger").showDoorhanger);
 loader.lazyRequireGetter(this, "sourceUtils", "devtools/shared/source-utils");
 

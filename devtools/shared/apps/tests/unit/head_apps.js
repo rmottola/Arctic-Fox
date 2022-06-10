@@ -7,13 +7,12 @@ const Cu = Components.utils;
 const Cr = Components.results;
 const CC = Components.Constructor;
 
-Cu.import("resource://gre/modules/devtools/dbg-server.jsm");
-Cu.import("resource://gre/modules/devtools/dbg-client.jsm");
-
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
 const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {DebuggerClient} = require("devtools/toolkit/client/main");
+const {DebuggerServer} = require("devtools/server/main");
 const {AppActorFront} = require("devtools/app-actor-front");
 
 var gClient, gActor, gActorFront;

@@ -9,8 +9,8 @@ const Cu = Components.utils;
 Cu.import("resource://gre/modules/Services.jsm");
 const {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
 const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const {DebuggerClient} = Cu.import("resource://gre/modules/devtools/dbg-client.jsm", {});
-const {DebuggerServer} = Cu.import("resource://gre/modules/devtools/dbg-server.jsm", {});
+const {DebuggerClient} = require("devtools/toolkit/client/main");
+const {DebuggerServer} = require("devtools/server/main");
 const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
 
 const PATH = "browser/toolkit/devtools/server/tests/browser/";
