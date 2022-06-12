@@ -544,8 +544,11 @@ var gDevToolsBrowser = {
     let target = TargetFactory.forTab(gBrowser.selectedTab);
     let toolbox = gDevTools.getToolbox(target);
 
-    toolbox ? toolbox.destroy() : gDevTools.showToolbox(target);
-  },
+    // If a toolbox exists, using toggle from the Main window :
+    // - should close a docked toolbox
+    // - should focus a windowed toolbox
+    let isDocked = toolbox && toolbox.hostType != devtools.Toolbox.HostType.WINDOW;
+    isDocked ? toolbox.destroy() : gDevTools.showToolbox(target);  },
 
   toggleBrowserToolboxCommand: function(gBrowser) {
     let target = TargetFactory.forWindow(gBrowser.ownerDocument.defaultView);
