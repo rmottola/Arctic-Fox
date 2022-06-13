@@ -265,7 +265,6 @@ devtools.jar:
     skin/themes/images/debugger-toggleBreakpoints@2x.png (themes/images/debugger-toggleBreakpoints@2x.png)
     skin/themes/images/tracer-icon.png (themes/images/tracer-icon.png)
     skin/themes/images/tracer-icon@2x.png (themes/images/tracer-icon@2x.png)
-    skin/themes/images/responsivemode/responsiveui-home.png (themes/images/responsivemode/responsiveui-home.png)
     skin/themes/images/responsivemode/responsive-se-resizer.png (themes/images/responsivemode/responsive-se-resizer.png)
     skin/themes/images/responsivemode/responsive-se-resizer@2x.png (themes/images/responsivemode/responsive-se-resizer@2x.png)
     skin/themes/images/responsivemode/responsive-vertical-resizer.png (themes/images/responsivemode/responsive-vertical-resizer.png)
