@@ -30,7 +30,7 @@ const MAXIMUM_FONT_SIZE = 96;
 const MINIMUM_FONT_SIZE = 6;
 const NORMAL_FONT_SIZE = 12;
 
-const SCRATCHPAD_L10N = "chrome://global/locale/devtools/scratchpad.properties";
+const SCRATCHPAD_L10N = "chrome://browser/locale/devtools/scratchpad.properties";
 const DEVTOOLS_CHROME_ENABLED = "devtools.chrome.enabled";
 const PREF_RECENT_FILES_MAX = "devtools.scratchpad.recentFilesMax";
 const SHOW_TRAILING_SPACE = "devtools.scratchpad.showTrailingSpace";
@@ -40,36 +40,38 @@ const FALLBACK_CHARSET_LIST = "intl.fallbackCharsetList.ISO-8859-1";
 
 const VARIABLES_VIEW_URL = "chrome://devtools/content/shared/widgets/VariablesView.xul";
 
-const {require, devtools: loader} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {require, loader} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 
-const Editor    = require("devtools/sourceeditor/editor");
-const TargetFactory = require("devtools/framework/target").TargetFactory;
-const EventEmitter = require("devtools/toolkit/event-emitter");
-const {DevToolsWorker} = require("devtools/toolkit/shared/worker");
+const Telemetry = require("devtools/client/shared/telemetry");
+const Editor    = require("devtools/client/sourceeditor/editor");
+const TargetFactory = require("devtools/client/framework/target").TargetFactory;
+const EventEmitter = require("devtools/shared/event-emitter");
+const {DevToolsWorker} = require("devtools/shared/shared/worker");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const promise = require("promise");
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
-Cu.import("resource:///modules/devtools/scratchpad-manager.jsm");
+Cu.import("resource:///modules/devtools/client/scratchpad/scratchpad-manager.jsm");
 Cu.import("resource://gre/modules/jsdebugger.jsm");
-Cu.import("resource:///modules/devtools/gDevTools.jsm");
+Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
-Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
 Cu.import("resource://gre/modules/reflect.jsm");
 Cu.import("resource://gre/modules/devtools/DevToolsUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "VariablesView",
-  "resource://gre/modules/devtools/VariablesView.jsm");
+  "resource:///modules/devtools/client/shared/widgets/VariablesView.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "VariablesViewController",
-  "resource://gre/modules/devtools/VariablesViewController.jsm");
+  "resource:///modules/devtools/client/shared/widgets/VariablesViewController.jsm");
 
 loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
 
-loader.lazyRequireGetter(this, "DebuggerClient", "devtools/toolkit/client/main", true);
-loader.lazyRequireGetter(this, "EnvironmentClient", "devtools/toolkit/client/main", true);
-loader.lazyRequireGetter(this, "ObjectClient", "devtools/toolkit/client/main", true);
+loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", true);
+loader.lazyRequireGetter(this, "EnvironmentClient", "devtools/shared/client/main", true);
+loader.lazyRequireGetter(this, "ObjectClient", "devtools/shared/client/main", true);
 
 XPCOMUtils.defineLazyGetter(this, "REMOTE_TIMEOUT", () =>
   Services.prefs.getIntPref("devtools.debugger.remote-timeout"));
@@ -80,7 +82,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "ShortcutUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "Reflect",
   "resource://gre/modules/reflect.jsm");
 
-let WebConsoleUtils = require("devtools/toolkit/webconsole/utils").Utils;
+var WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
 
 /**
  * The scratchpad object handles the Scratchpad window functionality.
@@ -2010,7 +2012,7 @@ function ScratchpadTab(aTab)
   this._tab = aTab;
 }
 
-let scratchpadTargets = new WeakMap();
+var scratchpadTargets = new WeakMap();
 
 /**
  * Returns the object containing the DebuggerClient and WebConsoleClient for a
@@ -2174,7 +2176,7 @@ function ScratchpadSidebar(aScratchpad)
   // panel to support event (emit) API.
   EventEmitter.decorate(this);
 
-  let ToolSidebar = require("devtools/framework/sidebar").ToolSidebar;
+  let ToolSidebar = require("devtools/client/framework/sidebar").ToolSidebar;
   let tabbox = document.querySelector("#scratchpad-sidebar");
   this._sidebar = new ToolSidebar(tabbox, this, "scratchpad");
   this._scratchpad = aScratchpad;

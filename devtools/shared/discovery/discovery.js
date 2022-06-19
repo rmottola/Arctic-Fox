@@ -32,7 +32,7 @@
  */
 
 const { Cu, CC, Cc, Ci } = require("chrome");
-const EventEmitter = require("devtools/toolkit/event-emitter");
+const EventEmitter = require("devtools/shared/event-emitter");
 const { setTimeout, clearTimeout } = require("sdk/timers");
 
 const UDPSocket = CC("@mozilla.org/network/udp-socket;1",
@@ -63,7 +63,7 @@ XPCOMUtils.defineLazyGetter(this, "libcutils", function () {
   return libcutils;
 });
 
-let logging = Services.prefs.getBoolPref("devtools.discovery.log");
+var logging = Services.prefs.getBoolPref("devtools.discovery.log");
 function log(msg) {
   if (logging) {
     console.log("DISCOVERY: " + msg);
@@ -183,7 +183,7 @@ LocalDevice.prototype = {
    */
   _generate: function() {
     if (Services.appinfo.widgetToolkit == "gonk") {
-      // For Gonk devices, create one from the device name plus a little
+      // For Firefox OS devices, create one from the device name plus a little
       // randomness.  The goal is just to distinguish devices in an office
       // environment where many people may have the same device model for
       // testing purposes (which would otherwise all report the same name).
@@ -193,6 +193,10 @@ LocalDevice.prototype = {
       // To hex and zero pad
       randomID = ("00000000" + randomID.toString(16)).slice(-8);
       this.name = name + "-" + randomID;
+    } else if (Services.appinfo.widgetToolkit == "android") {
+      // For Firefox for Android, use the device's model name.
+      // TODO: Bug 1180997: Find the right way to expose an editable name
+      this.name = sysInfo.get("device");
     } else {
       this.name = sysInfo.get("host");
     }
@@ -508,6 +512,6 @@ Discovery.prototype = {
 
 };
 
-let discovery = new Discovery();
+var discovery = new Discovery();
 
 module.exports = discovery;

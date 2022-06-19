@@ -9,15 +9,15 @@ const Cr = Components.results;
 const CC = Components.Constructor;
 
 const { require } =
-  Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+  Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 const promise = require("promise");
 const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 
 const Services = require("Services");
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils.js");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const xpcInspector = require("xpcInspector");
 const { DebuggerServer } = require("devtools/server/main");
-const { DebuggerClient } = require("devtools/toolkit/client/main");
+const { DebuggerClient } = require("devtools/shared/client/main");
 
 // We do not want to log packets by default, because in some tests,
 // we can be sending large amounts of data. The test harness has
@@ -48,8 +48,8 @@ function scriptErrorFlagsToKind(aFlags) {
 
 // Register a console listener, so console messages don't just disappear
 // into the ether.
-let errorCount = 0;
-let listener = {
+var errorCount = 0;
+var listener = {
   observe: function (aMessage) {
     errorCount++;
     try {
@@ -82,7 +82,7 @@ let listener = {
   }
 };
 
-let consoleService = Cc["@mozilla.org/consoleservice;1"]
+var consoleService = Cc["@mozilla.org/consoleservice;1"]
                      .getService(Ci.nsIConsoleService);
 consoleService.registerListener(listener);
 

@@ -8,7 +8,7 @@
 const Ci = Components.interfaces;
 const Cu = Components.utils;
 
-const DBG_STRINGS_URI = "chrome://global/locale/devtools/debugger.properties";
+const DBG_STRINGS_URI = "chrome://browser/locale/devtools/debugger.properties";
 const LAZY_EMPTY_DELAY = 150; // ms
 const LAZY_EXPAND_DELAY = 50; // ms
 const SCROLL_PAGE_SIZE_DEFAULT = 0;
@@ -19,11 +19,11 @@ const ITEM_FLASH_DURATION = 300 // ms
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
-Cu.import("resource://gre/modules/devtools/event-emitter.js");
+Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+Cu.import("resource://gre/modules/devtools/shared/event-emitter.js");
 Cu.import("resource://gre/modules/Task.jsm");
-const { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+const { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const promise = require("promise");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
@@ -35,7 +35,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "clipboardHelper",
 
 Object.defineProperty(this, "WebConsoleUtils", {
   get: function() {
-    return require("devtools/toolkit/webconsole/utils").Utils;
+    return require("devtools/shared/webconsole/utils").Utils;
   },
   configurable: true,
   enumerable: true
@@ -43,7 +43,7 @@ Object.defineProperty(this, "WebConsoleUtils", {
 
 Object.defineProperty(this, "NetworkHelper", {
   get: function() {
-    return require("devtools/toolkit/webconsole/network-helper");
+    return require("devtools/shared/webconsole/network-helper");
   },
   configurable: true,
   enumerable: true

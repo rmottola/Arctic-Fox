@@ -3,8 +3,7 @@
 
 // Tests that bar graph create a legend as expected.
 
-let BarGraphWidget = require("devtools/shared/widgets/BarGraphWidget");
-let {Promise} = require("resource://gre/modules/Promise.jsm");
+var BarGraphWidget = require("devtools/client/shared/widgets/BarGraphWidget");
 
 const CATEGORIES = [
   { color: "#46afe3", label: "Foo" },
@@ -25,7 +24,7 @@ function* performTest() {
 
   testGraph(graph);
 
-  graph.destroy();
+  yield graph.destroy();
   host.destroy();
 }
 

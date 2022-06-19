@@ -6,21 +6,21 @@
 
 "use strict";
 
-let { Ci } = require("chrome");
-let Services = require("Services");
-let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+var { Ci } = require("chrome");
+var Services = require("Services");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 loader.lazyRequireGetter(this, "DebuggerSocket",
-  "devtools/toolkit/security/socket", true);
+  "devtools/shared/security/socket", true);
 loader.lazyRequireGetter(this, "AuthenticationResult",
-  "devtools/toolkit/security/auth", true);
+  "devtools/shared/security/auth", true);
 
 DevToolsUtils.defineLazyGetter(this, "bundle", () => {
-  const DBG_STRINGS_URI = "chrome://global/locale/devtools/debugger-backend.properties";
+  const DBG_STRINGS_URI = "chrome://global/locale/devtools/debugger.properties";
   return Services.strings.createBundle(DBG_STRINGS_URI);
 });
 
-let Client = exports.Client = {};
-let Server = exports.Server = {};
+var Client = exports.Client = {};
+var Server = exports.Server = {};
 
 /**
  * During OOB_CERT authentication, a notification dialog like this is used to

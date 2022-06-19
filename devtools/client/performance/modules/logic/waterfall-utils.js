@@ -7,8 +7,10 @@
  * Utility functions for collapsing markers into a waterfall.
  */
 
-loader.lazyRequireGetter(this, "TIMELINE_BLUEPRINT",
-  "devtools/performance/markers", true);
+loader.lazyRequireGetter(this, "extend",
+  "sdk/util/object", true);
+loader.lazyRequireGetter(this, "MarkerUtils",
+  "devtools/client/performance/modules/logic/marker-utils");
 
 /**
  * Collapses markers into a tree-like structure. Currently, this only goes

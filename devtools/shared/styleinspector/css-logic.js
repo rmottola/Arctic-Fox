@@ -40,7 +40,7 @@
 
 const { Cc, Ci, Cu } = require("chrome");
 const Services = require("Services");
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 const MAX_DATA_URL_LENGTH = 40;
 
@@ -56,7 +56,7 @@ const RX_PSEUDO = /\s*:?:([\w-]+)(\(?\)?)\s*/g;
 // on the worker thread, where Cu is not available.
 if (Cu) {
   Cu.importGlobalProperties(['CSS']);
-  Cu.import("resource://gre/modules/devtools/LayoutHelpers.jsm");
+  Cu.import("resource://gre/modules/devtools/shared/LayoutHelpers.jsm");
 }
 
 function CssLogic()

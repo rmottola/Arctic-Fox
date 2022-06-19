@@ -11,18 +11,18 @@ Cu.import("resource://gre/modules/Services.jsm");
 const {Task} = Cu.import("resource://gre/modules/Task.jsm", {});
 
 // This gives logging to stdout for tests
-var {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
+var {console} = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
 
-let {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let WebConsoleUtils = require("devtools/toolkit/webconsole/utils").Utils;
+var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
 
-let ConsoleAPIStorage = Cc["@mozilla.org/consoleAPI-storage;1"]
+var ConsoleAPIStorage = Cc["@mozilla.org/consoleAPI-storage;1"]
                           .getService(Ci.nsIConsoleAPIStorage);
-let {DebuggerServer} = require("devtools/server/main");
-let {DebuggerClient, ObjectClient} = require("devtools/toolkit/client/main");
+var {DebuggerServer} = require("devtools/server/main");
+var {DebuggerClient, ObjectClient} = require("devtools/shared/client/main");
 
-let {ConsoleServiceListener, ConsoleAPIListener} =
-  require("devtools/toolkit/webconsole/utils");
+var {ConsoleServiceListener, ConsoleAPIListener} =
+  require("devtools/shared/webconsole/utils");
 
 function initCommon()
 {

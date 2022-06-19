@@ -28,7 +28,7 @@ this.EXPORTED_SYMBOLS = ["DebuggerTransport",
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
-let {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 
 let promise = Cu.import("resource://gre/modules/devtools/deprecated-sync-thenables.js").Promise;
 const { defer, resolve, reject } = promise;
@@ -49,7 +49,7 @@ Object.defineProperty(this, "WebConsoleClient", {
   enumerable: true
 });
 
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+var client = require("devtools/shared/client/main");
 this.executeSoon = DevToolsUtils.executeSoon;
 this.makeInfallible = DevToolsUtils.makeInfallible;
 this.values = DevToolsUtils.values;

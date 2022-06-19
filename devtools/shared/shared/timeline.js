@@ -9,7 +9,7 @@
  * has a name, start and end timestamps. Markers are stored in docShells.
  *
  * This module exposes this tracking mechanism. To use with devtools' RDP,
- * use toolkit/devtools/server/actors/timeline.js directly.
+ * use devtools/server/actors/timeline.js directly.
  *
  * To start/stop recording markers:
  *   timeline.start()
@@ -27,8 +27,8 @@ const { Class } = require("sdk/core/heritage");
 loader.lazyRequireGetter(this, "events", "sdk/event/core");
 loader.lazyRequireGetter(this, "Timers", "sdk/timers");
 loader.lazyRequireGetter(this, "Task", "resource://gre/modules/Task.jsm", true);
-loader.lazyRequireGetter(this, "Memory", "devtools/toolkit/shared/memory", true);
-loader.lazyRequireGetter(this, "Framerate", "devtools/toolkit/shared/framerate", true);
+loader.lazyRequireGetter(this, "Memory", "devtools/shared/shared/memory", true);
+loader.lazyRequireGetter(this, "Framerate", "devtools/shared/shared/framerate", true);
 loader.lazyRequireGetter(this, "StackFrameCache", "devtools/server/actors/utils/stack", true);
 loader.lazyRequireGetter(this, "EventTarget", "sdk/event/target", true);
 
@@ -40,7 +40,7 @@ const DEFAULT_TIMELINE_DATA_PULL_TIMEOUT = 200; // ms
 /**
  * The timeline actor pops and forwards timeline markers registered in docshells.
  */
-let Timeline = exports.Timeline = Class({
+var Timeline = exports.Timeline = Class({
   extends: EventTarget,
 
   /**

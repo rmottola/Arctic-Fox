@@ -17,23 +17,24 @@ const OS_HISTOGRAM = "DEVTOOLS_OS_ENUMERATED_PER_USER";
 const OS_IS_64_BITS = "DEVTOOLS_OS_IS_64_BITS_PER_USER";
 const SCREENSIZE_HISTOGRAM = "DEVTOOLS_SCREEN_RESOLUTION_ENUMERATED_PER_USER";
 
-let {Cc, Ci, Cu} = require("chrome");
-let promise = require("promise");
-let EventEmitter = require("devtools/toolkit/event-emitter");
-let Telemetry = require("devtools/shared/telemetry");
-let HUDService = require("devtools/webconsole/hudservice");
-let sourceUtils = require("devtools/shared/source-utils");
+var {Cc, Ci, Cu} = require("chrome");
+var promise = require("promise");
+var EventEmitter = require("devtools/shared/event-emitter");
+var Telemetry = require("devtools/client/shared/telemetry");
+var HUDService = require("devtools/client/webconsole/hudservice");
+var sourceUtils = require("devtools/client/shared/source-utils");
 
 Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource:///modules/devtools/gDevTools.jsm");
-Cu.import("resource:///modules/devtools/scratchpad-manager.jsm");
-Cu.import("resource:///modules/devtools/DOMHelpers.jsm");
+Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm");
+Cu.import("resource:///modules/devtools/client/scratchpad/scratchpad-manager.jsm");
+Cu.import("resource:///modules/devtools/client/shared/DOMHelpers.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 
 loader.lazyImporter(this, "CommandUtils",
-  "resource:///modules/devtools/DeveloperToolbar.jsm");
+  "resource:///modules/devtools/client/shared/DeveloperToolbar.jsm");
 loader.lazyGetter(this, "toolboxStrings", () => {
-  let bundle = Services.strings.createBundle("chrome://global/locale/devtools/toolbox.properties");
+  const properties = "chrome://browser/locale/devtools/toolbox.properties";
+  const bundle = Services.strings.createBundle(properties);
   return (name, ...args) => {
     try {
       if (!args.length) {
@@ -47,26 +48,26 @@ loader.lazyGetter(this, "toolboxStrings", () => {
   };
 });
 loader.lazyRequireGetter(this, "getHighlighterUtils",
-  "devtools/framework/toolbox-highlighter-utils", true);
+  "devtools/client/framework/toolbox-highlighter-utils", true);
 loader.lazyRequireGetter(this, "Hosts",
-  "devtools/framework/toolbox-hosts", true);
+  "devtools/client/framework/toolbox-hosts", true);
 loader.lazyRequireGetter(this, "Selection",
-  "devtools/framework/selection", true);
+  "devtools/client/framework/selection", true);
 loader.lazyRequireGetter(this, "InspectorFront",
   "devtools/server/actors/inspector", true);
 loader.lazyRequireGetter(this, "DevToolsUtils",
-  "devtools/toolkit/DevToolsUtils");
+  "devtools/shared/DevToolsUtils");
 loader.lazyRequireGetter(this, "showDoorhanger",
-  "devtools/shared/doorhanger", true);
+  "devtools/client/shared/doorhanger", true);
 loader.lazyRequireGetter(this, "createPerformanceFront",
   "devtools/server/actors/performance", true);
 loader.lazyRequireGetter(this, "system",
-  "devtools/toolkit/shared/system");
+  "devtools/shared/shared/system");
 loader.lazyGetter(this, "osString", () => {
   return Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULRuntime).OS;
 });
 loader.lazyGetter(this, "registerHarOverlay", () => {
-  return require("devtools/netmonitor/har/toolbox-overlay.js").register;
+  return require("devtools/client/netmonitor/har/toolbox-overlay").register;
 });
 
 // White-list buttons that can be toggled to prevent adding prefs for
@@ -2132,7 +2133,7 @@ Toolbox.prototype = {
 
   /**
    * Opens source in style editor. Falls back to plain "view-source:".
-   * @see browser/devtools/shared/source-utils.js
+   * @see devtools/client/shared/source-utils.js
    */
   viewSourceInStyleEditor: function(sourceURL, sourceLine) {
     return sourceUtils.viewSourceInStyleEditor(this, sourceURL, sourceLine);
@@ -2140,7 +2141,7 @@ Toolbox.prototype = {
 
   /**
    * Opens source in debugger. Falls back to plain "view-source:".
-   * @see browser/devtools/shared/source-utils.js
+   * @see devtools/client/shared/source-utils.js
    */
   viewSourceInDebugger: function(sourceURL, sourceLine) {
     return sourceUtils.viewSourceInDebugger(this, sourceURL, sourceLine);
@@ -2153,7 +2154,7 @@ Toolbox.prototype = {
    * to infer the URL from this toolbox, or use the built in scratchpad IN
    * the toolbox.
    *
-   * @see browser/devtools/shared/source-utils.js
+   * @see devtools/client/shared/source-utils.js
    */
   viewSourceInScratchpad: function(sourceURL, sourceLine) {
     return sourceUtils.viewSourceInScratchpad(sourceURL, sourceLine);
@@ -2161,7 +2162,7 @@ Toolbox.prototype = {
 
   /**
    * Opens source in plain "view-source:".
-   * @see browser/devtools/shared/source-utils.js
+   * @see devtools/client/shared/source-utils.js
    */
   viewSource: function(sourceURL, sourceLine) {
     return sourceUtils.viewSource(this, sourceURL, sourceLine);

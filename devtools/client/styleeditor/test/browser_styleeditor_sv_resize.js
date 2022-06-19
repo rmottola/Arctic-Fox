@@ -4,7 +4,7 @@
 
 const TESTCASE_URI = TEST_BASE + "simple.html";
 
-const {Toolbox} = require("devtools/framework/toolbox");
+const {Toolbox} = require("devtools/client/framework/toolbox");
 
 let gOriginalWidth; // these are set by runTests()
 let gOriginalHeight;

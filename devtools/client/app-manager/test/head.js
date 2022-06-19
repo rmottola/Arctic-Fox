@@ -5,16 +5,16 @@
 const {utils: Cu, classes: Cc, interfaces: Ci} = Components;
 
 const {Promise: promise} =
-  Cu.import("resource://gre/modules/devtools/deprecated-sync-thenables.js", {});
+  Cu.import("resource://gre/modules/devtools/shared/deprecated-sync-thenables.js", {});
 const {require} =
-  Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+  Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 
-const {AppProjects} = require("devtools/app-manager/app-projects");
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+const {AppProjects} = require("devtools/client/app-manager/app-projects");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 const APP_MANAGER_URL = "about:app-manager";
 const TEST_BASE =
-  "chrome://mochitests/content/browser/browser/devtools/app-manager/test/";
+  "chrome://mochitests/content/browser/devtools/client/app-manager/test/";
 const HOSTED_APP_MANIFEST = TEST_BASE + "hosted_app.manifest";
 
 const PACKAGED_APP_DIR_PATH = getTestFilePath(".");

@@ -3,9 +3,13 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-EXTRA_JS_MODULES.devtools.debugger += [
-    'debugger-commands.js',
-    'panel.js'
+DIRS += [
+    'content',
 ]
 
-BROWSER_CHROME_MANIFESTS += ['test/browser.ini']
+DevToolsModules(
+    'debugger-commands.js',
+    'panel.js'
+)
+
+BROWSER_CHROME_MANIFESTS += ['test/mochitest/browser.ini']

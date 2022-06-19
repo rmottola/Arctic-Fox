@@ -109,27 +109,27 @@ const ACTIVITY_TYPE = {
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/devtools/SideMenuWidget.jsm");
-Cu.import("resource://gre/modules/devtools/VariablesView.jsm");
-Cu.import("resource://gre/modules/devtools/VariablesViewController.jsm");
-Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/SideMenuWidget.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/VariablesView.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/VariablesViewController.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
 
-const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 const promise = require("promise");
-const EventEmitter = require("devtools/toolkit/event-emitter");
-const Editor = require("devtools/sourceeditor/editor");
-const {Tooltip} = require("devtools/shared/widgets/Tooltip");
-const {ToolSidebar} = require("devtools/framework/sidebar");
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+const EventEmitter = require("devtools/shared/event-emitter");
+const Editor = require("devtools/client/sourceeditor/editor");
+const {Tooltip} = require("devtools/client/shared/widgets/Tooltip");
+const {ToolSidebar} = require("devtools/client/framework/sidebar");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Chart",
-  "resource://gre/modules/devtools/Chart.jsm");
+  "resource:///modules/devtools/client/shared/widgets/Chart.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Curl",
-  "resource://gre/modules/devtools/Curl.jsm");
+  "resource:///modules/devtools/client/shared/Curl.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "CurlUtils",
-  "resource://gre/modules/devtools/Curl.jsm");
+  "resource:///modules/devtools/client/shared/Curl.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
   "resource://gre/modules/Task.jsm");
@@ -145,7 +145,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "DOMParser",
 
 Object.defineProperty(this, "NetworkHelper", {
   get: function() {
-    return require("devtools/toolkit/webconsole/network-helper");
+    return require("devtools/shared/webconsole/network-helper");
   },
   configurable: true,
   enumerable: true

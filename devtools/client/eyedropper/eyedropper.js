@@ -3,9 +3,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 const {Cc, Ci, Cu} = require("chrome");
-const {rgbToHsl} = require("devtools/css-color").colorUtils;
-const {EventEmitter} = Cu.import("resource://gre/modules/devtools/event-emitter.js");
-const promise = Cu.import("resource://gre/modules/Promise.jsm", {}).Promise;
+const {rgbToHsl} = require("devtools/shared/css-color").colorUtils;
+const Telemetry = require("devtools/client/shared/telemetry");
+const {EventEmitter} = Cu.import("resource://gre/modules/devtools/shared/event-emitter.js");
+const promise = require("promise");
 const {setTimeout, clearTimeout} = Cu.import("resource://gre/modules/Timer.jsm", {});
 
 Cu.import("resource://gre/modules/Services.jsm");
@@ -54,7 +55,7 @@ const HSL_BOX_WIDTH = 158;
  * Manage instances of eyedroppers for windows. Registering here isn't
  * necessary for creating an eyedropper, but can be used for testing.
  */
-let EyedropperManager = {
+var EyedropperManager = {
   _instances: new WeakMap(),
 
   getInstance: function(chromeWindow) {
@@ -132,7 +133,7 @@ function Eyedropper(chromeWindow, opts = { copyOnSelect: true, context: "other" 
   };
 
   let mm = this._contentTab.linkedBrowser.messageManager;
-  mm.loadFrameScript("resource://gre/modules/devtools/eyedropper/eyedropper-child.js", true);
+  mm.loadFrameScript("resource:///modules/devtools/client/eyedropper/eyedropper-child.js", true);
 
   EventEmitter.decorate(this);
 }

@@ -1,7 +1,7 @@
 var Cu = Components.utils;
-const {DebuggerClient} = require("devtools/toolkit/client/main");
+const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const {DebuggerClient} = require("devtools/shared/client/main");
 const {DebuggerServer} = require("devtools/server/main");
-const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 const Services = require("Services");
 
 // Always log packets when running tests.
@@ -13,7 +13,7 @@ SimpleTest.registerCleanupFunction(function() {
   Services.prefs.clearUserPref("dom.mozBrowserFramesEnabled");
 });
 
-const {promiseInvoke} = require("devtools/async-utils");
+const {promiseInvoke} = require("devtools/shared/async-utils");
 
 const { DirectorRegistry,
         DirectorRegistryFront } = require("devtools/server/actors/director-registry");

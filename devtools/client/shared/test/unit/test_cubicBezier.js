@@ -8,8 +8,8 @@
 // Tests the CubicBezier API in the CubicBezierWidget module
 
 const Cu = Components.utils;
-let {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let {CubicBezier} = require("devtools/shared/widgets/CubicBezierWidget");
+var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var {CubicBezier, _parseTimingFunction} = require("devtools/client/shared/widgets/CubicBezierWidget");
 
 function run_test() {
   throwsWhenMissingCoordinates();
@@ -19,6 +19,7 @@ function run_test() {
   pointGettersReturnPointCoordinatesArrays();
   toStringOutputsCubicBezierValue();
   toStringOutputsCssPresetValues();
+  testParseTimingFunction();
 }
 
 function throwsWhenMissingCoordinates() {
@@ -105,6 +106,30 @@ function toStringOutputsCssPresetValues() {
 
   c = new CubicBezier([0.42, 0, 0.58, 1]);
   do_check_eq(c.toString(), "ease-in-out");
+}
+
+function testParseTimingFunction() {
+  do_print("test parseTimingFunction");
+
+  for (let test of ["ease", "linear", "ease-in", "ease-out", "ease-in-out"]) {
+    ok(_parseTimingFunction(test), test);
+  }
+
+  ok(!_parseTimingFunction("something"), "non-function token");
+  ok(!_parseTimingFunction("something()"), "non-cubic-bezier function");
+  ok(!_parseTimingFunction("cubic-bezier(something)",
+                           "cubic-bezier with non-numeric argument"));
+  ok(!_parseTimingFunction("cubic-bezier(1,2,3:7)",
+                           "did not see comma"));
+  ok(!_parseTimingFunction("cubic-bezier(1,2,3,7:",
+                           "did not see close paren"));
+  ok(!_parseTimingFunction("cubic-bezier(1,2", "early EOF after number"));
+  ok(!_parseTimingFunction("cubic-bezier(1,2,", "early EOF after comma"));
+  deepEqual(_parseTimingFunction("cubic-bezier(1,2,3,7)"), [1,2,3,7],
+            "correct invocation");
+  deepEqual(_parseTimingFunction("cubic-bezier(1,  /* */ 2,3,   7  )"),
+            [1,2,3,7],
+            "correct with comments and whitespace");
 }
 
 function do_check_throws(cb, info) {

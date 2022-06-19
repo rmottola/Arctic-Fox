@@ -3,8 +3,8 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-Cu.import("resource://gre/modules/devtools/VariablesView.jsm");
-Cu.import("resource://gre/modules/devtools/VariablesViewController.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/VariablesView.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/VariablesViewController.jsm");
 
 const GENERIC_VARIABLES_VIEW_SETTINGS = {
   searchEnabled: false,
@@ -19,7 +19,7 @@ const GENERIC_VARIABLES_VIEW_SETTINGS = {
  * Functions handling the audio node inspector UI.
  */
 
-let PropertiesView = {
+var PropertiesView = {
 
   /**
    * Initialization function called when the tool starts up.

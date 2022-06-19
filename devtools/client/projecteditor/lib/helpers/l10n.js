@@ -9,8 +9,8 @@
  */
 
 const { Cu, Cc, Ci } = require("chrome");
-const { ViewHelpers } = Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm", {});
-const ITCHPAD_STRINGS_URI = "chrome://global/locale/devtools/projecteditor.properties";
+const { ViewHelpers } = Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm", {});
+const ITCHPAD_STRINGS_URI = "chrome://browser/locale/devtools/projecteditor.properties";
 const L10N = new ViewHelpers.L10N(ITCHPAD_STRINGS_URI).stringBundle;
 
 function getLocalizedString (name) {

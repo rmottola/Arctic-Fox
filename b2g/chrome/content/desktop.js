@@ -2,15 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-let browserWindow = Services.wm.getMostRecentWindow("navigator:browser");
-let isMulet = "ResponsiveUI" in browserWindow;
+var browserWindow = Services.wm.getMostRecentWindow("navigator:browser");
+var isMulet = "ResponsiveUI" in browserWindow;
 
 // Enable touch event shim on desktop that translates mouse events
 // into touch ones
 function enableTouch() {
-  let require = Cu.import('resource://gre/modules/devtools/Loader.jsm', {})
+  let require = Cu.import('resource://gre/modules/devtools/shared/Loader.jsm', {})
                   .devtools.require;
-  let { TouchEventSimulator } = require('devtools/toolkit/touch/simulator');
+  let { TouchEventSimulator } = require('devtools/shared/touch/simulator');
   let touchEventSimulator = new TouchEventSimulator(shell.contentBrowser);
   touchEventSimulator.start();
 }
@@ -111,7 +111,7 @@ function checkDebuggerPort() {
 
 
 function initResponsiveDesign() {
-  Cu.import('resource://gre/modules/devtools/responsivedesign.jsm');
+  Cu.import('resource:///modules/devtools/client/responsivedesign/responsivedesign.jsm');
   ResponsiveUIManager.on('on', function(event, {tab:tab}) {
     let responsive = ResponsiveUIManager.getResponsiveUIForTab(tab);
     let document = tab.ownerDocument;
@@ -157,8 +157,8 @@ function openDevtools() {
   Services.prefs.setIntPref('devtools.toolbox.sidebar.width',
                             browserWindow.outerWidth - 550);
   Services.prefs.setCharPref('devtools.toolbox.host', 'side');
-  let {gDevTools} = Cu.import('resource://gre/modules/devtools/gDevTools.jsm', {});
-  let {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+  let {gDevTools} = Cu.import('resource:///modules/devtools/client/framework/gDevTools.jsm', {});
+  let {devtools} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
   let target = devtools.TargetFactory.forTab(browserWindow.gBrowser.selectedTab);
   gDevTools.showToolbox(target);
 }

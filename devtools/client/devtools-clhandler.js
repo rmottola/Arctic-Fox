@@ -11,8 +11,8 @@ const kDebuggerPrefs = [
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Services", "resource://gre/modules/Services.jsm");
 
-function devtoolsCommandlineHandler() {}
-
+function devtoolsCommandlineHandler() {
+}
 devtoolsCommandlineHandler.prototype = {
   handle: function(cmdLine) {
     let consoleFlag = cmdLine.handleFlag("browserconsole", false);
@@ -45,12 +45,12 @@ devtoolsCommandlineHandler.prototype = {
   handleConsoleFlag: function(cmdLine) {
     let window = Services.wm.getMostRecentWindow("devtools:webconsole");
     if (!window) {
-      let { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+      let { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
       // Load the browser devtools main module as the loader's main module.
-      Cu.import("resource://gre/modules/devtools/gDevTools.jsm");
-      let hudservice = require("devtools/webconsole/hudservice");
-      let { console } = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
-      HUDService.toggleBrowserConsole().then(null, console.error);
+      Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm");
+      let hudservice = require("devtools/client/webconsole/hudservice");
+      let { console } = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
+      hudservice.toggleBrowserConsole().then(null, console.error);
     } else {
       // The Browser Console was already open.
       window.focus();
@@ -100,7 +100,7 @@ devtoolsCommandlineHandler.prototype = {
     if (!this._isRemoteDebuggingEnabled()) {
       return;
     }
-    Cu.import("resource://gre/modules/devtools/ToolboxProcess.jsm");
+    Cu.import("resource:///modules/devtools/client/framework/ToolboxProcess.jsm");
     BrowserToolboxProcess.init();
 
     if (cmdLine.state == Ci.nsICommandLine.STATE_REMOTE_AUTO) {

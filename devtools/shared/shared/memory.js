@@ -5,7 +5,7 @@
 "use strict";
 
 const { Cc, Ci, Cu } = require("chrome");
-const { reportException } = require("devtools/toolkit/DevToolsUtils");
+const { reportException } = require("devtools/shared/DevToolsUtils");
 const { Class } = require("sdk/core/heritage");
 const { expectState } = require("devtools/server/actors/common");
 loader.lazyRequireGetter(this, "events", "sdk/event/core");
@@ -61,7 +61,6 @@ var Memory = exports.Memory = Class({
     }
     return this._dbg;
   },
-
 
   /**
    * Attach to this MemoryBridge.

@@ -11,7 +11,7 @@
  *    toolkit/components/telemetry/Histograms.json. Each type is optional but it
  *    is best if all three can be included.
  *
- * 2. Add your chart entries to browser/devtools/shared/telemetry.js
+ * 2. Add your chart entries to devtools/client/shared/telemetry.js
  *    (Telemetry.prototype._histograms):
  *    mytoolname: {
  *      histogram: "DEVTOOLS_MYTOOLNAME_OPENED_BOOLEAN",
@@ -20,7 +20,7 @@
  *    },
  *
  * 3. Include this module at the top of your tool. Use:
- *      let Telemetry = require("devtools/shared/telemetry")
+ *      let Telemetry = require("devtools/client/shared/telemetry")
  *
  * 4. Create a telemetry instance in your tool's constructor:
  *      this._telemetry = new Telemetry();
@@ -54,9 +54,9 @@ this.Telemetry = function() {
 
 module.exports = Telemetry;
 
-let {Cc, Ci, Cu} = require("chrome");
-let {Services} = Cu.import("resource://gre/modules/Services.jsm", {});
-let {XPCOMUtils} = Cu.import("resource://gre/modules/XPCOMUtils.jsm", {});
+var {Cc, Ci, Cu} = require("chrome");
+var {Services} = Cu.import("resource://gre/modules/Services.jsm", {});
+var {XPCOMUtils} = Cu.import("resource://gre/modules/XPCOMUtils.jsm", {});
 
 Telemetry.prototype = {
   _histograms: {
@@ -151,9 +151,9 @@ Telemetry.prototype = {
       timerHistogram: "DEVTOOLS_NETMONITOR_TIME_ACTIVE_SECONDS"
     },
     storage: {
-       histogram: "DEVTOOLS_STORAGE_OPENED_BOOLEAN",
-       userHistogram: "DEVTOOLS_STORAGE_OPENED_PER_USER_FLAG",
-       timerHistogram: "DEVTOOLS_STORAGE_TIME_ACTIVE_SECONDS"
+      histogram: "DEVTOOLS_STORAGE_OPENED_BOOLEAN",
+      userHistogram: "DEVTOOLS_STORAGE_OPENED_PER_USER_FLAG",
+      timerHistogram: "DEVTOOLS_STORAGE_TIME_ACTIVE_SECONDS"
     },
     tilt: {
       histogram: "DEVTOOLS_TILT_OPENED_BOOLEAN",

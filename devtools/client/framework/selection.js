@@ -6,9 +6,9 @@
 
 "use strict";
 
-const {Cu, Ci} = require("chrome");
-let EventEmitter = require("devtools/toolkit/event-emitter");
-Cu.import("resource://gre/modules/devtools/LayoutHelpers.jsm");
+const { Cu, Ci } = require("chrome");
+const { getRootBindingParent } = require("devtools/shared/layout/utils");
+var EventEmitter = require("devtools/shared/event-emitter");
 
 /**
  * API

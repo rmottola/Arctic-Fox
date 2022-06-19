@@ -5,13 +5,14 @@
 "use strict";
 
 const {Cu, Cc, Ci} = require("chrome");
+
+const EventEmitter = require("devtools/shared/event-emitter");
 const Services = require("Services");
 const protocol = require("devtools/server/protocol");
 const {Arg, Option, method} = protocol;
 const events = require("sdk/event/core");
 const Heritage = require("sdk/core/heritage");
 const {CssLogic} = require("devtools/styleinspector/css-logic");
-const EventEmitter = require("devtools/toolkit/event-emitter");
 const {setIgnoreLayoutChanges} = require("devtools/server/actors/layout");
 
 Cu.import("resource://gre/modules/devtools/LayoutHelpers.jsm");

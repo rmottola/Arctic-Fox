@@ -3,12 +3,10 @@
 
 "use strict";
 
-const { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
-
-let {require} = Cu.import("resource:///modules/devtools/gDevTools.jsm", {});
-let {TargetFactory} = require("devtools/framework/target");
-let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
-let promise = require("promise");
+var {require} = Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm", {});
+var {TargetFactory} = require("devtools/client/framework/target");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
+var promise = require("promise");
 
 // Import the GCLI test helper
 var testDir = gTestPath.substr(0, gTestPath.lastIndexOf("/"));

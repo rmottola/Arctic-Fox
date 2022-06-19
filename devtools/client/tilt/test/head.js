@@ -2,14 +2,14 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 "use strict";
 
-let {require} = Components.utils.import("resource://gre/modules/devtools/Loader.jsm", {});
-let TiltManager = require("devtools/tilt/tilt").TiltManager;
-let TiltGL = require("devtools/tilt/tilt-gl");
-let {EPSILON, TiltMath, vec3, mat3, mat4, quat4} = require("devtools/tilt/tilt-math");
-let TiltUtils = require("devtools/tilt/tilt-utils");
-let {TiltVisualizer} = require("devtools/tilt/tilt-visualizer");
-let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
-let LayoutHelpers = require("devtools/toolkit/layout-helpers");
+var {require} = Components.utils.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var TiltManager = require("devtools/client/tilt/tilt").TiltManager;
+var TiltGL = require("devtools/client/tilt/tilt-gl");
+var {EPSILON, TiltMath, vec3, mat3, mat4, quat4} = require("devtools/client/tilt/tilt-math");
+var TiltUtils = require("devtools/client/tilt/tilt-utils");
+var {TiltVisualizer} = require("devtools/client/tilt/tilt-visualizer");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
+var {getRect, getIframeContentOffset} = require("devtools/shared/layout/utils");
 
 let tempScope = {};
 Components.utils.import("resource://gre/modules/devtools/LayoutHelpers.jsm", tempScope);

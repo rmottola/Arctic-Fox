@@ -16,7 +16,7 @@ const AUTO_CLOSE  = "devtools.editor.autoclosebrackets";
 const AUTOCOMPLETE  = "devtools.editor.autocomplete";
 const DETECT_INDENT = "devtools.editor.detectindentation";
 const DETECT_INDENT_MAX_LINES = 500;
-const L10N_BUNDLE = "chrome://global/locale/devtools/sourceeditor.properties";
+const L10N_BUNDLE = "chrome://browser/locale/devtools/sourceeditor.properties";
 const XUL_NS      = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 const VALID_KEYMAPS = new Set(["emacs", "vim", "sublime"]);
 
@@ -30,8 +30,8 @@ const RE_SCRATCHPAD_ERROR = /(?:@Scratchpad\/\d+:|\()(\d+):?(\d+)?(?:\)|\n)/;
 const RE_JUMP_TO_LINE = /^(\d+):?(\d+)?/;
 
 const promise = require("promise");
-const events  = require("devtools/toolkit/event-emitter");
-const { PrefObserver } = require("devtools/styleeditor/utils");
+const events  = require("devtools/shared/event-emitter");
+const { PrefObserver } = require("devtools/client/styleeditor/utils");
 
 Cu.import("resource://gre/modules/Services.jsm");
 const L10N = Services.strings.createBundle(L10N_BUNDLE);

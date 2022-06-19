@@ -4,12 +4,12 @@
 
 "use strict";
 
-const cssAutoCompleter  = require("devtools/sourceeditor/css-autocompleter");
+const cssAutoCompleter  = require("devtools/client/sourceeditor/css-autocompleter");
 const { Cc, Ci } = require("chrome");
 
-const CSS_URI = "http://mochi.test:8888/browser/browser/devtools/sourceeditor" +
+const CSS_URI = "http://mochi.test:8888/browser/devtools/client/sourceeditor" +
                 "/test/css_statemachine_testcases.css";
-const TESTS_URI = "http://mochi.test:8888/browser/browser/devtools/sourceeditor" +
+const TESTS_URI = "http://mochi.test:8888/browser/devtools/client/sourceeditor" +
                   "/test/css_statemachine_tests.json";
 
 const source = read(CSS_URI);
@@ -55,7 +55,7 @@ const TEST_URI = "data:text/html;charset=UTF-8," + encodeURIComponent(
    " </html>"
   ].join("\n"));
 
-let doc = null;
+var doc = null;
 function test() {
   waitForExplicitFinish();
   gBrowser.selectedTab = gBrowser.addTab();

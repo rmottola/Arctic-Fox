@@ -1,6 +1,6 @@
-const EventEmitter = require("devtools/toolkit/event-emitter");
+const EventEmitter = require("devtools/shared/event-emitter");
 const { Services } = require("resource://gre/modules/Services.jsm");
-
+const { Preferences } = require("resource://gre/modules/Preferences.jsm");
 const OPTIONS_SHOWN_EVENT = "options-shown";
 const OPTIONS_HIDDEN_EVENT = "options-hidden";
 const PREF_CHANGE_EVENT = "pref-changed";

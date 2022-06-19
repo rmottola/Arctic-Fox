@@ -14,8 +14,8 @@
 var Utils = (function() {
   const Cu = Components.utils;
   const {Services} = Cu.import("resource://gre/modules/Services.jsm", {});
-  const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-  const EventEmitter = require("devtools/toolkit/event-emitter");
+  const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+  const EventEmitter = require("devtools/shared/event-emitter");
 
 
   function _createSetEventForwarder(key, finalStore) {
@@ -52,7 +52,7 @@ var Utils = (function() {
   }
 
 
-  let strings = Services.strings.createBundle("chrome://global/locale/devtools/app-manager.properties");
+  let strings = Services.strings.createBundle("chrome://browser/locale/devtools/app-manager.properties");
 
   function l10n (property, args = []) {
     if (args && args.length > 0) {

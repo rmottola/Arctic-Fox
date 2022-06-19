@@ -22,8 +22,8 @@ var { helpers, assert } = (function() {
 
 var helpers = {};
 
-var { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-var { TargetFactory } = require("devtools/framework/target");
+var { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var { TargetFactory } = require("devtools/client/framework/target");
 
 var assert = { ok: ok, is: is, log: info };
 var util = require('gcli/util/util');
@@ -411,7 +411,7 @@ helpers.runTests = function(options, tests) {
   }, recover);
 };
 
-const MOCK_COMMANDS_URI = "chrome://mochitests/content/browser/toolkit/devtools/commandline/test/mockCommands.js";
+const MOCK_COMMANDS_URI = "chrome://mochitests/content/browser/devtools/client/commandline/test/mockCommands.js";
 
 const defer = function() {
   const deferred = { };

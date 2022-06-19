@@ -6,19 +6,13 @@
 
 "use strict";
 
-const {Cc, Ci, Cu, Cr} = require("chrome");
+const {Cu} = require("chrome");
+const EventEmitter = require("devtools/shared/event-emitter");
 
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/Promise.jsm");
-
-let EventEmitter = require("devtools/toolkit/event-emitter");
-
-loader.lazyGetter(this, "StorageFront",
-  () => require("devtools/server/actors/storage").StorageFront);
-
-loader.lazyGetter(this, "StorageUI",
-  () => require("devtools/storage/ui").StorageUI);
+loader.lazyRequireGetter(this, "StorageFront",
+                        "devtools/server/actors/storage", true);
+loader.lazyRequireGetter(this, "StorageUI",
+                         "devtools/client/storage/ui", true);
 
 this.StoragePanel = function StoragePanel(panelWin, toolbox) {
   EventEmitter.decorate(this);

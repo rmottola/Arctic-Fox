@@ -1,14 +1,14 @@
 const Cu = Components.utils;
-const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 const {FileUtils} = Cu.import("resource://gre/modules/FileUtils.jsm", {});
 const {NetUtil} = Cu.import("resource://gre/modules/NetUtil.jsm", {});
-const promise = require("projecteditor/helpers/promise");
-const ProjectEditor = require("projecteditor/projecteditor");
+const promise = require("promise");
+const ProjectEditor = require("devtools/client/projecteditor/lib/projecteditor");
 
 const SAMPLE_PATH = buildTempDirectoryStructure();
 const SAMPLE_NAME = "DevTools Content Application Name";
 const SAMPLE_PROJECT_URL = "data:text/html;charset=utf-8,<body><h1>Project Overview</h1></body>";
-const SAMPLE_ICON = "chrome://global/skin/devtools/tool-debugger.svg";
+const SAMPLE_ICON = "chrome://devtools/skin/themes/images/tool-debugger.svg";
 
 /**
  * Create a workspace for working on projecteditor, available at

@@ -3,11 +3,11 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-EXTRA_JS_MODULES.devtools.performance += [
+DevToolsModules(
     'graphs.js',
     'marker-details.js',
     'marker-view.js',
     'markers-overview.js',
     'tree-view.js',
     'waterfall-ticks.js',
-]
+)

@@ -4,11 +4,13 @@
 
 const { Cu } = require("chrome");
 const { AddonManager } = Cu.import("resource://gre/modules/AddonManager.jsm");
-loader.lazyRequireGetter(this, "ConnectionManager", "devtools/client/connection-manager", true);
-loader.lazyRequireGetter(this, "AddonSimulatorProcess", "devtools/webide/simulator-process", true);
-loader.lazyRequireGetter(this, "OldAddonSimulatorProcess", "devtools/webide/simulator-process", true);
-loader.lazyRequireGetter(this, "CustomSimulatorProcess", "devtools/webide/simulator-process", true);
-const EventEmitter = require("devtools/toolkit/event-emitter");
+const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
+loader.lazyRequireGetter(this, "ConnectionManager", "devtools/shared/client/connection-manager", true);
+loader.lazyRequireGetter(this, "AddonSimulatorProcess", "devtools/client/webide/modules/simulator-process", true);
+loader.lazyRequireGetter(this, "OldAddonSimulatorProcess", "devtools/client/webide/modules/simulator-process", true);
+loader.lazyRequireGetter(this, "CustomSimulatorProcess", "devtools/client/webide/modules/simulator-process", true);
+const asyncStorage = require("devtools/shared/shared/async-storage");
+const EventEmitter = require("devtools/shared/event-emitter");
 const promise = require("promise");
 
 const SimulatorRegExp = new RegExp(Services.prefs.getCharPref("devtools.webide.simulatorAddonRegExp"));
@@ -16,7 +18,7 @@ const LocaleCompare = (a, b) => {
   return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
 };
 
-let Simulators = {
+var Simulators = {
 
   // The list of simulator configurations.
   _simulators: [],

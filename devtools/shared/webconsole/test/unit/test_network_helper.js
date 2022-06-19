@@ -3,7 +3,7 @@
 
 "use strict";
 const Cu = Components.utils;
-const { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 
 Object.defineProperty(this, "NetworkHelper", {
   get: function() {

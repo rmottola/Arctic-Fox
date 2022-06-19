@@ -34,6 +34,20 @@ const RESIZE_REFRESH_RATE = 50; // ms
 const PROMISE_DEBUGGER_URL =
   "chrome://devtools/content/promisedebugger/promise-debugger.xhtml";
 
+const debuggerControllerEmit = DebuggerController.emit.bind(DebuggerController);
+const createStore = require("devtools/client/shared/redux/create-store")();
+const { combineEmittingReducers } = require("devtools/client/shared/redux/reducers");
+const reducers = require("./content/reducers/index");
+const store = createStore(combineEmittingReducers(reducers, debuggerControllerEmit));
+const { NAME: WAIT_UNTIL_NAME } = require("devtools/client/shared/redux/middleware/wait-service");
+
+const services = {
+  WAIT_UNTIL: WAIT_UNTIL_NAME
+};
+
+const EventListenersView = require('./content/views/event-listeners-view');
+const actions = require('./content/actions/event-listeners');
+
 /**
  * Object defining the debugger view components.
  */

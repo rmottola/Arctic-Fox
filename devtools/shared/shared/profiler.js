@@ -9,7 +9,7 @@ const { Class } = require("sdk/core/heritage");
 const FRAME_SCRIPT_UTILS_URL = "chrome://browser/content/devtools/frame-script-utils.js";
 loader.lazyRequireGetter(this, "events", "sdk/event/core");
 loader.lazyRequireGetter(this, "EventTarget", "sdk/event/target", true);
-loader.lazyRequireGetter(this, "DevToolsUtils", "devtools/toolkit/DevToolsUtils.js");
+loader.lazyRequireGetter(this, "DevToolsUtils", "devtools/shared/DevToolsUtils");
 loader.lazyRequireGetter(this, "DeferredTask", "resource://gre/modules/DeferredTask.jsm", true);
 loader.lazyRequireGetter(this, "Task", "resource://gre/modules/Task.jsm", true);
 loader.lazyRequireGetter(this, "uuid", "sdk/util/uuid", true);

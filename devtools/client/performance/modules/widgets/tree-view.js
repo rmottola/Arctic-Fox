@@ -9,9 +9,9 @@
  */
 
 const { Cc, Ci, Cu, Cr } = require("chrome");
-const { L10N } = require("devtools/performance/global");
-const { Heritage } = require("resource:///modules/devtools/ViewHelpers.jsm");
-const { AbstractTreeItem } = require("resource:///modules/devtools/AbstractTreeItem.jsm");
+const { L10N } = require("devtools/client/performance/modules/global");
+const { Heritage } = require("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+const { AbstractTreeItem } = require("resource:///modules/devtools/client/shared/widgets/AbstractTreeItem.jsm");
 
 const MILLISECOND_UNITS = L10N.getStr("table.ms");
 const PERCENTAGE_UNITS = L10N.getStr("table.percentage");

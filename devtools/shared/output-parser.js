@@ -2,10 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* globals DOMUtils */
+
 "use strict";
 
 const {Cc, Ci, Cu} = require("chrome");
-const {colorUtils} = require("devtools/css-color");
+const {colorUtils} = require("devtools/shared/css-color");
 const {Services} = Cu.import("resource://gre/modules/Services.jsm", {});
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
@@ -67,8 +69,8 @@ loader.lazyGetter(this, "REGEX_ALL_CSS_PROPERTIES", function () {
  *
  * Usage:
  *   const {require} =
- *      Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
- *   const {OutputParser} = require("devtools/output-parser");
+ *      Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+ *   const {OutputParser} = require("devtools/shared/output-parser");
  *
  *   let parser = new OutputParser();
  *

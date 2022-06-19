@@ -6,11 +6,10 @@
 
 #BROWSER_CHROME_MANIFESTS += ['test/browser.ini']
 
-if CONFIG['MOZ_DEVTOOLS']:
-    EXTRA_JS_MODULES.devtools.webconsole += [
-        'console-commands.js',
-        'console-output.js',
-        'hudservice.js',
-        'panel.js',
-        'webconsole.js',
-    ]
+DevToolsModules(
+    'console-commands.js',
+    'console-output.js',
+    'hudservice.js',
+    'panel.js',
+    'webconsole.js',
+)

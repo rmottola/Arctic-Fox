@@ -11,11 +11,11 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
 
-let promise = require("promise");
-let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
-let { ActorPool } = require("devtools/server/actors/common");
-let { DebuggerServer } = require("devtools/server/main");
-let Services = require("Services");
+var promise = require("promise");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
+var { ActorPool } = require("devtools/server/actors/common");
+var { DebuggerServer } = require("devtools/server/main");
+var Services = require("Services");
 
 // Comma separated list of permissions that a sideloaded app can't ask for
 const UNSAFE_PERMISSIONS = Services.prefs.getCharPref("devtools.apps.forbidden-permissions");

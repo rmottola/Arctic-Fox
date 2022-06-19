@@ -1,15 +1,17 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-///////////////////
-//
-// Whitelisting this test.
-// As part of bug 1077403, the leaking uncaught rejection should be fixed. 
-//
-thisTestLeaksUncaughtRejectionsAndShouldBeFixed("Error: Shader Editor is still waiting for a WebGL context to be created.");
+"use strict";
+
+/**
+ * Whitelisting this test.
+ * As part of bug 1077403, the leaking uncaught rejection should be fixed.
+ */
+thisTestLeaksUncaughtRejectionsAndShouldBeFixed("Error: Shader Editor is " +
+  "still waiting for a WebGL context to be created.");
 
 const { DebuggerServer } = require("devtools/server/main");
-const { DebuggerClient } = require("devtools/toolkit/client/main");
+const { DebuggerClient } = require("devtools/shared/client/main");
 
 /**
  * Bug 979536: Ensure fronts are destroyed after toolbox close.
@@ -38,7 +40,7 @@ const { DebuggerClient } = require("devtools/toolkit/client/main");
  */
 
 function runTools(target) {
-  return Task.spawn(function() {
+  return Task.spawn(function*() {
     let toolIds = gDevTools.getToolDefinitionArray()
                            .filter(def => def.isTargetSupported(target))
                            .map(def => def.id);
@@ -81,7 +83,7 @@ function getClient() {
 function getTarget(client) {
   let deferred = promise.defer();
 
-  let tabList = client.listTabs(tabList => {
+  client.listTabs(tabList => {
     let target = TargetFactory.forRemoteTab({
       client: client,
       form: tabList.tabs[tabList.selected],
@@ -94,7 +96,7 @@ function getTarget(client) {
 }
 
 function test() {
-  Task.spawn(function() {
+  Task.spawn(function*() {
     toggleAllTools(true);
     yield addTab("about:blank");
 
@@ -112,12 +114,12 @@ function test() {
         // Bug 1056342: Profiler fails today because of framerate actor, but
         // this appears more complex to rework, so leave it for that bug to
         // resolve.
-        if (actor.contains("framerateActor")) {
+        if (actor.includes("framerateActor")) {
           todo(false, "Front for " + actor + " still held in pool!");
           continue;
         }
         // gcliActor is for the commandline which is separate to the toolbox
-        if (actor.contains("gcliActor")) {
+        if (actor.includes("gcliActor")) {
           continue;
         }
         ok(false, "Front for " + actor + " still held in pool!");

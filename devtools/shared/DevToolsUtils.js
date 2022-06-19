@@ -10,6 +10,9 @@ var { Ci, Cu, Cc, components } = require("chrome");
 var Services = require("Services");
 var promise = require("promise");
 
+loader.lazyRequireGetter(this, "FileUtils",
+                         "resource://gre/modules/FileUtils.jsm", true);
+
 /**
  * Turn the error |aError| into a string, without fail.
  */
@@ -423,6 +426,18 @@ exports.defineLazyModuleGetter = function defineLazyModuleGetter(aObject, aName,
 
 exports.defineLazyGetter(this, "NetUtil", () => {
   return Cu.import("resource://gre/modules/NetUtil.jsm", {}).NetUtil;
+});
+
+exports.defineLazyGetter(this, "OS", () => {
+  return Cu.import("resource://gre/modules/osfile.jsm", {}).OS;
+});
+
+exports.defineLazyGetter(this, "TextDecoder", () => {
+  return Cu.import("resource://gre/modules/osfile.jsm", {}).TextDecoder;
+});
+
+exports.defineLazyGetter(this, "NetworkHelper", () => {
+  return require("devtools/shared/webconsole/network-helper");
 });
 
 /**

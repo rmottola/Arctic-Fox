@@ -9,13 +9,13 @@
 const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
 Cu.import("resource://gre/modules/Task.jsm");
-let { loader, require } = Cu.import("resource://gre/modules/devtools/Loader.jsm");
-Cu.import("resource://gre/modules/devtools/Console.jsm");
-Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
+var { loader, require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm");
+Cu.import("resource://gre/modules/devtools/shared/Console.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
 
 loader.lazyRequireGetter(this, "promise");
 loader.lazyRequireGetter(this, "EventEmitter",
-                               "devtools/toolkit/event-emitter");
+                               "devtools/shared/event-emitter");
 loader.lazyRequireGetter(this, "AnimationsFront",
                                "devtools/server/actors/animation", true);
 
@@ -23,13 +23,13 @@ const STRINGS_URI = "chrome://global/locale/devtools/animationinspector.properti
 const L10N = new ViewHelpers.L10N(STRINGS_URI);
 
 // Global toolbox/inspector, set when startup is called.
-let gToolbox, gInspector;
+var gToolbox, gInspector;
 
 /**
  * Startup the animationinspector controller and view, called by the sidebar
  * widget when loading/unloading the iframe into the tab.
  */
-let startup = Task.async(function*(inspector) {
+var startup = Task.async(function*(inspector) {
   gInspector = inspector;
   gToolbox = inspector.toolbox;
 
@@ -49,7 +49,7 @@ let startup = Task.async(function*(inspector) {
  * Shutdown the animationinspector controller and view, called by the sidebar
  * widget when loading/unloading the iframe into the tab.
  */
-let shutdown = Task.async(function*() {
+var shutdown = Task.async(function*() {
   yield AnimationsController.destroy();
   // Don't assume that AnimationsPanel is defined here, it's in another file.
   if (typeof AnimationsPanel !== "undefined") {
@@ -86,7 +86,7 @@ function destroy() {
  *   }
  * }
  */
-let AnimationsController = {
+var AnimationsController = {
   PLAYERS_UPDATED_EVENT: "players-updated",
 
   initialize: Task.async(function*() {

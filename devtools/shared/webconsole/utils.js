@@ -15,8 +15,8 @@ loader.lazyImporter(this, "LayoutHelpers", "resource://gre/modules/devtools/Layo
 
 // TODO: Bug 842672 - browser/ imports modules from toolkit/.
 // Note that these are only used in WebConsoleCommands, see $0 and pprint().
-loader.lazyImporter(this, "VariablesView", "resource:///modules/devtools/VariablesView.jsm");
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+loader.lazyImporter(this, "VariablesView", "resource:///modules/devtools/client/shared/widgets/VariablesView.jsm");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 // Match the function name from the result of toString() or toSource().
 //

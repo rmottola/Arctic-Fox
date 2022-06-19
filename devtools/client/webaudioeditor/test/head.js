@@ -4,28 +4,28 @@
 
 const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
-let { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
+var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
 
 // Enable logging for all the tests. Both the debugger server and frontend will
 // be affected by this pref.
-let gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
+var gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
 Services.prefs.setBoolPref("devtools.debugger.log", false);
 
-let { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
-let { gDevTools } = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
-let { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let { TargetFactory } = require("devtools/framework/target");
-let { DebuggerServer } = require("devtools/server/main");
-let { generateUUID } = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
+var { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
+var { gDevTools } = Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm", {});
+var { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var { TargetFactory } = require("devtools/client/framework/target");
+var { DebuggerServer } = require("devtools/server/main");
+var { generateUUID } = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
 
-let Promise = require("promise");
-let { WebAudioFront } = require("devtools/server/actors/webaudio");
-let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
-let audioNodes = require("devtools/server/actors/utils/audionodes.json");
-let mm = null;
+var Promise = require("promise");
+var { WebAudioFront } = require("devtools/server/actors/webaudio");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
+var audioNodes = require("devtools/server/actors/utils/audionodes.json");
+var mm = null;
 
 const FRAME_SCRIPT_UTILS_URL = "chrome://devtools/content/shared/frame-script-utils.js";
-const EXAMPLE_URL = "http://example.com/browser/browser/devtools/webaudioeditor/test/";
+const EXAMPLE_URL = "http://example.com/browser/devtools/client/webaudioeditor/test/";
 const SIMPLE_CONTEXT_URL = EXAMPLE_URL + "doc_simple-context.html";
 const COMPLEX_CONTEXT_URL = EXAMPLE_URL + "doc_complex-context.html";
 const SIMPLE_NODES_URL = EXAMPLE_URL + "doc_simple-node-creation.html";

@@ -16,7 +16,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-                                  "resource://gre/modules/devtools/Console.jsm");
+                                  "resource://gre/modules/devtools/shared/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PerformanceStats",
                                   "resource://gre/modules/PerformanceStats.jsm");
 XPCOMUtils.defineLazyServiceGetter(this, "Telemetry",
@@ -24,13 +24,12 @@ XPCOMUtils.defineLazyServiceGetter(this, "Telemetry",
                                   Ci.nsITelemetry);
 XPCOMUtils.defineLazyModuleGetter(this, "Services",
                                   "resource://gre/modules/Services.jsm");
-
 const FILTERS = [
   {probe: "jank", field: "longestDuration"},
   {probe: "cpow", field: "totalCPOWTime"},
 ];
 
-let AddonWatcher = {
+var AddonWatcher = {
   _previousPerformanceIndicators: {},
 
   /**

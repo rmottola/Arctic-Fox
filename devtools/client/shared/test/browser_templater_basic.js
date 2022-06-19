@@ -9,11 +9,11 @@
  * We should endevour to keep the source in sync.
  */
 
-const template = Cu.import("resource://gre/modules/devtools/Templater.jsm", {}).template;
+const template = Cu.import("resource://gre/modules/devtools/shared/gcli/Templater.jsm", {}).template;
 
 const TEST_URI = TEST_URI_ROOT + "browser_templater_basic.html";
 
-let test = Task.async(function*() {
+var test = Task.async(function*() {
   yield promiseTab("about:blank");
   let [host, win, doc] = yield createHost("bottom", TEST_URI);
 

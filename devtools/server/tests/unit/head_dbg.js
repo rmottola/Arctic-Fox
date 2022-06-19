@@ -8,11 +8,11 @@ const Cu = Components.utils;
 const Cr = Components.results;
 const CC = Components.Constructor;
 
-const { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const { worker } = Cu.import("resource://gre/modules/devtools/worker-loader.js", {})
+const { require, loader } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const { worker } = Cu.import("resource://gre/modules/devtools/shared/worker-loader.js", {})
 const promise = require("promise");
 const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
-const { promiseInvoke } = require("devtools/async-utils");
+const { promiseInvoke } = require("devtools/shared/async-utils");
 
 const Services = require("Services");
 // Always log packets when running tests. runxpcshelltests.py will throw
@@ -21,10 +21,15 @@ Services.prefs.setBoolPref("devtools.debugger.log", true);
 // Enable remote debugging for the relevant tests.
 Services.prefs.setBoolPref("devtools.debugger.remote-enabled", true);
 
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils.js");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const { DebuggerServer } = require("devtools/server/main");
 const { DebuggerServer: WorkerDebuggerServer } = worker.require("devtools/server/main");
-const { DebuggerClient, ObjectClient } = require("devtools/toolkit/client/main");
+const { DebuggerClient, ObjectClient } = require("devtools/shared/client/main");
+const { MemoryFront } = require("devtools/server/actors/memory");
+
+const { addDebuggerToGlobal } = Cu.import("resource://gre/modules/jsdebugger.jsm", {});
+
+const systemPrincipal = Cc["@mozilla.org/systemprincipal;1"].createInstance(Ci.nsIPrincipal);
 
 var loadSubScript = Cc[
   '@mozilla.org/moz/jssubscript-loader;1'
@@ -132,8 +137,8 @@ function tryImport(url) {
   }
 }
 
-tryImport("resource://gre/modules/devtools/Loader.jsm");
-tryImport("resource://gre/modules/devtools/Console.jsm");
+tryImport("resource://gre/modules/devtools/shared/Loader.jsm");
+tryImport("resource://gre/modules/devtools/shared/Console.jsm");
 
 function testExceptionHook(ex) {
   try {
@@ -169,8 +174,8 @@ function dbg_assert(cond, e) {
 
 // Register a console listener, so console messages don't just disappear
 // into the ether.
-let errorCount = 0;
-let listener = {
+var errorCount = 0;
+var listener = {
   observe: function (aMessage) {
     errorCount++;
     try {
@@ -210,7 +215,7 @@ let listener = {
   }
 };
 
-let consoleService = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
+var consoleService = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
 consoleService.registerListener(listener);
 
 function check_except(func)
@@ -512,28 +517,28 @@ function executeSoon(aFunc) {
 //
 // TODO: Remove this once bug 906232 is resolved
 //
-let do_check_true_old = do_check_true;
-let do_check_true = function (condition) {
+var do_check_true_old = do_check_true;
+var do_check_true = function (condition) {
   do_check_true_old(condition);
 };
 
-let do_check_false_old = do_check_false;
-let do_check_false = function (condition) {
+var do_check_false_old = do_check_false;
+var do_check_false = function (condition) {
   do_check_false_old(condition);
 };
 
-let do_check_eq_old = do_check_eq;
-let do_check_eq = function (left, right) {
+var do_check_eq_old = do_check_eq;
+var do_check_eq = function (left, right) {
   do_check_eq_old(left, right);
 };
 
-let do_check_neq_old = do_check_neq;
-let do_check_neq = function (left, right) {
+var do_check_neq_old = do_check_neq;
+var do_check_neq = function (left, right) {
   do_check_neq_old(left, right);
 };
 
-let do_check_matches_old = do_check_matches;
-let do_check_matches = function (pattern, value) {
+var do_check_matches_old = do_check_matches;
+var do_check_matches = function (pattern, value) {
   do_check_matches_old(pattern, value);
 };
 
@@ -704,6 +709,18 @@ function blackBox(sourceClient) {
 function unBlackBox(sourceClient) {
   dumpn("Un-black boxing source: " + sourceClient.actor);
   return rdpRequest(sourceClient, sourceClient.unblackBox);
+}
+
+/**
+ * Perform a "source" RDP request with the given SourceClient to get the source
+ * content and content type.
+ *
+ * @param SourceClient sourceClient
+ * @returns Promise
+ */
+function getSourceContent(sourceClient) {
+  dumpn("Getting source content for " + sourceClient.actor);
+  return rdpRequest(sourceClient, sourceClient.source);
 }
 
 /**

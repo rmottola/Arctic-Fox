@@ -9,25 +9,28 @@
 
 const { Cc, Ci, Cu, Cr } = require("chrome");
 const { Task } = require("resource://gre/modules/Task.jsm");
-const { LineGraphWidget } = require("resource:///modules/devtools/Graphs.jsm");
-const { BarGraphWidget } = require("resource:///modules/devtools/Graphs.jsm");
-const { CanvasGraphUtils } = require("resource:///modules/devtools/Graphs.jsm");
-const { Heritage } = require("resource:///modules/devtools/ViewHelpers.jsm");
+const { Heritage } = require("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+const LineGraphWidget = require("devtools/client/shared/widgets/LineGraphWidget");
+const BarGraphWidget = require("devtools/client/shared/widgets/BarGraphWidget");
+const MountainGraphWidget = require("devtools/client/shared/widgets/MountainGraphWidget");
+const { CanvasGraphUtils } = require("devtools/client/shared/widgets/Graphs");
 
 loader.lazyRequireGetter(this, "promise");
 loader.lazyRequireGetter(this, "EventEmitter",
-  "devtools/toolkit/event-emitter");
+  "devtools/shared/event-emitter");
 
 loader.lazyRequireGetter(this, "colorUtils",
-  "devtools/css-color", true);
+  "devtools/shared/css-color", true);
 loader.lazyRequireGetter(this, "getColor",
-  "devtools/shared/theme", true);
+  "devtools/client/shared/theme", true);
 loader.lazyRequireGetter(this, "ProfilerGlobal",
-  "devtools/performance/global");
-loader.lazyRequireGetter(this, "TimelineGlobal",
-  "devtools/performance/global");
+  "devtools/client/performance/modules/global");
+loader.lazyRequireGetter(this, "L10N",
+  "devtools/client/performance/modules/global", true);
 loader.lazyRequireGetter(this, "MarkersOverview",
-  "devtools/performance/markers-overview", true);
+  "devtools/client/performance/modules/widgets/markers-overview", true);
+loader.lazyRequireGetter(this, "createTierGraphDataFromFrameNode",
+  "devtools/client/performance/modules/logic/jit", true);
 
 /**
  * For line graphs

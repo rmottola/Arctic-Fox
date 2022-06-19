@@ -16,9 +16,9 @@ loader.lazyRequireGetter(this, "CATEGORY_JIT",
 loader.lazyRequireGetter(this, "CATEGORY_OTHER",
   "devtools/performance/global", true);
 loader.lazyRequireGetter(this, "JITOptimizations",
-  "devtools/performance/jit", true);
+  "devtools/client/performance/modules/logic/jit", true);
 loader.lazyRequireGetter(this, "FrameUtils",
-  "devtools/performance/frame-utils");
+  "devtools/client/performance/modules/logic/frame-utils");
 
 /**
  * A call tree for a thread. This is essentially a linkage between all frames

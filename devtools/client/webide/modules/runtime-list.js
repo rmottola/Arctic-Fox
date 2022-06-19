@@ -5,18 +5,17 @@
 const {Cu} = require("chrome");
 
 const {Services} = Cu.import("resource://gre/modules/Services.jsm");
-const {AppProjects} = require("devtools/app-manager/app-projects");
-const {AppManager} = require("devtools/webide/app-manager");
-const {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
-const EventEmitter = require("devtools/toolkit/event-emitter");
-const {RuntimeScanners, WiFiScanner} = require("devtools/webide/runtimes");
-const {Devices} = Cu.import("resource://gre/modules/devtools/Devices.jsm");
+const {AppProjects} = require("devtools/client/app-manager/app-projects");
+const {AppManager} = require("devtools/client/webide/modules/app-manager");
+const EventEmitter = require("devtools/shared/event-emitter");
+const {RuntimeScanners, WiFiScanner} = require("devtools/client/webide/modules/runtimes");
+const {Devices} = Cu.import("resource://gre/modules/devtools/shared/apps/Devices.jsm");
 const {Task} = Cu.import("resource://gre/modules/Task.jsm", {});
-const utils = require("devtools/webide/utils");
+const utils = require("devtools/client/webide/modules/utils");
 
 const Strings = Services.strings.createBundle("chrome://browser/locale/devtools/webide.properties");
 
-let RuntimeList;
+var RuntimeList;
 
 module.exports = RuntimeList = function(window, parentWindow) {
   EventEmitter.decorate(this);

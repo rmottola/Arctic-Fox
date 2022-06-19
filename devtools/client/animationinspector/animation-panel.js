@@ -8,18 +8,18 @@
 
 "use strict";
 
-const {createNode} = require("devtools/animationinspector/utils");
+const {createNode} = require("devtools/client/animationinspector/utils");
 const {
   PlayerMetaDataHeader,
   PlaybackRateSelector,
   AnimationTargetNode,
   AnimationsTimeline
-} = require("devtools/animationinspector/components");
+} = require("devtools/client/animationinspector/components");
 
 /**
  * The main animations panel UI.
  */
-let AnimationsPanel = {
+var AnimationsPanel = {
   UI_UPDATED_EVENT: "ui-updated",
   PANEL_INITIALIZED: "panel-initialized",
 

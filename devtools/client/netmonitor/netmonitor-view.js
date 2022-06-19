@@ -5,15 +5,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-XPCOMUtils.defineLazyModuleGetter(this, "DevToolsUtils",
-  "resource://gre/modules/devtools/DevToolsUtils.jsm");
-
 XPCOMUtils.defineLazyGetter(this, "HarExporter", function() {
-  return require("devtools/netmonitor/har/har-exporter.js").HarExporter;
+  return require("devtools/client/netmonitor/har/har-exporter").HarExporter;
 });
 
 XPCOMUtils.defineLazyGetter(this, "NetworkHelper", function() {
-  return require("devtools/toolkit/webconsole/network-helper");
+  return require("devtools/shared/webconsole/network-helper");
 });
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";

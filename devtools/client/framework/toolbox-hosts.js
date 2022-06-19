@@ -1,14 +1,21 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* globals DOMHelpers, Services */
 
 "use strict";
 
 const {Cu} = require("chrome");
-const EventEmitter = require("devtools/toolkit/event-emitter");
+const EventEmitter = require("devtools/shared/event-emitter");
 const promise = require("promise");
 Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/devtools/DOMHelpers.jsm");
+Cu.import("resource:///modules/devtools/client/shared/DOMHelpers.jsm");
+
+/* A host should always allow this much space for the page to be displayed.
+ * There is also a min-height on the browser, but we still don't want to set
+ * frame.height to be larger than that, since it can cause problems with
+ * resizing the toolbox and panel layout. */
+const MIN_PAGE_SIZE = 25;
 
 /**
  * A toolbox host represents an object that contains a toolbox (e.g. the

@@ -7301,15 +7301,15 @@ var TabContextMenu = {
 
 #ifdef MOZ_DEVTOOLS
 XPCOMUtils.defineLazyModuleGetter(this, "gDevTools",
-                                  "resource:///modules/devtools/gDevTools.jsm");
+                                  "resource:///modules/devtools/client/framework/gDevTools.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "gDevToolsBrowser",
-                                  "resource:///modules/devtools/gDevTools.jsm");
+                                  "resource:///modules/devtools/client/framework/gDevTools.jsm");
 
 Object.defineProperty(this, "HUDService", {
   get: function HUDService_getter() {
-    let devtools = Cu.import("resource://gre/modules/devtools/Loader.jsm", {}).devtools;
-    return devtools.require("devtools/webconsole/hudservice").HUDService;
+    let devtools = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {}).devtools;
+    return devtools.require("devtools/client/webconsole/hudservice");
   },
   configurable: true,
   enumerable: true
@@ -7426,7 +7426,7 @@ var Scratchpad = {
 
 XPCOMUtils.defineLazyGetter(Scratchpad, "ScratchpadManager", function() {
   let tmp = {};
-  Cu.import("resource://gre/modules/devtools/scratchpad-manager.jsm", tmp);
+  Cu.import("resource:///modules/devtools/client/scratchpad/scratchpad-manager.jsm", tmp);
   return tmp.ScratchpadManager;
 });
 
@@ -7438,7 +7438,7 @@ var ResponsiveUI = {
 
 XPCOMUtils.defineLazyGetter(ResponsiveUI, "ResponsiveUIManager", function() {
   let tmp = {};
-  Cu.import("resource://gre/modules/devtools/responsivedesign.jsm", tmp);
+  Cu.import("resource:///modules/devtools/client/responsivedesign/responsivedesign.jsm", tmp);
   return tmp.ResponsiveUIManager;
 });
 
@@ -7450,8 +7450,8 @@ function openEyedropper() {
 
 Object.defineProperty(this, "Eyedropper", {
   get: function() {
-    let devtools = Cu.import("resource://gre/modules/devtools/Loader.jsm", {}).devtools;
-    return devtools.require("devtools/eyedropper/eyedropper").Eyedropper;
+    let devtools = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {}).devtools;
+    return devtools.require("devtools/client/eyedropper/eyedropper").Eyedropper;
   },
   configurable: true,
   enumerable: true

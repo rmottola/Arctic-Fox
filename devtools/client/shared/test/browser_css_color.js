@@ -3,8 +3,7 @@
 
 const COLOR_UNIT_PREF = "devtools.defaultColorUnit";
 const TEST_URI = "data:text/html;charset=utf-8,browser_css_color.js";
-let {colorUtils} = require("devtools/css-color");
-let origColorUnit;
+var {colorUtils} = require("devtools/shared/css-color");
 
 add_task(function*() {
   yield promiseTab("about:blank");

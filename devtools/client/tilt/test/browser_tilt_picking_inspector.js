@@ -2,7 +2,8 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 "use strict";
 
-let presenter;
+Components.utils.import("resource://gre/modules/Task.jsm");
+var promise = require("promise");
 
 function test() {
   if (!isTiltEnabled()) {
@@ -19,7 +20,7 @@ function test() {
   waitForExplicitFinish();
 
   createTab(function() {
-    let {TargetFactory} = require("devtools/framework/target");
+    let {TargetFactory} = require("devtools/client/framework/target");
     let target = TargetFactory.forTab(gBrowser.selectedTab);
 
     gDevTools.showToolbox(target, "inspector").then(function(toolbox) {

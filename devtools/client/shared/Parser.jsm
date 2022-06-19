@@ -9,8 +9,8 @@ const Ci = Components.interfaces;
 const Cu = Components.utils;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-const { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+const { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 XPCOMUtils.defineLazyModuleGetter(this,
   "Reflect", "resource://gre/modules/reflect.jsm");
@@ -406,7 +406,7 @@ SyntaxTree.prototype = {
 /**
  * Parser utility methods.
  */
-let ParserHelpers = {
+var ParserHelpers = {
   /**
    * Gets the location information for a node. Not all nodes have a
    * location property directly attached, or the location information

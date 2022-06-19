@@ -4,11 +4,11 @@
 
 "use strict";
 
-Components.utils.import("resource://gre/modules/devtools/event-emitter.js");
+Components.utils.import("resource://gre/modules/devtools/shared/event-emitter.js");
 
 const EXPORTED_SYMBOLS = ["Devices"];
 
-let addonInstalled = false;
+var addonInstalled = false;
 
 const Devices = {
   _devices: {},

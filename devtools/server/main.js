@@ -10,23 +10,24 @@
  * Toolkit glue for the remote debugging protocol, loaded into the
  * debugging global.
  */
-let { Ci, Cc, CC, Cu, Cr } = require("chrome");
-let Services = require("Services");
-let { ActorPool, OriginalLocation, RegisteredActorFactory,
+var { Ci, Cc, CC, Cu, Cr } = require("chrome");
+var Services = require("Services");
+var { ActorPool, OriginalLocation, RegisteredActorFactory,
       ObservedActorFactory } = require("devtools/server/actors/common");
-let { LocalDebuggerTransport, ChildDebuggerTransport, WorkerDebuggerTransport } =
-  require("devtools/toolkit/transport/transport");
-let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
-let { dumpn, dumpv, dbg_assert } = DevToolsUtils;
-let EventEmitter = require("devtools/toolkit/event-emitter");
-let Debugger = require("Debugger");
+var { LocalDebuggerTransport, ChildDebuggerTransport, WorkerDebuggerTransport } =
+  require("devtools/shared/transport/transport");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
+var { dumpn, dumpv, dbg_assert } = DevToolsUtils;
+var EventEmitter = require("devtools/shared/event-emitter");
+var Debugger = require("Debugger");
+var Promise = require("promise");
 
 DevToolsUtils.defineLazyGetter(this, "DebuggerSocket", () => {
-  let { DebuggerSocket } = require("devtools/toolkit/security/socket");
+  let { DebuggerSocket } = require("devtools/shared/security/socket");
   return DebuggerSocket;
 });
 DevToolsUtils.defineLazyGetter(this, "Authentication", () => {
-  return require("devtools/toolkit/security/auth");
+  return require("devtools/shared/security/auth");
 });
 
 // On B2G, `this` != Global scope, so `Ci` won't be binded on `this`
@@ -83,7 +84,7 @@ function loadSubScript(aURL)
 
 loader.lazyRequireGetter(this, "events", "sdk/event/core");
 
-let {defer, resolve, reject, all} = require("devtools/toolkit/deprecated-sync-thenables");
+var {defer, resolve, reject, all} = require("devtools/shared/deprecated-sync-thenables");
 this.defer = defer;
 this.resolve = resolve;
 this.reject = reject;

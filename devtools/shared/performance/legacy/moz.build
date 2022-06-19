@@ -4,18 +4,9 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-EXTRA_JS_MODULES.devtools.performance += [
-  'io.js',
-  'recorder.js',
-  'utils.js',
-]
-
-EXTRA_JS_MODULES.devtools.performance.legacy += [
-  'legacy/actors.js',
-  'legacy/compatibility.js',
-  'legacy/front.js',
-  'legacy/recording.js',
-]
+DevToolsModules(
+  'actors.js',
+  'compatibility.js',
+  'front.js',
+  'recording.js',
+)

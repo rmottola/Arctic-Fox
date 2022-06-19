@@ -8,8 +8,8 @@ const { Cu } = require("chrome");
 const { Class } = require("sdk/core/heritage");
 const { EventTarget } = require("sdk/event/target");
 const { emit } = require("sdk/event/core");
-const promise = require("projecteditor/helpers/promise");
-const Editor  = require("devtools/sourceeditor/editor");
+const promise = require("promise");
+const Editor  = require("devtools/client/sourceeditor/editor");
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
@@ -134,8 +134,8 @@ var TextEditor = Class({
       let keyUpper = key.getAttribute("key").toUpperCase();
       let toolModifiers = key.getAttribute("modifiers");
       let modifiers = {
-        alt: toolModifiers.contains("alt"),
-        shift: toolModifiers.contains("shift")
+        alt: toolModifiers.includes("alt"),
+        shift: toolModifiers.includes("shift")
       };
 
       // On the key press, we will dispatch the event within projecteditor.
@@ -180,6 +180,9 @@ var TextEditor = Class({
     this.editor.on("focus", (...args) => {
       this.emit("focus", ...args);
     });
+    this.editor.on("saveRequested", (...args) => {
+      this.emit("saveRequested", ...args);
+    })
 
     this.appended = this.editor.appendTo(this.elt);
   },

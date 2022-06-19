@@ -6,9 +6,9 @@
 
 const { Cu } = require("chrome");
 const { Class } = require("sdk/core/heritage");
-const promise = require("projecteditor/helpers/promise");
+const promise = require("promise");
 const { ImageEditor } = require("./image-editor");
-const { registerPlugin, Plugin } = require("projecteditor/plugins/core");
+const { registerPlugin, Plugin } = require("devtools/client/projecteditor/lib/plugins/core");
 
 var ImageEditorPlugin = Class({
   extends: Plugin,

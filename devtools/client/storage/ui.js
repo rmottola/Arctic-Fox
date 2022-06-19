@@ -6,29 +6,29 @@
 "use strict";
 
 const {Cu} = require("chrome");
-const STORAGE_STRINGS = "chrome://global/locale/devtools/storage.properties";
+const EventEmitter = require("devtools/shared/event-emitter");
 
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-XPCOMUtils.defineLazyGetter(this, "TreeWidget",
-  () => require("devtools/shared/widgets/TreeWidget").TreeWidget);
-XPCOMUtils.defineLazyGetter(this, "TableWidget",
-  () => require("devtools/shared/widgets/TableWidget").TableWidget);
-XPCOMUtils.defineLazyModuleGetter(this, "EventEmitter",
-  "resource://gre/modules/devtools/event-emitter.js");
-XPCOMUtils.defineLazyModuleGetter(this, "ViewHelpers",
-  "resource://gre/modules/devtools/ViewHelpers.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "VariablesView",
-  "resource://gre/modules/devtools/VariablesView.jsm");
+loader.lazyRequireGetter(this, "TreeWidget",
+                         "devtools/client/shared/widgets/TreeWidget", true);
+loader.lazyRequireGetter(this, "TableWidget",
+                         "devtools/client/shared/widgets/TableWidget", true);
+loader.lazyImporter(this, "ViewHelpers",
+  "resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+loader.lazyImporter(this, "VariablesView",
+  "resource:///modules/devtools/client/shared/widgets/VariablesView.jsm");
+
+const Telemetry = require("devtools/client/shared/telemetry");
 
 /**
  * Localization convenience methods.
  */
-let L10N = new ViewHelpers.L10N(STORAGE_STRINGS);
+const STORAGE_STRINGS = "chrome://browser/locale/devtools/storage.properties";
+const L10N = new ViewHelpers.L10N(STORAGE_STRINGS);
 
 const GENERIC_VARIABLES_VIEW_SETTINGS = {
   lazyEmpty: true,
-  lazyEmptyDelay: 10, // ms
+   // ms
+  lazyEmptyDelay: 10,
   searchEnabled: true,
   searchPlaceholder: L10N.getStr("storage.search.placeholder"),
   preventDescriptorModifiers: true

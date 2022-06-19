@@ -8,7 +8,7 @@ if CONFIG['MOZ_DEVTOOLS']:
     BROWSER_CHROME_MANIFESTS += ['tests/browser/browser.ini']
     XPCSHELL_TESTS_MANIFESTS += ['tests/unit/xpcshell.ini']
 
-EXTRA_JS_MODULES.devtools.shared += [
+DevToolsModules(
   'async-storage.js',
   'framerate.js',
   'memory.js',
@@ -17,4 +17,4 @@ EXTRA_JS_MODULES.devtools.shared += [
   'timeline.js',
   'worker-helper.js',
   'worker.js'
-]
+)

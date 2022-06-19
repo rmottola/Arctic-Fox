@@ -2,11 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const Cu = Components.utils;
-const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const ProjectList = require("devtools/webide/project-list");
+/* eslint-env browser */
 
-let projectList = new ProjectList(window, window.parent);
+const Cu = Components.utils;
+const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const ProjectList = require("devtools/client/webide/modules/project-list");
+
+var projectList = new ProjectList(window, window.parent);
 
 window.addEventListener("load", function onLoad() {
   window.removeEventListener("load", onLoad, true);

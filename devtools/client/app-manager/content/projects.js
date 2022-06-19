@@ -6,18 +6,18 @@ const Cc = Components.classes;
 const Ci = Components.interfaces;
 const Cu = Components.utils;
 const Cr = Components.results;
-Cu.import("resource://gre/modules/devtools/gDevTools.jsm");
-const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const {ConnectionManager, Connection} = require("devtools/client/connection-manager");
-const {AppProjects} = require("devtools/app-manager/app-projects");
-const {AppValidator} = require("devtools/app-manager/app-validator");
+Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm");
+const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const {ConnectionManager, Connection} = require("devtools/shared/client/connection-manager");
+const {AppProjects} = require("devtools/client/app-manager/app-projects");
+const {AppValidator} = require("devtools/client/app-manager/app-validator");
 const {Services} = Cu.import("resource://gre/modules/Services.jsm");
 const {FileUtils} = Cu.import("resource://gre/modules/FileUtils.jsm");
 const {installHosted, installPackaged, getTargetForApp,
-       reloadApp, launchApp, closeApp} = require("devtools/app-actor-front");
-const {EventEmitter} = Cu.import("resource://gre/modules/devtools/event-emitter.js");
+       reloadApp, launchApp, closeApp} = require("devtools/shared/apps/app-actor-front");
+const {EventEmitter} = Cu.import("resource://gre/modules/devtools/shared/event-emitter.js");
 
-const promise = require("devtools/toolkit/deprecated-sync-thenables");
+const promise = require("devtools/shared/deprecated-sync-thenables");
 
 const MANIFEST_EDITOR_ENABLED = "devtools.appmanager.manifestEditor.enabled";
 
@@ -42,7 +42,7 @@ window.addEventListener("unload", function onUnload() {
   UI.destroy();
 });
 
-let UI = {
+var UI = {
   isReady: false,
 
   onload: function() {
@@ -131,7 +131,7 @@ let UI = {
       }
     }
     if (!icon)
-      return "chrome://global/skin/devtools/app-manager/default-app-icon.png";
+      return "chrome://devtools/skin/themes/app-manager/images/default-app-icon.png";
     if (project.type == "hosted") {
       let manifestURL = Services.io.newURI(project.location, null, null);
       let origin = Services.io.newURI(manifestURL.prePath, null, null);

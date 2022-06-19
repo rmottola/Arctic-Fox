@@ -3,16 +3,28 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const { ViewHelpers } = require("resource:///modules/devtools/ViewHelpers.jsm");
-const { AbstractCanvasGraph, GraphArea, GraphAreaDragger } = require("resource:///modules/devtools/Graphs.jsm");
-const { Promise } = require("resource://gre/modules/Promise.jsm");
 const { Task } = require("resource://gre/modules/Task.jsm");
-const { getColor } = require("devtools/shared/theme");
-const EventEmitter = require("devtools/toolkit/event-emitter");
-const FrameUtils = require("devtools/performance/frame-utils");
+const { ViewHelpers } = require("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+const { setNamedTimeout, clearNamedTimeout } = require("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+
+loader.lazyRequireGetter(this, "promise");
+loader.lazyRequireGetter(this, "EventEmitter",
+  "devtools/shared/event-emitter");
+
+loader.lazyRequireGetter(this, "getColor",
+  "devtools/client/shared/theme", true);
 
 loader.lazyRequireGetter(this, "CATEGORY_MAPPINGS",
-  "devtools/performance/global", true);
+  "devtools/client/performance/modules/global", true);
+loader.lazyRequireGetter(this, "FrameUtils",
+  "devtools/client/performance/modules/logic/frame-utils");
+
+loader.lazyRequireGetter(this, "AbstractCanvasGraph",
+  "devtools/client/shared/widgets/Graphs", true);
+loader.lazyRequireGetter(this, "GraphArea",
+  "devtools/client/shared/widgets/Graphs", true);
+loader.lazyRequireGetter(this, "GraphAreaDragger",
+  "devtools/client/shared/widgets/Graphs", true);
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 const GRAPH_SRC = "chrome://devtools/content/shared/widgets/graphs-frame.xhtml";

@@ -3,16 +3,7 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 function test() {
-  Cu.import("resource://gre/modules/Services.jsm");
-  let temp = {}
-  Cu.import("resource://gre/modules/devtools/gDevTools.jsm", temp);
-  let DevTools = temp.DevTools;
-  Cu.import("resource://gre/modules/devtools/LayoutHelpers.jsm", temp);
-  let LayoutHelpers = temp.LayoutHelpers;
-
-  let {Toolbox} = require("devtools/framework/toolbox");
-
-  let Toolbox = devtools.Toolbox;
+  let {Toolbox} = require("devtools/client/framework/toolbox");
 
   let toolbox, iframe, target, tab;
 

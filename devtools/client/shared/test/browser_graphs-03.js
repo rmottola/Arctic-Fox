@@ -4,8 +4,7 @@
 // Tests that graph widgets can handle clients getting/setting the
 // selection or cursor.
 
-let {LineGraphWidget} = Cu.import("resource://gre/modules/devtools/Graphs.jsm", {});
-let {Promise} = devtools.require("resource://gre/modules/Promise.jsm");
+var LineGraphWidget = require("devtools/client/shared/widgets/LineGraphWidget");
 
 add_task(function*() {
   yield promiseTab("about:blank");
@@ -21,7 +20,7 @@ function* performTest() {
   yield testSelection(graph);
   yield testCursor(graph);
 
-  graph.destroy();
+  yield graph.destroy();
   host.destroy();
 }
 

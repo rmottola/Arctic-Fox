@@ -2,25 +2,19 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 const FRAME_SCRIPT_UTILS_URL = "chrome://devtools/content/shared/frame-script-utils.js"
-const TEST_BASE = "chrome://mochitests/content/browser/browser/devtools/styleeditor/test/";
-const TEST_BASE_HTTP = "http://example.com/browser/browser/devtools/styleeditor/test/";
-const TEST_BASE_HTTPS = "https://example.com/browser/browser/devtools/styleeditor/test/";
+const TEST_BASE = "chrome://mochitests/content/browser/devtools/client/styleeditor/test/";
+const TEST_BASE_HTTP = "http://example.com/browser/devtools/client/styleeditor/test/";
+const TEST_BASE_HTTPS = "https://example.com/browser/devtools/client/styleeditor/test/";
 const TEST_HOST = 'mochi.test:8888';
 
-let {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let {TargetFactory} = require("devtools/framework/target");
-let {LoadContextInfo} = Cu.import("resource://gre/modules/LoadContextInfo.jsm", {});
-let {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
-let promise = require("promise");
-let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
-
-let gPanelWindow;
-let cache = Cc["@mozilla.org/netwerk/cache-storage-service;1"]
-              .getService(Ci.nsICacheStorageService);
-
+var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var {TargetFactory} = require("devtools/client/framework/target");
+var {console} = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
+var promise = require("promise");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 // Import the GCLI test helper
-let testDir = gTestPath.substr(0, gTestPath.lastIndexOf("/"));
+var testDir = gTestPath.substr(0, gTestPath.lastIndexOf("/"));
 Services.scriptloader.loadSubScript(testDir + "../../../commandline/test/helpers.js", this);
 
 DevToolsUtils.testing = true;

@@ -5,15 +5,15 @@
 
 const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
-let { gDevTools } = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
-let { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let { TargetFactory } = require("devtools/framework/target");
-let { Toolbox } = require("devtools/framework/toolbox");
-let { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
-let { DebuggerClient } = require("devtools/toolkit/client/main");
-let { ViewHelpers } =
-  Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm", {});
-let { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
+var { gDevTools } = Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm", {});
+var { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var { TargetFactory } = require("devtools/client/framework/target");
+var { Toolbox } = require("devtools/client/framework/toolbox");
+var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
+var { DebuggerClient } = require("devtools/shared/client/main");
+var { ViewHelpers } =
+  Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm", {});
+var { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 
 /**
  * Shortcuts for accessing various debugger preferences.

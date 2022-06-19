@@ -4,18 +4,18 @@
 
 const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
-let { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
-let { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
-let { gDevTools } = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
-let { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let { CurlUtils } = Cu.import("resource:///modules/devtools/Curl.jsm", {});
-let promise = require("promise");
-let NetworkHelper = require("devtools/toolkit/webconsole/network-helper");
-let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
-let { TargetFactory } = require("devtools/framework/target");
-let { Toolbox } = require("devtools/framework/toolbox");
+var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
+var { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
+var { gDevTools } = Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm", {});
+var { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var { CurlUtils } = Cu.import("resource:///modules/devtools/client/shared/Curl.jsm", {});
+var promise = require("promise");
+var NetworkHelper = require("devtools/shared/webconsole/network-helper");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
+var { TargetFactory } = require("devtools/client/framework/target");
+var { Toolbox } = require("devtools/client/framework/toolbox");
 
-const EXAMPLE_URL = "http://example.com/browser/browser/devtools/netmonitor/test/";
+const EXAMPLE_URL = "http://example.com/browser/devtools/client/netmonitor/test/";
 
 const API_CALLS_URL = EXAMPLE_URL + "html_api-calls-test-page.html";
 const SIMPLE_URL = EXAMPLE_URL + "html_simple-test-page.html";

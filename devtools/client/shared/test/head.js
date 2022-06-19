@@ -2,21 +2,21 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-let {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let {TargetFactory} = require("devtools/framework/target");
-let {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
-let {gDevTools} = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
-const {DOMHelpers} = Cu.import("resource://gre/modules/devtools/DOMHelpers.jsm", {});
-const {Hosts} = require("devtools/framework/toolbox-hosts");
-const {defer} = require("sdk/core/promise");
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var {TargetFactory} = require("devtools/client/framework/target");
+var {console} = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
+var {gDevTools} = Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm", {});
+const {DOMHelpers} = Cu.import("resource:///modules/devtools/client/shared/DOMHelpers.jsm", {});
+const {Hosts} = require("devtools/client/framework/toolbox-hosts");
+const {defer} = require("promise");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 DevToolsUtils.testing = true;
 SimpleTest.registerCleanupFunction(() => {
   DevToolsUtils.testing = false;
 });
 
-const TEST_URI_ROOT = "http://example.com/browser/browser/devtools/shared/test/";
+const TEST_URI_ROOT = "http://example.com/browser/devtools/client/shared/test/";
 const OPTIONS_VIEW_URL = TEST_URI_ROOT + "doc_options-view.xul";
 
 /**

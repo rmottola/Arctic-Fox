@@ -8,7 +8,7 @@ DIRS += [
     'widgets',
 ]
 
-EXTRA_JS_MODULES.devtools.performance += [
+DevToolsModules(
     'global.js',
     'markers.js',
-]
+)

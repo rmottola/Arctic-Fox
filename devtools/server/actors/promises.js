@@ -9,7 +9,7 @@ const { method, RetVal, Arg, types } = protocol;
 const { expectState, ActorPool } = require("devtools/server/actors/common");
 const { ObjectActor,
         createValueGrip } = require("devtools/server/actors/object");
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 loader.lazyRequireGetter(this, "events", "sdk/event/core");
 
 /* global events */
@@ -24,7 +24,7 @@ types.addType("ObjectActor", {
  * The Promises Actor provides support for getting the list of live promises and
  * observing changes to their settlement state.
  */
-let PromisesActor = protocol.ActorClass({
+var PromisesActor = protocol.ActorClass({
   typeName: "promises",
 
   events: {

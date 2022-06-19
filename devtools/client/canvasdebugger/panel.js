@@ -6,10 +6,10 @@
 "use strict";
 
 const { Cc, Ci, Cu, Cr } = require("chrome");
-const promise = Cu.import("resource://gre/modules/Promise.jsm", {}).Promise;
-const EventEmitter = require("devtools/toolkit/event-emitter");
+const promise = require("promise");
+const EventEmitter = require("devtools/shared/event-emitter");
 const { CanvasFront } = require("devtools/server/actors/canvas");
-const { DevToolsUtils } = Cu.import("resource://gre/modules/devtools/DevToolsUtils.jsm", {});
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 function CanvasDebuggerPanel(iframeWindow, toolbox) {
   this.panelWin = iframeWindow;

@@ -12,7 +12,7 @@ const {CssLogic} = require("devtools/styleinspector/css-logic");
 const {InplaceEditor, editableField, editableItem} = require("devtools/shared/inplace-editor");
 const {ELEMENT_STYLE, PSEUDO_ELEMENTS} = require("devtools/server/actors/styles");
 const {gDevTools} = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
-const {OutputParser} = require("devtools/output-parser");
+const {OutputParser} = require("devtools/shared/output-parser");
 const {PrefObserver, PREF_ORIG_SOURCES} = require("devtools/styleeditor/utils");
 const {
   parseDeclarations,

@@ -36,14 +36,14 @@ XPCOMUtils.defineLazyGetter(this, "prefBranch", function() {
 });
 
 XPCOMUtils.defineLazyGetter(this, "toolboxStrings", function () {
-  return Services.strings.createBundle("chrome://global/locale/devtools/toolbox.properties");
+  return Services.strings.createBundle("chrome://browser/locale/devtools/toolbox.properties");
 });
 
 const Telemetry = require("devtools/client/shared/telemetry");
 
 XPCOMUtils.defineLazyGetter(this, "gcliInit", function() {
   try {
-    return require("devtools/commandline/commands-index");
+    return require("devtools/shared/gcli/commands/index");
   }
   catch (ex) {
     console.log(ex);
@@ -56,7 +56,7 @@ XPCOMUtils.defineLazyGetter(this, "util", () => {
 
 Object.defineProperty(this, "ConsoleServiceListener", {
   get: function() {
-    return require("devtools/toolkit/webconsole/utils").ConsoleServiceListener;
+    return require("devtools/shared/webconsole/utils").ConsoleServiceListener;
   },
   configurable: true,
   enumerable: true

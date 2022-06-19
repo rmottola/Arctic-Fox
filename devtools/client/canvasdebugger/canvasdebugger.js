@@ -7,18 +7,18 @@ const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource:///modules/devtools/SideMenuWidget.jsm");
-Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
-Cu.import("resource://gre/modules/devtools/Console.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/SideMenuWidget.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+Cu.import("resource://gre/modules/devtools/shared/Console.jsm");
 
-const { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const promise = Cu.import("resource://gre/modules/Promise.jsm", {}).Promise;
-const EventEmitter = require("devtools/toolkit/event-emitter");
+const { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const promise = require("promise");
+const EventEmitter = require("devtools/shared/event-emitter");
 const { CallWatcherFront } = require("devtools/server/actors/call-watcher");
 const { CanvasFront } = require("devtools/server/actors/canvas");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
-const Telemetry = require("devtools/shared/telemetry");
+const Telemetry = require("devtools/client/shared/telemetry");
 const telemetry = new Telemetry();
 
 const CANVAS_ACTOR_RECORDING_ATTEMPT = DevToolsUtils.testing ? 500 : 5000;
@@ -79,8 +79,8 @@ const EVENTS = {
 };
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
-const STRINGS_URI = "chrome://global/locale/devtools/canvasdebugger.properties";
-const SHARED_STRINGS_URI = "chrome://global/locale/devtools/shared.properties";
+const STRINGS_URI = "chrome://browser/locale/devtools/canvasdebugger.properties";
+const SHARED_STRINGS_URI = "chrome://browser/locale/devtools/shared.properties";
 
 const SNAPSHOT_START_RECORDING_DELAY = 10; // ms
 const SNAPSHOT_DATA_EXPORT_MAX_BLOCK = 1000; // ms

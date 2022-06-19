@@ -18,15 +18,15 @@ window.onload = function() {
   var Cc = Components.classes;
   var Ci = Components.interfaces;
 
-  var {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-  var {DebuggerClient} = require("devtools/toolkit/client/main");
+  var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+  var {DebuggerClient} = require("devtools/shared/client/main");
   var {DebuggerServer} = require("devtools/server/main");
   Cu.import("resource://gre/modules/Services.jsm");
 
   SimpleTest.waitForExplicitFinish();
 
   var {ActorRegistryFront} = require("devtools/server/actors/actor-registry");
-  var actorURL = "chrome://mochitests/content/chrome/toolkit/devtools/server/tests/mochitest/hello-actor.js";
+  var actorURL = "chrome://mochitests/content/chrome/devtools/server/tests/mochitest/hello-actor.js";
 
   if (!DebuggerServer.initialized) {
     DebuggerServer.init();

@@ -9,14 +9,14 @@ const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/devtools/VariablesView.jsm");
-Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm");
-let {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let promise = require("promise");
+Cu.import("resource:///modules/devtools/client/shared/widgets/VariablesView.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var promise = require("promise");
 
 Object.defineProperty(this, "WebConsoleUtils", {
   get: function() {
-    return require("devtools/toolkit/webconsole/utils").Utils;
+    return require("devtools/shared/webconsole/utils").Utils;
   },
   configurable: true,
   enumerable: true
@@ -27,11 +27,11 @@ XPCOMUtils.defineLazyGetter(this, "VARIABLES_SORTING_ENABLED", () =>
 );
 
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-  "resource://gre/modules/devtools/Console.jsm");
+  "resource://gre/modules/devtools/shared/Console.jsm");
 
 const MAX_LONG_STRING_LENGTH = 200000;
 const MAX_PROPERTY_ITEMS = 2000;
-const DBG_STRINGS_URI = "chrome://global/locale/devtools/debugger.properties";
+const DBG_STRINGS_URI = "chrome://browser/locale/devtools/debugger.properties";
 
 const ELLIPSIS = Services.prefs.getComplexValue("intl.ellipsis", Ci.nsIPrefLocalizedString).data
 
@@ -731,7 +731,7 @@ VariablesViewController.attach = function(aView, aOptions) {
 /**
  * Utility functions for handling stackframes.
  */
-let StackFrameUtils = {
+var StackFrameUtils = {
   /**
    * Create a textual representation for the specified stack frame
    * to display in the stackframes container.
@@ -787,4 +787,4 @@ let StackFrameUtils = {
 /**
  * Localization convenience methods.
  */
-let L10N = new ViewHelpers.L10N(DBG_STRINGS_URI);
+var L10N = new ViewHelpers.L10N(DBG_STRINGS_URI);

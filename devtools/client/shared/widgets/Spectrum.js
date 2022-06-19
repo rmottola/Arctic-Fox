@@ -4,14 +4,14 @@
 
 "use strict";
 
-const EventEmitter = require("devtools/toolkit/event-emitter");
+const EventEmitter = require("devtools/shared/event-emitter");
 
 /**
  * Spectrum creates a color picker widget in any container you give it.
  *
  * Simple usage example:
  *
- * const {Spectrum} = require("devtools/shared/widgets/Spectrum");
+ * const {Spectrum} = require("devtools/client/shared/widgets/Spectrum");
  * let s = new Spectrum(containerElement, [255, 126, 255, 1]);
  * s.on("changed", (event, rgba, color) => {
  *   console.log("rgba(" + rgba[0] + ", " + rgba[1] + ", " + rgba[2] + ", " + rgba[3] + ")");
@@ -163,6 +163,10 @@ Spectrum.draggable = function(element, onmove, onstart, onstop) {
 
   function move(e) {
     if (dragging) {
+      if (e.buttons === 0) {
+        // The button is no longer pressed but we did not get a mouseup event.
+        return stop();
+      }
       let pageX = e.pageX;
       let pageY = e.pageY;
 

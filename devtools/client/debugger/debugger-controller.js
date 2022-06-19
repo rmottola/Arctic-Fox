@@ -7,7 +7,7 @@
 
 const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
-const DBG_STRINGS_URI = "chrome://global/locale/devtools/debugger.properties";
+const DBG_STRINGS_URI = "chrome://browser/locale/devtools/debugger.properties";
 const NEW_SOURCE_IGNORED_URLS = ["debugger eval code", "XStringBundle"];
 const NEW_SOURCE_DISPLAY_DELAY = 200; // ms
 const FETCH_SOURCE_RESPONSE_DELAY = 200; // ms
@@ -95,34 +95,31 @@ const FRAME_TYPE = {
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/devtools/event-emitter.js");
-Cu.import("resource:///modules/devtools/SimpleListWidget.jsm");
-Cu.import("resource:///modules/devtools/BreadcrumbsWidget.jsm");
-Cu.import("resource:///modules/devtools/SideMenuWidget.jsm");
-Cu.import("resource:///modules/devtools/VariablesView.jsm");
-Cu.import("resource:///modules/devtools/VariablesViewController.jsm");
-Cu.import("resource:///modules/devtools/ViewHelpers.jsm");
+Cu.import("resource://gre/modules/devtools/shared/event-emitter.js");
+Cu.import("resource:///modules/devtools/client/shared/widgets/SimpleListWidget.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/BreadcrumbsWidget.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/SideMenuWidget.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/VariablesView.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/VariablesViewController.jsm");
+Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
 
-const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const {TargetFactory} = require("devtools/framework/target");
-const {Toolbox} = require("devtools/framework/toolbox")
-const promise = require("devtools/toolkit/deprecated-sync-thenables");
-const Editor = require("devtools/sourceeditor/editor");
-const DebuggerEditor = require("devtools/sourceeditor/debugger.js");
-const {Tooltip} = require("devtools/shared/widgets/Tooltip");
-const FastListWidget = require("devtools/shared/widgets/FastListWidget");
+Cu.import("resource:///modules/devtools/client/shared/browser-loader.js");
+const require = BrowserLoader("resource:///modules/devtools/client/debugger/", this).require;
+
+const {TargetFactory} = require("devtools/client/framework/target");
+const {Toolbox} = require("devtools/client/framework/toolbox");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
+const promise = require("devtools/shared/deprecated-sync-thenables");
+const Editor = require("devtools/client/sourceeditor/editor");
+const DebuggerEditor = require("devtools/client/sourceeditor/debugger");
+const {Tooltip} = require("devtools/client/shared/widgets/Tooltip");
+const FastListWidget = require("devtools/client/shared/widgets/FastListWidget");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
   "resource://gre/modules/Task.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Parser",
-  "resource://gre/modules/devtools/Parser.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "devtools",
-  "resource://gre/modules/devtools/Loader.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "DevToolsUtils",
-  "resource://gre/modules/devtools/DevToolsUtils.jsm");
+  "resource:///modules/devtools/client/shared/Parser.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "ShortcutUtils",
   "resource://gre/modules/ShortcutUtils.jsm");
@@ -2555,4 +2552,4 @@ function dumpn(str) {
   }
 }
 
-let wantLogging = Services.prefs.getBoolPref("devtools.debugger.log");
+var wantLogging = Services.prefs.getBoolPref("devtools.debugger.log");

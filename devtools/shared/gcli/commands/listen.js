@@ -9,7 +9,7 @@ const Services = require("Services");
 const l10n = require("gcli/l10n");
 const { XPCOMUtils } = require("resource://gre/modules/XPCOMUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "DevToolsLoader",
-  "resource://gre/modules/devtools/Loader.jsm");
+  "resource://gre/modules/devtools/shared/Loader.jsm");
 
 const BRAND_SHORT_NAME = Cc["@mozilla.org/intl/stringbundle;1"]
                            .getService(Ci.nsIStringBundleService)
@@ -29,6 +29,7 @@ XPCOMUtils.defineLazyGetter(this, "debuggerServer", () => {
   let debuggerServer = serverLoader.DebuggerServer;
   debuggerServer.init();
   debuggerServer.addBrowserActors();
+  debuggerServer.allowChromeProcess = !l10n.hiddenByChromePref();
   return debuggerServer;
 });
 
@@ -64,5 +65,16 @@ exports.items = [
 
       return l10n.lookup("listenNoInitOutput");
     },
+  },
+  {
+    item: "command",
+    runAt: "client",
+    name: "unlisten",
+    description: l10n.lookup("unlistenDesc"),
+    manual: l10n.lookup("unlistenManual"),
+    exec: function(args, context) {
+      debuggerServer.closeAllListeners();
+      return l10n.lookup("unlistenOutput");
+    }
   }
 ];

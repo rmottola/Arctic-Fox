@@ -12,10 +12,10 @@ var chromeGlobal = this;
 // more than once.
 (function () {
   let Cu = Components.utils;
-  let { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-  const DevToolsUtils = require("devtools/toolkit/DevToolsUtils.js");
+  let { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+  const DevToolsUtils = require("devtools/shared/DevToolsUtils");
   const { dumpn } = DevToolsUtils;
-  const { DebuggerServer, ActorPool } = Cu.import("resource://gre/modules/devtools/dbg-server.jsm", {});
+  const { DebuggerServer, ActorPool } = require("devtools/server/main");
 
   if (!DebuggerServer.initialized) {
     DebuggerServer.init();

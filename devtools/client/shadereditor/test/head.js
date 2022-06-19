@@ -4,28 +4,28 @@
 
 const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
-let { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
+var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
 
-let gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
+var gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
 // To enable logging for try runs, just set the pref to true.
 Services.prefs.setBoolPref("devtools.debugger.log", false);
 
-let { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
-let { gDevTools } = Cu.import("resource:///modules/devtools/gDevTools.jsm", {});
-let { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+var { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
+var { gDevTools } = Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm", {});
+var { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 
-let promise = require("promise");
-let { DebuggerClient } = require("devtools/toolkit/client/main");
-let { DebuggerServer } = require("devtools/server/main");
-let { WebGLFront } = require("devtools/server/actors/webgl");
-let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
-let TiltGL = require("devtools/tilt/tilt-gl");
-let {TargetFactory} = require("devtools/framework/target");
-let {Toolbox} = require("devtools/framework/toolbox");
-let mm = null;
+var promise = require("promise");
+var { DebuggerClient } = require("devtools/shared/client/main");
+var { DebuggerServer } = require("devtools/server/main");
+var { WebGLFront } = require("devtools/server/actors/webgl");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
+var TiltGL = require("devtools/client/tilt/tilt-gl");
+var {TargetFactory} = require("devtools/client/framework/target");
+var {Toolbox} = require("devtools/client/framework/toolbox");
+var mm = null;
 
 const FRAME_SCRIPT_UTILS_URL = "chrome://devtools/content/shared/frame-script-utils.js"
-const EXAMPLE_URL = "http://example.com/browser/browser/devtools/shadereditor/test/";
+const EXAMPLE_URL = "http://example.com/browser/devtools/client/shadereditor/test/";
 const SIMPLE_CANVAS_URL = EXAMPLE_URL + "doc_simple-canvas.html";
 const SHADER_ORDER_URL = EXAMPLE_URL + "doc_shader-order.html";
 const MULTIPLE_CONTEXTS_URL = EXAMPLE_URL + "doc_multiple-contexts.html";

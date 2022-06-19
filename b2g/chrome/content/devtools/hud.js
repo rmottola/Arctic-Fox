@@ -7,18 +7,19 @@
 // settings.js loads this file when the HUD setting is enabled.
 
 const DEVELOPER_HUD_LOG_PREFIX = 'DeveloperHUD';
+const CUSTOM_HISTOGRAM_PREFIX = 'DEVTOOLS_HUD_CUSTOM_';
 
 XPCOMUtils.defineLazyGetter(this, 'devtools', function() {
-  const {devtools} = Cu.import('resource://gre/modules/devtools/Loader.jsm', {});
+  const {devtools} = Cu.import('resource://gre/modules/devtools/shared/Loader.jsm', {});
   return devtools;
 });
 
 XPCOMUtils.defineLazyGetter(this, 'DebuggerClient', function() {
- return devtools.require('devtools/toolkit/client/main').DebuggerClient;
+  return devtools.require('devtools/shared/client/main').DebuggerClient;
 });
 
 XPCOMUtils.defineLazyGetter(this, 'WebConsoleUtils', function() {
-  return devtools.require('devtools/toolkit/webconsole/utils').Utils;
+  return devtools.require('devtools/shared/webconsole/utils').Utils;
 });
 
 XPCOMUtils.defineLazyGetter(this, 'EventLoopLagFront', function() {
@@ -35,18 +36,30 @@ XPCOMUtils.defineLazyGetter(this, 'MemoryFront', function() {
 
 Cu.import('resource://gre/modules/Frames.jsm');
 
+var _telemetryDebug = true;
+
+function telemetryDebug(...args) {
+  if (_telemetryDebug) {
+    args.unshift('[AdvancedTelemetry]');
+    console.log(...args);
+  }
+}
+
 /**
  * The Developer HUD is an on-device developer tool that displays widgets,
  * showing visual debug information about apps. Each widget corresponds to a
  * metric as tracked by a metric watcher (e.g. consoleWatcher).
  */
-let developerHUD = {
+var developerHUD = {
 
   _targets: new Map(),
+  _histograms: new Set(),
+  _customHistograms: new Set(),
   _client: null,
   _conn: null,
   _watchers: [],
   _logging: true,
+  _telemetry: false,
 
   /**
    * This method registers a metric watcher that will watch one or more metrics
@@ -383,6 +396,16 @@ let consoleWatcher = {
             output += 'Warning (console)';
             break;
 
+          case 'info':
+            this.handleTelemetryMessage(target, packet);
+
+            // Currently, informational log entries are tracked only by
+            // telemetry. Nonetheless, for consistency, we continue here
+            // and let the function return normally, when it concludes 'info'
+            // entries are not being watched.
+            metric.name = 'info';
+            break;
+
           default:
             return;
         }
@@ -398,10 +421,35 @@ let consoleWatcher = {
         if (sourceURL) {
           output += ' ' + this.formatSourceURL(packet);
         }
+
+        // Telemetry also records reflow duration.
+        target._logHistogram({
+          name: 'reflow_duration',
+          value: Math.round(duration)
+        });
         break;
 
       default:
         return;
+    }
+
+    if (developerHUD._telemetry) {
+      // Always record telemetry for these metrics.
+      if (metric.name === 'errors' || metric.name === 'warnings' || metric.name === 'reflows') {
+        let value = target.metrics.get(metric.name);
+        metric.value = (value || 0) + 1;
+        target._logHistogram(metric);
+
+        // Telemetry has already been recorded.
+        metric.skipTelemetry = true;
+
+        // If the metric is not being watched, persist the incremented value.
+        // If the metric is being watched, `target.bump` will increment the value
+        // of the metric and will persist the incremented value.
+        if (!this._watching[metric.name]) {
+          target.metrics.set(metric.name, metric.value);
+        }
+      }
     }
 
     if (!this._watching[metric.name]) {
@@ -426,7 +474,7 @@ let consoleWatcher = {
 developerHUD.registerWatcher(consoleWatcher);
 
 
-let eventLoopLagWatcher = {
+var eventLoopLagWatcher = {
   _client: null,
   _fronts: new Map(),
   _active: false,
@@ -491,7 +539,7 @@ developerHUD.registerWatcher(eventLoopLagWatcher);
  * to the app-launch epoch and emits an "app-start-time-<performance mark name>"
  * event containing the delta.
  */
-let performanceEntriesWatcher = {
+var performanceEntriesWatcher = {
   _client: null,
   _fronts: new Map(),
   _appLaunchName: null,
@@ -555,7 +603,7 @@ developerHUD.registerWatcher(performanceEntriesWatcher);
 /**
  * The Memory Watcher uses devtools actors to track memory usage.
  */
-let memoryWatcher = {
+var memoryWatcher = {
 
   _client: null,
   _fronts: new Map(),

@@ -7,8 +7,8 @@
 
 const { Cc, Ci, Cu, Cr } = require("chrome");
 const promise = require("promise");
-const EventEmitter = require("devtools/toolkit/event-emitter");
-const { DevToolsUtils } = Cu.import("resource://gre/modules/devtools/DevToolsUtils.jsm", {});
+const EventEmitter = require("devtools/shared/event-emitter");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 function NetMonitorPanel(iframeWindow, toolbox) {
   this.panelWin = iframeWindow;

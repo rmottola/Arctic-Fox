@@ -4,17 +4,17 @@ const Ci = Components.interfaces;
 const Cu = Components.utils;
 const Cr = Components.results;
 
-const { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 
 this.sourceMap = require("source-map");
 this.acorn = require("acorn/acorn");
-this.prettyFast = require("devtools/pretty-fast");
-const { console } = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
+this.prettyFast = require("devtools/shared/pretty-fast/pretty-fast");
+const { console } = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
 
 // Register a console listener, so console messages don't just disappear
 // into the ether.
-let errorCount = 0;
-let listener = {
+var errorCount = 0;
+var listener = {
   observe: function (aMessage) {
     errorCount++;
     try {
@@ -39,6 +39,6 @@ let listener = {
   }
 };
 
-let consoleService = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
+var consoleService = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
 consoleService.registerListener(listener);
 

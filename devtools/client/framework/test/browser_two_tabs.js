@@ -5,8 +5,8 @@
  * Check regression when opening two tabs
  */
 
-let { DebuggerServer } = require("devtools/server/main");let { DebuggerClient } =
-let { DebuggerClient } = require("devtools/toolkit/client/main");
+var { DebuggerServer } = require("devtools/server/main");
+var { DebuggerClient } = require("devtools/shared/client/main");
 
 const TAB_URL_1 = "data:text/html;charset=utf-8,foo";
 const TAB_URL_2 = "data:text/html;charset=utf-8,bar";

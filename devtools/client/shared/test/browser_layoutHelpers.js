@@ -2,8 +2,7 @@
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 
 // Tests that scrollIntoViewIfNeeded works properly.
-let {LayoutHelpers} = Cu.import("resource://gre/modules/devtools/LayoutHelpers.jsm", {});
-
+let {scrollIntoViewIfNeeded} = require("devtools/shared/layout/utils");
 
 const TEST_URI = TEST_URI_ROOT + "browser_layoutHelpers.html";
 

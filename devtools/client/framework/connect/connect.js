@@ -10,18 +10,18 @@ const Cu = Components.utils;
 Cu.import('resource://gre/modules/XPCOMUtils.jsm');
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
-let {gDevTools} = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
-let {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let {TargetFactory} = require("devtools/framework/target");
-let {Toolbox} = require("devtools/framework/toolbox");
-let {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
-let {DebuggerClient} = require("devtools/toolkit/client/main");
+var {gDevTools} = Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm", {});
+var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var {TargetFactory} = require("devtools/client/framework/target");
+var {Toolbox} = require("devtools/client/framework/toolbox")
+var promise = require("promise");
+var {DebuggerClient} = require("devtools/shared/client/main");
 
-let gClient;
-let gConnectionTimeout;
+var gClient;
+var gConnectionTimeout;
 
 XPCOMUtils.defineLazyGetter(window, 'l10n', function () {
-  return Services.strings.createBundle('chrome://global/locale/devtools/connection-screen.properties');
+  return Services.strings.createBundle('chrome://browser/locale/devtools/connection-screen.properties');
 });
 
 /**

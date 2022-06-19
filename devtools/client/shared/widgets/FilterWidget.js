@@ -9,10 +9,10 @@
   * for Rule View's filter swatches
   */
 
-const EventEmitter = require("devtools/toolkit/event-emitter");
+const EventEmitter = require("devtools/shared/event-emitter");
 const { Cu } = require("chrome");
-const { ViewHelpers } = Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm", {});
-const STRINGS_URI = "chrome://global/locale/devtools/filterwidget.properties";
+const { ViewHelpers } = Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm", {});
+const STRINGS_URI = "chrome://browser/locale/devtools/filterwidget.properties";
 const L10N = new ViewHelpers.L10N(STRINGS_URI);
 
 const DEFAULT_FILTER_TYPE = "length";

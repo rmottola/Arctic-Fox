@@ -4,10 +4,10 @@
 
 const Ci = Components.interfaces;
 const gDeviceSizeWasPageSize = docShell.deviceSizeIsPageSize;
-const gFloatingScrollbarsStylesheet = Services.io.newURI("chrome://global/skin/devtools/floating-scrollbars.css", null, null);
-let gRequiresFloatingScrollbars;
+const gFloatingScrollbarsStylesheet = Services.io.newURI("chrome://devtools/skin/themes/floating-scrollbars.css", null, null);
+var gRequiresFloatingScrollbars;
 
-let active = false;
+var active = false;
 
 addMessageListener("ResponsiveMode:Start", startResponsiveMode);
 addMessageListener("ResponsiveMode:Stop", stopResponsiveMode);

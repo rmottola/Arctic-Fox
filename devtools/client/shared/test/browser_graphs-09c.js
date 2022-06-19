@@ -4,8 +4,7 @@
 // Tests that line graphs hide the tooltips when there's no data available.
 
 const TEST_DATA = [];
-let LineGraphWidget = require("devtools/shared/widgets/LineGraphWidget");
-let {Promise} = require("resource://gre/modules/Promise.jsm");
+var LineGraphWidget = require("devtools/client/shared/widgets/LineGraphWidget");
 
 add_task(function*() {
   yield promiseTab("about:blank");
@@ -19,7 +18,7 @@ function* performTest() {
 
   yield testGraph(graph);
 
-  graph.destroy();
+  yield graph.destroy();
   host.destroy();
 }
 

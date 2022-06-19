@@ -34,7 +34,7 @@ protocol.types.addDictType("call-details", {
  * This actor contains information about a function call, like the function
  * type, name, stack, arguments, returned value etc.
  */
-let FunctionCallActor = protocol.ActorClass({
+var FunctionCallActor = protocol.ActorClass({
   typeName: "function-call",
 
   /**

@@ -1,9 +1,12 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-let {Services} = Cu.import("resource://gre/modules/Services.jsm", {});
-let {Loader} = Cu.import("resource://gre/modules/commonjs/toolkit/loader.js", {});
-let {OutputParser} = require("devtools/output-parser");
+"use strict";
+
+var {Services} = Cu.import("resource://gre/modules/Services.jsm", {});
+var {Loader} = Cu.import("resource://gre/modules/commonjs/toolkit/loader.js",
+                         {});
+var {OutputParser} = require("devtools/shared/output-parser");
 
 add_task(function*() {
   yield promiseTab("about:blank");

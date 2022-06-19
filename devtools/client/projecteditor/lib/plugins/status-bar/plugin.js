@@ -6,8 +6,8 @@
 
 const { Cu } = require("chrome");
 const { Class } = require("sdk/core/heritage");
-const promise = require("projecteditor/helpers/promise");
-const { registerPlugin, Plugin } = require("projecteditor/plugins/core");
+const promise = require("promise");
+const { registerPlugin, Plugin } = require("devtools/client/projecteditor/lib/plugins/core");
 
 /**
  * Print information about the currently opened file

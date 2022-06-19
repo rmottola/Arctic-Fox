@@ -6,14 +6,14 @@
 (function (factory) { // Module boilerplate
   if (this.module && module.id.indexOf("worker") >= 0) { // require
     const { Cc, Ci, Cu, ChromeWorker } = require("chrome");
-    const dumpn = require("devtools/toolkit/DevToolsUtils").dumpn;
+    const dumpn = require("devtools/shared/DevToolsUtils").dumpn;
     factory.call(this, require, exports, module, { Cc, Ci, Cu }, ChromeWorker, dumpn);
   } else { // Cu.import
     const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
-    const { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+    const { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
     this.isWorker = false;
     this.Promise = Cu.import("resource://gre/modules/Promise.jsm", {}).Promise;
-    this.console = Cu.import("resource://gre/modules/devtools/Console.jsm", {}).console;
+    this.console = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {}).console;
     factory.call(
       this, require, this, { exports: this },
       { Cc, Ci, Cu }, ChromeWorker, null
@@ -22,14 +22,14 @@
   }
 }).call(this, function (require, exports, module, { Ci, Cc }, ChromeWorker, dumpn) {
 
-let MESSAGE_COUNTER = 0;
+var MESSAGE_COUNTER = 0;
 
 /**
  * Creates a wrapper around a ChromeWorker, providing easy
  * communication to offload demanding tasks. The corresponding URL
  * must implement the interface provided by `devtools/toolkit/shared/worker-helper`.
  *
- * @see `./toolkit/devtools/shared/widgets/GraphsWorker.js`
+ * @see `./devtools/client/shared/widgets/GraphsWorker.js`
  *
  * @param {string} url
  *        The URL of the worker.
@@ -38,7 +38,7 @@ let MESSAGE_COUNTER = 0;
  *        - name: a name that will be printed with logs
  *        - verbose: log incoming and outgoing messages
  */
-function DevToolsWorker (url, opts) {
+function DevToolsWorker(url, opts) {
   opts = opts || {};
   this._worker = new ChromeWorker(url);
   this._verbose = opts.verbose;
@@ -67,7 +67,7 @@ DevToolsWorker.prototype.performTask = function (task, data) {
   let id = ++MESSAGE_COUNTER;
   let payload = { task, id, data };
 
-  if(this._verbose && dumpn) {
+  if (this._verbose && dumpn) {
     dumpn("Sending message to worker" +
           (this._name ? (" (" + this._name + ")") : "" ) +
           ": " +
@@ -77,7 +77,7 @@ DevToolsWorker.prototype.performTask = function (task, data) {
 
   return new Promise((resolve, reject) => {
     let listener = ({ data }) => {
-      if(this._verbose && dumpn) {
+      if (this._verbose && dumpn) {
         dumpn("Received message from worker" +
               (this._name ? (" (" + this._name + ")") : "" ) +
               ": " +
@@ -97,7 +97,7 @@ DevToolsWorker.prototype.performTask = function (task, data) {
 
     worker.addEventListener("message", listener);
   });
-}
+};
 
 /**
  * Terminates the underlying worker. Use when no longer needing the worker.
@@ -110,12 +110,12 @@ DevToolsWorker.prototype.destroy = function () {
 
 DevToolsWorker.prototype.onError = function({ message, filename, lineno }) {
   dump(new Error(message + " @ " + filename + ":" + lineno) + "\n");
-}
+};
 
 /**
  * Takes a function and returns a Worker-wrapped version of the same function.
  * Returns a promise upon resolution.
- * @see `./toolkit/devtools/shared/tests/browser_devtools-worker-03.js
+ * @see `./devtools/shared/shared/tests/browser/browser_devtools-worker-03.js
  *
  * * * * ! ! ! This should only be used for tests or A/B testing performance ! ! ! * * * * * *
  *
@@ -160,7 +160,7 @@ exports.workerify = workerify;
  */
 function createWorkerString (fn) {
   return `importScripts("resource://gre/modules/workers/require.js");
-    const { createTask } = require("resource://gre/modules/devtools/shared/worker-helper");
+    const { createTask } = require("resource://gre/modules/devtools/shared/shared/worker-helper.js");
     createTask(self, "workerifiedTask", ${fn.toString()});
   `;
 }

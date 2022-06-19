@@ -2,15 +2,17 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-Components.utils.import("resource://gre/modules/Task.jsm");
-let {require} = Components.utils.import("resource://gre/modules/devtools/Loader.jsm", {});
-let promise = require("promise")
+"use strict";
 
-const TESTCASE_URI_HTML = TEST_BASE + "sourcemaps-watching.html";
-const TESTCASE_URI_CSS = TEST_BASE + "sourcemap-css/sourcemaps.css";
-const TESTCASE_URI_REG_CSS = TEST_BASE + "simple.css";
-const TESTCASE_URI_SCSS = TEST_BASE + "sourcemap-sass/sourcemaps.scss";
-const TESTCASE_URI_MAP = TEST_BASE + "sourcemap-css/sourcemaps.css.map";
+Components.utils.import("resource://gre/modules/Task.jsm");
+var {require} = Components.utils.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var promise = require("promise");
+
+const TESTCASE_URI_HTML = TEST_BASE_HTTP + "sourcemaps-watching.html";
+const TESTCASE_URI_CSS = TEST_BASE_HTTP + "sourcemap-css/sourcemaps.css";
+const TESTCASE_URI_REG_CSS = TEST_BASE_HTTP + "simple.css";
+const TESTCASE_URI_SCSS = TEST_BASE_HTTP + "sourcemap-sass/sourcemaps.scss";
+const TESTCASE_URI_MAP = TEST_BASE_HTTP + "sourcemap-css/sourcemaps.css.map";
 const TESTCASE_SCSS_NAME = "sourcemaps.scss";
 
 const TRANSITIONS_PREF = "devtools.styleeditor.transitions";
@@ -31,7 +33,7 @@ function test() {
 
   Services.prefs.setBoolPref(TRANSITIONS_PREF, false);
 
-  Task.spawn(function() {
+  Task.spawn(function*() {
     // copy all our files over so we don't screw them up for other tests
     let HTMLFile = yield copy(TESTCASE_URI_HTML, ["sourcemaps.html"]);
     let CSSFile = yield copy(TESTCASE_URI_CSS, ["sourcemap-css", "sourcemaps.css"]);
@@ -135,7 +137,7 @@ function getLinkFor(editor) {
 
 function getStylesheetNameFor(editor) {
   return editor.summary.querySelector(".stylesheet-name > label")
-         .getAttribute("value")
+    .getAttribute("value");
 }
 
 function copy(aSrcChromeURL, aDestFilePath)

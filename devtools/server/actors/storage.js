@@ -4,30 +4,20 @@
 
 "use strict";
 
-const {Cu, Cc, Ci} = require("chrome");
+const {Cc, Ci} = require("chrome");
 const events = require("sdk/event/core");
 const protocol = require("devtools/server/protocol");
-try {
-  const { indexedDB } = require("sdk/indexed-db");
-} catch (e) {
-  // In xpcshell tests, we can't actually have indexedDB, which is OK:
-  // we don't use it there anyway.
-}
-const {async} = require("devtools/async-utils");
+const {async} = require("devtools/shared/async-utils");
 const {Arg, method, RetVal, types} = protocol;
-const {LongStringActor, ShortLongString} = require("devtools/server/actors/string");
-
-Cu.import("resource://gre/modules/Promise.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/devtools/LayoutHelpers.jsm");
+const {LongStringActor} = require("devtools/server/actors/string");
+const {DebuggerServer} = require("devtools/server/main");
+const Services = require("Services");
+const promise = require("promise");
+const {isWindowIncluded} = require("devtools/shared/layout/utils");
 const { setTimeout, clearTimeout } = require("sdk/timers");
 
-XPCOMUtils.defineLazyModuleGetter(this, "Sqlite",
-  "resource://gre/modules/Sqlite.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "OS",
-  "resource://gre/modules/osfile.jsm");
+loader.lazyImporter(this, "OS", "resource://gre/modules/osfile.jsm");
+loader.lazyImporter(this, "Sqlite", "resource://gre/modules/Sqlite.jsm");
 
 // Global required for window less Indexed DB instantiation.
 let global = this;
@@ -42,7 +32,7 @@ const BATCH_DELAY = 200;
 // A RegExp for characters that cannot appear in a file/directory name. This is
 // used to sanitize the host name for indexed db to lookup whether the file is
 // present in <profileDir>/storage/default/ location
-let illegalFileNameCharacters = [
+var illegalFileNameCharacters = [
   "[",
   "\\x00-\\x25",     // Control characters \001 to \037
   "/:*?\\\"<>|\\\\", // Special characters

@@ -8,7 +8,7 @@
 const Ci = Components.interfaces;
 const Cu = Components.utils;
 
-const NET_STRINGS_URI = "chrome://global/locale/devtools/netmonitor.properties";
+const NET_STRINGS_URI = "chrome://browser/locale/devtools/netmonitor.properties";
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PI = Math.PI;
 const TAU = PI * 2;
@@ -19,21 +19,21 @@ const HOVERED_SLICE_TRANSLATE_DISTANCE_RATIO = 20;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm");
-Cu.import("resource://gre/modules/devtools/event-emitter.js");
+Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+Cu.import("resource://gre/modules/devtools/shared/event-emitter.js");
 
 this.EXPORTED_SYMBOLS = ["Chart"];
 
 /**
  * Localization convenience methods.
  */
-let L10N = new ViewHelpers.L10N(NET_STRINGS_URI);
+var L10N = new ViewHelpers.L10N(NET_STRINGS_URI);
 
 /**
  * A factory for creating charts.
  * Example usage: let myChart = Chart.Pie(document, { ... });
  */
-let Chart = {
+var Chart = {
   Pie: createPieChart,
   Table: createTableChart,
   PieTable: createPieTableChart

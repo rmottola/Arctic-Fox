@@ -2,12 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const TEST_BASE_HTTP = "http://example.com/browser/browser/devtools/commandline/test/";
-const TEST_BASE_HTTPS = "https://example.com/browser/browser/devtools/commandline/test/";
+const TEST_BASE_HTTP = "http://example.com/browser/devtools/client/commandline/test/";
+const TEST_BASE_HTTPS = "https://example.com/browser/devtools/client/commandline/test/";
 
-let { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let { console } = require("resource://gre/modules/devtools/Console.jsm");
-var DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+var { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var { console } = require("resource://gre/modules/devtools/shared/Console.jsm");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 // Import the GCLI test helper
 var testDir = gTestPath.substr(0, gTestPath.lastIndexOf("/"));

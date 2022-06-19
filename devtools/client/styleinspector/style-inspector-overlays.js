@@ -18,7 +18,7 @@ const {
   SwatchColorPickerTooltip,
   SwatchCubicBezierTooltip,
   SwatchFilterTooltip
-} = require("devtools/shared/widgets/Tooltip");
+} = require("devtools/client/shared/widgets/Tooltip");
 const {CssLogic} = require("devtools/styleinspector/css-logic");
 const promise = require("promise");
 Cu.import("resource://gre/modules/Task.jsm");
@@ -52,7 +52,7 @@ const VIEW_NODE_IMAGE_URL_TYPE = exports.VIEW_NODE_IMAGE_URL_TYPE = 4;
 function HighlightersOverlay(view) {
   this.view = view;
 
-  let {CssRuleView} = require("devtools/styleinspector/rule-view");
+  let {CssRuleView} = require("devtools/client/styleinspector/rule-view");
   this.isRuleView = view instanceof CssRuleView;
 
   this.highlighterUtils = this.view.inspector.toolbox.highlighterUtils;

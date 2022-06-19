@@ -23,11 +23,11 @@ const FRAME_SCRIPT_URL = ROOT_TEST_DIR + "doc_frame_script.js";
 // All test are asynchronous
 waitForExplicitFinish();
 
-let {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let {TargetFactory} = require("devtools/framework/target");
-let {console} = Cu.import("resource://gre/modules/devtools/Console.jsm", {});
-let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
-let promise = require("promise");
+var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var {TargetFactory} = require("devtools/client/framework/target");
+var {console} = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
+var promise = require("promise");
 
 // Import the GCLI test helper
 var testDir = gTestPath.substr(0, gTestPath.lastIndexOf("/"));

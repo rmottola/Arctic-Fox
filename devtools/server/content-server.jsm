@@ -9,11 +9,11 @@ const Cc = Components.classes;
 const Cu = Components.utils;
 
 const { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
-const { DevToolsLoader } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+const { DevToolsLoader } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 
 this.EXPORTED_SYMBOLS = ["init"];
 
-let started = false;
+var started = false;
 
 function init(msg) {
   if (started) {

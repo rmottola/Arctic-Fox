@@ -4,10 +4,19 @@
 
 "use strict";
 
-const { Cc, Ci, Cu } = require("chrome");
-const {TargetFactory} = require("devtools/framework/target");
+const { Ci } = require("chrome");
+loader.lazyRequireGetter(this, "getOuterId", "sdk/window/utils", true);
+loader.lazyRequireGetter(this, "getBrowserForTab", "sdk/tabs/utils", true);
 
-const EventEmitter = require("devtools/toolkit/event-emitter");
+var telemetry;
+try {
+  const Telemetry = require("devtools/client/shared/telemetry");
+  telemetry = new Telemetry();
+} catch(e) {
+  // DevTools Telemetry module only available in Firefox
+}
+
+const EventEmitter = require("devtools/shared/event-emitter");
 const eventEmitter = new EventEmitter();
 
 const gcli = require("gcli/index");

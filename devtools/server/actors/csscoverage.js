@@ -14,7 +14,7 @@ const protocol = require("devtools/server/protocol");
 const { method, custom, RetVal, Arg } = protocol;
 
 loader.lazyGetter(this, "gDevTools", () => {
-  return require("resource://gre/modules/devtools/gDevTools.jsm").gDevTools;
+  return require("resource:///modules/devtools/client/framework/gDevTools.jsm").gDevTools;
 });
 loader.lazyGetter(this, "DOMUtils", () => {
   return Cc["@mozilla.org/inspector/dom-utils;1"].getService(Ci.inIDOMUtils)
@@ -23,7 +23,7 @@ loader.lazyGetter(this, "stylesheets", () => {
   return require("devtools/server/actors/stylesheets");
 });
 loader.lazyGetter(this, "CssLogic", () => {
-  return require("devtools/styleinspector/css-logic").CssLogic;
+  return require("devtools/shared/styleinspector/css-logic").CssLogic;
 });
 
 const CSSRule = Ci.nsIDOMCSSRule;
@@ -74,7 +74,7 @@ const l10n = exports.l10n = {
  *       }, ...
  *     });
  */
-let CSSUsageActor = protocol.ActorClass({
+var CSSUsageActor = protocol.ActorClass({
   typeName: "cssUsage",
 
   events: {
@@ -749,10 +749,10 @@ const sheetToUrl = exports.sheetToUrl = function(stylesheet) {
  * and it isn't particularly useful, and it's confusing from a notification POV
  * so we only allow one.
  */
-let isRunning = false;
-let notification;
-let target;
-let chromeWindow;
+var isRunning = false;
+var notification;
+var target;
+var chromeWindow;
 
 /**
  * Front for CSSUsageActor

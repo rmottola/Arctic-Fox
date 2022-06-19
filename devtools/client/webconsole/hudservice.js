@@ -8,22 +8,23 @@
 
 const {Cc, Ci, Cu} = require("chrome");
 
-let WebConsoleUtils = require("devtools/toolkit/webconsole/utils").Utils;
-let Heritage = require("sdk/core/heritage");
-let {TargetFactory} = require("devtools/framework/target");
-let {Tools} = require("definitions");
-let promise = require("promise");
+var WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
+var Heritage = require("sdk/core/heritage");
+var {TargetFactory} = require("devtools/client/framework/target");
+var {Tools} = require("devtools/client/definitions");
+var promise = require("promise");
 
-loader.lazyGetter(this, "WebConsoleFrame", () => require("devtools/webconsole/webconsole").WebConsoleFrame);
-loader.lazyImporter(this, "gDevTools", "resource:///modules/devtools/gDevTools.jsm");
+loader.lazyGetter(this, "Telemetry", () => require("devtools/client/shared/telemetry"));
+loader.lazyGetter(this, "WebConsoleFrame", () => require("devtools/client/webconsole/webconsole").WebConsoleFrame);
+loader.lazyImporter(this, "gDevTools", "resource:///modules/devtools/client/framework/gDevTools.jsm");
 loader.lazyImporter(this, "Services", "resource://gre/modules/Services.jsm");
 loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
-loader.lazyRequireGetter(this, "DebuggerClient", "devtools/toolkit/client/main", true);
-loader.lazyGetter(this, "showDoorhanger", () => require("devtools/shared/doorhanger").showDoorhanger);
-loader.lazyRequireGetter(this, "sourceUtils", "devtools/shared/source-utils");
+loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", true);
+loader.lazyGetter(this, "showDoorhanger", () => require("devtools/client/shared/doorhanger").showDoorhanger);
+loader.lazyRequireGetter(this, "sourceUtils", "devtools/client/shared/source-utils");
 
-const STRINGS_URI = "chrome://global/locale/devtools/webconsole.properties";
-let l10n = new WebConsoleUtils.l10n(STRINGS_URI);
+const STRINGS_URI = "chrome://browser/locale/devtools/webconsole.properties";
+var l10n = new WebConsoleUtils.l10n(STRINGS_URI);
 
 const BROWSER_CONSOLE_WINDOW_FEATURES = "chrome,titlebar,toolbar,centerscreen,resizable,dialog=no";
 

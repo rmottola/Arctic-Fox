@@ -3,7 +3,7 @@
 
 // Tests that ViewHelpers.Prefs work properly.
 
-let {ViewHelpers} = Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm", {});
+var {ViewHelpers} = Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm", {});
 
 function test() {
   let Prefs = new ViewHelpers.Prefs("devtools.debugger", {

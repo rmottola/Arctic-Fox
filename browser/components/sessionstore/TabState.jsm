@@ -13,7 +13,7 @@ Cu.import("resource://gre/modules/Promise.jsm", this);
 Cu.import("resource://gre/modules/Task.jsm", this);
 
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-  "resource://gre/modules/devtools/Console.jsm");
+  "resource://gre/modules/devtools/shared/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivacyFilter",
   "resource:///modules/sessionstore/PrivacyFilter.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TabStateCache",
@@ -56,7 +56,7 @@ this.TabState = Object.freeze({
   }
 });
 
-let TabStateInternal = {
+var TabStateInternal = {
   // A map (xul:browser -> handler) that maps a tab to the
   // synchronous collection handler object for that tab.
   // See SyncHandler in content-sessionStore.js.

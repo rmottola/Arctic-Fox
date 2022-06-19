@@ -4,8 +4,9 @@
 
 "use strict";
 
-let {Toolbox} = require("devtools/framework/toolbox");
-let {SIDE, BOTTOM, WINDOW} = Toolbox.HostType;
+var {Toolbox} = require("devtools/client/framework/toolbox");
+var {SIDE, BOTTOM, WINDOW} = Toolbox.HostType;
+var toolbox, target;
 
 let temp = {}
 Cu.import("resource://gre/modules/devtools/gDevTools.jsm", temp);
@@ -15,8 +16,6 @@ Cu.import("resource://gre/modules/devtools/Loader.jsm", temp);
 let devtools = temp.devtools;
 
 let Toolbox = devtools.Toolbox;
-
-let toolbox, target;
 
 function test()
 {

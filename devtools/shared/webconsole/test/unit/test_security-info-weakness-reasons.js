@@ -6,7 +6,7 @@
 // Tests that NetworkHelper.getReasonsForWeakness returns correct reasons for
 // weak requests.
 
-const { require } = Components.utils.import("resource://gre/modules/devtools/Loader.jsm", {});
+const { require } = Components.utils.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 
 Object.defineProperty(this, "NetworkHelper", {
   get: function() {

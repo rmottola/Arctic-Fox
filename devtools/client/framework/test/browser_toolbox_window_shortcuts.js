@@ -1,9 +1,11 @@
 /* Any copyright is dedicated to the Public Domain.
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 
-let Toolbox = devtools.Toolbox;let {Toolbox} = require("devtools/framework/toolbox");
+"use strict";
 
-let toolbox, toolIDs, idIndex, modifiedPrefs = [];
+var {Toolbox} = require("devtools/client/framework/toolbox");
+
+var toolbox, toolIDs, idIndex, modifiedPrefs = [];
 
 function test() {
   addTab("about:blank").then(function() {
@@ -48,9 +50,9 @@ function testShortcuts(aToolbox, aIndex) {
   let key = gDevTools._tools.get(toolIDs[aIndex]).key;
   let toolModifiers = gDevTools._tools.get(toolIDs[aIndex]).modifiers;
   let modifiers = {
-    accelKey: toolModifiers.contains("accel"),
-    altKey: toolModifiers.contains("alt"),
-    shiftKey: toolModifiers.contains("shift"),
+    accelKey: toolModifiers.includes("accel"),
+    altKey: toolModifiers.includes("alt"),
+    shiftKey: toolModifiers.includes("shift"),
   };
   idIndex = aIndex;
   info("Testing shortcut for tool " + aIndex + ":" + toolIDs[aIndex] +

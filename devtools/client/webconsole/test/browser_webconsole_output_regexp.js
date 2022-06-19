@@ -5,11 +5,14 @@
 
 // Test the webconsole output for various types of objects.
 
-const TEST_URI = "http://example.com/browser/browser/devtools/webconsole/test/test-console-output-regexp.html";
+"use strict";
 
-let dateNow = Date.now();
+const TEST_URI = "http://example.com/browser/devtools/client/webconsole/" +
+                 "test/test-console-output-regexp.html";
 
-let inputTests = [
+var dateNow = Date.now();
+
+var inputTests = [
   // 0
   {
     input: "/foo/igym",

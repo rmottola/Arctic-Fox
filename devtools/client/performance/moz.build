@@ -7,9 +7,10 @@ DIRS += [
     'modules',
 ]
 
-EXTRA_JS_MODULES.devtools.performance += [
+DevToolsModules(
+    'events.js',
     'panel.js'
-]
+)
 
 BROWSER_CHROME_MANIFESTS += ['test/browser.ini']
 XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']

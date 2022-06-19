@@ -6,7 +6,7 @@
 
 const { Ci, Cc } = require("chrome");
 const { Services } = require("resource://gre/modules/Services.jsm");
-const { DOMHelpers } = require("resource://gre/modules/devtools/DOMHelpers.jsm");
+const { DOMHelpers } = require("resource:///modules/devtools/client/shared/DOMHelpers.jsm");
 const { Task } = require("resource://gre/modules/Task.jsm");
 const { Promise } = require("resource://gre/modules/Promise.jsm");
 const { setTimeout } = require("sdk/timers");
@@ -32,7 +32,7 @@ function shouldDevEditionPromoShow () {
          LOCALE === "en-US";
 }
 
-let TYPES = {
+var TYPES = {
   // The Developer Edition promo doorhanger, called by
   // opening the toolbox, browser console, WebIDE, or responsive design mode
   // in Beta releases. Only displayed once per profile.
@@ -47,7 +47,7 @@ let TYPES = {
   }
 };
 
-let panelAttrs = {
+var panelAttrs = {
   orient: "vertical",
   hidden: "false",
   consumeoutsideclicks: "true",

@@ -10,12 +10,12 @@ const CC = Components.Constructor;
 
 const { devtools } =
 const { require } =
-  Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+  Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 const promise = require("promise");
 const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 
 const Services = require("Services");
-const DevToolsUtils = require("devtools/toolkit/DevToolsUtils.js");
+const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
 // We do not want to log packets by default, because in some tests,
 // we can be sending large amounts of data. The test harness has
@@ -37,7 +37,7 @@ function tryImport(url) {
 }
 
 const { DebuggerServer } = require("devtools/server/main");
-const { DebuggerClient } = require("devtools/toolkit/client/main");
+const { DebuggerClient } = require("devtools/shared/client/main");
 
 function testExceptionHook(ex) {
   try {

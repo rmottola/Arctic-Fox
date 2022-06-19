@@ -118,7 +118,9 @@ HELPER_SHEET += ":-moz-devtools-highlighted { outline: 2px dashed #F06!important
 Cu.import("resource://gre/modules/devtools/LayoutHelpers.jsm");
 
 loader.lazyRequireGetter(this, "DevToolsUtils",
-                         "devtools/toolkit/DevToolsUtils");
+                         "devtools/shared/DevToolsUtils");
+
+loader.lazyRequireGetter(this, "AsyncUtils", "devtools/shared/async-utils");
 
 loader.lazyGetter(this, "DOMParser", function() {
   return Cc["@mozilla.org/xmlextras/domparser;1"].createInstance(Ci.nsIDOMParser);
@@ -129,7 +131,7 @@ loader.lazyGetter(this, "eventListenerService", function() {
            .getService(Ci.nsIEventListenerService);
 });
 
-loader.lazyGetter(this, "CssLogic", () => require("devtools/styleinspector/css-logic").CssLogic);
+loader.lazyGetter(this, "CssLogic", () => require("devtools/shared/styleinspector/css-logic").CssLogic);
 
 // XXX: A poor man's makeInfallible until we move it out of transport.js
 // Which should be very soon.
@@ -713,7 +715,7 @@ var NodeActor = exports.NodeActor = protocol.ActorClass({
  * the parent node from clients, but the `children` request should be used
  * to traverse children.
  */
-let NodeFront = protocol.FrontClass(NodeActor, {
+var NodeFront = protocol.FrontClass(NodeActor, {
   initialize: function(conn, form, detail, ctx) {
     this._parent = null; // The parent node
     this._child = null;  // The first child of this node.

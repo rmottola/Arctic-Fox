@@ -4,67 +4,35 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-if CONFIG['MOZ_DEVTOOLS']:
-    BROWSER_CHROME_MANIFESTS += ['test/browser.ini']
-    XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']
+BROWSER_CHROME_MANIFESTS += ['test/browser.ini']
+XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']
 
-EXTRA_JS_MODULES.devtools.shared += [
-  'async-storage.js',
-  'framerate.js',
-  'memory.js',
-  'timeline.js',
-  'worker-helper.js',
-  'worker.js'
+DIRS += [
+    'redux',
+    'vendor',
+    'widgets',
 ]
 
-if CONFIG['MOZ_DEVTOOLS']:
-    EXTRA_JS_MODULES.devtools += [
-        'AppCacheUtils.jsm',
-        'Curl.jsm',
-        'DeveloperToolbar.jsm',
-        'DOMHelpers.jsm',
-        'Jsbeautify.jsm',
-        'Parser.jsm',
-        'SplitView.jsm',
-    ]
-
-    EXTRA_JS_MODULES.devtools += [
-        'widgets/AbstractTreeItem.jsm',
-        'widgets/BreadcrumbsWidget.jsm',
-        'widgets/Chart.jsm',
-        'widgets/Graphs.jsm',
-        'widgets/GraphsWorker.js',
-        'widgets/SideMenuWidget.jsm',
-        'widgets/SimpleListWidget.jsm',
-        'widgets/VariablesView.jsm',
-        'widgets/VariablesViewController.jsm',
-        'widgets/ViewHelpers.jsm',
-    ]
-
-    EXTRA_JS_MODULES.devtools.shared += [
-        'autocomplete-popup.js',
-        'devices.js',
-        'doorhanger.js',
-        'frame-script-utils.js',
-        'inplace-editor.js',
-	'node-attribute-parser.js',
-        'observable-object.js',
-        'options-view.js',
-	'source-utils.js',
-	'telemetry.js',
-        'theme-switching.js',
-        'theme.js',
-        'undo.js'
-    ]
-
-    EXTRA_JS_MODULES.devtools.shared.widgets += [
-	'widgets/CubicBezierPresets.js',
-        'widgets/CubicBezierWidget.js',
-        'widgets/FastListWidget.js',
-        'widgets/FilterWidget.js',
-        'widgets/FlameGraph.js',
-        'widgets/Spectrum.js',
-        'widgets/TableWidget.js',
-        'widgets/Tooltip.js',
-        'widgets/TreeWidget.js',
-    ]
+DevToolsModules(
+    'AppCacheUtils.jsm',
+    'autocomplete-popup.js',
+    'Curl.jsm',
+    'DeveloperToolbar.jsm',
+    'devices.js',
+    'DOMHelpers.jsm',
+    'doorhanger.js',
+    'frame-script-utils.js',
+    'getjson.js',
+    'inplace-editor.js',
+    'Jsbeautify.jsm',
+    'node-attribute-parser.js',
+    'observable-object.js',
+    'options-view.js',
+    'Parser.jsm',
+    'source-utils.js',
+    'SplitView.jsm',
+    'telemetry.js',
+    'theme-switching.js',
+    'theme.js',
+    'undo.js'
+)

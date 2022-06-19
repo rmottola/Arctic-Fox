@@ -7,15 +7,15 @@ const protocol = require("devtools/server/protocol");
 const { actorBridge } = require("devtools/server/actors/common");
 const { method, custom, Arg, Option, RetVal } = protocol;
 const { on, once, off, emit } = require("sdk/event/core");
-const { Framerate } = require("devtools/toolkit/shared/framerate");
+const { Framerate } = require("devtools/shared/shared/framerate");
 
 /**
  * An actor wrapper around Framerate. Uses exposed
  * methods via bridge and provides RDP definitions.
  *
- * @see toolkit/devtools/shared/framerate.js for documentation.
+ * @see devtools/shared/shared/framerate.js for documentation.
  */
-let FramerateActor = exports.FramerateActor = protocol.ActorClass({
+var FramerateActor = exports.FramerateActor = protocol.ActorClass({
   typeName: "framerate",
   initialize: function (conn, tabActor) {
     protocol.Actor.prototype.initialize.call(this, conn);
@@ -54,7 +54,7 @@ let FramerateActor = exports.FramerateActor = protocol.ActorClass({
 /**
  * The corresponding Front object for the FramerateActor.
  */
-let FramerateFront = exports.FramerateFront = protocol.FrontClass(FramerateActor, {
+var FramerateFront = exports.FramerateFront = protocol.FrontClass(FramerateActor, {
   initialize: function(client, { framerateActor }) {
     protocol.Front.prototype.initialize.call(this, client, { actor: framerateActor });
     this.manage(this);

@@ -6,16 +6,18 @@
 
 const TEST_URI = "data:text/xml;charset=UTF-8,<?xml version='1.0'?>" +
   "<?xml-stylesheet href='chrome://global/skin/global.css'?>" +
-  "<?xml-stylesheet href='chrome://global/skin/devtools/common.css'?>" +
-  "<?xml-stylesheet href='chrome://global/skin/devtools/widgets.css'?>" +
+  "<?xml-stylesheet href='chrome://devtools/skin/themes/common.css'?>" +
+  "<?xml-stylesheet href='chrome://devtools/skin/themes/light-theme.css'?>" +
+  "<?xml-stylesheet href='chrome://devtools/skin/themes/widgets.css'?>" +
   "<window xmlns='http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul'" +
-  " title='Table Widget' width='600' height='500'><box flex='1'/></window>";
+  " title='Table Widget' width='600' height='500'>" +
+  "<box flex='1' class='theme-light'/></window>";
 const TEST_OPT = "chrome,titlebar,toolbar,centerscreen,resizable,dialog=no";
 
-const {TableWidget} = require("devtools/shared/widgets/TableWidget");
+const {TableWidget} = require("devtools/client/shared/widgets/TableWidget");
 const Promise = require("promise");
 
-let doc, table;
+var doc, table;
 
 function test() {
   waitForExplicitFinish();
@@ -50,7 +52,7 @@ function endTests() {
   finish();
 }
 
-let startTests = Task.async(function*() {
+var startTests = Task.async(function*() {
   populateTable();
   yield testMouseInteraction();
   endTests();
@@ -131,7 +133,7 @@ function click(node, button = 0) {
 /**
  * Tests if clicking the table items does the expected behavior
  */
-let testMouseInteraction = Task.async(function*() {
+var testMouseInteraction = Task.async(function*() {
   info("Testing mouse interaction with the table");
   ok(!table.selectedRow, "Nothing should be selected beforehand");
 
@@ -145,7 +147,7 @@ let testMouseInteraction = Task.async(function*() {
   ok(node.classList.contains("theme-selected"), "Node has selected class after click");
   is(id, "id1", "Correct row was selected");
 
-  info("clicking on second row to select it");
+  info("clicking on third row to select it");
   event = table.once(TableWidget.EVENTS.ROW_SELECTED);
   let node2 = table.tbody.firstChild.firstChild.children[3];
   // node should not have selected class
@@ -155,7 +157,7 @@ let testMouseInteraction = Task.async(function*() {
   id = yield event;
   ok(node2.classList.contains("theme-selected"),
      "New node has selected class after clicking");
-  is(id, "id3", "Correct table path is emitted for new node");
+  is(id, "id3", "Correct table path is emitted for new node")
   isnot(node, node2, "Old and new node are different");
   ok(!node.classList.contains("theme-selected"),
      "Old node should not have selected class after the click on new node");

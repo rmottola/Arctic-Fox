@@ -59,7 +59,7 @@ Tools.options = {
   id: "options",
   ordinal: 0,
   url: "chrome://devtools/content/framework/toolbox-options.xul",
-  icon: "chrome://devtools/skin/devtools/tool-options.svg",
+  icon: "chrome://devtools/skin/themes/images/tool-options.svg",
   invertIconForLightTheme: true,
   bgTheme: "theme-body",
   label: l10n("options.label", toolboxStrings),
@@ -83,7 +83,7 @@ Tools.inspector = {
   key: l10n("inspector.commandkey", inspectorStrings),
   ordinal: 1,
   modifiers: osString == "Darwin" ? "accel,alt" : "accel,shift",
-  icon: "chrome://global/skin/devtools/tool-inspector.svg",
+  icon: "chrome://devtools/skin/themes/images/tool-inspector.svg",
   invertIconForLightTheme: true,
   url: "chrome://devtools/content/inspector/inspector.xul",
   label: l10n("inspector.label", inspectorStrings),
@@ -94,9 +94,9 @@ Tools.inspector = {
   },
   inMenu: true,
   commands: [
-    "devtools/resize-commands",
-    "devtools/inspector/inspector-commands",
-    "devtools/eyedropper/commands.js"
+    "devtools/client/responsivedesign/resize-commands",
+    "devtools/client/inspector/inspector-commands",
+    "devtools/client/eyedropper/commands.js"
   ],
 
   preventClosingOnKey: true,
@@ -119,7 +119,7 @@ Tools.webConsole = {
   accesskey: l10n("webConsoleCmd.accesskey", webConsoleStrings),
   modifiers: Services.appinfo.OS == "Darwin" ? "accel,alt" : "accel,shift",
   ordinal: 2,
-  icon: "chrome://global/skin/devtools/tool-webconsole.svg",
+  icon: "chrome://devtools/skin/themes/images/tool-webconsole.svg",
   invertIconForLightTheme: true,
   url: "chrome://devtools/content/webconsole/webconsole.xul",
   label: l10n("ToolboxTabWebconsole.label", webConsoleStrings),
@@ -130,7 +130,7 @@ Tools.webConsole = {
     ( osString == "Darwin" ? "Cmd+Alt" : "Ctrl+Shift+" ) + this.key);
   },
   inMenu: true,
-  commands: "devtools/webconsole/console-commands",
+  commands: "devtools/client/webconsole/console-commands",
 
   preventClosingOnKey: true,
   onkey: function(panel, toolbox) {
@@ -155,9 +155,9 @@ Tools.jsdebugger = {
   accesskey: l10n("debuggerMenu.accesskey", debuggerStrings),
   modifiers: osString == "Darwin" ? "accel,alt" : "accel,shift",
   ordinal: 3,
-  icon: "chrome://global/skin/devtools/tool-debugger.svg",
+  icon: "chrome://devtools/skin/themes/images/tool-debugger.svg",
   invertIconForLightTheme: true,
-  highlightedicon: "chrome://global/skin/devtools/tool-debugger-paused.svg",
+  highlightedicon: "chrome://devtools/skin/themes/images/tool-debugger-paused.svg",
   url: "chrome://devtools/content/debugger/debugger.xul",
   label: l10n("ToolboxDebugger.label", debuggerStrings),
   panelLabel: l10n("ToolboxDebugger.panelLabel", debuggerStrings),
@@ -166,7 +166,7 @@ Tools.jsdebugger = {
     ( osString == "Darwin" ? "Cmd+Alt" : "Ctrl+Shift+" ) + this.key);
   },
   inMenu: true,
-  commands: "devtools/debugger/debugger-commands",
+  commands: "devtools/client/debugger/debugger-commands",
 
   isTargetSupported: function(target) {
     return true;
@@ -183,7 +183,7 @@ Tools.styleEditor = {
   ordinal: 4,
   accesskey: l10n("open.accesskey", styleEditorStrings),
   modifiers: "shift",
-  icon: "chrome://global/skin/devtools/tool-styleeditor.svg",
+  icon: "chrome://devtools/skin/themes/images/tool-styleeditor.svg",
   invertIconForLightTheme: true,
   url: "chrome://devtools/content/styleeditor/styleeditor.xul",
   label: l10n("ToolboxStyleEditor.label", styleEditorStrings),
@@ -193,7 +193,7 @@ Tools.styleEditor = {
     "Shift+" + functionkey(this.key));
   },
   inMenu: true,
-  commands: "devtools/styleeditor/styleeditor-commands",
+  commands: "devtools/client/styleeditor/styleeditor-commands",
 
   isTargetSupported: function(target) {
     return target.hasActor("styleEditor") || target.hasActor("styleSheets");
@@ -249,9 +249,9 @@ Tools.canvasDebugger = {
 Tools.performance = {
   id: "performance",
   ordinal: 7,
-  icon: "chrome://global/skin/devtools/tool-profiler.svg",
+  icon: "chrome://devtools/skin/themes/images/tool-profiler.svg",
   invertIconForLightTheme: true,
-  highlightedicon: "chrome://browser/skin/devtools/tool-profiler-active.svg",
+  highlightedicon: "chrome://devtools/skin/themes/images/tool-profiler-active.svg",
   url: "chrome://devtools/content/performance/performance.xul",
   visibilityswitch: "devtools.performance.enabled",
   label: l10n("profiler.label2", profilerStrings),
@@ -281,7 +281,7 @@ Tools.netMonitor = {
   ordinal: 9,
   modifiers: osString == "Darwin" ? "accel,alt" : "accel,shift",
   visibilityswitch: "devtools.netmonitor.enabled",
-  icon: "chrome://global/skin/devtools/tool-network.svg",
+  icon: "chrome://devtools/skin/themes/images/tool-network.svg",
   invertIconForLightTheme: true,
   url: "chrome://devtools/content/netmonitor/netmonitor.xul",
   label: l10n("netmonitor.label", netMonitorStrings),
@@ -308,7 +308,7 @@ Tools.storage = {
   accesskey: l10n("storage.accesskey", storageStrings),
   modifiers: "shift",
   visibilityswitch: "devtools.storage.enabled",
-  icon: "chrome://global/skin/devtools/tool-storage.svg",
+  icon: "chrome://devtools/skin/themes/images/tool-storage.svg",
   invertIconForLightTheme: true,
   url: "chrome://devtools/content/storage/storage.xul",
   label: l10n("storage.label", storageStrings),
@@ -355,14 +355,14 @@ Tools.scratchpad = {
   id: "scratchpad",
   ordinal: 12,
   visibilityswitch: "devtools.scratchpad.enabled",
-  icon: "chrome://global/skin/devtools/tool-scratchpad.svg",
+  icon: "chrome://devtools/skin/themes/images/tool-scratchpad.svg",
   invertIconForLightTheme: true,
   url: "chrome://devtools/content/scratchpad/scratchpad.xul",
   label: l10n("scratchpad.label", scratchpadStrings),
   panelLabel: l10n("scratchpad.panelLabel", scratchpadStrings),
   tooltip: l10n("scratchpad.tooltip", scratchpadStrings),
   inMenu: false,
-  commands: "devtools/scratchpad/scratchpad-commands",
+  commands: "devtools/client/scratchpad/scratchpad-commands",
 
   isTargetSupported: function(target) {
     return target.isRemote;
@@ -394,7 +394,7 @@ Tools.darkTheme = {
   id: "dark",
   label: l10n("options.darkTheme.label", toolboxStrings),
   ordinal: 1,
-  stylesheets: ["chrome://global/skin/devtools/dark-theme.css"],
+  stylesheets: ["chrome://devtools/skin/themes/dark-theme.css"],
   classList: ["theme-dark"],
 };
 
@@ -402,7 +402,7 @@ Tools.lightTheme = {
   id: "light",
   label: l10n("options.lightTheme.label", toolboxStrings),
   ordinal: 2,
-  stylesheets: ["chrome://global/skin/devtools/light-theme.css"],
+  stylesheets: ["chrome://devtools/skin/themes/light-theme.css"],
   classList: ["theme-light"],
 };
 

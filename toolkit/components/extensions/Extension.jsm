@@ -21,7 +21,7 @@ const Cr = Components.results;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/devtools/event-emitter.js");
+Cu.import("resource://gre/modules/devtools/shared/event-emitter.js");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Locale",
                                   "resource://gre/modules/Locale.jsm");
@@ -46,7 +46,7 @@ ExtensionManagement.registerScript("chrome://extensions/content/ext-webRequest.j
 ExtensionManagement.registerScript("chrome://extensions/content/ext-storage.js");
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
-let {
+var {
   MessageBroker,
   Messenger,
   injectAPI,
@@ -54,10 +54,10 @@ let {
 
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
-let scriptScope = this;
+var scriptScope = this;
 
 // This object loads the ext-*.js scripts that define the extension API.
-let Management = {
+var Management = {
   initialized: false,
   scopes: [],
   apis: [],
@@ -149,7 +149,7 @@ let Management = {
 
 // A MessageBroker that's used to send and receive messages for
 // extension pages (which run in the chrome process).
-let globalBroker = new MessageBroker([Services.mm, Services.ppmm]);
+var globalBroker = new MessageBroker([Services.mm, Services.ppmm]);
 
 // An extension page is an execution context for any extension content
 // that runs in the chrome process. It's used for background pages
@@ -218,7 +218,7 @@ ExtensionPage.prototype = {
 };
 
 // Responsible for loading extension APIs into the right globals.
-let GlobalManager = {
+var GlobalManager = {
   // Number of extensions currently enabled.
   count: 0,
 

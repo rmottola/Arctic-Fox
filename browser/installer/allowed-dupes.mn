@@ -249,7 +249,7 @@ browser/chrome/browser/skin/classic/browser/feeds/videoFeedIcon16.png
 browser/chrome/browser/skin/classic/browser/page-livemarks.png
 browser/modules/devtools/resize-commands.js
 browser/chrome/browser/content/global/devtools/responsivedesign/resize-commands.js
-browser/modules/devtools/projecteditor/helpers/readdir.js
+browser/modules/devtools/client/projecteditor/lib/helpers/readdir.js
 browser/chrome/browser/content/global/devtools/readdir.js
 modules/devtools/shared/theme-switching.js
 chrome/toolkit/content/global/devtools/theme-switching.js
@@ -276,7 +276,7 @@ browser/chrome/browser/skin/classic/browser/webapps-64.png
 chrome/toolkit/skin/classic/global/icons/webapps-64.png
 browser/chrome/browser/content/browser/abouthome/noise.png
 chrome/toolkit/skin/classic/global/media/imagedoc-lightnoise.png
-browser/modules/devtools/framework/toolbox-options.js
+browser/modules/devtools/client/framework/toolbox-options.js
 browser/chrome/browser/content/global/devtools/framework/toolbox-options.js
 modules/devtools/shared/d3.js
 chrome/toolkit/content/global/devtools/d3.js

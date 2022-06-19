@@ -5,7 +5,7 @@
 // cases including iframes, scroll and zoom
 
 const {utils: Cu} = Components;
-const {LayoutHelpers} = Cu.import("resource://gre/modules/devtools/LayoutHelpers.jsm", {});
+let {getAdjustedQuads} = require("devtools/shared/layout/utils");
 
 const TEST_URI = TEST_URI_ROOT + "browser_layoutHelpers-getBoxQuads.html";
 

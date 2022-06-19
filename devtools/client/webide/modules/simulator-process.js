@@ -8,7 +8,7 @@
 const { Cc, Ci, Cu } = require("chrome");
 
 const Environment = require("sdk/system/environment").env;
-const EventEmitter = require("devtools/toolkit/event-emitter");
+const EventEmitter = require("devtools/shared/event-emitter");
 const promise = require("promise");
 const Subprocess = require("sdk/system/child_process/subprocess");
 const { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
@@ -160,7 +160,7 @@ function CustomSimulatorProcess(options) {
   this.options = options;
 }
 
-let CSPp = CustomSimulatorProcess.prototype = Object.create(SimulatorProcess.prototype);
+var CSPp = CustomSimulatorProcess.prototype = Object.create(SimulatorProcess.prototype);
 
 // Compute B2G binary file handle.
 Object.defineProperty(CSPp, "b2gBinary", {
@@ -188,7 +188,7 @@ function AddonSimulatorProcess(addon, options) {
   this.options = options;
 }
 
-let ASPp = AddonSimulatorProcess.prototype = Object.create(SimulatorProcess.prototype);
+var ASPp = AddonSimulatorProcess.prototype = Object.create(SimulatorProcess.prototype);
 
 // Compute B2G binary file handle.
 Object.defineProperty(ASPp, "b2gBinary", {
@@ -248,7 +248,7 @@ function OldAddonSimulatorProcess(addon, options) {
   this.options = options;
 }
 
-let OASPp = OldAddonSimulatorProcess.prototype = Object.create(AddonSimulatorProcess.prototype);
+var OASPp = OldAddonSimulatorProcess.prototype = Object.create(AddonSimulatorProcess.prototype);
 
 // Compute B2G binary file handle.
 Object.defineProperty(OASPp, "b2gBinary", {
