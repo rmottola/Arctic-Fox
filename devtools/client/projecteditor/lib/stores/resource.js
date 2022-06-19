@@ -12,7 +12,7 @@ const { Class } = require("sdk/core/heritage");
 const { EventTarget } = require("sdk/event/target");
 const { emit } = require("sdk/event/core");
 const URL = require("sdk/url");
-const promise = require("projecteditor/helpers/promise");
+const promise = require("promise");
 const { OS } = Cu.import("resource://gre/modules/osfile.jsm", {});
 const { FileUtils } = Cu.import("resource://gre/modules/FileUtils.jsm", {});
 const mimeService = Cc["@mozilla.org/mime;1"].getService(Ci.nsIMIMEService);
@@ -387,7 +387,7 @@ var FileResource = Class({
    * See editors.js -> EditorTypeForResource.
    */
   get contentCategory() {
-    const NetworkHelper = require("devtools/toolkit/webconsole/network-helper");
+    const NetworkHelper = require("devtools/shared/webconsole/network-helper");
     let category = NetworkHelper.mimeCategoryMap[this.contentType];
     // Special treatment for manifest.webapp.
     if (!category && this.basename === "manifest.webapp") {

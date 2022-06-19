@@ -8,7 +8,6 @@ DevToolsModules(
     'event.js',
     'file-picker.js',
     'l10n.js',
-    'promise.js',
     'prompts.js',
     'readdir.js',
 )
