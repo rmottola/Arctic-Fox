@@ -41,6 +41,9 @@ function onPaintFlashingChanged(target, value) {
   target.off("navigate", fireChange);
   target.once("navigate", fireChange);
 
+  if (!telemetry) {
+    return;
+  }
   if (value) {
     telemetry.toolOpened("paintflashing");
   } else {
