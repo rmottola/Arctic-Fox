@@ -30,7 +30,6 @@
   <script type="text/javascript" src="views/workers-view.js"/>
   <script type="text/javascript" src="views/sources-view.js"/>
   <script type="text/javascript" src="views/variable-bubble-view.js"/>
-  <script type="text/javascript" src="views/tracer-view.js"/>
   <script type="text/javascript" src="views/watch-expressions-view.js"/>
   <script type="text/javascript" src="views/event-listeners-view.js"/>
   <script type="text/javascript" src="views/global-search-view.js"/>
@@ -285,13 +284,6 @@
                        class="devtools-toolbarbutton"
                        tabindex="0"/>
       </hbox>
-      <hbox>
-        <toolbarbutton id="trace"
-                       class="devtools-toolbarbutton"
-                       command="toggleTracing"
-                       tabindex="0"
-                       hidden="true"/>
-      </hbox>
       <vbox id="stackframes" flex="1"/>
       <textbox id="searchbox"
                class="devtools-searchinput" type="search"/>
@@ -329,7 +321,6 @@
           <tabs>
             <tab id="sources-tab" label="&debuggerUI.tabs.sources;"/>
             <tab id="callstack-tab" label="&debuggerUI.tabs.callstack;"/>
-            <tab id="tracer-tab" label="&debuggerUI.tabs.traces;" hidden="true"/>
           </tabs>
           <tabpanels flex="1">
             <tabpanel id="sources-tabpanel">
@@ -356,26 +347,6 @@
             </tabpanel>
             <tabpanel id="callstack-tabpanel">
               <vbox id="callstack-list" flex="1"/>
-            </tabpanel>
-            <tabpanel id="tracer-tabpanel">
-              <vbox id="tracer-traces" flex="1"/>
-              <hbox class="trace-item-template" hidden="true">
-                <hbox class="trace-item" align="center" flex="1" crop="end">
-                  <label class="trace-type plain"/>
-                  <label class="trace-name plain" crop="end"/>
-                </hbox>
-              </hbox>
-              <toolbar id="tracer-toolbar" class="devtools-toolbar">
-                <toolbarbutton id="clear-tracer"
-                               label="&debuggerUI.clearButton;"
-                               tooltiptext="&debuggerUI.clearButton.tooltip;"
-                               command="clearTraces"
-                               class="devtools-toolbarbutton"/>
-                <textbox id="tracer-search"
-                         class="devtools-searchinput"
-                         flex="1"
-                         type="search"/>
-              </toolbar>
             </tabpanel>
           </tabpanels>
         </tabbox>
