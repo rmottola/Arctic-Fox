@@ -12,8 +12,7 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=777674
   <script type="application/javascript;version=1.8" src="inspector-helpers.js"></script>
   <script type="application/javascript;version=1.8">
 window.onload = function() {
-  const {Promise: promise} =
-    Components.utils.import("resource://gre/modules/Promise.jsm", {});
+  const Ci = Components.interfaces;
   const {InspectorFront} =
     require("devtools/server/actors/inspector");
   const {_documentWalker} =

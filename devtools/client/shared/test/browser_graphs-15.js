@@ -20,8 +20,7 @@ for (let frameRate of FRAMES) {
   }
 }
 
-let LineGraphWidget = require("devtools/shared/widgets/LineGraphWidget");
-let {Promise} = require("resource://gre/modules/Promise.jsm");
+var LineGraphWidget = require("devtools/client/shared/widgets/LineGraphWidget");
 
 add_task(function*() {
   yield promiseTab("about:blank");

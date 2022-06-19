@@ -11,7 +11,6 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=921102
   <link rel="stylesheet" type="text/css" href="chrome://mochikit/content/tests/SimpleTest/test.css">
   <script type="application/javascript;version=1.8" src="inspector-helpers.js"></script>
   <script type="application/javascript;version=1.8">
-const {Promise: promise} = Components.utils.import("resource://gre/modules/Promise.jsm", {});
 const inspector = require("devtools/server/actors/inspector");
 
 window.onload = function() {
@@ -35,7 +34,7 @@ addTest(function() {
 addTest(function() {
   info("Resolve a relative URL without providing a context node");
   gInspector.resolveRelativeURL("test.png?id=4#wow").then(url => {
-    is(url, "chrome://mochitests/content/chrome/toolkit/devtools/server/tests/" +
+    is(url, "chrome://mochitests/content/chrome/devtools/server/tests/" +
             "mochitest/test.png?id=4#wow");
     runNextTest();
   });
@@ -43,9 +42,9 @@ addTest(function() {
 
 addTest(function() {
   info("Resolve an absolute URL without providing a context node");
-  gInspector.resolveRelativeURL("chrome://mochitests/content/chrome/toolkit/" +
+  gInspector.resolveRelativeURL("chrome://mochitests/content/chrome/" +
                                 "devtools/server/").then(url => {
-    is(url, "chrome://mochitests/content/chrome/toolkit/devtools/server/");
+    is(url, "chrome://mochitests/content/chrome/devtools/server/");
     runNextTest();
   });
 });
@@ -54,7 +53,7 @@ addTest(function() {
   info("Resolve a relative URL providing a context node");
   let node = gDoc.querySelector(".big-horizontal");
   gInspector.resolveRelativeURL("test.png?id=4#wow", node).then(url => {
-    is(url, "chrome://mochitests/content/chrome/toolkit/devtools/server/tests/" +
+    is(url, "chrome://mochitests/content/chrome/devtools/server/tests/" +
             "mochitest/test.png?id=4#wow");
     runNextTest();
   });
@@ -63,9 +62,9 @@ addTest(function() {
 addTest(function() {
   info("Resolve an absolute URL providing a context node");
   let node = gDoc.querySelector(".big-horizontal");
-  gInspector.resolveRelativeURL("chrome://mochitests/content/chrome/toolkit/" +
+  gInspector.resolveRelativeURL("chrome://mochitests/content/chrome/" +
                                 "devtools/server/", node).then(url => {
-    is(url, "chrome://mochitests/content/chrome/toolkit/devtools/server/");
+    is(url, "chrome://mochitests/content/chrome/devtools/server/");
     runNextTest();
   });
 });
