@@ -16,6 +16,7 @@ DIRS += [
 DevToolsModules(
     'AppCacheUtils.jsm',
     'autocomplete-popup.js',
+    'browser-loader.js',
     'Curl.jsm',
     'DeveloperToolbar.jsm',
     'devices.js',

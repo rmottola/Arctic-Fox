@@ -11,7 +11,6 @@ const DBG_STRINGS_URI = "chrome://browser/locale/devtools/debugger.properties";
 const NEW_SOURCE_IGNORED_URLS = ["debugger eval code", "XStringBundle"];
 const NEW_SOURCE_DISPLAY_DELAY = 200; // ms
 const FETCH_SOURCE_RESPONSE_DELAY = 200; // ms
-const FETCH_EVENT_LISTENERS_DELAY = 200; // ms
 const FRAME_STEP_CLEAR_DELAY = 100; // ms
 const CALL_STACK_PAGE_SIZE = 25; // frames
 
@@ -327,7 +326,9 @@ var DebuggerController = {
       this.SourceScripts.connect();
 
       if (aThreadClient.paused) {
-        aThreadClient.resume(this._ensureResumptionOrder);
+        aThreadClient.resume(res => {
+          this._ensureResumptionOrder(res)
+        });
       }
 
       deferred.resolve();
@@ -1306,7 +1307,7 @@ SourceScripts.prototype = {
 
     // Make sure the events listeners are up to date.
     if (DebuggerView.instrumentsPaneTab == "events-tab") {
-      DebuggerController.Breakpoints.DOM.scheduleEventListenersFetch();
+      store.dispatch(actions.fetchEventListeners());
     }
 
     // Signal that a new source has been added.
@@ -1795,112 +1796,6 @@ Tracer.prototype = {
    */
   WrappedObject: function(aObject) {
     this.object = aObject;
-  }
-};
-
-/**
- * Handles breaking on event listeners in the currently debugged target.
- */
-function EventListeners() {
-}
-
-EventListeners.prototype = {
-  /**
-   * A list of event names on which the debuggee will automatically pause
-   * when invoked.
-   */
-  activeEventNames: [],
-
-  /**
-   * Updates the list of events types with listeners that, when invoked,
-   * will automatically pause the debuggee. The respective events are
-   * retrieved from the UI.
-   */
-  scheduleEventBreakpointsUpdate: function() {
-    // Make sure we're not sending a batch of closely repeated requests.
-    // This can easily happen when toggling all events of a certain type.
-    setNamedTimeout("event-breakpoints-update", 0, () => {
-      this.activeEventNames = DebuggerView.EventListeners.getCheckedEvents();
-      gThreadClient.pauseOnDOMEvents(this.activeEventNames);
-
-      // Notify that event breakpoints were added/removed on the server.
-      window.emit(EVENTS.EVENT_BREAKPOINTS_UPDATED);
-    });
-  },
-
-  /**
-   * Schedules fetching the currently attached event listeners from the debugee.
-   */
-  scheduleEventListenersFetch: function() {
-    // Make sure we're not sending a batch of closely repeated requests.
-    // This can easily happen whenever new sources are fetched.
-    setNamedTimeout("event-listeners-fetch", FETCH_EVENT_LISTENERS_DELAY, () => {
-      if (gThreadClient.state != "paused") {
-        gThreadClient.interrupt(() => this._getListeners(() => gThreadClient.resume()));
-      } else {
-        this._getListeners();
-      }
-    });
-  },
-
-  /**
-   * Fetches the currently attached event listeners from the debugee.
-   * The thread client state is assumed to be "paused".
-   *
-   * @param function aCallback
-   *        Invoked once the event listeners are fetched and displayed.
-   */
-  _getListeners: function(aCallback) {
-    gThreadClient.eventListeners(Task.async(function*(aResponse) {
-      if (aResponse.error) {
-        throw "Error getting event listeners: " + aResponse.message;
-      }
-
-      // Make sure all the listeners are sorted by the event type, since
-      // they're not guaranteed to be clustered together.
-      aResponse.listeners.sort((a, b) => a.type > b.type ? 1 : -1);
-
-      // Add all the listeners in the debugger view event linsteners container.
-      for (let listener of aResponse.listeners) {
-        let definitionSite;
-        if (listener.function.class == "Function") {
-          definitionSite = yield this._getDefinitionSite(listener.function);
-        }
-        listener.function.url = definitionSite;
-        DebuggerView.EventListeners.addListener(listener, { staged: true });
-      }
-
-      // Flushes all the prepared events into the event listeners container.
-      DebuggerView.EventListeners.commit();
-
-      // Notify that event listeners were fetched and shown in the view,
-      // and callback to resume the active thread if necessary.
-      window.emit(EVENTS.EVENT_LISTENERS_FETCHED);
-      aCallback && aCallback();
-    }.bind(this)));
-  },
-
-  /**
-   * Gets a function's source-mapped definiton site.
-   *
-   * @param object aFunction
-   *        The grip of the function to get the definition site for.
-   * @return object
-   *         A promise that is resolved with the function's owner source url.
-   */
-  _getDefinitionSite: function(aFunction) {
-    let deferred = promise.defer();
-
-    gThreadClient.pauseGrip(aFunction).getDefinitionSite(aResponse => {
-      if (aResponse.error) {
-        // Don't make this error fatal, because it would break the entire events pane.
-        const msg = "Error getting function definition site: " + aResponse.message;
-        DevToolsUtils.reportException("_getDefinitionSite", msg);
-      }
-      deferred.resolve(aResponse.source.url);
-    });
-
-    return deferred.promise;
   }
 };
 
@@ -2491,6 +2386,7 @@ let Prefs = new ViewHelpers.Prefs("devtools", {
  * Convenient way of emitting events from the panel window.
  */
 EventEmitter.decorate(this);
+EventEmitter.decorate(DebuggerController);
 
 /**
  * Preliminary setup for the DebuggerController object.
@@ -2502,7 +2398,6 @@ DebuggerController.ThreadState = new ThreadState();
 DebuggerController.StackFrames = new StackFrames();
 DebuggerController.SourceScripts = new SourceScripts();
 DebuggerController.Breakpoints = new Breakpoints();
-DebuggerController.Breakpoints.DOM = new EventListeners();
 DebuggerController.Tracer = new Tracer();
 DebuggerController.HitCounts = new HitCounts();
 

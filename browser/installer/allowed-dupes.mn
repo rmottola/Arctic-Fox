@@ -46,8 +46,6 @@ browser/chrome/devtools/modules/devtools/client/jsonview/css/controls.png
 browser/chrome/devtools/modules/devtools/client/jsonview/css/controls@2x.png
 browser/chrome/devtools/modules/devtools/client/memory/initializer.js
 browser/chrome/devtools/modules/devtools/client/projecteditor/lib/helpers/readdir.js
-browser/chrome/devtools/modules/devtools/client/shared/frame-script-utils.js
-browser/chrome/devtools/modules/devtools/client/shared/theme-switching.js
 browser/chrome/devtools/modules/devtools/client/themes/common.css
 browser/chrome/devtools/modules/devtools/client/themes/variables.css
 browser/chrome/devtools/skin/common.css
@@ -251,9 +249,9 @@ browser/modules/devtools/resize-commands.js
 browser/chrome/browser/content/global/devtools/responsivedesign/resize-commands.js
 browser/modules/devtools/client/projecteditor/lib/helpers/readdir.js
 browser/chrome/browser/content/global/devtools/readdir.js
-modules/devtools/shared/theme-switching.js
+browser/modules/devtools/client/shared/theme-switching.js
 chrome/toolkit/content/global/devtools/theme-switching.js
-modules/devtools/shared/frame-script-utils.js
+browser/modules/devtools/client/shared/frame-script-utils.js
 chrome/toolkit/content/global/devtools/frame-script-utils.js
 chrome/toolkit/skin/classic/global/inContentUI/background-texture.png
 browser/modules/promise.js

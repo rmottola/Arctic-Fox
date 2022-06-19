@@ -594,7 +594,7 @@ var DebuggerView = {
    */
   _onInstrumentsPaneTabSelect: function() {
     if (this._instrumentsPane.selectedTab.id == "events-tab") {
-      DebuggerController.Breakpoints.DOM.scheduleEventListenersFetch();
+      store.dispatch(actions.fetchEventListeners());
     }
   },
 
@@ -857,3 +857,5 @@ ResultsPanelContainer.prototype = Heritage.extend(WidgetMethods, {
   left: 0,
   top: 0
 });
+
+DebuggerView.EventListeners = new EventListenersView(store, DebuggerController);
