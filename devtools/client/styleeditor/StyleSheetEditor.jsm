@@ -91,8 +91,7 @@ function StyleSheetEditor(styleSheet, win, file, isNew, walker, highlighter) {
     selection: {
       start: {line: 0, ch: 0},
       end: {line: 0, ch: 0}
-    },
-    topIndex: 0              // the first visible line
+    }
   };
 
   this._styleSheetFilePath = null;
@@ -237,26 +236,34 @@ StyleSheetEditor.prototype = {
 
   /**
    * Start fetching the full text source for this editor's sheet.
+   *
+   * @return {Promise}
+   *         A promise that'll resolve with the source text once the source
+   *         has been loaded or reject on unexpected error.
    */
-  fetchSource: function(callback) {
-    return this.styleSheet.getText().then((longStr) => {
-      longStr.string().then((source) => {
-        let ruleCount = this.styleSheet.ruleCount;
-        if (!this.styleSheet.isOriginalSource) {
-          source = CssLogic.prettifyCSS(source, ruleCount);
-        }
-        this._state.text = source;
-        this.sourceLoaded = true;
+  fetchSource: function () {
+    return Task.spawn(function* () {
+      let longStr = yield this.styleSheet.getText();
+      let source = yield longStr.string();
+      let ruleCount = this.styleSheet.ruleCount;
+      if (!this.styleSheet.isOriginalSource) {
+        source = CssLogic.prettifyCSS(source, ruleCount);
+      }
+      this._state.text = source;
+      this.sourceLoaded = true;
 
-        if (callback) {
-          callback(source);
-        }
-        return source;
-      });
-    }, e => {
-      this.emit("error", { key: LOAD_ERROR, append: this.styleSheet.href });
-      throw e;
-    })
+      return source;
+    }.bind(this)).then(null, e => {
+      if (this._isDestroyed) {
+        console.warn("Could not fetch the source for " +
+                     this.styleSheet.href +
+                     ", the editor was destroyed");
+        Cu.reportError(e);
+      } else {
+        this.emit("error", { key: LOAD_ERROR, append: this.styleSheet.href });
+        throw e;
+      }
+    });
   },
 
   /**
@@ -387,7 +394,6 @@ StyleSheetEditor.prototype = {
         sourceEditor.focus();
       }
 
-      sourceEditor.setFirstVisibleLine(this._state.topIndex);
       sourceEditor.setSelection(this._state.selection.start,
                                 this._state.selection.end);
 
@@ -433,7 +439,9 @@ StyleSheetEditor.prototype = {
    */
   onShow: function() {
     if (this.sourceEditor) {
-      this.sourceEditor.setFirstVisibleLine(this._state.topIndex);
+      // CodeMirror needs refresh to restore scroll position after hiding and
+      // showing the editor.
+      this.sourceEditor.refresh();
     }
     this.focus();
   },
@@ -713,6 +721,7 @@ StyleSheetEditor.prototype = {
     this.cssSheet.off("property-change", this._onPropertyChange);
     this.cssSheet.off("media-rules-changed", this._onMediaRulesChanged);
     this.styleSheet.off("error", this._onError);
+    this._isDestroyed = true;
   }
 }
 
