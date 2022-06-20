@@ -25,6 +25,7 @@ DIRS += [
     'scratchpad',
     'shadereditor',
     'shared',
+    'shims',
     'sourceeditor',
     'storage',
     'styleeditor',
