@@ -89,7 +89,7 @@ function* spawnTest() {
         output: [ /page1/, /page2/, /page3/ ]
       },
       post: function(output, text) {
-        ok(!text.contains("index"), "index is not contained in output");
+        ok(!text.includes("index"), "index is not contained in output");
       }
     },
 
@@ -111,7 +111,7 @@ function* spawnTest() {
       check: {
         input:  'appcache validate ' + TEST_URI,
               // appcache validate http://sub1.test2.example.com/browser/devtools/client/commandline/test/browser_cmd_appcache_valid_index.html
-        markup: 'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV',
+        markup: 'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV',
         status: 'VALID',
         args: {
           uri: {
@@ -149,10 +149,10 @@ function* spawnTest() {
         output: [ /no results/ ]
       },
       post: function(output, text) {
-        ok(!text.contains("index"), "index is not contained in output");
-        ok(!text.contains("page1"), "page1 is not contained in output");
-        ok(!text.contains("page2"), "page1 is not contained in output");
-        ok(!text.contains("page3"), "page1 is not contained in output");
+        ok(!text.includes("index"), "index is not contained in output");
+        ok(!text.includes("page1"), "page1 is not contained in output");
+        ok(!text.includes("page2"), "page1 is not contained in output");
+        ok(!text.includes("page3"), "page1 is not contained in output");
       }
     },
 
@@ -161,7 +161,7 @@ function* spawnTest() {
       check: {
         input:  'appcache viewentry --key ' + TEST_URI,
               // appcache viewentry --key http://sub1.test2.example.com/browser/devtools/client/commandline/test/browser_cmd_appcache_valid_index.html
-        markup: 'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV',
+        markup: 'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV',
         status: 'VALID',
         args: {}
       },
