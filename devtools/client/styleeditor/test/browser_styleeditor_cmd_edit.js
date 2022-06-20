@@ -3,7 +3,7 @@
 
 // Tests that the edit command works
 
-const TEST_URI = "http://example.com/browser/browser/devtools/styleeditor/" +
+const TEST_URI = "http://example.com/browser/devtools/client/styleeditor/" +
                  "test/browser_styleeditor_cmd_edit.html";
 
 add_task(function* () {

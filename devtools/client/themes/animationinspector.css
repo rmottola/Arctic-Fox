@@ -83,7 +83,7 @@ body {
   left: 50%;
   top: 50%;
   margin: -8px 0 0 -8px;
-  background-image: url("chrome://global/skin/devtools/command-pick.png");
+  background-image: url("chrome://devtools/skin/themes/images/command-pick.png");
 }
 
 #toggle-all::before {
@@ -101,7 +101,7 @@ body {
 
 @media (min-resolution: 1.25dppx) {
   #element-picker::before {
-    background-image: url("chrome://global/skin/devtools/command-pick@2x.png");
+    background-image: url("chrome://devtools/skin/themes/images/command-pick@2x.png");
     background-size: 64px;
   }
 
@@ -120,7 +120,7 @@ body {
   height: 100%;
   overflow: hidden;
   /* The timeline gets its background-image from a canvas element created in
-     /toolkit/devtools/animationinspector/utils.js drawGraphElementBackground
+     /devtools/client/animationinspector/utils.js drawGraphElementBackground
      thanks to document.mozSetImageElement("time-graduations", canvas)
      This is done so that the background can be built dynamically from script */
   background-image: -moz-element(#time-graduations);
@@ -280,7 +280,7 @@ body {
 }
 
 .animation-target .node-selector {
-  background: url("chrome://browser/skin/devtools/vview-open-inspector.png") no-repeat 0 0;
+  background: url("chrome://devtools/skin/themes/images/vview-open-inspector.png") no-repeat 0 0;
   padding-left: 16px;
   margin-right: 5px;
   cursor: pointer;

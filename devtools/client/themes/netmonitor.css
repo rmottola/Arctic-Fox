@@ -177,22 +177,20 @@
 }
 
 .security-state-insecure {
-  list-style-image: url(chrome://browser/skin/identity-icons-generic.png);
+  list-style-image: url(chrome://browser/skin/identity-mixed-active-loaded.svg);
 }
 
 .security-state-secure {
-  cursor: pointer;
-  list-style-image: url(chrome://browser/skin/identity-icons-https.png);
+  list-style-image: url(chrome://browser/skin/identity-secure.svg);
 }
 
 .security-state-weak {
-  cursor: pointer;
-  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-display.png);
+  list-style-image: url(chrome://browser/skin/identity-mixed-passive-loaded.svg);
 }
 
 .security-state-broken {
   cursor: pointer;
-  list-style-image: url(chrome://browser/skin/identity-icons-https-mixed-active.png);
+  list-style-image: url(chrome://browser/skin/controlcenter/warning-gray.svg);
 }
 
 .requests-menu-type {
@@ -367,7 +365,7 @@ label.requests-menu-status-code {
   -moz-padding-start: 0px;
   -moz-padding-end: 4px;
   /* Background created on a <canvas> in js. */
-  /* @see browser/devtools/netmonitor/netmonitor-view.js */
+  /* @see devtools/client/netmonitor/netmonitor-view.js */
   background-image: -moz-element(#waterfall-background);
   background-repeat: repeat-y;
   background-position: -1px center;
@@ -738,7 +736,7 @@ label.requests-menu-status-code {
   background: none;
   box-shadow: none;
   border-color: transparent;
-  list-style-image: url(profiler-stopwatch.svg);
+  list-style-image: url(images/profiler-stopwatch.svg);
   -moz-padding-end: 0;
   cursor: pointer;
 }
