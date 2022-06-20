@@ -97,7 +97,7 @@
 }
 
 .ruleview-warning {
-  background-image: url(alerticon-warning.png);
+  background-image: url(images/alerticon-warning.png);
   background-size: 13px 12px;
   -moz-margin-start: 5px;
   display: inline-block;
@@ -109,7 +109,7 @@
 
 @media (min-resolution: 1.25dppx) {
   .ruleview-warning {
-    background-image: url(alerticon-warning@2x.png);
+    background-image: url(images/alerticon-warning@2x.png);
   }
 }
 
@@ -185,18 +185,18 @@
 }
 
 .ruleview-bezierswatch {
-  background: url("chrome://global/skin/devtools/cubic-bezier-swatch.png");
+  background: url("chrome://devtools/skin/themes/images/cubic-bezier-swatch.png");
   background-size: 1em;
 }
 
 .ruleview-filterswatch {
-  background: url("chrome://browser/skin/devtools/filter-swatch.svg");
+  background: url("chrome://devtools/skin/themes/images/filter-swatch.svg");
   background-size: 1em;
 }
 
 @media (min-resolution: 1.25dppx) {
   .ruleview-bezierswatch {
-    background: url("chrome://global/skin/devtools/cubic-bezier-swatch@2x.png");
+    background: url("chrome://devtools/skin/themes/images/cubic-bezier-swatch@2x.png");
     background-size: 1em;
   }
 }

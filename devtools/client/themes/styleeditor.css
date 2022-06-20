@@ -106,7 +106,7 @@
 .stylesheet-enabled {
   padding: 8px 0;
   margin: 0 8px;
-  background-image: url(itemToggle.png);
+  background-image: url(images/itemToggle.png);
   background-repeat: no-repeat;
   background-clip: content-box;
   background-position: 0 8px;
@@ -117,7 +117,7 @@
 
 @media (min-resolution: 1.25dppx) {
   .stylesheet-enabled {
-    background-image: url(itemToggle@2x.png);
+    background-image: url(images/itemToggle@2x.png);
   }
 }
 

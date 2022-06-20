@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 (function() {
-  const DEVTOOLS_SKIN_URL = "chrome://global/skin/devtools/";
+  const DEVTOOLS_SKIN_URL = "chrome://devtools/skin/themes/";
   let documentElement = document.documentElement;
 
   function forceStyle() {
@@ -103,8 +103,10 @@
   const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
   Cu.import("resource://gre/modules/Services.jsm");
-  Cu.import("resource:///modules/devtools/gDevTools.jsm");
-  const {require} = Components.utils.import("resource://gre/modules/devtools/Loader.jsm", {});
+  Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm");
+  const {require} = Components.utils.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+  const StylesheetUtils = require("sdk/stylesheet/utils");
+
   if (documentElement.hasAttribute("force-theme")) {
     switchTheme(documentElement.getAttribute("force-theme"));
   } else {

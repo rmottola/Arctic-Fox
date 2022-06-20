@@ -3,12 +3,12 @@
      - License, v. 2.0. If a copy of the MPL was not distributed with this
      - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 <!DOCTYPE window [
-  <!ENTITY % appMgrDTD SYSTEM "chrome://global/locale/devtools/app-manager.dtd" >
+  <!ENTITY % appMgrDTD SYSTEM "chrome://browser/locale/devtools/app-manager.dtd" >
   %appMgrDTD;
 ]>
 
 <?xml-stylesheet href="chrome://global/skin/global.css"?>
-<?xml-stylesheet href="chrome://global/skin/devtools/app-manager/index.css"?>
+<?xml-stylesheet href="chrome://devtools/skin/themes/app-manager/index.css"?>
 
 <window id="app-manager-window"
         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"

@@ -101,7 +101,7 @@ OptionsStore.prototype = {
 /**
  * The low level structure of a tooltip is a XUL element (a <panel>).
  */
-let PanelFactory = {
+var PanelFactory = {
   /**
    * Get a new XUL panel instance.
    * @param {XULDocument} doc
@@ -307,7 +307,7 @@ Tooltip.prototype = {
   /**
    * Get rid of references and event listeners
    */
-  destroy: function () {
+  destroy: function() {
     this.hide();
 
     for (let event of POPUP_EVENTS) {
@@ -719,12 +719,13 @@ Tooltip.prototype = {
           options.naturalHeight);
       } else {
         // If no dimensions were provided, load the image to get them
-        label.textContent = l10n.strings.GetStringFromName("previewTooltip.image.brokenImage");
+        label.textContent =
+          l10n.strings.GetStringFromName("previewTooltip.image.brokenImage");
         let imgObj = new this.doc.defaultView.Image();
         imgObj.src = imageUrl;
         imgObj.onload = () => {
           imgObj.onload = null;
-            label.textContent = this._getImageDimensionLabel(imgObj.naturalWidth,
+          label.textContent = this._getImageDimensionLabel(imgObj.naturalWidth,
               imgObj.naturalHeight);
         };
       }
@@ -1595,9 +1596,9 @@ SwatchFilterTooltip.prototype = Heritage.extend(SwatchBasedEditorTooltip.prototy
 function L10N() {}
 L10N.prototype = {};
 
-let l10n = new L10N();
+var l10n = new L10N();
 
 loader.lazyGetter(L10N.prototype, "strings", () => {
   return Services.strings.createBundle(
-    "chrome://global/locale/devtools/inspector.properties");
+    "chrome://browser/locale/devtools/inspector.properties");
 });

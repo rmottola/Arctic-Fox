@@ -56,7 +56,7 @@ body {
 }
 
 .property-value, .other-property-value {
-  background-image: url(arrow-e.png);
+  background-image: url(images/arrow-e.png);
   background-repeat: no-repeat;
   background-size: 5px 8px;
 }
