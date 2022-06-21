@@ -122,6 +122,25 @@ var Memory = exports.Memory = Class({
   },
 
   /**
+   * Returns a boolean indicating whether or not allocation
+   * sites are being tracked.
+   */
+  isRecordingAllocations: function () {
+    return this.dbg.memory.trackingAllocationSites;
+  },
+
+  /**
+   * Save a heap snapshot scoped to the current debuggees' portion of the heap
+   * graph.
+   *
+   * @returns {String} The snapshot id.
+   */
+  saveHeapSnapshot: expectState("attached", function () {
+    const path = ThreadSafeChromeUtils.saveHeapSnapshot({ debugger: this.dbg });
+    return HeapSnapshotFileUtils.getSnapshotIdFromPath(path);
+  }, "saveHeapSnapshot"),
+
+  /**
    * Take a census of the heap. See js/src/doc/Debugger/Debugger.Memory.md for
    * more information.
    */

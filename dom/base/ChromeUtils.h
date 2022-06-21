@@ -26,8 +26,8 @@ public:
   // Implemented in devtools/shared/heapsnapshot/HeapSnapshot.cpp
   static void SaveHeapSnapshot(GlobalObject& global,
                                JSContext* cx,
-                               const nsAString& filePath,
                                const HeapSnapshotBoundaries& boundaries,
+                               nsAString& filePath,
                                ErrorResult& rv);
 
   // Implemented in devtools/shared/heapsnapshot/HeapSnapshot.cpp
