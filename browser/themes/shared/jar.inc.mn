@@ -51,10 +51,3 @@
   skin/classic/browser/panic-panel/header-small@2x.png         (../shared/panic-panel/header-small@2x.png)
   skin/classic/browser/panic-panel/icons.png                   (../shared/panic-panel/icons.png)
   skin/classic/browser/panic-panel/icons@2x.png                (../shared/panic-panel/icons@2x.png)
-  skin/classic/browser/devtools/add.svg                        (../shared/devtools/images/add.svg)
-  skin/classic/browser/devtools/filter-swatch.svg              (../shared/devtools/images/filter-swatch.svg)
-  skin/classic/browser/devtools/search-clear-failed.svg        (../shared/devtools/images/search-clear-failed.svg)
-  skin/classic/browser/devtools/search-clear-light.svg         (../shared/devtools/images/search-clear-light.svg)
-  skin/classic/browser/devtools/search-clear-dark.svg          (../shared/devtools/images/search-clear-dark.svg)
-  skin/classic/browser/devtools/tool-profiler-active.svg       (../shared/devtools/images/tool-profiler-active.svg)
-
