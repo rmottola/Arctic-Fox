@@ -99,7 +99,7 @@ DevTools.prototype = {
     // Make sure that additional tools will always be able to be hidden.
     // When being called from main.js, defaultTools has not yet been exported.
     // But, we can assume that in this case, it is a default tool.
-    if (devtools.defaultTools && devtools.defaultTools.indexOf(toolDefinition) == -1) {
+    if (DefaultTools && DefaultTools.indexOf(toolDefinition) == -1) {
       toolDefinition.visibilityswitch = "devtools." + toolId + ".enabled";
     }
 
@@ -546,8 +546,9 @@ var gDevToolsBrowser = {
     // If a toolbox exists, using toggle from the Main window :
     // - should close a docked toolbox
     // - should focus a windowed toolbox
-    let isDocked = toolbox && toolbox.hostType != devtools.Toolbox.HostType.WINDOW;
-    isDocked ? toolbox.destroy() : gDevTools.showToolbox(target);  },
+    let isDocked = toolbox && toolbox.hostType != Toolbox.HostType.WINDOW;
+    isDocked ? toolbox.destroy() : gDevTools.showToolbox(target);
+  },
 
   toggleBrowserToolboxCommand: function(gBrowser) {
     let target = TargetFactory.forWindow(gBrowser.ownerDocument.defaultView);
