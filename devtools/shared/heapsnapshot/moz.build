@@ -36,7 +36,7 @@ FINAL_LIBRARY = 'xul'
 
 DevToolsModules(
     'census-tree-node.js',
-#    'HeapAnalysesClient.js',
-#    'HeapAnalysesWorker.js',
+    'HeapAnalysesClient.js',
+    'HeapAnalysesWorker.js',
     'HeapSnapshotFileUtils.js',
 )
