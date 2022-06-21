@@ -38,5 +38,5 @@ DevToolsModules(
     'census-tree-node.js',
 #    'HeapAnalysesClient.js',
 #    'HeapAnalysesWorker.js',
-#    'HeapSnapshotFileUtils.js',
+    'HeapSnapshotFileUtils.js',
 )

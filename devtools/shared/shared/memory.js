@@ -14,6 +14,9 @@ loader.lazyRequireGetter(this, "DeferredTask",
   "resource://gre/modules/DeferredTask.jsm", true);
 loader.lazyRequireGetter(this, "StackFrameCache",
   "devtools/server/actors/utils/stack", true);
+loader.lazyRequireGetter(this, "ThreadSafeChromeUtils");
+loader.lazyRequireGetter(this, "HeapSnapshotFileUtils",
+  "devtools/shared/heapsnapshot/HeapSnapshotFileUtils");
 
 /**
  * A class that returns memory data for a parent actor's window.
