@@ -19,6 +19,7 @@ loader.lazyGetter(this, "StyleEditorPanel", () => require("devtools/client/style
 loader.lazyGetter(this, "ShaderEditorPanel", () => require("devtools/client/shadereditor/panel").ShaderEditorPanel);
 loader.lazyGetter(this, "CanvasDebuggerPanel", () => require("devtools/client/canvasdebugger/panel").CanvasDebuggerPanel);
 loader.lazyGetter(this, "WebAudioEditorPanel", () => require("devtools/client/webaudioeditor/panel").WebAudioEditorPanel);
+loader.lazyGetter(this, "MemoryPanel", () => require("devtools/client/memory/panel").MemoryPanel);
 loader.lazyGetter(this, "PerformancePanel", () => require("devtools/client/performance/panel").PerformancePanel);
 loader.lazyGetter(this, "NetMonitorPanel", () => require("devtools/client/netmonitor/panel").NetMonitorPanel);
 loader.lazyGetter(this, "StoragePanel", () => require("devtools/client/storage/panel").StoragePanel);
@@ -274,6 +275,31 @@ Tools.performance = {
   }
 };
 
+Tools.memory = {
+  id: "memory",
+  ordinal: 8,
+  icon: "chrome://devtools/skin/themes/images/tool-styleeditor.svg",
+  invertIconForLightTheme: true,
+  url: "chrome://devtools/content/memory/memory.xhtml",
+  visibilityswitch: "devtools.memory.enabled",
+  label: "Memory",
+  panelLabel: "Memory Panel",
+  tooltip: "Memory (keyboardshortcut)",
+  hiddenInOptions: true,
+
+  isTargetSupported: function (target) {
+    // TODO 1201907
+    // Once Fx44 lands, we should add a root trait `heapSnapshots`
+    // to indicate that the memory actor can handle this.
+    // Shouldn't make this change until Fx44, however.
+    return true; // target.getTrait("heapSnapshots");
+  },
+
+  build: function (frame, target) {
+    return new MemoryPanel(frame, target);
+  }
+};
+
 Tools.netMonitor = {
   id: "netmonitor",
   accesskey: l10n("netmonitor.accesskey", netMonitorStrings),
@@ -385,7 +411,8 @@ var defaultTools = [
   Tools.performance,
   Tools.netMonitor,
   Tools.storage,
-  Tools.scratchpad
+  Tools.scratchpad,
+  Tools.memory,
 ];
 
 exports.defaultTools = defaultTools;
