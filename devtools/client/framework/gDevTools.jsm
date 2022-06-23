@@ -51,8 +51,6 @@ this.DevTools = function DevTools() {
   this.destroy = this.destroy.bind(this);
   this._teardown = this._teardown.bind(this);
 
-  this._testing = false;
-
   EventEmitter.decorate(this);
 
   Services.obs.addObserver(this._teardown, "devtools-unloaded", false);
