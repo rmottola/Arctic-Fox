@@ -68,10 +68,17 @@ const {
   CustomHighlighterActor,
   isTypeRegistered,
 } = require("devtools/server/actors/highlighters");
+const {
+  isAnonymous,
+  isNativeAnonymous,
+  isXBLAnonymous,
+  isShadowAnonymous,
+  getFrameElement
+} = require("devtools/shared/layout/utils");
 const {getLayoutChangesObserver, releaseLayoutChangesObserver} =
   require("devtools/server/actors/layout");
 
-const {EventParsers} = require("devtools/toolkit/event-parsers");
+const {EventParsers} = require("devtools/shared/event-parsers");
 
 const FONT_FAMILY_PREVIEW_TEXT = "The quick brown fox jumps over the lazy dog";
 const FONT_FAMILY_PREVIEW_TEXT_SIZE = 20;
@@ -114,8 +121,6 @@ const PSEUDO_SELECTORS = [
 
 var HELPER_SHEET = ".__fx-devtools-hide-shortcut__ { visibility: hidden !important } ";
 HELPER_SHEET += ":-moz-devtools-highlighted { outline: 2px dashed #F06!important; outline-offset: -2px!important } ";
-
-Cu.import("resource://gre/modules/devtools/LayoutHelpers.jsm");
 
 loader.lazyRequireGetter(this, "DevToolsUtils",
                          "devtools/shared/DevToolsUtils");
@@ -252,10 +257,10 @@ var NodeActor = exports.NodeActor = protocol.ActorClass({
       attrs: this.writeAttrs(),
       isBeforePseudoElement: this.isBeforePseudoElement,
       isAfterPseudoElement: this.isAfterPseudoElement,
-      isAnonymous: LayoutHelpers.isAnonymous(this.rawNode),
-      isNativeAnonymous: LayoutHelpers.isNativeAnonymous(this.rawNode),
-      isXBLAnonymous: LayoutHelpers.isXBLAnonymous(this.rawNode),
-      isShadowAnonymous: LayoutHelpers.isShadowAnonymous(this.rawNode),
+      isAnonymous: isAnonymous(this.rawNode),
+      isNativeAnonymous: isNativeAnonymous(this.rawNode),
+      isXBLAnonymous: isXBLAnonymous(this.rawNode),
+      isShadowAnonymous: isShadowAnonymous(this.rawNode),
       pseudoClassLocks: this.writePseudoClassLocks(),
 
       isDisplayed: this.isDisplayed,
@@ -1223,8 +1228,6 @@ var WalkerActor = protocol.ActorClass({
     this._pendingMutations = [];
     this._activePseudoClassLocks = new Set();
     this.showAllAnonymousContent = options.showAllAnonymousContent;
-
-    this.layoutHelpers = new LayoutHelpers(this.rootWin);
 
     // Nodes which have been removed from the client's known
     // ownership tree are considered "orphaned", and stored in
@@ -2708,7 +2711,7 @@ var WalkerActor = protocol.ActorClass({
       });
       return;
     }
-    let frame = this.layoutHelpers.getFrameElement(window);
+    let frame = getFrameElement(window);
     let frameActor = this._refMap.get(frame);
     if (!frameActor) {
       return;
@@ -2735,7 +2738,7 @@ var WalkerActor = protocol.ActorClass({
       if (win === window) {
         return true;
       }
-      win = this.layoutHelpers.getFrameElement(win);
+      win = getFrameElement(win);
     }
     return false;
   },
@@ -3723,24 +3726,26 @@ function isXULElement(el) {
  * in XUL document (needed to show all elements in the browser toolbox).
  */
 function standardTreeWalkerFilter(aNode) {
+  // ::before and ::after are native anonymous content, but we always
+  // want to show them
+  if (aNode.nodeName === "_moz_generated_content_before" ||
+      aNode.nodeName === "_moz_generated_content_after") {
+    return Ci.nsIDOMNodeFilter.FILTER_ACCEPT;
+  }
+
   // Ignore empty whitespace text nodes.
   if (aNode.nodeType == Ci.nsIDOMNode.TEXT_NODE &&
       !/[^\s]/.exec(aNode.nodeValue)) {
     return Ci.nsIDOMNodeFilter.FILTER_SKIP;
   }
 
-  // Ignore all native anonymous content (like internals for form
-  // controls).  Except for:
-  //   1) Anonymous content in a XUL document. This is needed for all
-  //      elements within the Browser Toolbox to properly show up.
-  //   2) ::before/::after - we do want this to show in the walker so
-  //      they can be inspected.
-  if (LayoutHelpers.isNativeAnonymous(aNode) &&
-      !isXULElement(aNode.parentNode) &&
-      (
-        aNode.nodeName !== "_moz_generated_content_before" &&
-        aNode.nodeName !== "_moz_generated_content_after")
-      ) {
+  // Ignore all native and XBL anonymous content inside a non-XUL document
+  if (!isInXULDocument(aNode) && (isXBLAnonymous(aNode) ||
+                                  isNativeAnonymous(aNode))) {
+    // Note: this will skip inspecting the contents of feedSubscribeLine since
+    // that's XUL content injected in an HTML document, but we need to because
+    // this also skips many other elements that need to be skipped - like form
+    // controls, scrollbars, video controls, etc (see bug 1187482).
     return Ci.nsIDOMNodeFilter.FILTER_SKIP;
   }
 

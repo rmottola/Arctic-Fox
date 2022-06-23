@@ -75,8 +75,6 @@ function MarkupView(aInspector, aFrame, aControllerWindow) {
   this._elt = this.doc.querySelector("#root");
   this.htmlEditor = new HTMLEditor(this.doc);
 
-  this.layoutHelpers = new LayoutHelpers(this.doc.defaultView);
-
   try {
     this.maxChildren = Services.prefs.getIntPref("devtools.markup.pagesize");
   } catch(ex) {
@@ -857,7 +855,7 @@ MarkupView.prototype = {
       }
       return this._ensureVisible(aNode);
     }).then(() => {
-      this.layoutHelpers.scrollIntoViewIfNeeded(this.getContainer(aNode).editor.elt, centered);
+      scrollIntoViewIfNeeded(this.getContainer(aNode).editor.elt, centered);
     }, e => {
       // Only report this rejection as an error if the panel hasn't been
       // destroyed in the meantime.
@@ -878,7 +876,7 @@ MarkupView.prototype = {
       if (this._destroyer) {
         console.warn("Could not expand the node, the markup-view was destroyed");
         return;
-      } 
+      }
       aContainer.setExpanded(true);
     });
   },
@@ -2575,8 +2573,8 @@ ElementEditor.prototype = {
     // name="v"a"l"u"e" when editing -> name='v"a"l"u"e"'
     // name="v'a"l'u"e" when editing -> name="v'a&quot;l'u&quot;e"
     let editValueDisplayed = aAttr.value || "";
-    let hasDoubleQuote = editValueDisplayed.contains('"');
-    let hasSingleQuote = editValueDisplayed.contains("'");
+    let hasDoubleQuote = editValueDisplayed.includes('"');
+    let hasSingleQuote = editValueDisplayed.includes("'");
     let initial = aAttr.name + '="' + editValueDisplayed + '"';
 
     // Can't just wrap value with ' since the value contains both " and '.
@@ -2960,7 +2958,7 @@ function map(value, oldMin, oldMax, newMin, newMax) {
 }
 
 loader.lazyGetter(MarkupView.prototype, "strings", () => Services.strings.createBundle(
-  "chrome://global/locale/devtools/inspector.properties"
+  "chrome://browser/locale/devtools/inspector.properties"
 ));
 
 XPCOMUtils.defineLazyGetter(this, "clipboardHelper", function() {

@@ -38,10 +38,10 @@ var illegalFileNameCharacters = [
   "/:*?\\\"<>|\\\\", // Special characters
   "]"
 ].join("");
-let ILLEGAL_CHAR_REGEX = new RegExp(illegalFileNameCharacters, "g");
+var ILLEGAL_CHAR_REGEX = new RegExp(illegalFileNameCharacters, "g");
 
 // Holder for all the registered storage actors.
-let storageTypePool = new Map();
+var storageTypePool = new Map();
 
 /**
  * Gets an accumulated list of all storage actors registered to be used to
@@ -136,7 +136,7 @@ types.addDictType("storeUpdateObject", {
 });
 
 // Helper methods to create a storage actor.
-let StorageActors = {};
+var StorageActors = {};
 
 /**
  * Creates a default object with the common methods required by all storage
@@ -1314,22 +1314,18 @@ let StorageActor = exports.StorageActor = protocol.ActorClass({
     Services.obs.addObserver(this, "content-document-global-created", false);
     Services.obs.addObserver(this, "inner-window-destroyed", false);
     this.onPageChange = this.onPageChange.bind(this);
+
     let handler = tabActor.chromeEventHandler;
     handler.addEventListener("pageshow", this.onPageChange, true);
     handler.addEventListener("pagehide", this.onPageChange, true);
 
     this.destroyed = false;
     this.boundUpdate = {};
-
-    // Layout helper for window.parent and window.top helper methods that work
-    // accross devices.
-    this.layoutHelper = new LayoutHelpers(this.window);
   },
 
   destroy: function() {
     clearTimeout(this.batchTimer);
     this.batchTimer = null;
-    this.layoutHelper = null;
     // Remove observers
     Services.obs.removeObserver(this, "content-document-global-created", false);
     Services.obs.removeObserver(this, "inner-window-destroyed", false);
@@ -1377,7 +1373,7 @@ let StorageActor = exports.StorageActor = protocol.ActorClass({
   },
 
   isIncludedInTopLevelWindow: function(window) {
-    return this.layoutHelper.isIncludedInTopLevelWindow(window);
+    return isWindowIncluded(this.window, window);
   },
 
   getWindowFromInnerWindowID: function(innerID) {

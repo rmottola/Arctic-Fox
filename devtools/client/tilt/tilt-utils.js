@@ -407,9 +407,8 @@ TiltUtils.DOM = {
    */
   getNodePosition: function TUD_getNodePosition(aContentWindow, aNode,
                                                 aParentPosition) {
-    let lh = new LayoutHelpers(aContentWindow);
     // get the x, y, width and height coordinates of the node
-    let coord = lh.getRect(aNode, aContentWindow);
+    let coord = getRect(aContentWindow, aNode, aContentWindow);
     if (!coord) {
       return null;
     }
@@ -611,5 +610,5 @@ TiltUtils.bindObjectFunc(TiltUtils.DOM);
 // set the necessary string bundle
 XPCOMUtils.defineLazyGetter(TiltUtils.L10n, "stringBundle", function() {
   return Services.strings.createBundle(
-    "chrome://global/locale/devtools/tilt.properties");
+    "chrome://browser/locale/devtools/tilt.properties");
 });

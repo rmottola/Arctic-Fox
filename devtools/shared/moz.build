@@ -41,7 +41,6 @@ DevToolsModules(
     'DevToolsUtils.js',
     'event-emitter.js',
     'event-parsers.js',
-    'LayoutHelpers.jsm',
     'Loader.jsm',
     'output-parser.js',
     'path.js',

@@ -41,6 +41,7 @@
 const { Cc, Ci, Cu } = require("chrome");
 const Services = require("Services");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
+const { getRootBindingParent } = require("devtools/shared/layout/utils");
 
 const MAX_DATA_URL_LENGTH = 40;
 
@@ -55,8 +56,7 @@ const RX_PSEUDO = /\s*:?:([\w-]+)(\(?\)?)\s*/g;
 // This should be ok because none of the functions that use this should be used
 // on the worker thread, where Cu is not available.
 if (Cu) {
-  Cu.importGlobalProperties(['CSS']);
-  Cu.import("resource://gre/modules/devtools/shared/LayoutHelpers.jsm");
+  Cu.importGlobalProperties(["CSS"]);
 }
 
 function CssLogic()
@@ -931,7 +931,7 @@ function positionInNodeList(element, nodeList) {
  * and ele.ownerDocument.querySelectorAll(reply).length === 1
  */
 CssLogic.findCssSelector = function CssLogic_findCssSelector(ele) {
-  ele = LayoutHelpers.getRootBindingParent(ele);
+  ele = getRootBindingParent(ele);
   var document = ele.ownerDocument;
   if (!document || !document.contains(ele)) {
     throw new Error('findCssSelector received element not inside document');
