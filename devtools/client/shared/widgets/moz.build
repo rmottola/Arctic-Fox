@@ -16,6 +16,7 @@ DevToolsModules(
     'FlameGraph.js',
     'Graphs.js',
     'GraphsWorker.js',
+    'LineGraphWidget.js',
     'MdnDocsWidget.js',
     'SideMenuWidget.jsm',
     'SimpleListWidget.jsm',
