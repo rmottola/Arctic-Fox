@@ -755,6 +755,15 @@ var gDevToolsBrowser = {
     return deferred.promise;
   },
 
+  openContentProcessToolbox: function () {
+    this._getContentProcessTarget()
+        .then(target => {
+          // Display a new toolbox, in a new window, with debugger by default
+          return gDevTools.showToolbox(target, "jsdebugger",
+                                       Toolbox.HostType.WINDOW);
+        });
+  },
+
   /**
    * Install WebIDE widget
    */
