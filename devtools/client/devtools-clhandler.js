@@ -117,7 +117,7 @@ devtoolsCommandlineHandler.prototype = {
       portOrPath = 6000;
     }
     let { DevToolsLoader } =
-      Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+      Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 
     try {
       // Create a separate loader instance, so that we can be sure to receive
