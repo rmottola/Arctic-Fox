@@ -969,6 +969,27 @@ FlameGraph.prototype = {
   },
 
   /**
+   * Given a MouseEvent, make it relative to this._canvas.
+   * @return object {mouseX,mouseY}
+   */
+  _getRelativeEventCoordinates: function(e) {
+    // For ease of testing, testX and testY can be passed in as the event
+    // object.
+    if ("testX" in e && "testY" in e) {
+      return {
+        mouseX: e.testX * this._pixelRatio,
+        mouseY: e.testY * this._pixelRatio
+      };
+    }
+
+    let offset = this._getContainerOffset();
+    let mouseX = (e.clientX - offset.left) * this._pixelRatio;
+    let mouseY = (e.clientY - offset.top) * this._pixelRatio;
+
+    return {mouseX,mouseY};
+  },
+
+  /**
    * Listener for the "resize" event on the graph's parent node.
    */
   _onResize: function() {

@@ -18,7 +18,8 @@ loader.lazyImporter(this, "DevToolsWorker",
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 const GRAPH_SRC = "chrome://devtools/content/shared/widgets/graphs-frame.xhtml";
-const WORKER_URL = "resource:///modules/devtools/GraphsWorker.js";
+const WORKER_URL =
+  "resource:///modules/devtools/client/shared/widgets/GraphsWorker.js";
 
 // Generic constants.
 
@@ -1064,7 +1065,7 @@ AbstractCanvasGraph.prototype = {
             this.emit("deselecting");
           }
         } else {
-          this._selection.end = mouseX;
+          this._selection.end = this._cursor.x;
           this.emit("selecting");
         }
         break;
