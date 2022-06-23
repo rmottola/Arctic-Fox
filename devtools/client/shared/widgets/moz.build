@@ -14,7 +14,7 @@ DevToolsModules(
     'FastListWidget.js',
     'FilterWidget.js',
     'FlameGraph.js',
-    'Graphs.jsm',
+    'Graphs.js',
     'GraphsWorker.js',
     'MdnDocsWidget.js',
     'SideMenuWidget.jsm',

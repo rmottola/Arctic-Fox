@@ -3,28 +3,23 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const Cu = Components.utils;
+const { Cc, Ci, Cu, Cr } = require("chrome");
 
-Cu.import("resource://gre/modules/devtools/ViewHelpers.jsm");
-const promise = Cu.import("resource://gre/modules/Promise.jsm", {}).Promise;
-const {Task} = Cu.import("resource://gre/modules/Task.jsm", {});
-const {EventEmitter} = Cu.import("resource://gre/modules/devtools/event-emitter.js", {});
-const {DevToolsWorker} = Cu.import("resource://gre/modules/devtools/shared/worker.js", {});
+const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
+const { Heritage, setNamedTimeout, clearNamedTimeout } = require("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+const { getCurrentZoom } = require("devtools/shared/layout/utils");
 
-this.EXPORTED_SYMBOLS = [
-  "GraphCursor",
-  "GraphArea",
-  "GraphAreaDragger",
-  "GraphAreaResizer",
-  "AbstractCanvasGraph",
-  "LineGraphWidget",
-  "BarGraphWidget",
-  "CanvasGraphUtils"
-];
+loader.lazyRequireGetter(this, "promise");
+loader.lazyRequireGetter(this, "EventEmitter",
+  "devtools/shared/event-emitter");
+
+loader.lazyImporter(this, "DevToolsWorker",
+  "resource://gre/modules/devtools/shared/shared/worker.js");
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 const GRAPH_SRC = "chrome://devtools/content/shared/widgets/graphs-frame.xhtml";
-const WORKER_URL = "resource://gre/modules/devtools/GraphsWorker.js";
+const WORKER_URL = "resource:///modules/devtools/GraphsWorker.js";
+
 const L10N = new ViewHelpers.L10N();
 
 // Generic constants.
@@ -2187,3 +2182,12 @@ function findLast(array, predicate) {
     if (predicate(element)) return element;
   }
 }
+
+exports.GraphCursor = GraphCursor;
+exports.GraphArea = GraphArea;
+exports.GraphAreaDragger = GraphAreaDragger;
+exports.GraphAreaResizer = GraphAreaResizer;
+exports.AbstractCanvasGraph = AbstractCanvasGraph;
+exports.CanvasGraphUtils = CanvasGraphUtils;
+exports.CanvasGraphUtils.map = map;
+exports.CanvasGraphUtils.clamp = clamp;

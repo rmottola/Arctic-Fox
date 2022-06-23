@@ -125,7 +125,7 @@ function FlameGraph(parent, sharpness) {
   EventEmitter.decorate(this);
 
   this._parent = parent;
-  this._ready = Promise.defer();
+  this._ready = promise.defer();
 
   this.setTheme();
 
@@ -964,7 +964,7 @@ FlameGraph.prototype = {
  * A collection of utility functions converting various data sources
  * into a format drawable by the FlameGraph.
  */
-let FlameGraphUtils = {
+var FlameGraphUtils = {
   _cache: new WeakMap(),
 
   /**
