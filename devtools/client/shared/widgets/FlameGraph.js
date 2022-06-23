@@ -761,9 +761,7 @@ FlameGraph.prototype = {
    * Listener for the "mousemove" event on the graph's container.
    */
   _onMouseMove: function(e) {
-    let offset = this._getContainerOffset();
-    let mouseX = (e.clientX - offset.left) * this._pixelRatio;
-    let mouseY = (e.clientY - offset.top) * this._pixelRatio;
+    let {mouseX, mouseY} = this._getRelativeEventCoordinates(e);
 
     let canvasWidth = this._width;
     let canvasHeight = this._height;
@@ -813,9 +811,7 @@ FlameGraph.prototype = {
    * Listener for the "mousedown" event on the graph's container.
    */
   _onMouseDown: function(e) {
-    let offset = this._getContainerOffset();
-    let mouseX = (e.clientX - offset.left) * this._pixelRatio;
-    let mouseY = (e.clientY - offset.top) * this._pixelRatio;
+    let {mouseX, mouseY} = this._getRelativeEventCoordinates(e);
 
     this._selectionDragger.origin = mouseX;
     this._selectionDragger.anchor.start = this._selection.start;
@@ -847,8 +843,7 @@ FlameGraph.prototype = {
    * Listener for the "wheel" event on the graph's container.
    */
   _onMouseWheel: function(e) {
-    let offset = this._getContainerOffset();
-    let mouseX = (e.clientX - offset.left) * this._pixelRatio;
+    let {mouseX} = this._getRelativeEventCoordinates(e);
 
     let canvasWidth = this._width;
     let canvasHeight = this._height;
