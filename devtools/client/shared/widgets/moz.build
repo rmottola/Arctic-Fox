@@ -18,6 +18,7 @@ DevToolsModules(
     'GraphsWorker.js',
     'LineGraphWidget.js',
     'MdnDocsWidget.js',
+    'MountainGraphWidget.js',
     'SideMenuWidget.jsm',
     'SimpleListWidget.jsm',
     'Spectrum.js',
