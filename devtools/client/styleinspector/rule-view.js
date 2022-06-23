@@ -31,6 +31,7 @@ const HTML_NS = "http://www.w3.org/1999/xhtml";
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 const PREF_UA_STYLES = "devtools.inspector.showUserAgentStyles";
 const PREF_DEFAULT_COLOR_UNIT = "devtools.defaultColorUnit";
+const PROPERTY_NAME_CLASS = "ruleview-propertyname";
 const FILTER_CHANGED_TIMEOUT = 150;
 
 /**
@@ -1292,7 +1293,7 @@ CssRuleView.prototype = {
     let classes = node.classList;
     let prop = getParentTextProperty(node);
 
-    if (classes.contains("ruleview-propertyname") && prop) {
+    if (classes.contains(PROPERTY_NAME_CLASS) && prop) {
       type = overlays.VIEW_NODE_PROPERTY_TYPE;
       value = {
         property: node.textContent,

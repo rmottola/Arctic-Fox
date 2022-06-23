@@ -17,6 +17,7 @@ const {
   Tooltip,
   SwatchColorPickerTooltip,
   SwatchCubicBezierTooltip,
+  CssDocsTooltip,
   SwatchFilterTooltip
 } = require("devtools/client/shared/widgets/Tooltip");
 const {CssLogic} = require("devtools/styleinspector/css-logic");
@@ -274,6 +275,9 @@ TooltipsOverlay.prototype = {
     this.previewTooltip.startTogglingOnHover(this.view.element,
       this._onPreviewTooltipTargetHover.bind(this));
 
+    // MDN CSS help tooltip
+    this.cssDocs = new CssDocsTooltip(panelDoc);
+
     if (this.isRuleView) {
       // Color picker tooltip
       this.colorPicker = new SwatchColorPickerTooltip(this.view.inspector.panelDoc);
@@ -304,6 +308,10 @@ TooltipsOverlay.prototype = {
 
     if (this.cubicBezier) {
       this.cubicBezier.destroy();
+    }
+
+    if (this.cssDocs) {
+      this.cssDocs.destroy();
     }
 
     if (this.filterEditor) {
@@ -369,6 +377,10 @@ TooltipsOverlay.prototype = {
       this.cubicBezier.hide();
     }
 
+    if (this.isRuleView && this.cssDocs.tooltip.isShown()) {
+      this.cssDocs.hide();
+    }
+
     if (this.isRuleView && this.filterEditor.tooltip.isShown()) {
       this.filterEditor.revert();
       this.filterEdtior.hide();
@@ -401,6 +413,10 @@ TooltipsOverlay.prototype = {
 
     if (this.cubicBezier) {
       this.cubicBezier.hide();
+    }
+
+    if (this.cssDocs) {
+      this.cssDocs.hide();
     }
 
     if (this.filterEditor) {

@@ -150,7 +150,7 @@ devtools.jar:
     content/shared/widgets/cubic-bezier-frame.xhtml (shared/widgets/cubic-bezier-frame.xhtml)
     content/shared/widgets/cubic-bezier.css (shared/widgets/cubic-bezier.css)
     content/shared/widgets/mdn-docs-frame.xhtml (shared/widgets/mdn-docs-frame.xhtml)
-#    content/shared/widgets/mdn-docs.css (shared/widgets/mdn-docs.css)
+    content/shared/widgets/mdn-docs.css (shared/widgets/mdn-docs.css)
     content/shared/widgets/filter-frame.xhtml (shared/widgets/filter-frame.xhtml)
     content/shared/widgets/filter-widget.css (shared/widgets/filter-widget.css)
     content/eyedropper/eyedropper.xul (eyedropper/eyedropper.xul)
