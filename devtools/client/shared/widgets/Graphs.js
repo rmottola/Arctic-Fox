@@ -130,6 +130,7 @@ this.AbstractCanvasGraph = function(parent, name, sharpness) {
     this._selection = new GraphArea();
     this._selectionDragger = new GraphAreaDragger();
     this._selectionResizer = new GraphAreaResizer();
+    this._isMouseActive = false;
 
     this._onAnimationFrame = this._onAnimationFrame.bind(this);
     this._onMouseMove = this._onMouseMove.bind(this);
@@ -772,7 +773,9 @@ AbstractCanvasGraph.prototype = {
       stripesColor: this.selectionStripesColor
     });
     ctx.fillStyle = pattern;
-    ctx.fillRect(start, 0, end - start, this._height);
+    let rectStart = Math.min(this._width, Math.max(0, start));
+    let rectEnd = Math.min(this._width, Math.max(0, end));
+    ctx.fillRect(rectStart, 0, rectEnd - rectStart, this._height);
 
     // Draw left boundary.
 
