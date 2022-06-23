@@ -572,7 +572,7 @@ var gDevToolsBrowser = {
       if (isEnabled) {
         cmd.removeAttribute("disabled");
         cmd.removeAttribute("hidden");
-      } else {
+      } else if (cmd != null) {
         cmd.setAttribute("disabled", "true");
         cmd.setAttribute("hidden", "true");
       }

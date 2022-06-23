@@ -39,7 +39,6 @@ DevToolsModules(
     'css-color.js',
     'deprecated-sync-thenables.js',
     'DevToolsUtils.js',
-    'DevToolsUtils.jsm',
     'event-emitter.js',
     'event-parsers.js',
     'LayoutHelpers.jsm',
