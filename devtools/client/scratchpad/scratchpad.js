@@ -59,7 +59,6 @@ Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
 Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
 Cu.import("resource://gre/modules/reflect.jsm");
-Cu.import("resource://gre/modules/devtools/DevToolsUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "VariablesView",
   "resource:///modules/devtools/client/shared/widgets/VariablesView.jsm");
@@ -81,6 +80,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "ShortcutUtils",
 
 XPCOMUtils.defineLazyModuleGetter(this, "Reflect",
   "resource://gre/modules/reflect.jsm");
+
+// Because we have no constructor / destructor where we can log metrics we need
+// to do so here.
+var telemetry = new Telemetry();
+telemetry.toolOpened("scratchpad");
 
 var WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
 
