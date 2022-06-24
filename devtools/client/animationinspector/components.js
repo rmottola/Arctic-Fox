@@ -760,7 +760,8 @@ AnimationsTimeline.prototype = {
   drawHeaderAndBackground: function() {
     let width = this.timeHeaderEl.offsetWidth;
     let scale = width / (TimeScale.maxEndTime - TimeScale.minStartTime);
-    drawGraphElementBackground(this.win.document, "time-graduations", width, scale);
+    drawGraphElementBackground(this.win.document, "time-graduations",
+                               width, scale);
 
     // And the time graduation header.
     this.timeHeaderEl.innerHTML = "";
