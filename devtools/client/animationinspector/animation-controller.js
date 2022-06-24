@@ -100,6 +100,7 @@ var AnimationsController = {
     this.onAnimationMutations = this.onAnimationMutations.bind(this);
 
     let target = gToolbox.target;
+    this.animationsFront = new AnimationsFront(target.client, target.form);
 
     // Expose actor capabilities.
     this.hasToggleAll = yield target.actorHasMethod("animations", "toggleAll");
@@ -118,7 +119,6 @@ var AnimationsController = {
       return;
     }
 
-    this.animationsFront = new AnimationsFront(target.client, target.form);
     this.startListeners();
     yield this.onNewNodeFront();
 
