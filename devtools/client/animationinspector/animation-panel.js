@@ -30,7 +30,8 @@ var AnimationsPanel = {
       return;
     }
     if (this.initialized) {
-      return this.initialized.promise;
+      yield this.initialized.promise;
+      return;
     }
     this.initialized = promise.defer();
 
@@ -75,7 +76,8 @@ var AnimationsPanel = {
     }
 
     if (this.destroyed) {
-      return this.destroyed.promise;
+      yield this.destroyed.promise;
+      return;
     }
     this.destroyed = promise.defer();
 
@@ -153,7 +155,8 @@ var AnimationsPanel = {
           currentWidgetStateChange.push(btnClass.contains("paused")
             ? widget.play() : widget.pause());
         }
-        yield promise.all(currentWidgetStateChange).catch(e => console.error(e));
+        yield promise.all(currentWidgetStateChange)
+                     .catch(error => console.error(error));
       }
     }
 
@@ -166,7 +169,8 @@ var AnimationsPanel = {
   },
 
   onTimelineTimeChanged: function(e, time) {
-    AnimationsController.setCurrentTimeAll(time, true).catch(e => console.error(e));
+    AnimationsController.setCurrentTimeAll(time, true)
+                        .catch(error => console.error(error));
   },
 
   refreshAnimations: Task.async(function*() {

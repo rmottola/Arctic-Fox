@@ -82,7 +82,8 @@ function destroy() {
  *
  * Usage example:
  *
- * AnimationsController.on(AnimationsController.PLAYERS_UPDATED_EVENT, onPlayers);
+ * AnimationsController.on(AnimationsController.PLAYERS_UPDATED_EVENT,
+ *                         onPlayers);
  * function onPlayers() {
  *   for (let player of AnimationsController.animationPlayers) {
  *     // do something with player
@@ -94,7 +95,8 @@ var AnimationsController = {
 
   initialize: Task.async(function*() {
     if (this.initialized) {
-      return this.initialized.promise;
+      yield this.initialized.promise;
+      return;
     }
     this.initialized = promise.defer();
 
@@ -136,7 +138,8 @@ var AnimationsController = {
     }
 
     if (this.destroyed) {
-      return this.destroyed.promise;
+      yield this.destroyed.promise;
+      return;
     }
     this.destroyed = promise.defer();
 
@@ -252,7 +255,8 @@ var AnimationsController = {
   refreshAnimationPlayers: Task.async(function*(nodeFront) {
     yield this.destroyAnimationPlayers();
 
-    this.animationPlayers = yield this.animationsFront.getAnimationPlayersForNode(nodeFront);
+    this.animationPlayers = yield this.animationsFront
+                                      .getAnimationPlayersForNode(nodeFront);
     this.startAllAutoRefresh();
 
     // Start listening for animation mutations only after the first method call
