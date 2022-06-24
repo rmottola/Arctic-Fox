@@ -23,6 +23,7 @@ this.EXPORTED_SYMBOLS = ["Parser", "ParserHelpers", "SyntaxTreeVisitor"];
 this.Parser = function Parser() {
   this._cache = new Map();
   this.errors = [];
+  this.logExceptions = true;
 };
 
 Parser.prototype = {
@@ -67,7 +68,9 @@ Parser.prototype = {
         syntaxTrees.push(new SyntaxTree(nodes, aUrl, length));
       } catch (e) {
         this.errors.push(e);
-        DevToolsUtils.reportException(aUrl, e);
+        if (this.logExceptions) {
+          DevToolsUtils.reportException(aUrl, e);
+        }
       }
     }
     // Generate the AST nodes for each script.
@@ -81,7 +84,9 @@ Parser.prototype = {
           syntaxTrees.push(new SyntaxTree(nodes, aUrl, length, offset));
         } catch (e) {
           this.errors.push(e);
-          DevToolsUtils.reportException(aUrl, e);
+          if (this.logExceptions) {
+            DevToolsUtils.reportException(aUrl, e);
+          }
         }
       }
     }
