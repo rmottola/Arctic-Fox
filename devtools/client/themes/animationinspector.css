@@ -12,6 +12,10 @@
   --even-animation-timeline-background-color: rgba(128,128,128,0.03);
 }
 
+:root {
+  --timeline-sidebar-width: 150px;
+}
+
 html {
   height: 100%;
 }

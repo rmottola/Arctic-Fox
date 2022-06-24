@@ -628,6 +628,11 @@ let TimeScale = {
  * time play head.
  * Animations are organized by lines, with a left margin containing the preview
  * of the target DOM element the animation applies to.
+ * The current time play head can be moved by clicking/dragging in the header.
+ * when this happens, the component emits "current-data-changed" events with the
+ * new time and state of the timeline.
+ *
+ * @param {InspectorPanel} inspector.
  */
 function AnimationsTimeline(inspector) {
   this.animations = [];
@@ -635,6 +640,12 @@ function AnimationsTimeline(inspector) {
   this.inspector = inspector;
 
   this.onAnimationStateChanged = this.onAnimationStateChanged.bind(this);
+  this.onTimeHeaderMouseDown = this.onTimeHeaderMouseDown.bind(this);
+  this.onTimeHeaderMouseUp = this.onTimeHeaderMouseUp.bind(this);
+  this.onTimeHeaderMouseOut = this.onTimeHeaderMouseOut.bind(this);
+  this.onTimeHeaderMouseMove = this.onTimeHeaderMouseMove.bind(this);
+
+  EventEmitter.decorate(this);
 }
 
 exports.AnimationsTimeline = AnimationsTimeline;
@@ -647,6 +658,13 @@ AnimationsTimeline.prototype = {
       parent: containerEl,
       attributes: {
         "class": "animation-timeline"
+      }
+    });
+
+    this.scrubberEl = createNode({
+      parent: this.rootWrapperEl,
+      attributes: {
+        "class": "scrubber"
       }
     });
 
@@ -669,12 +687,16 @@ AnimationsTimeline.prototype = {
   destroy: function() {
     this.unrender();
 
+    this.timeHeaderEl.removeEventListener("mousedown",
+      this.onTimeHeaderMouseDown);
+
     this.rootWrapperEl.remove();
     this.animations = [];
 
     this.rootWrapperEl = null;
     this.timeHeaderEl = null;
     this.animationsEl = null;
+    this.scrubberEl = null;
     this.win = null;
     this.inspector = null;
   },
@@ -694,6 +716,47 @@ AnimationsTimeline.prototype = {
     TimeScale.reset();
     this.destroyTargetNodes();
     this.animationsEl.innerHTML = "";
+  },
+
+  onTimeHeaderMouseDown: function(e) {
+    this.moveScrubberTo(e.pageX);
+    this.win.addEventListener("mouseup", this.onTimeHeaderMouseUp);
+    this.win.addEventListener("mouseout", this.onTimeHeaderMouseOut);
+    this.win.addEventListener("mousemove", this.onTimeHeaderMouseMove);
+  },
+
+  onTimeHeaderMouseUp: function() {
+    this.cancelTimeHeaderDragging();
+  },
+
+  onTimeHeaderMouseOut: function(e) {
+    // Check that mouseout happened on the window itself, and if yes, cancel
+    // the dragging.
+    if (!this.win.document.contains(e.relatedTarget)) {
+      this.cancelTimeHeaderDragging();
+    }
+  },
+
+  cancelTimeHeaderDragging: function() {
+    this.win.removeEventListener("mouseup", this.onTimeHeaderMouseUp);
+    this.win.removeEventListener("mouseout", this.onTimeHeaderMouseOut);
+    this.win.removeEventListener("mousemove", this.onTimeHeaderMouseMove);
+  },
+
+  onTimeHeaderMouseMove: function(e) {
+    this.moveScrubberTo(e.pageX);
+  },
+
+  moveScrubberTo: function(pageX) {
+    let offset = pageX - this.scrubberEl.offsetWidth;
+    if (offset < 0) {
+      offset = 0;
+    }
+
+    this.scrubberEl.style.left = offset + "px";
+
+    let time = TimeScale.distanceToTime(offset, this.timeHeaderEl.offsetWidth);
+    this.emit("current-time-changed", time);
   },
 
   render: function(animations) {
