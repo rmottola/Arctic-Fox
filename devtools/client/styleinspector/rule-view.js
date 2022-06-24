@@ -31,6 +31,8 @@ const HTML_NS = "http://www.w3.org/1999/xhtml";
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 const PREF_UA_STYLES = "devtools.inspector.showUserAgentStyles";
 const PREF_DEFAULT_COLOR_UNIT = "devtools.defaultColorUnit";
+const PREF_ENABLE_MDN_DOCS_TOOLTIP =
+      "devtools.inspector.mdnDocsTooltip.enabled";
 const PROPERTY_NAME_CLASS = "ruleview-propertyname";
 const FILTER_CHANGED_TIMEOUT = 150;
 
@@ -1165,8 +1167,11 @@ function CssRuleView(aInspector, aDoc, aStore, aPageStyle) {
   this._prefObserver.on(PREF_ORIG_SOURCES, this._onSourcePrefChanged);
   this._prefObserver.on(PREF_UA_STYLES, this._handlePrefChange);
   this._prefObserver.on(PREF_DEFAULT_COLOR_UNIT, this._handlePrefChange);
+  this._prefObserver.on(PREF_ENABLE_MDN_DOCS_TOOLTIP, this._handlePrefChange);
 
   this.showUserAgentStyles = Services.prefs.getBoolPref(PREF_UA_STYLES);
+  this.enableMdnDocsTooltip =
+    Services.prefs.getBoolPref(PREF_ENABLE_MDN_DOCS_TOOLTIP);
 
   let options = {
     autoSelect: true,
