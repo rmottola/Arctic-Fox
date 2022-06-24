@@ -377,7 +377,7 @@ SyntaxTree.prototype = {
        * Callback invoked for each arrow expression node.
        * @param Node aNode
        */
-      onArrowExpression: function(aNode) {
+      onArrowFunctionExpression: function(aNode) {
         // Infer the function's name from an enclosing syntax tree node.
         let inferredInfo = ParserHelpers.inferFunctionExpressionInfo(aNode);
         let inferredName = inferredInfo.name;
@@ -1623,8 +1623,8 @@ var SyntaxTreeVisitor = {
   /**
    * An arrow expression.
    *
-   * interface ArrowExpression <: Function, Expression {
-   *   type: "ArrowExpression";
+   * interface ArrowFunctionExpression <: Function, Expression {
+   *   type: "ArrowFunctionExpression";
    *   params: [ Pattern ];
    *   defaults: [ Expression ];
    *   rest: Identifier | null;
@@ -1633,7 +1633,7 @@ var SyntaxTreeVisitor = {
    *   expression: boolean;
    * }
    */
-  ArrowExpression: function(aNode, aParent, aCallbacks) {
+  ArrowFunctionExpression: function(aNode, aParent, aCallbacks) {
     aNode._parent = aParent;
 
     if (this.break) {
@@ -1644,8 +1644,8 @@ var SyntaxTreeVisitor = {
         return;
       }
     }
-    if (aCallbacks.onArrowExpression) {
-      aCallbacks.onArrowExpression(aNode);
+    if (aCallbacks.onArrowFunctionExpression) {
+      aCallbacks.onArrowFunctionExpression(aNode);
     }
     for (let param of aNode.params) {
       this[param.type](param, aNode, aCallbacks);
