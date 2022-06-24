@@ -756,9 +756,7 @@ StackFrames.prototype = {
       let { depth, source, where: { line } } = frame;
 
       let isBlackBoxed = source ? this.activeThread.source(source).isBlackBoxed : false;
-      let location = NetworkHelper.convertToUnicode(unescape(source.url || source.introductionUrl));
-      let title = StackFrameUtils.getFrameTitle(frame);
-      DebuggerView.StackFrames.addFrame(title, location, line, depth, isBlackBoxed);
+      DebuggerView.StackFrames.addFrame(frame, line, depth, isBlackBoxed);
     }
 
     DebuggerView.StackFrames.selectedDepth = Math.max(this.currentFrameDepth, 0);
@@ -2049,7 +2047,8 @@ var Prefs = new ViewHelpers.Prefs("devtools", {
   autoPrettyPrint: ["Bool", "debugger.auto-pretty-print"],
   workersEnabled: ["Bool", "debugger.workers"],
   editorTabSize: ["Int", "editor.tabsize"],
-  autoBlackBox: ["Bool", "debugger.auto-black-box"]
+  autoBlackBox: ["Bool", "debugger.auto-black-box"],
+  promiseDebuggerEnabled: ["Bool", "debugger.promise"]
 });
 
 /**

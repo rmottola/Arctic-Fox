@@ -127,6 +127,7 @@ var DebuggerView = {
     this._workersAndSourcesPane = document.getElementById("workers-and-sources-pane");
     this._instrumentsPane = document.getElementById("instruments-pane");
     this._instrumentsPaneToggleButton = document.getElementById("instruments-pane-toggle");
+    this._promisePane = document.getElementById("promise-debugger-pane");
 
     this.showEditor = this.showEditor.bind(this);
     this.showBlackBoxMessage = this.showBlackBoxMessage.bind(this);
@@ -163,6 +164,7 @@ var DebuggerView = {
     this._workersAndSourcesPane = null;
     this._instrumentsPane = null;
     this._instrumentsPaneToggleButton = null;
+    this._promisePane = null;
   },
 
   /**

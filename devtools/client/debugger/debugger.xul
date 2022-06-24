@@ -343,6 +343,11 @@
                                class="devtools-toolbarbutton"
                                tooltiptext="&debuggerUI.sources.toggleBreakpoints;"
                                command="toggleBreakpointsCommand"/>
+                <toolbarbutton id="toggle-promise-debugger"
+                               class="devtools-toolbarbutton"
+                               tooltiptext="&debuggerUI.sources.togglePromiseDebugger;"
+                               command="togglePromiseDebuggerCommand"
+                               hidden="true"/>
               </toolbar>
             </tabpanel>
             <tabpanel id="callstack-tabpanel">
