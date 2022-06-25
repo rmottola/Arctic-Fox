@@ -197,6 +197,10 @@
     <broadcaster id="devtoolsMenuBroadcaster_ChromeDebugger"
                  label="&chromeDebuggerMenu.label;"
                  command="Tools:ChromeDebugger"/>
+    <broadcaster id="devtoolsMenuBroadcaster_BrowserToolbox"
+                 label="&browserToolboxMenu.label;"
+                 key="key_browserToolbox"
+                 command="Tools:BrowserToolbox"/>
     <broadcaster id="devtoolsMenuBroadcaster_BrowserConsole"
                  label="&browserConsoleCmd.label;"
                  key="key_browserConsole"
@@ -281,6 +285,7 @@
 #ifdef MOZ_DEVTOOLS
     <key id="key_browserConsole" key="&browserConsoleCmd.commandkey;" command="Tools:BrowserConsole" modifiers="accel,shift"/>
     <key id="key_devToolbox" keycode="VK_F12" keytext="F12" command="Tools:DevToolbox"/>
+    <key id="key_browserToolbox" key="&browserToolboxCmd.commandkey;" command="Tools:BrowserToolbox" modifiers="accel,alt,shift"/>
     <key id="key_devToolbar" keycode="&devToolbar.keycode;" modifiers="shift"
          keytext="&devToolbar.keytext;" command="Tools:DevToolbarFocus"/>
     <key id="key_responsiveUI" key="&responsiveDesignTool.commandkey;" command="Tools:ResponsiveUI"

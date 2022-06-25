@@ -67,6 +67,8 @@ this.BrowserToolboxProcess = function BrowserToolboxProcess(aOnClose, aOnRun, aO
     this._options = aOptions || {};
   }
 
+  this._telemetry = new Telemetry();
+
   this.close = this.close.bind(this);
   Services.obs.addObserver(this.close, "quit-application", false);
   this._initServer();
@@ -212,7 +214,18 @@ BrowserToolboxProcess.prototype = {
       args.push("-purgecaches");
     }
 
+    // Disable safe mode for the new process in case this was opened via the
+    // keyboard shortcut.
+    let nsIEnvironment = Components.classes["@mozilla.org/process/environment;1"].getService(Components.interfaces.nsIEnvironment);
+    let originalValue = nsIEnvironment.get("MOZ_DISABLE_SAFE_MODE_KEY");
+    nsIEnvironment.set("MOZ_DISABLE_SAFE_MODE_KEY", "1");
+
     process.runwAsync(args, args.length, { observe: () => this.close() });
+
+    // Now that the process has started, it's safe to reset the env variable.
+    nsIEnvironment.set("MOZ_DISABLE_SAFE_MODE_KEY", originalValue);
+
+    this._telemetry.toolOpened("jsbrowserdebugger");
 
     dumpn("Chrome toolbox is now running...");
     this.emit("run", this);
@@ -233,6 +246,7 @@ BrowserToolboxProcess.prototype = {
       this._dbgProcess.kill();
     }
 
+    this._telemetry.toolClosed("jsbrowserdebugger");
     if (this.debuggerServer) {
       this.debuggerServer.destroy();
     }
