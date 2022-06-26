@@ -145,7 +145,7 @@
 .devtools-menulist > .menulist-dropmarker {
   -moz-appearance: none;
   display: -moz-box;
-  list-style-image: url("chrome://global/skin/devtools/dropmarker.svg");
+  list-style-image: url("chrome://devtools/skin/themes/images/dropmarker.svg");
   -moz-box-align: center;
   min-width: 16px;
 }
@@ -153,7 +153,7 @@
 .devtools-toolbarbutton[type=menu] > .toolbarbutton-menu-dropmarker,
 .devtools-toolbarbutton[type=menu-button] > .toolbarbutton-menubutton-dropmarker {
   -moz-appearance: none !important;
-  list-style-image: url("chrome://global/skin/devtools/dropmarker.svg");
+  list-style-image: url("chrome://devtools/skin/themes/images/dropmarker.svg");
   -moz-box-align: center;
   padding: 0 3px;
 }
@@ -231,7 +231,7 @@
 
 .devtools-option-toolbarbutton {
   -moz-appearance: none;
-  list-style-image: url("chrome://global/skin/devtools/tool-options.svg");
+  list-style-image: url("chrome://devtools/skin/themes/images/tool-options.svg");
   background: none;
   opacity: .8;
   border: none;
@@ -357,11 +357,11 @@
 }
 
 .theme-dark .devtools-searchinput {
-  background-image: url(magnifying-glass.png);
+  background-image: url(images/magnifying-glass.png);
 }
 
 .theme-light .devtools-searchinput {
-  background-image: url(magnifying-glass-light.png);
+  background-image: url(images/magnifying-glass-light.png);
 }
 
 .devtools-searchinput:-moz-locale-dir(rtl) {
@@ -414,15 +414,15 @@
 }
 
 .theme-dark .devtools-searchinput-clear {
-  background-image: url("chrome://browser/skin/devtools/search-clear-dark.svg");
+  background-image: url("chrome://devtools/skin/themes/images/search-clear-dark.svg");
 }
 
 .theme-light .devtools-searchinput-clear {
-  background-image: url("chrome://browser/skin/devtools/search-clear-light.svg");
+  background-image: url("chrome://devtools/skin/themes/images/search-clear-light.svg");
 }
 
 .devtools-style-searchbox-no-match + .devtools-searchinput-clear {
-  background-image: url("chrome://browser/skin/devtools/search-clear-failed.svg") !important;
+  background-image: url("chrome://devtools/skin/themes/images/search-clear-failed.svg") !important;
 }
 
 .devtools-searchinput-clear:hover {
@@ -430,12 +430,12 @@
 }
 
 .theme-dark .devtools-searchinput > .textbox-input-box > .textbox-search-icons > .textbox-search-clear {
-  list-style-image: url("chrome://browser/skin/devtools/search-clear-dark.svg");
+  list-style-image: url("chrome://devtools/skin/themes/images/search-clear-dark.svg");
   -moz-image-region: rect(0, 16px, 16px, 0);
 }
 
 .theme-light .devtools-searchinput > .textbox-input-box > .textbox-search-icons > .textbox-search-clear {
-  list-style-image: url("chrome://browser/skin/devtools/search-clear-light.svg");
+  list-style-image: url("chrome://devtools/skin/themes/images/search-clear-light.svg");
   -moz-image-region: rect(0, 16px, 16px, 0);
 }
 
@@ -445,11 +445,11 @@
 
 @media (min-resolution: 1.25dppx) {
   .theme-dark .devtools-searchinput {
-    background-image: url(magnifying-glass@2x.png);
+    background-image: url(images/magnifying-glass@2x.png);
   }
 
   .theme-light .devtools-searchinput {
-    background-image: url(magnifying-glass-light@2x.png);
+    background-image: url(images/magnifying-glass-light@2x.png);
   }
 }
 
@@ -469,7 +469,7 @@
   height: 16px;
   -moz-appearance: none;
   background-size: 16px 16px;
-  background-image: url("chrome://global/skin/devtools/close@2x.png");
+  background-image: url("chrome://devtools/skin/themes/images/close@2x.png");
   background-position: center center;
   background-repeat: no-repeat;
 }
@@ -735,85 +735,85 @@
 }
 
 #command-button-paintflashing > image {
-  background-image: url("chrome://global/skin/devtools/command-paintflashing.png");
+  background-image: url("chrome://devtools/skin/themes/images/command-paintflashing.png");
 }
 
 #command-button-screenshot > image {
-  background-image: url("chrome://global/skin/devtools/command-screenshot.png");
+  background-image: url("chrome://devtools/skin/themes/images/command-screenshot.png");
 }
 
 #command-button-responsive > image {
-  background-image: url("chrome://global/skin/devtools/command-responsivemode.png");
+  background-image: url("chrome://devtools/skin/themes/images/command-responsivemode.png");
 }
 
 #command-button-tilt > image {
-  background-image: url("chrome://global/skin/devtools/command-tilt.png");
+  background-image: url("chrome://devtools/skin/themes/images/command-tilt.png");
 }
 
 #command-button-scratchpad > image {
-  background-image: url("chrome://global/skin/devtools/command-scratchpad.png");
+  background-image: url("chrome://devtools/skin/themes/images/command-scratchpad.png");
   background-size: 48px 16px;
 }
 
 #command-button-pick > image {
-  background-image: url("chrome://global/skin/devtools/command-pick.png");
+  background-image: url("chrome://devtools/skin/themes/images/command-pick.png");
 }
 
 #command-button-frames > image {
-  background-image: url("chrome://global/skin/devtools/command-frames.png");
+  background-image: url("chrome://devtools/skin/themes/images/command-frames.png");
 }
 
 #command-button-splitconsole > image {
-  background-image: url("chrome://global/skin/devtools/command-console.png");
+  background-image: url("chrome://devtools/skin/themes/images/command-console.png");
 }
 
 #command-button-eyedropper > image {
-  background-image: url("chrome://global/skin/devtools/command-eyedropper.png");
+  background-image: url("chrome://devtools/skin/themes/images/command-eyedropper.png");
 }
 
 #command-button-rulers > image {
-  background-image: url("chrome://global/skin/devtools/command-rulers.png");
+  background-image: url("chrome://devtools/skin/themes/images/command-rulers.png");
 }
 
 @media (min-resolution: 1.25dppx) {
   #command-button-paintflashing > image {
-    background-image: url("chrome://global/skin/devtools/command-paintflashing@2x.png");
+    background-image: url("chrome://devtools/skin/themes/images/command-paintflashing@2x.png");
   }
 
   #command-button-screenshot > image {
-    background-image: url("chrome://global/skin/devtools/command-screenshot@2x.png");
+    background-image: url("chrome://devtools/skin/themes/images/command-screenshot@2x.png");
   }
 
   #command-button-responsive > image {
-    background-image: url("chrome://global/skin/devtools/command-responsivemode@2x.png");
+    background-image: url("chrome://devtools/skin/themes/images/command-responsivemode@2x.png");
   }
 
   #command-button-tilt > image {
-    background-image: url("chrome://global/skin/devtools/command-tilt@2x.png");
+    background-image: url("chrome://devtools/skin/themes/images/command-tilt@2x.png");
   }
 
   #command-button-scratchpad > image {
-    background-image: url("chrome://global/skin/devtools/command-scratchpad@2x.png");
+    background-image: url("chrome://devtools/skin/themes/images/command-scratchpad@2x.png");
   }
 
   #command-button-pick > image {
-    background-image: url("chrome://global/skin/devtools/command-pick@2x.png");
+    background-image: url("chrome://devtools/skin/themes/images/command-pick@2x.png");
   }
 
   #command-button-frames > image {
-    background-image: url("chrome://global/skin/devtools/command-frames@2x.png");
+    background-image: url("chrome://devtools/skin/themes/images/command-frames@2x.png");
   }
 
   #command-button-splitconsole > image {
-    background-image: url("chrome://global/skin/devtools/command-console@2x.png");
+    background-image: url("chrome://devtools/skin/themes/images/command-console@2x.png");
   }
 
   #command-button-eyedropper > image {
-    background-image: url("chrome://global/skin/devtools/command-eyedropper@2x.png");
+    background-image: url("chrome://devtools/skin/themes/images/command-eyedropper@2x.png");
   }
 
   #command-button-rulers > image {
-    background-image: url("chrome://browser/skin/devtools/command-rulers@2x.png");
+    background-image: url("chrome://devtools/skin/themes/images/command-rulers@2x.png");
   }
 }
 
@@ -997,7 +997,7 @@
 .theme-light #requests-menu-network-summary-button .button-icon,
 .theme-light .event-tooltip-debugger-icon,
 .theme-light .devtools-button::before {
-  filter: url(filters.svg#invert);
+  filter: url(images/filters.svg#invert);
 }
 
 /* Since selected backgrounds are blue, we want to use the normal

@@ -127,7 +127,7 @@
 
 /* Invert all toggle icons but the one in the active row for light theme */
 .theme-light .splitview-nav > li:not(.splitview-active) .stylesheet-enabled {
-  filter: url(filters.svg#invert);
+  filter: url(images/filters.svg#invert);
 }
 
 .splitview-nav > li > .stylesheet-enabled:focus,
