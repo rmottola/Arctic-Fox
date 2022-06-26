@@ -419,7 +419,9 @@ DevToolsLoader.prototype = {
 
     this._provider.unload("reload");
     delete this._provider;
+    delete this._mainid;
     this._chooseProvider();
+    this.main("devtools/client/main");
   },
 
   /**
