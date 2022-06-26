@@ -115,7 +115,7 @@ ToolSidebar.prototype = {
     let tabs = this._tabbox.tabs;
 
     // Create a container and insert it first in the tabbox
-    let allTabsContainer = this._panelDoc.createElementNS(XULNS, "box");
+    let allTabsContainer = this._panelDoc.createElementNS(XULNS, "stack");
     this._tabbox.insertBefore(allTabsContainer, tabs);
 
     // Move the tabs inside and make them flex
@@ -125,8 +125,10 @@ ToolSidebar.prototype = {
     // Create the dropdown menu next to the tabs
     this._allTabsBtn = this._panelDoc.createElementNS(XULNS, "toolbarbutton");
     this._allTabsBtn.setAttribute("class", "devtools-sidebar-alltabs");
+    this._allTabsBtn.setAttribute("right", "0");
+    this._allTabsBtn.setAttribute("top", "0");
+    this._allTabsBtn.setAttribute("width", "15");
     this._allTabsBtn.setAttribute("type", "menu");
-    this._allTabsBtn.setAttribute("label", l10n("sidebar.showAllTabs.label"));
     this._allTabsBtn.setAttribute("tooltiptext", l10n("sidebar.showAllTabs.tooltip"));
     this._allTabsBtn.setAttribute("hidden", "true");
     allTabsContainer.appendChild(this._allTabsBtn);
@@ -157,7 +159,7 @@ ToolSidebar.prototype = {
 
     // Moving back the tabs as a first child of the tabbox
     this._tabbox.insertBefore(tabs, this._tabbox.tabpanels);
-    this._tabbox.querySelector("box").remove();
+    this._tabbox.querySelector("stack").remove();
 
     this._allTabsBtn = null;
   },
@@ -528,7 +530,7 @@ ToolSidebar.prototype = {
 }
 
 XPCOMUtils.defineLazyGetter(this, "l10n", function() {
-  let bundle = Services.strings.createBundle("chrome://global/locale/devtools/toolbox.properties");
+  let bundle = Services.strings.createBundle("chrome://browser/locale/devtools/toolbox.properties");
   let l10n = function(aName, ...aArgs) {
     try {
       if (aArgs.length == 0) {
