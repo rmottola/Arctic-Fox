@@ -117,7 +117,7 @@ body {
 }
 
 #toggle-all::before {
-  background-image: url("debugger-pause.png");
+  background-image: url("images/debugger-pause.png");
 }
 
 #element-picker[checked]::before {
@@ -126,7 +126,7 @@ body {
 }
 
 #toggle-all.paused::before {
-  background-image: url("debugger-play.png");
+  background-image: url("images/debugger-play.png");
 }
 
 @media (min-resolution: 1.25dppx) {
@@ -136,11 +136,11 @@ body {
   }
 
   #toggle-all::before {
-    background-image: url("debugger-pause@2x.png");
+    background-image: url("images/debugger-pause@2x.png");
   }
 
   #toggle-all.paused::before {
-    background-image: url("debugger-play@2x.png");
+    background-image: url("images/debugger-play@2x.png");
   }
 }
 
@@ -407,38 +407,38 @@ body {
 }
 
 .timeline .toggle::before {
-  background-image: url(debugger-pause.png);
+  background-image: url(images/debugger-pause.png);
 }
 
 .paused .timeline .toggle::before,
 .finished .timeline .toggle::before {
-  background-image: url(debugger-play.png);
+  background-image: url(images/debugger-play.png);
 }
 
 .timeline .ff::before {
-  background-image: url(fast-forward.png);
+  background-image: url(images/fast-forward.png);
 }
 
 .timeline .rw::before {
-  background-image: url(rewind.png);
+  background-image: url(images/rewind.png);
 }
 
 @media (min-resolution: 1.25dppx) {
   .timeline .toggle::before {
-    background-image: url(debugger-pause@2x.png);
+    background-image: url(images/debugger-pause@2x.png);
   }
 
   .paused .timeline .toggle::before,
   .finished .timeline .toggle::before {
-    background-image: url(debugger-play@2x.png);
+    background-image: url(images/debugger-play@2x.png);
   }
 
   .timeline .ff::before {
-    background-image: url(fast-forward@2x.png);
+    background-image: url(images/fast-forward@2x.png);
   }
 
   .timeline .rw::before {
-    background-image: url(rewind@2x.png);
+    background-image: url(images/rewind@2x.png);
   }
 }
 
