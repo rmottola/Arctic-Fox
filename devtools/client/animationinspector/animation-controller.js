@@ -69,6 +69,39 @@ function destroy() {
   return shutdown().catch(e => console.error(e));
 }
 
+
+/**
+ * Get all the server-side capabilities (traits) so the UI knows whether or not
+ * features should be enabled/disabled.
+ * @param {Target} target The current toolbox target.
+ * @return {Object} An object with boolean properties.
+ */
+let getServerTraits = Task.async(function*(target) {
+  let config = [{
+    name: "hasToggleAll", actor: "animations", method: "toggleAll"
+  }, {
+    name: "hasSetCurrentTime", actor: "animationplayer", method: "setCurrentTime"
+  }, {
+    name: "hasMutationEvents", actor: "animations", method: "stopAnimationPlayerUpdates"
+  }, {
+    name: "hasSetPlaybackRate", actor: "animationplayer", method: "setPlaybackRate"
+  }, {
+    name: "hasTargetNode", actor: "domwalker", method: "getNodeFromActor"
+  }, {
+    name: "hasSetCurrentTimes", actor: "animations", method: "setCurrentTimes"
+  }];
+
+  let traits = {};
+  for (let {name, actor, method} of config) {
+    traits[name] = yield target.actorHasMethod(actor, method);
+  }
+
+  // Special pref-based UI trait.
+  traits.isNewUI = Services.prefs.getBoolPref("devtools.inspector.animationInspectorV3");
+
+  return traits;
+});
+
 /**
  * The animationinspector controller's job is to retrieve AnimationPlayerFronts
  * from the server. It is also responsible for keeping the list of players up to
@@ -108,18 +141,7 @@ var AnimationsController = {
     this.animationsFront = new AnimationsFront(target.client, target.form);
 
     // Expose actor capabilities.
-    this.hasToggleAll = yield target.actorHasMethod("animations", "toggleAll");
-    this.hasSetCurrentTime = yield target.actorHasMethod("animationplayer",
-                                                         "setCurrentTime");
-    this.hasMutationEvents = yield target.actorHasMethod("animations",
-                                                         "stopAnimationPlayerUpdates");
-    this.hasSetPlaybackRate = yield target.actorHasMethod("animationplayer",
-                                                          "setPlaybackRate");
-    this.hasTargetNode = yield target.actorHasMethod("domwalker",
-                                                     "getNodeFromActor");
-    this.hasSetCurrentTimes = yield target.actorHasMethod("animations",
-                                                          "setCurrentTimes");
-    this.isNewUI = Services.prefs.getBoolPref("devtools.inspector.animationInspectorV3");
+    this.traits = yield getServerTraits(target);
 
     if (this.destroyed) {
       console.warn("Could not fully initialize the AnimationsController");
@@ -215,7 +237,7 @@ var AnimationsController = {
    * Toggle (pause/play) all animations in the current target.
    */
   toggleAll: function() {
-    if (!this.hasToggleAll) {
+    if (!this.traits.hasToggleAll) {
       return promise.resolve();
     }
 
@@ -261,7 +283,7 @@ var AnimationsController = {
 
     // Start listening for animation mutations only after the first method call
     // otherwise events won't be sent.
-    if (!this.isListeningToMutations && this.hasMutationEvents) {
+    if (!this.isListeningToMutations && this.traits.hasMutationEvents) {
       this.animationsFront.on("mutations", this.onAnimationMutations);
       this.isListeningToMutations = true;
     }
@@ -273,13 +295,13 @@ var AnimationsController = {
     for (let {type, player} of changes) {
       if (type === "added") {
         this.animationPlayers.push(player);
-        if (!this.isNewUI) {
+        if (!this.traits.isNewUI) {
           player.startAutoRefresh();
         }
       }
 
       if (type === "removed") {
-        if (!this.isNewUI) {
+        if (!this.traits.isNewUI) {
           player.stopAutoRefresh();
         }
         yield player.release();
@@ -293,7 +315,7 @@ var AnimationsController = {
   }),
 
   startAllAutoRefresh: function() {
-    if (this.isNewUI) {
+    if (this.traits.isNewUI) {
       return;
     }
 
@@ -303,7 +325,7 @@ var AnimationsController = {
   },
 
   stopAllAutoRefresh: function() {
-    if (this.isNewUI) {
+    if (this.traits.isNewUI) {
       return;
     }
 
@@ -316,7 +338,7 @@ var AnimationsController = {
     // Let the server know that we're not interested in receiving updates about
     // players for the current node. We're either being destroyed or a new node
     // has been selected.
-    if (this.hasMutationEvents) {
+    if (this.traits.hasMutationEvents) {
       yield this.animationsFront.stopAnimationPlayerUpdates();
     }
     this.stopAllAutoRefresh();
