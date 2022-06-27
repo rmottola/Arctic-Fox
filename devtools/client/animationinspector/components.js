@@ -530,7 +530,12 @@ AnimationsTimeline.prototype = {
 
     let time = TimeScale.distanceToRelativeTime(offset,
       this.timeHeaderEl.offsetWidth);
-    this.emit("current-time-changed", time);
+
+    this.emit("timeline-data-changed", {
+      isPaused: true,
+      isMoving: false,
+      time: time
+    });
   },
 
   render: function(animations, documentCurrentTime) {
