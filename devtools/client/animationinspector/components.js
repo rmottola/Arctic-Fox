@@ -294,7 +294,7 @@ AnimationTargetNode.prototype = {
  * Whenever a new animation is added to the panel, addAnimation(state) should be
  * called. reset() can be called to start over.
  */
-let TimeScale = {
+var TimeScale = {
   minStartTime: Infinity,
   maxEndTime: 0,
 
@@ -387,6 +387,8 @@ let TimeScale = {
     return L10N.getFormatStr("player.timeLabel", (time / 1000).toFixed(1));
   }
 };
+
+exports.TimeScale = TimeScale;
 
 /**
  * UI component responsible for displaying a timeline for animations.
