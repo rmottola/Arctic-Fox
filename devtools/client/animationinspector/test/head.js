@@ -84,13 +84,6 @@ function addTab(url) {
 }
 
 /**
- * Switch ON the new UI pref.
- */
-function enableNewUI() {
-  Services.prefs.setBoolPref(NEW_UI_PREF, true);
-}
-
-/**
  * Reload the current tab location.
  */
 function reloadTab() {
@@ -147,15 +140,9 @@ var selectNode = Task.async(function*(data, inspector, reason="test") {
  * @param {String} msg An optional string to be used as the assertion message.
  */
 function assertAnimationsDisplayed(panel, nbAnimations, msg="") {
-  let isNewUI = Services.prefs.getBoolPref(NEW_UI_PREF);
   msg = msg || `There are ${nbAnimations} animations in the panel`;
-  if (isNewUI) {
-    is(panel.animationsTimelineComponent.animationsEl.childNodes.length,
-       nbAnimations, msg);
-  } else {
-    is(panel.playersEl.querySelectorAll(".player-widget").length,
-       nbAnimations, msg);
-  }
+  is(panel.animationsTimelineComponent.animationsEl.childNodes.length,
+     nbAnimations, msg);
 }
 
 /**
@@ -237,26 +224,6 @@ var closeAnimationInspector = Task.async(function*() {
   let target = TargetFactory.forTab(gBrowser.selectedTab);
   yield gDevTools.closeToolbox(target);
 });
-
-/**
- * During the time period we migrate from the playerWidgets-based UI to the new
- * AnimationTimeline UI, we'll want to run certain tests against both UI.
- * This closes the toolbox, switch the new UI pref ON, and opens the toolbox
- * again, with the animation inspector panel selected.
- * @param {Boolean} reload Optionally reload the page after the toolbox was
- * closed and before it is opened again.
- * @return a promise that resolves when the animation inspector is ready.
- */
-let closeAnimationInspectorAndRestartWithNewUI = Task.async(function*(reload) {
-  info("Close the toolbox and test again with the new UI");
-  yield closeAnimationInspector();
-  if (reload) {
-    yield reloadTab();
-  }
-  enableNewUI();
-  return yield openAnimationInspectorNewUI();
-});
-
 
 /**
  * Wait for the toolbox frame to receive focus after it loads
@@ -465,3 +432,20 @@ var getAnimationPlayerState = Task.async(function*(selector, animationIndex=0) {
 function isNodeVisible(node) {
   return !!node.getClientRects().length;
 }
+
+/**
+ * Wait for all AnimationTargetNode instances to be fully loaded
+ * (fetched their related actor and rendered), and return them.
+ * @param {AnimationsPanel} panel
+ * @return {Array} all AnimationTargetNode instances
+ */
+var waitForAllAnimationTargets = Task.async(function*(panel) {
+  let targets = panel.animationsTimelineComponent.targetNodes;
+  yield promise.all(targets.map(t => {
+    if (!t.nodeFront) {
+      return t.once("target-retrieved");
+    }
+    return false;
+  }));
+  return targets;
+});

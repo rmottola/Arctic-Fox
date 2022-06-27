@@ -30,9 +30,6 @@ add_task(function*() {
 
   is(controller.animationPlayers.length, 2,
     "2 AnimationPlayerFronts have been created");
-  ok(controller.animationPlayers[0].autoRefreshTimer &&
-     controller.animationPlayers[1].autoRefreshTimer,
-    "The AnimationPlayerFronts have been set to auto-refresh");
 
   // Hold on to one of the AnimationPlayerFront objects and mock its release
   // method to test that it is released correctly and that its auto-refresh is
@@ -52,7 +49,6 @@ add_task(function*() {
 
   info("Checking the destroyed AnimationPlayerFront object");
   ok(releaseCalled, "The AnimationPlayerFront has been released");
-  ok(!retainedFront.autoRefreshTimer,
-    "The released AnimationPlayerFront's auto-refresh mode has been turned off");
+
   yield oldRelease.call(retainedFront);
 });
