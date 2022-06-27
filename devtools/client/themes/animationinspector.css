@@ -229,6 +229,20 @@ body {
                     transparent 2px);
   background-repeat: repeat-x;
   background-position: -1px 0;
+  border: 1px solid var(--timelime-border-color);
+
+  /* The background color is set independently */
+  background-color: var(--timeline-background-color);
+}
+
+.animation-timeline .animation .cssanimation {
+  --timelime-border-color: var(--theme-highlight-lightorange);
+  --timeline-background-color: var(--theme-contrast-background);
+}
+
+.animation-timeline .animation .csstransition {
+  --timelime-border-color: var(--theme-highlight-bluegrey);
+  --timeline-background-color: var(--theme-highlight-blue);
 }
 
 .animation-timeline .animation .iterations.infinite {

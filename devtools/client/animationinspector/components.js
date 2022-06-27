@@ -772,7 +772,7 @@ AnimationsTimeline.prototype = {
     this.emit("current-time-changed", time);
   },
 
-  render: function(animations) {
+  render: function(animations, documentCurrentTime) {
     this.unrender();
 
     this.animations = animations;
