@@ -40,6 +40,8 @@ function* playerHasAnInitialState(walker, front) {
   ok("delay" in player.initialState, "Player's state has delay");
   ok("iterationCount" in player.initialState, "Player's state has iterationCount");
   ok("isRunningOnCompositor" in player.initialState, "Player's state has isRunningOnCompositor");
+  ok("type" in player.initialState, "Player's state has type");
+  ok("documentCurrentTime" in player.initialState, "Player's state has documentCurrentTime");
 }
 
 function* playerStateIsCorrect(walker, front) {
