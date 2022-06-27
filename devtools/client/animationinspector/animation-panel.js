@@ -91,11 +91,12 @@ var AnimationsPanel = {
     AnimationsController.on(AnimationsController.PLAYERS_UPDATED_EVENT,
       this.refreshAnimations);
 
-    this.pickerButtonEl.addEventListener("click", this.togglePicker, false);
+    this.pickerButtonEl.addEventListener("click", this.togglePicker);
     gToolbox.on("picker-started", this.onPickerStarted);
     gToolbox.on("picker-stopped", this.onPickerStopped);
 
-    this.toggleAllButtonEl.addEventListener("click", this.toggleAll, false);
+    this.toggleAllButtonEl.addEventListener("click", this.toggleAll);
+    this.playTimelineButtonEl.addEventListener("click", this.playPauseTimeline);
     gToolbox.target.on("navigate", this.onTabNavigated);
 
     this.animationsTimelineComponent.on("timeline-data-changed",
@@ -106,11 +107,12 @@ var AnimationsPanel = {
     AnimationsController.off(AnimationsController.PLAYERS_UPDATED_EVENT,
       this.refreshAnimations);
 
-    this.pickerButtonEl.removeEventListener("click", this.togglePicker, false);
+    this.pickerButtonEl.removeEventListener("click", this.togglePicker);
     gToolbox.off("picker-started", this.onPickerStarted);
     gToolbox.off("picker-stopped", this.onPickerStopped);
 
-    this.toggleAllButtonEl.removeEventListener("click", this.toggleAll, false);
+    this.toggleAllButtonEl.removeEventListener("click", this.toggleAll);
+    this.playTimelineButtonEl.removeEventListener("click", this.playPauseTimeline);
     gToolbox.target.off("navigate", this.onTabNavigated);
 
     this.animationsTimelineComponent.off("timeline-data-changed",

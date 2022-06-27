@@ -262,6 +262,15 @@ var AnimationPlayerActor = ActorClass({
    * @return {Object}
    */
   getCurrentState: method(function() {
+    // Remember the startTime each time getCurrentState is called, it may be
+    // useful when animations get paused. As in, when an animation gets paused,
+    // it's startTime goes back to null, but the front-end might still be
+    // interested in knowing what the previous startTime was. So everytime it
+    // is set, remember it and send it along with the newState.
+    if (this.player.startTime) {
+      this.previousStartTime = this.player.startTime;
+    }
+
     // Note that if you add a new property to the state object, make sure you
     // add the corresponding property in the AnimationPlayerFront' initialState
     // getter.
@@ -269,6 +278,7 @@ var AnimationPlayerActor = ActorClass({
       type: this.getType(),
       // startTime is null whenever the animation is paused or waiting to start.
       startTime: this.player.startTime,
+      previousStartTime: this.previousStartTime,
       currentTime: this.player.currentTime,
       playState: this.player.playState,
       playbackRate: this.player.playbackRate,
@@ -435,6 +445,7 @@ var AnimationPlayerFront = FrontClass(AnimationPlayerActor, {
     return {
       type: this._form.type,
       startTime: this._form.startTime,
+      previousStartTime: this._form.previousStartTime,
       currentTime: this._form.currentTime,
       playState: this._form.playState,
       playbackRate: this._form.playbackRate,
@@ -511,7 +522,7 @@ types.addDictType("animationMutationChange", {
 /**
  * The Animations actor lists animation players for a given node.
  */
-let AnimationsActor = exports.AnimationsActor = ActorClass({
+var AnimationsActor = exports.AnimationsActor = ActorClass({
   typeName: "animations",
 
   events: {
@@ -793,7 +804,7 @@ let AnimationsActor = exports.AnimationsActor = ActorClass({
   })
 });
 
-let AnimationsFront = exports.AnimationsFront = FrontClass(AnimationsActor, {
+var AnimationsFront = exports.AnimationsFront = FrontClass(AnimationsActor, {
   initialize: function(client, {animationsActor}) {
     Front.prototype.initialize.call(this, client, {actor: animationsActor});
     this.manage(this);

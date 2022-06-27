@@ -303,18 +303,21 @@ var TimeScale = {
    * @param {Object} state A PlayerFront.state object.
    */
   addAnimation: function(state) {
-    let {startTime, delay, duration, iterationCount, playbackRate} = state;
+    let {previousStartTime, delay, duration,
+         iterationCount, playbackRate} = state;
 
     // Negative-delayed animations have their startTimes set such that we would
     // be displaying the delay outside the time window if we didn't take it into
     // account here.
     let relevantDelay = delay < 0 ? delay / playbackRate : 0;
+    previousStartTime = previousStartTime || 0;
 
-    this.minStartTime = Math.min(this.minStartTime, startTime + relevantDelay);
+    this.minStartTime = Math.min(this.minStartTime,
+                                 previousStartTime + relevantDelay);
     let length = (delay / playbackRate) +
                  ((duration / playbackRate) *
                   (!iterationCount ? 1 : iterationCount));
-    this.maxEndTime = Math.max(this.maxEndTime, startTime + length);
+    this.maxEndTime = Math.max(this.maxEndTime, previousStartTime + length);
   },
 
   /**
@@ -444,6 +447,7 @@ AnimationsTimeline.prototype = {
         "class": "time-header"
       }
     });
+    this.timeHeaderEl.addEventListener("mousedown", this.onTimeHeaderMouseDown);
 
     this.animationsEl = createNode({
       parent: this.rootWrapperEl,
