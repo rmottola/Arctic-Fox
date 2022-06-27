@@ -69,27 +69,29 @@ function destroy() {
   return shutdown().catch(e => console.error(e));
 }
 
-
 /**
  * Get all the server-side capabilities (traits) so the UI knows whether or not
  * features should be enabled/disabled.
  * @param {Target} target The current toolbox target.
  * @return {Object} An object with boolean properties.
  */
-let getServerTraits = Task.async(function*(target) {
-  let config = [{
-    name: "hasToggleAll", actor: "animations", method: "toggleAll"
-  }, {
-    name: "hasSetCurrentTime", actor: "animationplayer", method: "setCurrentTime"
-  }, {
-    name: "hasMutationEvents", actor: "animations", method: "stopAnimationPlayerUpdates"
-  }, {
-    name: "hasSetPlaybackRate", actor: "animationplayer", method: "setPlaybackRate"
-  }, {
-    name: "hasTargetNode", actor: "domwalker", method: "getNodeFromActor"
-  }, {
-    name: "hasSetCurrentTimes", actor: "animations", method: "setCurrentTimes"
-  }];
+var getServerTraits = Task.async(function*(target) {
+  let config = [
+    { name: "hasToggleAll", actor: "animations",
+      method: "toggleAll" },
+    { name: "hasToggleSeveral", actor: "animations",
+      method: "toggleSeveral" },
+    { name: "hasSetCurrentTime", actor: "animationplayer",
+      method: "setCurrentTime" },
+    { name: "hasMutationEvents", actor: "animations",
+     method: "stopAnimationPlayerUpdates" },
+    { name: "hasSetPlaybackRate", actor: "animationplayer",
+      method: "setPlaybackRate" },
+    { name: "hasTargetNode", actor: "domwalker",
+      method: "getNodeFromActor" },
+    { name: "hasSetCurrentTimes", actor: "animations",
+      method: "setCurrentTimes" }
+  ];
 
   let traits = {};
   for (let {name, actor, method} of config) {
@@ -244,21 +246,43 @@ var AnimationsController = {
     return this.animationsFront.toggleAll().catch(e => console.error(e));
   },
 
+  /**
+   * Similar to toggleAll except that it only plays/pauses the currently known
+   * animations (those listed in this.animationPlayers).
+   * @param {Boolean} shouldPause True if the animations should be paused, false
+   * if they should be played.
+   * @return {Promise} Resolves when the playState has been changed.
+   */
+  toggleCurrentAnimations: Task.async(function*(shouldPause) {
+    if (this.traits.hasToggleSeveral) {
+      yield this.animationsFront.toggleSeveral(this.animationPlayers,
+                                               shouldPause);
+    } else {
+      // Fall back to pausing/playing the players one by one, which is bound to
+      // introduce some de-synchronization.
+      for (let player of this.animationPlayers) {
+        if (shouldPause) {
+          yield player.pause();
+        } else {
+          yield player.play();
+        }
+      }
+    }
+  }),
 
   /**
    * Set all known animations' currentTimes to the provided time.
-   * Note that depending on the server's capabilities, this might resolve in
-   * either one packet, or as many packets as there are animations. In the
-   * latter case, some time deltas might be introduced.
    * @param {Number} time.
    * @param {Boolean} shouldPause Should the animations be paused too.
    * @return {Promise} Resolves when the current time has been set.
    */
   setCurrentTimeAll: Task.async(function*(time, shouldPause) {
-    if (this.hasSetCurrentTimes) {
+    if (this.traits.hasSetCurrentTimes) {
       yield this.animationsFront.setCurrentTimes(this.animationPlayers, time,
                                                  shouldPause);
     } else {
+      // Fall back to pausing and setting the current time on each player, one
+      // by one, which is bound to introduce some de-synchronization.
       for (let animation of this.animationPlayers) {
         if (shouldPause) {
           yield animation.pause();
