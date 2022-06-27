@@ -32,7 +32,7 @@ body {
 
 /* The top toolbar, containing the toggle-all button */
 
-#toolbar {
+#global-toolbar {
   border-bottom: 1px solid var(--theme-splitter-color);
   display: flex;
   flex-direction: row;
@@ -41,7 +41,7 @@ body {
   height: 20px;
 }
 
-#toolbar .label {
+#global-toolbar .label {
   padding: 1px 4px;
 }
 
