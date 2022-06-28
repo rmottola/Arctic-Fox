@@ -9,7 +9,6 @@
 
 const {utils: Cu, interfaces: Ci, classes: Cc} = Components;
 
-Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
 Cu.import("resource://gre/modules/devtools/shared/Console.jsm");
@@ -230,7 +229,8 @@ LayoutView.prototype = {
     if (!this.reflowFront) {
       let toolbox = this.inspector.toolbox;
       if (toolbox.target.form.reflowActor) {
-        this.reflowFront = ReflowFront(toolbox.target.client, toolbox.target.form);
+        this.reflowFront = ReflowFront(toolbox.target.client,
+                                       toolbox.target.form);
       } else {
         return;
       }
@@ -337,7 +337,10 @@ LayoutView.prototype = {
    */
   onNewSelection: function() {
     let done = this.inspector.updating("layoutview");
-    this.onNewNode().then(done, (err) => { console.error(err); done() });
+    this.onNewNode().then(done, err => {
+      console.error(err);
+      done();
+    });
   },
 
   /**
@@ -564,8 +567,8 @@ window.setPanel = function(panel) {
   }
 
   // Mark document as RTL or LTR:
-  let chromeReg = Cc["@mozilla.org/chrome/chrome-registry;1"].
-    getService(Ci.nsIXULChromeRegistry);
+  let chromeReg = Cc["@mozilla.org/chrome/chrome-registry;1"]
+                  .getService(Ci.nsIXULChromeRegistry);
   let dir = chromeReg.isLocaleRTL("global");
   document.body.setAttribute("dir", dir ? "rtl" : "ltr");
 
