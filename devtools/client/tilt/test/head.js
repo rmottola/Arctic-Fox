@@ -11,9 +11,6 @@ var {TiltVisualizer} = require("devtools/client/tilt/tilt-visualizer");
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 var {getRect, getIframeContentOffset} = require("devtools/shared/layout/utils");
 
-let tempScope = {};
-Components.utils.import("resource://gre/modules/devtools/LayoutHelpers.jsm", tempScope);
-let LayoutHelpers = tempScope.LayoutHelpers;
 
 const DEFAULT_HTML = "data:text/html," +
   "<DOCTYPE html>" +
