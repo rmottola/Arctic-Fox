@@ -138,9 +138,7 @@ const GcliActor = ActorClass({
       start: Arg(1, "number"), // Cursor start position
       rank: Arg(2, "number") // The prediction offset (# times UP/DOWN pressed)
     },
-    response: {
-      value: RetVal("array:json")
-    }
+    response: RetVal("json")
   }),
 
   /**
@@ -267,7 +265,7 @@ const GcliActor = ActorClass({
         },
 
         get document() {
-          return tabActor.window.document;
+          return tabActor.window && tabActor.window.document;
         }
       };
 
