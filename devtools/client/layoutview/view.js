@@ -540,6 +540,9 @@ var elts;
 
 var onmouseover = function(e) {
   let region = e.target.getAttribute("data-box");
+  if (!region) {
+    return false;
+  }
 
   this.layoutview.showBoxModel({
     region,
