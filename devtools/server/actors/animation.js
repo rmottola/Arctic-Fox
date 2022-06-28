@@ -563,13 +563,16 @@ var AnimationsActor = exports.AnimationsActor = ActorClass({
   },
 
   /**
-   * Retrieve the list of AnimationPlayerActor actors corresponding to
-   * currently running animations for a given node.
-   * @param {NodeActor} nodeActor The NodeActor type is defined in
-   * /toolkit/devtools/server/actors/inspector
+   * Retrieve the list of AnimationPlayerActor actors for currently running
+   * animations on a node and its descendants.
+   * @param {NodeActor} nodeActor The NodeActor as defined in
+   * /devtools/server/actors/inspector
    */
   getAnimationPlayersForNode: method(function(nodeActor) {
-    let animations = nodeActor.rawNode.getAnimations();
+    let animations = [
+      ...nodeActor.rawNode.getAnimations(),
+      ...this.getAllAnimations(nodeActor.rawNode)
+    ];
 
     // No care is taken here to destroy the previously stored actors because it
     // is assumed that the client is responsible for lifetimes of actors.
@@ -588,7 +591,10 @@ var AnimationsActor = exports.AnimationsActor = ActorClass({
     this.stopAnimationPlayerUpdates();
     let win = nodeActor.rawNode.ownerDocument.defaultView;
     this.observer = new win.MutationObserver(this.onAnimationMutation);
-    this.observer.observe(nodeActor.rawNode, {animations: true});
+    this.observer.observe(nodeActor.rawNode, {
+      animations: true,
+      subtree: true
+    });
 
     return this.actors;
   }, {
@@ -687,23 +693,31 @@ var AnimationsActor = exports.AnimationsActor = ActorClass({
   }),
 
   /**
-   * Iterates through all nodes in all of the tabActor's window documents and
-   * finds all existing animation players.
-   * This is currently used to allow playing/pausing all animations at once
-   * until the WebAnimations API provides a way to play/pause via the document
-   * timeline (alternatively, when bug 1123524 is fixed, we will be able to
-   * only iterate once and then listen for changes).
+   * Iterates through all nodes below a given rootNode (optionally also in
+   * nested frames) and finds all existing animation players.
+   * @param {DOMNode} rootNode The root node to start iterating at. Animation
+   * players will *not* be reported for this node.
+   * @param {Boolean} traverseFrames Whether we should iterate through nested
+   * frames too.
+   * @return {Array} An array of AnimationPlayer objects.
    */
-  getAllAnimationPlayers: function() {
+  getAllAnimations: function(rootNode, traverseFrames) {
     let animations = [];
 
     // These loops shouldn't be as bad as they look.
-    // Typically, there will be very few windows, and getElementsByTagName is
-    // really fast even on large DOM trees.
-    for (let window of this.tabActor.windows) {
-      let root = window.document.body || window.document;
-      for (let element of root.getElementsByTagNameNS("*", "*")) {
-        animations = [...animations, ...element.getAnimations()];
+    // Typically, there will be very few nested frames, and getElementsByTagName
+    // is really fast even on large DOM trees.
+    for (let element of rootNode.getElementsByTagNameNS("*", "*")) {
+      if (traverseFrames && element.contentWindow) {
+        animations = [
+          ...animations,
+          ...this.getAllAnimations(element.contentWindow.document, traverseFrames)
+        ];
+      } else {
+        animations = [
+          ...animations,
+          ...element.getAnimations()
+        ];
       }
     }
 
@@ -727,7 +741,10 @@ var AnimationsActor = exports.AnimationsActor = ActorClass({
    */
   pauseAll: method(function() {
     let readyPromises = [];
-    for (let player of this.getAllAnimationPlayers()) {
+    // Until the WebAnimations API provides a way to play/pause via the document
+    // timeline, we have to iterate through the whole DOM to find all players.
+    for (let player of
+         this.getAllAnimations(this.tabActor.window.document, true)) {
       player.pause();
       readyPromises.push(player.ready);
     }
@@ -744,7 +761,10 @@ var AnimationsActor = exports.AnimationsActor = ActorClass({
    */
   playAll: method(function() {
     let readyPromises = [];
-    for (let player of this.getAllAnimationPlayers()) {
+    // Until the WebAnimations API provides a way to play/pause via the document
+    // timeline, we have to iterate through the whole DOM to find all players.
+    for (let player of
+         this.getAllAnimations(this.tabActor.window.document, true)) {
       player.play();
       readyPromises.push(player.ready);
     }
