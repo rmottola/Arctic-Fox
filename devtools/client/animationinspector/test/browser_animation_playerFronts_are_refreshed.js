@@ -11,9 +11,6 @@ add_task(function*() {
   yield addTab(TEST_URL_ROOT + "doc_simple_animation.html");
   let {controller, inspector} = yield openAnimationInspector();
 
-  is(controller.animationPlayers.length, 0,
-    "There are no AnimationPlayerFront objects at first");
-
   info("Selecting an animated node");
   // selectNode waits for the inspector-updated event before resolving, which
   // means the controller.PLAYERS_UPDATED_EVENT event has been emitted before
@@ -22,8 +19,6 @@ add_task(function*() {
 
   is(controller.animationPlayers.length, 1,
     "One AnimationPlayerFront has been created");
-  ok(controller.animationPlayers[0].autoRefreshTimer,
-    "The AnimationPlayerFront has been set to auto-refresh");
 
   info("Selecting a node with mutliple animations");
   yield selectNode(".multi", inspector);

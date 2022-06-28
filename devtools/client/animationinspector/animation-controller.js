@@ -309,15 +309,9 @@ var AnimationsController = {
     for (let {type, player} of changes) {
       if (type === "added") {
         this.animationPlayers.push(player);
-        if (!this.traits.isNewUI) {
-          player.startAutoRefresh();
-        }
       }
 
       if (type === "removed") {
-        if (!this.traits.isNewUI) {
-          player.stopAutoRefresh();
-        }
         yield player.release();
         let index = this.animationPlayers.indexOf(player);
         this.animationPlayers.splice(index, 1);
