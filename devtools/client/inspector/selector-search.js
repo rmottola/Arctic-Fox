@@ -73,8 +73,9 @@ function SelectorSearch(aInspector, aInputNode) {
 exports.SelectorSearch = SelectorSearch;
 
 SelectorSearch.prototype = {
-
-  get walker() this.inspector.walker,
+  get walker() {
+    return this.inspector.walker;
+  },
 
   // The possible states of the query.
   States: {
@@ -435,14 +436,27 @@ SelectorSearch.prototype = {
         let lastPart = query.match(/[a-zA-Z][#\.][^#\.\s>+]*$/)[0];
         value = query.slice(0, -1 * lastPart.length + 1) + value;
       }
+
       let item = {
         preLabel: query,
         label: value,
         count: count
       };
-      if (toLowerCase) {
+
+      // In case of tagNames, change the case to small
+      if (value.match(/.*[\.#][^\.#]{0,}$/) == null) {
         item.label = value.toLowerCase();
       }
+
+      // In case the query's state is tag and the item's state is id or class
+      // adjust the preLabel
+      if (aState === this.States.TAG && state === this.States.CLASS) {
+        item.preLabel = "." + item.preLabel;
+      }
+      if (aState === this.States.TAG && state === this.States.ID) {
+        item.preLabel = "#" + item.preLabel;
+      }
+
       items.unshift(item);
       if (++total > MAX_SUGGESTIONS - 1) {
         break;
@@ -463,6 +477,7 @@ SelectorSearch.prototype = {
    */
   showSuggestions: function() {
     let query = this.searchBox.value;
+    let state = this.state;
     let firstPart = "";
     if (this.state == this.States.TAG) {
       // gets the tag that is being completed. For ex. 'div.foo > s' returns 's',
@@ -485,6 +500,7 @@ SelectorSearch.prototype = {
     if (/[\s+>~]$/.test(query)) {
       query += "*";
     }
+
     this._currentSuggesting = query;
     return this.walker.getSuggestionsForQuery(query, firstPart, this.state).then(result => {
       if (this._currentSuggesting != result.query) {
