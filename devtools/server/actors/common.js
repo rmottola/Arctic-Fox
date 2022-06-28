@@ -381,7 +381,7 @@ OriginalLocation.prototype = {
 exports.OriginalLocation = OriginalLocation;
 
 /**
- * A GeneratedLocation represents a location in an original source.
+ * A GeneratedLocation represents a location in a generated source.
  *
  * @param SourceActor actor
  *        A SourceActor representing a generated source.
