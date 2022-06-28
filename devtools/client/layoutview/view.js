@@ -264,11 +264,11 @@ LayoutView.prototype = {
       element: element,
       initial: initialValue,
 
-      start: (editor) => {
+      start: editor => {
         editor.elt.parentNode.classList.add("editing");
       },
 
-      change: (value) => {
+      change: value => {
         if (NUMERIC.test(value)) {
           value += "px";
         }
