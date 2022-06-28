@@ -1087,7 +1087,7 @@ var NodeListActor = exports.NodeListActor = protocol.ActorClass({
   form: function() {
     return {
       actor: this.actorID,
-      length: this.nodeList.length
+      length: this.nodeList ? this.nodeList.length : 0
     }
   },
 
@@ -1966,7 +1966,7 @@ var WalkerActor = protocol.ActorClass({
         sugs.classes.delete(HIDDEN_CLASS);
         for (let [className, count] of sugs.classes) {
           if (className.startsWith(completing)) {
-            result.push(["." + className, count]);
+            result.push(["." + CSS.escape(className), count, selectorState]);
           }
         }
         break;
@@ -1998,9 +1998,20 @@ var WalkerActor = protocol.ActorClass({
         }
         for (let [tag, count] of sugs.tags) {
           if ((new RegExp("^" + completing + ".*", "i")).test(tag)) {
-            result.push([tag, count]);
+            result.push([tag, count, selectorState]);
           }
         }
+
+        // For state 'tag' (no preceding # or .) and when there's no query (i.e.
+        // only one word) then search for the matching classes and ids
+        if (!query) {
+          result = [
+            ...result,
+            ...this.getSuggestionsForQuery(null, completing, "class").suggestions,
+            ...this.getSuggestionsForQuery(null, completing, "id").suggestions
+          ];
+        }
+
         break;
 
       case "null":
