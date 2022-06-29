@@ -14,5 +14,6 @@ DevToolsModules(
   'io.js',
   'process-communication.js',
   'recorder.js',
+  'recording-common.js',
   'utils.js',
 )
