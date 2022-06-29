@@ -24,5 +24,6 @@ DevToolsModules(
     'restart.js',
     'rulers.js',
     'screenshot.js',
+    'security.js',
     'tools.js',
 )
