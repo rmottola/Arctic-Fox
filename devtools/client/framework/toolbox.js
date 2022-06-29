@@ -575,8 +575,14 @@ Toolbox.prototype = {
     let inKey2 = this.doc.getElementById("toolbox-zoom-in-key2");
     inKey2.addEventListener("command", this.zoomIn.bind(this), true);
 
+    let inKey3 = this.doc.getElementById("toolbox-zoom-in-key3");
+    inKey3.addEventListener("command", this.zoomIn.bind(this), true);
+
     let outKey = this.doc.getElementById("toolbox-zoom-out-key");
     outKey.addEventListener("command", this.zoomOut.bind(this), true);
+
+    let outKey2 = this.doc.getElementById("toolbox-zoom-out-key2");
+    outKey2.addEventListener("command", this.zoomOut.bind(this), true);
 
     let resetKey = this.doc.getElementById("toolbox-zoom-reset-key");
     resetKey.addEventListener("command", this.zoomReset.bind(this), true);
