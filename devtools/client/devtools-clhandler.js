@@ -14,7 +14,7 @@ function devtoolsCommandlineHandler() {
 }
 devtoolsCommandlineHandler.prototype = {
   handle: function(cmdLine) {
-    let consoleFlag = cmdLine.handleFlag("browserconsole", false);
+    let consoleFlag = cmdLine.handleFlag("jsconsole", false);
     let debuggerFlag = cmdLine.handleFlag("jsdebugger", false);
     let devtoolsFlag = cmdLine.handleFlag("devtools", false);
 
@@ -51,8 +51,7 @@ devtoolsCommandlineHandler.prototype = {
       let { console } = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
       hudservice.toggleBrowserConsole().then(null, console.error);
     } else {
-      // The Browser Console was already open.
-      window.focus();
+      window.focus(); // the Browser Console was already open
     }
 
     if (cmdLine.state == Ci.nsICommandLine.STATE_REMOTE_AUTO) {
@@ -63,12 +62,9 @@ devtoolsCommandlineHandler.prototype = {
   // Open the toolbox on the selected tab once the browser starts up.
   handleDevToolsFlag: function() {
     Services.obs.addObserver(function onStartup(window) {
-      Services.obs.removeObserver(onStartup,
-                                  "browser-delayed-startup-finished");
-      const {gDevTools} = Cu.import(
-          "resource://gre/modules/devtools/gDevTools.jsm", {});
-      const {devtools} = Cu.import(
-          "resource://gre/modules/devtools/Loader.jsm", {});
+      Services.obs.removeObserver(onStartup, "browser-delayed-startup-finished");
+      const {gDevTools} = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
+      const {devtools} = Cu.import("resource://devtools/shared/Loader.jsm", {});
       let target = devtools.TargetFactory.forTab(window.gBrowser.selectedTab);
       gDevTools.showToolbox(target);
     }, "browser-delayed-startup-finished", false);
@@ -77,16 +73,14 @@ devtoolsCommandlineHandler.prototype = {
   _isRemoteDebuggingEnabled() {
     let remoteDebuggingEnabled = false;
     try {
-      remoteDebuggingEnabled = kDebuggerPrefs.every(pref => {
-        return Services.prefs.getBoolPref(pref);
-      });
-    } catch (e) {
-      Cu.reportError(e);
+      remoteDebuggingEnabled = kDebuggerPrefs.every((pref) => Services.prefs.getBoolPref(pref));
+    } catch (ex) {
+      Cu.reportError(ex);
       return false;
     }
     if (!remoteDebuggingEnabled) {
-      let errorMsg = "Could not run chrome debugger! You need the following " +
-                     "prefs to be set to true: " + kDebuggerPrefs.join(", ");
+      let errorMsg = "Could not run chrome debugger! You need the following prefs " +
+                     "to be set to true: " + kDebuggerPrefs.join(", ");
       Cu.reportError(errorMsg);
       // Dump as well, as we're doing this from a commandline, make sure people
       // don't miss it:
@@ -137,11 +131,8 @@ devtoolsCommandlineHandler.prototype = {
       listener.portOrPath = portOrPath;
       listener.open();
       dump("Started debugger server on " + portOrPath + "\n");
-    } catch (e) {
-      let _error = "Unable to start debugger server on " + portOrPath + ": "
-          + e;
-      Cu.reportError(_error);
-      dump(_error + "\n");
+    } catch(e) {
+      dump("Unable to start debugger server on " + portOrPath + ": " + e);
     }
 
     if (cmdLine.state == Ci.nsICommandLine.STATE_REMOTE_AUTO) {
@@ -149,15 +140,15 @@ devtoolsCommandlineHandler.prototype = {
     }
   },
 
-  helpInfo : "  -browserconsole                     Open the Browser Console.\n" +
-             "  -jsdebugger                         Open the Browser Toolbox.\n" +
-             "  -devtools                           Open DevTools on initial load.\n" +
-             "  -start-debugger-server [port|path]  Start the debugger server on a TCP port or Unix domain socket path.\n" +
-             "                                      Defaults to TCP port 6000.\n",
+  helpInfo : "  --jsconsole        Open the Browser Console.\n" +
+             "  --jsdebugger       Open the Browser Toolbox.\n" +
+             "  --devtools         Open DevTools on initial load.\n" +
+             "  --start-debugger-server [port|path] " +
+             "Start the debugger server on a TCP port or " +
+             "Unix domain socket path.  Defaults to TCP port 6000.\n",
 
   classID: Components.ID("{9e9a9283-0ce9-4e4a-8f1c-ba129a032c32}"),
   QueryInterface: XPCOMUtils.generateQI([Ci.nsICommandLineHandler]),
 };
 
-this.NSGetFactory = XPCOMUtils.generateNSGetFactory(
-    [devtoolsCommandlineHandler]);
+this.NSGetFactory = XPCOMUtils.generateNSGetFactory([devtoolsCommandlineHandler]);
