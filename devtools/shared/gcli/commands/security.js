@@ -32,7 +32,7 @@ exports.items = [
   {
     // --- General Security information
     name: "security",
-    description: l10n.lookup("securityDesc"),
+    description: l10n.lookup("securityPrivacyDesc"),
     manual: l10n.lookup("securityManual")
   },
   {
