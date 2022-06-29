@@ -10,6 +10,8 @@
 <!DOCTYPE window [
 <!ENTITY % toolboxDTD SYSTEM "chrome://browser/locale/devtools/toolbox.dtd" >
 %toolboxDTD;
+<!ENTITY % editMenuStrings SYSTEM "chrome://global/locale/editMenuOverlay.dtd">
+%editMenuStrings;
 <!ENTITY % globalKeysDTD SYSTEM "chrome://global/locale/globalKeys.dtd">
 %globalKeysDTD;
 ]>
