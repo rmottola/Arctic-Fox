@@ -299,7 +299,6 @@ devtools.jar:
     skin/themes/images/tool-shadereditor.svg (themes/images/tool-shadereditor.svg)
     skin/themes/images/tool-styleeditor.svg (themes/images/tool-styleeditor.svg)
     skin/themes/images/tool-storage.svg (themes/images/tool-storage.svg)
-*   skin/themes/profiler.css (themes/profiler.css)
     skin/themes/images/tool-profiler.svg (themes/images/tool-profiler.svg)
     skin/themes/images/tool-profiler-active.svg (themes/images/tool-profiler-active.svg)
     skin/themes/images/tool-network.svg (themes/images/tool-network.svg)
