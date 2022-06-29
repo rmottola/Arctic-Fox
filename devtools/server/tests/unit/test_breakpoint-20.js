@@ -11,8 +11,6 @@ var gClient;
 var gTraceClient;
 var gThreadClient;
 
-Components.utils.import('resource://gre/modules/devtools/SourceMap.jsm');
-
 function run_test()
 {
   initTestDebuggerServer();
