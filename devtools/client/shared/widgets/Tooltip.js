@@ -1278,8 +1278,9 @@ EventTooltip.prototype = {
       if (!listener.hide.debugger) {
         let debuggerIcon = doc.createElement("image");
         debuggerIcon.className = "event-tooltip-debugger-icon";
-        debuggerIcon.setAttribute("src", "chrome://global/skin/devtools/tool-debugger.svg");
-        let openInDebugger = l10n.strings.GetStringFromName("eventsTooltip.openInDebugger");
+        debuggerIcon.setAttribute("src", "chrome://devtools/skin/themes/images/tool-debugger.svg");
+        let openInDebugger =
+            l10n.strings.GetStringFromName("eventsTooltip.openInDebugger");
         debuggerIcon.setAttribute("tooltiptext", openInDebugger);
         header.appendChild(debuggerIcon);
       }
@@ -1302,7 +1303,8 @@ EventTooltip.prototype = {
       }
 
       let attributesContainer = doc.createElement("hbox");
-      attributesContainer.setAttribute("class", "event-tooltip-attributes-container");
+      attributesContainer.setAttribute("class",
+                                       "event-tooltip-attributes-container");
       header.appendChild(attributesContainer);
 
       if (!listener.hide.capturing) {
