@@ -291,7 +291,10 @@ InplaceEditor.prototype = {
     this._stopAutosize();
 
     this.elt.style.display = this.originalDisplay;
-    this.elt.focus();
+
+    if (this.doc.activeElement == this.input) {
+      this.elt.focus();
+    }
 
     this.elt.parentNode.removeChild(this.input);
     this.input = null;

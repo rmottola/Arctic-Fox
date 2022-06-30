@@ -1133,6 +1133,7 @@ function CssRuleView(aInspector, aDoc, aStore, aPageStyle) {
   this._buildContextMenu = this._buildContextMenu.bind(this);
   this._onContextMenu = this._onContextMenu.bind(this);
   this._contextMenuUpdate = this._contextMenuUpdate.bind(this);
+  this._onKeypress = this._onKeypress.bind(this);
   this._onAddRule = this._onAddRule.bind(this);
   this._onSelectAll = this._onSelectAll.bind(this);
   this._onCopy = this._onCopy.bind(this);
@@ -1148,6 +1149,7 @@ function CssRuleView(aInspector, aDoc, aStore, aPageStyle) {
 
   this.searchClearButton.hidden = true;
 
+  this.doc.addEventListener("keypress", this._onKeypress);
   this.element.addEventListener("copy", this._onCopy);
   this.element.addEventListener("contextmenu", this._onContextMenu);
   this.searchField.addEventListener("input", this._onFilterStyles);
@@ -2041,6 +2043,20 @@ CssRuleView.prototype = {
     }
 
     this._highlightedElements = [];
+  },
+
+  /**
+   * Handle the keypress event in the rule view.
+   */
+  _onKeypress: function(event) {
+    let isOSX = Services.appinfo.OS == "Darwin";
+
+    if (((isOSX && event.metaKey && !event.ctrlKey && !event.altKey) ||
+        (!isOSX && event.ctrlKey && !event.metaKey && !event.altKey)) &&
+        event.code === "KeyF") {
+      this.searchField.focus();
+      event.preventDefault();
+    }
   }
 };
 
