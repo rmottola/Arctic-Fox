@@ -248,3 +248,11 @@
 .ruleview-selector-separator, .ruleview-selector-unmatched {
   color: #888;
 }
+
+#pseudo-class-panel-toggle::before {
+  background-image: url("chrome://devtools/skin/themes/images/pseudo-class.svg#pseudo-class");
+  background-size: cover;
+}
+#pseudo-class-panel-toggle[checked]::before {
+  background-image: url("chrome://devtools/skin/themes/images/pseudo-class.svg#pseudo-class-checked");
+}
