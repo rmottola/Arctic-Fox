@@ -2710,7 +2710,7 @@ TextPropertyEditor.prototype = {
     const filterSwatchClass = "ruleview-filterswatch";
 
     let outputParser = this.ruleEditor.ruleView._outputParser;
-    let frag = outputParser.parseCssProperty(name, val, {
+    let parserOptions = {
       colorSwatchClass: sharedSwatchClass + colorSwatchClass,
       colorClass: "ruleview-color",
       bezierSwatchClass: sharedSwatchClass + bezierSwatchClass,
@@ -2720,7 +2720,8 @@ TextPropertyEditor.prototype = {
       defaultColorType: !propDirty,
       urlClass: "theme-link",
       baseURI: this.sheetURI
-    });
+    };
+    let frag = outputParser.parseCssProperty(name, val, parserOptions);
     this.valueSpan.innerHTML = "";
     this.valueSpan.appendChild(frag);
 
@@ -2762,13 +2763,14 @@ TextPropertyEditor.prototype = {
     let span = this.valueSpan.querySelector("." + filterSwatchClass);
     if (this.ruleEditor.isEditable) {
       if (span) {
+        parserOptions.filterSwatch = true;
         let originalValue = this.valueSpan.textContent;
 
         this.ruleEditor.ruleView.tooltips.filterEditor.addSwatch(span, {
           onPreview: () => this._previewValue(this.valueSpan.textContent),
           onCommit: () => this._applyNewValue(this.valueSpan.textContent),
           onRevert: () => this._applyNewValue(originalValue, false)
-        });
+        }, outputParser, parserOptions);
       }
     }
 
