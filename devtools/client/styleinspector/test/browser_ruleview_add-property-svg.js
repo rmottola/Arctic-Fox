@@ -4,31 +4,24 @@
 
 "use strict";
 
-// Tests all sorts of additions and updates of properties in the rule-view.
-// FIXME: TO BE SPLIT IN *MANY* SMALLER TESTS
+// Tests editing SVG styles using the rules view.
 
-const TEST_URI = `
-  <style type="text/css">
-    #testid {
-      background-color: blue;
-    }
-    .testclass, .unmatched {
-      background-color: green;
-    };
-  </style>
-  <div id='testid' class='testclass'>Styled Node</div>
-  <div id='testid2'>Styled Node</div>
-`;
+var TEST_URL = "chrome://global/skin/icons/warning.svg";
+var TEST_SELECTOR = "path";
 
 add_task(function*() {
-  yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
+  yield addTab(TEST_URL);
   let {inspector, view} = yield openRuleView();
-  yield testCreateNew(inspector, view);
+  yield selectNode(TEST_SELECTOR, inspector);
+  yield testCreateNew(view);
 });
 
-function* testCreateNew(inspector, ruleView) {
-  // Create a new property.
+function* testCreateNew(ruleView) {
+  info("Test creating a new property");
+
   let elementRuleEditor = getRuleViewRuleEditor(ruleView, 0);
+
+  info("Focusing a new property name in the rule-view");
   let editor = yield focusEditableField(ruleView, elementRuleEditor.closeBrace);
 
   is(inplaceEditor(elementRuleEditor.newPropSpan), editor,
@@ -36,16 +29,8 @@ function* testCreateNew(inspector, ruleView) {
 
   let input = editor.input;
 
-  ok(input.selectionStart === 0 && input.selectionEnd === input.value.length,
-    "Editor contents are selected.");
-
-  // Try clicking on the editor's input again, shouldn't cause trouble
-  // (see bug 761665).
-  EventUtils.synthesizeMouse(input, 1, 1, {}, ruleView.styleWindow);
-  input.select();
-
   info("Entering the property name");
-  input.value = "background-color";
+  input.value = "fill";
 
   info("Pressing RETURN and waiting for the value field focus");
   let onFocus = once(elementRuleEditor.element, "focus", true);
@@ -63,12 +48,14 @@ function* testCreateNew(inspector, ruleView) {
   is(editor, inplaceEditor(textProp.editor.valueSpan),
     "Should be editing the value span now.");
 
-  let onMutated = inspector.once("markupmutation");
-  editor.input.value = "purple";
+  editor.input.value = "red";
   let onBlur = once(editor.input, "blur");
   EventUtils.sendKey("return", ruleView.styleWindow);
   yield onBlur;
-  yield onMutated;
+  yield elementRuleEditor.rule._applyingModifications;
 
-  is(textProp.value, "purple", "Text prop should have been changed.");
+  is(textProp.value, "red", "Text prop should have been changed.");
+
+  is((yield getComputedStyleProperty(TEST_SELECTOR, null, "fill")),
+    "rgb(255, 0, 0)", "The fill was changed to red");
 }

@@ -4,8 +4,8 @@
 
 "use strict";
 
-// Tests that the rule view search filter works properly when modifying the
-// existing search filter value.
+// Tests that the rule view search filter escape keypress will clear the search
+// field.
 
 const SEARCH = "00F";
 
@@ -26,7 +26,7 @@ add_task(function*() {
   let {inspector, view} = yield openRuleView();
   yield selectNode("#testid", inspector);
   yield testAddTextInFilter(inspector, view);
-  yield testRemoveTextInFilter(inspector, view);
+  yield testEscapeKeypress(inspector, view);
 });
 
 function* testAddTextInFilter(inspector, view) {
@@ -45,32 +45,21 @@ function* testAddTextInFilter(inspector, view) {
     "background-color text property is correctly highlighted.");
 }
 
-function* testRemoveTextInFilter(inspector, view) {
-  info("Press backspace and set filter text to \"00\"");
+function* testEscapeKeypress(inspector, view) {
+  info("Pressing the escape key on search filter");
 
+  let doc = view.styleDocument;
   let win = view.styleWindow;
   let searchField = view.searchField;
+  let onRuleViewFiltered = inspector.once("ruleview-filtered");
 
   searchField.focus();
-  EventUtils.synthesizeKey("VK_BACK_SPACE", {}, win);
-  yield inspector.once("ruleview-filtered");
+  EventUtils.synthesizeKey("VK_ESCAPE", {}, win);
+  yield onRuleViewFiltered;
 
-  info("Check that the correct rules are visible");
+  info("Check the search filter is cleared and no rules are highlighted");
   is(view.element.children.length, 3, "Should have 3 rules.");
-  is(getRuleViewRuleEditor(view, 0).rule.selectorText, "element",
-    "First rule is inline element.");
-
-  let rule = getRuleViewRuleEditor(view, 1).rule;
-
-  is(rule.selectorText, "#testid", "Second rule is #testid.");
-  ok(rule.textProps[0].editor.container.classList
-    .contains("ruleview-highlight"),
-    "background-color text property is correctly highlighted.");
-
-  rule = getRuleViewRuleEditor(view, 2).rule;
-
-  is(rule.selectorText, ".testclass", "Second rule is .testclass.");
-  ok(rule.textProps[0].editor.container.classList
-    .contains("ruleview-highlight"),
-    "width text property is correctly highlighted.");
+  ok(!searchField.value, "Search filter is cleared");
+  ok(!doc.querySelectorAll(".ruleview-highlight").length,
+    "No rules are higlighted");
 }

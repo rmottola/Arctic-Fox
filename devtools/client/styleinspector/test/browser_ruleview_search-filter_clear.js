@@ -29,7 +29,7 @@ add_task(function*() {
 function* testAddTextInFilter(inspector, ruleView) {
   info("Setting filter text to \"00F\"");
 
-  let win = ruleView.doc.defaultView;
+  let win = ruleView.styleWindow;
   let searchField = ruleView.searchField;
   let onRuleViewFiltered = inspector.once("ruleview-filtered");
 
@@ -48,8 +48,8 @@ function* testAddTextInFilter(inspector, ruleView) {
 function* testClearSearchFilter(inspector, ruleView) {
   info("Clearing the search filter");
 
-  let doc = ruleView.doc;
-  let win = ruleView.doc.defaultView;
+  let doc = ruleView.styleDocument;
+  let win = ruleView.styleWindow;
   let searchField = ruleView.searchField;
   let searchClearButton = ruleView.searchClearButton;
   let onRuleViewFiltered = inspector.once("ruleview-filtered");

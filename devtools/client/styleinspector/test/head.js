@@ -5,22 +5,26 @@
 "use strict";
 
 const Cu = Components.utils;
-let {gDevTools} = Cu.import("resource://gre/modules/devtools/gDevTools.jsm", {});
-let {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let {TargetFactory} = require("devtools/framework/target");
-let {CssComputedView} = require("devtools/styleinspector/computed-view");
-let {CssRuleView, _ElementStyle} = require("devtools/styleinspector/rule-view");
-let {CssLogic, CssSelector} = require("devtools/styleinspector/css-logic");
-let DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
-let promise = require("promise");
-let {editableField, getInplaceEditorForSpan: inplaceEditor} = require("devtools/shared/inplace-editor");
-let {console} = Components.utils.import("resource://gre/modules/devtools/Console.jsm", {});
+var {gDevTools} = Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm", {});
+var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var {TargetFactory} = require("devtools/client/framework/target");
+var {CssComputedView} = require("devtools/client/styleinspector/computed-view");
+var {CssRuleView, _ElementStyle} = require("devtools/client/styleinspector/rule-view");
+var {CssLogic, CssSelector} = require("devtools/shared/styleinspector/css-logic");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
+var promise = require("promise");
+var {editableField, getInplaceEditorForSpan: inplaceEditor} =
+  require("devtools/client/shared/inplace-editor");
+var {console} =
+  Components.utils.import("resource://gre/modules/devtools/shared/Console.jsm", {});
 
 // All tests are asynchronous
 waitForExplicitFinish();
 
-const TEST_URL_ROOT = "http://example.com/browser/browser/devtools/styleinspector/test/";
-const TEST_URL_ROOT_SSL = "https://example.com/browser/browser/devtools/styleinspector/test/";
+const TEST_URL_ROOT =
+  "http://example.com/browser/devtools/client/styleinspector/test/";
+const TEST_URL_ROOT_SSL =
+  "https://example.com/browser/devtools/client/styleinspector/test/";
 const ROOT_TEST_DIR = getRootDirectory(gTestPath);
 const FRAME_SCRIPT_URL = ROOT_TEST_DIR + "doc_frame_script.js";
 
@@ -607,15 +611,19 @@ function synthesizeKeys(input, win) {
 /**
  * Get the DOMNode for a css rule in the rule-view that corresponds to the given
  * selector
- * @param {CssRuleView} view The instance of the rule-view panel
- * @param {String} selectorText The selector in the rule-view for which the rule
- * object is wanted
+ *
+ * @param {CssRuleView} view
+ *        The instance of the rule-view panel
+ * @param {String} selectorText
+ *        The selector in the rule-view for which the rule
+ *        object is wanted
  * @return {DOMNode}
  */
 function getRuleViewRule(view, selectorText) {
   let rule;
-  for (let r of view.doc.querySelectorAll(".ruleview-rule")) {
-    let selector = r.querySelector(".ruleview-selector, .ruleview-selector-matched");
+  for (let r of view.styleDocument.querySelectorAll(".ruleview-rule")) {
+    let selector = r.querySelector(".ruleview-selectorcontainer, " +
+                                   ".ruleview-selector-matched");
     if (selector && selector.textContent === selectorText) {
       rule = r;
       break;
@@ -711,12 +719,15 @@ let simulateColorPickerChange = Task.async(function*(colorPicker, newRgba, expec
 
 /**
  * Get a rule-link from the rule-view given its index
- * @param {CssRuleView} view The instance of the rule-view panel
- * @param {Number} index The index of the link to get
+ *
+ * @param {CssRuleView} view
+ *        The instance of the rule-view panel
+ * @param {Number} index
+ *        The index of the link to get
  * @return {DOMNode} The link if any at this index
  */
 function getRuleViewLinkByIndex(view, index) {
-  let links = view.doc.querySelectorAll(".ruleview-rule-source");
+  let links = view.styleDocument.querySelectorAll(".ruleview-rule-source");
   return links[index];
 }
 
@@ -788,8 +799,11 @@ let createNewRuleViewProperty = Task.async(function*(ruleEditor, inputValue) {
 /**
  * Get references to the name and value span nodes corresponding to a given
  * property name in the computed-view
- * @param {CssHtmlTree} view The instance of the computed view panel
- * @param {String} name The name of the property to retrieve
+ *
+ * @param {CssComputedView} view
+ *        The instance of the computed view panel
+ * @param {String} name
+ *        The name of the property to retrieve
  * @return an object {nameSpan, valueSpan}
  */
 function getComputedViewProperty(view, name) {
@@ -808,8 +822,11 @@ function getComputedViewProperty(view, name) {
 
 /**
  * Get an instance of PropertyView from the computed-view.
- * @param {CssHtmlTree} view The instance of the computed view panel
- * @param {String} name The name of the property to retrieve
+ *
+ * @param {CssComputedView} view
+ *        The instance of the computed view panel
+ * @param {String} name
+ *        The name of the property to retrieve
  * @return {PropertyView}
  */
 function getComputedViewPropertyView(view, name) {
@@ -828,14 +845,17 @@ function getComputedViewPropertyView(view, name) {
  * the computed-view.
  * A property-content element always follows (nextSibling) the property itself
  * and is only shown when the twisty icon is expanded on the property.
- * A property-content element contains matched rules, with selectors, properties,
- * values and stylesheet links
- * @param {CssHtmlTree} view The instance of the computed view panel
- * @param {String} name The name of the property to retrieve
+ * A property-content element contains matched rules, with selectors,
+ * properties, values and stylesheet links
+ *
+ * @param {CssComputedView} view
+ *        The instance of the computed view panel
+ * @param {String} name
+ *        The name of the property to retrieve
  * @return {Promise} A promise that resolves to the property matched rules
  * container
  */
-let getComputedViewMatchedRules = Task.async(function*(view, name) {
+var getComputedViewMatchedRules = Task.async(function*(view, name) {
   let expander;
   let propertyContent;
   for (let property of view.styleDocument.querySelectorAll(".property-view")) {
@@ -860,8 +880,11 @@ let getComputedViewMatchedRules = Task.async(function*(view, name) {
 /**
  * Get the text value of the property corresponding to a given name in the
  * computed-view
- * @param {CssHtmlTree} view The instance of the computed view panel
- * @param {String} name The name of the property to retrieve
+ *
+ * @param {CssComputedView} view
+ *        The instance of the computed view panel
+ * @param {String} name
+ *        The name of the property to retrieve
  * @return {String} The property value
  */
 function getComputedViewPropertyValue(view, name, propertyName) {
@@ -872,8 +895,11 @@ function getComputedViewPropertyValue(view, name, propertyName) {
 /**
  * Expand a given property, given its index in the current property list of
  * the computed view
- * @param {CssHtmlTree} view The instance of the computed view panel
- * @param {Number} index The index of the property to be expanded
+ *
+ * @param {CssComputedView} view
+ *        The instance of the computed view panel
+ * @param {Number} index
+ *        The index of the property to be expanded
  * @return a promise that resolves when the property has been expanded, or
  * rejects if the property was not found
  */
@@ -891,8 +917,11 @@ function expandComputedViewPropertyByIndex(view, index) {
 
 /**
  * Get a rule-link from the computed-view given its index
- * @param {CssHtmlTree} view The instance of the computed view panel
- * @param {Number} index The index of the link to be retrieved
+ *
+ * @param {CssComputedView} view
+ *        The instance of the computed view panel
+ * @param {Number} index
+ *        The index of the link to be retrieved
  * @return {DOMNode} The link at the given index, if one exists, null otherwise
  */
 function getComputedViewLinkByIndex(view, index) {

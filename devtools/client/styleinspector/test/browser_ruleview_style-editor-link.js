@@ -7,18 +7,16 @@
 ///////////////////
 //
 // Whitelisting this test.
-// As part of bug 1077403, the leaking uncaught rejection should be fixed. 
+// As part of bug 1077403, the leaking uncaught rejection should be fixed.
 //
 thisTestLeaksUncaughtRejectionsAndShouldBeFixed("Error: Unknown sheet source");
 
 // Test the links from the rule-view to the styleeditor
 
-const STYLESHEET_DATA_URL_CONTENTS = ["#first {",
-                                      "color: blue",
-                                      "}"].join("\n");
-const STYLESHEET_DATA_URL =
-      `data:text/css,${encodeURIComponent(STYLESHEET_DATA_URL_CONTENTS)}`;
-const STYLESHEET_DECODED_DATA_URL = `data:text/css,${STYLESHEET_DATA_URL_CONTENTS}`;
+const STYLESHEET_URL = "data:text/css,"+encodeURIComponent(
+  ["#first {",
+   "color: blue",
+   "}"].join("\n"));
 
 const EXTERNAL_STYLESHEET_FILE_NAME = "doc_style_editor_link.css";
 const EXTERNAL_STYLESHEET_URL = TEST_URL_ROOT + EXTERNAL_STYLESHEET_FILE_NAME;
@@ -36,7 +34,7 @@ const DOCUMENT_URL = "data:text/html;charset=utf-8,"+encodeURIComponent(
    '<style>',
    'div { font-weight: bold; }',
    '</style>',
-   '<link rel="stylesheet" type="text/css" href="'+STYLESHEET_DATA_URL+'">',
+   '<link rel="stylesheet" type="text/css" href="'+STYLESHEET_URL+'">',
    '<link rel="stylesheet" type="text/css" href="'+EXTERNAL_STYLESHEET_URL+'">',
    '</head>',
    '<body>',
@@ -59,29 +57,27 @@ const DOCUMENT_URL = "data:text/html;charset=utf-8,"+encodeURIComponent(
 add_task(function*() {
   yield addTab(DOCUMENT_URL);
   let {toolbox, inspector, view} = yield openRuleView();
-
-  info("Select the test node");
   yield selectNode("div", inspector);
 
-  yield testInlineStyle(view, inspector);
+  yield testInlineStyle(view);
   yield testFirstInlineStyleSheet(view, toolbox);
   yield testSecondInlineStyleSheet(view, toolbox);
   yield testExternalStyleSheet(view, toolbox);
 });
 
-function* testInlineStyle(view, inspector) {
+function* testInlineStyle(view) {
   info("Testing inline style");
 
-  let onWindow = waitForWindow();
+  let onTab = waitForTab();
   info("Clicking on the first link in the rule-view");
   clickLinkByIndex(view, 0);
 
-  let win = yield onWindow;
+  let tab = yield onTab;
 
-  let windowType = win.document.documentElement.getAttribute("windowtype");
-  is(windowType, "navigator:view-source", "View source window is open");
-  info("Closing window");
-  win.close();
+  let tabURI = tab.linkedBrowser.documentURI.spec;
+  ok(tabURI.startsWith("view-source:"), "View source tab is open");
+  info("Closing tab");
+  gBrowser.removeTab(tab);
 }
 
 function* testFirstInlineStyleSheet(view, toolbox) {
@@ -114,7 +110,8 @@ function* testSecondInlineStyleSheet(view, toolbox) {
   clickLinkByIndex(view, 3);
   let editor = yield onSelected;
 
-  is(toolbox.currentToolId, "styleeditor", "The style editor is selected again");
+  is(toolbox.currentToolId, "styleeditor",
+    "The style editor is selected again");
   validateStyleEditorSheet(editor, 1);
 }
 
@@ -133,7 +130,8 @@ function* testExternalStyleSheet(view, toolbox) {
   clickLinkByIndex(view, 1);
   let editor = yield onSelected;
 
-  is(toolbox.currentToolId, "styleeditor", "The style editor is selected again");
+  is(toolbox.currentToolId, "styleeditor",
+    "The style editor is selected again");
   validateStyleEditorSheet(editor, 2);
 }
 
@@ -143,32 +141,20 @@ function validateStyleEditorSheet(editor, expectedSheetIndex) {
      "loaded stylesheet index matches document stylesheet");
 
   let sheet = content.document.styleSheets[expectedSheetIndex];
-  is(editor.styleSheet.href, sheet.href, "loaded stylesheet href matches document stylesheet");
+  is(editor.styleSheet.href, sheet.href,
+    "loaded stylesheet href matches document stylesheet");
 }
 
 function testRuleViewLinkLabel(view) {
-  info("Checking the data URL link label");
-
-  let link = getRuleViewLinkByIndex(view, 1);
-  let labelElem = link.querySelector(".source-link-label");
+  let link = getRuleViewLinkByIndex(view, 2);
+  let labelElem = link.querySelector(".ruleview-rule-source-label");
   let value = labelElem.getAttribute("value");
   let tooltipText = labelElem.getAttribute("tooltiptext");
 
-  is(value, `${STYLESHEET_DATA_URL_CONTENTS}:1`,
-    "Rule view data URL stylesheet display value matches contents");
-  is(tooltipText, `${STYLESHEET_DECODED_DATA_URL}:1`,
-    "Rule view data URL stylesheet tooltip text matches the full URI path");
-
-  info("Checking the external link label");
-  link = getRuleViewLinkByIndex(view, 2);
-  labelElem = link.querySelector(".ruleview-rule-source-label");
-  value = labelElem.textContent;
-  tooltipText = labelElem.getAttribute("title");
-
-  is(value, `${EXTERNAL_STYLESHEET_FILE_NAME}:1`,
-    "Rule view external stylesheet display value matches filename and line number");
-  is(tooltipText, `${EXTERNAL_STYLESHEET_URL}:1`,
-    "Rule view external stylesheet tooltip text matches the full URI path");
+  is(value, EXTERNAL_STYLESHEET_FILE_NAME + ":1",
+    "rule view stylesheet display value matches filename and line number");
+  is(tooltipText, EXTERNAL_STYLESHEET_URL + ":1",
+    "rule view stylesheet tooltip text matches the full URI path");
 }
 
 function clickLinkByIndex(view, index) {
