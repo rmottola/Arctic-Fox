@@ -1072,6 +1072,7 @@ SwatchBasedEditorTooltip.prototype = {
     if (swatch) {
       this.activeSwatch = event.target;
       this.show();
+      swatch.callbacks.onShow();
       event.stopPropagation();
     }
   },
@@ -1558,7 +1559,6 @@ SwatchCubicBezierTooltip.prototype = Heritage.extend(SwatchBasedEditorTooltip.pr
     // Then set the curve and listen to changes to preview them
     if (this.activeSwatch) {
       this.currentBezierValue = this.activeSwatch.nextSibling;
-      let swatch = this.swatches.get(this.activeSwatch);
       this.widget.then(widget => {
         widget.off("updated", this._onUpdate);
         widget.cssCubicBezierValue = this.currentBezierValue.textContent;

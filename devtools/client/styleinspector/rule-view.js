@@ -2464,6 +2464,9 @@ function TextPropertyEditor(aRuleEditor, aProperty) {
   this._onStartEditing = this._onStartEditing.bind(this);
   this._onNameDone = this._onNameDone.bind(this);
   this._onValueDone = this._onValueDone.bind(this);
+  this._onSwatchCommit = this._onSwatchCommit.bind(this);
+  this._onSwatchPreview = this._onSwatchPreview.bind(this);
+  this._onSwatchRevert = this._onSwatchRevert.bind(this);
   this._onValidate = throttle(this._previewValue, 10, this);
   this.update = this.update.bind(this);
 
@@ -2678,7 +2681,7 @@ TextPropertyEditor.prototype = {
 
     this.warning.hidden = this.editing || this.isValid();
 
-    if ((this.prop.overridden || !this.prop.enabled) && !this.editing) {
+    if (this.prop.overridden || !this.prop.enabled) {
       this.element.classList.add("ruleview-overridden");
     } else {
       this.element.classList.remove("ruleview-overridden");
@@ -2734,10 +2737,11 @@ TextPropertyEditor.prototype = {
         let originalValue = this.valueSpan.textContent;
         // Adding this swatch to the list of swatches our colorpicker
         // knows about
-        this.ruleEditor.ruleView.tooltips.colorPicker.addSwatch(span, {
-          onPreview: () => this._previewValue(this.valueSpan.textContent),
-          onCommit: () => this._applyNewValue(this.valueSpan.textContent),
-          onRevert: () => this._applyNewValue(originalValue, false)
+        this.ruleView.tooltips.colorPicker.addSwatch(span, {
+          onShow: this._onStartEditing,
+          onPreview: this._onSwatchPreview,
+          onCommit: this._onSwatchCommit,
+          onRevert: this._onSwatchRevert
         });
       }
     }
@@ -2751,10 +2755,11 @@ TextPropertyEditor.prototype = {
         let originalValue = this.valueSpan.textContent;
         // Adding this swatch to the list of swatches our colorpicker
         // knows about
-        this.ruleEditor.ruleView.tooltips.cubicBezier.addSwatch(span, {
-          onPreview: () => this._previewValue(this.valueSpan.textContent),
-          onCommit: () => this._applyNewValue(this.valueSpan.textContent),
-          onRevert: () => this._applyNewValue(originalValue, false)
+        this.ruleView.tooltips.cubicBezier.addSwatch(span, {
+          onShow: this._onStartEditing,
+          onPreview: this._onSwatchPreview,
+          onCommit: this._onSwatchCommit,
+          onRevert: this._onSwatchRevert
         });
       }
     }
@@ -2766,10 +2771,11 @@ TextPropertyEditor.prototype = {
         parserOptions.filterSwatch = true;
         let originalValue = this.valueSpan.textContent;
 
-        this.ruleEditor.ruleView.tooltips.filterEditor.addSwatch(span, {
-          onPreview: () => this._previewValue(this.valueSpan.textContent),
-          onCommit: () => this._applyNewValue(this.valueSpan.textContent),
-          onRevert: () => this._applyNewValue(originalValue, false)
+        this.ruleView.tooltips.filterEditor.addSwatch(span, {
+          onShow: this._onStartEditing,
+          onPreview: this._onSwatchPreview,
+          onCommit: this._onSwatchCommit,
+          onRevert: this._onSwatchRevert
         }, outputParser, parserOptions);
       }
     }
@@ -2964,6 +2970,30 @@ TextPropertyEditor.prototype = {
         }
       }, 0);
     }
+  },
+
+  /**
+   * Called when the swatch editor wants to commit a value change.
+   */
+  _onSwatchCommit: function() {
+    this._onValueDone(this.valueSpan.textContent, true);
+    this.update();
+  },
+
+  /**
+   * Called when the swatch editor wants to preview a value change.
+   */
+  _onSwatchPreview: function() {
+    this._previewValue(this.valueSpan.textContent);
+  },
+
+  /**
+   * Called when the swatch editor closes from an ESC. Revert to the original
+   * value of this property before editing.
+   */
+  _onSwatchRevert: function() {
+    this.rule.setPropertyEnabled(this.prop, this.prop.enabled);
+    this.update();
   },
 
   /**
