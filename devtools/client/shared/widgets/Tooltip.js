@@ -1043,6 +1043,11 @@ SwatchBasedEditorTooltip.prototype = {
 
   _onSwatchClick: function(event) {
     let swatch = this.swatches.get(event.target);
+
+    if (event.shiftKey) {
+      event.stopPropagation();
+      return;
+    }
     if (swatch) {
       this.activeSwatch = event.target;
       this.show();
