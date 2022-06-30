@@ -415,25 +415,29 @@ function* waitForComputedStyleProperty(selector, pseudo, name, expected) {
 /**
  * Given an inplace editable element, click to switch it to edit mode, wait for
  * focus
+ *
  * @return a promise that resolves to the inplace-editor element when ready
  */
-let focusEditableField = Task.async(function*(editable, xOffset=1, yOffset=1, options={}) {
+var focusEditableField = Task.async(function*(ruleView, editable, xOffset=1,
+    yOffset=1, options={}) {
   let onFocus = once(editable.parentNode, "focus", true);
-
   info("Clicking on editable field to turn to edit mode");
   EventUtils.synthesizeMouse(editable, xOffset, yOffset, options,
     editable.ownerDocument.defaultView);
-  let event = yield onFocus;
+  yield onFocus;
 
   info("Editable field gained focus, returning the input field now");
-  return inplaceEditor(editable.ownerDocument.activeElement);
+  let onEdit = inplaceEditor(editable.ownerDocument.activeElement);
+
+  return onEdit;
 });
 
 /**
  * Given a tooltip object instance (see Tooltip.js), checks if it is set to
- * toggle and hover and if so, checks if the given target is a valid hover target.
- * This won't actually show the tooltip (the less we interact with XUL panels
- * during test runs, the better).
+ * toggle and hover and if so, checks if the given target is a valid hover
+ * target. This won't actually show the tooltip (the less we interact with XUL
+ * panels during test runs, the better).
+ *
  * @return a promise that resolves when the answer is known
  */
 function isHoverTooltipTarget(tooltip, target) {
@@ -447,6 +451,7 @@ function isHoverTooltipTarget(tooltip, target) {
 /**
  * Same as isHoverTooltipTarget except that it will fail the test if there is no
  * tooltip defined on hover of the given element
+ *
  * @return a promise
  */
 function assertHoverTooltipOn(tooltip, element) {
@@ -460,6 +465,7 @@ function assertHoverTooltipOn(tooltip, element) {
 /**
  * Same as assertHoverTooltipOn but fails the test if there is a tooltip defined
  * on hover of the given element
+ *
  * @return a promise
  */
 function assertNoHoverTooltipOn(tooltip, element) {
@@ -474,6 +480,7 @@ function assertNoHoverTooltipOn(tooltip, element) {
  * Listen for a new window to open and return a promise that resolves when one
  * does and completes its load.
  * Only resolves when the new window topic isn't domwindowopened.
+ *
  * @return a promise that resolves to the window object
  */
 function waitForWindow() {
@@ -690,16 +697,23 @@ function getRuleViewSelector(view, selectorText) {
 /**
  * Simulate a color change in a given color picker tooltip, and optionally wait
  * for a given element in the page to have its style changed as a result
+ *
+ * @param {RuleView} ruleView
+ *        The related rule view instance
  * @param {SwatchColorPickerTooltip} colorPicker
- * @param {Array} newRgba The new color to be set [r, g, b, a]
- * @param {Object} expectedChange Optional object that needs the following props:
- *                 - {DOMNode} element The element in the page that will have its
- *                   style changed.
- *                 - {String} name The style name that will be changed
- *                 - {String} value The expected style value
+ * @param {Array} newRgba
+ *        The new color to be set [r, g, b, a]
+ * @param {Object} expectedChange
+ *        Optional object that needs the following props:
+ *          - {DOMNode} element The element in the page that will have its
+ *            style changed.
+ *          - {String} name The style name that will be changed
+ *          - {String} value The expected style value
  * The style will be checked like so: getComputedStyle(element)[name] === value
  */
-let simulateColorPickerChange = Task.async(function*(colorPicker, newRgba, expectedChange) {
+var simulateColorPickerChange = Task.async(function*(ruleView, colorPicker,
+    newRgba, expectedChange) {
+  let onRuleViewChanged = ruleView.once("ruleview-changed");
   info("Getting the spectrum colorpicker object");
   let spectrum = yield colorPicker.spectrum;
   info("Setting the new color");
@@ -707,6 +721,8 @@ let simulateColorPickerChange = Task.async(function*(colorPicker, newRgba, expec
   info("Applying the change");
   spectrum.updateUI();
   spectrum.onChange();
+  info("Waiting for rule-view to update");
+  yield onRuleViewChanged;
 
   if (expectedChange) {
     info("Waiting for the style to be applied on the page");
@@ -746,19 +762,20 @@ function getRuleViewRuleEditor(view, childrenIndex, nodeIndex) {
 
 /**
  * Click on a rule-view's close brace to focus a new property name editor
- * @param {RuleEditor} ruleEditor An instance of RuleEditor that will receive
- * the new property
+ *
+ * @param {RuleEditor} ruleEditor
+ *        An instance of RuleEditor that will receive the new property
  * @return a promise that resolves to the newly created editor when ready and
  * focused
  */
-let focusNewRuleViewProperty = Task.async(function*(ruleEditor) {
+var focusNewRuleViewProperty = Task.async(function*(ruleEditor) {
   info("Clicking on a close ruleEditor brace to start editing a new property");
   ruleEditor.closeBrace.scrollIntoView();
-  let editor = yield focusEditableField(ruleEditor.closeBrace);
+  let editor = yield focusEditableField(ruleEditor.ruleView,
+    ruleEditor.closeBrace);
 
-  is(inplaceEditor(ruleEditor.newPropSpan), editor, "Focused editor is the new property editor.");
-  is(ruleEditor.rule.textProps.length,  0, "Starting with one new text property.");
-  is(ruleEditor.propertyList.children.length, 1, "Starting with two property editors.");
+  is(inplaceEditor(ruleEditor.newPropSpan), editor,
+    "Focused editor is the new property editor.");
 
   return editor;
 });

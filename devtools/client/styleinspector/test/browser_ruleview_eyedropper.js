@@ -4,28 +4,41 @@
 
 "use strict";
 
-const PAGE_CONTENT = [
-  '<style type="text/css">',
-  '  body {',
-  '    background-color: white;',
-  '    padding: 0px',
-  '  }',
-  '',
-  '  #div1 {',
-  '    background-color: #ff5;',
-  '    width: 20px;',
-  '    height: 20px;',
-  '  }',
-  '',
-  '  #div2 {',
-  '    margin-left: 20px;',
-  '    width: 20px;',
-  '    height: 20px;',
-  '    background-color: #f09;',
-  '  }',
-  '</style>',
-  '<body><div id="div1"></div><div id="div2"></div></body>'
-].join("\n");
+// So we can test collecting telemetry on the eyedropper
+var oldCanRecord = Services.telemetry.canRecordExtended;
+Services.telemetry.canRecordExtended = true;
+registerCleanupFunction(function() {
+  Services.telemetry.canRecordExtended = oldCanRecord;
+});
+const HISTOGRAM_ID = "DEVTOOLS_PICKER_EYEDROPPER_OPENED_BOOLEAN";
+const FLAG_HISTOGRAM_ID = "DEVTOOLS_PICKER_EYEDROPPER_OPENED_PER_USER_FLAG";
+const EXPECTED_TELEMETRY = {
+  "DEVTOOLS_PICKER_EYEDROPPER_OPENED_BOOLEAN": 2,
+  "DEVTOOLS_PICKER_EYEDROPPER_OPENED_PER_USER_FLAG": 1
+};
+
+const TEST_URI = `
+  <style type="text/css">
+    body {
+      background-color: white;
+      padding: 0px
+    }
+
+    #div1 {
+      background-color: #ff5;
+      width: 20px;
+      height: 20px;
+    }
+
+    #div2 {
+      margin-left: 20px;
+      width: 20px;
+      height: 20px;
+      background-color: #f09;
+    }
+  </style>
+  <body><div id="div1"></div><div id="div2"></div></body>
+`;
 
 const ORIGINAL_COLOR = "rgb(255, 0, 153)";  // #f09
 const EXPECTED_COLOR = "rgb(255, 255, 85)"; // #ff5
@@ -34,10 +47,11 @@ const EXPECTED_COLOR = "rgb(255, 255, 85)"; // #ff5
 // to close it, and clicking the page to select a color.
 
 add_task(function*() {
-  yield addTab("data:text/html;charset=utf-8,rule view eyedropper test");
-  content.document.body.innerHTML = PAGE_CONTENT;
+  // clear telemetry so we can get accurate counts
+  clearTelemetry();
 
-  let {toolbox, inspector, view} = yield openRuleView();
+  yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
+  let {inspector, view} = yield openRuleView();
   yield selectNode("#div2", inspector);
 
   let property = getRuleViewProperty(view, "#div2", "background-color");
@@ -56,7 +70,9 @@ add_task(function*() {
 
   ok(dropper, "dropper opened");
 
-  yield testSelect(swatch, dropper);
+  yield testSelect(view, swatch, dropper);
+
+  checkTelemetry();
 });
 
 function testESC(swatch, dropper) {
@@ -74,27 +90,41 @@ function testESC(swatch, dropper) {
   return deferred.promise;
 }
 
-function testSelect(swatch, dropper) {
-  let deferred = promise.defer();
-
-  dropper.once("destroy", () => {
-    let color = swatch.style.backgroundColor;
-    is(color, EXPECTED_COLOR, "swatch changed colors");
-
-    // the change to the content is done async after rule view change
-    executeSoon(() => {
-      let element = content.document.querySelector("div");
-      is(content.window.getComputedStyle(element).backgroundColor,
-         EXPECTED_COLOR,
-         "div's color set to body color after dropper");
-
-      deferred.resolve();
-    });
-  });
+function* testSelect(view, swatch, dropper) {
+  let onDestroyed = dropper.once("destroy");
+  // the change to the content is done async after rule view change
+  let onRuleViewChanged = view.once("ruleview-changed");
 
   inspectPage(dropper);
 
-  return deferred.promise;
+  yield onDestroyed;
+  yield onRuleViewChanged;
+
+  let color = swatch.style.backgroundColor;
+  is(color, EXPECTED_COLOR, "swatch changed colors");
+
+  let element = content.document.querySelector("div");
+  is(content.window.getComputedStyle(element).backgroundColor,
+     EXPECTED_COLOR,
+     "div's color set to body color after dropper");
+}
+
+function clearTelemetry() {
+  for (let histogramId in EXPECTED_TELEMETRY) {
+    let histogram = Services.telemetry.getHistogramById(histogramId);
+    histogram.clear();
+  }
+}
+
+function checkTelemetry() {
+  for (let histogramId in EXPECTED_TELEMETRY) {
+    let expected = EXPECTED_TELEMETRY[histogramId];
+    let histogram = Services.telemetry.getHistogramById(histogramId);
+    let snapshot = histogram.snapshot();
+
+    is(snapshot.counts[1], expected,
+      "eyedropper telemetry value correct for " + histogramId);
+  }
 }
 
 /* Helpers */
@@ -109,7 +139,7 @@ function openEyedropper(view, swatch) {
     let dropperButton = tooltipDoc.querySelector("#eyedropper-button");
 
     tooltip.once("eyedropper-opened", (event, dropper) => {
-      deferred.resolve(dropper)
+      deferred.resolve(dropper);
     });
     dropperButton.click();
   });
@@ -131,7 +161,8 @@ function inspectPage(dropper, click=true) {
     EventUtils.synthesizeMouse(target, x, y, { type: "mousemove" }, win);
 
     return dropperLoaded(dropper).then(() => {
-      EventUtils.synthesizeMouse(target, x + 10, y + 10, { type: "mousemove" }, win);
+      EventUtils.synthesizeMouse(target, x + 10, y + 10,
+        { type: "mousemove" }, win);
 
       if (click) {
         EventUtils.synthesizeMouse(target, x + 10, y + 10, {}, win);
