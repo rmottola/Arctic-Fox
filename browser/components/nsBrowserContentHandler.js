@@ -1,9 +1,12 @@
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+Components.utils.importGlobalProperties(["URLSearchParams"]);
 
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
+Components.utils.import("resource://gre/modules/AppConstants.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
                                   "resource://gre/modules/PrivateBrowsingUtils.jsm");
@@ -48,7 +51,7 @@ function shouldLoadURI(aURI) {
     return true;
 
   dump("*** Preventing external load of chrome: URI into browser window\n");
-  dump("    Use -chrome <uri> instead\n");
+  dump("    Use --chrome <uri> instead\n");
   return false;
 }
 
@@ -423,31 +426,35 @@ nsBrowserContentHandler.prototype = {
       cmdLine.preventDefault = true;
     }
 
-#ifdef XP_WIN
-    // Handle "? searchterm" for Windows Vista start menu integration
-    for (var i = cmdLine.length - 1; i >= 0; --i) {
-      var param = cmdLine.getArgument(i);
-      if (param.match(/^\? /)) {
-        cmdLine.removeArguments(i, i);
-        cmdLine.preventDefault = true;
+    if (AppConstants.platform  == "win") {
+      // Handle "? searchterm" for Windows Vista start menu integration
+      for (var i = cmdLine.length - 1; i >= 0; --i) {
+        var param = cmdLine.getArgument(i);
+        if (param.match(/^\? /)) {
+          cmdLine.removeArguments(i, i);
+          cmdLine.preventDefault = true;
 
-        searchParam = param.substr(2);
-        doSearch(searchParam, cmdLine);
+          searchParam = param.substr(2);
+          doSearch(searchParam, cmdLine);
+        }
       }
     }
-#endif
   },
 
-  helpInfo : "  -browser                            Open a browser window.\n" +
-             "  -new-window <url>                   Open <url> in a new window.\n" +
-             "  -new-tab <url>                      Open <url> in a new tab.\n" +
-             "  -private-window <url>               Open <url> in a new private window.\n" +
-#ifdef XP_WIN
-             "  -preferences                        Open Options dialog.\n" +
-#else
-             "  -preferences                        Open Preferences dialog.\n" +
-#endif
-             "  -search <term>                      Search <term> with your default search engine.\n",
+  get helpInfo() {
+    let info =
+              "  --browser          Open a browser window.\n" +
+              "  --new-window <url> Open <url> in a new window.\n" +
+              "  --new-tab <url>    Open <url> in a new tab.\n" +
+              "  --private-window <url> Open <url> in a new private window.\n";
+    if (AppConstants.platform == "win") {
+      info += "  --preferences      Open Options dialog.\n";
+    } else {
+      info += "  --preferences      Open Preferences dialog.\n";
+    }
+    info += "  --search <term>    Search <term> with your default search engine.\n";
+    return info;
+  },
 
   /* nsIBrowserHandler */
 
@@ -640,35 +647,33 @@ nsDefaultCommandLineHandler.prototype = {
     return this;
   },
 
-#ifdef XP_WIN
   _haveProfile: false,
-#endif
 
   /* nsICommandLineHandler */
   handle : function dch_handle(cmdLine) {
     var urilist = [];
 
-#ifdef XP_WIN
-    // If we don't have a profile selected yet (e.g. the Profile Manager is
-    // displayed) we will crash if we open an url and then select a profile. To
-    // prevent this handle all url command line flags and set the command line's
-    // preventDefault to true to prevent the display of the ui. The initial
-    // command line will be retained when nsAppRunner calls LaunchChild though
-    // urls launched after the initial launch will be lost.
-    if (!this._haveProfile) {
-      try {
-        // This will throw when a profile has not been selected.
-        var fl = Components.classes["@mozilla.org/file/directory_service;1"]
-                           .getService(Components.interfaces.nsIProperties);
-        var dir = fl.get("ProfD", Components.interfaces.nsILocalFile);
-        this._haveProfile = true;
-      }
-      catch (e) {
-        while ((ar = cmdLine.handleFlagWithParam("url", false))) { }
-        cmdLine.preventDefault = true;
+    if (AppConstants.platform == "win") {
+      // If we don't have a profile selected yet (e.g. the Profile Manager is
+      // displayed) we will crash if we open an url and then select a profile. To
+      // prevent this handle all url command line flags and set the command line's
+      // preventDefault to true to prevent the display of the ui. The initial
+      // command line will be retained when nsAppRunner calls LaunchChild though
+      // urls launched after the initial launch will be lost.
+      if (!this._haveProfile) {
+        try {
+          // This will throw when a profile has not been selected.
+          var fl = Components.classes["@mozilla.org/file/directory_service;1"]
+                             .getService(Components.interfaces.nsIProperties);
+          var dir = fl.get("ProfD", Components.interfaces.nsILocalFile);
+          this._haveProfile = true;
+        }
+        catch (e) {
+          while ((ar = cmdLine.handleFlagWithParam("url", false))) { }
+          cmdLine.preventDefault = true;
+        }
       }
     }
-#endif
 
     try {
       var ar;

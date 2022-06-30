@@ -1451,27 +1451,27 @@ DumpHelp()
 
 #ifdef MOZ_X11
   printf("X11 options\n"
-         "  --display=DISPLAY                   X display to use\n"
-         "  --sync                              Make X calls synchronous\n");
+         "  --display=DISPLAY  X display to use\n"
+         "  --sync             Make X calls synchronous\n");
 #endif
 #ifdef XP_UNIX
-  printf("  --g-fatal-warnings                  Make all warnings fatal\n"
+  printf("  --g-fatal-warnings Make all warnings fatal\n"
          "\n%s options\n", gAppData->name);
 #endif
 
-  printf("  -h or --help                        Print this message.\n"
-         "  -v or --version                     Print %s version.\n"
-         "  -P <profile>                        Start with <profile>.\n"
-         "  --profile <path>                    Start with profile at <path>.\n"
-         "  --migration                         Start with migration wizard.\n"
-         "  --ProfileManager                    Start with ProfileManager.\n"
-         "  --no-remote                         Do not accept or send remote commands; implies --new-instance.\n"
-         "  --new-instance                      Open new instance, not a new window in running instance.\n"
-         "  --UILocale <locale>                 Start with <locale> resources as UI Locale.\n"
-         "  --safe-mode                         Disables extensions and themes for this session.\n", gAppData->name);
+  printf("  -h or --help       Print this message.\n"
+         "  -v or --version    Print %s version.\n"
+         "  -P <profile>       Start with <profile>.\n"
+         "  --profile <path>   Start with profile at <path>.\n"
+         "  --migration        Start with migration wizard.\n"
+         "  --ProfileManager   Start with ProfileManager.\n"
+         "  --no-remote        Do not accept or send remote commands; implies --new-instance.\n"
+         "  --new-instance     Open new instance, not a new window in running instance.\n"
+         "  --UILocale <locale> Start with <locale> resources as UI Locale.\n"
+         "  --safe-mode        Disables extensions and themes for this session.\n", gAppData->name);
 
 #if defined(XP_WIN)
-  printf("  --console                           Start %s with a debugging console.\n", gAppData->name);
+  printf("  --console          Start %s with a debugging console.\n", gAppData->name);
 #endif
 
   // this works, but only after the components have registered.  so if you drop in a new command line handler, --help
