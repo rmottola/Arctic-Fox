@@ -28,9 +28,9 @@ loader.lazyGetter(this, "_strings", () => Services.strings
 
 function RuleViewTool(inspector, window, iframe) {
   this.inspector = inspector;
-  this.doc = window.document;
+  this.document = window.document;
 
-  this.view = new RuleView.CssRuleView(inspector, this.doc);
+  this.view = new RuleView.CssRuleView(this.inspector, this.document);
 
   this.onLinkClicked = this.onLinkClicked.bind(this);
   this.onSelected = this.onSelected.bind(this);
@@ -53,7 +53,6 @@ function RuleViewTool(inspector, window, iframe) {
 
   this.onSelected();
 }
-
 
 RuleViewTool.prototype = {
   isSidebarActive: function() {
@@ -167,9 +166,9 @@ RuleViewTool.prototype = {
 
 function ComputedViewTool(inspector, window, iframe) {
   this.inspector = inspector;
-  this.doc = window.document;
+  this.document = window.document;
 
-  this.view = new ComputedView.CssHtmlTree(this, inspector.pageStyle);
+  this.view = new ComputedView.CssComputedView(this.inspector, this.document, this.inspector.pageStyle);
 
   this.onSelected = this.onSelected.bind(this);
   this.refresh = this.refresh.bind(this);
@@ -246,8 +245,7 @@ ComputedViewTool.prototype = {
 
     this.view.destroy();
 
-    this.view = this.cssLogic = this.cssHtmlTree = null;
-    this.doc = this.inspector = null;
+    this.view = this.document = this.inspector = null;
   }
 };
 

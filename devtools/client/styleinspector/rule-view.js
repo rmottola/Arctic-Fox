@@ -4,6 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* globals overlays, Services, EventEmitter, StyleInspectorMenu,
+   clipboardHelper, _strings, domUtils, AutocompletePopup */
 "use strict";
 
 const {Cc, Ci, Cu} = require("chrome");
@@ -1110,8 +1112,8 @@ TextProperty.prototype = {
  * apply to a given element.  After construction, the 'element'
  * property will be available with the user interface.
  *
- * @param {Inspector} aInspector
- * @param {Document} aDoc
+ * @param {Inspector} inspector toolbox panel
+ * @param {Document} document The document that will contain the rule view.
  *        The document that will contain the rule view.
  * @param {object} aStore
  *        The CSS rule view can use this object to store metadata
@@ -1121,42 +1123,40 @@ TextProperty.prototype = {
  *        The PageStyleFront for communicating with the remote server.
  * @constructor
  */
-function CssRuleView(aInspector, aDoc, aStore, aPageStyle) {
-  this.inspector = aInspector;
-  this.doc = aDoc;
+function CssRuleView(inspector, document, aStore, aPageStyle) {
+  this.inspector = inspector;
+  this.styleDocument = document;
+  this.styleWindow = this.styleDocument.defaultView;
   this.store = aStore || {};
   this.pageStyle = aPageStyle;
 
   this._highlightedElements = [];
   this._outputParser = new OutputParser();
 
-  this._buildContextMenu = this._buildContextMenu.bind(this);
-  this._onContextMenu = this._onContextMenu.bind(this);
-  this._contextMenuUpdate = this._contextMenuUpdate.bind(this);
   this._onKeypress = this._onKeypress.bind(this);
   this._onAddRule = this._onAddRule.bind(this);
-  this._onSelectAll = this._onSelectAll.bind(this);
+  this._onContextMenu = this._onContextMenu.bind(this);
   this._onCopy = this._onCopy.bind(this);
-  this._onCopyColor = this._onCopyColor.bind(this);
-  this._onToggleOrigSources = this._onToggleOrigSources.bind(this);
   this._onFilterStyles = this._onFilterStyles.bind(this);
   this._onClearSearch = this._onClearSearch.bind(this);
   this._onFilterTextboxContextMenu = this._onFilterTextboxContextMenu.bind(this);
   this._onTogglePseudoClassPanel = this._onTogglePseudoClassPanel.bind(this);
   this._onTogglePseudoClass = this._onTogglePseudoClass.bind(this);
 
-  this.element = this.doc.getElementById("ruleview-container");
-  this.searchField = this.doc.getElementById("ruleview-searchbox");
-  this.searchClearButton = this.doc.getElementById("ruleview-searchinput-clear");
-  this.pseudoClassPanel = this.doc.getElementById("pseudo-class-panel");
-  this.pseudoClassToggle = this.doc.getElementById("pseudo-class-panel-toggle");
-  this.hoverCheckbox = this.doc.getElementById("pseudo-hover-toggle");
-  this.activeCheckbox = this.doc.getElementById("pseudo-active-toggle");
-  this.focusCheckbox = this.doc.getElementById("pseudo-focus-toggle");
+  let doc = this.styleDocument;
+  this.element = doc.getElementById("ruleview-container");
+  this.addRuleButton = doc.getElementById("ruleview-add-rule-button");
+  this.searchField = doc.getElementById("ruleview-searchbox");
+  this.searchClearButton = doc.getElementById("ruleview-searchinput-clear");
+  this.pseudoClassPanel = doc.getElementById("pseudo-class-panel");
+  this.pseudoClassToggle = doc.getElementById("pseudo-class-panel-toggle");
+  this.hoverCheckbox = doc.getElementById("pseudo-hover-toggle");
+  this.activeCheckbox = doc.getElementById("pseudo-active-toggle");
+  this.focusCheckbox = doc.getElementById("pseudo-focus-toggle");
 
   this.searchClearButton.hidden = true;
 
-  this.doc.addEventListener("keypress", this._onKeypress);
+  this.styleDocument.addEventListener("keypress", this._onKeypress);
   this.element.addEventListener("copy", this._onCopy);
   this.element.addEventListener("contextmenu", this._onContextMenu);
   this.searchField.addEventListener("input", this._onFilterStyles);
@@ -1184,10 +1184,11 @@ function CssRuleView(aInspector, aDoc, aStore, aPageStyle) {
     autoSelect: true,
     theme: "auto"
   };
-  this.popup = new AutocompletePopup(aDoc.defaultView.parent.document, options);
+  this.popup = new AutocompletePopup(this.styleWindow.parent.document, options);
 
-  this._buildContextMenu();
   this._showEmpty();
+
+  this._contextmenu = new StyleInspectorMenu(this, { isRuleView: true });
 
   // Add the tooltips and highlighters to the view
   this.tooltips = new overlays.TooltipsOverlay(this);
@@ -1204,88 +1205,6 @@ CssRuleView.prototype = {
 
   // Used for cancelling timeouts in the style filter.
   _filterChangedTimeout: null,
-
-  /**
-   * Build the context menu.
-   */
-  _buildContextMenu: function() {
-    let doc = this.doc.defaultView.parent.document;
-
-    this._contextmenu = doc.createElementNS(XUL_NS, "menupopup");
-    this._contextmenu.addEventListener("popupshowing", this._contextMenuUpdate);
-    this._contextmenu.id = "rule-view-context-menu";
-
-    this.menuitemAddRule = createMenuItem(this._contextmenu, {
-      label: "ruleView.contextmenu.addRule",
-      accesskey: "ruleView.contextmenu.addRule.accessKey",
-      command: this._onAddRule
-    });
-    this.menuitemSelectAll = createMenuItem(this._contextmenu, {
-      label: "ruleView.contextmenu.selectAll",
-      accesskey: "ruleView.contextmenu.selectAll.accessKey",
-      command: this._onSelectAll
-    });
-    this.menuitemCopy = createMenuItem(this._contextmenu, {
-      label: "ruleView.contextmenu.copy",
-      accesskey: "ruleView.contextmenu.copy.accessKey",
-      command: this._onCopy
-    });
-    this.menuitemCopyColor = createMenuItem(this._contextmenu, {
-      label: "ruleView.contextmenu.copyColor",
-      accesskey: "ruleView.contextmenu.copyColor.accessKey",
-      command: this._onCopyColor
-    });
-    this.menuitemSources = createMenuItem(this._contextmenu, {
-      label: "ruleView.contextmenu.showOrigSources",
-      accesskey: "ruleView.contextmenu.showOrigSources.accessKey",
-      command: this._onToggleOrigSources,
-      type: "checkbox"
-    });
-
-    let popupset = doc.documentElement.querySelector("popupset");
-    if (!popupset) {
-      popupset = doc.createElementNS(XUL_NS, "popupset");
-      doc.documentElement.appendChild(popupset);
-    }
-
-    popupset.appendChild(this._contextmenu);
-  },
-
-  /**
-   * Update the context menu. This means enabling or disabling menuitems as
-   * appropriate.
-   */
-  _contextMenuUpdate: function() {
-    let win = this.doc.defaultView;
-
-    // Copy selection.
-    let selection = win.getSelection();
-    let copy;
-
-    if (selection.toString()) {
-      // Panel text selected
-      copy = true;
-    } else if (selection.anchorNode) {
-      // input type="text"
-      let { selectionStart, selectionEnd } = this.doc.popupNode;
-
-      if (isFinite(selectionStart) && isFinite(selectionEnd) &&
-          selectionStart !== selectionEnd) {
-        copy = true;
-      }
-    } else {
-      // No text selected, disable copy.
-      copy = false;
-    }
-
-    this.menuitemCopyColor.hidden = !this._isColorPopup();
-    this.menuitemCopy.disabled = !copy;
-
-    var showOrig = Services.prefs.getBoolPref(PREF_ORIG_SOURCES);
-    this.menuitemSources.setAttribute("checked", showOrig);
-
-    this.menuitemAddRule.disabled = this.inspector.selection.isAnonymousNode();
-  },
 
   /**
    * Get the type of a given node in the rule-view
@@ -1337,9 +1256,19 @@ CssRuleView.prototype = {
         sheetHref: prop.rule.domRule.href
       };
     } else if (classes.contains("ruleview-selector-unmatched") ||
-               classes.contains("ruleview-selector-matched")) {
+               classes.contains("ruleview-selector-matched") ||
+               classes.contains("ruleview-selectorcontainer") ||
+               classes.contains("ruleview-selector") ||
+               classes.contains("ruleview-selector-attribute") ||
+               classes.contains("ruleview-selector-pseudo-class") ||
+               classes.contains("ruleview-selector-pseudo-class-lock")) {
       type = overlays.VIEW_NODE_SELECTOR_TYPE;
-      value = node.textContent;
+      value = this._getRuleEditorForNode(node).selectorText.textContent;
+    } else if (classes.contains("ruleview-rule-source") ||
+               classes.contains("ruleview-rule-source-label")) {
+      type = overlays.VIEW_NODE_LOCATION_TYPE;
+      let rule = this._getRuleEditorForNode(node).rule;
+      value = (rule.sheet && rule.sheet.href) ? rule.sheet.href : rule.title;
     } else {
       return null;
     }
@@ -1348,86 +1277,51 @@ CssRuleView.prototype = {
   },
 
   /**
-   * A helper that determines if the popup was opened with a click to a color
-   * value and saves the color to this._colorToCopy.
-   *
-   * @return {Boolean}
-   *         true if click on color opened the popup, false otherwise.
+   * Retrieve the RuleEditor instance that should be stored on
+   * the offset parent of the node
    */
-  _isColorPopup: function () {
-    this._colorToCopy = "";
-
-    let trigger = this.doc.popupNode;
-    if (!trigger) {
-      return false;
+  _getRuleEditorForNode: function(node) {
+    if (!node.offsetParent) {
+      // some nodes don't have an offsetParent, but their parentNode does
+      node = node.parentNode;
     }
-
-    let container = (trigger.nodeType == trigger.TEXT_NODE) ?
-                     trigger.parentElement : trigger;
-
-    let isColorNode = el => el.dataset && "color" in el.dataset;
-
-    while (!isColorNode(container)) {
-      container = container.parentNode;
-      if (!container) {
-        return false;
-      }
-    }
-
-    this._colorToCopy = container.dataset["color"];
-    return true;
+    return node.offsetParent._ruleEditor;
   },
 
   /**
    * Context menu handler.
    */
   _onContextMenu: function(event) {
-    try {
-      // In the sidebar we do not have this.doc.popupNode so we need to save
-      // the node ourselves.
-      this.doc.popupNode = event.explicitOriginalTarget;
-      this.doc.defaultView.focus();
-      this._contextmenu.openPopupAtScreen(event.screenX, event.screenY, true);
-    } catch(e) {
-      console.error(e);
+    this._contextmenu.show(event);
+  },
+
+  /**
+   * Callback for copy event. Copy the selected text.
+   * @param {Event} event copy event object.
+   */
+  _onCopy: function(event) {
+    if (event) {
+      this.copySelection(event.target);
+      event.preventDefault();
     }
   },
 
   /**
-   * Select all text.
+   * Copy the current selection. The current target is necessary
+   * if the selection is inside an input or a textarea
+   * @param {DOMNode} target DOMNode target of the copy action
    */
-  _onSelectAll: function() {
-    let win = this.doc.defaultView;
-    let selection = win.getSelection();
-
-    selection.selectAllChildren(this.doc.documentElement);
-  },
-
-  /**
-   * Copy selected text from the rule view.
-   *
-   * @param {Event} event
-   *        The event object.
-   */
-  _onCopy: function(event) {
+  copySelection: function(target) {
     try {
-      let target = event.target;
-      let text;
+      let text = "";
 
-      if (event.target.nodeName === "menuitem") {
-        target = this.doc.popupNode;
-      }
-
-      if (target.nodeName == "input") {
+      if (target && target.nodeName == "input") {
         let start = Math.min(target.selectionStart, target.selectionEnd);
         let end = Math.max(target.selectionStart, target.selectionEnd);
         let count = end - start;
         text = target.value.substr(start, count);
       } else {
-        let win = this.doc.defaultView;
-        let selection = win.getSelection();
-
-        text = selection.toString();
+        text = this.styleWindow.getSelection().toString();
 
         // Remove any double newlines.
         text = text.replace(/(\r?\n)\r?\n/g, "$1");
@@ -1439,7 +1333,6 @@ CssRuleView.prototype = {
       }
 
       clipboardHelper.copyString(text);
-      event.preventDefault();
     } catch(e) {
       console.error(e);
     }
@@ -1533,13 +1426,10 @@ CssRuleView.prototype = {
     }
   },
 
+  /**
+   * Update source links when pref for showing original sources changes
+   */
   _onSourcePrefChanged: function() {
-    if (this.menuitemSources) {
-      let isEnabled = Services.prefs.getBoolPref(PREF_ORIG_SOURCES);
-      this.menuitemSources.setAttribute("checked", isEnabled);
-    }
-
-    // update text of source links if the rule-view is populated
     if (this._elementStyle && this._elementStyle.rules) {
       for (let rule of this._elementStyle.rules) {
         if (rule.editor) {
@@ -1583,7 +1473,7 @@ CssRuleView.prototype = {
    */
   _onFilterTextboxContextMenu: function(event) {
     try {
-      this.doc.defaultView.focus();
+      this.styleWindow.focus();
       let contextmenu = this.inspector.toolbox.textboxContextMenuPopup;
       contextmenu.openPopupAtScreen(event.screenX, event.screenY, true);
     } catch(e) {
@@ -1617,33 +1507,9 @@ CssRuleView.prototype = {
 
     // Remove context menu
     if (this._contextmenu) {
-      // Destroy the Add Rule menuitem.
-      this.menuitemAddRule.removeEventListener("command", this._onAddRule);
-      this.menuitemAddRule = null;
-
-      // Destroy the Select All menuitem.
-      this.menuitemSelectAll.removeEventListener("command", this._onSelectAll);
-      this.menuitemSelectAll = null;
-
-      // Destroy the Copy menuitem.
-      this.menuitemCopy.removeEventListener("command", this._onCopy);
-      this.menuitemCopy = null;
-
-      // Destroy Copy Color menuitem.
-      this.menuitemCopyColor.removeEventListener("command", this._onCopyColor);
-      this.menuitemCopyColor = null;
-
-      this.menuitemSources.removeEventListener("command", this._onToggleOrigSources);
-      this.menuitemSources = null;
-
-      // Destroy the context menu.
-      this._contextmenu.removeEventListener("popupshowing", this._contextMenuUpdate);
-      this._contextmenu.parentNode.removeChild(this._contextmenu);
+      this._contextmenu.destroy();
       this._contextmenu = null;
     }
-
-    // We manage the popupNode ourselves so we also need to destroy it.
-    this.doc.popupNode = null;
 
     this.tooltips.destroy();
     this.highlighters.destroy();
@@ -1668,6 +1534,10 @@ CssRuleView.prototype = {
     this.hoverCheckbox = null;
     this.activeCheckbox = null;
     this.focusCheckbox = null;
+
+    this.inspector = null;
+    this.styleDocument = null;
+    this.styleWindow = null;
 
     if (this.element.parentNode) {
       this.element.parentNode.removeChild(this.element);
@@ -1809,7 +1679,7 @@ CssRuleView.prototype = {
    * Show the user that the rule view has no node selected.
    */
   _showEmpty: function() {
-    if (this.doc.getElementById("noResults") > 0) {
+    if (this.styleDocument.getElementById("noResults") > 0) {
       return;
     }
 
@@ -1889,19 +1759,19 @@ CssRuleView.prototype = {
    * @return {DOMNode} The container element
    */
   createExpandableContainer: function(aLabel, isPseudo = false) {
-    let header = this.doc.createElementNS(HTML_NS, "div");
+    let header = this.styleDocument.createElementNS(HTML_NS, "div");
     header.className = this._getRuleViewHeaderClassName(true);
     header.classList.add("show-expandable-container");
     header.textContent = aLabel;
 
-    let twisty = this.doc.createElementNS(HTML_NS, "span");
+    let twisty = this.styleDocument.createElementNS(HTML_NS, "span");
     twisty.className = "ruleview-expander theme-twisty";
     twisty.setAttribute("open", "true");
 
     header.insertBefore(twisty, header.firstChild);
     this.element.appendChild(header);
 
-    let container = this.doc.createElementNS(HTML_NS, "div");
+    let container = this.styleDocument.createElementNS(HTML_NS, "div");
     container.classList.add("ruleview-expandable-container");
     this.element.appendChild(container);
 
@@ -1993,7 +1863,7 @@ CssRuleView.prototype = {
       // Only print header for this element if there are pseudo elements
       if (seenPseudoElement && !seenNormalElement && !rule.pseudoElement) {
         seenNormalElement = true;
-        let div = this.doc.createElementNS(HTML_NS, "div");
+        let div = this.styleDocument.createElementNS(HTML_NS, "div");
         div.className = this._getRuleViewHeaderClassName();
         div.textContent = this.selectedElementLabel;
         this.element.appendChild(div);
@@ -2001,7 +1871,7 @@ CssRuleView.prototype = {
 
       let inheritedSource = rule.inheritedSource;
       if (inheritedSource && inheritedSource != lastInheritedSource) {
-        let div = this.doc.createElementNS(HTML_NS, "div");
+        let div = this.styleDocument.createElementNS(HTML_NS, "div");
         div.className = this._getRuleViewHeaderClassName();
         div.textContent = inheritedSource;
         lastInheritedSource = inheritedSource;
@@ -2158,8 +2028,9 @@ CssRuleView.prototype = {
  */
 function RuleEditor(aRuleView, aRule) {
   this.ruleView = aRuleView;
-  this.doc = this.ruleView.doc;
+  this.doc = this.ruleView.styleDocument;
   this.rule = aRule;
+
   this.isEditable = !aRule.isSystem;
   // Flag that blocks updates of the selector and properties when it is
   // being edited
@@ -2212,7 +2083,7 @@ RuleEditor.prototype = {
     }.bind(this));
     let sourceLabel = this.doc.createElementNS(XUL_NS, "label");
     sourceLabel.setAttribute("crop", "center");
-    sourceLabel.classList.add("source-link-label");
+    sourceLabel.classList.add("ruleview-rule-source-label");
     source.appendChild(sourceLabel);
 
     this.updateSourceLink();
@@ -2284,7 +2155,7 @@ RuleEditor.prototype = {
 
   updateSourceLink: function RuleEditor_updateSourceLink()
   {
-    let sourceLabel = this.element.querySelector(".source-link-label");
+    let sourceLabel = this.element.querySelector(".ruleview-rule-source-label");
     let sourceHref = (this.rule.sheet && this.rule.sheet.href) ?
       this.rule.sheet.href : this.rule.title;
     let sourceLine = this.rule.ruleLine > 0 ? ":" + this.rule.ruleLine : "";
@@ -3268,18 +3139,6 @@ function createChild(aParent, aTag, aAttributes) {
   }
   aParent.appendChild(elt);
   return elt;
-}
-
-function createMenuItem(aMenu, aAttributes) {
-  let item = aMenu.ownerDocument.createElementNS(XUL_NS, "menuitem");
-
-  item.setAttribute("label", _strings.GetStringFromName(aAttributes.label));
-  item.setAttribute("accesskey", _strings.GetStringFromName(aAttributes.accesskey));
-  item.addEventListener("command", aAttributes.command);
-
-  aMenu.appendChild(item);
-
-  return item;
 }
 
 function setTimeout() {

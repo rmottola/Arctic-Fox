@@ -20,7 +20,7 @@ const {
   CssDocsTooltip,
   SwatchFilterTooltip
 } = require("devtools/client/shared/widgets/Tooltip");
-const {CssLogic} = require("devtools/styleinspector/css-logic");
+const EventEmitter = require("devtools/shared/event-emitter");
 const promise = require("promise");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -238,7 +238,7 @@ HighlightersOverlay.prototype = {
 
 /**
  * Manages all tooltips in the style-inspector.
- * @param {CssRuleView|CssHtmlTree} view Either the rule-view or computed-view
+ * @param {CssRuleView|CssComputedView} view Either the rule-view or computed-view
  * panel
  */
 function TooltipsOverlay(view) {
