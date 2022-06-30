@@ -43,7 +43,6 @@ const Services = require("Services");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const { getRootBindingParent } = require("devtools/shared/layout/utils");
 
-const MAX_DATA_URL_LENGTH = 40;
 
 // This should be ok because none of the functions that use this should be used
 // on the worker thread, where Cu is not available.
@@ -873,13 +872,6 @@ CssLogic.shortSource = function CssLogic_shortSource(aSheet)
     return CssLogic.l10n("rule.sourceInline");
   }
 
-  // If the sheet is a data URL, return a trimmed version of it.
-  let dataUrl = aSheet.href.trim().match(/^data:.*?,((?:.|\r|\n)*)$/);
-  if (dataUrl) {
-    return dataUrl[1].length > MAX_DATA_URL_LENGTH ?
-      `${dataUrl[1].substr(0, MAX_DATA_URL_LENGTH - 1)}…` : dataUrl[1];
-  }
-
   // We try, in turn, the filename, filePath, query string, whole thing
   let url = {};
   try {
@@ -901,7 +893,8 @@ CssLogic.shortSource = function CssLogic_shortSource(aSheet)
     return url.query;
   }
 
-  return aSheet.href;
+  let dataUrl = aSheet.href.match(/^(data:[^,]*),/);
+  return dataUrl ? dataUrl[1] : aSheet.href;
 }
 
 /**
