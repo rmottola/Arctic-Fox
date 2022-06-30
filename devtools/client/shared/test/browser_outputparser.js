@@ -15,7 +15,7 @@ add_task(function*() {
 });
 
 function* performTest() {
-  let [host, win, doc] = yield createHost("bottom", "data:text/html," +
+  let [host, , doc] = yield createHost("bottom", "data:text/html," +
     "<h1>browser_outputParser.js</h1><div></div>");
 
   let parser = new OutputParser();
@@ -26,6 +26,9 @@ function* performTest() {
 
   host.destroy();
 }
+
+// Class name used in color swatch.
+var COLOR_TEST_CLASS = "test-class";
 
 function testParseCssProperty(doc, parser) {
   let frag = parser.parseCssProperty("border", "1px solid red", {

@@ -24,6 +24,9 @@ const REGEX_CUBIC_BEZIER = /^linear|^ease-in-out|^ease-in|^ease-out|^ease|^cubic
 //   characters U+00A0 and higher, plus the hyphen (-) and the underscore (_).
 const REGEX_CSS_VAR = /\bvar\(\s*--[-_a-zA-Z0-9\u00A0-\u10FFFF]+\s*\)/;
 
+const BEZIER_KEYWORDS = ["linear", "ease-in-out", "ease-in", "ease-out",
+                         "ease"];
+
 /**
  * This regex matches:
  *  - #F00
@@ -36,7 +39,7 @@ const REGEX_CSS_VAR = /\bvar\(\s*--[-_a-zA-Z0-9\u00A0-\u10FFFF]+\s*\)/;
  */
 const REGEX_ALL_COLORS = /^#[0-9a-fA-F]{3}\b|^#[0-9a-fA-F]{6}\b|^hsl\(.*?\)|^hsla\(.*?\)|^rgba?\(.*?\)|^[a-zA-Z-]+/;
 
-loader.lazyGetter(this, "DOMUtils", function () {
+loader.lazyGetter(this, "DOMUtils", function() {
   return Cc["@mozilla.org/inspector/dom-utils;1"].getService(Ci.inIDOMUtils);
 });
 
