@@ -43,7 +43,6 @@ function testColorUtils(canvas) {
     testColorMatch(name, hex, hsl, rgb, color.rgba, canvas);
   }
 
-  testProcessCSSString();
   testSetAlpha();
 }
 
@@ -110,20 +109,6 @@ function testColorMatch(name, hex, hsl, rgb, rgba, canvas) {
   test(hsl, "hsl");
   test(rgb, "rgb");
   switchColorUnit(origColorUnit);
-}
-
-function testProcessCSSString() {
-  let before = "border: 1px solid red; border-radius: 5px; " +
-               "color rgb(0, 255, 0); font-weight: bold; " +
-               "background-color: transparent; " +
-               "border-top-color: rgba(0, 0, 255, 0.5);";
-  let expected = "border: 1px solid #F00; border-radius: 5px; " +
-                 "color #0F0; font-weight: bold; " +
-                 "background-color: transparent; " +
-                 "border-top-color: rgba(0, 0, 255, 0.5);";
-  let after = colorUtils.processCSSString(before);
-
-  is(after, expected, "CSS string processed correctly");
 }
 
 function testSetAlpha() {

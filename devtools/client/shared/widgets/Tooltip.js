@@ -36,9 +36,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "VariablesViewController",
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
   "resource://gre/modules/Task.jsm");
 
-const GRADIENT_RE = /\b(repeating-)?(linear|radial)-gradient\(((rgb|hsl)a?\(.+?\)|[^\)])+\)/gi;
-const BORDERCOLOR_RE = /^border-[-a-z]*color$/ig;
-const BORDER_RE = /^border(-(top|bottom|left|right))?$/ig;
 const XHTML_NS = "http://www.w3.org/1999/xhtml";
 const SPECTRUM_FRAME = "chrome://devtools/content/shared/widgets/spectrum-frame.xhtml";
 const CUBIC_BEZIER_FRAME =
