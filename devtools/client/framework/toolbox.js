@@ -2003,8 +2003,8 @@ Toolbox.prototype = {
    */
   _updateTextboxMenuItems: function() {
     let window = this.doc.defaultView;
-    ['cmd_undo', 'cmd_delete', 'cmd_cut',
-     'cmd_copy', 'cmd_paste','cmd_selectAll'].forEach(window.goUpdateCommand);
+    ["cmd_undo", "cmd_delete", "cmd_cut",
+     "cmd_copy", "cmd_paste", "cmd_selectAll"].forEach(window.goUpdateCommand);
   },
 
   getPerformanceActorsConnection: function() {
