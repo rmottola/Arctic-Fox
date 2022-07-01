@@ -15,6 +15,7 @@
 <?xul-overlay href="chrome://global/content/editMenuOverlay.xul"?>
 
 <window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns:html="http://www.w3.org/1999/xhtml"
         macanimationtype="document"
         fullscreenbutton="true"
         screenX="4" screenY="4"
@@ -261,6 +262,10 @@
          key="&debuggerUI.removeAllWatch.key;"
          modifiers="accel alt"
          command="removeAllWatchExpressionsCommand"/>
+    <key id="debuggerSourcesCopyUrl"
+         key="&debuggerUI.context.copyUrl.key;"
+         modifiers="accel"
+         oncommand="DebuggerView.Sources._onCopyUrlCommand()"/>
   </keyset>
 
   <vbox id="body"
