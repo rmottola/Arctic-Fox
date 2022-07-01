@@ -22,7 +22,7 @@
       window.setPanel = function(panel, iframe) {
         let {require} = Components.utils.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
         let inspector = require("devtools/client/styleinspector/style-inspector");
-        this.ruleview = new inspector.RuleViewTool(panel, window, iframe);
+        this.ruleview = new inspector.RuleViewTool(panel, window);
       }
       window.onunload = function() {
         if (this.ruleview) {

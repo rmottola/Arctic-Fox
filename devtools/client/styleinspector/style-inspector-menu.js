@@ -11,21 +11,27 @@
 const {Cc, Ci, Cu} = require("chrome");
 const {PREF_ORIG_SOURCES} = require("devtools/client/styleeditor/utils");
 
-loader.lazyRequireGetter(this, "overlays", "devtools/client/styleinspector/style-inspector-overlays");
+loader.lazyRequireGetter(this, "overlays",
+  "devtools/client/styleinspector/style-inspector-overlays");
 loader.lazyImporter(this, "Services", "resource://gre/modules/Services.jsm");
-loader.lazyServiceGetter(this, "clipboardHelper", "@mozilla.org/widget/clipboardhelper;1", "nsIClipboardHelper");
+loader.lazyServiceGetter(this, "clipboardHelper",
+  "@mozilla.org/widget/clipboardhelper;1", "nsIClipboardHelper");
 loader.lazyGetter(this, "_strings", () => {
   return Services.strings
   .createBundle("chrome://global/locale/devtools/styleinspector.properties");
 });
 
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
-const PREF_ENABLE_MDN_DOCS_TOOLTIP = "devtools.inspector.mdnDocsTooltip.enabled";
+const PREF_ENABLE_MDN_DOCS_TOOLTIP =
+  "devtools.inspector.mdnDocsTooltip.enabled";
 
 /**
  * Style inspector context menu
- * @param {RuleView|ComputedView} view RuleView or ComputedView instance controlling this menu
- * @param {Object} options menu configuration
+ *
+ * @param {RuleView|ComputedView} view
+ *        RuleView or ComputedView instance controlling this menu
+ * @param {Object} options
+ *        Option menu configuration
  */
 function StyleInspectorMenu(view, options) {
   this.view = view;
@@ -189,7 +195,8 @@ StyleInspectorMenu.prototype = {
 
     item.setAttribute("label", _strings.GetStringFromName(attributes.label));
     if (attributes.accesskey) {
-      item.setAttribute("accesskey", _strings.GetStringFromName(attributes.accesskey));
+      item.setAttribute("accesskey",
+        _strings.GetStringFromName(attributes.accesskey));
     }
     item.addEventListener("command", attributes.command);
 
@@ -217,10 +224,14 @@ StyleInspectorMenu.prototype = {
     let showOrig = Services.prefs.getBoolPref(PREF_ORIG_SOURCES);
     this.menuitemSources.setAttribute("checked", showOrig);
 
-    let enableMdnDocsTooltip = Services.prefs.getBoolPref(PREF_ENABLE_MDN_DOCS_TOOLTIP);
-    this.menuitemShowMdnDocs.hidden = !(enableMdnDocsTooltip && this._isPropertyName());
+    let enableMdnDocsTooltip =
+      Services.prefs.getBoolPref(PREF_ENABLE_MDN_DOCS_TOOLTIP);
+    this.menuitemShowMdnDocs.hidden = !(enableMdnDocsTooltip &&
+                                        this._isPropertyName());
 
-    this.menuitemAddRule.disabled = !(this.isRuleView && !this.inspector.selection.isAnonymousNode());
+    this.menuitemAddRule.hidden = !this.isRuleView;
+    this.menuitemAddRule.disabled = !this.isRuleView ||
+                                    this.inspector.selection.isAnonymousNode();
   },
 
   /**
@@ -231,6 +242,8 @@ StyleInspectorMenu.prototype = {
     this.menuitemCopy.hidden = !this._hasTextSelected();
     this.menuitemCopyColor.hidden = !this._isColorPopup();
     this.menuitemCopyImageDataUrl.hidden = !this._isImageUrl();
+    this.menuitemCopyUrl.hidden = !this._isImageUrl();
+    this.menuitemCopyRule.hidden = !this.isRuleView;
 
     this.menuitemCopyRule.hidden = true;
     this.menuitemCopyLocation.hidden = true;
@@ -325,6 +338,7 @@ StyleInspectorMenu.prototype = {
 
   /**
    * Check if the current node (clicked node) is an image URL
+   *
    * @return {Boolean} true if the node is an image url
    */
   _isImageUrl: function() {
@@ -337,7 +351,9 @@ StyleInspectorMenu.prototype = {
 
   /**
    * Get the DOM Node container for the current popupNode.
-   * If popupNode is a textNode, return the parent node, otherwise return popupNode itself.
+   * If popupNode is a textNode, return the parent node, otherwise return
+   * popupNode itself.
+   *
    * @return {DOMNode}
    */
   _getClickedNode: function() {
@@ -363,7 +379,7 @@ StyleInspectorMenu.prototype = {
   /**
    * Copy the most recently selected color value to clipboard.
    */
-  _onCopy: function(event) {
+  _onCopy: function() {
     this.view.copySelection(this.styleDocument.popupNode);
   },
 
@@ -382,7 +398,8 @@ StyleInspectorMenu.prototype = {
   },
 
   /**
-   * Retrieve the image data for the selected image url and copy it to the clipboard
+   * Retrieve the image data for the selected image url and copy it to the
+   * clipboard
    */
   _onCopyImageDataUrl: Task.async(function*() {
     if (!this._clickedNodeInfo) {
@@ -396,7 +413,8 @@ StyleInspectorMenu.prototype = {
       let data = yield inspectorFront.getImageDataFromURL(imageUrl);
       message = yield data.data.string();
     } catch (e) {
-      message = _strings.GetStringFromName("styleinspector.copyImageDataUrlError");
+      message =
+        _strings.GetStringFromName("styleinspector.copyImageDataUrlError");
     }
 
     clipboardHelper.copyString(message);
@@ -468,7 +486,8 @@ StyleInspectorMenu.prototype = {
    * Copy the rule of the current clicked node.
    */
   _onCopyRule: function() {
-    let ruleEditor = this.styleDocument.popupNode.parentNode.offsetParent._ruleEditor;
+    let ruleEditor =
+      this.styleDocument.popupNode.parentNode.offsetParent._ruleEditor;
     let rule = ruleEditor.rule;
     clipboardHelper.copyString(rule.stringifyRule());
   },
@@ -512,11 +531,15 @@ StyleInspectorMenu.prototype = {
     this._removeContextMenuItem("menuitemAddRule", this._onAddNewRule);
     this._removeContextMenuItem("menuitemCopy", this._onCopy);
     this._removeContextMenuItem("menuitemCopyColor", this._onCopyColor);
-    this._removeContextMenuItem("menuitemCopyImageDataUrl", this._onCopyImageDataUrl);
+    this._removeContextMenuItem("menuitemCopyImageDataUrl",
+      this._onCopyImageDataUrl);
     this._removeContextMenuItem("menuitemCopyLocation", this._onCopyLocation);
-    this._removeContextMenuItem("menuitemCopyPropertyDeclaration", this._onCopyPropertyDeclaration);
-    this._removeContextMenuItem("menuitemCopyPropertyName", this._onCopyPropertyName);
-    this._removeContextMenuItem("menuitemCopyPropertyValue", this._onCopyPropertyValue);
+    this._removeContextMenuItem("menuitemCopyPropertyDeclaration",
+      this._onCopyPropertyDeclaration);
+    this._removeContextMenuItem("menuitemCopyPropertyName",
+      this._onCopyPropertyName);
+    this._removeContextMenuItem("menuitemCopyPropertyValue",
+      this._onCopyPropertyValue);
     this._removeContextMenuItem("menuitemCopyRule", this._onCopyRule);
     this._removeContextMenuItem("menuitemCopySelector", this._onCopySelector);
     this._removeContextMenuItem("menuitemCopyUrl", this._onCopyUrl);
