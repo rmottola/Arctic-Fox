@@ -106,14 +106,18 @@ BottomHost.prototype = {
     }
     this.isMinimized = true;
 
-    this.frame.style.marginBottom = -this.frame.height + height + "px";
-    this._splitter.classList.add("disabled");
+    let onTransitionEnd = event => {
+      if (event.propertyName !== "margin-bottom") {
+        // Ignore transitionend on unrelated properties.
+        return;
+      }
 
-    let onTransitionEnd = () => {
       this.frame.removeEventListener("transitionend", onTransitionEnd);
       this.emit("minimized");
     };
     this.frame.addEventListener("transitionend", onTransitionEnd);
+    this.frame.style.marginBottom = -this.frame.height + height + "px";
+    this._splitter.classList.add("disabled");
   },
 
   /**
@@ -126,14 +130,18 @@ BottomHost.prototype = {
     }
     this.isMinimized = false;
 
-    this.frame.style.marginBottom = "0";
-    this._splitter.classList.remove("disabled");
+    let onTransitionEnd = event => {
+      if (event.propertyName !== "margin-bottom") {
+        // Ignore transitionend on unrelated properties.
+        return;
+      }
 
-    let onTransitionEnd = () => {
       this.frame.removeEventListener("transitionend", onTransitionEnd);
       this.emit("maximized");
     };
     this.frame.addEventListener("transitionend", onTransitionEnd);
+    this.frame.style.marginBottom = "0";
+    this._splitter.classList.remove("disabled");
   },
 
   /**
