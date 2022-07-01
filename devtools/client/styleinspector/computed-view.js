@@ -1034,6 +1034,7 @@ PropertyView.prototype = {
   },
 
   _buildMatchedSelectors: function() {
+    let promises = [];
     let frag = this.element.ownerDocument.createDocumentFragment();
 
     for (let selector of this.matchedSelectorViews) {
@@ -1062,10 +1063,12 @@ PropertyView.prototype = {
         class: "other-property-value theme-fg-color1"
       });
       valueSpan.appendChild(selector.outputFragment);
+      promises.push(selector.ready);
     }
 
     this.matchedSelectorsContainer.innerHTML = "";
     this.matchedSelectorsContainer.appendChild(frag);
+    return promise.all(promises);
   },
 
   /**
