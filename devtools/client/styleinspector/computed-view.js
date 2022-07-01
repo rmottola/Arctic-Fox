@@ -28,7 +28,6 @@ loader.lazyRequireGetter(this, "StyleInspectorMenu",
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/devtools/Templater.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
                                   "resource://gre/modules/PluralForm.jsm");
@@ -223,36 +222,6 @@ CssComputedView.l10n = function(name) {
   } catch (ex) {
     Services.console.logStringMessage("Error reading '" + name + "'");
     throw new Error("l10n error with " + name);
-};
-
-/**
- * Clone the given template node, and process it by resolving ${} references
- * in the template.
- *
- * @param {nsIDOMElement} aTemplate the template note to use.
- * @param {nsIDOMElement} aDestination the destination node where the
- * processed nodes will be displayed.
- * @param {object} aData the data to pass to the template.
- * @param {Boolean} aPreserveDestination If true then the template will be
- * appended to aDestination's content else aDestination.innerHTML will be
- * cleared before the template is appended.
- */
-CssHtmlTree.processTemplate = function CssHtmlTree_processTemplate(aTemplate,
-                                  aDestination, aData, aPreserveDestination)
-{
-  if (!aPreserveDestination) {
-    aDestination.innerHTML = "";
-  }
-
-  // All the templater does is to populate a given DOM tree with the given
-  // values, so we need to clone the template first.
-  let duplicated = aTemplate.cloneNode(true);
-
-  // See https://github.com/mozilla/domtemplate/blob/master/README.md
-  // for docs on the template() function
-  template(duplicated, aData, { allowEval: true });
-  while (duplicated.firstChild) {
-    aDestination.appendChild(duplicated.firstChild);
   }
 };
 
