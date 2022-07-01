@@ -652,15 +652,23 @@
 }
 
 #toolbox-dock-bottom > image {
-  background-image: url("chrome://global/skin/devtools/dock-bottom@2x.png");
+  background-image: url("chrome://devtools/skin/themes/images/dock-bottom@2x.png");
 }
 
 #toolbox-dock-side  > image {
-  background-image: url("chrome://global/skin/devtools/dock-side@2x.png");
+  background-image: url("chrome://devtools/skin/themes/images/dock-side@2x.png");
 }
 
 #toolbox-dock-window > image {
-  background-image: url("chrome://global/skin/devtools/undock@2x.png");
+  background-image: url("chrome://devtools/skin/themes/images/undock@2x.png");
+}
+
+#toolbox-dock-bottom-minimize > image {
+  background-image: url("chrome://devtools/skin/themes/images/dock-bottom-minimize@2x.png");
+}
+
+#toolbox-dock-bottom-minimize.minimized > image {
+  background-image: url("chrome://devtools/skin/themes/images/dock-bottom-maximize@2x.png");
 }
 
 #toolbox-dock-window,

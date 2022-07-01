@@ -284,6 +284,8 @@ devtools.jar:
     skin/themes/images/toggle-tools.png (themes/images/toggle-tools.png)
     skin/themes/images/toggle-tools@2x.png (themes/images/toggle-tools@2x.png)
     skin/themes/images/dock-bottom@2x.png (themes/images/dock-bottom@2x.png)
+    skin/themes/images/dock-bottom-minimize@2x.png (themes/images/dock-bottom-minimize@2x.png)
+    skin/themes/images/dock-bottom-maximize@2x.png (themes/images/dock-bottom-maximize@2x.png)
     skin/themes/images/dock-side@2x.png (themes/images/dock-side@2x.png)
 *   skin/themes/floating-scrollbars.css (themes/floating-scrollbars.css)
     skin/themes/floating-scrollbars-light.css (themes/floating-scrollbars-light.css)
