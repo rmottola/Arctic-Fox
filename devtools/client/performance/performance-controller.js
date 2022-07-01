@@ -183,7 +183,7 @@ const EVENTS = {
 };
 
 /**
- * The current target and the profiler connection, set by this tool's host.
+ * The current target, toolbox and PerformanceFront, set by this tool's host.
  */
 var gToolbox, gTarget, gFront;
 
