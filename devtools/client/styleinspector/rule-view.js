@@ -1474,6 +1474,17 @@ CssRuleView.prototype = {
   },
 
   /**
+   * Set the filter style search value.
+   * @param {String} value
+   *        The search value.
+   */
+  setFilterStyles: function(value="") {
+    this.searchField.value = value;
+    this.searchField.focus();
+    this._onFilterStyles();
+  },
+
+  /**
    * Called when the user enters a search term in the filter style search box.
    */
   _onFilterStyles: function() {
@@ -1500,6 +1511,18 @@ CssRuleView.prototype = {
 
       this._filterChangeTimeout = null;
     }, filterTimeout);
+  },
+
+  /**
+   * Handle the search box's keypress event. If the escape key is pressed,
+   * clear the search box field.
+   */
+  _onFilterKeyPress: function(event) {
+    if (event.keyCode === Ci.nsIDOMKeyEvent.DOM_VK_ESCAPE &&
+        this._onClearSearch()) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
   },
 
   /**
@@ -1555,6 +1578,7 @@ CssRuleView.prototype = {
     this.element.removeEventListener("copy", this._onCopy);
     this.element.removeEventListener("contextmenu", this._onContextMenu);
     this.searchField.removeEventListener("input", this._onFilterStyles);
+    this.searchField.removeEventListener("keypress", this._onFilterKeyPress);
     this.searchField.removeEventListener("contextmenu",
       this._onFilterTextboxContextMenu);
     this.searchClearButton.removeEventListener("click", this._onClearSearch);

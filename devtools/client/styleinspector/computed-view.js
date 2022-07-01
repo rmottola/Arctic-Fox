@@ -513,7 +513,16 @@ CssComputedView.prototype = {
     }
   },
 
-
+  /**
+   * Set the filter style search value.
+   * @param {String} value
+   *        The search value.
+   */
+  setFilterStyles: function(value="") {
+    this.searchField.value = value;
+    this.searchField.focus();
+    this._onFilterStyles();
+  },
 
   /**
    * Called when the user enters a search term in the filter style search box.
@@ -537,6 +546,44 @@ CssComputedView.prototype = {
       this.refreshPanel();
       this._filterChangeTimeout = null;
     }, filterTimeout);
+  },
+
+  /**
+   * Handle the search box's keypress event. If the escape key is pressed,
+   * clear the search box field.
+   */
+  _onFilterKeyPress: function(event) {
+    if (event.keyCode === Ci.nsIDOMKeyEvent.DOM_VK_ESCAPE &&
+        this._onClearSearch()) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  },
+
+  /**
+   * Context menu handler for filter style search box.
+   */
+  _onFilterTextboxContextMenu: function(event) {
+    try {
+      this.styleDocument.defaultView.focus();
+      let contextmenu = this.inspector.toolbox.textboxContextMenuPopup;
+      contextmenu.openPopupAtScreen(event.screenX, event.screenY, true);
+    } catch(e) {
+      console.error(e);
+    }
+  },
+
+  /**
+   * Called when the user clicks on the clear button in the filter style search
+   * box. Returns true if the search box is cleared and false otherwise.
+   */
+  _onClearSearch: function() {
+    if (this.searchField.value) {
+      this.setFilterStyles("");
+      return true;
+    }
+
+    return false;
   },
 
   /**
