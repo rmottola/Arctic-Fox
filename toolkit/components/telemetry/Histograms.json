@@ -2575,7 +2575,7 @@
     "description": "Value of dom.ipc.plugins.hangUITimeoutSecs plus time spent in Plugin Hang UI (ms)"
   },
   "PLUGIN_LOAD_METADATA": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": "5000",
     "n_buckets": 20,
@@ -3529,6 +3529,18 @@
     "n_buckets": 30,
     "high": "180",
     "description": "Update: interval in days since the last background update check (timer initiated)"
+  },
+  "UPDATE_PING_COUNT_EXTERNAL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "releaseChannelCollection": "opt-out",
+    "description": "Update: count of systems for this ping for comparison with other pings (externally initiated)"
+  },
+  "UPDATE_PING_COUNT_NOTIFY": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "releaseChannelCollection": "opt-out",
+    "description": "Update: count of systems for this ping for comparison with other pings (timer initiated)"
   },
   "UPDATE_SERVICE_INSTALLED_EXTERNAL": {
     "expires_in_version": "never",
@@ -5951,20 +5963,90 @@
     "kind": "boolean",
     "description": "How many times has the DevTools WebIDE been opened?"
   },
+  "DEVTOOLS_TOOLBOX_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's toolbox been opened?"
+  },
+  "DEVTOOLS_OPTIONS_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Options panel been opened?"
+  },
+  "DEVTOOLS_WEBCONSOLE_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Web Console been opened?"
+  },
+  "DEVTOOLS_BROWSERCONSOLE_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Browser Console been opened?"
+  },
+  "DEVTOOLS_INSPECTOR_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Inspector been opened?"
+  },
+  "DEVTOOLS_RULEVIEW_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Rule View been opened?"
+  },
+  "DEVTOOLS_COMPUTEDVIEW_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Computed View been opened?"
+  },
+  "DEVTOOLS_LAYOUTVIEW_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Layout View been opened?"
+  },
+  "DEVTOOLS_FONTINSPECTOR_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Font Inspector been opened?"
+  },
+  "DEVTOOLS_ANIMATIONINSPECTOR_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Animation Inspector been opened?"
+  },
   "DEVTOOLS_JSDEBUGGER_OPENED_BOOLEAN": {
     "expires_in_version": "never",
     "kind": "boolean",
     "description": "How many times has the devtool's Debugger been opened?"
+  },
+  "DEVTOOLS_JSBROWSERDEBUGGER_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Browser Debugger been opened?"
+  },
+  "DEVTOOLS_STYLEEDITOR_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Style Editor been opened?"
+  },
+  "DEVTOOLS_SHADEREDITOR_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Shader Editor been opened?"
+  },
+  "DEVTOOLS_WEBAUDIOEDITOR_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Web Audio Editor been opened?"
   },
   "DEVTOOLS_CANVASDEBUGGER_OPENED_BOOLEAN": {
     "expires_in_version": "never",
     "kind": "boolean",
     "description": "How many times has the devtool's Canvas Debugger been opened?"
   },
-  "DEVTOOLS_TOOLBOX_OPENED_BOOLEAN": {
+  "DEVTOOLS_JSPROFILER_OPENED_BOOLEAN": {
     "expires_in_version": "never",
     "kind": "boolean",
-    "description": "How many times has the devtool's toolbox been opened?"
+    "description": "How many times has the devtool's JS Profiler been opened?"
   },
   "DEVTOOLS_NETMONITOR_OPENED_BOOLEAN": {
     "expires_in_version": "never",
@@ -5975,11 +6057,6 @@
     "expires_in_version": "never",
     "kind": "boolean",
     "description": "How many times has the Storage Inspector been opened?"
-  },
-  "DEVTOOLS_WEBIDE_OPENED_PER_USER_FLAG": {
-    "expires_in_version": "never",
-    "kind": "flag",
-    "description": "How many users have opened the DevTools WebIDE?"
   },
   "DEVTOOLS_JSDEBUGGER_OPENED_PER_USER_FLAG": {
     "expires_in_version": "never",
