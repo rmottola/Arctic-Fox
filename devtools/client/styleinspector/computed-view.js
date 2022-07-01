@@ -34,7 +34,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
 
 const FILTER_CHANGED_TIMEOUT = 150;
 const HTML_NS = "http://www.w3.org/1999/xhtml";
-const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
 /**
  * Helper for long-running processes that should yield occasionally to
@@ -646,6 +645,17 @@ CssComputedView.prototype = {
 
   /**
    * Callback for copy event. Copy selected text.
+   *
+   * @param {Event} event
+   *        copy event object.
+   */
+  _onCopy: function(event) {
+    this.copySelection();
+    event.preventDefault();
+  },
+
+  /**
+   * Copy the current selection to the clipboard
    */
   copySelection: function() {
     try {
@@ -674,10 +684,6 @@ CssComputedView.prototype = {
       }
 
       clipboardHelper.copyString(result);
-
-      if (event) {
-        event.preventDefault();
-      }
     } catch(e) {
       console.error(e);
     }
