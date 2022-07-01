@@ -135,6 +135,18 @@ function Eyedropper(chromeWindow, opts = { copyOnSelect: true, context: "other" 
   let mm = this._contentTab.linkedBrowser.messageManager;
   mm.loadFrameScript("resource:///modules/devtools/client/eyedropper/eyedropper-child.js", true);
 
+  // record if this was opened via the picker or standalone
+  var telemetry = new Telemetry();
+  if (opts.context == "command") {
+    telemetry.toolOpened("eyedropper");
+  }
+  else if (opts.context == "menu") {
+    telemetry.toolOpened("menueyedropper");
+  }
+  else if (opts.context == "picker") {
+    telemetry.toolOpened("pickereyedropper");
+  }
+
   EventEmitter.decorate(this);
 }
 
