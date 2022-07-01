@@ -22,6 +22,14 @@ const {ELEMENT_STYLE, PSEUDO_ELEMENTS} =
 const {OutputParser} = require("devtools/shared/output-parser");
 const {PrefObserver, PREF_ORIG_SOURCES} = require("devtools/client/styleeditor/utils");
 const {
+  createChild,
+  appendText,
+  advanceValidate,
+  blurOnMultipleProperties,
+  promiseWarn,
+  throttle
+} = require("devtools/client/styleinspector/utils");
+const {
   parseDeclarations,
   parseSingleValue,
   parsePseudoClassesAndAttributes,
@@ -53,11 +61,6 @@ const FILTER_PROP_RE = /\s*([^:\s]*)\s*:\s*(.*?)\s*;?$/;
 
 const IOService = Cc["@mozilla.org/network/io-service;1"]
                   .getService(Ci.nsIIOService);
-
-function promiseWarn(err) {
-  console.error(err);
-  return promise.reject(err);
-}
 
 /**
  * To figure out how shorthand properties are interpreted by the

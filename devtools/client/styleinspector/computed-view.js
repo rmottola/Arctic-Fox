@@ -72,7 +72,7 @@ UpdateProcess.prototype = {
     if (this.canceled) {
       return;
     }
-    this._timeout = this.win.setTimeout(this._timeoutHandler.bind(this), 0);
+    this._timeout = setTimeout(this._timeoutHandler.bind(this), 0);
   },
 
   /**
@@ -81,7 +81,7 @@ UpdateProcess.prototype = {
    */
   cancel: function() {
     if (this._timeout) {
-      this.win.clearTimeout(this._timeout);
+      clearTimeout(this._timeout);
       this._timeout = 0;
     }
     this.canceled = true;
@@ -1406,33 +1406,6 @@ SelectorView.prototype = {
     });
   }
 };
-
-/**
- * Create a child element with a set of attributes.
- *
- * @param {Element} parent
- *        The parent node.
- * @param {String} tag
- *        The tag name.
-* @param {Object} attributes
- *        A set of attributes to set on the node.
- */
-function createChild(parent, tag, attributes={}) {
-  let elt = parent.ownerDocument.createElementNS(HTML_NS, tag);
-  for (let attr in attributes) {
-    if (attributes.hasOwnProperty(attr)) {
-      if (attr === "textContent") {
-        elt.textContent = attributes[attr];
-      } else if (attr === "child") {
-        elt.appendChild(attributes[attr]);
-      } else {
-        elt.setAttribute(attr, attributes[attr]);
-      }
-    }
-  }
-  parent.appendChild(elt);
-  return elt;
-}
 
 exports.CssComputedView = CssComputedView;
 exports.PropertyView = PropertyView;
