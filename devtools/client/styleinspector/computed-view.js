@@ -1064,6 +1064,7 @@ PropertyView.prototype = {
       valueSpan.appendChild(selector.outputFragment);
     }
 
+    this.matchedSelectorsContainer.innerHTML = "";
     this.matchedSelectorsContainer.appendChild(frag);
   },
 
