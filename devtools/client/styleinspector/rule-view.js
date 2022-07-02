@@ -1107,6 +1107,21 @@ TextProperty.prototype = {
 
   remove: function() {
     this.rule.removeProperty(this);
+  },
+
+  /**
+   * Return a string representation of the rule property.
+   */
+  stringifyProperty: function() {
+    // Get the displayed property value
+    let declaration = this.name + ": " + this.editor.committed.value + ";";
+
+    // Comment out property declarations that are not enabled
+    if (!this.enabled) {
+      declaration = "/* " + declaration + " */";
+    }
+
+    return declaration;
   }
 };
 
@@ -3670,6 +3685,10 @@ function getPropertyNameAndValue(node) {
 XPCOMUtils.defineLazyGetter(this, "clipboardHelper", function() {
   return Cc["@mozilla.org/widget/clipboardhelper;1"]
     .getService(Ci.nsIClipboardHelper);
+});
+
+XPCOMUtils.defineLazyGetter(this, "osString", function() {
+  return Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULRuntime).OS;
 });
 
 XPCOMUtils.defineLazyGetter(this, "_strings", function() {
