@@ -77,12 +77,12 @@ registerCleanupFunction(() => {
  * There is no need to clean tabs up at the end of a test as this is done
  * automatically.
  *
- * It is advised not to store any references on the global scope. There shouldn't
- * be a need to anyway. Thanks to add_task, test steps, even though asynchronous,
- * can be described in a nice flat way, and if/for/while/... control flow can be
- * used as in sync code, making it possible to write the outline of the test case
- * all in add_task, and delegate actual processing and assertions to other
- * functions.
+ * It is advised not to store any references on the global scope. There
+ * shouldn't be a need to anyway. Thanks to add_task, test steps, even
+ * though asynchronous, can be described in a nice flat way, and
+ * if/for/while/... control flow can be used as in sync code, making it
+ * possible to write the outline of the test case all in add_task, and delegate
+ * actual processing and assertions to other functions.
  */
 
 /* *********************************************
@@ -804,6 +804,25 @@ let createNewRuleViewProperty = Task.async(function*(ruleEditor, inputValue) {
   EventUtils.synthesizeKey("VK_RETURN", {},
     ruleEditor.element.ownerDocument.defaultView);
   yield onFocus;
+});
+
+/**
+ * Set the search value for the rule-view filter styles search box.
+ *
+ * @param {CssRuleView} view
+ *        The instance of the rule-view panel
+ * @param {String} searchValue
+ *        The filter search value
+ * @return a promise that resolves when the rule-view is filtered for the
+ * search term
+ */
+var setSearchFilter = Task.async(function*(view, searchValue) {
+  info("Setting filter text to \"" + searchValue + "\"");
+  let win = view.styleWindow;
+  let searchField = view.searchField;
+  searchField.focus();
+  synthesizeKeys(searchValue, win);
+  yield view.inspector.once("ruleview-filtered");
 });
 
 /* *********************************************
