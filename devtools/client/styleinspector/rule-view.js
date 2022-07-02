@@ -1236,6 +1236,8 @@ function CssRuleView(inspector, document, store, pageStyle) {
   this.tooltips.addToView();
   this.highlighters = new overlays.HighlightersOverlay(this);
   this.highlighters.addToView();
+
+  EventEmitter.decorate(this);
 }
 
 exports.CssRuleView = CssRuleView;
