@@ -1114,7 +1114,8 @@ TextProperty.prototype = {
    */
   stringifyProperty: function() {
     // Get the displayed property value
-    let declaration = this.name + ": " + this.editor.committed.value + ";";
+    let declaration = this.name + ": " + this.editor.valueSpan.textContent +
+      ";";
 
     // Comment out property declarations that are not enabled
     if (!this.enabled) {
