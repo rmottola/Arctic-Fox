@@ -533,7 +533,7 @@ Rule.prototype = {
    * The rule's line within a stylesheet
    */
   get ruleLine() {
-    return this.domRule ? this.domRule.line : null;
+    return this.domRule ? this.domRule.line : "";
   },
 
   /**
@@ -555,14 +555,9 @@ Rule.prototype = {
     if (this._originalSourceStrings) {
       return promise.resolve(this._originalSourceStrings);
     }
-    return this.domRule.getOriginalLocation().then(({href, line}) => {
-     let decodedHref = href;
 
-      if (decodedHref) {
-        try {
-          decodedHref = decodeURIComponent(href);
-        } catch (e) {}
-      }
+    return this.domRule.getOriginalLocation().then(({href, line, mediaText}) => {
+      let mediaString = mediaText ? " @" + mediaText : "";
 
       let sourceStrings = {
         full: (href || CssLogic.l10n("rule.sourceInline")) + ":" +
