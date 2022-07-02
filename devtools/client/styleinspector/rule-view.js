@@ -2635,6 +2635,34 @@ RuleEditor.prototype = {
         let selectorContainer = createChild(this.selectorText, "span", {
           class: containerClass
         });
+
+        let parsedSelector = parsePseudoClassesAndAttributes(selector);
+
+        for (let selectorText of parsedSelector) {
+          let selectorClass = "";
+
+          switch (selectorText.type) {
+            case SELECTOR_ATTRIBUTE:
+              selectorClass = "ruleview-selector-attribute";
+              break;
+            case SELECTOR_ELEMENT:
+              selectorClass = "ruleview-selector";
+              break;
+            case SELECTOR_PSEUDO_CLASS:
+              selectorClass = [":active", ":focus", ":hover"].some(
+                  pseudo => selectorText.value === pseudo) ?
+                "ruleview-selector-pseudo-class-lock" :
+                "ruleview-selector-pseudo-class";
+              break;
+            default:
+              break;
+          }
+
+          createChild(selectorContainer, "span", {
+            textContent: selectorText.value,
+            class: selectorClass
+          });
+        }
       });
     }
 

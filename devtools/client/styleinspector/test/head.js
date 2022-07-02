@@ -95,7 +95,9 @@ registerCleanupFunction(() => {
 
 /**
  * Add a new test tab in the browser and load the given url.
- * @param {String} url The url to be loaded in the new tab
+ *
+ * @param {String} url
+ *        The url to be loaded in the new tab
  * @return a promise that resolves to the tab object when the url is loaded
  */
 function addTab(url) {
@@ -123,6 +125,7 @@ function addTab(url) {
 /**
  * Simple DOM node accesor function that takes either a node or a string css
  * selector as argument and returns the corresponding node
+ *
  * @param {String|DOMNode} nodeOrSelector
  * @return {DOMNode|CPOW} Note that in e10s mode a CPOW object is returned which
  * doesn't implement *all* of the DOMNode's properties
@@ -136,9 +139,10 @@ function getNode(nodeOrSelector) {
 
 /**
  * Get the NodeFront for a given css selector, via the protocol
+ *
  * @param {String} selector
- * @param {InspectorPanel} inspector The instance of InspectorPanel currently
- * loaded in the toolbox
+ * @param {InspectorPanel} inspector
+ *        The instance of InspectorPanel currently loaded in the toolbox
  * @return {Promise} Resolves to the NodeFront instance
  */
 function getNodeFront(selector, {walker}) {
@@ -148,12 +152,13 @@ function getNodeFront(selector, {walker}) {
 /**
  * Highlight a node that matches the given css selector and set the inspector's
  * current selection to this node.
+ *
  * @param {String} selector
- * @param {InspectorPanel} inspector The instance of InspectorPanel currently
- * loaded in the toolbox
+ * @param {InspectorPanel} inspector
+ *        The instance of InspectorPanel currently loaded in the toolbox
  * @return {Promise} Resolves when the inspector is updated with the new node
  */
-let selectAndHighlightNode = Task.async(function*(selector, inspector) {
+var selectAndHighlightNode = Task.async(function*(selector, inspector) {
   info("Highlighting and selecting the node for " + selector);
 
   let nodeFront = yield getNodeFront(selector, inspector);
@@ -165,17 +170,17 @@ let selectAndHighlightNode = Task.async(function*(selector, inspector) {
 /*
  * Set the inspector's current selection to a node or to the first match of the
  * given css selector.
- * @param {String|NodeFront}
- *        data The node to select
+ *
+ * @param {String|NodeFront} data
+ *        The node to select
  * @param {InspectorPanel} inspector
- *        The instance of InspectorPanel currently
- * loaded in the toolbox
+ *        The instance of InspectorPanel currently loaded in the toolbox
  * @param {String} reason
  *        Defaults to "test" which instructs the inspector not
  *        to highlight the node upon selection
  * @return {Promise} Resolves when the inspector is updated with the new node
  */
-let selectNode = Task.async(function*(data, inspector, reason="test") {
+var selectNode = Task.async(function*(data, inspector, reason="test") {
   info("Selecting the node for '" + data + "'");
   let nodeFront = data;
   if (!data._form) {
@@ -188,8 +193,9 @@ let selectNode = Task.async(function*(data, inspector, reason="test") {
 
 /**
  * Set the inspector's current selection to null so that no node is selected
- * @param {InspectorPanel} inspector The instance of InspectorPanel currently
- * loaded in the toolbox
+ *
+ * @param {InspectorPanel} inspector
+ *        The instance of InspectorPanel currently loaded in the toolbox
  * @return a promise that resolves when the inspector is updated
  */
 function clearCurrentNodeSelection(inspector) {
@@ -201,9 +207,10 @@ function clearCurrentNodeSelection(inspector) {
 
 /**
  * Open the toolbox, with the inspector tool visible.
+ *
  * @return a promise that resolves when the inspector is ready
  */
-let openInspector = Task.async(function*() {
+var openInspector = Task.async(function*() {
   info("Opening the inspector");
   let target = TargetFactory.forTab(gBrowser.selectedTab);
 
@@ -240,6 +247,7 @@ let openInspector = Task.async(function*() {
 
 /**
  * Wait for the toolbox frame to receive focus after it loads
+ *
  * @param {Toolbox} toolbox
  * @return a promise that resolves when focus has been received
  */
@@ -254,10 +262,11 @@ function waitForToolboxFrameFocus(toolbox) {
 /**
  * Open the toolbox, with the inspector tool visible, and the sidebar that
  * corresponds to the given id selected
+ *
  * @return a promise that resolves when the inspector is ready and the sidebar
  * view is visible and ready
  */
-let openInspectorSideBar = Task.async(function*(id) {
+var openInspectorSideBar = Task.async(function*(id) {
   let {toolbox, inspector} = yield openInspector();
 
   if (!hasSideBarTab(inspector, id)) {
@@ -278,6 +287,7 @@ let openInspectorSideBar = Task.async(function*(id) {
 /**
  * Open the toolbox, with the inspector tool visible, and the computed-view
  * sidebar tab selected.
+ *
  * @return a promise that resolves when the inspector is ready and the computed
  * view is visible and ready
  */
@@ -288,6 +298,7 @@ function openComputedView() {
 /**
  * Open the toolbox, with the inspector tool visible, and the rule-view
  * sidebar tab selected.
+ *
  * @return a promise that resolves when the inspector is ready and the rule
  * view is visible and ready
  */
@@ -297,10 +308,13 @@ function openRuleView() {
 
 /**
  * Wait for eventName on target.
- * @param {Object} target An observable object that either supports on/off or
- * addEventListener/removeEventListener
+ *
+ * @param {Object} target
+ *        An observable object that either supports on/off or
+ *        addEventListener/removeEventListener
  * @param {String} eventName
- * @param {Boolean} useCapture Optional, for addEventListener/removeEventListener
+ * @param {Boolean} useCapture
+ *        Optional, for addEventListener/removeEventListener
  * @return A promise that resolves when the event has been handled
  */
 function once(target, eventName, useCapture=false) {
@@ -328,7 +342,9 @@ function once(target, eventName, useCapture=false) {
 /**
  * This shouldn't be used in the tests, but is useful when writing new tests or
  * debugging existing tests in order to introduce delays in the test steps
- * @param {Number} ms The time to wait
+ *
+ * @param {Number} ms
+ *        The time to wait
  * @return A promise that resolves when the time is passed
  */
 function wait(ms) {
@@ -340,7 +356,9 @@ function wait(ms) {
 /**
  * Wait for a content -> chrome message on the message manager (the window
  * messagemanager is used).
- * @param {String} name The message name
+ *
+ * @param {String} name
+ *        The message name
  * @return {Promise} A promise that resolves to the response data when the
  * message has been received
  */
@@ -360,12 +378,17 @@ function waitForContentMessage(name) {
 /**
  * Send an async message to the frame script (chrome -> content) and wait for a
  * response message with the same name (content -> chrome).
- * @param {String} name The message name. Should be one of the messages defined
- * in doc_frame_script.js
- * @param {Object} data Optional data to send along
- * @param {Object} objects Optional CPOW objects to send along
- * @param {Boolean} expectResponse If set to false, don't wait for a response
- * with the same name from the content script. Defaults to true.
+ *
+ * @param {String} name
+ *        The message name. Should be one of the messages defined
+ *        in doc_frame_script.js
+ * @param {Object} data
+ *        Optional data to send along
+ * @param {Object} objects
+ *        Optional CPOW objects to send along
+ * @param {Boolean} expectResponse
+ *        If set to false, don't wait for a response with the same name
+ *        from the content script. Defaults to true.
  * @return {Promise} Resolves to the response data if a response is expected,
  * immediately resolves otherwise
  */
@@ -376,21 +399,25 @@ function executeInContent(name, data={}, objects={}, expectResponse=true) {
   mm.sendAsyncMessage(name, data, objects);
   if (expectResponse) {
     return waitForContentMessage(name);
-  } else {
-    return promise.resolve();
   }
+
+  return promise.resolve();
 }
 
 /**
  * Send an async message to the frame script and get back the requested
  * computed style property.
- * @param {String} selector: The selector used to obtain the element.
- * @param {String} pseudo: pseudo id to query, or null.
- * @param {String} name: name of the property.
+ *
+ * @param {String} selector
+ *        The selector used to obtain the element.
+ * @param {String} pseudo
+ *        pseudo id to query, or null.
+ * @param {String} name
+ *        name of the property.
  */
 function* getComputedStyleProperty(selector, pseudo, propName) {
- return yield executeInContent("Test:GetComputedStylePropertyValue",
-                               {selector,
+  return yield executeInContent("Test:GetComputedStylePropertyValue",
+                                {selector,
                                 pseudo,
                                 name: propName});
 }
@@ -398,15 +425,21 @@ function* getComputedStyleProperty(selector, pseudo, propName) {
 /**
  * Send an async message to the frame script and wait until the requested
  * computed style property has the expected value.
- * @param {String} selector: The selector used to obtain the element.
- * @param {String} pseudo: pseudo id to query, or null.
- * @param {String} prop: name of the property.
- * @param {String} expected: expected value of property
- * @param {String} name: the name used in test message
+ *
+ * @param {String} selector
+ *        The selector used to obtain the element.
+ * @param {String} pseudo
+ *        pseudo id to query, or null.
+ * @param {String} prop
+ *        name of the property.
+ * @param {String} expected
+ *        expected value of property
+ * @param {String} name
+ *        the name used in test message
  */
 function* waitForComputedStyleProperty(selector, pseudo, name, expected) {
- return yield executeInContent("Test:WaitForComputedStylePropertyValue",
-                               {selector,
+  return yield executeInContent("Test:WaitForComputedStylePropertyValue",
+                                {selector,
                                 pseudo,
                                 expected,
                                 name});
@@ -505,9 +538,12 @@ function waitForWindow() {
 
 /**
  * @see SimpleTest.waitForClipboard
- * @param {Function} setup Function to execute before checking for the
- * clipboard content
- * @param {String|Boolean} expected An expected string or validator function
+ *
+ * @param {Function} setup
+ *        Function to execute before checking for the
+ *        clipboard content
+ * @param {String|Boolean} expected
+ *        An expected string or validator function
  * @return a promise that resolves when the expected string has been found or
  * the validator function has returned true, rejects otherwise.
  */
@@ -529,23 +565,25 @@ function fireCopyEvent(element) {
 /**
  * Polls a given function waiting for it to return true.
  *
- * @param {Function} validatorFn A validator function that returns a boolean.
- * This is called every few milliseconds to check if the result is true. When
- * it is true, the promise resolves.
- * @param {String} name Optional name of the test. This is used to generate
- * the success and failure messages.
+ * @param {Function} validatorFn
+ *        A validator function that returns a boolean.
+ *        This is called every few milliseconds to check if the result is true.
+ *        When it is true, the promise resolves.
+ * @param {String} name
+ *        Optional name of the test. This is used to generate
+ *        the success and failure messages.
  * @return a promise that resolves when the function returned true or rejects
  * if the timeout is reached
  */
 function waitForSuccess(validatorFn, name="untitled") {
   let def = promise.defer();
 
-  function wait(validatorFn) {
-    if (validatorFn()) {
+  function wait(validator) {
+    if (validator()) {
       ok(true, "Validator function " + name + " returned true");
       def.resolve();
     } else {
-      setTimeout(() => wait(validatorFn), 200);
+      setTimeout(() => wait(validator), 200);
     }
   }
   wait(validatorFn);
@@ -556,6 +594,7 @@ function waitForSuccess(validatorFn, name="untitled") {
 /**
  * Create a new style tag containing the given style text and append it to the
  * document's head node
+ *
  * @param {Document} doc
  * @param {String} style
  * @return {DOMNode} The newly created style node
@@ -563,7 +602,7 @@ function waitForSuccess(validatorFn, name="untitled") {
 function addStyle(doc, style) {
   info("Adding a new style tag to the document with style content: " +
     style.substring(0, 50));
-  let node = doc.createElement('style');
+  let node = doc.createElement("style");
   node.setAttribute("type", "text/css");
   node.textContent = style;
   doc.getElementsByTagName("head")[0].appendChild(node);
@@ -573,6 +612,7 @@ function addStyle(doc, style) {
 /**
  * Checks whether the inspector's sidebar corresponding to the given id already
  * exists
+ *
  * @param {InspectorPanel}
  * @param {String}
  * @return {Boolean}
@@ -583,12 +623,14 @@ function hasSideBarTab(inspector, id) {
 
 /**
  * Get the dataURL for the font family tooltip.
- * @param {String} font The font family value.
+ *
+ * @param {String} font
+ *        The font family value.
  * @param {object} nodeFront
  *        The NodeActor that will used to retrieve the dataURL for the
  *        font family tooltip contents.
  */
-let getFontFamilyDataURL = Task.async(function*(font, nodeFront) {
+var getFontFamilyDataURL = Task.async(function*(font, nodeFront) {
   let fillStyle = (Services.prefs.getCharPref("devtools.theme") === "light") ?
       "black" : "white";
 
@@ -599,12 +641,15 @@ let getFontFamilyDataURL = Task.async(function*(font, nodeFront) {
 
 /**
  * Simulate the key input for the given input in the window.
- * @param {String} input The string value to input
- * @param {Window} win The window containing the panel
+ *
+ * @param {String} input
+ *        The string value to input
+ * @param {Window} win
+ *        The window containing the panel
  */
 function synthesizeKeys(input, win) {
   for (let key of input.split("")) {
-     EventUtils.synthesizeKey(key, {}, win);
+    EventUtils.synthesizeKey(key, {}, win);
   }
 }
 
@@ -643,10 +688,13 @@ function getRuleViewRule(view, selectorText) {
 /**
  * Get references to the name and value span nodes corresponding to a given
  * selector and property name in the rule-view
- * @param {CssRuleView} view The instance of the rule-view panel
- * @param {String} selectorText The selector in the rule-view to look for the
- * property in
- * @param {String} propertyName The name of the property
+ *
+ * @param {CssRuleView} view
+ *        The instance of the rule-view panel
+ * @param {String} selectorText
+ *        The selector in the rule-view to look for the property in
+ * @param {String} propertyName
+ *        The name of the property
  * @return {Object} An object like {nameSpan: DOMNode, valueSpan: DOMNode}
  */
 function getRuleViewProperty(view, selectorText, propertyName) {
@@ -671,10 +719,13 @@ function getRuleViewProperty(view, selectorText, propertyName) {
 /**
  * Get the text value of the property corresponding to a given selector and name
  * in the rule-view
- * @param {CssRuleView} view The instance of the rule-view panel
- * @param {String} selectorText The selector in the rule-view to look for the
- * property in
- * @param {String} propertyName The name of the property
+ *
+ * @param {CssRuleView} view
+ *        The instance of the rule-view panel
+ * @param {String} selectorText
+ *        The selector in the rule-view to look for the property in
+ * @param {String} propertyName
+ *        The name of the property
  * @return {String} The property value
  */
 function getRuleViewPropertyValue(view, selectorText, propertyName) {
@@ -685,8 +736,11 @@ function getRuleViewPropertyValue(view, selectorText, propertyName) {
 /**
  * Get a reference to the selector DOM element corresponding to a given selector
  * in the rule-view
- * @param {CssRuleView} view The instance of the rule-view panel
- * @param {String} selectorText The selector in the rule-view to look for
+ *
+ * @param {CssRuleView} view
+ *        The instance of the rule-view panel
+ * @param {String} selectorText
+ *        The selector in the rule-view to look for
  * @return {DOMNode} The selector DOM element
  */
 function getRuleViewSelector(view, selectorText) {
@@ -763,9 +817,13 @@ function getRuleViewLinkTextByIndex(view, index) {
 
 /**
  * Get the rule editor from the rule-view given its index
- * @param {CssRuleView} view The instance of the rule-view panel
- * @param {Number} childrenIndex The children index of the element to get
- * @param {Number} nodeIndex The child node index of the element to get
+ *
+ * @param {CssRuleView} view
+ *        The instance of the rule-view panel
+ * @param {Number} childrenIndex
+ *        The children index of the element to get
+ * @param {Number} nodeIndex
+ *        The child node index of the element to get
  * @return {DOMNode} The rule editor if any at this index
  */
 function getRuleViewRuleEditor(view, childrenIndex, nodeIndex) {
@@ -799,14 +857,15 @@ var focusNewRuleViewProperty = Task.async(function*(ruleEditor) {
  * by clicking on the close brace, and then entering the given text.
  * Keep in mind that the rule-view knows how to handle strings with multiple
  * properties, so the input text may be like: "p1:v1;p2:v2;p3:v3".
- * @param {RuleEditor} ruleEditor The instance of RuleEditor that will receive
- * the new property(ies)
- * @param {String} inputValue The text to be entered in the new property name
- * field
+ *
+ * @param {RuleEditor} ruleEditor
+ *        The instance of RuleEditor that will receive the new property(ies)
+ * @param {String} inputValue
+ *        The text to be entered in the new property name field
  * @return a promise that resolves when the new property name has been entered
  * and once the value field is focused
  */
-let createNewRuleViewProperty = Task.async(function*(ruleEditor, inputValue) {
+var createNewRuleViewProperty = Task.async(function*(ruleEditor, inputValue) {
   info("Creating a new property editor");
   let editor = yield focusNewRuleViewProperty(ruleEditor);
 
@@ -989,9 +1048,10 @@ function getComputedViewLinkByIndex(view, index) {
  * Wait for the toolbox to emit the styleeditor-selected event and when done
  * wait for the stylesheet identified by href to be loaded in the stylesheet
  * editor
+ *
  * @param {Toolbox} toolbox
- * @param {String} href Optional, if not provided, wait for the first editor
- * to be ready
+ * @param {String} href
+ *        Optional, if not provided, wait for the first editor to be ready
  * @return a promise that resolves to the editor when the stylesheet editor is
  * ready
  */
@@ -1022,9 +1082,11 @@ function waitForStyleEditor(toolbox, href) {
 /**
  * Reload the current page and wait for the inspector to be initialized after
  * the navigation
+ *
  * @param {InspectorPanel} inspector
  *        The instance of InspectorPanel currently loaded in the toolbox
- * @return a promise that resolves after page reload and inspector initialization
+ * @return a promise that resolves after page reload and inspector
+ * initialization
  */
 function reloadPage(inspector) {
   let onNewRoot = inspector.once("new-root");
