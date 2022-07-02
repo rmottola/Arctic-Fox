@@ -1731,7 +1731,6 @@ CssRuleView.prototype = {
     this._prefObserver.destroy();
 
     this._outputParser = null;
-    this._editorsExpandedForFilter = null;
 
     // Remove context menu
     if (this._contextmenu) {
@@ -3189,6 +3188,9 @@ TextPropertyEditor.prototype = {
 
     // Populate the computed styles.
     this._updateComputed();
+
+    // Update the rule property highlight.
+    this.ruleView._updatePropertyHighlight(this);
   },
 
   _onStartEditing: function() {
