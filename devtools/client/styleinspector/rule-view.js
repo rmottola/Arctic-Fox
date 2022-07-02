@@ -1250,6 +1250,95 @@ CssRuleView.prototype = {
   _filterChangedTimeout: null,
 
   /**
+   * Get an instance of SelectorHighlighter (used to highlight nodes that match
+   * selectors in the rule-view). A new instance is only created the first time
+   * this function is called. The same instance will then be returned.
+   *
+   * @return {Promise} Resolves to the instance of the highlighter.
+   */
+  getSelectorHighlighter: Task.async(function*() {
+    let utils = this.inspector.toolbox.highlighterUtils;
+    if (!utils.supportsCustomHighlighters()) {
+      return null;
+    }
+
+    if (this.selectorHighlighter) {
+      return this.selectorHighlighter;
+    }
+
+    try {
+      let h = yield utils.getHighlighterByType("SelectorHighlighter");
+      this.selectorHighlighter = h;
+      return h;
+    } catch (e) {
+      // The SelectorHighlighter type could not be created in the
+      // current target.  It could be an older server, or a XUL page.
+      return null;
+    }
+  }),
+
+  /**
+   * Highlight/unhighlight all the nodes that match a given set of selectors
+   * inside the document of the current selected node.
+   * Only one selector can be highlighted at a time, so calling the method a
+   * second time with a different selector will first unhighlight the previously
+   * highlighted nodes.
+   * Calling the method a second time with the same selector will just
+   * unhighlight the highlighted nodes.
+   *
+   * @param {DOMNode} selectorIcon
+   *        The icon that was clicked to toggle the selector. The
+   *        class 'highlighted' will be added when the selector is
+   *        highlighted.
+   * @param {String} selector
+   *        The selector used to find nodes in the page.
+   */
+  toggleSelectorHighlighter: function(selectorIcon, selector) {
+    if (this.lastSelectorIcon) {
+      this.lastSelectorIcon.classList.remove("highlighted");
+    }
+    selectorIcon.classList.remove("highlighted");
+
+    this.unhighlightSelector().then(() => {
+      if (selector !== this.highlightedSelector) {
+        this.highlightedSelector = selector;
+        selectorIcon.classList.add("highlighted");
+        this.lastSelectorIcon = selectorIcon;
+        this.highlightSelector(selector).then(() => {
+          this.emit("ruleview-selectorhighlighter-toggled", true);
+        }, Cu.reportError);
+      } else {
+        this.highlightedSelector = null;
+        this.emit("ruleview-selectorhighlighter-toggled", false);
+      }
+    }, Cu.reportError);
+  },
+
+  highlightSelector: Task.async(function*(selector) {
+    let node = this.inspector.selection.nodeFront;
+
+    let highlighter = yield this.getSelectorHighlighter();
+    if (!highlighter) {
+      return;
+    }
+
+    yield highlighter.show(node, {
+      hideInfoBar: true,
+      hideGuides: true,
+      selector
+    });
+  }),
+
+  unhighlightSelector: Task.async(function*() {
+    let highlighter = yield this.getSelectorHighlighter();
+    if (!highlighter) {
+      return;
+    }
+
+    yield highlighter.hide();
+  }),
+
+  /**
    * Get the type of a given node in the rule-view
    *
    * @param {DOMNode} node
