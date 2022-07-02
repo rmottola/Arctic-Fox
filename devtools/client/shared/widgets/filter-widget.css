@@ -111,12 +111,26 @@
 
 #add-filter {
   -moz-appearance: none;
-  background: url(chrome://browser/skin/devtools/add.svg);
-  background-size: 18px;
+  background: url(chrome://devtools/skin/themes/images/add.svg);
+  background-size: cover;
   border: none;
   width: 16px;
   height: 16px;
   font-size: 0;
   vertical-align: middle;
   cursor: pointer;
+  margin: 0 5px;
+}
+
+.add {
+  background: url(chrome://devtools/skin/themes/images/add.svg);
+}
+
+#toggle-presets {
+  background: url(chrome://devtools/skin/themes/images/pseudo-class.svg#pseudo-class);
+}
+
+.show-presets #toggle-presets {
+  background: url(chrome://devtools/skin/themes/images/pseudo-class.svg#pseudo-class-checked);
+  filter: none;
 }

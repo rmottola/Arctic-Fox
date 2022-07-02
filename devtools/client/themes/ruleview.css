@@ -249,6 +249,11 @@
   color: #888;
 }
 
+#ruleview-add-rule-button::before {
+  background-image: url("chrome://devtools/skin/themes/images/add.svg");
+  background-size: cover;
+}
+
 #pseudo-class-panel-toggle::before {
   background-image: url("chrome://devtools/skin/themes/images/pseudo-class.svg#pseudo-class");
   background-size: cover;
