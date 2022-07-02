@@ -58,7 +58,9 @@ const FILTER_CHANGED_TIMEOUT = 150;
 
 // This is used to parse user input when filtering.
 const FILTER_PROP_RE = /\s*([^:\s]*)\s*:\s*(.*?)\s*;?$/;
-
+// This is used to parse the filter search value to see if the filter
+// should be strict or not
+const FILTER_STRICT_RE = /\s*`(.*?)`\s*$/;
 const IOService = Cc["@mozilla.org/network/io-service;1"]
                   .getService(Ci.nsIIOService);
 
@@ -1506,7 +1508,59 @@ CssRuleView.prototype = {
         this.searchField.removeAttribute("filled");
       }
 
-      this._clearHighlights();
+      this.searchData = {
+        searchPropertyMatch: FILTER_PROP_RE.exec(this.searchValue),
+        searchPropertyName: this.searchValue,
+        searchPropertyValue: this.searchValue,
+        strictSearchValue: "",
+        strictSearchPropertyName: false,
+        strictSearchPropertyValue: false,
+        strictSearchAllValues: false
+      };
+
+      if (this.searchData.searchPropertyMatch) {
+        // Parse search value as a single property line and extract the
+        // property name and value. If the parsed property name or value is
+        // contained in backquotes (`), extract the value within the backquotes
+        // and set the corresponding strict search for the property to true.
+        if (FILTER_STRICT_RE.test(this.searchData.searchPropertyMatch[1])) {
+          this.searchData.strictSearchPropertyName = true;
+          this.searchData.searchPropertyName =
+            FILTER_STRICT_RE.exec(this.searchData.searchPropertyMatch[1])[1];
+        } else {
+          this.searchData.searchPropertyName =
+            this.searchData.searchPropertyMatch[1];
+        }
+
+        if (FILTER_STRICT_RE.test(this.searchData.searchPropertyMatch[2])) {
+          this.searchData.strictSearchPropertyValue = true;
+          this.searchData.searchPropertyValue =
+            FILTER_STRICT_RE.exec(this.searchData.searchPropertyMatch[2])[1];
+        } else {
+          this.searchData.searchPropertyValue =
+            this.searchData.searchPropertyMatch[2];
+        }
+
+        // Strict search for stylesheets will match the property line regex.
+        // Extract the search value within the backquotes to be used
+        // in the strict search for stylesheets in _highlightStyleSheet.
+        if (FILTER_STRICT_RE.test(this.searchValue)) {
+          this.searchData.strictSearchValue =
+            FILTER_STRICT_RE.exec(this.searchValue)[1];
+        }
+      } else if (FILTER_STRICT_RE.test(this.searchValue)) {
+        // If the search value does not correspond to a property line and
+        // is contained in backquotes, extract the search value within the
+        // backquotes and set the flag to perform a strict search for all
+        // the values (selector, stylesheet, property and computed values).
+        let searchValue = FILTER_STRICT_RE.exec(this.searchValue)[1];
+        this.searchData.strictSearchAllValues = true;
+        this.searchData.searchPropertyName = searchValue;
+        this.searchData.searchPropertyValue = searchValue;
+        this.searchData.strictSearchValue = searchValue;
+      }
+
+      this._clearHighlight(this.element);
       this._clearRules();
       this._createEditors();
 
