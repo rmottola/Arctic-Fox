@@ -1249,6 +1249,11 @@ CssRuleView.prototype = {
   // Used for cancelling timeouts in the style filter.
   _filterChangedTimeout: null,
 
+  // Get the filter search value.
+  get searchValue() {
+    return this.searchField.value.toLowerCase();
+  },
+
   /**
    * Get an instance of SelectorHighlighter (used to highlight nodes that match
    * selectors in the rule-view). A new instance is only created the first time
