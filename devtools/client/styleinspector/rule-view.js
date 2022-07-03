@@ -3331,8 +3331,6 @@ TextPropertyEditor.prototype = {
         continue;
       }
 
-      showExpander = true;
-
       let li = createChild(this.computed, "li", {
         class: "ruleview-computed"
       });
@@ -3366,13 +3364,6 @@ TextPropertyEditor.prototype = {
       // Store the computed style element for easy access when highlighting
       // styles
       computed.element = li;
-    }
-
-    // Show or hide the expander as needed.
-    if (showExpander) {
-      this.expander.style.visibility = "visible";
-    } else {
-      this.expander.style.visibility = "hidden";
     }
   },
 
@@ -3421,6 +3412,7 @@ TextPropertyEditor.prototype = {
     if (!this.computed.hasAttribute("user-open")) {
       this.expander.setAttribute("open", "true");
       this.computed.setAttribute("filter-open", "");
+      this._populateComputed();
     }
   },
 
