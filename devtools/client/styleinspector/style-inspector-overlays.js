@@ -267,6 +267,8 @@ TooltipsOverlay.prototype = {
       return;
     }
 
+    let panelDoc = this.view.inspector.panelDoc;
+
     // Image, fonts, ... preview tooltip
     this.previewTooltip = new Tooltip(panelDoc);
     this.previewTooltip.startTogglingOnHover(this.view.element,
