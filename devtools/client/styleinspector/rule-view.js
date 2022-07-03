@@ -2760,7 +2760,7 @@ RuleEditor.prototype = {
     });
 
     this.newPropSpan = createChild(this.newPropItem, "span", {
-      class: "ruleview-propertyname",
+      class: PROPERTY_NAME_CLASS,
       tabindex: "0"
     });
 
@@ -2861,10 +2861,57 @@ RuleEditor.prototype = {
         }
         return;
       }
+
+      let {ruleProps, isMatching} = response;
+      if (!ruleProps) {
+        // Notify for changes, even when nothing changes,
+        // just to allow tests being able to track end of this request.
+        ruleView.emit("ruleview-invalid-selector");
+        return;
+      }
+
+      let newRule = new Rule(elementStyle, ruleProps);
+      let editor = new RuleEditor(ruleView, newRule);
+      let rules = elementStyle.rules;
+
+      rules.splice(rules.indexOf(this.rule), 1);
+      rules.push(newRule);
+      elementStyle._changed();
+
+      editor.element.setAttribute("unmatched", !isMatching);
+      this.element.parentNode.replaceChild(editor.element, this.element);
+
+      // Remove highlight for modified selector
+      if (ruleView.highlightedSelector &&
+          ruleView.highlightedSelector === this.rule.selectorText) {
+        ruleView.toggleSelectorHighlighter(ruleView.lastSelectorIcon,
+          ruleView.highlightedSelector);
+      }
+
+      editor._moveSelectorFocus(direction);
     }).then(null, err => {
       this.isEditing = false;
       promiseWarn(err);
     });
+  },
+
+  /**
+   * Handle moving the focus change after a tab or return keypress in the
+   * selector inplace editor.
+   *
+   * @param {Number} direction
+   *        The move focus direction number.
+   */
+  _moveSelectorFocus: function(direction) {
+    if (!direction || direction === Ci.nsIFocusManager.MOVEFOCUS_BACKWARD) {
+      return;
+    }
+
+    if (this.rule.textProps.length > 0) {
+      this.rule.textProps[0].editor.nameSpan.click();
+    } else {
+      this.propertyList.click();
+    }
   }
 };
 
