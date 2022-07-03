@@ -1486,21 +1486,6 @@ CssRuleView.prototype = {
   },
 
   /**
-   * Copy the most recently selected color value to clipboard.
-   */
-  _onCopyColor: function() {
-    clipboardHelper.copyString(this._colorToCopy);
-  },
-
-  /**
-   *  Toggle the original sources pref.
-   */
-  _onToggleOrigSources: function() {
-    let isEnabled = Services.prefs.getBoolPref(PREF_ORIG_SOURCES);
-    Services.prefs.setBoolPref(PREF_ORIG_SOURCES, !isEnabled);
-  },
-
-  /**
    * Add a new rule to the current element.
    */
   _onAddRule: function() {
@@ -3240,8 +3225,6 @@ TextPropertyEditor.prototype = {
       this.valueSpan.querySelectorAll("." + colorSwatchClass);
     if (this.ruleEditor.isEditable) {
       for (let span of this._colorSwatchSpans) {
-        // Capture the original declaration value to be able to revert later
-        let originalValue = this.valueSpan.textContent;
         // Adding this swatch to the list of swatches our colorpicker
         // knows about
         this.ruleView.tooltips.colorPicker.addSwatch(span, {
@@ -3258,8 +3241,6 @@ TextPropertyEditor.prototype = {
       this.valueSpan.querySelectorAll("." + bezierSwatchClass);
     if (this.ruleEditor.isEditable) {
       for (let span of this._bezierSwatchSpans) {
-        // Capture the original declaration value to be able to revert later
-        let originalValue = this.valueSpan.textContent;
         // Adding this swatch to the list of swatches our colorpicker
         // knows about
         this.ruleView.tooltips.cubicBezier.addSwatch(span, {
@@ -3276,7 +3257,6 @@ TextPropertyEditor.prototype = {
     if (this.ruleEditor.isEditable) {
       if (span) {
         parserOptions.filterSwatch = true;
-        let originalValue = this.valueSpan.textContent;
 
         this.ruleView.tooltips.filterEditor.addSwatch(span, {
           onShow: this._onStartEditing,
