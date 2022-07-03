@@ -3354,6 +3354,9 @@ TextPropertyEditor.prototype = {
         }
       );
 
+      // Store the computed property value that was parsed for output
+      computed.parsedValue = frag.textContent;
+
       createChild(li, "span", {
         class: "ruleview-propertyvalue theme-fg-color1",
         child: frag
