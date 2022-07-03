@@ -3296,7 +3296,7 @@ TextPropertyEditor.prototype = {
 
   _onStartEditing: function() {
     this.element.classList.remove("ruleview-overridden");
-    this._previewValue(this.prop.value);
+    this.enable.style.visibility = "hidden";
   },
 
   /**
