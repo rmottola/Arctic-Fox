@@ -71,14 +71,15 @@ body {
 
 .ruleview-propertyvaluecontainer {
   cursor: text;
-  padding-right: 15px;
+  padding-right: 5px;
 }
 
 .ruleview-propertyvaluecontainer a {
   cursor: pointer;
 }
 
-.ruleview-computedlist:not(.styleinspector-open),
+.ruleview-computedlist,
+.ruleview-overridden-rule-filter[hidden],
 .ruleview-warning[hidden] {
   display: none;
 }

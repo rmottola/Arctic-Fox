@@ -3043,6 +3043,19 @@ TextPropertyEditor.prototype = {
       title: CssLogic.l10n("rule.warning.title"),
     });
 
+    // Filter button that filters for the current property name and is
+    // displayed when the property is overridden by another rule.
+    this.filterProperty = createChild(this.container, "div", {
+      class: "ruleview-overridden-rule-filter",
+      hidden: "",
+      title: CssLogic.l10n("rule.filterProperty.title"),
+    });
+
+    this.filterProperty.addEventListener("click", event => {
+      this.ruleEditor.ruleView.setFilterStyles("`" + this.prop.name + "`");
+      event.stopPropagation();
+    }, false);
+
     // Holds the viewers for the computed properties.
     // will be populated in |_updateComputed|.
     this.computed = createChild(this.element, "ul", {
@@ -3170,6 +3183,9 @@ TextPropertyEditor.prototype = {
     }
 
     this.warning.hidden = this.editing || this.isValid();
+    this.filterProperty.hidden = this.editing ||
+                                 !this.isValid() ||
+                                 !this.prop.overridden;
 
     if (this.prop.overridden || !this.prop.enabled) {
       this.element.classList.add("ruleview-overridden");
