@@ -129,9 +129,13 @@ HighlightersOverlay.prototype = {
     if (type) {
       this.highlighterShown = type;
       let node = this.view.inspector.selection.nodeFront;
-      this._getHighlighter(type).then(highlighter => {
-        highlighter.show(node);
-      });
+      this._getHighlighter(type)
+          .then(highlighter => highlighter.show(node))
+          .then(shown => {
+            if (shown) {
+              this.emit("highlighter-shown");
+            }
+          });
     }
   },
 
@@ -183,6 +187,7 @@ HighlightersOverlay.prototype = {
           promise.then(null, Cu.reportError);
         }
         this.highlighterShown = null;
+        this.emit("highlighter-hidden");
       });
     }
   },
