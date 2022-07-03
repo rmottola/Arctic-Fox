@@ -856,10 +856,12 @@ var PageStyleActor = protocol.ActorClass({
 
   /**
    * Adds a new rule, and returns the new StyleRuleActor.
-   * @param   NodeActor node
+   * @param NodeActor node
+   * @param [string] pseudoClasses The list of pseudo classes to append to the
+   * new selector.
    * @returns StyleRuleActor of the new rule
    */
-  addNewRule: method(function(node) {
+  addNewRule: method(function(node, pseudoClasses) {
     let style = this.styleElement;
     let sheet = style.sheet;
     let rawNode = node.rawNode;
@@ -875,13 +877,18 @@ var PageStyleActor = protocol.ActorClass({
       selector = rawNode.tagName.toLowerCase();
     }
 
+    if (pseudoClasses && pseudoClasses.length > 0) {
+      selector += pseudoClasses.join("");
+    }
+
     let index = sheet.insertRule(selector + " {}", cssRules.length);
     let ruleActor = this._styleRef(cssRules[index]);
     return this.getAppliedProps(node, [{ rule: ruleActor }],
       { matchedSelectors: true });
   }, {
     request: {
-      node: Arg(0, "domnode")
+      node: Arg(0, "domnode"),
+      pseudoClasses: Arg(1, "nullable:array:string")
     },
     response: RetVal("appliedStylesReturn")
   }),
@@ -936,8 +943,8 @@ var PageStyleFront = protocol.FrontClass(PageStyleActor, {
     impl: "_getApplied"
   }),
 
-  addNewRule: protocol.custom(function(node) {
-    return this._addNewRule(node).then(ret => {
+  addNewRule: protocol.custom(function(node, pseudoClasses) {
+    return this._addNewRule(node, pseudoClasses).then(ret => {
       return ret.entries[0];
     });
   }, {

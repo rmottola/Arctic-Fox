@@ -1508,6 +1508,7 @@ CssRuleView.prototype = {
     let element = elementStyle.element;
     let rules = elementStyle.rules;
     let client = this.inspector.toolbox._target.client;
+    let pseudoClasses = element.pseudoClassLocks;
 
     if (!client.traits.addNewRule) {
       return;
@@ -1744,6 +1745,7 @@ CssRuleView.prototype = {
     // Remove bound listeners
     this.element.removeEventListener("copy", this._onCopy);
     this.element.removeEventListener("contextmenu", this._onContextMenu);
+    this.addRuleButton.removeEventListener("click", this._onAddRule);
     this.searchField.removeEventListener("input", this._onFilterStyles);
     this.searchField.removeEventListener("keypress", this._onFilterKeyPress);
     this.searchField.removeEventListener("contextmenu",
