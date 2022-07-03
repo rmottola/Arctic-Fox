@@ -3219,7 +3219,7 @@ TextPropertyEditor.prototype = {
     const bezierSwatchClass = "ruleview-bezierswatch";
     const filterSwatchClass = "ruleview-filterswatch";
 
-    let outputParser = this.ruleEditor.ruleView._outputParser;
+    let outputParser = this.ruleView._outputParser;
     let parserOptions = {
       colorSwatchClass: sharedSwatchClass + colorSwatchClass,
       colorClass: "ruleview-color",
