@@ -30,6 +30,7 @@ DevToolsModules(
     'observable-object.js',
     'options-view.js',
     'Parser.jsm',
+    'poller.js',
     'source-utils.js',
     'SplitView.jsm',
     'telemetry.js',
