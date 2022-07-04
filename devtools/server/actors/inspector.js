@@ -470,6 +470,10 @@ var NodeActor = exports.NodeActor = protocol.ActorClass({
       }
     }
 
+    events.sort((a, b) => {
+      return a.type.localeCompare(b.type);
+    });
+
     return events;
   },
 
