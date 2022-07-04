@@ -710,6 +710,8 @@ MarkupView.prototype = {
 
     this._updateChildren(container);
 
+    this._inspector.emit("container-created", container);
+
     return container;
   },
 
