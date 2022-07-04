@@ -153,6 +153,19 @@ var PageStyleActor = protocol.ActorClass({
     events.on(this.inspector.tabActor, "will-navigate", this.onFrameUnload);
   },
 
+  destroy: function () {
+    if (!this.walker) {
+      return;
+    }
+    protocol.Actor.prototype.destroy.call(this);
+    events.off(this.inspector.tabActor, "will-navigate", this.onFrameUnload);
+    this.inspector = null;
+    this.walker = null;
+    this.refMap = null;
+    this.cssLogic = null;
+    this._styleElement = null;
+  },
+
   get conn() {
     return this.inspector.conn;
   },
