@@ -900,8 +900,8 @@ var PageStyleActor = protocol.ActorClass({
   addNewRule: method(function(node, pseudoClasses) {
     let style = this.styleElement;
     let sheet = style.sheet;
-    let rawNode = node.rawNode;
     let cssRules = sheet.cssRules;
+    let rawNode = node.rawNode;
     let classes = [...rawNode.classList];
 
     let selector;
@@ -1160,7 +1160,7 @@ var StyleRuleActor = protocol.ActorClass({
       document = this.getDocument(parentStyleSheet);
     }
 
-    let tempElement = document.createElement("div");
+    let tempElement = document.createElementNS(XHTML_NS, "div");
 
     for (let mod of modifications) {
       if (mod.type === "set") {
