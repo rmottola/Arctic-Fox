@@ -1026,6 +1026,17 @@ var StyleRuleActor = protocol.ActorClass({
     return this.pageStyle.conn;
   },
 
+  destroy: function () {
+    if (!this.rawStyle) {
+      return;
+    }
+    protocol.Actor.prototype.destroy.call(this);
+    this.rawStyle = null;
+    this.pageStyle = null;
+    this.rawNode = null;
+    this.rawRule = null;
+  },
+
   // Objects returned by this actor are owned by the PageStyleActor
   // to which this rule belongs.
   get marshallPool() {
