@@ -655,6 +655,9 @@ InspectorPanel.prototype = {
                              !this.selection.isPseudoElementNode();
     let isEditableElement = isSelectionElement &&
                             !this.selection.isAnonymousNode();
+    let isScreenshotable = isSelectionElement &&
+                           this.canGetUniqueSelector &&
+                           this.selection.nodeFront.isTreeDisplayed;
 
     // Set the pseudo classes
     for (let name of ["hover", "active", "focus"]) {
@@ -678,8 +681,9 @@ InspectorPanel.prototype = {
     }
 
     // Disable / enable "Copy Unique Selector", "Copy inner HTML",
-    // "Copy outer HTML" & "Scroll Into View" as appropriate
+    // "Copy outer HTML", "Scroll Into View" & "Screenshot Node" as appropriate
     let unique = this.panelDoc.getElementById("node-menu-copyuniqueselector");
+    let screenshot = this.panelDoc.getElementById("node-menu-screenshotnode");
     let copyInnerHTML = this.panelDoc.getElementById("node-menu-copyinner");
     let copyOuterHTML = this.panelDoc.getElementById("node-menu-copyouter");
     let scrollIntoView = this.panelDoc.getElementById("node-menu-scrollnodeintoview");
@@ -701,6 +705,12 @@ InspectorPanel.prototype = {
     }
     if (!this.canGetUniqueSelector) {
       unique.hidden = true;
+    }
+
+    if (isScreenshotable) {
+      screenshot.removeAttribute("disabled");
+    } else {
+      screenshot.setAttribute("disabled", "true");
     }
 
     // Enable/Disable the link open/copy items.
@@ -1090,6 +1100,20 @@ InspectorPanel.prototype = {
     this.selection.nodeFront.getUniqueSelector().then((selector) => {
       clipboardHelper.copyString(selector);
     }).then(null, console.error);
+  },
+
+  /**
+   * Initiate gcli screenshot command on selected node
+   */
+  screenshotNode: function() {
+    CommandUtils.createRequisition(this._target, {
+      environment: CommandUtils.createEnvironment(this, '_target')
+    }).then(requisition => {
+      // Bug 1180314 -  CssSelector might contain white space so need to make sure it is
+      // passed to screenshot as a single parameter.  More work *might* be needed if
+      // CssSelector could contain escaped single- or double-quotes, backslashes, etc.
+      requisition.updateExec("screenshot --selector '" + this.selectionCssSelector + "'");
+    });
   },
 
   /**
