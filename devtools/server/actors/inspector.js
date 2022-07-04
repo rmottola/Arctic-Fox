@@ -351,24 +351,20 @@ var NodeActor = exports.NodeActor = protocol.ActorClass({
       return 0;
     }
 
-    let numChildren = this.rawNode.childNodes.length;
+    let rawNode = this.rawNode;
+    let numChildren = rawNode.childNodes.length;
+    let hasAnonChildren = rawNode.nodeType === Ci.nsIDOMNode.ELEMENT_NODE &&
+                          rawNode.ownerDocument.getAnonymousNodes(rawNode);
+
     if (numChildren === 0 &&
-        (this.rawNode.contentDocument || this.rawNode.getSVGDocument)) {
+        (rawNode.contentDocument || rawNode.getSVGDocument)) {
       // This might be an iframe with virtual children.
       numChildren = 1;
     }
 
-    // Count any anonymous children
-    if (this.rawNode.nodeType === Ci.nsIDOMNode.ELEMENT_NODE) {
-      let anonChildren = this.rawNode.ownerDocument.getAnonymousNodes(this.rawNode);
-      if (anonChildren) {
-        numChildren += anonChildren.length;
-      }
-    }
-
-    // Normal counting misses ::before/::after, so we have to check to make sure
-    // we aren't missing anything
-    if (numChildren === 0) {
+    // Normal counting misses ::before/::after.  Also, some anonymous children
+    // may ultimately be skipped, so we have to consult with the walker.
+    if (numChildren === 0 || hasAnonChildren) {
       numChildren = this.walker.children(this).nodes.length;
     }
 
@@ -3789,9 +3785,11 @@ DocumentWalker.prototype = {
   }
 };
 
-function isXULElement(el) {
-  return el &&
-         el.namespaceURI === XUL_NS;
+function isInXULDocument(el) {
+  let doc = nodeDocument(el);
+  return doc &&
+         doc.documentElement &&
+         doc.documentElement.namespaceURI === XUL_NS;
 }
 
 /**
