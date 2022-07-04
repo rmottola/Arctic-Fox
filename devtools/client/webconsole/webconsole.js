@@ -3888,6 +3888,8 @@ JSTerm.prototype = {
       this.webConsoleClient.clearMessagesCache();
     }
 
+    this._sidebarDestroy();
+
     this.emit("messages-cleared");
   },
 
