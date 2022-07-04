@@ -652,6 +652,7 @@ WebConsole.prototype = {
 function BrowserConsole()
 {
   WebConsole.apply(this, arguments);
+  this._telemetry = new Telemetry();
 }
 
 BrowserConsole.prototype = Heritage.extend(WebConsole.prototype,
@@ -693,6 +694,8 @@ BrowserConsole.prototype = Heritage.extend(WebConsole.prototype,
     // Make sure Ctrl-W closes the Browser Console window.
     window.document.getElementById("cmd_close").removeAttribute("disabled");
 
+    this._telemetry.toolOpened("browserconsole");
+
     // Create an onFocus handler just to display the dev edition promo.
     // This is to prevent race conditions in some environments.
     // Hook to display promotional Developer Edition doorhanger. Only displayed once.
@@ -716,6 +719,8 @@ BrowserConsole.prototype = Heritage.extend(WebConsole.prototype,
     if (this._bc_destroyer) {
       return this._bc_destroyer.promise;
     }
+
+    this._telemetry.toolClosed("browserconsole");
 
     this._bc_destroyer = promise.defer();
 
