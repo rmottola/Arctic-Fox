@@ -3205,8 +3205,8 @@ Widgets.ObjectRenderers.add({
     let target = this.message.output.toolboxTarget;
     this.toolbox = gDevTools.getToolbox(target);
     if (!this.toolbox) {
-      // In cases like the browser console, there is no toolbox.
-      return;
+      throw new Error("The object cannot be linked to the inspector without a " +
+        "toolbox");
     }
 
     // Checking that the inspector supports the node
