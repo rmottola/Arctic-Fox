@@ -13,16 +13,6 @@ const {Services} = Cu.import("resource://gre/modules/Services.jsm", {});
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 
 const MAX_ITERATIONS = 100;
-const REGEX_QUOTES = /^".*?"|^".*|^'.*?'|^'.*/;
-const REGEX_WHITESPACE = /^\s+/;
-const REGEX_FIRST_WORD_OR_CHAR = /^\w+|^./;
-const REGEX_CUBIC_BEZIER = /^linear|^ease-in-out|^ease-in|^ease-out|^ease|^cubic-bezier\(([0-9.\- ]+,){3}[0-9.\- ]+\)/;
-
-// CSS variable names are identifiers which the spec defines as follows:
-//   In CSS, identifiers (including element names, classes, and IDs in
-//   selectors) can contain only the characters [a-zA-Z0-9] and ISO 10646
-//   characters U+00A0 and higher, plus the hyphen (-) and the underscore (_).
-const REGEX_CSS_VAR = /\bvar\(\s*--[-_a-zA-Z0-9\u00A0-\u10FFFF]+\s*\)/;
 
 const BEZIER_KEYWORDS = ["linear", "ease-in-out", "ease-in", "ease-out",
                          "ease"];
@@ -100,29 +90,44 @@ OutputParser.prototype = {
   },
 
   /**
-   * Matches the beginning of the provided string to a css background-image url
-   * and return both the whole url(...) match and the url itself.
-   * This isn't handled via a regular expression to make sure we can match urls
-   * that contain parenthesis easily
+   * Given an initial FUNCTION token, read tokens from |tokenStream|
+   * and collect all the (non-comment) text.  Return the collected
+   * text.  The function token and the close paren are included in the
+   * result.
+   *
+   * @param  {CSSToken} initialToken
+   *         The FUNCTION token.
+   * @param  {String} text
+   *         The original CSS text.
+   * @param  {CSSLexer} tokenStream
+   *         The token stream from which to read.
+   * @return {String}
+   *         The text of body of the function call.
    */
-  _matchBackgroundUrl: function(text) {
-    let startToken = "url(";
-    if (text.indexOf(startToken) !== 0) {
-      return null;
+  _collectFunctionText: function(initialToken, text, tokenStream) {
+    let result = text.substring(initialToken.startOffset,
+                                initialToken.endOffset);
+    let depth = 1;
+    while (depth > 0) {
+      let token = tokenStream.nextToken();
+      if (!token) {
+        break;
+      }
+      if (token.tokenType === "comment") {
+        continue;
+      }
+      result += text.substring(token.startOffset, token.endOffset);
+      if (token.tokenType === "symbol") {
+        if (token.text === "(") {
+          ++depth;
+        } else if (token.text === ")") {
+          --depth;
+        }
+      } else if (token.tokenType === "function") {
+        ++depth;
+      }
     }
-
-    let uri = text.substring(startToken.length).trim();
-    let quote = uri.substring(0, 1);
-    if (quote === "'" || quote === '"') {
-      uri = uri.substring(1, uri.search(new RegExp(quote + "\\s*\\)")));
-    } else {
-      uri = uri.substring(0, uri.indexOf(")"));
-      quote = "";
-    }
-    let end = startToken + quote + uri;
-    text = text.substring(0, text.indexOf(")", end.length) + 1);
-
-    return [text, uri.trim()];
+    return result;
   },
 
   /**
@@ -248,51 +253,6 @@ OutputParser.prototype = {
     }
 
     return result;
-  },
-
-  /**
-   * Convenience function to make the parser a little more readable.
-   *
-   * @param  {String} text
-   *         Main text
-   * @param  {String} match
-   *         Text to remove from the beginning
-   *
-   * @return {String}
-   *         The string passed as 'text' with 'match' stripped from the start.
-   */
-  _trimMatchFromStart: function(text, match) {
-    return text.substr(match.length);
-  },
-
-  /**
-   * Check if there is a color match and append it if it is valid.
-   *
-   * @param  {String} text
-   *         Main text
-   * @param  {Object} options
-   *         Options object. For valid options and default values see
-   *         _mergeOptions().
-   *
-   * @return {Array}
-   *         An array containing the remaining text and a dirty flag. This array
-   *         is designed for deconstruction using [text, dirty].
-   */
-  _appendColorOnMatch: function(text, options) {
-    let dirty;
-    let matched = text.match(REGEX_ALL_COLORS);
-
-    if (matched) {
-      let match = matched[0];
-      if (this._appendColor(match, options)) {
-        text = this._trimMatchFromStart(text, match);
-        dirty = true;
-      }
-    } else {
-      dirty = false;
-    }
-
-    return [text, dirty];
   },
 
   /**
