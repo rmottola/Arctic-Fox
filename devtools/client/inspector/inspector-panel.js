@@ -807,9 +807,7 @@ InspectorPanel.prototype = {
     }
 
     let type = popupNode.dataset.type;
-    // Bug 1158822 will make "resource" type URLs open in devtools, but for now
-    // they're considered like "uri".
-    if (type === "uri" || type === "resource") {
+    if (type === "uri" || type === "cssresource" || type === "jsresource") {
       // First make sure the target can resolve relative URLs.
       this.target.actorHasMethod("inspector", "resolveRelativeURL").then(canResolve => {
         if (!canResolve) {
@@ -819,7 +817,7 @@ InspectorPanel.prototype = {
         linkSeparator.removeAttribute("hidden");
 
         // Links can't be opened in new tabs in the browser toolbox.
-        if (!this.target.chrome) {
+        if (type === "uri" && !this.target.chrome) {
           linkFollow.removeAttribute("hidden");
           linkFollow.setAttribute("label", strings.GetStringFromName(
             "inspector.menu.openUrlInNewTab.label"));
@@ -1196,20 +1194,26 @@ InspectorPanel.prototype = {
       // When the inspector menu was setup on click (see _setupNodeLinkMenu), we
       // already checked that resolveRelativeURL existed.
       this.inspector.resolveRelativeURL(link, this.selection.nodeFront).then(url => {
-        let browserWin = this.target.tab.ownerDocument.defaultView;
-        browserWin.openUILinkIn(url, "tab");
-      }, console.error);
+        if (type === "uri") {
+          let browserWin = this.target.tab.ownerDocument.defaultView;
+          browserWin.openUILinkIn(url, "tab");
+        } else if (type === "cssresource") {
+          return this.toolbox.viewSourceInStyleEditor(url);
+        } else if (type === "jsresource") {
+          return this.toolbox.viewSourceInDebugger(url);
+        }
+      }).catch(e => console.error(e));
     } else if (type == "idref") {
       // Select the node in the same document.
       this.walker.document(this.selection.nodeFront).then(doc => {
-        this.walker.querySelector(doc, "#" + CSS.escape(link)).then(node => {
+        return this.walker.querySelector(doc, "#" + CSS.escape(link)).then(node => {
           if (!node) {
             this.emit("idref-attribute-link-failed");
             return;
           }
           this.selection.setNodeFront(node);
-        }, console.error);
-      }, console.error);
+        });
+      }).catch(e => console.error(e));
     }
   },
 
