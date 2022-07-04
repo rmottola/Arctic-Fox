@@ -309,8 +309,13 @@ exports.getProperty = function getProperty(aObj, aKey) {
  *         Whether a safe getter was found.
  */
 exports.hasSafeGetter = function hasSafeGetter(aDesc) {
-  let fn = aDesc.get;
-  return fn && fn.callable && fn.class == "Function" && fn.script === undefined;
+  try {
+    let fn = aDesc.get.unwrap();
+    return fn && fn.callable && fn.class == "Function" && fn.script === undefined;
+  } catch(e) {
+    // Avoid exception 'Object in compartment marked as invisible to Debugger'
+    return false;
+  }
 };
 
 /**
