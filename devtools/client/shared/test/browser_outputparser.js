@@ -18,11 +18,9 @@ function* performTest() {
   let [host, , doc] = yield createHost("bottom", "data:text/html," +
     "<h1>browser_outputParser.js</h1><div></div>");
 
-  let parser = new OutputParser();
+  let parser = new OutputParser(doc);
   testParseCssProperty(doc, parser);
   testParseCssVar(doc, parser);
-  testParseHTMLAttribute(doc, parser);
-  testParseNonCssHTMLAttribute(doc, parser);
 
   host.destroy();
 }
@@ -107,27 +105,34 @@ function testParseCssProperty(doc, parser) {
 
   let target = doc.querySelector("div");
   ok(target, "captain, we have the div");
-  target.appendChild(frag);
 
-  let expected = 'color:<span data-color="#F00"><span class="theme-color">#F00</span></span>; font-size: 12px; ' +
-                 'background-image: url("<a href="chrome://branding/content/about-logo.png" ' +
-                 'class="theme-link" ' +
-                 'target="_blank">chrome://branding/content/about-logo.png</a>")';
+  for (let test of tests) {
+    info(test.desc);
 
-  is(target.innerHTML, expected, "HTML Attribute correctly parsed");
-  target.innerHTML = "";
+    let frag = parser.parseCssProperty(test.name, test.value, {
+      colorSwatchClass: COLOR_TEST_CLASS
+    });
+
+    target.appendChild(frag);
+
+    is(target.innerHTML, test.expected,
+       "CSS property correctly parsed for " + test.name + ": " + test.value);
+
+    target.innerHTML = "";
+  }
 }
 
-function testParseNonCssHTMLAttribute(doc, parser) {
-  let attrib = "someclass background someotherclass red";
-  let frag = parser.parseHTMLAttribute(attrib);
+function testParseCssVar(doc, parser) {
+  let frag = parser.parseCssProperty("color", "var(--some-kind-of-green)", {
+    colorSwatchClass: "test-colorswatch"
+  });
 
   let target = doc.querySelector("div");
   ok(target, "captain, we have the div");
   target.appendChild(frag);
 
-  let expected = 'someclass background someotherclass red';
+  is(target.innerHTML, "var(--some-kind-of-green)",
+     "CSS property correctly parsed");
 
-  is(target.innerHTML, expected, "Non-CSS HTML Attribute correctly parsed");
   target.innerHTML = "";
 }
