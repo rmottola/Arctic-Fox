@@ -315,6 +315,25 @@ var NodeActor = exports.NodeActor = protocol.ActorClass({
     return form;
   },
 
+  /**
+   * Watch the given document node for mutations using the DOM observer
+   * API.
+   */
+  watchDocument: function(callback) {
+    let node = this.rawNode;
+    // Create the observer on the node's actor.  The node will make sure
+    // the observer is cleaned up when the actor is released.
+    let observer = new node.defaultView.MutationObserver(callback);
+    observer.mergeAttributeRecords = true;
+    observer.observe(node, {
+      attributes: true,
+      characterData: true,
+      childList: true,
+      subtree: true
+    });
+    this.mutationObserver = observer;
+  },
+
   get isBeforePseudoElement() {
     return this.rawNode.nodeName === "_moz_generated_content_before"
   },
@@ -764,12 +783,6 @@ var NodeFront = protocol.FrontClass(NodeActor, {
    * is being destroyed.
    */
   destroy: function() {
-    // If an observer was added on this node, shut it down.
-    if (this.observer) {
-      this.observer.disconnect();
-      this.observer = null;
-    }
-
     protocol.Front.prototype.destroy.call(this);
   },
 
@@ -1380,7 +1393,7 @@ var WalkerActor = protocol.ActorClass({
     this._refMap.set(node, actor);
 
     if (node.nodeType === Ci.nsIDOMNode.DOCUMENT_NODE) {
-      this._watchDocument(actor);
+      actor.watchDocument(this.onMutations);
     }
     return actor;
   },
@@ -1467,24 +1480,6 @@ var WalkerActor = protocol.ActorClass({
       nodes: nodeActors,
       newParents: [...newParents]
     };
-  },
-
-  /**
-   * Watch the given document node for mutations using the DOM observer
-   * API.
-   */
-  _watchDocument: function(actor) {
-    let node = actor.rawNode;
-    // Create the observer on the node's actor.  The node will make sure
-    // the observer is cleaned up when the actor is released.
-    actor.observer = new actor.rawNode.defaultView.MutationObserver(this.onMutations);
-    actor.observer.mergeAttributeRecords = true;
-    actor.observer.observe(node, {
-      attributes: true,
-      characterData: true,
-      childList: true,
-      subtree: true
-    });
   },
 
   /**
