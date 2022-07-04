@@ -41,6 +41,8 @@ const XHTML_NS = "http://www.w3.org/1999/xhtml";
 
 const MIXED_CONTENT_LEARN_MORE = "https://developer.mozilla.org/docs/Security/MixedContent";
 
+const TRACKING_PROTECTION_LEARN_MORE = "https://developer.mozilla.org/Firefox/Privacy/Tracking_Protection";
+
 const INSECURE_PASSWORDS_LEARN_MORE = "https://developer.mozilla.org/docs/Security/InsecurePasswords";
 
 const STRICT_TRANSPORT_SECURITY_LEARN_MORE = "https://developer.mozilla.org/docs/Security/HTTP_Strict_Transport_Security";
@@ -1733,9 +1735,12 @@ WebConsoleFrame.prototype = {
      case "SHA-1 Signature":
       url = WEAK_SIGNATURE_ALGORITHM_LEARN_MORE;
      break;
-     default:
-      // Unknown category. Return without adding more info node.
-      return;
+      case "Tracking Protection":
+        url = TRACKING_PROTECTION_LEARN_MORE;
+        break;
+      default:
+        // Unknown category. Return without adding more info node.
+        return;
     }
 
     this.addLearnMoreWarningNode(aNode, url);
