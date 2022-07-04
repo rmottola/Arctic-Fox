@@ -114,6 +114,9 @@ function MarkupView(aInspector, aFrame, aControllerWindow) {
   this._boundKeyDown = this._onKeyDown.bind(this);
   this._frame.contentWindow.addEventListener("keydown", this._boundKeyDown, false);
 
+  this._onCopy = this._onCopy.bind(this);
+  this._frame.contentWindow.addEventListener("copy", this._onCopy);
+
   this._boundFocus = this._onFocus.bind(this);
   this._frame.addEventListener("focus", this._boundFocus, false);
 
@@ -508,6 +511,20 @@ MarkupView.prototype = {
     return walker;
   },
 
+  _onCopy: function (evt) {
+    // Ignore copy events from editors
+    if (this._isInputOrTextarea(evt.target)) {
+      return;
+    }
+
+    let selection = this._inspector.selection;
+    if (selection.isNode()) {
+      this._inspector.copyOuterHTML();
+    }
+    evt.stopPropagation();
+    evt.preventDefault();
+  },
+
   /**
    * Key handling.
    */
@@ -515,8 +532,7 @@ MarkupView.prototype = {
     let handled = true;
 
     // Ignore keystrokes that originated in editors.
-    if (aEvent.target.tagName.toLowerCase() === "input" ||
-        aEvent.target.tagName.toLowerCase() === "textarea") {
+    if (this._isInputOrTextarea(aEvent.target)) {
       return;
     }
 
@@ -613,6 +629,14 @@ MarkupView.prototype = {
       aEvent.stopPropagation();
       aEvent.preventDefault();
     }
+  },
+
+  /**
+   * Check if a node is an input or textarea
+   */
+  _isInputOrTextarea : function (element) {
+    let name = element.tagName.toLowerCase();
+    return name === "input" || name === "textarea";
   },
 
   /**
@@ -1486,6 +1510,9 @@ MarkupView.prototype = {
       this._boundKeyDown, false);
     this._boundKeyDown = null;
 
+    this._frame.contentWindow.removeEventListener("copy", this._onCopy);
+    this._onCopy = null;
+
     this._inspector.selection.off("new-node-front", this._boundOnNewSelection);
     this._boundOnNewSelection = null;
 
@@ -2315,10 +2342,7 @@ function GenericEditor(aContainer, aNode) {
     this.tag.textContent = aNode.isBeforePseudoElement ? "::before" : "::after";
   } else if (aNode.nodeType == Ci.nsIDOMNode.DOCUMENT_TYPE_NODE) {
     this.elt.classList.add("comment");
-    this.tag.textContent = '<!DOCTYPE ' + aNode.name +
-       (aNode.publicId ? ' PUBLIC "' +  aNode.publicId + '"': '') +
-       (aNode.systemId ? ' "' + aNode.systemId + '"' : '') +
-       '>';
+    this.tag.textContent = aNode.doctypeString;
   } else {
     this.tag.textContent = aNode.nodeName;
   }

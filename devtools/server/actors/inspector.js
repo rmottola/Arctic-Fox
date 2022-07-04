@@ -869,6 +869,12 @@ var NodeFront = protocol.FrontClass(NodeActor, {
   get nodeName() {
     return this._form.nodeName;
   },
+  get doctypeString() {
+    return '<!DOCTYPE ' + this._form.name +
+     (this._form.publicId ? ' PUBLIC "' +  this._form.publicId + '"': '') +
+     (this._form.systemId ? ' "' + this._form.systemId + '"' : '') +
+     '>';
+  },
 
   get baseURI() {
     return this._form.baseURI;
@@ -2345,11 +2351,11 @@ var WalkerActor = protocol.ActorClass({
    * @param {NodeActor} node The node.
    */
   outerHTML: method(function(node) {
-    let html = "";
+    let outerHTML = "";
     if (!isNodeDead(node)) {
-      html = node.rawNode.outerHTML;
+      outerHTML = node.rawNode.outerHTML;
     }
-    return LongStringActor(this.conn, html);
+    return LongStringActor(this.conn, outerHTML);
   }, {
     request: {
       node: Arg(0, "domnode")
@@ -2724,7 +2730,9 @@ var WalkerActor = protocol.ActorClass({
       if (mutation.type === "attributes") {
         mutation.attributeName = change.attributeName;
         mutation.attributeNamespace = change.attributeNamespace || undefined;
-        mutation.newValue = targetNode.getAttribute(mutation.attributeName);
+        mutation.newValue = targetNode.hasAttribute(mutation.attributeName) ?
+                            targetNode.getAttribute(mutation.attributeName)
+                            : null;
       } else if (mutation.type === "characterData") {
         if (targetNode.nodeValue.length > gValueSummaryLength) {
           mutation.newValue = targetNode.nodeValue.substring(0, gValueSummaryLength);
