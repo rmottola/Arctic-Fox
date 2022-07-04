@@ -230,6 +230,19 @@ var NodeActor = exports.NodeActor = protocol.ActorClass({
            this.rawNode.ownerDocument.documentElement === this.rawNode;
   },
 
+  destroy: function () {
+    protocol.Actor.prototype.destroy.call(this);
+
+    if (this.mutationObserver) {
+      if (!Cu.isDeadWrapper(this.mutationObserver)) {
+        this.mutationObserver.disconnect();
+      }
+      this.mutationObserver = null;
+    }
+    this.rawNode = null;
+    this.walker = null;
+  },
+
   // Returns the JSON representation of this object over the wire.
   form: function(detail) {
     if (detail === "actorid") {
@@ -3431,7 +3444,9 @@ var InspectorActor = exports.InspectorActor = protocol.ActorClass({
     }
 
     this._pageStylePromise = this.getWalker().then(walker => {
-      return PageStyleActor(this);
+      let pageStyle = PageStyleActor(this);
+      this.manage(pageStyle);
+      return pageStyle;
     });
     return this._pageStylePromise;
   }, {
