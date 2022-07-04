@@ -1999,6 +1999,42 @@ var WalkerActor = protocol.ActorClass({
   }),
 
   /**
+   * Get a list of nodes that match the given selector in all known frames of
+   * the current content page.
+   * @param {String} selector.
+   * @return {Array}
+   */
+  _multiFrameQuerySelectorAll: function(selector) {
+    let nodes = [];
+
+    for (let {document} of this.tabActor.windows) {
+      try {
+        nodes = [...nodes, ...document.querySelectorAll(selector)];
+      } catch(e) {
+        // Bad selector. Do nothing as the selector can come from a searchbox.
+      }
+    }
+
+    return nodes;
+  },
+
+  /**
+   * Return a NodeListActor with all nodes that match the given selector in all
+   * frames of the current content page.
+   * @param {String} selector
+   */
+  multiFrameQuerySelectorAll: method(function(selector) {
+    return new NodeListActor(this, this._multiFrameQuerySelectorAll(selector));
+  }, {
+    request: {
+      selector: Arg(0)
+    },
+    response: {
+      list: RetVal("domnodelist")
+    }
+  }),
+
+  /**
    * Returns a list of matching results for CSS selector autocompletion.
    *
    * @param string query
@@ -2011,7 +2047,8 @@ var WalkerActor = protocol.ActorClass({
   getSuggestionsForQuery: method(function(query, completing, selectorState) {
     let sugs = {
       classes: new Map,
-      tags: new Map
+      tags: new Map,
+      ids: new Map
     };
     let result = [];
     let nodes = null;
@@ -2025,10 +2062,10 @@ var WalkerActor = protocol.ActorClass({
 
       case "class":
         if (!query) {
-          nodes = this.rootDoc.querySelectorAll("[class]");
+          nodes = this._multiFrameQuerySelectorAll("[class]");
         }
         else {
-          nodes = this.rootDoc.querySelectorAll(query);
+          nodes = this._multiFrameQuerySelectorAll(query);
         }
         for (let node of nodes) {
           for (let className of node.classList) {
@@ -2050,24 +2087,27 @@ var WalkerActor = protocol.ActorClass({
 
       case "id":
         if (!query) {
-          nodes = this.rootDoc.querySelectorAll("[id]");
+          nodes = this._multiFrameQuerySelectorAll("[id]");
         }
         else {
-          nodes = this.rootDoc.querySelectorAll(query);
+          nodes = this._multiFrameQuerySelectorAll(query);
         }
         for (let node of nodes) {
-          if (node.id.startsWith(completing)) {
-            result.push(["#" + node.id, 1]);
+          sugs.ids.set(node.id, (sugs.ids.get(node.id)|0) + 1);
+        }
+        for (let [id, count] of sugs.ids) {
+          if (id.startsWith(completing)) {
+            result.push(["#" + CSS.escape(id), count, selectorState]);
           }
         }
         break;
 
       case "tag":
         if (!query) {
-          nodes = this.rootDoc.getElementsByTagName("*");
+          nodes = this._multiFrameQuerySelectorAll("*");
         }
         else {
-          nodes = this.rootDoc.querySelectorAll(query);
+          nodes = this._multiFrameQuerySelectorAll(query);
         }
         for (let node of nodes) {
           let tag = node.tagName.toLowerCase();
@@ -2092,17 +2132,20 @@ var WalkerActor = protocol.ActorClass({
         break;
 
       case "null":
-        nodes = this.rootDoc.querySelectorAll(query);
+        nodes = this._multiFrameQuerySelectorAll(query);
         for (let node of nodes) {
-          node.id && result.push(["#" + node.id, 1]);
+          sugs.ids.set(node.id, (sugs.ids.get(node.id)|0) + 1);
           let tag = node.tagName.toLowerCase();
           sugs.tags.set(tag, (sugs.tags.get(tag)|0) + 1);
-          for (let className of node.classList) {
+          for (let className of node.className.split(" ")) {
             sugs.classes.set(className, (sugs.classes.get(className)|0) + 1);
           }
         }
         for (let [tag, count] of sugs.tags) {
           tag && result.push([tag, count]);
+        }
+        for (let [id, count] of sugs.ids) {
+          id && result.push(["#" + id, count]);
         }
         sugs.classes.delete("");
         // Editing the style editor may make the stylesheet have errors and
