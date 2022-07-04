@@ -691,6 +691,7 @@ Messages.Simple = function(message, options = {})
   this.location = options.location;
   this.stack    = options.stack;
   this.timestamp = options.timestamp || Date.now();
+  this.prefix = options.prefix;
   this.private = !!options.private;
 
   this._message = message;
@@ -729,6 +730,12 @@ Messages.Simple.prototype = Heritage.extend(Messages.BaseMessage.prototype,
    * @type array
    */
   stack: null,
+
+  /**
+   * Message prefix
+   * @type string|null
+   */
+  prefix: null,
 
   /**
    * Tells if this message comes from a private browsing context.
@@ -841,6 +848,7 @@ Messages.Simple.prototype = Heritage.extend(Messages.BaseMessage.prototype,
 
     rid.category = this.category;
     rid.severity = this.severity;
+    rid.prefix = this.prefix;
     rid.private = this.private;
     rid.location = this.location;
     rid.link = this._link;
@@ -876,6 +884,13 @@ Messages.Simple.prototype = Heritage.extend(Messages.BaseMessage.prototype,
       icon.addEventListener("click", this._onClickCollapsible);
     }
 
+    let prefixNode;
+    if (this.prefix) {
+      prefixNode = this.document.createElementNS(XHTML_NS, "span");
+      prefixNode.className = "prefix devtools-monospace";
+      prefixNode.textContent = this.prefix + ":";
+    }
+
     // Apply the current group by indenting appropriately.
     // TODO: remove this once bug 778766 is fixed.
     let indent = this._groupDepthCompat * COMPAT.GROUP_INDENT;
@@ -897,6 +912,9 @@ Messages.Simple.prototype = Heritage.extend(Messages.BaseMessage.prototype,
     this.element.appendChild(timestamp.element);
     this.element.appendChild(indentNode);
     this.element.appendChild(icon);
+    if (prefixNode) {
+      this.element.appendChild(prefixNode);
+    }
 
     if (this.stack) {
       let twisty = this.document.createElementNS(XHTML_NS, "a");
@@ -1364,6 +1382,7 @@ Messages.ConsoleGeneric = function(packet)
     timestamp: packet.timeStamp,
     category: packet.category || "webdev",
     severity: CONSOLE_API_LEVELS_TO_SEVERITIES[packet.level],
+    prefix: packet.prefix,
     private: packet.private,
     filterDuplicates: true,
     location: {
