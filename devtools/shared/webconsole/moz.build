@@ -12,6 +12,7 @@ DevToolsModules(
     'client.js',
     'network-helper.js',
     'network-monitor.js',
-    'network-panel.js',
+    'server-logger-monitor.js',
+    'server-logger.js',
     'utils.js',
 )

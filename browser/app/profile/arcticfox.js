@@ -1201,10 +1201,18 @@ pref("devtools.gcli.imgurUploadURL", "https://api.imgur.com/3/image");
 pref("devtools.webconsole.filter.serviceworkers", false);
 pref("devtools.webconsole.filter.sharedworkers", false);
 pref("devtools.webconsole.filter.windowlessworkers", false);
+pref("devtools.webconsole.filter.servererror", false);
+pref("devtools.webconsole.filter.serverwarn", false);
+pref("devtools.webconsole.filter.serverinfo", false);
+pref("devtools.webconsole.filter.serverlog", false);
 
 pref("devtools.browserconsole.filter.serviceworkers", true);
 pref("devtools.browserconsole.filter.sharedworkers", true);
 pref("devtools.browserconsole.filter.windowlessworkers", true);
+pref("devtools.browserconsole.filter.servererror", false);
+pref("devtools.browserconsole.filter.serverwarn", false);
+pref("devtools.browserconsole.filter.serverinfo", false);
+pref("devtools.browserconsole.filter.serverlog", false);
 
 // Max number of inputs to store in web console history.
 pref("devtools.webconsole.inputHistoryCount", 50);

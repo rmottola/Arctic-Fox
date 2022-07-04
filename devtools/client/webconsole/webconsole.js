@@ -73,6 +73,7 @@ const CATEGORY_WEBDEV = 3;
 const CATEGORY_INPUT = 4;   // always on
 const CATEGORY_OUTPUT = 5;  // always on
 const CATEGORY_SECURITY = 6;
+const CATEGORY_SERVER = 7;
 
 // The possible message severities. As before, we start at zero so we can use
 // these as indexes into MESSAGE_PREFERENCE_KEYS.
@@ -90,6 +91,7 @@ const CATEGORY_CLASS_FRAGMENTS = [
   "input",
   "output",
   "security",
+  "server",
 ];
 
 // The fragment of a CSS class name that identifies each severity.
@@ -106,14 +108,15 @@ const SEVERITY_CLASS_FRAGMENTS = [
 // Most of these rather idiosyncratic names are historical and predate the
 // division of message type into "category" and "severity".
 const MESSAGE_PREFERENCE_KEYS = [
-//  Error         Warning       Info       Log
-  [ "network",    "netwarn",    "netxhr",  "networkinfo", ],  // Network
-  [ "csserror",   "cssparser",  null,      "csslog",      ],  // CSS
-  [ "exception",  "jswarn",     null,      "jslog",       ],  // JS
-  [ "error",      "warn",       "info",    "log",         ],  // Web Developer
-  [ null,         null,         null,      null,          ],  // Input
-  [ null,         null,         null,      null,          ],  // Output
-  [ "secerror",   "secwarn",    null,      null,          ],  // Security
+//  Error          Warning       Info          Log
+  [ "network",     "netwarn",    "netxhr",     "networkinfo", ],  // Network
+  [ "csserror",    "cssparser",  null,         "csslog",      ],  // CSS
+  [ "exception",   "jswarn",     null,         "jslog",       ],  // JS
+  [ "error",       "warn",       "info",       "log",         ],  // Web Developer
+  [ null,          null,         null,         null,          ],  // Input
+  [ null,          null,         null,         null,          ],  // Output
+  [ "secerror",    "secwarn",    null,         null,          ],  // Security
+  [ "servererror", "serverwarn", "serverinfo", "serverlog",   ],  // Server Logging
 ];
 
 // A mapping from the console API log event levels to the Web Console
@@ -214,6 +217,7 @@ function WebConsoleFrame(aWebConsoleOwner)
   this._onPanelSelected = this._onPanelSelected.bind(this);
   this._flushMessageQueue = this._flushMessageQueue.bind(this);
   this._onToolboxPrefChanged = this._onToolboxPrefChanged.bind(this);
+  this._onUpdateListeners = this._onUpdateListeners.bind(this);
 
   this._outputTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
   this._outputTimerInitialized = false;
@@ -649,10 +653,12 @@ WebConsoleFrame.prototype = {
     let prefs = ["network", "networkinfo", "csserror", "cssparser", "csslog",
                  "exception", "jswarn", "jslog", "error", "info", "warn", "log",
                  "secerror", "secwarn", "netwarn", "netxhr", "sharedworkers",
-                 "serviceworkers", "windowlessworkers"];
+                 "serviceworkers", "windowlessworkers", "servererror",
+                 "serverwarn", "serverinfo", "serverlog"];
+
     for (let pref of prefs) {
-      this.filterPrefs[pref] = Services.prefs
-                               .getBoolPref(this._filterPrefsPrefix + pref);
+      this.filterPrefs[pref] = Services.prefs.getBoolPref(
+        this._filterPrefsPrefix + pref);
     }
   },
 
@@ -663,7 +669,6 @@ WebConsoleFrame.prototype = {
    * @param function [aCallback=null]
    *        Optional function to invoke when the listener has been
    *        added/removed.
-   *
    */
   _updateReflowActivityListener:
     function WCF__updateReflowActivityListener(aCallback)
@@ -675,6 +680,38 @@ WebConsoleFrame.prototype = {
       } else {
         this.webConsoleClient.stopListeners(["ReflowActivity"], aCallback);
       }
+    }
+  },
+
+  /**
+   * Attach / detach server logging listener depending on the filter
+   * preferences. If the user isn't interested in the server logs at
+   * all the listener is not registered.
+   *
+   * @param function [aCallback=null]
+   *        Optional function to invoke when the listener has been
+   *        added/removed.
+   */
+  _updateServerLoggingListener:
+    function WCF__updateServerLoggingListener(aCallback)
+  {
+    if (!this.webConsoleClient) {
+      return;
+    }
+
+    let startListener = false;
+    let prefs = ["servererror", "serverwarn", "serverinfo", "serverlog"];
+    for (let i = 0; i < prefs.length; i++) {
+      if (this.filterPrefs[prefs[i]]) {
+        startListener = true;
+        break;
+      }
+    }
+
+    if (startListener) {
+      this.webConsoleClient.startListeners(["ServerLogging"], aCallback);
+    } else {
+      this.webConsoleClient.stopListeners(["ServerLogging"], aCallback);
     }
   },
 
@@ -750,6 +787,9 @@ WebConsoleFrame.prototype = {
 
       let logging = this.document.querySelector("toolbarbutton[category=logging]");
       logging.removeAttribute("accesskey");
+
+      let serverLogging = this.document.querySelector("toolbarbutton[category=server]");
+      serverLogging.removeAttribute("accesskey");
     }
   },
 
@@ -967,8 +1007,15 @@ WebConsoleFrame.prototype = {
   {
     this.filterPrefs[aToggleType] = aState;
     this.adjustVisibilityForMessageType(aToggleType, aState);
+
     Services.prefs.setBoolPref(this._filterPrefsPrefix + aToggleType, aState);
-    this._updateReflowActivityListener();
+
+    if (this._updateListenersTimeout) {
+      Timers.clearTimeout(this._updateListenersTimeout);
+    }
+
+    this._updateListenersTimeout = Timers.setTimeout(
+      this._onUpdateListeners, 200);
   },
 
   /**
@@ -980,6 +1027,15 @@ WebConsoleFrame.prototype = {
   getFilterState: function WCF_getFilterState(aToggleType)
   {
     return this.filterPrefs[aToggleType];
+  },
+
+  /**
+   * Called when a logging filter changes. Allows to stop/start
+   * listeners according to the current filter state.
+   */
+  _onUpdateListeners: function() {
+    this._updateReflowActivityListener();
+    this._updateServerLoggingListener();
   },
 
   /**
@@ -4959,6 +5015,7 @@ function WebConsoleConnectionProxy(aWebConsole, aTarget)
   this._onNetworkEventUpdate = this._onNetworkEventUpdate.bind(this);
   this._onFileActivity = this._onFileActivity.bind(this);
   this._onReflowActivity = this._onReflowActivity.bind(this);
+  this._onServerLogCall = this._onServerLogCall.bind(this);
   this._onTabNavigated = this._onTabNavigated.bind(this);
   this._onAttachConsole = this._onAttachConsole.bind(this);
   this._onCachedMessages = this._onCachedMessages.bind(this);
@@ -5064,6 +5121,7 @@ WebConsoleConnectionProxy.prototype = {
     client.addListener("consoleAPICall", this._onConsoleAPICall);
     client.addListener("fileActivity", this._onFileActivity);
     client.addListener("reflowActivity", this._onReflowActivity);
+    client.addListener("serverLogCall", this._onServerLogCall);
     client.addListener("lastPrivateContextExited", this._onLastPrivateContextExited);
     this.target.on("will-navigate", this._onTabNavigated);
     this.target.on("navigate", this._onTabNavigated);
@@ -5132,7 +5190,7 @@ WebConsoleConnectionProxy.prototype = {
     let msgs = ["PageError", "ConsoleAPI"];
     this.webConsoleClient.getCachedMessages(msgs, this._onCachedMessages);
 
-    this.owner._updateReflowActivityListener();
+    this.owner._onUpdateListeners();
   },
 
   /**
@@ -5282,6 +5340,23 @@ WebConsoleConnectionProxy.prototype = {
   },
 
   /**
+   * The "serverLogCall" message type handler. We redirect any message to
+   * the UI for displaying.
+   *
+   * @private
+   * @param string aType
+   *        Message type.
+   * @param object aPacket
+   *        The message received from the server.
+   */
+  _onServerLogCall: function WCCP__onServerLogCall(aType, aPacket)
+  {
+    if (this.owner && aPacket.from == this._consoleActor) {
+      this.owner.handleConsoleAPICall(aPacket.message);
+    }
+  },
+
+  /**
    * The "lastPrivateContextExited" message type handler. When this message is
    * received the Web Console UI is cleared.
    *
@@ -5355,6 +5430,7 @@ WebConsoleConnectionProxy.prototype = {
     this.client.removeListener("consoleAPICall", this._onConsoleAPICall);
     this.client.removeListener("fileActivity", this._onFileActivity);
     this.client.removeListener("reflowActivity", this._onReflowActivity);
+    this.client.removeListener("serverLogCall", this._onServerLogCall);
     this.client.removeListener("lastPrivateContextExited", this._onLastPrivateContextExited);
     this.webConsoleClient.off("networkEvent", this._onNetworkEvent);
     this.webConsoleClient.off("networkEventUpdate", this._onNetworkEventUpdate);
@@ -5450,6 +5526,9 @@ ConsoleContextMenu.prototype = {
           break;
         case CATEGORY_WEBDEV:
           selection.add("webdev");
+          break;
+        case CATEGORY_SERVER:
+          selection.add("server");
           break;
       }
     }
