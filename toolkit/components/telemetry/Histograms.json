@@ -6058,10 +6058,75 @@
     "kind": "boolean",
     "description": "How many times has the Storage Inspector been opened?"
   },
+  "DEVTOOLS_PAINTFLASHING_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Paint Flashing been opened via the toolbox button?"
+  },
+  "DEVTOOLS_TILT_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Tilt been opened via the toolbox button?"
+  },
+  "DEVTOOLS_SCRATCHPAD_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Scratchpad been opened via the toolbox button?"
+  },
+  "DEVTOOLS_RESPONSIVE_OPENED_BOOLEAN": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times has the devtool's Responsive View been opened via the toolbox button?"
+  },
+  "DEVTOOLS_WEBCONSOLE_OPENED_PER_USER_FLAG": {
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "How many users have opened the devtool's Web Console?"
+  },
+  "DEVTOOLS_BROWSERCONSOLE_OPENED_PER_USER_FLAG": {
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "How many users have opened the devtool's Browser Console?"
+  },
+  "DEVTOOLS_INSPECTOR_OPENED_PER_USER_FLAG": {
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "How many users have opened the devtool's Inspector?"
+  },
+  "DEVTOOLS_RULEVIEW_OPENED_PER_USER_FLAG": {
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "How many users have opened the devtool's Rule View?"
+  },
+  "DEVTOOLS_COMPUTEDVIEW_OPENED_PER_USER_FLAG": {
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "How many users have opened the devtool's Computed View?"
+  },
+  "DEVTOOLS_LAYOUTVIEW_OPENED_PER_USER_FLAG": {
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "How many users have opened the devtool's Layout View?"
+  },
+  "DEVTOOLS_FONTINSPECTOR_OPENED_PER_USER_FLAG": {
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "How many users have opened the devtool's Font Inspector?"
+  },
+  "DEVTOOLS_ANIMATIONINSPECTOR_OPENED_PER_USER_FLAG": {
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "How many users have opened the devtool's Animation Inspector?"
+  },
   "DEVTOOLS_JSDEBUGGER_OPENED_PER_USER_FLAG": {
     "expires_in_version": "never",
     "kind": "flag",
     "description": "How many users have opened the devtool's Debugger?"
+  },
+  "DEVTOOLS_JSBROWSERDEBUGGER_OPENED_PER_USER_FLAG": {
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "How many users have opened the devtool's Browser Debugger?"
   },
   "DEVTOOLS_STYLEEDITOR_OPENED_PER_USER_FLAG": {
     "expires_in_version": "never",
