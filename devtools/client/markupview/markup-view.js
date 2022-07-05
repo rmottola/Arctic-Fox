@@ -1945,11 +1945,9 @@ MarkupContainer.prototype = {
 
     // Start dragging the container after a delay.
     this.markup._dragStartEl = target;
-    win.setTimeout(() => {
+    setTimeout(() => {
       // Make sure the mouse is still down and on target.
-      if (!this._isMouseDown || this.markup._dragStartEl !== target ||
-          this.node.isPseudoElement || this.node.isAnonymous ||
-          !this.win.getSelection().isCollapsed) {
+      if (!this.isDraggable(target)) {
         return;
       }
       this.isDragging = true;
