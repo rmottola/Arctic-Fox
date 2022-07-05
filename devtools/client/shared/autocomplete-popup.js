@@ -110,6 +110,8 @@ function AutocompletePopup(aDocument, aOptions = {})
     this._list.addEventListener("keypress", this.onKeypress, false);
   }
   this._itemIdCounter = 0;
+
+  events.decorate(this);
 }
 exports.AutocompletePopup = AutocompletePopup;
 
@@ -145,6 +147,8 @@ AutocompletePopup.prototype = {
     if (this.autoSelect) {
       this.selectFirstItem();
     }
+
+    this.emit("popup-opened");
   },
 
   /**
