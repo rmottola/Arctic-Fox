@@ -158,6 +158,9 @@ addMessageListener("devtools:test:setStyle", function(msg) {
  * - {String} namespaceURI.
  * - {Number} numChildren The number of children in the element.
  * - {Array} attributes An array of {name, value, namespaceURI} objects.
+ * - {String} outerHTML.
+ * - {String} innerHTML.
+ * - {String} textContent.
  */
 addMessageListener("devtools:test:getDomElementInfo", function(msg) {
   let {selector} = msg.data;
@@ -171,7 +174,10 @@ addMessageListener("devtools:test:getDomElementInfo", function(msg) {
       numChildren: node.children.length,
       attributes: [...node.attributes].map(({name, value, namespaceURI}) => {
         return {name, value, namespaceURI};
-      })
+      }),
+      outerHTML: node.outerHTML,
+      innerHTML: node.innerHTML,
+      textContent: node.textContent
     };
   }
 
