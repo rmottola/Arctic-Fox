@@ -896,6 +896,14 @@ InplaceEditor.prototype = {
       increment *= smallIncrement;
     }
 
+    // Use default cursor movement rather than providing auto-suggestions.
+    if (event.keyCode === Ci.nsIDOMKeyEvent.DOM_VK_HOME ||
+        event.keyCode === Ci.nsIDOMKeyEvent.DOM_VK_END ||
+        event.keyCode === Ci.nsIDOMKeyEvent.DOM_VK_PAGE_UP ||
+        event.keyCode === Ci.nsIDOMKeyEvent.DOM_VK_PAGE_DOWN) {
+      this._preventSuggestions = true;
+    }
+
     let cycling = false;
     if (increment && this._incrementValue(increment) ) {
       this._updateSize();
