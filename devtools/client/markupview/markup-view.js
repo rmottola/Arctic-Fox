@@ -1999,7 +1999,7 @@ MarkupContainer.prototype = {
   /**
    * On mouse up, stop dragging.
    */
-  _onMouseUp: function(event) {
+  _onMouseUp: Task.async(function*() {
     this._isMouseDown = false;
 
     if (!this.isDragging) {
@@ -2010,13 +2010,14 @@ MarkupContainer.prototype = {
 
     let dropTargetNodes = this.markup.dropTargetNodes;
 
-    if(!dropTargetNodes) {
+    if (!dropTargetNodes) {
       return;
     }
 
-    this.markup.walker.insertBefore(this.node, dropTargetNodes.parent,
-                                    dropTargetNodes.nextSibling);
-  },
+    yield this.markup.walker.insertBefore(this.node, dropTargetNodes.parent,
+                                          dropTargetNodes.nextSibling);
+    this.markup.emit("drop-completed");
+  }),
 
   /**
    * On mouse move, move the dragged element if any and indicate the drop target.
