@@ -28,6 +28,7 @@ loader.lazyRequireGetter(this, "FrameUtils",
  */
 function ThreadNode(thread, options = {}) {
   this.samples = 0;
+  this.sampleTimes = [];
   this.duration = 0;
   this.calls = [];
   this.nodeType = "Thread";
@@ -132,11 +133,6 @@ ThreadNode.prototype = {
     let endTime = options.endTime || Infinity;
     let flattenRecursion = options.flattenRecursion;
 
-    // Take the timestamp of the first sample as prevSampleTime. 0 is
-    // incorrect due to circular buffer wraparound. If wraparound happens,
-    // then the first sample will have an incorrect, large duration.
-    let prevSampleTime = samplesData[0][SAMPLE_TIME_SLOT];
-
     // Reused options object passed to InflatedFrame.prototype.getFrameKey.
     let mutableFrameKeyOptions = {
       contentOnly: options.contentOnly,
@@ -145,9 +141,7 @@ ThreadNode.prototype = {
       isMetaCategoryOut: false
     };
 
-    // Start iteration at the second sample, as we use the first sample to
-    // compute prevSampleTime.
-    for (let i = 1; i < samplesData.length; i++) {
+    for (let i = 0; i < samplesData.length; i++) {
       let sample = samplesData[i];
       let sampleTime = sample[SAMPLE_TIME_SLOT];
 
@@ -157,7 +151,6 @@ ThreadNode.prototype = {
       // Thus, we compare sampleTime <= start instead of < to filter out
       // samples that end exactly at the start time.
       if (!sampleTime || sampleTime <= startTime || sampleTime > endTime) {
-        prevSampleTime = sampleTime;
         continue;
       }
 

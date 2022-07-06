@@ -291,6 +291,7 @@ function getOrAddInflatedFrame(cache, index, frameTable, stringTable) {
  */
 function InflatedFrame(index, frameTable, stringTable) {
   const LOCATION_SLOT = frameTable.schema.location;
+  const IMPLEMENTATION_SLOT = frameTable.schema.implementation;
   const OPTIMIZATIONS_SLOT = frameTable.schema.optimizations;
   const LINE_SLOT = frameTable.schema.line;
   const CATEGORY_SLOT = frameTable.schema.category;
@@ -298,6 +299,7 @@ function InflatedFrame(index, frameTable, stringTable) {
   let frame = frameTable.data[index];
   let category = frame[CATEGORY_SLOT];
   this.location = stringTable[frame[LOCATION_SLOT]];
+  this.implementation = frame[IMPLEMENTATION_SLOT];
   this.optimizations = frame[OPTIMIZATIONS_SLOT];
   this.line = frame[LINE_SLOT];
   this.column = undefined;
