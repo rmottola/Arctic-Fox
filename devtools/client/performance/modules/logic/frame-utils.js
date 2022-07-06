@@ -242,12 +242,11 @@ function getInflatedFrameCache(frameTable) {
  * @param number index
  * @param object frameTable
  * @param object stringTable
- * @param object allocationsTable
  */
-function getOrAddInflatedFrame(cache, index, frameTable, stringTable, allocationsTable) {
+function getOrAddInflatedFrame(cache, index, frameTable, stringTable) {
   let inflatedFrame = cache[index];
   if (inflatedFrame === null) {
-    inflatedFrame = cache[index] = new InflatedFrame(index, frameTable, stringTable, allocationsTable);
+    inflatedFrame = cache[index] = new InflatedFrame(index, frameTable, stringTable);
   }
   return inflatedFrame;
 };
@@ -258,9 +257,8 @@ function getOrAddInflatedFrame(cache, index, frameTable, stringTable, allocation
  * @param number index
  * @param object frameTable
  * @param object stringTable
- * @param object allocationsTable
  */
-function InflatedFrame(index, frameTable, stringTable, allocationsTable) {
+function InflatedFrame(index, frameTable, stringTable) {
   const LOCATION_SLOT = frameTable.schema.location;
   const OPTIMIZATIONS_SLOT = frameTable.schema.optimizations;
   const LINE_SLOT = frameTable.schema.line;

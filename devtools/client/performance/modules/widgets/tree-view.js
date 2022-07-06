@@ -66,10 +66,8 @@ const DEFAULT_AUTO_EXPAND_DEPTH = 3; // depth
 const DEFAULT_VISIBLE_CELLS = {
   duration: true,
   percentage: true,
-  allocations: false,
   selfDuration: true,
   selfPercentage: true,
-  selfAllocations: false,
   samples: true,
   function: true,
 
@@ -167,7 +165,8 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
    * @return nsIDOMNode
    */
   _displaySelf: function(document, arrowNode) {
-   let frameInfo = this.getDisplayedData();
+    let frameInfo = this.getDisplayedData();
+    let cells = [];
 
     for (let type of CELL_TYPES) {
       if (this.visibleCells[type]) {
@@ -178,7 +177,7 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
     }
 
     if (this.visibleCells.function) {
-      var functionCell = this._createFunctionCell(document, arrowNode, displayedData.name, frameInfo, this.level);
+      cells.push(this._createFunctionCell(document, arrowNode, frameInfo.name, frameInfo, this.level));
     }
 
     let targetNode = document.createElement("hbox");
@@ -190,29 +189,9 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
     if (this.hidden) {
       targetNode.style.display = "none";
     }
-    if (this.visibleCells.duration) {
-      targetNode.appendChild(durationCell);
-    }
-    if (this.visibleCells.percentage) {
-      targetNode.appendChild(percentageCell);
-    }
-    if (this.visibleCells.allocations) {
-      targetNode.appendChild(allocationsCell);
-    }
-    if (this.visibleCells.selfDuration) {
-      targetNode.appendChild(selfDurationCell);
-    }
-    if (this.visibleCells.selfPercentage) {
-      targetNode.appendChild(selfPercentageCell);
-    }
-    if (this.visibleCells.selfAllocations) {
-      targetNode.appendChild(selfAllocationsCell);
-    }
-    if (this.visibleCells.samples) {
-      targetNode.appendChild(samplesCell);
-    }
-    if (this.visibleCells.function) {
-      targetNode.appendChild(functionCell);
+
+    for (let i = 0; i < cells.length; i++) {
+      targetNode.appendChild(cells[i]);
     }
 
     return targetNode;
@@ -344,7 +323,7 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
 
     return this._cachedDisplayedData = this.frame.getInfo({
       root: this.root.frame,
-      allocations: (this.visibleCells.allocations || this.visibleCells.selfAllocations)
+      allocations: (this.visibleCells.count || this.visibleCells.selfCount)
     });
 
     /**
