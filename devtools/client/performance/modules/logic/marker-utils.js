@@ -27,6 +27,10 @@ const GECKO_SYMBOL = "(Gecko)";
  * determines if this marker should be filtered or not.
  */
 function isMarkerValid (marker, filter) {
+  if (!filter || filter.length === 0) {
+    return true;
+  }
+
   let isUnknown = !(marker.name in TIMELINE_BLUEPRINT);
   if (isUnknown) {
     return filter.indexOf("UNKNOWN") === -1;
@@ -323,66 +327,6 @@ const DOM = {
 };
 
 /**
- * A series of collapsers used by the blueprint. These functions are
- * invoked on a moving window of two markers.
- */
-
-const CollapseFunctions = {
-  identical: function (parent, curr, peek) {
-    // If there is a parent marker currently being filled and the current marker
-    // should go into the parent marker, make it so.
-    if (parent && parent.name == curr.name) {
-      return { toParent: parent.name };
-    }
-    // Otherwise if the current marker is the same type as the next marker type,
-    // create a new parent marker containing the current marker.
-    let next = peek(1);
-    if (next && curr.name == next.name) {
-      return { toParent: curr.name };
-    }
-  },
-
-  adjacent: function (parent, curr, peek) {
-    let next = peek(1);
-    if (next && (next.start < curr.end || next.start - curr.end <= 10 /* ms */)) {
-      return CollapseFunctions.identical(parent, curr, peek);
-    }
-  },
-
-  DOMtoDOMJS: function (parent, curr, peek) {
-    // If the next marker is a JavaScript marker, create a new meta parent marker
-    // containing the current marker.
-    let next = peek(1);
-    if (next && next.name == "Javascript") {
-      return {
-        forceNew: true,
-        toParent: "meta::DOMEvent+JS",
-        withData: {
-          type: curr.type,
-          eventPhase: curr.eventPhase
-        },
-      };
-    }
-  },
-
-  JStoDOMJS: function (parent, curr, peek) {
-    // If there is a parent marker currently being filled, and it's the one
-    // created from a `DOMEvent` via `collapseDOMIntoDOMJS`, then the current
-    // marker has to go into that one.
-    if (parent && parent.name == "meta::DOMEvent+JS") {
-      return {
-        forceEnd: true,
-        toParent: "meta::DOMEvent+JS",
-        withData: {
-          stack: curr.stack,
-          endStack: curr.endStack
-        },
-      };
-    }
-  },
-};
-
-/**
  * Mapping of JS marker causes to a friendlier form. Only
  * markers that are considered "from content" should be labeled here.
  */
@@ -508,6 +452,5 @@ exports.getMarkerLabel = getMarkerLabel;
 exports.getMarkerClassName = getMarkerClassName;
 exports.getMarkerFields = getMarkerFields;
 exports.DOM = DOM;
-exports.CollapseFunctions = CollapseFunctions;
 exports.Formatters = Formatters;
 exports.getBlueprintFor = getBlueprintFor;

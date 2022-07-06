@@ -23,21 +23,11 @@ const { Formatters } = require("devtools/client/performance/modules/logic/marker
  *              for `.marker-details-bullet.{COLORNAME}` for the equivilent
  *              entry in ./devtools/client/themes/performance.inc.css
  *              https://developer.mozilla.org/en-US/docs/Tools/DevToolsColors
- * - collapseFunc: A function determining how markers are collapsed together.
- *                 Invoked with 3 arguments: the current parent marker, the
- *                 current marker and a method for peeking i markers ahead. If
- *                 nothing is returned, the marker is added as a standalone entry
- *                 in the waterfall. Otherwise, an object needs to be returned
- *                 with the following properties:
- *                 - toParent: The parent marker name (needs to be an entry in
- *                             the `TIMELINE_BLUEPRINT` itself).
- *                 - withData: An object containing some properties to staple
- *                             on the parent marker.
- *                 - forceNew: True if a new parent marker needs to be created
- *                             even though there is one currently available
- *                             with the same name.
- *                 - forceEnd: True if the current parent marker is full after
- *                             this collapse operation and should be finalized.
+ * - collapsible: Whether or not this marker can contain other markers it
+ *                eclipses, and becomes collapsible to reveal its nestable children.
+ *                Defaults to true.
+ * - nestable: Whether or not this marker can be nested inside an eclipsing
+ *             collapsible marker. Defaults to true.
  * - fields: An optional array of marker properties you wish to display in the
  *           marker details view. For example, a field in the array such as
  *           { property: "aCauseName", label: "Cause" } would render a string
@@ -57,24 +47,30 @@ const { Formatters } = require("devtools/client/performance/modules/logic/marker
  * updated as well.
  */
 const TIMELINE_BLUEPRINT = {
+  /* Default definition used for markers that occur but
+   * are not defined here. Should ultimately be defined, but this gives
+   * us room to work on the front end separately from the platform. */
+  "UNKNOWN": {
+    group: 2,
+    colorName: "graphs-grey",
+    label: Formatters.UnknownLabel,
+  },
+
   /* Group 0 - Reflow and Rendering pipeline */
   "Styles": {
     group: 0,
     colorName: "graphs-purple",
-    collapseFunc: CollapseFunctions.identical,
     label: L10N.getStr("timeline.label.styles2"),
     fields: Formatters.StylesFields,
   },
   "Reflow": {
     group: 0,
     colorName: "graphs-purple",
-    collapseFunc: CollapseFunctions.identical,
     label: L10N.getStr("timeline.label.reflow2"),
   },
   "Paint": {
     group: 0,
     colorName: "graphs-green",
-    collapseFunc: CollapseFunctions.identical,
     label: L10N.getStr("timeline.label.paint"),
   },
 
@@ -82,14 +78,12 @@ const TIMELINE_BLUEPRINT = {
   "DOMEvent": {
     group: 1,
     colorName: "graphs-yellow",
-    collapseFunc: CollapseFunctions.DOMtoDOMJS,
     label: L10N.getStr("timeline.label.domevent"),
     fields: Formatters.DOMEventFields,
   },
   "Javascript": {
     group: 1,
     colorName: "graphs-yellow",
-    collapseFunc: either(CollapseFunctions.JStoDOMJS, CollapseFunctions.identical),
     label: Formatters.JSLabel,
     fields: Formatters.JSFields
   },
@@ -101,19 +95,16 @@ const TIMELINE_BLUEPRINT = {
   "Parse HTML": {
     group: 1,
     colorName: "graphs-yellow",
-    collapseFunc: CollapseFunctions.identical,
     label: L10N.getStr("timeline.label.parseHTML"),
   },
   "Parse XML": {
     group: 1,
     colorName: "graphs-yellow",
-    collapseFunc: CollapseFunctions.identical,
     label: L10N.getStr("timeline.label.parseXML"),
   },
   "GarbageCollection": {
     group: 1,
     colorName: "graphs-red",
-    collapseFunc: CollapseFunctions.adjacent,
     label: Formatters.GCLabel,
     fields: [
       { property: "causeName", label: "Reason:" },
@@ -123,14 +114,12 @@ const TIMELINE_BLUEPRINT = {
   "nsCycleCollector::Collect": {
     group: 1,
     colorName: "graphs-red",
-    collapseFunc: either(collapse.parent, collapse.child),
     label: "Cycle Collection",
     fields: Formatters.CycleCollectionFields,
   },
   "nsCycleCollector::ForgetSkippable": {
     group: 1,
     colorName: "graphs-red",
-    collapseFunc: either(collapse.parent, collapse.child),
     label: "Cycle Collection",
     fields: Formatters.CycleCollectionFields,
   },
@@ -144,6 +133,8 @@ const TIMELINE_BLUEPRINT = {
       property: "causeName",
       label: L10N.getStr("timeline.markerDetail.consoleTimerName")
     }],
+    nestable: false,
+    collapsible: false,
   },
   "TimeStamp": {
     group: 2,
@@ -153,23 +144,9 @@ const TIMELINE_BLUEPRINT = {
       property: "causeName",
       label: "Label:"
     }],
+    collapsible: false,
   },
 };
-
-/**
- * Helper for creating a function that returns the first defined result from
- * a list of functions passed in as params, in order.
- * @param ...function fun
- * @return any
- */
-function either(...fun) {
-  return function() {
-    for (let f of fun) {
-      let result = f.apply(null, arguments);
-      if (result !== undefined) return result;
-    }
-  }
-}
 
 /**
  * Takes a main label (like "Timestamp") and a property,
