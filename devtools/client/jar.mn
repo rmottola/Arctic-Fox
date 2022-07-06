@@ -108,6 +108,7 @@ devtools.jar:
     content/performance/views/details-js-flamegraph.js (performance/views/details-js-flamegraph.js)
     content/performance/views/details-memory-call-tree.js (performance/views/details-memory-call-tree.js)
     content/performance/views/details-memory-flamegraph.js (performance/views/details-memory-flamegraph.js)
+    content/performance/views/optimizations-list.js (performance/views/optimizations-list.js)
     content/performance/views/recordings.js (performance/views/recordings.js)
     content/memory/memory.xhtml (memory/memory.xhtml)
     content/memory/controller.js (memory/controller.js)

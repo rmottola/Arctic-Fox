@@ -49,11 +49,7 @@ var PerformanceView = {
     this._onRecordButtonClick = this._onRecordButtonClick.bind(this);
     this._onImportButtonClick = this._onImportButtonClick.bind(this);
     this._onClearButtonClick = this._onClearButtonClick.bind(this);
-    this._lockRecordButtons = this._lockRecordButtons.bind(this);
-    this._unlockRecordButtons = this._unlockRecordButtons.bind(this);
     this._onRecordingSelected = this._onRecordingSelected.bind(this);
-    this._onRecordingStopped = this._onRecordingStopped.bind(this);
-    this._onRecordingStarted = this._onRecordingStarted.bind(this);
     this._onProfilerStatusUpdated = this._onProfilerStatusUpdated.bind(this);
     this._onRecordingStateChange = this._onRecordingStateChange.bind(this);
 
@@ -252,7 +248,7 @@ var PerformanceView = {
    */
   _onImportButtonClick: function(e) {
     let fp = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
-    fp.init(window, L10N.getStr("recordingsList.saveDialogTitle"), Ci.nsIFilePicker.modeOpen);
+    fp.init(window, L10N.getStr("recordingsList.importDialogTitle"), Ci.nsIFilePicker.modeOpen);
     fp.appendFilter(L10N.getStr("recordingsList.saveDialogJSONFilter"), "*.json");
     fp.appendFilter(L10N.getStr("recordingsList.saveDialogAllFilter"), "*.*");
 
