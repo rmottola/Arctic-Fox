@@ -162,20 +162,17 @@ function parseLocation(location, fallbackLine, fallbackColumn) {
 };
 
 /**
- * Checks if the specified function represents a chrome or content frame.
+ * Sets the properties of `isContent` and `category` on a frame.
  *
- * @param string location
- *        The location of the frame.
- * @param number category [optional]
- *        If a chrome frame, the category.
- * @return boolean
- *         True if a content frame, false if a chrome frame.
+ * @param {InflatedFrame} frame
  */
-function isContent({ location, category }) {
+function computeIsContentAndCategory(frame) {
   // Only C++ stack frames have associated category information.
-  if (category) {
-    return false;
+  if (frame.category) {
+    return;
   }
+
+  let location = frame.location;
 
   // Locations in frames with function names look like:
   //   "functionName (foo://bar)".
@@ -183,12 +180,37 @@ function isContent({ location, category }) {
   // scheme name.
   for (let i = 0; i < location.length; i++) {
     if (location.charCodeAt(i) === CHAR_CODE_LPAREN) {
-      return isContentScheme(location, i + 1);
+      if (isContentScheme(location, i + 1)) {
+        frame.isContent = true;
+        return;
+      }
+
+      for (let j = i + 1; j < location.length; j++) {
+        if (location.charCodeAt(j) === CHAR_CODE_R &&
+            isChromeScheme(location, j) &&
+            (location.indexOf("resource://gre/modules/devtools") !== -1 ||
+             location.indexOf("resource:///modules/devtools") !== -1)) {
+          frame.category = global.CATEGORY_DEVTOOLS;
+          return;
+        }
+      }
+
+      break;
     }
   }
 
   // If there was no left parenthesis, try matching from the start.
-  return isContentScheme(location, 0);
+  if (isContentScheme(location, 0)) {
+    frame.isContent = true;
+    return;
+  }
+
+  if (location === "EnterJIT") {
+    frame.category = global.CATEGORY_JIT;
+    return;
+  }
+
+  frame.category = global.CATEGORY_OTHER;
 }
 
 /**
@@ -248,9 +270,15 @@ function InflatedFrame(index, frameTable, stringTable, allocationsTable) {
   this.line = frame[LINE_SLOT];
   this.column = undefined;
   this.category = category;
-  this.metaCategory = category || CATEGORY_OTHER;
-  this.allocations = allocationsTable ? allocationsTable[index] : 0;
-  this.isContent = isContent(this);
+  this.isContent = false;
+
+  // Attempt to compute if this frame is a content frame, and if not,
+  // its category.
+  //
+  // Since only C++ stack frames have associated category information,
+  // attempt to generate a useful category, fallback to the one provided
+  // by the profiling data, or fallback to an unknown category.
+  computeIsContentAndCategory(this);
 };
 
 /**
@@ -284,7 +312,7 @@ InflatedFrame.prototype.getFrameKey = function getFrameKey(options) {
     // non-leaf platform frames don't give any meaningful context, and so we
     // can safely filter them out.
     options.isMetaCategoryOut = true;
-    return this.metaCategory;
+    return this.category;
   }
 
   // Return an empty string denoting that this frame should be skipped.
@@ -441,8 +469,8 @@ function findFrameByLocation (threadNode, location) {
 }
 
 exports.findFrameByLocation = findFrameByLocation;
+exports.computeIsContentAndCategory = computeIsContentAndCategory;
 exports.parseLocation = parseLocation;
-exports.isContent = isContent;
 exports.getInflatedFrameCache = getInflatedFrameCache;
 exports.getOrAddInflatedFrame = getOrAddInflatedFrame;
 exports.InflatedFrame = InflatedFrame;

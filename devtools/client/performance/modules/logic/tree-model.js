@@ -9,12 +9,6 @@ loader.lazyRequireGetter(this, "L10N",
   "devtools/performance/global", true);
 loader.lazyRequireGetter(this, "CATEGORY_MAPPINGS",
   "devtools/performance/global", true);
-loader.lazyRequireGetter(this, "CATEGORIES",
-  "devtools/performance/global", true);
-loader.lazyRequireGetter(this, "CATEGORY_JIT",
-  "devtools/performance/global", true);
-loader.lazyRequireGetter(this, "CATEGORY_OTHER",
-  "devtools/performance/global", true);
 loader.lazyRequireGetter(this, "JITOptimizations",
   "devtools/client/performance/modules/logic/jit", true);
 loader.lazyRequireGetter(this, "FrameUtils",
@@ -374,16 +368,16 @@ function FrameNode(frameKey, { location, line, category, allocations, isContent 
   this.key = frameKey;
   this.location = location;
   this.line = line;
-  this.category = category;
   this.allocations = allocations;
   this.samples = 0;
   this.duration = 0;
   this.calls = [];
-  this.isContent = isContent;
+  this.isContent = !!isContent;
   this._optimizations = null;
   this._tierData = [];
   this._stringTable = null;
-  this.isMetaCategory = isMetaCategory;
+  this.isMetaCategory = !!isMetaCategory;
+  this.category = category;
 }
 
 FrameNode.prototype = {
@@ -468,19 +462,7 @@ FrameNode.prototype = {
    * function name and source url.
    */
   _computeInfo: function() {
-    // "EnterJIT" pseudoframes are special, not actually on the stack.
-    if (this.location == "EnterJIT") {
-      this.category = CATEGORY_JIT;
-    }
-
-    if (this.isMetaCategory && !this.category) {
-      this.category = CATEGORY_OTHER;
-    }
-
-    // Since only C++ stack frames have associated category information,
-    // default to an "unknown" category otherwise.
     let categoryData = CATEGORY_MAPPINGS[this.category] || {};
-
     let parsedData = FrameUtils.parseLocation(this.location, this.line, this.column);
     parsedData.nodeType = "Frame";
     parsedData.categoryData = categoryData;
