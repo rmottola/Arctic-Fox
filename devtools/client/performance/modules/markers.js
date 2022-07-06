@@ -87,11 +87,6 @@ const TIMELINE_BLUEPRINT = {
     label: Formatters.JSLabel,
     fields: Formatters.JSFields
   },
-  "meta::DOMEvent+JS": {
-    colorName: "graphs-yellow",
-    label: Formatters.DOMJSLabel,
-    fields: Formatters.DOMJSFields,
-  },
   "Parse HTML": {
     group: 1,
     colorName: "graphs-yellow",
