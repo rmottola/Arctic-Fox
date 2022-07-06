@@ -30,7 +30,7 @@
 
   <popupset id="performance-options-popupset">
     <menupopup id="performance-filter-menupopup"/>
-    <menupopup id="performance-options-menupopup">
+    <menupopup id="performance-options-menupopup" position="before_end">
       <menuitem id="option-show-platform-data"
                 type="checkbox"
                 data-pref="show-platform-data"
@@ -292,10 +292,10 @@
                   </hbox>
                   <vbox class="call-tree-cells-container" flex="1"/>
                 </vbox>
-
-                <splitter id="js-call-tree-splitter" class="devtools-side-splitter"/>
-
-                <vbox id="jit-optimizations-view" hidden="true">
+                <splitter class="devtools-side-splitter"/>
+                <!-- Optimizations Panel -->
+                <vbox id="jit-optimizations-view"
+                      class="hidden">
                   <toolbar id="jit-optimizations-toolbar" class="devtools-toolbar">
                     <hbox id="jit-optimizations-header">
                       <span class="jit-optimizations-title">&performanceUI.JITOptimizationsTitle;</span>
