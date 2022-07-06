@@ -162,14 +162,14 @@ PrefObserver.prototype = {
    */
   get: function (prefName) {
     let fullName = this.branchName + prefName;
-    return Services.prefs.getBoolPref(fullName);
+    return Preferences.get(fullName);
   },
   /**
    * Sets `prefName`'s `value`. Does not require the branch name.
    */
   set: function (prefName, value) {
     let fullName = this.branchName + prefName;
-    Services.prefs.setBoolPref(fullName, value);
+    Preferences.set(fullName, value);
   },
   register: function () {
     this.branch.addObserver("", this, false);
