@@ -34,24 +34,44 @@ function MarkerDetails(parent, splitter) {
 
   this._parent.addEventListener("click", this._onClick);
   this._splitter.addEventListener("mouseup", this._onSplitterMouseUp);
+
+  this.hidden = true;
 }
 
 MarkerDetails.prototype = {
   /**
    * Sets this view's width.
-   * @param boolean
+   * @param number
    */
   set width(value) {
     this._parent.setAttribute("width", value);
   },
 
+  /**
+   * Sets this view's width.
+   * @return number
+   */
+  get width() {
+    return +this._parent.getAttribute("width");
+  },
 
   /**
    * Sets this view's visibility.
    * @param boolean
    */
   set hidden(value) {
-    this._parent.hidden = value;
+    if (this._parent.hidden != value) {
+      this._parent.hidden = value;
+      this.emit("resize");
+    }
+  },
+
+  /**
+   * Gets this view's visibility.
+   * @param boolean
+   */
+  get hidden() {
+    return this._parent.hidden;
   },
 
   /**

@@ -19,6 +19,7 @@ const HTML_NS = "http://www.w3.org/1999/xhtml";
 
 const LEVEL_INDENT = 10; // px
 const ARROW_NODE_OFFSET = -15; // px
+const WATERFALL_MARKER_SIDEBAR_SAFE_BOUNDS = 20; // px
 const WATERFALL_MARKER_SIDEBAR_WIDTH = 175; // px
 const WATERFALL_MARKER_TIMEBAR_WIDTH_MIN = 5; // px
 
@@ -55,7 +56,9 @@ MarkerView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
    * This should be invoked every time the container node is resized.
    */
   recalculateBounds: function() {
-    this.root._waterfallWidth = this.bounds.width - WATERFALL_MARKER_SIDEBAR_WIDTH;
+    this.root._waterfallWidth = this.bounds.width
+      - WATERFALL_MARKER_SIDEBAR_WIDTH
+      - WATERFALL_MARKER_SIDEBAR_SAFE_BOUNDS;
   },
 
   /**
@@ -289,4 +292,5 @@ function isMarkerInRange(e, start, end) {
 }
 
 exports.MarkerView = MarkerView;
+exports.WATERFALL_MARKER_SIDEBAR_SAFE_BOUNDS = WATERFALL_MARKER_SIDEBAR_SAFE_BOUNDS;
 exports.WATERFALL_MARKER_SIDEBAR_WIDTH = WATERFALL_MARKER_SIDEBAR_WIDTH;
