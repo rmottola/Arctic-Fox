@@ -221,6 +221,15 @@ var WaterfallView = Heritage.extend(DetailsSubview, {
 
     this.headerContainer.innerHTML = "";
     header.attachTo(this.headerContainer);
+
+    // If an item was previously selected in this view, attempt to
+    // re-select it by traversing the newly created tree.
+    if (this._lastSelected) {
+      let item = root.find(i => i.marker.uid == this._lastSelected);
+      if (item) {
+        item.focus();
+      }
+    }
   },
 
   toString: () => "[object WaterfallView]"
