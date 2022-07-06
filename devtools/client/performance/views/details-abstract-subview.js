@@ -153,8 +153,3 @@ var DetailsSubview = {
     }
   }
 };
-
-/**
- * Convenient way of emitting events from the view.
- */
-EventEmitter.decorate(DetailsSubview);

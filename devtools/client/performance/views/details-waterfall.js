@@ -219,3 +219,5 @@ var WaterfallView = Heritage.extend(DetailsSubview, {
 
   toString: () => "[object WaterfallView]"
 });
+
+EventEmitter.decorate(WaterfallView);

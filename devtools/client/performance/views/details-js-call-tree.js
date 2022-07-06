@@ -36,6 +36,7 @@ var JsCallTreeView = Heritage.extend(DetailsSubview, {
   destroy: function () {
     OptimizationsListView.destroy();
     this.container = null;
+    this.threadNode = null;
     DetailsSubview.destroy.call(this);
   },
 
@@ -137,7 +138,7 @@ var JsCallTreeView = Heritage.extend(DetailsSubview, {
       // Call trees should only auto-expand when not inverted. Passing undefined
       // will default to the CALL_TREE_AUTO_EXPAND depth.
       autoExpandDepth: inverted ? 0 : undefined,
-      enableOptimizations: options.enableOptimizations
+      showOptimizationHint: options.showOptimizationHint
     });
 
     // Bind events.
@@ -158,3 +159,5 @@ var JsCallTreeView = Heritage.extend(DetailsSubview, {
 
   toString: () => "[object JsCallTreeView]"
 });
+
+EventEmitter.decorate(JsCallTreeView);
