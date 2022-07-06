@@ -3,10 +3,6 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-// This should be removed with bug 1163763.
-const DBG_STRINGS_URI = "chrome://browser/locale/devtools/debugger.properties";
-const DBG_L10N = new ViewHelpers.L10N(DBG_STRINGS_URI);
-
 /**
  * Functions handling the recordings UI.
  */
@@ -127,7 +123,6 @@ var RecordingsView = Heritage.extend(WidgetMethods, {
       let durationNode = $(".recording-item-duration", recordingItem.target);
       durationNode.setAttribute("value", L10N.getStr("recordingsList.loadingLabel"));
     }
-  },
 
     // Render the recording item with finalized information (timing, etc)
     if (recording.isCompleted() && !recordingItem.finalized) {
