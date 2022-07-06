@@ -121,29 +121,28 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
    * @return nsIDOMNode
    */
   _displaySelf: function(document, arrowNode) {
-    let displayedData = this.getDisplayedData();
-    let frameInfo = this.frame.getInfo();
+   let frameInfo = this.getDisplayedData();
 
     if (this.visibleCells.duration) {
-      var durationCell = this._createTimeCell(document, displayedData.totalDuration);
+      var durationCell = this._createTimeCell(document, frameInfo.totalDuration);
     }
     if (this.visibleCells.selfDuration) {
-      var selfDurationCell = this._createTimeCell(document, displayedData.selfDuration, true);
+      var selfDurationCell = this._createTimeCell(document, frameInfo.selfDuration, true);
     }
     if (this.visibleCells.percentage) {
-      var percentageCell = this._createExecutionCell(document, displayedData.totalPercentage);
+      var percentageCell = this._createExecutionCell(document, frameInfo.totalPercentage);
     }
     if (this.visibleCells.selfPercentage) {
-      var selfPercentageCell = this._createExecutionCell(document, displayedData.selfPercentage, true);
+      var selfPercentageCell = this._createExecutionCell(document, frameInfo.selfPercentage, true);
     }
     if (this.visibleCells.allocations) {
-      var allocationsCell = this._createAllocationsCell(document, displayedData.totalAllocations);
+      var allocationsCell = this._createAllocationsCell(document, frameInfo.totalAllocations);
     }
     if (this.visibleCells.selfAllocations) {
-      var selfAllocationsCell = this._createAllocationsCell(document, displayedData.selfAllocations, true);
+      var selfAllocationsCell = this._createAllocationsCell(document, frameInfo.selfAllocations, true);
     }
     if (this.visibleCells.samples) {
-      var samplesCell = this._createSamplesCell(document, displayedData.samples);
+      var samplesCell = this._createSamplesCell(document, frameInfo.samples);
     }
     if (this.visibleCells.function) {
       var functionCell = this._createFunctionCell(document, arrowNode, displayedData.name, frameInfo, this.level);
@@ -153,7 +152,7 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
     targetNode.className = "call-tree-item";
     targetNode.setAttribute("origin", frameInfo.isContent ? "content" : "chrome");
     targetNode.setAttribute("category", frameInfo.categoryData.abbrev || "");
-    targetNode.setAttribute("tooltiptext", displayedData.tooltiptext);
+    targetNode.setAttribute("tooltiptext", frameInfo.tooltiptext);
 
     if (this.hidden) {
       targetNode.style.display = "none";
@@ -332,49 +331,11 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
       return this._cachedDisplayedData;
     }
 
-    let data = this._cachedDisplayedData = Object.create(null);
-    let frameInfo = this.frame.getInfo();
+    return this._cachedDisplayedData = this.frame.getInfo({
+      root: this.root.frame,
+      allocations: (this.visibleCells.allocations || this.visibleCells.selfAllocations)
+    });
 
-    // Self/total duration.
-    if (this.visibleCells.duration) {
-      data.totalDuration = this.frame.duration;
-    }
-    if (this.visibleCells.selfDuration) {
-      data.selfDuration = this.root.frame.selfDuration[this.frame.key];
-    }
-
-    // Self/total samples percentage.
-    if (this.visibleCells.percentage) {
-      data.totalPercentage = this.frame.samples / this.root.frame.samples * 100;
-    }
-    if (this.visibleCells.selfPercentage) {
-      data.selfPercentage = this.root.frame.selfCount[this.frame.key] / this.root.frame.samples * 100;
-    }
-
-    // Self/total allocations count.
-    if (this.visibleCells.allocations) {
-      let childrenAllocations = this.frame.calls.reduce((acc, node) => acc + node.allocations, 0);
-      data.totalAllocations = this.frame.allocations + childrenAllocations;
-    }
-    if (this.visibleCells.selfAllocations) {
-      data.selfAllocations = this.frame.allocations;
-    }
-
-    // Raw samples.
-    if (this.visibleCells.samples) {
-      data.samples = this.frame.samples;
-    }
-
-    // Frame name (function location or some meta information).
-    data.name = frameInfo.isMetaCategory
-      ? frameInfo.categoryData.label
-      : frameInfo.functionName || "";
-
-    data.tooltiptext = frameInfo.isMetaCategory
-      ? frameInfo.categoryData.label
-      : this.frame.location || "";
-
-    return this._cachedDisplayedData;
   },
 
   /**

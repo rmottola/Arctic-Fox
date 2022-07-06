@@ -5,10 +5,6 @@
 
 const { Cc, Ci, Cu, Cr } = require("chrome");
 
-loader.lazyRequireGetter(this, "L10N",
-  "devtools/performance/global", true);
-loader.lazyRequireGetter(this, "CATEGORY_MAPPINGS",
-  "devtools/performance/global", true);
 loader.lazyRequireGetter(this, "JITOptimizations",
   "devtools/client/performance/modules/logic/jit", true);
 loader.lazyRequireGetter(this, "FrameUtils",
@@ -35,6 +31,7 @@ function ThreadNode(thread, options = {}) {
   this.duration = 0;
   this.calls = [];
   this.inverted = options.invertTree;
+  this.nodeType = "Thread";
 
   // Maps of frame to their self counts and duration.
   this.selfCount = Object.create(null);
@@ -319,14 +316,12 @@ ThreadNode.prototype = {
 
   /**
    * Gets additional details about this node.
+   * @see FrameNode.prototype.getInfo for more information.
+   *
    * @return object
    */
-  getInfo: function() {
-    return {
-      nodeType: "Thread",
-      functionName: L10N.getStr("table.root"),
-      categoryData: {}
-    };
+  getInfo: function(options) {
+    return FrameUtils.getFrameInfo(this, options);
   },
 
   /**
@@ -378,6 +373,7 @@ function FrameNode(frameKey, { location, line, category, allocations, isContent 
   this._stringTable = null;
   this.isMetaCategory = !!isMetaCategory;
   this.category = category;
+  this.nodeType = "Frame";
 }
 
 FrameNode.prototype = {
@@ -447,29 +443,21 @@ FrameNode.prototype = {
 
   /**
    * Returns the parsed location and additional data describing
-   * this frame. Uses cached data if possible.
+   * this frame. Uses cached data if possible. Takes the following
+   * options:
+   *
+   * @param {ThreadNode} options.root
+   *                     The root thread node to calculate relative costs.
+   *                     Generates [self|total] [duration|percentage] values.
+   * @param {boolean} options.allocations
+   *                  Generates `totalAllocations` and `selfAllocations`.
    *
    * @return object
    *         The computed { name, file, url, line } properties for this
-   *         function call.
+   *         function call, as well as additional params if options specified.
    */
-  getInfo: function() {
-    return this._data || this._computeInfo();
-  },
-
-  /**
-   * Parses the raw location of this function call to retrieve the actual
-   * function name and source url.
-   */
-  _computeInfo: function() {
-    let categoryData = CATEGORY_MAPPINGS[this.category] || {};
-    let parsedData = FrameUtils.parseLocation(this.location, this.line, this.column);
-    parsedData.nodeType = "Frame";
-    parsedData.categoryData = categoryData;
-    parsedData.isContent = this.isContent;
-    parsedData.isMetaCategory = this.isMetaCategory;
-
-    return this._data = parsedData;
+  getInfo: function(options) {
+    return FrameUtils.getFrameInfo(this, options);
   },
 
   /**
