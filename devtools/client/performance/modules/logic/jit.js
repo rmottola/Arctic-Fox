@@ -35,9 +35,6 @@ const SUCCESSFUL_OUTCOMES = [
  * Note that propertyName is an index into a string table, which needs to be
  * provided in order for the raw optimization site to be inflated.
  *
- * Note that propertyName is an index into a string table, which needs to be
- * provided in order for the raw optimization site to be inflated.
- *
  * @type {Array<IonType>} types
  * @type {Array<OptimizationAttempt>} attempts
  * @type {?number} propertyName
@@ -210,7 +207,20 @@ const JITOptimizations = function (rawSites, stringTable) {
     };
   }
 
-  this.optimizationSites = sites.sort((a, b) => b.samples - a.samples);;
+  this.optimizationSites = sites.sort((a, b) => b.samples - a.samples);
+};
+
+/**
+ * Make JITOptimizations iterable.
+ */
+JITOptimizations.prototype = {
+  [Symbol.iterator]: function *() {
+    yield* this.optimizationSites;
+  },
+
+  get length() {
+    return this.optimizationSites.length;
+  }
 };
 
 /**
