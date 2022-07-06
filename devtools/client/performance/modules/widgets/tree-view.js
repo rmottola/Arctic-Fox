@@ -21,9 +21,17 @@ const CALL_TREE_INDENTATION = 16; // px
 const DEFAULT_SORTING_PREDICATE = (frameA, frameB) => {
   let dataA = frameA.getDisplayedData();
   let dataB = frameB.getDisplayedData();
-  return this.inverted
-    ? (dataA.selfPercentage < dataB.selfPercentage ? 1 : -1)
-    : (dataA.samples < dataB.samples ? 1 : -1);
+  let isAllocations = "totalSize" in dataA;
+
+  if (isAllocations) {
+    return this.inverted && dataA.selfSize !== dataB.selfSize ?
+           (dataA.selfSize < dataB.selfSize ? 1 : - 1) :
+           (dataA.totalSize < dataB.totalSize ? 1 : -1);
+  }
+
+  return this.inverted && dataA.selfPercentage !== dataB.selfPercentage ?
+         (dataA.selfPercentage < dataB.selfPercentage ? 1 : - 1) :
+         (dataA.totalPercentage < dataB.totalPercentage ? 1 : -1);
 };
 
 const DEFAULT_AUTO_EXPAND_DEPTH = 3; // depth
@@ -274,6 +282,7 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
 
     return cell;
   },
+
   _appendFunctionDetailsCells: function(doc, cell, frameInfo) {
     if (frameInfo.fileName) {
       let urlNode = doc.createElement("description");
@@ -336,6 +345,21 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
       allocations: (this.visibleCells.allocations || this.visibleCells.selfAllocations)
     });
 
+    /**
+     * When inverting call tree, the costs and times are dependent on position
+     * in the tree. We must only count leaf nodes with self cost, and total costs
+     * dependent on how many times the leaf node was found with a full stack path.
+     *
+     *   Total |  Self | Calls | Function
+     * ============================================================================
+     *  100%   |  100% |   100 | ▼ C
+     *   50%   |   0%  |    50 |   ▼ B
+     *   50%   |   0%  |    50 |     ▼ A
+     *   50%   |   0%  |    50 |   ▼ B
+     *
+     * Every instance of a `CallView` represents a row in the call tree. The same
+     * container node is used for all rows.
+     */
   },
 
   /**
@@ -357,7 +381,7 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
     e.preventDefault();
     e.stopPropagation();
     this.root.emit("link", this);
-  }
+  },
 });
 
 exports.CallView = CallView;
