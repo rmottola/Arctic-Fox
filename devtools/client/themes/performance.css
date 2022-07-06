@@ -658,26 +658,49 @@ menuitem.marker-color-graphs-blue:before,
   cursor: pointer;
 }
 
-#jit-optimizations-view .opt-icon::before {
+.opt-icon::before {
   content: "";
   background-image: url(chrome://devtools/skin/themes/images/webconsole.svg);
   background-repeat: no-repeat;
-  background-size: 48px 40px;
-  margin: 5px 6px 0 0;
-  width: 8px;
-  height: 8px;
-  max-height: 8px;
+  background-size: 72px 60px;
+  /* show grey "i" bubble by default */
+  background-position: -36px -36px;
+  width: 12px;
+  height: 12px;
   display: inline-block;
+
+  max-height: 12px;
 }
 
-#jit-optimizations-view .opt-icon[severity=warning]::before {
-  background-position: -16px -16px;
+#jit-optimizations-view .opt-icon::before {
+  margin: 5px 6px 0 0;
+}
+description.opt-icon {
+  margin: 0px 0px 0px 0px;
+}
+description.opt-icon::before {
+  margin: 1px 4px 0px 0px;
+}
+.theme-light .opt-icon::before {
+  background-image: url(chrome://devtools/skin/themes/images/webconsole.svg#light-icons);
+}
+.opt-icon[severity=warning]::before {
+  background-position: -24px -24px;
 }
 
-@media (min-resolution: 1.25dppx) {
-  #jit-optimizations-view .opt-icon::before {
-    background-image: url(chrome://devtools/skin/themes/images/webconsole@2x.png);
-  }
+ul.frames-list {
+  list-style-type: none;
+  padding: 0px;
+  margin: 0px;
+}
+
+ul.frames-list li {
+  cursor: pointer;
+}
+
+ul.frames-list li.selected {
+  background-color: var(--theme-selection-background);
+  color: var(--theme-selection-color);
 }
 
 /**
