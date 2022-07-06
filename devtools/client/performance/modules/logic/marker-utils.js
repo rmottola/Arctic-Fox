@@ -393,6 +393,20 @@ const Formatters = {
     }
   },
 
+  GCFields: function (marker) {
+    let fields = Object.create(null);
+    let cause = marker.causeName;
+    let label = L10N.getStr(`marker.gcreason.label.${cause}`) || cause;
+
+    fields[L10N.getStr("marker.field.causeName")] = label;
+
+    if ("nonincrementalReason" in marker) {
+      fields[L10N.getStr("marker.field.nonIncrementalCause")] = marker.nonincrementalReason;
+    }
+
+    return fields;
+  },
+
   DOMEventFields: function (marker) {
     let fields = Object.create(null);
     if ("type" in marker) {
@@ -428,6 +442,17 @@ const Formatters = {
 };
 
 /**
+ * Takes a marker and returns the definition for that marker type,
+ * falling back to the UNKNOWN definition if undefined.
+ *
+ * @param {Marker} marker
+ * @return {object}
+ */
+function getBlueprintFor (marker) {
+  return TIMELINE_BLUEPRINT[marker.name] || TIMELINE_BLUEPRINT.UNKNOWN;
+}
+
+/**
  * Takes a marker and determines if this marker should display
  * the allocations trigger button.
  *
@@ -437,17 +462,6 @@ const Formatters = {
 function showAllocationsTrigger (marker) {
   return marker.name === "GarbageCollection" &&
          PREFS["show-triggers-for-gc-types"].split(" ").indexOf(marker.causeName) !== -1;
-}
-
-/**
- * Takes a marker and returns the definition for that marker type,
- * falling back to the UNKNOWN definition if undefined.
- *
- * @param {Marker} marker
- * @return {object}
- */
-function getBlueprintFor (marker) {
-  return TIMELINE_BLUEPRINT[marker.name] || TIMELINE_BLUEPRINT.UNKNOWN;
 }
 
 exports.isMarkerValid = isMarkerValid;
