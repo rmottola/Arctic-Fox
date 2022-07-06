@@ -30,8 +30,8 @@ function ThreadNode(thread, options = {}) {
   this.samples = 0;
   this.duration = 0;
   this.calls = [];
-  this.inverted = options.invertTree;
   this.nodeType = "Thread";
+  this.inverted = options.invertTree;
 
   // Maps of frame to their self counts and duration.
   this.selfCount = Object.create(null);
