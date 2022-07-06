@@ -36,6 +36,7 @@ var WaterfallView = Heritage.extend(DetailsSubview, {
     this._onResize = this._onResize.bind(this);
     this._onViewSource = this._onViewSource.bind(this);
     this._onShowAllocations = this._onShowAllocations.bind(this);
+    this._hiddenMarkers = PerformanceController.getPref("hidden-markers");
 
     this.headerContainer = $("#waterfall-header");
     this.breakdownContainer = $("#waterfall-breakdown");
@@ -43,6 +44,8 @@ var WaterfallView = Heritage.extend(DetailsSubview, {
     this.detailsSplitter = $("#waterfall-view > splitter");
 
     this.details = new MarkerDetails($("#waterfall-details"), $("#waterfall-view > splitter"));
+    this.details.hidden = true;
+
     this.details.on("resize", this._onResize);
     this.details.on("view-source", this._onViewSource);
     this.details.on("show-allocations", this._onShowAllocations);
@@ -94,6 +97,7 @@ var WaterfallView = Heritage.extend(DetailsSubview, {
 
     if (event === "selected") {
       this.details.render({ marker, frames, allocations });
+      this.details.hidden = false;
       this._lastSelected = marker;
     }
     if (event === "unselected") {
@@ -115,8 +119,7 @@ var WaterfallView = Heritage.extend(DetailsSubview, {
    * Called whenever an observed pref is changed.
    */
   _onObservedPrefChange: function(_, prefName) {
-    let blueprint = PerformanceController.getTimelineBlueprint();
-    this._markersRoot.blueprint = blueprint;
+    this._hiddenMarkers = PerformanceController.getPref("hidden-markers");
   },
 
   /**
@@ -178,7 +181,7 @@ var WaterfallView = Heritage.extend(DetailsSubview, {
 
     WaterfallUtils.collapseMarkersIntoNode({
       markerNode: rootMarkerNode,
-      markersList: markers
+      markersList: markers,
     });
 
     this._cache.set(markers, rootMarkerNode);
@@ -202,8 +205,7 @@ var WaterfallView = Heritage.extend(DetailsSubview, {
     this._markersRoot = root;
     this._waterfallHeader = header;
 
-    let blueprint = PerformanceController.getTimelineBlueprint();
-    root.blueprint = blueprint;
+    root.filter = this._hiddenMarkers;
     root.interval = interval;
     root.on("selected", this._onMarkerSelected);
     root.on("unselected", this._onMarkerSelected);

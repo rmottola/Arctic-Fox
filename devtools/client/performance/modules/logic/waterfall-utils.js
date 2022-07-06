@@ -13,22 +13,21 @@ loader.lazyRequireGetter(this, "MarkerUtils",
   "devtools/client/performance/modules/logic/marker-utils");
 
 /**
- * Collapses markers into a tree-like structure. Currently, this only goes
- * one level deep.
+ * Collapses markers into a tree-like structure.
  * @param object markerNode
  * @param array markersList
  */
 function collapseMarkersIntoNode({ markerNode, markersList }) {
-  let [getOrCreateParentNode, getCurrentParentNode, clearParentNode] = makeParentNodeFactory();
+  let { getCurrentParentNode, collapseMarker, addParentNode, popParentNode } = createParentNodeFactory(markerNode);
 
   for (let i = 0, len = markersList.length; i < len; i++) {
     let curr = markersList[i];
-    let blueprint = TIMELINE_BLUEPRINT[curr.name];
 
     let parentNode = getCurrentParentNode();
+    let blueprint = getBlueprintFor(curr);
+
     let collapse = blueprint.collapseFunc || (() => null);
     let peek = distance => markersList[i + distance];
-    let collapseInfo = collapse(parentNode, curr, peek);
 
     if (collapseInfo) {
       let { toParent, withData, forceNew, forceEnd } = collapseInfo;
