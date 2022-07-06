@@ -40,6 +40,7 @@ function ThreadNode(thread, options = {}) {
   this.samples = 0;
   this.duration = 0;
   this.calls = [];
+  this.inverted = options.invertTree;
 
   // Maps of frame to their self counts and duration.
   this.selfCount = Object.create(null);
@@ -248,6 +249,10 @@ ThreadNode.prototype = {
         let frameNode = getOrAddFrameNode(calls, isLeaf, frameKey, inflatedFrame,
                                           mutableFrameKeyOptions.isMetaCategoryOut,
                                           leafTable);
+        if (isLeaf) {
+          frameNode.youngestFrameSamples++;
+          frameNode._addOptimizations(inflatedFrame.optimizations, inflatedFrame.implementation,
+                                      sampleTime, stringTable);
 
         frameNode._countSample(prevSampleTime, sampleTime, inflatedFrame.optimizations,
                                stringTable);
@@ -376,6 +381,7 @@ function FrameNode(frameKey, { location, line, category, allocations, isContent 
   this.calls = [];
   this.isContent = isContent;
   this._optimizations = null;
+  this._tierData = [];
   this._stringTable = null;
   this.isMetaCategory = isMetaCategory;
 }
@@ -391,23 +397,31 @@ FrameNode.prototype = {
    * @param object optimizationSite
    *               Any JIT optimization information attached to the current
    *               sample. Lazily inflated via stringTable.
+   * @param number implementation
+   *               JIT implementation used for this observed frame (baseline, ion);
+   *               can be null indicating "interpreter"
+   * @param number time
+   *               The time this optimization occurred.
    * @param object stringTable
    *               The string table used to inflate the optimizationSite.
    */
-  _countSample: function (prevSampleTime, sampleTime, optimizationSite, stringTable) {
-    this.samples++;
-    this.duration += sampleTime - prevSampleTime;
-
+  _addOptimizations: function (site, implementation, time, stringTable) {
     // Simply accumulate optimization sites for now. Processing is done lazily
     // by JITOptimizations, if optimization information is actually displayed.
-    if (optimizationSite) {
+    if (site) {
       let opts = this._optimizations;
       if (opts === null) {
         opts = this._optimizations = [];
-        this._stringTable = stringTable;
       }
-      opts.push(optimizationSite);
+      opts.push(site);
     }
+
+    if (!this._stringTable) {
+      this._stringTable = stringTable;
+    }
+
+    // Record type of implementation used and the sample time
+    this._tierData.push({ implementation, time });
   },
 
   _clone: function () {
@@ -496,6 +510,15 @@ FrameNode.prototype = {
       return null;
     }
     return new JITOptimizations(this._optimizations, this._stringTable);
+  },
+
+  /**
+   * Returns the tiers used overtime.
+   *
+   * @return {Array<object>}
+   */
+  getTierData: function () {
+    return this._tierData;
   }
 };
 

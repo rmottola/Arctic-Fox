@@ -418,6 +418,29 @@ function isNumeric(c) {
   return c >= CHAR_CODE_0 && c <= CHAR_CODE_9;
 }
 
+/**
+ * Takes an inverted ThreadNode and searches its youngest frames for
+ * a FrameNode with matching location.
+ *
+ * @param {ThreadNode} threadNode
+ * @param {string} location
+ * @return {?FrameNode}
+ */
+function findFrameByLocation (threadNode, location) {
+  if (!threadNode.inverted) {
+    throw new Error("FrameUtils.findFrameByLocation only supports leaf nodes in an inverted tree.");
+  }
+
+  let calls = threadNode.calls;
+  for (let i = 0; i < calls.length; i++) {
+    if (calls[i].location === location) {
+      return calls[i];
+    }
+  }
+  return null;
+}
+
+exports.findFrameByLocation = findFrameByLocation;
 exports.parseLocation = parseLocation;
 exports.isContent = isContent;
 exports.getInflatedFrameCache = getInflatedFrameCache;

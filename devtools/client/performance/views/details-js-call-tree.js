@@ -6,7 +6,7 @@
 /**
  * CallTree view containing profiler call tree, controlled by DetailsView.
  */
-let JsCallTreeView = Heritage.extend(DetailsSubview, {
+var JsCallTreeView = Heritage.extend(DetailsSubview, {
 
   rerenderPrefs: [
     "invert-call-tree",
@@ -50,12 +50,16 @@ let JsCallTreeView = Heritage.extend(DetailsSubview, {
       invertTree: PerformanceController.getOption("invert-call-tree"),
       flattenRecursion: PerformanceController.getOption("flatten-tree-recursion")
     };
-    let recording = PerformanceController.getCurrentRecording();
-    let profile = recording.getProfile();
-    let threadNode = this._prepareCallTree(profile, interval, options);
+    let threadNode = this.threadNode = this._prepareCallTree(profile, interval, options);
     this._populateCallTree(threadNode, options);
     this.emit(EVENTS.JS_CALL_TREE_RENDERED);
   },
+
+  _onFocus: function (_, treeItem) {
+    if (PerformanceController.getCurrentRecording().getConfiguration().withJITOptimizations) {
+      OptimizationsListView.setCurrentFrame(this.threadNode, treeItem.frame);
+      OptimizationsListView.render();
+    }
 
   /**
    * Fired on the "link" event for the call tree in this container.
