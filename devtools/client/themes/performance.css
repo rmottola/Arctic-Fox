@@ -79,6 +79,10 @@
   list-style-image: url(images/performance-icons.svg#details-flamegraph);
 }
 
+#select-optimizations-view {
+  list-style-image: url(images/profiler-stopwatch.svg);
+}
+
 /* Recording buttons */
 
 #main-record-button {
