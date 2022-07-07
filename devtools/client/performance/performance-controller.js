@@ -265,7 +265,7 @@ var PerformanceController = {
     // If last recording is not recording, but finalizing itself,
     // wait for that to finish
     if (latest && !latest.isCompleted()) {
-      yield this.once(EVENTS.RECORDING_STOPPED);
+      yield this.waitForStateChangeOnRecording(latest, "recording-stopped");
     }
 
     this._recordings.length = 0;
@@ -451,13 +451,6 @@ var PerformanceController = {
    * @option {Array<string>|string} features
    *         A string or array of strings indicating what configuration is needed on the recording
    *         model, like `withTicks`, or `withMemory`.
-   * @option {Array<string>} actors
-   *         An array of strings indicating what actors must exist.
-   * @option {boolean} mustBeCompleted
-   *         A boolean indicating whether the recording must be either completed or not.
-   *         Setting to undefined will allow either state.
-   * @param {RecordingModel} recording
-   *        An optional recording model to use instead of the currently selected.
    *
    * @return boolean
    */
