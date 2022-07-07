@@ -372,9 +372,8 @@ RecordingModel.prototype = {
           frames,
         }] = data;
 
-        let timeOffset = this._memoryStartTime * 1000;
-        let timeScale = 1000;
-        RecordingUtils.offsetAndScaleTimestamps(timestamps, timeOffset, timeScale);
+        let timeOffset = this._memoryStartTime;
+        RecordingUtils.offsetAndScaleTimestamps(timestamps, timeOffset);
         Array.prototype.push.apply(this._allocations.sites, sites);
         Array.prototype.push.apply(this._allocations.timestamps, timestamps);
         Array.prototype.push.apply(this._allocations.frames, frames);
