@@ -226,7 +226,8 @@ ThreadNode.prototype = {
 
         // If we shouldn't flatten the current frame into the previous one, advance a
         // level in the call tree.
-        if (!flattenRecursion || frameKey !== prevFrameKey) {
+        let shouldFlatten = flattenRecursion && frameKey === prevFrameKey;
+        if (!shouldFlatten) {
           calls = prevCalls;
         }
 
@@ -242,8 +243,14 @@ ThreadNode.prototype = {
             frameNode.youngestFrameByteSize += byteSize;
           }
         }
-        frameNode.samples++;
-        frameNode._addOptimizations(inflatedFrame.optimizations, stringTable);
+
+        // Don't overcount flattened recursive frames.
+        if (!shouldFlatten) {
+          frameNode.samples++;
+          if (byteSize) {
+            frameNode.byteSize += byteSize;
+          }
+        }
 
         prevFrameKey = frameKey;
         prevCalls = frameNode.calls;
