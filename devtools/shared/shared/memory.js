@@ -264,9 +264,6 @@ var Memory = exports.Memory = Class({
    *
    *          Additionally, the root node (null) is always at index 0.
    *
-   *          Note that the allocation counts include "self" allocations only,
-   *          and don't account for allocations in child frames.
-   *
    *          We use the indices into the "frames" array to avoid repeating the
    *          description of duplicate stack frames both when listing
    *          allocations, and when many stacks share the same tail of older
@@ -293,9 +290,9 @@ var Memory = exports.Memory = Class({
     const allocations = this.dbg.memory.drainAllocationsLog()
     const packet = {
       allocations: [],
-      allocationsTimestamps: []
+      allocationsTimestamps: [],
+      allocationSizes: [],
     };
-
     for (let { frame: stack, timestamp } of allocations) {
       if (stack && Cu.isDeadWrapper(stack)) {
         continue;

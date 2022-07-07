@@ -115,7 +115,7 @@ RecordingModel.prototype = {
     this._frames = [];
     this._memory = [];
     this._ticks = [];
-    this._allocations = { sites: [], timestamps: [], frames: [], counts: [] };
+    this._allocations = { sites: [], timestamps: [], frames: [] };
   },
 
   /**
@@ -366,14 +366,18 @@ RecordingModel.prototype = {
       // so offset all of them by the start time, also converting from µs to ms.
       case "allocations": {
         if (!config.withAllocations) { break; }
-        let [{ sites, timestamps, frames, counts }] = data;
+        let [{
+          allocations: sites,
+          allocationsTimestamps: timestamps,
+          frames,
+        }] = data;
+
         let timeOffset = this._memoryStartTime * 1000;
         let timeScale = 1000;
         RecordingUtils.offsetAndScaleTimestamps(timestamps, timeOffset, timeScale);
         Array.prototype.push.apply(this._allocations.sites, sites);
         Array.prototype.push.apply(this._allocations.timestamps, timestamps);
         Array.prototype.push.apply(this._allocations.frames, frames);
-        Array.prototype.push.apply(this._allocations.counts, counts);
         break;
       }
     }
