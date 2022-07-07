@@ -18,7 +18,7 @@
   <script type="application/javascript" src="performance-view.js"/>
   <script type="application/javascript" src="views/overview.js"/>
   <script type="application/javascript" src="views/toolbar.js"/>
-  <script type="application/javascript" src="views/details-subview.js"/>
+  <script type="application/javascript" src="views/details-abstract-subview.js"/>
   <script type="application/javascript" src="views/details-waterfall.js"/>
   <script type="application/javascript" src="views/details-js-call-tree.js"/>
   <script type="application/javascript" src="views/details-js-flamegraph.js"/>
