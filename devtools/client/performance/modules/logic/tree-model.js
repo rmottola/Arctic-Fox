@@ -34,6 +34,7 @@ function ThreadNode(thread, options = {}) {
   this.sampleTimes = [];
   this.youngestFrameSamples = 0;
   this.calls = [];
+  this.duration = options.endTime - options.startTime;
   this.nodeType = "Thread";
   this.inverted = options.invertTree;
 
@@ -415,6 +416,7 @@ function FrameNode(frameKey, { location, line, category, isContent }, isMetaCate
   this.category = category;
   this.nodeType = "Frame";
   this.byteSize = 0;
+  this.youngestFrameByteSize = 0;
 }
 
 FrameNode.prototype = {
@@ -486,6 +488,15 @@ FrameNode.prototype = {
        opts.push(otherOpts[i]);
       }
     }
+
+    if (otherNode._tierData.length) {
+      let tierData = this._tierData;
+      let otherTierData = otherNode._tierData;
+      for (let i = 0; i < otherTierData.length; i++) {
+        tierData.push(otherTierData[i]);
+      }
+      tierData.sort((a, b) => a.time - b.time);
+    }
   },
 
   /**
@@ -541,4 +552,3 @@ FrameNode.prototype = {
 
 exports.ThreadNode = ThreadNode;
 exports.FrameNode = FrameNode;
-exports.FrameNode.isContent = FrameUtils.isContent;
