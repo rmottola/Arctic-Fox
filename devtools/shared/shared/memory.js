@@ -236,6 +236,11 @@ var Memory = exports.Memory = Class({
    *                <timestamp for allocations[1]>,
    *                ...
    *              ],
+   *              allocationSizes: [
+   *                <bytesize for allocations[0]>,
+   *                <bytesize for allocations[1]>,
+   *                ...
+   *              ],
    *              frames: [
    *                {
    *                  line: <line number for this frame>,
@@ -246,12 +251,6 @@ var Memory = exports.Memory = Class({
    *                },
    *                ...
    *              ],
-   *              counts: [
-   *                <number of allocations in frames[0]>,
-   *                <number of allocations in frames[1]>,
-   *                <number of allocations in frames[2]>,
-   *                ...
-   *              ]
    *            }
    *
    *          The timestamps' unit is microseconds since the epoch.
@@ -293,7 +292,7 @@ var Memory = exports.Memory = Class({
       allocationsTimestamps: [],
       allocationSizes: [],
     };
-    for (let { frame: stack, timestamp } of allocations) {
+    for (let { frame: stack, timestamp, size } of allocations) {
       if (stack && Cu.isDeadWrapper(stack)) {
         continue;
       }
@@ -301,7 +300,7 @@ var Memory = exports.Memory = Class({
       // Safe because SavedFrames are frozen/immutable.
       let waived = Cu.waiveXrays(stack);
 
-      // Ensure that we have a form, count, and index for new allocations
+      // Ensure that we have a form, size, and index for new allocations
       // because we potentially haven't seen some or all of them yet. After this
       // loop, we can rely on the fact that every frame we deal with already has
       // its metadata stored.
@@ -309,6 +308,7 @@ var Memory = exports.Memory = Class({
 
       packet.allocations.push(index);
       packet.allocationsTimestamps.push(timestamp);
+      packet.allocationSizes.push(size);
     }
 
     return this._frameCache.updateFramePacket(packet);
