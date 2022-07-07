@@ -19,24 +19,25 @@ loader.lazyRequireGetter(this, "FrameUtils",
  *        The raw thread object received from the backend. Contains samples,
  *        stackTable, frameTable, and stringTable.
  * @param object options
- *        Additional supported options, @see ThreadNode.prototype.insert
- *          - number startTime [optional]
- *          - number endTime [optional]
+ *        Additional supported options
+ *          - number startTime
+ *          - number endTime
  *          - boolean contentOnly [optional]
  *          - boolean invertTree [optional]
  *          - boolean flattenRecursion [optional]
  */
 function ThreadNode(thread, options = {}) {
+  if (options.endTime == void 0 || options.startTime == void 0) {
+    throw new Error("ThreadNode requires both `startTime` and `endTime`.");
+  }
   this.samples = 0;
   this.sampleTimes = [];
-  this.duration = 0;
+  this.youngestFrameSamples = 0;
   this.calls = [];
   this.nodeType = "Thread";
   this.inverted = options.invertTree;
 
-  // Maps of frame to their self counts and duration.
-  this.selfCount = Object.create(null);
-  this.selfDuration = Object.create(null);
+  this.duration = options.endTime - options.startTime;
 
   let { samples, stackTable, frameTable, stringTable, allocationsTable } = thread;
 
@@ -73,8 +74,8 @@ ThreadNode.prototype = {
    *        index.
    * @param object options
    *        Additional supported options
-   *          - number startTime [optional]
-   *          - number endTime [optional]
+   *          - number startTime
+   *          - number endTime
    *          - boolean contentOnly [optional]
    *          - boolean invertTree [optional]
    */
@@ -119,9 +120,6 @@ ThreadNode.prototype = {
     const InflatedFrame = FrameUtils.InflatedFrame;
     const getOrAddInflatedFrame = FrameUtils.getOrAddInflatedFrame;
 
-    let selfCount = this.selfCount;
-    let selfDuration = this.selfDuration;
-
     let samplesData = samples.data;
     let stacksData = stackTable.data;
 
@@ -129,8 +127,8 @@ ThreadNode.prototype = {
     let inflatedFrameCache = FrameUtils.getInflatedFrameCache(frameTable);
     let leafTable = Object.create(null);
 
-    let startTime = options.startTime || 0
-    let endTime = options.endTime || Infinity;
+    let startTime = options.startTime;
+    let endTime = options.endTime;
     let flattenRecursion = options.flattenRecursion;
 
     // Reused options object passed to InflatedFrame.prototype.getFrameKey.
@@ -154,7 +152,6 @@ ThreadNode.prototype = {
         continue;
       }
 
-      let sampleDuration = sampleTime - prevSampleTime;
       let stackIndex = sample[SAMPLE_STACK_SLOT];
       let calls = this.calls;
       let prevCalls = this.calls;
@@ -214,22 +211,9 @@ ThreadNode.prototype = {
         mutableFrameKeyOptions.isRoot = stackIndex === null;
         let frameKey = inflatedFrame.getFrameKey(mutableFrameKeyOptions);
 
-        // Leaf frames are never skipped and require self count and duration
-        // bookkeeping.
-        if (isLeaf) {
-          // Tabulate self count and duration for the leaf frame. The frameKey
-          // is never empty for a leaf frame.
-          if (selfCount[frameKey] === undefined) {
-            selfCount[frameKey] = 0;
-            selfDuration[frameKey] = 0;
-          }
-          selfCount[frameKey]++;
-          selfDuration[frameKey] += sampleDuration;
-        } else {
-          // An empty frame key means this frame should be skipped.
-          if (frameKey === "") {
-            continue;
-          }
+        // An empty frame key means this frame should be skipped.
+        if (frameKey === "") {
+          continue;
         }
 
         // If we shouldn't flatten the current frame into the previous one, advance a
@@ -246,17 +230,18 @@ ThreadNode.prototype = {
           frameNode._addOptimizations(inflatedFrame.optimizations, inflatedFrame.implementation,
                                       sampleTime, stringTable);
 
-        frameNode._countSample(prevSampleTime, sampleTime, inflatedFrame.optimizations,
-                               stringTable);
+        if (isLeaf) {
+          frameNode.youngestFrameSamples++;
+        }
+        frameNode.samples++;
+        frameNode._addOptimizations(inflatedFrame.optimizations, stringTable);
 
         prevFrameKey = frameKey;
         prevCalls = frameNode.calls;
         isLeaf = mutableFrameKeyOptions.isLeaf = false;
       }
 
-      this.duration += sampleDuration;
       this.samples++;
-      prevSampleTime = sampleTime;
     }
   },
 
@@ -340,7 +325,19 @@ ThreadNode.prototype = {
 };
 
 /**
- * A function call node in a tree.
+ * A function call node in a tree. Represents a function call with a unique context,
+ * resulting in each FrameNode having its own row in the corresponding tree view.
+ * Take samples:
+ *  A()->B()->C()
+ *  A()->B()
+ *  Q()->B()
+ *
+ * In inverted tree, A()->B()->C() would have one frame node, and A()->B() and
+ * Q()->B() would share a frame node.
+ * In an uninverted tree, A()->B()->C() and A()->B() would share a frame node,
+ * with Q()->B() having its own.
+ *
+ * In all cases, all the frame nodes originated from the same InflatedFrame.
  *
  * @param string frameKey
  *        The key associated with this frame. The key determines identity of
@@ -364,9 +361,8 @@ function FrameNode(frameKey, { location, line, category, allocations, isContent 
   this.key = frameKey;
   this.location = location;
   this.line = line;
-  this.allocations = allocations;
+  this.youngestFrameSamples = 0;
   this.samples = 0;
-  this.duration = 0;
   this.calls = [];
   this.isContent = !!isContent;
   this._optimizations = null;
@@ -379,12 +375,8 @@ function FrameNode(frameKey, { location, line, category, allocations, isContent 
 
 FrameNode.prototype = {
   /**
-   * Count a sample as associated with this node.
+   * Take optimization data observed for this frame.
    *
-   * @param number prevSampleTime
-   *               The time when the immediate previous sample was sampled.
-   * @param number sampleTime
-   *               The time when the current sample was sampled.
    * @param object optimizationSite
    *               Any JIT optimization information attached to the current
    *               sample. Lazily inflated via stringTable.
@@ -427,7 +419,7 @@ FrameNode.prototype = {
     }
 
     this.samples += otherNode.samples;
-    this.duration += otherNode.duration;
+    this.youngestFrameSamples += otherNode.youngestFrameSamples;
 
     if (otherNode._optimizations) {
       let opts = this._optimizations;

@@ -88,7 +88,7 @@ var DetailsSubview = {
       return;
     }
     if (DetailsView.isViewSelected(this) || this.canUpdateWhileHidden) {
-      this.render();
+      this.render(OverviewView.getTimeInterval());
     } else {
       this.shouldUpdateWhenShown = true;
     }
