@@ -197,6 +197,23 @@ Telemetry.prototype = {
       userHistogram: "DEVTOOLS_WEBIDE_OPENED_PER_USER_FLAG",
       timerHistogram: "DEVTOOLS_WEBIDE_TIME_ACTIVE_SECONDS"
     },
+    webideProjectEditor: {
+      histogram: "DEVTOOLS_WEBIDE_PROJECT_EDITOR_OPENED_BOOLEAN",
+      userHistogram: "DEVTOOLS_WEBIDE_PROJECT_EDITOR_OPENED_PER_USER_FLAG",
+      timerHistogram: "DEVTOOLS_WEBIDE_PROJECT_EDITOR_TIME_ACTIVE_SECONDS"
+    },
+    webideProjectEditorSave: {
+      histogram: "DEVTOOLS_WEBIDE_PROJECT_EDITOR_SAVE_BOOLEAN",
+      userHistogram: "DEVTOOLS_WEBIDE_PROJECT_EDITOR_SAVE_PER_USER_FLAG",
+    },
+    webideNewProject: {
+      histogram: "DEVTOOLS_WEBIDE_NEW_PROJECT_BOOLEAN",
+      userHistogram: "DEVTOOLS_WEBIDE_NEW_PROJECT_PER_USER_FLAG",
+    },
+    webideImportProject: {
+      histogram: "DEVTOOLS_WEBIDE_IMPORT_PROJECT_BOOLEAN",
+      userHistogram: "DEVTOOLS_WEBIDE_IMPORT_PROJECT_PER_USER_FLAG",
+    },
     custom: {
       histogram: "DEVTOOLS_CUSTOM_OPENED_BOOLEAN",
       userHistogram: "DEVTOOLS_CUSTOM_OPENED_PER_USER_FLAG",
@@ -223,6 +240,15 @@ Telemetry.prototype = {
     if (charts.timerHistogram) {
       this.startTimer(charts.timerHistogram);
     }
+  },
+
+  /**
+   * Record that an action occurred.  Aliases to `toolOpened`, so it's just for
+   * readability at the call site for cases where we aren't actually opening
+   * tools.
+   */
+  actionOccurred(id) {
+    this.toolOpened(id);
   },
 
   toolClosed: function(id) {

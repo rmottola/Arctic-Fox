@@ -24,6 +24,7 @@ module.exports = ProjectList = function(win, parentWindow) {
   this._parentWindow = parentWindow;
   this._panelNodeEl = "toolbarbutton";
   this._sidebarsEnabled = Services.prefs.getBoolPref("devtools.webide.sidebars");
+  this._telemetry = new Telemetry();
 
   if (this._sidebarsEnabled) {
     this._panelNodeEl = "div";
@@ -78,6 +79,7 @@ ProjectList.prototype = {
    */
   newApp: function(testOptions) {
     let parentWindow = this._parentWindow;
+    let self = this;
     return this._UI.busyUntil(Task.spawn(function*() {
       // Open newapp.xul, which will feed ret.location
       let ret = {location: null, testOptions: testOptions};
@@ -90,6 +92,8 @@ ProjectList.prototype = {
 
       // Select project
       AppManager.selectedProject = project;
+
+      self._telemetry.actionOccurred("webideNewProject");
     }), "creating new app");
   },
 
