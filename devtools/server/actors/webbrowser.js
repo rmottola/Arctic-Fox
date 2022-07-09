@@ -1144,6 +1144,12 @@ TabActor.prototype = {
     //   http://hg.mozilla.org/mozilla-central/annotate/74d7fb43bb44/dom/ipc/TabChild.cpp#l944
     // So wait a tick before watching it:
     DevToolsUtils.executeSoon(() => {
+      // Bug 1142752: sometimes, the docshell appears to be immediately destroyed,
+      // bailout early to prevent random exceptions.
+      if (docShell.isBeingDestroyed()) {
+        return;
+      }
+
       // In child processes, we have new root docshells,
       // let's watch them and all their child docshells.
       if (this._isRootDocShell(docShell)) {
@@ -1230,10 +1236,24 @@ TabActor.prototype = {
     }
 
     if (webProgress.DOMWindow == this._originalWindow) {
-      // If for some reason (typically during Firefox shutdown), the original
-      // document is destroyed, we detach the tab actor to unregister all listeners
-      // and prevent any exception.
-      this.exit();
+      // If the original top level document we connected to is removed,
+      // we try to switch to any other top level document
+      let rootDocShells = this.docShells
+                              .filter(d => {
+                                return d != this.docShell &&
+                                       this._isRootDocShell(d);
+                              });
+      if (rootDocShells.length > 0) {
+        let newRoot = rootDocShells[0];
+        this._originalWindow = newRoot.DOMWindow;
+        this._changeTopLevelDocument(this._originalWindow);
+      } else {
+        // If for some reason (typically during Firefox shutdown), the original
+        // document is destroyed, and there is no other top level docshell,
+        // we detach the tab actor to unregister all listeners and prevent any
+        // exception
+        this.exit();
+      }
       return;
     }
 
