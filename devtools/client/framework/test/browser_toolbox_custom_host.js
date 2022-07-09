@@ -30,19 +30,27 @@ function test() {
     let json = JSON.parse(event.data);
     if (json.name == "toolbox-close") {
       ok("Got the `toolbox-close` message");
+      window.removeEventListener("message", onMessage);
       cleanup();
     }
   }
 
-  function testCustomHost(toolbox) {
+  function testCustomHost(t) {
+    toolbox = t;
     is(toolbox.doc.defaultView.top, window, "Toolbox is included in browser.xul");
     is(toolbox.doc, iframe.contentDocument, "Toolbox is in the custom iframe");
     executeSoon(() => gBrowser.removeCurrentTab());
   }
 
   function cleanup() {
-    window.removeEventListener("message", onMessage);
     iframe.remove();
-    finish();
+
+    // Even if we received "toolbox-close", the toolbox may still be destroying
+    // toolbox.destroy() returns a singleton promise that ensures
+    // everything is cleaned up before proceeding.
+    toolbox.destroy().then(() => {
+      toolbox = iframe = target = tab = null;
+      finish();
+    });
   }
 }

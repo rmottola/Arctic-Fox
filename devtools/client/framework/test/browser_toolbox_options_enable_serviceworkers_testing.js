@@ -17,7 +17,6 @@ const TEST_URI = URL_ROOT +
 const ELEMENT_ID = "devtools-enable-serviceWorkersTesting";
 
 var toolbox;
-let doc;
 
 function test() {
   // Note: Pref dom.serviceWorkers.testing.enabled is false since we are testing
@@ -26,16 +25,19 @@ function test() {
     ["dom.serviceWorkers.exemptFromPerDomainMax", true],
     ["dom.serviceWorkers.enabled", true],
     ["dom.serviceWorkers.testing.enabled", false]
-  ]}, start);
+  ]}, init);
 }
 
-function start() {
-  gBrowser.selectedTab = gBrowser.addTab();
+function init() {
+  let tab = gBrowser.selectedTab = gBrowser.addTab();
   let target = TargetFactory.forTab(gBrowser.selectedTab);
+  let linkedBrowser = tab.linkedBrowser;
+
+  linkedBrowser.messageManager.loadFrameScript(COMMON_FRAME_SCRIPT_URL, false);
+  linkedBrowser.messageManager.loadFrameScript(FRAME_SCRIPT_URL, false);
 
   gBrowser.selectedBrowser.addEventListener("load", function onLoad(evt) {
     gBrowser.selectedBrowser.removeEventListener(evt.type, onLoad, true);
-    doc = content.document;
     gDevTools.showToolbox(target).then(testSelectTool);
   }, true);
 
@@ -44,59 +46,24 @@ function start() {
 
 function testSelectTool(aToolbox) {
   toolbox = aToolbox;
-  toolbox.once("options-selected", testRegisterFails);
+  toolbox.once("options-selected", start);
   toolbox.selectTool("options");
 }
 
-function testRegisterFails() {
-  let output = doc.getElementById("output");
-  let button = doc.getElementById("button");
-
-  function doTheCheck() {
-    info("Testing it doesn't registers correctly until enable testing");
-    is(output.textContent,
-       "SecurityError",
-       "SecurityError expected");
-    testRegisterInstallingWorker();
-  }
-
-  if (output.textContent !== "No output") {
-    doTheCheck();
-  }
-
-  button.addEventListener('click', function onClick() {
-    button.removeEventListener('click', onClick);
-    doTheCheck();
-  });
+function register() {
+  return executeInContent("devtools:sw-test:register");
 }
 
-function testRegisterInstallingWorker() {
-  toggleServiceWorkersTestingCheckbox().then(() => {
-    let output = doc.getElementById("output");
-    let button = doc.getElementById("button");
+function unregister(swr) {
+  return executeInContent("devtools:sw-test:unregister");
+}
 
-    function doTheCheck() {
-      info("Testing it registers correctly and there is an installing worker");
-      is(output.textContent,
-         "Installing worker/",
-         "Installing worker expected");
-      toggleServiceWorkersTestingCheckbox().then(finishUp);
-    }
-
-    if (output.textContent !== "No output") {
-      doTheCheck();
-    }
-
-    button.addEventListener('click', function onClick() {
-      button.removeEventListener('click', onClick);
-      doTheCheck();
-    });
-  });
+function testRegisterFails(data) {
+  is(data.success, false, "Register should fail with security error");
+  return promise.resolve();
 }
 
 function toggleServiceWorkersTestingCheckbox() {
-  let deferred = promise.defer();
-
   let panel = toolbox.getCurrentPanel();
   let cbx = panel.panelDoc.getElementById(ELEMENT_ID);
 
@@ -108,24 +75,48 @@ function toggleServiceWorkersTestingCheckbox() {
     info("Checking checkbox to enable service workers testing");
   }
 
+  cbx.click();
+
+  return promise.resolve();
+}
+
+function reload() {
+  let deferred = promise.defer();
+
   gBrowser.selectedBrowser.addEventListener("load", function onLoad(evt) {
     gBrowser.selectedBrowser.removeEventListener(evt.type, onLoad, true);
-    doc = content.document;
     deferred.resolve();
   }, true);
 
-  cbx.click();
-
-  let mm = getFrameScript();
-  mm.sendAsyncMessage("devtools:test:reload");
-
+  executeInContent("devtools:test:reload", {}, {}, false);
   return deferred.promise;
 }
 
+function testRegisterSuccesses(data) {
+  is(data.success, true, "Register should success");
+  return promise.resolve();
+}
+
+function start() {
+  register()
+    .then(testRegisterFails)
+    .then(toggleServiceWorkersTestingCheckbox)
+    .then(reload)
+    .then(register)
+    .then(testRegisterSuccesses)
+    .then(unregister)
+    // Workers should be turned back off when we closes the toolbox
+    .then(toolbox.destroy.bind(toolbox))
+    .then(reload)
+    .then(register)
+    .then(testRegisterFails)
+    .catch(function(e) {
+      ok(false, "Some test failed with error " + e);
+    }).then(finishUp);
+}
+
 function finishUp() {
-  toolbox.destroy().then(function() {
-    gBrowser.removeCurrentTab();
-    toolbox = doc = null;
-    finish();
-  });
+  gBrowser.removeCurrentTab();
+  toolbox = null;
+  finish();
 }

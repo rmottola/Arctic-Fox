@@ -140,11 +140,13 @@ StyleEditorPanel.prototype = {
       this._target.off("close", this.destroy);
       this._target = null;
       this._toolbox = null;
+      this._panelWin = null;
       this._panelDoc = null;
       this._debuggee.destroy();
       this._debuggee = null;
 
       this.UI.destroy();
+      this.UI = null;
     }
 
     return promise.resolve(null);
