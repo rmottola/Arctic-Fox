@@ -364,25 +364,6 @@ OptionsPanel.prototype = {
     this.target.activeTab.reconfigure(options);
   },
 
-  /**
-   * Returns a boolean indicating whether or not the dev edition
-   * browser theme is applied.
-   */
-  _isDevEditionThemeOn: function() {
-    let win = Services.wm.getMostRecentWindow("navigator:browser");
-    return !!(win && win.DevEdition && win.DevEdition.styleSheet);
-  },
-
-  /**
-   * Called on observer notification for "devedition-theme-state-changed"
-   * to possibly change the state of the dev edition button
-   */
-  observe: function(aSubject, aTopic, aData) {
-    if (aTopic === kDeveditionChangedNotification) {
-      this.updateBrowserThemeButton();
-    }
-  },
-
   destroy: function() {
     if (this.destroyPromise) {
       return this.destroyPromise;
