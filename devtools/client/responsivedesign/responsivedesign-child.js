@@ -112,8 +112,11 @@ function screenshot() {
   sendAsyncMessage("ResponsiveMode:RequestScreenshot:Done", canvas.toDataURL());
 }
 
-let WebProgressListener = {
-  onLocationChange: function onLocationChange(aWebProgress) {
+var WebProgressListener = {
+  onLocationChange(webProgress, request, URI, flags) {
+    if (flags & Ci.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT) {
+      return;
+    }
     makeScrollbarsFloating();
   },
   QueryInterface: function QueryInterface(aIID) {
