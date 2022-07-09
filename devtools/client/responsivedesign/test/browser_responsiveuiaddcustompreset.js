@@ -40,7 +40,7 @@ function test() {
     key.doCommand();
   }
 
-  Task.spawn(function() {
+  Task.spawn(function*() {
 
     yield addTab("data:text/html;charset=utf8,test custom presets in responsive mode");
 
@@ -119,7 +119,9 @@ function test() {
     info(customPresetIndex);
     ok(customPresetIndex >= 0, "is the previously added preset (idx = " + customPresetIndex + ") in the list of items");
 
+    let resizePromise = instance._test_notifyOnResize();
     instance.menulist.selectedIndex = customPresetIndex;
+    yield resizePromise;
 
     is(content.innerWidth, 456, "add preset, and selected in the list, dimension valid (width)");
     is(content.innerHeight, 123, "add preset, and selected in the list, dimension valid (height)");
