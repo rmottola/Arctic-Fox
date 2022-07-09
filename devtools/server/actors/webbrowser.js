@@ -1717,7 +1717,7 @@ TabActor.prototype = {
     let threadActor = this.threadActor;
     if (request && threadActor.state == "paused") {
       request.suspend();
-      threadActor.onResume();
+      this.conn.send(threadActor.unsafeSynchronize(Promise.resolve(threadActor.onResume())));
       threadActor.dbg.enabled = false;
       this._pendingNavigation = request;
     }
