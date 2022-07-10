@@ -1172,7 +1172,8 @@ var Front = Class({
     this._requests.push({
       deferred,
       to: to || this.actorID,
-      type
+      type,
+      stack: components.stack,
     });
     this.send(packet);
     return deferred.promise;
@@ -1217,20 +1218,22 @@ var Front = Class({
       throw err;
     }
 
-    let { deferred } = this._requests.shift();
-    if (packet.error) {
-      // "Protocol error" is here to avoid TBPL heuristics. See also
-      // https://mxr.mozilla.org/webtools-central/source/tbpl/php/inc/GeneralErrorFilter.php
-      let message;
-      if (packet.error && packet.message) {
-        message = "Protocol error (" + packet.error + "): " + packet.message;
+    let { deferred, stack } = this._requests.shift();
+    Cu.callFunctionWithAsyncStack(() => {
+      if (packet.error) {
+        // "Protocol error" is here to avoid TBPL heuristics. See also
+        // https://mxr.mozilla.org/webtools-central/source/tbpl/php/inc/GeneralErrorFilter.php
+        let message;
+        if (packet.error && packet.message) {
+          message = "Protocol error (" + packet.error + "): " + packet.message;
+        } else {
+          message = packet.error;
+        }
+        deferred.reject(message);
       } else {
-        message = packet.error;
+        deferred.resolve(packet);
       }
-      deferred.reject(message);
-    } else {
-      deferred.resolve(packet);
-    }
+    }, stack, "DevTools RDP");
   }
 });
 exports.Front = Front;
