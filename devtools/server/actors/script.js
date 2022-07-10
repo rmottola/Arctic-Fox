@@ -767,7 +767,7 @@ ThreadActor.prototype = {
   _makeOnEnterFrame: function ({ pauseAndRespond }) {
     return aFrame => {
       const generatedLocation = this.sources.getFrameLocation(aFrame);
-      let { originalSourceActor } = this.synchronize(this.sources.getOriginalLocation(
+      let { originalSourceActor } = this.unsafeSynchronize(this.sources.getOriginalLocation(
         generatedLocation));
       let url = originalSourceActor.url;
 
@@ -1844,7 +1844,7 @@ ThreadActor.prototype = {
     }
 
     const generatedLocation = this.sources.getFrameLocation(aFrame);
-    const { sourceActor } = this.synchronize(this.sources.getOriginalLocation(
+    const { sourceActor } = this.unsafeSynchronize(this.sources.getOriginalLocation(
       generatedLocation));
     const url = sourceActor ? sourceActor.url : null;
 
