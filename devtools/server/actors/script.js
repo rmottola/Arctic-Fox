@@ -2288,6 +2288,37 @@ SourceActor.prototype = {
     }
   },
 
+  _reportLoadSourceError: function (error, map=null) {
+    try {
+      DevToolsUtils.reportException("SourceActor", error);
+
+      JSON.stringify(this.form(), null, 4).split(/\n/g)
+        .forEach(line => console.error("\t", line));
+
+      if (!map) {
+        return;
+      }
+
+      console.error("\t", "source map's sourceRoot =", map.sourceRoot);
+
+      console.error("\t", "source map's sources =");
+      map.sources.forEach(s => {
+        let hasSourceContent = map.sourceContentFor(s, true);
+        console.error("\t\t", s, "\t",
+                      hasSourceContent ? "has source content" : "no source content");
+      });
+
+      console.error("\t", "source map's sourcesContent =");
+      map.sourcesContent.forEach(c => {
+        if (c.length > 80) {
+          c = c.slice(0, 77) + "...";
+        }
+        c = c.replace(/\n/g, "\\n");
+        console.error("\t\t", c);
+      });
+    } catch (e) { }
+  },
+
   _getSourceText: function () {
     let toResolvedContent = t => ({
       content: t,
@@ -2296,9 +2327,16 @@ SourceActor.prototype = {
 
     let genSource = this.generatedSource || this.source;
     return this.threadActor.sources.fetchSourceMap(genSource).then(map => {
-      let sc;
-      if (map && (sc = map.sourceContentFor(this.url))) {
-        return toResolvedContent(sc);
+      if (map) {
+        try {
+          let sourceContent = map.sourceContentFor(this.url);
+          if (sourceContent) {
+            return toResolvedContent(sourceContent);
+          }
+        } catch (error) {
+          this._reportLoadSourceError(error, map);
+          throw error;
+        }
       }
 
       // Use `source.text` if it exists, is not the "no source"
@@ -2323,10 +2361,14 @@ SourceActor.prototype = {
         let sourceFetched = fetch(this.url, { loadFromCache: this.isInlineSource });
 
         // Record the contentType we just learned during fetching
-        return sourceFetched.then(result => {
-          this._contentType = result.contentType;
-          return result;
-        });
+        return sourceFetched
+          .then(result => {
+            this._contentType = result.contentType;
+            return result;
+          }, error => {
+            this._reportLoadSourceError(error, map);
+            throw error;
+          });
       }
     });
   },
@@ -3671,7 +3713,7 @@ exports.AddonThreadActor = AddonThreadActor;
  * @param String aPrefix
  *        An optional prefix for the reported error message.
  */
-let oldReportError = reportError;
+var oldReportError = reportError;
 reportError = function(aError, aPrefix="") {
   dbg_assert(aError instanceof Error, "Must pass Error objects to reportError");
   let msg = aPrefix + aError.message + ":\n" + aError.stack;
