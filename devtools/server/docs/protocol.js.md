@@ -393,7 +393,7 @@ Your actor has great news!
 
 Actors are subclasses of jetpack `EventTarget`, so you can just emit:
 
-    let event = require("sdk/core/event");
+    let event = require("sdk/event/core");
 
     giveGoodNews: method(function(news) {
         event.emit(this, "good-news", news);
@@ -421,6 +421,12 @@ You might want to update your front's state when an event is fired, before emitt
 
     countGoodNews: protocol.preEvent("good-news", function(news) {
         this.amountOfGoodNews++;
+    });
+
+You can have events wait until an asynchronous action completes before firing by returning a promise. If you have multiple preEvents defined for a specific event, and atleast one fires asynchronously, then all preEvents most resolve before all events are fired.
+
+    countGoodNews: protocol.preEvent("good-news", function(news) {
+        return this.updateGoodNews().then(() => this.amountOfGoodNews++);
     });
 
 On a somewhat related note, not every method needs to be request/response.  Just like an actor can emit a one-way event, a method can be marked as a one-way request.  Maybe we don't care about giveGoodNews returning anything:
