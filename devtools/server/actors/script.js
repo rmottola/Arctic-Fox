@@ -1882,13 +1882,6 @@ ThreadActor.prototype = {
    *        A Debugger.Object instance whose referent is the global object.
    */
   onNewScript: function (aScript, aGlobal) {
-    // XXX: The scripts must be added to the ScriptStore before restoring
-    // breakpoints in _addScript. If we try to add them to the ScriptStore
-    // inside _addScript, we can accidentally set a breakpoint in a top level
-    // script as a "closest match" because we wouldn't have added the child
-    // scripts to the ScriptStore yet.
-    this.scripts.addScripts(this.dbg.findScripts({ source: aScript.source }));
-
     this._addSource(aScript.source);
   },
 
@@ -1924,6 +1917,12 @@ ThreadActor.prototype = {
     if (!this.sources.allowSource(aSource) || this._debuggerSourcesSeen.has(aSource)) {
       return false;
     }
+
+    // The scripts must be added to the ScriptStore before restoring
+    // breakpoints. If we try to add them to the ScriptStore any later, we can
+    // accidentally set a breakpoint in a top level script as a "closest match"
+    // because we wouldn't have added the child scripts to the ScriptStore yet.
+    this.scripts.addScripts(this.dbg.findScripts({ source: aSource }));
 
     let sourceActor = this.sources.createNonSourceMappedActor(aSource);
 
