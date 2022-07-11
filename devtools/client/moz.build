@@ -19,6 +19,7 @@ DIRS += [
     'layoutview',
     'markupview',
     'netmonitor',
+    'performance',
     'projecteditor',
     'promisedebugger',
     'responsivedesign',
