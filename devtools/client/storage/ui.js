@@ -124,7 +124,7 @@ StorageUI.prototype = {
   removeItemFromTable: function(name) {
     if (this.table.isSelected(name)) {
       if (this.table.selectedIndex == 0) {
-        this.table.selectNextRow()
+        this.table.selectNextRow();
       } else {
         this.table.selectPreviousRow();
       }
@@ -400,7 +400,9 @@ StorageUI.prototype = {
         // which may be available.
         let rawObject = Object.create(null);
         let otherProps =
-          itemProps.filter(e => e != "name" && e != "value" && e != "valueActor");
+          itemProps.filter(e => e != "name" &&
+                                e != "value" &&
+                                e != "valueActor");
         for (let prop of otherProps) {
           rawObject[prop] = item[prop];
         }
@@ -454,9 +456,10 @@ StorageUI.prototype = {
     }
 
     let jsonObject = Object.create(null);
+    let view = this.view;
     jsonObject[name] = json;
-    let valueScope = this.view.getScopeAtIndex(1) ||
-                     this.view.addScope(L10N.getStr("storage.parsedValue.label"));
+    let valueScope = view.getScopeAtIndex(1) ||
+                     view.addScope(L10N.getStr("storage.parsedValue.label"));
     valueScope.expanded = true;
     let jsonVar = valueScope.addItem("", Object.create(null), true);
     jsonVar.expanded = true;
