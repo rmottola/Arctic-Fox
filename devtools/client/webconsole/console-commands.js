@@ -43,11 +43,12 @@ exports.items = [
       let toolbox = gDevTools.getToolbox(target);
 
       if (!toolbox) {
-        return gDevTools.showToolbox(target, "inspector").then((newToolbox) => {
-          newToolbox.toggleSplitConsole();
+        return gDevTools.showToolbox(target, "inspector").then((toolbox) => {
+          toolbox.toggleSplitConsole();
         });
+      } else {
+        toolbox.toggleSplitConsole();
       }
-      return toolbox.toggleSplitConsole();
     }
   },
   {
