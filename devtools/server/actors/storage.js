@@ -19,8 +19,7 @@ const { setTimeout, clearTimeout } = require("sdk/timers");
 loader.lazyImporter(this, "OS", "resource://gre/modules/osfile.jsm");
 loader.lazyImporter(this, "Sqlite", "resource://gre/modules/Sqlite.jsm");
 
-// Global required for window less Indexed DB instantiation.
-let global = this;
+var gTrackedMessageManager = new Map();
 
 // Maximum number of cookies/local storage key-value-pairs that can be sent
 // over the wire to the client in one request.
@@ -34,8 +33,10 @@ const BATCH_DELAY = 200;
 // present in <profileDir>/storage/default/ location
 var illegalFileNameCharacters = [
   "[",
-  "\\x00-\\x25",     // Control characters \001 to \037
-  "/:*?\\\"<>|\\\\", // Special characters
+  // Control characters \001 to \036
+  "\\x00-\\x24",
+  // Special characters
+  "/:*?\\\"<>|\\\\",
   "]"
 ].join("");
 var ILLEGAL_CHAR_REGEX = new RegExp(illegalFileNameCharacters, "g");
@@ -344,10 +345,24 @@ StorageActors.defaults = function(typeName, observationTopic, storeObjectType) {
 
       if (names) {
         for (let name of names) {
-          toReturn.data.push(
-            // yield because getValuesForHost is async for Indexed DB
-            ...(yield this.getValuesForHost(host, name, options))
-          );
+          let values =
+            yield this.getValuesForHost(host, name, options, this.hostVsStores);
+
+          let {result, objectStores} = values;
+
+          if (result && typeof result.objectsSize !== "undefined") {
+            for (let {key, count} of result.objectsSize) {
+              this.objectsSize[key] = count;
+            }
+          }
+
+          if (result) {
+            toReturn.data.push(...result.data);
+          } else if (objectStores) {
+            toReturn.data.push(...objectStores);
+          } else {
+            toReturn.data.push(...values);
+          }
         }
         toReturn.total = this.getObjectsSize(host, names, options);
         if (offset > toReturn.total) {
@@ -360,14 +375,19 @@ StorageActors.defaults = function(typeName, observationTopic, storeObjectType) {
           }).slice(offset, offset + size).map(a => this.toStoreObject(a));
         }
       } else {
-        let total = yield this.getValuesForHost(host);
-        toReturn.total = total.length;
+        let obj = yield this.getValuesForHost(host, undefined, undefined,
+                                              this.hostVsStores);
+        if (obj.dbs) {
+          obj = obj.dbs;
+        }
+
+        toReturn.total = obj.length;
         if (offset > toReturn.total) {
           // In this case, toReturn.data is an empty array.
           toReturn.offset = offset = toReturn.total;
           toReturn.data = [];
         } else {
-          toReturn.data = total.sort((a, b) => {
+          toReturn.data = obj.sort((a, b) => {
             return a[sortOn] - b[sortOn];
           }).slice(offset, offset + size)
             .map(object => this.toStoreObject(object));
@@ -383,7 +403,7 @@ StorageActors.defaults = function(typeName, observationTopic, storeObjectType) {
       },
       response: RetVal(storeObjectType)
     })
-  }
+  };
 };
 
 /**
@@ -429,7 +449,7 @@ StorageActors.createActor = function(options = {}, overrides = {}) {
     }
   });
   storageTypePool.set(actorObject.typeName, actor);
-}
+};
 
 /**
  * The Cookies actor and front.
@@ -443,8 +463,10 @@ StorageActors.createActor({
 
     this.storageActor = storageActor;
 
+    this.maybeSetupChildProcess();
     this.populateStoresForHosts();
-    Services.obs.addObserver(this, "cookie-changed", false);
+    this.addCookieObservers();
+
     this.onWindowReady = this.onWindowReady.bind(this);
     this.onWindowDestroyed = this.onWindowDestroyed.bind(this);
     events.on(this.storageActor, "window-ready", this.onWindowReady);
@@ -452,8 +474,15 @@ StorageActors.createActor({
   },
 
   destroy: function() {
-    this.hostVsStores.clear();
-    Services.obs.removeObserver(this, "cookie-changed", false);
+    this.hostVsStores = null;
+
+    // We need to remove the cookie listeners early in E10S mode so we need to
+    // use a conditional here to ensure that we only attempt to remove them in
+    // single process mode.
+    if (!DebuggerServer.isInChildProcess) {
+      this.removeCookieObservers();
+    }
+
     events.off(this.storageActor, "window-ready", this.onWindowReady);
     events.off(this.storageActor, "window-destroyed", this.onWindowDestroyed);
     this.storageActor = null;
@@ -504,9 +533,15 @@ StorageActors.createActor({
       name: cookie.name,
       path: cookie.path || "",
       host: cookie.host || "",
-      expires: (cookie.expires || 0) * 1000, // because expires is in seconds
-      creationTime: cookie.creationTime / 1000, // because it is in micro seconds
-      lastAccessed: cookie.lastAccessed / 1000, // - do -
+
+      // because expires is in seconds
+      expires: (cookie.expires || 0) * 1000,
+
+      // because it is in micro seconds
+      creationTime: cookie.creationTime / 1000,
+
+      // - do -
+      lastAccessed: cookie.lastAccessed / 1000,
       value: new LongStringActor(this.conn, cookie.value || ""),
       isDomain: cookie.isDomain,
       isSecure: cookie.isSecure,
@@ -517,14 +552,9 @@ StorageActors.createActor({
   populateStoresForHost: function(host) {
     this.hostVsStores.set(host, new Map());
 
-    // Local files have no host.
-    if (host.startsWith("file:///")) {
-      host = "";
-    }
+    let cookies = this.getCookiesFromHost(host);
 
-    let cookies = Services.cookies.getCookiesFromHost(host);
-    while (cookies.hasMoreElements()) {
-      let cookie = cookies.getNext().QueryInterface(Ci.nsICookie2);
+    for (let cookie of cookies) {
       if (this.isCookieAtHost(cookie, host)) {
         this.hostVsStores.get(host).set(cookie.name, cookie);
       }
@@ -532,7 +562,7 @@ StorageActors.createActor({
   },
 
   /**
-   * Notification observer for topics "cookie-change".
+   * Notification observer for "cookie-change".
    *
    * @param subject
    *        {nsiCookie|[nsiCookie]} A single nsiCookie object or a list of it
@@ -544,9 +574,8 @@ StorageActors.createActor({
    *        Additional data associated with the notification. Its the type of
    *        cookie change in the "cookie-change" topic.
    */
-  observe: function(subject, topic, action) {
-    if (!subject ||
-        topic !== "cookie-changed" ||
+  onCookieChanged: function(subject, topic, action) {
+    if (topic !== "cookie-changed" ||
         !this.storageActor ||
         !this.storageActor.windows) {
       return null;
@@ -555,7 +584,7 @@ StorageActors.createActor({
     let hosts = this.getMatchingHosts(subject);
     let data = {};
 
-    switch(action) {
+    switch (action) {
       case "added":
       case "changed":
         if (hosts.length) {
@@ -606,8 +635,175 @@ StorageActors.createActor({
     }
     return null;
   },
+
+  maybeSetupChildProcess: function() {
+    cookieHelpers.onCookieChanged = this.onCookieChanged.bind(this);
+
+    if (!DebuggerServer.isInChildProcess) {
+      this.getCookiesFromHost = cookieHelpers.getCookiesFromHost;
+      this.addCookieObservers = cookieHelpers.addCookieObservers;
+      this.removeCookieObservers = cookieHelpers.removeCookieObservers;
+      return;
+    }
+
+    const { sendSyncMessage, addMessageListener } =
+      this.conn.parentMessageManager;
+
+    this.conn.setupInParent({
+      module: "devtools/server/actors/storage",
+      setupParent: "setupParentProcessForCookies"
+    });
+
+    this.getCookiesFromHost =
+      callParentProcess.bind(null, "getCookiesFromHost");
+    this.addCookieObservers =
+      callParentProcess.bind(null, "addCookieObservers");
+    this.removeCookieObservers =
+      callParentProcess.bind(null, "removeCookieObservers");
+
+    addMessageListener("storage:storage-cookie-request-child",
+                       cookieHelpers.handleParentRequest);
+
+    function callParentProcess(methodName, ...args) {
+      let reply = sendSyncMessage("storage:storage-cookie-request-parent", {
+        method: methodName,
+        args: args
+      });
+
+      if (reply.length === 0) {
+        console.error("ERR_DIRECTOR_CHILD_NO_REPLY from " + methodName);
+      } else if (reply.length > 1) {
+        console.error("ERR_DIRECTOR_CHILD_MULTIPLE_REPLIES from " + methodName);
+      }
+
+      let result = reply[0];
+
+      if (methodName === "getCookiesFromHost") {
+        return JSON.parse(result);
+      }
+
+      return result;
+    }
+  },
 });
 
+var cookieHelpers = {
+  getCookiesFromHost: function(host) {
+    // Local files have no host.
+    if (host.startsWith("file:///")) {
+      host = "";
+    }
+
+    let cookies = Services.cookies.getCookiesFromHost(host);
+    let store = [];
+
+    while (cookies.hasMoreElements()) {
+      let cookie = cookies.getNext().QueryInterface(Ci.nsICookie2);
+      store.push(cookie);
+    }
+
+    return store;
+  },
+
+  addCookieObservers: function() {
+    Services.obs.addObserver(cookieHelpers, "cookie-changed", false);
+    return null;
+  },
+
+  removeCookieObservers: function() {
+    Services.obs.removeObserver(cookieHelpers, "cookie-changed", false);
+    return null;
+  },
+
+  observe: function(subject, topic, data) {
+    switch (topic) {
+      case "cookie-changed":
+        let cookie = subject.QueryInterface(Ci.nsICookie2);
+        cookieHelpers.onCookieChanged(cookie, topic, data);
+      break;
+    }
+  },
+
+  handleParentRequest: function(msg) {
+    switch (msg.json.method) {
+      case "onCookieChanged":
+        let [cookie, topic, data] = msg.data.args;
+        cookie = JSON.parse(cookie);
+        cookieHelpers.onCookieChanged(cookie, topic, data);
+      break;
+    }
+  },
+
+  handleChildRequest: function(msg) {
+    switch (msg.json.method) {
+      case "getCookiesFromHost":
+        let host = msg.data.args[0];
+        let cookies = cookieHelpers.getCookiesFromHost(host);
+        return JSON.stringify(cookies);
+      case "addCookieObservers":
+        return cookieHelpers.addCookieObservers();
+      case "removeCookieObservers":
+        return cookieHelpers.removeCookieObservers();
+      default:
+        console.error("ERR_DIRECTOR_PARENT_UNKNOWN_METHOD", msg.json.method);
+        throw new Error("ERR_DIRECTOR_PARENT_UNKNOWN_METHOD");
+    }
+  },
+};
+
+/**
+ * E10S parent/child setup helpers
+ */
+
+exports.setupParentProcessForCookies = function({mm, prefix}) {
+  cookieHelpers.onCookieChanged =
+    callChildProcess.bind(null, "onCookieChanged");
+
+  // listen for director-script requests from the child process
+  mm.addMessageListener("storage:storage-cookie-request-parent",
+                        cookieHelpers.handleChildRequest);
+
+  DebuggerServer.once("disconnected-from-child:" + prefix,
+                      handleMessageManagerDisconnected);
+
+  gTrackedMessageManager.set("cookies", mm);
+
+  function handleMessageManagerDisconnected(evt, { mm: disconnected_mm }) {
+    // filter out not subscribed message managers
+    if (disconnected_mm !== mm || !gTrackedMessageManager.has("cookies")) {
+      return;
+    }
+
+    // Although "disconnected-from-child" implies that the child is already
+    // disconnected this is not the case. The disconnection takes place after
+    // this method has finished. This gives us chance to clean up items within
+    // the parent process e.g. observers.
+    cookieHelpers.removeCookieObservers();
+
+    gTrackedMessageManager.delete("cookies");
+
+    // unregister for director-script requests handlers from the parent process
+    // (if any)
+    mm.removeMessageListener("storage:storage-cookie-request-parent",
+                             cookieHelpers.handleChildRequest);
+  }
+
+  function callChildProcess(methodName, ...args) {
+    if (methodName === "onCookieChanged") {
+      args[0] = JSON.stringify(args[0]);
+    }
+
+    try {
+      mm.sendAsyncMessage("storage:storage-cookie-request-child", {
+        method: methodName,
+        args: args
+      });
+    } catch(e) {
+      // We may receive a NS_ERROR_NOT_INITIALIZED if the target window has
+      // been closed. This can legitimately happen in between test runs.
+    }
+  }
+};
 
 /**
  * Helper method to create the overriden object required in
@@ -716,8 +912,8 @@ function getObjectForLocalOrSessionStorage(type) {
         value: new LongStringActor(this.conn, item.value || "")
       };
     },
-  }
-};
+  };
+}
 
 /**
  * The Local Storage actor and front.
@@ -736,7 +932,6 @@ StorageActors.createActor({
   observationTopic: "dom-storage2-changed",
   storeObjectType: "storagestoreobject"
 }, getObjectForLocalOrSessionStorage("sessionStorage"));
-
 
 /**
  * Code related to the Indexed DB actor and front
@@ -777,11 +972,24 @@ function ObjectStoreMetadata(objectStore) {
   this._name = objectStore.name;
   this._keyPath = objectStore.keyPath;
   this._autoIncrement = objectStore.autoIncrement;
-  this._indexes = new Map();
+  this._indexes = [];
 
   for (let i = 0; i < objectStore.indexNames.length; i++) {
     let index = objectStore.index(objectStore.indexNames[i]);
-    this._indexes.set(index, new IndexMetadata(index));
+
+    let newIndex = {
+      keypath: index.keyPath,
+      multiEntry: index.multiEntry,
+      name: index.name,
+      objectStore: {
+        autoIncrement: index.objectStore.autoIncrement,
+        indexNames: [...index.objectStore.indexNames],
+        keyPath: index.objectStore.keyPath,
+        name: index.objectStore.name,
+      }
+    };
+
+    this._indexes.push([newIndex, new IndexMetadata(index)]);
   }
 }
 ObjectStoreMetadata.prototype = {
@@ -809,7 +1017,7 @@ function DatabaseMetadata(origin, db) {
   this._origin = origin;
   this._name = db.name;
   this._version = db.version;
-  this._objectStores = new Map();
+  this._objectStores = [];
 
   if (db.objectStoreNames.length) {
     let transaction = db.transaction(db.objectStoreNames, "readonly");
@@ -817,11 +1025,11 @@ function DatabaseMetadata(origin, db) {
     for (let i = 0; i < transaction.objectStoreNames.length; i++) {
       let objectStore =
         transaction.objectStore(transaction.objectStoreNames[i]);
-      this._objectStores.set(transaction.objectStoreNames[i],
-                             new ObjectStoreMetadata(objectStore));
+      this._objectStores.push([transaction.objectStoreNames[i],
+                              new ObjectStoreMetadata(objectStore)]);
     }
   }
-};
+}
 DatabaseMetadata.prototype = {
   get objectStores() {
     return this._objectStores;
@@ -888,87 +1096,6 @@ StorageActors.createActor({
   },
 
   /**
-   * Returns all or requested entries from a particular objectStore from the db
-   * in the given host.
-   *
-   * @param {string} host
-   *        The given host.
-   * @param {string} dbName
-   *        The name of the indexed db from the above host.
-   * @param {string} objectStore
-   *        The name of the object store from the above db.
-   * @param {string} id
-   *        id of the requested entry from the above object store.
-   *        null if all entries from the above object store are requested.
-   * @param {string} index
-   *        name of the IDBIndex to be iterated on while fetching entries.
-   *        null or "name" if no index is to be iterated.
-   * @param {number} offset
-   *        ofsset of the entries to be fetched.
-   * @param {number} size
-   *        The intended size of the entries to be fetched.
-   */
-  getObjectStoreData:
-  function(host, dbName, objectStore, id, index, offset, size) {
-    let request = this.openWithOrigin(host, dbName);
-    let success = Promise.defer();
-    let data = [];
-    if (!size || size > MAX_STORE_OBJECT_COUNT) {
-      size = MAX_STORE_OBJECT_COUNT;
-    }
-
-    request.onsuccess = event => {
-      let db = event.target.result;
-
-      let transaction = db.transaction(objectStore, "readonly");
-      let source = transaction.objectStore(objectStore);
-      if (index && index != "name") {
-        source = source.index(index);
-      }
-
-      source.count().onsuccess = event => {
-        let count = event.target.result;
-        this.objectsSize[host + dbName + objectStore + index] = count;
-
-        if (!offset) {
-          offset = 0;
-        } else if (offset > count) {
-          db.close();
-          success.resolve([]);
-          return;
-        }
-
-        if (id) {
-          source.get(id).onsuccess = event => {
-            db.close();
-            success.resolve([{name: id, value: event.target.result}]);
-          };
-        }
-        else {
-          source.openCursor().onsuccess = event => {
-            let cursor = event.target.result;
-
-            if (!cursor || data.length >= size) {
-              db.close();
-              success.resolve(data);
-              return;
-            }
-            if (offset-- <= 0) {
-              data.push({name: cursor.key, value: cursor.value});
-            }
-            cursor.continue();
-          };
-        }
-      };
-    };
-    request.onerror = () => {
-      db.close();
-      success.resolve([]);
-    };
-    return success.promise;
-  },
-
-  /**
    * Returns the total number of entries for various types of requests to
    * getStoreObjects for Indexed DB actor.
    *
@@ -1018,36 +1145,6 @@ StorageActors.createActor({
     return 0;
   },
 
-  getValuesForHost: async(function*(host, name = "null", options) {
-    name = JSON.parse(name);
-    if (!name || !name.length) {
-      // This means that details about the db in this particular host are
-      // requested.
-      let dbs = [];
-      if (this.hostVsStores.has(host)) {
-        for (let [dbName, db] of this.hostVsStores.get(host)) {
-          dbs.push(db.toObject());
-        }
-      }
-      return dbs;
-    }
-    let [db, objectStore, id] = name;
-    if (!objectStore) {
-      // This means that details about all the object stores in this db are
-      // requested.
-      let objectStores = [];
-      if (this.hostVsStores.has(host) && this.hostVsStores.get(host).has(db)) {
-        for (let objectStore of this.hostVsStores.get(host).get(db).objectStores) {
-          objectStores.push(objectStore[1].toObject());
-        }
-      }
-      return objectStores;
-    }
-    // Get either all entries from the object store, or a particular id
-    return yield this.getObjectStoreData(host, db, objectStore, id,
-                                         options.index, options.size);
-  }),
-
   /**
    * Purpose of this method is same as populateStoresForHosts but this is async.
    * This exact same operation cannot be performed in populateStoresForHosts
@@ -1056,6 +1153,7 @@ StorageActors.createActor({
    */
   preListStores: async(function*() {
     this.hostVsStores = new Map();
+
     for (let host of this.hosts) {
       yield this.populateStoresForHost(host);
     }
@@ -1063,142 +1161,16 @@ StorageActors.createActor({
 
   populateStoresForHost: async(function*(host) {
     let storeMap = new Map();
-    for (let name of (yield this.getDBNamesForHost(host))) {
-      storeMap.set(name, yield this.getDBMetaData(host, name));
+    let {names} = yield this.getDBNamesForHost(host);
+
+    for (let name of names) {
+      let metadata = yield this.getDBMetaData(host, name);
+
+      indexedDBHelpers.patchMetadataMapsAndProtos(metadata);
+      storeMap.set(name, metadata);
     }
+
     this.hostVsStores.set(host, storeMap);
-  }),
-
-  /**
-   * Removes any illegal characters from the host name to make it a valid file
-   * name.
-   */
-  getSanitizedHost: function(host) {
-    return host.replace(ILLEGAL_CHAR_REGEX, "+");
-  },
-
-  /**
-   * Opens an indexed db connection for the given `host` and database `name`.
-   */
-  openWithOrigin: function(host, name) {
-    let principal;
-
-    if (/^(about:|chrome:)/.test(host)) {
-      principal = Services.scriptSecurityManager.getSystemPrincipal();
-    }
-    else {
-      let uri = Services.io.newURI(host, null, null);
-      principal = Services.scriptSecurityManager.getCodebasePrincipal(uri);
-    }
-
-    return require("indexedDB").openForPrincipal(principal, name);
-  },
-
-  /**
-   * Fetches and stores all the metadata information for the given database
-   * `name` for the given `host`. The stored metadata information is of
-   * `DatabaseMetadata` type.
-   */
-  getDBMetaData: function(host, name) {
-    let request = this.openWithOrigin(host, name);
-    let success = Promise.defer();
-    request.onsuccess = event => {
-      let db = event.target.result;
-
-      let dbData = new DatabaseMetadata(host, db);
-      db.close();
-      success.resolve(dbData);
-    };
-    request.onerror = event => {
-      console.error("Error opening indexeddb database " + name + " for host " +
-                    host);
-      success.resolve(null);
-    };
-    return success.promise;
-  },
-
-  /**
-   * Retrives the proper indexed db database name from the provided .sqlite file
-   * location.
-   */
-  getNameFromDatabaseFile: async(function*(path) {
-    let connection = null;
-    let retryCount = 0;
-
-    // Content pages might be having an open transaction for the same indexed db
-    // which this sqlite file belongs to. In that case, sqlite.openConnection
-    // will throw. Thus we retey for some time to see if lock is removed.
-    while (!connection && retryCount++ < 25) {
-      try {
-        connection = yield Sqlite.openConnection({ path: path });
-      }
-      catch (ex) {
-        // Continuously retrying is overkill. Waiting for 100ms before next try
-        yield sleep(100);
-      }
-    }
-
-    if (!connection) {
-      return null;
-    }
-
-    let rows = yield connection.execute("SELECT name FROM database");
-    if (rows.length != 1) {
-      return null;
-    }
-
-    let name = rows[0].getResultByName("name");
-
-    yield connection.close();
-
-    return name;
-  }),
-
-  /**
-   * Fetches all the databases and their metadata for the given `host`.
-   */
-  getDBNamesForHost: async(function*(host) {
-    let sanitizedHost = this.getSanitizedHost(host);
-    let directory = OS.Path.join(OS.Constants.Path.profileDir, "storage",
-                                 "default", sanitizedHost, "idb");
-
-    let exists = yield OS.File.exists(directory);
-    if (!exists && host.startsWith("about:")) {
-      // try for moz-safe-about directory
-      sanitizedHost = this.getSanitizedHost("moz-safe-" + host);
-      directory = OS.Path.join(OS.Constants.Path.profileDir, "storage",
-                               "permanent", sanitizedHost, "idb");
-      exists = yield OS.File.exists(directory);
-    }
-    if (!exists) {
-      return [];
-    }
-
-    let names = [];
-    let dirIterator = new OS.File.DirectoryIterator(directory);
-    try {
-      yield dirIterator.forEach(file => {
-        // Skip directories.
-        if (file.isDir) {
-          return null;
-        }
-
-        // Skip any non-sqlite files.
-        if (!file.name.endsWith(".sqlite")) {
-          return null;
-        }
-
-        return this.getNameFromDatabaseFile(file.path).then(name => {
-          if (name) {
-            names.push(name);
-          }
-          return null;
-        });
-      });
-    } finally {
-      dirIterator.close();
-    }
-    return names;
   }),
 
   /**
@@ -1247,6 +1219,337 @@ StorageActors.createActor({
     return {
       actor: this.actorID,
       hosts: hosts
+    };
+  },
+
+  maybeSetupChildProcess: function() {
+    if (!DebuggerServer.isInChildProcess) {
+      this.backToChild = function(...args) {
+        return args[1];
+      };
+      this.getDBMetaData = indexedDBHelpers.getDBMetaData;
+      this.openWithOrigin = indexedDBHelpers.openWithOrigin;
+      this.getDBNamesForHost = indexedDBHelpers.getDBNamesForHost;
+      this.getSanitizedHost = indexedDBHelpers.getSanitizedHost;
+      this.getNameFromDatabaseFile = indexedDBHelpers.getNameFromDatabaseFile;
+      this.getValuesForHost = indexedDBHelpers.getValuesForHost;
+      this.getObjectStoreData = indexedDBHelpers.getObjectStoreData;
+      this.patchMetadataMapsAndProtos =
+        indexedDBHelpers.patchMetadataMapsAndProtos;
+      return;
+    }
+
+    const { sendSyncMessage, addMessageListener } =
+      this.conn.parentMessageManager;
+
+    this.conn.setupInParent({
+      module: "devtools/server/actors/storage",
+      setupParent: "setupParentProcessForIndexedDB"
+    });
+
+    this.getDBMetaData =
+      callParentProcessAsync.bind(null, "getDBMetaData");
+    this.getDBNamesForHost =
+      callParentProcessAsync.bind(null, "getDBNamesForHost");
+    this.getValuesForHost =
+      callParentProcessAsync.bind(null, "getValuesForHost");
+
+    addMessageListener("storage:storage-indexedDB-request-child", msg => {
+      switch (msg.json.method) {
+        case "backToChild":
+          let func = msg.json.args.shift();
+          let deferred = unresolvedPromises.get(func);
+
+          if (deferred) {
+            unresolvedPromises.delete(func);
+            deferred.resolve(msg.json.args[0]);
+          }
+        break;
+      }
+    });
+
+    let unresolvedPromises = new Map();
+    function callParentProcessAsync(methodName, ...args) {
+      let deferred = promise.defer();
+
+      unresolvedPromises.set(methodName, deferred);
+
+      sendSyncMessage("storage:storage-indexedDB-request-parent", {
+        method: methodName,
+        args: args
+      });
+
+      return deferred.promise;
+    }
+  },
+});
+
+var indexedDBHelpers = {
+  backToChild: function(...args) {
+    let mm = Cc["@mozilla.org/globalmessagemanager;1"]
+               .getService(Ci.nsIMessageListenerManager);
+
+    mm.broadcastAsyncMessage("storage:storage-indexedDB-request-child", {
+      method: "backToChild",
+      args: args
+    });
+  },
+
+  /**
+   * Fetches and stores all the metadata information for the given database
+   * `name` for the given `host`. The stored metadata information is of
+   * `DatabaseMetadata` type.
+   */
+  getDBMetaData: async(function*(host, name) {
+    let request = this.openWithOrigin(host, name);
+    let success = promise.defer();
+
+    request.onsuccess = event => {
+      let db = event.target.result;
+
+      let dbData = new DatabaseMetadata(host, db);
+      db.close();
+
+      this.backToChild("getDBMetaData", dbData);
+      success.resolve(dbData);
+    };
+    request.onerror = () => {
+      console.error("Error opening indexeddb database " + name + " for host " +
+                    host);
+      this.backToChild("getDBMetaData", null);
+      success.resolve(null);
+    };
+    return success.promise;
+  }),
+
+  /**
+   * Opens an indexed db connection for the given `host` and database `name`.
+   */
+  openWithOrigin: function(host, name) {
+    let principal;
+
+    if (/^(about:|chrome:)/.test(host)) {
+      principal = Services.scriptSecurityManager.getSystemPrincipal();
+    } else {
+      let uri = Services.io.newURI(host, null, null);
+      principal = Services.scriptSecurityManager.createCodebasePrincipal(uri, {});
+    }
+
+    return require("indexedDB").openForPrincipal(principal, name);
+  },
+
+    /**
+   * Fetches all the databases and their metadata for the given `host`.
+   */
+  getDBNamesForHost: async(function*(host) {
+    let sanitizedHost = this.getSanitizedHost(host);
+    let directory = OS.Path.join(OS.Constants.Path.profileDir, "storage",
+                                 "default", sanitizedHost, "idb");
+
+    let exists = yield OS.File.exists(directory);
+    if (!exists && host.startsWith("about:")) {
+      // try for moz-safe-about directory
+      sanitizedHost = this.getSanitizedHost("moz-safe-" + host);
+      directory = OS.Path.join(OS.Constants.Path.profileDir, "storage",
+                               "permanent", sanitizedHost, "idb");
+      exists = yield OS.File.exists(directory);
+    }
+    if (!exists) {
+      return this.backToChild("getDBNamesForHost", {names: []});
+    }
+
+    let names = [];
+    let dirIterator = new OS.File.DirectoryIterator(directory);
+    try {
+      yield dirIterator.forEach(file => {
+        // Skip directories.
+        if (file.isDir) {
+          return null;
+        }
+
+        // Skip any non-sqlite files.
+        if (!file.name.endsWith(".sqlite")) {
+          return null;
+        }
+
+        return this.getNameFromDatabaseFile(file.path).then(name => {
+          if (name) {
+            names.push(name);
+          }
+          return null;
+        });
+      });
+    } finally {
+      dirIterator.close();
+    }
+    return this.backToChild("getDBNamesForHost", {names: names});
+  }),
+
+  /**
+   * Removes any illegal characters from the host name to make it a valid file
+   * name.
+   */
+  getSanitizedHost: function(host) {
+    return host.replace(ILLEGAL_CHAR_REGEX, "+");
+  },
+
+  /**
+   * Retrieves the proper indexed db database name from the provided .sqlite
+   * file location.
+   */
+  getNameFromDatabaseFile: async(function*(path) {
+    let connection = null;
+    let retryCount = 0;
+
+    // Content pages might be having an open transaction for the same indexed db
+    // which this sqlite file belongs to. In that case, sqlite.openConnection
+    // will throw. Thus we retey for some time to see if lock is removed.
+    while (!connection && retryCount++ < 25) {
+      try {
+        connection = yield Sqlite.openConnection({ path: path });
+      } catch (ex) {
+        // Continuously retrying is overkill. Waiting for 100ms before next try
+        yield sleep(100);
+      }
+    }
+
+    if (!connection) {
+      return null;
+    }
+
+    let rows = yield connection.execute("SELECT name FROM database");
+    if (rows.length != 1) {
+      return null;
+    }
+
+    let name = rows[0].getResultByName("name");
+
+    yield connection.close();
+
+    return name;
+  }),
+
+  getValuesForHost:
+  async(function*(host, name = "null", options, hostVsStores) {
+    name = JSON.parse(name);
+    if (!name || !name.length) {
+      // This means that details about the db in this particular host are
+      // requested.
+      let dbs = [];
+      if (hostVsStores.has(host)) {
+        for (let [, db] of hostVsStores.get(host)) {
+          indexedDBHelpers.patchMetadataMapsAndProtos(db);
+          dbs.push(db.toObject());
+        }
+      }
+      return this.backToChild("getValuesForHost", {dbs: dbs});
+    }
+
+    let [db2, objectStore, id] = name;
+    if (!objectStore) {
+      // This means that details about all the object stores in this db are
+      // requested.
+      let objectStores = [];
+      if (hostVsStores.has(host) && hostVsStores.get(host).has(db2)) {
+        let db = hostVsStores.get(host).get(db2);
+
+        indexedDBHelpers.patchMetadataMapsAndProtos(db);
+
+        let objectStores2 = db.objectStores;
+
+        for (let objectStore2 of objectStores2) {
+          objectStores.push(objectStore2[1].toObject());
+        }
+      }
+      return this.backToChild("getValuesForHost", {objectStores: objectStores});
+    }
+    // Get either all entries from the object store, or a particular id
+    let result = yield this.getObjectStoreData(host, db2, objectStore, id,
+                                               options.index, options.size);
+    return this.backToChild("getValuesForHost", {result: result});
+  }),
+
+  /**
+   * Returns all or requested entries from a particular objectStore from the db
+   * in the given host.
+   *
+   * @param {string} host
+   *        The given host.
+   * @param {string} dbName
+   *        The name of the indexed db from the above host.
+   * @param {string} objectStore
+   *        The name of the object store from the above db.
+   * @param {string} id
+   *        id of the requested entry from the above object store.
+   *        null if all entries from the above object store are requested.
+   * @param {string} index
+   *        name of the IDBIndex to be iterated on while fetching entries.
+   *        null or "name" if no index is to be iterated.
+   * @param {number} offset
+   *        ofsset of the entries to be fetched.
+   * @param {number} size
+   *        The intended size of the entries to be fetched.
+   */
+  getObjectStoreData:
+  function(host, dbName, objectStore, id, index, offset, size) {
+    let request = this.openWithOrigin(host, dbName);
+    let success = promise.defer();
+    let data = [];
+    let db;
+
+    if (!size || size > MAX_STORE_OBJECT_COUNT) {
+      size = MAX_STORE_OBJECT_COUNT;
+    }
+
+    request.onsuccess = event => {
+      db = event.target.result;
+
+      let transaction = db.transaction(objectStore, "readonly");
+      let source = transaction.objectStore(objectStore);
+      if (index && index != "name") {
+        source = source.index(index);
+      }
+
+      source.count().onsuccess = event2 => {
+        let objectsSize = [];
+        let count = event2.target.result;
+        objectsSize.push({
+          key: host + dbName + objectStore + index,
+          count: count
+        });
+
+        if (!offset) {
+          offset = 0;
+        } else if (offset > count) {
+          db.close();
+          success.resolve([]);
+          return;
+        }
+
+        if (id) {
+          source.get(id).onsuccess = event3 => {
+            db.close();
+            success.resolve([{name: id, value: event3.target.result}]);
+          };
+        } else {
+          source.openCursor().onsuccess = event4 => {
+            let cursor = event4.target.result;
+
+            if (!cursor || data.length >= size) {
+              db.close();
+              success.resolve({
+                data: data,
+                objectsSize: objectsSize
+              });
+              return;
+            }
+            if (offset-- <= 0) {
+              data.push({name: cursor.key, value: cursor.value});
+            }
+            cursor.continue();
+          };
+        }
+      };
     };
   },
 });
@@ -1398,6 +1701,7 @@ let StorageActor = exports.StorageActor = protocol.ActorClass({
         (!subject.location.href || subject.location.href == "about:blank")) {
       return null;
     }
+
     if (topic == "content-document-global-created" &&
         this.isIncludedInTopLevelWindow(subject)) {
       this.childWindowPool.add(subject);
@@ -1428,12 +1732,14 @@ let StorageActor = exports.StorageActor = protocol.ActorClass({
     if (this.destroyed) {
       return;
     }
+
     let window = target.defaultView;
+
     if (type == "pagehide" && this.childWindowPool.delete(window)) {
-      events.emit(this, "window-destroyed", window)
-    } else if (type == "pageshow" && persisted  && window.location.href &&
-             window.location.href != "about:blank" &&
-             this.isIncludedInTopLevelWindow(window)) {
+      events.emit(this, "window-destroyed", window);
+    } else if (type == "pageshow" && persisted && window.location.href &&
+               window.location.href != "about:blank" &&
+               this.isIncludedInTopLevelWindow(window)) {
       this.childWindowPool.add(window);
       events.emit(this, "window-ready", window);
     }
@@ -1450,12 +1756,14 @@ let StorageActor = exports.StorageActor = protocol.ActorClass({
    */
   listStores: method(async(function*() {
     let toReturn = {};
+
     for (let [name, value] of this.childActorPool) {
       if (value.preListStores) {
         yield value.preListStores();
       }
       toReturn[name] = value;
     }
+
     return toReturn;
   }), {
     response: RetVal(types.addDictType("storelist", getRegisteredTypes()))
@@ -1503,8 +1811,7 @@ let StorageActor = exports.StorageActor = protocol.ActorClass({
     for (let host in data) {
       if (!this.boundUpdate[action][storeType][host] || action == "deleted") {
         this.boundUpdate[action][storeType][host] = data[host];
-      }
-      else {
+      } else {
         this.boundUpdate[action][storeType][host] =
         this.boundUpdate[action][storeType][host].concat(data[host]);
       }
@@ -1587,7 +1894,7 @@ let StorageActor = exports.StorageActor = protocol.ActorClass({
 /**
  * Front for the Storage Actor.
  */
-let StorageFront = exports.StorageFront = protocol.FrontClass(StorageActor, {
+var StorageFront = exports.StorageFront = protocol.FrontClass(StorageActor, {
   initialize: function(client, tabForm) {
     protocol.Front.prototype.initialize.call(this, client);
     this.actorID = tabForm.storageActor;
