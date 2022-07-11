@@ -5229,6 +5229,160 @@
     "n_buckets": "1000",
     "description": "The time (in milliseconds) that it took a 'navigateTo' request to go round trip."
   },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_EVENTLISTENERS_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took an 'eventListeners' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_EVENTLISTENERS_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took an 'eventListeners' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_DETACH_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'detach' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_DETACH_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'detach' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_RESUME_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'resume' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_RESUME_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'resume' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_INTERRUPT_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took an 'interrupt' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_INTERRUPT_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took an 'interrupt' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_CLIENTEVALUATE_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'clientEvaluate' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_CLIENTEVALUATE_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'clientEvaluate' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_RELEASEMANY_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'releaseMany' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_RELEASEMANY_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'releaseMany' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_THREADGRIPS_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'threadGrips' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_THREADGRIPS_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'threadGrips' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_SOURCES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'sources' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_SOURCES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'sources' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_FRAMES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'frames' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_FRAMES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'frames' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_PARAMETERNAMES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'parameterNames' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_PARAMETERNAMES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'parameterNames' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_OWNPROPERTYNAMES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'ownPropertyNames' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_OWNPROPERTYNAMES_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'ownPropertyNames' request to go round trip."
+  },
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_PROTOTYPEANDPROPERTIES_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -5447,20 +5601,6 @@
     "description": "The time (in milliseconds) that it took a 'detach' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_REMOTE_TABDETACH_MS": {
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
-    "description": "The time (in milliseconds) that it took a 'detach' request to go round trip."
-  },
-  "DEVTOOLS_DEBUGGER_RDP_LOCAL_WORKERDETACH_MS": {
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
-    "description": "The time (in milliseconds) that it took a 'detach' request to go round trip."
-  },
-  "DEVTOOLS_DEBUGGER_RDP_REMOTE_WORKERDETACH_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
     "high": "10000",
@@ -5900,13 +6040,47 @@
     "n_values": 8,
     "description": "Type for media in getUserMedia calls (0=Camera, 1=Screen, 2=Application, 3=Window, 4=Browser, 5=Microphone, 6=AudioCapture, 7=Other)"
   },
-  "PERF_MONITORING_TEST_CPU_RESCHEDULING_PROPORTION_MOVED": {
-    "alert_emails": ["dteller@mozilla.com"],
-    "expires_in_version": "44",
-    "kind": "linear",
-    "high": "100",
-    "n_buckets": "20",
-    "description": "Proportion (%) of reschedulings of the main process to another CPU during the execution of code inside a JS compartment. Updated while we are measuring jank."
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_TRACERDETACH_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'detach' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_TRACERDETACH_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'detach' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_STARTTRACE_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'startTrace' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_STARTTRACE_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'startTrace' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_STOPTRACE_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'stopTrace' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_STOPTRACE_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'stopTrace' request to go round trip."
   },
   "COOKIES_3RDPARTY_NUM_SITES_ACCEPTED": {
     "expires_in_version": "40",
@@ -5938,30 +6112,91 @@
     "low": "10",
     "high": "500",
     "n_buckets": "50",
-    "description": "The total number of distinct attempts by third-party sites to place cookies which have been rejected.  Measures are normalized per 24h."
+    "description": "The total number of distinct attempts by third-party sites to place cookies which have been rejected.  Measures are normalized per 24h. *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
   },
-  "DEVTOOLS_OS_ENUMERATED_PER_USER": {
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_GET_EXECUTABLE_LINES_MS": {
     "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 13,
-    "description": "OS of DevTools user (0:Windows XP, 1:Windows Vista, 2:Windows 7, 3:Windows 8, 4:Windows 8.1, 5:OSX, 6:Linux 7:reserved, 8:reserved, 9:reserved, 10:reserved, 11:reserved, 12:other)"
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'getExecutableLines' request to go round trip."
   },
-  "DEVTOOLS_OS_IS_64_BITS_PER_USER": {
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_GET_EXECUTABLE_LINES_MS": {
     "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 3,
-    "description": "OS bit size of DevTools user (0:32bit, 1:64bit, 2:128bit)"
-    },
-  "DEVTOOLS_SCREEN_RESOLUTION_ENUMERATED_PER_USER": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 13,
-    "description": "Screen resolution of DevTools user (0:lower, 1:800x600, 2:1024x768, 3:1280x800, 4:1280x1024, 5:1366x768, 6:1440x900, 7:1920x1080, 8:2560×1440, 9:2560×1600, 10:2880x1800, 11:other, 12:higher)"
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'getExecutableLines' request to go round trip."
   },
-  "DEVTOOLS_WEBIDE_OPENED_BOOLEAN": {
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_BLACKBOX_MS": {
     "expires_in_version": "never",
-    "kind": "boolean",
-    "description": "How many times has the DevTools WebIDE been opened?"
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'blackbox' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_BLACKBOX_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'blackbox' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_UNBLACKBOX_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took an 'ublackbox' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_UNBLACKBOX_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took an 'unblackbox' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_SCOPE_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'scope' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_SCOPE_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'scope' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_BINDINGS_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'bindings' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_BINDINGS_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took a 'bindings' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_ASSIGN_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took an 'assign' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_ASSIGN_MS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "1000",
+    "description": "The time (in milliseconds) that it took an 'assign' request to go round trip."
   },
   "DEVTOOLS_TOOLBOX_OPENED_BOOLEAN": {
     "expires_in_version": "never",
@@ -6577,6 +6812,18 @@
     "n_values": 13,
     "description": "OS of DevTools user (0:Windows XP, 1:Windows Vista, 2:Windows 7, 3:Windows 8, 4:Windows 8.1, 5:OSX, 6:Linux 7:Windows 10, 8:reserved, 9:reserved, 10:reserved, 11:reserved, 12:other)"
   },
+  "DEVTOOLS_OS_IS_64_BITS_PER_USER": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 3,
+    "description": "OS bit size of DevTools user (0:32bit, 1:64bit, 2:128bit)"
+    },
+  "DEVTOOLS_SCREEN_RESOLUTION_ENUMERATED_PER_USER": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 13,
+    "description": "Screen resolution of DevTools user (0:lower, 1:800x600, 2:1024x768, 3:1280x800, 4:1280x1024, 5:1366x768, 6:1440x900, 7:1920x1080, 8:2560×1440, 9:2560×1600, 10:2880x1800, 11:other, 12:higher)"
+  },
   "DEVTOOLS_TABS_OPEN_PEAK_LINEAR": {
     "expires_in_version": "never",
     "kind": "linear",
@@ -6825,6 +7072,31 @@
     "n_values": "7",
     "description": "Final status of the CacheFileInputStream (0=ok, 1=other error, 2=out of memory, 3=disk full, 4=file corrupted, 5=file not found, 6=binding aborted)"
   },
+  "NETWORK_CACHE_FS_TYPE": {
+    "expires_in_version": "42",
+    "kind": "enumerated",
+    "n_values": "5",
+    "description": "Type of FS that the cache is stored on (0=NTFS (Win), 1=FAT32 (Win), 2=FAT (Win), 3=other FS (Win), 4=other OS)"
+  },
+  "NETWORK_CACHE_SIZE_FULL_FAT": {
+    "expires_in_version": "42",
+    "kind": "linear",
+    "high": "500",
+    "n_buckets": 50,
+    "description": "Size (in MB) of a cache that reached a file count limit"
+  },
+  "NETWORK_CACHE_HIT_MISS_STAT_PER_CACHE_SIZE": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 40,
+    "description": "Hit/Miss count split by cache size in file count (0=Hit 0-5000, 1=Miss 0-5000, 2=Hit 5001-10000, ...)"
+  },
+  "NETWORK_CACHE_HIT_RATE_PER_CACHE_SIZE": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 400,
+    "description": "Hit rate for a specific cache size in file count. The hit rate is split into 20 buckets, the lower limit of the range in percents is 5*n/20. The cache size is divided into 20 ranges of length 5000, the lower limit of the range is 5000*(n%20)"
+  },
   "NETWORK_CACHE_METADATA_FIRST_READ_TIME_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -6854,31 +7126,6 @@
     "high": "5119",
     "n_buckets": 256,
     "description": "Actual size of the metadata parsed from the disk."
-  },
-  "NETWORK_CACHE_HIT_MISS_STAT_PER_CACHE_SIZE": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 40,
-    "description": "Hit/Miss count split by cache size in file count (0=Hit 0-5000, 1=Miss 0-5000, 2=Hit 5001-10000, ...)"
-  },
-  "NETWORK_CACHE_HIT_RATE_PER_CACHE_SIZE": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 400,
-    "description": "Hit rate for a specific cache size in file count. The hit rate is split into 20 buckets, the lower limit of the range in percents is 5*n/20. The cache size is divided into 20 ranges of length 5000, the lower limit of the range is 5000*(n%20)"
-  },
-  "NETWORK_CACHE_FS_TYPE": {
-    "expires_in_version": "42",
-    "kind": "enumerated",
-    "n_values": "5",
-    "description": "Type of FS that the cache is stored on (0=NTFS (Win), 1=FAT32 (Win), 2=FAT (Win), 3=other FS (Win), 4=other OS)"
-  },
-  "NETWORK_CACHE_SIZE_FULL_FAT": {
-    "expires_in_version": "42",
-    "kind": "linear",
-    "high": "500",
-    "n_buckets": 50,
-    "description": "Size (in MB) of a cache that reached a file count limit"
   },
   "NETWORK_CACHE_HASH_STATS": {
     "expires_in_version": "46",
@@ -7975,6 +8222,11 @@
     "expires_in_version": "50",
     "kind": "count",
     "description": "Tracking whether a ServiceWorker spawn gets queued due to hitting max workers per domain limit. File bugs in Core::DOM in case of a Telemetry regression."
+  },
+  "SHARED_WORKER_SPAWN_GETS_QUEUED": {
+    "expires_in_version": "50",
+    "kind": "count",
+    "description": "Tracking whether a SharedWorker spawn gets queued due to hitting max workers per domain limit. File bugs in Core::DOM in case of a Telemetry regression."
   },
   "SERVICE_WORKER_REGISTRATIONS": {
     "expires_in_version": "50",
