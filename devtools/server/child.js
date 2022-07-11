@@ -17,14 +17,11 @@ var chromeGlobal = this;
   const { dumpn } = DevToolsUtils;
   const { DebuggerServer, ActorPool } = require("devtools/server/main");
 
+  // Note that this frame script may be evaluated in non-e10s build
+  // In such case, DebuggerServer is already going to be initialized.
   if (!DebuggerServer.initialized) {
     DebuggerServer.init();
-
-    // message manager helpers provided for actor module parent/child message exchange
-    DebuggerServer.parentMessageManager = {
-      sendSyncMessage: sendSyncMessage,
-      addMessageListener: addMessageListener
-    };
+    DebuggerServer.isInChildProcess = true;
   }
 
   // In case of apps being loaded in parent process, DebuggerServer is already
@@ -42,6 +39,7 @@ var chromeGlobal = this;
     let prefix = msg.data.prefix;
 
     let conn = DebuggerServer.connectToParent(prefix, mm);
+    conn.parentMessageManager = mm;
     connections.set(prefix, conn);
 
     let actor = new DebuggerServer.ContentActor(conn, chromeGlobal, prefix);
@@ -63,7 +61,7 @@ var chromeGlobal = this;
     try {
       m = require(module);
 
-      if (!(setupChild in m)) {
+      if (!setupChild in m) {
         dumpn("ERROR: module '" + module + "' does not export '" +
               setupChild + "'");
         return false;
