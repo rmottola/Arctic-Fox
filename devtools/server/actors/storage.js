@@ -485,7 +485,8 @@ StorageActors.createActor({
 
     events.off(this.storageActor, "window-ready", this.onWindowReady);
     events.off(this.storageActor, "window-destroyed", this.onWindowDestroyed);
-    this.storageActor = null;
+
+    this._pendingResponse = this.storageActor = null;
   },
 
   /**
@@ -1051,10 +1052,16 @@ StorageActors.createActor({
 }, {
   initialize: function(storageActor) {
     protocol.Actor.prototype.initialize.call(this, null);
+
+    this.storageActor = storageActor;
+
+    this.maybeSetupChildProcess();
+
     this.objectsSize = {};
     this.storageActor = storageActor;
     this.onWindowReady = this.onWindowReady.bind(this);
     this.onWindowDestroyed = this.onWindowDestroyed.bind(this);
+
     events.on(this.storageActor, "window-ready", this.onWindowReady);
     events.on(this.storageActor, "window-destroyed", this.onWindowDestroyed);
   },
@@ -1062,9 +1069,9 @@ StorageActors.createActor({
   destroy: function() {
     this.hostVsStores.clear();
     this.objectsSize = null;
+
     events.off(this.storageActor, "window-ready", this.onWindowReady);
     events.off(this.storageActor, "window-destroyed", this.onWindowDestroyed);
-    this.storageActor = null;
   },
 
   getHostName: function(location) {
@@ -1551,13 +1558,90 @@ var indexedDBHelpers = {
         }
       };
     };
+    request.onerror = () => {
+      db.close();
+      success.resolve([]);
+    };
+    return success.promise;
   },
-});
+
+  patchMetadataMapsAndProtos: function(metadata) {
+    for (let [, store] of metadata._objectStores) {
+      store.__proto__ = ObjectStoreMetadata.prototype;
+
+      if (typeof store._indexes.length !== "undefined") {
+        store._indexes = new Map(store._indexes);
+      }
+
+      for (let [, value] of store._indexes) {
+        value.__proto__ = IndexMetadata.prototype;
+      }
+    }
+
+    metadata._objectStores = new Map(metadata._objectStores);
+    metadata.__proto__ = DatabaseMetadata.prototype;
+  },
+
+  handleChildRequest: function(msg) {
+    let host;
+    let name;
+    let args = msg.data.args;
+
+    switch (msg.json.method) {
+      case "getDBMetaData":
+        host = args[0];
+        name = args[1];
+        return indexedDBHelpers.getDBMetaData(host, name);
+      case "getDBNamesForHost":
+        host = args[0];
+        return indexedDBHelpers.getDBNamesForHost(host);
+      case "getValuesForHost":
+        host = args[0];
+        name = args[1];
+        let options = args[2];
+        let hostVsStores = args[3];
+        return indexedDBHelpers.getValuesForHost(host, name, options,
+                                                 hostVsStores);
+      default:
+        console.error("ERR_DIRECTOR_PARENT_UNKNOWN_METHOD", msg.json.method);
+        throw new Error("ERR_DIRECTOR_PARENT_UNKNOWN_METHOD");
+    }
+  }
+};
+
+/**
+ * E10S parent/child setup helpers
+ */
+
+exports.setupParentProcessForIndexedDB = function({mm, prefix}) {
+  // listen for director-script requests from the child process
+  mm.addMessageListener("storage:storage-indexedDB-request-parent",
+                        indexedDBHelpers.handleChildRequest);
+
+  DebuggerServer.once("disconnected-from-child:" + prefix,
+                      handleMessageManagerDisconnected);
+
+  gTrackedMessageManager.set("indexedDB", mm);
+
+  function handleMessageManagerDisconnected(evt, { mm: disconnected_mm }) {
+    // filter out not subscribed message managers
+    if (disconnected_mm !== mm || !gTrackedMessageManager.has("indexedDB")) {
+      return;
+    }
+
+    gTrackedMessageManager.delete("indexedDB");
+
+    // unregister for director-script requests handlers from the parent process
+    // (if any)
+    mm.removeMessageListener("storage:storage-indexedDB-request-parent",
+                             indexedDBHelpers.handleChildRequest);
+  }
+};
 
 /**
  * The main Storage Actor.
  */
-let StorageActor = exports.StorageActor = protocol.ActorClass({
+var StorageActor = exports.StorageActor = protocol.ActorClass({
   typeName: "storage",
 
   get window() {
@@ -1645,8 +1729,9 @@ let StorageActor = exports.StorageActor = protocol.ActorClass({
     }
     this.childActorPool.clear();
     this.childWindowPool.clear();
-    this.childWindowPool = this.childActorPool = this.conn = this.parentActor =
-      this.boundUpdate = null;
+    this.childWindowPool = this.childActorPool = this.__poolMap = this.conn =
+      this.parentActor = this.boundUpdate = this.registeredPool =
+      this._pendingResponse = null;
   },
 
   /**

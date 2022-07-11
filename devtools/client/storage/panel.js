@@ -14,7 +14,8 @@ loader.lazyRequireGetter(this, "StorageFront",
 loader.lazyRequireGetter(this, "StorageUI",
                          "devtools/client/storage/ui", true);
 
-this.StoragePanel = function StoragePanel(panelWin, toolbox) {
+var StoragePanel = this.StoragePanel =
+function StoragePanel(panelWin, toolbox) {
   EventEmitter.decorate(this);
 
   this._toolbox = toolbox;
@@ -54,6 +55,7 @@ StoragePanel.prototype = {
       this.UI = new StorageUI(this._front, this._target, this._panelWin);
       this.isReady = true;
       this.emit("ready");
+
       return this;
     }).catch(this.destroy);
   },
@@ -65,6 +67,7 @@ StoragePanel.prototype = {
     if (!this._destroyed) {
       this.UI.destroy();
       this.UI = null;
+
       // Destroy front to ensure packet handler is removed from client
       this._front.destroy();
       this._front = null;
