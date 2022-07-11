@@ -317,13 +317,13 @@ this.WorkerDebuggerLoader = WorkerDebuggerLoader;
 // does not provide alternative definitions for them. Consequently, they are
 // stubbed out both on the main thread and worker threads.
 
-let PromiseDebugging = {
+var PromiseDebugging = {
   getState: function () {
     throw new Error("PromiseDebugging is not available in workers!");
   }
 };
 
-let chrome = {
+var chrome = {
   CC: undefined,
   Cc: undefined,
   ChromeWorker: undefined,
@@ -334,7 +334,7 @@ let chrome = {
   components: undefined
 };
 
-let loader = {
+var loader = {
   lazyGetter: function (object, name, lambda) {
     Object.defineProperty(object, name, {
       get: function () {
@@ -364,10 +364,11 @@ let loader = {
 // object to implement them. On worker threads, we use the APIs provided by
 // the worker debugger.
 
-let {
+var {
   Debugger,
   createSandbox,
   dump,
+  rpc,
   loadSubScript,
   reportError,
   setImmediate,
@@ -405,6 +406,8 @@ let {
       });
     };
 
+    let rpc = undefined;
+
     let subScriptLoader = Cc['@mozilla.org/moz/jssubscript-loader;1'].
                  getService(Ci.mozIJSSubScriptLoader);
 
@@ -427,6 +430,7 @@ let {
       Debugger,
       createSandbox,
       dump,
+      rpc,
       loadSubScript,
       reportError,
       setImmediate,
@@ -459,6 +463,7 @@ let {
       Debugger: this.Debugger,
       createSandbox: this.createSandbox,
       dump: this.dump,
+      rpc: this.rpc,
       loadSubScript: this.loadSubScript,
       reportError: this.reportError,
       setImmediate: this.setImmediate,
@@ -477,6 +482,7 @@ this.worker = new WorkerDebuggerLoader({
     "dump": dump,
     "loader": loader,
     "reportError": reportError,
+    "rpc": rpc,
     "setImmediate": setImmediate
   },
   loadSubScript: loadSubScript,
@@ -488,12 +494,18 @@ this.worker = new WorkerDebuggerLoader({
     "xpcInspector": xpcInspector
   },
   paths: {
+    // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
     "": "resource://gre/modules/commonjs/",
-    "devtools": "resource:///modules/devtools",
-    "devtools/server": "resource://gre/modules/devtools/server",
-    "devtools/toolkit": "resource://gre/modules/devtools",
+    // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
+    "devtools": "resource://gre/modules/devtools",
+    // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
+    "devtools/client": "resource:///modules/devtools/client",
+    // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
     "promise": "resource://gre/modules/Promise-backend.js",
-    "source-map": "resource://gre/modules/devtools/source-map",
+    // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
+    "source-map": "resource://gre/modules/devtools/sourcemap/source-map.js",
+    // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
     "xpcshell-test": "resource://test"
+    // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
   }
 });
