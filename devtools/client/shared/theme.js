@@ -12,11 +12,11 @@
 const { Ci, Cu } = require("chrome");
 const { NetUtil } = Cu.import("resource://gre/modules/NetUtil.jsm", {});
 loader.lazyRequireGetter(this, "Services");
-loader.lazyImporter(this, "gDevTools", "resource://gre/modules/devtools/gDevTools.jsm");
+loader.lazyImporter(this, "gDevTools", "resource:///modules/devtools/client/framework/gDevTools.jsm");
 
 const themeURIs = {
-  light: "chrome://global/skin/devtools/light-theme.css",
-  dark: "chrome://global/skin/devtools/dark-theme.css"
+  light: "chrome://devtools/skin/themes/light-theme.css",
+  dark: "chrome://devtools/skin/themes/dark-theme.css"
 }
 
 const cachedThemes = {};
@@ -85,10 +85,12 @@ const getColor = exports.getColor = (type, theme) => {
  * the themeing.
  */
 const setTheme = exports.setTheme = (newTheme) => {
+  let oldTheme = getTheme();
+
   Services.prefs.setCharPref("devtools.theme", newTheme);
   gDevTools.emit("pref-changed", {
     pref: "devtools.theme",
     newValue: newTheme,
-    oldValue: getTheme()
+    oldValue: oldTheme
   });
 };
