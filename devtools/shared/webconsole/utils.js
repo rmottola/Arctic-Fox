@@ -42,7 +42,7 @@ const CONSOLE_WORKER_IDS = exports.CONSOLE_WORKER_IDS = [ 'SharedWorker', 'Servi
 // Prevent iterating over too many properties during autocomplete suggestions.
 const MAX_AUTOCOMPLETIONS = exports.MAX_AUTOCOMPLETIONS = 1500;
 
-let WebConsoleUtils = {
+var WebConsoleUtils = {
   /**
    * Convenience function to unwrap a wrapped object.
    *
@@ -1121,7 +1121,7 @@ function getExactMatch_impl(aObj, aName, {chainIterator, getProperty})
 }
 
 
-let JSObjectSupport = {
+var JSObjectSupport = {
   chainIterator: function*(aObj)
   {
     while (aObj) {
@@ -1142,7 +1142,7 @@ let JSObjectSupport = {
   },
 };
 
-let DebuggerObjectSupport = {
+var DebuggerObjectSupport = {
   chainIterator: function*(aObj)
   {
     while (aObj) {
@@ -1163,7 +1163,7 @@ let DebuggerObjectSupport = {
   },
 };
 
-let DebuggerEnvironmentSupport = {
+var DebuggerEnvironmentSupport = {
   chainIterator: function*(aObj)
   {
     while (aObj) {
@@ -1518,7 +1518,7 @@ ConsoleAPIListener.prototype =
  * the Web Console but not from the web page.
  *
  */
-let WebConsoleCommands = {
+var WebConsoleCommands = {
   _registeredCommands: new Map(),
   _originalCommands: new Map(),
 
