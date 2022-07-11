@@ -81,10 +81,3 @@ StoragePanel.prototype = {
 
     return Promise.resolve(null);
   },
-}
-
-XPCOMUtils.defineLazyGetter(StoragePanel.prototype, "strings",
-  function () {
-    return Services.strings.createBundle(
-            "chrome://global/locale/devtools/storage.properties");
-  });
