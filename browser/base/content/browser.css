@@ -437,16 +437,9 @@ window[chromehidden~="toolbar"] toolbar:not(.toolbar-primary):not(#nav-bar):not(
   max-width: 95%;
   pointer-events: none;
 }
-
-#fullscreen-warning[hidden] {
-  /* To ensure the transition always works fine, never change
-     the value of display property. */
+#fullscreen-warning:not([hidden]) {
   display: flex;
-  visibility: hidden !important;
-  transition: initial;
-  pointer-events: none !important;
 }
-
 #fullscreen-warning[onscreen] {
   transform: translate(-50%, 50px);
 }
