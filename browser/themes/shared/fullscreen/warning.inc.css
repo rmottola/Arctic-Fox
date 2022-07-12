@@ -14,10 +14,39 @@
   font: message-box;
 }
 
-.full-screen-description {
-  font-size: 150%;
+#fullscreen-warning::before {
+  margin: 0;
+  width: 24px; height: 24px;
 }
 
-#full-screen-domain-text {
-  font-size: 300%;
+#fullscreen-warning.verifiedIdentity::before,
+#fullscreen-warning.verifiedDomain::before {
+  content: url("chrome://browser/skin/fullscreen/secure.svg");
+}
+
+#fullscreen-warning.unknownIdentity::before {
+  content: url("chrome://browser/skin/fullscreen/insecure.svg");
+}
+
+#fullscreen-domain-text,
+#fullscreen-generic-text {
+  font-size: 21px;
+  font-weight: lighter;
+  color: #fafafa;
+  margin: 0 16px;
+}
+
+#fullscreen-domain {
+  font-weight: bold;
+  margin: 0;
+}
+
+#fullscreen-exit-button {
+  padding: 0 30px;
+  font: message-box;
+  font-size: 14px;
+  font-weight: lighter;
+  margin: 0;
+  height: 28px;
+  box-sizing: content-box;
 }
