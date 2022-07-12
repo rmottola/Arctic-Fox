@@ -503,8 +503,13 @@ var gPopupBlockerObserver = {
         var brandBundle = document.getElementById("bundle_brand");
         var brandShortName = brandBundle.getString("brandShortName");
         var popupCount = gBrowser.selectedBrowser.blockedPopups.length;
+#ifdef XP_WIN
         var popupButtonText = gNavigatorBundle.getString("popupWarningButton");
         var popupButtonAccesskey = gNavigatorBundle.getString("popupWarningButton.accesskey");
+#else
+        var popupButtonText = gNavigatorBundle.getString("popupWarningButtonUnix");
+        var popupButtonAccesskey = gNavigatorBundle.getString("popupWarningButtonUnix.accesskey");
+#endif
         var messageBase = gNavigatorBundle.getString("popupWarning.message");
         var message = PluralForm.get(popupCount, messageBase)
                                 .replace("#1", brandShortName)
@@ -542,6 +547,9 @@ var gPopupBlockerObserver = {
     var shouldBlock = aEvent.target.getAttribute("block") == "true";
     var perm = shouldBlock ? pm.DENY_ACTION : pm.ALLOW_ACTION;
     pm.add(gBrowser.currentURI, "popup", perm);
+
+    if (!shouldBlock)
+      this.showAllBlockedPopups(gBrowser.selectedBrowser);
 
     gBrowser.getNotificationBox().removeCurrentNotification();
   },
@@ -597,6 +605,7 @@ var gPopupBlockerObserver = {
         // xxxdz this should make the option say "Show file picker" and do it (Bug 590306)
         if (!blockedPopup.popupWindowURI)
           continue;
+
         var popupURIspec = blockedPopup.popupWindowURI.spec;
 
         // Sometimes the popup URI that we get back from the blockedPopup
@@ -666,6 +675,18 @@ var gPopupBlockerObserver = {
     var popupReportIndex = target.getAttribute("popupReportIndex");
     let browser = target.popupReportBrowser;
     browser.unblockPopup(popupReportIndex);
+  },
+
+  showAllBlockedPopups: function (aBrowser)
+  {
+    let popups = aBrowser.blockedPopups;
+    if (!popups)
+      return;
+
+    for (let i = 0; i < popups.length; i++) {
+      if (popups[i].popupWindowURI)
+        aBrowser.unblockPopup(i);
+    }
   },
 
   editPopupSettings: function ()
@@ -741,6 +762,10 @@ function gKeywordURIFixup({ target: browser, data: fixupInfo }) {
     asciiHost = asciiHost.slice(0, -1);
   }
 
+  // Ignore number-only things entirely (no decimal IPs for you!)
+  if (/^\d+$/.test(asciiHost))
+    return;
+
   let onLookupComplete = (request, record, status) => {
     let browser = weakBrowser.get();
     if (!Components.isSuccessCode(status) || !browser)
@@ -792,7 +817,15 @@ function gKeywordURIFixup({ target: browser, data: fixupInfo }) {
     notification.persistence = 1;
   };
 
-  gDNSService.asyncResolve(hostName, 0, onLookupComplete, Services.tm.mainThread);
+  try {
+    gDNSService.asyncResolve(hostName, 0, onLookupComplete, Services.tm.mainThread);
+  } catch (ex) {
+    // Do nothing if the URL is invalid (we don't want to show a notification in that case).
+    if (ex.result != Cr.NS_ERROR_UNKNOWN_HOST) {
+      // ... otherwise, report:
+      Cu.reportError(ex);
+    }
+  }
 }
 
 // A shared function used by both remote and non-remote browser XBL bindings to
@@ -878,6 +911,8 @@ function RedirectLoad({ target: browser, data }) {
 }
 
 var gBrowserInit = {
+  delayedStartupFinished: false,
+
   onLoad: function() {
     gBrowser.addEventListener("DOMUpdatePageReport", gPopupBlockerObserver, false);
 
@@ -1404,9 +1439,8 @@ var gBrowserInit = {
       // Enable the Restore Last Session command if needed
       RestoreLastSessionObserver.init();
 
-      if ("TabView" in window) {
+      if ("TabView" in window)
         TabView.init();
-      }
 
       PanicButtonNotifier.init();
     });
@@ -1503,9 +1537,8 @@ var gBrowserInit = {
       gPrefService.removeObserver(ctrlTab.prefName, ctrlTab);
       gPrefService.removeObserver(allTabs.prefName, allTabs);
       ctrlTab.uninit();
-      if ("TabView" in window) {
+      if ("TabView" in window)
         TabView.uninit();
-      }
       gBrowserThumbnails.uninit();
       FullZoom.destroy();
 
@@ -1639,6 +1672,52 @@ var gBrowserInit = {
     BrowserOffline.uninit();
   },
 #endif
+
+  _initializeSanitizer: function() {
+    const kDidSanitizeDomain = "privacy.sanitize.didShutdownSanitize";
+    if (gPrefService.prefHasUserValue(kDidSanitizeDomain)) {
+      gPrefService.clearUserPref(kDidSanitizeDomain);
+      // We need to persist this preference change, since we want to
+      // check it at next app start even if the browser exits abruptly
+      gPrefService.savePrefFile(null);
+    }
+
+    /**
+     * Migrate Firefox 3.0 privacy.item prefs under one of these conditions:
+     *
+     * a) User has customized any privacy.item prefs
+     * b) privacy.sanitize.sanitizeOnShutdown is set
+     */
+    if (!gPrefService.getBoolPref("privacy.sanitize.migrateFx3Prefs")) {
+      let itemBranch = gPrefService.getBranch("privacy.item.");
+      let itemArray = itemBranch.getChildList("");
+
+      // See if any privacy.item prefs are set
+      let doMigrate = itemArray.some(function (name) itemBranch.prefHasUserValue(name));
+      // Or if sanitizeOnShutdown is set
+      if (!doMigrate)
+        doMigrate = gPrefService.getBoolPref("privacy.sanitize.sanitizeOnShutdown");
+
+      if (doMigrate) {
+        let cpdBranch = gPrefService.getBranch("privacy.cpd.");
+        let clearOnShutdownBranch = gPrefService.getBranch("privacy.clearOnShutdown.");
+        for (let name of itemArray) {
+          try {
+            // don't migrate password or offlineApps clearing in the CRH dialog since
+            // there's no UI for those anymore. They default to false. bug 497656
+            if (name != "passwords" && name != "offlineApps")
+              cpdBranch.setBoolPref(name, itemBranch.getBoolPref(name));
+            clearOnShutdownBranch.setBoolPref(name, itemBranch.getBoolPref(name));
+          }
+          catch(e) {
+            Cu.reportError("Exception thrown during privacy pref migration: " + e);
+          }
+        }
+      }
+
+      gPrefService.setBoolPref("privacy.sanitize.migrateFx3Prefs", true);
+    }
+  },
 }
 
 
@@ -2535,7 +2614,6 @@ function PageProxyClearIcon ()
   gProxyFavIcon.removeAttribute("src");
 }
 
-
 function PageProxyClickHandler(aEvent)
 {
   if (aEvent.button == 1 && gPrefService.getBoolPref("middlemouse.paste"))
@@ -2547,7 +2625,7 @@ function PageProxyClickHandler(aEvent)
  * or from about:newtab or from remote error pages that invoke
  * us via async messaging.
  */
-let BrowserOnClick = {
+var BrowserOnClick = {
   init: function () {
     let mm = window.messageManager;
     mm.addMessageListener("Browser:CertExceptionError", this);
@@ -3174,7 +3252,7 @@ const DOMLinkHandler = {
     if (gBrowser.isFailedIcon(aURL))
       return false;
 
-    let tab = gBrowser._getTabForBrowser(aBrowser);
+    let tab = gBrowser.getTabForBrowser(aBrowser);
     if (!tab)
       return false;
 
@@ -3183,7 +3261,7 @@ const DOMLinkHandler = {
   },
 
   addSearch: function(aBrowser, aEngine, aURL) {
-    let tab = gBrowser._getTabForBrowser(aBrowser);
+    let tab = gBrowser.getTabForBrowser(aBrowser);
     if (!tab)
       return false;
 
@@ -3996,7 +4074,7 @@ var XULBrowserWindow = {
                            .chromeEventHandler;
 
     // Ignore loads that aren't in the main tabbrowser
-    if (browser.localName != "browser" || browser.getTabBrowser() != gBrowser)
+    if (browser.localName != "browser" || !browser.getTabBrowser || browser.getTabBrowser() != gBrowser)
       return true;
 
     if (!E10SUtils.shouldLoadURI(aDocShell, aURI, aReferrer)) {
@@ -5488,6 +5566,8 @@ function middleMousePaste(event) {
   // bar's behavior (stripsurroundingwhitespace)
   clipboard = clipboard.replace(/\s*\n\s*/g, "");
 
+  clipboard = stripUnsafeProtocolOnPaste(clipboard);
+
   // if it's not the current tab, we don't need to do anything because the
   // browser doesn't exist.
   let where = whereToOpenLink(event, true, false);
@@ -5521,6 +5601,12 @@ function middleMousePaste(event) {
   });
 
   event.stopPropagation();
+}
+
+function stripUnsafeProtocolOnPaste(pasteData) {
+  // Don't allow pasting javascript URIs since we don't support
+  // LOAD_FLAGS_DISALLOW_INHERIT_OWNER for those.
+  return pasteData.replace(/^(?:\s*javascript:)+/i, "");
 }
 
 function handleDroppedLink(event, url, name)
@@ -6378,14 +6464,14 @@ function convertFromUnicode(charset, str)
 function undoCloseTab(aIndex) {
   // wallpaper patch to prevent an unnecessary blank tab (bug 343895)
   var blankTabToRemove = null;
-  if (gBrowser.tabs.length == 1 &&
-      !gPrefService.getBoolPref("browser.tabs.autoHide") &&
-      isTabEmpty(gBrowser.selectedTab)) 
+  if (gBrowser.tabs.length == 1 && isTabEmpty(gBrowser.selectedTab))
     blankTabToRemove = gBrowser.selectedTab;
 
   var tab = null;
   if (SessionStore.getClosedTabCount(window) > (aIndex || 0)) {
+    TabView.prepareUndoCloseTab(blankTabToRemove);
     tab = SessionStore.undoCloseTab(window, aIndex || 0);
+    TabView.afterUndoCloseTab();
 
     if (blankTabToRemove)
       gBrowser.removeTab(blankTabToRemove);
