@@ -2105,22 +2105,7 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     margin-left: 1em;
 }
 
-#full-screen-warning-message {
-    background-color: hsl(0,0%,15%);
-    color: white;
-    border-radius: 8px;
-    margin-top: 30px;
-    padding: 30px 50px;
-    box-shadow: 0 0 2px white;
-}
-
-.full-screen-description {
-    font-size: 150%;
-}
-
-#full-screen-domain-text {
-    font-size: 300%;
-}
+%include ../shared/fullscreen/warning.inc.css
 
 %ifdef MOZ_DEVTOOLS
 %include ../../../devtools/client/themes/responsivedesign.inc.css
