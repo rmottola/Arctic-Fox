@@ -182,7 +182,7 @@ var SessionHistoryInternal = {
       return entry;
     }
 
-    if (shEntry.childCount > 0) {
+    if (shEntry.childCount > 0 && !shEntry.hasDynamicallyAddedChild()) {
       let children = [];
       for (let i = 0; i < shEntry.childCount; i++) {
         let child = shEntry.GetChildAt(i);
