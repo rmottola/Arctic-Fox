@@ -193,11 +193,9 @@ nsContextMenu.prototype = {
                        this.onLink || this.onTextInput);
     this.showItem("context-viewsource", shouldShow);
     this.showItem("context-viewinfo", shouldShow);
-#ifdef MOZ_DEVTOOLS
     var showInspect = gPrefService.getBoolPref("devtools.inspector.enabled");
     this.showItem("inspect-separator", showInspect);
     this.showItem("context-inspect", showInspect);
-#endif
 
     this.showItem("context-sep-viewsource", shouldShow);
 

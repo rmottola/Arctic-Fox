@@ -910,7 +910,6 @@ pref("devtools.devedition.promo.url", "https://www.mozilla.org/firefox/developer
 
 // Only potentially show in beta release
 pref("devtools.devedition.promo.enabled", false);
-#ifdef MOZ_DEVTOOLS
 // Developer toolbar and GCLI preferences
 pref("devtools.toolbar.enabled", true);
 pref("devtools.toolbar.visible", false);
@@ -1170,7 +1169,6 @@ pref("devtools.telemetry.tools.opened.version", "{}");
 
 // Pref counting self-xss events
 pref("devtools.selfxss.count", 0);
-#endif //MOZ_DEVTOOLS
 
 // URL of the remote JSON catalog used for device simulation
 pref("devtools.devices.url", "https://code.cdn.mozilla.net/devices/devices.json");

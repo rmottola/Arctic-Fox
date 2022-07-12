@@ -396,11 +396,9 @@
                     oncommand="gContextMenu.openPasswordManager();"/>
         </menupopup>
       </menu>
-#ifdef MOZ_DEVTOOLS
       <menuseparator id="inspect-separator" hidden="true"/>
       <menuitem id="context-inspect"
                 hidden="true"
                 label="&inspectContextMenu.label;"
                 accesskey="&inspectContextMenu.accesskey;"
                 oncommand="gContextMenu.inspectNode();"/>
-#endif

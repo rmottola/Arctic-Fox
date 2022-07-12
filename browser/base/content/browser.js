@@ -139,7 +139,6 @@ XPCOMUtils.defineLazyGetter(this, "PopupNotifications", function () {
   }
 });
 
-#ifdef MOZ_DEVTOOLS
 XPCOMUtils.defineLazyGetter(this, "DeveloperToolbar", function() {
   let tmp = {};
   Cu.import("resource:///modules/devtools/client/shared/DeveloperToolbar.jsm", tmp);
@@ -151,7 +150,6 @@ XPCOMUtils.defineLazyGetter(this, "BrowserToolboxProcess", function() {
   Cu.import("resource:///modules/devtools/client/framework/ToolboxProcess.jsm", tmp);
   return tmp.BrowserToolboxProcess;
 });
-#endif
 
 XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
   "resource://gre/modules/PageThumbs.jsm");
@@ -1360,7 +1358,6 @@ var gBrowserInit = {
         setUrlAndSearchBarWidthForConditionalForwardButton();
     });
 
-#ifdef MOZ_DEVTOOLS
     // Enable Chrome Debugger?
     let chromeEnabled = gPrefService.getBoolPref("devtools.chrome.enabled");
     let remoteEnabled = chromeEnabled &&
@@ -1379,7 +1376,6 @@ var gBrowserInit = {
       cmd.removeAttribute("disabled");
       cmd.removeAttribute("hidden");
     }
-#endif
 
     // Enable Error Console?
     let consoleEnabled = gPrefService.getBoolPref("devtools.errorconsole.enabled");
@@ -1389,7 +1385,6 @@ var gBrowserInit = {
       cmd.removeAttribute("hidden");
     }
 
-#ifdef MOZ_DEVTOOLS
     // Enable Responsive UI?
     let responsiveUIEnabled = gPrefService.getBoolPref("devtools.responsiveUI.enabled");
     if (responsiveUIEnabled) {
@@ -1400,7 +1395,6 @@ var gBrowserInit = {
 
     // Add Devtools menuitems and listeners
     gDevToolsBrowser.registerBrowserWindow(window);
-#endif
 
     let appMenuButton = document.getElementById("appmenu-button");
     let appMenuPopup = document.getElementById("appmenu-popup");
@@ -1482,14 +1476,12 @@ var gBrowserInit = {
     if (!this._loadHandled)
       return;
 
-#ifdef MOZ_DEVTOOLS
     gDevToolsBrowser.forgetBrowserWindow(window);
 
     let desc = Object.getOwnPropertyDescriptor(window, "DeveloperToolbar");
     if (desc && !desc.get) {
       DeveloperToolbar.destroy();
     }
-#endif
 
     // First clean up services initialized in gBrowserInit.onLoad (or those whose
     // uninit methods don't depend on the services having been initialized).
@@ -7436,7 +7428,6 @@ var TabContextMenu = {
   }
 };
 
-#ifdef MOZ_DEVTOOLS
 XPCOMUtils.defineLazyModuleGetter(this, "gDevTools",
                                   "resource:///modules/devtools/client/framework/gDevTools.jsm");
 
@@ -7451,7 +7442,6 @@ Object.defineProperty(this, "HUDService", {
   configurable: true,
   enumerable: true
 });
-#endif
 
 // Prompt user to restart the browser in safe mode or normally
 function safeModeRestart() {
@@ -7552,7 +7542,6 @@ function duplicateTabIn(aTab, where, delta) {
   }
 }
 
-#ifdef MOZ_DEVTOOLS
 var Scratchpad = {
   prefEnabledName: "devtools.scratchpad.enabled",
 
@@ -7593,7 +7582,6 @@ Object.defineProperty(this, "Eyedropper", {
   configurable: true,
   enumerable: true
 });
-#endif
 
 XPCOMUtils.defineLazyGetter(window, "gShowPageResizers", function () {
 #ifdef XP_WIN
