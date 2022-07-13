@@ -1051,8 +1051,11 @@ var Links = {
    * @param aLink The link that changed.  If the link is new, it must have all
    *              of the _sortProperties.  Otherwise, it may have as few or as
    *              many as is convenient.
+   * @param aIndex The current index of the changed link in the sortedLinks
+                   cache in _providers. Defaults to -1 if the provider doesn't know the index
+   * @param aDeleted Boolean indicating if the provider has deleted the link.
    */
-  onLinkChanged: function Links_onLinkChanged(aProvider, aLink) {
+  onLinkChanged: function Links_onLinkChanged(aProvider, aLink, aIndex=-1, aDeleted=false) {
     if (!("url" in aLink))
       throw new Error("Changed links must have a url property");
 
@@ -1072,19 +1075,29 @@ var Links = {
       // Update our copy's position in O(lg n) by first removing it from its
       // list.  It's important to do this before modifying its properties.
       if (this._sortProperties.some(prop => prop in aLink)) {
-        let idx = this._indexOf(sortedLinks, existingLink);
+        let idx = aIndex;
+        if (idx < 0) {
+          idx = this._indexOf(sortedLinks, existingLink);
+        } else if (this.compareLinks(aLink, sortedLinks[idx]) != 0) {
+          throw new Error("aLink should be the same as sortedLinks[idx]");
+        }
+
         if (idx < 0) {
           throw new Error("Link should be in _sortedLinks if in _linkMap");
         }
         sortedLinks.splice(idx, 1);
-        // Update our copy's properties.
-        for (let prop of this._sortProperties) {
-          if (prop in aLink) {
-            existingLink[prop] = aLink[prop];
-          }
+
+        if (aDeleted) {
+          updatePages = true;
+          linkMap.delete(existingLink.url);
+          this._decrementSiteMap(siteMap, existingLink);
+        } else {
+          // Update our copy's properties.
+          Object.assign(existingLink, aLink);
+
+          // Finally, reinsert our copy below.
+          insertionLink = existingLink;
         }
-        // Finally, reinsert our copy below.
-        insertionLink = existingLink;
       }
       // Update our copy's title in O(1).
       if ("title" in aLink && aLink.title != existingLink.title) {
@@ -1325,6 +1338,14 @@ this.NewTabUtils = {
       return true;
     }
     return false;
+  },
+
+  getProviderLinks: function(aProvider) {
+    let cache = Links._providers.get(aProvider);
+    if (cache && cache.sortedLinks) {
+      return cache.sortedLinks;
+    }
+    return [];
   },
 
   isTopSiteGivenProvider: function(aSite, aProvider) {
