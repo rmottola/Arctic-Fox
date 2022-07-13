@@ -197,29 +197,6 @@ XPCOMUtils.defineLazyGetter(this, "gOSVersion", function aus_gOSVersion() {
   return osVersion;
 });
 
-// This is copied directly from nsUpdateService.js
-// It is used for calculating the URL string w/ var replacement.
-// TODO: refactor this out somewhere else
-XPCOMUtils.defineLazyGetter(this, "gABI", function aus_gABI() {
-  let abi = null;
-  try {
-    abi = Services.appinfo.XPCOMABI;
-  }
-  catch (e) {
-    LOG("gABI - XPCOM ABI unknown: updates are not possible.");
-  }
-  if (AppConstants.platform == "macosx") {
-    // Mac universal build should report a different ABI than either macppc
-    // or mactel.
-    let macutils = Cc["@mozilla.org/xpcom/mac-utils;1"].
-                   getService(Ci.nsIMacUtils);
-
-    if (macutils.isUniversalBinary)
-      abi += "-u-" + macutils.architecturesInBinary;
-  }
-  return abi;
-});
-
 /**
  * Provides an easy API for downloading and installing GMP Addons
  */
@@ -248,7 +225,7 @@ GMPInstallManager.prototype = {
       url.replace(/%PRODUCT%/g, Services.appinfo.name)
          .replace(/%VERSION%/g, Services.appinfo.version)
          .replace(/%BUILD_ID%/g, Services.appinfo.appBuildID)
-         .replace(/%BUILD_TARGET%/g, Services.appinfo.OS + "_" + gABI)
+         .replace(/%BUILD_TARGET%/g, Services.appinfo.OS + "_" + GMPUtils.ABI())
          .replace(/%OS_VERSION%/g, gOSVersion);
     if (/%LOCALE%/.test(url)) {
       // TODO: Get the real local, does it actually matter for GMP plugins?
@@ -893,6 +870,14 @@ GMPDownloader.prototype = {
         // Success, set the prefs
         let now = Math.round(Date.now() / 1000);
         GMPPrefs.set(GMPPrefs.KEY_PLUGIN_LAST_UPDATE, now, gmpAddon.id);
+        // Reset the trial create pref, so that Gecko knows to do a test
+        // run before reporting that the GMP works to content.
+        GMPPrefs.reset(GMPPrefs.KEY_PLUGIN_TRIAL_CREATE, gmpAddon.version,
+                       gmpAddon.id);
+        // Remember our ABI, so that if the profile is migrated to another
+        // platform or from 32 -> 64 bit, we notice and don't try to load the
+        // unexecutable plugin library.
+        GMPPrefs.set(GMPPrefs.KEY_PLUGIN_ABI, GMPUtils.ABI(), gmpAddon.id);
         // Setting the version pref signals installation completion to consumers,
         // if you need to set other prefs etc. do it before this.
         GMPPrefs.set(GMPPrefs.KEY_PLUGIN_VERSION, gmpAddon.version,

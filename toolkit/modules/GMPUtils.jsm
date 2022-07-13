@@ -15,6 +15,7 @@ this.EXPORTED_SYMBOLS = [ "EME_ADOBE_ID",
 
 Cu.import("resource://gre/modules/Preferences.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/AppConstants.jsm");
 
 // GMP IDs
 const OPEN_H264_ID  = "gmp-gmpopenh264";
@@ -142,6 +143,8 @@ this.GMPPrefs = {
   KEY_PLUGIN_VERSION:           "media.{0}.version",
   KEY_PLUGIN_AUTOUPDATE:        "media.{0}.autoupdate",
   KEY_PLUGIN_FORCEVISIBLE:      "media.{0}.forcevisible",
+  KEY_PLUGIN_TRIAL_CREATE:      "media.{0}.trial-create",
+  KEY_PLUGIN_ABI:               "media.{0}.abi",
   KEY_URL:                      "media.gmp-manager.url",
   KEY_URL_OVERRIDE:             "media.gmp-manager.url.override",
   KEY_CERT_CHECKATTRS:          "media.gmp-manager.cert.checkAttributes",
