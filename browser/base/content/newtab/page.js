@@ -66,7 +66,14 @@ let gPage = {
 
     this._initialized = true;
 
+    // Initialize search.
     gSearch.init();
+
+    if (document.hidden) {
+      addEventListener("visibilitychange", this);
+    } else {
+      this.onPageFirstVisible();
+    }
 
     gLinks.populateCache(function () {
       // Initialize and render the grid.
@@ -136,6 +143,43 @@ let gPage = {
           aEvent.stopPropagation();
         }
         break;
+      case "visibilitychange":
+        setTimeout(() => this.onPageFirstVisible());
+        removeEventListener("visibilitychange", this);
+        break;
     }
+  },
+
+  onPageFirstVisible: function () {
+    // Record another page impression.
+    Services.telemetry.getHistogramById("NEWTAB_PAGE_SHOWN").add(true);
+
+    // Initialize type counting with the types we want to count
+    let directoryCount = {};
+    for (let type of DirectoryLinksProvider.linkTypes) {
+      directoryCount[type] = 0;
+    }
+
+    for (let site of gGrid.sites) {
+      if (site) {
+        site.captureIfMissing();
+        let {type} = site.link;
+        if (type in directoryCount) {
+          directoryCount[type]++;
+        }
+      }
+    }
+
+    // Record how many directory sites were shown, but place counts over the
+    // default 9 in the same bucket
+    for (let type of Object.keys(directoryCount)) {
+      let count = directoryCount[type];
+      let shownId = "NEWTAB_PAGE_DIRECTORY_" + type.toUpperCase() + "_SHOWN";
+      let shownCount = Math.min(10, count);
+      Services.telemetry.getHistogramById(shownId).add(shownCount);
+    }
+
+    // Set up initial search state.
+    gSearch.setUpInitialState();
   }
 };

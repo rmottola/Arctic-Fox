@@ -138,6 +138,16 @@ Site.prototype = {
   },
 
   /**
+   * Captures the site's thumbnail in the background, but only if there's no
+   * existing thumbnail and the page allows background captures.
+   */
+  captureIfMissing: function Site_captureIfMissing() {
+    if (!document.hidden && !this.link.imageURI) {
+      BackgroundPageThumbs.captureIfMissing(this.url);
+    }
+  },
+
+  /**
    * Adds event handlers for the site and its buttons.
    */
   _addEventHandlers: function Site_addEventHandlers() {
