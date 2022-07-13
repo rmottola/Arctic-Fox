@@ -2517,6 +2517,201 @@
     "extended_statistics_ok": true,
     "description": "How many speculative connections are made needlessly"
   },
+  "STS_POLL_AND_EVENTS_CYCLE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "The duraion of a socketThread cycle, including polls and pending events. (ms)"
+  },
+  "STS_NUMBER_OF_PENDING_EVENTS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "2000",
+    "n_buckets": 100,
+    "description": "Number of pending events per SocketThread cycle."
+  },
+  "STS_POLL_CYCLE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "The duration of poll. (ms)"
+  },
+  "STS_POLL_AND_EVENT_THE_LAST_CYCLE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "The duraion of the socketThread cycle during shutdown, including polls and pending events. (ms)"
+  },
+  "STS_NUMBER_OF_PENDING_EVENTS_IN_THE_LAST_CYCLE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "2000",
+    "n_buckets": 100,
+    "description": "Number of pending events per SocketThread cycle during shutdown."
+  },
+  "STS_NUMBER_OF_ONSOCKETREADY_CALLS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "2000",
+    "n_buckets": 100,
+    "description": "Number of OnSocketReady calls during a single poll."
+  },
+  "STS_POLL_BLOCK_TIME": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked on poll (ms)."
+  },
+  "PRCONNECT_BLOCKING_TIME_NORMAL": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Connect when we are not shutting down and there has been niether a network nor an offline state change in the last 60s (ms)."
+  },
+  "PRCONNECT_BLOCKING_TIME_SHUTDOWN": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Connect during a shutdown (ms)."
+  },
+  "PRCONNECT_BLOCKING_TIME_CONNECTIVITY_CHANGE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Connect when there has been the connectiviy change in the last 60s (ms)."
+  },
+  "PRCONNECT_BLOCKING_TIME_LINK_CHANGE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Connect when there has been a link change in the last 60s (ms)."
+  },
+  "PRCONNECT_BLOCKING_TIME_OFFLINE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Connect when the offline state has changed in the last 60s (ms)."
+  },
+  "PRCONNECTCONTINUE_BLOCKING_TIME_NORMAL": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_ConnectContinue when we are not shutting down and there has been niether a network nor an offline state change in the last 60s (ms)."
+  },
+  "PRCONNECTCONTINUE_BLOCKING_TIME_SHUTDOWN": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_ConnectContinue during a shutdown (ms)."
+  },
+  "PRCONNECTCONTINUE_BLOCKING_TIME_CONNECTIVITY_CHANGE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_ConnectContinue when there has been the connectivity change in the last 60s (ms)."
+  },
+  "PRCONNECTCONTINUE_BLOCKING_TIME_LINK_CHANGE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_ConnectContinue when there has been a link change in the last 60s (ms)."
+  },
+  "PRCONNECTCONTINUE_BLOCKING_TIME_OFFLINE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_ConnectContinue when the offline state has changed in the last 60s (ms)."
+  },
+  "PRCLOSE_TCP_BLOCKING_TIME_NORMAL": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Close when we are not shutting down and there has been niether a network nor an offline state change in the last 60s (ms)."
+  },
+  "PRCLOSE_TCP_BLOCKING_TIME_SHUTDOWN": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Close during a shutdown (ms)."
+  },
+  "PRCLOSE_TCP_BLOCKING_TIME_CONNECTIVITY_CHANGE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Close when there has been the connectivity change in the last 60s (ms)."
+  },
+  "PRCLOSE_TCP_BLOCKING_TIME_LINK_CHANGE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Close when there has been a link change in the last 60s (ms)."
+  },
+  "PRCLOSE_TCP_BLOCKING_TIME_OFFLINE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Close when the offline state has changed in the last 60s (ms)."
+  },
+  "PRCLOSE_UDP_BLOCKING_TIME_NORMAL": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Close when we are not shutting down and there has been niether a network nor an offline state change in the last 60s (ms)."
+  },
+  "PRCLOSE_UDP_BLOCKING_TIME_SHUTDOWN": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Close during a shutdown (ms)."
+  },
+  "PRCLOSE_UDP_BLOCKING_TIME_CONNECTIVITY_CHANGE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Close when there has been the connectivity change in the last 60s (ms)."
+  },
+  "PRCLOSE_UDP_BLOCKING_TIME_LINK_CHANGE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Close when there has been a link change in the last 60s (ms)."
+  },
+  "PRCLOSE_UDP_BLOCKING_TIME_OFFLINE": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 1000,
+    "description": "Time spent blocked in PR_Close when the offline state has changed in the last 60s (ms)."
+  },
+  "IPV4_AND_IPV6_ADDRESS_CONNECTIVITY": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 4,
+    "description": "Count the number of 0) successful connections to an ipv4 address, 1) failed connection an ipv4 address, 2) successful connection to an ipv6 address and 3) failed connections to an ipv6 address."
+  },
   "URL_PATH_ENDS_IN_EXCLAMATION": {
     "expires_in_version": "never",
     "kind": "boolean",
@@ -2534,7 +2729,7 @@
   },
   "FIND_PLUGINS": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": "3000",
     "n_buckets": 10,
