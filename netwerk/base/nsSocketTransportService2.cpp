@@ -74,6 +74,8 @@ nsSocketTransportService::nsSocketTransportService()
     , mKeepaliveRetryIntervalS(1)
     , mKeepaliveProbeCount(kDefaultTCPKeepCount)
     , mKeepaliveEnabledPref(false)
+    , mServingPendingQueue(false)
+    , mMaxTimePerPollIter(100)
     , mTelemetryEnabledPref(false)
     , mProbedMaxCount(false)
 {
@@ -515,6 +517,8 @@ nsSocketTransportService::Init()
         tmpPrefService->AddObserver(KEEPALIVE_IDLE_TIME_PREF, this, false);
         tmpPrefService->AddObserver(KEEPALIVE_RETRY_INTERVAL_PREF, this, false);
         tmpPrefService->AddObserver(KEEPALIVE_PROBE_COUNT_PREF, this, false);
+        tmpPrefService->AddObserver(MAX_TIME_BETWEEN_TWO_POLLS, this, false);
+        tmpPrefService->AddObserver(TELEMETRY_PREF, this, false);
     }
     UpdatePrefs();
 
@@ -745,6 +749,12 @@ nsSocketTransportService::AfterProcessNextEvent(nsIThreadInternal* thread,
     return NS_OK;
 }
 
+void
+nsSocketTransportService::MarkTheLastElementOfPendingQueue()
+{
+    mServingPendingQueue = false;
+}
+
 #ifdef MOZ_NUWA_PROCESS
 #include "ipc/Nuwa.h"
 #endif
@@ -816,6 +826,10 @@ nsSocketTransportService::Run()
         pollDuration = 0;
 
         do {
+            if (mTelemetryEnabledPref) {
+                pollCycleStart = TimeStamp::NowLoRes();
+            }
+
             // If there are pending events for this thread then
             // DoPollIteration() should service the network without blocking.
             DoPollIteration(!pendingEvents, &singlePollDuration);
@@ -831,13 +845,57 @@ nsSocketTransportService::Run()
             }
 
             // If nothing was pending before the poll, it might be now
-            if (!pendingEvents)
+            if (!pendingEvents) {
                 thread->HasPendingEvents(&pendingEvents);
+            }
 
             if (pendingEvents) {
-                NS_ProcessNextEvent(thread);
-                pendingEvents = false;
-                thread->HasPendingEvents(&pendingEvents);
+                if (!mServingPendingQueue) {
+                    nsresult rv = Dispatch(NS_NewRunnableMethod(this,
+                        &nsSocketTransportService::MarkTheLastElementOfPendingQueue),
+                        nsIEventTarget::DISPATCH_NORMAL);
+                    if (NS_FAILED(rv)) {
+                        NS_WARNING("Could not dispatch a new event on the "
+                                   "socket thread.");
+                    } else {
+                        mServingPendingQueue = true;
+                    }
+
+                    if (mTelemetryEnabledPref) {
+                        startOfIteration = startOfNextIteration;
+                        // Everything that comes after this point will
+                        // be served in the next iteration. If no even
+                        // arrives, startOfNextIteration will be reset at the
+                        // beginning of each for-loop.
+                        startOfNextIteration = TimeStamp::NowLoRes();
+                    }
+                }
+                TimeStamp eventQueueStart = TimeStamp::NowLoRes();
+                do {
+                    NS_ProcessNextEvent(thread);
+                    numberOfPendingEvents++;
+                    pendingEvents = false;
+                    thread->HasPendingEvents(&pendingEvents);
+                } while (pendingEvents && mServingPendingQueue &&
+                         ((TimeStamp::NowLoRes() -
+                           eventQueueStart).ToMilliseconds() <
+                          mMaxTimePerPollIter));
+
+                if (mTelemetryEnabledPref && !mServingPendingQueue &&
+                    !startOfIteration.IsNull()) {
+                    Telemetry::AccumulateTimeDelta(
+                        Telemetry::STS_POLL_AND_EVENTS_CYCLE,
+                        startOfIteration + pollDuration,
+                        TimeStamp::NowLoRes());
+
+                    Telemetry::Accumulate(
+                        Telemetry::STS_NUMBER_OF_PENDING_EVENTS,
+                        numberOfPendingEvents);
+
+                    numberOfPendingEventsLastCycle += numberOfPendingEvents;
+                    numberOfPendingEvents = 0;
+                    pollDuration = 0;
+                }
             }
         } while (pendingEvents);
 
