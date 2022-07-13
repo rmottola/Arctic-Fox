@@ -1111,6 +1111,7 @@ nsSocketTransportService::DoPollIteration(bool wait, TimeDuration *pollDuration)
                 if (s.mElapsedTime >= s.mHandler->mPollTimeout) {
                     s.mElapsedTime = 0;
                     s.mHandler->OnSocketReady(desc.fd, -1);
+                    numberOfOnSocketReadyCalls++;
                 }
             }
         }
@@ -1455,7 +1456,8 @@ nsSocketTransportService::AnalyzeConnection(nsTArray<SocketInfo> *data,
     if (context->mHandler->mIsPrivate)
         return;
     PRFileDesc *aFD = context->mFD;
-    bool tcp = (PR_GetDescType(aFD) == PR_DESC_SOCKET_TCP);
+    bool tcp = (PR_GetDescType(PR_GetIdentitiesLayer(aFD, PR_NSPR_IO_LAYER)) ==
+                PR_DESC_SOCKET_TCP);
 
     PRNetAddr peer_addr;
     PR_GetPeerName(aFD, &peer_addr);
