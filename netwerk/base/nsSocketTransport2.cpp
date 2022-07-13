@@ -16,6 +16,7 @@
 #include "nsProxyInfo.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
+#include "ClosingService.h"
 #include "nsAutoPtr.h"
 #include "nsCOMPtr.h"
 #include "plstr.h"
@@ -1321,6 +1322,9 @@ nsSocketTransport::InitiateSocket()
 
     // Attach network activity monitor
     mozilla::net::NetworkActivityMonitor::AttachIOLayer(fd);
+
+    // Attach closing service.
+    ClosingService::AttachIOLayer(fd);
 
     PRStatus status;
 
