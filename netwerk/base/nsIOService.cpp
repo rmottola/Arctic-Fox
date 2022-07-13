@@ -1448,6 +1448,7 @@ nsIOService::Observe(nsISupports *subject,
 
         if (mCaptivePortalService) {
             static_cast<CaptivePortalService*>(mCaptivePortalService.get())->Stop();
+            mCaptivePortalService = nullptr;
         }
 
         // Break circular reference.
