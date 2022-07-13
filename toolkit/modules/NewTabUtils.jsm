@@ -471,9 +471,21 @@ var PinnedLinks = {
  */
 var BlockedLinks = {
   /**
+   * A list of objects that are observing blocked link changes.
+   */
+  _observers: [],
+
+  /**
    * The cached list of blocked links.
    */
   _links: null,
+
+  /**
+   * Registers an object that will be notified when the blocked links change.
+   */
+  addObserver: function (aObserver) {
+    this._observers.push(aObserver);
+  },
 
   /**
    * The list of blocked links.
@@ -486,10 +498,11 @@ var BlockedLinks = {
   },
 
   /**
-   * Blocks a given link.
+   * Blocks a given link. Adjusts siteMap accordingly, and notifies listeners.
    * @param aLink The link to block.
    */
   block: function BlockedLinks_block(aLink) {
+    this._callObservers("onLinkBlocked", aLink);
     this.links[toHash(aLink.url)] = 1;
     this.save();
 
@@ -498,13 +511,14 @@ var BlockedLinks = {
   },
 
   /**
-   * Unblocks a given link.
+   * Unblocks a given link. Adjusts siteMap accordingly, and notifies listeners.
    * @param aLink The link to unblock.
    */
   unblock: function BlockedLinks_unblock(aLink) {
     if (this.isBlocked(aLink)) {
       delete this.links[toHash(aLink.url)];
       this.save();
+      this._callObservers("onLinkUnblocked", aLink);
     }
   },
 
@@ -536,6 +550,18 @@ var BlockedLinks = {
    */
   resetCache: function BlockedLinks_resetCache() {
     this._links = null;
+  },
+
+  _callObservers(methodName, ...args) {
+    for (let obs of this._observers) {
+      if (typeof(obs[methodName]) == "function") {
+        try {
+          obs[methodName](...args);
+        } catch (err) {
+          Cu.reportError(err);
+        }
+      }
+    }
   }
 };
 
@@ -723,6 +749,8 @@ var Links = {
    * A mapping from each provider to an object { sortedLinks, siteMap, linkMap }.
    * sortedLinks is the cached, sorted array of links for the provider.
    * siteMap is a mapping from base domains to URL count associated with the domain.
+   *         The count does not include blocked URLs. siteMap is used to look up a
+   *         user's top sites that can be targeted with a suggested tile.
    * linkMap is a Map from link URLs to link objects.
    */
   _providerLinks: new Map(),
@@ -740,6 +768,18 @@ var Links = {
    * List of callbacks waiting for the cache to be populated.
    */
   _populateCallbacks: [],
+
+  /**
+   * A list of objects that are observing links updates.
+   */
+  _observers: [],
+
+  /**
+   * Registers an object that will be notified when links updates.
+   */
+  addObserver: function (aObserver) {
+    this._observers.push(aObserver);
+  },
 
   /**
    * Adds a link provider.
@@ -864,11 +904,19 @@ var Links = {
   },
 
   _incrementSiteMap: function(map, link) {
+    if (NewTabUtils.blockedLinks.isBlocked(link)) {
+      // Don't count blocked URLs.
+      return;
+    }
     let site = NewTabUtils.extractSite(link.url);
     map.set(site, (map.get(site) || 0) + 1);
   },
 
   _decrementSiteMap: function(map, link) {
+    if (NewTabUtils.blockedLinks.isBlocked(link)) {
+      // Blocked URLs are not included in map.
+      return;
+    }
     let site = NewTabUtils.extractSite(link.url);
     let previousURLCount = map.get(site);
     if (previousURLCount === 1) {
@@ -876,6 +924,45 @@ var Links = {
     } else {
       map.set(site, previousURLCount - 1);
     }
+  },
+
+  /**
+    * Update the siteMap cache based on the link given and whether we need
+    * to increment or decrement it. We do this by iterating over all stored providers
+    * to find which provider this link already exists in. For providers that
+    * have this link, we will adjust siteMap for them accordingly.
+    *
+    * @param aLink The link that will affect siteMap
+    * @param increment A boolean for whether to increment or decrement siteMap
+    */
+  _adjustSiteMapAndNotify: function(aLink, increment=true) {
+    for (let [provider, cache] of this._providers) {
+      // We only update siteMap if aLink is already stored in linkMap.
+      if (cache.linkMap.get(aLink.url)) {
+        if (increment) {
+          this._incrementSiteMap(cache.siteMap, aLink);
+          continue;
+        }
+        this._decrementSiteMap(cache.siteMap, aLink);
+      }
+    }
+    this._callObservers("onLinkChanged", aLink);
+  },
+
+  onLinkBlocked: function(aLink) {
+    this._adjustSiteMapAndNotify(aLink, false);
+  },
+
+  onLinkUnblocked: function(aLink) {
+    this._adjustSiteMapAndNotify(aLink);
+  },
+
+  populateProviderCache: function(provider, callback) {
+    if (!this._providers.has(provider)) {
+      throw new Error("Can only populate provider cache for existing provider.");
+    }
+
+    return this._populateProviderCache(provider, callback, false);
   },
 
   /**
@@ -1056,6 +1143,18 @@ var Links = {
       this.resetCache();
   },
 
+  _callObservers(methodName, ...args) {
+    for (let obs of this._observers) {
+      if (typeof(obs[methodName]) == "function") {
+        try {
+          obs[methodName](this, ...args);
+        } catch (err) {
+          Cu.reportError(err);
+        }
+      }
+    }
+  },
+
   /**
    * Adds a sanitization observer and turns itself into a no-op after the first
    * invokation.
@@ -1196,6 +1295,7 @@ this.NewTabUtils = {
     if (this.initWithoutProviders()) {
       PlacesProvider.init();
       Links.addProvider(PlacesProvider);
+      BlockedLinks.addObserver(Links);
     }
   },
 
