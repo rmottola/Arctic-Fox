@@ -37,5 +37,4 @@ add_task(function*() {
      "Got two requests for doc_uncached.css after Style Editor was loaded.");
   ok(attachments[1].fromCache,
      "Second request was loaded from browser cache");
-  gDevTools.testing = isTesting;
 });
