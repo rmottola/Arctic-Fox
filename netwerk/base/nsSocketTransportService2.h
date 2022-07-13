@@ -111,6 +111,8 @@ public:
 
     // Returns true if keepalives are enabled in prefs.
     bool IsKeepaliveEnabled() { return mKeepaliveEnabledPref; }
+
+    bool IsTelemetryEnabled() { return mTelemetryEnabledPref; }
 protected:
 
     virtual ~nsSocketTransportService();
