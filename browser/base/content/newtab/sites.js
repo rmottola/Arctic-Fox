@@ -117,9 +117,32 @@ Site.prototype = {
   },
 
   /**
+   * Checks for and modifies link at campaign end time
+   */
+  _checkLinkEndTime: function Site_checkLinkEndTime() {
+    if (this.link.endTime && this.link.endTime < Date.now()) {
+       let oldUrl = this.url;
+       // chop off the path part from url
+       this.link.url = Services.io.newURI(this.url, null, null).resolve("/");
+       // clear supplied images - this triggers thumbnail download for new url
+       delete this.link.imageURI;
+       delete this.link.enhancedImageURI;
+       // remove endTime to avoid further time checks
+       delete this.link.endTime;
+       // clear enhanced-content image that may still exist in preloaded page
+       this._querySelector(".enhanced-content").style.backgroundImage = "";
+       gPinnedLinks.replace(oldUrl, this.link);
+    }
+  },
+
+  /**
    * Renders the site's data (fills the HTML fragment).
    */
   _render: function Site_render() {
+    // first check for end time, as it may modify the link
+    this._checkLinkEndTime();
+    // setup display variables
+    let enhanced = gAllPages.enhanced && DirectoryLinksProvider.getEnhancedLink(this.link);
     let url = this.url;
     let title = this.title || url;
     let tooltip = (title == url ? title : title + "\n" + url);
@@ -138,6 +161,21 @@ Site.prototype = {
   },
 
   /**
+   * Called when the site's tab becomes visible for the first time.
+   * Since the newtab may be preloaded long before it's displayed,
+   * check for changed conditions and re-render if needed
+   */
+  onFirstVisible: function Site_onFirstVisible() {
+    if (this.link.endTime && this.link.endTime < Date.now()) {
+      // site needs to change landing url and background image
+      this._render();
+    }
+    else {
+      this.captureIfMissing();
+    }
+  },
+
+  /**
    * Captures the site's thumbnail in the background, but only if there's no
    * existing thumbnail and the page allows background captures.
    */
@@ -145,6 +183,42 @@ Site.prototype = {
     if (!document.hidden && !this.link.imageURI) {
       BackgroundPageThumbs.captureIfMissing(this.url);
     }
+  },
+
+  /**
+   * Refreshes the thumbnail for the site.
+   */
+  refreshThumbnail: function Site_refreshThumbnail() {
+    // Only enhance tiles if that feature is turned on
+    let link = gAllPages.enhanced && DirectoryLinksProvider.getEnhancedLink(this.link) ||
+               this.link;
+
+    let thumbnail = this._querySelector(".newtab-thumbnail");
+    if (link.bgColor) {
+      thumbnail.style.backgroundColor = link.bgColor;
+    }
+
+    let uri = link.imageURI || PageThumbs.getThumbnailURL(this.url);
+    thumbnail.style.backgroundImage = 'url("' + uri + '")';
+
+    if (link.enhancedImageURI) {
+      let enhanced = this._querySelector(".enhanced-content");
+      enhanced.style.backgroundImage = 'url("' + link.enhancedImageURI + '")';
+
+      if (this.link.type != link.type) {
+        this.node.setAttribute("type", "enhanced");
+        this.enhancedId = link.directoryId;
+      }
+    }
+  },
+
+  _ignoreHoverEvents: function(element) {
+    element.addEventListener("mouseover", () => {
+      this.cell.node.setAttribute("ignorehover", "true");
+    });
+    element.addEventListener("mouseout", () => {
+      this.cell.node.removeAttribute("ignorehover");
+    });
   },
 
   /**
