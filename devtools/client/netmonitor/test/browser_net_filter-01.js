@@ -5,7 +5,7 @@
  * Test if filtering items in the network table works correctly.
  */
 const BASIC_REQUESTS = [
-  { url: "sjs_content-type-test-server.sjs?fmt=html&res=undefined&text=sample" },
+  { url: "sjs_content-type-test-server.sjs?fmt=html&res=undefined&text=Sample" },
   { url: "sjs_content-type-test-server.sjs?fmt=css&text=sample" },
   { url: "sjs_content-type-test-server.sjs?fmt=js&text=sample" },
 ];
@@ -117,6 +117,12 @@ function test() {
           setFreetextFilter("sample");
           return testContents([1, 1, 1, 0, 0, 0, 0, 0]);
         })
+        .then(() => {
+          // Text in filter box that matches should filter out everything else.
+          EventUtils.sendMouseEvent({ type: "click" }, $("#requests-menu-filter-all-button"));
+          setFreetextFilter("SAMPLE");
+          return testContents([1, 1, 1, 0, 0, 0, 0, 0]);
+        })
         // ...then combine multiple filters together.
         .then(() => {
           // Enable filtering for html and css; should show request of both type.
@@ -132,6 +138,7 @@ function test() {
           setFreetextFilter("sample");
           return testContents([1, 1, 0, 0, 0, 0, 0, 0]);
         })
+
         .then(() => {
           EventUtils.sendMouseEvent({ type: "click" }, $("#requests-menu-filter-flash-button"));
           setFreetextFilter("");
