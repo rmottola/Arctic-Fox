@@ -967,7 +967,6 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    */
   get _filterPredicate() {
     let filterPredicates = this._allFilterPredicates;
-
     let currentFreetextFilter = this._currentFreetextFilter;
 
     return requestItem => {
