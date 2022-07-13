@@ -512,6 +512,10 @@ nsIOService::GetProtocolHandler(const char* scheme, nsIProtocolHandler* *result)
         }
 
 #ifdef MOZ_ENABLE_GIO
+        // check to see whether GVFS can handle this URI scheme.  if it can
+        // create a nsIURI for the "scheme:", then we assume it has support for
+        // the requested protocol.  otherwise, we failover to using the default
+        // protocol handler.
 
         rv = CallGetService(NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX"moz-gio",
                             result);
@@ -528,7 +532,6 @@ nsIOService::GetProtocolHandler(const char* scheme, nsIProtocolHandler* *result)
 
             NS_RELEASE(*result);
         }
-
 #endif
     }
 
@@ -673,7 +676,7 @@ nsIOService::NewChannelFromURIWithLoadInfo(nsIURI* aURI,
 NS_IMETHODIMP
 nsIOService::NewChannelFromURI(nsIURI *aURI, nsIChannel **result)
 {
-  NS_WARNING("Deprecated, use NewChannelFromURI2 providing loadInfo arguments!");
+  NS_ASSERTION(false, "Deprecated, use NewChannelFromURI2 providing loadInfo arguments!");
   return NewChannelFromURI2(aURI,
                             nullptr, // aLoadingNode
                             nullptr, // aLoadingPrincipal
@@ -838,10 +841,8 @@ nsIOService::NewChannelFromURIWithProxyFlags2(nsIURI* aURI,
                                        loadingNode,
                                        aSecurityFlags,
                                        aContentPolicyType);
-      if (!loadInfo) {
-        return NS_ERROR_UNEXPECTED;
-      }
     }
+    NS_ASSERTION(loadInfo, "Please pass security info when creating a channel");
     return NewChannelFromURIWithProxyFlagsInternal(aURI,
                                                    aProxyURI,
                                                    aProxyFlags,
@@ -865,7 +866,7 @@ nsIOService::NewChannelFromURIWithProxyFlags(nsIURI *aURI,
                                              uint32_t aProxyFlags,
                                              nsIChannel **result)
 {
-  NS_WARNING("Deprecated, use NewChannelFromURIWithProxyFlags2 providing loadInfo arguments!");
+  NS_ASSERTION(false, "Deprecated, use NewChannelFromURIWithProxyFlags2 providing loadInfo arguments!");
   return NewChannelFromURIWithProxyFlags2(aURI,
                                           aProxyURI,
                                           aProxyFlags,
@@ -915,7 +916,7 @@ nsIOService::NewChannel2(const nsACString& aSpec,
 NS_IMETHODIMP
 nsIOService::NewChannel(const nsACString &aSpec, const char *aCharset, nsIURI *aBaseURI, nsIChannel **result)
 {
-  NS_WARNING("Deprecated, use NewChannel2 providing loadInfo arguments!");
+  NS_ASSERTION(false, "Deprecated, use NewChannel2 providing loadInfo arguments!");
   return NewChannel2(aSpec,
                      aCharset,
                      aBaseURI,
