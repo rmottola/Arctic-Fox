@@ -95,41 +95,11 @@ var StyleSheetsActor = exports.StyleSheetsActor = protocol.ActorClass({
         }
       }
     }
-
-    return deferred.promise;
-  }, {
+    return actors;
+  }), {
     request: {},
     response: { styleSheets: RetVal("array:stylesheet") }
   }),
-
-  /**
-   * Add all the stylesheets in this document and its subframes.
-   * Assumes the document is loaded.
-   *
-   * @return {Promise}
-   *         Promise that resolves with an array of StyleSheetActors
-   */
-  _addAllStyleSheets: function() {
-    return Task.spawn(function*() {
-      let documents = [this.document];
-      let actors = [];
-
-      for (let doc of documents) {
-        let sheets = yield this._addStyleSheets(doc);
-        actors = actors.concat(sheets);
-
-        // Recursively handle style sheets of the documents in iframes.
-        for (let iframe of doc.querySelectorAll("iframe, browser, frame")) {
-          if (iframe.contentDocument) {
-            // Sometimes, iframes don't have any document, like the
-            // one that are over deeply nested (bug 285395)
-            documents.push(iframe.contentDocument);
-          }
-        }
-      }
-      return actors;
-    }.bind(this));
-  },
 
   /**
    * Check if we should be showing this stylesheet.
