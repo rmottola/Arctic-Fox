@@ -737,7 +737,19 @@ BrowserConsole.prototype = Heritage.extend(WebConsole.prototype,
 });
 
 const HUDService = new HUD_SERVICE();
-exports.HUDService = HUDService;
+
+(() => {
+  let methods = ["openWebConsole", "openBrowserConsole",
+                 "toggleBrowserConsole", "getOpenWebConsole",
+                 "getBrowserConsole", "getHudByWindow",
+                 "openBrowserConsoleOrFocus", "getHudReferenceById"];
+  for (let method of methods) {
+    exports[method] = HUDService[method].bind(HUDService);
+  }
+
+  exports.consoles = HUDService.consoles;
+  exports.lastFinishedRequest = HUDService.lastFinishedRequest;
+})();
 
 /**
  * The ShutdownObserver listens for app shutdown and saves the current state
