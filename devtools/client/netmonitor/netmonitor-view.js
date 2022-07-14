@@ -372,7 +372,6 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
 
     this.allowFocusOnRightClick = true;
     this.maintainSelectionVisible = true;
-    this.widget.autoscrollWithAppendedItems = true;
 
     this.widget.addEventListener("select", this._onSelect, false);
     this.widget.addEventListener("swap", this._onSwap, false);
