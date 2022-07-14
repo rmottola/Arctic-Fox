@@ -1440,7 +1440,11 @@ this.NewTabUtils = {
   },
 
   isTopSiteGivenProvider: function(aSite, aProvider) {
-    return Links._providers.get(aProvider).siteMap.has(aSite);
+    let cache = Links._providers.get(aProvider);
+    if (cache && cache.siteMap) {
+      return cache.siteMap.has(aSite);
+    }
+    return false;
   },
 
   isTopPlacesSite: function(aSite) {
