@@ -86,6 +86,7 @@ var EventsHandler = {
    * Listen for events emitted by the current tab target.
    */
   initialize: function() {
+    telemetry.toolOpened("shadereditor");
     this._onHostChanged = this._onHostChanged.bind(this);
     this._onTabNavigated = this._onTabNavigated.bind(this);
     this._onProgramLinked = this._onProgramLinked.bind(this);
@@ -94,17 +95,27 @@ var EventsHandler = {
     gTarget.on("will-navigate", this._onTabNavigated);
     gTarget.on("navigate", this._onTabNavigated);
     gFront.on("program-linked", this._onProgramLinked);
-
+    this.reloadButton = $("#requests-menu-reload-notice-button");
+    this.reloadButton.addEventListener("command", this._onReloadCommand);
   },
 
   /**
    * Remove events emitted by the current tab target.
    */
   destroy: function() {
+    telemetry.toolClosed("shadereditor");
     gToolbox.off("host-changed", this._onHostChanged);
     gTarget.off("will-navigate", this._onTabNavigated);
     gTarget.off("navigate", this._onTabNavigated);
     gFront.off("program-linked", this._onProgramLinked);
+    this.reloadButton.removeEventListener("command", this._onReloadCommand);
+  },
+
+  /**
+   * Handles a command event on reload button
+   */
+  _onReloadCommand() {
+    gFront.setup({ reload: true });
   },
 
   /**
