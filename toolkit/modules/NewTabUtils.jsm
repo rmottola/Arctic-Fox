@@ -950,6 +950,11 @@ var Links = {
     if (links.length)
       pinnedLinks = pinnedLinks.concat(links);
 
+    for (let link of pinnedLinks) {
+      if (link) {
+        link.baseDomain = NewTabUtils.extractSite(link.url);
+      }
+    }
     return pinnedLinks;
   },
 
