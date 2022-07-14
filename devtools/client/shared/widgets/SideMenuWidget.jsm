@@ -22,6 +22,7 @@ this.EXPORTED_SYMBOLS = ["SideMenuWidget"];
  * @param nsIDOMNode aNode
  *        The element associated with the widget.
  * @param Object aOptions
+ *        - contextMenu: optional element or element ID that serves as a context menu.
  *        - showArrows: specifies if items should display horizontal arrows.
  *        - showItemCheckboxes: specifies if items should display checkboxes.
  *        - showGroupCheckboxes: specifies if groups should display checkboxes.
@@ -31,7 +32,8 @@ this.SideMenuWidget = function SideMenuWidget(aNode, aOptions={}) {
   this.window = this.document.defaultView;
   this._parent = aNode;
 
-  let { showArrows, showItemCheckboxes, showGroupCheckboxes } = aOptions;
+  let { contextMenu, showArrows, showItemCheckboxes, showGroupCheckboxes } = aOptions;
+  this._contextMenu = contextMenu || null;
   this._showArrows = showArrows || false;
   this._showItemCheckboxes = showItemCheckboxes || false;
   this._showGroupCheckboxes = showGroupCheckboxes || false;
@@ -45,6 +47,7 @@ this.SideMenuWidget = function SideMenuWidget(aNode, aOptions={}) {
   this._list.setAttribute("with-item-checkboxes", this._showItemCheckboxes);
   this._list.setAttribute("with-group-checkboxes", this._showGroupCheckboxes);
   this._list.setAttribute("tabindex", "0");
+  this._list.addEventListener("contextmenu", e => this._showContextMenu(e), false);
   this._list.addEventListener("keypress", e => this.emit("keyPress", e), false);
   this._list.addEventListener("mousedown", e => this.emit("mousePress", e), false);
   this._parent.appendChild(this._list);
@@ -394,6 +397,26 @@ SideMenuWidget.prototype = {
     }
   },
 
+  /**
+   * Shows the contextMenu element.
+   */
+  _showContextMenu: function(e) {
+    if (!this._contextMenu) {
+      return;
+    }
+
+    // Don't show the menu if a descendant node is going to be visible also.
+    let node = e.originalTarget;
+    while (node && node !== this._list) {
+      if (node.hasAttribute("contextmenu")) {
+        return;
+      }
+      node = node.parentNode;
+    }
+
+    this._contextMenu.openPopupAtScreen(e.screenX, e.screenY, true);
+  },
+
   window: null,
   document: null,
   _showArrows: false,
@@ -501,7 +524,7 @@ SideMenuGroup.prototype = {
     for (let group of groupsArray) {
       let name = group.getAttribute("name");
       if (sortPredicate(name, identifier) > 0 && // Insertion sort at its best :)
-          !name.contains(identifier)) { // Least significant group should be last.
+          !name.includes(identifier)) { // Least significant group should be last.
         return groupsArray.indexOf(group);
       }
     }
