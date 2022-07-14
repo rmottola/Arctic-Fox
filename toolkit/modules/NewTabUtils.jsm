@@ -738,6 +738,20 @@ var PlacesProvider = {
     }
   },
 
+  onDeleteURI: function PlacesProvider_onDeleteURI(aURI, aGUID, aReason) {
+    // let observers remove sensetive data associated with deleted visit
+    this._callObservers("onDeleteURI", {
+      url: aURI.spec,
+    });
+  },
+
+  onClearHistory: function() {
+    this._callObservers("onClearHistory")
+  },
+
+  /**
+   * Called by the history service.
+   */
   onFrecencyChanged: function PlacesProvider_onFrecencyChanged(aURI, aNewFrecency, aGUID, aHidden, aLastVisitDate) {
     // If something is doing a batch update of history entries we don't want
     // to do lots of work for each record. So we just track the fact we need
