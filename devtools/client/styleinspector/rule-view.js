@@ -4,10 +4,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* globals overlays, Services, EventEmitter, StyleInspectorMenu,
-   clipboardHelper, _strings, domUtils, AutocompletePopup, loader,
-   osString */
-
 "use strict";
 
 const {Cc, Ci, Cu} = require("chrome");
@@ -30,6 +26,7 @@ const {
   throttle
 } = require("devtools/client/styleinspector/utils");
 const {
+  escapeCSSComment,
   parseDeclarations,
   parseSingleValue,
   parsePseudoClassesAndAttributes,
@@ -1121,7 +1118,7 @@ TextProperty.prototype = {
 
     // Comment out property declarations that are not enabled
     if (!this.enabled) {
-      declaration = "/* " + declaration + " */";
+      declaration = "/* " + escapeCSSComment(declaration) + " */";
     }
 
     return declaration;
