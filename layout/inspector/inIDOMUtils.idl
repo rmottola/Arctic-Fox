@@ -28,6 +28,16 @@ interface inIDOMUtils : nsISupports
   unsigned long getRuleLine(in nsIDOMCSSRule aRule);
   unsigned long getRuleColumn(in nsIDOMCSSRule aRule);
 
+  /**
+   * Like getRuleLine, but if the rule is in a <style> element,
+   * returns a line number relative to the start of the element.
+   *
+   * @param nsIDOMCSSRule aRule the rule to examine
+   * @return the line number of the rule, possibly relative to the
+   *         <style> element
+   */
+  unsigned long getRelativeRuleLine(in nsIDOMCSSRule aRule);
+
   [implicit_jscontext]
   jsval getCSSLexer(in DOMString aText);
 
