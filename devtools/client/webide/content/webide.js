@@ -36,6 +36,8 @@ const HELP_URL = "https://developer.mozilla.org/docs/Tools/WebIDE/Troubleshootin
 const MAX_ZOOM = 1.4;
 const MIN_ZOOM = 0.6;
 
+const MS_PER_DAY = 86400000;
+
 // Download remote resources early
 getJSON("devtools.webide.addonsURL", true);
 getJSON("devtools.webide.templatesURL", true);
@@ -470,6 +472,39 @@ var UI = {
       }
     }
 
+    // Runtime commands
+    let monitorCmd = document.querySelector("#cmd_showMonitor");
+    let screenshotCmd = document.querySelector("#cmd_takeScreenshot");
+    let permissionsCmd = document.querySelector("#cmd_showPermissionsTable");
+    let detailsCmd = document.querySelector("#cmd_showRuntimeDetails");
+    let disconnectCmd = document.querySelector("#cmd_disconnectRuntime");
+    let devicePrefsCmd = document.querySelector("#cmd_showDevicePrefs");
+    let settingsCmd = document.querySelector("#cmd_showSettings");
+
+    if (AppManager.connected) {
+      if (AppManager.deviceFront) {
+        monitorCmd.removeAttribute("disabled");
+        detailsCmd.removeAttribute("disabled");
+        permissionsCmd.removeAttribute("disabled");
+        screenshotCmd.removeAttribute("disabled");
+      }
+      if (AppManager.preferenceFront) {
+        devicePrefsCmd.removeAttribute("disabled");
+      }
+      if (AppManager.settingsFront) {
+        settingsCmd.removeAttribute("disabled");
+      }
+      disconnectCmd.removeAttribute("disabled");
+    } else {
+      monitorCmd.setAttribute("disabled", "true");
+      detailsCmd.setAttribute("disabled", "true");
+      permissionsCmd.setAttribute("disabled", "true");
+      screenshotCmd.setAttribute("disabled", "true");
+      disconnectCmd.setAttribute("disabled", "true");
+      devicePrefsCmd.setAttribute("disabled", "true");
+      settingsCmd.setAttribute("disabled", "true");
+    }
+
     let runtimePanelButton = document.querySelector("#runtime-panel-button");
 
     if (AppManager.connected) {
@@ -599,6 +634,7 @@ var UI = {
     if (!this._actionsToLog.has(action)) {
       return;
     }
+    this.logActionState(action, true);
     this._actionsToLog.delete(action);
   },
 
@@ -607,7 +643,16 @@ var UI = {
    * actions as having not occurred.
    */
   updateConnectionTelemetry: function() {
+    for (let action of this._actionsToLog.values()) {
+      this.logActionState(action, false);
+    }
     this._actionsToLog.clear();
+  },
+
+  logActionState: function(action, state) {
+    let histogramId = "DEVTOOLS_WEBIDE_CONNECTION_" +
+                      action.toUpperCase() + "_USED";
+    this._telemetry.log(histogramId, state);
   },
 
   /********** PROJECTS **********/
@@ -697,10 +742,6 @@ var UI = {
 
   isProjectEditorEnabled: function() {
     return Services.prefs.getBoolPref("devtools.webide.showProjectEditor");
-  },
-
-  isRuntimeConfigurationEnabled: function() {
-    return Services.prefs.getBoolPref("devtools.webide.enableRuntimeConfiguration");
   },
 
   openProject: function() {
