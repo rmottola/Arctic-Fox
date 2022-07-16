@@ -1017,6 +1017,10 @@ var UI = {
   },
 
   updateToolboxFullscreenState: function() {
+    if (projectList.sidebarsEnabled) {
+      return;
+    }
+
     let panel = document.querySelector("#deck").selectedPanel;
     let nbox = document.querySelector("#notificationbox");
     if (panel && panel.id == "deck-panel-details" &&
