@@ -297,6 +297,7 @@ devtools.jar:
     skin/themes/images/sort-arrows.svg       (themes/images/sort-arrows.svg)
     skin/themes/images/tool-options.svg (themes/images/tool-options.svg)
     skin/themes/images/tool-webconsole.svg (themes/images/tool-webconsole.svg)
+    skin/themes/images/tool-canvas.svg (themes/images/tool-canvas.svg)
     skin/themes/images/tool-debugger.svg (themes/images/tool-debugger.svg)
     skin/themes/images/tool-debugger-paused.svg (themes/images/tool-debugger-paused.svg)
     skin/themes/images/tool-inspector.svg (themes/images/tool-inspector.svg)
