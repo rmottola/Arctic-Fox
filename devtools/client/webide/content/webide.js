@@ -223,6 +223,9 @@ var UI = {
         this.updateCommands();
         break;
       case "runtime-global-actors":
+        // Check runtime version only on runtime-global-actors,
+        // as we expect to use device actor
+        this.checkRuntimeVersion();
         this.updateCommands();
         break;
       case "runtime-details":
@@ -911,6 +914,31 @@ var UI = {
     deck.selectedPanel = null;
     this.onChangeProjectEditorSelected();
   },
+
+  buildIDToDate(buildID) {
+    let fields = buildID.match(/(\d{4})(\d{2})(\d{2})/);
+    // Date expects 0 - 11 for months
+    return new Date(fields[1], Number.parseInt(fields[2]) - 1, fields[3]);
+  },
+
+  checkRuntimeVersion: Task.async(function* () {
+    if (AppManager.connected && AppManager.deviceFront) {
+      let desc = yield AppManager.deviceFront.getDescription();
+      // Compare device and firefox build IDs
+      // and only compare by day (strip hours/minutes) to prevent
+      // warning against builds of the same day.
+      let deviceID = desc.appbuildid.substr(0, 8);
+      let localID = Services.appinfo.appBuildID.substr(0, 8);
+      let deviceDate = this.buildIDToDate(deviceID);
+      let localDate = this.buildIDToDate(localID);
+      // Allow device to be newer by up to a week.  This accommodates those with
+      // local device builds, since their devices will almost always be newer
+      // than the client.
+      if (deviceDate - localDate > 7 * MS_PER_DAY) {
+        this.reportError("error_runtimeVersionTooRecent", deviceID, localID);
+      }
+    }
+  }),
 
   /********** TOOLBOX **********/
 
