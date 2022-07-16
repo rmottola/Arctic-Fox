@@ -35,10 +35,66 @@ html {
   width: 100%;
 }
 
+.panel-header:first-child {
+  margin-top: 0;
+}
+
+.panel-header[hidden], .panel-item[hidden] {
+  display: none;
+}
+
+#runtime-panel-simulator,
+.panel-item-complex {
+  clear: both;
+  position: relative;
+}
+
+.panel-item span {
+  display: block;
+  float: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 75%;
+  white-space: nowrap;
+}
+
 .panel-item {
+  padding: 3%;
+  display: block;
+  width: 94%;
+  cursor: pointer;
+  border-top: 1px solid transparent;
+  border-left: 0;
+  border-bottom: 1px solid #CCC;
+  border-right: 0;
+  background-color: transparent;
+}
+
+button.panel-item {
+  background-position: 5px 5px;
+  background-repeat: no-repeat;
+  background-size: 14px 14px;
+  padding-left: 25px;
+  width: 100%;
+}
+
+.panel-item:disabled {
+  background-color: #FFF;
+  color: #5A5A5A;
+  opacity: 0.5;
   cursor: default;
-  padding: 5px 0;
-  min-width: 130px;
+}
+
+#refresh-tabs {
+  background-color: #FFF;
+  border-top: 1px solid #EDEDED;
+  display: inline-block;
+  float: right;
+  padding: 3px;
+  text-transform: none;
+  border-right: 1px solid #CCC;
+  width: auto;
+  margin: 0 4px 5px 5px;
 }
 
 .panel-header[hidden] {

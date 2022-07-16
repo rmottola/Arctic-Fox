@@ -15,6 +15,7 @@ window.addEventListener("load", function onLoad() {
   document.getElementById("new-app").onclick = CreateNewApp;
   document.getElementById("hosted-app").onclick = ImportHostedApp;
   document.getElementById("packaged-app").onclick = ImportPackagedApp;
+  document.getElementById("refresh-tabs").onclick = RefreshTabs;
   projectList.update();
   projectList.updateCommands();
 }, true);
@@ -23,6 +24,10 @@ window.addEventListener("unload", function onUnload() {
   window.removeEventListener("unload", onUnload);
   projectList.destroy();
 });
+
+function RefreshTabs() {
+  projectList.refreshTabs();
+}
 
 function CreateNewApp() {
   projectList.newApp();
