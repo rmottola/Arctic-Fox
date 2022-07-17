@@ -200,4 +200,4 @@ this.ForgetAboutSite = {
 
     return Promise.all(promises);
   }
-}
+};
