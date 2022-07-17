@@ -150,8 +150,8 @@
                     tooltiptext="&options.enableServiceWorkersTesting.tooltip;"
                     data-pref="devtools.serviceWorkers.testing.enabled"/>
           <hbox class="hidden-labels-box">
-            <checkbox label="&options.enableChrome.label4;"
-                      tooltiptext="&options.enableChrome.tooltip2;"
+            <checkbox label="&options.enableChrome.label5;"
+                      tooltiptext="&options.enableChrome.tooltip3;"
                       data-pref="devtools.chrome.enabled"/>
           </hbox>
           <hbox class="hidden-labels-box">
