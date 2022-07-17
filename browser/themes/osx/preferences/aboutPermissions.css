@@ -101,8 +101,8 @@
 .pref-icon[type="geo"] {
   list-style-image: url(chrome://browser/skin/Geolocation-64.png);
 }
-.pref-icon[type="push"] {
-  list-style-image: url(chrome://browser/skin/Push-64.png);
+.pref-icon[type="desktop-notification"] {
+  list-style-image: url(chrome://browser/skin/notification-64.png);
 }
 .pref-icon[type="indexedDB"] {
   list-style-image: url(chrome://global/skin/icons/question-64.png);
@@ -118,6 +118,15 @@
 }
 .pref-icon[type="microphone"] {
   list-style-image: url(chrome://global/skin/icons/question-64.png);
+}
+
+@media (min-resolution: 2dppx) {
+  .pref-icon[type="geo"] {
+    list-style-image: url(chrome://browser/skin/Geolocation-64@2x.png);
+  }
+  .pref-icon[type="desktop-notification"] {
+    list-style-image: url(chrome://browser/skin/notification-64@2x.png);
+  }
 }
 
 .pref-title {

@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-let Ci = Components.interfaces;
-let Cc = Components.classes;
-let Cu = Components.utils;
+var Ci = Components.interfaces;
+var Cc = Components.classes;
+var Cu = Components.utils;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -16,18 +16,18 @@ Cu.import("resource://gre/modules/ForgetAboutSite.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
                                   "resource://gre/modules/PluralForm.jsm");
 
-let gSecMan = Cc["@mozilla.org/scriptsecuritymanager;1"].
+var gSecMan = Cc["@mozilla.org/scriptsecuritymanager;1"].
               getService(Ci.nsIScriptSecurityManager);
 
-let gFaviconService = Cc["@mozilla.org/browser/favicon-service;1"].
+var gFaviconService = Cc["@mozilla.org/browser/favicon-service;1"].
                       getService(Ci.nsIFaviconService);
 
-let gPlacesDatabase = Cc["@mozilla.org/browser/nav-history-service;1"].
+var gPlacesDatabase = Cc["@mozilla.org/browser/nav-history-service;1"].
                       getService(Ci.nsPIPlacesDatabase).
                       DBConnection.
                       clone(true);
 
-let gSitesStmt = gPlacesDatabase.createAsyncStatement(
+var gSitesStmt = gPlacesDatabase.createAsyncStatement(
                   "SELECT url " +
                   "FROM moz_places " +
                   "WHERE rev_host > '.' " +
@@ -36,7 +36,7 @@ let gSitesStmt = gPlacesDatabase.createAsyncStatement(
                   "ORDER BY MAX(frecency) DESC " +
                   "LIMIT :limit");
 
-let gVisitStmt = gPlacesDatabase.createAsyncStatement(
+var gVisitStmt = gPlacesDatabase.createAsyncStatement(
                   "SELECT SUM(visit_count) AS count " +
                   "FROM moz_places " +
                   "WHERE rev_host = :rev_host");
@@ -409,16 +409,15 @@ let PermissionDefaults = {
     Services.prefs.setBoolPref("full-screen-api.pointer-lock.enabled", value);
   },
 
-  get push() {
-    if (!Services.prefs.getBoolPref("dom.push.enabled")) {
-      return this.DENY;
-    }
+  get ["desktop-notification"]() {
     return this.UNKNOWN;
   },
-  set push(aValue) {
-    let value = (aValue != this.DENY);
-    Services.prefs.setBoolPref("dom.push.enabled", value);
+  get camera() {
+    return this.UNKNOWN;
   },
+  get microphone() {
+    return this.UNKNOWN;
+  }
 };
 
 /**
@@ -458,18 +457,18 @@ let AboutPermissions = {
    */
   _supportedPermissions: ["password", "image", "popup", "cookie",
                           "desktop-notification", "install", "geo", "indexedDB",
-                          "camera", "microphone", "push", "pointerLock"],
+                          "camera", "microphone", "pointerLock"],
 
   /**
    * Permissions that don't have a global "Allow" option.
    */
-  _noGlobalAllow: ["desktop-notification", "geo", "indexedDB", "camera", "microphone", "push",
+  _noGlobalAllow: ["desktop-notification", "geo", "indexedDB", "camera", "microphone",
                    "pointerLock"],
 
   /**
    * Permissions that don't have a global "Deny" option.
    */
-  _noGlobalDeny: ["camera", "microphone"],
+  _noGlobalDeny: ["camera", "microphone", "desktop-notification"],
 
   _stringBundleBrowser: Services.strings
       .createBundle("chrome://browser/locale/browser.properties"),

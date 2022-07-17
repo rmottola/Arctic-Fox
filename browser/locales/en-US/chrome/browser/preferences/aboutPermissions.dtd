@@ -51,9 +51,8 @@
 
 <!ENTITY popup.label                     "Open Pop-up Windows">
 
+<!ENTITY desktop-notification.label      "Show Notifications">
 <!ENTITY camera.label                    "Use the Camera">
 <!ENTITY microphone.label                "Use the Microphone">
-
-<!ENTITY push.label                      "Receive Push Notifications">
 
 <!ENTITY pointerLock.label               "Hide the Mouse Pointer">

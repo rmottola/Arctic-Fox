@@ -25,8 +25,6 @@ browser.jar:
 * skin/classic/browser/engineManager.css
   skin/classic/browser/Geolocation-16.png
   skin/classic/browser/Geolocation-64.png
-  skin/classic/browser/Push-16.png
-  skin/classic/browser/Push-64.png
   skin/classic/browser/Go-arrow.png
   skin/classic/browser/identity.png
   skin/classic/browser/imagedocument.png 

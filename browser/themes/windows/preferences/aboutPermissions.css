@@ -92,17 +92,14 @@
 .pref-icon[type="cookie"] {
   list-style-image: url(chrome://global/skin/icons/question-48.png);
 }
-.pref-icon[type="desktop-notification"] {
-  list-style-image: url(chrome://browser/skin/notification-64.png);
-}
 .pref-icon[type="install"] {
   list-style-image: url(chrome://mozapps/skin/extensions/extensionGeneric-48.png);
 }
 .pref-icon[type="geo"] {
   list-style-image: url(chrome://browser/skin/Geolocation-64.png);
 }
-.pref-icon[type="push"] {
-  list-style-image: url(chrome://browser/skin/Push-64.png);
+.pref-icon[type="desktop-notification"] {
+  list-style-image: url(chrome://browser/skin/notification-64.png);
 }
 .pref-icon[type="indexedDB"] {
   list-style-image: url(chrome://global/skin/icons/question-48.png);
