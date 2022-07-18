@@ -446,6 +446,9 @@ RestyleTracker::DoProcessRestyles()
     }
   }
 
+  // mPendingRestyles is now empty.
+  mHaveSelectors = false;
+
   mRestyleManager->EndProcessingRestyles();
 }
 
@@ -509,6 +512,25 @@ RestyleTracker::AddRestyleRootsIfAwaitingRestyle(
       mRestyleRoots.AppendElement(element);
     }
   }
+}
+
+void
+RestyleTracker::ClearSelectors()
+{
+  if (!mHaveSelectors) {
+    return;
+  }
+  for (auto it = mPendingRestyles.Iter(); !it.Done(); it.Next()) {
+    RestyleData* data = it.Data();
+    if (data->mRestyleHint & eRestyle_SomeDescendants) {
+      data->mRestyleHint =
+        (data->mRestyleHint & ~eRestyle_SomeDescendants) | eRestyle_Subtree;
+      data->mRestyleHintData.mSelectorsForDescendants.Clear();
+    } else {
+      MOZ_ASSERT(data->mRestyleHintData.mSelectorsForDescendants.IsEmpty());
+    }
+  }
+  mHaveSelectors = false;
 }
 
 } // namespace mozilla
