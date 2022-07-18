@@ -82,6 +82,7 @@ EXPORTS += [
     'nsIReflowCallback.h',
     'nsLayoutUtils.h',
     'nsPresArena.h',
+    'nsPresArenaObjectList.h',
     'nsPresContext.h',
     'nsPresState.h',
     'nsRefreshDriver.h',
@@ -94,6 +95,7 @@ EXPORTS += [
 ]
 
 EXPORTS.mozilla += [
+    'ArenaObjectID.h',
     'GeometryUtils.h',
     'PaintTracker.h',
     'RestyleLogging.h',
