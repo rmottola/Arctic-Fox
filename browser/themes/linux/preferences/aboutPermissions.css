@@ -46,8 +46,13 @@
 /* permissions box */
 
 #permissions-box {
-  padding-top: 10px;
+  -moz-padding-start: 10px;
+}
+
+#permissions-list {
   overflow-y: auto;
+  padding-top: 5px;
+  -moz-padding-end: 44px;
 }
 
 #site-description {
@@ -80,17 +85,8 @@
 .pref-icon[type="password"] {
   list-style-image: url(chrome://mozapps/skin/passwordmgr/key-64.png);
 }
-.pref-icon[type="image"] {
-  list-style-image: url(chrome://global/skin/icons/question-64.png);
-}
-.pref-icon[type="popup"] {
-  list-style-image: url(chrome://global/skin/icons/question-64.png);
-}
 .pref-icon[type="cookie"] {
   list-style-image: url(chrome://global/skin/icons/question-64.png);
-}
-.pref-icon[type="install"] {
-  list-style-image: url(chrome://mozapps/skin/extensions/extensionGeneric.png);
 }
 .pref-icon[type="geo"] {
   list-style-image: url(chrome://browser/skin/Geolocation-64.png);
@@ -101,11 +97,20 @@
 .pref-icon[type="indexedDB"] {
   list-style-image: url(chrome://global/skin/icons/question-64.png);
 }
-.pref-icon[type="plugins"] {
-  list-style-image: url(chrome://mozapps/skin/plugins/pluginGeneric.png);
+.pref-icon[type="install"] {
+  list-style-image: url(chrome://mozapps/skin/extensions/extensionGeneric.png);
 }
 .pref-icon[type="pointerLock"] {
   list-style-image: url(chrome://global/skin/icons/question-64.png);
+}
+.pref-icon[type="popup"] {
+  list-style-image: url(chrome://global/skin/icons/question-64.png);
+}
+.pref-icon[type="image"] {
+  list-style-image: url(chrome://global/skin/icons/question-64.png);
+}
+.pref-icon[type="plugins"] {
+  list-style-image: url(chrome://mozapps/skin/plugins/pluginGeneric.png);
 }
 .pref-icon[type="camera"] {
   list-style-image: url(chrome://global/skin/icons/question-64.png);
