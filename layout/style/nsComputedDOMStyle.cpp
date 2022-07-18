@@ -264,9 +264,23 @@ nsComputedDOMStyle::nsComputedDOMStyle(dom::Element* aElement,
 
 nsComputedDOMStyle::~nsComputedDOMStyle()
 {
+  ClearStyleContext();
 }
 
-NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(nsComputedDOMStyle, mContent)
+NS_IMPL_CYCLE_COLLECTION_CLASS(nsComputedDOMStyle)
+
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsComputedDOMStyle)
+  tmp->ClearStyleContext();  // remove observer before clearing mContent
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mContent)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
+NS_IMPL_CYCLE_COLLECTION_UNLINK_END
+
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsComputedDOMStyle)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mContent)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
+
+NS_IMPL_CYCLE_COLLECTION_TRACE_WRAPPERCACHE(nsComputedDOMStyle)
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(nsComputedDOMStyle)
   return tmp->IsBlack();
@@ -283,6 +297,7 @@ NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_END
 // QueryInterface implementation for nsComputedDOMStyle
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsComputedDOMStyle)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
+  NS_INTERFACE_MAP_ENTRY(nsIMutationObserver)
 NS_INTERFACE_MAP_END_INHERITING(nsDOMCSSDeclaration)
 
 
@@ -575,12 +590,38 @@ nsComputedDOMStyle::GetCSSParsingEnvironment(CSSParsingEnvironment& aCSSParseEnv
 }
 
 void
+nsComputedDOMStyle::ClearStyleContext()
+{
+  if (mResolvedStyleContext) {
+    mResolvedStyleContext = false;
+    mContent->RemoveMutationObserver(this);
+  }
+  mStyleContext = nullptr;
+}
+
+void
+nsComputedDOMStyle::SetResolvedStyleContext(nsRefPtr<nsStyleContext>&& aContext)
+{
+  if (!mResolvedStyleContext) {
+    mResolvedStyleContext = true;
+    mContent->AddMutationObserver(this);
+  }
+  mStyleContext = aContext;
+}
+
+void
+nsComputedDOMStyle::SetFrameStyleContext(nsStyleContext* aContext)
+{
+  ClearStyleContext();
+  mStyleContext = aContext;
+}
+
+void
 nsComputedDOMStyle::UpdateCurrentStyleSources(bool aNeedsLayoutFlush)
 {
   nsCOMPtr<nsIDocument> document = do_QueryReferent(mDocumentWeak);
   if (!document) {
-    mResolvedStyleContext = false;
-    mStyleContext = nullptr;
+    ClearStyleContext();
     return;
   }
 
@@ -598,8 +639,7 @@ nsComputedDOMStyle::UpdateCurrentStyleSources(bool aNeedsLayoutFlush)
 
   mPresShell = document->GetShell();
   if (!mPresShell || !mPresShell->GetPresContext()) {
-    mResolvedStyleContext = false;
-    mStyleContext = nullptr;
+    ClearStyleContext();
     return;
   }
 
@@ -635,8 +675,7 @@ nsComputedDOMStyle::UpdateCurrentStyleSources(bool aNeedsLayoutFlush)
                      "the inner table");
       }
 
-      mStyleContext = mInnerFrame->StyleContext();
-      mResolvedStyleContext = false;
+      SetFrameStyleContext(mInnerFrame->StyleContext());
       NS_ASSERTION(mStyleContext, "Frame without style context?");
     }
   }
@@ -664,13 +703,13 @@ nsComputedDOMStyle::UpdateCurrentStyleSources(bool aNeedsLayoutFlush)
     }
 #endif
     // Need to resolve a style context
-    mStyleContext =
+    nsRefPtr<nsStyleContext> resolvedStyleContext =
       nsComputedDOMStyle::GetStyleContextForElement(mContent->AsElement(),
                                                     mPseudo,
                                                     mPresShell,
                                                     mStyleType);
-    if (!mStyleContext) {
-      mResolvedStyleContext = false;
+    if (!resolvedStyleContext) {
+      ClearStyleContext();
       return;
     }
 
@@ -681,8 +720,7 @@ nsComputedDOMStyle::UpdateCurrentStyleSources(bool aNeedsLayoutFlush)
                    mPresShell->GetPresContext()->GetRestyleGeneration(),
                  "why should we have flushed style again?");
 
-    mResolvedStyleContext = true;
-    mStyleContextGeneration = currentGeneration;
+    SetResolvedStyleContext(Move(resolvedStyleContext));
     NS_ASSERTION(mPseudo || !mStyleContext->HasPseudoElementData(),
                  "should not have pseudo-element data");
   }
@@ -6019,6 +6057,17 @@ nsComputedDOMStyle::DoGetCustomProperty(const nsAString& aPropertyName)
   val->SetString(variableValue);
 
   return val;
+}
+
+void
+nsComputedDOMStyle::ParentChainChanged(nsIContent* aContent)
+{
+  NS_ASSERTION(mContent == aContent, "didn't we register mContent?");
+  NS_ASSERTION(mResolvedStyleContext,
+               "should have only registered an observer when "
+               "mResolvedStyleContext is true");
+
+  ClearStyleContext();
 }
 
 /* static */ nsComputedStyleMap*
