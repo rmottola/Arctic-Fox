@@ -1125,6 +1125,12 @@ NS_NewStyleContext(nsStyleContext* aParentContext,
   return context.forget();
 }
 
+nsIPresShell*
+nsStyleContext::Arena()
+{
+  return mRuleNode->PresContext()->PresShell();
+}
+
 static inline void
 ExtractAnimationValue(nsCSSProperty aProperty,
                       nsStyleContext* aStyleContext,
