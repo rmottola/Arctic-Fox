@@ -19,8 +19,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
                                   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "BrowserUtils",
-                                  "resource://gre/modules/BrowserUtils.jsm");
 
 this.EXPORTED_SYMBOLS = ["PushRecord"];
 
@@ -163,20 +161,12 @@ PushRecord.prototype = {
   },
 
   /**
-   * Returns the push permission state for the principal associated with
-   * this registration.
-   */
-  pushPermission() {
-    return Services.perms.testExactPermissionFromPrincipal(
-           this.principal, "push");
-  },
-
-  /**
    * Indicates whether the registration can deliver push messages to its
    * associated service worker.
    */
   hasPermission() {
-    let permission = this.pushPermission();
+    let permission = Services.perms.testExactPermissionFromPrincipal(
+      this.principal, "desktop-notification");
     return permission == Ci.nsIPermissionManager.ALLOW_ACTION;
   },
 
@@ -207,7 +197,7 @@ PushRecord.prototype = {
 
 // Define lazy getters for the principal and scope URI. IndexedDB can't store
 // `nsIPrincipal` objects, so we keep them in a private weak map.
-let principals = new WeakMap();
+var principals = new WeakMap();
 Object.defineProperties(PushRecord.prototype, {
   principal: {
     get() {
@@ -218,7 +208,7 @@ Object.defineProperties(PushRecord.prototype, {
           // Allow tests to omit origin attributes.
           url += this.originAttributes;
         }
-        principal = BrowserUtils.principalFromOrigin(url);
+        principal = Services.scriptSecurityManager.createCodebasePrincipalFromOrigin(url);
         principals.set(this, principal);
       }
       return principal;

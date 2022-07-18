@@ -571,7 +571,7 @@ var gAdvancedPane = {
     var list = document.getElementById("offlineAppsList");
     var item = list.selectedItem;
     var origin = item.getAttribute("origin");
-    var principal = BrowserUtils.principalFromOrigin(origin);
+    var principal = Services.scriptSecurityManager.createCodebasePrincipalFromOrigin(origin);
 
     var prompts = Components.classes["@mozilla.org/embedcomp/prompt-service;1"]
                             .getService(Components.interfaces.nsIPromptService);
