@@ -19,7 +19,7 @@
 #include "GeckoProfiler.h"
 #include "mozilla/Maybe.h"
 
-#if defined(MOZ_ENABLE_PROFILER_SPS)
+#if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
 #include "ProfilerBacktrace.h"
 #endif
 
@@ -313,7 +313,7 @@ public:
     // that we called AddPendingRestyle for and found the element this is
     // the RestyleData for as its nearest restyle root.
     nsTArray<nsRefPtr<Element>> mDescendants;
-#if defined(MOZ_ENABLE_PROFILER_SPS)
+#if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
     UniquePtr<ProfilerBacktrace> mBacktrace;
 #endif
   };
