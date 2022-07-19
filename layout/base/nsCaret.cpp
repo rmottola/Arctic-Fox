@@ -217,8 +217,8 @@ nsCaret::ComputeMetrics(nsIFrame* aFrame, int32_t aOffset, nscoord aCaretHeight)
   // between 0 and 1 goes up to 1 so we don't let the caret disappear.
   int32_t tpp = aFrame->PresContext()->AppUnitsPerDevPixel();
   Metrics result;
-  result.mCaretWidth = NS_ROUND_CARET_TO_PIXELS(caretWidth, tpp);
-  result.mBidiIndicatorSize = NS_ROUND_CARET_TO_PIXELS(bidiIndicatorSize, tpp);
+  result.mCaretWidth = NS_ROUND_BORDER_TO_PIXELS(caretWidth, tpp);
+  result.mBidiIndicatorSize = NS_ROUND_BORDER_TO_PIXELS(bidiIndicatorSize, tpp);
   return result;
 }
 
