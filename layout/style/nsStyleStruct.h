@@ -1289,7 +1289,8 @@ struct nsStyleGridTemplate {
   }
 
   inline bool operator!=(const nsStyleGridTemplate& aOther) const {
-    return mLineNameLists != aOther.mLineNameLists ||
+    return mIsSubgrid != aOther.mIsSubgrid ||
+           mLineNameLists != aOther.mLineNameLists ||
            mMinTrackSizingFunctions != aOther.mMinTrackSizingFunctions ||
            mMaxTrackSizingFunctions != aOther.mMaxTrackSizingFunctions;
   }
