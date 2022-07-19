@@ -2,51 +2,72 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 // This test makes sure that the style editor does not store any
 // content CSS files in the permanent cache when opened from PB mode.
 
-function test() {
-  waitForExplicitFinish();
-  let gUI;
-  let testURI = 'http://' + TEST_HOST + '/browser/browser/devtools/styleeditor/test/test_private.html';
+const TEST_URL = "http://" + TEST_HOST + "/browser/devtools/client/" +
+  "styleeditor/test/test_private.html";
+const {LoadContextInfo} =
+  Cu.import("resource://gre/modules/LoadContextInfo.jsm", {});
+const cache = Cc["@mozilla.org/netwerk/cache-storage-service;1"]
+  .getService(Ci.nsICacheStorageService);
 
+add_task(function* () {
   info("Opening a new private window");
   let win = OpenBrowserWindow({private: true});
-  win.addEventListener("load", function onLoad() {
-    win.removeEventListener("load", onLoad, false);
-    executeSoon(startTest);
-  }, false);
+  yield waitForDelayedStartupFinished(win);
 
-  function startTest() {
-    win.gBrowser.selectedBrowser.addEventListener("load", function onLoad() {
-      win.gBrowser.selectedBrowser.removeEventListener("load", onLoad, true);
+  info("Clearing the browser cache");
+  cache.clear();
 
-      info("Clearing the browser cache");
-      cache.clear();
+  let { ui } = yield openStyleEditorForURL(TEST_URL, win);
 
-      info("Opening the style editor in the private window");
-      openStyleEditorInWindow(win, function(panel) {
-        gUI = panel.UI;
-        gUI.on("editor-added", onEditorAdded);
-      });
-    }, true);
+  is(ui.editors.length, 1, "The style editor contains one sheet.");
+  let editor = ui.editors[0];
 
-    info("Loading the test URL in the new private window");
-    win.content.location = testURI;
-  }
+  yield editor.getSourceEditor();
+  yield checkDiskCacheFor(TEST_HOST);
+  win.close();
+});
 
-  function onEditorAdded(aEvent, aEditor) {
-    info("The style editor is ready")
-    aEditor.getSourceEditor().then(checkCache);
-  }
+function checkDiskCacheFor(host) {
+  let foundPrivateData = false;
+  let deferred = promise.defer();
 
-  function checkCache() {
-    checkDiskCacheFor(TEST_HOST, function() {
-      gUI.off("editor-added", onEditorAdded);
-      win.close();
-      win = null;
-      gUI = null;
-      finish();
-    });
-  }
+  Visitor.prototype = {
+    onCacheStorageInfo: function(num) {
+      info("disk storage contains " + num + " entries");
+    },
+    onCacheEntryInfo: function(uri) {
+      let urispec = uri.asciiSpec;
+      info(urispec);
+      foundPrivateData |= urispec.includes(host);
+    },
+    onCacheEntryVisitCompleted: function() {
+      is(foundPrivateData, false, "web content present in disk cache");
+      deferred.resolve();
+    }
+  };
+  function Visitor() {}
+
+  let storage = cache.diskCacheStorage(LoadContextInfo.default, false);
+  storage.asyncVisitStorage(new Visitor(),
+    /* Do walk entries */
+    true);
+
+  return deferred.promise;
+}
+
+function waitForDelayedStartupFinished(win) {
+  let deferred = promise.defer();
+  Services.obs.addObserver(function observer(subject, topic) {
+    if (win == subject) {
+      Services.obs.removeObserver(observer, topic);
+      deferred.resolve();
+    }
+  }, "browser-delayed-startup-finished", false);
+
+  return deferred.promise;
 }

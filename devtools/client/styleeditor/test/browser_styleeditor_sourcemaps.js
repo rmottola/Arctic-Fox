@@ -2,10 +2,11 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
+"use strict";
+
 // https rather than chrome to improve coverage
 const TESTCASE_URI = TEST_BASE_HTTPS + "sourcemaps.html";
 const PREF = "devtools.styleeditor.source-maps-enabled";
-
 
 const contents = {
   "sourcemaps.scss": [
@@ -40,7 +41,10 @@ const contents = {
     "#header {",
     "  color: #f06; }",
     "",
-    "/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiIiwic291cmNlcyI6WyJzYXNzL2NvbnRhaW5lZC5zY3NzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUVBO0VBQ0UsT0FISyIsInNvdXJjZXNDb250ZW50IjpbIiRwaW5rOiAjZjA2O1xuXG4jaGVhZGVyIHtcbiAgY29sb3I6ICRwaW5rO1xufSJdfQ==*/"
+    "/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJma" +
+    "WxlIjoiIiwic291cmNlcyI6WyJzYXNzL2NvbnRhaW5lZC5zY3NzIl0sIm5hbWVzIjpbXSwi" +
+    "bWFwcGluZ3MiOiJBQUVBO0VBQ0UsT0FISyIsInNvdXJjZXNDb250ZW50IjpbIiRwaW5rOiA" +
+    "jZjA2O1xuXG4jaGVhZGVyIHtcbiAgY29sb3I6ICRwaW5rO1xufSJdfQ==*/"
   ].join("\n"),
   "test-stylus.styl": [
    "paulrougetpink = #f06;",
@@ -59,9 +63,14 @@ const contents = {
     "span {",
     "  background-color: #eee;",
     "}",
-    "/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInRlc3Qtc3R5bHVzLnN0eWwiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBRUE7RUFDRSxPQUFPLEtBQVA7O0FBRUY7RUFDRSxrQkFBa0IsS0FBbEIiLCJmaWxlIjoidGVzdC1zdHlsdXMuY3NzIiwic291cmNlc0NvbnRlbnQiOlsicGF1bHJvdWdldHBpbmsgPSAjZjA2O1xuXG5kaXZcbiAgY29sb3I6IHBhdWxyb3VnZXRwaW5rXG5cbnNwYW5cbiAgYmFja2dyb3VuZC1jb2xvcjogI0VFRVxuIl19 */"
+    "/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb" +
+    "3VyY2VzIjpbInRlc3Qtc3R5bHVzLnN0eWwiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFB" +
+    "RUE7RUFDRSxPQUFPLEtBQVA7O0FBRUY7RUFDRSxrQkFBa0IsS0FBbEIiLCJmaWxlIjoidGV" +
+    "zdC1zdHlsdXMuY3NzIiwic291cmNlc0NvbnRlbnQiOlsicGF1bHJvdWdldHBpbmsgPSAjZj" +
+    "A2O1xuXG5kaXZcbiAgY29sb3I6IHBhdWxyb3VnZXRwaW5rXG5cbnNwYW5cbiAgYmFja2dyb" +
+    "3VuZC1jb2xvcjogI0VFRVxuIl19 */"
   ].join("\n")
-}
+};
 
 const cssNames = ["sourcemaps.css", "contained.css", "test-stylus.css"];
 const origNames = ["sourcemaps.scss", "contained.scss", "test-stylus.styl"];
@@ -69,28 +78,28 @@ const origNames = ["sourcemaps.scss", "contained.scss", "test-stylus.styl"];
 waitForExplicitFinish();
 
 add_task(function*() {
-  let {UI} = yield addTabAndOpenStyleEditors(7, null, TESTCASE_URI);
+  let {ui} = yield openStyleEditorForURL(TESTCASE_URI);
 
-  is(UI.editors.length, 4,
+  is(ui.editors.length, 4,
     "correct number of editors with source maps enabled");
 
   // Test first plain css editor
-  testFirstEditor(UI.editors[0]);
+  testFirstEditor(ui.editors[0]);
 
   // Test Scss editors
-  yield testEditor(UI.editors[1], origNames);
-  yield testEditor(UI.editors[2], origNames);
-  yield testEditor(UI.editors[3], origNames);
+  yield testEditor(ui.editors[1], origNames);
+  yield testEditor(ui.editors[2], origNames);
+  yield testEditor(ui.editors[3], origNames);
 
   // Test disabling original sources
-  yield togglePref(UI);
+  yield togglePref(ui);
 
-  is(UI.editors.length, 4, "correct number of editors after pref toggled");
+  is(ui.editors.length, 4, "correct number of editors after pref toggled");
 
   // Test CSS editors
-  yield testEditor(UI.editors[1], cssNames);
-  yield testEditor(UI.editors[2], cssNames);
-  yield testEditor(UI.editors[3], cssNames);
+  yield testEditor(ui.editors[1], cssNames);
+  yield testEditor(ui.editors[2], cssNames);
+  yield testEditor(ui.editors[3], cssNames);
 
   Services.prefs.clearUserPref(PREF);
 });
@@ -116,16 +125,7 @@ function testEditor(editor, possibleNames) {
 /* Helpers */
 
 function togglePref(UI) {
-  let deferred = promise.defer();
-  let count = 0;
-
-  UI.on("editor-added", (event, editor) => {
-    if (++count == 3) {
-      deferred.resolve();
-    }
-  })
-  let editorsPromise = deferred.promise;
-
+  let editorsPromise = UI.once("stylesheets-reset");
   let selectedPromise = UI.once("editor-selected");
 
   Services.prefs.setBoolPref(PREF, false);
@@ -145,5 +145,5 @@ function getLinkFor(editor) {
 
 function getStylesheetNameFor(editor) {
   return editor.summary.querySelector(".stylesheet-name > label")
-         .getAttribute("value")
+    .getAttribute("value");
 }

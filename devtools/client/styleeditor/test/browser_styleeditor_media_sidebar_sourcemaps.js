@@ -2,6 +2,8 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
+"use strict";
+
 // https rather than chrome to improve coverage
 const TESTCASE_URI = TEST_BASE_HTTPS + "media-rules-sourcemaps.html";
 const MAP_PREF = "devtools.styleeditor.source-maps-enabled";
@@ -15,14 +17,14 @@ waitForExplicitFinish();
 add_task(function*() {
   Services.prefs.setBoolPref(MAP_PREF, true);
 
-  let {UI} = yield addTabAndOpenStyleEditors(2, null, TESTCASE_URI);
+  let { ui } = yield openStyleEditorForURL(TESTCASE_URI);
 
-  yield listenForMediaChange(UI);
+  yield listenForMediaChange(ui);
 
-  is(UI.editors.length, 1, "correct number of editors");
+  is(ui.editors.length, 1, "correct number of editors");
 
   // Test editor with @media rules
-  let mediaEditor = UI.editors[0];
+  let mediaEditor = ui.editors[0];
   yield openEditor(mediaEditor);
   testMediaEditor(mediaEditor);
 
@@ -60,7 +62,7 @@ function listenForMediaChange(UI) {
   let deferred = promise.defer();
   UI.once("media-list-changed", () => {
     deferred.resolve();
-  })
+  });
   return deferred.promise;
 }
 

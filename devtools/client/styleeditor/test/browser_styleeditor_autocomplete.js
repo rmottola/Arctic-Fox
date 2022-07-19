@@ -1,19 +1,12 @@
 /* vim: set ts=2 et sw=2 tw=80: */
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
+"use strict";
 
-///////////////////
-//
-// Whitelisting this test.
-// As part of bug 1077403, the leaking uncaught rejection should be fixed. 
-//
-thisTestLeaksUncaughtRejectionsAndShouldBeFixed("Error: Unknown sheet source");
+// Test that autocompletion works as expected.
 
 const TESTCASE_URI = TEST_BASE_HTTP + "autocomplete.html";
 const MAX_SUGGESTIONS = 15;
-
-// Pref which decides if CSS autocompletion is enabled in Style Editor or not.
-const AUTOCOMPLETION_PREF = "devtools.styleeditor.autocompletion-enabled";
 
 const {CSSProperties, CSSValues} = getCSSKeywords();
 
@@ -24,98 +17,103 @@ const {CSSProperties, CSSValues} = getCSSKeywords();
 //   {
 //     total: Number of suggestions in the popup (-1 if popup is closed),
 //     current: Index of selected suggestion,
-//     inserted: 1 to check whether the selected suggestion is inserted into the editor or not,
+//     inserted: 1 to check whether the selected suggestion is inserted into the
+//               editor or not,
 //     entered: 1 if the suggestion is inserted and finalized
 //   }
 // ]
-let TEST_CASES = [
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['Ctrl+Space', {total: 1, current: 0}],
-  ['VK_LEFT'],
-  ['VK_RIGHT'],
-  ['VK_DOWN'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['Ctrl+Space', { total: getSuggestionNumberFor("font"), current: 0}],
-  ['VK_END'],
-  ['VK_RETURN'],
-  ['b', {total: getSuggestionNumberFor("b"), current: 0}],
-  ['a', {total: getSuggestionNumberFor("ba"), current: 0}],
-  ['VK_DOWN', {total: getSuggestionNumberFor("ba"), current: 0, inserted: 1}],
-  ['VK_TAB', {total: getSuggestionNumberFor("ba"), current: 1, inserted: 1}],
-  ['VK_RETURN', {current: 1, inserted: 1, entered: 1}],
-  ['b', {total: getSuggestionNumberFor("background", "b"), current: 0}],
-  ['l', {total: getSuggestionNumberFor("background", "bl"), current: 0}],
-  ['VK_TAB', {total: getSuggestionNumberFor("background", "bl"), current: 0, inserted: 1}],
-  ['VK_DOWN', {total: getSuggestionNumberFor("background", "bl"), current: 1, inserted: 1}],
-  ['VK_UP', {total: getSuggestionNumberFor("background", "bl"), current: 0, inserted: 1}],
-  ['VK_TAB', {total: getSuggestionNumberFor("background", "bl"), current: 1, inserted: 1}],
-  ['VK_TAB', {total: getSuggestionNumberFor("background", "bl"), current: 2, inserted: 1}],
-  [';'],
-  ['VK_RETURN'],
-  ['c', {total: getSuggestionNumberFor("c"), current: 0}],
-  ['o', {total: getSuggestionNumberFor("co"), current: 0}],
-  ['VK_RETURN', {current: 0, inserted: 1}],
-  ['r', {total: getSuggestionNumberFor("color", "r"), current: 0}],
-  ['VK_RETURN', {current: 0, inserted: 1}],
-  [';'],
-  ['VK_LEFT'],
-  ['VK_RIGHT'],
-  ['VK_DOWN'],
-  ['VK_RETURN'],
-  ['b', {total: 2, current: 0}],
-  ['u', {total: 1, current: 0}],
-  ['VK_RETURN', {current: 0, inserted: 1}],
-  ['{'],
-  ['VK_HOME'],
-  ['VK_DOWN'],
-  ['VK_DOWN'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['VK_RIGHT'],
-  ['Ctrl+Space', {total: 1, current: 0}],
+var TEST_CASES = [
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["Ctrl+Space", {total: 1, current: 0}],
+  ["VK_LEFT"],
+  ["VK_RIGHT"],
+  ["VK_DOWN"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["Ctrl+Space", { total: getSuggestionNumberFor("font"), current: 0}],
+  ["VK_END"],
+  ["VK_RETURN"],
+  ["b", {total: getSuggestionNumberFor("b"), current: 0}],
+  ["a", {total: getSuggestionNumberFor("ba"), current: 0}],
+  ["VK_DOWN", {total: getSuggestionNumberFor("ba"), current: 0, inserted: 1}],
+  ["VK_TAB", {total: getSuggestionNumberFor("ba"), current: 1, inserted: 1}],
+  ["VK_RETURN", {current: 1, inserted: 1, entered: 1}],
+  ["b", {total: getSuggestionNumberFor("background", "b"), current: 0}],
+  ["l", {total: getSuggestionNumberFor("background", "bl"), current: 0}],
+  ["VK_TAB", {
+    total: getSuggestionNumberFor("background", "bl"),
+    current: 0, inserted: 1
+  }],
+  ["VK_DOWN", {
+    total: getSuggestionNumberFor("background", "bl"),
+    current: 1, inserted: 1
+  }],
+  ["VK_UP", {
+    total: getSuggestionNumberFor("background", "bl"),
+    current: 0,
+    inserted: 1
+  }],
+  ["VK_TAB", {
+    total: getSuggestionNumberFor("background", "bl"),
+    current: 1,
+    inserted: 1
+  }],
+  ["VK_TAB", {
+    total: getSuggestionNumberFor("background", "bl"),
+    current: 2,
+    inserted: 1
+  }],
+  [";"],
+  ["VK_RETURN"],
+  ["c", {total: getSuggestionNumberFor("c"), current: 0}],
+  ["o", {total: getSuggestionNumberFor("co"), current: 0}],
+  ["VK_RETURN", {current: 0, inserted: 1}],
+  ["r", {total: getSuggestionNumberFor("color", "r"), current: 0}],
+  ["VK_RETURN", {current: 0, inserted: 1}],
+  [";"],
+  ["VK_LEFT"],
+  ["VK_RIGHT"],
+  ["VK_DOWN"],
+  ["VK_RETURN"],
+  ["b", {total: 2, current: 0}],
+  ["u", {total: 1, current: 0}],
+  ["VK_RETURN", {current: 0, inserted: 1}],
+  ["{"],
+  ["VK_HOME"],
+  ["VK_DOWN"],
+  ["VK_DOWN"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["VK_RIGHT"],
+  ["Ctrl+Space", {total: 1, current: 0}],
 ];
 
-let gEditor;
-let gPopup;
-let index = 0;
+add_task(function* () {
+  let { panel, ui } = yield openStyleEditorForURL(TESTCASE_URI);
+  let editor = yield ui.editors[0].getSourceEditor();
+  let sourceEditor = editor.sourceEditor;
+  let popup = sourceEditor.getAutocompletionPopup();
 
-function test()
-{
-  waitForExplicitFinish();
+  yield SimpleTest.promiseFocus(panel.panelWindow);
 
-  addTabAndOpenStyleEditors(1, testEditorAdded);
-
-  content.location = TESTCASE_URI;
-}
-
-function testEditorAdded(panel) {
-  info("Editor added, getting the source editor and starting tests");
-  panel.UI.editors[0].getSourceEditor().then(editor => {
-    info("source editor found, starting tests.");
-    gEditor = editor.sourceEditor;
-    gPopup = gEditor.getAutocompletionPopup();
-    waitForFocus(testState, gPanelWindow);
-  });
-}
-
-function testState() {
-  if (index == TEST_CASES.length) {
-    testAutocompletionDisabled();
-    return;
+  for (let index in TEST_CASES) {
+    yield testState(index, sourceEditor, popup, panel.panelWindow);
+    yield checkState(index, sourceEditor, popup);
   }
+});
 
+function testState(index, sourceEditor, popup, panelWindow) {
   let [key, details] = TEST_CASES[index];
   let entered;
   if (details) {
@@ -128,88 +126,58 @@ function testState() {
 
   let evt = "after-suggest";
 
-  if (key == 'Ctrl+Space') {
+  if (key == "Ctrl+Space") {
     key = " ";
     mods.ctrlKey = true;
-  }
-  else if (key == "VK_RETURN" && entered) {
+  } else if (key == "VK_RETURN" && entered) {
     evt = "popup-hidden";
-  }
-  else if (/(left|right|return|home|end)/ig.test(key) ||
-           (key == "VK_DOWN" && !gPopup.isOpen)) {
+  } else if (/(left|right|return|home|end)/ig.test(key) ||
+           (key == "VK_DOWN" && !popup.isOpen)) {
     evt = "cursorActivity";
-  }
-  else if (key == "VK_TAB" || key == "VK_UP" || key == "VK_DOWN") {
+  } else if (key == "VK_TAB" || key == "VK_UP" || key == "VK_DOWN") {
     evt = "suggestion-entered";
   }
 
-  gEditor.once(evt, checkState);
-  EventUtils.synthesizeKey(key, mods, gPanelWindow);
+  let ready = sourceEditor.once(evt);
+  EventUtils.synthesizeKey(key, mods, panelWindow);
+
+  return ready;
 }
 
-function checkState() {
+function checkState(index, sourceEditor, popup) {
+  let deferred = promise.defer();
   executeSoon(() => {
-    let [key, details] = TEST_CASES[index];
+    let [, details] = TEST_CASES[index];
     details = details || {};
     let {total, current, inserted} = details;
 
     if (total != undefined) {
-      ok(gPopup.isOpen, "Popup is open for index " + index);
-      is(total, gPopup.itemCount,
+      ok(popup.isOpen, "Popup is open for index " + index);
+      is(total, popup.itemCount,
          "Correct total suggestions for index " + index);
-      is(current, gPopup.selectedIndex,
+      is(current, popup.selectedIndex,
          "Correct index is selected for index " + index);
       if (inserted) {
-        let { preLabel, label, text } = gPopup.getItemAtIndex(current);
-        let { line, ch } = gEditor.getCursor();
-        let lineText = gEditor.getText(line);
+        let { text } = popup.getItemAtIndex(current);
+        let { line, ch } = sourceEditor.getCursor();
+        let lineText = sourceEditor.getText(line);
         is(lineText.substring(ch - text.length, ch), text,
            "Current suggestion from the popup is inserted into the editor.");
       }
-    }
-    else {
-      ok(!gPopup.isOpen, "Popup is closed for index " + index);
+    } else {
+      ok(!popup.isOpen, "Popup is closed for index " + index);
       if (inserted) {
-        let { preLabel, label, text } = gPopup.getItemAtIndex(current);
-        let { line, ch } = gEditor.getCursor();
-        let lineText = gEditor.getText(line);
+        let { text } = popup.getItemAtIndex(current);
+        let { line, ch } = sourceEditor.getCursor();
+        let lineText = sourceEditor.getText(line);
         is(lineText.substring(ch - text.length, ch), text,
            "Current suggestion from the popup is inserted into the editor.");
       }
     }
-    index++;
-    testState();
+    deferred.resolve();
   });
-}
 
-function testAutocompletionDisabled() {
-  gBrowser.removeCurrentTab();
-
-  index = 0;
-  info("Starting test to check if autocompletion is disabled correctly.")
-  Services.prefs.setBoolPref(AUTOCOMPLETION_PREF, false);
-
-  addTabAndOpenStyleEditors(1, testEditorAddedDisabled);
-
-  content.location = TESTCASE_URI;
-}
-
-function testEditorAddedDisabled(panel) {
-  info("Editor added, getting the source editor and starting tests");
-  panel.UI.editors[0].getSourceEditor().then(editor => {
-    is(editor.sourceEditor.getOption("autocomplete"), false,
-       "Autocompletion option does not exist");
-    ok(!editor.sourceEditor.getAutocompletionPopup(),
-       "Autocompletion popup does not exist");
-    cleanup();
-  });
-}
-
-function cleanup() {
-  Services.prefs.clearUserPref(AUTOCOMPLETION_PREF);
-  gEditor = null;
-  gPopup = null;
-  finish();
+  return deferred.promise;
 }
 
 /**
