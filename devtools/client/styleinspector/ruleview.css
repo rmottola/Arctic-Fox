@@ -84,7 +84,8 @@ body {
   display: none;
 }
 
-.ruleview-computedlist.filter-open {
+.ruleview-computedlist[user-open],
+.ruleview-computedlist[filter-open] {
   display: block;
 }
 
