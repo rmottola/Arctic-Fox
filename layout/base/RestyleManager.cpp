@@ -2433,9 +2433,11 @@ RestyleManager::ReparentStyleContext(nsIFrame* aFrame)
       // up resolving all the structs the old context resolved.
       if (!copyFromContinuation) {
         uint32_t equalStructs;
+        uint32_t samePointerStructs;
         DebugOnly<nsChangeHint> styleChange =
           oldContext->CalcStyleDifference(newContext, nsChangeHint(0),
-                                          &equalStructs);
+                                          &equalStructs,
+                                          &samePointerStructs);
         // The style change is always 0 because we have the same rulenode and
         // CalcStyleDifference optimizes us away.  That's OK, though:
         // reparenting should never trigger a frame reconstruct, and whenever
@@ -2499,10 +2501,12 @@ RestyleManager::ReparentStyleContext(nsIFrame* aFrame)
             // context ends up resolving all the structs the old context
             // resolved.
             uint32_t equalStructs;
+            uint32_t samePointerStructs;
             DebugOnly<nsChangeHint> styleChange =
               oldExtraContext->CalcStyleDifference(newExtraContext,
                                                    nsChangeHint(0),
-                                                   &equalStructs);
+                                                   &equalStructs,
+                                                   &samePointerStructs);
             // The style change is always 0 because we have the same
             // rulenode and CalcStyleDifference optimizes us away.  That's
             // OK, though: reparenting should never trigger a frame
@@ -2724,7 +2728,8 @@ void
 ElementRestyler::CaptureChange(nsStyleContext* aOldContext,
                                nsStyleContext* aNewContext,
                                nsChangeHint aChangeToAssume,
-                               uint32_t* aEqualStructs)
+                               uint32_t* aEqualStructs,
+                               uint32_t* aSamePointerStructs)
 {
   static_assert(nsStyleStructID_Length <= 32,
                 "aEqualStructs is not big enough");
@@ -2738,7 +2743,8 @@ ElementRestyler::CaptureChange(nsStyleContext* aOldContext,
   nsChangeHint ourChange =
     aOldContext->CalcStyleDifference(aNewContext,
                                      mParentFrameHintsNotHandledForDescendants,
-                                     aEqualStructs);
+                                     aEqualStructs,
+                                     aSamePointerStructs);
   NS_ASSERTION(!(ourChange & nsChangeHint_AllReflowHints) ||
                (ourChange & nsChangeHint_NeedReflow),
                "Reflow hint bits set without actually asking for a reflow");
@@ -3545,6 +3551,7 @@ ElementRestyler::RestyleSelf(nsIFrame* aSelf,
     }
 
     uint32_t equalStructs = 0;
+    uint32_t samePointerStructs = 0;
 
     if (copyFromContinuation) {
       // In theory we should know whether there was any style data difference,
@@ -3554,7 +3561,8 @@ ElementRestyler::RestyleSelf(nsIFrame* aSelf,
       // determine whether it is safe to stop restyling.
       if (result == eRestyleResult_Stop) {
         oldContext->CalcStyleDifference(newContext, nsChangeHint(0),
-                                        &equalStructs);
+                                        &equalStructs,
+                                        &samePointerStructs);
         if (equalStructs != NS_STYLE_INHERIT_MASK) {
           // At least one struct had different data in it, so we must
           // continue restyling children.
@@ -3573,7 +3581,7 @@ ElementRestyler::RestyleSelf(nsIFrame* aSelf,
         result = eRestyleResult_Continue;
       }
       CaptureChange(oldContext, newContext, assumeDifferenceHint,
-                    &equalStructs);
+                    &equalStructs, &samePointerStructs);
       if (equalStructs != NS_STYLE_INHERIT_MASK) {
         // At least one struct had different data in it, so we must
         // continue restyling children.
@@ -3730,8 +3738,9 @@ ElementRestyler::RestyleSelf(nsIFrame* aSelf,
 
     if (oldExtraContext != newExtraContext) {
       uint32_t equalStructs;
+      uint32_t samePointerStructs;
       CaptureChange(oldExtraContext, newExtraContext, assumeDifferenceHint,
-                    &equalStructs);
+                    &equalStructs, &samePointerStructs);
       if (!(mHintsHandled & nsChangeHint_ReconstructFrame)) {
         LOG_RESTYLE("setting new extra style context");
         aSelf->SetAdditionalStyleContext(contextIndex, newExtraContext);
