@@ -805,6 +805,7 @@ private:
 
   void AddPendingRestylesForDescendantsMatchingSelectors(Element* aElement,
                                                          Element* aRestyleRoot);
+  void AddPendingRestylesForDescendantsMatchingSelectors(nsIContent* aContent);
 
 #ifdef RESTYLE_LOGGING
   int32_t& LoggingDepth() { return mLoggingDepth; }
