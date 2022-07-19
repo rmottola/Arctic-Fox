@@ -268,6 +268,10 @@ class SamplerThread : public Thread {
     }
 #endif
 
+    // We're using thread_suspend on OS X because pthread_kill (which is what
+    // we're using on Linux) has less consistent performance and causes
+    // strange crashes, see bug 1166778 and bug 1166808.
+
     if (KERN_SUCCESS != thread_suspend(profiled_thread)) return;
 
 #if V8_HOST_ARCH_X64
