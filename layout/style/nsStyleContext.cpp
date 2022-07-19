@@ -621,7 +621,7 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
         presContext->StyleSet()->ResolveStyleFor(docElement, nullptr);
       auto dir = rootStyle->StyleVisibility()->mDirection;
       if (dir != StyleVisibility()->mDirection) {
-        nsStyleVisibility* uniqueVisibility = 
+        nsStyleVisibility* uniqueVisibility =
           (nsStyleVisibility*)GetUniqueStyleData(eStyleStruct_Visibility);
         uniqueVisibility->mDirection = dir;
       }
@@ -1586,6 +1586,6 @@ nsStyleContext::Initialize()
 {
   Preferences::AddBoolVarCache(
       &sExpensiveStyleStructAssertionsEnabled,
-      "layout.css.expensive-style-struct-assertions.enabed");
+      "layout.css.expensive-style-struct-assertions.enabled");
 }
 #endif
