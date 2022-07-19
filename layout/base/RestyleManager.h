@@ -782,7 +782,8 @@ private:
 
   // Helpers for RestyleChildren().
   void RestyleUndisplayedDescendants(nsRestyleHint aChildRestyleHint);
-  bool MustCheckUndisplayedContent(nsIContent*& aUndisplayedParent);
+  bool MustCheckUndisplayedContent(nsIFrame* aFrame,
+                                   nsIContent*& aUndisplayedParent);
 
   /**
    * In the following two methods, aParentStyleContext is either
