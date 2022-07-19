@@ -392,6 +392,10 @@ StyleInspectorMenu.prototype = {
    * Retrieve the url for the selected image and copy it to the clipboard
    */
   _onCopyUrl: function() {
+    if (!this._clickedNodeInfo) {
+      return;
+    }
+
     clipboardHelper.copyString(this._clickedNodeInfo.value.url);
   },
 
