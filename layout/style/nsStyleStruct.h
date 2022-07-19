@@ -488,12 +488,12 @@ struct nsStyleBackground {
       return !(*this == aOther);
     }
   };
-  
+
   struct Repeat;
   friend struct Repeat;
   struct Repeat {
     uint8_t mXRepeat, mYRepeat;
-    
+
     // Initialize nothing
     Repeat() {}
 
@@ -831,10 +831,11 @@ public:
     nsCSSShadowItem mArray[1]; // This MUST be the last item
 };
 
-// Border widths are rounded to the nearest integer number of pixels, but values
-// between zero and one device pixels are always rounded up to one device pixel.
+// Border widths are rounded to the nearest-below integer number of pixels,
+// but values between zero and one device pixels are always rounded up to
+// one device pixel.
 #define NS_ROUND_BORDER_TO_PIXELS(l,tpp) \
-  ((l) == 0) ? 0 : std::max((tpp), ((l) + ((tpp) / 2)) / (tpp) * (tpp))
+  ((l) == 0) ? 0 : std::max((tpp), (l) / (tpp) * (tpp))
 // Caret widths are rounded to the nearest-below integer number of pixels, but values
 // between zero and one device pixels are always rounded up to one device pixel.
 #define NS_ROUND_CARET_TO_PIXELS(l,tpp) \
