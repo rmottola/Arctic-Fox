@@ -874,7 +874,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
                                   differenceAlwaysHandledForDescendants) &    \
                   aParentHintsNotHandledForDescendants)) {                    \
         nsChangeHint difference =                                             \
-            this##struct_->CalcDifference(*other##struct_);                   \
+          this##struct_->CalcDifference(*other##struct_ EXTRA_DIFF_ARGS);     \
         NS_ASSERTION(NS_IsHintSubset(difference, maxDifference),              \
                      "CalcDifference() returned bigger hint than "            \
                      "MaxDifference()");                                      \
@@ -886,7 +886,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
         /* We still must call CalcDifference to see if there were any */      \
         /* changes so that we can set *aEqualStructs appropriately.   */      \
         nsChangeHint difference =                                             \
-            this##struct_->CalcDifference(*other##struct_);                   \
+          this##struct_->CalcDifference(*other##struct_ EXTRA_DIFF_ARGS);     \
         NS_ASSERTION(NS_IsHintSubset(difference, maxDifference),              \
                      "CalcDifference() returned bigger hint than "            \
                      "MaxDifference()");                                      \
@@ -905,6 +905,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
   // smallest.  This lets us skip later ones if we already have a hint
   // that subsumes their MaxDifference.  (As the hints get
   // finer-grained, this optimization is becoming less useful, though.)
+#define EXTRA_DIFF_ARGS /* nothing */
   DO_STRUCT_DIFFERENCE(Display);
   DO_STRUCT_DIFFERENCE(XUL);
   DO_STRUCT_DIFFERENCE(Column);
@@ -920,7 +921,11 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
   DO_STRUCT_DIFFERENCE(Quotes);
   DO_STRUCT_DIFFERENCE(SVGReset);
   DO_STRUCT_DIFFERENCE(SVG);
+#undef EXTRA_DIFF_ARGS
+#define EXTRA_DIFF_ARGS , this
   DO_STRUCT_DIFFERENCE(Position);
+#undef EXTRA_DIFF_ARGS
+#define EXTRA_DIFF_ARGS /* nothing */
   DO_STRUCT_DIFFERENCE(Font);
   DO_STRUCT_DIFFERENCE(Margin);
   DO_STRUCT_DIFFERENCE(Padding);
@@ -928,6 +933,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
   DO_STRUCT_DIFFERENCE(TextReset);
   DO_STRUCT_DIFFERENCE(Background);
   DO_STRUCT_DIFFERENCE(Color);
+#undef EXTRA_DIFF_ARGS
 
 #undef DO_STRUCT_DIFFERENCE
 
