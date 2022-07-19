@@ -103,7 +103,6 @@ add_task(function*() {
                        "\tbackground-color: #00F;[\\r\\n]+" +
                        "\tfont-size: 12px;[\\r\\n]+" +
                        "\tborder-color: #00F !important;[\\r\\n]+" +
-                       "\t--var: \"\\*/\";[\\r\\n]+" +
                        "}",
       hidden: {
         copyLocation: true,
@@ -145,7 +144,7 @@ add_task(function*() {
     },
     {
       setup: function*() {
-        yield disableProperty(view, 0);
+        yield disableProperty(view);
       },
       desc: "Test Copy Rule with Disabled Property",
       node: ruleEditor.rule.textProps[2].editor.nameSpan,
@@ -155,30 +154,6 @@ add_task(function*() {
                        "\tbackground-color: #00F;[\\r\\n]+" +
                        "\tfont-size: 12px;[\\r\\n]+" +
                        "\tborder-color: #00F !important;[\\r\\n]+" +
-                       "\t--var: \"\\*/\";[\\r\\n]+" +
-                       "}",
-      hidden: {
-        copyLocation: true,
-        copyPropertyDeclaration: false,
-        copyPropertyName: false,
-        copyPropertyValue: true,
-        copySelector: true,
-        copyRule: false
-      }
-    },
-    {
-      setup: function*() {
-        yield disableProperty(view, 4);
-      },
-      desc: "Test Copy Rule with Disabled Property with Comment",
-      node: ruleEditor.rule.textProps[2].editor.nameSpan,
-      menuItem: contextmenu.menuitemCopyRule,
-      expectedPattern: "#testid {[\\r\\n]+" +
-                       "\t\/\\* color: #F00; \\*\/[\\r\\n]+" +
-                       "\tbackground-color: #00F;[\\r\\n]+" +
-                       "\tfont-size: 12px;[\\r\\n]+" +
-                       "\tborder-color: #00F !important;[\\r\\n]+" +
-                       "\t/\\* --var: \"\\*\\\\\/\"; \\*\/[\\r\\n]+" +
                        "}",
       hidden: {
         copyLocation: true,
@@ -266,9 +241,9 @@ function* checkCopyStyle(view, node, menuItem, expectedPattern, hidden) {
   view._contextmenu._menupopup.hidePopup();
 }
 
-function* disableProperty(view, index) {
+function* disableProperty(view) {
   let ruleEditor = getRuleViewRuleEditor(view, 1);
-  let propEditor = ruleEditor.rule.textProps[index].editor;
+  let propEditor = ruleEditor.rule.textProps[0].editor;
 
   info("Disabling a property");
   propEditor.enable.click();
