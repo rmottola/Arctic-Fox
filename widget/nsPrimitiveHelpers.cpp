@@ -160,7 +160,7 @@ nsPrimitiveHelpers :: ConvertUnicodeToPlatformPlainText ( char16_t* inUnicode, i
   rv = converter->Init(platformCharset.get(),
                   nsISaveAsCharset::attr_EntityAfterCharsetConv +
                   nsISaveAsCharset::attr_FallbackQuestionMark,
-                  nsIEntityConverter::transliterate);
+                  0);
   NS_ENSURE_SUCCESS(rv, rv);
 
   rv = converter->Convert(inUnicode, outPlainTextData);
