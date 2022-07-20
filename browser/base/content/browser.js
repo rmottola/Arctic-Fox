@@ -207,6 +207,7 @@ var gInitialPages = [
 #include browser-plugins.js
 #include browser-tabPreviews.js
 #include browser-sidebar.js
+#include browser-tabview.js
 #include browser-thumbnails.js
 #include browser-gestureSupport.js
 
