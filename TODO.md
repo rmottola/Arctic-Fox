@@ -85,8 +85,10 @@
 - Bug 1198458: Webrtc updated to branch 43
 - 1227567 - Optimise module namespace imports in Ion where we have
 - update SKIA 1082598
+- remaining 1151214
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
+- Bug 1197620 - Part 3: Terminate *all* animations if corresponding ele
 - Bug 1235656 - Followup: Allow extended functions with guessed atoms i
 - Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
 - Bug 1223916 - 2015-11-14 Prohibit direct method calls at the parser level in 
