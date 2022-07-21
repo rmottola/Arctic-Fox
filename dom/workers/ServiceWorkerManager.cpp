@@ -2319,7 +2319,8 @@ public:
     GlobalObject globalObj(aCx, aWorkerPrivate->GlobalScope()->GetWrapper());
 
     PushEventInit pei;
-    pei.mData.Construct(mData);
+    // FIXME(nsm): Bug 1149195.
+    // pei.mData.Construct(mData);
     pei.mBubbles = false;
     pei.mCancelable = true;
 
