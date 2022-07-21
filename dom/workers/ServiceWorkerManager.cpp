@@ -1920,7 +1920,7 @@ LifecycleEventWorkerRunnable::DispatchLifecycleEvent(JSContext* aCx, WorkerPriva
     // FIXME(nsm): Bug 982787 pass previous active worker.
     ExtendableEventInit init;
     init.mBubbles = false;
-    init.mCancelable = true;
+    init.mCancelable = false;
     event = ExtendableEvent::Constructor(target, mEventName, init);
   } else {
     MOZ_CRASH("Unexpected lifecycle event");
@@ -2321,7 +2321,7 @@ public:
     // FIXME(nsm): Bug 1149195.
     // pei.mData.Construct(mData);
     pei.mBubbles = false;
-    pei.mCancelable = true;
+    pei.mCancelable = false;
 
     ErrorResult result;
     nsRefPtr<PushEvent> event =
@@ -2519,7 +2519,7 @@ public:
     NotificationEventInit nei;
     nei.mNotification = notification;
     nei.mBubbles = false;
-    nei.mCancelable = true;
+    nei.mCancelable = false;
 
     nsRefPtr<NotificationEvent> event =
       NotificationEvent::Constructor(target, NS_LITERAL_STRING("notificationclick"), nei, result);
@@ -3841,7 +3841,7 @@ private:
     init.mRequest.Construct();
     init.mRequest.Value() = request;
     init.mBubbles = false;
-    init.mCancelable = true;
+    init.mCancelable = false;
     init.mIsReload.Construct(mIsReload);
     nsRefPtr<FetchEvent> event =
       FetchEvent::Constructor(globalObj, NS_LITERAL_STRING("fetch"), init, result);
