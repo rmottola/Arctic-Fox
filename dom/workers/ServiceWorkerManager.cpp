@@ -2997,14 +2997,10 @@ ServiceWorkerRegistrationInfo::FinishActivate(bool aSuccess)
     return;
   }
 
-  if (aSuccess) {
-    mActiveWorker->UpdateState(ServiceWorkerState::Activated);
-    nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
-    swm->StoreRegistration(mPrincipal, this);
-  } else {
-    mActiveWorker->UpdateState(ServiceWorkerState::Redundant);
-    mActiveWorker = nullptr;
-  }
+  // Activation never fails, so aSuccess is ignored.
+  mActiveWorker->UpdateState(ServiceWorkerState::Activated);
+  nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+  swm->StoreRegistration(mPrincipal, this);
 }
 
 NS_IMETHODIMP
