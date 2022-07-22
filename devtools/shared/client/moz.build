@@ -6,6 +6,5 @@
 
 DevToolsModules(
     'connection-manager.js',
-    'dbg-client.jsm',
     'main.js',
 )
