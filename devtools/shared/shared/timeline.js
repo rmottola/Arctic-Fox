@@ -261,7 +261,7 @@ var Timeline = exports.Timeline = Class({
    * why there was a GC, and may contain a `nonincrementalReason` when SpiderMonkey could
    * not incrementally collect garbage.
    */
-  _onGarbageCollection: function ({ collections, reason, nonincrementalReason }) {
+  _onGarbageCollection: function ({ collections, gcCycleNumber, reason, nonincrementalReason }) {
     if (!this._isRecording || !this.docShells.length) {
       return;
     }
@@ -276,9 +276,9 @@ var Timeline = exports.Timeline = Class({
         name: "GarbageCollection",
         causeName: reason,
         nonincrementalReason: nonincrementalReason,
-        // Both timestamps are in microseconds -- convert to milliseconds to match other markers
-        start: (start - startTime) / 1000,
-        end: (end - startTime) / 1000
+        cycle: gcCycleNumber,
+        start,
+        end,
       };
     }), endTime);
   },
