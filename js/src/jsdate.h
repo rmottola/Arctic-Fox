@@ -40,12 +40,12 @@ NewDateObjectMsec(JSContext* cx, JS::ClippedTime t);
  * in 1995).
  */
 extern JS_FRIEND_API(JSObject*)
-NewDateObject(JSContext *cx, int year, int mon, int mday,
-                 int hour, int min, int sec);
+NewDateObject(JSContext* cx, int year, int mon, int mday,
+              int hour, int min, int sec);
 
 /* Date constructor native. Exposed only so the JIT can know its address. */
 bool
-DateConstructor(JSContext *cx, unsigned argc, JS::Value* vp);
+DateConstructor(JSContext* cx, unsigned argc, JS::Value* vp);
 
 /* Date methods exposed so they can be installed in the self-hosting global. */
 bool
