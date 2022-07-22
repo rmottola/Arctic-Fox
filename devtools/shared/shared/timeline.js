@@ -182,9 +182,6 @@ var Timeline = exports.Timeline = Class({
    */
   start: Task.async(function *({ withMemory, withTicks }) {
     let startTime = this._startTime = this.docShells[0].now();
-    // Store the start time from unix epoch so we can normalize
-    // markers from the memory actor
-    this._unixStartTime = Date.now();
 
     if (this._isRecording) {
       return startTime;
@@ -266,9 +263,6 @@ var Timeline = exports.Timeline = Class({
       return;
     }
 
-    // Normalize the start time to docshell start time, and convert it
-    // to microseconds.
-    let startTime = (this._unixStartTime - this._startTime) * 1000;
     let endTime = this.docShells[0].now();
 
     events.emit(this, "markers", collections.map(({ startTimestamp: start, endTimestamp: end }) => {
