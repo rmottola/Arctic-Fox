@@ -1364,6 +1364,9 @@ pref("security.mixed_content.block_active_content", true);
 // integrity temp directory.
 pref("security.sandbox.content.tempDirSuffix", "");
 
+// 2 = allow SHA-1 only before 2016-01-01
+pref("security.pki.sha1_enforcement_level", 2);
+
 // Required blocklist freshness for OneCRL OCSP bypass
 // (default should be at least as large as extensions.blocklist.interval)
 pref("security.onecrl.maximum_staleness_in_seconds", 0);
