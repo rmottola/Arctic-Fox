@@ -33,8 +33,6 @@ namespace mozilla {
 template<typename T> class OutParamRef;
 template<typename T> OutParamRef<T> byRef(RefPtr<T>&);
 
-
-
 /**
  * RefPtr points to a refcounted thing that has AddRef and Release
  * methods to increase/decrease the refcount, respectively.  After a
