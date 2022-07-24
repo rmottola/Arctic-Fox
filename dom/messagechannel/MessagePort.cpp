@@ -284,7 +284,7 @@ private:
 
 NS_IMPL_ISUPPORTS(ForceCloseHelper, nsIIPCBackgroundChildCreateCallback)
 
-} // anonymous namespace
+} // namespace
 
 MessagePort::MessagePort(nsPIDOMWindow* aWindow)
   : MessagePortBase(aWindow)
