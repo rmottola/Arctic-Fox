@@ -5684,14 +5684,14 @@ class WaitForTransactionsHelper final
   const nsCString mDatabaseId;
   nsCOMPtr<nsIRunnable> mCallback;
 
-  enum
+  enum class State
   {
-    State_Initial = 0,
-    State_WaitingForTransactions,
-    State_DispatchToMainThread,
-    State_WaitingForFileHandles,
-    State_DispatchToOwningThread,
-    State_Complete
+    Initial = 0,
+    WaitingForTransactions,
+    DispatchToMainThread,
+    WaitingForFileHandles,
+    DispatchToOwningThread,
+    Complete
   } mState;
 
 public:
@@ -5700,7 +5700,7 @@ public:
     : mOwningThread(NS_GetCurrentThread())
     , mDatabaseId(aDatabaseId)
     , mCallback(aCallback)
-    , mState(State_Initial)
+    , mState(State::Initial)
   {
     AssertIsOnBackgroundThread();
     MOZ_ASSERT(!aDatabaseId.IsEmpty());
@@ -5716,7 +5716,7 @@ private:
   ~WaitForTransactionsHelper()
   {
     MOZ_ASSERT(!mCallback);
-    MOZ_ASSERT(mState == State_Complete);
+    MOZ_ASSERT(mState == State::Complete);
   }
 
   void
@@ -6611,72 +6611,71 @@ public:
   struct MaybeBlockedDatabaseInfo;
 
 protected:
-  enum State
+  enum class State
   {
     // Just created on the PBackground thread, dispatched to the main thread.
-    // Next step is either State_SendingResults if permission is denied,
-    // State_PermissionChallenge if the permission is unknown, or
-    // State_DirectoryOpenPending if permission is granted.
-    State_Initial,
+    // Next step is either SendingResults if permission is denied,
+    // PermissionChallenge if the permission is unknown, or DirectoryOpenPending
+    // if permission is granted.
+    Initial,
 
     // Sending a permission challenge message to the child on the PBackground
-    // thread. Next step is State_PermissionRetry.
-    State_PermissionChallenge,
+    // thread. Next step is PermissionRetry.
+    PermissionChallenge,
 
     // Retrying permission check after a challenge on the main thread. Next step
-    // is either State_SendingResults if permission is denied or
-    // State_DirectoryOpenPending if permission is granted.
-    State_PermissionRetry,
+    // is either SendingResults if permission is denied or DirectoryOpenPending
+    // if permission is granted.
+    PermissionRetry,
 
     // Waiting for directory open allowed on the main thread. The next step is
-    // either State_SendingResults if directory lock failed to acquire, or
-    // State_DirectoryWorkOpen if directory lock is acquired.
-    State_DirectoryOpenPending,
+    // either SendingResults if directory lock failed to acquire, or
+    // DirectoryWorkOpen if directory lock is acquired.
+    DirectoryOpenPending,
 
-    // Checking if database open needs to wait on the PBackground thread.
-    // The next step is State_DatabaseOpenPending.
-    State_DirectoryWorkOpen,
+    // Checking if database open needs to wait on the PBackground thread. The
+    // next step is DatabaseOpenPending.
+    DirectoryWorkOpen,
 
     // Waiting for database open allowed on the main thread. The next step is
-    // State_DatabaseWorkOpen.
-    State_DatabaseOpenPending,
+    // DatabaseWorkOpen.
+    DatabaseOpenPending,
 
     // Waiting to do/doing work on the QuotaManager IO thread. Its next step is
-    // either State_BeginVersionChange if the requested version doesn't match
-    // the existing database version or State_SendingResults if the versions
-    // match.
-    State_DatabaseWorkOpen,
+    // either BeginVersionChange if the requested version doesn't match the
+    // existing database version or SendingResults if the versions match.
+    DatabaseWorkOpen,
 
     // Starting a version change transaction or deleting a database on the
     // PBackground thread. We need to notify other databases that a version
     // change is about to happen, and maybe tell the request that a version
     // change has been blocked. If databases are notified then the next step is
-    // State_WaitingForOtherDatabasesToClose. Otherwise the next step is
-    // State_WaitingForTransactionsToComplete.
-    State_BeginVersionChange,
+    // WaitingForOtherDatabasesToClose. Otherwise the next step is
+    // WaitingForTransactionsToComplete.
+    BeginVersionChange,
 
     // Waiting for other databases to close on the PBackground thread. This
     // state may persist until all databases are closed. The next state is
-    // State_WaitingForTransactionsToComplete.
-    State_WaitingForOtherDatabasesToClose,
+    // WaitingForTransactionsToComplete.
+    WaitingForOtherDatabasesToClose,
 
     // Waiting for all transactions that could interfere with this operation to
     // complete on the PBackground thread. Next state is
-    // State_DatabaseWorkVersionChange.
-    State_WaitingForTransactionsToComplete,
+    // DatabaseWorkVersionChange.
+    WaitingForTransactionsToComplete,
 
     // Waiting to do/doing work on the "work thread". This involves waiting for
     // the VersionChangeOp (OpenDatabaseOp and DeleteDatabaseOp each have a
     // different implementation) to do its work. Eventually the state will
-    // transition to State_SendingResults.
-    State_DatabaseWorkVersionChange,
+    // transition to SendingResults.
+    DatabaseWorkVersionChange,
 
     // Waiting to send/sending results on the PBackground thread. Next step is
-    // State_Completed.
-    State_SendingResults,
+    // Completed.
+    SendingResults,
 
     // All done.
-    State_Completed
+    Completed
   };
 
   // Must be released on the background thread!
@@ -6729,7 +6728,7 @@ protected:
     // Normally this would be out-of-line since it is a virtual function but
     // MSVC 2010 fails to link for some reason if it is not inlined here...
     MOZ_ASSERT_IF(OperationMayProceed(),
-                  mState == State_Initial || mState == State_Completed);
+                  mState == State::Initial || mState == State::Completed);
   }
 
   nsresult
@@ -12302,7 +12301,7 @@ Factory::DeallocPBackgroundIDBDatabaseParent(
 void
 WaitForTransactionsHelper::WaitForTransactions()
 {
-  MOZ_ASSERT(mState == State_Initial);
+  MOZ_ASSERT(mState == State::Initial);
 
   unused << this->Run();
 }
@@ -12311,14 +12310,14 @@ void
 WaitForTransactionsHelper::MaybeWaitForTransactions()
 {
   AssertIsOnBackgroundThread();
-  MOZ_ASSERT(mState == State_Initial);
+  MOZ_ASSERT(mState == State::Initial);
 
   nsRefPtr<ConnectionPool> connectionPool = gConnectionPool.get();
   if (connectionPool) {
     nsTArray<nsCString> ids(1);
     ids.AppendElement(mDatabaseId);
 
-    mState = State_WaitingForTransactions;
+    mState = State::WaitingForTransactions;
 
     connectionPool->WaitForDatabasesToComplete(Move(ids), this);
     return;
@@ -12331,9 +12330,9 @@ void
 WaitForTransactionsHelper::DispatchToMainThread()
 {
   AssertIsOnBackgroundThread();
-  MOZ_ASSERT(mState == State_Initial || mState == State_WaitingForTransactions);
+  MOZ_ASSERT(mState == State::Initial || mState == State::WaitingForTransactions);
 
-  mState = State_DispatchToMainThread;
+  mState = State::DispatchToMainThread;
 
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(this)));
 }
@@ -12342,14 +12341,14 @@ void
 WaitForTransactionsHelper::MaybeWaitForFileHandles()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mState == State_DispatchToMainThread);
+  MOZ_ASSERT(mState == State::DispatchToMainThread);
 
   FileService* service = FileService::Get();
   if (service) {
     nsTArray<nsCString> ids(1);
     ids.AppendElement(mDatabaseId);
 
-    mState = State_WaitingForFileHandles;
+    mState = State::WaitingForFileHandles;
 
     service->WaitForStoragesToComplete(ids, this);
 
@@ -12364,10 +12363,10 @@ void
 WaitForTransactionsHelper::DispatchToOwningThread()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mState == State_DispatchToMainThread ||
-             mState == State_WaitingForFileHandles);
+  MOZ_ASSERT(mState == State::DispatchToMainThread ||
+             mState == State::WaitingForFileHandles);
 
-  mState = State_DispatchToOwningThread;
+  mState = State::DispatchToOwningThread;
 
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mOwningThread->Dispatch(this,
                                                        NS_DISPATCH_NORMAL)));
@@ -12377,14 +12376,14 @@ void
 WaitForTransactionsHelper::CallCallback()
 {
   AssertIsOnBackgroundThread();
-  MOZ_ASSERT(mState == State_DispatchToOwningThread);
+  MOZ_ASSERT(mState == State::DispatchToOwningThread);
 
   nsCOMPtr<nsIRunnable> callback;
   mCallback.swap(callback);
 
   callback->Run();
 
-  mState = State_Complete;
+  mState = State::Complete;
 }
 
 NS_IMPL_ISUPPORTS_INHERITED0(WaitForTransactionsHelper,
@@ -12393,27 +12392,27 @@ NS_IMPL_ISUPPORTS_INHERITED0(WaitForTransactionsHelper,
 NS_IMETHODIMP
 WaitForTransactionsHelper::Run()
 {
-  MOZ_ASSERT(mState != State_Complete);
+  MOZ_ASSERT(mState != State::Complete);
   MOZ_ASSERT(mCallback);
 
   switch (mState) {
-    case State_Initial:
+    case State::Initial:
       MaybeWaitForTransactions();
       break;
 
-    case State_WaitingForTransactions:
+    case State::WaitingForTransactions:
       DispatchToMainThread();
       break;
 
-    case State_DispatchToMainThread:
+    case State::DispatchToMainThread:
       MaybeWaitForFileHandles();
       break;
 
-    case State_WaitingForFileHandles:
+    case State::WaitingForFileHandles:
       DispatchToOwningThread();
       break;
 
-    case State_DispatchToOwningThread:
+    case State::DispatchToOwningThread:
       CallCallback();
       break;
 
@@ -14284,7 +14283,7 @@ VersionChangeTransaction::SendCompleteNotification(nsresult aResult)
   MOZ_ASSERT(mOpenDatabaseOp);
   MOZ_ASSERT_IF(!mActorWasAlive, NS_FAILED(mOpenDatabaseOp->mResultCode));
   MOZ_ASSERT_IF(!mActorWasAlive,
-                mOpenDatabaseOp->mState > OpenDatabaseOp::State_SendingResults);
+                mOpenDatabaseOp->mState > OpenDatabaseOp::State::SendingResults);
 
   nsRefPtr<OpenDatabaseOp> openDatabaseOp;
   mOpenDatabaseOp.swap(openDatabaseOp);
@@ -14297,7 +14296,7 @@ VersionChangeTransaction::SendCompleteNotification(nsresult aResult)
     openDatabaseOp->mResultCode = aResult;
   }
 
-  openDatabaseOp->mState = OpenDatabaseOp::State_SendingResults;
+  openDatabaseOp->mState = OpenDatabaseOp::State::SendingResults;
 
   if (!IsActorDestroyed()) {
     unused << SendComplete(aResult);
@@ -18367,7 +18366,7 @@ FactoryOp::FactoryOp(Factory* aFactory,
   , mFactory(aFactory)
   , mContentParent(Move(aContentParent))
   , mCommonParams(aCommonParams)
-  , mState(State_Initial)
+  , mState(State::Initial)
   , mIsApp(false)
   , mEnforcingQuota(true)
   , mDeleting(aDeleting)
@@ -18383,7 +18382,7 @@ nsresult
 FactoryOp::Open()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mState == State_Initial);
+  MOZ_ASSERT(mState == State::Initial);
 
   // Swap this to the stack now to ensure that we release it on this thread.
   nsRefPtr<ContentParent> contentParent;
@@ -18447,7 +18446,7 @@ FactoryOp::Open()
   mDatabaseId.Append(NS_ConvertUTF16toUTF8(metadata.name()));
 
   if (permission == PermissionRequestBase::kPermissionPrompt) {
-    mState = State_PermissionChallenge;
+    mState = State::PermissionChallenge;
     MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mOwningThread->Dispatch(this,
                                                          NS_DISPATCH_NORMAL)));
     return NS_OK;
@@ -18467,7 +18466,7 @@ nsresult
 FactoryOp::ChallengePermission()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_PermissionChallenge);
+  MOZ_ASSERT(mState == State::PermissionChallenge);
 
   const PrincipalInfo& principalInfo = mCommonParams.principalInfo();
   MOZ_ASSERT(principalInfo.type() == PrincipalInfo::TContentPrincipalInfo);
@@ -18483,7 +18482,7 @@ nsresult
 FactoryOp::RetryCheckPermission()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mState == State_PermissionRetry);
+  MOZ_ASSERT(mState == State::PermissionRetry);
   MOZ_ASSERT(mCommonParams.principalInfo().type() ==
                PrincipalInfo::TContentPrincipalInfo);
 
@@ -18526,7 +18525,7 @@ nsresult
 FactoryOp::DirectoryOpen()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_DirectoryWorkOpen);
+  MOZ_ASSERT(mState == State::DirectoryWorkOpen);
   MOZ_ASSERT(mDirectoryLock);
 
   // gFactoryOps could be null here if the child process crashed or something
@@ -18554,7 +18553,7 @@ FactoryOp::DirectoryOpen()
 
   mBlockedDatabaseOpen = true;
 
-  mState = State_DatabaseOpenPending;
+  mState = State::DatabaseOpenPending;
   if (!delayed) {
     MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(this)));
   }
@@ -18566,7 +18565,7 @@ nsresult
 FactoryOp::SendToIOThread()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mState == State_DatabaseOpenPending);
+  MOZ_ASSERT(mState == State::DatabaseOpenPending);
 
   if (NS_WARN_IF(QuotaClient::IsShuttingDownOnMainThread()) ||
       !OperationMayProceed()) {
@@ -18578,7 +18577,7 @@ FactoryOp::SendToIOThread()
   MOZ_ASSERT(quotaManager);
 
   // Must set this before dispatching otherwise we will race with the IO thread.
-  mState = State_DatabaseWorkOpen;
+  mState = State::DatabaseWorkOpen;
 
   nsresult rv = quotaManager->IOThread()->Dispatch(this, NS_DISPATCH_NORMAL);
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -18593,15 +18592,15 @@ void
 FactoryOp::WaitForTransactions()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_BeginVersionChange ||
-             mState == State_WaitingForOtherDatabasesToClose);
+  MOZ_ASSERT(mState == State::BeginVersionChange ||
+             mState == State::WaitingForOtherDatabasesToClose);
   MOZ_ASSERT(!mDatabaseId.IsEmpty());
   MOZ_ASSERT(!IsActorDestroyed());
 
   nsTArray<nsCString> databaseIds;
   databaseIds.AppendElement(mDatabaseId);
 
-  mState = State_WaitingForTransactionsToComplete;
+  mState = State::WaitingForTransactionsToComplete;
 
   nsRefPtr<WaitForTransactionsHelper> helper =
     new WaitForTransactionsHelper(mDatabaseId, this);
@@ -18612,7 +18611,7 @@ void
 FactoryOp::FinishSendResults()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_SendingResults);
+  MOZ_ASSERT(mState == State::SendingResults);
   MOZ_ASSERT(mFactory);
 
   // Make sure to release the factory on this thread.
@@ -18629,7 +18628,7 @@ FactoryOp::FinishSendResults()
     gFactoryOps->RemoveElement(this);
   }
 
-  mState = State_Completed;
+  mState = State::Completed;
 }
 
 nsresult
@@ -18637,7 +18636,7 @@ FactoryOp::CheckPermission(ContentParent* aContentParent,
                            PermissionRequestBase::PermissionValue* aPermission)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mState == State_Initial || mState == State_PermissionRetry);
+  MOZ_ASSERT(mState == State::Initial || mState == State::PermissionRetry);
 
   const PrincipalInfo& principalInfo = mCommonParams.principalInfo();
   if (principalInfo.type() != PrincipalInfo::TSystemPrincipalInfo &&
@@ -18660,7 +18659,7 @@ FactoryOp::CheckPermission(ContentParent* aContentParent,
   MOZ_ASSERT(principalInfo.type() != PrincipalInfo::TNullPrincipalInfo);
 
   if (principalInfo.type() == PrincipalInfo::TSystemPrincipalInfo) {
-    MOZ_ASSERT(mState == State_Initial);
+    MOZ_ASSERT(mState == State::Initial);
     MOZ_ASSERT(persistenceType == PERSISTENCE_TYPE_PERSISTENT);
 
     if (aContentParent) {
@@ -18709,7 +18708,7 @@ FactoryOp::CheckPermission(ContentParent* aContentParent,
       mChromeWriteAccessAllowed = true;
     }
 
-    if (State_Initial == mState) {
+    if (State::Initial == mState) {
       QuotaManager::GetInfoForChrome(&mGroup, &mOrigin, &mIsApp);
 
       MOZ_ASSERT(!QuotaManager::IsFirstPromptRequired(persistenceType, mOrigin,
@@ -18776,7 +18775,7 @@ FactoryOp::CheckPermission(ContentParent* aContentParent,
   }
 
   if (permission != PermissionRequestBase::kPermissionDenied &&
-      State_Initial == mState) {
+      State::Initial == mState) {
     mGroup = group;
     mOrigin = origin;
     mIsApp = isApp;
@@ -18797,7 +18796,7 @@ FactoryOp::SendVersionChangeMessages(DatabaseActorInfo* aDatabaseActorInfo,
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(aDatabaseActorInfo);
-  MOZ_ASSERT(mState == State_BeginVersionChange);
+  MOZ_ASSERT(mState == State::BeginVersionChange);
   MOZ_ASSERT(mMaybeBlockedDatabases.IsEmpty());
   MOZ_ASSERT(!IsActorDestroyed());
 
@@ -18913,7 +18912,7 @@ nsresult
 FactoryOp::FinishOpen()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mState == State_Initial || mState == State_PermissionRetry);
+  MOZ_ASSERT(mState == State::Initial || mState == State::PermissionRetry);
   MOZ_ASSERT(!mOrigin.IsEmpty());
   MOZ_ASSERT(!mDatabaseId.IsEmpty());
   MOZ_ASSERT(!mDirectoryLock);
@@ -18926,7 +18925,7 @@ FactoryOp::FinishOpen()
     return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
   }
 
-  mState = State_DirectoryOpenPending;
+  mState = State::DirectoryOpenPending;
 
   quotaManager->OpenDirectory(mCommonParams.metadata().persistenceType(),
                               mGroup,
@@ -18956,7 +18955,7 @@ void
 FactoryOp::NoteDatabaseBlocked(Database* aDatabase)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_WaitingForOtherDatabasesToClose);
+  MOZ_ASSERT(mState == State::WaitingForOtherDatabasesToClose);
   MOZ_ASSERT(!mMaybeBlockedDatabases.IsEmpty());
   MOZ_ASSERT(mMaybeBlockedDatabases.Contains(aDatabase));
 
@@ -18991,58 +18990,58 @@ FactoryOp::Run()
   nsresult rv;
 
   switch (mState) {
-    case State_Initial:
+    case State::Initial:
       rv = Open();
       break;
 
-    case State_PermissionChallenge:
+    case State::PermissionChallenge:
       rv = ChallengePermission();
       break;
 
-    case State_PermissionRetry:
+    case State::PermissionRetry:
       rv = RetryCheckPermission();
       break;
 
-    case State_DirectoryWorkOpen:
+    case State::DirectoryWorkOpen:
       rv = DirectoryOpen();
       break;
 
-    case State_DatabaseOpenPending:
+    case State::DatabaseOpenPending:
       rv = DatabaseOpen();
       break;
 
-    case State_DatabaseWorkOpen:
+    case State::DatabaseWorkOpen:
       rv = DoDatabaseWork();
       break;
 
-    case State_BeginVersionChange:
+    case State::BeginVersionChange:
       rv = BeginVersionChange();
       break;
 
-    case State_WaitingForTransactionsToComplete:
+    case State::WaitingForTransactionsToComplete:
       rv = DispatchToWorkThread();
       break;
 
-    case State_SendingResults:
+    case State::SendingResults:
       SendResults();
       return NS_OK;
 
     // We raced, no need to crash.
-    case State_Completed:
+    case State::Completed:
       return NS_OK;
 
     default:
       MOZ_CRASH("Bad state!");
   }
 
-  if (NS_WARN_IF(NS_FAILED(rv)) && mState != State_SendingResults) {
+  if (NS_WARN_IF(NS_FAILED(rv)) && mState != State::SendingResults) {
     if (NS_SUCCEEDED(mResultCode)) {
       mResultCode = rv;
     }
 
     // Must set mState before dispatching otherwise we will race with the owning
     // thread.
-    mState = State_SendingResults;
+    mState = State::SendingResults;
 
     MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mOwningThread->Dispatch(this,
                                                          NS_DISPATCH_NORMAL)));
@@ -19055,12 +19054,12 @@ void
 FactoryOp::DirectoryLockAcquired(DirectoryLock* aLock)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mState == State_DirectoryOpenPending);
+  MOZ_ASSERT(mState == State::DirectoryOpenPending);
   MOZ_ASSERT(!mDirectoryLock);
 
   mDirectoryLock = aLock;
 
-  mState = State_DirectoryWorkOpen;
+  mState = State::DirectoryWorkOpen;
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mOwningThread->Dispatch(this,
                                                        NS_DISPATCH_NORMAL)));
 }
@@ -19069,7 +19068,7 @@ void
 FactoryOp::DirectoryLockFailed()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mState == State_DirectoryOpenPending);
+  MOZ_ASSERT(mState == State::DirectoryOpenPending);
   MOZ_ASSERT(!mDirectoryLock);
 
   if (NS_SUCCEEDED(mResultCode)) {
@@ -19077,7 +19076,7 @@ FactoryOp::DirectoryLockFailed()
     mResultCode = NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
   }
 
-  mState = State_SendingResults;
+  mState = State::SendingResults;
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mOwningThread->Dispatch(this,
                                                        NS_DISPATCH_NORMAL)));
 }
@@ -19089,9 +19088,9 @@ FactoryOp::ActorDestroy(ActorDestroyReason aWhy)
 
   NoteActorDestroyed();
 
-  if (mState == State_WaitingForTransactionsToComplete) {
+  if (mState == State::WaitingForTransactionsToComplete) {
     // We didn't get an opportunity to clean up.  Do that now.
-    mState = State_SendingResults;
+    mState = State::SendingResults;
     IDB_REPORT_INTERNAL_ERR();
     mResultCode = NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
     SendResults();
@@ -19103,11 +19102,11 @@ FactoryOp::RecvPermissionRetry()
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(!IsActorDestroyed());
-  MOZ_ASSERT(mState == State_PermissionChallenge);
+  MOZ_ASSERT(mState == State::PermissionChallenge);
 
   mContentParent = BackgroundParent::GetContentParent(Manager()->Manager());
 
-  mState = State_PermissionRetry;
+  mState = State::PermissionRetry;
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(this)));
 
   return true;
@@ -19150,7 +19149,7 @@ nsresult
 OpenDatabaseOp::DatabaseOpen()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mState == State_DatabaseOpenPending);
+  MOZ_ASSERT(mState == State::DatabaseOpenPending);
 
   nsresult rv = SendToIOThread();
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -19164,7 +19163,7 @@ nsresult
 OpenDatabaseOp::DoDatabaseWork()
 {
   AssertIsOnIOThread();
-  MOZ_ASSERT(mState == State_DatabaseWorkOpen);
+  MOZ_ASSERT(mState == State::DatabaseWorkOpen);
 
   PROFILER_LABEL("IndexedDB",
                  "OpenDatabaseOp::DoDatabaseWork",
@@ -19324,8 +19323,8 @@ OpenDatabaseOp::DoDatabaseWork()
   // Must set mState before dispatching otherwise we will race with the owning
   // thread.
   mState = (mMetadata->mCommonMetadata.version() == mRequestedVersion) ?
-           State_SendingResults :
-           State_BeginVersionChange;
+           State::SendingResults :
+           State::BeginVersionChange;
 
   rv = mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL);
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -19776,7 +19775,7 @@ nsresult
 OpenDatabaseOp::BeginVersionChange()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_BeginVersionChange);
+  MOZ_ASSERT(mState == State::BeginVersionChange);
   MOZ_ASSERT(mMaybeBlockedDatabases.IsEmpty());
   MOZ_ASSERT(mMetadata->mCommonMetadata.version() <= mRequestedVersion);
   MOZ_ASSERT(!mDatabase);
@@ -19836,7 +19835,7 @@ OpenDatabaseOp::BeginVersionChange()
 
   info->mWaitingFactoryOp = this;
 
-  mState = State_WaitingForOtherDatabasesToClose;
+  mState = State::WaitingForOtherDatabasesToClose;
   return NS_OK;
 }
 
@@ -19845,11 +19844,11 @@ OpenDatabaseOp::NoteDatabaseClosed(Database* aDatabase)
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(aDatabase);
-  MOZ_ASSERT(mState == State_WaitingForOtherDatabasesToClose ||
-             mState == State_WaitingForTransactionsToComplete ||
-             mState == State_DatabaseWorkVersionChange);
+  MOZ_ASSERT(mState == State::WaitingForOtherDatabasesToClose ||
+             mState == State::WaitingForTransactionsToComplete ||
+             mState == State::DatabaseWorkVersionChange);
 
-  if (mState != State_WaitingForOtherDatabasesToClose) {
+  if (mState != State::WaitingForOtherDatabasesToClose) {
     MOZ_ASSERT(mMaybeBlockedDatabases.IsEmpty());
     MOZ_ASSERT(mRequestedVersion >
                  aDatabase->Metadata()->mCommonMetadata.version(),
@@ -19886,7 +19885,7 @@ OpenDatabaseOp::NoteDatabaseClosed(Database* aDatabase)
       mResultCode = rv;
     }
 
-    mState = State_SendingResults;
+    mState = State::SendingResults;
     MOZ_ALWAYS_TRUE(NS_SUCCEEDED(Run()));
   }
 }
@@ -19895,7 +19894,7 @@ void
 OpenDatabaseOp::SendBlockedNotification()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_WaitingForOtherDatabasesToClose);
+  MOZ_ASSERT(mState == State::WaitingForOtherDatabasesToClose);
 
   if (!IsActorDestroyed()) {
     unused << SendBlocked(mMetadata->mCommonMetadata.version());
@@ -19906,7 +19905,7 @@ nsresult
 OpenDatabaseOp::DispatchToWorkThread()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_WaitingForTransactionsToComplete);
+  MOZ_ASSERT(mState == State::WaitingForTransactionsToComplete);
   MOZ_ASSERT(mVersionChangeTransaction);
   MOZ_ASSERT(mVersionChangeTransaction->GetMode() ==
                IDBTransaction::VERSION_CHANGE);
@@ -19919,7 +19918,7 @@ OpenDatabaseOp::DispatchToWorkThread()
     return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
   }
 
-  mState = State_DatabaseWorkVersionChange;
+  mState = State::DatabaseWorkVersionChange;
 
   // Intentionally empty.
   nsTArray<nsString> objectStoreNames;
@@ -19959,7 +19958,7 @@ nsresult
 OpenDatabaseOp::SendUpgradeNeeded()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_DatabaseWorkVersionChange);
+  MOZ_ASSERT(mState == State::DatabaseWorkVersionChange);
   MOZ_ASSERT(mVersionChangeTransaction);
   MOZ_ASSERT(mMaybeBlockedDatabases.IsEmpty());
   MOZ_ASSERT(NS_SUCCEEDED(mResultCode));
@@ -19999,7 +19998,7 @@ void
 OpenDatabaseOp::SendResults()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_SendingResults);
+  MOZ_ASSERT(mState == State::SendingResults);
   MOZ_ASSERT_IF(NS_SUCCEEDED(mResultCode), mMaybeBlockedDatabases.IsEmpty());
   MOZ_ASSERT_IF(NS_SUCCEEDED(mResultCode), !mVersionChangeTransaction);
 
@@ -20103,9 +20102,9 @@ void
 OpenDatabaseOp::EnsureDatabaseActor()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_BeginVersionChange ||
-             mState == State_DatabaseWorkVersionChange ||
-             mState == State_SendingResults);
+  MOZ_ASSERT(mState == State::BeginVersionChange ||
+             mState == State::DatabaseWorkVersionChange ||
+             mState == State::SendingResults);
   MOZ_ASSERT(NS_SUCCEEDED(mResultCode));
   MOZ_ASSERT(!mDatabaseFilePath.IsEmpty());
   MOZ_ASSERT(!IsActorDestroyed());
@@ -20151,8 +20150,8 @@ nsresult
 OpenDatabaseOp::EnsureDatabaseActorIsAlive()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_DatabaseWorkVersionChange ||
-             mState == State_SendingResults);
+  MOZ_ASSERT(mState == State::DatabaseWorkVersionChange ||
+             mState == State::SendingResults);
   MOZ_ASSERT(NS_SUCCEEDED(mResultCode));
   MOZ_ASSERT(!IsActorDestroyed());
 
@@ -20405,7 +20404,7 @@ VersionChangeOp::DoDatabaseWork(DatabaseConnection* aConnection)
   MOZ_ASSERT(aConnection);
   aConnection->AssertIsOnConnectionThread();
   MOZ_ASSERT(mOpenDatabaseOp);
-  MOZ_ASSERT(mOpenDatabaseOp->mState == State_DatabaseWorkVersionChange);
+  MOZ_ASSERT(mOpenDatabaseOp->mState == State::DatabaseWorkVersionChange);
 
   if (NS_WARN_IF(QuotaClient::IsShuttingDownOnNonMainThread()) ||
       !OperationMayProceed()) {
@@ -20457,7 +20456,7 @@ VersionChangeOp::SendSuccessResult()
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(mOpenDatabaseOp);
-  MOZ_ASSERT(mOpenDatabaseOp->mState == State_DatabaseWorkVersionChange);
+  MOZ_ASSERT(mOpenDatabaseOp->mState == State::DatabaseWorkVersionChange);
   MOZ_ASSERT(mOpenDatabaseOp->mVersionChangeOp == this);
 
   nsresult rv = mOpenDatabaseOp->SendUpgradeNeeded();
@@ -20474,11 +20473,11 @@ VersionChangeOp::SendFailureResult(nsresult aResultCode)
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(mOpenDatabaseOp);
-  MOZ_ASSERT(mOpenDatabaseOp->mState == State_DatabaseWorkVersionChange);
+  MOZ_ASSERT(mOpenDatabaseOp->mState == State::DatabaseWorkVersionChange);
   MOZ_ASSERT(mOpenDatabaseOp->mVersionChangeOp == this);
 
   mOpenDatabaseOp->SetFailureCode(aResultCode);
-  mOpenDatabaseOp->mState = State_SendingResults;
+  mOpenDatabaseOp->mState = State::SendingResults;
 
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mOpenDatabaseOp->Run()));
 
@@ -20511,7 +20510,7 @@ DeleteDatabaseOp::LoadPreviousVersion(nsIFile* aDatabaseFile)
 {
   AssertIsOnIOThread();
   MOZ_ASSERT(aDatabaseFile);
-  MOZ_ASSERT(mState == State_DatabaseWorkOpen);
+  MOZ_ASSERT(mState == State::DatabaseWorkOpen);
   MOZ_ASSERT(!mPreviousVersion);
 
   PROFILER_LABEL("IndexedDB",
@@ -20583,7 +20582,7 @@ nsresult
 DeleteDatabaseOp::DatabaseOpen()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mState == State_DatabaseOpenPending);
+  MOZ_ASSERT(mState == State::DatabaseOpenPending);
 
   // Swap this to the stack now to ensure that we release it on this thread.
   nsRefPtr<ContentParent> contentParent;
@@ -20601,7 +20600,7 @@ nsresult
 DeleteDatabaseOp::DoDatabaseWork()
 {
   AssertIsOnIOThread();
-  MOZ_ASSERT(mState == State_DatabaseWorkOpen);
+  MOZ_ASSERT(mState == State::DatabaseWorkOpen);
 
   PROFILER_LABEL("IndexedDB",
                  "DeleteDatabaseOp::DoDatabaseWork",
@@ -20664,9 +20663,9 @@ DeleteDatabaseOp::DoDatabaseWork()
     // deleting the file eventually.
     LoadPreviousVersion(dbFile);
 
-    mState = State_BeginVersionChange;
+    mState = State::BeginVersionChange;
   } else {
-    mState = State_SendingResults;
+    mState = State::SendingResults;
   }
 
   rv = mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL);
@@ -20681,7 +20680,7 @@ nsresult
 DeleteDatabaseOp::BeginVersionChange()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_BeginVersionChange);
+  MOZ_ASSERT(mState == State::BeginVersionChange);
   MOZ_ASSERT(mMaybeBlockedDatabases.IsEmpty());
 
   if (NS_WARN_IF(QuotaClient::IsShuttingDownOnNonMainThread()) ||
@@ -20705,7 +20704,7 @@ DeleteDatabaseOp::BeginVersionChange()
     if (!mMaybeBlockedDatabases.IsEmpty()) {
       info->mWaitingFactoryOp = this;
 
-      mState = State_WaitingForOtherDatabasesToClose;
+      mState = State::WaitingForOtherDatabasesToClose;
       return NS_OK;
     }
   }
@@ -20720,7 +20719,7 @@ nsresult
 DeleteDatabaseOp::DispatchToWorkThread()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_WaitingForTransactionsToComplete);
+  MOZ_ASSERT(mState == State::WaitingForTransactionsToComplete);
   MOZ_ASSERT(mMaybeBlockedDatabases.IsEmpty());
 
   if (NS_WARN_IF(QuotaClient::IsShuttingDownOnNonMainThread()) ||
@@ -20729,7 +20728,7 @@ DeleteDatabaseOp::DispatchToWorkThread()
     return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
   }
 
-  mState = State_DatabaseWorkVersionChange;
+  mState = State::DatabaseWorkVersionChange;
 
   nsRefPtr<VersionChangeOp> versionChangeOp = new VersionChangeOp(this);
 
@@ -20742,7 +20741,7 @@ void
 DeleteDatabaseOp::NoteDatabaseClosed(Database* aDatabase)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_WaitingForOtherDatabasesToClose);
+  MOZ_ASSERT(mState == State::WaitingForOtherDatabasesToClose);
   MOZ_ASSERT(!mMaybeBlockedDatabases.IsEmpty());
 
   bool actorDestroyed = IsActorDestroyed();
@@ -20772,7 +20771,7 @@ DeleteDatabaseOp::NoteDatabaseClosed(Database* aDatabase)
       mResultCode = rv;
     }
 
-    mState = State_SendingResults;
+    mState = State::SendingResults;
     MOZ_ALWAYS_TRUE(NS_SUCCEEDED(Run()));
   }
 }
@@ -20781,7 +20780,7 @@ void
 DeleteDatabaseOp::SendBlockedNotification()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_WaitingForOtherDatabasesToClose);
+  MOZ_ASSERT(mState == State::WaitingForOtherDatabasesToClose);
 
   if (!IsActorDestroyed()) {
     unused << SendBlocked(0);
@@ -20792,7 +20791,7 @@ void
 DeleteDatabaseOp::SendResults()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mState == State_SendingResults);
+  MOZ_ASSERT(mState == State::SendingResults);
 
   if (!IsActorDestroyed()) {
     FactoryRequestResponse response;
@@ -20822,7 +20821,7 @@ DeleteDatabaseOp::
 VersionChangeOp::RunOnMainThread()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mDeleteDatabaseOp->mState == State_DatabaseWorkVersionChange);
+  MOZ_ASSERT(mDeleteDatabaseOp->mState == State::DatabaseWorkVersionChange);
 
   if (NS_WARN_IF(QuotaClient::IsShuttingDownOnMainThread()) ||
       !OperationMayProceed()) {
@@ -20854,7 +20853,7 @@ VersionChangeOp::DeleteFile(nsIFile* aDirectory,
   MOZ_ASSERT(!aFilename.IsEmpty());
   MOZ_ASSERT_IF(aQuotaManager, mDeleteDatabaseOp->mEnforcingQuota);
 
-  MOZ_ASSERT(mDeleteDatabaseOp->mState == State_DatabaseWorkVersionChange);
+  MOZ_ASSERT(mDeleteDatabaseOp->mState == State::DatabaseWorkVersionChange);
 
   PROFILER_LABEL("IndexedDB",
                  "DeleteDatabaseOp::VersionChangeOp::DeleteFile",
@@ -20915,7 +20914,7 @@ DeleteDatabaseOp::
 VersionChangeOp::RunOnIOThread()
 {
   AssertIsOnIOThread();
-  MOZ_ASSERT(mDeleteDatabaseOp->mState == State_DatabaseWorkVersionChange);
+  MOZ_ASSERT(mDeleteDatabaseOp->mState == State::DatabaseWorkVersionChange);
 
   PROFILER_LABEL("IndexedDB",
                  "DeleteDatabaseOp::VersionChangeOp::RunOnIOThread",
@@ -21079,7 +21078,7 @@ DeleteDatabaseOp::
 VersionChangeOp::RunOnOwningThread()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mDeleteDatabaseOp->mState == State_DatabaseWorkVersionChange);
+  MOZ_ASSERT(mDeleteDatabaseOp->mState == State::DatabaseWorkVersionChange);
 
   nsRefPtr<DeleteDatabaseOp> deleteOp;
   mDeleteDatabaseOp.swap(deleteOp);
@@ -21128,7 +21127,7 @@ VersionChangeOp::RunOnOwningThread()
     }
   }
 
-  deleteOp->mState = State_SendingResults;
+  deleteOp->mState = State::SendingResults;
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(deleteOp->Run()));
 
 #ifdef DEBUG
