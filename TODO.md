@@ -190,6 +190,7 @@ https://github.com/mozilla/newtab-dev/commit/ac250f9d737362d0730b0897603ae379eca
 - Bug 1208747 - Move most of Stopwatch-related code to XPCOM-land (JSAP
 - Bug 1206290 - Part 1: Implement a JS::ubi::PostOrder depth first trav
 - Bug 1209704 - Part 2: Share storage and mixins between Read and Wri
+- Bug 1202048 - Root JSONParser explicitly; r=sfink 
 - Bug 1187062 - Part 2: Implement a concrete JS::ubi::StackFrame clas
 - Bug 1187062 - Part 1: Add the JS::ubi::StackFrame interface; r=sfink
 -  Bug 1187062 - Part 0: Make js::Debugger::getObjectAllocationSite retu
@@ -204,6 +205,7 @@ https://github.com/mozilla/newtab-dev/commit/ac250f9d737362d0730b0897603ae379eca
 - Bug 1167409 - 4/4 - Inititalize ScriptSourceObject even when off-main
 Bug 1191117 - Remove RootedGeneric and replace with normal Rooted usa
 Bug 1195866 - Make allocations log report whether an allocation was i
+Bug 1189490 - Follow ups: Move [Traceable]Fifo to js/src/ds. r=terrence
 - Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
 Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
 Bug 1181869 - Update Bindings to use normal Rooted primitives
