@@ -292,7 +292,7 @@ struct FullIndexMetadata
 
 public:
   FullIndexMetadata()
-    : mCommonMetadata(0, nsString(), KeyPath(0), false, false)
+    : mCommonMetadata(0, nsString(), KeyPath(0), nsCString(), false, false, false)
     , mDeleted(false)
   {
     // This can happen either on the QuotaManager IO thread or on a
@@ -5441,6 +5441,11 @@ protected:
   BindKeyRangeToStatement(const SerializedKeyRange& aKeyRange,
                           mozIStorageStatement* aStatement);
 
+  static nsresult
+  BindKeyRangeToStatement(const SerializedKeyRange& aKeyRange,
+                          mozIStorageStatement* aStatement,
+                          const nsCString& aLocale);
+
   static void
   AppendConditionClause(const nsACString& aColumnName,
                         const nsACString& aArgName,
@@ -7704,10 +7709,12 @@ private:
 
   nsCString mContinueQuery;
   nsCString mContinueToQuery;
+  nsCString mLocale;
 
   Key mKey;
   Key mObjectKey;
   Key mRangeKey;
+  Key mSortKey;
 
   CursorOpBase* mCurrentlyRunningOp;
 
@@ -7760,6 +7767,11 @@ private:
 
   virtual bool
   RecvContinue(const CursorRequestParams& aParams, const Key& key) override;
+
+  bool
+  IsLocaleAware() const {
+    return !mLocale.IsEmpty();
+  }
 };
 
 class Cursor::CursorOpBase
@@ -14787,6 +14799,10 @@ Cursor::Cursor(TransactionBase* aTransaction,
     MOZ_ASSERT(mBackgroundParent);
   }
 
+  if (aIndexMetadata) {
+    mLocale = aIndexMetadata->mCommonMetadata.locale();
+  }
+
   static_assert(OpenCursorParams::T__None == 0 &&
                   OpenCursorParams::T__Last == 4,
                 "Lots of code here assumes only four types of cursors!");
@@ -14832,6 +14848,8 @@ Cursor::VerifyRequestParams(const CursorRequestParams& aParams) const
     return false;
   }
 
+  const Key& sortKey = IsLocaleAware() ? mSortKey : mKey;
+
   switch (aParams.type()) {
     case CursorRequestParams::TContinueParams: {
       const Key& key = aParams.get_ContinueParams().key();
@@ -14839,7 +14857,7 @@ Cursor::VerifyRequestParams(const CursorRequestParams& aParams) const
         switch (mDirection) {
           case IDBCursor::NEXT:
           case IDBCursor::NEXT_UNIQUE:
-            if (NS_WARN_IF(key <= mKey)) {
+            if (NS_WARN_IF(key <= sortKey)) {
               ASSERT_UNLESS_FUZZING();
               return false;
             }
@@ -14847,7 +14865,7 @@ Cursor::VerifyRequestParams(const CursorRequestParams& aParams) const
 
           case IDBCursor::PREV:
           case IDBCursor::PREV_UNIQUE:
-            if (NS_WARN_IF(key >= mKey)) {
+            if (NS_WARN_IF(key >= sortKey)) {
               ASSERT_UNLESS_FUZZING();
               return false;
             }
@@ -17598,30 +17616,77 @@ DatabaseOperationBase::BindKeyRangeToStatement(
   MOZ_ASSERT(!IsOnBackgroundThread());
   MOZ_ASSERT(aStatement);
 
-  NS_NAMED_LITERAL_CSTRING(lowerKey, "lower_key");
-
-  if (aKeyRange.isOnly()) {
-    return aKeyRange.lower().BindToStatement(aStatement, lowerKey);
-  }
-
-  nsresult rv;
+  nsresult rv = NS_OK;
 
   if (!aKeyRange.lower().IsUnset()) {
-    rv = aKeyRange.lower().BindToStatement(aStatement, lowerKey);
+    rv = aKeyRange.lower().BindToStatement(aStatement, NS_LITERAL_CSTRING("lower_key"));
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
   }
 
+  if (aKeyRange.isOnly()) {
+    return rv;
+  }
+
   if (!aKeyRange.upper().IsUnset()) {
-    rv = aKeyRange.upper().BindToStatement(aStatement,
-                                           NS_LITERAL_CSTRING("upper_key"));
+    rv = aKeyRange.upper().BindToStatement(aStatement, NS_LITERAL_CSTRING("upper_key"));
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
   }
 
   return NS_OK;
+}
+
+// static
+nsresult
+DatabaseOperationBase::BindKeyRangeToStatement(
+                                            const SerializedKeyRange& aKeyRange,
+                                            mozIStorageStatement* aStatement,
+                                            const nsCString& aLocale)
+{
+#ifndef ENABLE_INTL_API
+  return BindKeyRangeToStatement(aKeyRange, aStatement);
+#else
+  MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(aStatement);
+  MOZ_ASSERT(!aLocale.IsEmpty());
+
+  nsresult rv = NS_OK;
+
+  if (!aKeyRange.lower().IsUnset()) {
+    Key lower;
+    rv = aKeyRange.lower().ToLocaleBasedKey(lower, aLocale);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    rv = lower.BindToStatement(aStatement, NS_LITERAL_CSTRING("lower_key"));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  if (aKeyRange.isOnly()) {
+    return rv;
+  }
+
+  if (!aKeyRange.upper().IsUnset()) {
+    Key upper;
+    rv = aKeyRange.upper().ToLocaleBasedKey(upper, aLocale);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    rv = upper.BindToStatement(aStatement, NS_LITERAL_CSTRING("upper_key"));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  return NS_OK;
+#endif
 }
 
 // static
@@ -17751,13 +17816,15 @@ DatabaseOperationBase::IndexDataValuesFromUpdateInfos(
     const IndexUpdateInfo& updateInfo = aUpdateInfos[idxIndex];
     const int64_t& indexId = updateInfo.indexId();
     const Key& key = updateInfo.value();
+    const Key& sortKey = updateInfo.localizedValue();
 
     bool unique;
     MOZ_ALWAYS_TRUE(aUniqueIndexTable.Get(indexId, &unique));
 
+    IndexDataValue idv(indexId, unique, key, sortKey);
+
     MOZ_ALWAYS_TRUE(
-      aIndexValues.InsertElementSorted(IndexDataValue(indexId, unique, key),
-                                       fallible));
+      aIndexValues.InsertElementSorted(idv, fallible));
   }
 
   return NS_OK;
@@ -22346,6 +22413,7 @@ UpdateIndexDataValuesFunction::OnFunctionCall(mozIStorageValueArray* aValues,
                                              metadata.keyPath(),
                                              metadata.unique(),
                                              metadata.multiEntry(),
+                                             metadata.locale(),
                                              mCx,
                                              clone,
                                              updateInfos);
@@ -22429,7 +22497,8 @@ UpdateIndexDataValuesFunction::OnFunctionCall(mozIStorageValueArray* aValues,
     MOZ_ALWAYS_TRUE(
       indexValues.InsertElementSorted(IndexDataValue(metadata.id(),
                                                      metadata.unique(),
-                                                     info.value()),
+                                                     info.value(),
+                                                     info.localizedValue()),
                                       fallible));
   }
 
@@ -22466,7 +22535,8 @@ UpdateIndexDataValuesFunction::OnFunctionCall(mozIStorageValueArray* aValues,
       MOZ_ALWAYS_TRUE(
         indexValues.InsertElementSorted(IndexDataValue(metadata.id(),
                                                        metadata.unique(),
-                                                       info.value()),
+                                                       info.value(),
+                                                       info.localizedValue()),
                                         fallible));
     }
   }
@@ -24854,9 +24924,23 @@ OpenOp::GetRangeKeyInfo(bool aLowerBound, Key* aKey, bool* aOpen)
     if (range.isOnly()) {
       *aKey = range.lower();
       *aOpen = false;
+#ifdef ENABLE_INTL_API
+      if (mCursor->IsLocaleAware()) {
+        range.lower().ToLocaleBasedKey(*aKey, mCursor->mLocale);
+      }
+#endif
     } else {
       *aKey = aLowerBound ? range.lower() : range.upper();
       *aOpen = aLowerBound ? range.lowerOpen() : range.upperOpen();
+#ifdef ENABLE_INTL_API
+      if (mCursor->IsLocaleAware()) {
+        if (aLowerBound) {
+          range.lower().ToLocaleBasedKey(*aKey, mCursor->mLocale);
+        } else {
+          range.upper().ToLocaleBasedKey(*aKey, mCursor->mLocale);
+        }
+      }
+#endif
     }
   } else {
     *aOpen = false;
@@ -25767,8 +25851,14 @@ ContinueOp::DoDatabaseWork(DatabaseConnection* aConnection)
   NS_NAMED_LITERAL_CSTRING(rangeKeyName, "range_key");
   NS_NAMED_LITERAL_CSTRING(objectKeyName, "object_key");
 
-  const Key& currentKey =
-    hasContinueKey ? mParams.get_ContinueParams().key() : mCursor->mKey;
+  const bool localeAware = mCursor->IsLocaleAware();
+
+  Key& currentKey = mCursor->mKey;
+  if (hasContinueKey) {
+    currentKey = mParams.get_ContinueParams().key();
+  } else if (localeAware) {
+    currentKey = mCursor->mSortKey;
+  }
 
   const bool usingRangeKey = !mCursor->mRangeKey.IsUnset();
 
