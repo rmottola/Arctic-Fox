@@ -1110,25 +1110,19 @@ IDBObjectStore::GetAddInfo(JSContext* aCx,
   }
 
   // Figure out indexes and the index values to update here.
-  /* XXX we have no Clone here, 
-  if (mSpec->indexes().Length() && !aValue.Clone(aCx)) {
-     return NS_ERROR_DOM_DATA_CLONE_ERR;
-  } */
-  {
-    const nsTArray<IndexMetadata>& indexes = mSpec->indexes();
+  const nsTArray<IndexMetadata>& indexes = mSpec->indexes();
 
-    const uint32_t idxCount = indexes.Length();
-    aUpdateInfoArray.SetCapacity(idxCount); // Pretty good estimate
+  const uint32_t idxCount = indexes.Length();
+  aUpdateInfoArray.SetCapacity(idxCount); // Pretty good estimate
 
-    for (uint32_t idxIndex = 0; idxIndex < idxCount; idxIndex++) {
-      const IndexMetadata& metadata = indexes[idxIndex];
+  for (uint32_t idxIndex = 0; idxIndex < idxCount; idxIndex++) {
+    const IndexMetadata& metadata = indexes[idxIndex];
 
-      rv = AppendIndexUpdateInfo(metadata.id(), metadata.keyPath(),
+    rv = AppendIndexUpdateInfo(metadata.id(), metadata.keyPath(),
                                metadata.unique(), metadata.multiEntry(), aCx,
                                aValue, aUpdateInfoArray);
-      if (NS_WARN_IF(NS_FAILED(rv))) {
-        return rv;
-      }
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
     }
   }
 
