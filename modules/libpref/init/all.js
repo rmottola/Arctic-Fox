@@ -139,6 +139,9 @@ pref("dom.select_events.textcontrols.enabled", true);
 // Whether or not the document visbility API is enabled
 pref("dom.visibilityAPI.enabled", true);
 
+// Whether or not File Handle is enabled.
+pref("dom.fileHandle.enabled", true);
+
 // Whether or not the Permissions API is enabled.
 #ifdef NIGHTLY_BUILD
 pref("dom.permissions.enabled", true);
