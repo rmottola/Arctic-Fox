@@ -28,7 +28,7 @@ PostMessageEvent::PostMessageEvent(nsGlobalWindow* aSource,
                                    nsGlobalWindow* aTargetWindow,
                                    nsIPrincipal* aProvidedPrincipal,
                                    bool aTrustedCaller)
-: StructuredCloneHelper(CloningSupported, TransferringSupported,
+: StructuredCloneHolder(CloningSupported, TransferringSupported,
                         SameProcessSameThread),
   mSource(aSource),
   mCallerOrigin(aCallerOrigin),
