@@ -598,12 +598,6 @@ define('lib/source-map/util', ['require', 'exports', 'module' , ], function(requ
   }
   exports.fromSetString = fromSetString;
 
-  function strcmp(aStr1, aStr2) {
-    var s1 = aStr1 || "";
-    var s2 = aStr2 || "";
-    return (s1 > s2) - (s1 < s2);
-  }
-
   /**
    * Comparator between two mappings where the original positions are compared.
    *
@@ -613,34 +607,32 @@ define('lib/source-map/util', ['require', 'exports', 'module' , ], function(requ
    * stubbed out mapping.
    */
   function compareByOriginalPositions(mappingA, mappingB, onlyCompareOriginal) {
-    var cmp;
-
-    cmp = strcmp(mappingA.source, mappingB.source);
-    if (cmp) {
+    var cmp = mappingA.source - mappingB.source;
+    if (cmp !== 0) {
       return cmp;
     }
 
     cmp = mappingA.originalLine - mappingB.originalLine;
-    if (cmp) {
+    if (cmp !== 0) {
       return cmp;
     }
 
     cmp = mappingA.originalColumn - mappingB.originalColumn;
-    if (cmp || onlyCompareOriginal) {
+    if (cmp !== 0 || onlyCompareOriginal) {
       return cmp;
     }
 
     cmp = mappingA.generatedColumn - mappingB.generatedColumn;
-    if (cmp) {
+    if (cmp !== 0) {
       return cmp;
     }
 
     cmp = mappingA.generatedLine - mappingB.generatedLine;
-    if (cmp) {
+    if (cmp !== 0) {
       return cmp;
     }
 
-    return strcmp(mappingA.name, mappingB.name);
+    return mappingA.name - mappingB.name;
   };
   exports.compareByOriginalPositions = compareByOriginalPositions;
 
@@ -654,34 +646,32 @@ define('lib/source-map/util', ['require', 'exports', 'module' , ], function(requ
    * mapping with a stubbed out mapping.
    */
   function compareByGeneratedPositions(mappingA, mappingB, onlyCompareGenerated) {
-    var cmp;
-
-    cmp = mappingA.generatedLine - mappingB.generatedLine;
-    if (cmp) {
+    var cmp = mappingA.generatedLine - mappingB.generatedLine;
+    if (cmp !== 0) {
       return cmp;
     }
 
     cmp = mappingA.generatedColumn - mappingB.generatedColumn;
-    if (cmp || onlyCompareGenerated) {
+    if (cmp !== 0 || onlyCompareGenerated) {
       return cmp;
     }
 
-    cmp = strcmp(mappingA.source, mappingB.source);
-    if (cmp) {
+    cmp = mappingA.source - mappingB.source;
+    if (cmp !== 0) {
       return cmp;
     }
 
     cmp = mappingA.originalLine - mappingB.originalLine;
-    if (cmp) {
+    if (cmp !== 0) {
       return cmp;
     }
 
     cmp = mappingA.originalColumn - mappingB.originalColumn;
-    if (cmp) {
+    if (cmp !== 0) {
       return cmp;
     }
 
-    return strcmp(mappingA.name, mappingB.name);
+    return mappingA.name - mappingB.name;
   };
   exports.compareByGeneratedPositions = compareByGeneratedPositions;
 
