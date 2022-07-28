@@ -2,16 +2,23 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// Equivalent to 0o600 permissions; used for saved Sync Recovery Key.
+// Equivalent to 0600 permissions; used for saved Sync Recovery Key.
 // This constant can be replaced when the equivalent values are available to
 // chrome JS; see Bug 433295 and Bug 757351.
 const PERMISSIONS_RWUSR = 0x180;
 
 // Weave should always exist before before this file gets included.
-let gSyncUtils = {
+var gSyncUtils = {
   get bundle() {
     delete this.bundle;
     return this.bundle = Services.strings.createBundle("chrome://browser/locale/syncSetup.properties");
+  },
+
+  get fxAccountsEnabled() {
+    let service = Components.classes["@mozilla.org/weave/service;1"]
+                            .getService(Components.interfaces.nsISupports)
+                            .wrappedJSObject;
+    return service.fxAccountsEnabled;
   },
 
   // opens in a new window if we're in a modal prefwindow world, in a new tab otherwise
@@ -71,11 +78,13 @@ let gSyncUtils = {
   },
 
   openToS: function () {
-    this._openLink(Weave.Svc.Prefs.get("termsURL"));
+    let root = this.fxAccountsEnabled ? "fxa." : "";
+    this._openLink(Weave.Svc.Prefs.get(root + "termsURL"));
   },
 
   openPrivacyPolicy: function () {
-    this._openLink(Weave.Svc.Prefs.get("privacyURL"));
+    let root = this.fxAccountsEnabled ? "fxa." : "";
+    this._openLink(Weave.Svc.Prefs.get(root + "privacyURL"));
   },
 
   /**
