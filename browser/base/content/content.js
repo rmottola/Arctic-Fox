@@ -528,7 +528,7 @@ ClickEventHandler.init();
 ContentLinkHandler.init(this);
 
 // TODO: Load this lazily so the JSM is run only if a relevant event/message fires.
-let pluginContent = new PluginContent(global);
+var pluginContent = new PluginContent(global);
 
 addEventListener("DOMWebNotificationClicked", function(event) {
   sendAsyncMessage("DOMWebNotificationClicked", {});
@@ -551,7 +551,7 @@ addEventListener("pageshow", function(event) {
   }
 });
 
-let PageMetadataMessenger = {
+var PageMetadataMessenger = {
   init() {
     addMessageListener("PageMetadata:GetPageData", this);
     addMessageListener("PageMetadata:GetMicrodata", this);
