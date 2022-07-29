@@ -212,7 +212,7 @@ struct MOZ_STACK_CLASS ParseContext : public GenericParseContext
      */
     bool generateFunctionBindings(ExclusiveContext* cx, TokenStream& ts,
                                   LifoAlloc& alloc,
-                                  InternalHandle<Bindings*> bindings) const;
+                                  MutableHandle<Bindings> bindings) const;
 
   private:
     ParseContext**  parserPC;     /* this points to the Parser's active pc
