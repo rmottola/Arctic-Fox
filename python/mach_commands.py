@@ -76,8 +76,8 @@ class MachCommands(MachCommandBase):
         self._activate_virtualenv()
 
         return self.run_process([self.virtualenv_manager.python_path] + args,
-            pass_thru=True, # Allow user to run Python interactively.
-            ensure_exit_code=False, # Don't throw on non-zero exit code.
+            pass_thru=True,  # Allow user to run Python interactively.
+            ensure_exit_code=False,  # Don't throw on non-zero exit code.
             # Note: subprocess requires native strings in os.environ on Windows
             append_env={b'PYTHONDONTWRITEBYTECODE': str('1')})
 
@@ -133,14 +133,15 @@ class MachCommands(MachCommandBase):
                         return 1
 
         for f in files:
-            file_displayed_test = [] # Used as a boolean.
+            file_displayed_test = []  # Used as a boolean.
+
             def _line_handler(line):
                 if not file_displayed_test and line.startswith('TEST-'):
                     file_displayed_test.append(True)
 
             inner_return_code = self.run_process(
                 [self.virtualenv_manager.python_path, f],
-                ensure_exit_code=False, # Don't throw on non-zero exit code.
+                ensure_exit_code=False,  # Don't throw on non-zero exit code.
                 log_name='python-test',
                 # subprocess requires native strings in os.environ on Windows
                 append_env={b'PYTHONDONTWRITEBYTECODE': str('1')},
