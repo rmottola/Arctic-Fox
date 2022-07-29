@@ -50,20 +50,6 @@ MarkPropertyDescriptorRoot(JSTracer* trc, JSPropertyDescriptor* pd, const char* 
     pd->trace(trc);
 }
 
-// We cannot instantiate (even indirectly) the abstract JS::DynamicTraceable.
-// Instead we cast to a ConcreteTraceable, then upcast before calling trace so
-// that we get the implementation defined dynamically in the vtable.
-struct ConcreteTraceable : public JS::DynamicTraceable
-{
-    void trace(JSTracer* trc) override {}
-};
-
-static void
-MarkDynamicTraceable(JSTracer* trc, ConcreteTraceable* t, const char* name)
-{
-    static_cast<JS::DynamicTraceable*>(t)->trace(trc);
-}
-
 template <typename T>
 using TraceFunction = void (*)(JSTracer* trc, T* ref, const char* name);
 
@@ -86,8 +72,7 @@ MarkExactStackRootsAcrossTypes(T context, JSTracer* trc)
     MarkExactStackRootList<JSObject*>(trc, context, "exact-object");
     MarkExactStackRootList<Shape*>(trc, context, "exact-shape");
     MarkExactStackRootList<BaseShape*>(trc, context, "exact-baseshape");
-    MarkExactStackRootList<ObjectGroup*>(
-        trc, context, "exact-objectgroup");
+    MarkExactStackRootList<ObjectGroup*>(trc, context, "exact-objectgroup");
     MarkExactStackRootList<JSString*>(trc, context, "exact-string");
     MarkExactStackRootList<JS::Symbol*>(trc, context, "exact-symbol");
     MarkExactStackRootList<jit::JitCode*>(trc, context, "exact-jitcode");
@@ -97,11 +82,8 @@ MarkExactStackRootsAcrossTypes(T context, JSTracer* trc)
     MarkExactStackRootList<Value>(trc, context, "exact-value");
     MarkExactStackRootList<JSPropertyDescriptor, MarkPropertyDescriptorRoot>(
         trc, context, "JSPropertyDescriptor");
-    MarkExactStackRootList<JS::StaticTraceable,
-                           js::DispatchWrapper<JS::StaticTraceable>::TraceWrapped>(
-        trc, context, "StaticTraceable");
-    MarkExactStackRootList<ConcreteTraceable, MarkDynamicTraceable>(
-        trc, context, "DynamicTraceable");
+    MarkExactStackRootList<JS::Traceable, js::DispatchWrapper<JS::Traceable>::TraceWrapped>(
+        trc, context, "Traceable");
 }
 
 static void

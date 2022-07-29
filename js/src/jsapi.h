@@ -2470,9 +2470,10 @@ JS_PreventExtensions(JSContext* cx, JS::HandleObject obj, JS::ObjectOpResult& re
 extern JS_PUBLIC_API(JSObject*)
 JS_New(JSContext* cx, JS::HandleObject ctor, const JS::HandleValueArray& args);
 
+
 /*** Property descriptors ************************************************************************/
 
-struct JSPropertyDescriptor {
+struct JSPropertyDescriptor : public JS::Traceable {
     JSObject* obj;
     unsigned attrs;
     JSGetterOp getter;
