@@ -65,6 +65,8 @@ browser.jar:
   skin/classic/browser/urlbar-arrow.png
   skin/classic/browser/urlbar-arrow@2x.png
 * skin/classic/browser/controlcenter/panel.css        (controlcenter/panel.css)
+  skin/classic/browser/customizableui/thumburger.png  (customizableui/thumburger.png)
+  skin/classic/browser/customizableui/thumburger-inverted.png  (customizableui/thumburger-inverted.png)
   skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
   skin/classic/browser/downloads/buttons.png          (downloads/buttons.png)
   skin/classic/browser/downloads/contentAreaDownloadsView.css  (downloads/contentAreaDownloadsView.css)
