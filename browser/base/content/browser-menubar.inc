@@ -174,6 +174,15 @@
                           label="&bidiSwitchTextDirectionItem.label;"
                           accesskey="&bidiSwitchTextDirectionItem.accesskey;"
                           hidden="true"/>
+#ifdef XP_UNIX
+#ifndef XP_MACOSX
+                <menuseparator/>
+                <menuitem id="menu_preferences"
+                          label="&preferencesCmdUnix.label;"
+                          accesskey="&preferencesCmdUnix.accesskey;"
+                          oncommand="openPreferences();"/>
+#endif
+#endif
               </menupopup>
             </menu>
 
