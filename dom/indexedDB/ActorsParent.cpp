@@ -6599,6 +6599,7 @@ private:
   Atomic<bool> mInvalidatedOnAnyThread;
   const Mode mMode;
   bool mHasBeenActive;
+  bool mHasBeenActiveOnConnectionThread;
   bool mActorDestroyed;
   bool mInvalidated;
 
@@ -6649,6 +6650,13 @@ public:
 
     mTransactionId = aTransactionId;
     mHasBeenActive = true;
+  }
+
+  void
+  SetActiveOnConnectionThread()
+  {
+    AssertIsOnConnectionThread();
+    mHasBeenActiveOnConnectionThread = true;
   }
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(
@@ -13872,6 +13880,8 @@ StartTransactionOp::DoDatabaseWork(DatabaseConnection* aConnection)
   MOZ_ASSERT(aConnection);
   aConnection->AssertIsOnConnectionThread();
 
+  Transaction()->SetActiveOnConnectionThread();
+
   if (Transaction()->GetMode() != IDBTransaction::READ_ONLY) {
     nsresult rv = aConnection->BeginWriteTransaction();
     if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -13926,6 +13936,7 @@ TransactionBase::TransactionBase(Database* aDatabase, Mode aMode)
   , mInvalidatedOnAnyThread(false)
   , mMode(aMode)
   , mHasBeenActive(false)
+  , mHasBeenActiveOnConnectionThread(false)
   , mActorDestroyed(false)
   , mInvalidated(false)
   , mResultCode(NS_OK)
@@ -21555,6 +21566,8 @@ VersionChangeOp::DoDatabaseWork(DatabaseConnection* aConnection)
                IDB_LOG_ID_STRING(mBackgroundChildLoggingId),
                mLoggingSerialNumber);
 
+  Transaction()->SetActiveOnConnectionThread();
+
   nsresult rv = aConnection->BeginWriteTransaction();
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
@@ -22666,7 +22679,8 @@ CommitOp::Run()
                mTransaction->LoggingSerialNumber(),
                mLoggingSerialNumber);
 
-  if (mTransaction->GetMode() != IDBTransaction::READ_ONLY) {
+  if (mTransaction->GetMode() != IDBTransaction::READ_ONLY &&
+      mTransaction->mHasBeenActiveOnConnectionThread) {
     Database* database = mTransaction->GetDatabase();
     MOZ_ASSERT(database);
 
