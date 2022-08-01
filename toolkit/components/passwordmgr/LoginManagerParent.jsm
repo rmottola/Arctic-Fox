@@ -19,10 +19,15 @@ XPCOMUtils.defineLazyModuleGetter(this, "DeferredTask",
                                   "resource://gre/modules/DeferredTask.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LoginDoorhangers",
                                   "resource://gre/modules/LoginDoorhangers.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
+                                  "resource://gre/modules/LoginHelper.jsm");
+
+XPCOMUtils.defineLazyGetter(this, "log", () => {
+  let logger = LoginHelper.createLogger("LoginManagerParent");
+  return logger.log.bind(logger);
+});
 
 this.EXPORTED_SYMBOLS = [ "LoginManagerParent", "PasswordsMetricsProvider" ];
-
-var gDebug;
 
 #ifndef ANDROID
 #ifdef MOZ_SERVICES_HEALTHREPORT
@@ -50,7 +55,7 @@ const PasswordsHealthReport = {
 
 this.PasswordsMetricsProvider = function() {
   Metrics.Provider.call(this);
-}
+};
 
 PasswordsMetricsProvider.prototype = Object.freeze({
   __proto__: Metrics.Provider.prototype,
@@ -124,44 +129,6 @@ PasswordsMeasurement2.prototype = Object.freeze({
 
 #endif
 #endif
-
-
-function log(...pieces) {
-  function generateLogMessage(args) {
-    let strings = ['Login Manager (parent):'];
-
-    args.forEach(function(arg) {
-      if (typeof arg === 'string') {
-        strings.push(arg);
-      } else if (typeof arg === 'undefined') {
-        strings.push('undefined');
-      } else if (arg === null) {
-        strings.push('null');
-      } else {
-        try {
-          strings.push(JSON.stringify(arg, null, 2));
-        } catch(err) {
-          strings.push("<<something>>");
-        }
-      }
-    });
-    return strings.join(' ');
-  }
-
-  if (!gDebug)
-    return;
-
-  let message = generateLogMessage(pieces);
-  dump(message + "\n");
-  Services.console.logStringMessage(message);
-}
-
-function prefChanged() {
-  gDebug = Services.prefs.getBoolPref("signon.debug");
-}
-
-Services.prefs.addObserver("signon.debug", prefChanged, false);
-prefChanged();
 
 var LoginManagerParent = {
   /**
