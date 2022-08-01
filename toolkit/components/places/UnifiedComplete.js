@@ -1021,7 +1021,7 @@ Search.prototype = {
     match.engineAlias = alias;
     let query = this._searchTokens.slice(1).join(" ");
 
-    yield this._addSearchEngineMatch(match, query);
+    this._addSearchEngineMatch(match, query);
     return true;
   },
 
@@ -1031,16 +1031,17 @@ Search.prototype = {
       return;
 
     let query = this._originalSearchString;
-
-    yield this._addSearchEngineMatch(match, query);
+    this._addSearchEngineMatch(match, query);
   },
 
-  _addSearchEngineMatch: function* (match, query) {
+  _addSearchEngineMatch(match, query, suggestion) {
     let actionURLParams = {
       engineName: match.engineName,
       input: this._originalSearchString,
       searchQuery: query,
     };
+    if (suggestion)
+      actionURLParams.searchSuggestion = suggestion;
     if (match.engineAlias) {
       actionURLParams.alias = match.engineAlias;
     }
