@@ -344,6 +344,10 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     js::HeapPtrObject uncaughtExceptionHook; /* Strong reference. */
     bool enabled;
     bool allowUnobservedAsmJS;
+
+    // Wether to enable code coverage on the Debuggee.
+    bool collectCoverageInfo;
+
     JSCList breakpoints;                /* Circular list of all js::Breakpoints in this debugger */
 
     // The set of GC numbers for which one or more of this Debugger's observed
@@ -549,6 +553,8 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static bool setUncaughtExceptionHook(JSContext* cx, unsigned argc, Value* vp);
     static bool getAllowUnobservedAsmJS(JSContext* cx, unsigned argc, Value* vp);
     static bool setAllowUnobservedAsmJS(JSContext* cx, unsigned argc, Value* vp);
+    static bool getCollectCoverageInfo(JSContext* cx, unsigned argc, Value* vp);
+    static bool setCollectCoverageInfo(JSContext* cx, unsigned argc, Value* vp);
     static bool getMemory(JSContext* cx, unsigned argc, Value* vp);
     static bool getOnIonCompilation(JSContext* cx, unsigned argc, Value* vp);
     static bool setOnIonCompilation(JSContext* cx, unsigned argc, Value* vp);
@@ -598,6 +604,10 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     // execution of its debuggees.
     IsObserving observesAsmJS() const;
 
+    // Whether the Debugger instance needs to observe coverage of any JavaScript
+    // execution.
+    IsObserving observesCoverage() const;
+
   private:
     static bool ensureExecutionObservabilityOfFrame(JSContext* cx, AbstractFramePtr frame);
     static bool ensureExecutionObservabilityOfCompartment(JSContext* cx, JSCompartment* comp);
@@ -605,6 +615,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static bool hookObservesAllExecution(Hook which);
 
     bool updateObservesAllExecutionOnDebuggees(JSContext* cx, IsObserving observing);
+    bool updateObservesCoverageOnDebuggees(JSContext* cx, IsObserving observing);
     void updateObservesAsmJSOnDebuggees(IsObserving observing);
 
     JSObject* getHook(Hook hook) const;
