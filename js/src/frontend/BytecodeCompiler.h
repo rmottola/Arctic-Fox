@@ -17,6 +17,7 @@ namespace js {
 
 class LazyScript;
 class LifoAlloc;
+class ModuleObject;
 class ScriptSourceObject;
 class ScopeObject;
 struct SourceCompressionTask;
@@ -28,7 +29,12 @@ CompileScript(ExclusiveContext* cx, LifoAlloc* alloc,
               HandleObject scopeChain, Handle<ScopeObject*> enclosingStaticScope,
               HandleScript evalCaller, const ReadOnlyCompileOptions& options,
               SourceBufferHolder& srcBuf, JSString* source_ = nullptr,
-              SourceCompressionTask* extraSct = nullptr);
+              SourceCompressionTask* extraSct = nullptr,
+              ScriptSourceObject** sourceObjectOut = nullptr);
+
+ModuleObject *
+CompileModule(JSContext *cx, HandleObject obj, const ReadOnlyCompileOptions &options,
+              SourceBufferHolder &srcBuf);
 
 bool
 CompileLazyFunction(JSContext* cx, Handle<LazyScript*> lazy, const char16_t* chars, size_t length);

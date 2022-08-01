@@ -372,6 +372,7 @@ AssertRootMarkingPhase(JSTracer* trc)
     D(GlobalObject*) \
     D(JSObject*) \
     D(JSFunction*) \
+    D(ModuleObject*)      \
     D(NestedScopeObject*) \
     D(PlainObject*) \
     D(SavedFrame*) \

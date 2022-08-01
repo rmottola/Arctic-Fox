@@ -10,6 +10,7 @@
 #include "jsscript.h"
 
 #include "asmjs/AsmJSLink.h"
+#include "builtin/ModuleObject.h"
 #include "frontend/BytecodeEmitter.h"
 #include "frontend/FoldConstants.h"
 #include "frontend/NameFunctions.h"
@@ -57,8 +58,11 @@ class MOZ_STACK_CLASS BytecodeCompiler
     void setSourceArgumentsNotIncluded();
 
     JSScript* compileScript(HandleObject scopeChain, HandleScript evalCaller);
+    ModuleObject* compileModule();
     bool compileFunctionBody(MutableHandleFunction fun, Handle<PropertyNameVector> formals,
                              GeneratorKind generatorKind);
+
+    ScriptSourceObject* sourceObjectPtr() const;
 
   private:
     bool checkLength();
@@ -500,13 +504,14 @@ BytecodeCompiler::initGlobalBindings(ParseContext<FullParseHandler>& pc)
     // scope dynamically via JSOP_DEFFUN/VAR).  They may have block-scoped
     // locals, however, which are allocated to the fixed part of the stack
     // frame.
-    InternalHandle<Bindings*> bindings(script, &script->bindings);
-    if (!Bindings::initWithTemporaryStorage(cx, bindings, 0, 0, 0,
+    Rooted<Bindings> bindings(cx, script->bindings);
+    if (!Bindings::initWithTemporaryStorage(cx, &bindings, 0, 0, 0,
                                             pc.blockScopeDepth, 0, 0, nullptr))
     {
         return false;
     }
 
+    script->bindings = bindings;
     return true;
 }
 
@@ -598,6 +603,50 @@ BytecodeCompiler::compileScript(HandleObject scopeChain, HandleScript evalCaller
     return script;
 }
 
+ModuleObject* BytecodeCompiler::compileModule()
+{
+    MOZ_ASSERT(!enclosingStaticScope);
+
+    if (!createSourceAndParser())
+        return nullptr;
+
+    if (!createScript())
+        return nullptr;
+
+    Rooted<ModuleObject*> module(cx, ModuleObject::create(cx));
+    if (!module)
+        return nullptr;
+
+    module->init(script);
+
+    ParseNode* pn = parser->standaloneModule(module);
+    if (!pn)
+        return nullptr;
+
+    if (!NameFunctions(cx, pn) ||
+        !maybeSetDisplayURL(parser->tokenStream) ||
+        !maybeSetSourceMap(parser->tokenStream))
+    {
+        return nullptr;
+    }
+
+    script->bindings = pn->pn_modulebox->bindings;
+
+    if (!createEmitter(pn->pn_modulebox) ||
+        !emitter->emitModuleScript(pn->pn_body))
+    {
+        return nullptr;
+    }
+
+    if (!maybeCompleteCompressSource())
+        return nullptr;
+
+    parser->handler.freeTree(pn);
+
+    MOZ_ASSERT_IF(cx->isJSContext(), !cx->asJSContext()->isExceptionPending());
+    return module;
+}
+
 bool
 BytecodeCompiler::compileFunctionBody(MutableHandleFunction fun,
                                       Handle<PropertyNameVector> formals,
@@ -657,6 +706,12 @@ BytecodeCompiler::compileFunctionBody(MutableHandleFunction fun,
 }
 
 ScriptSourceObject*
+BytecodeCompiler::sourceObjectPtr() const
+{
+    return sourceObject.get();
+}
+
+ScriptSourceObject*
 frontend::CreateScriptSourceObject(ExclusiveContext* cx, const ReadOnlyCompileOptions& options)
 {
     ScriptSource* ss = cx->new_<ScriptSource>();
@@ -695,7 +750,8 @@ frontend::CompileScript(ExclusiveContext* cx, LifoAlloc* alloc, HandleObject sco
                         const ReadOnlyCompileOptions& options,
                         SourceBufferHolder& srcBuf,
                         JSString* source_ /* = nullptr */,
-                        SourceCompressionTask* extraSct /* = nullptr */)
+                        SourceCompressionTask* extraSct /* = nullptr */,
+                        ScriptSourceObject** sourceObjectOut /* = nullptr */)
 {
     MOZ_ASSERT(srcBuf.get());
 
@@ -707,10 +763,48 @@ frontend::CompileScript(ExclusiveContext* cx, LifoAlloc* alloc, HandleObject sco
     MOZ_ASSERT_IF(evalCaller, options.forEval);
     MOZ_ASSERT_IF(evalCaller && evalCaller->strict(), options.strictOption);
 
+   MOZ_ASSERT_IF(sourceObjectOut, *sourceObjectOut == nullptr);
+
     BytecodeCompiler compiler(cx, alloc, options, srcBuf, enclosingStaticScope,
                               TraceLogger_ParserCompileScript);
     compiler.maybeSetSourceCompressor(extraSct);
-    return compiler.compileScript(scopeChain, evalCaller);
+    JSScript* script = compiler.compileScript(scopeChain, evalCaller);
+
+    // frontend::CompileScript independently returns the
+    // ScriptSourceObject (SSO) for the compile.  This is used by
+    // off-main-thread script compilation (OMT-SC).
+    //
+    // OMT-SC cannot initialize the SSO when it is first constructed
+    // because the SSO is allocated initially in a separate compartment.
+    //
+    // After OMT-SC, the separate compartment is merged with the main
+    // compartment, at which point the JSScripts created become observable
+    // by the debugger via memory-space scanning.
+    //
+    // Whatever happens to the top-level script compilation (even if it
+    // fails and returns null), we must finish initializing the SSO.  This
+    // is because there may be valid inner scripts observable by the debugger
+    // which reference the partially-initialized SSO.
+    if (sourceObjectOut)
+        *sourceObjectOut = compiler.sourceObjectPtr();
+
+    return script;
+}
+
+ModuleObject*
+frontend::CompileModule(JSContext* cx, HandleObject obj,
+                        const ReadOnlyCompileOptions& optionsInput,
+                        SourceBufferHolder& srcBuf)
+{
+    MOZ_ASSERT(srcBuf.get());
+
+    CompileOptions options(cx, optionsInput);
+    options.maybeMakeStrictMode(true); // ES6 10.2.1 Module code is always strict mode code.
+    options.setIsRunOnce(true);
+
+    BytecodeCompiler compiler(cx, &cx->tempLifoAlloc(), options, srcBuf, nullptr,
+                              TraceLogger_ParserCompileModule);
+    return compiler.compileModule();
 }
 
 bool

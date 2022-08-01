@@ -40,36 +40,6 @@ typedef RootedValueMap::Range RootRange;
 typedef RootedValueMap::Entry RootEntry;
 typedef RootedValueMap::Enum RootEnum;
 
-// Note: the following two functions cannot be static as long as we are using
-// GCC 4.4, since it requires template function parameters to have external
-// linkage.
-
-void
-MarkBindingsRoot(JSTracer* trc, Bindings* bindings, const char* name)
-{
-    bindings->trace(trc);
-}
-
-void
-MarkPropertyDescriptorRoot(JSTracer* trc, JSPropertyDescriptor* pd, const char* name)
-{
-    pd->trace(trc);
-}
-
-// We cannot instantiate (even indirectly) the abstract JS::DynamicTraceable.
-// Instead we cast to a ConcreteTraceable, then upcast before calling trace so
-// that we get the implementation defined dynamically in the vtable.
-struct ConcreteTraceable : public JS::DynamicTraceable
-{
-    void trace(JSTracer* trc) override {}
-};
-
-static void
-MarkDynamicTraceable(JSTracer* trc, ConcreteTraceable* t, const char* name)
-{
-    static_cast<JS::DynamicTraceable*>(t)->trace(trc);
-}
-
 template <typename T>
 using TraceFunction = void (*)(JSTracer* trc, T* ref, const char* name);
 
@@ -92,8 +62,7 @@ MarkExactStackRootsAcrossTypes(T context, JSTracer* trc)
     MarkExactStackRootList<JSObject*>(trc, context, "exact-object");
     MarkExactStackRootList<Shape*>(trc, context, "exact-shape");
     MarkExactStackRootList<BaseShape*>(trc, context, "exact-baseshape");
-    MarkExactStackRootList<ObjectGroup*>(
-        trc, context, "exact-objectgroup");
+    MarkExactStackRootList<ObjectGroup*>(trc, context, "exact-objectgroup");
     MarkExactStackRootList<JSString*>(trc, context, "exact-string");
     MarkExactStackRootList<JS::Symbol*>(trc, context, "exact-symbol");
     MarkExactStackRootList<jit::JitCode*>(trc, context, "exact-jitcode");
@@ -101,14 +70,8 @@ MarkExactStackRootsAcrossTypes(T context, JSTracer* trc)
     MarkExactStackRootList<LazyScript*>(trc, context, "exact-lazy-script");
     MarkExactStackRootList<jsid>(trc, context, "exact-id");
     MarkExactStackRootList<Value>(trc, context, "exact-value");
-    MarkExactStackRootList<Bindings, MarkBindingsRoot>(trc, context, "Bindings");
-    MarkExactStackRootList<JSPropertyDescriptor, MarkPropertyDescriptorRoot>(
-        trc, context, "JSPropertyDescriptor");
-    MarkExactStackRootList<JS::StaticTraceable,
-                           js::DispatchWrapper<JS::StaticTraceable>::TraceWrapped>(
-        trc, context, "StaticTraceable");
-    MarkExactStackRootList<ConcreteTraceable, MarkDynamicTraceable>(
-        trc, context, "DynamicTraceable");
+    MarkExactStackRootList<JS::Traceable, js::DispatchWrapper<JS::Traceable>::TraceWrapped>(
+        trc, context, "Traceable");
 }
 
 static void
@@ -359,22 +322,6 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc, TraceOrMarkRuntime traceOrMark)
 
     for (ContextIter acx(rt); !acx.done(); acx.next())
         acx->mark(trc);
-
-    for (ZonesIter zone(rt, SkipAtoms); !zone.done(); zone.next()) {
-        if (traceOrMark == MarkRuntime && !zone->isCollecting())
-            continue;
-
-        /* Do not discard scripts with counts while profiling. */
-        if (rt->profilingScripts && !rt->isHeapMinorCollecting()) {
-            for (ZoneCellIterUnderGC i(zone, AllocKind::SCRIPT); !i.done(); i.next()) {
-                JSScript* script = i.get<JSScript>();
-                if (script->hasScriptCounts()) {
-                    TraceRoot(trc, &script, "profilingScripts");
-                    MOZ_ASSERT(script == i.get<JSScript>());
-                }
-            }
-        }
-    }
 
     for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next())
         c->traceRoots(trc, traceOrMark);

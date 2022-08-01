@@ -19,6 +19,7 @@
 #include "jsweakmap.h"
 #include "jswrapper.h"
 
+#include "ds/TraceableFifo.h"
 #include "gc/Barrier.h"
 #include "js/Debug.h"
 #include "js/HashTable.h"
@@ -292,64 +293,78 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     void logTenurePromotion(JSRuntime* rt, JSObject& obj, double when);
     static SavedFrame* getObjectAllocationSite(JSObject& obj);
 
-  private:
-    HeapPtrNativeObject object;         /* The Debugger object. Strong reference. */
-    WeakGlobalObjectSet debuggees;      /* Debuggee globals. Cross-compartment weak references. */
-    JS::ZoneSet debuggeeZones; /* Set of zones that we have debuggees in. */
-    js::HeapPtrObject uncaughtExceptionHook; /* Strong reference. */
-    bool enabled;
-    JSCList breakpoints;                /* Circular list of all js::Breakpoints in this debugger */
-
-    // The set of GC numbers for which one or more of this Debugger's observed
-    // debuggees participated in.
-    js::HashSet<uint64_t> observedGCs;
-
-    struct TenurePromotionsEntry : public mozilla::LinkedListElement<TenurePromotionsEntry>
+    struct TenurePromotionsLogEntry : public JS::Traceable
     {
-        TenurePromotionsEntry(JSRuntime* rt, JSObject& obj, double when);
+        TenurePromotionsLogEntry(JSRuntime* rt, JSObject& obj, double when);
 
         const char* className;
         double when;
         RelocatablePtrObject frame;
         size_t size;
+
+        static void trace(TenurePromotionsLogEntry* e, JSTracer* trc) {
+            if (e->frame)
+                TraceEdge(trc, &e->frame, "Debugger::TenurePromotionsLogEntry::frame");
+        }
     };
 
-    using TenurePromotionsLog = mozilla::LinkedList<TenurePromotionsEntry>;
-    TenurePromotionsLog tenurePromotionsLog;
-    bool trackingTenurePromotions;
-    size_t tenurePromotionsLogLength;
-    size_t maxTenurePromotionsLogLength;
-    bool tenurePromotionsLogOverflowed;
-
-    struct AllocationSite : public mozilla::LinkedListElement<AllocationSite>
+    struct AllocationsLogEntry : public JS::Traceable
     {
-        AllocationSite(HandleObject frame, double when)
+        AllocationsLogEntry(HandleObject frame, double when, const char* className,
+                            HandleAtom ctorName, size_t size, bool inNursery)
             : frame(frame),
               when(when),
-              className(nullptr),
-              ctorName(nullptr),
-              size(0)
+              className(className),
+              ctorName(ctorName),
+              size(size),
+              inNursery(inNursery)
         {
             MOZ_ASSERT_IF(frame, UncheckedUnwrap(frame)->is<SavedFrame>());
         };
-
-        static AllocationSite* create(JSContext* cx, HandleObject frame, double when,
-                                      HandleObject obj);
 
         RelocatablePtrObject frame;
         double when;
         const char* className;
         RelocatablePtrAtom ctorName;
         size_t size;
-    };
-    typedef mozilla::LinkedList<AllocationSite> AllocationSiteList;
+        bool inNursery;
 
+        static void trace(AllocationsLogEntry* e, JSTracer* trc) {
+            if (e->frame)
+                TraceEdge(trc, &e->frame, "Debugger::AllocationsLogEntry::frame");
+            if (e->ctorName)
+                TraceEdge(trc, &e->ctorName, "Debugger::AllocationsLogEntry::ctorName");
+        }
+    };
+
+  private:
+    HeapPtrNativeObject object;         /* The Debugger object. Strong reference. */
+    WeakGlobalObjectSet debuggees;      /* Debuggee globals. Cross-compartment weak references. */
+    JS::ZoneSet debuggeeZones; /* Set of zones that we have debuggees in. */
+    js::HeapPtrObject uncaughtExceptionHook; /* Strong reference. */
+    bool enabled;
     bool allowUnobservedAsmJS;
 
+    // Wether to enable code coverage on the Debuggee.
+    bool collectCoverageInfo;
+
+    JSCList breakpoints;                /* Circular list of all js::Breakpoints in this debugger */
+
+    // The set of GC numbers for which one or more of this Debugger's observed
+    // debuggees participated in.
+    js::HashSet<uint64_t> observedGCs;
+
+    using TenurePromotionsLog = js::TraceableFifo<TenurePromotionsLogEntry>;
+    TenurePromotionsLog tenurePromotionsLog;
+    bool trackingTenurePromotions;
+    size_t maxTenurePromotionsLogLength;
+    bool tenurePromotionsLogOverflowed;
+
+    using AllocationsLog = js::TraceableFifo<AllocationsLogEntry>;
+
+    AllocationsLog allocationsLog;
     bool trackingAllocationSites;
     double allocationSamplingProbability;
-    AllocationSiteList allocationsLog;
-    size_t allocationsLogLength;
     size_t maxAllocationsLogLength;
     bool allocationsLogOverflowed;
 
@@ -357,8 +372,6 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
 
     bool appendAllocationSite(JSContext* cx, HandleObject obj, HandleSavedFrame frame,
                               double when);
-    void emptyAllocationsLog();
-    void emptyTenurePromotionsLog();
 
     /*
      * Recompute the set of debuggee zones based on the set of debuggee globals.
@@ -513,7 +526,6 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     void trace(JSTracer* trc);
     static void finalize(FreeOp* fop, JSObject* obj);
     void markCrossCompartmentEdges(JSTracer* tracer);
-    void traceTenurePromotionsLog(JSTracer* trc);
 
     static const Class jsclass;
 
@@ -541,6 +553,8 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static bool setUncaughtExceptionHook(JSContext* cx, unsigned argc, Value* vp);
     static bool getAllowUnobservedAsmJS(JSContext* cx, unsigned argc, Value* vp);
     static bool setAllowUnobservedAsmJS(JSContext* cx, unsigned argc, Value* vp);
+    static bool getCollectCoverageInfo(JSContext* cx, unsigned argc, Value* vp);
+    static bool setCollectCoverageInfo(JSContext* cx, unsigned argc, Value* vp);
     static bool getMemory(JSContext* cx, unsigned argc, Value* vp);
     static bool getOnIonCompilation(JSContext* cx, unsigned argc, Value* vp);
     static bool setOnIonCompilation(JSContext* cx, unsigned argc, Value* vp);
@@ -590,6 +604,10 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     // execution of its debuggees.
     IsObserving observesAsmJS() const;
 
+    // Whether the Debugger instance needs to observe coverage of any JavaScript
+    // execution.
+    IsObserving observesCoverage() const;
+
   private:
     static bool ensureExecutionObservabilityOfFrame(JSContext* cx, AbstractFramePtr frame);
     static bool ensureExecutionObservabilityOfCompartment(JSContext* cx, JSCompartment* comp);
@@ -597,6 +615,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static bool hookObservesAllExecution(Hook which);
 
     bool updateObservesAllExecutionOnDebuggees(JSContext* cx, IsObserving observing);
+    bool updateObservesCoverageOnDebuggees(JSContext* cx, IsObserving observing);
     void updateObservesAsmJSOnDebuggees(IsObserving observing);
 
     JSObject* getHook(Hook hook) const;
@@ -928,6 +947,20 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
   private:
     Debugger(const Debugger&) = delete;
     Debugger & operator=(const Debugger&) = delete;
+};
+
+template<>
+struct DefaultTracer<Debugger::TenurePromotionsLogEntry> {
+    static void trace(JSTracer* trc, Debugger::TenurePromotionsLogEntry* e, const char*) {
+        Debugger::TenurePromotionsLogEntry::trace(e, trc);
+    }
+};
+
+template<>
+struct DefaultTracer<Debugger::AllocationsLogEntry> {
+    static void trace(JSTracer* trc, Debugger::AllocationsLogEntry* e, const char*) {
+        Debugger::AllocationsLogEntry::trace(e, trc);
+    }
 };
 
 class BreakpointSite {
