@@ -170,11 +170,11 @@ class MOZ_STACK_CLASS JSONParserBase : private JS::AutoGCRooter
     bool finishArray(MutableHandleValue vp, ElementVector& elements);
 
   private:
-    friend void AutoGCRooter::trace(JSTracer *trc);
-    void trace(JSTracer *trc);
+    friend void AutoGCRooter::trace(JSTracer* trc);
+    void trace(JSTracer* trc);
 
-    JSONParserBase(const JSONParserBase &other) = delete;
-    void operator=(const JSONParserBase &other) = delete;
+    JSONParserBase(const JSONParserBase& other) = delete;
+    void operator=(const JSONParserBase& other) = delete;
 };
 
 template <typename CharT>

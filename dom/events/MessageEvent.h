@@ -16,6 +16,8 @@ namespace mozilla {
 namespace dom {
 
 struct MessageEventInit;
+class MessagePort;
+class MessagePortList;
 class OwningWindowProxyOrMessagePortOrClient;
 
 namespace workers {
@@ -91,7 +93,7 @@ private:
   nsString mOrigin;
   nsString mLastEventId;
   nsCOMPtr<nsIDOMWindow> mWindowSource;
-  nsRefPtr<MessagePortBase> mPortSource;
+  nsRefPtr<MessagePort> mPortSource;
   nsRefPtr<workers::ServiceWorkerClient> mClientSource;
   nsRefPtr<MessagePortList> mPorts;
 };

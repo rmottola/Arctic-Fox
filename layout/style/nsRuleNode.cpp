@@ -1402,7 +1402,7 @@ void*
 nsRuleNode::operator new(size_t sz, nsPresContext* aPresContext) CPP_THROW_NEW
 {
   // Check the recycle list first.
-  return aPresContext->PresShell()->AllocateByObjectID(nsPresArena::nsRuleNode_id, sz);
+  return aPresContext->PresShell()->AllocateByObjectID(eArenaObjectID_nsRuleNode, sz);
 }
 
 // Overridden to prevent the global delete from being called, since the memory
@@ -1457,7 +1457,7 @@ nsRuleNode::DestroyInternal(nsRuleNode ***aDestroyQueueTail)
 
   // Don't let the memory be freed, since it will be recycled
   // instead. Don't call the global operator delete.
-  mPresContext->PresShell()->FreeByObjectID(nsPresArena::nsRuleNode_id, this);
+  mPresContext->PresShell()->FreeByObjectID(eArenaObjectID_nsRuleNode, this);
 }
 
 nsRuleNode* nsRuleNode::CreateRootNode(nsPresContext* aPresContext)
@@ -1475,7 +1475,8 @@ nsRuleNode::nsRuleNode(nsPresContext* aContext, nsRuleNode* aParent,
     mNextSibling(nullptr),
     mDependentBits((uint32_t(aLevel) << NS_RULE_NODE_LEVEL_SHIFT) |
                    (aIsImportant ? NS_RULE_NODE_IS_IMPORTANT : 0)),
-    mNoneBits(0),
+    mNoneBits(aParent ? aParent->mNoneBits & NS_RULE_NODE_HAS_ANIMATION_DATA :
+                        0),
     mRefCnt(0)
 {
   MOZ_ASSERT(aContext);
@@ -2753,6 +2754,14 @@ nsRuleNode::SetDefaultOnRoot(const nsStyleStructID aSID, nsStyleContext* aContex
     /* We can't be cached in the rule node.  We have to be put right */       \
     /* on the style context. */                                               \
     aContext->SetStyle(eStyleStruct_##type_, data_);                          \
+    if (aContext->GetParent()) {                                              \
+      /* This is pessimistic; we could be uncacheable because we had a */     \
+      /* relative font-weight, for example, which does not need to defeat */  \
+      /* the restyle optimizations in RestyleManager.cpp that look at */      \
+      /* NS_STYLE_HAS_CHILD_THAT_USES_RESET_STYLE. */                         \
+      aContext->GetParent()->                                                 \
+        AddStyleBit(NS_STYLE_HAS_CHILD_THAT_USES_RESET_STYLE);                \
+    }                                                                         \
   }                                                                           \
                                                                               \
   return data_;
@@ -4356,13 +4365,13 @@ nsRuleNode::ComputeTextData(void* aStartStruct,
               parentText->mTextCombineUpright,
               NS_STYLE_TEXT_COMBINE_UPRIGHT_NONE, 0, 0, 0, 0);
 
-  // -moz-text-discard: enum, inherit, initial
+  // -moz-control-character-visibility: enum, inherit, initial
   SetDiscrete(*aRuleData->ValueForControlCharacterVisibility(),
               text->mControlCharacterVisibility,
               conditions,
               SETDSC_ENUMERATED | SETDSC_UNSET_INHERIT,
               parentText->mControlCharacterVisibility,
-              NS_STYLE_CONTROL_CHARACTER_VISIBILITY_HIDDEN, 0, 0, 0, 0);
+              NS_STYLE_CONTROL_CHARACTER_VISIBILITY_VISIBLE, 0, 0, 0, 0);
 
   COMPUTE_END_INHERITED(Text, text)
 }
@@ -7996,7 +8005,7 @@ nsRuleNode::ComputeTableBorderData(void* aStartStruct,
               table->mCaptionSide, conditions,
               SETDSC_ENUMERATED | SETDSC_UNSET_INHERIT,
               parentTable->mCaptionSide,
-              NS_STYLE_CAPTION_SIDE_BSTART, 0, 0, 0, 0);
+              NS_STYLE_CAPTION_SIDE_TOP, 0, 0, 0, 0);
 
   // empty-cells: enum, inherit, initial
   SetDiscrete(*aRuleData->ValueForEmptyCells(),
@@ -9328,9 +9337,14 @@ nsRuleNode::GetStyleData(nsStyleStructID aSID,
                "in some way.");
 
   const void *data;
-  data = mStyleData.GetStyleData(aSID, aContext);
-  if (MOZ_LIKELY(data != nullptr))
-    return data; // We have a fully specified struct. Just return it.
+
+  // Never use cached data for animated style inside a pseudo-element;
+  // see comment on cacheability in AnimValuesStyleRule::MapRuleInfoInto.
+  if (!(HasAnimationData() && ParentHasPseudoElementData(aContext))) {
+    data = mStyleData.GetStyleData(aSID, aContext);
+    if (MOZ_LIKELY(data != nullptr))
+      return data; // We have a fully specified struct. Just return it.
+  }
 
   if (MOZ_UNLIKELY(!aComputeData))
     return nullptr;
@@ -9785,4 +9799,11 @@ nsRuleNode::ComputeColor(const nsCSSValue& aValue, nsPresContext* aPresContext,
                      aResult, conditions);
   MOZ_ASSERT(ok || !(aPresContext && aStyleContext));
   return ok;
+}
+
+/* static */ bool
+nsRuleNode::ParentHasPseudoElementData(nsStyleContext* aContext)
+{
+  nsStyleContext* parent = aContext->GetParent();
+  return parent && parent->HasPseudoElementData();
 }

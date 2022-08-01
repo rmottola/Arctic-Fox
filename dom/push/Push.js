@@ -5,7 +5,7 @@
 "use strict";
 
 // Don't modify this, instead set dom.push.debug.
-let gDebuggingEnabled = true;
+var gDebuggingEnabled = false;
 
 function debug(s) {
   if (gDebuggingEnabled)
@@ -67,13 +67,13 @@ Push.prototype = {
   askPermission: function (aAllowCallback, aCancelCallback) {
     debug("askPermission");
 
-    let principal = this._window.document.nodePrincipal;
-    let type = "push";
-    let permValue =
-      Services.perms.testExactPermissionFromPrincipal(principal, type);
+    let permValue = Services.perms.testExactPermissionFromPrincipal(
+      this._principal,
+      "desktop-notification"
+    );
 
     if (permValue == Ci.nsIPermissionManager.ALLOW_ACTION) {
-        aAllowCallback();
+      aAllowCallback();
       return;
     }
 
@@ -83,8 +83,8 @@ Push.prototype = {
     }
 
     // Create an array with a single nsIContentPermissionType element.
-    type = {
-      type: "push",
+    let type = {
+      type: "desktop-notification",
       access: null,
       options: [],
       QueryInterface: XPCOMUtils.generateQI([Ci.nsIContentPermissionType])
@@ -95,17 +95,23 @@ Push.prototype = {
     // create a nsIContentPermissionRequest
     let request = {
       types: typeArray,
-      principal: principal,
+      principal: this._principal,
       QueryInterface: XPCOMUtils.generateQI([Ci.nsIContentPermissionRequest]),
       allow: function() {
+        let histogram = Services.telemetry.getHistogramById("PUSH_API_PERMISSION_GRANTED");
+        histogram.add();
         aAllowCallback();
       },
       cancel: function() {
+        let histogram = Services.telemetry.getHistogramById("PUSH_API_PERMISSION_DENIED");
+        histogram.add();
         aCancelCallback();
       },
       window: this._window
     };
 
+    let histogram = Services.telemetry.getHistogramById("PUSH_API_PERMISSION_REQUESTED");
+    histogram.add(1);
     // Using askPermission from nsIDOMWindowUtils that takes care of the
     // remoting if needed.
     let windowUtils = this._window.QueryInterface(Ci.nsIInterfaceRequestor)
@@ -121,10 +127,22 @@ Push.prototype = {
         () => {
           fn(that._scope, that._principal, {
             QueryInterface: XPCOMUtils.generateQI([Ci.nsIPushEndpointCallback]),
-            onPushEndpoint: function(ok, endpoint) {
+            onPushEndpoint: function(ok, endpoint, keyLen, key) {
               if (ok === Cr.NS_OK) {
                 if (endpoint) {
-                  let sub = new that._window.PushSubscription(endpoint, that._scope);
+                  let sub;
+                  if (keyLen) {
+                    let publicKey = new ArrayBuffer(keyLen);
+                    let keyView = new Uint8Array(publicKey);
+                    keyView.set(key);
+                    sub = new that._window.PushSubscription(endpoint,
+                                                            that._scope,
+                                                            publicKey);
+                  } else {
+                    sub = new that._window.PushSubscription(endpoint,
+                                                            that._scope,
+                                                            null);
+                  }
                   sub.setPrincipal(that._principal);
                   resolve(sub);
                 } else {
@@ -147,6 +165,8 @@ Push.prototype = {
 
   subscribe: function() {
     debug("subscribe()");
+    let histogram = Services.telemetry.getHistogramById("PUSH_API_USED");
+    histogram.add(true);
     return this.getEndpointResponse(this._client.subscribe.bind(this._client));
   },
 
@@ -162,11 +182,8 @@ Push.prototype = {
       let permission = Ci.nsIPermissionManager.DENY_ACTION;
 
       try {
-        let permissionManager = Cc["@mozilla.org/permissionmanager;1"]
-                                .getService(Ci.nsIPermissionManager);
-        permission =
-          permissionManager.testExactPermissionFromPrincipal(this._principal,
-                                                             "push");
+        permission = Services.perms.testExactPermissionFromPrincipal(
+          this._principal, "desktop-notification");
       } catch(e) {
         reject();
         return;

@@ -70,53 +70,16 @@ var SessionHistoryInternal = {
     let history = webNavigation.sessionHistory.QueryInterface(Ci.nsISHistoryInternal);
 
     if (history && history.count > 0) {
-      let oldest;
-      let maxSerializeBack =
-        Services.prefs.getIntPref("browser.sessionstore.max_serialize_back");
-      if (maxSerializeBack >= 0) {
-        oldest = Math.max(0, history.index - maxSerializeBack);
-      } else { // History.getEntryAtIndex(0, ...) is the oldest.
-        oldest = 0;
-      }
-
-      let newest;
-      let maxSerializeFwd =
-        Services.prefs.getIntPref("browser.sessionstore.max_serialize_forward");
-      if (maxSerializeFwd >= 0) {
-        newest = Math.min(history.count - 1, history.index + maxSerializeFwd);
-      } else { // History.getEntryAtIndex(history.count - 1, ...) is the newest.
-        newest = history.count - 1;
-      }
-
       // Loop over the transaction linked list directly so we can get the
       // persist property for each transaction.
-      let txn = history.rootTransaction;
-      let i = 0;
-      while (txn && i < oldest) {
-        txn = txn.next;
-        i++;
-      }
-
-      while (txn && i <= newest) {
-        let shEntry = txn.sHEntry;
-        let entry = this.serializeEntry(shEntry, isPinned);
+      for (let txn = history.rootTransaction; txn; txn = txn.next) {
+        let entry = this.serializeEntry(txn.sHEntry, isPinned);
         entry.persist = txn.persist;
         data.entries.push(entry);
-        txn = txn.next;
-        i++;
       }
 
-      if (i <= newest) {
-        // In some cases, there don't seem to be as many history entries as
-        // history.count claims. we'll save whatever history we can, print an
-        // error message, and still save sessionstore.js.
-        debug("SessionStore failed gathering complete history " +
-              "for the focused window/tab. See bug 669196.");
-      }
-
-      // Set the one-based index of the currently active tab,
-      // ensuring it isn't out of bounds if an exception was thrown above.
-      data.index = Math.min(history.index - oldest + 1, data.entries.length);
+      // Ensure the index isn't out of bounds if an exception was thrown above.
+      data.index = Math.min(history.index + 1, data.entries.length);
     }
 
     // If either the session history isn't available yet or doesn't have any
@@ -159,6 +122,8 @@ var SessionHistoryInternal = {
     if (shEntry.isSubFrame) {
       entry.subframe = true;
     }
+
+    entry.charset = shEntry.URI.originCharset;
 
     let cacheKey = shEntry.cacheKey;
     if (cacheKey && cacheKey instanceof Ci.nsISupportsPRUint32 &&
@@ -217,7 +182,7 @@ var SessionHistoryInternal = {
       return entry;
     }
 
-    if (shEntry.childCount > 0) {
+    if (shEntry.childCount > 0 && !shEntry.hasDynamicallyAddedChild()) {
       let children = [];
       for (let i = 0; i < shEntry.childCount; i++) {
         let child = shEntry.GetChildAt(i);
@@ -326,7 +291,7 @@ var SessionHistoryInternal = {
     var shEntry = Cc["@mozilla.org/browser/session-history-entry;1"].
                   createInstance(Ci.nsISHEntry);
 
-    shEntry.setURI(Utils.makeURI(entry.url));
+    shEntry.setURI(Utils.makeURI(entry.url, entry.charset));
     shEntry.setTitle(entry.title || entry.url);
     if (entry.subframe)
       shEntry.setIsSubFrame(entry.subframe || false);

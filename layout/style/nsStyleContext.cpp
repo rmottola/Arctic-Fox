@@ -5,6 +5,7 @@
  
 /* the interface (to internal code) for retrieving computed style data */
 
+#include "CSSVariableImageTable.h"
 #include "mozilla/DebugOnly.h"
 
 #include "nsCSSAnonBoxes.h"
@@ -24,6 +25,7 @@
 #include "nsIDocument.h"
 #include "nsPrintfCString.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/ArenaObjectID.h"
 
 #ifdef DEBUG
 // #define NOISY_DEBUG
@@ -165,6 +167,9 @@ nsStyleContext::~nsStyleContext()
   if (mCachedResetData) {
     mCachedResetData->Destroy(mBits, presContext);
   }
+
+  // Free any ImageValues we were holding on to for CSS variable values.
+  CSSVariableImageTable::RemoveAll(this);
 }
 
 #ifdef DEBUG
@@ -308,18 +313,30 @@ nsStyleContext::MoveTo(nsStyleContext* aNewParent)
   // Assertions checking for visited style are just to avoid some tricky
   // cases we can't be bothered handling at the moment.
   MOZ_ASSERT(!IsStyleIfVisited());
+  MOZ_ASSERT(!mParent->IsStyleIfVisited());
   MOZ_ASSERT(!aNewParent->IsStyleIfVisited());
+  MOZ_ASSERT(!mStyleIfVisited || mStyleIfVisited->mParent == mParent);
 
   nsStyleContext* oldParent = mParent;
 
+  if (oldParent->HasChildThatUsesResetStyle()) {
+    aNewParent->AddStyleBit(NS_STYLE_HAS_CHILD_THAT_USES_RESET_STYLE);
+  }
+
   aNewParent->AddRef();
-
   mParent->RemoveChild(this);
-
   mParent = aNewParent;
   mParent->AddChild(this);
-
   oldParent->Release();
+
+  if (mStyleIfVisited) {
+    oldParent = mStyleIfVisited->mParent;
+    aNewParent->AddRef();
+    mStyleIfVisited->mParent->RemoveChild(mStyleIfVisited);
+    mStyleIfVisited->mParent = aNewParent;
+    mStyleIfVisited->mParent->AddChild(mStyleIfVisited);
+    oldParent->Release();
+  }
 }
 
 already_AddRefed<nsStyleContext>
@@ -546,9 +563,28 @@ ShouldSuppressLineBreak(const nsStyleDisplay* aStyleDisplay,
   // the level containers themselves are breakable. We have to check
   // the container display type against all ruby display type here
   // because any of the ruby boxes could be anonymous.
-  if (aContainerDisplay->IsRubyDisplayType() &&
-      aStyleDisplay->mDisplay != NS_STYLE_DISPLAY_RUBY_BASE_CONTAINER &&
-      aStyleDisplay->mDisplay != NS_STYLE_DISPLAY_RUBY_TEXT_CONTAINER) {
+  // Note that, when certain HTML tags, e.g. form controls, have ruby
+  // level container display type, they could also escape from this flag
+  // while they shouldn't. However, it is generally fine since they
+  // won't usually break the assertion that there is no line break
+  // inside ruby, because:
+  // 1. their display types, the ruby level container types, are inline-
+  //    outside, which means they won't cause any forced line break; and
+  // 2. they never start an inline span, which means their children, if
+  //    any, won't be able to break the line its ruby ancestor lays; and
+  // 3. their parent frame is always a ruby content frame (due to
+  //    anonymous ruby box generation), which makes line layout suppress
+  //    any optional line break around this frame.
+  // However, there is one special case which is BR tag, because it
+  // directly affects the line layout. This case is handled by the BR
+  // frame which checks the flag of its parent frame instead of itself.
+  if ((aContainerDisplay->IsRubyDisplayType() &&
+       aStyleDisplay->mDisplay != NS_STYLE_DISPLAY_RUBY_BASE_CONTAINER &&
+       aStyleDisplay->mDisplay != NS_STYLE_DISPLAY_RUBY_TEXT_CONTAINER) ||
+      // Since ruby base and ruby text may exist themselves without any
+      // non-anonymous frame outside, we should also check them.
+      aStyleDisplay->mDisplay == NS_STYLE_DISPLAY_RUBY_BASE ||
+      aStyleDisplay->mDisplay == NS_STYLE_DISPLAY_RUBY_TEXT) {
     return true;
   }
   return false;
@@ -585,7 +621,7 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
         presContext->StyleSet()->ResolveStyleFor(docElement, nullptr);
       auto dir = rootStyle->StyleVisibility()->mDirection;
       if (dir != StyleVisibility()->mDirection) {
-        nsStyleVisibility* uniqueVisibility = 
+        nsStyleVisibility* uniqueVisibility =
           (nsStyleVisibility*)GetUniqueStyleData(eStyleStruct_Visibility);
         uniqueVisibility->mDirection = dir;
       }
@@ -617,7 +653,14 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
   // doesn't get confused by looking at the style data.
   if (!mParent) {
     uint8_t displayVal = disp->mDisplay;
-    nsRuleNode::EnsureBlockDisplay(displayVal, true);
+    if (displayVal != NS_STYLE_DISPLAY_CONTENTS) {
+      nsRuleNode::EnsureBlockDisplay(displayVal, true);
+    } else {
+      // http://dev.w3.org/csswg/css-display/#transformations
+      // "... a display-outside of 'contents' computes to block-level
+      //  on the root element."
+      displayVal = NS_STYLE_DISPLAY_BLOCK;
+    }
     if (displayVal != disp->mDisplay) {
       nsStyleDisplay *mutable_display =
         static_cast<nsStyleDisplay*>(GetUniqueStyleData(eStyleStruct_Display));
@@ -733,6 +776,26 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
     }
   }
 
+  /*
+   * According to https://drafts.csswg.org/css-writing-modes-3/#block-flow:
+   *
+   * If a box has a different block flow direction than its containing block:
+   *   * If the box has a specified display of inline, its display computes
+   *     to inline-block. [CSS21]
+   *   ...etc.
+   */
+  if (disp->mDisplay == NS_STYLE_DISPLAY_INLINE && mParent) {
+    // We don't need the full mozilla::WritingMode value (incorporating dir
+    // and text-orientation) here; just the writing-mode property is enough.
+    if (StyleVisibility()->mWritingMode !=
+        mParent->StyleVisibility()->mWritingMode) {
+      nsStyleDisplay *mutable_display =
+        static_cast<nsStyleDisplay*>(GetUniqueStyleData(eStyleStruct_Display));
+      mutable_display->mOriginalDisplay = mutable_display->mDisplay =
+        NS_STYLE_DISPLAY_INLINE_BLOCK;
+    }
+  }
+
   // Compute User Interface style, to trigger loads of cursors
   StyleUserInterface();
 }
@@ -740,7 +803,8 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
 nsChangeHint
 nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
                                     nsChangeHint aParentHintsNotHandledForDescendants,
-                                    uint32_t* aEqualStructs)
+                                    uint32_t* aEqualStructs,
+                                    uint32_t* aSamePointerStructs)
 {
   PROFILER_LABEL("nsStyleContext", "CalcStyleDifference",
     js::ProfileEntry::Category::CSS);
@@ -814,7 +878,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
                                   differenceAlwaysHandledForDescendants) &    \
                   aParentHintsNotHandledForDescendants)) {                    \
         nsChangeHint difference =                                             \
-            this##struct_->CalcDifference(*other##struct_);                   \
+          this##struct_->CalcDifference(*other##struct_ EXTRA_DIFF_ARGS);     \
         NS_ASSERTION(NS_IsHintSubset(difference, maxDifference),              \
                      "CalcDifference() returned bigger hint than "            \
                      "MaxDifference()");                                      \
@@ -826,7 +890,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
         /* We still must call CalcDifference to see if there were any */      \
         /* changes so that we can set *aEqualStructs appropriately.   */      \
         nsChangeHint difference =                                             \
-            this##struct_->CalcDifference(*other##struct_);                   \
+          this##struct_->CalcDifference(*other##struct_ EXTRA_DIFF_ARGS);     \
         NS_ASSERTION(NS_IsHintSubset(difference, maxDifference),              \
                      "CalcDifference() returned bigger hint than "            \
                      "MaxDifference()");                                      \
@@ -845,6 +909,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
   // smallest.  This lets us skip later ones if we already have a hint
   // that subsumes their MaxDifference.  (As the hints get
   // finer-grained, this optimization is becoming less useful, though.)
+#define EXTRA_DIFF_ARGS /* nothing */
   DO_STRUCT_DIFFERENCE(Display);
   DO_STRUCT_DIFFERENCE(XUL);
   DO_STRUCT_DIFFERENCE(Column);
@@ -860,7 +925,11 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
   DO_STRUCT_DIFFERENCE(Quotes);
   DO_STRUCT_DIFFERENCE(SVGReset);
   DO_STRUCT_DIFFERENCE(SVG);
+#undef EXTRA_DIFF_ARGS
+#define EXTRA_DIFF_ARGS , this
   DO_STRUCT_DIFFERENCE(Position);
+#undef EXTRA_DIFF_ARGS
+#define EXTRA_DIFF_ARGS /* nothing */
   DO_STRUCT_DIFFERENCE(Font);
   DO_STRUCT_DIFFERENCE(Margin);
   DO_STRUCT_DIFFERENCE(Padding);
@@ -868,11 +937,32 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
   DO_STRUCT_DIFFERENCE(TextReset);
   DO_STRUCT_DIFFERENCE(Background);
   DO_STRUCT_DIFFERENCE(Color);
+#undef EXTRA_DIFF_ARGS
 
 #undef DO_STRUCT_DIFFERENCE
 
   MOZ_ASSERT(styleStructCount == nsStyleStructID_Length,
              "missing a call to DO_STRUCT_DIFFERENCE");
+
+  // We check for struct pointer equality here rather than as part of the
+  // DO_STRUCT_DIFFERENCE calls, since those calls can result in structs
+  // we previously examined and found to be null on this style context
+  // getting computed by later DO_STRUCT_DIFFERENCE calls (which can
+  // happen when the nsRuleNode::ComputeXXXData method looks up another
+  // struct.)  This is important for callers in RestyleManager that
+  // need to know the equality or not of the final set of cached struct
+  // pointers.
+  *aSamePointerStructs = 0;
+
+#define STYLE_STRUCT(name_, callback_)                                        \
+  {                                                                           \
+    const nsStyle##name_* data = PeekStyle##name_();                          \
+    if (!data || data == aOther->Style##name_()) {                            \
+      *aSamePointerStructs |= NS_STYLE_INHERIT_BIT(name_);                    \
+    }                                                                         \
+  }
+#include "nsStyleStructList.h"
+#undef STYLE_STRUCT
 
   // Note that we do not check whether this->RelevantLinkVisited() !=
   // aOther->RelevantLinkVisited(); we don't need to since
@@ -1089,7 +1179,8 @@ void*
 nsStyleContext::operator new(size_t sz, nsPresContext* aPresContext) CPP_THROW_NEW
 {
   // Check the recycle list first.
-  return aPresContext->PresShell()->AllocateByObjectID(nsPresArena::nsStyleContext_id, sz);
+  return aPresContext->PresShell()->
+    AllocateByObjectID(eArenaObjectID_nsStyleContext, sz);
 }
 
 // Overridden to prevent the global delete from being called, since the memory
@@ -1105,7 +1196,8 @@ nsStyleContext::Destroy()
 
   // Don't let the memory be freed, since it will be recycled
   // instead. Don't call the global operator delete.
-  presContext->PresShell()->FreeByObjectID(nsPresArena::nsStyleContext_id, this);
+  presContext->PresShell()->
+    FreeByObjectID(eArenaObjectID_nsStyleContext, this);
 }
 
 already_AddRefed<nsStyleContext>
@@ -1120,6 +1212,12 @@ NS_NewStyleContext(nsStyleContext* aParentContext,
     nsStyleContext(aParentContext, aPseudoTag, aPseudoType, aRuleNode,
                    aSkipParentDisplayBasedStyleFixup);
   return context.forget();
+}
+
+nsIPresShell*
+nsStyleContext::Arena()
+{
+  return mRuleNode->PresContext()->PresShell();
 }
 
 static inline void
@@ -1258,13 +1356,6 @@ nsStyleContext::LookupStruct(const nsACString& aName, nsStyleStructID& aResult)
   return true;
 }
 #endif
-
-bool
-nsStyleContext::HasSameCachedStyleData(nsStyleContext* aOther,
-                                       nsStyleStructID aSID)
-{
-  return GetCachedStyleData(aSID) == aOther->GetCachedStyleData(aSID);
-}
 
 void
 nsStyleContext::SwapStyleData(nsStyleContext* aNewContext, uint32_t aStructs)
@@ -1495,6 +1586,6 @@ nsStyleContext::Initialize()
 {
   Preferences::AddBoolVarCache(
       &sExpensiveStyleStructAssertionsEnabled,
-      "layout.css.expensive-style-struct-assertions.enabed");
+      "layout.css.expensive-style-struct-assertions.enabled");
 }
 #endif

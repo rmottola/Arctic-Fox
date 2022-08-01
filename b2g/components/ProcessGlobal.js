@@ -63,6 +63,18 @@ function ConsoleMessage(aMsg, aLevel) {
   }
 }
 
+function toggleUnrestrictedDevtools(unrestricted) {
+  Services.prefs.setBoolPref("devtools.debugger.forbid-certified-apps",
+    !unrestricted);
+  Services.prefs.setBoolPref("dom.apps.developer_mode", unrestricted);
+  // TODO: Remove once bug 1125916 is fixed.
+  Services.prefs.setBoolPref("network.disable.ipc.security", unrestricted);
+  Services.prefs.setBoolPref("dom.webcomponents.enabled", unrestricted);
+  let lock = settings.createLock();
+  lock.set("developer.menu.enabled", unrestricted, null);
+  lock.set("devtools.unrestricted", unrestricted, null);
+}
+
 ConsoleMessage.prototype = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIConsoleMessage]),
   toString: function() { return this.msg; }

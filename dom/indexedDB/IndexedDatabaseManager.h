@@ -118,6 +118,9 @@ public:
     return ExperimentalFeaturesEnabled();
   }
 
+  static bool
+  IsFileHandleEnabled();
+
   already_AddRefed<FileManager>
   GetFileManager(PersistenceType aPersistenceType,
                  const nsACString& aOrigin,
@@ -157,6 +160,11 @@ public:
 
   nsresult
   FlushPendingFileDeletions();
+
+#ifdef ENABLE_INTL_API
+  static const nsCString&
+  GetLocale();
+#endif
 
   static mozilla::Mutex&
   FileMutex()
@@ -199,6 +207,10 @@ private:
   // It's s also used to atomically update FileInfo.mRefCnt, FileInfo.mDBRefCnt
   // and FileInfo.mSliceRefCnt
   mozilla::Mutex mFileMutex;
+
+#ifdef ENABLE_INTL_API
+  nsCString mLocale;
+#endif
 
   static bool sIsMainProcess;
   static bool sFullSynchronousMode;

@@ -17,6 +17,8 @@
 #include "nsIObserver.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/net/DashboardTypes.h"
+#include "mozilla/Atomics.h"
+#include "mozilla/TimeStamp.h"
 
 class nsASocketHandler;
 struct PRPollDesc;
@@ -111,6 +113,8 @@ public:
 
     // Returns true if keepalives are enabled in prefs.
     bool IsKeepaliveEnabled() { return mKeepaliveEnabledPref; }
+
+    bool IsTelemetryEnabled() { return mTelemetryEnabledPref; }
 protected:
 
     virtual ~nsSocketTransportService();
@@ -202,12 +206,17 @@ private:
     PRPollDesc *mPollList;                        /* mListSize + 1 entries */
 
     PRIntervalTime PollTimeout();            // computes ideal poll timeout
-    nsresult       DoPollIteration(bool wait);
+    nsresult       DoPollIteration(bool wait,
+                                   mozilla::TimeDuration *pollDuration);
                                              // perfoms a single poll iteration
-    int32_t        Poll(bool wait, uint32_t *interval);
+    int32_t        Poll(bool wait,
+                        uint32_t *interval,
+                        mozilla::TimeDuration *pollDuration);
                                              // calls PR_Poll.  the out param
                                              // interval indicates the poll
                                              // duration in seconds.
+                                             // pollDuration is used only for
+                                             // telemetry
 
     //-------------------------------------------------------------------------
     // pending socket queue - see NotifyWhenCanAttachSocket
@@ -228,6 +237,10 @@ private:
     // True if TCP keepalive is enabled globally.
     bool        mKeepaliveEnabledPref;
 
+    mozilla::Atomic<bool>  mServingPendingQueue;
+    mozilla::Atomic<int32_t, mozilla::Relaxed> mMaxTimePerPollIter;
+    mozilla::Atomic<bool, mozilla::Relaxed>  mTelemetryEnabledPref;
+
     void OnKeepaliveEnabledPrefChange();
     void NotifyKeepaliveEnabledPrefChange(SocketContext *sock);
 
@@ -244,6 +257,8 @@ private:
     void DetachSocketWithGuard(bool aGuardLocals,
                                SocketContext *socketList,
                                int32_t index);
+
+    void MarkTheLastElementOfPendingQueue();
 };
 
 extern nsSocketTransportService *gSocketTransportService;

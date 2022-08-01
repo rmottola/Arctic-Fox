@@ -191,6 +191,7 @@
 @BINPATH@/components/dom.xpt
 @BINPATH@/components/dom_activities.xpt
 @BINPATH@/components/dom_apps.xpt
+@BINPATH@/components/dom_newapps.xpt
 @BINPATH@/components/dom_audiochannel.xpt
 @BINPATH@/components/dom_base.xpt
 @BINPATH@/components/dom_system.xpt
@@ -723,6 +724,10 @@
 #ifdef MOZ_ENABLE_GNOME_COMPONENT
 @RESPATH@/components/@DLL_PREFIX@mozgnome@DLL_SUFFIX@
 #endif
+
+; Signed Packaged Content
+@RESPATH@/components/InstallPackagedWebapp.manifest
+@RESPATH@/components/InstallPackagedWebapp.js
 
 ; ANGLE on Win32
 #ifdef XP_WIN32

@@ -427,6 +427,9 @@ GMPWrapper.prototype = {
       gmpService.removeAndDeletePluginDirectory(this.gmpPath);
     }
     GMPPrefs.reset(GMPPrefs.KEY_PLUGIN_VERSION, this.id);
+    GMPPrefs.reset(GMPPrefs.KEY_PLUGIN_TRIAL_CREATE, this.id);
+    GMPPrefs.reset(GMPPrefs.KEY_PLUGIN_ABI, this.id);
+    GMPPrefs.reset(GMPPrefs.KEY_PLUGIN_LAST_UPDATE, this.id);
     AddonManagerPrivate.callAddonListeners("onUninstalled", this);
   },
 
@@ -532,6 +535,23 @@ var GMPProvider = {
                       gmpPath);
 
       if (gmpPath && isEnabled) {
+        let validation = wrapper.validate();
+        if (validation.mismatchedABI) {
+          this._log.info("startup - gmp " + plugin.id +
+                         " mismatched ABI, uninstalling");
+          wrapper.uninstallPlugin();
+          continue;
+        }
+        if (validation.installed) {
+          telemetryService.getHistogramById(wrapper.missingFilesKey).add(validation.telemetry);
+        }
+        if (!validation.valid) {
+          this._log.info("startup - gmp " + plugin.id +
+                         " missing [" + validation.missing + "], uninstalling");
+          telemetryService.getHistogramById(wrapper.missingKey).add(true);
+          wrapper.uninstallPlugin();
+          continue;
+        }
         this._log.info("startup - adding gmp directory " + gmpPath);
         try {
           gmpService.addPluginDirectory(gmpPath);

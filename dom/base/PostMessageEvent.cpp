@@ -28,7 +28,7 @@ PostMessageEvent::PostMessageEvent(nsGlobalWindow* aSource,
                                    nsGlobalWindow* aTargetWindow,
                                    nsIPrincipal* aProvidedPrincipal,
                                    bool aTrustedCaller)
-: StructuredCloneHelper(CloningSupported, TransferringSupported,
+: StructuredCloneHolder(CloningSupported, TransferringSupported,
                         SameProcessSameThread),
   mSource(aSource),
   mCallerOrigin(aCallerOrigin),
@@ -114,8 +114,7 @@ PostMessageEvent::Run()
                           false /*cancelable */, messageData, mCallerOrigin,
                           EmptyString(), mSource);
 
-  nsTArray<nsRefPtr<MessagePortBase>> ports;
-  TakeTransferredPorts(ports);
+  nsTArray<nsRefPtr<MessagePort>> ports = TakeTransferredPorts();
 
   event->SetPorts(new MessagePortList(static_cast<dom::Event*>(event.get()),
                                       ports));

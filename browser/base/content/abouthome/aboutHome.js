@@ -234,8 +234,8 @@ const SEARCH_ENGINES = {
 };
 
 // This global tracks if the page has been set up before, to prevent double inits
-let gInitialized = false;
-let gObserver = new MutationObserver(function (mutations) {
+var gInitialized = false;
+var gObserver = new MutationObserver(function (mutations) {
   for (let mutation of mutations) {
     if (mutation.attributeName == "searchEngineName") {
       setupSearchEngine();

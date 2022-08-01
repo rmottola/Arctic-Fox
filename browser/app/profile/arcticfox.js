@@ -1,4 +1,4 @@
-# -*- Mode: JavaScript; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+# -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -12,7 +12,7 @@
 #
 #  - Dashes are delimiters; use underscores instead.
 #  - The first character after a period must be alphabetic.
-#  - Computed values (e.g. 50 * 1024) dont work.
+#  - Computed values (e.g. 50 * 1024) don't work.
 #
 
 #ifdef XP_UNIX
@@ -1105,8 +1105,9 @@ pref("devtools.errorconsole.enabled", true);
 pref("devtools.toolbox.footer.height", 250);
 pref("devtools.toolbox.sidebar.width", 500);
 pref("devtools.toolbox.host", "bottom");
+pref("devtools.toolbox.previousHost", "side");
 pref("devtools.toolbox.selectedTool", "webconsole");
-pref("devtools.toolbox.toolbarSpec", '["splitconsole", "paintflashing toggle","tilt toggle","scratchpad","resize toggle","eyedropper","screenshot --fullpage", "rulers"]');
+pref("devtools.toolbox.toolbarSpec", '["splitconsole", "paintflashing toggle","tilt toggle","scratchpad","resize toggle","eyedropper","screenshot --fullpage", "rulers", "measure"]');
 pref("devtools.toolbox.sideEnabled", true);
 pref("devtools.toolbox.zoomValue", "1");
 pref("devtools.toolbox.splitconsoleEnabled", false);
@@ -1123,6 +1124,10 @@ pref("devtools.command-button-responsive.enabled", true);
 pref("devtools.command-button-eyedropper.enabled", false);
 pref("devtools.command-button-screenshot.enabled", false);
 pref("devtools.command-button-rulers.enabled", false);
+pref("devtools.command-button-measure.enabled", false);
+
+// Enable the MDN docs tooltip
+pref("devtools.inspector.mdnDocsTooltip.enabled", true);
 
 // Enable the Debugger
 pref("devtools.debugger.enabled", true);
@@ -1136,7 +1141,6 @@ pref("devtools.debugger.source-maps-enabled", true);
 pref("devtools.debugger.pretty-print-enabled", true);
 pref("devtools.debugger.auto-pretty-print", false);
 pref("devtools.debugger.auto-black-box", true);
-pref("devtools.debugger.tracer", false);
 pref("devtools.debugger.workers", false);
 
 // The default Debugger UI settings
@@ -1147,6 +1151,9 @@ pref("devtools.debugger.ui.variables-sorting-enabled", true);
 pref("devtools.debugger.ui.variables-only-enum-visible", false);
 pref("devtools.debugger.ui.variables-searchbox-visible", false);
 
+// Enable the Memory tools
+pref("devtools.memory.enabled", false);
+
 // Enable the Performance tools
 pref("devtools.performance.enabled", true);
 
@@ -1156,7 +1163,18 @@ pref("devtools.performance.memory.max-log-length", 2147483647); // Math.pow(2,31
 pref("devtools.performance.timeline.hidden-markers", "[]");
 pref("devtools.performance.profiler.buffer-size", 10000000);
 pref("devtools.performance.profiler.sample-frequency-khz", 1);
-pref("devtools.performance.ui.show-jit-optimizations", false);
+pref("devtools.performance.ui.show-platform-data", false);
+pref("devtools.performance.ui.show-idle-blocks", true);
+pref("devtools.performance.ui.enable-memory", false);
+pref("devtools.performance.ui.enable-allocations", false);
+pref("devtools.performance.ui.enable-framerate", true);
+pref("devtools.performance.ui.enable-jit-optimizations", false);
+pref("devtools.performance.ui.show-triggers-for-gc-types",
+  "TOO_MUCH_MALLOC ALLOC_TRIGGER LAST_DITCH EAGER_ALLOC_TRIGGER");
+
+// Temporary pref disabling memory flame views
+// TODO remove once we have flame charts via bug 1148663
+pref("devtools.performance.ui.enable-memory-flame", false);
 
 // Enable experimental options in the UI only in Nightly
 #if defined(NIGHTLY_BUILD)
@@ -1164,6 +1182,17 @@ pref("devtools.performance.ui.experimental", true);
 #else
 pref("devtools.performance.ui.experimental", false);
 #endif
+
+// The default Network monitor HAR export setting
+pref("devtools.netmonitor.har.defaultLogDir", "");
+pref("devtools.netmonitor.har.defaultFileName", "Archive %y-%m-%d %H-%M-%S");
+pref("devtools.netmonitor.har.jsonp", false);
+pref("devtools.netmonitor.har.jsonpCallback", "");
+pref("devtools.netmonitor.har.includeResponseBodies", true);
+pref("devtools.netmonitor.har.compress", false);
+pref("devtools.netmonitor.har.forceExport", false);
+pref("devtools.netmonitor.har.pageLoadedTimeout", 1500);
+pref("devtools.netmonitor.har.enableAutoExportToFile", false);
 
 // Default theme ("dark" or "light")
 #ifdef MOZ_DEV_EDITION
@@ -1181,16 +1210,100 @@ pref("devtools.gcli.imgurClientID", '0df414e888d7240');
 // Imgur's upload URL
 pref("devtools.gcli.imgurUploadURL", "https://api.imgur.com/3/image");
 
+// Remember the Web Console filters
+pref("devtools.webconsole.filter.network", true);
+pref("devtools.webconsole.filter.networkinfo", false);
+pref("devtools.webconsole.filter.netwarn", true);
+pref("devtools.webconsole.filter.netxhr", false);
+pref("devtools.webconsole.filter.csserror", true);
+pref("devtools.webconsole.filter.cssparser", false);
+pref("devtools.webconsole.filter.csslog", false);
+pref("devtools.webconsole.filter.exception", true);
+pref("devtools.webconsole.filter.jswarn", true);
+pref("devtools.webconsole.filter.jslog", false);
+pref("devtools.webconsole.filter.error", true);
+pref("devtools.webconsole.filter.warn", true);
+pref("devtools.webconsole.filter.info", true);
+pref("devtools.webconsole.filter.log", true);
+pref("devtools.webconsole.filter.secerror", true);
+pref("devtools.webconsole.filter.secwarn", true);
 pref("devtools.webconsole.filter.serviceworkers", false);
 pref("devtools.webconsole.filter.sharedworkers", false);
 pref("devtools.webconsole.filter.windowlessworkers", false);
+pref("devtools.webconsole.filter.servererror", false);
+pref("devtools.webconsole.filter.serverwarn", false);
+pref("devtools.webconsole.filter.serverinfo", false);
+pref("devtools.webconsole.filter.serverlog", false);
 
+// Remember the Browser Console filters
+pref("devtools.browserconsole.filter.network", true);
+pref("devtools.browserconsole.filter.networkinfo", false);
+pref("devtools.browserconsole.filter.netwarn", true);
+pref("devtools.browserconsole.filter.netxhr", false);
+pref("devtools.browserconsole.filter.csserror", true);
+pref("devtools.browserconsole.filter.cssparser", false);
+pref("devtools.browserconsole.filter.csslog", false);
+pref("devtools.browserconsole.filter.exception", true);
+pref("devtools.browserconsole.filter.jswarn", true);
+pref("devtools.browserconsole.filter.jslog", true);
+pref("devtools.browserconsole.filter.error", true);
+pref("devtools.browserconsole.filter.warn", true);
+pref("devtools.browserconsole.filter.info", true);
+pref("devtools.browserconsole.filter.log", true);
 pref("devtools.browserconsole.filter.serviceworkers", true);
 pref("devtools.browserconsole.filter.sharedworkers", true);
 pref("devtools.browserconsole.filter.windowlessworkers", true);
+pref("devtools.browserconsole.filter.servererror", false);
+pref("devtools.browserconsole.filter.serverwarn", false);
+pref("devtools.browserconsole.filter.serverinfo", false);
+pref("devtools.browserconsole.filter.serverlog", false);
+
+// Text size in the Web Console. Use 0 for the system default size.
+pref("devtools.webconsole.fontSize", 0);
+
 
 // Max number of inputs to store in web console history.
-pref("devtools.webconsole.inputHistoryCount", 50);
+pref("devtools.webconsole.inputHistoryCount", 51);
+
+
+// Persistent logging: |true| if you want the Web Console to keep all of the
+// logged messages after reloading the page, |false| if you want the output to
+// be cleared each time page navigation happens.
+pref("devtools.webconsole.persistlog", false);
+
+// Web Console timestamp: |true| if you want the logs and instructions
+// in the Web Console to display a timestamp, or |false| to not display
+// any timestamps.
+pref("devtools.webconsole.timestampMessages", false);
+
+// The number of lines that are displayed in the web console for the Net,
+// CSS, JS and Web Developer categories. These defaults should be kept in sync
+// with DEFAULT_LOG_LIMIT in the webconsole frontend.
+pref("devtools.hud.loglimit.network", 1000);
+pref("devtools.hud.loglimit.cssparser", 1000);
+pref("devtools.hud.loglimit.exception", 1000);
+pref("devtools.hud.loglimit.console", 1000);
+
+// By how many times eyedropper will magnify pixels
+pref("devtools.eyedropper.zoom", 6);
+
+// The developer tools editor configuration:
+// - tabsize: how many spaces to use when a Tab character is displayed.
+// - expandtab: expand Tab characters to spaces.
+// - keymap: which keymap to use (can be 'default', 'emacs' or 'vim')
+// - autoclosebrackets: whether to permit automatic bracket/quote closing.
+// - detectindentation: whether to detect the indentation from the file
+// - enableCodeFolding: Whether to enable code folding or not.
+pref("devtools.editor.tabsize", 2);
+pref("devtools.editor.expandtab", true);
+pref("devtools.editor.keymap", "default");
+pref("devtools.editor.autoclosebrackets", true);
+pref("devtools.editor.detectindentation", true);
+pref("devtools.editor.enableCodeFolding", true);
+pref("devtools.editor.autocomplete", true);
+
+// Enable the Font Inspector
+pref("devtools.fontinspector.enabled", true);
 
 // Whether the character encoding menu is under the main Firefox button. This
 // preference is a string so that localizers can alter it.
@@ -1250,6 +1363,9 @@ pref("security.mixed_content.block_active_content", true);
 // ID (a UUID when set by gecko) that is used as a per profile suffix to a low
 // integrity temp directory.
 pref("security.sandbox.content.tempDirSuffix", "");
+
+// 2 = allow SHA-1 only before 2016-01-01
+pref("security.pki.sha1_enforcement_level", 2);
 
 // Required blocklist freshness for OneCRL OCSP bypass
 // (default should be at least as large as extensions.blocklist.interval)

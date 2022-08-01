@@ -751,6 +751,10 @@ class nsXULAppInfo : public nsIXULAppInfo,
 #ifdef XP_WIN
                      public nsIWinAppHelper,
 #endif
+#ifdef MOZ_CRASHREPORTER
+                     public nsICrashReporter,
+                     public nsIFinishDumpingCallback,
+#endif
                      public nsIXULRuntime
 
 {
@@ -761,6 +765,10 @@ public:
   NS_DECL_NSIXULRUNTIME
 #ifdef E10S_TESTING_ONLY
   NS_DECL_NSIOBSERVER
+#endif
+#ifdef MOZ_CRASHREPORTER
+  NS_DECL_NSICRASHREPORTER
+  NS_DECL_NSIFINISHDUMPINGCALLBACK
 #endif
 #ifdef XP_WIN
   NS_DECL_NSIWINAPPHELPER
@@ -1187,6 +1195,213 @@ nsXULAppInfo::GetUserCanElevate(bool *aUserCanElevate)
 }
 #endif
 
+#ifdef MOZ_CRASHREPORTER
+NS_IMETHODIMP
+nsXULAppInfo::GetEnabled(bool *aEnabled)
+{
+  *aEnabled = CrashReporter::GetEnabled();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::SetEnabled(bool aEnabled)
+{
+  if (aEnabled) {
+    if (CrashReporter::GetEnabled()) {
+      // no point in erroring for double-enabling
+      return NS_OK;
+    }
+
+    nsCOMPtr<nsIFile> greBinDir;
+    NS_GetSpecialDirectory(NS_GRE_BIN_DIR, getter_AddRefs(greBinDir));
+    if (!greBinDir) {
+      return NS_ERROR_FAILURE;
+    }
+
+    nsCOMPtr<nsIFile> xreBinDirectory = do_QueryInterface(greBinDir);
+    if (!xreBinDirectory) {
+      return NS_ERROR_FAILURE;
+    }
+
+    return CrashReporter::SetExceptionHandler(xreBinDirectory, true);
+  }
+  else {
+    if (!CrashReporter::GetEnabled()) {
+      // no point in erroring for double-disabling
+      return NS_OK;
+    }
+
+    return CrashReporter::UnsetExceptionHandler();
+  }
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::GetServerURL(nsIURL** aServerURL)
+{
+  if (!CrashReporter::GetEnabled())
+    return NS_ERROR_NOT_INITIALIZED;
+
+  nsAutoCString data;
+  if (!CrashReporter::GetServerURL(data)) {
+    return NS_ERROR_FAILURE;
+  }
+  nsCOMPtr<nsIURI> uri;
+  NS_NewURI(getter_AddRefs(uri), data);
+  if (!uri)
+    return NS_ERROR_FAILURE;
+
+  nsCOMPtr<nsIURL> url;
+  url = do_QueryInterface(uri);
+  NS_ADDREF(*aServerURL = url);
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::SetServerURL(nsIURL* aServerURL)
+{
+  bool schemeOk;
+  // only allow https or http URLs
+  nsresult rv = aServerURL->SchemeIs("https", &schemeOk);
+  NS_ENSURE_SUCCESS(rv, rv);
+  if (!schemeOk) {
+    rv = aServerURL->SchemeIs("http", &schemeOk);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    if (!schemeOk)
+      return NS_ERROR_INVALID_ARG;
+  }
+  nsAutoCString spec;
+  rv = aServerURL->GetSpec(spec);
+  NS_ENSURE_SUCCESS(rv, rv);
+  
+  return CrashReporter::SetServerURL(spec);
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::GetMinidumpPath(nsIFile** aMinidumpPath)
+{
+  if (!CrashReporter::GetEnabled())
+    return NS_ERROR_NOT_INITIALIZED;
+
+  nsAutoString path;
+  if (!CrashReporter::GetMinidumpPath(path))
+    return NS_ERROR_FAILURE;
+
+  nsresult rv = NS_NewLocalFile(path, false, aMinidumpPath);
+  NS_ENSURE_SUCCESS(rv, rv);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::SetMinidumpPath(nsIFile* aMinidumpPath)
+{
+  nsAutoString path;
+  nsresult rv = aMinidumpPath->GetPath(path);
+  NS_ENSURE_SUCCESS(rv, rv);
+  return CrashReporter::SetMinidumpPath(path);
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::AnnotateCrashReport(const nsACString& key,
+                                  const nsACString& data)
+{
+  return CrashReporter::AnnotateCrashReport(key, data);
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::AppendAppNotesToCrashReport(const nsACString& data)
+{
+  return CrashReporter::AppendAppNotesToCrashReport(data);
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::RegisterAppMemory(uint64_t pointer,
+                                uint64_t len)
+{
+  return CrashReporter::RegisterAppMemory((void *)pointer, len);
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::WriteMinidumpForException(void* aExceptionInfo)
+{
+#ifdef XP_WIN32
+  return CrashReporter::WriteMinidumpForException(static_cast<EXCEPTION_POINTERS*>(aExceptionInfo));
+#else
+  return NS_ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::AppendObjCExceptionInfoToAppNotes(void* aException)
+{
+#ifdef XP_MACOSX
+  return CrashReporter::AppendObjCExceptionInfoToAppNotes(aException);
+#else
+  return NS_ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::GetSubmitReports(bool* aEnabled)
+{
+  return CrashReporter::GetSubmitReports(aEnabled);
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::SetSubmitReports(bool aEnabled)
+{
+  return CrashReporter::SetSubmitReports(aEnabled);
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::UpdateCrashEventsDir()
+{
+  CrashReporter::UpdateCrashEventsDir();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::SaveMemoryReport()
+{
+  if (!CrashReporter::GetEnabled()) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+  nsCOMPtr<nsIFile> file;
+  nsresult rv = NS_GetSpecialDirectory(NS_APP_PROFILE_DIR_STARTUP,
+                                       getter_AddRefs(file));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  file->AppendNative(NS_LITERAL_CSTRING("memory-report.json.gz"));
+
+  nsString path;
+  file->GetPath(path);
+
+  nsCOMPtr<nsIMemoryInfoDumper> dumper =
+    do_GetService("@mozilla.org/memory-info-dumper;1");
+  if (NS_WARN_IF(!dumper)) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  rv = dumper->DumpMemoryReportsToNamedFile(path, this, file, true /* anonymize */);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::Callback(nsISupports* aData)
+{
+  nsCOMPtr<nsIFile> file = do_QueryInterface(aData);
+  MOZ_ASSERT(file);
+
+  CrashReporter::SetMemoryReportFile(file);
+  return NS_OK;
+}
+#endif
+
 static const nsXULAppInfo kAppInfo;
 static nsresult AppInfoConstructor(nsISupports* aOuter,
                                    REFNSIID aIID, void **aResult)
@@ -1291,6 +1506,9 @@ static const mozilla::Module::CIDEntry kXRECIDs[] = {
 static const mozilla::Module::ContractIDEntry kXREContracts[] = {
   { XULAPPINFO_SERVICE_CONTRACTID, &kAPPINFO_CID },
   { XULRUNTIME_SERVICE_CONTRACTID, &kAPPINFO_CID },
+#ifdef MOZ_CRASHREPORTER
+  { NS_CRASHREPORTER_CONTRACTID, &kAPPINFO_CID },
+#endif
   { NS_PROFILESERVICE_CONTRACTID, &kProfileServiceCID },
   { NS_NATIVEAPPSUPPORT_CONTRACTID, &kNativeAppSupportCID },
   { nullptr }
@@ -1451,27 +1669,27 @@ DumpHelp()
 
 #ifdef MOZ_X11
   printf("X11 options\n"
-         "  --display=DISPLAY                   X display to use\n"
-         "  --sync                              Make X calls synchronous\n");
+         "  --display=DISPLAY  X display to use\n"
+         "  --sync             Make X calls synchronous\n");
 #endif
 #ifdef XP_UNIX
-  printf("  --g-fatal-warnings                  Make all warnings fatal\n"
+  printf("  --g-fatal-warnings Make all warnings fatal\n"
          "\n%s options\n", gAppData->name);
 #endif
 
-  printf("  -h or --help                        Print this message.\n"
-         "  -v or --version                     Print %s version.\n"
-         "  -P <profile>                        Start with <profile>.\n"
-         "  --profile <path>                    Start with profile at <path>.\n"
-         "  --migration                         Start with migration wizard.\n"
-         "  --ProfileManager                    Start with ProfileManager.\n"
-         "  --no-remote                         Do not accept or send remote commands; implies --new-instance.\n"
-         "  --new-instance                      Open new instance, not a new window in running instance.\n"
-         "  --UILocale <locale>                 Start with <locale> resources as UI Locale.\n"
-         "  --safe-mode                         Disables extensions and themes for this session.\n", gAppData->name);
+  printf("  -h or --help       Print this message.\n"
+         "  -v or --version    Print %s version.\n"
+         "  -P <profile>       Start with <profile>.\n"
+         "  --profile <path>   Start with profile at <path>.\n"
+         "  --migration        Start with migration wizard.\n"
+         "  --ProfileManager   Start with ProfileManager.\n"
+         "  --no-remote        Do not accept or send remote commands; implies --new-instance.\n"
+         "  --new-instance     Open new instance, not a new window in running instance.\n"
+         "  --UILocale <locale> Start with <locale> resources as UI Locale.\n"
+         "  --safe-mode        Disables extensions and themes for this session.\n", gAppData->name);
 
 #if defined(XP_WIN)
-  printf("  --console                           Start %s with a debugging console.\n", gAppData->name);
+  printf("  --console          Start %s with a debugging console.\n", gAppData->name);
 #endif
 
   // this works, but only after the components have registered.  so if you drop in a new command line handler, --help
@@ -3019,6 +3237,81 @@ XREMain::XRE_mainInit(bool* aExitFlag)
   if (NS_FAILED(rv))
     return 1;
 
+#ifdef MOZ_CRASHREPORTER
+  if (EnvHasValue("MOZ_CRASHREPORTER")) {
+    mAppData->flags |= NS_XRE_ENABLE_CRASH_REPORTER;
+  }
+
+  nsCOMPtr<nsIFile> xreBinDirectory;
+  xreBinDirectory = mDirProvider.GetGREBinDir();
+
+  if ((mAppData->flags & NS_XRE_ENABLE_CRASH_REPORTER) &&
+      NS_SUCCEEDED(
+        CrashReporter::SetExceptionHandler(xreBinDirectory))) {
+    nsCOMPtr<nsIFile> file;
+    rv = mDirProvider.GetUserAppDataDirectory(getter_AddRefs(file));
+    if (NS_SUCCEEDED(rv)) {
+      CrashReporter::SetUserAppDataDirectory(file);
+    }
+    if (mAppData->crashReporterURL)
+      CrashReporter::SetServerURL(nsDependentCString(mAppData->crashReporterURL));
+
+    // pass some basic info from the app data
+    if (mAppData->vendor)
+      CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("Vendor"),
+                                         nsDependentCString(mAppData->vendor));
+    if (mAppData->name)
+      CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("ProductName"),
+                                         nsDependentCString(mAppData->name));
+    if (mAppData->ID)
+      CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("ProductID"),
+                                         nsDependentCString(mAppData->ID));
+    if (mAppData->version)
+      CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("Version"),
+                                         nsDependentCString(mAppData->version));
+    if (mAppData->buildID)
+      CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("BuildID"),
+                                         nsDependentCString(mAppData->buildID));
+
+    nsDependentCString releaseChannel(NS_STRINGIFY(MOZ_UPDATE_CHANNEL));
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("ReleaseChannel"),
+                                       releaseChannel);
+#ifdef MOZ_LINKER
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("CrashAddressLikelyWrong"),
+                                       IsSignalHandlingBroken() ? NS_LITERAL_CSTRING("1")
+                                                                : NS_LITERAL_CSTRING("0"));
+#endif
+    CrashReporter::SetRestartArgs(gArgc, gArgv);
+
+    // annotate other data (user id etc)
+    nsCOMPtr<nsIFile> userAppDataDir;
+    if (NS_SUCCEEDED(mDirProvider.GetUserAppDataDirectory(
+                                                         getter_AddRefs(userAppDataDir)))) {
+      CrashReporter::SetupExtraData(userAppDataDir,
+                                    nsDependentCString(mAppData->buildID));
+
+      // see if we have a crashreporter-override.ini in the application directory
+      nsCOMPtr<nsIFile> overrideini;
+      bool exists;
+      if (NS_SUCCEEDED(mDirProvider.GetAppDir()->Clone(getter_AddRefs(overrideini))) &&
+          NS_SUCCEEDED(overrideini->AppendNative(NS_LITERAL_CSTRING("crashreporter-override.ini"))) &&
+          NS_SUCCEEDED(overrideini->Exists(&exists)) &&
+          exists) {
+#ifdef XP_WIN
+        nsAutoString overridePathW;
+        overrideini->GetPath(overridePathW);
+        NS_ConvertUTF16toUTF8 overridePath(overridePathW);
+#else
+        nsAutoCString overridePath;
+        overrideini->GetNativePath(overridePath);
+#endif
+
+        SaveWordToEnv("MOZ_CRASHREPORTER_STRINGS_OVERRIDE", overridePath);
+      }
+    }
+  }
+#endif
+
 #ifdef XP_MACOSX
   if (EnvHasValue("MOZ_LAUNCHED_CHILD")) {
     // This is needed, on relaunch, to force the OS to use the "Cocoa Dock
@@ -3160,6 +3453,88 @@ XREMain::XRE_mainInit(bool* aExitFlag)
   return 0;
 }
 
+#ifdef MOZ_CRASHREPORTER
+#ifdef XP_WIN
+/**
+ * Uses WMI to read some manufacturer information that may be useful for
+ * diagnosing hardware-specific crashes. This function is best-effort; failures
+ * shouldn't burden the caller. COM must be initialized before calling.
+ */
+static void AnnotateSystemManufacturer()
+{
+  nsRefPtr<IWbemLocator> locator;
+
+  HRESULT hr = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER,
+                                IID_IWbemLocator, getter_AddRefs(locator));
+
+  if (FAILED(hr)) {
+    return;
+  }
+
+  nsRefPtr<IWbemServices> services;
+
+  hr = locator->ConnectServer(_bstr_t(L"ROOT\\CIMV2"), nullptr, nullptr, nullptr,
+                              0, nullptr, nullptr, getter_AddRefs(services));
+
+  if (FAILED(hr)) {
+    return;
+  }
+
+  hr = CoSetProxyBlanket(services, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, nullptr,
+                         RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE,
+                         nullptr, EOAC_NONE);
+
+  if (FAILED(hr)) {
+    return;
+  }
+
+  nsRefPtr<IEnumWbemClassObject> enumerator;
+
+  hr = services->ExecQuery(_bstr_t(L"WQL"), _bstr_t(L"SELECT * FROM Win32_BIOS"),
+                           WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+                           nullptr, getter_AddRefs(enumerator));
+
+  if (FAILED(hr) || !enumerator) {
+    return;
+  }
+
+  nsRefPtr<IWbemClassObject> classObject;
+  ULONG results;
+
+  hr = enumerator->Next(WBEM_INFINITE, 1, getter_AddRefs(classObject), &results);
+
+  if (FAILED(hr) || results == 0) {
+    return;
+  }
+
+  VARIANT value;
+  VariantInit(&value);
+
+  hr = classObject->Get(L"Manufacturer", 0, &value, 0, 0);
+
+  if (SUCCEEDED(hr) && V_VT(&value) == VT_BSTR) {
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("BIOS_Manufacturer"),
+                                       NS_ConvertUTF16toUTF8(V_BSTR(&value)));
+  }
+
+  VariantClear(&value);
+}
+
+static void PR_CALLBACK AnnotateSystemManufacturer_ThreadStart(void*)
+{
+  HRESULT hr = CoInitialize(nullptr);
+
+  if (FAILED(hr)) {
+    return;
+  }
+
+  AnnotateSystemManufacturer();
+
+  CoUninitialize();
+}
+#endif
+#endif
+
 namespace mozilla {
   ShutdownChecksMode gShutdownChecks = SCM_NOTHING;
 } // namespace mozilla
@@ -3272,6 +3647,13 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
   }
 
   // Initialize GTK here for splash.
+
+#if (MOZ_WIDGET_GTK == 3) && defined(MOZ_X11)
+  // Disable XInput2 support due to focus bugginess. See bugs 1182700, 1170342.
+  const char* useXI2 = PR_GetEnv("MOZ_USE_XINPUT2");
+  if (!useXI2 || (*useXI2 == '0'))
+    gdk_disable_multidevice();
+#endif
 
   // Open the display ourselves instead of using gtk_init, so that we can
   // close it without fear that one day gtk might clean up the display it
@@ -4000,6 +4382,10 @@ XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
 
     rv = LaunchChild(mNativeApp, true);
 
+#ifdef MOZ_CRASHREPORTER
+    if (mAppData->flags & NS_XRE_ENABLE_CRASH_REPORTER)
+      CrashReporter::UnsetExceptionHandler();
+#endif
     return rv == NS_ERROR_LAUNCHED_CHILD_PROCESS ? 0 : 1;
   }
 
@@ -4007,6 +4393,11 @@ XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
   // gdk_display_close also calls gdk_display_manager_set_default_display
   // appropriately when necessary.
   MOZ_gdk_display_close(mGdkDisplay);
+#endif
+
+#ifdef MOZ_CRASHREPORTER
+  if (mAppData->flags & NS_XRE_ENABLE_CRASH_REPORTER)
+      CrashReporter::UnsetExceptionHandler();
 #endif
 
   XRE_DeinitCommandLine();

@@ -17,8 +17,9 @@
 #include "mozilla/SplayTree.h"
 #include "mozilla/RestyleLogging.h"
 #include "GeckoProfiler.h"
+#include "mozilla/Maybe.h"
 
-#if defined(MOZ_ENABLE_PROFILER_SPS)
+#if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
 #include "ProfilerBacktrace.h"
 #endif
 
@@ -230,6 +231,7 @@ public:
   explicit RestyleTracker(Element::FlagsType aRestyleBits)
     : mRestyleBits(aRestyleBits)
     , mHaveLaterSiblingRestyles(false)
+    , mHaveSelectors(false)
   {
     NS_PRECONDITION((mRestyleBits & ~ELEMENT_ALL_RESTYLE_FLAGS) == 0,
                     "Why do we have these bits set?");
@@ -238,10 +240,10 @@ public:
     NS_PRECONDITION((mRestyleBits & ELEMENT_PENDING_RESTYLE_FLAGS) !=
                       ELEMENT_PENDING_RESTYLE_FLAGS,
                     "Shouldn't have both restyle flags set");
-    NS_PRECONDITION((mRestyleBits & ~ELEMENT_PENDING_RESTYLE_FLAGS) != 0,
+    NS_PRECONDITION((mRestyleBits & ELEMENT_POTENTIAL_RESTYLE_ROOT_FLAGS) != 0,
                     "Must have root flag");
-    NS_PRECONDITION((mRestyleBits & ~ELEMENT_PENDING_RESTYLE_FLAGS) !=
-                    (ELEMENT_ALL_RESTYLE_FLAGS & ~ELEMENT_PENDING_RESTYLE_FLAGS),
+    NS_PRECONDITION((mRestyleBits & ELEMENT_POTENTIAL_RESTYLE_ROOT_FLAGS) !=
+                    ELEMENT_POTENTIAL_RESTYLE_ROOT_FLAGS,
                     "Shouldn't have both root flags");
   }
 
@@ -256,10 +258,19 @@ public:
   /**
    * Add a restyle for the given element to the tracker.  Returns true
    * if the element already had eRestyle_LaterSiblings set on it.
+   *
+   * aRestyleRoot is the closest restyle root for aElement.  If the caller
+   * does not know what the closest restyle root is, Nothing should be
+   * passed.  A Some(nullptr) restyle root can be passed if there is no
+   * ancestor element that is a restyle root.
    */
   bool AddPendingRestyle(Element* aElement, nsRestyleHint aRestyleHint,
                          nsChangeHint aMinChangeHint,
-                         const RestyleHintData* aRestyleHintData = nullptr);
+                         const RestyleHintData* aRestyleHintData = nullptr,
+                         mozilla::Maybe<Element*> aRestyleRoot =
+                           mozilla::Nothing());
+
+  Element* FindClosestRestyleRoot(Element* aElement);
 
   /**
    * Process the restyles we've been tracking.
@@ -273,7 +284,13 @@ public:
 
   // Return our ELEMENT_IS_POTENTIAL_(ANIMATION_)RESTYLE_ROOT bit
   Element::FlagsType RootBit() const {
-    return mRestyleBits & ~ELEMENT_PENDING_RESTYLE_FLAGS;
+    return mRestyleBits & ELEMENT_POTENTIAL_RESTYLE_ROOT_FLAGS;
+  }
+
+  // Return our ELEMENT_IS_CONDITIONAL_RESTYLE_ANCESTOR bit if present,
+  // or 0 if it is not.
+  Element::FlagsType ConditionalDescendantsBit() const {
+    return mRestyleBits & ELEMENT_IS_CONDITIONAL_RESTYLE_ANCESTOR;
   }
 
   struct Hints {
@@ -302,7 +319,7 @@ public:
     // that we called AddPendingRestyle for and found the element this is
     // the RestyleData for as its nearest restyle root.
     nsTArray<nsRefPtr<Element>> mDescendants;
-#if defined(MOZ_ENABLE_PROFILER_SPS)
+#if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
     UniquePtr<ProfilerBacktrace> mBacktrace;
 #endif
   };
@@ -343,6 +360,14 @@ public:
                                   const nsTArray<nsRefPtr<Element>>& aElements);
 
   /**
+   * Converts any eRestyle_SomeDescendants restyle hints in the pending restyle
+   * table into eRestyle_Subtree hints and clears out the associated arrays of
+   * nsCSSSelector pointers.  This is called in response to a style sheet change
+   * that might have cause an nsCSSSelector to be destroyed.
+   */
+  void ClearSelectors();
+
+  /**
    * The document we're associated with.
    */
   inline nsIDocument* Document() const;
@@ -371,8 +396,9 @@ private:
   typedef nsClassHashtable<nsISupportsHashKey, RestyleData> PendingRestyleTable;
   typedef nsAutoTArray< nsRefPtr<Element>, 32> RestyleRootArray;
   // Our restyle bits.  These will be a subset of ELEMENT_ALL_RESTYLE_FLAGS, and
-  // will include one flag from ELEMENT_PENDING_RESTYLE_FLAGS and one flag
-  // that's not in ELEMENT_PENDING_RESTYLE_FLAGS.
+  // will include one flag from ELEMENT_PENDING_RESTYLE_FLAGS, one flag
+  // from ELEMENT_POTENTIAL_RESTYLE_ROOT_FLAGS, and might also include
+  // ELEMENT_IS_CONDITIONAL_RESTYLE_ANCESTOR.
   Element::FlagsType mRestyleBits;
   RestyleManager* mRestyleManager; // Owns us
   // A hashtable that maps elements to pointers to RestyleData structs.  The
@@ -392,6 +418,9 @@ private:
   // flag.  We need this to avoid enumerating the hashtable looking
   // for such entries when we can't possibly have any.
   bool mHaveLaterSiblingRestyles;
+  // True if we have some entries with selectors in the restyle hint data.
+  // We use this to skip iterating over mPendingRestyles in ClearSelectors.
+  bool mHaveSelectors;
 };
 
 inline bool
@@ -402,6 +431,11 @@ RestyleTracker::AddPendingRestyleToTable(Element* aElement,
 {
   RestyleData* existingData;
 
+  if (aRestyleHintData &&
+      !aRestyleHintData->mSelectorsForDescendants.IsEmpty()) {
+    mHaveSelectors = true;
+  }
+
   // Check the RestyleBit() flag before doing the hashtable Get, since
   // it's possible that the data in the hashtable isn't actually
   // relevant anymore (if the flag is not set).
@@ -410,6 +444,13 @@ RestyleTracker::AddPendingRestyleToTable(Element* aElement,
   } else {
     aElement->SetFlags(RestyleBit());
     existingData = nullptr;
+  }
+
+  if (aRestyleHint & eRestyle_SomeDescendants) {
+    NS_ASSERTION(ConditionalDescendantsBit(),
+                 "why are we getting eRestyle_SomeDescendants in an "
+                 "animation-only restyle?");
+    aElement->SetFlags(ConditionalDescendantsBit());
   }
 
   if (!existingData) {
@@ -437,11 +478,40 @@ RestyleTracker::AddPendingRestyleToTable(Element* aElement,
   return hadRestyleLaterSiblings;
 }
 
+inline mozilla::dom::Element*
+RestyleTracker::FindClosestRestyleRoot(Element* aElement)
+{
+  Element* cur = aElement;
+  while (!cur->HasFlag(RootBit())) {
+    nsIContent* parent = cur->GetFlattenedTreeParent();
+    // Stop if we have no parent or the parent is not an element or
+    // we're part of the viewport scrollbars (because those are not
+    // frametree descendants of the primary frame of the root
+    // element).
+    // XXXbz maybe the primary frame of the root should be the root scrollframe?
+    if (!parent || !parent->IsElement() ||
+        // If we've hit the root via a native anonymous kid and that
+        // this native anonymous kid is not obviously a descendant
+        // of the root's primary frame, assume we're under the root
+        // scrollbars.  Since those don't get reresolved when
+        // reresolving the root, we need to make sure to add the
+        // element to mRestyleRoots.
+        (cur->IsInNativeAnonymousSubtree() && !parent->GetParent() &&
+         cur->GetPrimaryFrame() &&
+         cur->GetPrimaryFrame()->GetParent() != parent->GetPrimaryFrame())) {
+      return nullptr;
+    }
+    cur = parent->AsElement();
+  }
+  return cur;
+}
+
 inline bool
 RestyleTracker::AddPendingRestyle(Element* aElement,
                                   nsRestyleHint aRestyleHint,
                                   nsChangeHint aMinChangeHint,
-                                  const RestyleHintData* aRestyleHintData)
+                                  const RestyleHintData* aRestyleHintData,
+                                  mozilla::Maybe<Element*> aRestyleRoot)
 {
   bool hadRestyleLaterSiblings =
     AddPendingRestyleToTable(aElement, aRestyleHint, aMinChangeHint,
@@ -452,29 +522,11 @@ RestyleTracker::AddPendingRestyle(Element* aElement,
   // ReResolveStyleContext on it or just reframe it).
   if ((aRestyleHint & ~eRestyle_LaterSiblings) ||
       (aMinChangeHint & nsChangeHint_ReconstructFrame)) {
-    Element* cur = aElement;
-    while (!cur->HasFlag(RootBit())) {
-      nsIContent* parent = cur->GetFlattenedTreeParent();
-      // Stop if we have no parent or the parent is not an element or
-      // we're part of the viewport scrollbars (because those are not
-      // frametree descendants of the primary frame of the root
-      // element).
-      // XXXbz maybe the primary frame of the root should be the root scrollframe?
-      if (!parent || !parent->IsElement() ||
-          // If we've hit the root via a native anonymous kid and that
-          // this native anonymous kid is not obviously a descendant
-          // of the root's primary frame, assume we're under the root
-          // scrollbars.  Since those don't get reresolved when
-          // reresolving the root, we need to make sure to add the
-          // element to mRestyleRoots.
-          (cur->IsInNativeAnonymousSubtree() && !parent->GetParent() &&
-           cur->GetPrimaryFrame() &&
-           cur->GetPrimaryFrame()->GetParent() != parent->GetPrimaryFrame())) {
-        mRestyleRoots.AppendElement(aElement);
-        cur = aElement;
-        break;
-      }
-      cur = parent->AsElement();
+    Element* cur =
+      aRestyleRoot ? *aRestyleRoot : FindClosestRestyleRoot(aElement);
+    if (!cur) {
+      mRestyleRoots.AppendElement(aElement);
+      cur = aElement;
     }
     // At this point some ancestor of aElement (possibly aElement
     // itself) is in mRestyleRoots.  Set the root bit on aElement, to

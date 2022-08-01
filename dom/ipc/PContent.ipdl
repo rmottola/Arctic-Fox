@@ -21,6 +21,7 @@ include protocol PFileDescriptorSet;
 include protocol PFMRadio;
 include protocol PFileSystemRequest;
 include protocol PHal;
+include protocol PHeapSnapshotTempFileHelper;
 include protocol PIcc;
 include protocol PProcessHangMonitor;
 include protocol PImageBridge;
@@ -434,6 +435,7 @@ prio(normal upto urgent) sync protocol PContent
     manages PFileDescriptorSet;
     manages PFMRadio;
     manages PHal;
+    manages PHeapSnapshotTempFileHelper;
     manages PIcc;
     manages PMedia;
     manages PMemoryReportRequest;
@@ -763,6 +765,8 @@ parent:
         returns (LookAndFeelInt[] lookAndFeelIntCache);
 
     prio(urgent) async PHal();
+
+    async PHeapSnapshotTempFileHelper();
 
     PIcc(uint32_t serviceId);
 

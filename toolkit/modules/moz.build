@@ -13,6 +13,8 @@ SPHINX_TREES['toolkit_modules'] = 'docs'
 
 EXTRA_JS_MODULES += [
     'addons/MatchPattern.jsm',
+    'addons/WebNavigation.jsm',
+    'addons/WebNavigationContent.js',
     'addons/WebRequest.jsm',
     'addons/WebRequestCommon.jsm',
     'addons/WebRequestContent.js',
@@ -103,7 +105,8 @@ for var in ('ANDROID_PACKAGE_NAME',
             'MOZ_APP_VERSION_DISPLAY',
             'MOZ_WIDGET_TOOLKIT',
             'DLL_PREFIX',
-            'DLL_SUFFIX'):
+            'DLL_SUFFIX',
+            'DEBUG_JS_MODULES'):
             DEFINES[var] = CONFIG[var]
 
 for var in ('MOZILLA_OFFICIAL',

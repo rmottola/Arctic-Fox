@@ -193,11 +193,9 @@ nsContextMenu.prototype = {
                        this.onLink || this.onTextInput);
     this.showItem("context-viewsource", shouldShow);
     this.showItem("context-viewinfo", shouldShow);
-#ifdef MOZ_DEVTOOLS
     var showInspect = gPrefService.getBoolPref("devtools.inspector.enabled");
     this.showItem("inspect-separator", showInspect);
     this.showItem("context-inspect", showInspect);
-#endif
 
     this.showItem("context-sep-viewsource", shouldShow);
 
@@ -461,7 +459,7 @@ nsContextMenu.prototype = {
   },
 
   inspectNode: function CM_inspectNode() {
-    let {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+    let {devtools} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
     let gBrowser = this.browser.ownerDocument.defaultView.gBrowser;
     let tt = devtools.TargetFactory.forTab(gBrowser.selectedTab);
     return gDevTools.showToolbox(tt, "inspector").then(function(toolbox) {

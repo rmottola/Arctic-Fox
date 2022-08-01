@@ -600,6 +600,13 @@ Debugger::slowPathOnLeaveFrame(JSContext* cx, AbstractFramePtr frame, bool frame
     if (frameRange.empty())
         return frameOk;
 
+    auto frameMapsGuard = MakeScopeExit([&] {
+        // Clean up all Debugger.Frame instances. This call creates a fresh
+        // FrameRange, as one debugger's onPop handler could have caused another
+        // debugger to create its own Debugger.Frame instance.
+        removeFromFrameMapsAndClearBreakpointsIn(cx, frame);
+    });
+
     /* Save the frame's completion value. */
     JSTrapStatus status;
     RootedValue value(cx);
@@ -659,13 +666,6 @@ Debugger::slowPathOnLeaveFrame(JSContext* cx, AbstractFramePtr frame, bool frame
             }
         }
     }
-
-    /*
-     * Clean up all Debugger.Frame instances. This call creates a fresh
-     * FrameRange, as one debugger's onPop handler could have caused another
-     * debugger to create its own Debugger.Frame instance.
-     */
-    removeFromFrameMapsAndClearBreakpointsIn(cx, frame);
 
     /* Establish (status, value) as our resumption value. */
     switch (status) {
@@ -5363,10 +5363,10 @@ DebuggerScript_setBreakpoint(JSContext* cx, unsigned argc, Value* vp)
     if (!handler)
         return false;
 
-    // Ensure observability *before* setting the breakpoint. If the script's
-    // compartment is not already a debuggee, trying to ensure observability
-    // after setting the breakpoint (and thus marking the script as a
-    // debuggee) will skip actually ensuring observability.
+    // Ensure observability *before* setting the breakpoint. If the script is
+    // not already a debuggee, trying to ensure observability after setting
+    // the breakpoint (and thus marking the script as a debuggee) will skip
+    // actually ensuring observability.
     if (!dbg->ensureExecutionObservabilityOfScript(cx, script))
         return false;
 
@@ -6316,6 +6316,12 @@ DebuggerFrame_setOnStep(JSContext* cx, unsigned argc, Value* vp)
     if (!args[0].isUndefined() && prior.isUndefined()) {
         // Single stepping toggled off->on.
         AutoCompartment ac(cx, frame.scopeChain());
+        // Ensure observability *before* incrementing the step mode
+        // count. Calling this function after calling incrementStepModeCount
+        // will make it a no-op.
+        Debugger *dbg = Debugger::fromChildJSObject(thisobj);
+        if (!dbg->ensureExecutionObservabilityOfScript(cx, frame.script()))
+            return false;
         if (!frame.script()->incrementStepModeCount(cx))
             return false;
     } else if (args[0].isUndefined() && !prior.isUndefined()) {
@@ -7464,29 +7470,30 @@ RequireGlobalObject(JSContext* cx, HandleValue dbgobj, HandleObject referent)
 }
 
 static bool
-DebuggerObject_evalInGlobal(JSContext* cx, unsigned argc, Value* vp)
+DebuggerObject_executeInGlobal(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGOBJECT_OWNER_REFERENT(cx, argc, vp, "evalInGlobal", args, dbg, referent);
-    if (!args.requireAtLeast(cx, "Debugger.Object.prototype.evalInGlobal", 1))
+    THIS_DEBUGOBJECT_OWNER_REFERENT(cx, argc, vp, "executeInGlobal", args, dbg, referent);
+    if (!args.requireAtLeast(cx, "Debugger.Object.prototype.executeInGlobal", 1))
         return false;
     if (!RequireGlobalObject(cx, args.thisv(), referent))
         return false;
 
-    return DebuggerGenericEval(cx, "Debugger.Object.prototype.evalInGlobal",
+    return DebuggerGenericEval(cx, "Debugger.Object.prototype.executeInGlobal",
                                args[0], EvalWithDefaultBindings, JS::UndefinedHandleValue,
                                args.get(1), args.rval(), dbg, referent, nullptr);
 }
 
 static bool
-DebuggerObject_evalInGlobalWithBindings(JSContext* cx, unsigned argc, Value* vp)
+DebuggerObject_executeInGlobalWithBindings(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGOBJECT_OWNER_REFERENT(cx, argc, vp, "evalInGlobalWithBindings", args, dbg, referent);
-    if (!args.requireAtLeast(cx, "Debugger.Object.prototype.evalInGlobalWithBindings", 2))
+    THIS_DEBUGOBJECT_OWNER_REFERENT(cx, argc, vp, "executeInGlobalWithBindings", args, dbg,
+                                    referent);
+    if (!args.requireAtLeast(cx, "Debugger.Object.prototype.executeInGlobalWithBindings", 2))
         return false;
     if (!RequireGlobalObject(cx, args.thisv(), referent))
         return false;
 
-    return DebuggerGenericEval(cx, "Debugger.Object.prototype.evalInGlobalWithBindings",
+    return DebuggerGenericEval(cx, "Debugger.Object.prototype.executeInGlobalWithBindings",
                                args[0], EvalHasExtraBindings, args[1], args.get(2),
                                args.rval(), dbg, referent, nullptr);
 }
@@ -7566,8 +7573,8 @@ static const JSFunctionSpec DebuggerObject_methods[] = {
     JS_FN("apply", DebuggerObject_apply, 0, 0),
     JS_FN("call", DebuggerObject_call, 0, 0),
     JS_FN("makeDebuggeeValue", DebuggerObject_makeDebuggeeValue, 1, 0),
-    JS_FN("evalInGlobal", DebuggerObject_evalInGlobal, 1, 0),
-    JS_FN("evalInGlobalWithBindings", DebuggerObject_evalInGlobalWithBindings, 2, 0),
+    JS_FN("executeInGlobal", DebuggerObject_executeInGlobal, 1, 0),
+    JS_FN("executeInGlobalWithBindings", DebuggerObject_executeInGlobalWithBindings, 2, 0),
     JS_FN("unwrap", DebuggerObject_unwrap, 0, 0),
     JS_FN("unsafeDereference", DebuggerObject_unsafeDereference, 0, 0),
     JS_FS_END
@@ -8160,17 +8167,19 @@ JS::dbg::onPromiseSettled(JSContext* cx, HandleObject promise)
 }
 
 JS_PUBLIC_API(bool)
-JS::dbg::IsDebugger(const JSObject& obj)
+JS::dbg::IsDebugger(JSObject& obj)
 {
-    return js::GetObjectClass(&obj) == &Debugger::jsclass &&
-           js::Debugger::fromJSObject(&obj) != nullptr;
+    JSObject* unwrapped = CheckedUnwrap(&obj);
+    return unwrapped &&
+           js::GetObjectClass(unwrapped) == &Debugger::jsclass &&
+           js::Debugger::fromJSObject(unwrapped) != nullptr;
 }
 
 JS_PUBLIC_API(bool)
-JS::dbg::GetDebuggeeGlobals(JSContext* cx, const JSObject& dbgObj, AutoObjectVector& vector)
+JS::dbg::GetDebuggeeGlobals(JSContext* cx, JSObject& dbgObj, AutoObjectVector& vector)
 {
     MOZ_ASSERT(IsDebugger(dbgObj));
-    js::Debugger* dbg = js::Debugger::fromJSObject(&dbgObj);
+    js::Debugger* dbg = js::Debugger::fromJSObject(CheckedUnwrap(&dbgObj));
 
     if (!vector.reserve(vector.length() + dbg->debuggees.count())) {
         JS_ReportOutOfMemory(cx);

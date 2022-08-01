@@ -69,6 +69,14 @@ typedef ucontext_t tickcontext_t;
 pid_t gettid();
 #endif
 
+#if defined(__arm__) && defined(ANDROID)
+ // Should also work on ARM Linux, but not tested there yet.
+ #define USE_EHABI_STACKWALK
+#endif
+#ifdef USE_EHABI_STACKWALK
+ #include "EHABIStackWalk.h"
+#endif
+
 #ifndef SPS_STANDALONE
 #if defined(SPS_PLAT_amd64_linux) || defined(SPS_PLAT_x86_linux)
 # define USE_LUL_STACKWALK

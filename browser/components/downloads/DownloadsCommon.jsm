@@ -1,4 +1,4 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
 /* vim: set ts=2 et sw=2 tw=80 filetype=javascript: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
@@ -33,10 +33,7 @@ this.EXPORTED_SYMBOLS = [
 ////////////////////////////////////////////////////////////////////////////////
 //// Globals
 
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
-const Cr = Components.results;
+const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -65,8 +62,15 @@ XPCOMUtils.defineLazyModuleGetter(this, "Promise",
                                   "resource://gre/modules/Promise.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "DownloadsLogger",
-                                  "resource:///modules/DownloadsLogger.jsm");
+
+XPCOMUtils.defineLazyGetter(this, "DownloadsLogger", () => {
+  let { ConsoleAPI } = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
+  let consoleOptions = {
+    maxLogLevelPref: "browser.download.loglevel",
+    prefix: "Downloads"
+  };
+  return new ConsoleAPI(consoleOptions);
+});
 
 const nsIDM = Ci.nsIDownloadManager;
 
@@ -92,7 +96,7 @@ const kPartialDownloadSuffix = ".part";
 
 const kPrefBranch = Services.prefs.getBranch("browser.download.");
 
-let PrefObserver = {
+var PrefObserver = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver,
                                          Ci.nsISupportsWeakReference]),
   getPref(name) {
@@ -480,7 +484,7 @@ this.DownloadsCommon = {
       if (!shouldLaunch) {
         return;
       }
-
+  
       // Actually open the file.
       try {
         if (aMimeInfo && aMimeInfo.preferredAction == aMimeInfo.useHelperApp) {
@@ -488,12 +492,12 @@ this.DownloadsCommon = {
           return;
         }
       } catch (ex) { }
-
+  
       // If either we don't have the mime info, or the preferred action failed,
       // attempt to launch the file directly.
       try {
         aFile.launch();
-      } catch(ex) {
+      } catch (ex) {
         // If launch fails, try sending it through the system's external "file:"
         // URL handler.
         Cc["@mozilla.org/uriloader/external-protocol-service;1"]

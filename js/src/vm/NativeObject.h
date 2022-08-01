@@ -710,9 +710,8 @@ class NativeObject : public JSObject
      */
     static Shape*
     addPropertyInternal(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
-                        JSGetterOp getter, JSSetterOp setter,
-                        uint32_t slot, unsigned attrs, unsigned flags, ShapeTable::Entry* entry,
-                        bool allowDictionary);
+                        JSGetterOp getter, JSSetterOp setter, uint32_t slot, unsigned attrs,
+                        unsigned flags, ShapeTable::Entry* entry, bool allowDictionary);
 
     void fillInAfterSwap(JSContext* cx, const Vector<Value>& values, void* priv);
 
@@ -1314,8 +1313,8 @@ NativeGetElement(JSContext* cx, HandleNativeObject obj, uint32_t index, MutableH
 }
 
 bool
-SetPropertyByDefining(JSContext* cx, HandleId id, HandleValue v, HandleValue receiver,
-                      ObjectOpResult& result);
+SetPropertyByDefining(JSContext* cx, HandleId id, HandleValue v,
+                      HandleValue receiver, ObjectOpResult& result);
 
 bool
 SetPropertyOnProto(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,

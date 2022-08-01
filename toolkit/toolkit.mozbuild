@@ -94,7 +94,6 @@ DIRS += [
     '/dom',
     '/view',
     '/widget',
-    '/content',
     '/editor',
     '/layout',
     '/docshell',
@@ -146,6 +145,8 @@ if CONFIG['MOZ_PREF_EXTENSIONS']:
     DIRS += ['/extensions/pref']
 
 DIRS += [
+    '/devtools/server',
+    '/devtools/shared',
     '/services',
     '/startupcache',
     '/js/ductwork/debugger',
@@ -162,6 +163,8 @@ DIRS += [
 
 if CONFIG['MOZ_ENABLE_GNOME_COMPONENT']:
     DIRS += ['/toolkit/system/gnome']
+
+DIRS += ['/addon-sdk']
 
 # if QtNetwork is present, it will do its own network monitoring
 if not CONFIG['MOZ_ENABLE_QTNETWORK'] and CONFIG['MOZ_ENABLE_DBUS']:

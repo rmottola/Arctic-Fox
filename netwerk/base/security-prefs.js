@@ -3,16 +3,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 pref("security.tls.version.min", 1);
-pref("security.tls.version.max", 3);
-
-/* The lowest protocol version the handshake may insecurely fall back to
-   Disabled by default (only fall back to highest = no fallback) but
-   can be lowered to 1 if environments require this */
+pref("security.tls.version.max", 4);
 pref("security.tls.version.fallback-limit", 3);
-
 pref("security.tls.insecure_fallback_hosts", "");
 pref("security.tls.insecure_fallback_hosts.use_static_list", true);
-
 pref("security.tls.unrestricted_rc4_fallback", false);
 pref("security.tls.enable_0rtt_data", false);
 

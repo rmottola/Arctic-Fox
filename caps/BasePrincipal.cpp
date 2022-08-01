@@ -6,6 +6,7 @@
 
 #include "mozilla/BasePrincipal.h"
 
+#include "nsDocShell.h"
 #include "nsIAddonPolicyService.h"
 #include "nsIContentSecurityPolicy.h"
 #include "nsIObjectInputStream.h"
@@ -19,12 +20,35 @@
 #include "nsServiceManagerUtils.h"
 
 #include "mozilla/dom/CSPDictionariesBinding.h"
+#include "mozilla/dom/quota/QuotaManager.h"
 #include "mozilla/dom/ToJSValue.h"
 #include "mozilla/dom/URLSearchParams.h"
 
 namespace mozilla {
 
 using dom::URLParams;
+
+void OriginAttributes::InheritFromDocShellParent(const OriginAttributes& aParent)
+{
+  mAppId = aParent.mAppId;
+  mInBrowser = aParent.mInBrowser;
+  mUserContextId = aParent.mUserContextId;
+  mSignedPkg = aParent.mSignedPkg;
+}
+
+bool OriginAttributes::CopyFromLoadContext(nsILoadContext* aLoadContext)
+{
+  OriginAttributes attrs;
+  bool result = aLoadContext->GetOriginAttributes(attrs);
+  NS_ENSURE_TRUE(result, false);
+
+  mAppId = attrs.mAppId;
+  mInBrowser = attrs.mInBrowser;
+  mAddonId = attrs.mAddonId;
+  mUserContextId = attrs.mUserContextId;
+  mSignedPkg = attrs.mSignedPkg;
+  return true;
+}
 
 void
 OriginAttributes::CreateSuffix(nsACString& aStr) const
@@ -33,6 +57,13 @@ OriginAttributes::CreateSuffix(nsACString& aStr) const
 
   UniquePtr<URLParams> params(new URLParams());
   nsAutoString value;
+
+  //
+  // Important: While serializing any string-valued attributes, perform a
+  // release-mode assertion to make sure that they don't contain characters that
+  // will break the quota manager when it uses the serialization for file
+  // naming (see addonId below).
+  //
 
   if (mAppId != nsIScriptSecurityManager::NO_APP_ID) {
     value.AppendInt(mAppId);
@@ -44,6 +75,7 @@ OriginAttributes::CreateSuffix(nsACString& aStr) const
   }
 
   if (!mAddonId.IsEmpty()) {
+    MOZ_RELEASE_ASSERT(mAddonId.FindCharInSet(dom::quota::QuotaManager::kReplaceChars) == kNotFound);
     params->Set(NS_LITERAL_STRING("addonId"), mAddonId);
   }
 
@@ -53,6 +85,10 @@ OriginAttributes::CreateSuffix(nsACString& aStr) const
     params->Set(NS_LITERAL_STRING("userContextId"), value);
   }
 
+  if (!mSignedPkg.IsEmpty()) {
+    params->Set(NS_LITERAL_STRING("signedPkg"), mSignedPkg);
+  }
+
   aStr.Truncate();
 
   params->Serialize(value);
@@ -60,6 +96,13 @@ OriginAttributes::CreateSuffix(nsACString& aStr) const
     aStr.AppendLiteral("^");
     aStr.Append(NS_ConvertUTF16toUTF8(value));
   }
+
+// In debug builds, check the whole string for illegal characters too (just in case).
+#ifdef DEBUG
+  nsAutoCString str;
+  str.Assign(aStr);
+  MOZ_ASSERT(str.FindCharInSet(dom::quota::QuotaManager::kReplaceChars) == kNotFound);
+#endif
 }
 
 namespace {
@@ -116,6 +159,12 @@ public:
       return true;
     }
 
+    if (aName.EqualsLiteral("signedPkg")) {
+      MOZ_RELEASE_ASSERT(mOriginAttributes->mSignedPkg.IsEmpty());
+      mOriginAttributes->mSignedPkg.Assign(aValue);
+      return true;
+    }
+
     // No other attributes are supported.
     return false;
   }
@@ -124,7 +173,7 @@ private:
   OriginAttributes* mOriginAttributes;
 };
 
-} // anonymous namespace
+} // namespace
 
 bool
 OriginAttributes::PopulateFromSuffix(const nsACString& aStr)
@@ -346,7 +395,7 @@ BasePrincipal::GetUnknownAppId(bool* aUnknownAppId)
 }
 
 already_AddRefed<BasePrincipal>
-BasePrincipal::CreateCodebasePrincipal(nsIURI* aURI, OriginAttributes& aAttrs)
+BasePrincipal::CreateCodebasePrincipal(nsIURI* aURI, const OriginAttributes& aAttrs)
 {
   // If the URI is supposed to inherit the security context of whoever loads it,
   // we shouldn't make a codebase principal for it.
@@ -375,6 +424,28 @@ BasePrincipal::CreateCodebasePrincipal(nsIURI* aURI, OriginAttributes& aAttrs)
   rv = codebase->Init(aURI, aAttrs);
   NS_ENSURE_SUCCESS(rv, nullptr);
   return codebase.forget();
+}
+
+already_AddRefed<BasePrincipal>
+BasePrincipal::CreateCodebasePrincipal(const nsACString& aOrigin)
+{
+  MOZ_ASSERT(!StringBeginsWith(aOrigin, NS_LITERAL_CSTRING("[")),
+             "CreateCodebasePrincipal does not support System and Expanded principals");
+
+  MOZ_ASSERT(!StringBeginsWith(aOrigin, NS_LITERAL_CSTRING(NS_NULLPRINCIPAL_SCHEME ":")),
+             "CreateCodebasePrincipal does not support nsNullPrincipal");
+
+  nsAutoCString originNoSuffix;
+  mozilla::OriginAttributes attrs;
+  if (!attrs.PopulateFromOrigin(aOrigin, originNoSuffix)) {
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIURI> uri;
+  nsresult rv = NS_NewURI(getter_AddRefs(uri), originNoSuffix);
+  NS_ENSURE_SUCCESS(rv, nullptr);
+
+  return BasePrincipal::CreateCodebasePrincipal(uri, attrs);
 }
 
 bool

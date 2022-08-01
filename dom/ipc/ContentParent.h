@@ -344,6 +344,9 @@ public:
         return PContentParent::RecvPHalConstructor(aActor);
     }
 
+    virtual PHeapSnapshotTempFileHelperParent*
+    AllocPHeapSnapshotTempFileHelperParent() override;
+
     virtual PStorageParent* AllocPStorageParent() override;
     virtual bool RecvPStorageConstructor(PStorageParent* aActor) override {
         return PContentParent::RecvPStorageConstructor(aActor);
@@ -623,6 +626,8 @@ private:
                                  const uint32_t& aFlags, bool* aIsSecureURI) override;
 
     virtual bool DeallocPHalParent(PHalParent*) override;
+
+    virtual bool DeallocPHeapSnapshotTempFileHelperParent(PHeapSnapshotTempFileHelperParent*) override;
 
     virtual PIccParent* AllocPIccParent(const uint32_t& aServiceId) override;
     virtual bool DeallocPIccParent(PIccParent* aActor) override;

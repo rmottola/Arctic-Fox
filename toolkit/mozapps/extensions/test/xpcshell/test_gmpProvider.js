@@ -272,6 +272,45 @@ add_task(function* test_pluginRegistration() {
                       TEST_VERSION);
     clearPaths();
     yield promiseRestartManager();
+    Assert.equal(addedPaths.indexOf(file.path), -1);
+    Assert.deepEqual(removedPaths, [file.path]);
+
+    // Test that the GMPProvider tried to report via telemetry that the
+    // addon's lib files are missing.
+    Assert.strictEqual(reportedKeys[addon.missingKey], true);
+    Assert.strictEqual(reportedKeys[addon.missingFilesKey],
+                       addon.missingFilesKey != "VIDEO_ADOBE_GMP_MISSING_FILES"
+                       ? (1+2) : (1+2+4));
+    reportedKeys = {};
+
+    // Create dummy GMP library/info files, and test that plugin registration
+    // succeeds during startup, now that we've added GMP info/lib files.
+    createMockPluginFilesIfNeeded(file, addon.id);
+
+    gPrefs.setCharPref(gGetKey(GMPScope.GMPPrefs.KEY_PLUGIN_VERSION, addon.id),
+                       TEST_VERSION);
+    clearPaths();
+    yield promiseRestartManager();
+    Assert.notEqual(addedPaths.indexOf(file.path), -1);
+    Assert.deepEqual(removedPaths, []);
+
+    // Test that the GMPProvider tried to report via telemetry that the
+    // addon's lib files are NOT missing.
+    Assert.strictEqual(reportedKeys[addon.missingFilesKey], 0);
+
+    // Setting the ABI to something invalid should cause plugin to be removed at startup.
+    clearPaths();
+    gPrefs.setCharPref(gGetKey(GMPScope.GMPPrefs.KEY_PLUGIN_ABI, addon.id), "invalid-ABI");
+    yield promiseRestartManager();
+    Assert.equal(addedPaths.indexOf(file.path), -1);
+    Assert.deepEqual(removedPaths, [file.path]);
+
+    // Setting the ABI to expected ABI should cause registration at startup.
+    clearPaths();
+    gPrefs.setCharPref(gGetKey(GMPScope.GMPPrefs.KEY_PLUGIN_VERSION, addon.id),
+                       TEST_VERSION);
+    gPrefs.setCharPref(gGetKey(GMPScope.GMPPrefs.KEY_PLUGIN_ABI, addon.id), GMPScope.GMPUtils.ABI());
+    yield promiseRestartManager();
     Assert.notEqual(addedPaths.indexOf(file.path), -1);
     Assert.deepEqual(removedPaths, []);
 

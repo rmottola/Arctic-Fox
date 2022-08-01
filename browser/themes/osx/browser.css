@@ -2105,34 +2105,15 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     margin-left: 1em;
 }
 
-#full-screen-warning-message {
-    background-color: hsl(0,0%,15%);
-    color: white;
-    border-radius: 8px;
-    margin-top: 30px;
-    padding: 30px 50px;
-    box-shadow: 0 0 2px white;
-}
-
-.full-screen-description {
-    font-size: 150%;
-}
-
-#full-screen-domain-text {
-    font-size: 300%;
-}
-
-%ifdef MOZ_DEVTOOLS
-%include ../../../toolkit/themes/shared/devtools/responsivedesign.inc.css
-%include ../../../toolkit/themes/shared/devtools/commandline.inc.css
-%endif
+%include ../shared/fullscreen/warning.inc.css
+%include ../../../devtools/client/themes/responsivedesign.inc.css
+%include ../../../devtools/client/themes/commandline.inc.css
 %include ../shared/plugin-doorhanger.inc.css
 %include ../shared/badcontent-doorhanger.inc.css
 %include ../shared/login-doorhanger.inc.css
 
 %include downloads/indicator.css
 
-%ifdef MOZ_DEVTOOLS
 /* Error counter */
 
 #developer-toolbar-toolbox-button[error-count]:before {
@@ -2143,7 +2124,6 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     border-radius: 1px;
     -moz-margin-end: 5px;
 }
-%endif
 
 .toolbarbutton-badge-container {
     margin: 0;

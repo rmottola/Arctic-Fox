@@ -139,6 +139,9 @@ pref("dom.select_events.textcontrols.enabled", true);
 // Whether or not the document visbility API is enabled
 pref("dom.visibilityAPI.enabled", true);
 
+// Whether or not File Handle is enabled.
+pref("dom.fileHandle.enabled", true);
+
 // Whether or not the Permissions API is enabled.
 #ifdef NIGHTLY_BUILD
 pref("dom.permissions.enabled", true);
@@ -910,7 +913,6 @@ pref("devtools.devedition.promo.url", "https://www.mozilla.org/firefox/developer
 
 // Only potentially show in beta release
 pref("devtools.devedition.promo.enabled", false);
-#ifdef MOZ_DEVTOOLS
 // Developer toolbar and GCLI preferences
 pref("devtools.toolbar.enabled", true);
 pref("devtools.toolbar.visible", false);
@@ -1170,13 +1172,17 @@ pref("devtools.telemetry.tools.opened.version", "{}");
 
 // Pref counting self-xss events
 pref("devtools.selfxss.count", 0);
-#endif //MOZ_DEVTOOLS
 
 // URL of the remote JSON catalog used for device simulation
 pref("devtools.devices.url", "https://code.cdn.mozilla.net/devices/devices.json");
 
 // URL of the remote JSON catalog used for device simulation
 pref("devtools.devices.url", "https://code.cdn.mozilla.net/devices/devices.json");
+
+
+// Deprecation warnings after DevTools file migration.  Bug 1204127 tracks
+// enabling this.
+pref("devtools.migration.warnings", false);
 
 // view source
 pref("view_source.syntax_highlight", true);
@@ -1735,6 +1741,8 @@ pref("network.http.packaged-apps-developer-mode", false);
 pref("network.ftp.data.qos", 0);
 pref("network.ftp.control.qos", 0);
 
+// The max time to spend on xpcom events between two polls in ms.
+pref("network.sts.max_time_for_events_between_two_polls", 100);
 // </http>
 
 // 2147483647 == PR_INT32_MAX == ~2 GB
@@ -4610,8 +4618,12 @@ pref("full-screen-api.enabled", false);
 pref("full-screen-api.allow-trusted-requests-only", true);
 pref("full-screen-api.pointer-lock.enabled", true);
 // transition duration of fade-to-black and fade-from-black, unit: ms
-pref("full-screen-api.transition-duration.enter", "400 400");
-pref("full-screen-api.transition-duration.leave", "400 400");
+pref("full-screen-api.transition-duration.enter", "200 200");
+pref("full-screen-api.transition-duration.leave", "200 200");
+// time for the warning box stays on the screen before sliding out, unit: ms
+pref("full-screen-api.warning.timeout", 3000);
+// delay for the warning box to show when pointer stays on the top, unit: ms
+pref("full-screen-api.warning.delay", 500);
 
 // DOM idle observers API
 pref("dom.idle-observers-api.enabled", true);
@@ -4731,7 +4743,7 @@ pref("layout.css.touch_action.enabled", false);
 // Enables some assertions in nsStyleContext that are too expensive
 // for general use, but might be useful to enable for specific tests.
 // This only has an effect in DEBUG-builds.
-pref("layout.css.expensive-style-struct-assertions.enabed", false);
+pref("layout.css.expensive-style-struct-assertions.enabled", false);
 
 // enable JS dump() function.
 pref("browser.dom.window.dump.enabled", false);

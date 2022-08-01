@@ -192,6 +192,28 @@ UnboxedArrayObject::setLength(ExclusiveContext* cx, uint32_t length)
     length_ = length;
 }
 
+inline void
+UnboxedArrayObject::setInitializedLength(uint32_t initlen)
+{
+    MOZ_ASSERT(initlen <= InitializedLengthMask);
+    if (initlen < initializedLength()) {
+        switch (elementType()) {
+          case JSVAL_TYPE_STRING:
+            for (size_t i = initlen; i < initializedLength(); i++)
+                triggerPreBarrier<JSVAL_TYPE_STRING>(i);
+            break;
+          case JSVAL_TYPE_OBJECT:
+            for (size_t i = initlen; i < initializedLength(); i++)
+                triggerPreBarrier<JSVAL_TYPE_OBJECT>(i);
+            break;
+          default:
+            MOZ_ASSERT(!UnboxedTypeNeedsPreBarrier(elementType()));
+        }
+    }
+    capacityIndexAndInitializedLength_ =
+        (capacityIndexAndInitializedLength_ & CapacityMask) | initlen;
+}
+
 template <JSValueType Type>
 inline bool
 UnboxedArrayObject::setElementSpecific(ExclusiveContext* cx, size_t index, const Value& v)
@@ -621,6 +643,8 @@ CopyBoxedOrUnboxedDenseElements(JSContext* cx, JSObject* dst, JSObject* src,
 /////////////////////////////////////////////////////////////////////
 
 // Goop to fix MSVC. See DispatchTraceKindTyped in TraceKind.h.
+// The clang-cl front end defines _MSC_VER, but still requires the explicit
+// template declaration, so we must test for __clang__ here as well.
 #if defined(_MSC_VER) && !defined(__clang__)
 # define DEPENDENT_TEMPLATE_HINT
 #else
