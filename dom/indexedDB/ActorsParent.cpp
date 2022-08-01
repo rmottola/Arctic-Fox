@@ -242,11 +242,6 @@ const char kPrefFileHandleEnabled[] = "dom.fileHandle.enabled";
 #define PERMISSION_STRING_CHROME_READ_SUFFIX "-read"
 #define PERMISSION_STRING_CHROME_WRITE_SUFFIX "-write"
 
-enum AppId {
-  kNoAppId = nsIScriptSecurityManager::NO_APP_ID,
-  kUnknownAppId = nsIScriptSecurityManager::UNKNOWN_APP_ID
-};
-
 const char kIdleServiceContractId[] = "@mozilla.org/widget/idleservice;1";
 
 #ifdef DEBUG
@@ -19890,7 +19885,8 @@ FactoryOp::CheckAtLeastOneAppHasPermission(ContentParent* aContentParent,
          index++) {
       uint32_t appId =
         TabParent::GetFrom(browsers[index])->OwnOrContainingAppId();
-      MOZ_ASSERT(kUnknownAppId != appId && kNoAppId != appId);
+      MOZ_ASSERT(appId != nsIScriptSecurityManager::UNKNOWN_APP_ID &&
+                 appId != nsIScriptSecurityManager::NO_APP_ID);
 
       nsCOMPtr<mozIApplication> app;
       nsresult rv = appsService->GetAppByLocalId(appId, getter_AddRefs(app));
