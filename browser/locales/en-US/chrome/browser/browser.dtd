@@ -100,6 +100,14 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY showAllTabsCmd.label "Show All Tabs">
 <!ENTITY showAllTabsCmd.accesskey "A">
 
+<!ENTITY fxaSignIn.label "Sign in to &syncBrand.shortName.label;">
+<!ENTITY fxaSignedIn.tooltip "Open &syncBrand.shortName.label; preferences">
+<!ENTITY fxaSignInError.label "Reconnect to &syncBrand.shortName.label;">
+<!ENTITY fxaUnverified.label "Verify Your Account">
+<!ENTITY syncStartPanel2.heading "&syncBrand.shortName.label; enabled">
+<!ENTITY syncStartPanel2.subTitle "&brandShortName; will begin syncing momentarily.">
+
+
 <!ENTITY fullScreenMinimize.tooltip "Minimize">
 <!ENTITY fullScreenRestore.tooltip "Restore">
 <!ENTITY fullScreenClose.tooltip "Close">
@@ -130,6 +138,7 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY bookmarksMenu.label "Bookmarks">
 <!ENTITY bookmarksMenu.accesskey "B">
 <!ENTITY bookmarkThisPageCmd.label "Bookmark This Page">
+<!ENTITY editThisBookmarkCmd.label "Edit This Bookmark">
 <!ENTITY bookmarkThisPageCmd.commandkey "d">
 <!ENTITY markPageCmd.commandkey "l">
 <!ENTITY subscribeToPageMenupopup.label "Subscribe to This Page">
@@ -274,6 +283,7 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY devToolbar.keytext                "F2">
 <!ENTITY devToolboxMenuItem.label          "Toggle Tools">
 <!ENTITY devToolboxMenuItem.accesskey      "T">
+<!ENTITY devToolboxMenuItem.keytext        "I">
 
 <!ENTITY devToolbarToolsButton.tooltip     "Toggle developer tools">
 <!ENTITY devToolbarOtherToolsButton.label  "More Tools">
@@ -288,6 +298,7 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY newNavigatorCmd.accesskey      "N">
 <!ENTITY newPrivateWindow.label     "New Private Window">
 <!ENTITY newPrivateWindow.accesskey "W">
+<!ENTITY newNonRemoteWindow.label   "New Non-e10s Window">
 
 <!ENTITY editMenu.label         "Edit"> 
 <!ENTITY editMenu.accesskey       "E"> 
@@ -327,7 +338,7 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY viewToolbarsMenu.accesskey     "T"> 
 <!ENTITY viewSidebarMenu.label "Sidebar">
 <!ENTITY viewSidebarMenu.accesskey "e">
-<!ENTITY viewCustomizeToolbar.label       "Customize"> 
+<!ENTITY viewCustomizeToolbar.label       "Customize…"> 
 <!ENTITY viewCustomizeToolbar.accesskey     "C">
 <!ENTITY viewTabsOnTop.label            "Tabs on Top">
 <!ENTITY viewTabsOnTop.accesskey        "T">
@@ -381,10 +392,43 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY searchFocus.commandkey2      "e">
 <!ENTITY searchFocusUnix.commandkey   "j">
 
+<!-- LOCALIZATION NOTE (contentSearchInput.label, contentSearchSubmit.label):
+     These are set as the aria-label attribute for the search input box and
+     submit button in the in-content search UI, to be used by screen readers. -->
+<!ENTITY contentSearchInput.label     "Search query">
+<!ENTITY contentSearchSubmit.label    "Submit search">
+
+<!-- LOCALIZATION NOTE (searchFor.label, searchWith.label):
+     These two strings are used to build the header above the list of one-click
+     search providers:  "Search for <used typed keywords> with:" -->
+<!ENTITY searchFor.label              "Search for ">
+<!ENTITY searchWith.label             " with:">
+
+<!-- LOCALIZATION NOTE (search.label, searchAfter.label):
+     This string is used to build the header above the list of one-click search
+     providers when a one off engine has been selected.  The searchAfter text is
+     intentionally left empty for en-US and can be used by other localizations to
+     display a string after the search engine name.  This string will be displayed
+     as:  "Search <selected engine name><searchAfter.label text>" -->
+<!ENTITY search.label                 "Search ">
+<!ENTITY searchAfter.label            "">
+
+<!-- LOCALIZATION NOTE (searchWithHeader.label):
+     The wording of this string should be as close as possible to
+     searchFor.label and searchWith.label. This string will be used instead of
+     them when the user has not typed any keyword. -->
+<!ENTITY searchWithHeader.label       "Search with:">
 <!-- LOCALIZATION NOTE (changeSearchSettings.button):
      This string won't wrap, so if the translated string is longer,
      consider translating it as if it said only "Search Settings". -->
 <!ENTITY changeSearchSettings.button  "Change Search Settings">
+
+<!ENTITY searchInNewTab.label         "Search in New Tab">
+<!ENTITY searchInNewTab.accesskey     "T">
+<!ENTITY searchSetAsDefault.label     "Set As Default Search Engine">
+<!ENTITY searchSetAsDefault.accesskey "D">
+
+<!ENTITY tabView.commandkey           "e">
 
 <!ENTITY openLinkCmdInTab.label       "Open Link in New Tab">
 <!ENTITY openLinkCmdInTab.accesskey   "T">
@@ -635,6 +679,7 @@ you can use these alternative items. Otherwise, their values should be empty.  -
 <!ENTITY identity.moreInfoLinkText "More Information…">
 
 <!ENTITY identity.permissions "Permissions">
+<!ENTITY identity.permissionsEmpty "You have not granted this site any special permissions.">
 
 <!ENTITY allTabs.filter.emptyText "Search Tabs">
 <!-- Name for the tabs toolbar as spoken by screen readers.
