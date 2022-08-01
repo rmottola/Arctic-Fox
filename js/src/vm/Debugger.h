@@ -311,12 +311,13 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     struct AllocationsLogEntry : public JS::Traceable
     {
         AllocationsLogEntry(HandleObject frame, double when, const char* className,
-                            HandleAtom ctorName, size_t size)
+                            HandleAtom ctorName, size_t size, bool inNursery)
             : frame(frame),
               when(when),
               className(className),
               ctorName(ctorName),
-              size(size)
+              size(size),
+              inNursery(inNursery)
         {
             MOZ_ASSERT_IF(frame, UncheckedUnwrap(frame)->is<SavedFrame>());
         };
@@ -326,6 +327,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
         const char* className;
         RelocatablePtrAtom ctorName;
         size_t size;
+        bool inNursery;
 
         static void trace(AllocationsLogEntry* e, JSTracer* trc) {
             if (e->frame)
