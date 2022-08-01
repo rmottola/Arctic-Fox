@@ -7360,7 +7360,7 @@ class OpenDatabaseOp final
 
   class VersionChangeOp;
 
-  const OptionalContentId mOptionalContentParentId;
+  OptionalContentId mOptionalContentParentId;
 
   nsRefPtr<FullDatabaseMetadata> mMetadata;
 
@@ -7984,7 +7984,7 @@ class ObjectStoreAddOrPutRequestOp final
   const nsCString mOrigin;
   const PersistenceType mPersistenceType;
   const bool mOverwrite;
-  const bool mObjectStoreMayHaveIndexes;
+  bool mObjectStoreMayHaveIndexes;
 
 private:
   // Only created by TransactionBase.
@@ -8104,7 +8104,7 @@ class ObjectStoreDeleteRequestOp final
 
   const ObjectStoreDeleteParams mParams;
   ObjectStoreDeleteResponse mResponse;
-  const bool mObjectStoreMayHaveIndexes;
+  bool mObjectStoreMayHaveIndexes;
 
 private:
   ObjectStoreDeleteRequestOp(TransactionBase* aTransaction,
@@ -8130,7 +8130,7 @@ class ObjectStoreClearRequestOp final
 
   const ObjectStoreClearParams mParams;
   ObjectStoreClearResponse mResponse;
-  const bool mObjectStoreMayHaveIndexes;
+  bool mObjectStoreMayHaveIndexes;
 
 private:
   ObjectStoreClearRequestOp(TransactionBase* aTransaction,
@@ -20263,15 +20263,12 @@ OpenDatabaseOp::OpenDatabaseOp(Factory* aFactory,
   , mVersionChangeOp(nullptr)
   , mTelemetryId(0)
 {
-  auto& optionalContentParentId =
-    const_cast<OptionalContentId&>(mOptionalContentParentId);
-
   if (mContentParent) {
     // This is a little scary but it looks safe to call this off the main thread
     // for now.
-    optionalContentParentId = mContentParent->ChildID();
+    mOptionalContentParentId = mContentParent->ChildID();
   } else {
-    optionalContentParentId = void_t();
+    mOptionalContentParentId = void_t();
   }
 }
 
@@ -24533,7 +24530,7 @@ ObjectStoreAddOrPutRequestOp::ObjectStoreAddOrPutRequestOp(
     aTransaction->GetMetadataForObjectStoreId(mParams.objectStoreId());
   MOZ_ASSERT(mMetadata);
 
-  const_cast<bool&>(mObjectStoreMayHaveIndexes) = mMetadata->HasLiveIndexes();
+  mObjectStoreMayHaveIndexes = mMetadata->HasLiveIndexes();
 }
 
 nsresult
@@ -25468,7 +25465,7 @@ ObjectStoreDeleteRequestOp::ObjectStoreDeleteRequestOp(
     aTransaction->GetMetadataForObjectStoreId(mParams.objectStoreId());
   MOZ_ASSERT(metadata);
 
-  const_cast<bool&>(mObjectStoreMayHaveIndexes) = metadata->HasLiveIndexes();
+  mObjectStoreMayHaveIndexes = metadata->HasLiveIndexes();
 }
 
 nsresult
@@ -25560,7 +25557,7 @@ ObjectStoreClearRequestOp::ObjectStoreClearRequestOp(
     aTransaction->GetMetadataForObjectStoreId(mParams.objectStoreId());
   MOZ_ASSERT(metadata);
 
-  const_cast<bool&>(mObjectStoreMayHaveIndexes) = metadata->HasLiveIndexes();
+  mObjectStoreMayHaveIndexes = metadata->HasLiveIndexes();
 }
 
 nsresult
