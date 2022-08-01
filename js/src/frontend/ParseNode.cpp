@@ -518,6 +518,7 @@ PushNodeChildren(ParseNode* pn, NodeStack* stack)
         return PushNameNodeChildren(pn, stack);
 
       case PNK_FUNCTION:
+      case PNK_MODULE:
         return PushCodeNodeChildren(pn, stack);
 
       case PNK_LIMIT: // invalid sentinel value
@@ -1150,6 +1151,13 @@ ObjectBox::asFunctionBox()
     return static_cast<FunctionBox*>(this);
 }
 
+ModuleBox*
+ObjectBox::asModuleBox()
+{
+    MOZ_ASSERT(isModuleBox());
+    return static_cast<ModuleBox*>(this);
+}
+
 void
 ObjectBox::trace(JSTracer* trc)
 {
@@ -1161,6 +1169,9 @@ ObjectBox::trace(JSTracer* trc)
             funbox->bindings.trace(trc);
             if (funbox->enclosingStaticScope_)
                 TraceRoot(trc, &funbox->enclosingStaticScope_, "funbox-enclosingStaticScope");
+        } else if (box->isModuleBox()) {
+            ModuleBox* modulebox = box->asModuleBox();
+            modulebox->bindings.trace(trc);
         }
         box = box->traceLink;
     }
