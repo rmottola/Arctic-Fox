@@ -31,6 +31,12 @@ const LoginInfo =
       Components.Constructor("@mozilla.org/login-manager/loginInfo;1",
                              "nsILoginInfo", "init");
 
+// Import LoginTestUtils.jsm as LoginTestUtils.
+XPCOMUtils.defineLazyModuleGetter(this, "LoginTestUtils",
+                                  "resource://testing-common/LoginTestUtils.jsm");
+LoginTestUtils.Assert = Assert;
+const TestData = LoginTestUtils.testData;
+
 /**
  * All the tests are implemented with add_task, this starts them automatically.
  */
@@ -409,8 +415,8 @@ add_task(function test_common_initialize()
   yield Services.logins.initializationPromise;
 
   // Ensure that every test file starts with an empty database.
-  LoginTest.clearData();
+  LoginTestUtils.clearData();
 
   // Clean up after every test.
-  do_register_cleanup(() => LoginTest.clearData());
+  do_register_cleanup(() => LoginTestUtils.clearData());
 });
