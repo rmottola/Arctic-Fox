@@ -157,7 +157,7 @@ ConvertToNSArray(nsTArray<ProxyAccessible*>& aArray)
 #pragma mark -
 
 @implementation mozAccessible
- 
+
 - (id)initWithAccessible:(uintptr_t)aGeckoAccessible
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
@@ -1023,6 +1023,8 @@ ConvertToNSArray(nsTArray<ProxyAccessible*>& aArray)
       return @"AXMathSubscriptSuperscript";
 
     case roles::MATHML_ROW:
+    case roles::MATHML_STYLE:
+    case roles::MATHML_ERROR:
       return @"AXMathRow";
 
     case roles::MATHML_UNDER:
