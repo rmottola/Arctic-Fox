@@ -81,6 +81,11 @@ public:
   uint64_t State() const;
 
   /*
+   * Return the native states for the proxied accessible.
+   */
+  uint64_t NativeState() const;
+
+  /*
    * Set aName to the name of the proxied accessible.
    */
   void Name(nsString& aName) const;
