@@ -137,8 +137,6 @@ public:
   int32_t CharacterCount();
   int32_t SelectionCount();
 
-  char16_t CharAt(int32_t aOffset);
-
   /**
    * Get the text between the given offsets.
    */
@@ -156,6 +154,8 @@ public:
   void GetTextBeforeOffset(int32_t aOffset, AccessibleTextBoundary aBoundaryType,
                            nsString& aText, int32_t* aStartOffset,
                            int32_t* aEndOffset);
+
+  char16_t CharAt(int32_t aOffset);
 
   void TextAttributes(bool aIncludeDefAttrs,
                       const int32_t aOffset,
