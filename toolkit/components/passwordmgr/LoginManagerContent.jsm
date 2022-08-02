@@ -1011,7 +1011,7 @@ function UserAutoCompleteResult (aSearchString, matchingLogins) {
     if (userA < userB)
       return -1;
 
-    if (userB > userA)
+    if (userA > userB)
       return  1;
 
     return 0;
