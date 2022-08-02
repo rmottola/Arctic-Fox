@@ -14,6 +14,7 @@
 #include "jsgc.h"
 #include "jsprf.h"
 
+#include "builtin/ModuleObject.h"
 #include "gc/GCInternals.h"
 #include "jit/IonCode.h"
 #include "js/SliceBudget.h"
@@ -380,6 +381,7 @@ AssertRootMarkingPhase(JSTracer* trc)
     D(ScriptSourceObject*) \
     D(SharedArrayBufferObject*) \
     D(SharedTypedArrayObject*) \
+    D(ImportEntryObject*)      \
     D(JSScript*) \
     D(LazyScript*) \
     D(Shape*) \
