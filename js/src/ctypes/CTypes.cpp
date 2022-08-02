@@ -560,7 +560,7 @@ static const JSClass sCDataProtoClass = {
 
 static const JSClass sCTypeClass = {
   "CType",
-  JSCLASS_IMPLEMENTS_BARRIERS | JSCLASS_HAS_RESERVED_SLOTS(CTYPE_SLOTS),
+  JSCLASS_HAS_RESERVED_SLOTS(CTYPE_SLOTS),
   nullptr, nullptr, nullptr, nullptr, nullptr,
   nullptr, nullptr, nullptr, CType::Finalize,
   CType::ConstructData, CType::HasInstance, CType::ConstructData,
@@ -577,7 +577,7 @@ static const JSClass sCDataClass = {
 
 static const JSClass sCClosureClass = {
   "CClosure",
-  JSCLASS_IMPLEMENTS_BARRIERS | JSCLASS_HAS_RESERVED_SLOTS(CCLOSURE_SLOTS),
+  JSCLASS_HAS_RESERVED_SLOTS(CCLOSURE_SLOTS),
   nullptr, nullptr, nullptr, nullptr, nullptr,
   nullptr, nullptr, nullptr, CClosure::Finalize,
   nullptr, nullptr, nullptr, CClosure::Trace

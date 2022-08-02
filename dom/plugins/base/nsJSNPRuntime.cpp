@@ -207,7 +207,7 @@ CreateNPObjectMember(NPP npp, JSContext *cx,
 const static js::Class sNPObjectJSWrapperClass =
   {
     NPRUNTIME_JSCLASS_NAME,
-    JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS,
+    JSCLASS_HAS_PRIVATE,
     NPObjWrapper_AddProperty,
     NPObjWrapper_DelProperty,
     NPObjWrapper_GetProperty,
@@ -269,7 +269,7 @@ NPObjectMember_toPrimitive(JSContext *cx, unsigned argc, JS::Value *vp);
 
 static const JSClass sNPObjectMemberClass =
   {
-    "NPObject Ambiguous Member class", JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS,
+    "NPObject Ambiguous Member class", JSCLASS_HAS_PRIVATE,
     nullptr, nullptr, NPObjectMember_GetProperty, nullptr,
     nullptr, nullptr, nullptr, nullptr,
     NPObjectMember_Finalize, NPObjectMember_Call,

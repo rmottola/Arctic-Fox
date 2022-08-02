@@ -216,7 +216,7 @@ template class JS_PUBLIC_API(JS::WeakMapPtr)<JSObject*, JSObject*>;
     return (result || !src) ? NS_OK : NS_ERROR_OUT_OF_MEMORY
 
 
-#define WRAPPER_FLAGS (JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS )
+#define WRAPPER_FLAGS JSCLASS_HAS_PRIVATE
 
 #define INVALID_OBJECT ((JSObject*)1)
 

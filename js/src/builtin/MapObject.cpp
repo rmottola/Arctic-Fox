@@ -106,7 +106,6 @@ namespace {
 
 const Class MapIteratorObject::class_ = {
     "Map Iterator",
-    JSCLASS_IMPLEMENTS_BARRIERS |
     JSCLASS_HAS_RESERVED_SLOTS(MapIteratorObject::SlotCount),
     nullptr, /* addProperty */
     nullptr, /* delProperty */
@@ -220,7 +219,7 @@ MapIteratorObject::next(JSContext* cx, Handle<MapIteratorObject*> mapIterator,
 
 const Class MapObject::class_ = {
     "Map",
-    JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS |
+    JSCLASS_HAS_PRIVATE | 
     JSCLASS_HAS_CACHED_PROTO(JSProto_Map),
     nullptr, // addProperty
     nullptr, // delProperty
@@ -828,7 +827,6 @@ class SetIteratorObject : public NativeObject
 
 const Class SetIteratorObject::class_ = {
     "Set Iterator",
-    JSCLASS_IMPLEMENTS_BARRIERS |
     JSCLASS_HAS_RESERVED_SLOTS(SetIteratorObject::SlotCount),
     nullptr, /* addProperty */
     nullptr, /* delProperty */
@@ -966,7 +964,7 @@ SetIteratorObject::next(JSContext* cx, unsigned argc, Value* vp)
 
 const Class SetObject::class_ = {
     "Set",
-    JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS |
+    JSCLASS_HAS_PRIVATE |
     JSCLASS_HAS_CACHED_PROTO(JSProto_Set),
     nullptr, // addProperty
     nullptr, // delProperty
