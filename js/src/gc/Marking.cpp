@@ -381,7 +381,8 @@ AssertRootMarkingPhase(JSTracer* trc)
     D(ScriptSourceObject*) \
     D(SharedArrayBufferObject*) \
     D(SharedTypedArrayObject*) \
-    D(ImportEntryObject*)      \
+    D(ImportEntryObject*) \
+    D(ExportEntryObject*) \
     D(JSScript*) \
     D(LazyScript*) \
     D(Shape*) \
