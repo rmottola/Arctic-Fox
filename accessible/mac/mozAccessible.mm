@@ -1076,7 +1076,11 @@ struct RoleDescrComparator
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   nsAutoString title;
-  [self getGeckoAccessible]->Name(title);
+  if (AccessibleWrap* accWrap = [self getGeckoAccessible])
+    accWrap->Name(title);
+  else if (ProxyAccessible* proxy = [self getProxyAccessible])
+    proxy->Name(title);
+
   return nsCocoaUtils::ToNSString(title);
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
@@ -1087,7 +1091,11 @@ struct RoleDescrComparator
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   nsAutoString value;
-  [self getGeckoAccessible]->Value(value);
+  if (AccessibleWrap* accWrap = [self getGeckoAccessible])
+    accWrap->Value(value);
+  else if (ProxyAccessible* proxy = [self getProxyAccessible])
+    proxy->Value(value);
+
   return nsCocoaUtils::ToNSString(value);
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
@@ -1133,7 +1141,11 @@ struct RoleDescrComparator
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   nsAutoString helpText;
-  [self getGeckoAccessible]->Help(helpText);
+  if (AccessibleWrap* accWrap = [self getGeckoAccessible])
+    accWrap->Help(helpText);
+  else if (ProxyAccessible* proxy = [self getProxyAccessible])
+    proxy->Help(helpText);
+
   return nsCocoaUtils::ToNSString(helpText);
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
@@ -1172,8 +1184,13 @@ struct RoleDescrComparator
 
 - (BOOL)isEnabled
 {
-  AccessibleWrap* accWrap = [self getGeckoAccessible];
-  return accWrap && ((accWrap->InteractiveState() & states::UNAVAILABLE) == 0);
+  if (AccessibleWrap* accWrap = [self getGeckoAccessible])
+    return ((accWrap->InteractiveState() & states::UNAVAILABLE) == 0);
+
+  if (ProxyAccessible* proxy = [self getProxyAccessible])
+    return ((proxy->State() & states::UNAVAILABLE) == 0);
+
+  return false;
 }
 
 // The root accessible calls this when the focused node was
@@ -1245,7 +1262,7 @@ struct RoleDescrComparator
 
 - (BOOL)isExpired
 {
-  return ![self getGeckoAccessible];
+  return ![self getGeckoAccessible] && ![self getProxyAccessible];
 }
 
 #pragma mark -
