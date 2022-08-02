@@ -23509,6 +23509,22 @@ CreateIndexOp::DoDatabaseWork(DatabaseConnection* aConnection)
     return rv;
   }
 
+  if (mMetadata.locale().IsEmpty()) {
+    rv = stmt->BindNullByName(NS_LITERAL_CSTRING("locale"));
+  } else {
+    rv = stmt->BindUTF8StringByName(NS_LITERAL_CSTRING("locale"),
+                                    mMetadata.locale());
+  }
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  rv = stmt->BindInt32ByName(NS_LITERAL_CSTRING("is_auto_locale"),
+                             mMetadata.autoLocale());
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
   rv = stmt->Execute();
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
@@ -26650,8 +26666,14 @@ OpenOp::DoIndexDatabaseWork(DatabaseConnection* aConnection)
   }
 
   if (usingKeyRange) {
-    rv = BindKeyRangeToStatement(mOptionalKeyRange.get_SerializedKeyRange(),
-                                 stmt);
+    if (mCursor->IsLocaleAware()) {
+      rv = BindKeyRangeToStatement(mOptionalKeyRange.get_SerializedKeyRange(),
+                                   stmt,
+                                   mCursor->mLocale);
+    } else {
+      rv = BindKeyRangeToStatement(mOptionalKeyRange.get_SerializedKeyRange(),
+                                   stmt);
+    }
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
