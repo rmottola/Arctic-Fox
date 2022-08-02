@@ -638,10 +638,14 @@ ModuleObject* BytecodeCompiler::compileModule()
         return nullptr;
     }
 
-    if (!maybeCompleteCompressSource())
+    ModuleBuilder builder(cx->asJSContext());
+    if (!builder.buildAndInit(pn, module))
         return nullptr;
 
     parser->handler.freeTree(pn);
+
+    if (!maybeCompleteCompressSource())
+        return nullptr;
 
     MOZ_ASSERT_IF(cx->isJSContext(), !cx->asJSContext()->isExceptionPending());
     return module;
