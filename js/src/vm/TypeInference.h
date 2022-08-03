@@ -967,7 +967,7 @@ class TypeNewScript
 
     bool rollbackPartiallyInitializedObjects(JSContext* cx, ObjectGroup* group);
 
-    static void make(JSContext* cx, ObjectGroup* group, JSFunction* fun);
+    static bool make(JSContext* cx, ObjectGroup* group, JSFunction* fun);
     static TypeNewScript* makeNativeVersion(JSContext* cx, TypeNewScript* newScript,
                                             PlainObject* templateObject);
 

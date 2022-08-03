@@ -3260,8 +3260,10 @@ js::detail::CopyScript(JSContext* cx, HandleObject scriptStaticScope, HandleScri
 
     size_t size = src->dataSize();
     uint8_t* data = AllocScriptData(cx->zone(), size);
-    if (size && !data)
+    if (size && !data) {
+        ReportOutOfMemory(cx);
         return false;
+    }
 
     /* Bindings */
 
