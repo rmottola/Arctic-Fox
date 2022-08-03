@@ -114,6 +114,7 @@ class GlobalObject : public NativeObject
         INT16X8_TYPE_DESCR,
         INT32X4_TYPE_DESCR,
         FOR_OF_PIC_CHAIN,
+        MODULE_RESOLVE_HOOK,
 
         /* Total reserved-slot count for global objects. */
         RESERVED_SLOTS
@@ -740,6 +741,19 @@ class GlobalObject : public NativeObject
         return &forOfPIC.toObject().as<NativeObject>();
     }
     static NativeObject* getOrCreateForOfPICObject(JSContext* cx, Handle<GlobalObject*> global);
+
+    void setModuleResolveHook(HandleFunction hook) {
+        MOZ_ASSERT(hook);
+        setSlot(MODULE_RESOLVE_HOOK, ObjectValue(*hook));
+    }
+
+    JSFunction* moduleResolveHook() {
+        Value value = getSlotRef(MODULE_RESOLVE_HOOK);
+        if (value.isUndefined())
+            return nullptr;
+
+        return &value.toObject().as<JSFunction>();
+    }
 
     // Returns either this global's star-generator function prototype, or null
     // if that object was never created.  Dodgy; for use only in also-dodgy
