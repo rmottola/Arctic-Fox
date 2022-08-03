@@ -4763,6 +4763,10 @@ Parser<FullParseHandler>::exportDeclaration()
         if (!tokenStream.getToken(&tt, TokenStream::Operand))
             return null();
 
+        if (!addExportName(context->names().default_))
+            return null();
+
+        ParseNode* binding = nullptr;
         switch (tt) {
           case TOK_FUNCTION:
             kid = functionStmt(YieldIsKeyword, AllowDefaultName);
@@ -4772,6 +4776,10 @@ Parser<FullParseHandler>::exportDeclaration()
             break;
           default:
             tokenStream.ungetToken();
+            RootedPropertyName name(context, context->names().starDefaultStar);
+            binding = makeInitializedLexicalBinding(name, true, pos());
+            if (!binding)
+                return null();
             kid = assignExpr(InAllowed, YieldIsKeyword);
             if (kid) {
                 if (!MatchOrInsertSemicolon(tokenStream))
@@ -4782,10 +4790,7 @@ Parser<FullParseHandler>::exportDeclaration()
         if (!kid)
             return null();
 
-        if (!addExportName(context->names().default_))
-            return null();
-
-        return handler.newExportDefaultDeclaration(kid, TokenPos(begin, pos().end));
+        return handler.newExportDefaultDeclaration(kid, binding, TokenPos(begin, pos().end));
       }
 
       case TOK_LET:
