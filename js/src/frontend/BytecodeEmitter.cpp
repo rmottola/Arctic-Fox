@@ -7785,8 +7785,8 @@ BytecodeEmitter::emitTree(ParseNode* pn)
             if (!emitTree(subexpr))
                 return false;
         }
-        for (int i = 0; i < pn->pn_count - 1; i++) {
-            if (emit1(JSOP_POW))
+        for (uint32_t i = 0; i < pn->pn_count - 1; i++) {
+            if (!emit1(JSOP_POW))
                 return false;
         }
         break;
