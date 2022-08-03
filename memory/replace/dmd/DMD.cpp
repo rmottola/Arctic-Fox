@@ -219,6 +219,7 @@ public:
   }
 
   static void reportAllocOverflow() { ExitOnFailure(nullptr); }
+  bool checkSimulatedOOM() const { return true; }
 };
 
 // This is only needed because of the |const void*| vs |void*| arg mismatch.

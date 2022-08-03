@@ -560,6 +560,9 @@ class LifoAllocPolicy
     }
     void reportAllocOverflow() const {
     }
+    bool checkSimulatedOOM() const {
+        return fb == Infallible || !js::oom::ShouldFailWithOOM();
+    }
 };
 
 } // namespace js
