@@ -460,6 +460,7 @@ class StaticEvalObject : public ScopeObject
     // Indirect evals terminate in the global at run time, and has no static
     // enclosing scope.
     bool isDirect() const {
+        MOZ_ASSERT_IF(!getReservedSlot(SCOPE_CHAIN_SLOT).isObject(), !isStrict());
         return getReservedSlot(SCOPE_CHAIN_SLOT).isObject();
     }
 };
@@ -664,6 +665,14 @@ class StaticBlockObject : public BlockObject
      * static scope is a JSFunction.
      */
     inline StaticBlockObject* enclosingBlock() const;
+
+    StaticEvalObject* maybeEnclosingEval() const {
+        if (JSObject* enclosing = enclosingStaticScope()) {
+            if (enclosing->is<StaticEvalObject>())
+                return &enclosing->as<StaticEvalObject>();
+        }
+        return nullptr;
+    }
 
     uint32_t localOffset() {
         return getReservedSlot(LOCAL_OFFSET_SLOT).toPrivateUint32();
