@@ -5817,7 +5817,7 @@ BytecodeEmitter::emitFunction(ParseNode* pn, bool needsProto)
     if (sc->isGlobalContext()) {
         MOZ_ASSERT(pn->pn_scopecoord.isFree());
         MOZ_ASSERT(pn->getOp() == JSOP_NOP);
-        MOZ_ASSERT(!innermostStmt());
+        MOZ_ASSERT(!innermostStmt() || sc->isModuleBox());
         switchToPrologue();
         if (!emitIndex32(JSOP_DEFFUN, index))
             return false;
@@ -7819,12 +7819,36 @@ BytecodeEmitter::emitTree(ParseNode* pn)
         break;
 
       case PNK_IMPORT:
+        if (!checkIsModule())
+            return false;
+        ok = true;
+        break;
+
       case PNK_EXPORT:
+        if (!checkIsModule())
+            return false;
+        if (pn->pn_kid->getKind() != PNK_EXPORT_SPEC_LIST)
+            ok = emitTree(pn->pn_kid);
+        else
+            ok = true;
+        break;
+
       case PNK_EXPORT_DEFAULT:
+        if (!checkIsModule())
+            return false;
+        if (pn->pn_kid->isDefn()) {
+            ok = emitTree(pn->pn_kid);
+        } else {
+            // TODO: Emit a definition of *default* from child expression.
+            ok = true;
+        }
+        break;
+
       case PNK_EXPORT_FROM:
-       // TODO: Implement emitter support for modules
-       reportError(nullptr, JSMSG_MODULES_NOT_IMPLEMENTED);
-       return false;
+        if (!checkIsModule())
+            return false;
+        ok = true;
+        break;
 
       case PNK_ARRAYPUSH: {
         /*
@@ -7958,6 +7982,16 @@ BytecodeEmitter::emitTree(ParseNode* pn)
     }
 
     return ok;
+}
+
+bool
+BytecodeEmitter::checkIsModule()
+{
+    if (!sc->isModuleBox()) {
+        reportError(nullptr, JSMSG_INVALID_OUTSIDE_MODULE);
+        return false;
+    }
+    return true;
 }
 
 static bool
