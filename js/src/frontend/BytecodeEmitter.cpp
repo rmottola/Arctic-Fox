@@ -5149,7 +5149,8 @@ BytecodeEmitter::emitIf(ParseNode* pn)
 }
 
 /*
- * pnLet represents a let-statement:    let (x = y) { ... }
+ * pnLet represents a let-statement: let (x = y) { ... }
+ *
  */
 /*
  * Using MOZ_NEVER_INLINE in here is a workaround for llvm.org/pr14047. See
@@ -5565,7 +5566,7 @@ BytecodeEmitter::emitForIn(ParseNode* pn, ptrdiff_t top)
     if (!emit1(JSOP_POP))
         return false;
 
-    if (!tryNoteList.append(JSTRY_FOR_IN, stackDepth, top, offset()))
+    if (!tryNoteList.append(JSTRY_FOR_IN, this->stackDepth, top, offset()))
         return false;
     if (!emit1(JSOP_ENDITER))
         return false;
