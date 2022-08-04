@@ -714,8 +714,8 @@ struct JSCompartment
   private:
     js::jit::JitCompartment* jitCompartment_;
 
-    js::ReadBarriered<js::ArgumentsObject*> normalArgumentsTemplate_;
-    js::ReadBarriered<js::ArgumentsObject*> strictArgumentsTemplate_;
+    js::ReadBarriered<js::ArgumentsObject*> mappedArgumentsTemplate_;
+    js::ReadBarriered<js::ArgumentsObject*> unmappedArgumentsTemplate_;
 
   public:
     bool ensureJitCompartmentExists(JSContext* cx);
@@ -736,7 +736,7 @@ struct JSCompartment
         DeprecatedLanguageExtensionCount
     };
 
-    js::ArgumentsObject* getOrCreateArgumentsTemplateObject(JSContext* cx, bool strict);
+    js::ArgumentsObject* getOrCreateArgumentsTemplateObject(JSContext* cx, bool mapped);
 
   private:
     // Used for collecting telemetry on SpiderMonkey's deprecated language extensions.
