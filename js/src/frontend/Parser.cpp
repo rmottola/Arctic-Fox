@@ -6761,13 +6761,12 @@ Parser<ParseHandler>::statement(YieldHandling yieldHandling, bool canHaveDirecti
 
       // LexicalDeclaration[In, ?Yield]
       case TOK_LET:
-        if (!abortIfSyntaxParser())
-            return null();
-        return lexicalDeclaration(yieldHandling, /* isConst = */ false);
       case TOK_CONST:
         if (!abortIfSyntaxParser())
             return null();
-        return lexicalDeclaration(yieldHandling, /* isConst = */ true);
+        // [In] is the default behavior, because for-loops currently specially
+        // parse their heads to handle |in| in this situation.
+        return lexicalDeclaration(yieldHandling, /* isConst = */ tt == TOK_CONST);
 
       // ImportDeclaration (only inside modules)
       case TOK_IMPORT:
