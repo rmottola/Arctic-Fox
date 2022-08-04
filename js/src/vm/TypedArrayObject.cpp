@@ -832,7 +832,6 @@ TypedArrayObject::sharedTypedArrayPrototypeClass = {
     nullptr,                /* enumerate */
     nullptr,                /* resolve */
     nullptr,                /* mayResolve */
-    nullptr,                /* convert */
     nullptr,                /* finalize */
     nullptr,                /* call */
     nullptr,                /* hasInstance */
@@ -1804,7 +1803,6 @@ IMPL_TYPED_ARRAY_COMBINED_UNWRAPPERS(Float64, double, double)
     nullptr,                 /* enumerate   */                                 \
     nullptr,                 /* resolve     */                                 \
     nullptr,                 /* mayResolve  */                                 \
-    nullptr,                 /* convert     */                                 \
     nullptr,                 /* finalize    */                                 \
     nullptr,                 /* call        */                                 \
     nullptr,                 /* hasInstance */                                 \
@@ -1850,7 +1848,6 @@ const Class TypedArrayObject::classes[Scalar::MaxTypedArrayViewType] = {
     nullptr, /* enumerate */ \
     nullptr, /* resolve */ \
     nullptr, /* mayResolve */ \
-    nullptr, /* convert */ \
     nullptr, /* finalize */ \
     nullptr, /* call */ \
     nullptr, /* hasInstance */ \
@@ -1905,7 +1902,6 @@ const Class DataViewObject::class_ = {
     nullptr, /* enumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
-    nullptr, /* convert */
     nullptr, /* finalize */
     nullptr, /* call */
     nullptr, /* hasInstance */
