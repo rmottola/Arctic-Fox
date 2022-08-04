@@ -61,6 +61,7 @@ class HeapSnapshot final : public nsISupports
                          , public nsWrapperCache
 {
   friend struct DeserializedNode;
+  friend struct DeserializedStackFrame;
 
   explicit HeapSnapshot(JSContext* cx, nsISupports* aParent)
     : timestamp(Nothing())
