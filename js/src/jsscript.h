@@ -359,7 +359,7 @@ static_assert(sizeof(Bindings) % js::gc::CellSize == 0,
 template <class Outer>
 class BindingsOperations
 {
-    const Bindings& bindings() const { return static_cast<const Outer*>(this)->extract(); }
+    const Bindings& bindings() const { return static_cast<const Outer*>(this)->get(); }
 
   public:
     // Direct data access to the underlying bindings.
@@ -423,7 +423,7 @@ class BindingsOperations
 template <class Outer>
 class MutableBindingsOperations : public BindingsOperations<Outer>
 {
-    Bindings& bindings() { return static_cast<Outer*>(this)->extractMutable(); }
+    Bindings& bindings() { return static_cast<Outer*>(this)->get(); }
 
   public:
     void setCallObjShape(HandleShape shape) { bindings().callObjShape_ = shape; }
@@ -448,27 +448,12 @@ class MutableBindingsOperations : public BindingsOperations<Outer>
 
 template <>
 class HandleBase<Bindings> : public BindingsOperations<JS::Handle<Bindings>>
-{
-    friend class BindingsOperations<JS::Handle<Bindings>>;
-    const Bindings& extract() const {
-        return static_cast<const JS::Handle<Bindings>*>(this)->get();
-    }
-};
+{};
 
 template <>
 class MutableHandleBase<Bindings>
   : public MutableBindingsOperations<JS::MutableHandle<Bindings>>
-{
-    friend class BindingsOperations<JS::MutableHandle<Bindings>>;
-    const Bindings& extract() const {
-        return static_cast<const JS::MutableHandle<Bindings>*>(this)->get();
-    }
-
-    friend class MutableBindingsOperations<JS::MutableHandle<Bindings>>;
-    Bindings& extractMutable() {
-        return static_cast<JS::MutableHandle<Bindings>*>(this)->get();
-    }
-};
+{};
 
 class ScriptCounts
 {
