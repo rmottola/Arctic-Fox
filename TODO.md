@@ -135,7 +135,6 @@
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1181612 - 2015-09-16 - Split AsmJSValidate into AsmJS{Validate,Compile} and dif
-- Bug 895274 - 1 to 270 parts
 - Bug 1051052 - Made mid an outparam in JsepSession::AddLocalIceCandida
 - Bug 1189200 - 2015-08-31 -  Only clear pending fullscreen requests in inclusive des
 -  Remove the backend flag to TextureClient::CreateForDrawing. (bug 1183910 part 9, r=mattwoodrow)
@@ -145,15 +144,10 @@
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - Bug 1171379 - and check all related on bugzilla
-- Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier 
-- Bug 1181869 [provokes crashing] - 2015-07-09 -  Update Bindings to use normal Rooted primitives; r=shu 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
 - bug 1181823 - convert test_ev_certs.js, test_keysize_ev.js, a
 - Bug 1175523 - Update most (but not all) tests to use elem.srcObject o
---Bug 1194422 - Expose census traversals to SpiderMonkey embedders; r=s
-- Bug 1148505 - 2015-08-28 [Warning: breaks history] -  remove cpow usage from back-forward menu by using sessio
 - Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
-- Bug 912121 - 2015-09-21 Migrate major DevTools directories. 
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1242578
 
@@ -184,31 +178,12 @@ Check with Roy Tam:
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/ac250f9d737362d0730b0897603ae379eca89ebf
 
-## Breaking JS
--  Bug 603201 - Enable primitive receivers in [[Get]]. r=jorendorff 
-- Bug 1191570 - Use ToPropertyKey everywhere ES6 says to use it. r=Wald
+## Enhancing JS
+ Bug 1316079 - Mark JS::PropertyDescriptor as JS_PUBLIC_API to fix lin¿
 - Bug 1208747 - Move most of Stopwatch-related code to XPCOM-land (JSAP
 - Bug 1206290 - Part 1: Implement a JS::ubi::PostOrder depth first trav
 - Bug 1209704 - Part 2: Share storage and mixins between Read and Wri
-- Bug 1202048 - Root JSONParser explicitly; r=sfink 
-- Bug 1187062 - Part 2: Implement a concrete JS::ubi::StackFrame clas
-- Bug 1187062 - Part 1: Add the JS::ubi::StackFrame interface; r=sfink
--  Bug 1187062 - Part 0: Make js::Debugger::getObjectAllocationSite retu
-- 1175394 part 2 - Rename normal/strict arguments to mapped/unmappe
-- Bug 1054756, part 5 - Remove Class::convert. 
-- Bug 1054756, part 4 - Remove BaseProxyHandler::defaultValue. r=jandem
-- Bug 1054756, part 3 - Implement Symbol.toPrimitive. Replace existing 
-- Bug 1088214 - Remove JSCLASS_IMPLEMENTS_BARRIERS now this is implemen
-- Bug 1193583 - Fix eval to always execute under a non-extensible lexi
-- Bug 1191236 - Remove extract() methods used by operation forwarding 
-- Bug 930414 - 22 parts
-- Bug 1167409 - 4/4 - Inititalize ScriptSourceObject even when off-main
-Bug 1191117 - Remove RootedGeneric and replace with normal Rooted usa
-Bug 1195866 - Make allocations log report whether an allocation was i
-Bug 1189490 - Follow ups: Move [Traceable]Fifo to js/src/ds. r=terrence
-- Bug 1189490 - Part 2: Stop using mozilla::LinkedList for the alloca
-Bug 1182124 - Remove InternalHandle and its last use; r=bbouvier
-Bug 1181869 - Update Bindings to use normal Rooted primitives
+- Bug 930414 - remaining 6 out of 22 parts
 
 ### FIXME / TODO
 - Reapply Bug 486262 - Part 2 with removal of tabbrowser.dtd - breaks browser currently
