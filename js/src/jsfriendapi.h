@@ -2697,7 +2697,7 @@ typedef void
 JS_FRIEND_API(void)
 SetCTypesActivityCallback(JSRuntime* rt, CTypesActivityCallback cb);
 
-class JS_FRIEND_API(AutoCTypesActivityCallback) {
+class MOZ_RAII JS_FRIEND_API(AutoCTypesActivityCallback) {
   private:
     JSContext* cx;
     CTypesActivityCallback callback;

@@ -185,7 +185,7 @@ using NewObjectMetadataState = mozilla::Variant<ImmediateMetadata,
                                                 DelayMetadata,
                                                 PendingMetadata>;
 
-class MOZ_STACK_CLASS AutoSetNewObjectMetadata : private JS::CustomAutoRooter
+class MOZ_RAII AutoSetNewObjectMetadata : private JS::CustomAutoRooter
 {
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER;
 
@@ -778,7 +778,7 @@ ExclusiveContext::global() const
     return Handle<GlobalObject*>::fromMarkedLocation(compartment_->global_.unsafeGet());
 }
 
-class AssertCompartmentUnchanged
+class MOZ_RAII AssertCompartmentUnchanged
 {
   public:
     explicit AssertCompartmentUnchanged(JSContext* cx
@@ -876,7 +876,7 @@ struct WrapperValue
     Value value;
 };
 
-class AutoWrapperVector : public JS::AutoVectorRooterBase<WrapperValue>
+class MOZ_RAII AutoWrapperVector : public JS::AutoVectorRooterBase<WrapperValue>
 {
   public:
     explicit AutoWrapperVector(JSContext* cx
@@ -889,7 +889,7 @@ class AutoWrapperVector : public JS::AutoVectorRooterBase<WrapperValue>
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 };
 
-class AutoWrapperRooter : private JS::AutoGCRooter {
+class MOZ_RAII AutoWrapperRooter : private JS::AutoGCRooter {
   public:
     AutoWrapperRooter(JSContext* cx, WrapperValue v
                       MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
