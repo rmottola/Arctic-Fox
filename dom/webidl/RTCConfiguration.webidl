@@ -14,8 +14,15 @@ dictionary RTCIceServer {
     DOMString? username = null;
 };
 
+enum RTCBundlePolicy {
+    "balanced",
+    "max-compat",
+    "max-bundle"
+};
+
 dictionary RTCConfiguration {
     sequence<RTCIceServer> iceServers;
+    RTCBundlePolicy bundlePolicy = "balanced";
     DOMString? peerIdentity = null;
     sequence<RTCCertificate> certificates;
 };
