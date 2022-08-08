@@ -2274,8 +2274,8 @@ JsepSessionImpl::AddRemoteIceCandidate(const std::string& candidate,
 
 nsresult
 JsepSessionImpl::AddLocalIceCandidate(const std::string& candidate,
-                                      const std::string& mid,
                                       uint16_t level,
+                                      std::string* mid,
                                       bool* skipped)
 {
   mLastError.clear();
@@ -2307,9 +2307,14 @@ JsepSessionImpl::AddLocalIceCandidate(const std::string& candidate,
     }
   }
 
+  nsresult rv = mSdpHelper.GetMidFromLevel(*sdp, level, mid);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
   *skipped = false;
 
-  return mSdpHelper.AddCandidateToSdp(sdp, candidate, mid, level);
+  return mSdpHelper.AddCandidateToSdp(sdp, candidate, *mid, level);
 }
 
 nsresult
