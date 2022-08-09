@@ -1136,8 +1136,8 @@ class IceGatherTest : public ::testing::Test {
     ASSERT_TRUE_WAIT(peer_->gathering_complete(), waitTime);
   }
 
-  void UseFakeStunServerWithResponse(const std::string& fake_addr,
-                                     uint16_t fake_port) {
+  void UseFakeStunUdpServerWithResponse(const std::string& fake_addr,
+                                        uint16_t fake_port) {
     EnsurePeer();
     TestStunServer::GetInstance()->SetResponseAddr(fake_addr, fake_port);
     // Sets an additional stun server
@@ -1587,7 +1587,8 @@ TEST_F(IceGatherTest, TestGatherFakeStunServerTcpHostnameNoResolver) {
   }
 
   EnsurePeer();
-  peer_->SetStunServer(g_stun_server_hostname, kDefaultStunServerPort, kNrIceTransportTcp);
+  peer_->SetStunServer(g_stun_server_hostname, kDefaultStunServerPort,
+    kNrIceTransportTcp);
   Gather();
 }
 
@@ -1633,6 +1634,10 @@ TEST_F(IceGatherTest, TestGatherDNSStunServerIpAddress) {
 }
 
 TEST_F(IceGatherTest, TestGatherDNSStunServerIpAddressTcp) {
+  if (g_stun_server_address.empty()) {
+    return;
+  }
+
   EnsurePeer();
   peer_->SetStunServer(g_stun_server_address, kDefaultStunServerPort,
     kNrIceTransportTcp);
@@ -1660,6 +1665,10 @@ TEST_F(IceGatherTest, TestGatherDNSStunServerHostnameTcp) {
 }
 
 TEST_F(IceGatherTest, TestGatherDNSStunServerHostnameBothUdpTcp) {
+  if (g_stun_server_hostname.empty()) {
+    return;
+  }
+
   std::vector<NrIceStunServer> stun_servers;
 
   EnsurePeer();
@@ -1673,6 +1682,10 @@ TEST_F(IceGatherTest, TestGatherDNSStunServerHostnameBothUdpTcp) {
 }
 
 TEST_F(IceGatherTest, TestGatherDNSStunServerIpAddressBothUdpTcp) {
+  if (g_stun_server_address.empty()) {
+    return;
+  }
+
   std::vector<NrIceStunServer> stun_servers;
 
   EnsurePeer();
@@ -1767,7 +1780,7 @@ TEST_F(IceGatherTest, TestBogusCandidate) {
 }
 
 TEST_F(IceGatherTest, VerifyTestStunServer) {
-  UseFakeStunServerWithResponse("192.0.2.133", 3333);
+  UseFakeStunUdpServerWithResponse("192.0.2.133", 3333);
   Gather();
   ASSERT_TRUE(StreamHasMatchingCandidate(0, " 192.0.2.133 3333 "));
 }
@@ -1775,29 +1788,30 @@ TEST_F(IceGatherTest, VerifyTestStunServer) {
 TEST_F(IceGatherTest, VerifyTestStunTcpServer) {
   UseFakeStunTcpServerWithResponse("192.0.2.233", 3333);
   Gather();
-  ASSERT_TRUE(StreamHasMatchingCandidate(0, " 192.0.2.233 3333 typ srflx", " tcptype "));
+  ASSERT_TRUE(StreamHasMatchingCandidate(0, " 192.0.2.233 3333 typ srflx",
+    " tcptype "));
 }
 
 TEST_F(IceGatherTest, TestStunServerReturnsWildcardAddr) {
-  UseFakeStunServerWithResponse("0.0.0.0", 3333);
+  UseFakeStunUdpServerWithResponse("0.0.0.0", 3333);
   Gather(kDefaultTimeout * 3);
   ASSERT_FALSE(StreamHasMatchingCandidate(0, " 0.0.0.0 "));
 }
 
 TEST_F(IceGatherTest, TestStunServerReturnsPort0) {
-  UseFakeStunServerWithResponse("192.0.2.133", 0);
+  UseFakeStunUdpServerWithResponse("192.0.2.133", 0);
   Gather(kDefaultTimeout * 3);
   ASSERT_FALSE(StreamHasMatchingCandidate(0, " 192.0.2.133 0 "));
 }
 
 TEST_F(IceGatherTest, TestStunServerReturnsLoopbackAddr) {
-  UseFakeStunServerWithResponse("127.0.0.133", 3333);
+  UseFakeStunUdpServerWithResponse("127.0.0.133", 3333);
   Gather(kDefaultTimeout * 3);
   ASSERT_FALSE(StreamHasMatchingCandidate(0, " 127.0.0.133 "));
 }
 
 TEST_F(IceGatherTest, TestStunServerTrickle) {
-  UseFakeStunServerWithResponse("192.0.2.1", 3333);
+  UseFakeStunUdpServerWithResponse("192.0.2.1", 3333);
   TestStunServer::GetInstance()->SetActive(false);
   Gather(0);
   ASSERT_FALSE(StreamHasMatchingCandidate(0, "192.0.2.1"));
