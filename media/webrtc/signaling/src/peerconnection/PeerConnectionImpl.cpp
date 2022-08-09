@@ -526,6 +526,20 @@ PeerConnectionConfiguration::Init(const RTCConfiguration& aSrc)
     default:
       MOZ_CRASH();
   }
+
+  switch (aSrc.mIceTransportPolicy) {
+    case dom::RTCIceTransportPolicy::None:
+      setIceTransportPolicy(NrIceCtx::ICE_POLICY_NONE);
+      break;
+    case dom::RTCIceTransportPolicy::Relay:
+      setIceTransportPolicy(NrIceCtx::ICE_POLICY_RELAY);
+      break;
+    case dom::RTCIceTransportPolicy::All:
+      setIceTransportPolicy(NrIceCtx::ICE_POLICY_ALL);
+      break;
+    default:
+      MOZ_CRASH();
+  }
   return NS_OK;
 }
 
@@ -742,7 +756,8 @@ PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
 
   // Initialize the media object.
   res = mMedia->Init(aConfiguration.getStunServers(),
-                     aConfiguration.getTurnServers());
+                     aConfiguration.getTurnServers(),
+                     aConfiguration.getIceTransportPolicy());
   if (NS_FAILED(res)) {
     CSFLogError(logTag, "%s: Couldn't initialize media object", __FUNCTION__);
     return res;
