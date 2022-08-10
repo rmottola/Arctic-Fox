@@ -360,7 +360,9 @@ Http2Decompressor::DecodeHeaderBlock(const uint8_t *data, uint32_t datalen,
   mIsPush = isPush;
 
   nsresult rv = NS_OK;
+  nsresult softfail_rv = NS_OK;
   while (NS_SUCCEEDED(rv) && (mOffset < mDataLen)) {
+    bool modifiesTable = true;
     if (mData[mOffset] & 0x80) {
       rv = DoIndexed();
       LOG(("Decompressor state after indexed"));
@@ -371,16 +373,37 @@ Http2Decompressor::DecodeHeaderBlock(const uint8_t *data, uint32_t datalen,
       rv = DoContextUpdate();
       LOG(("Decompressor state after context update"));
     } else if (mData[mOffset] & 0x10) {
+      modifiesTable = false;
       rv = DoLiteralNeverIndexed();
       LOG(("Decompressor state after literal never index"));
     } else {
+      modifiesTable = false;
       rv = DoLiteralWithoutIndex();
       LOG(("Decompressor state after literal without index"));
     }
     DumpState();
+    if (rv == NS_ERROR_ILLEGAL_VALUE) {
+      if (modifiesTable) {
+        // Unfortunately, we can't count on our peer now having the same state
+        // as us, so let's terminate the session and we can try again later.
+        return NS_ERROR_FAILURE;
+      }
+
+      // This is an http-level error that we can handle by resetting the stream
+      // in the upper layers. Let's note that we saw this, then continue
+      // decompressing until we either hit the end of the header block or find a
+      // hard failure. That way we won't get an inconsistent compression state
+      // with the server.
+      softfail_rv = rv;
+      rv = NS_OK;
+    }
   }
 
-  return rv;
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  return softfail_rv;
 }
 
 nsresult
@@ -407,7 +430,8 @@ Http2Decompressor::DecodeInteger(uint32_t prefixLen, uint32_t &accum)
 
   if (mOffset >= mDataLen) {
     NS_WARNING("Ran out of data to decode integer");
-    return NS_ERROR_ILLEGAL_VALUE;
+    // This is session-fatal.
+    return NS_ERROR_FAILURE;
   }
   bool chainBit = mData[mOffset] & 0x80;
   accum += (mData[mOffset] & 0x7f) * factor;
@@ -419,12 +443,16 @@ Http2Decompressor::DecodeInteger(uint32_t prefixLen, uint32_t &accum)
     // really big offsets are just trawling for overflows
     if (accum >= 0x800000) {
       NS_WARNING("Decoding integer >= 0x800000");
-      return NS_ERROR_ILLEGAL_VALUE;
+      // This is not strictly fatal to the session, but given the fact that
+      // the value is way to large to be reasonable, let's just tell our peer
+      // to go away.
+      return NS_ERROR_FAILURE;
     }
 
     if (mOffset >= mDataLen) {
       NS_WARNING("Ran out of data to decode integer");
-      return NS_ERROR_ILLEGAL_VALUE;
+      // This is session-fatal.
+      return NS_ERROR_FAILURE;
     }
     chainBit = mData[mOffset] & 0x80;
     accum += (mData[mOffset] & 0x7f) * factor;
@@ -540,7 +568,8 @@ Http2Decompressor::OutputHeader(uint32_t index)
   // bounds check
   if (mHeaderTable.Length() <= index) {
     LOG(("Http2Decompressor::OutputHeader index too large %u", index));
-    return NS_ERROR_ILLEGAL_VALUE;
+    // This is session-fatal.
+    return NS_ERROR_FAILURE;
   }
 
   return OutputHeader(mHeaderTable[index]->mName,
@@ -552,8 +581,10 @@ Http2Decompressor::CopyHeaderString(uint32_t index, nsACString &name)
 {
   // NWGH - make this < index
   // bounds check
-  if (mHeaderTable.Length() <= index)
-    return NS_ERROR_ILLEGAL_VALUE;
+  if (mHeaderTable.Length() <= index) {
+    // This is session-fatal.
+    return NS_ERROR_FAILURE;
+  }
 
   name = mHeaderTable[index]->mName;
   return NS_OK;
@@ -562,8 +593,10 @@ Http2Decompressor::CopyHeaderString(uint32_t index, nsACString &name)
 nsresult
 Http2Decompressor::CopyStringFromInput(uint32_t bytes, nsACString &val)
 {
-  if (mOffset + bytes > mDataLen)
-    return NS_ERROR_ILLEGAL_VALUE;
+  if (mOffset + bytes > mDataLen) {
+    // This is session-fatal.
+    return NS_ERROR_FAILURE;
+  }
 
   val.Assign(reinterpret_cast<const char *>(mData) + mOffset, bytes);
   mOffset += bytes;
@@ -591,21 +624,21 @@ Http2Decompressor::DecodeFinalHuffmanCharacter(HuffmanIncomingTable *table,
   if (entry->mPtr) {
     // Can't chain to another table when we're all out of bits in the encoding
     LOG(("DecodeFinalHuffmanCharacter trying to chain when we're out of bits"));
-    return NS_ERROR_ILLEGAL_VALUE;
+    return NS_ERROR_FAILURE;
   }
 
   if (bitsLeft < entry->mPrefixLen) {
     // We don't have enough bits to actually make a match, this is some sort of
     // invalid coding
     LOG(("DecodeFinalHuffmanCharacter does't have enough bits to match"));
-    return NS_ERROR_ILLEGAL_VALUE;
+    return NS_ERROR_FAILURE;
   }
 
   // This is a character!
   if (entry->mValue == 256) {
     // EOS
     LOG(("DecodeFinalHuffmanCharacter actually decoded an EOS"));
-    return NS_ERROR_ILLEGAL_VALUE;
+    return NS_ERROR_FAILURE;
   }
   c = static_cast<uint8_t>(entry->mValue & 0xFF);
   bitsLeft -= entry->mPrefixLen;
@@ -652,7 +685,7 @@ Http2Decompressor::DecodeHuffmanCharacter(HuffmanIncomingTable *table,
         // TODO - does this get me into trouble in the new world?
         // No info left in input to try to consume, we're done
         LOG(("DecodeHuffmanCharacter all out of bits to consume, can't chain"));
-        return NS_ERROR_ILLEGAL_VALUE;
+        return NS_ERROR_FAILURE;
       }
 
       // We might get lucky here!
@@ -665,7 +698,7 @@ Http2Decompressor::DecodeHuffmanCharacter(HuffmanIncomingTable *table,
 
   if (entry->mValue == 256) {
     LOG(("DecodeHuffmanCharacter found an actual EOS"));
-    return NS_ERROR_ILLEGAL_VALUE;
+    return NS_ERROR_FAILURE;
   }
   c = static_cast<uint8_t>(entry->mValue & 0xFF);
 
@@ -688,7 +721,7 @@ Http2Decompressor::CopyHuffmanStringFromInput(uint32_t bytes, nsACString &val)
 {
   if (mOffset + bytes > mDataLen) {
     LOG(("CopyHuffmanStringFromInput not enough data"));
-    return NS_ERROR_ILLEGAL_VALUE;
+    return NS_ERROR_FAILURE;
   }
 
   uint32_t bytesRead = 0;
@@ -712,7 +745,7 @@ Http2Decompressor::CopyHuffmanStringFromInput(uint32_t bytes, nsACString &val)
 
   if (bytesRead > bytes) {
     LOG(("CopyHuffmanStringFromInput read more bytes than was allowed!"));
-    return NS_ERROR_ILLEGAL_VALUE;
+    return NS_ERROR_FAILURE;
   }
 
   if (bitsLeft) {
@@ -727,7 +760,7 @@ Http2Decompressor::CopyHuffmanStringFromInput(uint32_t bytes, nsACString &val)
 
   if (bitsLeft > 7) {
     LOG(("CopyHuffmanStringFromInput more than 7 bits of padding"));
-    return NS_ERROR_ILLEGAL_VALUE;
+    return NS_ERROR_FAILURE;
   }
 
   if (bitsLeft) {
@@ -738,7 +771,7 @@ Http2Decompressor::CopyHuffmanStringFromInput(uint32_t bytes, nsACString &val)
     if (bits != mask) {
       LOG(("CopyHuffmanStringFromInput ran out of data but found possible "
            "non-EOS symbol"));
-      return NS_ERROR_ILLEGAL_VALUE;
+      return NS_ERROR_FAILURE;
     }
   }
 
@@ -757,13 +790,14 @@ Http2Decompressor::DoIndexed()
 
   uint32_t index;
   nsresult rv = DecodeInteger(7, index);
-  if (NS_FAILED(rv))
+  if (NS_FAILED(rv)) {
     return rv;
+  }
 
   LOG(("HTTP decompressor indexed entry %u\n", index));
 
   if (index == 0) {
-    return NS_ERROR_ILLEGAL_VALUE;
+    return NS_ERROR_FAILURE;
   }
   // NWGH - remove this line, since we'll keep everything 1-indexed
   index--; // Internally, we 0-index everything, since this is, y'know, C++
@@ -783,8 +817,9 @@ Http2Decompressor::DoLiteralInternal(nsACString &name, nsACString &value,
   // first let's get the name
   uint32_t index;
   nsresult rv = DecodeInteger(namePrefixLen, index);
-  if (NS_FAILED(rv))
+  if (NS_FAILED(rv)) {
     return rv;
+  }
 
   // sanity check
   if (mOffset >= mDataLen) {
@@ -816,8 +851,9 @@ Http2Decompressor::DoLiteralInternal(nsACString &name, nsACString &value,
     LOG(("Http2Decompressor::DoLiteralInternal indexed name %d %s",
          index, name.BeginReading()));
   }
-  if (NS_FAILED(rv))
+  if (NS_FAILED(rv)) {
     return rv;
+  }
 
   // sanity check
   if (mOffset >= mDataLen) {
@@ -837,8 +873,19 @@ Http2Decompressor::DoLiteralInternal(nsACString &name, nsACString &value,
       rv = CopyStringFromInput(valueLen, value);
     }
   }
-  if (NS_FAILED(rv))
+  if (NS_FAILED(rv)) {
     return rv;
+  }
+
+  int32_t newline = 0;
+  while ((newline = value.FindChar('\n', newline)) != -1) {
+    if (value[newline + 1] == ' ' || value[newline + 1] == '\t') {
+      LOG(("Http2Decompressor::Disallowing folded header value %s",
+           value.BeginReading()));
+      return NS_ERROR_ILLEGAL_VALUE;
+    }
+  }
+
   LOG(("Http2Decompressor::DoLiteralInternal value %s", value.BeginReading()));
   return NS_OK;
 }
@@ -855,8 +902,9 @@ Http2Decompressor::DoLiteralWithoutIndex()
   LOG(("HTTP decompressor literal without index %s %s\n",
        name.get(), value.get()));
 
-  if (NS_SUCCEEDED(rv))
+  if (NS_SUCCEEDED(rv)) {
     rv = OutputHeader(name, value);
+  }
   return rv;
 }
 
@@ -868,10 +916,12 @@ Http2Decompressor::DoLiteralWithIncremental()
 
   nsAutoCString name, value;
   nsresult rv = DoLiteralInternal(name, value, 6);
-  if (NS_SUCCEEDED(rv))
+  if (NS_SUCCEEDED(rv)) {
     rv = OutputHeader(name, value);
-  if (NS_FAILED(rv))
+  }
+  if (NS_FAILED(rv)) {
     return rv;
+  }
 
   uint32_t room = nvPair(name, value).Size();
   if (room > mMaxBuffer) {
@@ -906,8 +956,9 @@ Http2Decompressor::DoLiteralNeverIndexed()
   LOG(("HTTP decompressor literal never indexed %s %s\n",
        name.get(), value.get()));
 
-  if (NS_SUCCEEDED(rv))
+  if (NS_SUCCEEDED(rv)) {
     rv = OutputHeader(name, value);
+  }
   return rv;
 }
 
@@ -921,8 +972,9 @@ Http2Decompressor::DoContextUpdate()
   uint32_t newMaxSize;
   nsresult rv = DecodeInteger(5, newMaxSize);
   LOG(("Http2Decompressor::DoContextUpdate new maximum size %u", newMaxSize));
-  if (NS_FAILED(rv))
+  if (NS_FAILED(rv)) {
     return rv;
+  }
   return mCompressor->SetMaxBufferSizeInternal(newMaxSize);
 }
 
@@ -968,13 +1020,15 @@ Http2Compressor::EncodeHeaderBlock(const nsCString &nvInput,
     int32_t startIndex = crlfIndex + 2;
 
     crlfIndex = nvInput.Find("\r\n", false, startIndex);
-    if (crlfIndex == -1)
+    if (crlfIndex == -1) {
       break;
+    }
 
     int32_t colonIndex = nvInput.Find(":", false, startIndex,
                                       crlfIndex - startIndex);
-    if (colonIndex == -1)
+    if (colonIndex == -1) {
       break;
+    }
 
     nsDependentCSubstring name = Substring(beginBuffer + startIndex,
                                            beginBuffer + colonIndex);
@@ -1021,8 +1075,9 @@ Http2Compressor::EncodeHeaderBlock(const nsCString &nvInput,
     if (name.EqualsLiteral("content-length")) {
       int64_t len;
       nsCString tmp(value);
-      if (nsHttp::ParseInt64(tmp.get(), nullptr, &len))
+      if (nsHttp::ParseInt64(tmp.get(), nullptr, &len)) {
         mParsedContentLength = len;
+      }
     }
 
     if (name.EqualsLiteral("cookie")) {
@@ -1156,8 +1211,9 @@ Http2Compressor::EncodeInteger(uint32_t prefixLen, uint32_t val)
     q = val / 128;
     r = val % 128;
     tmp = r;
-    if (q)
+    if (q) {
       tmp |= 0x80; // chain bit
+    }
     val = q;
     mOutput->Append(reinterpret_cast<char *>(&tmp), 1);
   } while (q);
@@ -1326,7 +1382,7 @@ nsresult
 Http2Compressor::SetMaxBufferSizeInternal(uint32_t maxBufferSize)
 {
   if (maxBufferSize > mMaxBufferSetting) {
-    return NS_ERROR_ILLEGAL_VALUE;
+    return NS_ERROR_FAILURE;
   }
 
   uint32_t removedCount = 0;
