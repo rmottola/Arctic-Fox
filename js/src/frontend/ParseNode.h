@@ -624,7 +624,7 @@ class ParseNode
             union {
                 unsigned iflags;        /* JSITER_* flags for PNK_FOR node */
                 ObjectBox* objbox;      /* Only for PN_BINARY_OBJ */
-		bool isStatic;          /* Only for PNK_CLASSMETHOD */
+                bool isStatic;          /* Only for PNK_CLASSMETHOD */
             };
         } binary;
         struct {                        /* one kid if unary */
@@ -1128,7 +1128,7 @@ struct LexicalScopeNode : public ParseNode
         pn_blockid = blockNode->pn_blockid;
     }
 
-    static bool test(const ParseNode &node) {
+    static bool test(const ParseNode& node) {
         return node.isKind(PNK_LEXICALSCOPE);
     }
 };
@@ -1369,22 +1369,22 @@ struct ClassMethod : public BinaryNode {
      * Method defintions often keep a name and function body that overlap,
      * so explicitly define the beginning and end here.
      */
-    ClassMethod(ParseNode *name, ParseNode *body, JSOp op, bool isStatic)
+    ClassMethod(ParseNode* name, ParseNode* body, JSOp op, bool isStatic)
       : BinaryNode(PNK_CLASSMETHOD, op, TokenPos(name->pn_pos.begin, body->pn_pos.end), name, body)
     {
         pn_u.binary.isStatic = isStatic;
     }
 
-    static bool test(const ParseNode &node) {
+    static bool test(const ParseNode& node) {
         bool match = node.isKind(PNK_CLASSMETHOD);
         MOZ_ASSERT_IF(match, node.isArity(PN_BINARY));
         return match;
     }
 
-    ParseNode &name() const {
+    ParseNode& name() const {
         return *pn_u.binary.left;
     }
-    ParseNode &method() const {
+    ParseNode& method() const {
         return *pn_u.binary.right;
     }
     bool isStatic() const {
