@@ -339,9 +339,12 @@ extern JS_PUBLIC_API(void)
 JS_CallTenuredObjectTracer(JSTracer* trc, JS::TenuredHeap<JSObject*>* objp, const char* name);
 
 extern JS_PUBLIC_API(void)
-JS_TraceChildren(JSTracer* trc, void* thing, JS::TraceKind kind);
+JS_TraceRuntime(JSTracer* trc);
 
 namespace JS {
+extern JS_PUBLIC_API(void)
+TraceChildren(JSTracer* trc, GCCellPtr thing);
+
 typedef js::HashSet<Zone*, js::DefaultHasher<Zone*>, js::SystemAllocPolicy> ZoneSet;
 } // namespace JS
 
