@@ -18,6 +18,7 @@ UNIFIED_SOURCES = [
     'SerializesEdgeNames.cpp',
     'SerializesEverythingInHeapGraphOnce.cpp',
     'SerializesTypeNames.cpp',
+    'UniqueStringHashPolicy.cpp',
 ]
 
 # XXX: We should fix these warnings.
