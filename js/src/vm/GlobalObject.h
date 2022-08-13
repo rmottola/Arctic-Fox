@@ -534,8 +534,7 @@ class GlobalObject : public NativeObject
         return MaybeNativeObject(global->getOrCreateObject(cx, ITERATOR_PROTO, initIteratorProto));
     }
 
-    static NativeObject* getOrCreateArrayIteratorPrototype(JSContext* cx,
-                                                           Handle<GlobalObject*> global)
+    static NativeObject* getOrCreateArrayIteratorPrototype(JSContext* cx, Handle<GlobalObject*> global)
     {
         return MaybeNativeObject(global->getOrCreateObject(cx, ARRAY_ITERATOR_PROTO, initArrayIteratorProto));
     }
