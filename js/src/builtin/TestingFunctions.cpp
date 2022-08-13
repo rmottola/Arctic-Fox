@@ -2131,7 +2131,7 @@ struct FindPathHandler {
 
         // Record how we reached this node. This is the last edge on a
         // shortest path to this node.
-        EdgeName edgeName = DuplicateString(cx, edge.name);
+        EdgeName edgeName = DuplicateString(cx, edge.name.get());
         if (!edgeName)
             return false;
         *backEdge = mozilla::Move(BackEdge(origin, Move(edgeName)));

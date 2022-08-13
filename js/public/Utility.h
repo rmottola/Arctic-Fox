@@ -464,15 +464,15 @@ namespace JS {
 template<typename T>
 struct DeletePolicy
 {
-    void operator()(T* ptr) {
-        js_delete(ptr);
+    void operator()(const T* ptr) {
+        js_delete(const_cast<T*>(ptr));
     }
 };
 
 struct FreePolicy
 {
-    void operator()(void* ptr) {
-        js_free(ptr);
+    void operator()(const void* ptr) {
+        js_free(const_cast<void*>(ptr));
     }
 };
 
