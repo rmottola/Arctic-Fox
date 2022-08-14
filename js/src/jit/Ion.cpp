@@ -437,15 +437,16 @@ typedef Vector<OnIonCompilationInfo> OnIonCompilationVector;
 // Debugger::onIonCompilation should be called.
 static inline void
 PrepareForDebuggerOnIonCompilationHook(JSContext* cx, jit::MIRGraph& graph,
-                                       AutoScriptVector* scripts, OnIonCompilationInfo* info)
+                                       MutableHandle<ScriptVector> scripts,
+                                       OnIonCompilationInfo* info)
 {
     info->numBlocks = 0;
     if (!Debugger::observesIonCompilation(cx))
         return;
 
     // fireOnIonCompilation failures are ignored, do the same here.
-    info->scriptIndex = scripts->length();
-    if (!scripts->reserve(graph.numBlocks() + scripts->length())) {
+    info->scriptIndex = scripts.length();
+    if (!scripts.reserve(graph.numBlocks() + scripts.length())) {
         cx->clearPendingException();
         return;
     }
@@ -453,7 +454,7 @@ PrepareForDebuggerOnIonCompilationHook(JSContext* cx, jit::MIRGraph& graph,
     // Collect the list of scripts which are inlined in the MIRGraph.
     info->numBlocks = graph.numBlocks();
     for (jit::MBasicBlockIterator block(graph.begin()); block != graph.end(); block++)
-        scripts->infallibleAppend(block->info().script());
+        scripts.infallibleAppend(block->info().script());
 
     // Spew the JSON graph made for the Debugger at the end of the LifoAlloc
     // used by the compiler. This would not prevent unexpected GC from the
@@ -462,7 +463,7 @@ PrepareForDebuggerOnIonCompilationHook(JSContext* cx, jit::MIRGraph& graph,
     jit::JSONSpewer spewer(info->graph);
     spewer.spewDebuggerGraph(&graph);
     if (info->graph.hadOutOfMemory()) {
-        scripts->resize(info->scriptIndex);
+        scripts.resize(info->scriptIndex);
         info->numBlocks = 0;
     }
 }
@@ -541,7 +542,7 @@ class MOZ_RAII AutoLazyLinkExitFrame
 
 static bool
 LinkCodeGen(JSContext* cx, IonBuilder* builder, CodeGenerator *codegen,
-            AutoScriptVector* scripts, OnIonCompilationInfo* info)
+            MutableHandle<ScriptVector> scripts, OnIonCompilationInfo* info)
 {
     RootedScript script(cx, builder->script());
     TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
@@ -558,7 +559,7 @@ LinkCodeGen(JSContext* cx, IonBuilder* builder, CodeGenerator *codegen,
 
 static bool
 LinkBackgroundCodeGen(JSContext* cx, IonBuilder* builder,
-                      AutoScriptVector* scripts, OnIonCompilationInfo* info)
+                      MutableHandle<ScriptVector> scripts, OnIonCompilationInfo* info)
 {
     CodeGenerator* codegen = builder->backgroundCodegen();
     if (!codegen)
@@ -592,7 +593,7 @@ jit::LazyLink(JSContext* cx, HandleScript calleeScript)
     }
 
     // See PrepareForDebuggerOnIonCompilationHook
-    AutoScriptVector debugScripts(cx);
+    Rooted<ScriptVector> debugScripts(cx, ScriptVector(cx));
     OnIonCompilationInfo info(builder->alloc().lifoAlloc());
 
     {
@@ -2225,7 +2226,7 @@ IonCompile(JSContext* cx, JSScript* script,
     }
 
     // See PrepareForDebuggerOnIonCompilationHook
-    AutoScriptVector debugScripts(cx);
+    Rooted<ScriptVector> debugScripts(cx, ScriptVector(cx));
     OnIonCompilationInfo debugInfo(alloc);
 
     ScopedJSDeletePtr<CodeGenerator> codegen;
