@@ -1509,7 +1509,7 @@ JSFunction::createScriptForLazilyInterpretedFunction(JSContext* cx, HandleFuncti
             // script together during bytecode compilation. Reset it now on
             // error.
             fun->initLazyScript(lazy);
-            if (lazy->maybeScriptUnbarriered())
+            if (lazy->hasScript())
                 lazy->resetScript();
             return false;
         }
