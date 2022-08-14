@@ -2008,7 +2008,7 @@ struct LcovSourceFile
 };
 
 static bool
-LcovWriteScript(JSContext* cx, LcovSourceFile& lsf, JSScript* script)
+LcovWriteScript(LcovSourceFile& lsf, JSScript* script)
 {
     lsf.numFunctionsFound++;
     lsf.outFN.printf("FN:%d,", script->lineno());
@@ -2196,7 +2196,7 @@ GenerateLcovInfo(JSContext* cx, JSCompartment* comp, GenericPrinter& out)
             script = queue.popCopy();
 
             // Code the current script before pushing.
-            if (!LcovWriteScript(cx, lsf, script))
+            if (!LcovWriteScript(lsf, script))
                 return false;
 
             // Iterate from the last to the first object in order to have
