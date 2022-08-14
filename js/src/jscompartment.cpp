@@ -79,7 +79,8 @@ JSCompartment::JSCompartment(Zone* zone, const JS::CompartmentOptions& options =
     maybeAlive(true),
     jitCompartment_(nullptr),
     mappedArgumentsTemplate_(nullptr),
-    unmappedArgumentsTemplate_(nullptr)
+    unmappedArgumentsTemplate_(nullptr),
+    lcovOutput()
 {
     PodArrayZero(sawDeprecatedLanguageExtension);
     runtime_->numCompartments++;
@@ -89,6 +90,11 @@ JSCompartment::JSCompartment(Zone* zone, const JS::CompartmentOptions& options =
 JSCompartment::~JSCompartment()
 {
     reportTelemetry();
+
+    // Write the code coverage information in a file.
+    JSRuntime* rt = runtimeFromMainThread();
+    if (rt->lcovOutput.isEnabled())
+        rt->lcovOutput.writeLCovResult(lcovOutput);
 
     js_delete(jitCompartment_);
     js_delete(watchpointMap);
