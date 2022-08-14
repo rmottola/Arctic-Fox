@@ -194,7 +194,7 @@ js::DumpPCCounts(JSContext* cx, HandleScript script, Sprinter* sp)
 }
 
 void
-js::DumpCompartmentPCCounts(JSContext *cx)
+js::DumpCompartmentPCCounts(JSContext* cx)
 {
     for (ZoneCellIter i(cx->zone(), gc::AllocKind::SCRIPT); !i.done(); i.next()) {
         RootedScript script(cx, i.get<JSScript>());
@@ -215,12 +215,12 @@ js::DumpCompartmentPCCounts(JSContext *cx)
 
     for (auto thingKind : ObjectAllocKinds()) {
         for (ZoneCellIter i(cx->zone(), thingKind); !i.done(); i.next()) {
-            JSObject *obj = i.get<JSObject>();
+            JSObject* obj = i.get<JSObject>();
             if (obj->compartment() != cx->compartment())
                 continue;
 
             if (obj->is<AsmJSModuleObject>()) {
-                AsmJSModule &module = obj->as<AsmJSModuleObject>().module();
+                AsmJSModule& module = obj->as<AsmJSModuleObject>().module();
 
                 Sprinter sprinter(cx);
                 if (!sprinter.init())
@@ -710,7 +710,7 @@ js::Disassemble(JSContext* cx, HandleScript script, bool lines, Sprinter* sp)
 }
 
 JS_FRIEND_API(bool)
-js::DumpPC(JSContext *cx)
+js::DumpPC(JSContext* cx)
 {
     gc::AutoSuppressGC suppressGC(cx);
     Sprinter sprinter(cx);
@@ -728,7 +728,7 @@ js::DumpPC(JSContext *cx)
 }
 
 JS_FRIEND_API(bool)
-js::DumpScript(JSContext *cx, JSScript *scriptArg)
+js::DumpScript(JSContext* cx, JSScript* scriptArg)
 {
     gc::AutoSuppressGC suppressGC(cx);
     Sprinter sprinter(cx);
