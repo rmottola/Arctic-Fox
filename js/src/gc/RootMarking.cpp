@@ -123,12 +123,6 @@ AutoGCRooter::trace(JSTracer* trc)
         return;
       }
 
-      case HASHABLEVALUE: {
-        AutoHashableValueRooter* rooter = static_cast<AutoHashableValueRooter*>(this);
-        rooter->trace(trc);
-        return;
-      }
-
       case IONMASM: {
         static_cast<js::jit::MacroAssembler::AutoRooter*>(this)->masm()->trace(trc);
         return;
@@ -183,12 +177,6 @@ AutoGCRooter::traceAllWrappers(JSTracer* trc)
                 gcr->trace(trc);
         }
     }
-}
-
-void
-AutoHashableValueRooter::trace(JSTracer* trc)
-{
-    TraceRoot(trc, reinterpret_cast<Value*>(&value), "AutoHashableValueRooter");
 }
 
 void
