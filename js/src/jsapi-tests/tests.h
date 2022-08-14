@@ -406,6 +406,11 @@ class TestJSPrincipals : public JSPrincipals
     {
         refcount = rc;
     }
+
+    bool write(JSContext* cx, JSStructuredCloneWriter* writer) override {
+        MOZ_ASSERT(false, "not implemented");
+        return false;
+    }
 };
 
 #ifdef JS_GC_ZEAL
