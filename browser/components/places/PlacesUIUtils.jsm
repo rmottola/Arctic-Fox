@@ -1,4 +1,4 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -13,20 +13,24 @@ var Cu = Components.utils;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 
+Cu.import("resource://gre/modules/PlacesUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
                                   "resource://gre/modules/PluralForm.jsm");
-
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
                                   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RecentWindow",
                                   "resource:///modules/RecentWindow.jsm");
-                                  
-XPCOMUtils.defineLazyGetter(this, "PlacesUtils", function() {
-  Cu.import("resource://gre/modules/PlacesUtils.jsm");
-  return PlacesUtils;
-});
+
+// PlacesUtils exposes multiple symbols, so we can't use defineLazyModuleGetter.
+Cu.import("resource://gre/modules/PlacesUtils.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "PlacesTransactions",
+                                  "resource://gre/modules/PlacesTransactions.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "CloudSync",
+                                  "resource://gre/modules/CloudSync.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Weave",
                                   "resource://services-sync/main.js");
