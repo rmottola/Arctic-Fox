@@ -8,10 +8,10 @@ function debug(msg) {
   Services.console.logStringMessage("SessionStoreContent: " + msg);
 }
 
-let Cu = Components.utils;
-let Cc = Components.classes;
-let Ci = Components.interfaces;
-let Cr = Components.results;
+var Cu = Components.utils;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cr = Components.results;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 Cu.import("resource://gre/modules/Timer.jsm", this);
@@ -30,14 +30,14 @@ XPCOMUtils.defineLazyModuleGetter(this, "TextAndScrollData",
   "resource:///modules/sessionstore/TextAndScrollData.jsm");
 
 Cu.import("resource:///modules/sessionstore/FrameTree.jsm", this);
-let gFrameTree = new FrameTree(this);
+var gFrameTree = new FrameTree(this);
 
 Cu.import("resource:///modules/sessionstore/ContentRestore.jsm", this);
 XPCOMUtils.defineLazyGetter(this, 'gContentRestore',
                             () => { return new ContentRestore(this) });
 
 // The current epoch.
-let gCurrentEpoch = 0;
+var gCurrentEpoch = 0;
 
 /**
  * Returns a lazy function that will evaluate the given
@@ -75,18 +75,17 @@ function isSessionStorageEvent(event) {
  * Listens for and handles content events that we need for the
  * session store service to be notified of state changes in content.
  */
-let EventListener = {
+var EventListener = {
 
   init: function () {
     addEventListener("load", this, true);
   },
 
   handleEvent: function (event) {
-   // Ignore load events from subframes.
+    // Ignore load events from subframes.
     if (event.target != content.document) {
       return;
     }
-
 
     // Restore the form data and scroll position. If we're not currently
     // restoring a tab state then this call will simply be a noop.
@@ -204,7 +203,7 @@ let MessageListener = {
  * This will hopefully not be needed in the future once we have async APIs for
  * closing windows and tabs.
  */
-let SyncHandler = {
+var SyncHandler = {
   init: function () {
     // Send this object as a CPOW to chrome. In single-process mode,
     // the synchronous send ensures that the handler object is
@@ -252,7 +251,7 @@ let SyncHandler = {
  * Example:
  *   {entries: [{url: "about:mozilla", ...}, ...], index: 1}
  */
-let SessionHistoryListener = {
+var SessionHistoryListener = {
   init: function () {
     // The frame tree observer is needed to handle initial subframe loads.
     // It will redundantly invalidate with the SHistoryListener in some cases
@@ -345,7 +344,7 @@ let SessionHistoryListener = {
  * Example:
  *   {scroll: "100,100", children: [null, null, {scroll: "200,200"}]}
  */
-let ScrollPositionListener = {
+var ScrollPositionListener = {
   init: function () {
     addEventListener("scroll", this);
     gFrameTree.addObserver(this);
@@ -385,7 +384,7 @@ let ScrollPositionListener = {
  * Example:
  *   {pageStyle: "Dusk", children: [null, {pageStyle: "Mozilla"}]}
  */
-let PageStyleListener = {
+var PageStyleListener = {
   init: function () {
     Services.obs.addObserver(this, "author-style-disabled-changed", false);
     Services.obs.addObserver(this, "style-sheet-applicable-state-changed", false);
@@ -427,7 +426,7 @@ let PageStyleListener = {
  * disabled docShell capabilities (all nsIDocShell.allow* properties set to
  * false) as a string - i.e. capability names separate by commas.
  */
-let DocShellCapabilitiesListener = {
+var DocShellCapabilitiesListener = {
   /**
    * This field is used to compare the last docShell capabilities to the ones
    * that have just been collected. If nothing changed we won't send a message.
@@ -463,7 +462,7 @@ let DocShellCapabilitiesListener = {
  * DOMSessionStorage contents. The data is a nested object using host names
  * as keys and per-host DOMSessionStorage data as values.
  */
-let SessionStorageListener = {
+var SessionStorageListener = {
   init: function () {
     addEventListener("MozStorageChanged", this, true);
     Services.obs.addObserver(this, "browser:purge-domain-data", false);
@@ -512,7 +511,7 @@ let SessionStorageListener = {
  *  |null| if the tab is now public - the field is therefore
  *  not saved.
  */
-let PrivacyListener = {
+var PrivacyListener = {
   init: function() {
     docShell.addWeakPrivacyTransitionObserver(this);
 
@@ -539,7 +538,7 @@ let PrivacyListener = {
  * will be batched if they're pushed in quick succession to avoid a message
  * flood.
  */
-let MessageQueue = {
+var MessageQueue = {
   /**
    * A unique, monotonically increasing ID used for outgoing messages. This is
    * important to make it possible to reuse tabs and allow sync flushes before
