@@ -243,7 +243,7 @@ this.DownloadsCommon = {
    *        The browser window which owns the download button.
    */
   getData(aWindow) {
-    if (PrivateBrowsingUtils.isWindowPrivate(aWindow)) {
+    if (PrivateBrowsingUtils.isContentWindowPrivate(aWindow)) {
       return PrivateDownloadsData;
     } else {
       return DownloadsData;
@@ -265,7 +265,7 @@ this.DownloadsCommon = {
    * the window in question.
    */
   getIndicatorData(aWindow) {
-    if (PrivateBrowsingUtils.isWindowPrivate(aWindow)) {
+    if (PrivateBrowsingUtils.isContentWindowPrivate(aWindow)) {
       return PrivateDownloadsIndicatorData;
     } else {
       return DownloadsIndicatorData;
@@ -283,7 +283,7 @@ this.DownloadsCommon = {
    *        from the summary.
    */
   getSummary(aWindow, aNumToExclude) {
-    if (PrivateBrowsingUtils.isWindowPrivate(aWindow)) {
+    if (PrivateBrowsingUtils.isContentWindowPrivate(aWindow)) {
       if (this._privateSummary) {
         return this._privateSummary;
       }
