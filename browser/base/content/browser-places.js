@@ -1129,6 +1129,19 @@ let BookmarkingUI = {
     }
   },
 
+  attachPlacesView: function(event, node) {
+    // If the view is already there, bail out early.
+    if (node.parentNode._placesView)
+      return;
+
+    new PlacesMenu(event, "place:folder=BOOKMARKS_MENU", {
+      extraClasses: {
+        mainLevel: "subviewbutton"
+      },
+      insertionPoint: ".panel-subview-footer"
+    });
+  },
+
   /**
    * Handles star styling based on page proxy state changes.
    */
