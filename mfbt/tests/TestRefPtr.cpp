@@ -61,7 +61,6 @@ GetNewFoo(RefPtr<Foo>* aFoo)
   *aFoo = new Bar();
 }
 
-
 already_AddRefed<Foo>
 GetNullFoo()
 {
