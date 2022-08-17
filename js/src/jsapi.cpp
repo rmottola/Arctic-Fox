@@ -1459,6 +1459,30 @@ JS_IsGlobalObject(JSObject* obj)
     return obj->is<GlobalObject>();
 }
 
+extern JS_PUBLIC_API(JSObject*)
+JS_GlobalLexicalScope(JSObject* obj)
+{
+    return &obj->as<GlobalObject>().lexicalScope();
+}
+
+extern JS_PUBLIC_API(bool)
+JS_HasExtensibleLexicalScope(JSObject* obj)
+{
+    return obj->is<GlobalObject>() || obj->compartment()->getNonSyntacticLexicalScope(obj);
+}
+
+extern JS_PUBLIC_API(JSObject*)
+JS_ExtensibleLexicalScope(JSObject* obj)
+{
+    JSObject* lexical = nullptr;
+    if (obj->is<GlobalObject>())
+        lexical = JS_GlobalLexicalScope(obj);
+    else
+        lexical = obj->compartment()->getNonSyntacticLexicalScope(obj);
+    MOZ_ASSERT(lexical);
+    return lexical;
+}
+
 JS_PUBLIC_API(JSObject*)
 JS_GetGlobalForCompartmentOrNull(JSContext* cx, JSCompartment* c)
 {
@@ -3468,6 +3492,19 @@ CreateNonSyntacticScopeChain(JSContext* cx, AutoObjectVector& scopeChain,
         //
         // See JSObject::isQualifiedVarObj.
         if (!dynamicScopeObj->setQualifiedVarObj(cx))
+            return false;
+
+        // Also get a non-syntactic lexical scope to capture 'let' and 'const'
+        // bindings. To persist lexical bindings, we have a 1-1 mapping with
+        // the final unwrapped dynamic scope object (the scope that stores the
+        // 'var' bindings) and the lexical scope.
+        //
+        // TODOshu: disallow the subscript loader from using non-distinguished
+        // objects as dynamic scopes.
+        dynamicScopeObj.set(
+            cx->compartment()->getOrCreateNonSyntacticLexicalScope(cx, staticScopeObj,
+                                                                   dynamicScopeObj));
+        if (!dynamicScopeObj)
             return false;
     }
 
