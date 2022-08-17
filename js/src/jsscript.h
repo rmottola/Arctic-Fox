@@ -1655,6 +1655,10 @@ class JSScript : public js::gc::TenuredCell
         return enclosingStaticScope_;
     }
 
+    // Switch the script over from the off-thread compartment's static
+    // global lexical scope to the main thread compartment's.
+    void fixEnclosingStaticGlobalLexicalScope();
+
   private:
     bool makeTypes(JSContext* cx);
 
@@ -2197,6 +2201,11 @@ class LazyScript : public gc::TenuredCell
     JSObject* enclosingScope() const {
         return enclosingScope_;
     }
+
+    // Switch the script over from the off-thread compartment's static
+    // global lexical scope to the main thread compartment's.
+    void fixEnclosingStaticGlobalLexicalScope();
+
     ScriptSourceObject* sourceObject() const;
     ScriptSource* scriptSource() const {
         return sourceObject()->source();
