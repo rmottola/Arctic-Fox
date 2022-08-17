@@ -582,6 +582,8 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
 {
     /* NB: Keep this in sync with CopyScript. */
 
+    MOZ_ASSERT(enclosingScopeArg);
+
     enum ScriptBits {
         NoScriptRval,
         SavedCallerFun,
@@ -810,8 +812,10 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
 
         // If the outermost script has a non-syntactic scope, reflect that on
         // the static scope chain.
-        if (scriptBits & (1 << HasNonSyntacticScope) && !enclosingScope) {
-            enclosingScope = StaticNonSyntacticScopeObjects::create(cx, nullptr);
+        if (scriptBits & (1 << HasNonSyntacticScope) &&
+            IsStaticGlobalLexicalScope(enclosingScope))
+        {
+            enclosingScope = StaticNonSyntacticScopeObjects::create(cx, enclosingScope);
             if (!enclosingScope)
                 return false;
         }
@@ -3498,7 +3502,7 @@ CreateEmptyScriptForClone(JSContext* cx, HandleObject enclosingScope, HandleScri
 JSScript*
 js::CloneGlobalScript(JSContext* cx, Handle<ScopeObject*> enclosingScope, HandleScript src)
 {
-    MOZ_ASSERT(IsGlobalLexicalScope(enclosingScope) ||
+    MOZ_ASSERT(IsStaticGlobalLexicalScope(enclosingScope) ||
                enclosingScope->is<StaticNonSyntacticScopeObjects>());
 
     RootedScript dst(cx, CreateEmptyScriptForClone(cx, enclosingScope, src));
@@ -3818,7 +3822,7 @@ JSScript::calculateLiveFixed(jsbytecode* pc)
                 staticScope = MaybeForwarded(staticScope);
         }
 
-        if (staticScope) {
+        if (staticScope && !IsStaticGlobalLexicalScope(staticScope)) {
             StaticBlockObject& blockObj = staticScope->as<StaticBlockObject>();
             nlivefixed = blockObj.localOffset() + blockObj.numVariables();
         }
