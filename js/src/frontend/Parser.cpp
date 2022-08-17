@@ -4087,9 +4087,6 @@ Parser<ParseHandler>::blockStatement(YieldHandling yieldHandling)
     Node list = statements(yieldHandling);
     if (!list)
         return null();
-    // Initialize the enclosing scope manually for the call to |variables|
-    // below.
-    blockObj->initEnclosingScopeFromParser(pc->innermostStaticScope());
 
     MUST_MATCH_TOKEN_MOD(TOK_RC, TokenStream::Operand, JSMSG_CURLY_IN_COMPOUND);
     return list;
