@@ -941,7 +941,8 @@ js::ExecuteKernel(JSContext* cx, HandleScript script, JSObject& scopeChainArg, c
                   Value* result)
 {
     MOZ_ASSERT_IF(evalInFrame, type == EXECUTE_DEBUG);
-    MOZ_ASSERT_IF(type == EXECUTE_GLOBAL, !IsSyntacticScope(&scopeChainArg));
+    MOZ_ASSERT_IF(type == EXECUTE_GLOBAL, IsGlobalLexicalScope(&scopeChainArg) ||
+                                          !IsSyntacticScope(&scopeChainArg));
 #ifdef DEBUG
     if (thisv.isObject()) {
         RootedObject thisObj(cx, &thisv.toObject());
@@ -988,7 +989,7 @@ js::Execute(JSContext* cx, HandleScript script, JSObject& scopeChainArg, Value* 
     RootedObject scopeChain(cx, &scopeChainArg);
     MOZ_ASSERT(scopeChain == GetInnerObject(scopeChain));
 
-    MOZ_RELEASE_ASSERT(scopeChain->is<GlobalObject>() || script->hasNonSyntacticScope(),
+    MOZ_RELEASE_ASSERT(IsGlobalLexicalScope(scopeChain) || script->hasNonSyntacticScope(),
                        "Only scripts with non-syntactic scopes can be executed with "
                        "interesting scopechains");
 
@@ -1629,7 +1630,7 @@ ComputeImplicitThis(JSContext* cx, HandleObject obj, MutableHandleValue vp)
 {
     vp.setUndefined();
 
-    if (obj->is<GlobalObject>())
+    if (IsGlobalLexicalScope(obj))
         return true;
 
     if (IsCacheableNonGlobalScope(obj))
