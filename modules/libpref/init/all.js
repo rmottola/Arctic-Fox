@@ -5322,3 +5322,5 @@ pref("plugins.rewrite_youtube_embeds", true);
 
 // Expose Request.context. Currently disabled since the spec is in flux.
 pref("dom.requestcontext.enabled", false);
+
+pref("dom.mozKillSwitch.enabled", false);
