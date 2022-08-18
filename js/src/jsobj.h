@@ -769,15 +769,15 @@ DefineProperty(JSContext* cx, HandleObject obj, HandleId id,
 
 extern bool
 DefineProperty(ExclusiveContext* cx, HandleObject obj, HandleId id, HandleValue value,
-               JSGetterOp getter, JSSetterOp, unsigned attrs, ObjectOpResult& result);
+               JSGetterOp getter, JSSetterOp setter, unsigned attrs, ObjectOpResult& result);
 
 extern bool
 DefineProperty(ExclusiveContext* cx, HandleObject obj, PropertyName* name, HandleValue value,
-               JSGetterOp getter, JSSetterOp, unsigned attrs, ObjectOpResult& result);
+               JSGetterOp getter, JSSetterOp setter, unsigned attrs, ObjectOpResult& result);
 
 extern bool
 DefineElement(ExclusiveContext* cx, HandleObject obj, uint32_t index, HandleValue value,
-              JSGetterOp getter, JSSetterOp, unsigned attrs, ObjectOpResult& result);
+              JSGetterOp getter, JSSetterOp setter, unsigned attrs, ObjectOpResult& result);
 
 /*
  * When the 'result' out-param is omitted, the behavior is the same as above, except
@@ -1251,7 +1251,6 @@ LookupNameUnqualified(JSContext* cx, HandlePropertyName name, HandleObject scope
                       MutableHandleObject objp);
 
 } // namespace js
-
 
 namespace js {
 
