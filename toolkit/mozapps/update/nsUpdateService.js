@@ -688,8 +688,7 @@ function getCanStageUpdates() {
     return false;
   }
 
-  if (AppConstants.platform == "win" && isServiceInstalled() &&
-      shouldUseService()) {
+  if (AppConstants.platform == "win" && shouldUseService()) {
     // No need to perform directory write checks, the maintenance service will
     // be able to write to all directories.
     LOG("getCanStageUpdates - able to stage updates using the service");
@@ -1065,13 +1064,12 @@ function releaseSDCardMountLock() {
 
 /**
  * Determines if the service should be used to attempt an update
- * or not.  For now this is only when PREF_APP_UPDATE_SERVICE_ENABLED
- * is true and we have Firefox.
+ * or not.
  *
  * @return  true if the service should be used for updates.
  */
 function shouldUseService() {
-  if (AppConstants.MOZ_MAINTENANCE_SERVICE) {
+  if (AppConstants.MOZ_MAINTENANCE_SERVICE && isServiceInstalled()) {
     return getPref("getBoolPref",
                    PREF_APP_UPDATE_SERVICE_ENABLED, false);
   }
