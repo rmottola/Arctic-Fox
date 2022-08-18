@@ -301,6 +301,10 @@ pref("browser.urlbar.suggest.bookmark",             true);
 pref("browser.urlbar.suggest.openpage",             true);
 pref("browser.urlbar.suggest.searches",             true);
 
+// Limit the number of characters sent to the current search engine to fetch
+// suggestions.
+pref("browser.urlbar.maxCharsForSearchSuggestions", 20);
+
 // Restrictions to current suggestions can also be applied (intersection).
 // Typed suggestion works only if history is set to true.
 pref("browser.urlbar.suggest.history.onlyTyped",    false);
