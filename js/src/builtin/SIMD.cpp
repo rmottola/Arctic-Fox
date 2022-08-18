@@ -175,7 +175,6 @@ const Class SimdTypeDescr::class_ = {
     nullptr, /* enumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
-    nullptr, /* convert */
     TypeDescr::finalize,
     call
 };
@@ -417,12 +416,11 @@ static bool
 FillLanes(JSContext* cx, Handle<TypedObject*> result, const CallArgs& args)
 {
     typedef typename T::Elem Elem;
-    InternalHandle<Elem*> mem(result, reinterpret_cast<Elem*>(result->typedMem()));
     Elem tmp;
     for (unsigned i = 0; i < T::lanes; i++) {
         if (!T::toType(cx, args.get(i), &tmp))
             return false;
-        mem.get()[i] = tmp;
+        reinterpret_cast<Elem*>(result->typedMem())[i] = tmp;
     }
     args.rval().setObject(*result);
     return true;

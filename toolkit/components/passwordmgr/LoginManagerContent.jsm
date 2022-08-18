@@ -1,4 +1,3 @@
-/* vim: set ts=2 sts=2 sw=2 et tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,48 +8,27 @@ this.EXPORTED_SYMBOLS = [ "LoginManagerContent",
                           "UserAutoCompleteResult" ];
 
 const { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
+const PASSWORD_INPUT_ADDED_COALESCING_THRESHOLD_MS = 1;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
 Cu.import("resource://gre/modules/Promise.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "DeferredTask", "resource://gre/modules/DeferredTask.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LoginRecipesContent",
                                   "resource://gre/modules/LoginRecipes.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
+                                  "resource://gre/modules/LoginHelper.jsm");
+
+XPCOMUtils.defineLazyGetter(this, "log", () => {
+  let logger = LoginHelper.createLogger("LoginManagerContent");
+  return logger.log.bind(logger);
+});
+
 // These mirror signon.* prefs.
-var gEnabled, gDebug, gAutofillForms, gStoreWhenAutocompleteOff;
-
-function log(...pieces) {
-  function generateLogMessage(args) {
-    let strings = ['Login Manager (content):'];
-
-    args.forEach(function(arg) {
-      if (typeof arg === 'string') {
-        strings.push(arg);
-      } else if (typeof arg === 'undefined') {
-        strings.push('undefined');
-      } else if (arg === null) {
-        strings.push('null');
-      } else {
-        try {
-          strings.push(JSON.stringify(arg, null, 2));
-        } catch(err) {
-          strings.push("<<something>>");
-        }
-      }
-    });
-    return strings.join(' ');
-  }
-
-  if (!gDebug)
-    return;
-
-  let message = generateLogMessage(pieces);
-  dump(message + "\n");
-  Services.console.logStringMessage(message);
-}
-
+var gEnabled, gAutofillForms, gStoreWhenAutocompleteOff;
 
 var observer = {
   QueryInterface : XPCOMUtils.generateQI([Ci.nsIObserver,
@@ -65,16 +43,17 @@ var observer = {
     // can grab form data before it might be modified (see bug 257781).
 
     try {
-      LoginManagerContent._onFormSubmit(formElement);
+      let formLike = FormLikeFactory.createFromForm(formElement);
+      LoginManagerContent._onFormSubmit(formLike);
     } catch (e) {
       log("Caught error in onFormSubmit(", e.lineNumber, "):", e.message);
+      Cu.reportError(e);
     }
 
     return true; // Always return true, or form submit will be canceled.
   },
 
   onPrefChange : function() {
-    gDebug = Services.prefs.getBoolPref("signon.debug");
     gEnabled = Services.prefs.getBoolPref("signon.rememberSignons");
     gAutofillForms = Services.prefs.getBoolPref("signon.autofillForms");
     gStoreWhenAutocompleteOff = Services.prefs.getBoolPref("signon.storeWhenAutocompleteOff");
@@ -115,6 +94,30 @@ var LoginManagerContent = {
 
   _messages: [ "RemoteLogins:loginsFound",
                "RemoteLogins:loginsAutoCompleted" ],
+
+  /**
+   * WeakMap of the root element of a FormLike to the FormLike representing its fields.
+   *
+   * This is used to be able to lookup an existing FormLike for a given root element since multiple
+   * calls to FormLikeFactory won't give the exact same object. When batching fills we don't always
+   * want to use the most recent list of elements for a FormLike since we may end up doing multiple
+   * fills for the same set of elements when a field gets added between arming and running the
+   * DeferredTask.
+   *
+   * @type {WeakMap}
+   */
+  _formLikeByRootElement: new WeakMap(),
+
+  /**
+   * WeakMap of the root element of a WeakMap to the DeferredTask to fill its fields.
+   *
+   * This is used to be able to throttle fills for a FormLike since onDOMInputPasswordAdded gets
+   * dispatched for each password field added to a document but we only want to fill once per
+   * FormLike when multiple fields are added at once.
+   *
+   * @type {WeakMap}
+   */
+  _deferredPasswordAddedTasksByRootElement: new WeakMap(),
 
   // Map from form login requests to information about that request.
   _requests: new Map(),
@@ -243,6 +246,11 @@ var LoginManagerContent = {
     let form = aElement.form;
     let win = doc.defaultView;
 
+    if (!form) {
+      return Promise.reject("Bug 1173583: _autoCompleteSearchAsync needs to be " +
+                            "updated to work outside of <form>");
+    }
+
     let formOrigin = LoginUtils._getPasswordOrigin(doc.documentURI);
     let actionOrigin = LoginUtils._getActionOrigin(form);
 
@@ -270,7 +278,69 @@ var LoginManagerContent = {
     }
 
     let form = event.target;
+    let formLike = FormLikeFactory.createFromForm(form);
+    log("onDOMFormHasPassword:", form, formLike);
+    this._fetchLoginsFromParentAndFillForm(formLike, window);
+  },
 
+  onDOMInputPasswordAdded(event, window) {
+    if (!event.isTrusted) {
+      return;
+    }
+
+    let pwField = event.target;
+    if (pwField.form) {
+      // Handled by onDOMFormHasPassword which is already throttled.
+      return;
+    }
+
+    let formLike = FormLikeFactory.createFromPasswordField(pwField);
+    log("onDOMInputPasswordAdded:", pwField, formLike);
+
+    let deferredTask = this._deferredPasswordAddedTasksByRootElement.get(formLike.rootElement);
+    if (!deferredTask) {
+      log("Creating a DeferredTask to call _fetchLoginsFromParentAndFillForm soon");
+      this._formLikeByRootElement.set(formLike.rootElement, formLike);
+
+      deferredTask = new DeferredTask(function* deferredInputProcessing() {
+        // Get the updated formLike instead of the one at the time of creating the DeferredTask via
+        // a closure since it could be stale since FormLike.elements isn't live.
+        let formLike2 = this._formLikeByRootElement.get(formLike.rootElement);
+        log("Running deferred processing of onDOMInputPasswordAdded", formLike2);
+        this._deferredPasswordAddedTasksByRootElement.delete(formLike2.rootElement);
+        this._fetchLoginsFromParentAndFillForm(formLike2, window);
+        this._formLikeByRootElement.delete(formLike.rootElement);
+      }.bind(this), PASSWORD_INPUT_ADDED_COALESCING_THRESHOLD_MS);
+
+      this._deferredPasswordAddedTasksByRootElement.set(formLike.rootElement, deferredTask);
+    }
+
+    if (deferredTask.isArmed) {
+      log("DeferredTask is already armed so just updating the FormLike");
+      // We update the FormLike so it (most important .elements) is fresh when the task eventually
+      // runs since changes to the elements could affect our field heuristics.
+      this._formLikeByRootElement.set(formLike.rootElement, formLike);
+    } else {
+      if (window.document.readyState == "complete") {
+        log("Arming the DeferredTask we just created since document.readyState == 'complete'");
+        deferredTask.arm();
+      } else {
+        window.addEventListener("DOMContentLoaded", function armPasswordAddedTask() {
+          window.removeEventListener("DOMContentLoaded", armPasswordAddedTask);
+          log("Arming the onDOMInputPasswordAdded DeferredTask due to DOMContentLoaded");
+          deferredTask.arm();
+        });
+      }
+    }
+  },
+
+  /**
+   * Fetch logins from the parent for a given form and then attempt to fill it.
+   *
+   * @param {FormLike} form to fetch the logins for then try autofill.
+   * @param {Window} window
+   */
+  _fetchLoginsFromParentAndFillForm(form, window) {
     // Always record the most recently added form with a password field.
     this.stateForDocument(form.ownerDocument).loginForm = form;
 
@@ -283,7 +353,6 @@ var LoginManagerContent = {
       return;
     }
 
-    log("onDOMFormHasPassword for", form.ownerDocument.documentURI);
     this._getLoginDataFromParent(form, { showMasterPassword: true })
         .then(this.loginsFound.bind(this))
         .then(null, Cu.reportError);
@@ -440,7 +509,7 @@ var LoginManagerContent = {
     if (!this._isUsernameFieldType(acInputField))
       return;
 
-    var acForm = acInputField.form;
+    var acForm = acInputField.form; // XXX: Bug 1173583 - This doesn't work outside of <form>.
     if (!acForm)
       return;
 
@@ -467,27 +536,28 @@ var LoginManagerContent = {
     }
   },
 
-
-  /*
-   * _getPasswordFields
-   *
-   * Returns an array of password field elements for the specified form.
-   * If no pw fields are found, or if more than 3 are found, then null
-   * is returned.
-   *
-   * skipEmptyFields can be set to ignore password fields with no value.
+  /**
+   * @param {FormLike} form - the FormLike to look for password fields in.
+   * @param {bool} [skipEmptyFields=false] - Whether to ignore password fields with no value.
+   *                                         Used at capture time since saving empty values isn't
+   *                                         useful.
+   * @return {Array|null} Array of password field elements for the specified form.
+   *                      If no pw fields are found, or if more than 3 are found, then null
+   *                      is returned.
    */
-  _getPasswordFields : function (form, skipEmptyFields) {
+  _getPasswordFields(form, skipEmptyFields = false) {
     // Locate the password fields in the form.
-    var pwFields = [];
-    for (var i = 0; i < form.elements.length; i++) {
-      var element = form.elements[i];
+    let pwFields = [];
+    for (let i = 0; i < form.elements.length; i++) {
+      let element = form.elements[i];
       if (!(element instanceof Ci.nsIDOMHTMLInputElement) ||
-          element.type != "password")
+          element.type != "password") {
         continue;
+      }
 
-      if (skipEmptyFields && !element.value)
+      if (skipEmptyFields && !element.value) {
         continue;
+      }
 
       pwFields[pwFields.length] = {
                                     index   : i,
@@ -500,14 +570,12 @@ var LoginManagerContent = {
       log("(form ignored -- no password fields.)");
       return null;
     } else if (pwFields.length > 3) {
-      log("(form ignored -- too many password fields. [ got ",
-                  pwFields.length, "])");
+      log("(form ignored -- too many password fields. [ got ", pwFields.length, "])");
       return null;
     }
 
     return pwFields;
   },
-
 
   _isUsernameFieldType: function(element) {
     if (!(element instanceof Ci.nsIDOMHTMLInputElement))
@@ -532,7 +600,7 @@ var LoginManagerContent = {
    * Can handle complex forms by trying to figure out what the
    * relevant fields are.
    *
-   * @param {HTMLFormElement} form
+   * @param {FormLike} form
    * @param {bool} isSubmission
    * @param {Set} recipes
    * @return {Array} [usernameField, newPasswordField, oldPasswordField]
@@ -554,8 +622,10 @@ var LoginManagerContent = {
         fieldOverrideRecipe.passwordSelector
       );
       if (pwOverrideField) {
+        // The field from the password override may be in a different FormLike.
+        let formLike = FormLikeFactory.createFromPasswordField(pwOverrideField);
         pwFields = [{
-          index   : [...pwOverrideField.form.elements].indexOf(pwOverrideField),
+          index   : [...formLike.elements].indexOf(pwOverrideField),
           element : pwOverrideField,
         }];
       }
@@ -581,7 +651,7 @@ var LoginManagerContent = {
 
     if (!usernameField) {
       // Locate the username field in the form by searching backwards
-      // from the first passwordfield, assume the first text field is the
+      // from the first password field, assume the first text field is the
       // username. We might not find a username field if the user is
       // already logged in to the site.
       for (var i = pwFields[0].index - 1; i >= 0; i--) {
@@ -655,30 +725,23 @@ var LoginManagerContent = {
   },
 
 
-  /*
-   * _isAutoCompleteDisabled
-   *
-   * Returns true if the page requests autocomplete be disabled for the
-   * specified form input.
+  /**
+   * @return true if the page requests autocomplete be disabled for the
+   *              specified element.
    */
-  _isAutocompleteDisabled :  function (element) {
-    if (element && element.hasAttribute("autocomplete") &&
-        element.getAttribute("autocomplete").toLowerCase() == "off")
-      return true;
-
-    return false;
+  _isAutocompleteDisabled(element) {
+    return element && element.autocomplete == "off";
   },
 
-
-  /*
-   * _onFormSubmit
-   *
-   * Called by the our observer when notified of a form submission.
+  /**
+   * Called by our observer when notified of a form submission.
    * [Note that this happens before any DOM onsubmit handlers are invoked.]
    * Looks for a password change in the submitted form, so we can update
    * our stored password.
+   *
+   * @param {FormLike} form
    */
-  _onFormSubmit : function (form) {
+  _onFormSubmit(form) {
     var doc = form.ownerDocument;
     var win = doc.defaultView;
 
@@ -707,11 +770,17 @@ var LoginManagerContent = {
       return;
     }
 
-    var formSubmitURL = LoginUtils._getActionOrigin(form)
+    let formSubmitURL = LoginUtils._getActionOrigin(form);
+    let messageManager = messageManagerFromWindow(win);
+
+    let recipesArray = messageManager.sendSyncMessage("RemoteLogins:findRecipes", {
+      formOrigin: hostname,
+    })[0];
+    let recipes = new Set(recipesArray);
 
     // Get the appropriate fields from the form.
     var [usernameField, newPasswordField, oldPasswordField] =
-        this._getFormFields(form, true);
+          this._getFormFields(form, true, recipes);
 
     // Need at least 1 valid password field to do anything.
     if (newPasswordField == null)
@@ -745,7 +814,6 @@ var LoginManagerContent = {
     // Make sure to pass the opener's top in case it was in a frame.
     let opener = win.opener ? win.opener.top : null;
 
-    let messageManager = messageManagerFromWindow(win);
     messageManager.sendAsyncMessage("RemoteLogins:onFormSubmit",
                                     { hostname: hostname,
                                       formSubmitURL: formSubmitURL,
@@ -975,7 +1043,7 @@ var LoginManagerContent = {
       let messageManager = messageManagerFromWindow(win);
       messageManager.sendAsyncMessage("LoginStats:LoginFillSuccessful");
     } finally {
-      Services.obs.notifyObservers(form, "passwordmgr-processed-form", null);
+      Services.obs.notifyObservers(form.rootElement, "passwordmgr-processed-form", null);
     }
   },
 
@@ -1037,7 +1105,7 @@ function UserAutoCompleteResult (aSearchString, matchingLogins) {
     if (userA < userB)
       return -1;
 
-    if (userB > userA)
+    if (userA > userB)
       return  1;
 
     return 0;
@@ -1116,4 +1184,77 @@ UserAutoCompleteResult.prototype = {
       pwmgr.removeLogin(removedLogin);
     }
   }
+};
+
+/**
+ * A factory to generate FormLike objects that represent a set of login fields
+ * which aren't necessarily marked up with a <form> element.
+ */
+let FormLikeFactory = {
+  _propsFromForm: [
+    "autocomplete",
+    "ownerDocument",
+  ],
+
+  /**
+   * Create a FormLike object from a <form>.
+   *
+   * @param {HTMLFormElement} aForm
+   * @return {FormLike}
+   * @throws Error if aForm isn't an HTMLFormElement
+   */
+  createFromForm(aForm) {
+    if (!(aForm instanceof Ci.nsIDOMHTMLFormElement)) {
+      throw new Error("createFromForm: aForm must be a nsIDOMHTMLFormElement");
+    }
+
+    let formLike = {
+      action: LoginUtils._getActionOrigin(aForm),
+      elements: [...aForm.elements],
+      rootElement: aForm,
+    };
+
+    for (let prop of this._propsFromForm) {
+      formLike[prop] = aForm[prop];
+    }
+
+    return formLike;
+  },
+
+  /**
+   * Create a FormLike object from an <input type=password>.
+   *
+   * If the <input> is in a <form>, construct the FormLike from the form.
+   * Otherwise, create a FormLike with a rootElement (wrapper) according to
+   * heuristics. Currently all <input> not in a <form> are one FormLike but this
+   * shouldn't be relied upon as the heuristics may change to detect multiple
+   * "forms" (e.g. registration and login) on one page with a <form>.
+   *
+   * @param {HTMLInputElement} aPasswordField - a password field in a document
+   * @return {FormLike}
+   * @throws Error if aPasswordField isn't a password input in a document
+   */
+  createFromPasswordField(aPasswordField) {
+    if (!(aPasswordField instanceof Ci.nsIDOMHTMLInputElement) ||
+        aPasswordField.type != "password" ||
+        !aPasswordField.ownerDocument) {
+      throw new Error("createFromPasswordField requires a password field in a document");
+    }
+
+    if (aPasswordField.form) {
+      return this.createFromForm(aPasswordField.form);
+    }
+
+    let doc = aPasswordField.ownerDocument;
+    log("Created non-form FormLike for rootElement:", doc.documentElement);
+    return {
+      action: LoginUtils._getPasswordOrigin(doc.baseURI),
+      autocomplete: "on",
+      // Exclude elements inside the rootElement that are already in a <form> as
+      // they will be handled by their own FormLike.
+      elements: [for (el of doc.documentElement.querySelectorAll("input")) if (!el.form) el],
+      ownerDocument: doc,
+      rootElement: doc.documentElement,
+    };
+  },
 };

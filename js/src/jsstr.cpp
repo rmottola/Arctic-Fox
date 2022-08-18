@@ -3480,10 +3480,10 @@ LambdaIsGetElem(JSContext* cx, JSObject& lambda, MutableHandleNativeObject pobj)
 
     /*
      * JSOP_GETALIASEDVAR tells us exactly where to find the base object 'b'.
-     * Rule out the (unlikely) possibility of a heavyweight function since it
-     * would make our scope walk off by 1.
+     * Rule out the (unlikely) possibility of a function with a call object
+     * since it would make our scope walk off by 1.
      */
-    if (JSOp(*pc) != JSOP_GETALIASEDVAR || fun->isHeavyweight())
+    if (JSOp(*pc) != JSOP_GETALIASEDVAR || fun->needsCallObject())
         return true;
     ScopeCoordinate sc(pc);
     ScopeObject* scope = &fun->environment()->as<ScopeObject>();
@@ -4540,6 +4540,17 @@ js::DuplicateString(js::ExclusiveContext* cx, const char16_t* s)
     auto ret = cx->make_pod_array<char16_t>(n);
     if (!ret)
         return ret;
+    PodCopy(ret.get(), s, n);
+    return ret;
+}
+
+UniquePtr<char16_t[], JS::FreePolicy>
+js::DuplicateString(const char16_t* s)
+{
+    size_t n = js_strlen(s) + 1;
+    UniquePtr<char16_t[], JS::FreePolicy> ret(js_pod_malloc<char16_t>(n));
+    if (!ret)
+        return nullptr;
     PodCopy(ret.get(), s, n);
     return ret;
 }

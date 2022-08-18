@@ -772,7 +772,10 @@ TokenStream::reportAsmJSError(uint32_t offset, unsigned errorNumber, ...)
 {
     va_list args;
     va_start(args, errorNumber);
-    reportCompileErrorNumberVA(offset, JSREPORT_WARNING, errorNumber, args);
+    unsigned flags = options().throwOnAsmJSValidationFailureOption
+                     ? JSREPORT_ERROR
+                     : JSREPORT_WARNING;
+    reportCompileErrorNumberVA(offset, flags, errorNumber, args);
     va_end(args);
 }
 
@@ -1014,16 +1017,6 @@ TokenStream::checkForKeyword(const KeywordInfo* kw, TokenKind* ttp)
 }
 
 bool
-TokenStream::checkForKeyword(const char16_t* s, size_t length, TokenKind* ttp)
-{
-    const KeywordInfo* kw = FindKeyword(s, length);
-    if (!kw)
-        return true;
-
-    return checkForKeyword(kw, ttp);
-}
-
-bool
 TokenStream::checkForKeyword(JSAtom* atom, TokenKind* ttp)
 {
     const KeywordInfo* kw = FindKeyword(atom);
@@ -1233,13 +1226,23 @@ TokenStream::getTokenInternal(TokenKind* ttp, Modifier modifier)
             length = userbuf.addressOfNextRawChar() - identStart;
         }
 
-        // Check for keywords unless the parser told us not to.
+        // Represent keywords as keyword tokens unless told otherwise.
         if (modifier != KeywordIsName) {
-            tp->type = TOK_NAME;
-            if (!checkForKeyword(chars, length, &tp->type))
-                goto error;
-            if (tp->type != TOK_NAME)
-                goto out;
+            if (const KeywordInfo* kw = FindKeyword(chars, length)) {
+                // That said, keywords can't contain escapes.  (Contexts where
+                // keywords are treated as names, that also sometimes treat
+                // keywords as keywords, must manually check this requirement.)
+                if (hadUnicodeEscape) {
+                    reportError(JSMSG_ESCAPED_KEYWORD);
+                    goto error;
+                }
+
+                tp->type = TOK_NAME;
+                if (!checkForKeyword(kw, &tp->type))
+                    goto error;
+                if (tp->type != TOK_NAME)
+                    goto out;
+            }
         }
 
         JSAtom* atom = AtomizeChars(cx, chars, length);

@@ -13,6 +13,7 @@
 #include "jsscript.h"
 #include "jstypes.h"
 
+#include "builtin/ModuleObject.h"
 #include "frontend/ParseMaps.h"
 #include "frontend/ParseNode.h"
 #include "frontend/TokenStream.h"
@@ -227,8 +228,12 @@ class SharedContext
     void computeInWith(JSObject* staticScope);
 
     virtual ObjectBox* toObjectBox() { return nullptr; }
-    inline bool isFunctionBox() { return toObjectBox() && toObjectBox()->isFunctionBox(); }
+    bool isObjectBox() { return toObjectBox() != nullptr; }
+    bool isFunctionBox() { return isObjectBox() && toObjectBox()->isFunctionBox(); }
     inline FunctionBox* asFunctionBox();
+    bool isModuleBox() { return isObjectBox() && toObjectBox()->isModuleBox(); }
+    inline ModuleBox* asModuleBox();
+    bool isGlobalContext() { return !toObjectBox(); }
 
     bool allowNewTarget()              const { return allowNewTarget_; }
     bool allowSuperProperty()          const { return allowSuperProperty_; }
@@ -299,6 +304,7 @@ class FunctionBox : public ObjectBox, public SharedContext
     bool            hasDestructuringArgs:1; /* arguments list contains destructuring expression */
     bool            useAsm:1;               /* see useAsmOrInsideUseAsm */
     bool            insideUseAsm:1;         /* see useAsmOrInsideUseAsm */
+    bool            wasEmitted:1;           /* Bytecode has been emitted for this function. */
 
     // Fields for use in heuristics.
     bool            usesArguments:1;  /* contains a free use of 'arguments' */
@@ -377,9 +383,9 @@ class FunctionBox : public ObjectBox, public SharedContext
         startColumn = tokenStream.getColumn();
     }
 
-    bool isHeavyweight()
+    bool needsCallObject()
     {
-        // Note: this should be kept in sync with JSFunction::isHeavyweight().
+        // Note: this should be kept in sync with JSFunction::needsCallObject().
         return bindings.hasAnyAliasedBindings() ||
                hasExtensibleScope() ||
                needsDeclEnvObject() ||
@@ -388,11 +394,33 @@ class FunctionBox : public ObjectBox, public SharedContext
     }
 };
 
+class ModuleBox : public ObjectBox, public SharedContext
+{
+  public:
+    Bindings bindings;
+    TraceableVector<JSAtom*> exportNames;
+
+    template <typename ParseHandler>
+    ModuleBox(ExclusiveContext* cx, ObjectBox* traceListHead, ModuleObject* module,
+              ParseContext<ParseHandler>* pc);
+
+    ObjectBox* toObjectBox() override { return this; }
+    ModuleObject* module() const { return &object->as<ModuleObject>(); }
+    JSObject* staticScope() const override { return module(); }
+};
+
 inline FunctionBox*
 SharedContext::asFunctionBox()
 {
     MOZ_ASSERT(isFunctionBox());
     return static_cast<FunctionBox*>(this);
+}
+
+inline ModuleBox*
+SharedContext::asModuleBox()
+{
+    MOZ_ASSERT(isModuleBox());
+    return static_cast<ModuleBox*>(this);
 }
 
 

@@ -211,7 +211,6 @@ PeerConnectionMedia::PeerConnectionMedia(PeerConnectionImpl *parent)
     : mParent(parent),
       mParentHandle(parent->GetHandle()),
       mParentName(parent->GetName()),
-      mAllowIceLoopback(false),
       mIceCtx(nullptr),
       mDNSResolver(new NrIceResolver()),
       mUuidGen(MakeUnique<PCUuidGenerator>()),
@@ -221,7 +220,8 @@ PeerConnectionMedia::PeerConnectionMedia(PeerConnectionImpl *parent)
 }
 
 nsresult PeerConnectionMedia::Init(const std::vector<NrIceStunServer>& stun_servers,
-                                   const std::vector<NrIceTurnServer>& turn_servers)
+                                   const std::vector<NrIceTurnServer>& turn_servers,
+                                   NrIceCtx::Policy policy)
 {
   nsresult rv;
 #if defined(MOZILLA_XPCOMRT_API)
@@ -292,12 +292,21 @@ nsresult PeerConnectionMedia::Init(const std::vector<NrIceStunServer>& stun_serv
   }
 #endif // defined(MOZILLA_XPCOMRT_API)
 
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
+  bool ice_tcp = Preferences::GetBool("media.peerconnection.ice.tcp", false);
+#else
+  bool ice_tcp = false;
+#endif
+
   // TODO(ekr@rtfm.com): need some way to set not offerer later
   // Looks like a bug in the NrIceCtx API.
   mIceCtx = NrIceCtx::Create("PC:" + mParentName,
                              true, // Offerer
-                             true, // Trickle
-                             mAllowIceLoopback);
+                             true, // Explicitly set priorities
+                             mParent->GetAllowIceLoopback(),
+                             ice_tcp,
+                             mParent->GetAllowIceLinkLocal(),
+                             policy);
   if(!mIceCtx) {
     CSFLogError(logTag, "%s: Failed to create Ice Context", __FUNCTION__);
     return NS_ERROR_FAILURE;

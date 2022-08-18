@@ -1,4 +1,3 @@
-/* vim: set ts=2 sts=2 sw=2 et tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -10,15 +9,21 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
 Cu.import("resource://gre/modules/SharedPromptUtils.jsm");
 
-/* Constants for password prompt telemetry.
+XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
+                                  "resource://gre/modules/LoginHelper.jsm");
+
+const LoginInfo =
+      Components.Constructor("@mozilla.org/login-manager/loginInfo;1",
+                             "nsILoginInfo", "init");
+
+/**
+ * Constants for password prompt telemetry.
  * Mirrored in mobile/android/components/LoginManagerPrompter.js */
 const PROMPT_DISPLAYED = 0;
 
-const PROMPT_ADD = 1;
+const PROMPT_ADD_OR_UPDATE = 1;
 const PROMPT_NOTNOW = 2;
 const PROMPT_NEVER = 3;
-
-const PROMPT_UPDATE = 1;
 
 /*
  * LoginManagerPromptFactory
@@ -38,7 +43,6 @@ LoginManagerPromptFactory.prototype = {
   classID : Components.ID("{749e62f4-60ae-4569-a8a2-de78b649660e}"),
   QueryInterface : XPCOMUtils.generateQI([Ci.nsIPromptFactory, Ci.nsIObserver, Ci.nsISupportsWeakReference]),
 
-  _debug : false,
   _asyncPrompts : {},
   _asyncPromptInProgress : false,
 
@@ -57,9 +61,6 @@ LoginManagerPromptFactory.prototype = {
   },
 
   getPrompt : function (aWindow, aIID) {
-    var prefBranch = Services.prefs.getBranch("signon.");
-    this._debug = prefBranch.getBoolPref("debug");
-
     var prompt = new LoginManagerPrompter().QueryInterface(aIID);
     prompt.init(aWindow, this);
     return prompt;
@@ -165,16 +166,12 @@ LoginManagerPromptFactory.prototype = {
       }
     }
   },
-
-
-  log : function (message) {
-    if (!this._debug)
-      return;
-
-    dump("Pwmgr PromptFactory: " + message + "\n");
-    Services.console.logStringMessage("Pwmgr PrompFactory: " + message);
-  }
 }; // end of LoginManagerPromptFactory implementation
+
+XPCOMUtils.defineLazyGetter(this.LoginManagerPromptFactory.prototype, "log", () => {
+  let logger = LoginHelper.createLogger("Login PromptFactory");
+  return logger.log.bind(logger);
+});
 
 
 
@@ -210,7 +207,6 @@ LoginManagerPrompter.prototype = {
   _window        : null,
   _browser       : null,
   _opener        : null,
-  _debug         : false, // mirrors signon.debug
 
   __pwmgr : null, // Password Manager service
   get _pwmgr() {
@@ -270,20 +266,6 @@ LoginManagerPrompter.prototype = {
       // information.
       return true;
     }
-  },
-
-
-  /*
-   * log
-   *
-   * Internal function for logging debug messages to the Error Console window.
-   */
-  log : function (message) {
-    if (!this._debug)
-      return;
-
-    dump("Pwmgr Prompter: " + message + "\n");
-    Services.console.logStringMessage("Pwmgr Prompter: " + message);
   },
 
 
@@ -723,8 +705,6 @@ LoginManagerPrompter.prototype = {
     this._browser = null;
     this._opener = null;
 
-    var prefBranch = Services.prefs.getBranch("signon.");
-    this._debug = prefBranch.getBoolPref("debug");
     this.log("===== initialized =====");
   },
 
@@ -742,8 +722,6 @@ LoginManagerPrompter.prototype = {
    */
   promptToSavePassword : function (aLogin) {
     var notifyObj = this._getPopupNote() || this._getNotifyBox();
-    Services.telemetry.getHistogramById("PWMGR_PROMPT_REMEMBER_ACTION").add(PROMPT_DISPLAYED);
-
     if (notifyObj)
       this._showSaveLoginNotification(notifyObj, aLogin);
     else
@@ -781,6 +759,173 @@ LoginManagerPrompter.prototype = {
       this.log("(...and removing old " + aName + " notification bar)");
       aNotifyBox.removeNotification(oldBar);
     }
+  },
+
+  /**
+   * Displays the PopupNotifications.jsm doorhanger for password save or change.
+   *
+   * @param {nsILoginInfo} login
+   *        Login to save or change. For changes, this login should contain the
+   *        new password.
+   * @param {string} type
+   *        This is "password-save" or "password-change" depending on the
+   *        original notification type. This is used for telemetry and tests.
+   */
+  _showLoginCaptureDoorhanger(login, type) {
+    let { browser } = this._getNotifyWindow();
+
+    let saveMsgNames = {
+      prompt: "rememberPasswordMsgNoUsername",
+      buttonLabel: "notifyBarRememberPasswordButtonText",
+      buttonAccessKey: "notifyBarRememberPasswordButtonAccessKey",
+    };
+
+    let changeMsgNames = {
+      // We reuse the existing message, even if it expects a username, until we
+      // switch to the final terminology in bug 1144856.
+      prompt: "updatePasswordMsg",
+      buttonLabel: "notifyBarUpdateButtonText",
+      buttonAccessKey: "notifyBarUpdateButtonAccessKey",
+    };
+
+    let initialMsgNames = type == "password-save" ? saveMsgNames
+                                                  : changeMsgNames;
+
+    let histogramName = type == "password-save" ? "PWMGR_PROMPT_REMEMBER_ACTION"
+                                                : "PWMGR_PROMPT_UPDATE_ACTION";
+    let histogram = Services.telemetry.getHistogramById(histogramName);
+    histogram.add(PROMPT_DISPLAYED);
+
+    let chromeDoc = browser.ownerDocument;
+
+    let currentNotification;
+
+    let updateButtonLabel = () => {
+      let foundLogins = Services.logins.findLogins({}, login.hostname,
+                                                   login.formSubmitURL,
+                                                   login.httpRealm);
+      let logins = foundLogins.filter(l => l.username == login.username);
+      let msgNames = (logins.length == 0) ? saveMsgNames : changeMsgNames;
+
+      // Update the label based on whether this will be a new login or not.
+      let label = this._getLocalizedString(msgNames.buttonLabel);
+      let accessKey = this._getLocalizedString(msgNames.buttonAccessKey);
+
+      // Update the labels for the next time the panel is opened.
+      currentNotification.mainAction.label = label;
+      currentNotification.mainAction.accessKey = accessKey;
+
+      // Update the labels in real time if the notification is displayed.
+      let element = [...currentNotification.owner.panel.childNodes]
+                    .find(n => n.notification == currentNotification);
+      if (element) {
+        element.setAttribute("buttonlabel", label);
+        element.setAttribute("buttonaccesskey", accessKey);
+      }
+    };
+
+    let writeDataToUI = () => {
+      chromeDoc.getElementById("password-notification-username")
+               .setAttribute("placeholder", usernamePlaceholder);
+      chromeDoc.getElementById("password-notification-username")
+               .setAttribute("value", login.username);
+      chromeDoc.getElementById("password-notification-password")
+               .setAttribute("value", login.password);
+      updateButtonLabel();
+    };
+
+    let readDataFromUI = () => {
+      login.username =
+        chromeDoc.getElementById("password-notification-username").value;
+      login.password =
+        chromeDoc.getElementById("password-notification-password").value;
+    };
+
+    let onUsernameInput = () => {
+      readDataFromUI();
+      updateButtonLabel();
+    };
+
+    let persistData = () => {
+      let foundLogins = Services.logins.findLogins({}, login.hostname,
+                                                   login.formSubmitURL,
+                                                   login.httpRealm);
+      let logins = foundLogins.filter(l => l.username == login.username);
+      if (logins.length == 0) {
+        // The original login we have been provided with might have its own
+        // metadata, but we don't want it propagated to the newly created one.
+        Services.logins.addLogin(new LoginInfo(login.hostname,
+                                               login.formSubmitURL,
+                                               login.httpRealm,
+                                               login.username,
+                                               login.password,
+                                               login.usernameField,
+                                               login.passwordField));
+      } else if (logins.length == 1) {
+        this._updateLogin(logins[0], login.password);
+      } else {
+        Cu.reportError("Unexpected match of multiple logins.");
+      }
+    };
+
+    // The main action is the "Remember" or "Update" button.
+    let mainAction = {
+      label: this._getLocalizedString(initialMsgNames.buttonLabel),
+      accessKey: this._getLocalizedString(initialMsgNames.buttonAccessKey),
+      callback: () => {
+        histogram.add(PROMPT_ADD_OR_UPDATE);
+        readDataFromUI();
+        persistData();
+        browser.focus();
+      }
+    };
+
+    // Include a "Never for this site" button when saving a new password.
+    let secondaryActions = type == "password-save" ? [{
+      label: this._getLocalizedString("notifyBarNeverRememberButtonText"),
+      accessKey: this._getLocalizedString("notifyBarNeverRememberButtonAccessKey"),
+      callback: () => {
+        histogram.add(PROMPT_NEVER);
+        Services.logins.setLoginSavingEnabled(login.hostname, false);
+        browser.focus();
+      }
+    }] : null;
+
+    let usernamePlaceholder = this._getLocalizedString("noUsernamePlaceholder");
+    let displayHost = this._getShortDisplayHost(login.hostname);
+
+    this._getPopupNote().show(
+      browser,
+      "password",
+      this._getLocalizedString(initialMsgNames.prompt, [displayHost]),
+      "password-notification-icon",
+      mainAction,
+      secondaryActions,
+      {
+        timeout: Date.now() + 10000,
+        persistWhileVisible: true,
+        passwordNotificationType: type,
+        eventCallback: function (topic) {
+          switch (topic) {
+            case "showing":
+              currentNotification = this;
+              writeDataToUI();
+              chromeDoc.getElementById("password-notification-username")
+                       .addEventListener("input", onUsernameInput);
+              break;
+            case "dismissed":
+              readDataFromUI();
+              // Fall through.
+            case "removed":
+              currentNotification = null;
+              chromeDoc.getElementById("password-notification-username")
+                       .removeEventListener("input", onUsernameInput);
+              break;
+          }
+          return false;
+        },
+      }
+    );
   },
 
   /*
@@ -828,37 +973,7 @@ LoginManagerPrompter.prototype = {
 
     // Notification is a PopupNotification
     if (aNotifyObj == this._getPopupNote()) {
-      // "Remember" button
-      var mainAction = {
-        label:     rememberButtonText,
-        accessKey: rememberButtonAccessKey,
-        callback: function(aNotifyObj, aButton) {
-          promptHistogram.add(PROMPT_ADD);
-          pwmgr.addLogin(aLogin);
-          Services.obs.notifyObservers(null, 'LoginStats:NewSavedPassword', null);
-          browser.focus();
-        }
-      };
-
-      var secondaryActions = [
-        // "Never for this site" button
-        {
-          label:     neverButtonText,
-          accessKey: neverButtonAccessKey,
-          callback: function(aNotifyObj, aButton) {
-            promptHistogram.add(PROMPT_NEVER);
-            pwmgr.setLoginSavingEnabled(aLogin.hostname, false);
-            browser.focus();
-          }
-        }
-      ];
-
-      var { browser } = this._getNotifyWindow();
-
-      aNotifyObj.show(browser, "password-save", notificationText,
-                      "password-notification-icon", mainAction,
-                      secondaryActions, { timeout: Date.now() + 10000,
-                                          persistWhileVisible: true });
+      this._showLoginCaptureDoorhanger(aLogin, "password-save");
     } else {
       var notNowButtonText =
             this._getLocalizedString("notifyBarNotNowButtonText");
@@ -1041,24 +1156,8 @@ LoginManagerPrompter.prototype = {
     let promptHistogram = Services.telemetry.getHistogramById("PWMGR_PROMPT_UPDATE_ACTION");
     // Notification is a PopupNotification
     if (aNotifyObj == this._getPopupNote()) {
-      // "Yes" button
-      var mainAction = {
-        label:     changeButtonText,
-        accessKey: changeButtonAccessKey,
-        popup:     null,
-        callback:  function(aNotifyObj, aButton) {
-          self._updateLogin(aOldLogin, aNewPassword);
-          promptHistogram.add(PROMPT_UPDATE);
-        }
-      };
-
-      var { browser } = this._getNotifyWindow();
-
-      Services.telemetry.getHistogramById("PWMGR_PROMPT_UPDATE_ACTION").add(PROMPT_DISPLAYED);
-      aNotifyObj.show(browser, "password-change", notificationText,
-                      "password-notification-icon", mainAction,
-                      null, { timeout: Date.now() + 10000,
-                              persistWhileVisible: true });
+      aOldLogin.password = aNewPassword;
+      this._showLoginCaptureDoorhanger(aOldLogin, "password-change");
     } else {
       var dontChangeButtonText =
             this._getLocalizedString("notifyBarDontChangeButtonText");
@@ -1543,6 +1642,10 @@ LoginManagerPrompter.prototype = {
 
 }; // end of LoginManagerPrompter implementation
 
+XPCOMUtils.defineLazyGetter(this.LoginManagerPrompter.prototype, "log", () => {
+  let logger = LoginHelper.createLogger("LoginManagerPrompter");
+  return logger.log.bind(logger);
+});
 
 var component = [LoginManagerPromptFactory, LoginManagerPrompter];
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory(component);

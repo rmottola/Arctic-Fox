@@ -38,10 +38,13 @@ size_t fakeMallocSizeOf(const void*) {
 
 DEF_TEST(DeserializedNodeUbiNodes, {
     const char16_t* typeName = MOZ_UTF16("TestTypeName");
+    const char* className = "MyObjectClassName";
 
-    NodeId id = 1L << 33;
-    uint64_t size = 1L << 60;
+    NodeId id = uint64_t(1) << 33;
+    uint64_t size = uint64_t(1) << 60;
     MockDeserializedNode mocked(id, typeName, size);
+    mocked.coarseType = JS::ubi::CoarseType::Script;
+    mocked.jsObjectClassName = className;
 
     DeserializedNode& deserialized = mocked;
     JS::ubi::Node ubi(&deserialized);
@@ -50,16 +53,17 @@ DEF_TEST(DeserializedNodeUbiNodes, {
 
     EXPECT_EQ(size, ubi.size(fakeMallocSizeOf));
     EXPECT_EQ(typeName, ubi.typeName());
+    EXPECT_EQ(JS::ubi::CoarseType::Script, ubi.coarseType());
     EXPECT_EQ(id, ubi.identifier());
     EXPECT_FALSE(ubi.isLive());
+    EXPECT_EQ(ubi.jsObjectClassName(), className);
 
     // Test the ubi::Node's edges.
 
     UniquePtr<DeserializedNode> referent1(new MockDeserializedNode(1,
                                                                    nullptr,
                                                                    10));
-    DeserializedEdge edge1;
-    edge1.referent = referent1->id;
+    DeserializedEdge edge1(referent1->id);
     mocked.addEdge(Move(edge1));
     EXPECT_CALL(mocked,
                 getEdgeReferent(Field(&DeserializedEdge::referent,
@@ -70,8 +74,7 @@ DEF_TEST(DeserializedNodeUbiNodes, {
     UniquePtr<DeserializedNode> referent2(new MockDeserializedNode(2,
                                                                    nullptr,
                                                                    20));
-    DeserializedEdge edge2;
-    edge2.referent = referent2->id;
+    DeserializedEdge edge2(referent2->id);
     mocked.addEdge(Move(edge2));
     EXPECT_CALL(mocked,
                 getEdgeReferent(Field(&DeserializedEdge::referent,
@@ -82,8 +85,7 @@ DEF_TEST(DeserializedNodeUbiNodes, {
     UniquePtr<DeserializedNode> referent3(new MockDeserializedNode(3,
                                                                    nullptr,
                                                                    30));
-    DeserializedEdge edge3;
-    edge3.referent = referent3->id;
+    DeserializedEdge edge3(referent3->id);
     mocked.addEdge(Move(edge3));
     EXPECT_CALL(mocked,
                 getEdgeReferent(Field(&DeserializedEdge::referent,
@@ -91,5 +93,5 @@ DEF_TEST(DeserializedNodeUbiNodes, {
       .Times(1)
       .WillOnce(Return(JS::ubi::Node(referent3.get())));
 
-    ubi.edges(cx);
+    ubi.edges(rt);
   });

@@ -9,14 +9,14 @@ do_get_profile(); // must be called before getting nsIX509CertDB
 const certdb  = Cc["@mozilla.org/security/x509certdb;1"]
                   .getService(Ci.nsIX509CertDB);
 
-let certList = [
+var certList = [
   'ee',
   'int',
   'ca',
 ];
 
 function load_cert(cert_name, trust_string) {
-  let cert_filename = cert_name + ".der";
+  let cert_filename = cert_name + ".pem";
   addCertFromFile(certdb, "test_cert_trust/" + cert_filename, trust_string);
 }
 

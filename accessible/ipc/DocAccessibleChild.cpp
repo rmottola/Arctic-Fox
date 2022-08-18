@@ -10,6 +10,7 @@
 #include "ProxyAccessible.h"
 #include "Relation.h"
 #include "HyperTextAccessible-inl.h"
+#include "TextLeafAccessible.h"
 #include "ImageAccessible.h"
 #include "TableAccessible.h"
 #include "TableCellAccessible.h"
@@ -26,6 +27,21 @@ InterfacesFor(Accessible* aAcc)
   uint32_t interfaces = 0;
   if (aAcc->IsHyperText() && aAcc->AsHyperText()->IsTextRole())
     interfaces |= Interfaces::HYPERTEXT;
+
+  if (aAcc->IsLink())
+    interfaces |= Interfaces::HYPERLINK;
+
+  if (aAcc->HasNumericValue())
+    interfaces |= Interfaces::VALUE;
+
+  if (aAcc->IsImage())
+    interfaces |= Interfaces::IMAGE;
+
+  if (aAcc->IsTableCell())
+    interfaces |= Interfaces::TABLECELL;
+
+  if (aAcc->IsDoc())
+    interfaces |= Interfaces::DOCUMENT;
 
   return interfaces;
 }
@@ -82,6 +98,13 @@ DocAccessibleChild::IdToHyperTextAccessible(const uint64_t& aID) const
   return acc && acc->IsHyperText() ? acc->AsHyperText() : nullptr;
 }
 
+TextLeafAccessible*
+DocAccessibleChild::IdToTextLeafAccessible(const uint64_t& aID) const
+{
+  Accessible* acc = IdToAccessible(aID);
+  return acc && acc->IsTextLeaf() ? acc->AsTextLeaf() : nullptr;
+}
+
 ImageAccessible*
 DocAccessibleChild::IdToImageAccessible(const uint64_t& aID) const
 {
@@ -130,6 +153,20 @@ DocAccessibleChild::RecvState(const uint64_t& aID, uint64_t* aState)
 }
 
 bool
+DocAccessibleChild::RecvNativeState(const uint64_t& aID, uint64_t* aState)
+{
+  Accessible* acc = IdToAccessible(aID);
+  if (!acc) {
+    *aState = states::DEFUNCT;
+    return true;
+  }
+
+  *aState = acc->NativeState();
+
+  return true;
+}
+
+bool
 DocAccessibleChild::RecvName(const uint64_t& aID, nsString* aName)
 {
   Accessible* acc = IdToAccessible(aID);
@@ -149,6 +186,18 @@ DocAccessibleChild::RecvValue(const uint64_t& aID, nsString* aValue)
   }
 
   acc->Value(*aValue);
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvHelp(const uint64_t& aID, nsString* aHelp)
+{
+  Accessible* acc = IdToAccessible(aID);
+  if (!acc) {
+    return true;
+  }
+
+  acc->Help(*aHelp);
   return true;
 }
 
@@ -255,6 +304,67 @@ DocAccessibleChild::RecvRelations(const uint64_t& aID,
 #include "RelationTypeMap.h"
 #undef RELATIONTYPE
 
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvIsSearchbox(const uint64_t& aID, bool* aRetVal)
+{
+  Accessible* acc = IdToAccessible(aID);
+  if (!acc)
+    return true;
+
+  *aRetVal = acc->IsSearchbox();
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvLandmarkRole(const uint64_t& aID, nsString* aLandmark)
+{
+  Accessible* acc = IdToAccessible(aID);
+  if (!acc) {
+    return true;
+  }
+
+  if (nsIAtom* roleAtom = acc->LandmarkRole()) {
+    roleAtom->ToString(*aLandmark);
+  }
+
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvARIARoleAtom(const uint64_t& aID, nsString* aRole)
+{
+  Accessible* acc = IdToAccessible(aID);
+  if (!acc) {
+    return true;
+  }
+
+  if (nsRoleMapEntry* roleMap = acc->ARIARoleMap()) {
+    if (nsIAtom* roleAtom = *(roleMap->roleAtom)) {
+      roleAtom->ToString(*aRole);
+    }
+  }
+
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvGetLevelInternal(const uint64_t& aID, int32_t* aLevel)
+{
+  Accessible* acc = IdToAccessible(aID);
+  if (acc) {
+    *aLevel = acc->GetLevelInternal();
+  }
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvCaretLineNumber(const uint64_t& aID, int32_t* aLineNumber)
+{
+  HyperTextAccessible* acc = IdToHyperTextAccessible(aID);
+  *aLineNumber = acc && acc->IsTextRole() ? acc->CaretLineNumber() : 0;
   return true;
 }
 
@@ -541,6 +651,17 @@ DocAccessibleChild::RecvScrollSubstringToPoint(const uint64_t& aID,
   return true;
 }
 
+bool
+DocAccessibleChild::RecvText(const uint64_t& aID,
+                             nsString* aText)
+{
+  TextLeafAccessible* acc = IdToTextLeafAccessible(aID);
+  if (acc) {
+    *aText = acc->Text();
+  }
+
+  return true;
+}
 
 bool
 DocAccessibleChild::RecvReplaceText(const uint64_t& aID,
@@ -1607,6 +1728,22 @@ DocAccessibleChild::RecvTakeFocus(const uint64_t& aID)
 }
 
 bool
+DocAccessibleChild::RecvEmbeddedChildCount(const uint64_t& aID,
+                                           uint32_t* aCount)
+{
+  *aCount = 0;
+
+  Accessible* acc = IdToAccessible(aID);
+  if (!acc) {
+    return true;
+  }
+
+  *aCount = acc->EmbeddedChildCount();
+
+  return true;
+}
+
+bool
 DocAccessibleChild::RecvIndexOfEmbeddedChild(const uint64_t& aID,
                                              const uint64_t& aChildID,
                                              uint32_t* aChildIdx)
@@ -1656,42 +1793,6 @@ DocAccessibleChild::RecvFocusedChild(const uint64_t& aID,
 }
 
 bool
-DocAccessibleChild::RecvChildAtPoint(const uint64_t& aID,
-                                     const int32_t& aX,
-                                     const int32_t& aY,
-                                     const uint32_t& aWhich,
-                                     uint64_t* aChild,
-                                     bool* aOk)
-{
-  *aChild = 0;
-  *aOk = false;
-  Accessible* acc = IdToAccessible(aID);
-  if (acc && !acc->IsDefunct() && !nsAccUtils::MustPrune(acc)) {
-    Accessible* child =
-      acc->ChildAtPoint(aX, aY,
-                        static_cast<Accessible::EWhichChildAtPoint>(aWhich));
-    if (child) {
-      *aChild = reinterpret_cast<uint64_t>(child->UniqueID());
-      *aOk = true;
-    }
-  }
-
-  return true;
-}
-
-bool
-DocAccessibleChild::RecvBounds(const uint64_t& aID,
-                               nsIntRect* aRect)
-{
-  Accessible* acc = IdToAccessible(aID);
-  if (acc && !acc->IsDefunct()) {
-    *aRect = acc->Bounds();
-  }
-
-  return false;
-}
-
-bool
 DocAccessibleChild::RecvLanguage(const uint64_t& aID,
                                  nsString* aLocale)
 {
@@ -1710,6 +1811,19 @@ DocAccessibleChild::RecvDocType(const uint64_t& aID,
   Accessible* acc = IdToAccessible(aID);
   if (acc && acc->IsDoc()) {
     acc->AsDoc()->DocType(*aType);
+  }
+
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvTitle(const uint64_t& aID,
+                            nsString* aTitle)
+{
+  Accessible* acc = IdToAccessible(aID);
+  if (acc) {
+    mozilla::ErrorResult rv;
+    acc->GetContent()->GetTextContent(*aTitle, rv);
   }
 
   return true;
@@ -1753,6 +1867,72 @@ DocAccessibleChild::RecvURLDocTypeMimeType(const uint64_t& aID,
     doc->MimeType(*aMimeType);
   }
 
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvAccessibleAtPoint(const uint64_t& aID,
+                                          const int32_t& aX,
+                                          const int32_t& aY,
+                                          const bool& aNeedsScreenCoords,
+                                          const uint32_t& aWhich,
+                                          uint64_t* aResult,
+                                          bool* aOk)
+{
+  *aResult = 0;
+  *aOk = false;
+  Accessible* acc = IdToAccessible(aID);
+  if (acc && !acc->IsDefunct() && !nsAccUtils::MustPrune(acc)) {
+    int32_t x = aX;
+    int32_t y = aY;
+    if (aNeedsScreenCoords) {
+      nsIntPoint winCoords =
+        nsCoreUtils::GetScreenCoordsForWindow(acc->GetNode());
+      x += winCoords.x;
+      y += winCoords.y;
+    }
+
+    Accessible* result =
+      acc->ChildAtPoint(x, y,
+                        static_cast<Accessible::EWhichChildAtPoint>(aWhich));
+    if (result) {
+      *aResult = reinterpret_cast<uint64_t>(result->UniqueID());
+      *aOk = true;
+    }
+  }
+
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvExtents(const uint64_t& aID,
+                                const bool& aNeedsScreenCoords,
+                                int32_t* aX,
+                                int32_t* aY,
+                                int32_t* aWidth,
+                                int32_t* aHeight)
+{
+  *aX = 0;
+  *aY = 0;
+  *aWidth = 0;
+  *aHeight = 0;
+  Accessible* acc = IdToAccessible(aID);
+  if (acc && !acc->IsDefunct() && !nsAccUtils::MustPrune(acc)) {
+    nsIntRect screenRect = acc->Bounds();
+    if (!screenRect.IsEmpty()) {
+      if (aNeedsScreenCoords) {
+        nsIntPoint winCoords =
+          nsCoreUtils::GetScreenCoordsForWindow(acc->GetNode());
+        screenRect.x -= winCoords.x;
+        screenRect.y -= winCoords.y;
+      }
+
+      *aX = screenRect.x;
+      *aY = screenRect.y;
+      *aWidth = screenRect.width;
+      *aHeight = screenRect.height;
+    }
+  }
   return true;
 }
 

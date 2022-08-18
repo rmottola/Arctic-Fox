@@ -68,7 +68,6 @@ static const JSFunctionSpec exception_methods[] = {
 #define IMPLEMENT_ERROR_SUBCLASS(name) \
     { \
         js_Error_str, /* yes, really */ \
-        JSCLASS_IMPLEMENTS_BARRIERS | \
         JSCLASS_HAS_CACHED_PROTO(JSProto_##name) | \
         JSCLASS_HAS_RESERVED_SLOTS(ErrorObject::RESERVED_SLOTS), \
         nullptr,                 /* addProperty */ \
@@ -78,7 +77,6 @@ static const JSFunctionSpec exception_methods[] = {
         nullptr,                 /* enumerate */ \
         nullptr,                 /* resolve */ \
         nullptr,                 /* mayResolve */ \
-        nullptr,                 /* convert */ \
         exn_finalize, \
         nullptr,                 /* call        */ \
         nullptr,                 /* hasInstance */ \
@@ -100,7 +98,6 @@ const Class
 ErrorObject::classes[JSEXN_LIMIT] = {
     {
         js_Error_str,
-        JSCLASS_IMPLEMENTS_BARRIERS |
         JSCLASS_HAS_CACHED_PROTO(JSProto_Error) |
         JSCLASS_HAS_RESERVED_SLOTS(ErrorObject::RESERVED_SLOTS),
         nullptr,                 /* addProperty */
@@ -110,7 +107,6 @@ ErrorObject::classes[JSEXN_LIMIT] = {
         nullptr,                 /* enumerate */
         nullptr,                 /* resolve */
         nullptr,                 /* mayResolve */
-        nullptr,                 /* convert */
         exn_finalize,
         nullptr,                 /* call        */
         nullptr,                 /* hasInstance */

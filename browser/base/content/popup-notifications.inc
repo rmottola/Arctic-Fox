@@ -54,6 +54,13 @@
       </popupnotificationcontent>
     </popupnotification>
 
+    <popupnotification id="password-notification" hidden="true">
+      <popupnotificationcontent orient="vertical">
+        <textbox id="password-notification-username"/>
+        <textbox id="password-notification-password" type="password" show-content=""/>
+      </popupnotificationcontent>
+    </popupnotification>
+
     <vbox id="login-fill-doorhanger" hidden="true">
       <description id="login-fill-testing"
                    value="Thanks for testing the login fill doorhanger!"/>

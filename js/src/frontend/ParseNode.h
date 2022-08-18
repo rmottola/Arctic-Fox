@@ -19,6 +19,7 @@ struct ParseContext;
 
 class FullParseHandler;
 class FunctionBox;
+class ModuleBox;
 class ObjectBox;
 
 // A packed ScopeCoordinate for use in the frontend during bytecode
@@ -118,6 +119,7 @@ class PackedScopeCoordinate
     F(NULL) \
     F(THIS) \
     F(FUNCTION) \
+    F(MODULE) \
     F(IF) \
     F(SWITCH) \
     F(CASE) \
@@ -514,7 +516,7 @@ class ParseNode
 {
     uint32_t            pn_type   : 16, /* PNK_* type */
                         pn_op     : 8,  /* see JSOp enum and jsopcode.tbl */
-                        pn_arity  : 5,  /* see ParseNodeArity enum */
+                        pn_arity  : 4,  /* see ParseNodeArity enum */
                         pn_parens : 1,  /* this expr was enclosed in parens */
                         pn_used   : 1,  /* name node is on a use-chain */
                         pn_defn   : 1;  /* this node is a Definition */
@@ -622,7 +624,7 @@ class ParseNode
             union {
                 unsigned iflags;        /* JSITER_* flags for PNK_FOR node */
                 ObjectBox* objbox;      /* Only for PN_BINARY_OBJ */
-		bool isStatic;          /* Only for PNK_CLASSMETHOD */
+                bool isStatic;          /* Only for PNK_CLASSMETHOD */
             };
         } binary;
         struct {                        /* one kid if unary */
@@ -632,9 +634,10 @@ class ParseNode
         } unary;
         struct {                        /* name, labeled statement, etc. */
             union {
-                JSAtom*     atom;      /* lexical name or label atom */
-                ObjectBox*  objbox;    /* block or regexp object */
+                JSAtom*      atom;      /* lexical name or label atom */
+                ObjectBox*   objbox;    /* block or regexp object */
                 FunctionBox* funbox;    /* function object */
+                ModuleBox*   modulebox; /* module object */
             };
             union {
                 ParseNode*  expr;      /* module or function body, var
@@ -658,6 +661,7 @@ class ParseNode
     } pn_u;
 
 #define pn_modulebox    pn_u.name.modulebox
+#define pn_objbox       pn_u.name.objbox
 #define pn_funbox       pn_u.name.funbox
 #define pn_body         pn_u.name.expr
 #define pn_scopecoord   pn_u.name.scopeCoord
@@ -746,9 +750,9 @@ class ParseNode
                                            'arguments' that has been converted
                                            into a definition after the function
                                            body has been parsed. */
-#define PND_EMITTEDFUNCTION    0x200    /* hoisted function that was emitted */
+#define PND_IMPORT             0x200    /* the definition is a module import. */
 
-    static_assert(PND_EMITTEDFUNCTION < (1 << NumDefinitionFlagBits), "Not enough bits");
+    static_assert(PND_IMPORT < (1 << NumDefinitionFlagBits), "Not enough bits");
 
 /* Flags to propagate from uses to definition. */
 #define PND_USE2DEF_FLAGS (PND_ASSIGNED | PND_CLOSED)
@@ -817,6 +821,7 @@ class ParseNode
     bool isImplicitArguments() const { return test(PND_IMPLICITARGUMENTS); }
     bool isHoistedLexicalUse() const { return test(PND_LEXICAL) && isUsed(); }
     bool isKnownAliased() const { return test(PND_KNOWNALIASED); }
+    bool isImport() const       { return test(PND_IMPORT); }
 
     /* True if pn is a parsenode representing a literal constant. */
     bool isLiteral() const {
@@ -1068,15 +1073,17 @@ struct ListNode : public ParseNode
 
 struct CodeNode : public ParseNode
 {
-    explicit CodeNode(const TokenPos& pos)
-      : ParseNode(PNK_FUNCTION, JSOP_NOP, PN_CODE, pos)
+    CodeNode(ParseNodeKind kind, const TokenPos& pos)
+      : ParseNode(kind, JSOP_NOP, PN_CODE, pos)
     {
+        MOZ_ASSERT(kind == PNK_FUNCTION || kind == PNK_MODULE);
         MOZ_ASSERT(!pn_body);
-        MOZ_ASSERT(!pn_funbox);
+        MOZ_ASSERT(!pn_objbox);
         MOZ_ASSERT(pn_dflags == 0);
         pn_scopecoord.makeFree();
     }
 
+  public:
 #ifdef DEBUG
     void dump(int indent);
 #endif
@@ -1121,7 +1128,7 @@ struct LexicalScopeNode : public ParseNode
         pn_blockid = blockNode->pn_blockid;
     }
 
-    static bool test(const ParseNode &node) {
+    static bool test(const ParseNode& node) {
         return node.isKind(PNK_LEXICALSCOPE);
     }
 };
@@ -1362,22 +1369,22 @@ struct ClassMethod : public BinaryNode {
      * Method defintions often keep a name and function body that overlap,
      * so explicitly define the beginning and end here.
      */
-    ClassMethod(ParseNode *name, ParseNode *body, JSOp op, bool isStatic)
+    ClassMethod(ParseNode* name, ParseNode* body, JSOp op, bool isStatic)
       : BinaryNode(PNK_CLASSMETHOD, op, TokenPos(name->pn_pos.begin, body->pn_pos.end), name, body)
     {
         pn_u.binary.isStatic = isStatic;
     }
 
-    static bool test(const ParseNode &node) {
+    static bool test(const ParseNode& node) {
         bool match = node.isKind(PNK_CLASSMETHOD);
         MOZ_ASSERT_IF(match, node.isArity(PN_BINARY));
         return match;
     }
 
-    ParseNode &name() const {
+    ParseNode& name() const {
         return *pn_u.binary.left;
     }
-    ParseNode &method() const {
+    ParseNode& method() const {
         return *pn_u.binary.right;
     }
     bool isStatic() const {
@@ -1561,7 +1568,17 @@ struct Definition : public ParseNode
         return pn_scopecoord.isFree();
     }
 
-    enum Kind { MISSING = 0, VAR, GLOBALCONST, CONST, LET, ARG, NAMED_LAMBDA, PLACEHOLDER };
+    enum Kind {
+        MISSING = 0,
+        VAR,
+        GLOBALCONST,
+        CONST,
+        LET,
+        ARG,
+        NAMED_LAMBDA,
+        PLACEHOLDER,
+        IMPORT
+    };
 
     bool canHaveInitializer() { return int(kind()) <= int(ARG); }
 
@@ -1580,6 +1597,8 @@ struct Definition : public ParseNode
             return PLACEHOLDER;
         if (isOp(JSOP_GETARG))
             return ARG;
+        if (isImport())
+            return IMPORT;
         if (isLexical())
             return isConst() ? CONST : LET;
         if (isConst())
@@ -1667,6 +1686,8 @@ class ObjectBox
     ObjectBox(JSObject* object, ObjectBox* traceLink);
     bool isFunctionBox() { return object->is<JSFunction>(); }
     FunctionBox* asFunctionBox();
+    bool isModuleBox() { return object->is<ModuleObject>(); }
+    ModuleBox* asModuleBox();
     void trace(JSTracer* trc);
 
   protected:

@@ -10,11 +10,6 @@
 namespace mozilla {
 namespace devtools {
 
-DeserializedEdge::DeserializedEdge()
-  : referent(0)
-  , name(nullptr)
-{ }
-
 DeserializedEdge::DeserializedEdge(DeserializedEdge&& rhs)
 {
   referent = rhs.referent;
@@ -29,59 +24,6 @@ DeserializedEdge& DeserializedEdge::operator=(DeserializedEdge&& rhs)
   return *this;
 }
 
-bool
-DeserializedEdge::init(const protobuf::Edge& edge, HeapSnapshot& owner)
-{
-  // Although the referent property is optional in the protobuf format for
-  // future compatibility, we can't semantically have an edge to nowhere and
-  // require a referent here.
-  if (!edge.has_referent())
-    return false;
-  referent = edge.referent();
-
-  if (edge.has_name()) {
-    const char16_t* duplicateEdgeName = reinterpret_cast<const char16_t*>(edge.name().c_str());
-    name = owner.borrowUniqueString(duplicateEdgeName, edge.name().length() / sizeof(char16_t));
-    if (!name)
-      return false;
-  }
-
-  return true;
-}
-
-DeserializedNode::DeserializedNode(DeserializedNode&& rhs)
-{
-  id = rhs.id;
-  rhs.id = 0;
-
-  typeName = rhs.typeName;
-  rhs.typeName = nullptr;
-
-  size = rhs.size;
-  rhs.size = 0;
-
-  edges = Move(rhs.edges);
-
-  owner = rhs.owner;
-  rhs.owner = nullptr;
-}
-
-DeserializedNode& DeserializedNode::operator=(DeserializedNode&& rhs)
-{
-  MOZ_ASSERT(&rhs != this);
-  this->~DeserializedNode();
-  new(this) DeserializedNode(Move(rhs));
-  return *this;
-}
-
-DeserializedNode::DeserializedNode(NodeId id, const char16_t* typeName, uint64_t size)
-  : id(id)
-  , typeName(typeName)
-  , size(size)
-  , edges()
-  , owner(nullptr)
-{ }
-
 JS::ubi::Node
 DeserializedNode::getEdgeReferent(const DeserializedEdge& edge)
 {
@@ -95,6 +37,17 @@ DeserializedNode::getEdgeReferent(const DeserializedEdge& edge)
   // is its id, which can't be changed via `ubi::Node`, so this cast can't cause
   // the trouble `HashSet` is concerned a non-const reference would cause.
   return JS::ubi::Node(const_cast<DeserializedNode*>(&*ptr));
+}
+
+JS::ubi::StackFrame
+DeserializedStackFrame::getParentStackFrame() const
+{
+  MOZ_ASSERT(parent.isSome());
+  auto ptr = owner->frames.lookup(parent.ref());
+  MOZ_ASSERT(ptr);
+  // See above comment in DeserializedNode::getEdgeReferent about why this
+  // const_cast is needed and safe.
+  return JS::ubi::StackFrame(const_cast<DeserializedStackFrame*>(&*ptr));
 }
 
 } // namespace devtools
@@ -114,7 +67,7 @@ Concrete<DeserializedNode>::typeName() const
   return get().typeName;
 }
 
-size_t
+Node::Size
 Concrete<DeserializedNode>::size(mozilla::MallocSizeOf mallocSizeof) const
 {
   return get().size;
@@ -122,16 +75,16 @@ Concrete<DeserializedNode>::size(mozilla::MallocSizeOf mallocSizeof) const
 
 class DeserializedEdgeRange : public EdgeRange
 {
-  SimpleEdgeVector edges;
-  size_t           i;
+  EdgeVector edges;
+  size_t     i;
 
   void settle() {
     front_ = i < edges.length() ? &edges[i] : nullptr;
   }
 
 public:
-  explicit DeserializedEdgeRange(JSContext* cx)
-    : edges(cx)
+  explicit DeserializedEdgeRange()
+    : edges()
     , i(0)
   {
     settle();
@@ -154,7 +107,7 @@ public:
       }
 
       auto referent = node.getEdgeReferent(*edgep);
-      edges.infallibleAppend(mozilla::Move(SimpleEdge(name, referent)));
+      edges.infallibleAppend(mozilla::Move(Edge(name, referent)));
     }
 
     settle();
@@ -168,16 +121,44 @@ public:
   }
 };
 
+StackFrame
+Concrete<DeserializedNode>::allocationStack() const
+{
+  MOZ_ASSERT(hasAllocationStack());
+  auto id = get().allocationStack.ref();
+  auto ptr = get().owner->frames.lookup(id);
+  MOZ_ASSERT(ptr);
+  // See above comment in DeserializedNode::getEdgeReferent about why this
+  // const_cast is needed and safe.
+  return JS::ubi::StackFrame(const_cast<DeserializedStackFrame*>(&*ptr));
+}
+
+
 UniquePtr<EdgeRange>
-Concrete<DeserializedNode>::edges(JSContext* cx, bool) const
+Concrete<DeserializedNode>::edges(JSRuntime* rt, bool) const
 {
   UniquePtr<DeserializedEdgeRange, JS::DeletePolicy<DeserializedEdgeRange>> range(
-    js_new<DeserializedEdgeRange>(cx));
+    js_new<DeserializedEdgeRange>());
 
   if (!range || !range->init(get()))
     return nullptr;
 
   return UniquePtr<EdgeRange>(range.release());
+}
+
+StackFrame
+ConcreteStackFrame<DeserializedStackFrame>::parent() const
+{
+  return get().parent.isNothing() ? StackFrame() : get().getParentStackFrame();
+}
+
+bool
+ConcreteStackFrame<DeserializedStackFrame>::constructSavedFrameStack(
+  JSContext* cx,
+  MutableHandleObject outSavedFrameStack) const
+{
+  StackFrame f(&get());
+  return ConstructSavedFrameStackSlow(cx, f, outSavedFrameStack);
 }
 
 } // namespace ubi

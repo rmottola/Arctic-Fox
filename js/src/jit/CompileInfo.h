@@ -248,6 +248,9 @@ class CompileInfo
     JSFunction* funMaybeLazy() const {
         return fun_;
     }
+    ModuleObject* module() const {
+        return script_->module();
+    }
     bool constructing() const {
         return constructing_;
     }
@@ -494,7 +497,7 @@ class CompileInfo
         if (slot == thisSlot())
             return true;
 
-        if (funMaybeLazy()->isHeavyweight() && slot == scopeChainSlot())
+        if (funMaybeLazy()->needsCallObject() && slot == scopeChainSlot())
             return true;
 
         // If the function may need an arguments object, then make sure to

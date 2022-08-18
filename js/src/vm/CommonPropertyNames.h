@@ -116,6 +116,7 @@
     macro(InitializeCollator, InitializeCollator, "InitializeCollator") \
     macro(InitializeDateTimeFormat, InitializeDateTimeFormat, "InitializeDateTimeFormat") \
     macro(InitializeNumberFormat, InitializeNumberFormat, "InitializeNumberFormat") \
+    macro(inNursery, inNursery, "inNursery") \
     macro(innermost, innermost, "innermost") \
     macro(input, input, "input") \
     macro(int8x16, int8x16, "Int8x16") \
@@ -197,6 +198,7 @@
     macro(resumeGenerator, resumeGenerator, "resumeGenerator") \
     macro(return, return_, "return") \
     macro(revoke, revoke, "revoke") \
+    macro(script, script, "script") \
     macro(scripts, scripts, "scripts") \
     macro(sensitivity, sensitivity, "sensitivity") \
     macro(set, set, "set") \

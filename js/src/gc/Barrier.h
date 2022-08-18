@@ -135,20 +135,27 @@
  *
  * This file implements four classes, illustrated here:
  *
- * BarrieredBase          abstract base class which provides common operations
- *  |  |  |  |
- *  |  |  | PreBarriered  provides pre-barriers only
- *  |  |  |
- *  |  | HeapPtr          provides pre- and post-barriers
+ * BarrieredBase             base class of all barriers
  *  |  |
- *  | RelocatablePtr      provides pre- and post-barriers and is relocatable
+ *  | WriteBarrieredBase     base class which provides common write operations
+ *  |  |  |  |  |
+ *  |  |  |  | PreBarriered  provides pre-barriers only
+ *  |  |  |  |
+ *  |  |  | HeapPtr          provides pre- and post-barriers
+ *  |  |  |
+ *  |  | RelocatablePtr      provides pre- and post-barriers and is relocatable
+ *  |  |
+ *  | HeapSlot               similar to HeapPtr, but tailored to slots storage
  *  |
- * HeapSlot               similar to HeapPtr, but tailored to slots storage
+ * ReadBarrieredBase         base class which provides common read operations
+ *  |
+ * ReadBarriered             provides read barriers only
+ *
  *
  * The implementation of the barrier logic is implemented on T::writeBarrier.*,
  * via:
  *
- * BarrieredBase<T>::pre
+ * WriteBarrieredBase<T>::pre
  *  -> InternalGCMethods<T*>::preBarrier
  *      -> T::writeBarrierPre
  *  -> InternalGCMethods<Value>::preBarrier
@@ -263,7 +270,7 @@ struct InternalGCMethods<Value>
     static bool isMarkableTaggedPointer(Value v) { return isMarkable(v); }
 
     static void preBarrier(Value v) {
-        DispatchValueTyped(PreBarrierFunctor<Value>(), v);
+        DispatchTyped(PreBarrierFunctor<Value>(), v);
     }
 
     static void postBarrier(Value* vp, const Value& prev, const Value& next) {
@@ -288,7 +295,7 @@ struct InternalGCMethods<Value>
     }
 
     static void readBarrier(const Value& v) {
-        DispatchValueTyped(ReadBarrierFunctor<Value>(), v);
+        DispatchTyped(ReadBarrierFunctor<Value>(), v);
     }
 };
 
@@ -298,54 +305,73 @@ struct InternalGCMethods<jsid>
     static bool isMarkable(jsid id) { return JSID_IS_STRING(id) || JSID_IS_SYMBOL(id); }
     static bool isMarkableTaggedPointer(jsid id) { return isMarkable(id); }
 
-    static void preBarrier(jsid id) { DispatchIdTyped(PreBarrierFunctor<jsid>(), id); }
+    static void preBarrier(jsid id) { DispatchTyped(PreBarrierFunctor<jsid>(), id); }
     static void postBarrier(jsid* idp, jsid prev, jsid next) {}
 };
 
+// Barrier classes can use Mixins to add methods to a set of barrier
+// instantiations, to make the barriered thing look and feel more like the
+// thing itself.
 template <typename T>
 class BarrieredBaseMixins {};
 
-/*
- * Base class for barriered pointer types.
- */
-template <class T>
+// Base class of all barrier types.
+template <typename T>
 class BarrieredBase : public BarrieredBaseMixins<T>
 {
   protected:
+    // BarrieredBase is not directly instantiable.
+    explicit BarrieredBase(T v) : value(v) {
+#ifdef DEBUG
+        assertTypeConstraints();
+#endif
+    }
+
+    // Storage for all barrier classes. |value| must be a GC thing reference
+    // type: either a direct pointer to a GC thing or a supported tagged
+    // pointer that can reference GC things, such as JS::Value or jsid. Nested
+    // barrier types are NOT supported. See assertTypeConstraints.
     T value;
 
-    explicit BarrieredBase(T v) : value(v) {}
+  public:
+    // Note: this is public because C++ cannot friend to a specific template instantiation.
+    // Friending to the generic template leads to a number of unintended consequences, including
+    // template resolution ambiguity and a circular dependency with Tracing.h.
+    T* unsafeUnbarrieredForTracing() { return &value; }
+
+  private:
+#ifdef DEBUG
+    // Static type assertions about T must be moved out of line to avoid
+    // circular dependencies between Barrier classes and GC memory definitions.
+    void assertTypeConstraints() const;
+#endif
+};
+
+// Base class for barriered pointer types that intercept only writes.
+template <class T>
+class WriteBarrieredBase : public BarrieredBase<T>
+{
+  protected:
+    // WriteBarrieredBase is not directly instantiable.
+    explicit WriteBarrieredBase(T v) : BarrieredBase<T>(v) {}
 
   public:
     DECLARE_POINTER_COMPARISON_OPS(T);
     DECLARE_POINTER_CONSTREF_OPS(T);
 
-    /* Use this if the automatic coercion to T isn't working. */
-    const T& get() const { return value; }
+    // Use this if the automatic coercion to T isn't working.
+    const T& get() const { return this->value; }
 
-    /*
-     * Use these if you want to change the value without invoking barriers.
-     * Obviously this is dangerous unless you know the barrier is not needed.
-     */
-    T* unsafeGet() { return &value; }
-    const T* unsafeGet() const { return &value; }
-    void unsafeSet(T v) { value = v; }
+    // Use this if you want to change the value without invoking barriers.
+    // Obviously this is dangerous unless you know the barrier is not needed.
+    void unsafeSet(T v) { this->value = v; }
 
-    /* For users who need to manually barrier the raw types. */
+    // For users who need to manually barrier the raw types.
     static void writeBarrierPre(const T& v) { InternalGCMethods<T>::preBarrier(v); }
 
   protected:
-    void pre() { InternalGCMethods<T>::preBarrier(value); }
-    void post(T prev, T next) { InternalGCMethods<T>::postBarrier(&value, prev, next); }
-};
-
-template <>
-class BarrieredBaseMixins<JS::Value> : public ValueOperations<BarrieredBase<JS::Value> >
-{
-    friend class ValueOperations<BarrieredBase<JS::Value> >;
-    const JS::Value * extract() const {
-        return static_cast<const BarrieredBase<JS::Value>*>(this)->unsafeGet();
-    }
+    void pre() { InternalGCMethods<T>::preBarrier(this->value); }
+    void post(T prev, T next) { InternalGCMethods<T>::postBarrier(&this->value, prev, next); }
 };
 
 /*
@@ -355,15 +381,15 @@ class BarrieredBaseMixins<JS::Value> : public ValueOperations<BarrieredBase<JS::
  * of moving behavior, e.g. for HashMap keys.
  */
 template <class T>
-class PreBarriered : public BarrieredBase<T>
+class PreBarriered : public WriteBarrieredBase<T>
 {
   public:
-    PreBarriered() : BarrieredBase<T>(GCMethods<T>::initial()) {}
+    PreBarriered() : WriteBarrieredBase<T>(GCMethods<T>::initial()) {}
     /*
      * Allow implicit construction for use in generic contexts, such as DebuggerWeakMap::markKeys.
      */
-    MOZ_IMPLICIT PreBarriered(T v) : BarrieredBase<T>(v) {}
-    explicit PreBarriered(const PreBarriered<T>& v) : BarrieredBase<T>(v.value) {}
+    MOZ_IMPLICIT PreBarriered(T v) : WriteBarrieredBase<T>(v) {}
+    explicit PreBarriered(const PreBarriered<T>& v) : WriteBarrieredBase<T>(v.value) {}
     ~PreBarriered() { this->pre(); }
 
     void init(T v) {
@@ -400,14 +426,14 @@ class PreBarriered : public BarrieredBase<T>
  * automatically handling deletion or movement.
  */
 template <class T>
-class HeapPtr : public BarrieredBase<T>
+class HeapPtr : public WriteBarrieredBase<T>
 {
   public:
-    HeapPtr() : BarrieredBase<T>(GCMethods<T>::initial()) {}
-    explicit HeapPtr(T v) : BarrieredBase<T>(v) {
+    HeapPtr() : WriteBarrieredBase<T>(GCMethods<T>::initial()) {}
+    explicit HeapPtr(T v) : WriteBarrieredBase<T>(v) {
         this->post(GCMethods<T>::initial(), v);
     }
-    explicit HeapPtr(const HeapPtr<T>& v) : BarrieredBase<T>(v) {
+    explicit HeapPtr(const HeapPtr<T>& v) : WriteBarrieredBase<T>(v) {
         this->post(GCMethods<T>::initial(), v);
     }
 #ifdef DEBUG
@@ -452,11 +478,11 @@ class HeapPtr : public BarrieredBase<T>
  * used in contexts where this ability is necessary.
  */
 template <class T>
-class RelocatablePtr : public BarrieredBase<T>
+class RelocatablePtr : public WriteBarrieredBase<T>
 {
   public:
-    RelocatablePtr() : BarrieredBase<T>(GCMethods<T>::initial()) {}
-    explicit RelocatablePtr(T v) : BarrieredBase<T>(v) {
+    RelocatablePtr() : WriteBarrieredBase<T>(GCMethods<T>::initial()) {}
+    explicit RelocatablePtr(T v) : WriteBarrieredBase<T>(v) {
         this->post(GCMethods<T>::initial(), this->value);
     }
 
@@ -466,7 +492,7 @@ class RelocatablePtr : public BarrieredBase<T>
      * function that will be used for both lvalue and rvalue copies, so we can
      * simply omit the rvalue variant.
      */
-    RelocatablePtr(const RelocatablePtr<T>& v) : BarrieredBase<T>(v) {
+    RelocatablePtr(const RelocatablePtr<T>& v) : WriteBarrieredBase<T>(v) {
         this->post(GCMethods<T>::initial(), this->value);
     }
 
@@ -502,52 +528,84 @@ class RelocatablePtr : public BarrieredBase<T>
     }
 };
 
-/*
- * Incremental GC requires that weak pointers have read barriers. This is mostly
- * an issue for empty shapes stored in JSCompartment. The problem happens when,
- * during an incremental GC, some JS code stores one of the compartment's empty
- * shapes into an object already marked black. Normally, this would not be a
- * problem, because the empty shape would have been part of the initial snapshot
- * when the GC started. However, since this is a weak pointer, it isn't. So we
- * may collect the empty shape even though a live object points to it. To fix
- * this, we mark these empty shapes black whenever they get read out.
- */
-template <class T>
-class ReadBarriered
+// Base class for barriered pointer types that intercept reads and writes.
+template <typename T>
+class ReadBarrieredBase : public BarrieredBase<T>
 {
-    T value;
+  protected:
+    // ReadBarrieredBase is not directly instantiable.
+    explicit ReadBarrieredBase(T v) : BarrieredBase<T>(v) {}
 
-  public:
-    ReadBarriered() : value(nullptr) {}
-    explicit ReadBarriered(T value) : value(value) {}
-    explicit ReadBarriered(const Rooted<T>& rooted) : value(rooted) {}
-
-    T get() const {
-        if (!InternalGCMethods<T>::isMarkable(value))
-            return GCMethods<T>::initial();
-        InternalGCMethods<T>::readBarrier(value);
-        return value;
-    }
-
-    T unbarrieredGet() const {
-        return value;
-    }
-
-    operator T() const { return get(); }
-
-    T& operator*() const { return *get(); }
-    T operator->() const { return get(); }
-
-    T* unsafeGet() { return &value; }
-    T const * unsafeGet() const { return &value; }
-
-    void set(T v) { value = v; }
+  protected:
+    void read() const { InternalGCMethods<T>::readBarrier(this->value); }
+    void post(T prev, T next) { InternalGCMethods<T>::postBarrier(&this->value, prev, next); }
 };
+
+// Incremental GC requires that weak pointers have read barriers. This is mostly
+// an issue for empty shapes stored in JSCompartment. The problem happens when,
+// during an incremental GC, some JS code stores one of the compartment's empty
+// shapes into an object already marked black. Normally, this would not be a
+// problem, because the empty shape would have been part of the initial snapshot
+// when the GC started. However, since this is a weak pointer, it isn't. So we
+// may collect the empty shape even though a live object points to it. To fix
+// this, we mark these empty shapes black whenever they get read out.
+//
+// Note that this class also has post-barriers, so is safe to use with nursery
+// pointers. However, when used as a hashtable key, care must still be taken to
+// insert manual post-barriers on the table for rekeying if the key is based in
+// any way on the address of the object.
+template <typename T>
+class ReadBarriered : public ReadBarrieredBase<T>
+{
+  public:
+    ReadBarriered() : ReadBarrieredBase<T>(GCMethods<T>::initial()) {}
+    explicit ReadBarriered(const T& v) : ReadBarrieredBase<T>(v) {
+        this->post(GCMethods<T>::initial(), v);
+    }
+    ~ReadBarriered() {
+        this->post(this->value, GCMethods<T>::initial());
+    }
+
+    const T get() const {
+        if (!InternalGCMethods<T>::isMarkable(this->value))
+            return GCMethods<T>::initial();
+        this->read();
+        return this->value;
+    }
+
+    const T unbarrieredGet() const {
+        return this->value;
+    }
+
+    operator const T() const { return get(); }
+
+    const T operator->() const { return get(); }
+
+    T const* unsafeGet() const { return &this->value; }
+
+    void set(const T& v)
+    {
+        T tmp = this->value;
+        this->value = v;
+        this->post(tmp, v);
+    }
+};
+
+// A WeakRef pointer does not hold its target live and is automatically nulled
+// out when the GC discovers that it is not reachable from any other path.
+template <typename T>
+using WeakRef = ReadBarriered<T>;
+
+// Add Value operations to all Barrier types. Note, this must be defined before
+// HeapSlot for HeapSlot's base to get these operations.
+template <>
+class BarrieredBaseMixins<JS::Value> : public ValueOperations<WriteBarrieredBase<JS::Value>>
+{};
 
 // A pre- and post-barriered Value that is specialized to be aware that it
 // resides in a slots or elements vector. This allows it to be relocated in
 // memory, but with substantially less overhead than a RelocatablePtr.
-class HeapSlot : public BarrieredBase<Value>
+class HeapSlot : public WriteBarrieredBase<Value>
 {
   public:
     enum Kind {
@@ -558,13 +616,13 @@ class HeapSlot : public BarrieredBase<Value>
     explicit HeapSlot() = delete;
 
     explicit HeapSlot(NativeObject* obj, Kind kind, uint32_t slot, const Value& v)
-      : BarrieredBase<Value>(v)
+      : WriteBarrieredBase<Value>(v)
     {
         post(obj, kind, slot, v);
     }
 
     explicit HeapSlot(NativeObject* obj, Kind kind, uint32_t slot, const HeapSlot& s)
-      : BarrieredBase<Value>(s.value)
+      : WriteBarrieredBase<Value>(s.value)
     {
         post(obj, kind, slot, s);
     }
@@ -594,8 +652,6 @@ class HeapSlot : public BarrieredBase<Value>
     static void writeBarrierPost(NativeObject* owner, Kind kind, uint32_t slot, const Value& target) {
         reinterpret_cast<HeapSlot*>(const_cast<Value*>(&target))->post(owner, kind, slot, target);
     }
-
-    Value* unsafeGet() { return &value; }
 
   private:
     void post(NativeObject* owner, Kind kind, uint32_t slot, const Value& target) {

@@ -221,19 +221,15 @@ class JS_PUBLIC_API(AutoGCRooter)
         VALVECTOR =   -10, /* js::AutoValueVector */
         IDVECTOR =    -11, /* js::AutoIdVector */
         OBJVECTOR =   -14, /* js::AutoObjectVector */
-        SCRIPTVECTOR =-16, /* js::AutoScriptVector */
-        HASHABLEVALUE=-18, /* js::HashableValue */
         IONMASM =     -19, /* js::jit::MacroAssembler */
         WRAPVECTOR =  -20, /* js::AutoWrapperVector */
         WRAPPER =     -21, /* js::AutoWrapperRooter */
-        JSONPARSER =  -25, /* js::JSONParser */
         CUSTOM =      -26  /* js::CustomAutoRooter */
     };
 
     static ptrdiff_t GetTag(const Value& value) { return VALVECTOR; }
     static ptrdiff_t GetTag(const jsid& id) { return IDVECTOR; }
     static ptrdiff_t GetTag(JSObject* obj) { return OBJVECTOR; }
-    static ptrdiff_t GetTag(JSScript* script) { return SCRIPTVECTOR; }
 
   private:
     AutoGCRooter ** const stackTop;
@@ -275,11 +271,7 @@ enum ThingRootKind
     THING_ROOT_LAZY_SCRIPT,
     THING_ROOT_ID,
     THING_ROOT_VALUE,
-    THING_ROOT_BINDINGS,
-    THING_ROOT_PROPERTY_DESCRIPTOR,
-    THING_ROOT_PROP_DESC,
-    THING_ROOT_STATIC_TRACEABLE,
-    THING_ROOT_DYNAMIC_TRACEABLE,
+    THING_ROOT_TRACEABLE,
     THING_ROOT_LIMIT
 };
 

@@ -19,6 +19,8 @@
 
 namespace js {
 
+class WeakMapBase;
+
 // A subclass template of js::HashMap whose keys and values may be garbage-collected. When
 // a key is collected, the table entry disappears, dropping its reference to the value.
 //
@@ -117,7 +119,7 @@ class WeakMapBase {
 };
 
 template <typename T>
-static T extractUnbarriered(BarrieredBase<T> v)
+static T extractUnbarriered(WriteBarrieredBase<T> v)
 {
     return v.get();
 }
@@ -394,6 +396,44 @@ WeakMap_clear(JSContext* cx, unsigned argc, Value* vp);
 
 extern JSObject*
 InitWeakMapClass(JSContext* cx, HandleObject obj);
+
+
+class ObjectValueMap : public WeakMap<PreBarrieredObject, RelocatableValue>
+{
+  public:
+    ObjectValueMap(JSContext* cx, JSObject* obj)
+      : WeakMap<PreBarrieredObject, RelocatableValue>(cx, obj) {}
+
+    virtual bool findZoneEdges();
+};
+
+
+// Generic weak map for mapping objects to other objects.
+class ObjectWeakMap
+{
+  private:
+    ObjectValueMap map;
+    typedef gc::HashKeyRef<ObjectValueMap, JSObject*> StoreBufferRef;
+
+  public:
+    explicit ObjectWeakMap(JSContext* cx);
+    bool init();
+    ~ObjectWeakMap();
+
+    JSObject* lookup(const JSObject* obj);
+    bool add(JSContext* cx, JSObject* obj, JSObject* target);
+    void clear();
+
+    void trace(JSTracer* trc);
+    size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf);
+    size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) {
+        return mallocSizeOf(this) + sizeOfExcludingThis(mallocSizeOf);
+    }
+
+#ifdef JSGC_HASH_TABLE_CHECKS
+    void checkAfterMovingGC();
+#endif
+};
 
 } /* namespace js */
 

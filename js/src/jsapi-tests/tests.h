@@ -227,7 +227,7 @@ class JSAPITest
             "global", JSCLASS_GLOBAL_FLAGS,
             nullptr, nullptr, nullptr, nullptr,
             nullptr, nullptr, nullptr, nullptr,
-            nullptr, nullptr, nullptr, nullptr,
+            nullptr, nullptr, nullptr,
             JS_GlobalObjectTraceHook
         };
         return &c;
@@ -405,6 +405,11 @@ class TestJSPrincipals : public JSPrincipals
       : JSPrincipals()
     {
         refcount = rc;
+    }
+
+    bool write(JSContext* cx, JSStructuredCloneWriter* writer) override {
+        MOZ_ASSERT(false, "not implemented");
+        return false;
     }
 };
 

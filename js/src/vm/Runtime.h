@@ -39,6 +39,7 @@
 #endif
 #include "js/TraceableVector.h"
 #include "js/Vector.h"
+#include "vm/CodeCoverage.h"
 #include "vm/CommonPropertyNames.h"
 #include "vm/DateTime.h"
 #include "vm/MallocProvider.h"
@@ -1067,6 +1068,9 @@ struct JSRuntime : public JS::shadow::Runtime,
     /* Strong references on scripts held for PCCount profiling API. */
     JS::PersistentRooted<js::ScriptAndCountsVector>* scriptAndCountsVector;
 
+    /* Code coverage output. */
+    js::coverage::LCovRuntime lcovOutput;
+
     /* Well-known numbers held for use by this runtime's contexts. */
     const js::Value     NaNValue;
     const js::Value     negativeInfinityValue;
@@ -1165,9 +1169,7 @@ struct JSRuntime : public JS::shadow::Runtime,
     const JSSecurityCallbacks* securityCallbacks;
     const js::DOMCallbacks* DOMcallbacks;
     JSDestroyPrincipalsOp destroyPrincipals;
-
-    /* Structured data callbacks are runtime-wide. */
-    const JSStructuredCloneCallbacks* structuredCloneCallbacks;
+    JSReadPrincipalsOp readPrincipals;
 
     /* Optional error reporter. */
     JSErrorReporter     errorReporter;
@@ -1868,8 +1870,9 @@ FreeOp::freeLater(void* p)
     // and won't hold onto the pointers to free indefinitely.
     MOZ_ASSERT(this != runtime()->defaultFreeOp());
 
+    AutoEnterOOMUnsafeRegion oomUnsafe;
     if (!freeLaterList.append(p))
-        CrashAtUnhandlableOOM("FreeOp::freeLater");
+        oomUnsafe.crash("FreeOp::freeLater");
 }
 
 /*
@@ -1878,7 +1881,7 @@ FreeOp::freeLater(void* p)
  * Note that the lock may be temporarily released by use of AutoUnlockGC when
  * passed a non-const reference to this class.
  */
-class MOZ_STACK_CLASS AutoLockGC
+class MOZ_RAII AutoLockGC
 {
   public:
     explicit AutoLockGC(JSRuntime* rt
@@ -1917,7 +1920,7 @@ class MOZ_STACK_CLASS AutoLockGC
     AutoLockGC& operator=(const AutoLockGC&) = delete;
 };
 
-class MOZ_STACK_CLASS AutoUnlockGC
+class MOZ_RAII AutoUnlockGC
 {
   public:
     explicit AutoUnlockGC(AutoLockGC& lock
@@ -1940,7 +1943,7 @@ class MOZ_STACK_CLASS AutoUnlockGC
     AutoUnlockGC& operator=(const AutoUnlockGC&) = delete;
 };
 
-class MOZ_STACK_CLASS AutoKeepAtoms
+class MOZ_RAII AutoKeepAtoms
 {
     PerThreadData* pt;
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
@@ -2087,6 +2090,21 @@ class RuntimeAllocPolicy
     MOZ_IMPLICIT RuntimeAllocPolicy(JSRuntime* rt) : runtime(rt) {}
 
     template <typename T>
+    T* maybe_pod_malloc(size_t numElems) {
+        return runtime->maybe_pod_malloc<T>(numElems);
+    }
+
+    template <typename T>
+    T* maybe_pod_calloc(size_t numElems) {
+        return runtime->maybe_pod_calloc<T>(numElems);
+    }
+
+    template <typename T>
+    T* maybe_pod_realloc(T* p, size_t oldSize, size_t newSize) {
+        return runtime->maybe_pod_realloc<T>(p, oldSize, newSize);
+    }
+
+    template <typename T>
     T* pod_malloc(size_t numElems) {
         return runtime->pod_malloc<T>(numElems);
     }
@@ -2103,13 +2121,17 @@ class RuntimeAllocPolicy
 
     void free_(void* p) { js_free(p); }
     void reportAllocOverflow() const {}
+
+    bool checkSimulatedOOM() const {
+        return !js::oom::ShouldFailWithOOM();
+    }
 };
 
 extern const JSSecurityCallbacks NullSecurityCallbacks;
 
 // Debugging RAII class which marks the current thread as performing an Ion
 // compilation, for use by CurrentThreadCan{Read,Write}CompilationData
-class AutoEnterIonCompilation
+class MOZ_RAII AutoEnterIonCompilation
 {
   public:
     explicit AutoEnterIonCompilation(bool safeForMinorGC
@@ -2183,18 +2205,18 @@ class MOZ_STACK_CLASS AutoInitGCManagedObject
     }
 
     T& operator*() const {
-        return *ptr_.get();
+        return *get();
     }
 
     T* operator->() const {
-        return ptr_.get();
+        return get();
     }
 
     explicit operator bool() const {
-        return ptr_.get() != nullptr;
+        return get() != nullptr;
     }
 
-    T* get() {
+    T* get() const {
         return ptr_.get();
     }
 

@@ -816,7 +816,7 @@ PeerConnectionWrapper.prototype = {
 
     var element = createMediaElement(type, this.label + '_' + side + this.streams.length);
     this.mediaElements.push(element);
-    element.mozSrcObject = stream;
+    element.srcObject = stream;
     element.play();
 
     // Store local media elements so that we can stop them when done.
@@ -1242,8 +1242,8 @@ PeerConnectionWrapper.prototype = {
 
       info(this.label + ": iceCandidate = " + JSON.stringify(anEvent.candidate));
       ok(anEvent.candidate.candidate.length > 0, "ICE candidate contains candidate");
-      // we don't support SDP MID's yet
-      ok(anEvent.candidate.sdpMid.length === 0, "SDP MID has length zero");
+      ok(anEvent.candidate.sdpMid.length > 0, "SDP mid not empty");
+
       ok(typeof anEvent.candidate.sdpMLineIndex === 'number', "SDP MLine Index needs to exist");
       this._local_ice_candidates.push(anEvent.candidate);
       candidateHandler(this.label, anEvent.candidate);

@@ -4,6 +4,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#ifndef mozilla_devtools_AutoMemMap_h
+#define mozilla_devtools_AutoMemMap_h
+
 #include <prio.h>
 #include "mozilla/GuardObjects.h"
 
@@ -28,7 +31,7 @@ namespace devtools {
 //       doStuffWithMappedMemory(mm.address());
 //     }
 //     // The memory is automatically unmapped when the AutoMemMap leaves scope.
-class MOZ_STACK_CLASS AutoMemMap
+class MOZ_RAII AutoMemMap
 {
   MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER;
 
@@ -68,3 +71,5 @@ public:
 
 } // namespace devtools
 } // namespace mozilla
+
+#endif // mozilla_devtools_AutoMemMap_h

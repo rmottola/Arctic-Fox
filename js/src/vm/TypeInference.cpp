@@ -335,7 +335,7 @@ TemporaryTypeSet::TemporaryTypeSet(LifoAlloc* alloc, Type type)
 }
 
 bool
-TypeSet::mightBeMIRType(jit::MIRType type)
+TypeSet::mightBeMIRType(jit::MIRType type) const
 {
     if (unknown())
         return true;
@@ -1277,9 +1277,12 @@ js::EnsureTrackPropertyTypes(JSContext* cx, JSObject* obj, jsid id)
 
     if (obj->isSingleton()) {
         AutoEnterAnalysis enter(cx);
-        if (obj->hasLazyGroup() && !obj->getGroup(cx)) {
-            CrashAtUnhandlableOOM("Could not allocate ObjectGroup in EnsureTrackPropertyTypes");
-            return;
+        if (obj->hasLazyGroup()) {
+            AutoEnterOOMUnsafeRegion oomUnsafe;
+            if (!obj->getGroup(cx)) {
+                oomUnsafe.crash("Could not allocate ObjectGroup in EnsureTrackPropertyTypes");
+                return;
+            }
         }
         if (!obj->group()->unknownProperties() && !obj->group()->getProperty(cx, obj, id)) {
             MOZ_ASSERT(obj->group()->unknownProperties());
@@ -2462,8 +2465,9 @@ TypeZone::processPendingRecompiles(FreeOp* fop, RecompileInfoVector& recompiles)
      */
     RecompileInfoVector pending;
     for (size_t i = 0; i < recompiles.length(); i++) {
+        AutoEnterOOMUnsafeRegion oomUnsafe;
         if (!pending.append(recompiles[i]))
-            CrashAtUnhandlableOOM("processPendingRecompiles");
+            oomUnsafe.crash("processPendingRecompiles");
     }
     recompiles.clear();
 
@@ -2484,8 +2488,9 @@ TypeZone::addPendingRecompile(JSContext* cx, const RecompileInfo& info)
 
     co->setPendingInvalidation();
 
+    AutoEnterOOMUnsafeRegion oomUnsafe;
     if (!cx->zone()->types.activeAnalysis->pendingRecompiles.append(info))
-        CrashAtUnhandlableOOM("Could not update pendingRecompiles");
+        oomUnsafe.crash("Could not update pendingRecompiles");
 }
 
 void
@@ -3490,7 +3495,7 @@ PreliminaryObjectArrayWithTemplate::maybeAnalyze(ExclusiveContext* cx, ObjectGro
 
 // Make a TypeNewScript for |group|, and set it up to hold the preliminary
 // objects created with the group.
-/* static */ void
+/* static */ bool
 TypeNewScript::make(JSContext* cx, ObjectGroup* group, JSFunction* fun)
 {
     MOZ_ASSERT(cx->zone()->types.activeAnalysis);
@@ -3502,21 +3507,22 @@ TypeNewScript::make(JSContext* cx, ObjectGroup* group, JSFunction* fun)
     MOZ_ASSERT(fun->maybeCanonicalFunction() == fun);
 
     if (group->unknownProperties())
-        return;
+        return true;
 
     ScopedJSDeletePtr<TypeNewScript> newScript(cx->new_<TypeNewScript>());
     if (!newScript)
-        return;
+        return false;
 
     newScript->function_ = fun;
 
     newScript->preliminaryObjects = group->zone()->new_<PreliminaryObjectArray>();
     if (!newScript->preliminaryObjects)
-        return;
+        return true;
 
     group->setNewScript(newScript.forget());
 
     gc::TraceTypeNewScript(group);
+    return true;
 }
 
 // Make a TypeNewScript with the same initializer list as |newScript| but with
@@ -3773,10 +3779,11 @@ TypeNewScript::maybeAnalyze(JSContext* cx, ObjectGroup* group, bool* regenerate,
         // with an unboxed layout. Currently it is a mutant object with a
         // non-native group and native shape, so make it safe for GC by changing
         // its group to the default for its prototype.
+        AutoEnterOOMUnsafeRegion oomUnsafe;
         ObjectGroup* plainGroup = ObjectGroup::defaultNewGroup(cx, &PlainObject::class_,
                                                                group->proto());
         if (!plainGroup)
-            CrashAtUnhandlableOOM("TypeNewScript::maybeAnalyze");
+            oomUnsafe.crash("TypeNewScript::maybeAnalyze");
         templateObject_->setGroup(plainGroup);
         templateObject_ = nullptr;
 
@@ -3872,10 +3879,10 @@ TypeNewScript::rollbackPartiallyInitializedObjects(JSContext* cx, ObjectGroup* g
             continue;
         }
 
-        if (thisv.toObject().is<UnboxedPlainObject>() &&
-            !UnboxedPlainObject::convertToNative(cx, &thisv.toObject()))
-        {
-            CrashAtUnhandlableOOM("rollbackPartiallyInitializedObjects");
+        if (thisv.toObject().is<UnboxedPlainObject>()) {
+            AutoEnterOOMUnsafeRegion oomUnsafe;
+            if (!UnboxedPlainObject::convertToNative(cx, &thisv.toObject()))
+                oomUnsafe.crash("rollbackPartiallyInitializedObjects");
         }
 
         // Found a matching frame.
@@ -4009,13 +4016,15 @@ ConstraintTypeSet::trace(Zone* zone, JSTracer* trc)
             if (!key)
                 continue;
             TraceObjectKey(trc, &key);
+
+            AutoEnterOOMUnsafeRegion oomUnsafe;
             ObjectKey** pentry =
                 TypeHashSet::Insert<ObjectKey*, ObjectKey, ObjectKey>
                     (zone->types.typeLifoAlloc, objectSet, objectCount, key);
-            if (pentry)
-                *pentry = key;
-            else
-                CrashAtUnhandlableOOM("ConstraintTypeSet::trace");
+            if (!pentry)
+                oomUnsafe.crash("ConstraintTypeSet::trace");
+
+            *pentry = key;
         }
         setBaseObjectCount(objectCount);
     } else if (objectCount == 1) {

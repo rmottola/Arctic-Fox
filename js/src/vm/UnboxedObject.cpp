@@ -497,10 +497,9 @@ UnboxedLayout::makeNativeGroup(JSContext* cx, ObjectGroup* group)
     for (size_t i = 0; i < layout.properties().length(); i++) {
         const UnboxedLayout::Property& property = layout.properties()[i];
 
-        StackShape unrootedChild(shape->base()->unowned(), NameToId(property.name), i,
-                                 JSPROP_ENUMERATE, 0);
-        RootedGeneric<StackShape*> child(cx, &unrootedChild);
-        shape = cx->compartment()->propertyTree.getChild(cx, shape, *child);
+        Rooted<StackShape> child(cx, StackShape(shape->base()->unowned(), NameToId(property.name),
+                                                i, JSPROP_ENUMERATE, 0));
+        shape = cx->compartment()->propertyTree.getChild(cx, shape, child);
         if (!shape)
             return false;
     }
@@ -930,13 +929,12 @@ UnboxedPlainObject::obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector&
 
 const Class UnboxedExpandoObject::class_ = {
     "UnboxedExpandoObject",
-    JSCLASS_IMPLEMENTS_BARRIERS
+    0
 };
 
 const Class UnboxedPlainObject::class_ = {
     js_Object_str,
     Class::NON_NATIVE |
-    JSCLASS_IMPLEMENTS_BARRIERS |
     JSCLASS_HAS_CACHED_PROTO(JSProto_Object),
     nullptr,        /* addProperty */
     nullptr,        /* delProperty */
@@ -945,7 +943,6 @@ const Class UnboxedPlainObject::class_ = {
     nullptr,        /* enumerate   */
     nullptr,        /* resolve     */
     nullptr,        /* mayResolve  */
-    nullptr,        /* convert     */
     nullptr,        /* finalize    */
     nullptr,        /* call        */
     nullptr,        /* hasInstance */
@@ -1226,9 +1223,10 @@ UnboxedArrayObject::objectMovedDuringMinorGC(JSTracer* trc, JSObject* dst, JSObj
     } else {
         MOZ_ASSERT(allocKind == gc::AllocKind::OBJECT0);
 
+        AutoEnterOOMUnsafeRegion oomUnsafe;
         uint8_t* data = nsrc->zone()->pod_malloc<uint8_t>(nbytes);
         if (!data)
-            CrashAtUnhandlableOOM("Failed to allocate unboxed array elements while tenuring.");
+            oomUnsafe.crash("Failed to allocate unboxed array elements while tenuring.");
         ndst->elements_ = data;
     }
 
@@ -1621,7 +1619,6 @@ UnboxedArrayObject::obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector&
 const Class UnboxedArrayObject::class_ = {
     "Array",
     Class::NON_NATIVE |
-    JSCLASS_IMPLEMENTS_BARRIERS |
     JSCLASS_SKIP_NURSERY_FINALIZE |
     JSCLASS_BACKGROUND_FINALIZE,
     nullptr,        /* addProperty */
@@ -1631,7 +1628,6 @@ const Class UnboxedArrayObject::class_ = {
     nullptr,        /* enumerate   */
     nullptr,        /* resolve     */
     nullptr,        /* mayResolve  */
-    nullptr,        /* convert     */
     UnboxedArrayObject::finalize,
     nullptr,        /* call        */
     nullptr,        /* hasInstance */
@@ -1904,8 +1900,10 @@ UnboxedArrayObject::fillAfterConvert(ExclusiveContext* cx,
     if (!initlen)
         return;
 
+    AutoEnterOOMUnsafeRegion oomUnsafe;
     if (!growElements(cx, initlen))
-        CrashAtUnhandlableOOM("UnboxedArrayObject::fillAfterConvert");
+        oomUnsafe.crash("UnboxedArrayObject::fillAfterConvert");
+
     setInitializedLength(initlen);
 
     for (size_t i = 0; i < size_t(initlen); i++)
@@ -2066,12 +2064,15 @@ js::TryConvertToUnboxedLayout(ExclusiveContext* cx, Shape* templateShape,
         if (!obj)
             continue;
 
-        if (isArray) {
-            if (!GetValuesFromPreliminaryArrayObject(&obj->as<ArrayObject>(), values))
-                return false;
-        } else {
-            if (!GetValuesFromPreliminaryPlainObject(&obj->as<PlainObject>(), values))
-                return false;
+        bool ok;
+        if (isArray)
+            ok = GetValuesFromPreliminaryArrayObject(&obj->as<ArrayObject>(), values);
+        else
+            ok = GetValuesFromPreliminaryPlainObject(&obj->as<PlainObject>(), values);
+
+        if (!ok) {
+            cx->recoverFromOutOfMemory();
+            return false;
         }
     }
 

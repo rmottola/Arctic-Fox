@@ -7,6 +7,8 @@
 #ifndef vm_SavedFrame_h
 #define vm_SavedFrame_h
 
+#include "js/UbiNode.h"
+
 namespace js {
 
 class SavedFrame : public NativeObject {
@@ -197,6 +199,88 @@ SavedFrame::RootedIterator::operator++()
     range_->frame_ = range_->frame_->getParent();
 }
 
+// When we reconstruct a SavedFrame stack from a JS::ubi::StackFrame, we may not
+// have access to the principals that the original stack was captured
+// with. Instead, we use these two singleton principals based on whether
+// JS::ubi::StackFrame::isSystem or not. These singletons should never be passed
+// to the subsumes callback, and should be special cased with a shortcut before
+// that.
+struct ReconstructedSavedFramePrincipals : public JSPrincipals
+{
+    explicit ReconstructedSavedFramePrincipals()
+        : JSPrincipals()
+    {
+        MOZ_ASSERT(is(this));
+        this->refcount = 1;
+    }
+
+    bool write(JSContext* cx, JSStructuredCloneWriter* writer) override {
+        MOZ_ASSERT(false, "ReconstructedSavedFramePrincipals should never be exposed to embedders");
+        return false;
+    }
+
+    static ReconstructedSavedFramePrincipals IsSystem;
+    static ReconstructedSavedFramePrincipals IsNotSystem;
+
+    // Return true if the given JSPrincipals* points to one of the
+    // ReconstructedSavedFramePrincipals singletons, false otherwise.
+    static bool is(JSPrincipals* p) { return p == &IsSystem || p == &IsNotSystem;}
+
+    // Get the appropriate ReconstructedSavedFramePrincipals singleton for the
+    // given JS::ubi::StackFrame that is being reconstructed as a SavedFrame
+    // stack.
+    static JSPrincipals* getSingleton(JS::ubi::StackFrame& f) {
+        return f.isSystem() ? &IsSystem : &IsNotSystem;
+    }
+};
+
 } // namespace js
+
+namespace JS {
+namespace ubi {
+
+using js::SavedFrame;
+
+// A concrete JS::ubi::StackFrame that is backed by a live SavedFrame object.
+template<>
+class ConcreteStackFrame<SavedFrame> : public BaseStackFrame {
+    explicit ConcreteStackFrame(SavedFrame* ptr) : BaseStackFrame(ptr) { }
+    SavedFrame& get() const { return *static_cast<SavedFrame*>(ptr); }
+
+  public:
+    static void construct(void* storage, SavedFrame* ptr) { new (storage) ConcreteStackFrame(ptr); }
+
+    StackFrame parent() const override { return get().getParent(); }
+    uint32_t line() const override { return get().getLine(); }
+    uint32_t column() const override { return get().getColumn(); }
+
+    AtomOrTwoByteChars source() const override {
+        auto source = get().getSource();
+        return AtomOrTwoByteChars(source);
+    }
+
+    AtomOrTwoByteChars functionDisplayName() const override {
+        auto name = get().getFunctionDisplayName();
+        return AtomOrTwoByteChars(name);
+    }
+
+    void trace(JSTracer* trc) override {
+        JSObject* prev = &get();
+        JSObject* next = prev;
+        js::TraceRoot(trc, &next, "ConcreteStackFrame<SavedFrame>::ptr");
+        if (next != prev)
+            ptr = next;
+    }
+
+    bool isSelfHosted() const override { return get().isSelfHosted(); }
+
+    bool isSystem() const override;
+
+    bool constructSavedFrameStack(JSContext* cx,
+                                 MutableHandleObject outSavedFrameStack) const override;
+};
+
+} // namespace ubi
+} // namespace JS
 
 #endif // vm_SavedFrame_h

@@ -83,7 +83,6 @@
 #include "vm/StringBuffer.h"
 #include "vm/Symbol.h"
 #include "vm/TypedArrayCommon.h"
-#include "vm/WeakMapObject.h"
 #include "vm/WrapperObject.h"
 #include "vm/Xdr.h"
 
@@ -588,6 +587,12 @@ JS_Init(void)
     using js::TlsPerThreadData;
     if (!TlsPerThreadData.initialized() && !TlsPerThreadData.init())
         return false;
+
+#if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
+    if (!js::oom::InitThreadType())
+        return false;
+    js::oom::SetThreadType(js::oom::THREAD_TYPE_MAIN);
+#endif
 
     jit::ExecutableAllocator::initStatic();
 
@@ -3331,7 +3336,7 @@ JS_GetSecurityCallbacks(JSRuntime* rt)
 }
 
 JS_PUBLIC_API(void)
-JS_SetTrustedPrincipals(JSRuntime* rt, const JSPrincipals* prin)
+JS_SetTrustedPrincipals(JSRuntime* rt, JSPrincipals* prin)
 {
     rt->setTrustedPrincipals(prin);
 }
@@ -3342,6 +3347,14 @@ JS_InitDestroyPrincipalsCallback(JSRuntime* rt, JSDestroyPrincipalsOp destroyPri
     MOZ_ASSERT(destroyPrincipals);
     MOZ_ASSERT(!rt->destroyPrincipals);
     rt->destroyPrincipals = destroyPrincipals;
+}
+
+extern JS_PUBLIC_API(void)
+JS_InitReadPrincipalsCallback(JSRuntime* rt, JSReadPrincipalsOp read)
+{
+    MOZ_ASSERT(read);
+    MOZ_ASSERT(!rt->readPrincipals);
+    rt->readPrincipals = read;
 }
 
 JS_PUBLIC_API(JSFunction*)
@@ -3477,11 +3490,9 @@ IsFunctionCloneable(HandleFunction fun, HandleObject dynamicScope)
 
         // If the script is an indirect eval that is immediately scoped under
         // the global, we can clone it.
-        if (scope->is<StaticEvalObject>() &&
-            !scope->as<StaticEvalObject>().isDirect() &&
-            !scope->as<StaticEvalObject>().isStrict())
-        {
-            return true;
+        if (scope->is<StaticBlockObject>()) {
+            if (StaticEvalObject* staticEval = scope->as<StaticBlockObject>().maybeEnclosingEval())
+                return !staticEval->isDirect();
         }
 
         // Any other enclosing static scope (e.g., function, block) cannot be
@@ -3903,6 +3914,7 @@ JS::TransitiveCompileOptions::copyPODTransitiveOptions(const TransitiveCompileOp
     extraWarningsOption = rhs.extraWarningsOption;
     werrorOption = rhs.werrorOption;
     asmJSOption = rhs.asmJSOption;
+    throwOnAsmJSValidationFailureOption = rhs.throwOnAsmJSValidationFailureOption;
     forceAsync = rhs.forceAsync;
     installedFile = rhs.installedFile;
     sourceIsLazy = rhs.sourceIsLazy;
@@ -4025,6 +4037,7 @@ JS::CompileOptions::CompileOptions(JSContext* cx, JSVersion version)
     extraWarningsOption = cx->compartment()->options().extraWarnings(cx);
     werrorOption = cx->runtime()->options().werror();
     asmJSOption = cx->runtime()->options().asmJS();
+    throwOnAsmJSValidationFailureOption = cx->runtime()->options().throwOnAsmJSValidationFailure();
 }
 
 enum SyntacticScopeOption { HasSyntacticScope, HasNonSyntacticScope };

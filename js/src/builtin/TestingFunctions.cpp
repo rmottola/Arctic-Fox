@@ -25,7 +25,7 @@
 #include "js/HashTable.h"
 #include "js/StructuredClone.h"
 #include "js/UbiNode.h"
-#include "js/UbiNodeTraverse.h"
+#include "js/UbiNodeBreadthFirst.h"
 #include "js/Vector.h"
 #include "vm/GlobalObject.h"
 #include "vm/Interpreter.h"
@@ -985,39 +985,57 @@ DisableTrackAllocations(JSContext* cx, unsigned argc, Value* vp)
 
 #if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
 static bool
-OOMAfterAllocations(JSContext* cx, unsigned argc, Value* vp)
+OOMThreadTypes(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    if (args.length() != 1) {
-        JS_ReportError(cx, "count argument required");
+    args.rval().setInt32(js::oom::THREAD_TYPE_MAX);
+    return true;
+}
+
+static bool
+SetupOOMFailure(JSContext* cx, bool failAlways, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    if (args.length() < 1) {
+        JS_ReportError(cx, "Count argument required");
+        return false;
+    }
+
+    if (args.length() > 2) {
+        JS_ReportError(cx, "Too many arguments");
         return false;
     }
 
     uint32_t count;
-    if (!JS::ToUint32(cx, args[0], &count))
+    if (!JS::ToUint32(cx, args.get(0), &count))
         return false;
 
+    uint32_t targetThread = js::oom::THREAD_TYPE_MAIN;
+    if (args.length() > 1 && !ToUint32(cx, args[1], &targetThread))
+        return false;
+
+    if (targetThread == js::oom::THREAD_TYPE_NONE || targetThread >= js::oom::THREAD_TYPE_MAX) {
+        JS_ReportError(cx, "Invalid thread type specified");
+        return false;
+    }
+
+    HelperThreadState().waitForAllThreads();
+    js::oom::targetThread = targetThread;
     OOM_maxAllocations = OOM_counter + count;
-    OOM_failAlways = true;
+    OOM_failAlways = failAlways;
     return true;
+}
+
+static bool
+OOMAfterAllocations(JSContext* cx, unsigned argc, Value* vp)
+{
+    return SetupOOMFailure(cx, true, argc, vp);
 }
 
 static bool
 OOMAtAllocation(JSContext* cx, unsigned argc, Value* vp)
 {
-    CallArgs args = CallArgsFromVp(argc, vp);
-    if (args.length() != 1) {
-        JS_ReportError(cx, "count argument required");
-        return false;
-    }
-
-    uint32_t count;
-    if (!JS::ToUint32(cx, args[0], &count))
-        return false;
-
-    OOM_maxAllocations = OOM_counter + count;
-    OOM_failAlways = false;
-    return true;
+    return SetupOOMFailure(cx, false, argc, vp);
 }
 
 static bool
@@ -1025,6 +1043,7 @@ ResetOOMFailure(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     args.rval().setBoolean(OOM_counter >= OOM_maxAllocations);
+    js::oom::targetThread = js::oom::THREAD_TYPE_NONE;
     OOM_maxAllocations = UINT32_MAX;
     return true;
 }
@@ -1081,7 +1100,6 @@ static const JSClass FinalizeCounterClass = {
     nullptr, /* enumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
-    nullptr, /* convert */
     finalize_counter_finalize
 };
 
@@ -1354,13 +1372,15 @@ DisplayName(JSContext* cx, unsigned argc, Value* vp)
 static JSObject*
 ShellObjectMetadataCallback(JSContext* cx, JSObject*)
 {
+    AutoEnterOOMUnsafeRegion oomUnsafe;
+
     RootedObject obj(cx, NewBuiltinClassInstance<PlainObject>(cx));
     if (!obj)
-        CrashAtUnhandlableOOM("ShellObjectMetadataCallback");
+        oomUnsafe.crash("ShellObjectMetadataCallback");
 
     RootedObject stack(cx, NewDenseEmptyArray(cx));
     if (!stack)
-        CrashAtUnhandlableOOM("ShellObjectMetadataCallback");
+        oomUnsafe.crash("ShellObjectMetadataCallback");
 
     static int createdIndex = 0;
     createdIndex++;
@@ -1368,13 +1388,13 @@ ShellObjectMetadataCallback(JSContext* cx, JSObject*)
     if (!JS_DefineProperty(cx, obj, "index", createdIndex, 0,
                            JS_STUBGETTER, JS_STUBSETTER))
     {
-        CrashAtUnhandlableOOM("ShellObjectMetadataCallback");
+        oomUnsafe.crash("ShellObjectMetadataCallback");
     }
 
     if (!JS_DefineProperty(cx, obj, "stack", stack, 0,
                            JS_STUBGETTER, JS_STUBSETTER))
     {
-        CrashAtUnhandlableOOM("ShellObjectMetadataCallback");
+        oomUnsafe.crash("ShellObjectMetadataCallback");
     }
 
     int stackIndex = 0;
@@ -1387,7 +1407,7 @@ ShellObjectMetadataCallback(JSContext* cx, JSObject*)
             if (!JS_DefinePropertyById(cx, stack, id, callee, 0,
                                        JS_STUBGETTER, JS_STUBSETTER))
             {
-                CrashAtUnhandlableOOM("ShellObjectMetadataCallback");
+                oomUnsafe.crash("ShellObjectMetadataCallback");
             }
             stackIndex++;
         }
@@ -1773,7 +1793,6 @@ const Class CloneBufferObject::class_ = {
     nullptr, /* enumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
-    nullptr, /* convert */
     Finalize
 };
 
@@ -2096,9 +2115,9 @@ struct FindPathHandler {
     typedef BackEdge NodeData;
     typedef JS::ubi::BreadthFirst<FindPathHandler> Traversal;
 
-    FindPathHandler(JS::ubi::Node start, JS::ubi::Node target,
+    FindPathHandler(JSContext*cx, JS::ubi::Node start, JS::ubi::Node target,
                     AutoValueVector& nodes, Vector<EdgeName>& edges)
-      : start(start), target(target), foundPath(false),
+      : cx(cx), start(start), target(target), foundPath(false),
         nodes(nodes), edges(edges) { }
 
     bool
@@ -2112,7 +2131,7 @@ struct FindPathHandler {
 
         // Record how we reached this node. This is the last edge on a
         // shortest path to this node.
-        EdgeName edgeName = DuplicateString(traversal.cx, edge.name);
+        EdgeName edgeName = DuplicateString(cx, edge.name.get());
         if (!edgeName)
             return false;
         *backEdge = mozilla::Move(BackEdge(origin, Move(edgeName)));
@@ -2148,6 +2167,8 @@ struct FindPathHandler {
 
         return true;
     }
+
+    JSContext* cx;
 
     // The node we're starting from.
     JS::ubi::Node start;
@@ -2207,8 +2228,8 @@ FindPath(JSContext* cx, unsigned argc, Value* vp)
 
         JS::ubi::Node start(args[0]), target(args[1]);
 
-        heaptools::FindPathHandler handler(start, target, nodes, edges);
-        heaptools::FindPathHandler::Traversal traversal(cx, handler, autoCannotGC);
+        heaptools::FindPathHandler handler(cx, start, target, nodes, edges);
+        heaptools::FindPathHandler::Traversal traversal(cx->runtime(), handler, autoCannotGC);
         if (!traversal.init() || !traversal.addStart(start))
             return false;
 
@@ -2433,6 +2454,34 @@ ByteSize(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
+ByteSizeOfScript(JSContext*cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    if (!args.requireAtLeast(cx, "byteSizeOfScript", 1))
+        return false;
+    if (!args[0].isObject() || !args[0].toObject().is<JSFunction>()) {
+        JS_ReportError(cx, "Argument must be a Function object");
+        return false;
+    }
+
+    RootedScript script(cx, args[0].toObject().as<JSFunction>().getOrCreateScript(cx));
+    mozilla::MallocSizeOf mallocSizeOf = cx->runtime()->debuggerMallocSizeOf;
+
+    {
+        // We can't tolerate the GC moving things around while we're using a
+        // ubi::Node. Check that nothing we do causes a GC.
+        JS::AutoCheckCannotGC autoCannotGC;
+
+        JS::ubi::Node node = script;
+        if (node)
+            args.rval().setNumber(uint32_t(node.size(mallocSizeOf)));
+        else
+            args.rval().setUndefined();
+    }
+    return true;
+}
+
+static bool
 ImmutablePrototypesEnabled(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -2532,11 +2581,23 @@ AllocationMarker(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    static const JSClass cls = { "AllocationMarker" };
+    bool allocateInsideNursery = true;
+    if (args.length() > 0 && args[0].isObject()) {
+        RootedObject options(cx, &args[0].toObject());
 
-    RootedObject obj(cx, JS_NewObject(cx, &cls));
+        RootedValue nurseryVal(cx);
+        if (!JS_GetProperty(cx, options, "nursery", &nurseryVal))
+            return false;
+        allocateInsideNursery = ToBoolean(nurseryVal);
+    }
+
+    static const Class cls = { "AllocationMarker" };
+
+    auto newKind = allocateInsideNursery ? GenericObject : TenuredObject;
+    RootedObject obj(cx, NewObjectWithGivenProto(cx, &cls, nullptr, newKind));
     if (!obj)
         return false;
+
     args.rval().setObject(*obj);
     return true;
 }
@@ -2848,15 +2909,22 @@ static const JSFunctionSpecWithHelp TestingFunctions[] = {
 "  Stop capturing the JS stack at every allocation."),
 
 #if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
-    JS_FN_HELP("oomAfterAllocations", OOMAfterAllocations, 1, 0,
-"oomAfterAllocations(count)",
-"  After 'count' js_malloc memory allocations, fail every following allocation\n"
-"  (return NULL)."),
+    JS_FN_HELP("oomThreadTypes", OOMThreadTypes, 0, 0,
+"oomThreadTypes()",
+"  Get the number of thread types that can be used as an argument for\n"
+"oomAfterAllocations() and oomAtAllocation()."),
 
-    JS_FN_HELP("oomAtAllocation", OOMAtAllocation, 1, 0,
-"oomAtAllocation(count)",
+    JS_FN_HELP("oomAfterAllocations", OOMAfterAllocations, 2, 0,
+"oomAfterAllocations(count [,threadType])",
+"  After 'count' js_malloc memory allocations, fail every following allocation\n"
+"  (return nullptr). The optional thread type limits the effect to the\n"
+"  specified type of helper thread."),
+
+    JS_FN_HELP("oomAtAllocation", OOMAtAllocation, 2, 0,
+"oomAtAllocation(count [,threadType])",
 "  After 'count' js_malloc memory allocations, fail the next allocation\n"
-"  (return NULL)."),
+"  (return nullptr). The optional thread type limits the effect to the\n"
+"  specified type of helper thread."),
 
     JS_FN_HELP("resetOOMFailure", ResetOOMFailure, 0, 0,
 "resetOOMFailure()",
@@ -3170,6 +3238,10 @@ gc::ZealModeHelpText),
 "  Return the size in bytes occupied by |value|, or |undefined| if value\n"
 "  is not allocated in memory.\n"),
 
+    JS_FN_HELP("byteSizeOfScript", ByteSizeOfScript, 1, 0,
+"byteSizeOfScript(f)",
+"  Return the size in bytes occupied by the function |f|'s JSScript.\n"),
+
     JS_FN_HELP("immutablePrototypesEnabled", ImmutablePrototypesEnabled, 0, 0,
 "immutablePrototypesEnabled()",
 "  Returns true if immutable-prototype behavior (triggered by setImmutablePrototype)\n"
@@ -3205,11 +3277,13 @@ gc::ZealModeHelpText),
 "  Otherwise, return null."),
 
     JS_FN_HELP("allocationMarker", AllocationMarker, 0, 0,
-"allocationMarker()",
+"allocationMarker([options])",
 "  Return a freshly allocated object whose [[Class]] name is\n"
 "  \"AllocationMarker\". Such objects are allocated only by calls\n"
 "  to this function, never implicitly by the system, making them\n"
-"  suitable for use in allocation tooling tests.\n"),
+"  suitable for use in allocation tooling tests. Takes an optional\n"
+"  options object which may contain the following properties:\n"
+"    * nursery: bool, whether to allocate the object in the nursery\n"),
 
     JS_FN_HELP("setGCCallback", SetGCCallback, 1, 0,
 "setGCCallback({action:\"...\", options...})",

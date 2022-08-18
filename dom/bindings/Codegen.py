@@ -428,7 +428,7 @@ class CGDOMJSClass(CGThing):
             """,
             objectMoved=objectMovedHook)
         if self.descriptor.isGlobal():
-            classFlags += "JSCLASS_DOM_GLOBAL | JSCLASS_GLOBAL_FLAGS_WITH_SLOTS(DOM_GLOBAL_SLOTS) | JSCLASS_IMPLEMENTS_BARRIERS"
+            classFlags += "JSCLASS_DOM_GLOBAL | JSCLASS_GLOBAL_FLAGS_WITH_SLOTS(DOM_GLOBAL_SLOTS)"
             traceHook = "JS_GlobalObjectTraceHook"
             reservedSlots = "JSCLASS_GLOBAL_APPLICATION_SLOTS"
             if self.descriptor.interface.identifier.name == "Window":
@@ -485,7 +485,6 @@ class CGDOMJSClass(CGThing):
                 ${enumerate}, /* enumerate */
                 ${resolve}, /* resolve */
                 ${mayResolve}, /* mayResolve */
-                nullptr,               /* convert */
                 ${finalize}, /* finalize */
                 ${call}, /* call */
                 nullptr,               /* hasInstance */
@@ -628,7 +627,6 @@ class CGPrototypeJSClass(CGThing):
                 nullptr,               /* enumerate */
                 nullptr,               /* resolve */
                 nullptr,               /* mayResolve */
-                nullptr,               /* convert */
                 nullptr,               /* finalize */
                 nullptr,               /* call */
                 nullptr,               /* hasInstance */
@@ -725,7 +723,6 @@ class CGInterfaceObjectJSClass(CGThing):
                 nullptr,               /* enumerate */
                 nullptr,               /* resolve */
                 nullptr,               /* mayResolve */
-                nullptr,               /* convert */
                 nullptr,               /* finalize */
                 ${ctorname}, /* call */
                 ${hasInstance}, /* hasInstance */
@@ -6917,20 +6914,13 @@ class CGPerSignatureCall(CGThing):
                     }
                     """)))
 
-        if idlNode.getExtendedAttribute("Deprecated"):
+        deprecated = (idlNode.getExtendedAttribute("Deprecated") or
+                      (static and descriptor.interface.getExtendedAttribute("Deprecated")))
+        if deprecated:
             cgThings.append(CGGeneric(dedent(
                 """
-                {
-                  GlobalObject global(cx, obj);
-                  if (global.Failed()) {
-                    return false;
-                  }
-                  nsCOMPtr<nsPIDOMWindow> pWindow = do_QueryInterface(global.GetAsSupports());
-                  if (pWindow && pWindow->GetExtantDoc()) {
-                    pWindow->GetExtantDoc()->WarnOnceAbout(nsIDocument::e%s);
-                  }
-                }
-                """ % idlNode.getExtendedAttribute("Deprecated")[0])))
+                DeprecationWarning(cx, obj, nsIDocument::e%s);
+                """ % deprecated[0])))
 
         lenientFloatCode = None
         if idlNode.getExtendedAttribute('LenientFloat') is not None:

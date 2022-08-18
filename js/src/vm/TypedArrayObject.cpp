@@ -832,7 +832,6 @@ TypedArrayObject::sharedTypedArrayPrototypeClass = {
     nullptr,                /* enumerate */
     nullptr,                /* resolve */
     nullptr,                /* mayResolve */
-    nullptr,                /* convert */
     nullptr,                /* finalize */
     nullptr,                /* call */
     nullptr,                /* hasInstance */
@@ -1794,7 +1793,7 @@ IMPL_TYPED_ARRAY_COMBINED_UNWRAPPERS(Float64, double, double)
 {                                                                              \
     #_typedArray,                                                              \
     JSCLASS_HAS_RESERVED_SLOTS(TypedArrayLayout::RESERVED_SLOTS) |             \
-    JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS |                        \
+    JSCLASS_HAS_PRIVATE |                                                      \
     JSCLASS_HAS_CACHED_PROTO(JSProto_##_typedArray) |                          \
     JSCLASS_DELAY_METADATA_CALLBACK,                                           \
     nullptr,                 /* addProperty */                                 \
@@ -1804,7 +1803,6 @@ IMPL_TYPED_ARRAY_COMBINED_UNWRAPPERS(Float64, double, double)
     nullptr,                 /* enumerate   */                                 \
     nullptr,                 /* resolve     */                                 \
     nullptr,                 /* mayResolve  */                                 \
-    nullptr,                 /* convert     */                                 \
     nullptr,                 /* finalize    */                                 \
     nullptr,                 /* call        */                                 \
     nullptr,                 /* hasInstance */                                 \
@@ -1850,7 +1848,6 @@ const Class TypedArrayObject::classes[Scalar::MaxTypedArrayViewType] = {
     nullptr, /* enumerate */ \
     nullptr, /* resolve */ \
     nullptr, /* mayResolve */ \
-    nullptr, /* convert */ \
     nullptr, /* finalize */ \
     nullptr, /* call */ \
     nullptr, /* hasInstance */ \
@@ -1896,7 +1893,6 @@ const Class DataViewObject::protoClass = {
 const Class DataViewObject::class_ = {
     "DataView",
     JSCLASS_HAS_PRIVATE |
-    JSCLASS_IMPLEMENTS_BARRIERS |
     JSCLASS_HAS_RESERVED_SLOTS(TypedArrayLayout::RESERVED_SLOTS) |
     JSCLASS_HAS_CACHED_PROTO(JSProto_DataView),
     nullptr, /* addProperty */
@@ -1906,7 +1902,6 @@ const Class DataViewObject::class_ = {
     nullptr, /* enumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
-    nullptr, /* convert */
     nullptr, /* finalize */
     nullptr, /* call */
     nullptr, /* hasInstance */

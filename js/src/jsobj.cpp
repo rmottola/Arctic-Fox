@@ -528,14 +528,13 @@ js::SetIntegrityLevel(JSContext* cx, HandleObject obj, IntegrityLevel level)
         Reverse(shapes.begin(), shapes.end());
 
         for (Shape* shape : shapes) {
-            StackShape unrootedChild(shape);
-            RootedGeneric<StackShape*> child(cx, &unrootedChild);
-            child->attrs |= GetSealedOrFrozenAttributes(child->attrs, level);
+            Rooted<StackShape> child(cx, StackShape(shape));
+            child.setAttrs(child.attrs() | GetSealedOrFrozenAttributes(child.attrs(), level));
 
-            if (!JSID_IS_EMPTY(child->propid) && level == IntegrityLevel::Frozen)
-                MarkTypePropertyNonWritable(cx, nobj, child->propid);
+            if (!JSID_IS_EMPTY(child.get().propid) && level == IntegrityLevel::Frozen)
+                MarkTypePropertyNonWritable(cx, nobj, child.get().propid);
 
-            last = cx->compartment()->propertyTree.getChild(cx, last, *child);
+            last = cx->compartment()->propertyTree.getChild(cx, last, child);
             if (!last)
                 return false;
         }
@@ -692,11 +691,6 @@ NewObject(ExclusiveContext* cx, HandleObjectGroup group, gc::AllocKind kind,
             return nullptr;
         obj = nobj;
     }
-
-    bool globalWithoutCustomTrace = clasp->trace == JS_GlobalObjectTraceHook &&
-                                    !cx->compartment()->options().getTrace();
-    if (clasp->trace && !globalWithoutCustomTrace)
-        MOZ_RELEASE_ASSERT(clasp->flags & JSCLASS_IMPLEMENTS_BARRIERS);
 
     probes::CreateObject(cx, obj);
     return obj;
@@ -1361,9 +1355,8 @@ InitializePropertiesFromCompatibleNativeObject(JSContext* cx,
         Reverse(shapes.begin(), shapes.end());
 
         for (Shape* shape : shapes) {
-            StackShape unrootedChild(shape);
-            RootedGeneric<StackShape*> child(cx, &unrootedChild);
-            shape = cx->compartment()->propertyTree.getChild(cx, shape, *child);
+            Rooted<StackShape> child(cx, StackShape(shape));
+            shape = cx->compartment()->propertyTree.getChild(cx, shape, child);
             if (!shape)
                 return false;
         }
@@ -1506,7 +1499,7 @@ js::XDRObjectLiteral(XDRState<XDR_ENCODE>* xdr, MutableHandleObject obj);
 template bool
 js::XDRObjectLiteral(XDRState<XDR_DECODE>* xdr, MutableHandleObject obj);
 
-void
+bool
 NativeObject::fillInAfterSwap(JSContext* cx, const Vector<Value>& values, void* priv)
 {
     // This object has just been swapped with some other object, and its shape
@@ -1518,7 +1511,7 @@ NativeObject::fillInAfterSwap(JSContext* cx, const Vector<Value>& values, void* 
     size_t nfixed = gc::GetGCKindSlots(asTenured().getAllocKind(), getClass());
     if (nfixed != shape_->numFixedSlots()) {
         if (!generateOwnShape(cx))
-            CrashAtUnhandlableOOM("fillInAfterSwap");
+            return false;
         shape_->setNumFixedSlots(nfixed);
     }
 
@@ -1535,11 +1528,12 @@ NativeObject::fillInAfterSwap(JSContext* cx, const Vector<Value>& values, void* 
     if (size_t ndynamic = dynamicSlotsCount(nfixed, values.length(), getClass())) {
         slots_ = cx->zone()->pod_malloc<HeapSlot>(ndynamic);
         if (!slots_)
-            CrashAtUnhandlableOOM("fillInAfterSwap");
+            return false;
         Debug_SetSlotRangeToCrashOnTouch(slots_, ndynamic);
     }
 
     initSlotRange(0, values.begin(), values.length());
+    return true;
 }
 
 void
@@ -1560,12 +1554,14 @@ JSObject::swap(JSContext* cx, HandleObject a, HandleObject b)
                IsBackgroundFinalized(b->asTenured().getAllocKind()));
     MOZ_ASSERT(a->compartment() == b->compartment());
 
+    AutoEnterOOMUnsafeRegion oomUnsafe;
+
     AutoCompartment ac(cx, a);
 
     if (!a->getGroup(cx))
-        CrashAtUnhandlableOOM("JSObject::swap");
+        oomUnsafe.crash("JSObject::swap");
     if (!b->getGroup(cx))
-        CrashAtUnhandlableOOM("JSObject::swap");
+        oomUnsafe.crash("JSObject::swap");
 
     /*
      * Neither object may be in the nursery, but ensure we update any embedded
@@ -1624,7 +1620,7 @@ JSObject::swap(JSContext* cx, HandleObject a, HandleObject b)
             apriv = na->hasPrivate() ? na->getPrivate() : nullptr;
             for (size_t i = 0; i < na->slotSpan(); i++) {
                 if (!avals.append(na->getSlot(i)))
-                    CrashAtUnhandlableOOM("JSObject::swap");
+                    oomUnsafe.crash("JSObject::swap");
             }
         }
         Vector<Value> bvals(cx);
@@ -1633,7 +1629,7 @@ JSObject::swap(JSContext* cx, HandleObject a, HandleObject b)
             bpriv = nb->hasPrivate() ? nb->getPrivate() : nullptr;
             for (size_t i = 0; i < nb->slotSpan(); i++) {
                 if (!bvals.append(nb->getSlot(i)))
-                    CrashAtUnhandlableOOM("JSObject::swap");
+                    oomUnsafe.crash("JSObject::swap");
             }
         }
 
@@ -1646,10 +1642,10 @@ JSObject::swap(JSContext* cx, HandleObject a, HandleObject b)
         a->fixDictionaryShapeAfterSwap();
         b->fixDictionaryShapeAfterSwap();
 
-        if (na)
-            b->as<NativeObject>().fillInAfterSwap(cx, avals, apriv);
-        if (nb)
-            a->as<NativeObject>().fillInAfterSwap(cx, bvals, bpriv);
+        if (na && !b->as<NativeObject>().fillInAfterSwap(cx, avals, apriv))
+            oomUnsafe.crash("fillInAfterSwap");
+        if (nb && !a->as<NativeObject>().fillInAfterSwap(cx, bvals, bpriv))
+            oomUnsafe.crash("fillInAfterSwap");
     }
 
     // Swapping the contents of two objects invalidates type sets which contain
@@ -3685,7 +3681,7 @@ JSObject::sizeOfIncludingThisInNursery() const
     return size;
 }
 
-size_t
+JS::ubi::Node::Size
 JS::ubi::Concrete<JSObject>::size(mozilla::MallocSizeOf mallocSizeOf) const
 {
     JSObject& obj = get();
@@ -3720,7 +3716,8 @@ JSObject::traceChildren(JSTracer* trc)
             JS::AutoTracingDetails ctx(trc, func);
             JS::AutoTracingIndex index(trc);
             for (uint32_t i = 0; i < nobj->slotSpan(); ++i) {
-                TraceManuallyBarrieredEdge(trc, nobj->getSlotRef(i).unsafeGet(), "object slot");
+                TraceManuallyBarrieredEdge(trc, nobj->getSlotRef(i).unsafeUnbarrieredForTracing(),
+                                           "object slot");
                 ++index;
             }
         }

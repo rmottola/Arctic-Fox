@@ -11,7 +11,8 @@
 
 #include "js/Debug.h"
 #include "js/TypeDecls.h"
-#include "js/UbiNodeTraverse.h"
+#include "js/UbiNodeCensus.h"
+#include "js/UbiNodeBreadthFirst.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/devtools/AutoMemMap.h"
 #include "mozilla/devtools/CoreDump.pb.h"
@@ -22,6 +23,7 @@
 #include "mozilla/dom/ChromeUtils.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/HeapSnapshotBinding.h"
+#include "mozilla/RangedPtr.h"
 #include "mozilla/Telemetry.h"
 
 #include "jsapi.h"
@@ -47,6 +49,8 @@ using ::google::protobuf::io::ArrayInputStream;
 using ::google::protobuf::io::CodedInputStream;
 using ::google::protobuf::io::GzipInputStream;
 using ::google::protobuf::io::ZeroCopyInputStream;
+
+using JS::ubi::AtomOrTwoByteChars;
 
 NS_IMPL_CYCLE_COLLECTION_CLASS(HeapSnapshot)
 
@@ -74,6 +78,8 @@ HeapSnapshot::WrapObject(JSContext* aCx, HandleObject aGivenProto)
 {
   return HeapSnapshotBinding::Wrap(aCx, this, aGivenProto);
 }
+
+/*** Reading Heap Snapshots ***********************************************************************/
 
 /* static */ already_AddRefed<HeapSnapshot>
 HeapSnapshot::Create(JSContext* cx,
@@ -118,41 +124,231 @@ parseMessage(ZeroCopyInputStream& stream, MessageType& message)
   return true;
 }
 
+template<typename CharT, typename InternedStringSet>
+struct GetOrInternStringMatcher
+{
+  using ReturnType = const CharT*;
+
+  InternedStringSet& internedStrings;
+
+  explicit GetOrInternStringMatcher(InternedStringSet& strings) : internedStrings(strings) { }
+
+  const CharT* match(const std::string* str) {
+    MOZ_ASSERT(str);
+    size_t length = str->length() / sizeof(CharT);
+    auto tempString = reinterpret_cast<const CharT*>(str->data());
+
+    UniquePtr<CharT[], NSFreePolicy> owned(NS_strndup(tempString, length));
+    if (!owned || !internedStrings.append(Move(owned)))
+      return nullptr;
+
+    return internedStrings.back().get();
+  }
+
+  const CharT* match(uint64_t ref) {
+    if (MOZ_LIKELY(ref < internedStrings.length())) {
+      auto& string = internedStrings[ref];
+      MOZ_ASSERT(string);
+      return string.get();
+    }
+
+    return nullptr;
+  }
+};
+
+template<
+  // Either char or char16_t.
+  typename CharT,
+  // A reference to either `internedOneByteStrings` or `internedTwoByteStrings`
+  // if CharT is char or char16_t respectively.
+  typename InternedStringSet>
+const CharT*
+HeapSnapshot::getOrInternString(InternedStringSet& internedStrings,
+                                Maybe<StringOrRef>& maybeStrOrRef)
+{
+  // Incomplete message: has neither a string nor a reference to an already
+  // interned string.
+  if (MOZ_UNLIKELY(maybeStrOrRef.isNothing()))
+    return nullptr;
+
+  GetOrInternStringMatcher<CharT, InternedStringSet> m(internedStrings);
+  return maybeStrOrRef->match(m);
+}
+
+// Get a de-duplicated string as a Maybe<StringOrRef> from the given `msg`.
+#define GET_STRING_OR_REF_WITH_PROP_NAMES(msg, strPropertyName, refPropertyName) \
+  (msg.has_##refPropertyName()                                                   \
+    ? Some(StringOrRef(msg.refPropertyName()))                                   \
+    : msg.has_##strPropertyName()                                                \
+      ? Some(StringOrRef(&msg.strPropertyName()))                                \
+      : Nothing())
+
+#define GET_STRING_OR_REF(msg, property)      \
+  (msg.has_##property##ref()                  \
+     ? Some(StringOrRef(msg.property##ref())) \
+     : msg.has_##property()                   \
+       ? Some(StringOrRef(&msg.property()))   \
+       : Nothing())
+
 bool
 HeapSnapshot::saveNode(const protobuf::Node& node)
 {
-  if (!node.has_id())
+  // NB: de-duplicated string properties must be read back and interned in the
+  // same order here as they are written and serialized in
+  // `CoreDumpWriter::writeNode` or else indices in references to already
+  // serialized strings will be off.
+
+  if (NS_WARN_IF(!node.has_id()))
     return false;
   NodeId id = node.id();
 
-  if (!node.has_typename_())
+  // Should only deserialize each node once.
+  if (NS_WARN_IF(nodes.has(id)))
     return false;
 
-  const auto* duplicatedTypeName = reinterpret_cast<const char16_t*>(
-    node.typename_().c_str());
-  const char16_t* typeName = borrowUniqueString(
-    duplicatedTypeName,
-    node.typename_().length() / sizeof(char16_t));
-  if (!typeName)
+  if (NS_WARN_IF(!JS::ubi::Uint32IsValidCoarseType(node.coarsetype())))
+    return false;
+  auto coarseType = JS::ubi::Uint32ToCoarseType(node.coarsetype());
+
+  Maybe<StringOrRef> typeNameOrRef = GET_STRING_OR_REF_WITH_PROP_NAMES(node, typename_, typenameref);
+  auto typeName = getOrInternString<char16_t>(internedTwoByteStrings, typeNameOrRef);
+  if (NS_WARN_IF(!typeName))
     return false;
 
-  if (!node.has_size())
+  if (NS_WARN_IF(!node.has_size()))
     return false;
   uint64_t size = node.size();
 
   auto edgesLength = node.edges_size();
   DeserializedNode::EdgeVector edges;
-  if (!edges.reserve(edgesLength))
+  if (NS_WARN_IF(!edges.reserve(edgesLength)))
     return false;
   for (decltype(edgesLength) i = 0; i < edgesLength; i++) {
-    DeserializedEdge edge;
-    if (!edge.init(node.edges(i), *this))
+    auto& protoEdge = node.edges(i);
+
+    if (NS_WARN_IF(!protoEdge.has_referent()))
       return false;
-    edges.infallibleAppend(Move(edge));
+    NodeId referent = protoEdge.referent();
+
+    const char16_t* edgeName = nullptr;
+    if (protoEdge.EdgeNameOrRef_case() != protobuf::Edge::EDGENAMEORREF_NOT_SET) {
+      Maybe<StringOrRef> edgeNameOrRef = GET_STRING_OR_REF(protoEdge, name);
+      edgeName = getOrInternString<char16_t>(internedTwoByteStrings, edgeNameOrRef);
+      if (NS_WARN_IF(!edgeName))
+        return false;
+    }
+
+    edges.infallibleAppend(DeserializedEdge(referent, edgeName));
   }
 
-  DeserializedNode dn(id, typeName, size, Move(edges), *this);
-  return nodes.putNew(id, Move(dn));
+  Maybe<StackFrameId> allocationStack;
+  if (node.has_allocationstack()) {
+    StackFrameId id = 0;
+    if (NS_WARN_IF(!saveStackFrame(node.allocationstack(), id)))
+      return false;
+    allocationStack.emplace(id);
+  }
+  MOZ_ASSERT(allocationStack.isSome() == node.has_allocationstack());
+
+  const char* jsObjectClassName = nullptr;
+  if (node.JSObjectClassNameOrRef_case() != protobuf::Node::JSOBJECTCLASSNAMEORREF_NOT_SET) {
+    Maybe<StringOrRef> clsNameOrRef = GET_STRING_OR_REF(node, jsobjectclassname);
+    jsObjectClassName = getOrInternString<char>(internedOneByteStrings, clsNameOrRef);
+    if (NS_WARN_IF(!jsObjectClassName))
+      return false;
+  }
+
+  if (NS_WARN_IF(!nodes.putNew(id, DeserializedNode(id, coarseType, typeName,
+                                                    size, Move(edges),
+                                                    allocationStack,
+                                                    jsObjectClassName, *this))))
+  {
+    return false;
+  };
+
+  return true;
+}
+
+bool
+HeapSnapshot::saveStackFrame(const protobuf::StackFrame& frame,
+                             StackFrameId& outFrameId)
+{
+  // NB: de-duplicated string properties must be read in the same order here as
+  // they are written in `CoreDumpWriter::getProtobufStackFrame` or else indices
+  // in references to already serialized strings will be off.
+
+  if (frame.has_ref()) {
+    // We should only get a reference to the previous frame if we have already
+    // seen the previous frame.
+    if (!frames.has(frame.ref()))
+      return false;
+
+    outFrameId = frame.ref();
+    return true;
+  }
+
+  // Incomplete message.
+  if (!frame.has_data())
+    return false;
+
+  auto data = frame.data();
+
+  if (!data.has_id())
+    return false;
+  StackFrameId id = data.id();
+
+  // This should be the first and only time we see this frame.
+  if (frames.has(id))
+    return false;
+
+  if (!data.has_line())
+    return false;
+  uint32_t line = data.line();
+
+  if (!data.has_column())
+    return false;
+  uint32_t column = data.column();
+
+  if (!data.has_issystem())
+    return false;
+  bool isSystem = data.issystem();
+
+  if (!data.has_isselfhosted())
+    return false;
+  bool isSelfHosted = data.isselfhosted();
+
+  Maybe<StringOrRef> sourceOrRef = GET_STRING_OR_REF(data, source);
+  auto source = getOrInternString<char16_t>(internedTwoByteStrings, sourceOrRef);
+  if (!source)
+    return false;
+
+  const char16_t* functionDisplayName = nullptr;
+  if (data.FunctionDisplayNameOrRef_case() !=
+      protobuf::StackFrame_Data::FUNCTIONDISPLAYNAMEORREF_NOT_SET)
+  {
+    Maybe<StringOrRef> nameOrRef = GET_STRING_OR_REF(data, functiondisplayname);
+    functionDisplayName = getOrInternString<char16_t>(internedTwoByteStrings, nameOrRef);
+    if (!functionDisplayName)
+      return false;
+  }
+
+  Maybe<StackFrameId> parent;
+  if (data.has_parent()) {
+    StackFrameId parentId = 0;
+    if (!saveStackFrame(data.parent(), parentId))
+      return false;
+    parent = Some(parentId);
+  }
+
+  if (!frames.putNew(id, DeserializedStackFrame(id, parent, line, column,
+                                                source, functionDisplayName,
+                                                isSystem, isSelfHosted, *this)))
+  {
+    return false;
+  }
+
+  outFrameId = id;
+  return true;
 }
 
 static inline bool
@@ -181,7 +377,7 @@ StreamHasData(GzipInputStream& stream)
 bool
 HeapSnapshot::init(const uint8_t* buffer, uint32_t size)
 {
-  if (!nodes.init() || !strings.init())
+  if (!nodes.init() || !frames.init())
     return false;
 
   ArrayInputStream stream(buffer, size);
@@ -223,22 +419,64 @@ HeapSnapshot::init(const uint8_t* buffer, uint32_t size)
   return true;
 }
 
-const char16_t*
-HeapSnapshot::borrowUniqueString(const char16_t* duplicateString, size_t length)
-{
-  MOZ_ASSERT(duplicateString);
-  UniqueStringHashPolicy::Lookup lookup(duplicateString, length);
-  auto ptr = strings.lookupForAdd(lookup);
 
-  if (!ptr) {
-    UniqueString owned(NS_strndup(duplicateString, length));
-    if (!owned || !strings.add(ptr, Move(owned)))
-      return nullptr;
+/*** Heap Snapshot Analyses ***********************************************************************/
+
+void
+HeapSnapshot::TakeCensus(JSContext* cx, JS::HandleObject options,
+                         JS::MutableHandleValue rval, ErrorResult& rv)
+{
+  JS::ubi::Census census(cx);
+  if (NS_WARN_IF(!census.init())) {
+    rv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    return;
   }
 
-  MOZ_ASSERT(ptr->get() != duplicateString);
-  return ptr->get();
+  JS::ubi::CountTypePtr rootType;
+  if (NS_WARN_IF(!JS::ubi::ParseCensusOptions(cx,  census, options, rootType))) {
+    rv.Throw(NS_ERROR_UNEXPECTED);
+    return;
+  }
+
+  JS::ubi::RootedCount rootCount(cx, rootType->makeCount());
+  if (NS_WARN_IF(!rootCount)) {
+    rv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    return;
+  }
+
+  JS::ubi::CensusHandler handler(census, rootCount);
+
+  {
+    JS::AutoCheckCannotGC nogc;
+
+    JS::ubi::CensusTraversal traversal(JS_GetRuntime(cx), handler, nogc);
+    if (NS_WARN_IF(!traversal.init())) {
+      rv.Throw(NS_ERROR_OUT_OF_MEMORY);
+      return;
+    }
+
+    if (NS_WARN_IF(!traversal.addStart(getRoot()))) {
+      rv.Throw(NS_ERROR_OUT_OF_MEMORY);
+      return;
+    }
+
+    if (NS_WARN_IF(!traversal.traverse())) {
+      rv.Throw(NS_ERROR_UNEXPECTED);
+      return;
+    }
+  }
+
+  if (NS_WARN_IF(!handler.report(rval))) {
+    rv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    return;
+  }
 }
+
+#undef GET_STRING_OR_REF_WITH_PROP_NAMES
+#undef GET_STRING_OR_REF
+
+
+/*** Saving Heap Snapshots ************************************************************************/
 
 // If we are only taking a snapshot of the heap affected by the given set of
 // globals, find the set of zones the globals are allocated within. Returns
@@ -380,12 +618,225 @@ EstablishBoundaries(JSContext* cx,
 }
 
 
+// A variant covering all the various two-byte strings that we can get from the
+// ubi::Node API.
+class TwoByteString : public Variant<JSAtom*, const char16_t*, JS::ubi::EdgeName>
+{
+  using Base = Variant<JSAtom*, const char16_t*, JS::ubi::EdgeName>;
+
+  struct AsTwoByteStringMatcher
+  {
+    using ReturnType = TwoByteString;
+
+    TwoByteString match(JSAtom* atom) {
+      return TwoByteString(atom);
+    }
+
+    TwoByteString match(const char16_t* chars) {
+      return TwoByteString(chars);
+    }
+  };
+
+  struct IsNonNullMatcher
+  {
+    using ReturnType = bool;
+
+    template<typename T>
+    bool match(const T& t) { return t != nullptr; }
+  };
+
+  struct LengthMatcher
+  {
+    using ReturnType = size_t;
+
+    size_t match(JSAtom* atom) {
+      MOZ_ASSERT(atom);
+      JS::ubi::AtomOrTwoByteChars s(atom);
+      return s.length();
+    }
+
+    size_t match(const char16_t* chars) {
+      MOZ_ASSERT(chars);
+      return NS_strlen(chars);
+    }
+
+    size_t match(const JS::ubi::EdgeName& ptr) {
+      MOZ_ASSERT(ptr);
+      return NS_strlen(ptr.get());
+    }
+  };
+
+  struct CopyToBufferMatcher
+  {
+    using ReturnType = size_t;
+
+    RangedPtr<char16_t> destination;
+    size_t              maxLength;
+
+    CopyToBufferMatcher(RangedPtr<char16_t> destination, size_t maxLength)
+      : destination(destination)
+      , maxLength(maxLength)
+    { }
+
+    size_t match(JS::ubi::EdgeName& ptr) {
+      return ptr ? match(ptr.get()) : 0;
+    }
+
+    size_t match(JSAtom* atom) {
+      MOZ_ASSERT(atom);
+      JS::ubi::AtomOrTwoByteChars s(atom);
+      return s.copyToBuffer(destination, maxLength);
+    }
+
+    size_t match(const char16_t* chars) {
+      MOZ_ASSERT(chars);
+      JS::ubi::AtomOrTwoByteChars s(chars);
+      return s.copyToBuffer(destination, maxLength);
+    }
+  };
+
+public:
+  template<typename T>
+  MOZ_IMPLICIT TwoByteString(T&& rhs) : Base(Forward<T>(rhs)) { }
+
+  template<typename T>
+  TwoByteString& operator=(T&& rhs) {
+    MOZ_ASSERT(this != &rhs, "self-move disallowed");
+    this->~TwoByteString();
+    new (this) TwoByteString(Forward<T>(rhs));
+    return *this;
+  }
+
+  TwoByteString(const TwoByteString&) = delete;
+  TwoByteString& operator=(const TwoByteString&) = delete;
+
+  // Rewrap the inner value of a JS::ubi::AtomOrTwoByteChars as a TwoByteString.
+  static TwoByteString from(JS::ubi::AtomOrTwoByteChars&& s) {
+    AsTwoByteStringMatcher m;
+    return s.match(m);
+  }
+
+  // Returns true if the given TwoByteString is non-null, false otherwise.
+  bool isNonNull() const {
+    IsNonNullMatcher m;
+    return match(m);
+  }
+
+  // Return the length of the string, 0 if it is null.
+  size_t length() const {
+    LengthMatcher m;
+    return match(m);
+  }
+
+  // Copy the contents of a TwoByteString into the provided buffer. The buffer
+  // is NOT null terminated. The number of characters written is returned.
+  size_t copyToBuffer(RangedPtr<char16_t> destination, size_t maxLength) {
+    CopyToBufferMatcher m(destination, maxLength);
+    return match(m);
+  }
+
+  struct HashPolicy;
+};
+
+// A hashing policy for TwoByteString.
+//
+// Atoms are pointer hashed and use pointer equality, which means that we
+// tolerate some duplication across atoms and the other two types of two-byte
+// strings. In practice, we expect the amount of this duplication to be very low
+// because each type is generally a different semantic thing in addition to
+// having a slightly different representation. For example, the set of edge
+// names and the set stack frames' source names naturally tend not to overlap
+// very much if at all.
+struct TwoByteString::HashPolicy {
+  using Lookup = TwoByteString;
+
+  struct HashingMatcher {
+    using ReturnType  = js::HashNumber;
+
+    js::HashNumber match(const JSAtom* atom) {
+      return js::DefaultHasher<const JSAtom*>::hash(atom);
+    }
+
+    js::HashNumber match(const char16_t* chars) {
+      MOZ_ASSERT(chars);
+      auto length = NS_strlen(chars);
+      return HashString(chars, length);
+    }
+
+    js::HashNumber match(const JS::ubi::EdgeName& ptr) {
+      MOZ_ASSERT(ptr);
+      return match(ptr.get());
+    }
+  };
+
+  static js::HashNumber hash(const Lookup& l) {
+    HashingMatcher hasher;
+    return l.match(hasher);
+  }
+
+  struct EqualityMatcher {
+    using ReturnType = bool;
+    const TwoByteString& rhs;
+    explicit EqualityMatcher(const TwoByteString& rhs) : rhs(rhs) { }
+
+    bool match(const JSAtom* atom) {
+      return rhs.is<JSAtom*>() && rhs.as<JSAtom*>() == atom;
+    }
+
+    bool match(const char16_t* chars) {
+      MOZ_ASSERT(chars);
+
+      const char16_t* rhsChars = nullptr;
+      if (rhs.is<const char16_t*>())
+        rhsChars = rhs.as<const char16_t*>();
+      else if (rhs.is<JS::ubi::EdgeName>())
+        rhsChars = rhs.as<JS::ubi::EdgeName>().get();
+      else
+        return false;
+      MOZ_ASSERT(rhsChars);
+
+      auto length = NS_strlen(chars);
+      if (NS_strlen(rhsChars) != length)
+        return false;
+
+      return memcmp(chars, rhsChars, length * sizeof(char16_t)) == 0;
+    }
+
+    bool match(const JS::ubi::EdgeName& ptr) {
+      MOZ_ASSERT(ptr);
+      return match(ptr.get());
+    }
+  };
+
+  static bool match(const TwoByteString& k, const Lookup& l) {
+    EqualityMatcher eq(l);
+    return k.match(eq);
+  }
+
+  static void rekey(TwoByteString& k, TwoByteString&& newKey) {
+    k = Move(newKey);
+  }
+};
+
 // A `CoreDumpWriter` that serializes nodes to protobufs and writes them to the
 // given `ZeroCopyOutputStream`.
 class MOZ_STACK_CLASS StreamWriter : public CoreDumpWriter
 {
-  JSContext* cx;
-  bool      wantNames;
+  using FrameSet         = js::HashSet<uint64_t>;
+  using TwoByteStringMap = js::HashMap<TwoByteString, uint64_t, TwoByteString::HashPolicy>;
+  using OneByteStringMap = js::HashMap<const char*, uint64_t>;
+
+  JSContext*       cx;
+  bool             wantNames;
+  // The set of |JS::ubi::StackFrame::identifier()|s that have already been
+  // serialized and written to the core dump.
+  FrameSet         framesAlreadySerialized;
+  // The set of two-byte strings that have already been serialized and written
+  // to the core dump.
+  TwoByteStringMap twoByteStringsAlreadySerialized;
+  // The set of one-byte strings that have already been serialized and written
+  // to the core dump.
+  OneByteStringMap oneByteStringsAlreadySerialized;
 
   ::google::protobuf::io::ZeroCopyOutputStream& stream;
 
@@ -399,31 +850,166 @@ class MOZ_STACK_CLASS StreamWriter : public CoreDumpWriter
     return !codedStream.HadError();
   }
 
+  // Attach the full two-byte string or a reference to a two-byte string that
+  // has already been serialized to a protobuf message.
+  template <typename SetStringFunction,
+            typename SetRefFunction>
+  bool attachTwoByteString(TwoByteString& string, SetStringFunction setString,
+                           SetRefFunction setRef) {
+    auto ptr = twoByteStringsAlreadySerialized.lookupForAdd(string);
+    if (ptr) {
+      setRef(ptr->value());
+      return true;
+    }
+
+    auto length = string.length();
+    auto stringData = MakeUnique<std::string>(length * sizeof(char16_t), '\0');
+    if (!stringData)
+      return false;
+
+    auto buf = const_cast<char16_t*>(reinterpret_cast<const char16_t*>(stringData->data()));
+    string.copyToBuffer(RangedPtr<char16_t>(buf, length), length);
+
+    uint64_t ref = twoByteStringsAlreadySerialized.count();
+    if (!twoByteStringsAlreadySerialized.add(ptr, Move(string), ref))
+      return false;
+
+    setString(stringData.release());
+    return true;
+  }
+
+  // Attach the full one-byte string or a reference to a one-byte string that
+  // has already been serialized to a protobuf message.
+  template <typename SetStringFunction,
+            typename SetRefFunction>
+  bool attachOneByteString(const char* string, SetStringFunction setString,
+                           SetRefFunction setRef) {
+    auto ptr = oneByteStringsAlreadySerialized.lookupForAdd(string);
+    if (ptr) {
+      setRef(ptr->value());
+      return true;
+    }
+
+    auto length = strlen(string);
+    auto stringData = MakeUnique<std::string>(string, length);
+    if (!stringData)
+      return false;
+
+    uint64_t ref = oneByteStringsAlreadySerialized.count();
+    if (!oneByteStringsAlreadySerialized.add(ptr, string, ref))
+      return false;
+
+    setString(stringData.release());
+    return true;
+  }
+
+  protobuf::StackFrame* getProtobufStackFrame(JS::ubi::StackFrame& frame) {
+    // NB: de-duplicated string properties must be written in the same order
+    // here as they are read in `HeapSnapshot::saveStackFrame` or else indices
+    // in references to already serialized strings will be off.
+
+    MOZ_ASSERT(frame,
+               "null frames should be represented as the lack of a serialized "
+               "stack frame");
+
+    auto id = frame.identifier();
+    auto protobufStackFrame = MakeUnique<protobuf::StackFrame>();
+    if (!protobufStackFrame)
+      return nullptr;
+
+    if (framesAlreadySerialized.has(id)) {
+      protobufStackFrame->set_ref(id);
+      return protobufStackFrame.release();
+    }
+
+    auto data = MakeUnique<protobuf::StackFrame_Data>();
+    if (!data)
+      return nullptr;
+
+    data->set_id(id);
+    data->set_line(frame.line());
+    data->set_column(frame.column());
+    data->set_issystem(frame.isSystem());
+    data->set_isselfhosted(frame.isSelfHosted());
+
+    auto dupeSource = TwoByteString::from(frame.source());
+    if (!attachTwoByteString(dupeSource,
+                             [&] (std::string* source) { data->set_allocated_source(source); },
+                             [&] (uint64_t ref) { data->set_sourceref(ref); }))
+    {
+      return nullptr;
+    }
+
+    auto dupeName = TwoByteString::from(frame.functionDisplayName());
+    if (dupeName.isNonNull()) {
+      if (!attachTwoByteString(dupeName,
+                               [&] (std::string* name) { data->set_allocated_functiondisplayname(name); },
+                               [&] (uint64_t ref) { data->set_functiondisplaynameref(ref); }))
+      {
+        return nullptr;
+      }
+    }
+
+    auto parent = frame.parent();
+    if (parent) {
+      auto protobufParent = getProtobufStackFrame(parent);
+      if (!protobufParent)
+        return nullptr;
+      data->set_allocated_parent(protobufParent);
+    }
+
+    protobufStackFrame->set_allocated_data(data.release());
+
+    if (!framesAlreadySerialized.put(id))
+      return nullptr;
+
+    return protobufStackFrame.release();
+  }
+
 public:
   StreamWriter(JSContext* cx,
                ::google::protobuf::io::ZeroCopyOutputStream& stream,
                bool wantNames)
     : cx(cx)
     , wantNames(wantNames)
+    , framesAlreadySerialized(cx)
+    , twoByteStringsAlreadySerialized(cx)
+    , oneByteStringsAlreadySerialized(cx)
     , stream(stream)
   { }
 
+  bool init() {
+    return framesAlreadySerialized.init() &&
+           twoByteStringsAlreadySerialized.init() &&
+           oneByteStringsAlreadySerialized.init();
+  }
+
   ~StreamWriter() override { }
 
-  virtual bool writeMetadata(uint64_t timestamp) override {
+  virtual bool writeMetadata(uint64_t timestamp) final {
     protobuf::Metadata metadata;
     metadata.set_timestamp(timestamp);
     return writeMessage(metadata);
   }
 
   virtual bool writeNode(const JS::ubi::Node& ubiNode,
-                         EdgePolicy includeEdges) override {
+                         EdgePolicy includeEdges) final {
+    // NB: de-duplicated string properties must be written in the same order
+    // here as they are read in `HeapSnapshot::saveNode` or else indices in
+    // references to already serialized strings will be off.
+
     protobuf::Node protobufNode;
     protobufNode.set_id(ubiNode.identifier());
 
-    const char16_t* typeName = ubiNode.typeName();
-    size_t length = NS_strlen(typeName) * sizeof(char16_t);
-    protobufNode.set_typename_(typeName, length);
+    protobufNode.set_coarsetype(JS::ubi::CoarseTypeToUint32(ubiNode.coarseType()));
+
+    auto typeName = TwoByteString(ubiNode.typeName());
+    if (NS_WARN_IF(!attachTwoByteString(typeName,
+                                        [&] (std::string* name) { protobufNode.set_allocated_typename_(name); },
+                                        [&] (uint64_t ref) { protobufNode.set_typenameref(ref); })))
+    {
+      return false;
+    }
 
     JSRuntime* rt = JS_GetRuntime(cx);
     mozilla::MallocSizeOf mallocSizeOf = dbg::GetDebuggerMallocSizeOf(rt);
@@ -431,12 +1017,12 @@ public:
     protobufNode.set_size(ubiNode.size(mallocSizeOf));
 
     if (includeEdges) {
-      auto edges = ubiNode.edges(cx, wantNames);
+      auto edges = ubiNode.edges(JS_GetRuntime(cx), wantNames);
       if (NS_WARN_IF(!edges))
         return false;
 
       for ( ; !edges->empty(); edges->popFront()) {
-        const ubi::Edge& ubiEdge = edges->front();
+        ubi::Edge& ubiEdge = edges->front();
 
         protobuf::Edge* protobufEdge = protobufNode.add_edges();
         if (NS_WARN_IF(!protobufEdge)) {
@@ -446,9 +1032,31 @@ public:
         protobufEdge->set_referent(ubiEdge.referent.identifier());
 
         if (wantNames && ubiEdge.name) {
-          size_t length = NS_strlen(ubiEdge.name) * sizeof(char16_t);
-          protobufEdge->set_name(ubiEdge.name, length);
+          TwoByteString edgeName(Move(ubiEdge.name));
+          if (NS_WARN_IF(!attachTwoByteString(edgeName,
+                                              [&] (std::string* name) { protobufEdge->set_allocated_name(name); },
+                                              [&] (uint64_t ref) { protobufEdge->set_nameref(ref); })))
+          {
+            return false;
+          }
         }
+      }
+    }
+
+    if (ubiNode.hasAllocationStack()) {
+      auto ubiStackFrame = ubiNode.allocationStack();
+      auto protoStackFrame = getProtobufStackFrame(ubiStackFrame);
+      if (NS_WARN_IF(!protoStackFrame))
+        return false;
+      protobufNode.set_allocated_allocationstack(protoStackFrame);
+    }
+
+    if (auto className = ubiNode.jsObjectClassName()) {
+      if (NS_WARN_IF(!attachOneByteString(className,
+                                          [&] (std::string* name) { protobufNode.set_allocated_jsobjectclassname(name); },
+                                          [&] (uint64_t ref) { protobufNode.set_jsobjectclassnameref(ref); })))
+      {
+        return false;
       }
     }
 
@@ -542,7 +1150,7 @@ WriteHeapGraph(JSContext* cx,
   // core dump.
 
   HeapSnapshotHandler handler(writer, zones);
-  HeapSnapshotHandler::Traversal traversal(cx, handler, noGC);
+  HeapSnapshotHandler::Traversal traversal(JS_GetRuntime(cx), handler, noGC);
   if (!traversal.init())
     return false;
   traversal.wantNames = wantNames;
@@ -700,10 +1308,14 @@ ThreadSafeChromeUtils::SaveHeapSnapshot(GlobalObject& global,
   ::google::protobuf::io::GzipOutputStream gzipStream(&zeroCopyStream);
 
   StreamWriter writer(cx, gzipStream, wantNames);
+  if (NS_WARN_IF(!writer.init())) {
+    rv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    return;
+  }
 
   {
     Maybe<AutoCheckCannotGC> maybeNoGC;
-    ubi::RootList rootList(cx, maybeNoGC, wantNames);
+    ubi::RootList rootList(JS_GetRuntime(cx), maybeNoGC, wantNames);
     if (!EstablishBoundaries(cx, rv, boundaries, rootList, zones))
       return;
 

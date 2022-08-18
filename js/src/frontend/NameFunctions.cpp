@@ -337,7 +337,7 @@ class NameResolver
         if (cur == nullptr)
             return true;
 
-        MOZ_ASSERT(cur->isKind(PNK_FUNCTION) == cur->isArity(PN_CODE));
+        MOZ_ASSERT((cur->isKind(PNK_FUNCTION) || cur->isKind(PNK_MODULE)) == cur->isArity(PN_CODE));
         if (cur->isKind(PNK_FUNCTION)) {
             RootedAtom prefix2(cx);
             if (!resolveFun(cur, prefix, &prefix2))
@@ -412,7 +412,6 @@ class NameResolver
           case PNK_SPREAD:
           case PNK_MUTATEPROTO:
           case PNK_EXPORT:
-          case PNK_EXPORT_DEFAULT:
             MOZ_ASSERT(cur->isArity(PN_UNARY));
             if (!resolve(cur->pn_kid, prefix))
                 return false;
@@ -517,13 +516,15 @@ class NameResolver
 
           case PNK_IMPORT:
           case PNK_EXPORT_FROM:
+          case PNK_EXPORT_DEFAULT:
             MOZ_ASSERT(cur->isArity(PN_BINARY));
             // The left halves of these nodes don't contain any unconstrained
             // expressions, but it's very hard to assert this to safely rely on
             // it.  So recur anyway.
             if (!resolve(cur->pn_left, prefix))
                 return false;
-            MOZ_ASSERT(cur->pn_right->isKind(PNK_STRING));
+            MOZ_ASSERT_IF(!cur->isKind(PNK_EXPORT_DEFAULT),
+                          cur->pn_right->isKind(PNK_STRING));
             break;
 
           // Ternary nodes with three expression children.
@@ -784,6 +785,7 @@ class NameResolver
             break;
 
           case PNK_FUNCTION:
+          case PNK_MODULE:
             MOZ_ASSERT(cur->isArity(PN_CODE));
             if (!resolve(cur->pn_body, prefix))
                 return false;

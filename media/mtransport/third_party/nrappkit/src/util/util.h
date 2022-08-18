@@ -70,6 +70,7 @@ int snprintf(char *buffer, size_t n, const char *format, ...);
 // with a different type modifier, so we don't redefine it
 #if defined(WINVER) && WINVER <0x0600 
 const char *inet_ntop(int af, const void *src, char *dst, size_t size);
+int inet_pton(int af, const char *src, void *dst);
 #endif
 #endif
 

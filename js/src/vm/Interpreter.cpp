@@ -374,7 +374,7 @@ namespace js {
 // All mutable state is stored in `Runtime::stopwatch` (per-process
 // performance stats and logistics) and in `PerformanceGroup` (per
 // group performance stats).
-class AutoStopwatch final
+class MOZ_RAII AutoStopwatch final
 {
     // The context with which this object was initialized.
     // Non-null.
@@ -1007,7 +1007,8 @@ js::Execute(JSContext* cx, HandleScript script, JSObject& scopeChainArg, Value* 
         return false;
     Value thisv = ObjectValue(*thisObj);
 
-    return ExecuteKernel(cx, script, *scopeChain, thisv, NullValue(), EXECUTE_GLOBAL,
+    ExecuteType type = script->module() ? EXECUTE_MODULE : EXECUTE_GLOBAL;
+    return ExecuteKernel(cx, script, *scopeChain, thisv, NullValue(), type,
                          NullFramePtr() /* evalInFrame */, rval);
 }
 
@@ -1297,6 +1298,7 @@ PopScope(JSContext* cx, ScopeIter& si)
       case ScopeIter::With:
         si.initialFrame().popWith(cx);
         break;
+      case ScopeIter::Module:
       case ScopeIter::Call:
       case ScopeIter::Eval:
       case ScopeIter::NonSyntactic:
@@ -1819,12 +1821,7 @@ class ReservedRooted : public ReservedRootedBase<T>
 
 template <>
 class ReservedRootedBase<Value> : public ValueOperations<ReservedRooted<Value>>
-{
-    friend class ValueOperations<ReservedRooted<Value>>;
-    const Value* extract() const {
-        return static_cast<const ReservedRooted<Value>*>(this)->address();
-    }
-};
+{};
 
 static MOZ_NEVER_INLINE bool
 Interpret(JSContext* cx, RunState& state)
@@ -2001,7 +1998,7 @@ Interpret(JSContext* cx, RunState& state)
         MOZ_CRASH("bad Debugger::onEnterFrame status");
     }
 
-    if (cx->runtime()->profilingScripts)
+    if (cx->compartment()->collectCoverage())
         activation.enableInterruptsUnconditionally();
 
     // Enter the interpreter loop starting at the current pc.
@@ -2014,9 +2011,8 @@ CASE(EnableInterruptsPseudoOpcode)
     bool moreInterrupts = false;
     jsbytecode op = *REGS.pc;
 
-    if (cx->runtime()->profilingScripts) {
-        if (!script->hasScriptCounts())
-            script->initScriptCounts(cx);
+    if (!script->hasScriptCounts() && cx->compartment()->collectCoverage()) {
+        script->initScriptCounts(cx);
         moreInterrupts = true;
     }
 
@@ -3647,7 +3643,8 @@ END_CASE(JSOP_NEWINIT)
 CASE(JSOP_NEWARRAY)
 CASE(JSOP_SPREADCALLARRAY)
 {
-    JSObject* obj = NewArrayOperation(cx, script, REGS.pc, GET_UINT24(REGS.pc));
+    uint32_t length = GET_UINT32(REGS.pc);
+    JSObject* obj = NewArrayOperation(cx, script, REGS.pc, length);
     if (!obj)
         goto error;
     PUSH_OBJECT(*obj);
@@ -3743,7 +3740,7 @@ CASE(JSOP_INITELEM_ARRAY)
 
     ReservedRooted<JSObject*> obj(&rootObject0, &REGS.sp[-2].toObject());
 
-    uint32_t index = GET_UINT24(REGS.pc);
+    uint32_t index = GET_UINT32(REGS.pc);
     if (!InitArrayElemOperation(cx, REGS.pc, obj, index, val))
         goto error;
 

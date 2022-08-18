@@ -18,6 +18,7 @@
 #include "mozilla/CycleCollectedJSRuntime.h"
 #include "mozilla/Move.h"
 #include "mozilla/UniquePtr.h"
+#include "js/Principals.h"
 #include "js/UbiNode.h"
 
 using namespace mozilla;
@@ -156,13 +157,13 @@ struct DevTools : public ::testing::Test {
 class MOZ_STACK_CLASS FakeNode
 {
 public:
-  JS::ubi::SimpleEdgeVector edges;
-  JSCompartment*            compartment;
-  JS::Zone*                 zone;
-  size_t                    size;
+  JS::ubi::EdgeVector edges;
+  JSCompartment*      compartment;
+  JS::Zone*           zone;
+  size_t              size;
 
-  explicit FakeNode(JSContext* cx)
-    : edges(cx),
+  explicit FakeNode()
+    : edges(),
     compartment(nullptr),
     zone(nullptr),
     size(1)
@@ -181,11 +182,11 @@ class Concrete<FakeNode> : public Base
     return concreteTypeName;
   }
 
-  UniquePtr<EdgeRange> edges(JSContext* cx, bool wantNames) const override {
-    return UniquePtr<EdgeRange>(js_new<PreComputedEdgeRange>(cx, get().edges));
+  UniquePtr<EdgeRange> edges(JSRuntime*, bool) const override {
+    return UniquePtr<EdgeRange>(js_new<PreComputedEdgeRange>(get().edges));
   }
 
-  size_t size(mozilla::MallocSizeOf) const override {
+  Size size(mozilla::MallocSizeOf) const override {
     return get().size;
   }
 
@@ -220,7 +221,7 @@ void AddEdge(FakeNode& node, FakeNode& referent, const char16_t* edgeName = null
     ASSERT_NE(ownedEdgeName, nullptr);
   }
 
-  JS::ubi::SimpleEdge edge(ownedEdgeName, &referent);
+  JS::ubi::Edge edge(ownedEdgeName, &referent);
   ASSERT_TRUE(node.edges.append(mozilla::Move(edge)));
 }
 
@@ -232,8 +233,8 @@ void AddEdge(FakeNode& node, FakeNode& referent, const char16_t* edgeName = null
 namespace testing {
 
 // Ensure that given node has the expected number of edges.
-MATCHER_P2(EdgesLength, cx, expectedLength, "") {
-  auto edges = arg.edges(cx);
+MATCHER_P2(EdgesLength, rt, expectedLength, "") {
+  auto edges = arg.edges(rt);
   if (!edges)
     return false;
 
@@ -246,8 +247,8 @@ MATCHER_P2(EdgesLength, cx, expectedLength, "") {
 }
 
 // Get the nth edge and match it with the given matcher.
-MATCHER_P3(Edge, cx, n, matcher, "") {
-  auto edges = arg.edges(cx);
+MATCHER_P3(Edge, rt, n, matcher, "") {
+  auto edges = arg.edges(rt);
   if (!edges)
     return false;
 
@@ -267,6 +268,14 @@ MATCHER_P3(Edge, cx, n, matcher, "") {
 // Ensures that two char16_t* strings are equal.
 MATCHER_P(UTF16StrEq, str, "") {
   return NS_strcmp(arg, str) == 0;
+}
+
+MATCHER_P(UniqueUTF16StrEq, str, "") {
+  return NS_strcmp(arg.get(), str) == 0;
+}
+
+MATCHER(UniqueIsNull, "") {
+  return arg.get() == nullptr;
 }
 
 } // namespace testing

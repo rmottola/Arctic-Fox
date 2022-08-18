@@ -43,7 +43,6 @@ using ScriptVector = js::TraceableVector<JSScript*>;
 template <typename T> class AutoVectorRooter;
 template<typename K, typename V> class AutoHashMapRooter;
 template<typename T> class AutoHashSetRooter;
-template<typename T> class RootedGeneric;
 
 class MOZ_STACK_CLASS SourceBufferHolder;
 
@@ -83,7 +82,6 @@ using JS::AutoVectorRooter;
 typedef AutoVectorRooter<Value> AutoValueVector;
 typedef AutoVectorRooter<jsid> AutoIdVector;
 typedef AutoVectorRooter<JSObject*> AutoObjectVector;
-typedef AutoVectorRooter<JSScript*> AutoScriptVector;
 
 using JS::ValueVector;
 using JS::IdVector;
@@ -91,7 +89,6 @@ using JS::ScriptVector;
 
 using JS::AutoHashMapRooter;
 using JS::AutoHashSetRooter;
-using JS::RootedGeneric;
 
 using JS::CallArgs;
 using JS::CallNonGenericMethod;

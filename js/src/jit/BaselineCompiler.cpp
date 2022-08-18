@@ -6,6 +6,7 @@
 
 #include "jit/BaselineCompiler.h"
 
+#include "mozilla/Casting.h"
 #include "mozilla/UniquePtr.h"
 
 #include "jit/BaselineIC.h"
@@ -31,6 +32,8 @@
 
 using namespace js;
 using namespace js::jit;
+
+using mozilla::AssertedCast;
 
 BaselineCompiler::BaselineCompiler(JSContext* cx, TempAllocator& alloc, JSScript* script)
   : BaselineCompilerSpecific(cx, alloc, script),
@@ -91,6 +94,12 @@ BaselineCompiler::compile()
     if (!script->ensureHasTypes(cx) || !script->ensureHasAnalyzedArgsUsage(cx))
         return Method_Error;
 
+    // When a Debugger set the collectCoverageInfo flag, we recompile baseline
+    // scripts without entering the interpreter again. We have to create the
+    // ScriptCounts if they do not exist.
+    if (!script->hasScriptCounts() && cx->compartment()->collectCoverage())
+        script->initScriptCounts(cx);
+
     // Pin analysis info during compilation.
     AutoEnterAnalysis autoEnterAnalysis(cx);
 
@@ -109,12 +118,12 @@ BaselineCompiler::compile()
     if (!emitOutOfLinePostBarrierSlot())
         return Method_Error;
 
+    Linker linker(masm);
     if (masm.oom()) {
         ReportOutOfMemory(cx);
         return Method_Error;
     }
 
-    Linker linker(masm);
     AutoFlushICache afc("Baseline");
     JitCode* code = linker.newCode<CanGC>(cx, BASELINE_CODE);
     if (!code)
@@ -123,7 +132,7 @@ BaselineCompiler::compile()
     JSObject* templateScope = nullptr;
     if (script->functionNonDelazifying()) {
         RootedFunction fun(cx, script->functionNonDelazifying());
-        if (fun->isHeavyweight()) {
+        if (fun->needsCallObject()) {
             RootedScript scriptRoot(cx, script);
             templateScope = CallObject::createTemplateObject(cx, scriptRoot, gc::TenuredHeap);
             if (!templateScope)
@@ -630,13 +639,13 @@ BaselineCompiler::emitDebugPrologue()
     return true;
 }
 
-typedef bool (*StrictEvalPrologueFn)(JSContext*, BaselineFrame*);
-static const VMFunction StrictEvalPrologueInfo =
-    FunctionInfo<StrictEvalPrologueFn>(jit::StrictEvalPrologue);
+typedef bool (*InitStrictEvalScopeObjectsFn)(JSContext*, BaselineFrame*);
+static const VMFunction InitStrictEvalScopeObjectsInfo =
+    FunctionInfo<InitStrictEvalScopeObjectsFn>(jit::InitStrictEvalScopeObjects);
 
-typedef bool (*HeavyweightFunPrologueFn)(JSContext*, BaselineFrame*);
-static const VMFunction HeavyweightFunPrologueInfo =
-    FunctionInfo<HeavyweightFunPrologueFn>(jit::HeavyweightFunPrologue);
+typedef bool (*InitFunctionScopeObjectsFn)(JSContext*, BaselineFrame*);
+static const VMFunction InitFunctionScopeObjectsInfo =
+    FunctionInfo<InitFunctionScopeObjectsFn>(jit::InitFunctionScopeObjects);
 
 bool
 BaselineCompiler::initScopeChain()
@@ -648,7 +657,7 @@ BaselineCompiler::initScopeChain()
     RootedFunction fun(cx, function());
     if (fun) {
         // Use callee->environment as scope chain. Note that we do
-        // this also for heavy-weight functions, so that the scope
+        // this also for needsCallObject functions, so that the scope
         // chain slot is properly initialized if the call triggers GC.
         Register callee = R0.scratchReg();
         Register scope = R1.scratchReg();
@@ -656,16 +665,21 @@ BaselineCompiler::initScopeChain()
         masm.loadPtr(Address(callee, JSFunction::offsetOfEnvironment()), scope);
         masm.storePtr(scope, frame.addressOfScopeChain());
 
-        if (fun->isHeavyweight()) {
+        if (fun->needsCallObject()) {
             // Call into the VM to create a new call object.
             prepareVMCall();
 
             masm.loadBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
             pushArg(R0.scratchReg());
 
-            if (!callVMNonOp(HeavyweightFunPrologueInfo, phase))
+            if (!callVMNonOp(InitFunctionScopeObjectsInfo, phase))
                 return false;
         }
+    } else if (module()) {
+        // Modules use a pre-created scope object.
+        Register scope = R1.scratchReg();
+        masm.movePtr(ImmGCPtr(&module()->initialEnvironment()), scope);
+        masm.storePtr(scope, frame.addressOfScopeChain());
     } else {
         // ScopeChain pointer in BaselineFrame has already been initialized
         // in prologue.
@@ -677,7 +691,7 @@ BaselineCompiler::initScopeChain()
             masm.loadBaselineFramePtr(BaselineFrameReg, R0.scratchReg());
             pushArg(R0.scratchReg());
 
-            if (!callVMNonOp(StrictEvalPrologueInfo, phase))
+            if (!callVMNonOp(InitStrictEvalScopeObjectsInfo, phase))
                 return false;
         }
     }
@@ -1781,10 +1795,13 @@ BaselineCompiler::emit_JSOP_NEWARRAY()
 {
     frame.syncStack(0);
 
-    uint32_t length = GET_UINT24(pc);
+    uint32_t length = GET_UINT32(pc);
+    MOZ_ASSERT(length <= INT32_MAX,
+               "the bytecode emitter must fail to compile code that would "
+               "produce JSOP_NEWARRAY with a length exceeding int32_t range");
 
     // Pass length in R0.
-    masm.move32(Imm32(length), R0.scratchReg());
+    masm.move32(Imm32(AssertedCast<int32_t>(length)), R0.scratchReg());
 
     ObjectGroup* group = ObjectGroup::allocationSiteGroup(cx, script, pc, JSProto_Array);
     if (!group)
@@ -1838,7 +1855,12 @@ BaselineCompiler::emit_JSOP_INITELEM_ARRAY()
 
     // Load object in R0, index in R1.
     masm.loadValue(frame.addressOfStackValue(frame.peek(-2)), R0);
-    masm.moveValue(Int32Value(GET_UINT24(pc)), R1);
+    uint32_t index = GET_UINT32(pc);
+    MOZ_ASSERT(index <= INT32_MAX,
+               "the bytecode emitter must fail to compile code that would "
+               "produce JSOP_INITELEM_ARRAY with a length exceeding "
+               "int32_t range");
+    masm.moveValue(Int32Value(AssertedCast<int32_t>(index)), R1);
 
     // Call IC.
     ICSetElem_Fallback::Compiler stubCompiler(cx);

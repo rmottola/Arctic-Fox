@@ -2391,9 +2391,9 @@ TryAttachGetElemStub(JSContext* cx, JSScript* script, jsbytecode* pc, ICGetElem_
 
     // Check for ArgumentsObj[int] accesses
     if (obj->is<ArgumentsObject>() && rhs.isInt32()) {
-        ICGetElem_Arguments::Which which = ICGetElem_Arguments::Normal;
-        if (obj->is<StrictArgumentsObject>())
-            which = ICGetElem_Arguments::Strict;
+        ICGetElem_Arguments::Which which = ICGetElem_Arguments::Mapped;
+        if (obj->is<UnmappedArgumentsObject>())
+            which = ICGetElem_Arguments::Unmapped;
         if (!ArgumentsGetElemStubExists(stub, which)) {
             JitSpew(JitSpew_BaselineIC, "  Generating GetElem(ArgsObj[Int32]) stub");
             ICGetElem_Arguments::Compiler compiler(
@@ -3382,11 +3382,12 @@ ICGetElem_Arguments::Compiler::generateStubCode(MacroAssembler& masm)
         return true;
     }
 
-    MOZ_ASSERT(which_ == ICGetElem_Arguments::Strict ||
-               which_ == ICGetElem_Arguments::Normal);
+    MOZ_ASSERT(which_ == ICGetElem_Arguments::Mapped ||
+               which_ == ICGetElem_Arguments::Unmapped);
 
-    bool isStrict = which_ == ICGetElem_Arguments::Strict;
-    const Class* clasp = isStrict ? &StrictArgumentsObject::class_ : &NormalArgumentsObject::class_;
+    const Class* clasp = (which_ == ICGetElem_Arguments::Mapped)
+                         ? &MappedArgumentsObject::class_
+                         : &UnmappedArgumentsObject::class_;
 
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(2));
     Register scratchReg = regs.takeAny();
@@ -3705,7 +3706,11 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
         if (!InitElemOperation(cx, obj, index, rhs))
             return false;
     } else if (op == JSOP_INITELEM_ARRAY) {
-        MOZ_ASSERT(uint32_t(index.toInt32()) == GET_UINT24(pc));
+        MOZ_ASSERT(uint32_t(index.toInt32()) <= INT32_MAX,
+                   "the bytecode emitter must fail to compile code that would "
+                   "produce JSOP_INITELEM_ARRAY with an index exceeding "
+                   "int32_t range");
+        MOZ_ASSERT(uint32_t(index.toInt32()) == GET_UINT32(pc));
         if (!InitArrayElemOperation(cx, pc, obj, index.toInt32(), rhs))
             return false;
     } else if (op == JSOP_INITELEM_INC) {
@@ -5500,10 +5505,10 @@ TryAttachLengthStub(JSContext* cx, JSScript* script, ICGetProp_Fallback* stub, H
 
     if (obj->is<ArgumentsObject>() && res.isInt32()) {
         JitSpew(JitSpew_BaselineIC, "  Generating GetProp(ArgsObj.length %s) stub",
-                obj->is<StrictArgumentsObject>() ? "Strict" : "Normal");
-        ICGetProp_ArgumentsLength::Which which = ICGetProp_ArgumentsLength::Normal;
-        if (obj->is<StrictArgumentsObject>())
-            which = ICGetProp_ArgumentsLength::Strict;
+                obj->is<MappedArgumentsObject>() ? "Mapped" : "Unmapped");
+        ICGetProp_ArgumentsLength::Which which = ICGetProp_ArgumentsLength::Mapped;
+        if (obj->is<UnmappedArgumentsObject>())
+            which = ICGetProp_ArgumentsLength::Unmapped;
         ICGetProp_ArgumentsLength::Compiler compiler(cx, which);
         ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
         if (!newStub)
@@ -6971,11 +6976,12 @@ ICGetProp_ArgumentsLength::Compiler::generateStubCode(MacroAssembler& masm)
         EmitStubGuardFailure(masm);
         return true;
     }
-    MOZ_ASSERT(which_ == ICGetProp_ArgumentsLength::Strict ||
-               which_ == ICGetProp_ArgumentsLength::Normal);
+    MOZ_ASSERT(which_ == ICGetProp_ArgumentsLength::Mapped ||
+               which_ == ICGetProp_ArgumentsLength::Unmapped);
 
-    bool isStrict = which_ == ICGetProp_ArgumentsLength::Strict;
-    const Class* clasp = isStrict ? &StrictArgumentsObject::class_ : &NormalArgumentsObject::class_;
+    const Class* clasp = (which_ == ICGetProp_ArgumentsLength::Mapped)
+                         ? &MappedArgumentsObject::class_
+                         : &UnmappedArgumentsObject::class_;
 
     Register scratchReg = R1.scratchReg();
 
@@ -11136,10 +11142,17 @@ ICGetElem_NativePrototypeCallNative<T>::Clone(JSContext* cx,
                                               ICGetElem_NativePrototypeCallNative<T>& other)
 {
     return ICStub::New<ICGetElem_NativePrototypeCallNative<T>>(cx, space, other.jitCode(),
-                firstMonitorStub, other.receiverGuard(), other.key().unsafeGet(), other.accessType(),
+                firstMonitorStub, other.receiverGuard(), &other.key().get(), other.accessType(),
                 other.needsAtomize(), other.getter(), other.pcOffset_, other.holder(),
                 other.holderShape());
 }
+
+template ICGetElem_NativePrototypeCallNative<JS::Symbol*>*
+ICGetElem_NativePrototypeCallNative<JS::Symbol*>::Clone(JSContext*, ICStubSpace*, ICStub*,
+                                          ICGetElem_NativePrototypeCallNative<JS::Symbol*>&);
+template ICGetElem_NativePrototypeCallNative<js::PropertyName*>*
+ICGetElem_NativePrototypeCallNative<js::PropertyName*>::Clone(JSContext*, ICStubSpace*, ICStub*,
+                                          ICGetElem_NativePrototypeCallNative<js::PropertyName*>&);
 
 template <class T>
 /* static */ ICGetElem_NativePrototypeCallScripted<T>*
@@ -11149,10 +11162,17 @@ ICGetElem_NativePrototypeCallScripted<T>::Clone(JSContext* cx,
                                                 ICGetElem_NativePrototypeCallScripted<T>& other)
 {
     return ICStub::New<ICGetElem_NativePrototypeCallScripted<T>>(cx, space, other.jitCode(),
-                firstMonitorStub, other.receiverGuard(), other.key().unsafeGet(), other.accessType(),
+                firstMonitorStub, other.receiverGuard(), &other.key().get(), other.accessType(),
                 other.needsAtomize(), other.getter(), other.pcOffset_, other.holder(),
                 other.holderShape());
 }
+
+template ICGetElem_NativePrototypeCallScripted<JS::Symbol*>*
+ICGetElem_NativePrototypeCallScripted<JS::Symbol*>::Clone(JSContext*, ICStubSpace*, ICStub*,
+                                        ICGetElem_NativePrototypeCallScripted<JS::Symbol*>&);
+template ICGetElem_NativePrototypeCallScripted<js::PropertyName*>*
+ICGetElem_NativePrototypeCallScripted<js::PropertyName*>::Clone(JSContext*, ICStubSpace*, ICStub*,
+                                        ICGetElem_NativePrototypeCallScripted<js::PropertyName*>&);
 
 ICGetElem_Dense::ICGetElem_Dense(JitCode* stubCode, ICStub* firstMonitorStub, Shape* shape)
     : ICMonitoredStub(GetElem_Dense, stubCode, firstMonitorStub),

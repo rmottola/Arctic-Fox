@@ -185,7 +185,7 @@ using NewObjectMetadataState = mozilla::Variant<ImmediateMetadata,
                                                 DelayMetadata,
                                                 PendingMetadata>;
 
-class MOZ_STACK_CLASS AutoSetNewObjectMetadata : private JS::CustomAutoRooter
+class MOZ_RAII AutoSetNewObjectMetadata : private JS::CustomAutoRooter
 {
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER;
 
@@ -199,7 +199,7 @@ class MOZ_STACK_CLASS AutoSetNewObjectMetadata : private JS::CustomAutoRooter
     virtual void trace(JSTracer* trc) override {
         if (prevState_.is<PendingMetadata>()) {
             TraceRoot(trc,
-                      prevState_.as<PendingMetadata>().unsafeGet(),
+                      prevState_.as<PendingMetadata>().unsafeUnbarrieredForTracing(),
                       "Object pending metadata");
         }
     }
@@ -462,13 +462,15 @@ struct JSCompartment
         IsDebuggee = 1 << 0,
         DebuggerObservesAllExecution = 1 << 1,
         DebuggerObservesAsmJS = 1 << 2,
-        DebuggerNeedsDelazification = 1 << 3
+        DebuggerObservesCoverage = 1 << 3,
+        DebuggerNeedsDelazification = 1 << 4
     };
 
     unsigned                     debugModeBits;
 
     static const unsigned DebuggerObservesMask = IsDebuggee |
                                                  DebuggerObservesAllExecution |
+                                                 DebuggerObservesCoverage |
                                                  DebuggerObservesAsmJS;
 
     void updateDebuggerObservesFlag(unsigned flag);
@@ -648,6 +650,23 @@ struct JSCompartment
         updateDebuggerObservesFlag(DebuggerObservesAsmJS);
     }
 
+    // True if this compartment's global is a debuggee of some Debugger object
+    // whose collectCoverageInfo flag is true.
+    bool debuggerObservesCoverage() const {
+        static const unsigned Mask = DebuggerObservesCoverage;
+        return (debugModeBits & Mask) == Mask;
+    }
+    void updateDebuggerObservesCoverage();
+
+    // The code coverage can be enabled either for each compartment, with the
+    // Debugger API, or for the entire runtime.
+    bool collectCoverage() const {
+        return debuggerObservesCoverage() ||
+               runtimeFromAnyThread()->profilingScripts ||
+               runtimeFromAnyThread()->lcovOutput.isEnabled();
+    }
+    void clearScriptCounts();
+
     bool needsDelazificationForDebugger() const {
         return debugModeBits & DebuggerNeedsDelazification;
     }
@@ -696,8 +715,8 @@ struct JSCompartment
   private:
     js::jit::JitCompartment* jitCompartment_;
 
-    js::ReadBarriered<js::ArgumentsObject*> normalArgumentsTemplate_;
-    js::ReadBarriered<js::ArgumentsObject*> strictArgumentsTemplate_;
+    js::ReadBarriered<js::ArgumentsObject*> mappedArgumentsTemplate_;
+    js::ReadBarriered<js::ArgumentsObject*> unmappedArgumentsTemplate_;
 
   public:
     bool ensureJitCompartmentExists(JSContext* cx);
@@ -718,7 +737,7 @@ struct JSCompartment
         DeprecatedLanguageExtensionCount
     };
 
-    js::ArgumentsObject* getOrCreateArgumentsTemplateObject(JSContext* cx, bool strict);
+    js::ArgumentsObject* getOrCreateArgumentsTemplateObject(JSContext* cx, bool mapped);
 
   private:
     // Used for collecting telemetry on SpiderMonkey's deprecated language extensions.
@@ -728,6 +747,11 @@ struct JSCompartment
 
   public:
     void addTelemetry(const char* filename, DeprecatedLanguageExtension e);
+
+  public:
+    // Aggregated output used to collect JSScript hit counts when code coverage
+    // is enabled.
+    js::coverage::LCovCompartment lcovOutput;
 };
 
 inline bool
@@ -760,7 +784,7 @@ ExclusiveContext::global() const
     return Handle<GlobalObject*>::fromMarkedLocation(compartment_->global_.unsafeGet());
 }
 
-class AssertCompartmentUnchanged
+class MOZ_RAII AssertCompartmentUnchanged
 {
   public:
     explicit AssertCompartmentUnchanged(JSContext* cx
@@ -858,7 +882,7 @@ struct WrapperValue
     Value value;
 };
 
-class AutoWrapperVector : public JS::AutoVectorRooterBase<WrapperValue>
+class MOZ_RAII AutoWrapperVector : public JS::AutoVectorRooterBase<WrapperValue>
 {
   public:
     explicit AutoWrapperVector(JSContext* cx
@@ -871,7 +895,7 @@ class AutoWrapperVector : public JS::AutoVectorRooterBase<WrapperValue>
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 };
 
-class AutoWrapperRooter : private JS::AutoGCRooter {
+class MOZ_RAII AutoWrapperRooter : private JS::AutoGCRooter {
   public:
     AutoWrapperRooter(JSContext* cx, WrapperValue v
                       MOZ_GUARD_OBJECT_NOTIFIER_PARAM)

@@ -330,12 +330,6 @@ typedef bool
 typedef bool
 (* JSMayResolveOp)(const JSAtomState& names, jsid id, JSObject* maybeObj);
 
-// Convert obj to the given type, returning true with the resulting value in
-// *vp on success, and returning false on error or exception.
-typedef bool
-(* JSConvertOp)(JSContext* cx, JS::HandleObject obj, JSType type,
-                JS::MutableHandleValue vp);
-
 // Finalize obj, which the garbage collector has determined to be unreachable
 // from other live objects or from GC roots.  Obviously, finalizers must never
 // store a reference to obj.
@@ -470,7 +464,6 @@ typedef void
     JSEnumerateOp       enumerate;                                            \
     JSResolveOp         resolve;                                              \
     JSMayResolveOp      mayResolve;                                           \
-    JSConvertOp         convert;                                              \
     FinalizeOpType      finalize;                                             \
     JSNative            call;                                                 \
     JSHasInstanceOp     hasInstance;                                          \
@@ -650,8 +643,7 @@ struct JSClass {
                                                 // SetNewObjectMetadata itself
 #define JSCLASS_PRIVATE_IS_NSISUPPORTS  (1<<3)  // private is (nsISupports*)
 #define JSCLASS_IS_DOMJSCLASS           (1<<4)  // objects are DOM
-#define JSCLASS_IMPLEMENTS_BARRIERS     (1<<5)  // Correctly implements GC read
-                                                // and write barriers
+// Bit 5 is unused.
 #define JSCLASS_EMULATES_UNDEFINED      (1<<6)  // objects of this class act
                                                 // like the value undefined,
                                                 // in some contexts
@@ -704,7 +696,8 @@ struct JSClass {
 // the beginning of every global object's slots for use by the
 // application.
 #define JSCLASS_GLOBAL_APPLICATION_SLOTS 5
-#define JSCLASS_GLOBAL_SLOT_COUNT      (JSCLASS_GLOBAL_APPLICATION_SLOTS + JSProto_LIMIT * 3 + 35)
+#define JSCLASS_GLOBAL_SLOT_COUNT                                             \
+    (JSCLASS_GLOBAL_APPLICATION_SLOTS + JSProto_LIMIT * 3 + 36)
 #define JSCLASS_GLOBAL_FLAGS_WITH_SLOTS(n)                                    \
     (JSCLASS_IS_GLOBAL | JSCLASS_HAS_RESERVED_SLOTS(JSCLASS_GLOBAL_SLOT_COUNT + (n)))
 #define JSCLASS_GLOBAL_FLAGS                                                  \
@@ -797,8 +790,6 @@ static_assert(offsetof(JSClass, enumerate) == offsetof(Class, enumerate),
 static_assert(offsetof(JSClass, resolve) == offsetof(Class, resolve),
               "Class and JSClass must be consistent");
 static_assert(offsetof(JSClass, mayResolve) == offsetof(Class, mayResolve),
-              "Class and JSClass must be consistent");
-static_assert(offsetof(JSClass, convert) == offsetof(Class, convert),
               "Class and JSClass must be consistent");
 static_assert(offsetof(JSClass, finalize) == offsetof(Class, finalize),
               "Class and JSClass must be consistent");

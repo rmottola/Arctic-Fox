@@ -966,9 +966,10 @@ GetCachePageLocked(Simulator::ICacheMap& i_cache, void* page)
     if (p)
         return p->value();
 
+    AutoEnterOOMUnsafeRegion oomUnsafe;
     CachePage* new_page = js_new<CachePage>();
     if (!new_page || !i_cache.add(p, page, new_page))
-        CrashAtUnhandlableOOM("Simulator CachePage");
+        oomUnsafe.crash("Simulator CachePage");
 
     return new_page;
 }
@@ -1196,9 +1197,10 @@ class Redirection
             }
         }
 
+        AutoEnterOOMUnsafeRegion oomUnsafe;
         Redirection* redir = (Redirection*)js_malloc(sizeof(Redirection));
         if (!redir)
-            CrashAtUnhandlableOOM("Simulator redirection");
+            oomUnsafe.crash("Simulator redirection");
         new(redir) Redirection(nativeFunction, type, sim);
         return redir;
     }

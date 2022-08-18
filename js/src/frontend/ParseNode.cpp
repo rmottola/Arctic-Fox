@@ -13,6 +13,7 @@
 using namespace js;
 using namespace js::frontend;
 
+using mozilla::ArrayLength;
 using mozilla::IsFinite;
 
 #ifdef DEBUG
@@ -242,7 +243,6 @@ PushNodeChildren(ParseNode* pn, NodeStack* stack)
       case PNK_SPREAD:
       case PNK_MUTATEPROTO:
       case PNK_EXPORT:
-      case PNK_EXPORT_DEFAULT:
         return PushUnaryNodeChild(pn, stack);
 
       // Nodes with a single nullable child.
@@ -364,6 +364,15 @@ PushNodeChildren(ParseNode* pn, NodeStack* stack)
         MOZ_ASSERT(pn->pn_right->isKind(PNK_STRING));
         stack->pushList(pn->pn_left);
         stack->push(pn->pn_right);
+        return PushResult::Recyclable;
+      }
+
+      case PNK_EXPORT_DEFAULT: {
+        MOZ_ASSERT(pn->isArity(PN_BINARY));
+        MOZ_ASSERT_IF(pn->pn_right, pn->pn_right->isKind(PNK_NAME));
+        stack->push(pn->pn_left);
+        if (pn->pn_right)
+            stack->push(pn->pn_right);
         return PushResult::Recyclable;
       }
 
@@ -518,6 +527,7 @@ PushNodeChildren(ParseNode* pn, NodeStack* stack)
         return PushNameNodeChildren(pn, stack);
 
       case PNK_FUNCTION:
+      case PNK_MODULE:
         return PushCodeNodeChildren(pn, stack);
 
       case PNK_LIMIT: // invalid sentinel value
@@ -642,11 +652,19 @@ ParseNode::appendOrCreateList(ParseNodeKind kind, JSOp op, ParseNode* left, Pars
 const char*
 Definition::kindString(Kind kind)
 {
-    static const char * const table[] = {
-        "", js_var_str, js_const_str, js_const_str, js_let_str, "argument", js_function_str, "unknown"
+    static const char* const table[] = {
+        "",
+        js_var_str,
+        js_const_str,
+        js_const_str,
+        js_let_str,
+        "argument",
+        js_function_str,
+        "unknown",
+        js_import_str
     };
 
-    MOZ_ASSERT(unsigned(kind) <= unsigned(ARG));
+    MOZ_ASSERT(kind < ArrayLength(table));
     return table[kind];
 }
 
@@ -1150,6 +1168,13 @@ ObjectBox::asFunctionBox()
     return static_cast<FunctionBox*>(this);
 }
 
+ModuleBox*
+ObjectBox::asModuleBox()
+{
+    MOZ_ASSERT(isModuleBox());
+    return static_cast<ModuleBox*>(this);
+}
+
 void
 ObjectBox::trace(JSTracer* trc)
 {
@@ -1161,6 +1186,10 @@ ObjectBox::trace(JSTracer* trc)
             funbox->bindings.trace(trc);
             if (funbox->enclosingStaticScope_)
                 TraceRoot(trc, &funbox->enclosingStaticScope_, "funbox-enclosingStaticScope");
+        } else if (box->isModuleBox()) {
+            ModuleBox* modulebox = box->asModuleBox();
+            modulebox->bindings.trace(trc);
+            modulebox->exportNames.trace(trc);
         }
         box = box->traceLink;
     }

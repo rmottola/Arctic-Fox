@@ -1004,7 +1004,7 @@ AsmJSModuleObject_trace(JSTracer* trc, JSObject* obj)
 
 const Class AsmJSModuleObject::class_ = {
     "AsmJSModuleObject",
-    JSCLASS_IS_ANONYMOUS | JSCLASS_IMPLEMENTS_BARRIERS | JSCLASS_DELAY_METADATA_CALLBACK |
+    JSCLASS_IS_ANONYMOUS | JSCLASS_DELAY_METADATA_CALLBACK |
     JSCLASS_HAS_RESERVED_SLOTS(AsmJSModuleObject::RESERVED_SLOTS),
     nullptr, /* addProperty */
     nullptr, /* delProperty */
@@ -1013,7 +1013,6 @@ const Class AsmJSModuleObject::class_ = {
     nullptr, /* enumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
-    nullptr, /* convert */
     AsmJSModuleObject_finalize,
     nullptr, /* call */
     nullptr, /* hasInstance */

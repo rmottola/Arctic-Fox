@@ -51,6 +51,47 @@ enum State {
     COMPACT
 };
 
+// Expand the given macro D for each valid GC reference type.
+#define FOR_EACH_GC_POINTER_TYPE(D) \
+    D(AccessorShape*) \
+    D(BaseShape*) \
+    D(UnownedBaseShape*) \
+    D(jit::JitCode*) \
+    D(NativeObject*) \
+    D(ArrayObject*) \
+    D(ArgumentsObject*) \
+    D(ArrayBufferObject*) \
+    D(ArrayBufferObjectMaybeShared*) \
+    D(ArrayBufferViewObject*) \
+    D(DebugScopeObject*) \
+    D(GlobalObject*) \
+    D(JSObject*) \
+    D(JSFunction*) \
+    D(ModuleObject*) \
+    D(ModuleEnvironmentObject*) \
+    D(NestedScopeObject*) \
+    D(PlainObject*) \
+    D(SavedFrame*) \
+    D(ScopeObject*) \
+    D(ScriptSourceObject*) \
+    D(SharedArrayBufferObject*) \
+    D(SharedTypedArrayObject*) \
+    D(ImportEntryObject*) \
+    D(ExportEntryObject*) \
+    D(JSScript*) \
+    D(LazyScript*) \
+    D(Shape*) \
+    D(JSAtom*) \
+    D(JSString*) \
+    D(JSFlatString*) \
+    D(JSLinearString*) \
+    D(PropertyName*) \
+    D(JS::Symbol*) \
+    D(js::ObjectGroup*) \
+    D(Value) \
+    D(jsid) \
+    D(TaggedProto)
+
 /* Map from C++ type to alloc kind. JSObject does not have a 1:1 mapping, so must use Arena::thingSize. */
 template <typename T> struct MapTypeToFinalizeKind {};
 template <> struct MapTypeToFinalizeKind<JSScript>          { static const AllocKind kind = AllocKind::SCRIPT; };
@@ -172,7 +213,7 @@ GetGCObjectKind(size_t numSlots)
 
 /* As for GetGCObjectKind, but for dense array allocation. */
 static inline AllocKind
-GetGCArrayKind(size_t numSlots)
+GetGCArrayKind(size_t numElements)
 {
     /*
      * Dense arrays can use their fixed slots to hold their elements array
@@ -181,9 +222,12 @@ GetGCArrayKind(size_t numSlots)
      * unused.
      */
     JS_STATIC_ASSERT(ObjectElements::VALUES_PER_HEADER == 2);
-    if (numSlots > NativeObject::NELEMENTS_LIMIT || numSlots + 2 >= SLOTS_TO_THING_KIND_LIMIT)
+    if (numElements > NativeObject::MAX_DENSE_ELEMENTS_COUNT ||
+        numElements + ObjectElements::VALUES_PER_HEADER >= SLOTS_TO_THING_KIND_LIMIT)
+    {
         return AllocKind::OBJECT2;
-    return slotsToThingKind[numSlots + 2];
+    }
+    return slotsToThingKind[numElements + ObjectElements::VALUES_PER_HEADER];
 }
 
 static inline AllocKind
@@ -1186,7 +1230,7 @@ struct IsForwardedFunctor : public BoolDefaultAdaptor<Value, false> {
 inline bool
 IsForwarded(const JS::Value& value)
 {
-    return DispatchValueTyped(IsForwardedFunctor(), value);
+    return DispatchTyped(IsForwardedFunctor(), value);
 }
 
 template <typename T>
@@ -1200,14 +1244,14 @@ Forwarded(T* t)
 
 struct ForwardedFunctor : public IdentityDefaultAdaptor<Value> {
     template <typename T> inline Value operator()(T* t) {
-        return js::gc::RewrapValueOrId<Value, T*>::wrap(Forwarded(t));
+        return js::gc::RewrapTaggedPointer<Value, T*>::wrap(Forwarded(t));
     }
 };
 
 inline Value
 Forwarded(const JS::Value& value)
 {
-    return DispatchValueTyped(ForwardedFunctor(), value);
+    return DispatchTyped(ForwardedFunctor(), value);
 }
 
 template <typename T>
@@ -1243,7 +1287,7 @@ struct CheckValueAfterMovingGCFunctor : public VoidDefaultAdaptor<Value> {
 inline void
 CheckValueAfterMovingGC(const JS::Value& value)
 {
-    DispatchValueTyped(CheckValueAfterMovingGCFunctor(), value);
+    DispatchTyped(CheckValueAfterMovingGCFunctor(), value);
 }
 
 #endif // JSGC_HASH_TABLE_CHECKS
@@ -1297,7 +1341,7 @@ MaybeVerifyBarriers(JSContext* cx, bool always = false)
  * read the comment in vm/Runtime.h above |suppressGC| and take all appropriate
  * precautions before instantiating this class.
  */
-class AutoSuppressGC
+class MOZ_RAII AutoSuppressGC
 {
     int32_t& suppressGC_;
 
@@ -1347,24 +1391,22 @@ NewMemoryStatisticsObject(JSContext* cx);
 
 #ifdef DEBUG
 /* Use this to avoid assertions when manipulating the wrapper map. */
-class AutoDisableProxyCheck
+class MOZ_RAII AutoDisableProxyCheck
 {
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER;
     gc::GCRuntime& gc;
 
   public:
-    explicit AutoDisableProxyCheck(JSRuntime* rt
-                                   MOZ_GUARD_OBJECT_NOTIFIER_PARAM);
+    explicit AutoDisableProxyCheck(JSRuntime* rt);
     ~AutoDisableProxyCheck();
 };
 #else
-struct AutoDisableProxyCheck
+struct MOZ_RAII AutoDisableProxyCheck
 {
     explicit AutoDisableProxyCheck(JSRuntime* rt) {}
 };
 #endif
 
-struct AutoDisableCompactingGC
+struct MOZ_RAII AutoDisableCompactingGC
 {
     explicit AutoDisableCompactingGC(JSRuntime* rt);
     ~AutoDisableCompactingGC();

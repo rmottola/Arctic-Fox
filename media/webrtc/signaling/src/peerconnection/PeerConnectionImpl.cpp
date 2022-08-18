@@ -383,6 +383,7 @@ PeerConnectionImpl::PeerConnectionImpl(const GlobalObject* aGlobal)
   , mPrivacyRequested(false)
   , mSTSThread(nullptr)
   , mAllowIceLoopback(false)
+  , mAllowIceLinkLocal(false)
   , mMedia(nullptr)
   , mUuidGen(MakeUnique<PCUuidGenerator>())
   , mNumAudioStreams(0)
@@ -404,6 +405,8 @@ PeerConnectionImpl::PeerConnectionImpl(const GlobalObject* aGlobal)
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
   mAllowIceLoopback = Preferences::GetBool(
     "media.peerconnection.ice.loopback", false);
+  mAllowIceLinkLocal = Preferences::GetBool(
+    "media.peerconnection.ice.link_local", false);
 #endif
 }
 
@@ -489,6 +492,7 @@ PeerConnectionImpl::CreateRemoteSourceStreamInfo(nsRefPtr<RemoteSourceStreamInfo
   return NS_OK;
 }
 
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
 /**
  * In JS, an RTCConfiguration looks like this:
  *
@@ -496,28 +500,52 @@ PeerConnectionImpl::CreateRemoteSourceStreamInfo(nsRefPtr<RemoteSourceStreamInfo
  *                   { url:"turn:turn.example.org?transport=udp",
  *                     username: "jib", credential:"mypass"} ] }
  *
- * This function converts that into an internal IceConfiguration object.
+ * This function converts that into an internal PeerConnectionConfiguration
+ * object.
  */
 nsresult
-PeerConnectionImpl::ConvertRTCConfiguration(const RTCConfiguration& aSrc,
-                                            IceConfiguration *aDst)
+PeerConnectionConfiguration::Init(const RTCConfiguration& aSrc)
 {
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
   if (aSrc.mIceServers.WasPassed()) {
     for (size_t i = 0; i < aSrc.mIceServers.Value().Length(); i++) {
-      nsresult rv = AddIceServer(aSrc.mIceServers.Value()[i], aDst);
+      nsresult rv = AddIceServer(aSrc.mIceServers.Value()[i]);
       NS_ENSURE_SUCCESS(rv, rv);
     }
   }
-#endif
+
+  switch (aSrc.mBundlePolicy) {
+    case dom::RTCBundlePolicy::Balanced:
+      setBundlePolicy(kBundleBalanced);
+      break;
+    case dom::RTCBundlePolicy::Max_compat:
+      setBundlePolicy(kBundleMaxCompat);
+      break;
+    case dom::RTCBundlePolicy::Max_bundle:
+      setBundlePolicy(kBundleMaxBundle);
+      break;
+    default:
+      MOZ_CRASH();
+  }
+
+  switch (aSrc.mIceTransportPolicy) {
+    case dom::RTCIceTransportPolicy::None:
+      setIceTransportPolicy(NrIceCtx::ICE_POLICY_NONE);
+      break;
+    case dom::RTCIceTransportPolicy::Relay:
+      setIceTransportPolicy(NrIceCtx::ICE_POLICY_RELAY);
+      break;
+    case dom::RTCIceTransportPolicy::All:
+      setIceTransportPolicy(NrIceCtx::ICE_POLICY_ALL);
+      break;
+    default:
+      MOZ_CRASH();
+  }
   return NS_OK;
 }
 
 nsresult
-PeerConnectionImpl::AddIceServer(const RTCIceServer &aServer,
-                                 IceConfiguration *aDst)
+PeerConnectionConfiguration::AddIceServer(const RTCIceServer &aServer)
 {
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
   NS_ENSURE_STATE(aServer.mUrls.WasPassed());
   NS_ENSURE_STATE(aServer.mUrls.Value().IsStringSequence());
   auto &urls = aServer.mUrls.Value().GetAsStringSequence();
@@ -598,34 +626,32 @@ PeerConnectionImpl::AddIceServer(const RTCIceServer &aServer,
         continue;
       }
 
-      if (!aDst->addTurnServer(host.get(), port,
-                               username.get(),
-                               credential.get(),
-                               (transport.IsEmpty() ?
-                                kNrIceTransportUdp : transport.get()))) {
+      if (!addTurnServer(host.get(), port,
+                         username.get(),
+                         credential.get(),
+                         (transport.IsEmpty() ?
+                          kNrIceTransportUdp : transport.get()))) {
         return NS_ERROR_FAILURE;
       }
     } else {
-      if (!aDst->addStunServer(host.get(), port)) {
+      if (!addStunServer(host.get(), port, (transport.IsEmpty() ?
+                         kNrIceTransportUdp : transport.get()))) {
         return NS_ERROR_FAILURE;
       }
     }
   }
-#endif
   return NS_OK;
 }
+#endif
 
-NS_IMETHODIMP
+nsresult
 PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
                                nsGlobalWindow* aWindow,
-                               const IceConfiguration* aConfiguration,
-                               const RTCConfiguration* aRTCConfiguration,
+                               const PeerConnectionConfiguration& aConfiguration,
                                nsISupports* aThread)
 {
   nsresult res;
 
-  // Invariant: we receive configuration one way or the other but not both (XOR)
-  MOZ_ASSERT(!aConfiguration != !aRTCConfiguration);
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aThread);
   mThread = do_QueryInterface(aThread);
@@ -654,11 +680,6 @@ PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
   MOZ_ASSERT(aWindow);
   mWindow = aWindow;
   NS_ENSURE_STATE(mWindow);
-
-  if (!aRTCConfiguration->mPeerIdentity.IsEmpty()) {
-    mPeerIdentity = new PeerIdentity(aRTCConfiguration->mPeerIdentity);
-    mPrivacyRequested = true;
-  }
 #endif // MOZILLA_INTERNAL_API
 
   PRTime timestamp = PR_Now();
@@ -718,19 +739,7 @@ PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
   res = PeerConnectionCtx::InitializeGlobal(mThread, mSTSThread);
   NS_ENSURE_SUCCESS(res, res);
 
-
-  IceConfiguration converted;
-  if (aRTCConfiguration) {
-    res = ConvertRTCConfiguration(*aRTCConfiguration, &converted);
-    if (NS_FAILED(res)) {
-      CSFLogError(logTag, "%s: Invalid RTCConfiguration", __FUNCTION__);
-      return res;
-    }
-    aConfiguration = &converted;
-  }
-
   mMedia = new PeerConnectionMedia(this);
-  mMedia->SetAllowIceLoopback(mAllowIceLoopback);
 
   // Connect ICE slots.
   mMedia->SignalIceGatheringStateChange.connect(
@@ -746,8 +755,9 @@ PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
   mMedia->SignalCandidate.connect(this, &PeerConnectionImpl::CandidateReady);
 
   // Initialize the media object.
-  res = mMedia->Init(aConfiguration->getStunServers(),
-                     aConfiguration->getTurnServers());
+  res = mMedia->Init(aConfiguration.getStunServers(),
+                     aConfiguration.getTurnServers(),
+                     aConfiguration.getIceTransportPolicy());
   if (NS_FAILED(res)) {
     CSFLogError(logTag, "%s: Couldn't initialize media object", __FUNCTION__);
     return res;
@@ -793,8 +803,45 @@ PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
   }
 #endif
 
+  res = mJsepSession->SetBundlePolicy(aConfiguration.getBundlePolicy());
+  if (NS_FAILED(res)) {
+    CSFLogError(logTag, "%s: Couldn't set bundle policy, res=%u, error=%s",
+                        __FUNCTION__,
+                        static_cast<unsigned>(res),
+                        mJsepSession->GetLastError().c_str());
+    return res;
+  }
+
   return NS_OK;
 }
+
+#ifndef MOZILLA_EXTERNAL_LINKAGE
+void
+PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
+                               nsGlobalWindow& aWindow,
+                               const RTCConfiguration& aConfiguration,
+                               nsISupports* aThread,
+                               ErrorResult &rv)
+{
+  PeerConnectionConfiguration converted;
+  nsresult res = converted.Init(aConfiguration);
+  if (NS_FAILED(res)) {
+    CSFLogError(logTag, "%s: Invalid RTCConfiguration", __FUNCTION__);
+    rv.Throw(res);
+    return;
+  }
+
+  res = Initialize(aObserver, &aWindow, converted, aThread);
+  if (NS_FAILED(res)) {
+    rv.Throw(res);
+  }
+
+  if (!aConfiguration.mPeerIdentity.IsEmpty()) {
+    mPeerIdentity = new PeerIdentity(aConfiguration.mPeerIdentity);
+    mPrivacyRequested = true;
+  }
+}
+#endif
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
 void
@@ -2608,15 +2655,11 @@ PeerConnectionImpl::CandidateReady(const std::string& candidate,
                                    uint16_t level) {
   PC_AUTO_ENTER_API_CALL_VOID_RETURN(false);
 
-  // TODO: What about mid? Is this something that we will choose, or will
-  // JsepSession choose for us? If the latter, we'll need to make it an
-  // outparam or something. Bug 1051052.
   std::string mid;
-
   bool skipped = false;
   nsresult res = mJsepSession->AddLocalIceCandidate(candidate,
-                                                    mid,
                                                     level,
+                                                    &mid,
                                                     &skipped);
 
   if (NS_FAILED(res)) {
@@ -2628,6 +2671,7 @@ PeerConnectionImpl::CandidateReady(const std::string& candidate,
                         candidate.c_str(),
                         static_cast<unsigned>(level),
                         errorString.c_str());
+    return;
   }
 
   if (skipped) {

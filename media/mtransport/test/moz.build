@@ -5,9 +5,10 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 if CONFIG['OS_TARGET'] != 'WINNT' and CONFIG['MOZ_WIDGET_TOOLKIT'] != 'gonk':
-    GeckoCppUnitTests([
+    CppUnitTests([
         'buffered_stun_socket_unittest',
         'ice_unittest',
+        'multi_tcp_socket_unittest',
         'nrappkit_unittest',
         'proxy_tunnel_socket_unittest',
         'rlogringbuffer_unittest',
@@ -21,11 +22,11 @@ if CONFIG['OS_TARGET'] != 'WINNT' and CONFIG['MOZ_WIDGET_TOOLKIT'] != 'gonk':
     ])
 
     if CONFIG['MOZ_SCTP']:
-        GeckoCppUnitTests([
+        CppUnitTests([
             'sctp_unittest',
         ])
 
-for var in ('HAVE_STRDUP', 'NR_SOCKET_IS_VOID_PTR', 'SCTP_DEBUG', 'INET'):
+for var in ('MOZILLA_INTERNAL_API', 'MOZILLA_XPCOMRT_API', 'MOZILLA_EXTERNAL_LINKAGE', 'HAVE_STRDUP', 'NR_SOCKET_IS_VOID_PTR', 'SCTP_DEBUG', 'INET'):
     DEFINES[var] = True
 
 if CONFIG['OS_TARGET'] == 'Android':
