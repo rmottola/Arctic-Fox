@@ -211,7 +211,8 @@ BrowserElementParent.prototype = {
       "got-set-audio-channel-volume": this._gotDOMRequestResult,
       "got-audio-channel-muted": this._gotDOMRequestResult,
       "got-set-audio-channel-muted": this._gotDOMRequestResult,
-      "got-is-audio-channel-active": this._gotDOMRequestResult
+      "got-is-audio-channel-active": this._gotDOMRequestResult,
+      "got-structured-data": this._gotDOMRequestResult
     };
 
     let mmSecuritySensitiveCalls = {
@@ -1029,6 +1030,8 @@ BrowserElementParent.prototype = {
     return this._sendDOMRequest('get-is-audio-channel-active',
                                 {audioChannel: aAudioChannel});
   },
+
+  getStructuredData: defineDOMRequestMethod('get-structured-data'),
 
   /**
    * Called when the visibility of the window which owns this iframe changes.
