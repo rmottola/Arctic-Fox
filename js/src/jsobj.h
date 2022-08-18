@@ -173,7 +173,7 @@ class JSObject : public js::gc::Cell
                                    js::HandleObjectGroup group);
 
     // Set the shape of an object. This pointer is valid for native objects and
-    // some non-native objects. After creating an object, tobjects for which
+    // some non-native objects. After creating an object, the objects for which
     // the shape pointer is invalid need to overwrite this pointer before a GC
     // can occur.
     inline void setInitialShapeMaybeNonNative(js::Shape* shape);
