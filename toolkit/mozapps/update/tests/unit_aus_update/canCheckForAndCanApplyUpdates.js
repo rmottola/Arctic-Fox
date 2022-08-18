@@ -11,9 +11,9 @@ function run_test() {
   let testFile = getCurrentProcessDir();
   testFile.append("update_write_access_test");
   testFile.create(Ci.nsIFile.NORMAL_FILE_TYPE, PERMS_FILE);
-  do_check_true(testFile.exists());
+  Assert.ok(testFile.exists(), MSG_SHOULD_EXIST);
   testFile.remove(false);
-  do_check_false(testFile.exists());
+  Assert.ok(!testFile.exists(), MSG_SHOULD_NOT_EXIST);
 
   standardInit();
 

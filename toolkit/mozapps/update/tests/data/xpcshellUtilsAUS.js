@@ -51,6 +51,11 @@ const ERR_BACKUP_DISCARD = "backup_discard: unable to remove";
 
 const LOG_SVC_SUCCESSFUL_LAUNCH = "Process was started... waiting on result.";
 
+// Typical end of a message when calling assert
+const MSG_SHOULD_EQUAL = " should equal the expected value";
+const MSG_SHOULD_EXIST = "the file or directory should exist";
+const MSG_SHOULD_NOT_EXIST = "the file or directory should not exist";
+
 // All we care about is that the last modified time has changed so that Mac OS
 // X Launch Services invalidates its cache so the test allows up to one minute
 // difference in the last modified time.
@@ -750,7 +755,7 @@ function setupTestCommon() {
       }
       do_throw("The parallel run of this test failed. Failing non-parallel " +
                "test so the log from the parallel run can be displayed in " +
-               "non-parallel log.")
+               "non-parallel log.");
     } else {
       gRealDump = dump;
       dump = dumpOverride;
@@ -1006,6 +1011,56 @@ function preventDistributionFiles() {
   });
 }
 
+/**
+ * On Mac OS X this sets the last modified time for the app bundle directory to
+ * a date in the past to test that the last modified time is updated when an
+ * update has been successfully applied (bug 600098).
+ */
+function setAppBundleModTime() {
+  if (!IS_MACOSX) {
+    return;
+  }
+  let now = Date.now();
+  let yesterday = now - (1000 * 60 * 60 * 24);
+  let applyToDir = getApplyDirFile();
+  applyToDir.lastModifiedTime = yesterday;
+}
+
+/**
+ * On Mac OS X this checks that the last modified time for the app bundle
+ * directory has been updated when an update has been successfully applied
+ * (bug 600098).
+ */
+function checkAppBundleModTime() {
+  if (!IS_MACOSX) {
+    return;
+  }
+  let now = Date.now();
+  let applyToDir = getApplyDirFile();
+  let timeDiff = Math.abs(applyToDir.lastModifiedTime - now);
+  Assert.ok(timeDiff < MAC_MAX_TIME_DIFFERENCE,
+            "the last modified time on the apply to directory should " +
+            "change after a successful update");
+}
+
+/**
+ * On Mac OS X and Windows this checks if the post update '.running' file exists
+ * to determine if the post update binary was launched.
+ *
+ * @param   aShouldExist
+ *          Whether the post update '.running' file should exist.
+ */
+function checkPostUpdateRunningFile(aShouldExist) {
+  if (!IS_WIN && !IS_MACOSX) {
+    return;
+  }
+  let postUpdateRunningFile = getPostUpdateFile(".running");
+  if (aShouldExist) {
+    Assert.ok(postUpdateRunningFile.exists(), MSG_SHOULD_EXIST);
+  } else {
+    Assert.ok(!postUpdateRunningFile.exists(), MSG_SHOULD_NOT_EXIST);
+  }
+}
 
 /**
  * Initializes the most commonly used settings and creates an instance of the
@@ -2069,7 +2124,8 @@ function runUpdateUsingService(aInitialStatus, aExpectedStatus, aCheckSvcLog) {
   writeStatusFile(aInitialStatus);
 
   // sanity check
-  do_check_eq(readStatusState(), aInitialStatus);
+  Assert.equal(readStatusState(), aInitialStatus,
+               "the update status state" + MSG_SHOULD_EQUAL);
 
   writeVersionFile(DEFAULT_UPDATE_VERSION);
 
@@ -2089,9 +2145,9 @@ function runUpdateUsingService(aInitialStatus, aExpectedStatus, aCheckSvcLog) {
 
   let updater = getTestDirFile(FILE_UPDATER_BIN);
   if (!updater.exists()) {
-    do_throw("Unable to find updater binary!");
+    do_throw("Unable to find the updater binary!");
   }
-  let testBinDir = getGREBinDir()
+  let testBinDir = getGREBinDir();
   updater.copyToFollowingLinks(testBinDir, updater.leafName);
   updater.copyToFollowingLinks(updatesDir, updater.leafName);
 
@@ -2315,8 +2371,8 @@ function setupUpdaterTest(aMarFile) {
         writeFile(testFile, aTestFile.originalContents);
       }
 
-      // Skip these tests on Windows and OS/2 since their
-      // implementaions of chmod doesn't really set permissions.
+      // Skip these tests on Windows since chmod doesn't really set permissions
+      // on Windows.
       if (!IS_WIN && aTestFile.originalPerms) {
         testFile.permissions = aTestFile.originalPerms;
         // Store the actual permissions on the file for reference later after
@@ -2533,13 +2589,15 @@ function checkUpdateLogContents(aCompareLogFile, aExcludeDistributionDir) {
     // xpcshell tests won't display the entire contents so log the incorrect
     // line.
     for (let i = 0; i < aryLog.length; ++i) {
-      if (aryCompare[i] != aryLog[i]) {
-        logTestInfo("the first incorrect line in the log is: " + aryLog[i]);
-        do_check_eq(aryCompare[i], aryLog[i]);
+      if (aryLog[i] != aryCompare[i]) {
+        logTestInfo("the first incorrect line in the update log is: " +
+                    aryLog[i]);
+        Assert.equal(aryLog[i], aryCompare[i],
+                     "the update log contents" + MSG_SHOULD_EQUAL);
       }
     }
     // This should never happen!
-    do_throw("Unable to find incorrect log contents!");
+    do_throw("Unable to find incorrect update log contents!");
   }
 }
 
@@ -2820,7 +2878,8 @@ function checkFilesAfterUpdateCommon(aGetFileFunc, aStageDirExists,
   let entries = updatesDir.QueryInterface(Ci.nsIFile).directoryEntries;
   while (entries.hasMoreElements()) {
     let entry = entries.getNext().QueryInterface(Ci.nsIFile);
-    do_check_neq(getFileExtension(entry), "patch");
+    Assert.notEqual(getFileExtension(entry), "patch",
+                    "the file's extension should not equal patch");
   }
 }
 
@@ -2892,7 +2951,8 @@ function checkPostUpdateAppLog() {
   // It is possible for the log file contents check to occur before the log file
   // contents are completely written so wait until the contents are the expected
   // value. If the contents are never the expected value then the test will
-  // fail by timing out.
+  // fail by timing out after gTimeoutRuns is greater than MAX_TIMEOUT_RUNS or
+  // the test harness times out the test.
   if (logContents != "post-update\n") {
     if (gTimeoutRuns > MAX_TIMEOUT_RUNS) {
       do_throw("Exceeded MAX_TIMEOUT_RUNS while waiting for the post update " +
@@ -2915,7 +2975,8 @@ function checkPostUpdateAppLog() {
  * the callback application.
  */
 function checkCallbackServiceLog() {
-  do_check_neq(gServiceLaunchedCallbackLog, null);
+  Assert.ok(!!gServiceLaunchedCallbackLog,
+            "gServiceLaunchedCallbackLog should be defined");
 
   let expectedLogContents = gServiceLaunchedCallbackArgs.join("\n") + "\n";
   let logFile = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsILocalFile);
@@ -2993,7 +3054,8 @@ function waitForFilesInUse() {
  *          An nsIFile to check if it has moz-backup for its extension.
  */
 function checkForBackupFiles(aFile) {
-  do_check_neq(getFileExtension(aFile), "moz-backup");
+  Assert.notEqual(getFileExtension(aFile), "moz-backup",
+                  "the file's extension should not equal moz-backup");
 }
 
 /**
@@ -3229,7 +3291,7 @@ function start_httpserver() {
  *          The callback to call after stopping the http server.
  */
 function stop_httpserver(aCallback) {
-  do_check_true(!!aCallback);
+  Assert.ok(!!aCallback, "the aCallback parameter should be defined");
   gTestserver.stop(aCallback);
 }
 
