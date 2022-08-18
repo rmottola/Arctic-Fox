@@ -1085,7 +1085,6 @@ AudioManager::AppendProfileToVolumeSetting(const char* aName, AudioOutputProfile
   return topic;
 }
 
-
 void
 AudioManager::InitVolumeFromDatabase()
 {
