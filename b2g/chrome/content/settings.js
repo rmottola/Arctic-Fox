@@ -214,11 +214,19 @@ let LogShake;
   LogShake.init();
 })();
 
-SettingsListener.observe('devtools.logshake', false, value => {
+SettingsListener.observe('devtools.logshake.enabled', false, value => {
   if (value) {
     LogShake.enableDeviceMotionListener();
   } else {
     LogShake.disableDeviceMotionListener();
+  }
+});
+
+SettingsListener.observe('devtools.logshake.qa_enabled', false, value => {
+  if (value) {
+    LogShake.enableQAMode();
+  } else {
+    LogShake.disableQAMode();
   }
 });
 #endif
