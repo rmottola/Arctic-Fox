@@ -153,7 +153,9 @@ const SERVICE_ERRORS = [SERVICE_UPDATER_COULD_NOT_BE_STARTED,
                         SERVICE_UPDATER_NOT_FIXED_DRIVE,
                         SERVICE_COULD_NOT_LOCK_UPDATER,
                         SERVICE_INSTALLDIR_ERROR,
-                        SERVICE_COULD_NOT_COPY_UPDATER];
+                        SERVICE_COULD_NOT_COPY_UPDATER,
+                        SERVICE_STILL_APPLYING_TERMINATED,
+                        SERVICE_STILL_APPLYING_NO_EXIT_CODE];
 
 // Error codes 80 through 99 are reserved for nsUpdateService.js and are not
 // defined in common/errors.h
