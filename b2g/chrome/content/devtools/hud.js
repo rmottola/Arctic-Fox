@@ -744,9 +744,24 @@ var performanceEntriesWatcher = {
   _fronts: new Map(),
   _appLaunchName: null,
   _appLaunchStartTime: null,
+  _supported: [
+    'contentInteractive',
+    'navigationInteractive',
+    'navigationLoaded',
+    'visuallyLoaded',
+    'fullyLoaded',
+    'mediaEnumerated',
+    'scanEnd'
+  ],
 
   init(client) {
     this._client = client;
+    let setting = 'devtools.telemetry.supported_performance_marks';
+    let defaultValue = this._supported.join(',');
+
+    SettingsListener.observe(setting, defaultValue, supported => {
+      this._supported = supported.split(',');
+    });
   },
 
   trackTarget(target) {
