@@ -107,6 +107,10 @@ var developerHUD = {
     SettingsListener.observe('hud.logging', this._logging, enabled => {
       this._logging = enabled;
     });
+
+    SettingsListener.observe('debug.performance_data.advanced_telemetry', this._telemetry, enabled => {
+      this._telemetry = enabled;
+    });
   },
 
   uninit: function dwp_uninit() {
@@ -186,12 +190,23 @@ var developerHUD = {
  * metrics, and how to notify the front-end when metrics have changed.
  */
 function Target(frame, actor) {
-  this.frame = frame;
+  this._frame = frame;
   this.actor = actor;
   this.metrics = new Map();
 }
 
 Target.prototype = {
+
+  get frame() {
+    let frame = this._frame;
+    let systemapp = document.querySelector('#systemapp');
+
+    return (frame === systemapp ? getContentWindow() : frame);
+  },
+
+  get manifest() {
+    return this._frame.appManifestURL;
+  },
 
   /**
    * Register a metric that can later be updated. Does not update the front-end.
@@ -220,7 +235,7 @@ Target.prototype = {
 
     let data = {
       metrics: [], // FIXME(Bug 982066) Remove this field.
-      manifest: this.frame.appManifestURL,
+      manifest: this.manifest,
       metric: metric,
       message: message
     };
@@ -235,6 +250,7 @@ Target.prototype = {
     if (message) {
       developerHUD.log('[' + data.manifest + '] ' + data.message);
     }
+
     this._send(data);
   },
 
@@ -268,14 +284,33 @@ Target.prototype = {
   _send: function target_send(data) {
     let frame = this.frame;
 
-    let systemapp = document.querySelector('#systemapp');
-    if (this.frame === systemapp) {
-      frame = getContentWindow();
+    shell.sendEvent(frame, 'developer-hud-update', Cu.cloneInto(data, frame));
+    this._sendTelemetryEvent(data.metric);
+  },
+
+  _sendTelemetryEvent: function target_sendTelemetryEvent(metric) {
+    if (!developerHUD._telemetry || !metric || metric.skipTelemetry) {
+      return;
     }
 
-    shell.sendEvent(frame, 'developer-hud-update', Cu.cloneInto(data, frame));
-  }
+    if (!this.appName) {
+      let manifest = this.manifest;
+      if (!manifest) {
+        return;
+      }
+      let start = manifest.indexOf('/') + 2;
+      let end = manifest.indexOf('.', start);
+      this.appName = manifest.substring(start, end).toLowerCase();
+    }
 
+    metric.appName = this.appName;
+
+    let data = { metric: metric };
+    let frame = this.frame;
+
+    telemetryDebug('sending advanced-telemetry-update with this data: ' + JSON.stringify(data));
+    shell.sendEvent(frame, 'advanced-telemetry-update', Cu.cloneInto(data, frame));
+  }
 };
 
 
@@ -376,6 +411,18 @@ let consoleWatcher = {
 
         if (this._security.indexOf(pageError.category) > -1) {
           metric.name = 'security';
+
+          // Telemetry sends the security error category not the
+          // count of security errors.
+          target._sendTelemetryEvent({
+            name: 'security',
+            value: pageError.category,
+          });
+
+          // Indicate that the 'hud' security metric (the count of security
+          // errors) should not be sent as a telemetry metric since the
+          // security error category is being sent instead.
+          metric.skipTelemetry = true;
         }
 
         let {errorMessage, sourceName, category, lineNumber, columnNumber} = pageError;
@@ -406,9 +453,22 @@ let consoleWatcher = {
             metric.name = 'info';
             break;
 
+          case 'info':
+            this.handleTelemetryMessage(target, packet);
+
+            // Currently, informational log entries are tracked only by
+            // advanced telemetry. Nonetheless, for consistency, we
+            // continue here and let the function return normally, when it
+            // concludes 'info' entries are not being watched.
+            metric.name = 'info';
+            break;
+
           default:
             return;
         }
+
+        // Telemetry also records reflow duration.
+        target._sendTelemetryEvent({name: 'reflow-duration', value: Math.round(duration)});
         break;
 
       case 'reflowActivity':
@@ -469,6 +529,49 @@ let consoleWatcher = {
       ', ' + source + ':' + sourceLine;
 
     return source;
+  },
+
+  handleTelemetryMessage:
+    function cw_handleTelemetryMessage(target, packet) {
+
+    if (!developerHUD._telemetry) {
+      return;
+    }
+
+    // If this is a 'telemetry' log entry, create a telemetry metric from
+    // the log content.
+    let separator = '|';
+    let logContent = packet.message.arguments.toString();
+
+    if (logContent.indexOf('telemetry') < 0) {
+      return;
+    }
+
+    let telemetryData = logContent.split(separator);
+
+    // Positions of the components of a telemetry log entry.
+    let TELEMETRY_IDENTIFIER_IDX = 0;
+    let NAME_IDX = 1;
+    let VALUE_IDX = 2;
+    let CONTEXT_IDX = 3;
+
+    if (telemetryData[TELEMETRY_IDENTIFIER_IDX] != 'telemetry' ||
+        telemetryData.length < 3 || telemetryData.length > 4) {
+      return;
+    }
+
+    let metric = {
+      name: telemetryData[NAME_IDX],
+      value: telemetryData[VALUE_IDX]
+    };
+
+    // The metric's app name, if a 'context' was provided, is the
+    // specified context appended to the specified app name.
+    if (telemetryData.length === 4) {
+      metric.context = telemetryData[CONTEXT_IDX];
+    }
+
+    target._sendTelemetryEvent(metric);
   }
 };
 developerHUD.registerWatcher(consoleWatcher);
