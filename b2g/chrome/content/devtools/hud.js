@@ -68,11 +68,11 @@ var developerHUD = {
    * observed metrics with `target.register(metric)`, and keep them up-to-date
    * with `target.update(metric, message)` when necessary.
    */
-  registerWatcher: function dwp_registerWatcher(watcher) {
+  registerWatcher(watcher) {
     this._watchers.unshift(watcher);
   },
 
-  init: function dwp_init() {
+  init() {
     if (this._client) {
       return;
     }
@@ -113,7 +113,7 @@ var developerHUD = {
     });
   },
 
-  uninit: function dwp_uninit() {
+  uninit() {
     if (!this._client) {
       return;
     }
@@ -132,7 +132,7 @@ var developerHUD = {
    * This method will ask all registered watchers to track and update metrics
    * on an app frame.
    */
-  trackFrame: function dwp_trackFrame(frame) {
+  trackFrame(frame) {
     if (this._targets.has(frame)) {
       return;
     }
@@ -147,7 +147,7 @@ var developerHUD = {
     });
   },
 
-  untrackFrame: function dwp_untrackFrame(frame) {
+  untrackFrame(frame) {
     let target = this._targets.get(frame);
     if (target) {
       for (let w of this._watchers) {
@@ -159,7 +159,7 @@ var developerHUD = {
     }
   },
 
-  onFrameCreated: function (frame, isFirstAppFrame) {
+  onFrameCreated(frame, isFirstAppFrame) {
     let mozapp = frame.getAttribute('mozapp');
     if (!mozapp) {
       return;
@@ -167,7 +167,7 @@ var developerHUD = {
     this.trackFrame(frame);
   },
 
-  onFrameDestroyed: function (frame, isLastAppFrame) {
+  onFrameDestroyed(frame, isLastAppFrame) {
     let mozapp = frame.getAttribute('mozapp');
     if (!mozapp) {
       return;
@@ -175,7 +175,7 @@ var developerHUD = {
     this.untrackFrame(frame);
   },
 
-  log: function dwp_log(message) {
+  log(message) {
     if (this._logging) {
       dump(DEVELOPER_HUD_LOG_PREFIX + ': ' + message + '\n');
     }
@@ -276,37 +276,97 @@ Target.prototype = {
    * Tear everything down, including the front-end by sending a message without
    * widgets.
    */
-  destroy: function target_destroy() {
+  destroy() {
     delete this.metrics;
-    this._send({});
+    this._send({metric: {skipTelemetry: true}});
   },
 
-  _send: function target_send(data) {
+  _send(data) {
     let frame = this.frame;
 
     shell.sendEvent(frame, 'developer-hud-update', Cu.cloneInto(data, frame));
-    this._sendTelemetryEvent(data.metric);
+    this._logHistogram(data.metric);
   },
 
-  _sendTelemetryEvent: function target_sendTelemetryEvent(metric) {
-    if (!developerHUD._telemetry || !metric || metric.skipTelemetry) {
+  _getAddonHistogram(item) {
+    let APPNAME_IDX = 3;
+    let HISTNAME_IDX = 4;
+
+    let array = item.split('_');
+    let appName = array[APPNAME_IDX].toUpperCase();
+    let histName = array[HISTNAME_IDX].toUpperCase();
+    return Services.telemetry.getAddonHistogram(appName,
+      CUSTOM_HISTOGRAM_PREFIX + histName);
+  },
+
+  _clearTelemetryData() {
+    developerHUD._histograms.forEach(function(item) {
+      Services.telemetry.getKeyedHistogramById(item).clear();
+    });
+
+    developerHUD._customHistograms.forEach(item => {
+      this._getAddonHistogram(item).clear();
+    });
+  },
+
+  _sendTelemetryData() {
+    if (!developerHUD._telemetry) {
+      return;
+    }
+    telemetryDebug('calling sendTelemetryData');
+    let frame = this.frame;
+    let payload = {
+      keyedHistograms: {},
+      addonHistograms: {}
+    };
+    // Package the hud histograms.
+    developerHUD._histograms.forEach(function(item) {
+      payload.keyedHistograms[item] =
+        Services.telemetry.getKeyedHistogramById(item).snapshot();
+    });
+    // Package the registered hud custom histograms
+    developerHUD._customHistograms.forEach(item => {
+      payload.addonHistograms[item] = this._getAddonHistogram(item).snapshot();
+    });
+
+    shell.sendEvent(frame, 'advanced-telemetry-update', Cu.cloneInto(payload, frame));
+  },
+
+  _logHistogram(metric) {
+    if (!developerHUD._telemetry || metric.skipTelemetry) {
       return;
     }
 
-    if (!this.appName) {
-      let manifest = this.manifest;
-      if (!manifest) {
-        return;
-      }
-      let start = manifest.indexOf('/') + 2;
-      let end = manifest.indexOf('.', start);
-      this.appName = manifest.substring(start, end).toLowerCase();
+    metric.appName = this.appName;
+    if (!metric.appName) {
+      return;
     }
 
-    metric.appName = this.appName;
-
-    let data = { metric: metric };
-    let frame = this.frame;
+    let metricName = metric.name.toUpperCase();
+    let metricAppName = metric.appName.toUpperCase();
+    if (!metric.custom) {
+      let keyedMetricName = 'DEVTOOLS_HUD_' + metricName;
+      try {
+        let keyed = Services.telemetry.getKeyedHistogramById(keyedMetricName);
+        if (keyed) {
+          keyed.add(metric.appName, parseInt(metric.value, 10));
+          developerHUD._histograms.add(keyedMetricName);
+          telemetryDebug(keyedMetricName, metric.value, metric.appName);
+        }
+      } catch(err) {
+        console.error('Histogram error is metricname added to histograms.json:'
+          + keyedMetricName);
+      }
+    } else {
+      let histogramName = CUSTOM_HISTOGRAM_PREFIX + metricAppName + '_'
+        + metricName;
+      // This is a call to add a value to an existing histogram.
+      if (typeof metric.value !== 'undefined') {
+        Services.telemetry.getAddonHistogram(metricAppName,
+          CUSTOM_HISTOGRAM_PREFIX + metricName).add(parseInt(metric.value, 10));
+        telemetryDebug(histogramName, metric.value);
+        return;
+      }
 
     telemetryDebug('sending advanced-telemetry-update with this data: ' + JSON.stringify(data));
     shell.sendEvent(frame, 'advanced-telemetry-update', Cu.cloneInto(data, frame));
@@ -318,7 +378,7 @@ Target.prototype = {
  * The Console Watcher tracks the following metrics in apps: reflows, warnings,
  * and errors, with security errors reported separately.
  */
-let consoleWatcher = {
+var consoleWatcher = {
 
   _client: null,
   _targets: new Map(),
@@ -339,7 +399,7 @@ let consoleWatcher = {
     'CORS'
   ],
 
-  init: function cw_init(client) {
+  init(client) {
     this._client = client;
     this.consoleListener = this.consoleListener.bind(this);
 
@@ -366,7 +426,7 @@ let consoleWatcher = {
     client.addListener('reflowActivity', this.consoleListener);
   },
 
-  trackTarget: function cw_trackTarget(target) {
+  trackTarget(target) {
     target.register('reflows');
     target.register('warnings');
     target.register('errors');
@@ -381,7 +441,7 @@ let consoleWatcher = {
     });
   },
 
-  untrackTarget: function cw_untrackTarget(target) {
+  untrackTarget(target) {
     this._client.request({
       to: target.actor.consoleActor,
       type: 'stopListeners',
@@ -391,7 +451,7 @@ let consoleWatcher = {
     this._targets.delete(target.actor.consoleActor);
   },
 
-  consoleListener: function cw_consoleListener(type, packet) {
+  consoleListener(type, packet) {
     let target = this._targets.get(packet.from);
     let metric = {};
     let output = '';
@@ -414,9 +474,9 @@ let consoleWatcher = {
 
           // Telemetry sends the security error category not the
           // count of security errors.
-          target._sendTelemetryEvent({
-            name: 'security',
-            value: pageError.category,
+          target._logHistogram({
+            name: 'security_category',
+            value: pageError.category
           });
 
           // Indicate that the 'hud' security metric (the count of security
