@@ -296,7 +296,7 @@ Target.prototype = {
    * Void a metric value and make sure it isn't displayed on the front-end
    * anymore.
    */
-  clear: function target_clear(metric) {
+  clear(metric) {
     metric.value = 0;
     this.update(metric);
   },
@@ -561,22 +561,9 @@ var consoleWatcher = {
             metric.name = 'info';
             break;
 
-          case 'info':
-            this.handleTelemetryMessage(target, packet);
-
-            // Currently, informational log entries are tracked only by
-            // advanced telemetry. Nonetheless, for consistency, we
-            // continue here and let the function return normally, when it
-            // concludes 'info' entries are not being watched.
-            metric.name = 'info';
-            break;
-
           default:
             return;
         }
-
-        // Telemetry also records reflow duration.
-        target._sendTelemetryEvent({name: 'reflow-duration', value: Math.round(duration)});
         break;
 
       case 'reflowActivity':
@@ -627,7 +614,7 @@ var consoleWatcher = {
     target.bump(metric, output);
   },
 
-  formatSourceURL: function cw_formatSourceURL(packet) {
+  formatSourceURL(packet) {
     // Abbreviate source URL
     let source = WebConsoleUtils.abbreviateSourceURL(packet.sourceURL);
 
@@ -639,9 +626,7 @@ var consoleWatcher = {
     return source;
   },
 
-  handleTelemetryMessage:
-    function cw_handleTelemetryMessage(target, packet) {
-
+  handleTelemetryMessage(target, packet) {
     if (!developerHUD._telemetry) {
       return;
     }
