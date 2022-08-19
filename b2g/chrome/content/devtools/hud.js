@@ -193,6 +193,7 @@ function Target(frame, actor) {
   this._frame = frame;
   this.actor = actor;
   this.metrics = new Map();
+  this._appName = null;
 }
 
 Target.prototype = {
@@ -206,6 +207,42 @@ Target.prototype = {
 
   get manifest() {
     return this._frame.appManifestURL;
+  },
+
+
+  get appName() {
+
+    if (this._appName) {
+      return this._appName;
+    }
+
+    let manifest = this.manifest;
+    if (!manifest) {
+      let msg = DEVELOPER_HUD_LOG_PREFIX + ': Unable to determine app for telemetry metric. src: ' +
+                this.frame.src;
+      console.error(msg);
+      return null;
+    }
+
+    // "communications" apps are a special case
+    if (manifest.indexOf('communications') === -1) {
+      let start = manifest.indexOf('/') + 2;
+      let end = manifest.indexOf('.', start);
+      this._appName = manifest.substring(start, end).toLowerCase();
+    } else {
+      let src = this.frame.src;
+      if (src) {
+        // e.g., `app://communications.gaiamobile.org/contacts/index.html`
+        let parts = src.split('/');
+        let APP = 3;
+        let EXPECTED_PARTS_LENGTH = 5;
+        if (parts.length === EXPECTED_PARTS_LENGTH) {
+          this._appName = parts[APP];
+        }
+      }
+    }
+
+    return this._appName;
   },
 
   /**
