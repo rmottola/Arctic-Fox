@@ -209,7 +209,6 @@ Target.prototype = {
     return this._frame.appManifestURL;
   },
 
-
   get appName() {
 
     if (this._appName) {
