@@ -105,29 +105,25 @@
 - Bug 1208385 part 1 - Store a pointer to the owning animation on each ¿ 
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - Bug 1214508: SharedStubs - Part 1: Move the getprop stubs in to share
-- Bug 1158111 - "Add caching and control updating tab offset values in 
 - Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or
 - Bug 1257650 - 2016-03-19 Skip Security checks if triggeringPrincipal is System
 - Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
 - Bug 1226909 multipart AsyncOpen2 
 - Bug 1213646: Allow URI_IS_UI_RESOURCE and safe about: URIs when SEC_A
 - 1185106 - at least part 0 to 4 for TFF
+- Check completeness of Bug 1216401: Eviscerate nsIDOMWindow
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
 - Bug 1182571 - 2015-10-19 Fix nsILoadInfo->GetContentPolicyType API to be less am
 - Bug 1170958 - 2015-09-30 - Allow MediaInputPort to lock to a specific input track
 - Bug 1191148 - Don't count fullscreen request handled if we don't chanyesy
 - Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
 - Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
-- Bug 901633
 - 1203427
-- Bug 1155618 - Fix more out of memory handling issues r=terrence 
 - Bug 1193583 - 2015-08-31 Change the semantics of Debugger.evalInGlobal
-- Bug 1131470 - Part 3, 4, 5
 - Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
 - Bug 1192130 - Part 1: Add MOZ_NON_AUTOABLE to restrict using auto in
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
-- Bug 1178961 - Restore the std::string fix from bug 1167230 r=BenWa 
 - Bug 1169268 - Don't crash when pasting files. r=ndeakin
 - Bug 1202085 2015-10-26 - Part 0 to 6
 - Bug 1188643 2015-09-30 - Buffer more audio in audio capture mode to avoid glitche
@@ -137,9 +133,13 @@
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
 - bug 1181823 - convert test_ev_certs.js, test_keysize_ev.js, a
-- Bug 1202902 - 2015-07-15 - Mass replace toplevel 'let' with 'var' in preparation f
 - 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1242578
+-  missing bits of Bug 1207245 - part 1 - move RefCounted<T>
+
+JS - breaks:
+Bug 1212183 - Fix DOM getter optimizations in the JITs. (r=jandem)
+https://bugzilla.mozilla.org/show_bug.cgi?id=589199
 
 
 impacting download and shutdown:
