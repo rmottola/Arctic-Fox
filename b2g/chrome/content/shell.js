@@ -88,7 +88,13 @@ var shell = {
 
   get CrashSubmit() {
     delete this.CrashSubmit;
+#ifdef MOZ_CRASHREPORTER
+    Cu.import("resource://gre/modules/CrashSubmit.jsm", this);
+    return this.CrashSubmit;
+#else
+    dump('Crash reporter : disabled at build time.');
     return this.CrashSubmit = null;
+#endif
   },
 
   onlineForCrashReport: function shell_onlineForCrashReport() {
@@ -588,7 +594,7 @@ var shell = {
         // TODO: We should get the `isActive` state from evt.isActive.
         // Then we don't need to do `channel.isActive()` here.
         channel.isActive().onsuccess = function(evt) {
-          this.sendChromeEvent({
+          SystemAppProxy._sendCustomEvent('mozSystemWindowChromeEvent', {
             type: 'system-audiochannel-state-changed',
             name: channel.name,
             isActive: evt.target.result
