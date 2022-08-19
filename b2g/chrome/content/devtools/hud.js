@@ -211,7 +211,7 @@ Target.prototype = {
   /**
    * Register a metric that can later be updated. Does not update the front-end.
    */
-  register: function target_register(metric) {
+  register(metric) {
     this.metrics.set(metric, 0);
   },
 
@@ -219,7 +219,7 @@ Target.prototype = {
    * Modify one of a target's metrics, and send out an event to notify relevant
    * parties (e.g. the developer HUD, automated tests, etc).
    */
-  update: function target_update(metric, message) {
+  update(metric, message) {
     if (!metric.name) {
       throw new Error('Missing metric.name');
     }
@@ -258,7 +258,7 @@ Target.prototype = {
    * Nicer way to call update() when the metric value is a number that needs
    * to be incremented.
    */
-  bump: function target_bump(metric, message) {
+  bump(metric, message) {
     metric.value = (this.metrics.get(metric.name) || 0) + 1;
     this.update(metric, message);
   },
@@ -368,8 +368,27 @@ Target.prototype = {
         return;
       }
 
-    telemetryDebug('sending advanced-telemetry-update with this data: ' + JSON.stringify(data));
-    shell.sendEvent(frame, 'advanced-telemetry-update', Cu.cloneInto(data, frame));
+      // The histogram already exists and are not adding data to it.
+      if (developerHUD._customHistograms.has(histogramName)) {
+        return;
+      }
+
+      // This is a call to create a new histogram.
+      try {
+        let metricType = parseInt(metric.type, 10);
+        if (metricType === Services.telemetry.HISTOGRAM_COUNT) {
+          Services.telemetry.registerAddonHistogram(metricAppName,
+            CUSTOM_HISTOGRAM_PREFIX + metricName, metricType);
+        } else {
+          Services.telemetry.registerAddonHistogram(metricAppName,
+            CUSTOM_HISTOGRAM_PREFIX + metricName, metricType, metric.min,
+            metric.max, metric.buckets);
+        }
+        developerHUD._customHistograms.add(histogramName);
+      } catch (err) {
+        console.error('Histogram error: ' + err);
+      }
+    }
   }
 };
 
@@ -613,25 +632,43 @@ var consoleWatcher = {
     let TELEMETRY_IDENTIFIER_IDX = 0;
     let NAME_IDX = 1;
     let VALUE_IDX = 2;
-    let CONTEXT_IDX = 3;
+    let TYPE_IDX = 2;
+    let MIN_IDX = 3;
+    let MAX_IDX = 4;
+    let BUCKETS_IDX = 5;
+    let MAX_CUSTOM_ARGS = 6;
+    let MIN_CUSTOM_ARGS = 3;
 
     if (telemetryData[TELEMETRY_IDENTIFIER_IDX] != 'telemetry' ||
-        telemetryData.length < 3 || telemetryData.length > 4) {
+        telemetryData.length < MIN_CUSTOM_ARGS ||
+        telemetryData.length > MAX_CUSTOM_ARGS) {
       return;
     }
 
     let metric = {
-      name: telemetryData[NAME_IDX],
-      value: telemetryData[VALUE_IDX]
+      name: telemetryData[NAME_IDX]
     };
 
-    // The metric's app name, if a 'context' was provided, is the
-    // specified context appended to the specified app name.
-    if (telemetryData.length === 4) {
-      metric.context = telemetryData[CONTEXT_IDX];
+    if (metric.name === 'MGMT') {
+      metric.value = telemetryData[VALUE_IDX];
+      if (metric.value === 'TIMETOSHIP') {
+        telemetryDebug('Received a Ship event');
+        target._sendTelemetryData();
+      } else if (metric.value === 'CLEARMETRICS') {
+        target._clearTelemetryData();
+      }
+    } else {
+      if (telemetryData.length === MIN_CUSTOM_ARGS) {
+        metric.value = telemetryData[VALUE_IDX];
+      } else if (telemetryData.length === MAX_CUSTOM_ARGS) {
+        metric.type = telemetryData[TYPE_IDX];
+        metric.min = telemetryData[MIN_IDX];
+        metric.max = telemetryData[MAX_IDX];
+        metric.buckets = telemetryData[BUCKETS_IDX];
+      }
+      metric.custom = true;
+      target._logHistogram(metric);
     }
-
-    target._sendTelemetryEvent(metric);
   }
 };
 developerHUD.registerWatcher(consoleWatcher);
@@ -642,13 +679,13 @@ var eventLoopLagWatcher = {
   _fronts: new Map(),
   _active: false,
 
-  init: function(client) {
+  init(client) {
     this._client = client;
 
     SettingsListener.observe('hud.jank', false, this.settingsListener.bind(this));
   },
 
-  settingsListener: function(value) {
+  settingsListener(value) {
     if (this._active == value) {
       return;
     }
@@ -667,7 +704,7 @@ var eventLoopLagWatcher = {
     }
   },
 
-  trackTarget: function(target) {
+  trackTarget(target) {
     target.register('jank');
 
     let front = new EventLoopLagFront(this._client, target.actor);
@@ -682,7 +719,7 @@ var eventLoopLagWatcher = {
     }
   },
 
-  untrackTarget: function(target) {
+  untrackTarget(target) {
     let fronts = this._fronts;
     if (fronts.has(target)) {
       fronts.get(target).destroy();
@@ -808,7 +845,7 @@ var memoryWatcher = {
   },
   _active: false,
 
-  init: function mw_init(client) {
+  init(client) {
     this._client = client;
     let watching = this._watching;
 
@@ -821,7 +858,7 @@ var memoryWatcher = {
     }
   },
 
-  update: function mw_update() {
+  update() {
     let watching = this._watching;
     let active = watching.appmemory || watching.uss;
 
@@ -885,7 +922,7 @@ var memoryWatcher = {
     this._timers.set(target, timer);
   },
 
-  formatMemory: function mw_formatMemory(bytes) {
+  formatMemory(bytes) {
     var prefix = ['','K','M','G','T','P','E','Z','Y'];
     var i = 0;
     for (; bytes > 1024 && i < prefix.length; ++i) {
@@ -894,7 +931,7 @@ var memoryWatcher = {
     return (Math.round(bytes * 100) / 100) + ' ' + prefix[i] + 'B';
   },
 
-  trackTarget: function mw_trackTarget(target) {
+  trackTarget(target) {
     target.register('uss');
     target.register('memory');
     this._fronts.set(target, MemoryFront(this._client, target.actor));
@@ -903,7 +940,7 @@ var memoryWatcher = {
     }
   },
 
-  untrackTarget: function mw_untrackTarget(target) {
+  untrackTarget(target) {
     let front = this._fronts.get(target);
     if (front) {
       front.destroy();
