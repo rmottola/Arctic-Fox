@@ -68,6 +68,12 @@
       <richlistbox id="login-fill-list"/>
     </vbox>
 
+#ifdef E10S_TESTING_ONLY
+    <popupnotification id="enable-e10s-notification" hidden="true">
+      <popupnotificationcontent orient="vertical"/>
+    </popupnotification>
+#endif
+
     <popupnotification id="addon-progress-notification" hidden="true">
       <popupnotificationcontent orient="vertical">
         <progressmeter id="addon-progress-notification-progressmeter"/>
