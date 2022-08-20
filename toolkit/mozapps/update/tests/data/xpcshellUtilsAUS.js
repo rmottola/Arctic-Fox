@@ -1521,16 +1521,16 @@ function unlockDirectory(aDir) {
 function runUpdate(aExpectedExitValue, aExpectedStatus, aCallback) {
   // Copy the updater binary to the updates directory.
   let binDir = gGREBinDirOrig.clone();
-  let updater = binDir.clone();
-  updater.append("updater.app");
+  let updater = getTestDirFile("updater.app", true);
   if (!updater.exists()) {
     updater = getTestDirFile(FILE_UPDATER_BIN);
     if (!updater.exists()) {
-      do_throw("Unable to find updater binary!");
+      do_throw("Unable to find the updater binary!");
     }
   }
+  Assert.ok(updater.exists(), MSG_SHOULD_EXIST);
 
-   let updatesDir = getUpdatesPatchDir();
+  let updatesDir = getUpdatesPatchDir();
   let updateBin;
   if (IS_WIN) {
     updateBin = updater.clone();
