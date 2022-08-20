@@ -8,7 +8,7 @@
  * This singleton represents the whole 'New Tab Page' and takes care of
  * initializing all its components.
  */
-let gPage = {
+var gPage = {
   /**
    * Initializes the page.
    */
@@ -100,7 +100,7 @@ let gPage = {
    */
   _updateAttributes: function Page_updateAttributes(aValue) {
     // Set the nodes' states.
-    let nodeSelector = "#newtab-scrollbox, #newtab-toggle, #newtab-grid, #newtab-search-container";
+    let nodeSelector = "#newtab-grid, #newtab-search-container";
     for (let node of document.querySelectorAll(nodeSelector)) {
       if (aValue)
         node.removeAttribute("page-disabled");
@@ -111,7 +111,7 @@ let gPage = {
     // Enables/disables the control and link elements.
     let inputSelector = ".newtab-control, .newtab-link";
     for (let input of document.querySelectorAll(inputSelector)) {
-      if (aValue) 
+      if (aValue)
         input.removeAttribute("tabindex");
       else
         input.setAttribute("tabindex", "-1");

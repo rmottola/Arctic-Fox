@@ -2,26 +2,36 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-input[type=button] {
-  cursor: pointer;
+html {
+  width: 100%;
+  height: 100%;
 }
 
-/* SCROLLBOX */
-#newtab-scrollbox {
+body {
+  font: message-box;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  background-color: #F9F9F9;
   display: -moz-box;
   position: relative;
   -moz-box-flex: 1;
   -moz-user-focus: normal;
 }
 
-#newtab-scrollbox:not([page-disabled]) {
-  overflow: auto;
+input {
+  font: message-box !important;
+  font-size: 16px !important;
+}
+
+input[type=button] {
+  cursor: pointer;
 }
 
 /* UNDO */
 #newtab-undo-container {
   transition: opacity 100ms ease-out;
-  display: -moz-box;
   -moz-box-align: center;
   -moz-box-pack: center;
 }
@@ -38,7 +48,7 @@ input[type=button] {
   right: 12px;
 }
 
-#newtab-toggle:-moz-locale-dir(rtl) {
+#newtab-toggle:-moz-dir(rtl) {
   left: 12px;
   right: auto;
 }
@@ -193,13 +203,13 @@ input[type=button] {
   }
 }
 
-.newtab-control-pin:-moz-locale-dir(ltr),
-.newtab-control-block:-moz-locale-dir(rtl) {
+.newtab-control-pin:-moz-dir(ltr),
+.newtab-control-block:-moz-dir(rtl) {
   left: 4px;
 }
 
-.newtab-control-block:-moz-locale-dir(ltr),
-.newtab-control-pin:-moz-locale-dir(rtl) {
+.newtab-control-block:-moz-dir(ltr),
+.newtab-control-pin:-moz-dir(rtl) {
   right: 4px;
 }
 
