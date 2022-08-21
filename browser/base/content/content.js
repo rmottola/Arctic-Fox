@@ -239,7 +239,7 @@ Cc["@mozilla.org/eventlistenerservice;1"]
   .getService(Ci.nsIEventListenerService)
   .addSystemEventListener(global, "contextmenu", handleContentContextMenu, false);
 
-let AboutNetErrorListener = {
+var AboutNetErrorListener = {
   init: function(chromeGlobal) {
     chromeGlobal.addEventListener('AboutNetErrorLoad', this, false, true);
     chromeGlobal.addEventListener('AboutNetErrorSetAutomatic', this, false, true);
@@ -354,7 +354,8 @@ let AboutNetErrorListener = {
 
 AboutNetErrorListener.init(this);
 
-let ClickEventHandler = {
+
+var ClickEventHandler = {
   init: function init() {
     Cc["@mozilla.org/eventlistenerservice;1"]
       .getService(Ci.nsIEventListenerService)

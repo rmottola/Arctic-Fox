@@ -25,7 +25,7 @@ Cu.import("resource://gre/modules/Services.jsm");
  */
 const HANG_EXPIRATION_TIME = 10000;
 
-let ProcessHangMonitor = {
+var ProcessHangMonitor = {
   /**
    * Collection of hang reports that haven't expired or been dismissed
    * by the user. The keys are nsIHangReports and values keys are
