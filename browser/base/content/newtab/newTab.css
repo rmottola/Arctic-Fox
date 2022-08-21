@@ -127,7 +127,9 @@ input[type=button] {
 /* CELLS */
 .newtab-cell {
   display: -moz-box;
-  -moz-box-flex: 1;
+  height: 210px;
+  margin: 20px 10px 35px;
+  width: 290px;
 }
 
 /* SITES */
