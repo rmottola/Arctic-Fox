@@ -50,13 +50,19 @@ Site.prototype = {
   /**
    * Pins the site on its current or a given index.
    * @param aIndex The pinned index (optional).
+   * @return true if link changed type after pin
    */
   pin: function Site_pin(aIndex) {
     if (typeof aIndex == "undefined")
       aIndex = this.cell.index;
 
     this._updateAttributes(true);
-    gPinnedLinks.pin(this._link, aIndex);
+    let changed = gPinnedLinks.pin(this._link, aIndex);
+    if (changed) {
+      // render site again to remove suggested/sponsored tags
+      this._render();
+    }
+    return changed;
   },
 
   /**
