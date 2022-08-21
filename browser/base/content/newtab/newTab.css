@@ -160,17 +160,6 @@ input[type=button] {
   bottom: 0;
 }
 
-.newtab-thumbnail {
-  opacity: .8;
-  transition: opacity 100ms ease-out;
-}
-
-.newtab-thumbnail[dragged],
-.newtab-link:-moz-focusring > .newtab-thumbnail,
-.newtab-site:hover > .newtab-link > .newtab-thumbnail {
-  opacity: 1;
-}
-
 /* TITLES */
 .newtab-sponsored,
 .newtab-title,
