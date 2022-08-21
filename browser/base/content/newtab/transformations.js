@@ -156,7 +156,7 @@ var gTransformation = {
       finish();
     } else {
       this.setSitePosition(aSite, targetPosition);
-      this._whenTransitionEnded(aSite.node, finish);
+      this._whenTransitionEnded(aSite.node, ["left", "top"], finish);
     }
   },
 
@@ -179,38 +179,42 @@ var gTransformation = {
       if (!aSite || aSite == gDrag.draggedSite)
         return;
 
-      let deferred = Promise.defer();
-      batch.push(deferred.promise);
-      let cb = function () deferred.resolve();
-
-      if (!cells[aIndex])
-        // The site disappeared from the grid, hide it.
-        this.hideSite(aSite, cb);
-      else if (this._getNodeOpacity(aSite.node) != 1)
-        // The site disappeared before but is now back, show it.
-        this.showSite(aSite, cb);
-      else
-        // The site's position has changed, move it around.
-        this._moveSite(aSite, aIndex, {unfreeze: unfreeze, callback: cb});
+      batch.push(new Promise(resolve => {
+        if (!cells[aIndex]) {
+          // The site disappeared from the grid, hide it.
+          this.hideSite(aSite, resolve);
+        } else if (this._getNodeOpacity(aSite.node) != 1) {
+          // The site disappeared before but is now back, show it.
+          this.showSite(aSite, resolve);
+        } else {
+          // The site's position has changed, move it around.
+          this._moveSite(aSite, aIndex, {unfreeze: unfreeze, callback: resolve});
+        }
+      }));
     }, this);
 
-    let wait = Promise.promised(function () callback && callback());
-    wait.apply(null, batch);
+    if (callback) {
+      Promise.all(batch).then(callback);
+    }
   },
 
   /**
    * Listens for the 'transitionend' event on a given node and calls the given
    * callback.
    * @param aNode The node that is transitioned.
+   * @param aProperties The properties we'll wait to be transitioned.
    * @param aCallback The callback to call when finished.
    */
   _whenTransitionEnded:
-    function Transformation_whenTransitionEnded(aNode, aCallback) {
+    function Transformation_whenTransitionEnded(aNode, aProperties, aCallback) {
 
-    aNode.addEventListener("transitionend", function onEnd() {
-      aNode.removeEventListener("transitionend", onEnd, false);
-      aCallback();
-    }, false);
+    let props = new Set(aProperties);
+    aNode.addEventListener("transitionend", function onEnd(e) {
+      if (props.has(e.propertyName)) {
+        aNode.removeEventListener("transitionend", onEnd);
+        aCallback();
+      }
+    });
   },
 
   /**
@@ -236,8 +240,9 @@ var gTransformation = {
       if (aCallback)
         aCallback();
     } else {
-      if (aCallback)
-        this._whenTransitionEnded(aNode, aCallback);
+      if (aCallback) {
+        this._whenTransitionEnded(aNode, ["opacity"], aCallback);
+      }
 
       aNode.style.opacity = aOpacity;
     }
