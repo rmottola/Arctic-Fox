@@ -1933,8 +1933,8 @@ JS_PropertyStub(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                 JS::MutableHandleValue vp);
 
 extern JS_PUBLIC_API(bool)
-JS_StrictPropertyStub(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
-                      JS::MutableHandleValue vp, JS::ObjectOpResult &result);
+JS_StrictPropertyStub(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+                      JS::MutableHandleValue vp, JS::ObjectOpResult& result);
 
 template<typename T>
 struct JSConstScalarSpec {
