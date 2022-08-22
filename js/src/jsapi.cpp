@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+ * vim: set ts=8 sts=4 et sw=4 tw=99:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -2936,10 +2937,10 @@ JS_GetOwnPropertyDescriptorById(JSContext* cx, HandleObject obj, HandleId id,
 }
 
 JS_PUBLIC_API(bool)
-JS_GetOwnUCPropertyDescriptor(JSContext* cx, HandleObject obj, const char16_t* name,
-                              MutableHandle<JSPropertyDescriptor> desc)
+JS_GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, const char* name,
+                            MutableHandle<JSPropertyDescriptor> desc)
 {
-    JSAtom* atom = AtomizeChars(cx, name, js_strlen(name));
+    JSAtom* atom = Atomize(cx, name, strlen(name));
     if (!atom)
         return false;
     RootedId id(cx, AtomToId(atom));
@@ -2947,10 +2948,10 @@ JS_GetOwnUCPropertyDescriptor(JSContext* cx, HandleObject obj, const char16_t* n
 }
 
 JS_PUBLIC_API(bool)
-JS_GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, const char* name,
-                            MutableHandle<JSPropertyDescriptor> desc)
+JS_GetOwnUCPropertyDescriptor(JSContext* cx, HandleObject obj, const char16_t* name,
+                              MutableHandle<JSPropertyDescriptor> desc)
 {
-    JSAtom* atom = Atomize(cx, name, strlen(name));
+    JSAtom* atom = AtomizeChars(cx, name, js_strlen(name));
     if (!atom)
         return false;
     RootedId id(cx, AtomToId(atom));
