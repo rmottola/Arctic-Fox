@@ -2188,6 +2188,12 @@ ComputeRadialGradientLine(nsPresContext* aPresContext,
 }
 
 
+
+static float Interpolate(float aF1, float aF2, float aFrac)
+{
+  return aF1 + aFrac * (aF2 - aF1);
+}
+
 // Returns aFrac*aC2 + (1 - aFrac)*C1. The interpolation is done
 // in unpremultiplied space, which is what SVG gradients and cairo
 // gradients expect.
@@ -2346,6 +2352,77 @@ static void ResolveMidpoints(nsTArray<ColorStop>& stops)
 
     stops.ReplaceElementsAt(x, 1, newStops, 9);
     x += 9;
+  }
+}
+
+static gfxRGBA
+Premultiply(const gfxRGBA& aColor)
+{
+  gfxFloat a = aColor.a;
+  return gfxRGBA(aColor.r * a, aColor.g * a, aColor.b * a, a);
+}
+
+static gfxRGBA
+Unpremultiply(const gfxRGBA& aColor)
+{
+  gfxFloat a = aColor.a;
+  return (a > 0.0) ? gfxRGBA(aColor.r / a, aColor.g / a, aColor.b / a, a) : aColor;
+}
+
+static gfxRGBA
+TransparentColor(gfxRGBA aColor) {
+  aColor.a = 0;
+  return aColor;
+}
+
+// Adjusts and adds color stops in such a way that drawing the gradient with
+// unpremultiplied interpolation looks nearly the same as if it were drawn with
+// premultiplied interpolation.
+static const float kAlphaIncrementPerGradientStep = 0.1f;
+static void
+ResolvePremultipliedAlpha(nsTArray<ColorStop>& aStops)
+{
+  for (size_t x = 1; x < aStops.Length(); x++) {
+    const ColorStop leftStop = aStops[x - 1];
+    const ColorStop rightStop = aStops[x];
+
+    // if the left and right stop have the same alpha value, we don't need
+    // to do anything
+    if (leftStop.mColor.a == rightStop.mColor.a) {
+      continue;
+    }
+
+    // Is the stop on the left 100% transparent? If so, have it adopt the color
+    // of the right stop
+    if (leftStop.mColor.a == 0) {
+      aStops[x - 1].mColor = TransparentColor(rightStop.mColor);
+      continue;
+    }
+
+    // Is the stop on the right completely transparent?
+    // If so, duplicate it and assign it the color on the left.
+    if (rightStop.mColor.a == 0) {
+      ColorStop newStop = rightStop;
+      newStop.mColor = TransparentColor(leftStop.mColor);
+      aStops.InsertElementAt(x, newStop);
+      x++;
+      continue;
+    }
+
+    // Now handle cases where one or both of the stops are partially transparent.
+    if (leftStop.mColor.a != 1.0f || rightStop.mColor.a != 1.0f) {
+      gfxRGBA premulLeftColor = Premultiply(leftStop.mColor);
+      gfxRGBA premulRightColor = Premultiply(rightStop.mColor);
+      // Calculate how many extra steps. We do a step per 10% transparency.
+      size_t stepCount = NSToIntFloor(fabs(leftStop.mColor.a - rightStop.mColor.a) / kAlphaIncrementPerGradientStep);
+      for (size_t y = 1; y < stepCount; y++) {
+        float frac = static_cast<float>(y) / stepCount;
+        ColorStop newStop(Interpolate(leftStop.mPosition, rightStop.mPosition, frac), false,
+                          Unpremultiply(InterpolateColor(premulLeftColor, premulRightColor, frac)));
+        aStops.InsertElementAt(x, newStop);
+        x++;
+      }
+    }
   }
 }
 
@@ -2644,6 +2721,8 @@ nsCSSRendering::PaintGradient(nsPresContext* aPresContext,
   }
 
   ResolveMidpoints(stops);
+
+  ResolvePremultipliedAlpha(stops);
 
   bool isRepeat = aGradient->mRepeating || forceRepeatToCoverTiles;
 
