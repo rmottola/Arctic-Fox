@@ -5352,7 +5352,7 @@ bool PresShell::AsyncPanZoomEnabled()
       return widget->AsyncPanZoomEnabled();
     }
   }
-  return false;
+  return gfxPlatform::AsyncPanZoomEnabled();
 }
 
 void PresShell::SetIgnoreViewportScrolling(bool aIgnore)
