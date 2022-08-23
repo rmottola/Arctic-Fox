@@ -1199,7 +1199,7 @@ nsImageFrame::DisplayAltText(nsPresContext*      aPresContext,
       nscoord x, y;
 
       if (isVertical) {
-        x = pt.x + maxDescent; // XXX will need update for sideways-left
+        x = pt.x + maxDescent;
         if (wm.IsBidiLTR()) {
           y = aRect.y;
           dir = NSBIDI_LTR;
