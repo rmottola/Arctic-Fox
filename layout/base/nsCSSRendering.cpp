@@ -2456,44 +2456,6 @@ nsCSSRendering::PaintGradient(nsPresContext* aPresContext,
     }
   }
 
-  // Special case for 'transparent'
-  for (uint32_t i = 0; i < stops.Length(); ++i) {
-    gfxRGBA color = stops[i].mColor;
-    if (color.r == 0 && color.g == 0 && color.b == 0 && color.a == 0) {
-      // We have (0,0,0,0) as a color stop - this means 'transparent'.
-      // In this case for the usually intended effect, we change the color
-      // of the transparent stop to the color of the adjacent stop with
-      // 0 opacity. If we are not on either edge, we add a stop on both
-      // sides of the transparent point with the adjacent color value.
-      // i.e.: c1 -> c1 (alpha 0) | c2 (alpha 0) -> c2
-      // XXX: We should probably track the use of the transparent keyword
-      // down from the CSS parsing level to here with a flag in mStops, if
-      // rgba(0,0,0,0) ever is an intended thing (very much a corner case).
-      if (i > 0) {
-        // Change stop color to adjacent-previous (color->T)
-        color = stops[i - 1].mColor;
-        color.a = 0;
-        stops[i].mColor = color;
-        if (i < stops.Length() - 1) {
-          // We're in the middle somewhere: insert stop adjacent-next (T->color)
-          gfxRGBA color2 = stops[i + 1].mColor;
-          color2.a = 0;
-          if (color != color2) {
-            // Only insert an extra stop if c1 is different than c2 in c1->T->c2
-            // Note: A transparent stop is never considered an interpolation hint
-            stops.InsertElementAt(i + 1, ColorStop(stops[i].mPosition, false, color2));
-            i++;
-          }
-        }
-      } else if (i < stops.Length() - 1) {
-        // Change stop color to adjacent-next (T->color)
-        color = stops[i + 1].mColor;
-        color.a = 0;
-        stops[i].mColor = color;
-      }
-    }
-  }
-  
   // Eliminate negative-position stops if the gradient is radial.
   double firstStop = stops[0].mPosition;
   if (aGradient->mShape != NS_STYLE_GRADIENT_SHAPE_LINEAR && firstStop < 0.0) {
