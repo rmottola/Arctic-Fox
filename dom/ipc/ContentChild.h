@@ -338,7 +338,7 @@ public:
 
     virtual bool RecvAddPermission(const IPC::Permission& permission) override;
 
-    virtual bool RecvScreenSizeChanged(const gfxIntSize &size) override;
+    virtual bool RecvScreenSizeChanged(const gfx::IntSize &size) override;
 
     virtual bool RecvFlushMemory(const nsString& reason) override;
 
@@ -413,7 +413,7 @@ public:
     virtual bool RecvEndDragSession(const bool& aDoneDrag,
                                     const bool& aUserCancelled) override;
 #ifdef ANDROID
-    gfxIntSize GetScreenSize() { return mScreenSize; }
+    gfx::IntSize GetScreenSize() { return mScreenSize; }
 #endif
 
     // Get the directory for IndexedDB files. We query the parent for this and
@@ -508,7 +508,7 @@ private:
     AppInfo mAppInfo;
 
 #ifdef ANDROID
-    gfxIntSize mScreenSize;
+    gfx::IntSize mScreenSize;
 #endif
 
     bool mIsForApp;

@@ -3020,7 +3020,7 @@ public:
     if (!mElement) {
       return;
     }
-    gfxIntSize size;
+    gfx::IntSize size;
     {
       MutexAutoLock lock(mMutex);
       size = mInitialSize;
@@ -3034,13 +3034,13 @@ public:
                                         const MediaSegment& aQueuedMedia) override
   {
     MutexAutoLock lock(mMutex);
-    if (mInitialSize != gfxIntSize(0,0) ||
+    if (mInitialSize != gfx::IntSize(0,0) ||
         aQueuedMedia.GetType() != MediaSegment::VIDEO) {
       return;
     }
     const VideoSegment& video = static_cast<const VideoSegment&>(aQueuedMedia);
     for (VideoSegment::ConstChunkIterator c(video); !c.IsEnded(); c.Next()) {
-      if (c->mFrame.GetIntrinsicSize() != gfxIntSize(0,0)) {
+      if (c->mFrame.GetIntrinsicSize() != gfx::IntSize(0,0)) {
         mInitialSize = c->mFrame.GetIntrinsicSize();
         nsCOMPtr<nsIRunnable> event =
           NS_NewRunnableMethod(this, &StreamSizeListener::ReceivedSize);
@@ -3055,7 +3055,7 @@ private:
 
   // mMutex protects the fields below; they can be accessed on any thread
   Mutex mMutex;
-  gfxIntSize mInitialSize;
+  gfx::IntSize mInitialSize;
 };
 
 class HTMLMediaElement::MediaStreamTracksAvailableCallback:
