@@ -3621,10 +3621,9 @@ PluginInstanceChild::ReadbackDifferenceRect(const nsIntRect& rect)
 #elif defined(XP_WIN)
     if (!SharedDIBSurface::IsSharedDIBSurface(mBackSurface))
         return false;
-#else
-    return false;
 #endif
 
+#if defined(MOZ_X11) || defined(XP_WIN)
     if (mCurrentSurface->GetContentType() != mBackSurface->GetContentType())
         return false;
 
@@ -3650,6 +3649,9 @@ PluginInstanceChild::ReadbackDifferenceRect(const nsIntRect& rect)
     }
 
     return true;
+#else
+    return false;
+#endif
 }
 
 void
