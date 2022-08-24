@@ -2928,7 +2928,7 @@ nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
 
   // If we might be using a background color, go ahead and set it now.
   if (drawBackgroundColor && !isCanvasFrame)
-    ctx->SetColor(gfxRGBA(bgColor));
+    ctx->SetColor(Color::FromABGR(bgColor));
 
   // NOTE: no Save() yet, we do that later by calling autoSR.EnsureSaved(ctx)
   // in the cases we need it.
@@ -3940,7 +3940,7 @@ nsCSSRendering::DrawTableBorderSegment(nsRenderingContext&     aContext,
   AntialiasMode oldMode = ctx->CurrentAntialiasMode();
   ctx->SetAntialiasMode(AntialiasMode::NONE);
 
-  ctx->SetColor(aBorderColor);
+  ctx->SetColor(Color::FromABGR(aBorderColor));
 
   switch (aBorderStyle) {
   case NS_STYLE_BORDER_STYLE_NONE:
@@ -4004,7 +4004,7 @@ nsCSSRendering::DrawTableBorderSegment(nsRenderingContext&     aContext,
                                           aBGColor->mBackgroundColor,
                                           aBorderColor);
       // XXXbz is this SetColor call still needed?
-      ctx->SetColor(bevelColor);
+      ctx->SetColor(Color::FromABGR(bevelColor));
       nsRect rect(aBorder);
       nscoord half;
       if (horizontal) { // top, bottom
@@ -4041,7 +4041,7 @@ nsCSSRendering::DrawTableBorderSegment(nsRenderingContext&     aContext,
       bevelColor = MakeBevelColor(ridgeGrooveSide, ridgeGroove,
                                   aBGColor->mBackgroundColor, aBorderColor);
       // XXXbz is this SetColor call still needed?
-      ctx->SetColor(bevelColor);
+      ctx->SetColor(Color::FromABGR(bevelColor));
       if (horizontal) {
         rect.y = rect.y + half;
         rect.height = aBorder.height - half;
