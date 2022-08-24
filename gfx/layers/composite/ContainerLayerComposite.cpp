@@ -464,6 +464,7 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
   r = transform.TransformBounds(scrollRect.ToUnknownRect());
   compositor->FillRect(r, backgroundColor, clipRect, aContainer->GetEffectiveTransform());
 
+  /* Disabled because on long pages SlowDrawRect becomes a bottleneck.
   int tileW = gfxPrefs::LayersTileWidth();
   int tileH = gfxPrefs::LayersTileHeight();
 
@@ -477,6 +478,7 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
       compositor->SlowDrawRect(r, tileBorderColor, clipRect, aContainer->GetEffectiveTransform());
     }
   }
+  */
 
   r = transform.TransformBounds(scrollRect.ToUnknownRect());
   compositor->SlowDrawRect(r, pageBorderColor, clipRect, aContainer->GetEffectiveTransform());
