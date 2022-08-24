@@ -24,7 +24,7 @@
 #include "mozilla/layers/AsyncCompositionManager.h" // for ViewTransform
 #include "mozilla/layers/LayerMetricsWrapper.h" // for LayerMetricsWrapper
 #include "mozilla/mozalloc.h"           // for operator delete, etc
-#include "mozilla/nsRefPtr.h"           // for nsRefPtr
+#include "mozilla/nsRefPtr.h"                   // for nsRefPtr
 #include "nsDebug.h"                    // for NS_ASSERTION
 #include "nsISupportsImpl.h"            // for MOZ_COUNT_CTOR, etc
 #include "nsISupportsUtils.h"           // for NS_ADDREF, NS_RELEASE
@@ -33,6 +33,9 @@
 #include "TextRenderer.h"               // for TextRenderer
 #include <vector>
 #include "GeckoProfiler.h"              // for GeckoProfiler
+#ifdef MOZ_ENABLE_PROFILER_SPS
+#include "ProfilerMarkers.h"            // for ProfilerMarkers
+#endif
 
 #define CULLING_LOG(...)
 // #define CULLING_LOG(...) printf_stderr("CULLING: " __VA_ARGS__)
@@ -99,6 +102,26 @@ static gfx::IntRect ContainerVisibleRect(ContainerT* aContainer)
 
 static void PrintUniformityInfo(Layer* aLayer)
 {
+#ifdef MOZ_ENABLE_PROFILER_SPS
+  if (!profiler_is_active()) {
+    return;
+  }
+
+  // Don't want to print a log for smaller layers
+  if (aLayer->GetEffectiveVisibleRegion().GetBounds().width < 300 ||
+      aLayer->GetEffectiveVisibleRegion().GetBounds().height < 300) {
+    return;
+  }
+
+  Matrix4x4 transform = aLayer->AsLayerComposite()->GetShadowTransform();
+  if (!transform.Is2D()) {
+    return;
+  }
+
+  Point translation = transform.As2D().GetTranslation();
+  LayerTranslationPayload* payload = new LayerTranslationPayload(aLayer, translation);
+  PROFILER_MARKER_PAYLOAD("LayerTranslation", payload);
+#endif
 }
 
 /* all of the per-layer prepared data we need to maintain */
