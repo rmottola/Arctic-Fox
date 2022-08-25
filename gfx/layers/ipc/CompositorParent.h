@@ -470,7 +470,7 @@ protected:
    */
   bool CanComposite();
 
-  void DidComposite();
+  void DidComposite(TimeStamp& aCompositeStart, TimeStamp& aCompositeEnd);
 
   nsRefPtr<LayerManagerComposite> mLayerManager;
   nsRefPtr<Compositor> mCompositor;
