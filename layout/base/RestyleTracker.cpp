@@ -100,10 +100,9 @@ struct RestyleCollector {
 class RestyleTimelineMarker : public TimelineMarker
 {
 public:
-  RestyleTimelineMarker(nsDocShell* aDocShell,
-                        TracingMetadata aMetaData,
-                        nsRestyleHint aRestyleHint)
-    : TimelineMarker(aDocShell, "Styles", aMetaData)
+  explicit RestyleTimelineMarker(TracingMetadata aMetaData,
+                                 nsRestyleHint aRestyleHint)
+    : TimelineMarker("Styles", aMetaData)
   {
     if (aRestyleHint) {
       mRestyleHint.AssignWithConversion(RestyleManager::RestyleHintToString(aRestyleHint));
@@ -365,8 +364,7 @@ RestyleTracker::DoProcessRestyles()
 
         if (isTimelineRecording) {
           mozilla::UniquePtr<TimelineMarker> marker =
-            MakeUnique<RestyleTimelineMarker>(docShell,
-                                              TRACING_INTERVAL_START,
+            MakeUnique<RestyleTimelineMarker>(TRACING_INTERVAL_START,
                                               data->mRestyleHint);
           TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
         }
@@ -383,8 +381,7 @@ RestyleTracker::DoProcessRestyles()
 
         if (isTimelineRecording) {
           mozilla::UniquePtr<TimelineMarker> marker =
-            MakeUnique<RestyleTimelineMarker>(docShell,
-                                              TRACING_INTERVAL_END,
+            MakeUnique<RestyleTimelineMarker>(TRACING_INTERVAL_END,
                                               data->mRestyleHint);
           TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
         }
@@ -430,8 +427,7 @@ RestyleTracker::DoProcessRestyles()
 #endif
           if (isTimelineRecording) {
             mozilla::UniquePtr<TimelineMarker> marker =
-              MakeUnique<RestyleTimelineMarker>(docShell,
-                                                TRACING_INTERVAL_START,
+              MakeUnique<RestyleTimelineMarker>(TRACING_INTERVAL_START,
                                                 currentRestyle->mRestyleHint);
             TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
           }
@@ -443,8 +439,7 @@ RestyleTracker::DoProcessRestyles()
 
           if (isTimelineRecording) {
             mozilla::UniquePtr<TimelineMarker> marker =
-              MakeUnique<RestyleTimelineMarker>(docShell,
-                                                TRACING_INTERVAL_END,
+              MakeUnique<RestyleTimelineMarker>(TRACING_INTERVAL_END,
                                                 currentRestyle->mRestyleHint);
             TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
           }
