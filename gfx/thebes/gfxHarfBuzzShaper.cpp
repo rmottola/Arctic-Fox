@@ -1782,7 +1782,7 @@ gfxHarfBuzzShaper::SetGlyphsFromRun(gfxContext     *aContext,
             charGlyphs[baseCharIndex].SetSimpleGlyph(advance,
                                                      ginfo[glyphStart].codepoint);
         } else {
-            // collect all glyphs in a list to be assigned to the first char;
+            // Collect all glyphs in a list to be assigned to the first char;
             // there must be at least one in the clump, and we already measured
             // its advance, hence the placement of the loop-exit test and the
             // measurement of the next glyph.
