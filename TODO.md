@@ -61,6 +61,7 @@
 - Bug 1258905 - 2016-03-28 Remove a bunch of dead IPC code.
 - Bug 1252262 - 2016-03-08 - Don't combine the client offset into the outer rect for
 - Bug 1249787 - 2016-02-20 - BaldrMonkey: Fix wasm string hex escape parsing endiann
+- 2016-02-21 Back out 3 changesets (bug 1216001) for Win8 reftest failures in 1193¿ 
 - Bug 1251347 - Refining SessionFile Shutdown hang details;r
 - Bug 1251347 - Making sure that SessionFile.write initializes its work
 - Bug 1244650 - Failure to clear Forms and Search Data on exit. r
