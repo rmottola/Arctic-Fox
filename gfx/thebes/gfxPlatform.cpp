@@ -506,6 +506,8 @@ gfxPlatform::Init()
     InitLayersAccelerationPrefs();
     InitLayersIPC();
 
+    gPlatform->ComputeTileSize();
+
     nsresult rv;
 
     bool usePlatformFontList = true;
@@ -1006,7 +1008,7 @@ gfxPlatform::ComputeTileSize()
   // The tile size should be picked in the parent processes
   // and sent to the child processes over IPDL GetTileSize.
   if (!XRE_IsParentProcess()) {
-    NS_RUNTIMEABORT("wrong process.");
+    return;
   }
 
   int32_t w = gfxPrefs::LayersTileWidth();
@@ -1030,6 +1032,7 @@ gfxPlatform::ComputeTileSize()
 #endif
   }
 
+#ifdef XP_MACOSX
   // Use double sized tiles for HiDPI screens.
   nsCOMPtr<nsIScreenManager> screenManager =
     do_GetService("@mozilla.org/gfx/screenmanager;1");
@@ -1045,6 +1048,7 @@ gfxPlatform::ComputeTileSize()
       h *= 2;
     }
   }
+#endif
 
   SetTileSize(w, h);
 }
