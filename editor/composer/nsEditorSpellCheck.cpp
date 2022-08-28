@@ -716,7 +716,7 @@ nsEditorSpellCheck::UpdateCurrentDictionary(nsIEditorSpellCheckCallback* aCallba
 // Helper function that iterates over the list of dictionaries and sets the one
 // that matches based on a given comparison type.
 nsresult
-nsEditorSpellCheck::TryDictionary(nsAutoString aDictName,
+nsEditorSpellCheck::TryDictionary(const nsAString& aDictName,
                                   nsTArray<nsString>& aDictList,
                                   enum dictCompare aCompareType)
 {
@@ -998,7 +998,6 @@ nsEditorSpellCheck::DictionaryFetched(DictionaryFetcher* aFetcher)
   // up. The user can manually reset the language to their choice on
   // the dialog if it is wrong.
 
-  // Dictionary has changed, so delete the suggested word list.
   DeleteSuggestedWordList();
 
   return NS_OK;
