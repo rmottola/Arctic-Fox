@@ -109,6 +109,11 @@ function Tester(aTests, aDumper, aCallback) {
   this._scriptLoader.loadSubScript("chrome://mochikit/content/chrome-harness.js", simpleTestScope);
   this.SimpleTest = simpleTestScope.SimpleTest;
 
+  var extensionUtilsScope = {};
+  extensionUtilsScope.SimpleTest = this.SimpleTest;
+  this._scriptLoader.loadSubScript("chrome://mochikit/content/tests/SimpleTest/ExtensionTestUtils.js", extensionUtilsScope);
+  this.ExtensionTestUtils = extensionUtilsScope.ExtensionTestUtils;
+
   this.SimpleTest.harnessParameters = gConfig;
 
   this.MemoryStats = simpleTestScope.MemoryStats;
@@ -161,6 +166,7 @@ Tester.prototype = {
   SimpleTest: {},
   Task: null,
   ContentTask: null,
+  ExtensionTestUtils: null,
   Assert: null,
 
   repeat: 0,
@@ -627,6 +633,7 @@ Tester.prototype = {
     this.currentTest.scope.ContentTask = this.ContentTask;
     this.currentTest.scope.BrowserTestUtils = this.BrowserTestUtils;
     this.currentTest.scope.TestUtils = this.TestUtils;
+    this.currentTest.scope.ExtensionTestUtils = this.ExtensionTestUtils;
     // Pass a custom report function for mochitest style reporting.
     this.currentTest.scope.Assert = new this.Assert(function(err, message, stack) {
       let res;
@@ -1020,6 +1027,7 @@ testScope.prototype = {
   ContentTask: null,
   BrowserTestUtils: null,
   TestUtils: null,
+  ExtensionTestUtils: null,
   Assert: null,
 
   /**

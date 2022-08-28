@@ -2041,7 +2041,7 @@ SpecialPowersAPI.prototype = {
     });
     let unloadPromise = new Promise(resolve => { resolveUnload = resolve; });
 
-    handler = handler.wrappedJSObject;
+    handler = Cu.waiveXrays(handler);
 
     let sp = this;
     let extension = {
