@@ -2046,6 +2046,8 @@ SpecialPowersAPI.prototype = {
 
     let sp = this;
     let extension = {
+      id,
+
       startup() {
         sp._sendAsyncMessage("SPStartupExtension", {id});
         return startupPromise;
