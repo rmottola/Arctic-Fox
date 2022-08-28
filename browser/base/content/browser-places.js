@@ -1152,10 +1152,14 @@ let BookmarkingUI = {
 
     if (aState == "invalid") {
       this.star.setAttribute("disabled", "true");
-      this.star.removeAttribute("starred");
+      this.broadcaster.setAttribute("stardisabled", "true");
+      this.broadcaster.removeAttribute("starred");
+      this.broadcaster.setAttribute("buttontooltiptext", "");
     }
     else {
       this.star.removeAttribute("disabled");
+      this.broadcaster.removeAttribute("stardisabled");
+      this._updateStar();
     }
   },
 
@@ -1274,17 +1278,27 @@ let BookmarkingUI = {
   },
 
   _updateStar: function BUI__updateStar() {
-    if (!this.star) {
+    if (!this._shouldUpdateStarState()) {
+      if (this.broadcaster.hasAttribute("starred")) {
+        this.broadcaster.removeAttribute("starred");
+        this.broadcaster.removeAttribute("buttontooltiptext");
+      }
       return;
     }
 
     if (this._itemIds.length > 0) {
-      this.star.setAttribute("starred", "true");
-      this.star.setAttribute("tooltiptext", this._starredTooltip);
+      this.broadcaster.setAttribute("starred", "true");
+      this.broadcaster.setAttribute("buttontooltiptext", this._starredTooltip);
+      if (this.button.getAttribute("overflowedItem") == "true") {
+        this.button.setAttribute("label", this._starButtonOverflowedStarredLabel);
+      }
     }
     else {
-      this.star.removeAttribute("starred");
-      this.star.setAttribute("tooltiptext", this._unstarredTooltip);
+      this.broadcaster.removeAttribute("starred");
+      this.broadcaster.setAttribute("buttontooltiptext", this._unstarredTooltip);
+      if (this.button.getAttribute("overflowedItem") == "true") {
+        this.button.setAttribute("label", this._starButtonOverflowedLabel);
+      }
     }
   },
 
@@ -1298,6 +1312,64 @@ let BookmarkingUI = {
     }
   },
 
+  onCurrentPageContextPopupShowing() {
+    this._updateBookmarkPageMenuItem();
+  },
+
+  handleEvent: function BUI_handleEvent(aEvent) {
+    switch (aEvent.type) {
+      case "ViewShowing":
+        this.onPanelMenuViewShowing(aEvent);
+        break;
+      case "ViewHiding":
+        this.onPanelMenuViewHiding(aEvent);
+        break;
+    }
+  },
+
+  onPanelMenuViewShowing: function BUI_onViewShowing(aEvent) {
+    this._updateBookmarkPageMenuItem();
+    this.updatePocketItemVisibility("panelMenu_");
+    // Update checked status of the toolbar toggle.
+    let viewToolbar = document.getElementById("panelMenu_viewBookmarksToolbar");
+    let personalToolbar = document.getElementById("PersonalToolbar");
+    if (personalToolbar.collapsed)
+      viewToolbar.removeAttribute("checked");
+    else
+      viewToolbar.setAttribute("checked", "true");
+    // Get all statically placed buttons to supply them with keyboard shortcuts.
+    let staticButtons = viewToolbar.parentNode.getElementsByTagName("toolbarbutton");
+    for (let i = 0, l = staticButtons.length; i < l; ++i)
+      CustomizableUI.addShortcut(staticButtons[i]);
+    // Setup the Places view.
+    this._panelMenuView = new PlacesPanelMenuView("place:folder=BOOKMARKS_MENU",
+                                                  "panelMenu_bookmarksMenu",
+                                                  "panelMenu_bookmarksMenu", {
+                                                    extraClasses: {
+                                                      entry: "subviewbutton",
+                                                      footer: "panel-subview-footer"
+                                                    }
+                                                  });
+    aEvent.target.removeEventListener("ViewShowing", this);
+  },
+
+  onPanelMenuViewHiding: function BUI_onViewHiding(aEvent) {
+    this._panelMenuView.uninit();
+    delete this._panelMenuView;
+    aEvent.target.removeEventListener("ViewHiding", this);
+  },
+
+  onPanelMenuViewCommand: function BUI_onPanelMenuViewCommand(aEvent, aView) {
+    let target = aEvent.originalTarget;
+    if (!target._placesNode)
+      return;
+    if (PlacesUtils.nodeIsContainer(target._placesNode))
+      PlacesCommandHook.showPlacesOrganizer([ "BookmarksMenu", target._placesNode.itemId ]);
+    else
+      PlacesUIUtils.openNodeWithEvent(target._placesNode, aEvent, aView);
+    PanelUI.hide();
+  },
+
   // nsINavBookmarkObserver
   onItemAdded: function BUI_onItemAdded(aItemId, aParentId, aIndex, aItemType,
                                         aURI) {
@@ -1305,7 +1377,10 @@ let BookmarkingUI = {
       // If a new bookmark has been added to the tracked uri, register it.
       if (this._itemIds.indexOf(aItemId) == -1) {
         this._itemIds.push(aItemId);
-        this._updateStar();
+        // Only need to update the UI if it wasn't marked as starred before:
+        if (this._itemIds.length == 1) {
+          this._updateStar();
+        }
       }
     }
   },
@@ -1315,7 +1390,10 @@ let BookmarkingUI = {
     // If one of the tracked bookmarks has been removed, unregister it.
     if (index != -1) {
       this._itemIds.splice(index, 1);
-      this._updateStar();
+      // Only need to update the UI if the page is no longer starred
+      if (this._itemIds.length == 0) {
+        this._updateStar();
+      }
     }
   },
 
@@ -1327,12 +1405,18 @@ let BookmarkingUI = {
       // a different uri and unregister it.
       if (index != -1 && aNewValue != this._uri.spec) {
         this._itemIds.splice(index, 1);
-        this._updateStar();
+        // Only need to update the UI if the page is no longer starred
+        if (this._itemIds.length == 0) {
+          this._updateStar();
+        }
       }
       // If another bookmark is now pointing to the tracked uri, register it.
       else if (index == -1 && aNewValue == this._uri.spec) {
         this._itemIds.push(aItemId);
-        this._updateStar();
+        // Only need to update the UI if it wasn't marked as starred before:
+        if (this._itemIds.length == 1) {
+          this._updateStar();
+        }
       }
     }
   },

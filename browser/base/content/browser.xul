@@ -545,6 +545,8 @@
                      ondragover="PlacesMenuDNDHandler.onDragOver(event);"
                      ondragleave="PlacesMenuDNDHandler.onDragLeave(event);"
                      ondrop="PlacesMenuDNDHandler.onDrop(event);">
+        <observes element="bookmarkThisPageBroadcaster" attribute="starred"/>
+        <observes element="bookmarkThisPageBroadcaster" attribute="buttontooltiptext"/>
         <menupopup id="BMB_bookmarksPopup"
                    placespopup="true"
                    context="placesContext"
