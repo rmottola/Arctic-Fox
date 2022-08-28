@@ -113,6 +113,7 @@ function Tester(aTests, aDumper, aCallback) {
 
   this.MemoryStats = simpleTestScope.MemoryStats;
   this.Task = Task;
+  this.ContentTask = Components.utils.import("resource://testing-common/ContentTask.jsm", null).ContentTask;
   this.Task.Debugging.maintainStack = true;
   this.Promise = Components.utils.import("resource://gre/modules/Promise.jsm", null).Promise;
   this.Assert = Components.utils.import("resource://testing-common/Assert.jsm", null).Assert;
@@ -157,6 +158,7 @@ Tester.prototype = {
   EventUtils: {},
   SimpleTest: {},
   Task: null,
+  ContentTask: null,
   Assert: null,
 
   repeat: 0,
@@ -620,6 +622,7 @@ Tester.prototype = {
     this.currentTest.scope.SimpleTest = this.SimpleTest;
     this.currentTest.scope.gTestPath = this.currentTest.path;
     this.currentTest.scope.Task = this.Task;
+    this.currentTest.scope.ContentTask = this.ContentTask;
     // Pass a custom report function for mochitest style reporting.
     this.currentTest.scope.Assert = new this.Assert(function(err, message, stack) {
       let res;
@@ -1010,6 +1013,7 @@ testScope.prototype = {
   EventUtils: {},
   SimpleTest: {},
   Task: null,
+  ContentTask: null,
   Assert: null,
 
   /**
