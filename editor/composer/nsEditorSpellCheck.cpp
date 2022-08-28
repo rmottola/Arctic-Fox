@@ -590,8 +590,8 @@ nsEditorSpellCheck::SetCurrentDictionary(const nsAString& aDictionary)
 
   // The purpose of mUpdateDictionaryRunning is to avoid doing all of this if
   // UpdateCurrentDictionary's helper method DictionaryFetched, which calls us,
-  // is on the stack (meaning: only do this if the user manually selected a
-  // dictionary to use)
+  // is on the stack. In other words: Only do this, if the user manually selected a
+  // dictionary to use.
   if (!mUpdateDictionaryRunning) {
 
     // Ignore pending dictionary fetchers by increasing this number.
@@ -600,20 +600,24 @@ nsEditorSpellCheck::SetCurrentDictionary(const nsAString& aDictionary)
     uint32_t flags = 0;
     mEditor->GetFlags(&flags);
     if (!(flags & nsIPlaintextEditor::eEditorMailMask)) {
-      if (mPreferredLang.IsEmpty() ||
-          !mPreferredLang.Equals(aDictionary, nsCaseInsensitiveStringComparator())) {
+      if (!aDictionary.IsEmpty() && (mPreferredLang.IsEmpty() ||
+          !mPreferredLang.Equals(aDictionary,
+                                 nsCaseInsensitiveStringComparator()))) {
         // When user sets dictionary manually, we store this value associated
-        // with editor url.
+        // with editor url, if it doesn't match the document language exactly.
+        // For example on "en" sites, we need to store "en-GB", otherwise
+        // the language might jump back to en-US although the user explicitly
+        // chose otherwise.
         StoreCurrentDictionary(mEditor, aDictionary);
       } else {
-        // If user sets a dictionary matching (even partially), lang defined by
+        // If user sets a dictionary matching the language defined by
         // document, we consider content pref has been canceled, and we clear it.
         ClearCurrentDictionary(mEditor);
       }
 
-      // Also store it in as a preference. It will be used as a default value
-      // when everything else fails but we don't want this for mail composer
-      // because it has spellchecked dictionary settings in Preferences.
+      // Also store it in as a preference, so we can use it as a fallback.
+      // We don't want this for mail composer because it uses
+      // "spellchecker.dictionary" as a preference.
       Preferences::SetString("spellchecker.dictionary", aDictionary);
     }
   }
