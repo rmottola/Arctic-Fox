@@ -637,13 +637,6 @@ nsEditorSpellCheck::SetCurrentDictionary(const nsAString& aDictionary)
 }
 
 NS_IMETHODIMP
-nsEditorSpellCheck::CheckCurrentDictionary()
-{
-  mSpellChecker->CheckCurrentDictionary();
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 nsEditorSpellCheck::UninitSpellChecker()
 {
   NS_ENSURE_TRUE(mSpellChecker, NS_ERROR_NOT_INITIALIZED);
@@ -814,14 +807,6 @@ nsEditorSpellCheck::DictionaryFetched(DictionaryFetcher* aFetcher)
            NS_ConvertUTF16toUTF8(mPreferredLang).get());
 #endif
   }
-
-  // Auxiliary status.
-  nsresult rv2;
-
-  // We obtain a list of available dictionaries.
-  nsTArray<nsString> dictList;
-  rv2 = mSpellChecker->GetDictionaryList(&dictList);
-  NS_ENSURE_SUCCESS(rv2, rv2);
 
   // Auxiliary status.
   nsresult rv2;
