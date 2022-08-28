@@ -53,8 +53,6 @@ var {
   injectAPI,
 } = ExtensionUtils;
 
-const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
-
 var scriptScope = this;
 
 // This object loads the ext-*.js scripts that define the extension API.
@@ -72,7 +70,10 @@ var Management = {
     this.initialized = true;
 
     for (let script of ExtensionManagement.getScripts()) {
-      let scope = {extensions: this, global: scriptScope};
+      let scope = {extensions: this,
+                   global: scriptScope,
+                   ExtensionPage: ExtensionPage,
+                   GlobalManager: GlobalManager};
       Services.scriptloader.loadSubScript(script, scope, "UTF-8");
 
       // Save the scope to avoid it being garbage collected.
