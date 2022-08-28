@@ -2030,7 +2030,7 @@ SpecialPowersAPI.prototype = {
     this.notifyObserversInParentProcess(null, "browser:purge-domain-data", "example.com");
   },
 
-  loadExtension: function(url, handler) {
+  loadExtension: function(name, handler) {
     let uuidGenerator = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
     let id = uuidGenerator.generateUUID().number;
 
@@ -2045,9 +2045,6 @@ SpecialPowersAPI.prototype = {
 
     let sp = this;
     let extension = {
-      id,
-      url,
-
       startup() {
         sp._sendAsyncMessage("SPStartupExtension", {id});
         return startupPromise;
@@ -2063,7 +2060,7 @@ SpecialPowersAPI.prototype = {
       },
     };
 
-    this._sendAsyncMessage("SPLoadExtension", {url, id});
+    this._sendAsyncMessage("SPLoadExtension", {name, id});
 
     let listener = (msg) => {
       if (msg.data.id == id) {
