@@ -4339,18 +4339,6 @@ var XULBrowserWindow = {
       } else
         disableFindCommands(false);
 
-      if (gFindBarInitialized) {
-        if (gFindBar.findMode != gFindBar.FIND_NORMAL) {
-          // Close the Find toolbar if we're in old-style TAF mode
-          gFindBar.close();
-        }
-        
-        if (!(gPrefService.getBoolPref("accessibility.typeaheadfind.highlightallremember") ||
-              gPrefService.getBoolPref("accessibility.typeaheadfind.highlightallbydefault"))) {
-            // fix bug 253793 - turn off highlight when page changes
-            gFindBar.getElement("highlight").checked = false;
-        }
-      }
     }
     UpdateBackForwardCommands(gBrowser.webNavigation);
     ReaderParent.updateReaderButton(gBrowser.selectedBrowser);
