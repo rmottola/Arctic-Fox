@@ -1559,8 +1559,8 @@ PlacesController.prototype = {
     }
     else {
       let transactions = [];
+      let insertionIndex = ip.index;
       for (let i = 0; i < items.length; ++i) {
-        let insertionIndex = ip.index + i;
         if (ip.isTag) {
           // Pasting into a tag container means tagging the item, regardless of
           // the requested action.
