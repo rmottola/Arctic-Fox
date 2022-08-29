@@ -289,7 +289,7 @@ PlacesController.prototype = {
       this.reloadSelectedLivemark();
       break;
     case "placesCmd_sortBy:name":
-      this.sortFolderByName();
+      this.sortFolderByName().then(null, Cu.reportError);
       break;
     case "placesCmd_createBookmark":
       let node = this._view.selectedNode;
@@ -753,7 +753,7 @@ PlacesController.prototype = {
       throw Cr.NS_ERROR_NOT_AVAILABLE;
 
     if (!PlacesUIUtils.useAsyncTransactions) {
-      var txn = new PlacesCreateSeparatorTransaction(ip.itemId, ip.index);
+      let txn = new PlacesCreateSeparatorTransaction(ip.itemId, ip.index);
       PlacesUtils.transactionManager.doTransaction(txn);
       // Select the new item.
       let insertedNodeId = PlacesUtils.bookmarks
@@ -782,11 +782,16 @@ PlacesController.prototype = {
   /**
    * Sort the selected folder by name.
    */
-  sortFolderByName: function PC_sortFolderByName() {
-    var itemId = PlacesUtils.getConcreteItemId(this._view.selectedNode);
-    var txn = new PlacesSortFolderByNameTransaction(itemId);
-    PlacesUtils.transactionManager.doTransaction(txn);
-  },
+  sortFolderByName: Task.async(function* () {
+    let itemId = PlacesUtils.getConcreteItemId(this._view.selectedNode);
+    if (!PlacesUIUtils.useAsyncTransactions) {
+      var txn = new PlacesSortFolderByNameTransaction(itemId);
+      PlacesUtils.transactionManager.doTransaction(txn);
+      return;
+    }
+    let guid = yield PlacesUtils.promiseItemGUID(itemId);
+    yield PlacesTransactions.transact(PlacesTransactions.SortByName(guid));
+  }),
 
   /**
    * Open the parent folder for the selected bookmarks search result.
