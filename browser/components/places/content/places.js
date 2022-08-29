@@ -627,7 +627,7 @@ PlacesBackups.saveBookmarksToJSONFile(fp.file.path);
         infoBox.setAttribute("minimal", "true");
       infoBox.removeAttribute("wasminimal");
       infoBoxExpanderWrapper.hidden =
-        this._additionalInfoFields.every(function (id)
+        this._additionalInfoFields.every(id =>
           document.getElementById(id).collapsed);
     }
     additionalInfoBroadcaster.hidden = infoBox.getAttribute("minimal") == "true";
@@ -1473,7 +1473,9 @@ let ContentArea = {
                                            options: aOptions || new Object() });
   },
 
-  get currentView() PlacesUIUtils.getViewForNode(this._deck.selectedPanel),
+  get currentView() {
+    return PlacesUIUtils.getViewForNode(this._deck.selectedPanel);
+  },
   set currentView(aNewView) {
     let oldView = this.currentView;
     if (oldView != aNewView) {
@@ -1487,7 +1489,9 @@ let ContentArea = {
     return aNewView;
   },
 
-  get currentPlace() this.currentView.place,
+  get currentPlace() {
+    return this.currentView.place;
+  },
   set currentPlace(aQueryString) {
     let oldView = this.currentView;
     let newView = this.getContentViewForQueryString(aQueryString);
@@ -1552,12 +1556,16 @@ let ContentTree = {
     this._view = document.getElementById("placeContent");
   },
 
-  get view() this._view,
+  get view() {
+    return this._view;
+  },
 
-  get viewOptions() Object.seal({
-    showDetailsPane: true,
-    toolbarSet: "back-button, forward-button, organizeButton, viewMenu, maintenanceButton, libraryToolbarSpacer, searchFilter"
-  }),
+  get viewOptions() {
+    return Object.seal({
+      showDetailsPane: true,
+      toolbarSet: "back-button, forward-button, organizeButton, viewMenu, maintenanceButton, libraryToolbarSpacer, searchFilter"
+    });
+  },
 
   openSelectedNode: function CT_openSelectedNode(aEvent) {
     let view = this.view;
