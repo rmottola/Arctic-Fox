@@ -107,6 +107,9 @@
                 dropPoint.folderElt = elt;
               return dropPoint;
             }
+
+            let tagName = PlacesUtils.nodeIsTagQuery(elt._placesNode) ?
+                            elt._placesNode.title : null;
             if ((PlacesUtils.nodeIsFolder(elt._placesNode) &&
                  !PlacesUIUtils.isContentsReadOnly(elt._placesNode)) ||
                 PlacesUtils.nodeIsTagQuery(elt._placesNode)) {
@@ -117,7 +120,7 @@
                                     PlacesUtils.getConcreteItemId(resultNode),
                                     -1,
                                     Ci.nsITreeView.DROP_BEFORE,
-                                    PlacesUtils.nodeIsTagQuery(elt._placesNode),
+                                    tagName,
                                     elt._placesNode.itemId);
                 return dropPoint;
               }
@@ -127,7 +130,7 @@
                                     PlacesUtils.getConcreteItemId(elt._placesNode),
                                     -1,
                                     Ci.nsITreeView.DROP_ON,
-                                    PlacesUtils.nodeIsTagQuery(elt._placesNode));
+                                    tagName);
                 dropPoint.folderElt = elt;
                 return dropPoint;
               }
@@ -139,7 +142,7 @@
                                   PlacesUtils.getConcreteItemId(resultNode),
                                   -1,
                                   Ci.nsITreeView.DROP_BEFORE,
-                                  PlacesUtils.nodeIsTagQuery(elt._placesNode),
+                                  tagName,
                                   elt._placesNode.itemId);
               return dropPoint;
             }
@@ -149,7 +152,7 @@
                                 PlacesUtils.getConcreteItemId(resultNode),
                                 -1,
                                 Ci.nsITreeView.DROP_AFTER,
-                                PlacesUtils.nodeIsTagQuery(elt._placesNode),
+                                tagName,
                                 elt._placesNode.itemId);
             return dropPoint;
         ]]></body>
