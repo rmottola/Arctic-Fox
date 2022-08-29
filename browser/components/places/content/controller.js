@@ -3,8 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://gre/modules/ForgetAboutSite.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "ForgetAboutSite",
+                                  "resource://gre/modules/ForgetAboutSite.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
                                   "resource://gre/modules/NetUtil.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
@@ -1284,22 +1284,21 @@ PlacesController.prototype = {
    */
   setDataTransfer: function PC_setDataTransfer(aEvent) {
     let dt = aEvent.dataTransfer;
-    let doCopy = ["copyLink", "copy", "link"].indexOf(dt.effectAllowed) != -1;
 
     let result = this._view.result;
     let didSuppressNotifications = result.suppressNotifications;
     if (!didSuppressNotifications)
       result.suppressNotifications = true;
 
-    function addData(type, index, overrideURI) {
-      let wrapNode = PlacesUtils.wrapNode(node, type, overrideURI, doCopy);
+    function addData(type, index, feedURI) {
+      let wrapNode = PlacesUtils.wrapNode(node, type, feedURI);
       dt.mozSetDataAt(type, wrapNode, index);
     }
 
-    function addURIData(index, overrideURI) {
-      addData(PlacesUtils.TYPE_X_MOZ_URL, index, overrideURI);
-      addData(PlacesUtils.TYPE_UNICODE, index, overrideURI);
-      addData(PlacesUtils.TYPE_HTML, index, overrideURI);
+    function addURIData(index, feedURI) {
+      addData(PlacesUtils.TYPE_X_MOZ_URL, index, feedURI);
+      addData(PlacesUtils.TYPE_UNICODE, index, feedURI);
+      addData(PlacesUtils.TYPE_HTML, index, feedURI);
     }
 
     try {
@@ -1391,12 +1390,11 @@ PlacesController.prototype = {
         copiedFolders.push(node);
 
       let livemarkInfo = this.getCachedLivemarkInfo(node);
-      let overrideURI = livemarkInfo ? livemarkInfo.feedURI.spec : null;
-      let resolveShortcuts = !PlacesControllerDragHelper.canMoveNode(node);
+      let feedURI = livemarkInfo && livemarkInfo.feedURI.spec;
 
       contents.forEach(function (content) {
         content.entries.push(
-          PlacesUtils.wrapNode(node, content.type, overrideURI, resolveShortcuts)
+          PlacesUtils.wrapNode(node, content.type, feedURI)
         );
       });
     }, this);
@@ -1737,7 +1735,7 @@ let PlacesControllerDragHelper = {
       }
 
       // Only bookmarks and urls can be dropped into tag containers.
-      if (ip.isTag && ip.orientation == Ci.nsITreeView.DROP_ON &&
+      if (ip.isTag &&
           dragged.type != PlacesUtils.TYPE_X_MOZ_URL &&
           (dragged.type != PlacesUtils.TYPE_X_MOZ_PLACE ||
            (dragged.uri && dragged.uri.startsWith("place:")) ))
@@ -1826,8 +1824,7 @@ let PlacesControllerDragHelper = {
         index += movedCount++;
 
       // If dragging over a tag container we should tag the item.
-      if (insertionPoint.isTag &&
-          insertionPoint.orientation == Ci.nsITreeView.DROP_ON) {
+      if (insertionPoint.isTag) {
         let uri = NetUtil.newURI(unwrapped.uri);
         let tagItemId = insertionPoint.itemId;
         let tagTxn = new PlacesTagURITransaction(uri, [tagItemId]);
