@@ -275,6 +275,7 @@ WEBIDL_FILES = [
     'KeyAlgorithm.webidl',
     'KeyboardEvent.webidl',
     'KeyEvent.webidl',
+    'Keyframe.webidl',
     'KeyframeEffect.webidl',
     'KillSwitch.webidl',
     'LegacyQueryInterface.webidl',
