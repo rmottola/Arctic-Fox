@@ -59,6 +59,8 @@ InsertionPoint.prototype = {
     return this._index = val;
   },
 
+  promiseGuid: function () PlacesUtils.promiseItemGuid(this.itemId),
+
   get index() {
     if (this.dropNearItemId > 0) {
       // If dropNearItemId is set up we must calculate the real index of
@@ -275,7 +277,7 @@ PlacesController.prototype = {
       this.newItem("livemark");
       break;
     case "placesCmd_new:separator":
-      this.newSeparator();
+      this.newSeparator().catch(Cu.reportError);
       break;
     case "placesCmd_show:info":
       this.showBookmarkPropertiesForSelection();
@@ -745,17 +747,28 @@ PlacesController.prototype = {
   /**
    * Create a new Bookmark separator somewhere.
    */
-  newSeparator: function PC_newSeparator() {
+  newSeparator: Task.async(function* () {
     var ip = this._view.insertionPoint;
     if (!ip)
       throw Cr.NS_ERROR_NOT_AVAILABLE;
-    var txn = new PlacesCreateSeparatorTransaction(ip.itemId, ip.index);
-    PlacesUtils.transactionManager.doTransaction(txn);
-    // select the new item
-    var insertedNodeId = PlacesUtils.bookmarks
-                                    .getIdForItemAt(ip.itemId, ip.index);
-    this._view.selectItems([insertedNodeId], false);
-  },
+
+    if (!PlacesUIUtils.useAsyncTransactions) {
+      var txn = new PlacesCreateSeparatorTransaction(ip.itemId, ip.index);
+      PlacesUtils.transactionManager.doTransaction(txn);
+      // Select the new item.
+      let insertedNodeId = PlacesUtils.bookmarks
+                                      .getIdForItemAt(ip.itemId, ip.index);
+      this._view.selectItems([insertedNodeId], false);
+      return;
+    }
+
+    let txn = PlacesTransactions.NewSeparator({ parentGUID: yield ip.promiseGUID()
+                                              , index: ip.index });
+    let guid = yield PlacesTransactions.transact(txn);
+    let itemId = yield PlacesUtils.promiseItemId(guid);
+    // Select the new item.
+    this._view.selectItems([itemId], false);
+  }),
 
   /**
    * Opens a dialog for moving the selected nodes.
