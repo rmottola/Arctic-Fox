@@ -348,7 +348,7 @@ var FullZoom = {
         this._executeSoon(function () {
           // _getGlobalValue may be either sync or async, so notify asyncly so
           // observers are guaranteed consistent behavior.
-          Services.obs.notifyObservers(null, "browser-fullZoom:reset", "");
+          Services.obs.notifyObservers(null, "browser-fullZoom:zoomReset", "");
         });
       }
     });
