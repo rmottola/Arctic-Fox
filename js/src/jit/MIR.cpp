@@ -7,6 +7,7 @@
 #include "jit/MIR.h"
 
 #include "mozilla/FloatingPoint.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/SizePrintfMacros.h"
 
@@ -1088,7 +1089,7 @@ void
 MConstantElements::printOpcode(GenericPrinter& out) const
 {
     PrintOpcodeName(out, op());
-    out.printf(" %p", value());
+    out.printf(" 0x%" PRIxPTR, value().asValue());
 }
 
 void
@@ -4556,7 +4557,7 @@ InlinePropertyTable::buildTypeSetForFunction(JSFunction* func) const
     return types;
 }
 
-void*
+SharedMem<void*>
 MLoadTypedArrayElementStatic::base() const
 {
     return AnyTypedArrayViewData(someTypedArray_);
@@ -4585,7 +4586,7 @@ MLoadTypedArrayElementStatic::congruentTo(const MDefinition* ins) const
     return congruentIfOperandsEqual(other);
 }
 
-void*
+SharedMem<void*>
 MStoreTypedArrayElementStatic::base() const
 {
     return AnyTypedArrayViewData(someTypedArray_);
