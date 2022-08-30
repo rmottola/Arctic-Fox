@@ -7414,6 +7414,10 @@ var TabContextMenu = {
     bookmarkAllTabs.hidden = this.contextTab.pinned;
     if (!bookmarkAllTabs.hidden)
       PlacesCommandHook.updateBookmarkAllTabsCommand();
+
+    // Hide "Move to Group" if it's a pinned tab.
+    document.getElementById("context_tabViewMenu").hidden =
+      (this.contextTab.pinned || !TabView.firstUseExperienced);
   }
 };
 
