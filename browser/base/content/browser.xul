@@ -971,7 +971,6 @@
                   autocompletepopup="PopupAutoComplete"
                   selectmenulist="ContentSelectDropdown"/>
       <chatbar id="pinnedchats" layer="true" mousethrough="always" hidden="true"/>
-      <statuspanel id="statusbar-display" inactive="true"/>
     </vbox>
     <vbox id="browser-border-end" hidden="true" layer="true"/>
   </hbox>

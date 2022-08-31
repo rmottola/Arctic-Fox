@@ -207,6 +207,28 @@
         ]]></body>
       </method>
 
+      <method name="getStatusPanel">
+        <body><![CDATA[
+          if (!this._statusPanel) {
+            this._statusPanel = document.createElementNS(this.namespaceURI, "statuspanel");
+            this._statusPanel.setAttribute("inactive", "true");
+            this._statusPanel.setAttribute("layer", "true");
+            this._appendStatusPanel();
+          }
+          return this._statusPanel;
+        ]]></body>
+      </method>
+
+      <method name="_appendStatusPanel">
+        <body><![CDATA[
+          if (this._statusPanel) {
+            let browser = this.selectedBrowser;
+            let browserContainer = this.getBrowserContainer(browser);
+            browserContainer.insertBefore(this._statusPanel, browser.parentNode.nextSibling);
+          }
+        ]]></body>
+      </method>
+
       <method name="updateWindowResizers">
         <body><![CDATA[
           if (!window.gShowPageResizers)
@@ -1116,6 +1138,8 @@
                 backForwardContainer.removeAttribute("switchingtabs");
               });
             }
+
+            this._appendStatusPanel();
 
             if (updateBlockedPopups)
               this.mCurrentBrowser.updateBlockedPopups();
