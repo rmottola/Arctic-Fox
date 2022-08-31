@@ -2505,6 +2505,7 @@
             let modifiedAttrs = [];
             if (aOtherTab.hasAttribute("muted")) {
               aOurTab.setAttribute("muted", "true");
+              ourBrowser.mute();
               modifiedAttrs.push("muted");
             }
             if (aOtherTab.hasAttribute("soundplaying")) {
