@@ -138,7 +138,11 @@
          work correctly on the menupopup. ContentSelectDropdown expects the
          popuponly menulist to be its immediate parent. -->
     <menulist popuponly="true" id="ContentSelectDropdown" hidden="true">
-      <menupopup rolluponmousewheel="true"/>
+      <menupopup rolluponmousewheel="true"
+#ifdef XP_WIN
+                 consumeoutsideclicks="false" ignorekeys="handled"
+#endif
+        />
     </menulist>
 
     <!-- for invalid form error message -->
