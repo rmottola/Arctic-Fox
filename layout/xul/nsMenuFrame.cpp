@@ -474,7 +474,7 @@ nsMenuFrame::HandleEvent(nsPresContext* aPresContext,
           // Submenus don't get closed up immediately.
         }
         else if (this == menuParent->GetCurrentMenuItem()) {
-          menuParent->ChangeMenuItem(nullptr, false);
+          menuParent->ChangeMenuItem(nullptr, false, false);
         }
       }
     }
@@ -487,7 +487,7 @@ nsMenuFrame::HandleEvent(nsPresContext* aPresContext,
     }
 
     // Let the menu parent know we're the new item.
-    menuParent->ChangeMenuItem(this, false);
+    menuParent->ChangeMenuItem(this, false, false);
     NS_ENSURE_TRUE(weakFrame.IsAlive(), NS_OK);
     NS_ENSURE_TRUE(menuParent, NS_OK);
 
@@ -1430,7 +1430,7 @@ nsMenuFrame::SetActiveChild(nsIDOMElement* aChild)
 
   if (!aChild) {
     // Remove the current selection
-    popupFrame->ChangeMenuItem(nullptr, false);
+    popupFrame->ChangeMenuItem(nullptr, false, false);
     return NS_OK;
   }
 
@@ -1438,7 +1438,7 @@ nsMenuFrame::SetActiveChild(nsIDOMElement* aChild)
 
   nsMenuFrame* menu = do_QueryFrame(child->GetPrimaryFrame());
   if (menu)
-    popupFrame->ChangeMenuItem(menu, false);
+    popupFrame->ChangeMenuItem(menu, false, false);
   return NS_OK;
 }
 
