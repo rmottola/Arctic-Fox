@@ -716,12 +716,22 @@ addMessageListener("ContextMenu:SearchFieldBookmarkData", (message) => {
                    { spec, title, description, postData, charset });
 });
 
+addMessageListener("Bookmarks:GetPageDetails", (message) => {
+  let doc = content.document;
+  let isErrorPage = /^about:(neterror|certerror|blocked)/.test(doc.documentURI);
+  sendAsyncMessage("Bookmarks:GetPageDetails:Result",
+                   { isErrorPage: isErrorPage,
+                     description: PlacesUIUtils.getDescriptionFromDocument(doc) });
+});
+
+
 addMessageListener("ContextMenu:BookmarkFrame", (message) => {
   let frame = message.objects.target.ownerDocument;
   sendAsyncMessage("ContextMenu:BookmarkFrame:Result",
                    { title: frame.title,
                      description: PlacesUIUtils.getDescriptionFromDocument(frame) });
 });
+
 
 function disableSetDesktopBackground(aTarget) {
   // Disable the Set as Desktop Background menu item if we're still trying

@@ -318,13 +318,14 @@ var PlacesCommandHook = {
       var title;
       var description;
       var charset;
+
+      let docInfo = yield this._getPageDetails(aBrowser);
+
       try {
-        let isErrorPage = /^about:(neterror|certerror|blocked)/
-                          .test(aBrowser.contentDocumentAsCPOW.documentURI);
-        title = isErrorPage ? PlacesUtils.history.getPageTitle(uri)
-                            : aBrowser.contentTitle;
+        title = docInfo.isErrorPage ? PlacesUtils.history.getPageTitle(uri)
+                                    : aBrowser.contentTitle;
         title = title || uri.spec;
-        description = PlacesUIUtils.getDescriptionFromDocument(aBrowser.contentDocumentAsCPOW);
+        description = docInfo.description;
         charset = aBrowser.characterSet;
       }
       catch (e) { }
@@ -389,14 +390,15 @@ var PlacesCommandHook = {
       // Bug 1148838 - Make this code work for full page plugins.
       let description = null;
       let charset = null;
+
+      let docInfo = yield this._getPageDetails(aBrowser);
+
       try {
-        let isErrorPage = /^about:(neterror|certerror|blocked)/
-                          .test(aBrowser.contentDocumentAsCPOW.documentURI);
-        info.title = isErrorPage ?
+        info.title = docInfo.isErrorPage ?
           (yield PlacesUtils.promisePlaceInfo(aBrowser.currentURI)).title :
           aBrowser.contentTitle;
         info.title = info.title || url.href;
-        description = PlacesUIUtils.getDescriptionFromDocument(aBrowser.contentDocumentAsCPOW);
+        description = docInfo.description;
         charset = aBrowser.characterSet;
       }
       catch (e) {
@@ -450,6 +452,18 @@ var PlacesCommandHook = {
       StarUI.showEditBookmarkPopup(node, aBrowser, "overlap");
     }
   }),
+
+  _getPageDetails(browser) {
+    return new Promise(resolve => {
+      let mm = browser.messageManager;
+      mm.addMessageListener("Bookmarks:GetPageDetails:Result", function listener(msg) {
+        mm.removeMessageListener("Bookmarks:GetPageDetails:Result", listener);
+        resolve(msg.data);
+      });
+
+      mm.sendAsyncMessage("Bookmarks:GetPageDetails", { })
+    });
+  },
 
   /**
    * Adds a bookmark to the page loaded in the current tab. 
@@ -552,8 +566,8 @@ var PlacesCommandHook = {
    * @subtitle  subtitle
    *            A short description of the feed. Optional.
    */
-  addLiveBookmark: function PCH_addLiveBookmark(url, feedTitle, feedSubtitle) {
-    var toolbarIP = new InsertionPoint(PlacesUtils.toolbarFolderId,
+  addLiveBookmark: Task.async(function *(url, feedTitle, feedSubtitle) {
+    let toolbarIP = new InsertionPoint(PlacesUtils.toolbarFolderId,
                                        PlacesUtils.bookmarks.DEFAULT_INDEX,
                                        Components.interfaces.nsITreeView.DROP_ON);
 
@@ -561,7 +575,7 @@ var PlacesCommandHook = {
     let title = feedTitle || gBrowser.contentTitle;
     let description = feedSubtitle;
     if (!description) {
-      description = PlacesUIUtils.getDescriptionFromDocument(gBrowser.contentDocument);
+      description = (yield this._getPageDetails(gBrowser.selectedBrowser)).description;
     }
 
     PlacesUIUtils.showBookmarkDialog({ action: "add"
@@ -575,7 +589,7 @@ var PlacesCommandHook = {
                                                    , "siteLocation"
                                                    , "description" ]
                                      }, window);
-  },
+  }),
 
   /**
    * Opens the Places Organizer. 
