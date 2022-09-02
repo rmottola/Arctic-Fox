@@ -7862,11 +7862,6 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
                           defaultScale,
                           /*allowZoom*/ true,
                           /*allowDoubleTapZoom*/ true);
-  case DisplayWidthHeightNoZoom:
-    return nsViewportInfo(aDisplaySize,
-                          defaultScale,
-                          /*allowZoom*/ false,
-                          /*allowDoubleTapZoom*/ false);
   case Unknown:
   {
     nsAutoString viewport;
@@ -7889,7 +7884,7 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
             return nsViewportInfo(aDisplaySize,
                                   defaultScale,
                                   /*allowZoom*/true,
-                                  /*allowDoubleTapZoom*/false);
+                                  /*allowDoubleTapZoom*/true);
           }
         }
       }
@@ -7901,7 +7896,7 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
         return nsViewportInfo(aDisplaySize,
                               defaultScale,
                               /*allowZoom*/true,
-                              /*allowDoubleTapZoom*/false);
+                              /*allowDoubleTapZoom*/true);
       }
     }
 
