@@ -7841,8 +7841,8 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
     ScreenSize viewportSize(viewportWidth, viewportWidth * aspectRatio);
     return nsViewportInfo(RoundedToInt(viewportSize),
                           CSSToScreenScale(scaleToFit),
-                          /*allowZoom*/false,
-                          /*allowDoubleTapZoom*/ false);
+                          /*allowZoom*/ true,
+                          /*allowDoubleTapZoom*/ true);
   }
 
   if (!gfxPrefs::MetaViewportEnabled()) {
