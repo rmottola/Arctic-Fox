@@ -53,7 +53,7 @@ const DIAL_ERROR_RADIO_NOT_AVAILABLE = RIL.GECKO_ERROR_RADIO_NOT_AVAILABLE;
 
 const TONES_GAP_DURATION = 70;
 
-let DEBUG;
+var DEBUG;
 function debug(s) {
   dump("TelephonyService: " + s + "\n");
 }

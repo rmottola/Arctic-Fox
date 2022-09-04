@@ -40,7 +40,7 @@ let RILQUIRKS_SUBSCRIPTION_CONTROL =
 
 // Ril quirk to always turn the radio off for the client without SIM card
 // except hw default client.
-let RILQUIRKS_RADIO_OFF_WO_CARD =
+var RILQUIRKS_RADIO_OFF_WO_CARD =
   libcutils.property_get("ro.moz.ril.radio_off_wo_card", "false") == "true";
 
 // Ril quirk to enable IPv6 protocol/roaming protocol in APN settings.
