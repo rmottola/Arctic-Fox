@@ -37,7 +37,7 @@ function testGetAttribute() {
     s += document.body.attributes[i].nodeName + "=" +
          document.body.attributes[i].nodeValue;
   }
-  is(s, "AA=UPPERCASE", "Wrong attribute!");
+  is(s, "aa=UPPERCASE", "Wrong attribute!");
 
   is(document.body.getAttributeNode("aa"), document.body.getAttributeNode("AA"),
      "Wrong node!");
@@ -99,7 +99,7 @@ function testSetAttributeNodeKeepsRef(div) {
 }
 is(testSetAttributeNodeKeepsRef(), "1", "(4)");
 
-function testAttribNodeNamePreservesCase() {
+function testAttribNodeNameFoldsCase() {
   var div = document.createElement('div');
   var a = div.ownerDocument.createAttribute("A");
   a.nodeValue = "x";
@@ -107,9 +107,9 @@ function testAttribNodeNamePreservesCase() {
   var result = [ a.name, a.nodeName ];
   return result.join(",");
 }
-is(testAttribNodeNamePreservesCase(), "A,A", "(5)");
+is(testAttribNodeNameFoldsCase(), "a,a", "(5)");
 
-function testAttribNodeNamePreservesCaseGetNode() {
+function testAttribNodeNameFoldsCaseGetNode() {
   var body = document.body;
   var a = body.ownerDocument.createAttribute("A");
   a.nodeValue = "x";
@@ -120,9 +120,9 @@ function testAttribNodeNamePreservesCaseGetNode() {
   var result = [ a.name, a.nodeName ];
   return result.join(",");
 }
-is(testAttribNodeNamePreservesCaseGetNode(), "A,A", "(6)");
+is(testAttribNodeNameFoldsCaseGetNode(), "a,a", "(6)");
 
-function testAttribNodeNamePreservesCaseGetNode2() {
+function testAttribNodeNameFoldsCaseGetNode2() {
   var body = document.body;
   var a = body.ownerDocument.createAttribute("B");
   a.nodeValue = "x";
@@ -138,7 +138,7 @@ function testAttribNodeNamePreservesCaseGetNode2() {
   var result = [ a.name, a.nodeName ];
   return result.join(",");
 }
-is(testAttribNodeNamePreservesCaseGetNode2(), "B,B", "(7)");
+is(testAttribNodeNameFoldsCaseGetNode2(), "b,b", "(7)");
 
 function testAttribNodeNameGetMutate() {
   var body = document.body;
