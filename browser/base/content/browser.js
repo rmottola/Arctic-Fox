@@ -4402,6 +4402,10 @@ var XULBrowserWindow = {
 
     this._hostChanged = false;
 
+    // Make sure the "https" part of the URL is striked out or not,
+    // depending on the current mixed active content blocking state.
+    gURLBar.formatValue();
+
     // aState is defined as a bitmask that may be extended in the future.
     // We filter out any unknown bits before testing for known values.
     const wpl = Components.interfaces.nsIWebProgressListener;
