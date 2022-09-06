@@ -142,6 +142,11 @@
                  type="checkbox" group="sidebar" sidebarurl="chrome://browser/content/web-panels.xul"
                  oncommand="SidebarUI.toggle('viewWebPanelsSidebar');"/>
 
+    <broadcaster id="bookmarkThisPageBroadcaster"
+                 label="&bookmarkThisPageCmd.label;"
+                 bookmarklabel="&bookmarkThisPageCmd.label;"
+                 editlabel="&editThisBookmarkCmd.label;"/>
+
     <!-- popup blocking menu items -->
     <broadcaster id="blockedPopupAllowSite"
                  accesskey="&allowPopups.accesskey;"

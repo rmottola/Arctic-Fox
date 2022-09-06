@@ -1046,7 +1046,7 @@ let PlacesToolbarHelper = {
  * menu button.
  */
 
-let BookmarkingUI = {
+var BookmarkingUI = {
   get button() {
     if (!this._button) {
       this._button = document.getElementById("bookmarks-menu-button");
@@ -1069,10 +1069,19 @@ let BookmarkingUI = {
     return null;
   },
 
+  get broadcaster() {
+    delete this.broadcaster;
+    let broadcaster = document.getElementById("bookmarkThisPageBroadcaster");
+    return this.broadcaster = broadcaster;
+  },
+
   STATUS_UPDATING: -1,
   STATUS_UNSTARRED: 0,
   STATUS_STARRED: 1,
   get status() {
+    if (!this._shouldUpdateStarState()) {
+      return this.STATUS_UNSTARRED;
+    }
     if (this._pendingStmt)
       return this.STATUS_UPDATING;
     return this.star &&
@@ -1092,6 +1101,16 @@ let BookmarkingUI = {
     delete this._unstarredTooltip;
     return this._unstarredTooltip =
       gNavigatorBundle.getString("starButtonOff.tooltip");
+  },
+
+  /**
+   * The type of the area in which the button is currently located.
+   * When in the panel, we don't update the button's icon.
+   */
+  _currentAreaType: null,
+  _shouldUpdateStarState: function() {
+//    return this._currentAreaType == CustomizableUI.TYPE_TOOLBAR;
+    return;
   },
 
   /**
