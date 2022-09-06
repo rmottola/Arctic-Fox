@@ -336,7 +336,7 @@ const Class SharedArrayBufferObject::class_ = {
 };
 
 JSObject*
-js::InitSharedArrayBufferClass(JSContext *cx, HandleObject obj)
+js::InitSharedArrayBufferClass(JSContext* cx, HandleObject obj)
 {
     MOZ_ASSERT(obj->isNative());
     Rooted<GlobalObject*> global(cx, &obj->as<GlobalObject>());

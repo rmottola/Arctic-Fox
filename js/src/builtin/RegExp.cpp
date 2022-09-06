@@ -198,7 +198,7 @@ RegExpInitialize(JSContext* cx, RegExpObjectBuilder& builder,
  * Compile a new |RegExpShared| for the |RegExpObject|.
  */
 static bool
-CompileRegExpObject(JSContext* cx, RegExpObjectBuilder& builder, CallArgs args,
+CompileRegExpObject(JSContext* cx, RegExpObjectBuilder& builder, const CallArgs& args,
                     RegExpCreationMode creationMode, bool patternIsRegExp=false)
 {
     if (args.length() == 0) {
@@ -328,6 +328,12 @@ CompileRegExpObject(JSContext* cx, RegExpObjectBuilder& builder, CallArgs args,
     return true;
 }
 
+MOZ_ALWAYS_INLINE bool
+IsRegExpObject(HandleValue v)
+{
+    return v.isObject() && v.toObject().is<RegExpObject>();
+}
+
 /* ES6 draft rc3 7.2.8. */
 bool
 js::IsRegExp(JSContext* cx, HandleValue value, bool* result)
@@ -358,12 +364,6 @@ js::IsRegExp(JSContext* cx, HandleValue value, bool* result)
 
     *result = cls == ESClass_RegExp;
     return true;
-}
-
-MOZ_ALWAYS_INLINE bool
-IsRegExpObject(HandleValue v)
-{
-    return v.isObject() && v.toObject().is<RegExpObject>();
 }
 
 /* ES6 draft rc4 B.2.5.1. */

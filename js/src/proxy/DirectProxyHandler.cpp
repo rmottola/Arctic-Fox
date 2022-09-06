@@ -33,9 +33,9 @@ DirectProxyHandler::getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, 
 }
 
 bool
-DirectProxyHandler::defineProperty(JSContext *cx, HandleObject proxy, HandleId id,
+DirectProxyHandler::defineProperty(JSContext* cx, HandleObject proxy, HandleId id,
                                    Handle<PropertyDescriptor> desc,
-                                   ObjectOpResult &result) const
+                                   ObjectOpResult& result) const
 {
     assertEnteredPolicy(cx, proxy, id, SET);
     RootedObject target(cx, proxy->as<ProxyObject>().target());
@@ -52,8 +52,8 @@ DirectProxyHandler::ownPropertyKeys(JSContext* cx, HandleObject proxy,
 }
 
 bool
-DirectProxyHandler::delete_(JSContext *cx, HandleObject proxy, HandleId id,
-                            ObjectOpResult &result) const
+DirectProxyHandler::delete_(JSContext* cx, HandleObject proxy, HandleId id,
+                            ObjectOpResult& result) const
 {
     assertEnteredPolicy(cx, proxy, id, SET);
     RootedObject target(cx, proxy->as<ProxyObject>().target());
@@ -118,36 +118,36 @@ DirectProxyHandler::hasInstance(JSContext* cx, HandleObject proxy, MutableHandle
 }
 
 bool
-DirectProxyHandler::getPrototype(JSContext *cx, HandleObject proxy, MutableHandleObject protop) const
+DirectProxyHandler::getPrototype(JSContext* cx, HandleObject proxy, MutableHandleObject protop) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     return GetPrototype(cx, target, protop);
 }
 
 bool
-DirectProxyHandler::setPrototype(JSContext *cx, HandleObject proxy, HandleObject proto,
-                                 ObjectOpResult &result) const
+DirectProxyHandler::setPrototype(JSContext* cx, HandleObject proxy, HandleObject proto,
+                                 ObjectOpResult& result) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     return SetPrototype(cx, target, proto, result);
 }
 
 bool
-DirectProxyHandler::setImmutablePrototype(JSContext *cx, HandleObject proxy, bool *succeeded) const
+DirectProxyHandler::setImmutablePrototype(JSContext* cx, HandleObject proxy, bool* succeeded) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     return SetImmutablePrototype(cx, target, succeeded);
 }
 
 bool
-DirectProxyHandler::preventExtensions(JSContext *cx, HandleObject proxy, ObjectOpResult &result) const
+DirectProxyHandler::preventExtensions(JSContext* cx, HandleObject proxy, ObjectOpResult& result) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     return PreventExtensions(cx, target, result);
 }
 
 bool
-DirectProxyHandler::isExtensible(JSContext *cx, HandleObject proxy, bool *extensible) const
+DirectProxyHandler::isExtensible(JSContext* cx, HandleObject proxy, bool* extensible) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     return IsExtensible(cx, target, extensible);
@@ -233,8 +233,8 @@ DirectProxyHandler::get(JSContext* cx, HandleObject proxy, HandleValue receiver,
 }
 
 bool
-DirectProxyHandler::set(JSContext *cx, HandleObject proxy, HandleId id, HandleValue v,
-                        HandleValue receiver, ObjectOpResult &result) const
+DirectProxyHandler::set(JSContext* cx, HandleObject proxy, HandleId id, HandleValue v,
+                        HandleValue receiver, ObjectOpResult& result) const
 {
     assertEnteredPolicy(cx, proxy, id, SET);
     RootedObject target(cx, proxy->as<ProxyObject>().target());
