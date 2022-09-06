@@ -556,6 +556,7 @@
                    placespopup="true"
                    context="placesContext"
                    openInTabs="children"
+                   anonanchorclass="toolbarbutton-menubutton-dropmarker"
                    oncommand="BookmarksEventHandler.onCommand(event, this.parentNode._placesView);"
                    onclick="event.stopPropagation();
                             BookmarksEventHandler.onClick(event, this.parentNode._placesView);"
