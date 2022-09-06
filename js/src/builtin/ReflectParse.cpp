@@ -2663,8 +2663,6 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
 
         RootedValue init(cx), test(cx), update(cx);
 
-        // Init with nullptr in case of a freshen block (for(let x;;)),
-        // disconnecting chain inheritance.
         return forInit(head->pn_kid1 && !head->pn_kid1->isKind(PNK_FRESHENBLOCK)
                        ? head->pn_kid1
                        : nullptr,
@@ -2819,15 +2817,14 @@ ASTSerializer::rightAssociate(ParseNode* pn, MutableHandleValue dst)
     MOZ_ASSERT(pn->isArity(PN_LIST));
     MOZ_ASSERT(pn->pn_count >= 1);
 
-    // First, we need to reverse the list, so that we can traverse it in the correct order.
+    // First, we need to reverse the list, so that we can traverse it in the right order.
     // It's OK to destructively reverse the list, because there are no other consumers.
 
     ParseNode* head = pn->pn_head;
     ParseNode* prev = nullptr;
     ParseNode* current = head;
     ParseNode* next;
-    while (current != nullptr)
-    {
+    while (current != nullptr) {
         next = current->pn_next;
         current->pn_next = prev;
         prev = current;
