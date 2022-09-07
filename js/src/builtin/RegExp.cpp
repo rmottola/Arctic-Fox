@@ -503,6 +503,35 @@ regexp_multiline(JSContext* cx, unsigned argc, JS::Value* vp)
     return CallNonGenericMethod<IsRegExpObject, regexp_multiline_impl>(cx, args);
 }
 
+/* ES6 draft rev32 21.2.5.10. */
+MOZ_ALWAYS_INLINE bool
+regexp_source_impl(JSContext* cx, const CallArgs& args)
+{
+    MOZ_ASSERT(IsRegExpObject(args.thisv()));
+    Rooted<RegExpObject*> reObj(cx, &args.thisv().toObject().as<RegExpObject>());
+
+    /* Step 5. */
+    RootedAtom src(cx, reObj->getSource());
+    if (!src)
+        return false;
+
+    /* Step 7. */
+    RootedString str(cx, EscapeRegExpPattern(cx, src));
+    if (!str)
+        return false;
+
+    args.rval().setString(str);
+    return true;
+}
+
+static bool
+regexp_source(JSContext* cx, unsigned argc, JS::Value* vp)
+{
+    /* Steps 1-4. */
+    CallArgs args = CallArgsFromVp(argc, vp);
+    return CallNonGenericMethod<IsRegExpObject, regexp_source_impl>(cx, args);
+}
+
 /* ES6 draft rev32 21.2.5.12. */
 MOZ_ALWAYS_INLINE bool
 regexp_sticky_impl(JSContext* cx, const CallArgs& args)
@@ -528,6 +557,7 @@ const JSPropertySpec js::regexp_properties[] = {
     JS_PSG("global", regexp_global, 0),
     JS_PSG("ignoreCase", regexp_ignoreCase, 0),
     JS_PSG("multiline", regexp_multiline, 0),
+    JS_PSG("source", regexp_source, 0),
     JS_PSG("sticky", regexp_sticky, 0),
     JS_PS_END
 };
