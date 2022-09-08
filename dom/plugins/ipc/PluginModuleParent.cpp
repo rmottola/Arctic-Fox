@@ -47,6 +47,11 @@
 #include "PluginHangUIParent.h"
 #endif
 
+#ifdef MOZ_ENABLE_PROFILER_SPS
+#include "nsIProfiler.h"
+#include "nsIProfileSaveEvent.h"
+#endif
+
 #ifdef MOZ_WIDGET_GTK
 #include <glib.h>
 #elif XP_MACOSX
@@ -690,7 +695,9 @@ PluginModuleChromeParent::PluginModuleChromeParent(const char* aFilePath,
     sInstantiated = true;
     mRunID = GeckoChildProcessHost::GetUniqueID();
 
-    RegisterSettingsCallbacks();
+#ifdef MOZ_ENABLE_PROFILER_SPS
+    InitPluginProfiling();
+#endif
 
     mozilla::HangMonitor::RegisterAnnotator(*this);
 }
@@ -700,6 +707,10 @@ PluginModuleChromeParent::~PluginModuleChromeParent()
     if (!OkToCleanup()) {
         NS_RUNTIMEABORT("unsafe destruction");
     }
+
+#ifdef MOZ_ENABLE_PROFILER_SPS
+    ShutdownPluginProfiling();
+#endif
 
     if (!mShutdown) {
         NS_WARNING("Plugin host deleted the module without shutting down.");
@@ -741,6 +752,52 @@ PluginModuleChromeParent::~PluginModuleChromeParent()
 
     mozilla::HangMonitor::UnregisterAnnotator(*this);
 }
+
+#ifdef MOZ_CRASHREPORTER
+void
+PluginModuleChromeParent::WriteExtraDataForMinidump(AnnotationTable& notes)
+{
+#ifdef XP_WIN
+    // mCrashReporterMutex is already held by the caller
+    mCrashReporterMutex.AssertCurrentThreadOwns();
+#endif
+    typedef nsDependentCString CS;
+
+    // Get the plugin filename, try to get just the file leafname
+    const std::string& pluginFile = mSubprocess->GetPluginFilePath();
+    size_t filePos = pluginFile.rfind(FILE_PATH_SEPARATOR);
+    if (filePos == std::string::npos)
+        filePos = 0;
+    else
+        filePos++;
+    notes.Put(NS_LITERAL_CSTRING("PluginFilename"), CS(pluginFile.substr(filePos).c_str()));
+
+    notes.Put(NS_LITERAL_CSTRING("PluginName"), mPluginName);
+    notes.Put(NS_LITERAL_CSTRING("PluginVersion"), mPluginVersion);
+
+    CrashReporterParent* crashReporter = CrashReporter();
+    if (crashReporter) {
+#ifdef XP_WIN
+        if (mPluginCpuUsageOnHang.Length() > 0) {
+            notes.Put(NS_LITERAL_CSTRING("NumberOfProcessors"),
+                      nsPrintfCString("%d", PR_GetNumberOfProcessors()));
+
+            nsCString cpuUsageStr;
+            cpuUsageStr.AppendFloat(std::ceil(mPluginCpuUsageOnHang[0] * 100) / 100);
+            notes.Put(NS_LITERAL_CSTRING("PluginCpuUsage"), cpuUsageStr);
+
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+            for (uint32_t i=1; i<mPluginCpuUsageOnHang.Length(); ++i) {
+                nsCString tempStr;
+                tempStr.AppendFloat(std::ceil(mPluginCpuUsageOnHang[i] * 100) / 100);
+                notes.Put(nsPrintfCString("CpuUsageFlashProcess%d", i), tempStr);
+            }
+#endif
+        }
+#endif
+    }
+}
+#endif  // MOZ_CRASHREPORTER
 
 void
 PluginModuleParent::SetChildTimeout(const int32_t aChildTimeout)
@@ -1055,6 +1112,20 @@ PluginModuleChromeParent::AnnotateHang(mozilla::HangMonitor::HangAnnotations& aA
     }
 }
 
+#ifdef MOZ_CRASHREPORTER
+static bool
+CreatePluginMinidump(base::ProcessId processId, ThreadId childThread,
+                     nsIFile* parentMinidump, const nsACString& name)
+{
+  mozilla::ipc::ScopedProcessHandle handle;
+  if (processId == 0 ||
+      !base::OpenPrivilegedProcessHandle(processId, &handle.rwget())) {
+    return false;
+  }
+  return CreateAdditionalChildMinidump(handle, 0, parentMinidump, name);
+}
+#endif
+
 bool
 PluginModuleChromeParent::ShouldContinueFromReplyTimeout()
 {
@@ -1114,6 +1185,19 @@ PluginModuleChromeParent::TerminateChildProcess(MessageLoop* aMsgLoop,
     if (childOpened) {
         processHandles.AppendElement(geckoChildProcess);
     }
+
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+    mozilla::ipc::ScopedProcessHandle flashBrokerProcess;
+    if (mFlashProcess1 &&
+        base::OpenProcessHandle(mFlashProcess1, &flashBrokerProcess.rwget())) {
+        processHandles.AppendElement(flashBrokerProcess);
+    }
+    mozilla::ipc::ScopedProcessHandle flashSandboxProcess;
+    if (mFlashProcess2 &&
+        base::OpenProcessHandle(mFlashProcess2, &flashSandboxProcess.rwget())) {
+        processHandles.AppendElement(flashSandboxProcess);
+    }
+#endif
 
     if (!GetProcessCpuUsage(processHandles, mPluginCpuUsageOnHang)) {
       mPluginCpuUsageOnHang.Clear();
@@ -1260,6 +1344,102 @@ PluginModuleChromeParent::OnHangUIContinue()
     mHangAnnotationFlags |= kHangUIContinued;
 }
 #endif // XP_WIN
+
+#ifdef MOZ_CRASHREPORTER
+CrashReporterParent*
+PluginModuleChromeParent::CrashReporter()
+{
+    return static_cast<CrashReporterParent*>(ManagedPCrashReporterParent()[0]);
+}
+
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+static void
+RemoveMinidump(nsIFile* minidump)
+{
+    if (!minidump)
+        return;
+
+    minidump->Remove(false);
+    nsCOMPtr<nsIFile> extraFile;
+    if (GetExtraFileForMinidump(minidump,
+                                getter_AddRefs(extraFile))) {
+        extraFile->Remove(true);
+    }
+}
+#endif // MOZ_CRASHREPORTER_INJECTOR
+
+void
+PluginModuleChromeParent::ProcessFirstMinidump()
+{
+#ifdef XP_WIN
+    mozilla::MutexAutoLock lock(mCrashReporterMutex);
+#endif
+    CrashReporterParent* crashReporter = CrashReporter();
+    if (!crashReporter)
+        return;
+
+    AnnotationTable notes(4);
+    WriteExtraDataForMinidump(notes);
+
+    if (!mPluginDumpID.IsEmpty()) {
+        crashReporter->GenerateChildData(&notes);
+        return;
+    }
+
+    uint32_t sequence = UINT32_MAX;
+    nsCOMPtr<nsIFile> dumpFile;
+    nsAutoCString flashProcessType;
+    TakeMinidump(getter_AddRefs(dumpFile), &sequence);
+
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+    nsCOMPtr<nsIFile> childDumpFile;
+    uint32_t childSequence;
+
+    if (mFlashProcess1 &&
+        TakeMinidumpForChild(mFlashProcess1,
+                             getter_AddRefs(childDumpFile),
+                             &childSequence)) {
+        if (childSequence < sequence) {
+            RemoveMinidump(dumpFile);
+            dumpFile = childDumpFile;
+            sequence = childSequence;
+            flashProcessType.AssignLiteral("Broker");
+        }
+        else {
+            RemoveMinidump(childDumpFile);
+        }
+    }
+    if (mFlashProcess2 &&
+        TakeMinidumpForChild(mFlashProcess2,
+                             getter_AddRefs(childDumpFile),
+                             &childSequence)) {
+        if (childSequence < sequence) {
+            RemoveMinidump(dumpFile);
+            dumpFile = childDumpFile;
+            sequence = childSequence;
+            flashProcessType.AssignLiteral("Sandbox");
+        }
+        else {
+            RemoveMinidump(childDumpFile);
+        }
+    }
+#endif
+
+    if (!dumpFile) {
+        NS_WARNING("[PluginModuleParent::ActorDestroy] abnormal shutdown without minidump!");
+        return;
+    }
+
+    PLUGIN_LOG_DEBUG(("got child minidump: %s",
+                      NS_ConvertUTF16toUTF8(mPluginDumpID).get()));
+
+    GetIDFromMinidump(dumpFile, mPluginDumpID);
+    if (!flashProcessType.IsEmpty()) {
+        notes.Put(NS_LITERAL_CSTRING("FlashProcessDump"), flashProcessType);
+    }
+    crashReporter->GenerateCrashReportForMinidump(dumpFile, &notes);
+}
+#endif
 
 void
 PluginModuleParent::ActorDestroy(ActorDestroyReason why)
@@ -2032,6 +2212,9 @@ PluginModuleChromeParent::RecvNP_InitializeResult(const NPError& aError)
         }
 #endif
 
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+        InitializeInjector();
+#endif
     }
 
     return PluginModuleParent::RecvNP_InitializeResult(aError) && ok;
@@ -2790,8 +2973,8 @@ PluginModuleChromeParent::OnCrash(DWORD processID)
 #endif // MOZ_CRASHREPORTER_INJECTOR
 
 #ifdef MOZ_ENABLE_PROFILER_SPS
-class PluginProfilerObserver MOZ_FINAL : public nsIObserver,
-                                         public nsSupportsWeakReference
+class PluginProfilerObserver final : public nsIObserver,
+                                     public nsSupportsWeakReference
 {
 public:
     NS_DECL_ISUPPORTS
@@ -2891,4 +3074,5 @@ PluginModuleChromeParent::RecvProfile(const nsCString& aProfile)
 #endif
     return true;
 }
+
 
