@@ -3114,7 +3114,15 @@ PluginModuleChromeParent::OnCrash(DWORD processID)
 {
     if (!mShutdown) {
         GetIPCChannel()->CloseWithError();
-        KillProcess(OtherProcess(), 1, false);
+        mozilla::ipc::ScopedProcessHandle geckoPluginChild;
+        if (base::OpenProcessHandle(OtherPid(), &geckoPluginChild.rwget())) {
+            if (!base::KillProcess(geckoPluginChild,
+                                   base::PROCESS_END_KILLED_BY_USER, false)) {
+                NS_ERROR("May have failed to kill child process.");
+            }
+        } else {
+            NS_ERROR("Failed to open child process when attempting kill.");
+        }
     }
 }
 
