@@ -218,7 +218,7 @@ InterpreterFrame::popOffScopeChain()
 }
 
 inline void
-InterpreterFrame::replaceInnermostScope(ScopeObject &scope)
+InterpreterFrame::replaceInnermostScope(ScopeObject& scope)
 {
     MOZ_ASSERT(flags_ & HAS_SCOPECHAIN);
     MOZ_ASSERT(scope.enclosingScope() == scopeChain_->as<ScopeObject>().enclosingScope());
@@ -862,7 +862,7 @@ AbstractFramePtr::newTarget() const
 }
 
 inline bool
-AbstractFramePtr::freshenBlock(JSContext *cx) const
+AbstractFramePtr::freshenBlock(JSContext* cx) const
 {
     if (isInterpreterFrame())
         return asInterpreterFrame()->freshenBlock(cx);
