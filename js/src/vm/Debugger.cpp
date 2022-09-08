@@ -2304,7 +2304,7 @@ Debugger::isObservedByDebuggerTrackingAllocations(const GlobalObject& debuggee)
     if (auto* v = debuggee.getDebuggers()) {
         Debugger** p;
         for (p = v->begin(); p != v->end(); p++) {
-            if ((*p)->trackingAllocationSites) {
+            if ((*p)->trackingAllocationSites && (*p)->enabled) {
                 return true;
             }
         }
@@ -3417,10 +3417,10 @@ Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global)
     });
 
     // (5)
-    if (trackingAllocationSites && !Debugger::addAllocationsTracking(cx, *global))
+    if (trackingAllocationSites && enabled && !Debugger::addAllocationsTracking(cx, *global))
             return false;
     auto allocationsTrackingGuard = MakeScopeExit([&] {
-        if (trackingAllocationSites)
+        if (trackingAllocationSites && enabled)
             Debugger::removeAllocationsTracking(*global);
     });
 
