@@ -2833,7 +2833,13 @@ pref("dom.ipc.plugins.flash.disable-protected-mode", false);
 // Defaults to 1 minute.
 pref("dom.ipc.plugins.unloadTimeoutSecs", 60);
 
-pref("dom.ipc.plugins.asyncInit", true);
+// Asynchronous plugin initialization should only be enabled on non-e10s
+// channels until some remaining bugs are resolved.
+#ifdef E10S_TESTING_ONLY
+pref("dom.ipc.plugins.asyncInit.enabled", false);
+#else
+pref("dom.ipc.plugins.asyncInit.enabled", true);
+#endif
 
 pref("dom.ipc.processCount", 1);
 
