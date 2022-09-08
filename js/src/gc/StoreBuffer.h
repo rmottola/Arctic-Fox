@@ -155,8 +155,7 @@ class StoreBuffer
         }
 
         bool isAboutToOverflow() const {
-            return !storage_->isEmpty() &&
-                   storage_->availableInCurrentChunk() < LowAvailableThreshold;
+            return !storage_->isEmpty() && storage_->availableInCurrentChunk() < LowAvailableThreshold;
         }
 
         /* Trace all generic edges. */
