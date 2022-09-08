@@ -332,11 +332,11 @@ InterpreterFrame::pushBlock(JSContext* cx, StaticBlockObject& block)
 }
 
 bool
-InterpreterFrame::freshenBlock(JSContext *cx)
+InterpreterFrame::freshenBlock(JSContext* cx)
 {
     MOZ_ASSERT(flags_ & HAS_SCOPECHAIN);
     Rooted<ClonedBlockObject*> block(cx, &scopeChain_->as<ClonedBlockObject>());
-    ClonedBlockObject *fresh = ClonedBlockObject::clone(cx, block);
+    ClonedBlockObject* fresh = ClonedBlockObject::clone(cx, block);
     if (!fresh)
         return false;
 
@@ -362,7 +362,7 @@ InterpreterFrame::popWith(JSContext* cx)
 }
 
 void
-InterpreterFrame::mark(JSTracer *trc)
+InterpreterFrame::mark(JSTracer* trc)
 {
     /*
      * Normally we would use MarkRoot here, except that generators also take
@@ -1763,7 +1763,7 @@ ActivationIterator::settle()
         activation_ = activation_->prev();
 }
 
-JS::ProfilingFrameIterator::ProfilingFrameIterator(JSRuntime *rt, const RegisterState &state,
+JS::ProfilingFrameIterator::ProfilingFrameIterator(JSRuntime* rt, const RegisterState& state,
                                                    uint32_t sampleBufferGen)
   : rt_(rt),
     sampleBufferGen_(sampleBufferGen),

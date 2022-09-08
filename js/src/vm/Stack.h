@@ -327,20 +327,20 @@ class InterpreterFrame
         HAS_ARGS_OBJ           =      0x200,  /* ArgumentsObject created for needsArgsObj script */
 
         /* Lazy frame initialization */
-        HAS_RVAL              =      0x800,  /* frame has rval_ set */
-        HAS_SCOPECHAIN        =     0x1000,  /* frame has scopeChain_ set */
+        HAS_RVAL               =      0x800,  /* frame has rval_ set */
+        HAS_SCOPECHAIN         =     0x1000,  /* frame has scopeChain_ set */
 
         /* Debugger state */
-        PREV_UP_TO_DATE       =     0x4000,  /* see DebugScopes::updateLiveScopes */
+        PREV_UP_TO_DATE        =     0x4000,  /* see DebugScopes::updateLiveScopes */
 
         /*
          * See comment above 'isDebuggee' in jscompartment.h for explanation of
          * invariants of debuggee compartments, scripts, and frames.
          */
-        DEBUGGEE              =     0x8000,  /* Execution is being observed by Debugger */
+        DEBUGGEE               =     0x8000,  /* Execution is being observed by Debugger */
 
         /* Used in tracking calls and profiling (see vm/SPSProfiler.cpp) */
-        HAS_PUSHED_SPS_FRAME  =   0x10000, /* SPS was notified of enty */
+        HAS_PUSHED_SPS_FRAME   =    0x10000, /* SPS was notified of enty */
 
 
         /*

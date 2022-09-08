@@ -180,25 +180,6 @@ struct SavedFrame::HashPolicy
 // SavedFrame object or wrapper (Xray or CCW) around a SavedFrame object.
 inline void AssertObjectIsSavedFrameOrWrapper(JSContext* cx, HandleObject stack);
 
-inline void
-SavedFrame::Iterator::operator++()
-{
-    frame_ = frame_->getParent();
-}
-
-inline void
-SavedFrame::ConstIterator::operator++()
-{
-    frame_ = frame_->getParent();
-}
-
-inline void
-SavedFrame::RootedIterator::operator++()
-{
-    MOZ_ASSERT(range_);
-    range_->frame_ = range_->frame_->getParent();
-}
-
 // When we reconstruct a SavedFrame stack from a JS::ubi::StackFrame, we may not
 // have access to the principals that the original stack was captured
 // with. Instead, we use these two singleton principals based on whether
@@ -233,6 +214,25 @@ struct ReconstructedSavedFramePrincipals : public JSPrincipals
         return f.isSystem() ? &IsSystem : &IsNotSystem;
     }
 };
+
+inline void
+SavedFrame::Iterator::operator++()
+{
+    frame_ = frame_->getParent();
+}
+
+inline void
+SavedFrame::ConstIterator::operator++()
+{
+    frame_ = frame_->getParent();
+}
+
+inline void
+SavedFrame::RootedIterator::operator++()
+{
+    MOZ_ASSERT(range_);
+    range_->frame_ = range_->frame_->getParent();
+}
 
 } // namespace js
 

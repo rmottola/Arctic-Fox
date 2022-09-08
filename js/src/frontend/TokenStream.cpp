@@ -1824,7 +1824,7 @@ TokenStream::getStringOrTemplateToken(int untilChar, Token** tp)
                     }
 
                     c = char16_t(val);
-                } 
+                }
                 break;
             }
         } else if (TokenBuf::isRawEOLChar(c)) {
