@@ -159,8 +159,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
-  "resource:///modules/FormValidationHandler.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "SitePermissions",
+  "resource:///modules/SitePermissions.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
+  "resource:///modules/sessionstore/SessionStore.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "gWebRTCUI",
   "resource:///modules/webrtcUI.jsm", "webrtcUI");
@@ -172,14 +175,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "PluginCrashReporter",
   "resource:///modules/ContentCrashReporters.jsm");
 #endif
 
-XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
-  "resource:///modules/sessionstore/SessionStore.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
+  "resource:///modules/FormValidationHandler.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "SitePermissions",
-  "resource:///modules/SitePermissions.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",
-  "resource:///modules/ReaderParent.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "UITour",
+  "resource:///modules/UITour.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "CastingApps",
   "resource:///modules/CastingApps.jsm");
@@ -187,8 +187,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "CastingApps",
 XPCOMUtils.defineLazyModuleGetter(this, "SimpleServiceDiscovery",
   "resource://gre/modules/SimpleServiceDiscovery.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "UITour",
-  "resource:///modules/UITour.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",
+  "resource:///modules/ReaderParent.jsm");
 
 var gInitialPages = [
   "about:blank",
@@ -3401,7 +3401,7 @@ const BrowserSearch = {
                  inBackground: inBackground,
                  relatedToCurrent: true });
 
-   return engine;
+    return engine;
   },
 
   /**
@@ -7143,10 +7143,14 @@ function getTabModalPromptBox(aWindow) {
 };
 
 /* DEPRECATED */
-function getBrowser() gBrowser;
-function getNavToolbox() gNavToolbox;
+function getBrowser() {
+  return gBrowser;
+}
+function getNavToolbox() {
+  return gNavToolbox;
+}
 
-let gPrivateBrowsingUI = {
+var gPrivateBrowsingUI = {
   init: function PBUI_init() {
     // Do nothing for normal windows
     if (!PrivateBrowsingUtils.isWindowPrivate(window)) {
@@ -7204,7 +7208,7 @@ let gPrivateBrowsingUI = {
   }
 };
 
-let gRemoteTabsUI = {
+var gRemoteTabsUI = {
   init: function() {
     if (window.location.href != getBrowserURL() &&
         // Also check hidden window for the Mac no-window case
@@ -7343,7 +7347,7 @@ function switchToTabHavingURI(aURI, aOpenNew, aOpenParams={}) {
   return false;
 }
 
-let RestoreLastSessionObserver = {
+var RestoreLastSessionObserver = {
   init: function () {
     if (SessionStore.canRestoreLastSession &&
         !PrivateBrowsingUtils.isWindowPrivate(window)) {
@@ -7671,7 +7675,7 @@ function BrowserOpenNewTabOrWindow(event) {
   }
 }
 
-let ToolbarIconColor = {
+var ToolbarIconColor = {
   init: function () {
     this._initialized = true;
 
