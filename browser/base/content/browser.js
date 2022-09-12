@@ -1052,7 +1052,6 @@ var gBrowserInit = {
     gPrivateBrowsingUI.init();
     TabsInTitlebar.init();
     retrieveToolbarIconsizesFromTheme();
-    ToolbarIconColor.init();
 
 #ifdef XP_WIN
     if (window.matchMedia("(-moz-os-version: windows-win8)").matches &&
@@ -1071,6 +1070,8 @@ var gBrowserInit = {
       }
     }
 #endif
+
+    ToolbarIconColor.init();
 
     // Wait until chrome is painted before executing code not critical to making the window visible
     this._boundDelayedStartup = this._delayedStartup.bind(this);
