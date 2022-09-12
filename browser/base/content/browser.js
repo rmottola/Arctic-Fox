@@ -1239,6 +1239,11 @@ var gBrowserInit = {
       TabCrashReporter.init();
 #endif
 
+    // Initialize the full zoom setting.
+    // We do this before the session restore service gets initialized so we can
+    // apply full zoom settings to tabs restored by the session restore service.
+    FullZoom.init();
+
     SidebarUI.startDelayedLoad();
 
     UpdateUrlbarSearchSplitterState();
@@ -1279,11 +1284,6 @@ var gBrowserInit = {
     // menus if global click-and-hold isn't turned on
     if (!getBoolPref("ui.click_hold_context_menus", false))
       SetClickAndHoldHandlers();
-
-    // Initialize the full zoom setting.
-    // We do this before the session restore service gets initialized so we can
-    // apply full zoom settings to tabs restored by the session restore service.
-    FullZoom.init();
 
     let NP = {};
     Cu.import("resource:///modules/NetworkPrioritizer.jsm", NP);
