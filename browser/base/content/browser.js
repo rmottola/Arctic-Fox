@@ -130,7 +130,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "Weave",
 
 XPCOMUtils.defineLazyGetter(this, "PopupNotifications", function () {
   let tmp = {};
-  Cu.import("resource:///modules/PopupNotifications.jsm", tmp);
+  Cu.import("resource://gre/modules/PopupNotifications.jsm", tmp);
   try {
     return new tmp.PopupNotifications(gBrowser,
                                       document.getElementById("notification-popup"),
