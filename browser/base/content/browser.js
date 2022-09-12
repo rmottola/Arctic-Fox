@@ -1093,9 +1093,6 @@ var gBrowserInit = {
 
     this._cancelDelayedStartup();
 
-    let uriToLoad = this._getUriToLoad();
-    var isLoadingBlank = isBlankPageURL(uriToLoad);
-
     // This pageshow listener needs to be registered before we may call
     // swapBrowsersAndCloseOther() to receive pageshow events fired by that.
     let mm = window.messageManager;
@@ -1146,6 +1143,7 @@ var gBrowserInit = {
       }
     }, false, true);
 
+    let uriToLoad = this._getUriToLoad();
     if (uriToLoad && uriToLoad != "about:blank") {
       if (uriToLoad instanceof Ci.nsISupportsArray) {
         let count = uriToLoad.Count();
@@ -1245,8 +1243,10 @@ var gBrowserInit = {
 
     UpdateUrlbarSearchSplitterState();
 
-    if (!isLoadingBlank || !focusAndSelectUrlBar())
+    if (!(isBlankPageURL(uriToLoad) || uriToLoad == "about:privatebrowsing") ||
+        !focusAndSelectUrlBar()) {
       gBrowser.selectedBrowser.focus();
+    }
 
     gNavToolbox.customizeDone = BrowserToolboxCustomizeDone;
     gNavToolbox.customizeChange = BrowserToolboxCustomizeChange;
