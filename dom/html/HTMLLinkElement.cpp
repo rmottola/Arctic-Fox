@@ -333,7 +333,7 @@ HTMLLinkElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
   // already been set or unset.  ResetLinkState needs the updated attribute
   // value because notifying the document that content states have changed will
   // call IntrinsicState, which will try to get updated information about the
-  // visited state from Link.
+  // visitedness from Link.
   if (aName == nsGkAtoms::href && kNameSpaceID_None == aNameSpaceID) {
     bool hasHref = aValue;
     Link::ResetLinkState(!!aNotify, hasHref);
@@ -370,7 +370,7 @@ HTMLLinkElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
           UpdatePreconnect();
         }
       }
-    
+
       UpdateStyleSheetInternal(nullptr, nullptr,
                                dropSheet ||
                                (aName == nsGkAtoms::title ||
@@ -394,7 +394,7 @@ HTMLLinkElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
       }
     }
   }
-  
+
   return nsGenericHTMLElement::AfterSetAttr(aNameSpaceID, aName, aValue,
                                             aNotify);
 }
