@@ -41,6 +41,11 @@ this.ContentLinkHandler = {
     if (!link || !link.ownerDocument || !rel || !link.href)
       return;
 
+    // Ignore sub-frames (bugs 305472, 479408).
+    let window = link.ownerDocument.defaultView;
+    if (window != window.top)
+      return;
+
     var feedAdded = false;
     var iconAdded = false;
     var searchAdded = false;
