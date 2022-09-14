@@ -846,3 +846,20 @@ this.BrowserUITelemetry = {
     return timeStr;
   },
 };
+
+/**
+ * Returns the id of the first ancestor of aNode that has an id. If aNode
+ * has no parent, or no ancestor has an id, returns null.
+ *
+ * @param aNode the node to find the first ID'd ancestor of
+ */
+function getIDBasedOnFirstIDedAncestor(aNode) {
+  while (!aNode.id) {
+    aNode = aNode.parentNode;
+    if (!aNode) {
+      return null;
+    }
+  }
+
+  return aNode.id;
+}
