@@ -116,8 +116,8 @@ function crc32(str) {
  * Setup Telemetry logging. This function also gets called when loggin related
  * preferences change.
  */
-let gLogger = null;
-let gLogAppenderDump = null;
+var gLogger = null;
+var gLogAppenderDump = null;
 function configureLogging() {
   if (!gLogger) {
     gLogger = Log.repository.getLogger(LOGGER_NAME);
@@ -148,7 +148,7 @@ function configureLogging() {
 /**
  * This is a policy object used to override behavior for testing.
  */
-let Policy = {
+var Policy = {
   now: () => new Date(),
   generatePingId: () => Utils.generateUUID(),
   getCachedClientID: () => ClientID.getCachedClientID(),
@@ -362,7 +362,7 @@ this.TelemetryController = Object.freeze({
   },
 });
 
-let Impl = {
+var Impl = {
   _initialized: false,
   _initStarted: false, // Whether we started setting up TelemetryController.
   _logger: null,

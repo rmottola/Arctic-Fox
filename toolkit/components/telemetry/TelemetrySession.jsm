@@ -108,7 +108,7 @@ const TOPIC_CYCLE_COLLECTOR_BEGIN = "cycle-collector-begin";
 
 var gLastMemoryPoll = null;
 
-let gWasDebuggerAttached = false;
+var gWasDebuggerAttached = false;
 
 function getLocale() {
   return Cc["@mozilla.org/chrome/chrome-registry;1"].
@@ -163,7 +163,7 @@ function generateUUID() {
 /**
  * This is a policy object used to override behavior for testing.
  */
-let Policy = {
+var Policy = {
   now: () => new Date(),
   generateSessionUUID: () => generateUUID(),
   generateSubsessionUUID: () => generateUUID(),
@@ -217,7 +217,7 @@ function toLocalTimeISOString(date) {
 /**
  * Read current process I/O counters.
  */
-let processInfo = {
+var processInfo = {
   _initialized: false,
   _IO_COUNTERS: null,
   _kernel32: null,
@@ -358,7 +358,7 @@ SaveSerializer.prototype = {
  * reasoning about scheduling actions in a single place, making it easier to
  * coordinate jobs and coalesce them.
  */
-let TelemetryScheduler = {
+var TelemetryScheduler = {
   _lastDailyPingTime: 0,
   _lastSessionCheckpointTime: 0,
 
@@ -759,7 +759,7 @@ this.TelemetrySession = Object.freeze({
   },
 });
 
-let Impl = {
+var Impl = {
   _histograms: {},
   _initialized: false,
   _logger: null,
