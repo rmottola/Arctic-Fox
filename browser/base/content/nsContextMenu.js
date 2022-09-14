@@ -1089,9 +1089,6 @@ nsContextMenu.prototype = {
   },
 
   saveVideoFrameAsImage: function () {
-    urlSecurityCheck(this.mediaURL,
-                     this.browser.contentPrincipal,
-                     Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
     let mm = this.browser.messageManager;
     let name = "";
     try {
