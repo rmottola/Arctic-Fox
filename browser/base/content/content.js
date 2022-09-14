@@ -655,6 +655,13 @@ addMessageListener("ContextMenu:ReloadImage", (message) => {
     image.forceReload();
 });
 
+addMessageListener("ContextMenu:BookmarkFrame", (message) => {
+  let frame = message.objects.target.ownerDocument;
+  sendAsyncMessage("ContextMenu:BookmarkFrame:Result",
+                   { title: frame.title,
+                     description: PlacesUIUtils.getDescriptionFromDocument(frame) });
+});
+
 addMessageListener("ContextMenu:SearchFieldBookmarkData", (message) => {
   let node = message.objects.target;
 
