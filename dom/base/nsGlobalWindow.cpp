@@ -55,7 +55,6 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/Likely.h"
 #include "mozilla/unused.h"
-#include "../../js/public/HashTable.h" // for MultiCompartmentMatcher
 
 // Other Classes
 #include "mozilla/dom/BarProps.h"
@@ -9179,22 +9178,6 @@ struct BrowserCompartmentMatcher : public js::CompartmentFilter {
   }
 };
 
-class MultiCompartmentMatcher : public js::CompartmentFilter {
-  friend class WindowRequestCleanupEvent;
-
-  js::HashSet<JSCompartment*,js::DefaultHasher<JSCompartment*>,js::SystemAllocPolicy> compartments;
-
-  MultiCompartmentMatcher()
-  {
-    compartments.init();
-  }
-  
-public: 
-  virtual bool match(JSCompartment* c) const override
-  {
-    return compartments.has(c);
-  }
-};
 
 class WindowDestroyedEvent : public nsRunnable
 {
