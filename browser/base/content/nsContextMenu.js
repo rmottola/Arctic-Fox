@@ -1057,36 +1057,34 @@ nsContextMenu.prototype = {
                                                  null, { target: this.target });
   },
 
+  _canvasToDataURL: function(target) {
+    let mm = this.browser.messageManager;
+    return new Promise(function(resolve) {
+      mm.sendAsyncMessage("ContextMenu:Canvas:ToDataURL", {}, { target });
+
+      let onMessage = (message) => {
+        mm.removeMessageListener("ContextMenu:Canvas:ToDataURL:Result", onMessage);
+        resolve(message.data.dataURL);
+      };
+      mm.addMessageListener("ContextMenu:Canvas:ToDataURL:Result", onMessage);
+    });
+  },
+
   // Change current window to the URL of the image, video, or audio.
   viewMedia: function(e) {
-    var viewURL;
-    var doc = this.target.ownerDocument;
+    let referrerURI = gContextMenuContentData.documentURIObject;
     if (this.onCanvas) {
-      var target = this.target;
-      var win = doc.defaultView;
-      if (!win) {
-        Components.utils.reportError(
-            "View Image (on the <canvas> element):\n" +
-            "This feature cannot be used, because it hasn't found " + 
-            "an appropriate window.");
-      } else {
-        new Promise.resolve({then: function (resolve) {
-          target.toBlob((blob) => {
-            resolve(win.URL.createObjectURL(blob));
-          })
-        }}).then(function (blobURL) {
-          openUILink(blobURL, e, { disallowInheritPrincipal: true,
-                                   referrerURI: doc.documentURIObject });
-        }, Components.utils.reportError);
-      }
-    } else {
-      viewURL = this.mediaURL;
-      urlSecurityCheck(viewURL,
+      this._canvasToDataURL(this.target).then(function(dataURL) {
+        openUILink(dataURL, e, { disallowInheritPrincipal: true,
+                                 referrerURI: referrerURI });
+      }, Cu.reportError);
+    }
+    else {
+      urlSecurityCheck(this.mediaURL,
                        this.browser.contentPrincipal,
                        Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
-      let doc = this.target.ownerDocument;
-      openUILink(viewURL, e, { disallowInheritPrincipal: true,
-                               referrerURI: doc.documentURIObject });
+      openUILink(this.mediaURL, e, { disallowInheritPrincipal: true,
+                                     referrerURI: referrerURI });
     }
   },
 
