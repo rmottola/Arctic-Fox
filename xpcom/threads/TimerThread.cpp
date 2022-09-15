@@ -743,7 +743,7 @@ TimerThread::PostTimerEvent(already_AddRefed<nsTimerImpl> aTimerRef)
 void
 TimerThread::DoBeforeSleep()
 {
-  // Main thread
+  // Mainthread
   MonitorAutoLock lock(mMonitor);
   mSleeping = true;
 }
@@ -752,11 +752,13 @@ TimerThread::DoBeforeSleep()
 void
 TimerThread::DoAfterSleep()
 {
-  // Main thread
+  // Mainthread
   MonitorAutoLock lock(mMonitor);
   mSleeping = false;
-  // Wake up the timer thread to re-process the array of timers, to
-  // ensure the sleep delay is correct and fire any expired timers.
+
+  // Wake up the timer thread to re-process the array to ensure the sleep delay is correct,
+  // and fire any expired timers (perhaps quite a few)
+  mNotified = true;
   mMonitor.Notify();
 }
 
