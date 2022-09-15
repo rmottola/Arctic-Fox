@@ -654,15 +654,15 @@ var LoginManagerContent = {
     if (!usernameField)
       log("(form -- no username field found)");
     else
-      log("Username field id/name/value is: ", usernameField.id, " / ",
-          usernameField.name, " / ", usernameField.value);
+      log("Username field ", usernameField, "has name/value:",
+          usernameField.name, "/", usernameField.value);
 
     // If we're not submitting a form (it's a page load), there are no
     // password field values for us to use for identifying fields. So,
     // just assume the first password field is the one to be filled in.
     if (!isSubmission || pwFields.length == 1) {
       var passwordField = pwFields[0].element;
-      log("Password field id/name is: ", passwordField.id, " / ", passwordField.name);
+      log("Password field", passwordField, "has name: ", passwordField.name);
       return [usernameField, passwordField, null];
     }
 
@@ -1033,6 +1033,7 @@ var LoginManagerContent = {
         passwordField.setUserInput(selectedLogin.password);
       }
 
+      log("_fillForm succeeded");
       recordAutofillResult(AUTOFILL_RESULT.FILLED);
       let doc = form.ownerDocument;
       let win = doc.defaultView;
@@ -1260,6 +1261,7 @@ var FormLikeFactory = {
       formLike[prop] = aForm[prop];
     }
 
+    this._addToJSONProperty(formLike);
     return formLike;
   },
 
@@ -1289,7 +1291,7 @@ var FormLikeFactory = {
 
     let doc = aField.ownerDocument;
     log("Created non-form FormLike for rootElement:", doc.documentElement);
-    return {
+    let formLike = {
       action: LoginUtils._getPasswordOrigin(doc.baseURI),
       autocomplete: "on",
       // Exclude elements inside the rootElement that are already in a <form> as
@@ -1298,5 +1300,54 @@ var FormLikeFactory = {
       ownerDocument: doc,
       rootElement: doc.documentElement,
     };
+
+    this._addToJSONProperty(formLike);
+    return formLike;
+  },
+
+  /**
+   * Add a `toJSON` property to a FormLike so logging which ends up going
+   * through dump doesn't include usless garbage from DOM objects.
+   */
+  _addToJSONProperty(aFormLike) {
+    function prettyElementOutput(aElement) {
+      let idText = aElement.id ? "#" + aElement.id : "";
+      let classText = [for (className of aElement.classList) "." + className].join("");
+      return `<${aElement.nodeName + idText + classText}>`;
+    }
+
+    Object.defineProperty(aFormLike, "toJSON", {
+      value: () => {
+        let cleansed = {};
+        for (let key of Object.keys(aFormLike)) {
+          let value = aFormLike[key];
+          let cleansedValue = value;
+
+          switch (key) {
+            case "elements": {
+              cleansedValue = [for (element of value) prettyElementOutput(element)];
+              break;
+            }
+
+            case "ownerDocument": {
+              cleansedValue = {
+                location: {
+                  href: value.location.href,
+                },
+              };
+              break;
+            }
+
+            case "rootElement": {
+              cleansedValue = prettyElementOutput(value);
+              break;
+            }
+          }
+
+          cleansed[key] = cleansedValue;
+        }
+        return cleansed;
+      }
+    });
   },
 };
