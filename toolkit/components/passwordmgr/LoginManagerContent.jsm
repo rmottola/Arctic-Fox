@@ -875,7 +875,7 @@ var LoginManagerContent = {
       // so that the user isn't prompted for a master password
       // without need.
       var [usernameField, passwordField, ignored] =
-          this._getFormFields(form, false);
+            this._getFormFields(form, false, recipes);
 
       // If we have a password inputElement parameter and it's not
       // the same as the one heuristically found, use the parameter
@@ -1021,7 +1021,7 @@ var LoginManagerContent = {
       // Fill the form
 
       if (usernameField) {
-        // Don't modify the username field if it's disabled or readOnly so we preserve its case.
+      // Don't modify the username field if it's disabled or readOnly so we preserve its case.
         let disabledOrReadOnly = usernameField.disabled || usernameField.readOnly;
 
         let userNameDiffers = selectedLogin.username != usernameField.value;
