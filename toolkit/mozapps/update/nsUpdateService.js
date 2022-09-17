@@ -2432,7 +2432,7 @@ UpdateService.prototype = {
             "update is not supported for this system");
         this._showPrompt(update);
       }
-      this._backgroundUpdateCheckCodePing(PING_BGUC_UNSUPPORTED);
+      AUSTLMY.pingCheckCode(this._pingSuffix, AUSTLMY.CHK_UNSUPPORTED);
       return;
     }
 
@@ -2440,7 +2440,7 @@ UpdateService.prototype = {
       LOG("UpdateService:_selectAndInstallUpdate - the user is unable to " +
           "apply updates... prompting");
       this._showPrompt(update);
-      this._backgroundUpdateCheckCodePing(PING_BGUC_UNABLE_TO_APPLY);
+      AUSTLMY.pingCheckCode(this._pingSuffix, AUSTLMY.CHK_UNABLE_TO_APPLY);
       return;
     }
 
