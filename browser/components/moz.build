@@ -47,3 +47,6 @@ EXTRA_JS_MODULES += [
 
 with Files('controlcenter/**'):
     BUG_COMPONENT = ('Firefox', 'General')
+
+if CONFIG['MOZ_REQUIRE_SIGNING']:
+    DEFINES['MOZ_REQUIRE_SIGNING'] = 1
