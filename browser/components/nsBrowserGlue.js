@@ -939,16 +939,6 @@ BrowserGlue.prototype = {
       this._resetUnusedProfileNotification();
     }
 
-    let disabledAddons = AddonManager.getStartupChanges(AddonManager.STARTUP_CHANGE_DISABLED);
-    AddonManager.getAddonsByIDs(disabledAddons, (addons) => {
-      for (let addon of addons) {
-        if (addon.signedState <= AddonManager.SIGNEDSTATE_MISSING) {
-          this._notifyUnsignedAddonsDisabled();
-          break;
-        }
-      }
-    });
-
     this._firstWindowTelemetry(aWindow);
   },
 
@@ -1027,6 +1017,16 @@ BrowserGlue.prototype = {
         })
       });
     }
+
+    let disabledAddons = AddonManager.getStartupChanges(AddonManager.STARTUP_CHANGE_DISABLED);
+    AddonManager.getAddonsByIDs(disabledAddons, (addons) => {
+      for (let addon of addons) {
+        if (addon.signedState <= AddonManager.SIGNEDSTATE_MISSING) {
+          this._notifyUnsignedAddonsDisabled();
+          break;
+        }
+      }
+    });
 
     // Perform default browser checking.
     if (ShellService) {
