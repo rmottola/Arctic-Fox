@@ -3757,15 +3757,15 @@
     "kind": "count",
     "description": "Update: count of systems that manually uninstalled the service (timer initiated)"
   },
-  "UPDATE_CANNOT_APPLY_EXTERNAL": {
+  "UPDATE_UNABLE_TO_APPLY_EXTERNAL": {
     "expires_in_version": "never",
-    "kind": "boolean",
-    "description": "Update: systems that cannot apply updates (externally initiated)"
+    "kind": "count",
+    "description": "Update: count of systems that cannot apply updates (externally initiated)"
   },
-  "UPDATE_CANNOT_APPLY_NOTIFY": {
+  "UPDATE_UNABLE_TO_APPLY_NOTIFY": {
     "expires_in_version": "never",
-    "kind": "boolean",
-    "description": "Update: systems that cannot apply updates (timer initiated)"
+    "kind": "count",
+    "description": "Update: count of systems that cannot apply updates (timer initiated)"
   },
   "UPDATE_CANNOT_STAGE_EXTERNAL": {
     "expires_in_version": "never",
