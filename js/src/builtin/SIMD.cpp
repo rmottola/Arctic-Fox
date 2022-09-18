@@ -223,7 +223,7 @@ class Float64x2Defn {
     static const JSFunctionSpec Methods[];
 };
 
-}
+} // namespace
 
 const JSFunctionSpec Float32x4Defn::TypeDescriptorMethods[] = {
     JS_SELF_HOSTED_FN("toSource", "DescrToSource", 0, 0),
@@ -576,7 +576,7 @@ struct RecApprox {
 };
 template<typename T>
 struct RecSqrtApprox {
-    static inline T apply(T x) { return 1 / sqrt(x); }
+    static T apply(T x) { return 1 / sqrt(x); }
 };
 template<typename T>
 struct Sqrt {
