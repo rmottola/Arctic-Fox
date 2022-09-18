@@ -247,7 +247,7 @@ class FloatRegisters
         invalid_freg
     };
 
-    typedef FPRegisterID Code;
+    typedef uint32_t Code;
     typedef FPRegisterID Encoding;
 
     // Content spilled during bailouts.
@@ -255,15 +255,15 @@ class FloatRegisters
         double d;
     };
 
-    static const char* GetDoubleName(Code code) {
-        static const char*  const Names[] = { "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
+    static const char* GetDoubleName(Encoding code) {
+        static const char * const Names[] = { "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
                                               "d8", "d9", "d10", "d11", "d12", "d13", "d14", "d15",
                                               "d16", "d17", "d18", "d19", "d20", "d21", "d22", "d23",
                                               "d24", "d25", "d26", "d27", "d28", "d29", "d30", "d31"};
         return Names[code];
     }
-    static const char* GetSingleName(Code code) {
-        static const char*  const Names[] = { "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7",
+    static const char* GetSingleName(Encoding code) {
+        static const char * const Names[] = { "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7",
                                               "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15",
                                               "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23",
                                               "s24", "s25", "s26", "s27", "s28", "s29", "s30", "s31"};
@@ -272,12 +272,12 @@ class FloatRegisters
 
     static const char* GetName(uint32_t i) {
         MOZ_ASSERT(i < Total);
-        return GetName(Code(i));
+        return GetName(Encoding(i));
     }
 
     static Code FromName(const char* name);
 
-    static const Code Invalid = invalid_freg;
+    static const Encoding Invalid = invalid_freg;
     static const uint32_t Total = 48;
     static const uint32_t TotalDouble = 16;
     static const uint32_t TotalSingle = 32;
@@ -440,7 +440,7 @@ class VFPRegister
     }
     Encoding encoding() const {
         MOZ_ASSERT(!_isInvalid && !_isMissing);
-        return Code(code_ | (kind << 5));
+        return Encoding(code_);
     }
     uint32_t id() const {
         return code_;
@@ -457,8 +457,8 @@ class VFPRegister
     }
     const char* name() const {
         if (isDouble())
-            return FloatRegisters::GetDoubleName(Code(code_));
-        return FloatRegisters::GetSingleName(Code(code_));
+            return FloatRegisters::GetDoubleName(Encoding(code_));
+        return FloatRegisters::GetSingleName(Encoding(code_));
     }
     bool operator != (const VFPRegister& other) const {
         return other.kind != kind || code_ != other.code_;
