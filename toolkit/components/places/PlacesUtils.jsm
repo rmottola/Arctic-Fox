@@ -123,7 +123,8 @@ function* notifyKeywordChange(url, keyword) {
                                          bookmark.lastModified * 1000,
                                          bookmark.type,
                                          bookmark.parentId,
-                                         bookmark.guid, bookmark.parentGuid
+                                         bookmark.guid, bookmark.parentGuid,
+                                         ""
                                        ]);
   }
   gIgnoreKeywordNotifications = false;
