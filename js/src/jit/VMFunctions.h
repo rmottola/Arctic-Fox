@@ -254,11 +254,6 @@ struct VMFunction
     }
 
     VMFunction(const VMFunction& o) {
-        init(o);
-    }
-
-    void init(const VMFunction& o) {
-        MOZ_ASSERT(!wrapped);
         *this = o;
         addToFunctions();
     }
