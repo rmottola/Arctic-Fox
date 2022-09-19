@@ -701,6 +701,7 @@ IonBuilder::analyzeNewLoopTypes(MBasicBlock* entry, jsbytecode* start, jsbytecod
                 type = MIRType_Double;
                 break;
               case JSOP_STRING:
+              case JSOP_TOSTRING:
               case JSOP_TYPEOF:
               case JSOP_TYPEOFEXPR:
                 type = MIRType_String;
@@ -1538,6 +1539,7 @@ IonBuilder::traverseBytecode()
 
               case JSOP_POS:
               case JSOP_TOID:
+              case JSOP_TOSTRING:
                 // These ops may leave their input on the stack without setting
                 // the ImplicitlyUsed flag. If this value will be popped immediately,
                 // we may replace it with |undefined|, but the difference is
@@ -1678,6 +1680,9 @@ IonBuilder::inspectOpcode(JSOp op)
 
       case JSOP_NEG:
         return jsop_neg();
+
+      case JSOP_TOSTRING:
+        return jsop_tostring();
 
       case JSOP_AND:
       case JSOP_OR:
@@ -4902,6 +4907,20 @@ IonBuilder::jsop_neg()
     MDefinition* right = current->pop();
 
     return jsop_binary_arith(JSOP_MUL, negator, right);
+}
+
+bool
+IonBuilder::jsop_tostring()
+{
+    if (current->peek(-1)->type() == MIRType_String)
+        return true;
+
+    MDefinition* value = current->pop();
+    MToString* ins = MToString::New(alloc(), value);
+    current->add(ins);
+    current->push(ins);
+    MOZ_ASSERT(!ins->isEffectful());
+    return true;
 }
 
 class AutoAccumulateReturns
