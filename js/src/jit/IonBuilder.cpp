@@ -3725,14 +3725,14 @@ IonBuilder::improveTypesAtNullOrUndefinedCompare(MCompare* ins, bool trueBranch,
         tmp.addType(TypeSet::PrimitiveType(ValueTypeFromMIRType(subject->type())), alloc_->lifoAlloc());
     }
 
-    if (!altersUndefined && !altersNull)
+    if (inputTypes->unknown())
         return true;
 
     TemporaryTypeSet* type;
 
     // Decide if we need to filter the type or set it.
     if ((op == JSOP_STRICTEQ || op == JSOP_EQ) ^ trueBranch) {
-        // Remover undefined/null
+        // Remove undefined/null
         TemporaryTypeSet remove;
         if (altersUndefined)
             remove.addType(TypeSet::UndefinedType(), alloc_->lifoAlloc());
@@ -4586,6 +4586,7 @@ IonBuilder::jsop_bitnot()
     MOZ_ASSERT(ins->isEffectful());
     return resumeAfter(ins);
 }
+
 bool
 IonBuilder::jsop_bitop(JSOp op)
 {
