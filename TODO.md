@@ -113,15 +113,12 @@
 - Bug 1213646: Allow URI_IS_UI_RESOURCE and safe about: URIs when SEC_A
 - 1185106 - at least part 0 to 4 for TFF
 - Check completeness of Bug 1216401: Eviscerate nsIDOMWindow
+- Bug 1158632 - IonBuilder TableSwitch, fill-the-gap cases should encor¿
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
 - Bug 1182571 - 2015-10-19 Fix nsILoadInfo->GetContentPolicyType API to be less am
 - Bug 1170958 - 2015-09-30 - Allow MediaInputPort to lock to a specific input track
-- Bug 1191148 - Don't count fullscreen request handled if we don't chanyesy
-- Bug 1198334 (part 1) - Replace the opt-in FAIL_ON_WARNINGS with the o
-- Bug 603201 - 2015-09-18 - Change GetProperty receiver argument to Value in JS. r=e
 - 1203427
 - Bug 1193583 - 2015-08-31 Change the semantics of Debugger.evalInGlobal
-- Bug 1150678 - 2015-08-05  Part 1: notify the old value in onItemChanged (only URI
 - remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
 - Bug 1192130 - Part 1: Add MOZ_NON_AUTOABLE to restrict using auto in
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
@@ -139,7 +136,6 @@
 -  missing bits of Bug 1207245 - part 1 - move RefCounted<T>
 
 JS - breaks:
-Bug 1212183 - Fix DOM getter optimizations in the JITs. (r=jandem)
 https://bugzilla.mozilla.org/show_bug.cgi?id=589199
 
 
@@ -162,9 +158,6 @@ Check with Roy Tam:
 - Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 
 - Bug 1129633 - part1. Use win8 geolocation with a fallback to MLS
 - bug 1139012 - telemetry for MLS vs win8 geolocation response.
-
-# Patches that apply but break things:
-- Bug 1096294 - 2015-02-24 Display pseudo-arrays like arrays in the console; r=pbrosset
 
 Parents of:
 https://github.com/mozilla/newtab-dev/commit/ac250f9d737362d0730b0897603ae379eca89ebf
