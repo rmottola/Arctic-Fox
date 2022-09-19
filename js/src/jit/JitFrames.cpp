@@ -1061,7 +1061,7 @@ MarkThisAndArguments(JSTracer* trc, const JitFrameIterator& frame)
     if (CalleeTokenIsFunction(layout->calleeToken())) {
         JSFunction* fun = CalleeTokenToFunction(layout->calleeToken());
         if (!frame.isExitFrameLayout<LazyLinkExitFrameLayout>() &&
-            !fun->nonLazyScript()->mayReadFrameArgsDirectly))
+            !fun->nonLazyScript()->mayReadFrameArgsDirectly())
         {
             nformals = fun->nargs();
         }
@@ -3094,7 +3094,16 @@ JitProfilingFrameIterator::tryInitWithTable(JitcodeGlobalTable* table, void* pc,
 
     JSScript* callee = frameScript();
 
-    MOZ_ASSERT(entry.isIon() || entry.isBaseline() || entry.isIonCache());
+    MOZ_ASSERT(entry.isIon() || entry.isBaseline() || entry.isIonCache() || entry.isDummy());
+
+    // Treat dummy lookups as an empty frame sequence.
+    if (entry.isDummy()) {
+        type_ = JitFrame_Entry;
+        fp_ = nullptr;
+        returnAddressToFp_ = nullptr;
+        return true;
+    }
+
     if (entry.isIon()) {
         // If looked-up callee doesn't match frame callee, don't accept lastProfilingCallSite
         if (entry.ionEntry().getScript(0) != callee)
