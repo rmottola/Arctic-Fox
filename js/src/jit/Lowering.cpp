@@ -551,9 +551,9 @@ LIRGenerator::visitUnreachable(MUnreachable* unreachable)
 }
 
 void
-LIRGenerator::visitEncodeSnapshot(MEncodeSnapshot *mir)
+LIRGenerator::visitEncodeSnapshot(MEncodeSnapshot* mir)
 {
-    LEncodeSnapshot *lir = new(alloc()) LEncodeSnapshot();
+    LEncodeSnapshot* lir = new(alloc()) LEncodeSnapshot();
     assignSnapshot(lir, Bailout_Inevitable);
     add(lir, mir);
 }
@@ -4129,26 +4129,6 @@ LIRGenerator::visitSimdSwizzle(MSimdSwizzle* ins)
 }
 
 void
-LIRGenerator::visitSimdShuffle(MSimdShuffle* ins)
-{
-    MOZ_ASSERT(IsSimdType(ins->lhs()->type()));
-    MOZ_ASSERT(IsSimdType(ins->rhs()->type()));
-    MOZ_ASSERT(IsSimdType(ins->type()));
-    MOZ_ASSERT(ins->type() == MIRType_Int32x4 || ins->type() == MIRType_Float32x4);
-
-    bool zFromLHS = ins->laneZ() < 4;
-    bool wFromLHS = ins->laneW() < 4;
-    uint32_t lanesFromLHS = (ins->laneX() < 4) + (ins->laneY() < 4) + zFromLHS + wFromLHS;
-
-    LSimdShuffle* lir = new (alloc()) LSimdShuffle();
-    lowerForFPU(lir, ins, ins->lhs(), ins->rhs());
-
-    // See codegen for requirements details.
-    LDefinition temp = (lanesFromLHS == 3) ? tempCopy(ins->rhs(), 1) : LDefinition::BogusTemp();
-    lir->setTemp(0, temp);
-}
-
-void
 LIRGenerator::visitSimdGeneralShuffle(MSimdGeneralShuffle*ins)
 {
     MOZ_ASSERT(IsSimdType(ins->type()));
@@ -4176,6 +4156,26 @@ LIRGenerator::visitSimdGeneralShuffle(MSimdGeneralShuffle*ins)
 
     assignSnapshot(lir, Bailout_BoundsCheck);
     define(lir, ins);
+}
+
+void
+LIRGenerator::visitSimdShuffle(MSimdShuffle* ins)
+{
+    MOZ_ASSERT(IsSimdType(ins->lhs()->type()));
+    MOZ_ASSERT(IsSimdType(ins->rhs()->type()));
+    MOZ_ASSERT(IsSimdType(ins->type()));
+    MOZ_ASSERT(ins->type() == MIRType_Int32x4 || ins->type() == MIRType_Float32x4);
+
+    bool zFromLHS = ins->laneZ() < 4;
+    bool wFromLHS = ins->laneW() < 4;
+    uint32_t lanesFromLHS = (ins->laneX() < 4) + (ins->laneY() < 4) + zFromLHS + wFromLHS;
+
+    LSimdShuffle* lir = new (alloc()) LSimdShuffle();
+    lowerForFPU(lir, ins, ins->lhs(), ins->rhs());
+
+    // See codegen for requirements details.
+    LDefinition temp = (lanesFromLHS == 3) ? tempCopy(ins->rhs(), 1) : LDefinition::BogusTemp();
+    lir->setTemp(0, temp);
 }
 
 void
