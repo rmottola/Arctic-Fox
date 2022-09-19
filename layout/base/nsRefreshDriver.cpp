@@ -857,7 +857,6 @@ CreateVsyncRefreshTimer()
   gfxPrefs::GetSingleton();
 
   if (!gfxPrefs::VsyncAlignedRefreshDriver()
-        || !gfxPrefs::HardwareVsyncEnabled()
         || gfxPlatform::IsInLayoutAsapMode()) {
     return;
   }
