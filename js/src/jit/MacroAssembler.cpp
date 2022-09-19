@@ -1252,7 +1252,7 @@ MacroAssembler::initUnboxedObjectContents(Register object, UnboxedPlainObject* t
     const UnboxedLayout& layout = templateObject->layout();
 
     // Initialize reference fields of the object, per UnboxedPlainObject::create.
-    if (const int32_t *list = layout.traceList()) {
+    if (const int32_t* list = layout.traceList()) {
         while (*list != -1) {
             storePtr(ImmGCPtr(GetJitContext()->runtime->names().empty),
                      Address(object, UnboxedPlainObject::offsetOfData() + *list));
@@ -1527,7 +1527,7 @@ MacroAssembler::handleFailure()
 
 #ifdef DEBUG
 static void
-AssumeUnreachable_(const char *output) {
+AssumeUnreachable_(const char* output) {
     MOZ_ReportAssertionFailure(output, __FILE__, __LINE__);
 }
 #endif
@@ -1577,7 +1577,7 @@ Printf0_(const char* output) {
 }
 
 void
-MacroAssembler::printf(const char *output)
+MacroAssembler::printf(const char* output)
 {
     AllocatableRegisterSet regs(RegisterSet::Volatile());
     LiveRegisterSet save(regs.asLiveSet());
@@ -1601,7 +1601,7 @@ Printf1_(const char* output, uintptr_t value) {
 }
 
 void
-MacroAssembler::printf(const char *output, Register value)
+MacroAssembler::printf(const char* output, Register value)
 {
     AllocatableRegisterSet regs(RegisterSet::Volatile());
     LiveRegisterSet save(regs.asLiveSet());
@@ -1665,7 +1665,7 @@ MacroAssembler::tracelogStartId(Register logger, Register textId)
 void
 MacroAssembler::tracelogStartEvent(Register logger, Register event)
 {
-    void (&TraceLogFunc)(TraceLoggerThread*, const TraceLoggerEvent &) = TraceLogStartEvent;
+    void (&TraceLogFunc)(TraceLoggerThread*, const TraceLoggerEvent&) = TraceLogStartEvent;
 
     AllocatableRegisterSet regs(RegisterSet::Volatile());
     LiveRegisterSet save(regs.asLiveSet());
@@ -2416,14 +2416,14 @@ MacroAssembler::Push(ConstantOrRegister v)
 }
 
 void
-MacroAssembler::Push(const ValueOperand &val)
+MacroAssembler::Push(const ValueOperand& val)
 {
     pushValue(val);
     framePushed_ += sizeof(Value);
 }
 
 void
-MacroAssembler::Push(const Value &val)
+MacroAssembler::Push(const Value& val)
 {
     pushValue(val);
     framePushed_ += sizeof(Value);
@@ -2465,7 +2465,7 @@ MacroAssembler::PushEmptyRooted(VMFunction::RootType rootType)
 
 void
 MacroAssembler::popRooted(VMFunction::RootType rootType, Register cellReg,
-                          const ValueOperand &valueReg)
+                          const ValueOperand& valueReg)
 {
     switch (rootType) {
       case VMFunction::RootNone:
