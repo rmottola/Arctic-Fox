@@ -45,7 +45,7 @@ MacroAssembler::setFramePushed(uint32_t framePushed)
 void
 MacroAssembler::adjustFrame(int32_t value)
 {
-    MOZ_ASSERT_IF(value < 0, framePushed_ >= -value);
+    MOZ_ASSERT_IF(value < 0, framePushed_ >= uint32_t(-value));
     setFramePushed(framePushed_ + value);
 }
 
