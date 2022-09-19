@@ -2407,6 +2407,8 @@ MBinaryArithInstruction::trySpecializeFloat32(TempAllocator& alloc)
     // Do not use Float32 if we can use int32.
     if (specialization_ == MIRType_Int32)
         return;
+    if (specialization_ == MIRType_None)
+        return;
 
     MDefinition* left = lhs();
     MDefinition* right = rhs();
