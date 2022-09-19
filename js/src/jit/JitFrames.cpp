@@ -409,17 +409,26 @@ CloseLiveIteratorIon(JSContext* cx, const InlineFrameIterator& frame, uint32_t s
         UnwindIteratorForUncatchableException(cx, obj);
 }
 
-class IgnoreStackDepthOp
+class IonFrameStackDepthOp
 {
+    uint32_t depth_;
+
   public:
-    uint32_t operator()() { return UINT32_MAX; }
+    explicit IonFrameStackDepthOp(const InlineFrameIterator& frame) {
+        uint32_t base = NumArgAndLocalSlots(frame);
+        SnapshotIterator si = frame.snapshotIterator();
+        MOZ_ASSERT(si.numAllocations() >= base);
+        depth_ = si.numAllocations() - base;
+    }
+
+    uint32_t operator()() { return depth_; }
 };
 
-class TryNoteIterIon : public TryNoteIter<IgnoreStackDepthOp>
+class TryNoteIterIon : public TryNoteIter<IonFrameStackDepthOp>
 {
   public:
-    TryNoteIterIon(JSContext* cx, JSScript* script, jsbytecode* pc)
-      : TryNoteIter(cx, script, pc, IgnoreStackDepthOp())
+    TryNoteIterIon(JSContext* cx, const InlineFrameIterator& frame)
+      : TryNoteIter(cx, frame.script(), frame.pc(), IonFrameStackDepthOp(frame))
     { }
 };
 
@@ -427,9 +436,6 @@ static void
 HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame, ResumeFromException* rfe,
                    bool* overrecursed)
 {
-    RootedScript script(cx, frame.script());
-    jsbytecode* pc = frame.pc();
-
     if (cx->compartment()->isDebuggee()) {
         // We need to bail when there is a catchable exception, and we are the
         // debuggee of a Debugger with a live onExceptionUnwind hook, or if a
@@ -465,10 +471,11 @@ HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame, ResumeFromEx
         MOZ_ASSERT_IF(rematFrame, !Debugger::inFrameMaps(rematFrame));
     }
 
+    RootedScript script(cx, frame.script());
     if (!script->hasTrynotes())
         return;
 
-    for (TryNoteIterIon tni(cx, script, pc); !tni.done(); ++tni) {
+    for (TryNoteIterIon tni(cx, frame); !tni.done(); ++tni) {
         JSTryNote* tn = *tni;
 
         switch (tn->kind) {
