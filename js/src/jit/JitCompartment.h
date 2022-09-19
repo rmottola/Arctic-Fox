@@ -384,7 +384,7 @@ class JitCompartment
     }
 
     JSObject* maybeGetSimdTemplateObjectFor(SimdTypeDescr::Type type) const {
-        const ReadBarrieredObject &tpl = simdTemplateObjects_[type];
+        const ReadBarrieredObject& tpl = simdTemplateObjects_[type];
 
         // This function is used by Eager Simd Unbox phase, so we cannot use the
         // read barrier. For more information, see the comment above
@@ -395,7 +395,7 @@ class JitCompartment
     // This function is used to call the read barrier, to mark the SIMD template
     // type as used. This function can only be called from the main thread.
     void registerSimdTemplateObjectFor(SimdTypeDescr::Type type) {
-        ReadBarrieredObject &tpl = simdTemplateObjects_[type];
+        ReadBarrieredObject& tpl = simdTemplateObjects_[type];
         MOZ_ASSERT(tpl.unbarrieredGet());
         tpl.get();
     }
