@@ -2557,9 +2557,11 @@ gfxPlatform::NotifyCompositorCreated(LayersBackend aBackend)
   mCompositorBackend = aBackend;
 
   // Notify that we created a compositor, so telemetry can update.
-  if (nsCOMPtr<nsIObserverService> obsvc = services::GetObserverService()) {
-    obsvc->NotifyObservers(nullptr, "compositor:created", nullptr);
-  }
+  NS_DispatchToMainThread(NS_NewRunnableFunction([] {
+    if (nsCOMPtr<nsIObserverService> obsvc = services::GetObserverService()) {
+      obsvc->NotifyObservers(nullptr, "compositor:created", nullptr);
+    }
+  }));
 }
 
 void
