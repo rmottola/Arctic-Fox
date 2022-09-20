@@ -544,6 +544,7 @@ CompositorParent::CompositorParent(nsIWidget* aWidget,
   , mEGLSurfaceSize(aSurfaceWidth, aSurfaceHeight)
   , mPauseCompositionMonitor("PauseCompositionMonitor")
   , mResumeCompositionMonitor("ResumeCompositionMonitor")
+  , mRootLayerTreeID(AllocateLayerTreeId())
   , mOverrideComposeReadiness(false)
   , mForceCompositionTask(nullptr)
   , mCompositorThreadHolder(sCompositorThreadHolder)
@@ -563,7 +564,6 @@ CompositorParent::CompositorParent(nsIWidget* aWidget,
 
   CompositorLoop()->PostTask(FROM_HERE, NewRunnableFunction(SetThreadPriority));
 
-  mRootLayerTreeID = AllocateLayerTreeId();
 
   { // scope lock
     MonitorAutoLock lock(*sIndirectLayerTreesLock);
