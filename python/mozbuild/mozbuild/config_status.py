@@ -11,6 +11,7 @@ from __future__ import absolute_import, print_function
 import logging
 import os
 import sys
+import time
 
 from optparse import OptionParser
 
@@ -118,6 +119,9 @@ def config_status(topobjdir='.', topsrcdir='.',
         from mozbuild.backend.fastermake import FasterMakeBackend
         backend_cls = FasterMakeBackend
 
+    cpu_start = time.clock()
+    time_start = time.time()
+
     the_backend = backend_cls(env)
 
     reader = BuildReader(env)
@@ -134,15 +138,34 @@ def config_status(topobjdir='.', topsrcdir='.',
     log_manager.add_terminal_logging(level=log_level)
     log_manager.enable_unstructured()
 
-    print('Walking the dog...', file=sys.stderr)
-    summary = the_backend.consume(definitions)
+    print('Reticulating splines...', file=sys.stderr)
+    the_backend.consume(definitions)
 
-    for line in summary.summaries():
-        print(line, file=sys.stderr)
+    execution_time = 0.0
+    for obj in (reader, emitter, the_backend):
+        summary = obj.summary()
+        print(summary, file=sys.stderr)
+        execution_time += summary.execution_time
+
+    cpu_time = time.clock() - cpu_start
+    wall_time = time.time() - time_start
+    efficiency = cpu_time / wall_time if wall_time else 100
+    untracked = wall_time - execution_time
+
+    print(
+        'Total wall time: {:.2f}s; CPU time: {:.2f}s; Efficiency: '
+        '{:.0%}; Untracked: {:.2f}s'.format(
+            wall_time, cpu_time, efficiency, untracked),
+        file=sys.stderr
+    )
 
     if options.diff:
-        for path, diff in sorted(summary.file_diffs.items()):
+        for path, diff in sorted(the_backend.file_diffs.items()):
             print('\n'.join(diff))
+
+    # Advertise Visual Studio if appropriate.
+    if os.name == 'nt' and 'VisualStudio' not in options.backend:
+        print(VISUAL_STUDIO_ADVERTISEMENT)
 
     # Advertise Eclipse if it is appropriate.
     if MachCommandConditions.is_android(env):
