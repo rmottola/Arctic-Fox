@@ -457,7 +457,7 @@ static nsDefaultMimeTypeEntry defaultMimeEntries [] =
   { VIDEO_WEBM, "webm" },
   { AUDIO_WEBM, "webm" },
 #endif
-#if defined(MOZ_WMF)
+#if defined(MOZ_GSTREAMER) || defined(MOZ_WMF)
   { VIDEO_MP4, "mp4" },
   { AUDIO_MP4, "m4a" },
   { AUDIO_MP3, "mp3" },

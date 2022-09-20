@@ -368,6 +368,10 @@ pref("media.webm.enabled", true);
 pref("media.webm.intel_decoder.enabled", false);
 #endif
 #endif
+#ifdef MOZ_GSTREAMER
+pref("media.gstreamer.enabled", true);
+pref("media.gstreamer.enable-blacklist", true);
+#endif
 #ifdef MOZ_APPLEMEDIA
 pref("media.apple.mp3.enabled", true);
 pref("media.apple.mp4.enabled", true);

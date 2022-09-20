@@ -46,6 +46,9 @@ if CONFIG['MOZ_WAVE']:
 if CONFIG['MOZ_WEBM']:
     DIRS += ['webm']
 
+if CONFIG['MOZ_GSTREAMER']:
+    DIRS += ['gstreamer']
+
 if CONFIG['MOZ_DIRECTSHOW']:
     DIRS += ['directshow']
 
