@@ -5861,7 +5861,7 @@ nsLayoutUtils::GetGraphicsFilterForFrame(nsIFrame* aForFrame)
 
   switch (sc->StyleSVG()->mImageRendering) {
   case NS_STYLE_IMAGE_RENDERING_OPTIMIZESPEED:
-    return GraphicsFilter::FILTER_FAST;
+    return GraphicsFilter::FILTER_BEST;
   case NS_STYLE_IMAGE_RENDERING_OPTIMIZEQUALITY:
     return GraphicsFilter::FILTER_BEST;
   case NS_STYLE_IMAGE_RENDERING_CRISPEDGES:
