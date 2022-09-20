@@ -229,7 +229,7 @@ Shape::fixupDictionaryShapeAfterMovingGC()
     // Get a fake cell pointer to use for the calls below. This might not point
     // to the beginning of a cell, but will point into the right arena and will
     // have the right alignment.
-    Cell *cell = reinterpret_cast<Cell *>(uintptr_t(listp) & ~CellMask);
+    Cell* cell = reinterpret_cast<Cell*>(uintptr_t(listp) & ~CellMask);
 
     // It's possible that this shape is unreachable and that listp points to the
     // location of a dead object in the nursery, in which case we should never
@@ -245,12 +245,12 @@ Shape::fixupDictionaryShapeAfterMovingGC()
                IsObjectAllocKind(kind));
     if (kind == AllocKind::SHAPE || kind == AllocKind::ACCESSOR_SHAPE) {
         // listp points to the parent field of the next shape.
-        Shape *next = reinterpret_cast<Shape *>(uintptr_t(listp) -
+        Shape* next = reinterpret_cast<Shape*>(uintptr_t(listp) -
                                                 offsetof(Shape, parent));
         listp = &gc::MaybeForwarded(next)->parent;
     } else {
         // listp points to the shape_ field of an object.
-        JSObject *last = reinterpret_cast<JSObject *>(uintptr_t(listp) -
+        JSObject* last = reinterpret_cast<JSObject*>(uintptr_t(listp) -
                                                       JSObject::offsetOfShape());
         listp = &gc::MaybeForwarded(last)->as<NativeObject>().shape_;
     }
