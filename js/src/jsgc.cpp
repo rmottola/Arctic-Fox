@@ -2582,8 +2582,8 @@ GCRuntime::updateAllCellPointersParallel(MovingTracer* trc, Zone* zone)
         for (i = 0; i < taskCount && !bgArenas.done(); ++i) {
             bgTasks[i].init(rt, &bgArenas, lock);
             startTask(bgTasks[i], gcstats::PHASE_COMPACT_UPDATE_CELLS);
-            tasksStarted++;
         }
+        tasksStarted = i;
 
         fgTask.init(rt, &fgArenas, lock);
     }
