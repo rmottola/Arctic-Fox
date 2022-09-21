@@ -266,9 +266,11 @@ private:
     NS_INLINE_DECL_THREADSAFE_REFCOUNTING(SignalObject)
 
     SignalObject(const char* aName);
-    ~SignalObject();
     void Wait();
     void Signal();
+
+  protected:
+    ~SignalObject();
 
   private:
     // Forbidden
