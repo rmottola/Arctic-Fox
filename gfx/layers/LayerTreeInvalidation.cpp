@@ -403,9 +403,14 @@ struct ImageLayerProperties : public LayerPropertiesBase
     , mFilter(aImage->GetFilter())
     , mScaleToSize(aImage->GetScaleToSize())
     , mScaleMode(aImage->GetScaleMode())
+    , mLastProducerID(-1)
+    , mLastFrameID(-1)
     , mIsMask(aIsMask)
   {
-    mFrameID = mImageHost ? mImageHost->GetFrameID() : -1;
+    if (mImageHost) {
+      mLastProducerID = mImageHost->GetLastProducerID();
+      mLastFrameID = mImageHost->GetLastFrameID();
+    }
   }
 
   virtual nsIntRegion ComputeChangeInternal(NotifySubDocInvalidationFunc aCallback,
@@ -427,7 +432,8 @@ struct ImageLayerProperties : public LayerPropertiesBase
         mScaleToSize != imageLayer->GetScaleToSize() ||
         mScaleMode != imageLayer->GetScaleMode() ||
         host != mImageHost ||
-        (host && host->GetFrameID() != mFrameID)) {
+        (host && host->GetProducerID() != mLastProducerID) ||
+        (host && host->GetFrameID() != mLastFrameID)) {
       aGeometryChanged = true;
 
       if (mIsMask) {
@@ -453,8 +459,9 @@ struct ImageLayerProperties : public LayerPropertiesBase
   nsRefPtr<ImageHost> mImageHost;
   GraphicsFilter mFilter;
   gfx::IntSize mScaleToSize;
-  int32_t mFrameID;
   ScaleMode mScaleMode;
+  int32_t mLastProducerID;
+  int32_t mLastFrameID;
   bool mIsMask;
 };
 
