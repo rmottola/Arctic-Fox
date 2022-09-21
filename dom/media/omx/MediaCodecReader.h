@@ -27,6 +27,8 @@
 #include <ui/Fence.h>
 #endif
 
+#include "MP3FrameParser.h"
+
 namespace android {
 struct ALooper;
 struct AMessage;
@@ -439,6 +441,8 @@ private:
     FenceHandle mReleaseFence;
   };
   nsTArray<ReleaseItem> mPendingReleaseItems;
+
+  NotifyDataArrivedFilter mFilter;
 };
 
 } // namespace mozilla
