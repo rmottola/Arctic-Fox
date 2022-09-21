@@ -1038,9 +1038,6 @@ nsDisplayListBuilder::IsAnimatedGeometryRoot(nsIFrame* aFrame, nsIFrame** aParen
     // for background-attachment:fixed elements.
     return true;
   }
-  if (aFrame->IsTransformed()) {
-    return true;
-  }
 
   nsIFrame* parent = nsLayoutUtils::GetCrossDocParentFrame(aFrame);
   if (!parent)
@@ -1079,20 +1076,23 @@ nsDisplayListBuilder::IsAnimatedGeometryRoot(nsIFrame* aFrame, nsIFrame** aParen
 
 bool
 nsDisplayListBuilder::GetCachedAnimatedGeometryRoot(const nsIFrame* aFrame,
+                                                    const nsIFrame* aStopAtAncestor,
                                                     nsIFrame** aOutResult)
 {
-  return mAnimatedGeometryRootCache.Get(const_cast<nsIFrame*>(aFrame), aOutResult);
+  AnimatedGeometryRootLookup lookup(aFrame, aStopAtAncestor);
+  return mAnimatedGeometryRootCache.Get(lookup, aOutResult);
 }
 
 static nsIFrame*
 ComputeAnimatedGeometryRootFor(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
+                               const nsIFrame* aStopAtAncestor = nullptr,
                                bool aUseCache = false)
 {
   nsIFrame* cursor = aFrame;
-  while (cursor != aBuilder->RootReferenceFrame()) {
+  while (cursor != aStopAtAncestor) {
     if (aUseCache) {
       nsIFrame* result;
-      if (aBuilder->GetCachedAnimatedGeometryRoot(cursor, &result)) {
+      if (aBuilder->GetCachedAnimatedGeometryRoot(cursor, aStopAtAncestor, &result)) {
         return result;
       }
     }
@@ -1105,14 +1105,15 @@ ComputeAnimatedGeometryRootFor(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
 }
 
 nsIFrame*
-nsDisplayListBuilder::FindAnimatedGeometryRootFor(nsIFrame* aFrame)
+nsDisplayListBuilder::FindAnimatedGeometryRootFor(nsIFrame* aFrame, const nsIFrame* aStopAtAncestor)
 {
   if (aFrame == mCurrentFrame) {
     return mCurrentAnimatedGeometryRoot;
   }
 
-  nsIFrame* result = ComputeAnimatedGeometryRootFor(this, aFrame, true);
-  mAnimatedGeometryRootCache.Put(aFrame, result);
+  nsIFrame* result = ComputeAnimatedGeometryRootFor(this, aFrame, aStopAtAncestor, true);
+  AnimatedGeometryRootLookup lookup(aFrame, aStopAtAncestor);
+  mAnimatedGeometryRootCache.Put(lookup, result);
   return result;
 }
 
@@ -1120,9 +1121,8 @@ void
 nsDisplayListBuilder::RecomputeCurrentAnimatedGeometryRoot()
 {
   mCurrentAnimatedGeometryRoot = ComputeAnimatedGeometryRootFor(this, const_cast<nsIFrame *>(mCurrentFrame));
-  MOZ_ASSERT(nsLayoutUtils::IsAncestorFrameCrossDoc(RootReferenceFrame(),
-                                                    mCurrentAnimatedGeometryRoot), "Bad");
-  mAnimatedGeometryRootCache.Put(const_cast<nsIFrame*>(mCurrentFrame), mCurrentAnimatedGeometryRoot);
+  AnimatedGeometryRootLookup lookup(mCurrentFrame, nullptr);
+  mAnimatedGeometryRootCache.Put(lookup, mCurrentAnimatedGeometryRoot);
 }
 
 void
@@ -1984,17 +1984,11 @@ void nsDisplayList::Sort(nsDisplayListBuilder* aBuilder,
 nsDisplayItem::nsDisplayItem(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame)
   : mFrame(aFrame)
   , mClip(aBuilder->ClipState().GetCurrentCombinedClip(aBuilder))
-  , mAnimatedGeometryRoot(nullptr)
 #ifdef MOZ_DUMP_PAINTING
   , mPainted(false)
 #endif
 {
   mReferenceFrame = aBuilder->FindReferenceFrameFor(aFrame, &mToReferenceFrame);
-  // This can return the wrong result if the item override ShouldFixToViewport(),
-  // the item needs to set it again in its constructor.
-  mAnimatedGeometryRoot = nsLayoutUtils::GetAnimatedGeometryRootFor(this, aBuilder);
-  MOZ_ASSERT(nsLayoutUtils::IsAncestorFrameCrossDoc(aBuilder->RootReferenceFrame(),
-                                                      mAnimatedGeometryRoot), "Bad");
   NS_ASSERTION(aBuilder->GetDirtyRect().width >= 0 ||
                !aBuilder->IsForPainting(), "dirty rect not set");
   // The dirty rect is for mCurrentFrame, so we have to use
@@ -2134,9 +2128,6 @@ nsDisplayBackgroundImage::nsDisplayBackgroundImage(nsDisplayListBuilder* aBuilde
   MOZ_COUNT_CTOR(nsDisplayBackgroundImage);
 
   mBounds = GetBoundsInternal(aBuilder);
-  if (ShouldFixToViewport(aBuilder)) {
-    mAnimatedGeometryRoot = nsLayoutUtils::GetAnimatedGeometryRootFor(this, aBuilder);
-  }
 }
 
 nsDisplayBackgroundImage::~nsDisplayBackgroundImage()
@@ -3718,7 +3709,8 @@ RequiredLayerStateForChildren(nsDisplayListBuilder* aBuilder,
   LayerState result = LAYER_INACTIVE;
   for (nsDisplayItem* i = aList.GetBottom(); i; i = i->GetAbove()) {
     if (result == LAYER_INACTIVE &&
-        i->AnimatedGeometryRoot() != aExpectedAnimatedGeometryRootForChildren) {
+        nsLayoutUtils::GetAnimatedGeometryRootFor(i, aBuilder) !=
+          aExpectedAnimatedGeometryRootForChildren) {
       result = LAYER_ACTIVE;
     }
 
@@ -3975,7 +3967,8 @@ nsDisplayOpacity::GetLayerState(nsDisplayListBuilder* aBuilder,
   if (NeedsActiveLayer(aBuilder))
     return LAYER_ACTIVE;
 
-  return RequiredLayerStateForChildren(aBuilder, aManager, aParameters, mList, AnimatedGeometryRoot());
+  return RequiredLayerStateForChildren(aBuilder, aManager, aParameters, mList,
+    nsLayoutUtils::GetAnimatedGeometryRootFor(this, aBuilder));
 }
 
 bool
@@ -4689,14 +4682,10 @@ nsDisplayTransform::nsDisplayTransform(nsDisplayListBuilder* aBuilder,
 void
 nsDisplayTransform::SetReferenceFrameToAncestor(nsDisplayListBuilder* aBuilder)
 {
-  if (mFrame == aBuilder->RootReferenceFrame()) {
-    return;
-  }
   nsIFrame *outerFrame = nsLayoutUtils::GetCrossDocParentFrame(mFrame);
   mReferenceFrame =
     aBuilder->FindReferenceFrameFor(outerFrame);
   mToReferenceFrame = mFrame->GetOffsetToCrossDoc(mReferenceFrame);
-  mAnimatedGeometryRoot = nsLayoutUtils::GetAnimatedGeometryRootForFrame(aBuilder, outerFrame);
   mVisibleRect = aBuilder->GetDirtyRect() + mToReferenceFrame;
 }
 
