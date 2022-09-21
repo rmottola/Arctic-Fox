@@ -717,10 +717,8 @@ VectorImage::GetFrameAtSize(const IntSize& aSize,
 
   nsRefPtr<gfxContext> context = new gfxContext(dt);
 
-  auto result = Draw(context, aSize,
-                     ImageRegion::Create(aSize),
-                     aWhichFrame, GraphicsFilter::FILTER_NEAREST,
-                     Nothing(), aFlags);
+  auto result = Draw(context, aSize, ImageRegion::Create(aSize),
+                     aWhichFrame, Filter::POINT, Nothing(), aFlags);
 
   return result == DrawResult::SUCCESS ? dt->Snapshot() : nullptr;
 }
@@ -900,7 +898,7 @@ VectorImage::CreateSurfaceAndShow(const SVGDrawingParameters& aParams)
   nsresult rv =
     frame->InitWithDrawable(svgDrawable, aParams.size,
                             SurfaceFormat::B8G8R8A8,
-                            GraphicsFilter::FILTER_NEAREST, aParams.flags);
+                            Filter::POINT, aParams.flags);
 
   // If we couldn't create the frame, it was probably because it would end
   // up way too big. Generally it also wouldn't fit in the cache, but the prefs
