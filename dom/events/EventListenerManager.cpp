@@ -1130,7 +1130,7 @@ EventListenerManager::HandleEventInternal(nsPresContext* aPresContext,
               uint16_t phase;
               (*aDOMEvent)->GetEventPhase(&phase);
               UniquePtr<TimelineMarker> marker = MakeUnique<EventTimelineMarker>(
-                typeStr, phase, TRACING_INTERVAL_START);
+                typeStr, phase, MarkerTracingType::START);
               TimelineConsumers::AddMarkerForDocShell(ds, Move(marker));
             }
           }
@@ -1142,7 +1142,7 @@ EventListenerManager::HandleEventInternal(nsPresContext* aPresContext,
 
           if (isTimelineRecording) {
             nsDocShell* ds = static_cast<nsDocShell*>(docShell.get());
-            TimelineConsumers::AddMarkerForDocShell(ds, "DOMEvent", TRACING_INTERVAL_END);
+            TimelineConsumers::AddMarkerForDocShell(ds, "DOMEvent", MarkerTracingType::END);
           }
         }
       }

@@ -341,7 +341,7 @@ RestyleTracker::DoProcessRestyles()
 
         if (isTimelineRecording) {
           UniquePtr<TimelineMarker> marker = MakeUnique<RestyleTimelineMarker>(
-            data->mRestyleHint, TRACING_INTERVAL_START);
+            data->mRestyleHint, MarkerTracingType::START);
           TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
         }
 
@@ -357,7 +357,7 @@ RestyleTracker::DoProcessRestyles()
 
         if (isTimelineRecording) {
           UniquePtr<TimelineMarker> marker = MakeUnique<RestyleTimelineMarker>(
-            data->mRestyleHint, TRACING_INTERVAL_END);
+            data->mRestyleHint, MarkerTracingType::END);
           TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
         }
       }
@@ -402,7 +402,7 @@ RestyleTracker::DoProcessRestyles()
 #endif
           if (isTimelineRecording) {
             UniquePtr<TimelineMarker> marker = MakeUnique<RestyleTimelineMarker>(
-              currentRestyle->mRestyleHint, TRACING_INTERVAL_START);
+              currentRestyle->mRestyleHint, MarkerTracingType::START);
             TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
           }
 
@@ -413,7 +413,7 @@ RestyleTracker::DoProcessRestyles()
 
           if (isTimelineRecording) {
             UniquePtr<TimelineMarker> marker = MakeUnique<RestyleTimelineMarker>(
-              currentRestyle->mRestyleHint, TRACING_INTERVAL_END);
+              currentRestyle->mRestyleHint, MarkerTracingType::END);
             TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
           }
         }

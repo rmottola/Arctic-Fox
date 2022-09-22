@@ -13940,7 +13940,7 @@ nsDocShell::NotifyJSRunToCompletionStart(const char* aReason,
   // If first start, mark interval start.
   if (timelineOn && mJSRunToCompletionDepth == 0) {
     UniquePtr<TimelineMarker> marker = MakeUnique<JavascriptTimelineMarker>(
-      aReason, aFunctionName, aFilename, aLineNumber, TRACING_INTERVAL_START);
+      aReason, aFunctionName, aFilename, aLineNumber, MarkerTracingType::START);
     TimelineConsumers::AddMarkerForDocShell(this, Move(marker));
   }
   mJSRunToCompletionDepth++;
@@ -13954,7 +13954,7 @@ nsDocShell::NotifyJSRunToCompletionStop()
   // If last stop, mark interval end.
   mJSRunToCompletionDepth--;
   if (timelineOn && mJSRunToCompletionDepth == 0) {
-    TimelineConsumers::AddMarkerForDocShell(this, "Javascript", TRACING_INTERVAL_END);
+    TimelineConsumers::AddMarkerForDocShell(this, "Javascript", MarkerTracingType::END);
   }
 }
 
