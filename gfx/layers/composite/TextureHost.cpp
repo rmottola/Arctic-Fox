@@ -67,6 +67,7 @@ public:
   ~TextureParent();
 
   bool Init(const SurfaceDescriptor& aSharedData,
+            const LayersBackend& aLayersBackend,
             const TextureFlags& aFlags);
 
   void CompositorRecycle();
@@ -91,11 +92,10 @@ public:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-
-// static
 PTextureParent*
 TextureHost::CreateIPDLActor(CompositableParentManager* aManager,
                              const SurfaceDescriptor& aSharedData,
+                             LayersBackend aLayersBackend,
                              TextureFlags aFlags)
 {
   if (aSharedData.type() == SurfaceDescriptor::TSurfaceDescriptorMemory &&
@@ -105,7 +105,7 @@ TextureHost::CreateIPDLActor(CompositableParentManager* aManager,
     return nullptr;
   }
   TextureParent* actor = new TextureParent(aManager);
-  if (!actor->Init(aSharedData, aFlags)) {
+  if (!actor->Init(aSharedData, aLayersBackend, aFlags)) {
     delete actor;
     return nullptr;
   }
@@ -198,10 +198,10 @@ already_AddRefed<TextureHost> CreateTextureHostD3D9(const SurfaceDescriptor& aDe
                                                 ISurfaceAllocator* aDeallocator,
                                                 TextureFlags aFlags);
 
-// static
 already_AddRefed<TextureHost>
 TextureHost::Create(const SurfaceDescriptor& aDesc,
                     ISurfaceAllocator* aDeallocator,
+                    LayersBackend aBackend,
                     TextureFlags aFlags)
 {
   switch (aDesc.type()) {
@@ -217,7 +217,7 @@ TextureHost::Create(const SurfaceDescriptor& aDesc,
       return CreateTextureHostOGL(aDesc, aDeallocator, aFlags);
 
     case SurfaceDescriptor::TSurfaceDescriptorMacIOSurface:
-      if (Compositor::GetBackend() == LayersBackend::LAYERS_OPENGL) {
+      if (aBackend == LayersBackend::LAYERS_OPENGL) {
         return CreateTextureHostOGL(aDesc, aDeallocator, aFlags);
       } else {
         return CreateTextureHostBasic(aDesc, aDeallocator, aFlags);
@@ -236,7 +236,7 @@ TextureHost::Create(const SurfaceDescriptor& aDesc,
 
     case SurfaceDescriptor::TSurfaceDescriptorD3D10:
     case SurfaceDescriptor::TSurfaceDescriptorDXGIYCbCr:
-      if (Compositor::GetBackend() == LayersBackend::LAYERS_D3D9) {
+      if (aBackend == LayersBackend::LAYERS_D3D9) {
         return CreateTextureHostD3D9(aDesc, aDeallocator, aFlags);
       } else {
         return CreateTextureHostD3D11(aDesc, aDeallocator, aFlags);
@@ -796,10 +796,12 @@ TextureParent::RecvClientRecycle()
 
 bool
 TextureParent::Init(const SurfaceDescriptor& aSharedData,
+                    const LayersBackend& aBackend,
                     const TextureFlags& aFlags)
 {
   mTextureHost = TextureHost::Create(aSharedData,
                                      mCompositableManager,
+                                     aBackend,
                                      aFlags);
   if (mTextureHost) {
     mTextureHost->mActor = this;
