@@ -172,7 +172,7 @@ private:
   gfx::IntSize mSize;
 
   uint32_t mDeviceResetCount;
-  uint32_t mFailedResetAttemps;
+  uint32_t mFailedResetAttempts;
 };
 
 }
