@@ -3360,7 +3360,6 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
     regions.mNoActionRegion = ScaleRegionToOutsidePixels(data->mNoActionRegion);
     regions.mHorizontalPanRegion = ScaleRegionToOutsidePixels(data->mHorizontalPanRegion);
     regions.mVerticalPanRegion = ScaleRegionToOutsidePixels(data->mVerticalPanRegion);
-
     // Points whose hit-region status we're not sure about need to be dispatched
     // to the content thread. If a point is in both maybeHitRegion and hitRegion
     // then it's not a "maybe" any more, and doesn't go into the dispatch-to-
@@ -3371,7 +3370,7 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
         ScaleRegionToOutsidePixels(data->mDispatchToContentHitRegion));
     regions.mHitRegion.OrWith(maybeHitRegion);
 
-    Matrix mat = layer->GetBaseTransform().As2D();
+    Matrix mat = layer->GetTransform().As2D();
     mat.Invert();
     regions.ApplyTranslationAndScale(mat._31, mat._32, mat._11, mat._22);
 
