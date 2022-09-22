@@ -1634,7 +1634,7 @@ TabChild::MaybeRequestPreinitCamera()
 
     nsCOMPtr<mozIApplication> app;
     nsresult rv = appsService->GetAppByLocalId(OwnAppId(), getter_AddRefs(app));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
+    if (NS_WARN_IF(NS_FAILED(rv)) || !app) {
       return;
     }
 
