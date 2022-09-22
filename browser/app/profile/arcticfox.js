@@ -1170,7 +1170,8 @@ pref("devtools.performance.enabled", true);
 // The default Performance UI settings
 pref("devtools.performance.memory.sample-probability", "0.05");
 pref("devtools.performance.memory.max-log-length", 2147483647); // Math.pow(2,31) - 1
-pref("devtools.performance.timeline.hidden-markers", "[]");
+pref("devtools.performance.timeline.hidden-markers",
+  "[\"Composite\",\"CompositeForwardTransaction\"]");
 pref("devtools.performance.profiler.buffer-size", 10000000);
 pref("devtools.performance.profiler.sample-frequency-khz", 1);
 pref("devtools.performance.ui.show-platform-data", false);
