@@ -2531,7 +2531,10 @@ gfxPlatform::NotifyCompositorCreated(LayersBackend aBackend)
     return;
   }
 
-  NS_ASSERTION(mCompositorBackend == LayersBackend::LAYERS_NONE, "Compositor backend changed.");
+  if (mCompositorBackend != LayersBackend::LAYERS_NONE) {
+    gfxCriticalNote << "Compositors might be mixed ("
+      << int(mCompositorBackend) << "," << int(aBackend) << ")";
+  }
 
   // Set the backend before we notify so it's available immediately.
   mCompositorBackend = aBackend;
