@@ -476,7 +476,8 @@ CompositorD3D11::GetTextureFactoryIdentifier()
   if (mAttachments->mSyncTexture) {
     HRESULT hr = mAttachments->mSyncTexture->GetSharedHandle(&ident.mSyncHandle);
     if (FAILED(hr) || !ident.mSyncHandle) {
-      gfxCriticalError() << "Failed to get SharedHandle for sync texture. Result: " << hr;
+      gfxCriticalError() << "Failed to get SharedHandle for sync texture. Result: "
+                         << hexa(hr);
       MOZ_CRASH();
     }
   }
@@ -1388,7 +1389,7 @@ CompositorD3D11::UpdateConstantBuffers()
 
   hr = mContext->Map(mAttachments->mVSConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
   if (Failed(hr) || !resource.pData) {
-    gfxCriticalError() << "Failed to map VSConstantBuffer. Result: " << hr;
+    gfxCriticalError() << "Failed to map VSConstantBuffer. Result: " << hexa(hr);
     return false;
   }
   *(VertexShaderConstants*)resource.pData = mVSConstants;
@@ -1397,7 +1398,7 @@ CompositorD3D11::UpdateConstantBuffers()
 
   hr = mContext->Map(mAttachments->mPSConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
   if (Failed(hr) || !resource.pData) {
-    gfxCriticalError() << "Failed to map PSConstantBuffer. Result: " << hr;
+    gfxCriticalError() << "Failed to map PSConstantBuffer. Result: " << hexa(hr);
     return false;
   }
   *(PixelShaderConstants*)resource.pData = mPSConstants;
