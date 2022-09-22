@@ -42,6 +42,20 @@ You should verify any changes using |mach build|.
 =============
 '''.strip()
 
+VISUAL_STUDIO_ADVERTISEMENT = '''
+===============================
+Visual Studio Support Available
+
+You are building Firefox on Windows. Please help us test the experimental
+Visual Studio project files (yes, IntelliSense works) by running the
+following:
+
+   mach build-backend --backend=VisualStudio
+
+===============================
+'''.strip()
+
+
 def config_status(topobjdir='.', topsrcdir='.',
         defines=[], non_global_defines=[], substs=[], source=None):
     '''Main function, providing config.status functionality.
