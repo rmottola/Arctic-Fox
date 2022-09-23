@@ -118,6 +118,10 @@
 
 #include "mozilla/dom/FeatureList.h"
 
+#ifdef MOZ_WIDGET_GONK
+#include <cutils/properties.h>
+#endif
+
 namespace mozilla {
 namespace dom {
 
@@ -1554,6 +1558,26 @@ Navigator::GetFeature(const nsAString& aName, ErrorResult& aRv)
   } // hardware.memory
 #endif
 
+#ifdef MOZ_WIDGET_GONK
+  if (StringBeginsWith(aName, NS_LITERAL_STRING("acl.")) &&
+      (aName.EqualsLiteral("acl.version") || CheckPermission("external-app"))) {
+    char value[PROPERTY_VALUE_MAX];
+    nsCString propertyKey("persist.");
+    propertyKey.Append(NS_ConvertUTF16toUTF8(aName));
+    uint32_t len = property_get(propertyKey.get(), value, nullptr);
+    if (len > 0) {
+      p->MaybeResolve(NS_ConvertUTF8toUTF16(value));
+      return p.forget();
+    }
+  }
+#endif
+
+  // Mirror the dom.apps.developer_mode pref to let apps get it read-only.
+  if (aName.EqualsLiteral("dom.apps.developer_mode")) {
+    p->MaybeResolve(Preferences::GetBool("dom.apps.developer_mode", false));
+    return p.forget();
+  }
+
   p->MaybeResolve(JS::UndefinedHandleValue);
   return p.forget();
 }
@@ -1566,6 +1590,14 @@ Navigator::HasFeature(const nsAString& aName, ErrorResult& aRv)
   if (aRv.Failed()) {
     return nullptr;
   }
+
+  // Hardcoded web-extensions feature which is b2g specific.
+#ifdef MOZ_B2G
+  if (aName.EqualsLiteral("web-extensions")) {
+    p->MaybeResolve(true);
+    return p.forget();
+  }
+#endif
 
   // Hardcoded manifest features. Some are still b2g specific.
   const char manifestFeatures[][64] = {
