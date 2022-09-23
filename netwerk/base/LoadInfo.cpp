@@ -87,13 +87,14 @@ LoadInfo::LoadInfo(const LoadInfo& rhs)
   , mTriggeringPrincipal(rhs.mTriggeringPrincipal)
   , mLoadingContext(rhs.mLoadingContext)
   , mSecurityFlags(rhs.mSecurityFlags)
-  , mContentPolicyType(rhs.mContentPolicyType)
+  , mInternalContentPolicyType(rhs.mInternalContentPolicyType)
   , mUpgradeInsecureRequests(rhs.mUpgradeInsecureRequests)
   , mInnerWindowID(rhs.mInnerWindowID)
   , mOuterWindowID(rhs.mOuterWindowID)
   , mParentOuterWindowID(rhs.mParentOuterWindowID)
   , mEnforceSecurity(false)
   , mInitialSecurityCheckDone(false)
+  , mIsFromProcessingFrameAttributes(rhs.mIsFromProcessingFrameAttributes)
 {
 }
 
