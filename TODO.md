@@ -118,14 +118,10 @@
 - Bug 1182571 - 2015-10-19 Fix nsILoadInfo->GetContentPolicyType API to be less am
 - Bug 1170958 - 2015-09-30 - Allow MediaInputPort to lock to a specific input track
 - 1203427
-- Bug 1193583 - 2015-08-31 Change the semantics of Debugger.evalInGlobal
-- remaining part of Bug 1192130 - Part 2: Use MOZ_NON_AUTOABLE to validate the usage of 
-- Bug 1192130 - Part 1: Add MOZ_NON_AUTOABLE to restrict using auto in
 - 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 - Bug 1169268 - Don't crash when pasting files. r=ndeakin
 - Bug 1202085 2015-10-26 - Part 0 to 6
 - Bug 1188643 2015-09-30 - Buffer more audio in audio capture mode to avoid glitche
-- https://bugzilla.mozilla.org/show_bug.cgi?id=1201309
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
@@ -165,8 +161,6 @@ https://github.com/mozilla/newtab-dev/commit/ac250f9d737362d0730b0897603ae379eca
 ## Enhancing JS
  Bug 1316079 - Mark JS::PropertyDescriptor as JS_PUBLIC_API to fix lin¿
 - Bug 1208747 - Move most of Stopwatch-related code to XPCOM-land (JSAP
-- Bug 1206290 - Part 1: Implement a JS::ubi::PostOrder depth first trav
-- Bug 1209704 - Part 2: Share storage and mixins between Read and Wri
 - Bug 930414 - remaining 6 out of 22 parts
 
 ### FIXME / TODO
