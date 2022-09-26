@@ -1655,9 +1655,7 @@ BrowserGlue.prototype = {
 
     if (currentUIVersion < 3) {
       // This code merges the reload/stop/go button into the url bar.
-      let currentsetResource = this._rdf.GetResource("currentset");
-      let toolbarResource = this._rdf.GetResource(BROWSER_DOCURL + "nav-bar");
-      let currentset = this._getPersist(toolbarResource, currentsetResource);
+      let currentset = xulStore.getValue(BROWSER_DOCURL, "nav-bar", "currentset");
       // Need to migrate only if toolbar is customized and all 3 elements are found.
       if (currentset &&
           currentset.indexOf("reload-button") != -1 &&
@@ -1668,7 +1666,7 @@ BrowserGlue.prototype = {
                                .replace(/(^|,)stop-button($|,)/, "$1$2")
                                .replace(/(^|,)urlbar-container($|,)/,
                                         "$1urlbar-container,reload-button,stop-button$2");
-        this._setPersist(toolbarResource, currentsetResource, currentset);
+        xulStore.setValue(BROWSER_DOCURL, "nav-bar", "currentset", currentset);
       }
     }
 
