@@ -14,6 +14,10 @@ Cu.import("resource://testing-common/httpd.js");
 XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
                                   "resource://gre/modules/LightweightThemeManager.jsm");
 
+// Lazy load |ProfileAge| as it is not available on Android.
+XPCOMUtils.defineLazyModuleGetter(this, "ProfileAge",
+                                  "resource://gre/modules/ProfileAge.jsm");
+
 // The webserver hosting the addons.
 var gHttpServer = null;
 // The URL of the webserver root.
@@ -159,7 +163,12 @@ function spoofGfxAdapter() {
 }
 
 function spoofProfileReset() {
-  let profileAccessor = new ProfileTimesAccessor();
+  if (gIsAndroid) {
+    // ProfileAge is not available on Android.
+    return true;
+  }
+
+  let profileAccessor = new ProfileAge();
 
   return profileAccessor.writeTimes({
     created: PROFILE_CREATION_DATE_MS,
