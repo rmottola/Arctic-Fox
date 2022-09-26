@@ -382,15 +382,14 @@ function GetWindowsPasswordsResource(aProfileFolder) {
         password_element, password_value, signon_realm, scheme, date_created,
         times_used FROM logins WHERE blacklisted_by_user = 0`);
       let crypto = new OSCrypto();
-      let utf8Converter = Cc["@mozilla.org/intl/utf8converterservice;1"].getService(Ci.nsIUTF8ConverterService);
 
       stmt.executeAsync({
         _rowToLoginInfo(row) {
           let loginInfo = {
-            username: utf8Converter.convertURISpecToUTF8(row.getResultByName("username_value"), "UTF-8"),
-            password: utf8Converter.convertURISpecToUTF8(
-                        crypto.decryptData(crypto.arrayToString(row.getResultByName("password_value")), null),
-                        "UTF-8"),
+            username: row.getResultByName("username_value"),
+            password: crypto.
+                      decryptData(crypto.arrayToString(row.getResultByName("password_value")),
+                                                       null),
             hostName: NetUtil.newURI(row.getResultByName("origin_url")).prePath,
             submitURL: null,
             httpRealm: null,
