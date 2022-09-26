@@ -25,10 +25,12 @@ EXTRA_COMPONENTS += [
 if CONFIG['OS_ARCH'] == 'WINNT':
     EXTRA_COMPONENTS += [
         '360seProfileMigrator.js',
+        'EdgeProfileMigrator.js',
         'IEProfileMigrator.js',
     ]
     DEFINES['HAS_360SE_MIGRATOR'] = True
     DEFINES['HAS_IE_MIGRATOR'] = True
+    DEFINES['HAS_EDGE_MIGRATOR'] = True
 
 EXTRA_PP_COMPONENTS += [
     'BrowserProfileMigrators.manifest',
@@ -50,6 +52,11 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
 EXTRA_PP_JS_MODULES += [
     'MigrationUtils.jsm',
 ]
+
+if CONFIG['OS_ARCH'] == 'WINNT':
+    EXTRA_JS_MODULES += [
+        'MSMigrationUtils.jsm',
+    ]
 
 FINAL_LIBRARY = 'browsercomps'
 
