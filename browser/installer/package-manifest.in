@@ -508,6 +508,7 @@
 @RESPATH@/browser/components/status4evar.manifest
 #endif
 #ifdef XP_WIN
+@RESPATH@/browser/components/360seProfileMigrator.js
 @RESPATH@/browser/components/IEProfileMigrator.js
 @RESPATH@/browser/components/SafariProfileMigrator.js
 #endif
