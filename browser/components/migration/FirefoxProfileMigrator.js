@@ -242,7 +242,7 @@ FirefoxProfileMigrator.prototype._getResourcesInternal = function(sourceProfileD
 };
 
 Object.defineProperty(FirefoxProfileMigrator.prototype, "startupOnlyMigrator", {
-  get: function() true
+  get: () => true
 });
 
 
