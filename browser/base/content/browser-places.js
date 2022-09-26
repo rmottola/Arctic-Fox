@@ -1192,6 +1192,7 @@ var BookmarkingUI = {
     let viewToolbarMenuitem = getPlacesAnonymousElement("view-toolbar");
     if (viewToolbarMenuitem) {
       // Update View bookmarks toolbar checkbox menuitem.
+      viewToolbarMenuitem.classList.add("subviewbutton");
       let personalToolbar = document.getElementById("PersonalToolbar");
       viewToolbarMenuitem.setAttribute("checked", !personalToolbar.collapsed);
     }
@@ -1478,6 +1479,15 @@ var BookmarkingUI = {
     if (aEvent.target != aEvent.currentTarget) {
       return;
     }
+
+    // Handle special case when the button is in the panel.
+    let isBookmarked = this._itemIds.length > 0;
+
+    if (this._currentAreaType == CustomizableUI.TYPE_MENU_PANEL) {
+      this._showSubview();
+      return;
+    }
+
     // Ignore clicks on the star if we are updating its state.
     if (!this._pendingStmt) {
       if (!isBookmarked)
@@ -1597,6 +1607,7 @@ var BookmarkingUI = {
 
   onBeginUpdateBatch: function () {},
   onEndUpdateBatch: function () {},
+  onBeforeItemRemoved: function () {},
   onItemVisited: function () {},
   onItemMoved: function () {},
 

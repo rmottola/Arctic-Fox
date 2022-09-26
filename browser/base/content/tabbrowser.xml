@@ -376,11 +376,12 @@
         </body>
       </method>
 
-      <method name="getBrowserForOuterWindowID">
-        <parameter name="aID"/>
+      <method name="getBrowserForContentWindow">
+        <parameter name="aWindow"/>
         <body>
           <![CDATA[
-            return this._outerWindowIDBrowserMap.get(aID);
+            var tab = this._getTabForContentWindow(aWindow);
+            return tab ? tab.linkedBrowser : null;
           ]]>
         </body>
       </method>
@@ -398,8 +399,21 @@
         <parameter name="aWindow"/>
         <body>
         <![CDATA[
+          // When not using remote browsers, we can take a fast path by getting
+          // directly from the content window to the browser without looping
+          // over all browsers.
+          if (!gMultiProcessBrowser) {
+            let browser = aWindow.QueryInterface(Ci.nsIInterfaceRequestor)
+                                 .getInterface(Ci.nsIWebNavigation)
+                                 .QueryInterface(Ci.nsIDocShell)
+                                 .chromeEventHandler;
+            return this.getTabForBrowser(browser);
+          }
+
           for (let i = 0; i < this.browsers.length; i++) {
-            if (this.browsers[i].contentWindow == aWindow)
+            // NB: We use contentWindowAsCPOW so that this code works both
+            // for remote browsers as well. aWindow may be a CPOW.
+            if (this.browsers[i].contentWindowAsCPOW == aWindow)
               return this.tabs[i];
           }
           return null;
@@ -5938,7 +5952,7 @@
                      xbl:inherits="value=visibleLabel,crop,accesskey,fadein,pinned,selected,visuallyselected"
                      class="tab-text tab-label"
                      role="presentation"/>
-          <xul:image xbl:inherits="soundplaying,pinned,muted"
+          <xul:image xbl:inherits="soundplaying,pinned,muted,visuallyselected"
                      anonid="soundplaying-icon"
                      class="tab-icon-sound"
                      role="presentation"/>
@@ -5950,6 +5964,19 @@
     </content>
 
     <implementation>
+
+      <property name="_logicallySelected">
+        <setter>
+          <![CDATA[
+          if (val)
+            this.setAttribute("selected", "true");
+          else
+            this.removeAttribute("selected");
+
+          return val;
+          ]]>
+        </setter>
+      </property>
 
       <property name="_selected">
         <setter>
@@ -6014,8 +6041,9 @@
 
       <method name="_mouseenter">
         <body><![CDATA[
-          if (this.closing)
+          if (this.hidden || this.closing)
             return;
+
           let tabContainer = this.parentNode;
           let visibleTabs = tabContainer.tabbrowser.visibleTabs;
           let tabIndex = visibleTabs.indexOf(this);
@@ -6028,6 +6056,7 @@
               candidate.setAttribute("beforehovered", "true");
             }
           }
+
           if (tabIndex == visibleTabs.length - 1) {
             tabContainer._afterHoveredTab = null;
           } else {
@@ -6037,6 +6066,7 @@
               candidate.setAttribute("afterhovered", "true");
             }
           }
+
           tabContainer._hoveredTab = this;
         ]]></body>
       </method>

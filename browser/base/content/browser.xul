@@ -332,13 +332,26 @@
     </hbox>
 #endif
     <spacer id="titlebar-spacer" flex="1"/>
-    <hbox id="titlebar-buttonbox-container" align="start">
+    <hbox id="titlebar-buttonbox-container">
+#ifdef XP_WIN
+      <hbox id="private-browsing-indicator-titlebar">
+        <hbox class="private-browsing-indicator"/>
+      </hbox>
+#endif
       <hbox id="titlebar-buttonbox">
         <toolbarbutton class="titlebar-button" id="titlebar-min" oncommand="window.minimize();"/>
         <toolbarbutton class="titlebar-button" id="titlebar-max" oncommand="onTitlebarMaxClick();"/>
         <toolbarbutton class="titlebar-button" id="titlebar-close" command="cmd_closeWindow"/>
       </hbox>
     </hbox>
+#ifdef XP_MACOSX
+    <!-- OS X does not natively support RTL for its titlebar items, so we prevent this secondary
+         buttonbox from reversing order in RTL by forcing an LTR direction. -->
+    <hbox id="titlebar-secondary-buttonbox" dir="ltr">
+      <hbox class="private-browsing-indicator"/>
+      <hbox id="titlebar-fullscreen-button"/>
+    </hbox>
+#endif
   </hbox>
 </vbox>
 #endif
@@ -357,6 +370,9 @@
 #ifdef MENUBAR_CAN_AUTOHIDE
              toolbarname="&menubarCmd.label;"
              accesskey="&menubarCmd.accesskey;"
+#if defined(MOZ_WIDGET_GTK) || defined(MOZ_WIDGET_QT)
+             autohide="true"
+#endif
 #endif
              context="toolbar-context-menu">
       <toolbaritem id="menubar-items" align="center">
@@ -700,6 +716,11 @@
                        oncommand="window.minimize();"/>
 
         <toolbarbutton id="restore-button"
+#ifdef XP_MACOSX
+# Prior to 10.7 there wasn't a native fullscreen button so we use #restore-button
+# to exit fullscreen and want it to behave like other toolbar buttons.
+                       class="toolbarbutton-1"
+#endif
                        tooltiptext="&fullScreenRestore.tooltip;"
                        oncommand="BrowserFullScreen();"/>
 
