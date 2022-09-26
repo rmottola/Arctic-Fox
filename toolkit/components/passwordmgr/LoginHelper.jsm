@@ -344,27 +344,6 @@ this.LoginHelper = {
   },
 
   /**
-   * Open the password manager window.
-   *
-   * @param {Window} window
-   *                 the window from where we want to open the dialog
-   *
-   * @param {string} [filterString=""]
-   *                 the filterString parameter to pass to the login manager dialog
-   */
-  openPasswordManager(window, filterString = "") {
-    let win = Services.wm.getMostRecentWindow("Toolkit:PasswordManager");
-    if (win) {
-      win.setFilter(filterString);
-      win.focus();
-    } else {
-      window.openDialog("chrome://passwordmgr/content/passwordManager.xul",
-                        "Toolkit:PasswordManager", "",
-                        {filterString : filterString});
-    }
-  },
-
-  /**
    * Add the login to the password manager if a similar one doesn't already exist. Merge it
    * otherwise with the similar existing ones.
    * @param {Object} loginData - the data about the login that needs to be added.
