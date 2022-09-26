@@ -285,7 +285,7 @@ function hostIsIPAddress(aHost) {
   return false;
 }
 
-let gEdgeDir;
+var gEdgeDir;
 function getEdgeLocalDataFolder() {
   if (gEdgeDir) {
     return gEdgeDir.clone();
