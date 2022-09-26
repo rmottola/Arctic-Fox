@@ -2460,7 +2460,6 @@ var GuidHelper = {
     if (rows.length == 0)
       throw new Error("no item found for the given GUID");
 
-    this.ensureObservingRemovedItems();
     let itemId = rows[0].getResultByName("id");
     this.updateCache(itemId, aGuid);
     return itemId;
@@ -2479,7 +2478,6 @@ var GuidHelper = {
     if (rows.length == 0)
       throw new Error("no item found for the given itemId");
 
-    this.ensureObservingRemovedItems();
     let guid = rows[0].getResultByName("guid");
     this.updateCache(aItemId, guid);
     return guid;
@@ -2496,6 +2494,7 @@ var GuidHelper = {
       throw new Error("Trying to update the GUIDs cache with an invalid itemId");
     if (typeof(aGuid) != "string" || !/^[a-zA-Z0-9\-_]{12}$/.test(aGuid))
       throw new Error("Trying to update the GUIDs cache with an invalid GUID");
+    this.ensureObservingRemovedItems();
     this.guidsForIds.set(aItemId, aGuid);
     this.idsForGuids.set(aGuid, aItemId);
   },
