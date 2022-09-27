@@ -69,11 +69,17 @@ this.RecentlyClosedTabsAndWindowsMenuUtils = {
         fragment.appendChild(element);
       }
 
-      fragment.appendChild(doc.createElementNS(kNSXUL, "menuseparator"));
-      let restoreAllTabs = fragment.appendChild(doc.createElementNS(kNSXUL, aTagName));
-      restoreAllTabs.setAttribute("label", navigatorBundle.GetStringFromName("menuRestoreAllTabs.label"));
+      let restoreAllTabs = doc.createElementNS(kNSXUL, aTagName);
+      restoreAllTabs.classList.add("restoreallitem");
+      restoreAllTabs.setAttribute("label", navigatorBundle.GetStringFromName(aRestoreAllLabel));
       restoreAllTabs.setAttribute("oncommand",
               "for (var i = 0; i < " + closedTabs.length + "; i++) undoCloseTab();");
+      if (!aPrefixRestoreAll) {
+        fragment.appendChild(doc.createElementNS(kNSXUL, "menuseparator"));
+        fragment.appendChild(restoreAllTabs);
+      } else {
+        fragment.insertBefore(restoreAllTabs, fragment.firstChild);
+      }
     }
     return fragment;
   },
