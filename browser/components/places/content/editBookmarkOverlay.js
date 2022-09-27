@@ -9,7 +9,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "Task",
 const LAST_USED_ANNO = "bookmarkPropertiesDialog/folderLastUsed";
 const MAX_FOLDER_ITEM_IN_MENU_LIST = 5;
 
-let gEditItemOverlay = {
+var gEditItemOverlay = {
   _observersAdded: false,
   _staticFoldersListBuilt: false,
 
@@ -203,7 +203,7 @@ let gEditItemOverlay = {
     showOrCollapse("locationRow", isURI, "location");
     if (isURI) {
       this._initLocationField();
-      this._locationField.readOnly = !this.readOnly;
+      this._locationField.readOnly = this.readOnly;
     }
 
     // hide the description field for
