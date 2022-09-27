@@ -100,9 +100,11 @@ FirefoxProfileMigrator.prototype._getResourcesInternal = function(sourceProfileD
     let files = [];
     for (let fileName of aFileNames) {
       let file = this._getFileObject(sourceProfileDir, fileName);
-      if (!file)
-        return null;
-      files.push(file);
+      if (file)
+        files.push(file);
+    }
+    if (!files.length) {
+      return null;
     }
     return {
       type: aMigrationType,
