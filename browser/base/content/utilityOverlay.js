@@ -309,11 +309,18 @@ function openLinkIn(url, where, params) {
                          getBoolPref("browser.tabs.loadInBackground");
   }
 
+  let uriObj;
+  if (where == "current") {
+    try {
+      uriObj = Services.io.newURI(url, null, null);
+    } catch (e) {}
+  }
+
   if (where == "current" && w.gBrowser.selectedTab.pinned) {
     try {
-      let uriObj = Services.io.newURI(url, null, null);
-      if (!uriObj.schemeIs("javascript") &&
-          w.gBrowser.currentURI.host != uriObj.host) {
+      // nsIURI.host can throw for non-nsStandardURL nsIURIs.
+      if (!uriObj || (!uriObj.schemeIs("javascript") &&
+                      w.gBrowser.currentURI.host != uriObj.host)) {
         where = "tab";
         loadInBackground = false;
       }
@@ -334,7 +341,12 @@ function openLinkIn(url, where, params) {
       flags |= Ci.nsIWebNavigation.LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP;
       flags |= Ci.nsIWebNavigation.LOAD_FLAGS_FIXUP_SCHEME_TYPOS;
     }
-    if (aDisallowInheritPrincipal)
+
+    // LOAD_FLAGS_DISALLOW_INHERIT_OWNER isn't supported for javascript URIs,
+    // i.e. it causes them not to load at all. Callers should strip
+    // "javascript:" from pasted strings to protect users from malicious URIs
+    // (see stripUnsafeProtocolOnPaste).
+    if (aDisallowInheritPrincipal && !(uriObj && uriObj.schemeIs("javascript")))
       flags |= Ci.nsIWebNavigation.LOAD_FLAGS_DISALLOW_INHERIT_OWNER;
 
     w.gBrowser.loadURIWithFlags(url, {
