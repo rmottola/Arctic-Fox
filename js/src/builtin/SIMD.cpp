@@ -223,7 +223,7 @@ class Float64x2Defn {
     static const JSFunctionSpec Methods[];
 };
 
-}
+} // namespace
 
 const JSFunctionSpec Float32x4Defn::TypeDescriptorMethods[] = {
     JS_SELF_HOSTED_FN("toSource", "DescrToSource", 0, 0),
@@ -576,7 +576,7 @@ struct RecApprox {
 };
 template<typename T>
 struct RecSqrtApprox {
-    static inline T apply(T x) { return 1 / sqrt(x); }
+    static T apply(T x) { return 1 / sqrt(x); }
 };
 template<typename T>
 struct Sqrt {
@@ -1148,9 +1148,9 @@ Load(JSContext* cx, unsigned argc, Value* vp)
     if (!result)
         return false;
 
-    Elem* src = reinterpret_cast<Elem*>(static_cast<char*>(AnyTypedArrayViewData(typedArray)) + byteStart);
+    SharedMem<Elem*> src = AnyTypedArrayViewData(typedArray).addBytes(byteStart).cast<Elem*>();
     Elem* dst = reinterpret_cast<Elem*>(result->typedMem());
-    memcpy(dst, src, sizeof(Elem) * NumElem);
+    jit::AtomicOperations::memcpySafeWhenRacy(dst, src, sizeof(Elem) * NumElem);
 
     args.rval().setObject(*result);
     return true;
@@ -1175,8 +1175,8 @@ Store(JSContext* cx, unsigned argc, Value* vp)
         return ErrorBadArgs(cx);
 
     Elem* src = TypedObjectMemory<Elem*>(args[2]);
-    Elem* dst = reinterpret_cast<Elem*>(static_cast<char*>(AnyTypedArrayViewData(typedArray)) + byteStart);
-    memcpy(dst, src, sizeof(Elem) * NumElem);
+    SharedMem<Elem*> dst = AnyTypedArrayViewData(typedArray).addBytes(byteStart).cast<Elem*>();
+    js::jit::AtomicOperations::memcpySafeWhenRacy(dst, src, sizeof(Elem) * NumElem);
 
     args.rval().setObject(args[2].toObject());
     return true;

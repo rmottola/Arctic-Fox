@@ -148,6 +148,7 @@ var handleContentContextMenu = function (event) {
   let frameOuterWindowID = doc.defaultView.QueryInterface(Ci.nsIInterfaceRequestor)
                                           .getInterface(Ci.nsIDOMWindowUtils)
                                           .outerWindowID;
+  let loginFillInfo = LoginManagerContent.getFieldContext(event.target);
 
   // get referrer attribute from clicked link and parse it
   // if per element referrer is enabled, the element referrer overrules
@@ -209,7 +210,8 @@ var handleContentContextMenu = function (event) {
                    { editFlags, spellInfo, customMenuItems, addonInfo,
                      principal, docLocation, charSet, baseURI, referrer,
                      referrerPolicy, contentType, contentDisposition,
-                     frameOuterWindowID, selectionInfo, disableSetDesktopBg },
+                     frameOuterWindowID, selectionInfo, disableSetDesktopBg,
+                     loginFillInfo, },
                    { event, popupNode: event.target });
   }
   else {
@@ -231,6 +233,7 @@ var handleContentContextMenu = function (event) {
       contentDisposition: contentDisposition,
       selectionInfo: selectionInfo,
       disableSetDesktopBackground: disableSetDesktopBg,
+      loginFillInfo,
     };
   }
 }
@@ -239,7 +242,7 @@ Cc["@mozilla.org/eventlistenerservice;1"]
   .getService(Ci.nsIEventListenerService)
   .addSystemEventListener(global, "contextmenu", handleContentContextMenu, false);
 
-let AboutNetErrorListener = {
+var AboutNetErrorListener = {
   init: function(chromeGlobal) {
     chromeGlobal.addEventListener('AboutNetErrorLoad', this, false, true);
     chromeGlobal.addEventListener('AboutNetErrorSetAutomatic', this, false, true);
@@ -354,7 +357,8 @@ let AboutNetErrorListener = {
 
 AboutNetErrorListener.init(this);
 
-let ClickEventHandler = {
+
+var ClickEventHandler = {
   init: function init() {
     Cc["@mozilla.org/eventlistenerservice;1"]
       .getService(Ci.nsIEventListenerService)
@@ -368,6 +372,9 @@ let ClickEventHandler = {
 
     let originalTarget = event.originalTarget;
     let ownerDoc = originalTarget.ownerDocument;
+    if (!ownerDoc) {
+      return;
+    }
 
     // Handle click events from about pages
     if (ownerDoc.documentURI.startsWith("about:certerror")) {
@@ -377,7 +384,7 @@ let ClickEventHandler = {
       this.onAboutBlocked(originalTarget, ownerDoc);
       return;
     } else if (ownerDoc.documentURI.startsWith("about:neterror")) {
-      this.onAboutNetError(originalTarget, ownerDoc);
+      this.onAboutNetError(event, ownerDoc.documentURI);
       return;
     }
 
@@ -470,12 +477,18 @@ let ClickEventHandler = {
     });
   },
 
-  onAboutNetError: function (targetElement, ownerDoc) {
-    let elmId = targetElement.getAttribute("id");
-    if (elmId != "errorTryAgain" || !/e=netOffline/.test(ownerDoc.documentURI)) {
+  onAboutNetError: function (event, documentURI) {
+    let elmId = event.originalTarget.getAttribute("id");
+    if (elmId != "errorTryAgain" || !/e=netOffline/.test(documentURI)) {
       return;
     }
-    sendSyncMessage("Browser:NetworkError", {});
+    // browser front end will handle clearing offline mode and refreshing
+    // the page *if* we're in offline mode now. Otherwise let the error page
+    // handle the click.
+    if (Services.io.offline) {
+      event.preventDefault();
+      sendAsyncMessage("Browser:EnableOnlineMode", {});
+    }
   },
 
   /**
@@ -645,6 +658,13 @@ addMessageListener("ContextMenu:ReloadImage", (message) => {
     image.forceReload();
 });
 
+addMessageListener("ContextMenu:BookmarkFrame", (message) => {
+  let frame = message.objects.target.ownerDocument;
+  sendAsyncMessage("ContextMenu:BookmarkFrame:Result",
+                   { title: frame.title,
+                     description: PlacesUIUtils.getDescriptionFromDocument(frame) });
+});
+
 addMessageListener("ContextMenu:SearchFieldBookmarkData", (message) => {
   let node = message.objects.target;
 
@@ -715,12 +735,22 @@ addMessageListener("ContextMenu:SearchFieldBookmarkData", (message) => {
                    { spec, title, description, postData, charset });
 });
 
+addMessageListener("Bookmarks:GetPageDetails", (message) => {
+  let doc = content.document;
+  let isErrorPage = /^about:(neterror|certerror|blocked)/.test(doc.documentURI);
+  sendAsyncMessage("Bookmarks:GetPageDetails:Result",
+                   { isErrorPage: isErrorPage,
+                     description: PlacesUIUtils.getDescriptionFromDocument(doc) });
+});
+
+
 addMessageListener("ContextMenu:BookmarkFrame", (message) => {
   let frame = message.objects.target.ownerDocument;
   sendAsyncMessage("ContextMenu:BookmarkFrame:Result",
                    { title: frame.title,
                      description: PlacesUIUtils.getDescriptionFromDocument(frame) });
 });
+
 
 function disableSetDesktopBackground(aTarget) {
   // Disable the Set as Desktop Background menu item if we're still trying

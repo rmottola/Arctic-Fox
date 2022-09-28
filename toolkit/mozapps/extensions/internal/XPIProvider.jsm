@@ -1425,14 +1425,28 @@ function verifyZipSigning(aZip, aCertificate) {
  * Returns the signedState for a given return code and certificate by verifying
  * it against the expected ID.
  */
-function getSignedStatus(aRv, aCert, aExpectedID) {
+function getSignedStatus(aRv, aCert, aAddonID) {
+  let expectedCommonName = aAddonID;
+  if (aAddonID.length > 64) {
+    let converter = Cc["@mozilla.org/intl/scriptableunicodeconverter"].
+                    createInstance(Ci.nsIScriptableUnicodeConverter);
+    converter.charset = "UTF-8";
+    let data = converter.convertToByteArray(aAddonID, {});
+
+    let crypto = Cc["@mozilla.org/security/hash;1"].
+                 createInstance(Ci.nsICryptoHash);
+    crypto.init(Ci.nsICryptoHash.SHA256);
+    crypto.update(data, data.length);
+    expectedCommonName = getHashStringForCrypto(crypto);
+  }
+
   switch (aRv) {
     case Cr.NS_OK:
-      if (aExpectedID != aCert.commonName)
+      if (expectedCommonName != aCert.commonName)
         return AddonManager.SIGNEDSTATE_BROKEN;
 
       let hotfixID = Preferences.get(PREF_EM_HOTFIX_ID, undefined);
-      if (hotfixID && hotfixID == aExpectedID && Preferences.get(PREF_EM_CERT_CHECKATTRIBUTES, false)) {
+      if (hotfixID && hotfixID == aAddonID && Preferences.get(PREF_EM_CERT_CHECKATTRIBUTES, false)) {
         // The hotfix add-on has some more rigorous certificate checks
         try {
           CertUtils.validateCert(aCert,
@@ -2072,7 +2086,9 @@ this.XPIStates = {
 };
 
 this.XPIProvider = {
-  get name() "XPIProvider",
+  get name() {
+    return "XPIProvider";
+  },
 
   // An array of known install locations
   installLocations: null,
@@ -5070,8 +5086,7 @@ this.XPIProvider = {
 
 function getHashStringForCrypto(aCrypto) {
   // return the two-digit hexadecimal code for a byte
-  function toHexString(charCode)
-    ("0" + charCode.toString(16)).slice(-2);
+  let toHexString = charCode => ("0" + charCode.toString(16)).slice(-2);
 
   // convert the binary hash data to a hex string.
   let binary = aCrypto.finish(false);
@@ -6330,18 +6345,26 @@ function AddonInstallWrapper(aInstall) {
 
   ["name", "version", "icons", "releaseNotesURI", "file", "state", "error",
    "progress", "maxProgress", "certificate", "certName"].forEach(function(aProp) {
-    this.__defineGetter__(aProp, function AIW_propertyGetter() aInstall[aProp]);
+    this.__defineGetter__(aProp, function AIW_propertyGetter() {
+      return aInstall[aProp];
+    });
   }, this);
 
   this.__defineGetter__("type", () => getExternalType(aInstall.type));
 
-  this.__defineGetter__("iconURL", function AIW_iconURL() aInstall.icons[32]);
+  this.__defineGetter__("iconURL", function AIW_iconURL() {
+    return aInstall.icons[32];
+  });
 
   this.__defineGetter__("existingAddon", function AIW_existingAddonGetter() {
     return createWrapper(aInstall.existingAddon);
   });
-  this.__defineGetter__("addon", function AIW_addonGetter() createWrapper(aInstall.addon));
-  this.__defineGetter__("sourceURI", function AIW_sourceURIGetter() aInstall.sourceURI);
+  this.__defineGetter__("addon", function AIW_addonGetter() {
+    return createWrapper(aInstall.addon);
+  });
+  this.__defineGetter__("sourceURI", function AIW_sourceURIGetter() {
+    return aInstall.sourceURI;
+  });
 
   this.__defineGetter__("linkedInstalls", function AIW_linkedInstallsGetter() {
     if (!aInstall.linkedInstalls)
@@ -6950,8 +6973,10 @@ function AddonWrapper(aAddon) {
    "providesUpdatesSecurely", "blocklistState", "blocklistURL", "appDisabled",
    "softDisabled", "skinnable", "size", "foreignInstall", "hasBinaryComponents",
    "strictCompatibility", "compatibilityOverrides", "updateURL",
-   "getDataDirectory", "multiprocessCompatible", "signedState", "native"].forEach(function(aProp) {
-     this.__defineGetter__(aProp, function AddonWrapper_propertyGetter() aAddon[aProp]);
+   "getDataDirectory", "multiprocessCompatible", "signedState"].forEach(function(aProp) {
+     this.__defineGetter__(aProp, function AddonWrapper_propertyGetter() {
+       return aAddon[aProp];
+     });
   }, this);
 
   this.__defineGetter__("type", () => getExternalType(aAddon.type));
@@ -6973,7 +6998,9 @@ function AddonWrapper(aAddon) {
   });
 
   ["installDate", "updateDate"].forEach(function(aProp) {
-    this.__defineGetter__(aProp, function AddonWrapper_datePropertyGetter() new Date(aAddon[aProp]));
+    this.__defineGetter__(aProp, function AddonWrapper_datePropertyGetter() {
+      return new Date(aAddon[aProp]);
+    });
   }, this);
 
   ["sourceURI", "releaseNotesURI"].forEach(function(aProp) {

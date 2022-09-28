@@ -79,7 +79,9 @@ document.addEventListener("load", initialize, true);
 window.addEventListener("unload", shutdown, false);
 
 var gPendingInitializations = 1;
-this.__defineGetter__("gIsInitializing", function gIsInitializingGetter() gPendingInitializations > 0);
+this.__defineGetter__("gIsInitializing", function gIsInitializingGetter() {
+  return gPendingInitializations > 0;
+});
 
 function initialize(event) {
   // XXXbz this listener gets _all_ load events for all nodes in the
@@ -197,6 +199,14 @@ function loadView(aViewId) {
   } else {
     gViewController.loadView(aViewId);
   }
+}
+
+function isCorrectlySigned(aAddon) {
+  if (aAddon.signedState <= AddonManager.SIGNEDSTATE_MISSING)
+    return false;
+  if (aAddon.foreignInstall && aAddon.signedState < AddonManager.SIGNEDSTATE_SIGNED)
+    return false;
+  return true;
 }
 
 function isDiscoverEnabled() {
@@ -822,7 +832,9 @@ var gViewController = {
     },
 
     cmd_restartApp: {
-      isEnabled: function cmd_restartApp_isEnabled() true,
+      isEnabled: function cmd_restartApp_isEnabled() {
+        return true;
+      },
       doCommand: function cmd_restartApp_doCommand() {
         let cancelQuit = Cc["@mozilla.org/supports-PRBool;1"].
                          createInstance(Ci.nsISupportsPRBool);
@@ -838,14 +850,18 @@ var gViewController = {
     },
 
     cmd_enableCheckCompatibility: {
-      isEnabled: function cmd_enableCheckCompatibility_isEnabled() true,
+      isEnabled: function cmd_enableCheckCompatibility_isEnabled() {
+        return true;
+      },
       doCommand: function cmd_enableCheckCompatibility_doCommand() {
         AddonManager.checkCompatibility = true;
       }
     },
 
     cmd_enableUpdateSecurity: {
-      isEnabled: function cmd_enableUpdateSecurity_isEnabled() true,
+      isEnabled: function cmd_enableUpdateSecurity_isEnabled() {
+        return true;
+      },
       doCommand: function cmd_enableUpdateSecurity_doCommand() {
         AddonManager.checkUpdateSecurity = true;
       }
@@ -853,7 +869,9 @@ var gViewController = {
 
 /* Plugincheck service is currently N/A for Pale Moon
     cmd_pluginCheck: {
-      isEnabled: function cmd_pluginCheck_isEnabled() true,
+      isEnabled: function cmd_pluginCheck_isEnabled() {
+        return true;
+      },
       doCommand: function cmd_pluginCheck_doCommand() {
         openURL(Services.urlFormatter.formatURLPref("plugins.update.url"));
       }
@@ -861,7 +879,9 @@ var gViewController = {
 */
 
     cmd_toggleAutoUpdateDefault: {
-      isEnabled: function cmd_toggleAutoUpdateDefault_isEnabled() true,
+      isEnabled: function cmd_toggleAutoUpdateDefault_isEnabled() {
+        return true;
+      },
       doCommand: function cmd_toggleAutoUpdateDefault_doCommand() {
         if (!AddonManager.updateEnabled || !AddonManager.autoUpdateDefault) {
           // One or both of the prefs is false, i.e. the checkbox is not checked.
@@ -878,7 +898,9 @@ var gViewController = {
     },
 
     cmd_resetAddonAutoUpdate: {
-      isEnabled: function cmd_resetAddonAutoUpdate_isEnabled() true,
+      isEnabled: function cmd_resetAddonAutoUpdate_isEnabled() {
+        return true;
+      },
       doCommand: function cmd_resetAddonAutoUpdate_doCommand() {
         AddonManager.getAllAddons(function cmd_resetAddonAutoUpdate_getAllAddons(aAddonList) {
           for (let addon of aAddonList) {
@@ -899,14 +921,18 @@ var gViewController = {
     },
 
     cmd_goToRecentUpdates: {
-      isEnabled: function cmd_goToRecentUpdates_isEnabled() true,
+      isEnabled: function cmd_goToRecentUpdates_isEnabled() {
+        return true;
+      },
       doCommand: function cmd_goToRecentUpdates_doCommand() {
         gViewController.loadView("addons://updates/recent");
       }
     },
 
     cmd_goToAvailableUpdates: {
-      isEnabled: function cmd_goToAvailableUpdates_isEnabled() true,
+      isEnabled: function cmd_goToAvailableUpdates_isEnabled() {
+        return true;
+      },
       doCommand: function cmd_goToAvailableUpdates_doCommand() {
         gViewController.loadView("addons://updates/available");
       }
@@ -925,7 +951,9 @@ var gViewController = {
 
     cmd_findAllUpdates: {
       inProgress: false,
-      isEnabled: function cmd_findAllUpdates_isEnabled() !this.inProgress,
+      isEnabled: function cmd_findAllUpdates_isEnabled() {
+        return !this.inProgress;
+      },
       doCommand: function cmd_findAllUpdates_doCommand() {
         this.inProgress = true;
         gViewController.updateCommand("cmd_findAllUpdates");
@@ -1228,7 +1256,9 @@ var gViewController = {
     },
 
     cmd_installFromFile: {
-      isEnabled: function cmd_installFromFile_isEnabled() true,
+      isEnabled: function cmd_installFromFile_isEnabled() {
+        return true;
+      },
       doCommand: function cmd_installFromFile_doCommand() {
         const nsIFilePicker = Ci.nsIFilePicker;
         var fp = Cc["@mozilla.org/filepicker;1"]
@@ -2286,7 +2316,9 @@ var gDiscoverView = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIWebProgressListener,
                                          Ci.nsISupportsWeakReference]),
 
-  getSelectedAddon: function gDiscoverView_getSelectedAddon() null
+  getSelectedAddon: function gDiscoverView_getSelectedAddon() {
+    return null;
+  }
 };
 
 
@@ -2317,16 +2349,15 @@ var gSearchView = {
     if (!AddonManager.isInstallEnabled("application/x-xpinstall"))
       this._filter.hidden = true;
 
-    var self = this;
-    this._listBox.addEventListener("keydown", function listbox_onKeydown(aEvent) {
+    this._listBox.addEventListener("keydown", aEvent => {
       if (aEvent.keyCode == aEvent.DOM_VK_RETURN) {
-        var item = self._listBox.selectedItem;
+        var item = this._listBox.selectedItem;
         if (item)
           item.showInDetailView();
       }
     }, false);
 
-    this._filter.addEventListener("command", function filter_onCommand() self.updateView(), false);
+    this._filter.addEventListener("command", () => this.updateView(), false);
   },
 
   shutdown: function gSearchView_shutdown() {
@@ -2718,13 +2749,13 @@ var gListView = {
   filterDisabledUnsigned: function gListView_filterDisabledUnsigned(aFilter = true) {
     let foundDisabledUnsigned = false;
 
-    for (let item of this._listBox.childNodes) {
-      let isDisabledUnsigned = item.mAddon.appDisabled &&
-                               item.mAddon.signedState <= AddonManager.SIGNEDSTATE_MISSING;
-      if (isDisabledUnsigned)
-        foundDisabledUnsigned = true;
-      else
-        item.hidden = aFilter;
+    if (SIGNING_REQUIRED) {
+      for (let item of this._listBox.childNodes) {
+        if (!isCorrectlySigned(item.mAddon))
+          foundDisabledUnsigned = true;
+        else
+          item.hidden = aFilter;
+      }
     }
 
     document.getElementById("show-disabled-unsigned-extensions").hidden =
@@ -3171,17 +3202,15 @@ var gDetailView = {
         errorLink.value = gStrings.ext.GetStringFromName("details.notification.blocked.link");
         errorLink.href = this._addon.blocklistURL;
         errorLink.hidden = false;
-      } else if (this._addon.signedState <= AddonManager.SIGNEDSTATE_MISSING) {
-        let msgType = this._addon.appDisabled ? "error" : "warning";
-        this.node.setAttribute("notification", msgType);
-        document.getElementById("detail-" + msgType).textContent = gStrings.ext.formatStringFromName(
-          "details.notification.unsigned" + (this._addon.appDisabled ? "AndDisabled" : ""),
-          [this._addon.name, gStrings.brandShortName], 2
+      } else if (!isCorrectlySigned(this._addon) && SIGNING_REQUIRED) {
+        this.node.setAttribute("notification", "error");
+        document.getElementById("detail-error").textContent = gStrings.ext.formatStringFromName(
+          "details.notification.unsignedAndDisabled", [this._addon.name, gStrings.brandShortName], 2
         );
-        var infoLink = document.getElementById("detail-" + msgType + "-link");
-        infoLink.value = gStrings.ext.GetStringFromName("details.notification.unsigned.link");
-        infoLink.href = Services.prefs.getCharPref("xpinstall.signatures.infoURL");
-        infoLink.hidden = false;
+        var errorLink = document.getElementById("detail-error-link");
+        errorLink.value = gStrings.ext.GetStringFromName("details.notification.unsigned.link");
+        errorLink.href = Services.urlFormatter.formatURLPref("app.support.baseURL") + "unsigned-addons";
+        errorLink.hidden = false;
       } else if (!this._addon.isCompatible && (AddonManager.checkCompatibility ||
         (this._addon.blocklistState != Ci.nsIBlocklistService.STATE_SOFTBLOCKED))) {
         this.node.setAttribute("notification", "warning");
@@ -3190,6 +3219,15 @@ var gDetailView = {
           [this._addon.name, gStrings.brandShortName, gStrings.appVersion], 3
         );
         document.getElementById("detail-warning-link").hidden = true;
+      } else if (!isCorrectlySigned(this._addon)) {
+        this.node.setAttribute("notification", "warning");
+        document.getElementById("detail-warning").textContent = gStrings.ext.formatStringFromName(
+          "details.notification.unsigned", [this._addon.name, gStrings.brandShortName], 2
+        );
+        var warningLink = document.getElementById("detail-warning-link");
+        warningLink.value = gStrings.ext.GetStringFromName("details.notification.unsigned.link");
+        warningLink.href = Services.urlFormatter.formatURLPref("app.support.baseURL") + "unsigned-addons";
+        warningLink.hidden = false;
       } else if (this._addon.blocklistState == Ci.nsIBlocklistService.STATE_SOFTBLOCKED) {
         this.node.setAttribute("notification", "warning");
         document.getElementById("detail-warning").textContent = gStrings.ext.formatStringFromName(
@@ -3761,3 +3799,9 @@ var gDragDrop = {
     aEvent.preventDefault();
   }
 };
+
+#ifdef MOZ_REQUIRE_SIGNING
+const SIGNING_REQUIRED = true;
+#else
+const SIGNING_REQUIRED = Services.prefs.getBoolPref("xpinstall.signatures.required");
+#endif

@@ -172,14 +172,6 @@ LIRGeneratorX86::lowerUntypedPhiInput(MPhi* phi, uint32_t inputPosition, LBlock*
 }
 
 void
-LIRGeneratorX86::visitAsmJSUnsignedToDouble(MAsmJSUnsignedToDouble* ins)
-{
-    MOZ_ASSERT(ins->input()->type() == MIRType_Int32);
-    LAsmJSUInt32ToDouble* lir = new(alloc()) LAsmJSUInt32ToDouble(useRegisterAtStart(ins->input()), temp());
-    define(lir, ins);
-}
-
-void
 LIRGeneratorX86::visitCompareExchangeTypedArrayElement(MCompareExchangeTypedArrayElement* ins)
 {
     lowerCompareExchangeTypedArrayElement(ins, /* useI386ByteRegisters = */ true);
@@ -195,6 +187,14 @@ void
 LIRGeneratorX86::visitAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop* ins)
 {
     lowerAtomicTypedArrayElementBinop(ins, /* useI386ByteRegisters = */ true);
+}
+
+void
+LIRGeneratorX86::visitAsmJSUnsignedToDouble(MAsmJSUnsignedToDouble* ins)
+{
+    MOZ_ASSERT(ins->input()->type() == MIRType_Int32);
+    LAsmJSUInt32ToDouble* lir = new(alloc()) LAsmJSUInt32ToDouble(useRegisterAtStart(ins->input()), temp());
+    define(lir, ins);
 }
 
 void

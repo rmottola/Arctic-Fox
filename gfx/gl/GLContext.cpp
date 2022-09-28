@@ -39,7 +39,6 @@
 
 #ifdef XP_MACOSX
 #include <CoreServices/CoreServices.h>
-#include "gfxColor.h"
 #endif
 
 #if defined(MOZ_WIDGET_COCOA)
@@ -315,6 +314,7 @@ GLContext::GLContext(const SurfaceCaps& caps,
     mMaxTextureImageSize(0),
     mMaxRenderbufferSize(0),
     mNeedsTextureSizeChecks(false),
+    mNeedsFlushBeforeDeleteFB(false),
     mWorkAroundDriverBugs(true),
     mHeavyGLCallsSinceLastFlush(false)
 {
@@ -615,6 +615,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
                 "Adreno (TM) 200",
                 "Adreno (TM) 205",
                 "Adreno (TM) 320",
+                "Adreno (TM) 420",
                 "PowerVR SGX 530",
                 "PowerVR SGX 540",
                 "NVIDIA Tegra",
@@ -1606,6 +1607,12 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
             mNeedsTextureSizeChecks = true;
         }
 #endif
+        if (mWorkAroundDriverBugs &&
+            Renderer() == GLRenderer::AdrenoTM420) {
+            // see bug 1194923. Calling glFlush before glDeleteFramebuffers
+            // prevents occasional driver crash.
+            mNeedsFlushBeforeDeleteFB = true;
+        }
 
         mMaxTextureImageSize = mMaxTextureSize;
 
@@ -1805,6 +1812,9 @@ GLContext::InitExtensions()
             // doesn't expose the OES_rgb8_rgba8 extension, but it seems to
             // support it (tautologically, as it only runs on desktop GL).
             MarkExtensionSupported(OES_rgb8_rgba8);
+            // there seems to be a similar issue for EXT_texture_format_BGRA8888
+            // on the Android 4.3 emulator
+            MarkExtensionSupported(EXT_texture_format_BGRA8888);
         }
 
         if (Vendor() == GLVendor::VMware &&
@@ -2004,7 +2014,8 @@ GLContext::AttachBuffersToFB(GLuint colorTex, GLuint colorRB,
                               colorTex,
                               0);
     } else if (colorRB) {
-        MOZ_ASSERT(fIsRenderbuffer(colorRB));
+        // On the Android 4.3 emulator, IsRenderbuffer may return false incorrectly.
+        MOZ_ASSERT_IF(Renderer() != GLRenderer::AndroidEmulator, fIsRenderbuffer(colorRB));
         fFramebufferRenderbuffer(LOCAL_GL_FRAMEBUFFER,
                                  LOCAL_GL_COLOR_ATTACHMENT0,
                                  LOCAL_GL_RENDERBUFFER,
@@ -2012,7 +2023,7 @@ GLContext::AttachBuffersToFB(GLuint colorTex, GLuint colorRB,
     }
 
     if (depthRB) {
-        MOZ_ASSERT(fIsRenderbuffer(depthRB));
+        MOZ_ASSERT_IF(Renderer() != GLRenderer::AndroidEmulator, fIsRenderbuffer(depthRB));
         fFramebufferRenderbuffer(LOCAL_GL_FRAMEBUFFER,
                                  LOCAL_GL_DEPTH_ATTACHMENT,
                                  LOCAL_GL_RENDERBUFFER,
@@ -2020,7 +2031,7 @@ GLContext::AttachBuffersToFB(GLuint colorTex, GLuint colorRB,
     }
 
     if (stencilRB) {
-        MOZ_ASSERT(fIsRenderbuffer(stencilRB));
+        MOZ_ASSERT_IF(Renderer() != GLRenderer::AndroidEmulator, fIsRenderbuffer(stencilRB));
         fFramebufferRenderbuffer(LOCAL_GL_FRAMEBUFFER,
                                  LOCAL_GL_STENCIL_ATTACHMENT,
                                  LOCAL_GL_RENDERBUFFER,
@@ -2844,6 +2855,11 @@ GLContext::fDeleteFramebuffers(GLsizei n, const GLuint* names)
         for (int i = 0; i < n; i++) {
             mScreen->DeletingFB(names[i]);
         }
+    }
+
+    // Avoid crash by flushing before glDeleteFramebuffers. See bug 1194923.
+    if (mNeedsFlushBeforeDeleteFB) {
+        fFlush();
     }
 
     if (n == 1 && *names == 0) {

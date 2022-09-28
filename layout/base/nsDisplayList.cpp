@@ -340,13 +340,13 @@ static void AddTransformFunctions(nsCSSValueList* aList,
 static TimingFunction
 ToTimingFunction(const ComputedTimingFunction& aCTF)
 {
-  if (aCTF.GetType() == nsTimingFunction::Function) {
+  if (aCTF.HasSpline()) {
     const nsSMILKeySpline* spline = aCTF.GetFunction();
     return TimingFunction(CubicBezierFunction(spline->X1(), spline->Y1(),
                                               spline->X2(), spline->Y2()));
   }
 
-  uint32_t type = aCTF.GetType() == nsTimingFunction::StepStart ? 1 : 2;
+  uint32_t type = aCTF.GetType() == nsTimingFunction::Type::StepStart ? 1 : 2;
   return TimingFunction(StepFunction(aCTF.GetSteps(), type));
 }
 
@@ -467,7 +467,7 @@ AddAnimationsForProperty(nsIFrame* aFrame, nsCSSProperty aProperty,
     }
 
     AddAnimationForProperty(aFrame, *property, anim, aLayer, aData, aPending);
-    anim->SetIsRunningOnCompositor();
+    effect->SetIsRunningOnCompositor(aProperty, true);
   }
 }
 
@@ -516,11 +516,16 @@ nsDisplayListBuilder::AddAnimationsAndTransitionsToLayer(Layer* aLayer,
   aLayer->SetAnimationGeneration(animationGeneration);
 
   nsPresContext* presContext = aFrame->PresContext();
+  presContext->TransitionManager()->ClearIsRunningOnCompositor(aFrame,
+                                                               aProperty);
+  presContext->AnimationManager()->ClearIsRunningOnCompositor(aFrame,
+                                                              aProperty);
   AnimationCollection* transitions =
-    presContext->TransitionManager()->GetAnimationsForCompositor(aFrame, aProperty);
+    presContext->TransitionManager()->GetAnimationsForCompositor(aFrame,
+                                                                 aProperty);
   AnimationCollection* animations =
-    presContext->AnimationManager()->GetAnimationsForCompositor(aFrame, aProperty);
-
+    presContext->AnimationManager()->GetAnimationsForCompositor(aFrame,
+                                                                aProperty);
   if (!animations && !transitions) {
     return;
   }
@@ -567,9 +572,17 @@ nsDisplayListBuilder::AddAnimationsAndTransitionsToLayer(Layer* aLayer,
     }
     nsPoint origin;
     if (aItem) {
+      // This branch is for display items to leverage the cache of
+      // nsDisplayListBuilder.
       origin = aItem->ToReferenceFrame();
     } else {
-      nsIFrame* referenceFrame = nsLayoutUtils::GetReferenceFrame(aFrame);
+      // This branch is running for restyling.
+      // Animations are animated at the coordination of the reference
+      // frame outside, not the given frame itself.  The given frame
+      // is also reference frame too, so the parent's reference frame
+      // are used.
+      nsIFrame* referenceFrame =
+        nsLayoutUtils::GetReferenceFrame(nsLayoutUtils::GetCrossDocParentFrame(aFrame));
       origin = aFrame->GetOffsetToCrossDoc(referenceFrame);
     }
 
@@ -668,8 +681,7 @@ static void MarkFrameForDisplay(nsIFrame* aFrame, nsIFrame* aStopAtFrame) {
 void nsDisplayListBuilder::SetContainsBlendMode(uint8_t aBlendMode)
 {
   MOZ_ASSERT(aBlendMode != NS_STYLE_BLEND_NORMAL);
-  gfxContext::GraphicsOperator op = nsCSSRendering::GetGFXBlendMode(aBlendMode);
-  mContainedBlendModes += gfx::CompositionOpForOp(op);
+  mContainedBlendModes += nsCSSRendering::GetGFXBlendMode(aBlendMode);
 }
 
 bool nsDisplayListBuilder::NeedToForceTransparentSurfaceForItem(nsDisplayItem* aItem)
@@ -1455,6 +1467,23 @@ TriggerPendingAnimations(nsIDocument* aDocument,
                                          const_cast<TimeStamp*>(&aReadyTime));
 }
 
+LayerManager*
+nsDisplayListBuilder::GetWidgetLayerManager(nsView** aView, bool* aAllowRetaining)
+{
+  nsView* view = RootReferenceFrame()->GetView();
+  if (aView) {
+    *aView = view;
+  }
+  if (RootReferenceFrame() != nsLayoutUtils::GetDisplayRootFrame(RootReferenceFrame())) {
+    return nullptr;
+  }
+  nsIWidget* window = RootReferenceFrame()->GetNearestWidget();
+  if (window) {
+    return window->GetLayerManager(aAllowRetaining);
+  }
+  return nullptr;
+}
+
 /**
  * We paint by executing a layer manager transaction, constructing a
  * single layer representing the display list, and then making it the
@@ -1472,17 +1501,10 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
   bool doBeginTransaction = true;
   nsView *view = nullptr;
   if (aFlags & PAINT_USE_WIDGET_LAYERS) {
-    nsIFrame* rootReferenceFrame = aBuilder->RootReferenceFrame();
-    view = rootReferenceFrame->GetView();
-    NS_ASSERTION(rootReferenceFrame == nsLayoutUtils::GetDisplayRootFrame(rootReferenceFrame),
-                 "Reference frame must be a display root for us to use the layer manager");
-    nsIWidget* window = rootReferenceFrame->GetNearestWidget();
-    if (window) {
-      layerManager = window->GetLayerManager(&allowRetaining);
-      if (layerManager) {
-        doBeginTransaction = !(aFlags & PAINT_EXISTING_TRANSACTION);
-        widgetTransaction = true;
-      }
+    layerManager = aBuilder->GetWidgetLayerManager(&view, &allowRetaining);
+    if (layerManager) {
+      doBeginTransaction = !(aFlags & PAINT_EXISTING_TRANSACTION);
+      widgetTransaction = true;
     }
   }
   if (!layerManager) {
@@ -2349,11 +2371,12 @@ nsDisplayBackgroundImage::IsNonEmptyFixedImage() const
 }
 
 bool
-nsDisplayBackgroundImage::ShouldFixToViewport(LayerManager* aManager)
+nsDisplayBackgroundImage::ShouldFixToViewport(nsDisplayListBuilder* aBuilder)
 {
   // APZ needs background-attachment:fixed images layerized for correctness.
+  nsRefPtr<LayerManager> layerManager = aBuilder->GetWidgetLayerManager();
   if (!nsLayoutUtils::UsesAsyncScrolling(mFrame) &&
-      aManager && aManager->ShouldAvoidComponentAlphaLayers()) {
+      layerManager && layerManager->ShouldAvoidComponentAlphaLayers()) {
     return false;
   }
 
@@ -2990,7 +3013,7 @@ void
 nsDisplayBackgroundColor::Paint(nsDisplayListBuilder* aBuilder,
                                 nsRenderingContext* aCtx)
 {
-  if (mColor == NS_RGBA(0, 0, 0, 0)) {
+  if (mColor == Color()) {
     return;
   }
 
@@ -3044,7 +3067,7 @@ nsDisplayBackgroundColor::GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
 bool
 nsDisplayBackgroundColor::IsUniform(nsDisplayListBuilder* aBuilder, nscolor* aColor)
 {
-  *aColor = NS_RGBA_FROM_GFXRGBA(mColor);
+  *aColor = mColor.ToABGR();
   return true;
 }
 
@@ -3081,7 +3104,7 @@ nsDisplayClearBackground::BuildLayer(nsDisplayListBuilder* aBuilder,
     if (!layer)
       return nullptr;
   }
-  layer->SetColor(NS_RGBA(0, 0, 0, 0));
+  layer->SetColor(Color());
   layer->SetMixBlendMode(gfx::CompositionOp::OP_SOURCE);
 
   bool snap;
@@ -3686,7 +3709,7 @@ RequiredLayerStateForChildren(nsDisplayListBuilder* aBuilder,
   LayerState result = LAYER_INACTIVE;
   for (nsDisplayItem* i = aList.GetBottom(); i; i = i->GetAbove()) {
     if (result == LAYER_INACTIVE &&
-        nsLayoutUtils::GetAnimatedGeometryRootFor(i, aBuilder, aManager) !=
+        nsLayoutUtils::GetAnimatedGeometryRootFor(i, aBuilder) !=
           aExpectedAnimatedGeometryRootForChildren) {
       result = LAYER_ACTIVE;
     }
@@ -3945,7 +3968,7 @@ nsDisplayOpacity::GetLayerState(nsDisplayListBuilder* aBuilder,
     return LAYER_ACTIVE;
 
   return RequiredLayerStateForChildren(aBuilder, aManager, aParameters, mList,
-    nsLayoutUtils::GetAnimatedGeometryRootFor(this, aBuilder, aManager));
+    nsLayoutUtils::GetAnimatedGeometryRootFor(this, aBuilder));
 }
 
 bool
@@ -4008,11 +4031,11 @@ nsDisplayMixBlendMode::GetLayerState(nsDisplayListBuilder* aBuilder,
                                      LayerManager* aManager,
                                      const ContainerLayerParameters& aParameters)
 {
-  gfxContext::GraphicsOperator op = nsCSSRendering::GetGFXBlendMode(mFrame->StyleDisplay()->mMixBlendMode);
-  if (aManager->SupportsMixBlendMode(gfx::CompositionOpForOp(op))) {
-    return LAYER_ACTIVE;
-  }
-  return LAYER_INACTIVE;
+  CompositionOp op =
+    nsCSSRendering::GetGFXBlendMode(mFrame->StyleDisplay()->mMixBlendMode);
+  return aManager->SupportsMixBlendMode(op)
+       ? LAYER_ACTIVE
+       : LAYER_INACTIVE;
 }
 
 // nsDisplayMixBlendMode uses layers for rendering
@@ -4030,7 +4053,7 @@ nsDisplayMixBlendMode::BuildLayer(nsDisplayListBuilder* aBuilder,
     return nullptr;
   }
 
-  container->DeprecatedSetMixBlendMode(nsCSSRendering::GetGFXBlendMode(mFrame->StyleDisplay()->mMixBlendMode));
+  container->SetMixBlendMode(nsCSSRendering::GetGFXBlendMode(mFrame->StyleDisplay()->mMixBlendMode));
 
   return container.forget();
 }

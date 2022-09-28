@@ -78,7 +78,6 @@ using namespace mozilla::layout;
 static PRLogModuleInfo *gLog = nullptr;
 #define LOG(...) MOZ_LOG(gLog, mozilla::LogLevel::Debug, (__VA_ARGS__))
 
-#define DEFAULT_FRAME_RATE 60
 #define DEFAULT_THROTTLED_FRAME_RATE 1
 #define DEFAULT_RECOMPUTE_VISIBILITY_INTERVAL_MS 1000
 // after 10 minutes, stop firing off inactive timers
@@ -857,7 +856,6 @@ CreateVsyncRefreshTimer()
   gfxPrefs::GetSingleton();
 
   if (!gfxPrefs::VsyncAlignedRefreshDriver()
-        || !gfxPrefs::HardwareVsyncEnabled()
         || gfxPlatform::IsInLayoutAsapMode()) {
     return;
   }
@@ -934,7 +932,7 @@ nsRefreshDriver::Shutdown()
 /* static */ int32_t
 nsRefreshDriver::DefaultInterval()
 {
-  return NSToIntRound(1000.0 / DEFAULT_FRAME_RATE);
+  return NSToIntRound(1000.0 / gfxPlatform::GetDefaultFrameRate());
 }
 
 // Compute the interval to use for the refresh driver timer, in milliseconds.
@@ -950,7 +948,7 @@ nsRefreshDriver::GetRegularTimerInterval(bool *outIsDefault) const
 {
   int32_t rate = Preferences::GetInt("layout.frame_rate", -1);
   if (rate < 0) {
-    rate = DEFAULT_FRAME_RATE;
+    rate = gfxPlatform::GetDefaultFrameRate();
     if (outIsDefault) {
       *outIsDefault = true;
     }
@@ -1882,7 +1880,7 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
     for (nsDocShell* docShell : profilingDocShells) {
       // For the sake of the profile timeline's simplicity, this is flagged as
       // paint even if it includes creating display lists
-      TimelineConsumers::AddMarkerForDocShell(docShell, "Paint", TRACING_INTERVAL_START);
+      TimelineConsumers::AddMarkerForDocShell(docShell, "Paint",  MarkerTracingType::START);
     }
 #ifdef MOZ_DUMP_PAINTING
     if (nsLayoutUtils::InvalidationDebuggingIsEnabled()) {
@@ -1899,7 +1897,7 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
     }
 #endif
     for (nsDocShell* docShell : profilingDocShells) {
-      TimelineConsumers::AddMarkerForDocShell(docShell, "Paint", TRACING_INTERVAL_END);
+      TimelineConsumers::AddMarkerForDocShell(docShell, "Paint",  MarkerTracingType::END);
     }
 
     if (nsContentUtils::XPConnect()) {

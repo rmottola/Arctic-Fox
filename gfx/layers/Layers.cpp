@@ -463,9 +463,11 @@ Layer::SetAnimations(const AnimationArray& aAnimations)
           NS_ASSERTION(tf.type() == TimingFunction::TStepFunction,
                        "Function must be bezier or step");
           StepFunction sf = tf.get_StepFunction();
-          nsTimingFunction::Type type = sf.type() == 1 ? nsTimingFunction::StepStart
-                                                       : nsTimingFunction::StepEnd;
-          ctf->Init(nsTimingFunction(type, sf.steps()));
+          nsTimingFunction::Type type = sf.type() == 1 ?
+                                          nsTimingFunction::Type::StepStart :
+                                          nsTimingFunction::Type::StepEnd;
+          ctf->Init(nsTimingFunction(type, sf.steps(),
+                                     nsTimingFunction::Keyword::Explicit));
           break;
         }
       }
@@ -554,6 +556,13 @@ Layer::ApplyPendingUpdatesToSubtree()
   for (Layer* child = GetFirstChild(); child; child = child->GetNextSibling()) {
     child->ApplyPendingUpdatesToSubtree();
   }
+}
+
+bool
+Layer::IsOpaqueForVisibility()
+{
+  return GetLocalOpacity() == 1.0f &&
+         GetEffectiveMixBlendMode() == CompositionOp::OP_OVER;
 }
 
 bool
@@ -748,7 +757,8 @@ Layer::CalculateScissorRect(const RenderTargetIntRect& aCurrentScissorRect)
   NS_ASSERTION(GetParent(), "This can't be called on the root!");
 
   // Find the layer creating the 3D context.
-  while (container->Extend3DContext()) {
+  while (container->Extend3DContext() &&
+         !container->UseIntermediateSurface()) {
     containerChild = container;
     container = container->GetParent();
     MOZ_ASSERT(container);
@@ -933,12 +943,6 @@ Layer::GetEffectiveMixBlendMode()
   }
 
   return mMixBlendMode;
-}
-
-gfxContext::GraphicsOperator
-Layer::DeprecatedGetEffectiveMixBlendMode()
-{
-  return ThebesOp(GetEffectiveMixBlendMode());
 }
 
 void
@@ -1281,7 +1285,8 @@ ContainerLayer::Collect3DContextLeaves(nsTArray<Layer*>& aToSort)
 {
   for (Layer* l = GetFirstChild(); l; l = l->GetNextSibling()) {
     ContainerLayer* container = l->AsContainerLayer();
-    if (container && container->Extend3DContext()) {
+    if (container && container->Extend3DContext() &&
+        !container->UseIntermediateSurface()) {
       container->Collect3DContextLeaves(aToSort);
     } else {
       aToSort.AppendElement(l);
@@ -1296,7 +1301,8 @@ ContainerLayer::SortChildrenBy3DZOrder(nsTArray<Layer*>& aArray)
 
   for (Layer* l = GetFirstChild(); l; l = l->GetNextSibling()) {
     ContainerLayer* container = l->AsContainerLayer();
-    if (container && container->Extend3DContext()) {
+    if (container && container->Extend3DContext() &&
+        !container->UseIntermediateSurface()) {
       container->Collect3DContextLeaves(toSort);
     } else {
       if (toSort.Length() > 0) {
@@ -2098,14 +2104,14 @@ ColorLayer::DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent)
   using namespace layerscope;
   LayersPacket::Layer* layer = aPacket->mutable_layer(aPacket->layer_size()-1);
   layer->set_type(LayersPacket::Layer::ColorLayer);
-  layer->set_color(mColor.Packed());
+  layer->set_color(mColor.ToABGR());
 }
 
 void
 CanvasLayer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
 {
   Layer::PrintInfo(aStream, aPrefix);
-  if (mFilter != GraphicsFilter::FILTER_GOOD) {
+  if (mFilter != Filter::GOOD) {
     AppendToString(aStream, mFilter, " [filter=", "]");
   }
 }
@@ -2113,27 +2119,18 @@ CanvasLayer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
 // This help function is used to assign the correct enum value
 // to the packet
 static void
-DumpFilter(layerscope::LayersPacket::Layer* aLayer, const GraphicsFilter& aFilter)
+DumpFilter(layerscope::LayersPacket::Layer* aLayer, const Filter& aFilter)
 {
   using namespace layerscope;
   switch (aFilter) {
-    case GraphicsFilter::FILTER_FAST:
-      aLayer->set_filter(LayersPacket::Layer::FILTER_FAST);
-      break;
-    case GraphicsFilter::FILTER_GOOD:
+    case Filter::GOOD:
       aLayer->set_filter(LayersPacket::Layer::FILTER_GOOD);
       break;
-    case GraphicsFilter::FILTER_BEST:
-      aLayer->set_filter(LayersPacket::Layer::FILTER_BEST);
+    case Filter::LINEAR:
+      aLayer->set_filter(LayersPacket::Layer::FILTER_LINEAR);
       break;
-    case GraphicsFilter::FILTER_NEAREST:
-      aLayer->set_filter(LayersPacket::Layer::FILTER_NEAREST);
-      break;
-    case GraphicsFilter::FILTER_BILINEAR:
-      aLayer->set_filter(LayersPacket::Layer::FILTER_BILINEAR);
-      break;
-    case GraphicsFilter::FILTER_GAUSSIAN:
-      aLayer->set_filter(LayersPacket::Layer::FILTER_GAUSSIAN);
+    case Filter::POINT:
+      aLayer->set_filter(LayersPacket::Layer::FILTER_POINT);
       break;
     default:
       // ignore it
@@ -2156,7 +2153,7 @@ void
 ImageLayer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
 {
   Layer::PrintInfo(aStream, aPrefix);
-  if (mFilter != GraphicsFilter::FILTER_GOOD) {
+  if (mFilter != Filter::GOOD) {
     AppendToString(aStream, mFilter, " [filter=", "]");
   }
 }
@@ -2200,7 +2197,7 @@ ReadbackLayer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
   if (mBackgroundLayer) {
     AppendToString(aStream, mBackgroundLayer, " [backgroundLayer=", "]");
     AppendToString(aStream, mBackgroundLayerOffset, " [backgroundOffset=", "]");
-  } else if (mBackgroundColor.a == 1.0) {
+  } else if (mBackgroundColor.a == 1.f) {
     AppendToString(aStream, mBackgroundColor, " [backgroundColor=", "]");
   } else {
     aStream << " [nobackground]";

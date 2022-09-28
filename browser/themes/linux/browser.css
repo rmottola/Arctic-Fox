@@ -644,7 +644,7 @@ toolbar[mode="full"] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 
 #history-button,
 #history-menu-button {
-  -moz-image-region: rect(0px 48px 24px 24px);
+  -moz-image-region: rect(0px 180px 18px 162px);
 }
 
 #history-menu-button.toolbarbutton-1 {
@@ -653,7 +653,7 @@ toolbar[mode="full"] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 
 #bookmarks-button,
 #bookmarks-menu-button {
-  -moz-image-region: rect(0px 72px 24px 48px);
+  -moz-image-region: rect(0px 144px 18px 126px);
 }
 
 #bookmarks-menu-button.bookmark-item {
@@ -1343,6 +1343,18 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
 #history-menu-button[disabled] > .toolbarbutton-menubutton-button > .toolbarbutton-icon,
 #history-menu-button > .toolbarbutton-menubutton-button[disabled] > .toolbarbutton-icon {
   opacity: .4;
+}
+
+#BMB_bookmarksPopup[side="top"],
+#BMB_bookmarksPopup[side="bottom"] {
+  margin-left: -16px;
+  margin-right: -16px;
+}
+
+#BMB_bookmarksPopup[side="left"],
+#BMB_bookmarksPopup[side="right"] {
+  margin-top: -16px;
+  margin-bottom: -16px;
 }
 
 /* Bookmarking panel */

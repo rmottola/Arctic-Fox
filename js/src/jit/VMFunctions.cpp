@@ -167,25 +167,35 @@ CheckOverRecursedWithExtra(JSContext* cx, BaselineFrame* frame,
 }
 
 bool
-DefVarOrConst(JSContext* cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain)
+DefVar(JSContext* cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain)
 {
     // Given the ScopeChain, extract the VarObj.
     RootedObject obj(cx, scopeChain);
     while (!obj->isQualifiedVarObj())
         obj = obj->enclosingScope();
 
-    return DefVarOrConstOperation(cx, obj, dn, attrs);
+    return DefVarOperation(cx, obj, dn, attrs);
 }
 
 bool
-SetConst(JSContext* cx, HandlePropertyName name, HandleObject scopeChain, HandleValue rval)
+DefLexical(JSContext* cx, HandlePropertyName dn, unsigned attrs, HandleObject scopeChain)
 {
-    // Given the ScopeChain, extract the VarObj.
-    RootedObject obj(cx, scopeChain);
-    while (!obj->isQualifiedVarObj())
-        obj = obj->enclosingScope();
+    // Find the extensible lexical scope.
+    Rooted<ClonedBlockObject*> lexical(cx, &NearestEnclosingExtensibleLexicalScope(scopeChain));
 
-    return SetConstOperation(cx, obj, name, rval);
+    // Find the variables object.
+    RootedObject varObj(cx, scopeChain);
+    while (!varObj->isQualifiedVarObj())
+        varObj = varObj->enclosingScope();
+
+    return DefLexicalOperation(cx, lexical, varObj, dn, attrs);
+}
+
+bool
+DefGlobalLexical(JSContext* cx, HandlePropertyName dn, unsigned attrs)
+{
+    Rooted<ClonedBlockObject*> globalLexical(cx, &cx->global()->lexicalScope());
+    return DefLexicalOperation(cx, globalLexical, cx->global(), dn, attrs);
 }
 
 bool
@@ -495,7 +505,7 @@ NewCallObject(JSContext* cx, HandleShape shape, HandleObjectGroup group, uint32_
     // the initializing writes. The interpreter, however, may have allocated
     // the call object tenured, so barrier as needed before re-entering.
     if (!IsInsideNursery(obj))
-        cx->runtime()->gc.storeBuffer.putWholeCellFromMainThread(obj);
+        cx->runtime()->gc.storeBuffer.putWholeCell(obj);
 
     return obj;
 }
@@ -512,7 +522,7 @@ NewSingletonCallObject(JSContext* cx, HandleShape shape, uint32_t lexicalBegin)
     // the call object tenured, so barrier as needed before re-entering.
     MOZ_ASSERT(!IsInsideNursery(obj),
                "singletons are created in the tenured heap");
-    cx->runtime()->gc.storeBuffer.putWholeCellFromMainThread(obj);
+    cx->runtime()->gc.storeBuffer.putWholeCell(obj);
 
     return obj;
 }
@@ -613,7 +623,7 @@ void
 PostWriteBarrier(JSRuntime* rt, JSObject* obj)
 {
     MOZ_ASSERT(!IsInsideNursery(obj));
-    rt->gc.storeBuffer.putWholeCellFromMainThread(obj);
+    rt->gc.storeBuffer.putWholeCell(obj);
 }
 
 void
@@ -835,9 +845,41 @@ GeneratorThrowOrClose(JSContext* cx, BaselineFrame* frame, Handle<GeneratorObjec
 }
 
 bool
-InitStrictEvalScopeObjects(JSContext* cx, BaselineFrame* frame)
+InitGlobalOrEvalScopeObjects(JSContext* cx, BaselineFrame* frame)
 {
-    return frame->initStrictEvalScopeObjects(cx);
+    RootedScript script(cx, frame->script());
+    RootedObject varObj(cx, frame->scopeChain());
+    while (!varObj->isQualifiedVarObj())
+        varObj = varObj->enclosingScope();
+
+    if (script->isForEval()) {
+        // Strict eval needs its own call object.
+        //
+        // Non-strict eval may introduce 'var' bindings that conflict with
+        // lexical bindings in an enclosing lexical scope.
+        if (script->strict()) {
+            if (!frame->initStrictEvalScopeObjects(cx))
+                return false;
+        } else {
+            RootedObject scopeChain(cx, frame->scopeChain());
+            if (!CheckEvalDeclarationConflicts(cx, script, scopeChain, varObj))
+                return false;
+        }
+    } else {
+        Rooted<ClonedBlockObject*> lexicalScope(cx,
+            &NearestEnclosingExtensibleLexicalScope(frame->scopeChain()));
+        if (!CheckGlobalDeclarationConflicts(cx, script, lexicalScope, varObj))
+            return false;
+    }
+
+    return true;
+}
+
+bool
+GlobalNameConflictsCheckFromIon(JSContext* cx, HandleScript script)
+{
+    Rooted<ClonedBlockObject*> lexicalScope(cx, &cx->global()->lexicalScope());
+    return CheckGlobalDeclarationConflicts(cx, script, lexicalScope, cx->global());
 }
 
 bool

@@ -196,7 +196,6 @@ public:
   NS_IMETHOD SetNetworkInterfaceId(const nsACString& aNetworkInterfaceId) override;
   NS_IMETHOD ForcePending(bool aForcePending) override;
   NS_IMETHOD GetLastModifiedTime(PRTime* lastModifiedTime) override;
-  NS_IMETHOD ForceNoIntercept() override;
   NS_IMETHOD GetCorsIncludeCredentials(bool* aInclude) override;
   NS_IMETHOD SetCorsIncludeCredentials(bool aInclude) override;
   NS_IMETHOD GetCorsMode(uint32_t* aCorsMode) override;
@@ -316,6 +315,8 @@ protected:
   // GetPrincipal Returns the channel's URI principal.
   nsIPrincipal *GetURIPrincipal();
 
+  bool BypassServiceWorker() const;
+
   // Returns true if this channel should intercept the network request and prepare
   // for a possible synthesized response instead.
   bool ShouldIntercept();
@@ -394,9 +395,6 @@ protected:
   // Is 1 if no redirects have occured or if all redirects
   // pass the Resource Timing timing-allow-check
   uint32_t                          mAllRedirectsPassTimingAllowCheck : 1;
-
-  // True if this channel should skip any interception checks
-  uint32_t                          mForceNoIntercept           : 1;
 
   // If true, we behave as if the LOAD_FROM_CACHE flag has been set.
   // Used to enforce that flag's behavior but not expose it externally.

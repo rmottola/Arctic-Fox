@@ -2166,7 +2166,6 @@ ASTSerializer::declaration(ParseNode* pn, MutableHandleValue dst)
 {
     MOZ_ASSERT(pn->isKind(PNK_FUNCTION) ||
                pn->isKind(PNK_VAR) ||
-               pn->isKind(PNK_GLOBALCONST) ||
                pn->isKind(PNK_LET) ||
                pn->isKind(PNK_CONST));
 
@@ -2175,7 +2174,6 @@ ASTSerializer::declaration(ParseNode* pn, MutableHandleValue dst)
         return function(pn, AST_FUNC_DECL, dst);
 
       case PNK_VAR:
-      case PNK_GLOBALCONST:
         return variableDeclaration(pn, false, dst);
 
       default:
@@ -2188,7 +2186,7 @@ bool
 ASTSerializer::variableDeclaration(ParseNode* pn, bool lexical, MutableHandleValue dst)
 {
     MOZ_ASSERT_IF(lexical, pn->isKind(PNK_LET) || pn->isKind(PNK_CONST));
-    MOZ_ASSERT_IF(!lexical, pn->isKind(PNK_VAR) || pn->isKind(PNK_GLOBALCONST));
+    MOZ_ASSERT_IF(!lexical, pn->isKind(PNK_VAR));
 
     VarDeclKind kind = VARDECL_ERR;
     // Treat both the toplevel const binding (secretly var-like) and the lexical const
@@ -2345,9 +2343,8 @@ ASTSerializer::exportDeclaration(ParseNode* pn, MutableHandleValue dst)
 
       case PNK_VAR:
       case PNK_CONST:
-      case PNK_GLOBALCONST:
       case PNK_LET:
-        if (!variableDeclaration(kid, (kind == PNK_LET || kind == PNK_CONST), &decl))
+        if (!variableDeclaration(kid, kind != PNK_VAR, &decl))
             return false;
         break;
 
@@ -2494,7 +2491,7 @@ ASTSerializer::forInit(ParseNode* pn, MutableHandleValue dst)
         return true;
     }
 
-    return (pn->isKind(PNK_VAR) || pn->isKind(PNK_GLOBALCONST))
+    return (pn->isKind(PNK_VAR))
            ? variableDeclaration(pn, false, dst)
            : expression(pn, dst);
 }
@@ -2544,7 +2541,6 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
     switch (pn->getKind()) {
       case PNK_FUNCTION:
       case PNK_VAR:
-      case PNK_GLOBALCONST:
         return declaration(pn, dst);
 
       case PNK_LETBLOCK:
@@ -2667,8 +2663,6 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
 
         RootedValue init(cx), test(cx), update(cx);
 
-        // Init with nullptr in case of a freshen block (for(let x;;)),
-        // disconnecting chain inheritance.
         return forInit(head->pn_kid1 && !head->pn_kid1->isKind(PNK_FRESHENBLOCK)
                        ? head->pn_kid1
                        : nullptr,
@@ -2823,15 +2817,14 @@ ASTSerializer::rightAssociate(ParseNode* pn, MutableHandleValue dst)
     MOZ_ASSERT(pn->isArity(PN_LIST));
     MOZ_ASSERT(pn->pn_count >= 1);
 
-    // First, we need to reverse the list, so that we can traverse it in the correct order.
+    // First, we need to reverse the list, so that we can traverse it in the right order.
     // It's OK to destructively reverse the list, because there are no other consumers.
 
     ParseNode* head = pn->pn_head;
     ParseNode* prev = nullptr;
     ParseNode* current = head;
     ParseNode* next;
-    while (current != nullptr)
-    {
+    while (current != nullptr) {
         next = current->pn_next;
         current->pn_next = prev;
         prev = current;

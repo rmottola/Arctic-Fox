@@ -7,6 +7,9 @@
  * apply it.
  */
 
+const START_STATE = STATE_PENDING;
+const END_STATE = STATE_SUCCEEDED;
+
 function run_test() {
   if (MOZ_APP_NAME == "xulrunner") {
     logTestInfo("Unable to run this test on xulrunner");
@@ -19,26 +22,17 @@ function run_test() {
   setupUpdaterTest(FILE_COMPLETE_MAR);
 
   createUpdaterINI();
-
-  // For Mac OS X set the last modified time for the root directory to a date in
-  // the past to test that the last modified time is updated on a successful
-  // update (bug 600098).
-  if (IS_MACOSX) {
-    let now = Date.now();
-    let yesterday = now - (1000 * 60 * 60 * 24);
-    let applyToDir = getApplyDirFile();
-    applyToDir.lastModifiedTime = yesterday;
-  }
+  setAppBundleModTime();
 
   let channel = Services.prefs.getCharPref(PREF_APP_UPDATE_CHANNEL);
   let patches = getLocalPatchString(null, null, null, null, null, "true",
-                                    STATE_PENDING);
+                                    START_STATE);
   let updates = getLocalUpdateString(patches, null, null, null, null, null,
                                      null, null, null, null, null, null,
                                      null, "true", channel);
   writeUpdatesToXMLFile(getLocalUpdatesXMLString(updates), true);
   writeVersionFile(getAppVersion());
-  writeStatusFile(STATE_PENDING);
+  writeStatusFile(START_STATE);
 
   setupAppFilesAsync();
 }
@@ -68,10 +62,10 @@ function finishCheckUpdateFinished() {
   gTimeoutRuns++;
   // Don't proceed until the update's status state is the expected value.
   let state = readStatusState();
-  if (state != STATE_SUCCEEDED) {
+  if (state != END_STATE) {
     if (gTimeoutRuns > MAX_TIMEOUT_RUNS) {
       do_throw("Exceeded MAX_TIMEOUT_RUNS while waiting for the update " +
-               "status state to equal: " + STATE_SUCCEEDED +
+               "status state to equal: " + END_STATE +
                ", current status state: " + state);
     } else {
       do_timeout(TEST_CHECK_TIMEOUT, checkUpdateFinished);
@@ -86,9 +80,8 @@ function finishCheckUpdateFinished() {
     if (gTimeoutRuns > MAX_TIMEOUT_RUNS) {
       do_throw("Exceeded MAX_TIMEOUT_RUNS while waiting for the update log " +
                "to be created. Path: " + log.path);
-    } else {
-      do_timeout(TEST_CHECK_TIMEOUT, checkUpdateFinished);
     }
+    do_timeout(TEST_CHECK_TIMEOUT, checkUpdateFinished);
     return;
   }
 

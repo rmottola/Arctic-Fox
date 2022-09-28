@@ -34,14 +34,22 @@ XPCOMUtils.defineLazyGetter(this, "gStringBundle", function() {
     createBundle("chrome://browser/locale/newTab.properties");
 });
 
-function newTabString(name) gStringBundle.GetStringFromName('newtab.' + name);
+function newTabString(name, args) {
+  let stringName = "newtab." + name;
+  if (!args) {
+    return gStringBundle.GetStringFromName(stringName);
+  }
+  return gStringBundle.formatStringFromName(stringName, args, args.length);
+}
 
 function inPrivateBrowsingMode() {
-  return PrivateBrowsingUtils.isWindowPrivate(window);
+  return PrivateBrowsingUtils.isContentWindowPrivate(window);
 }
 
 const HTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 const XUL_NAMESPACE = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+
+const TILES_EXPLAIN_LINK = "https://support.mozilla.org/kb/how-do-tiles-work-firefox";
 
 #include transformations.js
 #include page.js

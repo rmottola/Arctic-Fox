@@ -4840,13 +4840,18 @@ ComputeTimingFunction(const nsCSSValue& aValue, nsTimingFunction& aResult)
                      (array->Item(1).GetIntValue() ==
                        NS_STYLE_TRANSITION_TIMING_FUNCTION_STEP_START ||
                       array->Item(1).GetIntValue() ==
-                       NS_STYLE_TRANSITION_TIMING_FUNCTION_STEP_END),
+                       NS_STYLE_TRANSITION_TIMING_FUNCTION_STEP_END ||
+                      array->Item(1).GetIntValue() == -1),
                      "unexpected second value");
         nsTimingFunction::Type type =
           (array->Item(1).GetIntValue() ==
-            NS_STYLE_TRANSITION_TIMING_FUNCTION_STEP_END)
-            ? nsTimingFunction::StepEnd : nsTimingFunction::StepStart;
-        aResult = nsTimingFunction(type, array->Item(0).GetIntValue());
+            NS_STYLE_TRANSITION_TIMING_FUNCTION_STEP_START) ?
+              nsTimingFunction::Type::StepStart :
+              nsTimingFunction::Type::StepEnd;
+        aResult = nsTimingFunction(type, array->Item(0).GetIntValue(),
+                                   array->Item(1).GetIntValue() == -1 ?
+                                     nsTimingFunction::Keyword::Implicit :
+                                     nsTimingFunction::Keyword::Explicit);
       }
       break;
     default:
@@ -7648,6 +7653,8 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
       break;
     case NS_STYLE_WRITING_MODE_VERTICAL_RL:
     case NS_STYLE_WRITING_MODE_VERTICAL_LR:
+    case NS_STYLE_WRITING_MODE_SIDEWAYS_RL:
+    case NS_STYLE_WRITING_MODE_SIDEWAYS_LR:
       vertical = true;
       break;
   }

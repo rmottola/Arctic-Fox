@@ -22,7 +22,7 @@
 //
 // See https://bugzilla.mozilla.org/show_bug.cgi?id=699859
 
-let EXPORTED_SYMBOLS = [
+var EXPORTED_SYMBOLS = [
   "ContentPrefService2",
 ];
 
@@ -829,8 +829,8 @@ ContentPrefService2.prototype = {
     cps._genericObservers = [];
 
     let tables = ["prefs", "groups", "settings"];
-    let stmts = tables.map(function (t) this._stmt(`DELETE FROM ${t}`), this);
-    this._execStmts(stmts, { onDone: function () callback() });
+    let stmts = tables.map(t => this._stmt(`DELETE FROM ${t}`));
+    this._execStmts(stmts, { onDone: () => callback() });
   },
 
   QueryInterface: function CPS2_QueryInterface(iid) {
@@ -839,7 +839,7 @@ ContentPrefService2.prototype = {
       Ci.nsIObserver,
       Ci.nsISupports,
     ];
-    if (supportedIIDs.some(function (i) iid.equals(i)))
+    if (supportedIIDs.some(i => iid.equals(i)))
       return this;
     if (iid.equals(Ci.nsIContentPrefService))
       return this._cps;

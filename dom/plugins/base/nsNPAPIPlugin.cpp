@@ -407,7 +407,7 @@ GetNewPluginLibrary(nsPluginTag *aPluginTag)
   }
 
   if (XRE_IsContentProcess()) {
-    return PluginModuleContentParent::LoadModule(aPluginTag->mId);
+    return PluginModuleContentParent::LoadModule(aPluginTag->mId, aPluginTag);
   }
 
   if (nsNPAPIPlugin::RunPluginOOP(aPluginTag)) {
@@ -2678,7 +2678,6 @@ _getvalueforurl(NPP instance, NPNURLVariable variable, const char *url,
       return NPERR_NO_ERROR;
     }
 
-    break;
   default:
     // Fall through and return an error...
     ;

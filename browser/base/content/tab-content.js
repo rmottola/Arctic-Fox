@@ -98,7 +98,7 @@ addMessageListener("SecondScreen:tab-mirror", function(message) {
   }
 });
 
-let AboutHomeListener = {
+var AboutHomeListener = {
   init: function(chromeGlobal) {
     chromeGlobal.addEventListener('AboutHomeLoad', this, false, true);
   },
@@ -265,7 +265,7 @@ let AboutHomeListener = {
 };
 AboutHomeListener.init(this);
 
-let AboutPrivateBrowsingListener = {
+var AboutPrivateBrowsingListener = {
   init(chromeGlobal) {
     chromeGlobal.addEventListener("AboutPrivateBrowsingOpenWindow", this,
                                   false, true);
@@ -288,7 +288,7 @@ let AboutPrivateBrowsingListener = {
 };
 AboutPrivateBrowsingListener.init(this);
 
-let AboutReaderListener = {
+var AboutReaderListener = {
 
   _articlePromise: null,
 
@@ -403,7 +403,7 @@ let AboutReaderListener = {
 AboutReaderListener.init();
 
 
-let ContentSearchMediator = {
+var ContentSearchMediator = {
 
   whitelist: new Set([
     "about:home",
@@ -458,7 +458,7 @@ let ContentSearchMediator = {
 };
 ContentSearchMediator.init(this);
 
-let PageStyleHandler = {
+var PageStyleHandler = {
   init: function() {
     addMessageListener("PageStyle:Switch", this);
     addMessageListener("PageStyle:Disable", this);
@@ -587,7 +587,7 @@ addMessageListener("Browser:AppTab", function(message) {
   }
 });
 
-let WebBrowserChrome = {
+var WebBrowserChrome = {
   onBeforeLinkTraversal: function(originalTarget, linkURI, linkNode, isAppTab) {
     return BrowserUtils.onBeforeLinkTraversal(originalTarget, linkURI, linkNode, isAppTab);
   },
@@ -610,7 +610,7 @@ if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
 }
 
 
-let DOMFullscreenHandler = {
+var DOMFullscreenHandler = {
   _fullscreenDoc: null,
 
   init: function() {

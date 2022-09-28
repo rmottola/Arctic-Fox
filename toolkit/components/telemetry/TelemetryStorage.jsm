@@ -58,7 +58,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 /**
  * This is a policy object used to override behavior for testing.
  */
-let Policy = {
+var Policy = {
   now: () => new Date(),
   getArchiveQuota: () => ARCHIVE_QUOTA_BYTES,
 };
@@ -450,7 +450,7 @@ SaveSerializer.prototype = {
   },
 };
 
-let TelemetryStorageImpl = {
+var TelemetryStorageImpl = {
   _logger: null,
   // Used to serialize aborted session ping writes to disk.
   _abortedSessionSerializer: new SaveSerializer(),
@@ -687,7 +687,7 @@ let TelemetryStorageImpl = {
    */
   _enforceArchiveQuota: Task.async(function*() {
     this._log.trace("_enforceArchiveQuota");
-    const startTimeStamp = Policy.now().getTime();
+    let startTimeStamp = Policy.now().getTime();
 
     // Build an ordered list, from newer to older, of archived pings.
     let pingList = [for (p of this._archivedPings) {
@@ -1278,7 +1278,7 @@ function getArchivedPingPath(aPingId, aDate, aType) {
  * Get the size of the ping file on the disk.
  * @return {Integer} The file size, in bytes, of the ping file or 0 on errors.
  */
-let getArchivedPingSize = Task.async(function*(aPingId, aDate, aType) {
+var getArchivedPingSize = Task.async(function*(aPingId, aDate, aType) {
   const path = getArchivedPingPath(aPingId, aDate, aType);
   let filePaths = [ path + "lz4", path ];
 

@@ -23,9 +23,14 @@
 #include "nsStyleConsts.h"
 #include "mozilla/Likely.h"
 #include "gfx2DGlue.h"
+#include "mozilla/gfx/Logging.h"        // for gfxCriticalError
 
 #if defined(MOZ_WIDGET_GTK)
 #include "gfxPlatformGtk.h" // xxx - for UseFcFontList
+#endif
+
+#ifdef XP_WIN
+#include "gfxWindowsPlatform.h"
 #endif
 
 #include "cairo.h"
@@ -513,14 +518,13 @@ HasSyntheticBold(gfxTextRun *aRun, uint32_t aStart, uint32_t aLength)
 // returns true if color is non-opaque (i.e. alpha != 1.0) or completely transparent, false otherwise
 // if true, color is set on output
 static bool
-HasNonOpaqueColor(gfxContext *aContext, gfxRGBA& aCurrentColor)
+HasNonOpaqueColor(gfxContext *aContext, Color& aCurrentColorOut)
 {
-    if (aContext->GetDeviceColor(aCurrentColor)) {
-        if (aCurrentColor.a < 1.0 && aCurrentColor.a > 0.0) {
+    if (aContext->GetDeviceColor(aCurrentColorOut)) {
+        if (0.0 < aCurrentColorOut.a && aCurrentColorOut.a < 1.0) {
             return true;
         }
     }
-        
     return false;
 }
 
@@ -534,7 +538,7 @@ struct BufferAlphaColor {
 
     ~BufferAlphaColor() {}
 
-    void PushSolidColor(const gfxRect& aBounds, const gfxRGBA& aAlphaColor, uint32_t appsPerDevUnit)
+    void PushSolidColor(const gfxRect& aBounds, const Color& aAlphaColor, uint32_t appsPerDevUnit)
     {
         mContext->Save();
         mContext->NewPath();
@@ -543,7 +547,7 @@ struct BufferAlphaColor {
                     aBounds.Width() / appsPerDevUnit,
                     aBounds.Height() / appsPerDevUnit), true);
         mContext->Clip();
-        mContext->SetColor(gfxRGBA(aAlphaColor.r, aAlphaColor.g, aAlphaColor.b));
+        mContext->SetColor(Color(aAlphaColor.r, aAlphaColor.g, aAlphaColor.b));
         mContext->PushGroup(gfxContentType::COLOR_ALPHA);
         mAlpha = aAlphaColor.a;
     }
@@ -552,7 +556,7 @@ struct BufferAlphaColor {
     {
         // pop the text, using the color alpha as the opacity
         mContext->PopGroupToSource();
-        mContext->SetOperator(gfxContext::OPERATOR_OVER);
+        mContext->SetOp(CompositionOp::OP_OVER);
         mContext->Paint(mAlpha);
         mContext->Restore();
     }
@@ -577,7 +581,7 @@ gfxTextRun::Draw(gfxContext *aContext, gfxPoint aPt, DrawMode aDrawMode,
 
     bool skipDrawing = mSkipDrawing;
     if (aDrawMode == DrawMode::GLYPH_FILL) {
-        gfxRGBA currentColor;
+        Color currentColor;
         if (aContext->GetDeviceColor(currentColor) && currentColor.a == 0) {
             skipDrawing = true;
         }
@@ -617,7 +621,7 @@ gfxTextRun::Draw(gfxContext *aContext, gfxPoint aPt, DrawMode aDrawMode,
     // synthetic bolding draws glyphs twice ==> colors with opacity won't draw
     // correctly unless first drawn without alpha
     BufferAlphaColor syntheticBoldBuffer(aContext);
-    gfxRGBA currentColor;
+    Color currentColor;
     bool needToRestore = false;
 
     if (aDrawMode == DrawMode::GLYPH_FILL &&
@@ -1876,20 +1880,29 @@ gfxFontGroup::GetDefaultFont()
         }
     }
 
+    uint32_t numInits, loaderState;
+    pfl->GetFontlistInitInfo(numInits, loaderState);
+    NS_ASSERTION(numInits != 0,
+                 "must initialize system fontlist before getting default font!");
+
+    uint32_t numFonts = 0;
     if (!mDefaultFont) {
         // Try for a "font of last resort...."
         // Because an empty font list would be Really Bad for later code
         // that assumes it will be able to get valid metrics for layout,
         // just look for the first usable font and put in the list.
         // (see bug 554544)
-        nsAutoTArray<nsRefPtr<gfxFontFamily>,200> families;
-        pfl->GetFontFamilyList(families);
-        uint32_t count = families.Length();
-        for (uint32_t i = 0; i < count; ++i) {
-            gfxFontEntry *fe = families[i]->FindFontForStyle(mStyle,
-                                                             needsBold);
+        nsAutoTArray<nsRefPtr<gfxFontFamily>,200> familyList;
+        pfl->GetFontFamilyList(familyList);
+        numFonts = familyList.Length();
+        for (uint32_t i = 0; i < numFonts; ++i) {
+            gfxFontEntry *fe = familyList[i]->FindFontForStyle(mStyle,
+                                                               needsBold);
             if (fe) {
                 mDefaultFont = fe->FindOrMakeFont(&mStyle, needsBold);
+                if (mDefaultFont) {
+                    break;
+                }
             }
         }
     }
@@ -1897,17 +1910,29 @@ gfxFontGroup::GetDefaultFont()
     if (!mDefaultFont) {
         // an empty font list at this point is fatal; we're not going to
         // be able to do even the most basic layout operations
+
+        // annotate crash report with fontlist info
+        nsAutoCString fontInitInfo;
+        fontInitInfo.AppendPrintf("no fonts - init: %d fonts: %d loader: %d",
+                                  numInits, numFonts, loaderState);
+#ifdef XP_WIN
+        bool dwriteEnabled = gfxWindowsPlatform::GetPlatform()->DWriteEnabled();
+        double upTime = (double) GetTickCount();
+        fontInitInfo.AppendPrintf(" backend: %s system-uptime: %9.3f sec",
+                                  dwriteEnabled ? "directwrite" : "gdi", upTime/1000);
+#endif
+        gfxCriticalError() << fontInitInfo.get();
+
         char msg[256]; // CHECK buffer length if revising message below
-        nsAutoString families;
-        mFamilyList.ToString(families);
+        nsAutoString familiesString;
+        mFamilyList.ToString(familiesString);
         snprintf_literal(msg, "unable to find a usable font (%.220s)",
-                         NS_ConvertUTF16toUTF8(families).get());
+                         NS_ConvertUTF16toUTF8(familiesString).get());
         NS_RUNTIMEABORT(msg);
     }
 
     return mDefaultFont.get();
 }
-
 
 gfxFont*
 gfxFontGroup::GetFirstValidFont(uint32_t aCh)

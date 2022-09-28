@@ -7,6 +7,7 @@
 #include "jit/MIR.h"
 
 #include "mozilla/FloatingPoint.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/SizePrintfMacros.h"
 
@@ -26,8 +27,6 @@
 #include "jsatominlines.h"
 #include "jsobjinlines.h"
 #include "jsscriptinlines.h"
-
-#include "jit/AtomicOperations-inl.h"
 
 using namespace js;
 using namespace js::jit;
@@ -974,7 +973,7 @@ MSimdSplatX4::foldsTo(TempAllocator& alloc)
 }
 
 MDefinition*
-MSimdUnbox::foldsTo(TempAllocator &alloc)
+MSimdUnbox::foldsTo(TempAllocator& alloc)
 {
     MDefinition* in = input();
 
@@ -1088,7 +1087,7 @@ void
 MConstantElements::printOpcode(GenericPrinter& out) const
 {
     PrintOpcodeName(out, op());
-    out.printf(" %p", value());
+    out.printf(" 0x%" PRIxPTR, value().asValue());
 }
 
 void
@@ -1861,8 +1860,11 @@ jit::MergeTypes(MIRType* ptype, TemporaryTypeSet** ptypeSet,
                 return false;
         }
         if (newTypeSet) {
-            if (!newTypeSet->isSubset(*ptypeSet))
+            if (!newTypeSet->isSubset(*ptypeSet)) {
                 *ptypeSet = TypeSet::unionSets(*ptypeSet, newTypeSet, alloc);
+                if (!*ptypeSet)
+                    return false;
+            }
         } else {
             *ptypeSet = nullptr;
         }
@@ -2404,6 +2406,8 @@ MBinaryArithInstruction::trySpecializeFloat32(TempAllocator& alloc)
 {
     // Do not use Float32 if we can use int32.
     if (specialization_ == MIRType_Int32)
+        return;
+    if (specialization_ == MIRType_None)
         return;
 
     MDefinition* left = lhs();
@@ -3917,7 +3921,7 @@ MBeta::printOpcode(GenericPrinter& out) const
 bool
 MNewObject::shouldUseVM() const
 {
-    if (JSObject *obj = templateObject())
+    if (JSObject* obj = templateObject())
         return obj->is<PlainObject>() && obj->as<PlainObject>().hasDynamicSlots();
     return true;
 }
@@ -4323,8 +4327,8 @@ MLoadElement::foldsTo(TempAllocator& alloc)
 // Gets the MDefinition* representing the source/target object's storage.
 // Usually this is just an MElements*, but sometimes there are layers
 // of indirection or inlining, which are handled elsewhere.
-static inline const MElements *
-MaybeUnwrapElements(const MDefinition *elementsOrObj)
+static inline const MElements*
+MaybeUnwrapElements(const MDefinition* elementsOrObj)
 {
     // Sometimes there is a level of indirection for conversion.
     if (elementsOrObj->isConvertElementsToDoubles())
@@ -4556,7 +4560,7 @@ InlinePropertyTable::buildTypeSetForFunction(JSFunction* func) const
     return types;
 }
 
-void*
+SharedMem<void*>
 MLoadTypedArrayElementStatic::base() const
 {
     return AnyTypedArrayViewData(someTypedArray_);
@@ -4585,7 +4589,7 @@ MLoadTypedArrayElementStatic::congruentTo(const MDefinition* ins) const
     return congruentIfOperandsEqual(other);
 }
 
-void*
+SharedMem<void*>
 MStoreTypedArrayElementStatic::base() const
 {
     return AnyTypedArrayViewData(someTypedArray_);

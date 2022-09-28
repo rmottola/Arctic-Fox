@@ -35,6 +35,7 @@ let {
   Messenger,
   ignoreEvent,
   injectAPI,
+  flushJarCache,
 } = ExtensionUtils;
 
 function isWhenBeforeOrSame(when1, when2)
@@ -221,7 +222,8 @@ function ExtensionContext(extensionId, contentWindow)
   this.messenger = new Messenger(this, broker, {id: extensionId, frameId, url},
                                  {id: extensionId, frameId}, delegate);
 
-  let chromeObj = Cu.createObjectIn(this.sandbox, {defineAs: "chrome"});
+  let chromeObj = Cu.createObjectIn(this.sandbox, {defineAs: "browser"});
+  this.sandbox.wrappedJSObject.chrome = this.sandbox.wrappedJSObject.browser;
   injectAPI(api(this), chromeObj);
 
   this.onClose = new Set();
@@ -341,8 +343,11 @@ let DocumentManager = {
     }
 
     // TODO: Somehow make sure we have the right permissions for this origin!
-    // FIXME: Need to keep this around so that I will execute it later if we're not in the right state.
-    context.execute(script, scheduled => scheduled == state);
+
+    // FIXME: Script should be executed only if current state has
+    // already reached its run_at state, or we have to keep it around
+    // somewhere to execute later.
+    context.execute(script, scheduled => true);
   },
 
   enumerateWindows: function*(docShell) {
@@ -414,7 +419,7 @@ let DocumentManager = {
       for (let script of extension.scripts) {
         if (script.matches(window)) {
           let context = this.getContext(extensionId, window);
-          context.execute(script, scheduled => isWhenBeforeOrSame(scheduled, state));
+          context.execute(script, scheduled => scheduled == state);
         }
       }
     }
@@ -457,6 +462,7 @@ let ExtensionManager = {
   init() {
     Services.cpmm.addMessageListener("Extension:Startup", this);
     Services.cpmm.addMessageListener("Extension:Shutdown", this);
+    Services.cpmm.addMessageListener("Extension:FlushJarCache", this);
 
     if (Services.cpmm.initialProcessData && "Extension:Extensions" in Services.cpmm.initialProcessData) {
       let extensions = Services.cpmm.initialProcessData["Extension:Extensions"];
@@ -474,18 +480,29 @@ let ExtensionManager = {
   receiveMessage({name, data}) {
     let extension;
     switch (name) {
-    case "Extension:Startup":
-      extension = new BrowserExtensionContent(data);
-      this.extensions.set(data.id, extension);
-      DocumentManager.startupExtension(data.id);
-      break;
+      case "Extension:Startup": {
+        extension = new BrowserExtensionContent(data);
+        this.extensions.set(data.id, extension);
+        DocumentManager.startupExtension(data.id);
+        break;
+      }
 
-    case "Extension:Shutdown":
-      extension = this.extensions.get(data.id);
-      extension.shutdown();
-      DocumentManager.shutdownExtension(data.id);
-      this.extensions.delete(data.id);
-      break;
+      case "Extension:Shutdown": {
+        extension = this.extensions.get(data.id);
+        extension.shutdown();
+        DocumentManager.shutdownExtension(data.id);
+        this.extensions.delete(data.id);
+        break;
+      }
+
+      case "Extension:FlushJarCache": {
+        let nsIFile = Components.Constructor("@mozilla.org/file/local;1", "nsIFile",
+                                             "initWithPath");
+        let file = new nsIFile(data.path);
+        flushJarCache(file);
+        Services.cpmm.sendAsyncMessage("Extension:FlushJarCacheComplete");
+        break;
+      }
     }
   }
 };

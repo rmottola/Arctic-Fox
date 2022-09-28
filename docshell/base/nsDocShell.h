@@ -34,9 +34,9 @@
 #include "nsAutoPtr.h"
 #include "nsThreadUtils.h"
 #include "nsContentUtils.h"
-#include "timeline/TimelineMarker.h"
-#include "timeline/TimelineConsumers.h"
 #include "timeline/ObservedDocShell.h"
+#include "timeline/TimelineConsumers.h"
+#include "timeline/TimelineMarker.h"
 
 // Threshold value in ms for META refresh based redirects
 #define REFRESH_REDIRECT_TIMER 15000
@@ -59,6 +59,7 @@
 #include "prtime.h"
 #include "nsRect.h"
 #include "Units.h"
+#include "nsIDeprecationWarner.h"
 
 namespace mozilla {
 namespace dom {
@@ -146,6 +147,7 @@ class nsDocShell final
   , public nsIClipboardCommands
   , public nsIDOMStorageManager
   , public nsINetworkInterceptController
+  , public nsIDeprecationWarner
   , public mozilla::SupportsWeakPtr<nsDocShell>
 {
   friend class nsDSURIContentListener;
@@ -177,6 +179,7 @@ public:
   NS_DECL_NSICLIPBOARDCOMMANDS
   NS_DECL_NSIWEBSHELLSERVICES
   NS_DECL_NSINETWORKINTERCEPTCONTROLLER
+  NS_DECL_NSIDEPRECATIONWARNER
   NS_FORWARD_SAFE_NSIDOMSTORAGEMANAGER(TopSessionStorageManager())
 
   NS_IMETHOD Stop() override
@@ -279,12 +282,14 @@ private:
   // be very fast, so instead of using a Map or having to search for some
   // docshell-specific markers storage, a pointer to an `ObservedDocShell` is
   // is stored on docshells directly.
-  friend void mozilla::TimelineConsumers::AddConsumer(nsDocShell* aDocShell);
-  friend void mozilla::TimelineConsumers::RemoveConsumer(nsDocShell* aDocShell);
+  friend void mozilla::TimelineConsumers::AddConsumer(nsDocShell*);
+  friend void mozilla::TimelineConsumers::RemoveConsumer(nsDocShell*);
   friend void mozilla::TimelineConsumers::AddMarkerForDocShell(
-    nsDocShell* aDocShell, UniquePtr<TimelineMarker>&& aMarker);
+    nsDocShell*, const char*, MarkerTracingType);
   friend void mozilla::TimelineConsumers::AddMarkerForDocShell(
-    nsDocShell* aDocShell, const char* aName, TracingMetadata aMetaData);
+    nsDocShell*, const char*, const TimeStamp&, MarkerTracingType);
+  friend void mozilla::TimelineConsumers::AddMarkerForDocShell(
+    nsDocShell*, UniquePtr<TimelineMarker>&&);
 
 public:
   // Tell the favicon service that aNewURI has the same favicon as aOldURI.

@@ -545,9 +545,7 @@ ProcessPriorityManagerImpl::ObserveContentParentDestroyed(nsISupports* aSubject)
 
     mParticularManagers.Remove(childID);
 
-    if (mHighPriorityChildIDs.Contains(childID)) {
-      mHighPriorityChildIDs.RemoveEntry(childID);
-    }
+    mHighPriorityChildIDs.RemoveEntry(childID);
   }
 }
 

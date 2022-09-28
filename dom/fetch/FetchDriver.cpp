@@ -415,6 +415,12 @@ FetchDriver::HttpFetch(bool aCORSFlag, bool aCORSPreflightFlag, bool aAuthentica
   // new cookies sent by the server from being stored.
   const nsLoadFlags credentialsFlag = useCredentials ? 0 : nsIRequest::LOAD_ANONYMOUS;
 
+  // Set skip serviceworker flag.
+  // While the spec also gates on the client being a ServiceWorker, we can't
+  // infer that here. Instead we rely on callers to set the flag correctly.
+  const nsLoadFlags bypassFlag = mRequest->SkipServiceWorker() ?
+                                 nsIChannel::LOAD_BYPASS_SERVICE_WORKER : 0;
+
   // From here on we create a channel and set its properties with the
   // information from the InternalRequest. This is an implementation detail.
   MOZ_ASSERT(mLoadGroup);
@@ -426,7 +432,7 @@ FetchDriver::HttpFetch(bool aCORSFlag, bool aCORSPreflightFlag, bool aAuthentica
                      mRequest->ContentPolicyType(),
                      mLoadGroup,
                      nullptr, /* aCallbacks */
-                     nsIRequest::LOAD_NORMAL | credentialsFlag,
+                     nsIRequest::LOAD_NORMAL | credentialsFlag | bypassFlag,
                      ios);
   mLoadGroup = nullptr;
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -559,21 +565,6 @@ FetchDriver::HttpFetch(bool aCORSFlag, bool aCORSPreflightFlag, bool aAuthentica
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return FailWithNetworkError();
       }
-    }
-  }
-
-  // Set skip serviceworker flag.
-  // While the spec also gates on the client being a ServiceWorker, we can't
-  // infer that here. Instead we rely on callers to set the flag correctly.
-  if (mRequest->SkipServiceWorker()) {
-    if (httpChan) {
-      nsCOMPtr<nsIHttpChannelInternal> internalChan = do_QueryInterface(httpChan);
-      internalChan->ForceNoIntercept();
-    } else {
-      nsCOMPtr<nsIJARChannel> jarChannel = do_QueryInterface(chan);
-      // If it is not an http channel, it has to be a jar one.
-      MOZ_ASSERT(jarChannel);
-      jarChannel->ForceNoIntercept();
     }
   }
 
@@ -786,6 +777,13 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
     uint32_t responseStatus = 200;
     nsAutoCString statusText;
     response = new InternalResponse(responseStatus, NS_LITERAL_CSTRING("OK"));
+    ErrorResult result;
+    nsAutoCString contentType;
+    jarChannel->GetContentType(contentType);
+    response->Headers()->Append(NS_LITERAL_CSTRING("content-type"),
+                                contentType,
+                                result);
+    MOZ_ASSERT(!result.Failed());
   }
 
   // We open a pipe so that we can immediately set the pipe's read end as the

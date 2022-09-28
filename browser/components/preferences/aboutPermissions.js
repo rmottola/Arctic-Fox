@@ -264,11 +264,11 @@ Site.prototype = {
  *
  * Inspired by pageinfo/permissions.js
  */
-let PermissionDefaults = {
-  UNKNOWN: Ci.nsIPermissionManager.UNKNOWN_ACTION,   // 0
-  ALLOW: Ci.nsIPermissionManager.ALLOW_ACTION,       // 1
-  DENY: Ci.nsIPermissionManager.DENY_ACTION,         // 2
-  SESSION: Ci.nsICookiePermission.ACCESS_SESSION,    // 8
+var PermissionDefaults = {
+  UNKNOWN: Ci.nsIPermissionManager.UNKNOWN_ACTION, // 0
+  ALLOW: Ci.nsIPermissionManager.ALLOW_ACTION, // 1
+  DENY: Ci.nsIPermissionManager.DENY_ACTION, // 2
+  SESSION: Ci.nsICookiePermission.ACCESS_SESSION, // 8
 
   get password() {
     if (Services.prefs.getBoolPref("signon.rememberSignons")) {

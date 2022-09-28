@@ -1,4 +1,4 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -13,23 +13,69 @@ var Cu = Components.utils;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 
+Cu.import("resource://gre/modules/PlacesUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
                                   "resource://gre/modules/PluralForm.jsm");
-
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
                                   "resource://gre/modules/PrivateBrowsingUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
+                                  "resource://gre/modules/NetUtil.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RecentWindow",
                                   "resource:///modules/RecentWindow.jsm");
-                                  
-XPCOMUtils.defineLazyGetter(this, "PlacesUtils", function() {
-  Cu.import("resource://gre/modules/PlacesUtils.jsm");
-  return PlacesUtils;
-});
+
+// PlacesUtils exposes multiple symbols, so we can't use defineLazyModuleGetter.
+Cu.import("resource://gre/modules/PlacesUtils.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "PlacesTransactions",
+                                  "resource://gre/modules/PlacesTransactions.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "CloudSync",
+                                  "resource://gre/modules/CloudSync.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Weave",
                                   "resource://services-sync/main.js");
+
+// copied from utilityOverlay.js
+const TAB_DROP_TYPE = "application/x-moz-tabbrowser-tab";
+
+// This function isn't public both because it's synchronous and because it is
+// going to be removed in bug 1072833.
+function IsLivemark(aItemId) {
+  // Since this check may be done on each dragover event, it's worth maintaining
+  // a cache.
+  let self = IsLivemark;
+  if (!("ids" in self)) {
+    const LIVEMARK_ANNO = PlacesUtils.LMANNO_FEEDURI;
+
+    let idsVec = PlacesUtils.annotations.getItemsWithAnnotation(LIVEMARK_ANNO);
+    self.ids = new Set(idsVec);
+
+    let obs = Object.freeze({
+      QueryInterface: XPCOMUtils.generateQI(Ci.nsIAnnotationObserver),
+
+      onItemAnnotationSet(itemId, annoName) {
+        if (annoName == LIVEMARK_ANNO)
+          self.ids.add(itemId);
+      },
+
+      onItemAnnotationRemoved(itemId, annoName) {
+        // If annoName is set to an empty string, the item is gone.
+        if (annoName == LIVEMARK_ANNO || annoName == "")
+          self.ids.delete(itemId);
+      },
+
+      onPageAnnotationSet() { },
+      onPageAnnotationRemoved() { },
+    });
+    PlacesUtils.annotations.addObserver(obs);
+    PlacesUtils.registerShutdownFunction(() => {
+      PlacesUtils.annotations.removeObserver(obs);
+    });
+  }
+  return self.ids.has(aItemId);
+}
 
 this.PlacesUIUtils = {
   ORGANIZER_LEFTPANE_VERSION: 7,
@@ -38,8 +84,6 @@ this.PlacesUIUtils = {
 
   LOAD_IN_SIDEBAR_ANNO: "bookmarkProperties/loadInSidebar",
   DESCRIPTION_ANNO: "bookmarkProperties/description",
-
-  TYPE_TAB_DROP: "application/x-moz-tabbrowser-tab",
 
   /**
    * Makes a URI from a spec, and do fixup
@@ -84,11 +128,13 @@ this.PlacesUIUtils = {
     return bundle.GetStringFromName(key);
   },
 
-  get _copyableAnnotations() [
-    this.DESCRIPTION_ANNO,
-    this.LOAD_IN_SIDEBAR_ANNO,
-    PlacesUtils.READ_ONLY_ANNO,
-  ],
+  get _copyableAnnotations() {
+    return [
+      this.DESCRIPTION_ANNO,
+      this.LOAD_IN_SIDEBAR_ANNO,
+      PlacesUtils.READ_ONLY_ANNO,
+    ];
+  },
 
   /**
    * Get a transaction for copying a uri item (either a bookmark or a history
@@ -150,14 +196,21 @@ this.PlacesUIUtils = {
    *       annotations are synced from the old one.
    * @see this._copyableAnnotations for the list of copyable annotations.
    */
-  _getFolderCopyTransaction:
-  function PUIU__getFolderCopyTransaction(aData, aContainer, aIndex)
-  {
-    function getChildItemsTransactions(aChildren)
-    {
+  _getFolderCopyTransaction(aData, aContainer, aIndex) {
+    function getChildItemsTransactions(aRoot) {
       let transactions = [];
       let index = aIndex;
-      aChildren.forEach(function (node, i) {
+      for (let i = 0; i < aRoot.childCount; ++i) {
+        let child = aRoot.getChild(i);
+        // Temporary hacks until we switch to PlacesTransactions.jsm.
+        let isLivemark =
+          PlacesUtils.annotations.itemHasAnnotation(child.itemId,
+                                                    PlacesUtils.LMANNO_FEEDURI);
+        let [node] = PlacesUtils.unwrapNodes(
+          PlacesUtils.wrapNode(child, PlacesUtils.TYPE_X_MOZ_PLACE, isLivemark),
+          PlacesUtils.TYPE_X_MOZ_PLACE
+        );
+
         // Make sure that items are given the correct index, this will be
         // passed by the transaction manager to the backend for the insertion.
         // Insertion behaves differently for DEFAULT_INDEX (append).
@@ -188,19 +241,21 @@ this.PlacesUIUtils = {
         else {
           throw new Error("Unexpected item under a bookmarks folder");
         }
-      });
+      }
       return transactions;
     }
 
-    if (aContainer == PlacesUtils.tagsFolderId) { // Copying a tag folder.
+    if (aContainer == PlacesUtils.tagsFolderId) { // Copying into a tag folder.
       let transactions = [];
-      if (aData.children) {
-        aData.children.forEach(function(aChild) {
+      if (!aData.livemark && aData.type == PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER) {
+        let {root} = PlacesUtils.getFolderContents(aData.id, false, false);
+        let urls = PlacesUtils.getURLsForContainerNode(root);
+        root.containerOpen = false;
+        for (let { uri } of urls) {
           transactions.push(
-            new PlacesTagURITransaction(PlacesUtils._uri(aChild.uri),
-                                        [aData.title])
+            new PlacesTagURITransaction(NetUtil.newURI(uri), [aData.title])
           );
-        });
+        }
       }
       return new PlacesAggregatedTransaction("addTags", transactions);
     }
@@ -209,7 +264,10 @@ this.PlacesUIUtils = {
       return this._getLivemarkCopyTransaction(aData, aContainer, aIndex);
     }
 
-    let transactions = getChildItemsTransactions(aData.children);
+    let {root} = PlacesUtils.getFolderContents(aData.id, false, false);
+    let transactions = getChildItemsTransactions(root);
+    root.containerOpen = false;
+
     if (aData.dateAdded) {
       transactions.push(
         new PlacesEditItemDateAddedTransaction(null, aData.dateAdded)
@@ -368,7 +426,7 @@ this.PlacesUIUtils = {
       default:
         if (type == PlacesUtils.TYPE_X_MOZ_URL ||
             type == PlacesUtils.TYPE_UNICODE ||
-            type == this.TYPE_TAB_DROP) {
+            type == TAB_DROP_TYPE) {
           let title = type != PlacesUtils.TYPE_UNICODE ? data.title
                                                        : data.uri;
           return new PlacesCreateBookmarkTransaction(PlacesUtils._uri(data.uri),
@@ -376,6 +434,120 @@ this.PlacesUIUtils = {
         }
     }
     return null;
+  },
+
+  /**
+   * ********* PlacesTransactions version of the function defined above ********
+   *
+   * Constructs a Places Transaction for the drop or paste of a blob of data
+   * into a container.
+   *
+   * @param   aData
+   *          The unwrapped data blob of dropped or pasted data.
+   * @param   aType
+   *          The content type of the data.
+   * @param   aNewParentGuid
+   *          GUID of the container the data was dropped or pasted into.
+   * @param   aIndex
+   *          The index within the container the item was dropped or pasted at.
+   * @param   aCopy
+   *          The drag action was copy, so don't move folders or links.
+   *
+   * @return  a Places Transaction that can be transacted for performing the
+   *          move/insert command.
+   */
+  getTransactionForData: function(aData, aType, aNewParentGuid, aIndex, aCopy) {
+    if (this.SUPPORTED_FLAVORS.indexOf(aData.type) == -1)
+      throw new Error(`Unsupported '${aData.type}' data type`);
+
+    if ("itemGuid" in aData) {
+      if (this.PLACES_FLAVORS.indexOf(aData.type) == -1)
+        throw new Error (`itemGuid unexpectedly set on ${aData.type} data`);
+
+      let info = { guid: aData.itemGuid
+                 , newParentGuid: aNewParentGuid
+                 , newIndex: aIndex };
+      if (aCopy) {
+        info.excludingAnnotation = "Places/SmartBookmark";
+        return PlacesTransactions.Copy(info);
+      }
+      return PlacesTransactions.Move(info);
+    }
+
+    // Since it's cheap and harmless, we allow the paste of separators and
+    // bookmarks from builds that use legacy transactions (i.e. when itemGuid
+    // was not set on PLACES_FLAVORS data). Containers are a different story,
+    // and thus disallowed.
+    if (aData.type == PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER)
+      throw new Error("Can't copy a container from a legacy-transactions build");
+
+    if (aData.type == PlacesUtils.TYPE_X_MOZ_PLACE_SEPARATOR) {
+      return PlacesTransactions.NewSeparator({ parentGuid: aNewParentGuid
+                                             , index: aIndex });
+    }
+
+    let title = aData.type != PlacesUtils.TYPE_UNICODE ? aData.title
+                                                       : aData.uri;
+    return PlacesTransactions.NewBookmark({ uri: NetUtil.newURI(aData.uri)
+                                          , title: title
+                                          , parentGuid: aNewParentGuid
+                                          , index: aIndex });
+  },
+
+  /**
+   * ********* PlacesTransactions version of the function defined above ********
+   *
+   * Constructs a Places Transaction for the drop or paste of a blob of data
+   * into a container.
+   *
+   * @param aData
+   *        The unwrapped data blob of dropped or pasted data.
+   * @param aType
+   *        The content type of the data.
+   * @param aNewParentGuid
+   *        GUID of the container the data was dropped or pasted into.
+   * @param aIndex
+   *        The index within the container the item was dropped or pasted at.
+   * @param aCopy
+   *        The drag action was copy, so don't move folders or links.
+   *
+   * @returns a Places Transaction that can be passed to
+   *          PlacesTranactions.transact for performing the move/insert command.
+   */
+  getTransactionForData: function(aData, aType, aNewParentGuid, aIndex, aCopy) {
+    if (this.SUPPORTED_FLAVORS.indexOf(aData.type) == -1)
+      throw new Error(`Unsupported '${aData.type}' data type`);
+
+    if ("itemGuid" in aData) {
+      if (this.PLACES_FLAVORS.indexOf(aData.type) == -1)
+        throw new Error (`itemGuid unexpectedly set on ${aData.type} data`);
+
+      let info = { GUID: aData.itemGuid
+                 , newParentGUID: aNewParentGuid
+                 , newIndex: aIndex };
+      if (aCopy)
+        return PlacesTransactions.Copy(info);
+      return PlacesTransactions.Move(info);
+    }
+
+    // Since it's cheap and harmless, we allow the paste of separators and
+    // bookmarks from builds that use legacy transactions (i.e. when itemGuid
+    // was not set on PLACES_FLAVORS data). Containers are a different story,
+    // and thus disallowed.
+    if (aData.type == PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER)
+      throw new Error("Can't copy a container from a legacy-transactions build");
+
+    if (aData.type == PlacesUtils.TYPE_X_MOZ_PLACE_SEPARATOR) {
+      return PlacesTransactions.NewSeparator({ parentGUID: aNewParentGuid
+                                             , index: aIndex });
+    }
+
+    let title = aData.type != PlacesUtils.TYPE_UNICODE ? aData.title
+                                                       : aData.uri;
+    return PlacesTransactions.NewBookmark({ uri: NetUtil.newURI(aData.uri)
+                                          , title: title
+                                          , parentGUID: aNewParentGuid
+                                          , index: aIndex });
   },
 
   /**
@@ -1306,13 +1478,33 @@ this.PlacesUIUtils = {
   })
 };
 
+
+PlacesUIUtils.PLACES_FLAVORS = [PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER,
+                                PlacesUtils.TYPE_X_MOZ_PLACE_SEPARATOR,
+                                PlacesUtils.TYPE_X_MOZ_PLACE];
+
+PlacesUIUtils.URI_FLAVORS = [PlacesUtils.TYPE_X_MOZ_URL,
+                             TAB_DROP_TYPE,
+                             PlacesUtils.TYPE_UNICODE],
+
+PlacesUIUtils.SUPPORTED_FLAVORS = [...PlacesUIUtils.PLACES_FLAVORS,
+                                   ...PlacesUIUtils.URI_FLAVORS];
+
+
+PlacesUIUtils.PLACES_FLAVORS = [PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER,
+                                PlacesUtils.TYPE_X_MOZ_PLACE_SEPARATOR,
+                                PlacesUtils.TYPE_X_MOZ_PLACE];
+
+PlacesUIUtils.URI_FLAVORS = [PlacesUtils.TYPE_X_MOZ_URL,
+                             TAB_DROP_TYPE,
+                             PlacesUtils.TYPE_UNICODE],
+
+PlacesUIUtils.SUPPORTED_FLAVORS = [...PlacesUIUtils.PLACES_FLAVORS,
+                                   ...PlacesUIUtils.URI_FLAVORS];
+
 XPCOMUtils.defineLazyServiceGetter(PlacesUIUtils, "RDF",
                                    "@mozilla.org/rdf/rdf-service;1",
                                    "nsIRDFService");
-
-XPCOMUtils.defineLazyGetter(PlacesUIUtils, "localStore", function() {
-  return PlacesUIUtils.RDF.GetDataSource("rdf:local-store");
-});
 
 XPCOMUtils.defineLazyGetter(PlacesUIUtils, "ellipsis", function() {
   return Services.prefs.getComplexValue("intl.ellipsis",
@@ -1356,68 +1548,68 @@ XPCOMUtils.defineLazyGetter(PlacesUIUtils, "ptm", function() {
   PlacesUtils;
 
   return {
-    aggregateTransactions: function(aName, aTransactions)
+    aggregateTransactions: (aName, aTransactions) =>
       new PlacesAggregatedTransaction(aName, aTransactions),
 
-    createFolder: function(aName, aContainer, aIndex, aAnnotations,
-                           aChildItemsTransactions)
+    createFolder: (aName, aContainer, aIndex, aAnnotations,
+                   aChildItemsTransactions) =>
       new PlacesCreateFolderTransaction(aName, aContainer, aIndex, aAnnotations,
                                         aChildItemsTransactions),
 
-    createItem: function(aURI, aContainer, aIndex, aTitle, aKeyword,
-                         aAnnotations, aChildTransactions)
+    createItem: (aURI, aContainer, aIndex, aTitle, aKeyword,
+                 aAnnotations, aChildTransactions) =>
       new PlacesCreateBookmarkTransaction(aURI, aContainer, aIndex, aTitle,
                                           aKeyword, aAnnotations,
                                           aChildTransactions),
 
-    createSeparator: function(aContainer, aIndex)
+    createSeparator: (aContainer, aIndex) =>
       new PlacesCreateSeparatorTransaction(aContainer, aIndex),
 
-    createLivemark: function(aFeedURI, aSiteURI, aName, aContainer, aIndex,
-                             aAnnotations)
+    createLivemark: (aFeedURI, aSiteURI, aName, aContainer, aIndex,
+                     aAnnotations) =>
       new PlacesCreateLivemarkTransaction(aFeedURI, aSiteURI, aName, aContainer,
                                           aIndex, aAnnotations),
 
-    moveItem: function(aItemId, aNewContainer, aNewIndex)
+    moveItem: (aItemId, aNewContainer, aNewIndex) =>
       new PlacesMoveItemTransaction(aItemId, aNewContainer, aNewIndex),
 
-    removeItem: function(aItemId)
+    removeItem: (aItemId) =>
       new PlacesRemoveItemTransaction(aItemId),
 
-    editItemTitle: function(aItemId, aNewTitle)
+    editItemTitle: (aItemId, aNewTitle) =>
       new PlacesEditItemTitleTransaction(aItemId, aNewTitle),
 
-    editBookmarkURI: function(aItemId, aNewURI)
+    editBookmarkURI: (aItemId, aNewURI) =>
       new PlacesEditBookmarkURITransaction(aItemId, aNewURI),
 
-    setItemAnnotation: function(aItemId, aAnnotationObject)
+    setItemAnnotation: (aItemId, aAnnotationObject) =>
       new PlacesSetItemAnnotationTransaction(aItemId, aAnnotationObject),
 
-    setPageAnnotation: function(aURI, aAnnotationObject)
+    setPageAnnotation: (aURI, aAnnotationObject) =>
       new PlacesSetPageAnnotationTransaction(aURI, aAnnotationObject),
 
-    editBookmarkKeyword: function(aItemId, aNewKeyword)
+    editBookmarkKeyword: (aItemId, aNewKeyword) =>
       new PlacesEditBookmarkKeywordTransaction(aItemId, aNewKeyword),
 
-    editLivemarkSiteURI: function(aLivemarkId, aSiteURI)
+    editLivemarkSiteURI: (aLivemarkId, aSiteURI) =>
       new PlacesEditLivemarkSiteURITransaction(aLivemarkId, aSiteURI),
 
-    editLivemarkFeedURI: function(aLivemarkId, aFeedURI)
+    editLivemarkFeedURI: (aLivemarkId, aFeedURI) =>
       new PlacesEditLivemarkFeedURITransaction(aLivemarkId, aFeedURI),
 
-    editItemDateAdded: function(aItemId, aNewDateAdded)
+    editItemDateAdded: (aItemId, aNewDateAdded) =>
       new PlacesEditItemDateAddedTransaction(aItemId, aNewDateAdded),
 
-    editItemLastModified: function(aItemId, aNewLastModified)
+    editItemLastModified: (aItemId, aNewLastModified) =>
       new PlacesEditItemLastModifiedTransaction(aItemId, aNewLastModified),
 
-    sortFolderByName: function(aFolderId)
+    sortFolderByName: (aFolderId) =>
       new PlacesSortFolderByNameTransaction(aFolderId),
 
-    tagURI: function(aURI, aTags)
+    tagURI: (aURI, aTags) =>
       new PlacesTagURITransaction(aURI, aTags),
 
-    untagURI: function(aURI, aTags)
+    untagURI: (aURI, aTags) =>
       new PlacesUntagURITransaction(aURI, aTags),
 
     /**
@@ -1461,49 +1653,53 @@ XPCOMUtils.defineLazyGetter(PlacesUIUtils, "ptm", function() {
     ////////////////////////////////////////////////////////////////////////////
     //// nsITransactionManager forwarders.
 
-    beginBatch: function()
+    beginBatch: () =>
       PlacesUtils.transactionManager.beginBatch(null),
 
-    endBatch: function()
+    endBatch: () =>
       PlacesUtils.transactionManager.endBatch(false),
 
-    doTransaction: function(txn)
+    doTransaction: (txn) =>
       PlacesUtils.transactionManager.doTransaction(txn),
 
-    undoTransaction: function()
+    undoTransaction: () =>
       PlacesUtils.transactionManager.undoTransaction(),
 
-    redoTransaction: function()
+    redoTransaction: () =>
       PlacesUtils.transactionManager.redoTransaction(),
 
-    get numberOfUndoItems()
-      PlacesUtils.transactionManager.numberOfUndoItems,
-    get numberOfRedoItems()
-      PlacesUtils.transactionManager.numberOfRedoItems,
-    get maxTransactionCount()
-      PlacesUtils.transactionManager.maxTransactionCount,
-    set maxTransactionCount(val)
-      PlacesUtils.transactionManager.maxTransactionCount = val,
+    get numberOfUndoItems() {
+      return PlacesUtils.transactionManager.numberOfUndoItems;
+    },
+    get numberOfRedoItems() {
+      return PlacesUtils.transactionManager.numberOfRedoItems;
+    },
+    get maxTransactionCount() {
+      return PlacesUtils.transactionManager.maxTransactionCount;
+    },
+    set maxTransactionCount(val) {
+      PlacesUtils.transactionManager.maxTransactionCount = val;
+    },
 
-    clear: function()
+    clear: () =>
       PlacesUtils.transactionManager.clear(),
 
-    peekUndoStack: function()
+    peekUndoStack: () =>
       PlacesUtils.transactionManager.peekUndoStack(),
 
-    peekRedoStack: function()
+    peekRedoStack: () =>
       PlacesUtils.transactionManager.peekRedoStack(),
 
-    getUndoStack: function()
+    getUndoStack: () =>
       PlacesUtils.transactionManager.getUndoStack(),
 
-    getRedoStack: function()
+    getRedoStack: () =>
       PlacesUtils.transactionManager.getRedoStack(),
 
-    AddListener: function(aListener)
+    AddListener: (aListener) =>
       PlacesUtils.transactionManager.AddListener(aListener),
 
-    RemoveListener: function(aListener)
+    RemoveListener: (aListener) =>
       PlacesUtils.transactionManager.RemoveListener(aListener)
   }
 });

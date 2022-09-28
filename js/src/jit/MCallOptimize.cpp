@@ -1230,7 +1230,7 @@ IonBuilder::inlineMathHypot(CallInfo& callInfo)
         return InliningStatus_NotInlined;
 
     for (uint32_t i = 0; i < argc; ++i) {
-        MDefinition* arg = callInfo.getArg(i);
+        MDefinition * arg = callInfo.getArg(i);
         if (!IsNumberType(arg->type()))
             return InliningStatus_NotInlined;
         vector.infallibleAppend(arg);
@@ -2153,6 +2153,18 @@ IonBuilder::inlineIsTypedArrayHelper(CallInfo& callInfo, WrappingBehavior wrappi
     return InliningStatus_Inlined;
 }
 
+IonBuilder::InliningStatus
+IonBuilder::inlineIsTypedArray(CallInfo& callInfo)
+{
+    return inlineIsTypedArrayHelper(callInfo, RejectWrappedTypedArrays);
+}
+
+IonBuilder::InliningStatus
+IonBuilder::inlineIsPossiblyWrappedTypedArray(CallInfo& callInfo)
+{
+    return inlineIsTypedArrayHelper(callInfo, AllowWrappedTypedArrays);
+}
+
 static bool
 IsTypedArrayObject(CompilerConstraintList* constraints, MDefinition* def)
 {
@@ -2164,18 +2176,6 @@ IsTypedArrayObject(CompilerConstraintList* constraints, MDefinition* def)
 
     return types->forAllClasses(constraints, IsTypedArrayClass) ==
            TemporaryTypeSet::ForAllResult::ALL_TRUE;
-}
-
-IonBuilder::InliningStatus
-IonBuilder::inlineIsTypedArray(CallInfo& callInfo)
-{
-    return inlineIsTypedArrayHelper(callInfo, RejectWrappedTypedArrays);
-}
-
-IonBuilder::InliningStatus
-IonBuilder::inlineIsPossiblyWrappedTypedArray(CallInfo& callInfo)
-{
-    return inlineIsTypedArrayHelper(callInfo, AllowWrappedTypedArrays);
 }
 
 IonBuilder::InliningStatus

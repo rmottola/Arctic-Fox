@@ -24,6 +24,10 @@ export:: $(CERT_HEADERS)
 
 primaryCert.h: $(PRIMARY_CERT)
 secondaryCert.h: $(SECONDARY_CERT)
+
+# This is how the xpcshellCertificate.der file is generated, in case we ever
+# have to regenerate it.
+# ./certutil -L -d modules/libmar/tests/unit/data -n mycert -r > xpcshellCertificate.der
 xpcshellCert.h: xpcshellCertificate.der
 
 $(CERT_HEADERS): gen_cert_header.py

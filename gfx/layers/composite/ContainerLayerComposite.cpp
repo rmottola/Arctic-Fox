@@ -24,7 +24,7 @@
 #include "mozilla/layers/AsyncCompositionManager.h" // for ViewTransform
 #include "mozilla/layers/LayerMetricsWrapper.h" // for LayerMetricsWrapper
 #include "mozilla/mozalloc.h"           // for operator delete, etc
-#include "mozilla/nsRefPtr.h"           // for nsRefPtr
+#include "mozilla/nsRefPtr.h"                   // for nsRefPtr
 #include "nsDebug.h"                    // for NS_ASSERTION
 #include "nsISupportsImpl.h"            // for MOZ_COUNT_CTOR, etc
 #include "nsISupportsUtils.h"           // for NS_ADDREF, NS_RELEASE
@@ -33,6 +33,9 @@
 #include "TextRenderer.h"               // for TextRenderer
 #include <vector>
 #include "GeckoProfiler.h"              // for GeckoProfiler
+#ifdef MOZ_ENABLE_PROFILER_SPS
+#include "ProfilerMarkers.h"            // for ProfilerMarkers
+#endif
 
 #define CULLING_LOG(...)
 // #define CULLING_LOG(...) printf_stderr("CULLING: " __VA_ARGS__)
@@ -48,7 +51,7 @@ namespace layers {
 using namespace gfx;
 
 static bool
-LayerHasCheckerboardingAPZC(Layer* aLayer, gfxRGBA* aOutColor)
+LayerHasCheckerboardingAPZC(Layer* aLayer, Color* aOutColor)
 {
   for (LayerMetricsWrapper i(aLayer, LayerMetricsWrapper::StartAt::BOTTOM); i; i = i.GetParent()) {
     if (!i.Metrics().IsScrollable()) {
@@ -99,6 +102,26 @@ static gfx::IntRect ContainerVisibleRect(ContainerT* aContainer)
 
 static void PrintUniformityInfo(Layer* aLayer)
 {
+#ifdef MOZ_ENABLE_PROFILER_SPS
+  if (!profiler_is_active()) {
+    return;
+  }
+
+  // Don't want to print a log for smaller layers
+  if (aLayer->GetEffectiveVisibleRegion().GetBounds().width < 300 ||
+      aLayer->GetEffectiveVisibleRegion().GetBounds().height < 300) {
+    return;
+  }
+
+  Matrix4x4 transform = aLayer->AsLayerComposite()->GetShadowTransform();
+  if (!transform.Is2D()) {
+    return;
+  }
+
+  Point translation = transform.As2D().GetTranslation();
+  LayerTranslationPayload* payload = new LayerTranslationPayload(aLayer, translation);
+  PROFILER_MARKER_PAYLOAD("LayerTranslation", payload);
+#endif
 }
 
 /* all of the per-layer prepared data we need to maintain */
@@ -193,24 +216,26 @@ ContainerRenderVR(ContainerT* aContainer,
       // from WebGL (and maybe depth video?)
       compositor->SetRenderTarget(surface);
       aContainer->ReplaceEffectiveTransform(origTransform);
-      
+
       // If this native-VR child layer does not have sizes that match
       // the eye resolution (that is, returned by the recommended
       // render rect from the HMD device), then we need to scale it
       // up/down.
-      nsIntRect layerBounds;
+      Rect layerBounds;
       // XXX this is a hack! Canvas layers aren't reporting the
       // proper bounds here (visible region bounds are 0,0,0,0)
       // and I'm not sure if this is the bounds we want anyway.
       if (layer->GetType() == Layer::TYPE_CANVAS) {
-        layerBounds = static_cast<CanvasLayer*>(layer)->GetBounds();
+        layerBounds = ToRect(static_cast<CanvasLayer*>(layer)->GetBounds());
       } else {
-        layerBounds = layer->GetEffectiveVisibleRegion().GetBounds();
+        layerBounds = ToRect(layer->GetEffectiveVisibleRegion().GetBounds());
       }
-      DUMP("  layer %p [type %d] bounds [%d %d %d %d] surfaceRect [%d %d %d %d]\n", layer, (int) layer->GetType(),
-           XYWH(layerBounds), XYWH(surfaceRect));
-      
       const gfx::Matrix4x4 childTransform = layer->GetEffectiveTransform();
+      layerBounds = childTransform.TransformBounds(layerBounds);
+
+      DUMP("  layer %p [type %d] bounds [%f %f %f %f] surfaceRect [%d %d %d %d]\n", layer, (int) layer->GetType(),
+           XYWH(layerBounds), XYWH(surfaceRect));
+
       bool restoreTransform = false;
       if ((layerBounds.width != 0 && layerBounds.height != 0) &&
           (layerBounds.width != surfaceRect.width ||
@@ -220,8 +245,8 @@ ContainerRenderVR(ContainerT* aContainer,
              surfaceRect.width / float(layerBounds.width),
              surfaceRect.height / float(layerBounds.height));
         gfx::Matrix4x4 scaledChildTransform(childTransform);
-        scaledChildTransform.PreScale(surfaceRect.width / float(layerBounds.width),
-                                      surfaceRect.height / float(layerBounds.height),
+        scaledChildTransform.PreScale(surfaceRect.width / layerBounds.width,
+                                      surfaceRect.height / layerBounds.height,
                                       1.0f);
 
         layer->ReplaceEffectiveTransform(scaledChildTransform);
@@ -431,9 +456,15 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
 
   // Rects
   const FrameMetrics& fm = aLayer->GetFrameMetrics(0);
+  ParentLayerRect compositionBounds = fm.GetCompositionBounds();
   LayerRect scrollRect = fm.GetScrollableRect() * fm.LayersPixelsPerCSSPixel();
-  LayerRect viewRect = ParentLayerRect(scrollOffset, fm.GetCompositionBounds().Size()) / LayerToParentLayerScale(1);
+  LayerRect viewRect = ParentLayerRect(scrollOffset, compositionBounds.Size()) / LayerToParentLayerScale(1);
   LayerRect dp = (fm.GetDisplayPort() + fm.GetScrollOffset()) * fm.LayersPixelsPerCSSPixel();
+
+  // Don't render trivial minimap. They can show up from textboxes and other tiny frames.
+  if (viewRect.width < 64 && viewRect.height < 64) {
+    return;
+  }
 
   // Compute a scale with an appropriate aspect ratio
   // We allocate up to 100px of width and the height of this layer.
@@ -445,7 +476,7 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
   scaleFactor = std::min(scaleFactorX, scaleFactorY);
 
   Matrix4x4 transform = Matrix4x4::Scaling(scaleFactor, scaleFactor, 1);
-  transform.PostTranslate(horizontalPadding, verticalPadding, 0);
+  transform.PostTranslate(horizontalPadding + compositionBounds.x, verticalPadding + compositionBounds.y, 0);
 
   Rect clipRect = aContainer->GetEffectiveTransform().TransformBounds(
                     transform.TransformBounds(scrollRect.ToUnknownRect()));
@@ -456,6 +487,7 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
   r = transform.TransformBounds(scrollRect.ToUnknownRect());
   compositor->FillRect(r, backgroundColor, clipRect, aContainer->GetEffectiveTransform());
 
+  /* Disabled because on long pages SlowDrawRect becomes a bottleneck.
   int tileW = gfxPrefs::LayersTileWidth();
   int tileH = gfxPrefs::LayersTileHeight();
 
@@ -469,13 +501,16 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
       compositor->SlowDrawRect(r, tileBorderColor, clipRect, aContainer->GetEffectiveTransform());
     }
   }
+  */
 
   r = transform.TransformBounds(scrollRect.ToUnknownRect());
   compositor->SlowDrawRect(r, pageBorderColor, clipRect, aContainer->GetEffectiveTransform());
   r = transform.TransformBounds(dp.ToUnknownRect());
+  compositor->FillRect(r, tileActiveColor, clipRect, aContainer->GetEffectiveTransform());
+  r = transform.TransformBounds(dp.ToUnknownRect());
   compositor->SlowDrawRect(r, displayPortColor, clipRect, aContainer->GetEffectiveTransform());
   r = transform.TransformBounds(viewRect.ToUnknownRect());
-  compositor->SlowDrawRect(r, viewPortColor, clipRect, aContainer->GetEffectiveTransform());
+  compositor->SlowDrawRect(r, viewPortColor, clipRect, aContainer->GetEffectiveTransform(), 2);
 }
 
 
@@ -492,9 +527,13 @@ RenderLayers(ContainerT* aContainer,
     const RenderTargetIntRect& clipRect = preparedData.mClipRect;
     Layer* layer = layerToRender->GetLayer();
 
-    gfxRGBA color;
+    Color color;
     if ((layer->GetContentFlags() & Layer::CONTENT_OPAQUE) &&
+        layer->IsOpaqueForVisibility() &&
         LayerHasCheckerboardingAPZC(layer, &color)) {
+      if (gfxPrefs::APZHighlightCheckerboardedAreas()) {
+        color = Color(255 / 255.f, 188 / 255.f, 217 / 255.f, 1.f); // "Cotton Candy"
+      }
       // Ideally we would want to intersect the checkerboard region from the APZ with the layer bounds
       // and only fill in that area. However the layer bounds takes into account the base translation
       // for the painted layer whereas the checkerboard region does not. One does not simply
@@ -503,7 +542,7 @@ RenderLayers(ContainerT* aContainer,
       // should only occur transiently.
       gfx::IntRect layerBounds = layer->GetLayerBounds();
       EffectChain effectChain(layer);
-      effectChain.mPrimaryEffect = new EffectSolidColor(ToColor(color));
+      effectChain.mPrimaryEffect = new EffectSolidColor(color);
       aManager->GetCompositor()->DrawQuad(gfx::Rect(layerBounds.x, layerBounds.y, layerBounds.width, layerBounds.height),
                                           gfx::Rect(clipRect.ToUnknownRect()),
                                           effectChain, layer->GetEffectiveOpacity(),

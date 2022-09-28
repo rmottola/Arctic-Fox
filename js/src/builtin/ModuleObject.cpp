@@ -264,6 +264,8 @@ ModuleObject::isInstance(HandleValue value)
 ModuleObject::create(ExclusiveContext* cx)
 {
     Rooted<ModuleObject*> self(cx, NewBuiltinClassInstance<ModuleObject>(cx, TenuredObject));
+    if (!self)
+        return nullptr;
 
     IndirectBindingMap* bindings = cx->new_<IndirectBindingMap>();
     if (!bindings || !bindings->init()) {
@@ -279,7 +281,9 @@ ModuleObject::create(ExclusiveContext* cx)
 /* static */ void
 ModuleObject::finalize(js::FreeOp* fop, JSObject* obj)
 {
-    fop->delete_(&obj->as<ModuleObject>().importBindings());
+    ModuleObject* self = &obj->as<ModuleObject>();
+    if (!self->getReservedSlot(ImportBindingsSlot).isUndefined())
+        fop->delete_(&self->importBindings());
 }
 
 ModuleEnvironmentObject*
@@ -636,7 +640,6 @@ ModuleBuilder::processExport(frontend::ParseNode* pn)
 
       case PNK_VAR:
       case PNK_CONST:
-      case PNK_GLOBALCONST:
       case PNK_LET: {
           MOZ_ASSERT(kid->isArity(PN_LIST));
           for (ParseNode* var = kid->pn_head; var; var = var->pn_next) {

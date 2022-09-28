@@ -139,8 +139,6 @@ public:
         RENDER_MODE_MAX
     };
 
-    int GetScreenDepth() const;
-
     RenderMode GetRenderMode() { return mRenderMode; }
     void SetRenderMode(RenderMode rmode) { mRenderMode = rmode; }
 
@@ -214,6 +212,8 @@ public:
     virtual bool IsFontFormatSupported(nsIURI *aFontURI, uint32_t aFormatFlags);
 
     virtual bool DidRenderingDeviceReset(DeviceResetReason* aResetReason = nullptr);
+
+    mozilla::gfx::BackendType GetContentBackendFor(mozilla::layers::LayersBackend aLayers) override;
 
     // ClearType is not always enabled even when available (e.g. Windows XP)
     // if either of these prefs are enabled and apply, use ClearType rendering

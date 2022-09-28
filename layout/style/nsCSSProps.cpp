@@ -1764,9 +1764,8 @@ const KTableValue nsCSSProps::kTextDecorationStyleKTable[] = {
 const KTableValue nsCSSProps::kTextOrientationKTable[] = {
   eCSSKeyword_mixed, NS_STYLE_TEXT_ORIENTATION_MIXED,
   eCSSKeyword_upright, NS_STYLE_TEXT_ORIENTATION_UPRIGHT,
-  eCSSKeyword_sideways_right, NS_STYLE_TEXT_ORIENTATION_SIDEWAYS_RIGHT,
-  /* eCSSKeyword_sideways_left, NS_STYLE_TEXT_ORIENTATION_SIDEWAYS_LEFT, */
-  /* eCSSKeyword_sideways, NS_STYLE_TEXT_ORIENTATION_SIDEWAYS, */
+  eCSSKeyword_sideways, NS_STYLE_TEXT_ORIENTATION_SIDEWAYS,
+  eCSSKeyword_sideways_right, NS_STYLE_TEXT_ORIENTATION_SIDEWAYS,
   eCSSKeyword_UNKNOWN, -1
 };
 
@@ -1934,6 +1933,14 @@ const KTableValue nsCSSProps::kWritingModeKTable[] = {
   eCSSKeyword_horizontal_tb, NS_STYLE_WRITING_MODE_HORIZONTAL_TB,
   eCSSKeyword_vertical_lr, NS_STYLE_WRITING_MODE_VERTICAL_LR,
   eCSSKeyword_vertical_rl, NS_STYLE_WRITING_MODE_VERTICAL_RL,
+  eCSSKeyword_sideways_lr, NS_STYLE_WRITING_MODE_SIDEWAYS_LR,
+  eCSSKeyword_sideways_rl, NS_STYLE_WRITING_MODE_SIDEWAYS_RL,
+  eCSSKeyword_lr, NS_STYLE_WRITING_MODE_HORIZONTAL_TB,
+  eCSSKeyword_lr_tb, NS_STYLE_WRITING_MODE_HORIZONTAL_TB,
+  eCSSKeyword_rl, NS_STYLE_WRITING_MODE_HORIZONTAL_TB,
+  eCSSKeyword_rl_tb, NS_STYLE_WRITING_MODE_HORIZONTAL_TB,
+  eCSSKeyword_tb, NS_STYLE_WRITING_MODE_VERTICAL_RL,
+  eCSSKeyword_tb_rl, NS_STYLE_WRITING_MODE_VERTICAL_RL,
   eCSSKeyword_UNKNOWN, -1
 };
 
@@ -3001,3 +3008,5 @@ nsCSSProps::gPropertyUseCounter[eCSSProperty_COUNT_no_shorthands] = {
 #include "nsCSSPropList.h"
 #undef CSS_PROP_LOGICAL
 #undef CSS_PROP
+
+#include "nsCSSPropsGenerated.inc"

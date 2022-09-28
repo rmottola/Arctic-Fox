@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
 
 const kIMig = Ci.nsIBrowserProfileMigrator;
 const kIPStartup = Ci.nsIProfileStartup;
@@ -302,11 +302,20 @@ var MigrationWizard = {
       case "safari":
         source = "sourceNameSafari";
         break;
+      case "canary":
+        source = "sourceNameCanary";
+        break;
       case "chrome":
         source = "sourceNameChrome";
         break;
+      case "chromium":
+        source = "sourceNameChromium";
+        break;
       case "firefox":
         source = "sourceNameFirefox";
+        break;
+      case "360se":
+        source = "sourceName360se";
         break;
     }
 

@@ -14,16 +14,17 @@
 
 #include "js/Conversions.h"
 
-// This macro should be "1" if the compiler being used supports built-in
-// functions like __builtin_sadd_overflow.
+
+// This macro is should be `one' if current compiler supports builtin functions
+// like __builtin_sadd_overflow.
 #if __GNUC__ >= 5
     // GCC 5 and above supports these functions.
-	#define BUILTIN_CHECKED_ARITHMETIC_SUPPORTED(x) 1
+    #define BUILTIN_CHECKED_ARITHMETIC_SUPPORTED(x) 1
 #else
-	// For CLANG, we can use its own function to check for this.
+    // For CLANG, we use its own function to check for this.
     #ifdef __has_builtin
-	    #define BUILTIN_CHECKED_ARITHMETIC_SUPPORTED(x) __has_builtin(x)
-	#endif
+        #define BUILTIN_CHECKED_ARITHMETIC_SUPPORTED(x) __has_builtin(x)
+    #endif
 #endif
 #ifndef BUILTIN_CHECKED_ARITHMETIC_SUPPORTED
     #define BUILTIN_CHECKED_ARITHMETIC_SUPPORTED(x) 0
@@ -278,8 +279,8 @@ inline bool
 SafeAdd(int32_t one, int32_t two, int32_t* res)
 {
 #if BUILTIN_CHECKED_ARITHMETIC_SUPPORTED(__builtin_sadd_overflow)
-    // Use the compiler's builtin function.
-	return !__builtin_sadd_overflow(one, two, res);
+    // Using compiler's builtin function.
+    return !__builtin_sadd_overflow(one, two, res);
 #else
     // Use unsigned for the 32-bit operation since signed overflow gets
     // undefined behavior.

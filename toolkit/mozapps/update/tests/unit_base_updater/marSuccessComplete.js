@@ -21,30 +21,21 @@ function run_test() {
   }
 
   createUpdaterINI();
+  setAppBundleModTime();
 
-  // For Mac OS X set the last modified time for the root directory to a date in
-  // the past to test that the last modified time is updated on a successful
-  // update (bug 600098).
-  if (IS_MACOSX) {
-    let now = Date.now();
-    let yesterday = now - (1000 * 60 * 60 * 24);
-    let applyToDir = getApplyDirFile();
-    applyToDir.lastModifiedTime = yesterday;
-  }
-
-  runUpdate(0, STATE_SUCCEEDED);
+  runUpdate(0, STATE_SUCCEEDED, checkUpdateFinished);
 }
 
 /**
  * Checks if the post update binary was properly launched for the platforms that
  * support launching post update process.
  */
-function checkUpdateApplied() {
+function checkUpdateFinished() {
   if (IS_WIN || IS_MACOSX) {
-    gCheckFunc = finishCheckUpdateApplied;
+    gCheckFunc = finishCheckUpdateFinished;
     checkPostUpdateAppLog();
   } else {
-    finishCheckUpdateApplied();
+    finishCheckUpdateFinished();
   }
 }
 

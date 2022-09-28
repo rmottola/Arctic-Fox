@@ -31,19 +31,30 @@ function nativeHorizontalWheelEventMsg() {
   throw "Native wheel events not supported on platform " + getPlatform();
 }
 
+// Convert (aX, aY), in CSS pixels relative to aElement's bounding rect,
+// to device pixels relative to aElement's containing window.
+function coordinatesRelativeToWindow(aX, aY, aElement) {
+  var targetWindow = aElement.ownerDocument.defaultView;
+  var scale = targetWindow.devicePixelRatio;
+  var rect = aElement.getBoundingClientRect();
+  return {
+    x: targetWindow.mozInnerScreenX + ((rect.left + aX) * scale),
+    y: targetWindow.mozInnerScreenY + ((rect.top + aY) * scale)
+  };
+}
+
 // Synthesizes a native mousewheel event and returns immediately. This does not
 // guarantee anything; you probably want to use one of the other functions below
 // which actually wait for results.
 // aX and aY are relative to |window|'s top-left. aDeltaX and aDeltaY
 // are pixel deltas, and aObserver can be left undefined if not needed.
 function synthesizeNativeWheel(aElement, aX, aY, aDeltaX, aDeltaY, aObserver) {
-  aX += window.mozInnerScreenX;
-  aY += window.mozInnerScreenY;
+  var pt = coordinatesRelativeToWindow(aX, aY, aElement);
   if (aDeltaX && aDeltaY) {
     throw "Simultaneous wheeling of horizontal and vertical is not supported on all platforms.";
   }
   var msg = aDeltaX ? nativeHorizontalWheelEventMsg() : nativeVerticalWheelEventMsg();
-  _getDOMWindowUtils().sendNativeMouseScrollEvent(aX, aY, msg, aDeltaX, aDeltaY, 0, 0, 0, aElement, aObserver);
+  _getDOMWindowUtils().sendNativeMouseScrollEvent(pt.x, pt.y, msg, aDeltaX, aDeltaY, 0, 0, 0, aElement, aObserver);
   return true;
 }
 
@@ -85,18 +96,34 @@ function synthesizeNativeWheelAndWaitForScrollEvent(aElement, aX, aY, aDeltaX, a
   return synthesizeNativeWheel(aElement, aX, aY, aDeltaX, aDeltaY);
 }
 
+// Synthesizes a native mouse move event and returns immediately.
+// aX and aY are relative to the top-left of |aElement|'s containing window.
+function synthesizeNativeMouseMove(aElement, aX, aY) {
+  var pt = coordinatesRelativeToWindow(aX, aY, aElement);
+  _getDOMWindowUtils().sendNativeMouseEvent(pt.x, pt.y, nativeMouseMoveEventMsg(), 0, aElement);
+  return true;
+}
+
+// Synthesizes a native mouse move event and invokes the callback once the
+// mouse move event is dispatched to |aElement|'s containing window. If the event
+// targets content in a subdocument, |aElement| should be inside the
+// subdocument. See synthesizeNativeMouseMove for details on the other
+// parameters.
+function synthesizeNativeMouseMoveAndWaitForMoveEvent(aElement, aX, aY, aCallback) {
+  var targetWindow = aElement.ownerDocument.defaultView;
+  targetWindow.addEventListener("mousemove", function mousemoveWaiter(e) {
+    targetWindow.removeEventListener("mousemove", mousemoveWaiter);
+    setTimeout(aCallback, 0);
+  });
+  return synthesizeNativeMouseMove(aElement, aX, aY);
+}
+
 // Synthesizes a native touch event and dispatches it. aX and aY in CSS pixels
 // relative to the top-left of |aElement|'s bounding rect.
 function synthesizeNativeTouch(aElement, aX, aY, aType, aObserver = null, aTouchId = 0) {
-  var targetWindow = aElement.ownerDocument.defaultView;
-
-  var scale = targetWindow.devicePixelRatio;
-  var rect = aElement.getBoundingClientRect();
-  var x = targetWindow.mozInnerScreenX + ((rect.left + aX) * scale);
-  var y = targetWindow.mozInnerScreenY + ((rect.top + aY) * scale);
-
-  var utils = SpecialPowers.getDOMWindowUtils(targetWindow);
-  utils.sendNativeTouchPoint(aTouchId, aType, x, y, 1, 90, aObserver);
+  var pt = coordinatesRelativeToWindow(aX, aY, aElement);
+  var utils = SpecialPowers.getDOMWindowUtils(aElement.ownerDocument.defaultView);
+  utils.sendNativeTouchPoint(aTouchId, aType, pt.x, pt.y, 1, 90, aObserver);
   return true;
 }
 

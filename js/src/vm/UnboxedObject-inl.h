@@ -82,7 +82,7 @@ SetUnboxedValueNoTypeChange(JSObject* unboxedObject,
         JSObject* obj = v.toObjectOrNull();
         if (IsInsideNursery(obj) && !IsInsideNursery(unboxedObject)) {
             JSRuntime* rt = unboxedObject->runtimeFromMainThread();
-            rt->gc.storeBuffer.putWholeCellFromMainThread(unboxedObject);
+            rt->gc.storeBuffer.putWholeCell(unboxedObject);
         }
 
         if (preBarrier)
@@ -146,7 +146,7 @@ SetUnboxedValue(ExclusiveContext* cx, JSObject* unboxedObject, jsid id,
             JSObject* obj = v.toObjectOrNull();
             if (IsInsideNursery(v.toObjectOrNull()) && !IsInsideNursery(unboxedObject)) {
                 JSRuntime* rt = unboxedObject->runtimeFromMainThread();
-                rt->gc.storeBuffer.putWholeCellFromMainThread(unboxedObject);
+                rt->gc.storeBuffer.putWholeCell(unboxedObject);
             }
 
             if (preBarrier)
@@ -195,7 +195,6 @@ UnboxedArrayObject::setLength(ExclusiveContext* cx, uint32_t length)
 inline void
 UnboxedArrayObject::setInitializedLength(uint32_t initlen)
 {
-    MOZ_ASSERT(initlen <= InitializedLengthMask);
     if (initlen < initializedLength()) {
         switch (elementType()) {
           case JSVAL_TYPE_STRING:
@@ -210,8 +209,7 @@ UnboxedArrayObject::setInitializedLength(uint32_t initlen)
             MOZ_ASSERT(!UnboxedTypeNeedsPreBarrier(elementType()));
         }
     }
-    capacityIndexAndInitializedLength_ =
-        (capacityIndexAndInitializedLength_ & CapacityMask) | initlen;
+    setInitializedLengthNoBarrier(initlen);
 }
 
 template <JSValueType Type>
@@ -541,7 +539,7 @@ SetOrExtendBoxedOrUnboxedDenseElements(ExclusiveContext* cx, JSObject* obj,
         } else {
             for (; i < count; i++) {
                 if (!nobj->initElementSpecific<Type>(cx, start + i, vp[i])) {
-                    nobj->setInitializedLength(oldInitlen);
+                    nobj->setInitializedLengthNoBarrier(oldInitlen);
                     return DenseElementResult::Incomplete;
                 }
             }
@@ -619,7 +617,7 @@ CopyBoxedOrUnboxedDenseElements(JSContext* cx, JSObject* dst, JSObject* src,
 
         // Add a store buffer entry if we might have copied a nursery pointer to dst.
         if (UnboxedTypeNeedsPostBarrier(DstType) && !IsInsideNursery(dst))
-            dst->runtimeFromMainThread()->gc.storeBuffer.putWholeCellFromMainThread(dst);
+            dst->runtimeFromMainThread()->gc.storeBuffer.putWholeCell(dst);
     } else if (DstType == JSVAL_TYPE_DOUBLE && SrcType == JSVAL_TYPE_INT32) {
         uint8_t* dstData = dst->as<UnboxedArrayObject>().elements();
         uint8_t* srcData = src->as<UnboxedArrayObject>().elements();

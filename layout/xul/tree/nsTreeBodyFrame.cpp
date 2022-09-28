@@ -3249,7 +3249,8 @@ nsTreeBodyFrame::PaintCell(int32_t              aRowIndex,
                  pc->AppUnitsToGfxUnits(lineY + mRowHeight / 2));
         Point p2(pc->AppUnitsToGfxUnits(destX),
                  pc->AppUnitsToGfxUnits(lineY + mRowHeight / 2));
-        SnapLineToDevicePixelsForStroking(p1, p2, *drawTarget);
+        SnapLineToDevicePixelsForStroking(p1, p2, *drawTarget,
+                                          strokeOptions.mLineWidth);
         drawTarget->StrokeLine(p1, p2, colorPatt, strokeOptions);
       }
 
@@ -3270,7 +3271,8 @@ nsTreeBodyFrame::PaintCell(int32_t              aRowIndex,
             else if (i == level)
               p2.y = pc->AppUnitsToGfxUnits(lineY + mRowHeight / 2);
 
-            SnapLineToDevicePixelsForStroking(p1, p2, *drawTarget);
+            SnapLineToDevicePixelsForStroking(p1, p2, *drawTarget,
+                                              strokeOptions.mLineWidth);
             drawTarget->StrokeLine(p1, p2, colorPatt, strokeOptions);
           }          
         }
@@ -3416,11 +3418,11 @@ nsTreeBodyFrame::PaintTwisty(int32_t              aRowIndex,
         if (imageSize.height < twistyRect.height) {
           pt.y += (twistyRect.height - imageSize.height)/2;
         }
-          
+
         // Paint the image.
-        nsLayoutUtils::DrawSingleUnscaledImage(*aRenderingContext.ThebesContext(),
-            aPresContext, image,
-            GraphicsFilter::FILTER_NEAREST, pt, &aDirtyRect,
+        nsLayoutUtils::DrawSingleUnscaledImage(
+            *aRenderingContext.ThebesContext(), aPresContext, image,
+            Filter::POINT, pt, &aDirtyRect,
             imgIContainer::FLAG_NONE, &imageSize);
       }
     }
@@ -3687,7 +3689,7 @@ nsTreeBodyFrame::PaintText(int32_t              aRowIndex,
     ctx->PushGroup(gfxContentType::COLOR_ALPHA);
   }
 
-  ctx->SetColor(textContext->StyleColor()->mColor);
+  ctx->SetColor(Color::FromABGR(textContext->StyleColor()->mColor));
   nsLayoutUtils::DrawString(this, *fontMet, &aRenderingContext, text.get(),
                             text.Length(),
                             textRect.TopLeft() + nsPoint(0, baseline),
@@ -3759,7 +3761,7 @@ nsTreeBodyFrame::PaintCheckbox(int32_t              aRowIndex,
     // Paint the image.
     nsLayoutUtils::DrawSingleUnscaledImage(*aRenderingContext.ThebesContext(),
         aPresContext,
-        image, GraphicsFilter::FILTER_NEAREST, pt, &aDirtyRect,
+        image, Filter::POINT, pt, &aDirtyRect,
         imgIContainer::FLAG_NONE, &imageSize);
   }
 }

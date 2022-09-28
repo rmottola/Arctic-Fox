@@ -178,22 +178,17 @@ CompositorChild::AllocPLayerTransactionChild(const nsTArray<LayersBackend>& aBac
   return c;
 }
 
-/*static*/ PLDHashOperator
-CompositorChild::RemoveSharedMetricsForLayersId(const uint64_t& aKey,
-                                                nsAutoPtr<SharedFrameMetricsData>& aData,
-                                                void* aLayerTransactionChild)
-{
-  uint64_t childId = static_cast<LayerTransactionChild*>(aLayerTransactionChild)->GetId();
-  if (aData->GetLayersId() == childId) {
-    return PLDHashOperator::PL_DHASH_REMOVE;
-  }
-  return PLDHashOperator::PL_DHASH_NEXT;
-}
-
 bool
 CompositorChild::DeallocPLayerTransactionChild(PLayerTransactionChild* actor)
 {
-  mFrameMetricsTable.Enumerate(RemoveSharedMetricsForLayersId, actor);
+  uint64_t childId = static_cast<LayerTransactionChild*>(actor)->GetId();
+
+  for (auto iter = mFrameMetricsTable.Iter(); !iter.Done(); iter.Next()) {
+    nsAutoPtr<SharedFrameMetricsData>& data = iter.Data();
+    if (data->GetLayersId() == childId) {
+      iter.Remove();
+    }
+  }
   static_cast<LayerTransactionChild*>(actor)->ReleaseIPDLReference();
   return true;
 }
@@ -217,14 +212,14 @@ static void CalculatePluginClip(const gfx::IntRect& aBounds,
                                 bool& aPluginIsVisible)
 {
   aPluginIsVisible = true;
-  // aBounds (content origin)
-  nsIntRegion contentVisibleRegion(aBounds);
-  // aPluginClipRects (plugin widget origin)
+  nsIntRegion contentVisibleRegion;
+  // aPluginClipRects (plugin widget origin) - contains *visible* rects
   for (uint32_t idx = 0; idx < aPluginClipRects.Length(); idx++) {
     gfx::IntRect rect = aPluginClipRects[idx];
     // shift to content origin
     rect.MoveBy(aBounds.x, aBounds.y);
-    contentVisibleRegion.AndWith(rect);
+    // accumulate visible rects
+    contentVisibleRegion.OrWith(rect);
   }
   // apply layers clip (window origin)
   nsIntRegion region = aParentLayerVisibleRegion;
@@ -345,16 +340,18 @@ CompositorChild::RecvUpdatePluginVisibility(const uintptr_t& aOwnerWidget,
 }
 
 bool
-CompositorChild::RecvDidComposite(const uint64_t& aId, const uint64_t& aTransactionId)
+CompositorChild::RecvDidComposite(const uint64_t& aId, const uint64_t& aTransactionId,
+                                  const TimeStamp& aCompositeStart,
+                                  const TimeStamp& aCompositeEnd)
 {
   if (mLayerManager) {
     MOZ_ASSERT(aId == 0);
     nsRefPtr<ClientLayerManager> m = mLayerManager;
-    m->DidComposite(aTransactionId);
+    m->DidComposite(aTransactionId, aCompositeStart, aCompositeEnd);
   } else if (aId != 0) {
     nsRefPtr<dom::TabChild> child = dom::TabChild::GetFrom(aId);
     if (child) {
-      child->DidComposite(aTransactionId);
+      child->DidComposite(aTransactionId, aCompositeStart, aCompositeEnd);
     }
   }
   return true;

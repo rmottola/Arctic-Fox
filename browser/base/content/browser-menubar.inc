@@ -435,7 +435,7 @@
                openInTabs="children"
                oncommand="BookmarksEventHandler.onCommand(event, this.parentNode._placesView);"
                onclick="BookmarksEventHandler.onClick(event, this.parentNode._placesView);"
-               onpopupshowing="PlacesCommandHook.updateBookmarkAllTabsCommand();
+               onpopupshowing="BookmarkingUI.onMainMenuPopupShowing(event);
                                if (!this.parentNode._placesView)
                                  new PlacesMenu(event, 'place:folder=BOOKMARKS_MENU');"
                tooltip="bhTooltip" popupsinherittooltip="true">
@@ -451,8 +451,8 @@
 #ifndef XP_MACOSX
                 class="menuitem-iconic"
 #endif
-                label="&bookmarkThisPageCmd.label;"
                 command="Browser:AddBookmarkAs"
+                observes="bookmarkThisPageBroadcaster"
                 key="addBookmarkAsKb"/>
       <menuitem id="subscribeToPageMenuitem"
 #ifndef XP_MACOSX

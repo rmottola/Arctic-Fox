@@ -276,7 +276,7 @@ var gSanitizePromptDialog = {
       this.showItemList();
     else
       this.hideItemList();
-  }
+  },
 
 #ifdef CRH_DIALOG_TREE_VIEW
   // A duration value; used in the same context as Sanitizer.TIMESPAN_HOUR,

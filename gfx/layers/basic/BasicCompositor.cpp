@@ -71,10 +71,9 @@ BasicCompositor::BasicCompositor(nsIWidget *aWidget)
   : mWidget(aWidget)
 {
   MOZ_COUNT_CTOR(BasicCompositor);
-  SetBackend(LayersBackend::LAYERS_BASIC);
 
   mMaxTextureSize =
-    Factory::GetMaxSurfaceSize(gfxPlatform::GetPlatform()->GetContentBackend());
+    Factory::GetMaxSurfaceSize(gfxPlatform::GetPlatform()->GetContentBackendFor(LayersBackend::LAYERS_BASIC));
 }
 
 BasicCompositor::~BasicCompositor()
@@ -107,6 +106,20 @@ void BasicCompositor::Destroy()
 {
   mWidget->CleanupRemoteDrawing();
   mWidget = nullptr;
+}
+
+TextureFactoryIdentifier
+BasicCompositor::GetTextureFactoryIdentifier()
+{
+  TextureFactoryIdentifier ident(LayersBackend::LAYERS_BASIC,
+                                 XRE_GetProcessType(),
+                                 GetMaxTextureSize());
+
+  // All composition ops are supported in software.
+  for (uint8_t op = 0; op < uint8_t(CompositionOp::OP_COUNT); op++) {
+    ident.mSupportedBlendModes += CompositionOp(op);
+  }
+  return ident;
 }
 
 already_AddRefed<CompositingRenderTarget>
@@ -148,7 +161,7 @@ BasicCompositor::CreateDataTextureSource(TextureFlags aFlags)
 bool
 BasicCompositor::SupportsEffect(EffectTypes aEffect)
 {
-  return static_cast<EffectTypes>(aEffect) != EffectTypes::YCBCR;
+  return aEffect != EffectTypes::YCBCR && aEffect != EffectTypes::COMPONENT_ALPHA;
 }
 
 static void
@@ -157,7 +170,7 @@ DrawSurfaceWithTextureCoords(DrawTarget *aDest,
                              SourceSurface *aSource,
                              const gfx::Rect& aTextureCoords,
                              gfx::Filter aFilter,
-                             float aOpacity,
+                             const DrawOptions& aOptions,
                              SourceSurface *aMask,
                              const Matrix* aMaskTransform)
 {
@@ -182,7 +195,7 @@ DrawSurfaceWithTextureCoords(DrawTarget *aDest,
   gfx::Rect unitRect(0, 0, 1, 1);
   ExtendMode mode = unitRect.Contains(aTextureCoords) ? ExtendMode::CLAMP : ExtendMode::REPEAT;
 
-  FillRectWithMask(aDest, aDestRect, aSource, aFilter, DrawOptions(aOpacity),
+  FillRectWithMask(aDest, aDestRect, aSource, aFilter, aOptions,
                    mode, aMask, aMaskTransform, &matrix);
 }
 
@@ -383,13 +396,18 @@ BasicCompositor::DrawQuad(const gfx::Rect& aRect,
     maskTransform.PreTranslate(-offset.x, -offset.y);
   }
 
+  CompositionOp blendMode = CompositionOp::OP_OVER;
+  if (Effect* effect = aEffectChain.mSecondaryEffects[EffectTypes::BLEND_MODE].get()) {
+    blendMode = static_cast<EffectBlendMode*>(effect)->mBlendMode;
+  }
+
   switch (aEffectChain.mPrimaryEffect->mType) {
     case EffectTypes::SOLID_COLOR: {
       EffectSolidColor* effectSolidColor =
         static_cast<EffectSolidColor*>(aEffectChain.mPrimaryEffect.get());
 
       FillRectWithMask(dest, aRect, effectSolidColor->mColor,
-                       DrawOptions(aOpacity), sourceMask, &maskTransform);
+                       DrawOptions(aOpacity, blendMode), sourceMask, &maskTransform);
       break;
     }
     case EffectTypes::RGB: {
@@ -402,7 +420,8 @@ BasicCompositor::DrawQuad(const gfx::Rect& aRect,
                                        source->GetSurface(dest),
                                        texturedEffect->mTextureCoords,
                                        texturedEffect->mFilter,
-                                       aOpacity, sourceMask, &maskTransform);
+                                       DrawOptions(aOpacity, blendMode),
+                                       sourceMask, &maskTransform);
       } else {
           RefPtr<DataSourceSurface> srcData = source->GetSurface(dest)->GetDataSurface();
 
@@ -414,7 +433,8 @@ BasicCompositor::DrawQuad(const gfx::Rect& aRect,
                                        premultData,
                                        texturedEffect->mTextureCoords,
                                        texturedEffect->mFilter,
-                                       aOpacity, sourceMask, &maskTransform);
+                                       DrawOptions(aOpacity, blendMode),
+                                       sourceMask, &maskTransform);
       }
       break;
     }
@@ -433,7 +453,8 @@ BasicCompositor::DrawQuad(const gfx::Rect& aRect,
                                    sourceSurf,
                                    effectRenderTarget->mTextureCoords,
                                    effectRenderTarget->mFilter,
-                                   aOpacity, sourceMask, &maskTransform);
+                                   DrawOptions(aOpacity, blendMode),
+                                   sourceMask, &maskTransform);
       break;
     }
     case EffectTypes::COMPONENT_ALPHA: {
@@ -458,6 +479,7 @@ BasicCompositor::DrawQuad(const gfx::Rect& aRect,
 #endif
         );
     if (NS_WARN_IF(!temp)) {
+      buffer->PopClip();
       return;
     }
 

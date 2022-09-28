@@ -225,6 +225,7 @@ class BaselineFrame
   private:
     Value* evalNewTargetAddress() const {
         MOZ_ASSERT(isEvalFrame());
+        MOZ_ASSERT(isFunctionFrame());
         return (Value*)(reinterpret_cast<const uint8_t*>(this) +
                         BaselineFrame::Size() +
                         offsetOfEvalNewTarget());
@@ -407,9 +408,9 @@ class BaselineFrame
     bool isNonStrictEvalFrame() const {
         return isEvalFrame() && !script()->strict();
     }
-    bool isDirectEvalFrame() const;
+    bool isNonGlobalEvalFrame() const;
     bool isNonStrictDirectEvalFrame() const {
-        return isNonStrictEvalFrame() && isDirectEvalFrame();
+        return isNonStrictEvalFrame() && isNonGlobalEvalFrame();
     }
     bool isNonEvalFunctionFrame() const {
         return isFunctionFrame() && !isEvalFrame();

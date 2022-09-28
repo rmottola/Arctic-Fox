@@ -471,7 +471,7 @@ DebuggerMemory::getOnGarbageCollection(JSContext* cx, unsigned argc, Value* vp)
 }
 
 /* static */ bool
-DebuggerMemory::setOnGarbageCollection(JSContext *cx, unsigned argc, Value *vp)
+DebuggerMemory::setOnGarbageCollection(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_DEBUGGER_MEMORY(cx, argc, vp, "(set onGarbageCollection)", args, memory);
     return Debugger::setHookImpl(cx, args, *memory->getDebugger(), Debugger::OnGarbageCollection);

@@ -169,11 +169,14 @@ interface BrowserElementPrivileged {
    CheckAnyPermissions="browser"]
   void clearMatch();
 
-  // Additional |browser:universalxss| permission is required for executeScript API
   [Throws,
    Pref="dom.mozBrowserFramesEnabled",
-   CheckAnyPermissions="browser"]
+   CheckAllPermissions="browser browser:universalxss"]
   DOMRequest executeScript(DOMString script,
                            optional BrowserElementExecuteScriptOptions options);
 
+  [Throws,
+   Pref="dom.mozBrowserFramesEnabled",
+   CheckAllPermissions="browser"]
+  DOMRequest getStructuredData();
 };

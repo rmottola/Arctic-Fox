@@ -3,7 +3,6 @@
 
 // Check that TelemetrySession notifies correctly on idle-daily.
 
-
 Cu.import("resource://testing-common/httpd.js", this);
 Cu.import("resource://gre/modules/PromiseUtils.jsm", this);
 Cu.import("resource://gre/modules/Services.jsm", this);
@@ -16,12 +15,11 @@ Cu.import("resource://gre/modules/TelemetrySend.jsm", this);
 const PREF_ENABLED = "toolkit.telemetry.enabled";
 const PREF_FHR_UPLOAD_ENABLED = "datareporting.healthreport.uploadEnabled";
 
-let gHttpServer = null;
+var gHttpServer = null;
 
 function run_test() {
   do_test_pending();
   do_get_profile();
-
 
   Services.prefs.setBoolPref(PREF_ENABLED, true);
   Services.prefs.setBoolPref(PREF_FHR_UPLOAD_ENABLED, true);

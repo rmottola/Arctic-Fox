@@ -29,6 +29,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "MatchPattern",
                                   "resource://gre/modules/MatchPattern.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
                                   "resource://gre/modules/NetUtil.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "FileUtils",
+                                  "resource://gre/modules/FileUtils.jsm");
 
 Cu.import("resource://gre/modules/ExtensionManagement.jsm");
 
@@ -44,15 +46,15 @@ ExtensionManagement.registerScript("chrome://extensions/content/ext-extension.js
 ExtensionManagement.registerScript("chrome://extensions/content/ext-webNavigation.js");
 ExtensionManagement.registerScript("chrome://extensions/content/ext-webRequest.js");
 ExtensionManagement.registerScript("chrome://extensions/content/ext-storage.js");
+ExtensionManagement.registerScript("chrome://extensions/content/ext-test.js");
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   MessageBroker,
   Messenger,
   injectAPI,
+  flushJarCache,
 } = ExtensionUtils;
-
-const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
 var scriptScope = this;
 
@@ -71,7 +73,10 @@ var Management = {
     this.initialized = true;
 
     for (let script of ExtensionManagement.getScripts()) {
-      let scope = {extensions: this, global: scriptScope};
+      let scope = {extensions: this,
+                   global: scriptScope,
+                   ExtensionPage: ExtensionPage,
+                   GlobalManager: GlobalManager};
       Services.scriptloader.loadSubScript(script, scope, "UTF-8");
 
       // Save the scope to avoid it being garbage collected.
@@ -259,7 +264,8 @@ var GlobalManager = {
 
   observe(contentWindow, topic, data) {
     function inject(extension, context) {
-      let chromeObj = Cu.createObjectIn(contentWindow, {defineAs: "chrome"});
+      let chromeObj = Cu.createObjectIn(contentWindow, {defineAs: "browser"});
+      contentWindow.wrappedJSObject.chrome = contentWindow.wrappedJSObject.browser;
       let api = Management.generateAPIs(extension, context);
       injectAPI(api, chromeObj);
     }
@@ -272,7 +278,9 @@ var GlobalManager = {
 
     if (this.docShells.has(docShell)) {
       let {extension, context} = this.docShells.get(docShell);
-      inject(extension, context);
+      if (context) {
+        inject(extension, context);
+      }
       return;
     }
 
@@ -313,6 +321,12 @@ this.Extension = function(addonData)
   uuid = uuid.substring(1, uuid.length - 1); // Strip of { and } off the UUID.
   this.uuid = uuid;
 
+  if (addonData.cleanupFile) {
+    Services.obs.addObserver(this, "xpcom-shutdown", false);
+    this.cleanupFile = addonData.cleanupFile || null;
+    delete addonData.cleanupFile;
+  }
+
   this.addonData = addonData;
   this.id = addonData.id;
   this.baseURI = Services.io.newURI("moz-extension://" + uuid, null, null);
@@ -330,10 +344,143 @@ this.Extension = function(addonData)
   this.whiteListedHosts = null;
   this.webAccessibleResources = new Set();
 
-  ExtensionManagement.startupExtension(this.uuid, this.addonData.resourceURI, this);
+  this.emitter = new EventEmitter();
+}
+
+/**
+ * This code is designed to make it easy to test a WebExtension
+ * without creating a bunch of files. Everything is contained in a
+ * single JSON blob.
+ *
+ * Properties:
+ *   "background": "<JS code>"
+ *     A script to be loaded as the background script.
+ *     The "background" section of the "manifest" property is overwritten
+ *     if this is provided.
+ *   "manifest": {...}
+ *     Contents of manifest.json
+ *   "files": {"filename1": "contents1", ...}
+ *     Data to be included as files. Can be referenced from the manifest.
+ *     If a manifest file is provided here, it takes precedence over
+ *     a generated one. Always use "/" as a directory separator.
+ *     Directories should appear here only implicitly (as a prefix
+ *     to file names)
+ *
+ * To make things easier, the value of "background" and "files"[] can
+ * be a function, which is converted to source that is run.
+ */
+this.Extension.generate = function(id, data)
+{
+  let manifest = data.manifest;
+  if (!manifest) {
+    manifest = {};
+  }
+
+  let files = data.files;
+  if (!files) {
+    files = {};
+  }
+
+  function provide(obj, keys, value, override = false) {
+    if (keys.length == 1) {
+      if (!(keys[0] in obj) || override) {
+        obj[keys[0]] = value;
+      }
+    } else {
+      if (!(keys[0] in obj)) {
+        obj[keys[0]] = {};
+      }
+      provide(obj[keys[0]], keys.slice(1), value, override);
+    }
+  }
+
+  provide(manifest, ["applications", "gecko", "id"], id);
+
+  provide(manifest, ["name"], "Generated extension");
+  provide(manifest, ["manifest_version"], 2);
+  provide(manifest, ["version"], "1.0");
+
+  if (data.background) {
+    let uuidGenerator = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
+    let bgScript = uuidGenerator.generateUUID().number + ".js";
+
+    provide(manifest, ["background", "scripts"], [bgScript], true);
+    files[bgScript] = data.background;
+  }
+
+  provide(files, ["manifest.json"], JSON.stringify(manifest));
+
+  let ZipWriter = Components.Constructor("@mozilla.org/zipwriter;1", "nsIZipWriter");
+  let zipW = new ZipWriter();
+
+  let file = FileUtils.getFile("TmpD", ["generated-extension.xpi"]);
+  file.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, FileUtils.PERMS_FILE);
+
+  const MODE_WRONLY = 0x02;
+  const MODE_TRUNCATE = 0x20;
+  zipW.open(file, MODE_WRONLY | MODE_TRUNCATE);
+
+  // Needs to be in microseconds for some reason.
+  let time = Date.now() * 1000;
+
+  function generateFile(filename) {
+    let components = filename.split("/");
+    let path = "";
+    for (let component of components.slice(0, -1)) {
+      path += component;
+      if (!zipW.hasEntry(path)) {
+        zipW.addEntryDirectory(path, time, false);
+      }
+
+      path += "/";
+    }
+  }
+
+  for (let filename in files) {
+    let script = files[filename];
+    if (typeof(script) == "function") {
+      script = "(" + script.toString() + ")()";
+    }
+
+    let stream = Cc["@mozilla.org/io/string-input-stream;1"].createInstance(Ci.nsIStringInputStream);
+    stream.data = script;
+
+    generateFile(filename);
+    zipW.addEntryStream(filename, time, 0, stream, false);
+  }
+
+  zipW.close();
+
+  flushJarCache(file);
+  Services.ppmm.broadcastAsyncMessage("Extension:FlushJarCache", {path: file.path});
+
+  let fileURI = Services.io.newFileURI(file);
+  let jarURI = Services.io.newURI("jar:" + fileURI.spec + "!/", null, null);
+
+  return new Extension({
+    id,
+    resourceURI: jarURI,
+    cleanupFile: file
+  });
 }
 
 Extension.prototype = {
+  on(hook, f) {
+    return this.emitter.on(hook, f);
+  },
+
+  off(hook, f) {
+    return this.emitter.off(hook, f);
+  },
+
+  emit(...args) {
+    return this.emitter.emit(...args);
+  },
+
+  testMessage(...args) {
+    Management.emit("test-message", this, ...args);
+  },
+
   // Representation of the extension to send to content
   // processes. This should include anything the content process might
   // need.
@@ -533,6 +680,12 @@ Extension.prototype = {
   },
 
   startup() {
+    try {
+      ExtensionManagement.startupExtension(this.uuid, this.addonData.resourceURI, this);
+    } catch (e) {
+      return Promise.reject(e);
+    }
+
     return Promise.all([this.readManifest(), this.readLocaleMessages()]).then(([manifest, messages]) => {
       if (this.hasShutdown) {
         return;
@@ -549,7 +702,33 @@ Extension.prototype = {
     }).catch(e => {
       dump(`Extension error: ${e} ${e.fileName}:${e.lineNumber}\n`);
       Cu.reportError(e);
+      throw e;
     });
+  },
+
+  cleanupGeneratedFile() {
+    if (!this.cleanupFile) {
+      return;
+    }
+
+    let file = this.cleanupFile;
+    this.cleanupFile = null;
+
+    Services.obs.removeObserver(this, "xpcom-shutdown");
+
+    let count = Services.ppmm.childCount;
+
+    Services.ppmm.addMessageListener("Extension:FlushJarCacheComplete", function listener() {
+      count--;
+      if (count == 0) {
+        // We can't delete this file until everyone using it has
+        // closed it (because Windows is dumb). So we wait for all the
+        // child processes (including the parent) to flush their JAR
+        // caches. These caches may keep the file open.
+        file.remove(false);
+      }
+    });
+    Services.ppmm.broadcastAsyncMessage("Extension:FlushJarCache", {path: file.path});
   },
 
   shutdown() {
@@ -573,10 +752,23 @@ Extension.prototype = {
     Services.ppmm.broadcastAsyncMessage("Extension:Shutdown", {id: this.id});
 
     ExtensionManagement.shutdownExtension(this.uuid);
+
+    // Clean up a generated file.
+    this.cleanupGeneratedFile();
+  },
+
+  observe(subject, topic, data) {
+    if (topic == "xpcom-shutdown") {
+      this.cleanupGeneratedFile();
+    }
   },
 
   hasPermission(perm) {
     return this.permissions.has(perm);
+  },
+
+  get name() {
+    return this.localize(this.manifest.name);
   },
 };
 

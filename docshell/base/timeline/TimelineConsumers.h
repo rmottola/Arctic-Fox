@@ -10,11 +10,16 @@
 #include "mozilla/UniquePtr.h"
 #include "mozilla/LinkedList.h"
 #include "mozilla/Vector.h"
-#include "timeline/ObservedDocShell.h"
+#include "mozilla/TimeStamp.h"
+
+#include "TimelineMarkerEnums.h"
 
 class nsDocShell;
+class nsIDocShell;
 
 namespace mozilla {
+class ObservedDocShell;
+class TimelineMarker;
 
 class TimelineConsumers
 {
@@ -30,16 +35,49 @@ public:
   static bool IsEmpty();
   static bool GetKnownDocShells(Vector<nsRefPtr<nsDocShell>>& aStore);
 
-  // Methods for adding markers to appropriate docshells. These will only add
-  // markers if the docshell is currently being observed by a timeline.
+  // Methods for adding markers relevant for particular docshells, or generic
+  // (meaning that they either can't be tied to a particular docshell, or one
+  // wasn't accessible in the part of the codebase where they're instantiated).
+
+  // These will only add markers if at least one docshell is currently being
+  // observed by a timeline. Markers tied to a particular docshell won't be
+  // created unless that docshell is specifically being currently observed.
   // See nsIDocShell::recordProfileTimelineMarkers
+
+  // These methods create a custom marker from a name and some metadata,
+  // relevant for a specific docshell.
+  static void AddMarkerForDocShell(nsDocShell* aDocShell,
+                                   const char* aName,
+                                   MarkerTracingType aTracingType);
+  static void AddMarkerForDocShell(nsIDocShell* aDocShell,
+                                   const char* aName,
+                                   MarkerTracingType aTracingType);
+
+  static void AddMarkerForDocShell(nsDocShell* aDocShell,
+                                   const char* aName,
+                                   const TimeStamp& aTime,
+                                   MarkerTracingType aTracingType);
+  static void AddMarkerForDocShell(nsIDocShell* aDocShell,
+                                   const char* aName,
+                                   const TimeStamp& aTime,
+                                   MarkerTracingType aTracingType);
+
+  // These methods register and receive ownership of an already created marker,
+  // relevant for a specific docshell.
   static void AddMarkerForDocShell(nsDocShell* aDocShell,
                                    UniquePtr<TimelineMarker>&& aMarker);
-  static void AddMarkerForDocShell(nsDocShell* aDocShell,
-                                   const char* aName, TracingMetadata aMetaData);
-  static void AddMarkerToDocShellsList(Vector<nsRefPtr<nsDocShell>>& aDocShells,
-                                       const char* aName, TracingMetadata aMetaData);
-  static void AddMarkerToAllObservedDocShells(const char* aName, TracingMetadata aMetaData);
+  static void AddMarkerForDocShell(nsIDocShell* aDocShell,
+                                   UniquePtr<TimelineMarker>&& aMarker);
+
+  // This method creates custom markers, relevant for a list of docshells.
+  static void AddMarkerForDocShellsList(Vector<nsRefPtr<nsDocShell>>& aDocShells,
+                                        const char* aName,
+                                        MarkerTracingType aTracingType);
+
+  // This method creates custom markers, none of which have to be tied to a
+  // particular docshell.
+  static void AddMarkerForAllObservedDocShells(const char* aName,
+                                               MarkerTracingType aTracingType);
 };
 
 } // namespace mozilla

@@ -21,6 +21,7 @@
 #include "nsThreadUtils.h"
 
 #include "BackgroundFileSaver.h"
+#include "mozilla/Telemetry.h"
 
 #ifdef XP_WIN
 #include <windows.h>
@@ -84,6 +85,7 @@ private:
 //// BackgroundFileSaver
 
 uint32_t BackgroundFileSaver::sThreadCount = 0;
+uint32_t BackgroundFileSaver::sTelemetryMaxThreadCount = 0;
 
 BackgroundFileSaver::BackgroundFileSaver()
 : mControlThread(nullptr)
@@ -157,6 +159,11 @@ BackgroundFileSaver::Init()
 
   rv = NS_NewThread(getter_AddRefs(mWorkerThread));
   NS_ENSURE_SUCCESS(rv, rv);
+
+  sThreadCount++;
+  if (sThreadCount > sTelemetryMaxThreadCount) {
+    sTelemetryMaxThreadCount = sThreadCount;
+  }
 
   return NS_OK;
 }
@@ -504,16 +511,10 @@ BackgroundFileSaver::ProcessStateChange()
         NS_ENSURE_SUCCESS(rv, rv);
       }
 
-      // We should not only update the mActualTarget with renameTarget when
-      // they point to the different files.
-      // In this way, if mActualTarget and renamedTarget point to the same file
-      // with different addresses, "CheckCompletion()" will return false forever.
+      // Now we can update the actual target file name.
+      mActualTarget = renamedTarget;
+      mActualTargetKeepPartial = renamedTargetKeepPartial;
     }
-
-    // Update mActualTarget with renameTarget,
-    // even if they point to the same file.
-    mActualTarget = renamedTarget;
-    mActualTargetKeepPartial = renamedTargetKeepPartial;
   }
 
   // Notify if the target file name actually changed.
@@ -797,6 +798,16 @@ BackgroundFileSaver::NotifySaveComplete()
   mWorkerThread->Shutdown();
 
   sThreadCount--;
+
+  // When there are no more active downloads, we consider the download session
+  // finished. We record the maximum number of concurrent downloads reached
+  // during the session in a telemetry histogram, and we reset the maximum
+  // thread counter for the next download session
+  if (sThreadCount == 0) {
+    Telemetry::Accumulate(Telemetry::BACKGROUNDFILESAVER_THREAD_COUNT,
+                          sTelemetryMaxThreadCount);
+    sTelemetryMaxThreadCount = 0;
+  }
 
   return NS_OK;
 }

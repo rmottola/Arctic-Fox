@@ -301,6 +301,10 @@ pref("browser.urlbar.suggest.bookmark",             true);
 pref("browser.urlbar.suggest.openpage",             true);
 pref("browser.urlbar.suggest.searches",             true);
 
+// Limit the number of characters sent to the current search engine to fetch
+// suggestions.
+pref("browser.urlbar.maxCharsForSearchSuggestions", 20);
+
 // Restrictions to current suggestions can also be applied (intersection).
 // Typed suggestion works only if history is set to true.
 pref("browser.urlbar.suggest.history.onlyTyped",    false);
@@ -949,7 +953,12 @@ pref("browser.tabs.remote.desktopbehavior", true);
 // This will require a restart.
 pref("security.sandbox.windows.log", false);
 
+#if defined(_AMD64_)
+// The lines in PluginModuleParent.cpp should be changed in line with this.
+pref("dom.ipc.plugins.sandbox-level.flash", 2);
+#else
 pref("dom.ipc.plugins.sandbox-level.flash", 0);
+#endif
 
 #if defined(MOZ_CONTENT_SANDBOX)
 // This controls the strength of the Windows content process sandbox for testing
@@ -1161,7 +1170,8 @@ pref("devtools.performance.enabled", true);
 // The default Performance UI settings
 pref("devtools.performance.memory.sample-probability", "0.05");
 pref("devtools.performance.memory.max-log-length", 2147483647); // Math.pow(2,31) - 1
-pref("devtools.performance.timeline.hidden-markers", "[]");
+pref("devtools.performance.timeline.hidden-markers",
+  "[\"Composite\",\"CompositeForwardTransaction\"]");
 pref("devtools.performance.profiler.buffer-size", 10000000);
 pref("devtools.performance.profiler.sample-frequency-khz", 1);
 pref("devtools.performance.ui.show-platform-data", false);

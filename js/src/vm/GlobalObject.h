@@ -27,6 +27,8 @@ InitSharedArrayBufferClass(JSContext* cx, HandleObject obj);
 
 class Debugger;
 class TypedObjectModuleObject;
+class StaticBlockObject;
+class ClonedBlockObject;
 
 /*
  * Global object slots are reserved as follows:
@@ -91,6 +93,7 @@ class GlobalObject : public NativeObject
         FROM_BUFFER_UINT8CLAMPED,
 
         /* One-off properties stored after slots for built-ins. */
+        LEXICAL_SCOPE,
         ITERATOR_PROTO,
         ARRAY_ITERATOR_PROTO,
         STRING_ITERATOR_PROTO,
@@ -143,6 +146,8 @@ class GlobalObject : public NativeObject
 
 
   public:
+    ClonedBlockObject& lexicalScope() const;
+
     void setThrowTypeError(JSFunction* fun) {
         MOZ_ASSERT(getSlotRef(THROWTYPEERROR).isUndefined());
         setSlot(THROWTYPEERROR, ObjectValue(*fun));

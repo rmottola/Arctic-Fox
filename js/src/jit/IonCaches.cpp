@@ -1092,6 +1092,11 @@ GenerateCallGetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
     Label pop1AndFail;
     Label* maybePopAndFail = failures;
 
+    // If we're calling a getter on the global, inline the logic for the
+    // 'this' hook on the global lexical scope and manually push the global.
+    if (IsGlobalLexicalScope(obj))
+        masm.extractObject(Address(object, ScopeObject::offsetOfEnclosingScope()), object);
+
     // Save off the object register if it aliases the scratchReg
     if (spillObjReg) {
         masm.push(object);
@@ -1258,6 +1263,13 @@ IsCacheableArrayLength(JSContext* cx, HandleObject obj, HandlePropertyName name,
         // is equipped to handle that.
         return false;
     }
+
+    // The emitted stub can only handle int32 lengths. If the length of the
+    // actual object does not fit in an int32 then don't attach a stub, as if
+    // the cache is idempotent we won't end up invalidating the compiled script
+    // otherwise.
+    if (obj->as<ArrayObject>().length() > INT32_MAX)
+        return false;
 
     return true;
 }
@@ -3339,8 +3351,16 @@ SetPropertyIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex
     }
 
     // Set/Add the property on the object, the inlined cache are setup for the next execution.
-    if (!SetProperty(cx, obj, name, value, cache.strict(), cache.pc()))
-        return false;
+    if (JSOp(*cache.pc()) == JSOP_INITGLEXICAL) {
+        RootedScript script(cx);
+        jsbytecode* pc;
+        cache.getScriptedLocation(&script, &pc);
+        MOZ_ASSERT(!script->hasNonSyntacticScope());
+        InitGlobalLexicalOperation(cx, &cx->global()->lexicalScope(), script, pc, value);
+    } else {
+        if (!SetProperty(cx, obj, name, value, cache.strict(), cache.pc()))
+            return false;
+    }
 
     // A GC may have caused cache.value() to become stale as it is not traced.
     // In this case the IonScript will have been invalidated, so check for that.
@@ -3430,6 +3450,7 @@ GetElementIC::attachGetProp(JSContext* cx, HandleScript outerScript, IonScript* 
             JitSpew(JitSpew_IonIC, "GETELEM uncacheable property");
             return true;
         }
+        MOZ_ASSERT(monitoredResult());
     } else if (obj->is<UnboxedPlainObject>()) {
         MOZ_ASSERT(canCache == GetPropertyIC::CanAttachNone);
         const UnboxedLayout::Property* property =

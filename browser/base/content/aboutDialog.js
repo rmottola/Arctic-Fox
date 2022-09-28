@@ -66,6 +66,13 @@ function init(aEvent)
 
 #ifdef MOZ_UPDATER
   gAppUpdater = new appUpdater();
+
+  let defaults = Services.prefs.getDefaultBranch("");
+  let channelLabel = document.getElementById("currentChannel");
+  let currentChannelText = document.getElementById("currentChannelText");
+  channelLabel.value = UpdateUtils.UpdateChannel;
+  if (/^release($|\-)/.test(channelLabel.value))
+      currentChannelText.hidden = true;
 #endif
 
 #ifdef XP_MACOSX
@@ -88,6 +95,9 @@ function init(aEvent)
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/DownloadUtils.jsm");
 Components.utils.import("resource://gre/modules/AddonManager.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
+                                  "resource://gre/modules/UpdateUtils.jsm");
 
 var gAppUpdater;
 

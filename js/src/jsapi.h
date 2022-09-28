@@ -1149,7 +1149,8 @@ class JS_PUBLIC_API(RuntimeOptions) {
         asyncStack_(true),
         werror_(false),
         strictMode_(false),
-        extraWarnings_(false)
+        extraWarnings_(false),
+        noSuchMethod_(false)
     {
     }
 
@@ -1241,6 +1242,12 @@ class JS_PUBLIC_API(RuntimeOptions) {
         return *this;
     }
 
+    bool noSuchMethod() const { return noSuchMethod_; }
+    RuntimeOptions& setNoSuchMethod(bool flag) {
+        noSuchMethod_ = flag;
+        return *this;
+    }
+
   private:
     bool baseline_ : 1;
     bool ion_ : 1;
@@ -1252,6 +1259,7 @@ class JS_PUBLIC_API(RuntimeOptions) {
     bool werror_ : 1;
     bool strictMode_ : 1;
     bool extraWarnings_ : 1;
+    bool noSuchMethod_ : 1;
 };
 
 JS_PUBLIC_API(RuntimeOptions&)
@@ -1555,6 +1563,15 @@ JS_GetGlobalForObject(JSContext* cx, JSObject* obj);
 
 extern JS_PUBLIC_API(bool)
 JS_IsGlobalObject(JSObject* obj);
+
+extern JS_PUBLIC_API(JSObject*)
+JS_GlobalLexicalScope(JSObject* obj);
+
+extern JS_PUBLIC_API(bool)
+JS_HasExtensibleLexicalScope(JSObject* obj);
+
+extern JS_PUBLIC_API(JSObject*)
+JS_ExtensibleLexicalScope(JSObject* obj);
 
 /*
  * May return nullptr, if |c| never had a global (e.g. the atoms compartment),
@@ -1885,6 +1902,8 @@ JS_StringToId(JSContext* cx, JS::HandleString s, JS::MutableHandleId idp);
 extern JS_PUBLIC_API(bool)
 JS_IdToValue(JSContext* cx, jsid id, JS::MutableHandle<JS::Value> vp);
 
+namespace JS {
+
 /**
  * Convert obj to a primitive value. On success, store the result in vp and
  * return true.
@@ -1895,10 +1914,7 @@ JS_IdToValue(JSContext* cx, jsid id, JS::MutableHandle<JS::Value> vp);
  * Implements: ES6 7.1.1 ToPrimitive(input, [PreferredType]).
  */
 extern JS_PUBLIC_API(bool)
-JS_DefaultValue(JSContext* cx, JS::HandleObject obj, JSType hint,
-                JS::MutableHandleValue vp);
-
-namespace JS {
+ToPrimitive(JSContext* cx, JS::HandleObject obj, JSType hint, JS::MutableHandleValue vp);
 
 /**
  * If args.get(0) is one of the strings "string", "number", or "default", set
@@ -1917,8 +1933,8 @@ JS_PropertyStub(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                 JS::MutableHandleValue vp);
 
 extern JS_PUBLIC_API(bool)
-JS_StrictPropertyStub(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
-                      JS::MutableHandleValue vp, JS::ObjectOpResult &result);
+JS_StrictPropertyStub(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
+                      JS::MutableHandleValue vp, JS::ObjectOpResult& result);
 
 template<typename T>
 struct JSConstScalarSpec {
@@ -5416,9 +5432,12 @@ GetSavedFrameParent(JSContext* cx, HandleObject savedFrame, MutableHandleObject 
  * The same notes above about SavedFrame accessors applies here as well: cx
  * doesn't need to be in stack's compartment, and stack can be null, a
  * SavedFrame object, or a wrapper (CCW or Xray) around a SavedFrame object.
+ *
+ * Optional indent parameter specifies the number of white spaces to indent
+ * each line.
  */
 extern JS_PUBLIC_API(bool)
-BuildStackString(JSContext* cx, HandleObject stack, MutableHandleString stringp);
+BuildStackString(JSContext* cx, HandleObject stack, MutableHandleString stringp, size_t indent = 0);
 
 } /* namespace JS */
 

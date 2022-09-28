@@ -76,6 +76,13 @@ public:
             nsTArray<nsRefPtr<dom::BrowserElementAudioChannel>>& aAudioChannels,
             ErrorResult& aRv);
 
+  void Mute(ErrorResult& aRv);
+  void Unmute(ErrorResult& aRv);
+  already_AddRefed<dom::DOMRequest> GetMuted(ErrorResult& aRv);
+
+  void SetVolume(float aVolume , ErrorResult& aRv);
+  already_AddRefed<dom::DOMRequest> GetVolume(ErrorResult& aRv);
+
   already_AddRefed<dom::DOMRequest>
   GetScreenshot(uint32_t aWidth,
                 uint32_t aHeight,
@@ -105,8 +112,19 @@ public:
                                                   const dom::BrowserElementExecuteScriptOptions& aOptions,
                                                   ErrorResult& aRv);
 
+  already_AddRefed<dom::DOMRequest> GetStructuredData(ErrorResult& aRv);
+
   void SetNFCFocus(bool isFocus,
                    ErrorResult& aRv);
+
+  // Helper
+  static void GenerateAllowedAudioChannels(
+                 nsPIDOMWindow* aWindow,
+                 nsIFrameLoader* aFrameLoader,
+                 nsIBrowserElementAPI* aAPI,
+                 const nsAString& aManifestURL,
+                 nsTArray<nsRefPtr<dom::BrowserElementAudioChannel>>& aAudioChannels,
+                 ErrorResult& aRv);
 
 protected:
   NS_IMETHOD_(already_AddRefed<nsFrameLoader>) GetFrameLoader() = 0;

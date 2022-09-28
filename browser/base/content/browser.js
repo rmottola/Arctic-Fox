@@ -28,6 +28,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "PromiseUtils",
                                   "resource://gre/modules/PromiseUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "CharsetMenu",
                                   "resource://gre/modules/CharsetMenu.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "ShortcutUtils",
+                                  "resource://gre/modules/ShortcutUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
                                   "resource:///modules/ContentSearch.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
@@ -36,8 +38,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "Log",
                                   "resource://gre/modules/Log.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
                                   "resource://gre/modules/AppConstants.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "UpdateChannel",
-                                  "resource://gre/modules/UpdateChannel.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
+                                  "resource://gre/modules/UpdateUtils.jsm");
 XPCOMUtils.defineLazyServiceGetter(this, "Favicons",
                                    "@mozilla.org/browser/favicon-service;1",
                                    "mozIAsyncFavicons");
@@ -128,7 +130,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "Weave",
 
 XPCOMUtils.defineLazyGetter(this, "PopupNotifications", function () {
   let tmp = {};
-  Cu.import("resource:///modules/PopupNotifications.jsm", tmp);
+  Cu.import("resource://gre/modules/PopupNotifications.jsm", tmp);
   try {
     return new tmp.PopupNotifications(gBrowser,
                                       document.getElementById("notification-popup"),
@@ -157,8 +159,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
-  "resource:///modules/FormValidationHandler.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "SitePermissions",
+  "resource:///modules/SitePermissions.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
+  "resource:///modules/sessionstore/SessionStore.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "gWebRTCUI",
   "resource:///modules/webrtcUI.jsm", "webrtcUI");
@@ -170,14 +175,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "PluginCrashReporter",
   "resource:///modules/ContentCrashReporters.jsm");
 #endif
 
-XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
-  "resource:///modules/sessionstore/SessionStore.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
+  "resource:///modules/FormValidationHandler.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "SitePermissions",
-  "resource:///modules/SitePermissions.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",
-  "resource:///modules/ReaderParent.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "UITour",
+  "resource:///modules/UITour.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "CastingApps",
   "resource:///modules/CastingApps.jsm");
@@ -185,8 +187,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "CastingApps",
 XPCOMUtils.defineLazyModuleGetter(this, "SimpleServiceDiscovery",
   "resource://gre/modules/SimpleServiceDiscovery.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "UITour",
-  "resource:///modules/UITour.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",
+  "resource:///modules/ReaderParent.jsm");
 
 var gInitialPages = [
   "about:blank",
@@ -926,6 +928,7 @@ var gBrowserInit = {
     DOMLinkHandler.init();
     gPageStyleMenu.init();
     BrowserOnClick.init();
+    FeedHandler.init();
     DevEdition.init();
     AboutPrivateBrowsingListener.init();
     
@@ -1049,7 +1052,6 @@ var gBrowserInit = {
     gPrivateBrowsingUI.init();
     TabsInTitlebar.init();
     retrieveToolbarIconsizesFromTheme();
-    ToolbarIconColor.init();
 
 #ifdef XP_WIN
     if (window.matchMedia("(-moz-os-version: windows-win8)").matches &&
@@ -1068,6 +1070,8 @@ var gBrowserInit = {
       }
     }
 #endif
+
+    ToolbarIconColor.init();
 
     // Wait until chrome is painted before executing code not critical to making the window visible
     this._boundDelayedStartup = this._delayedStartup.bind(this);
@@ -1088,9 +1092,6 @@ var gBrowserInit = {
     TelemetryTimestamps.add("delayedStartupStarted");
 
     this._cancelDelayedStartup();
-
-    let uriToLoad = this._getUriToLoad();
-    var isLoadingBlank = isBlankPageURL(uriToLoad);
 
     // This pageshow listener needs to be registered before we may call
     // swapBrowsersAndCloseOther() to receive pageshow events fired by that.
@@ -1142,6 +1143,7 @@ var gBrowserInit = {
       }
     }, false, true);
 
+    let uriToLoad = this._getUriToLoad();
     if (uriToLoad && uriToLoad != "about:blank") {
       if (uriToLoad instanceof Ci.nsISupportsArray) {
         let count = uriToLoad.Count();
@@ -1237,12 +1239,19 @@ var gBrowserInit = {
       TabCrashReporter.init();
 #endif
 
+    // Initialize the full zoom setting.
+    // We do this before the session restore service gets initialized so we can
+    // apply full zoom settings to tabs restored by the session restore service.
+    FullZoom.init();
+
     SidebarUI.startDelayedLoad();
 
     UpdateUrlbarSearchSplitterState();
 
-    if (!isLoadingBlank || !focusAndSelectUrlBar())
+    if (!(isBlankPageURL(uriToLoad) || uriToLoad == "about:privatebrowsing") ||
+        !focusAndSelectUrlBar()) {
       gBrowser.selectedBrowser.focus();
+    }
 
     gNavToolbox.customizeDone = BrowserToolboxCustomizeDone;
     gNavToolbox.customizeChange = BrowserToolboxCustomizeChange;
@@ -1276,17 +1285,9 @@ var gBrowserInit = {
     if (!getBoolPref("ui.click_hold_context_menus", false))
       SetClickAndHoldHandlers();
 
-    // Initialize the full zoom setting.
-    // We do this before the session restore service gets initialized so we can
-    // apply full zoom settings to tabs restored by the session restore service.
-    FullZoom.init();
-
-    // Bug 666804 - NetworkPrioritizer support for e10s
-    if (!gMultiProcessBrowser) {
-      let NP = {};
-      Cu.import("resource:///modules/NetworkPrioritizer.jsm", NP);
-      NP.trackBrowserWindow(window);
-    }
+    let NP = {};
+    Cu.import("resource:///modules/NetworkPrioritizer.jsm", NP);
+    NP.trackBrowserWindow(window);
 
     PlacesToolbarHelper.init();
 
@@ -2461,10 +2462,12 @@ function URLBarSetURI(aURI) {
 
 function losslessDecodeURI(aURI) {
   let scheme = aURI.scheme;
-  let decodeASCIIOnly = !(/(https|http|file|ftp)/i.test(scheme));
-  
+  if (scheme == "moz-action")
+    throw new Error("losslessDecodeURI should never get a moz-action URI");
+
   var value = aURI.spec;
-  
+
+  let decodeASCIIOnly = !(/(https|http|file|ftp)/i.test(scheme));
   // Try to decode as UTF-8 if there's no encoding sequence that we would break.
   if (!/%25(?:3B|2F|3F|3A|40|26|3D|2B|24|2C|23)/i.test(value)) {
     if (decodeASCIIOnly) {
@@ -2624,7 +2627,7 @@ var BrowserOnClick = {
     let mm = window.messageManager;
     mm.addMessageListener("Browser:CertExceptionError", this);
     mm.addMessageListener("Browser:SiteBlockedError", this);
-    mm.addMessageListener("Browser:NetworkError", this);
+    mm.addMessageListener("Browser:EnableOnlineMode", this);
     mm.addMessageListener("Browser:SendSSLErrorReport", this);
     mm.addMessageListener("Browser:SetSSLErrorReportAuto", this);
   },
@@ -2633,7 +2636,7 @@ var BrowserOnClick = {
     let mm = window.messageManager;
     mm.removeMessageListener("Browser:CertExceptionError", this);
     mm.removeMessageListener("Browser:SiteBlockedError", this);
-    mm.removeMessageListener("Browser:NetworkError", this);
+    mm.removeMessageListener("Browser:EnableOnlineMode", this);
     mm.removeMessageListener("Browser:SendSSLErrorReport", this);
     mm.removeMessageListener("Browser:SetSSLErrorReportAuto", this);
   },
@@ -2646,6 +2649,9 @@ var BrowserOnClick = {
 
     let originalTarget = event.originalTarget;
     let ownerDoc = originalTarget.ownerDocument;
+    if (!ownerDoc) {
+      return;
+    }
 
     if (gMultiProcessBrowser &&
         ownerDoc.documentURI.toLowerCase() == "about:newtab") {
@@ -2664,9 +2670,12 @@ var BrowserOnClick = {
         this.onAboutBlocked(msg.data.elementId, msg.data.reason,
                             msg.data.isTopFrame, msg.data.location);
       break;
-      case "Browser:NetworkError":
-        // Reset network state, the error page will refresh on its own.
-        Services.io.offline = false;
+      case "Browser:EnableOnlineMode":
+        if (Services.io.offline) {
+          // Reset network state and refresh the page.
+          Services.io.offline = false;
+          msg.target.reload();
+        }
       break;
       case "Browser:SendSSLErrorReport":
         this.onSSLErrorReport(msg.target, msg.data.elementId,
@@ -2751,7 +2760,7 @@ var BrowserOnClick = {
       version: 1,
       build: gAppInfo.appBuildID,
       product: gAppInfo.name,
-      channel: UpdateChannel.get()
+      channel: UpdateUtils.UpdateChannel
     }
 
     let reportURL = Services.prefs.getCharPref("security.ssl.errorReporting.url");
@@ -2877,7 +2886,7 @@ var BrowserOnClick = {
    */
   onE10sAboutNewTab: function(event, ownerDoc) {
     let isTopFrame = (ownerDoc.defaultView.parent === ownerDoc.defaultView);
-    if (!isTopFrame || event.button != 0) {
+    if (!isTopFrame) {
       return;
     }
 
@@ -2886,8 +2895,72 @@ var BrowserOnClick = {
     if (anchorTarget instanceof HTMLAnchorElement &&
         anchorTarget.classList.contains("newtab-link")) {
       event.preventDefault();
-      openUILinkIn(anchorTarget.href, "current");
+      let where = whereToOpenLink(event, false, false);
+      openLinkIn(anchorTarget.href, where, { charset: ownerDoc.characterSet });
     }
+  },
+
+  ignoreWarningButton: function (reason) {
+    // Allow users to override and continue through to the site,
+    // but add a notify bar as a reminder, so that they don't lose
+    // track after, e.g., tab switching.
+    gBrowser.loadURIWithFlags(gBrowser.currentURI.spec,
+                              nsIWebNavigation.LOAD_FLAGS_BYPASS_CLASSIFIER,
+                              null, null, null);
+
+    Services.perms.add(gBrowser.currentURI, "safe-browsing",
+                       Ci.nsIPermissionManager.ALLOW_ACTION,
+                       Ci.nsIPermissionManager.EXPIRE_SESSION);
+
+    let buttons = [{
+      label: gNavigatorBundle.getString("safebrowsing.getMeOutOfHereButton.label"),
+      accessKey: gNavigatorBundle.getString("safebrowsing.getMeOutOfHereButton.accessKey"),
+      callback: function() { getMeOutOfHere(); }
+    }];
+
+    let title;
+    if (reason === 'malware') {
+      title = gNavigatorBundle.getString("safebrowsing.reportedAttackSite");
+      buttons[1] = {
+        label: gNavigatorBundle.getString("safebrowsing.notAnAttackButton.label"),
+        accessKey: gNavigatorBundle.getString("safebrowsing.notAnAttackButton.accessKey"),
+        callback: function() {
+          openUILinkIn(gSafeBrowsing.getReportURL('MalwareMistake'), 'tab');
+        }
+      };
+    } else if (reason === 'phishing') {
+      title = gNavigatorBundle.getString("safebrowsing.reportedWebForgery");
+      buttons[1] = {
+        label: gNavigatorBundle.getString("safebrowsing.notAForgeryButton.label"),
+        accessKey: gNavigatorBundle.getString("safebrowsing.notAForgeryButton.accessKey"),
+        callback: function() {
+          openUILinkIn(gSafeBrowsing.getReportURL('PhishMistake'), 'tab');
+        }
+      };
+    } else if (reason === 'unwanted') {
+      title = gNavigatorBundle.getString("safebrowsing.reportedUnwantedSite");
+      // There is no button for reporting errors since Google doesn't currently
+      // provide a URL endpoint for these reports.
+    }
+
+    let notificationBox = gBrowser.getNotificationBox();
+    let value = "blocked-badware-page";
+
+    let previousNotification = notificationBox.getNotificationWithValue(value);
+    if (previousNotification) {
+      notificationBox.removeNotification(previousNotification);
+    }
+
+    let notification = notificationBox.appendNotification(
+      title,
+      value,
+      "chrome://global/skin/icons/blacklist_favicon.png",
+      notificationBox.PRIORITY_CRITICAL_HIGH,
+      buttons
+    );
+    // Persist the notification until the user removes so it
+    // doesn't get removed on redirects.
+    notification.persistence = -1;
   },
 };
 
@@ -3221,7 +3294,7 @@ const DOMLinkHandler = {
   init: function() {
     let mm = window.messageManager;
     mm.addMessageListener("Link:AddFeed", this);
-    mm.addMessageListener("Link:AddIcon", this);
+    mm.addMessageListener("Link:SetIcon", this);
     mm.addMessageListener("Link:AddSearch", this);
   },
 
@@ -3232,8 +3305,8 @@ const DOMLinkHandler = {
         FeedHandler.addFeed(link, aMsg.target);
         break;
 
-      case "Link:AddIcon":
-        return this.addIcon(aMsg.target, aMsg.data.url);
+      case "Link:SetIcon":
+        return this.setIcon(aMsg.target, aMsg.data.url);
         break;
 
       case "Link:AddSearch":
@@ -3242,7 +3315,7 @@ const DOMLinkHandler = {
     }
   },
 
-  addIcon: function(aBrowser, aURL) {
+  setIcon: function(aBrowser, aURL) {
     if (gBrowser.isFailedIcon(aURL))
       return false;
 
@@ -3398,7 +3471,7 @@ const BrowserSearch = {
                  inBackground: inBackground,
                  relatedToCurrent: true });
 
-   return engine;
+    return engine;
   },
 
   /**
@@ -3563,7 +3636,6 @@ function FillHistoryMenu(aParent) {
         PlacesUtils.favicons.getFaviconURLForPage(entryURI, function (aURI) {
           if (aURI) {
             let iconURL = PlacesUtils.favicons.getFaviconLinkForIcon(aURI).spec;
-            iconURL = PlacesUtils.getImageURLForResolution(window, iconURL);
             item.style.listStyleImage = "url(" + iconURL + ")";
           }
         });
@@ -3985,8 +4057,7 @@ var XULBrowserWindow = {
     return this.reloadCommand = document.getElementById("Browser:Reload");
   },
   get statusTextField () {
-    delete this.statusTextField;
-    return this.statusTextField = document.getElementById("statusbar-display");
+    return gBrowser.getStatusPanel();
   },
   get isImage () {
     delete this.isImage;
@@ -4012,7 +4083,6 @@ var XULBrowserWindow = {
     delete this.throbberElement;
     delete this.stopCommand;
     delete this.reloadCommand;
-    delete this.statusTextField;
     delete this.statusText;
   },
 
@@ -4339,18 +4409,6 @@ var XULBrowserWindow = {
       } else
         disableFindCommands(false);
 
-      if (gFindBarInitialized) {
-        if (gFindBar.findMode != gFindBar.FIND_NORMAL) {
-          // Close the Find toolbar if we're in old-style TAF mode
-          gFindBar.close();
-        }
-        
-        if (!(gPrefService.getBoolPref("accessibility.typeaheadfind.highlightallremember") ||
-              gPrefService.getBoolPref("accessibility.typeaheadfind.highlightallbydefault"))) {
-            // fix bug 253793 - turn off highlight when page changes
-            gFindBar.getElement("highlight").checked = false;
-        }
-      }
     }
     UpdateBackForwardCommands(gBrowser.webNavigation);
     ReaderParent.updateReaderButton(gBrowser.selectedBrowser);
@@ -4414,6 +4472,10 @@ var XULBrowserWindow = {
 #endif
 
     this._hostChanged = false;
+
+    // Make sure the "https" part of the URL is striked out or not,
+    // depending on the current mixed active content blocking state.
+    gURLBar.formatValue();
 
     // aState is defined as a bitmask that may be extended in the future.
     // We filter out any unknown bits before testing for known values.
@@ -4810,7 +4872,9 @@ nsBrowserAccess.prototype = {
     if (aOpener && aOpener.document) {
       referrerPolicy = aOpener.document.referrerPolicy;
     }
-    let isPrivate = PrivateBrowsingUtils.isWindowPrivate(aOpener || window);
+    let isPrivate = aOpener
+                  ? PrivateBrowsingUtils.isContentWindowPrivate(aOpener)
+                  : PrivateBrowsingUtils.isWindowPrivate(window);
 
     switch (aWhere) {
       case Ci.nsIBrowserDOMWindow.OPEN_NEWWINDOW :
@@ -4875,7 +4939,14 @@ nsBrowserAccess.prototype = {
 
   isTabContentWindow: function (aWindow) {
     return gBrowser.browsers.some(function (browser) browser.contentWindow == aWindow);
-  }
+  },
+}
+
+function getTogglableToolbars() {
+  let toolbarNodes = Array.slice(gNavToolbox.childNodes);
+  toolbarNodes = toolbarNodes.concat(gNavToolbox.externalToolbars);
+  toolbarNodes = toolbarNodes.filter(node => node.getAttribute("toolbarname"));
+  return toolbarNodes;
 }
 
 function onViewToolbarsPopupShowing(aEvent, aInsertPoint) {
@@ -4892,28 +4963,24 @@ function onViewToolbarsPopupShowing(aEvent, aInsertPoint) {
 
   var firstMenuItem = aInsertPoint || popup.firstChild;
 
-  let toolbarNodes = Array.slice(gNavToolbox.childNodes);
+  let toolbarNodes = getTogglableToolbars();
 
   for (let toolbar of toolbarNodes) {
-    let toolbarName = toolbar.getAttribute("toolbarname");
-    if (toolbarName) {
-      let menuItem = document.createElement("menuitem");
-      let hidingAttribute = toolbar.getAttribute("type") == "menubar" ?
-                            "autohide" : "collapsed";
-      menuItem.setAttribute("id", "toggle_" + toolbar.id);
-      menuItem.setAttribute("toolbarId", toolbar.id);
-      menuItem.setAttribute("type", "checkbox");
-      menuItem.setAttribute("label", toolbarName);
-      menuItem.setAttribute("checked", toolbar.getAttribute(hidingAttribute) != "true");
-      if (popup.id != "appmenu_customizeMenu")
-        menuItem.setAttribute("accesskey", toolbar.getAttribute("accesskey"));
-      if (popup.id != "toolbar-context-menu")
-        menuItem.setAttribute("key", toolbar.getAttribute("key"));
+    let menuItem = document.createElement("menuitem");
+    let hidingAttribute = toolbar.getAttribute("type") == "menubar" ?
+                          "autohide" : "collapsed";
+    menuItem.setAttribute("id", "toggle_" + toolbar.id);
+    menuItem.setAttribute("toolbarId", toolbar.id);
+    menuItem.setAttribute("type", "checkbox");
+    menuItem.setAttribute("label", toolbar.getAttribute("toolbarname"));
+    menuItem.setAttribute("checked", toolbar.getAttribute(hidingAttribute) != "true");
+    menuItem.setAttribute("accesskey", toolbar.getAttribute("accesskey"));
+    if (popup.id != "toolbar-context-menu")
+      menuItem.setAttribute("key", toolbar.getAttribute("key"));
 
       popup.insertBefore(menuItem, firstMenuItem);
 
-      menuItem.addEventListener("command", onViewToolbarCommand, false);
-    }
+    menuItem.addEventListener("command", onViewToolbarCommand, false);
   }
 }
 
@@ -7150,10 +7217,14 @@ function getTabModalPromptBox(aWindow) {
 };
 
 /* DEPRECATED */
-function getBrowser() gBrowser;
-function getNavToolbox() gNavToolbox;
+function getBrowser() {
+  return gBrowser;
+}
+function getNavToolbox() {
+  return gNavToolbox;
+}
 
-let gPrivateBrowsingUI = {
+var gPrivateBrowsingUI = {
   init: function PBUI_init() {
     // Do nothing for normal windows
     if (!PrivateBrowsingUtils.isWindowPrivate(window)) {
@@ -7211,7 +7282,7 @@ let gPrivateBrowsingUI = {
   }
 };
 
-let gRemoteTabsUI = {
+var gRemoteTabsUI = {
   init: function() {
     if (window.location.href != getBrowserURL() &&
         // Also check hidden window for the Mac no-window case
@@ -7350,7 +7421,7 @@ function switchToTabHavingURI(aURI, aOpenNew, aOpenParams={}) {
   return false;
 }
 
-let RestoreLastSessionObserver = {
+var RestoreLastSessionObserver = {
   init: function () {
     if (SessionStore.canRestoreLastSession &&
         !PrivateBrowsingUtils.isWindowPrivate(window)) {
@@ -7426,6 +7497,20 @@ var TabContextMenu = {
     bookmarkAllTabs.hidden = this.contextTab.pinned;
     if (!bookmarkAllTabs.hidden)
       PlacesCommandHook.updateBookmarkAllTabsCommand();
+
+    // Hide "Move to Group" if it's a pinned tab.
+    document.getElementById("context_tabViewMenu").hidden =
+      (this.contextTab.pinned || !TabView.firstUseExperienced);
+
+    // Adjust the state of the toggle mute menu item.
+    let toggleMute = document.getElementById("context_toggleMuteTab");
+    if (this.contextTab.hasAttribute("muted")) {
+      toggleMute.label = gNavigatorBundle.getString("unmuteTab.label");
+      toggleMute.accessKey = gNavigatorBundle.getString("unmuteTab.accesskey");
+    } else {
+      toggleMute.label = gNavigatorBundle.getString("muteTab.label");
+      toggleMute.accessKey = gNavigatorBundle.getString("muteTab.accesskey");
+    }
   }
 };
 
@@ -7664,7 +7749,7 @@ function BrowserOpenNewTabOrWindow(event) {
   }
 }
 
-let ToolbarIconColor = {
+var ToolbarIconColor = {
   init: function () {
     this._initialized = true;
 

@@ -31,8 +31,14 @@ UNIFIED_SOURCES += [
     'SRIMetadata.cpp',
 ]
 
+include('/ipc/chromium/chromium-config.mozbuild')
+
 FINAL_LIBRARY = 'xul'
 LOCAL_INCLUDES += [
     '/caps',
     '/netwerk/base',
 ]
+
+if CONFIG['GNU_CC']:
+    CFLAGS += ['-Wshadow', '-Wformat-security']
+    CXXFLAGS += ['-Wshadow', '-Wformat-security']

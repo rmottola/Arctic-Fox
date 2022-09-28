@@ -13,12 +13,13 @@ var Cu = Components.utils;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/PlacesUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
                                   "resource://gre/modules/PluralForm.jsm");
 
-let navigatorBundle = Services.strings.createBundle("chrome://browser/locale/browser.properties");
-let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
+var navigatorBundle = Services.strings.createBundle("chrome://browser/locale/browser.properties");
+var ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
 
 this.RecentlyClosedTabsAndWindowsMenuUtils = {
 
@@ -45,7 +46,7 @@ this.RecentlyClosedTabsAndWindowsMenuUtils = {
         let element = doc.createElementNS(kNSXUL, aTagName);
         element.setAttribute("label", closedTabs[i].title);
         if (closedTabs[i].image) {
-          setImage(closedTabs[i], element);
+          setImage(aWindow, closedTabs[i], element);
         }
         element.setAttribute("value", i);
         if (aTagName == "menuitem") {
@@ -68,11 +69,17 @@ this.RecentlyClosedTabsAndWindowsMenuUtils = {
         fragment.appendChild(element);
       }
 
-      fragment.appendChild(doc.createElementNS(kNSXUL, "menuseparator"));
-      let restoreAllTabs = fragment.appendChild(doc.createElementNS(kNSXUL, aTagName));
-      restoreAllTabs.setAttribute("label", navigatorBundle.GetStringFromName("menuRestoreAllTabs.label"));
+      let restoreAllTabs = doc.createElementNS(kNSXUL, aTagName);
+      restoreAllTabs.classList.add("restoreallitem");
+      restoreAllTabs.setAttribute("label", navigatorBundle.GetStringFromName(aRestoreAllLabel));
       restoreAllTabs.setAttribute("oncommand",
               "for (var i = 0; i < " + closedTabs.length + "; i++) undoCloseTab();");
+      if (!aPrefixRestoreAll) {
+        fragment.appendChild(doc.createElementNS(kNSXUL, "menuseparator"));
+        fragment.appendChild(restoreAllTabs);
+      } else {
+        fragment.insertBefore(restoreAllTabs, fragment.firstChild);
+      }
     }
     return fragment;
   },
@@ -111,7 +118,7 @@ this.RecentlyClosedTabsAndWindowsMenuUtils = {
         item.setAttribute("label", menuLabel);
         let selectedTab = undoItem.tabs[undoItem.selected - 1];
         if (selectedTab.image) {
-          setImage(selectedTab, item);
+          setImage(aWindow, selectedTab, item);
         }
         if (aTagName == "menuitem") {
           item.setAttribute("class", "menuitem-iconic bookmark-item menuitem-with-favicon");
@@ -161,10 +168,11 @@ this.RecentlyClosedTabsAndWindowsMenuUtils = {
   },
 };
 
-function setImage(aItem, aElement) {
+function setImage(aWindow, aItem, aElement) {
   let iconURL = aItem.image;
   // don't initiate a connection just to fetch a favicon (see bug 467828)
   if (/^https?:/.test(iconURL))
     iconURL = "moz-anno:favicon:" + iconURL;
+
   aElement.setAttribute("image", iconURL);
 }

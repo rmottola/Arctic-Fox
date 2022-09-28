@@ -22,6 +22,7 @@
 #include "mozilla/PodOperations.h"
 
 #include "asmjs/AsmJSModule.h"
+#include "jit/AtomicOperations.h"
 #include "jit/Disassembler.h"
 #include "vm/Runtime.h"
 
@@ -201,6 +202,7 @@ class AutoSetHandlingSignal
 #elif defined(XP_DARWIN)
 # define EIP_sig(p) ((p)->uc_mcontext->__ss.__eip)
 # define RIP_sig(p) ((p)->uc_mcontext->__ss.__rip)
+# define R15_sig(p) ((p)->uc_mcontext->__ss.__pc)
 #else
 # error "Don't know how to read/write to the thread state via the mcontext_t."
 #endif
@@ -320,12 +322,20 @@ struct macos_x64_context {
     x86_float_state64_t float_;
 };
 #  define EMULATOR_CONTEXT macos_x64_context
-# else
+# elif defined(JS_CODEGEN_X86)
 struct macos_x86_context {
     x86_thread_state_t thread;
     x86_float_state_t float_;
 };
 #  define EMULATOR_CONTEXT macos_x86_context
+# elif defined(JS_CODEGEN_ARM)
+struct macos_arm_context {
+    arm_thread_state_t thread;
+    arm_neon_state_t float_;
+};
+#  define EMULATOR_CONTEXT macos_arm_context
+# else
+#  error Unsupported architecture
 # endif
 #else
 # define EMULATOR_CONTEXT CONTEXT
@@ -375,50 +385,50 @@ SetGPRegToZero(void* gp_reg)
 }
 
 MOZ_COLD static void
-SetFPRegToLoadedValue(const void* addr, size_t size, void* fp_reg)
+SetFPRegToLoadedValue(SharedMem<void*> addr, size_t size, void* fp_reg)
 {
     MOZ_RELEASE_ASSERT(size <= Simd128DataSize);
     memset(fp_reg, 0, Simd128DataSize);
-    memcpy(fp_reg, addr, size);
+    AtomicOperations::memcpySafeWhenRacy(fp_reg, addr, size);
 }
 
 MOZ_COLD static void
-SetGPRegToLoadedValue(const void* addr, size_t size, void* gp_reg)
+SetGPRegToLoadedValue(SharedMem<void*> addr, size_t size, void* gp_reg)
 {
     MOZ_RELEASE_ASSERT(size <= sizeof(void*));
     memset(gp_reg, 0, sizeof(void*));
-    memcpy(gp_reg, addr, size);
+    AtomicOperations::memcpySafeWhenRacy(gp_reg, addr, size);
 }
 
 MOZ_COLD static void
-SetGPRegToLoadedValueSext32(const void* addr, size_t size, void* gp_reg)
+SetGPRegToLoadedValueSext32(SharedMem<void*> addr, size_t size, void* gp_reg)
 {
     MOZ_RELEASE_ASSERT(size <= sizeof(int32_t));
-    int8_t msb = static_cast<const int8_t*>(addr)[size - 1];
+    int8_t msb = AtomicOperations::loadSafeWhenRacy(addr.cast<uint8_t*>() + (size - 1));
     memset(gp_reg, 0, sizeof(void*));
     memset(gp_reg, msb >> 7, sizeof(int32_t));
-    memcpy(gp_reg, addr, size);
+    AtomicOperations::memcpySafeWhenRacy(gp_reg, addr, size);
 }
 
 MOZ_COLD static void
-StoreValueFromFPReg(void* addr, size_t size, const void* fp_reg)
+StoreValueFromFPReg(SharedMem<void*> addr, size_t size, const void* fp_reg)
 {
     MOZ_RELEASE_ASSERT(size <= Simd128DataSize);
-    memcpy(addr, fp_reg, size);
+    AtomicOperations::memcpySafeWhenRacy(addr, const_cast<void*>(fp_reg), size);
 }
 
 MOZ_COLD static void
-StoreValueFromGPReg(void* addr, size_t size, const void* gp_reg)
+StoreValueFromGPReg(SharedMem<void*> addr, size_t size, const void* gp_reg)
 {
     MOZ_RELEASE_ASSERT(size <= sizeof(void*));
-    memcpy(addr, gp_reg, size);
+    AtomicOperations::memcpySafeWhenRacy(addr, const_cast<void*>(gp_reg), size);
 }
 
 MOZ_COLD static void
-StoreValueFromGPImm(void* addr, size_t size, int32_t imm)
+StoreValueFromGPImm(SharedMem<void*> addr, size_t size, int32_t imm)
 {
     MOZ_RELEASE_ASSERT(size <= sizeof(imm));
-    memcpy(addr, &imm, size);
+    AtomicOperations::memcpySafeWhenRacy(addr, static_cast<void*>(&imm), size);
 }
 
 # if !defined(XP_DARWIN)
@@ -535,7 +545,7 @@ SetRegisterToCoercedUndefined(EMULATOR_CONTEXT* context, size_t size,
 }
 
 MOZ_COLD static void
-SetRegisterToLoadedValue(EMULATOR_CONTEXT* context, const void* addr, size_t size,
+SetRegisterToLoadedValue(EMULATOR_CONTEXT* context, SharedMem<void*> addr, size_t size,
                          const Disassembler::OtherOperand& value)
 {
     if (value.kind() == Disassembler::OtherOperand::FPR)
@@ -545,14 +555,14 @@ SetRegisterToLoadedValue(EMULATOR_CONTEXT* context, const void* addr, size_t siz
 }
 
 MOZ_COLD static void
-SetRegisterToLoadedValueSext32(EMULATOR_CONTEXT* context, const void* addr, size_t size,
+SetRegisterToLoadedValueSext32(EMULATOR_CONTEXT* context, SharedMem<void*> addr, size_t size,
                                const Disassembler::OtherOperand& value)
 {
     SetGPRegToLoadedValueSext32(addr, size, AddressOfGPRegisterSlot(context, value.gpr()));
 }
 
 MOZ_COLD static void
-StoreValueFromRegister(EMULATOR_CONTEXT* context, void* addr, size_t size,
+StoreValueFromRegister(EMULATOR_CONTEXT* context, SharedMem<void*> addr, size_t size,
                        const Disassembler::OtherOperand& value)
 {
     if (value.kind() == Disassembler::OtherOperand::FPR)
@@ -572,14 +582,14 @@ ComputeAccessAddress(EMULATOR_CONTEXT* context, const Disassembler::ComplexAddre
 
     if (address.hasBase()) {
         uintptr_t base;
-        StoreValueFromGPReg(&base, sizeof(uintptr_t),
+        StoreValueFromGPReg(SharedMem<void*>::unshared(&base), sizeof(uintptr_t),
                             AddressOfGPRegisterSlot(context, address.base()));
         result += base;
     }
 
     if (address.hasIndex()) {
         uintptr_t index;
-        StoreValueFromGPReg(&index, sizeof(uintptr_t),
+        StoreValueFromGPReg(SharedMem<void*>::unshared(&index), sizeof(uintptr_t),
                             AddressOfGPRegisterSlot(context, address.index()));
         result += index * (1 << address.scale());
     }
@@ -612,13 +622,13 @@ EmulateHeapAccess(EMULATOR_CONTEXT* context, uint8_t* pc, uint8_t* faultingAddre
     MOZ_RELEASE_ASSERT(address.scale() == 0);
     if (address.hasBase()) {
         uintptr_t base;
-        StoreValueFromGPReg(&base, sizeof(uintptr_t),
+        StoreValueFromGPReg(SharedMem<void*>::unshared(&base), sizeof(uintptr_t),
                             AddressOfGPRegisterSlot(context, address.base()));
         MOZ_RELEASE_ASSERT(reinterpret_cast<uint8_t*>(base) == module.maybeHeap());
     }
     if (address.hasIndex()) {
         uintptr_t index;
-        StoreValueFromGPReg(&index, sizeof(uintptr_t),
+        StoreValueFromGPReg(SharedMem<void*>::unshared(&index), sizeof(uintptr_t),
                             AddressOfGPRegisterSlot(context, address.index()));
         MOZ_RELEASE_ASSERT(uint32_t(index) == index);
     }
@@ -653,7 +663,7 @@ EmulateHeapAccess(EMULATOR_CONTEXT* context, uint8_t* pc, uint8_t* faultingAddre
     //
     // Taking a signal is really slow, but in theory programs really shouldn't
     // be hitting this anyway.
-    intptr_t unwrappedOffset = accessAddress - module.maybeHeap();
+    intptr_t unwrappedOffset = accessAddress - module.maybeHeap().unwrap(/*safe - for value*/);
     uint32_t wrappedOffset = uint32_t(unwrappedOffset);
     size_t size = access.size();
     MOZ_RELEASE_ASSERT(wrappedOffset + size > wrappedOffset);
@@ -671,19 +681,19 @@ EmulateHeapAccess(EMULATOR_CONTEXT* context, uint8_t* pc, uint8_t* faultingAddre
         // We now know that this is an access that is actually in bounds when
         // properly wrapped. Complete the load or store with the wrapped
         // address.
-        uint8_t* wrappedAddress = module.maybeHeap() + wrappedOffset;
+        SharedMem<uint8_t*> wrappedAddress = module.maybeHeap() + wrappedOffset;
         MOZ_RELEASE_ASSERT(wrappedAddress >= module.maybeHeap());
         MOZ_RELEASE_ASSERT(wrappedAddress + size > wrappedAddress);
         MOZ_RELEASE_ASSERT(wrappedAddress + size <= module.maybeHeap() + module.heapLength());
         switch (access.kind()) {
           case Disassembler::HeapAccess::Load:
-            SetRegisterToLoadedValue(context, wrappedAddress, size, access.otherOperand());
+            SetRegisterToLoadedValue(context, wrappedAddress.cast<void*>(), size, access.otherOperand());
             break;
           case Disassembler::HeapAccess::LoadSext32:
-            SetRegisterToLoadedValueSext32(context, wrappedAddress, size, access.otherOperand());
+            SetRegisterToLoadedValueSext32(context, wrappedAddress.cast<void*>(), size, access.otherOperand());
             break;
           case Disassembler::HeapAccess::Store:
-            StoreValueFromRegister(context, wrappedAddress, size, access.otherOperand());
+            StoreValueFromRegister(context, wrappedAddress.cast<void*>(), size, access.otherOperand());
             break;
           case Disassembler::HeapAccess::Unknown:
             MOZ_CRASH("Failed to disassemble instruction");
@@ -803,10 +813,16 @@ ContextToPC(EMULATOR_CONTEXT* context)
     static_assert(sizeof(context->thread.__rip) == sizeof(void*),
                   "stored IP should be compile-time pointer-sized");
     return reinterpret_cast<uint8_t**>(&context->thread.__rip);
-# else
+# elif defined(JS_CPU_X86)
     static_assert(sizeof(context->thread.uts.ts32.__eip) == sizeof(void*),
                   "stored IP should be compile-time pointer-sized");
     return reinterpret_cast<uint8_t**>(&context->thread.uts.ts32.__eip);
+# elif defined(JS_CPU_ARM)
+    static_assert(sizeof(context->thread.__pc) == sizeof(void*),
+                  "stored IP should be compile-time pointer-sized");
+    return reinterpret_cast<uint8_t**>(&context->thread.__pc);
+# else
+#  error Unsupported architecture
 # endif
 }
 
@@ -852,11 +868,18 @@ HandleMachException(JSRuntime* rt, const ExceptionRequest& request)
     unsigned int float_state_count = x86_FLOAT_STATE64_COUNT;
     int thread_state = x86_THREAD_STATE64;
     int float_state = x86_FLOAT_STATE64;
-# else
+# elif defined(JS_CODEGEN_X86)
     unsigned int thread_state_count = x86_THREAD_STATE_COUNT;
     unsigned int float_state_count = x86_FLOAT_STATE_COUNT;
     int thread_state = x86_THREAD_STATE;
     int float_state = x86_FLOAT_STATE;
+# elif defined(JS_CODEGEN_ARM)
+    unsigned int thread_state_count = ARM_THREAD_STATE_COUNT;
+    unsigned int float_state_count = ARM_NEON_STATE_COUNT;
+    int thread_state = ARM_THREAD_STATE;
+    int float_state = ARM_NEON_STATE;
+# else
+#  error Unsupported architecture
 # endif
     kern_return_t kret;
     kret = thread_get_state(rtThread, thread_state,

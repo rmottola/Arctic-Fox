@@ -87,6 +87,7 @@
 #include "ScopedNSSTypes.h"
 #include "nsNullPrincipal.h"
 #include "nsIPackagedAppService.h"
+#include "nsIDeprecationWarner.h"
 #include "nsIDocument.h"
 #include "nsIDOMDocument.h"
 
@@ -2117,10 +2118,12 @@ nsHttpChannel::StartRedirectChannelToURI(nsIURI *upgradedURI, uint32_t flags)
 
     // Ensure that internally-redirected channels cannot be intercepted, which would look
     // like two separate requests to the nsINetworkInterceptController.
-    nsCOMPtr<nsIHttpChannelInternal> httpRedirect = do_QueryInterface(mRedirectChannel);
-    if (httpRedirect) {
-        httpRedirect->ForceNoIntercept();
-    }
+    nsLoadFlags loadFlags = nsIRequest::LOAD_NORMAL;
+    rv = mRedirectChannel->GetLoadFlags(&loadFlags);
+    NS_ENSURE_SUCCESS(rv, rv);
+    loadFlags |= nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
+    rv = mRedirectChannel->SetLoadFlags(loadFlags);
+    NS_ENSURE_SUCCESS(rv, rv);
 
     PushRedirectAsyncFunc(
         &nsHttpChannel::ContinueAsyncRedirectChannelToURI);
@@ -2932,8 +2935,7 @@ nsHttpChannel::ContinueProcessFallback(nsresult rv)
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (mLoadFlags & LOAD_INITIAL_DOCUMENT_URI) {
-        Telemetry::Accumulate(Telemetry::HTTP_OFFLINE_CACHE_DOCUMENT_LOAD,
-                              true);
+        MaybeWarnAboutAppCache();
     }
 
     // close down this channel
@@ -3733,8 +3735,7 @@ nsHttpChannel::OnOfflineCacheEntryAvailable(nsICacheEntry *aEntry,
         mCacheEntryIsWriteOnly = false;
 
         if (mLoadFlags & LOAD_INITIAL_DOCUMENT_URI && !mApplicationCacheForWrite) {
-            Telemetry::Accumulate(Telemetry::HTTP_OFFLINE_CACHE_DOCUMENT_LOAD,
-                                  true);
+            MaybeWarnAboutAppCache();
         }
 
         return NS_OK;
@@ -7111,6 +7112,7 @@ nsHttpChannel::OnPush(const nsACString &url, Http2PushedStream *pushedStream)
 void
 nsHttpChannel::SetCouldBeSynthesized()
 {
+  MOZ_ASSERT(!BypassServiceWorker());
   mResponseCouldBeSynthesized = true;
 }
 
@@ -7134,6 +7136,24 @@ nsHttpChannel::OnPreflightFailed(nsresult aError)
     CloseCacheEntry(true);
     AsyncAbort(aError);
     return NS_OK;
+}
+
+void
+nsHttpChannel::MaybeWarnAboutAppCache()
+{
+    // First, accumulate a telemetry ping about appcache usage.
+    Telemetry::Accumulate(Telemetry::HTTP_OFFLINE_CACHE_DOCUMENT_LOAD,
+                          true);
+
+    // Then, issue a deprecation warning if service worker interception is
+    // enabled.
+    if (nsContentUtils::ServiceWorkerInterceptionEnabled()) {
+        nsCOMPtr<nsIDeprecationWarner> warner;
+        GetCallback(warner);
+        if (warner) {
+            warner->IssueWarning(nsIDocument::eAppCache, false);
+        }
+    }
 }
 
 } // namespace net

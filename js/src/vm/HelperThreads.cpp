@@ -1395,10 +1395,20 @@ HelperThread::handleParseWorkload()
                                               task->exclusiveContextGlobal->runtimeFromAnyThread());
         SourceBufferHolder srcBuf(task->chars, task->length,
                                   SourceBufferHolder::NoOwnership);
-        task->script = frontend::CompileScript(task->cx, &task->alloc,
-                                               nullptr, nullptr, nullptr,
-                                               task->options,
-                                               srcBuf,
+
+        // ! WARNING WARNING WARNING !
+        //
+        // See comment in Parser::bindLexical about optimizing global lexical
+        // bindings. If we start optimizing them, passing in task->cx's
+        // global lexical scope would be incorrect!
+        //
+        // ! WARNING WARNING WARNING !
+        ExclusiveContext* parseCx = task->cx;
+        Rooted<ClonedBlockObject*> globalLexical(parseCx, &parseCx->global()->lexicalScope());
+        Rooted<ScopeObject*> staticScope(parseCx, &globalLexical->staticBlock());
+        task->script = frontend::CompileScript(parseCx, &task->alloc,
+                                               globalLexical, staticScope, nullptr,
+                                               task->options, srcBuf,
                                                /* source_ = */ nullptr,
                                                /* extraSct = */ nullptr,
                                                /* sourceObjectOut = */ &(task->sourceObject));

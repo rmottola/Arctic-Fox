@@ -21,8 +21,8 @@ const ICON_ANCHOR_ATTRIBUTE = "popupnotificationanchor";
 
 const PREF_SECURITY_DELAY = "security.notification_enable_delay";
 
-let popupNotificationsMap = new WeakMap();
-let gNotificationParents = new WeakMap;
+var popupNotificationsMap = new WeakMap();
+var gNotificationParents = new WeakMap;
 
 function getAnchorFromBrowser(aBrowser, aAnchorID) {
   let attrPrefix = aAnchorID ? aAnchorID.replace("notification-icon", "") : "";
@@ -173,7 +173,7 @@ PopupNotifications.prototype = {
   getNotification: function PopupNotifications_getNotification(id, browser) {
     let n = null;
     let notifications = this._getNotificationsForBrowser(browser || this.tabbrowser.selectedBrowser);
-    notifications.some(function(x) x.id == id && (n = x));
+    notifications.some(x => x.id == id && (n = x));
     return n;
   },
 
@@ -212,6 +212,9 @@ PopupNotifications.prototype = {
    * @param options
    *        An options JavaScript object holding additional properties for the
    *        notification. The following properties are currently supported:
+   *        origin:      A string representing the origin of the site presenting
+   *                     a notification so it can be shown to the user (possibly
+   *                     with a favicon). e.g. https://example.com:8080
    *        persistence: An integer. The notification will not automatically
    *                     dismiss for this many page loads.
    *        timeout:     A time in milliseconds. The notification will not

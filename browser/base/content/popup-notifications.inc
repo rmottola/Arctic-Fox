@@ -6,6 +6,7 @@
            position="after_start"
            hidden="true"
            orient="vertical"
+           noautofocus="true"
            role="alert"/>
 
     <popupnotification id="webRTC-shareDevices-notification" hidden="true">
@@ -67,6 +68,12 @@
       <textbox id="login-fill-filter"/>
       <richlistbox id="login-fill-list"/>
     </vbox>
+
+#ifdef E10S_TESTING_ONLY
+    <popupnotification id="enable-e10s-notification" hidden="true">
+      <popupnotificationcontent orient="vertical"/>
+    </popupnotification>
+#endif
 
     <popupnotification id="addon-progress-notification" hidden="true">
       <popupnotificationcontent orient="vertical">

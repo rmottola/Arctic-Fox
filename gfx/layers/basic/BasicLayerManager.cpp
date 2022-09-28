@@ -17,7 +17,6 @@
 #include "basic/BasicImplData.h"        // for BasicImplData
 #include "basic/BasicLayers.h"          // for BasicLayerManager, etc
 #include "gfxASurface.h"                // for gfxASurface, etc
-#include "gfxColor.h"                   // for gfxRGBA
 #include "gfxContext.h"                 // for gfxContext, etc
 #include "gfxImageSurface.h"            // for gfxImageSurface
 #include "gfxMatrix.h"                  // for gfxMatrix
@@ -425,8 +424,8 @@ ApplyDoubleBuffering(Layer* aLayer, const IntRect& aVisibleRect)
   BasicContainerLayer* container =
     static_cast<BasicContainerLayer*>(aLayer->AsContainerLayer());
   // Layers that act as their own backbuffers should be drawn to the destination
-  // using OPERATOR_SOURCE to ensure that alpha values in a transparent window
-  // are cleared. This can also be faster than OPERATOR_OVER.
+  // using OP_SOURCE to ensure that alpha values in a transparent window are
+  // cleared. This can also be faster than OP_OVER.
   if (!container) {
     data->SetOperator(CompositionOp::OP_SOURCE);
     data->SetDrawAtomically(true);
@@ -584,7 +583,7 @@ BasicLayerManager::FlashWidgetUpdateArea(gfxContext *aContext)
     float r = float(rand()) / RAND_MAX;
     float g = float(rand()) / RAND_MAX;
     float b = float(rand()) / RAND_MAX;
-    aContext->SetColor(gfxRGBA(r, g, b, 0.2));
+    aContext->SetColor(Color(r, g, b, 0.2f));
     aContext->Paint();
   }
 }
@@ -791,6 +790,7 @@ void
 BasicLayerManager::PaintSelfOrChildren(PaintLayerContext& aPaintContext,
                                        gfxContext* aGroupTarget)
 {
+  MOZ_ASSERT(aGroupTarget);
   BasicImplData* data = ToData(aPaintContext.mLayer);
 
   /* Only paint ourself, or our children - This optimization relies on this! */
@@ -845,7 +845,7 @@ BasicLayerManager::FlushGroup(PaintLayerContext& aPaintContext, bool aNeedsClipT
     }
 
     CompositionOp op = GetEffectiveOperator(aPaintContext.mLayer);
-    AutoSetOperator setOperator(aPaintContext.mTarget, ThebesOp(op));
+    AutoSetOperator setOperator(aPaintContext.mTarget, op);
 
     PaintWithMask(aPaintContext.mTarget, aPaintContext.mLayer->GetEffectiveOpacity(),
                   aPaintContext.mLayer->GetMaskLayer());
@@ -893,6 +893,8 @@ BasicLayerManager::PaintLayer(gfxContext* aTarget,
                               DrawPaintedLayerCallback aCallback,
                               void* aCallbackData)
 {
+  MOZ_ASSERT(aTarget);
+
   PROFILER_LABEL("BasicLayerManager", "PaintLayer",
     js::ProfileEntry::Category::GRAPHICS);
 
@@ -959,7 +961,7 @@ BasicLayerManager::PaintLayer(gfxContext* aTarget,
     paintLayerContext.AnnotateOpaqueRect();
   }
 
-  bool clipIsEmpty = !aTarget || aTarget->GetClipExtents().IsEmpty();
+  bool clipIsEmpty = aTarget->GetClipExtents().IsEmpty();
   if (clipIsEmpty) {
     PaintSelfOrChildren(paintLayerContext, aTarget);
     return;
@@ -1001,10 +1003,9 @@ BasicLayerManager::PaintLayer(gfxContext* aTarget,
     gfxRect destRect;
 #ifdef DEBUG
     if (aLayer->GetDebugColorIndex() != 0) {
-      gfxRGBA  color((aLayer->GetDebugColorIndex() & 1) ? 1.0 : 0.0,
-                     (aLayer->GetDebugColorIndex() & 2) ? 1.0 : 0.0,
-                     (aLayer->GetDebugColorIndex() & 4) ? 1.0 : 0.0,
-                     1.0);
+      Color color((aLayer->GetDebugColorIndex() & 1) ? 1.f : 0.f,
+                  (aLayer->GetDebugColorIndex() & 2) ? 1.f : 0.f,
+                  (aLayer->GetDebugColorIndex() & 4) ? 1.f : 0.f);
 
       nsRefPtr<gfxContext> temp = new gfxContext(untransformedDT, Point(bounds.x, bounds.y));
       temp->SetColor(color);

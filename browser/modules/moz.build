@@ -27,7 +27,6 @@ EXTRA_JS_MODULES += [
     'openLocationLastURL.jsm',
     'PageMenu.jsm',
     'PluginContent.jsm',
-    'PopupNotifications.jsm',
     'ProcessHangMonitor.jsm',
     'QuotaManager.jsm',
     'ReaderParent.jsm',

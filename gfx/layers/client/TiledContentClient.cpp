@@ -46,7 +46,7 @@ static void DrawDebugOverlay(mozilla::gfx::DrawTarget* dt, int x, int y, int wid
 
   // Draw border
   c.NewPath();
-  c.SetDeviceColor(gfxRGBA(0.0, 0.0, 0.0, 1.0));
+  c.SetDeviceColor(Color(0.f, 0.f, 0.f));
   c.Rectangle(gfxRect(0, 0, width, height));
   c.Stroke();
 
@@ -63,12 +63,12 @@ static void DrawDebugOverlay(mozilla::gfx::DrawTarget* dt, int x, int y, int wid
   int textWidth = extents.width + 6;
 
   c.NewPath();
-  c.SetDeviceColor(gfxRGBA(0.0, 0.0, 0.0, 1.0));
+  c.SetDeviceColor(Color(0.f, 0.f, 0.f));
   c.Rectangle(gfxRect(gfxPoint(2,2),gfxSize(textWidth, 30)));
   c.Fill();
 
   c.NewPath();
-  c.SetDeviceColor(gfxRGBA(1.0, 0.0, 0.0, 1.0));
+  c.SetDeviceColor(Color(1.0, 0.0, 0.0));
   c.Rectangle(gfxRect(gfxPoint(2,2),gfxSize(textWidth, 30)));
   c.Stroke();
 
@@ -89,7 +89,7 @@ namespace layers {
 
 MultiTiledContentClient::MultiTiledContentClient(ClientTiledPaintedLayer* aPaintedLayer,
                                                  ClientLayerManager* aManager)
-  : TiledContentClient(aManager)
+  : TiledContentClient(aManager, "Multi")
 {
   MOZ_COUNT_CTOR(MultiTiledContentClient);
 
@@ -1669,7 +1669,7 @@ void
 TiledContentClient::PrintInfo(std::stringstream& aStream, const char* aPrefix)
 {
   aStream << aPrefix;
-  aStream << nsPrintfCString("TiledContentClient (0x%p)", this).get();
+  aStream << nsPrintfCString("%sTiledContentClient (0x%p)", mName, this).get();
 
   if (profiler_feature_active("displaylistdump")) {
     nsAutoCString pfx(aPrefix);
@@ -1682,9 +1682,10 @@ TiledContentClient::PrintInfo(std::stringstream& aStream, const char* aPrefix)
 void
 TiledContentClient::Dump(std::stringstream& aStream,
                          const char* aPrefix,
-                         bool aDumpHtml)
+                         bool aDumpHtml,
+                         TextureDumpMode aCompress)
 {
-  GetTiledBuffer()->Dump(aStream, aPrefix, aDumpHtml);
+  GetTiledBuffer()->Dump(aStream, aPrefix, aDumpHtml, aCompress);
 }
 
 void

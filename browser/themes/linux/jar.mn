@@ -81,7 +81,6 @@ browser.jar:
   skin/classic/browser/feeds/subscribe.css            (feeds/subscribe.css)
   skin/classic/browser/feeds/subscribe-ui.css         (feeds/subscribe-ui.css)
   skin/classic/browser/newtab/newTab.css              (newtab/newTab.css)
-  skin/classic/browser/newtab/controls.png            (newtab/controls.png)
   skin/classic/browser/newtab/noise.png               (newtab/noise.png)
   skin/classic/browser/places/bookmarksMenu.png       (places/bookmarksMenu.png)
   skin/classic/browser/places/bookmarksToolbar.png    (places/bookmarksToolbar.png)

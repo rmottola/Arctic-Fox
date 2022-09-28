@@ -219,7 +219,7 @@ var FullZoom = {
     let ctxt = this._loadContextFromBrowser(browser);
     let token = this._getBrowserToken(browser);
     this._cps2.getByDomainAndName(browser.currentURI.spec, this.name, ctxt, {
-      handleResult: function () hasPref = true,
+      handleResult: function () { hasPref = true; },
       handleCompletion: function () {
         if (!hasPref && token.isCurrent)
           this._applyPrefToZoom(undefined, browser);
@@ -291,7 +291,7 @@ var FullZoom = {
     let value = undefined;
     let token = this._getBrowserToken(browser);
     this._cps2.getByDomainAndName(aURI.spec, this.name, ctxt, {
-      handleResult: function (resultPref) value = resultPref.value,
+      handleResult: function (resultPref) { value = resultPref.value; },
       handleCompletion: function () {
         if (!token.isCurrent) {
           this._notifyOnLocationChange();
@@ -345,6 +345,11 @@ var FullZoom = {
       if (token.isCurrent) {
         ZoomManager.setZoomForBrowser(browser, value === undefined ? 1 : value);
         this._ignorePendingZoomAccesses(browser);
+        this._executeSoon(function () {
+          // _getGlobalValue may be either sync or async, so notify asyncly so
+          // observers are guaranteed consistent behavior.
+          Services.obs.notifyObservers(null, "browser-fullZoom:zoomReset", "");
+        });
       }
     });
     this._removePref(browser);
@@ -524,7 +529,7 @@ var FullZoom = {
     }
     let value = undefined;
     this._cps2.getGlobal(this.name, this._loadContextFromBrowser(browser), {
-      handleResult: function (pref) value = pref.value,
+      handleResult: function (pref) { value = pref.value; },
       handleCompletion: function (reason) {
         this._globalValue = this._ensureValid(value);
         callback.call(this, this._globalValue);

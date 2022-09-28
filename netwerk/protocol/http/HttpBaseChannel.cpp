@@ -78,7 +78,6 @@ HttpBaseChannel::HttpBaseChannel()
   , mAllRedirectsSameOrigin(true)
   , mAllRedirectsPassTimingAllowCheck(true)
   , mResponseCouldBeSynthesized(false)
-  , mForceNoIntercept(false)
   , mAllowStaleCacheContent(false)
   , mSuspendCount(0)
   , mInitialRwin(0)
@@ -1607,6 +1606,8 @@ HttpBaseChannel::OverrideSecurityInfo(nsISupports* aSecurityInfo)
              "This can only be called when we don't have a security info object already");
   MOZ_RELEASE_ASSERT(aSecurityInfo,
                      "This can only be called with a valid security info object");
+  MOZ_ASSERT(!BypassServiceWorker(),
+             "This can only be called on channels that are not bypassing interception");
   MOZ_ASSERT(mResponseCouldBeSynthesized,
              "This can only be called on channels that can be intercepted");
   if (mSecurityInfo) {
@@ -2171,14 +2172,6 @@ HttpBaseChannel::GetLastModifiedTime(PRTime* lastModifiedTime)
 }
 
 NS_IMETHODIMP
-HttpBaseChannel::ForceNoIntercept()
-{
-  mForceNoIntercept = true;
-  mResponseCouldBeSynthesized = false;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 HttpBaseChannel::GetCorsIncludeCredentials(bool* aInclude)
 {
   *aInclude = mCorsIncludeCredentials;
@@ -2319,12 +2312,18 @@ HttpBaseChannel::IsNavigation()
 }
 
 bool
+HttpBaseChannel::BypassServiceWorker() const
+{
+  return mLoadFlags & LOAD_BYPASS_SERVICE_WORKER;
+}
+
+bool
 HttpBaseChannel::ShouldIntercept()
 {
   nsCOMPtr<nsINetworkInterceptController> controller;
   GetCallback(controller);
   bool shouldIntercept = false;
-  if (controller && !mForceNoIntercept && mLoadInfo) {
+  if (controller && !BypassServiceWorker() && mLoadInfo) {
     nsContentPolicyType type = mLoadInfo->InternalContentPolicyType();
     nsresult rv = controller->ShouldPrepareForIntercept(mURI,
                                                         IsNavigation(),
@@ -2604,11 +2603,6 @@ HttpBaseChannel::SetupReplacementChannel(nsIURI       *newURI,
         LOG(("HttpBaseChannel::SetupReplacementChannel "
              "[this=%p] transferring chain of redirect cache-keys", this));
         httpInternal->SetCacheKeysRedirectChain(mRedirectedCachekeys.forget());
-    }
-
-    // Preserve any skip-serviceworker-flag.
-    if (mForceNoIntercept) {
-      httpInternal->ForceNoIntercept();
     }
 
     // Preserve CORS mode flag.

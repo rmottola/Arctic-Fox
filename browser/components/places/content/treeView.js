@@ -21,7 +21,17 @@ function PlacesTreeView(aFlatList, aOnOpenFlatContainer, aController) {
 }
 
 PlacesTreeView.prototype = {
-  get wrappedJSObject() this,
+  get wrappedJSObject() {
+    return this;
+  },
+
+  __xulStore: null,
+  get _xulStore() {
+    if (!this.__xulStore) {
+      this.__xulStore = Cc["@mozilla.org/xul/xulstore;1"].getService(Ci.nsIXULStore);
+    }
+    return this.__xulStore;
+  },
 
   __dateService: null,
   get _dateService() {
@@ -308,11 +318,14 @@ PlacesTreeView.prototype = {
       if (!this._flatList &&
           curChild instanceof Ci.nsINavHistoryContainerResultNode &&
           !this._controller.hasCachedLivemarkInfo(curChild)) {
-        let resource = this._getResourceForNode(curChild);
-        let isopen = resource != null &&
-                     PlacesUIUtils.localStore.HasAssertion(resource,
-                                                           openLiteral,
-                                                           trueLiteral, true);
+        let uri = curChild.uri;
+        let isopen = false;
+
+        if (uri) {
+          let val = this._xulStore.getValue(document.documentURI, uri, "open");
+          isopen = (val == "true");
+        }
+
         if (isopen != curChild.containerOpen)
           aToOpen.push(curChild);
         else if (curChild.containerOpen && curChild.childCount > 0)
@@ -1075,7 +1088,9 @@ PlacesTreeView.prototype = {
     }
   },
 
-  get result() this._result,
+  get result() {
+    return this._result;
+  },
   set result(val) {
     if (this._result) {
       this._result.removeObserver(this);
@@ -1119,17 +1134,28 @@ PlacesTreeView.prototype = {
     return Ci.nsINavHistoryResultTreeViewer.INDEX_INVISIBLE;
   },
 
-  _getResourceForNode: function PTV_getResourceForNode(aNode)
+  // Retrieves an nsIURI for the document
+  _documentURI: null,
+  _getDocumentURI: function()
   {
-    let uri = aNode.uri;
-    NS_ASSERT(uri, "if there is no uri, we can't persist the open state");
-    return uri ? PlacesUIUtils.RDF.GetResource(uri) : null;
+    if (!this._documentURI) {
+      let ioService = Cc["@mozilla.org/network/io-service;1"].
+                      getService(Ci.nsIIOService);
+      this._documentURI = ioService.newURI(document.URL, null, null);
+    }
+    return this._documentURI;
   },
 
   // nsITreeView
-  get rowCount() this._rows.length,
-  get selection() this._selection,
-  set selection(val) this._selection = val,
+  get rowCount() {
+    return this._rows.length;
+  },
+  get selection() {
+    return this._selection;
+  },
+  set selection(val) {
+    this._selection = val;
+  },
 
   getRowProperties: function() { return ""; },
 
@@ -1350,9 +1376,17 @@ PlacesTreeView.prototype = {
     if (PlacesControllerDragHelper.disallowInsertion(container))
       return null;
 
+    // TODO (Bug 1160193): properly support dropping on a tag root.
+    let tagName = null;
+    if (PlacesUtils.nodeIsTagQuery(container)) {
+      tagName = container.title;
+      if (!tagName)
+        return null;
+    }
+
     return new InsertionPoint(PlacesUtils.getConcreteItemId(container),
                               index, orientation,
-                              PlacesUtils.nodeIsTagQuery(container),
+                              tagName,
                               dropNearItemId);
   },
 
@@ -1400,7 +1434,9 @@ PlacesTreeView.prototype = {
     return false;
   },
 
-  getLevel: function(aRow) this._getNodeForRow(aRow).indentLevel,
+  getLevel: function(aRow) {
+    return this._getNodeForRow(aRow).indentLevel;
+  },
 
   getImageSrc: function PTV_getImageSrc(aRow, aColumn) {
     // Only the title column has an image.
@@ -1545,15 +1581,16 @@ PlacesTreeView.prototype = {
 
     // Persist containers open status, but never persist livemarks.
     if (!this._controller.hasCachedLivemarkInfo(node)) {
-      let resource = this._getResourceForNode(node);
-      if (resource) {
-        const openLiteral = PlacesUIUtils.RDF.GetResource("http://home.netscape.com/NC-rdf#open");
-        const trueLiteral = PlacesUIUtils.RDF.GetLiteral("true");
+      let uri = node.uri;
 
-        if (node.containerOpen)
-          PlacesUIUtils.localStore.Unassert(resource, openLiteral, trueLiteral);
-        else
-          PlacesUIUtils.localStore.Assert(resource, openLiteral, trueLiteral, true);
+      if (uri) {
+        let docURI = document.documentURI;
+
+        if (node.containerOpen) {
+          this._xulStore.removeValue(docURI, uri, "open");
+        } else {
+          this._xulStore.setValue(docURI, uri, "open", "true");
+        }
       }
     }
 

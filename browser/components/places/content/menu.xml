@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
 <bindings id="placesMenuBindings"
           xmlns="http://www.mozilla.org/xbl"
@@ -25,6 +25,10 @@
     </content>
 
     <implementation>
+
+      <field name="AppConstants" readonly="true">
+        (Components.utils.import("resource://gre/modules/AppConstants.jsm", {})).AppConstants;
+      </field>
 
       <field name="_indicatorBar">
         document.getAnonymousElementByAttribute(this, "class",
@@ -80,8 +84,8 @@
               elt = elt.parentNode;
 
             // Calculate positions taking care of arrowscrollbox
-            let eventY = aEvent.layerY;
             let scrollbox = this._scrollBox;
+            let eventY = aEvent.layerY + (scrollbox.boxObject.y - this.boxObject.y);
             let scrollboxOffset = scrollbox.scrollBoxObject.y -
                                   (scrollbox.boxObject.y - this.boxObject.y);
             let eltY = elt.boxObject.y - scrollboxOffset;
@@ -103,6 +107,9 @@
                 dropPoint.folderElt = elt;
               return dropPoint;
             }
+
+            let tagName = PlacesUtils.nodeIsTagQuery(elt._placesNode) ?
+                            elt._placesNode.title : null;
             if ((PlacesUtils.nodeIsFolder(elt._placesNode) &&
                  !PlacesUIUtils.isContentsReadOnly(elt._placesNode)) ||
                 PlacesUtils.nodeIsTagQuery(elt._placesNode)) {
@@ -113,7 +120,7 @@
                                     PlacesUtils.getConcreteItemId(resultNode),
                                     -1,
                                     Ci.nsITreeView.DROP_BEFORE,
-                                    PlacesUtils.nodeIsTagQuery(elt._placesNode),
+                                    tagName,
                                     elt._placesNode.itemId);
                 return dropPoint;
               }
@@ -123,7 +130,7 @@
                                     PlacesUtils.getConcreteItemId(elt._placesNode),
                                     -1,
                                     Ci.nsITreeView.DROP_ON,
-                                    PlacesUtils.nodeIsTagQuery(elt._placesNode));
+                                    tagName);
                 dropPoint.folderElt = elt;
                 return dropPoint;
               }
@@ -135,7 +142,7 @@
                                   PlacesUtils.getConcreteItemId(resultNode),
                                   -1,
                                   Ci.nsITreeView.DROP_BEFORE,
-                                  PlacesUtils.nodeIsTagQuery(elt._placesNode),
+                                  tagName,
                                   elt._placesNode.itemId);
               return dropPoint;
             }
@@ -145,7 +152,7 @@
                                 PlacesUtils.getConcreteItemId(resultNode),
                                 -1,
                                 Ci.nsITreeView.DROP_AFTER,
-                                PlacesUtils.nodeIsTagQuery(elt._placesNode),
+                                tagName,
                                 elt._placesNode.itemId);
             return dropPoint;
         ]]></body>
@@ -304,18 +311,18 @@
         if (elt.parentNode != this)
           return;
 
-#ifdef XP_MACOSX
-        // XXX: The following check is a temporary hack until bug 420033 is
-        // resolved.
-        let parentElt = elt.parent;
-        while (parentElt) {
-          if (parentElt.id == "bookmarksMenuPopup" ||
-              parentElt.id == "goPopup")
-            return;
+        if (this.AppConstants.platform === "macosx") {
+          // XXX: The following check is a temporary hack until bug 420033 is
+          // resolved.
+          let parentElt = elt.parent;
+          while (parentElt) {
+            if (parentElt.id == "bookmarksMenuPopup" ||
+                parentElt.id == "goPopup")
+              return;
 
-          parentElt = parentElt.parentNode;
+            parentElt = parentElt.parentNode;
+          }
         }
-#endif
 
         if (window.XULBrowserWindow) {
           let elt = event.target;
@@ -483,6 +490,141 @@
         this._cleanupDragDetails();
       ]]></handler>
 
+    </handlers>
+  </binding>
+
+  <!-- Most of this is copied from the arrowpanel binding in popup.xml -->
+  <binding id="places-popup-arrow"
+           extends="chrome://browser/content/places/menu.xml#places-popup-base">
+    <content flip="both" side="top" position="bottomcenter topright">
+      <xul:vbox anonid="container" class="panel-arrowcontainer" flex="1"
+               xbl:inherits="side,panelopen">
+        <xul:box anonid="arrowbox" class="panel-arrowbox">
+          <xul:image anonid="arrow" class="panel-arrow" xbl:inherits="side"/>
+        </xul:box>
+        <xul:box class="panel-arrowcontent" xbl:inherits="side,align,dir,orient,pack" flex="1">
+          <xul:vbox class="menupopup-drop-indicator-bar" hidden="true">
+            <xul:image class="menupopup-drop-indicator" mousethrough="always"/>
+          </xul:vbox>
+          <xul:arrowscrollbox class="popup-internal-box" flex="1" orient="vertical"
+                              smoothscroll="false">
+            <children/>
+          </xul:arrowscrollbox>
+        </xul:box>
+      </xul:vbox>
+    </content>
+
+    <implementation>
+      <constructor><![CDATA[
+        this.style.pointerEvents = 'none';
+      ]]></constructor>
+      <method name="adjustArrowPosition">
+        <body><![CDATA[
+          var arrow = document.getAnonymousElementByAttribute(this, "anonid", "arrow");
+
+          var anchor = this.anchorNode;
+          if (!anchor) {
+            arrow.hidden = true;
+            return;
+          }
+
+          var container = document.getAnonymousElementByAttribute(this, "anonid", "container");
+          var arrowbox = document.getAnonymousElementByAttribute(this, "anonid", "arrowbox");
+
+          var position = this.alignmentPosition;
+          var offset = this.alignmentOffset;
+
+          this.setAttribute("arrowposition", position);
+
+          // if this panel has a "sliding" arrow, we may have previously set margins...
+          arrowbox.style.removeProperty("transform");
+          if (position.indexOf("start_") == 0 || position.indexOf("end_") == 0) {
+            container.orient = "horizontal";
+            arrowbox.orient = "vertical";
+            if (position.indexOf("_after") > 0) {
+              arrowbox.pack = "end";
+            } else {
+              arrowbox.pack = "start";
+            }
+            arrowbox.style.transform = "translate(0, " + -offset + "px)";
+
+            // The assigned side stays the same regardless of direction.
+            var isRTL = (window.getComputedStyle(this).direction == "rtl");
+
+            if (position.indexOf("start_") == 0) {
+              container.dir = "reverse";
+              this.setAttribute("side", isRTL ? "left" : "right");
+            }
+            else {
+              container.dir = "";
+              this.setAttribute("side", isRTL ? "right" : "left");
+            }
+          }
+          else if (position.indexOf("before_") == 0 || position.indexOf("after_") == 0) {
+            container.orient = "";
+            arrowbox.orient = "";
+            if (position.indexOf("_end") > 0) {
+              arrowbox.pack = "end";
+            } else {
+              arrowbox.pack = "start";
+            }
+            arrowbox.style.transform = "translate(" + -offset + "px, 0)";
+
+            if (position.indexOf("before_") == 0) {
+              container.dir = "reverse";
+              this.setAttribute("side", "bottom");
+            }
+            else {
+              container.dir = "";
+              this.setAttribute("side", "top");
+            }
+          }
+
+          arrow.hidden = false;
+        ]]></body>
+      </method>
+    </implementation>
+
+    <handlers>
+      <handler event="popupshowing" phase="target"><![CDATA[
+        this.adjustArrowPosition();
+        this.setAttribute("animate", "open");
+      ]]></handler>
+      <handler event="popupshown" phase="target"><![CDATA[
+        this.setAttribute("panelopen", "true");
+        let disablePointerEvents;
+        if (!this.hasAttribute("disablepointereventsfortransition")) {
+          let container = document.getAnonymousElementByAttribute(this, "anonid", "container");
+          let cs = getComputedStyle(container);
+          let transitionProp = cs.transitionProperty;
+          let transitionTime = parseFloat(cs.transitionDuration);
+          disablePointerEvents = (transitionProp.includes("transform") ||
+                                  transitionProp == "all") &&
+                                 transitionTime > 0;
+          this.setAttribute("disablepointereventsfortransition", disablePointerEvents);
+        } else {
+          disablePointerEvents = this.getAttribute("disablepointereventsfortransition") == "true";
+        }
+        if (!disablePointerEvents) {
+          this.style.removeProperty("pointer-events");
+        }
+      ]]></handler>
+      <handler event="transitionend"><![CDATA[
+        if (event.originalTarget.getAttribute("anonid") == "container" &&
+            event.propertyName == "transform") {
+          this.style.removeProperty("pointer-events");
+        }
+      ]]></handler>
+      <handler event="popuphiding" phase="target"><![CDATA[
+        this.setAttribute("animate", "cancel");
+      ]]></handler>
+      <handler event="popuphidden" phase="target"><![CDATA[
+        this.removeAttribute("panelopen");
+        if (this.getAttribute("disablepointereventsfortransition") == "true") {
+          this.style.pointerEvents = 'none';
+        }
+        this.removeAttribute("animate");
+      ]]></handler>
     </handlers>
   </binding>
 </bindings>

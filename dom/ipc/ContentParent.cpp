@@ -141,6 +141,7 @@
 #include "nsIXULRuntime.h"
 #include "gfxDrawable.h"
 #include "ImageOps.h"
+#include "mozilla/dom/nsMixedContentBlocker.h"
 #include "nsMemoryInfoDumper.h"
 #include "nsMemoryReporterManager.h"
 #include "nsServiceManagerUtils.h"
@@ -2502,15 +2503,8 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
             DebugOnly<bool> opened = PCompositor::Open(this);
             MOZ_ASSERT(opened);
 
-#ifndef MOZ_WIDGET_GONK
-            if (gfxPrefs::AsyncVideoOOPEnabled()) {
-                opened = PImageBridge::Open(this);
-                MOZ_ASSERT(opened);
-            }
-#else
             opened = PImageBridge::Open(this);
             MOZ_ASSERT(opened);
-#endif
         }
 #ifdef MOZ_WIDGET_GONK
         DebugOnly<bool> opened = PSharedBufferManager::Open(this);
@@ -2697,7 +2691,7 @@ ContentParent::RecvSetClipboard(const IPCDataTransfer& aDataTransfer,
             item.flavor().EqualsLiteral(kPNGImageMime) ||
             item.flavor().EqualsLiteral(kGIFImageMime)) {
           const IPCDataTransferImage& imageDetails = item.imageDetails();
-          const gfxIntSize size(imageDetails.width(), imageDetails.height());
+          const gfx::IntSize size(imageDetails.width(), imageDetails.height());
           if (!size.width || !size.height) {
             return true;
           }
@@ -4172,6 +4166,17 @@ ContentParent::RecvIsSecureURI(const uint32_t& type,
     }
     nsresult rv = sss->IsSecureURI(type, ourURI, flags, isSecureURI);
     return NS_SUCCEEDED(rv);
+}
+
+bool
+ContentParent::RecvAccumulateMixedContentHSTS(const URIParams& aURI, const bool& aActive)
+{
+    nsCOMPtr<nsIURI> ourURI = DeserializeURI(aURI);
+    if (!ourURI) {
+        return false;
+    }
+    nsMixedContentBlocker::AccumulateMixedContentHSTS(ourURI, aActive);
+    return true;
 }
 
 bool

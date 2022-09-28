@@ -173,7 +173,7 @@ class JSObject : public js::gc::Cell
                                    js::HandleObjectGroup group);
 
     // Set the shape of an object. This pointer is valid for native objects and
-    // some non-native objects. After creating an object, tobjects for which
+    // some non-native objects. After creating an object, the objects for which
     // the shape pointer is invalid need to overwrite this pointer before a GC
     // can occur.
     inline void setInitialShapeMaybeNonNative(js::Shape* shape);
@@ -642,18 +642,18 @@ JSObject::writeBarrierPost(void* cellp, JSObject* prev, JSObject* next)
     js::gc::StoreBuffer* buffer;
     if (next && (buffer = next->storeBuffer())) {
         // If we know that the prev has already inserted an entry, we can skip
-        // doing the lookup to add the new entry.
-        if (prev && prev->storeBuffer()) {
-            buffer->assertHasCellEdge(static_cast<js::gc::Cell**>(cellp));
+        // doing the lookup to add the new entry. Note that we cannot safely
+        // assert the presence of the entry because it may have been added
+        // via a different store buffer.
+        if (prev && prev->storeBuffer())
             return;
-        }
-        buffer->putCellFromAnyThread(static_cast<js::gc::Cell**>(cellp));
+        buffer->putCell(static_cast<js::gc::Cell**>(cellp));
         return;
     }
 
     // Remove the prev entry if the new value does not need it.
     if (prev && (buffer = prev->storeBuffer()))
-        buffer->unputCellFromAnyThread(static_cast<js::gc::Cell**>(cellp));
+        buffer->unputCell(static_cast<js::gc::Cell**>(cellp));
 }
 
 namespace js {
@@ -769,15 +769,15 @@ DefineProperty(JSContext* cx, HandleObject obj, HandleId id,
 
 extern bool
 DefineProperty(ExclusiveContext* cx, HandleObject obj, HandleId id, HandleValue value,
-               JSGetterOp getter, JSSetterOp, unsigned attrs, ObjectOpResult& result);
+               JSGetterOp getter, JSSetterOp setter, unsigned attrs, ObjectOpResult& result);
 
 extern bool
 DefineProperty(ExclusiveContext* cx, HandleObject obj, PropertyName* name, HandleValue value,
-               JSGetterOp getter, JSSetterOp, unsigned attrs, ObjectOpResult& result);
+               JSGetterOp getter, JSSetterOp setter, unsigned attrs, ObjectOpResult& result);
 
 extern bool
 DefineElement(ExclusiveContext* cx, HandleObject obj, uint32_t index, HandleValue value,
-              JSGetterOp getter, JSSetterOp, unsigned attrs, ObjectOpResult& result);
+              JSGetterOp getter, JSSetterOp setter, unsigned attrs, ObjectOpResult& result);
 
 /*
  * When the 'result' out-param is omitted, the behavior is the same as above, except
@@ -1251,7 +1251,6 @@ LookupNameUnqualified(JSContext* cx, HandlePropertyName name, HandleObject scope
                       MutableHandleObject objp);
 
 } // namespace js
-
 
 namespace js {
 

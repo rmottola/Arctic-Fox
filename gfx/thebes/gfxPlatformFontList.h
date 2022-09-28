@@ -194,6 +194,11 @@ public:
 
     static const gfxFontEntry::ScriptRange sComplexScriptRanges[];
 
+    void GetFontlistInitInfo(uint32_t& aNumInits, uint32_t& aLoaderState) {
+        aNumInits = mFontlistInitCount;
+        aLoaderState = (uint32_t) mState;
+    }
+
 protected:
     class MemoryReporter final : public nsIMemoryReporter
     {
@@ -206,10 +211,6 @@ protected:
     explicit gfxPlatformFontList(bool aNeedFullnamePostscriptNames = true);
 
     static gfxPlatformFontList *sPlatformFontList;
-
-    static PLDHashOperator FindFontForCharProc(nsStringHashKey::KeyType aKey,
-                                               nsRefPtr<gfxFontFamily>& aFamilyEntry,
-                                               void* userArg);
 
     // Lookup family name in global family list without substitutions or
     // localized family name lookup. Used for common font fallback families.
@@ -246,20 +247,10 @@ protected:
     // initialize localized family names
     void InitOtherFamilyNames();
 
-    static PLDHashOperator
-    InitOtherFamilyNamesProc(nsStringHashKey::KeyType aKey,
-                             nsRefPtr<gfxFontFamily>& aFamilyEntry,
-                             void* userArg);
-
     // search through font families, looking for a given name, initializing
     // facename lists along the way. first checks all families with names
     // close to face name, then searchs all families if not found.
     gfxFontEntry* SearchFamiliesForFaceName(const nsAString& aFaceName);
-
-    static PLDHashOperator
-    ReadFaceNamesProc(nsStringHashKey::KeyType aKey,
-                      nsRefPtr<gfxFontFamily>& aFamilyEntry,
-                      void* userArg);
 
     // helper method for finding fullname/postscript names in facename lists
     gfxFontEntry* FindFaceName(const nsAString& aFaceName);
@@ -363,6 +354,10 @@ protected:
     uint32_t mStartIndex;
     uint32_t mIncrement;
     uint32_t mNumFamilies;
+
+    // xxx - info for diagnosing no default font aborts
+    // see bugs 636957, 1070983, 1189129
+    uint32_t mFontlistInitCount; // num times InitFontList called
 
     nsTHashtable<nsPtrHashKey<gfxUserFontSet> > mUserFontSetList;
 };

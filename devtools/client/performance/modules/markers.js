@@ -83,6 +83,16 @@ const TIMELINE_BLUEPRINT = {
     colorName: "graphs-bluegrey",
     label: L10N.getStr("marker.label.compositeForwardTransaction"),
   },
+  "Composite": {
+    group: 0,
+    colorName: "graphs-green",
+    label: L10N.getStr("marker.label.composite"),
+  },
+  "CompositeForwardTransaction": {
+    group: 0,
+    colorName: "graphs-bluegrey",
+    label: L10N.getStr("marker.label.compositeForwardTransaction"),
+  },
 
   /* Group 1 - JS */
   "DOMEvent": {

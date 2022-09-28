@@ -752,7 +752,7 @@ nsImageFrame::MaybeDecodeForPredictedSize()
   // Determine the optimal image size to use.
   uint32_t flags = imgIContainer::FLAG_HIGH_QUALITY_SCALING
                  | imgIContainer::FLAG_ASYNC_NOTIFY;
-  GraphicsFilter filter = nsLayoutUtils::GetGraphicsFilterForFrame(this);
+  Filter filter = nsLayoutUtils::GetGraphicsFilterForFrame(this);
   gfxSize gfxPredictedScreenSize = gfxSize(predictedScreenIntSize.width,
                                            predictedScreenIntSize.height);
   nsIntSize predictedImageSize =
@@ -1143,7 +1143,8 @@ nsImageFrame::DisplayAltText(nsPresContext*      aPresContext,
                              const nsRect&        aRect)
 {
   // Set font and color
-  aRenderingContext.ThebesContext()->SetColor(StyleColor()->mColor);
+  aRenderingContext.ThebesContext()->
+    SetColor(Color::FromABGR(StyleColor()->mColor));
   nsRefPtr<nsFontMetrics> fm;
   nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fm),
     nsLayoutUtils::FontSizeInflationFor(this));
@@ -1199,7 +1200,7 @@ nsImageFrame::DisplayAltText(nsPresContext*      aPresContext,
       nscoord x, y;
 
       if (isVertical) {
-        x = pt.x + maxDescent; // XXX will need update for sideways-left
+        x = pt.x + maxDescent;
         if (wm.IsBidiLTR()) {
           y = aRect.y;
           dir = NSBIDI_LTR;

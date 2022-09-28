@@ -28,6 +28,8 @@ struct RectCornerRadii;
 } // namespace gfx
 } // namespace mozilla
 
+class ClipExporter;
+
 /**
  * This is the main class for doing actual drawing. It is initialized using
  * a surface and can be drawn on. It manages various state information like
@@ -44,6 +46,7 @@ struct RectCornerRadii;
  */
 class gfxContext final {
     typedef mozilla::gfx::CapStyle CapStyle;
+    typedef mozilla::gfx::CompositionOp CompositionOp;
     typedef mozilla::gfx::JoinStyle JoinStyle;
     typedef mozilla::gfx::FillRule FillRule;
     typedef mozilla::gfx::Path Path;
@@ -253,21 +256,21 @@ public:
      * Set a solid color to use for drawing.  This color is in the device color space
      * and is not transformed.
      */
-    void SetDeviceColor(const gfxRGBA& c);
+    void SetDeviceColor(const mozilla::gfx::Color& aColor);
 
     /**
      * Gets the current color.  It's returned in the device color space.
      * returns false if there is something other than a color
      *         set as the current source (pattern, surface, etc)
      */
-    bool GetDeviceColor(gfxRGBA& c);
+    bool GetDeviceColor(mozilla::gfx::Color& aColorOut);
 
     /**
      * Set a solid color in the sRGB color space to use for drawing.
      * If CMS is not enabled, the color is treated as a device-space color
      * and this call is identical to SetDeviceColor().
      */
-    void SetColor(const gfxRGBA& c);
+    void SetColor(const mozilla::gfx::Color& aColor);
 
     /**
      * Uses a surface for drawing. This is a shorthand for creating a
@@ -319,7 +322,7 @@ public:
      */
     void Mask(gfxASurface *surface, const gfxPoint& offset = gfxPoint(0.0, 0.0));
 
-    void Mask(mozilla::gfx::SourceSurface *surface, const mozilla::gfx::Point& offset = mozilla::gfx::Point());
+    void Mask(mozilla::gfx::SourceSurface *surface, float alpha = 1.0f, const mozilla::gfx::Point& offset = mozilla::gfx::Point());
 
     /**
      ** Line Properties
@@ -369,52 +372,13 @@ public:
     FillRule CurrentFillRule() const;
 
     /**
-     ** Operators and Rendering control
-     **/
-
-    // define enum for operators (clear, src, dst, etc)
-    enum GraphicsOperator {
-        OPERATOR_SOURCE,
-
-        OPERATOR_OVER,
-        OPERATOR_IN,
-        OPERATOR_OUT,
-        OPERATOR_ATOP,
-
-        OPERATOR_DEST,
-        OPERATOR_DEST_OVER,
-        OPERATOR_DEST_IN,
-        OPERATOR_DEST_OUT,
-        OPERATOR_DEST_ATOP,
-
-        OPERATOR_XOR,
-        OPERATOR_ADD,
-        OPERATOR_SATURATE,
-
-        OPERATOR_MULTIPLY,
-        OPERATOR_SCREEN,
-        OPERATOR_OVERLAY,
-        OPERATOR_DARKEN,
-        OPERATOR_LIGHTEN,
-        OPERATOR_COLOR_DODGE,
-        OPERATOR_COLOR_BURN,
-        OPERATOR_HARD_LIGHT,
-        OPERATOR_SOFT_LIGHT,
-        OPERATOR_DIFFERENCE,
-        OPERATOR_EXCLUSION,
-        OPERATOR_HUE,
-        OPERATOR_SATURATION,
-        OPERATOR_COLOR,
-        OPERATOR_LUMINOSITY
-    };
-    /**
      * Sets the operator used for all further drawing. The operator affects
      * how drawing something will modify the destination. For example, the
      * OVER operator will do alpha blending of source and destination, while
      * SOURCE will replace the destination with the source.
      */
-    void SetOperator(GraphicsOperator op);
-    GraphicsOperator CurrentOperator() const;
+    void SetOp(CompositionOp op);
+    CompositionOp CurrentOp() const;
 
     void SetAntialiasMode(mozilla::gfx::AntialiasMode mode);
     mozilla::gfx::AntialiasMode CurrentAntialiasMode() const;
@@ -457,6 +421,11 @@ public:
      */
     bool ClipContainsRect(const gfxRect& aRect);
 
+     /**
+      * Exports the current clip using the provided exporter.
+      */
+    bool ExportClip(ClipExporter& aExporter);
+
     /**
      * Groups
      */
@@ -470,7 +439,7 @@ public:
      * the correct results and using an opaque pushed surface gives better
      * quality and performance.
      * This API really only makes sense if you do a PopGroupToSource and
-     * immediate Paint with OPERATOR_OVER.
+     * immediate Paint with OP_OVER.
      */
     void PushGroupAndCopyBackground(gfxContentType content = gfxContentType::COLOR);
     already_AddRefed<gfxPattern> PopGroup();
@@ -518,7 +487,6 @@ private:
   typedef mozilla::gfx::Color Color;
   typedef mozilla::gfx::StrokeOptions StrokeOptions;
   typedef mozilla::gfx::Float Float;
-  typedef mozilla::gfx::CompositionOp CompositionOp;
   typedef mozilla::gfx::PathBuilder PathBuilder;
   typedef mozilla::gfx::SourceSurface SourceSurface;
   
@@ -726,6 +694,14 @@ private:
 
   gfxContext *mContext;
   mozilla::gfx::Pattern *mPattern;
+};
+
+/* This interface should be implemented to handle exporting the clip from a context.
+ */
+class ClipExporter : public mozilla::gfx::PathSink {
+public:
+  virtual void BeginClip(const mozilla::gfx::Matrix& aMatrix) = 0;
+  virtual void EndClip() = 0;
 };
 
 #endif /* GFX_CONTEXT_H */

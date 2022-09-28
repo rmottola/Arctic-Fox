@@ -37,7 +37,7 @@ const PREF_OPTOUT_SAMPLE = PREF_BRANCH + "optoutSample";
 
 const Telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
 
-let gClientID = null;
+var gClientID = null;
 
 function sendPing(aSendClientId, aSendEnvironment) {
   if (PingServer.started) {

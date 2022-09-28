@@ -1,4 +1,4 @@
-/* -*- Mode: js; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
  * vim: sw=2 ts=2 sts=2 et */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -6,10 +6,7 @@
 
 "use strict";
 
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
-const Cr = Components.results;
+const { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
 
 const FILE_INPUT_STREAM_CID = "@mozilla.org/network/file-input-stream;1";
 
@@ -26,6 +23,7 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
+Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource:///modules/MigrationUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
@@ -50,29 +48,24 @@ function chromeTimeToDate(aTime)
 /**
  * Insert bookmark items into specific folder.
  *
- * @param   aFolderId
- *          id of folder where items will be inserted
- * @param   aItems
+ * @param   parentGuid
+ *          GUID of the folder where items will be inserted
+ * @param   items
  *          bookmark items to be inserted
  */
-function insertBookmarkItems(aFolderId, aItems)
-{
-  for (let i = 0; i < aItems.length; i++) {
-    let item = aItems[i];
-
+function* insertBookmarkItems(parentGuid, items) {
+  for (let item of items) {
     try {
       if (item.type == "url") {
-        PlacesUtils.bookmarks.insertBookmark(aFolderId,
-                                             NetUtil.newURI(item.url),
-                                             PlacesUtils.bookmarks.DEFAULT_INDEX,
-                                             item.name);
+        yield PlacesUtils.bookmarks.insert({
+          parentGuid, url: item.url, title: item.name
+        });
       } else if (item.type == "folder") {
-        let newFolderId =
-          PlacesUtils.bookmarks.createFolder(aFolderId,
-                                             item.name,
-                                             PlacesUtils.bookmarks.DEFAULT_INDEX);
+        let newFolderGuid = (yield PlacesUtils.bookmarks.insert({
+          parentGuid, type: PlacesUtils.bookmarks.TYPE_FOLDER, title: item.name
+        })).guid;
 
-        insertBookmarkItems(newFolderId, item.children);
+        yield insertBookmarkItems(newFolderGuid, item.children);
       }
     } catch (e) {
       Cu.reportError(e);
@@ -208,48 +201,51 @@ function GetBookmarksResource(aProfileFolder) {
     type: MigrationUtils.resourceTypes.BOOKMARKS,
 
     migrate: function(aCallback) {
-      NetUtil.asyncFetch2(bookmarksFile, MigrationUtils.wrapMigrateFunction(
-        function(aInputStream, aResultCode) {
-          if (!Components.isSuccessCode(aResultCode))
-            throw new Error("Could not read Bookmarks file");
-            
-          // Parse Chrome bookmark file that is JSON format
-          let bookmarkJSON = NetUtil.readInputStreamToString(
-            aInputStream, aInputStream.available(), { charset : "UTF-8" });
-          let roots = JSON.parse(bookmarkJSON).roots;
-          PlacesUtils.bookmarks.runInBatchMode({
-            runBatched: function() {
-              // Importing bookmark bar items
-              if (roots.bookmark_bar.children &&
-                  roots.bookmark_bar.children.length > 0) {
-                // Toolbar
-                let parentId = PlacesUtils.toolbarFolderId;
-                if (!MigrationUtils.isStartupMigration) { 
-                  parentId = MigrationUtils.createImportedBookmarksFolder(
-                    "Chrome", parentId);
-                }
-                insertBookmarkItems(parentId, roots.bookmark_bar.children);
-              }
+      return Task.spawn(function* () {
+        let jsonStream = yield new Promise(resolve =>
+          NetUtil.asyncFetch({ uri: NetUtil.newURI(bookmarksFile),
+                               loadUsingSystemPrincipal: true
+                             },
+                             (inputStream, resultCode) => {
+                               if (Components.isSuccessCode(resultCode)) {
+                                 resolve(inputStream);
+                               } else {
+                                 reject(new Error("Could not read Bookmarks file"));
+                               }
+                             }
+          )
+        );
 
-              // Importing bookmark menu items
-              if (roots.other.children &&
-                  roots.other.children.length > 0) {
-                // Bookmark menu
-                let parentId = PlacesUtils.bookmarksMenuFolderId;
-                if (!MigrationUtils.isStartupMigration) { 
-                  parentId = MigrationUtils.createImportedBookmarksFolder(
-                    "Chrome", parentId);
-                }
-                insertBookmarkItems(parentId, roots.other.children);
-              }
-            }
-          }, null);
-        }, aCallback),
-        null,      // aLoadingNode
-        Services.scriptSecurityManager.getSystemPrincipal(),
-        null,      // aTriggeringPrincipal
-        Ci.nsILoadInfo.SEC_NORMAL,
-        Ci.nsIContentPolicy.TYPE_OTHER);
+        // Parse Chrome bookmark file that is JSON format
+        let bookmarkJSON = NetUtil.readInputStreamToString(
+          jsonStream, jsonStream.available(), { charset : "UTF-8" });
+        let roots = JSON.parse(bookmarkJSON).roots;
+
+        // Importing bookmark bar items
+        if (roots.bookmark_bar.children &&
+            roots.bookmark_bar.children.length > 0) {
+          // Toolbar
+          let parentGuid = PlacesUtils.bookmarks.toolbarGuid;
+          if (!MigrationUtils.isStartupMigration) {
+            parentGuid =
+              yield MigrationUtils.createImportedBookmarksFolder("Chrome", parentGuid);
+          }
+          yield insertBookmarkItems(parentGuid, roots.bookmark_bar.children);
+        }
+
+        // Importing bookmark menu items
+        if (roots.other.children &&
+            roots.other.children.length > 0) {
+          // Bookmark menu
+          let parentGuid = PlacesUtils.bookmarks.menuGuid;
+          if (!MigrationUtils.isStartupMigration) {
+            parentGuid =
+              yield MigrationUtils.createImportedBookmarksFolder("Chrome", parentGuid);
+          }
+          yield insertBookmarkItems(parentGuid, roots.other.children);
+        }
+      }.bind(this)).then(() => aCallback(true),
+                          e => { Cu.reportError(e); aCallback(false) });
     }
   };
 }
@@ -326,8 +322,11 @@ function GetCookiesResource(aProfileFolder) {
 
     migrate: function(aCallback) {
       let dbConn = Services.storage.openUnsharedDatabase(cookiesFile);
-      let stmt = dbConn.createAsyncStatement(
-          "SELECT host_key, path, name, value, secure, httponly, expires_utc FROM cookies");
+      // We don't support decrypting cookies yet so only import plaintext ones.
+      let stmt = dbConn.createAsyncStatement(`
+        SELECT host_key, name, value, path, expires_utc, secure, httponly, encrypted_value
+        FROM cookies
+        WHERE length(encrypted_value) = 0`);
 
       stmt.executeAsync({
         handleResult : function(aResults) {
@@ -386,15 +385,14 @@ function GetWindowsPasswordsResource(aProfileFolder) {
         password_element, password_value, signon_realm, scheme, date_created,
         times_used FROM logins WHERE blacklisted_by_user = 0`);
       let crypto = new OSCrypto();
-      let utf8Converter = Cc["@mozilla.org/intl/utf8converterservice;1"].getService(Ci.nsIUTF8ConverterService);
 
       stmt.executeAsync({
         _rowToLoginInfo(row) {
           let loginInfo = {
-            username: utf8Converter.convertURISpecToUTF8(row.getResultByName("username_value"), "UTF-8"),
-            password: utf8Converter.convertURISpecToUTF8(
-                        crypto.decryptData(crypto.arrayToString(row.getResultByName("password_value")), null),
-                        "UTF-8"),
+            username: row.getResultByName("username_value"),
+            password: crypto.
+                      decryptData(crypto.arrayToString(row.getResultByName("password_value")),
+                                                       null),
             hostName: NetUtil.newURI(row.getResultByName("origin_url")).prePath,
             submitURL: null,
             httpRealm: null,
@@ -472,4 +470,51 @@ ChromeProfileMigrator.prototype.classDescription = "Chrome Profile Migrator";
 ChromeProfileMigrator.prototype.contractID = "@mozilla.org/profile/migrator;1?app=browser&type=chrome";
 ChromeProfileMigrator.prototype.classID = Components.ID("{4cec1de4-1671-4fc3-a53e-6c539dc77a26}");
 
-this.NSGetFactory = XPCOMUtils.generateNSGetFactory([ChromeProfileMigrator]);
+
+/**
+ *  Chromium migration
+ **/
+function ChromiumProfileMigrator() {
+  let chromiumUserDataFolder = FileUtils.getDir(
+#ifdef XP_WIN
+    "LocalAppData", ["Chromium", "User Data"]
+#elifdef XP_MACOSX
+    "ULibDir", ["Application Support", "Chromium"]
+#else
+    "Home", [".config", "chromium"]
+#endif
+    , false);
+  this._chromeUserDataFolder = chromiumUserDataFolder.exists() ? chromiumUserDataFolder : null;
+}
+
+ChromiumProfileMigrator.prototype = Object.create(ChromeProfileMigrator.prototype);
+ChromiumProfileMigrator.prototype.classDescription = "Chromium Profile Migrator";
+ChromiumProfileMigrator.prototype.contractID = "@mozilla.org/profile/migrator;1?app=browser&type=chromium";
+ChromiumProfileMigrator.prototype.classID = Components.ID("{8cece922-9720-42de-b7db-7cef88cb07ca}");
+
+var componentsArray = [ChromeProfileMigrator, ChromiumProfileMigrator];
+
+#if defined(XP_WIN) || defined(XP_MACOSX)
+/**
+ * Chrome Canary
+ * Not available on Linux
+ **/
+function CanaryProfileMigrator() {
+  let chromeUserDataFolder = FileUtils.getDir(
+#ifdef XP_WIN
+    "LocalAppData", ["Google", "Chrome SxS", "User Data"]
+#elifdef XP_MACOSX
+    "ULibDir", ["Application Support", "Google", "Chrome Canary"]
+#endif
+    , false);
+  this._chromeUserDataFolder = chromeUserDataFolder.exists() ? chromeUserDataFolder : null;
+}
+CanaryProfileMigrator.prototype = Object.create(ChromeProfileMigrator.prototype);
+CanaryProfileMigrator.prototype.classDescription = "Chrome Canary Profile Migrator";
+CanaryProfileMigrator.prototype.contractID = "@mozilla.org/profile/migrator;1?app=browser&type=canary";
+CanaryProfileMigrator.prototype.classID = Components.ID("{4bf85aa5-4e21-46ca-825f-f9c51a5e8c76}");
+
+componentsArray.push(CanaryProfileMigrator);
+#endif
+
+this.NSGetFactory = XPCOMUtils.generateNSGetFactory(componentsArray);

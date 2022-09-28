@@ -324,6 +324,13 @@ Bindings::bindingIsAliased(uint32_t bindingIndex)
 }
 
 void
+Binding::trace(JSTracer* trc)
+{
+    PropertyName* name = this->name();
+    TraceManuallyBarrieredEdge(trc, &name, "binding");
+}
+
+void
 Bindings::trace(JSTracer* trc)
 {
     if (callObjShape_)
@@ -337,10 +344,8 @@ Bindings::trace(JSTracer* trc)
     if (bindingArrayUsingTemporaryStorage())
         return;
 
-    for (const Binding& b : *this) {
-        PropertyName* name = b.name();
-        TraceManuallyBarrieredEdge(trc, &name, "bindingArray");
-    }
+    for (Binding& b : *this)
+        b.trace(trc);
 }
 
 template<XDRMode mode>
@@ -582,6 +587,8 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
 {
     /* NB: Keep this in sync with CopyScript. */
 
+    MOZ_ASSERT(enclosingScopeArg);
+
     enum ScriptBits {
         NoScriptRval,
         SavedCallerFun,
@@ -810,8 +817,10 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
 
         // If the outermost script has a non-syntactic scope, reflect that on
         // the static scope chain.
-        if (scriptBits & (1 << HasNonSyntacticScope) && !enclosingScope) {
-            enclosingScope = StaticNonSyntacticScopeObjects::create(cx, nullptr);
+        if (scriptBits & (1 << HasNonSyntacticScope) &&
+            IsStaticGlobalLexicalScope(enclosingScope))
+        {
+            enclosingScope = StaticNonSyntacticScopeObjects::create(cx, enclosingScope);
             if (!enclosingScope)
                 return false;
         }
@@ -993,10 +1002,14 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
             uint32_t enclosingStaticScopeIndex = 0;
             if (mode == XDR_ENCODE) {
                 NestedScopeObject& scope = (*objp)->as<NestedScopeObject>();
-                if (NestedScopeObject* enclosing = scope.enclosingNestedScope())
-                    enclosingStaticScopeIndex = FindScopeObjectIndex(script, *enclosing);
-                else
+                if (NestedScopeObject* enclosing = scope.enclosingNestedScope()) {
+                    if (IsStaticGlobalLexicalScope(enclosing))
+                        enclosingStaticScopeIndex = UINT32_MAX;
+                    else
+                        enclosingStaticScopeIndex = FindScopeObjectIndex(script, *enclosing);
+                } else {
                     enclosingStaticScopeIndex = UINT32_MAX;
+                }
             }
             if (!xdr->codeUint32(&enclosingStaticScopeIndex))
                 return false;
@@ -1059,8 +1072,12 @@ js::XDRScript(XDRState<mode>* xdr, HandleObject enclosingScopeArg, HandleScript 
                     MOZ_ASSERT_IF(ssi.done() || ssi.type() != StaticScopeIter<NoGC>::Function, !fun);
                     funEnclosingScopeIndex = UINT32_MAX;
                 } else if (ssi.type() == StaticScopeIter<NoGC>::Block) {
-                    funEnclosingScopeIndex = FindScopeObjectIndex(script, ssi.block());
-                    MOZ_ASSERT(funEnclosingScopeIndex < i);
+                    if (ssi.block().isGlobal()) {
+                        funEnclosingScopeIndex = UINT32_MAX;
+                    } else {
+                        funEnclosingScopeIndex = FindScopeObjectIndex(script, ssi.block());
+                        MOZ_ASSERT(funEnclosingScopeIndex < i);
+                    }
                 } else {
                     funEnclosingScopeIndex = FindScopeObjectIndex(script, ssi.staticWith());
                     MOZ_ASSERT(funEnclosingScopeIndex < i);
@@ -2938,6 +2955,20 @@ JSScript::uninlinedGlobal() const
 }
 
 void
+JSScript::fixEnclosingStaticGlobalLexicalScope()
+{
+    MOZ_ASSERT(IsStaticGlobalLexicalScope(enclosingStaticScope_));
+    enclosingStaticScope_ = &global().lexicalScope().staticBlock();
+}
+
+void
+LazyScript::fixEnclosingStaticGlobalLexicalScope()
+{
+    MOZ_ASSERT(IsStaticGlobalLexicalScope(enclosingScope_));
+    enclosingScope_ = &function_->global().lexicalScope().staticBlock();
+}
+
+void
 JSScript::finalize(FreeOp* fop)
 {
     // NOTE: this JSScript may be partially initialized at this point.  E.g. we
@@ -3298,10 +3329,17 @@ js::detail::CopyScript(JSContext* cx, HandleObject scriptStaticScope, HandleScri
                 Rooted<NestedScopeObject*> innerBlock(cx, &obj->as<NestedScopeObject>());
 
                 RootedObject enclosingScope(cx);
-                if (NestedScopeObject* enclosingBlock = innerBlock->enclosingNestedScope())
-                    enclosingScope = objects[FindScopeObjectIndex(src, *enclosingBlock)];
-                else
+                if (NestedScopeObject* enclosingBlock = innerBlock->enclosingNestedScope()) {
+                    if (IsStaticGlobalLexicalScope(enclosingBlock)) {
+                        MOZ_ASSERT(IsStaticGlobalLexicalScope(scriptStaticScope) ||
+                                   scriptStaticScope->is<StaticNonSyntacticScopeObjects>());
+                        enclosingScope = scriptStaticScope;
+                    } else {
+                        enclosingScope = objects[FindScopeObjectIndex(src, *enclosingBlock)];
+                    }
+                } else {
                     enclosingScope = scriptStaticScope;
+                }
 
                 clone = CloneNestedScopeObject(cx, enclosingScope, innerBlock);
             } else if (obj->is<JSFunction>()) {
@@ -3328,7 +3366,13 @@ js::detail::CopyScript(JSContext* cx, HandleObject scriptStaticScope, HandleScri
                         MOZ_ASSERT(scriptStaticScope->is<JSFunction>());
                         enclosingScope = scriptStaticScope;
                     } else if (ssi.type() == StaticScopeIter<CanGC>::Block) {
-                        enclosingScope = objects[FindScopeObjectIndex(src, ssi.block())];
+                        if (ssi.block().isGlobal()) {
+                            MOZ_ASSERT(IsStaticGlobalLexicalScope(scriptStaticScope) ||
+                                       scriptStaticScope->is<StaticNonSyntacticScopeObjects>());
+                            enclosingScope = scriptStaticScope;
+                        } else {
+                            enclosingScope = objects[FindScopeObjectIndex(src, ssi.block())];
+                        }
                     } else {
                         enclosingScope = objects[FindScopeObjectIndex(src, ssi.staticWith())];
                     }
@@ -3478,8 +3522,8 @@ CreateEmptyScriptForClone(JSContext* cx, HandleObject enclosingScope, HandleScri
 JSScript*
 js::CloneGlobalScript(JSContext* cx, Handle<ScopeObject*> enclosingScope, HandleScript src)
 {
-    // No enclosingScope means clean global.
-    MOZ_ASSERT(!enclosingScope || enclosingScope->is<StaticNonSyntacticScopeObjects>());
+    MOZ_ASSERT(IsStaticGlobalLexicalScope(enclosingScope) ||
+               enclosingScope->is<StaticNonSyntacticScopeObjects>());
 
     RootedScript dst(cx, CreateEmptyScriptForClone(cx, enclosingScope, src));
     if (!dst)
@@ -3798,7 +3842,7 @@ JSScript::calculateLiveFixed(jsbytecode* pc)
                 staticScope = MaybeForwarded(staticScope);
         }
 
-        if (staticScope) {
+        if (staticScope && !IsStaticGlobalLexicalScope(staticScope)) {
             StaticBlockObject& blockObj = staticScope->as<StaticBlockObject>();
             nlivefixed = blockObj.localOffset() + blockObj.numVariables();
         }

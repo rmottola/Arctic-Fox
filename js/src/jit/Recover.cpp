@@ -1466,7 +1466,7 @@ RArrayState::recover(JSContext* cx, SnapshotIterator& iter) const
 }
 
 bool
-MAssertRecoveredOnBailout::writeRecoverData(CompactBufferWriter &writer) const
+MAssertRecoveredOnBailout::writeRecoverData(CompactBufferWriter& writer) const
 {
     MOZ_ASSERT(canRecoverOnBailout());
     MOZ_RELEASE_ASSERT(input()->isRecoveredOnBailout() == mustBeRecovered_,
@@ -1475,10 +1475,10 @@ MAssertRecoveredOnBailout::writeRecoverData(CompactBufferWriter &writer) const
     return true;
 }
 
-RAssertRecoveredOnBailout::RAssertRecoveredOnBailout(CompactBufferReader &reader)
+RAssertRecoveredOnBailout::RAssertRecoveredOnBailout(CompactBufferReader& reader)
 { }
 
-bool RAssertRecoveredOnBailout::recover(JSContext *cx, SnapshotIterator &iter) const
+bool RAssertRecoveredOnBailout::recover(JSContext* cx, SnapshotIterator& iter) const
 {
     RootedValue result(cx);
     result.setUndefined();

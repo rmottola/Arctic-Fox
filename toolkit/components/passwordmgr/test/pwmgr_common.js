@@ -259,6 +259,13 @@ function dumpLogin(label, login) {
     ok(true, label + loginText);
 }
 
+function getRecipeParent() {
+  var { LoginManagerParent } = SpecialPowers.Cu.import("resource://gre/modules/LoginManagerParent.jsm", {});
+  return LoginManagerParent.recipeParentPromise.then((recipeParent) => {
+    return SpecialPowers.wrap(recipeParent);
+  });
+}
+
 /**
  * Resolves when a specified number of forms have been processed.
  */
@@ -301,5 +308,10 @@ if (this.addMessageListener) {
   var globalMM = Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageListenerManager);
   globalMM.addMessageListener("RemoteLogins:onFormSubmit", function onFormSubmit(message) {
     sendAsyncMessage("formSubmissionProcessed", message.data, message.objects);
+  });
+} else {
+  // Code to only run in the mochitest pages (not in the chrome script).
+  SimpleTest.registerCleanupFunction(() => {
+    getRecipeParent().then(recipeParent => recipeParent.reset());
   });
 }

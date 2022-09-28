@@ -221,7 +221,7 @@ GetBuildConfiguration(JSContext* cx, unsigned argc, Value* vp)
     if (!JS_SetProperty(cx, info, "moz-memory", value))
         return false;
 
-    value.setInt32(sizeof(void *));
+    value.setInt32(sizeof(void*));
     if (!JS_SetProperty(cx, info, "pointer-byte-size", value))
         return false;
 
@@ -822,7 +822,7 @@ class HasChildTracer : public JS::CallbackTracer
             found_ = true;
     }
 
- public:
+  public:
     HasChildTracer(JSRuntime* rt, HandleValue child)
       : JS::CallbackTracer(rt, TraceWeakMapKeysValues), child_(rt, child), found_(false)
     {}
@@ -1417,12 +1417,11 @@ ShellObjectMetadataCallback(JSContext* cx, JSObject*)
 }
 
 static bool
-SetObjectMetadataCallback(JSContext* cx, unsigned argc, Value* vp)
+EnableShellObjectMetadataCallback(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    bool enabled = args.length() ? ToBoolean(args[0]) : false;
-    SetObjectMetadataCallback(cx, enabled ? ShellObjectMetadataCallback : nullptr);
+    SetObjectMetadataCallback(cx, ShellObjectMetadataCallback);
 
     args.rval().setUndefined();
     return true;
@@ -2345,7 +2344,8 @@ EvalReturningScope(JSContext* cx, unsigned argc, Value* vp)
         global = JS::CurrentGlobalOrNull(cx);
     }
 
-    RootedObject scope(cx);
+    RootedObject varObj(cx);
+    RootedObject lexicalScope(cx);
 
     {
         // If we're switching globals here, ExecuteInGlobalAndReturnScope will
@@ -2353,14 +2353,29 @@ EvalReturningScope(JSContext* cx, unsigned argc, Value* vp)
         // executing it.
         AutoCompartment ac(cx, global);
 
-        if (!js::ExecuteInGlobalAndReturnScope(cx, global, script, &scope))
+        if (!js::ExecuteInGlobalAndReturnScope(cx, global, script, &lexicalScope))
             return false;
+
+        varObj = lexicalScope->enclosingScope();
     }
 
-    if (!cx->compartment()->wrap(cx, &scope))
+    RootedObject rv(cx, JS_NewPlainObject(cx));
+    if (!rv)
         return false;
 
-    args.rval().setObject(*scope);
+    RootedValue varObjVal(cx, ObjectValue(*varObj));
+    if (!cx->compartment()->wrap(cx, &varObjVal))
+        return false;
+    if (!JS_SetProperty(cx, rv, "vars", varObjVal))
+        return false;
+
+    RootedValue lexicalScopeVal(cx, ObjectValue(*lexicalScope));
+    if (!cx->compartment()->wrap(cx, &lexicalScopeVal))
+        return false;
+    if (!JS_SetProperty(cx, rv, "lexicals", lexicalScopeVal))
+        return false;
+
+    args.rval().setObject(*rv);
     return true;
 }
 
@@ -2821,6 +2836,15 @@ GetLcovInfo(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
+static bool
+EnableNoSuchMethod(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    cx->runtime()->options().setNoSuchMethod(true);
+    args.rval().setUndefined();
+    return true;
+}
+
 #ifdef DEBUG
 static bool
 SetRNGState(JSContext* cx, unsigned argc, Value* vp)
@@ -3103,9 +3127,9 @@ gc::ZealModeHelpText),
 "isRelazifiableFunction(fun)",
 "  Ture if fun is a JSFunction with a relazifiable JSScript."),
 
-    JS_FN_HELP("setObjectMetadataCallback", SetObjectMetadataCallback, 1, 0,
-"setObjectMetadataCallback(fn)",
-"  Specify function to supply metadata for all newly created objects."),
+    JS_FN_HELP("enableShellObjectMetadataCallback", EnableShellObjectMetadataCallback, 0, 0,
+"enableShellObjectMetadataCallback()",
+"  Use ShellObjectMetadataCallback to supply metadata for all newly created objects."),
 
     JS_FN_HELP("getObjectMetadata", GetObjectMetadata, 1, 0,
 "getObjectMetadata(obj)",
@@ -3300,6 +3324,10 @@ gc::ZealModeHelpText),
 "getLcovInfo(global)",
 "  Generate LCOV tracefile for the given compartment.  If no global are provided then\n"
 "  the current global is used as the default one.\n"),
+
+    JS_FN_HELP("enableNoSuchMethod", EnableNoSuchMethod, 0, 0,
+"enableNoSuchMethod()",
+"  Enables the deprecated, non-standard __noSuchMethod__ feature.\n"),
 
 #ifdef DEBUG
     JS_FN_HELP("setRNGState", SetRNGState, 1, 0,

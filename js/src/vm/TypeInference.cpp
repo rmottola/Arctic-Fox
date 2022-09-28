@@ -2568,9 +2568,11 @@ UpdatePropertyType(ExclusiveContext* cx, HeapTypeSet* types, NativeObject* obj, 
          * comment).
          *
          * Also don't add untracked values (initial uninitialized lexical
-         * magic values and optimized out values) as appearing in CallObjects.
+         * magic values and optimized out values) as appearing in CallObjects
+         * and the global lexical scope.
          */
-        MOZ_ASSERT_IF(TypeSet::IsUntrackedValue(value), obj->is<CallObject>());
+        MOZ_ASSERT_IF(TypeSet::IsUntrackedValue(value),
+                      obj->is<CallObject>() || IsExtensibleLexicalScope(obj));
         if ((indexed || !value.isUndefined() || !CanHaveEmptyPropertyTypesForOwnProperty(obj)) &&
             !TypeSet::IsUntrackedValue(value))
         {
@@ -4473,3 +4475,11 @@ TypeScript::printTypes(JSContext* cx, HandleScript script) const
     fprintf(stderr, "\n");
 }
 #endif /* DEBUG */
+
+JS::ubi::Node::Size
+JS::ubi::Concrete<js::ObjectGroup>::size(mozilla::MallocSizeOf mallocSizeOf) const
+{
+    Size size = js::gc::Arena::thingSize(get().asTenured().getAllocKind());
+    size += get().sizeOfExcludingThis(mallocSizeOf);
+    return size;
+}

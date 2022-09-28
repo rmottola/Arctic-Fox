@@ -28,6 +28,7 @@
 #include "mozilla/IMEStateManager.h"
 #include "mozilla/ipc/DocumentRendererParent.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
+#include "mozilla/layers/AsyncDragMetrics.h"
 #include "mozilla/layers/CompositorParent.h"
 #include "mozilla/layers/InputAPZContext.h"
 #include "mozilla/layout/RenderFrameParent.h"
@@ -1440,14 +1441,19 @@ bool TabParent::SendRealMouseEvent(WidgetMouseEvent& event)
     }
   }
 
+  ScrollableLayerGuid guid;
+  uint64_t blockId;
+  ApzAwareEventRoutingToChild(&guid, &blockId, nullptr);
+
   if (eMouseMove == event.mMessage) {
     if (event.reason == WidgetMouseEvent::eSynthesized) {
-      return SendSynthMouseMoveEvent(event);
+      return SendSynthMouseMoveEvent(event, guid, blockId);
     } else {
-      return SendRealMouseMoveEvent(event);
+      return SendRealMouseMoveEvent(event, guid, blockId);
     }
   }
-  return SendRealMouseButtonEvent(event);
+
+  return SendRealMouseButtonEvent(event, guid, blockId);
 }
 
 LayoutDeviceToCSSScale
@@ -1953,7 +1959,7 @@ TabParent::RecvSetCustomCursor(const nsCString& aCursorData,
     }
 
     if (mTabSetsCursor) {
-      const gfxIntSize size(aWidth, aHeight);
+      const gfx::IntSize size(aWidth, aHeight);
 
       mozilla::RefPtr<gfx::DataSourceSurface> customCursor = new mozilla::gfx::SourceSurfaceRawData();
       mozilla::gfx::SourceSurfaceRawData* raw = static_cast<mozilla::gfx::SourceSurfaceRawData*>(customCursor.get());
@@ -1971,15 +1977,6 @@ TabParent::RecvSetCustomCursor(const nsCString& aCursorData,
     }
   }
 
-  return true;
-}
-
-bool
-TabParent::RecvSetBackgroundColor(const nscolor& aColor)
-{
-  if (RenderFrameParent* frame = GetRenderFrame()) {
-    frame->SetBackgroundColor(aColor);
-  }
   return true;
 }
 
@@ -2931,6 +2928,15 @@ TabParent::RecvSetTargetAPZC(const uint64_t& aInputBlockId,
 {
   if (RenderFrameParent* rfp = GetRenderFrame()) {
     rfp->SetTargetAPZC(aInputBlockId, aTargets);
+  }
+  return true;
+}
+
+bool
+TabParent::RecvStartScrollbarDrag(const AsyncDragMetrics& aDragMetrics)
+{
+  if (RenderFrameParent* rfp = GetRenderFrame()) {
+    rfp->StartScrollbarDrag(aDragMetrics);
   }
   return true;
 }

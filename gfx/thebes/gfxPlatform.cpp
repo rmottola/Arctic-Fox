@@ -52,13 +52,18 @@
 #include "gfxGraphiteShaper.h"
 #include "gfx2DGlue.h"
 #include "gfxGradientCache.h"
+#include "gfxUtils.h" // for NextPowerOfTwo
 
 #include "nsUnicodeRange.h"
 #include "nsServiceManagerUtils.h"
 #include "nsTArray.h"
 #include "nsILocaleService.h"
 #include "nsIObserverService.h"
+#include "nsIScreenManager.h"
 #include "MainThreadUtils.h"
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
 
 #include "nsWeakReference.h"
 
@@ -86,12 +91,20 @@
 #endif
 
 #include "mozilla/Hal.h"
+
 #ifdef USE_SKIA
-#include "skia/include/core/SkGraphics.h"
+# ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wshadow"
+# endif
+# include "skia/include/core/SkGraphics.h"
 # ifdef USE_SKIA_GPU
 #  include "skia/include/gpu/GrContext.h"
 #  include "skia/include/gpu/gl/GrGLInterface.h"
 #  include "SkiaGLGlue.h"
+# endif
+# ifdef __GNUC__
+#  pragma GCC diagnostic pop // -Wshadow
 # endif
 #endif
 
@@ -351,71 +364,26 @@ MemoryPressureObserver::Observe(nsISupports *aSubject,
     return NS_OK;
 }
 
-// this needs to match the list of pref font.default.xx entries listed in all.js!
-// the order *must* match the order in eFontPrefLang
+// xxx - this can probably be eliminated by reworking pref font handling code
 static const char *gPrefLangNames[] = {
-    "x-western",
-    "ja",
-    "zh-TW",
-    "zh-CN",
-    "zh-HK",
-    "ko",
-    "x-cyrillic",
-    "el",
-    "th",
-    "he",
-    "ar",
-    "x-devanagari",
-    "x-tamil",
-    "x-armn",
-    "x-beng",
-    "x-cans",
-    "x-ethi",
-    "x-geor",
-    "x-gujr",
-    "x-guru",
-    "x-khmr",
-    "x-mlym",
-    "x-orya",
-    "x-telu",
-    "x-knda",
-    "x-sinh",
-    "x-tibt",
-    "x-unicode",
+    #define FONT_PREF_LANG(enum_id_, str_, atom_id_) str_
+    #include "gfxFontPrefLangList.h"
+    #undef FONT_PREF_LANG
 };
 
-// this needs to match the list of pref font.default.xx entries listed in all.js!
-// the order *must* match the order in eFontPrefLang
-static nsIAtom* gPrefLangToLangGroups[] = {
-    nsGkAtoms::x_western,
-    nsGkAtoms::Japanese,
-    nsGkAtoms::Taiwanese,
-    nsGkAtoms::Chinese,
-    nsGkAtoms::HongKongChinese,
-    nsGkAtoms::ko,
-    nsGkAtoms::x_cyrillic,
-    nsGkAtoms::el,
-    nsGkAtoms::th,
-    nsGkAtoms::he,
-    nsGkAtoms::ar,
-    nsGkAtoms::x_devanagari,
-    nsGkAtoms::x_tamil,
-    nsGkAtoms::x_armn,
-    nsGkAtoms::x_beng,
-    nsGkAtoms::x_cans,
-    nsGkAtoms::x_ethi,
-    nsGkAtoms::x_geor,
-    nsGkAtoms::x_gujr,
-    nsGkAtoms::x_guru,
-    nsGkAtoms::x_khmr,
-    nsGkAtoms::x_mlym,
-    nsGkAtoms::x_orya,
-    nsGkAtoms::x_telu,
-    nsGkAtoms::x_knda,
-    nsGkAtoms::x_sinh,
-    nsGkAtoms::x_tibt,
-    nsGkAtoms::Unicode
-};
+static nsIAtom* PrefLangToLangGroups(uint32_t aIndex)
+{
+    // static array here avoids static constructor
+    static nsIAtom* gPrefLangToLangGroups[] = {
+        #define FONT_PREF_LANG(enum_id_, str_, atom_id_) nsGkAtoms::atom_id_
+        #include "gfxFontPrefLangList.h"
+        #undef FONT_PREF_LANG
+    };
+
+    return aIndex < ArrayLength(gPrefLangToLangGroups)
+         ? gPrefLangToLangGroups[aIndex]
+         : nsGkAtoms::Unicode;
+}
 
 gfxPlatform::gfxPlatform()
   : mTileWidth(-1)
@@ -423,6 +391,7 @@ gfxPlatform::gfxPlatform()
   , mAzureCanvasBackendCollector(this, &gfxPlatform::GetAzureBackendInfo)
   , mApzSupportCollector(this, &gfxPlatform::GetApzSupportInfo)
   , mCompositorBackend(layers::LayersBackend::LAYERS_NONE)
+  , mScreenDepth(0)
 {
     mAllowDownloadableFonts = UNINITIALIZED_VALUE;
     mFallbackUsesCmaps = UNINITIALIZED_VALUE;
@@ -495,6 +464,7 @@ void RecordingPrefChanged(const char *aPrefName, void *aClosure)
 void
 gfxPlatform::Init()
 {
+    MOZ_RELEASE_ASSERT(NS_IsMainThread());
     if (gEverInitialized) {
         NS_RUNTIMEABORT("Already started???");
     }
@@ -546,6 +516,9 @@ gfxPlatform::Init()
 
     InitLayersAccelerationPrefs();
     InitLayersIPC();
+
+    gPlatform->PopulateScreenInfo();
+    gPlatform->ComputeTileSize();
 
     nsresult rv;
 
@@ -619,8 +592,12 @@ gfxPlatform::Init()
 
     RegisterStrongMemoryReporter(new GfxMemoryImageReporter());
 
-    if (XRE_IsParentProcess() && gfxPrefs::HardwareVsyncEnabled()) {
-      gPlatform->mVsyncSource = gPlatform->CreateHardwareVsyncSource();
+    if (XRE_IsParentProcess()) {
+      if (gfxPlatform::ForceSoftwareVsync()) {
+        gPlatform->mVsyncSource = (gPlatform)->gfxPlatform::CreateHardwareVsyncSource();
+      } else {
+        gPlatform->mVsyncSource = gPlatform->CreateHardwareVsyncSource();
+      }
     }
 }
 
@@ -719,14 +696,10 @@ gfxPlatform::InitLayersIPC()
     if (XRE_IsParentProcess())
     {
         mozilla::layers::CompositorParent::StartUp();
-#ifndef MOZ_WIDGET_GONK
-        if (gfxPrefs::AsyncVideoEnabled()) {
-            mozilla::layers::ImageBridgeChild::StartUp();
-        }
-#else
-        mozilla::layers::ImageBridgeChild::StartUp();
+#ifdef MOZ_WIDGET_GONK
         SharedBufferManagerChild::StartUp();
 #endif
+        mozilla::layers::ImageBridgeChild::StartUp();
     }
 }
 
@@ -1051,31 +1024,53 @@ gfxPlatform::ComputeTileSize()
   // The tile size should be picked in the parent processes
   // and sent to the child processes over IPDL GetTileSize.
   if (!XRE_IsParentProcess()) {
-    NS_RUNTIMEABORT("wrong process.");
+    return;
   }
 
   int32_t w = gfxPrefs::LayersTileWidth();
   int32_t h = gfxPrefs::LayersTileHeight();
 
-  // TODO We may want to take the screen size into consideration here.
   if (gfxPrefs::LayersTilesAdjust()) {
+    gfx::IntSize screenSize = GetScreenSize();
+    if (screenSize.width > 0) {
+      // FIXME: we should probably make sure this is within the max texture size,
+      // but I think everything should at least support 1024
+      w = h = std::max(std::min(NextPowerOfTwo(screenSize.width) / 2, 1024), 256);
+    }
+
 #ifdef MOZ_WIDGET_GONK
-    int32_t format = android::PIXEL_FORMAT_RGBA_8888;
     android::sp<android::GraphicBuffer> alloc =
-      new android::GraphicBuffer(gfxPrefs::LayersTileWidth(), gfxPrefs::LayersTileHeight(),
-                                 format,
-                                 android::GraphicBuffer::USAGE_SW_READ_OFTEN |
-                                 android::GraphicBuffer::USAGE_SW_WRITE_OFTEN |
-                                 android::GraphicBuffer::USAGE_HW_TEXTURE);
+          new android::GraphicBuffer(w, h, android::PIXEL_FORMAT_RGBA_8888,
+                                     android::GraphicBuffer::USAGE_SW_READ_OFTEN |
+                                     android::GraphicBuffer::USAGE_SW_WRITE_OFTEN |
+                                     android::GraphicBuffer::USAGE_HW_TEXTURE);
 
     if (alloc.get()) {
       w = alloc->getStride(); // We want the tiles to be gralloc stride aligned.
-      // No need to adjust the height here.
     }
 #endif
   }
 
   SetTileSize(w, h);
+}
+
+void
+gfxPlatform::PopulateScreenInfo()
+{
+  nsCOMPtr<nsIScreenManager> manager = do_GetService("@mozilla.org/gfx/screenmanager;1");
+  MOZ_ASSERT(manager, "failed to get nsIScreenManager");
+
+  nsCOMPtr<nsIScreen> screen;
+  manager->GetPrimaryScreen(getter_AddRefs(screen));
+  if (!screen) {
+    // This can happen in xpcshell, for instance
+    return;
+  }
+
+  screen->GetColorDepth(&mScreenDepth);
+
+  int left, top;
+  screen->GetRect(&left, &top, &mScreenSize.width, &mScreenSize.height);
 }
 
 bool
@@ -1369,58 +1364,6 @@ gfxPlatform::MakePlatformFont(const nsAString& aFontName,
     return nullptr;
 }
 
-static void
-AppendGenericFontFromPref(nsString& aFonts, nsIAtom *aLangGroup, const char *aGenericName)
-{
-    NS_ENSURE_TRUE_VOID(Preferences::GetRootBranch());
-
-    nsAutoCString prefName, langGroupString;
-
-    aLangGroup->ToUTF8String(langGroupString);
-
-    nsAutoCString genericDotLang;
-    if (aGenericName) {
-        genericDotLang.Assign(aGenericName);
-    } else {
-        prefName.AssignLiteral("font.default.");
-        prefName.Append(langGroupString);
-        genericDotLang = Preferences::GetCString(prefName.get());
-    }
-
-    genericDotLang.Append('.');
-    genericDotLang.Append(langGroupString);
-
-    // fetch font.name.xxx value
-    prefName.AssignLiteral("font.name.");
-    prefName.Append(genericDotLang);
-    nsAdoptingString nameValue = Preferences::GetString(prefName.get());
-    if (nameValue) {
-        if (!aFonts.IsEmpty())
-            aFonts.AppendLiteral(", ");
-        aFonts += nameValue;
-    }
-
-    // fetch font.name-list.xxx value
-    prefName.AssignLiteral("font.name-list.");
-    prefName.Append(genericDotLang);
-    nsAdoptingString nameListValue = Preferences::GetString(prefName.get());
-    if (nameListValue && !nameListValue.Equals(nameValue)) {
-        if (!aFonts.IsEmpty())
-            aFonts.AppendLiteral(", ");
-        aFonts += nameListValue;
-    }
-}
-
-void
-gfxPlatform::GetPrefFonts(nsIAtom *aLanguage, nsString& aFonts, bool aAppendUnicode)
-{
-    aFonts.Truncate();
-
-    AppendGenericFontFromPref(aFonts, aLanguage, nullptr);
-    if (aAppendUnicode)
-        AppendGenericFontFromPref(aFonts, nsGkAtoms::Unicode, nullptr);
-}
-
 bool gfxPlatform::ForEachPrefFont(eFontPrefLang aLangArray[], uint32_t aLangArrayLen, PrefFontCallback aCallback,
                                     void *aClosure)
 {
@@ -1512,10 +1455,7 @@ gfxPlatform::GetLangGroupForPrefLang(eFontPrefLang aLang)
     // calls to individual CJK pref langs before getting here
     NS_ASSERTION(aLang != eFontPrefLang_CJKSet, "unresolved CJK set pref lang");
 
-    if (uint32_t(aLang) < ArrayLength(gPrefLangToLangGroups)) {
-        return gPrefLangToLangGroups[uint32_t(aLang)];
-    }
-    return nsGkAtoms::Unicode;
+    return PrefLangToLangGroups(uint32_t(aLang));
 }
 
 const char*
@@ -1876,12 +1816,12 @@ gfxPlatform::TransformPixel(const Color& in, Color& out, qcms_transform *transfo
         out = Color::FromABGR(packed);
 #else
         /* ARGB puts the bytes in |ARGB| order on big endian */
-        uint32_t packed = in.ToARGB();
+        uint32_t packed = in.UnusualToARGB();
         /* add one to move past the alpha byte */
         qcms_transform_data(transform,
                        (uint8_t *)&packed + 1, (uint8_t *)&packed + 1,
                        1);
-        out = Color::FromARGB(packed);
+        out = Color::UnusualFromARGB(packed);
 #endif
     }
 
@@ -2150,34 +2090,20 @@ gfxPlatform::GetLog(eGfxLog aWhichLog)
     switch (aWhichLog) {
     case eGfxLog_fontlist:
         return sFontlistLog;
-        break;
     case eGfxLog_fontinit:
         return sFontInitLog;
-        break;
     case eGfxLog_textrun:
         return sTextrunLog;
-        break;
     case eGfxLog_textrunui:
         return sTextrunuiLog;
-        break;
     case eGfxLog_cmapdata:
         return sCmapDataLog;
-        break;
     case eGfxLog_textperf:
         return sTextPerfLog;
-        break;
-    default:
-        break;
     }
 
+    MOZ_ASSERT_UNREACHABLE("Unexpected log type");
     return nullptr;
-}
-
-int
-gfxPlatform::GetScreenDepth() const
-{
-    NS_WARNING("GetScreenDepth not implemented on this platform -- returning 0!");
-    return 0;
 }
 
 mozilla::gfx::SurfaceFormat
@@ -2421,6 +2347,13 @@ gfxPlatform::UsesOffMainThreadCompositing()
 }
 
 
+/***
+ * The preference "layout.frame_rate" has 3 meanings depending on the value:
+ *
+ * -1 = Auto (default), use hardware vsync or software vsync @ 60 hz if hw vsync fails.
+ *  0 = ASAP mode - used during talos testing.
+ *  X = Software vsync at a rate of X times per second.
+ */
 already_AddRefed<mozilla::gfx::VsyncSource>
 gfxPlatform::CreateHardwareVsyncSource()
 {
@@ -2438,6 +2371,29 @@ gfxPlatform::IsInLayoutAsapMode()
   // goes at whatever the configurated rate is. This only checks the version
   // talos uses, which is the refresh driver and compositor are in lockstep.
   return Preferences::GetInt("layout.frame_rate", -1) == 0;
+}
+
+/* static */ bool
+gfxPlatform::ForceSoftwareVsync()
+{
+  return Preferences::GetInt("layout.frame_rate", -1) > 0;
+}
+
+/* static */ int
+gfxPlatform::GetSoftwareVsyncRate()
+{
+  int preferenceRate = Preferences::GetInt("layout.frame_rate",
+                                           gfxPlatform::GetDefaultFrameRate());
+  if (preferenceRate <= 0) {
+    return gfxPlatform::GetDefaultFrameRate();
+  }
+  return preferenceRate;
+}
+
+/* static */ int
+gfxPlatform::GetDefaultFrameRate()
+{
+  return 60;
 }
 
 static nsString
@@ -2486,6 +2442,10 @@ gfxPlatform::GetApzSupportInfo(mozilla::widget::InfoObject& aObj)
 
   if (SupportsApzTouchInput()) {
     aObj.DefineProperty("ApzTouchInput", 1);
+  }
+
+  if (SupportsApzDragInput()) {
+    aObj.DefineProperty("ApzDragInput", 1);
   }
 }
 
@@ -2571,15 +2531,20 @@ gfxPlatform::NotifyCompositorCreated(LayersBackend aBackend)
     return;
   }
 
-  NS_ASSERTION(mCompositorBackend == LayersBackend::LAYERS_NONE, "Compositor backend changed.");
+  if (mCompositorBackend != LayersBackend::LAYERS_NONE) {
+    gfxCriticalNote << "Compositors might be mixed ("
+      << int(mCompositorBackend) << "," << int(aBackend) << ")";
+  }
 
   // Set the backend before we notify so it's available immediately.
   mCompositorBackend = aBackend;
 
   // Notify that we created a compositor, so telemetry can update.
-  if (nsCOMPtr<nsIObserverService> obsvc = services::GetObserverService()) {
-    obsvc->NotifyObservers(nullptr, "compositor:created", nullptr);
-  }
+  NS_DispatchToMainThread(NS_NewRunnableFunction([] {
+    if (nsCOMPtr<nsIObserverService> obsvc = services::GetObserverService()) {
+      obsvc->NotifyObservers(nullptr, "compositor:created", nullptr);
+    }
+  }));
 }
 
 void
@@ -2601,4 +2566,10 @@ gfxPlatform::UpdateDeviceInitData()
   mozilla::dom::ContentChild::GetSingleton()->SendGetGraphicsDeviceInitData(&data);
 
   SetDeviceInitData(data);
+}
+
+bool
+gfxPlatform::SupportsApzDragInput() const
+{
+  return gfxPrefs::APZDragEnabled();
 }

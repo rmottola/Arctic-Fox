@@ -170,6 +170,7 @@ enum class GLRenderer {
     AdrenoTM200,
     AdrenoTM205,
     AdrenoTM320,
+    AdrenoTM420,
     SGX530,
     SGX540,
     Tegra,
@@ -1537,15 +1538,15 @@ public:
         AFTER_GL_CALL;
     }
 
-    void fStencilFunc(GLenum func, GLint ref, GLuint mask) {
+    void fStencilFunc(GLenum func, GLint reference, GLuint mask) {
         BEFORE_GL_CALL;
-        mSymbols.fStencilFunc(func, ref, mask);
+        mSymbols.fStencilFunc(func, reference, mask);
         AFTER_GL_CALL;
     }
 
-    void fStencilFuncSeparate(GLenum frontfunc, GLenum backfunc, GLint ref, GLuint mask) {
+    void fStencilFuncSeparate(GLenum frontfunc, GLenum backfunc, GLint reference, GLuint mask) {
         BEFORE_GL_CALL;
-        mSymbols.fStencilFuncSeparate(frontfunc, backfunc, ref, mask);
+        mSymbols.fStencilFuncSeparate(frontfunc, backfunc, reference, mask);
         AFTER_GL_CALL;
     }
 
@@ -3504,6 +3505,7 @@ protected:
     GLint mMaxViewportDims[2];
     GLsizei mMaxSamples;
     bool mNeedsTextureSizeChecks;
+    bool mNeedsFlushBeforeDeleteFB;
     bool mWorkAroundDriverBugs;
 
     bool IsTextureSizeSafeToPassToDriver(GLenum target, GLsizei width, GLsizei height) const {

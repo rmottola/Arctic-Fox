@@ -206,7 +206,7 @@ class MOZ_STACK_CLASS SavedFrame::AutoLookupVector : public JS::CustomAutoRooter
         lookups(cx)
     { }
 
-    typedef Vector<Lookup, 20> LookupVector;
+    typedef Vector<Lookup, ASYNC_STACK_MAX_FRAME_COUNT> LookupVector;
     inline LookupVector* operator->() { return &lookups; }
     inline HandleLookup operator[](size_t i) { return HandleLookup(lookups[i]); }
 
@@ -736,7 +736,7 @@ GetSavedFrameParent(JSContext* cx, HandleObject savedFrame, MutableHandleObject 
 }
 
 JS_PUBLIC_API(bool)
-BuildStackString(JSContext* cx, HandleObject stack, MutableHandleString stringp)
+BuildStackString(JSContext* cx, HandleObject stack, MutableHandleString stringp, size_t indent)
 {
     js::StringBuffer sb(cx);
 
@@ -763,7 +763,8 @@ BuildStackString(JSContext* cx, HandleObject stack, MutableHandleString stringp)
                     asyncCause.set(cx->names().Async);
 
                 js::RootedAtom name(cx, frame->getFunctionDisplayName());
-                if ((asyncCause && (!sb.append(asyncCause) || !sb.append('*')))
+                if ((indent && !sb.appendN(' ', indent))
+                    || (asyncCause && (!sb.append(asyncCause) || !sb.append('*')))
                     || (name && !sb.append(name))
                     || !sb.append('@')
                     || !sb.append(frame->getSource())
@@ -1140,29 +1141,50 @@ SavedStacks::adoptAsyncStack(JSContext* cx, HandleSavedFrame asyncStack,
     // stack frames, but async stacks are not limited by the available stack
     // memory, so we need to set an arbitrary limit when collecting them. We
     // still don't enforce an upper limit if the caller requested more frames.
-    if (maxFrameCount == 0)
-        maxFrameCount = ASYNC_STACK_MAX_FRAME_COUNT;
+    unsigned maxFrames = maxFrameCount > 0 ? maxFrameCount : ASYNC_STACK_MAX_FRAME_COUNT;
 
     // Accumulate the vector of Lookup objects in |stackChain|.
     SavedFrame::AutoLookupVector stackChain(cx);
     SavedFrame* currentSavedFrame = asyncStack;
-    for (unsigned i = 0; i < maxFrameCount && currentSavedFrame; i++) {
+    SavedFrame* firstSavedFrameParent = nullptr;
+    for (unsigned i = 0; i < maxFrames && currentSavedFrame; i++) {
         if (!stackChain->emplaceBack(*currentSavedFrame)) {
             ReportOutOfMemory(cx);
             return false;
         }
 
-        // Attach the asyncCause to the youngest frame.
-        if (i == 0)
-            stackChain->back().asyncCause = asyncCauseAtom;
-
         currentSavedFrame = currentSavedFrame->getParent();
+
+        // Attach the asyncCause to the youngest frame.
+        if (i == 0) {
+            stackChain->back().asyncCause = asyncCauseAtom;
+            firstSavedFrameParent = currentSavedFrame;
+        }
+    }
+
+    // This is the 1-based index of the oldest frame we care about.
+    size_t oldestFramePosition = stackChain->length();
+    RootedSavedFrame parentFrame(cx, nullptr);
+
+    if (currentSavedFrame == nullptr &&
+        asyncStack->compartment() == cx->compartment()) {
+        // If we consumed the full async stack, and the stack is in the same
+        // compartment as the one requested, we don't need to rebuild the full
+        // chain again using the lookup objects, we can just reference the
+        // existing chain and change the asyncCause on the younger frame.
+        oldestFramePosition = 1;
+        parentFrame = firstSavedFrameParent;
+    } else if (maxFrameCount == 0 &&
+               oldestFramePosition == ASYNC_STACK_MAX_FRAME_COUNT) {
+        // If we captured the maximum number of frames and the caller requested
+        // no specific limit, we only return half of them. This means that for
+        // the next iterations, it's likely we can use the optimization above.
+        oldestFramePosition = ASYNC_STACK_MAX_FRAME_COUNT / 2;
     }
 
     // Iterate through |stackChain| in reverse order and get or create the
     // actual SavedFrame instances.
-    RootedSavedFrame parentFrame(cx, nullptr);
-    for (size_t i = stackChain->length(); i != 0; i--) {
+    for (size_t i = oldestFramePosition; i != 0; i--) {
         SavedFrame::HandleLookup lookup = stackChain[i-1];
         lookup->parent = parentFrame;
         parentFrame.set(getOrCreateSavedFrame(cx, lookup));
@@ -1311,6 +1333,7 @@ SavedStacks::chooseSamplingProbability(JSContext* cx)
         return;
 
     mozilla::DebugOnly<Debugger**> begin = dbgs->begin();
+    mozilla::DebugOnly<bool> foundAnyDebuggers = false;
 
     allocationSamplingProbability = 0;
     for (Debugger** dbgp = dbgs->begin(); dbgp < dbgs->end(); dbgp++) {
@@ -1319,10 +1342,12 @@ SavedStacks::chooseSamplingProbability(JSContext* cx)
         MOZ_ASSERT(dbgs->begin() == begin);
 
         if ((*dbgp)->trackingAllocationSites && (*dbgp)->enabled) {
+            foundAnyDebuggers = true;
             allocationSamplingProbability = std::max((*dbgp)->allocationSamplingProbability,
                                                      allocationSamplingProbability);
         }
     }
+    MOZ_ASSERT(foundAnyDebuggers);
 }
 
 JSObject*

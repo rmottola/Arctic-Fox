@@ -32,8 +32,13 @@
 #include "nsIChannelEventSink.h"
 #include "nsAsyncRedirectVerifyHelper.h"
 #include "mozilla/LoadInfo.h"
+#include "nsISiteSecurityService.h"
 
 #include "mozilla/Logging.h"
+#include "mozilla/Telemetry.h"
+#include "mozilla/dom/ContentChild.h"
+#include "mozilla/ipc/URIUtils.h"
+
 
 using namespace mozilla;
 
@@ -343,7 +348,7 @@ nsMixedContentBlocker::ShouldLoad(uint32_t aContentType,
   // callers of this method don't know whether the load went through cached
   // image redirects.  This is handled by direct callers of the static
   // ShouldLoad.
-  nsresult rv = ShouldLoad(false,   //aHadInsecureImageRedirect
+  nsresult rv = ShouldLoad(false,   // aHadInsecureImageRedirect
                            aContentType,
                            aContentLocation,
                            aRequestingLocation,
@@ -392,7 +397,6 @@ nsMixedContentBlocker::ShouldLoad(bool aHadInsecureImageRedirect,
   // Make decision to block/reject by default
   *aDecision = REJECT_REQUEST;
 
-
   // Notes on non-obvious decisions:
   //
   // TYPE_DTD: A DTD can contain entity definitions that expand to scripts.
@@ -417,16 +421,15 @@ nsMixedContentBlocker::ShouldLoad(bool aHadInsecureImageRedirect,
   // Also, PING requests have no bearing on the rendering or operation of
   // the page when used as designed, so even though they are lower risk than
   // scripts, blocking them is basically risk-free as far as compatibility is
-  // concerned.  Ping is turned off by default in Firefox, so unless a user
-  // opts into ping, no request will be made.  Categorizing this as Mixed
-  // Display Content for now, but this is subject to change.
+  // concerned.
   //
   // TYPE_STYLESHEET: XSLT stylesheets can insert scripts. CSS positioning
   // and other advanced CSS features can possibly be exploited to cause
   // spoofing attacks (e.g. make a "grant permission" button look like a
   // "refuse permission" button).
   //
-  // TYPE_BEACON: Beacon requests are similar to TYPE_PING, but are default on.
+  // TYPE_BEACON: Beacon requests are similar to TYPE_PING, and are blocked by
+  // default.
   //
   // TYPE_WEBSOCKET: The Websockets API requires browsers to
   // reject mixed-content websockets: "If secure is false but the origin of
@@ -470,23 +473,23 @@ nsMixedContentBlocker::ShouldLoad(bool aHadInsecureImageRedirect,
     case TYPE_IMAGE:
     case TYPE_MEDIA:
     case TYPE_OBJECT_SUBREQUEST:
-    case TYPE_PING:
-    case TYPE_BEACON:
       classification = eMixedDisplay;
       break;
 
     // Active content (or content with a low value/risk-of-blocking ratio)
     // that has been explicitly evaluated; listed here for documentation
     // purposes and to avoid the assertion and warning for the default case.
-    case TYPE_IMAGESET:
+    case TYPE_BEACON:
     case TYPE_CSP_REPORT:
     case TYPE_DTD:
     case TYPE_FETCH:
     case TYPE_FONT:
+    case TYPE_IMAGESET:
     case TYPE_OBJECT:
     case TYPE_SCRIPT:
     case TYPE_STYLESHEET:
     case TYPE_SUBDOCUMENT:
+    case TYPE_PING:
     case TYPE_WEB_MANIFEST:
     case TYPE_XBL:
     case TYPE_XMLHTTPREQUEST:
@@ -615,7 +618,14 @@ nsMixedContentBlocker::ShouldLoad(bool aHadInsecureImageRedirect,
   // Check the parent scheme. If it is not an HTTPS page then mixed content
   // restrictions do not apply.
   bool parentIsHttps;
-  nsresult rv = requestingLocation->SchemeIs("https", &parentIsHttps);
+  nsCOMPtr<nsIURI> innerURI = NS_GetInnermostURI(requestingLocation);
+  if (!innerURI) {
+    NS_ERROR("Can't get innerURI from requestingLocation");
+    *aDecision = REJECT_REQUEST;
+    return NS_OK;
+  }
+
+  nsresult rv = innerURI->SchemeIs("https", &parentIsHttps);
   if (NS_FAILED(rv)) {
     NS_ERROR("requestingLocation->SchemeIs failed");
     *aDecision = REJECT_REQUEST;
@@ -739,6 +749,33 @@ nsMixedContentBlocker::ShouldLoad(bool aHadInsecureImageRedirect,
     return NS_OK;
   }
   nsresult stateRV = securityUI->GetState(&state);
+
+  // At this point we know that the request is mixed content, and the only
+  // question is whether we block it.  Record telemetry at this point as to
+  // whether HSTS would have fixed things by making the content location
+  // into an HTTPS URL.
+  //
+  // Note that we count this for redirects as well as primary requests. This
+  // will cause some degree of double-counting, especially when mixed content
+  // is not blocked (e.g., for images).  For more detail, see:
+  //   https://bugzilla.mozilla.org/show_bug.cgi?id=1198572#c19
+  //
+  // We do not count requests aHadInsecureImageRedirect=true, since these are
+  // just an artifact of the image caching system.
+  bool active = (classification == eMixedScript);
+  if (!aHadInsecureImageRedirect) {
+    if (XRE_IsParentProcess()) {
+      AccumulateMixedContentHSTS(aContentLocation, active);
+    } else {
+      // Ask the parent process to do the same call
+      mozilla::dom::ContentChild* cc = mozilla::dom::ContentChild::GetSingleton();
+      if (cc) {
+        mozilla::ipc::URIParams uri;
+        SerializeURI(aContentLocation, uri);
+        cc->SendAccumulateMixedContentHSTS(uri, active);
+      }
+    }
+  }
 
   // If the content is display content, and the pref says display content should be blocked, block it.
   if (sBlockMixedDisplay && classification == eMixedDisplay) {
@@ -878,4 +915,55 @@ nsMixedContentBlocker::ShouldProcess(uint32_t aContentType,
   return ShouldLoad(aContentType, aContentLocation, aRequestingLocation,
                     aRequestingContext, aMimeGuess, aExtra, aRequestPrincipal,
                     aDecision);
+}
+
+enum MixedContentHSTSState {
+  MCB_HSTS_PASSIVE_NO_HSTS   = 0,
+  MCB_HSTS_PASSIVE_WITH_HSTS = 1,
+  MCB_HSTS_ACTIVE_NO_HSTS    = 2,
+  MCB_HSTS_ACTIVE_WITH_HSTS  = 3
+};
+
+// Record information on when HSTS would have made mixed content not mixed
+// content (regardless of whether it was actually blocked)
+void
+nsMixedContentBlocker::AccumulateMixedContentHSTS(nsIURI* aURI, bool aActive)
+{
+  // This method must only be called in the parent, because
+  // nsSiteSecurityService is only available in the parent
+  if (!XRE_IsParentProcess()) {
+    MOZ_ASSERT(false);
+    return;
+  }
+
+  bool hsts;
+  nsresult rv;
+  nsCOMPtr<nsISiteSecurityService> sss = do_GetService(NS_SSSERVICE_CONTRACTID, &rv);
+  if (NS_FAILED(rv)) {
+    return;
+  }
+  rv = sss->IsSecureURI(nsISiteSecurityService::HEADER_HSTS, aURI, 0, &hsts);
+  if (NS_FAILED(rv)) {
+    return;
+  }
+
+  if (!aActive) {
+    if (!hsts) {
+      Telemetry::Accumulate(Telemetry::MIXED_CONTENT_HSTS,
+                            MCB_HSTS_PASSIVE_NO_HSTS);
+    }
+    else {
+      Telemetry::Accumulate(Telemetry::MIXED_CONTENT_HSTS,
+                            MCB_HSTS_PASSIVE_WITH_HSTS);
+    }
+  } else {
+    if (!hsts) {
+      Telemetry::Accumulate(Telemetry::MIXED_CONTENT_HSTS,
+                            MCB_HSTS_ACTIVE_NO_HSTS);
+    }
+    else {
+      Telemetry::Accumulate(Telemetry::MIXED_CONTENT_HSTS,
+                            MCB_HSTS_ACTIVE_WITH_HSTS);
+    }
+  }
 }

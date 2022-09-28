@@ -1462,15 +1462,12 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
         Ret(vixl::ip0);
     }
 
-    void j(Condition code, Label* dest) {
-        b(dest, code);
-    }
-    void j(Label* dest) {
-        b(dest, Always);
+    void j(Condition cond, Label* dest) {
+        B(dest, cond);
     }
 
     void branch(Condition cond, Label* label) {
-        b(label, cond);
+        B(label, cond);
     }
     void branch(JitCode* target) {
         syncStackPtr();
@@ -1481,20 +1478,20 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
     void branch32(Condition cond, const Operand& lhs, Register rhs, Label* label) {
         // since rhs is an operand, do the compare backwards
         Cmp(ARMRegister(rhs, 32), lhs);
-        b(label, Assembler::InvertCmpCondition(cond));
+        B(label, Assembler::InvertCmpCondition(cond));
     }
     void branch32(Condition cond, const Operand& lhs, Imm32 rhs, Label* label) {
         ARMRegister l = lhs.reg();
         Cmp(l, Operand(rhs.value));
-        b(label, cond);
+        B(label, cond);
     }
     void branch32(Condition cond, Register lhs, Register rhs, Label* label) {
         cmp32(lhs, rhs);
-        b(label, cond);
+        B(label, cond);
     }
     void branch32(Condition cond, Register lhs, Imm32 imm, Label* label) {
         cmp32(lhs, imm);
-        b(label, cond);
+        B(label, cond);
     }
     void branch32(Condition cond, const Address& lhs, Register rhs, Label* label) {
         vixl::UseScratchRegisterScope temps(this);
@@ -1583,7 +1580,7 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
         MOZ_ASSERT(!label->bound());
         if (cond != Always) {
             Label notTaken;
-            b(&notTaken, Assembler::InvertCondition(cond));
+            B(&notTaken, Assembler::InvertCondition(cond));
             branch_bo = b(-1);
             bind(&notTaken);
         } else {
@@ -1594,7 +1591,7 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
         return CodeOffsetJump(load_bo.getOffset(), pe.index());
     }
     CodeOffsetJump backedgeJump(RepatchLabel* label, Label* documentation = nullptr) {
-        return jumpWithPatch(label, documentation);
+        return jumpWithPatch(label, Always, documentation);
     }
     template <typename T>
     CodeOffsetJump branchPtrWithPatch(Condition cond, Register reg, T ptr, RepatchLabel* label) {
@@ -2446,7 +2443,7 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
             Label onFalse;
             branch(Zero, &onFalse);
             branch(Overflow, &onFalse);
-            b(label);
+            B(label);
             bind(&onFalse);
         }
     }

@@ -409,17 +409,26 @@ CloseLiveIteratorIon(JSContext* cx, const InlineFrameIterator& frame, uint32_t s
         UnwindIteratorForUncatchableException(cx, obj);
 }
 
-class IgnoreStackDepthOp
+class IonFrameStackDepthOp
 {
+    uint32_t depth_;
+
   public:
-    uint32_t operator()() { return UINT32_MAX; }
+    explicit IonFrameStackDepthOp(const InlineFrameIterator& frame) {
+        uint32_t base = NumArgAndLocalSlots(frame);
+        SnapshotIterator si = frame.snapshotIterator();
+        MOZ_ASSERT(si.numAllocations() >= base);
+        depth_ = si.numAllocations() - base;
+    }
+
+    uint32_t operator()() { return depth_; }
 };
 
-class TryNoteIterIon : public TryNoteIter<IgnoreStackDepthOp>
+class TryNoteIterIon : public TryNoteIter<IonFrameStackDepthOp>
 {
   public:
-    TryNoteIterIon(JSContext* cx, JSScript* script, jsbytecode* pc)
-      : TryNoteIter(cx, script, pc, IgnoreStackDepthOp())
+    TryNoteIterIon(JSContext* cx, const InlineFrameIterator& frame)
+      : TryNoteIter(cx, frame.script(), frame.pc(), IonFrameStackDepthOp(frame))
     { }
 };
 
@@ -427,9 +436,6 @@ static void
 HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame, ResumeFromException* rfe,
                    bool* overrecursed)
 {
-    RootedScript script(cx, frame.script());
-    jsbytecode* pc = frame.pc();
-
     if (cx->compartment()->isDebuggee()) {
         // We need to bail when there is a catchable exception, and we are the
         // debuggee of a Debugger with a live onExceptionUnwind hook, or if a
@@ -465,10 +471,11 @@ HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame, ResumeFromEx
         MOZ_ASSERT_IF(rematFrame, !Debugger::inFrameMaps(rematFrame));
     }
 
+    RootedScript script(cx, frame.script());
     if (!script->hasTrynotes())
         return;
 
-    for (TryNoteIterIon tni(cx, script, pc); !tni.done(); ++tni) {
+    for (TryNoteIterIon tni(cx, frame); !tni.done(); ++tni) {
         JSTryNote* tn = *tni;
 
         switch (tn->kind) {
@@ -1037,19 +1044,27 @@ ReadAllocation(const JitFrameIterator& frame, const LAllocation* a)
 #endif
 
 static void
-MarkThisAndArguments(JSTracer* trc, JitFrameLayout* layout)
+MarkThisAndArguments(JSTracer* trc, const JitFrameIterator& frame)
 {
     // Mark |this| and any extra actual arguments for an Ion frame. Marking of
     // formal arguments is taken care of by the frame's safepoint/snapshot,
     // except when the script might have lazy arguments, in which case we mark
-    // them as well.
+    // them as well. We also have to mark formals if we have a LazyLink frame.
+
+    JitFrameLayout* layout = frame.isExitFrameLayout<LazyLinkExitFrameLayout>()
+                             ? frame.exitFrame()->as<LazyLinkExitFrameLayout>()->jsFrame()
+                             : frame.jsFrame();
 
     size_t nargs = layout->numActualArgs();
     size_t nformals = 0;
     size_t newTargetOffset = 0;
     if (CalleeTokenIsFunction(layout->calleeToken())) {
         JSFunction* fun = CalleeTokenToFunction(layout->calleeToken());
-        nformals = fun->nonLazyScript()->mayReadFrameArgsDirectly() ? 0 : fun->nargs();
+        if (!frame.isExitFrameLayout<LazyLinkExitFrameLayout>() &&
+            !fun->nonLazyScript()->mayReadFrameArgsDirectly())
+        {
+            nformals = fun->nargs();
+        }
         newTargetOffset = Max(nargs, fun->nargs());
     }
 
@@ -1066,13 +1081,6 @@ MarkThisAndArguments(JSTracer* trc, JitFrameLayout* layout)
     // +1 to pass |this|
     if (CalleeTokenIsConstructing(layout->calleeToken()))
         TraceRoot(trc, &argv[1 + newTargetOffset], "ion-newTarget");
-}
-
-static void
-MarkThisAndArguments(JSTracer* trc, const JitFrameIterator& frame)
-{
-    JitFrameLayout* layout = frame.jsFrame();
-    MarkThisAndArguments(trc, layout);
 }
 
 #ifdef JS_NUNBOX32
@@ -1418,7 +1426,7 @@ MarkJitExitFrame(JSTracer* trc, const JitFrameIterator& frame)
 
         TraceRoot(trc, ll->stubCode(), "lazy-link-code");
         layout->replaceCalleeToken(MarkCalleeToken(trc, layout->calleeToken()));
-        MarkThisAndArguments(trc, layout);
+        MarkThisAndArguments(trc, frame);
         return;
     }
 
@@ -2544,7 +2552,7 @@ InlineFrameIterator::computeScopeChain(Value scopeChainValue, MaybeReadFallback&
     // the global on their scope chain.
     MOZ_ASSERT(!script()->isForEval());
     MOZ_ASSERT(!script()->hasNonSyntacticScope());
-    return &script()->global();
+    return &script()->global().lexicalScope();
 }
 
 bool
@@ -3086,7 +3094,16 @@ JitProfilingFrameIterator::tryInitWithTable(JitcodeGlobalTable* table, void* pc,
 
     JSScript* callee = frameScript();
 
-    MOZ_ASSERT(entry.isIon() || entry.isBaseline() || entry.isIonCache());
+    MOZ_ASSERT(entry.isIon() || entry.isBaseline() || entry.isIonCache() || entry.isDummy());
+
+    // Treat dummy lookups as an empty frame sequence.
+    if (entry.isDummy()) {
+        type_ = JitFrame_Entry;
+        fp_ = nullptr;
+        returnAddressToFp_ = nullptr;
+        return true;
+    }
+
     if (entry.isIon()) {
         // If looked-up callee doesn't match frame callee, don't accept lastProfilingCallSite
         if (entry.ionEntry().getScript(0) != callee)

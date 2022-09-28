@@ -12,9 +12,7 @@
 #include "GLUploadHelpers.h"
 #include "Layers.h"                     // for WriteSnapshotToDumpFile
 #include "LayerScope.h"                 // for LayerScope
-#include "gfx2DGlue.h"                  // for ThebesFilter
 #include "gfxCrashReporterUtils.h"      // for ScopedGfxFeatureReporter
-#include "GraphicsFilter.h"             // for GraphicsFilter
 #include "gfxPlatform.h"                // for gfxPlatform
 #include "gfxPrefs.h"                   // for gfxPrefs
 #include "gfxRect.h"                    // for gfxRect
@@ -92,7 +90,6 @@ CompositorOGL::CompositorOGL(nsIWidget *aWidget, int aSurfaceWidth,
   , mCurrentProgram(nullptr)
 {
   MOZ_COUNT_CTOR(CompositorOGL);
-  SetBackend(LayersBackend::LAYERS_OPENGL);
 }
 
 CompositorOGL::~CompositorOGL()

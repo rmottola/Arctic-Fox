@@ -25,7 +25,6 @@ from mozbuild.frontend.data import (
     JsPreferenceFile,
     LocalInclude,
     Program,
-    ReaderSummary,
     Resources,
     SimpleProgram,
     Sources,
@@ -77,15 +76,10 @@ class TestEmitterBasic(unittest.TestCase):
 
         objs = list(ack(o) for o in emitter.emit(reader.read_topsrcdir()))
         self.assertGreater(len(objs), 0)
-        self.assertIsInstance(objs[-1], ReaderSummary)
 
         filtered = []
         for obj in objs:
             if filter_common and isinstance(obj, DirectoryTraversal):
-                continue
-
-            # Always filter ReaderSummary because it's asserted above.
-            if isinstance(obj, ReaderSummary):
                 continue
 
             filtered.append(obj)

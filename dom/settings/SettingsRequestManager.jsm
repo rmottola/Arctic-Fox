@@ -6,6 +6,7 @@
 
 const Cc = Components.classes;
 const Ci = Components.interfaces;
+const Cr = Components.results;
 const Cu = Components.utils;
 
 Cu.importGlobalProperties(['File']);
@@ -17,9 +18,9 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/PermissionsTable.jsm");
 
-let DEBUG = false;
-let VERBOSE = false;
-let TRACK = false;
+var DEBUG = false;
+var VERBOSE = false;
+var TRACK = false;
 
 try {
   DEBUG   =
@@ -30,7 +31,7 @@ try {
     Services.prefs.getBoolPref("dom.mozSettings.trackTasksUsage");
 } catch (ex) { }
 
-let allowForceReadOnly = false;
+var allowForceReadOnly = false;
 try {
   allowForceReadOnly = Services.prefs.getBoolPref("dom.mozSettings.allowForceReadOnly");
 } catch (ex) { }
@@ -38,6 +39,9 @@ try {
 function debug(s) {
   dump("-*- SettingsRequestManager: " + s + "\n");
 }
+
+let inParent = Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULRuntime)
+                  .processType == Ci.nsIXULRuntime.PROCESS_TYPE_DEFAULT;
 
 const kXpcomShutdownObserverTopic      = "xpcom-shutdown";
 const kInnerWindowDestroyed            = "inner-window-destroyed";
@@ -70,7 +74,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "gSettingsService",
                                    "@mozilla.org/settingsService;1",
                                    "nsISettingsService");
 
-let SettingsPermissions = {
+var SettingsPermissions = {
   checkPermission: function(aPrincipal, aPerm) {
     if (!aPrincipal) {
       Cu.reportError("SettingsPermissions.checkPermission was passed a null principal. Denying all permissions.");
@@ -200,7 +204,7 @@ function SettingsLockInfo(aDB, aMsgMgr, aPrincipal, aLockID, aIsServiceLock, aWi
   };
 }
 
-let SettingsRequestManager = {
+var SettingsRequestManager = {
   // Access to the settings DB
   settingsDB: new SettingsDB(),
   // Remote messages to listen for from child
@@ -1206,5 +1210,11 @@ let SettingsRequestManager = {
   }
 };
 
-this.SettingsRequestManager = SettingsRequestManager;
-SettingsRequestManager.init();
+// This code should ALWAYS be living only on the parent side.
+if (!inParent) {
+  debug("SettingsRequestManager should be living on parent side.");
+  throw Cr.NS_ERROR_ABORT;
+} else {
+  this.SettingsRequestManager = SettingsRequestManager;
+  SettingsRequestManager.init();
+}

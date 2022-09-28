@@ -526,27 +526,28 @@ void
 MediaCodecReader::NotifyDataArrivedInternal(uint32_t aLength,
                                             int64_t aOffset)
 {
-  nsRefPtr<MediaByteBuffer> bytes =
-    mDecoder->GetResource()->MediaReadAt(aOffset, aLength);
-  NS_ENSURE_TRUE_VOID(bytes);
-
-  MonitorAutoLock monLock(mParserMonitor);
-  if (mNextParserPosition == mParsedDataLength &&
-      mNextParserPosition >= aOffset &&
-      mNextParserPosition <= aOffset + aLength) {
-    // No pending parsing runnable currently. And available data are adjacent to
-    // parsed data.
-    int64_t shift = mNextParserPosition - aOffset;
-    const char* buffer = reinterpret_cast<const char*>(bytes->Elements()) + shift;
-    uint32_t length = aLength - shift;
-    int64_t offset = mNextParserPosition;
-    if (length > 0) {
-      MonitorAutoUnlock monUnlock(mParserMonitor);
-      ParseDataSegment(buffer, length, offset);
+  IntervalSet<int64_t> intervals = mFilter.NotifyDataArrived(aLength, aOffset);
+  for (const auto& interval : intervals) {
+    nsRefPtr<MediaByteBuffer> bytes =
+      mDecoder->GetResource()->MediaReadAt(interval.mStart, interval.Length());
+    MonitorAutoLock monLock(mParserMonitor);
+    if (mNextParserPosition == mParsedDataLength &&
+        mNextParserPosition >= interval.mStart &&
+        mNextParserPosition <= interval.mEnd) {
+      // No pending parsing runnable currently. And available data are adjacent to
+      // parsed data.
+      int64_t shift = mNextParserPosition - interval.mStart;
+      const char* buffer = reinterpret_cast<const char*>(bytes->Elements()) + shift;
+      uint32_t length = interval.Length() - shift;
+      int64_t offset = mNextParserPosition;
+      if (length > 0) {
+        MonitorAutoUnlock monUnlock(mParserMonitor);
+        ParseDataSegment(buffer, length, offset);
+      }
+      mParseDataFromCache = false;
+      mParsedDataLength = offset + length;
+      mNextParserPosition = mParsedDataLength;
     }
-    mParseDataFromCache = false;
-    mParsedDataLength = offset + length;
-    mNextParserPosition = mParsedDataLength;
   }
 }
 
@@ -744,7 +745,7 @@ MediaCodecReader::HandleResourceAllocated()
   VideoFrameContainer* container = mDecoder->GetVideoFrameContainer();
   if (container) {
     container->ClearCurrentFrame(
-      gfxIntSize(mInfo.mVideo.mDisplay.width, mInfo.mVideo.mDisplay.height));
+      gfx::IntSize(mInfo.mVideo.mDisplay.width, mInfo.mVideo.mDisplay.height));
   }
 
   nsRefPtr<MetadataHolder> metadata = new MetadataHolder();
@@ -847,32 +848,6 @@ MediaCodecReader::WaitFenceAndReleaseOutputBuffer()
   }
 }
 
-PLDHashOperator
-MediaCodecReader::ReleaseTextureClient(TextureClient* aClient,
-                                       size_t& aIndex,
-                                       void* aUserArg)
-{
-  nsRefPtr<MediaCodecReader> reader = static_cast<MediaCodecReader*>(aUserArg);
-  MOZ_ASSERT(reader, "reader should not be nullptr in ReleaseTextureClient()");
-
-  return reader->ReleaseTextureClient(aClient, aIndex);
-}
-
-PLDHashOperator
-MediaCodecReader::ReleaseTextureClient(TextureClient* aClient,
-                                       size_t& aIndex)
-{
-  MOZ_ASSERT(aClient, "TextureClient should be a valid pointer");
-
-  aClient->ClearRecycleCallback();
-
-  if (mVideoTrack.mCodec != nullptr) {
-    mVideoTrack.mCodec->releaseOutputBuffer(aIndex);
-  }
-
-  return PL_DHASH_REMOVE;
-}
-
 void
 MediaCodecReader::ReleaseAllTextureClients()
 {
@@ -884,7 +859,17 @@ MediaCodecReader::ReleaseAllTextureClients()
   }
   printf_stderr("All TextureClients should be released already");
 
-  mTextureClientIndexes.Enumerate(MediaCodecReader::ReleaseTextureClient, this);
+  for (auto iter = mTextureClientIndexes.Iter(); !iter.Done(); iter.Next()) {
+    TextureClient* client = iter.Key();
+    size_t& index = iter.Data();
+
+    client->ClearRecycleCallback();
+
+    if (mVideoTrack.mCodec != nullptr) {
+      mVideoTrack.mCodec->releaseOutputBuffer(index);
+    }
+    iter.Remove();
+  }
   mTextureClientIndexes.Clear();
 }
 

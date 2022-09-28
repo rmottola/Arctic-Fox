@@ -710,6 +710,10 @@ private:
   static bool IsRtspEnabled();
 #endif
 
+#ifdef MOZ_GSTREAMER
+  static bool IsGStreamerEnabled();
+#endif
+
 #ifdef MOZ_OMX_DECODER
   static bool IsOmxEnabled();
   static bool IsOmxAsyncEnabled();

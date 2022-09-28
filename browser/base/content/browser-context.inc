@@ -3,6 +3,40 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+# NB: IF YOU ADD ITEMS TO THIS FILE, PLEASE UPDATE THE WHITELIST IN
+# BrowserUITelemetry.jsm. SEE BUG 991757 FOR DETAILS.
+
+      <menugroup id="context-navigation">
+        <menuitem id="context-back"
+                  class="menuitem-iconic"
+                  tooltiptext="&backButton.tooltip;"
+                  aria-label="&backCmd.label;"
+                  command="Browser:BackOrBackDuplicate"
+                  onclick="checkForMiddleClick(this, event);"/>
+        <menuitem id="context-forward"
+                  class="menuitem-iconic"
+                  tooltiptext="&forwardButton.tooltip;"
+                  aria-label="&forwardCmd.label;"
+                  command="Browser:ForwardOrForwardDuplicate"
+                  onclick="checkForMiddleClick(this, event);"/>
+        <menuitem id="context-reload"
+                  class="menuitem-iconic"
+                  tooltiptext="&reloadButton.tooltip;"
+                  aria-label="&reloadCmd.label;"
+                  oncommand="gContextMenu.reload(event);"
+                  onclick="checkForMiddleClick(this, event);"/>
+        <menuitem id="context-stop"
+                  class="menuitem-iconic"
+                  tooltiptext="&stopButton.tooltip;"
+                  aria-label="&stopCmd.label;"
+                  command="Browser:Stop"/>
+        <menuitem id="context-bookmarkpage"
+                  class="menuitem-iconic"
+                  observes="bookmarkThisPageBroadcaster"
+                  aria-label="&bookmarkPageCmd2.label;"
+                  oncommand="gContextMenu.bookmarkThisPage();"/>
+      </menugroup>
+      <menuseparator id="context-sep-navigation"/>
       <menuseparator id="page-menu-separator"/>
       <menuitem id="spell-no-suggestions"
                 disabled="true"
@@ -45,6 +79,10 @@
                 label="&sendLinkCmd.label;"
                 accesskey="&sendLinkCmd.accesskey;"
                 oncommand="gContextMenu.sendLink();"/>
+      <menuitem id="context-savelinktopocket"
+                label="&saveLinkToPocketCmd.label;"
+                accesskey="&saveLinkToPocketCmd.accesskey;"
+                oncommand="gContextMenu.saveLinkToPocket();"/>
       <menuitem id="context-copyemail"
                 label="&copyEmailCmd.label;"
                 accesskey="&copyEmailCmd.accesskey;"
@@ -244,6 +282,10 @@
                 label="&sendPageCmd.label;"
                 accesskey="&sendPageCmd.accesskey;"
                 oncommand="gContextMenu.sendPage();"/>
+      <menuitem id="context-pocket"
+                label="&saveToPocketCmd.label;"
+                accesskey="&saveToPocketCmd.accesskey;"
+                oncommand="gContextMenu.savePageToPocket();"/>
       <menuseparator id="context-sep-viewbgimage"/>
       <menuitem id="context-viewbgimage"
                 label="&viewBGImageCmd.label;"
@@ -381,9 +423,15 @@
                 oncommand="gContextMenu.switchPageDirection();"/>
       <menuseparator id="fill-login-separator" hidden="true"/>
       <menu id="fill-login"
-            label="&fillPasswordMenu.label;"
+            label="&fillLoginMenu.label;"
             class="menu-iconic"
-            accesskey="&fillPasswordMenu.accesskey;"
+            label-login="&fillLoginMenu.label;"
+            label-password="&fillPasswordMenu.label;"
+            label-username="&fillUsernameMenu.label;"
+            accesskey="&fillLoginMenu.accesskey;"
+            accesskey-login="&fillLoginMenu.accesskey;"
+            accesskey-password="&fillPasswordMenu.accesskey;"
+            accesskey-username="&fillUsernameMenu.accesskey;"
             hidden="true">
         <menupopup id="fill-login-popup">
           <menuitem id="fill-login-no-logins"

@@ -258,7 +258,9 @@ CompositableClient::GetTextureClientRecycler()
 }
 
 void
-CompositableClient::DumpTextureClient(std::stringstream& aStream, TextureClient* aTexture)
+CompositableClient::DumpTextureClient(std::stringstream& aStream,
+                                      TextureClient* aTexture,
+                                      TextureDumpMode aCompress)
 {
   if (!aTexture) {
     return;
@@ -267,7 +269,32 @@ CompositableClient::DumpTextureClient(std::stringstream& aStream, TextureClient*
   if (!dSurf) {
     return;
   }
-  aStream << gfxUtils::GetAsLZ4Base64Str(dSurf).get();
+  if (aCompress == TextureDumpMode::Compress) {
+    aStream << gfxUtils::GetAsLZ4Base64Str(dSurf).get();
+  } else {
+    aStream << gfxUtils::GetAsDataURI(dSurf).get();
+  }
+}
+
+AutoRemoveTexture::~AutoRemoveTexture()
+{
+#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
+  if (mCompositable && mTexture && mCompositable->GetForwarder()) {
+    // remove old buffer from CompositableHost
+    RefPtr<AsyncTransactionWaiter> waiter = new AsyncTransactionWaiter();
+    RefPtr<AsyncTransactionTracker> tracker =
+        new RemoveTextureFromCompositableTracker(waiter);
+    // Hold TextureClient until transaction complete.
+    tracker->SetTextureClient(mTexture);
+    mTexture->SetRemoveFromCompositableWaiter(waiter);
+    // RemoveTextureFromCompositableAsync() expects CompositorChild's presence.
+    mCompositable->GetForwarder()->RemoveTextureFromCompositableAsync(tracker, mCompositable, mTexture);
+  }
+#else
+  if (mCompositable && mTexture) {
+    mCompositable->RemoveTexture(mTexture);
+  }
+#endif
 }
 
 } // namespace layers

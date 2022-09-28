@@ -286,12 +286,12 @@ struct InternalGCMethods<Value>
                 sb->assertHasValueEdge(vp);
                 return;
             }
-            sb->putValueFromAnyThread(vp);
+            sb->putValue(vp);
             return;
         }
         // Remove the prev entry if the new value does not need it.
         if (prev.isObject() && (sb = reinterpret_cast<gc::Cell*>(&prev.toObject())->storeBuffer()))
-            sb->unputValueFromAnyThread(vp);
+            sb->unputValue(vp);
     }
 
     static void readBarrier(const Value& v) {
@@ -577,6 +577,10 @@ class ReadBarriered : public ReadBarrieredBase<T>
         return this->value;
     }
 
+    explicit operator bool() const {
+        return bool(this->value);
+    }
+
     operator const T() const { return get(); }
 
     const T operator->() const { return get(); }
@@ -659,7 +663,7 @@ class HeapSlot : public WriteBarrieredBase<Value>
         if (this->value.isObject()) {
             gc::Cell* cell = reinterpret_cast<gc::Cell*>(&this->value.toObject());
             if (cell->storeBuffer())
-                cell->storeBuffer()->putSlotFromAnyThread(owner, kind, slot, 1);
+                cell->storeBuffer()->putSlot(owner, kind, slot, 1);
         }
     }
 };

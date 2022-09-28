@@ -57,7 +57,7 @@ public:
   void Invalidate();
 
   // Call these on any thread.
-  void SetCurrentFrame(const gfxIntSize& aIntrinsicSize, Image* aImage);
+  void SetCurrentFrame(const gfx::IntSize& aIntrinsicSize, Image* aImage);
   void ClearCurrentFrame();
   void RateLimit(bool aLimit);
 

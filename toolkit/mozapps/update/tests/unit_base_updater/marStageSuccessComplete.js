@@ -25,16 +25,7 @@ function run_test() {
   }
 
   createUpdaterINI(false);
-
-  // For Mac OS X set the last modified time for the root directory to a date in
-  // the past to test that the last modified time is updated on a successful
-  // update (bug 600098).
-  if (IS_MACOSX) {
-    let now = Date.now();
-    let yesterday = now - (1000 * 60 * 60 * 24);
-    let applyToDir = getApplyDirFile();
-    applyToDir.lastModifiedTime = yesterday;
-  }
+  setAppBundleModTime();
 
   // Don't test symlinks on Mac OS X in this test since it tends to timeout.
   // It is tested on Mac OS X in marAppInUseStageSuccessComplete_unix.js
@@ -60,18 +51,13 @@ function run_test() {
 
   checkFilesAfterUpdateSuccess(getStageDirFile, true, false);
   checkUpdateLogContents(LOG_COMPLETE_SUCCESS);
-
-  if (IS_WIN || IS_MACOSX) {
-    // Check that the post update process was not launched when staging an
-    // update.
-    do_check_false(getPostUpdateFile(".running").exists());
-  }
+  checkPostUpdateRunningFile(false);
 
   // Switch the application to the staged application that was updated.
   gStageUpdate = false;
   gSwitchApp = true;
   do_timeout(TEST_CHECK_TIMEOUT, function() {
-    runUpdate(0, STATE_SUCCEEDED);
+    runUpdate(0, STATE_SUCCEEDED, checkUpdateApplied);
   });
 }
 
@@ -129,7 +115,8 @@ function runHelperProcess(args) {
   process.init(helperBin);
   logTestInfo("Running " + helperBin.path + " " + args.join(" "));
   process.run(true, args, args.length);
-  do_check_eq(process.exitValue, 0);
+  Assert.equal(process.exitValue, 0,
+               "the helper process exit value should be 0");
 }
 
 function createSymlink() {

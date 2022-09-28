@@ -142,6 +142,11 @@
                  type="checkbox" group="sidebar" sidebarurl="chrome://browser/content/web-panels.xul"
                  oncommand="SidebarUI.toggle('viewWebPanelsSidebar');"/>
 
+    <broadcaster id="bookmarkThisPageBroadcaster"
+                 label="&bookmarkThisPageCmd.label;"
+                 bookmarklabel="&bookmarkThisPageCmd.label;"
+                 editlabel="&editThisBookmarkCmd.label;"/>
+
     <!-- popup blocking menu items -->
     <broadcaster id="blockedPopupAllowSite"
                  accesskey="&allowPopups.accesskey;"
@@ -293,7 +298,7 @@
     <key id="printKb" key="&printCmd.commandkey;" command="cmd_print"  modifiers="accel"/>
     <key id="key_close" key="&closeCmd.key;" command="cmd_close" modifiers="accel"/>
     <key id="key_closeWindow" key="&closeCmd.key;" command="cmd_closeWindow" modifiers="accel,shift"/>
-    <key id="key_toggleMute" key="&toggleMuteCmd.key;" command="cmd_toggleMute" modifiers="alt,shift"/>
+    <key id="key_toggleMute" key="&toggleMuteCmd.key;" command="cmd_toggleMute" modifiers="control"/>
     <key id="key_undo"
          key="&undoCmd.key;"
          modifiers="accel"/>

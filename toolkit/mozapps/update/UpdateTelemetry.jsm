@@ -45,7 +45,7 @@ this.AUSTLMY = {
   CHK_SHOWPROMPT_PREF: 3,
   // Incompatible add-on check disabled by preference (background download)
   CHK_ADDON_PREF_DISABLED: 4,
-  // Incompatible add-on checke not performed due to same app version as the
+  // Incompatible add-on check not performed due to same app version as the
   // update's app version (background download)
   CHK_ADDON_SAME_APP_VER: 5,
   // Incompatible add-ons found and all of them have updates (background download)
@@ -363,12 +363,6 @@ this.AUSTLMY = {
    * service is installed and a telemetry ping for a boolean type histogram that
    * indicates if the service was at some point installed and is now
    * uninstalled.
-   * Note: the total for the following histogram IDs can be used to determine
-   *       the total number of telemetry timer and externally initiated
-   *       submissions for systems that build with MOZ_MAINTENANCE_SERVICE
-   *       defined:
-   *       UPDATE_SERVICE_INSTALLED_EXTERNAL
-   *       UPDATE_SERVICE_INSTALLED_NOTIFY
    *
    * @param  aSuffix
    *         The histogram id suffix for histogram IDs:
@@ -489,11 +483,6 @@ this.AUSTLMY = {
    * the aExpected parameter is specified. If the aExpected parameter is
    * specified and it equals the value specified by the aValue
    * parameter the telemetry submission will be skipped.
-   * Note: the total for the following histogram IDs can be used to determine
-   *       the total number of telemetry timer and externally initiated
-   *       submissions:
-   *       UPDATE_CANNOT_APPLY_EXTERNAL
-   *       UPDATE_CANNOT_APPLY_NOTIFY
    *
    * @param  aID
    *         The histogram ID to report to.

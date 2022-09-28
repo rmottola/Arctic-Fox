@@ -47,8 +47,8 @@ importScripts("ril_worker_buf_object.js");
 importScripts("ril_worker_telephony_request_queue.js");
 
 // set to true in ril_consts.js to see debug messages
-let DEBUG = DEBUG_WORKER;
-let GLOBAL = this;
+var DEBUG = DEBUG_WORKER;
+var GLOBAL = this;
 
 if (!this.debug) {
   // Debugging stub that goes nowhere.

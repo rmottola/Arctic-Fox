@@ -138,7 +138,7 @@ let snapshotFormatters = {
     let apzInfo = [];
     let formatApzInfo = function (info) {
       let out = [];
-      for (let type of ['Wheel', 'Touch']) {
+      for (let type of ['Wheel', 'Touch', 'Drag']) {
         let key = 'Apz' + type + 'Input';
         let warningKey = key + 'Warning';
 
@@ -211,7 +211,7 @@ let snapshotFormatters = {
     let out = Object.create(data);
 
     if (apzInfo.length == 0)
-      out.asyncPanZoom = "none";
+      out.asyncPanZoom = localizedMsg(["apzNone"]);
     else
       out.asyncPanZoom = apzInfo.join("; ");
 

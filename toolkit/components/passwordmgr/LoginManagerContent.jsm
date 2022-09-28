@@ -294,7 +294,7 @@ var LoginManagerContent = {
       return;
     }
 
-    let formLike = FormLikeFactory.createFromPasswordField(pwField);
+    let formLike = FormLikeFactory.createFromField(pwField);
     log("onDOMInputPasswordAdded:", pwField, formLike);
 
     let deferredTask = this._deferredPasswordAddedTasksByRootElement.get(formLike.rootElement);
@@ -475,8 +475,10 @@ var LoginManagerContent = {
 
     // If we have a target input, fills it's form.
     if (inputElement) {
-      form = FormLikeFactory.createFromPasswordField(inputElement);
-      clobberUsername = false;
+      form = FormLikeFactory.createFromField(inputElement);
+      if (inputElement.type == "password") {
+        clobberUsername = false;
+      }
     }
     this._fillForm(form, true, clobberUsername, true, true, loginsFound, recipes, options);
   },
@@ -506,7 +508,7 @@ var LoginManagerContent = {
     if (!(acInputField.ownerDocument instanceof Ci.nsIDOMHTMLDocument))
       return;
 
-    if (!this._isUsernameFieldType(acInputField))
+    if (!LoginHelper.isUsernameFieldType(acInputField))
       return;
 
     var acForm = acInputField.form; // XXX: Bug 1173583 - This doesn't work outside of <form>.
@@ -521,10 +523,16 @@ var LoginManagerContent = {
 
     log("onUsernameInput from", event.type);
 
+    let doc = acForm.ownerDocument;
+    let messageManager = messageManagerFromWindow(doc.defaultView);
+    let recipes = messageManager.sendSyncMessage("RemoteLogins:findRecipes", {
+      formOrigin: LoginUtils._getPasswordOrigin(doc.documentURI),
+    })[0];
+
     // Make sure the username field fillForm will use is the
     // same field as the autocomplete was activated on.
     var [usernameField, passwordField, ignored] =
-        this._getFormFields(acForm, false);
+        this._getFormFields(acForm, false, recipes);
     if (usernameField == acInputField && passwordField) {
       this._getLoginDataFromParent(acForm, { showMasterPassword: false })
           .then(({ form, loginsFound, recipes }) => {
@@ -577,24 +585,6 @@ var LoginManagerContent = {
     return pwFields;
   },
 
-  _isUsernameFieldType: function(element) {
-    if (!(element instanceof Ci.nsIDOMHTMLInputElement))
-      return false;
-
-    let fieldType = (element.hasAttribute("type") ?
-                     element.getAttribute("type").toLowerCase() :
-                     element.type);
-    if (fieldType == "text"  ||
-        fieldType == "email" ||
-        fieldType == "url"   ||
-        fieldType == "tel"   ||
-        fieldType == "number") {
-      return true;
-    }
-    return false;
-  },
-
-
   /**
    * Returns the username and password fields found in the form.
    * Can handle complex forms by trying to figure out what the
@@ -611,6 +601,10 @@ var LoginManagerContent = {
    * "theLoginField". If not null, the form is apparently a
    * change-password field, with oldPasswordField containing the password
    * that is being changed.
+   *
+   * Note that even though we can create a FormLike from a text field,
+   * this method will only return a non-null usernameField if the
+   * FormLike has a password field.
    */
   _getFormFields : function (form, isSubmission, recipes) {
     var usernameField = null;
@@ -623,7 +617,7 @@ var LoginManagerContent = {
       );
       if (pwOverrideField) {
         // The field from the password override may be in a different FormLike.
-        let formLike = FormLikeFactory.createFromPasswordField(pwOverrideField);
+        let formLike = FormLikeFactory.createFromField(pwOverrideField);
         pwFields = [{
           index   : [...formLike.elements].indexOf(pwOverrideField),
           element : pwOverrideField,
@@ -656,7 +650,7 @@ var LoginManagerContent = {
       // already logged in to the site.
       for (var i = pwFields[0].index - 1; i >= 0; i--) {
         var element = form.elements[i];
-        if (this._isUsernameFieldType(element)) {
+        if (LoginHelper.isUsernameFieldType(element)) {
           usernameField = element;
           break;
         }
@@ -666,15 +660,15 @@ var LoginManagerContent = {
     if (!usernameField)
       log("(form -- no username field found)");
     else
-      log("Username field id/name/value is: ", usernameField.id, " / ",
-          usernameField.name, " / ", usernameField.value);
+      log("Username field ", usernameField, "has name/value:",
+          usernameField.name, "/", usernameField.value);
 
     // If we're not submitting a form (it's a page load), there are no
     // password field values for us to use for identifying fields. So,
     // just assume the first password field is the one to be filled in.
     if (!isSubmission || pwFields.length == 1) {
       var passwordField = pwFields[0].element;
-      log("Password field id/name is: ", passwordField.id, " / ", passwordField.name);
+      log("Password field", passwordField, "has name: ", passwordField.name);
       return [usernameField, passwordField, null];
     }
 
@@ -720,7 +714,8 @@ var LoginManagerContent = {
     }
 
     log("Password field (new) id/name is: ", newPasswordField.id, " / ", newPasswordField.name);
-    log("Password field (old) id/name is: ", oldPasswordField.id, " / ", oldPasswordField.name);
+    if (oldPasswordField)
+      log("Password field (old) id/name is: ", oldPasswordField.id, " / ", oldPasswordField.name);
     return [usernameField, newPasswordField, oldPasswordField];
   },
 
@@ -762,21 +757,12 @@ var LoginManagerContent = {
       return;
     }
 
-    // Somewhat gross hack - we don't want to show the "remember password"
-    // notification on about:accounts for Firefox.
-    let topWin = win.top;
-    if (/^about:accounts($|\?)/i.test(topWin.document.documentURI)) {
-      log("(form submission ignored -- about:accounts)");
-      return;
-    }
-
     let formSubmitURL = LoginUtils._getActionOrigin(form);
     let messageManager = messageManagerFromWindow(win);
 
-    let recipesArray = messageManager.sendSyncMessage("RemoteLogins:findRecipes", {
+    let recipes = messageManager.sendSyncMessage("RemoteLogins:findRecipes", {
       formOrigin: hostname,
     })[0];
-    let recipes = new Set(recipesArray);
 
     // Get the appropriate fields from the form.
     var [usernameField, newPasswordField, oldPasswordField] =
@@ -829,8 +815,11 @@ var LoginManagerContent = {
    *
    * @param {HTMLFormElement} form
    * @param {bool} autofillForm denotes if we should fill the form in automatically
-   * @param {bool} clobberUsername controls if an existing username can be
-   *                               overwritten
+   * @param {bool} clobberUsername controls if an existing username can be overwritten.
+   *                               If this is false and an inputElement of type password
+   *                               is also passed, the username field will be ignored.
+   *                               If this is false and no inputElement is passed, if the username
+   *                               field value is not found in foundLogins, it will not fill the password.
    * @param {bool} clobberPassword controls if an existing password value can be
    *                               overwritten
    * @param {bool} userTriggered is an indication of whether this filling was triggered by
@@ -878,17 +867,22 @@ var LoginManagerContent = {
       // so that the user isn't prompted for a master password
       // without need.
       var [usernameField, passwordField, ignored] =
-          this._getFormFields(form, false);
+            this._getFormFields(form, false, recipes);
 
       // If we have a password inputElement parameter and it's not
       // the same as the one heuristically found, use the parameter
       // one instead.
       if (inputElement) {
-        if (inputElement.type != "password") {
+        if (inputElement.type == "password") {
+          passwordField = inputElement;
+          if (!clobberUsername) {
+            usernameField = null;
+          }
+        } else if (LoginHelper.isUsernameFieldType(inputElement)) {
+          usernameField = inputElement;
+        } else {
           throw new Error("Unexpected input element type.");
         }
-        passwordField = inputElement;
-        usernameField = null;
       }
 
       // Need a valid password field to do anything.
@@ -962,7 +956,7 @@ var LoginManagerContent = {
         // password if we find a matching login.
         var username = usernameField.value.toLowerCase();
 
-        let matchingLogins = logins.filter(function(l)
+        let matchingLogins = logins.filter(l =>
                                            l.username.toLowerCase() == username);
         if (matchingLogins.length == 0) {
           log("Password not filled. None of the stored logins match the username already present.");
@@ -989,9 +983,9 @@ var LoginManagerContent = {
         // (user+pass or pass-only) when there's exactly one that matches.
         let matchingLogins;
         if (usernameField)
-          matchingLogins = logins.filter(function(l) l.username);
+          matchingLogins = logins.filter(l => l.username);
         else
-          matchingLogins = logins.filter(function(l) !l.username);
+          matchingLogins = logins.filter(l => !l.username);
 
         if (matchingLogins.length != 1) {
           log("Multiple logins for form, so not filling any.");
@@ -1019,7 +1013,7 @@ var LoginManagerContent = {
       // Fill the form
 
       if (usernameField) {
-        // Don't modify the username field if it's disabled or readOnly so we preserve its case.
+      // Don't modify the username field if it's disabled or readOnly so we preserve its case.
         let disabledOrReadOnly = usernameField.disabled || usernameField.readOnly;
 
         let userNameDiffers = selectedLogin.username != usernameField.value;
@@ -1037,6 +1031,7 @@ var LoginManagerContent = {
         passwordField.setUserInput(selectedLogin.password);
       }
 
+      log("_fillForm succeeded");
       recordAutofillResult(AUTOFILL_RESULT.FILLED);
       let doc = form.ownerDocument;
       let win = doc.defaultView;
@@ -1045,6 +1040,53 @@ var LoginManagerContent = {
     } finally {
       Services.obs.notifyObservers(form.rootElement, "passwordmgr-processed-form", null);
     }
+  },
+
+  /**
+   * Verify if a field is a valid login form field and
+   * returns some information about it's FormLike.
+   *
+   * @param {Element} aField
+   *                  A form field we want to verify.
+   *
+   * @returns {Object} an object with information about the
+   *                   FormLike username and password field
+   *                   or null if the passed field is invalid.
+   */
+  getFieldContext(aField) {
+    // If the element is not a proper form field, return null.
+    if (!(aField instanceof Ci.nsIDOMHTMLInputElement) ||
+        (aField.type != "password" && !LoginHelper.isUsernameFieldType(aField)) ||
+        !aField.ownerDocument) {
+      return null;
+    }
+    let form = FormLikeFactory.createFromField(aField);
+
+    let doc = aField.ownerDocument;
+    let messageManager = messageManagerFromWindow(doc.defaultView);
+    let recipes = messageManager.sendSyncMessage("RemoteLogins:findRecipes", {
+      formOrigin: LoginUtils._getPasswordOrigin(doc.documentURI),
+    })[0];
+
+    let [usernameField, newPasswordField, oldPasswordField] =
+          this._getFormFields(form, false, recipes);
+
+    // If we are not verifying a password field, we want
+    // to use aField as the username field.
+    if (aField.type != "password") {
+      usernameField = aField;
+    }
+
+    return {
+      usernameField: {
+        found: !!usernameField,
+        disabled: usernameField && (usernameField.disabled || usernameField.readOnly),
+      },
+      passwordField: {
+        found: !!newPasswordField,
+        disabled: newPasswordField && (newPasswordField.disabled || newPasswordField.readOnly),
+      },
+    };
   },
 
 };
@@ -1093,7 +1135,6 @@ var LoginUtils = {
 
     return this._getPasswordOrigin(uriString, true);
   },
-
 };
 
 // nsIAutoCompleteResult implementation
@@ -1190,7 +1231,7 @@ UserAutoCompleteResult.prototype = {
  * A factory to generate FormLike objects that represent a set of login fields
  * which aren't necessarily marked up with a <form> element.
  */
-let FormLikeFactory = {
+var FormLikeFactory = {
   _propsFromForm: [
     "autocomplete",
     "ownerDocument",
@@ -1218,36 +1259,37 @@ let FormLikeFactory = {
       formLike[prop] = aForm[prop];
     }
 
+    this._addToJSONProperty(formLike);
     return formLike;
   },
 
   /**
-   * Create a FormLike object from an <input type=password>.
+   * Create a FormLike object from a password or username field.
    *
-   * If the <input> is in a <form>, construct the FormLike from the form.
+   * If the field is in a <form>, construct the FormLike from the form.
    * Otherwise, create a FormLike with a rootElement (wrapper) according to
    * heuristics. Currently all <input> not in a <form> are one FormLike but this
    * shouldn't be relied upon as the heuristics may change to detect multiple
    * "forms" (e.g. registration and login) on one page with a <form>.
    *
-   * @param {HTMLInputElement} aPasswordField - a password field in a document
+   * @param {HTMLInputElement} aField - a password or username field in a document
    * @return {FormLike}
-   * @throws Error if aPasswordField isn't a password input in a document
+   * @throws Error if aField isn't a password or username field in a document
    */
-  createFromPasswordField(aPasswordField) {
-    if (!(aPasswordField instanceof Ci.nsIDOMHTMLInputElement) ||
-        aPasswordField.type != "password" ||
-        !aPasswordField.ownerDocument) {
-      throw new Error("createFromPasswordField requires a password field in a document");
+  createFromField(aField) {
+    if (!(aField instanceof Ci.nsIDOMHTMLInputElement) ||
+        (aField.type != "password" && !LoginHelper.isUsernameFieldType(aField)) ||
+        !aField.ownerDocument) {
+      throw new Error("createFromField requires a password or username field in a document");
     }
 
-    if (aPasswordField.form) {
-      return this.createFromForm(aPasswordField.form);
+    if (aField.form) {
+      return this.createFromForm(aField.form);
     }
 
-    let doc = aPasswordField.ownerDocument;
+    let doc = aField.ownerDocument;
     log("Created non-form FormLike for rootElement:", doc.documentElement);
-    return {
+    let formLike = {
       action: LoginUtils._getPasswordOrigin(doc.baseURI),
       autocomplete: "on",
       // Exclude elements inside the rootElement that are already in a <form> as
@@ -1256,5 +1298,54 @@ let FormLikeFactory = {
       ownerDocument: doc,
       rootElement: doc.documentElement,
     };
+
+    this._addToJSONProperty(formLike);
+    return formLike;
+  },
+
+  /**
+   * Add a `toJSON` property to a FormLike so logging which ends up going
+   * through dump doesn't include usless garbage from DOM objects.
+   */
+  _addToJSONProperty(aFormLike) {
+    function prettyElementOutput(aElement) {
+      let idText = aElement.id ? "#" + aElement.id : "";
+      let classText = [for (className of aElement.classList) "." + className].join("");
+      return `<${aElement.nodeName + idText + classText}>`;
+    }
+
+    Object.defineProperty(aFormLike, "toJSON", {
+      value: () => {
+        let cleansed = {};
+        for (let key of Object.keys(aFormLike)) {
+          let value = aFormLike[key];
+          let cleansedValue = value;
+
+          switch (key) {
+            case "elements": {
+              cleansedValue = [for (element of value) prettyElementOutput(element)];
+              break;
+            }
+
+            case "ownerDocument": {
+              cleansedValue = {
+                location: {
+                  href: value.location.href,
+                },
+              };
+              break;
+            }
+
+            case "rootElement": {
+              cleansedValue = prettyElementOutput(value);
+              break;
+            }
+          }
+
+          cleansed[key] = cleansedValue;
+        }
+        return cleansed;
+      }
+    });
   },
 };

@@ -64,6 +64,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "PlacesBackups",
 XPCOMUtils.defineLazyModuleGetter(this, "OS",
                                   "resource://gre/modules/osfile.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "Feeds",
+                                  "resource:///modules/Feeds.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
                                   "resource://gre/modules/LoginManagerParent.jsm");
 
@@ -74,7 +77,6 @@ XPCOMUtils.defineLazyGetter(this, "gBrandBundle", function() {
 XPCOMUtils.defineLazyGetter(this, "gBrowserBundle", function() {
   return Services.strings.createBundle('chrome://browser/locale/browser.properties');
 });
-
 
 XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
                                   "resource:///modules/FormValidationHandler.jsm");
@@ -99,6 +101,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "SimpleServiceDiscovery",
 
 XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
                                   "resource:///modules/ContentSearch.jsm");
+
+#ifdef E10S_TESTING_ONLY
+XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
+                                  "resource://gre/modules/UpdateUtils.jsm");
+#endif
 
 #ifdef MOZ_CRASHREPORTER
 XPCOMUtils.defineLazyModuleGetter(this, "TabCrashReporter",
@@ -416,8 +423,15 @@ BrowserGlue.prototype = {
         this._sanitizer.onStartup();
         break;
       case "xpi-signature-changed":
-        if (JSON.parse(data).disabled.length)
-          this._notifyUnsignedAddonsDisabled();
+        let disabledAddons = JSON.parse(data).disabled;
+        AddonManager.getAddonsByIDs(disabledAddons, (addons) => {
+          for (let addon of addons) {
+            if (addon.type != "experiment") {
+              this._notifyUnsignedAddonsDisabled();
+              break;
+            }
+          }
+        });
         break;
       case "autocomplete-did-enter-text":
         this._handleURLBarTelemetry(subject.QueryInterface(Ci.nsIAutoCompleteInput));
@@ -691,6 +705,7 @@ BrowserGlue.prototype = {
 
     if (Services.prefs.getBoolPref("browser.tabs.remote"))
       ContentClick.init();
+    Feeds.init();
 
     LoginManagerParent.init();
     ReaderParent.init();
@@ -876,8 +891,39 @@ BrowserGlue.prototype = {
                           nb.PRIORITY_WARNING_MEDIUM, buttons);
   },
 
+  _firstWindowTelemetry: function(aWindow) {
+#ifdef XP_WIN
+    let SCALING_PROBE_NAME = "DISPLAY_SCALING_MSWIN";
+#elifdef XP_MACOSX
+    let SCALING_PROBE_NAME = "DISPLAY_SCALING_OSX";
+#elifdef XP_LINUX
+    let SCALING_PROBE_NAME = "DISPLAY_SCALING_LINUX";
+#else
+    let SCALING_PROBE_NAME = "";
+#endif
+    if (SCALING_PROBE_NAME) {
+      let scaling = aWindow.devicePixelRatio * 100;
+      Services.telemetry.getHistogramById(SCALING_PROBE_NAME).add(scaling);
+    }
+
+#ifdef XP_WIN
+    if (WindowsUIUtils.inTabletMode) {
+      Services.telemetry.getHistogramById("FX_TABLET_MODE_USED_DURING_SESSION")
+                        .add(1);
+    }
+#endif
+  },
+
   // the first browser window has finished initializing
   _onFirstWindowLoaded: function BG__onFirstWindowLoaded(aWindow) {
+
+#ifdef NIGHTLY_BUILD
+    // Registering Shumway bootstrap script the child processes.
+    aWindow.messageManager.loadFrameScript("chrome://shumway/content/bootstrap-content.js", true);
+    // Initializing Shumway (shall be run after child script registration).
+    ShumwayUtils.init();
+#endif
+
 #ifdef XP_WIN
     // For windows seven, initialize the jump list module.
     const WINTASKBAR_CONTRACTID = "@mozilla.org/windows-taskbar;1";
@@ -899,6 +945,8 @@ BrowserGlue.prototype = {
         processStartupTime.getTime() - lastUse >= OFFER_PROFILE_RESET_INTERVAL_MS) {
       this._resetUnusedProfileNotification();
     }
+
+    this._firstWindowTelemetry(aWindow);
   },
 
   /**
@@ -974,6 +1022,27 @@ BrowserGlue.prototype = {
 
           win.openUILinkIn("about:newaddon?id=" + aAddon.id, "tab");
         })
+      });
+    }
+
+#ifdef MOZ_REQUIRE_SIGNING
+    let signingRequired = true;
+#else
+    let signingRequired = Services.prefs.getBoolPref("xpinstall.signatures.required");
+#endif
+
+    if (signingRequired) {
+      let disabledAddons = AddonManager.getStartupChanges(AddonManager.STARTUP_CHANGE_DISABLED);
+      AddonManager.getAddonsByIDs(disabledAddons, (addons) => {
+        for (let addon of addons) {
+          if (addon.type == "experiment")
+            continue;
+
+          if (addon.signedState <= AddonManager.SIGNEDSTATE_MISSING) {
+            this._notifyUnsignedAddonsDisabled();
+            break;
+          }
+        }
       });
     }
 
@@ -1563,7 +1632,7 @@ BrowserGlue.prototype = {
 
   _migrateUI: function BG__migrateUI() {
     const UI_VERSION = 28;
-    const BROWSER_DOCURL = "chrome://browser/content/browser.xul#";
+    const BROWSER_DOCURL = "chrome://browser/content/browser.xul";
     let currentUIVersion = 0;
     try {
       currentUIVersion = Services.prefs.getIntPref("browser.migration.version");
@@ -1571,28 +1640,22 @@ BrowserGlue.prototype = {
     if (currentUIVersion >= UI_VERSION)
       return;
 
-    this._rdf = Cc["@mozilla.org/rdf/rdf-service;1"].getService(Ci.nsIRDFService);
-    this._dataSource = this._rdf.GetDataSource("rdf:local-store");
-    this._dirty = false;
+    let xulStore = Cc["@mozilla.org/xul/xulstore;1"].getService(Ci.nsIXULStore);
 
     if (currentUIVersion < 2) {
       // This code adds the customizable bookmarks button.
-      let currentsetResource = this._rdf.GetResource("currentset");
-      let toolbarResource = this._rdf.GetResource(BROWSER_DOCURL + "nav-bar");
-      let currentset = this._getPersist(toolbarResource, currentsetResource);
+      let currentset = xulStore.getValue(BROWSER_DOCURL, "nav-bar", "currentset");
       // Need to migrate only if toolbar is customized and the element is not found.
       if (currentset &&
           currentset.indexOf("bookmarks-menu-button-container") == -1) {
         currentset += ",bookmarks-menu-button-container";
-        this._setPersist(toolbarResource, currentsetResource, currentset);
+        xulStore.setValue(BROWSER_DOCURL, "nav-bar", "currentset", currentset);
       }
     }
 
     if (currentUIVersion < 3) {
       // This code merges the reload/stop/go button into the url bar.
-      let currentsetResource = this._rdf.GetResource("currentset");
-      let toolbarResource = this._rdf.GetResource(BROWSER_DOCURL + "nav-bar");
-      let currentset = this._getPersist(toolbarResource, currentsetResource);
+      let currentset = xulStore.getValue(BROWSER_DOCURL, "nav-bar", "currentset");
       // Need to migrate only if toolbar is customized and all 3 elements are found.
       if (currentset &&
           currentset.indexOf("reload-button") != -1 &&
@@ -1603,15 +1666,13 @@ BrowserGlue.prototype = {
                                .replace(/(^|,)stop-button($|,)/, "$1$2")
                                .replace(/(^|,)urlbar-container($|,)/,
                                         "$1urlbar-container,reload-button,stop-button$2");
-        this._setPersist(toolbarResource, currentsetResource, currentset);
+        xulStore.setValue(BROWSER_DOCURL, "nav-bar", "currentset", currentset);
       }
     }
 
     if (currentUIVersion < 4) {
       // This code moves the home button to the immediate left of the bookmarks menu button.
-      let currentsetResource = this._rdf.GetResource("currentset");
-      let toolbarResource = this._rdf.GetResource(BROWSER_DOCURL + "nav-bar");
-      let currentset = this._getPersist(toolbarResource, currentsetResource);
+      let currentset = xulStore.getValue(BROWSER_DOCURL, "nav-bar", "currentset");
       // Need to migrate only if toolbar is customized and the elements are found.
       if (currentset &&
           currentset.indexOf("home-button") != -1 &&
@@ -1619,56 +1680,38 @@ BrowserGlue.prototype = {
         currentset = currentset.replace(/(^|,)home-button($|,)/, "$1$2")
                                .replace(/(^|,)bookmarks-menu-button-container($|,)/,
                                         "$1home-button,bookmarks-menu-button-container$2");
-        this._setPersist(toolbarResource, currentsetResource, currentset);
+        xulStore.setValue(BROWSER_DOCURL, "nav-bar", "currentset", currentset);
       }
     }
 
     if (currentUIVersion < 5) {
       // This code uncollapses PersonalToolbar if its collapsed status is not
       // persisted, and user customized it or changed default bookmarks.
-      let toolbarResource = this._rdf.GetResource(BROWSER_DOCURL + "PersonalToolbar");
-      let collapsedResource = this._rdf.GetResource("collapsed");
-      let collapsed = this._getPersist(toolbarResource, collapsedResource);
+      //
       // If the user does not have a persisted value for the toolbar's
       // "collapsed" attribute, try to determine whether it's customized.
-      if (collapsed === null) {
+      if (!xulStore.hasValue(BROWSER_DOCURL, "PersonalToolbar", "collapsed")) {
         // We consider the toolbar customized if it has more than
         // 3 children, or if it has a persisted currentset value.
-        let currentsetResource = this._rdf.GetResource("currentset");
-        let toolbarIsCustomized = !!this._getPersist(toolbarResource,
-                                                     currentsetResource);
-        function getToolbarFolderCount() {
+        let toolbarIsCustomized = xulStore.hasValue(BROWSER_DOCURL,
+                                                    "PersonalToolbar", "currentset");
+        let getToolbarFolderCount = function () {
           let toolbarFolder =
             PlacesUtils.getFolderContents(PlacesUtils.toolbarFolderId).root;
           let toolbarChildCount = toolbarFolder.childCount;
           toolbarFolder.containerOpen = false;
           return toolbarChildCount;
-        }
+        };
 
         if (toolbarIsCustomized || getToolbarFolderCount() > 3) {
-          this._setPersist(toolbarResource, collapsedResource, "false");
+          xulStore.setValue(BROWSER_DOCURL, "PersonalToolbar", "collapsed", "false");
         }
       }
     }
 
-    if (currentUIVersion < 6) {
-      // convert tabsontop attribute to pref
-      let toolboxResource = this._rdf.GetResource(BROWSER_DOCURL + "navigator-toolbox");
-      let tabsOnTopResource = this._rdf.GetResource("tabsontop");
-      let tabsOnTopAttribute = this._getPersist(toolboxResource, tabsOnTopResource);
-      if (tabsOnTopAttribute)
-        Services.prefs.setBoolPref("browser.tabs.onTop", tabsOnTopAttribute == "true");
-    }
-
-    // Migration at version 7 only occurred for users who wanted to try the new
-    // Downloads Panel feature before its release. Since migration at version
-    // 9 adds the button by default, this step has been removed.
-
     if (currentUIVersion < 9) {
       // This code adds the customizable downloads buttons.
-      let currentsetResource = this._rdf.GetResource("currentset");
-      let toolbarResource = this._rdf.GetResource(BROWSER_DOCURL + "nav-bar");
-      let currentset = this._getPersist(toolbarResource, currentsetResource);
+      let currentset = xulStore.getValue(BROWSER_DOCURL, "nav-bar", "currentset");
 
       // Since the Downloads button is located in the navigation bar by default,
       // migration needs to happen only if the toolbar was customized using a
@@ -1689,7 +1732,7 @@ BrowserGlue.prototype = {
           currentset = currentset.replace(/(^|,)window-controls($|,)/,
                                           "$1downloads-button,window-controls$2")
         }
-        this._setPersist(toolbarResource, currentsetResource, currentset);
+        xulStore.setValue(BROWSER_DOCURL, "nav-bar", "currentset", currentset);
       }
 
       Services.prefs.clearUserPref("browser.download.useToolkitUI");
@@ -1722,37 +1765,101 @@ BrowserGlue.prototype = {
     if (currentUIVersion < 12) {
       // Remove bookmarks-menu-button-container, then place
       // bookmarks-menu-button into its position.
-      let currentsetResource = this._rdf.GetResource("currentset");
-      let toolbarResource = this._rdf.GetResource(BROWSER_DOCURL + "nav-bar");
-      let currentset = this._getPersist(toolbarResource, currentsetResource);
+      let currentset = xulStore.getValue(BROWSER_DOCURL, "nav-bar", "currentset");
       // Need to migrate only if toolbar is customized.
       if (currentset) {
         if (currentset.includes("bookmarks-menu-button-container")) {
           currentset = currentset.replace(/(^|,)bookmarks-menu-button-container($|,)/,
                                           "$1bookmarks-menu-button$2");
-          this._setPersist(toolbarResource, currentsetResource, currentset);
+          xulStore.setValue(BROWSER_DOCURL, "nav-bar", "currentset", currentset);
         }
       }
+    }
+
+    if (currentUIVersion < 14) {
+      // DOM Storage doesn't specially handle about: pages anymore.
+      let path = OS.Path.join(OS.Constants.Path.profileDir,
+                              "chromeappsstore.sqlite");
+      OS.File.remove(path);
     }
 
     if (currentUIVersion < 16) {
-      // Migrate Sync from pmsync.palemoon.net to pmsync.palemoon.org
-      try {
-        let syncURL = Services.prefs.getCharPref("services.sync.clusterURL");
-        let newSyncURL = syncURL.replace(/pmsync\.palemoon\.net/i,"pmsync.palemoon.org");
-        if (newSyncURL != syncURL) {
-          Services.prefs.setCharPref("services.sync.clusterURL", newSyncURL);
+      xulStore.removeValue(BROWSER_DOCURL, "nav-bar", "collapsed");
+    }
+
+    // Insert the bookmarks-menu-button into the nav-bar if it isn't already
+    // there.
+    if (currentUIVersion < 17) {
+      let currentset = xulStore.getValue(BROWSER_DOCURL, "nav-bar", "currentset");
+      // Need to migrate only if toolbar is customized.
+      if (currentset) {
+        if (!currentset.includes("bookmarks-menu-button")) {
+          // The button isn't in the nav-bar, so let's look for an appropriate
+          // place to put it.
+          if (currentset.includes("downloads-button")) {
+            currentset = currentset.replace(/(^|,)downloads-button($|,)/,
+                                            "$1bookmarks-menu-button,downloads-button$2");
+          } else if (currentset.includes("home-button")) {
+            currentset = currentset.replace(/(^|,)home-button($|,)/,
+                                            "$1bookmarks-menu-button,home-button$2");
+          } else {
+            // Just append.
+            currentset = currentset.replace(/(^|,)window-controls($|,)/,
+                                            "$1bookmarks-menu-button,window-controls$2")
+          }
+          xulStore.setValue(BROWSER_DOCURL, "nav-bar", "currentset", currentset);
         }
-      } catch(ex) {
-        // Pref not found: Sync not in use, nothing to do.
       }
     }
 
-    if (this._dirty)
-      this._dataSource.QueryInterface(Ci.nsIRDFRemoteDataSource).Flush();
+    if (currentUIVersion < 18) {
+      // Remove iconsize and mode from all the toolbars
+      let toolbars = ["navigator-toolbox", "nav-bar", "PersonalToolbar",
+                      "addon-bar", "TabsToolbar", "toolbar-menubar"];
+      for (let resourceName of ["mode", "iconsize"]) {
+        for (let toolbarId of toolbars) {
+          xulStore.removeValue(BROWSER_DOCURL, toolbarId, resourceName);
+        }
+      }
+    }
 
-    delete this._rdf;
-    delete this._dataSource;
+    if (currentUIVersion < 19) {
+      let detector = null;    
+      try {
+        detector = Services.prefs.getComplexValue("intl.charset.detector",
+                                                  Ci.nsIPrefLocalizedString).data;
+      } catch (ex) {}
+      if (!(detector == "" ||
+            detector == "ja_parallel_state_machine" ||
+            detector == "ruprob" ||
+            detector == "ukprob")) {
+        // If the encoding detector pref value is not reachable from the UI,
+        // reset to default (varies by localization).
+        Services.prefs.clearUserPref("intl.charset.detector");
+      }
+    }
+
+    if (currentUIVersion < 20) {
+      // Remove persisted collapsed state from TabsToolbar.
+      xulStore.removeValue(BROWSER_DOCURL, "TabsToolbar", "collapsed");
+    }
+
+    if (currentUIVersion < 22) {
+      // Reset the Sync promobox count to promote the new FxAccount-based Sync.
+      Services.prefs.clearUserPref("browser.syncPromoViewsLeft");
+      Services.prefs.clearUserPref("browser.syncPromoViewsLeftMap");
+    }
+
+    if (currentUIVersion < 23) {
+      const kSelectedEnginePref = "browser.search.selectedEngine";
+      if (Services.prefs.prefHasUserValue(kSelectedEnginePref)) {
+        try {
+          let name = Services.prefs.getComplexValue(kSelectedEnginePref,
+                                                    Ci.nsIPrefLocalizedString).data;
+          Services.search.currentEngine = Services.search.getEngineByName(name);
+        } catch (ex) {}
+      }
+    }
 
     if (currentUIVersion < 24) {
       // Reset homepage pref for users who have it set to start.mozilla.org
@@ -1780,7 +1887,79 @@ BrowserGlue.prototype = {
       }
     }
 
-    if (currentUIVersion < 28) {
+    if (currentUIVersion < 25) {
+      // Make sure the doNotTrack value conforms to the conversion from
+      // three-state to two-state. (This reverts a setting of "please track me"
+      // to the default "don't say anything").
+      try {
+        if (Services.prefs.getBoolPref("privacy.donottrackheader.enabled") &&
+            Services.prefs.getIntPref("privacy.donottrackheader.value") != 1) {
+          Services.prefs.clearUserPref("privacy.donottrackheader.enabled");
+          Services.prefs.clearUserPref("privacy.donottrackheader.value");
+        }
+      }
+      catch (ex) {}
+    }
+
+    if (currentUIVersion < 26) {
+      // Refactor urlbar suggestion preferences to make it extendable and
+      // allow new suggestion types (e.g: search suggestions).
+      let types = ["history", "bookmark", "openpage"];
+      let defaultBehavior = 0;
+      try {
+        defaultBehavior = Services.prefs.getIntPref("browser.urlbar.default.behavior");
+      } catch (ex) {}
+      try {
+        let autocompleteEnabled = Services.prefs.getBoolPref("browser.urlbar.autocomplete.enabled");
+        if (!autocompleteEnabled) {
+          defaultBehavior = -1;
+        }
+      } catch (ex) {}
+
+      // If the default behavior is:
+      //    -1  - all new "...suggest.*" preferences will be false
+      //     0  - all new "...suggest.*" preferences will use the default values
+      //   > 0  - all new "...suggest.*" preferences will be inherited
+      for (let type of types) {
+        let prefValue = defaultBehavior == 0;
+        if (defaultBehavior > 0) {
+          prefValue = !!(defaultBehavior & Ci.mozIPlacesAutoComplete["BEHAVIOR_" + type.toUpperCase()]);
+        }
+        Services.prefs.setBoolPref("browser.urlbar.suggest." + type, prefValue);
+      }
+
+      // Typed behavior will be used only for results from history.
+      if (defaultBehavior != -1 &&
+          !!(defaultBehavior & Ci.mozIPlacesAutoComplete["BEHAVIOR_TYPED"])) {
+        Services.prefs.setBoolPref("browser.urlbar.suggest.history.onlyTyped", true);
+      }
+    }
+
+    if (currentUIVersion < 27) {
+      // Fix up document color use:
+      const kOldColorPref = "browser.display.use_document_colors";
+      if (Services.prefs.prefHasUserValue(kOldColorPref) &&
+          !Services.prefs.getBoolPref(kOldColorPref)) {
+        Services.prefs.setIntPref("browser.display.document_color_use", 2);
+      }
+    }
+
+    if (currentUIVersion < 29) {
+      let group = null;
+      try {
+        group = Services.prefs.getComplexValue("font.language.group",
+                                               Ci.nsIPrefLocalizedString);
+      } catch (ex) {}
+      if (group &&
+          ["tr", "x-baltic", "x-central-euro"].some(g => g == group.data)) {
+        // Latin groups were consolidated.
+        group.data = "x-western";
+        Services.prefs.setComplexValue("font.language.group",
+                                       Ci.nsIPrefLocalizedString, group);
+      }
+    }
+
+    if (currentUIVersion < 30) {
       // Convert old devedition theme pref to lightweight theme storage
       let lightweightThemeSelected = false;
       let selectedThemeID = null;
@@ -1815,42 +1994,14 @@ BrowserGlue.prototype = {
       // if for some reason this function runs again (even though it shouldn't)
       Services.prefs.clearUserPref("browser.devedition.showCustomizeButton");
     }
+ 
+    if (currentUIVersion < 31) {
+      xulStore.removeValue(BROWSER_DOCURL, "bookmarks-menu-button", "class");
+      xulStore.removeValue(BROWSER_DOCURL, "home-button", "class");
+    }
 
     // Update the migration version.
     Services.prefs.setIntPref("browser.migration.version", UI_VERSION);
-  },
-
-  _getPersist: function BG__getPersist(aSource, aProperty) {
-    var target = this._dataSource.GetTarget(aSource, aProperty, true);
-    if (target instanceof Ci.nsIRDFLiteral)
-      return target.Value;
-    return null;
-  },
-
-  _setPersist: function BG__setPersist(aSource, aProperty, aTarget) {
-    this._dirty = true;
-    try {
-      var oldTarget = this._dataSource.GetTarget(aSource, aProperty, true);
-      if (oldTarget) {
-        if (aTarget)
-          this._dataSource.Change(aSource, aProperty, oldTarget, this._rdf.GetLiteral(aTarget));
-        else
-          this._dataSource.Unassert(aSource, aProperty, oldTarget);
-      }
-      else {
-        this._dataSource.Assert(aSource, aProperty, this._rdf.GetLiteral(aTarget), true);
-      }
-
-      // Add the entry to the persisted set for this document if it's not there.
-      // This code is mostly borrowed from XULDocument::Persist.
-      let docURL = aSource.ValueUTF8.split("#")[0];
-      let docResource = this._rdf.GetResource(docURL);
-      let persistResource = this._rdf.GetResource("http://home.netscape.com/NC-rdf#persist");
-      if (!this._dataSource.HasAssertion(docResource, persistResource, aSource, true)) {
-        this._dataSource.Assert(docResource, persistResource, aSource, true);
-      }
-    }
-    catch(ex) {}
   },
 
   // ------------------------------
@@ -2577,15 +2728,18 @@ var DefaultBrowserCheck = {
 };
 
 #ifdef E10S_TESTING_ONLY
-let E10SUINotification = {
+var E10SUINotification = {
   // Increase this number each time we want to roll out an
   // e10s testing period to Nightly users.
   CURRENT_NOTICE_COUNT: 0,
+  CURRENT_NOTICE_COUNT: 1,
+  CURRENT_PROMPT_PREF: "browser.displayedE10SPrompt.1",
+  PREVIOUS_PROMPT_PREF: "browser.displayedE10SPrompt",
 
   checkStatus: function() {
     let skipE10sChecks = false;
     try {
-      let updateChannel = UpdateChannel.get();
+      let updateChannel = UpdateUtils.UpdateChannel;
       let channelAuthorized = updateChannel == "nightly" || updateChannel == "aurora";
 
       skipE10sChecks = !channelAuthorized ||
@@ -2616,16 +2770,25 @@ let E10SUINotification = {
     } else {
       let e10sPromptShownCount = 0;
       try {
-        e10sPromptShownCount = Services.prefs.getIntPref("browser.displayedE10SPrompt");
+        e10sPromptShownCount = Services.prefs.getIntPref(this.CURRENT_PROMPT_PREF);
       } catch(e) {}
+
+      let isHardwareAccelerated = true;
+      try {
+        let win = RecentWindow.getMostRecentBrowserWindow();
+        let winutils = win.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindowUtils);
+        isHardwareAccelerated = winutils.layerManagerType != "Basic";
+      } catch (e) {}
 
       if (!Services.appinfo.inSafeMode &&
           !Services.appinfo.accessibilityEnabled &&
+          isHardwareAccelerated &&
           e10sPromptShownCount < 5) {
         Services.tm.mainThread.dispatch(() => {
           try {
             this._showE10SPrompt();
-            Services.prefs.setIntPref("browser.displayedE10SPrompt", e10sPromptShownCount + 1);
+            Services.prefs.setIntPref(this.CURRENT_PROMPT_PREF, e10sPromptShownCount + 1);
+            Services.prefs.clearUserPref(this.PREVIOUS_PROMPT_PREF);
           } catch (ex) {
             Cu.reportError("Failed to show e10s prompt: " + ex);
           }
@@ -2700,7 +2863,7 @@ let E10SUINotification = {
         label: win.gNavigatorBundle.getString("e10s.offerPopup.noThanks.label"),
         accessKey: win.gNavigatorBundle.getString("e10s.offerPopup.noThanks.accesskey"),
         callback: function () {
-          Services.prefs.setIntPref("browser.displayedE10SPrompt", 5);
+          Services.prefs.setIntPref(E10SUINotification.CURRENT_PROMPT_PREF, 5);
         }
       }
     ];
@@ -2710,7 +2873,7 @@ let E10SUINotification = {
       persistWhileVisible: true
     };
 
-    win.PopupNotifications.show(browser, "enable_e10s", promptMessage, null, mainAction, secondaryActions, options);
+    win.PopupNotifications.show(browser, "enable-e10s", promptMessage, null, mainAction, secondaryActions, options);
 
     let highlights = [
       win.gNavigatorBundle.getString("e10s.offerPopup.highlight1"),

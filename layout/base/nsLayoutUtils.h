@@ -16,7 +16,6 @@
 #include "mozilla/layout/FrameChildList.h"
 #include "nsThreadUtils.h"
 #include "nsIPrincipal.h"
-#include "GraphicsFilter.h"
 #include "nsCSSPseudoElements.h"
 #include "FrameMetrics.h"
 #include "nsIWidget.h"
@@ -112,7 +111,6 @@ struct DisplayPortMarginsPropertyData {
  */
 class nsLayoutUtils
 {
-  typedef ::GraphicsFilter GraphicsFilter;
   typedef mozilla::dom::DOMRectList DOMRectList;
   typedef mozilla::layers::Layer Layer;
   typedef mozilla::ContainerLayerParameters ContainerLayerParameters;
@@ -120,6 +118,7 @@ class nsLayoutUtils
   typedef mozilla::gfx::SourceSurface SourceSurface;
   typedef mozilla::gfx::Color Color;
   typedef mozilla::gfx::DrawTarget DrawTarget;
+  typedef mozilla::gfx::Filter Filter;
   typedef mozilla::gfx::Float Float;
   typedef mozilla::gfx::Point Point;
   typedef mozilla::gfx::Rect Rect;
@@ -164,6 +163,16 @@ public:
    * Get display port for the given element.
    */
   static bool GetDisplayPort(nsIContent* aContent, nsRect *aResult = nullptr);
+
+  /**
+   * @return the display port for the given element which should be used for
+   * visibility testing purposes.
+   *
+   * If low-precision buffers are enabled, this is the critical display port;
+   * otherwise, it's the same display port returned by GetDisplayPort().
+   */
+  static bool GetDisplayPortForVisibilityTesting(nsIContent* aContent,
+                                                 nsRect* aResult = nullptr);
 
   enum class RepaintMode : uint8_t {
     Repaint,
@@ -540,8 +549,7 @@ public:
    * geometry root.
    */
   static nsIFrame* GetAnimatedGeometryRootFor(nsDisplayItem* aItem,
-                                              nsDisplayListBuilder* aBuilder,
-                                              mozilla::layers::LayerManager* aManager);
+                                              nsDisplayListBuilder* aBuilder);
 
   /**
    * Finds the nearest ancestor frame to aFrame that is considered to have (or
@@ -994,11 +1002,10 @@ public:
     PAINT_IGNORE_SUPPRESSION = 0x08,
     PAINT_DOCUMENT_RELATIVE = 0x10,
     PAINT_HIDE_CARET = 0x20,
-    PAINT_ALL_CONTINUATIONS = 0x40,
-    PAINT_TO_WINDOW = 0x80,
-    PAINT_EXISTING_TRANSACTION = 0x100,
-    PAINT_NO_COMPOSITE = 0x200,
-    PAINT_COMPRESSED = 0x400
+    PAINT_TO_WINDOW = 0x40,
+    PAINT_EXISTING_TRANSACTION = 0x80,
+    PAINT_NO_COMPOSITE = 0x100,
+    PAINT_COMPRESSED = 0x200
   };
 
   /**
@@ -1697,7 +1704,7 @@ public:
   /**
    * Gets the graphics filter for the frame
    */
-  static GraphicsFilter GetGraphicsFilterForFrame(nsIFrame* aFrame);
+  static Filter GetGraphicsFilterForFrame(nsIFrame* aFrame);
 
   /* N.B. The only difference between variants of the Draw*Image
    * functions below is the type of the aImage argument.
@@ -1733,7 +1740,7 @@ public:
                                         nsPresContext*      aPresContext,
                                         imgIContainer*      aImage,
                                         const CSSIntSize&   aImageSize,
-                                        GraphicsFilter      aGraphicsFilter,
+                                        Filter              aGraphicsFilter,
                                         const nsRect&       aDest,
                                         const nsRect&       aFill,
                                         const nsSize&       aRepeatSize,
@@ -1759,7 +1766,7 @@ public:
   static DrawResult DrawImage(gfxContext&         aContext,
                               nsPresContext*      aPresContext,
                               imgIContainer*      aImage,
-                              GraphicsFilter      aGraphicsFilter,
+                              Filter              aGraphicsFilter,
                               const nsRect&       aDest,
                               const nsRect&       aFill,
                               const nsPoint&      aAnchor,
@@ -1813,7 +1820,7 @@ public:
   static DrawResult DrawSingleUnscaledImage(gfxContext&          aContext,
                                             nsPresContext*       aPresContext,
                                             imgIContainer*       aImage,
-                                            GraphicsFilter       aGraphicsFilter,
+                                            Filter               aGraphicsFilter,
                                             const nsPoint&       aDest,
                                             const nsRect*        aDirty,
                                             uint32_t             aImageFlags,
@@ -1844,7 +1851,7 @@ public:
   static DrawResult DrawSingleImage(gfxContext&         aContext,
                                     nsPresContext*      aPresContext,
                                     imgIContainer*      aImage,
-                                    GraphicsFilter      aGraphicsFilter,
+                                    Filter              aGraphicsFilter,
                                     const nsRect&       aDest,
                                     const nsRect&       aDirty,
                                     const mozilla::SVGImageContext* aSVGContext,
@@ -2062,7 +2069,7 @@ public:
     DirectDrawInfo mDrawInfo;
 
     /* The size of the surface */
-    gfxIntSize mSize;
+    mozilla::gfx::IntSize mSize;
     /* The principal associated with the element whose surface was returned.
        If there is a surface, this will never be null. */
     nsCOMPtr<nsIPrincipal> mPrincipal;
@@ -2739,6 +2746,26 @@ public:
 
   static bool ShouldUseNoScriptSheet(nsIDocument* aDocument);
   static bool ShouldUseNoFramesSheet(nsIDocument* aDocument);
+
+  /**
+   * Get the text content inside the frame. This methods traverse the
+   * frame tree and collect the content from text frames. Note that this
+   * method is similiar to nsContentUtils::GetNodeTextContent, but it at
+   * least differs from that method in the following things:
+   * 1. it skips text content inside nodes like style, script, textarea
+   *    which don't generate an in-tree text frame for the text;
+   * 2. it skips elements with display property set to none;
+   * 3. it skips out-of-flow elements;
+   * 4. it includes content inside pseudo elements;
+   * 5. it may include part of text content of a node if a text frame
+   *    inside is split to different continuations.
+   */
+  static void GetFrameTextContent(nsIFrame* aFrame, nsAString& aResult);
+
+  /**
+   * Same as GetFrameTextContent but appends the result rather than sets it.
+   */
+  static void AppendFrameTextContent(nsIFrame* aFrame, nsAString& aResult);
 
 private:
   static uint32_t sFontSizeInflationEmPerLine;

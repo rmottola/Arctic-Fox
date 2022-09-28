@@ -1667,8 +1667,6 @@ public:
   nsContainerFrame* GetFloatContainingBlock(nsIFrame* aFrame);
 
 private:
-  nsIContent* PropagateScrollToViewport();
-
   // Build a scroll frame:
   //  Calls BeginBuildingScrollFrame, InitAndRestoreFrame, and then FinishBuildingScrollFrame.
   // @param aNewFrame the created scrollframe --- output only

@@ -164,7 +164,7 @@ class YieldOffsetArray {
     }
 };
 
-class Binding
+class Binding : public JS::Traceable
 {
     // One JSScript stores one Binding per formal/variable so we use a
     // packed-word representation.
@@ -200,6 +200,9 @@ class Binding
     bool aliased() const {
         return bool(bits_ & ALIASED_BIT);
     }
+
+    static void trace(Binding* self, JSTracer* trc) { self->trace(trc); }
+    void trace(JSTracer* trc);
 };
 
 JS_STATIC_ASSERT(sizeof(Binding) == sizeof(uintptr_t));
@@ -1655,6 +1658,10 @@ class JSScript : public js::gc::TenuredCell
         return enclosingStaticScope_;
     }
 
+    // Switch the script over from the off-thread compartment's static
+    // global lexical scope to the main thread compartment's.
+    void fixEnclosingStaticGlobalLexicalScope();
+
   private:
     bool makeTypes(JSContext* cx);
 
@@ -2197,6 +2204,11 @@ class LazyScript : public gc::TenuredCell
     JSObject* enclosingScope() const {
         return enclosingScope_;
     }
+
+    // Switch the script over from the off-thread compartment's static
+    // global lexical scope to the main thread compartment's.
+    void fixEnclosingStaticGlobalLexicalScope();
+
     ScriptSourceObject* sourceObject() const;
     ScriptSource* scriptSource() const {
         return sourceObject()->source();

@@ -28,6 +28,7 @@ Components.utils.import("resource://gre/modules/Promise.jsm");
 Components.utils.import("resource://gre/modules/Task.jsm");
 Components.utils.import("resource://gre/modules/osfile.jsm");
 Components.utils.import("resource://gre/modules/AsyncShutdown.jsm");
+Components.utils.import("resource://testing-common/MockRegistrar.jsm");
 
 Services.prefs.setBoolPref("toolkit.osfile.log", true);
 
@@ -192,8 +193,7 @@ function do_get_file_hash(aFile, aAlgorithm) {
   crypto.updateFromStream(fis, aFile.fileSize);
 
   // return the two-digit hexadecimal code for a byte
-  function toHexString(charCode)
-    ("0" + charCode.toString(16)).slice(-2);
+  let toHexString = charCode => ("0" + charCode.toString(16)).slice(-2);
 
   let binary = crypto.finish(false);
   return aAlgorithm + ":" + [toHexString(binary.charCodeAt(i)) for (i in binary)].join("")
@@ -564,7 +564,7 @@ function check_startup_changes(aType, aIds) {
   var ids = aIds.slice(0);
   ids.sort();
   var changes = AddonManager.getStartupChanges(aType);
-  changes = changes.filter(function(aEl) /@tests.mozilla.org$/.test(aEl));
+  changes = changes.filter(aEl => /@tests.mozilla.org$/.test(aEl));
   changes.sort();
 
   do_check_eq(JSON.stringify(ids), JSON.stringify(changes));
@@ -1464,20 +1464,7 @@ if ("nsIWindowsRegKey" in AM_Ci) {
     }
   };
 
-  var WinRegFactory = {
-    createInstance: function(aOuter, aIid) {
-      if (aOuter != null)
-        throw Components.results.NS_ERROR_NO_AGGREGATION;
-
-      var key = new MockWindowsRegKey();
-      return key.QueryInterface(aIid);
-    }
-  };
-
-  var registrar = Components.manager.QueryInterface(AM_Ci.nsIComponentRegistrar);
-  registrar.registerFactory(Components.ID("{0478de5b-0f38-4edb-851d-4c99f1ed8eba}"),
-                            "Mock Windows Registry Implementation",
-                            "@mozilla.org/windows-registry-key;1", WinRegFactory);
+  MockRegistrar.register("@mozilla.org/windows-registry-key;1", MockWindowsRegKey);
 }
 
 // Get the profile directory for tests to use.

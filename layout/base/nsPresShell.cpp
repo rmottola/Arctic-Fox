@@ -1752,9 +1752,9 @@ PresShell::Initialize(nscoord aWidth, nscoord aHeight)
         Preferences::GetInt("nglayout.initialpaint.delay",
                             PAINTLOCK_EVENT_DELAY);
 
-      mPaintSuppressionTimer->InitWithFuncCallback(sPaintSuppressionCallback,
-                                                   this, delay,
-                                                   nsITimer::TYPE_ONE_SHOT);
+      mPaintSuppressionTimer->InitWithNamedFuncCallback(
+        sPaintSuppressionCallback, this, delay, nsITimer::TYPE_ONE_SHOT,
+        "PresShell::sPaintSuppressionCallback");
     }
   }
 
@@ -4630,26 +4630,26 @@ PresShell::RenderDocument(const nsRect& aRect, uint32_t aFlags,
   nsIFrame* rootFrame = mFrameConstructor->GetRootFrame();
   if (!rootFrame) {
     // Nothing to paint, just fill the rect
-    aThebesContext->SetColor(gfxRGBA(aBackgroundColor));
+    aThebesContext->SetColor(Color::FromABGR(aBackgroundColor));
     aThebesContext->Fill();
     return NS_OK;
   }
 
   gfxContextAutoSaveRestore save(aThebesContext);
 
-  gfxContext::GraphicsOperator oldOperator = aThebesContext->CurrentOperator();
-  if (oldOperator == gfxContext::OPERATOR_OVER) {
+  CompositionOp oldOp = aThebesContext->CurrentOp();
+  if (oldOp == CompositionOp::OP_OVER) {
     // Clip to the destination rectangle before we push the group,
     // to limit the size of the temporary surface
     aThebesContext->Clip();
   }
 
   // we want the window to be composited as a single image using
-  // whatever operator was set; set OPERATOR_OVER here, which is
+  // whatever operator was set; set OP_OVER here, which is
   // either already the case, or overrides the operator in a group.
   // the original operator will be present when we PopGroup.
-  // we can avoid using a temporary surface if we're using OPERATOR_OVER
-  bool needsGroup = oldOperator != gfxContext::OPERATOR_OVER;
+  // we can avoid using a temporary surface if we're using OP_OVER
+  bool needsGroup = oldOp != CompositionOp::OP_OVER;
 
   if (needsGroup) {
     aThebesContext->PushGroup(NS_GET_A(aBackgroundColor) == 0xff ?
@@ -4657,14 +4657,14 @@ PresShell::RenderDocument(const nsRect& aRect, uint32_t aFlags,
                               gfxContentType::COLOR_ALPHA);
     aThebesContext->Save();
 
-    if (oldOperator != gfxContext::OPERATOR_OVER) {
+    if (oldOp != CompositionOp::OP_OVER) {
       // Clip now while we paint to the temporary surface. For
       // non-source-bounded operators (e.g., SOURCE), we need to do clip
       // here after we've pushed the group, so that eventually popping
       // the group and painting it will be able to clear the entire
       // destination surface.
       aThebesContext->Clip();
-      aThebesContext->SetOperator(gfxContext::OPERATOR_OVER);
+      aThebesContext->SetOp(CompositionOp::OP_OVER);
     }
   }
 
@@ -5304,11 +5304,6 @@ void PresShell::UpdateCanvasBackground()
   if (!FrameConstructor()->GetRootElementFrame()) {
     mCanvasBackgroundColor = GetDefaultBackgroundColorToDraw();
   }
-  if (XRE_IsContentProcess()) {
-    if (TabChild* tabChild = TabChild::GetFrom(this)) {
-      tabChild->SetBackgroundColor(mCanvasBackgroundColor);
-    }
-  }
 }
 
 nscolor PresShell::ComputeBackstopColor(nsView* aDisplayRoot)
@@ -5352,7 +5347,7 @@ bool PresShell::AsyncPanZoomEnabled()
       return widget->AsyncPanZoomEnabled();
     }
   }
-  return false;
+  return gfxPlatform::AsyncPanZoomEnabled();
 }
 
 void PresShell::SetIgnoreViewportScrolling(bool aIgnore)
@@ -5723,7 +5718,9 @@ PresShell::MarkImagesInSubtreeVisible(nsIFrame* aFrame, const nsRect& aRect)
   nsIScrollableFrame* scrollFrame = do_QueryFrame(aFrame);
   if (scrollFrame) {
     nsRect displayPort;
-    bool usingDisplayport = nsLayoutUtils::GetDisplayPort(aFrame->GetContent(), &displayPort);
+    bool usingDisplayport =
+      nsLayoutUtils::GetDisplayPortForVisibilityTesting(aFrame->GetContent(),
+                                                        &displayPort);
     if (usingDisplayport) {
       rect = displayPort;
     } else {
@@ -6167,7 +6164,7 @@ PresShell::Paint(nsView*        aViewToPaint,
     nsIntRect bounds =
       pc->GetVisibleArea().ToOutsidePixels(pc->AppUnitsPerDevPixel());
     bgcolor = NS_ComposeColors(bgcolor, mCanvasBackgroundColor);
-    root->SetColor(bgcolor);
+    root->SetColor(Color::FromABGR(bgcolor));
     root->SetVisibleRegion(bounds);
     layerManager->SetRoot(root);
   }
@@ -8971,7 +8968,7 @@ PresShell::DoReflow(nsIFrame* target, bool aInterruptible)
 
   nsDocShell* docShell = static_cast<nsDocShell*>(GetPresContext()->GetDocShell());
   if (docShell) {
-    TimelineConsumers::AddMarkerForDocShell(docShell, "Reflow", TRACING_INTERVAL_START);
+    TimelineConsumers::AddMarkerForDocShell(docShell, "Reflow", MarkerTracingType::START);
   }
 
   if (mReflowContinueTimer) {
@@ -9149,7 +9146,7 @@ PresShell::DoReflow(nsIFrame* target, bool aInterruptible)
   }
 
   if (docShell) {
-    TimelineConsumers::AddMarkerForDocShell(docShell, "Reflow", TRACING_INTERVAL_END);
+    TimelineConsumers::AddMarkerForDocShell(docShell, "Reflow", MarkerTracingType::END);
   }
   return !interrupted;
 }
@@ -10225,23 +10222,23 @@ void ReflowCountMgr::PaintCount(const char*     aName,
       fm->SetTextRunRTL(false);
       width = fm->GetWidth(buf, len, aRenderingContext);;
 
-      uint32_t color;
-      uint32_t color2;
+      Color color;
+      Color color2;
       if (aColor != 0) {
-        color  = aColor;
-        color2 = NS_RGB(0,0,0);
+        color  = Color::FromABGR(aColor);
+        color2 = Color(0.f, 0.f, 0.f);
       } else {
-        uint8_t rc = 0, gc = 0, bc = 0;
+        gfx::Float rc = 0.f, gc = 0.f, bc = 0.f;
         if (counter->mCount < 5) {
-          rc = 255;
-          gc = 255;
-        } else if ( counter->mCount < 11) {
-          gc = 255;
+          rc = 1.f;
+          gc = 1.f;
+        } else if (counter->mCount < 11) {
+          gc = 1.f;
         } else {
-          rc = 255;
+          rc = 1.f;
         }
-        color  = NS_RGB(rc,gc,bc);
-        color2 = NS_RGB(rc/2,gc/2,bc/2);
+        color  = Color(rc, gc, bc);
+        color2 = Color(rc/2, gc/2, bc/2);
       }
 
       nsRect rect(0,0, width+15, height+15);

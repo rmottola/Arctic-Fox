@@ -336,7 +336,7 @@ LIRGeneratorX64::visitStoreTypedArrayElementStatic(MStoreTypedArrayElementStatic
 void
 LIRGeneratorX64::visitRandom(MRandom* ins)
 {
-    LRandom* lir = new(alloc()) LRandom(temp(),
+    LRandom *lir = new(alloc()) LRandom(temp(),
                                         temp(),
                                         temp());
     defineFixed(lir, ins, LFloatReg(ReturnDoubleReg));

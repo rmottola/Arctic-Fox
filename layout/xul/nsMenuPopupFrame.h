@@ -21,6 +21,8 @@
 
 #include "nsITimer.h"
 
+#include "Units.h"
+
 class nsIWidget;
 
 // XUL popups can be in several different states. When opening a popup, the
@@ -171,7 +173,9 @@ public:
   virtual nsMenuFrame* GetCurrentMenuItem() override;
   NS_IMETHOD SetCurrentMenuItem(nsMenuFrame* aMenuItem) override;
   virtual void CurrentMenuIsBeingDestroyed() override;
-  NS_IMETHOD ChangeMenuItem(nsMenuFrame* aMenuItem, bool aSelectFirstItem) override;
+  NS_IMETHOD ChangeMenuItem(nsMenuFrame* aMenuItem,
+                            bool aSelectFirstItem,
+                            bool aFromKey) override;
 
   // as popups are opened asynchronously, the popup pending state is used to
   // prevent multiple requests from attempting to open the same popup twice
@@ -340,11 +344,11 @@ public:
 
   void ChangeByPage(bool aIsUp);
 
-  // Move the popup to the screen coordinate (aLeft, aTop) in CSS pixels.
+  // Move the popup to the screen coordinate |aPos| in CSS pixels.
   // If aUpdateAttrs is true, and the popup already has left or top attributes,
   // then those attributes are updated to the new location.
   // The frame may be destroyed by this method.
-  void MoveTo(int32_t aLeft, int32_t aTop, bool aUpdateAttrs);
+  void MoveTo(const mozilla::CSSIntPoint& aPos, bool aUpdateAttrs);
 
   void MoveToAnchor(nsIContent* aAnchorContent,
                     const nsAString& aPosition,
@@ -388,9 +392,9 @@ public:
   // Return the anchor if there is one.
   nsIContent* GetAnchor() const { return mAnchorContent; }
 
-  // Return the screen coordinates of the popup, or (-1, -1) if anchored.
-  // This position is in CSS pixels.
-  nsIntPoint ScreenPosition() const { return mScreenRect.TopLeft(); }
+  // Return the screen coordinates in CSS pixels of the popup,
+  // or (-1, -1, 0, 0) if anchored.
+  nsIntRect GetScreenAnchorRect() const { return mScreenRect; }
 
   nsIntPoint GetLastClientOffset() const { return mLastClientOffset; }
 
