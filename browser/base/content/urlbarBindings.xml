@@ -367,7 +367,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               openUILinkIn(url, "current", {
                 allowThirdPartyFixup: true,
                 disallowInheritPrincipal: !mayInheritPrincipal,
-                postData: postData
+                postData: postData,
+                allowPopups: url.startsWith("javascript:"),
               });
               // Ensure the start of the URL is visible for UX reasons:
               this.selectionStart = this.selectionEnd = 0;
