@@ -371,10 +371,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               // keyword).
               if (!mayInheritPrincipal)
                 flags |= Ci.nsIWebNavigation.LOAD_FLAGS_DISALLOW_INHERIT_OWNER;
-              // If the value wasn't typed, we know that we decoded the value as
-              // UTF-8 (see losslessDecodeURI)
-              if (!this.valueIsTyped)
-                flags |= Ci.nsIWebNavigation.LOAD_FLAGS_URI_IS_UTF8;
               gBrowser.loadURIWithFlags(url, flags, null, null, postData);
             }
 
@@ -404,8 +400,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                 let params = { allowThirdPartyFixup: true,
                                postData: postData,
                                initiatingDoc: document };
-                if (!this.valueIsTyped)
-                  params.isUTF8 = true;
                 openUILinkIn(url, where, params);
               }
             } else {
