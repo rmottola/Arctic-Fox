@@ -4423,6 +4423,9 @@ pref("webgl.enable-privileged-extensions", false);
 pref("webgl.bypass-shader-validation", false);
 pref("webgl.enable-prototype-webgl2", false);
 pref("webgl.disable-fail-if-major-performance-caveat", false);
+pref("webgl.disable-debug-renderer-info", false);
+pref("webgl.renderer-string-override", "");
+pref("webgl.vendor-string-override", "");
 
 #ifdef RELEASE_BUILD
 // Keep this disabled on Release and Beta for now. (see bug 1171228)
