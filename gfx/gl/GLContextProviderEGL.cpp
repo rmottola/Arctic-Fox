@@ -182,17 +182,15 @@ DestroySurface(EGLSurface oldSurface) {
 
 static EGLSurface
 CreateSurfaceForWindow(nsIWidget* widget, const EGLConfig& config) {
-    EGLSurface newSurface = EGL_NO_SURFACE;
+    EGLSurface newSurface = nullptr;
 
 #ifdef MOZ_WIDGET_ANDROID
         mozilla::AndroidBridge::Bridge()->RegisterCompositor();
         newSurface = mozilla::AndroidBridge::Bridge()->CreateEGLSurfaceForCompositor();
-        if (newSurface == EGL_NO_SURFACE) {
-            return EGL_NO_SURFACE;
-        }
-#elif defined(XP_WIN)
+#else
         MOZ_ASSERT(widget != nullptr);
-        newSurface = sEGLLibrary.fCreateWindowSurface(EGL_DISPLAY(), config, GET_NATIVE_WINDOW(widget), 0);
+        newSurface = sEGLLibrary.fCreateWindowSurface(EGL_DISPLAY(), config,
+                                                      GET_NATIVE_WINDOW(widget), 0);
 #endif
     return newSurface;
 }
