@@ -532,6 +532,7 @@ HasNonOpaqueNonTransparentColor(gfxContext *aContext, Color& aCurrentColorOut)
 struct BufferAlphaColor {
     explicit BufferAlphaColor(gfxContext *aContext)
         : mContext(aContext)
+        , mAlpha(0.0)
     {
 
     }
