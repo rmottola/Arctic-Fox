@@ -1711,7 +1711,6 @@ gfxFontGroup::FindPlatformFont(const nsAString& aName, bool aUseFontSet)
 {
     bool needsBold;
     gfxFontFamily *family = nullptr;
-    gfxFontEntry *fe = nullptr;
 
     if (aUseFontSet) {
         // First, look up in the user font set...
@@ -1722,18 +1721,6 @@ gfxFontGroup::FindPlatformFont(const nsAString& aName, bool aUseFontSet)
             // Add userfonts to the fontlist whether already loaded
             // or not. Loading is initiated during font matching.
             family = mUserFontSet->LookupFamily(aName);
-            if (family) {
-                nsAutoTArray<gfxFontEntry*,4> userfonts;
-                family->FindAllFontsForStyle(mStyle, userfonts, needsBold);
-                // add these to the fontlist
-                uint32_t count = userfonts.Length();
-                for (uint32_t i = 0; i < count; i++) {
-                    fe = userfonts[i];
-                    FamilyFace ff(family, fe, needsBold);
-                    ff.CheckState(mSkipDrawing);
-                    mFonts.AppendElement(ff);
-                }
-            }
         }
     }
 
@@ -1741,14 +1728,24 @@ gfxFontGroup::FindPlatformFont(const nsAString& aName, bool aUseFontSet)
     if (!family) {
         gfxPlatformFontList *fontList = gfxPlatformFontList::PlatformFontList();
         family = fontList->FindFamily(aName, mStyle.language, mStyle.systemFont);
-        if (family) {
-            fe = family->FindFontForStyle(mStyle, needsBold);
-        }
     }
 
-    // add to the font group, unless it's already there
-    if (fe && !HasFont(fe)) {
-        mFonts.AppendElement(FamilyFace(family, fe, needsBold));
+    // if family found, do style matching and add all font entries to mFonts
+    if (family) {
+        nsAutoTArray<gfxFontEntry*,4> fontEntryList;
+        family->FindAllFontsForStyle(mStyle, fontEntryList, needsBold);
+        // add these to the fontlist
+        uint32_t n = fontEntryList.Length();
+        for (uint32_t i = 0; i < n; i++) {
+            gfxFontEntry* fe = fontEntryList[i];
+            if (!HasFont(fe)) {
+                FamilyFace ff(family, fe, needsBold);
+                if (fe->mIsUserFontContainer) {
+                    ff.CheckState(mSkipDrawing);
+                }
+                mFonts.AppendElement(ff);
+            }
+        }
     }
 }
 
