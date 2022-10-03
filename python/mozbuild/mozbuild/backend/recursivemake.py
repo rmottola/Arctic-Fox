@@ -515,7 +515,7 @@ class RecursiveMakeBackend(CommonBackend):
 
         elif isinstance(obj, Resources):
             self._process_resources(obj, obj.resources, backend_file)
-        
+
         elif isinstance(obj, BrandingFiles):
             self._process_branding_files(obj, obj.files, backend_file)
 
