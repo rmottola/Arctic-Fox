@@ -541,7 +541,7 @@ class LifoAllocPolicy
     }
     template <typename T>
     T* maybe_pod_calloc(size_t numElems) {
-        T* p = pod_malloc<T>(numElems);
+        T* p = maybe_pod_malloc<T>(numElems);
         if (MOZ_UNLIKELY(!p))
             return nullptr;
         memset(p, 0, numElems * sizeof(T));
@@ -549,7 +549,7 @@ class LifoAllocPolicy
     }
     template <typename T>
     T* maybe_pod_realloc(T* p, size_t oldSize, size_t newSize) {
-        T* n = pod_malloc<T>(newSize);
+        T* n = maybe_pod_malloc<T>(newSize);
         if (MOZ_UNLIKELY(!n))
             return nullptr;
         MOZ_ASSERT(!(oldSize & mozilla::tl::MulOverflowMask<sizeof(T)>::value));

@@ -87,7 +87,7 @@ class JitAllocPolicy
     }
     template <typename T>
     T* maybe_pod_calloc(size_t numElems) {
-        T* p = pod_malloc<T>(numElems);
+        T* p = maybe_pod_malloc<T>(numElems);
         if (MOZ_LIKELY(p))
             memset(p, 0, numElems * sizeof(T));
         return p;
