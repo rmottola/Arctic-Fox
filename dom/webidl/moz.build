@@ -87,6 +87,7 @@ WEBIDL_FILES = [
     'ContainerBoxObject.webidl',
     'ConvolverNode.webidl',
     'Coordinates.webidl',
+    'CreateOfferRequest.webidl',
     'Crypto.webidl',
     'CSPDictionaries.webidl',
     'CSPReport.webidl',
