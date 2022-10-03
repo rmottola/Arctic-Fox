@@ -79,9 +79,13 @@ browser.jar:
   skin/classic/browser/reader-mode-16@2x.png          (../shared/reader/reader-mode-16@2x.png)
   skin/classic/browser/webapps-16.png
   skin/classic/browser/webapps-64.png
-  skin/classic/browser/webRTC-camera-black-16.png
-  skin/classic/browser/webRTC-microphone-black-16.png
-  skin/classic/browser/webRTC-screen-black-16.png
+  skin/classic/browser/webRTC-sharingDevice-menubar.png
+  skin/classic/browser/webRTC-sharingDevice-menubar@2x.png
+  skin/classic/browser/webRTC-sharingMicrophone-menubar.png
+  skin/classic/browser/webRTC-sharingMicrophone-menubar@2x.png
+  skin/classic/browser/webRTC-sharingScreen-menubar.png
+  skin/classic/browser/webRTC-sharingScreen-menubar@2x.png
+  skin/classic/browser/webRTC-indicator.css
 * skin/classic/browser/controlcenter/panel.css        (controlcenter/panel.css)
 * skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
   skin/classic/browser/downloads/buttons.png                   (downloads/buttons.png)
