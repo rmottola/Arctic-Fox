@@ -559,7 +559,7 @@ class TreeMetadataEmitter(LoggingMixin):
                                          '.manifest file.  See '
                                          'https://developer.mozilla.org/en/XPCOM/XPCOM_changes_in_Gecko_2.0 .',
                                          context);
-            
+
         # Proxy some variables as-is until we have richer classes to represent
         # them. We should aim to keep this set small because it violates the
         # desired abstraction of the build definition away from makefiles.
@@ -1167,11 +1167,11 @@ class TreeMetadataEmitter(LoggingMixin):
                 relpath=mozpath.join(manifest_reldir,
                     mozpath.basename(manifest_path)))
 
-        for test in sorted(manifest.files):
+        for test, source_manifest in sorted(manifest.tests):
             obj.tests.append({
                 'path': test,
                 'here': mozpath.dirname(test),
-                'manifest': manifest_full_path,
+                'manifest': source_manifest,
                 'name': mozpath.basename(test),
                 'head': '',
                 'tail': '',
