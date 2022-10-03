@@ -26,6 +26,7 @@ import mozpack.path as mozpath
 
 from .common import CommonBackend
 from ..frontend.data import (
+    AndroidAssetsDirs,
     AndroidResDirs,
     AndroidEclipseProjectData,
     BrandingFiles,
@@ -72,6 +73,7 @@ from ..util import (
 from ..makeutil import Makefile
 
 MOZBUILD_VARIABLES = [
+    b'ANDROID_ASSETS_DIRS',
     b'ANDROID_GENERATED_RESFILES',
     b'ANDROID_RES_DIRS',
     b'ASFLAGS',
@@ -599,6 +601,10 @@ class RecursiveMakeBackend(CommonBackend):
         elif isinstance(obj, AndroidResDirs):
             for p in obj.paths:
                 backend_file.write('ANDROID_RES_DIRS += %s\n' % p.full_path)
+
+        elif isinstance(obj, AndroidAssetsDirs):
+            for p in obj.paths:
+                backend_file.write('ANDROID_ASSETS_DIRS += %s\n' % p.full_path)
 
         else:
             return
