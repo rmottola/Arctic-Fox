@@ -11,6 +11,8 @@ component_intl   = ('Core', 'JavaScript: Internationalization API')
 component_jit    = ('Core', 'JavaScript Engine: JIT')
 component_stl    = ('Core', 'JavaScript: Standard Library')
 
+FILES_PER_UNIFIED_FILE = 6
+
 with Files('../public/**'):
     BUG_COMPONENT = component_engine
 with Files('*'):
@@ -46,6 +48,10 @@ with Files('builtin/make_intl_data.py'):
 
 with Files('../public/TrackedOptimizationInfo.h'):
     BUG_COMPONENT = component_jit
+
+
+if CONFIG['DEHYDRA_PATH']:
+    DIRS += ['analysis-tests']
 
 if CONFIG['JS_BUNDLED_EDITLINE']:
     DIRS += ['editline']
