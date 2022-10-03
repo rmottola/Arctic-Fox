@@ -45,9 +45,5 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
         'WindowsPreviewPerTab.jsm',
     ]
 
-EXTRA_PP_JS_MODULES += [
-    'webrtcUI.jsm',
-]
-
 if CONFIG['MOZILLA_OFFICIAL']:
     DEFINES['MOZILLA_OFFICIAL'] = 1

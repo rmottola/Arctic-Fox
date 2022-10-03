@@ -28,15 +28,13 @@ from ..util import (
     group_unified_files,
 )
 
+from ..testing import (
+    all_test_flavors,
+)
+
 
 class TreeMetadata(object):
     """Base class for all data being captured."""
-
-    def __init__(self):
-        self._ack = False
-
-    def ack(self):
-        self._ack = True
 
 
 class ContextDerived(TreeMetadata):
@@ -72,6 +70,12 @@ class ContextDerived(TreeMetadata):
         self.objdir = context.objdir
 
         self.config = context.config
+
+        self._context = context
+
+    @property
+    def install_target(self):
+        return self._context['FINAL_TARGET']
 
     @property
     def relobjdir(self):
@@ -148,7 +152,6 @@ class XPIDLFile(ContextDerived):
     __slots__ = (
         'add_to_manifest',
         'basename',
-        'install_target',
         'source_path',
     )
 
@@ -159,8 +162,6 @@ class XPIDLFile(ContextDerived):
         self.basename = mozpath.basename(source)
         self.module = module
         self.add_to_manifest = add_to_manifest
-
-        self.install_target = context['FINAL_TARGET']
 
 class BaseDefines(ContextDerived):
     """Context derived container object for DEFINES/HOST_DEFINES,
@@ -619,6 +620,8 @@ class TestManifest(ContextDerived):
             install_prefix=None, relpath=None, dupe_manifest=False):
         ContextDerived.__init__(self, context)
 
+        assert flavor in all_test_flavors()
+
         self.path = path
         self.directory = mozpath.dirname(path)
         self.manifest = manifest
@@ -959,3 +962,53 @@ class AndroidEclipseProjectData(object):
         cpe.ignore_warnings = ignore_warnings
         self._classpathentries.append(cpe)
         return cpe
+
+
+class AndroidResDirs(ContextDerived):
+    """Represents Android resource directories."""
+
+    __slots__ = (
+        'paths',
+    )
+
+    def __init__(self, context, paths):
+        ContextDerived.__init__(self, context)
+        self.paths = paths
+
+class AndroidAssetsDirs(ContextDerived):
+    """Represents Android assets directories."""
+
+    __slots__ = (
+        'paths',
+    )
+
+    def __init__(self, context, paths):
+        ContextDerived.__init__(self, context)
+        self.paths = paths
+
+class AndroidExtraResDirs(ContextDerived):
+    """Represents Android extra resource directories.
+
+    Extra resources are resources provided by libraries and including in a
+    packaged APK, but not otherwise redistributed.  In practice, this means
+    resources included in Fennec but not in GeckoView.
+    """
+
+    __slots__ = (
+        'paths',
+    )
+
+    def __init__(self, context, paths):
+        ContextDerived.__init__(self, context)
+        self.paths = paths
+
+class AndroidExtraPackages(ContextDerived):
+    """Represents Android extra packages."""
+
+    __slots__ = (
+        'packages',
+    )
+
+    def __init__(self, context, packages):
+        ContextDerived.__init__(self, context)
+        self.packages = packages

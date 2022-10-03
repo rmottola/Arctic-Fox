@@ -37,8 +37,8 @@ static const char *sEGLExtensionNames[] = {
     "EGL_KHR_fence_sync",
     "EGL_ANDROID_native_fence_sync",
     "EGL_ANDROID_image_crop",
-    "ANGLE_platform_angle",
-    "ANGLE_platform_angle_d3d"
+    "EGL_ANGLE_platform_angle",
+    "EGL_ANGLE_platform_angle_d3d"
 };
 
 #if defined(ANDROID)
@@ -175,6 +175,11 @@ GLLibraryEGL::EnsureInitialized(bool forceAccel)
 
 #ifdef MOZ_D3DCOMPILER_VISTA_DLL
             if (LoadLibraryForEGLOnWindows(NS_LITERAL_STRING(NS_STRINGIFY(MOZ_D3DCOMPILER_VISTA_DLL))))
+                break;
+#endif
+
+#ifdef MOZ_D3DCOMPILER_XP_DLL
+            if (LoadLibraryForEGLOnWindows(NS_LITERAL_STRING(NS_STRINGIFY(MOZ_D3DCOMPILER_XP_DLL))))
                 break;
 #endif
 

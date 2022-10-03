@@ -421,6 +421,12 @@ CreateSamplingRestrictedDrawable(gfxDrawable* aDrawable,
     PROFILER_LABEL("gfxUtils", "CreateSamplingRestricedDrawable",
       js::ProfileEntry::Category::GRAPHICS);
 
+    DrawTarget* destDrawTarget = aContext->GetDrawTarget();
+    if ((destDrawTarget->GetBackendType() == BackendType::DIRECT2D1_1) ||
+        (destDrawTarget->GetBackendType() == BackendType::DIRECT2D)) {
+      return nullptr;
+    }
+
     gfxRect clipExtents = aContext->GetClipExtents();
 
     // Inflate by one pixel because bilinear filtering will sample at most
@@ -757,13 +763,13 @@ gfxUtils::DrawPixelSnapped(gfxContext*         aContext,
               CreateSamplingRestrictedDrawable(aDrawable, aContext,
                                                aRegion, aFormat);
             if (restrictedDrawable) {
-                drawable.swap(restrictedDrawable);
-            }
+              drawable.swap(restrictedDrawable);
 
-            // We no longer need to tile: Either we never needed to, or we already
-            // filled a surface with the tiled pattern; this surface can now be
-            // drawn without tiling.
-            doTile = false;
+              // We no longer need to tile: Either we never needed to, or we already
+              // filled a surface with the tiled pattern; this surface can now be
+              // drawn without tiling.
+              doTile = false;
+            }
 #endif
         }
     }

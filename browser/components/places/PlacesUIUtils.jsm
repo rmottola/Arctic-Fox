@@ -332,52 +332,6 @@ this.PlacesUIUtils = {
   },
 
   /**
-   * Test if a bookmark item = a live bookmark item.
-   *
-   * @param aItemId
-   *        item identifier
-   * @return true if a live bookmark item, false otherwise.
-   *
-   * @note Maybe this should be removed later, see bug 1072833.
-   */
-  _isLivemark:
-  function PUIU__isLivemark(aItemId)
-  {
-    // Since this check may be done on each dragover event, it's worth maintaining
-    // a cache.
-    let self = PUIU__isLivemark;
-    if (!("ids" in self)) {
-      const LIVEMARK_ANNO = PlacesUtils.LMANNO_FEEDURI;
-
-      let idsVec = PlacesUtils.annotations.getItemsWithAnnotation(LIVEMARK_ANNO);
-      self.ids = new Set(idsVec);
-
-      let obs = Object.freeze({
-        QueryInterface: XPCOMUtils.generateQI(Ci.nsIAnnotationObserver),
-
-        onItemAnnotationSet(itemId, annoName) {
-          if (annoName == LIVEMARK_ANNO)
-            self.ids.add(itemId);
-        },
-
-        onItemAnnotationRemoved(itemId, annoName) {
-          // If annoName is set to an empty string, the item is gone.
-          if (annoName == LIVEMARK_ANNO || annoName == "")
-            self.ids.delete(itemId);
-        },
-
-        onPageAnnotationSet() { },
-        onPageAnnotationRemoved() { },
-      });
-      PlacesUtils.annotations.addObserver(obs);
-      PlacesUtils.registerShutdownFunction(() => {
-        PlacesUtils.annotations.removeObserver(obs);
-      });
-    }
-    return self.ids.has(aItemId);
-  },
-
-  /**
    * Constructs a Transaction for the drop or paste of a blob of data into
    * a container.
    * @param   data
@@ -770,7 +724,7 @@ this.PlacesUIUtils = {
       throw new Error("invalid value for aNodeOrItemId");
     }
 
-    if (itemId == PlacesUtils.placesRootId || this._isLivemark(itemId))
+    if (itemId == PlacesUtils.placesRootId || IsLivemark(itemId))
       return true;
 
     // leftPaneFolderId, and as a result, allBookmarksFolderId, is a lazy getter
@@ -978,7 +932,9 @@ this.PlacesUIUtils = {
           }
         }
       }
+
       aWindow.openUILinkIn(aNode.uri, aWhere, {
+        allowPopups: aNode.uri.startsWith("javascript:"),
         inBackground: Services.prefs.getBoolPref("browser.tabs.loadBookmarksInBackground"),
         private: aPrivate,
       });
@@ -1125,6 +1081,7 @@ this.PlacesUIUtils = {
       let items = as.getItemsWithAnnotation(this.ORGANIZER_QUERY_ANNO);
       // While looping through queries we will also check for their validity.
       let queriesCount = 0;
+      let corrupt = false;
       for (let i = 0; i < items.length; i++) {
         let queryName = as.getItemAnnotation(items[i], this.ORGANIZER_QUERY_ANNO);
 
@@ -1138,6 +1095,7 @@ this.PlacesUIUtils = {
 
         if (!itemExists(query.itemId)) {
           // Orphan annotation, bail out and create a new left pane root.
+          corrupt = true;
           break;
         }
 
@@ -1146,6 +1104,7 @@ this.PlacesUIUtils = {
         if (items.indexOf(parentId) == -1 && parentId != leftPaneRoot) {
           // The parent is not part of the left pane, bail out and create a new
           // left pane root.
+          corrupt = true;
           break;
         }
 
@@ -1163,7 +1122,11 @@ this.PlacesUIUtils = {
         queriesCount++;
       }
 
-      if (queriesCount != EXPECTED_QUERY_COUNT) {
+      // Note: it's not enough to just check for queriesCount, since we may
+      // find an invalid query just after accounting for a sufficient number of
+      // valid ones.  As well as we can't just rely on corrupt since we may find
+      // less valid queries than expected.
+      if (corrupt || queriesCount != EXPECTED_QUERY_COUNT) {
         // Queries number is wrong, so the left pane must be corrupt.
         // Note: we can't just remove the leftPaneRoot, because some query could
         // have a bad parent, so we have to remove all items one by one.

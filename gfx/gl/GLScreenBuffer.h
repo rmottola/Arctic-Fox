@@ -26,7 +26,7 @@
 namespace mozilla {
 namespace layers {
 class SharedSurfaceTextureClient;
-}
+} // namespace layers
 
 namespace gl {
 

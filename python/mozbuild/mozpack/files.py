@@ -2,6 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+from __future__ import absolute_import
+
 import errno
 import os
 import platform
@@ -409,12 +411,15 @@ class PreprocessedFile(BaseFile):
     File class for a file that is preprocessed. PreprocessedFile.copy() runs
     the preprocessor on the file to create the output.
     '''
-    def __init__(self, path, depfile_path, marker, defines, extra_depends=None):
+    def __init__(self, path, depfile_path, marker, defines, extra_depends=None,
+                 silence_missing_directive_warnings=False):
         self.path = path
         self.depfile = depfile_path
         self.marker = marker
         self.defines = defines
         self.extra_depends = list(extra_depends or [])
+        self.silence_missing_directive_warnings = \
+            silence_missing_directive_warnings
 
     def copy(self, dest, skip_if_older=True):
         '''
@@ -463,6 +468,7 @@ class PreprocessedFile(BaseFile):
         if self.depfile:
             deps_out = FileAvoidWrite(self.depfile)
         pp = Preprocessor(defines=self.defines, marker=self.marker)
+        pp.setSilenceDirectiveWarnings(self.silence_missing_directive_warnings)
 
         with open(self.path, 'rU') as input:
             pp.processFile(input=input, output=dest, depfile=deps_out)

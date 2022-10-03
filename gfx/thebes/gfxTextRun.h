@@ -10,6 +10,7 @@
 #include "nsString.h"
 #include "gfxPoint.h"
 #include "gfxFont.h"
+#include "gfxFontConstants.h"
 #include "nsTArray.h"
 #include "gfxSkipChars.h"
 #include "gfxPlatform.h"
@@ -832,18 +833,6 @@ public:
                         int32_t aRunScript, gfxFont *aPrevMatchedFont,
                         uint8_t *aMatchType);
 
-    // search through pref fonts for a character, return nullptr if no matching pref font
-    virtual already_AddRefed<gfxFont> WhichPrefFontSupportsChar(uint32_t aCh);
-
-    already_AddRefed<gfxFont>
-        WhichSystemFontSupportsChar(uint32_t aCh, uint32_t aNextCh,
-                                    int32_t aRunScript);
-
-    template<typename T>
-    void ComputeRanges(nsTArray<gfxTextRange>& mRanges,
-                       const T *aString, uint32_t aLength,
-                       int32_t aRunScript, uint16_t aOrientation);
-
     gfxUserFontSet* GetUserFontSet();
 
     // With downloadable fonts, the composition of the font group can change as fonts are downloaded
@@ -884,13 +873,19 @@ public:
     gfxTextRun* GetEllipsisTextRun(int32_t aAppUnitsPerDevPixel, uint32_t aFlags,
                                    LazyReferenceContextGetter& aRefContextGetter);
 
-    // helper method for resolving generic font families
-    static void
-    ResolveGenericFontNames(mozilla::FontFamilyType aGenericType,
-                            nsIAtom *aLanguage,
-                            nsTArray<nsString>& aGenericFamilies);
-
 protected:
+    // search through pref fonts for a character, return nullptr if no matching pref font
+    already_AddRefed<gfxFont> WhichPrefFontSupportsChar(uint32_t aCh);
+
+    already_AddRefed<gfxFont>
+        WhichSystemFontSupportsChar(uint32_t aCh, uint32_t aNextCh,
+                                    int32_t aRunScript);
+
+    template<typename T>
+    void ComputeRanges(nsTArray<gfxTextRange>& mRanges,
+                       const T *aString, uint32_t aLength,
+                       int32_t aRunScript, uint16_t aOrientation);
+
     class FamilyFace {
     public:
         FamilyFace() : mFamily(nullptr), mFontEntry(nullptr),
@@ -1117,18 +1112,12 @@ protected:
 
     // helper methods for looking up fonts
 
-    // iterate over the fontlist, lookup names and expand generics
-    void EnumerateFontList(nsIAtom *aLanguage, void *aClosure = nullptr);
-
-    // expand a generic to a list of specific names based on prefs
-    void FindGenericFonts(mozilla::FontFamilyType aGenericType,
-                          nsIAtom *aLanguage,
-                          void *aClosure);
-
     // lookup and add a font with a given name (i.e. *not* a generic!)
-    virtual void FindPlatformFont(const nsAString& aName,
-                                  bool aUseFontSet,
-                                  void *aClosure);
+    void AddPlatformFont(const nsAString& aName,
+                         nsTArray<gfxFontFamily*>& aFamilyList);
+
+    // do style selection and add entries to list
+    void AddFamilyToFontList(gfxFontFamily* aFamily);
 
     static nsILanguageAtomService* gLangService;
 };

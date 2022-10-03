@@ -78,6 +78,7 @@ GLXLibrary::EnsureInitialized()
 
     if (!mOGLLibrary) {
         const char* libGLfilename = nullptr;
+        bool forceFeatureReport = false;
 
         // see e.g. bug 608526: it is intrinsically interesting to know whether we have dynamically linked to libGL.so.1
         // because at least the NVIDIA implementation requires an executable stack, which causes mprotect calls,
@@ -88,11 +89,13 @@ GLXLibrary::EnsureInitialized()
         libGLfilename = "libGL.so.1";
 #endif
 
+        ScopedGfxFeatureReporter reporter(libGLfilename, forceFeatureReport);
         mOGLLibrary = PR_LoadLibrary(libGLfilename);
         if (!mOGLLibrary) {
             NS_WARNING("Couldn't load OpenGL shared library.");
             return false;
         }
+        reporter.SetSuccessful();
     }
 
     if (PR_GetEnv("MOZ_GLX_DEBUG")) {
@@ -234,7 +237,9 @@ GLXLibrary::EnsureInitialized()
     }
 
     if (HasExtension(extensionsStr, "GLX_ARB_create_context_robustness") &&
-        GLLibraryLoader::LoadSymbols(mOGLLibrary, symbols_robustness)) {
+        GLLibraryLoader::LoadSymbols(mOGLLibrary, symbols_robustness,
+                                     (GLLibraryLoader::PlatformLookupFunction)&xGetProcAddress))
+    {
         mHasRobustness = true;
     }
 

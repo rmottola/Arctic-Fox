@@ -11,6 +11,8 @@ component_intl   = ('Core', 'JavaScript: Internationalization API')
 component_jit    = ('Core', 'JavaScript Engine: JIT')
 component_stl    = ('Core', 'JavaScript: Standard Library')
 
+FILES_PER_UNIFIED_FILE = 6
+
 with Files('../public/**'):
     BUG_COMPONENT = component_engine
 with Files('*'):
@@ -46,6 +48,10 @@ with Files('builtin/make_intl_data.py'):
 
 with Files('../public/TrackedOptimizationInfo.h'):
     BUG_COMPONENT = component_jit
+
+
+if CONFIG['DEHYDRA_PATH']:
+    DIRS += ['analysis-tests']
 
 if CONFIG['JS_BUNDLED_EDITLINE']:
     DIRS += ['editline']
@@ -475,7 +481,12 @@ elif CONFIG['JS_CODEGEN_MIPS32']:
     UNIFIED_SOURCES += [
         'jit/mips-shared/Architecture-mips-shared.cpp',
         'jit/mips-shared/Assembler-mips-shared.cpp',
+        'jit/mips-shared/Bailouts-mips-shared.cpp',
+        'jit/mips-shared/BaselineCompiler-mips-shared.cpp',
+        'jit/mips-shared/BaselineIC-mips-shared.cpp',
+        'jit/mips-shared/CodeGenerator-mips-shared.cpp',
         'jit/mips-shared/Lowering-mips-shared.cpp',
+        'jit/mips-shared/MoveEmitter-mips-shared.cpp',
     ]
     if CONFIG['JS_CODEGEN_MIPS32']:
         UNIFIED_SOURCES += [

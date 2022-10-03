@@ -1144,7 +1144,7 @@ gfxFT2FontList::FindFonts()
     gfxFontCache *fc = gfxFontCache::GetCache();
     if (fc)
         fc->AgeAllGenerations();
-    mPrefFonts.Clear();
+    ClearLangGroupPrefFonts();
     mCodepointsWithNoFonts.reset();
 
     mCodepointsWithNoFonts.SetRange(0,0x1f);     // C0 controls

@@ -555,6 +555,8 @@ addEventListener("DOMServiceWorkerFocusClient", function(event) {
 }, false);
 
 ContentWebRTC.init();
+addMessageListener("rtcpeer:Allow", ContentWebRTC);
+addMessageListener("rtcpeer:Deny", ContentWebRTC);
 addMessageListener("webrtc:Allow", ContentWebRTC);
 addMessageListener("webrtc:Deny", ContentWebRTC);
 addMessageListener("webrtc:StopSharing", ContentWebRTC);

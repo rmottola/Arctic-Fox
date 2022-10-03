@@ -24,6 +24,10 @@ import reftest
 import mozinfo
 
 from .data import (
+    AndroidAssetsDirs,
+    AndroidExtraPackages,
+    AndroidExtraResDirs,
+    AndroidResDirs,
     BrandingFiles,
     ConfigFileSubstitution,
     ContextWrapped,
@@ -75,9 +79,14 @@ from .data import (
 
 from .reader import SandboxValidationError
 
+from ..testing import (
+    TEST_MANIFESTS,
+    REFTEST_FLAVORS,
+    WEB_PATFORM_TESTS_FLAVORS,
+)
+
 from .context import (
     Context,
-    ObjDirPath,
     SourcePath,
     ObjDirPath,
     Path,
@@ -150,8 +159,6 @@ class TreeMetadataEmitter(LoggingMixin):
             for o in objs:
                 self._object_count += 1
                 yield o
-                if not o._ack:
-                    raise Exception('Unhandled object of type %s' % type(o))
 
         for out in output:
             # Nothing in sub-contexts is currently of interest to us. Filter
@@ -542,14 +549,26 @@ class TreeMetadataEmitter(LoggingMixin):
         for obj in self._process_xpidl(context):
             yield obj
 
+        # Check for manifest declarations in EXTRA_{PP_,}COMPONENTS.
+        extras = context.get('EXTRA_COMPONENTS', []) + context.get('EXTRA_PP_COMPONENTS', [])
+        if any(e.endswith('.js') for e in extras) and \
+                not any(e.endswith('.manifest') for e in extras) and \
+                not context.get('NO_JS_MANIFEST', False):
+            raise SandboxValidationError('A .js component was specified in EXTRA_COMPONENTS '
+                                         'or EXTRA_PP_COMPONENTS without a matching '
+                                         '.manifest file.  See '
+                                         'https://developer.mozilla.org/en/XPCOM/XPCOM_changes_in_Gecko_2.0 .',
+                                         context);
+
         # Proxy some variables as-is until we have richer classes to represent
         # them. We should aim to keep this set small because it violates the
         # desired abstraction of the build definition away from makefiles.
         passthru = VariablePassthru(context)
         varlist = [
             'ALLOW_COMPILER_WARNINGS',
+            'ANDROID_APK_NAME',
+            'ANDROID_APK_PACKAGE',
             'ANDROID_GENERATED_RESFILES',
-            'ANDROID_RES_DIRS',
             'DISABLE_STL_WRAPPING',
             'EXTRA_COMPONENTS',
             'EXTRA_DSO_LDOPTS',
@@ -696,6 +715,24 @@ class TreeMetadataEmitter(LoggingMixin):
 
         for name, data in context.get('ANDROID_ECLIPSE_PROJECT_TARGETS', {}).items():
             yield ContextWrapped(context, data)
+
+        for (symbol, cls) in [
+                ('ANDROID_RES_DIRS', AndroidResDirs),
+                ('ANDROID_EXTRA_RES_DIRS', AndroidExtraResDirs),
+                ('ANDROID_ASSETS_DIRS', AndroidAssetsDirs)]:
+            paths = context.get(symbol)
+            if not paths:
+                continue
+            for p in paths:
+                if isinstance(p, SourcePath) and not os.path.isdir(p.full_path):
+                    raise SandboxValidationError('Directory listed in '
+                        '%s is not a directory: \'%s\'' %
+                            (symbol, p.full_path), context)
+            yield cls(context, paths)
+
+        android_extra_packages = context.get('ANDROID_EXTRA_PACKAGES')
+        if android_extra_packages:
+            yield AndroidExtraPackages(context, android_extra_packages)
 
         if passthru.variables:
             yield passthru
@@ -949,49 +986,21 @@ class TreeMetadataEmitter(LoggingMixin):
                     else 'USE_LIBS'))
 
     def _process_test_manifests(self, context):
-        # While there are multiple test manifests, the behavior is very similar
-        # across them. We enforce this by having common handling of all
-        # manifests and outputting a single class type with the differences
-        # described inside the instance.
-        #
-        # Keys are variable prefixes and values are tuples describing how these
-        # manifests should be handled:
-        #
-        #    (flavor, install_prefix, package_tests)
-        #
-        # flavor identifies the flavor of this test.
-        # install_prefix is the path prefix of where to install the files in
-        #     the tests directory.
-        # package_tests indicates whether to package test files into the test
-        #     package; suites that compile the test files should not install
-        #     them into the test package.
-        #
-        test_manifests = dict(
-            A11Y=('a11y', 'testing/mochitest', 'a11y', True),
-            BROWSER_CHROME=('browser-chrome', 'testing/mochitest', 'browser', True),
-            ANDROID_INSTRUMENTATION=('instrumentation', 'instrumentation', '.', False),
-            JETPACK_PACKAGE=('jetpack-package', 'testing/mochitest', 'jetpack-package', True),
-            JETPACK_ADDON=('jetpack-addon', 'testing/mochitest', 'jetpack-addon', False),
-            METRO_CHROME=('metro-chrome', 'testing/mochitest', 'metro', True),
-            MOCHITEST=('mochitest', 'testing/mochitest', 'tests', True),
-            MOCHITEST_CHROME=('chrome', 'testing/mochitest', 'chrome', True),
-            WEBRTC_SIGNALLING_TEST=('steeplechase', 'steeplechase', '.', True),
-            XPCSHELL_TESTS=('xpcshell', 'xpcshell', '.', True),
-        )
 
-        for prefix, info in test_manifests.items():
+        for prefix, info in TEST_MANIFESTS.items():
             for path in context.get('%s_MANIFESTS' % prefix, []):
                 for obj in self._process_test_manifest(context, info, path):
                     yield obj
 
-        for flavor in ('crashtest', 'reftest'):
+        for flavor in REFTEST_FLAVORS:
             for path in context.get('%s_MANIFESTS' % flavor.upper(), []):
                 for obj in self._process_reftest_manifest(context, flavor, path):
                     yield obj
 
-        for path in context.get("WEB_PLATFORM_TESTS_MANIFESTS", []):
-            for obj in self._process_web_platform_tests_manifest(context, path):
-                yield obj
+        for flavor in WEB_PATFORM_TESTS_FLAVORS:
+            for path in context.get("%s_MANIFESTS" % flavor.upper().replace('-', '_'), []):
+                for obj in self._process_web_platform_tests_manifest(context, path):
+                    yield obj
 
     def _process_test_manifest(self, context, info, manifest_path):
         flavor, install_root, install_subdir, package_tests = info
@@ -1158,11 +1167,11 @@ class TreeMetadataEmitter(LoggingMixin):
                 relpath=mozpath.join(manifest_reldir,
                     mozpath.basename(manifest_path)))
 
-        for test in sorted(manifest.files):
+        for test, source_manifest in sorted(manifest.tests):
             obj.tests.append({
                 'path': test,
                 'here': mozpath.dirname(test),
-                'manifest': manifest_full_path,
+                'manifest': source_manifest,
                 'name': mozpath.basename(test),
                 'head': '',
                 'tail': '',
@@ -1257,6 +1266,7 @@ class TreeMetadataEmitter(LoggingMixin):
 
         # Some paths have a subconfigure, yet also have a moz.build. Those
         # shouldn't end up in self._external_paths.
-        self._external_paths -= { o.relobjdir }
+        if o.objdir:
+            self._external_paths -= { o.relobjdir }
 
         yield o

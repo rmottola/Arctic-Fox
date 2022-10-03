@@ -434,6 +434,7 @@ pref("media.peerconnection.default_iceservers", "[]");
 pref("media.peerconnection.ice.loopback", false); // Set only for testing in offline environments.
 pref("media.peerconnection.ice.tcp", false);
 pref("media.peerconnection.ice.link_local", false); // Set only for testing IPV6 in networks that don't assign IPV6 addresses
+pref("media.peerconnection.ice.relay_only", false); // Limit candidates to TURN
 pref("media.peerconnection.use_document_iceservers", true);
 pref("media.peerconnection.identity.enabled", true);
 pref("media.peerconnection.identity.timeout", 10000);
@@ -4423,6 +4424,9 @@ pref("webgl.enable-privileged-extensions", false);
 pref("webgl.bypass-shader-validation", false);
 pref("webgl.enable-prototype-webgl2", false);
 pref("webgl.disable-fail-if-major-performance-caveat", false);
+pref("webgl.disable-debug-renderer-info", false);
+pref("webgl.renderer-string-override", "");
+pref("webgl.vendor-string-override", "");
 
 #ifdef RELEASE_BUILD
 // Keep this disabled on Release and Beta for now. (see bug 1171228)

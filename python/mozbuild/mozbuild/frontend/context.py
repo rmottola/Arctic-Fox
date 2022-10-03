@@ -18,7 +18,10 @@ from __future__ import absolute_import, unicode_literals
 
 import os
 
-from collections import OrderedDict
+from collections import (
+    Counter,
+    OrderedDict,
+)
 from mozbuild.util import (
     HierarchicalStringList,
     HierarchicalStringListWithFlagsFactory,
@@ -32,9 +35,10 @@ from mozbuild.util import (
     TypedList,
     TypedNamedTuple,
 )
+
+from ..testing import all_test_flavors
 import mozpack.path as mozpath
 from types import FunctionType
-from UserString import UserString
 
 import itertools
 
@@ -43,6 +47,7 @@ class ContextDerivedValue(object):
     """Classes deriving from this one receive a special treatment in a
     Context. See Context documentation.
     """
+    __slots__ = ()
 
 
 class Context(KeyedDefaultDict):
@@ -326,8 +331,13 @@ class PathMeta(type):
             assert isinstance(context, Context)
             if isinstance(value, Path):
                 context = value.context
-        if not issubclass(cls, (SourcePath, ObjDirPath)):
-            cls = ObjDirPath if value.startswith('!') else SourcePath
+        if not issubclass(cls, (SourcePath, ObjDirPath, AbsolutePath)):
+            if value.startswith('!'):
+                cls = ObjDirPath
+            elif value.startswith('%'):
+                cls = AbsolutePath
+            else:
+                cls = SourcePath
         return super(PathMeta, cls).__call__(context, value)
 
 class Path(ContextDerivedValue, unicode):
@@ -339,6 +349,7 @@ class Path(ContextDerivedValue, unicode):
       - 'srcdir/relative/paths'
       - '!/topobjdir/relative/paths'
       - '!objdir/relative/paths'
+      - '%/filesystem/absolute/paths'
     """
     __metaclass__ = PathMeta
 
@@ -394,6 +405,8 @@ class SourcePath(Path):
     def __init__(self, context, value):
         if value.startswith('!'):
             raise ValueError('Object directory paths are not allowed')
+        if value.startswith('%'):
+            raise ValueError('Filesystem absolute paths are not allowed')
         super(SourcePath, self).__init__(context, value)
 
         if value.startswith('/'):
@@ -425,7 +438,7 @@ class ObjDirPath(Path):
     """Like Path, but limited to paths in the object directory."""
     def __init__(self, context, value=None):
         if not value.startswith('!'):
-            raise ValueError('Source paths are not allowed')
+            raise ValueError('Object directory paths must start with ! prefix')
         super(ObjDirPath, self).__init__(context, value)
 
         if value.startswith('!/'):
@@ -433,6 +446,18 @@ class ObjDirPath(Path):
         else:
             path = mozpath.join(context.objdir, value[1:])
         self.full_path = mozpath.normpath(path)
+
+
+class AbsolutePath(Path):
+    """Like Path, but allows arbitrary paths outside the source and object directories."""
+    def __init__(self, context, value=None):
+        if not value.startswith('%'):
+            raise ValueError('Absolute paths must start with % prefix')
+        if not os.path.isabs(value[1:]):
+            raise ValueError('Path \'%s\' is not absolute' % value[1:])
+        super(AbsolutePath, self).__init__(context, value)
+
+        self.full_path = mozpath.normpath(value[1:])
 
 
 @memoize
@@ -464,12 +489,52 @@ def ContextDerivedTypedListWithItems(type, base_class=List):
     return _TypedListWithItems
 
 
+@memoize
+def ContextDerivedTypedRecord(*fields):
+    """Factory for objects with certain properties and dynamic
+    type checks.
+
+    This API is extremely similar to the TypedNamedTuple API,
+    except that properties may be mutated. This supports syntax like:
+
+    VARIABLE_NAME.property += [
+      'item1',
+      'item2',
+    ]
+    """
+
+    class _TypedRecord(ContextDerivedValue):
+        __slots__ = tuple([name for name, _ in fields])
+
+        def __init__(self, context):
+            for fname, ftype in self._fields.items():
+                if issubclass(ftype, ContextDerivedValue):
+                    setattr(self, fname, self._fields[fname](context))
+                else:
+                    setattr(self, fname, self._fields[fname]())
+
+        def __setattr__(self, name, value):
+            if name in self._fields and not isinstance(value, self._fields[name]):
+                value = self._fields[name](value)
+            object.__setattr__(self, name, value)
+
+    _TypedRecord._fields = dict(fields)
+    return _TypedRecord
+
 BugzillaComponent = TypedNamedTuple('BugzillaComponent',
                         [('product', unicode), ('component', unicode)])
 
 WebPlatformTestManifest = TypedNamedTuple("WebPlatformTestManifest",
                                           [("manifest_path", unicode),
                                            ("test_root", unicode)])
+
+OrderedSourceList = ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList)
+OrderedTestFlavorList = TypedList(Enum(*all_test_flavors()),
+                                  StrictOrderingOnAppendList)
+OrderedStringList = TypedList(unicode, StrictOrderingOnAppendList)
+DependentTestsEntry = ContextDerivedTypedRecord(('files', OrderedSourceList),
+                                                ('tags', OrderedStringList),
+                                                ('flavors', OrderedTestFlavorList))
 
 class Files(SubContext):
     """Metadata attached to files.
@@ -491,8 +556,8 @@ class Files(SubContext):
     most one entity.
 
     Patterns with ``*`` or ``**`` are wildcard matches. ``*`` matches files
-    within a single directory. ``**`` matches files across several directories.
-    Here are some examples:
+    at least within a single directory. ``**`` matches files across several
+    directories.
 
     ``foo.html``
        Will match only the ``foo.html`` file in the current directory.
@@ -503,11 +568,18 @@ class Files(SubContext):
     ``foo/*.css``
        Will match all ``.css`` files in the ``foo/`` directory.
     ``bar/*``
-       Will match all files in the ``bar/`` directory but not any files in
-       child directories of ``bar/``, such as ``bar/dir1/baz``.
-    ``baz/**``
-       Will match all files in the ``baz/`` directory and all directories
-       underneath.
+       Will match all files in the ``bar/`` directory and all of its
+       children directories.
+    ``bar/**``
+       This is equivalent to ``bar/*`` above.
+    ``bar/**/foo``
+       Will match all ``foo`` files in the ``bar/`` directory and all of its
+       children directories.
+
+    The difference in behavior between ``*`` and ``**`` is only evident if
+    a pattern follows the ``*`` or ``**``. A pattern ending with ``*`` is
+    greedy. ``**`` is needed when you need an additional pattern after the
+    wildcard. e.g. ``**/foo``.
     """
 
     VARIABLES = {
@@ -532,17 +604,79 @@ class Files(SubContext):
 
             See :ref:`mozbuild_files_metadata_finalizing` for more info.
             """, None),
+        'IMPACTED_TESTS': (DependentTestsEntry, list,
+            """File patterns, tags, and flavors for tests relevant to these files.
+
+            Maps source files to the tests potentially impacted by those files.
+            Tests can be specified by file pattern, tag, or flavor.
+
+            For example:
+
+            with Files('runtests.py'):
+               IMPACTED_TESTS.files += [
+                   '**',
+               ]
+
+            in testing/mochitest/moz.build will suggest that any of the tests
+            under testing/mochitest may be impacted by a change to runtests.py.
+
+            File patterns may be made relative to the topsrcdir with a leading
+            '/', so
+
+            with Files('httpd.js'):
+               IMPACTED_TESTS.files += [
+                   '/testing/mochitest/tests/Harness_sanity/**',
+               ]
+
+            in netwerk/test/httpserver/moz.build will suggest that any change to httpd.js
+            will be relevant to the mochitest sanity tests.
+
+            Tags and flavors are sorted string lists (flavors are limited to valid
+            values).
+
+            For example:
+
+            with Files('toolkit/devtools/*'):
+                IMPACTED_TESTS.tags += [
+                    'devtools',
+                ]
+
+            in the root moz.build would suggest that any test tagged 'devtools' would
+            potentially be impacted by a change to a file under toolkit/devtools, and
+
+            with Files('dom/base/nsGlobalWindow.cpp'):
+                IMPACTED_TESTS.flavors += [
+                    'mochitest',
+                ]
+
+            Would suggest that nsGlobalWindow.cpp is potentially relevant to
+            any plain mochitest.
+            """, None),
     }
 
     def __init__(self, parent, pattern=None):
         super(Files, self).__init__(parent)
         self.pattern = pattern
         self.finalized = set()
+        self.test_files = set()
+        self.test_tags = set()
+        self.test_flavors = set()
 
     def __iadd__(self, other):
         assert isinstance(other, Files)
 
+        self.test_files |= other.test_files
+        self.test_tags |= other.test_tags
+        self.test_flavors |= other.test_flavors
+
         for k, v in other.items():
+            if k == 'IMPACTED_TESTS':
+                self.test_files |= set(mozpath.relpath(e.full_path, e.context.config.topsrcdir)
+                                       for e in v.files)
+                self.test_tags |= set(v.tags)
+                self.test_flavors |= set(v.flavors)
+                continue
+
             # Ignore updates to finalized flags.
             if k in self.finalized:
                 continue
@@ -565,6 +699,49 @@ class Files(SubContext):
         if 'BUG_COMPONENT' in self:
             bc = self['BUG_COMPONENT']
             d['bug_component'] = (bc.product, bc.component)
+
+        return d
+
+    @staticmethod
+    def aggregate(files):
+        """Given a mapping of path to Files, obtain aggregate results.
+
+        Consumers may want to extract useful information from a collection of
+        Files describing paths. e.g. given the files info data for N paths,
+        recommend a single bug component based on the most frequent one. This
+        function provides logic for deriving aggregate knowledge from a
+        collection of path File metadata.
+
+        Note: the intent of this function is to operate on the result of
+        :py:func:`mozbuild.frontend.reader.BuildReader.files_info`. The
+        :py:func:`mozbuild.frontend.context.Files` instances passed in are
+        thus the "collapsed" (``__iadd__``ed) results of all ``Files`` from all
+        moz.build files relevant to a specific path, not individual ``Files``
+        instances from a single moz.build file.
+        """
+        d = {}
+
+        bug_components = Counter()
+
+        for f in files.values():
+            bug_component = f.get('BUG_COMPONENT')
+            if bug_component:
+                bug_components[bug_component] += 1
+
+        d['bug_component_counts'] = []
+        for c, count in bug_components.most_common():
+            component = (c.product, c.component)
+            d['bug_component_counts'].append((c, count))
+
+            if 'recommended_bug_component' not in d:
+                d['recommended_bug_component'] = component
+                recommended_count = count
+            elif count == recommended_count:
+                # Don't recommend a component if it doesn't have a clear lead.
+                d['recommended_bug_component'] = None
+
+        # In case no bug components.
+        d.setdefault('recommended_bug_component', None)
 
         return d
 
@@ -626,12 +803,41 @@ VARIABLES = {
         file.
         """, 'export'),
 
-    'ANDROID_RES_DIRS': (List, list,
+    'ANDROID_APK_NAME': (unicode, unicode,
+        """The name of an Android APK file to generate.
+        """, 'export'),
+
+    'ANDROID_APK_PACKAGE': (unicode, unicode,
+        """The name of the Android package to generate R.java for, like org.mozilla.gecko.
+        """, 'export'),
+
+    'ANDROID_EXTRA_PACKAGES': (StrictOrderingOnAppendList, list,
+        """The name of extra Android packages to generate R.java for, like ['org.mozilla.other'].
+        """, 'export'),
+
+    'ANDROID_EXTRA_RES_DIRS': (ContextDerivedTypedListWithItems(Path, List), list,
+        """Android extra package resource directories.
+
+        This variable contains a list of directories containing static files
+        to package into a 'res' directory and merge into an APK file.  These
+        directories are packaged into the APK but are assumed to be static
+        unchecked dependencies that should not be otherwise re-distributed.
+        """, 'export'),
+
+    'ANDROID_RES_DIRS': (ContextDerivedTypedListWithItems(Path, List), list,
         """Android resource directories.
 
-        This variable contains a list of directories, each relative to
-        the srcdir, containing static files to package into a 'res'
-        directory and merge into an APK file.
+        This variable contains a list of directories containing static
+        files to package into a 'res' directory and merge into an APK
+        file.
+        """, 'export'),
+
+    'ANDROID_ASSETS_DIRS': (ContextDerivedTypedListWithItems(Path, List), list,
+        """Android assets directories.
+
+        This variable contains a list of directories containing static
+        files to package into an 'assets' directory and merge into an
+        APK file.
         """, 'export'),
 
     'ANDROID_ECLIPSE_PROJECT_TARGETS': (dict, dict,

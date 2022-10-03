@@ -182,17 +182,15 @@ DestroySurface(EGLSurface oldSurface) {
 
 static EGLSurface
 CreateSurfaceForWindow(nsIWidget* widget, const EGLConfig& config) {
-    EGLSurface newSurface = EGL_NO_SURFACE;
+    EGLSurface newSurface = nullptr;
 
 #ifdef MOZ_WIDGET_ANDROID
         mozilla::AndroidBridge::Bridge()->RegisterCompositor();
         newSurface = mozilla::AndroidBridge::Bridge()->CreateEGLSurfaceForCompositor();
-        if (newSurface == EGL_NO_SURFACE) {
-            return EGL_NO_SURFACE;
-        }
-#elif defined(XP_WIN)
+#else
         MOZ_ASSERT(widget != nullptr);
-        newSurface = sEGLLibrary.fCreateWindowSurface(EGL_DISPLAY(), config, GET_NATIVE_WINDOW(widget), 0);
+        newSurface = sEGLLibrary.fCreateWindowSurface(EGL_DISPLAY(), config,
+                                                      GET_NATIVE_WINDOW(widget), 0);
 #endif
     return newSurface;
 }
@@ -343,7 +341,8 @@ GLContextEGL::SetEGLSurfaceOverride(EGLSurface surf) {
     }
 
     mSurfaceOverride = surf;
-    MakeCurrent(true);
+    DebugOnly<bool> ok = MakeCurrent(true);
+    MOZ_ASSERT(ok);
 }
 
 bool
@@ -1041,15 +1040,15 @@ GLContextProviderEGL::CreateOffscreen(const mozilla::gfx::IntSize& size,
     }
 
     RefPtr<GLContext> gl;
-    SurfaceCaps offscreenCaps = minCaps;
+    SurfaceCaps minOffscreenCaps = minCaps;
 
     if (canOffscreenUseHeadless) {
         gl = CreateHeadless(flags);
         if (!gl)
             return nullptr;
     } else {
-        SurfaceCaps minBackbufferCaps = minCaps;
-        if (minCaps.antialias) {
+        SurfaceCaps minBackbufferCaps = minOffscreenCaps;
+        if (minOffscreenCaps.antialias) {
             minBackbufferCaps.antialias = false;
             minBackbufferCaps.depth = false;
             minBackbufferCaps.stencil = false;
@@ -1059,14 +1058,19 @@ GLContextProviderEGL::CreateOffscreen(const mozilla::gfx::IntSize& size,
         if (!gl)
             return nullptr;
 
-        offscreenCaps = gl->Caps();
-        if (minCaps.antialias) {
-            offscreenCaps.depth = minCaps.depth;
-            offscreenCaps.stencil = minCaps.stencil;
+        // Pull the actual resulting caps to ensure that our offscreen matches our
+        // backbuffer.
+        minOffscreenCaps.alpha = gl->Caps().alpha;
+        if (!minOffscreenCaps.antialias) {
+            // Only update these if we don't have AA. If we do have AA, we ignore
+            // backbuffer depth/stencil.
+            minOffscreenCaps.depth = gl->Caps().depth;
+            minOffscreenCaps.stencil = gl->Caps().stencil;
         }
     }
 
-    if (!gl->InitOffscreen(size, offscreenCaps))
+    // Init the offscreen with the updated offscreen caps.
+    if (!gl->InitOffscreen(size, minOffscreenCaps))
         return nullptr;
 
     return gl.forget();

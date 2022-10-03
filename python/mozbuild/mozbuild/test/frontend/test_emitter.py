@@ -10,6 +10,8 @@ import unittest
 from mozunit import main
 
 from mozbuild.frontend.data import (
+    AndroidResDirs,
+    BrandingFiles,
     ConfigFileSubstitution,
     Defines,
     DistFiles,
@@ -70,11 +72,7 @@ class TestEmitterBasic(unittest.TestCase):
 
     def read_topsrcdir(self, reader, filter_common=True):
         emitter = TreeMetadataEmitter(reader.config)
-        def ack(obj):
-            obj.ack()
-            return obj
-
-        objs = list(ack(o) for o in emitter.emit(reader.read_topsrcdir()))
+        objs = list(emitter.emit(reader.read_topsrcdir()))
         self.assertGreater(len(objs), 0)
 
         filtered = []
@@ -156,7 +154,7 @@ class TestEmitterBasic(unittest.TestCase):
         wanted = {
             'ALLOW_COMPILER_WARNINGS': True,
             'DISABLE_STL_WRAPPING': True,
-            'EXTRA_COMPONENTS': ['fans.js', 'tans.js'],
+            'EXTRA_COMPONENTS': ['dummy.manifest', 'fans.js', 'tans.js'],
             'EXTRA_PP_COMPONENTS': ['fans.pp.js', 'tans.pp.js'],
             'NO_DIST_INSTALL': True,
             'VISIBILITY_FLAGS': '',
@@ -343,6 +341,23 @@ class TestEmitterBasic(unittest.TestCase):
         overwrite = resources._children['overwrite']
         self.assertEqual(overwrite._strings, ['new.res'])
 
+    def test_branding_files(self):
+        reader = self.reader('branding-files')
+        objs = self.read_topsrcdir(reader)
+
+        self.assertEqual(len(objs), 1)
+        self.assertIsInstance(objs[0], BrandingFiles)
+
+        files = objs[0].files
+
+        self.assertEqual(files._strings, ['app.ico', 'bar.ico', 'baz.png', 'foo.xpm'])
+        self.assertEqual(files['app.ico'].source, 'test/bar.ico')
+
+        self.assertIn('icons', files._children)
+        icons = files._children['icons']
+
+        self.assertEqual(icons._strings, ['quux.icns'])
+
     def test_preferences_js(self):
         reader = self.reader('js_preference_files')
         objs = self.read_topsrcdir(reader)
@@ -447,6 +462,24 @@ class TestEmitterBasic(unittest.TestCase):
         ]
         paths = sorted([v[0] for v in o.installs.values()])
         self.assertEqual(paths, expected)
+
+    def test_test_manifest_includes(self):
+        """Ensure that manifest objects from the emitter list a correct manifest.
+        """
+        reader = self.reader('test-manifest-emitted-includes')
+        [obj] = self.read_topsrcdir(reader)
+
+        # Expected manifest leafs for our tests.
+        expected_manifests = {
+            'reftest1.html': 'reftest.list',
+            'reftest1-ref.html': 'reftest.list',
+            'reftest2.html': 'included-reftest.list',
+            'reftest2-ref.html': 'included-reftest.list',
+        }
+
+        for t in obj.tests:
+            self.assertTrue(t['manifest'].endswith(expected_manifests[t['name']]))
+
 
     def test_test_manifest_keys_extracted(self):
         """Ensure all metadata from test manifests is extracted."""
@@ -854,6 +887,22 @@ class TestEmitterBasic(unittest.TestCase):
             'DIST_FILES does not exist'):
             reader = self.reader('dist-files-missing')
             self.read_topsrcdir(reader)
+
+    def test_android_res_dirs(self):
+        """Test that ANDROID_RES_DIRS works properly."""
+        reader = self.reader('android-res-dirs')
+        objs = self.read_topsrcdir(reader)
+
+        self.assertEqual(len(objs), 1)
+        self.assertIsInstance(objs[0], AndroidResDirs)
+
+        # Android resource directories are ordered.
+        expected = [
+            mozpath.join(reader.config.topsrcdir, 'dir1'),
+            mozpath.join(reader.config.topobjdir, 'dir2'),
+            '/dir3',
+        ]
+        self.assertEquals([p.full_path for p in objs[0].paths], expected)
 
 if __name__ == '__main__':
     main()
