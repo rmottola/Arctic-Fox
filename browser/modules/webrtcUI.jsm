@@ -111,7 +111,7 @@ this.webrtcUI = {
       let browser = aStream.browser;
       let browserWindow = browser.ownerDocument.defaultView;
       let tab = browserWindow.gBrowser &&
-                browserWindow.gBrowser._getTabForBrowser(browser);
+                browserWindow.gBrowser.getTabForBrowser(browser);
       return {uri: state.documentURI, tab: tab, browser: browser, types: types};
     });
   },
@@ -134,6 +134,17 @@ this.webrtcUI = {
     let PopupNotifications = browserWindow.PopupNotifications;
     let notif = PopupNotifications.getNotification("webRTC-sharing" + aType,
                                                    aActiveStream.browser);
+    if (AppConstants.platform == "macosx" && !Services.focus.activeWindow) {
+      browserWindow.addEventListener("activate", function onActivate() {
+        browserWindow.removeEventListener("activate", onActivate);
+        Services.tm.mainThread.dispatch(function() {
+          notif.reshow();
+        }, Ci.nsIThread.DISPATCH_NORMAL);
+      });
+      Cc["@mozilla.org/widget/macdocksupport;1"].getService(Ci.nsIMacDockSupport)
+        .activateApplication(true);
+      return;
+    }
     notif.reshow();
   },
 
