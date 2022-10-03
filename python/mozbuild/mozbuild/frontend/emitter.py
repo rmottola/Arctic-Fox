@@ -25,6 +25,8 @@ import mozinfo
 
 from .data import (
     AndroidAssetsDirs,
+    AndroidExtraPackages,
+    AndroidExtraResDirs,
     AndroidResDirs,
     BrandingFiles,
     ConfigFileSubstitution,
@@ -702,6 +704,7 @@ class TreeMetadataEmitter(LoggingMixin):
 
         for (symbol, cls) in [
                 ('ANDROID_RES_DIRS', AndroidResDirs),
+                ('ANDROID_EXTRA_RES_DIRS', AndroidExtraResDirs),
                 ('ANDROID_ASSETS_DIRS', AndroidAssetsDirs)]:
             paths = context.get(symbol)
             if not paths:
@@ -712,6 +715,10 @@ class TreeMetadataEmitter(LoggingMixin):
                         '%s is not a directory: \'%s\'' %
                             (symbol, p.full_path), context)
             yield cls(context, paths)
+
+        android_extra_packages = context.get('ANDROID_EXTRA_PACKAGES')
+        if android_extra_packages:
+            yield AndroidExtraPackages(context, android_extra_packages)
 
         if passthru.variables:
             yield passthru
