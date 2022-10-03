@@ -71,6 +71,12 @@ class ContextDerived(TreeMetadata):
 
         self.config = context.config
 
+        self._context = context
+
+    @property
+    def install_target(self):
+        return self._context['FINAL_TARGET']
+
     @property
     def relobjdir(self):
         return mozpath.relpath(self.objdir, self.topobjdir)
@@ -146,7 +152,6 @@ class XPIDLFile(ContextDerived):
     __slots__ = (
         'add_to_manifest',
         'basename',
-        'install_target',
         'source_path',
     )
 
@@ -157,8 +162,6 @@ class XPIDLFile(ContextDerived):
         self.basename = mozpath.basename(source)
         self.module = module
         self.add_to_manifest = add_to_manifest
-
-        self.install_target = context['FINAL_TARGET']
 
 class BaseDefines(ContextDerived):
     """Context derived container object for DEFINES/HOST_DEFINES,
