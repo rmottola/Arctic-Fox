@@ -555,7 +555,7 @@ function prompt(aBrowser, aRequest) {
                                              windowID: aRequest.windowID,
                                              devices: allowedDevices});
       };
-      return true;
+      return false;
     }
   };
 
