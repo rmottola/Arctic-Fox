@@ -279,7 +279,7 @@ CodeGeneratorMIPS::visitMinMaxF(LMinMaxF* ins)
 
     // Check for zero.
     masm.bind(&equal);
-    masm.loadConstantFloat32(0.0, ScratchFloat32Reg);
+    masm.loadConstantFloat32(0.0f, ScratchFloat32Reg);
     // First wasn't 0 or -0, so just return it.
     masm.ma_bc1s(first, ScratchFloat32Reg, &done, Assembler::DoubleNotEqualOrUnordered, ShortJump);
 
@@ -1105,7 +1105,7 @@ CodeGeneratorMIPS::visitFloorF(LFloorF* lir)
     Label skipCheck, done;
 
     // If Nan, 0 or -0 check for bailout
-    masm.loadConstantFloat32(0.0, scratch);
+    masm.loadConstantFloat32(0.0f, scratch);
     masm.ma_bc1s(input, scratch, &skipCheck, Assembler::DoubleNotEqual, ShortJump);
 
     // If binary value is not zero, it is NaN or -0, so we bail.
@@ -1265,7 +1265,7 @@ CodeGeneratorMIPS::visitRoundF(LRoundF* lir)
     masm.loadConstantFloat32(0.5, temp);
 
     // Branch to a slow path for negative inputs. Doesn't catch NaN or -0.
-    masm.loadConstantFloat32(0.0, scratch);
+    masm.loadConstantFloat32(0.0f, scratch);
     masm.ma_bc1s(input, scratch, &negative, Assembler::DoubleLessThan, ShortJump);
 
     // If Nan, 0 or -0 check for bailout
@@ -1476,7 +1476,7 @@ CodeGeneratorMIPS::visitTestFAndBranch(LTestFAndBranch* test)
     MBasicBlock* ifTrue = test->ifTrue();
     MBasicBlock* ifFalse = test->ifFalse();
 
-    masm.loadConstantFloat32(0.0, ScratchFloat32Reg);
+    masm.loadConstantFloat32(0.0f, ScratchFloat32Reg);
     // If 0, or NaN, the result is false.
 
     if (isNextBlock(ifFalse->lir())) {
@@ -1701,7 +1701,7 @@ CodeGeneratorMIPS::visitNotF(LNotF* ins)
     Register dest = ToRegister(ins->output());
 
     Label falsey, done;
-    masm.loadConstantFloat32(0.0, ScratchFloat32Reg);
+    masm.loadConstantFloat32(0.0f, ScratchFloat32Reg);
     masm.ma_bc1s(in, ScratchFloat32Reg, &falsey, Assembler::DoubleEqualOrUnordered, ShortJump);
 
     masm.move32(Imm32(0), dest);
