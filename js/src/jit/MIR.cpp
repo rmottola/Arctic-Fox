@@ -2211,14 +2211,13 @@ NeedNegativeZeroCheck(MDefinition* def)
             // Figure out the order in which the addition's operands will
             // execute. EdgeCaseAnalysis::analyzeLate has renumbered the MIR
             // definitions for us so that this just requires comparing ids.
-            MDefinition* first = use_def->toAdd()->getOperand(0);
-            MDefinition* second = use_def->toAdd()->getOperand(1);
+            MDefinition* first = use_def->toAdd()->lhs();
+            MDefinition* second = use_def->toAdd()->rhs();
             if (first->id() > second->id()) {
                 MDefinition* temp = first;
                 first = second;
                 second = temp;
             }
-
             // Negative zero checks can be removed on the first executed
             // operand only if it is guaranteed the second executed operand
             // will produce a value other than -0. While the second is
