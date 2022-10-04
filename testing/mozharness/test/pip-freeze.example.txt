@@ -6,7 +6,7 @@ WebOb==1.2b3
 coverage==3.5.1
 -e hg+http://k0s.org/mozilla/hg/jetperf@4645ae34d2c41a353dcdbd856b486b6d3faabb99#egg=jetperf-dev
 logilab-astng==0.23.1
-logilab-common==0.57.1
+logilab-common==0.61.0
 mozdevice==0.2
 -e hg+https://hg.mozilla.org/build/mozharness@df6b7f1e14d8c472125ef7a77b8a3b40c96ae181#egg=mozharness-jetperf
 mozhttpd==0.3
