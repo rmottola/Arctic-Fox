@@ -44,6 +44,7 @@ class CpowHolder;
 } // namespace jsipc
 
 namespace layers {
+class AsyncDragMetrics;
 struct FrameMetrics;
 struct TextureFactoryIdentifier;
 } // namespace layers
@@ -83,6 +84,7 @@ class TabParent final : public PBrowserParent
                       , public nsIWebBrowserPersistable
 {
     typedef mozilla::dom::ClonedMessageData ClonedMessageData;
+    typedef mozilla::layers::AsyncDragMetrics AsyncDragMetrics;
 
     virtual ~TabParent();
 
@@ -215,7 +217,6 @@ public:
                                      const uint32_t& aHotspotX,
                                      const uint32_t& aHotspotY,
                                      const bool& aForce) override;
-    virtual bool RecvSetBackgroundColor(const nscolor& aValue) override;
     virtual bool RecvSetStatus(const uint32_t& aType, const nsString& aStatus) override;
     virtual bool RecvIsParentWindowMainWidgetVisible(bool* aIsVisible) override;
     virtual bool RecvShowTooltip(const uint32_t& aX, const uint32_t& aY, const nsString& aTooltip) override;
@@ -244,6 +245,7 @@ public:
     virtual bool RecvDispatchWheelEvent(const mozilla::WidgetWheelEvent& aEvent) override;
     virtual bool RecvDispatchMouseEvent(const mozilla::WidgetMouseEvent& aEvent) override;
     virtual bool RecvDispatchKeyboardEvent(const mozilla::WidgetKeyboardEvent& aEvent) override;
+    virtual bool RecvStartScrollbarDrag(const AsyncDragMetrics& aDragMetrics) override;
 
     virtual PColorPickerParent*
     AllocPColorPickerParent(const nsString& aTitle, const nsString& aInitialColor) override;

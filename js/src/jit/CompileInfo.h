@@ -10,6 +10,7 @@
 #include "jsfun.h"
 
 #include "jit/JitAllocPolicy.h"
+#include "jit/JitFrames.h"
 #include "jit/Registers.h"
 #include "vm/ScopeObject.h"
 
@@ -221,7 +222,7 @@ class CompileInfo
         nbodyfixed_ = script->nbodyfixed();
         nlocals_ = script->nfixed();
         fixedLexicalBegin_ = script->fixedLexicalBegin();
-        nstack_ = script->nslots() - script->nfixed();
+        nstack_ = Max<unsigned>(script->nslots() - script->nfixed(), MinJITStackSize);
         nslots_ = nimplicit_ + nargs_ + nlocals_ + nstack_;
     }
 
@@ -247,6 +248,9 @@ class CompileInfo
     }
     JSFunction* funMaybeLazy() const {
         return fun_;
+    }
+    ModuleObject* module() const {
+        return script_->module();
     }
     bool constructing() const {
         return constructing_;
@@ -494,7 +498,7 @@ class CompileInfo
         if (slot == thisSlot())
             return true;
 
-        if (funMaybeLazy()->isHeavyweight() && slot == scopeChainSlot())
+        if (funMaybeLazy()->needsCallObject() && slot == scopeChainSlot())
             return true;
 
         // If the function may need an arguments object, then make sure to

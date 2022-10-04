@@ -67,6 +67,7 @@
 #include "nsContentUtils.h"
 #include "nsJSUtils.h"
 #include "nsILoadInfo.h"
+#include "nsXPCOMStrings.h"
 
 // This should be probably defined on some other place... but I couldn't find it
 #define WEBAPPS_PERM_NAME "webapps-manage"
@@ -768,16 +769,6 @@ nsScriptSecurityManager::CheckLoadURIWithPrincipal(nsIPrincipal* aPrincipal,
     // the methods that work on chains of nested URIs and they will only look
     // at the flags for our one URI.
 
-    // Special case: moz-extension has a whitelist of URIs that are loadable by
-    // anyone.
-    if (targetScheme.EqualsLiteral("moz-extension") && GetAddonPolicyService()) {
-      bool loadable = false;
-      rv = GetAddonPolicyService()->ExtensionURILoadableByAnyone(targetBaseURI, &loadable);
-      if (NS_SUCCEEDED(rv) && loadable) {
-        return NS_OK;
-      }
-    }
-
     // Check for system target URI
     rv = DenyAccessIfURIHasFlags(targetBaseURI,
                                  nsIProtocolHandler::URI_DANGEROUS_TO_LOAD);
@@ -1070,6 +1061,23 @@ nsScriptSecurityManager::CreateCodebasePrincipal(nsIURI* aURI, JS::Handle<JS::Va
 }
 
 NS_IMETHODIMP
+nsScriptSecurityManager::CreateCodebasePrincipalFromOrigin(const nsACString& aOrigin,
+                                                           nsIPrincipal** aPrincipal)
+{
+  if (StringBeginsWith(aOrigin, NS_LITERAL_CSTRING("["))) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  if (StringBeginsWith(aOrigin, NS_LITERAL_CSTRING(NS_NULLPRINCIPAL_SCHEME ":"))) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  nsCOMPtr<nsIPrincipal> prin = BasePrincipal::CreateCodebasePrincipal(aOrigin);
+  prin.forget(aPrincipal);
+  return *aPrincipal ? NS_OK : NS_ERROR_FAILURE;
+}
+
+NS_IMETHODIMP
 nsScriptSecurityManager::CreateNullPrincipal(JS::Handle<JS::Value> aOriginAttributes,
                                              JSContext* aCx, nsIPrincipal** aPrincipal)
 {
@@ -1119,10 +1127,10 @@ nsScriptSecurityManager::
                                   nsILoadContext* aLoadContext,
                                   nsIPrincipal** aPrincipal)
 {
-  // XXXbholley - Make this more general in bug 1165466.
   OriginAttributes attrs;
-  aLoadContext->GetAppId(&attrs.mAppId);
-  aLoadContext->GetIsInBrowserElement(&attrs.mInBrowser);
+  bool result = attrs.CopyFromLoadContext(aLoadContext);
+  NS_ENSURE_TRUE(result, NS_ERROR_FAILURE);
+
   nsresult rv = MaybeSetAddonIdFromURI(attrs, aURI);
   NS_ENSURE_SUCCESS(rv, rv);
   nsCOMPtr<nsIPrincipal> prin = BasePrincipal::CreateCodebasePrincipal(aURI, attrs);
@@ -1135,8 +1143,11 @@ nsScriptSecurityManager::GetDocShellCodebasePrincipal(nsIURI* aURI,
                                                       nsIDocShell* aDocShell,
                                                       nsIPrincipal** aPrincipal)
 {
-  // XXXbholley - Make this more general in bug 1165466.
-  OriginAttributes attrs(aDocShell->GetAppId(), aDocShell->GetIsInBrowserElement());
+  OriginAttributes attrs;
+  nsDocShell* docShell= nsDocShell::Cast(aDocShell);
+  bool result = attrs.CopyFromLoadContext(docShell);
+  NS_ENSURE_TRUE(result, NS_ERROR_FAILURE);
+
   nsresult rv = MaybeSetAddonIdFromURI(attrs, aURI);
   NS_ENSURE_SUCCESS(rv, rv);
   nsCOMPtr<nsIPrincipal> prin = BasePrincipal::CreateCodebasePrincipal(aURI, attrs);

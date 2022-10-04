@@ -139,6 +139,9 @@ pref("dom.select_events.textcontrols.enabled", true);
 // Whether or not the document visbility API is enabled
 pref("dom.visibilityAPI.enabled", true);
 
+// Whether or not File Handle is enabled.
+pref("dom.fileHandle.enabled", true);
+
 // Whether or not the Permissions API is enabled.
 #ifdef NIGHTLY_BUILD
 pref("dom.permissions.enabled", true);
@@ -365,6 +368,10 @@ pref("media.webm.enabled", true);
 pref("media.webm.intel_decoder.enabled", false);
 #endif
 #endif
+#ifdef MOZ_GSTREAMER
+pref("media.gstreamer.enabled", true);
+pref("media.gstreamer.enable-blacklist", true);
+#endif
 #ifdef MOZ_APPLEMEDIA
 pref("media.apple.mp3.enabled", true);
 pref("media.apple.mp4.enabled", true);
@@ -387,8 +394,8 @@ pref("media.webrtc.debug.log_file", "");
 pref("media.webrtc.debug.aec_dump_max_size", 4194304); // 4MB
 
 #ifdef MOZ_WIDGET_GONK
-pref("media.navigator.video.default_width",320);
-pref("media.navigator.video.default_height",240);
+pref("media.navigator.video.default_width", 320);
+pref("media.navigator.video.default_height", 240);
 pref("media.peerconnection.enabled", true);
 pref("media.peerconnection.video.enabled", true);
 pref("media.navigator.video.max_fs", 1200); // 640x480 == 1200mb
@@ -425,6 +432,9 @@ pref("media.peerconnection.video.max_bitrate", 2000);
 pref("media.navigator.permission.disabled", false);
 pref("media.peerconnection.default_iceservers", "[]");
 pref("media.peerconnection.ice.loopback", false); // Set only for testing in offline environments.
+pref("media.peerconnection.ice.tcp", false);
+pref("media.peerconnection.ice.link_local", false); // Set only for testing IPV6 in networks that don't assign IPV6 addresses
+pref("media.peerconnection.ice.relay_only", false); // Limit candidates to TURN
 pref("media.peerconnection.use_document_iceservers", true);
 pref("media.peerconnection.identity.enabled", true);
 pref("media.peerconnection.identity.timeout", 10000);
@@ -552,6 +562,7 @@ pref("apz.axis_lock.breakout_angle", "0.3926991");    // PI / 8 (22.5 degrees)
 pref("apz.axis_lock.direct_pan_angle", "1.047197");   // PI / 3 (60 degrees)
 pref("apz.content_response_timeout", 300);
 pref("apz.cross_slide.enabled", false);
+pref("apz.drag.enabled", false);
 pref("apz.danger_zone_x", 50);
 pref("apz.danger_zone_y", 100);
 pref("apz.enlarge_displayport_when_clipped", false);
@@ -566,6 +577,7 @@ pref("apz.fling_curve_threshold_inches_per_ms", "-1.0");
 pref("apz.fling_friction", "0.002");
 pref("apz.fling_stop_on_tap_threshold", "0.05");
 pref("apz.fling_stopped_threshold", "0.01");
+pref("apz.highlight_checkerboarded_areas", false);
 pref("apz.max_velocity_inches_per_ms", "-1.0");
 pref("apz.max_velocity_queue_size", 5);
 pref("apz.min_skate_speed", "1.0");
@@ -910,7 +922,6 @@ pref("devtools.devedition.promo.url", "https://www.mozilla.org/firefox/developer
 
 // Only potentially show in beta release
 pref("devtools.devedition.promo.enabled", false);
-#ifdef MOZ_DEVTOOLS
 // Developer toolbar and GCLI preferences
 pref("devtools.toolbar.enabled", true);
 pref("devtools.toolbar.visible", false);
@@ -1170,13 +1181,19 @@ pref("devtools.telemetry.tools.opened.version", "{}");
 
 // Pref counting self-xss events
 pref("devtools.selfxss.count", 0);
-#endif //MOZ_DEVTOOLS
 
 // URL of the remote JSON catalog used for device simulation
 pref("devtools.devices.url", "https://code.cdn.mozilla.net/devices/devices.json");
 
 // URL of the remote JSON catalog used for device simulation
 pref("devtools.devices.url", "https://code.cdn.mozilla.net/devices/devices.json");
+
+// Allows setting the performance marks for which telemetry metrics will be recorded.
+pref("devtools.telemetry.supported_performance_marks", "contentInteractive,navigationInteractive,navigationLoaded,visuallyLoaded,fullyLoaded,mediaEnumerated,scanEnd");
+
+// Deprecation warnings after DevTools file migration.  Bug 1204127 tracks
+// enabling this.
+pref("devtools.migration.warnings", false);
 
 // view source
 pref("view_source.syntax_highlight", true);
@@ -1735,6 +1752,8 @@ pref("network.http.packaged-apps-developer-mode", false);
 pref("network.ftp.data.qos", 0);
 pref("network.ftp.control.qos", 0);
 
+// The max time to spend on xpcom events between two polls in ms.
+pref("network.sts.max_time_for_events_between_two_polls", 100);
 // </http>
 
 // 2147483647 == PR_INT32_MAX == ~2 GB
@@ -1788,6 +1807,8 @@ pref("dom.server-events.default-reconnection-time", 5000); // in milliseconds
 // application/java-archive or application/x-jar will not be opened
 // by the jar channel.
 pref("network.jar.open-unsafe-types", false);
+// If true, loading remote JAR files using the jar: protocol will be prevented.
+pref("network.jar.block-remote-files", false);
 
 // This preference, if true, causes all UTF-8 domain names to be normalized to
 // punycode.  The intention is to allow UTF-8 domain names as input, but never
@@ -2820,7 +2841,13 @@ pref("dom.ipc.plugins.flash.disable-protected-mode", false);
 // Defaults to 1 minute.
 pref("dom.ipc.plugins.unloadTimeoutSecs", 60);
 
-pref("dom.ipc.plugins.asyncInit", true);
+// Asynchronous plugin initialization should only be enabled on non-e10s
+// channels until some remaining bugs are resolved.
+#ifdef E10S_TESTING_ONLY
+pref("dom.ipc.plugins.asyncInit.enabled", false);
+#else
+pref("dom.ipc.plugins.asyncInit.enabled", true);
+#endif
 
 pref("dom.ipc.processCount", 1);
 
@@ -3868,6 +3895,9 @@ pref("print.print_extra_margin", 0); // twips
 pref("layout.css.scroll-behavior.enabled", false);
 pref("layout.css.scroll-behavior.property-enabled", false);
 
+// CSS Scroll Snapping requires the C++ APZC
+pref("layout.css.scroll-snap.enabled", false);
+
 /* PostScript print module prefs */
 // pref("print.postscript.enabled",      true);
 pref("print.postscript.paper_size",    "letter");
@@ -3936,6 +3966,9 @@ pref("print.print_extra_margin", 0); // twips
 
 // font names
 
+pref("font.name.serif.ar", "serif");
+pref("font.name.sans-serif.ar", "sans-serif");
+pref("font.name.monospace.ar", "monospace");
 pref("font.size.fixed.ar", 12);
 
 pref("font.name.serif.el", "serif");
@@ -3986,7 +4019,9 @@ pref("font.name.serif.zh-HK", "serif");
 pref("font.name.sans-serif.zh-HK", "sans-serif");
 pref("font.name.monospace.zh-HK", "monospace");
 
-// zh-TW
+pref("font.name.serif.zh-TW", "serif");
+pref("font.name.sans-serif.zh-TW", "sans-serif");
+pref("font.name.monospace.zh-TW", "monospace");
 
 /* PostScript print module prefs */
 // pref("print.postscript.enabled",      true);
@@ -4369,6 +4404,8 @@ pref("gl.msaa-level", 0);
 #else
 pref("gl.msaa-level", 2);
 #endif
+pref("gl.require-hardware", false);
+
 pref("webgl.force-enabled", false);
 pref("webgl.disabled", false);
 pref("webgl.disable-angle", false);
@@ -4387,7 +4424,19 @@ pref("webgl.enable-privileged-extensions", false);
 pref("webgl.bypass-shader-validation", false);
 pref("webgl.enable-prototype-webgl2", false);
 pref("webgl.disable-fail-if-major-performance-caveat", false);
-pref("gl.require-hardware", false);
+pref("webgl.disable-debug-renderer-info", false);
+pref("webgl.renderer-string-override", "");
+pref("webgl.vendor-string-override", "");
+
+#ifdef RELEASE_BUILD
+// Keep this disabled on Release and Beta for now. (see bug 1171228)
+pref("webgl.enable-debug-renderer-info", false);
+#else
+pref("webgl.enable-debug-renderer-info", true);
+#endif
+
+pref("webgl.renderer-string-override", "");
+pref("webgl.vendor-string-override", "");
 
 #ifdef XP_WIN
 pref("webgl.angle.try-d3d11", true);
@@ -4482,11 +4531,6 @@ pref("layers.offmainthreadcomposition.enabled", true);
 // 0  -> full-tilt mode: Recomposite even if not transaction occured.
 pref("layers.offmainthreadcomposition.frame-rate", -1);
 
-// Asynchonous video compositing using the ImageBridge IPDL protocol.
-// requires off-main-thread compositing.
-pref("layers.async-video.enabled", true);
-pref("layers.async-video-oop.enabled",true);
-
 #ifdef MOZ_WIDGET_UIKIT
 pref("layers.async-pan-zoom.enabled", true);
 #endif
@@ -4497,6 +4541,8 @@ pref("layers.async-pan-zoom.enabled", true);
 
 #ifdef XP_MACOSX
 pref("layers.enable-tiles", true);
+pref("layers.tile-width", 512);
+pref("layers.tile-height", 512);
 pref("layers.tiled-drawtarget.enabled", true);
 pref("layers.tiles.edge-padding", false);
 #endif
@@ -4587,7 +4633,6 @@ pref("browser.history.maxStateObjectSize", 655360);
 pref("xpinstall.whitelist.required", true);
 // Only Firefox requires add-on signatures
 pref("xpinstall.signatures.required", false);
-pref("xpinstall.signatures.infoURL", "https://wiki.mozilla.org/Addons/Extension_Signing");
 pref("extensions.alwaysUnpack", false);
 pref("extensions.minCompatiblePlatformVersion", "1.8");
 
@@ -4599,6 +4644,9 @@ pref("notification.feature.enabled", false);
 
 // Web Notification
 pref("dom.webnotifications.enabled", true);
+#if !defined(RELEASE_BUILD)
+pref("dom.webnotifications.serviceworker.enabled", true);
+#endif
 
 // Alert animation effect, name is disableSlidingEffect for backwards-compat.
 pref("alerts.disableSlidingEffect", false);
@@ -4610,8 +4658,12 @@ pref("full-screen-api.enabled", false);
 pref("full-screen-api.allow-trusted-requests-only", true);
 pref("full-screen-api.pointer-lock.enabled", true);
 // transition duration of fade-to-black and fade-from-black, unit: ms
-pref("full-screen-api.transition-duration.enter", "400 400");
-pref("full-screen-api.transition-duration.leave", "400 400");
+pref("full-screen-api.transition-duration.enter", "200 200");
+pref("full-screen-api.transition-duration.leave", "200 200");
+// time for the warning box stays on the screen before sliding out, unit: ms
+pref("full-screen-api.warning.timeout", 3000);
+// delay for the warning box to show when pointer stays on the top, unit: ms
+pref("full-screen-api.warning.delay", 500);
 
 // DOM idle observers API
 pref("dom.idle-observers-api.enabled", true);
@@ -4731,7 +4783,7 @@ pref("layout.css.touch_action.enabled", false);
 // Enables some assertions in nsStyleContext that are too expensive
 // for general use, but might be useful to enable for specific tests.
 // This only has an effect in DEBUG-builds.
-pref("layout.css.expensive-style-struct-assertions.enabed", false);
+pref("layout.css.expensive-style-struct-assertions.enabled", false);
 
 // enable JS dump() function.
 pref("browser.dom.window.dump.enabled", false);
@@ -5099,6 +5151,7 @@ pref("dom.beforeAfterKeyboardEvent.enabled", false);
 pref("dom.presentation.enabled", false);
 pref("dom.presentation.tcp_server.debug", false);
 pref("dom.presentation.discovery.enabled", true);
+pref("dom.presentation.discovery.timeout_ms", 10000);
 pref("dom.presentation.discoverable", false);
 
 #ifdef XP_MACOSX
@@ -5271,8 +5324,6 @@ pref("dom.audiochannel.mutedByDefault", false);
 // Hardware vsync supported on windows, os x, and b2g.
 // Linux and fennec will use software vsync.
 #if defined(XP_MACOSX) || defined(XP_WIN) || defined(XP_LINUX)
-pref("gfx.vsync.hw-vsync.enabled", false);
-pref("gfx.vsync.compositor", true);
 pref("gfx.vsync.refreshdriver", true);
 #endif
 
@@ -5308,3 +5359,5 @@ pref("plugins.rewrite_youtube_embeds", true);
 
 // Expose Request.context. Currently disabled since the spec is in flux.
 pref("dom.requestcontext.enabled", false);
+
+pref("dom.mozKillSwitch.enabled", false);

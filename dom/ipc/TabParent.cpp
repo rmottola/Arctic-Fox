@@ -28,6 +28,7 @@
 #include "mozilla/IMEStateManager.h"
 #include "mozilla/ipc/DocumentRendererParent.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
+#include "mozilla/layers/AsyncDragMetrics.h"
 #include "mozilla/layers/CompositorParent.h"
 #include "mozilla/layers/InputAPZContext.h"
 #include "mozilla/layout/RenderFrameParent.h"
@@ -1440,14 +1441,19 @@ bool TabParent::SendRealMouseEvent(WidgetMouseEvent& event)
     }
   }
 
+  ScrollableLayerGuid guid;
+  uint64_t blockId;
+  ApzAwareEventRoutingToChild(&guid, &blockId, nullptr);
+
   if (eMouseMove == event.mMessage) {
     if (event.reason == WidgetMouseEvent::eSynthesized) {
-      return SendSynthMouseMoveEvent(event);
+      return SendSynthMouseMoveEvent(event, guid, blockId);
     } else {
-      return SendRealMouseMoveEvent(event);
+      return SendRealMouseMoveEvent(event, guid, blockId);
     }
   }
-  return SendRealMouseButtonEvent(event);
+
+  return SendRealMouseButtonEvent(event, guid, blockId);
 }
 
 LayoutDeviceToCSSScale
@@ -1953,7 +1959,7 @@ TabParent::RecvSetCustomCursor(const nsCString& aCursorData,
     }
 
     if (mTabSetsCursor) {
-      const gfxIntSize size(aWidth, aHeight);
+      const gfx::IntSize size(aWidth, aHeight);
 
       mozilla::RefPtr<gfx::DataSourceSurface> customCursor = new mozilla::gfx::SourceSurfaceRawData();
       mozilla::gfx::SourceSurfaceRawData* raw = static_cast<mozilla::gfx::SourceSurfaceRawData*>(customCursor.get());
@@ -1971,15 +1977,6 @@ TabParent::RecvSetCustomCursor(const nsCString& aCursorData,
     }
   }
 
-  return true;
-}
-
-bool
-TabParent::RecvSetBackgroundColor(const nscolor& aColor)
-{
-  if (RenderFrameParent* frame = GetRenderFrame()) {
-    frame->SetBackgroundColor(aColor);
-  }
   return true;
 }
 
@@ -2936,6 +2933,15 @@ TabParent::RecvSetTargetAPZC(const uint64_t& aInputBlockId,
 }
 
 bool
+TabParent::RecvStartScrollbarDrag(const AsyncDragMetrics& aDragMetrics)
+{
+  if (RenderFrameParent* rfp = GetRenderFrame()) {
+    rfp->StartScrollbarDrag(aDragMetrics);
+  }
+  return true;
+}
+
+bool
 TabParent::RecvSetAllowedTouchBehavior(const uint64_t& aInputBlockId,
                                        nsTArray<TouchBehaviorFlags>&& aFlags)
 {
@@ -2952,12 +2958,13 @@ TabParent::GetLoadContext()
   if (mLoadContext) {
     loadContext = mLoadContext;
   } else {
+    // TODO Bug 1191740 - Add OriginAttributes in TabContext
+    OriginAttributes attrs = OriginAttributes(OwnOrContainingAppId(), IsBrowserElement());
     loadContext = new LoadContext(GetOwnerElement(),
-                                  OwnOrContainingAppId(),
                                   true /* aIsContent */,
                                   mChromeFlags & nsIWebBrowserChrome::CHROME_PRIVATE_WINDOW,
                                   mChromeFlags & nsIWebBrowserChrome::CHROME_REMOTE_WINDOW,
-                                  IsBrowserElement());
+                                  attrs);
     mLoadContext = loadContext;
   }
   return loadContext.forget();
@@ -3326,6 +3333,7 @@ public:
   NS_IMETHOD SetPrivateBrowsing(bool) NO_IMPL
   NS_IMETHOD GetIsInBrowserElement(bool*) NO_IMPL
   NS_IMETHOD GetAppId(uint32_t*) NO_IMPL
+  NS_IMETHOD GetOriginAttributes(JS::MutableHandleValue) NO_IMPL
   NS_IMETHOD GetUseRemoteTabs(bool*) NO_IMPL
   NS_IMETHOD SetRemoteTabs(bool) NO_IMPL
 #undef NO_IMPL

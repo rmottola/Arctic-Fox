@@ -203,10 +203,12 @@ nsJARChannel::nsJARChannel()
     , mIsUnsafe(true)
     , mOpeningRemote(false)
     , mSynthesizedStreamLength(0)
-    , mForceNoIntercept(false)
+    , mBlockRemoteFiles(false)
 {
     if (!gJarProtocolLog)
         gJarProtocolLog = PR_NewLogModule("nsJarProtocol");
+
+    mBlockRemoteFiles = Preferences::GetBool("network.jar.block-remote-files", false);
 
     // hold an owning reference to the jar handler
     NS_ADDREF(gJarHandler);
@@ -865,6 +867,12 @@ nsJARChannel::Open2(nsIInputStream** aStream)
 }
 
 bool
+nsJARChannel::BypassServiceWorker() const
+{
+  return mLoadFlags & LOAD_BYPASS_SERVICE_WORKER;
+}
+
+bool
 nsJARChannel::ShouldIntercept()
 {
     LOG(("nsJARChannel::ShouldIntercept [this=%x]\n", this));
@@ -878,7 +886,7 @@ nsJARChannel::ShouldIntercept()
                                   NS_GET_IID(nsINetworkInterceptController),
                                   getter_AddRefs(controller));
     bool shouldIntercept = false;
-    if (controller && !mForceNoIntercept && mLoadInfo) {
+    if (controller && !BypassServiceWorker() && mLoadInfo) {
       bool isNavigation = mLoadFlags & LOAD_DOCUMENT_URI;
       nsContentPolicyType type = mLoadInfo->InternalContentPolicyType();
       nsresult rv = controller->ShouldPrepareForIntercept(mAppURI,
@@ -901,7 +909,8 @@ void nsJARChannel::ResetInterception()
 }
 
 void
-nsJARChannel::OverrideWithSynthesizedResponse(nsIInputStream* aSynthesizedInput)
+nsJARChannel::OverrideWithSynthesizedResponse(nsIInputStream* aSynthesizedInput,
+                                              const nsACString& aContentType)
 {
     // In our current implementation, the FetchEvent handler will copy the
     // response stream completely into the pipe backing the input stream so we
@@ -921,6 +930,8 @@ nsJARChannel::OverrideWithSynthesizedResponse(nsIInputStream* aSynthesizedInput)
       aSynthesizedInput->Close();
       return;
     }
+
+    SetContentType(aContentType);
 
     FinishAsyncOpen();
 
@@ -1006,6 +1017,13 @@ nsJARChannel::ContinueAsyncOpen()
 
     if (!mJarFile) {
         // Not a local file...
+
+        // Check preferences to see if all remote jar support should be disabled
+        if (mBlockRemoteFiles) {
+            mIsUnsafe = true;
+            return NS_ERROR_UNSAFE_CONTENT_TYPE;
+        }
+
         // kick off an async download of the base URI...
         nsCOMPtr<nsIStreamListener> downloader = new MemoryDownloader(this);
         uint32_t loadFlags =
@@ -1105,13 +1123,6 @@ nsJARChannel::GetZipEntry(nsIZipEntry **aZipEntry)
     return reader->GetEntry(mJarEntry, aZipEntry);
 }
 
-NS_IMETHODIMP
-nsJARChannel::ForceNoIntercept()
-{
-    mForceNoIntercept = true;
-    return NS_OK;
-}
-
 //-----------------------------------------------------------------------------
 // mozilla::net::MemoryDownloader::IObserver
 //-----------------------------------------------------------------------------
@@ -1184,6 +1195,10 @@ nsJARChannel::OnDownloadComplete(MemoryDownloader* aDownloader,
         channel->GetContentDispositionHeader(mContentDispositionHeader);
         mContentDisposition = NS_GetContentDispositionFromHeader(mContentDispositionHeader, this);
     }
+
+    // This is a defense-in-depth check for the preferences to see if all remote jar
+    // support should be disabled. This check may not be needed.
+    MOZ_RELEASE_ASSERT(!mBlockRemoteFiles);
 
     if (NS_SUCCEEDED(status) && mIsUnsafe &&
         !Preferences::GetBool("network.jar.open-unsafe-types", false)) {

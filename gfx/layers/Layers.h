@@ -11,10 +11,8 @@
 #include <sys/types.h>                  // for int32_t, int64_t
 #include "FrameMetrics.h"               // for FrameMetrics
 #include "Units.h"                      // for LayerMargin, LayerPoint, ParentLayerIntRect
-#include "gfxContext.h"                 // for GraphicsOperator
+#include "gfxContext.h"
 #include "gfxTypes.h"
-#include "gfxColor.h"                   // for gfxRGBA
-#include "GraphicsFilter.h"             // for GraphicsFilter
 #include "gfxPoint.h"                   // for gfxPoint
 #include "gfxRect.h"                    // for gfxRect
 #include "gfx2DGlue.h"
@@ -155,8 +153,7 @@ static void LayerManagerUserDataDestroy(void *data)
  * 1) Construction: layers are created, inserted, removed and have
  * properties set on them in this phase.
  * BeginTransaction and BeginTransactionWithTarget start a transaction in
- * the Construction phase. When the client has finished constructing the layer
- * tree, it should call EndConstruction() to enter the drawing phase.
+ * the Construction phase.
  * 2) Drawing: PaintedLayers are rendered into in this phase, in tree
  * order. When the client has finished drawing into the PaintedLayers, it should
  * call EndTransaction to complete the transaction.
@@ -260,11 +257,12 @@ public:
    * The callee must draw all of aRegionToDraw.
    * This region is relative to 0,0 in the PaintedLayer.
    *
-   * aDirtyRegion, if non-null, contains the total region that is due to be
-   * painted during the transaction, even though only aRegionToDraw should
-   * be drawn during this call. The sum of every aRegionToDraw over the
-   * course of the transaction must equal aDirtyRegion. aDirtyRegion can be
-   * null if the total dirty region is unknown.
+   * aDirtyRegion should contain the total region that is be due to be painted
+   * during the transaction, even though only aRegionToDraw should be drawn
+   * during this call. aRegionToDraw must be entirely contained within
+   * aDirtyRegion. If the total dirty region is unknown it is okay to pass a
+   * subregion of the total dirty region, e.g. just aRegionToDraw, though it
+   * may not be as efficient.
    *
    * aRegionToInvalidate contains a region whose contents have been
    * changed by the layer manager and which must therefore be invalidated.
@@ -286,7 +284,7 @@ public:
   typedef void (* DrawPaintedLayerCallback)(PaintedLayer* aLayer,
                                            gfxContext* aContext,
                                            const nsIntRegion& aRegionToDraw,
-                                           const nsIntRegion* aDirtyRegion,
+                                           const nsIntRegion& aDirtyRegion,
                                            DrawRegionClip aClip,
                                            const nsIntRegion& aRegionToInvalidate,
                                            void* aCallbackData);
@@ -978,11 +976,6 @@ public:
     }
   }
 
-  void DeprecatedSetMixBlendMode(gfxContext::GraphicsOperator aMixBlendMode)
-  {
-    SetMixBlendMode(gfx::CompositionOpForOp(aMixBlendMode));
-  }
-
   void SetForceIsolatedGroup(bool aForceIsolatedGroup)
   {
     if(mForceIsolatedGroup != aForceIsolatedGroup) {
@@ -1384,6 +1377,11 @@ public:
     return SurfaceMode::SURFACE_SINGLE_CHANNEL_ALPHA;
   }
 
+  // Returns true if this layer can be treated as opaque for visibility
+  // computation. A layer may be non-opaque for visibility even if it
+  // is not transparent, for example, if it has a mix-blend-mode.
+  bool IsOpaqueForVisibility();
+
   /**
    * This setter can be used anytime. The user data for all keys is
    * initially null. Ownership pases to the layer manager.
@@ -1500,7 +1498,6 @@ public:
    * Returns the blendmode of this layer.
    */
   gfx::CompositionOp GetEffectiveMixBlendMode();
-  gfxContext::GraphicsOperator DeprecatedGetEffectiveMixBlendMode();
 
   /**
    * This returns the effective transform computed by
@@ -2211,7 +2208,7 @@ public:
    * CONSTRUCTION PHASE ONLY
    * Set the color of the layer.
    */
-  virtual void SetColor(const gfxRGBA& aColor)
+  virtual void SetColor(const gfx::Color& aColor)
   {
     if (mColor != aColor) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) Color", this));
@@ -2234,7 +2231,7 @@ public:
   }
 
   // This getter can be used anytime.
-  virtual const gfxRGBA& GetColor() { return mColor; }
+  virtual const gfx::Color& GetColor() { return mColor; }
 
   MOZ_LAYER_DECL_NAME("ColorLayer", TYPE_COLOR)
 
@@ -2247,8 +2244,8 @@ public:
 
 protected:
   ColorLayer(LayerManager* aManager, void* aImplData)
-    : Layer(aManager, aImplData),
-      mColor(0.0, 0.0, 0.0, 0.0)
+    : Layer(aManager, aImplData)
+    , mColor()
   {}
 
   virtual void PrintInfo(std::stringstream& aStream, const char* aPrefix) override;
@@ -2256,7 +2253,7 @@ protected:
   virtual void DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent) override;
 
   gfx::IntRect mBounds;
-  gfxRGBA mColor;
+  gfx::Color mColor;
 };
 
 /**
@@ -2374,7 +2371,7 @@ public:
    * CONSTRUCTION PHASE ONLY
    * Set the filter used to resample this image (if necessary).
    */
-  void SetFilter(GraphicsFilter aFilter)
+  void SetFilter(gfx::Filter aFilter)
   {
     if (mFilter != aFilter) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) Filter", this));
@@ -2382,7 +2379,7 @@ public:
       Mutated();
     }
   }
-  GraphicsFilter GetFilter() const { return mFilter; }
+  gfx::Filter GetFilter() const { return mFilter; }
 
   MOZ_LAYER_DECL_NAME("CanvasLayer", TYPE_CANVAS)
 
@@ -2406,7 +2403,7 @@ protected:
     , mPreTransCallbackData(nullptr)
     , mPostTransCallback(nullptr)
     , mPostTransCallbackData(nullptr)
-    , mFilter(GraphicsFilter::FILTER_GOOD)
+    , mFilter(gfx::Filter::GOOD)
     , mDirty(false)
   {}
 
@@ -2429,7 +2426,7 @@ protected:
   void* mPreTransCallbackData;
   DidTransactionCallback mPostTransCallback;
   void* mPostTransCallbackData;
-  GraphicsFilter mFilter;
+  gfx::Filter mFilter;
 
 private:
   /**

@@ -269,7 +269,7 @@ PluginModuleChild::InitForChrome(const std::string& aPluginFilename,
 
     nsPluginFile pluginFile(localFile);
 
-#if defined(MOZ_X11) || defined(OS_MACOSX)
+#if defined(MOZ_X11) || defined(XP_MACOSX)
     nsPluginInfo info = nsPluginInfo();
     if (NS_FAILED(pluginFile.GetPluginInfo(info, &mLibrary))) {
         return false;
@@ -280,7 +280,7 @@ PluginModuleChild::InitForChrome(const std::string& aPluginFilename,
     if (StringBeginsWith(nsDependentCString(info.fDescription), flash10Head)) {
         AddQuirk(QUIRK_FLASH_EXPOSE_COORD_TRANSLATION);
     }
-#else // defined(OS_MACOSX)
+#else // defined(XP_MACOSX)
     const char* namePrefix = "Plugin Content";
     char nameBuffer[80];
     snprintf(nameBuffer, sizeof(nameBuffer), "%s (%s)", namePrefix, info.fName);
@@ -2152,6 +2152,26 @@ PluginModuleChild::AnswerSyncNPP_New(PPluginInstanceChild* aActor, NPError* rv)
     return true;
 }
 
+class AsyncNewResultSender : public ChildAsyncCall
+{
+public:
+    AsyncNewResultSender(PluginInstanceChild* aInstance, NPError aResult)
+        : ChildAsyncCall(aInstance, nullptr, nullptr)
+        , mResult(aResult)
+    {
+    }
+
+    void Run() override
+    {
+        RemoveFromAsyncList();
+        DebugOnly<bool> sendOk = mInstance->SendAsyncNPP_NewResult(mResult);
+        MOZ_ASSERT(sendOk);
+    }
+
+private:
+    NPError  mResult;
+};
+
 bool
 PluginModuleChild::RecvAsyncNPP_New(PPluginInstanceChild* aActor)
 {
@@ -2160,7 +2180,8 @@ PluginModuleChild::RecvAsyncNPP_New(PPluginInstanceChild* aActor)
         reinterpret_cast<PluginInstanceChild*>(aActor);
     AssertPluginThread();
     NPError rv = childInstance->DoNPP_New();
-    childInstance->SendAsyncNPP_NewResult(rv);
+    AsyncNewResultSender* task = new AsyncNewResultSender(childInstance, rv);
+    childInstance->PostChildAsyncCall(task);
     return true;
 }
 

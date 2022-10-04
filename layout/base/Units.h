@@ -263,6 +263,13 @@ struct LayoutDevicePixel {
                              NSAppUnitsToFloatPixels(aPoint.y, aAppUnitsPerDevPixel));
   }
 
+  static LayoutDeviceMargin FromAppUnits(const nsMargin& aMargin, nscoord aAppUnitsPerDevPixel) {
+    return LayoutDeviceMargin(NSAppUnitsToFloatPixels(aMargin.top, aAppUnitsPerDevPixel),
+                              NSAppUnitsToFloatPixels(aMargin.right, aAppUnitsPerDevPixel),
+                              NSAppUnitsToFloatPixels(aMargin.bottom, aAppUnitsPerDevPixel),
+                              NSAppUnitsToFloatPixels(aMargin.left, aAppUnitsPerDevPixel));
+  }
+
   static LayoutDeviceIntPoint FromAppUnitsRounded(const nsPoint& aPoint, nscoord aAppUnitsPerDevPixel) {
     return LayoutDeviceIntPoint(NSAppUnitsToIntPixels(aPoint.x, aAppUnitsPerDevPixel),
                                 NSAppUnitsToIntPixels(aPoint.y, aAppUnitsPerDevPixel));
@@ -439,6 +446,30 @@ template<class src, class dst>
 gfx::PointTyped<dst> operator/(const gfx::PointTyped<src>& aPoint, const gfx::ScaleFactors2D<dst, src>& aScale) {
   return gfx::PointTyped<dst>(aPoint.x / aScale.xScale,
                               aPoint.y / aScale.yScale);
+}
+
+template<class src, class dst>
+gfx::PointTyped<dst> operator*(const gfx::IntPointTyped<src>& aPoint, const gfx::ScaleFactor<src, dst>& aScale) {
+  return gfx::PointTyped<dst>(float(aPoint.x) * aScale.scale,
+                              float(aPoint.y) * aScale.scale);
+}
+
+template<class src, class dst>
+gfx::PointTyped<dst> operator/(const gfx::IntPointTyped<src>& aPoint, const gfx::ScaleFactor<dst, src>& aScale) {
+  return gfx::PointTyped<dst>(float(aPoint.x) / aScale.scale,
+                              float(aPoint.y) / aScale.scale);
+}
+
+template<class src, class dst>
+gfx::PointTyped<dst> operator*(const gfx::IntPointTyped<src>& aPoint, const gfx::ScaleFactors2D<src, dst>& aScale) {
+  return gfx::PointTyped<dst>(float(aPoint.x) * aScale.xScale,
+                              float(aPoint.y) * aScale.yScale);
+}
+
+template<class src, class dst>
+gfx::PointTyped<dst> operator/(const gfx::IntPointTyped<src>& aPoint, const gfx::ScaleFactors2D<dst, src>& aScale) {
+  return gfx::PointTyped<dst>(float(aPoint.x) / aScale.xScale,
+                              float(aPoint.y) / aScale.yScale);
 }
 
 template<class src, class dst>

@@ -91,14 +91,14 @@ BasicPaintedLayer::PaintThebes(gfxContext* aContext,
         groupContext = aContext;
       }
       SetAntialiasingFlags(this, groupContext->GetDrawTarget());
-      aCallback(this, groupContext, toDraw, &toDraw,
+      aCallback(this, groupContext, toDraw, toDraw,
                 DrawRegionClip::NONE, nsIntRegion(), aCallbackData);
       if (needsGroup) {
         aContext->PopGroupToSource();
         if (needsClipToVisibleRegion) {
           gfxUtils::ClipToRegion(aContext, toDraw);
         }
-        AutoSetOperator setOptimizedOperator(aContext, ThebesOp(effectiveOperator));
+        AutoSetOperator setOptimizedOperator(aContext, effectiveOperator);
         PaintWithMask(aContext, opacity, aMaskLayer);
       }
 
@@ -212,8 +212,7 @@ BasicPaintedLayer::Validate(LayerManager::DrawPaintedLayerCallback aCallback,
       NS_ASSERTION(!GetMaskLayer(), "Should only read back layers without masks");
       ctx->SetMatrix(ctx->CurrentMatrix().Translate(offset.x, offset.y));
       mContentClient->DrawTo(this, ctx->GetDrawTarget(), 1.0,
-                             CompositionOpForOp(ctx->CurrentOperator()),
-                             nullptr, nullptr);
+                             ctx->CurrentOp(), nullptr, nullptr);
       update.mLayer->GetSink()->EndUpdate(ctx, update.mUpdateRect + offset);
     }
   }

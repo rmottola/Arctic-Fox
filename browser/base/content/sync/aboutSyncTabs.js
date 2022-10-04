@@ -11,12 +11,24 @@ Cu.import("resource://gre/modules/PlacesUtils.jsm", this);
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
-let RemoteTabViewer = {
+XPCOMUtils.defineLazyModuleGetter(this, "Promise",
+                                  "resource://gre/modules/Promise.jsm");
+
+#ifdef MOZ_SERVICES_CLOUDSYNC
+XPCOMUtils.defineLazyModuleGetter(this, "CloudSync",
+                                  "resource://gre/modules/CloudSync.jsm");
+#else
+var CloudSync = null;
+#endif
+
+var RemoteTabViewer = {
   _tabsList: null,
 
   init: function () {
     Services.obs.addObserver(this, "weave:service:login:finish", false);
     Services.obs.addObserver(this, "weave:engine:sync:finish", false);
+
+    Services.obs.addObserver(this, "cloudsync:tabs:update", false);
 
     this._tabsList = document.getElementById("tabsList");
 
@@ -26,12 +38,14 @@ let RemoteTabViewer = {
   uninit: function () {
     Services.obs.removeObserver(this, "weave:service:login:finish");
     Services.obs.removeObserver(this, "weave:engine:sync:finish");
+
+    Services.obs.removeObserver(this, "cloudsync:tabs:update");
   },
 
-  createItem: function(attrs) {
+  createItem: function (attrs) {
     let item = document.createElement("richlistitem");
 
-    // Copy the attributes from the argument into the item
+    // Copy the attributes from the argument into the item.
     for (let attr in attrs) {
       item.setAttribute(attr, attrs[attr]);
     }
@@ -43,7 +57,7 @@ let RemoteTabViewer = {
     return item;
   },
 
-  filterTabs: function(event) {
+  filterTabs: function (event) {
     let val = event.target.value.toLowerCase();
     let numTabs = this._tabsList.getRowCount();
     let clientTabs = 0;
@@ -53,7 +67,7 @@ let RemoteTabViewer = {
       let item = this._tabsList.getItemAtIndex(i);
       let hide = false;
       if (item.getAttribute("type") == "tab") {
-        if (!item.getAttribute("url").toLowerCase().includes(val) && 
+        if (!item.getAttribute("url").toLowerCase().includes(val) &&
             !item.getAttribute("title").toLowerCase().includes(val)) {
           hide = true;
         } else {
@@ -76,10 +90,10 @@ let RemoteTabViewer = {
     }
   },
 
-  openSelected: function() {
+  openSelected: function () {
     let items = this._tabsList.selectedItems;
     let urls = [];
-    for (let i = 0;i < items.length;i++) {
+    for (let i = 0; i < items.length; i++) {
       if (items[i].getAttribute("type") == "tab") {
         urls.push(items[i].getAttribute("url"));
         let index = this._tabsList.getIndexOfItem(items[i]);
@@ -92,7 +106,7 @@ let RemoteTabViewer = {
     }
   },
 
-  bookmarkSingleTab: function() {
+  bookmarkSingleTab: function () {
     let item = this._tabsList.selectedItems[0];
     let uri = Weave.Utils.makeURI(item.getAttribute("url"));
     let title = item.getAttribute("title");
@@ -107,10 +121,10 @@ let RemoteTabViewer = {
                                      }, window.top);
   },
 
-  bookmarkSelectedTabs: function() {
+  bookmarkSelectedTabs: function () {
     let items = this._tabsList.selectedItems;
     let URIs = [];
-    for (let i = 0;i < items.length;i++) {
+    for (let i = 0; i < items.length; i++) {
       if (items[i].getAttribute("type") == "tab") {
         let uri = Weave.Utils.makeURI(items[i].getAttribute("url"));
         if (!uri) {
@@ -170,13 +184,18 @@ let RemoteTabViewer = {
       }
     }
 
-    complete();
+    if (CloudSync && CloudSync.ready && CloudSync().tabsReady && CloudSync().tabs.hasRemoteTabs()) {
+      this._generateCloudSyncTabList()
+          .then(complete, complete);
+    } else {
+      complete();
+    }
   },
 
   _clearTabList: function () {
     let list = this._tabsList;
 
-    // Clear out existing richlistitems
+    // Clear out existing richlistitems.
     let count = list.getRowCount();
     if (count > 0) {
       for (let i = count - 1; i >= 0; i--) {
@@ -226,7 +245,37 @@ let RemoteTabViewer = {
     }
   },
 
-  adjustContextMenu: function(event) {
+  _generateCloudSyncTabList: function () {
+    let updateTabList = function (remoteTabs) {
+      let list = this._tabsList;
+
+      for (let client of remoteTabs) {
+        let clientAttrs = {
+          type: "client",
+          clientName: client.name,
+        };
+
+        let clientEnt = this.createItem(clientAttrs);
+        list.appendChild(clientEnt);
+
+        for (let tab of client.tabs) {
+          let tabAttrs = {
+            type: "tab",
+            title: tab.title,
+            url: tab.url,
+            icon: this.getIcon(tab.icon),
+          };
+          let tabEnt = this.createItem(tabAttrs);
+          list.appendChild(tabEnt);
+        }
+      }
+    }.bind(this);
+
+    return CloudSync().tabs.getRemoteTabs()
+                           .then(updateTabList, Promise.reject);
+  },
+
+  adjustContextMenu: function (event) {
     let mode = "all";
     switch (this._tabsList.selectedItems.length) {
       case 0:
@@ -251,7 +300,7 @@ let RemoteTabViewer = {
     }
   },
 
-  _refetchTabs: function(force) {
+  _refetchTabs: function (force) {
     if (!force) {
       // Don't bother refetching tabs if we already did so recently
       let lastFetch = 0;
@@ -283,7 +332,7 @@ let RemoteTabViewer = {
     return true;
   },
 
-  observe: function(subject, topic, data) {
+  observe: function (subject, topic, data) {
     switch (topic) {
       case "weave:service:login:finish":
         this.buildList(true);
@@ -293,14 +342,16 @@ let RemoteTabViewer = {
           this.buildList(false);
         }
         break;
+      case "cloudsync:tabs:update":
+        this.buildList(false);
+        break;
     }
   },
 
-  handleClick: function(event) {
+  handleClick: function (event) {
     if (event.target.getAttribute("type") != "tab") {
       return;
     }
-
 
     if (event.button == 1) {
       let url = event.target.getAttribute("url");
@@ -310,4 +361,3 @@ let RemoteTabViewer = {
     }
   }
 }
-

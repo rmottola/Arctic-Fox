@@ -196,11 +196,6 @@ var FeedHandler = {
   },
 
   addFeed: function(link, browserForLink) {
-    if (!browserForLink) {
-      // ignore feeds loaded in subframes (see bug 305472)
-      return;
-    }
-
     if (!browserForLink.feeds)
       browserForLink.feeds = [];
 
@@ -218,5 +213,17 @@ var FeedHandler = {
         clearTimeout(this._updateFeedTimeout);
       this._updateFeedTimeout = setTimeout(this.updateFeeds.bind(this), 100);
     }
-  }
+  },
+
+  init() {
+    window.messageManager.addMessageListener("FeedWriter:ShownFirstRun", this);
+  },
+
+  receiveMessage(msg) {
+    switch (msg.name) {
+      case "FeedWriter:ShownFirstRun":
+        Services.prefs.setBoolPref("browser.feeds.showFirstRunUI", false);
+        break;
+    }
+  },
 };

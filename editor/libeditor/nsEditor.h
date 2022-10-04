@@ -140,7 +140,6 @@ inline bool operator!(const EditAction& aOp)
 class nsEditor : public nsIEditor,
                  public nsIEditorIMESupport,
                  public nsSupportsWeakReference,
-                 public nsIObserver,
                  public nsIPhonetic
 {
 public:
@@ -187,9 +186,6 @@ public:
 
   /* ------------ nsIEditorIMESupport methods -------------- */
   NS_DECL_NSIEDITORIMESUPPORT
-
-  /* ------------ nsIObserver methods -------------- */
-  NS_DECL_NSIOBSERVER
 
   // nsIPhonetic
   NS_DECL_NSIPHONETIC

@@ -66,10 +66,12 @@
                           accesskey="&emailPageCmd.accesskey;"
                           command="Browser:SendLink"/>
                 <menuseparator/>
+#if !defined(MOZ_WIDGET_GTK) && !defined(MOZ_WIDGET_QT)
                 <menuitem id="menu_printSetup"
                           label="&printSetupCmd.label;"
                           accesskey="&printSetupCmd.accesskey;"
                           command="cmd_pageSetup"/>
+#endif
 #ifndef XP_MACOSX
                 <menuitem id="menu_printPreview"
                           label="&printPreviewCmd.label;"
@@ -172,6 +174,15 @@
                           label="&bidiSwitchTextDirectionItem.label;"
                           accesskey="&bidiSwitchTextDirectionItem.accesskey;"
                           hidden="true"/>
+#ifdef XP_UNIX
+#ifndef XP_MACOSX
+                <menuseparator/>
+                <menuitem id="menu_preferences"
+                          label="&preferencesCmdUnix.label;"
+                          accesskey="&preferencesCmdUnix.accesskey;"
+                          oncommand="openPreferences();"/>
+#endif
+#endif
               </menupopup>
             </menu>
 
@@ -424,7 +435,7 @@
                openInTabs="children"
                oncommand="BookmarksEventHandler.onCommand(event, this.parentNode._placesView);"
                onclick="BookmarksEventHandler.onClick(event, this.parentNode._placesView);"
-               onpopupshowing="PlacesCommandHook.updateBookmarkAllTabsCommand();
+               onpopupshowing="BookmarkingUI.onMainMenuPopupShowing(event);
                                if (!this.parentNode._placesView)
                                  new PlacesMenu(event, 'place:folder=BOOKMARKS_MENU');"
                tooltip="bhTooltip" popupsinherittooltip="true">
@@ -440,8 +451,8 @@
 #ifndef XP_MACOSX
                 class="menuitem-iconic"
 #endif
-                label="&bookmarkThisPageCmd.label;"
                 command="Browser:AddBookmarkAs"
+                observes="bookmarkThisPageBroadcaster"
                 key="addBookmarkAsKb"/>
       <menuitem id="subscribeToPageMenuitem"
 #ifndef XP_MACOSX
@@ -547,8 +558,7 @@
                     label="&webDeveloperMenu.label;"
                     accesskey="&webDeveloperMenu.accesskey;">
                 <menupopup id="menuWebDeveloperPopup">
-#ifdef MOZ_DEVTOOLS
-				<menuitem id="menu_devToolbox"
+                  <menuitem id="menu_devToolbox"
                             observes="devtoolsMenuBroadcaster_DevToolbox"
                             accesskey="&devToolboxMenuItem.accesskey;"/>
                   <menuseparator id="menu_devtools_separator"/>
@@ -569,17 +579,14 @@
                   <menuitem id="menu_scratchpad"
                             observes="devtoolsMenuBroadcaster_Scratchpad"
                             accesskey="&scratchpad.accesskey;"/>
-#endif
                   <menuitem id="menu_pageSource"
                             observes="devtoolsMenuBroadcaster_PageSource"
                             accesskey="&pageSourceCmd.accesskey;"/>
                   <menuitem id="javascriptConsole"
                             observes="devtoolsMenuBroadcaster_ErrorConsole"
                             accesskey="&errorConsoleCmd.accesskey;"/>
-#ifdef MOZ_DEVTOOLS
                   <menuitem id="menu_devtools_connect"
                             observes="devtoolsMenuBroadcaster_connect"/>
-#endif
                   <menuseparator id="devToolsEndSeparator"/>
                   <menuitem id="getMoreDevtools"
                             observes="devtoolsMenuBroadcaster_GetMoreTools"
@@ -600,11 +607,13 @@
                 <menupopup id="menu_mirrorTab-popup"
                            onpopupshowing="populateMirrorTabMenu(this)"/>
               </menu>
+#ifndef XP_UNIX
               <menuseparator id="prefSep"/>
               <menuitem id="menu_preferences"
                         label="&preferencesCmd2.label;"
                         accesskey="&preferencesCmd2.accesskey;"
                         oncommand="openPreferences();"/>
+#endif
               </menupopup>
             </menu>
 

@@ -13,11 +13,13 @@
 #include "nsIDocument.h"
 #include "nsWrapperCache.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/LayerAnimationInfo.h" // LayerAnimations::kRecords
 #include "mozilla/StickyTimeDuration.h"
 #include "mozilla/StyleAnimationValue.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/dom/AnimationEffectReadOnly.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/dom/KeyframeBinding.h"
 #include "mozilla/dom/Nullable.h"
 #include "nsSMILKeySpline.h"
 #include "nsStyleStruct.h" // for nsTimingFunction
@@ -108,28 +110,35 @@ class ComputedTimingFunction
 {
 public:
   typedef nsTimingFunction::Type Type;
+  typedef nsTimingFunction::StepSyntax StepSyntax;
   void Init(const nsTimingFunction &aFunction);
   double GetValue(double aPortion) const;
   const nsSMILKeySpline* GetFunction() const {
-    NS_ASSERTION(mType == nsTimingFunction::Function, "Type mismatch");
+    NS_ASSERTION(HasSpline(), "Type mismatch");
     return &mTimingFunction;
   }
   Type GetType() const { return mType; }
+  bool HasSpline() const { return nsTimingFunction::IsSplineType(mType); }
   uint32_t GetSteps() const { return mSteps; }
+  StepSyntax GetStepSyntax() const { return mStepSyntax; }
   bool operator==(const ComputedTimingFunction& aOther) const {
     return mType == aOther.mType &&
-           (mType == nsTimingFunction::Function ?
+           (HasSpline() ?
             mTimingFunction == aOther.mTimingFunction :
-            mSteps == aOther.mSteps);
+            (mSteps == aOther.mSteps &&
+             mStepSyntax == aOther.mStepSyntax));
   }
   bool operator!=(const ComputedTimingFunction& aOther) const {
     return !(*this == aOther);
   }
+  int32_t Compare(const ComputedTimingFunction& aRhs) const;
+  void AppendToString(nsAString& aResult) const;
 
 private:
   Type mType;
   nsSMILKeySpline mTimingFunction;
   uint32_t mSteps;
+  StepSyntax mStepSyntax;
 };
 
 struct AnimationPropertySegment
@@ -192,14 +201,7 @@ public:
   KeyframeEffectReadOnly(nsIDocument* aDocument,
                          Element* aTarget,
                          nsCSSPseudoElements::Type aPseudoType,
-                         const AnimationTiming &aTiming)
-    : AnimationEffectReadOnly(aDocument)
-    , mTarget(aTarget)
-    , mTiming(aTiming)
-    , mPseudoType(aPseudoType)
-  {
-    MOZ_ASSERT(aTarget, "null animation target is not yet supported");
-  }
+                         const AnimationTiming& aTiming);
 
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS_INHERITED(KeyframeEffectReadOnly,
@@ -224,6 +226,9 @@ public:
                " pseudo-element is not yet supported.");
     return mTarget;
   }
+  void GetFrames(JSContext*& aCx,
+                 nsTArray<JSObject*>& aResult,
+                 ErrorResult& aRv);
 
   // Temporary workaround to return both the target element and pseudo-type
   // until we implement PseudoElement (bug 1174575).
@@ -309,9 +314,12 @@ public:
   // Any updated properties are added to |aSetProperties|.
   void ComposeStyle(nsRefPtr<AnimValuesStyleRule>& aStyleRule,
                     nsCSSPropertySet& aSetProperties);
+  bool IsRunningOnCompositor() const;
+  void SetIsRunningOnCompositor(nsCSSProperty aProperty, bool aIsRunning);
 
 protected:
   virtual ~KeyframeEffectReadOnly() { }
+  void ResetIsRunningOnCompositor();
 
   nsCOMPtr<Element> mTarget;
   Nullable<TimeDuration> mParentTime;
@@ -320,6 +328,17 @@ protected:
   nsCSSPseudoElements::Type mPseudoType;
 
   InfallibleTArray<AnimationProperty> mProperties;
+
+  // Parallel array corresponding to CommonAnimationManager::sLayerAnimationInfo
+  // such that mIsPropertyRunningOnCompositor[x] is true only if this effect has
+  // an animation of CommonAnimationManager::sLayerAnimationInfo[x].mProperty
+  // that is currently running on the compositor.
+  //
+  // Note that when the owning Animation requests a non-throttled restyle, in
+  // between calling RequestRestyle on its AnimationCollection and when the
+  // restyle is performed, this member may temporarily become false even if
+  // the animation remains on the layer after the restyle.
+  bool mIsPropertyRunningOnCompositor[LayerAnimationInfo::kRecords];
 };
 
 } // namespace dom

@@ -263,7 +263,7 @@ static void nr_ice_candidate_pair_stun_cb(NR_SOCKET s, int how, void *cb_arg)
           if(!cand){
             if(r=nr_ice_candidate_create(pair->pctx->ctx,
               pair->local->component,pair->local->isock,pair->local->osock,
-              PEER_REFLEXIVE,0,pair->local->component->component_id,&cand))
+              PEER_REFLEXIVE,pair->local->tcp_type,0,pair->local->component->component_id,&cand))
               ABORT(r);
             if(r=nr_transport_addr_copy(&cand->addr,&pair->stun_client->results.ice_binding_response.mapped_addr))
               ABORT(r);
@@ -377,7 +377,6 @@ static void nr_ice_candidate_pair_restart(nr_ice_peer_ctx *pctx, nr_ice_cand_pai
 int nr_ice_candidate_pair_start(nr_ice_peer_ctx *pctx, nr_ice_cand_pair *pair)
   {
     int r,_status;
-    UINT4 mode;
 
     /* Register the stun ctx for when responses come in*/
     if(r=nr_ice_socket_register_stun_client(pair->local->isock,pair->stun_client,&pair->stun_client_handle))

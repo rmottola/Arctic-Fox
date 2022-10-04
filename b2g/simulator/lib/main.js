@@ -8,7 +8,7 @@ const { Cc, Ci, Cu } = require("chrome");
 const { AddonManager } = Cu.import("resource://gre/modules/AddonManager.jsm", {});
 const { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
 const { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
-const { Simulator } = Cu.import("resource://gre/modules/devtools/Simulator.jsm");
+const { Simulator } = Cu.import("resource://gre/modules/devtools/shared/apps/Simulator.jsm");
 const { SimulatorProcess } = require("./simulator-process");
 const Runtime = require("sdk/system/runtime");
 const URL = require("sdk/url");
@@ -17,7 +17,7 @@ const ROOT_URI = require("addon").uri;
 const PROFILE_URL = ROOT_URI + "profile/";
 const BIN_URL = ROOT_URI + "b2g/";
 
-let process;
+var process;
 
 function launch(options) {
   // Close already opened simulation.
@@ -71,7 +71,7 @@ function close() {
   return p.kill();
 }
 
-let name;
+var name;
 
 AddonManager.getAddonByID(require("addon").id, function (addon) {
   name = addon.name.replace(" Simulator", "");

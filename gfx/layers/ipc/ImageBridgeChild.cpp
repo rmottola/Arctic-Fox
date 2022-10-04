@@ -119,6 +119,11 @@ ImageBridgeChild::UseTextures(CompositableClient* aCompositable,
   for (auto& t : aTextures) {
     MOZ_ASSERT(t.mTextureClient);
     MOZ_ASSERT(t.mTextureClient->GetIPDLActor());
+
+    if (!t.mTextureClient->IsSharedWithCompositor()) {
+      return;
+    }
+
     FenceHandle fence = t.mTextureClient->GetAcquireFenceHandle();
     textures.AppendElement(TimedTexture(nullptr, t.mTextureClient->GetIPDLActor(),
                                         fence.IsValid() ? MaybeFence(fence) : MaybeFence(null_t()),
@@ -830,6 +835,7 @@ ImageBridgeChild::DeallocShmem(ipc::Shmem& aShmem)
 
 PTextureChild*
 ImageBridgeChild::AllocPTextureChild(const SurfaceDescriptor&,
+                                     const LayersBackend&,
                                      const TextureFlags&)
 {
   MOZ_ASSERT(!mShuttingDown);
@@ -925,10 +931,11 @@ ImageBridgeChild::RecvDidComposite(InfallibleTArray<ImageCompositeNotification>&
 
 PTextureChild*
 ImageBridgeChild::CreateTexture(const SurfaceDescriptor& aSharedData,
+                                LayersBackend aLayersBackend,
                                 TextureFlags aFlags)
 {
   MOZ_ASSERT(!mShuttingDown);
-  return SendPTextureConstructor(aSharedData, aFlags);
+  return SendPTextureConstructor(aSharedData, aLayersBackend, aFlags);
 }
 
 void
@@ -936,6 +943,11 @@ ImageBridgeChild::RemoveTextureFromCompositable(CompositableClient* aCompositabl
                                                 TextureClient* aTexture)
 {
   MOZ_ASSERT(!mShuttingDown);
+  MOZ_ASSERT(aTexture);
+  MOZ_ASSERT(aTexture->IsSharedWithCompositor());
+  if (!aTexture || !aTexture->IsSharedWithCompositor()) {
+    return;
+  }
   if (aTexture->GetFlags() & TextureFlags::DEALLOCATE_CLIENT) {
     mTxn->AddEdit(OpRemoveTexture(nullptr, aCompositable->GetIPDLActor(),
                                   nullptr, aTexture->GetIPDLActor()));
@@ -952,6 +964,12 @@ ImageBridgeChild::RemoveTextureFromCompositableAsync(AsyncTransactionTracker* aA
                                                      CompositableClient* aCompositable,
                                                      TextureClient* aTexture)
 {
+  MOZ_ASSERT(!mShuttingDown);
+  MOZ_ASSERT(aTexture);
+  MOZ_ASSERT(aTexture->IsSharedWithCompositor());
+  if (!aTexture || !aTexture->IsSharedWithCompositor()) {
+    return;
+  }
   mTxn->AddNoSwapEdit(OpRemoveTextureAsync(CompositableClient::GetTrackersHolderId(aCompositable->GetIPDLActor()),
                                            aAsyncTransactionTracker->GetId(),
                                            nullptr, aCompositable->GetIPDLActor(),

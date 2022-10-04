@@ -1196,15 +1196,6 @@ public:
   static void AsyncExitFullscreen(nsIDocument* aDocument);
 
   /**
-   * Handles one single fullscreen request, updates `aHandled` if the request
-   * is handled, and returns whether this request should be removed from the
-   * request queue.
-   */
-  static bool HandlePendingFullscreenRequest(const FullscreenRequest& aRequest,
-                                             nsIDocShellTreeItem* aRootShell,
-                                             bool* aHandled);
-
-  /**
    * Handles any pending fullscreen in aDocument or its subdocuments.
    *
    * Returns whether there is any fullscreen request handled.
@@ -2897,10 +2888,6 @@ protected:
 
   // True if DisallowBFCaching has been called on this document.
   bool mBFCacheDisallowed : 1;
-
-  // If true, we have an input encoding.  If this is false, then the
-  // document was created entirely in memory
-  bool mHaveInputEncoding : 1;
 
   bool mHasHadDefaultView : 1;
 

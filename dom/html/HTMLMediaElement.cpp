@@ -105,6 +105,12 @@ static PRLogModuleInfo* gMediaElementEventsLog;
 
 #include "mozilla/EventStateManager.h"
 
+#if defined(MOZ_B2G) && !defined(MOZ_GRAPHENE)
+// This controls the b2g specific of pausing the media element when the
+// AudioChannel tells us to mute it.
+#define PAUSE_MEDIA_ELEMENT_FROM_AUDIOCHANNEL
+#endif
+
 using namespace mozilla::layers;
 using mozilla::net::nsMediaFragmentURIParser;
 
@@ -1986,7 +1992,7 @@ HTMLMediaElement::RemoveMediaElementFromURITable()
   }
   entry->mElements.RemoveElement(this);
   if (entry->mElements.IsEmpty()) {
-    gElementTable->RemoveEntry(mLoadingSrc);
+    gElementTable->RemoveEntry(entry);
     if (gElementTable->Count() == 0) {
       delete gElementTable;
       gElementTable = nullptr;
@@ -3020,7 +3026,7 @@ public:
     if (!mElement) {
       return;
     }
-    gfxIntSize size;
+    gfx::IntSize size;
     {
       MutexAutoLock lock(mMutex);
       size = mInitialSize;
@@ -3034,13 +3040,13 @@ public:
                                         const MediaSegment& aQueuedMedia) override
   {
     MutexAutoLock lock(mMutex);
-    if (mInitialSize != gfxIntSize(0,0) ||
+    if (mInitialSize != gfx::IntSize(0,0) ||
         aQueuedMedia.GetType() != MediaSegment::VIDEO) {
       return;
     }
     const VideoSegment& video = static_cast<const VideoSegment&>(aQueuedMedia);
     for (VideoSegment::ConstChunkIterator c(video); !c.IsEnded(); c.Next()) {
-      if (c->mFrame.GetIntrinsicSize() != gfxIntSize(0,0)) {
+      if (c->mFrame.GetIntrinsicSize() != gfx::IntSize(0,0)) {
         mInitialSize = c->mFrame.GetIntrinsicSize();
         nsCOMPtr<nsIRunnable> event =
           NS_NewRunnableMethod(this, &StreamSizeListener::ReceivedSize);
@@ -3055,7 +3061,7 @@ private:
 
   // mMutex protects the fields below; they can be accessed on any thread
   Mutex mMutex;
-  gfxIntSize mInitialSize;
+  gfx::IntSize mInitialSize;
 };
 
 class HTMLMediaElement::MediaStreamTracksAvailableCallback:
@@ -3511,10 +3517,9 @@ void HTMLMediaElement::StartProgressTimer()
   NS_ASSERTION(!mProgressTimer, "Already started progress timer.");
 
   mProgressTimer = do_CreateInstance("@mozilla.org/timer;1");
-  mProgressTimer->InitWithFuncCallback(ProgressTimerCallback,
-                                       this,
-                                       PROGRESS_MS,
-                                       nsITimer::TYPE_REPEATING_SLACK);
+  mProgressTimer->InitWithNamedFuncCallback(
+    ProgressTimerCallback, this, PROGRESS_MS, nsITimer::TYPE_REPEATING_SLACK,
+    "HTMLMediaElement::ProgressTimerCallback");
 }
 
 void HTMLMediaElement::StartProgress()
@@ -4057,7 +4062,7 @@ HTMLMediaElement::NotifyOwnerDocumentActivityChangedInternal()
   }
 
   bool pauseElement = !IsActive();
-#ifdef MOZ_B2G
+#ifdef PAUSE_MEDIA_ELEMENT_FROM_AUDIOCHANNEL
   pauseElement |= ComputedMuted();
 #endif
 
@@ -4500,7 +4505,7 @@ nsresult HTMLMediaElement::UpdateChannelMuteState(float aVolume, bool aMuted)
     }
   }
 
-#ifdef MOZ_B2G
+#ifdef PAUSE_MEDIA_ELEMENT_FROM_AUDIOCHANNEL
   SuspendOrResumeElement(ComputedMuted(), false);
 #endif
   return NS_OK;
@@ -4586,7 +4591,7 @@ NS_IMETHODIMP HTMLMediaElement::WindowVolumeChanged(float aVolume, bool aMuted)
 
   UpdateChannelMuteState(aVolume, aMuted);
 
-#ifdef MOZ_B2G
+#ifdef PAUSE_MEDIA_ELEMENT_FROM_AUDIOCHANNEL
   mPaused.SetCanPlay(!aMuted);
 #endif
 

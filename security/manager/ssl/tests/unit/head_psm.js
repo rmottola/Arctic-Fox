@@ -132,10 +132,14 @@ function addCertFromFile(certdb, filename, trustString) {
 
 function constructCertFromFile(filename) {
   let certFile = do_get_file(filename, false);
-  let certDER = readFile(certFile);
+  let certBytes = readFile(certFile);
   let certdb = Cc["@mozilla.org/security/x509certdb;1"]
-                  .getService(Ci.nsIX509CertDB);
-  return certdb.constructX509(certDER, certDER.length);
+                 .getService(Ci.nsIX509CertDB);
+  try {
+    return certdb.constructX509(certBytes, certBytes.length);
+  } catch (e) {}
+  // It might be PEM instead of DER.
+  return certdb.constructX509FromBase64(pemToBase64(certBytes));
 }
 
 function setCertTrust(cert, trustString) {
@@ -148,6 +152,20 @@ function getXPCOMStatusFromNSS(statusNSS) {
   let nssErrorsService = Cc["@mozilla.org/nss_errors_service;1"]
                            .getService(Ci.nsINSSErrorsService);
   return nssErrorsService.getXPCOMFromNSSError(statusNSS);
+}
+
+// certdb implements nsIX509CertDB. See nsIX509CertDB.idl for documentation.
+// In particular, hostname is optional.
+function checkCertErrorGenericAtTime(certdb, cert, expectedError, usage, time,
+                                     /*optional*/ hasEVPolicy,
+                                     /*optional*/ hostname) {
+  do_print(`cert cn=${cert.commonName}`);
+  do_print(`cert issuer cn=${cert.issuerCommonName}`);
+  let verifiedChain = {};
+  let error = certdb.verifyCertAtTime(cert, usage, NO_FLAGS, hostname, time,
+                                      verifiedChain, hasEVPolicy || {});
+  Assert.equal(error, expectedError,
+               "Actual and expected error should match");
 }
 
 // certdb implements nsIX509CertDB. See nsIX509CertDB.idl for documentation.

@@ -185,18 +185,20 @@ XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
                                   "resource://gre/modules/PlacesUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-                                  "resource://gre/modules/devtools/Console.jsm");
+                                  "resource://gre/modules/devtools/shared/Console.jsm");
 
 Components.utils.importGlobalProperties(["URL"]);
 
-let TransactionsHistory = [];
+var TransactionsHistory = [];
 TransactionsHistory.__proto__ = {
   __proto__: Array.prototype,
 
   // The index of the first undo entry (if any) - See the documentation
   // at the top of this file.
   _undoPosition: 0,
-  get undoPosition() this._undoPosition,
+  get undoPosition() {
+    return this._undoPosition;
+  },
 
   // Handy shortcuts
   get topUndoEntry() {
@@ -306,7 +308,7 @@ TransactionsHistory.__proto__ = {
 };
 
 
-let PlacesTransactions = {
+var PlacesTransactions = {
   /**
    * @see Batches in the module documentation.
    */
@@ -486,7 +488,7 @@ Enqueuer.prototype = {
   }
 };
 
-let TransactionsManager = {
+var TransactionsManager = {
   // See the documentation at the top of this file. |transact| calls are not
   // serialized with |batch| calls.
   _mainEnqueuer: new Enqueuer(),
@@ -1065,7 +1067,7 @@ function* createItemsFromBookmarksTree(aBookmarksTree, aRestoring = false,
  * are also documented there.
  *****************************************************************************/
 
-let PT = PlacesTransactions;
+var PT = PlacesTransactions;
 
 /**
  * Transaction for creating a bookmark.

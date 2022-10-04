@@ -644,7 +644,7 @@ toolbar[mode="full"] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 
 #history-button,
 #history-menu-button {
-  -moz-image-region: rect(0px 48px 24px 24px);
+  -moz-image-region: rect(0px 180px 18px 162px);
 }
 
 #history-menu-button.toolbarbutton-1 {
@@ -653,7 +653,7 @@ toolbar[mode="full"] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 
 #bookmarks-button,
 #bookmarks-menu-button {
-  -moz-image-region: rect(0px 72px 24px 48px);
+  -moz-image-region: rect(0px 144px 18px 126px);
 }
 
 #bookmarks-menu-button.bookmark-item {
@@ -1345,6 +1345,18 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
   opacity: .4;
 }
 
+#BMB_bookmarksPopup[side="top"],
+#BMB_bookmarksPopup[side="bottom"] {
+  margin-left: -16px;
+  margin-right: -16px;
+}
+
+#BMB_bookmarksPopup[side="left"],
+#BMB_bookmarksPopup[side="right"] {
+  margin-top: -16px;
+  margin-bottom: -16px;
+}
+
 /* Bookmarking panel */
 #editBookmarkPanelStarIcon {
   list-style-image: url("chrome://browser/skin/places/starred48.png");
@@ -1849,34 +1861,15 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
   margin-left: 1em;
 }
 
-#full-screen-warning-message {
-  background-color: hsl(0,0%,15%);
-  color: white;
-  border-radius: 8px;
-  margin-top: 30px;
-  padding: 30px 50px;
-  box-shadow: 0 0 2px white;
-}
-
-.full-screen-description {
-  font-size: 150%;
-}
-
-#full-screen-domain-text {
-  font-size: 300%;
-}
-
-%ifdef MOZ_DEVTOOLS
-%include ../../../toolkit/themes/shared/devtools/responsivedesign.inc.css
-%include ../../../toolkit/themes/shared/devtools/commandline.inc.css
-%endif
+%include ../shared/fullscreen/warning.inc.css
+%include ../../../devtools/client/themes/responsivedesign.inc.css
+%include ../../../devtools/client/themes/commandline.inc.css
 %include ../shared/plugin-doorhanger.inc.css
 %include ../shared/badcontent-doorhanger.inc.css
 %include ../shared/login-doorhanger.inc.css
 
 %include downloads/indicator.css
 
-%ifdef MOZ_DEVTOOLS
 .gcli-panel {
   padding: 0;
 }
@@ -1895,7 +1888,6 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
   border-radius: 1px;
   -moz-margin-end: 2px;
 }
-%endif
 
 .toolbarbutton-badge-container {
   margin: 5px 3px;

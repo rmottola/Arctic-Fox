@@ -82,7 +82,7 @@ SetUnboxedValueNoTypeChange(JSObject* unboxedObject,
         JSObject* obj = v.toObjectOrNull();
         if (IsInsideNursery(obj) && !IsInsideNursery(unboxedObject)) {
             JSRuntime* rt = unboxedObject->runtimeFromMainThread();
-            rt->gc.storeBuffer.putWholeCellFromMainThread(unboxedObject);
+            rt->gc.storeBuffer.putWholeCell(unboxedObject);
         }
 
         if (preBarrier)
@@ -146,7 +146,7 @@ SetUnboxedValue(ExclusiveContext* cx, JSObject* unboxedObject, jsid id,
             JSObject* obj = v.toObjectOrNull();
             if (IsInsideNursery(v.toObjectOrNull()) && !IsInsideNursery(unboxedObject)) {
                 JSRuntime* rt = unboxedObject->runtimeFromMainThread();
-                rt->gc.storeBuffer.putWholeCellFromMainThread(unboxedObject);
+                rt->gc.storeBuffer.putWholeCell(unboxedObject);
             }
 
             if (preBarrier)
@@ -190,6 +190,26 @@ UnboxedArrayObject::setLength(ExclusiveContext* cx, uint32_t length)
     }
 
     length_ = length;
+}
+
+inline void
+UnboxedArrayObject::setInitializedLength(uint32_t initlen)
+{
+    if (initlen < initializedLength()) {
+        switch (elementType()) {
+          case JSVAL_TYPE_STRING:
+            for (size_t i = initlen; i < initializedLength(); i++)
+                triggerPreBarrier<JSVAL_TYPE_STRING>(i);
+            break;
+          case JSVAL_TYPE_OBJECT:
+            for (size_t i = initlen; i < initializedLength(); i++)
+                triggerPreBarrier<JSVAL_TYPE_OBJECT>(i);
+            break;
+          default:
+            MOZ_ASSERT(!UnboxedTypeNeedsPreBarrier(elementType()));
+        }
+    }
+    setInitializedLengthNoBarrier(initlen);
 }
 
 template <JSValueType Type>
@@ -519,7 +539,7 @@ SetOrExtendBoxedOrUnboxedDenseElements(ExclusiveContext* cx, JSObject* obj,
         } else {
             for (; i < count; i++) {
                 if (!nobj->initElementSpecific<Type>(cx, start + i, vp[i])) {
-                    nobj->setInitializedLength(oldInitlen);
+                    nobj->setInitializedLengthNoBarrier(oldInitlen);
                     return DenseElementResult::Incomplete;
                 }
             }
@@ -597,7 +617,7 @@ CopyBoxedOrUnboxedDenseElements(JSContext* cx, JSObject* dst, JSObject* src,
 
         // Add a store buffer entry if we might have copied a nursery pointer to dst.
         if (UnboxedTypeNeedsPostBarrier(DstType) && !IsInsideNursery(dst))
-            dst->runtimeFromMainThread()->gc.storeBuffer.putWholeCellFromMainThread(dst);
+            dst->runtimeFromMainThread()->gc.storeBuffer.putWholeCell(dst);
     } else if (DstType == JSVAL_TYPE_DOUBLE && SrcType == JSVAL_TYPE_INT32) {
         uint8_t* dstData = dst->as<UnboxedArrayObject>().elements();
         uint8_t* srcData = src->as<UnboxedArrayObject>().elements();
@@ -621,6 +641,8 @@ CopyBoxedOrUnboxedDenseElements(JSContext* cx, JSObject* dst, JSObject* src,
 /////////////////////////////////////////////////////////////////////
 
 // Goop to fix MSVC. See DispatchTraceKindTyped in TraceKind.h.
+// The clang-cl front end defines _MSC_VER, but still requires the explicit
+// template declaration, so we must test for __clang__ here as well.
 #if defined(_MSC_VER) && !defined(__clang__)
 # define DEPENDENT_TEMPLATE_HINT
 #else

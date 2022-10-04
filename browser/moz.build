@@ -13,10 +13,10 @@ DIRS += [
     'locales',
     'modules',
     'themes',
+    '/devtools/client',
 ]
 
 DIRS += [
-    'devtools',
     'app',
 ]
 

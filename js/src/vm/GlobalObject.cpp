@@ -21,18 +21,20 @@
 # include "builtin/Intl.h"
 #endif
 #include "builtin/MapObject.h"
+#include "builtin/ModuleObject.h"
 #include "builtin/Object.h"
 #include "builtin/RegExp.h"
 #include "builtin/SIMD.h"
 #include "builtin/SymbolObject.h"
 #include "builtin/TypedObject.h"
+#include "builtin/WeakMapObject.h"
 #include "builtin/WeakSetObject.h"
 #include "vm/HelperThreads.h"
 #include "vm/PIC.h"
 #include "vm/RegExpStatics.h"
 #include "vm/RegExpStaticsObject.h"
+#include "vm/ScopeObject.h"
 #include "vm/StopIterationObject.h"
-#include "vm/WeakMapObject.h"
 
 #include "jscompartmentinlines.h"
 #include "jsobjinlines.h"
@@ -256,6 +258,11 @@ GlobalObject::createInternal(JSContext* cx, const Class* clasp)
     if (clasp->flags & JSCLASS_HAS_PRIVATE)
         global->setPrivate(nullptr);
 
+    Rooted<ClonedBlockObject*> lexical(cx, ClonedBlockObject::createGlobal(cx, global));
+    if (!lexical)
+        return nullptr;
+    global->setReservedSlot(LEXICAL_SCOPE, ObjectValue(*lexical));
+
     cx->compartment()->initGlobal(*global);
 
     if (!global->setQualifiedVarObj(cx))
@@ -306,6 +313,12 @@ GlobalObject::new_(JSContext* cx, const Class* clasp, JSPrincipals* principals,
         JS_FireOnNewGlobalObject(cx, global);
 
     return global;
+}
+
+ClonedBlockObject&
+GlobalObject::lexicalScope() const
+{
+    return getReservedSlot(LEXICAL_SCOPE).toObject().as<ClonedBlockObject>();
 }
 
 /* static */ bool
@@ -528,7 +541,7 @@ GlobalDebuggees_finalize(FreeOp* fop, JSObject* obj)
 static const Class
 GlobalDebuggees_class = {
     "GlobalDebuggee", JSCLASS_HAS_PRIVATE,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr, nullptr, nullptr, nullptr,
     nullptr, nullptr, nullptr, GlobalDebuggees_finalize
 };
 
@@ -697,7 +710,7 @@ GlobalObject::addIntrinsicValue(JSContext* cx, Handle<GlobalObject*> global,
     Rooted<UnownedBaseShape*> base(cx, last->base()->unowned());
 
     RootedId id(cx, NameToId(name));
-    StackShape child(base, id, slot, 0, 0);
+    Rooted<StackShape> child(cx, StackShape(base, id, slot, 0, 0));
     Shape* shape = cx->compartment()->propertyTree.getChild(cx, last, child);
     if (!shape)
         return false;

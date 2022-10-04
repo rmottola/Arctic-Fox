@@ -14,7 +14,7 @@ interface PushEvent : ExtendableEvent {
   readonly attribute PushMessageData data;
 };
 
-typedef USVString PushMessageDataInit;
+typedef (BufferSource or USVString) PushMessageDataInit;
 
 dictionary PushEventInit : ExtendableEventInit {
   PushMessageDataInit data;

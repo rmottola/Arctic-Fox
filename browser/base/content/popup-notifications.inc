@@ -6,6 +6,7 @@
            position="after_start"
            hidden="true"
            orient="vertical"
+           noautofocus="true"
            role="alert"/>
 
     <popupnotification id="webRTC-shareDevices-notification" hidden="true">
@@ -54,12 +55,25 @@
       </popupnotificationcontent>
     </popupnotification>
 
+    <popupnotification id="password-notification" hidden="true">
+      <popupnotificationcontent orient="vertical">
+        <textbox id="password-notification-username"/>
+        <textbox id="password-notification-password" type="password" show-content=""/>
+      </popupnotificationcontent>
+    </popupnotification>
+
     <vbox id="login-fill-doorhanger" hidden="true">
       <description id="login-fill-testing"
                    value="Thanks for testing the login fill doorhanger!"/>
       <textbox id="login-fill-filter"/>
       <richlistbox id="login-fill-list"/>
     </vbox>
+
+#ifdef E10S_TESTING_ONLY
+    <popupnotification id="enable-e10s-notification" hidden="true">
+      <popupnotificationcontent orient="vertical"/>
+    </popupnotification>
+#endif
 
     <popupnotification id="addon-progress-notification" hidden="true">
       <popupnotificationcontent orient="vertical">

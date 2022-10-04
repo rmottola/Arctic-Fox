@@ -29,6 +29,42 @@ def data_cls_getter(output_node, visited_node):
     raise ValueError
 
 
+def disabled(node):
+    """Boolean indicating whether the test is disabled"""
+    try:
+        return node.get("disabled")
+    except KeyError:
+        return None
+
+
+def tags(node):
+    """Set of tags that have been applied to the test"""
+    try:
+        value = node.get("tags")
+        if isinstance(value, (str, unicode)):
+            return {value}
+        return set(value)
+    except KeyError:
+        return set()
+
+
+def prefs(node):
+    def value(ini_value):
+        if isinstance(ini_value, (str, unicode)):
+            return tuple(ini_value.split(":", 1))
+        else:
+            return (ini_value, None)
+
+    try:
+        node_prefs = node.get("prefs")
+        if type(node_prefs) in (str, unicode):
+            prefs = {value(node_prefs)}
+        rv = dict(value(item) for item in node_prefs)
+    except KeyError:
+        rv = {}
+    return rv
+
+
 class ExpectedManifest(ManifestItem):
     def __init__(self, name, test_path, url_base):
         """Object representing all the tests in a particular manifest
@@ -54,7 +90,6 @@ class ExpectedManifest(ManifestItem):
         """Add a test to the manifest"""
         ManifestItem.append(self, child)
         self.child_map[child.id] = child
-        assert len(self.child_map) == len(self.children)
 
     def _remove_child(self, child):
         del self.child_map[child.id]
@@ -71,6 +106,32 @@ class ExpectedManifest(ManifestItem):
     def url(self):
         return urlparse.urljoin(self.url_base,
                                 "/".join(self.test_path.split(os.path.sep)))
+
+    @property
+    def disabled(self):
+        return disabled(self)
+
+    @property
+    def tags(self):
+        return tags(self)
+
+    @property
+    def prefs(self):
+        return prefs(self)
+
+
+class DirectoryManifest(ManifestItem):
+    @property
+    def disabled(self):
+        return disabled(self)
+
+    @property
+    def tags(self):
+        return tags(self)
+
+    @property
+    def prefs(self):
+        return prefs(self)
 
 
 class TestNode(ManifestItem):
@@ -89,8 +150,6 @@ class TestNode(ManifestItem):
     @property
     def is_empty(self):
         required_keys = set(["type"])
-        if self.test_type == "reftest":
-            required_keys |= set(["reftype", "refurl"])
         if set(self._data.keys()) != required_keys:
             return False
         return all(child.is_empty for child in self.children)
@@ -101,18 +160,19 @@ class TestNode(ManifestItem):
 
     @property
     def id(self):
-        url = urlparse.urljoin(self.parent.url, self.name)
-        if self.test_type == "reftest":
-            return (url, self.get("reftype"), self.get("refurl"))
-        else:
-            return url
+        return urlparse.urljoin(self.parent.url, self.name)
 
+    @property
     def disabled(self):
-        """Boolean indicating whether the test is disabled"""
-        try:
-            return self.get("disabled")
-        except KeyError:
-            return False
+        return disabled(self)
+
+    @property
+    def tags(self):
+        return tags(self)
+
+    @property
+    def prefs(self):
+        return prefs(self)
 
     def append(self, node):
         """Add a subtest to the current test
@@ -157,9 +217,28 @@ def get_manifest(metadata_root, test_path, url_base, run_info):
     manifest_path = expected.expected_path(metadata_root, test_path)
     try:
         with open(manifest_path) as f:
-            return static.compile(f, run_info,
+            return static.compile(f,
+                                  run_info,
                                   data_cls_getter=data_cls_getter,
                                   test_path=test_path,
                                   url_base=url_base)
+    except IOError:
+        return None
+
+def get_dir_manifest(metadata_root, path, run_info):
+    """Get the ExpectedManifest for a particular test path, or None if there is no
+    metadata stored for that test path.
+
+    :param metadata_root: Absolute path to the root of the metadata directory
+    :param path: Path to the ini file relative to the metadata root
+    :param run_info: Dictionary of properties of the test run for which the expectation
+                     values should be computed.
+    """
+    full_path = os.path.join(metadata_root, path)
+    try:
+        with open(full_path) as f:
+            return static.compile(f,
+                                  run_info,
+                                  data_cls_getter=lambda x,y: DirectoryManifest)
     except IOError:
         return None

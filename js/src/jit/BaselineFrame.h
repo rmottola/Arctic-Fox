@@ -49,7 +49,7 @@ class BaselineFrame
 
         // Frame has execution observed by a Debugger.
         //
-        // See comment above 'debugMode' in jscompartment.h for explanation of
+        // See comment above 'isDebuggee' in jscompartment.h for explanation of
         // invariants of debuggee compartments, scripts, and frames.
         DEBUGGEE         = 1 << 6,
 
@@ -225,6 +225,7 @@ class BaselineFrame
   private:
     Value* evalNewTargetAddress() const {
         MOZ_ASSERT(isEvalFrame());
+        MOZ_ASSERT(isFunctionFrame());
         return (Value*)(reinterpret_cast<const uint8_t*>(this) +
                         BaselineFrame::Size() +
                         offsetOfEvalNewTarget());
@@ -279,8 +280,7 @@ class BaselineFrame
     inline void popBlock(JSContext* cx);
     inline bool freshenBlock(JSContext* cx);
 
-    bool strictEvalPrologue(JSContext* cx);
-    bool heavyweightFunPrologue(JSContext* cx);
+    bool initStrictEvalScopeObjects(JSContext* cx);
     bool initFunctionScopeObjects(JSContext* cx);
 
     void initArgsObjUnchecked(ArgumentsObject& argsobj) {
@@ -408,9 +408,9 @@ class BaselineFrame
     bool isNonStrictEvalFrame() const {
         return isEvalFrame() && !script()->strict();
     }
-    bool isDirectEvalFrame() const;
+    bool isNonGlobalEvalFrame() const;
     bool isNonStrictDirectEvalFrame() const {
-        return isNonStrictEvalFrame() && isDirectEvalFrame();
+        return isNonStrictEvalFrame() && isNonGlobalEvalFrame();
     }
     bool isNonEvalFunctionFrame() const {
         return isFunctionFrame() && !isEvalFrame();

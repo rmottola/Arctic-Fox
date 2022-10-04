@@ -54,8 +54,8 @@
 #include "ScriptSettings.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Likely.h"
+#include "mozilla/Snprintf.h"
 #include "mozilla/unused.h"
-#include "../../js/public/HashTable.h" // for MultiCompartmentMatcher
 
 // Other Classes
 #include "mozilla/dom/BarProps.h"
@@ -547,8 +547,9 @@ NS_IMPL_CYCLE_COLLECTION_UNROOT_NATIVE(nsTimeout, Release)
 nsresult
 nsTimeout::InitTimer(uint32_t aDelay)
 {
-  return mTimer->InitWithFuncCallback(nsGlobalWindow::TimerCallback, this,
-                                      aDelay, nsITimer::TYPE_ONE_SHOT);
+  return mTimer->InitWithNameableFuncCallback(
+    nsGlobalWindow::TimerCallback, this, aDelay,
+    nsITimer::TYPE_ONE_SHOT, nsGlobalWindow::TimerNameCallback);
 }
 
 // Return true if this timeout has a refcount of 1. This is used to check
@@ -9179,22 +9180,6 @@ struct BrowserCompartmentMatcher : public js::CompartmentFilter {
   }
 };
 
-class MultiCompartmentMatcher : public js::CompartmentFilter {
-  friend class WindowRequestCleanupEvent;
-
-  js::HashSet<JSCompartment*,js::DefaultHasher<JSCompartment*>,js::SystemAllocPolicy> compartments;
-
-  MultiCompartmentMatcher()
-  {
-    compartments.init();
-  }
-  
-public: 
-  virtual bool match(JSCompartment* c) const override
-  {
-    return compartments.has(c);
-  }
-};
 
 class WindowDestroyedEvent : public nsRunnable
 {
@@ -13171,6 +13156,19 @@ nsGlobalWindow::TimerCallback(nsITimer *aTimer, void *aClosure)
   nsRefPtr<nsTimeout> timeout = (nsTimeout *)aClosure;
 
   timeout->mWindow->RunTimeout(timeout);
+}
+
+// static
+void
+nsGlobalWindow::TimerNameCallback(nsITimer* aTimer, void* aClosure, char* aBuf,
+                                  size_t aLen)
+{
+  nsRefPtr<nsTimeout> timeout = (nsTimeout*)aClosure;
+
+  const char* filename;
+  uint32_t lineNum, column;
+  timeout->mScriptHandler->GetLocation(&filename, &lineNum, &column);
+  snprintf(aBuf, aLen, "[content] %s:%u:%u", filename, lineNum, column);
 }
 
 //*****************************************************************************

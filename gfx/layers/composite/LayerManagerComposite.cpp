@@ -161,7 +161,7 @@ LayerManagerComposite::UpdateRenderBounds(const IntRect& aRect)
 bool
 LayerManagerComposite::AreComponentAlphaLayersEnabled()
 {
-  return Compositor::GetBackend() != LayersBackend::LAYERS_BASIC &&
+  return mCompositor->GetBackendType() != LayersBackend::LAYERS_BASIC &&
          LayerManager::AreComponentAlphaLayersEnabled();
 }
 
@@ -240,7 +240,7 @@ LayerManagerComposite::ApplyOcclusionCulling(Layer* aLayer, nsIntRegion& aOpaque
   // aOpaqueRegion.
   if (isTranslation &&
       !aLayer->HasMaskLayers() &&
-      aLayer->GetLocalOpacity() == 1.0f) {
+      aLayer->IsOpaqueForVisibility()) {
     if (aLayer->GetContentFlags() & Layer::CONTENT_OPAQUE) {
       localOpaque.Or(localOpaque, composite->GetFullyRenderedRegion());
     }

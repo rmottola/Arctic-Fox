@@ -127,7 +127,35 @@ ALL_TESTS_JSON = b'''
             "relpath": "src/TestDistribution.java",
             "subsuite": "browser"
         }
-    ]
+    ],
+    "image/test/browser/browser_bug666317.js": [
+        {
+            "dir_relpath": "image/test/browser",
+            "file_relpath": "image/test/browser/browser_bug666317.js",
+            "flavor": "browser-chrome",
+            "here": "/home/chris/m-c/obj-dbg/_tests/testing/mochitest/browser/image/test/browser",
+            "manifest": "/home/chris/m-c/image/test/browser/browser.ini",
+            "name": "browser_bug666317.js",
+            "path": "/home/chris/m-c/obj-dbg/_tests/testing/mochitest/browser/image/test/browser/browser_bug666317.js",
+            "relpath": "image/test/browser/browser_bug666317.js",
+            "skip-if": "e10s # Bug 948194 - Decoded Images seem to not be discarded on memory-pressure notification with e10s enabled",
+            "subsuite": ""
+        }
+   ],
+   "devtools/client/markupview/test/browser_markupview_copy_image_data.js": [
+        {
+            "dir_relpath": "devtools/client/markupview/test",
+            "file_relpath": "devtools/client/markupview/test/browser_markupview_copy_image_data.js",
+            "flavor": "browser-chrome",
+            "here": "/home/chris/m-c/obj-dbg/_tests/testing/mochitest/browser/devtools/client/markupview/test",
+            "manifest": "/home/chris/m-c/devtools/client/markupview/test/browser.ini",
+            "name": "browser_markupview_copy_image_data.js",
+            "path": "/home/chris/m-c/obj-dbg/_tests/testing/mochitest/browser/devtools/client/markupview/test/browser_markupview_copy_image_data.js",
+            "relpath": "devtools/client/markupview/test/browser_markupview_copy_image_data.js",
+            "subsuite": "devtools",
+            "tags": "devtools"
+        }
+   ]
 }'''.strip()
 
 

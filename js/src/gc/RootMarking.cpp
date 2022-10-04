@@ -24,7 +24,6 @@
 #include "js/HashTable.h"
 #include "vm/Debugger.h"
 #include "vm/JSONParser.h"
-#include "vm/WeakMapObject.h"
 
 #include "jsgcinlines.h"
 #include "jsobjinlines.h"
@@ -39,36 +38,6 @@ using JS::AutoGCRooter;
 typedef RootedValueMap::Range RootRange;
 typedef RootedValueMap::Entry RootEntry;
 typedef RootedValueMap::Enum RootEnum;
-
-// Note: the following two functions cannot be static as long as we are using
-// GCC 4.4, since it requires template function parameters to have external
-// linkage.
-
-void
-MarkBindingsRoot(JSTracer* trc, Bindings* bindings, const char* name)
-{
-    bindings->trace(trc);
-}
-
-void
-MarkPropertyDescriptorRoot(JSTracer* trc, JSPropertyDescriptor* pd, const char* name)
-{
-    pd->trace(trc);
-}
-
-// We cannot instantiate (even indirectly) the abstract JS::DynamicTraceable.
-// Instead we cast to a ConcreteTraceable, then upcast before calling trace so
-// that we get the implementation defined dynamically in the vtable.
-struct ConcreteTraceable : public JS::DynamicTraceable
-{
-    void trace(JSTracer* trc) override {}
-};
-
-static void
-MarkDynamicTraceable(JSTracer* trc, ConcreteTraceable* t, const char* name)
-{
-    static_cast<JS::DynamicTraceable*>(t)->trace(trc);
-}
 
 template <typename T>
 using TraceFunction = void (*)(JSTracer* trc, T* ref, const char* name);
@@ -92,8 +61,7 @@ MarkExactStackRootsAcrossTypes(T context, JSTracer* trc)
     MarkExactStackRootList<JSObject*>(trc, context, "exact-object");
     MarkExactStackRootList<Shape*>(trc, context, "exact-shape");
     MarkExactStackRootList<BaseShape*>(trc, context, "exact-baseshape");
-    MarkExactStackRootList<ObjectGroup*>(
-        trc, context, "exact-objectgroup");
+    MarkExactStackRootList<ObjectGroup*>(trc, context, "exact-objectgroup");
     MarkExactStackRootList<JSString*>(trc, context, "exact-string");
     MarkExactStackRootList<JS::Symbol*>(trc, context, "exact-symbol");
     MarkExactStackRootList<jit::JitCode*>(trc, context, "exact-jitcode");
@@ -101,14 +69,8 @@ MarkExactStackRootsAcrossTypes(T context, JSTracer* trc)
     MarkExactStackRootList<LazyScript*>(trc, context, "exact-lazy-script");
     MarkExactStackRootList<jsid>(trc, context, "exact-id");
     MarkExactStackRootList<Value>(trc, context, "exact-value");
-    MarkExactStackRootList<Bindings, MarkBindingsRoot>(trc, context, "Bindings");
-    MarkExactStackRootList<JSPropertyDescriptor, MarkPropertyDescriptorRoot>(
-        trc, context, "JSPropertyDescriptor");
-    MarkExactStackRootList<JS::StaticTraceable,
-                           js::DispatchWrapper<JS::StaticTraceable>::TraceWrapped>(
-        trc, context, "StaticTraceable");
-    MarkExactStackRootList<ConcreteTraceable, MarkDynamicTraceable>(
-        trc, context, "DynamicTraceable");
+    MarkExactStackRootList<JS::Traceable, js::DispatchWrapper<JS::Traceable>::TraceWrapped>(
+        trc, context, "Traceable");
 }
 
 static void
@@ -155,18 +117,6 @@ AutoGCRooter::trace(JSTracer* trc)
         return;
       }
 
-      case SCRIPTVECTOR: {
-        AutoScriptVector::VectorImpl& vector = static_cast<AutoScriptVector*>(this)->vector;
-        TraceRootRange(trc, vector.length(), vector.begin(), "js::AutoScriptVector.vector");
-        return;
-      }
-
-      case HASHABLEVALUE: {
-        AutoHashableValueRooter* rooter = static_cast<AutoHashableValueRooter*>(this);
-        rooter->trace(trc);
-        return;
-      }
-
       case IONMASM: {
         static_cast<js::jit::MacroAssembler::AutoRooter*>(this)->masm()->trace(trc);
         return;
@@ -195,10 +145,6 @@ AutoGCRooter::trace(JSTracer* trc)
         return;
       }
 
-      case JSONPARSER:
-        static_cast<js::JSONParserBase*>(this)->trace(trc);
-        return;
-
       case CUSTOM:
         static_cast<JS::CustomAutoRooter*>(this)->trace(trc);
         return;
@@ -225,12 +171,6 @@ AutoGCRooter::traceAllWrappers(JSTracer* trc)
                 gcr->trace(trc);
         }
     }
-}
-
-void
-AutoHashableValueRooter::trace(JSTracer* trc)
-{
-    TraceRoot(trc, reinterpret_cast<Value*>(&value), "AutoHashableValueRooter");
 }
 
 void
@@ -276,11 +216,12 @@ struct PersistentRootedMarker
     typedef mozilla::LinkedList<Element> List;
     typedef void (*MarkFunc)(JSTracer* trc, T* ref, const char* name);
 
+    template <TraceFunction<T> TraceFn = TraceNullableRoot>
     static void
     markChain(JSTracer* trc, List& list, const char* name)
     {
         for (Element* r = list.getFirst(); r; r = r->getNext())
-            TraceNullableRoot(trc, r->address(), name);
+            TraceFn(trc, r->address(), name);
     }
 };
 
@@ -301,6 +242,12 @@ js::gc::MarkPersistentRootedChainsInLists(RootLists& roots, JSTracer* trc)
                                             "PersistentRooted<jsid>");
     PersistentRootedMarker<Value>::markChain(trc, roots.getPersistentRootedList<Value>(),
                                              "PersistentRooted<Value>");
+
+    PersistentRootedMarker<JS::Traceable>::markChain<
+        js::DispatchWrapper<JS::Traceable>::TraceWrapped>(trc,
+            reinterpret_cast<mozilla::LinkedList<JS::PersistentRooted<JS::Traceable>>&>(
+                roots.heapRoots_[THING_ROOT_TRACEABLE]),
+            "PersistentRooted<Traceable>");
 }
 
 void
@@ -359,22 +306,6 @@ js::gc::GCRuntime::markRuntime(JSTracer* trc, TraceOrMarkRuntime traceOrMark)
 
     for (ContextIter acx(rt); !acx.done(); acx.next())
         acx->mark(trc);
-
-    for (ZonesIter zone(rt, SkipAtoms); !zone.done(); zone.next()) {
-        if (traceOrMark == MarkRuntime && !zone->isCollecting())
-            continue;
-
-        /* Do not discard scripts with counts while profiling. */
-        if (rt->profilingScripts && !rt->isHeapMinorCollecting()) {
-            for (ZoneCellIterUnderGC i(zone, AllocKind::SCRIPT); !i.done(); i.next()) {
-                JSScript* script = i.get<JSScript>();
-                if (script->hasScriptCounts()) {
-                    TraceRoot(trc, &script, "profilingScripts");
-                    MOZ_ASSERT(script == i.get<JSScript>());
-                }
-            }
-        }
-    }
 
     for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next())
         c->traceRoots(trc, traceOrMark);
@@ -481,7 +412,7 @@ BufferGrayRootsTracer::onChild(const JS::GCCellPtr& thing)
         // objects and scripts. We rely on gray root buffering for this to work,
         // but we only need to worry about uncollected dead compartments during
         // incremental GCs (when we do gray root buffering).
-        DispatchTraceKindTyped(SetMaybeAliveFunctor(), tenured, thing.kind());
+        DispatchTyped(SetMaybeAliveFunctor(), thing);
 
         if (!zone->gcGrayRoots.append(tenured))
             bufferingGrayRootsFailed = true;

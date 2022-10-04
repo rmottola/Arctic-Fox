@@ -24,7 +24,6 @@
 
   <commandset id="placesCommands"/>
   <commandset id="editMenuCommands"/>
-  <keyset id="placesCommandKeys"/>
   <menupopup id="placesContext"/>
 
   <!-- Bookmarks and history tooltip -->

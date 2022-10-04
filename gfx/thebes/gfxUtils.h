@@ -6,9 +6,7 @@
 #ifndef GFX_UTILS_H
 #define GFX_UTILS_H
 
-#include "gfxColor.h"
 #include "gfxTypes.h"
-#include "GraphicsFilter.h"
 #include "imgIContainer.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/RefPtr.h"
@@ -80,7 +78,7 @@ public:
                                  const gfxSize&     aImageSize,
                                  const ImageRegion& aRegion,
                                  const mozilla::gfx::SurfaceFormat aFormat,
-                                 GraphicsFilter     aFilter,
+                                 mozilla::gfx::Filter aFilter,
                                  uint32_t           aImageFlags = imgIContainer::FLAG_NONE,
                                  gfxFloat           aOpacity = 1.0);
 
@@ -161,9 +159,7 @@ public:
     /**
      * Clears surface to aColor (which defaults to transparent black).
      */
-    static void ClearThebesSurface(gfxASurface* aSurface,
-                                   mozilla::gfx::IntRect* aRect = nullptr,
-                                   const gfxRGBA& aColor = gfxRGBA(0.0, 0.0, 0.0, 0.0));
+    static void ClearThebesSurface(gfxASurface* aSurface);
 
     /**
      * Creates a copy of aSurface, but having the SurfaceFormat aFormat.
@@ -311,7 +307,6 @@ namespace gfx {
  */
 Color ToDeviceColor(Color aColor);
 Color ToDeviceColor(nscolor aColor);
-Color ToDeviceColor(const gfxRGBA& aColor);
 
 /* These techniques are suggested by "Bit Twiddling Hacks"
  */

@@ -147,19 +147,6 @@ MatchPairs::initArrayFrom(MatchPairs& copyFrom)
     return true;
 }
 
-void
-MatchPairs::displace(size_t disp)
-{
-    if (disp == 0)
-        return;
-
-    for (size_t i = 0; i < pairCount_; i++) {
-        MOZ_ASSERT(pairs_[i].check());
-        pairs_[i].start += (pairs_[i].start < 0) ? 0 : disp;
-        pairs_[i].limit += (pairs_[i].limit < 0) ? 0 : disp;
-    }
-}
-
 bool
 ScopedMatchPairs::allocOrExpandArray(size_t pairCount)
 {
@@ -242,7 +229,7 @@ RegExpObject::trace(JSTracer* trc, JSObject* obj)
 
 const Class RegExpObject::class_ = {
     js_RegExp_str,
-    JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS |
+    JSCLASS_HAS_PRIVATE |
     JSCLASS_HAS_RESERVED_SLOTS(RegExpObject::RESERVED_SLOTS) |
     JSCLASS_HAS_CACHED_PROTO(JSProto_RegExp),
     nullptr, /* addProperty */
@@ -252,7 +239,6 @@ const Class RegExpObject::class_ = {
     nullptr, /* enumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
-    nullptr, /* convert */
     nullptr, /* finalize */
     nullptr, /* call */
     nullptr, /* hasInstance */
@@ -329,15 +315,9 @@ RegExpObject::assignInitialShape(ExclusiveContext* cx, Handle<RegExpObject*> sel
     MOZ_ASSERT(self->empty());
 
     JS_STATIC_ASSERT(LAST_INDEX_SLOT == 0);
-    JS_STATIC_ASSERT(SOURCE_SLOT == LAST_INDEX_SLOT + 1);
 
     /* The lastIndex property alone is writable but non-configurable. */
-    if (!self->addDataProperty(cx, cx->names().lastIndex, LAST_INDEX_SLOT, JSPROP_PERMANENT))
-        return nullptr;
-
-    /* Remaining instance property are non-writable and non-configurable. */
-    unsigned attrs = JSPROP_PERMANENT | JSPROP_READONLY;
-    return self->addDataProperty(cx, cx->names().source, SOURCE_SLOT, attrs);
+    return self->addDataProperty(cx, cx->names().lastIndex, LAST_INDEX_SLOT, JSPROP_PERMANENT);
 }
 
 bool
@@ -350,8 +330,6 @@ RegExpObject::init(ExclusiveContext* cx, HandleAtom source, RegExpFlag flags)
 
     MOZ_ASSERT(self->lookup(cx, NameToId(cx->names().lastIndex))->slot() ==
                LAST_INDEX_SLOT);
-    MOZ_ASSERT(self->lookup(cx, NameToId(cx->names().source))->slot() ==
-               SOURCE_SLOT);
 
     /*
      * If this is a re-initialization with an existing RegExpShared, 'flags'
@@ -588,32 +566,8 @@ RegExpShared::compile(JSContext* cx, HandleLinearString input,
     TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
     AutoTraceLog logCompile(logger, TraceLogger_IrregexpCompile);
 
-    if (!sticky()) {
-        RootedAtom pattern(cx, source);
-        return compile(cx, pattern, input, mode, force);
-    }
-
-    /*
-     * The sticky case we implement hackily by prepending a caret onto the front
-     * and relying on |::execute| to pseudo-slice the string when it sees a sticky regexp.
-     */
-    static const char prefix[] = {'^', '(', '?', ':'};
-    static const char postfix[] = {')'};
-
-    using mozilla::ArrayLength;
-    StringBuffer sb(cx);
-    if (!sb.reserve(ArrayLength(prefix) + source->length() + ArrayLength(postfix)))
-        return false;
-    sb.infallibleAppend(prefix, ArrayLength(prefix));
-    if (!sb.append(source))
-        return false;
-    sb.infallibleAppend(postfix, ArrayLength(postfix));
-
-    RootedAtom fakeySource(cx, sb.finishAtom());
-    if (!fakeySource)
-        return false;
-
-    return compile(cx, fakeySource, input, mode, force);
+    RootedAtom pattern(cx, source);
+    return compile(cx, pattern, input, mode, force);
 }
 
 bool
@@ -643,7 +597,8 @@ RegExpShared::compile(JSContext* cx, HandleAtom pattern, HandleLinearString inpu
                                                          ignoreCase(),
                                                          input->hasLatin1Chars(),
                                                          mode == MatchOnly,
-                                                         force == ForceByteCode);
+                                                         force == ForceByteCode,
+                                                         sticky());
     if (code.empty())
         return false;
 
@@ -689,36 +644,39 @@ RegExpShared::execute(JSContext* cx, HandleLinearString input, size_t start,
         return RegExpRunStatus_Error;
     }
 
-    /*
-     * |displacement| emulates sticky mode by matching from this offset
-     * into the char buffer and subtracting the delta off at the end.
-     */
-    size_t charsOffset = 0;
     size_t length = input->length();
-    size_t origLength = length;
-    size_t displacement = 0;
-
-    if (sticky()) {
-        displacement = start;
-        charsOffset += displacement;
-        length -= displacement;
-        start = 0;
-    }
 
     // Reset the Irregexp backtrack stack if it grows during execution.
     irregexp::RegExpStackScope stackScope(cx->runtime());
 
     if (canStringMatch) {
         MOZ_ASSERT(pairCount() == 1);
-        int res = StringFindPattern(input, source, start + charsOffset);
+        size_t sourceLength = source->length();
+        if (sticky()) {
+            // First part checks size_t overflow.
+            if (sourceLength + start < sourceLength || sourceLength + start > length)
+                return RegExpRunStatus_Success_NotFound;
+            if (!HasSubstringAt(input, source, start))
+                return RegExpRunStatus_Success_NotFound;
+
+            if (matches) {
+                (*matches)[0].start = start;
+                (*matches)[0].limit = start + sourceLength;
+
+                matches->checkAgainst(length);
+            }
+            return RegExpRunStatus_Success;
+        }
+
+        int res = StringFindPattern(input, source, start);
         if (res == -1)
             return RegExpRunStatus_Success_NotFound;
 
         if (matches) {
             (*matches)[0].start = res;
-            (*matches)[0].limit = res + source->length();
+            (*matches)[0].limit = res + sourceLength;
 
-            matches->checkAgainst(origLength);
+            matches->checkAgainst(length);
         }
         return RegExpRunStatus_Success;
     }
@@ -733,10 +691,10 @@ RegExpShared::execute(JSContext* cx, HandleLinearString input, size_t start,
             AutoTraceLog logJIT(logger, TraceLogger_IrregexpExecute);
             AutoCheckCannotGC nogc;
             if (input->hasLatin1Chars()) {
-                const Latin1Char* chars = input->latin1Chars(nogc) + charsOffset;
+                const Latin1Char* chars = input->latin1Chars(nogc);
                 result = irregexp::ExecuteCode(cx, code, chars, start, length, matches);
             } else {
-                const char16_t* chars = input->twoByteChars(nogc) + charsOffset;
+                const char16_t* chars = input->twoByteChars(nogc);
                 result = irregexp::ExecuteCode(cx, code, chars, start, length, matches);
             }
         }
@@ -757,10 +715,8 @@ RegExpShared::execute(JSContext* cx, HandleLinearString input, size_t start,
 
         MOZ_ASSERT(result == RegExpRunStatus_Success);
 
-        if (matches) {
-            matches->displace(displacement);
-            matches->checkAgainst(origLength);
-        }
+        if (matches)
+            matches->checkAgainst(length);
         return RegExpRunStatus_Success;
     } while (false);
 
@@ -777,17 +733,15 @@ RegExpShared::execute(JSContext* cx, HandleLinearString input, size_t start,
 
     RegExpRunStatus result;
     if (inputChars.isLatin1()) {
-        const Latin1Char* chars = inputChars.latin1Range().start().get() + charsOffset;
+        const Latin1Char* chars = inputChars.latin1Range().start().get();
         result = irregexp::InterpretCode(cx, byteCode, chars, start, length, matches);
     } else {
-        const char16_t* chars = inputChars.twoByteRange().start().get() + charsOffset;
+        const char16_t* chars = inputChars.twoByteRange().start().get();
         result = irregexp::InterpretCode(cx, byteCode, chars, start, length, matches);
     }
 
-    if (result == RegExpRunStatus_Success && matches) {
-        matches->displace(displacement);
-        matches->checkAgainst(origLength);
-    }
+    if (result == RegExpRunStatus_Success && matches)
+        matches->checkAgainst(length);
     return result;
 }
 

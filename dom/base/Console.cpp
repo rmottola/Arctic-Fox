@@ -10,7 +10,7 @@
 #include "mozilla/dom/BlobBinding.h"
 #include "mozilla/dom/Exceptions.h"
 #include "mozilla/dom/File.h"
-#include "mozilla/dom/StructuredCloneHelper.h"
+#include "mozilla/dom/StructuredCloneHolder.h"
 #include "mozilla/dom/ToJSValue.h"
 #include "mozilla/Maybe.h"
 #include "nsCycleCollectionParticipant.h"
@@ -26,6 +26,8 @@
 #include "nsContentUtils.h"
 #include "nsDocShell.h"
 #include "nsProxyRelease.h"
+#include "mozilla/ConsoleTimelineMarker.h"
+#include "mozilla/TimestampTimelineMarker.h"
 
 #include "nsIConsoleAPIStorage.h"
 #include "nsIDOMWindowUtils.h"
@@ -194,7 +196,7 @@ private:
 
 class ConsoleRunnable : public nsRunnable
                       , public WorkerFeature
-                      , public StructuredCloneHelperInternal
+                      , public StructuredCloneHolderBase
 {
 public:
   explicit ConsoleRunnable(Console* aConsole)
@@ -207,8 +209,8 @@ public:
   virtual
   ~ConsoleRunnable()
   {
-    // Shutdown the StructuredCloneHelperInternal class.
-    Shutdown();
+    // Clear the StructuredCloneHolderBase class.
+    Clear();
   }
 
   bool
@@ -348,10 +350,10 @@ protected:
   RunConsole(JSContext* aCx, nsPIDOMWindow* aOuterWindow,
              nsPIDOMWindow* aInnerWindow) = 0;
 
-  virtual JSObject* ReadCallback(JSContext* aCx,
-                                 JSStructuredCloneReader* aReader,
-                                 uint32_t aTag,
-                                 uint32_t aIndex) override
+  virtual JSObject* CustomReadHandler(JSContext* aCx,
+                                      JSStructuredCloneReader* aReader,
+                                      uint32_t aTag,
+                                      uint32_t aIndex) override
   {
     AssertIsOnMainThread();
 
@@ -374,9 +376,9 @@ protected:
     return nullptr;
   }
 
-  virtual bool WriteCallback(JSContext* aCx,
-                             JSStructuredCloneWriter* aWriter,
-                             JS::Handle<JSObject*> aObj) override
+  virtual bool CustomWriteHandler(JSContext* aCx,
+                                  JSStructuredCloneWriter* aWriter,
+                                  JS::Handle<JSObject*> aObj) override
   {
     nsRefPtr<Blob> blob;
     if (NS_SUCCEEDED(UNWRAP_OBJECT(Blob, aObj, blob)) &&
@@ -983,59 +985,6 @@ ReifyStack(nsIStackFrame* aStack, nsTArray<ConsoleStackEntry>& aRefiedStack)
   return NS_OK;
 }
 
-class ConsoleTimelineMarker : public TimelineMarker
-{
-public:
-  ConsoleTimelineMarker(nsDocShell* aDocShell,
-                        TracingMetadata aMetaData,
-                        const nsAString& aCause)
-    : TimelineMarker(aDocShell, "ConsoleTime", aMetaData, aCause)
-  {
-    if (aMetaData == TRACING_INTERVAL_END) {
-      CaptureStack();
-    }
-  }
-
-  virtual bool Equals(const TimelineMarker& aOther) override
-  {
-    if (!TimelineMarker::Equals(aOther)) {
-      return false;
-    }
-    // Console markers must have matching causes as well.
-    return GetCause() == aOther.GetCause();
-  }
-
-  virtual void AddDetails(JSContext* aCx,
-                          mozilla::dom::ProfileTimelineMarker& aMarker) override
-  {
-    if (GetMetaData() == TRACING_INTERVAL_START) {
-      aMarker.mCauseName.Construct(GetCause());
-    } else {
-      aMarker.mEndStack = GetStack();
-    }
-  }
-};
-
-class TimestampTimelineMarker : public TimelineMarker
-{
-public:
-  TimestampTimelineMarker(nsDocShell* aDocShell,
-                          TracingMetadata aMetaData,
-                          const nsAString& aCause)
-    : TimelineMarker(aDocShell, "TimeStamp", aMetaData, aCause)
-  {
-    MOZ_ASSERT(aMetaData == TRACING_TIMESTAMP);
-  }
-
-  virtual void AddDetails(JSContext* aCx,
-                          mozilla::dom::ProfileTimelineMarker& aMarker) override
-  {
-    if (!GetCause().IsEmpty()) {
-      aMarker.mCauseName.Construct(GetCause());
-    }
-  }
-};
-
 // Queue a call to a console method. See the CALL_DELAY constant.
 void
 Console::Method(JSContext* aCx, MethodName aMethodName,
@@ -1142,8 +1091,7 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
           key.init(aCx, jsString);
         }
 
-        mozilla::UniquePtr<TimelineMarker> marker =
-          MakeUnique<TimestampTimelineMarker>(docShell, TRACING_TIMESTAMP, key);
+        UniquePtr<TimelineMarker> marker = MakeUnique<TimestampTimelineMarker>(key);
         TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
       }
       // For `console.time(foo)` and `console.timeEnd(foo)`
@@ -1153,10 +1101,9 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
         if (jsString) {
           nsAutoJSString key;
           if (key.init(aCx, jsString)) {
-            mozilla::UniquePtr<TimelineMarker> marker =
-              MakeUnique<ConsoleTimelineMarker>(docShell,
-                                                aMethodName == MethodTime ? TRACING_INTERVAL_START : TRACING_INTERVAL_END,
-                                                key);
+            UniquePtr<TimelineMarker> marker = MakeUnique<ConsoleTimelineMarker>(
+              key, aMethodName == MethodTime ? MarkerTracingType::START
+                                             : MarkerTracingType::END);
             TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
           }
         }

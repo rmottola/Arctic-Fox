@@ -21,6 +21,7 @@ include protocol PFileDescriptorSet;
 include protocol PFMRadio;
 include protocol PFileSystemRequest;
 include protocol PHal;
+include protocol PHeapSnapshotTempFileHelper;
 include protocol PIcc;
 include protocol PProcessHangMonitor;
 include protocol PImageBridge;
@@ -85,7 +86,7 @@ using struct mozilla::void_t from "ipc/IPCMessageUtils.h";
 using mozilla::dom::NativeThreadId from "mozilla/dom/TabMessageUtils.h";
 using mozilla::dom::quota::PersistenceType from "mozilla/dom/quota/PersistenceType.h";
 using mozilla::hal::ProcessPriority from "mozilla/HalTypes.h";
-using gfxIntSize from "nsSize.h";
+using mozilla::gfx::IntSize from "mozilla/gfx/2D.h";
 using mozilla::dom::TabId from "mozilla/dom/ipc/IdType.h";
 using mozilla::dom::ContentParentId from "mozilla/dom/ipc/IdType.h";
 using struct LookAndFeelInt from "mozilla/widget/WidgetMessageUtils.h";
@@ -434,6 +435,7 @@ prio(normal upto urgent) sync protocol PContent
     manages PFileDescriptorSet;
     manages PFMRadio;
     manages PHal;
+    manages PHeapSnapshotTempFileHelper;
     manages PIcc;
     manages PMedia;
     manages PMemoryReportRequest;
@@ -554,7 +556,7 @@ child:
     // nsIPermissionManager messages
     AddPermission(Permission permission);
 
-    ScreenSizeChanged(gfxIntSize size);
+    ScreenSizeChanged(IntSize size);
 
     Volumes(VolumeInfo[] volumes);
 
@@ -759,10 +761,14 @@ parent:
     sync IsSecureURI(uint32_t type, URIParams uri, uint32_t flags)
         returns (bool isSecureURI);
 
+    async AccumulateMixedContentHSTS(URIParams uri, bool active);
+
     sync GetLookAndFeelCache()
         returns (LookAndFeelInt[] lookAndFeelIntCache);
 
     prio(urgent) async PHal();
+
+    async PHeapSnapshotTempFileHelper();
 
     PIcc(uint32_t serviceId);
 

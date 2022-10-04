@@ -56,7 +56,7 @@ const LOGGER_PREFIX = "TelemetrySession" + (Utils.isContentProcess ? "#content::
 const PREF_BRANCH = "toolkit.telemetry.";
 const PREF_PREVIOUS_BUILDID = PREF_BRANCH + "previousBuildID";
 const PREF_FHR_UPLOAD_ENABLED = "datareporting.healthreport.uploadEnabled";
-const PREF_ASYNC_PLUGIN_INIT = "dom.ipc.plugins.asyncInit";
+const PREF_ASYNC_PLUGIN_INIT = "dom.ipc.plugins.asyncInit.enabled";
 const PREF_UNIFIED = PREF_BRANCH + "unified";
 
 
@@ -108,7 +108,7 @@ const TOPIC_CYCLE_COLLECTOR_BEGIN = "cycle-collector-begin";
 
 var gLastMemoryPoll = null;
 
-let gWasDebuggerAttached = false;
+var gWasDebuggerAttached = false;
 
 function getLocale() {
   return Cc["@mozilla.org/chrome/chrome-registry;1"].
@@ -149,8 +149,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "ThirdPartyCookieProbe",
                                   "resource://gre/modules/ThirdPartyCookieProbe.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "UITelemetry",
                                   "resource://gre/modules/UITelemetry.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "UpdateChannel",
-                                  "resource://gre/modules/UpdateChannel.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetryEnvironment",
                                   "resource://gre/modules/TelemetryEnvironment.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "CommonUtils",
@@ -165,7 +163,7 @@ function generateUUID() {
 /**
  * This is a policy object used to override behavior for testing.
  */
-let Policy = {
+var Policy = {
   now: () => new Date(),
   generateSessionUUID: () => generateUUID(),
   generateSubsessionUUID: () => generateUUID(),
@@ -219,7 +217,7 @@ function toLocalTimeISOString(date) {
 /**
  * Read current process I/O counters.
  */
-let processInfo = {
+var processInfo = {
   _initialized: false,
   _IO_COUNTERS: null,
   _kernel32: null,
@@ -360,7 +358,7 @@ SaveSerializer.prototype = {
  * reasoning about scheduling actions in a single place, making it easier to
  * coordinate jobs and coalesce them.
  */
-let TelemetryScheduler = {
+var TelemetryScheduler = {
   _lastDailyPingTime: 0,
   _lastSessionCheckpointTime: 0,
 
@@ -761,7 +759,7 @@ this.TelemetrySession = Object.freeze({
   },
 });
 
-let Impl = {
+var Impl = {
   _histograms: {},
   _initialized: false,
   _logger: null,

@@ -595,7 +595,7 @@ var gCSSProperties = {
     type: CSS_TYPE_TRUE_SHORTHAND,
     subproperties: [ "animation-name", "animation-duration", "animation-timing-function", "animation-delay", "animation-direction", "animation-fill-mode", "animation-iteration-count", "animation-play-state" ],
     initial_values: [ "none none 0s 0s ease normal running 1.0", "none", "0s", "ease", "normal", "running", "1.0" ],
-    other_values: [ "bounce 1s linear 2s", "bounce 1s 2s linear", "bounce linear 1s 2s", "linear bounce 1s 2s", "linear 1s bounce 2s", "linear 1s 2s bounce", "1s bounce linear 2s", "1s bounce 2s linear", "1s 2s bounce linear", "1s linear bounce 2s", "1s linear 2s bounce", "1s 2s linear bounce", "bounce linear 1s", "bounce 1s linear", "linear bounce 1s", "linear 1s bounce", "1s bounce linear", "1s linear bounce", "1s 2s bounce", "1s bounce 2s", "bounce 1s 2s", "1s 2s linear", "1s linear 2s", "linear 1s 2s", "bounce 1s", "1s bounce", "linear 1s", "1s linear", "1s 2s", "2s 1s", "bounce", "linear", "1s", "height", "2s", "ease-in-out", "2s ease-in", "opacity linear", "ease-out 2s", "2s color, 1s bounce, 500ms height linear, 1s opacity 4s cubic-bezier(0.0, 0.1, 1.0, 1.0)", "1s \\32bounce linear 2s", "1s -bounce linear 2s", "1s -\\32bounce linear 2s", "1s \\32 0bounce linear 2s", "1s -\\32 0bounce linear 2s", "1s \\2bounce linear 2s", "1s -\\2bounce linear 2s", "2s, 1s bounce", "1s bounce, 2s", "2s all, 1s bounce", "1s bounce, 2s all", "1s bounce, 2s none", "2s none, 1s bounce", "2s bounce, 1s all", "2s all, 1s bounce" ],
+    other_values: [ "none none 0s 0s cubic-bezier(0.25, 0.1, 0.25, 1.0) normal running 1.0", "bounce 1s linear 2s", "bounce 1s 2s linear", "bounce linear 1s 2s", "linear bounce 1s 2s", "linear 1s bounce 2s", "linear 1s 2s bounce", "1s bounce linear 2s", "1s bounce 2s linear", "1s 2s bounce linear", "1s linear bounce 2s", "1s linear 2s bounce", "1s 2s linear bounce", "bounce linear 1s", "bounce 1s linear", "linear bounce 1s", "linear 1s bounce", "1s bounce linear", "1s linear bounce", "1s 2s bounce", "1s bounce 2s", "bounce 1s 2s", "1s 2s linear", "1s linear 2s", "linear 1s 2s", "bounce 1s", "1s bounce", "linear 1s", "1s linear", "1s 2s", "2s 1s", "bounce", "linear", "1s", "height", "2s", "ease-in-out", "2s ease-in", "opacity linear", "ease-out 2s", "2s color, 1s bounce, 500ms height linear, 1s opacity 4s cubic-bezier(0.0, 0.1, 1.0, 1.0)", "1s \\32bounce linear 2s", "1s -bounce linear 2s", "1s -\\32bounce linear 2s", "1s \\32 0bounce linear 2s", "1s -\\32 0bounce linear 2s", "1s \\2bounce linear 2s", "1s -\\2bounce linear 2s", "2s, 1s bounce", "1s bounce, 2s", "2s all, 1s bounce", "1s bounce, 2s all", "1s bounce, 2s none", "2s none, 1s bounce", "2s bounce, 1s all", "2s all, 1s bounce" ],
     invalid_values: [  "2s inherit", "inherit 2s", "2s bounce, 1s inherit", "2s inherit, 1s bounce", "2s initial", "2s all,, 1s bounce", "2s all, , 1s bounce" ]
   },
   "animation-delay": {
@@ -660,8 +660,8 @@ var gCSSProperties = {
     domProp: "animationTimingFunction",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
-    initial_values: [ "ease", "cubic-bezier(0.25, 0.1, 0.25, 1.0)" ],
-    other_values: [ "linear", "ease-in", "ease-out", "ease-in-out", "linear, ease-in, cubic-bezier(0.1, 0.2, 0.8, 0.9)", "cubic-bezier(0.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.25, 1.5, 0.75, -0.5)", "step-start", "step-end", "steps(1)", "steps(2, start)", "steps(386)", "steps(3, end)" ],
+    initial_values: [ "ease" ],
+    other_values: [ "cubic-bezier(0.25, 0.1, 0.25, 1.0)", "linear", "ease-in", "ease-out", "ease-in-out", "linear, ease-in, cubic-bezier(0.1, 0.2, 0.8, 0.9)", "cubic-bezier(0.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.25, 1.5, 0.75, -0.5)", "step-start", "step-end", "steps(1)", "steps(2, start)", "steps(386)", "steps(3, end)" ],
     invalid_values: [ "none", "auto", "cubic-bezier(0.25, 0.1, 0.25)", "cubic-bezier(0.25, 0.1, 0.25, 0.25, 1.0)", "cubic-bezier(-0.5, 0.5, 0.5, 0.5)", "cubic-bezier(1.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.5, 0.5, -0.5, 0.5)", "cubic-bezier(0.5, 0.5, 1.5, 0.5)", "steps(2, step-end)", "steps(0)", "steps(-2)", "steps(0, step-end, 1)" ]
   },
   "-moz-appearance": {
@@ -2365,8 +2365,8 @@ var gCSSProperties = {
     domProp: "captionSide",
     inherited: true,
     type: CSS_TYPE_LONGHAND,
-    initial_values: [ "block-start" ],
-    other_values: [ "block-end", "inline-start", "inline-end", "block-start-outside", "block-end-outside", "top", "bottom", "left", "right", "top-outside", "bottom-outside" ],
+    initial_values: [ "top" ],
+    other_values: [ "bottom", "left", "right", "top-outside", "bottom-outside" ],
     invalid_values: []
   },
   "clear": {
@@ -3448,7 +3448,7 @@ var gCSSProperties = {
     type: CSS_TYPE_TRUE_SHORTHAND,
     subproperties: [ "transition-property", "transition-duration", "transition-timing-function", "transition-delay" ],
     initial_values: [ "all 0s ease 0s", "all", "0s", "0s 0s", "ease" ],
-    other_values: [ "width 1s linear 2s", "width 1s 2s linear", "width linear 1s 2s", "linear width 1s 2s", "linear 1s width 2s", "linear 1s 2s width", "1s width linear 2s", "1s width 2s linear", "1s 2s width linear", "1s linear width 2s", "1s linear 2s width", "1s 2s linear width", "width linear 1s", "width 1s linear", "linear width 1s", "linear 1s width", "1s width linear", "1s linear width", "1s 2s width", "1s width 2s", "width 1s 2s", "1s 2s linear", "1s linear 2s", "linear 1s 2s", "width 1s", "1s width", "linear 1s", "1s linear", "1s 2s", "2s 1s", "width", "linear", "1s", "height", "2s", "ease-in-out", "2s ease-in", "opacity linear", "ease-out 2s", "2s color, 1s width, 500ms height linear, 1s opacity 4s cubic-bezier(0.0, 0.1, 1.0, 1.0)", "1s \\32width linear 2s", "1s -width linear 2s", "1s -\\32width linear 2s", "1s \\32 0width linear 2s", "1s -\\32 0width linear 2s", "1s \\2width linear 2s", "1s -\\2width linear 2s", "2s, 1s width", "1s width, 2s", "2s all, 1s width", "1s width, 2s all", "2s all, 1s width", "2s width, 1s all" ],
+    other_values: [ "all 0s cubic-bezier(0.25, 0.1, 0.25, 1.0) 0s", "width 1s linear 2s", "width 1s 2s linear", "width linear 1s 2s", "linear width 1s 2s", "linear 1s width 2s", "linear 1s 2s width", "1s width linear 2s", "1s width 2s linear", "1s 2s width linear", "1s linear width 2s", "1s linear 2s width", "1s 2s linear width", "width linear 1s", "width 1s linear", "linear width 1s", "linear 1s width", "1s width linear", "1s linear width", "1s 2s width", "1s width 2s", "width 1s 2s", "1s 2s linear", "1s linear 2s", "linear 1s 2s", "width 1s", "1s width", "linear 1s", "1s linear", "1s 2s", "2s 1s", "width", "linear", "1s", "height", "2s", "ease-in-out", "2s ease-in", "opacity linear", "ease-out 2s", "2s color, 1s width, 500ms height linear, 1s opacity 4s cubic-bezier(0.0, 0.1, 1.0, 1.0)", "1s \\32width linear 2s", "1s -width linear 2s", "1s -\\32width linear 2s", "1s \\32 0width linear 2s", "1s -\\32 0width linear 2s", "1s \\2width linear 2s", "1s -\\2width linear 2s", "2s, 1s width", "1s width, 2s", "2s all, 1s width", "1s width, 2s all", "2s all, 1s width", "2s width, 1s all" ],
     invalid_values: [ "1s width, 2s none", "2s none, 1s width", "2s inherit", "inherit 2s", "2s width, 1s inherit", "2s inherit, 1s width", "2s initial", "1s width,,2s color", "1s width, ,2s color" ]
   },
   "transition-delay": {
@@ -3479,8 +3479,8 @@ var gCSSProperties = {
     domProp: "transitionTimingFunction",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
-    initial_values: [ "ease", "cubic-bezier(0.25, 0.1, 0.25, 1.0)" ],
-    other_values: [ "linear", "ease-in", "ease-out", "ease-in-out", "linear, ease-in, cubic-bezier(0.1, 0.2, 0.8, 0.9)", "cubic-bezier(0.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.25, 1.5, 0.75, -0.5)", "step-start", "step-end", "steps(1)", "steps(2, start)", "steps(386)", "steps(3, end)" ],
+    initial_values: [ "ease" ],
+    other_values: [ "cubic-bezier(0.25, 0.1, 0.25, 1.0)", "linear", "ease-in", "ease-out", "ease-in-out", "linear, ease-in, cubic-bezier(0.1, 0.2, 0.8, 0.9)", "cubic-bezier(0.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.25, 1.5, 0.75, -0.5)", "step-start", "step-end", "steps(1)", "steps(2, start)", "steps(386)", "steps(3, end)" ],
     invalid_values: [ "none", "auto", "cubic-bezier(0.25, 0.1, 0.25)", "cubic-bezier(0.25, 0.1, 0.25, 0.25, 1.0)", "cubic-bezier(-0.5, 0.5, 0.5, 0.5)", "cubic-bezier(1.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.5, 0.5, -0.5, 0.5)", "cubic-bezier(0.5, 0.5, 1.5, 0.5)", "steps(2, step-end)", "steps(0)", "steps(-2)", "steps(0, step-end, 1)" ]
   },
   "unicode-bidi": {
@@ -4391,7 +4391,7 @@ var gCSSProperties = {
     alias_for: "transition",
     subproperties: [ "transition-property", "transition-duration", "transition-timing-function", "transition-delay" ],
     initial_values: [ "all 0s ease 0s", "all", "0s", "0s 0s", "ease" ],
-    other_values: [ "width 1s linear 2s", "width 1s 2s linear", "width linear 1s 2s", "linear width 1s 2s", "linear 1s width 2s", "linear 1s 2s width", "1s width linear 2s", "1s width 2s linear", "1s 2s width linear", "1s linear width 2s", "1s linear 2s width", "1s 2s linear width", "width linear 1s", "width 1s linear", "linear width 1s", "linear 1s width", "1s width linear", "1s linear width", "1s 2s width", "1s width 2s", "width 1s 2s", "1s 2s linear", "1s linear 2s", "linear 1s 2s", "width 1s", "1s width", "linear 1s", "1s linear", "1s 2s", "2s 1s", "width", "linear", "1s", "height", "2s", "ease-in-out", "2s ease-in", "opacity linear", "ease-out 2s", "2s color, 1s width, 500ms height linear, 1s opacity 4s cubic-bezier(0.0, 0.1, 1.0, 1.0)", "1s \\32width linear 2s", "1s -width linear 2s", "1s -\\32width linear 2s", "1s \\32 0width linear 2s", "1s -\\32 0width linear 2s", "1s \\2width linear 2s", "1s -\\2width linear 2s", "2s, 1s width", "1s width, 2s", "2s all, 1s width", "1s width, 2s all", "2s all, 1s width", "2s width, 1s all" ],
+    other_values: [ "all 0s cubic-bezier(0.25, 0.1, 0.25, 1.0) 0s", "width 1s linear 2s", "width 1s 2s linear", "width linear 1s 2s", "linear width 1s 2s", "linear 1s width 2s", "linear 1s 2s width", "1s width linear 2s", "1s width 2s linear", "1s 2s width linear", "1s linear width 2s", "1s linear 2s width", "1s 2s linear width", "width linear 1s", "width 1s linear", "linear width 1s", "linear 1s width", "1s width linear", "1s linear width", "1s 2s width", "1s width 2s", "width 1s 2s", "1s 2s linear", "1s linear 2s", "linear 1s 2s", "width 1s", "1s width", "linear 1s", "1s linear", "1s 2s", "2s 1s", "width", "linear", "1s", "height", "2s", "ease-in-out", "2s ease-in", "opacity linear", "ease-out 2s", "2s color, 1s width, 500ms height linear, 1s opacity 4s cubic-bezier(0.0, 0.1, 1.0, 1.0)", "1s \\32width linear 2s", "1s -width linear 2s", "1s -\\32width linear 2s", "1s \\32 0width linear 2s", "1s -\\32 0width linear 2s", "1s \\2width linear 2s", "1s -\\2width linear 2s", "2s, 1s width", "1s width, 2s", "2s all, 1s width", "1s width, 2s all", "2s all, 1s width", "2s width, 1s all" ],
     invalid_values: [ "1s width, 2s none", "2s none, 1s width", "2s inherit", "inherit 2s", "2s width, 1s inherit", "2s inherit, 1s width", "2s initial" ]
   },
   "-moz-transition-delay": {
@@ -4430,8 +4430,8 @@ var gCSSProperties = {
     type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
     alias_for: "transition-timing-function",
     subproperties: [ "transition-timing-function" ],
-    initial_values: [ "ease", "cubic-bezier(0.25, 0.1, 0.25, 1.0)" ],
-    other_values: [ "linear", "ease-in", "ease-out", "ease-in-out", "linear, ease-in, cubic-bezier(0.1, 0.2, 0.8, 0.9)", "cubic-bezier(0.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.25, 1.5, 0.75, -0.5)", "step-start", "step-end", "steps(1)", "steps(2, start)", "steps(386)", "steps(3, end)" ],
+    initial_values: [ "ease" ],
+    other_values: [ "cubic-bezier(0.25, 0.1, 0.25, 1.0)", "linear", "ease-in", "ease-out", "ease-in-out", "linear, ease-in, cubic-bezier(0.1, 0.2, 0.8, 0.9)", "cubic-bezier(0.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.25, 1.5, 0.75, -0.5)", "step-start", "step-end", "steps(1)", "steps(2, start)", "steps(386)", "steps(3, end)" ],
     invalid_values: [ "none", "auto", "cubic-bezier(0.25, 0.1, 0.25)", "cubic-bezier(0.25, 0.1, 0.25, 0.25, 1.0)", "cubic-bezier(-0.5, 0.5, 0.5, 0.5)", "cubic-bezier(1.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.5, 0.5, -0.5, 0.5)", "cubic-bezier(0.5, 0.5, 1.5, 0.5)", "steps(2, step-end)", "steps(0)", "steps(-2)", "steps(0, step-end, 1)" ]
   },
   "-moz-animation": {
@@ -4441,7 +4441,7 @@ var gCSSProperties = {
     alias_for: "animation",
     subproperties: [ "animation-name", "animation-duration", "animation-timing-function", "animation-delay", "animation-direction", "animation-fill-mode", "animation-iteration-count", "animation-play-state" ],
     initial_values: [ "none none 0s 0s ease normal running 1.0", "none", "0s", "ease", "normal", "running", "1.0" ],
-    other_values: [ "bounce 1s linear 2s", "bounce 1s 2s linear", "bounce linear 1s 2s", "linear bounce 1s 2s", "linear 1s bounce 2s", "linear 1s 2s bounce", "1s bounce linear 2s", "1s bounce 2s linear", "1s 2s bounce linear", "1s linear bounce 2s", "1s linear 2s bounce", "1s 2s linear bounce", "bounce linear 1s", "bounce 1s linear", "linear bounce 1s", "linear 1s bounce", "1s bounce linear", "1s linear bounce", "1s 2s bounce", "1s bounce 2s", "bounce 1s 2s", "1s 2s linear", "1s linear 2s", "linear 1s 2s", "bounce 1s", "1s bounce", "linear 1s", "1s linear", "1s 2s", "2s 1s", "bounce", "linear", "1s", "height", "2s", "ease-in-out", "2s ease-in", "opacity linear", "ease-out 2s", "2s color, 1s bounce, 500ms height linear, 1s opacity 4s cubic-bezier(0.0, 0.1, 1.0, 1.0)", "1s \\32bounce linear 2s", "1s -bounce linear 2s", "1s -\\32bounce linear 2s", "1s \\32 0bounce linear 2s", "1s -\\32 0bounce linear 2s", "1s \\2bounce linear 2s", "1s -\\2bounce linear 2s", "2s, 1s bounce", "1s bounce, 2s", "2s all, 1s bounce", "1s bounce, 2s all", "1s bounce, 2s none", "2s none, 1s bounce", "2s bounce, 1s all", "2s all, 1s bounce" ],
+    other_values: [ "none none 0s 0s cubic-bezier(0.25, 0.1, 0.25, 1.0) normal running 1.0", "bounce 1s linear 2s", "bounce 1s 2s linear", "bounce linear 1s 2s", "linear bounce 1s 2s", "linear 1s bounce 2s", "linear 1s 2s bounce", "1s bounce linear 2s", "1s bounce 2s linear", "1s 2s bounce linear", "1s linear bounce 2s", "1s linear 2s bounce", "1s 2s linear bounce", "bounce linear 1s", "bounce 1s linear", "linear bounce 1s", "linear 1s bounce", "1s bounce linear", "1s linear bounce", "1s 2s bounce", "1s bounce 2s", "bounce 1s 2s", "1s 2s linear", "1s linear 2s", "linear 1s 2s", "bounce 1s", "1s bounce", "linear 1s", "1s linear", "1s 2s", "2s 1s", "bounce", "linear", "1s", "height", "2s", "ease-in-out", "2s ease-in", "opacity linear", "ease-out 2s", "2s color, 1s bounce, 500ms height linear, 1s opacity 4s cubic-bezier(0.0, 0.1, 1.0, 1.0)", "1s \\32bounce linear 2s", "1s -bounce linear 2s", "1s -\\32bounce linear 2s", "1s \\32 0bounce linear 2s", "1s -\\32 0bounce linear 2s", "1s \\2bounce linear 2s", "1s -\\2bounce linear 2s", "2s, 1s bounce", "1s bounce, 2s", "2s all, 1s bounce", "1s bounce, 2s all", "1s bounce, 2s none", "2s none, 1s bounce", "2s bounce, 1s all", "2s all, 1s bounce" ],
     invalid_values: [  "2s inherit", "inherit 2s", "2s bounce, 1s inherit", "2s inherit, 1s bounce", "2s initial" ]
   },
   "-moz-animation-delay": {
@@ -4522,8 +4522,8 @@ var gCSSProperties = {
     type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
     alias_for: "animation-timing-function",
     subproperties: [ "animation-timing-function" ],
-    initial_values: [ "ease", "cubic-bezier(0.25, 0.1, 0.25, 1.0)" ],
-    other_values: [ "linear", "ease-in", "ease-out", "ease-in-out", "linear, ease-in, cubic-bezier(0.1, 0.2, 0.8, 0.9)", "cubic-bezier(0.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.25, 1.5, 0.75, -0.5)", "step-start", "step-end", "steps(1)", "steps(2, start)", "steps(386)", "steps(3, end)" ],
+    initial_values: [ "ease" ],
+    other_values: [ "cubic-bezier(0.25, 0.1, 0.25, 1.0)", "linear", "ease-in", "ease-out", "ease-in-out", "linear, ease-in, cubic-bezier(0.1, 0.2, 0.8, 0.9)", "cubic-bezier(0.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.25, 1.5, 0.75, -0.5)", "step-start", "step-end", "steps(1)", "steps(2, start)", "steps(386)", "steps(3, end)" ],
     invalid_values: [ "none", "auto", "cubic-bezier(0.25, 0.1, 0.25)", "cubic-bezier(0.25, 0.1, 0.25, 0.25, 1.0)", "cubic-bezier(-0.5, 0.5, 0.5, 0.5)", "cubic-bezier(1.5, 0.5, 0.5, 0.5)", "cubic-bezier(0.5, 0.5, -0.5, 0.5)", "cubic-bezier(0.5, 0.5, 1.5, 0.5)", "steps(2, step-end)", "steps(0)", "steps(-2)", "steps(0, step-end, 1)" ]
   },
   "-moz-font-feature-settings": {
@@ -4577,12 +4577,24 @@ function logical_axis_prop_get_computed(cs, property)
   var orientation = writingMode.substring(0, writingMode.indexOf("-"));
 
   var mappings = {
-    "block-size":      { horizontal: "height",     vertical: "width"      },
-    "inline-size":     { horizontal: "width",      vertical: "height"     },
-    "max-block-size":  { horizontal: "max-height", vertical: "max-width"  },
-    "max-inline-size": { horizontal: "max-width",  vertical: "max-height" },
-    "min-block-size":  { horizontal: "min-height", vertical: "min-width"  },
-    "min-inline-size": { horizontal: "min-width",  vertical: "min-height" },
+    "block-size":      { horizontal: "height",
+                         vertical:   "width",
+                         sideways:   "width"      },
+    "inline-size":     { horizontal: "width",
+                         vertical:   "height",
+                         sideways:   "height"     },
+    "max-block-size":  { horizontal: "max-height",
+                         vertical:   "max-width",
+                         sideways:   "max-width"  },
+    "max-inline-size": { horizontal: "max-width",
+                         vertical:   "max-height",
+                         sideways:   "max-height" },
+    "min-block-size":  { horizontal: "min-height",
+                         vertical:   "min-width",
+                         sideways:   "min-width"  },
+    "min-inline-size": { horizontal: "min-width",
+                         vertical:   "min-height",
+                         sideways:   "min-height" },
   };
 
   if (!mappings[property]) {
@@ -4601,51 +4613,42 @@ function logical_box_prop_get_computed(cs, property)
 {
   // http://dev.w3.org/csswg/css-writing-modes-3/#logical-to-physical
 
-  // Use defaults for these two properties in case the vertical text
-  // pref (which they live behind) is turned off.
+  // Use default for writing-mode in case the vertical text
+  // pref (which it lives behind) is turned off.
   var writingMode = cs.getPropertyValue("writing-mode") || "horizontal-tb";
-  var textOrientation = cs.getPropertyValue("text-orientation") || "mixed";
 
   var direction = cs.getPropertyValue("direction");
-
-  // We only need to distinguish between text-orientation values of
-  // sideways-left and {mixed,upright,sideways-right} (which we will
-  // call "others").
-
-  if (textOrientation == "sideways") {
-    // text-orientation does not contribute to the logical to physical
-    // mapping when writing-mode is horizontal-tb, so it doesn't matter
-    // that we convert it to sideways-left in that case.
-    textOrientation = writingMode == "vertical-rl" ? "others" : "sideways-left";
-  } else if (textOrientation != "sideways-left") {
-    textOrientation = "others";
-  }
 
   // keys in blockMappings are writing-mode values
   var blockMappings = {
     "horizontal-tb": { "start": "top",   "end": "bottom" },
     "vertical-rl":   { "start": "right", "end": "left"   },
     "vertical-lr":   { "start": "left",  "end": "right"  },
+    "sideways-rl":   { "start": "right", "end": "left"   },
+    "sideways-lr":   { "start": "left",  "end": "right"  },
   };
 
   // keys in inlineMappings are regular expressions that match against
-  // a {writing-mode,text-orientation,direction} triple as a space-
-  // separated string
+  // a {writing-mode,direction} pair as a space-separated string
   var inlineMappings = {
-    "horizontal-tb \\S+ ltr":        { "start": "left",   "end": "right"  },
-    "horizontal-tb \\S+ rtl":        { "start": "right",  "end": "left"   },
-    "vertical-.. sideways-left ltr": { "start": "bottom", "end": "top"    },
-    "vertical-.. sideways-left rtl": { "start": "top",    "end": "bottom" },
-    "vertical-.. others ltr":        { "start": "top",    "end": "bottom" },
-    "vertical-.. others rtl":        { "start": "bottom", "end": "top"    },
+    "horizontal-tb ltr": { "start": "left",   "end": "right"  },
+    "horizontal-tb rtl": { "start": "right",  "end": "left"   },
+    "vertical-.. ltr":   { "start": "bottom", "end": "top"    },
+    "vertical-.. rtl":   { "start": "top",    "end": "bottom" },
+    "vertical-.. ltr":   { "start": "top",    "end": "bottom" },
+    "vertical-.. rtl":   { "start": "bottom", "end": "top"    },
+    "sideways-lr ltr":   { "start": "bottom", "end": "top"    },
+    "sideways-lr rtl":   { "start": "top",    "end": "bottom" },
+    "sideways-rl ltr":   { "start": "top",    "end": "bottom" },
+    "sideways-rl rtl":   { "start": "bottom", "end": "top"    },
   };
 
   var blockMapping = blockMappings[writingMode];
   var inlineMapping;
 
   // test each regular expression in inlineMappings against the
-  // {writing-mode,text-orientation,direction} triple
-  var key = `${writingMode} ${textOrientation} ${direction}`;
+  // {writing-mode,direction} pair
+  var key = `${writingMode} ${direction}`;
   for (var k in inlineMappings) {
     if (new RegExp(k).test(key)) {
       inlineMapping = inlineMappings[k];
@@ -4727,8 +4730,8 @@ if (SpecialPowers.getBoolPref("layout.css.vertical-text.enabled")) {
       domProp: "writingMode",
       inherited: true,
       type: CSS_TYPE_LONGHAND,
-      initial_values: [ "horizontal-tb" ],
-      other_values: [ "vertical-lr", "vertical-rl" ],
+      initial_values: [ "horizontal-tb", "lr", "lr-tb", "rl", "rl-tb" ],
+      other_values: [ "vertical-lr", "vertical-rl", "sideways-rl", "sideways-lr", "tb", "tb-rl" ],
       invalid_values: [ "10px", "30%", "justify", "auto", "1em" ]
     },
     "text-orientation": {
@@ -4736,8 +4739,8 @@ if (SpecialPowers.getBoolPref("layout.css.vertical-text.enabled")) {
       inherited: true,
       type: CSS_TYPE_LONGHAND,
       initial_values: [ "mixed" ],
-      other_values: [ "upright", "sideways-right" ],
-      invalid_values: [ "none", "3em", "sideways", "sideways-left" ] /* sideways, sideways-left not yet supported */
+      other_values: [ "upright", "sideways", "sideways-right" ], /* sideways-right alias for backward compatibility */
+      invalid_values: [ "none", "3em", "sideways-left" ] /* sideways-left removed from CSS Writing Modes */
     },
     "border-block-end": {
       domProp: "borderBlockEnd",

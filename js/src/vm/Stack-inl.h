@@ -35,7 +35,10 @@ namespace js {
 static inline bool
 IsCacheableNonGlobalScope(JSObject* obj)
 {
-    bool cacheable = (obj->is<CallObject>() || obj->is<BlockObject>() || obj->is<DeclEnvObject>());
+    bool cacheable =
+        (obj->is<CallObject>() && !obj->is<ModuleEnvironmentObject>()) ||
+        obj->is<BlockObject>() ||
+        obj->is<DeclEnvObject>();
 
     MOZ_ASSERT_IF(cacheable, !obj->getOps()->lookupProperty);
     return cacheable;
@@ -59,12 +62,18 @@ InterpreterFrame::global() const
 }
 
 inline JSObject&
-InterpreterFrame::varObj()
+InterpreterFrame::varObj() const
 {
     JSObject* obj = scopeChain();
     while (!obj->isQualifiedVarObj())
         obj = obj->enclosingScope();
     return *obj;
+}
+
+inline ClonedBlockObject&
+InterpreterFrame::extensibleLexicalScope() const
+{
+    return NearestEnclosingExtensibleLexicalScope(scopeChain());
 }
 
 inline JSCompartment*
@@ -209,7 +218,7 @@ InterpreterFrame::popOffScopeChain()
 }
 
 inline void
-InterpreterFrame::replaceInnermostScope(ScopeObject &scope)
+InterpreterFrame::replaceInnermostScope(ScopeObject& scope)
 {
     MOZ_ASSERT(flags_ & HAS_SCOPECHAIN);
     MOZ_ASSERT(scope.enclosingScope() == scopeChain_->as<ScopeObject>().enclosingScope());
@@ -219,14 +228,14 @@ InterpreterFrame::replaceInnermostScope(ScopeObject &scope)
 bool
 InterpreterFrame::hasCallObj() const
 {
-    MOZ_ASSERT(isStrictEvalFrame() || fun()->isHeavyweight());
+    MOZ_ASSERT(isStrictEvalFrame() || fun()->needsCallObject());
     return flags_ & HAS_CALL_OBJ;
 }
 
 inline CallObject&
 InterpreterFrame::callObj() const
 {
-    MOZ_ASSERT(fun()->isHeavyweight());
+    MOZ_ASSERT(fun()->needsCallObject());
 
     JSObject* pobj = scopeChain();
     while (MOZ_UNLIKELY(!pobj->is<CallObject>()))
@@ -853,7 +862,7 @@ AbstractFramePtr::newTarget() const
 }
 
 inline bool
-AbstractFramePtr::freshenBlock(JSContext *cx) const
+AbstractFramePtr::freshenBlock(JSContext* cx) const
 {
     if (isInterpreterFrame())
         return asInterpreterFrame()->freshenBlock(cx);

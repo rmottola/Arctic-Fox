@@ -610,7 +610,7 @@ class PaintFrameCallback : public gfxDrawingCallback {
 public:
   PaintFrameCallback(nsIFrame* aFrame,
                      const nsSize aPaintServerSize,
-                     const gfxIntSize aRenderSize,
+                     const IntSize aRenderSize,
                      uint32_t aFlags)
    : mFrame(aFrame)
    , mPaintServerSize(aPaintServerSize)
@@ -618,20 +618,20 @@ public:
    , mFlags (aFlags)
   {}
   virtual bool operator()(gfxContext* aContext,
-                            const gfxRect& aFillRect,
-                            const GraphicsFilter& aFilter,
-                            const gfxMatrix& aTransform) override;
+                          const gfxRect& aFillRect,
+                          const Filter& aFilter,
+                          const gfxMatrix& aTransform) override;
 private:
   nsIFrame* mFrame;
   nsSize mPaintServerSize;
-  gfxIntSize mRenderSize;
+  IntSize mRenderSize;
   uint32_t mFlags;
 };
 
 bool
 PaintFrameCallback::operator()(gfxContext* aContext,
                                const gfxRect& aFillRect,
-                               const GraphicsFilter& aFilter,
+                               const Filter& aFilter,
                                const gfxMatrix& aTransform)
 {
   if (mFrame->GetStateBits() & NS_FRAME_DRAWING_AS_PAINTSERVER)
@@ -674,8 +674,7 @@ PaintFrameCallback::operator()(gfxContext* aContext,
   nsRect dirty(-offset.x, -offset.y,
                mPaintServerSize.width, mPaintServerSize.height);
 
-  uint32_t flags = nsLayoutUtils::PAINT_IN_TRANSFORM |
-                   nsLayoutUtils::PAINT_ALL_CONTINUATIONS;
+  uint32_t flags = nsLayoutUtils::PAINT_IN_TRANSFORM;
   if (mFlags & nsSVGIntegrationUtils::FLAG_SYNC_DECODE_IMAGES) {
     flags |= nsLayoutUtils::PAINT_SYNC_DECODE_IMAGES;
   }
@@ -683,6 +682,23 @@ PaintFrameCallback::operator()(gfxContext* aContext,
   nsLayoutUtils::PaintFrame(&context, mFrame,
                             dirty, NS_RGBA(0, 0, 0, 0),
                             flags);
+
+  nsIFrame* currentFrame = mFrame;
+   while ((currentFrame = currentFrame->GetNextContinuation()) != nullptr) {
+    offset = currentFrame->GetOffsetToCrossDoc(mFrame);
+    devPxOffset = gfxPoint(offset.x, offset.y) / appUnitsPerDevPixel;
+
+    aContext->Save();
+    aContext->Multiply(gfxMatrix::Scaling(1/scaleX, 1/scaleY));
+    aContext->Multiply(gfxMatrix::Translation(devPxOffset));
+    aContext->Multiply(gfxMatrix::Scaling(scaleX, scaleY));
+
+    nsLayoutUtils::PaintFrame(&context, currentFrame,
+                              dirty - offset, NS_RGBA(0, 0, 0, 0),
+                              flags);
+
+    aContext->Restore();
+  }
 
   aContext->Restore();
 
@@ -695,7 +711,7 @@ PaintFrameCallback::operator()(gfxContext* aContext,
 nsSVGIntegrationUtils::DrawableFromPaintServer(nsIFrame*         aFrame,
                                                nsIFrame*         aTarget,
                                                const nsSize&     aPaintServerSize,
-                                               const gfxIntSize& aRenderSize,
+                                               const IntSize& aRenderSize,
                                                const DrawTarget* aDrawTarget,
                                                const gfxMatrix&  aContextMatrix,
                                                uint32_t          aFlags)

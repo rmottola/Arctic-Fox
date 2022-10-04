@@ -7,12 +7,13 @@
 #ifndef GLCONTEXT_H_
 #define GLCONTEXT_H_
 
-#include <stdio.h>
-#include <stdint.h>
-#include <ctype.h>
-#include <map>
 #include <bitset>
+#include <ctype.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <map>
 #include <queue>
+#include <stack>
 
 #ifdef DEBUG
 #include <string.h>
@@ -169,6 +170,7 @@ enum class GLRenderer {
     AdrenoTM200,
     AdrenoTM205,
     AdrenoTM320,
+    AdrenoTM420,
     SGX530,
     SGX540,
     Tegra,
@@ -618,7 +620,7 @@ public:
     class LocalErrorScope;
 
 private:
-    LocalErrorScope* mLocalErrorScope;
+    std::stack<const LocalErrorScope*> mLocalErrorScopeStack;
 
 public:
     class LocalErrorScope {
@@ -631,8 +633,7 @@ public:
             : mGL(gl)
             , mHasBeenChecked(false)
         {
-            MOZ_ASSERT(!mGL.mLocalErrorScope);
-            mGL.mLocalErrorScope = this;
+            mGL.mLocalErrorScopeStack.push(this);
 
             mGL.FlushErrors();
 
@@ -652,10 +653,10 @@ public:
 
             MOZ_ASSERT(mGL.fGetError() == LOCAL_GL_NO_ERROR);
 
-            mGL.mTopError = mOldTop;
+            MOZ_ASSERT(mGL.mLocalErrorScopeStack.top() == this);
+            mGL.mLocalErrorScopeStack.pop();
 
-            MOZ_ASSERT(mGL.mLocalErrorScope == this);
-            mGL.mLocalErrorScope = nullptr;
+            mGL.mTopError = mOldTop;
         }
     };
 
@@ -737,7 +738,7 @@ private:
             }
 
             if (err != LOCAL_GL_NO_ERROR &&
-                !mLocalErrorScope)
+                !mLocalErrorScopeStack.size())
             {
                 printf_stderr("[gl:%p] %s: Generated unexpected %s error."
                               " (0x%04x)\n", this, funcName,
@@ -1537,15 +1538,15 @@ public:
         AFTER_GL_CALL;
     }
 
-    void fStencilFunc(GLenum func, GLint ref, GLuint mask) {
+    void fStencilFunc(GLenum func, GLint reference, GLuint mask) {
         BEFORE_GL_CALL;
-        mSymbols.fStencilFunc(func, ref, mask);
+        mSymbols.fStencilFunc(func, reference, mask);
         AFTER_GL_CALL;
     }
 
-    void fStencilFuncSeparate(GLenum frontfunc, GLenum backfunc, GLint ref, GLuint mask) {
+    void fStencilFuncSeparate(GLenum frontfunc, GLenum backfunc, GLint reference, GLuint mask) {
         BEFORE_GL_CALL;
-        mSymbols.fStencilFuncSeparate(frontfunc, backfunc, ref, mask);
+        mSymbols.fStencilFuncSeparate(frontfunc, backfunc, reference, mask);
         AFTER_GL_CALL;
     }
 
@@ -3504,6 +3505,7 @@ protected:
     GLint mMaxViewportDims[2];
     GLsizei mMaxSamples;
     bool mNeedsTextureSizeChecks;
+    bool mNeedsFlushBeforeDeleteFB;
     bool mWorkAroundDriverBugs;
 
     bool IsTextureSizeSafeToPassToDriver(GLenum target, GLsizei width, GLsizei height) const {
@@ -3649,6 +3651,28 @@ MarkBitfieldByStrings(const std::vector<nsCString>& strList,
             printf_stderr("  %s%s\n", str.BeginReading(), wasMarked ? "(*)" : "");
     }
 }
+
+/**
+ * Helper function that creates a 2D texture aSize.width x aSize.height with
+ * storage type specified by aFormats. Returns GL texture object id.
+ *
+ * See mozilla::gl::CreateTexture.
+ */
+GLuint CreateTextureForOffscreen(GLContext* aGL, const GLFormats& aFormats,
+                                 const gfx::IntSize& aSize);
+
+/**
+ * Helper function that creates a 2D texture aSize.width x aSize.height with
+ * storage type aInternalFormat. Returns GL texture object id.
+ *
+ * Initialize textyre parameters to:
+ *    GL_TEXTURE_MIN_FILTER = GL_LINEAR
+ *    GL_TEXTURE_MAG_FILTER = GL_LINEAR
+ *    GL_TEXTURE_WRAP_S = GL_CLAMP_TO_EDGE
+ *    GL_TEXTURE_WRAP_T = GL_CLAMP_TO_EDGE
+ */
+GLuint CreateTexture(GLContext* aGL, GLenum aInternalFormat, GLenum aFormat,
+                     GLenum aType, const gfx::IntSize& aSize, bool linear = true);
 
 } /* namespace gl */
 } /* namespace mozilla */

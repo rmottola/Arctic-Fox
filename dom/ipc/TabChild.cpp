@@ -33,6 +33,7 @@
 #include "mozilla/layers/CompositorChild.h"
 #include "mozilla/layers/DoubleTapToZoom.h"
 #include "mozilla/layers/ImageBridgeChild.h"
+#include "mozilla/layers/InputAPZContext.h"
 #include "mozilla/layers/ShadowLayers.h"
 #include "mozilla/layout/RenderFrameChild.h"
 #include "mozilla/LookAndFeel.h"
@@ -611,7 +612,6 @@ TabChild::TabChild(nsIContentChild* aManager,
   , mLayersId(0)
   , mActivePointerId(-1)
   , mAppPackageFileDescriptorRecved(false)
-  , mLastBackgroundColor(NS_RGB(255, 255, 255))
   , mDidFakeShow(false)
   , mNotified(false)
   , mTriedBrowserInit(false)
@@ -1634,7 +1634,7 @@ TabChild::MaybeRequestPreinitCamera()
 
     nsCOMPtr<mozIApplication> app;
     nsresult rv = appsService->GetAppByLocalId(OwnAppId(), getter_AddRefs(app));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
+    if (NS_WARN_IF(NS_FAILED(rv)) || !app) {
       return;
     }
 
@@ -1915,20 +1915,29 @@ TabChild::RecvMouseEvent(const nsString& aType,
 }
 
 bool
-TabChild::RecvRealMouseMoveEvent(const WidgetMouseEvent& event)
+TabChild::RecvRealMouseMoveEvent(const WidgetMouseEvent& event,
+                                 const ScrollableLayerGuid& aGuid,
+                                 const uint64_t& aInputBlockId)
 {
-  return RecvRealMouseButtonEvent(event);
+  return RecvRealMouseButtonEvent(event, aGuid, aInputBlockId);
 }
 
 bool
-TabChild::RecvSynthMouseMoveEvent(const WidgetMouseEvent& event)
+TabChild::RecvSynthMouseMoveEvent(const WidgetMouseEvent& event,
+                                  const ScrollableLayerGuid& aGuid,
+                                  const uint64_t& aInputBlockId)
 {
-  return RecvRealMouseButtonEvent(event);
+  return RecvRealMouseButtonEvent(event, aGuid, aInputBlockId);
 }
 
 bool
-TabChild::RecvRealMouseButtonEvent(const WidgetMouseEvent& event)
+TabChild::RecvRealMouseButtonEvent(const WidgetMouseEvent& event,
+                                   const ScrollableLayerGuid& aGuid,
+                                   const uint64_t& aInputBlockId)
 {
+  nsEventStatus unused;
+  InputAPZContext context(aGuid, aInputBlockId, unused);
+
   WidgetMouseEvent localEvent(event);
   localEvent.widget = mPuppetWidget;
   APZCCallbackHelper::DispatchWidgetEvent(localEvent);
@@ -2743,15 +2752,6 @@ TabChild::InitRenderingState(const TextureFactoryIdentifier& aTextureFactoryIden
 }
 
 void
-TabChild::SetBackgroundColor(const nscolor& aColor)
-{
-  if (mLastBackgroundColor != aColor) {
-    mLastBackgroundColor = aColor;
-    SendSetBackgroundColor(mLastBackgroundColor);
-  }
-}
-
-void
 TabChild::GetDPI(float* aDPI)
 {
     *aDPI = -1.0;
@@ -2961,7 +2961,9 @@ TabChild::GetFrom(uint64_t aLayersId)
 }
 
 void
-TabChild::DidComposite(uint64_t aTransactionId)
+TabChild::DidComposite(uint64_t aTransactionId,
+                       const TimeStamp& aCompositeStart,
+                       const TimeStamp& aCompositeEnd)
 {
   MOZ_ASSERT(mPuppetWidget);
   MOZ_ASSERT(mPuppetWidget->GetLayerManager());
@@ -2970,8 +2972,23 @@ TabChild::DidComposite(uint64_t aTransactionId)
 
   nsRefPtr<ClientLayerManager> manager =
     static_cast<ClientLayerManager*>(mPuppetWidget->GetLayerManager());
-    
-  manager->DidComposite(aTransactionId);
+
+  manager->DidComposite(aTransactionId, aCompositeStart, aCompositeEnd);
+}
+
+void
+TabChild::DidRequestComposite(const TimeStamp& aCompositeReqStart,
+                              const TimeStamp& aCompositeReqEnd)
+{
+  nsCOMPtr<nsIDocShell> docShell = do_GetInterface(WebNavigation());
+  if (!docShell) {
+    return;
+  }
+
+  TimelineConsumers::AddMarkerForDocShell(docShell.get(),
+    "CompositeForwardTransaction", aCompositeReqStart, MarkerTracingType::START);
+  TimelineConsumers::AddMarkerForDocShell(docShell.get(),
+    "CompositeForwardTransaction", aCompositeReqEnd, MarkerTracingType::END);
 }
 
 void

@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 
 import mozfile
 
-from mozlog.structured import (
+from mozlog import (
     commandline,
     reader,
     structuredlog,
@@ -733,6 +733,22 @@ class TestCommandline(unittest.TestCase):
         logger = commandline.setup_logging("test_optparse", args, {})
         self.assertEqual(len(logger.handlers), 1)
         self.assertIsInstance(logger.handlers[0], handlers.StreamHandler)
+
+    def test_limit_formatters(self):
+        parser = argparse.ArgumentParser()
+        commandline.add_logging_group(parser, include_formatters=['raw'])
+        other_formatters = [fmt for fmt in commandline.log_formatters
+                            if fmt != 'raw']
+        # check that every formatter except raw is not present
+        for fmt in other_formatters:
+            with self.assertRaises(SystemExit):
+                parser.parse_args(["--log-%s=-" % fmt])
+            with self.assertRaises(SystemExit):
+                parser.parse_args(["--log-%s-level=error" % fmt])
+        # raw is still ok
+        args = parser.parse_args(["--log-raw=-"])
+        logger = commandline.setup_logging("test_setup_logging2", args, {})
+        self.assertEqual(len(logger.handlers), 1)
 
     def test_setup_logging_optparse_unicode(self):
         parser = optparse.OptionParser()

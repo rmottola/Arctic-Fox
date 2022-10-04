@@ -74,7 +74,9 @@ public:
   RecvClearCachedResources(const uint64_t& id) override;
 
   virtual bool
-  RecvDidComposite(const uint64_t& aId, const uint64_t& aTransactionId) override;
+  RecvDidComposite(const uint64_t& aId, const uint64_t& aTransactionId,
+                   const TimeStamp& aCompositeStart,
+                   const TimeStamp& aCompositeEnd) override;
 
   virtual bool
   RecvInvalidateAll() override;
@@ -172,10 +174,6 @@ private:
     // Unique ID of the APZC that is sharing the FrameMetrics
     uint32_t mAPZCId;
   };
-
-  static PLDHashOperator RemoveSharedMetricsForLayersId(const uint64_t& aKey,
-                                                        nsAutoPtr<SharedFrameMetricsData>& aData,
-                                                        void* aLayerTransactionChild);
 
   nsRefPtr<ClientLayerManager> mLayerManager;
   // When not multi-process, hold a reference to the CompositorParent to keep it

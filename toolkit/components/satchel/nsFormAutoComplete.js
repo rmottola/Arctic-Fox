@@ -167,7 +167,8 @@ FormAutoComplete.prototype = {
         let emptyResult = aDatalistResult ||
                           new FormAutoCompleteResult(FormHistory, [],
                                                      aInputName,
-                                                     aUntrimmedSearchString);
+                                                     aUntrimmedSearchString,
+                                                     null);
         if (!this._enabled) {
             if (aListener) {
                 aListener.onSearchCompletion(emptyResult);
@@ -241,7 +242,7 @@ FormAutoComplete.prototype = {
                 let entry = entries[i];
                 // Remove results that do not contain the token
                 // XXX bug 394604 -- .toLowerCase can be wrong for some intl chars
-                if(searchTokens.some(function (tok) entry.textLowerCase.indexOf(tok) < 0))
+                if(searchTokens.some(tok => entry.textLowerCase.indexOf(tok) < 0))
                     continue;
                 this._calculateScore(entry, searchString, searchTokens);
                 this.log("Reusing autocomplete entry '" + entry.text +
@@ -273,7 +274,7 @@ FormAutoComplete.prototype = {
 
             // Start with an empty list.
             let result = aDatalistResult ?
-                new FormAutoCompleteResult(FormHistory, [], aInputName, aUntrimmedSearchString) :
+                new FormAutoCompleteResult(FormHistory, [], aInputName, aUntrimmedSearchString, null) :
                 emptyResult;
 
             let processEntry = (aEntries) => {
@@ -518,7 +519,8 @@ FormAutoCompleteChild.prototype = {
           null,
           [for (res of message.data.results) {text: res}],
           null,
-          null
+          null,
+          mm
         );
         if (aListener) {
           aListener.onSearchCompletion(result);
@@ -536,11 +538,16 @@ FormAutoCompleteChild.prototype = {
 }; // end of FormAutoCompleteChild implementation
 
 // nsIAutoCompleteResult implementation
-function FormAutoCompleteResult (formHistory, entries, fieldName, searchString) {
+function FormAutoCompleteResult(formHistory,
+                                entries,
+                                fieldName,
+                                searchString,
+                                messageManager) {
     this.formHistory = formHistory;
     this.entries = entries;
     this.fieldName = fieldName;
     this.searchString = searchString;
+    this.messageManager = messageManager;
 }
 
 FormAutoCompleteResult.prototype = {
@@ -615,9 +622,14 @@ FormAutoCompleteResult.prototype = {
         let [removedEntry] = this.entries.splice(index, 1);
 
         if (removeFromDB) {
-          this.formHistory.update({ op: "remove",
-                                    fieldname: this.fieldName,
-                                    value: removedEntry.text });
+            if (this.formHistory) {
+                this.formHistory.update({ op: "remove",
+                                          fieldname: this.fieldName,
+                                          value: removedEntry.text });
+            } else {
+                this.messageManager.sendAsyncMessage("FormAutoComplete:RemoveEntry",
+                                                     { index });
+            }
         }
     }
 };

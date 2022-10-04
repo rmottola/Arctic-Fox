@@ -95,7 +95,7 @@ const MAX_LRU_PINGS = 50;
  * Tests override properties on this object to allow for control of behavior
  * that would otherwise be very hard to cover.
  */
-let Policy = {
+var Policy = {
   now: () => new Date(),
   midnightPingFuzzingDelay: () => MIDNIGHT_FUZZING_DELAY_MS,
   setSchedulerTickTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
@@ -296,7 +296,7 @@ let CancellableTimeout = {
 /**
  * SendScheduler implements the timer & scheduling behavior for ping sends.
  */
-let SendScheduler = {
+var SendScheduler = {
   // Whether any ping sends failed since the last tick. If yes, we start with our exponential
   // backoff timeout.
   _sendsFailed: false,
@@ -493,7 +493,7 @@ let SendScheduler = {
   },
  };
 
-let TelemetrySendImpl = {
+var TelemetrySendImpl = {
   _sendingEnabled: false,
   _logger: null,
   // Timer for scheduled ping sends.

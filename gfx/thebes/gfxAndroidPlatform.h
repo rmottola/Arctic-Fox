@@ -80,8 +80,6 @@ public:
 
     FT_Library GetFTLibrary();
 
-    virtual int GetScreenDepth() const;
-
     virtual bool CanRenderContentToDataSurface() const override {
       return true;
     }
@@ -94,7 +92,7 @@ public:
     virtual bool IsInGonkEmulator() const { return mIsInGonkEmulator; }
 #endif
 
-    virtual bool SupportsApzTouchInput() override {
+    virtual bool SupportsApzTouchInput() const override {
       return true;
     }
 

@@ -47,6 +47,8 @@
 
       <field name="_controller">null</field>
 
+      <field name="_selectParentHelper">null</field>
+
       <field name="_remoteWebNavigation">null</field>
 
       <property name="webNavigation"
@@ -334,10 +336,15 @@
               break;
 
             case "Forms:ShowDropDown": {
-              Cu.import("resource://gre/modules/SelectParentHelper.jsm");
+              if (!this._selectParentHelper) {
+                this._selectParentHelper =
+                  Cu.import("resource://gre/modules/SelectParentHelper.jsm", {}).SelectParentHelper;
+              }
+
               let menulist = document.getElementById(this.getAttribute("selectmenulist"));
-              SelectParentHelper.populate(menulist, data.options, data.selectedIndex);
-              SelectParentHelper.open(this, menulist, data.rect);
+              menulist.menupopup.style.direction = data.direction;
+              this._selectParentHelper.populate(menulist, data.options, data.selectedIndex, this._fullZoom);
+              this._selectParentHelper.open(this, menulist, data.rect);
               break;
             }
 
@@ -365,9 +372,10 @@
             }
 
             case "Forms:HideDropDown": {
-              Cu.import("resource://gre/modules/SelectParentHelper.jsm");
-              let menulist = document.getElementById(this.getAttribute("selectmenulist"));
-              SelectParentHelper.hide(menulist);
+              if (this._selectParentHelper) {
+                let menulist = document.getElementById(this.getAttribute("selectmenulist"));
+                this._selectParentHelper.hide(menulist);
+              }
               break;
             }
 
@@ -459,7 +467,11 @@
       <method name="purgeSessionHistory">
         <body>
           <![CDATA[
-            this.messageManager.sendAsyncMessage("Browser:PurgeSessionHistory");
+            try {
+              this.messageManager.sendAsyncMessage("Browser:PurgeSessionHistory");
+            } catch (ex if ex.result == Components.results.NS_ERROR_NOT_INITIALIZED) {
+              // This can throw if the browser has started to go away.
+            }
             this.webNavigation.canGoBack = false;
             this.webNavigation.canGoForward = false;
           ]]>

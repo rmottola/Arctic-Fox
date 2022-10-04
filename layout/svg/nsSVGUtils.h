@@ -137,7 +137,7 @@ private:
 // GRRR WINDOWS HATE HATE HATE
 #undef CLIP_MASK
 
-class MOZ_STACK_CLASS SVGAutoRenderState
+class MOZ_RAII SVGAutoRenderState
 {
   typedef mozilla::gfx::DrawTarget DrawTarget;
 
@@ -351,8 +351,8 @@ public:
    * @param aResultOverflows true if the desired surface size is too big
    * @return the surface size to use
    */
-  static gfxIntSize ConvertToSurfaceSize(const gfxSize& aSize,
-                                         bool *aResultOverflows);
+  static mozilla::gfx::IntSize ConvertToSurfaceSize(const gfxSize& aSize,
+                                                    bool *aResultOverflows);
 
   /*
    * Hit test a given rectangle/matrix.

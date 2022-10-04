@@ -44,6 +44,25 @@ HistoryEngine.prototype = {
   applyIncomingBatchSize: HISTORY_STORE_BATCH_SIZE,
 
   syncPriority: 7,
+
+  _processIncoming: function (newitems) {
+    // We want to notify history observers that a batch operation is underway
+    // so they don't do lots of work for each incoming record.
+    let observers = PlacesUtils.history.getObservers();
+    function notifyHistoryObservers(notification) {
+      for (let observer of observers) {
+        try {
+          observer[notification]();
+        } catch (ex) { }
+      }
+    }
+    notifyHistoryObservers("onBeginUpdateBatch");
+    try {
+      return SyncEngine.prototype._processIncoming.call(this, newitems);
+    } finally {
+      notifyHistoryObservers("onEndUpdateBatch");
+    }
+  },
 };
 
 function HistoryStore(name, engine) {
@@ -131,7 +150,7 @@ HistoryStore.prototype = {
       "SELECT visit_type type, visit_date date " +
       "FROM moz_historyvisits " +
       "WHERE place_id = (SELECT id FROM moz_places WHERE url = :url) " +
-      "ORDER BY date DESC LIMIT 10");
+      "ORDER BY date DESC LIMIT 20");
   },
   _visitCols: ["date", "type"],
 
@@ -276,14 +295,14 @@ HistoryStore.prototype = {
       if (!visit.date || typeof visit.date != "number") {
         this._log.warn("Encountered record with invalid visit date: "
                        + visit.date);
-        throw "Visit has no date!";
+        continue;
       }
 
       if (!visit.type || !(visit.type >= PlacesUtils.history.TRANSITION_LINK &&
                            visit.type <= PlacesUtils.history.TRANSITION_FRAMED_LINK)) {
-        this._log.warn("Encountered record with invalid visit type: "
-                       + visit.type);
-        throw "Invalid visit type!";
+        this._log.warn("Encountered record with invalid visit type: " +
+                       visit.type + "; ignoring.");
+        continue;
       }
 
       // Dates need to be integers.
@@ -294,6 +313,7 @@ HistoryStore.prototype = {
         // overwritten.
         continue;
       }
+
       visit.visitDate = visit.date;
       visit.transitionType = visit.type;
       k += 1;

@@ -11,6 +11,7 @@
 #include "nsIInputStream.h"
 #include "nsILineInputStream.h"
 #include "nsIObserverService.h"
+#include "nsIOutputStream.h"
 #include "nsISafeOutputStream.h"
 
 #include "MainThreadUtils.h"
@@ -150,12 +151,26 @@ ServiceWorkerRegistrar::RegisterServiceWorker(
     MonitorAutoLock lock(mMonitor);
     MOZ_ASSERT(mDataLoaded);
 
+    const mozilla::ipc::PrincipalInfo& newPrincipalInfo = aData.principal();
+    MOZ_ASSERT(newPrincipalInfo.type() ==
+               mozilla::ipc::PrincipalInfo::TContentPrincipalInfo);
+
+    const mozilla::ipc::ContentPrincipalInfo& newContentPrincipalInfo =
+      newPrincipalInfo.get_ContentPrincipalInfo();
+
     bool found = false;
     for (uint32_t i = 0, len = mData.Length(); i < len; ++i) {
       if (mData[i].scope() == aData.scope()) {
-        mData[i] = aData;
-        found = true;
-        break;
+        const mozilla::ipc::PrincipalInfo& existingPrincipalInfo =
+          mData[i].principal();
+        const mozilla::ipc::ContentPrincipalInfo& existingContentPrincipalInfo =
+          existingPrincipalInfo.get_ContentPrincipalInfo();
+
+        if (newContentPrincipalInfo == existingContentPrincipalInfo) {
+          mData[i] = aData;
+          found = true;
+          break;
+        }
       }
     }
 
@@ -308,25 +323,17 @@ ServiceWorkerRegistrar::ReadData()
       return NS_ERROR_FAILURE;                        \
     }
 
-    GET_LINE(line);
+    nsAutoCString suffix;
+    GET_LINE(suffix);
 
-    uint32_t appId = line.ToInteger(&rv);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
+    OriginAttributes attrs;
+    if (!attrs.PopulateFromSuffix(suffix)) {
+      return NS_ERROR_INVALID_ARG;
     }
-
-    GET_LINE(line);
-
-    if (!line.EqualsLiteral(SERVICEWORKERREGISTRAR_TRUE) &&
-        !line.EqualsLiteral(SERVICEWORKERREGISTRAR_FALSE)) {
-      return NS_ERROR_FAILURE;
-    }
-
-    bool isInBrowserElement = line.EqualsLiteral(SERVICEWORKERREGISTRAR_TRUE);
 
     GET_LINE(line);
     entry->principal() =
-      mozilla::ipc::ContentPrincipalInfo(appId, isInBrowserElement, line);
+      mozilla::ipc::ContentPrincipalInfo(attrs, line);
 
     GET_LINE(entry->scope());
     GET_LINE(entry->scriptSpec());
@@ -541,19 +548,14 @@ ServiceWorkerRegistrar::WriteData()
     const mozilla::ipc::ContentPrincipalInfo& cInfo =
       info.get_ContentPrincipalInfo();
 
+    nsAutoCString suffix;
+    cInfo.attrs().CreateSuffix(suffix);
+
     buffer.Truncate();
-    buffer.AppendInt(cInfo.appId());
+    buffer.Append(suffix.get());
     buffer.Append('\n');
 
-    if (cInfo.isInBrowserElement()) {
-      buffer.AppendLiteral(SERVICEWORKERREGISTRAR_TRUE);
-    } else {
-      buffer.AppendLiteral(SERVICEWORKERREGISTRAR_FALSE);
-    }
-
-    buffer.Append('\n');
     buffer.Append(cInfo.spec());
-
     buffer.Append('\n');
 
     buffer.Append(data[i].scope());

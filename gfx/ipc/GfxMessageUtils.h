@@ -13,14 +13,13 @@
 
 #include <stdint.h>
 
-#include "gfxColor.h"
 #include "mozilla/gfx/Matrix.h"
-#include "GraphicsFilter.h"
 #include "gfxPoint.h"
 #include "gfxRect.h"
 #include "nsRect.h"
 #include "nsRegion.h"
 #include "gfxTypes.h"
+#include "mozilla/layers/AsyncDragMetrics.h"
 #include "mozilla/layers/LayersTypes.h"
 #include "mozilla/layers/CompositorTypes.h"
 #include "FrameMetrics.h"
@@ -34,7 +33,6 @@
 namespace mozilla {
 
 typedef gfxImageFormat PixelFormat;
-typedef ::GraphicsFilter GraphicsFilterType;
 
 } // namespace mozilla
 
@@ -207,11 +205,11 @@ struct ParamTraits<gfxSurfaceType>
 {};
 
 template <>
-struct ParamTraits<mozilla::GraphicsFilterType>
+struct ParamTraits<mozilla::gfx::Filter>
   : public ContiguousEnumSerializer<
-             mozilla::GraphicsFilterType,
-             GraphicsFilter::FILTER_FAST,
-             GraphicsFilter::FILTER_SENTINEL>
+             mozilla::gfx::Filter,
+             mozilla::gfx::Filter::GOOD,
+             mozilla::gfx::Filter::SENTINEL>
 {};
 
 template <>
@@ -292,28 +290,6 @@ struct ParamTraits<mozilla::PixelFormat>
                           gfxImageFormat::Unknown>
 {};
 */
-
-template<>
-struct ParamTraits<gfxRGBA>
-{
-  typedef gfxRGBA paramType;
-
-  static void Write(Message* msg, const paramType& param)
-  {
-    WriteParam(msg, param.r);
-    WriteParam(msg, param.g);
-    WriteParam(msg, param.b);
-    WriteParam(msg, param.a);
-  }
-
-  static bool Read(const Message* msg, void** iter, paramType* result)
-  {
-    return (ReadParam(msg, iter, &result->r) &&
-            ReadParam(msg, iter, &result->g) &&
-            ReadParam(msg, iter, &result->b) &&
-            ReadParam(msg, iter, &result->a));
-  }
-};
 
 template<>
 struct ParamTraits<mozilla::gfx::Color>
@@ -1120,6 +1096,40 @@ struct ParamTraits<mozilla::layers::EventRegionsOverride>
             mozilla::layers::EventRegionsOverride,
             mozilla::layers::EventRegionsOverride::ALL_BITS>
 {};
+
+template<>
+struct ParamTraits<mozilla::layers::AsyncDragMetrics::DragDirection>
+  : public ContiguousEnumSerializer<
+             mozilla::layers::AsyncDragMetrics::DragDirection,
+             mozilla::layers::AsyncDragMetrics::DragDirection::NONE,
+             mozilla::layers::AsyncDragMetrics::DragDirection::SENTINEL>
+{};
+
+template<>
+struct ParamTraits<mozilla::layers::AsyncDragMetrics>
+{
+  typedef mozilla::layers::AsyncDragMetrics paramType;
+
+  static void Write(Message* aMsg, const paramType& aParam)
+  {
+    WriteParam(aMsg, aParam.mViewId);
+    WriteParam(aMsg, aParam.mPresShellId);
+    WriteParam(aMsg, aParam.mDragStartSequenceNumber);
+    WriteParam(aMsg, aParam.mScrollbarDragOffset);
+    WriteParam(aMsg, aParam.mScrollTrack);
+    WriteParam(aMsg, aParam.mDirection);
+  }
+
+  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  {
+    return (ReadParam(aMsg, aIter, &aResult->mViewId) &&
+            ReadParam(aMsg, aIter, &aResult->mPresShellId) &&
+            ReadParam(aMsg, aIter, &aResult->mDragStartSequenceNumber) &&
+            ReadParam(aMsg, aIter, &aResult->mScrollbarDragOffset) &&
+            ReadParam(aMsg, aIter, &aResult->mScrollTrack) &&
+            ReadParam(aMsg, aIter, &aResult->mDirection));
+  }
+};
 
 } /* namespace IPC */
 

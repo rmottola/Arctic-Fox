@@ -281,7 +281,8 @@ public:
                            uint16_t aItemType,
                            int64_t aParentId,
                            const nsACString& aGUID,
-                           const nsACString& aParentGUID);
+                           const nsACString& aParentGUID,
+                           const nsACString &aOldValue);
 
 protected:
   virtual ~nsNavHistoryResultNode() {}
@@ -674,7 +675,6 @@ public:
   virtual void RecursiveSort(const char* aData,
                              SortComparator aComparator) override;
 
-  nsCOMPtr<nsIURI> mRemovingURI;
   nsresult NotifyIfTagsChanged(nsIURI* aURI);
 
   uint32_t mBatchChanges;

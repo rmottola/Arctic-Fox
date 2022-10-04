@@ -506,6 +506,43 @@ public:
 private:
   static bool gPropertyEnabled[eCSSProperty_COUNT_with_aliases];
 
+private:
+  // Defined in the generated nsCSSPropsGenerated.inc.
+  static const char* const kIDLNameTable[eCSSProperty_COUNT];
+
+public:
+  /**
+   * Returns the IDL name of the specified property, which must be a
+   * longhand, logical or shorthand property.  The IDL name is the property
+   * name with any hyphen-lowercase character pairs replaced by an
+   * uppercase character:
+   * https://drafts.csswg.org/cssom/#css-property-to-idl-attribute
+   *
+   * As a special case, the string "cssFloat" is returned for the float
+   * property.  nullptr is returned for internal properties.
+   */
+  static const char* PropertyIDLName(nsCSSProperty aProperty)
+  {
+    MOZ_ASSERT(0 <= aProperty && aProperty < eCSSProperty_COUNT,
+               "out of range");
+    return kIDLNameTable[aProperty];
+  }
+
+private:
+  static const int32_t kIDLNameSortPositionTable[eCSSProperty_COUNT];
+
+public:
+  /**
+   * Returns the position of the specified property in a list of all
+   * properties sorted by their IDL name.
+   */
+  static int32_t PropertyIDLNameSortPosition(nsCSSProperty aProperty)
+  {
+    MOZ_ASSERT(0 <= aProperty && aProperty < eCSSProperty_COUNT,
+               "out of range");
+    return kIDLNameSortPositionTable[aProperty];
+  }
+
 public:
 
   static bool IsEnabled(nsCSSProperty aProperty) {

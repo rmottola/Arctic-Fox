@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "AccessibleWrap.h"
+#include "ProxyAccessible.h"
 
 #import <Cocoa/Cocoa.h>
 
@@ -17,6 +18,10 @@
  * a document view. When we hand an object off to an AT, we always want
  * to give it the represented view, in the latter case.
  */
+
+namespace mozilla {
+namespace a11y {
+
 inline id <mozAccessible>
 GetObjectOrRepresentedView(id <mozAccessible> aObject)
 {
@@ -24,12 +29,28 @@ GetObjectOrRepresentedView(id <mozAccessible> aObject)
 }
 
 inline mozAccessible*
-GetNativeFromGeckoAccessible(mozilla::a11y::Accessible* aAccessible)
+GetNativeFromGeckoAccessible(Accessible* aAccessible)
 {
   mozAccessible* native = nil;
   aAccessible->GetNativeInterface((void**)&native);
   return native;
 }
+
+inline mozAccessible*
+GetNativeFromProxy(const ProxyAccessible* aProxy)
+{
+  return reinterpret_cast<mozAccessible*>(aProxy->GetWrapper());
+}
+
+ProxyAccessible* GetProxyUnignoredParent(const ProxyAccessible* aProxy);
+
+void GetProxyUnignoredChildren(const ProxyAccessible* aProxy,
+                               nsTArray<ProxyAccessible*>* aChildrenArray);
+
+BOOL IsProxyIgnored(const ProxyAccessible* aProxy);
+
+} // a11y
+} // mozilla
 
 // This is OR'd with the Accessible owner to indicate the wrap-ee is a proxy.
 static const uintptr_t IS_PROXY = 1;
@@ -91,16 +112,13 @@ static const uintptr_t IS_PROXY = 1;
 // returns the native window we're inside.
 - (NSWindow*)window;
 
-// the accessible description of this particular instance.
-- (NSString*)customDescription;
-
 // the value of this element.
 - (id)value;
 
 // name that is associated with this accessible (for buttons, etc)
 - (NSString*)title;
 
-// help text associated with this element.
+// the accessible description (help text) of this particular instance.
 - (NSString*)help;
 
 - (BOOL)isEnabled;

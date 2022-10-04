@@ -96,6 +96,7 @@
 #include "nsSHistory.h"
 #include "nsDocShellEditorData.h"
 #include "GeckoProfiler.h"
+#include "timeline/JavascriptTimelineMarker.h"
 
 // Helper Classes
 #include "nsError.h"
@@ -944,6 +945,7 @@ NS_INTERFACE_MAP_BEGIN(nsDocShell)
   NS_INTERFACE_MAP_ENTRY(nsIClipboardCommands)
   NS_INTERFACE_MAP_ENTRY(nsIDOMStorageManager)
   NS_INTERFACE_MAP_ENTRY(nsINetworkInterceptController)
+  NS_INTERFACE_MAP_ENTRY(nsIDeprecationWarner)
 NS_INTERFACE_MAP_END_INHERITING(nsDocLoader)
 
 NS_IMETHODIMP
@@ -1613,7 +1615,7 @@ nsDocShell::LoadStream(nsIInputStream* aStream, nsIURI* aURI,
     (void)aLoadInfo->GetLoadType(&lt);
     // Get the appropriate LoadType from nsIDocShellLoadInfo type
     loadType = ConvertDocShellLoadInfoToLoadType(lt);
-  
+
     nsCOMPtr<nsISupports> owner;
     aLoadInfo->GetOwner(getter_AddRefs(owner));
     requestingPrincipal = do_QueryInterface(owner);
@@ -2863,129 +2865,16 @@ nsDocShell::GetRecordProfileTimelineMarkers(bool* aValue)
 nsresult
 nsDocShell::PopProfileTimelineMarkers(
     JSContext* aCx,
-    JS::MutableHandle<JS::Value> aProfileTimelineMarkers)
+    JS::MutableHandle<JS::Value> aOut)
 {
-  // Looping over all markers gathered so far at the docShell level, whenever a
-  // START marker is found, look for the corresponding END marker and build a
-  // {name,start,end} JS object.
-  // Paint markers are different because paint is handled at root docShell level
-  // in the information that a paint was done is then stored at each sub
-  // docShell level but we can only be sure that a paint did happen in a
-  // docShell if an Layer marker type was recorded too.
+  nsTArray<dom::ProfileTimelineMarker> store;
+  SequenceRooter<dom::ProfileTimelineMarker> rooter(aCx, &store);
 
-  nsTArray<mozilla::dom::ProfileTimelineMarker> profileTimelineMarkers;
-  SequenceRooter<mozilla::dom::ProfileTimelineMarker> rooter(
-    aCx, &profileTimelineMarkers);
-
-  if (!IsObserved()) {
-    if (!ToJSValue(aCx, profileTimelineMarkers, aProfileTimelineMarkers)) {
-      JS_ClearPendingException(aCx);
-      return NS_ERROR_UNEXPECTED;
-    }
-    return NS_OK;
+  if (IsObserved()) {
+    mObserved->PopMarkers(aCx, store);
   }
 
-  nsTArray<UniquePtr<TimelineMarker>>& markersStore = mObserved.get()->mTimelineMarkers;
-
-  // If we see an unpaired START, we keep it around for the next call
-  // to PopProfileTimelineMarkers.  We store the kept START objects in
-  // this array.
-  nsTArray<UniquePtr<TimelineMarker>> keptMarkers;
-
-  for (uint32_t i = 0; i < markersStore.Length(); ++i) {
-    UniquePtr<TimelineMarker>& startPayload = markersStore[i];
-    const char* startMarkerName = startPayload->GetName();
-
-    bool hasSeenPaintedLayer = false;
-    bool isPaint = strcmp(startMarkerName, "Paint") == 0;
-
-    // If we are processing a Paint marker, we append information from
-    // all the embedded Layer markers to this array.
-    dom::Sequence<dom::ProfileTimelineLayerRect> layerRectangles;
-
-    // If this is a TRACING_TIMESTAMP marker, there's no corresponding "end"
-    // marker, as it's a single unit of time, not a duration, create the final
-    // marker here.
-    if (startPayload->GetMetaData() == TRACING_TIMESTAMP) {
-      mozilla::dom::ProfileTimelineMarker* marker =
-        profileTimelineMarkers.AppendElement();
-
-      marker->mName = NS_ConvertUTF8toUTF16(startPayload->GetName());
-      marker->mStart = startPayload->GetTime();
-      marker->mEnd = startPayload->GetTime();
-      marker->mStack = startPayload->GetStack();
-      startPayload->AddDetails(aCx, *marker);
-      continue;
-    }
-
-    if (startPayload->GetMetaData() == TRACING_INTERVAL_START) {
-      bool hasSeenEnd = false;
-
-      // DOM events can be nested, so we must take care when searching
-      // for the matching end.  It doesn't hurt to apply this logic to
-      // all event types.
-      uint32_t markerDepth = 0;
-
-      // The assumption is that the devtools timeline flushes markers frequently
-      // enough for the amount of markers to always be small enough that the
-      // nested for loop isn't going to be a performance problem.
-      for (uint32_t j = i + 1; j < markersStore.Length(); ++j) {
-        UniquePtr<TimelineMarker>& endPayload = markersStore[j];
-        const char* endMarkerName = endPayload->GetName();
-
-        // Look for Layer markers to stream out paint markers.
-        if (isPaint && strcmp(endMarkerName, "Layer") == 0) {
-          hasSeenPaintedLayer = true;
-          endPayload->AddLayerRectangles(layerRectangles);
-        }
-
-        if (!startPayload->Equals(*endPayload)) {
-          continue;
-        }
-
-        // Pair start and end markers.
-        if (endPayload->GetMetaData() == TRACING_INTERVAL_START) {
-          ++markerDepth;
-        } else if (endPayload->GetMetaData() == TRACING_INTERVAL_END) {
-          if (markerDepth > 0) {
-            --markerDepth;
-          } else {
-            // But ignore paint start/end if no layer has been painted.
-            if (!isPaint || (isPaint && hasSeenPaintedLayer)) {
-              mozilla::dom::ProfileTimelineMarker* marker =
-                profileTimelineMarkers.AppendElement();
-
-              marker->mName = NS_ConvertUTF8toUTF16(startPayload->GetName());
-              marker->mStart = startPayload->GetTime();
-              marker->mEnd = endPayload->GetTime();
-              marker->mStack = startPayload->GetStack();
-              if (isPaint) {
-                marker->mRectangles.Construct(layerRectangles);
-              }
-              startPayload->AddDetails(aCx, *marker);
-              endPayload->AddDetails(aCx, *marker);
-            }
-
-            // We want the start to be dropped either way.
-            hasSeenEnd = true;
-
-            break;
-          }
-        }
-      }
-
-      // If we did not see the corresponding END, keep the START.
-      if (!hasSeenEnd) {
-        keptMarkers.AppendElement(Move(markersStore[i]));
-        markersStore.RemoveElementAt(i);
-        --i;
-      }
-    }
-  }
-
-  markersStore.SwapElements(keptMarkers);
-
-  if (!ToJSValue(aCx, profileTimelineMarkers, aProfileTimelineMarkers)) {
+  if (!ToJSValue(aCx, store, aOut)) {
     JS_ClearPendingException(aCx);
     return NS_ERROR_UNEXPECTED;
   }
@@ -3488,6 +3377,25 @@ nsDocShell::GetSameTypeRootTreeItem(nsIDocShellTreeItem** aRootTreeItem)
   }
   NS_ADDREF(*aRootTreeItem);
   return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDocShell::GetSameTypeRootTreeItemIgnoreBrowserAndAppBoundaries(nsIDocShell ** aRootTreeItem)
+{
+    NS_ENSURE_ARG_POINTER(aRootTreeItem);
+    *aRootTreeItem = static_cast<nsIDocShell *>(this);
+
+    nsCOMPtr<nsIDocShell> parent;
+    NS_ENSURE_SUCCESS(GetSameTypeParentIgnoreBrowserAndAppBoundaries(getter_AddRefs(parent)),
+                      NS_ERROR_FAILURE);
+    while (parent) {
+      *aRootTreeItem = parent;
+      NS_ENSURE_SUCCESS((*aRootTreeItem)->
+        GetSameTypeParentIgnoreBrowserAndAppBoundaries(getter_AddRefs(parent)),
+        NS_ERROR_FAILURE);
+    }
+    NS_ADDREF(*aRootTreeItem);
+    return NS_OK;
 }
 
 /* static */
@@ -5094,6 +5002,7 @@ nsDocShell::DisplayLoadError(nsresult aError, nsIURI* aURI,
       case NS_ERROR_INTERCEPTED_USED_RESPONSE:
       case NS_ERROR_CLIENT_REQUEST_OPAQUE_INTERCEPTION:
       case NS_ERROR_BAD_OPAQUE_REDIRECT_INTERCEPTION:
+      case NS_ERROR_INTERCEPTION_CANCELED:
         // ServiceWorker intercepted request, but something went wrong.
         nsContentUtils::MaybeReportInterceptionErrorToConsole(GetDocument(),
                                                               aError);
@@ -7766,6 +7675,7 @@ nsDocShell::EndPageLoad(nsIWebProgress* aProgress,
                aStatus == NS_ERROR_INTERCEPTED_ERROR_RESPONSE ||
                aStatus == NS_ERROR_INTERCEPTED_USED_RESPONSE ||
                aStatus == NS_ERROR_CLIENT_REQUEST_OPAQUE_INTERCEPTION ||
+               aStatus == NS_ERROR_INTERCEPTION_CANCELED ||
                NS_ERROR_GET_MODULE(aStatus) == NS_ERROR_MODULE_SECURITY) {
       // Errors to be shown for any frame
       DisplayLoadError(aStatus, url, nullptr, aChannel);
@@ -9518,17 +9428,7 @@ nsresult
 nsDocShell::CreatePrincipalFromReferrer(nsIURI* aReferrer,
                                         nsIPrincipal** aResult)
 {
-  nsresult rv;
-
-  uint32_t appId;
-  rv = GetAppId(&appId);
-  NS_ENSURE_SUCCESS(rv, rv);
-  bool isInBrowserElement;
-  rv = GetIsInBrowserElement(&isInBrowserElement);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  // TODO: Bug 1165466 - Pass mOriginAttributes directly.
-  OriginAttributes attrs(appId, isInBrowserElement);
+  OriginAttributes attrs = GetOriginAttributes();
   nsCOMPtr<nsIPrincipal> prin =
     BasePrincipal::CreateCodebasePrincipal(aReferrer, attrs);
   prin.forget(aResult);
@@ -11028,19 +10928,13 @@ nsDocShell::DoChannelLoad(nsIChannel* aChannel,
     loadFlags |= nsIChannel::LOAD_CLASSIFY_URI;
   }
 
-  (void)aChannel->SetLoadFlags(loadFlags);
-
   // If the user pressed shift-reload, then do not allow ServiceWorker
   // interception to occur. See step 12.1 of the SW HandleFetch algorithm.
-  if (mLoadType == LOAD_RELOAD_BYPASS_CACHE ||
-      mLoadType == LOAD_RELOAD_BYPASS_PROXY ||
-      mLoadType == LOAD_RELOAD_BYPASS_PROXY_AND_CACHE ||
-      mLoadType == LOAD_RELOAD_ALLOW_MIXED_CONTENT) {
-    nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(aChannel);
-    if (internal) {
-      internal->ForceNoIntercept();
-    }
+  if (IsForceReloadType(mLoadType)) {
+    loadFlags |= nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
   }
+
+  (void)aChannel->SetLoadFlags(loadFlags);
 
   uint32_t openFlags = 0;
   if (mLoadType == LOAD_LINK) {
@@ -11324,11 +11218,7 @@ nsDocShell::OnNewURI(nsIURI* aURI, nsIChannel* aChannel, nsISupports* aOwner,
    * for the page. Save the new cacheKey in Session History.
    * see bug 90098
    */
-  if (aChannel &&
-      (aLoadType == LOAD_RELOAD_BYPASS_CACHE ||
-       aLoadType == LOAD_RELOAD_BYPASS_PROXY ||
-       aLoadType == LOAD_RELOAD_BYPASS_PROXY_AND_CACHE ||
-       aLoadType == LOAD_RELOAD_ALLOW_MIXED_CONTENT)) {
+  if (aChannel && IsForceReloadType(aLoadType)) {
     NS_ASSERTION(!updateSHistory,
                  "We shouldn't be updating session history for forced"
                  " reloads!");
@@ -13936,6 +13826,38 @@ nsDocShell::GetAppId(uint32_t* aAppId)
   return parent->GetAppId(aAppId);
 }
 
+OriginAttributes
+nsDocShell::GetOriginAttributes()
+{
+  OriginAttributes attrs;
+  nsRefPtr<nsDocShell> parent = GetParentDocshell();
+  if (parent) {
+    attrs.InheritFromDocShellParent(parent->GetOriginAttributes());
+  }
+
+  if (mOwnOrContainingAppId != nsIScriptSecurityManager::UNKNOWN_APP_ID) {
+    attrs.mAppId = mOwnOrContainingAppId;
+  }
+
+  if (mFrameType == eFrameTypeBrowser) {
+    attrs.mInBrowser = true;
+  }
+
+  return attrs;
+}
+
+NS_IMETHODIMP
+nsDocShell::GetOriginAttributes(JS::MutableHandle<JS::Value> aVal)
+{
+  JSContext* cx = nsContentUtils::GetCurrentJSContext();
+  MOZ_ASSERT(cx);
+
+  OriginAttributes attrs = GetOriginAttributes();
+  bool ok = ToJSValue(cx, attrs, aVal);
+  NS_ENSURE_TRUE(ok, NS_ERROR_FAILURE);
+  return NS_OK;
+}
+
 NS_IMETHODIMP
 nsDocShell::GetAppManifestURL(nsAString& aAppManifestURL)
 {
@@ -14005,51 +13927,6 @@ nsDocShell::GetOpener()
   return opener;
 }
 
-class JavascriptTimelineMarker : public TimelineMarker
-{
-public:
-  JavascriptTimelineMarker(nsDocShell* aDocShell, const char* aName,
-                           const char* aReason,
-                           const char16_t* aFunctionName,
-                           const char16_t* aFileName,
-                           uint32_t aLineNumber)
-    : TimelineMarker(aDocShell, aName, TRACING_INTERVAL_START,
-                     NS_ConvertUTF8toUTF16(aReason),
-                     NO_STACK)
-    , mFunctionName(aFunctionName)
-    , mFileName(aFileName)
-    , mLineNumber(aLineNumber)
-  {
-  }
-
-  void AddDetails(JSContext* aCx, mozilla::dom::ProfileTimelineMarker& aMarker)
-    override
-  {
-    aMarker.mCauseName.Construct(GetCause());
-
-    if (!mFunctionName.IsEmpty() || !mFileName.IsEmpty()) {
-      RootedDictionary<ProfileTimelineStackFrame> stackFrame(aCx);
-      stackFrame.mLine.Construct(mLineNumber);
-      stackFrame.mSource.Construct(mFileName);
-      stackFrame.mFunctionDisplayName.Construct(mFunctionName);
-
-      JS::Rooted<JS::Value> newStack(aCx);
-      if (ToJSValue(aCx, stackFrame, &newStack)) {
-        if (newStack.isObject()) {
-          aMarker.mStack = &newStack.toObject();
-        }
-      } else {
-        JS_ClearPendingException(aCx);
-      }
-    }
-  }
-
-private:
-  nsString mFunctionName;
-  nsString mFileName;
-  uint32_t mLineNumber;
-};
-
 void
 nsDocShell::NotifyJSRunToCompletionStart(const char* aReason,
                                          const char16_t* aFunctionName,
@@ -14060,10 +13937,8 @@ nsDocShell::NotifyJSRunToCompletionStart(const char* aReason,
 
   // If first start, mark interval start.
   if (timelineOn && mJSRunToCompletionDepth == 0) {
-    mozilla::UniquePtr<TimelineMarker> marker =
-      MakeUnique<JavascriptTimelineMarker>(this, "Javascript", aReason,
-                                           aFunctionName, aFilename,
-                                           aLineNumber);
+    UniquePtr<TimelineMarker> marker = MakeUnique<JavascriptTimelineMarker>(
+      aReason, aFunctionName, aFilename, aLineNumber, MarkerTracingType::START);
     TimelineConsumers::AddMarkerForDocShell(this, Move(marker));
   }
   mJSRunToCompletionDepth++;
@@ -14077,7 +13952,7 @@ nsDocShell::NotifyJSRunToCompletionStop()
   // If last stop, mark interval end.
   mJSRunToCompletionDepth--;
   if (timelineOn && mJSRunToCompletionDepth == 0) {
-    TimelineConsumers::AddMarkerForDocShell(this, "Javascript", TRACING_INTERVAL_END);
+    TimelineConsumers::AddMarkerForDocShell(this, "Javascript", MarkerTracingType::END);
   }
 }
 
@@ -14326,4 +14201,14 @@ nsDocShell::InFrameSwap()
     shell = shell->GetParentDocshell();
   } while (shell);
   return false;
+}
+
+NS_IMETHODIMP
+nsDocShell::IssueWarning(uint32_t aWarning, bool aAsError)
+{
+  nsCOMPtr<nsIDocument> doc = mContentViewer->GetDocument();
+  if (doc) {
+    doc->WarnOnceAbout(nsIDocument::DeprecatedOperations(aWarning), aAsError);
+  }
+  return NS_OK;
 }

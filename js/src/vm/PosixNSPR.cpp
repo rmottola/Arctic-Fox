@@ -141,7 +141,14 @@ PR_GetCurrentThread()
     if (!gInitialized)
         Initialize();
 
-    return (PRThread*)pthread_getspecific(gSelfThreadIndex);
+    PRThread* thread = reinterpret_cast<PRThread*>(pthread_getspecific(gSelfThreadIndex));
+    if (!thread) {
+        thread = js_new<PRThread>(nullptr, nullptr, false);
+        if (!thread)
+            MOZ_CRASH();
+        pthread_setspecific(gSelfThreadIndex, thread);
+    }
+    return thread;
 }
 
 PRStatus
@@ -270,7 +277,7 @@ class nspr::CondVar
     nspr::Lock* lock_;
 
   public:
-    CondVar(nspr::Lock* lock) : lock_(lock) {}
+    explicit CondVar(nspr::Lock* lock) : lock_(lock) {}
     pthread_cond_t& cond() { return cond_; }
     nspr::Lock* lock() { return lock_; }
 };

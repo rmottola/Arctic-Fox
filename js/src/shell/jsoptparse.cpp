@@ -27,22 +27,22 @@ const char OptionParser::prognameMeta[] = "{progname}";
     Option::as##__cls##Option() \
     { \
         MOZ_ASSERT(is##__cls##Option()); \
-        return static_cast<__cls##Option *>(this); \
+        return static_cast<__cls##Option*>(this); \
     } \
     const __cls##Option * \
     Option::as##__cls##Option() const \
     { \
-        return const_cast<Option *>(this)->as##__cls##Option(); \
+        return const_cast<Option*>(this)->as##__cls##Option(); \
     }
 
-ValuedOption *
+ValuedOption*
 Option::asValued()
 {
     MOZ_ASSERT(isValued());
-    return static_cast<ValuedOption *>(this);
+    return static_cast<ValuedOption*>(this);
 }
 
-const ValuedOption *
+const ValuedOption*
 Option::asValued() const
 {
     return const_cast<Option*>(this)->asValued();

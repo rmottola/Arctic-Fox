@@ -216,7 +216,7 @@ ArrayInfo(JSContext* cx, unsigned argc, Value* vp);
 #endif
 
 /* Array constructor native. Exposed only so the JIT can know its address. */
-bool
+extern bool
 ArrayConstructor(JSContext* cx, unsigned argc, Value* vp);
 
 } /* namespace js */

@@ -18,6 +18,7 @@
 #include "nsIContentViewerContainer.h"
 #include "nsIDOMStorageManager.h"
 #include "nsDocLoader.h"
+#include "mozilla/BasePrincipal.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/WeakPtr.h"
 #include "mozilla/TimeStamp.h"
@@ -33,9 +34,9 @@
 #include "nsAutoPtr.h"
 #include "nsThreadUtils.h"
 #include "nsContentUtils.h"
-#include "timeline/TimelineMarker.h"
-#include "timeline/TimelineConsumers.h"
 #include "timeline/ObservedDocShell.h"
+#include "timeline/TimelineConsumers.h"
+#include "timeline/TimelineMarker.h"
 
 // Threshold value in ms for META refresh based redirects
 #define REFRESH_REDIRECT_TIMER 15000
@@ -58,6 +59,7 @@
 #include "prtime.h"
 #include "nsRect.h"
 #include "Units.h"
+#include "nsIDeprecationWarner.h"
 
 namespace mozilla {
 namespace dom {
@@ -145,6 +147,7 @@ class nsDocShell final
   , public nsIClipboardCommands
   , public nsIDOMStorageManager
   , public nsINetworkInterceptController
+  , public nsIDeprecationWarner
   , public mozilla::SupportsWeakPtr<nsDocShell>
 {
   friend class nsDSURIContentListener;
@@ -176,6 +179,7 @@ public:
   NS_DECL_NSICLIPBOARDCOMMANDS
   NS_DECL_NSIWEBSHELLSERVICES
   NS_DECL_NSINETWORKINTERCEPTCONTROLLER
+  NS_DECL_NSIDEPRECATIONWARNER
   NS_FORWARD_SAFE_NSIDOMSTORAGEMANAGER(TopSessionStorageManager())
 
   NS_IMETHOD Stop() override
@@ -227,6 +231,7 @@ public:
   NS_IMETHOD SetPrivateBrowsing(bool) override;
   NS_IMETHOD GetUseRemoteTabs(bool*) override;
   NS_IMETHOD SetRemoteTabs(bool) override;
+  NS_IMETHOD GetOriginAttributes(JS::MutableHandle<JS::Value>) override;
 
   // Restores a cached presentation from history (mLSHE).
   // This method swaps out the content viewer and simulates loads for
@@ -265,6 +270,8 @@ public:
   }
   bool InFrameSwap();
 
+  mozilla::OriginAttributes GetOriginAttributes();
+
 private:
   // An observed docshell wrapper is created when recording markers is enabled.
   mozilla::UniquePtr<mozilla::ObservedDocShell> mObserved;
@@ -275,18 +282,25 @@ private:
   // be very fast, so instead of using a Map or having to search for some
   // docshell-specific markers storage, a pointer to an `ObservedDocShell` is
   // is stored on docshells directly.
-  friend void mozilla::TimelineConsumers::AddConsumer(nsDocShell* aDocShell);
-  friend void mozilla::TimelineConsumers::RemoveConsumer(nsDocShell* aDocShell);
+  friend void mozilla::TimelineConsumers::AddConsumer(nsDocShell*);
+  friend void mozilla::TimelineConsumers::RemoveConsumer(nsDocShell*);
   friend void mozilla::TimelineConsumers::AddMarkerForDocShell(
-    nsDocShell* aDocShell, UniquePtr<TimelineMarker>&& aMarker);
+    nsDocShell*, const char*, MarkerTracingType);
   friend void mozilla::TimelineConsumers::AddMarkerForDocShell(
-    nsDocShell* aDocShell, const char* aName, TracingMetadata aMetaData);
+    nsDocShell*, const char*, const TimeStamp&, MarkerTracingType);
+  friend void mozilla::TimelineConsumers::AddMarkerForDocShell(
+    nsDocShell*, UniquePtr<TimelineMarker>&&);
 
 public:
   // Tell the favicon service that aNewURI has the same favicon as aOldURI.
   static void CopyFavicon(nsIURI* aOldURI,
                           nsIURI* aNewURI,
                           bool aInPrivateBrowsing);
+
+  static nsDocShell* Cast(nsIDocShell* aDocShell)
+  {
+    return static_cast<nsDocShell*>(aDocShell);
+  }
 
 protected:
   virtual ~nsDocShell();

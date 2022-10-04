@@ -359,7 +359,6 @@ class GCZoneGroupIter {
 
 typedef CompartmentsIterT<GCZoneGroupIter> GCCompartmentGroupIter;
 
-
 } /* namespace gc */
 } /* namespace js */
 

@@ -13,6 +13,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "PeerConnectionIdp",
   "resource://gre/modules/media/PeerConnectionIdp.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "convertToRTCStatsReport",
   "resource://gre/modules/media/RTCStatsReport.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
+  "resource://gre/modules/AppConstants.jsm");
 
 const PC_CONTRACT = "@mozilla.org/dom/peerconnection;1";
 const PC_OBS_CONTRACT = "@mozilla.org/dom/peerconnectionobserver;1";
@@ -20,10 +22,10 @@ const PC_ICE_CONTRACT = "@mozilla.org/dom/rtcicecandidate;1";
 const PC_SESSION_CONTRACT = "@mozilla.org/dom/rtcsessiondescription;1";
 const PC_MANAGER_CONTRACT = "@mozilla.org/dom/peerconnectionmanager;1";
 const PC_STATS_CONTRACT = "@mozilla.org/dom/rtcstatsreport;1";
-const PC_IDENTITY_CONTRACT = "@mozilla.org/dom/rtcidentityassertion;1";
 const PC_STATIC_CONTRACT = "@mozilla.org/dom/peerconnectionstatic;1";
 const PC_SENDER_CONTRACT = "@mozilla.org/dom/rtpsender;1";
 const PC_RECEIVER_CONTRACT = "@mozilla.org/dom/rtpreceiver;1";
+const PC_COREQUEST_CONTRACT = "@mozilla.org/dom/createofferrequest;1";
 
 const PC_CID = Components.ID("{bdc2e533-b308-4708-ac8e-a8bfade6d851}");
 const PC_OBS_CID = Components.ID("{d1748d4c-7f6a-4dc5-add6-d55b7678537e}");
@@ -31,10 +33,10 @@ const PC_ICE_CID = Components.ID("{02b9970c-433d-4cc2-923d-f7028ac66073}");
 const PC_SESSION_CID = Components.ID("{1775081b-b62d-4954-8ffe-a067bbf508a7}");
 const PC_MANAGER_CID = Components.ID("{7293e901-2be3-4c02-b4bd-cbef6fc24f78}");
 const PC_STATS_CID = Components.ID("{7fe6e18b-0da3-4056-bf3b-440ef3809e06}");
-const PC_IDENTITY_CID = Components.ID("{1abc7499-3c54-43e0-bd60-686e2703f072}");
 const PC_STATIC_CID = Components.ID("{0fb47c47-a205-4583-a9fc-cbadf8c95880}");
 const PC_SENDER_CID = Components.ID("{4fff5d46-d827-4cd4-a970-8fd53977440e}");
 const PC_RECEIVER_CID = Components.ID("{d974b814-8fde-411c-8c45-b86791b81030}");
+const PC_COREQUEST_CID = Components.ID("{74b2122d-65a8-4824-aa9e-3d664cb75dc2}");
 
 // Global list of PeerConnection objects, so they can be cleaned up when
 // a page is torn down. (Maps inner window ID to an array of PC objects).
@@ -42,11 +44,14 @@ function GlobalPCList() {
   this._list = {};
   this._networkdown = false; // XXX Need to query current state somehow
   this._lifecycleobservers = {};
+  this._nextId = 1;
   Services.obs.addObserver(this, "inner-window-destroyed", true);
   Services.obs.addObserver(this, "profile-change-net-teardown", true);
   Services.obs.addObserver(this, "network:offline-about-to-go-offline", true);
   Services.obs.addObserver(this, "network:offline-status-changed", true);
   Services.obs.addObserver(this, "gmp-plugin-crash", true);
+  Services.obs.addObserver(this, "PeerConnection:response:allow", true);
+  Services.obs.addObserver(this, "PeerConnection:response:deny", true);
   if (Cc["@mozilla.org/childprocessmessagemanager;1"]) {
     let mm = Cc["@mozilla.org/childprocessmessagemanager;1"].getService(Ci.nsIMessageListenerManager);
     mm.addMessageListener("gmp-plugin-crash", this);
@@ -80,7 +85,21 @@ GlobalPCList.prototype = {
     } else {
       this._list[winID] = [Cu.getWeakReference(pc)];
     }
+    pc._globalPCListId = this._nextId++;
     this.removeNullRefs(winID);
+  },
+
+  findPC: function(globalPCListId) {
+    for (let winId in this._list) {
+      if (this._list.hasOwnProperty(winId)) {
+        for (let pcref of this._list[winId]) {
+          let pc = pcref.get();
+          if (pc && pc._globalPCListId == globalPCListId) {
+            return pc;
+          }
+        }
+      }
+    }
   },
 
   removeNullRefs: function(winID) {
@@ -170,20 +189,36 @@ GlobalPCList.prototype = {
         this._networkdown = false;
       }
     } else if (topic == "network:app-offline-status-changed") {
-      // App just went offline. The subject also contains the appId,
-      // but navigator.onLine checks that for us
-      if (!this._networkdown && !this._win.navigator.onLine) {
-        for (let winId in this._list) {
+      // App changed offline status. The subject contains the appId for which
+      // we need to check the status
+      let appId = subject.QueryInterface(Ci.nsIAppOfflineInfo).appId;
+      let ios = Cc['@mozilla.org/network/io-service;1'].getService(Ci.nsIIOService);
+      for (let winId in this._list) {
+        if (appId != this._list[winId]._appId) {
+          continue;
+        }
+        if (ios.isAppOffline(appId)) {
           cleanupWinId(this._list, winId);
         }
       }
-      this._networkdown = !this._win.navigator.onLine;
     } else if (topic == "gmp-plugin-crash") {
       if (subject instanceof Ci.nsIWritablePropertyBag2) {
         let pluginID = subject.getPropertyAsUint32("pluginID");
         let pluginName = subject.getPropertyAsAString("pluginName");
         let data = { pluginID, pluginName };
         this.handleGMPCrash(data);
+      }
+    } else if (topic == "PeerConnection:response:allow" ||
+               topic == "PeerConnection:response:deny") {
+      var pc = this.findPC(data);
+      if (pc) {
+        if (topic == "PeerConnection:response:allow") {
+          pc._settlePermission.allow();
+        } else {
+          let err = new pc._win.DOMException("The operation is insecure.",
+                                             "SecurityError");
+          pc._settlePermission.deny(err);
+        }
       }
     }
   },
@@ -192,7 +227,7 @@ GlobalPCList.prototype = {
     this._lifecycleobservers[winID] = cb;
   },
 };
-let _globalPCList = new GlobalPCList();
+var _globalPCList = new GlobalPCList();
 
 function RTCIceCandidate() {
   this.candidate = this.sdpMid = this.sdpMLineIndex = null;
@@ -285,22 +320,6 @@ RTCStatsReport.prototype = {
   get mozPcid() { return this._pcid; }
 };
 
-function RTCIdentityAssertion() {}
-RTCIdentityAssertion.prototype = {
-  classDescription: "RTCIdentityAssertion",
-  classID: PC_IDENTITY_CID,
-  contractID: PC_IDENTITY_CONTRACT,
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsISupports,
-                                         Ci.nsIDOMGlobalPropertyInitializer]),
-
-  init: function(win) { this._win = win; },
-
-  __init: function(idp, name) {
-    this.idp = idp;
-    this.name  = name;
-  }
-};
-
 function RTCPeerConnection() {
   this._senders = [];
   this._receivers = [];
@@ -337,25 +356,50 @@ RTCPeerConnection.prototype = {
   __init: function(rtcConfig) {
     this._winID = this._win.QueryInterface(Ci.nsIInterfaceRequestor)
     .getInterface(Ci.nsIDOMWindowUtils).currentInnerWindowID;
-
+    // TODO: Update this code once we support pc.setConfiguration, to track
+    // setting from content independently from pref (Bug 1181768).
+    if (rtcConfig.iceTransportPolicy == "all" &&
+        Services.prefs.getBoolPref("media.peerconnection.ice.relay_only")) {
+      rtcConfig.iceTransportPolicy = "relay";
+    }
     if (!rtcConfig.iceServers ||
         !Services.prefs.getBoolPref("media.peerconnection.use_document_iceservers")) {
-      rtcConfig.iceServers =
-        JSON.parse(Services.prefs.getCharPref("media.peerconnection.default_iceservers"));
-    }
-    // Normalize iceServers input
-    rtcConfig.iceServers.forEach(server => {
-      if (typeof server.urls === "string") {
-        server.urls = [server.urls];
-      } else if (!server.urls && server.url) {
-        // TODO: Remove support for legacy iceServer.url eventually (Bug 1116766)
-        server.urls = [server.url];
-        this.logWarning("RTCIceServer.url is deprecated! Use urls instead.", null, 0);
+      try {
+         rtcConfig.iceServers =
+           JSON.parse(Services.prefs.getCharPref("media.peerconnection.default_iceservers") || "[]");
+      } catch (e) {
+        this.logWarning(
+            "Ignoring invalid media.peerconnection.default_iceservers in about:config",
+             null, 0);
+        rtcConfig.iceServers = [];
       }
-    });
-    this._mustValidateRTCConfiguration(rtcConfig,
+      try {
+        this._mustValidateRTCConfiguration(rtcConfig,
+            "Ignoring invalid media.peerconnection.default_iceservers in about:config");
+      } catch (e) {
+        this.logWarning(e.message, null, 0);
+        rtcConfig.iceServers = [];
+      }
+    } else {
+      // This gets executed in the typical case when iceServers
+      // are passed in through the web page.
+      this._mustValidateRTCConfiguration(rtcConfig,
         "RTCPeerConnection constructor passed invalid RTCConfiguration");
-    if (_globalPCList._networkdown || !this._win.navigator.onLine) {
+    }
+    // Save the appId
+    var principal = Cu.getWebIDLCallerPrincipal();
+    this._appId = principal.appId;
+    this._isChrome = Services.scriptSecurityManager.isSystemPrincipal(principal);
+
+    // Get the offline status for this appId
+    let appOffline = false;
+    if (this._appId != Ci.nsIScriptSecurityManager.NO_APP_ID &&
+        this._appId != Ci.nsIScriptSecurityManager.UNKNOWN_APP_ID) {
+      let ios = Cc['@mozilla.org/network/io-service;1'].getService(Ci.nsIIOService);
+      appOffline = ios.isAppOffline(this._appId);
+    }
+
+    if (_globalPCList._networkdown || appOffline) {
       throw new this._win.DOMException(
           "Can't create RTCPeerConnections when the network is down",
           "InvalidStateError");
@@ -490,12 +534,23 @@ RTCPeerConnection.prototype = {
    *                   { urls: ["turn:turn1.x.org", "turn:turn2.x.org"],
    *                     username:"jib", credential:"mypass"} ] }
    *
-   * WebIDL normalizes structure for us, so we test well-formed stun/turn urls,
-   * but not validity of servers themselves, before passing along to C++.
-   *
+   * This function normalizes the structure of the input for rtcConfig.iceServers for us,
+   * so we test well-formed stun/turn urls before passing along to C++.
    *   msg - Error message to detail which array-entry failed, if any.
    */
   _mustValidateRTCConfiguration: function(rtcConfig, msg) {
+
+    // Normalize iceServers input
+    rtcConfig.iceServers.forEach(server => {
+      if (typeof server.urls === "string") {
+        server.urls = [server.urls];
+      } else if (!server.urls && server.url) {
+        // TODO: Remove support for legacy iceServer.url eventually (Bug 1116766)
+        server.urls = [server.url];
+        this.logWarning("RTCIceServer.url is deprecated! Use urls instead.", null, 0);
+      }
+    });
+
     let ios = Cc['@mozilla.org/network/io-service;1'].getService(Ci.nsIIOService);
 
     let nicerNewURI = uriStr => {
@@ -604,16 +659,20 @@ RTCPeerConnection.prototype = {
                           });
   },
 
-  _addIdentityAssertion: function(p, origin) {
-    if (this._localIdp.enabled) {
-      return this._localIdp.getIdentityAssertion(this._impl.fingerprint, origin)
-        .then(() => p)
-        .then(sdp => this._localIdp.addIdentityAttribute(sdp));
+  _addIdentityAssertion: function(sdpPromise, origin) {
+    if (!this._localIdp.enabled) {
+      return sdpPromise;
     }
-    return p;
+    return Promise.all([
+      this._certificateReady
+        .then(() => this._localIdp.getIdentityAssertion(this._impl.fingerprint,
+                                                        origin)),
+      sdpPromise
+    ]).then(([,sdp]) => this._localIdp.addIdentityAttribute(sdp));
   },
 
   createOffer: function(optionsOrOnSuccess, onError, options) {
+    // This entry-point handles both new and legacy call sig. Decipher which one
     let onSuccess;
     if (typeof optionsOrOnSuccess == "function") {
       onSuccess = optionsOrOnSuccess;
@@ -621,7 +680,7 @@ RTCPeerConnection.prototype = {
       options = optionsOrOnSuccess;
     }
     return this._legacyCatch(onSuccess, onError, () => {
-      // TODO: Remove old constraint-like RTCOptions support soon (Bug 1064223).
+      // TODO: Remove error on constraint-like RTCOptions next cycle (1197021).
       // Note that webidl bindings make o.mandatory implicit but not o.optional.
       function convertLegacyOptions(o) {
         // Detect (mandatory OR optional) AND no other top-level members.
@@ -658,21 +717,21 @@ RTCPeerConnection.prototype = {
       }
 
       if (options && convertLegacyOptions(options)) {
-        this.logWarning(
-          "Mandatory/optional in createOffer options is deprecated! Use " +
+        this.logError(
+          "Mandatory/optional in createOffer options no longer works! Use " +
             JSON.stringify(options) + " instead (note the case difference)!",
           null, 0);
+        options = {};
       }
 
       let origin = Cu.getWebIDLCallerPrincipal().origin;
       return this._chain(() => {
-        let p = this._certificateReady.then(
-          () => new this._win.Promise((resolve, reject) => {
+        let p = Promise.all([this.getPermission(), this._certificateReady])
+          .then(() => new this._win.Promise((resolve, reject) => {
             this._onCreateOfferSuccess = resolve;
             this._onCreateOfferFailure = reject;
             this._impl.createOffer(options);
-          })
-        );
+          }));
         p = this._addIdentityAssertion(p, origin);
         return p.then(
           sdp => new this._win.mozRTCSessionDescription({ type: "offer", sdp: sdp }));
@@ -680,12 +739,19 @@ RTCPeerConnection.prototype = {
     });
   },
 
-  createAnswer: function(onSuccess, onError) {
+  createAnswer: function(optionsOrOnSuccess, onError) {
+    // This entry-point handles both new and legacy call sig. Decipher which one
+    let onSuccess, options;
+    if (typeof optionsOrOnSuccess == "function") {
+      onSuccess = optionsOrOnSuccess;
+    } else {
+      options = optionsOrOnSuccess;
+    }
     return this._legacyCatch(onSuccess, onError, () => {
       let origin = Cu.getWebIDLCallerPrincipal().origin;
       return this._chain(() => {
-        let p = this._certificateReady.then(
-          () => new this._win.Promise((resolve, reject) => {
+        let p = Promise.all([this.getPermission(), this._certificateReady])
+          .then(() => new this._win.Promise((resolve, reject) => {
             // We give up line-numbers in errors by doing this here, but do all
             // state-checks inside the chain, to support the legacy feature that
             // callers don't have to wait for setRemoteDescription to finish.
@@ -700,13 +766,33 @@ RTCPeerConnection.prototype = {
             this._onCreateAnswerSuccess = resolve;
             this._onCreateAnswerFailure = reject;
             this._impl.createAnswer();
-          })
-        );
+          }));
         p = this._addIdentityAssertion(p, origin);
         return p.then(sdp => {
           return new this._win.mozRTCSessionDescription({ type: "answer", sdp: sdp });
         });
       });
+    });
+  },
+
+  getPermission: function() {
+    if (this._havePermission) {
+      return this._havePermission;
+    }
+    if (this._isChrome ||
+        AppConstants.MOZ_B2G ||
+        Services.prefs.getBoolPref("media.navigator.permission.disabled")) {
+      return this._havePermission = Promise.resolve();
+    }
+    return this._havePermission = new Promise((resolve, reject) => {
+      this._settlePermission = { allow: resolve, deny: reject };
+      let outerId = this._win.QueryInterface(Ci.nsIInterfaceRequestor).
+          getInterface(Ci.nsIDOMWindowUtils).outerWindowID;
+
+      let chrome = new CreateOfferRequest(outerId, this._winID,
+                                                 this._globalPCListId, false);
+      let request = this._win.CreateOfferRequest._create(this._win, chrome);
+      Services.obs.notifyObservers(request, "PeerConnection:request", null);
     });
   },
 
@@ -733,11 +819,19 @@ RTCPeerConnection.prototype = {
               "Invalid type " + desc.type + " provided to setLocalDescription",
               "InvalidParameterError");
       }
-      return this._chain(() => new this._win.Promise((resolve, reject) => {
+
+      if (desc.type !== "rollback" && !desc.sdp) {
+        throw new this._win.DOMException(
+            "Empty or null SDP provided to setLocalDescription",
+            "InvalidParameterError");
+      }
+
+      return this._chain(() => this.getPermission()
+          .then(() => new this._win.Promise((resolve, reject) => {
         this._onSetLocalDescriptionSuccess = resolve;
         this._onSetLocalDescriptionFailure = reject;
         this._impl.setLocalDescription(type, desc.sdp);
-      }));
+      })));
     });
   },
 
@@ -761,9 +855,10 @@ RTCPeerConnection.prototype = {
         if (msg) {
           // Set new identity and generate an event.
           this._impl.peerIdentity = msg.identity;
-          let assertion = new this._win.RTCIdentityAssertion(
-            this._remoteIdp.provider, msg.identity);
-          this._resolvePeerIdentity(assertion);
+          this._resolvePeerIdentity(Cu.cloneInto({
+            idp: this._remoteIdp.provider,
+            name: msg.identity
+          }, this._win));
         }
       })
       .catch(e => {
@@ -806,21 +901,35 @@ RTCPeerConnection.prototype = {
         default:
           throw new this._win.DOMException(
               "Invalid type " + desc.type + " provided to setRemoteDescription",
+              "InvalidParameterError");
+      }
+
+      if (!desc.sdp && desc.type !== "rollback") {
+        throw new this._win.DOMException(
+            "Empty or null SDP provided to setRemoteDescription",
             "InvalidParameterError");
       }
 
       // Get caller's origin before hitting the promise chain
       let origin = Cu.getWebIDLCallerPrincipal().origin;
 
-      // Do setRemoteDescription and identity validation in parallel
-      return this._chain(() => this._win.Promise.all([
-        new this._win.Promise((resolve, reject) => {
-          this._onSetRemoteDescriptionSuccess = resolve;
-          this._onSetRemoteDescriptionFailure = reject;
-          this._impl.setRemoteDescription(type, desc.sdp);
-        }),
-        this._validateIdentity(desc.sdp, origin)
-      ])).then(() => {}); // must return undefined
+      return this._chain(() => {
+        let setRem = this.getPermission()
+          .then(() => new this._win.Promise((resolve, reject) => {
+            this._onSetRemoteDescriptionSuccess = resolve;
+            this._onSetRemoteDescriptionFailure = reject;
+            this._impl.setRemoteDescription(type, desc.sdp);
+          }));
+
+        if (desc.type === "rollback") {
+          return setRem;
+        }
+
+        // Do setRemoteDescription and identity validation in parallel
+        let validId = this._validateIdentity(desc.sdp, origin);
+        return this._win.Promise.all([setRem, validId])
+          .then(() => {}); // must return undefined
+      });
     });
   },
 
@@ -1384,6 +1493,19 @@ RTCRtpReceiver.prototype = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsISupports]),
 };
 
+function CreateOfferRequest(windowID, innerWindowID, callID, isSecure) {
+  this.windowID = windowID;
+  this.innerWindowID = innerWindowID;
+  this.callID = callID;
+  this.isSecure = isSecure;
+}
+CreateOfferRequest.prototype = {
+  classDescription: "CreateOfferRequest",
+  classID: PC_COREQUEST_CID,
+  contractID: PC_COREQUEST_CONTRACT,
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsISupports]),
+};
+
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory(
   [GlobalPCList,
    RTCIceCandidate,
@@ -1393,6 +1515,6 @@ this.NSGetFactory = XPCOMUtils.generateNSGetFactory(
    RTCRtpReceiver,
    RTCRtpSender,
    RTCStatsReport,
-   RTCIdentityAssertion,
-   PeerConnectionObserver]
+   PeerConnectionObserver,
+   CreateOfferRequest]
 );

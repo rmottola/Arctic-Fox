@@ -33,6 +33,7 @@
 #include "imgIContainer.h"
 #include "mozIApplication.h"
 #include "mozilla/ClearOnShutdown.h"
+#include "mozilla/devtools/HeapSnapshotTempFileHelperParent.h"
 #include "mozilla/docshell/OfflineCacheUpdateParent.h"
 #include "mozilla/dom/DataStoreService.h"
 #include "mozilla/dom/DataTransfer.h"
@@ -53,6 +54,7 @@
 #include "mozilla/dom/cellbroadcast/CellBroadcastParent.h"
 #include "mozilla/dom/devicestorage/DeviceStorageRequestParent.h"
 #include "mozilla/dom/icc/IccParent.h"
+#include "mozilla/dom/indexedDB/IndexedDatabaseManager.h"
 #include "mozilla/dom/mobileconnection/MobileConnectionParent.h"
 #include "mozilla/dom/mobilemessage/SmsParent.h"
 #include "mozilla/dom/power/PowerManagerService.h"
@@ -139,6 +141,7 @@
 #include "nsIXULRuntime.h"
 #include "gfxDrawable.h"
 #include "ImageOps.h"
+#include "mozilla/dom/nsMixedContentBlocker.h"
 #include "nsMemoryInfoDumper.h"
 #include "nsMemoryReporterManager.h"
 #include "nsServiceManagerUtils.h"
@@ -2500,15 +2503,8 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
             DebugOnly<bool> opened = PCompositor::Open(this);
             MOZ_ASSERT(opened);
 
-#ifndef MOZ_WIDGET_GONK
-            if (gfxPrefs::AsyncVideoOOPEnabled()) {
-                opened = PImageBridge::Open(this);
-                MOZ_ASSERT(opened);
-            }
-#else
             opened = PImageBridge::Open(this);
             MOZ_ASSERT(opened);
-#endif
         }
 #ifdef MOZ_WIDGET_GONK
         DebugOnly<bool> opened = PSharedBufferManager::Open(this);
@@ -2695,7 +2691,7 @@ ContentParent::RecvSetClipboard(const IPCDataTransfer& aDataTransfer,
             item.flavor().EqualsLiteral(kPNGImageMime) ||
             item.flavor().EqualsLiteral(kGIFImageMime)) {
           const IPCDataTransferImage& imageDetails = item.imageDetails();
-          const gfxIntSize size(imageDetails.width(), imageDetails.height());
+          const gfx::IntSize size(imageDetails.width(), imageDetails.height());
           if (!size.width || !size.height) {
             return true;
           }
@@ -3591,6 +3587,20 @@ ContentParent::DeallocPHalParent(hal_sandbox::PHalParent* aHal)
     return true;
 }
 
+devtools::PHeapSnapshotTempFileHelperParent*
+ContentParent::AllocPHeapSnapshotTempFileHelperParent()
+{
+    return devtools::HeapSnapshotTempFileHelperParent::Create();
+}
+
+bool
+ContentParent::DeallocPHeapSnapshotTempFileHelperParent(
+    devtools::PHeapSnapshotTempFileHelperParent* aHeapSnapshotHelper)
+{
+    delete aHeapSnapshotHelper;
+    return true;
+}
+
 PIccParent*
 ContentParent::AllocPIccParent(const uint32_t& aServiceId)
 {
@@ -4156,6 +4166,17 @@ ContentParent::RecvIsSecureURI(const uint32_t& type,
     }
     nsresult rv = sss->IsSecureURI(type, ourURI, flags, isSecureURI);
     return NS_SUCCEEDED(rv);
+}
+
+bool
+ContentParent::RecvAccumulateMixedContentHSTS(const URIParams& aURI, const bool& aActive)
+{
+    nsCOMPtr<nsIURI> ourURI = DeserializeURI(aURI);
+    if (!ourURI) {
+        return false;
+    }
+    nsMixedContentBlocker::AccumulateMixedContentHSTS(ourURI, aActive);
+    return true;
 }
 
 bool

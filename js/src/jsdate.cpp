@@ -3181,7 +3181,6 @@ const Class DateObject::class_ = {
     nullptr, /* enumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
-    nullptr, /* convert */
     nullptr, /* finalize */
     nullptr, /* call */
     nullptr, /* hasInstance */
@@ -3208,7 +3207,6 @@ const Class DateObject::protoClass_ = {
     nullptr, /* enumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
-    nullptr, /* convert */
     nullptr, /* finalize */
     nullptr, /* call */
     nullptr, /* hasInstance */
@@ -3237,8 +3235,8 @@ js::NewDateObjectMsec(JSContext* cx, ClippedTime t)
 }
 
 JS_FRIEND_API(JSObject*)
-js::NewDateObject(JSContext *cx, int year, int mon, int mday,
-                int hour, int min, int sec)
+js::NewDateObject(JSContext* cx, int year, int mon, int mday,
+                  int hour, int min, int sec)
 {
     MOZ_ASSERT(mon < 12);
     double msec_time = MakeDate(MakeDay(year, mon, mday), MakeTime(hour, min, sec, 0.0));

@@ -153,7 +153,8 @@ NS_IMPL_ISUPPORTS(HttpChannelParent,
                   nsIParentChannel,
                   nsIAuthPromptProvider,
                   nsIParentRedirectingChannel,
-                  nsINetworkInterceptController)
+                  nsINetworkInterceptController,
+                  nsIDeprecationWarner)
 
 NS_IMETHODIMP
 HttpChannelParent::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNavigate,
@@ -471,7 +472,10 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
     }
 
   } else {
-    mChannel->ForceNoIntercept();
+    nsLoadFlags loadFlags;
+    mChannel->GetLoadFlags(&loadFlags);
+    loadFlags |= nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
+    mChannel->SetLoadFlags(loadFlags);
   }
 
   nsCOMPtr<nsISupportsPRUint32> cacheKey =
@@ -523,13 +527,11 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
     }
 
     if (setChooseApplicationCache) {
-      bool inBrowser = false;
+      OriginAttributes attrs;
       if (mLoadContext) {
-        mLoadContext->GetIsInBrowserElement(&inBrowser);
+        attrs.CopyFromLoadContext(mLoadContext);
       }
 
-      // TODO: Bug 1165466 - use originAttribute in nsILoadContext.
-      OriginAttributes attrs(appId, inBrowser);
       nsCOMPtr<nsIPrincipal> principal =
         BasePrincipal::CreateCodebasePrincipal(uri, attrs);
 
@@ -1579,6 +1581,13 @@ HttpChannelParent::ReportSecurityMessage(const nsAString& aMessageTag,
                                             nsString(aMessageCategory)))) {
     return NS_ERROR_UNEXPECTED;
   }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+HttpChannelParent::IssueWarning(uint32_t aWarning, bool aAsError)
+{
+  unused << SendIssueDeprecationWarning(aWarning, aAsError);
   return NS_OK;
 }
 

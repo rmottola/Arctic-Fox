@@ -14,6 +14,7 @@
 
 #include "gc/Marking.h"
 #include "js/UbiNode.h"
+#include "vm/SPSProfiler.h"
 
 #include "jscntxtinlines.h"
 #include "jscompartmentinlines.h"
@@ -67,7 +68,7 @@ JSString::sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf)
            : mallocSizeOf(flat.rawTwoByteChars());
 }
 
-size_t
+JS::ubi::Node::Size
 JS::ubi::Concrete<JSString>::size(mozilla::MallocSizeOf mallocSizeOf) const
 {
     JSString &str = get();
@@ -554,6 +555,10 @@ JSRope::flattenInternal(ExclusiveContext* maybecx)
 JSFlatString*
 JSRope::flatten(ExclusiveContext* maybecx)
 {
+    mozilla::Maybe<AutoSPSEntry> sps;
+    if (maybecx && maybecx->isJSContext())
+        sps.emplace(maybecx->asJSContext()->runtime(), "JSRope::flatten");
+
     if (zone()->needsIncrementalBarrier())
         return flattenInternal<WithIncrementalBarrier>(maybecx);
     return flattenInternal<NoBarrier>(maybecx);
@@ -1133,8 +1138,11 @@ NewStringCopyNDontDeflate(ExclusiveContext* cx, const CharT* s, size_t n)
         return NewInlineString<allowGC>(cx, mozilla::Range<const CharT>(s, n));
 
     ScopedJSFreePtr<CharT> news(cx->pod_malloc<CharT>(n + 1));
-    if (!news)
+    if (!news) {
+        if (!allowGC)
+            cx->recoverFromOutOfMemory();
         return nullptr;
+    }
 
     PodCopy(news.get(), s, n);
     news[n] = 0;

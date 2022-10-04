@@ -35,7 +35,8 @@ var panelProgressListener = {
                 aStateFlags & Ci.nsIWebProgressListener.STATE_IS_NETWORK) {
             window.parent.document.getElementById('sidebar-throbber').removeAttribute("loading");
         }
-    },
+    }
+    ,
 
     onLocationChange : function(aWebProgress, aRequest, aLocation, aFlags) {
         UpdateBackForwardCommands(getPanelBrowser().webNavigation);

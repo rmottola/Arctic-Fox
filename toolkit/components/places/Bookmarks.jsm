@@ -82,7 +82,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
 const DB_URL_LENGTH_MAX = 65536;
 const DB_TITLE_LENGTH_MAX = 4096;
 
-let Bookmarks = Object.freeze({
+var Bookmarks = Object.freeze({
   /**
    * Item's type constants.
    * These should stay consistent with nsINavBookmarksService.idl
@@ -140,7 +140,7 @@ let Bookmarks = Object.freeze({
     // dateAdded may be imposed by the caller.
     let time = (info && info.dateAdded) || new Date();
     let insertInfo = validateBookmarkObject(info,
-      { type: { required: true }
+      { type: { defaultValue: this.TYPE_BOOKMARK }
       , index: { defaultValue: this.DEFAULT_INDEX }
       , url: { requiredIf: b => b.type == this.TYPE_BOOKMARK
              , validIf: b => b.type == this.TYPE_BOOKMARK }
@@ -187,7 +187,8 @@ let Bookmarks = Object.freeze({
           notify(observers, "onItemChanged", [ entry._id, "tags", false, "",
                                                toPRTime(entry.lastModified),
                                                entry.type, entry._parentId,
-                                               entry.guid, entry.parentGuid ]);
+                                               entry.guid, entry.parentGuid,
+                                               "" ]);
         }
       }
 
@@ -325,7 +326,7 @@ let Bookmarks = Object.freeze({
                                                updatedItem.type,
                                                updatedItem._parentId,
                                                updatedItem.guid,
-                                               updatedItem.parentGuid ]);
+                                               updatedItem.parentGuid, "" ]);
         }
         if (updateInfo.hasOwnProperty("title")) {
           notify(observers, "onItemChanged", [ updatedItem._id, "title",
@@ -334,7 +335,7 @@ let Bookmarks = Object.freeze({
                                                updatedItem.type,
                                                updatedItem._parentId,
                                                updatedItem.guid,
-                                               updatedItem.parentGuid ]);
+                                               updatedItem.parentGuid, "" ]);
         }
         if (updateInfo.hasOwnProperty("url")) {
           notify(observers, "onItemChanged", [ updatedItem._id, "uri",
@@ -343,7 +344,8 @@ let Bookmarks = Object.freeze({
                                                updatedItem.type,
                                                updatedItem._parentId,
                                                updatedItem.guid,
-                                               updatedItem.parentGuid ]);
+                                               updatedItem.parentGuid,
+                                               item.url.href ]);
         }
         // If the item was moved, notify onItemMoved.
         if (item.parentGuid != updatedItem.parentGuid ||
@@ -410,7 +412,8 @@ let Bookmarks = Object.freeze({
           notify(observers, "onItemChanged", [ entry._id, "tags", false, "",
                                                toPRTime(entry.lastModified),
                                                entry.type, entry._parentId,
-                                               entry.guid, entry.parentGuid ]);
+                                               entry.guid, entry.parentGuid,
+                                               "" ]);
         }
       }
 
@@ -872,7 +875,8 @@ function fetchBookmarksByURL(info) {
     Task.async(function*(db) {
 
     let rows = yield db.executeCached(
-      `SELECT b.guid, IFNULL(p.guid, "") AS parentGuid, b.position AS 'index',
+      `/* do not warn (bug no): not worth to add an index */
+       SELECT b.guid, IFNULL(p.guid, "") AS parentGuid, b.position AS 'index',
               b.dateAdded, b.lastModified, b.type, b.title, h.url AS url,
               b.id AS _id, b.parent AS _parentId,
               (SELECT count(*) FROM moz_bookmarks WHERE parent = b.id) AS _childCount,
@@ -1235,7 +1239,7 @@ function validateBookmarkObject(input, behavior={}) {
       throw new Error(`Invalid value for property '${prop}': ${input[prop]}`);
     }
     if (behavior[prop].hasOwnProperty("defaultValue") && input[prop] === undefined) {
-      normalizedInput[prop] = behavior[prop].defaultValue;
+      input[prop] = behavior[prop].defaultValue;
     }
   }
 
@@ -1267,7 +1271,7 @@ function validateBookmarkObject(input, behavior={}) {
  * @param urls
  *        the array of URLs to update.
  */
-let updateFrecency = Task.async(function* (db, urls) {
+var updateFrecency = Task.async(function* (db, urls) {
   yield db.execute(
     `UPDATE moz_places
      SET frecency = NOTIFY_FRECENCY(
@@ -1289,7 +1293,7 @@ let updateFrecency = Task.async(function* (db, urls) {
  * @param db
  *        the Sqlite.jsm connection handle.
  */
-let removeOrphanAnnotations = Task.async(function* (db) {
+var removeOrphanAnnotations = Task.async(function* (db) {
   yield db.executeCached(
     `DELETE FROM moz_items_annos
      WHERE id IN (SELECT a.id from moz_items_annos a
@@ -1313,7 +1317,7 @@ let removeOrphanAnnotations = Task.async(function* (db) {
  * @param itemId
  *        internal id of the item for which to remove annotations.
  */
-let removeAnnotationsForItem = Task.async(function* (db, itemId) {
+var removeAnnotationsForItem = Task.async(function* (db, itemId) {
   yield db.executeCached(
     `DELETE FROM moz_items_annos
      WHERE item_id = :id
@@ -1339,7 +1343,7 @@ let removeAnnotationsForItem = Task.async(function* (db, itemId) {
  *
  * @note the folder itself is also updated.
  */
-let setAncestorsLastModified = Task.async(function* (db, folderGuid, time) {
+var setAncestorsLastModified = Task.async(function* (db, folderGuid, time) {
   yield db.executeCached(
     `WITH RECURSIVE
      ancestors(aid) AS (
@@ -1363,7 +1367,7 @@ let setAncestorsLastModified = Task.async(function* (db, folderGuid, time) {
  * @param folderGuids
  *        array of folder guids.
  */
-let removeFoldersContents =
+var removeFoldersContents =
 Task.async(function* (db, folderGuids) {
   let itemsRemoved = [];
   for (let folderGuid of folderGuids) {
@@ -1428,7 +1432,8 @@ Task.async(function* (db, folderGuids) {
         notify(observers, "onItemChanged", [ entry._id, "tags", false, "",
                                              toPRTime(entry.lastModified),
                                              entry.type, entry._parentId,
-                                             entry.guid, entry.parentGuid ]);
+                                             entry.guid, entry.parentGuid,
+                                             "" ]);
       }
     }
   }

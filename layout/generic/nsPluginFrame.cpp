@@ -1426,12 +1426,11 @@ nsPluginFrame::BuildLayer(nsDisplayListBuilder* aBuilder,
 
     imglayer->SetScaleToSize(size, ScaleMode::STRETCH);
     imglayer->SetContainer(container);
-    GraphicsFilter filter =
-      nsLayoutUtils::GetGraphicsFilterForFrame(this);
+    Filter filter = nsLayoutUtils::GetGraphicsFilterForFrame(this);
 #ifdef MOZ_GFX_OPTIMIZE_MOBILE
     if (!aManager->IsCompositingCheap()) {
       // Pixman just horrible with bilinear filter scaling
-      filter = GraphicsFilter::FILTER_NEAREST;
+      filter = Filter::POINT;
     }
 #endif
     imglayer->SetFilter(filter);

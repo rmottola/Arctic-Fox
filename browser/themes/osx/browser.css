@@ -602,11 +602,11 @@ toolbar[mode=full] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 /* unified back/forward button */
 
 #back-button {
-    -moz-image-region: rect(0, 18px, 18px, 0);
+    -moz-image-region: rect(0, 54px, 18px, 36px);
 }
 
 #forward-button {
-    -moz-image-region: rect(0, 36px, 18px, 18px);
+    -moz-image-region: rect(0, 72px, 18px, 54px);
 }
 
 #back-button:-moz-locale-dir(rtl) > .toolbarbutton-icon,
@@ -646,7 +646,7 @@ toolbar[mode=full] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 }
 
 @conditionalForwardWithUrlbar@ > #back-button {
-    -moz-image-region: rect(18px, 20px, 38px, 0);
+    -moz-image-region: rect(0, 36px, 18px, 18px);
     padding-top: 3px;
     padding-bottom: 3px;
     -moz-padding-start: 5px;
@@ -717,7 +717,7 @@ toolbar[mode=full] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 }
 
 #reload-button {
-    -moz-image-region: rect(0, 72px, 18px, 54px);
+    -moz-image-region: rect(0, 90px, 18px, 72px);
 }
 
 #home-button.bookmark-item {
@@ -728,7 +728,7 @@ toolbar[brighttext] #home-button.bookmark-item {
 }
 
 #home-button {
-    -moz-image-region: rect(0, 90px, 18px, 72px);
+    -moz-image-region: rect(0, 126px, 18px, 108px);
 }
 
 #downloads-button {
@@ -2105,34 +2105,15 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     margin-left: 1em;
 }
 
-#full-screen-warning-message {
-    background-color: hsl(0,0%,15%);
-    color: white;
-    border-radius: 8px;
-    margin-top: 30px;
-    padding: 30px 50px;
-    box-shadow: 0 0 2px white;
-}
-
-.full-screen-description {
-    font-size: 150%;
-}
-
-#full-screen-domain-text {
-    font-size: 300%;
-}
-
-%ifdef MOZ_DEVTOOLS
-%include ../../../toolkit/themes/shared/devtools/responsivedesign.inc.css
-%include ../../../toolkit/themes/shared/devtools/commandline.inc.css
-%endif
+%include ../shared/fullscreen/warning.inc.css
+%include ../../../devtools/client/themes/responsivedesign.inc.css
+%include ../../../devtools/client/themes/commandline.inc.css
 %include ../shared/plugin-doorhanger.inc.css
 %include ../shared/badcontent-doorhanger.inc.css
 %include ../shared/login-doorhanger.inc.css
 
 %include downloads/indicator.css
 
-%ifdef MOZ_DEVTOOLS
 /* Error counter */
 
 #developer-toolbar-toolbox-button[error-count]:before {
@@ -2143,7 +2124,6 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     border-radius: 1px;
     -moz-margin-end: 5px;
 }
-%endif
 
 .toolbarbutton-badge-container {
     margin: 0;

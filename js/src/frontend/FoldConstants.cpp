@@ -75,7 +75,7 @@ ContainsHoistedDeclaration(ExclusiveContext* cx, ParseNode* node, bool* result)
       // Non-global lexical declarations are block-scoped (ergo not hoistable).
       // (Global lexical declarations, in addition to being irrelevant here as
       // ContainsHoistedDeclaration is only used on the arms of an |if|
-      // statement, are handled by PNK_GLOBALCONST and PNK_VAR.)
+      // statement, are handled by PNK_VAR.)
       case PNK_LET:
       case PNK_CONST:
         MOZ_ASSERT(node->isArity(PN_LIST));
@@ -97,6 +97,10 @@ ContainsHoistedDeclaration(ExclusiveContext* cx, ParseNode* node, bool* result)
       // declaration.
       case PNK_FUNCTION:
         MOZ_ASSERT(node->isArity(PN_CODE));
+        *result = false;
+        return true;
+
+      case PNK_MODULE:
         *result = false;
         return true;
 
@@ -412,10 +416,6 @@ ContainsHoistedDeclaration(ExclusiveContext* cx, ParseNode* node, bool* result)
       case PNK_POSHOLDER:
         MOZ_CRASH("ContainsHoistedDeclaration should have indicated false on "
                   "some parent node without recurring to test this node");
-
-      case PNK_GLOBALCONST:
-        MOZ_CRASH("ContainsHoistedDeclaration is only called on nested nodes where "
-                  "globalconst nodes should never have been generated");
 
       case PNK_LIMIT: // invalid sentinel value
         MOZ_CRASH("unexpected PNK_LIMIT in node");
@@ -1110,6 +1110,17 @@ ComputeBinary(ParseNodeKind kind, double left, double right)
 }
 
 static bool
+FoldModule(ExclusiveContext* cx, ParseNode* node, Parser<FullParseHandler>& parser)
+{
+    MOZ_ASSERT(node->isKind(PNK_MODULE));
+    MOZ_ASSERT(node->isArity(PN_CODE));
+
+    ParseNode*& moduleBody = node->pn_body;
+    MOZ_ASSERT(moduleBody);
+    return Fold(cx, &moduleBody, parser, false);
+}
+
+static bool
 FoldBinaryArithmetic(ExclusiveContext* cx, ParseNode* node, Parser<FullParseHandler>& parser,
                      bool inGenexpLambda)
 {
@@ -1760,10 +1771,13 @@ Fold(ExclusiveContext* cx, ParseNode** pnp, Parser<FullParseHandler>& parser, bo
       case PNK_COMPUTED_NAME:
       case PNK_SPREAD:
       case PNK_EXPORT:
-      case PNK_EXPORT_DEFAULT:
       case PNK_VOID:
         MOZ_ASSERT(pn->isArity(PN_UNARY));
         return Fold(cx, &pn->pn_kid, parser, inGenexpLambda);
+
+      case PNK_EXPORT_DEFAULT:
+        MOZ_ASSERT(pn->isArity(PN_BINARY));
+        return Fold(cx, &pn->pn_left, parser, inGenexpLambda);
 
       case PNK_SEMI:
         MOZ_ASSERT(pn->isArity(PN_UNARY));
@@ -1777,6 +1791,9 @@ Fold(ExclusiveContext* cx, ParseNode** pnp, Parser<FullParseHandler>& parser, bo
 
       case PNK_FUNCTION:
         return FoldFunction(cx, pn, parser, inGenexpLambda);
+
+      case PNK_MODULE:
+        return FoldModule(cx, pn, parser);
 
       case PNK_SUB:
       case PNK_STAR:
@@ -1816,7 +1833,6 @@ Fold(ExclusiveContext* cx, ParseNode** pnp, Parser<FullParseHandler>& parser, bo
       case PNK_TEMPLATE_STRING_LIST:
       case PNK_VAR:
       case PNK_CONST:
-      case PNK_GLOBALCONST:
       case PNK_LET:
       case PNK_ARGSBODY:
       case PNK_CALLSITEOBJ:

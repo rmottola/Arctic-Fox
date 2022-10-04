@@ -19,7 +19,7 @@ function registerAddonResourceHandler(data) {
   return "resource://" + resourceName + "/";
 }
 
-let mainModule;
+var mainModule;
 
 function install(data, reason) {}
 function uninstall(data, reason) {}
@@ -31,7 +31,7 @@ function startup(data, reason) {
     Cu.import('resource://gre/modules/commonjs/toolkit/loader.js').Loader;
   let { Loader, Require, Main } = loaderModule;
 
-  const { ConsoleAPI } = Cu.import("resource://gre/modules/devtools/Console.jsm");
+  const { ConsoleAPI } = Cu.import("resource://gre/modules/devtools/shared/Console.jsm");
 
   let loader = Loader({
     paths: {

@@ -20,6 +20,7 @@
 #ifndef nsIPresShell_h___
 #define nsIPresShell_h___
 
+#include "mozilla/ArenaObjectID.h"
 #include "mozilla/EventForwards.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/StaticPtr.h"
@@ -246,7 +247,7 @@ public:
    * the same aSize value.  AllocateByObjectID returns zero-filled memory.
    * AllocateByObjectID is infallible and will abort on out-of-memory.
    */
-  void* AllocateByObjectID(nsPresArena::ObjectID aID, size_t aSize)
+  void* AllocateByObjectID(mozilla::ArenaObjectID aID, size_t aSize)
   {
 #ifdef DEBUG
     mPresArenaAllocCount++;
@@ -256,7 +257,7 @@ public:
     return result;
   }
 
-  void FreeByObjectID(nsPresArena::ObjectID aID, void* aPtr)
+  void FreeByObjectID(mozilla::ArenaObjectID aID, void* aPtr)
   {
 #ifdef DEBUG
     mPresArenaAllocCount--;
@@ -289,6 +290,23 @@ public:
 #endif
     if (!mIsDestroying)
       mFrameArena.FreeBySize(aSize, aPtr);
+  }
+
+  template<typename T>
+  void RegisterArenaRefPtr(mozilla::ArenaRefPtr<T>* aPtr)
+  {
+    mFrameArena.RegisterArenaRefPtr(aPtr);
+  }
+
+  template<typename T>
+  void DeregisterArenaRefPtr(mozilla::ArenaRefPtr<T>* aPtr)
+  {
+    mFrameArena.DeregisterArenaRefPtr(aPtr);
+  }
+
+  void ClearArenaRefPtrs(mozilla::ArenaObjectID aObjectID)
+  {
+    mFrameArena.ClearArenaRefPtrs(aObjectID);
   }
 
   nsIDocument* GetDocument() const { return mDocument; }
@@ -507,9 +525,19 @@ public:
     eTreeChange, // mark intrinsic widths dirty on aFrame and its ancestors
     eStyleChange // Do eTreeChange, plus all of aFrame's descendants
   };
+  enum ReflowRootHandling {
+    ePositionOrSizeChange, // aFrame is changing position or size
+    eNoPositionOrSizeChange, // ... NOT changing ...
+    eInferFromBitToAdd // is changing iff (aBitToAdd == NS_FRAME_IS_DIRTY)
+
+    // Note:  With eStyleChange, these can also apply to out-of-flows
+    // in addition to aFrame.
+  };
   virtual void FrameNeedsReflow(nsIFrame *aFrame,
                                 IntrinsicDirty aIntrinsicDirty,
-                                nsFrameState aBitToAdd) = 0;
+                                nsFrameState aBitToAdd,
+                                ReflowRootHandling aRootHandling =
+                                  eInferFromBitToAdd) = 0;
 
   /**
    * Calls FrameNeedsReflow on all fixed position children of the root frame.

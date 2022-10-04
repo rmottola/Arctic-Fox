@@ -113,7 +113,7 @@ protected:
 
     virtual PPluginSurfaceChild*
     AllocPPluginSurfaceChild(const WindowsSharedMemoryHandle&,
-                             const gfxIntSize&, const bool&) override {
+                             const gfx::IntSize&, const bool&) override {
         return new PPluginSurfaceChild();
     }
 
@@ -254,6 +254,8 @@ public:
     void UnscheduleTimer(uint32_t id);
 
     void AsyncCall(PluginThreadCallback aFunc, void* aUserData);
+    // This function is a more general version of AsyncCall
+    void PostChildAsyncCall(ChildAsyncCall* aTask);
 
     int GetQuirks();
 
@@ -380,7 +382,7 @@ private:
     InfallibleTArray<nsCString> mValues;
     NPP_t mData;
     NPWindow mWindow;
-#if defined(XP_MACOSX)
+#if defined(XP_DARWIN)
     double mContentsScaleFactor;
 #endif
     int16_t               mDrawingModel;
@@ -512,7 +514,7 @@ private:
     // Paint plugin content rectangle to surface with bg color filling
     void PaintRectToSurface(const nsIntRect& aRect,
                             gfxASurface* aSurface,
-                            const gfxRGBA& aColor);
+                            const gfx::Color& aColor);
 
     // Render plugin content to surface using
     // white/black image alpha extraction algorithm

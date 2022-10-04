@@ -45,6 +45,7 @@
 #include "nsThemeConstants.h"
 #include "nsTransitionManager.h"
 #include "nsDisplayList.h"
+#include "nsIDOMXULSelectCntrlItemEl.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventStateManager.h"
 #include "mozilla/EventStates.h"
@@ -1746,7 +1747,7 @@ void nsMenuPopupFrame::ChangeByPage(bool aIsUp)
 
   // Select the new menuitem.
   if (newMenu) {
-    ChangeMenuItem(newMenu, false);
+    ChangeMenuItem(newMenu, false, true);
   }
 }
 
@@ -1777,7 +1778,8 @@ nsMenuPopupFrame::CurrentMenuIsBeingDestroyed()
 
 NS_IMETHODIMP
 nsMenuPopupFrame::ChangeMenuItem(nsMenuFrame* aMenuItem,
-                                 bool aSelectFirstItem)
+                                 bool aSelectFirstItem,
+                                 bool aFromKey)
 {
   if (mCurrentMenu == aMenuItem)
     return NS_OK;
@@ -1804,6 +1806,26 @@ nsMenuPopupFrame::ChangeMenuItem(nsMenuFrame* aMenuItem,
   if (aMenuItem) {
     EnsureMenuItemIsVisible(aMenuItem);
     aMenuItem->SelectMenu(true);
+
+    // On Windows, a menulist should update its value whenever navigation was
+    // done by the keyboard.
+#ifdef XP_WIN
+    if (aFromKey && IsOpen()) {
+      nsIFrame* parentMenu = GetParent();
+      if (parentMenu) {
+        nsCOMPtr<nsIDOMXULMenuListElement> menulist = do_QueryInterface(parentMenu->GetContent());
+        if (menulist) {
+          // Fire a command event as the new item, but we don't want to close
+          // the menu, blink it, or update any other state of the menuitem. The
+          // command event will cause the item to be selected.
+          nsContentUtils::DispatchXULCommand(aMenuItem->GetContent(),
+                                             nsContentUtils::IsCallerChrome(),
+                                             nullptr, PresContext()->PresShell(),
+                                             false, false, false, false);
+        }
+      }
+    }
+#endif
   }
 
   mCurrentMenu = aMenuItem;
@@ -2073,11 +2095,10 @@ nsMenuPopupFrame::MoveToAttributePosition()
   mContent->GetAttr(kNameSpaceID_None, nsGkAtoms::left, left);
   mContent->GetAttr(kNameSpaceID_None, nsGkAtoms::top, top);
   nsresult err1, err2;
-  int32_t xpos = left.ToInteger(&err1);
-  int32_t ypos = top.ToInteger(&err2);
+  mozilla::CSSIntPoint pos(left.ToInteger(&err1), top.ToInteger(&err2));
 
   if (NS_SUCCEEDED(err1) && NS_SUCCEEDED(err2))
-    MoveTo(xpos, ypos, false);
+    MoveTo(pos, false);
 }
 
 void
@@ -2112,10 +2133,10 @@ nsMenuPopupFrame::DestroyFrom(nsIFrame* aDestructRoot)
 
 
 void
-nsMenuPopupFrame::MoveTo(int32_t aLeft, int32_t aTop, bool aUpdateAttrs)
+nsMenuPopupFrame::MoveTo(const CSSIntPoint& aPos, bool aUpdateAttrs)
 {
   nsIWidget* widget = GetWidget();
-  if ((mScreenRect.x == aLeft && mScreenRect.y == aTop) &&
+  if ((mScreenRect.x == aPos.x && mScreenRect.y == aPos.y) &&
       (!widget || widget->GetClientOffset() == mLastClientOffset)) {
     return;
   }
@@ -2136,10 +2157,10 @@ nsMenuPopupFrame::MoveTo(int32_t aLeft, int32_t aTop, bool aUpdateAttrs)
   }
 
   nsPresContext* presContext = PresContext();
-  mAnchorType = aLeft == -1 || aTop == -1 ?
+  mAnchorType = aPos.x == -1 || aPos.y == -1 ?
                 MenuPopupAnchorType_Node : MenuPopupAnchorType_Point;
-  mScreenRect.x = aLeft - presContext->AppUnitsToIntCSSPixels(margin.left);
-  mScreenRect.y = aTop - presContext->AppUnitsToIntCSSPixels(margin.top);
+  mScreenRect.x = aPos.x - presContext->AppUnitsToIntCSSPixels(margin.left);
+  mScreenRect.y = aPos.y - presContext->AppUnitsToIntCSSPixels(margin.top);
 
   SetPopupPosition(nullptr, true, false);
 
@@ -2148,8 +2169,8 @@ nsMenuPopupFrame::MoveTo(int32_t aLeft, int32_t aTop, bool aUpdateAttrs)
                        popup->HasAttr(kNameSpaceID_None, nsGkAtoms::top)))
   {
     nsAutoString left, top;
-    left.AppendInt(aLeft);
-    top.AppendInt(aTop);
+    left.AppendInt(aPos.x);
+    top.AppendInt(aPos.y);
     popup->SetAttr(kNameSpaceID_None, nsGkAtoms::left, left, false);
     popup->SetAttr(kNameSpaceID_None, nsGkAtoms::top, top, false);
   }

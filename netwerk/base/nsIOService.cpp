@@ -7,6 +7,7 @@
 #include "mozilla/DebugOnly.h"
 
 #include "nsIOService.h"
+#include "nsIDOMNode.h"
 #include "nsIProtocolHandler.h"
 #include "nsIFileProtocolHandler.h"
 #include "nscore.h"
@@ -20,6 +21,7 @@
 #include "nsIProxiedProtocolHandler.h"
 #include "nsIProxyInfo.h"
 #include "nsEscape.h"
+#include "nsNetUtil.h"
 #include "nsNetCID.h"
 #include "nsCRT.h"
 #include "nsSecCheckWrapChannel.h"
@@ -42,6 +44,7 @@
 #include "nsThreadUtils.h"
 #include "mozilla/LoadInfo.h"
 #include "mozilla/net/NeckoCommon.h"
+#include "mozilla/Services.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/net/DNS.h"
 #include "CaptivePortalService.h"
@@ -176,6 +179,9 @@ nsIOService::nsIOService()
     , mAutoDialEnabled(false)
     , mNetworkNotifyChanged(true)
     , mPreviousWifiState(-1)
+    , mLastOfflineStateChange(PR_IntervalNow())
+    , mLastConnectivityChange(PR_IntervalNow())
+    , mLastNetworkLinkChange(PR_IntervalNow())
 {
 }
 
@@ -506,6 +512,10 @@ nsIOService::GetProtocolHandler(const char* scheme, nsIProtocolHandler* *result)
         }
 
 #ifdef MOZ_ENABLE_GIO
+        // check to see whether GVFS can handle this URI scheme.  if it can
+        // create a nsIURI for the "scheme:", then we assume it has support for
+        // the requested protocol.  otherwise, we failover to using the default
+        // protocol handler.
 
         rv = CallGetService(NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX"moz-gio",
                             result);
@@ -522,7 +532,6 @@ nsIOService::GetProtocolHandler(const char* scheme, nsIProtocolHandler* *result)
 
             NS_RELEASE(*result);
         }
-
 #endif
     }
 
@@ -552,6 +561,9 @@ nsIOService::GetProtocolFlags(const char* scheme, uint32_t *flags)
     nsresult rv = GetProtocolHandler(scheme, getter_AddRefs(handler));
     if (NS_FAILED(rv)) return rv;
 
+    // We can't call DoGetProtocolFlags here because we don't have a URI. This
+    // API is used by (and only used by) extensions, which is why it's still
+    // around. Calling this on a scheme with dynamic flags will throw.
     rv = handler->GetProtocolFlags(flags);
     return rv;
 }
@@ -664,7 +676,7 @@ nsIOService::NewChannelFromURIWithLoadInfo(nsIURI* aURI,
 NS_IMETHODIMP
 nsIOService::NewChannelFromURI(nsIURI *aURI, nsIChannel **result)
 {
-  NS_WARNING("Deprecated, use NewChannelFromURI2 providing loadInfo arguments!");
+  NS_ASSERTION(false, "Deprecated, use NewChannelFromURI2 providing loadInfo arguments!");
   return NewChannelFromURI2(aURI,
                             nullptr, // aLoadingNode
                             nullptr, // aLoadingPrincipal
@@ -717,7 +729,7 @@ nsIOService::NewChannelFromURIWithProxyFlagsInternal(nsIURI* aURI,
         return rv;
 
     uint32_t protoFlags;
-    rv = handler->GetProtocolFlags(&protoFlags);
+    rv = handler->DoGetProtocolFlags(aURI, &protoFlags);
     if (NS_FAILED(rv))
         return rv;
 
@@ -829,10 +841,8 @@ nsIOService::NewChannelFromURIWithProxyFlags2(nsIURI* aURI,
                                        loadingNode,
                                        aSecurityFlags,
                                        aContentPolicyType);
-      if (!loadInfo) {
-        return NS_ERROR_UNEXPECTED;
-      }
     }
+    NS_ASSERTION(loadInfo, "Please pass security info when creating a channel");
     return NewChannelFromURIWithProxyFlagsInternal(aURI,
                                                    aProxyURI,
                                                    aProxyFlags,
@@ -856,7 +866,7 @@ nsIOService::NewChannelFromURIWithProxyFlags(nsIURI *aURI,
                                              uint32_t aProxyFlags,
                                              nsIChannel **result)
 {
-  NS_WARNING("Deprecated, use NewChannelFromURIWithProxyFlags2 providing loadInfo arguments!");
+  NS_ASSERTION(false, "Deprecated, use NewChannelFromURIWithProxyFlags2 providing loadInfo arguments!");
   return NewChannelFromURIWithProxyFlags2(aURI,
                                           aProxyURI,
                                           aProxyFlags,
@@ -906,7 +916,7 @@ nsIOService::NewChannel2(const nsACString& aSpec,
 NS_IMETHODIMP
 nsIOService::NewChannel(const nsACString &aSpec, const char *aCharset, nsIURI *aBaseURI, nsIChannel **result)
 {
-  NS_WARNING("Deprecated, use NewChannel2 providing loadInfo arguments!");
+  NS_ASSERTION(false, "Deprecated, use NewChannel2 providing loadInfo arguments!");
   return NewChannel2(aSpec,
                      aCharset,
                      aBaseURI,
@@ -1002,6 +1012,7 @@ nsIOService::SetOffline(bool offline)
             if (mSocketTransportService)
                 mSocketTransportService->SetOffline(true);
 
+            mLastOfflineStateChange = PR_IntervalNow();
             if (observerService)
                 observerService->NotifyObservers(subject,
                                                  NS_IOSERVICE_OFFLINE_STATUS_TOPIC,
@@ -1022,12 +1033,14 @@ nsIOService::SetOffline(bool offline)
             if (mProxyService)
                 mProxyService->ReloadPAC();
 
+            mLastOfflineStateChange = PR_IntervalNow();
             // don't care if notification fails
             // Only send the ONLINE notification if there is connectivity
-            if (observerService && mConnectivity)
+            if (observerService && mConnectivity) {
                 observerService->NotifyObservers(subject,
                                                  NS_IOSERVICE_OFFLINE_STATUS_TOPIC,
                                                  NS_LITERAL_STRING(NS_IOSERVICE_ONLINE).get());
+            }
         }
     }
 
@@ -1077,6 +1090,10 @@ nsIOService::SetConnectivityInternal(bool aConnectivity)
         return NS_OK;
     }
     mConnectivity = aConnectivity;
+
+    // This is used for PR_Connect PR_Close telemetry so it is important that
+    // we have statistic about network change event even if we are offline.
+    mLastConnectivityChange = PR_IntervalNow();
 
     nsCOMPtr<nsIObserverService> observerService =
         mozilla::services::GetObserverService();
@@ -1348,6 +1365,46 @@ nsIOService::EnumerateWifiAppsChangingState(const unsigned int &aKey,
     return PL_DHASH_NEXT;
 }
 
+class
+nsWakeupNotifier : public nsRunnable
+{
+public:
+    explicit nsWakeupNotifier(nsIIOServiceInternal *ioService)
+        :mIOService(ioService)
+    { }
+
+    NS_IMETHOD Run()
+    {
+        return mIOService->NotifyWakeup();
+    }
+
+private:
+    virtual ~nsWakeupNotifier() { }
+    nsCOMPtr<nsIIOServiceInternal> mIOService;
+};
+
+NS_IMETHODIMP
+nsIOService::NotifyWakeup()
+{
+    nsCOMPtr<nsIObserverService> observerService =
+        mozilla::services::GetObserverService();
+
+    NS_ASSERTION(observerService, "The observer service should not be null");
+
+    if (observerService && mNetworkNotifyChanged) {
+        (void)observerService->
+            NotifyObservers(nullptr,
+                            NS_NETWORK_LINK_TOPIC,
+                            MOZ_UTF16(NS_NETWORK_LINK_DATA_CHANGED));
+    }
+
+    if (mCaptivePortalService) {
+        mCaptivePortalService->RecheckCaptivePortal();
+    }
+
+    return NS_OK;
+}
+
 // nsIObserver interface
 NS_IMETHODIMP
 nsIOService::Observe(nsISupports *subject,
@@ -1391,6 +1448,7 @@ nsIOService::Observe(nsISupports *subject,
 
         if (mCaptivePortalService) {
             static_cast<CaptivePortalService*>(mCaptivePortalService.get())->Stop();
+            mCaptivePortalService = nullptr;
         }
 
         // Break circular reference.
@@ -1399,21 +1457,10 @@ nsIOService::Observe(nsISupports *subject,
         OnNetworkLinkEvent(NS_ConvertUTF16toUTF8(data).get());
     } else if (!strcmp(topic, NS_WIDGET_WAKE_OBSERVER_TOPIC)) {
         // coming back alive from sleep
-        nsCOMPtr<nsIObserverService> observerService =
-            mozilla::services::GetObserverService();
-
-        NS_ASSERTION(observerService, "The observer service should not be null");
-
-        if (observerService && mNetworkNotifyChanged) {
-            (void)observerService->
-                NotifyObservers(nullptr,
-                                NS_NETWORK_LINK_TOPIC,
-                                MOZ_UTF16(NS_NETWORK_LINK_DATA_CHANGED));
-        }
-
-        if (mCaptivePortalService) {
-            mCaptivePortalService->RecheckCaptivePortal();
-        }
+        // this indirection brought to you by:
+        // https://bugzilla.mozilla.org/show_bug.cgi?id=1152048#c19
+        nsCOMPtr<nsIRunnable> wakeupNotifier = new nsWakeupNotifier(this);
+        NS_DispatchToMainThread(wakeupNotifier);
     } else if (!strcmp(topic, kNetworkActiveChanged)) {
 #ifdef MOZ_WIDGET_GONK
         if (IsNeckoChild()) {
@@ -1481,15 +1528,17 @@ nsIOService::ProtocolHasFlags(nsIURI   *uri,
     nsAutoCString scheme;
     nsresult rv = uri->GetScheme(scheme);
     NS_ENSURE_SUCCESS(rv, rv);
-  
-    uint32_t protocolFlags;
-    rv = GetProtocolFlags(scheme.get(), &protocolFlags);
 
-    if (NS_SUCCEEDED(rv)) {
-        *result = (protocolFlags & flags) == flags;
-    }
-  
-    return rv;
+    // Grab the protocol flags from the URI.
+    uint32_t protocolFlags;
+    nsCOMPtr<nsIProtocolHandler> handler;
+    rv = GetProtocolHandler(scheme.get(), getter_AddRefs(handler));
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = handler->DoGetProtocolFlags(uri, &protocolFlags);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    *result = (protocolFlags & flags) == flags;
+    return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -1615,6 +1664,7 @@ nsIOService::OnNetworkLinkEvent(const char *data)
 
     bool isUp = true;
     if (!strcmp(data, NS_NETWORK_LINK_DATA_CHANGED)) {
+        mLastNetworkLinkChange = PR_IntervalNow();
         // CHANGED means UP/DOWN didn't change
         return NS_OK;
     } else if (!strcmp(data, NS_NETWORK_LINK_DATA_DOWN)) {

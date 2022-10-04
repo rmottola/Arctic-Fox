@@ -145,7 +145,7 @@ static const std::string strSampleSdpAudioVideoNoIce =
 static const std::string strSampleCandidate =
   "a=candidate:1 1 UDP 2130706431 192.168.2.1 50005 typ host\r\n";
 
-static const std::string strSampleMid = "";
+static const std::string strSampleMid = "sdparta";
 
 static const unsigned short nSamplelevel = 2;
 
@@ -645,9 +645,9 @@ class PCDispatchWrapper : public nsSupportsWeakReference
   }
 
   NS_IMETHODIMP Initialize(TestObserver* aObserver,
-                      nsGlobalWindow* aWindow,
-                      const IceConfiguration& aConfiguration,
-                      nsIThread* aThread) {
+                           nsGlobalWindow* aWindow,
+                           const PeerConnectionConfiguration& aConfiguration,
+                           nsIThread* aThread) {
     nsresult rv;
 
     observer_ = aObserver;
@@ -906,12 +906,14 @@ class SignalingAgent {
     mExpectRtcpMuxAudio(true),
     mExpectRtcpMuxVideo(true),
     mRemoteDescriptionSet(false) {
-    cfg_.addStunServer(stun_addr, stun_port);
+    cfg_.addStunServer(stun_addr, stun_port, kNrIceTransportUdp);
+    cfg_.addStunServer(stun_addr, stun_port, kNrIceTransportTcp);
 
     PeerConnectionImpl *pcImpl =
       PeerConnectionImpl::CreatePeerConnection();
     EXPECT_TRUE(pcImpl);
     pcImpl->SetAllowIceLoopback(true);
+    pcImpl->SetAllowIceLinkLocal(true);
     pc = new PCDispatchWrapper(pcImpl);
   }
 
@@ -938,6 +940,11 @@ class SignalingAgent {
   void SetBundleEnabled(bool enabled)
   {
     mBundleEnabled = enabled;
+  }
+
+  void SetBundlePolicy(JsepBundlePolicy policy)
+  {
+    cfg_.setBundlePolicy(policy);
   }
 
   void SetExpectedFrameRequestType(VideoSessionConduit::FrameRequestType type)
@@ -1425,6 +1432,7 @@ class SignalingAgent {
 
     // Verify that adding ICE candidates does not change the signaling state
     ASSERT_EQ(signaling_state(), endState);
+    ASSERT_NE("", mid);
   }
 
   int GetPacketsReceived(const std::string& streamId) const
@@ -1538,7 +1546,7 @@ public:
   std::string offer_;
   std::string answer_;
   std::vector<nsRefPtr<DOMMediaStream>> domMediaStreams_;
-  IceConfiguration cfg_;
+  PeerConnectionConfiguration cfg_;
   const std::string name;
   bool mBundleEnabled;
   VideoSessionConduit::FrameRequestType mExpectedFrameRequestType;
@@ -1699,18 +1707,33 @@ public:
 
     a1_ = new SignalingAgent(callerName, stun_addr_, stun_port_);
     a2_ = new SignalingAgent(calleeName, stun_addr_, stun_port_);
-    a1_->Init();
-    a2_->Init();
+
     if (GetParam() == "no_bundle") {
       a1_->SetBundleEnabled(false);
     } else if(GetParam() == "reject_bundle") {
       a2_->SetBundleEnabled(false);
+    } else if (GetParam() == "max-bundle") {
+      a1_->SetBundlePolicy(JsepBundlePolicy::kBundleMaxBundle);
+      a2_->SetBundlePolicy(JsepBundlePolicy::kBundleMaxBundle);
+    } else if (GetParam() == "balanced") {
+      a1_->SetBundlePolicy(JsepBundlePolicy::kBundleBalanced);
+      a2_->SetBundlePolicy(JsepBundlePolicy::kBundleBalanced);
+    } else if (GetParam() == "max-compat") {
+      a1_->SetBundlePolicy(JsepBundlePolicy::kBundleMaxCompat);
+      a2_->SetBundlePolicy(JsepBundlePolicy::kBundleMaxCompat);
     }
 
+    a1_->Init();
+    a2_->Init();
     a1_->SetPeer(a2_.get());
     a2_->SetPeer(a1_.get());
 
     init_ = true;
+  }
+
+  bool UseBundle()
+  {
+    return (GetParam() != "no_bundle") && (GetParam() != "reject_bundle");
   }
 
   void WaitForGather() {
@@ -2468,7 +2491,7 @@ TEST_P(SignalingTest, RenegotiationAnswererReplacesTrack)
 
 TEST_P(SignalingTest, BundleRenegotiation)
 {
-  if (GetParam() == "bundle") {
+  if (UseBundle()) {
     // We don't support ICE restart, which is a prereq for renegotiating bundle
     // off.
     return;
@@ -3375,7 +3398,7 @@ TEST_P(SignalingTest, AudioOnlyG722Rejected)
 
 TEST_P(SignalingTest, FullCallAudioNoMuxVideoMux)
 {
-  if (GetParam() == "bundle") {
+  if (UseBundle()) {
     // This test doesn't make sense for bundle
     return;
   }
@@ -4508,7 +4531,7 @@ TEST_P(SignalingTest, AudioNegotiationFails)
 
 TEST_P(SignalingTest, BundleStreamCorrelationBySsrc)
 {
-  if (GetParam() != "bundle") {
+  if (!UseBundle()) {
     return;
   }
 
@@ -4556,7 +4579,7 @@ TEST_P(SignalingTest, BundleStreamCorrelationBySsrc)
 
 TEST_P(SignalingTest, BundleStreamCorrelationByUniquePt)
 {
-  if (GetParam() != "bundle") {
+  if (!UseBundle()) {
     return;
   }
 
@@ -4607,7 +4630,9 @@ TEST_P(SignalingTest, BundleStreamCorrelationByUniquePt)
 }
 
 INSTANTIATE_TEST_CASE_P(Variants, SignalingTest,
-                        ::testing::Values("bundle",
+                        ::testing::Values("max-bundle",
+                                          "balanced",
+                                          "max-compat",
                                           "no_bundle",
                                           "reject_bundle"));
 
@@ -4708,7 +4733,7 @@ int main(int argc, char **argv) {
   // Adds a listener to the end.  Google Test takes the ownership.
   listeners.Append(new test::RingbufferDumper(test_utils));
   test_utils->sts_target()->Dispatch(
-    WrapRunnableNM(&TestStunServer::GetInstance), NS_DISPATCH_SYNC);
+    WrapRunnableNM(&TestStunServer::GetInstance, AF_INET), NS_DISPATCH_SYNC);
 
   // Set the main thread global which is this thread.
   nsIThread *thread;

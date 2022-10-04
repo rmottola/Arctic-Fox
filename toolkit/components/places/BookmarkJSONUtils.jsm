@@ -462,10 +462,16 @@ BookmarkImporter.prototype = {
           this._importPromises.push(kwPromise);
         }
         if (aData.tags) {
-          // TODO (bug 967196) the tagging service should trim by itself.
-          let tags = aData.tags.split(",").map(tag => tag.trim());
-          if (tags.length)
-            PlacesUtils.tagging.tagURI(NetUtil.newURI(aData.uri), tags);
+          let tags = aData.tags.split(",").filter(aTag =>
+            aTag.length <= Ci.nsITaggingService.MAX_TAG_LENGTH);
+          if (tags.length) {
+            try {
+              PlacesUtils.tagging.tagURI(NetUtil.newURI(aData.uri), tags);
+            } catch (ex) {
+              // Invalid tag child, skip it.
+              Cu.reportError(`Unable to set tags "${tags.join(", ")}" for ${aData.uri}: ${ex}`);
+            }
+          }
         }
         if (aData.charset) {
           PlacesUtils.annotations.setPageAnnotation(

@@ -49,7 +49,7 @@ InterpreterFrame::initExecuteFrame(JSContext* cx, HandleScript script, AbstractF
     // newTarget = NullValue is an initial sentinel for "please fill me in from the stack".
     // It should never be passed from Ion code.
     RootedValue newTarget(cx, newTargetValue);
-    if (!(flags_ & (GLOBAL))) {
+    if (!(flags_ & (GLOBAL | MODULE))) {
         if (evalInFramePrev) {
             MOZ_ASSERT(evalInFramePrev.isFunctionFrame() || evalInFramePrev.isGlobalFrame());
             if (evalInFramePrev.isFunctionFrame()) {
@@ -83,7 +83,7 @@ InterpreterFrame::initExecuteFrame(JSContext* cx, HandleScript script, AbstractF
         exec.fun = &callee->as<JSFunction>();
         u.evalScript = script;
     } else {
-        MOZ_ASSERT(isGlobalFrame());
+        MOZ_ASSERT(isGlobalFrame() || isModuleFrame());
         dstvp[1] = NullValue();
         exec.script = script;
 #ifdef DEBUG
@@ -109,10 +109,10 @@ InterpreterFrame::initExecuteFrame(JSContext* cx, HandleScript script, AbstractF
 }
 
 bool
-InterpreterFrame::isDirectEvalFrame() const
+InterpreterFrame::isNonGlobalEvalFrame() const
 {
     return isEvalFrame() &&
-           script()->enclosingStaticScope()->as<StaticEvalObject>().isDirect();
+           script()->enclosingStaticScope()->as<StaticEvalObject>().isNonGlobal();
 }
 
 bool
@@ -140,15 +140,24 @@ static inline void
 AssertDynamicScopeMatchesStaticScope(JSContext* cx, JSScript* script, JSObject* scope)
 {
 #ifdef DEBUG
+    RootedObject originalScope(cx, scope);
     RootedObject enclosingScope(cx, script->enclosingStaticScope());
     for (StaticScopeIter<NoGC> i(enclosingScope); !i.done(); i++) {
         if (i.type() == StaticScopeIter<NoGC>::NonSyntactic) {
-            while (scope->is<DynamicWithObject>() || scope->is<NonSyntacticVariablesObject>()) {
+            while (scope->is<DynamicWithObject>() ||
+                   scope->is<NonSyntacticVariablesObject>() ||
+                   (scope->is<ClonedBlockObject>() &&
+                    !scope->as<ClonedBlockObject>().isSyntactic()))
+            {
                 MOZ_ASSERT(!IsSyntacticScope(scope));
                 scope = &scope->as<ScopeObject>().enclosingScope();
             }
         } else if (i.hasSyntacticDynamicScopeObject()) {
             switch (i.type()) {
+              case StaticScopeIter<NoGC>::Module:
+                MOZ_ASSERT(scope->as<ModuleEnvironmentObject>().module().script() == i.moduleScript());
+                scope = &scope->as<ModuleEnvironmentObject>().enclosingScope();
+                break;
               case StaticScopeIter<NoGC>::Function:
                 MOZ_ASSERT(scope->as<CallObject>().callee().nonLazyScript() == i.funScript());
                 scope = &scope->as<CallObject>().enclosingScope();
@@ -174,7 +183,14 @@ AssertDynamicScopeMatchesStaticScope(JSContext* cx, JSScript* script, JSObject* 
         }
     }
 
-    MOZ_ASSERT(scope->is<GlobalObject>() || scope->is<DebugScopeObject>());
+    // In the case of a non-syntactic scope chain, the immediate parent of the
+    // outermost non-syntactic scope may be the global lexical scope, or, if
+    // called from Debugger, a DebugScopeObject.
+    //
+    // In the case of a syntactic scope chain, the outermost scope is always a
+    // GlobalObject.
+    MOZ_ASSERT(scope->is<GlobalObject>() || IsGlobalLexicalScope(scope) ||
+               scope->is<DebugScopeObject>());
 #endif
 }
 
@@ -194,6 +210,7 @@ InterpreterFrame::prologue(JSContext* cx)
 {
     RootedScript script(cx, this->script());
 
+    MOZ_ASSERT(isModuleFrame() == !!script->module());
     MOZ_ASSERT(cx->interpreterRegs().pc == script->code());
 
     if (isEvalFrame()) {
@@ -203,17 +220,42 @@ InterpreterFrame::prologue(JSContext* cx)
                 return false;
             pushOnScopeChain(*callobj);
             flags_ |= HAS_CALL_OBJ;
+        } else {
+            // Non-strict eval may introduce var bindings that conflict with
+            // lexical bindings in an enclosing lexical scope.
+            RootedObject varObjRoot(cx, &varObj());
+            if (!CheckEvalDeclarationConflicts(cx, script, scopeChain(), varObjRoot))
+                return false;
         }
         return probes::EnterScript(cx, script, nullptr, this);
     }
 
-    if (isGlobalFrame())
+    if (isGlobalFrame()) {
+        Rooted<ClonedBlockObject*> lexicalScope(cx);
+        RootedObject varObjRoot(cx);
+        if (script->hasNonSyntacticScope()) {
+            lexicalScope = &extensibleLexicalScope();
+            varObjRoot = &varObj();
+        } else {
+            lexicalScope = &cx->global()->lexicalScope();
+            varObjRoot = cx->global();
+        }
+        if (!CheckGlobalDeclarationConflicts(cx, script, lexicalScope, varObjRoot))
+            return false;
         return probes::EnterScript(cx, script, nullptr, this);
+    }
 
-    MOZ_ASSERT(isNonEvalFunctionFrame());
     AssertDynamicScopeMatchesStaticScope(cx, script, scopeChain());
 
-    if (fun()->isHeavyweight() && !initFunctionScopeObjects(cx))
+    if (isModuleFrame()) {
+        RootedModuleEnvironmentObject scope(cx, &script->module()->initialEnvironment());
+        MOZ_ASSERT(&scope->enclosingScope() == scopeChain());
+        pushOnScopeChain(*scope);
+        return probes::EnterScript(cx, script, nullptr, this);
+    }
+
+    MOZ_ASSERT(isNonEvalFunctionFrame());
+    if (fun()->needsCallObject() && !initFunctionScopeObjects(cx))
         return false;
 
     if (isConstructing() && functionThis().isPrimitive()) {
@@ -239,34 +281,28 @@ InterpreterFrame::epilogue(JSContext* cx)
             MOZ_ASSERT_IF(hasCallObj(), scopeChain()->as<CallObject>().isForEval());
             if (MOZ_UNLIKELY(cx->compartment()->isDebuggee()))
                 DebugScopes::onPopStrictEvalScope(this);
-        } else if (isDirectEvalFrame()) {
+        } else if (isNonGlobalEvalFrame()) {
             MOZ_ASSERT_IF(isDebuggerEvalFrame(), !IsSyntacticScope(scopeChain()));
-        } else {
-            /*
-             * Debugger.Object.prototype.evalInGlobal creates indirect eval
-             * frames scoped to the given global;
-             * Debugger.Object.prototype.evalInGlobalWithBindings creates
-             * indirect eval frames scoped to an object carrying the introduced
-             * bindings.
-             */
-            if (isDebuggerEvalFrame()) {
-                MOZ_ASSERT(scopeChain()->is<GlobalObject>() ||
-                           scopeChain()->enclosingScope()->is<GlobalObject>());
-            } else {
-                MOZ_ASSERT(scopeChain()->is<GlobalObject>());
-            }
         }
         return;
     }
 
     if (isGlobalFrame()) {
-        MOZ_ASSERT(!IsSyntacticScope(scopeChain()));
+        // Confusingly, global frames may run in non-global scopes (that is,
+        // not directly under the GlobalObject and its lexical scope).
+        //
+        // Gecko often runs global scripts under custom scopes. See users of
+        // CreateNonSyntacticScopeChain.
+        MOZ_ASSERT(IsGlobalLexicalScope(scopeChain()) || !IsSyntacticScope(scopeChain()));
         return;
     }
 
+    if (isModuleFrame())
+        return;
+
     MOZ_ASSERT(isNonEvalFunctionFrame());
 
-    if (fun()->isHeavyweight()) {
+    if (fun()->needsCallObject()) {
         MOZ_ASSERT_IF(hasCallObj() && !fun()->isGenerator(),
                       scopeChain()->as<CallObject>().callee().nonLazyScript() == script);
     } else {
@@ -296,11 +332,11 @@ InterpreterFrame::pushBlock(JSContext* cx, StaticBlockObject& block)
 }
 
 bool
-InterpreterFrame::freshenBlock(JSContext *cx)
+InterpreterFrame::freshenBlock(JSContext* cx)
 {
     MOZ_ASSERT(flags_ & HAS_SCOPECHAIN);
     Rooted<ClonedBlockObject*> block(cx, &scopeChain_->as<ClonedBlockObject>());
-    ClonedBlockObject *fresh = ClonedBlockObject::clone(cx, block);
+    ClonedBlockObject* fresh = ClonedBlockObject::clone(cx, block);
     if (!fresh)
         return false;
 
@@ -326,7 +362,7 @@ InterpreterFrame::popWith(JSContext* cx)
 }
 
 void
-InterpreterFrame::mark(JSTracer *trc)
+InterpreterFrame::mark(JSTracer* trc)
 {
     /*
      * Normally we would use MarkRoot here, except that generators also take
@@ -751,9 +787,17 @@ FrameIter::Data*
 FrameIter::copyData() const
 {
     Data* data = data_.cx_->new_<Data>(data_);
+    if (!data)
+        return nullptr;
+
     MOZ_ASSERT(data_.state_ != ASMJS);
     if (data && data_.jitFrames_.isIonScripted())
         data->ionInlineFrameNo_ = ionInlineFrames_.frameNo();
+    // Give the copied Data the cx of the current activation, which may be
+    // different than the cx that the current FrameIter was constructed
+    // with. This ensures that when we instantiate another FrameIter with the
+    // copied data, its cx is still alive.
+    data->cx_ = activation()->cx();
     return data;
 }
 
@@ -1185,7 +1229,7 @@ FrameIter::scopeChain(JSContext* cx) const
 CallObject&
 FrameIter::callObj(JSContext* cx) const
 {
-    MOZ_ASSERT(calleeTemplate()->isHeavyweight());
+    MOZ_ASSERT(calleeTemplate()->needsCallObject());
 
     JSObject* pobj = scopeChain(cx);
     while (!pobj->is<CallObject>())
@@ -1515,8 +1559,11 @@ jit::JitActivation::getRematerializedFrame(JSContext* cx, const JitFrameIterator
 
     if (!rematerializedFrames_) {
         rematerializedFrames_ = cx->new_<RematerializedFrameTable>(cx);
-        if (!rematerializedFrames_ || !rematerializedFrames_->init()) {
+        if (!rematerializedFrames_)
+            return nullptr;
+        if (!rematerializedFrames_->init()) {
             rematerializedFrames_ = nullptr;
+            ReportOutOfMemory(cx);
             return nullptr;
         }
     }
@@ -1525,8 +1572,10 @@ jit::JitActivation::getRematerializedFrame(JSContext* cx, const JitFrameIterator
     RematerializedFrameTable::AddPtr p = rematerializedFrames_->lookupForAdd(top);
     if (!p) {
         RematerializedFrameVector empty(cx);
-        if (!rematerializedFrames_->add(p, top, Move(empty)))
+        if (!rematerializedFrames_->add(p, top, Move(empty))) {
+            ReportOutOfMemory(cx);
             return nullptr;
+        }
 
         // The unit of rematerialization is an uninlined frame and its inlined
         // frames. Since inlined frames do not exist outside of snapshots, it
@@ -1727,7 +1776,7 @@ ActivationIterator::settle()
         activation_ = activation_->prev();
 }
 
-JS::ProfilingFrameIterator::ProfilingFrameIterator(JSRuntime *rt, const RegisterState &state,
+JS::ProfilingFrameIterator::ProfilingFrameIterator(JSRuntime* rt, const RegisterState& state,
                                                    uint32_t sampleBufferGen)
   : rt_(rt),
     sampleBufferGen_(sampleBufferGen),

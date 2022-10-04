@@ -6,7 +6,7 @@
 /* This content script should work in any browser or iframe and should not
  * depend on the frame being contained in tabbrowser. */
 
-let {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -49,8 +49,8 @@ XPCOMUtils.defineLazyGetter(this, "PageMenuChild", function() {
   Cu.import("resource://gre/modules/PageMenu.jsm", tmp);
   return new tmp.PageMenuChild();
 });
-
-XPCOMUtils.defineLazyModuleGetter(this, "Feeds", "resource:///modules/Feeds.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Feeds",
+  "resource:///modules/Feeds.jsm");
 
 // TabChildGlobal
 var global = this;
@@ -68,6 +68,9 @@ addMessageListener("RemoteLogins:fillForm", function(message) {
 addEventListener("DOMFormHasPassword", function(event) {
   LoginManagerContent.onDOMFormHasPassword(event, content);
   InsecurePasswordUtils.checkForInsecurePasswords(event.target);
+});
+addEventListener("DOMInputPasswordAdded", function(event) {
+  LoginManagerContent.onDOMInputPasswordAdded(event, content);
 });
 addEventListener("pageshow", function(event) {
   LoginManagerContent.onPageShow(event, content);
@@ -110,7 +113,7 @@ if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
 } else {
 }
 
-let handleContentContextMenu = function (event) {
+var handleContentContextMenu = function (event) {
   let defaultPrevented = event.defaultPrevented;
   if (!Services.prefs.getBoolPref("dom.event.contextmenu.enabled")) {
     let plugin = null;
@@ -145,6 +148,7 @@ let handleContentContextMenu = function (event) {
   let frameOuterWindowID = doc.defaultView.QueryInterface(Ci.nsIInterfaceRequestor)
                                           .getInterface(Ci.nsIDOMWindowUtils)
                                           .outerWindowID;
+  let loginFillInfo = LoginManagerContent.getFieldContext(event.target);
 
   // get referrer attribute from clicked link and parse it
   // if per element referrer is enabled, the element referrer overrules
@@ -206,7 +210,8 @@ let handleContentContextMenu = function (event) {
                    { editFlags, spellInfo, customMenuItems, addonInfo,
                      principal, docLocation, charSet, baseURI, referrer,
                      referrerPolicy, contentType, contentDisposition,
-                     frameOuterWindowID, selectionInfo, disableSetDesktopBg },
+                     frameOuterWindowID, selectionInfo, disableSetDesktopBg,
+                     loginFillInfo, },
                    { event, popupNode: event.target });
   }
   else {
@@ -228,6 +233,7 @@ let handleContentContextMenu = function (event) {
       contentDisposition: contentDisposition,
       selectionInfo: selectionInfo,
       disableSetDesktopBackground: disableSetDesktopBg,
+      loginFillInfo,
     };
   }
 }
@@ -236,7 +242,7 @@ Cc["@mozilla.org/eventlistenerservice;1"]
   .getService(Ci.nsIEventListenerService)
   .addSystemEventListener(global, "contextmenu", handleContentContextMenu, false);
 
-let AboutNetErrorListener = {
+var AboutNetErrorListener = {
   init: function(chromeGlobal) {
     chromeGlobal.addEventListener('AboutNetErrorLoad', this, false, true);
     chromeGlobal.addEventListener('AboutNetErrorSetAutomatic', this, false, true);
@@ -351,7 +357,8 @@ let AboutNetErrorListener = {
 
 AboutNetErrorListener.init(this);
 
-let ClickEventHandler = {
+
+var ClickEventHandler = {
   init: function init() {
     Cc["@mozilla.org/eventlistenerservice;1"]
       .getService(Ci.nsIEventListenerService)
@@ -365,6 +372,9 @@ let ClickEventHandler = {
 
     let originalTarget = event.originalTarget;
     let ownerDoc = originalTarget.ownerDocument;
+    if (!ownerDoc) {
+      return;
+    }
 
     // Handle click events from about pages
     if (ownerDoc.documentURI.startsWith("about:certerror")) {
@@ -374,7 +384,7 @@ let ClickEventHandler = {
       this.onAboutBlocked(originalTarget, ownerDoc);
       return;
     } else if (ownerDoc.documentURI.startsWith("about:neterror")) {
-      this.onAboutNetError(originalTarget, ownerDoc);
+      this.onAboutNetError(event, ownerDoc.documentURI);
       return;
     }
 
@@ -467,12 +477,18 @@ let ClickEventHandler = {
     });
   },
 
-  onAboutNetError: function (targetElement, ownerDoc) {
-    let elmId = targetElement.getAttribute("id");
-    if (elmId != "errorTryAgain" || !/e=netOffline/.test(ownerDoc.documentURI)) {
+  onAboutNetError: function (event, documentURI) {
+    let elmId = event.originalTarget.getAttribute("id");
+    if (elmId != "errorTryAgain" || !/e=netOffline/.test(documentURI)) {
       return;
     }
-    sendSyncMessage("Browser:NetworkError", {});
+    // browser front end will handle clearing offline mode and refreshing
+    // the page *if* we're in offline mode now. Otherwise let the error page
+    // handle the click.
+    if (Services.io.offline) {
+      event.preventDefault();
+      sendAsyncMessage("Browser:EnableOnlineMode", {});
+    }
   },
 
   /**
@@ -528,7 +544,7 @@ ClickEventHandler.init();
 ContentLinkHandler.init(this);
 
 // TODO: Load this lazily so the JSM is run only if a relevant event/message fires.
-let pluginContent = new PluginContent(global);
+var pluginContent = new PluginContent(global);
 
 addEventListener("DOMWebNotificationClicked", function(event) {
   sendAsyncMessage("DOMWebNotificationClicked", {});
@@ -539,6 +555,8 @@ addEventListener("DOMServiceWorkerFocusClient", function(event) {
 }, false);
 
 ContentWebRTC.init();
+addMessageListener("rtcpeer:Allow", ContentWebRTC);
+addMessageListener("rtcpeer:Deny", ContentWebRTC);
 addMessageListener("webrtc:Allow", ContentWebRTC);
 addMessageListener("webrtc:Deny", ContentWebRTC);
 addMessageListener("webrtc:StopSharing", ContentWebRTC);
@@ -551,7 +569,7 @@ addEventListener("pageshow", function(event) {
   }
 });
 
-let PageMetadataMessenger = {
+var PageMetadataMessenger = {
   init() {
     addMessageListener("PageMetadata:GetPageData", this);
     addMessageListener("PageMetadata:GetMicrodata", this);
@@ -642,6 +660,13 @@ addMessageListener("ContextMenu:ReloadImage", (message) => {
     image.forceReload();
 });
 
+addMessageListener("ContextMenu:BookmarkFrame", (message) => {
+  let frame = message.objects.target.ownerDocument;
+  sendAsyncMessage("ContextMenu:BookmarkFrame:Result",
+                   { title: frame.title,
+                     description: PlacesUIUtils.getDescriptionFromDocument(frame) });
+});
+
 addMessageListener("ContextMenu:SearchFieldBookmarkData", (message) => {
   let node = message.objects.target;
 
@@ -712,12 +737,22 @@ addMessageListener("ContextMenu:SearchFieldBookmarkData", (message) => {
                    { spec, title, description, postData, charset });
 });
 
+addMessageListener("Bookmarks:GetPageDetails", (message) => {
+  let doc = content.document;
+  let isErrorPage = /^about:(neterror|certerror|blocked)/.test(doc.documentURI);
+  sendAsyncMessage("Bookmarks:GetPageDetails:Result",
+                   { isErrorPage: isErrorPage,
+                     description: PlacesUIUtils.getDescriptionFromDocument(doc) });
+});
+
+
 addMessageListener("ContextMenu:BookmarkFrame", (message) => {
   let frame = message.objects.target.ownerDocument;
   sendAsyncMessage("ContextMenu:BookmarkFrame:Result",
                    { title: frame.title,
                      description: PlacesUIUtils.getDescriptionFromDocument(frame) });
 });
+
 
 function disableSetDesktopBackground(aTarget) {
   // Disable the Set as Desktop Background menu item if we're still trying
@@ -768,7 +803,7 @@ addMessageListener("ContextMenu:SetAsDesktopBackground", (message) => {
     sendAsyncMessage("ContextMenu:SetAsDesktopBackground:Result", { disable });
 });
 
-let pageInfoListener = {
+var pageInfoListener = {
 
   init: function(chromeGlobal) {
     chromeGlobal.addMessageListener("PageInfo:getData", this, false, true);

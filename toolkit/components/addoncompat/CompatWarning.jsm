@@ -13,9 +13,9 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Preferences.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-                                  "resource://gre/modules/devtools/Console.jsm");
+                                  "resource://gre/modules/devtools/shared/Console.jsm");
 
-let CompatWarning = {
+var CompatWarning = {
   warn: function CompatWarning_warn(msg, url) {
 
     if (!Preferences.get("dom.ipc.shims.enabledWarnings", false))

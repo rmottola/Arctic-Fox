@@ -207,7 +207,7 @@ CreateNPObjectMember(NPP npp, JSContext *cx,
 const static js::Class sNPObjectJSWrapperClass =
   {
     NPRUNTIME_JSCLASS_NAME,
-    JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS,
+    JSCLASS_HAS_PRIVATE,
     NPObjWrapper_AddProperty,
     NPObjWrapper_DelProperty,
     NPObjWrapper_GetProperty,
@@ -215,7 +215,6 @@ const static js::Class sNPObjectJSWrapperClass =
     nullptr,
     NPObjWrapper_Resolve,
     nullptr,                                                /* mayResolve */
-    nullptr,                                                /* convert */
     NPObjWrapper_Finalize,
     NPObjWrapper_Call,
     nullptr,                                                /* hasInstance */
@@ -269,9 +268,9 @@ NPObjectMember_toPrimitive(JSContext *cx, unsigned argc, JS::Value *vp);
 
 static const JSClass sNPObjectMemberClass =
   {
-    "NPObject Ambiguous Member class", JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS,
+    "NPObject Ambiguous Member class", JSCLASS_HAS_PRIVATE,
     nullptr, nullptr, NPObjectMember_GetProperty, nullptr,
-    nullptr, nullptr, nullptr, nullptr,
+    nullptr, nullptr, nullptr,
     NPObjectMember_Finalize, NPObjectMember_Call,
     nullptr, nullptr, NPObjectMember_Trace
   };
@@ -2306,14 +2305,14 @@ NPObjectMember_toPrimitive(JSContext *cx, unsigned argc, JS::Value *vp)
   if (!memberPrivate)
     return false;
 
-  JSType type;
-  if (!JS::GetFirstArgumentAsTypeHint(cx, args, &type))
+  JSType hint;
+  if (!JS::GetFirstArgumentAsTypeHint(cx, args, &hint))
     return false;
 
   args.rval().set(memberPrivate->fieldValue);
   if (args.rval().isObject()) {
     JS::Rooted<JSObject*> objVal(cx, &args.rval().toObject());
-    return JS_DefaultValue(cx, objVal, type, args.rval());
+    return JS::ToPrimitive(cx, objVal, hint, args.rval());
   }
   return true;
 }

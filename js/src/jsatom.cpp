@@ -94,7 +94,7 @@ const char js_with_str[]            = "with";
 // which create a small number of atoms.
 static const uint32_t JS_STRING_HASH_COUNT = 64;
 
-AtomSet::Ptr js::FrozenAtomSet::readonlyThreadsafeLookup(const AtomSet::Lookup &l) const {
+AtomSet::Ptr js::FrozenAtomSet::readonlyThreadsafeLookup(const AtomSet::Lookup& l) const {
     return mSet->readonlyThreadsafeLookup(l);
 }
 
@@ -264,7 +264,7 @@ JSRuntime::sweepAtoms()
 }
 
 bool
-JSRuntime::transformToPermanentAtoms(JSContext *cx)
+JSRuntime::transformToPermanentAtoms(JSContext* cx)
 {
     MOZ_ASSERT(!parentRuntime);
 
@@ -498,7 +498,12 @@ js::ToAtom(ExclusiveContext* cx, typename MaybeRooted<Value, allowGC>::HandleTyp
     if (str->isAtom())
         return &str->asAtom();
 
-    return AtomizeString(cx, str);
+    JSAtom* atom = AtomizeString(cx, str);
+    if (!atom && !allowGC) {
+        MOZ_ASSERT_IF(cx->isJSContext(), cx->asJSContext()->isThrowingOutOfMemory());
+        cx->recoverFromOutOfMemory();
+    }
+    return atom;
 }
 
 template JSAtom*

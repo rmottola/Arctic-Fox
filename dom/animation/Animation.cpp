@@ -569,7 +569,7 @@ Animation::CanThrottle() const
     return true;
   }
 
-  return mIsRunningOnCompositor;
+  return IsRunningOnCompositor();
 }
 
 void
@@ -763,11 +763,6 @@ Animation::DoPause(ErrorResult& aRv)
     CancelPendingTasks();
     reuseReadyPromise = true;
   }
-
-  // Mark this as no longer running on the compositor so that next time
-  // we update animations we won't throttle them and will have a chance
-  // to remove the animation from any layer it might be on.
-  mIsRunningOnCompositor = false;
 
   if (!reuseReadyPromise) {
     // Clear ready promise. We'll create a new one lazily.
@@ -1162,6 +1157,12 @@ Animation::DispatchPlaybackEvent(const nsAString& aName)
   nsRefPtr<AsyncEventDispatcher> asyncDispatcher =
     new AsyncEventDispatcher(this, event);
   asyncDispatcher->PostDOMEvent();
+}
+
+bool
+Animation::IsRunningOnCompositor() const
+{
+  return mEffect && mEffect->IsRunningOnCompositor();
 }
 
 } // namespace dom

@@ -178,7 +178,7 @@ public:
 
   // Creates and allocates a TextureClient usable with Moz2D.
   static already_AddRefed<TextureClient>
-  CreateForDrawing(ISurfaceAllocator* aAllocator,
+  CreateForDrawing(CompositableForwarder* aAllocator,
                    gfx::SurfaceFormat aFormat,
                    gfx::IntSize aSize,
                    BackendSelector aSelector,
@@ -382,7 +382,7 @@ public:
 
   void MarkImmutable() { AddFlags(TextureFlags::IMMUTABLE); }
 
-  bool IsSharedWithCompositor() const { return mShared; }
+  bool IsSharedWithCompositor() const;
 
   bool ShouldDeallocateInDestructor() const;
 
@@ -444,7 +444,7 @@ public:
     mReleaseFenceHandle.Merge(aReleaseFenceHandle);
   }
 
-  FenceHandle GetAndResetReleaseFenceHandle()
+  virtual FenceHandle GetAndResetReleaseFenceHandle()
   {
     FenceHandle fence;
     mReleaseFenceHandle.TransferToAnotherFenceHandle(fence);
@@ -456,7 +456,7 @@ public:
     mAcquireFenceHandle = aAcquireFenceHandle;
   }
 
-  const FenceHandle& GetAcquireFenceHandle() const
+  virtual const FenceHandle& GetAcquireFenceHandle() const
   {
     return mAcquireFenceHandle;
   }

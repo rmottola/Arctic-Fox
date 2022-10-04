@@ -3565,7 +3565,6 @@ nsPluginHost::AddHeadersToChannel(const char *aHeadersData,
       return rv;
     }
   }
-  return rv;
 }
 
 nsresult

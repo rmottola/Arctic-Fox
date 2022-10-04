@@ -34,13 +34,13 @@
 #include "jit/MIRGenerator.h"
 #include "jit/MoveEmitter.h"
 #include "jit/RangeAnalysis.h"
+#include "jit/SharedICHelpers.h"
 #include "vm/MatchPairs.h"
 #include "vm/RegExpStatics.h"
 #include "vm/TraceLogging.h"
 
 #include "jsboolinlines.h"
 
-#include "jit/AtomicOperations-inl.h"
 #include "jit/MacroAssembler-inl.h"
 #include "jit/shared/CodeGenerator-shared-inl.h"
 #include "jit/shared/Lowering-shared-inl.h"
@@ -657,7 +657,7 @@ CodeGenerator::getJumpLabelForBranch(MBasicBlock* block)
     // important here as these tests are extremely unlikely to be used in loop
     // backedges, so emit inline code for the patchable jump. Heap allocating
     // the label allows it to be used by out of line blocks.
-    Label* res = alloc().lifoAlloc()->new_<Label>();
+    Label* res = alloc().lifoAlloc()->newInfallible<Label>();
     Label after;
     masm.jump(&after);
     masm.bind(res);
@@ -3713,9 +3713,8 @@ CodeGenerator::visitCheckOverRecursed(LCheckOverRecursed* lir)
     masm.bind(ool->rejoin());
 }
 
-typedef bool (*DefVarOrConstFn)(JSContext*, HandlePropertyName, unsigned, HandleObject);
-static const VMFunction DefVarOrConstInfo =
-    FunctionInfo<DefVarOrConstFn>(DefVarOrConst);
+typedef bool (*DefVarFn)(JSContext*, HandlePropertyName, unsigned, HandleObject);
+static const VMFunction DefVarInfo = FunctionInfo<DefVarFn>(DefVar);
 
 void
 CodeGenerator::visitDefVar(LDefVar* lir)
@@ -3726,7 +3725,19 @@ CodeGenerator::visitDefVar(LDefVar* lir)
     pushArg(Imm32(lir->mir()->attrs())); // unsigned
     pushArg(ImmGCPtr(lir->mir()->name())); // PropertyName*
 
-    callVM(DefVarOrConstInfo, lir);
+    callVM(DefVarInfo, lir);
+}
+
+typedef bool (*DefLexicalFn)(JSContext*, HandlePropertyName, unsigned);
+static const VMFunction DefLexicalInfo = FunctionInfo<DefLexicalFn>(DefGlobalLexical);
+
+void
+CodeGenerator::visitDefLexical(LDefLexical* lir)
+{
+    pushArg(Imm32(lir->mir()->attrs())); // unsigned
+    pushArg(ImmGCPtr(lir->mir()->name())); // PropertyName*
+
+    callVM(DefLexicalInfo, lir);
 }
 
 typedef bool (*DefFunOperationFn)(JSContext*, HandleScript, HandleObject, HandleFunction);
@@ -4219,12 +4230,12 @@ CodeGenerator::visitNewArrayCallVM(LNewArray* lir)
     if (templateObject) {
         pushArg(Imm32(lir->mir()->convertDoubleElements()));
         pushArg(ImmGCPtr(templateObject->group()));
-        pushArg(Imm32(lir->mir()->count()));
+        pushArg(Imm32(lir->mir()->length()));
 
         callVM(NewArrayWithGroupInfo, lir);
     } else {
         pushArg(Imm32(GenericObject));
-        pushArg(Imm32(lir->mir()->count()));
+        pushArg(Imm32(lir->mir()->length()));
         pushArg(ImmPtr(lir->mir()->pc()));
         pushArg(ImmGCPtr(lir->mir()->block()->info().script()));
 
@@ -4300,9 +4311,9 @@ CodeGenerator::visitNewArray(LNewArray* lir)
     Register objReg = ToRegister(lir->output());
     Register tempReg = ToRegister(lir->temp());
     JSObject* templateObject = lir->mir()->templateObject();
-    DebugOnly<uint32_t> count = lir->mir()->count();
+    DebugOnly<uint32_t> length = lir->mir()->length();
 
-    MOZ_ASSERT(count < NativeObject::NELEMENTS_LIMIT);
+    MOZ_ASSERT(length <= NativeObject::MAX_DENSE_ELEMENTS_COUNT);
 
     if (lir->mir()->shouldUseVM()) {
         visitNewArrayCallVM(lir);
@@ -6945,7 +6956,7 @@ CodeGenerator::visitOutOfLineStoreElementHole(OutOfLineStoreElementHole* ool)
                        key, &callStub);
 
         // Update initialized length. The capacity guard above ensures this won't overflow,
-        // due to NELEMENTS_LIMIT.
+        // due to MAX_DENSE_ELEMENTS_COUNT.
         masm.bumpKey(&key, 1);
         masm.storeKey(key, Address(elements, ObjectElements::offsetOfInitializedLength()));
 
@@ -8207,7 +8218,7 @@ CodeGenerator::link(JSContext* cx, CompilerConstraintList* constraints)
         for (size_t i = 0; i < graph.numConstants(); i++) {
             const Value& v = vp[i];
             if (v.isObject() && IsInsideNursery(&v.toObject())) {
-                cx->runtime()->gc.storeBuffer.putWholeCellFromMainThread(script);
+                cx->runtime()->gc.storeBuffer.putWholeCell(script);
                 break;
             }
         }
@@ -10252,6 +10263,17 @@ void
 CodeGenerator::visitThrowUninitializedLexical(LThrowUninitializedLexical* ins)
 {
     callVM(ThrowUninitializedLexicalInfo, ins);
+}
+
+typedef bool (*GlobalNameConflictsCheckFromIonFn)(JSContext*, HandleScript);
+static const VMFunction GlobalNameConflictsCheckFromIonInfo =
+    FunctionInfo<GlobalNameConflictsCheckFromIonFn>(GlobalNameConflictsCheckFromIon);
+
+void
+CodeGenerator::visitGlobalNameConflictsCheck(LGlobalNameConflictsCheck* ins)
+{
+    pushArg(ImmGCPtr(ins->mirRaw()->block()->info().script()));
+    callVM(GlobalNameConflictsCheckFromIonInfo, ins);
 }
 
 void

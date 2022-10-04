@@ -160,6 +160,8 @@ public:
   NS_IMETHOD RedirectTo(nsIURI *newURI) override;
   NS_IMETHOD GetSchedulingContextID(nsID *aSCID) override;
   NS_IMETHOD SetSchedulingContextID(const nsID aSCID) override;
+  NS_IMETHOD GetIsMainDocumentChannel(bool* aValue) override;
+  NS_IMETHOD SetIsMainDocumentChannel(bool aValue) override;
 
   // nsIHttpChannelInternal
   NS_IMETHOD GetDocumentURI(nsIURI **aDocumentURI) override;
@@ -194,7 +196,6 @@ public:
   NS_IMETHOD SetNetworkInterfaceId(const nsACString& aNetworkInterfaceId) override;
   NS_IMETHOD ForcePending(bool aForcePending) override;
   NS_IMETHOD GetLastModifiedTime(PRTime* lastModifiedTime) override;
-  NS_IMETHOD ForceNoIntercept() override;
   NS_IMETHOD GetCorsIncludeCredentials(bool* aInclude) override;
   NS_IMETHOD SetCorsIncludeCredentials(bool aInclude) override;
   NS_IMETHOD GetCorsMode(uint32_t* aCorsMode) override;
@@ -314,6 +315,8 @@ protected:
   // GetPrincipal Returns the channel's URI principal.
   nsIPrincipal *GetURIPrincipal();
 
+  bool BypassServiceWorker() const;
+
   // Returns true if this channel should intercept the network request and prepare
   // for a possible synthesized response instead.
   bool ShouldIntercept();
@@ -393,9 +396,6 @@ protected:
   // pass the Resource Timing timing-allow-check
   uint32_t                          mAllRedirectsPassTimingAllowCheck : 1;
 
-  // True if this channel should skip any interception checks
-  uint32_t                          mForceNoIntercept           : 1;
-
   // If true, we behave as if the LOAD_FROM_CACHE flag has been set.
   // Used to enforce that flag's behavior but not expose it externally.
   uint32_t                          mAllowStaleCacheContent : 1;
@@ -467,6 +467,8 @@ protected:
   bool                              mWithCredentials;
   nsTArray<nsCString>               mUnsafeHeaders;
   nsCOMPtr<nsIPrincipal>            mPreflightPrincipal;
+
+  bool mForceMainDocumentChannel;
 };
 
 // Share some code while working around C++'s absurd inability to handle casting

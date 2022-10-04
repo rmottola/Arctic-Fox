@@ -30,6 +30,7 @@
 #include "nsPrintfCString.h"
 #include "nsRenderingContext.h"
 #include "nsSVGIntegrationUtils.h"
+#include "mozilla/LayerTimelineMarker.h"
 
 #include "mozilla/Move.h"
 #include "mozilla/ReverseIterator.h"
@@ -227,6 +228,24 @@ FrameLayerBuilder::DisplayItemData::~DisplayItemData()
   if (sAliveDisplayItemDatas->Count() == 0) {
     delete sAliveDisplayItemDatas;
     sAliveDisplayItemDatas = nullptr;
+  }
+}
+
+void
+FrameLayerBuilder::DisplayItemData::ClearAnimationCompositorState()
+{
+  if (mDisplayItemKey != nsDisplayItem::TYPE_TRANSFORM &&
+      mDisplayItemKey != nsDisplayItem::TYPE_OPACITY) {
+    return;
+  }
+
+  for (nsIFrame* frame : mFrameList) {
+    nsCSSProperty prop = mDisplayItemKey == nsDisplayItem::TYPE_TRANSFORM ?
+      eCSSProperty_transform : eCSSProperty_opacity;
+    frame->PresContext()->AnimationManager()->
+      ClearIsRunningOnCompositor(frame, prop);
+    frame->PresContext()->TransitionManager()->
+      ClearIsRunningOnCompositor(frame, prop);
   }
 }
 
@@ -1023,10 +1042,10 @@ public:
     MOZ_ASSERT_IF(isAtRoot, mContainerReferenceFrame == mBuilder->RootReferenceFrame());
     mContainerAnimatedGeometryRoot = isAtRoot
       ? mContainerReferenceFrame
-      : nsLayoutUtils::GetAnimatedGeometryRootFor(aContainerItem, aBuilder, aManager);
+      : nsLayoutUtils::GetAnimatedGeometryRootFor(aContainerItem, aBuilder);
     MOZ_ASSERT(nsLayoutUtils::IsAncestorFrameCrossDoc(mBuilder->RootReferenceFrame(),
                                                       mContainerAnimatedGeometryRoot));
-    NS_ASSERTION(!aContainerItem || !aContainerItem->ShouldFixToViewport(aManager),
+    NS_ASSERTION(!aContainerItem || !aContainerItem->ShouldFixToViewport(mBuilder),
                  "Container items never return true for ShouldFixToViewport");
     mContainerFixedPosFrame =
         FindFixedPosFrameForLayerData(mContainerAnimatedGeometryRoot, false);
@@ -1401,8 +1420,7 @@ public:
     mXScale(1.f), mYScale(1.f),
     mAppUnitsPerDevPixel(0),
     mTranslation(0, 0),
-    mAnimatedGeometryRootPosition(0, 0),
-    mNeedsRecomputeVisibility(false) {}
+    mAnimatedGeometryRootPosition(0, 0) {}
 
   /**
    * Record the number of clips in the PaintedLayer's mask layer.
@@ -1474,10 +1492,12 @@ public:
   nsRefPtr<ColorLayer> mColorLayer;
   nsRefPtr<ImageLayer> mImageLayer;
 
-  // True if the display items for this layer have changed and we need a call
-  // to RecomputeVisibilityForItems before painting them. This can be false
-  // during the latter iterations of progressive painting.
-  bool mNeedsRecomputeVisibility;
+  // The region for which display item visibility for this layer has already
+  // been calculated. Used to reduce the number of calls to
+  // RecomputeVisibilityForItems if it is known in advance that a larger
+  // region will be painted during a transaction than in a single call to
+  // DrawPaintedLayer, for example when progressive paint is enabled.
+  nsIntRegion mVisibilityComputedRegion;
 };
 
 /*
@@ -1556,7 +1576,7 @@ FrameLayerBuilder::FlashPaint(gfxContext *aContext)
   float r = float(rand()) / RAND_MAX;
   float g = float(rand()) / RAND_MAX;
   float b = float(rand()) / RAND_MAX;
-  aContext->SetColor(gfxRGBA(r, g, b, 0.4));
+  aContext->SetColor(Color(r, g, b, 0.4f));
   aContext->Paint();
 }
 
@@ -1798,6 +1818,7 @@ FrameLayerBuilder::WillEndTransaction()
                                       GetLastPaintOffset(t));
       }
 
+      data->ClearAnimationCompositorState();
       iter.Remove();
     } else {
       ComputeGeometryChangeForItem(data);
@@ -2073,21 +2094,30 @@ ContainerState::GetLayerCreationHint(const nsIFrame* aAnimatedGeometryRoot)
 {
   // Check whether the layer will be scrollable. This is used as a hint to
   // influence whether tiled layers are used or not.
-  if (mParameters.mInLowPrecisionDisplayPort) {
-    return LayerManager::SCROLLABLE;
-  }
-  nsIFrame* animatedGeometryRootParent = aAnimatedGeometryRoot->GetParent();
-  nsIScrollableFrame* scrollable = do_QueryFrame(animatedGeometryRootParent);
-  if (scrollable
-#ifdef MOZ_B2G
-      && scrollable->WantAsyncScroll()
-#endif
-     ) {
-    // WantAsyncScroll() returns false when the frame has overflow:hidden,
-    // so we won't create tiled layers for overflow:hidden frames even if
-    // they have a display port. The main purpose of the WantAsyncScroll check
-    // is to allow the B2G camera app to use hardware composer for compositing.
-    return LayerManager::SCROLLABLE;
+
+  // Check whether there's any active scroll frame on the animated geometry
+  // root chain.
+  nsIFrame* fParent;
+  for (const nsIFrame* f = aAnimatedGeometryRoot;
+       f != mContainerAnimatedGeometryRoot;
+       f = nsLayoutUtils::GetAnimatedGeometryRootForFrame(mBuilder,
+           fParent, mContainerAnimatedGeometryRoot)) {
+    fParent = nsLayoutUtils::GetCrossDocParentFrame(f);
+    if (!fParent) {
+      break;
+    }
+    nsIScrollableFrame* scrollable = do_QueryFrame(fParent);
+    if (scrollable
+  #ifdef MOZ_B2G
+        && scrollable->WantAsyncScroll()
+  #endif
+       ) {
+      // WantAsyncScroll() returns false when the frame has overflow:hidden,
+      // so we won't create tiled layers for overflow:hidden frames even if
+      // they have a display port. The main purpose of the WantAsyncScroll check
+      // is to allow the B2G camera app to use hardware composer for compositing.
+      return LayerManager::SCROLLABLE;
+    }
   }
   return LayerManager::NONE;
 }
@@ -2319,7 +2349,7 @@ ContainerState::PreparePaintedLayerForUse(PaintedLayer* aLayer,
 
   ComputeAndSetIgnoreInvalidationRect(aLayer, aData, aAnimatedGeometryRoot, mBuilder, pixOffset);
 
-  aData->mNeedsRecomputeVisibility = true;
+  aData->mVisibilityComputedRegion.SetEmpty();
 
   // FIXME: Temporary workaround for bug 681192 and bug 724786.
 #ifndef MOZ_WIDGET_ANDROID
@@ -3067,7 +3097,7 @@ already_AddRefed<Layer>
 ContainerState::PrepareColorLayer(PaintedLayerData* aData)
 {
   nsRefPtr<ColorLayer> colorLayer = CreateOrRecycleColorLayer(aData->mLayer);
-  colorLayer->SetColor(aData->mSolidColor);
+  colorLayer->SetColor(Color::FromABGR(aData->mSolidColor));
 
   // Copy transform
   colorLayer->SetBaseTransform(aData->mLayer->GetBaseTransform());
@@ -3233,7 +3263,23 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
     // use a mask layer for rounded rect clipping.
     // data->mCommonClipCount may be -1 if we haven't put any actual
     // drawable items in this layer (i.e. it's only catching events).
-    int32_t commonClipCount = std::max(0, data->mCommonClipCount);
+    int32_t commonClipCount;
+    // If the layer contains a single item fixed to the viewport, we removed
+    // its clip in ProcessDisplayItems() and saved it to set on the layer instead.
+    // Set the clip on the layer now.
+    if (data->mSingleItemFixedToViewport && data->mItemClip.HasClip()) {
+      nsIntRect layerClipRect = ScaleToNearestPixels(data->mItemClip.GetClipRect());
+      layerClipRect.MoveBy(mParameters.mOffset);
+      data->mLayer->SetClipRect(Some(ViewAs<ParentLayerPixel>(layerClipRect)));
+      // There is only one item, so all of the clips are in common to all items.
+      // data->mCommonClipCount will be zero because we removed the clip from
+      // the display item. (It could also be -1 if we're inside an inactive
+      // layer tree in which we don't call UpdateCommonClipCount() at all.)
+      MOZ_ASSERT(data->mCommonClipCount == -1 || data->mCommonClipCount == 0);
+      commonClipCount = data->mItemClip.GetRoundedRectCount();
+    } else {
+      commonClipCount = std::max(0, data->mCommonClipCount);
+    }
     SetupMaskLayer(layer, data->mItemClip, data->mVisibleRegion, commonClipCount);
     // copy commonClipCount to the entry
     FrameLayerBuilder::PaintedLayerItemsEntry* entry = mLayerBuilder->
@@ -3314,7 +3360,6 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
     regions.mNoActionRegion = ScaleRegionToOutsidePixels(data->mNoActionRegion);
     regions.mHorizontalPanRegion = ScaleRegionToOutsidePixels(data->mHorizontalPanRegion);
     regions.mVerticalPanRegion = ScaleRegionToOutsidePixels(data->mVerticalPanRegion);
-
     // Points whose hit-region status we're not sure about need to be dispatched
     // to the content thread. If a point is in both maybeHitRegion and hitRegion
     // then it's not a "maybe" any more, and doesn't go into the dispatch-to-
@@ -3325,7 +3370,7 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
         ScaleRegionToOutsidePixels(data->mDispatchToContentHitRegion));
     regions.mHitRegion.OrWith(maybeHitRegion);
 
-    Matrix mat = layer->GetBaseTransform().As2D();
+    Matrix mat = layer->GetTransform().As2D();
     mat.Invert();
     regions.ApplyTranslationAndScale(mat._31, mat._32, mat._11, mat._22);
 
@@ -3476,7 +3521,7 @@ PaintedLayerData::Accumulate(ContainerState* aState,
        // transparent are always added to the opaque region. This helps ensure
        // that we get as much subpixel-AA as possible in the chrome.
        if (tmp.GetNumRects() <= 4 || aItem->Frame()->PresContext()->IsChrome()) {
-        mOpaqueRegion = tmp;
+        mOpaqueRegion = Move(tmp);
       }
     }
   }
@@ -3567,9 +3612,9 @@ DumpPaintedImage(nsDisplayItem* aItem, SourceSurface* aSurface)
   nsCString string(aItem->Name());
   string.Append('-');
   string.AppendInt((uint64_t)aItem);
-  fprintf_stderr(gfxUtils::sDumpPaintFile, "array[\"%s\"]=\"", string.BeginReading());
+  fprintf_stderr(gfxUtils::sDumpPaintFile, "<script>array[\"%s\"]=\"", string.BeginReading());
   gfxUtils::DumpAsDataURI(aSurface, gfxUtils::sDumpPaintFile);
-  fprintf_stderr(gfxUtils::sDumpPaintFile, "\";");
+  fprintf_stderr(gfxUtils::sDumpPaintFile, "\";</script>\n");
 }
 #endif
 
@@ -3653,7 +3698,7 @@ ContainerState::ChooseAnimatedGeometryRoot(const nsDisplayList& aList,
     // Try using the actual active scrolled root of the backmost item, as that
     // should result in the least invalidation when scrolling.
     *aAnimatedGeometryRoot =
-      nsLayoutUtils::GetAnimatedGeometryRootFor(item, mBuilder, mManager);
+      nsLayoutUtils::GetAnimatedGeometryRootFor(item, mBuilder);
     return true;
   }
   return false;
@@ -3830,7 +3875,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
     const nsIFrame* animatedGeometryRoot;
     const nsIFrame* animatedGeometryRootForScrollMetadata = nullptr;
     const nsIFrame* realAnimatedGeometryRootOfItem =
-      nsLayoutUtils::GetAnimatedGeometryRootFor(item, mBuilder, mManager);
+      nsLayoutUtils::GetAnimatedGeometryRootFor(item, mBuilder);
     if (mFlattenToSingleLayer) {
       forceInactive = true;
       animatedGeometryRoot = lastAnimatedGeometryRoot;
@@ -3871,6 +3916,19 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
       item->SetClip(mBuilder, clip);
     }
 
+    bool shouldFixToViewport = !animatedGeometryRoot->GetParent() &&
+      item->ShouldFixToViewport(mBuilder);
+
+    // For items that are fixed to the viewport, remove their clip at the
+    // display item level because additional areas could be brought into
+    // view by async scrolling. Save the clip so we can set it on the layer
+    // instead later.
+    DisplayItemClip fixedToViewportClip = DisplayItemClip::NoClip();
+    if (shouldFixToViewport) {
+      fixedToViewportClip = item->GetClip();
+      item->SetClip(mBuilder, DisplayItemClip::NoClip());
+    }
+
     bool snap;
     nsRect itemContent = item->GetBounds(mBuilder, &snap);
     if (itemType == nsDisplayItem::TYPE_LAYER_EVENT_REGIONS) {
@@ -3900,16 +3958,21 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
         bounds.IntersectRect(bounds, itemClip.GetClipRect());
       }
     }
+    bounds = fixedToViewportClip.ApplyNonRoundedIntersection(bounds);
     ((nsRect&)mAccumulatedChildBounds).UnionRect(mAccumulatedChildBounds, bounds);
 #endif
-    // We haven't computed visibility at this point, so item->GetVisibleRect()
-    // is just the dirty rect that item was initialized with. We intersect it
-    // with the clipped item bounds to get a tighter visible rect.
-    nsIntRect itemVisibleRect = itemDrawRect.Intersect(
-      ScaleToOutsidePixels(item->GetVisibleRect(), false));
 
-    bool shouldFixToViewport = !animatedGeometryRoot->GetParent() &&
-      item->ShouldFixToViewport(mManager);
+    nsIntRect itemVisibleRect = itemDrawRect;
+    if (!shouldFixToViewport) {
+      // We haven't computed visibility at this point, so item->GetVisibleRect()
+      // is just the dirty rect that item was initialized with. We intersect it
+      // with the clipped item bounds to get a tighter visible rect.
+      // However, we don't do this for fixed background images, because their
+      // clips can move asynchronously so we want the layer to contain the
+      // whole bounds of the display item.
+      itemVisibleRect = itemVisibleRect.Intersect(
+        ScaleToOutsidePixels(item->GetVisibleRect(), false));
+    }
 
     if (maxLayers != -1 && layerCount >= maxLayers) {
       forceInactive = true;
@@ -4160,6 +4223,13 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
         opaquePixels.AndWith(itemVisibleRect);
         paintedLayerData->Accumulate(this, item, opaquePixels,
             itemVisibleRect, itemClip, layerState);
+
+        // If we removed the clip from the display item above because it's
+        // fixed to the viewport, save it on the PaintedLayerData so we can
+        // set it on the layer later.
+        if (fixedToViewportClip.HasClip()) {
+          paintedLayerData->mItemClip = fixedToViewportClip;
+        }
 
         if (!paintedLayerData->mLayer) {
           // Try to recycle the old layer of this display item.
@@ -4413,6 +4483,15 @@ FrameLayerBuilder::AddPaintedDisplayItem(PaintedLayerData* aLayerData,
       tempManager->SetRoot(tmpLayer);
       layerBuilder->WillEndTransaction();
       tempManager->AbortTransaction();
+
+#ifdef MOZ_DUMP_PAINTING
+      if (gfxUtils::DumpDisplayList() || gfxUtils::sDumpPainting) {
+        fprintf_stderr(gfxUtils::sDumpPaintFile, "Basic layer tree for painting contents of display item %s(%p):\n", aItem->Name(), aItem->Frame());
+        std::stringstream stream;
+        tempManager->Dump(stream, "", gfxUtils::sDumpPaintingToFile);
+        fprint_stderr(gfxUtils::sDumpPaintFile, stream);  // not a typo, fprint_stderr declared in LayersLogging.h
+      }
+#endif
 
       nsIntPoint offset = GetLastPaintOffset(layer) - GetTranslationForPaintedLayer(layer);
       props->MoveBy(-offset);
@@ -4796,6 +4875,11 @@ ContainerState::PostprocessRetainedLayers(nsIntRegion* aOpaqueRegionForContainer
       Maybe<ParentLayerIntRect> clipRect = e->mLayer->GetCombinedClipRect();
       if (clipRect) {
         clippedOpaque.AndWith(ParentLayerIntRect::ToUntyped(*clipRect));
+      }
+      if (e->mLayer->GetIsFixedPosition() && !e->mLayer->IsClipFixed()) {
+        // The clip can move asynchronously, so we can't rely on opaque parts
+        // staying in the same place.
+        clippedOpaque.SetEmpty();
       }
       data->mOpaqueRegion.Or(data->mOpaqueRegion, clippedOpaque);
       if (e->mHideAllLayersBelow) {
@@ -5633,36 +5717,6 @@ static void DrawForcedBackgroundColor(DrawTarget& aDrawTarget,
   }
 }
 
-class LayerTimelineMarker : public TimelineMarker
-{
-public:
-  LayerTimelineMarker(nsDocShell* aDocShell, const nsIntRegion& aRegion)
-    : TimelineMarker(aDocShell, "Layer", TRACING_EVENT)
-    , mRegion(aRegion)
-  {
-  }
-
-  ~LayerTimelineMarker()
-  {
-  }
-
-  virtual void AddLayerRectangles(mozilla::dom::Sequence<mozilla::dom::ProfileTimelineLayerRect>& aRectangles) override
-  {
-    nsIntRegionRectIterator it(mRegion);
-    while (const nsIntRect* iterRect = it.Next()) {
-      mozilla::dom::ProfileTimelineLayerRect rect;
-      rect.mX = iterRect->X();
-      rect.mY = iterRect->Y();
-      rect.mWidth = iterRect->Width();
-      rect.mHeight = iterRect->Height();
-      aRectangles.AppendElement(rect, fallible);
-    }
-  }
-
-private:
-  nsIntRegion mRegion;
-};
-
 /*
  * A note on residual transforms:
  *
@@ -5695,7 +5749,7 @@ private:
 FrameLayerBuilder::DrawPaintedLayer(PaintedLayer* aLayer,
                                    gfxContext* aContext,
                                    const nsIntRegion& aRegionToDraw,
-                                   const nsIntRegion* aDirtyRegion,
+                                   const nsIntRegion& aDirtyRegion,
                                    DrawRegionClip aClip,
                                    const nsIntRegion& aRegionToInvalidate,
                                    void* aCallbackData)
@@ -5748,21 +5802,18 @@ FrameLayerBuilder::DrawPaintedLayer(PaintedLayer* aLayer,
   nsIntPoint offset = GetTranslationForPaintedLayer(aLayer);
   nsPresContext* presContext = entry->mContainerLayerFrame->PresContext();
 
-  if (userData->mNeedsRecomputeVisibility &&
+  if (!userData->mVisibilityComputedRegion.Contains(aDirtyRegion) &&
       !layerBuilder->GetContainingPaintedLayerData()) {
-    // Recompute visibility of items in our PaintedLayer. Note that this
-    // recomputes visibility for all descendants of our display items too,
-    // so there's no need to do this for the items in inactive PaintedLayers.
-    // If aDirtyRegion is non-null then recompute the visibility of the entire
-    // aDirtyRegion at once, rather of aRegionToDraw separately on each call.
+    // Recompute visibility of items in our PaintedLayer, if required. Note
+    // that this recomputes visibility for all descendants of our display
+    // items too, so there's no need to do this for the items in inactive
+    // PaintedLayers. If aDirtyRegion has not changed since the previous call
+    // then we can skip this.
     int32_t appUnitsPerDevPixel = presContext->AppUnitsPerDevPixel();
-    RecomputeVisibilityForItems(entry->mItems, builder,
-                                aDirtyRegion ? *aDirtyRegion : aRegionToDraw,
+    RecomputeVisibilityForItems(entry->mItems, builder, aDirtyRegion,
                                 offset, appUnitsPerDevPixel,
                                 userData->mXScale, userData->mYScale);
-    if (aDirtyRegion) {
-      userData->mNeedsRecomputeVisibility = false;
-    }
+    userData->mVisibilityComputedRegion = aDirtyRegion;
   }
 
   nsRenderingContext rc(aContext);
@@ -5823,8 +5874,7 @@ FrameLayerBuilder::DrawPaintedLayer(PaintedLayer* aLayer,
     bool isRecording;
     docShell->GetRecordProfileTimelineMarkers(&isRecording);
     if (isRecording) {
-      mozilla::UniquePtr<TimelineMarker> marker =
-        MakeUnique<LayerTimelineMarker>(docShell, aRegionToDraw);
+      UniquePtr<TimelineMarker> marker = MakeUnique<LayerTimelineMarker>(aRegionToDraw);
       TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
     }
   }

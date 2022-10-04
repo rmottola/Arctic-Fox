@@ -147,6 +147,9 @@ namespace js {
 
 class SavedStacks {
     friend JSObject* SavedStacksMetadataCallback(JSContext* cx, JSObject* target);
+    friend bool JS::ubi::ConstructSavedFrameStackSlow(JSContext* cx,
+                                                      JS::ubi::StackFrame& ubiFrame,
+                                                      MutableHandleObject outSavedFrameStack);
 
   public:
     SavedStacks()
@@ -178,7 +181,7 @@ class SavedStacks {
     // Similar to mozilla::ReentrancyGuard, but instead of asserting against
     // reentrancy, just change the behavior of SavedStacks::saveCurrentStack to
     // return a nullptr SavedFrame.
-    struct MOZ_STACK_CLASS AutoReentrancyGuard {
+    struct MOZ_RAII AutoReentrancyGuard {
         MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER;
         SavedStacks& stacks;
 
@@ -195,15 +198,15 @@ class SavedStacks {
         }
     };
 
-    bool       insertFrames(JSContext* cx, FrameIter& iter, MutableHandleSavedFrame frame,
-                            unsigned maxFrameCount = 0);
-    bool       adoptAsyncStack(JSContext* cx, HandleSavedFrame asyncStack,
-                               HandleString asyncCause,
-                               MutableHandleSavedFrame adoptedStack,
-                               unsigned maxFrameCount);
+    bool        insertFrames(JSContext* cx, FrameIter& iter, MutableHandleSavedFrame frame,
+                             unsigned maxFrameCount = 0);
+    bool        adoptAsyncStack(JSContext* cx, HandleSavedFrame asyncStack,
+                                HandleString asyncCause,
+                                MutableHandleSavedFrame adoptedStack,
+                                unsigned maxFrameCount);
     SavedFrame* getOrCreateSavedFrame(JSContext* cx, SavedFrame::HandleLookup lookup);
     SavedFrame* createFrameFromLookup(JSContext* cx, SavedFrame::HandleLookup lookup);
-    void       chooseSamplingProbability(JSContext* cx);
+    void        chooseSamplingProbability(JSContext* cx);
 
     // Cache for memoizing PCToLineNumber lookups.
 

@@ -6,15 +6,15 @@
 
 "use strict";
 
-XPCOMUtils.defineLazyGetter(this, "DebuggerServer", function() {
-  Cu.import("resource://gre/modules/devtools/dbg-server.jsm");
-  return DebuggerServer;
-});
-
 XPCOMUtils.defineLazyGetter(this, "devtools", function() {
   const { devtools } =
-    Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+    Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
   return devtools;
+});
+
+XPCOMUtils.defineLazyGetter(this, "DebuggerServer", function() {
+  const { DebuggerServer } = devtools.require("devtools/server/main");
+  return DebuggerServer;
 });
 
 XPCOMUtils.defineLazyGetter(this, "B2GTabList", function() {
@@ -23,7 +23,12 @@ XPCOMUtils.defineLazyGetter(this, "B2GTabList", function() {
   return B2GTabList;
 });
 
-let RemoteDebugger = {
+// Load the discovery module eagerly, so that it can set a device name at
+// startup.  This does not cause discovery to start listening for packets, as
+// that only happens once DevTools is enabled.
+devtools.require("devtools/shared/discovery/discovery");
+
+var RemoteDebugger = {
   _listening: false,
 
   /**
@@ -44,7 +49,7 @@ let RemoteDebugger = {
    *        }
    *        Specific authentication modes may include additional fields.  Check
    *        the different |allowConnection| methods in
-   *        toolkit/devtools/security/auth.js.
+   *        devtools/shared/security/auth.js.
    * @return An AuthenticationResult value.
    *         A promise that will be resolved to the above is also allowed.
    */
@@ -94,7 +99,7 @@ let RemoteDebugger = {
     }
     this._listen();
 
-    const QR = devtools.require("devtools/toolkit/qrcode/index");
+    const QR = devtools.require("devtools/shared/qrcode/index");
     this._receivingOOB = new Promise((resolve, reject) => {
       this._handleAuthEvent = detail => {
         debug(detail.action);
@@ -223,7 +228,7 @@ RemoteDebugger.allowConnection =
 RemoteDebugger.receiveOOB =
   RemoteDebugger.receiveOOB.bind(RemoteDebugger);
 
-let USBRemoteDebugger = {
+var USBRemoteDebugger = {
 
   get isDebugging() {
     if (!this._listener) {
@@ -277,7 +282,7 @@ let USBRemoteDebugger = {
 
 };
 
-let WiFiRemoteDebugger = {
+var WiFiRemoteDebugger = {
 
   start: function() {
     if (this._listener) {

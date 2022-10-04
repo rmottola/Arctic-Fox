@@ -8,9 +8,12 @@ import unittest
 from mozunit import main
 
 from mozbuild.frontend.context import (
+    AbsolutePath,
     Context,
+    ContextDerivedTypedRecord,
     ContextDerivedTypedList,
     ContextDerivedTypedListWithItems,
+    Files,
     FUNCTIONS,
     ObjDirPath,
     Path,
@@ -453,6 +456,18 @@ class TestPaths(unittest.TestCase):
         path = Path(path)
         self.assertIsInstance(path, ObjDirPath)
 
+    def test_absolute_path(self):
+        config = self.config
+        ctxt = Context(config=config)
+        ctxt.push_source(mozpath.join(config.topsrcdir, 'foo', 'moz.build'))
+
+        path = AbsolutePath(ctxt, '%/qux')
+        self.assertEqual(path, '%/qux')
+        self.assertEqual(path.full_path, '/qux')
+
+        with self.assertRaises(ValueError):
+            path = AbsolutePath(ctxt, '%qux')
+
     def test_path_with_mixed_contexts(self):
         config = self.config
         ctxt1 = Context(config=config)
@@ -564,6 +579,95 @@ class TestPaths(unittest.TestCase):
             self.assertEqual(p_path, Path(ctxt1, p_str))
             self.assertEqual(l[p_str].foo, True)
             self.assertEqual(l[p_path].foo, True)
+
+class TestTypedRecord(unittest.TestCase):
+
+    def test_fields(self):
+        T = ContextDerivedTypedRecord(('field1', unicode),
+                                      ('field2', list))
+        inst = T(None)
+        self.assertEqual(inst.field1, '')
+        self.assertEqual(inst.field2, [])
+
+        inst.field1 = 'foo'
+        inst.field2 += ['bar']
+
+        self.assertEqual(inst.field1, 'foo')
+        self.assertEqual(inst.field2, ['bar'])
+
+        with self.assertRaises(AttributeError):
+            inst.field3 = []
+
+    def test_coercion(self):
+        T = ContextDerivedTypedRecord(('field1', unicode),
+                                      ('field2', list))
+        inst = T(None)
+        inst.field1 = 3
+        inst.field2 += ('bar',)
+        self.assertEqual(inst.field1, '3')
+        self.assertEqual(inst.field2, ['bar'])
+
+        with self.assertRaises(TypeError):
+            inst.field2 = object()
+
+
+class TestFiles(unittest.TestCase):
+    def test_aggregate_empty(self):
+        c = Context({})
+
+        files = {'moz.build': Files(c, pattern='**')}
+
+        self.assertEqual(Files.aggregate(files), {
+            'bug_component_counts': [],
+            'recommended_bug_component': None,
+        })
+
+    def test_single_bug_component(self):
+        c = Context({})
+        f = Files(c, pattern='**')
+        f['BUG_COMPONENT'] = (u'Product1', u'Component1')
+
+        files = {'moz.build': f}
+        self.assertEqual(Files.aggregate(files), {
+            'bug_component_counts': [((u'Product1', u'Component1'), 1)],
+            'recommended_bug_component': (u'Product1', u'Component1'),
+        })
+
+    def test_multiple_bug_components(self):
+        c = Context({})
+        f1 = Files(c, pattern='**')
+        f1['BUG_COMPONENT'] = (u'Product1', u'Component1')
+
+        f2 = Files(c, pattern='**')
+        f2['BUG_COMPONENT'] = (u'Product2', u'Component2')
+
+        files = {'a': f1, 'b': f2, 'c': f1}
+        self.assertEqual(Files.aggregate(files), {
+            'bug_component_counts': [
+                ((u'Product1', u'Component1'), 2),
+                ((u'Product2', u'Component2'), 1),
+            ],
+            'recommended_bug_component': (u'Product1', u'Component1'),
+        })
+
+    def test_no_recommended_bug_component(self):
+        """If there is no clear count winner, we don't recommend a bug component."""
+        c = Context({})
+        f1 = Files(c, pattern='**')
+        f1['BUG_COMPONENT'] = (u'Product1', u'Component1')
+
+        f2 = Files(c, pattern='**')
+        f2['BUG_COMPONENT'] = (u'Product2', u'Component2')
+
+        files = {'a': f1, 'b': f2}
+        self.assertEqual(Files.aggregate(files), {
+            'bug_component_counts': [
+                ((u'Product1', u'Component1'), 1),
+                ((u'Product2', u'Component2'), 1),
+            ],
+            'recommended_bug_component': None,
+        })
+
 
 if __name__ == '__main__':
     main()

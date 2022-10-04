@@ -19,7 +19,8 @@ namespace js {
  * Initialize the exception constructor/prototype hierarchy.
  */
 extern JSObject*
-InitExceptionClasses(JSContext *cx, HandleObject obj);
+InitExceptionClasses(JSContext* cx, HandleObject obj);
+
 class ErrorObject : public NativeObject
 {
     static JSObject*
@@ -30,7 +31,7 @@ class ErrorObject : public NativeObject
 
     /* For access to createProto. */
     friend JSObject*
-   js::InitExceptionClasses(JSContext *cx, HandleObject global);
+    js::InitExceptionClasses(JSContext* cx, HandleObject global);
 
     static bool
     init(JSContext* cx, Handle<ErrorObject*> obj, JSExnType type,

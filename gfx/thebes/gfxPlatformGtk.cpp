@@ -19,6 +19,7 @@
 #include "gfxUserFontSet.h"
 #include "gfxUtils.h"
 #include "gfxFT2FontBase.h"
+#include "gfxPrefs.h"
 
 #include "mozilla/gfx/2D.h"
 
@@ -338,6 +339,18 @@ gfxPlatformGtk::GetDPIScale()
     return (dpi > 96) ? round(dpi/96.0) : 1.0;
 }
 
+bool
+gfxPlatformGtk::UseImageOffscreenSurfaces()
+{
+    // We want to turn on image offscreen surfaces ONLY for GTK3 builds since
+    // GTK2 theme rendering still requires xlib surfaces.
+#if (MOZ_WIDGET_GTK == 3)
+    return gfxPrefs::UseImageOffscreenSurfaces();
+#else
+    return false;
+#endif
+}
+
 gfxImageFormat
 gfxPlatformGtk::GetOffscreenFormat()
 {
@@ -348,24 +361,6 @@ gfxPlatformGtk::GetOffscreenFormat()
     }
 
     return gfxImageFormat::RGB24;
-}
-
-static int sDepth = 0;
-
-int
-gfxPlatformGtk::GetScreenDepth() const
-{
-    if (!sDepth) {
-        GdkScreen *screen = gdk_screen_get_default();
-        if (screen) {
-            sDepth = gdk_visual_get_depth(gdk_visual_get_system());
-        } else {
-            sDepth = 24;
-        }
-
-    }
-
-    return sDepth;
 }
 
 void

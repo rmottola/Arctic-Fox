@@ -33,8 +33,10 @@ XPCOMUtils.defineLazyServiceGetter(this, "etld",
  */
 
 // Internal helper methods and state
-let SocialServiceInternal = {
-  get enabled() this.providerArray.length > 0,
+var SocialServiceInternal = {
+  get enabled() {
+    return this.providerArray.length > 0;
+  },
 
   get providerArray() {
     return [p for ([, p] of Iterator(this.providers))];
@@ -122,7 +124,7 @@ let SocialServiceInternal = {
           // all enabled providers get sorted even with frecency zero.
           let providerList = SocialServiceInternal.providerArray;
           // reverse sort
-          aCallback(providerList.sort(function(a, b) b.frecency - a.frecency));
+          aCallback(providerList.sort((a, b) => b.frecency - a.frecency));
         }
       });
     } finally {
@@ -165,7 +167,7 @@ function getOriginActivationType(origin) {
   return "foreign";
 }
 
-let ActiveProviders = {
+var ActiveProviders = {
   get _providers() {
     delete this._providers;
     this._providers = {};
@@ -439,7 +441,6 @@ this.SocialService = {
       // correctly.
       addon.pendingOperations -= AddonManager.PENDING_DISABLE;
       AddonManagerPrivate.callAddonListeners("onDisabled", addon);
-      AddonManagerPrivate.notifyAddonChanged(addon.id, ADDON_TYPE_SERVICE, false);
     }
 
     this.getOrderedProviderList(function (providers) {
@@ -601,10 +602,15 @@ this.SocialService = {
         aAddon.userDisabled = false;
       }
       schedule(function () {
-        this._installProvider(data, options, aManifest => {
-          this._notifyProviderListeners("provider-installed", aManifest.origin);
-          installCallback(aManifest);
-        });
+        try {
+          this._installProvider(data, options, aManifest => {
+              this._notifyProviderListeners("provider-installed", aManifest.origin);
+              installCallback(aManifest);
+          });
+        } catch(e) {
+          Cu.reportError("Activation failed: " + e);
+          installCallback(null);
+        }
       }.bind(this));
     }.bind(this));
   },
@@ -615,6 +621,12 @@ this.SocialService = {
 
     if (data.installType == "foreign" && !Services.prefs.getBoolPref("social.remote-install.enabled"))
       throw new Error("Remote install of services is disabled");
+
+    // if installing from any website, the install must happen over https.
+    // "internal" are installs from about:home or similar
+    if (data.installType != "internal" && !Services.io.newURI(data.origin, null, null).schemeIs("https")) {
+      throw new Error("attempt to activate provider over unsecured channel: " + data.origin);
+    }
 
     let installer = new AddonInstaller(data.url, data.manifest, installCallback);
     let bypassPanel = options.bypassInstallPanel ||

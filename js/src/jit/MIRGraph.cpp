@@ -107,8 +107,9 @@ MIRGenerator::addAbortedPreliminaryGroup(ObjectGroup* group)
         if (group == abortedPreliminaryGroups_[i])
             return;
     }
+    AutoEnterOOMUnsafeRegion oomUnsafe;
     if (!abortedPreliminaryGroups_.append(group))
-        CrashAtUnhandlableOOM("addAbortedPreliminaryGroup");
+        oomUnsafe.crash("addAbortedPreliminaryGroup");
 }
 
 bool
@@ -605,8 +606,9 @@ MBasicBlock::linkOsrValues(MStart* start)
             MOZ_ASSERT(def->isOsrValue() || def->isGetArgumentsObjectArg() || def->isConstant() ||
                        def->isParameter());
 
-            // A constant Undefined can show up here for an argument slot when the function uses
-            // a heavyweight argsobj, but the argument in question is stored on the scope chain.
+            // A constant Undefined can show up here for an argument slot when
+            // the function has an arguments object, but the argument in
+            // question is stored on the scope chain.
             MOZ_ASSERT_IF(def->isConstant(), def->toConstant()->value() == UndefinedValue());
 
             if (def->isOsrValue())
@@ -1136,16 +1138,18 @@ MBasicBlock::addPredecessorSameInputsAs(MBasicBlock* pred, MBasicBlock* existing
     MOZ_ASSERT(pred->hasLastIns());
     MOZ_ASSERT(!pred->successorWithPhis());
 
+    AutoEnterOOMUnsafeRegion oomUnsafe;
+
     if (!phisEmpty()) {
         size_t existingPosition = indexForPredecessor(existingPred);
         for (MPhiIterator iter = phisBegin(); iter != phisEnd(); iter++) {
             if (!iter->addInputSlow(iter->getOperand(existingPosition)))
-                CrashAtUnhandlableOOM("MBasicBlock::addPredecessorAdjustPhis");
+                oomUnsafe.crash("MBasicBlock::addPredecessorAdjustPhis");
         }
     }
 
     if (!predecessors_.append(pred))
-        CrashAtUnhandlableOOM("MBasicBlock::addPredecessorAdjustPhis");
+        oomUnsafe.crash("MBasicBlock::addPredecessorAdjustPhis");
 }
 
 bool

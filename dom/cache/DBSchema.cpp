@@ -1740,10 +1740,8 @@ InsertEntry(mozIStorageConnection* aConn, CacheId aCacheId,
 
     serializedInfo.Append(cInfo.spec());
 
-    MOZ_ASSERT(cInfo.appId() != nsIScriptSecurityManager::UNKNOWN_APP_ID);
-    OriginAttributes attrs(cInfo.appId(), cInfo.isInBrowserElement());
     nsAutoCString suffix;
-    attrs.CreateSuffix(suffix);
+    cInfo.attrs().CreateSuffix(suffix);
     serializedInfo.Append(suffix);
   }
 
@@ -1914,7 +1912,7 @@ ReadResponse(mozIStorageConnection* aConn, EntryId aEntryId,
     }
 
     aSavedResponseOut->mValue.principalInfo() =
-      mozilla::ipc::ContentPrincipalInfo(attrs.mAppId, attrs.mInBrowser, originNoSuffix);
+      mozilla::ipc::ContentPrincipalInfo(attrs, originNoSuffix);
   }
 
   int32_t redirected;

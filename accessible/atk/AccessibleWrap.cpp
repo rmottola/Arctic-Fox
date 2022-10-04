@@ -818,12 +818,20 @@ getParentCB(AtkObject *aAtkObj)
 gint
 getChildCountCB(AtkObject *aAtkObj)
 {
-    AccessibleWrap* accWrap = GetAccessibleWrap(aAtkObj);
-    if (!accWrap || nsAccUtils::MustPrune(accWrap)) {
-        return 0;
+  if (AccessibleWrap* accWrap = GetAccessibleWrap(aAtkObj)) {
+    if (nsAccUtils::MustPrune(accWrap)) {
+      return 0;
     }
 
     return static_cast<gint>(accWrap->EmbeddedChildCount());
+  }
+
+  ProxyAccessible* proxy = GetProxy(aAtkObj);
+  if (proxy && !proxy->MustPruneChildren()) {
+    return proxy->EmbeddedChildCount();
+  }
+
+  return 0;
 }
 
 AtkObject *
@@ -1030,14 +1038,17 @@ refRelationSetCB(AtkObject *aAtkObj)
 AccessibleWrap*
 GetAccessibleWrap(AtkObject* aAtkObj)
 {
-  NS_ENSURE_TRUE(IS_MAI_OBJECT(aAtkObj), nullptr);
+  bool isMAIObject = IS_MAI_OBJECT(aAtkObj);
+  NS_ENSURE_TRUE(isMAIObject || MAI_IS_ATK_SOCKET(aAtkObj),
+                 nullptr);
 
-  // Make sure its native is an AccessibleWrap not a proxy.
-  if (MAI_ATK_OBJECT(aAtkObj)->accWrap & IS_PROXY)
+  uintptr_t accWrapPtr = isMAIObject ?
+    MAI_ATK_OBJECT(aAtkObj)->accWrap :
+    reinterpret_cast<uintptr_t>(MAI_ATK_SOCKET(aAtkObj)->accWrap);
+  if (accWrapPtr & IS_PROXY)
     return nullptr;
 
-    AccessibleWrap* accWrap =
-      reinterpret_cast<AccessibleWrap*>(MAI_ATK_OBJECT(aAtkObj)->accWrap);
+  AccessibleWrap* accWrap = reinterpret_cast<AccessibleWrap*>(accWrapPtr);
 
   // Check if the accessible was deconstructed.
   if (!accWrap)
@@ -1055,7 +1066,8 @@ GetAccessibleWrap(AtkObject* aAtkObj)
 ProxyAccessible*
 GetProxy(AtkObject* aObj)
 {
-  if (!aObj || !(MAI_ATK_OBJECT(aObj)->accWrap & IS_PROXY))
+  if (!aObj || !IS_MAI_OBJECT(aObj) ||
+      !(MAI_ATK_OBJECT(aObj)->accWrap & IS_PROXY))
     return nullptr;
 
   return reinterpret_cast<ProxyAccessible*>(MAI_ATK_OBJECT(aObj)->accWrap
@@ -1075,6 +1087,21 @@ GetInterfacesForProxy(ProxyAccessible* aProxy, uint32_t aInterfaces)
   if (aInterfaces & Interfaces::HYPERTEXT)
     interfaces |= (1 << MAI_INTERFACE_HYPERTEXT) | (1 << MAI_INTERFACE_TEXT)
         | (1 << MAI_INTERFACE_EDITABLE_TEXT);
+
+  if (aInterfaces & Interfaces::HYPERLINK)
+    interfaces |= MAI_INTERFACE_HYPERLINK_IMPL;
+
+  if (aInterfaces & Interfaces::VALUE)
+    interfaces |= MAI_INTERFACE_VALUE;
+
+  if (aInterfaces & Interfaces::TABLE)
+    interfaces |= MAI_INTERFACE_TABLE;
+
+  if (aInterfaces & Interfaces::IMAGE)
+    interfaces |= MAI_INTERFACE_IMAGE;
+
+  if (aInterfaces & Interfaces::DOCUMENT)
+    interfaces |= MAI_INTERFACE_DOCUMENT;
 
   return interfaces;
 }

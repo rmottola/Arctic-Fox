@@ -23,6 +23,7 @@
 #include "mozilla/LookAndFeel.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/ProcessHangMonitorIPC.h"
+#include "mozilla/devtools/HeapSnapshotTempFileHelperChild.h"
 #include "mozilla/docshell/OfflineCacheUpdateChild.h"
 #include "mozilla/dom/ContentBridgeChild.h"
 #include "mozilla/dom/ContentBridgeParent.h"
@@ -1481,6 +1482,20 @@ ContentChild::DeallocPHalChild(PHalChild* aHal)
     return true;
 }
 
+devtools::PHeapSnapshotTempFileHelperChild*
+ContentChild::AllocPHeapSnapshotTempFileHelperChild()
+{
+    return devtools::HeapSnapshotTempFileHelperChild::Create();
+}
+
+bool
+ContentChild::DeallocPHeapSnapshotTempFileHelperChild(
+    devtools::PHeapSnapshotTempFileHelperChild* aHeapSnapshotHelper)
+{
+    delete aHeapSnapshotHelper;
+    return true;
+}
+
 PIccChild*
 ContentChild::SendPIccConstructor(PIccChild* aActor,
                                   const uint32_t& aServiceId)
@@ -2190,7 +2205,7 @@ ContentChild::RecvAddPermission(const IPC::Permission& permission)
 }
 
 bool
-ContentChild::RecvScreenSizeChanged(const gfxIntSize& size)
+ContentChild::RecvScreenSizeChanged(const gfx::IntSize& size)
 {
 #ifdef ANDROID
     mScreenSize = size;

@@ -1478,6 +1478,14 @@ MediaDecoder::IsRtspEnabled()
 }
 #endif
 
+#ifdef MOZ_GSTREAMER
+bool
+MediaDecoder::IsGStreamerEnabled()
+{
+  return Preferences::GetBool("media.gstreamer.enabled");
+}
+#endif
+
 #ifdef MOZ_OMX_DECODER
 bool
 MediaDecoder::IsOmxEnabled()

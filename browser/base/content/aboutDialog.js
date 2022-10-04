@@ -5,6 +5,14 @@
 // Services = object with smart getters for common XPCOM services
 Components.utils.import("resource://gre/modules/Services.jsm");
 
+const PREF_EM_HOTFIX_ID = "extensions.hotfix.id";
+
+var gMenuButton = null;
+try {
+  gMenuButton = Services.wm.getMostRecentWindow("navigator:browser")
+                        .document.getElementById("PanelUI-menu-button");
+} catch (ex) { };
+
 function init(aEvent)
 {
   if (aEvent.target != document)
@@ -45,8 +53,26 @@ function init(aEvent)
     document.getElementById("PMversion").textContent += " (" + buildDate + ")";
   }
 
+  if (/^42/.test(version)) {
+    document.getElementById("version").addEventListener("click", event => {
+      if (gMenuButton) {
+        gMenuButton.classList.add("thumburger");
+        if (event.shiftKey) {
+          gMenuButton = null;
+        }
+      }
+    });
+  }
+
 #ifdef MOZ_UPDATER
   gAppUpdater = new appUpdater();
+
+  let defaults = Services.prefs.getDefaultBranch("");
+  let channelLabel = document.getElementById("currentChannel");
+  let currentChannelText = document.getElementById("currentChannelText");
+  channelLabel.value = UpdateUtils.UpdateChannel;
+  if (/^release($|\-)/.test(channelLabel.value))
+      currentChannelText.hidden = true;
 #endif
 
 #ifdef XP_MACOSX
@@ -70,6 +96,9 @@ Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/DownloadUtils.jsm");
 Components.utils.import("resource://gre/modules/AddonManager.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
+                                  "resource://gre/modules/UpdateUtils.jsm");
+
 var gAppUpdater;
 
 function onUnload(aEvent) {
@@ -78,6 +107,9 @@ function onUnload(aEvent) {
   // Safe to call even when there isn't a download in progress.
   gAppUpdater.removeDownloadListener();
   gAppUpdater = null;
+  if (gMenuButton) {
+    gMenuButton.classList.remove("thumburger");
+  }
 }
 
 

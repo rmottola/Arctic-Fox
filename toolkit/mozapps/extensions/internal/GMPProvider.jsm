@@ -19,6 +19,7 @@ Cu.import("resource://gre/modules/Log.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/GMPUtils.jsm");
 Cu.import("resource://gre/modules/AppConstants.jsm");
+Cu.import("resource://gre/modules/UpdateUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(
   this, "GMPInstallManager", "resource://gre/modules/GMPInstallManager.jsm");
@@ -427,6 +428,9 @@ GMPWrapper.prototype = {
       gmpService.removeAndDeletePluginDirectory(this.gmpPath);
     }
     GMPPrefs.reset(GMPPrefs.KEY_PLUGIN_VERSION, this.id);
+    GMPPrefs.reset(GMPPrefs.KEY_PLUGIN_TRIAL_CREATE, this.id);
+    GMPPrefs.reset(GMPPrefs.KEY_PLUGIN_ABI, this.id);
+    GMPPrefs.reset(GMPPrefs.KEY_PLUGIN_LAST_UPDATE, this.id);
     AddonManagerPrivate.callAddonListeners("onUninstalled", this);
   },
 
@@ -470,8 +474,8 @@ GMPWrapper.prototype = {
       return { installed: false, valid: true };
     }
 
-    let abi = GMPPrefs.get(GMPPrefs.KEY_PLUGIN_ABI, GMPUtils.ABI(), this._plugin.id);
-    if (abi != GMPUtils.ABI()) {
+    let abi = GMPPrefs.get(GMPPrefs.KEY_PLUGIN_ABI, UpdateUtils.ABI, this._plugin.id);
+    if (abi != UpdateUtils.ABI) {
       // ABI doesn't match. Possibly this is a profile migrated across platforms
       // or from 32 -> 64 bit.
       return {
@@ -532,6 +536,23 @@ var GMPProvider = {
                       gmpPath);
 
       if (gmpPath && isEnabled) {
+        let validation = wrapper.validate();
+        if (validation.mismatchedABI) {
+          this._log.info("startup - gmp " + plugin.id +
+                         " mismatched ABI, uninstalling");
+          wrapper.uninstallPlugin();
+          continue;
+        }
+        if (validation.installed) {
+          telemetryService.getHistogramById(wrapper.missingFilesKey).add(validation.telemetry);
+        }
+        if (!validation.valid) {
+          this._log.info("startup - gmp " + plugin.id +
+                         " missing [" + validation.missing + "], uninstalling");
+          telemetryService.getHistogramById(wrapper.missingKey).add(true);
+          wrapper.uninstallPlugin();
+          continue;
+        }
         this._log.info("startup - adding gmp directory " + gmpPath);
         try {
           gmpService.addPluginDirectory(gmpPath);

@@ -18,7 +18,7 @@ Cu.import("resource://gre/modules/TelemetryStopwatch.jsm", this);
 XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
   "resource://gre/modules/AppConstants.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-  "resource://gre/modules/devtools/Console.jsm");
+  "resource://gre/modules/devtools/shared/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivacyFilter",
   "resource:///modules/sessionstore/PrivacyFilter.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
@@ -59,9 +59,9 @@ function stopWatch(method) {
   };
 }
 
-let stopWatchStart = stopWatch("start");
-let stopWatchCancel = stopWatch("cancel");
-let stopWatchFinish = stopWatch("finish");
+var stopWatchStart = stopWatch("start");
+var stopWatchCancel = stopWatch("cancel");
+var stopWatchFinish = stopWatch("finish");
 
 /**
  * The external API implemented by the SessionSaver module.
@@ -102,7 +102,7 @@ this.SessionSaver = Object.freeze({
 /**
  * The internal API.
  */
-let SessionSaverInternal = {
+var SessionSaverInternal = {
   /**
    * The timeout ID referencing an active timer for a delayed save. When no
    * save is pending, this is null.
@@ -182,7 +182,6 @@ let SessionSaverInternal = {
 
     stopWatchStart("COLLECT_DATA_MS", "COLLECT_DATA_LONGEST_OP_MS");
     let state = SessionStore.getCurrentState(forceUpdateAllWindows);
-
     PrivacyFilter.filterPrivateWindowsAndTabs(state);
 
     // Make sure that we keep the previous session if we started with a single

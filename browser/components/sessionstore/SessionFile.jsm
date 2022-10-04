@@ -38,7 +38,7 @@ Cu.import("resource://gre/modules/AsyncShutdown.jsm");
 Cu.import("resource://gre/modules/Preferences.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-  "resource://gre/modules/devtools/Console.jsm");
+  "resource://gre/modules/devtools/shared/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PromiseUtils",
   "resource://gre/modules/PromiseUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RunState",
@@ -93,10 +93,10 @@ this.SessionFile = {
 
 Object.freeze(SessionFile);
 
-let Path = OS.Path;
-let profileDir = OS.Constants.Path.profileDir;
+var Path = OS.Path;
+var profileDir = OS.Constants.Path.profileDir;
 
-let SessionFileInternal = {
+var SessionFileInternal = {
   Paths: Object.freeze({
     // The path to the latest version of sessionstore written during a clean
     // shutdown. After startup, it is renamed `cleanBackup`.

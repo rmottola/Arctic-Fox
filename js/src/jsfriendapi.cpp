@@ -24,7 +24,6 @@
 #include "proxy/DeadObjectProxy.h"
 #include "vm/ArgumentsObject.h"
 #include "vm/Time.h"
-#include "vm/WeakMapObject.h"
 #include "vm/WrapperObject.h"
 
 #include "jsobjinlines.h"
@@ -987,7 +986,7 @@ DumpHeapVisitCell(JSRuntime* rt, void* data, void* thing,
     char cellDesc[1024 * 32];
     JS_GetTraceThingInfo(cellDesc, sizeof(cellDesc), dtrc, thing, traceKind, true);
     fprintf(dtrc->output, "%p %c %s\n", thing, MarkDescriptor(thing), cellDesc);
-    JS_TraceChildren(dtrc, thing, traceKind);
+    js::TraceChildren(dtrc, thing, traceKind);
 }
 
 void
@@ -1026,12 +1025,6 @@ js::DumpHeap(JSRuntime* rt, FILE* fp, js::DumpHeapNurseryBehaviour nurseryBehavi
     fflush(dtrc.output);
 }
 
-JS_FRIEND_API(const JSStructuredCloneCallbacks*)
-js::GetContextStructuredCloneCallbacks(JSContext* cx)
-{
-    return cx->runtime()->structuredCloneCallbacks;
-}
-
 JS_FRIEND_API(bool)
 js::ContextHasOutstandingRequests(const JSContext* cx)
 {
@@ -1043,12 +1036,6 @@ js::SetActivityCallback(JSRuntime* rt, ActivityCallback cb, void* arg)
 {
     rt->activityCallback = cb;
     rt->activityCallbackArg = arg;
-}
-
-JS_FRIEND_API(bool)
-js::IsContextRunningJS(JSContext* cx)
-{
-    return cx->currentlyRunning();
 }
 
 JS_FRIEND_API(void)

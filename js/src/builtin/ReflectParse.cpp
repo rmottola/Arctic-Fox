@@ -33,6 +33,12 @@ using JS::AutoValueArray;
 using mozilla::ArrayLength;
 using mozilla::DebugOnly;
 
+enum class ParseTarget
+{
+    Script,
+    Module
+};
+
 enum ASTType {
     AST_ERROR = -1,
 #define ASTDEF(ast, str, method) ast,
@@ -2160,7 +2166,6 @@ ASTSerializer::declaration(ParseNode* pn, MutableHandleValue dst)
 {
     MOZ_ASSERT(pn->isKind(PNK_FUNCTION) ||
                pn->isKind(PNK_VAR) ||
-               pn->isKind(PNK_GLOBALCONST) ||
                pn->isKind(PNK_LET) ||
                pn->isKind(PNK_CONST));
 
@@ -2169,7 +2174,6 @@ ASTSerializer::declaration(ParseNode* pn, MutableHandleValue dst)
         return function(pn, AST_FUNC_DECL, dst);
 
       case PNK_VAR:
-      case PNK_GLOBALCONST:
         return variableDeclaration(pn, false, dst);
 
       default:
@@ -2182,7 +2186,7 @@ bool
 ASTSerializer::variableDeclaration(ParseNode* pn, bool lexical, MutableHandleValue dst)
 {
     MOZ_ASSERT_IF(lexical, pn->isKind(PNK_LET) || pn->isKind(PNK_CONST));
-    MOZ_ASSERT_IF(!lexical, pn->isKind(PNK_VAR) || pn->isKind(PNK_GLOBALCONST));
+    MOZ_ASSERT_IF(!lexical, pn->isKind(PNK_VAR));
 
     VarDeclKind kind = VARDECL_ERR;
     // Treat both the toplevel const binding (secretly var-like) and the lexical const
@@ -2302,12 +2306,13 @@ ASTSerializer::exportDeclaration(ParseNode* pn, MutableHandleValue dst)
     MOZ_ASSERT(pn->isKind(PNK_EXPORT) ||
                pn->isKind(PNK_EXPORT_FROM) ||
                pn->isKind(PNK_EXPORT_DEFAULT));
+    MOZ_ASSERT(pn->getArity() == pn->isKind(PNK_EXPORT) ? PN_UNARY : PN_BINARY);
     MOZ_ASSERT_IF(pn->isKind(PNK_EXPORT_FROM), pn->pn_right->isKind(PNK_STRING));
 
     RootedValue decl(cx, NullValue());
     NodeVector elts(cx);
 
-    ParseNode* kid = pn->isKind(PNK_EXPORT_FROM) ? pn->pn_left: pn->pn_kid;
+    ParseNode* kid = pn->isKind(PNK_EXPORT) ? pn->pn_kid : pn->pn_left;
     switch (ParseNodeKind kind = kid->getKind()) {
       case PNK_EXPORT_SPEC_LIST:
         if (!elts.reserve(pn->pn_left->pn_count))
@@ -2338,9 +2343,8 @@ ASTSerializer::exportDeclaration(ParseNode* pn, MutableHandleValue dst)
 
       case PNK_VAR:
       case PNK_CONST:
-      case PNK_GLOBALCONST:
       case PNK_LET:
-        if (!variableDeclaration(kid, kind == PNK_LET, &decl))
+        if (!variableDeclaration(kid, kind != PNK_VAR, &decl))
             return false;
         break;
 
@@ -2487,7 +2491,7 @@ ASTSerializer::forInit(ParseNode* pn, MutableHandleValue dst)
         return true;
     }
 
-    return (pn->isKind(PNK_VAR) || pn->isKind(PNK_GLOBALCONST))
+    return (pn->isKind(PNK_VAR))
            ? variableDeclaration(pn, false, dst)
            : expression(pn, dst);
 }
@@ -2537,7 +2541,6 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
     switch (pn->getKind()) {
       case PNK_FUNCTION:
       case PNK_VAR:
-      case PNK_GLOBALCONST:
         return declaration(pn, dst);
 
       case PNK_LETBLOCK:
@@ -2660,8 +2663,6 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
 
         RootedValue init(cx), test(cx), update(cx);
 
-        // Init with nullptr in case of a freshen block (for(let x;;)),
-        // disconnecting chain inheritance.
         return forInit(head->pn_kid1 && !head->pn_kid1->isKind(PNK_FRESHENBLOCK)
                        ? head->pn_kid1
                        : nullptr,
@@ -2816,15 +2817,14 @@ ASTSerializer::rightAssociate(ParseNode* pn, MutableHandleValue dst)
     MOZ_ASSERT(pn->isArity(PN_LIST));
     MOZ_ASSERT(pn->pn_count >= 1);
 
-    // First, we need to reverse the list, so that we can traverse it in the correct order.
+    // First, we need to reverse the list, so that we can traverse it in the right order.
     // It's OK to destructively reverse the list, because there are no other consumers.
 
     ParseNode* head = pn->pn_head;
     ParseNode* prev = nullptr;
     ParseNode* current = head;
     ParseNode* next;
-    while (current != nullptr)
-    {
+    while (current != nullptr) {
         next = current->pn_next;
         current->pn_next = prev;
         prev = current;
@@ -3719,8 +3719,8 @@ reflect_parse(JSContext* cx, uint32_t argc, Value* vp)
     ScopedJSFreePtr<char> filename;
     uint32_t lineno = 1;
     bool loc = true;
-
     RootedObject builder(cx);
+    ParseTarget target = ParseTarget::Script;
 
     RootedValue arg(cx, args.get(1));
 
@@ -3785,6 +3785,36 @@ reflect_parse(JSContext* cx, uint32_t argc, Value* vp)
             }
             builder = &prop.toObject();
         }
+
+        /* config.target */
+        RootedId targetId(cx, NameToId(cx->names().target));
+        RootedValue scriptVal(cx, StringValue(cx->names().script));
+        if (!GetPropertyDefault(cx, config, targetId, scriptVal, &prop))
+            return false;
+
+        if (!prop.isString()) {
+            ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE, JSDVG_SEARCH_STACK,
+                                  prop, nullptr, "not 'script' or 'module'", nullptr);
+            return false;
+        }
+
+        RootedString stringProp(cx, prop.toString());
+        bool isScript = false;
+        bool isModule = false;
+        if (!EqualStrings(cx, stringProp, cx->names().script, &isScript))
+            return false;
+
+        if (!EqualStrings(cx, stringProp, cx->names().module, &isModule))
+            return false;
+
+        if (isScript) {
+            target = ParseTarget::Script;
+        } else if (isModule) {
+            target = ParseTarget::Module;
+        } else {
+            JS_ReportError(cx, "Bad target value, expected 'script' or 'module'");
+            return false;
+        }
     }
 
     /* Extract the builder methods first to report errors before parsing. */
@@ -3811,9 +3841,23 @@ reflect_parse(JSContext* cx, uint32_t argc, Value* vp)
 
     serialize.setParser(&parser);
 
-    ParseNode* pn = parser.parse();
-    if (!pn)
-        return false;
+    ParseNode* pn;
+    if (target == ParseTarget::Script) {
+        pn = parser.parse();
+        if (!pn)
+            return false;
+    } else {
+        Rooted<ModuleObject*> module(cx, ModuleObject::create(cx));
+        if (!module)
+            return false;
+
+        pn = parser.standaloneModule(module);
+        if (!pn)
+            return false;
+
+        MOZ_ASSERT(pn->getKind() == PNK_MODULE);
+        pn = pn->pn_body;
+    }
 
     RootedValue val(cx);
     if (!serialize.program(pn, &val)) {

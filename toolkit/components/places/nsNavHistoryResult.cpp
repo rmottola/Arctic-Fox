@@ -2767,7 +2767,7 @@ nsNavHistoryQueryResultNode::NotifyIfTagsChanged(nsIURI* aURI)
   nsCOMArray<nsNavHistoryResultNode> matches;
   RecursiveFindURIs(onlyOneEntry, this, spec, &matches);
 
-  if (matches.Count() == 0 && mHasSearchTerms && !mRemovingURI) {
+  if (matches.Count() == 0 && mHasSearchTerms) {
     // A new tag has been added, it's possible it matches our query.
     NS_ENSURE_TRUE(history, NS_ERROR_OUT_OF_MEMORY);
     rv = history->URIToResultNode(aURI, mOptions, getter_AddRefs(node));
@@ -2838,7 +2838,6 @@ nsNavHistoryQueryResultNode::OnItemRemoved(int64_t aItemId,
                                            const nsACString& aGUID,
                                            const nsACString& aParentGUID)
 {
-  mRemovingURI = aURI;
   if (aItemType == nsINavBookmarksService::TYPE_BOOKMARK &&
       mLiveUpdate != QUERYUPDATE_SIMPLE && mLiveUpdate != QUERYUPDATE_TIME) {
     nsresult rv = Refresh();
@@ -2857,7 +2856,8 @@ nsNavHistoryQueryResultNode::OnItemChanged(int64_t aItemId,
                                            uint16_t aItemType,
                                            int64_t aParentId,
                                            const nsACString& aGUID,
-                                           const nsACString& aParentGUID)
+                                           const nsACString& aParentGUID,
+                                           const nsACString& aOldValue)
 {
   // History observers should not get OnItemChanged
   // but should get the corresponding history notifications instead.
@@ -2903,7 +2903,7 @@ nsNavHistoryQueryResultNode::OnItemChanged(int64_t aItemId,
                                                aIsAnnotationProperty,
                                                aNewValue, aLastModified,
                                                aItemType, aParentId, aGUID,
-                                               aParentGUID);
+                                               aParentGUID, aOldValue);
 }
 
 NS_IMETHODIMP
@@ -3666,7 +3666,8 @@ nsNavHistoryResultNode::OnItemChanged(int64_t aItemId,
                                       uint16_t aItemType,
                                       int64_t aParentId,
                                       const nsACString& aGUID,
-                                      const nsACString& aParentGUID)
+                                      const nsACString& aParentGUID,
+                                      const nsACString& aOldValue)
 {
   if (aItemId != mItemId)
     return NS_OK;
@@ -3756,7 +3757,8 @@ nsNavHistoryFolderResultNode::OnItemChanged(int64_t aItemId,
                                             uint16_t aItemType,
                                             int64_t aParentId,
                                             const nsACString& aGUID,
-                                            const nsACString&aParentGUID)
+                                            const nsACString& aParentGUID,
+                                            const nsACString& aOldValue)
 {
   RESTART_AND_RETURN_IF_ASYNC_PENDING();
 
@@ -3764,7 +3766,7 @@ nsNavHistoryFolderResultNode::OnItemChanged(int64_t aItemId,
                                                aIsAnnotationProperty,
                                                aNewValue, aLastModified,
                                                aItemType, aParentId, aGUID,
-                                               aParentGUID);
+                                               aParentGUID, aOldValue);
 }
 
 /**
@@ -4461,11 +4463,13 @@ nsNavHistoryResult::OnItemChanged(int64_t aItemId,
                                   uint16_t aItemType,
                                   int64_t aParentId,
                                   const nsACString& aGUID,
-                                  const nsACString& aParentGUID)
+                                  const nsACString& aParentGUID,
+                                  const nsACString& aOldValue)
 {
   ENUMERATE_ALL_BOOKMARKS_OBSERVERS(
     OnItemChanged(aItemId, aProperty, aIsAnnotationProperty, aNewValue,
-                  aLastModified, aItemType, aParentId, aGUID, aParentGUID));
+                  aLastModified, aItemType, aParentId, aGUID, aParentGUID,
+                  aOldValue));
 
   // Note: folder-nodes set their own bookmark observer only once they're
   // opened, meaning we cannot optimize this code path for changes done to
@@ -4489,7 +4493,7 @@ nsNavHistoryResult::OnItemChanged(int64_t aItemId,
           folder->StartIncrementalUpdate()) {
         node->OnItemChanged(aItemId, aProperty, aIsAnnotationProperty,
                             aNewValue, aLastModified, aItemType, aParentId,
-                            aGUID, aParentGUID);
+                            aGUID, aParentGUID, aOldValue);
       }
     }
   }

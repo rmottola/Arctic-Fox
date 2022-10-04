@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+Components.utils.import("resource://gre/modules/AppConstants.jsm");
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/TelemetryStopwatch.jsm");
 Components.utils.import("resource:///modules/MigrationUtils.jsm");
@@ -14,6 +15,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "PlacesBackups",
                                   "resource://gre/modules/PlacesBackups.jsm");
 
 const RESTORE_FILEPICKER_FILTER_EXT = "*.json;*.jsonlz4";
+const HISTORY_LIBRARY_SEARCH_TELEMETRY = "PLACES_HISTORY_LIBRARY_SEARCH_TIME_MS";
 
 var PlacesOrganizer = {
   _places: null,
@@ -62,7 +64,7 @@ var PlacesOrganizer = {
       for (let container of hierarchy) {
         switch (typeof container) {
           case "number":
-            this._places.selectItems([container]);
+            this._places.selectItems([container], false);
             break;
           case "string":
             if (container.substr(0, 6) == "place:")
@@ -109,27 +111,21 @@ var PlacesOrganizer = {
     PlacesSearchBox.init();
 
     window.addEventListener("AppCommand", this, true);
-#ifdef XP_MACOSX
-    // 1. Map Edit->Find command to OrganizerCommand_find:all.  Need to map
-    // both the menuitem and the Find key.
-    var findMenuItem = document.getElementById("menu_find");
-    findMenuItem.setAttribute("command", "OrganizerCommand_find:all");
-    var findKey = document.getElementById("key_find");
-    findKey.setAttribute("command", "OrganizerCommand_find:all");
 
-    // 2. Disable some keybindings from browser.xul
-    var elements = ["cmd_handleBackspace", "cmd_handleShiftBackspace"];
-    for (var i=0; i < elements.length; i++) {
-      document.getElementById(elements[i]).setAttribute("disabled", "true");
+    if (AppConstants.platform === "macosx") {
+      // 1. Map Edit->Find command to OrganizerCommand_find:all.  Need to map
+      // both the menuitem and the Find key.
+      let findMenuItem = document.getElementById("menu_find");
+      findMenuItem.setAttribute("command", "OrganizerCommand_find:all");
+      let findKey = document.getElementById("key_find");
+      findKey.setAttribute("command", "OrganizerCommand_find:all");
+
+      // 2. Disable some keybindings from browser.xul
+      let elements = ["cmd_handleBackspace", "cmd_handleShiftBackspace"];
+      for (let i = 0; i < elements.length; i++) {
+        document.getElementById(elements[i]).setAttribute("disabled", "true");
+      }
     }
-    
-    // 3. Disable the keyboard shortcut for the History menu back/forward
-    // in order to support those in the Library
-    var historyMenuBack = document.getElementById("historyMenuBack");
-    historyMenuBack.removeAttribute("key");
-    var historyMenuForward = document.getElementById("historyMenuForward");
-    historyMenuForward.removeAttribute("key");
-#endif
 
     // remove the "Properties" context-menu item, we've our own details pane
     document.getElementById("placesContext")
@@ -359,7 +355,7 @@ var PlacesOrganizer = {
 
   openFlatContainer: function PO_openFlatContainerFlatContainer(aContainer) {
     if (aContainer.itemId != -1)
-      this._places.selectItems([aContainer.itemId]);
+      this._places.selectItems([aContainer.itemId], false);
     else if (PlacesUtils.nodeIsQuery(aContainer))
       this._places.selectPlaceURI(aContainer.uri);
   },
@@ -575,7 +571,7 @@ var PlacesOrganizer = {
     let fpCallback = function fpCallback_done(aResult) {
       if (aResult != Ci.nsIFilePicker.returnCancel) {
         // There is no OS.File version of the filepicker yet (Bug 937812).
-PlacesBackups.saveBookmarksToJSONFile(fp.file.path);
+        PlacesBackups.saveBookmarksToJSONFile(fp.file.path);
       }
     };
 
@@ -632,7 +628,7 @@ PlacesBackups.saveBookmarksToJSONFile(fp.file.path);
         infoBox.setAttribute("minimal", "true");
       infoBox.removeAttribute("wasminimal");
       infoBoxExpanderWrapper.hidden =
-        this._additionalInfoFields.every(function (id)
+        this._additionalInfoFields.every(id =>
           document.getElementById(id).collapsed);
     }
     additionalInfoBroadcaster.hidden = infoBox.getAttribute("minimal") == "true";
@@ -916,7 +912,9 @@ var PlacesSearchBox = {
           currentView.load([query], options);
         }
         else {
+          TelemetryStopwatch.start(HISTORY_LIBRARY_SEARCH_TELEMETRY);
           currentView.applyFilter(filterString, null, true);
+          TelemetryStopwatch.finish(HISTORY_LIBRARY_SEARCH_TELEMETRY);
         }
         break;
       case "downloads":
@@ -1418,7 +1416,7 @@ var ViewMenu = {
   }
 }
 
-let ContentArea = {
+var ContentArea = {
   _specialViews: new Map(),
 
   init: function CA_init() {
@@ -1478,7 +1476,9 @@ let ContentArea = {
                                            options: aOptions || new Object() });
   },
 
-  get currentView() PlacesUIUtils.getViewForNode(this._deck.selectedPanel),
+  get currentView() {
+    return PlacesUIUtils.getViewForNode(this._deck.selectedPanel);
+  },
   set currentView(aNewView) {
     let oldView = this.currentView;
     if (oldView != aNewView) {
@@ -1492,7 +1492,9 @@ let ContentArea = {
     return aNewView;
   },
 
-  get currentPlace() this.currentView.place,
+  get currentPlace() {
+    return this.currentView.place;
+  },
   set currentPlace(aQueryString) {
     let oldView = this.currentView;
     let newView = this.getContentViewForQueryString(aQueryString);
@@ -1552,17 +1554,21 @@ let ContentArea = {
   }
 };
 
-let ContentTree = {
+var ContentTree = {
   init: function CT_init() {
     this._view = document.getElementById("placeContent");
   },
 
-  get view() this._view,
+  get view() {
+    return this._view;
+  },
 
-  get viewOptions() Object.seal({
-    showDetailsPane: true,
-    toolbarSet: "back-button, forward-button, organizeButton, viewMenu, maintenanceButton, libraryToolbarSpacer, searchFilter"
-  }),
+  get viewOptions() {
+    return Object.seal({
+      showDetailsPane: true,
+      toolbarSet: "back-button, forward-button, organizeButton, viewMenu, maintenanceButton, libraryToolbarSpacer, searchFilter"
+    });
+  },
 
   openSelectedNode: function CT_openSelectedNode(aEvent) {
     let view = this.view;

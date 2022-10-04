@@ -145,7 +145,11 @@ private:
   void GeneratePong(uint8_t *payload, uint32_t len);
   void GeneratePing();
 
-  void     BeginOpen();
+  nsresult OnNetworkChanged();
+  nsresult StartPinging();
+
+  void     BeginOpen(bool aCalledFromAdmissionManager);
+  void     BeginOpenInternal();
   nsresult HandleExtensions();
   nsresult SetupRequest();
   nsresult ApplyForAdmission();

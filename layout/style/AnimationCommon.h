@@ -48,7 +48,8 @@ public:
   virtual nsRestyleHint HasStateDependentStyle(PseudoElementStateRuleProcessorData* aData) override;
   virtual bool HasDocumentStateDependentStyle(StateRuleProcessorData* aData) override;
   virtual nsRestyleHint
-    HasAttributeDependentStyle(AttributeRuleProcessorData* aData) override;
+    HasAttributeDependentStyle(AttributeRuleProcessorData* aData,
+                               RestyleHintData& aRestyleHintDataResult) override;
   virtual bool MediumFeaturesChanged(nsPresContext* aPresContext) override;
   virtual void RulesMatching(ElementRuleProcessorData* aData) override;
   virtual void RulesMatching(PseudoElementRuleProcessorData* aData) override;
@@ -161,6 +162,8 @@ public:
   AnimationCollection*
   GetAnimationCollection(const nsIFrame* aFrame);
 
+  void ClearIsRunningOnCompositor(const nsIFrame *aFrame,
+                                  nsCSSProperty aProperty);
 protected:
   LinkedList<AnimationCollection> mElementCollections;
   nsPresContext *mPresContext; // weak (non-null from ctor to Disconnect)
@@ -281,6 +284,7 @@ struct AnimationCollection : public LinkedListElement<AnimationCollection>
     Layer
   };
   void RequestRestyle(RestyleType aRestyleType);
+  void ClearIsRunningOnCompositor(nsCSSProperty aProperty);
 
 private:
   static bool

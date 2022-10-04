@@ -159,8 +159,7 @@ const gXPInstallObserver = {
       }
     };
 
-    options.learnMoreURL = Services.urlFormatter.formatURLPref("app.support.baseURL") +
-                           "find-and-install-add-ons";
+    options.learnMoreURL = Services.urlFormatter.formatURLPref("app.support.baseURL");
 
     let messageString;
     let notification = document.getElementById("addon-install-confirmation-notification");
@@ -168,17 +167,20 @@ const gXPInstallObserver = {
       // None of the add-ons are verified
       messageString = gNavigatorBundle.getString("addonConfirmInstallUnsigned.message");
       notification.setAttribute("warning", "true");
+      options.learnMoreURL += "unsigned-addons";
     }
     else if (unsigned.length == 0) {
       // All add-ons are verified or don't need to be verified
       messageString = gNavigatorBundle.getString("addonConfirmInstall.message");
       notification.removeAttribute("warning");
+      options.learnMoreURL += "find-and-install-add-ons";
     }
     else {
       // Some of the add-ons are unverified, the list of names will indicate
       // which
       messageString = gNavigatorBundle.getString("addonConfirmInstallSomeUnsigned.message");
       notification.setAttribute("warning", "true");
+      options.learnMoreURL += "unsigned-addons";
     }
 
     let brandBundle = document.getElementById("bundle_brand");
@@ -355,10 +357,18 @@ const gXPInstallObserver = {
           args = [brandShortName, Services.appinfo.version, install.name];
         }
 
+        // Add Learn More link when refusing to install an unsigned add-on
+        if (install.error == AddonManager.ERROR_SIGNEDSTATE_REQUIRED) {
+          options.learnMoreURL = Services.urlFormatter.formatURLPref("app.support.baseURL") + "unsigned-addons";
+        }
+
         messageString = gNavigatorBundle.getFormattedString(error, args);
 
         PopupNotifications.show(browser, notificationID, messageString, anchorID,
                                 action, null, options);
+
+        // Can't have multiple notifications with the same ID, so stop here.
+        break;
       }
       this._removeProgressNotification(browser);
       break; }
@@ -504,12 +514,13 @@ var LightWeightThemeWebInstaller = {
   },
 
   _install: function (newLWTheme) {
-    var previousLWTheme = this._manager.currentTheme;
+    let previousLWTheme = this._manager.currentTheme;
 
-    var listener = {
+    let listener = {
       onEnabling: function(aAddon, aRequiresRestart) {
-        if (!aRequiresRestart)
+        if (!aRequiresRestart) {
           return;
+        }
 
         let messageString = gNavigatorBundle.getFormattedString("lwthemeNeedsRestart.message",
           [aAddon.name], 1);

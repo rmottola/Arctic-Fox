@@ -775,13 +775,13 @@ bool nsIDNService::isLabelSafe(const nsAString &label)
     // in the upcoming (Unicode 10.0-based) revision of UAX #31.
     // See: http://www.unicode.org/reports/tr31/#Aspirational_Use_Scripts
     XidmodType xm = GetIdentifierModification(ch);
-    int32_t script = GetScriptCode(ch);
     if (xm != XIDMOD_RECOMMENDED &&
         xm != XIDMOD_INCLUSION) {
       return false;
     }
 
     // Check for mixed script
+    int32_t script = GetScriptCode(ch);
     if (script != MOZ_SCRIPT_COMMON &&
         script != MOZ_SCRIPT_INHERITED &&
         script != lastScript) {

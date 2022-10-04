@@ -28,6 +28,7 @@
 #include "mozilla/ErrorResult.h"
 #include "mozilla/Likely.h"
 #include "mozilla/MemoryReporting.h"
+#include "nsIDocument.h"
 #include "nsIGlobalObject.h"
 #include "nsIXPConnect.h"
 #include "nsJSUtils.h"
@@ -2284,7 +2285,7 @@ void DoTraceSequence(JSTracer* trc, InfallibleTArray<T>& seq)
 
 // Rooter class for sequences; this is what we mostly use in the codegen
 template<typename T>
-class MOZ_STACK_CLASS SequenceRooter : private JS::CustomAutoRooter
+class MOZ_RAII SequenceRooter : private JS::CustomAutoRooter
 {
 public:
   SequenceRooter(JSContext *aCx, FallibleTArray<T>* aSequence
@@ -2343,7 +2344,7 @@ public:
 
 // Rooter class for MozMap; this is what we mostly use in the codegen.
 template<typename T>
-class MOZ_STACK_CLASS MozMapRooter : private JS::CustomAutoRooter
+class MOZ_RAII MozMapRooter : private JS::CustomAutoRooter
 {
 public:
   MozMapRooter(JSContext *aCx, MozMap<T>* aMozMap
@@ -2389,8 +2390,8 @@ private:
 };
 
 template<typename T>
-class MOZ_STACK_CLASS RootedUnion : public T,
-                                    private JS::CustomAutoRooter
+class MOZ_RAII RootedUnion : public T,
+                             private JS::CustomAutoRooter
 {
 public:
   explicit RootedUnion(JSContext* cx MOZ_GUARD_OBJECT_NOTIFIER_PARAM) :
@@ -3344,6 +3345,11 @@ GetDesiredProto(JSContext* aCx, const JS::CallArgs& aCallArgs,
 void
 SetDocumentAndPageUseCounter(JSContext* aCx, JSObject* aObject,
                              UseCounter aUseCounter);
+
+// Warnings
+void
+DeprecationWarning(JSContext* aCx, JSObject* aObject,
+                   nsIDocument::DeprecatedOperations aOperation);
 
 } // namespace dom
 } // namespace mozilla

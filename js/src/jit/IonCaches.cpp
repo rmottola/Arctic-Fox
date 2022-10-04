@@ -1092,6 +1092,11 @@ GenerateCallGetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
     Label pop1AndFail;
     Label* maybePopAndFail = failures;
 
+    // If we're calling a getter on the global, inline the logic for the
+    // 'this' hook on the global lexical scope and manually push the global.
+    if (IsGlobalLexicalScope(obj))
+        masm.extractObject(Address(object, ScopeObject::offsetOfEnclosingScope()), object);
+
     // Save off the object register if it aliases the scratchReg
     if (spillObjReg) {
         masm.push(object);
@@ -1258,6 +1263,13 @@ IsCacheableArrayLength(JSContext* cx, HandleObject obj, HandlePropertyName name,
         // is equipped to handle that.
         return false;
     }
+
+    // The emitted stub can only handle int32 lengths. If the length of the
+    // actual object does not fit in an int32 then don't attach a stub, as if
+    // the cache is idempotent we won't end up invalidating the compiled script
+    // otherwise.
+    if (obj->as<ArrayObject>().length() > INT32_MAX)
+        return false;
 
     return true;
 }
@@ -1869,7 +1881,7 @@ GetPropertyIC::tryAttachArgumentsLength(JSContext* cx, HandleScript outerScript,
     if (!(outputType == MIRType_Value || outputType == MIRType_Int32))
         return true;
 
-    if (hasArgumentsLengthStub(obj->is<StrictArgumentsObject>()))
+    if (hasArgumentsLengthStub(obj->is<MappedArgumentsObject>()))
         return true;
 
     *emitted = true;
@@ -1889,10 +1901,7 @@ GetPropertyIC::tryAttachArgumentsLength(JSContext* cx, HandleScript outerScript,
     }
     MOZ_ASSERT(object() != tmpReg);
 
-    const Class* clasp = obj->is<StrictArgumentsObject>() ? &StrictArgumentsObject::class_
-                                                          : &NormalArgumentsObject::class_;
-
-    masm.branchTestObjClass(Assembler::NotEqual, object(), tmpReg, clasp, &failures);
+    masm.branchTestObjClass(Assembler::NotEqual, object(), tmpReg, obj->getClass(), &failures);
 
     // Get initial ArgsObj length value, test if length has been overridden.
     masm.unboxInt32(Address(object(), ArgumentsObject::getInitialLengthSlotOffset()), tmpReg);
@@ -1912,16 +1921,16 @@ GetPropertyIC::tryAttachArgumentsLength(JSContext* cx, HandleScript outerScript,
     masm.bind(&failures);
     attacher.jumpNextStub(masm);
 
-    if (obj->is<StrictArgumentsObject>()) {
-        MOZ_ASSERT(!hasStrictArgumentsLengthStub_);
-        hasStrictArgumentsLengthStub_ = true;
-        return linkAndAttachStub(cx, masm, attacher, ion, "ArgsObj length (strict)",
+    if (obj->is<UnmappedArgumentsObject>()) {
+        MOZ_ASSERT(!hasUnmappedArgumentsLengthStub_);
+        hasUnmappedArgumentsLengthStub_ = true;
+        return linkAndAttachStub(cx, masm, attacher, ion, "ArgsObj length (unmapped)",
                                  JS::TrackedOutcome::ICGetPropStub_ArgumentsLength);
     }
 
-    MOZ_ASSERT(!hasNormalArgumentsLengthStub_);
-    hasNormalArgumentsLengthStub_ = true;
-    return linkAndAttachStub(cx, masm, attacher, ion, "ArgsObj length (normal)",
+    MOZ_ASSERT(!hasMappedArgumentsLengthStub_);
+    hasMappedArgumentsLengthStub_ = true;
+    return linkAndAttachStub(cx, masm, attacher, ion, "ArgsObj length (mapped)",
                                  JS::TrackedOutcome::ICGetPropStub_ArgumentsLength);
 }
 
@@ -2039,8 +2048,8 @@ GetPropertyIC::reset(ReprotectCode reprotect)
     IonCache::reset(reprotect);
     hasTypedArrayLengthStub_ = false;
     hasSharedTypedArrayLengthStub_ = false;
-    hasStrictArgumentsLengthStub_ = false;
-    hasNormalArgumentsLengthStub_ = false;
+    hasMappedArgumentsLengthStub_ = false;
+    hasUnmappedArgumentsLengthStub_ = false;
     hasGenericProxyStub_ = false;
 }
 
@@ -3342,8 +3351,16 @@ SetPropertyIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex
     }
 
     // Set/Add the property on the object, the inlined cache are setup for the next execution.
-    if (!SetProperty(cx, obj, name, value, cache.strict(), cache.pc()))
-        return false;
+    if (JSOp(*cache.pc()) == JSOP_INITGLEXICAL) {
+        RootedScript script(cx);
+        jsbytecode* pc;
+        cache.getScriptedLocation(&script, &pc);
+        MOZ_ASSERT(!script->hasNonSyntacticScope());
+        InitGlobalLexicalOperation(cx, &cx->global()->lexicalScope(), script, pc, value);
+    } else {
+        if (!SetProperty(cx, obj, name, value, cache.strict(), cache.pc()))
+            return false;
+    }
 
     // A GC may have caused cache.value() to become stale as it is not traced.
     // In this case the IonScript will have been invalidated, so check for that.
@@ -3433,6 +3450,7 @@ GetElementIC::attachGetProp(JSContext* cx, HandleScript outerScript, IonScript* 
             JitSpew(JitSpew_IonIC, "GETELEM uncacheable property");
             return true;
         }
+        MOZ_ASSERT(monitoredResult());
     } else if (obj->is<UnboxedPlainObject>()) {
         MOZ_ASSERT(canCache == GetPropertyIC::CanAttachNone);
         const UnboxedLayout::Property* property =
@@ -3953,10 +3971,7 @@ GetElementIC::attachArgumentsElement(JSContext* cx, HandleScript outerScript, Io
     Register tmpReg = output().scratchReg().gpr();
     MOZ_ASSERT(tmpReg != InvalidReg);
 
-    const Class* clasp = obj->is<StrictArgumentsObject>() ? &StrictArgumentsObject::class_
-                                                          : &NormalArgumentsObject::class_;
-
-    masm.branchTestObjClass(Assembler::NotEqual, object(), tmpReg, clasp, &failures);
+    masm.branchTestObjClass(Assembler::NotEqual, object(), tmpReg, obj->getClass(), &failures);
 
     // Get initial ArgsObj length value, test if length has been overridden.
     masm.unboxInt32(Address(object(), ArgumentsObject::getInitialLengthSlotOffset()), tmpReg);
@@ -4038,18 +4053,17 @@ GetElementIC::attachArgumentsElement(JSContext* cx, HandleScript outerScript, Io
     masm.bind(&failures);
     attacher.jumpNextStub(masm);
 
-
-    if (obj->is<StrictArgumentsObject>()) {
-        MOZ_ASSERT(!hasStrictArgumentsStub_);
-        hasStrictArgumentsStub_ = true;
-        return linkAndAttachStub(cx, masm, attacher, ion, "ArgsObj element (strict)",
-                                 JS::TrackedOutcome::ICGetElemStub_ArgsElementStrict);
+    if (obj->is<UnmappedArgumentsObject>()) {
+        MOZ_ASSERT(!hasUnmappedArgumentsStub_);
+        hasUnmappedArgumentsStub_ = true;
+        return linkAndAttachStub(cx, masm, attacher, ion, "ArgsObj element (unmapped)",
+                                 JS::TrackedOutcome::ICGetElemStub_ArgsElementUnmapped);
     }
 
-    MOZ_ASSERT(!hasNormalArgumentsStub_);
-    hasNormalArgumentsStub_ = true;
-    return linkAndAttachStub(cx, masm, attacher, ion, "ArgsObj element (normal)",
-                             JS::TrackedOutcome::ICGetElemStub_ArgsElement);
+    MOZ_ASSERT(!hasMappedArgumentsStub_);
+    hasMappedArgumentsStub_ = true;
+    return linkAndAttachStub(cx, masm, attacher, ion, "ArgsObj element (mapped)",
+                             JS::TrackedOutcome::ICGetElemStub_ArgsElementMapped);
 }
 
 bool
@@ -4080,7 +4094,7 @@ GetElementIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex,
     bool attachedStub = false;
     if (cache.canAttachStub()) {
         if (IsOptimizableArgumentsObjectForGetElem(obj, idval) &&
-            !cache.hasArgumentsStub(obj->is<StrictArgumentsObject>()) &&
+            !cache.hasArgumentsStub(obj->is<MappedArgumentsObject>()) &&
             (cache.index().hasValue() ||
              cache.index().type() == MIRType_Int32) &&
             (cache.output().hasValue() || !cache.output().typedReg().isFloat()))
@@ -4138,8 +4152,8 @@ GetElementIC::reset(ReprotectCode reprotect)
 {
     IonCache::reset(reprotect);
     hasDenseStub_ = false;
-    hasStrictArgumentsStub_ = false;
-    hasNormalArgumentsStub_ = false;
+    hasMappedArgumentsStub_ = false;
+    hasUnmappedArgumentsStub_ = false;
 }
 
 static bool
@@ -4710,6 +4724,9 @@ IsCacheableNameReadSlot(HandleObject scopeChain, HandleObject obj,
         if (!IsCacheableGetPropReadSlotForIon(obj, holder, shape) &&
             !IsCacheableNoProperty(obj, holder, shape, pc, output))
             return false;
+    } else if (obj->is<ModuleEnvironmentObject>()) {
+        // We don't yet support lookups in a module environment.
+        return false;
     } else if (obj->is<CallObject>()) {
         MOZ_ASSERT(obj == holder);
         if (!shape->hasDefaultGetter())

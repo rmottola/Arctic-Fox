@@ -9,12 +9,11 @@ this.EXPORTED_SYMBOLS = ["SessionStorage"];
 const Cu = Components.utils;
 const Ci = Components.interfaces;
 
-Cu.import("resource://gre/modules/BrowserUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-  "resource://gre/modules/devtools/Console.jsm");
+  "resource://gre/modules/devtools/shared/Console.jsm");
 
 // Returns the principal for a given |frame| contained in a given |docShell|.
 function getPrincipalForFrame(docShell, frame) {
@@ -105,7 +104,7 @@ var SessionStorageInternal = {
   restore: function (aDocShell, aStorageData) {
     for (let origin of Object.keys(aStorageData)) {
       let data = aStorageData[origin];
-      let principal = BrowserUtils.principalFromOrigin(origin);
+      let principal = Services.scriptSecurityManager.createCodebasePrincipalFromOrigin(origin);
       let storageManager = aDocShell.QueryInterface(Ci.nsIDOMStorageManager);
       let window = aDocShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindow);
 

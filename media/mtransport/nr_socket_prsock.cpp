@@ -276,14 +276,14 @@ NS_IMPL_ISUPPORTS0(NrSocket)
 
 // The nsASocket callbacks
 void NrSocket::OnSocketReady(PRFileDesc *fd, int16_t outflags) {
-  if (outflags & PR_POLL_READ)
+  if (outflags & PR_POLL_READ & poll_flags())
     fire_callback(NR_ASYNC_WAIT_READ);
-  if (outflags & PR_POLL_WRITE)
+  if (outflags & PR_POLL_WRITE & poll_flags())
     fire_callback(NR_ASYNC_WAIT_WRITE);
 }
 
 void NrSocket::OnSocketDetached(PRFileDesc *fd) {
-  ;  // TODO: Log?
+  r_log(LOG_GENERIC, LOG_DEBUG, "Socket %p detached", fd);
 }
 
 void NrSocket::IsLocal(bool *aIsLocal) {
@@ -337,20 +337,11 @@ static int nr_transport_addr_to_praddr(nr_transport_addr *addr,
         naddr->inet.ip = addr->u.addr4.sin_addr.s_addr;
         break;
       case NR_IPV6:
-#if 0
         naddr->ipv6.family = PR_AF_INET6;
         naddr->ipv6.port = addr->u.addr6.sin6_port;
-#ifdef LINUX
-        memcpy(naddr->ipv6.ip._S6_un._S6_u8,
-               &addr->u.addr6.sin6_addr.__in6_u.__u6_addr8, 16);
-#else
-        memcpy(naddr->ipv6.ip._S6_un._S6_u8,
-               &addr->u.addr6.sin6_addr.__u6_addr.__u6_addr8, 16);
-#endif
-#else
-        // TODO: make IPv6 work
-        ABORT(R_INTERNAL);
-#endif
+        naddr->ipv6.flowinfo = addr->u.addr6.sin6_flowinfo;
+        memcpy(&naddr->ipv6.ip, &addr->u.addr6.sin6_addr, sizeof(in6_addr));
+        naddr->ipv6.scope_id = addr->u.addr6.sin6_scope_id;
         break;
       default:
         ABORT(R_BAD_ARGS);
@@ -440,6 +431,7 @@ int nr_praddr_to_transport_addr(const PRNetAddr *praddr,
     int _status;
     int r;
     struct sockaddr_in ip4;
+    struct sockaddr_in6 ip6;
 
     switch(praddr->raw.family) {
       case PR_AF_INET:
@@ -447,18 +439,19 @@ int nr_praddr_to_transport_addr(const PRNetAddr *praddr,
         ip4.sin_addr.s_addr = praddr->inet.ip;
         ip4.sin_port = praddr->inet.port;
         if ((r = nr_sockaddr_to_transport_addr((sockaddr *)&ip4,
-                                               sizeof(ip4),
                                                protocol, keep,
                                                addr)))
           ABORT(r);
         break;
       case PR_AF_INET6:
-#if 0
-        r = nr_sockaddr_to_transport_addr((sockaddr *)&praddr->raw,
-          sizeof(struct sockaddr_in6),IPPROTO_UDP,keep,addr);
+        ip6.sin6_family = PF_INET6;
+        ip6.sin6_port = praddr->ipv6.port;
+        ip6.sin6_flowinfo = praddr->ipv6.flowinfo;
+        memcpy(&ip6.sin6_addr, &praddr->ipv6.ip, sizeof(in6_addr));
+        ip6.sin6_scope_id = praddr->ipv6.scope_id;
+        if ((r = nr_sockaddr_to_transport_addr((sockaddr *)&ip6,protocol,keep,addr)))
+          ABORT(r);
         break;
-#endif
-        ABORT(R_BAD_ARGS);
       default:
         MOZ_ASSERT(false);
         ABORT(R_BAD_ARGS);
@@ -516,15 +509,49 @@ int NrSocket::create(nr_transport_addr *addr) {
 
   switch (addr->protocol) {
     case IPPROTO_UDP:
-      if (!(fd_ = PR_NewUDPSocket())) {
-        r_log(LOG_GENERIC,LOG_CRIT,"Couldn't create socket");
+      if (!(fd_ = PR_OpenUDPSocket(naddr.raw.family))) {
+        r_log(LOG_GENERIC,LOG_CRIT,"Couldn't create UDP socket, "
+              "family=%d, err=%d", naddr.raw.family, PR_GetError());
         ABORT(R_INTERNAL);
       }
       break;
     case IPPROTO_TCP:
-      if (!(fd_ = PR_NewTCPSocket())) {
-        r_log(LOG_GENERIC,LOG_CRIT,"Couldn't create socket");
+      if (!(fd_ = PR_OpenTCPSocket(naddr.raw.family))) {
+        r_log(LOG_GENERIC,LOG_CRIT,"Couldn't create TCP socket, "
+              "family=%d, err=%d", naddr.raw.family, PR_GetError());
         ABORT(R_INTERNAL);
+      }
+      // Set ReuseAddr for TCP sockets to enable having several
+      // sockets bound to same local IP and port
+      PRSocketOptionData opt_reuseaddr;
+      opt_reuseaddr.option = PR_SockOpt_Reuseaddr;
+      opt_reuseaddr.value.reuse_addr = PR_TRUE;
+      status = PR_SetSocketOption(fd_, &opt_reuseaddr);
+      if (status != PR_SUCCESS) {
+        r_log(LOG_GENERIC, LOG_CRIT,
+          "Couldn't set reuse addr socket option: %d", status);
+        ABORT(R_INTERNAL);
+      }
+      // And also set ReusePort for platforms supporting this socket option
+      PRSocketOptionData opt_reuseport;
+      opt_reuseport.option = PR_SockOpt_Reuseport;
+      opt_reuseport.value.reuse_port = PR_TRUE;
+      status = PR_SetSocketOption(fd_, &opt_reuseport);
+      if (status != PR_SUCCESS) {
+        if (PR_GetError() != PR_OPERATION_NOT_SUPPORTED_ERROR) {
+          r_log(LOG_GENERIC, LOG_CRIT,
+            "Couldn't set reuse port socket option: %d", status);
+          ABORT(R_INTERNAL);
+        }
+      }
+      // Try to speedup packet delivery by disabling TCP Nagle
+      PRSocketOptionData opt_nodelay;
+      opt_nodelay.option = PR_SockOpt_NoDelay;
+      opt_nodelay.value.no_delay = PR_TRUE;
+      status = PR_SetSocketOption(fd_, &opt_nodelay);
+      if (status != PR_SUCCESS) {
+        r_log(LOG_GENERIC, LOG_WARNING,
+          "Couldn't set Nodelay socket option: %d", status);
       }
       break;
     default:
@@ -556,10 +583,10 @@ int NrSocket::create(nr_transport_addr *addr) {
 
 
   // Set nonblocking
-  PRSocketOptionData option;
-  option.option = PR_SockOpt_Nonblocking;
-  option.value.non_blocking = PR_TRUE;
-  status = PR_SetSocketOption(fd_, &option);
+  PRSocketOptionData opt_nonblock;
+  opt_nonblock.option = PR_SockOpt_Nonblocking;
+  opt_nonblock.value.non_blocking = PR_TRUE;
+  status = PR_SetSocketOption(fd_, &opt_nonblock);
   if (status != PR_SUCCESS) {
     r_log(LOG_GENERIC, LOG_CRIT, "Couldn't make socket nonblocking");
     ABORT(R_INTERNAL);
@@ -573,6 +600,7 @@ int NrSocket::create(nr_transport_addr *addr) {
   // Finally, register with the STS
   rv = stservice->AttachSocket(fd_, this);
   if (!NS_SUCCEEDED(rv)) {
+    r_log(LOG_GENERIC, LOG_CRIT, "Couldn't attach socket to STS");
     ABORT(R_INTERNAL);
   }
 
@@ -653,7 +681,8 @@ int NrSocket::sendto(const void *msg, size_t len,
     if (PR_GetError() == PR_WOULD_BLOCK_ERROR)
       ABORT(R_WOULDBLOCK);
 
-    r_log(LOG_GENERIC, LOG_INFO, "Error in sendto: %s", to->as_string);
+    r_log(LOG_GENERIC, LOG_INFO, "Error in sendto %s: %d",
+          to->as_string, PR_GetError());
     ABORT(R_IO_ERROR);
   }
 
@@ -743,6 +772,7 @@ int NrSocket::write(const void *msg, size_t len, size_t *written) {
   if (status < 0) {
     if (PR_GetError() == PR_WOULD_BLOCK_ERROR)
       ABORT(R_WOULDBLOCK);
+    r_log(LOG_GENERIC, LOG_INFO, "Error in write");
     ABORT(R_IO_ERROR);
   }
 
@@ -765,6 +795,7 @@ int NrSocket::read(void* buf, size_t maxlen, size_t *len) {
   if (status < 0) {
     if (PR_GetError() == PR_WOULD_BLOCK_ERROR)
       ABORT(R_WOULDBLOCK);
+    r_log(LOG_GENERIC, LOG_INFO, "Error in read");
     ABORT(R_IO_ERROR);
   }
   if (status == 0)
@@ -773,6 +804,104 @@ int NrSocket::read(void* buf, size_t maxlen, size_t *len) {
   *len = (size_t)status;  // Guaranteed to be > 0
   _status = 0;
 abort:
+  return(_status);
+}
+
+int NrSocket::listen(int backlog) {
+  ASSERT_ON_THREAD(ststhread_);
+  int32_t status;
+  int _status;
+
+  assert(fd_);
+  status = PR_Listen(fd_, backlog);
+  if (status != PR_SUCCESS) {
+    ABORT(R_IO_ERROR);
+  }
+
+  _status=0;
+abort:
+  return(_status);
+}
+
+int NrSocket::accept(nr_transport_addr *addrp, nr_socket **sockp) {
+  ASSERT_ON_THREAD(ststhread_);
+  int _status, r;
+  PRStatus status;
+  PRFileDesc *prfd;
+  PRNetAddr nfrom;
+  NrSocket *sock=nullptr;
+  nsresult rv;
+  PRSocketOptionData opt_nonblock, opt_nodelay;
+  nsCOMPtr<nsISocketTransportService> stservice =
+      do_GetService(NS_SOCKETTRANSPORTSERVICE_CONTRACTID, &rv);
+
+  if (NS_FAILED(rv)) {
+    ABORT(R_INTERNAL);
+  }
+
+  if(!fd_)
+    ABORT(R_EOD);
+
+  prfd = PR_Accept(fd_, &nfrom, PR_INTERVAL_NO_WAIT);
+
+  if (!prfd) {
+    if (PR_GetError() == PR_WOULD_BLOCK_ERROR)
+      ABORT(R_WOULDBLOCK);
+
+    ABORT(R_IO_ERROR);
+  }
+
+  sock = new NrSocket();
+
+  sock->fd_=prfd;
+  nr_transport_addr_copy(&sock->my_addr_, &my_addr_);
+
+  if((r=nr_praddr_to_transport_addr(&nfrom, addrp, my_addr_.protocol, 0)))
+    ABORT(r);
+
+  // Set nonblocking
+  opt_nonblock.option = PR_SockOpt_Nonblocking;
+  opt_nonblock.value.non_blocking = PR_TRUE;
+  status = PR_SetSocketOption(prfd, &opt_nonblock);
+  if (status != PR_SUCCESS) {
+    r_log(LOG_GENERIC, LOG_CRIT,
+      "Failed to make accepted socket nonblocking: %d", status);
+    ABORT(R_INTERNAL);
+  }
+  // Disable TCP Nagle
+  opt_nodelay.option = PR_SockOpt_NoDelay;
+  opt_nodelay.value.no_delay = PR_TRUE;
+  status = PR_SetSocketOption(prfd, &opt_nodelay);
+  if (status != PR_SUCCESS) {
+    r_log(LOG_GENERIC, LOG_WARNING,
+      "Failed to set Nodelay on accepted socket: %d", status);
+  }
+
+  // Should fail only with OOM
+  if ((r=nr_socket_create_int(static_cast<void *>(sock), sock->vtbl(), sockp)))
+    ABORT(r);
+
+  // Remember our thread.
+  sock->ststhread_ = do_QueryInterface(stservice, &rv);
+  if (NS_FAILED(rv))
+    ABORT(R_INTERNAL);
+
+  // Finally, register with the STS
+  rv = stservice->AttachSocket(prfd, sock);
+  if (NS_FAILED(rv)) {
+    ABORT(R_INTERNAL);
+  }
+
+  sock->connect_invoked_ = true;
+
+  // Add a reference so that we can delete it in destroy()
+  sock->AddRef();
+  _status=0;
+abort:
+  if (_status) {
+    delete sock;
+  }
+
   return(_status);
 }
 
@@ -1168,6 +1297,16 @@ int NrSocketIpc::read(void* buf, size_t maxlen, size_t *len) {
   return R_INTERNAL;
 }
 
+int NrSocketIpc::listen(int backlog) {
+  MOZ_ASSERT(false);
+  return R_INTERNAL;
+}
+
+int NrSocketIpc::accept(nr_transport_addr *addrp, nr_socket **sockp) {
+  MOZ_ASSERT(false);
+  return R_INTERNAL;
+}
+
 // IO thread executors
 void NrSocketIpc::create_i(const nsACString &host, const uint16_t port) {
   ASSERT_ON_THREAD(io_thread_);
@@ -1295,9 +1434,12 @@ static int nr_socket_local_write(void *obj,const void *msg, size_t len,
                                  size_t *written);
 static int nr_socket_local_read(void *obj,void * restrict buf, size_t maxlen,
                                 size_t *len);
+static int nr_socket_local_listen(void *obj, int backlog);
+static int nr_socket_local_accept(void *obj, nr_transport_addr *addrp,
+                                  nr_socket **sockp);
 
 static nr_socket_vtbl nr_socket_local_vtbl={
-  1,
+  2,
   nr_socket_local_destroy,
   nr_socket_local_sendto,
   nr_socket_local_recvfrom,
@@ -1306,7 +1448,9 @@ static nr_socket_vtbl nr_socket_local_vtbl={
   nr_socket_local_connect,
   nr_socket_local_write,
   nr_socket_local_read,
-  nr_socket_local_close
+  nr_socket_local_close,
+  nr_socket_local_listen,
+  nr_socket_local_accept
 };
 
 int nr_socket_local_create(void *obj, nr_transport_addr *addr, nr_socket **sockp) {
@@ -1413,6 +1557,19 @@ static int nr_socket_local_connect(void *obj, nr_transport_addr *addr) {
   NrSocket *sock = static_cast<NrSocket *>(obj);
 
   return sock->connect(addr);
+}
+
+static int nr_socket_local_listen(void *obj, int backlog) {
+  NrSocket *sock = static_cast<NrSocket *>(obj);
+
+  return sock->listen(backlog);
+}
+
+static int nr_socket_local_accept(void *obj, nr_transport_addr *addrp,
+                                  nr_socket **sockp) {
+  NrSocket *sock = static_cast<NrSocket *>(obj);
+
+  return sock->accept(addrp, sockp);
 }
 
 // Implement async api

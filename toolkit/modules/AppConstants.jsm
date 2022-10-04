@@ -94,6 +94,14 @@ this.AppConstants = Object.freeze({
   false,
 #endif
 
+# MOZ_B2G covers both device and desktop b2g
+  MOZ_B2G:
+#ifdef MOZ_B2G
+  true,
+#else
+  false,
+#endif
+
 # NOTE! XP_LINUX has to go after MOZ_WIDGET_ANDROID otherwise Android
 # builds will be misidentified as linux.
   platform:
@@ -121,8 +129,21 @@ this.AppConstants = Object.freeze({
            Services.vc.compare(platformVersion, version) >= 0;
   },
 
+  isPlatformAndVersionAtMost(platform, version) {
+    let platformVersion = Services.sysinfo.getProperty("version");
+    return platform == this.platform &&
+           Services.vc.compare(platformVersion, version) <= 0;
+  },
+
   MOZ_CRASHREPORTER:
 #ifdef MOZ_CRASHREPORTER
+  true,
+#else
+  false,
+#endif
+
+  MOZ_VERIFY_MAR_SIGNATURE:
+#ifdef MOZ_VERIFY_MAR_SIGNATURE
   true,
 #else
   false,
@@ -171,6 +192,15 @@ this.AppConstants = Object.freeze({
   MOZ_APP_VERSION_DISPLAY: "@MOZ_APP_VERSION_DISPLAY@",
   MOZ_BUILD_APP: "@MOZ_BUILD_APP@",
   MOZ_UPDATE_CHANNEL: "@MOZ_UPDATE_CHANNEL@",
+  INSTALL_LOCALE: "@AB_CD@",
   MOZ_WIDGET_TOOLKIT: "@MOZ_WIDGET_TOOLKIT@",
   ANDROID_PACKAGE_NAME: "@ANDROID_PACKAGE_NAME@",
+
+  MOZ_ANDROID_APZ:
+#ifdef MOZ_ANDROID_APZ
+    true,
+#else
+    false,
+#endif
+  DEBUG_JS_MODULES: "@DEBUG_JS_MODULES@"
 });

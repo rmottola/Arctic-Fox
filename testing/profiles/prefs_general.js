@@ -28,7 +28,6 @@ user_pref("javascript.options.showInConsole", true);
 user_pref("devtools.browsertoolbox.panel", "jsdebugger");
 user_pref("devtools.errorconsole.enabled", true);
 user_pref("devtools.debugger.remote-port", 6023);
-user_pref("layout.debug.enable_data_xbl", true);
 user_pref("browser.EULA.override", true);
 user_pref("gfx.color_management.force_srgb", true);
 user_pref("network.manage-offline-status", false);
@@ -252,9 +251,6 @@ user_pref("identity.fxaccounts.remote.force_auth.uri", "https://%(server)s/fxa-f
 user_pref("identity.fxaccounts.remote.signin.uri", "https://%(server)s/fxa-signin");
 user_pref("identity.fxaccounts.settings.uri", "https://%(server)s/fxa-settings");
 user_pref('identity.fxaccounts.remote.webchannel.uri', 'https://%(server)s/');
-
-// Enable logging of APZ test data (see bug 961289).
-user_pref('apz.test.logging_enabled', true);
 
 // Make sure SSL Error reports don't hit the network
 user_pref("security.ssl.errorReporting.url", "https://example.com/browser/browser/base/content/test/general/pinning_reports.sjs?succeed");

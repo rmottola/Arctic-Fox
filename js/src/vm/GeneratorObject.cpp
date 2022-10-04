@@ -290,7 +290,7 @@ GlobalObject::initLegacyGeneratorProto(JSContext* cx, Handle<GlobalObject*> glob
 {
     if (global->getReservedSlot(LEGACY_GENERATOR_OBJECT_PROTO).isObject())
         return true;
- 
+
     RootedObject proto(cx, NewSingletonObjectWithObjectPrototype(cx, global));
     if (!proto || !proto->setDelegate(cx))
         return false;

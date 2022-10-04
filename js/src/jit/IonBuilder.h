@@ -649,8 +649,10 @@ class IonBuilder
     bool jsop_pow();
     bool jsop_pos();
     bool jsop_neg();
+    bool jsop_tostring();
     bool jsop_setarg(uint32_t arg);
     bool jsop_defvar(uint32_t index);
+    bool jsop_deflexical(uint32_t index);
     bool jsop_deffun(uint32_t index);
     bool jsop_notearg();
     bool jsop_checklexical();
@@ -696,7 +698,7 @@ class IonBuilder
     bool jsop_setprop(PropertyName* name);
     bool jsop_delprop(PropertyName* name);
     bool jsop_delelem();
-    bool jsop_newarray(uint32_t count);
+    bool jsop_newarray(uint32_t length);
     bool jsop_newarray_copyonwrite();
     bool jsop_newobject();
     bool jsop_initelem();
@@ -959,6 +961,8 @@ class IonBuilder
                                   TemporaryTypeSet* pushedTypes);
 
     MGetPropertyCache* getInlineableGetPropertyCache(CallInfo& callInfo);
+
+    JSObject* testGlobalLexicalBinding(PropertyName* name);
 
     JSObject* testSingletonProperty(JSObject* obj, jsid id);
     JSObject* testSingletonPropertyTypes(MDefinition* obj, jsid id);

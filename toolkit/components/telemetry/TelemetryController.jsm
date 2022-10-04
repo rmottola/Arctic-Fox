@@ -80,8 +80,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "TelemetryEnvironment",
                                   "resource://gre/modules/TelemetryEnvironment.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionRecorder",
                                   "resource://gre/modules/SessionRecorder.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "UpdateChannel",
-                                  "resource://gre/modules/UpdateChannel.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
+                                  "resource://gre/modules/UpdateUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetryArchive",
                                   "resource://gre/modules/TelemetryArchive.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetrySession",
@@ -116,8 +116,8 @@ function crc32(str) {
  * Setup Telemetry logging. This function also gets called when loggin related
  * preferences change.
  */
-let gLogger = null;
-let gLogAppenderDump = null;
+var gLogger = null;
+var gLogAppenderDump = null;
 function configureLogging() {
   if (!gLogger) {
     gLogger = Log.repository.getLogger(LOGGER_NAME);
@@ -148,7 +148,7 @@ function configureLogging() {
 /**
  * This is a policy object used to override behavior for testing.
  */
-let Policy = {
+var Policy = {
   now: () => new Date(),
   generatePingId: () => Utils.generateUUID(),
   getCachedClientID: () => ClientID.getCachedClientID(),
@@ -362,7 +362,7 @@ this.TelemetryController = Object.freeze({
   },
 });
 
-let Impl = {
+var Impl = {
   _initialized: false,
   _initStarted: false, // Whether we started setting up TelemetryController.
   _logger: null,
@@ -410,7 +410,7 @@ let Impl = {
 
     let updateChannel = null;
     try {
-      updateChannel = UpdateChannel.get(false);
+      updateChannel = UpdateUtils.getUpdateChannel(false);
     } catch (e) {
       this._log.trace("assemblePing - Unable to get update channel.", e);
     }

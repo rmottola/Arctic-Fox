@@ -14,8 +14,11 @@
 #include "mozilla/dom/ChromeUtilsBinding.h"
 
 class nsIContentSecurityPolicy;
+class nsILoadContext;
 class nsIObjectOutputStream;
 class nsIObjectInputStream;
+
+class nsExpandedPrincipal;
 
 namespace mozilla {
 
@@ -36,12 +39,35 @@ public:
     return mAppId == aOther.mAppId &&
            mInBrowser == aOther.mInBrowser &&
            mAddonId == aOther.mAddonId &&
-           mUserContextId == aOther.mUserContextId;
+           mUserContextId == aOther.mUserContextId &&
+           mSignedPkg == aOther.mSignedPkg;
   }
   bool operator!=(const OriginAttributes& aOther) const
   {
     return !(*this == aOther);
   }
+
+  // The docshell often influences the origin attributes of content loaded
+  // inside of it, and in some cases also influences the origin attributes of
+  // content loaded in child docshells. We say that a given attribute "lives on
+  // the docshell" to indicate that this attribute is specified by the docshell
+  // (if any) associated with a given content document.
+  //
+  // In practice, this usually means that we need to store a copy of those
+  // attributes on each docshell, or provide methods on the docshell to compute
+  // them on-demand.
+  // We could track each of these attributes individually, but since the
+  // majority of the existing origin attributes currently live on the docshell,
+  // it's cleaner to simply store an entire OriginAttributes struct on each
+  // docshell, and selectively copy them to child docshells and content
+  // principals in a manner that implements our desired semantics.
+  //
+  // This method is used to propagate attributes from parent to child
+  // docshells.
+  void InheritFromDocShellParent(const OriginAttributes& aParent);
+
+  // Copy from the origin attributes of the nsILoadContext.
+  bool CopyFromLoadContext(nsILoadContext* aLoadContext);
 
   // Serializes/Deserializes non-default values into the suffix format, i.e.
   // |!key1=value1&key2=value2|. If there are no non-default attributes, this
@@ -88,6 +114,10 @@ public:
       return false;
     }
 
+    if (mSignedPkg.WasPassed() && mSignedPkg.Value() != aAttrs.mSignedPkg) {
+      return false;
+    }
+
     return true;
   }
 };
@@ -113,6 +143,7 @@ public:
   NS_IMETHOD EqualsConsideringDomain(nsIPrincipal* other, bool* _retval) final;
   NS_IMETHOD Subsumes(nsIPrincipal* other, bool* _retval) final;
   NS_IMETHOD SubsumesConsideringDomain(nsIPrincipal* other, bool* _retval) final;
+  NS_IMETHOD CheckMayLoad(nsIURI* uri, bool report, bool allowIfInheritsPrincipal) final;
   NS_IMETHOD GetCsp(nsIContentSecurityPolicy** aCsp) override;
   NS_IMETHOD SetCsp(nsIContentSecurityPolicy* aCsp) override;
   NS_IMETHOD GetCspJSON(nsAString& outCSPinJSON) override;
@@ -131,7 +162,9 @@ public:
   virtual bool IsCodebasePrincipal() const { return false; };
 
   static BasePrincipal* Cast(nsIPrincipal* aPrin) { return static_cast<BasePrincipal*>(aPrin); }
-  static already_AddRefed<BasePrincipal> CreateCodebasePrincipal(nsIURI* aURI, OriginAttributes& aAttrs);
+  static already_AddRefed<BasePrincipal>
+  CreateCodebasePrincipal(nsIURI* aURI, const OriginAttributes& aAttrs);
+  static already_AddRefed<BasePrincipal> CreateCodebasePrincipal(const nsACString& aOrigin);
 
   const OriginAttributes& OriginAttributesRef() { return mOriginAttributes; }
   uint32_t AppId() const { return mOriginAttributes.mAppId; }
@@ -143,6 +176,12 @@ protected:
 
   virtual nsresult GetOriginInternal(nsACString& aOrigin) = 0;
   virtual bool SubsumesInternal(nsIPrincipal* aOther, DocumentDomainConsideration aConsider) = 0;
+
+  // Internal, side-effect-free check to determine whether the concrete
+  // principal would allow the load ignoring any common behavior implemented in
+  // BasePrincipal::CheckMayLoad.
+  virtual bool MayLoadInternal(nsIURI* aURI) = 0;
+  friend class ::nsExpandedPrincipal;
 
   // Helper to check whether this principal is associated with an addon that
   // allows unprivileged code to load aURI.

@@ -80,6 +80,9 @@ NS_IMETHODIMP
 InterceptedJARChannel::SynthesizeHeader(const nsACString& aName,
                                         const nsACString& aValue)
 {
+  if (aName.LowerCaseEqualsLiteral("content-type")) {
+    mContentType = aValue;
+  }
   return NS_OK;
 }
 
@@ -90,7 +93,7 @@ InterceptedJARChannel::FinishSynthesizedResponse()
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  mChannel->OverrideWithSynthesizedResponse(mSynthesizedInput);
+  mChannel->OverrideWithSynthesizedResponse(mSynthesizedInput, mContentType);
 
   mResponseBody = nullptr;
   mChannel = nullptr;

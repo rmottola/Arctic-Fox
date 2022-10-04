@@ -8,7 +8,6 @@ import sys
 import os
 import stat
 import platform
-import urllib2
 import errno
 
 from mach.decorators import (
@@ -17,7 +16,7 @@ from mach.decorators import (
     Command,
 )
 
-from mozbuild.base import MachCommandBase
+from mozbuild.base import MachCommandBase, MozbuildObject
 
 
 @CommandProvider
@@ -75,7 +74,7 @@ class Interface(object):
     from, what its uuid is, and where in the source file the uuid is.
     '''
     def __init__(self, filename, production):
-        import xpidl
+        from xpidl import xpidl
         assert isinstance(production, xpidl.Interface)
         self.name = production.name
         self.base = production.base
@@ -172,7 +171,7 @@ class UUIDProvider(object):
                           'Their descendants are updated as well.')
     def update_uuids(self, path, interfaces):
         import os
-        import xpidl
+        from xpidl import xpidl
         from mozpack.files import FileFinder
         import mozpack.path as mozpath
         from tempfile import mkdtemp
@@ -210,7 +209,7 @@ class PastebinProvider(object):
         description='Command line interface to pastebin.mozilla.org.')
     @CommandArgument('--language', default=None,
                      help='Language to use for syntax highlighting')
-    @CommandArgument('--poster', default=None,
+    @CommandArgument('--poster', default='',
                      help='Specify your name for use with pastebin.mozilla.org')
     @CommandArgument('--duration', default='day',
                      choices=['d', 'day', 'm', 'month', 'f', 'forever'],
@@ -219,10 +218,10 @@ class PastebinProvider(object):
                      help='Specify the file to upload to pastebin.mozilla.org')
 
     def pastebin(self, language, poster, duration, file):
-        import sys
         import urllib
+        import urllib2
 
-        URL = 'http://pastebin.mozilla.org/'
+        URL = 'https://pastebin.mozilla.org/'
 
         FILE_TYPES = [{'value': 'text', 'name': 'None', 'extension': 'txt'},
         {'value': 'bash', 'name': 'Bash', 'extension': 'sh'},
@@ -299,6 +298,8 @@ class FormatProvider(MachCommandBase):
     @CommandArgument('--show', '-s', action = 'store_true',
         help = 'Show diff output on instead of applying changes')
     def clang_format(self, show=False):
+        import urllib2
+
         plat = platform.system()
         fmt = plat.lower() + "/clang-format-3.5"
         fmt_diff = "clang-format-diff-3.5"
@@ -375,3 +376,58 @@ class FormatProvider(MachCommandBase):
             os.rename(temp, target)
         return target
 
+def mozregression_import():
+    # Lazy loading of mozregression.
+    # Note that only the mach_interface module should be used from this file.
+    try:
+        import mozregression.mach_interface
+    except ImportError:
+        return None
+    return mozregression.mach_interface
+
+
+def mozregression_create_parser():
+    # Create the mozregression command line parser.
+    # if mozregression is not installed, or not up to date, it will
+    # first be installed.
+    cmd = MozbuildObject.from_environment()
+    cmd._activate_virtualenv()
+    mozregression = mozregression_import()
+    if not mozregression:
+        # mozregression is not here at all, install it
+        cmd.virtualenv_manager.install_pip_package('mozregression')
+        print("mozregression was installed. please re-run your"
+              " command.")
+    else:
+        # check if there is a new release available
+        release = mozregression.new_release_on_pypi()
+        if release:
+            print(release)
+            # there is one, so install it. Note that install_pip_package
+            # does not work here, so just run pip directly.
+            cmd.virtualenv_manager._run_pip([
+                'install',
+                'mozregression==%s' % release
+            ])
+            print("mozregression was updated to version %s. please"
+                  " re-run your command." % release)
+        else:
+            # mozregression is up to date, return the parser.
+            return mozregression.parser()
+    # exit if we updated or installed mozregression because
+    # we may have already imported mozregression and running it
+    # as this may cause issues.
+    sys.exit(0)
+
+
+@CommandProvider
+class MozregressionCommand(MachCommandBase):
+    @Command('mozregression',
+             category='misc',
+             description=("Regression range finder for nightly"
+                          " and inbound builds."),
+             parser=mozregression_create_parser)
+    def run(self, **options):
+        self._activate_virtualenv()
+        mozregression = mozregression_import()
+        mozregression.run(options)

@@ -51,6 +51,11 @@ const ERR_BACKUP_DISCARD = "backup_discard: unable to remove";
 
 const LOG_SVC_SUCCESSFUL_LAUNCH = "Process was started... waiting on result.";
 
+// Typical end of a message when calling assert
+const MSG_SHOULD_EQUAL = " should equal the expected value";
+const MSG_SHOULD_EXIST = "the file or directory should exist";
+const MSG_SHOULD_NOT_EXIST = "the file or directory should not exist";
+
 // All we care about is that the last modified time has changed so that Mac OS
 // X Launch Services invalidates its cache so the test allows up to one minute
 // difference in the last modified time.
@@ -84,12 +89,6 @@ var gTestID;
 var gTestserver;
 
 var gRegisteredServiceCleanup;
-
-var gXHR;
-var gXHRCallback;
-
-var gUpdatePrompt;
-var gUpdatePromptCallback;
 
 var gCheckFunc;
 var gResponseBody;
@@ -756,7 +755,7 @@ function setupTestCommon() {
       }
       do_throw("The parallel run of this test failed. Failing non-parallel " +
                "test so the log from the parallel run can be displayed in " +
-               "non-parallel log.")
+               "non-parallel log.");
     } else {
       gRealDump = dump;
       dump = dumpOverride;
@@ -830,18 +829,6 @@ function cleanupTestCommon() {
   // outside of the scope of this test don't assert and thereby cause app update
   // tests to fail.
   gAUS.observe(null, "xpcom-shutdown", "");
-
-  if (gXHR) {
-    gXHRCallback     = null;
-
-    gXHR.responseXML = null;
-    // null out the event handlers to prevent a mFreeCount leak of 1
-    gXHR.onerror     = null;
-    gXHR.onload      = null;
-    gXHR.onprogress  = null;
-
-    gXHR             = null;
-  }
 
   gTestserver = null;
 
@@ -1024,6 +1011,56 @@ function preventDistributionFiles() {
   });
 }
 
+/**
+ * On Mac OS X this sets the last modified time for the app bundle directory to
+ * a date in the past to test that the last modified time is updated when an
+ * update has been successfully applied (bug 600098).
+ */
+function setAppBundleModTime() {
+  if (!IS_MACOSX) {
+    return;
+  }
+  let now = Date.now();
+  let yesterday = now - (1000 * 60 * 60 * 24);
+  let applyToDir = getApplyDirFile();
+  applyToDir.lastModifiedTime = yesterday;
+}
+
+/**
+ * On Mac OS X this checks that the last modified time for the app bundle
+ * directory has been updated when an update has been successfully applied
+ * (bug 600098).
+ */
+function checkAppBundleModTime() {
+  if (!IS_MACOSX) {
+    return;
+  }
+  let now = Date.now();
+  let applyToDir = getApplyDirFile();
+  let timeDiff = Math.abs(applyToDir.lastModifiedTime - now);
+  Assert.ok(timeDiff < MAC_MAX_TIME_DIFFERENCE,
+            "the last modified time on the apply to directory should " +
+            "change after a successful update");
+}
+
+/**
+ * On Mac OS X and Windows this checks if the post update '.running' file exists
+ * to determine if the post update binary was launched.
+ *
+ * @param   aShouldExist
+ *          Whether the post update '.running' file should exist.
+ */
+function checkPostUpdateRunningFile(aShouldExist) {
+  if (!IS_WIN && !IS_MACOSX) {
+    return;
+  }
+  let postUpdateRunningFile = getPostUpdateFile(".running");
+  if (aShouldExist) {
+    Assert.ok(postUpdateRunningFile.exists(), MSG_SHOULD_EXIST);
+  } else {
+    Assert.ok(!postUpdateRunningFile.exists(), MSG_SHOULD_NOT_EXIST);
+  }
+}
 
 /**
  * Initializes the most commonly used settings and creates an instance of the
@@ -1484,16 +1521,16 @@ function unlockDirectory(aDir) {
 function runUpdate(aExpectedExitValue, aExpectedStatus, aCallback) {
   // Copy the updater binary to the updates directory.
   let binDir = gGREBinDirOrig.clone();
-  let updater = binDir.clone();
-  updater.append("updater.app");
+  let updater = getTestDirFile("updater.app", true);
   if (!updater.exists()) {
     updater = getTestDirFile(FILE_UPDATER_BIN);
     if (!updater.exists()) {
-      do_throw("Unable to find updater binary!");
+      do_throw("Unable to find the updater binary!");
     }
   }
+  Assert.ok(updater.exists(), MSG_SHOULD_EXIST);
 
-   let updatesDir = getUpdatesPatchDir();
+  let updatesDir = getUpdatesPatchDir();
   let updateBin;
   if (IS_WIN) {
     updateBin = updater.clone();
@@ -2087,7 +2124,8 @@ function runUpdateUsingService(aInitialStatus, aExpectedStatus, aCheckSvcLog) {
   writeStatusFile(aInitialStatus);
 
   // sanity check
-  do_check_eq(readStatusState(), aInitialStatus);
+  Assert.equal(readStatusState(), aInitialStatus,
+               "the update status state" + MSG_SHOULD_EQUAL);
 
   writeVersionFile(DEFAULT_UPDATE_VERSION);
 
@@ -2107,9 +2145,9 @@ function runUpdateUsingService(aInitialStatus, aExpectedStatus, aCheckSvcLog) {
 
   let updater = getTestDirFile(FILE_UPDATER_BIN);
   if (!updater.exists()) {
-    do_throw("Unable to find updater binary!");
+    do_throw("Unable to find the updater binary!");
   }
-  let testBinDir = getGREBinDir()
+  let testBinDir = getGREBinDir();
   updater.copyToFollowingLinks(testBinDir, updater.leafName);
   updater.copyToFollowingLinks(updatesDir, updater.leafName);
 
@@ -2333,8 +2371,8 @@ function setupUpdaterTest(aMarFile) {
         writeFile(testFile, aTestFile.originalContents);
       }
 
-      // Skip these tests on Windows and OS/2 since their
-      // implementaions of chmod doesn't really set permissions.
+      // Skip these tests on Windows since chmod doesn't really set permissions
+      // on Windows.
       if (!IS_WIN && aTestFile.originalPerms) {
         testFile.permissions = aTestFile.originalPerms;
         // Store the actual permissions on the file for reference later after
@@ -2551,13 +2589,15 @@ function checkUpdateLogContents(aCompareLogFile, aExcludeDistributionDir) {
     // xpcshell tests won't display the entire contents so log the incorrect
     // line.
     for (let i = 0; i < aryLog.length; ++i) {
-      if (aryCompare[i] != aryLog[i]) {
-        logTestInfo("the first incorrect line in the log is: " + aryLog[i]);
-        do_check_eq(aryCompare[i], aryLog[i]);
+      if (aryLog[i] != aryCompare[i]) {
+        logTestInfo("the first incorrect line in the update log is: " +
+                    aryLog[i]);
+        Assert.equal(aryLog[i], aryCompare[i],
+                     "the update log contents" + MSG_SHOULD_EQUAL);
       }
     }
     // This should never happen!
-    do_throw("Unable to find incorrect log contents!");
+    do_throw("Unable to find incorrect update log contents!");
   }
 }
 
@@ -2838,7 +2878,8 @@ function checkFilesAfterUpdateCommon(aGetFileFunc, aStageDirExists,
   let entries = updatesDir.QueryInterface(Ci.nsIFile).directoryEntries;
   while (entries.hasMoreElements()) {
     let entry = entries.getNext().QueryInterface(Ci.nsIFile);
-    do_check_neq(getFileExtension(entry), "patch");
+    Assert.notEqual(getFileExtension(entry), "patch",
+                    "the file's extension should not equal patch");
   }
 }
 
@@ -2910,7 +2951,8 @@ function checkPostUpdateAppLog() {
   // It is possible for the log file contents check to occur before the log file
   // contents are completely written so wait until the contents are the expected
   // value. If the contents are never the expected value then the test will
-  // fail by timing out.
+  // fail by timing out after gTimeoutRuns is greater than MAX_TIMEOUT_RUNS or
+  // the test harness times out the test.
   if (logContents != "post-update\n") {
     if (gTimeoutRuns > MAX_TIMEOUT_RUNS) {
       do_throw("Exceeded MAX_TIMEOUT_RUNS while waiting for the post update " +
@@ -2933,7 +2975,8 @@ function checkPostUpdateAppLog() {
  * the callback application.
  */
 function checkCallbackServiceLog() {
-  do_check_neq(gServiceLaunchedCallbackLog, null);
+  Assert.ok(!!gServiceLaunchedCallbackLog,
+            "gServiceLaunchedCallbackLog should be defined");
 
   let expectedLogContents = gServiceLaunchedCallbackArgs.join("\n") + "\n";
   let logFile = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsILocalFile);
@@ -3011,7 +3054,8 @@ function waitForFilesInUse() {
  *          An nsIFile to check if it has moz-backup for its extension.
  */
 function checkForBackupFiles(aFile) {
-  do_check_neq(getFileExtension(aFile), "moz-backup");
+  Assert.notEqual(getFileExtension(aFile), "moz-backup",
+                  "the file's extension should not equal moz-backup");
 }
 
 /**
@@ -3051,18 +3095,15 @@ function checkFilesInDirRecursive(aDir, aCallback) {
  *
  *          Example of the callback function
  *
- *            function callHandleEvent() {
- *              gXHR.status = gExpectedStatus;
- *              let e = { target: gXHR };
- *              gXHR.onload.handleEvent(e);
+ *            function callHandleEvent(aXHR) {
+ *              aXHR.status = gExpectedStatus;
+ *              let e = { target: aXHR };
+ *              aXHR.onload.handleEvent(e);
  *            }
  */
 function overrideXHR(aCallback) {
-  gXHRCallback = aCallback;
-  gXHR = new xhr();
-  let registrar = Cm.QueryInterface(Ci.nsIComponentRegistrar);
-  registrar.registerFactory(gXHR.classID, gXHR.classDescription,
-                            gXHR.contractID, gXHR);
+  Cu.import("resource://testing-common/MockRegistrar.jsm");
+  MockRegistrar.register("@mozilla.org/xmlextras/xmlhttprequest;1", xhr, [aCallback]);
 }
 
 
@@ -3076,51 +3117,48 @@ function makeHandler(aVal) {
   }
   return aVal;
 }
-function xhr() {
+function xhr(aCallback) {
+  this._callback = aCallback;
 }
 xhr.prototype = {
   overrideMimeType: function(aMimetype) { },
   setRequestHeader: function(aHeader, aValue) { },
   status: null,
-  channel: { set notificationCallbacks(aVal) { } },
+  channel: {
+    set notificationCallbacks(aVal) { },
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIChannel])
+  },
   _url: null,
   _method: null,
   open: function(aMethod, aUrl) {
-    gXHR.channel.originalURI = Services.io.newURI(aUrl, null, null);
-    gXHR._method = aMethod; gXHR._url = aUrl;
+    this.channel.originalURI = Services.io.newURI(aUrl, null, null);
+    this._method = aMethod; this._url = aUrl;
   },
   responseXML: null,
   responseText: null,
   send: function(aBody) {
-    do_execute_soon(gXHRCallback); // Use a timeout so the XHR completes
+    do_execute_soon(function() {
+      this._callback(this);
+    }.bind(this)); // Use a timeout so the XHR completes
   },
   _onprogress: null,
-  set onprogress(aValue) { gXHR._onprogress = makeHandler(aValue); },
-  get onprogress() { return gXHR._onprogress; },
+  set onprogress(aValue) { this._onprogress = makeHandler(aValue); },
+  get onprogress() { return this._onprogress; },
   _onerror: null,
-  set onerror(aValue) { gXHR._onerror = makeHandler(aValue); },
-  get onerror() { return gXHR._onerror; },
+  set onerror(aValue) { this._onerror = makeHandler(aValue); },
+  get onerror() { return this._onerror; },
   _onload: null,
-  set onload(aValue) { gXHR._onload = makeHandler(aValue); },
-  get onload() { return gXHR._onload; },
+  set onload(aValue) { this._onload = makeHandler(aValue); },
+  get onload() { return this._onload; },
   addEventListener: function(aEvent, aValue, aCapturing) {
-    eval("gXHR._on" + aEvent + " = aValue");
+    eval("this._on" + aEvent + " = aValue");
   },
   flags: Ci.nsIClassInfo.SINGLETON,
-  getScriptableHelper: function() null,
+  getScriptableHelper: () => null,
   getInterfaces: function(aCount) {
     let interfaces = [Ci.nsISupports];
     aCount.value = interfaces.length;
     return interfaces;
-  },
-  classDescription: "XMLHttpRequest",
-  contractID: "@mozilla.org/xmlextras/xmlhttprequest;1",
-  classID: Components.ID("{c9b37f43-4278-4304-a5e0-600991ab08cb}"),
-  createInstance: function(aOuter, aIID) {
-    if (aOuter == null) {
-      return gXHR.QueryInterface(aIID);
-    }
-    throw Cr.NS_ERROR_NO_AGGREGATION;
   },
   get wrappedJSObject() { return this; },
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIClassInfo])
@@ -3134,29 +3172,28 @@ xhr.prototype = {
  *          The callback to call if the update prompt component is called.
  */
 function overrideUpdatePrompt(aCallback) {
-  let registrar = Cm.QueryInterface(Ci.nsIComponentRegistrar);
-  gUpdatePrompt = new UpdatePrompt();
-  gUpdatePromptCallback = aCallback;
-  registrar.registerFactory(gUpdatePrompt.classID, gUpdatePrompt.classDescription,
-                            gUpdatePrompt.contractID, gUpdatePrompt);
+  Cu.import("resource://testing-common/MockRegistrar.jsm");
+  MockRegistrar.register("@mozilla.org/updates/update-prompt;1", UpdatePrompt, [aCallback]);
 }
 
-function UpdatePrompt() {
+function UpdatePrompt(aCallback) {
+  this._callback = aCallback;
+
   let fns = ["checkForUpdates", "showUpdateAvailable", "showUpdateDownloaded",
              "showUpdateError", "showUpdateHistory", "showUpdateInstalled"];
 
   fns.forEach(function(aPromptFn) {
     UpdatePrompt.prototype[aPromptFn] = function() {
-      if (!gUpdatePromptCallback) {
+      if (!this._callback) {
         return;
       }
 
-      let callback = gUpdatePromptCallback[aPromptFn];
+      let callback = this._callback[aPromptFn];
       if (!callback) {
         return;
       }
 
-      callback.apply(gUpdatePromptCallback,
+      callback.apply(this._callback,
                      Array.prototype.slice.call(arguments));
     }
   });
@@ -3164,20 +3201,11 @@ function UpdatePrompt() {
 
 UpdatePrompt.prototype = {
   flags: Ci.nsIClassInfo.SINGLETON,
-  getScriptableHelper: function() null,
+  getScriptableHelper: () => null,
   getInterfaces: function(aCount) {
     let interfaces = [Ci.nsISupports, Ci.nsIUpdatePrompt];
     aCount.value = interfaces.length;
     return interfaces;
-  },
-  classDescription: "UpdatePrompt",
-  contractID: "@mozilla.org/updates/update-prompt;1",
-  classID: Components.ID("{8c350a15-9b90-4622-93a1-4d320308664b}"),
-  createInstance: function(aOuter, aIID) {
-    if (aOuter == null) {
-      return gUpdatePrompt.QueryInterface(aIID);
-    }
-    throw Cr.NS_ERROR_NO_AGGREGATION;
   },
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIClassInfo, Ci.nsIUpdatePrompt])
 };
@@ -3263,7 +3291,7 @@ function start_httpserver() {
  *          The callback to call after stopping the http server.
  */
 function stop_httpserver(aCallback) {
-  do_check_true(!!aCallback);
+  Assert.ok(!!aCallback, "the aCallback parameter should be defined");
   gTestserver.stop(aCallback);
 }
 

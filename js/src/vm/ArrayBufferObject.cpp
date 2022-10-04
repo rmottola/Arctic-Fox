@@ -100,7 +100,6 @@ const Class ArrayBufferObject::protoClass = {
 
 const Class ArrayBufferObject::class_ = {
     "ArrayBuffer",
-    JSCLASS_IMPLEMENTS_BARRIERS |
     JSCLASS_DELAY_METADATA_CALLBACK |
     JSCLASS_HAS_RESERVED_SLOTS(RESERVED_SLOTS) |
     JSCLASS_HAS_CACHED_PROTO(JSProto_ArrayBuffer) |
@@ -112,7 +111,6 @@ const Class ArrayBufferObject::class_ = {
     nullptr,                 /* enumerate */
     nullptr,                 /* resolve */
     nullptr,                 /* mayResolve */
-    nullptr,                 /* convert */
     ArrayBufferObject::finalize,
     nullptr,        /* call        */
     nullptr,        /* hasInstance */
@@ -268,8 +266,8 @@ ReleaseAsmJSMappedData(void* base)
 #ifdef NIGHTLY_BUILD
 # if defined(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB)
 static bool
-TransferAsmJSMappedBuffer(JSContext* cx, const CallArgs& args, Handle<ArrayBufferObject*> oldBuffer,
-                          size_t newByteLength)
+TransferAsmJSMappedBuffer(JSContext* cx, const CallArgs& args,
+                          Handle<ArrayBufferObject*> oldBuffer, size_t newByteLength)
 {
     size_t oldByteLength = oldBuffer->byteLength();
     MOZ_ASSERT(oldByteLength % AsmJSPageSize == 0);
@@ -529,8 +527,9 @@ ArrayBufferObject::neuter(JSContext* cx, Handle<ArrayBufferObject*> buffer,
     if (buffer->hasTypedObjectViews()) {
         // Make sure the global object's group has been instantiated, so the
         // flag change will be observed.
+        AutoEnterOOMUnsafeRegion oomUnsafe;
         if (!cx->global()->getGroup(cx))
-            CrashAtUnhandlableOOM("ArrayBufferObject::neuter");
+            oomUnsafe.crash("ArrayBufferObject::neuter");
         MarkObjectGroupFlags(cx, cx->global(), OBJECT_FLAG_TYPED_OBJECT_NEUTERED);
         cx->compartment()->neuteredTypedObjects = 1;
     }
@@ -727,6 +726,12 @@ uint8_t*
 ArrayBufferObject::dataPointer() const
 {
     return static_cast<uint8_t*>(getSlot(DATA_SLOT).toPrivate());
+}
+
+SharedMem<uint8_t*>
+ArrayBufferObject::dataPointerShared() const
+{
+    return SharedMem<uint8_t*>::unshared(getSlot(DATA_SLOT).toPrivate());
 }
 
 void

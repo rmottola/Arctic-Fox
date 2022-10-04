@@ -332,9 +332,15 @@ public:
                                 const int32_t&  aClickCount,
                                 const int32_t&  aModifiers,
                                 const bool&     aIgnoreRootScrollFrame) override;
-    virtual bool RecvRealMouseMoveEvent(const mozilla::WidgetMouseEvent& event) override;
-    virtual bool RecvSynthMouseMoveEvent(const mozilla::WidgetMouseEvent& event) override;
-    virtual bool RecvRealMouseButtonEvent(const mozilla::WidgetMouseEvent& event) override;
+    virtual bool RecvRealMouseMoveEvent(const mozilla::WidgetMouseEvent& event,
+                                        const ScrollableLayerGuid& aGuid,
+                                        const uint64_t& aInputBlockId) override;
+    virtual bool RecvSynthMouseMoveEvent(const mozilla::WidgetMouseEvent& event,
+                                         const ScrollableLayerGuid& aGuid,
+                                         const uint64_t& aInputBlockId) override;
+    virtual bool RecvRealMouseButtonEvent(const mozilla::WidgetMouseEvent& event,
+                                          const ScrollableLayerGuid& aGuid,
+                                          const uint64_t& aInputBlockId) override;
     virtual bool RecvRealDragEvent(const WidgetDragEvent& aEvent,
                                    const uint32_t& aDragAction,
                                    const uint32_t& aDropEffect) override;
@@ -461,7 +467,12 @@ public:
     static TabChild* GetFrom(nsIPresShell* aPresShell);
     static TabChild* GetFrom(uint64_t aLayersId);
 
-    void DidComposite(uint64_t aTransactionId);
+    void DidComposite(uint64_t aTransactionId,
+                      const TimeStamp& aCompositeStart,
+                      const TimeStamp& aCompositeEnd);
+    void DidRequestComposite(const TimeStamp& aCompositeReqStart,
+                             const TimeStamp& aCompositeReqEnd);
+
     void ClearCachedResources();
 
     static inline TabChild*

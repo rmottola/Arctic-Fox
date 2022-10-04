@@ -68,6 +68,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         this._mayTrimURLs = this._prefs.getBoolPref("trimURLs");
 
         this.inputField.controllers.insertControllerAt(0, this._copyCutController);
+        this.inputField.addEventListener("paste", this, false);
         this.inputField.addEventListener("mousedown", this, false);
         this.inputField.addEventListener("mousemove", this, false);
         this.inputField.addEventListener("mouseout", this, false);
@@ -117,6 +118,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         this._prefs.removeObserver("", this);
         this._prefs = null;
         this.inputField.controllers.removeController(this._copyCutController);
+        this.inputField.removeEventListener("paste", this, false);
         this.inputField.removeEventListener("mousedown", this, false);
         this.inputField.removeEventListener("mousemove", this, false);
         this.inputField.removeEventListener("mouseout", this, false);
@@ -186,12 +188,18 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
       <field name="_formattingEnabled">true</field>
       <method name="formatValue">
         <body><![CDATA[
-          if (!this._formattingEnabled || this.focused)
+          if (!this._formattingEnabled || !this.editor)
             return;
 
           let controller = this.editor.selectionController;
+          let strikeOut = controller.getSelection(controller.SELECTION_URLSTRIKEOUT);
+          strikeOut.removeAllRanges();
+
           let selection = controller.getSelection(controller.SELECTION_URLSECONDARY);
           selection.removeAllRanges();
+
+          if (this.focused)
+            return;
 
           let textNode = this.editor.rootElement.firstChild;
           let value = textNode.textContent;
@@ -224,6 +232,17 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           let matchedURL = value.match(/^((?:[a-z]+:\/\/)?(?:[^\/]+@)?)(.+?)(?::\d+)?(?:\/|$)/);
           if (!matchedURL)
             return;
+
+          // Strike out the "https" part if mixed active content is loaded.
+          if (this.getAttribute("pageproxystate") == "valid" &&
+              value.startsWith("https:") &&
+              gBrowser.securityUI.state &
+                Ci.nsIWebProgressListener.STATE_LOADED_MIXED_ACTIVE_CONTENT) {
+            let range = document.createRange();
+            range.setStart(textNode, 0);
+            range.setEnd(textNode, 5);
+            strikeOut.addRange(range);
+          }
 
           let [, preDomain, domain] = matchedURL;
           let baseDomain = domain;
@@ -259,17 +278,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         ]]></body>
       </method>
 
-      <method name="_clearFormatting">
-        <body><![CDATA[
-          if (!this._formattingEnabled)
-            return;
-
-          let controller = this.editor.selectionController;
-          let selection = controller.getSelection(controller.SELECTION_URLSECONDARY);
-          selection.removeAllRanges();
-        ]]></body>
-      </method>
-
       <method name="handleRevert">
         <body><![CDATA[
           var isScrolling = this.popupOpen;
@@ -302,7 +310,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           var mayInheritPrincipal = false;
           var postData = null;
 
-	  let action = this._parseActionUrl(this._value);
+          let action = this._parseActionUrl(this._value);
           let lastLocationChange = gBrowser.selectedBrowser.lastLocationChange;
 
           let matchLastLocationChange = true;
@@ -321,7 +329,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               url = action.params.url;
             } else if (action.type == "searchengine") {
               let engine = Services.search.getEngineByName(action.params.engineName);
-              let submission = engine.getSubmission(action.params.searchQuery);
+              let query = action.params.searchSuggestion ||
+                          action.params.searchQuery;
+              let submission = engine.getSubmission(query);
 
               url = submission.uri.spec;
               postData = submission.postData;
@@ -353,20 +363,24 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               Cu.reportError(ex);
             }
 
-            function loadCurrent() {
-              let flags = Ci.nsIWebNavigation.LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP;
-              // Pass LOAD_FLAGS_DISALLOW_INHERIT_OWNER to prevent any loads from
-              // inheriting the currently loaded document's principal, unless this
-              // URL is marked as safe to inherit (e.g. came from a bookmark
-              // keyword).
-              if (!mayInheritPrincipal)
-                flags |= Ci.nsIWebNavigation.LOAD_FLAGS_DISALLOW_INHERIT_OWNER;
-              // If the value wasn't typed, we know that we decoded the value as
-              // UTF-8 (see losslessDecodeURI)
-              if (!this.valueIsTyped)
-                flags |= Ci.nsIWebNavigation.LOAD_FLAGS_URI_IS_UTF8;
-              gBrowser.loadURIWithFlags(url, flags, null, null, postData);
-            }
+            let loadCurrent = () => {
+              try {
+                openUILinkIn(url, "current", {
+                  allowThirdPartyFixup: true,
+                  disallowInheritPrincipal: !mayInheritPrincipal,
+                  allowPinnedTabHostChange: true,
+                  postData: postData,
+                  allowPopups: url.startsWith("javascript:"),
+                });
+              } catch (ex) {
+                // This load can throw an exception in certain cases, which means
+                // we'll want to replace the URL with the loaded URL:
+                this.handleRevert();
+              }
+
+              // Ensure the start of the URL is visible for UX reasons:
+              this.selectionStart = this.selectionEnd = 0;
+            };
 
             // Focus the content area before triggering loads, since if the load
             // occurs in a new tab, we want focus to be restored to the content
@@ -394,8 +408,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                 let params = { allowThirdPartyFixup: true,
                                postData: postData,
                                initiatingDoc: document };
-                if (!this.valueIsTyped)
-                  params.isUTF8 = true;
                 openUILinkIn(url, where, params);
               }
             } else {
@@ -676,6 +688,36 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         <parameter name="aEvent"/>
         <body><![CDATA[
           switch (aEvent.type) {
+            case "paste":
+              let originalPasteData = aEvent.clipboardData.getData("text/plain");
+              if (!originalPasteData) {
+                return;
+              }
+
+              let oldValue = this.inputField.value;
+              let oldStart = oldValue.substring(0, this.inputField.selectionStart);
+              // If there is already non-whitespace content in the URL bar
+              // preceding the pasted content, it's not necessary to check
+              // protocols used by the pasted content:
+              if (oldStart.trim()) {
+                return;
+              }
+              let oldEnd = oldValue.substring(this.inputField.selectionEnd);
+
+              let pasteData = stripUnsafeProtocolOnPaste(originalPasteData);
+              if (originalPasteData != pasteData) {
+                // Unfortunately we're not allowed to set the bits being pasted
+                // so cancel this event:
+                aEvent.preventDefault();
+                aEvent.stopPropagation();
+
+                this.inputField.value = oldStart + pasteData + oldEnd;
+                // Fix up cursor/selection:
+                let newCursorPos = oldStart.length + pasteData.length;
+                this.inputField.selectionStart = newCursorPos;
+                this.inputField.selectionEnd = newCursorPos;
+              }
+              break;
             case "mousedown":
               if (this.doubleClickSelectsAll &&
                   aEvent.button == 0 && aEvent.detail == 2) {
@@ -761,12 +803,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
           try {
             action.params = JSON.parse(params);
-            if (action.params.input) {
-              action.params.input = decodeURIComponent(action.params.input);
-            }
-            if (action.params.searchQuery) {
-              action.params.searchQuery = decodeURIComponent(action.params.searchQuery);
-            }
           } catch (e) {
             // If this failed, we assume that params is not a JSON object, and
             // is instead just a flat string. This will happen when
@@ -774,6 +810,17 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             // a URL.
             action.params = {
               url: params,
+            }
+            return action;
+          }
+
+          for (let key of [
+            "input",
+            "searchQuery",
+            "searchSuggestion",
+          ]) {
+            if (action.params[key]) {
+              action.params[key] = decodeURIComponent(action.params[key]);
             }
           }
 
@@ -871,11 +918,18 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         }
       ]]></handler>
 
+      <handler event="focus"><![CDATA[
+        if (event.originalTarget == this.inputField) {
+          this._hideURLTooltip();
+          this.formatValue();
+        }
+      ]]></handler>
+
       <handler event="blur"><![CDATA[
-        if (event.originalTarget != this.inputField)
-          return;
-        this._clearNoActions();
-        this.formatValue();
+        if (event.originalTarget == this.inputField) {
+          this._clearNoActions();
+          this.formatValue();
+        }
       ]]></handler>
 
       <handler event="dragstart" phase="capturing"><![CDATA[
@@ -903,13 +957,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
         dt.effectAllowed = "copyLink";
         event.stopPropagation();
-      ]]></handler>
-
-      <handler event="focus" phase="capturing"><![CDATA[
-        if (event.originalTarget != this.inputField)
-          return;
-        this._hideURLTooltip();
-        this._clearFormatting();
       ]]></handler>
 
       <handler event="dragover" phase="capturing" action="this.onDragOver(event, this);"/>
@@ -1111,6 +1158,15 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                   url = action.params.url;
                   break;
                 }
+                case "searchengine": {
+                  let engine = Services.search.getEngineByName(action.params.engineName);
+                  let query = action.params.searchSuggestion ||
+                              action.params.searchQuery;
+                  let submission = engine.getSubmission(query, null, "keyword");
+                  url = submission.uri.spec;
+                  options.postData = submission.postData;
+                  break;
+                }
                 default: {
                   return;
                 }
@@ -1148,8 +1204,12 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             if (!Services.prefs.getBoolPref("browser.urlbar.unifiedcomplete"))
               return;
 
-            if (this._matchCount > 0 && this.selectedIndex == -1)
+            if (this._matchCount > 0 && this.selectedIndex == -1) {
+              // Don't handle this as a user-initiated action.
+              this._ignoreNextSelect = true;
               this.selectedIndex = 0;
+              this._ignoreNextSelect = false;
+            }
 
             this.input.gotResultForCurrentQuery = true;
             if (this.input.handleEnterWhenGotResult) {
@@ -1161,6 +1221,18 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
       </method>
 
     </implementation>
+    <handlers>
+
+      <handler event="select"><![CDATA[
+        // When the user selects one of matches, stop the search to avoid
+        // changing the underlying result unexpectedly.
+        if (!this._ignoreNextSelect && this.selectedIndex >= 0) {
+          let controller = this.view.QueryInterface(Components.interfaces.nsIAutoCompleteController);
+          controller.stopSearch();
+        }
+      ]]></handler>
+
+    </handlers>
   </binding>
 
   <binding id="addon-progress-notification" extends="chrome://global/content/bindings/notification.xml#popup-notification">
@@ -2215,13 +2287,17 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
           let viewsLeft = this._viewsLeft;
           if (viewsLeft) {
-            // XXX: Short-circuit this for now.
-            // TO-DO: Clean up this code for sync promotion
-            this._viewsLeft = 0;
-            viewsLeft = 0;
-            return;
-            // XXX
-            
+            let notification = this._panel.firstElementChild.notification;
+            if (this._notificationType == "passwords" && notification && notification.options &&
+                notification.options.displayURI instanceof Ci.nsIStandardURL) {
+              let fxAOrigin = new URL(Services.prefs.getCharPref("identity.fxaccounts.remote.signup.uri")).origin
+              if (notification.options.displayURI.prePath == fxAOrigin) {
+                // Somewhat gross hack - we don't want to show the sync promo while
+                // the user may be logging into Sync.
+                return;
+              }
+            }
+
             if (Services.prefs.prefHasUserValue("services.sync.username") &&
                this._notificationType != "addons-sync-disabled") {
               // If the user has already setup Sync, don't show the notification.

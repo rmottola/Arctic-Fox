@@ -402,11 +402,24 @@ static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
 #define NS_STYLE_DIRECTION_RTL                  1
 
 // See nsStyleVisibility
-// WritingModes.h depends on the particular values used here
+// NOTE: WritingModes.h depends on the particular values used here.
 #define NS_STYLE_WRITING_MODE_HORIZONTAL_TB     0
 #define NS_STYLE_WRITING_MODE_VERTICAL_RL       1
 // #define NS_STYLE_WRITING_MODE_HORIZONTAL_BT  2  // hypothetical
 #define NS_STYLE_WRITING_MODE_VERTICAL_LR       3
+
+// Single-bit flag, used in combination with VERTICAL_LR and _RL to specify
+// the corresponding SIDEWAYS_* modes.
+// (To avoid ambiguity, this bit must be high enough such that no other
+// values here accidentally use it in their binary representation.)
+#define NS_STYLE_WRITING_MODE_SIDEWAYS_MASK     4
+
+#define NS_STYLE_WRITING_MODE_SIDEWAYS_RL         \
+          (NS_STYLE_WRITING_MODE_VERTICAL_RL |    \
+           NS_STYLE_WRITING_MODE_SIDEWAYS_MASK)
+#define NS_STYLE_WRITING_MODE_SIDEWAYS_LR         \
+          (NS_STYLE_WRITING_MODE_VERTICAL_LR |    \
+           NS_STYLE_WRITING_MODE_SIDEWAYS_MASK)
 
 // See nsStyleDisplay
 #define NS_STYLE_DISPLAY_NONE                   0
@@ -882,9 +895,7 @@ static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
 // See nsStyleText
 #define NS_STYLE_TEXT_ORIENTATION_MIXED          0
 #define NS_STYLE_TEXT_ORIENTATION_UPRIGHT        1
-#define NS_STYLE_TEXT_ORIENTATION_SIDEWAYS_RIGHT 2
-#define NS_STYLE_TEXT_ORIENTATION_SIDEWAYS_LEFT  3 /* placeholder, not yet parsed */
-#define NS_STYLE_TEXT_ORIENTATION_SIDEWAYS       4 /* placeholder, not yet parsed */
+#define NS_STYLE_TEXT_ORIENTATION_SIDEWAYS       2
 
 // See nsStyleText
 #define NS_STYLE_TEXT_COMBINE_UPRIGHT_NONE        0
@@ -910,18 +921,16 @@ static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
 #define NS_STYLE_TABLE_EMPTY_CELLS_HIDE            0
 #define NS_STYLE_TABLE_EMPTY_CELLS_SHOW            1
 
-#define NS_STYLE_CAPTION_SIDE_BSTART            0 // matches eLogicalSideBStart
-#define NS_STYLE_CAPTION_SIDE_BEND              1 // matches eLogicalSideBEnd
-#define NS_STYLE_CAPTION_SIDE_ISTART            2 // matches eLogicalSideIStart
-#define NS_STYLE_CAPTION_SIDE_IEND              3 // matches eLogicalSideIEnd
-#define NS_STYLE_CAPTION_SIDE_BSTART_OUTSIDE    4
-#define NS_STYLE_CAPTION_SIDE_BEND_OUTSIDE      5
-#define NS_STYLE_CAPTION_SIDE_TOP               6
-#define NS_STYLE_CAPTION_SIDE_RIGHT             7
-#define NS_STYLE_CAPTION_SIDE_BOTTOM            8
-#define NS_STYLE_CAPTION_SIDE_LEFT              9
-#define NS_STYLE_CAPTION_SIDE_TOP_OUTSIDE       10
-#define NS_STYLE_CAPTION_SIDE_BOTTOM_OUTSIDE    11
+// Constants for the caption-side property. Note that despite having "physical"
+// names, these are actually interpreted according to the table's writing-mode:
+// TOP and BOTTOM are treated as block-start and -end respectively, and LEFT
+// and RIGHT are treated as line-left and -right.
+#define NS_STYLE_CAPTION_SIDE_TOP               0
+#define NS_STYLE_CAPTION_SIDE_RIGHT             1
+#define NS_STYLE_CAPTION_SIDE_BOTTOM            2
+#define NS_STYLE_CAPTION_SIDE_LEFT              3
+#define NS_STYLE_CAPTION_SIDE_TOP_OUTSIDE       4
+#define NS_STYLE_CAPTION_SIDE_BOTTOM_OUTSIDE    5
 
 // constants for cell "scope" attribute
 #define NS_STYLE_CELL_SCOPE_ROW                 0

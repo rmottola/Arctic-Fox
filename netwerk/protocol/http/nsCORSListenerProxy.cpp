@@ -41,6 +41,7 @@
 #include "nsINetworkInterceptController.h"
 #include "nsNullPrincipal.h"
 #include "nsICorsPreflightCallback.h"
+#include "mozilla/LoadInfo.h"
 #include <algorithm>
 
 using namespace mozilla;
@@ -516,8 +517,10 @@ nsCORSListenerProxy::OnStartRequest(nsIRequest* aRequest,
             do_QueryInterface(channel);
           if (httpChannelChild) {
             rv = httpChannelChild->RemoveCorsPreflightCacheEntry(uri, mRequestingPrincipal);
-            if (NS_WARN_IF(NS_FAILED(rv))) {
-              return rv;
+            if (NS_FAILED(rv)) {
+              // Only warn here to ensure we fall through the request Cancel()
+              // and outer listener OnStartRequest() calls.
+              NS_WARNING("Failed to remove CORS preflight cache entry!");
             }
           }
         }
@@ -831,7 +834,7 @@ nsCORSListenerProxy::OnRedirectVerifyCallback(nsresult result)
   NS_ASSERTION(mNewRedirectChannel, "mNewRedirectChannel not set in callback");
 
   if (NS_SUCCEEDED(result)) {
-      nsresult rv = UpdateChannel(mNewRedirectChannel, DataURIHandling::Disallow);
+    nsresult rv = UpdateChannel(mNewRedirectChannel, DataURIHandling::Disallow);
       if (NS_FAILED(rv)) {
           NS_WARNING("nsCORSListenerProxy::OnRedirectVerifyCallback: "
                      "UpdateChannel() returned failure");
@@ -1308,11 +1311,14 @@ nsCORSListenerProxy::StartCORSPreflight(nsIChannel* aRequestChannel,
   nsresult rv = NS_GetFinalChannelURI(aRequestChannel, getter_AddRefs(uri));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsILoadInfo> loadInfo = aRequestChannel->GetLoadInfo();
-  MOZ_ASSERT(loadInfo, "can not perform CORS preflight without a loadInfo");
-  if (!loadInfo) {
+  nsCOMPtr<nsILoadInfo> originalLoadInfo = aRequestChannel->GetLoadInfo();
+  MOZ_ASSERT(originalLoadInfo, "can not perform CORS preflight without a loadInfo");
+  if (!originalLoadInfo) {
     return NS_ERROR_FAILURE;
   }
+
+  nsCOMPtr<nsILoadInfo> loadInfo = static_cast<mozilla::LoadInfo*>
+    (originalLoadInfo.get())->Clone();
 
   nsSecurityFlags securityMode = loadInfo->GetSecurityMode();
 
@@ -1341,6 +1347,14 @@ nsCORSListenerProxy::StartCORSPreflight(nsIChannel* aRequestChannel,
   rv = aRequestChannel->GetLoadFlags(&loadFlags);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  // Preflight requests should never be intercepted by service workers.
+  // NOTE: We ignore CORS checks on synthesized responses (see the CORS
+  // preflights, then we need to extend the GetResponseSynthesized() check in
+  // nsCORSListenerProxy::CheckRequestApproved()). If we change our behavior
+  // here and allow service workers to intercept CORS preflights, then that
+  // check won't be safe any more.
+  loadFlags |= nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
+
   nsCOMPtr<nsIChannel> preflightChannel;
   rv = NS_NewChannelInternal(getter_AddRefs(preflightChannel),
                              uri,
@@ -1356,17 +1370,6 @@ nsCORSListenerProxy::StartCORSPreflight(nsIChannel* aRequestChannel,
   rv = preHttp->SetRequestMethod(NS_LITERAL_CSTRING("OPTIONS"));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  // Preflight requests should never be intercepted by service workers.
-  nsCOMPtr<nsIHttpChannelInternal> preInternal = do_QueryInterface(preflightChannel);
-  if (preInternal) {
-    // NOTE: We ignore CORS checks on synthesized responses (see the CORS
-    // preflights, then we need to extend the GetResponseSynthesized() check in
-    // nsCORSListenerProxy::CheckRequestApproved()). If we change our behavior
-    // here and allow service workers to intercept CORS preflights, then that
-    // check won't be safe any more.
-    preInternal->ForceNoIntercept();
-  }
-  
   // Set up listener which will start the original channel
   nsCOMPtr<nsIStreamListener> preflightListener =
     new nsCORSPreflightListener(aRequestChannel, aListener, nullptr, aPrincipal,

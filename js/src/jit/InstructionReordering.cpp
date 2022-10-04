@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "jit/InstructionReordering.h"
+#include "jit/MIRGraph.h"
 
 using namespace js;
 using namespace js::jit;
@@ -94,8 +95,11 @@ jit::ReorderInstructions(MIRGenerator* mir, MIRGraph& graph)
             {
                 iter++;
                 MInstructionIterator targetIter = block->begin();
-                if (targetIter->isInterruptCheck())
+                while (targetIter->isConstant() || targetIter->isInterruptCheck()) {
+                    if (*targetIter == ins)
+                        break;
                     targetIter++;
+                }
                 MoveBefore(*block, *targetIter, ins);
                 continue;
             }

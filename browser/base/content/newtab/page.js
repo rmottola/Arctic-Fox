@@ -8,7 +8,7 @@
  * This singleton represents the whole 'New Tab Page' and takes care of
  * initializing all its components.
  */
-let gPage = {
+var gPage = {
   /**
    * Initializes the page.
    */
@@ -66,7 +66,14 @@ let gPage = {
 
     this._initialized = true;
 
+    // Initialize search.
     gSearch.init();
+
+    if (document.hidden) {
+      addEventListener("visibilitychange", this);
+    } else {
+      this.onPageFirstVisible();
+    }
 
     gLinks.populateCache(function () {
       // Initialize and render the grid.
@@ -93,7 +100,7 @@ let gPage = {
    */
   _updateAttributes: function Page_updateAttributes(aValue) {
     // Set the nodes' states.
-    let nodeSelector = "#newtab-scrollbox, #newtab-toggle, #newtab-grid, #newtab-search-container";
+    let nodeSelector = "#newtab-grid, #newtab-search-container";
     for (let node of document.querySelectorAll(nodeSelector)) {
       if (aValue)
         node.removeAttribute("page-disabled");
@@ -104,7 +111,7 @@ let gPage = {
     // Enables/disables the control and link elements.
     let inputSelector = ".newtab-control, .newtab-link";
     for (let input of document.querySelectorAll(inputSelector)) {
-      if (aValue) 
+      if (aValue)
         input.removeAttribute("tabindex");
       else
         input.setAttribute("tabindex", "-1");
@@ -136,6 +143,42 @@ let gPage = {
           aEvent.stopPropagation();
         }
         break;
+      case "visibilitychange":
+        setTimeout(() => this.onPageFirstVisible());
+        removeEventListener("visibilitychange", this);
+        break;
     }
+  },
+
+  onPageFirstVisible: function () {
+    // Record another page impression.
+    Services.telemetry.getHistogramById("NEWTAB_PAGE_SHOWN").add(true);
+
+    // Initialize type counting with the types we want to count
+    let directoryCount = {};
+    for (let type of DirectoryLinksProvider.linkTypes) {
+      directoryCount[type] = 0;
+    }
+
+    for (let site of gGrid.sites) {
+      if (site) {
+        // The site may need to modify and/or re-render itself if
+        // something changed after newtab was created by preloader.
+        // For example, the suggested tile endTime may have passed.
+        site.onFirstVisible();
+      }
+    }
+
+    // Record how many directory sites were shown, but place counts over the
+    // default 9 in the same bucket
+    for (let type of Object.keys(directoryCount)) {
+      let count = directoryCount[type];
+      let shownId = "NEWTAB_PAGE_DIRECTORY_" + type.toUpperCase() + "_SHOWN";
+      let shownCount = Math.min(10, count);
+      Services.telemetry.getHistogramById(shownId).add(shownCount);
+    }
+
+    // Set up initial search state.
+    gSearch.setUpInitialState();
   }
 };

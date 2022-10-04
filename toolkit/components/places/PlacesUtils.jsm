@@ -73,8 +73,12 @@ function QI_node(aNode, aIID) {
   }
   return result;
 }
-function asContainer(aNode) QI_node(aNode, Ci.nsINavHistoryContainerResultNode);
-function asQuery(aNode) QI_node(aNode, Ci.nsINavHistoryQueryResultNode);
+function asContainer(aNode) {
+  return QI_node(aNode, Ci.nsINavHistoryContainerResultNode);
+}
+function asQuery(aNode) {
+  return QI_node(aNode, Ci.nsINavHistoryQueryResultNode);
+}
 
 /**
  * Sends a bookmarks notification through the given observers.
@@ -119,10 +123,94 @@ function* notifyKeywordChange(url, keyword) {
                                          bookmark.lastModified * 1000,
                                          bookmark.type,
                                          bookmark.parentId,
-                                         bookmark.guid, bookmark.parentGuid
+                                         bookmark.guid, bookmark.parentGuid,
+                                         ""
                                        ]);
   }
   gIgnoreKeywordNotifications = false;
+}
+
+/**
+ * Serializes the given node in JSON format.
+ *
+ * @param aNode
+ *        An nsINavHistoryResultNode
+ * @param aIsLivemark
+ *        Whether the node represents a livemark.
+ */
+function serializeNode(aNode, aIsLivemark) {
+  let data = {};
+
+  data.title = aNode.title;
+  data.id = aNode.itemId;
+  data.livemark = aIsLivemark;
+
+  let guid = aNode.bookmarkGuid;
+  if (guid) {
+    data.itemGuid = guid;
+    if (aNode.parent)
+      data.parent = aNode.parent.itemId;
+    let grandParent = aNode.parent && aNode.parent.parent;
+    if (grandParent)
+      data.grandParentId = grandParent.itemId;
+
+    data.dateAdded = aNode.dateAdded;
+    data.lastModified = aNode.lastModified;
+
+    let annos = PlacesUtils.getAnnotationsForItem(data.id);
+    if (annos.length > 0)
+      data.annos = annos;
+  }
+
+  if (PlacesUtils.nodeIsURI(aNode)) {
+    // Check for url validity.
+    NetUtil.newURI(aNode.uri);
+
+    // Tag root accepts only folder nodes, not URIs.
+    if (data.parent == PlacesUtils.tagsFolderId)
+      throw new Error("Unexpected node type");
+
+    data.type = PlacesUtils.TYPE_X_MOZ_PLACE;
+    data.uri = aNode.uri;
+
+    if (aNode.tags)
+      data.tags = aNode.tags;
+  }
+  else if (PlacesUtils.nodeIsContainer(aNode)) {
+    // Tag containers accept only uri nodes.
+    if (data.grandParentId == PlacesUtils.tagsFolderId)
+      throw new Error("Unexpected node type");
+
+    let concreteId = PlacesUtils.getConcreteItemId(aNode);
+    if (concreteId != -1) {
+      // This is a bookmark or a tag container.
+      if (PlacesUtils.nodeIsQuery(aNode) || concreteId != aNode.itemId) {
+        // This is a folder shortcut.
+        data.type = PlacesUtils.TYPE_X_MOZ_PLACE;
+        data.uri = aNode.uri;
+        data.concreteId = concreteId;
+      }
+      else {
+        // This is a bookmark folder.
+        data.type = PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER;
+      }
+    }
+    else {
+      // This is a grouped container query, dynamically generated.
+      data.type = PlacesUtils.TYPE_X_MOZ_PLACE;
+      data.uri = aNode.uri;
+    }
+  }
+  else if (PlacesUtils.nodeIsSeparator(aNode)) {
+    // Tag containers don't accept separators.
+    if (data.parent == PlacesUtils.tagsFolderId ||
+        data.grandParentId == PlacesUtils.tagsFolderId)
+      throw new Error("Unexpected node type");
+
+    data.type = PlacesUtils.TYPE_X_MOZ_PLACE_SEPARATOR;
+  }
+
+  return JSON.stringify(data);
 }
 
 this.PlacesUtils = {
@@ -159,8 +247,8 @@ this.PlacesUtils = {
   TOPIC_BOOKMARKS_RESTORE_SUCCESS: "bookmarks-restore-success",
   TOPIC_BOOKMARKS_RESTORE_FAILED: "bookmarks-restore-failed",
 
-  asContainer: function(aNode) asContainer(aNode),
-  asQuery: function(aNode) asQuery(aNode),
+  asContainer: aNode => asContainer(aNode),
+  asQuery: aNode => asQuery(aNode),
 
   endl: NEWLINE,
 
@@ -473,176 +561,125 @@ this.PlacesUtils = {
 
   /**
    * String-wraps a result node according to the rules of the specified
-   * content type.
+   * content type for copy or move operations.
+   *
    * @param   aNode
    *          The Result node to wrap (serialize)
    * @param   aType
    *          The content type to serialize as
-   * @param   [optional] aOverrideURI
+   * @param   [optional] aFeedURI
    *          Used instead of the node's URI if provided.
-   *          This is useful for wrapping a container as TYPE_X_MOZ_URL,
+   *          This is useful for wrapping a livemark as TYPE_X_MOZ_URL,
    *          TYPE_HTML or TYPE_UNICODE.
    * @return  A string serialization of the node
    */
-  wrapNode: function PU_wrapNode(aNode, aType, aOverrideURI) {
+  wrapNode(aNode, aType, aFeedURI) {
     // when wrapping a node, we want all the items, even if the original
     // query options are excluding them.
-    // this can happen when copying from the left hand pane of the bookmarks
-    // organizer
+    // This can happen when copying from the left hand pane of the bookmarks
+    // organizer.
     // @return [node, shouldClose]
-    function convertNode(cNode) {
-      if (PlacesUtils.nodeIsFolder(cNode) &&
-          cNode.type != Ci.nsINavHistoryResultNode.RESULT_TYPE_FOLDER_SHORTCUT &&
-          asQuery(cNode).queryOptions.excludeItems) {
-        return [PlacesUtils.getFolderContents(cNode.itemId, false, true).root, true];
+    function gatherDataFromNode(node, gatherDataFunc) {
+      if (PlacesUtils.nodeIsFolder(node) &&
+          node.type != Ci.nsINavHistoryResultNode.RESULT_TYPE_FOLDER_SHORTCUT &&
+          asQuery(node).queryOptions.excludeItems) {
+        let node = PlacesUtils.getFolderContents(node.itemId, false, true).root;
+        try {
+          return gatherDataFunc(node);
+        } finally {
+          node.containerOpen = false;
+        }
       }
-
-      // If we didn't create our own query, do not alter the node's open state.
-      return [cNode, false];
+      // If we didn't create our own query, do not alter the node's state.
+      return gatherDataFunc(node);
     }
 
-    function gatherLivemarkUrl(aNode) {
-      try {
-        return PlacesUtils.annotations
-                          .getItemAnnotation(aNode.itemId,
-                                             PlacesUtils.LMANNO_SITEURI);
-      } catch (ex) {
-        return PlacesUtils.annotations
-                          .getItemAnnotation(aNode.itemId,
-                                             PlacesUtils.LMANNO_FEEDURI);
+    function gatherDataHtml(node) {
+      let htmlEscape = s => s.replace(/&/g, "&amp;")
+                             .replace(/>/g, "&gt;")
+                             .replace(/</g, "&lt;")
+                             .replace(/"/g, "&quot;")
+                             .replace(/'/g, "&apos;");
+
+      // escape out potential HTML in the title
+      let escapedTitle = node.title ? htmlEscape(node.title) : "";
+
+      if (aFeedURI) {
+        return `<A HREF="${aFeedURI}">${escapedTitle}</A>${NEWLINE}`;
       }
+
+      if (PlacesUtils.nodeIsContainer(node)) {
+        asContainer(node);
+        let wasOpen = node.containerOpen;
+        if (!wasOpen)
+          node.containerOpen = true;
+
+        let childString = "<DL><DT>" + escapedTitle + "</DT>" + NEWLINE;
+        let cc = node.childCount;
+        for (let i = 0; i < cc; ++i) {
+          childString += "<DD>"
+                         + NEWLINE
+                         + gatherDataHtml(node.getChild(i))
+                         + "</DD>"
+                         + NEWLINE;
+        }
+        node.containerOpen = wasOpen;
+        return childString + "</DL>" + NEWLINE;
+      }
+      if (PlacesUtils.nodeIsURI(node))
+        return `<A HREF="${node.uri}">${escapedTitle}</A>${NEWLINE}`;
+      if (PlacesUtils.nodeIsSeparator(node))
+        return "<HR>" + NEWLINE;
+      return "";
     }
 
-    function isLivemark(aNode) {
-      return PlacesUtils.nodeIsFolder(aNode) &&
-             PlacesUtils.annotations
-                        .itemHasAnnotation(aNode.itemId,
-                                           PlacesUtils.LMANNO_FEEDURI);
+    function gatherDataText(node) {
+      if (aFeedURI) {
+        return aFeedURI;
+      }
+
+      if (PlacesUtils.nodeIsContainer(node)) {
+        asContainer(node);
+        let wasOpen = node.containerOpen;
+        if (!wasOpen)
+          node.containerOpen = true;
+
+        let childString = node.title + NEWLINE;
+        let cc = node.childCount;
+        for (let i = 0; i < cc; ++i) {
+          let child = node.getChild(i);
+          let suffix = i < (cc - 1) ? NEWLINE : "";
+          childString += gatherDataText(child) + suffix;
+        }
+        node.containerOpen = wasOpen;
+        return childString;
+      }
+      if (PlacesUtils.nodeIsURI(node))
+        return node.uri;
+      if (PlacesUtils.nodeIsSeparator(node))
+        return "--------------------";
+      return "";
     }
 
     switch (aType) {
       case this.TYPE_X_MOZ_PLACE:
       case this.TYPE_X_MOZ_PLACE_SEPARATOR:
       case this.TYPE_X_MOZ_PLACE_CONTAINER: {
-        let writer = {
-          value: "",
-          write: function PU_wrapNode__write(aStr, aLen) {
-            this.value += aStr;
-          }
-        };
-
-        let [node, shouldClose] = convertNode(aNode);
-        this._serializeNodeAsJSONToOutputStream(node, writer);
-        if (shouldClose)
-          node.containerOpen = false;
-
-        return writer.value;
+        // Serialize the node to JSON.
+        return serializeNode(aNode, aFeedURI);
       }
       case this.TYPE_X_MOZ_URL: {
-        let gatherDataUrl = function (bNode) {
-          if (isLivemark(bNode)) {
-            return gatherLivemarkUrl(bNode) + NEWLINE + bNode.title;
-          }
-
-          if (PlacesUtils.nodeIsURI(bNode))
-            return (aOverrideURI || bNode.uri) + NEWLINE + bNode.title;
-          // ignore containers and separators - items without valid URIs
-          return "";
-        };
-
-        let [node, shouldClose] = convertNode(aNode);
-        let dataUrl = gatherDataUrl(node);
-        if (shouldClose)
-          node.containerOpen = false;
-
-        return dataUrl;
+        if (aFeedURI || PlacesUtils.nodeIsURI(aNode))
+          return (aFeedURI || aNode.uri) + NEWLINE + aNode.title;
+        return "";
       }
       case this.TYPE_HTML: {
-        let gatherDataHtml = function (bNode) {
-          let htmlEscape = function (s) {
-            s = s.replace(/&/g, "&amp;");
-            s = s.replace(/>/g, "&gt;");
-            s = s.replace(/</g, "&lt;");
-            s = s.replace(/"/g, "&quot;");
-            s = s.replace(/'/g, "&apos;");
-            return s;
-          };
-          // escape out potential HTML in the title
-          let escapedTitle = bNode.title ? htmlEscape(bNode.title) : "";
-
-          if (isLivemark(bNode)) {
-            return "<A HREF=\"" + gatherLivemarkUrl(bNode) + "\">" + escapedTitle + "</A>" + NEWLINE;
-          }
-
-          if (PlacesUtils.nodeIsContainer(bNode)) {
-            asContainer(bNode);
-            let wasOpen = bNode.containerOpen;
-            if (!wasOpen)
-              bNode.containerOpen = true;
-
-            let childString = "<DL><DT>" + escapedTitle + "</DT>" + NEWLINE;
-            let cc = bNode.childCount;
-            for (let i = 0; i < cc; ++i)
-              childString += "<DD>"
-                             + NEWLINE
-                             + gatherDataHtml(bNode.getChild(i))
-                             + "</DD>"
-                             + NEWLINE;
-            bNode.containerOpen = wasOpen;
-            return childString + "</DL>" + NEWLINE;
-          }
-          if (PlacesUtils.nodeIsURI(bNode))
-            return "<A HREF=\"" + bNode.uri + "\">" + escapedTitle + "</A>" + NEWLINE;
-          if (PlacesUtils.nodeIsSeparator(bNode))
-            return "<HR>" + NEWLINE;
-          return "";
-        }
-
-        let [node, shouldClose] = convertNode(aNode);
-        let dataHtml = gatherDataHtml(node);
-        if (shouldClose)
-          node.containerOpen = false;
-
-        return dataHtml;
+        return gatherDataFromNode(aNode, gatherDataHtml);
       }
     }
 
     // Otherwise, we wrap as TYPE_UNICODE.
-    function gatherDataText(bNode) {
-      if (isLivemark(bNode)) {
-        return gatherLivemarkUrl(bNode);
-      }
-
-      if (PlacesUtils.nodeIsContainer(bNode)) {
-        asContainer(bNode);
-        let wasOpen = bNode.containerOpen;
-        if (!wasOpen)
-          bNode.containerOpen = true;
-
-        let childString = bNode.title + NEWLINE;
-        let cc = bNode.childCount;
-        for (let i = 0; i < cc; ++i) {
-          let child = bNode.getChild(i);
-          let suffix = i < (cc - 1) ? NEWLINE : "";
-          childString += gatherDataText(child) + suffix;
-        }
-        bNode.containerOpen = wasOpen;
-        return childString;
-      }
-      if (PlacesUtils.nodeIsURI(bNode))
-        return (aOverrideURI || bNode.uri);
-      if (PlacesUtils.nodeIsSeparator(bNode))
-        return "--------------------";
-      return "";
-    }
-
-    let [node, shouldClose] = convertNode(aNode);
-    let dataText = gatherDataText(node);
-    // Convert node could pass an open container node.
-    if (shouldClose)
-      node.containerOpen = false;
-
-    return dataText;
+    return gatherDataFromNode(aNode, gatherDataText);
   },
 
   /**
@@ -1149,207 +1186,6 @@ this.PlacesUtils = {
   /**
    * Serializes the given node (and all its descendents) as JSON
    * and writes the serialization to the given output stream.
-   * 
-   * @param   aNode
-   *          An nsINavHistoryResultNode
-   * @param   aStream
-   *          An nsIOutputStream. NOTE: it only uses the write(str, len)
-   *          method of nsIOutputStream. The caller is responsible for
-   *          closing the stream.
-   */
-  _serializeNodeAsJSONToOutputStream: function (aNode, aStream) {
-    function addGenericProperties(aPlacesNode, aJSNode) {
-      aJSNode.title = aPlacesNode.title;
-      aJSNode.id = aPlacesNode.itemId;
-      let guid = aPlacesNode.bookmarkGuid;
-      if (guid) {
-        aJSNode.itemGuid = guid;
-        var parent = aPlacesNode.parent;
-        if (parent)
-          aJSNode.parent = parent.itemId;
-
-        var dateAdded = aPlacesNode.dateAdded;
-        if (dateAdded)
-          aJSNode.dateAdded = dateAdded;
-        var lastModified = aPlacesNode.lastModified;
-        if (lastModified)
-          aJSNode.lastModified = lastModified;
-
-        // XXX need a hasAnnos api
-        var annos = [];
-        try {
-          annos = PlacesUtils.getAnnotationsForItem(aJSNode.id).filter(function(anno) {
-            // XXX should whitelist this instead, w/ a pref for
-            // backup/restore of non-whitelisted annos
-            // XXX causes JSON encoding errors, so utf-8 encode
-            //anno.value = unescape(encodeURIComponent(anno.value));
-            if (anno.name == PlacesUtils.LMANNO_FEEDURI)
-              aJSNode.livemark = 1;
-            return true;
-          });
-        } catch(ex) {}
-        if (annos.length != 0)
-          aJSNode.annos = annos;
-      }
-      // XXXdietrich - store annos for non-bookmark items
-    }
-
-    function addURIProperties(aPlacesNode, aJSNode) {
-      aJSNode.type = PlacesUtils.TYPE_X_MOZ_PLACE;
-      aJSNode.uri = aPlacesNode.uri;
-      if (aJSNode.id && aJSNode.id != -1) {
-        // harvest bookmark-specific properties
-        var keyword = PlacesUtils.bookmarks.getKeywordForBookmark(aJSNode.id);
-        if (keyword)
-          aJSNode.keyword = keyword;
-      }
-
-      if (aPlacesNode.tags)
-        aJSNode.tags = aPlacesNode.tags;
-
-      // last character-set
-      var uri = PlacesUtils._uri(aPlacesNode.uri);
-      try {
-        var lastCharset = PlacesUtils.annotations.getPageAnnotation(
-                            uri, PlacesUtils.CHARSET_ANNO);
-        aJSNode.charset = lastCharset;
-      } catch (e) {}
-    }
-
-    function addSeparatorProperties(aPlacesNode, aJSNode) {
-      aJSNode.type = PlacesUtils.TYPE_X_MOZ_PLACE_SEPARATOR;
-    }
-
-    function addContainerProperties(aPlacesNode, aJSNode) {
-      var concreteId = PlacesUtils.getConcreteItemId(aPlacesNode);
-      if (concreteId != -1) {
-        // This is a bookmark or a tag container.
-        if (PlacesUtils.nodeIsQuery(aPlacesNode) ||
-            concreteId != aPlacesNode.itemId) {
-          aJSNode.type = PlacesUtils.TYPE_X_MOZ_PLACE;
-          aJSNode.uri = aPlacesNode.uri;
-          // folder shortcut
-          aJSNode.concreteId = concreteId;
-        }
-        else { // Bookmark folder or a shortcut we should convert to folder.
-          aJSNode.type = PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER;
-
-          // Mark root folders.
-          if (aJSNode.id == PlacesUtils.placesRootId)
-            aJSNode.root = "placesRoot";
-          else if (aJSNode.id == PlacesUtils.bookmarksMenuFolderId)
-            aJSNode.root = "bookmarksMenuFolder";
-          else if (aJSNode.id == PlacesUtils.tagsFolderId)
-            aJSNode.root = "tagsFolder";
-          else if (aJSNode.id == PlacesUtils.unfiledBookmarksFolderId)
-            aJSNode.root = "unfiledBookmarksFolder";
-          else if (aJSNode.id == PlacesUtils.toolbarFolderId)
-            aJSNode.root = "toolbarFolder";
-        }
-      }
-      else {
-        // This is a grouped container query, generated on the fly.
-        aJSNode.type = PlacesUtils.TYPE_X_MOZ_PLACE;
-        aJSNode.uri = aPlacesNode.uri;
-      }
-    }
-
-    function appendConvertedComplexNode(aNode, aSourceNode, aArray) {
-      var repr = {};
-
-      for (let [name, value] in Iterator(aNode))
-        repr[name] = value;
-
-      // write child nodes
-      var children = repr.children = [];
-      if (!aNode.livemark) {
-        asContainer(aSourceNode);
-        var wasOpen = aSourceNode.containerOpen;
-        if (!wasOpen)
-          aSourceNode.containerOpen = true;
-        var cc = aSourceNode.childCount;
-        for (var i = 0; i < cc; ++i) {
-          var childNode = aSourceNode.getChild(i);
-          appendConvertedNode(aSourceNode.getChild(i), i, children);
-        }
-        if (!wasOpen)
-          aSourceNode.containerOpen = false;
-      }
-
-      aArray.push(repr);
-      return true;
-    }
-
-    function appendConvertedNode(bNode, aIndex, aArray) {
-      var node = {};
-
-      // set index in order received
-      // XXX handy shortcut, but are there cases where we don't want
-      // to export using the sorting provided by the query?
-      if (aIndex)
-        node.index = aIndex;
-
-      addGenericProperties(bNode, node);
-
-      var parent = bNode.parent;
-      var grandParent = parent ? parent.parent : null;
-      if (grandParent)
-        node.grandParentId = grandParent.itemId;
-
-      if (PlacesUtils.nodeIsURI(bNode)) {
-        // Tag root accept only folder nodes
-        if (parent && parent.itemId == PlacesUtils.tagsFolderId)
-          return false;
-
-        // Check for url validity, since we can't halt while writing a backup.
-        // This will throw if we try to serialize an invalid url and it does
-        // not make sense saving a wrong or corrupt uri node.
-        try {
-          PlacesUtils._uri(bNode.uri);
-        } catch (ex) {
-          return false;
-        }
-
-        addURIProperties(bNode, node);
-      }
-      else if (PlacesUtils.nodeIsContainer(bNode)) {
-        // Tag containers accept only uri nodes
-        if (grandParent && grandParent.itemId == PlacesUtils.tagsFolderId)
-          return false;
-
-        addContainerProperties(bNode, node);
-      }
-      else if (PlacesUtils.nodeIsSeparator(bNode)) {
-        // Tag root accept only folder nodes
-        // Tag containers accept only uri nodes
-        if ((parent && parent.itemId == PlacesUtils.tagsFolderId) ||
-            (grandParent && grandParent.itemId == PlacesUtils.tagsFolderId))
-          return false;
-
-        addSeparatorProperties(bNode, node);
-      }
-
-      if (!node.feedURI && node.type == PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER)
-        return appendConvertedComplexNode(node, bNode, aArray);
-
-      aArray.push(node);
-      return true;
-    }
-
-    // serialize to stream
-    var array = [];
-    if (appendConvertedNode(aNode, null, array)) {
-      var json = JSON.stringify(array[0]);
-      aStream.write(json, json.length);
-    }
-    else {
-      throw Cr.NS_ERROR_UNEXPECTED;
-    }
-  },
-
-  /**
-   * Serializes the given node (and all its descendents) as JSON
-   * and writes the serialization to the given output stream.
    *
    * @param   aNode
    *          An nsINavHistoryResultNode
@@ -1826,36 +1662,6 @@ this.PlacesUtils = {
   },
 
   /**
-   * Returns the passed URL with a #-moz-resolution fragment
-   * for the specified dimensions and devicePixelRatio.
-   *
-   * @param aWindow
-   *        A window from where we want to get the device
-   *        pixel Ratio
-   *
-   * @param aURL
-   *        The URL where we should add the fragment
-   *
-   * @param aWidth
-   *        The target image width
-   *
-   * @param aHeight
-   *        The target image height
-   *
-   * @return The URL with the fragment at the end
-   */
-  getImageURLForResolution:
-  function PU_getImageURLForResolution(aWindow, aURL, aWidth = 16, aHeight = 16) {
-    if (!aURL.endsWith('.ico') && !aURL.endsWith('.ICO')) {
-      return aURL;
-    }
-    let width  = Math.round(aWidth * aWindow.devicePixelRatio);
-    let height = Math.round(aHeight * aWindow.devicePixelRatio);
-    return aURL + (aURL.includes("#") ? "&" : "#") +
-           "-moz-resolution=" + width + "," + height;
-  },
-
-  /**
    * Get the unique id for an item (a bookmark, a folder or a separator) given
    * its item id.
    *
@@ -2087,6 +1893,7 @@ this.PlacesUtils = {
         { tags_folder: PlacesUtils.tagsFolderId,
           charset_anno: PlacesUtils.CHARSET_ANNO,
           item_guid: aItemGuid });
+    let yieldCounter = 0;
     for (let row of rows) {
       let item;
       if (!rootItem) {
@@ -2125,6 +1932,14 @@ this.PlacesUtils = {
 
       if (item.type == this.TYPE_X_MOZ_PLACE_CONTAINER)
         parentsMap.set(item.guid, item);
+
+      // With many bookmarks we end up stealing the CPU - even with yielding!
+      // So we let everyone else have a go every few items (bug 1186714).
+      if (++yieldCounter % 50 == 0) {
+        yield new Promise(resolve => {
+          Services.tm.currentThread.dispatch(resolve, Ci.nsIThread.DISPATCH_NORMAL);
+        });
+      }
     }
 
     return rootItem;
@@ -2230,7 +2045,7 @@ XPCOMUtils.defineLazyGetter(this, "bundle", function() {
 
 // A promise resolved once the Sqlite.jsm connections
 // can be closed.
-let promiseCanCloseConnection = function() {
+var promiseCanCloseConnection = function() {
   let TOPIC = "places-will-close-connection";
   return new Promise(resolve => {
     let observer = function() {
@@ -2315,7 +2130,7 @@ XPCOMUtils.defineLazyGetter(this, "gAsyncDBWrapperPromised",
  * Keywords are associated with URLs and can have POST data.
  * A single URL can have multiple keywords, provided they differ by POST data.
  */
-let Keywords = {
+var Keywords = {
   /**
    * Fetches a keyword entry based on keyword or URL.
    *
@@ -2490,7 +2305,7 @@ let Keywords = {
 
 // Set by the keywords API to distinguish notifications fired by the old API.
 // Once the old API will be gone, we can remove this and stop observing.
-let gIgnoreKeywordNotifications = false;
+var gIgnoreKeywordNotifications = false;
 
 XPCOMUtils.defineLazyGetter(this, "gKeywordsCachePromise", () =>
   PlacesUtils.withConnectionWrapper("PlacesUtils: gKeywordsCachePromise",
@@ -2597,7 +2412,7 @@ XPCOMUtils.defineLazyGetter(this, "gKeywordsCachePromise", () =>
 // working with GUIDs.  So, until it does, this helper object accesses the
 // Places database directly in order to switch between GUIDs and itemIds, and
 // "restore" GUIDs on items re-created items.
-let GuidHelper = {
+var GuidHelper = {
   // Cache for GUID<->itemId paris.
   guidsForIds: new Map(),
   idsForGuids: new Map(),
@@ -2607,16 +2422,17 @@ let GuidHelper = {
     if (cached !== undefined)
       return cached;
 
-    let conn = yield PlacesUtils.promiseDBConnection();
+    let itemId = yield PlacesUtils.withConnectionWrapper("GuidHelper.getItemId",
+                                                         Task.async(function* (db) {
+      let rows = yield db.executeCached(
+        "SELECT b.id, b.guid from moz_bookmarks b WHERE b.guid = :guid LIMIT 1",
+        { guid: aGuid });
+      if (rows.length == 0)
+        throw new Error("no item found for the given GUID");
 
-    let rows = yield conn.executeCached(
-      "SELECT b.id, b.guid from moz_bookmarks b WHERE b.guid = :guid LIMIT 1",
-      { guid: aGuid });
-    if (rows.length == 0)
-      throw new Error("no item found for the given GUID");
+      return rows[0].getResultByName("id");
+    }));
 
-    this.ensureObservingRemovedItems();
-    let itemId = rows[0].getResultByName("id");
     this.updateCache(itemId, aGuid);
     return itemId;
   }),
@@ -2626,16 +2442,18 @@ let GuidHelper = {
     if (cached !== undefined)
       return cached;
 
-    let conn = yield PlacesUtils.promiseDBConnection();
+    let guid = yield PlacesUtils.withConnectionWrapper("GuidHelper.getItemGuid",
+                                                       Task.async(function* (db) {
 
-    let rows = yield conn.executeCached(
-      "SELECT b.id, b.guid from moz_bookmarks b WHERE b.id = :id LIMIT 1",
-      { id: aItemId });
-    if (rows.length == 0)
-      throw new Error("no item found for the given itemId");
+      let rows = yield db.executeCached(
+        "SELECT b.id, b.guid from moz_bookmarks b WHERE b.id = :id LIMIT 1",
+        { id: aItemId });
+      if (rows.length == 0)
+        throw new Error("no item found for the given itemId");
 
-    this.ensureObservingRemovedItems();
-    let guid = rows[0].getResultByName("guid");
+      return rows[0].getResultByName("guid");
+    }));
+
     this.updateCache(aItemId, guid);
     return guid;
   }),
@@ -2651,6 +2469,7 @@ let GuidHelper = {
       throw new Error("Trying to update the GUIDs cache with an invalid itemId");
     if (typeof(aGuid) != "string" || !/^[a-zA-Z0-9\-_]{12}$/.test(aGuid))
       throw new Error("Trying to update the GUIDs cache with an invalid GUID");
+    this.ensureObservingRemovedItems();
     this.guidsForIds.set(aItemId, aGuid);
     this.idsForGuids.set(aGuid, aItemId);
   },
@@ -2727,45 +2546,61 @@ function TransactionItemCache()
 }
 
 TransactionItemCache.prototype = {
-  set id(v)
-    this._id = (parseInt(v) > 0 ? v : null),
-  get id()
-    this._id || -1,
-  set parentId(v)
-    this._parentId = (parseInt(v) > 0 ? v : null),
-  get parentId()
-    this._parentId || -1,
+  set id(v) {
+    this._id = (parseInt(v) > 0 ? v : null);
+  },
+  get id() {
+    return this._id || -1;
+  },
+  set parentId(v) {
+    this._parentId = (parseInt(v) > 0 ? v : null);
+  },
+  get parentId() {
+    return this._parentId || -1;
+  },
   keyword: null,
   title: null,
   dateAdded: null,
   lastModified: null,
   postData: null,
   itemType: null,
-  set uri(v)
-    this._uri = (v instanceof Ci.nsIURI ? v.clone() : null),
-  get uri()
-    this._uri || null,
-  set feedURI(v)
-    this._feedURI = (v instanceof Ci.nsIURI ? v.clone() : null),
-  get feedURI()
-    this._feedURI || null,
-  set siteURI(v)
-    this._siteURI = (v instanceof Ci.nsIURI ? v.clone() : null),
-  get siteURI()
-    this._siteURI || null,
-  set index(v)
-    this._index = (parseInt(v) >= 0 ? v : null),
+  set uri(v) {
+    this._uri = (v instanceof Ci.nsIURI ? v.clone() : null);
+  },
+  get uri() {
+    return this._uri || null;
+  },
+  set feedURI(v) {
+    this._feedURI = (v instanceof Ci.nsIURI ? v.clone() : null);
+  },
+  get feedURI() {
+    return this._feedURI || null;
+  },
+  set siteURI(v) {
+    this._siteURI = (v instanceof Ci.nsIURI ? v.clone() : null);
+  },
+  get siteURI() {
+    return this._siteURI || null;
+  },
+  set index(v) {
+    this._index = (parseInt(v) >= 0 ? v : null);
+  },
   // Index can be 0.
-  get index()
-    this._index != null ? this._index : PlacesUtils.bookmarks.DEFAULT_INDEX,
-  set annotations(v)
-    this._annotations = Array.isArray(v) ? Cu.cloneInto(v, {}) : null,
-  get annotations()
-    this._annotations || null,
-  set tags(v)
-    this._tags = (v && Array.isArray(v) ? Array.slice(v) : null),
-  get tags()
-    this._tags || null,
+  get index() {
+    return this._index != null ? this._index : PlacesUtils.bookmarks.DEFAULT_INDEX;
+  },
+  set annotations(v) {
+    this._annotations = Array.isArray(v) ? Cu.cloneInto(v, {}) : null;
+  },
+  get annotations() {
+    return this._annotations || null;
+  },
+  set tags(v) {
+    this._tags = (v && Array.isArray(v) ? Array.slice(v) : null);
+  },
+  get tags() {
+    return this._tags || null;
+  },
 };
 
 
@@ -2780,15 +2615,23 @@ function BaseTransaction()
 
 BaseTransaction.prototype = {
   name: null,
-  set childTransactions(v)
-    this._childTransactions = (Array.isArray(v) ? Array.slice(v) : null),
-  get childTransactions()
-    this._childTransactions || null,
+  set childTransactions(v) {
+    this._childTransactions = (Array.isArray(v) ? Array.slice(v) : null);
+  },
+  get childTransactions() {
+    return this._childTransactions || null;
+  },
   doTransaction: function BTXN_doTransaction() {},
-  redoTransaction: function BTXN_redoTransaction() this.doTransaction(),
+  redoTransaction: function BTXN_redoTransaction() {
+    return this.doTransaction();
+  },
   undoTransaction: function BTXN_undoTransaction() {},
-  merge: function BTXN_merge() false,
-  get isTransient() false,
+  merge: function BTXN_merge() {
+    return false;
+  },
+  get isTransient() {
+    return false;
+  },
   QueryInterface: XPCOMUtils.generateQI([
     Ci.nsITransaction
   ]),
@@ -3099,7 +2942,7 @@ PlacesCreateLivemarkTransaction.prototype = {
 
   doTransaction: function CLTXN_doTransaction()
   {
-    PlacesUtils.livemarks.addLivemark(
+    this._promise = PlacesUtils.livemarks.addLivemark(
       { title: this.item.title
       , feedURI: this.item.feedURI
       , parentId: this.item.parentId
@@ -3118,7 +2961,7 @@ PlacesCreateLivemarkTransaction.prototype = {
   {
     // The getLivemark callback may fail, but it is used just to serialize,
     // so it doesn't matter.
-    PlacesUtils.livemarks.getLivemark({ id: this.item.id })
+    this._promise = PlacesUtils.livemarks.getLivemark({ id: this.item.id })
       .then(null, null).then( () => {
         PlacesUtils.bookmarks.removeItem(this.item.id);
       });
@@ -3445,7 +3288,7 @@ PlacesEditBookmarkURITransaction.prototype = {
     PlacesUtils.bookmarks.changeBookmarkURI(this.item.id, this.new.uri);
     // move tags from old URI to new URI
     this.item.tags = PlacesUtils.tagging.getTagsForURI(this.item.uri);
-    if (this.item.tags.length != 0) {
+    if (this.item.tags.length > 0) {
       // only untag the old URI if this is the only bookmark
       if (PlacesUtils.getBookmarksForURI(this.item.uri, {}).length == 0)
         PlacesUtils.tagging.untagURI(this.item.uri, this.item.tags);
@@ -3457,7 +3300,7 @@ PlacesEditBookmarkURITransaction.prototype = {
   {
     PlacesUtils.bookmarks.changeBookmarkURI(this.item.id, this.item.uri);
     // move tags from new URI to old URI 
-    if (this.item.tags.length != 0) {
+    if (this.item.tags.length > 0) {
       // only untag the new URI if this is the only bookmark
       if (PlacesUtils.getBookmarksForURI(this.new.uri, {}).length == 0)
         PlacesUtils.tagging.untagURI(this.new.uri, this.item.tags);

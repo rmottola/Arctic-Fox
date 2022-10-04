@@ -62,7 +62,7 @@ if os.path.isdir(mozbase):
 
 from manifestparser import TestManifest
 from manifestparser.filters import chunk_by_slice, tags
-from mozlog import structured
+from mozlog import commandline
 import mozcrash
 import mozinfo
 
@@ -518,8 +518,7 @@ class XPCShellTestThread(Thread):
         self.log.info("<<<<<<<")
 
     def report_message(self, message):
-        """Stores or logs a json log message in mozlog.structured
-        format."""
+        """Stores or logs a json log message in mozlog format."""
         if self.verbose:
             self.log_line(message)
         else:
@@ -954,10 +953,10 @@ class XPCShellTests(object):
                             nodeMozInfo['hasNode'] = True
                             searchObj = re.search( r'SPDY server listening on port (.*)', msg, 0)
                             if searchObj:
-                              self.env["MOZSPDY-PORT"] = searchObj.group(1)
+                              self.env["MOZSPDY_PORT"] = searchObj.group(1)
                             searchObj = re.search( r'HTTP2 server listening on port (.*)', msg, 0)
                             if searchObj:
-                              self.env["MOZHTTP2-PORT"] = searchObj.group(1)
+                              self.env["MOZHTTP2_PORT"] = searchObj.group(1)
                     except OSError, e:
                         # This occurs if the subprocess couldn't be started
                         self.log.error('Could not run %s server: %s' % (name, str(e)))
@@ -965,6 +964,9 @@ class XPCShellTests(object):
             myDir = os.path.split(os.path.abspath(__file__))[0]
             startServer('moz-spdy', os.path.join(myDir, 'moz-spdy', 'moz-spdy.js'))
             startServer('moz-http2', os.path.join(myDir, 'moz-http2', 'moz-http2.js'))
+        elif os.getenv('MOZ_ASSUME_NODE_RUNNING', None):
+            self.log.info('Assuming required node servers are already running')
+            nodeMozInfo['hasNode'] = True
 
         mozinfo.update(nodeMozInfo)
 
@@ -1483,13 +1485,11 @@ class XPCShellOptions(OptionParser):
 
 def main():
     parser = XPCShellOptions()
-    structured.commandline.add_logging_group(parser)
+    commandline.add_logging_group(parser)
     options, args = parser.parse_args()
 
 
-    log = structured.commandline.setup_logging("XPCShell",
-                                               options,
-                                               {"tbpl": sys.stdout})
+    log = commandline.setup_logging("XPCShell", options, {"tbpl": sys.stdout})
 
     if len(args) < 2 and options.manifest is None or \
        (len(args) < 1 and options.manifest is not None):

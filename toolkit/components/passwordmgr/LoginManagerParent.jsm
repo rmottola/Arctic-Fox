@@ -1,4 +1,3 @@
-/* vim: set ts=2 sts=2 sw=2 et tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -20,10 +19,15 @@ XPCOMUtils.defineLazyModuleGetter(this, "DeferredTask",
                                   "resource://gre/modules/DeferredTask.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LoginDoorhangers",
                                   "resource://gre/modules/LoginDoorhangers.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
+                                  "resource://gre/modules/LoginHelper.jsm");
+
+XPCOMUtils.defineLazyGetter(this, "log", () => {
+  let logger = LoginHelper.createLogger("LoginManagerParent");
+  return logger.log.bind(logger);
+});
 
 this.EXPORTED_SYMBOLS = [ "LoginManagerParent", "PasswordsMetricsProvider" ];
-
-var gDebug;
 
 #ifndef ANDROID
 #ifdef MOZ_SERVICES_HEALTHREPORT
@@ -51,7 +55,7 @@ const PasswordsHealthReport = {
 
 this.PasswordsMetricsProvider = function() {
   Metrics.Provider.call(this);
-}
+};
 
 PasswordsMetricsProvider.prototype = Object.freeze({
   __proto__: Metrics.Provider.prototype,
@@ -126,49 +130,22 @@ PasswordsMeasurement2.prototype = Object.freeze({
 #endif
 #endif
 
-
-function log(...pieces) {
-  function generateLogMessage(args) {
-    let strings = ['Login Manager (parent):'];
-
-    args.forEach(function(arg) {
-      if (typeof arg === 'string') {
-        strings.push(arg);
-      } else if (typeof arg === 'undefined') {
-        strings.push('undefined');
-      } else if (arg === null) {
-        strings.push('null');
-      } else {
-        try {
-          strings.push(JSON.stringify(arg, null, 2));
-        } catch(err) {
-          strings.push("<<something>>");
-        }
-      }
-    });
-    return strings.join(' ');
-  }
-
-  if (!gDebug)
-    return;
-
-  let message = generateLogMessage(pieces);
-  dump(message + "\n");
-  Services.console.logStringMessage(message);
-}
-
-function prefChanged() {
-  gDebug = Services.prefs.getBoolPref("signon.debug");
-}
-
-Services.prefs.addObserver("signon.debug", prefChanged, false);
-prefChanged();
-
 var LoginManagerParent = {
+  /**
+   * Reference to the default LoginRecipesParent (instead of the initialization promise) for
+   * synchronous access. This is a temporary hack and new consumers should yield on
+   * recipeParentPromise instead.
+   *
+   * @type LoginRecipesParent
+   * @deprecated
+   */
+  _recipeManager: null,
+
   init: function() {
     let mm = Cc["@mozilla.org/globalmessagemanager;1"]
                .getService(Ci.nsIMessageListenerManager);
     mm.addMessageListener("RemoteLogins:findLogins", this);
+    mm.addMessageListener("RemoteLogins:findRecipes", this);
     mm.addMessageListener("RemoteLogins:onFormSubmit", this);
     mm.addMessageListener("RemoteLogins:autoCompleteLogins", this);
     mm.addMessageListener("RemoteLogins:updateLoginFormPresence", this);
@@ -178,9 +155,10 @@ var LoginManagerParent = {
 
     XPCOMUtils.defineLazyGetter(this, "recipeParentPromise", () => {
       const { LoginRecipesParent } = Cu.import("resource://gre/modules/LoginRecipes.jsm", {});
-      let parent = new LoginRecipesParent();
-      return parent.initializationPromise;
+      this._recipeManager = new LoginRecipesParent();
+      return this._recipeManager.initializationPromise;
     });
+
   },
 
   observe: function (aSubject, aTopic, aData) {
@@ -205,6 +183,11 @@ var LoginManagerParent = {
                                   data.requestId,
                                   msg.target.messageManager);
         break;
+      }
+
+      case "RemoteLogins:findRecipes": {
+        let formHost = (new URL(data.formOrigin)).host;
+        return this._recipeManager.getRecipesForHost(formHost);
       }
 
       case "RemoteLogins:onFormSubmit": {
@@ -439,6 +422,15 @@ var LoginManagerParent = {
       return prompterSvc;
     }
 
+    function recordLoginUse(login) {
+      // Update the lastUsed timestamp and increment the use count.
+      let propBag = Cc["@mozilla.org/hash-property-bag;1"].
+                    createInstance(Ci.nsIWritablePropertyBag);
+      propBag.setProperty("timeLastUsed", Date.now());
+      propBag.setProperty("timesUsedIncrement", 1);
+      Services.logins.modifyLogin(login, propBag);
+    }
+
     if (!Services.logins.getLoginSavingEnabled(hostname)) {
       log("(form submission ignored -- saving is disabled for:", hostname, ")");
       return;
@@ -452,24 +444,24 @@ var LoginManagerParent = {
                    (usernameField ? usernameField.name  : ""),
                    newPasswordField.name);
 
+    let logins = Services.logins.findLogins({}, hostname, formSubmitURL, null);
+
     // If we didn't find a username field, but seem to be changing a
     // password, allow the user to select from a list of applicable
     // logins to update the password for.
-    if (!usernameField && oldPasswordField) {
-
-      var logins = Services.logins.findLogins({}, hostname, formSubmitURL, null);
-
-      if (logins.length == 0) {
-        // Could prompt to save this as a new password-only login.
-        // This seems uncommon, and might be wrong, so ignore.
-        log("(no logins for this host -- pwchange ignored)");
-        return;
-      }
-
+    if (!usernameField && oldPasswordField && logins.length > 0) {
       var prompter = getPrompter();
 
       if (logins.length == 1) {
         var oldLogin = logins[0];
+
+        if (oldLogin.password == formLogin.password) {
+          recordLoginUse(oldLogin);
+          log("(Not prompting to save/change since we have no username and the " +
+              "only saved password matches the new password)");
+          return;
+        }
+
         formLogin.username      = oldLogin.username;
         formLogin.usernameField = oldLogin.usernameField;
 
@@ -483,10 +475,8 @@ var LoginManagerParent = {
     }
 
 
-    // Look for an existing login that matches the form login.
     var existingLogin = null;
-    var logins = Services.logins.findLogins({}, hostname, formSubmitURL, null);
-
+    // Look for an existing login that matches the form login.
     for (var i = 0; i < logins.length; i++) {
       var same, login = logins[i];
 
@@ -522,12 +512,7 @@ var LoginManagerParent = {
         prompter = getPrompter();
         prompter.promptToChangePassword(existingLogin, formLogin);
       } else {
-        // Update the lastUsed timestamp.
-        var propBag = Cc["@mozilla.org/hash-property-bag;1"].
-                      createInstance(Ci.nsIWritablePropertyBag);
-        propBag.setProperty("timeLastUsed", Date.now());
-        propBag.setProperty("timesUsedIncrement", 1);
-        Services.logins.modifyLogin(existingLogin, propBag);
+        recordLoginUse(existingLogin);
       }
 
       return;

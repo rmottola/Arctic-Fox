@@ -553,7 +553,7 @@
         ({
           _autocomplete: this,
           _kGlobalClipboard: Components.interfaces.nsIClipboard.kGlobalClipboard,
-          supportsCommand: function(aCommand) aCommand == "cmd_paste",
+          supportsCommand: aCommand => aCommand == "cmd_paste",
           doCommand: function(aCommand) {
             this._autocomplete._valueIsPasted = true;
             this._autocomplete.editor.paste(this._kGlobalClipboard);
@@ -1123,24 +1123,6 @@ extends="chrome://global/content/bindings/popup.xml#popup">
         </body>
       </method>
 
-      <method name="_getImageURLForResolution">
-        <parameter name="aWin"/>
-        <parameter name="aURL"/>
-        <parameter name="aWidth"/>
-        <parameter name="aHeight"/>
-        <body>
-          <![CDATA[
-          if (!aURL.endsWith('.ico') && !aURL.endsWith('.ICO')) {
-            return aURL;
-          }
-          let width  = Math.round(aWidth * aWin.devicePixelRatio);
-          let height = Math.round(aHeight * aWin.devicePixelRatio);
-          return aURL + (aURL.includes("#") ? "&" : "#") +
-                 "-moz-resolution=" + width + "," + height;
-          ]]>
-        </body>
-      </method>
-
       <method name="_appendCurrentResult">
         <body>
           <![CDATA[
@@ -1182,7 +1164,7 @@ extends="chrome://global/content/bindings/popup.xml#popup">
 
             // set these attributes before we set the class
             // so that we can use them from the constructor
-            let iconURI = this._getImageURLForResolution(window, controller.getImageAt(this._currentIndex), 16, 16);
+            let iconURI = controller.getImageAt(this._currentIndex);
             item.setAttribute("image", iconURI);
             item.setAttribute("url", url);
             item.setAttribute("title", controller.getCommentAt(this._currentIndex));
@@ -1548,11 +1530,10 @@ extends="chrome://global/content/bindings/popup.xml#popup">
                 let index = (match[1] || 1) - 1;
 
                 if (index >= 0 && index < aReplacements.length) {
-                  let replacement = aReplacements[index];
-                  pairs.push([...replacement]);
+                  pairs.push([...aReplacements[index]]);
                 }
               } else {
-                pairs.push([part, false]);
+                pairs.push([part]);
               }
             }
 
@@ -1581,8 +1562,15 @@ extends="chrome://global/content/bindings/popup.xml#popup">
             if (emphasise) {
               let span = aDescriptionElement.appendChild(
                 document.createElementNS("http://www.w3.org/1999/xhtml", "span"));
-              span.className = "ac-emphasize-text";
               span.textContent = text;
+              switch(emphasise) {
+                case "match":
+                  span.className = "ac-emphasize-text";
+                  break;
+                case "selected":
+                  span.className = "ac-selected-text";
+                  break;
+              }
             } else {
               aDescriptionElement.appendChild(document.createTextNode(text));
             }
@@ -1638,11 +1626,45 @@ extends="chrome://global/content/bindings/popup.xml#popup">
             } else if (action.type == "searchengine") {
               emphasiseUrl = false;
 
-              let sourceStr = this._stringBundle.GetStringFromName("searchWithEngineForQuery");
-              title = this._generateEmphasisPairs(sourceStr, [
-                                                    [action.params.engineName, false],
-                                                    [action.params.searchQuery, true]
-                                                  ]);
+              // The order here is not localizable, we default to appending
+              // "- Search with Engine" to the search string, to be able to
+              // properly generate emphasis pairs. That said, no localization
+              // changed the order while it was possible, so doesn't look like
+              // there's a strong need for that.
+              let {engineName, searchSuggestion, searchQuery} = action.params;
+              let engineStr = "- " +
+                this._stringBundle.formatStringFromName("searchWithEngine",
+                                                        [engineName], 1);
+
+              // Make the title by generating an array of pairs and its
+              // corresponding interpolation string (e.g., "%1$S") to pass to
+              // _generateEmphasisPairs.
+              let pairs;
+              if (searchSuggestion) {
+                // Check if the search query appears in the suggestion.  It may
+                // not.  If it does, then emphasize the query in the suggestion
+                // and otherwise just include the suggestion without emphasis.
+                let idx = searchSuggestion.indexOf(searchQuery);
+                if (idx >= 0) {
+                  pairs = [
+                    [searchSuggestion.substring(0, idx), ""],
+                    [searchQuery, "match"],
+                    [searchSuggestion.substring(idx + searchQuery.length), ""],
+                  ];
+                } else {
+                  pairs = [
+                    [searchSuggestion, ""],
+                  ];
+                }
+              } else {
+                pairs = [
+                  [searchQuery, ""],
+                ];
+              }
+              pairs.push([engineStr, "selected"]);
+              let interpStr = pairs.map((pair, i) => `%${i + 1}$S`).join("");
+              title = this._generateEmphasisPairs(interpStr, pairs);
+
               // If this is a default search match, we remove the image so we
               // can style it ourselves with a generic search icon.
               // We don't do this when matching an aliased search engine,
@@ -1658,7 +1680,7 @@ extends="chrome://global/content/bindings/popup.xml#popup">
 
               let sourceStr = this._stringBundle.GetStringFromName("visitURL");
               title = this._generateEmphasisPairs(sourceStr, [
-                                                    [displayUrl, true],
+                                                    [displayUrl, "match"],
                                                   ]);
             }
 
@@ -1688,7 +1710,7 @@ extends="chrome://global/content/bindings/popup.xml#popup">
 
             let sourceStr = this._stringBundle.GetStringFromName("visitURL");
             title = this._generateEmphasisPairs(sourceStr, [
-                                                 [displayUrl, true],
+                                                 [displayUrl, "match"],
                                                 ]);
 
             types.delete("autofill");

@@ -31,7 +31,7 @@ protected:
   RefPtr<TextureClient> mTextureClient;
 };
 
-TextureClientRecycleAllocator::TextureClientRecycleAllocator(ISurfaceAllocator *aAllocator)
+TextureClientRecycleAllocator::TextureClientRecycleAllocator(CompositableForwarder* aAllocator)
   : mSurfaceAllocator(aAllocator)
   , mMaxPooledSize(kMaxPooledSized)
   , mLock("TextureClientRecycleAllocatorImp.mLock")
@@ -52,6 +52,24 @@ TextureClientRecycleAllocator::SetMaxPoolSize(uint32_t aMax)
 {
   mMaxPooledSize = aMax;
 }
+
+class TextureClientRecycleTask : public Task
+{
+public:
+  explicit TextureClientRecycleTask(TextureClient* aClient, TextureFlags aFlags)
+    : mTextureClient(aClient)
+    , mFlags(aFlags)
+  {}
+
+  virtual void Run() override
+  {
+    mTextureClient->RecycleTexture(mFlags);
+  }
+
+private:
+  mozilla::RefPtr<TextureClient> mTextureClient;
+  TextureFlags mFlags;
+};
 
 already_AddRefed<TextureClient>
 TextureClientRecycleAllocator::CreateOrRecycle(gfx::SurfaceFormat aFormat,
@@ -74,17 +92,18 @@ TextureClientRecycleAllocator::CreateOrRecycle(gfx::SurfaceFormat aFormat,
     if (!mPooledClients.empty()) {
       textureHolder = mPooledClients.top();
       mPooledClients.pop();
+      Task* task = nullptr;
       // If a pooled TextureClient is not compatible, release it.
       if (textureHolder->GetTextureClient()->GetFormat() != aFormat ||
           textureHolder->GetTextureClient()->GetSize() != aSize) {
-        TextureClientReleaseTask* task = new TextureClientReleaseTask(textureHolder->GetTextureClient());
+        // Release TextureClient.
+        task = new TextureClientReleaseTask(textureHolder->GetTextureClient());
         textureHolder->ClearTextureClient();
         textureHolder = nullptr;
-        // Release TextureClient.
-        mSurfaceAllocator->GetMessageLoop()->PostTask(FROM_HERE, task);
       } else {
-        textureHolder->GetTextureClient()->RecycleTexture(aTextureFlags);
+        task = new TextureClientRecycleTask(textureHolder->GetTextureClient(), aTextureFlags);
       }
+      mSurfaceAllocator->GetMessageLoop()->PostTask(FROM_HERE, task);
     }
   }
 

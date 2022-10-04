@@ -824,7 +824,7 @@ Disassemble(JSContext* cx, JS::Handle<JSScript*> script, bool lines, Sprinter* s
 
 unsigned
 Disassemble1(JSContext* cx, JS::Handle<JSScript*> script, jsbytecode* pc, unsigned loc,
-                bool lines, Sprinter* sp);
+             bool lines, Sprinter* sp);
 
 #endif
 

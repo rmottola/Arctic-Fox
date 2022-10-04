@@ -7,7 +7,6 @@
 #include "gfxASurface.h"
 #include "gfxContext.h"
 #include "gfxPlatform.h"
-#include "gfxColor.h"
 #include "gfx2DGlue.h"
 #ifdef MOZ_X11
 #include "cairo.h"
@@ -35,7 +34,7 @@ gfxSurfaceDrawable::DrawWithSamplingRect(gfxContext* aContext,
                                          const gfxRect& aFillRect,
                                          const gfxRect& aSamplingRect,
                                          bool aRepeat,
-                                         const GraphicsFilter& aFilter,
+                                         const Filter& aFilter,
                                          gfxFloat aOpacity)
 {
   if (!mSourceSurface) {
@@ -61,7 +60,7 @@ bool
 gfxSurfaceDrawable::Draw(gfxContext* aContext,
                          const gfxRect& aFillRect,
                          bool aRepeat,
-                         const GraphicsFilter& aFilter,
+                         const Filter& aFilter,
                          gfxFloat aOpacity,
                          const gfxMatrix& aTransform)
 {
@@ -78,7 +77,7 @@ gfxSurfaceDrawable::DrawInternal(gfxContext* aContext,
                                  const gfxRect& aFillRect,
                                  const IntRect& aSamplingRect,
                                  bool aRepeat,
-                                 const GraphicsFilter& aFilter,
+                                 const Filter& aFilter,
                                  gfxFloat aOpacity,
                                  const gfxMatrix& aTransform)
 {
@@ -92,20 +91,19 @@ gfxSurfaceDrawable::DrawInternal(gfxContext* aContext,
     patternTransform.Invert();
 
     SurfacePattern pattern(mSourceSurface, extend,
-                           patternTransform, ToFilter(aFilter), aSamplingRect);
+                           patternTransform, aFilter, aSamplingRect);
 
     Rect fillRect = ToRect(aFillRect);
     DrawTarget* dt = aContext->GetDrawTarget();
 
-    if (aContext->CurrentOperator() == gfxContext::OPERATOR_SOURCE &&
+    if (aContext->CurrentOp() == CompositionOp::OP_SOURCE &&
         aOpacity == 1.0) {
         // Emulate cairo operator source which is bound by mask!
         dt->ClearRect(fillRect);
         dt->FillRect(fillRect, pattern);
     } else {
         dt->FillRect(fillRect, pattern,
-                     DrawOptions(aOpacity,
-                                 CompositionOpForOp(aContext->CurrentOperator()),
+                     DrawOptions(aOpacity, aContext->CurrentOp(),
                                  aContext->CurrentAntialiasMode()));
     }
 }
@@ -118,7 +116,7 @@ gfxCallbackDrawable::gfxCallbackDrawable(gfxDrawingCallback* aCallback,
 }
 
 already_AddRefed<gfxSurfaceDrawable>
-gfxCallbackDrawable::MakeSurfaceDrawable(const GraphicsFilter aFilter)
+gfxCallbackDrawable::MakeSurfaceDrawable(const Filter aFilter)
 {
     SurfaceFormat format =
         gfxPlatform::GetPlatform()->Optimal2DFormatForContent(gfxContentType::COLOR_ALPHA);
@@ -143,7 +141,7 @@ bool
 gfxCallbackDrawable::Draw(gfxContext* aContext,
                           const gfxRect& aFillRect,
                           bool aRepeat,
-                          const GraphicsFilter& aFilter,
+                          const Filter& aFilter,
                           gfxFloat aOpacity,
                           const gfxMatrix& aTransform)
 {
@@ -183,7 +181,7 @@ public:
 
     virtual bool operator()(gfxContext* aContext,
                               const gfxRect& aFillRect,
-                              const GraphicsFilter& aFilter,
+                              const Filter& aFilter,
                               const gfxMatrix& aTransform = gfxMatrix())
     {
         return mDrawable->Draw(aContext, aFillRect, false, aFilter, 1.0,
@@ -207,7 +205,7 @@ bool
 gfxPatternDrawable::Draw(gfxContext* aContext,
                          const gfxRect& aFillRect,
                          bool aRepeat,
-                         const GraphicsFilter& aFilter,
+                         const Filter& aFilter,
                          gfxFloat aOpacity,
                          const gfxMatrix& aTransform)
 {

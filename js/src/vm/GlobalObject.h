@@ -27,6 +27,8 @@ InitSharedArrayBufferClass(JSContext* cx, HandleObject obj);
 
 class Debugger;
 class TypedObjectModuleObject;
+class StaticBlockObject;
+class ClonedBlockObject;
 
 /*
  * Global object slots are reserved as follows:
@@ -91,6 +93,7 @@ class GlobalObject : public NativeObject
         FROM_BUFFER_UINT8CLAMPED,
 
         /* One-off properties stored after slots for built-ins. */
+        LEXICAL_SCOPE,
         ITERATOR_PROTO,
         ARRAY_ITERATOR_PROTO,
         STRING_ITERATOR_PROTO,
@@ -114,6 +117,7 @@ class GlobalObject : public NativeObject
         INT16X8_TYPE_DESCR,
         INT32X4_TYPE_DESCR,
         FOR_OF_PIC_CHAIN,
+        MODULE_RESOLVE_HOOK,
 
         /* Total reserved-slot count for global objects. */
         RESERVED_SLOTS
@@ -142,6 +146,8 @@ class GlobalObject : public NativeObject
 
 
   public:
+    ClonedBlockObject& lexicalScope() const;
+
     void setThrowTypeError(JSFunction* fun) {
         MOZ_ASSERT(getSlotRef(THROWTYPEERROR).isUndefined());
         setSlot(THROWTYPEERROR, ObjectValue(*fun));
@@ -533,8 +539,7 @@ class GlobalObject : public NativeObject
         return MaybeNativeObject(global->getOrCreateObject(cx, ITERATOR_PROTO, initIteratorProto));
     }
 
-    static NativeObject* getOrCreateArrayIteratorPrototype(JSContext* cx,
-                                                           Handle<GlobalObject*> global)
+    static NativeObject* getOrCreateArrayIteratorPrototype(JSContext* cx, Handle<GlobalObject*> global)
     {
         return MaybeNativeObject(global->getOrCreateObject(cx, ARRAY_ITERATOR_PROTO, initArrayIteratorProto));
     }
@@ -740,6 +745,19 @@ class GlobalObject : public NativeObject
         return &forOfPIC.toObject().as<NativeObject>();
     }
     static NativeObject* getOrCreateForOfPICObject(JSContext* cx, Handle<GlobalObject*> global);
+
+    void setModuleResolveHook(HandleFunction hook) {
+        MOZ_ASSERT(hook);
+        setSlot(MODULE_RESOLVE_HOOK, ObjectValue(*hook));
+    }
+
+    JSFunction* moduleResolveHook() {
+        Value value = getSlotRef(MODULE_RESOLVE_HOOK);
+        if (value.isUndefined())
+            return nullptr;
+
+        return &value.toObject().as<JSFunction>();
+    }
 
     // Returns either this global's star-generator function prototype, or null
     // if that object was never created.  Dodgy; for use only in also-dodgy

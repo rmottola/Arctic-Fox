@@ -6,7 +6,6 @@
 
 Components.utils.import("resource://gre/modules/Services.jsm");
 
-
 addEventListener("dialogaccept", function () {
   let pane = document.getElementById("sync-customize-pane");
   // First determine what the preference for the "global" sync enabled pref

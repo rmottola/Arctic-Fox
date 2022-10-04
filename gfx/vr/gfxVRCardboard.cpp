@@ -72,7 +72,7 @@ RemapMatrixForOrientation(ScreenOrientationInternal screenConfig, const Matrix4x
   return out;
 }
 
-}
+} // namespace
 
 HMDInfoCardboard::HMDInfoCardboard()
   : VRHMDInfo(VRHMDType::Cardboard)

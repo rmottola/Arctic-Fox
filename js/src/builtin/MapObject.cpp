@@ -106,7 +106,6 @@ namespace {
 
 const Class MapIteratorObject::class_ = {
     "Map Iterator",
-    JSCLASS_IMPLEMENTS_BARRIERS |
     JSCLASS_HAS_RESERVED_SLOTS(MapIteratorObject::SlotCount),
     nullptr, /* addProperty */
     nullptr, /* delProperty */
@@ -115,7 +114,6 @@ const Class MapIteratorObject::class_ = {
     nullptr, /* enumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
-    nullptr, /* convert */
     MapIteratorObject::finalize
 };
 
@@ -220,7 +218,7 @@ MapIteratorObject::next(JSContext* cx, Handle<MapIteratorObject*> mapIterator,
 
 const Class MapObject::class_ = {
     "Map",
-    JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS |
+    JSCLASS_HAS_PRIVATE | 
     JSCLASS_HAS_CACHED_PROTO(JSProto_Map),
     nullptr, // addProperty
     nullptr, // delProperty
@@ -229,7 +227,6 @@ const Class MapObject::class_ = {
     nullptr, // enumerate
     nullptr, // resolve
     nullptr, // mayResolve
-    nullptr, // convert
     finalize,
     nullptr, // call
     nullptr, // hasInstance
@@ -264,10 +261,9 @@ InitClass(JSContext* cx, Handle<GlobalObject*> global, const Class* clasp, JSPro
           const JSPropertySpec* properties, const JSFunctionSpec* methods,
           const JSPropertySpec* staticProperties)
 {
-    RootedNativeObject proto(cx, global->createBlankPrototype(cx, clasp));
+    RootedPlainObject proto(cx, NewBuiltinClassInstance<PlainObject>(cx));
     if (!proto)
         return nullptr;
-    proto->setPrivate(nullptr);
 
     Rooted<JSFunction*> ctor(cx, global->createConstructor(cx, construct, ClassName(key, cx), 0));
     if (!ctor ||
@@ -399,7 +395,7 @@ MapObject::set(JSContext* cx, HandleObject obj, HandleValue k, HandleValue v)
     if (!map)
         return false;
 
-    AutoHashableValueRooter key(cx);
+    Rooted<HashableValue> key(cx);
     if (!key.setValue(cx, k))
         return false;
 
@@ -408,7 +404,7 @@ MapObject::set(JSContext* cx, HandleObject obj, HandleValue k, HandleValue v)
         ReportOutOfMemory(cx);
         return false;
     }
-    WriteBarrierPost(cx->runtime(), map, key.get());
+    WriteBarrierPost(cx->runtime(), map, key.value());
     return true;
 }
 
@@ -467,7 +463,7 @@ MapObject::construct(JSContext* cx, unsigned argc, Value* vp)
             return false;
         RootedValue pairVal(cx);
         RootedObject pairObj(cx);
-        AutoHashableValueRooter hkey(cx);
+        Rooted<HashableValue> hkey(cx);
         ValueMap* map = obj->getData();
         while (true) {
             bool done;
@@ -535,7 +531,7 @@ MapObject::is(HandleObject o)
 }
 
 #define ARG0_KEY(cx, args, key)                                               \
-    AutoHashableValueRooter key(cx);                                          \
+    Rooted<HashableValue> key(cx);                                          \
     if (args.length() > 0 && !key.setValue(cx, args[0]))                      \
         return false
 
@@ -583,7 +579,7 @@ MapObject::get(JSContext* cx, HandleObject obj,
                HandleValue key, MutableHandleValue rval)
 {
     ValueMap& map = extract(obj);
-    AutoHashableValueRooter k(cx);
+    Rooted<HashableValue> k(cx);
 
     if (!k.setValue(cx, key))
         return false;
@@ -614,7 +610,7 @@ bool
 MapObject::has(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
 {
     ValueMap& map = extract(obj);
-    AutoHashableValueRooter k(cx);
+    Rooted<HashableValue> k(cx);
 
     if (!k.setValue(cx, key))
         return false;
@@ -654,7 +650,7 @@ MapObject::set_impl(JSContext* cx, const CallArgs& args)
         ReportOutOfMemory(cx);
         return false;
     }
-    WriteBarrierPost(cx->runtime(), &map, key.get());
+    WriteBarrierPost(cx->runtime(), &map, key.value());
     args.rval().set(args.thisv());
     return true;
 }
@@ -667,10 +663,10 @@ MapObject::set(JSContext* cx, unsigned argc, Value* vp)
 }
 
 bool
-MapObject::delete_(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+MapObject::delete_(JSContext *cx, HandleObject obj, HandleValue key, bool *rval)
 {
     ValueMap &map = extract(obj);
-    AutoHashableValueRooter k(cx);
+    Rooted<HashableValue> k(cx);
 
     if (!k.setValue(cx, key))
         return false;
@@ -683,7 +679,7 @@ MapObject::delete_(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
 }
 
 bool
-MapObject::delete_impl(JSContext* cx, const CallArgs& args)
+MapObject::delete_impl(JSContext *cx, const CallArgs& args)
 {
     // MapObject::mark does not mark deleted entries. Incremental GC therefore
     // requires that no RelocatableValue objects pointing to heap values be
@@ -829,7 +825,6 @@ class SetIteratorObject : public NativeObject
 
 const Class SetIteratorObject::class_ = {
     "Set Iterator",
-    JSCLASS_IMPLEMENTS_BARRIERS |
     JSCLASS_HAS_RESERVED_SLOTS(SetIteratorObject::SlotCount),
     nullptr, /* addProperty */
     nullptr, /* delProperty */
@@ -838,7 +833,6 @@ const Class SetIteratorObject::class_ = {
     nullptr, /* enumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
-    nullptr, /* convert */
     SetIteratorObject::finalize
 };
 
@@ -967,7 +961,7 @@ SetIteratorObject::next(JSContext* cx, unsigned argc, Value* vp)
 
 const Class SetObject::class_ = {
     "Set",
-    JSCLASS_HAS_PRIVATE | JSCLASS_IMPLEMENTS_BARRIERS |
+    JSCLASS_HAS_PRIVATE |
     JSCLASS_HAS_CACHED_PROTO(JSProto_Set),
     nullptr, // addProperty
     nullptr, // delProperty
@@ -976,7 +970,6 @@ const Class SetObject::class_ = {
     nullptr, // enumerate
     nullptr, // resolve
     nullptr, // mayResolve
-    nullptr, // convert
     finalize,
     nullptr, // call
     nullptr, // hasInstance
@@ -1052,7 +1045,7 @@ SetObject::add(JSContext* cx, HandleObject obj, HandleValue k)
     if (!set)
         return false;
 
-    AutoHashableValueRooter key(cx);
+    Rooted<HashableValue> key(cx);
     if (!key.setValue(cx, k))
         return false;
 
@@ -1060,7 +1053,7 @@ SetObject::add(JSContext* cx, HandleObject obj, HandleValue k)
         ReportOutOfMemory(cx);
         return false;
     }
-    WriteBarrierPost(cx->runtime(), set, key.get());
+    WriteBarrierPost(cx->runtime(), set, key.value());
     return true;
 }
 
@@ -1128,7 +1121,7 @@ SetObject::construct(JSContext* cx, unsigned argc, Value* vp)
         ForOfIterator iter(cx);
         if (!iter.init(args[0]))
             return false;
-        AutoHashableValueRooter key(cx);
+        Rooted<HashableValue> key(cx);
         ValueSet* set = obj->getData();
         while (true) {
             bool done;
@@ -1191,7 +1184,7 @@ SetObject::extract(CallReceiver call)
 }
 
 uint32_t
-SetObject::size(JSContext* cx, HandleObject obj)
+SetObject::size(JSContext *cx, HandleObject obj)
 {
     MOZ_ASSERT(SetObject::is(obj));
     ValueSet &set = extract(obj);
@@ -1231,12 +1224,12 @@ SetObject::has_impl(JSContext* cx, const CallArgs& args)
 }
 
 bool
-SetObject::has(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+SetObject::has(JSContext *cx, HandleObject obj, HandleValue key, bool *rval)
 {
     MOZ_ASSERT(SetObject::is(obj));
 
     ValueSet &set = extract(obj);
-    AutoHashableValueRooter k(cx);
+    Rooted<HashableValue> k(cx);
 
     if (!k.setValue(cx, key))
         return false;
@@ -1246,7 +1239,7 @@ SetObject::has(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
 }
 
 bool
-SetObject::has(JSContext* cx, unsigned argc, Value* vp)
+SetObject::has(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     return CallNonGenericMethod<SetObject::is, SetObject::has_impl>(cx, args);
@@ -1263,7 +1256,7 @@ SetObject::add_impl(JSContext* cx, const CallArgs& args)
         ReportOutOfMemory(cx);
         return false;
     }
-    WriteBarrierPost(cx->runtime(), &set, key.get());
+    WriteBarrierPost(cx->runtime(), &set, key.value());
     args.rval().set(args.thisv());
     return true;
 }
@@ -1276,12 +1269,12 @@ SetObject::add(JSContext* cx, unsigned argc, Value* vp)
 }
 
 bool
-SetObject::delete_(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+SetObject::delete_(JSContext *cx, HandleObject obj, HandleValue key, bool *rval)
 {
     MOZ_ASSERT(SetObject::is(obj));
 
     ValueSet &set = extract(obj);
-    AutoHashableValueRooter k(cx);
+    Rooted<HashableValue> k(cx);
 
     if (!k.setValue(cx, key))
         return false;
@@ -1294,7 +1287,7 @@ SetObject::delete_(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
 }
 
 bool
-SetObject::delete_impl(JSContext* cx, const CallArgs& args)
+SetObject::delete_impl(JSContext *cx, const CallArgs& args)
 {
     MOZ_ASSERT(is(args.thisv()));
 
@@ -1317,7 +1310,7 @@ SetObject::delete_(JSContext* cx, unsigned argc, Value* vp)
 }
 
 bool
-SetObject::iterator(JSContext* cx, IteratorKind kind,
+SetObject::iterator(JSContext *cx, IteratorKind kind,
                     HandleObject obj, MutableHandleValue iter)
 {
     MOZ_ASSERT(SetObject::is(obj));
@@ -1327,7 +1320,7 @@ SetObject::iterator(JSContext* cx, IteratorKind kind,
 }
 
 bool
-SetObject::iterator_impl(JSContext* cx, const CallArgs& args, IteratorKind kind)
+SetObject::iterator_impl(JSContext *cx, const CallArgs& args, IteratorKind kind)
 {
     Rooted<SetObject*> setobj(cx, &args.thisv().toObject().as<SetObject>());
     ValueSet& set = *setobj->getData();
@@ -1365,7 +1358,7 @@ SetObject::entries(JSContext* cx, unsigned argc, Value* vp)
 }
 
 bool
-SetObject::clear(JSContext* cx, HandleObject obj)
+SetObject::clear(JSContext *cx, HandleObject obj)
 {
     MOZ_ASSERT(SetObject::is(obj));
     ValueSet &set = extract(obj);
@@ -1377,7 +1370,7 @@ SetObject::clear(JSContext* cx, HandleObject obj)
 }
 
 bool
-SetObject::clear_impl(JSContext* cx, const CallArgs& args)
+SetObject::clear_impl(JSContext *cx, const CallArgs& args)
 {
     Rooted<SetObject*> setobj(cx, &args.thisv().toObject().as<SetObject>());
     if (!setobj->getData()->clear()) {
@@ -1416,7 +1409,7 @@ js::InitSelfHostingCollectionIteratorFunctions(JSContext* cx, HandleObject obj)
 
 static
 bool
-forEach(const char* funcName, JSContext* cx, HandleObject obj, HandleValue callbackFn, HandleValue thisArg)
+forEach(const char* funcName, JSContext *cx, HandleObject obj, HandleValue callbackFn, HandleValue thisArg)
 {
     CHECK_REQUEST(cx);
     RootedId forEachId(cx, NameToId(cx->names().forEach));
@@ -1453,8 +1446,8 @@ CallObjFunc(RetT(*ObjFunc)(JSContext*, HandleObject), JSContext* cx, HandleObjec
 
 // Handles Has/Delete for public jsapi map/set access
 bool
-CallObjFunc(bool(*ObjFunc)(JSContext* cx, HandleObject obj, HandleValue key, bool* rval),
-            JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+CallObjFunc(bool(*ObjFunc)(JSContext *cx, HandleObject obj, HandleValue key, bool *rval),
+            JSContext *cx, HandleObject obj, HandleValue key, bool *rval)
 {
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, key);
@@ -1479,7 +1472,7 @@ template<typename Iter>
 bool
 CallObjFunc(bool(*ObjFunc)(JSContext* cx, Iter kind,
                            HandleObject obj, MutableHandleValue iter),
-            JSContext* cx, Iter iterType, HandleObject obj, MutableHandleValue rval)
+            JSContext *cx, Iter iterType, HandleObject obj, MutableHandleValue rval)
 {
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj);
@@ -1550,7 +1543,7 @@ JS::MapGet(JSContext* cx, HandleObject obj, HandleValue key, MutableHandleValue 
 }
 
 JS_PUBLIC_API(bool)
-JS::MapSet(JSContext* cx, HandleObject obj, HandleValue key, HandleValue val)
+JS::MapSet(JSContext *cx, HandleObject obj, HandleValue key, HandleValue val)
 {
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, key, val);
@@ -1583,7 +1576,7 @@ JS::MapHas(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
 }
 
 JS_PUBLIC_API(bool)
-JS::MapDelete(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+JS::MapDelete(JSContext *cx, HandleObject obj, HandleValue key, bool* rval)
 {
     return CallObjFunc(MapObject::delete_, cx, obj, key, rval);
 }
@@ -1613,25 +1606,25 @@ JS::MapEntries(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 }
 
 JS_PUBLIC_API(bool)
-JS::MapForEach(JSContext* cx, HandleObject obj, HandleValue callbackFn, HandleValue thisVal)
+JS::MapForEach(JSContext *cx, HandleObject obj, HandleValue callbackFn, HandleValue thisVal)
 {
     return forEach("MapForEach", cx, obj, callbackFn, thisVal);
 }
 
-JS_PUBLIC_API(JSObject*)
-JS::NewSetObject(JSContext* cx)
+JS_PUBLIC_API(JSObject *)
+JS::NewSetObject(JSContext *cx)
 {
     return SetObject::create(cx);
 }
 
 JS_PUBLIC_API(uint32_t)
-JS::SetSize(JSContext* cx, HandleObject obj)
+JS::SetSize(JSContext *cx, HandleObject obj)
 {
     return CallObjFunc<uint32_t>(&SetObject::size, cx, obj);
 }
 
 JS_PUBLIC_API(bool)
-JS::SetAdd(JSContext* cx, HandleObject obj, HandleValue key)
+JS::SetAdd(JSContext *cx, HandleObject obj, HandleValue key)
 {
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, key);
@@ -1660,7 +1653,7 @@ JS::SetHas(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
 }
 
 JS_PUBLIC_API(bool)
-JS::SetDelete(JSContext* cx, HandleObject obj, HandleValue key, bool* rval)
+JS::SetDelete(JSContext *cx, HandleObject obj, HandleValue key, bool *rval)
 {
     return CallObjFunc(SetObject::delete_, cx, obj, key, rval);
 }
@@ -1690,7 +1683,7 @@ JS::SetEntries(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 }
 
 JS_PUBLIC_API(bool)
-JS::SetForEach(JSContext* cx, HandleObject obj, HandleValue callbackFn, HandleValue thisVal)
+JS::SetForEach(JSContext *cx, HandleObject obj, HandleValue callbackFn, HandleValue thisVal)
 {
     return forEach("SetForEach", cx, obj, callbackFn, thisVal);
 }

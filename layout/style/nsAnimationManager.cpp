@@ -469,9 +469,6 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
           oldEffect->Properties() = newEffect->Properties();
         }
 
-        // Reset compositor state so animation will be re-synchronized.
-        oldAnim->ClearIsRunningOnCompositor();
-
         // Handle changes in play state. If the animation is idle, however,
         // changes to animation-play-state should *not* restart it.
         if (oldAnim->PlayState() != AnimationPlayState::Idle) {
@@ -544,6 +541,22 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
   }
 
   return GetAnimationRule(aElement, aStyleContext->GetPseudoType());
+}
+
+void
+nsAnimationManager::StopAnimationsForElement(
+  mozilla::dom::Element* aElement,
+  nsCSSPseudoElements::Type aPseudoType)
+{
+  MOZ_ASSERT(aElement);
+  AnimationCollection* collection =
+    GetAnimations(aElement, aPseudoType, false);
+  if (!collection) {
+    return;
+  }
+
+  nsAutoAnimationMutationBatch mb(aElement->OwnerDoc());
+  collection->Destroy();
 }
 
 struct KeyframeData {

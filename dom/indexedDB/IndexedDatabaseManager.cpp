@@ -31,6 +31,8 @@
 #include "nsThreadUtils.h"
 #include "mozilla/Logging.h"
 
+#include "FileInfo.h"
+#include "FileManager.h"
 #include "IDBEvents.h"
 #include "IDBFactory.h"
 #include "IDBKeyRange.h"
@@ -51,6 +53,11 @@
 #include "mozilla/dom/IDBRequestBinding.h"
 #include "mozilla/dom/IDBTransactionBinding.h"
 #include "mozilla/dom/IDBVersionChangeEventBinding.h"
+
+#ifdef ENABLE_INTL_API
+#include "nsCharSeparatedTokenizer.h"
+#include "unicode/locid.h"
+#endif
 
 #define IDB_STR "indexedDB"
 
@@ -121,6 +128,7 @@ const uint32_t kDeleteTimeoutMs = 1000;
 
 const char kTestingPref[] = IDB_PREF_BRANCH_ROOT "testing";
 const char kPrefExperimental[] = IDB_PREF_BRANCH_ROOT "experimental";
+const char kPrefFileHandle[] = "dom.fileHandle.enabled";
 
 #define IDB_PREF_LOGGING_BRANCH_ROOT IDB_PREF_BRANCH_ROOT "logging."
 
@@ -141,6 +149,7 @@ Atomic<bool> gInitialized(false);
 Atomic<bool> gClosed(false);
 Atomic<bool> gTestingMode(false);
 Atomic<bool> gExperimentalFeaturesEnabled(false);
+Atomic<bool> gFileHandleEnabled(false);
 
 class DeleteFilesRunnable final
   : public nsIRunnable
@@ -376,6 +385,9 @@ IndexedDatabaseManager::Init()
   Preferences::RegisterCallbackAndCall(AtomicBoolPrefChangedCallback,
                                        kPrefExperimental,
                                        &gExperimentalFeaturesEnabled);
+  Preferences::RegisterCallbackAndCall(AtomicBoolPrefChangedCallback,
+                                       kPrefFileHandle,
+                                       &gFileHandleEnabled);
 
   // By default IndexedDB uses SQLite with PRAGMA synchronous = NORMAL. This
   // guarantees (unlike synchronous = OFF) atomicity and consistency, but not
@@ -393,6 +405,27 @@ IndexedDatabaseManager::Init()
 #endif
   Preferences::RegisterCallbackAndCall(LoggingModePrefChangedCallback,
                                        kPrefLoggingEnabled);
+
+#ifdef ENABLE_INTL_API
+  const nsAdoptingCString& acceptLang =
+    Preferences::GetLocalizedCString("intl.accept_languages");
+
+  // Split values on commas.
+  nsCCharSeparatedTokenizer langTokenizer(acceptLang, ',');
+  while (langTokenizer.hasMoreTokens()) {
+    nsAutoCString lang(langTokenizer.nextToken());
+    icu::Locale locale = icu::Locale::createCanonical(lang.get());
+    if (!locale.isBogus()) {
+      // icu::Locale::getBaseName is always ASCII as per BCP 47
+      mLocale.AssignASCII(locale.getBaseName());
+      break;
+    }
+  }
+
+  if (mLocale.IsEmpty()) {
+    mLocale.AssignLiteral("en-US");
+  }
+#endif
 
   return NS_OK;
 }
@@ -420,6 +453,9 @@ IndexedDatabaseManager::Destroy()
   Preferences::UnregisterCallback(AtomicBoolPrefChangedCallback,
                                   kPrefExperimental,
                                   &gExperimentalFeaturesEnabled);
+  Preferences::UnregisterCallback(AtomicBoolPrefChangedCallback,
+                                  kPrefFileHandle,
+                                  &gFileHandleEnabled);
 
   Preferences::UnregisterCallback(LoggingModePrefChangedCallback,
                                   kPrefLoggingDetails);
@@ -597,6 +633,7 @@ IndexedDatabaseManager::DefineIndexedDB(JSContext* aCx,
       !IDBFactoryBinding::GetConstructorObject(aCx, aGlobal) ||
       !IDBIndexBinding::GetConstructorObject(aCx, aGlobal) ||
       !IDBKeyRangeBinding::GetConstructorObject(aCx, aGlobal) ||
+      !IDBLocaleAwareKeyRangeBinding::GetConstructorObject(aCx, aGlobal) ||
       !IDBMutableFileBinding::GetConstructorObject(aCx, aGlobal) ||
       !IDBObjectStoreBinding::GetConstructorObject(aCx, aGlobal) ||
       !IDBOpenDBRequestBinding::GetConstructorObject(aCx, aGlobal) ||
@@ -715,6 +752,17 @@ IndexedDatabaseManager::ExperimentalFeaturesEnabled()
   return gExperimentalFeaturesEnabled;
 }
 
+// static
+bool
+IndexedDatabaseManager::IsFileHandleEnabled()
+{
+  MOZ_ASSERT(gDBManager,
+             "IsFileHandleEnabled() called before indexedDB has been "
+             "initialized!");
+
+  return gFileHandleEnabled;
+}
+
 already_AddRefed<FileManager>
 IndexedDatabaseManager::GetFileManager(PersistenceType aPersistenceType,
                                        const nsACString& aOrigin,
@@ -753,24 +801,13 @@ IndexedDatabaseManager::InvalidateAllFileManagers()
 {
   AssertIsOnIOThread();
 
-  class MOZ_STACK_CLASS Helper final
-  {
-  public:
-    static PLDHashOperator
-    Enumerate(const nsACString& aKey,
-              FileManagerInfo* aValue,
-              void* aUserArg)
-    {
-      AssertIsOnIOThread();
-      MOZ_ASSERT(!aKey.IsEmpty());
-      MOZ_ASSERT(aValue);
+  for (auto iter = mFileManagerInfos.ConstIter(); !iter.Done(); iter.Next()) {
+    auto value = iter.Data();
+    MOZ_ASSERT(value);
 
-      aValue->InvalidateAllFileManagers();
-      return PL_DHASH_NEXT;
-    }
-  };
+    value->InvalidateAllFileManagers();
+  }
 
-  mFileManagerInfos.EnumerateRead(Helper::Enumerate, nullptr);
   mFileManagerInfos.Clear();
 }
 
@@ -964,6 +1001,18 @@ IndexedDatabaseManager::LoggingModePrefChangedCallback(
   }
 }
 
+#ifdef ENABLE_INTL_API
+// static
+const nsCString&
+IndexedDatabaseManager::GetLocale()
+{
+  IndexedDatabaseManager* idbManager = Get();
+  MOZ_ASSERT(idbManager, "IDBManager is not ready!");
+
+  return idbManager->mLocale;
+}
+#endif
+
 NS_IMPL_ADDREF(IndexedDatabaseManager)
 NS_IMPL_RELEASE_WITH_DESTROY(IndexedDatabaseManager, Destroy())
 NS_IMPL_QUERY_INTERFACE(IndexedDatabaseManager, nsIObserver, nsITimerCallback)
@@ -1003,29 +1052,19 @@ IndexedDatabaseManager::Notify(nsITimer* aTimer)
   MOZ_ASSERT(IsMainProcess());
   MOZ_ASSERT(NS_IsMainThread());
 
-  class MOZ_STACK_CLASS Helper final
-  {
-  public:
-    static PLDHashOperator
-    CreateAndDispatchRunnables(FileManager* aFileManager,
-                               nsTArray<int64_t>* aValue,
-                               void* aClosure)
-    {
-      MOZ_ASSERT(!aValue->IsEmpty());
+  for (auto iter = mPendingDeleteInfos.ConstIter(); !iter.Done(); iter.Next()) {
+    auto key = iter.Key();
+    auto value = iter.Data();
+    MOZ_ASSERT(!value->IsEmpty());
 
-      nsRefPtr<DeleteFilesRunnable> runnable =
-        new DeleteFilesRunnable(aFileManager, *aValue);
+    nsRefPtr<DeleteFilesRunnable> runnable =
+      new DeleteFilesRunnable(key, *value);
 
-      MOZ_ASSERT(aValue->IsEmpty());
+    MOZ_ASSERT(value->IsEmpty());
 
-      MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(runnable)));
+    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(runnable)));
+  }
 
-      return PL_DHASH_NEXT;
-    }
-  };
-
-  mPendingDeleteInfos.EnumerateRead(Helper::CreateAndDispatchRunnables,
-                                    nullptr);
   mPendingDeleteInfos.Clear();
 
   return NS_OK;

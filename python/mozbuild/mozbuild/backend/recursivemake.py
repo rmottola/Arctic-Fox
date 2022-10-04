@@ -26,6 +26,10 @@ import mozpack.path as mozpath
 
 from .common import CommonBackend
 from ..frontend.data import (
+    AndroidAssetsDirs,
+    AndroidResDirs,
+    AndroidExtraResDirs,
+    AndroidExtraPackages,
     AndroidEclipseProjectData,
     BrandingFiles,
     ConfigFileSubstitution,
@@ -71,6 +75,11 @@ from ..util import (
 from ..makeutil import Makefile
 
 MOZBUILD_VARIABLES = [
+    b'ANDROID_APK_NAME',
+    b'ANDROID_APK_PACKAGE',
+    b'ANDROID_ASSETS_DIRS',
+    b'ANDROID_EXTRA_PACKAGES',
+    b'ANDROID_EXTRA_RES_DIRS',
     b'ANDROID_GENERATED_RESFILES',
     b'ANDROID_RES_DIRS',
     b'ASFLAGS',
@@ -367,26 +376,8 @@ class RecursiveMakeBackend(CommonBackend):
         self._backend_files = {}
         self._idl_dirs = set()
 
-        def detailed(summary):
-            s = '{:d} total backend files; ' \
-                '{:d} created; {:d} updated; {:d} unchanged; ' \
-                '{:d} deleted; {:d} -> {:d} Makefile'.format(
-                summary.created_count + summary.updated_count +
-                summary.unchanged_count,
-                summary.created_count,
-                summary.updated_count,
-                summary.unchanged_count,
-                summary.deleted_count,
-                summary.makefile_in_count,
-                summary.makefile_out_count)
-
-            return s
-
-        # This is a little kludgy and could be improved with a better API.
-        self.summary.backend_detailed_summary = types.MethodType(detailed,
-            self.summary)
-        self.summary.makefile_in_count = 0
-        self.summary.makefile_out_count = 0
+        self._makefile_in_count = 0
+        self._makefile_out_count = 0
 
         self._test_manifests = {}
 
@@ -419,6 +410,13 @@ class RecursiveMakeBackend(CommonBackend):
             'tools': set(),
         }
 
+    def summary(self):
+        summary = super(RecursiveMakeBackend, self).summary()
+        summary.extend('; {makefile_in:d} -> {makefile_out:d} Makefile',
+                       makefile_in=self._makefile_in_count,
+                       makefile_out=self._makefile_out_count)
+        return summary
+
     def _get_backend_file_for(self, obj):
         if obj.objdir not in self._backend_files:
             self._backend_files[obj.objdir] = \
@@ -430,11 +428,11 @@ class RecursiveMakeBackend(CommonBackend):
         """Write out build files necessary to build with recursive make."""
 
         if not isinstance(obj, ContextDerived):
-            return
+            return False
 
         backend_file = self._get_backend_file_for(obj)
 
-        CommonBackend.consume_object(self, obj)
+        consumed = CommonBackend.consume_object(self, obj)
 
         # CommonBackend handles XPIDLFile and TestManifest, but we want to do
         # some extra things for them.
@@ -447,8 +445,8 @@ class RecursiveMakeBackend(CommonBackend):
             self._process_test_manifest(obj, backend_file)
 
         # If CommonBackend acknowledged the object, we're done with it.
-        if obj._ack:
-            return
+        if consumed:
+            return True
 
         if isinstance(obj, DirectoryTraversal):
             self._process_directory_traversal(obj, backend_file)
@@ -526,7 +524,7 @@ class RecursiveMakeBackend(CommonBackend):
 
         elif isinstance(obj, Resources):
             self._process_resources(obj, obj.resources, backend_file)
-        
+
         elif isinstance(obj, BrandingFiles):
             self._process_branding_files(obj, obj.files, backend_file)
 
@@ -581,7 +579,7 @@ class RecursiveMakeBackend(CommonBackend):
             elif isinstance(obj.wrapped, AndroidEclipseProjectData):
                 self._process_android_eclipse_project_data(obj.wrapped, backend_file)
             else:
-                return
+                return False
 
         elif isinstance(obj, SharedLibrary):
             self._process_shared_library(obj, backend_file)
@@ -606,9 +604,26 @@ class RecursiveMakeBackend(CommonBackend):
             for f in obj.files:
                 backend_file.write('DIST_FILES += %s\n' % f)
 
+        elif isinstance(obj, AndroidResDirs):
+            for p in obj.paths:
+                backend_file.write('ANDROID_RES_DIRS += %s\n' % p.full_path)
+
+        elif isinstance(obj, AndroidAssetsDirs):
+            for p in obj.paths:
+                backend_file.write('ANDROID_ASSETS_DIRS += %s\n' % p.full_path)
+
+        elif isinstance(obj, AndroidExtraResDirs):
+            for p in obj.paths:
+                backend_file.write('ANDROID_EXTRA_RES_DIRS += %s\n' % p.full_path)
+
+        elif isinstance(obj, AndroidExtraPackages):
+            for p in obj.packages:
+                backend_file.write('ANDROID_EXTRA_PACKAGES += %s\n' % p)
+
         else:
-            return
-        obj.ack()
+            return False
+
+        return True
 
     def _fill_root_mk(self):
         """
@@ -780,7 +795,7 @@ class RecursiveMakeBackend(CommonBackend):
                 if not stub:
                     self.log(logging.DEBUG, 'substitute_makefile',
                         {'path': makefile}, 'Substituting makefile: {path}')
-                    self.summary.makefile_in_count += 1
+                    self._makefile_in_count += 1
 
                     for tier, skiplist in self._may_skip.items():
                         if bf.relobjdir in skiplist:
@@ -1078,6 +1093,7 @@ INSTALL_TARGETS += %(prefix)s
         modules = manager.modules
         xpt_modules = sorted(modules.keys())
         xpt_files = set()
+        registered_xpt_files = set()
 
         mk = Makefile()
 
@@ -1109,15 +1125,16 @@ INSTALL_TARGETS += %(prefix)s
         rules = StringIO()
         mk.dump(rules, removal_guard=False)
 
-        # Write out manifests defining interfaces
+        interfaces_manifests = []
         dist_dir = mozpath.join(self.environment.topobjdir, 'dist')
         for manifest, entries in manager.interface_manifests.items():
-            path = mozpath.join(self.environment.topobjdir, manifest)
-            with self._write_file(path) as fh:
-                for xpt in sorted(entries):
-                    fh.write('interfaces %s\n' % xpt)
+            interfaces_manifests.append(mozpath.join('$(DEPTH)', manifest))
+            for xpt in sorted(entries):
+                registered_xpt_files.add(mozpath.join(
+                    '$(DEPTH)', mozpath.dirname(manifest), xpt))
 
             if install_target.startswith('dist/'):
+                path = mozpath.join(self.environment.topobjdir, manifest)
                 path = mozpath.relpath(path, dist_dir)
                 prefix, subpath = path.split('/', 1)
                 key = 'dist_%s' % prefix
@@ -1140,9 +1157,11 @@ INSTALL_TARGETS += %(prefix)s
         obj.config = self.environment
         self._create_makefile(obj, extra=dict(
             chrome_manifests = ' '.join(chrome_manifests),
+            interfaces_manifests = ' '.join(interfaces_manifests),
             xpidl_rules=rules.getvalue(),
             xpidl_modules=' '.join(xpt_modules),
-            xpt_files=' '.join(sorted(xpt_files)),
+            xpt_files=' '.join(sorted(xpt_files - registered_xpt_files)),
+            registered_xpt_files=' '.join(sorted(registered_xpt_files)),
         ))
 
     def _process_program(self, program, backend_file):
@@ -1425,7 +1444,7 @@ INSTALL_TARGETS += %(prefix)s
             # the autogenerated one automatically.
             self.backend_input_files.add(obj.input_path)
 
-        self.summary.makefile_out_count += 1
+        self._makefile_out_count += 1
 
     def _handle_ipdl_sources(self, ipdl_dir, sorted_ipdl_sources,
                              unified_ipdl_cppsrcs_mapping):

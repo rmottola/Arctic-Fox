@@ -12,9 +12,7 @@
 <?xml-stylesheet href="chrome://browser/content/browser-title.css" type="text/css"?>
 
 <?xml-stylesheet href="chrome://browser/content/places/places.css" type="text/css"?>
-#ifdef MOZ_DEVTOOLS
-<?xml-stylesheet href="chrome://global/skin/devtools/common.css" type="text/css"?>
-#endif
+<?xml-stylesheet href="chrome://devtools/skin/themes/common.css" type="text/css"?>
 <?xml-stylesheet href="chrome://browser/skin/controlcenter/panel.css" type="text/css"?>
 <?xml-stylesheet href="chrome://browser/skin/" type="text/css"?>
 
@@ -83,6 +81,7 @@
                onpopuphidden="if (event.target == this) TabContextMenu.contextTab = null;">
       <menuitem id="context_reloadTab" label="&reloadTab.label;" accesskey="&reloadTab.accesskey;"
                 oncommand="gBrowser.reloadTab(TabContextMenu.contextTab);"/>
+      <menuitem id="context_toggleMuteTab" oncommand="TabContextMenu.contextTab.toggleMuteAudio();"/>
       <menuseparator/>
       <menuitem id="context_pinTab" label="&pinTab.label;"
                 accesskey="&pinTab.accesskey;"
@@ -139,7 +138,11 @@
          work correctly on the menupopup. ContentSelectDropdown expects the
          popuponly menulist to be its immediate parent. -->
     <menulist popuponly="true" id="ContentSelectDropdown" hidden="true">
-      <menupopup rolluponmousewheel="true"/>
+      <menupopup rolluponmousewheel="true"
+#ifdef XP_WIN
+                 consumeoutsideclicks="false" ignorekeys="handled"
+#endif
+        />
     </menulist>
 
     <!-- for invalid form error message -->
@@ -329,13 +332,26 @@
     </hbox>
 #endif
     <spacer id="titlebar-spacer" flex="1"/>
-    <hbox id="titlebar-buttonbox-container" align="start">
+    <hbox id="titlebar-buttonbox-container">
+#ifdef XP_WIN
+      <hbox id="private-browsing-indicator-titlebar">
+        <hbox class="private-browsing-indicator"/>
+      </hbox>
+#endif
       <hbox id="titlebar-buttonbox">
         <toolbarbutton class="titlebar-button" id="titlebar-min" oncommand="window.minimize();"/>
         <toolbarbutton class="titlebar-button" id="titlebar-max" oncommand="onTitlebarMaxClick();"/>
         <toolbarbutton class="titlebar-button" id="titlebar-close" command="cmd_closeWindow"/>
       </hbox>
     </hbox>
+#ifdef XP_MACOSX
+    <!-- OS X does not natively support RTL for its titlebar items, so we prevent this secondary
+         buttonbox from reversing order in RTL by forcing an LTR direction. -->
+    <hbox id="titlebar-secondary-buttonbox" dir="ltr">
+      <hbox class="private-browsing-indicator"/>
+      <hbox id="titlebar-fullscreen-button"/>
+    </hbox>
+#endif
   </hbox>
 </vbox>
 #endif
@@ -354,6 +370,9 @@
 #ifdef MENUBAR_CAN_AUTOHIDE
              toolbarname="&menubarCmd.label;"
              accesskey="&menubarCmd.accesskey;"
+#if defined(MOZ_WIDGET_GTK) || defined(MOZ_WIDGET_QT)
+             autohide="true"
+#endif
 #endif
              context="toolbar-context-menu">
       <toolbaritem id="menubar-items" align="center">
@@ -442,7 +461,6 @@
           <box id="notification-popup-box" hidden="true" align="center">
             <image id="default-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="geo-notification-icon" class="notification-anchor-icon" role="button"/>
-            <image id="push-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="addons-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="indexedDB-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="login-fill-notification-icon" class="notification-anchor-icon" role="button"/>
@@ -548,10 +566,13 @@
                      ondragover="PlacesMenuDNDHandler.onDragOver(event);"
                      ondragleave="PlacesMenuDNDHandler.onDragLeave(event);"
                      ondrop="PlacesMenuDNDHandler.onDrop(event);">
+        <observes element="bookmarkThisPageBroadcaster" attribute="starred"/>
+        <observes element="bookmarkThisPageBroadcaster" attribute="buttontooltiptext"/>
         <menupopup id="BMB_bookmarksPopup"
                    placespopup="true"
                    context="placesContext"
                    openInTabs="children"
+                   anonanchorclass="toolbarbutton-menubutton-dropmarker"
                    oncommand="BookmarksEventHandler.onCommand(event, this.parentNode._placesView);"
                    onclick="event.stopPropagation();
                             BookmarksEventHandler.onClick(event, this.parentNode._placesView);"
@@ -695,6 +716,11 @@
                        oncommand="window.minimize();"/>
 
         <toolbarbutton id="restore-button"
+#ifdef XP_MACOSX
+# Prior to 10.7 there wasn't a native fullscreen button so we use #restore-button
+# to exit fullscreen and want it to behave like other toolbar buttons.
+                       class="toolbarbutton-1"
+#endif
                        tooltiptext="&fullScreenRestore.tooltip;"
                        oncommand="BrowserFullScreen();"/>
 
@@ -971,23 +997,30 @@
                   autocompletepopup="PopupAutoComplete"
                   selectmenulist="ContentSelectDropdown"/>
       <chatbar id="pinnedchats" layer="true" mousethrough="always" hidden="true"/>
-      <statuspanel id="statusbar-display" inactive="true"/>
     </vbox>
     <vbox id="browser-border-end" hidden="true" layer="true"/>
   </hbox>
 
-  <hbox id="full-screen-warning-container" hidden="true" fadeout="true">
-    <hbox style="width: 100%;" pack="center"> <!-- Inner hbox needed due to bug 579776. -->
-      <vbox id="full-screen-warning-message" align="center">
-        <description id="full-screen-domain-text"/>
-        <description class="full-screen-description" value="&fullscreenExitHint.value;"/>
-      </vbox>
-    </hbox>
+  <hbox id="fullscreen-warning" hidden="true">
+    <description id="fullscreen-domain-text">
+      &fullscreenWarning.beforeDomain.label;
+      <label id="fullscreen-domain"/>
+      &fullscreenWarning.afterDomain.label;
+    </description>
+    <description id="fullscreen-generic-text">
+      &fullscreenWarning.generic.label;
+    </description>
+    <button id="fullscreen-exit-button"
+#ifdef XP_MACOSX
+            label="&exitDOMFullscreenMac.button;"
+#else
+            label="&exitDOMFullscreen.button;"
+#endif
+            oncommand="FullScreen.exitDomFullScreen();"/>
   </hbox>
 
   <vbox id="browser-bottombox" layer="true">
     <notificationbox id="global-notificationbox"/>
-#ifdef MOZ_DEVTOOLS
     <toolbar id="developer-toolbar"
              class="devtools-toolbar"
              hidden="true">
@@ -1012,8 +1045,6 @@
                          tooltiptext="&devToolbarCloseButton.tooltiptext;"/>
 #endif
    </toolbar>
-#endif
-
   </vbox>
 
 #ifndef XP_UNIX

@@ -3,8 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // How to run this file:
-// 1. [obtain Pale Moon source code]
-// 2. [build/obtain Pale Moon binaries]
+// 1. [obtain Arctic Fox source code]
+// 2. [build/obtain Arcitc Fox binaries]
 // 3. run `[path to]/run-mozilla.sh [path to]/xpcshell \
 //                                  [path to]/getHSTSPreloadlist.js \
 //                                  [absolute path to]/nsSTSPreloadlist.inc'
@@ -17,13 +17,13 @@ const Cu = Components.utils;
 const Cr = Components.results;
 
 // Register resource://app/ URI
-let ios = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
-let resHandler = ios.getProtocolHandler("resource")
+var ios = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
+var resHandler = ios.getProtocolHandler("resource")
                  .QueryInterface(Ci.nsIResProtocolHandler);
-let mozDir = Cc["@mozilla.org/file/directory_service;1"]
+var mozDir = Cc["@mozilla.org/file/directory_service;1"]
              .getService(Ci.nsIProperties)
              .get("CurProcD", Ci.nsILocalFile);
-let mozDirURI = ios.newFileURI(mozDir);
+var mozDirURI = ios.newFileURI(mozDir);
 resHandler.setSubstitution("app", mozDirURI);
 
 Cu.import("resource://gre/modules/Services.jsm");

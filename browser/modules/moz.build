@@ -17,6 +17,7 @@ EXTRA_JS_MODULES += [
     'ContentLinkHandler.jsm',
     'ContentSearch.jsm',
     'ContentWebRTC.jsm',
+    'DirectoryLinksProvider.jsm',
     'E10SUtils.jsm',
     'Feeds.jsm',
     'FormSubmitObserver.jsm',
@@ -26,7 +27,7 @@ EXTRA_JS_MODULES += [
     'openLocationLastURL.jsm',
     'PageMenu.jsm',
     'PluginContent.jsm',
-    'PopupNotifications.jsm',
+    'ProcessHangMonitor.jsm',
     'QuotaManager.jsm',
     'ReaderParent.jsm',
     'RecentWindow.jsm',
@@ -34,6 +35,7 @@ EXTRA_JS_MODULES += [
     'SharedFrame.jsm',
     'SitePermissions.jsm',
     'TabCrashReporter.jsm',
+    'webrtcUI.jsm',
 ]
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
@@ -42,10 +44,6 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
         'WindowsJumpLists.jsm',
         'WindowsPreviewPerTab.jsm',
     ]
-
-EXTRA_PP_JS_MODULES += [
-    'webrtcUI.jsm',
-]
 
 if CONFIG['MOZILLA_OFFICIAL']:
     DEFINES['MOZILLA_OFFICIAL'] = 1

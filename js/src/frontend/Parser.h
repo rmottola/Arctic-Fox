@@ -22,6 +22,7 @@
 
 namespace js {
 
+class ModuleObject;
 class StaticFunctionBoxScopeObject;
 
 namespace frontend {
@@ -194,25 +195,39 @@ struct MOZ_STACK_CLASS ParseContext : public GenericParseContext
     void prepareToAddDuplicateArg(HandlePropertyName name, DefinitionNode prevDecl);
 
     /* See the sad story in MakeDefIntoUse. */
-    void updateDecl(JSAtom* atom, Node newDecl);
+    void updateDecl(TokenStream& ts, JSAtom* atom, Node newDecl);
 
     /*
-     * After a function body has been parsed, the parser generates the
-     * function's "bindings". Bindings are a data-structure, ultimately stored
-     * in the compiled JSScript, that serve three purposes:
+     * After a function body or module has been parsed, the parser generates the
+     * code's "bindings". Bindings are a data-structure, ultimately stored in
+     * the compiled JSScript, that serve three purposes:
      *  - After parsing, the ParseContext is destroyed and 'decls' along with
      *    it. Mostly, the emitter just uses the binding information stored in
      *    the use/def nodes, but the emitter occasionally needs 'bindings' for
      *    various scope-related queries.
      *  - Bindings provide the initial js::Shape to use when creating a dynamic
-     *    scope object (js::CallObject) for the function. This shape is used
-     *    during dynamic name lookup.
+     *    scope object (js::CallObject). This shape is used during dynamic name
+     *    lookup.
      *  - Sometimes a script's bindings are accessed at runtime to retrieve the
      *    contents of the lexical scope (e.g., from the debugger).
      */
-    bool generateFunctionBindings(ExclusiveContext* cx, TokenStream& ts,
-                                  LifoAlloc& alloc,
-                                  InternalHandle<Bindings*> bindings) const;
+    bool generateBindings(ExclusiveContext* cx, TokenStream& ts, LifoAlloc& alloc,
+                          MutableHandle<Bindings> bindings) const;
+
+    // All global names in global scripts are added to the scope dynamically
+    // via JSOP_DEF{FUN,VAR,LET,CONST}, but ES6 15.1.8 specifies that if there
+    // are name conflicts in the script, *no* bindings from the script are
+    // instantiated. So, record the vars and lexical bindings to check for
+    // redeclarations in the prologue.
+    //
+    // Eval scripts do not need this mechanism as they always have a
+    // non-extensible lexical scope.
+    //
+    // Global and eval scripts may have block-scoped locals, however, which
+    // are allocated to the fixed part of the stack frame.
+    bool drainGlobalOrEvalBindings(ExclusiveContext* cx,
+                                   MutableHandle<TraceableVector<Binding>> vars,
+                                   MutableHandle<TraceableVector<Binding>> lexicals);
 
   private:
     ParseContext**  parserPC;     /* this points to the Parser's active pc
@@ -300,8 +315,34 @@ struct MOZ_STACK_CLASS ParseContext : public GenericParseContext
     //   function f1() { function f2() { } }
     //   if (cond) { function f3() { if (cond) { function f4() { } } } }
     //
-    bool atBodyLevel() { return !innermostStmt(); }
-    bool atGlobalLevel() { return atBodyLevel() && !sc->isFunctionBox() && !innermostScopeStmt(); }
+    bool atBodyLevel() {
+        // 'eval' and non-syntactic scripts are always under an invisible
+        // lexical scope, but since it is not syntactic, it should still be
+        // considered at body level.
+        if (sc->staticScope()->is<StaticEvalObject>()) {
+            bool bl = !innermostStmt()->enclosing;
+            MOZ_ASSERT_IF(bl, innermostStmt()->type == StmtType::BLOCK);
+            MOZ_ASSERT_IF(bl, innermostStmt()->staticScope
+                                             ->template as<StaticBlockObject>()
+                                             .enclosingStaticScope() == sc->staticScope());
+            return bl;
+        }
+        return !innermostStmt();
+    }
+
+    bool atGlobalLevel() {
+        return atBodyLevel() && sc->isGlobalContext() && !innermostScopeStmt();
+    }
+
+    // True if we are at the topmost level of a module only.
+    bool atModuleLevel() {
+        return atBodyLevel() && sc->isModuleBox();
+    }
+
+    // True if the current lexical scope is the topmost level of a module.
+    bool atModuleScope() {
+        return sc->isModuleBox() && !innermostScopeStmt();
+    }
 
     // True if this is the ParseContext for the body of a function created by
     // the Function constructor.
@@ -496,6 +537,8 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
         return newFunctionBox(fn, fun, outerpc, directives, generatorKind, enclosing);
     }
 
+    ModuleBox* newModuleBox(Node pn, HandleModuleObject module);
+
     /*
      * Create a new function object given a name (which is optional if this is
      * a function expression).
@@ -524,6 +567,8 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
 
     bool isUnexpectedEOF() const { return isUnexpectedEOF_; }
 
+    bool checkUnescapedName();
+
   private:
     Parser* thisForCtor() { return this; }
 
@@ -547,6 +592,16 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     Node statement(YieldHandling yieldHandling, bool canHaveDirectives = false);
 
     bool maybeParseDirective(Node list, Node pn, bool* cont);
+
+    // Parse the body of an eval.
+    //
+    // Eval scripts are distinguished from global scripts in that in ES6, per
+    // 18.2.1.1 steps 9 and 10, all eval scripts are executed under a fresh
+    // lexical scope.
+    Node evalBody();
+
+    // Parse a module.
+    Node standaloneModule(Handle<ModuleObject*> module);
 
     // Parse a function, given only its body. Used for the Function and
     // Generator constructors.
@@ -701,7 +756,9 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     Node destructuringExprWithoutYield(YieldHandling yieldHandling, BindData<ParseHandler>* data,
                                        TokenKind tt, unsigned msg);
 
+    Node newBoundImportForCurrentName();
     bool namedImportsOrNamespaceImport(TokenKind tt, Node importSpecSet);
+    bool addExportName(JSAtom* exportName);
 
     enum ClassContext { ClassStatement, ClassExpression };
     Node classDefinition(YieldHandling yieldHandling, ClassContext classContext, DefaultHandling defaultHandling);
@@ -730,7 +787,7 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     bool matchInOrOf(bool* isForInp, bool* isForOfp);
 
     bool checkFunctionArguments();
-    bool makeDefIntoUse(Definition* dn, Node pn, JSAtom* atom);
+    bool makeDefIntoUse(Definition* dn, Node pn, HandleAtom atom);
     bool checkFunctionDefinition(HandlePropertyName funName, Node* pn, FunctionSyntaxKind kind,
                                  bool* pbodyProcessed);
     bool finishFunctionDefinition(Node pn, FunctionBox* funbox, Node body);
@@ -789,6 +846,7 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     bool checkDestructuringName(BindData<ParseHandler>* data, Node expr);
 
     bool bindInitialized(BindData<ParseHandler>* data, Node pn);
+    bool bindUninitialized(BindData<ParseHandler>* data, Node pn);
     bool makeSetCall(Node node, unsigned errnum);
     Node cloneDestructuringDefault(Node opn);
     Node cloneLeftHandSide(Node opn);
@@ -807,8 +865,8 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
                 HandlePropertyName name, Parser<ParseHandler>* parser);
 
     static bool
-    bindVarOrGlobalConst(BindData<ParseHandler>* data,
-                         HandlePropertyName name, Parser<ParseHandler>* parser);
+    bindVar(BindData<ParseHandler>* data,
+            HandlePropertyName name, Parser<ParseHandler>* parser);
 
     static Node null() { return ParseHandler::null(); }
 

@@ -146,13 +146,6 @@ gfxFontEntry::gfxFontEntry(const nsAString& aName, bool aIsStandardFace) :
     memset(&mNonDefaultSubSpaceFeatures, 0, sizeof(mNonDefaultSubSpaceFeatures));
 }
 
-static PLDHashOperator
-DestroyHBSet(const uint32_t& aTag, hb_set_t*& aSet, void *aUserArg)
-{
-    hb_set_destroy(aSet);
-    return PL_DHASH_NEXT;
-}
-
 gfxFontEntry::~gfxFontEntry()
 {
     if (mCOLR) {
@@ -170,7 +163,10 @@ gfxFontEntry::~gfxFontEntry()
     }
 
     if (mFeatureInputs) {
-        mFeatureInputs->Enumerate(DestroyHBSet, nullptr);
+        for (auto iter = mFeatureInputs->Iter(); !iter.Done(); iter.Next()) {
+            hb_set_t*& set = iter.Data();
+            hb_set_destroy(set);
+        }
     }
 
     // By the time the entry is destroyed, all font instances that were
@@ -905,7 +901,8 @@ gfxFontEntry::SupportsOpenTypeFeature(int32_t aScript, uint32_t aFeatureTag)
                  aFeatureTag == HB_TAG('p','c','a','p') ||
                  aFeatureTag == HB_TAG('c','2','p','c') ||
                  aFeatureTag == HB_TAG('s','u','p','s') ||
-                 aFeatureTag == HB_TAG('s','u','b','s'),
+                 aFeatureTag == HB_TAG('s','u','b','s') ||
+                 aFeatureTag == HB_TAG('v','e','r','t'),
                  "use of unknown feature tag");
 
     // note: graphite feature support uses the last script index
@@ -1337,9 +1334,9 @@ gfxFontFamily::FindAllFontsForStyle(const gfxFontStyle& aFontStyle,
 
     uint32_t minDistance = 0xffffffff;
     gfxFontEntry* matched = nullptr;
-    // iterate in reverse order so that the last-defined font is the first one
-    // in the fontlist used for matching, as per CSS Fonts spec
-    for (int32_t i = count - 1; i >= 0; i--) {
+    // iterate in forward order so that faces like 'Bold' are matched before
+    // matching style distance faces such as 'Bold Outline' (see bug 1185812)
+    for (uint32_t i = 0; i < count; i++) {
         fe = mAvailableFonts[i];
         uint32_t distance =
             WeightDistance(aFontStyle.weight, fe->Weight()) +

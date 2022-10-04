@@ -77,8 +77,6 @@ function BrowserElementParent() {
   Services.obs.addObserver(this, 'oop-frameloader-crashed', /* ownsWeak = */ true);
   Services.obs.addObserver(this, 'copypaste-docommand', /* ownsWeak = */ true);
   Services.obs.addObserver(this, 'ask-children-to-execute-copypaste-command', /* ownsWeak = */ true);
-  Services.obs.addObserver(this, 'frameloader-message-manager-will-change', /* ownsWeak = */ true);
-  Services.obs.addObserver(this, 'frameloader-message-manager-changed', /* ownsWeak = */ true);
 }
 
 BrowserElementParent.prototype = {
@@ -194,6 +192,8 @@ BrowserElementParent.prototype = {
       "got-contentdimensions": this._gotDOMRequestResult,
       "got-can-go-back": this._gotDOMRequestResult,
       "got-can-go-forward": this._gotDOMRequestResult,
+      "got-muted": this._gotDOMRequestResult,
+      "got-volume": this._gotDOMRequestResult,
       "requested-dom-fullscreen": this._requestedDOMFullscreen,
       "fullscreen-origin-change": this._fullscreenOriginChange,
       "exit-dom-fullscreen": this._exitDomFullscreen,
@@ -209,7 +209,8 @@ BrowserElementParent.prototype = {
       "got-set-audio-channel-volume": this._gotDOMRequestResult,
       "got-audio-channel-muted": this._gotDOMRequestResult,
       "got-set-audio-channel-muted": this._gotDOMRequestResult,
-      "got-is-audio-channel-active": this._gotDOMRequestResult
+      "got-is-audio-channel-active": this._gotDOMRequestResult,
+      "got-structured-data": this._gotDOMRequestResult
     };
 
     let mmSecuritySensitiveCalls = {
@@ -671,6 +672,22 @@ BrowserElementParent.prototype = {
     return this._sendAsyncMsg('clear-match');
   }),
 
+  mute: defineNoReturnMethod(function() {
+    this._sendAsyncMsg('mute');
+  }),
+
+  unmute: defineNoReturnMethod(function() {
+    this._sendAsyncMsg('unmute');
+  }),
+
+  getMuted: defineDOMRequestMethod('get-muted'),
+
+  getVolume: defineDOMRequestMethod('get-volume'),
+
+  setVolume: defineNoReturnMethod(function(volume) {
+    this._sendAsyncMsg('set-volume', {volume});
+  }),
+
   goBack: defineNoReturnMethod(function() {
     this._sendAsyncMsg('go-back');
   }),
@@ -820,15 +837,12 @@ BrowserElementParent.prototype = {
         debug('Malformed referrer -- ' + e);
       }
 
-      // TODO Bug 1165466: use originAttributes from nsILoadContext.
-      let attrs = {appId: this._frameLoader.loadContext.appId,
-                   inBrowser: this._frameLoader.loadContext.isInBrowserElement};
       // This simply returns null if there is no principal available
       // for the requested uri. This is an acceptable fallback when
       // calling newChannelFromURI2.
       principal =
         Services.scriptSecurityManager.createCodebasePrincipal(
-          referrer, attrs);
+          referrer, this._frameLoader.loadContext.originAttributes);
     }
 
     debug('Using principal? ' + !!principal);
@@ -1015,6 +1029,8 @@ BrowserElementParent.prototype = {
                                 {audioChannel: aAudioChannel});
   },
 
+  getStructuredData: defineDOMRequestMethod('get-structured-data'),
+
   /**
    * Called when the visibility of the window which owns this iframe changes.
    */
@@ -1089,16 +1105,6 @@ BrowserElementParent.prototype = {
     case 'ask-children-to-execute-copypaste-command':
       if (this._isAlive() && this._frameElement == subject.wrappedJSObject) {
         this._sendAsyncMsg('copypaste-do-command', { command: data });
-      }
-      break;
-    case 'frameloader-message-manager-will-change':
-      if (this._isAlive() && subject == this._frameLoader) {
-        this._removeMessageListener();
-      }
-      break;
-    case 'frameloader-message-manager-changed':
-      if (this._isAlive() && subject == this._frameLoader) {
-        this._setupMessageListener();
       }
       break;
     default:

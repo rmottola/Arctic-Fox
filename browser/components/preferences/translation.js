@@ -1,4 +1,4 @@
-/* -*- Mode: Java; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/* -*- indent-tabs-mode: nil; js-indent-level: 4 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,7 +9,6 @@ const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/BrowserUtils.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "gLangBundle", () =>
   Services.strings.createBundle("chrome://global/locale/languageNames.properties"));
@@ -69,7 +68,7 @@ Lang.prototype = {
   toString: function() this._label
 }
 
-let gTranslationExceptions = {
+var gTranslationExceptions = {
   onLoad: function() {
     if (this._siteTree) {
       // Re-using an open dialog, clear the old observers.
@@ -190,7 +189,7 @@ let gTranslationExceptions = {
   onSiteDeleted: function() {
     let removedSites = this._siteTree.getSelectedItems();
     for (let origin of removedSites) {
-      let principal = BrowserUtils.principalFromOrigin(origin);
+      let principal = Services.scriptSecurityManager.createCodebasePrincipalFromOrigin(origin);
       Services.perms.removeFromPrincipal(principal, kPermissionType);
     }
   },
@@ -203,7 +202,7 @@ let gTranslationExceptions = {
     this._siteTree.boxObject.rowCountChanged(0, -removedSites.length);
 
     for (let origin of removedSites) {
-      let principal = BrowserUtils.principalFromOrigin(origin);
+      let principal = Services.scriptSecurityManager.createCodebasePrincipalFromOrigin(origin);
       Services.perms.removeFromPrincipal(principal, kPermissionType);
     }
 

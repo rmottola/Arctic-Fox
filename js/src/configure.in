@@ -125,6 +125,8 @@ MOZ_ARG_WITH_STRING(dist-dir,
     TOP_DIST=dist)
 AC_SUBST(TOP_DIST)
 
+MOZ_BUILD_BACKEND
+
 MOZ_DEFAULT_COMPILER
 
 COMPILE_ENVIRONMENT=1
@@ -303,6 +305,10 @@ MOZ_TOOL_VARIABLES
 
 MOZ_CHECK_COMPILER_WRAPPER
 
+AC_PROG_CPP
+AC_PROG_CXXCPP
+MOZ_RUST_SUPPORT
+
 dnl Special win32 checks
 dnl ========================================================
 
@@ -432,8 +438,6 @@ case "$target" in
 
         CFLAGS="$CFLAGS -D_HAS_EXCEPTIONS=0"
         CXXFLAGS="$CXXFLAGS -D_HAS_EXCEPTIONS=0"
-
-        MOZ_FIND_WINSDK_VERSION
     else
         # Check w32api version
         _W32API_MAJOR_VERSION=`echo $W32API_VERSION | $AWK -F\. '{ print $1 }'`
@@ -469,10 +473,9 @@ case "$target" in
         then
             AC_MSG_ERROR([windres version $WINDRES_VERSION or higher is required to build.])
         fi
-
-        MOZ_WINSDK_MAXVER=0x06030000
     fi # !GNU_CC
 
+    MOZ_FIND_WINSDK_VERSION
     AC_DEFINE_UNQUOTED(WINVER,0x$WINVER)
     AC_DEFINE_UNQUOTED(_WIN32_WINNT,0x$WINVER)
     # Require OS features provided by IE 6.0 SP2 (XP SP2)
@@ -493,9 +496,6 @@ case "$target" in
     AC_DEFINE_UNQUOTED(MOZ_NTDDI_WIN7, 0x06010000)
     ;;
 esac
-
-AC_PROG_CPP
-AC_PROG_CXXCPP
 
 if test -n "$_WIN32_MSVC"; then
     SKIP_PATH_CHECKS=1
@@ -705,6 +705,9 @@ dnl ==============================================================
 MOZILLA_VERSION=`$PYTHON $srcdir/python/mozbuild/mozbuild/milestone.py --topsrcdir $srcdir`
 MOZILLA_UAVERSION=`$PYTHON $srcdir/python/mozbuild/mozbuild/milestone.py --topsrcdir $srcdir --uaversion`
 MOZILLA_SYMBOLVERSION=`$PYTHON $srcdir/python/mozbuild/mozbuild/milestone.py --topsrcdir $srcdir --symbolversion`
+if test -z "$MOZILLA_VERSION"; then
+  AC_MSG_ERROR([failed to read version info from milestone file])
+fi
 
 AC_DEFINE_UNQUOTED(MOZILLA_VERSION,"$MOZILLA_VERSION")
 AC_DEFINE_UNQUOTED(MOZILLA_VERSION_U,$MOZILLA_VERSION)
@@ -1399,46 +1402,6 @@ else
     _DEFINES_CXXFLAGS='-DMOZILLA_CLIENT -D_JS_CONFDEFS_H_ $(ACDEFINES)'
 fi
 
-dnl gcc can come with its own linker so it is better to use the pass-thru calls
-dnl MKSHLIB_FORCE_ALL is used to force the linker to include all object
-dnl files present in an archive. MKSHLIB_UNFORCE_ALL reverts the linker to
-dnl normal behavior.
-dnl ========================================================
-MKSHLIB_FORCE_ALL=
-MKSHLIB_UNFORCE_ALL=
-
-if test "$COMPILE_ENVIRONMENT"; then
-if test "$GNU_CC"; then
-  AC_MSG_CHECKING(whether ld has archive extraction flags)
-  AC_CACHE_VAL(ac_cv_mkshlib_force_and_unforce,
-   [_SAVE_LDFLAGS=$LDFLAGS; _SAVE_LIBS=$LIBS
-    ac_cv_mkshlib_force_and_unforce="no"
-    exec 3<&0 <<LOOP_INPUT
-	force="-Wl,--whole-archive";   unforce="-Wl,--no-whole-archive"
-	force="-Wl,-z -Wl,allextract"; unforce="-Wl,-z -Wl,defaultextract"
-	force="-Wl,-all";              unforce="-Wl,-none"
-LOOP_INPUT
-    while read line
-    do
-      eval $line
-      LDFLAGS=$force
-      LIBS=$unforce
-      AC_TRY_LINK(,, ac_cv_mkshlib_force_and_unforce=$line; break)
-    done
-    exec 0<&3 3<&-
-    LDFLAGS=$_SAVE_LDFLAGS; LIBS=$_SAVE_LIBS
-   ])
-  if test "$ac_cv_mkshlib_force_and_unforce" = "no"; then
-    AC_MSG_RESULT(no)
-  else
-    AC_MSG_RESULT(yes)
-    eval $ac_cv_mkshlib_force_and_unforce
-    MKSHLIB_FORCE_ALL=$force
-    MKSHLIB_UNFORCE_ALL=$unforce
-  fi
-fi # GNU_CC
-fi # COMPILE_ENVIRONMENT
-
 dnl ========================================================
 dnl Checking for 64-bit OS
 dnl ========================================================
@@ -1771,8 +1734,6 @@ ia64*-hpux*)
         IMPORT_LIB_SUFFIX=lib
         MKSHLIB='$(LD) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
         MKCSHLIB='$(LD) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
-        MKSHLIB_FORCE_ALL=
-        MKSHLIB_UNFORCE_ALL=
         dnl Set subsystem version 5 for Windows XP.
         if test "$CPU_ARCH" = "x86"; then
             WIN32_SUBSYSTEM_VERSION=5.01
@@ -1920,8 +1881,6 @@ ia64*-hpux*)
     	DSO_LDOPTS='-shared'
     fi
     # This will fail on a.out systems prior to 1.5.1_ALPHA.
-    MKSHLIB_FORCE_ALL='-Wl,--whole-archive'
-    MKSHLIB_UNFORCE_ALL='-Wl,--no-whole-archive'
     if test "$LIBRUNPATH"; then
 	DSO_LDOPTS="-Wl,-R$LIBRUNPATH $DSO_LDOPTS"
     fi
@@ -1968,8 +1927,6 @@ ia64*-hpux*)
        MOZ_OPTIMIZE_FLAGS="-xO4"
        MKSHLIB='$(CXX) $(CXXFLAGS) $(DSO_PIC_FLAGS) $(DSO_LDOPTS) -h $(DSO_SONAME) -o $@'
        MKCSHLIB='$(CC) $(CFLAGS) $(DSO_PIC_FLAGS) $(DSO_LDOPTS) -h $(DSO_SONAME) -o $@'
-       MKSHLIB_FORCE_ALL='-z allextract'
-       MKSHLIB_UNFORCE_ALL='-z defaultextract'
        DSO_LDOPTS='-G'
        AR_LIST="$AR t"
        AR_EXTRACT="$AR x"
@@ -2010,8 +1967,6 @@ ia64*-hpux*)
     else
        LDFLAGS="$LDFLAGS -Wl,-z,ignore -Wl,-R,'\$\$ORIGIN:\$\$ORIGIN/..' -Wl,-z,lazyload -Wl,-z,combreloc -Wl,-z,muldefs"
        LIBS="-lc $LIBS"
-       MKSHLIB_FORCE_ALL='-Wl,-z -Wl,allextract'
-       MKSHLIB_UNFORCE_ALL='-Wl,-z -Wl,defaultextract'
        ASFLAGS="$ASFLAGS -fPIC"
        DSO_LDOPTS='-shared'
        WARNINGS_AS_ERRORS='-Werror'
@@ -2044,31 +1999,6 @@ esac
 dnl Only one oddball right now (QNX), but this gives us flexibility
 dnl if any other platforms need to override this in the future.
 AC_DEFINE_UNQUOTED(D_INO,$DIRENT_INO)
-
-dnl ========================================================
-dnl Any platform that doesn't have MKSHLIB_FORCE_ALL defined
-dnl by now will not have any way to link most binaries (tests
-dnl as well as viewer, apprunner, etc.), because some symbols
-dnl will be left out of the "composite" .so's by ld as unneeded.
-dnl So, by defining NO_LD_ARCHIVE_FLAGS for these platforms,
-dnl they can link in the static libs that provide the missing
-dnl symbols.
-dnl ========================================================
-NO_LD_ARCHIVE_FLAGS=
-if test -z "$MKSHLIB_FORCE_ALL" -o -z "$MKSHLIB_UNFORCE_ALL"; then
-    NO_LD_ARCHIVE_FLAGS=1
-fi
-case "$target" in
-*-aix4.3*|*-aix5*)
-    NO_LD_ARCHIVE_FLAGS=
-    ;;
-*-mingw*)
-    if test -z "$GNU_CC"; then
-        NO_LD_ARCHIVE_FLAGS=
-    fi
-    ;;
-esac
-AC_SUBST(NO_LD_ARCHIVE_FLAGS)
 
 dnl ========================================================
 dnl = Flags to strip unused symbols from .so components
@@ -3798,8 +3728,6 @@ AC_SUBST(INTEL_ARCHITECTURE)
 AC_SUBST(WRAP_LDFLAGS)
 AC_SUBST(MKSHLIB)
 AC_SUBST(MKCSHLIB)
-AC_SUBST(MKSHLIB_FORCE_ALL)
-AC_SUBST(MKSHLIB_UNFORCE_ALL)
 AC_SUBST(DSO_CFLAGS)
 AC_SUBST(DSO_PIC_CFLAGS)
 AC_SUBST(DSO_LDOPTS)

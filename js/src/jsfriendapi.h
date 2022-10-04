@@ -323,7 +323,6 @@ namespace js {
         name,                                                                           \
         js::Class::NON_NATIVE |                                                         \
             JSCLASS_IS_PROXY |                                                          \
-            JSCLASS_IMPLEMENTS_BARRIERS |                                               \
             JSCLASS_DELAY_METADATA_CALLBACK |                                           \
             flags,                                                                      \
         nullptr,                 /* addProperty */                                      \
@@ -333,7 +332,6 @@ namespace js {
         nullptr,                 /* enumerate */                                        \
         nullptr,                 /* resolve */                                          \
         nullptr,                 /* mayResolve */                                       \
-        nullptr,                 /* convert */                                          \
         js::proxy_Finalize,      /* finalize    */                                      \
         nullptr,                 /* call        */                                      \
         js::proxy_HasInstance,   /* hasInstance */                                      \
@@ -1085,12 +1083,6 @@ typedef void
  */
 JS_FRIEND_API(void)
 SetActivityCallback(JSRuntime* rt, ActivityCallback cb, void* arg);
-
-extern JS_FRIEND_API(const JSStructuredCloneCallbacks*)
-GetContextStructuredCloneCallbacks(JSContext* cx);
-
-extern JS_FRIEND_API(bool)
-IsContextRunningJS(JSContext* cx);
 
 typedef bool
 (* DOMInstanceClassHasProtoAtDepth)(const Class* instanceClass,
@@ -2699,7 +2691,7 @@ typedef void
 JS_FRIEND_API(void)
 SetCTypesActivityCallback(JSRuntime* rt, CTypesActivityCallback cb);
 
-class JS_FRIEND_API(AutoCTypesActivityCallback) {
+class MOZ_RAII JS_FRIEND_API(AutoCTypesActivityCallback) {
   private:
     JSContext* cx;
     CTypesActivityCallback callback;
@@ -2806,13 +2798,12 @@ SetJitExceptionHandler(JitExceptionHandler handler);
 #endif
 
 /*
- * Get the object underlying the object environment (in the ES
- * NewObjectEnvironment) sense for a given function.  If the function is not
- * scripted or does not have an object environment, just returns the function's
- * parent.
+ * Get the nearest enclosing with scope object for a given function. If the
+ * function is not scripted or is not enclosed by a with scope, returns the
+ * global.
  */
 extern JS_FRIEND_API(JSObject*)
-GetObjectEnvironmentObjectForFunction(JSFunction* fun);
+GetNearestEnclosingWithScopeObjectForFunction(JSFunction* fun);
 
 /*
  * Get the first SavedFrame object in this SavedFrame stack whose principals are

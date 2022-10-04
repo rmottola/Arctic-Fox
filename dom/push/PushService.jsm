@@ -6,7 +6,7 @@
 "use strict";
 
 // Don't modify this, instead set dom.push.debug.
-let gDebuggingEnabled = true;
+var gDebuggingEnabled = false;
 
 function debug(s) {
   if (gDebuggingEnabled) {
@@ -28,6 +28,7 @@ Cu.import("resource://gre/modules/Promise.jsm");
 
 const {PushServiceWebSocket} = Cu.import("resource://gre/modules/PushServiceWebSocket.jsm");
 const {PushServiceHttp2} = Cu.import("resource://gre/modules/PushServiceHttp2.jsm");
+const {PushCrypto} = Cu.import("resource://gre/modules/PushCrypto.jsm");
 
 // Currently supported protocols: WebSocket.
 const CONNECTION_PROTOCOLS = [PushServiceWebSocket, PushServiceHttp2];
@@ -42,7 +43,8 @@ const prefs = new Preferences("dom.push.");
 gDebuggingEnabled = prefs.get("debug");
 
 const kCHILD_PROCESS_MESSAGES = ["Push:Register", "Push:Unregister",
-                                 "Push:Registration"];
+                                 "Push:Registration", "Push:RegisterEventNotificationListener",
+                                 "child-process-shutdown"];
 
 const PUSH_SERVICE_UNINIT = 0;
 const PUSH_SERVICE_INIT = 1; // No serverURI
@@ -50,6 +52,16 @@ const PUSH_SERVICE_ACTIVATING = 2;//activating db
 const PUSH_SERVICE_CONNECTION_DISABLE = 3;
 const PUSH_SERVICE_ACTIVE_OFFLINE = 4;
 const PUSH_SERVICE_RUNNING = 5;
+
+// Telemetry failure to send push notification to Service Worker reasons.
+// Key not found in local database.
+const kDROP_NOTIFICATION_REASON_KEY_NOT_FOUND = 0;
+// User cleared history.
+const kDROP_NOTIFICATION_REASON_NO_HISTORY = 1;
+// Version of message received not newer than previous one.
+const kDROP_NOTIFICATION_REASON_NO_VERSION_INCREMENT = 2;
+// Subscription has expired.
+const kDROP_NOTIFICATION_REASON_EXPIRED = 3;
 
 /**
  * State is change only in couple of functions:
@@ -84,6 +96,8 @@ this.PushService = {
   _db: null,
   _options: null,
   _alarmID: null,
+
+  _childListeners: [],
 
   // When serverURI changes (this is used for testing), db is cleaned up and a
   // a new db is started. This events must be sequential.
@@ -270,7 +284,7 @@ this.PushService = {
                   // just for it
                   if (this._ws) {
                     debug("Had a connection, so telling the server");
-                    this._sendRequest("unregister", {channelID: record.channelID})
+                    this._sendUnregister({channelID: record.channelID})
                         .catch(function(e) {
                           debug("Unregister errored " + e);
                         });
@@ -283,7 +297,7 @@ this.PushService = {
                   // just for it
                   if (this._ws) {
                     debug("Had a connection, so telling the server");
-                    this._sendRequest("unregister", {channelID: record.channelID})
+                    this._sendUnregister({channelID: record.channelID})
                         .catch(function(e) {
                           debug("Unregister errored " + e);
                         });
@@ -405,12 +419,6 @@ this.PushService = {
     }
 
     this._setState(PUSH_SERVICE_ACTIVATING);
-
-    var globalMM = Cc["@mozilla.org/globalmessagemanager;1"]
-                     .getService(Ci.nsIFrameScriptLoader);
-
-    globalMM.loadFrameScript("chrome://global/content/PushServiceChildPreload.js",
-                             true);
 
     // Debugging
     prefs.observe("debug", this);
@@ -596,6 +604,8 @@ this.PushService = {
   uninit: function() {
     debug("uninit()");
 
+    this._childListeners = [];
+
     if (this._state == PUSH_SERVICE_UNINIT) {
       return;
     }
@@ -662,8 +672,6 @@ this.PushService = {
   },
 
   _notifySubscriptionChangeObservers: function(record) {
-    let globalMM = Cc['@mozilla.org/globalmessagemanager;1']
-                     .getService(Ci.nsIMessageListenerManager);
     // Notify XPCOM observers.
     Services.obs.notifyObservers(
       null,
@@ -676,7 +684,26 @@ this.PushService = {
       scope: record.scope
     };
 
-    globalMM.broadcastAsyncMessage('pushsubscriptionchange', data);
+    Services.telemetry.getHistogramById("PUSH_API_NOTIFY_REGISTRATION_LOST").add();
+    this._notifyListeners('pushsubscriptionchange', data);
+  },
+
+  _notifyListeners: function(name, data) {
+    if (this._childListeners.length > 0) {
+      // Try to send messages to all listeners, but remove any that fail since
+      // the receiver is likely gone away.
+      for (var i = this._childListeners.length - 1; i >= 0; --i) {
+        try {
+          this._childListeners[i].sendAsyncMessage(name, data);
+        } catch(e) {
+          this._childListeners.splice(i, 1);
+        }
+      }
+    } else {
+      let ppmm = Cc['@mozilla.org/parentprocessmessagemanager;1']
+                   .getService(Ci.nsIMessageListenerManager);
+      ppmm.broadcastAsyncMessage(name, data);
+    }
   },
 
   // Fires a push-register system message to all applications that have
@@ -684,11 +711,11 @@ this.PushService = {
   _notifyAllAppsRegister: function() {
     debug("notifyAllAppsRegister()");
     // records are objects describing the registration as stored in IndexedDB.
-    return this._db.getAllUnexpired().then(records =>
-      records.forEach(record =>
-        this._notifySubscriptionChangeObservers(record)
-      )
-    );
+    return this._db.getAllUnexpired().then(records => {
+      records.forEach(record => {
+        this._notifySubscriptionChangeObservers(record);
+      });
+    });
   },
 
   dropRegistrationAndNotifyApp: function(aKeyId) {
@@ -704,6 +731,39 @@ this.PushService = {
       .then(record => this._notifySubscriptionChangeObservers(record));
   },
 
+  ensureP256dhKey: function(record) {
+    if (record.p256dhPublicKey && record.p256dhPrivateKey) {
+      return Promise.resolve(record);
+    }
+    // We do not have a encryption key. so we need to generate it. This
+    // is only going to happen on db upgrade from version 4 to higher.
+    return PushCrypto.generateKeys()
+      .then(exportedKeys => {
+        return this.updateRecordAndNotifyApp(record.keyID, record => {
+          record.p256dhPublicKey = exportedKeys[0];
+          record.p256dhPrivateKey = exportedKeys[1];
+          return record;
+        });
+      }, error => {
+        return this.dropRegistrationAndNotifyApp(record.keyID).then(
+          () => Promise.reject(error));
+      });
+  },
+
+  updateRecordAndNotifyApp: function(aKeyID, aUpdateFunc) {
+    return this._db.update(aKeyID, aUpdateFunc)
+      .then(record => {
+        this._notifySubscriptionChangeObservers(record);
+        return record;
+      });
+  },
+
+  _recordDidNotNotify: function(reason) {
+    Services.telemetry.
+      getHistogramById("PUSH_API_NOTIFICATION_RECEIVED_BUT_DID_NOT_NOTIFY").
+      add(reason);
+  },
+
   /**
    * Dispatches an incoming message to a service worker, recalculating the
    * quota for the associated push registration. If the quota is exceeded,
@@ -712,18 +772,21 @@ this.PushService = {
    *
    * @param {String} keyID The push registration ID.
    * @param {String} message The message contents.
+   * @param {Object} cryptoParams The message encryption settings.
    * @param {Function} updateFunc A function that receives the existing
    *  registration record as its argument, and returns a new record. If the
    *  function returns `null` or `undefined`, the record will not be updated.
    *  `PushServiceWebSocket` uses this to drop incoming updates with older
    *  versions.
    */
-  receivedPushMessage: function(keyID, message, updateFunc) {
+  receivedPushMessage: function(keyID, message, cryptoParams, updateFunc) {
     debug("receivedPushMessage()");
+    Services.telemetry.getHistogramById("PUSH_API_NOTIFICATION_RECEIVED").add();
 
     let shouldNotify = false;
-    this.getByKeyID(keyID).then(record => {
+    return this.getByKeyID(keyID).then(record => {
       if (!record) {
+        this._recordDidNotNotify(kDROP_NOTIFICATION_REASON_KEY_NOT_FOUND);
         throw new Error("No record for key ID " + keyID);
       }
       return record.getLastVisit();
@@ -731,14 +794,20 @@ this.PushService = {
       // As a special case, don't notify the service worker if the user
       // cleared their history.
       shouldNotify = isFinite(lastVisit);
+      if (!shouldNotify) {
+          this._recordDidNotNotify(kDROP_NOTIFICATION_REASON_NO_HISTORY);
+      }
       return this._db.update(keyID, record => {
         let newRecord = updateFunc(record);
         if (!newRecord) {
+          this._recordDidNotNotify(kDROP_NOTIFICATION_REASON_NO_VERSION_INCREMENT);
           return null;
         }
+        // Because `unregister` is advisory only, we can still receive messages
+        // for stale Simple Push registrations from the server. To work around
+        // this, we check if the record has expired before *and* after updating
+        // the quota.
         if (newRecord.isExpired()) {
-          // Because `unregister` is advisory only, we can still receive messages
-          // for stale registrations from the server.
           debug("receivedPushMessage: Ignoring update for expired key ID " + keyID);
           return null;
         }
@@ -746,20 +815,37 @@ this.PushService = {
         return newRecord;
       });
     }).then(record => {
+      var notified = false;
       if (!record) {
-        return null;
+        return notified;
       }
-      if (shouldNotify) {
-        this._notifyApp(record, message);
+      let decodedPromise;
+      if (cryptoParams) {
+        decodedPromise = PushCrypto.decodeMsg(
+          message,
+          record.p256dhPrivateKey,
+          cryptoParams.dh,
+          cryptoParams.salt,
+          cryptoParams.rs
+        );
+      } else {
+        decodedPromise = Promise.resolve(null);
       }
-      if (record.isExpired()) {
-        // Drop the registration in the background. If the user returns to the
-        // site, the service worker will be notified on the next `idle-daily`
-        // event.
-        this._sendRequest("unregister", record).catch(error => {
-          debug("receivedPushMessage: Unregister error: " + error);
-        });
-      }
+      return decodedPromise.then(message => {
+        if (shouldNotify) {
+          notified = this._notifyApp(record, message);
+        }
+        if (record.isExpired()) {
+          this._recordDidNotNotify(kDROP_NOTIFICATION_REASON_EXPIRED);
+          // Drop the registration in the background. If the user returns to the
+          // site, the service worker will be notified on the next `idle-daily`
+          // event.
+          this._sendUnregister(record).catch(error => {
+            debug("receivedPushMessage: Unregister error: " + error);
+          });
+        }
+        return notified;
+      });
     }).catch(error => {
       debug("receivedPushMessage: Error notifying app: " + error);
     });
@@ -770,17 +856,25 @@ this.PushService = {
         aPushRecord.originAttributes === undefined) {
       debug("notifyApp() something is undefined.  Dropping notification: " +
         JSON.stringify(aPushRecord) );
-      return;
+      return false;
     }
 
     debug("notifyApp() " + aPushRecord.scope);
-    let scopeURI = Services.io.newURI(aPushRecord.scope, null, null);
     // Notify XPCOM observers.
     let notification = Cc["@mozilla.org/push/ObserverNotification;1"]
                          .createInstance(Ci.nsIPushObserverNotification);
     notification.pushEndpoint = aPushRecord.pushEndpoint;
     notification.version = aPushRecord.version;
-    notification.data = message;
+
+    let payload = ArrayBuffer.isView(message) ?
+                  new Uint8Array(message.buffer) : message;
+    if (payload) {
+      notification.data = "";
+      for (let i = 0; i < payload.length; i++) {
+        notification.data += String.fromCharCode(payload[i]);
+      }
+    }
+
     notification.lastPush = aPushRecord.lastPush;
     notification.pushCount = aPushRecord.pushCount;
 
@@ -791,22 +885,20 @@ this.PushService = {
     );
 
     // If permission has been revoked, trash the message.
-    if (Services.perms.testExactPermission(scopeURI, "push") !=
-        Ci.nsIPermissionManager.ALLOW_ACTION) {
+    if (!aPushRecord.hasPermission()) {
       debug("Does not have permission for push.");
-      return;
+      return false;
     }
 
-    // TODO data.
     let data = {
-      payload: message,
+      payload: payload,
       originAttributes: aPushRecord.originAttributes,
       scope: aPushRecord.scope
     };
 
-    let globalMM = Cc['@mozilla.org/globalmessagemanager;1']
-                 .getService(Ci.nsIMessageListenerManager);
-    globalMM.broadcastAsyncMessage('push', data);
+    Services.telemetry.getHistogramById("PUSH_API_NOTIFY").add();
+    this._notifyListeners('push', data);
+    return true;
   },
 
   getByKeyID: function(aKeyID) {
@@ -833,6 +925,7 @@ this.PushService = {
   _registerWithServer: function(aPageRecord) {
     debug("registerWithServer()" + JSON.stringify(aPageRecord));
 
+    Services.telemetry.getHistogramById("PUSH_API_SUBSCRIBE_ATTEMPT").add();
     return this._sendRequest("register", aPageRecord)
       .then(record => this._onRegisterSuccess(record),
             err => this._onRegisterError(err))
@@ -876,6 +969,17 @@ this.PushService = {
       });
   },
 
+  _sendUnregister: function(aRecord) {
+    Services.telemetry.getHistogramById("PUSH_API_UNSUBSCRIBE_ATTEMPT").add();
+    return this._sendRequest("unregister", aRecord).then(function(v) {
+      Services.telemetry.getHistogramById("PUSH_API_UNSUBSCRIBE_SUCCEEDED").add();
+      return v;
+    }).catch(function(e) {
+      Services.telemetry.getHistogramById("PUSH_API_UNSUBSCRIBE_FAILED").add();
+      return Promise.reject(e);
+    });
+  },
+
   /**
    * Exceptions thrown in _onRegisterSuccess are caught by the promise obtained
    * from _service.request, causing the promise to be rejected instead.
@@ -884,9 +988,14 @@ this.PushService = {
     debug("_onRegisterSuccess()");
 
     return this._db.put(aRecord)
+      .then(record => {
+        Services.telemetry.getHistogramById("PUSH_API_SUBSCRIBE_SUCCEEDED").add();
+        return record;
+      })
       .catch(error => {
+        Services.telemetry.getHistogramById("PUSH_API_SUBSCRIBE_FAILED").add()
         // Unable to save. Destroy the subscription in the background.
-        this._sendRequest("unregister", aRecord).catch(err => {
+        this._sendUnregister(aRecord).catch(err => {
           debug("_onRegisterSuccess: Error unregistering stale subscription" +
             err);
         });
@@ -900,6 +1009,7 @@ this.PushService = {
    */
   _onRegisterError: function(reply) {
     debug("_onRegisterError()");
+    Services.telemetry.getHistogramById("PUSH_API_SUBSCRIBE_FAILED").add()
     if (!reply.error) {
       debug("Called without valid error message!");
       throw "Registration error";
@@ -912,6 +1022,23 @@ this.PushService = {
 
     if (kCHILD_PROCESS_MESSAGES.indexOf(aMessage.name) == -1) {
       debug("Invalid message from child " + aMessage.name);
+      return;
+    }
+
+    if (aMessage.name === "Push:RegisterEventNotificationListener") {
+      debug("Adding child listener");
+      this._childListeners.push(aMessage.target);
+      return;
+    }
+
+    if (aMessage.name === "child-process-shutdown") {
+      debug("Possibly removing child listener");
+      for (var i = this._childListeners.length - 1; i >= 0; --i) {
+        if (this._childListeners[i] == aMessage.target) {
+          debug("Removed child listener");
+          this._childListeners.splice(i, 1);
+        }
+      }
       return;
     }
 
@@ -1006,7 +1133,7 @@ this.PushService = {
         }
 
         return Promise.all([
-          this._sendRequest("unregister", record),
+          this._sendUnregister(record),
           this._db.delete(record.keyID),
         ]).then(() => true);
       });
@@ -1033,7 +1160,47 @@ this.PushService = {
   _clearAll: function _clearAll() {
     return this._checkActivated()
       .then(_ => this._db.clearAll())
-      .catch(_ => {
+      .catch(_ => Promise.resolve());
+  },
+
+  _clearForDomain: function(domain) {
+    /**
+     * Copied from ForgetAboutSite.jsm.
+     *
+     * Returns true if the string passed in is part of the root domain of the
+     * current string.  For example, if this is "www.mozilla.org", and we pass in
+     * "mozilla.org", this will return true.  It would return false the other way
+     * around.
+     */
+    function hasRootDomain(str, aDomain)
+    {
+      let index = str.indexOf(aDomain);
+      // If aDomain is not found, we know we do not have it as a root domain.
+      if (index == -1)
+        return false;
+
+      // If the strings are the same, we obviously have a match.
+      if (str == aDomain)
+        return true;
+
+      // Otherwise, we have aDomain as our root domain iff the index of aDomain is
+      // aDomain.length subtracted from our length and (since we do not have an
+      // exact match) the character before the index is a dot or slash.
+      let prevChar = str[index - 1];
+      return (index == (str.length - aDomain.length)) &&
+             (prevChar == "." || prevChar == "/");
+    }
+
+    let clear = (db, domain) => {
+      db.clearIf(record => {
+        return hasRootDomain(record.uri.prePath, domain);
+      });
+    }
+
+    return this._checkActivated()
+      .then(_ => clear(this._db, domain))
+      .catch(e => {
+        debug("Error forgetting about domain! " + e);
         return Promise.resolve();
       });
   },

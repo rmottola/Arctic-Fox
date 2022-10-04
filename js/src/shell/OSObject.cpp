@@ -756,5 +756,5 @@ DefineOS(JSContext* cx, HandleObject global, bool fuzzingSafe)
     return true;
 }
 
-}
-}
+} // namespace shell
+} // namespace js

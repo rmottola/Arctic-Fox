@@ -7,7 +7,8 @@
  * apply it.
  */
 
-Cu.import("resource://gre/modules/ctypes.jsm");
+const START_STATE = STATE_PENDING;
+const END_STATE = STATE_APPLIED;
 
 function run_test() {
   if (MOZ_APP_NAME == "xulrunner") {
@@ -28,31 +29,23 @@ function run_test() {
 
   let channel = Services.prefs.getCharPref(PREF_APP_UPDATE_CHANNEL);
   let patches = getLocalPatchString(null, null, null, null, null, "true",
-                                    STATE_PENDING);
+                                    START_STATE);
   let updates = getLocalUpdateString(patches, null, null, null, null, null,
                                      null, null, null, null, null, null,
                                      null, "true", channel);
   writeUpdatesToXMLFile(getLocalUpdatesXMLString(updates), true);
   writeVersionFile(getAppVersion());
-  writeStatusFile(STATE_PENDING);
+  writeStatusFile(START_STATE);
 
   reloadUpdateManagerData();
-  do_check_true(!!gUpdateManager.activeUpdate);
+  Assert.ok(!!gUpdateManager.activeUpdate,
+            "the active update should be defined");
 
   setupAppFilesAsync();
 }
 
 function setupAppFilesFinished() {
-  // For Mac OS X set the last modified time for the root directory to a date in
-  // the past to test that the last modified time is updated on a successful
-  // update (bug 600098).
-  if (IS_MACOSX) {
-    let now = Date.now();
-    let yesterday = now - (1000 * 60 * 60 * 24);
-    let applyToDir = getApplyDirFile();
-    applyToDir.lastModifiedTime = yesterday;
-  }
-
+  setAppBundleModTime();
   stageUpdate();
 }
 
@@ -74,7 +67,8 @@ function customLaunchAppToApplyUpdate() {
   gHandle = CreateFile(getAppBaseDir().path, GENERIC_READ,
                        FILE_SHARE_READ | FILE_SHARE_WRITE, LPVOID(0),
                        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, LPVOID(0));
-  do_check_neq(gHandle.toString(), INVALID_HANDLE_VALUE.toString());
+  Assert.notEqual(gHandle.toString(), INVALID_HANDLE_VALUE.toString(),
+                  "the handle should not equal INVALID_HANDLE_VALUE");
   kernel32.close();
   logTestInfo("finish - locking installation directory");
 }
@@ -85,28 +79,27 @@ function customLaunchAppToApplyUpdate() {
 function checkUpdateApplied() {
   gTimeoutRuns++;
   // Don't proceed until the active update's state is the expected value.
-  if (gUpdateManager.activeUpdate.state != STATE_APPLIED) {
+  if (gUpdateManager.activeUpdate.state != END_STATE) {
     if (gTimeoutRuns > MAX_TIMEOUT_RUNS) {
-      do_throw("Exceeded MAX_TIMEOUT_RUNS while waiting for update to equal: " +
-               STATE_APPLIED +
+      do_throw("Exceeded MAX_TIMEOUT_RUNS while waiting for the " +
+               "active update status state to equal: " +
+               END_STATE +
                ", current state: " + gUpdateManager.activeUpdate.state);
-    } else {
-      do_timeout(TEST_CHECK_TIMEOUT, checkUpdateApplied);
     }
+    do_timeout(TEST_CHECK_TIMEOUT, checkUpdateApplied);
     return;
   }
 
   // Don't proceed until the update's status state is the expected value.
   let state = readStatusState();
-  if (state != STATE_APPLIED) {
+  if (state != END_STATE) {
     if (gTimeoutRuns > MAX_TIMEOUT_RUNS) {
-      do_throw("Exceeded MAX_TIMEOUT_RUNS while waiting for the update " +
-               "status state to equal: " +
-               STATE_APPLIED +
+      do_throw("Exceeded MAX_TIMEOUT_RUNS while waiting for the update" +
+               "status file state to equal: " +
+               END_STATE +
                ", current status state: " + state);
-    } else {
-      do_timeout(TEST_CHECK_TIMEOUT, checkUpdateApplied);
     }
+    do_timeout(TEST_CHECK_TIMEOUT, checkUpdateApplied);
     return;
   }
 
@@ -206,13 +199,12 @@ function finishCheckUpdateFinished() {
   let state = readStatusState();
   if (state != STATE_SUCCEEDED) {
     if (gTimeoutRuns > MAX_TIMEOUT_RUNS) {
-      do_throw("Exceeded MAX_TIMEOUT_RUNS while waiting for the update " +
-               "status state to equal: " +
+      do_throw("Exceeded MAX_TIMEOUT_RUNS while waiting for the " +
+               "update status file state to equal: " +
                STATE_SUCCEEDED +
                ", current status state: " + state);
-    } else {
-      do_timeout(TEST_CHECK_TIMEOUT, checkUpdateFinished);
     }
+    do_timeout(TEST_CHECK_TIMEOUT, checkUpdateFinished);
     return;
   }
 
@@ -221,11 +213,10 @@ function finishCheckUpdateFinished() {
   let updatedDir = getStageDirFile(null, true);
   if (updatedDir.exists()) {
     if (gTimeoutRuns > MAX_TIMEOUT_RUNS) {
-      do_throw("Exceeded while waiting for updated dir to not exist. Path: " +
-               updatedDir.path);
-    } else {
-      do_timeout(TEST_CHECK_TIMEOUT, checkUpdateFinished);
+      do_throw("Exceeded MAX_TIMEOUT_RUNS while waiting for the updated " +
+               "directory to not exist. Path: " + updatedDir.path);
     }
+    do_timeout(TEST_CHECK_TIMEOUT, checkUpdateFinished);
     return;
   }
 

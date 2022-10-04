@@ -5,9 +5,16 @@
 #endif
 
 /**
+ * Define various fixed dimensions
+ */
+const GRID_BOTTOM_EXTRA = 7; // title's line-height extends 7px past the margin
+const GRID_WIDTH_EXTRA = 1; // provide 1px buffer to allow for rounding error
+const SPONSORED_TAG_BUFFER = 2; // 2px buffer to clip off top of sponsored tag
+
+/**
  * This singleton represents the grid that contains all sites.
  */
-let gGrid = {
+var gGrid = {
   /**
    * The DOM node of the grid.
    */

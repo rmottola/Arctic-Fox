@@ -7,7 +7,6 @@
 #define GFX_PLATFORM_GTK_H
 
 #include "gfxPlatform.h"
-#include "gfxPrefs.h"
 #include "nsAutoRef.h"
 #include "nsTArray.h"
 
@@ -100,8 +99,8 @@ public:
 
     bool UseXRender() {
 #if defined(MOZ_X11)
-        if (GetContentBackend() != mozilla::gfx::BackendType::NONE &&
-            GetContentBackend() != mozilla::gfx::BackendType::CAIRO)
+        if (GetDefaultContentBackend() != mozilla::gfx::BackendType::NONE &&
+            GetDefaultContentBackend() != mozilla::gfx::BackendType::CAIRO)
             return false;
 
         return sUseXRender;
@@ -110,21 +109,18 @@ public:
 #endif
     }
 
+#ifdef MOZ_X11
+    virtual void GetAzureBackendInfo(mozilla::widget::InfoObject &aObj) override {
+      gfxPlatform::GetAzureBackendInfo(aObj);
+      aObj.DefineProperty("CairoUseXRender", UseXRender());
+    }
+#endif
+
     static bool UseFcFontList() { return sUseFcFontList; }
 
-    bool UseImageOffscreenSurfaces() {
-        // We want to turn on image offscreen surfaces ONLY for GTK3 builds
-        // since GTK2 theme rendering still requires xlib surfaces per se.
-#if (MOZ_WIDGET_GTK == 3)
-        return gfxPrefs::UseImageOffscreenSurfaces();
-#else
-        return false;
-#endif
-    }
+    bool UseImageOffscreenSurfaces();
 
     virtual gfxImageFormat GetOffscreenFormat() override;
-
-    virtual int GetScreenDepth() const override;
 
     bool SupportsApzWheelInput() const override {
       return true;

@@ -428,7 +428,7 @@ protected:
    * state (in a CSSParserInputState object), and it restores the parser to
    * that state when destructed, unless "DoNotRestore()" has been called.
   */
-  class MOZ_STACK_CLASS nsAutoCSSParserInputStateRestorer {
+  class MOZ_RAII nsAutoCSSParserInputStateRestorer {
     public:
       explicit nsAutoCSSParserInputStateRestorer(CSSParserImpl* aParser
                                                  MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
@@ -476,7 +476,7 @@ protected:
    * XXXdholbert we could also change this & report errors, if needed. Might
    * want to customize the error reporting somehow though.
    */
-  class MOZ_STACK_CLASS nsAutoScannerChanger {
+  class MOZ_RAII nsAutoScannerChanger {
     public:
       nsAutoScannerChanger(CSSParserImpl* aParser,
                            const nsAString& aStringToScan
@@ -14693,12 +14693,11 @@ CSSParserImpl::ParseTransitionStepTimingFunctionValues(nsCSSValue& aValue)
     return false;
   }
 
-  int32_t type = NS_STYLE_TRANSITION_TIMING_FUNCTION_STEP_END;
+  int32_t type = -1;  // indicates an implicit end value
   if (ExpectSymbol(',', true)) {
     if (!GetToken(true)) {
       return false;
     }
-    type = -1;
     if (mToken.mType == eCSSToken_Ident) {
       if (mToken.mIdent.LowerCaseEqualsLiteral("start")) {
         type = NS_STYLE_TRANSITION_TIMING_FUNCTION_STEP_START;

@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+Components.utils.import("resource://gre/modules/AppConstants.jsm");
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
 
@@ -9,8 +10,9 @@ Components.utils.import("resource://gre/modules/Services.jsm");
  * The base view implements everything that's common to the toolbar and
  * menu views.
  */
-function PlacesViewBase(aPlace) {
+function PlacesViewBase(aPlace, aOptions) {
   this.place = aPlace;
+  this.options = aOptions;
   this._controller = new PlacesController(this);
   this._viewElt.controllers.appendController(this._controller);
 }
@@ -94,6 +96,21 @@ PlacesViewBase.prototype = {
     return val;
   },
 
+  _options: null,
+  get options() {
+    return this._options;
+  },
+  set options(val) {
+    if (!val)
+      val = {};
+
+    if (!("extraClasses" in val))
+      val.extraClasses = {};
+    this._options = val;
+
+    return val;
+  },
+
   /**
    * Gets the DOM node used for the given places node.
    *
@@ -173,7 +190,7 @@ PlacesViewBase.prototype = {
     let index = PlacesUtils.bookmarks.DEFAULT_INDEX;
     let container = this._resultNode;
     let orientation = Ci.nsITreeView.DROP_BEFORE;
-    let isTag = false;
+    let tagName = null;
 
     let selectedNode = this.selectedNode;
     if (selectedNode) {
@@ -189,7 +206,12 @@ PlacesViewBase.prototype = {
         // In all other cases the insertion point is before that node.
         container = selectedNode.parent;
         index = container.getChildIndex(selectedNode);
-        isTag = PlacesUtils.nodeIsTagQuery(container);
+        if (PlacesUtils.nodeIsTagQuery(container)) {
+          tagName = container.title;
+          // TODO (Bug 1160193): properly support dropping on a tag root.
+          if (!tagName)
+            return null;
+        }
       }
     }
 
@@ -197,7 +219,7 @@ PlacesViewBase.prototype = {
       return null;
 
     return new InsertionPoint(PlacesUtils.getConcreteItemId(container),
-                              index, orientation, isTag);
+                              index, orientation, tagName);
   },
 
   buildContextMenu: function PVB_buildContextMenu(aPopup) {
@@ -279,6 +301,9 @@ PlacesViewBase.prototype = {
       aPopup._emptyMenuitem = document.createElement("menuitem");
       aPopup._emptyMenuitem.setAttribute("label", label);
       aPopup._emptyMenuitem.setAttribute("disabled", true);
+      aPopup._emptyMenuitem.className = "bookmark-item";
+      if (typeof this.options.extraClasses.entry == "string")
+        aPopup._emptyMenuitem.classList.add(this.options.extraClasses.entry);
     }
 
     if (aEmpty) {
@@ -330,12 +355,12 @@ PlacesViewBase.prototype = {
           PlacesUtils.livemarks.getLivemark({ id: itemId })
             .then(aLivemark => {
               element.setAttribute("livemark", "true");
-#ifdef XP_MACOSX
-              // OS X native menubar doesn't track list-style-images since
-              // it doesn't have a frame (bug 733415).  Thus enforce updating.
-              element.setAttribute("image", "");
-              element.removeAttribute("image");
-#endif
+              if (AppConstants.platform === "macosx") {
+                // OS X native menubar doesn't track list-style-images since
+                // it doesn't have a frame (bug 733415).  Thus enforce updating.
+                element.setAttribute("image", "");
+                element.removeAttribute("image");
+              }
               this.controller.cacheLivemarkInfo(aPlacesNode, aLivemark);
             }, () => undefined);
         }
@@ -347,12 +372,11 @@ PlacesViewBase.prototype = {
           popup.setAttribute("placespopup", "true");
         }
 
-#ifdef XP_MACOSX
-        // No context menu on mac.
-        popup.setAttribute("context", "placesContext");
-#endif
         element.appendChild(popup);
         element.className = "menu-iconic bookmark-item";
+        if (typeof this.options.extraClasses.entry == "string") {
+          element.classList.add(this.options.extraClasses.entry);
+        }
 
         this._domNodes.set(aPlacesNode, popup);
       }
@@ -377,6 +401,12 @@ PlacesViewBase.prototype = {
   function PVB__insertNewItemToPopup(aNewChild, aPopup, aBefore) {
     let element = this._createMenuItemForPlacesNode(aNewChild);
     let before = aBefore || aPopup._endMarker;
+
+    if (element.localName == "menuitem" || element.localName == "menu") {
+      if (typeof this.options.extraClasses.entry == "string")
+        element.classList.add(this.options.extraClasses.entry);
+    }
+
     aPopup.insertBefore(element, before);
     return element;
   },
@@ -396,6 +426,9 @@ PlacesViewBase.prototype = {
       // Add "Open (Feed Name)" menuitem.
       aPopup._siteURIMenuitem = document.createElement("menuitem");
       aPopup._siteURIMenuitem.className = "openlivemarksite-menuitem";
+      if (typeof this.options.extraClasses.entry == "string") {
+        aPopup._siteURIMenuitem.classList.add(this.options.extraClasses.entry);
+      }
       aPopup._siteURIMenuitem.setAttribute("targetURI", siteUrl);
       aPopup._siteURIMenuitem.setAttribute("oncommand",
         "openUILink(this.getAttribute('targetURI'), event);");
@@ -431,6 +464,9 @@ PlacesViewBase.prototype = {
       // Create the status menuitem and cache it in the popup object.
       statusMenuitem = document.createElement("menuitem");
       statusMenuitem.className = "livemarkstatus-menuitem";
+      if (typeof this.options.extraClasses.entry == "string") {
+        statusMenuitem.classList.add(this.options.extraClasses.entry);
+      }
       statusMenuitem.setAttribute("disabled", true);
       aPopup._statusMenuitem = statusMenuitem;
     }
@@ -502,12 +538,12 @@ PlacesViewBase.prototype = {
       let menu = elt.parentNode;
       if (!menu.hasAttribute("livemark")) {
         menu.setAttribute("livemark", "true");
-#ifdef XP_MACOSX
-        // OS X native menubar doesn't track list-style-images since
-        // it doesn't have a frame (bug 733415).  Thus enforce updating.
-        menu.setAttribute("image", "");
-        menu.removeAttribute("image");
-#endif
+        if (AppConstants.platform === "macosx") {
+          // OS X native menubar doesn't track list-style-images since
+          // it doesn't have a frame (bug 733415).  Thus enforce updating.
+          menu.setAttribute("image", "");
+          menu.removeAttribute("image");
+        }
       }
 
       PlacesUtils.livemarks.getLivemark({ id: aPlacesNode.itemId })
@@ -795,6 +831,12 @@ PlacesViewBase.prototype = {
       // Add the "Open All in Tabs" menuitem.
       aPopup._endOptOpenAllInTabs = document.createElement("menuitem");
       aPopup._endOptOpenAllInTabs.className = "openintabs-menuitem";
+
+      if (typeof this.options.extraClasses.entry == "string")
+        aPopup._endOptOpenAllInTabs.classList.add(this.options.extraClasses.entry);
+      if (typeof this.options.extraClasses.footer == "string")
+        aPopup._endOptOpenAllInTabs.classList.add(this.options.extraClasses.footer);
+
       if (isLiveMark) {
         aPopup._endOptOpenAllInTabs.setAttribute("oncommand",
           "PlacesUIUtils.openLiveMarkNodesInTabs(this.parentNode._placesNode, event, " +
@@ -821,9 +863,16 @@ PlacesViewBase.prototype = {
     aPopup._startMarker.hidden = true;
     aPopup.insertBefore(aPopup._startMarker, aPopup.firstChild);
 
-    // _endMarker is an hidden menuseparator that lives after places nodes.
-    aPopup._endMarker = document.createElement("menuseparator");
-    aPopup._endMarker.hidden = true;
+    // _endMarker is a DOM node that lives after places nodes, specified with
+    // the 'insertionPoint' option or will be a hidden menuseparator.
+    let node = ("insertionPoint" in this.options) ?
+               aPopup.querySelector(this.options.insertionPoint) : null;
+    if (node) {
+      aPopup._endMarker = node;
+    } else {
+      aPopup._endMarker = document.createElement("menuseparator");
+      aPopup._endMarker.hidden = true;
+    }
     aPopup.appendChild(aPopup._endMarker);
 
     // Move the markers to the right position.
@@ -1016,9 +1065,7 @@ PlacesToolbar.prototype = {
         popup.setAttribute("placespopup", "true");
         button.appendChild(popup);
         popup._placesNode = PlacesUtils.asContainer(aChild);
-#ifndef XP_MACOSX
         popup.setAttribute("context", "placesContext");
-#endif
 
         this._domNodes.set(aChild, popup);
       }
@@ -1357,10 +1404,12 @@ PlacesToolbar.prototype = {
         else if (this.isRTL ? (aEvent.clientX > eltRect.left + threshold)
                             : (aEvent.clientX < eltRect.right - threshold)) {
           // Drop inside this folder.
+          let tagName = PlacesUtils.nodeIsTagQuery(elt._placesNode) ?
+                        elt._placesNode.title : null;
           dropPoint.ip =
             new InsertionPoint(PlacesUtils.getConcreteItemId(elt._placesNode),
                                -1, Ci.nsITreeView.DROP_ON,
-                               PlacesUtils.nodeIsTagQuery(elt._placesNode));
+                               tagName);
           dropPoint.beforeIndex = eltIndex;
           dropPoint.folderElt = elt;
         }
@@ -1689,24 +1738,24 @@ PlacesToolbar.prototype = {
  * View for Places menus.  This object should be created during the first
  * popupshowing that's dispatched on the menu.
  */
-function PlacesMenu(aPopupShowingEvent, aPlace) {
+function PlacesMenu(aPopupShowingEvent, aPlace, aOptions) {
   this._rootElt = aPopupShowingEvent.target; // <menupopup>
   this._viewElt = this._rootElt.parentNode;   // <menu>
   this._viewElt._placesView = this;
   this._addEventListeners(this._rootElt, ["popupshowing", "popuphidden"], true);
   this._addEventListeners(window, ["unload"], false);
 
-#ifdef XP_MACOSX
-  // Must walk up to support views in sub-menus, like Bookmarks Toolbar menu.
-  for (let elt = this._viewElt.parentNode; elt; elt = elt.parentNode) {
-    if (elt.localName == "menubar") {
-      this._nativeView = true;
-      break;
+  if (AppConstants.platform === "macosx") {
+    // Must walk up to support views in sub-menus, like Bookmarks Toolbar menu.
+    for (let elt = this._viewElt.parentNode; elt; elt = elt.parentNode) {
+      if (elt.localName == "menubar") {
+        this._nativeView = true;
+        break;
+      }
     }
   }
-#endif
 
-  PlacesViewBase.call(this, aPlace);
+  PlacesViewBase.call(this, aPlace, aOptions);
   this._onPopupShowing(aPopupShowingEvent);
 }
 
@@ -1769,3 +1818,153 @@ PlacesMenu.prototype = {
   }
 };
 
+function PlacesPanelMenuView(aPlace, aViewId, aRootId, aOptions) {
+  this._viewElt = document.getElementById(aViewId);
+  this._rootElt = document.getElementById(aRootId);
+  this._viewElt._placesView = this;
+  this.options = aOptions;
+
+  PlacesViewBase.call(this, aPlace, aOptions);
+}
+
+PlacesPanelMenuView.prototype = {
+  __proto__: PlacesViewBase.prototype,
+
+  QueryInterface: function PAMV_QueryInterface(aIID) {
+    return PlacesViewBase.prototype.QueryInterface.apply(this, arguments);
+  },
+
+  uninit: function PAMV_uninit() {
+    PlacesViewBase.prototype.uninit.apply(this, arguments);
+  },
+
+  _insertNewItem:
+  function PAMV__insertNewItem(aChild, aBefore) {
+    this._domNodes.delete(aChild);
+
+    let type = aChild.type;
+    let button;
+    if (type == Ci.nsINavHistoryResultNode.RESULT_TYPE_SEPARATOR) {
+      button = document.createElement("toolbarseparator");
+      button.setAttribute("class", "small-separator");
+    }
+    else {
+      button = document.createElement("toolbarbutton");
+      button.className = "bookmark-item";
+      if (typeof this.options.extraClasses.entry == "string")
+        button.classList.add(this.options.extraClasses.entry);
+      button.setAttribute("label", aChild.title || "");
+      let icon = aChild.icon;
+      if (icon)
+        button.setAttribute("image", icon);
+
+      if (PlacesUtils.containerTypes.indexOf(type) != -1) {
+        button.setAttribute("container", "true");
+
+        if (PlacesUtils.nodeIsQuery(aChild)) {
+          button.setAttribute("query", "true");
+          if (PlacesUtils.nodeIsTagQuery(aChild))
+            button.setAttribute("tagContainer", "true");
+        }
+        else if (PlacesUtils.nodeIsFolder(aChild)) {
+          PlacesUtils.livemarks.getLivemark({ id: aChild.itemId })
+            .then(aLivemark => {
+              button.setAttribute("livemark", "true");
+              this.controller.cacheLivemarkInfo(aChild, aLivemark);
+            }, () => undefined);
+        }
+      }
+      else if (PlacesUtils.nodeIsURI(aChild)) {
+        button.setAttribute("scheme",
+                            PlacesUIUtils.guessUrlSchemeForUI(aChild.uri));
+      }
+    }
+
+    button._placesNode = aChild;
+    if (!this._domNodes.has(aChild))
+      this._domNodes.set(aChild, button);
+
+    this._rootElt.insertBefore(button, aBefore);
+  },
+
+  nodeInserted:
+  function PAMV_nodeInserted(aParentPlacesNode, aPlacesNode, aIndex) {
+    let parentElt = this._getDOMNodeForPlacesNode(aParentPlacesNode);
+    if (parentElt != this._rootElt)
+      return;
+
+    let children = this._rootElt.childNodes;
+    this._insertNewItem(aPlacesNode,
+      aIndex < children.length ? children[aIndex] : null);
+  },
+
+  nodeRemoved:
+  function PAMV_nodeRemoved(aParentPlacesNode, aPlacesNode, aIndex) {
+    let parentElt = this._getDOMNodeForPlacesNode(aParentPlacesNode);
+    if (parentElt != this._rootElt)
+      return;
+
+    let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
+    this._removeChild(elt);
+  },
+
+  nodeMoved:
+  function PAMV_nodeMoved(aPlacesNode,
+                          aOldParentPlacesNode, aOldIndex,
+                          aNewParentPlacesNode, aNewIndex) {
+    let parentElt = this._getDOMNodeForPlacesNode(aNewParentPlacesNode);
+    if (parentElt != this._rootElt)
+      return;
+
+    let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
+    this._removeChild(elt);
+    this._rootElt.insertBefore(elt, this._rootElt.childNodes[aNewIndex]);
+  },
+
+  nodeAnnotationChanged:
+  function PAMV_nodeAnnotationChanged(aPlacesNode, aAnno) {
+    let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
+    // There's no UI representation for the root node.
+    if (elt == this._rootElt)
+      return;
+
+    if (elt.parentNode != this._rootElt)
+      return;
+
+    // All livemarks have a feedURI, so use it as our indicator.
+    if (aAnno == PlacesUtils.LMANNO_FEEDURI) {
+      elt.setAttribute("livemark", true);
+
+      PlacesUtils.livemarks.getLivemark({ id: aPlacesNode.itemId })
+        .then(aLivemark => {
+          this.controller.cacheLivemarkInfo(aPlacesNode, aLivemark);
+          this.invalidateContainer(aPlacesNode);
+        }, Components.utils.reportError);
+    }
+  },
+
+  nodeTitleChanged: function PAMV_nodeTitleChanged(aPlacesNode, aNewTitle) {
+    let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
+
+    // There's no UI representation for the root node.
+    if (elt == this._rootElt)
+      return;
+
+    PlacesViewBase.prototype.nodeTitleChanged.apply(this, arguments);
+  },
+
+  invalidateContainer: function PAMV_invalidateContainer(aPlacesNode) {
+    let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
+    if (elt != this._rootElt)
+      return;
+
+    // Container is the toolbar itself.
+    while (this._rootElt.hasChildNodes()) {
+      this._rootElt.removeChild(this._rootElt.firstChild);
+    }
+
+    for (let i = 0; i < this._resultNode.childCount; ++i) {
+      this._insertNewItem(this._resultNode.getChild(i), null);
+    }
+  }
+};

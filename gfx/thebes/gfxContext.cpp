@@ -14,7 +14,6 @@
 
 #include "gfxContext.h"
 
-#include "gfxColor.h"
 #include "gfxMatrix.h"
 #include "gfxUtils.h"
 #include "gfxASurface.h"
@@ -494,15 +493,15 @@ gfxContext::CurrentLineWidth() const
 }
 
 void
-gfxContext::SetOperator(GraphicsOperator op)
+gfxContext::SetOp(CompositionOp aOp)
 {
-  CurrentState().op = CompositionOpForOp(op);
+  CurrentState().op = aOp;
 }
 
-gfxContext::GraphicsOperator
-gfxContext::CurrentOperator() const
+CompositionOp
+gfxContext::CurrentOp() const
 {
-  return ThebesOp(CurrentState().op);
+  return CurrentState().op;
 }
 
 void
@@ -637,6 +636,40 @@ gfxContext::HasComplexClip() const
 }
 
 bool
+gfxContext::ExportClip(ClipExporter& aExporter)
+{
+  unsigned int lastReset = 0;
+  for (int i = mStateStack.Length() - 1; i > 0; i--) {
+    if (mStateStack[i].clipWasReset) {
+      lastReset = i;
+      break;
+    }
+  }
+
+  for (unsigned int i = lastReset; i < mStateStack.Length(); i++) {
+    for (unsigned int c = 0; c < mStateStack[i].pushedClips.Length(); c++) {
+      AzureState::PushedClip &clip = mStateStack[i].pushedClips[c];
+      gfx::Matrix transform = clip.transform;
+      transform.PostTranslate(-GetDeviceOffset());
+
+      aExporter.BeginClip(transform);
+      if (clip.path) {
+        clip.path->StreamToSink(&aExporter);
+      } else {
+        aExporter.MoveTo(clip.rect.TopLeft());
+        aExporter.LineTo(clip.rect.TopRight());
+        aExporter.LineTo(clip.rect.BottomRight());
+        aExporter.LineTo(clip.rect.BottomLeft());
+        aExporter.Close();
+      }
+      aExporter.EndClip();
+    }
+  }
+
+  return true;
+}
+
+bool
 gfxContext::ClipContainsRect(const gfxRect& aRect)
 {
   unsigned int lastReset = 0;
@@ -673,35 +706,34 @@ gfxContext::ClipContainsRect(const gfxRect& aRect)
 // rendering sources
 
 void
-gfxContext::SetColor(const gfxRGBA& c)
+gfxContext::SetColor(const Color& aColor)
 {
   CurrentState().pattern = nullptr;
   CurrentState().sourceSurfCairo = nullptr;
   CurrentState().sourceSurface = nullptr;
-  CurrentState().color = ToDeviceColor(c);
+  CurrentState().color = ToDeviceColor(aColor);
 }
 
 void
-gfxContext::SetDeviceColor(const gfxRGBA& c)
+gfxContext::SetDeviceColor(const Color& aColor)
 {
   CurrentState().pattern = nullptr;
   CurrentState().sourceSurfCairo = nullptr;
   CurrentState().sourceSurface = nullptr;
-  CurrentState().color = ToColor(c);
+  CurrentState().color = aColor;
 }
 
 bool
-gfxContext::GetDeviceColor(gfxRGBA& c)
+gfxContext::GetDeviceColor(Color& aColorOut)
 {
   if (CurrentState().sourceSurface) {
     return false;
   }
   if (CurrentState().pattern) {
-    gfxRGBA color;
-    return CurrentState().pattern->GetSolidColor(c);
+    return CurrentState().pattern->GetSolidColor(aColorOut);
   }
 
-  c = ThebesRGBA(CurrentState().color);
+  aColorOut = CurrentState().color;
   return true;
 }
 
@@ -739,7 +771,7 @@ gfxContext::GetPattern()
   } else if (state.sourceSurface) {
     NS_ASSERTION(false, "Ugh, this isn't good.");
   } else {
-    pat = new gfxPattern(ThebesRGBA(state.color));
+    pat = new gfxPattern(state.color);
   }
   return pat.forget();
 }
@@ -785,17 +817,17 @@ gfxContext::Mask(gfxASurface *surface, const gfxPoint& offset)
 
   gfxPoint pt = surface->GetDeviceOffset();
 
-  Mask(sourceSurf, Point(offset.x - pt.x, offset.y - pt.y));
+  Mask(sourceSurf, 1.0f, Point(offset.x - pt.x, offset.y - pt.y));
 }
 
 void
-gfxContext::Mask(SourceSurface *surface, const Point& offset)
+gfxContext::Mask(SourceSurface *surface, float alpha, const Point& offset)
 {
   // We clip here to bind to the mask surface bounds, see above.
   mDT->MaskSurface(PatternFromState(this),
             surface,
             offset,
-            DrawOptions(1.0f, CurrentState().op, CurrentState().aaMode));
+            DrawOptions(alpha, CurrentState().op, CurrentState().aaMode));
 }
 
 void

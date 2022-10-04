@@ -94,7 +94,7 @@ js::ErrorObject::create(JSContext* cx, JSExnType errorType, HandleObject stack,
 
     Rooted<ErrorObject*> errObject(cx);
     {
-        const Class *clasp = ErrorObject::classForType(errorType);
+        const Class* clasp = ErrorObject::classForType(errorType);
         JSObject* obj = NewObjectWithGivenProto(cx, clasp, proto);
         if (!obj)
             return nullptr;
@@ -155,10 +155,10 @@ js::ErrorObject::getOrCreateErrorReport(JSContext* cx)
 }
 
 /* static */ bool
-js::ErrorObject::checkAndUnwrapThis(JSContext *cx, CallArgs &args, const char *fnName,
+js::ErrorObject::checkAndUnwrapThis(JSContext* cx, CallArgs& args, const char* fnName,
                                     MutableHandle<ErrorObject*> error)
 {
-    const Value &thisValue = args.thisv();
+    const Value& thisValue = args.thisv();
 
     if (!thisValue.isObject()) {
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_NONNULL_OBJECT,
@@ -201,7 +201,7 @@ js::ErrorObject::checkAndUnwrapThis(JSContext *cx, CallArgs &args, const char *f
 }
 
 /* static */ bool
-js::ErrorObject::getStack(JSContext *cx, unsigned argc, Value *vp)
+js::ErrorObject::getStack(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     Rooted<ErrorObject*> error(cx);
@@ -223,7 +223,7 @@ IsObject(HandleValue v)
 }
 
 /* static */ bool
-js::ErrorObject::setStack(JSContext *cx, unsigned argc, Value *vp)
+js::ErrorObject::setStack(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     // We accept any object here, because of poor-man's subclassing of Error.
@@ -231,9 +231,9 @@ js::ErrorObject::setStack(JSContext *cx, unsigned argc, Value *vp)
 }
 
 /* static */ bool
-js::ErrorObject::setStack_impl(JSContext *cx, const CallArgs& args)
+js::ErrorObject::setStack_impl(JSContext* cx, const CallArgs& args)
 {
-    const Value &thisValue = args.thisv();
+    const Value& thisValue = args.thisv();
     MOZ_ASSERT(thisValue.isObject());
     RootedObject thisObj(cx, &thisValue.toObject());
 

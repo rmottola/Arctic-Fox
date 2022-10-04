@@ -20,6 +20,7 @@
 #include "jit/arm/MacroAssembler-arm.h"
 #include "jit/ExecutableAllocator.h"
 #include "jit/JitCompartment.h"
+#include "jit/MacroAssembler.h"
 
 using namespace js;
 using namespace js::jit;
@@ -1427,7 +1428,7 @@ Assembler::bytesNeeded() const
 void
 Assembler::spew(Instruction* i)
 {
-    if (spewDisabled())
+    if (spewDisabled() || !i)
         return;
     disasm::NameConverter converter;
     disasm::Disassembler dasm(converter);
@@ -1453,7 +1454,7 @@ Assembler::spewTarget(Label* target)
 void
 Assembler::spewBranch(Instruction* i, Label* target /* may be nullptr */)
 {
-    if (spewDisabled())
+    if (spewDisabled() || !i)
         return;
     disasm::NameConverter converter;
     disasm::Disassembler dasm(converter);
@@ -1515,7 +1516,10 @@ Assembler::spewData(BufferOffset addr, size_t numInstr, bool loadToPC)
 {
     if (spewDisabled())
         return;
-    uint32_t *instr = reinterpret_cast<uint32_t*>(m_buffer.getInst(addr));
+    Instruction* inst = m_buffer.getInstOrNull(addr);
+    if (!inst)
+        return;
+    uint32_t *instr = reinterpret_cast<uint32_t*>(inst);
     for ( size_t k=0 ; k < numInstr ; k++ ) {
         spew("   %08x  %08x       (patchable constant load%s)",
              reinterpret_cast<uint32_t>(instr+k), *(instr+k), loadToPC ? " to PC" : "");
@@ -1632,7 +1636,7 @@ Assembler::writeInst(uint32_t x)
 {
     BufferOffset offs = m_buffer.putInt(x);
 #ifdef JS_DISASM_ARM
-    spew(m_buffer.getInst(offs));
+    spew(m_buffer.getInstOrNull(offs));
 #endif
     return offs;
 }
@@ -1642,7 +1646,7 @@ Assembler::writeBranchInst(uint32_t x, Label* documentation)
 {
     BufferOffset offs = m_buffer.putInt(x, /* markAsBranch = */ true);
 #ifdef JS_DISASM_ARM
-    spewBranch(m_buffer.getInst(offs), documentation);
+    spewBranch(m_buffer.getInstOrNull(offs), documentation);
 #endif
     return offs;
 }
@@ -2117,6 +2121,7 @@ Assembler::allocEntry(size_t numInst, unsigned numPoolEntries,
                       bool markAsBranch, bool loadToPC)
 {
     BufferOffset offs = m_buffer.allocEntry(numInst, numPoolEntries, inst, data, pe, markAsBranch);
+    propagateOOM(offs.assigned());
 #ifdef JS_DISASM_ARM
     spewData(offs, numInst, loadToPC);
 #endif
@@ -2374,7 +2379,7 @@ Assembler::as_b(Label* l, Condition c)
         BufferOffset ret = allocBranchInst();
         as_b(BufferOffset(l).diffB<BOffImm>(ret), c, ret);
 #ifdef JS_DISASM_ARM
-        spewBranch(m_buffer.getInst(ret), l);
+        spewBranch(m_buffer.getInstOrNull(ret), l);
 #endif
         return ret;
     }
@@ -2441,7 +2446,7 @@ Assembler::as_bl(Label* l, Condition c)
         BufferOffset ret = allocBranchInst();
         as_bl(BufferOffset(l).diffB<BOffImm>(ret), c, ret);
 #ifdef JS_DISASM_ARM
-        spewBranch(m_buffer.getInst(ret), l);
+        spewBranch(m_buffer.getInstOrNull(ret), l);
 #endif
         return ret;
     }

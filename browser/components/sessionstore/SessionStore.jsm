@@ -147,7 +147,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "gScreenManager",
 XPCOMUtils.defineLazyServiceGetter(this, "Telemetry",
   "@mozilla.org/base/telemetry;1", "nsITelemetry");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-  "resource://gre/modules/devtools/Console.jsm");
+  "resource://gre/modules/devtools/shared/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RecentWindow",
   "resource:///modules/RecentWindow.jsm");
 
@@ -160,7 +160,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivacyFilter",
 XPCOMUtils.defineLazyModuleGetter(this, "RunState",
   "resource:///modules/sessionstore/RunState.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ScratchpadManager",
-  "resource://gre/modules/devtools/scratchpad-manager.jsm");
+  "resource:///modules/devtools/client/scratchpad/scratchpad-manager.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionSaver",
   "resource:///modules/sessionstore/SessionSaver.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionCookies",
@@ -329,6 +329,10 @@ this.SessionStore = {
 
   navigateAndRestore(tab, loadArguments, historyIndex) {
     return SessionStoreInternal.navigateAndRestore(tab, loadArguments, historyIndex);
+  },
+
+  getSessionHistory(tab, updatedCallback) {
+    return SessionStoreInternal.getSessionHistory(tab, updatedCallback);
   },
 
   /**
@@ -2536,6 +2540,34 @@ var SessionStoreInternal = {
   },
 
   /**
+   * Retrieves the latest session history information for a tab. The cached data
+   * is returned immediately, but a callback may be provided that supplies
+   * up-to-date data when or if it is available. The callback is passed a single
+   * argument with data in the same format as the return value.
+   *
+   * @param tab tab to retrieve the session history for
+   * @param updatedCallback function to call with updated data as the single argument
+   * @returns a object containing 'index' specifying the current index, and an
+   * array 'entries' containing an object for each history item.
+   */
+  getSessionHistory(tab, updatedCallback) {
+    if (updatedCallback) {
+      TabStateFlusher.flush(tab.linkedBrowser).then(() => {
+        let sessionHistory = this.getSessionHistory(tab);
+        if (sessionHistory) {
+          updatedCallback(sessionHistory);
+        }
+      });
+    }
+
+    // Don't continue if the tab was closed before TabStateFlusher.flush resolves.
+    if (tab.linkedBrowser) {
+      let tabState = TabState.collect(tab);
+      return { index: tabState.index - 1, entries: tabState.entries }
+    }
+  },
+
+  /**
    * See if aWindow is usable for use when restoring a previous session via
    * restoreLastSession. If usable, prepare it for use.
    *
@@ -3585,8 +3617,8 @@ var SessionStoreInternal = {
    */
   _isCmdLineEmpty: function ssi_isCmdLineEmpty(aWindow, aState) {
     var pinnedOnly = aState.windows &&
-                     aState.windows.every(function (win)
-                       win.tabs.every(function (tab) tab.pinned));
+                     aState.windows.every(win =>
+                       win.tabs.every(tab => tab.pinned));
 
     let hasFirstArgument = aWindow.arguments && aWindow.arguments[0];
     if (!pinnedOnly) {

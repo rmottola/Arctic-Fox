@@ -392,7 +392,7 @@ class Assembler : public AssemblerX86Shared
     }
 
     void vhaddpd(FloatRegister src, FloatRegister dest) {
-        MOZ_ASSERT(HasSSE2());
+        MOZ_ASSERT(HasSSE3());
         MOZ_ASSERT(src.size() == 16);
         MOZ_ASSERT(dest.size() == 16);
         masm.vhaddpd_rr(src.encoding(), dest.encoding());
@@ -470,7 +470,7 @@ class Assembler : public AssemblerX86Shared
         CodeOffsetLabel offset(size());
         JmpSrc src = enabled ? masm.call() : masm.cmp_eax();
         addPendingJump(src, ImmPtr(target->raw()), Relocation::JITCODE);
-        MOZ_ASSERT(size() - offset.offset() == ToggledCallSize(nullptr));
+        MOZ_ASSERT_IF(!oom(), size() - offset.offset() == ToggledCallSize(nullptr));
         return offset;
     }
 

@@ -578,11 +578,11 @@ JSONParser<CharT>::advanceAfterProperty()
 }
 
 inline bool
-JSONParserBase::finishObject(MutableHandleValue vp, PropertyVector &properties)
+JSONParserBase::finishObject(MutableHandleValue vp, PropertyVector& properties)
 {
     MOZ_ASSERT(&properties == &stack.back().properties());
 
-    JSObject *obj = ObjectGroup::newPlainObject(cx, properties.begin(), properties.length(), GenericObject);
+    JSObject* obj = ObjectGroup::newPlainObject(cx, properties.begin(), properties.length(), GenericObject);
     if (!obj)
         return false;
 

@@ -200,7 +200,7 @@ class JS_PUBLIC_API(CallbackTracer) : public JSTracer
 };
 
 // Set the name portion of the tracer's context for the current edge.
-class AutoTracingName
+class MOZ_RAII AutoTracingName
 {
     CallbackTracer* trc_;
     const char* prior_;
@@ -217,7 +217,7 @@ class AutoTracingName
 };
 
 // Set the index portion of the tracer's context for the current range.
-class AutoTracingIndex
+class MOZ_RAII AutoTracingIndex
 {
     CallbackTracer* trc_;
 
@@ -246,7 +246,7 @@ class AutoTracingIndex
 
 // Set a context callback for the trace callback to use, if it needs a detailed
 // edge description.
-class AutoTracingDetails
+class MOZ_RAII AutoTracingDetails
 {
     CallbackTracer* trc_;
 
@@ -339,9 +339,12 @@ extern JS_PUBLIC_API(void)
 JS_CallTenuredObjectTracer(JSTracer* trc, JS::TenuredHeap<JSObject*>* objp, const char* name);
 
 extern JS_PUBLIC_API(void)
-JS_TraceChildren(JSTracer* trc, void* thing, JS::TraceKind kind);
+JS_TraceRuntime(JSTracer* trc);
 
 namespace JS {
+extern JS_PUBLIC_API(void)
+TraceChildren(JSTracer* trc, GCCellPtr thing);
+
 typedef js::HashSet<Zone*, js::DefaultHasher<Zone*>, js::SystemAllocPolicy> ZoneSet;
 } // namespace JS
 
