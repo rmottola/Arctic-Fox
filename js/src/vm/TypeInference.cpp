@@ -1368,7 +1368,7 @@ class TypeConstraintFreezeStack : public TypeConstraint
 
 bool
 js::FinishCompilation(JSContext* cx, HandleScript script, CompilerConstraintList* constraints,
-                      RecompileInfo* precompileInfo)
+                      RecompileInfo* precompileInfo, bool* isValidOut)
 {
     if (constraints->failed())
         return false;
@@ -1454,9 +1454,11 @@ js::FinishCompilation(JSContext* cx, HandleScript script, CompilerConstraintList
     if (!succeeded || types.compilerOutputs->back().pendingInvalidation()) {
         types.compilerOutputs->back().invalidate();
         script->resetWarmUpCounter();
-        return false;
+        *isValidOut = false;
+        return true;
     }
 
+    *isValidOut = true;
     return true;
 }
 
