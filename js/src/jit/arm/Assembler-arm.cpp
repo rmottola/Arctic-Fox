@@ -1540,7 +1540,7 @@ Assembler::spewData(BufferOffset addr, size_t numInstr, bool loadToPC)
 bool
 Assembler::spewDisabled()
 {
-    return !JitSpewEnabled(JitSpew_Codegen);
+    return !(JitSpewEnabled(JitSpew_Codegen) || printer_);
 }
 
 void
@@ -1555,6 +1555,10 @@ Assembler::spew(const char* fmt, ...)
 void
 Assembler::spew(const char* fmt, va_list va)
 {
+    if (printer_) {
+        printer_->vprintf(fmt, va);
+        printer_->put("\n");
+    }
     js::jit::JitSpewVA(js::jit::JitSpew_Codegen, fmt, va);
 }
 

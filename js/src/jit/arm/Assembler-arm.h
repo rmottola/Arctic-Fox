@@ -1328,6 +1328,7 @@ class Assembler : public AssemblerShared
 
     SpewNodes spewNodes_;
     uint32_t spewNext_;
+    Sprinter* printer_;
 
     bool spewDisabled();
     uint32_t spewResolve(Label* l);
@@ -1344,6 +1345,7 @@ class Assembler : public AssemblerShared
       : m_buffer(1, 1, 8, GetPoolMaxOffset(), 8, 0xe320f000, 0xeaffffff, GetNopFill()),
 #ifdef JS_DISASM_ARM
         spewNext_(1000),
+        printer_(nullptr),
 #endif
         isFinished(false),
         dtmActive(false),
@@ -1404,6 +1406,7 @@ class Assembler : public AssemblerShared
     bool oom() const;
 
     void setPrinter(Sprinter* sp) {
+        printer_ = sp;
     }
 
     static const Register getStackPointer() {
