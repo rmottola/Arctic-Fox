@@ -3439,9 +3439,6 @@ MClampToUint8::foldsTo(TempAllocator& alloc)
 bool
 MCompare::tryFoldEqualOperands(bool* result)
 {
-    // Temporarily disabled due to bug 1130679.
-    return false;
-
     if (lhs() != rhs())
         return false;
 
