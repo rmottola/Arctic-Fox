@@ -236,25 +236,15 @@ class Assembler : public vixl::Assembler
             preBarrierTableBytes();
     }
 
-    void addCodeLabel(CodeLabel label) {
-        propagateOOM(codeLabels_.append(label));
-    }
-    size_t numCodeLabels() const {
-        return codeLabels_.length();
-    }
-    CodeLabel codeLabel(size_t i) {
-        return codeLabels_[i];
-    }
     void processCodeLabels(uint8_t* rawCode) {
         for (size_t i = 0; i < codeLabels_.length(); i++) {
             CodeLabel label = codeLabels_[i];
-            Bind(rawCode, label.dest(), rawCode + actualOffset(label.src()->offset()));
+            Bind(rawCode, label.dest(), rawCode + label.src()->offset());
         }
     }
 
     void Bind(uint8_t* rawCode, AbsoluteLabel* label, const void* address) {
-        uint32_t off = actualOffset(label->offset());
-        *reinterpret_cast<const void**>(rawCode + off) = address;
+        *reinterpret_cast<const void**>(rawCode + label->offset()) = address;
     }
     bool nextLink(BufferOffset cur, BufferOffset* next) {
         Instruction* link = getInstructionAt(cur);
@@ -272,16 +262,11 @@ class Assembler : public vixl::Assembler
         armbuffer_.flushPool();
     }
 
-    int actualOffset(int curOffset) {
-        return curOffset + armbuffer_.poolSizeBefore(curOffset);
-    }
     int actualIndex(int curOffset) {
         ARMBuffer::PoolEntry pe(curOffset);
         return armbuffer_.poolEntryOffset(pe);
     }
-    int labelOffsetToPatchOffset(int labelOff) {
-        return actualOffset(labelOff);
-    }
+    size_t labelOffsetToPatchOffset(size_t labelOff) { return labelOff; }
     static uint8_t* PatchableJumpAddress(JitCode* code, uint32_t index) {
         return code->raw() + index;
     }
@@ -388,7 +373,7 @@ class Assembler : public vixl::Assembler
 
     // Convert a BufferOffset to a final byte offset from the start of the code buffer.
     size_t toFinalOffset(BufferOffset offset) {
-        return size_t(offset.getOffset() + armbuffer_.poolSizeBefore(offset.getOffset()));
+        return size_t(offset.getOffset());
     }
 
   public:
@@ -465,8 +450,6 @@ class Assembler : public vixl::Assembler
           : offset(offset), target(target), kind(kind)
         { }
     };
-
-    js::Vector<CodeLabel, 0, SystemAllocPolicy> codeLabels_;
 
     // List of jumps for which the target is either unknown until finalization,
     // or cannot be known due to GC. Each entry here requires a unique entry

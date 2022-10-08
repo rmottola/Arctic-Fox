@@ -160,8 +160,8 @@ CodeGeneratorARM::bailoutFrom(Label* label, LSnapshot* snapshot)
     if (masm.bailed())
         return;
 
-    MOZ_ASSERT(label->used());
-    MOZ_ASSERT(!label->bound());
+    MOZ_ASSERT_IF(!masm.oom(), label->used());
+    MOZ_ASSERT_IF(!masm.oom(), !label->bound());
 
     encode(snapshot);
 
@@ -546,12 +546,14 @@ CodeGeneratorARM::visitDivI(LDivI* ins)
     if (mir->canTruncateRemainder()) {
         masm.ma_sdiv(lhs, rhs, output);
     } else {
-        ScratchRegisterScope scratch(masm);
-        masm.ma_sdiv(lhs, rhs, scratch);
-        masm.ma_mul(scratch, rhs, temp);
-        masm.ma_cmp(lhs, temp);
+        {
+            ScratchRegisterScope scratch(masm);
+            masm.ma_sdiv(lhs, rhs, temp);
+            masm.ma_mul(temp, rhs, scratch);
+            masm.ma_cmp(lhs, scratch);
+        }
         bailoutIf(Assembler::NotEqual, ins->snapshot());
-        masm.ma_mov(scratch, output);
+        masm.ma_mov(temp, output);
     }
 
     masm.bind(&done);
@@ -2447,12 +2449,26 @@ CodeGeneratorARM::visitUDiv(LUDiv* ins)
 
     masm.ma_udiv(lhs, rhs, output);
 
+    // Check for large unsigned result - represent as double.
     if (!ins->mir()->isTruncated()) {
+        MOZ_ASSERT(ins->mir()->fallible());
         masm.ma_cmp(output, Imm32(0));
         bailoutIf(Assembler::LessThan, ins->snapshot());
     }
 
-    masm.bind(&done);
+    // Check for non-zero remainder if not truncating to int.
+    if (!ins->mir()->canTruncateRemainder()) {
+        MOZ_ASSERT(ins->mir()->fallible());
+        {
+            ScratchRegisterScope scratch(masm);
+            masm.ma_mul(rhs, output, scratch);
+            masm.ma_cmp(scratch, lhs);
+        }
+        bailoutIf(Assembler::NotEqual, ins->snapshot());
+    }
+
+    if (done.used())
+        masm.bind(&done);
 }
 
 void
@@ -2467,12 +2483,15 @@ CodeGeneratorARM::visitUMod(LUMod* ins)
 
     masm.ma_umod(lhs, rhs, output);
 
+    // Check for large unsigned result - represent as double.
     if (!ins->mir()->isTruncated()) {
+        MOZ_ASSERT(ins->mir()->fallible());
         masm.ma_cmp(output, Imm32(0));
         bailoutIf(Assembler::LessThan, ins->snapshot());
     }
 
-    masm.bind(&done);
+    if (done.used())
+        masm.bind(&done);
 }
 
 template<class T>

@@ -12,23 +12,6 @@
 #include <limits.h>
 #include <stdint.h>
 
-#define REGISTERS_NAMES         \
-    { "zero", "at", "v0", "v1", "a0", "a1", "a2", "a3", \
-      "t0",   "t1", "t2", "t3", "t4", "t5", "t6", "t7", \
-      "s0",   "s1", "s2", "s3", "s4", "s5", "s6", "s7", \
-      "t8",   "t9", "k0", "k1", "gp", "sp", "fp", "ra"};
-
-#define REGISTERS_ALLOCATABLE   14
-#define REGISTERS_ARGREGMASK    SharedArgRegMask
-
-#define REGISTERS_JSCALLMASK    \
-    (1 << Registers::a2) |      \
-    (1 << Registers::a3);
-
-#define REGISTERS_CALLMASK      \
-    (1 << Registers::v0) |      \
-    (1 << Registers::v1);  // used for double-size returns
-
 #include "jit/mips-shared/Architecture-mips-shared.h"
 
 #include "js/Utility.h"
@@ -59,7 +42,7 @@ static const uint32_t BAILOUT_TABLE_ENTRY_SIZE = 2 * sizeof(void*);
 
 // When using O32 ABI, floating-point coprocessor is 32 bit.
 // When using N32 ABI, floating-point coprocessor is 64 bit.
-class FloatRegisters : public BaseFloatRegisters
+class FloatRegisters : public FloatRegistersMIPSShared
 {
   public:
     static const char* GetName(uint32_t i) {
@@ -128,7 +111,7 @@ class FloatRegisters : public BaseFloatRegisters
     static const SetType AllocatableMask = AllMask & ~NonAllocatableMask;
 };
 
-class FloatRegister : public BaseFloatRegister
+class FloatRegister : public FloatRegisterMIPSShared
 {
   public:
     enum RegType {

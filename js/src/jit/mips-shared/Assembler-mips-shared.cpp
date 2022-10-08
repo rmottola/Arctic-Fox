@@ -89,12 +89,6 @@ AssemblerMIPSShared::finish()
 }
 
 uint32_t
-AssemblerMIPSShared::actualOffset(uint32_t off_) const
-{
-    return off_;
-}
-
-uint32_t
 AssemblerMIPSShared::actualIndex(uint32_t idx_) const
 {
     return idx_;
@@ -104,12 +98,6 @@ uint8_t*
 AssemblerMIPSShared::PatchableJumpAddress(JitCode* code, uint32_t pe_)
 {
     return code->raw() + pe_;
-}
-
-Assembler&
-AssemblerMIPSShared::asAsm()
-{
-    return *static_cast<Assembler*>(this);
 }
 
 void
@@ -138,7 +126,7 @@ AssemblerMIPSShared::processCodeLabels(uint8_t* rawCode)
 {
     for (size_t i = 0; i < codeLabels_.length(); i++) {
         CodeLabel label = codeLabels_[i];
-        asAsm().Bind(rawCode, label.dest(), rawCode + actualOffset(label.src()->offset()));
+        Bind(rawCode, label.dest(), rawCode + label.src()->offset());
     }
 }
 
@@ -229,12 +217,6 @@ AssemblerMIPSShared::oom() const
            jumpRelocations_.oom() ||
            dataRelocations_.oom() ||
            preBarriers_.oom();
-}
-
-void
-AssemblerMIPSShared::addCodeLabel(CodeLabel label)
-{
-    propagateOOM(codeLabels_.append(label));
 }
 
 // Size of the instruction stream, in bytes.
@@ -481,9 +463,28 @@ AssemblerMIPSShared::as_addiu(Register rd, Register rs, int32_t j)
 }
 
 BufferOffset
+AssemblerMIPSShared::as_daddu(Register rd, Register rs, Register rt)
+{
+    return writeInst(InstReg(op_special, rs, rt, rd, ff_daddu).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_daddiu(Register rd, Register rs, int32_t j)
+{
+    MOZ_ASSERT(Imm16::IsInSignedRange(j));
+    return writeInst(InstImm(op_daddiu, rs, rd, Imm16(j)).encode());
+}
+
+BufferOffset
 AssemblerMIPSShared::as_subu(Register rd, Register rs, Register rt)
 {
     return writeInst(InstReg(op_special, rs, rt, rd, ff_subu).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dsubu(Register rd, Register rs, Register rt)
+{
+    return writeInst(InstReg(op_special, rs, rt, rd, ff_dsubu).encode());
 }
 
 BufferOffset
@@ -499,6 +500,18 @@ AssemblerMIPSShared::as_multu(Register rs, Register rt)
 }
 
 BufferOffset
+AssemblerMIPSShared::as_dmult(Register rs, Register rt)
+{
+    return writeInst(InstReg(op_special, rs, rt, ff_dmult).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dmultu(Register rs, Register rt)
+{
+    return writeInst(InstReg(op_special, rs, rt, ff_dmultu).encode());
+}
+
+BufferOffset
 AssemblerMIPSShared::as_div(Register rs, Register rt)
 {
     return writeInst(InstReg(op_special, rs, rt, ff_div).encode());
@@ -508,6 +521,18 @@ BufferOffset
 AssemblerMIPSShared::as_divu(Register rs, Register rt)
 {
     return writeInst(InstReg(op_special, rs, rt, ff_divu).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_ddiv(Register rs, Register rt)
+{
+    return writeInst(InstReg(op_special, rs, rt, ff_ddiv).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_ddivu(Register rs, Register rt)
+{
+    return writeInst(InstReg(op_special, rs, rt, ff_ddivu).encode());
 }
 
 BufferOffset
@@ -532,9 +557,29 @@ AssemblerMIPSShared::as_sll(Register rd, Register rt, uint16_t sa)
 }
 
 BufferOffset
+AssemblerMIPSShared::as_dsll(Register rd, Register rt, uint16_t sa)
+{
+    MOZ_ASSERT(sa < 32);
+    return writeInst(InstReg(op_special, rs_zero, rt, rd, sa, ff_dsll).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dsll32(Register rd, Register rt, uint16_t sa)
+{
+    MOZ_ASSERT(31 < sa && sa < 64);
+    return writeInst(InstReg(op_special, rs_zero, rt, rd, sa - 32, ff_dsll32).encode());
+}
+
+BufferOffset
 AssemblerMIPSShared::as_sllv(Register rd, Register rt, Register rs)
 {
     return writeInst(InstReg(op_special, rs, rt, rd, ff_sllv).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dsllv(Register rd, Register rt, Register rs)
+{
+    return writeInst(InstReg(op_special, rs, rt, rd, ff_dsllv).encode());
 }
 
 BufferOffset
@@ -545,9 +590,29 @@ AssemblerMIPSShared::as_srl(Register rd, Register rt, uint16_t sa)
 }
 
 BufferOffset
+AssemblerMIPSShared::as_dsrl(Register rd, Register rt, uint16_t sa)
+{
+    MOZ_ASSERT(sa < 32);
+    return writeInst(InstReg(op_special, rs_zero, rt, rd, sa, ff_dsrl).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dsrl32(Register rd, Register rt, uint16_t sa)
+{
+    MOZ_ASSERT(31 < sa && sa < 64);
+    return writeInst(InstReg(op_special, rs_zero, rt, rd, sa - 32, ff_dsrl32).encode());
+}
+
+BufferOffset
 AssemblerMIPSShared::as_srlv(Register rd, Register rt, Register rs)
 {
     return writeInst(InstReg(op_special, rs, rt, rd, ff_srlv).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dsrlv(Register rd, Register rt, Register rs)
+{
+    return writeInst(InstReg(op_special, rs, rt, rd, ff_dsrlv).encode());
 }
 
 BufferOffset
@@ -558,9 +623,29 @@ AssemblerMIPSShared::as_sra(Register rd, Register rt, uint16_t sa)
 }
 
 BufferOffset
+AssemblerMIPSShared::as_dsra(Register rd, Register rt, uint16_t sa)
+{
+    MOZ_ASSERT(sa < 32);
+    return writeInst(InstReg(op_special, rs_zero, rt, rd, sa, ff_dsra).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dsra32(Register rd, Register rt, uint16_t sa)
+{
+    MOZ_ASSERT(31 < sa && sa < 64);
+    return writeInst(InstReg(op_special, rs_zero, rt, rd, sa - 32, ff_dsra32).encode());
+}
+
+BufferOffset
 AssemblerMIPSShared::as_srav(Register rd, Register rt, Register rs)
 {
     return writeInst(InstReg(op_special, rs, rt, rd, ff_srav).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dsrav(Register rd, Register rt, Register rs)
+{
+    return writeInst(InstReg(op_special, rs, rt, rd, ff_dsrav).encode());
 }
 
 BufferOffset
@@ -571,9 +656,29 @@ AssemblerMIPSShared::as_rotr(Register rd, Register rt, uint16_t sa)
 }
 
 BufferOffset
+AssemblerMIPSShared::as_drotr(Register rd, Register rt, uint16_t sa)
+{
+    MOZ_ASSERT(sa < 32);
+    return writeInst(InstReg(op_special, rs_one, rt, rd, sa, ff_dsrl).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_drotr32(Register rd, Register rt, uint16_t sa)
+{
+    MOZ_ASSERT(31 < sa && sa < 64);
+    return writeInst(InstReg(op_special, rs_one, rt, rd, sa - 32, ff_dsrl32).encode());
+}
+
+BufferOffset
 AssemblerMIPSShared::as_rotrv(Register rd, Register rt, Register rs)
 {
     return writeInst(InstReg(op_special, rs, rt, rd, 1, ff_srlv).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_drotrv(Register rd, Register rt, Register rs)
+{
+    return writeInst(InstReg(op_special, rs, rt, rd, 1, ff_dsrlv).encode());
 }
 
 // Load and store instructions
@@ -608,6 +713,12 @@ AssemblerMIPSShared::as_lw(Register rd, Register rs, int16_t off)
 }
 
 BufferOffset
+AssemblerMIPSShared::as_lwu(Register rd, Register rs, int16_t off)
+{
+    return writeInst(InstImm(op_lwu, rs, rd, Imm16(off)).encode());
+}
+
+BufferOffset
 AssemblerMIPSShared::as_lwl(Register rd, Register rs, int16_t off)
 {
     return writeInst(InstImm(op_lwl, rs, rd, Imm16(off)).encode());
@@ -617,6 +728,30 @@ BufferOffset
 AssemblerMIPSShared::as_lwr(Register rd, Register rs, int16_t off)
 {
     return writeInst(InstImm(op_lwr, rs, rd, Imm16(off)).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_ll(Register rd, Register rs, int16_t off)
+{
+    return writeInst(InstImm(op_ll, rs, rd, Imm16(off)).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_ld(Register rd, Register rs, int16_t off)
+{
+    return writeInst(InstImm(op_ld, rs, rd, Imm16(off)).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_ldl(Register rd, Register rs, int16_t off)
+{
+    return writeInst(InstImm(op_ldl, rs, rd, Imm16(off)).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_ldr(Register rd, Register rs, int16_t off)
+{
+    return writeInst(InstImm(op_ldr, rs, rd, Imm16(off)).encode());
 }
 
 BufferOffset
@@ -647,6 +782,30 @@ BufferOffset
 AssemblerMIPSShared::as_swr(Register rd, Register rs, int16_t off)
 {
     return writeInst(InstImm(op_swr, rs, rd, Imm16(off)).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_sc(Register rd, Register rs, int16_t off)
+{
+    return writeInst(InstImm(op_sc, rs, rd, Imm16(off)).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_sd(Register rd, Register rs, int16_t off)
+{
+    return writeInst(InstImm(op_sd, rs, rd, Imm16(off)).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_sdl(Register rd, Register rs, int16_t off)
+{
+    return writeInst(InstImm(op_sdl, rs, rd, Imm16(off)).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_sdr(Register rd, Register rs, int16_t off)
+{
+    return writeInst(InstImm(op_sdr, rs, rd, Imm16(off)).encode());
 }
 
 // Move from HI/LO register.
@@ -726,6 +885,12 @@ AssemblerMIPSShared::as_clz(Register rd, Register rs)
 }
 
 BufferOffset
+AssemblerMIPSShared::as_dclz(Register rd, Register rs)
+{
+    return writeInst(InstReg(op_special2, rs, rd, rd, ff_dclz).encode());
+}
+
+BufferOffset
 AssemblerMIPSShared::as_ins(Register rt, Register rs, uint16_t pos, uint16_t size)
 {
     MOZ_ASSERT(pos < 32 && size != 0 && size <= 32 && pos + size != 0 && pos + size <= 32);
@@ -735,12 +900,79 @@ AssemblerMIPSShared::as_ins(Register rt, Register rs, uint16_t pos, uint16_t siz
 }
 
 BufferOffset
+AssemblerMIPSShared::as_dins(Register rt, Register rs, uint16_t pos, uint16_t size)
+{
+    MOZ_ASSERT(pos < 32 && size != 0 && size <= 32 && pos + size != 0 && pos + size <= 32);
+    Register rd;
+    rd = Register::FromCode(pos + size - 1);
+    return writeInst(InstReg(op_special3, rs, rt, rd, pos, ff_dins).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dinsm(Register rt, Register rs, uint16_t pos, uint16_t size)
+{
+    MOZ_ASSERT(pos < 32 && size >= 2 && size <= 64 && pos + size > 32 && pos + size <= 64);
+    Register rd;
+    rd = Register::FromCode(pos + size - 1 - 32);
+    return writeInst(InstReg(op_special3, rs, rt, rd, pos, ff_dinsm).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dinsu(Register rt, Register rs, uint16_t pos, uint16_t size)
+{
+    MOZ_ASSERT(pos >= 32 && pos < 64 && size >= 1 && size <= 32 && pos + size > 32 && pos + size <= 64);
+    Register rd;
+    rd = Register::FromCode(pos + size - 1 - 32);
+    return writeInst(InstReg(op_special3, rs, rt, rd, pos - 32, ff_dinsu).encode());
+}
+
+BufferOffset
 AssemblerMIPSShared::as_ext(Register rt, Register rs, uint16_t pos, uint16_t size)
 {
     MOZ_ASSERT(pos < 32 && size != 0 && size <= 32 && pos + size != 0 && pos + size <= 32);
     Register rd;
     rd = Register::FromCode(size - 1);
     return writeInst(InstReg(op_special3, rs, rt, rd, pos, ff_ext).encode());
+}
+
+// Sign extend
+BufferOffset
+AssemblerMIPSShared::as_seb(Register rd, Register rt)
+{
+    return writeInst(InstReg(op_special3, zero, rt, rd, 16, ff_bshfl).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_seh(Register rd, Register rt)
+{
+    return writeInst(InstReg(op_special3, zero, rt, rd, 24, ff_bshfl).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dext(Register rt, Register rs, uint16_t pos, uint16_t size)
+{
+    MOZ_ASSERT(pos < 32 && size != 0 && size <= 32 && pos + size != 0 && pos + size <= 63);
+    Register rd;
+    rd = Register::FromCode(size - 1);
+    return writeInst(InstReg(op_special3, rs, rt, rd, pos, ff_dext).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dextm(Register rt, Register rs, uint16_t pos, uint16_t size)
+{
+    MOZ_ASSERT(pos < 32 && size > 32 && size <= 64 && pos + size > 32 && pos + size <= 64);
+    Register rd;
+    rd = Register::FromCode(size - 1 - 32);
+   return writeInst(InstReg(op_special3, rs, rt, rd, pos, ff_dextm).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dextu(Register rt, Register rs, uint16_t pos, uint16_t size)
+{
+    MOZ_ASSERT(pos >= 32 && pos < 64 && size != 0 && size <= 32 && pos + size > 32 && pos + size <= 64);
+    Register rd;
+    rd = Register::FromCode(size - 1);
+    return writeInst(InstReg(op_special3, rs, rt, rd, pos - 32, ff_dextu).encode());
 }
 
 // FP instructions
@@ -796,6 +1028,30 @@ AssemblerMIPSShared::as_mfc1(Register rt, FloatRegister fs)
     return writeInst(InstReg(op_cop1, rs_mfc1, rt, fs).encode());
 }
 
+BufferOffset
+AssemblerMIPSShared::as_mthc1(Register rt, FloatRegister fs)
+{
+    return writeInst(InstReg(op_cop1, rs_mthc1, rt, fs).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_mfhc1(Register rt, FloatRegister fs)
+{
+    return writeInst(InstReg(op_cop1, rs_mfhc1, rt, fs).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dmtc1(Register rt, FloatRegister fs)
+{
+    return writeInst(InstReg(op_cop1, rs_dmtc1, rt, fs).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_dmfc1(Register rt, FloatRegister fs)
+{
+    return writeInst(InstReg(op_cop1, rs_dmfc1, rt, fs).encode());
+}
+
 // FP convert instructions
 BufferOffset
 AssemblerMIPSShared::as_ceilws(FloatRegister fd, FloatRegister fs)
@@ -843,6 +1099,12 @@ BufferOffset
 AssemblerMIPSShared::as_truncwd(FloatRegister fd, FloatRegister fs)
 {
     return writeInst(InstReg(op_cop1, rs_d, zero, fs, fd, ff_trunc_w_fmt).encode());
+}
+
+BufferOffset
+AssemblerMIPSShared::as_cvtdl(FloatRegister fd, FloatRegister fs)
+{
+    return writeInst(InstReg(op_cop1, rs_l, zero, fs, fd, ff_cvt_d_fmt).encode());
 }
 
 BufferOffset
@@ -1040,7 +1302,7 @@ AssemblerMIPSShared::bind(Label* label, BufferOffset boff)
 
             // Second word holds a pointer to the next branch in label's chain.
             next = inst[1].encode();
-            asAsm().bind(reinterpret_cast<InstImm*>(inst), b.getOffset(), dest.getOffset());
+            bind(reinterpret_cast<InstImm*>(inst), b.getOffset(), dest.getOffset());
 
             b = BufferOffset(next);
         } while (next != LabelBase::INVALID_OFFSET);
@@ -1093,10 +1355,10 @@ AssemblerMIPSShared::as_break(uint32_t code)
 }
 
 void
-AssemblerMIPSShared::PatchDataWithValueCheck(CodeLocationLabel label, ImmPtr newValue, ImmPtr expectedValue)
+AssemblerMIPSShared::as_sync(uint32_t stype)
 {
-    Assembler::PatchDataWithValueCheck(label, PatchedImmPtr(newValue.value),
-                            PatchedImmPtr(expectedValue.value));
+    MOZ_ASSERT(stype <= 31);
+    writeInst(InstReg(op_special, zero, zero, zero, stype, ff_sync).encode());
 }
 
 // This just stomps over memory with 32 bits of raw data. Its purpose is to

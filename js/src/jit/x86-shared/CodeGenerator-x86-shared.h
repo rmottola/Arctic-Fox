@@ -78,7 +78,7 @@ class CodeGeneratorX86Shared : public CodeGeneratorShared
         LInstruction* ins_;
 
       public:
-        OutOfLineSimdFloatToIntCheck(Register temp, FloatRegister input, LInstruction* ins)
+        OutOfLineSimdFloatToIntCheck(Register temp, FloatRegister input, LInstruction *ins)
           : temp_(temp), input_(input), ins_(ins)
         {}
 
@@ -238,7 +238,7 @@ class CodeGeneratorX86Shared : public CodeGeneratorShared
     virtual void visitGuardClass(LGuardClass* guard);
     virtual void visitEffectiveAddress(LEffectiveAddress* ins);
     virtual void visitUDivOrMod(LUDivOrMod* ins);
-    virtual void visitUDivOrModConstant(LUDivOrModConstant* ins);
+    virtual void visitUDivOrModConstant(LUDivOrModConstant *ins);
     virtual void visitAsmJSPassStackArg(LAsmJSPassStackArg* ins);
     virtual void visitMemoryBarrier(LMemoryBarrier* ins);
     virtual void visitAtomicTypedArrayElementBinop(LAtomicTypedArrayElementBinop* lir);

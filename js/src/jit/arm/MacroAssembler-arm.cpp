@@ -300,20 +300,19 @@ MacroAssemblerARM::alu_dbl(Register src1, Imm32 imm, Register dest, ALUOp op,
 {
     if ((s == SetCC && ! condsAreSafe(op)) || !can_dbl(op))
         return false;
+
     ALUOp interop = getDestVariant(op);
     Imm8::TwoImm8mData both = Imm8::EncodeTwoImms(imm.value);
     if (both.fst.invalid)
         return false;
-
-    ScratchRegisterScope scratch(asMasm());
 
     // For the most part, there is no good reason to set the condition codes for
     // the first instruction. We can do better things if the second instruction
     // doesn't have a dest, such as check for overflow by doing first operation
     // don't do second operation if first operation overflowed. This preserves
     // the overflow condition code. Unfortunately, it is horribly brittle.
-    as_alu(scratch, src1, Operand2(both.fst), interop, LeaveCC, c);
-    as_alu(dest, scratch, Operand2(both.snd), op, s, c);
+    as_alu(dest, src1, Operand2(both.fst), interop, LeaveCC, c);
+    as_alu(dest, dest, Operand2(both.snd), op, s, c);
     return true;
 }
 
@@ -418,7 +417,18 @@ MacroAssemblerARM::ma_alu(Register src1, Imm32 imm, Register dest,
         alu_dbl(src1, negImm, negDest, negOp, s, c))
         return;
 
-    ScratchRegisterScope scratch(asMasm());
+    // Often this code is called with dest as the ScratchRegister.  The register
+    // is logically owned by the caller after this call.
+    const Register& scratch = ScratchRegister;
+    MOZ_ASSERT(src1 != scratch);
+#ifdef DEBUG
+    if (dest != scratch) {
+        // If the destination register is not the scratch register, double check
+        // that the current function does not erase the content of the scratch
+        // register.
+        ScratchRegisterScope assertScratch(asMasm());
+    }
+#endif
 
     // Well, damn. We can use two 16 bit mov's, then do the op or we can do a
     // single load from a pool then op.
@@ -2004,15 +2014,13 @@ MacroAssemblerARMCompat::load8ZeroExtend(const BaseIndex& src, Register dest)
     Register base = src.base;
     uint32_t scale = Imm32::ShiftOf(src.scale).value;
 
-    ScratchRegisterScope scratch(asMasm());
-
-    if (src.offset != 0) {
-        ma_mov(base, scratch);
-        base = scratch;
-        ma_add(base, Imm32(src.offset), base);
+    if (src.offset == 0) {
+        ma_ldrb(DTRAddr(base, DtrRegImmShift(src.index, LSL, scale)), dest);
+    } else {
+        ScratchRegisterScope scratch(asMasm());
+        ma_add(base, Imm32(src.offset), scratch);
+        ma_ldrb(DTRAddr(scratch, DtrRegImmShift(src.index, LSL, scale)), dest);
     }
-    ma_ldrb(DTRAddr(base, DtrRegImmShift(src.index, LSL, scale)), dest);
-
 }
 
 void

@@ -17,11 +17,13 @@
 // gcc appears to use _mips_hard_float to denote
 // that the target is a hard-float target.
 #ifdef _mips_hard_float
-#define JS_CODEGEN_MIPS32_HARDFP
+#define JS_CODEGEN_MIPS_HARDFP
 #endif
 
-#if _MIPS_SIM == _ABIO32
+#if (defined(_MIPS_SIM) && (_MIPS_SIM == _ABIO32)) || defined(JS_SIMULATOR_MIPS32)
 #define USES_O32_ABI
+#elif (defined(_MIPS_SIM) && (_MIPS_SIM == _ABI64)) || defined(JS_SIMULATOR_MIPS64)
+#define USES_N64_ABI
 #else
 #error "Unsupported ABI"
 #endif
@@ -73,6 +75,7 @@ class Registers
         a1 = r5,
         a2 = r6,
         a3 = r7,
+#if defined(USES_O32_ABI)
         t0 = r8,
         t1 = r9,
         t2 = r10,
@@ -81,6 +84,24 @@ class Registers
         t5 = r13,
         t6 = r14,
         t7 = r15,
+        ta0 = t4,
+        ta1 = t5,
+        ta2 = t6,
+        ta3 = t7,
+#elif defined(USES_N64_ABI)
+        a4 = r8,
+        a5 = r9,
+        a6 = r10,
+        a7 = r11,
+        t0 = r12,
+        t1 = r13,
+        t2 = r14,
+        t3 = r15,
+        ta0 = a4,
+        ta1 = a5,
+        ta2 = a6,
+        ta3 = a7,
+#endif
         s0 = r16,
         s1 = r17,
         s2 = r18,
@@ -107,10 +128,10 @@ class Registers
         uintptr_t r;
     };
 
+    static const char * const RegNames[];
     static const char* GetName(Code code) {
         MOZ_ASSERT(code < Total);
-        static const char * const Names[] = REGISTERS_NAMES;
-        return Names[code];
+        return RegNames[code];
     }
     static const char* GetName(Encoding i) {
         return GetName(Code(i));
@@ -122,12 +143,12 @@ class Registers
     static const Encoding Invalid = invalid_reg;
 
     static const uint32_t Total = 32;
-    static const uint32_t Allocatable = REGISTERS_ALLOCATABLE;
+    static const uint32_t Allocatable;
 
     typedef uint32_t SetType;
     static const SetType AllMask = 0xffffffff;
     static const SetType SharedArgRegMask = (1 << a0) | (1 << a1) | (1 << a2) | (1 << a3);
-    static const SetType ArgRegMask = REGISTERS_ARGREGMASK;
+    static const SetType ArgRegMask;
 
     static const SetType VolatileMask =
         (1 << Registers::v0) |
@@ -140,10 +161,10 @@ class Registers
         (1 << Registers::t1) |
         (1 << Registers::t2) |
         (1 << Registers::t3) |
-        (1 << Registers::t4) |
-        (1 << Registers::t5) |
-        (1 << Registers::t6) |
-        (1 << Registers::t7);
+        (1 << Registers::ta0) |
+        (1 << Registers::ta1) |
+        (1 << Registers::ta2) |
+        (1 << Registers::ta3);
 
     // We use this constant to save registers when entering functions. This
     // is why $ra is added here even though it is not "Non Volatile".
@@ -179,11 +200,11 @@ class Registers
     static const SetType TempMask = VolatileMask & ~NonAllocatableMask;
 
     // Registers returned from a JS -> JS call.
-    static const SetType JSCallMask = REGISTERS_JSCALLMASK;
+    static const SetType JSCallMask;
 
     // Registers returned from a JS -> C call.
     static const SetType SharedCallMask = (1 << Registers::v0);
-    static const SetType CallMask = REGISTERS_CALLMASK;
+    static const SetType CallMask;
 
     static const SetType AllocatableMask = AllMask & ~NonAllocatableMask;
 
@@ -202,7 +223,7 @@ class Registers
 // Smallest integer type that can hold a register bitmask.
 typedef uint32_t PackedRegisterMask;
 
-class BaseFloatRegisters
+class FloatRegistersMIPSShared
 {
   public:
     enum FPRegisterID {
@@ -265,13 +286,13 @@ class BaseFloatRegisters
 template <typename T>
 class TypedRegisterSet;
 
-class BaseFloatRegister
+class FloatRegisterMIPSShared
 {
   public:
     bool isInt32x4() const { return false; }
     bool isFloat32x4() const { return false; }
 
-    typedef BaseFloatRegisters::SetType SetType;
+    typedef FloatRegistersMIPSShared::SetType SetType;
 
     static uint32_t SetSize(SetType x) {
         static_assert(sizeof(SetType) == 8, "SetType must be 64 bits");
