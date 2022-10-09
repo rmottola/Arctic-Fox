@@ -47,12 +47,12 @@ class MoveEmitterARM
                     MoveOp::Type type, uint32_t slot);
     void completeCycle(const MoveOperand& from, const MoveOperand& to,
                        MoveOp::Type type, uint32_t slot);
-    void emit(const MoveOp &move);
+    void emit(const MoveOp& move);
 
   public:
-    MoveEmitterARM(MacroAssembler &masm);
+    MoveEmitterARM(MacroAssembler& masm);
     ~MoveEmitterARM();
-    void emit(const MoveResolver &moves);
+    void emit(const MoveResolver& moves);
     void finish();
 
     void setScratchRegister(Register reg) {}

@@ -186,6 +186,7 @@ static FILE* gOutFile = nullptr;
 static bool reportWarnings = true;
 static bool compileOnly = false;
 static bool fuzzingSafe = false;
+static bool disableOOMFunctions = false;
 
 #ifdef DEBUG
 static bool dumpEntrainedVariables = false;
@@ -2094,7 +2095,8 @@ DisassembleToSprinter(JSContext* cx, unsigned argc, Value* vp, Sprinter* sprinte
                 return false;
         }
     }
-    return true;
+
+    return !sprinter->hadOutOfMemory();
 }
 
 static bool
@@ -2444,7 +2446,7 @@ EvalInContext(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.requireAtLeast(cx, "evalcx", 1))
         return false;
-    
+
     RootedString str(cx, ToString(cx, args[0]));
     if (!str)
         return false;
@@ -2616,7 +2618,8 @@ EvalInWorker(JSContext* cx, unsigned argc, Value* vp)
         return false;
 
     PRThread* thread = PR_CreateThread(PR_USER_THREAD, WorkerMain, input,
-                                       PR_PRIORITY_NORMAL, PR_GLOBAL_THREAD, PR_JOINABLE_THREAD, 0);
+                                       PR_PRIORITY_NORMAL, PR_GLOBAL_THREAD, PR_JOINABLE_THREAD,
+                                       gMaxStackSize + 128 * 1024);
     if (!thread || !workerThreads.append(thread))
         return false;
 
@@ -3088,8 +3091,8 @@ ParseModule(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
     if (!args[0].isString()) {
-        JS_ReportError(cx, "expected string to compile, got %s",
-                       JS_TypeOfValue(cx, args[0]));
+        const char* typeName = InformalValueTypeName(args[0]);
+        JS_ReportError(cx, "expected string to compile, got %s", typeName);
         return false;
     }
 
@@ -5779,7 +5782,7 @@ NewGlobalObject(JSContext* cx, JS::CompartmentOptions& options,
         {
             return nullptr;
         }
-        if (!js::DefineTestingFunctions(cx, glob, fuzzingSafe))
+        if (!js::DefineTestingFunctions(cx, glob, fuzzingSafe, disableOOMFunctions))
             return nullptr;
 
         if (!fuzzingSafe) {
@@ -5850,6 +5853,20 @@ BindScriptArgs(JSContext* cx, OptionParser* op)
         }
     }
 
+    const char* scriptPath = op->getStringArg("script");
+    RootedValue scriptPathValue(cx);
+    if (scriptPath) {
+        RootedString scriptPathString(cx, JS_NewStringCopyZ(cx, scriptPath));
+        if (!scriptPathString)
+            return false;
+        scriptPathValue = StringValue(scriptPathString);
+    } else {
+        scriptPathValue = UndefinedValue();
+    }
+
+    if (!JS_DefineProperty(cx, cx->global(), "scriptPath", scriptPathValue, 0))
+        return false;
+
     return true;
 }
 
@@ -5895,8 +5912,13 @@ ProcessArgs(JSContext* cx, OptionParser* op)
             if (!JS::Evaluate(cx, opts, code, strlen(code), &rval))
                 return gExitCode ? gExitCode : EXITCODE_RUNTIME_ERROR;
             codeChunks.popFront();
+            if (gQuitting)
+                break;
         }
     }
+
+    if (gQuitting)
+        return gExitCode ? gExitCode : EXIT_SUCCESS;
 
     /* The |script| argument is processed after all options. */
     if (const char* path = op->getStringArg("script")) {
@@ -6169,6 +6191,8 @@ SetWorkerRuntimeOptions(JSRuntime* rt)
     if (*gZealStr)
         rt->gc.parseAndSetZeal(gZealStr);
 #endif
+
+    JS_SetNativeStackQuota(rt, gMaxStackSize);
 }
 
 static int
@@ -6188,6 +6212,9 @@ Shell(JSContext* cx, OptionParser* op, char** envp)
         fuzzingSafe = true;
     else
         fuzzingSafe = (getenv("MOZ_FUZZING_SAFE") && getenv("MOZ_FUZZING_SAFE")[0] != '0');
+
+    if (op->getBoolOption("disable-oom-functions"))
+        disableOOMFunctions = true;
 
     RootedObject glob(cx);
     JS::CompartmentOptions options;
@@ -6388,6 +6415,8 @@ main(int argc, char** argv, char** envp)
         || !op.addBoolOption('\0', "no-avx", "No-op. AVX is currently disabled by default.")
         || !op.addBoolOption('\0', "fuzzing-safe", "Don't expose functions that aren't safe for "
                              "fuzzers to call")
+        || !op.addBoolOption('\0', "disable-oom-functions", "Disable functions that cause "
+                            "artificial OOMs")
         || !op.addBoolOption('\0', "no-threads", "Disable helper threads")
 #ifdef DEBUG
         || !op.addBoolOption('\0', "dump-entrained-variables", "Print variables which are "

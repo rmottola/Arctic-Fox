@@ -8,6 +8,7 @@
 #include "jsapi.h"
 #include "jsfriendapi.h"
 #include "jsprf.h"
+#include "mozilla/ChaosMode.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "nsServiceManagerUtils.h"
 #include "nsComponentManagerUtils.h"
@@ -32,6 +33,7 @@
 #include "nsIPrincipal.h"
 #include "nsJSUtils.h"
 #include "gfxPrefs.h"
+#include "nsIXULRuntime.h"
 
 #include "base/histogram.h"
 
@@ -51,6 +53,11 @@
 #endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>     /* for isatty() */
+#endif
+
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#include "nsICrashReporter.h"
 #endif
 
 using namespace mozilla;
@@ -658,8 +665,8 @@ static const JSFunctionSpec glob_functions[] = {
 };
 
 static bool
-env_setProperty(JSContext *cx, HandleObject obj, HandleId id, MutableHandleValue vp,
-                ObjectOpResult &result)
+env_setProperty(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp,
+                ObjectOpResult& result)
 {
 /* XXX porting may be easy, but these don't seem to supply setenv by default */
 #if !defined SOLARIS
@@ -1252,6 +1259,20 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
     UniquePtr<base::StatisticsRecorder> telStats =
        MakeUnique<base::StatisticsRecorder>();
 
+    if (PR_GetEnv("MOZ_CHAOSMODE")) {
+        ChaosFeature feature = ChaosFeature::Any;
+        long featureInt = strtol(PR_GetEnv("MOZ_CHAOSMODE"), nullptr, 16);
+        if (featureInt) {
+            // NOTE: MOZ_CHAOSMODE=0 or a non-hex value maps to Any feature.
+            feature = static_cast<ChaosFeature>(featureInt);
+        }
+        ChaosMode::SetChaosFeature(feature);
+    }
+
+    if (ChaosMode::isActive(ChaosFeature::Any)) {
+        printf_stderr("*** You are running in chaos test mode. See ChaosMode.h. ***\n");
+    }
+
     nsCOMPtr<nsIFile> appFile;
     rv = XRE_GetBinaryPath(argv[0], getter_AddRefs(appFile));
     if (NS_FAILED(rv)) {
@@ -1347,6 +1368,18 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
         argc -= 2;
         argv += 2;
     }
+
+#ifdef MOZ_CRASHREPORTER
+    const char* val = getenv("MOZ_CRASHREPORTER");
+    if (val && *val) {
+        rv = CrashReporter::SetExceptionHandler(greDir, true);
+        if (NS_FAILED(rv)) {
+            printf("CrashReporter::SetExceptionHandler failed!\n");
+            return 1;
+        }
+        MOZ_ASSERT(CrashReporter::GetEnabled());
+    }
+#endif
 
     {
         if (argc > 1 && !strcmp(argv[1], "--greomni")) {
@@ -1457,6 +1490,8 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
 
         // Initialize graphics prefs on the main thread, if not already done
         gfxPrefs::GetSingleton();
+        // Initialize e10s check on the main thread, if not already done
+        BrowserTabsRemoteAutostart();
 
         {
             JS::Rooted<JSObject*> glob(cx, holder->GetJSObject());
@@ -1548,6 +1583,12 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
     dirprovider.ClearAppDir();
     dirprovider.ClearPluginDir();
     dirprovider.ClearAppFile();
+
+#ifdef MOZ_CRASHREPORTER
+    // Shut down the crashreporter service to prevent leaking some strings it holds.
+    if (CrashReporter::GetEnabled())
+        CrashReporter::UnsetExceptionHandler();
+#endif
 
     NS_LogTerm();
 

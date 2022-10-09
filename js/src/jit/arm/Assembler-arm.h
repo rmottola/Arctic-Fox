@@ -1260,6 +1260,7 @@ class Assembler : public AssemblerShared
     }
 
 #ifdef JS_DISASM_ARM
+    static void spewInst(Instruction* i);
     void spew(Instruction* i);
     void spewBranch(Instruction* i, Label* target);
     void spewData(BufferOffset addr, size_t numInstr, bool loadToPC);
@@ -1270,10 +1271,8 @@ class Assembler : public AssemblerShared
 
   public:
     void resetCounter();
-    uint32_t actualOffset(uint32_t) const;
     uint32_t actualIndex(uint32_t) const;
     static uint8_t* PatchableJumpAddress(JitCode* code, uint32_t index);
-    BufferOffset actualOffset(BufferOffset) const;
     static uint32_t NopFill;
     static uint32_t GetNopFill();
     static uint32_t AsmPoolMaxOffset;
@@ -1293,11 +1292,7 @@ class Assembler : public AssemblerShared
 
     // TODO: this should actually be a pool-like object. It is currently a big
     // hack, and probably shouldn't exist.
-    js::Vector<CodeLabel, 0, SystemAllocPolicy> codeLabels_;
     js::Vector<RelativePatch, 8, SystemAllocPolicy> jumps_;
-    js::Vector<BufferOffset, 0, SystemAllocPolicy> tmpJumpRelocations_;
-    js::Vector<BufferOffset, 0, SystemAllocPolicy> tmpDataRelocations_;
-    js::Vector<BufferOffset, 0, SystemAllocPolicy> tmpPreBarriers_;
 
     CompactBufferWriter jumpRelocations_;
     CompactBufferWriter dataRelocations_;
@@ -1327,6 +1322,7 @@ class Assembler : public AssemblerShared
 
     SpewNodes spewNodes_;
     uint32_t spewNext_;
+    Sprinter* printer_;
 
     bool spewDisabled();
     uint32_t spewResolve(Label* l);
@@ -1343,6 +1339,7 @@ class Assembler : public AssemblerShared
       : m_buffer(1, 1, 8, GetPoolMaxOffset(), 8, 0xe320f000, 0xeaffffff, GetNopFill()),
 #ifdef JS_DISASM_ARM
         spewNext_(1000),
+        printer_(nullptr),
 #endif
         isFinished(false),
         dtmActive(false),
@@ -1360,7 +1357,7 @@ class Assembler : public AssemblerShared
     // MacroAssemblers hold onto gcthings, so they are traced by the GC.
     void trace(JSTracer* trc);
     void writeRelocation(BufferOffset src) {
-        tmpJumpRelocations_.append(src);
+        jumpRelocations_.writeUnsigned(src.getOffset());
     }
 
     // As opposed to x86/x64 version, the data relocation has to be executed
@@ -1370,11 +1367,11 @@ class Assembler : public AssemblerShared
             if (gc::IsInsideNursery(ptr.value))
                 embedsNurseryPointers_ = true;
             if (ptr.value)
-                tmpDataRelocations_.append(nextOffset());
+                dataRelocations_.writeUnsigned(nextOffset().getOffset());
         }
     }
     void writePrebarrierOffset(CodeOffsetLabel label) {
-        tmpPreBarriers_.append(BufferOffset(label.offset()));
+        preBarriers_.writeUnsigned(label.offset());
     }
 
     enum RelocBranchStyle {
@@ -1403,6 +1400,9 @@ class Assembler : public AssemblerShared
     bool oom() const;
 
     void setPrinter(Sprinter* sp) {
+#ifdef JS_DISASM_ARM
+        printer_ = sp;
+#endif
     }
 
     static const Register getStackPointer() {
@@ -1417,14 +1417,6 @@ class Assembler : public AssemblerShared
     void copyJumpRelocationTable(uint8_t* dest);
     void copyDataRelocationTable(uint8_t* dest);
     void copyPreBarrierTable(uint8_t* dest);
-
-    void addCodeLabel(CodeLabel label);
-    size_t numCodeLabels() const {
-        return codeLabels_.length();
-    }
-    CodeLabel codeLabel(size_t i) {
-        return codeLabels_[i];
-    }
 
     // Size of the instruction stream, in bytes, after pools are flushed.
     size_t size() const;
@@ -1722,7 +1714,7 @@ class Assembler : public AssemblerShared
 
     // See Bind
     size_t labelOffsetToPatchOffset(size_t offset) {
-        return actualOffset(offset);
+        return offset;
     }
 
     void as_bkpt();
@@ -1980,9 +1972,9 @@ class Instruction
     }
     // Since almost all instructions have condition codes, the condition code
     // extractor resides in the base class.
-    void extractCond(Assembler::Condition* c) {
-        if (data >> 28 != 0xf )
-            *c = (Assembler::Condition)(data & 0xf0000000);
+    Assembler::Condition extractCond() {
+        MOZ_ASSERT(data >> 28 != 0xf, "The instruction does not have condition code");
+        return (Assembler::Condition)(data & 0xf0000000);
     }
     // Get the next instruction in the instruction stream.
     // This does neat things like ignoreconstant pools and their guards.

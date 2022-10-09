@@ -86,7 +86,7 @@ XPCNativeMember::Resolve(XPCCallContext& ccx, XPCNativeInterface* iface,
         callback = XPC_WN_GetterSetter;
     }
 
-    JSFunction *fun = js::NewFunctionByIdWithReserved(ccx, callback, argc, 0, GetName());
+    JSFunction* fun = js::NewFunctionByIdWithReserved(ccx, callback, argc, 0, GetName());
     if (!fun)
         return false;
 
@@ -239,8 +239,8 @@ XPCNativeInterface::NewInstance(nsIInterfaceInfo* aInfo)
     if (mainProcessScriptableOnly && !XRE_IsParentProcess()) {
         nsCOMPtr<nsIConsoleService> console(do_GetService(NS_CONSOLESERVICE_CONTRACTID));
         if (console) {
-            char* intfNameChars;
-            aInfo->GetName(&intfNameChars);
+            const char* intfNameChars;
+            aInfo->GetNameShared(&intfNameChars);
             nsPrintfCString errorMsg("Use of %s in content process is deprecated.", intfNameChars);
 
             nsAutoString filename;
