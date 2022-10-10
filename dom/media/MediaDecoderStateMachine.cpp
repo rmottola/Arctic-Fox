@@ -1156,7 +1156,6 @@ void MediaDecoderStateMachine::UpdatePlaybackPosition(int64_t aTime)
 static const char* const gMachineStateStr[] = {
   "NONE",
   "DECODING_METADATA",
-  "WAIT_FOR_RESOURCES",
   "WAIT_FOR_CDM",
   "DORMANT",
   "DECODING",
@@ -1391,14 +1390,7 @@ MediaDecoderStateMachine::NotifyWaitingForResourcesStatusChanged()
 {
   MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-  if (mState == DECODER_STATE_WAIT_FOR_RESOURCES) {
-    // Try again.
-    SetState(DECODER_STATE_DECODING_NONE);
-    ScheduleStateMachine();
-  } else if (mState == DECODER_STATE_WAIT_FOR_CDM &&
-             !mReader->IsWaitingOnCDMResource()) {
-    StartDecoding();
-  }
+  DECODER_LOG("NotifyWaitingForResourcesStatusChanged");
 }
 
 void MediaDecoderStateMachine::PlayStateChanged()
@@ -2016,14 +2008,8 @@ MediaDecoderStateMachine::OnMetadataNotRead(ReadMetadataFailureReason aReason)
   MOZ_ASSERT(mState == DECODER_STATE_DECODING_METADATA);
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
   mMetadataRequest.Complete();
-
-  if (aReason == ReadMetadataFailureReason::WAITING_FOR_RESOURCES) {
-    SetState(DECODER_STATE_WAIT_FOR_RESOURCES);
-  } else {
-    MOZ_ASSERT(aReason == ReadMetadataFailureReason::METADATA_ERROR);
-    DECODER_WARN("Decode metadata failed, shutting down decoder");
-    DecodeError();
-  }
+  DECODER_WARN("Decode metadata failed, shutting down decoder");
+  DecodeError();
 }
 
 void
@@ -2299,7 +2285,6 @@ nsresult MediaDecoderStateMachine::RunStateMachine()
     case DECODER_STATE_SHUTDOWN:
     case DECODER_STATE_DORMANT:
     case DECODER_STATE_WAIT_FOR_CDM:
-    case DECODER_STATE_WAIT_FOR_RESOURCES:
       return NS_OK;
 
     case DECODER_STATE_DECODING_NONE: {
