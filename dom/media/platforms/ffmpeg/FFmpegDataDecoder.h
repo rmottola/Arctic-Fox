@@ -33,21 +33,35 @@ public:
   nsRefPtr<InitPromise> Init() override = 0;
   nsresult Input(MediaRawData* aSample) override = 0;
   nsresult Flush() override;
-  nsresult Drain() override = 0;
+  nsresult Drain() override;
   nsresult Shutdown() override;
 
   static AVCodec* FindAVCodec(AVCodecID aCodec);
 
 protected:
+  // Flush and Drain operation, always run
+  virtual void ProcessFlush();
+  virtual void ProcessDrain() = 0;
+  virtual void ProcessShutdown();
   virtual void InitCodecContext() {}
   AVFrame*        PrepareFrame();
   nsresult        InitDecoder();
 
-  FlushableTaskQueue* mTaskQueue;
+  nsRefPtr<FlushableTaskQueue> mTaskQueue;
+  MediaDataDecoderCallback* mCallback;
+
   AVCodecContext* mCodecContext;
   AVFrame*        mFrame;
   nsRefPtr<MediaByteBuffer> mExtraData;
   AVCodecID mCodecID;
+
+  // For wait on mIsFlushing during Shutdown() process.
+  // Protects mReorderQueue.
+  Monitor mMonitor;
+  // Set on reader/decode thread calling Flush() to indicate that output is
+  // not required and so input samples on mTaskQueue need not be processed.
+  // Cleared on mTaskQueue in ProcessDrain().
+  Atomic<bool> mIsFlushing;
 
 private:
   static bool sFFmpegInitDone;
