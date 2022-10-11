@@ -62,7 +62,6 @@ private:
   nsRefPtr<MediaDataDecoder> mDecoder;
   MozPromiseRequestHolder<InitPromise> mInitPromiseRequest;
   bool mNeedAVCC;
-  bool mDecoderInitializing;
   nsresult mLastError;
 };
 
