@@ -1,3 +1,5 @@
+# This project now has a new owner. Please report bugs / pull requests etc here: https://github.com/rmotolla/Arctic-Fox
+
 # Arctic Fox Web Browser
 
 Arctic Fox started as a forked and rebranded Pale Moon 27.9.4 and retains its _classic_ interface. Many fixes and enhancements have been imported from Firefox and TenFourFox.
