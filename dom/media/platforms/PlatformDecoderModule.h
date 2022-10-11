@@ -152,6 +152,8 @@ protected:
 #endif
   static bool sGMPDecoderEnabled;
   static bool sEnableFuzzingWrapper;
+  static uint32_t sVideoOutputMinimumInterval_ms;
+  static bool sDontDelayInputExhausted;
 };
 
 // A callback used by MediaDataDecoder to return output/errors to the
