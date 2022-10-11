@@ -515,8 +515,6 @@ public:
 
   bool OnStateMachineTaskQueue() const override;
 
-  bool OnDecodeTaskQueue() const override;
-
   MediaDecoderStateMachine* GetStateMachine() const;
   void SetStateMachine(MediaDecoderStateMachine* aStateMachine);
 
