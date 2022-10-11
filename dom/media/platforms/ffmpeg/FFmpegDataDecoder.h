@@ -23,7 +23,9 @@ template <>
 class FFmpegDataDecoder<LIBAV_VER> : public MediaDataDecoder
 {
 public:
-  FFmpegDataDecoder(FlushableTaskQueue* aTaskQueue, AVCodecID aCodecID);
+  FFmpegDataDecoder(FlushableTaskQueue* aTaskQueue,
+                    MediaDataDecoderCallback* aCallback,
+                    AVCodecID aCodecID);
   virtual ~FFmpegDataDecoder();
 
   static bool Link();

@@ -27,14 +27,12 @@ public:
 
   virtual nsRefPtr<InitPromise> Init() override;
   virtual nsresult Input(MediaRawData* aSample) override;
-  virtual nsresult Drain() override;
+  virtual void ProcessDrain() override;
   void InitCodecContext() override;
   static AVCodecID GetCodecId(const nsACString& aMimeType);
 
 private:
   void DecodePacket(MediaRawData* aSample);
-
-  MediaDataDecoderCallback* mCallback;
 };
 
 } // namespace mozilla
