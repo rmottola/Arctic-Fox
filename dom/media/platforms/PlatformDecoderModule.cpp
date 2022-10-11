@@ -29,6 +29,7 @@
 #include "mozilla/SharedThreadPool.h"
 
 #include "MediaInfo.h"
+#include "FuzzingWrapper.h"
 #include "H264Converter.h"
 
 #include "OpusDecoder.h"
@@ -52,6 +53,7 @@ bool PlatformDecoderModule::sAndroidMCDecoderEnabled = false;
 bool PlatformDecoderModule::sAndroidMCDecoderPreferred = false;
 #endif
 bool PlatformDecoderModule::sGMPDecoderEnabled = false;
+bool PlatformDecoderModule::sEnableFuzzingWrapper = false;
 
 /* static */
 void
@@ -83,6 +85,9 @@ PlatformDecoderModule::Init()
 
   Preferences::AddBoolVarCache(&sGMPDecoderEnabled,
                                "media.gmp.decoder.enabled", false);
+
+  Preferences::AddBoolVarCache(&sEnableFuzzingWrapper,
+                               "media.decoder.fuzzing.enabled", false);
 
 #ifdef XP_WIN
   WMFDecoderModule::Init();
@@ -187,6 +192,13 @@ PlatformDecoderModule::CreateDecoder(const TrackInfo& aConfig,
     return nullptr;
   }
 
+  MediaDataDecoderCallback* callback = aCallback;
+  nsRefPtr<DecoderCallbackFuzzingWrapper> callbackWrapper;
+  if (sEnableFuzzingWrapper) {
+    callbackWrapper = new DecoderCallbackFuzzingWrapper(aCallback);
+    callback = callbackWrapper.get();
+  }
+
   if (H264Converter::IsH264(aConfig)) {
     nsRefPtr<H264Converter> h
       = new H264Converter(this,
@@ -194,7 +206,7 @@ PlatformDecoderModule::CreateDecoder(const TrackInfo& aConfig,
                           aLayersBackend,
                           aImageContainer,
                           aTaskQueue,
-                          aCallback);
+                          callback);
     const nsresult rv = h->GetLastError();
     if (NS_SUCCEEDED(rv) || rv == NS_ERROR_NOT_INITIALIZED) {
       // The H264Converter either successfully created the wrapped decoder,
@@ -206,14 +218,19 @@ PlatformDecoderModule::CreateDecoder(const TrackInfo& aConfig,
     m = new VPXDecoder(*aConfig.GetAsVideoInfo(),
                        aImageContainer,
                        aTaskQueue,
-                       aCallback);
+                       callback);
   } else {
     m = CreateVideoDecoder(*aConfig.GetAsVideoInfo(),
                            aLayersBackend,
                            aImageContainer,
                            aTaskQueue,
-                           aCallback);
+                           callback);
   }
+
+  if (callbackWrapper && m) {
+    m = new DecoderFuzzingWrapper(m.forget(), callbackWrapper.forget());
+  }
+
   return m.forget();
 }
 

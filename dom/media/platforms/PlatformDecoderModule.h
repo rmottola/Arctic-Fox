@@ -151,6 +151,7 @@ protected:
   static bool sAndroidMCDecoderEnabled;
 #endif
   static bool sGMPDecoderEnabled;
+  static bool sEnableFuzzingWrapper;
 };
 
 // A callback used by MediaDataDecoder to return output/errors to the
