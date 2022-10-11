@@ -405,9 +405,9 @@ public:
                       ImageContainer* aContainer,
                       Image** aOutImage) override;
 
-  virtual HRESULT ConfigureForSize(uint32_t aWidth, uint32_t aHeight) override;
+  HRESULT ConfigureForSize(uint32_t aWidth, uint32_t aHeight) override;
 
-  virtual bool IsD3D11() override { return true; }
+  bool IsD3D11() override { return true; }
 
 private:
   HRESULT CreateFormatConverter();

@@ -65,7 +65,7 @@ public:
     mGLContext = nullptr;
   }
 
-  virtual nsresult Input(MediaRawData* aSample) override {
+  nsresult Input(MediaRawData* aSample) override {
     return MediaCodecDataDecoder::Input(aSample);
   }
 
@@ -99,8 +99,8 @@ public:
     return eglImage;
   }
 
-  virtual nsresult PostOutput(BufferInfo::Param aInfo, MediaFormat::Param aFormat,
-                              const media::TimeUnit& aDuration) override {
+  nsresult PostOutput(BufferInfo::Param aInfo, MediaFormat::Param aFormat,
+                      const media::TimeUnit& aDuration) override {
     if (!EnsureGLContext()) {
       return NS_ERROR_FAILURE;
     }

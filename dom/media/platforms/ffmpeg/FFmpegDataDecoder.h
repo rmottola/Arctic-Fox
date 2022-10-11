@@ -30,11 +30,11 @@ public:
 
   static bool Link();
 
-  virtual nsRefPtr<InitPromise> Init() override = 0;
-  virtual nsresult Input(MediaRawData* aSample) override = 0;
-  virtual nsresult Flush() override;
-  virtual nsresult Drain() override = 0;
-  virtual nsresult Shutdown() override;
+  nsRefPtr<InitPromise> Init() override = 0;
+  nsresult Input(MediaRawData* aSample) override = 0;
+  nsresult Flush() override;
+  nsresult Drain() override = 0;
+  nsresult Shutdown() override;
 
   static AVCodec* FindAVCodec(AVCodecID aCodec);
 
