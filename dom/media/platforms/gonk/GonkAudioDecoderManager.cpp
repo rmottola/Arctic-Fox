@@ -52,11 +52,21 @@ GonkAudioDecoderManager::~GonkAudioDecoderManager()
   MOZ_COUNT_DTOR(GonkAudioDecoderManager);
 }
 
-android::sp<MediaCodecProxy>
+nsRefPtr<MediaDataDecoder::InitPromise>
 GonkAudioDecoderManager::Init(MediaDataDecoderCallback* aCallback)
 {
+  if (InitMediaCodecProxy(aCallback)) {
+    return InitPromise::CreateAndResolve(TrackType::kAudioTrack, __func__);
+  } else {
+    return InitPromise::CreateAndReject(DecoderFailureReason::INIT_ERROR, __func__);
+  }
+}
+
+bool
+GonkAudioDecoderManager::InitMediaCodecProxy(MediaDataDecoderCallback* aCallback)
+{
   if (mLooper != nullptr) {
-    return nullptr;
+    return false;
   }
   // Create ALooper
   mLooper = new ALooper;
@@ -65,12 +75,12 @@ GonkAudioDecoderManager::Init(MediaDataDecoderCallback* aCallback)
 
   mDecoder = MediaCodecProxy::CreateByType(mLooper, "audio/mp4a-latm", false, nullptr);
   if (!mDecoder.get()) {
-    return nullptr;
+    return false;
   }
   if (!mDecoder->AskMediaCodecAndWait())
   {
     mDecoder = nullptr;
-    return nullptr;
+    return false;
   }
   sp<AMessage> format = new AMessage;
   // Fixed values
@@ -82,16 +92,16 @@ GonkAudioDecoderManager::Init(MediaDataDecoderCallback* aCallback)
   format->setInt32("aac-profile", mAudioProfile);
   status_t err = mDecoder->configure(format, nullptr, nullptr, 0);
   if (err != OK || !mDecoder->Prepare()) {
-    return nullptr;
+    return false;
   }
   status_t rv = mDecoder->Input(mUserData.Elements(), mUserData.Length(), 0,
                                 android::MediaCodec::BUFFER_FLAG_CODECCONFIG);
 
   if (rv == OK) {
-    return mDecoder;
+    return true;
   } else {
     GADM_LOG("Failed to input codec specific data!");
-    return nullptr;
+    return false;
   }
 }
 
