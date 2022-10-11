@@ -205,6 +205,19 @@ public:
     OwnerThread()->Dispatch(r.forget());
   }
 
+  void DispatchAudioOffloading(bool aAudioOffloading)
+  {
+    nsRefPtr<MediaDecoderStateMachine> self = this;
+    nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([=] () {
+      ReentrantMonitorAutoEnter mon(self->mDecoder->GetReentrantMonitor());
+      if (self->mAudioOffloading != aAudioOffloading) {
+        self->mAudioOffloading = aAudioOffloading;
+        self->ScheduleStateMachine();
+      }
+    });
+    OwnerThread()->Dispatch(r.forget());
+  }
+
   // Drop reference to decoder.  Only called during shutdown dance.
   void BreakCycles() {
     MOZ_ASSERT(NS_IsMainThread());
@@ -1238,6 +1251,10 @@ private:
 
   MediaEventListener mAudioQueueListener;
   MediaEventListener mVideoQueueListener;
+
+  // True if audio is offloading.
+  // Playback will not start when audio is offloading.
+  bool mAudioOffloading;
 
 private:
   // The buffered range. Mirrored from the decoder thread.
