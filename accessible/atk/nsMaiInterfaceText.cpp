@@ -576,9 +576,8 @@ setCaretOffsetCB(AtkText *aText, gint aOffset)
   }
 
   if (ProxyAccessible* proxy = GetProxy(ATK_OBJECT(aText))) {
-    if (proxy->SetCaretOffset(aOffset)) {
-      return TRUE;
-    }
+    proxy->SetCaretOffset(aOffset);
+    return TRUE;
   }
 
   return FALSE;
