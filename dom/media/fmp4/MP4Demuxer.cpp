@@ -297,11 +297,11 @@ MP4TrackDemuxer::UpdateSamples(nsTArray<nsRefPtr<MediaRawData>>& aSamples)
 {
   for (size_t i = 0; i < aSamples.Length(); i++) {
     MediaRawData* sample = aSamples[i];
-    if (sample->mCrypto.valid) {
+    if (sample->mCrypto.mValid) {
       nsAutoPtr<MediaRawDataWriter> writer(sample->CreateWriter());
-      writer->mCrypto.mode = mInfo->mCrypto.mode;
-      writer->mCrypto.iv_size = mInfo->mCrypto.iv_size;
-      writer->mCrypto.key.AppendElements(mInfo->mCrypto.key);
+      writer->mCrypto.mMode = mInfo->mCrypto.mMode;
+      writer->mCrypto.mIVSize = mInfo->mCrypto.mIVSize;
+      writer->mCrypto.mKeyId.AppendElements(mInfo->mCrypto.mKeyId);
     }
     if (mInfo->GetAsVideoInfo()) {
       sample->mExtraData = mInfo->GetAsVideoInfo()->mExtraData;
