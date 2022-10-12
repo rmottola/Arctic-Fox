@@ -91,7 +91,7 @@ public:
 
   // Initializes the reader, returns NS_OK on success, or NS_ERROR_FAILURE
   // on failure.
-  virtual nsresult Init(MediaDecoderReader* aCloneDonor) = 0;
+  virtual nsresult Init() { return NS_OK; }
 
   // True if this reader is waiting for a Content Decryption Module to become
   // available.
