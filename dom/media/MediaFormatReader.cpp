@@ -172,7 +172,7 @@ nsresult
 MediaFormatReader::Init(MediaDecoderReader* aCloneDonor)
 {
   MOZ_ASSERT(NS_IsMainThread(), "Must be on main thread.");
-  PlatformDecoderModule::Init();
+  PDMFactory::Init();
 
   InitLayersBackendType();
 
@@ -318,16 +318,13 @@ MediaFormatReader::EnsureDecodersCreated()
   MOZ_ASSERT(OnTaskQueue());
 
   if (!mPlatform) {
+    mPlatform = new PDMFactory();
+    NS_ENSURE_TRUE(mPlatform, false);
     if (IsEncrypted()) {
       // EME not supported.
       return false;
-    } else {
-      mPlatform = PlatformDecoderModule::Create();
-      NS_ENSURE_TRUE(mPlatform, false);
     }
   }
-
-  MOZ_ASSERT(mPlatform);
 
   if (HasAudio() && !mAudio.mDecoder) {
     NS_ENSURE_TRUE(IsSupportedAudioMimeType(mInfo.mAudio.mMimeType),
