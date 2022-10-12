@@ -119,7 +119,9 @@ bool
 AppleDecoderModule::SupportsMimeType(const nsACString& aMimeType)
 {
   return aMimeType.EqualsLiteral("audio/mpeg") ||
-    PlatformDecoderModule::SupportsMimeType(aMimeType);
+    aMimeType.EqualsLiteral("audio/mp4a-latm") ||
+    aMimeType.EqualsLiteral("video/mp4") ||
+    aMimeType.EqualsLiteral("video/avc");
 }
 
 PlatformDecoderModule::ConversionRequired
