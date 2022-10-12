@@ -1058,11 +1058,11 @@ nsContextMenu.prototype = {
   },
 
   viewImageDesc: function(e) {
-    var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.imageDescURL, this.browser.contentPrincipal,
+    urlSecurityCheck(this.imageDescURL,
+                     this.browser.contentPrincipal,
                      Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
     openUILink(this.imageDescURL, e, { disallowInheritPrincipal: true,
-                             referrerURI: doc.documentURIObject });
+                                       referrerURI: gContextMenuContentData.documentURIObject });
   },
 
   viewFrameInfo: function() {
