@@ -9,6 +9,14 @@
 
 #include "PDMFactory.h"
 
+PRLogModuleInfo* GetPDMLog() {
+  static PRLogModuleInfo* log = nullptr;
+  if (!log) {
+    log = PR_NewLogModule("PlatformDecoderModule");
+  }
+  return log;
+}
+
 
 namespace mozilla {
 
