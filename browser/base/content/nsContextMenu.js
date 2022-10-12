@@ -1042,16 +1042,6 @@ nsContextMenu.prototype = {
     BrowserPageInfo(this.target.ownerDocument.defaultView.top.document);
   },
 
-
-  viewImageDesc: function(e) {
-    var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.imageDescURL,
-                     this.browser.contentPrincipal,
-                     Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
-    openUILink(this.imageDescURL, e, { disallowInheritPrincipal: true,
-                             referrerURI: doc.documentURIObject });
-  },
-
   viewImageInfo: function() {
     BrowserPageInfo(this.target.ownerDocument.defaultView.top.document,
                     "mediaTab", this.target);
