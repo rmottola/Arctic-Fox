@@ -933,6 +933,12 @@ ProxyAccessible::KeyboardShortcut()
   return KeyBinding(key, modifierMask);
 }
 
+void
+ProxyAccessible::AtkKeyBinding(nsString& aBinding)
+{
+  unused << mDoc->SendAtkKeyBinding(mID, &aBinding);
+}
+
 double
 ProxyAccessible::CurValue()
 {
