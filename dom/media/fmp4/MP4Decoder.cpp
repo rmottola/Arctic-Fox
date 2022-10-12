@@ -30,6 +30,8 @@
 #endif
 #include "mozilla/layers/LayersTypes.h"
 
+#include "PDMFactory.h"
+
 namespace mozilla {
 
 #if defined(MOZ_GONK_MEDIACODEC) || defined(XP_WIN) || defined(MOZ_APPLEMEDIA) || defined(MOZ_FFMPEG)
@@ -151,11 +153,8 @@ MP4Decoder::CanHandleMediaType(const nsACString& aMIMETypeExcludingCodecs,
   }
 
   // Verify that we have a PDM that supports the whitelisted types.
-  PlatformDecoderModule::Init();
-  nsRefPtr<PlatformDecoderModule> platform = PlatformDecoderModule::Create();
-  if (!platform) {
-    return false;
-  }
+  PDMFactory::Init();
+  nsRefPtr<PDMFactory> platform = new PDMFactory();
   for (const nsCString& codecMime : codecMimes) {
     if (!platform->SupportsMimeType(codecMime)) {
       return false;
@@ -189,7 +188,7 @@ IsFFmpegAvailable()
   if (!Preferences::GetBool("media.ffmpeg.enabled", false)) {
     return false;
   }
-  PlatformDecoderModule::Init();
+  PDMFactory::Init();
   nsRefPtr<PlatformDecoderModule> m = FFmpegRuntimeLinker::CreateDecoderModule();
   return !!m;
 #endif
@@ -276,10 +275,10 @@ CreateTestH264Decoder(layers::LayersBackend aBackend,
   aConfig.mExtraData->AppendElements(sTestH264ExtraData,
                                      MOZ_ARRAY_LENGTH(sTestH264ExtraData));
 
-  PlatformDecoderModule::Init();
+  PDMFactory::Init();
 
-  nsRefPtr<PlatformDecoderModule> platform = PlatformDecoderModule::Create();
-  if (!platform) {
+  nsRefPtr<PDMFactory> platform = new PDMFactory();
+  if (!platform->SupportsMimeType(NS_LITERAL_CSTRING("video/mp4"))) {
     return nullptr;
   }
 
@@ -327,10 +326,10 @@ MP4Decoder::CanCreateH264Decoder()
 static already_AddRefed<MediaDataDecoder>
 CreateTestAACDecoder(AudioInfo& aConfig)
 {
-  PlatformDecoderModule::Init();
+  PDMFactory::Init();
 
-  nsRefPtr<PlatformDecoderModule> platform = PlatformDecoderModule::Create();
-  if (!platform) {
+  nsRefPtr<PDMFactory> platform = new PDMFactory();
+  if (!platform->SupportsMimeType(NS_LITERAL_CSTRING("audio/mp4a-latm"))) {
     return nullptr;
   }
 
