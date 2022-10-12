@@ -25,9 +25,7 @@
 #ifdef MOZ_APPLEMEDIA
 #include "AppleDecoderModule.h"
 #endif
-#ifdef MOZ_FFMPEG
-#include "FFmpegRuntimeLinker.h"
-#endif
+
 #include "mozilla/layers/LayersTypes.h"
 
 #include "PDMFactory.h"
@@ -179,79 +177,11 @@ MP4Decoder::CanHandleMediaType(const nsAString& aContentType)
   return CanHandleMediaType(NS_ConvertUTF16toUTF8(mimeType), codecs);
 }
 
-static bool
-IsFFmpegAvailable()
-{
-#ifndef MOZ_FFMPEG
-  return false;
-#else
-  if (!Preferences::GetBool("media.ffmpeg.enabled", false)) {
-    return false;
-  }
-  PDMFactory::Init();
-  nsRefPtr<PlatformDecoderModule> m = FFmpegRuntimeLinker::CreateDecoderModule();
-  return !!m;
-#endif
-}
-
-static bool
-IsAppleAvailable()
-{
-#ifndef MOZ_APPLEMEDIA
-  // Not the right platform.
-  return false;
-#else
-  return Preferences::GetBool("media.apple.mp4.enabled", false);
-#endif
-}
-
-static bool
-IsAndroidAvailable()
-{
-#ifndef MOZ_WIDGET_ANDROID
-  return false;
-#else
-  // We need android.media.MediaCodec which exists in API level 16 and higher.
-  return AndroidBridge::Bridge() && (AndroidBridge::Bridge()->GetAPIVersion() >= 16);
-#endif
-}
-
-static bool
-IsGonkMP4DecoderAvailable()
-{
-  return Preferences::GetBool("media.gonk.enabled", false);
-}
-
-static bool
-IsGMPDecoderAvailable()
-{
-  return Preferences::GetBool("media.gmp.decoder.enabled", false);
-}
-
-static bool
-HavePlatformMPEGDecoders()
-{
-#ifdef XP_WIN
-  // We always have H.264/AAC platform decoders on Windows.
-  return true;
-#else
-  return Preferences::GetBool("media.use-blank-decoder") ||
-         IsAndroidAvailable() ||
-         IsFFmpegAvailable() ||
-         IsAppleAvailable() ||
-         IsGonkMP4DecoderAvailable() ||
-         IsGMPDecoderAvailable() ||
-         // TODO: Other platforms...
-         false;
-#endif
-}
-
 /* static */
 bool
 MP4Decoder::IsEnabled()
 {
-  return Preferences::GetBool("media.fragmented-mp4.enabled") &&
-         HavePlatformMPEGDecoders();
+  return Preferences::GetBool("media.mp4.enabled");
 }
 
 static const uint8_t sTestH264ExtraData[] = {
