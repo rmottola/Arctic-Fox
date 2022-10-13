@@ -479,8 +479,8 @@ class Build(MachCommandBase):
                     print('To take your build for a test drive, run: |mach run|')
                 app = self.substs['MOZ_BUILD_APP']
                 if app in ('browser', 'mobile/android'):
-                    print('Please remember that you also need to PACKAGE your build '
-                        'to have all components properly included and unnecessary files removed.')
+                    print('For more information on what to do now, see '
+                        'https://developer.mozilla.org/docs/Developer_Guide/So_You_Just_Built_Firefox')
             except Exception:
                 # Ignore Exceptions in case we can't find config.status (such
                 # as when doing OSX Universal builds)

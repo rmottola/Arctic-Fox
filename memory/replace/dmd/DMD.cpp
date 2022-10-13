@@ -385,6 +385,8 @@ public:
   bool IsDarkMatterMode() const { return mMode == DarkMatter; }
   bool IsCumulativeMode() const { return mMode == Cumulative; }
 
+  const char* ModeString() const;
+
   const char* DMDEnvVar() const { return mDMDEnvVar; }
 
   size_t SampleBelowSize() const { return mSampleBelowSize.mActual; }
@@ -1496,6 +1498,22 @@ Options::BadArg(const char* aArg)
   exit(1);
 }
 
+const char*
+Options::ModeString() const
+{
+  switch (mMode) {
+  case Live:
+    return "live";
+  case DarkMatter:
+    return "dark-matter";
+  case Cumulative:
+    return "cumulative";
+  default:
+    MOZ_ASSERT(false);
+    return "(unknown DMD mode)";
+  }
+}
+
 //---------------------------------------------------------------------------
 // DMD start-up
 //---------------------------------------------------------------------------
@@ -1777,19 +1795,7 @@ AnalyzeImpl(UniquePtr<JSONWriteFunc> aWriter)
         writer.NullProperty("dmdEnvVar");
       }
 
-      const char* mode;
-      if (gOptions->IsLiveMode()) {
-        mode = "live";
-      } else if (gOptions->IsDarkMatterMode()) {
-        mode = "dark-matter";
-      } else if (gOptions->IsCumulativeMode()) {
-        mode = "cumulative";
-      } else {
-        MOZ_ASSERT(false);
-        mode = "(unknown DMD mode)";
-      }
-      writer.StringProperty("mode", mode);
-
+      writer.StringProperty("mode", gOptions->ModeString());
       writer.IntProperty("sampleBelowSize", gOptions->SampleBelowSize());
     }
     writer.EndObject();
