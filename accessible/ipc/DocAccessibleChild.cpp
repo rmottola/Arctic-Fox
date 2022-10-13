@@ -477,6 +477,17 @@ DocAccessibleChild::RecvGetTextBeforeOffset(const uint64_t& aID,
 }
 
 bool
+DocAccessibleChild::RecvCharAt(const uint64_t& aID,
+                               const int32_t& aOffset,
+                               uint16_t* aChar)
+{
+  HyperTextAccessible* acc = IdToHyperTextAccessible(aID);
+  *aChar = acc && acc->IsTextRole() ?
+    static_cast<uint16_t>(acc->CharAt(aOffset)) : 0;
+  return true;
+}
+
+bool
 DocAccessibleChild::RecvTextAttributes(const uint64_t& aID,
                                        const bool& aIncludeDefAttrs,
                                        const int32_t& aOffset,
@@ -740,17 +751,6 @@ DocAccessibleChild::RecvPasteText(const uint64_t& aID,
     acc->PasteText(aPosition);
   }
 
-  return true;
-}
-
-bool
-DocAccessibleChild::RecvCharAt(const uint64_t& aID,
-                               const int32_t& aOffset,
-                               uint16_t* aChar)
-{
-  HyperTextAccessible* acc = IdToHyperTextAccessible(aID);
-  *aChar = acc && acc->IsTextRole() ?
-    static_cast<uint16_t>(acc->CharAt(aOffset)) : 0;
   return true;
 }
 

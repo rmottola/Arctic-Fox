@@ -132,6 +132,10 @@ public:
                                        nsString* aText, int32_t* aStartOffset,
                                        int32_t* aEndOffset) override;
 
+  virtual bool RecvCharAt(const uint64_t& aID,
+                          const int32_t& aOffset,
+                          uint16_t* aChar) override;
+
   virtual bool RecvTextAttributes(const uint64_t& aID,
                                   const bool& aIncludeDefAttrs,
                                   const int32_t& aOffset,
@@ -219,10 +223,6 @@ public:
 
   virtual bool RecvPasteText(const uint64_t& aID,
                              const int32_t& aPosition, bool* aValid) override;
-
-  virtual bool RecvCharAt(const uint64_t& aID,
-                          const int32_t& aOffset,
-                          uint16_t* aChar) override;
 
   virtual bool RecvImagePosition(const uint64_t& aID,
                                  const uint32_t& aCoordType,

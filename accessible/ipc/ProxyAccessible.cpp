@@ -276,6 +276,14 @@ ProxyAccessible::GetTextBeforeOffset(int32_t aOffset,
                                           &aText, aStartOffset, aEndOffset);
 }
 
+char16_t
+ProxyAccessible::CharAt(int32_t aOffset)
+{
+  uint16_t retval = 0;
+  unused << mDoc->SendCharAt(mID, aOffset, &retval);
+  return static_cast<char16_t>(retval);
+}
+
 void
 ProxyAccessible::TextAttributes(bool aIncludeDefAttrs,
                                 int32_t aOffset,
@@ -427,14 +435,6 @@ ProxyAccessible::PasteText(int32_t aPosition)
   bool valid;
   unused << mDoc->SendPasteText(mID, aPosition, &valid);
   return valid;
-}
-
-char16_t
-ProxyAccessible::CharAt(int32_t aOffset)
-{
-  uint16_t retval = 0;
-  unused << mDoc->SendCharAt(mID, aOffset, &retval);
-  return static_cast<char16_t>(retval);
 }
 
 nsIntPoint
