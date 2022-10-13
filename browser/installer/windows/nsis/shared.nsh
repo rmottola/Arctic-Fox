@@ -15,12 +15,12 @@
   System::Call "kernel32::ProcessIdToSessionId(i $0, *i ${NSIS_MAX_STRLEN} r9)"
 
   ; Determine if we're the protected UserChoice default or not. If so fix the
-  ; start menu tile.  In case there are 2 Pale Moon installations, we only do
+  ; start menu tile.  In case there are 2 Arctic Fox installations, we only do
   ; this if the application being updated is the default.
   ReadRegStr $0 HKCU "Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice" "ProgId"
-  ${If} $0 == "PaleMoonURL"
+  ${If} $0 == "ArcticFoxURL"
   ${AndIf} $9 != 0 ; We're not running in session 0
-    ReadRegStr $0 HKCU "Software\Classes\PaleMoonURL\shell\open\command" ""
+    ReadRegStr $0 HKCU "Software\Classes\ArcticFoxURL\shell\open\command" ""
     ${GetPathFromString} "$0" $0
     ${GetParent} "$0" $0
     ${If} ${FileExists} "$0"
@@ -278,13 +278,13 @@
   ClearErrors
   EnumRegKey $7 HKCR "${FILE_TYPE}" 0
   ${If} ${Errors}
-    WriteRegStr SHCTX "SOFTWARE\Classes\${FILE_TYPE}"  "" "PaleMoonHTML"
+    WriteRegStr SHCTX "SOFTWARE\Classes\${FILE_TYPE}"  "" "ArcticFoxHTML"
   ${EndIf}
 !macroend
 !define AddAssociationIfNoneExist "!insertmacro AddAssociationIfNoneExist"
 
 
-; Adds the protocol and file handler registry entries for making Pale Moon the
+; Adds the protocol and file handler registry entries for making Arctic Fox the
 ; default handler (uses SHCTX).
 !macro SetHandlers
   ${GetLongPath} "$INSTDIR\${FileMainEXE}" $8
@@ -292,30 +292,30 @@
   StrCpy $0 "SOFTWARE\Classes"
   StrCpy $2 "$\"$8$\" -osint -url $\"%1$\""
 
-  ; Associate the file handlers with PaleMoonHTML
+  ; Associate the file handlers with ArcticFoxHTML
   ReadRegStr $6 SHCTX "$0\.htm" ""
-  ${If} "$6" != "PaleMoonHTML"
-    WriteRegStr SHCTX "$0\.htm"   "" "PaleMoonHTML"
+  ${If} "$6" != "ArcticFoxHTML"
+    WriteRegStr SHCTX "$0\.htm"   "" "ArcticFoxHTML"
   ${EndIf}
 
   ReadRegStr $6 SHCTX "$0\.html" ""
-  ${If} "$6" != "PaleMoonHTML"
-    WriteRegStr SHCTX "$0\.html"  "" "PaleMoonHTML"
+  ${If} "$6" != "ArcticFoxHTML"
+    WriteRegStr SHCTX "$0\.html"  "" "ArcticFoxHTML"
   ${EndIf}
 
   ReadRegStr $6 SHCTX "$0\.shtml" ""
-  ${If} "$6" != "PaleMoonHTML"
-    WriteRegStr SHCTX "$0\.shtml" "" "PaleMoonHTML"
+  ${If} "$6" != "ArcticFoxHTML"
+    WriteRegStr SHCTX "$0\.shtml" "" "ArcticFoxHTML"
   ${EndIf}
 
   ReadRegStr $6 SHCTX "$0\.xht" ""
-  ${If} "$6" != "PaleMoonHTML"
-    WriteRegStr SHCTX "$0\.xht"   "" "PaleMoonHTML"
+  ${If} "$6" != "ArcticFoxHTML"
+    WriteRegStr SHCTX "$0\.xht"   "" "ArcticFoxHTML"
   ${EndIf}
 
   ReadRegStr $6 SHCTX "$0\.xhtml" ""
-  ${If} "$6" != "PaleMoonHTML"
-    WriteRegStr SHCTX "$0\.xhtml" "" "PaleMoonHTML"
+  ${If} "$6" != "ArcticFoxHTML"
+    WriteRegStr SHCTX "$0\.xhtml" "" "ArcticFoxHTML"
   ${EndIf}
 
   ;Register file associations, but only if they don't exist yet.
@@ -324,12 +324,12 @@
   ${AddAssociationIfNoneExist} ".ogv"
   ${AddAssociationIfNoneExist} ".webm"
 
-  ; An empty string is used for the 5th param because PaleMoonHTML is not a
+  ; An empty string is used for the 5th param because ArcticFoxHTML is not a
   ; protocol handler
-  ${AddDisabledDDEHandlerValues} "PaleMoonHTML" "$2" "$8,1" \
+  ${AddDisabledDDEHandlerValues} "ArcticFoxHTML" "$2" "$8,1" \
                                  "${AppRegName} HTML Document" ""
 
-  ${AddDisabledDDEHandlerValues} "PaleMoonURL" "$2" "$8,1" "${AppRegName} URL" \
+  ${AddDisabledDDEHandlerValues} "ArcticFoxHTML" "$2" "$8,1" "${AppRegName} URL" \
                                  "true"
 
   ; An empty string is used for the 4th & 5th params because the following
@@ -400,35 +400,35 @@
   WriteRegStr ${RegKey} "$0\Capabilities" "ApplicationIcon" "$8,0"
   WriteRegStr ${RegKey} "$0\Capabilities" "ApplicationName" "${BrandShortName}"
 
-  WriteRegStr ${RegKey} "$0\Capabilities\FileAssociations" ".htm"   "PaleMoonHTML"
-  WriteRegStr ${RegKey} "$0\Capabilities\FileAssociations" ".html"  "PaleMoonHTML"
-  WriteRegStr ${RegKey} "$0\Capabilities\FileAssociations" ".shtml" "PaleMoonHTML"
-  WriteRegStr ${RegKey} "$0\Capabilities\FileAssociations" ".xht"   "PaleMoonHTML"
-  WriteRegStr ${RegKey} "$0\Capabilities\FileAssociations" ".xhtml" "PaleMoonHTML"
+  WriteRegStr ${RegKey} "$0\Capabilities\FileAssociations" ".htm"   "ArcticFoxHTML"
+  WriteRegStr ${RegKey} "$0\Capabilities\FileAssociations" ".html"  "ArcticFoxHTML"
+  WriteRegStr ${RegKey} "$0\Capabilities\FileAssociations" ".shtml" "ArcticFoxHTML"
+  WriteRegStr ${RegKey} "$0\Capabilities\FileAssociations" ".xht"   "ArcticFoxHTML"
+  WriteRegStr ${RegKey} "$0\Capabilities\FileAssociations" ".xhtml" "ArcticFoxHTML"
 
   WriteRegStr ${RegKey} "$0\Capabilities\StartMenu" "StartMenuInternet" "$R9"
 
-  WriteRegStr ${RegKey} "$0\Capabilities\URLAssociations" "ftp"    "PaleMoonURL"
-  WriteRegStr ${RegKey} "$0\Capabilities\URLAssociations" "http"   "PaleMoonURL"
-  WriteRegStr ${RegKey} "$0\Capabilities\URLAssociations" "https"  "PaleMoonURL"
+  WriteRegStr ${RegKey} "$0\Capabilities\URLAssociations" "ftp"    "ArcticFoxHTML"
+  WriteRegStr ${RegKey} "$0\Capabilities\URLAssociations" "http"   "ArcticFoxHTML"
+  WriteRegStr ${RegKey} "$0\Capabilities\URLAssociations" "https"  "ArcticFoxHTML"
 
   ; Vista Registered Application
   WriteRegStr ${RegKey} "Software\RegisteredApplications" "${AppRegName}" "$0\Capabilities"
 !macroend
 !define SetStartMenuInternet "!insertmacro SetStartMenuInternet"
 
-; The IconHandler reference for PaleMoonHTML can end up in an inconsistent state
+; The IconHandler reference for ArcticFoxHTML can end up in an inconsistent state
 ; due to changes not being detected by the IconHandler for side by side
 ; installs (see bug 268512). The symptoms can be either an incorrect icon or no
-; icon being displayed for files associated with Pale Moon (does not use SHCTX).
+; icon being displayed for files associated with Arctic Fox (does not use SHCTX).
 !macro FixShellIconHandler RegKey
   ClearErrors
-  ReadRegStr $1 ${RegKey} "Software\Classes\PaleMoonHTML\ShellEx\IconHandler" ""
+  ReadRegStr $1 ${RegKey} "Software\Classes\ArcticFoxHTML\ShellEx\IconHandler" ""
   ${Unless} ${Errors}
-    ReadRegStr $1 ${RegKey} "Software\Classes\PaleMoonHTML\DefaultIcon" ""
+    ReadRegStr $1 ${RegKey} "Software\Classes\ArcticFoxHTML\DefaultIcon" ""
     ${GetLongPath} "$INSTDIR\${FileMainEXE}" $2
     ${If} "$1" != "$2,1"
-      WriteRegStr ${RegKey} "Software\Classes\PaleMoonHTML\DefaultIcon" "" "$2,1"
+      WriteRegStr ${RegKey} "Software\Classes\ArcticFoxHTML\DefaultIcon" "" "$2,1"
     ${EndIf}
   ${EndUnless}
 !macroend
@@ -498,7 +498,7 @@
     ${WriteRegStr2} $1 "$0" "DisplayName" "${BrandFullNameInternal} (${ARCH} ${AB_CD})" 0
     ${WriteRegStr2} $1 "$0" "DisplayVersion" "${AppVersion}" 0
     ${WriteRegStr2} $1 "$0" "InstallLocation" "$8" 0
-    ${WriteRegStr2} $1 "$0" "Publisher" "Moonchild Productions" 0
+    ${WriteRegStr2} $1 "$0" "Publisher" "Arctic Fox Developers" 0
     ${WriteRegStr2} $1 "$0" "UninstallString" "$\"$8\uninstall\helper.exe$\"" 0
     ${WriteRegStr2} $1 "$0" "URLInfoAbout" "${URLInfoAbout}" 0
     ${WriteRegStr2} $1 "$0" "URLUpdateInfo" "${URLUpdateInfo}" 0
@@ -524,7 +524,7 @@
 ; HKCU Software\Classes keys when associating handlers. The fix uses the merged
 ; view in HKCR to check for existance of an existing association. This macro
 ; cleans affected installations by removing the HKLM and HKCU value if it is set
-; to PaleMoonHTML when there is a value for PersistentHandler or by removing the
+; to ArcticFoxHTML when there is a value for PersistentHandler or by removing the
 ; HKCU value when the HKLM value has a value other than an empty string.
 !macro FixBadFileAssociation FILE_TYPE
   ; Only delete the default value in case the key has values for OpenWithList,
@@ -533,16 +533,16 @@
   ReadRegStr $1 HKLM "Software\Classes\${FILE_TYPE}" ""
   ReadRegStr $2 HKCR "${FILE_TYPE}\PersistentHandler" ""
   ${If} "$2" != ""
-    ; Since there is a persistent handler remove PaleMoonHTML as the default
-    ; value from both HKCU and HKLM if it is set to PaleMoonHTML.
-    ${If} "$0" == "PaleMoonHTML"
+    ; Since there is a persistent handler remove ArcticFoxHTML as the default
+    ; value from both HKCU and HKLM if it is set to ArcticFoxHTML.
+    ${If} "$0" == "ArcticFoxHTML"
       DeleteRegValue HKCU "Software\Classes\${FILE_TYPE}" ""
     ${EndIf}
-    ${If} "$1" == "PaleMoonHTML"
+    ${If} "$1" == "ArcticFoxHTML"
       DeleteRegValue HKLM "Software\Classes\${FILE_TYPE}" ""
     ${EndIf}
-  ${ElseIf} "$0" == "PaleMoonHTML"
-    ; Since KHCU is set to PaleMoonHTML, remove it as the default value
+  ${ElseIf} "$0" == "ArcticFoxHTML"
+    ; Since KHCU is set to ArcticFoxHTML remove ArcticFoxHTML as the default value
     ; from HKCU if HKLM is set to a value other than an empty string.
     ${If} "$1" != ""
       DeleteRegValue HKCU "Software\Classes\${FILE_TYPE}" ""
@@ -596,17 +596,17 @@
   ; Only set the file and protocol handlers if the existing one under HKCR is
   ; for this install location.
 
-  ${IsHandlerForInstallDir} "PaleMoonHTML" $R9
+  ${IsHandlerForInstallDir} "ArcticFoxHTML" $R9
   ${If} "$R9" == "true"
-    ; An empty string is used for the 5th param because PaleMoonHTML is not a
+    ; An empty string is used for the 5th param because ArcticFoxHTML is not a
     ; protocol handler.
-    ${AddDisabledDDEHandlerValues} "PaleMoonHTML" "$2" "$8,1" \
+    ${AddDisabledDDEHandlerValues} "ArcticFoxHTML" "$2" "$8,1" \
                                    "${AppRegName} HTML Document" ""
   ${EndIf}
 
-  ${IsHandlerForInstallDir} "PaleMoonURL" $R9
+  ${IsHandlerForInstallDir} "ArcticFoxHTML" $R9
   ${If} "$R9" == "true"
-    ${AddDisabledDDEHandlerValues} "PaleMoonURL" "$2" "$8,1" \
+    ${AddDisabledDDEHandlerValues} "ArcticFoxHTML" "$2" "$8,1" \
                                    "${AppRegName} URL" "true"
   ${EndIf}
 
@@ -634,11 +634,11 @@
 !macro RemoveDeprecatedKeys
   StrCpy $0 "SOFTWARE\Classes"
   ; Remove support for launching gopher urls from the shell during install or
-  ; update if the DefaultIcon is from palemoon.exe.
+  ; update if the DefaultIcon is from arcticfox.exe.
   ${RegCleanAppHandler} "gopher"
 
   ; Remove support for launching chrome urls from the shell during install or
-  ; update if the DefaultIcon is from palemoon.exe (Bug 301073).
+  ; update if the DefaultIcon is from arcticfox.exe (Bug 301073).
   ${RegCleanAppHandler} "chrome"
 
   ; Remove the app compatibility registry key
@@ -655,10 +655,10 @@
     DeleteRegValue HKLM "$0\Capabilities\URLAssociations" "gopher"
   ${EndUnless}
 
-  ; Delete gopher from the user's UrlAssociations if it points to PaleMoonURL.
+  ; Delete gopher from the user's UrlAssociations if it points to ArcticFoxURL.
   StrCpy $0 "Software\Microsoft\Windows\Shell\Associations\UrlAssociations\gopher"
   ReadRegStr $2 HKCU "$0\UserChoice" "Progid"
-  ${If} "$2" == "PaleMoonURL"
+  ${If} "$2" == "ArcticFoxURL"
     DeleteRegKey HKCU "$0"
   ${EndIf}
 !macroend
@@ -876,15 +876,15 @@
           ${If} $5 == ""
             ${Break}
           ${EndIf}
-          ${If} $5 == 233 ; ansi ??
+          ${If} $5 == 233 ; ansi é
             StrCpy $0 "1"
             FileWriteByte $4 195
             FileWriteByte $4 169
-          ${ElseIf} $5 == 241 ; ansi ??
+          ${ElseIf} $5 == 241 ; ansi ñ
             StrCpy $0 "1"
             FileWriteByte $4 195
             FileWriteByte $4 177
-          ${ElseIf} $5 == 252 ; ansi ??
+          ${ElseIf} $5 == 252 ; ansi ü
             StrCpy $0 "1"
             FileWriteByte $4 195
             FileWriteByte $4 188
@@ -928,7 +928,7 @@
       ${If} ${AtLeastWin7}
         ; No need to check the default on Win8 and later
         ${If} ${AtMostWin2008R2}
-          ; Check if Pale Moon is the http handler for this user
+          ; Check if Arctic Fox is the http handler for this user
           SetShellVarContext current ; Set SHCTX to the current user
           ${IsHandlerForInstallDir} "http" $R9
           ${If} $TmpVal == "HKLM"
@@ -1311,4 +1311,4 @@ Function SetAsDefaultAppUser
 FunctionEnd
 !define SetAsDefaultAppUser "Call SetAsDefaultAppUser"
 
-!endif
+!endif ; NO_LOG

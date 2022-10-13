@@ -28,7 +28,7 @@
     <em:description>The default theme.</em:description>
 
     <!-- Front End Integration Hooks (used by Theme Manager)-->
-    <em:creator>Moonchild Productions</em:creator>
+    <em:creator>Mozilla</em:creator>
     <em:contributor>Mozilla Contributors</em:contributor>
 
     <!-- Allow lightweight themes to apply to this theme -->

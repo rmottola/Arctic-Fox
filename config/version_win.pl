@@ -239,9 +239,8 @@ $productversion = "$appver[0],$appver[1],$appver[2],$appver[3]";
 $mpversion = "$appver[0].$appver[1].$appver[2].$appver[3]";
 my $platformversion = "$mstone[0].$mstone[1].$mstone[2].$daycount";
 
-
-my $copyright = "License: MPL 2.0";
-my $company = "Moonchild Productions";
+my $copyright = "License: MPL 2";
+my $company = "";
 my $trademarks = "";
 my $productname = $displayname;
 
