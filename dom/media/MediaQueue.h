@@ -76,11 +76,6 @@ public:
     return static_cast<T*>(nsDeque::PeekFront());
   }
 
-  inline void Empty() {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
-    nsDeque::Empty();
-  }
-
   void Reset() {
     ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     while (GetSize() > 0) {
