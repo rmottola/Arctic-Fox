@@ -311,7 +311,7 @@ private:
   RefPtr<ServiceWorkerManagerChild> mActor;
 };
 
-} // anonymous namespace
+} // namespace
 
 NS_IMPL_ISUPPORTS0(ServiceWorkerJob)
 NS_IMPL_ISUPPORTS0(ServiceWorkerRegistrationInfo)
@@ -418,7 +418,6 @@ ServiceWorkerManager::~ServiceWorkerManager()
 {
   // The map will assert if it is not empty when destroyed.
   mRegistrationInfos.Clear();
-
   MOZ_ASSERT(!mActor);
 }
 
@@ -866,9 +865,7 @@ private:
   {}
 };
 
-} // anonymous namespace
-
-
+} // namespace
 
 class ServiceWorkerRegisterJob final : public ServiceWorkerJob,
                                        public serviceWorkerScriptCache::CompareCallback
@@ -1841,7 +1838,7 @@ DispatchExtendableEventOnWorkerScope(JSContext* aCx,
   MOZ_ASSERT(waitUntilPromise);
   return waitUntilPromise.forget();
 }
-}; // anonymous namespace
+} // namespace
 
 /*
  * Used to handle ExtendableEvent::waitUntil() and proceed with
@@ -1926,7 +1923,7 @@ LifecycleEventWorkerRunnable::DispatchLifecycleEvent(JSContext* aCx, WorkerPriva
     // FIXME(nsm): Bug 982787 pass previous active worker.
     ExtendableEventInit init;
     init.mBubbles = false;
-    init.mCancelable = false;
+    init.mCancelable = true;
     event = ExtendableEvent::Constructor(target, mEventName, init);
   } else {
     MOZ_CRASH("Unexpected lifecycle event");
@@ -4910,7 +4907,7 @@ GetAllRegistrationsPerPrincipalEnumerator(const nsACString& aKey,
   return PL_DHASH_NEXT;
 }
 
-} // anonymous namespace
+} // namespace
 
 NS_IMPL_ISUPPORTS(ServiceWorkerDataInfo, nsIServiceWorkerInfo)
 
