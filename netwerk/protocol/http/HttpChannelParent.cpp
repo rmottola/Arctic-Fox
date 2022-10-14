@@ -150,6 +150,7 @@ NS_IMPL_ISUPPORTS(HttpChannelParent,
                   nsIProgressEventSink,
                   nsIRequestObserver,
                   nsIStreamListener,
+                  nsIPackagedAppChannelListener,
                   nsIParentChannel,
                   nsIAuthPromptProvider,
                   nsIParentRedirectingChannel,
@@ -1007,6 +1008,19 @@ HttpChannelParent::RecvRemoveCorsPreflightCacheEntry(const URIParams& uri,
   nsCORSListenerProxy::RemoveFromCorsPreflightCache(deserializedURI,
                                                     principal);
   return true;
+}
+
+//-----------------------------------------------------------------------------
+// HttpChannelParent::nsIPackagedAppChannelListener
+//-----------------------------------------------------------------------------
+
+NS_IMETHODIMP
+HttpChannelParent::OnStartSignedPackageRequest(const nsACString& aPackageId)
+{
+  if (mTabParent) {
+    mTabParent->OnStartSignedPackageRequest(mChannel);
+  }
+  return NS_OK;
 }
 
 //-----------------------------------------------------------------------------
