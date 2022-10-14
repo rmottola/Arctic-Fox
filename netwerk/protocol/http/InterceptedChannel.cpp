@@ -30,10 +30,8 @@ DoAddCacheEntryHeaders(nsHttpChannel *self,
 
 NS_IMPL_ISUPPORTS(InterceptedChannelBase, nsIInterceptedChannel)
 
-InterceptedChannelBase::InterceptedChannelBase(nsINetworkInterceptController* aController,
-                                               bool aIsNavigation)
+InterceptedChannelBase::InterceptedChannelBase(nsINetworkInterceptController* aController)
 : mController(aController)
-, mIsNavigation(aIsNavigation)
 {
 }
 
@@ -74,13 +72,6 @@ InterceptedChannelBase::DoNotifyController()
     mController = nullptr;
 }
 
-NS_IMETHODIMP
-InterceptedChannelBase::GetIsNavigation(bool* aIsNavigation)
-{
-  *aIsNavigation = mIsNavigation;
-  return NS_OK;
-}
-
 nsresult
 InterceptedChannelBase::DoSynthesizeStatus(uint16_t aStatus, const nsACString& aReason)
 {
@@ -112,7 +103,7 @@ InterceptedChannelBase::DoSynthesizeHeader(const nsACString& aName, const nsACSt
 InterceptedChannelChrome::InterceptedChannelChrome(nsHttpChannel* aChannel,
                                                    nsINetworkInterceptController* aController,
                                                    nsICacheEntry* aEntry)
-: InterceptedChannelBase(aController, aChannel->IsNavigation())
+: InterceptedChannelBase(aController)
 , mChannel(aChannel)
 , mSynthesizedCacheEntry(aEntry)
 {
@@ -277,7 +268,7 @@ InterceptedChannelChrome::GetInternalContentPolicyType(nsContentPolicyType* aPol
 InterceptedChannelContent::InterceptedChannelContent(HttpChannelChild* aChannel,
                                                      nsINetworkInterceptController* aController,
                                                      nsIStreamListener* aListener)
-: InterceptedChannelBase(aController, aChannel->IsNavigation())
+: InterceptedChannelBase(aController)
 , mChannel(aChannel)
 , mStreamListener(aListener)
 {
