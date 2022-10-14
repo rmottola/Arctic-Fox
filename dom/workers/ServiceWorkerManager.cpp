@@ -1823,6 +1823,7 @@ DispatchExtendableEventOnWorkerScope(JSContext* aCx,
   ErrorResult result;
   result = aWorkerScope->DispatchDOMEvent(nullptr, aEvent, nullptr, nullptr);
   if (result.Failed() || internalEvent->mFlags.mExceptionHasBeenRisen) {
+    result.SuppressException();
     return nullptr;
   }
 
@@ -1832,6 +1833,7 @@ DispatchExtendableEventOnWorkerScope(JSContext* aCx,
     waitUntilPromise =
       Promise::Resolve(sgo, aCx, JS::UndefinedHandleValue, result);
     if (NS_WARN_IF(result.Failed())) {
+      result.SuppressException();
       return nullptr;
     }
   }
@@ -2338,6 +2340,7 @@ public:
     RefPtr<PushEvent> event =
       PushEvent::Constructor(globalObj, NS_LITERAL_STRING("push"), pei, result);
     if (NS_WARN_IF(result.Failed())) {
+      result.SuppressException();
       return false;
     }
 
@@ -3834,6 +3837,7 @@ private:
       ErrorResult result;
       internalHeaders->Set(mHeaderNames[i], mHeaderValues[i], result);
       if (NS_WARN_IF(result.Failed())) {
+        result.SuppressException();
         return false;
       }
     }
@@ -3849,6 +3853,7 @@ private:
     ErrorResult result;
     RefPtr<Request> request = Request::Constructor(globalObj, requestInfo, reqInit, result);
     if (NS_WARN_IF(result.Failed())) {
+      result.SuppressException();
       return false;
     }
     // For Telemetry, note that this Request object was created by a Fetch event.
@@ -3875,6 +3880,7 @@ private:
     RefPtr<FetchEvent> event =
       FetchEvent::Constructor(globalObj, NS_LITERAL_STRING("fetch"), init, result);
     if (NS_WARN_IF(result.Failed())) {
+      result.SuppressException();
       return false;
     }
 
@@ -4429,6 +4435,7 @@ FireControllerChangeOnDocument(nsIDocument* aDocument)
   ErrorResult result;
   dom::Navigator* navigator = window->GetNavigator(result);
   if (NS_WARN_IF(result.Failed())) {
+    result.SuppressException();
     return;
   }
 
