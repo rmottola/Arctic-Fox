@@ -282,7 +282,7 @@ InterceptedChannelChrome::GetInternalContentPolicyType(nsContentPolicyType* aPol
 
 InterceptedChannelContent::InterceptedChannelContent(HttpChannelChild* aChannel,
                                                      nsINetworkInterceptController* aController,
-                                                     nsIStreamListener* aListener)
+                                                     InterceptStreamListener* aListener)
 : InterceptedChannelBase(aController)
 , mChannel(aChannel)
 , mStreamListener(aListener)
@@ -351,9 +351,27 @@ InterceptedChannelContent::FinishSynthesizedResponse(const nsACString& aFinalURL
 
   EnsureSynthesizedResponse();
 
-  mChannel->OverrideWithSynthesizedResponse(mSynthesizedResponseHead.ref(),
-                                            mSynthesizedInput,
-                                            mStreamListener);
+  nsCOMPtr<nsIURI> originalURI;
+  mChannel->GetURI(getter_AddRefs(originalURI));
+
+  nsCOMPtr<nsIURI> responseURI;
+  if (!aFinalURLSpec.IsEmpty()) {
+    nsresult rv = NS_NewURI(getter_AddRefs(responseURI), aFinalURLSpec);
+    NS_ENSURE_SUCCESS(rv, rv);
+  } else {
+    responseURI = originalURI;
+  }
+
+  bool equal = false;
+  originalURI->Equals(responseURI, &equal);
+  if (!equal) {
+    mChannel->ForceIntercepted(mSynthesizedInput);
+    mChannel->BeginNonIPCRedirect(responseURI, *mSynthesizedResponseHead.ptr());
+  } else {
+    mChannel->OverrideWithSynthesizedResponse(mSynthesizedResponseHead.ref(),
+                                              mSynthesizedInput,
+                                              mStreamListener);
+  }
 
   mResponseBody = nullptr;
   mChannel = nullptr;
