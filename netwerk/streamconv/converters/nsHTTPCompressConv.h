@@ -76,7 +76,7 @@ public:
     // nsISupports methods
     NS_DECL_THREADSAFE_ISUPPORTS
 
-	NS_DECL_NSIREQUESTOBSERVER
+    NS_DECL_NSIREQUESTOBSERVER
     NS_DECL_NSISTREAMLISTENER
 
     // nsIStreamConverter methods
@@ -89,8 +89,8 @@ private:
 
     virtual ~nsHTTPCompressConv ();
 
-    nsIStreamListener   *mListener; // this guy gets the converted data via his OnDataAvailable ()
-	CompressMode        mMode;
+    nsCOMPtr<nsIStreamListener> mListener; // this guy gets the converted data via his OnDataAvailable ()
+    CompressMode        mMode;
 
     unsigned char *mOutBuffer;
     unsigned char *mInpBuffer;
@@ -99,7 +99,7 @@ private:
     uint32_t	mInpBufferLen;
 
     nsAutoPtr<BrotliWrapper> mBrotli;
-	
+
     nsCOMPtr<nsISupports>   mAsyncConvContext;
     nsCOMPtr<nsIStringInputStream>  mStream;
 

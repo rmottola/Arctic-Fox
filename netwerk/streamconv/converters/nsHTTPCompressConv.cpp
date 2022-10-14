@@ -31,8 +31,7 @@ NS_IMPL_ISUPPORTS(nsHTTPCompressConv,
 
 // nsFTPDirListingConv methods
 nsHTTPCompressConv::nsHTTPCompressConv()
-    : mListener(nullptr)
-    , mMode(HTTP_COMPRESS_IDENTITY)
+    : mMode(HTTP_COMPRESS_IDENTITY)
     , mOutBuffer(nullptr)
     , mInpBuffer(nullptr)
     , mOutBufferLen(0)
@@ -55,8 +54,6 @@ nsHTTPCompressConv::nsHTTPCompressConv()
 
 nsHTTPCompressConv::~nsHTTPCompressConv()
 {
-    NS_IF_RELEASE(mListener);
-
     if (mInpBuffer)
         free(mInpBuffer);
 
@@ -70,41 +67,38 @@ nsHTTPCompressConv::~nsHTTPCompressConv()
 }
 
 NS_IMETHODIMP
-nsHTTPCompressConv::AsyncConvertData(const char *aFromType, 
-                                     const char *aToType, 
-                                     nsIStreamListener *aListener, 
+nsHTTPCompressConv::AsyncConvertData(const char *aFromType,
+                                     const char *aToType,
+                                     nsIStreamListener *aListener,
                                      nsISupports *aCtxt)
 {
     if (!PL_strncasecmp(aFromType, HTTP_COMPRESS_TYPE, sizeof(HTTP_COMPRESS_TYPE)-1) ||
-        !PL_strncasecmp(aFromType, HTTP_X_COMPRESS_TYPE, sizeof(HTTP_X_COMPRESS_TYPE)-1))
+        !PL_strncasecmp(aFromType, HTTP_X_COMPRESS_TYPE, sizeof(HTTP_X_COMPRESS_TYPE)-1)) {
         mMode = HTTP_COMPRESS_COMPRESS;
 
-    else if (!PL_strncasecmp(aFromType, HTTP_GZIP_TYPE, sizeof(HTTP_GZIP_TYPE)-1) ||
-             !PL_strncasecmp(aFromType, HTTP_X_GZIP_TYPE, sizeof(HTTP_X_GZIP_TYPE)-1))
+    } else if (!PL_strncasecmp(aFromType, HTTP_GZIP_TYPE, sizeof(HTTP_GZIP_TYPE)-1) ||
+              !PL_strncasecmp(aFromType, HTTP_X_GZIP_TYPE, sizeof(HTTP_X_GZIP_TYPE)-1)) {
         mMode = HTTP_COMPRESS_GZIP;
-
-    else if (!PL_strncasecmp(aFromType, HTTP_DEFLATE_TYPE, sizeof(HTTP_DEFLATE_TYPE)-1))
+    } else if (!PL_strncasecmp(aFromType, HTTP_DEFLATE_TYPE, sizeof(HTTP_DEFLATE_TYPE)-1)) {
         mMode = HTTP_COMPRESS_DEFLATE;
-
-    else if (!PL_strncasecmp(aFromType, HTTP_BROTLI_TYPE, sizeof(HTTP_BROTLI_TYPE)-1))
+    } else if (!PL_strncasecmp(aFromType, HTTP_BROTLI_TYPE, sizeof(HTTP_BROTLI_TYPE)-1)) {
         mMode = HTTP_COMPRESS_BROTLI;
-	
-    // hook ourself up with the receiving listener. 
+    }	
+    // hook ourself up with the receiving listener.
     mListener = aListener;
-    NS_ADDREF(mListener);
 
     mAsyncConvContext = aCtxt;
-    return NS_OK; 
-} 
+    return NS_OK;
+}
 
 NS_IMETHODIMP
 nsHTTPCompressConv::OnStartRequest(nsIRequest* request, nsISupports *aContext)
 {
     return mListener->OnStartRequest(request, aContext);
-} 
+}
 
 NS_IMETHODIMP
-nsHTTPCompressConv::OnStopRequest(nsIRequest* request, nsISupports *aContext, 
+nsHTTPCompressConv::OnStopRequest(nsIRequest* request, nsISupports *aContext,
                                   nsresult aStatus)
 {
     nsresult status = aStatus;
@@ -133,7 +127,7 @@ nsHTTPCompressConv::OnStopRequest(nsIRequest* request, nsISupports *aContext,
         }
     }
     return mListener->OnStopRequest(request, aContext, status);
-} 
+}
 
 // static
 NS_METHOD
@@ -252,7 +246,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
             if (mInpBuffer != nullptr && streamLen > mInpBufferLen)
             {
                 mInpBuffer = (unsigned char *) realloc(mInpBuffer, mInpBufferLen = streamLen);
-               
+
                 if (mOutBufferLen < streamLen * 2)
                     mOutBuffer = (unsigned char *) realloc(mOutBuffer, mOutBufferLen = streamLen * 3);
 
@@ -277,7 +271,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
                 if (!mStreamInitialized)
                 {
                     memset(&d_stream, 0, sizeof (d_stream));
-                
+
                     if (inflateInit(&d_stream) != Z_OK)
                         return NS_ERROR_FAILURE;
 
@@ -291,7 +285,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
                 {
                     d_stream.next_out = mOutBuffer;
                     d_stream.avail_out = (uInt)mOutBufferLen;
- 
+
                     int code = inflate(&d_stream, Z_NO_FLUSH);
                     unsigned bytesWritten = (uInt)mOutBufferLen - d_stream.avail_out;
 
@@ -303,7 +297,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
                             if (NS_FAILED (rv))
                                 return rv;
                         }
-                        
+
                         inflateEnd(&d_stream);
                         mStreamEnded = true;
                         break;
@@ -354,9 +348,9 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
                         // reset stream pointers to our original data
                         d_stream.next_in = mInpBuffer;
                         d_stream.avail_in = (uInt)streamLen;
-                    }    
-                    else
+                    } else {
                         return NS_ERROR_INVALID_CONTENT_ENCODING;
+                    }
                 } /* for */
             }
             else
@@ -364,7 +358,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
                 if (!mStreamInitialized)
                 {
                     memset(&d_stream, 0, sizeof (d_stream));
-                
+
                     if (inflateInit2(&d_stream, -MAX_WBITS) != Z_OK)
                         return NS_ERROR_FAILURE;
 
@@ -378,7 +372,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
                 {
                     d_stream.next_out  = mOutBuffer;
                     d_stream.avail_out = (uInt)mOutBufferLen;
- 
+
                     int code = inflate (&d_stream, Z_NO_FLUSH);
                     unsigned bytesWritten = (uInt)mOutBufferLen - d_stream.avail_out;
 
@@ -390,7 +384,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
                             if (NS_FAILED (rv))
                                 return rv;
                         }
-                        
+
                         inflateEnd(&d_stream);
                         mStreamEnded = true;
                         break;
@@ -440,7 +434,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
         }
             break;
       
-        default: 
+        default:
             rv = mListener->OnDataAvailable(request, aContext, iStr, aSourceOffset, aCount);
             if (NS_FAILED (rv))
                 return rv;
@@ -453,14 +447,14 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 // XXX/ruslan: need to implement this too
 
 NS_IMETHODIMP
-nsHTTPCompressConv::Convert(nsIInputStream *aFromStream, 
-                            const char *aFromType, 
-                            const char *aToType, 
-                            nsISupports *aCtxt, 
+nsHTTPCompressConv::Convert(nsIInputStream *aFromStream,
+                            const char *aFromType,
+                            const char *aToType,
+                            nsISupports *aCtxt,
                             nsIInputStream **_retval)
-{ 
+{
     return NS_ERROR_NOT_IMPLEMENTED;
-} 
+}
 
 nsresult
 nsHTTPCompressConv::do_OnDataAvailable(nsIRequest* request,
@@ -512,7 +506,7 @@ nsHTTPCompressConv::check_header(nsIInputStream *iStr, uint32_t streamLen, nsres
                 uint32_t unused;
                 iStr->Read(&c, 1, &unused);
                 streamLen--;
-                
+
                 if (mSkipCount == 0 && ((unsigned)c & 0377) != gz_magic[0])
                 {
                     *rs = NS_ERROR_INVALID_CONTENT_ENCODING;
@@ -553,7 +547,7 @@ nsHTTPCompressConv::check_header(nsIInputStream *iStr, uint32_t streamLen, nsres
                 if (mSkipCount == 6)
                     hMode = GZIP_EXTRA0;
                 break;
-        
+
             case GZIP_EXTRA0:
                 if (mFlags & EXTRA_FIELD)
                 {
