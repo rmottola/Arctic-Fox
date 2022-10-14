@@ -48,13 +48,13 @@ public:
   }
 
   void GetIncludedServices(
-    nsTArray<nsRefPtr<BluetoothGattService>>& aIncludedServices) const
+    nsTArray<RefPtr<BluetoothGattService>>& aIncludedServices) const
   {
     aIncludedServices = mIncludedServices;
   }
 
   void GetCharacteristics(
-    nsTArray<nsRefPtr<BluetoothGattCharacteristic>>& aCharacteristics) const
+    nsTArray<RefPtr<BluetoothGattCharacteristic>>& aCharacteristics) const
   {
     aCharacteristics = mCharacteristics;
   }
@@ -148,12 +148,12 @@ private:
   /**
    * Array of discovered included services for this service.
    */
-  nsTArray<nsRefPtr<BluetoothGattService>> mIncludedServices;
+  nsTArray<RefPtr<BluetoothGattService>> mIncludedServices;
 
   /**
    * Array of discovered characteristics for this service.
    */
-  nsTArray<nsRefPtr<BluetoothGattCharacteristic>> mCharacteristics;
+  nsTArray<RefPtr<BluetoothGattCharacteristic>> mCharacteristics;
 };
 
 END_BLUETOOTH_NAMESPACE
@@ -163,16 +163,16 @@ END_BLUETOOTH_NAMESPACE
  *
  * Allows customizing the template code for a given set of template arguments.
  * With this function template, nsTArray can handle comparison between
- * 'nsRefPtr<BluetoothGattService>' and 'BluetoothGattServiceId' properly,
+ * 'RefPtr<BluetoothGattService>' and 'BluetoothGattServiceId' properly,
  * including IndexOf() and Contains();
  */
 template <>
 class nsDefaultComparator <
-  nsRefPtr<mozilla::dom::bluetooth::BluetoothGattService>,
+  RefPtr<mozilla::dom::bluetooth::BluetoothGattService>,
   mozilla::dom::bluetooth::BluetoothGattServiceId> {
 public:
   bool Equals(
-    const nsRefPtr<mozilla::dom::bluetooth::BluetoothGattService>& aService,
+    const RefPtr<mozilla::dom::bluetooth::BluetoothGattService>& aService,
     const mozilla::dom::bluetooth::BluetoothGattServiceId& aServiceId) const
   {
     return aService->GetServiceId() == aServiceId;

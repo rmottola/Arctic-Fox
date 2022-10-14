@@ -69,7 +69,7 @@ gfxAlphaBoxBlur::Init(const gfxRect& aRect,
     }
     memset(mData, 0, blurDataSize);
 
-    mozilla::RefPtr<DrawTarget> dt =
+    RefPtr<DrawTarget> dt =
         gfxPlatform::GetPlatform()->CreateDrawTargetForData(mData, size,
                                                             mBlur->GetStride(),
                                                             SurfaceFormat::A8);
@@ -94,7 +94,7 @@ DrawBlur(gfxContext* aDestinationCtx,
 {
     DrawTarget *dest = aDestinationCtx->GetDrawTarget();
 
-    nsRefPtr<gfxPattern> thebesPat = aDestinationCtx->GetPattern();
+    RefPtr<gfxPattern> thebesPat = aDestinationCtx->GetPattern();
     Pattern* pat = thebesPat->GetPattern(dest, nullptr);
 
     Matrix oldTransform = dest->GetTransform();

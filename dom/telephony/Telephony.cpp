@@ -68,7 +68,7 @@ Telephony::Telephony(nsPIDOMWindow* aOwner)
   MOZ_ASSERT(global);
 
   ErrorResult rv;
-  nsRefPtr<Promise> promise = Promise::Create(global, rv);
+  RefPtr<Promise> promise = Promise::Create(global, rv);
   MOZ_ASSERT(!rv.Failed());
 
   mReadyPromise = promise;
@@ -125,7 +125,7 @@ Telephony::Create(nsPIDOMWindow* aOwner, ErrorResult& aRv)
     return nullptr;
   }
 
-  nsRefPtr<Telephony> telephony = new Telephony(aOwner);
+  RefPtr<Telephony> telephony = new Telephony(aOwner);
 
   telephony->mService = ril;
   telephony->mListener = new Listener(telephony);
@@ -187,7 +187,7 @@ bool
 Telephony::HasDialingCall()
 {
   for (uint32_t i = 0; i < mCalls.Length(); i++) {
-    const nsRefPtr<TelephonyCall>& call = mCalls[i];
+    const RefPtr<TelephonyCall>& call = mCalls[i];
     if (call->CallState() > nsITelephonyService::CALL_STATE_UNKNOWN &&
         call->CallState() < nsITelephonyService::CALL_STATE_CONNECTED) {
       return true;
@@ -206,7 +206,7 @@ Telephony::DialInternal(uint32_t aServiceId, const nsAString& aNumber,
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   if (aRv.Failed()) {
     return nullptr;
   }
@@ -254,7 +254,7 @@ already_AddRefed<TelephonyCallId>
 Telephony::CreateCallId(const nsAString& aNumber, uint16_t aNumberPresentation,
                         const nsAString& aName, uint16_t aNamePresentation)
 {
-  nsRefPtr<TelephonyCallId> id =
+  RefPtr<TelephonyCallId> id =
     new TelephonyCallId(GetOwner(), aNumber, aNumberPresentation,
                         aName, aNamePresentation);
 
@@ -272,7 +272,7 @@ Telephony::CreateCall(TelephonyCallId* aId, uint32_t aServiceId,
     return nullptr;
   }
 
-  nsRefPtr<TelephonyCall> call =
+  RefPtr<TelephonyCall> call =
     TelephonyCall::Create(this, aId, aServiceId, aCallIndex, aCallState,
                           aEmergency, aConference, aSwitchable, aMergeable);
 
@@ -299,10 +299,10 @@ Telephony::NotifyCallsChanged(TelephonyCall* aCall)
 already_AddRefed<TelephonyCall>
 Telephony::GetCall(uint32_t aServiceId, uint32_t aCallIndex)
 {
-  nsRefPtr<TelephonyCall> call;
+  RefPtr<TelephonyCall> call;
 
   for (uint32_t i = 0; i < mCalls.Length(); i++) {
-    nsRefPtr<TelephonyCall>& tempCall = mCalls[i];
+    RefPtr<TelephonyCall>& tempCall = mCalls[i];
     if (tempCall->ServiceId() == aServiceId &&
         tempCall->CallIndex() == aCallIndex) {
       call = tempCall;
@@ -316,7 +316,7 @@ Telephony::GetCall(uint32_t aServiceId, uint32_t aCallIndex)
 already_AddRefed<TelephonyCall>
 Telephony::GetCallFromEverywhere(uint32_t aServiceId, uint32_t aCallIndex)
 {
-  nsRefPtr<TelephonyCall> call = GetCall(aServiceId, aCallIndex);
+  RefPtr<TelephonyCall> call = GetCall(aServiceId, aCallIndex);
 
   if (!call) {
     call = mGroup->GetCall(aServiceId, aCallIndex);
@@ -344,10 +344,10 @@ Telephony::HandleCallInfo(nsITelephonyCallInfo* aInfo)
   aInfo->GetIsSwitchable(&isSwitchable);
   aInfo->GetIsMergeable(&isMergeable);
 
-  nsRefPtr<TelephonyCall> call = GetCallFromEverywhere(serviceId, callIndex);
+  RefPtr<TelephonyCall> call = GetCallFromEverywhere(serviceId, callIndex);
 
   if (!call) {
-    nsRefPtr<TelephonyCallId> id = CreateCallId(aInfo);
+    RefPtr<TelephonyCallId> id = CreateCallId(aInfo);
     call = CreateCall(id, serviceId, callIndex, callState, isEmergency,
                       isConference, isSwitchable, isMergeable);
 
@@ -362,7 +362,7 @@ Telephony::HandleCallInfo(nsITelephonyCallInfo* aInfo)
 
     nsAutoString number;
     aInfo->GetNumber(number);
-    nsRefPtr<TelephonyCallId> id = call->Id();
+    RefPtr<TelephonyCallId> id = call->Id();
     id->UpdateNumber(number);
 
     // State changed.
@@ -382,7 +382,7 @@ Telephony::HandleCallInfo(nsITelephonyCallInfo* aInfo)
     }
 
     // Group changed.
-    nsRefPtr<TelephonyCallGroup> group = call->GetGroup();
+    RefPtr<TelephonyCallGroup> group = call->GetGroup();
 
     if (!group && isConference) {
       // Add to conference.
@@ -436,7 +436,7 @@ Telephony::Dial(const nsAString& aNumber, const Optional<uint32_t>& aServiceId,
                 ErrorResult& aRv)
 {
   uint32_t serviceId = ProvidedOrDefaultServiceId(aServiceId);
-  nsRefPtr<Promise> promise = DialInternal(serviceId, aNumber, false, aRv);
+  RefPtr<Promise> promise = DialInternal(serviceId, aNumber, false, aRv);
   return promise.forget();
 }
 
@@ -446,7 +446,7 @@ Telephony::DialEmergency(const nsAString& aNumber,
                          ErrorResult& aRv)
 {
   uint32_t serviceId = ProvidedOrDefaultServiceId(aServiceId);
-  nsRefPtr<Promise> promise = DialInternal(serviceId, aNumber, true, aRv);
+  RefPtr<Promise> promise = DialInternal(serviceId, aNumber, true, aRv);
   return promise.forget();
 }
 
@@ -464,7 +464,7 @@ Telephony::SendTones(const nsAString& aDTMFChars,
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   if (aRv.Failed()) {
     return nullptr;
   }
@@ -572,14 +572,14 @@ Telephony::GetActive(Nullable<OwningTelephonyCallOrTelephonyCallGroup>& aValue)
 already_AddRefed<CallsList>
 Telephony::Calls() const
 {
-  nsRefPtr<CallsList> list = mCallsList;
+  RefPtr<CallsList> list = mCallsList;
   return list.forget();
 }
 
 already_AddRefed<TelephonyCallGroup>
 Telephony::ConferenceGroup() const
 {
-  nsRefPtr<TelephonyCallGroup> group = mGroup;
+  RefPtr<TelephonyCallGroup> group = mGroup;
   return group.forget();
 }
 
@@ -591,7 +591,7 @@ Telephony::GetReady(ErrorResult& aRv) const
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = mReadyPromise;
+  RefPtr<Promise> promise = mReadyPromise;
   return promise.forget();
 }
 
@@ -624,7 +624,7 @@ Telephony::EnumerateCallStateComplete()
 {
   // Set conference state.
   if (mGroup->CallsArray().Length() >= 2) {
-    const nsTArray<nsRefPtr<TelephonyCall> > &calls = mGroup->CallsArray();
+    const nsTArray<RefPtr<TelephonyCall> > &calls = mGroup->CallsArray();
 
     uint16_t callState = calls[0]->CallState();
     for (uint32_t i = 1; i < calls.Length(); i++) {
@@ -652,7 +652,7 @@ Telephony::SupplementaryServiceNotification(uint32_t aServiceId,
                                             int32_t aCallIndex,
                                             uint16_t aNotification)
 {
-  nsRefPtr<TelephonyCall> associatedCall;
+  RefPtr<TelephonyCall> associatedCall;
   if (!mCalls.IsEmpty()) {
     associatedCall = GetCall(aServiceId, aCallIndex);
   }
@@ -679,7 +679,7 @@ Telephony::NotifyError(uint32_t aServiceId,
                        int32_t aCallIndex,
                        const nsAString& aError)
 {
-  nsRefPtr<TelephonyCall> callToNotify =
+  RefPtr<TelephonyCall> callToNotify =
     GetCallFromEverywhere(aServiceId, aCallIndex);
   if (!callToNotify) {
     NS_ERROR("Don't call me with a bad call index!");
@@ -700,10 +700,10 @@ Telephony::NotifyCdmaCallWaiting(uint32_t aServiceId, const nsAString& aNumber,
 {
   MOZ_ASSERT(mCalls.Length() == 1);
 
-  nsRefPtr<TelephonyCall> callToNotify = mCalls[0];
+  RefPtr<TelephonyCall> callToNotify = mCalls[0];
   MOZ_ASSERT(callToNotify && callToNotify->ServiceId() == aServiceId);
 
-  nsRefPtr<TelephonyCallId> id =
+  RefPtr<TelephonyCallId> id =
     new TelephonyCallId(GetOwner(), aNumber, aNumberPresentation, aName,
                         aNamePresentation);
   callToNotify->UpdateSecondId(id);
@@ -731,7 +731,7 @@ Telephony::DispatchCallEvent(const nsAString& aType,
   init.mCancelable = false;
   init.mCall = aCall;
 
-  nsRefPtr<CallEvent> event = CallEvent::Constructor(this, aType, init);
+  RefPtr<CallEvent> event = CallEvent::Constructor(this, aType, init);
 
   return DispatchTrustedEvent(event);
 }

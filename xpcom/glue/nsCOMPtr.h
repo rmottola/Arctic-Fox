@@ -28,7 +28,7 @@
 
 #include "nsDebug.h" // for |NS_ASSERTION|
 #include "nsISupportsUtils.h" // for |nsresult|, |NS_ADDREF|, |NS_GET_TEMPLATE_IID| et al
-#include "mozilla/nsRefPtr.h"
+#include "mozilla/RefPtr.h"
 
 #include "nsCycleCollectionNoteChild.h"
 
@@ -1371,7 +1371,7 @@ CallQueryInterface(nsCOMPtr<SourceType>& aSourcePtr, DestinationType** aDestPtr)
 }
 
 template <class T>
-nsRefPtr<T>::nsRefPtr(const nsCOMPtr_helper& aHelper)
+RefPtr<T>::RefPtr(const nsCOMPtr_helper& aHelper)
 {
   void* newRawPtr;
   if (NS_FAILED(aHelper(NS_GET_TEMPLATE_IID(T), &newRawPtr))) {
@@ -1381,8 +1381,8 @@ nsRefPtr<T>::nsRefPtr(const nsCOMPtr_helper& aHelper)
 }
 
 template <class T>
-nsRefPtr<T>&
-nsRefPtr<T>::operator=(const nsCOMPtr_helper& aHelper)
+RefPtr<T>&
+RefPtr<T>::operator=(const nsCOMPtr_helper& aHelper)
 {
   void* newRawPtr;
   if (NS_FAILED(aHelper(NS_GET_TEMPLATE_IID(T), &newRawPtr))) {

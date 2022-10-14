@@ -46,7 +46,7 @@ ServiceWorkerManagerService::Get()
 {
   AssertIsOnBackgroundThread();
 
-  nsRefPtr<ServiceWorkerManagerService> instance = sInstance;
+  RefPtr<ServiceWorkerManagerService> instance = sInstance;
   return instance.forget();
 }
 
@@ -55,7 +55,7 @@ ServiceWorkerManagerService::GetOrCreate()
 {
   AssertIsOnBackgroundThread();
 
-  nsRefPtr<ServiceWorkerManagerService> instance = sInstance;
+  RefPtr<ServiceWorkerManagerService> instance = sInstance;
   if (!instance) {
     instance = new ServiceWorkerManagerService();
   }
@@ -145,7 +145,7 @@ ServiceWorkerManagerService::PropagateUnregister(
 {
   AssertIsOnBackgroundThread();
 
-  nsRefPtr<dom::ServiceWorkerRegistrar> service =
+  RefPtr<dom::ServiceWorkerRegistrar> service =
     dom::ServiceWorkerRegistrar::Get();
   MOZ_ASSERT(service);
 
@@ -205,7 +205,7 @@ ServiceWorkerManagerService::PropagateRemoveAll(uint64_t aParentID)
 {
   AssertIsOnBackgroundThread();
 
-  nsRefPtr<dom::ServiceWorkerRegistrar> service =
+  RefPtr<dom::ServiceWorkerRegistrar> service =
     dom::ServiceWorkerRegistrar::Get();
   MOZ_ASSERT(service);
 

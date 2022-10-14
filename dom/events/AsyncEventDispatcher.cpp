@@ -25,7 +25,7 @@ AsyncEventDispatcher::AsyncEventDispatcher(EventTarget* aTarget,
   : mTarget(aTarget)
 {
   MOZ_ASSERT(mTarget);
-  nsRefPtr<Event> event =
+  RefPtr<Event> event =
     EventDispatcher::CreateEvent(aTarget, nullptr, &aEvent, EmptyString());
   mEvent = do_QueryInterface(event);
   NS_ASSERTION(mEvent, "Should never fail to create an event");
@@ -39,7 +39,7 @@ AsyncEventDispatcher::Run()
   if (mCanceled) {
     return NS_OK;
   }
-  nsRefPtr<Event> event = mEvent ? mEvent->InternalDOMEvent() : nullptr;
+  RefPtr<Event> event = mEvent ? mEvent->InternalDOMEvent() : nullptr;
   if (!event) {
     event = NS_NewDOMEvent(mTarget, nullptr, nullptr);
     nsresult rv = event->InitEvent(mEventType, mBubbles, false);
@@ -65,14 +65,14 @@ AsyncEventDispatcher::Cancel()
 nsresult
 AsyncEventDispatcher::PostDOMEvent()
 {
-  nsRefPtr<AsyncEventDispatcher> ensureDeletionWhenFailing = this;
+  RefPtr<AsyncEventDispatcher> ensureDeletionWhenFailing = this;
   return NS_DispatchToCurrentThread(this);
 }
 
 void
 AsyncEventDispatcher::RunDOMEventWhenSafe()
 {
-  nsRefPtr<AsyncEventDispatcher> ensureDeletionWhenFailing = this;
+  RefPtr<AsyncEventDispatcher> ensureDeletionWhenFailing = this;
   nsContentUtils::AddScriptRunner(this);
 }
 

@@ -58,7 +58,7 @@ public:
   explicit SpeechSynthesisRequestParent(SpeechTaskParent* aTask);
   virtual ~SpeechSynthesisRequestParent();
 
-  nsRefPtr<SpeechTaskParent> mTask;
+  RefPtr<SpeechTaskParent> mTask;
 
 protected:
 

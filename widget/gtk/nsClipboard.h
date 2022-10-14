@@ -53,7 +53,7 @@ private:
     nsCOMPtr<nsIClipboardOwner>  mGlobalOwner;
     nsCOMPtr<nsITransferable>    mSelectionTransferable;
     nsCOMPtr<nsITransferable>    mGlobalTransferable;
-    nsRefPtr<nsClipboardPrivacyHandler> mPrivacyHandler;
+    RefPtr<nsClipboardPrivacyHandler> mPrivacyHandler;
 
 };
 

@@ -246,7 +246,7 @@ public:
     NS_ConvertUTF8toUTF16 storageName(mStorageName);
     NS_ConvertUTF8toUTF16 path(mPath);
 
-    nsRefPtr<DeviceStorageFile> dsf(
+    RefPtr<DeviceStorageFile> dsf(
       new DeviceStorageFile(NS_LITERAL_STRING(DEVICESTORAGE_SDCARD),
                             storageName, path));
     NS_ConvertUTF8toUTF16 eventType(mEventType);
@@ -295,7 +295,7 @@ MozMtpDatabase::FileWatcherNotify(DbEntry* aEntry, const char* aEventType)
   nsAutoCString relPath(Substring(aEntry->mPath,
                                   storageEntry->mStoragePath.Length() + 1));
 
-  nsRefPtr<FileWatcherNotifyRunnable> r =
+  RefPtr<FileWatcherNotifyRunnable> r =
     new FileWatcherNotifyRunnable(storageEntry->mStorageName, relPath, aEventType);
   DebugOnly<nsresult> rv = NS_DispatchToMainThread(r);
   MOZ_ASSERT(NS_SUCCEEDED(rv));
@@ -585,7 +585,7 @@ MozMtpDatabase::AddStorage(MtpStorageID aStorageID,
     return;
   }
 
-  nsRefPtr<StorageEntry> storageEntry = new StorageEntry;
+  RefPtr<StorageEntry> storageEntry = new StorageEntry;
 
   storageEntry->mStorageID = aStorageID;
   storageEntry->mStoragePath = aPath;

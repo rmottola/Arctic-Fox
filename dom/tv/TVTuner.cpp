@@ -41,7 +41,7 @@ TVTuner::~TVTuner()
 TVTuner::Create(nsPIDOMWindow* aWindow,
                 nsITVTunerData* aData)
 {
-  nsRefPtr<TVTuner> tuner = new TVTuner(aWindow);
+  RefPtr<TVTuner> tuner = new TVTuner(aWindow);
   return (tuner->Init(aData)) ? tuner.forget() : nullptr;
 }
 
@@ -68,7 +68,7 @@ TVTuner::Init(nsITVTunerData* aData)
     }
 
     // Generate the source instance based on the supported source type.
-    nsRefPtr<TVSource> source = TVSource::Create(GetOwner(), sourceType, this);
+    RefPtr<TVSource> source = TVSource::Create(GetOwner(), sourceType, this);
     if (NS_WARN_IF(!source)) {
       continue;
     }
@@ -141,7 +141,7 @@ TVTuner::GetSources(ErrorResult& aRv)
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetOwner());
   MOZ_ASSERT(global);
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
@@ -157,7 +157,7 @@ TVTuner::SetCurrentSource(const TVSourceType aSourceType, ErrorResult& aRv)
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetOwner());
   MOZ_ASSERT(global);
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
@@ -183,14 +183,14 @@ TVTuner::GetId(nsAString& aId) const
 already_AddRefed<TVSource>
 TVTuner::GetCurrentSource() const
 {
-  nsRefPtr<TVSource> currentSource = mCurrentSource;
+  RefPtr<TVSource> currentSource = mCurrentSource;
   return currentSource.forget();
 }
 
 already_AddRefed<DOMMediaStream>
 TVTuner::GetStream() const
 {
-  nsRefPtr<DOMMediaStream> stream = mStream;
+  RefPtr<DOMMediaStream> stream = mStream;
   return stream.forget();
 }
 
@@ -198,7 +198,7 @@ nsresult
 TVTuner::InitMediaStream()
 {
   nsCOMPtr<nsIDOMWindow> window = do_QueryInterface(GetOwner());
-  nsRefPtr<DOMHwMediaStream> stream = DOMHwMediaStream::CreateHwStream(window);
+  RefPtr<DOMHwMediaStream> stream = DOMHwMediaStream::CreateHwStream(window);
 
   mStream = stream.forget();
   return NS_OK;

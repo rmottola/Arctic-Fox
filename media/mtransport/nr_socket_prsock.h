@@ -260,7 +260,7 @@ private:
   NrSocketIpcState state_;
   std::queue<RefPtr<nr_udp_message> > received_msgs_;
 
-  nsRefPtr<nsIUDPSocketChild> socket_child_; // only accessed from the io_thread
+  RefPtr<nsIUDPSocketChild> socket_child_; // only accessed from the io_thread
   nsCOMPtr<nsIEventTarget> sts_thread_;
   const nsCOMPtr<nsIEventTarget> io_thread_;
   ReentrantMonitor monitor_;
@@ -273,12 +273,12 @@ public:
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIUDPSOCKETINTERNAL
 
-  nsresult Init(const nsRefPtr<NrSocketIpc>& socket);
+  nsresult Init(const RefPtr<NrSocketIpc>& socket);
 
 private:
   virtual ~NrSocketIpcProxy();
 
-  nsRefPtr<NrSocketIpc> socket_;
+  RefPtr<NrSocketIpc> socket_;
   nsCOMPtr<nsIEventTarget> sts_thread_;
 };
 

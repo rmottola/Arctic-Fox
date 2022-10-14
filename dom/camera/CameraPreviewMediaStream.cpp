@@ -62,7 +62,7 @@ void
 CameraPreviewMediaStream::AddVideoOutput(VideoFrameContainer* aContainer)
 {
   MutexAutoLock lock(mMutex);
-  nsRefPtr<VideoFrameContainer> container = aContainer;
+  RefPtr<VideoFrameContainer> container = aContainer;
   AddVideoOutputImpl(container.forget());
 
   if (mVideoOutputs.Length() > 1) {
@@ -111,7 +111,7 @@ CameraPreviewMediaStream::RemoveListener(MediaStreamListener* aListener)
 {
   MutexAutoLock lock(mMutex);
 
-  nsRefPtr<MediaStreamListener> listener(aListener);
+  RefPtr<MediaStreamListener> listener(aListener);
   mListeners.RemoveElement(aListener);
   listener->NotifyEvent(mFakeMediaStreamGraph, MediaStreamListener::EVENT_REMOVED);
 }
@@ -148,7 +148,7 @@ CameraPreviewMediaStream::Invalidate()
 {
   MutexAutoLock lock(mMutex);
   --mInvalidatePending;
-  for (nsTArray<nsRefPtr<VideoFrameContainer> >::size_type i = 0; i < mVideoOutputs.Length(); ++i) {
+  for (nsTArray<RefPtr<VideoFrameContainer> >::size_type i = 0; i < mVideoOutputs.Length(); ++i) {
     VideoFrameContainer* output = mVideoOutputs[i];
     output->Invalidate();
   }
@@ -180,7 +180,7 @@ CameraPreviewMediaStream::SetCurrentFrame(const gfx::IntSize& aIntrinsicSize, Im
     mDiscardedFrames = 0;
 
     TimeStamp now = TimeStamp::Now();
-    for (nsTArray<nsRefPtr<VideoFrameContainer> >::size_type i = 0; i < mVideoOutputs.Length(); ++i) {
+    for (nsTArray<RefPtr<VideoFrameContainer> >::size_type i = 0; i < mVideoOutputs.Length(); ++i) {
       VideoFrameContainer* output = mVideoOutputs[i];
       output->SetCurrentFrame(aIntrinsicSize, aImage, now);
     }
@@ -198,7 +198,7 @@ CameraPreviewMediaStream::ClearCurrentFrame()
 {
   MutexAutoLock lock(mMutex);
 
-  for (nsTArray<nsRefPtr<VideoFrameContainer> >::size_type i = 0; i < mVideoOutputs.Length(); ++i) {
+  for (nsTArray<RefPtr<VideoFrameContainer> >::size_type i = 0; i < mVideoOutputs.Length(); ++i) {
     VideoFrameContainer* output = mVideoOutputs[i];
     output->ClearCurrentFrame();
     nsCOMPtr<nsIRunnable> event =

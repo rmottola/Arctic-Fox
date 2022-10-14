@@ -172,7 +172,7 @@ SVGContentUtils::GetStrokeOptions(AutoStrokeOptions* aStrokeOptions,
                                   gfxTextContextPaint *aContextPaint,
                                   StrokeOptionFlags aFlags)
 {
-  nsRefPtr<nsStyleContext> styleContext;
+  RefPtr<nsStyleContext> styleContext;
   if (aStyleContext) {
     styleContext = aStyleContext;
   } else {
@@ -237,7 +237,7 @@ SVGContentUtils::GetStrokeWidth(nsSVGElement* aElement,
                                 nsStyleContext* aStyleContext,
                                 gfxTextContextPaint *aContextPaint)
 {
-  nsRefPtr<nsStyleContext> styleContext;
+  RefPtr<nsStyleContext> styleContext;
   if (aStyleContext) {
     styleContext = aStyleContext;
   } else {
@@ -265,7 +265,7 @@ SVGContentUtils::GetFontSize(Element *aElement)
   if (!aElement)
     return 1.0f;
 
-  nsRefPtr<nsStyleContext> styleContext = 
+  RefPtr<nsStyleContext> styleContext = 
     nsComputedDOMStyle::GetStyleContextForElementNoFlush(aElement,
                                                          nullptr, nullptr);
   if (!styleContext) {
@@ -303,7 +303,7 @@ SVGContentUtils::GetFontXHeight(Element *aElement)
   if (!aElement)
     return 1.0f;
 
-  nsRefPtr<nsStyleContext> styleContext = 
+  RefPtr<nsStyleContext> styleContext = 
     nsComputedDOMStyle::GetStyleContextForElementNoFlush(aElement,
                                                          nullptr, nullptr);
   if (!styleContext) {
@@ -330,7 +330,7 @@ SVGContentUtils::GetFontXHeight(nsStyleContext *aStyleContext)
   nsPresContext *presContext = aStyleContext->PresContext();
   MOZ_ASSERT(presContext, "NULL pres context in GetFontXHeight");
 
-  nsRefPtr<nsFontMetrics> fontMetrics;
+  RefPtr<nsFontMetrics> fontMetrics;
   nsLayoutUtils::GetFontMetricsForStyleContext(aStyleContext,
                                                getter_AddRefs(fontMetrics));
 

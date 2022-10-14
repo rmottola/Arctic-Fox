@@ -3670,7 +3670,7 @@ nsWindow::StartRemoteDrawing()
                "Unexpected render mode for remote drawing");
 
   HDC dc = (HDC)GetNativeData(NS_NATIVE_GRAPHIC);
-  nsRefPtr<gfxASurface> surf;
+  RefPtr<gfxASurface> surf;
 
   if (mTransparencyMode == eTransparencyTransparent) {
     if (!mTransparentSurface) {
@@ -3721,7 +3721,7 @@ nsWindow::EndRemoteDrawing()
 void
 nsWindow::UpdateThemeGeometries(const nsTArray<ThemeGeometry>& aThemeGeometries)
 {
-  nsRefPtr<LayerManager> layerManager = GetLayerManager();
+  RefPtr<LayerManager> layerManager = GetLayerManager();
   if (!layerManager) {
     return;
   }
@@ -7075,7 +7075,7 @@ void nsWindow::ResizeTranslucentWindow(int32_t aNewWidth, int32_t aNewHeight, bo
   if (!force && aNewWidth == mBounds.width && aNewHeight == mBounds.height)
     return;
 
-  nsRefPtr<gfxWindowsSurface> newSurface =
+  RefPtr<gfxWindowsSurface> newSurface =
     new gfxWindowsSurface(IntSize(aNewWidth, aNewHeight), gfxImageFormat::ARGB32);
   mTransparentSurface = newSurface;
   mMemoryDC = newSurface->GetDC();
@@ -7837,7 +7837,7 @@ bool nsWindow::CaptureWidgetOnScreen(RefPtr<DrawTarget> aDT)
                    ? 0
                    : gfxWindowsSurface::FLAG_IS_TRANSPARENT;
 
-  nsRefPtr<gfxASurface> surf = new gfxWindowsSurface(dc, flags);
+  RefPtr<gfxASurface> surf = new gfxWindowsSurface(dc, flags);
   IntSize size(surf->GetSize().width, surf->GetSize().height);
   if (size.width <= 0 || size.height <= 0) {
     ::ReleaseDC(mWnd, dc);

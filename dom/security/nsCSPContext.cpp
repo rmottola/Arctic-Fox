@@ -848,7 +848,7 @@ nsCSPContext::SendReports(nsISupports* aBlockedContentSource,
 
     // we need to set an nsIChannelEventSink on the channel object
     // so we can tell it to not follow redirects when posting the reports
-    nsRefPtr<CSPReportRedirectSink> reportSink = new CSPReportRedirectSink();
+    RefPtr<CSPReportRedirectSink> reportSink = new CSPReportRedirectSink();
     if (docShell) {
       nsCOMPtr<nsINetworkInterceptController> interceptController = do_QueryInterface(docShell);
       reportSink->SetInterceptController(interceptController);
@@ -904,7 +904,7 @@ nsCSPContext::SendReports(nsISupports* aBlockedContentSource,
       httpChannel->SetRequestMethod(NS_LITERAL_CSTRING("POST"));
     }
 
-    nsRefPtr<CSPViolationReportListener> listener = new CSPViolationReportListener();
+    RefPtr<CSPViolationReportListener> listener = new CSPViolationReportListener();
     rv = reportChannel->AsyncOpen(listener, nullptr);
 
     // AsyncOpen should not fail, but could if there's no load group (like if
@@ -1025,7 +1025,7 @@ class CSPReportSenderRunnable final : public nsRunnable
     nsString                mScriptSample;
     uint32_t                mLineNum;
     uint64_t                mInnerWindowID;
-    nsRefPtr<nsCSPContext>  mCSPContext;
+    RefPtr<nsCSPContext>  mCSPContext;
 };
 
 /**

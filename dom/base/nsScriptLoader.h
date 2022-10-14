@@ -504,11 +504,11 @@ private:
   nsScriptLoadRequestList mLoadedAsyncRequests;
   nsScriptLoadRequestList mDeferRequests;
   nsScriptLoadRequestList mXSLTRequests;
-  nsRefPtr<nsScriptLoadRequest> mParserBlockingRequest;
+  RefPtr<nsScriptLoadRequest> mParserBlockingRequest;
 
   // In mRequests, the additional information here is stored by the element.
   struct PreloadInfo {
-    nsRefPtr<nsScriptLoadRequest> mRequest;
+    RefPtr<nsScriptLoadRequest> mRequest;
     nsString mCharset;
   };
 
@@ -527,7 +527,7 @@ private:
   nsCOMPtr<nsIScriptElement> mCurrentScript;
   nsCOMPtr<nsIScriptElement> mCurrentParserInsertedScript;
   // XXXbz do we want to cycle-collect these or something?  Not sure.
-  nsTArray< nsRefPtr<nsScriptLoader> > mPendingChildLoaders;
+  nsTArray< RefPtr<nsScriptLoader> > mPendingChildLoaders;
   uint32_t mBlockerCount;
   bool mEnabled;
   bool mDeferEnabled;
@@ -555,7 +555,7 @@ public:
   }
 
   bool mWasEnabled;
-  nsRefPtr<nsScriptLoader> mLoader;
+  RefPtr<nsScriptLoader> mLoader;
 };
 
 #endif //__nsScriptLoader_h__

@@ -47,7 +47,7 @@ MediaSourceDecoder::CreateStateMachine()
 {
   MOZ_ASSERT(NS_IsMainThread());
   mDemuxer = new MediaSourceDemuxer();
-  nsRefPtr<MediaFormatReader> reader = new MediaFormatReader(this, mDemuxer);
+  RefPtr<MediaFormatReader> reader = new MediaFormatReader(this, mDemuxer);
   return new MediaDecoderStateMachine(this, reader);
 }
 
@@ -168,7 +168,7 @@ MediaSourceDecoder::Shutdown()
 already_AddRefed<MediaResource>
 MediaSourceDecoder::CreateResource(nsIPrincipal* aPrincipal)
 {
-  return nsRefPtr<MediaResource>(new MediaSourceResource(aPrincipal)).forget();
+  return RefPtr<MediaResource>(new MediaSourceResource(aPrincipal)).forget();
 }
 
 void

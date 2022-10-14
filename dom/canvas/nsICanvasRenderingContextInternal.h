@@ -162,8 +162,8 @@ public:
   NS_IMETHOD SetIsIPC(bool isIPC) = 0;
 
 protected:
-  nsRefPtr<mozilla::dom::HTMLCanvasElement> mCanvasElement;
-  nsRefPtr<nsRefreshDriver> mRefreshDriver;
+  RefPtr<mozilla::dom::HTMLCanvasElement> mCanvasElement;
+  RefPtr<nsRefreshDriver> mRefreshDriver;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(nsICanvasRenderingContextInternal,

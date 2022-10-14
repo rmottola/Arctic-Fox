@@ -50,7 +50,7 @@ public:
 private:
   virtual ~DiscoveryRequest() { Cancel(NS_OK); }
 
-  nsRefPtr<nsDNSServiceDiscovery> mService;
+  RefPtr<nsDNSServiceDiscovery> mService;
   nsIDNSServiceDiscoveryListener* mListener;
 };
 
@@ -86,7 +86,7 @@ public:
 private:
   virtual ~RegisterRequest() { Cancel(NS_OK); }
 
-  nsRefPtr<nsDNSServiceDiscovery> mService;
+  RefPtr<nsDNSServiceDiscovery> mService;
   nsIDNSRegistrationListener* mListener;
 };
 
@@ -133,7 +133,7 @@ nsDNSServiceDiscovery::StartDiscovery(const nsACString& aServiceType,
     return rv;
   }
 
-  nsRefPtr<BrowseOperator> browserOp = new BrowseOperator(aServiceType,
+  RefPtr<BrowseOperator> browserOp = new BrowseOperator(aServiceType,
                                                           aListener);
   if (NS_WARN_IF(NS_FAILED(rv = browserOp->Start()))) {
     return rv;
@@ -152,7 +152,7 @@ nsDNSServiceDiscovery::StopDiscovery(nsIDNSServiceDiscoveryListener* aListener)
 {
   nsresult rv;
 
-  nsRefPtr<BrowseOperator> browserOp;
+  RefPtr<BrowseOperator> browserOp;
   if (!mDiscoveryMap.Get(aListener, getter_AddRefs(browserOp))) {
     return NS_OK;
   }
@@ -178,7 +178,7 @@ nsDNSServiceDiscovery::RegisterService(nsIDNSServiceInfo* aServiceInfo,
     return rv;
   }
 
-  nsRefPtr<RegisterOperator> registerOp = new RegisterOperator(aServiceInfo,
+  RefPtr<RegisterOperator> registerOp = new RegisterOperator(aServiceInfo,
                                                                aListener);
   if (NS_WARN_IF(NS_FAILED(rv = registerOp->Start()))) {
     return rv;
@@ -197,7 +197,7 @@ nsDNSServiceDiscovery::UnregisterService(nsIDNSRegistrationListener* aListener)
 {
   nsresult rv;
 
-  nsRefPtr<RegisterOperator> registerOp;
+  RefPtr<RegisterOperator> registerOp;
   if (!mRegisterMap.Get(aListener, getter_AddRefs(registerOp))) {
     return NS_OK;
   }
@@ -217,7 +217,7 @@ nsDNSServiceDiscovery::ResolveService(nsIDNSServiceInfo* aServiceInfo,
 {
   nsresult rv;
 
-  nsRefPtr<ResolveOperator> resolveOp = new ResolveOperator(aServiceInfo,
+  RefPtr<ResolveOperator> resolveOp = new ResolveOperator(aServiceInfo,
                                                             aListener);
   if (NS_WARN_IF(NS_FAILED(rv = resolveOp->Start()))) {
     return rv;

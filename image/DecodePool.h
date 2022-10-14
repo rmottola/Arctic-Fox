@@ -92,7 +92,7 @@ private:
   static StaticRefPtr<DecodePool> sSingleton;
   static uint32_t sNumCores;
 
-  nsRefPtr<DecodePoolImpl>    mImpl;
+  RefPtr<DecodePoolImpl>    mImpl;
 
   // mMutex protects mThreads and mIOThread.
   Mutex                     mMutex;

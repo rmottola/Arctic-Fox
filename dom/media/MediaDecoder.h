@@ -548,7 +548,7 @@ public:
     mozilla::MallocSizeOf mMallocSizeOf;
     mozilla::Atomic<size_t> mByteSize;
 
-    nsRefPtr<SizeOfPromise> Promise()
+    RefPtr<SizeOfPromise> Promise()
     {
       return mCallback.Ensure(__func__);
     }
@@ -581,7 +581,7 @@ private:
   // Used to estimate rates of data passing through the decoder's channel.
   // Records activity stopping on the channel.
   void DispatchPlaybackStarted() {
-    nsRefPtr<MediaDecoder> self = this;
+    RefPtr<MediaDecoder> self = this;
     nsCOMPtr<nsIRunnable> r =
       NS_NewRunnableFunction([self] () { self->mPlaybackStatistics->Start(); });
     AbstractThread::MainThread()->Dispatch(r.forget());
@@ -590,7 +590,7 @@ private:
   // Used to estimate rates of data passing through the decoder's channel.
   // Records activity stopping on the channel.
   void DispatchPlaybackStopped() {
-    nsRefPtr<MediaDecoder> self = this;
+    RefPtr<MediaDecoder> self = this;
     nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([self] () {
       self->mPlaybackStatistics->Stop();
       self->ComputePlaybackRate();
@@ -911,7 +911,7 @@ protected:
    ******/
 
   // Media data resource.
-  nsRefPtr<MediaResource> mResource;
+  RefPtr<MediaResource> mResource;
 
 	// Amount of buffered data ahead of current time required to consider that
   // the next frame is available.
@@ -926,7 +926,7 @@ private:
   // is safe to access it during this period.
   //
   // Explicitly private to force access via accessors.
-  nsRefPtr<MediaDecoderStateMachine> mDecoderStateMachine;
+  RefPtr<MediaDecoderStateMachine> mDecoderStateMachine;
 
   // |ReentrantMonitor| for detecting when the video play state changes. A call
   // to |Wait| on this monitor will block the thread until the next state
@@ -969,12 +969,12 @@ protected:
   // Counters related to decode and presentation of frames.
   FrameStatistics mFrameStats;
 
-  nsRefPtr<VideoFrameContainer> mVideoFrameContainer;
+  RefPtr<VideoFrameContainer> mVideoFrameContainer;
 
   // Data needed to estimate playback data rate. The timeline used for
   // this estimate is "decode time" (where the "current time" is the
   // time of the last decoded video frame).
-  nsRefPtr<MediaChannelStatistics> mPlaybackStatistics;
+  RefPtr<MediaChannelStatistics> mPlaybackStatistics;
 
   // True when our media stream has been pinned. We pin the stream
   // while seeking.

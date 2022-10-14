@@ -772,7 +772,7 @@ BluetoothDaemonCoreModule::HandleRsp(
     return;
   }
 
-  nsRefPtr<BluetoothResultHandler> res =
+  RefPtr<BluetoothResultHandler> res =
     static_cast<BluetoothResultHandler*>(aRes);
 
   if (!res) {

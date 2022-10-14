@@ -222,7 +222,7 @@ private:
   }
 
   nsCOMPtr<nsIInterceptedChannel> mChannel;
-  nsRefPtr<HttpChannelParent> mParentChannel;
+  RefPtr<HttpChannelParent> mParentChannel;
 };
 
 NS_IMPL_ISUPPORTS(ResponseSynthesizer, nsIFetchEventDispatcher)
@@ -239,7 +239,7 @@ NS_IMETHODIMP
 HttpChannelParent::ChannelIntercepted(nsIInterceptedChannel* aChannel,
                                       nsIFetchEventDispatcher** aDispatcher)
 {
-  nsRefPtr<ResponseSynthesizer> dispatcher =
+  RefPtr<ResponseSynthesizer> dispatcher =
     new ResponseSynthesizer(aChannel, this);
   dispatcher.forget(aDispatcher);
   return NS_OK;
@@ -1464,7 +1464,7 @@ public:
     return NS_OK;
   }
 private:
-  nsRefPtr<HttpChannelParent> mChannelParent;
+  RefPtr<HttpChannelParent> mChannelParent;
   nsresult mErrorCode;
   bool mSkipResume;
 };

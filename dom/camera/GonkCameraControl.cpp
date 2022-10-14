@@ -944,7 +944,7 @@ nsGonkCameraControl::SetThumbnailSize(const Size& aSize)
     }
 
   protected:
-    nsRefPtr<nsGonkCameraControl> mCameraControl;
+    RefPtr<nsGonkCameraControl> mCameraControl;
     Size mSize;
   };
 
@@ -1062,7 +1062,7 @@ nsGonkCameraControl::SetPictureSize(const Size& aSize)
     }
 
   protected:
-    nsRefPtr<nsGonkCameraControl> mCameraControl;
+    RefPtr<nsGonkCameraControl> mCameraControl;
     Size mSize;
   };
 
@@ -1196,7 +1196,7 @@ nsGonkCameraControl::StartRecordingImpl(DeviceStorageFileDescriptor* aFileDescri
   // close the file descriptor when we leave this function. Also note, that
   // since we're already off the main thread, we don't need to dispatch this.
   // We just let the CloseFileRunnable destructor do the work.
-  nsRefPtr<CloseFileRunnable> closer;
+  RefPtr<CloseFileRunnable> closer;
   if (aFileDescriptor->mFileDescriptor.IsValid()) {
     closer = new CloseFileRunnable(aFileDescriptor->mFileDescriptor);
   }
@@ -1255,7 +1255,7 @@ nsGonkCameraControl::StopRecordingImpl()
     }
 
   private:
-    nsRefPtr<DeviceStorageFile> mFile;
+    RefPtr<DeviceStorageFile> mFile;
   };
 
   ReentrantMonitorAutoEnter mon(mRecorderMonitor);
@@ -1326,7 +1326,7 @@ nsGonkCameraControl::OnAutoFocusComplete(bool aSuccess)
     }
 
   protected:
-    nsRefPtr<nsGonkCameraControl> mCameraControl;
+    RefPtr<nsGonkCameraControl> mCameraControl;
     bool mSuccess;
   };
 
@@ -1734,7 +1734,7 @@ public:
 
 protected:
   ~GonkRecorderListener() { }
-  nsRefPtr<nsGonkCameraControl> mCameraControl;
+  RefPtr<nsGonkCameraControl> mCameraControl;
 };
 
 void
@@ -1969,7 +1969,7 @@ nsresult
 nsGonkCameraControl::LoadRecorderProfiles()
 {
   if (mRecorderProfiles.Count() == 0) {
-    nsTArray<nsRefPtr<RecorderProfile>> profiles;
+    nsTArray<RefPtr<RecorderProfile>> profiles;
     nsresult rv = GonkRecorderProfile::GetAll(mCameraId, profiles);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
@@ -2062,7 +2062,7 @@ void
 nsGonkCameraControl::OnNewPreviewFrame(layers::TextureClient* aBuffer)
 {
 #ifdef MOZ_WIDGET_GONK
-  nsRefPtr<Image> frame = mImageContainer->CreateImage(ImageFormat::GRALLOC_PLANAR_YCBCR);
+  RefPtr<Image> frame = mImageContainer->CreateImage(ImageFormat::GRALLOC_PLANAR_YCBCR);
 
   GrallocImage* videoImage = static_cast<GrallocImage*>(frame.get());
 

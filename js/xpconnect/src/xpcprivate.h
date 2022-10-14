@@ -645,12 +645,12 @@ private:
     XPCRootSetElem* mWrappedJSRoots;
     XPCRootSetElem* mObjectHolderRoots;
     nsTArray<xpcGCCallback> extraGCCallbacks;
-    nsRefPtr<WatchdogManager> mWatchdogManager;
+    RefPtr<WatchdogManager> mWatchdogManager;
     JS::GCSliceCallback mPrevGCSliceCallback;
     JS::PersistentRootedObject mUnprivilegedJunkScope;
     JS::PersistentRootedObject mPrivilegedJunkScope;
     JS::PersistentRootedObject mCompilationScope;
-    nsRefPtr<AsyncFreeSnowWhite> mAsyncSnowWhiteFreer;
+    RefPtr<AsyncFreeSnowWhite> mAsyncSnowWhiteFreer;
 
     // If we spend too much time running JS code in an event handler, then we
     // want to show the slow script UI. The timeout T is controlled by prefs. We
@@ -887,7 +887,7 @@ private:
     JSAutoRequest                   mAr;
     State                           mState;
 
-    nsRefPtr<nsXPConnect>           mXPC;
+    RefPtr<nsXPConnect>           mXPC;
 
     XPCContext*                     mXPCContext;
     JSContext*                      mJSContext;
@@ -1208,7 +1208,7 @@ private:
     XPCJSRuntime*                    mRuntime;
     Native2WrappedNativeMap*         mWrappedNativeMap;
     ClassInfo2WrappedNativeProtoMap* mWrappedNativeProtoMap;
-    nsRefPtr<nsXPCComponentsBase>    mComponents;
+    RefPtr<nsXPCComponentsBase>    mComponents;
     XPCWrappedNativeScope*           mNext;
     // The JS global object for this scope.  If non-null, this will be the
     // default parent for the XPCWrappedNatives that have us as the scope,
@@ -1986,7 +1986,7 @@ private:
     XPCNativeInterface* mInterface;
     // mNative is an nsRefPtr not an nsCOMPtr because it may not be the canonical
     // nsISupports pointer.
-    nsRefPtr<nsISupports> mNative;
+    RefPtr<nsISupports> mNative;
     JS::TenuredHeap<JSObject*> mJSObject;
 };
 
@@ -2508,7 +2508,7 @@ protected:
 
 private:
     JS::Heap<JSObject*> mJSObj;
-    nsRefPtr<nsXPCWrappedJSClass> mClass;
+    RefPtr<nsXPCWrappedJSClass> mClass;
     nsXPCWrappedJS* mRoot;    // If mRoot != this, it is an owning pointer.
     nsXPCWrappedJS* mNext;
     nsCOMPtr<nsISupports> mOuter;    // only set in root
@@ -2818,7 +2818,7 @@ private:
     void ResolveName();
 
 private:
-    nsRefPtr<nsJSID> mDetails;
+    RefPtr<nsJSID> mDetails;
 };
 
 
@@ -2916,9 +2916,9 @@ protected:
     XPCWrappedNativeScope*                   mScope;
 
     // Unprivileged members from nsIXPCComponentsBase.
-    nsRefPtr<nsXPCComponents_Interfaces>     mInterfaces;
-    nsRefPtr<nsXPCComponents_InterfacesByID> mInterfacesByID;
-    nsRefPtr<nsXPCComponents_Results>        mResults;
+    RefPtr<nsXPCComponents_Interfaces>     mInterfaces;
+    RefPtr<nsXPCComponents_InterfacesByID> mInterfacesByID;
+    RefPtr<nsXPCComponents_Results>        mResults;
 
     friend class XPCWrappedNativeScope;
 };
@@ -2937,12 +2937,12 @@ protected:
     virtual void ClearMembers() override;
 
     // Privileged members added by nsIXPCComponents.
-    nsRefPtr<nsXPCComponents_Classes>     mClasses;
-    nsRefPtr<nsXPCComponents_ClassesByID> mClassesByID;
-    nsRefPtr<nsXPCComponents_ID>          mID;
-    nsRefPtr<nsXPCComponents_Exception>   mException;
-    nsRefPtr<nsXPCComponents_Constructor> mConstructor;
-    nsRefPtr<nsXPCComponents_Utils>       mUtils;
+    RefPtr<nsXPCComponents_Classes>     mClasses;
+    RefPtr<nsXPCComponents_ClassesByID> mClassesByID;
+    RefPtr<nsXPCComponents_ID>          mID;
+    RefPtr<nsXPCComponents_Exception>   mException;
+    RefPtr<nsXPCComponents_Constructor> mConstructor;
+    RefPtr<nsXPCComponents_Utils>       mUtils;
 
     friend class XPCWrappedNativeScope;
 };

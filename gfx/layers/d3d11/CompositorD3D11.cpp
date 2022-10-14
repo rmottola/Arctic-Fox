@@ -405,14 +405,14 @@ CompositorD3D11::Initialize()
     }
   }
 
-  nsRefPtr<IDXGIDevice> dxgiDevice;
-  nsRefPtr<IDXGIAdapter> dxgiAdapter;
+  RefPtr<IDXGIDevice> dxgiDevice;
+  RefPtr<IDXGIAdapter> dxgiAdapter;
 
   mDevice->QueryInterface(dxgiDevice.StartAssignment());
   dxgiDevice->GetAdapter(getter_AddRefs(dxgiAdapter));
 
   {
-    nsRefPtr<IDXGIFactory> dxgiFactory;
+    RefPtr<IDXGIFactory> dxgiFactory;
     dxgiAdapter->GetParent(IID_PPV_ARGS(dxgiFactory.StartAssignment()));
 
     DXGI_SWAP_CHAIN_DESC swapDesc;
@@ -1317,7 +1317,7 @@ CompositorD3D11::UpdateRenderTarget()
 
   HRESULT hr;
 
-  nsRefPtr<ID3D11Texture2D> backBuf;
+  RefPtr<ID3D11Texture2D> backBuf;
 
   hr = mSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)backBuf.StartAssignment());
   if (hr == DXGI_ERROR_INVALID_CALL) {
@@ -1459,7 +1459,7 @@ CompositorD3D11::SetSamplerForFilter(Filter aFilter)
 void
 CompositorD3D11::PaintToTarget()
 {
-  nsRefPtr<ID3D11Texture2D> backBuf;
+  RefPtr<ID3D11Texture2D> backBuf;
   HRESULT hr;
 
   hr = mSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)backBuf.StartAssignment());
@@ -1477,7 +1477,7 @@ CompositorD3D11::PaintToTarget()
   softDesc.Usage = D3D11_USAGE_STAGING;
   softDesc.BindFlags = 0;
 
-  nsRefPtr<ID3D11Texture2D> readTexture;
+  RefPtr<ID3D11Texture2D> readTexture;
 
   hr = mDevice->CreateTexture2D(&softDesc, nullptr, getter_AddRefs(readTexture));
   if (Failed(hr)) {

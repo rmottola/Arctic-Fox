@@ -412,7 +412,7 @@ nsEditingSession::SetupEditorOnWindow(nsIDOMWindow *aWindow)
 
   // Hide selection changes during initialization, in order to hide this
   // from web pages.
-  nsRefPtr<nsFrameSelection> fs = presShell->FrameSelection();
+  RefPtr<nsFrameSelection> fs = presShell->FrameSelection();
   NS_ENSURE_TRUE(fs, NS_ERROR_FAILURE);
   mozilla::dom::AutoHideSelectionChanges hideSelectionChanges(fs);
 

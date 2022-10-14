@@ -14,7 +14,7 @@
 #include "nsIInputStream.h"
 #include "nsIRunnable.h"
 #include "nsIThread.h"
-#include "mozilla/nsRefPtr.h"
+#include "mozilla/RefPtr.h"
 #include "nsString.h"
 #include "nsThreadUtils.h"
 
@@ -50,7 +50,7 @@ public:
 
   void Go()
   {
-    nsRefPtr<SourceSurface> surface =
+    RefPtr<SourceSurface> surface =
       ImageOps::DecodeToSurface(mInputStream,
                                 nsAutoCString(mTestCase.mMimeType),
                                 imgIContainer::DECODE_FLAGS_DEFAULT);
@@ -112,7 +112,7 @@ TEST(ImageDecodeToSurface, Corrupt)
   nsCOMPtr<nsIInputStream> inputStream = LoadFile(testCase.mPath);
   ASSERT_TRUE(inputStream != nullptr);
 
-  nsRefPtr<SourceSurface> surface =
+  RefPtr<SourceSurface> surface =
     ImageOps::DecodeToSurface(inputStream,
                               nsAutoCString(testCase.mMimeType),
                               imgIContainer::DECODE_FLAGS_DEFAULT);

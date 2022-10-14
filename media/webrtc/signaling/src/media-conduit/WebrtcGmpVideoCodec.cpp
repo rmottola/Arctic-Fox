@@ -149,7 +149,7 @@ WebrtcGmpVideoEncoder::InitEncode(const webrtc::VideoCodec* aCodecSettings,
   nsCOMPtr<nsIThread> currentThread(do_GetCurrentThread());
   MOZ_ASSERT(currentThread != mGMPThread);
 
-  nsRefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
+  RefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
   mGMPThread->Dispatch(WrapRunnable(this,
                                     &WebrtcGmpVideoEncoder::InitEncode_g,
                                     aCodecSettings,
@@ -257,7 +257,7 @@ WebrtcGmpVideoEncoder::Encode(const webrtc::I420VideoFrame& aInputImage,
     LOGD(("GMP Encode: resolution change from %ux%u to %dx%d",
           mCodecParams.mWidth, mCodecParams.mHeight, aInputImage.width(), aInputImage.height()));
 
-    nsRefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
+    RefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
     nsCOMPtr<nsIRunnable> task(
       WrapRunnable(this,
                    &WebrtcGmpVideoEncoder::RegetEncoderForResolutionChange,
@@ -604,7 +604,7 @@ WebrtcGmpVideoDecoder::InitDecode(const webrtc::VideoCodec* aCodecSettings,
     }
   }
 
-  nsRefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
+  RefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
   mGMPThread->Dispatch(WrapRunnable(this,
                                     &WebrtcGmpVideoDecoder::InitDecode_g,
                                     aCodecSettings,

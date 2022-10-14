@@ -237,9 +237,9 @@ private:
 
   // Accessed from MediaStreamGraph thread, MediaManager thread, and MainThread
   // No locking needed as they're only addrefed except on the MediaManager thread
-  nsRefPtr<MediaEngineSource> mAudioSource; // threadsafe refcnt
-  nsRefPtr<MediaEngineSource> mVideoSource; // threadsafe refcnt
-  nsRefPtr<SourceMediaStream> mStream; // threadsafe refcnt
+  RefPtr<MediaEngineSource> mAudioSource; // threadsafe refcnt
+  RefPtr<MediaEngineSource> mVideoSource; // threadsafe refcnt
+  RefPtr<SourceMediaStream> mStream; // threadsafe refcnt
   bool mFinished;
 
   // Accessed from MainThread and MSG thread
@@ -277,14 +277,14 @@ class GetUserMediaNotificationEvent: public nsRunnable
     NS_IMETHOD Run() override;
 
   protected:
-    nsRefPtr<GetUserMediaCallbackMediaStreamListener> mListener; // threadsafe
-    nsRefPtr<DOMMediaStream> mStream;
+    RefPtr<GetUserMediaCallbackMediaStreamListener> mListener; // threadsafe
+    RefPtr<DOMMediaStream> mStream;
     nsAutoPtr<DOMMediaStream::OnTracksAvailableCallback> mOnTracksAvailableCallback;
     GetUserMediaStatus mStatus;
     bool mIsAudio;
     bool mIsVideo;
     uint64_t mWindowID;
-    nsRefPtr<nsIDOMGetUserMediaErrorCallback> mOnFailure;
+    RefPtr<nsIDOMGetUserMediaErrorCallback> mOnFailure;
 };
 
 typedef enum {
@@ -306,7 +306,7 @@ public:
     mOnTracksAvailableCallback(aOnTracksAvailableCallback) {}
   NS_IMETHOD Run() override {return NS_OK;}
 private:
-  nsRefPtr<DOMMediaStream> mStream;
+  RefPtr<DOMMediaStream> mStream;
   nsAutoPtr<DOMMediaStream::OnTracksAvailableCallback> mOnTracksAvailableCallback;
 };
 
@@ -445,17 +445,17 @@ public:
 
 private:
   MediaOperation mType;
-  nsRefPtr<DOMMediaStream> mStream;
+  RefPtr<DOMMediaStream> mStream;
   nsAutoPtr<DOMMediaStream::OnTracksAvailableCallback> mOnTracksAvailableCallback;
-  nsRefPtr<MediaEngineSource> mAudioSource; // threadsafe
-  nsRefPtr<MediaEngineSource> mVideoSource; // threadsafe
-  nsRefPtr<GetUserMediaCallbackMediaStreamListener> mListener; // threadsafe
+  RefPtr<MediaEngineSource> mAudioSource; // threadsafe
+  RefPtr<MediaEngineSource> mVideoSource; // threadsafe
+  RefPtr<GetUserMediaCallbackMediaStreamListener> mListener; // threadsafe
   bool mBool;
   uint64_t mWindowID;
   nsCOMPtr<nsIDOMGetUserMediaErrorCallback> mOnFailure;
 };
 
-typedef nsTArray<nsRefPtr<GetUserMediaCallbackMediaStreamListener> > StreamListeners;
+typedef nsTArray<RefPtr<GetUserMediaCallbackMediaStreamListener> > StreamListeners;
 typedef nsClassHashtable<nsUint64HashKey, StreamListeners> WindowTable;
 
 class MediaDevice : public nsIMediaDevice
@@ -481,7 +481,7 @@ protected:
   nsString mName;
   nsString mID;
   dom::MediaSourceEnum mMediaSource;
-  nsRefPtr<MediaEngineSource> mSource;
+  RefPtr<MediaEngineSource> mSource;
 public:
   bool mIsVideo;
 };
@@ -583,7 +583,7 @@ public:
 
   MediaEnginePrefs mPrefs;
 
-  typedef nsTArray<nsRefPtr<MediaDevice>> SourceSet;
+  typedef nsTArray<RefPtr<MediaDevice>> SourceSet;
   static bool IsPrivateBrowsing(nsPIDOMWindow *window);
 private:
   typedef media::Pledge<SourceSet*, dom::MediaStreamError> PledgeSourceSet;
@@ -647,7 +647,7 @@ private:
 
   media::CoatCheck<PledgeSourceSet> mOutstandingPledges;
 #if defined(MOZ_B2G_CAMERA) && defined(MOZ_WIDGET_GONK)
-  nsRefPtr<nsDOMCameraManager> mCameraManager;
+  RefPtr<nsDOMCameraManager> mCameraManager;
 #endif
 public:
   media::CoatCheck<media::Pledge<nsCString>> mGetOriginKeyPledges;

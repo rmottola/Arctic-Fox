@@ -49,7 +49,7 @@ public:
   {
   }
 
-  nsRefPtr<MediaEngineGonkVideoSource> mMediaEngine;
+  RefPtr<MediaEngineGonkVideoSource> mMediaEngine;
 };
 
 #define WEBRTC_GONK_VIDEO_SOURCE_POOL_BUFFERS 10
@@ -77,7 +77,7 @@ MediaEngineGonkVideoSource::NotifyPull(MediaStreamGraph* aGraph,
   // though.
 
   // Note: we're not giving up mImage here
-  nsRefPtr<layers::Image> image = mImage;
+  RefPtr<layers::Image> image = mImage;
   StreamTime delta = aDesiredTime - aSource->GetEndOfAppendedData(aID);
   LOGFRAME(("NotifyPull, desired = %ld, delta = %ld %s", (int64_t) aDesiredTime,
             (int64_t) delta, image ? "" : "<null>"));
@@ -155,7 +155,7 @@ MediaEngineGonkVideoSource::Allocate(const dom::MediaTrackConstraints& aConstrai
   ReentrantMonitorAutoEnter sync(mCallbackMonitor);
   if (mState == kReleased && mInitDone) {
     ChooseCapability(aConstraints, aPrefs, aDeviceId);
-    NS_DispatchToMainThread(WrapRunnable(nsRefPtr<MediaEngineGonkVideoSource>(this),
+    NS_DispatchToMainThread(WrapRunnable(RefPtr<MediaEngineGonkVideoSource>(this),
                                          &MediaEngineGonkVideoSource::AllocImpl));
     mCallbackMonitor.Wait();
     if (mState != kAllocated) {
@@ -185,7 +185,7 @@ MediaEngineGonkVideoSource::Deallocate()
 
     // We do not register success callback here
 
-    NS_DispatchToMainThread(WrapRunnable(nsRefPtr<MediaEngineGonkVideoSource>(this),
+    NS_DispatchToMainThread(WrapRunnable(RefPtr<MediaEngineGonkVideoSource>(this),
                                          &MediaEngineGonkVideoSource::DeallocImpl));
     mCallbackMonitor.Wait();
     if (mState != kReleased) {
@@ -223,7 +223,7 @@ MediaEngineGonkVideoSource::Start(SourceMediaStream* aStream, TrackID aID)
   mTrackID = aID;
   mImageContainer = layers::LayerManager::CreateImageContainer();
 
-  NS_DispatchToMainThread(WrapRunnable(nsRefPtr<MediaEngineGonkVideoSource>(this),
+  NS_DispatchToMainThread(WrapRunnable(RefPtr<MediaEngineGonkVideoSource>(this),
                                        &MediaEngineGonkVideoSource::StartImpl,
                                        mCapability));
   mCallbackMonitor.Wait();
@@ -319,7 +319,7 @@ MediaEngineGonkVideoSource::Stop(SourceMediaStream* aSource, TrackID aID)
     mImage = nullptr;
   }
 
-  NS_DispatchToMainThread(WrapRunnable(nsRefPtr<MediaEngineGonkVideoSource>(this),
+  NS_DispatchToMainThread(WrapRunnable(RefPtr<MediaEngineGonkVideoSource>(this),
                                        &MediaEngineGonkVideoSource::StopImpl));
 
   return NS_OK;
@@ -498,7 +498,7 @@ MediaEngineGonkVideoSource::OnHardwareStateChange(HardwareState aState,
       break;
     case CameraControlListener::kHardwareOpen:
       // Can't read this except on MainThread (ugh)
-      NS_DispatchToMainThread(WrapRunnable(nsRefPtr<MediaEngineGonkVideoSource>(this),
+      NS_DispatchToMainThread(WrapRunnable(RefPtr<MediaEngineGonkVideoSource>(this),
                                            &MediaEngineGonkVideoSource::GetRotation));
       mState = kStarted;
       mCallbackMonitor.Notify();
@@ -550,7 +550,7 @@ MediaEngineGonkVideoSource::OnUserError(UserContext aContext, nsresult aError)
   // A main thread runnable to send error code to all queued PhotoCallbacks.
   class TakePhotoError : public nsRunnable {
   public:
-    TakePhotoError(nsTArray<nsRefPtr<PhotoCallback>>& aCallbacks,
+    TakePhotoError(nsTArray<RefPtr<PhotoCallback>>& aCallbacks,
                    nsresult aRv)
       : mRv(aRv)
     {
@@ -569,7 +569,7 @@ MediaEngineGonkVideoSource::OnUserError(UserContext aContext, nsresult aError)
     }
 
   protected:
-    nsTArray<nsRefPtr<PhotoCallback>> mCallbacks;
+    nsTArray<RefPtr<PhotoCallback>> mCallbacks;
     nsresult mRv;
   };
 
@@ -592,7 +592,7 @@ MediaEngineGonkVideoSource::OnTakePictureComplete(uint8_t* aData, uint32_t aLeng
   // PhotoCallbacks.
   class GenerateBlobRunnable : public nsRunnable {
   public:
-    GenerateBlobRunnable(nsTArray<nsRefPtr<PhotoCallback>>& aCallbacks,
+    GenerateBlobRunnable(nsTArray<RefPtr<PhotoCallback>>& aCallbacks,
                          uint8_t* aData,
                          uint32_t aLength,
                          const nsAString& aMimeType)
@@ -606,11 +606,11 @@ MediaEngineGonkVideoSource::OnTakePictureComplete(uint8_t* aData, uint32_t aLeng
 
     NS_IMETHOD Run()
     {
-      nsRefPtr<dom::Blob> blob =
+      RefPtr<dom::Blob> blob =
         dom::Blob::CreateMemoryBlob(nullptr, mPhotoData, mPhotoDataLength, mMimeType);
       uint32_t callbackCounts = mCallbacks.Length();
       for (uint8_t i = 0; i < callbackCounts; i++) {
-        nsRefPtr<dom::Blob> tempBlob = blob;
+        RefPtr<dom::Blob> tempBlob = blob;
         mCallbacks[i]->PhotoComplete(tempBlob.forget());
       }
       // PhotoCallback needs to dereference on main thread.
@@ -618,7 +618,7 @@ MediaEngineGonkVideoSource::OnTakePictureComplete(uint8_t* aData, uint32_t aLeng
       return NS_OK;
     }
 
-    nsTArray<nsRefPtr<PhotoCallback>> mCallbacks;
+    nsTArray<RefPtr<PhotoCallback>> mCallbacks;
     uint8_t* mPhotoData;
     nsString mMimeType;
     uint32_t mPhotoDataLength;
@@ -728,7 +728,7 @@ MediaEngineGonkVideoSource::RotateImage(layers::Image* aImage, uint32_t aWidth, 
   uint8_t* srcPtr = static_cast<uint8_t*>(pMem);
   // Create a video frame and append it to the track.
   ImageFormat format = ImageFormat::GONK_CAMERA_IMAGE;
-  nsRefPtr<layers::Image> image = mImageContainer->CreateImage(format);
+  RefPtr<layers::Image> image = mImageContainer->CreateImage(format);
 
   uint32_t dstWidth;
   uint32_t dstHeight;

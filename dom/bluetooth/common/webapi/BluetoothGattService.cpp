@@ -80,7 +80,7 @@ BluetoothGattService::AssignDescriptors(
   size_t index = mCharacteristics.IndexOf(aCharacteristicId);
   NS_ENSURE_TRUE_VOID(index != mCharacteristics.NoIndex);
 
-  nsRefPtr<BluetoothGattCharacteristic> characteristic =
+  RefPtr<BluetoothGattCharacteristic> characteristic =
     mCharacteristics.ElementAt(index);
   characteristic->AssignDescriptors(aDescriptorIds);
 }

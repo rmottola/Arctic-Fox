@@ -397,11 +397,11 @@ private:
 
 #ifdef MOZ_HAVE_SHMIMAGE
     // If we're using xshm rendering
-    nsRefPtr<nsShmImage>  mShmImage;
+    RefPtr<nsShmImage>  mShmImage;
 #endif
 
 #ifdef ACCESSIBILITY
-    nsRefPtr<mozilla::a11y::Accessible> mRootAccessible;
+    RefPtr<mozilla::a11y::Accessible> mRootAccessible;
 
     /**
      * Request to create the accessible for this window if it is top level.
@@ -498,7 +498,7 @@ private:
      * level window is released, the children still have a valid pointer,
      * however, IME doesn't work at that time.
      */
-    nsRefPtr<mozilla::widget::IMContextWrapper> mIMContext;
+    RefPtr<mozilla::widget::IMContextWrapper> mIMContext;
 
     // HiDPI scale conversion
     gint GdkScaleFactor();

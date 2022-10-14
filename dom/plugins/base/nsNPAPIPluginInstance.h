@@ -31,7 +31,7 @@ class SharedPluginTexture;
 
 #include "mozilla/TimeStamp.h"
 #include "mozilla/PluginLibrary.h"
-#include "mozilla/nsRefPtr.h"
+#include "mozilla/RefPtr.h"
 
 class nsPluginStreamListenerPeer; // browser-initiated stream class
 class nsNPAPIPluginStreamListener; // plugin-initiated stream class
@@ -222,7 +222,7 @@ public:
       mSurfaceTexture = nullptr;
     }
 
-    mozilla::RefPtr<mozilla::gl::AndroidSurfaceTexture> mSurfaceTexture;
+    RefPtr<mozilla::gl::AndroidSurfaceTexture> mSurfaceTexture;
     gfxRect mDimensions;
   };
 
@@ -337,7 +337,7 @@ protected:
 
   friend class PluginEventRunnable;
 
-  nsTArray<nsRefPtr<PluginEventRunnable>> mPostedEvents;
+  nsTArray<RefPtr<PluginEventRunnable>> mPostedEvents;
   void PopPostedEvent(PluginEventRunnable* r);
   void OnSurfaceTextureFrameAvailable();
 
@@ -346,8 +346,8 @@ protected:
   bool mFullScreen;
   mozilla::gl::OriginPos mOriginPos;
 
-  mozilla::RefPtr<SharedPluginTexture> mContentTexture;
-  mozilla::RefPtr<mozilla::gl::AndroidSurfaceTexture> mContentSurface;
+  RefPtr<SharedPluginTexture> mContentTexture;
+  RefPtr<mozilla::gl::AndroidSurfaceTexture> mContentSurface;
 #endif
 
   enum {
@@ -371,7 +371,7 @@ public:
   nsXPIDLCString mFakeURL;
 
 private:
-  nsRefPtr<nsNPAPIPlugin> mPlugin;
+  RefPtr<nsNPAPIPlugin> mPlugin;
 
   nsTArray<nsNPAPIPluginStreamListener*> mStreamListeners;
 

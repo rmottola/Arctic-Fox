@@ -65,7 +65,7 @@ AudioNodeStream::Create(MediaStreamGraph* aGraph, AudioNodeEngine* aEngine,
 
   dom::AudioContext::AudioContextId contextIdForStream = node ? node->Context()->Id() :
                                                                 NO_AUDIO_CONTEXT;
-  nsRefPtr<AudioNodeStream> stream =
+  RefPtr<AudioNodeStream> stream =
     new AudioNodeStream(aEngine, aFlags, aGraph->GraphRate(),
                         contextIdForStream);
   if (aEngine->HasNode()) {
@@ -254,7 +254,7 @@ AudioNodeStream::SetBuffer(already_AddRefed<ThreadSharedFloatArrayBufferList>&& 
       static_cast<AudioNodeStream*>(mStream)->Engine()->
           SetBuffer(mBuffer.forget());
     }
-    nsRefPtr<ThreadSharedFloatArrayBufferList> mBuffer;
+    RefPtr<ThreadSharedFloatArrayBufferList> mBuffer;
   };
 
   GraphImpl()->AppendMessage(new Message(this, aBuffer));

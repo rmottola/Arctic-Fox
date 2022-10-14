@@ -32,7 +32,7 @@ namespace media {
  * or variables you lambda-capture into them, need be threasafe or support
  * threadsafe refcounting. After all, they'll run later on the same thread.
  *
- *   nsRefPtr<media::Pledge<Foo>> p = GetFooAsynchronously(); // returns a pledge
+ *   RefPtr<media::Pledge<Foo>> p = GetFooAsynchronously(); // returns a pledge
  *   p->Then([](const Foo& foo) {
  *     // use foo here (same thread. Need not be thread-safe!)
  *   });
@@ -137,7 +137,7 @@ protected:
 private:
   ~Pledge() {};
   bool mDone;
-  nsRefPtr<ErrorType> mError;
+  RefPtr<ErrorType> mError;
   ScopedDeletePtr<FunctorsBase> mFunctors;
 };
 
@@ -250,10 +250,10 @@ private:
  *         // Use mBar
  *       }
  *     private:
- *       nsRefPtr<Bar> mBar;
+ *       RefPtr<Bar> mBar;
  *     };
  *
- *     nsRefPtr<Bar> bar = new Bar();
+ *     RefPtr<Bar> bar = new Bar();
  *     NS_DispatchToMainThread(new FooRunnable(bar);
  *   }
  *
@@ -261,7 +261,7 @@ private:
  *
  *   void Foo()
  *   {
- *     nsRefPtr<Bar> bar = new Bar();
+ *     RefPtr<Bar> bar = new Bar();
  *     NS_DispatchToMainThread(media::NewRunnableFrom([bar]() mutable {
  *       // use bar
  *     });
@@ -335,14 +335,14 @@ NewTaskFrom(OnRunType aOnRun)
  *   public:
  *     void DoFoo()
  *     {
- *       nsRefPtr<Foo> foo = new Foo();
+ *       RefPtr<Foo> foo = new Foo();
  *       uint32_t requestId = mOutstandingFoos.Append(*foo);
  *       sChild->SendFoo(requestId);
  *     }
  *
  *     void RecvFooResponse(uint32_t requestId)
  *     {
- *       nsRefPtr<Foo> foo = mOutstandingFoos.Remove(requestId);
+ *       RefPtr<Foo> foo = mOutstandingFoos.Remove(requestId);
  *       if (foo) {
  *         // use foo
  *       }
@@ -358,7 +358,7 @@ NewTaskFrom(OnRunType aOnRun)
  *   public:
  *     already_addRefed<Pledge<Foo>> GetFooAsynchronously()
  *     {
- *       nsRefPtr<Pledge<Foo>> p = new Pledge<Foo>();
+ *       RefPtr<Pledge<Foo>> p = new Pledge<Foo>();
  *       uint32_t requestId = mOutstandingPledges.Append(*p);
  *       sChild->SendFoo(requestId);
  *       return p.forget();
@@ -366,7 +366,7 @@ NewTaskFrom(OnRunType aOnRun)
  *
  *     void RecvFooResponse(uint32_t requestId, const Foo& fooResult)
  *     {
- *       nsRefPtr<Foo> p = mOutstandingPledges.Remove(requestId);
+ *       RefPtr<Foo> p = mOutstandingPledges.Remove(requestId);
  *       if (p) {
  *         p->Resolve(fooResult);
  *       }
@@ -381,12 +381,12 @@ template<class T>
 class CoatCheck
 {
 public:
-  typedef std::pair<uint32_t, nsRefPtr<T>> Element;
+  typedef std::pair<uint32_t, RefPtr<T>> Element;
 
   uint32_t Append(T& t)
   {
     uint32_t id = GetNextId();
-    mElements.AppendElement(Element(id, nsRefPtr<T>(&t)));
+    mElements.AppendElement(Element(id, RefPtr<T>(&t)));
     return id;
   }
 
@@ -394,7 +394,7 @@ public:
   {
     for (auto& element : mElements) {
       if (element.first == aId) {
-        nsRefPtr<T> ref;
+        RefPtr<T> ref;
         ref.swap(element.second);
         mElements.RemoveElement(element);
         return ref.forget();

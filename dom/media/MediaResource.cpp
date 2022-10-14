@@ -570,7 +570,7 @@ nsresult ChannelMediaResource::OpenChannel(nsIStreamListener** aStreamListener)
     dom::HTMLMediaElement* element = owner->GetMediaElement();
     NS_ENSURE_TRUE(element, NS_ERROR_FAILURE);
     if (element->ShouldCheckAllowOrigin()) {
-      nsRefPtr<nsCORSListenerProxy> crossSiteListener =
+      RefPtr<nsCORSListenerProxy> crossSiteListener =
         new nsCORSListenerProxy(mListener,
                                 element->NodePrincipal(),
                                 false);
@@ -663,7 +663,7 @@ already_AddRefed<MediaResource> ChannelMediaResource::CloneData(MediaDecoder* aD
   NS_ASSERTION(NS_IsMainThread(), "Only call on main thread");
   NS_ASSERTION(mCacheStream.IsAvailableForSharing(), "Stream can't be cloned");
 
-  nsRefPtr<ChannelMediaResource> resource =
+  RefPtr<ChannelMediaResource> resource =
     new ChannelMediaResource(aDecoder,
                              nullptr,
                              mURI,
@@ -737,7 +737,7 @@ ChannelMediaResource::MediaReadAt(int64_t aOffset, uint32_t aCount)
 {
   NS_ASSERTION(!NS_IsMainThread(), "Don't call on main thread");
 
-  nsRefPtr<MediaByteBuffer> bytes = new MediaByteBuffer();
+  RefPtr<MediaByteBuffer> bytes = new MediaByteBuffer();
   bool ok = bytes->SetLength(aCount, fallible);
   NS_ENSURE_TRUE(ok, nullptr);
   char* curr = reinterpret_cast<char*>(bytes->Elements());
@@ -950,7 +950,7 @@ public:
     return NS_OK;
   }
 private:
-  nsRefPtr<MediaDecoder> mDecoder;
+  RefPtr<MediaDecoder> mDecoder;
   nsresult               mStatus;
 };
 
@@ -1474,7 +1474,7 @@ already_AddRefed<MediaResource> FileMediaResource::CloneData(MediaDecoder* aDeco
   if (NS_FAILED(rv))
     return nullptr;
 
-  nsRefPtr<MediaResource> resource(new FileMediaResource(aDecoder, channel, mURI, GetContentType()));
+  RefPtr<MediaResource> resource(new FileMediaResource(aDecoder, channel, mURI, GetContentType()));
   return resource.forget();
 }
 
@@ -1549,7 +1549,7 @@ FileMediaResource::MediaReadAt(int64_t aOffset, uint32_t aCount)
 already_AddRefed<MediaByteBuffer>
 FileMediaResource::UnsafeMediaReadAt(int64_t aOffset, uint32_t aCount)
 {
-  nsRefPtr<MediaByteBuffer> bytes = new MediaByteBuffer();
+  RefPtr<MediaByteBuffer> bytes = new MediaByteBuffer();
   bool ok = bytes->SetLength(aCount, fallible);
   NS_ENSURE_TRUE(ok, nullptr);
   nsresult rv = UnsafeSeek(nsISeekableStream::NS_SEEK_SET, aOffset);
@@ -1611,7 +1611,7 @@ MediaResource::Create(MediaDecoder* aDecoder, nsIChannel* aChannel)
   aChannel->GetContentType(contentType);
 
   nsCOMPtr<nsIFileChannel> fc = do_QueryInterface(aChannel);
-  nsRefPtr<MediaResource> resource;
+  RefPtr<MediaResource> resource;
   if (fc || IsBlobURI(uri)) {
     resource = new FileMediaResource(aDecoder, aChannel, uri, contentType);
   } else if (IsRtspURI(uri)) {

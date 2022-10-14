@@ -276,15 +276,15 @@ CreateFlushableMediaDecodeTaskQueue();
 // Iteratively invokes aWork until aCondition returns true, or aWork returns false.
 // Use this rather than a while loop to avoid bogarting the task queue.
 template<class Work, class Condition>
-nsRefPtr<GenericPromise> InvokeUntil(Work aWork, Condition aCondition) {
-  nsRefPtr<GenericPromise::Private> p = new GenericPromise::Private(__func__);
+RefPtr<GenericPromise> InvokeUntil(Work aWork, Condition aCondition) {
+  RefPtr<GenericPromise::Private> p = new GenericPromise::Private(__func__);
 
   if (aCondition()) {
     p->Resolve(true, __func__);
   }
 
   struct Helper {
-    static void Iteration(nsRefPtr<GenericPromise::Private> aPromise, Work aWork, Condition aCondition) {
+    static void Iteration(RefPtr<GenericPromise::Private> aPromise, Work aWork, Condition aCondition) {
       if (!aWork()) {
         aPromise->Reject(NS_ERROR_FAILURE, __func__);
       } else if (aCondition()) {

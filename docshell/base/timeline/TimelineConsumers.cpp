@@ -50,7 +50,7 @@ TimelineConsumers::IsEmpty()
 }
 
 bool
-TimelineConsumers::GetKnownDocShells(Vector<nsRefPtr<nsDocShell>>& aStore)
+TimelineConsumers::GetKnownDocShells(Vector<RefPtr<nsDocShell>>& aStore)
 {
   const LinkedList<ObservedDocShell>& docShells = GetOrCreateObservedDocShellsList();
 
@@ -120,11 +120,11 @@ TimelineConsumers::AddMarkerForDocShell(nsIDocShell* aDocShell,
 }
 
 void
-TimelineConsumers::AddMarkerForDocShellsList(Vector<nsRefPtr<nsDocShell>>& aDocShells,
+TimelineConsumers::AddMarkerForDocShellsList(Vector<RefPtr<nsDocShell>>& aDocShells,
                                              const char* aName,
                                              MarkerTracingType aTracingType)
 {
-  for (Vector<nsRefPtr<nsDocShell>>::Range range = aDocShells.all();
+  for (Vector<RefPtr<nsDocShell>>::Range range = aDocShells.all();
        !range.empty();
        range.popFront()) {
     AddMarkerForDocShell(range.front(), aName, aTracingType);
@@ -135,7 +135,7 @@ void
 TimelineConsumers::AddMarkerForAllObservedDocShells(const char* aName,
                                                     MarkerTracingType aTracingType)
 {
-  Vector<nsRefPtr<nsDocShell>> docShells;
+  Vector<RefPtr<nsDocShell>> docShells;
   if (!GetKnownDocShells(docShells)) {
     // If we don't successfully populate our vector with *all* docshells being
     // observed, don't add the marker to *any* of them.

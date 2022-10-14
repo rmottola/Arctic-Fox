@@ -107,7 +107,7 @@ SourceBuffer::GetBuffered(ErrorResult& aRv)
   }
   media::TimeIntervals ranges = mContentManager->Buffered();
   MSE_DEBUGV("ranges=%s", DumpTimeRanges(ranges).get());
-  nsRefPtr<dom::TimeRanges> tr = new dom::TimeRanges();
+  RefPtr<dom::TimeRanges> tr = new dom::TimeRanges();
   ranges.ToTimeRanges(tr);
   return tr.forget();
 }
@@ -234,7 +234,7 @@ void
 SourceBuffer::RangeRemoval(double aStart, double aEnd)
 {
   StartUpdating();
-  nsRefPtr<SourceBuffer> self = this;
+  RefPtr<SourceBuffer> self = this;
   mContentManager->RangeRemoval(TimeUnit::FromSeconds(aStart),
                                 TimeUnit::FromSeconds(aEnd))
     ->Then(AbstractThread::MainThread(), __func__,
@@ -393,7 +393,7 @@ SourceBuffer::AppendData(const uint8_t* aData, uint32_t aLength, ErrorResult& aR
 {
   MSE_DEBUG("AppendData(aLength=%u)", aLength);
 
-  nsRefPtr<MediaByteBuffer> data = PrepareAppend(aData, aLength, aRv);
+  RefPtr<MediaByteBuffer> data = PrepareAppend(aData, aLength, aRv);
   if (!data) {
     return;
   }
@@ -535,7 +535,7 @@ SourceBuffer::PrepareAppend(const uint8_t* aData, uint32_t aLength, ErrorResult&
     return nullptr;
   }
 
-  nsRefPtr<MediaByteBuffer> data = new MediaByteBuffer();
+  RefPtr<MediaByteBuffer> data = new MediaByteBuffer();
   if (!data->AppendElements(aData, aLength, fallible)) {
     aRv.Throw(NS_ERROR_DOM_QUOTA_EXCEEDED_ERR);
     return nullptr;
@@ -548,7 +548,7 @@ SourceBuffer::GetBufferedStart()
 {
   MOZ_ASSERT(NS_IsMainThread());
   ErrorResult dummy;
-  nsRefPtr<TimeRanges> ranges = GetBuffered(dummy);
+  RefPtr<TimeRanges> ranges = GetBuffered(dummy);
   return ranges->Length() > 0 ? ranges->GetStartTime() : 0;
 }
 
@@ -557,7 +557,7 @@ SourceBuffer::GetBufferedEnd()
 {
   MOZ_ASSERT(NS_IsMainThread());
   ErrorResult dummy;
-  nsRefPtr<TimeRanges> ranges = GetBuffered(dummy);
+  RefPtr<TimeRanges> ranges = GetBuffered(dummy);
   return ranges->Length() > 0 ? ranges->GetEndTime() : 0;
 }
 

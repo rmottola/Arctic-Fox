@@ -573,7 +573,7 @@ Animation::CanThrottle() const
 }
 
 void
-Animation::ComposeStyle(nsRefPtr<AnimValuesStyleRule>& aStyleRule,
+Animation::ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
                         nsCSSPropertySet& aSetProperties,
                         bool& aNeedsRefreshes)
 {
@@ -1101,7 +1101,7 @@ Animation::DoFinishNotification(SyncNotifyFlag aSyncNotifyFlag)
   if (aSyncNotifyFlag == SyncNotifyFlag::Sync) {
     DoFinishNotificationImmediately();
   } else if (!mFinishNotificationTask.IsPending()) {
-    nsRefPtr<nsRunnableMethod<Animation>> runnable =
+    RefPtr<nsRunnableMethod<Animation>> runnable =
       NS_NewRunnableMethod(this, &Animation::DoFinishNotificationImmediately);
     Promise::DispatchToMicroTask(runnable);
     mFinishNotificationTask = runnable;
@@ -1150,11 +1150,11 @@ Animation::DispatchPlaybackEvent(const nsAString& aName)
     init.mTimelineTime = mTimeline->GetCurrentTimeAsDouble();
   }
 
-  nsRefPtr<AnimationPlaybackEvent> event =
+  RefPtr<AnimationPlaybackEvent> event =
     AnimationPlaybackEvent::Constructor(this, aName, init);
   event->SetTrusted(true);
 
-  nsRefPtr<AsyncEventDispatcher> asyncDispatcher =
+  RefPtr<AsyncEventDispatcher> asyncDispatcher =
     new AsyncEventDispatcher(this, event);
   asyncDispatcher->PostDOMEvent();
 }

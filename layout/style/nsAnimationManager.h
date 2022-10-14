@@ -26,7 +26,7 @@ class Promise;
 } /* namespace dom */
 
 struct AnimationEventInfo {
-  nsRefPtr<mozilla::dom::Element> mElement;
+  RefPtr<mozilla::dom::Element> mElement;
   mozilla::InternalAnimationEvent mEvent;
 
   AnimationEventInfo(mozilla::dom::Element *aElement,

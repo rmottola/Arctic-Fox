@@ -36,7 +36,7 @@ nsDBusService::Get() {
   if (!gSingleton) {
     gSingleton = new nsDBusService();
   }
-  nsRefPtr<nsDBusService> ret = gSingleton;
+  RefPtr<nsDBusService> ret = gSingleton;
   return ret.forget();
 }
   

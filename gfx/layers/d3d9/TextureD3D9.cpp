@@ -215,7 +215,7 @@ FinishTextures(DeviceManagerD3D9* aDeviceManager,
   }
 
   aSurface->UnlockRect();
-  nsRefPtr<IDirect3DSurface9> dstSurface;
+  RefPtr<IDirect3DSurface9> dstSurface;
   aTexture->GetSurfaceLevel(0, getter_AddRefs(dstSurface));
   aDeviceManager->device()->UpdateSurface(aSurface, nullptr, dstSurface,
                                           nullptr);
@@ -549,7 +549,7 @@ TextureClientD3D9::BorrowDrawTarget()
   }
 
   if (ContentForFormat(mFormat) == gfxContentType::COLOR) {
-    nsRefPtr<gfxASurface> surface = new gfxWindowsSurface(mD3D9Surface);
+    RefPtr<gfxASurface> surface = new gfxWindowsSurface(mD3D9Surface);
     if (!surface || surface->CairoStatus()) {
       NS_WARNING("Could not create surface for d3d9 surface");
       return nullptr;
@@ -937,7 +937,7 @@ DXGITextureHostD3D9::OpenSharedHandle()
     return;
   }
 
-  nsRefPtr<IDirect3DTexture9> texture;
+  RefPtr<IDirect3DTexture9> texture;
   HRESULT hr = GetDevice()->CreateTexture(mSize.width, mSize.height, 1,
                                           D3DUSAGE_RENDERTARGET,
                                           SurfaceFormatToD3D9Format(mFormat),

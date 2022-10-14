@@ -8,7 +8,7 @@
 #define mozilla_ObservedDocShell_h_
 
 #include "nsTArray.h"
-#include "mozilla/nsRefPtr.h"
+#include "mozilla/RefPtr.h"
 
 class nsDocShell;
 
@@ -26,7 +26,7 @@ struct ProfileTimelineMarker;
 class ObservedDocShell : public LinkedListElement<ObservedDocShell>
 {
 private:
-  nsRefPtr<nsDocShell> mDocShell;
+  RefPtr<nsDocShell> mDocShell;
   nsTArray<UniquePtr<TimelineMarker>> mTimelineMarkers;
 
 public:

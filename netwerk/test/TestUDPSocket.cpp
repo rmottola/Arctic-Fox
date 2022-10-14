@@ -271,7 +271,7 @@ main(int32_t argc, char *argv[])
   NS_ENSURE_SUCCESS(rv, -1);
 
   // Create UDPServerListener to process UDP packets
-  nsRefPtr<UDPServerListener> serverListener = new UDPServerListener();
+  RefPtr<UDPServerListener> serverListener = new UDPServerListener();
 
   nsCOMPtr<nsIScriptSecurityManager> secman =
     do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID, &rv);
@@ -289,7 +289,7 @@ main(int32_t argc, char *argv[])
   server->AsyncListen(serverListener);
 
   // Bind clinet on arbitrary port
-  nsRefPtr<UDPClientListener> clientListener = new UDPClientListener();
+  RefPtr<UDPClientListener> clientListener = new UDPClientListener();
   client->Init(0, false, systemPrincipal, true, 0);
   client->AsyncListen(clientListener);
 
@@ -335,7 +335,7 @@ main(int32_t argc, char *argv[])
   if (NS_WARN_IF(!timer)) {
     return -1;
   }
-  nsRefPtr<MulticastTimerCallback> timerCb = new MulticastTimerCallback();
+  RefPtr<MulticastTimerCallback> timerCb = new MulticastTimerCallback();
 
   // The following multicast tests using multiple sockets require a firewall
   // exception on Windows XP before they pass.  For now, we'll skip them here.

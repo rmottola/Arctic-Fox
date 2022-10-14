@@ -99,7 +99,7 @@ public:
   bool ReadStructuredClone(JSContext* aCx, JSStructuredCloneReader* aReader);
 private:
   MozNDEFRecord() = delete;
-  nsRefPtr<nsISupports> mParent;
+  RefPtr<nsISupports> mParent;
   void HoldData();
   void DropData();
   void InitType(JSContext* aCx, const Optional<Nullable<Uint8Array>>& aType);

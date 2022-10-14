@@ -46,7 +46,7 @@ private:
   friend class DelayNodeEngine;
 
 private:
-  nsRefPtr<AudioParam> mDelay;
+  RefPtr<AudioParam> mDelay;
 };
 
 } // namespace dom

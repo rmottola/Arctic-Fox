@@ -318,7 +318,7 @@ ContentCacheInChild::CacheTextRects(nsIWidget* aWidget,
   }
 
   // Retrieve text rects in composition string if there is.
-  nsRefPtr<TextComposition> textComposition =
+  RefPtr<TextComposition> textComposition =
     IMEStateManager::GetTextCompositionFor(aWidget);
   if (textComposition) {
     // Note that TextComposition::String() may not be modified here because

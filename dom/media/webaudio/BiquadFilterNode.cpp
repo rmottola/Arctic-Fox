@@ -156,7 +156,7 @@ public:
         if (!mBiquads.IsEmpty()) {
           mBiquads.Clear();
 
-          nsRefPtr<PlayingRefChangeHandler> refchanged =
+          RefPtr<PlayingRefChangeHandler> refchanged =
             new PlayingRefChangeHandler(aStream, PlayingRefChangeHandler::RELEASE);
           aStream->Graph()->
             DispatchToMainThreadAfterStreamStateUpdate(refchanged.forget());
@@ -170,7 +170,7 @@ public:
 
     } else if(mBiquads.Length() != aInput.mChannelData.Length()){
       if (mBiquads.IsEmpty()) {
-        nsRefPtr<PlayingRefChangeHandler> refchanged =
+        RefPtr<PlayingRefChangeHandler> refchanged =
           new PlayingRefChangeHandler(aStream, PlayingRefChangeHandler::ADDREF);
         aStream->Graph()->
           DispatchToMainThreadAfterStreamStateUpdate(refchanged.forget());

@@ -356,7 +356,7 @@ GenerateRandomPathName(nsCString& aOutSalt, uint32_t aLength)
 already_AddRefed<TaskQueue>
 CreateMediaDecodeTaskQueue()
 {
-  nsRefPtr<TaskQueue> queue = new TaskQueue(
+  RefPtr<TaskQueue> queue = new TaskQueue(
     GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
   return queue.forget();
 }
@@ -364,7 +364,7 @@ CreateMediaDecodeTaskQueue()
 already_AddRefed<FlushableTaskQueue>
 CreateFlushableMediaDecodeTaskQueue()
 {
-  nsRefPtr<FlushableTaskQueue> queue = new FlushableTaskQueue(
+  RefPtr<FlushableTaskQueue> queue = new FlushableTaskQueue(
     GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
   return queue.forget();
 }

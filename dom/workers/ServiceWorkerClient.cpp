@@ -37,7 +37,7 @@ ServiceWorkerClientInfo::ServiceWorkerClientInfo(nsIDocument* aDoc)
     NS_WARNING("Failed to get the UUID of the document.");
   }
 
-  nsRefPtr<nsGlobalWindow> innerWindow = static_cast<nsGlobalWindow*>(aDoc->GetInnerWindow());
+  RefPtr<nsGlobalWindow> innerWindow = static_cast<nsGlobalWindow*>(aDoc->GetInnerWindow());
   if (innerWindow) {
     // XXXcatalinb: The inner window can be null if the document is navigating
     // and was detached.
@@ -53,7 +53,7 @@ ServiceWorkerClientInfo::ServiceWorkerClientInfo(nsIDocument* aDoc)
     NS_WARNING("Failed to get focus information.");
   }
 
-  nsRefPtr<nsGlobalWindow> outerWindow = static_cast<nsGlobalWindow*>(aDoc->GetWindow());
+  RefPtr<nsGlobalWindow> outerWindow = static_cast<nsGlobalWindow*>(aDoc->GetWindow());
   MOZ_ASSERT(outerWindow);
   if (!outerWindow->IsTopLevelWindow()) {
     mFrameType = FrameType::Nested;
@@ -100,7 +100,7 @@ public:
       return result.StealNSResult();
     }
 
-    nsRefPtr<ServiceWorkerContainer> container = navigator->ServiceWorker();
+    RefPtr<ServiceWorkerContainer> container = navigator->ServiceWorker();
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(window))) {
       return NS_ERROR_FAILURE;
@@ -124,7 +124,7 @@ private:
       return NS_ERROR_FAILURE;
     }
 
-    nsRefPtr<MessageEvent> event = new MessageEvent(aTargetContainer,
+    RefPtr<MessageEvent> event = new MessageEvent(aTargetContainer,
                                                     nullptr, nullptr);
     rv = event->InitMessageEvent(NS_LITERAL_STRING("message"),
                                  false /* non-bubbling */,
@@ -138,9 +138,9 @@ private:
       return NS_ERROR_FAILURE;
     }
 
-    nsTArray<nsRefPtr<MessagePort>> ports = TakeTransferredPorts();
+    nsTArray<RefPtr<MessagePort>> ports = TakeTransferredPorts();
 
-    nsRefPtr<MessagePortList> portList =
+    RefPtr<MessagePortList> portList =
       new MessagePortList(static_cast<dom::Event*>(event.get()),
                           ports);
     event->SetPorts(portList);
@@ -186,7 +186,7 @@ ServiceWorkerClient::PostMessage(JSContext* aCx, JS::Handle<JS::Value> aMessage,
     transferable.setObject(*array);
   }
 
-  nsRefPtr<ServiceWorkerClientPostMessageRunnable> runnable =
+  RefPtr<ServiceWorkerClientPostMessageRunnable> runnable =
     new ServiceWorkerClientPostMessageRunnable(mWindowId);
 
   runnable->Write(aCx, aMessage, transferable, aRv);

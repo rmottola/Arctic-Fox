@@ -225,7 +225,7 @@ nsContentDLF::CreateInstance(const char* aCommand,
                           aDocListener, aDocViewer);
   }
 
-  nsRefPtr<nsPluginHost> pluginHost = nsPluginHost::GetInst();
+  RefPtr<nsPluginHost> pluginHost = nsPluginHost::GetInst();
   // Don't exclude disabled plugins, which will still trigger the "this plugin
   // is disabled" placeholder.
   if (pluginHost && pluginHost->HavePluginForType(contentType,
@@ -285,7 +285,7 @@ nsContentDLF::CreateBlankDocument(nsILoadGroup *aLoadGroup,
 
     nsNodeInfoManager *nim = blankDoc->NodeInfoManager();
 
-    nsRefPtr<mozilla::dom::NodeInfo> htmlNodeInfo;
+    RefPtr<mozilla::dom::NodeInfo> htmlNodeInfo;
 
     // generate an html html element
     htmlNodeInfo = nim->GetNodeInfo(nsGkAtoms::html, 0, kNameSpaceID_XHTML,

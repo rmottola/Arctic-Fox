@@ -445,7 +445,7 @@ BluetoothDaemonAvrcpModule::HandleRsp(
     return;
   }
 
-  nsRefPtr<BluetoothAvrcpResultHandler> res =
+  RefPtr<BluetoothAvrcpResultHandler> res =
     static_cast<BluetoothAvrcpResultHandler*>(aRes);
 
   if (!res) {
@@ -857,7 +857,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothAvrcpResultHandler> mRes;
+  RefPtr<BluetoothAvrcpResultHandler> mRes;
 };
 
 void
@@ -926,7 +926,7 @@ public:
 
 private:
   BluetoothDaemonAvrcpModule* mModule;
-  nsRefPtr<BluetoothAvrcpResultHandler> mRes;
+  RefPtr<BluetoothAvrcpResultHandler> mRes;
 };
 
 void

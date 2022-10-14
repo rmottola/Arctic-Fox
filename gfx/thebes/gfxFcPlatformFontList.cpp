@@ -349,7 +349,7 @@ gfxFontconfigFontEntry::ReadCMAP(FontInfoData *aFontInfoData)
         return NS_OK;
     }
 
-    nsRefPtr<gfxCharacterMap> charmap;
+    RefPtr<gfxCharacterMap> charmap;
     nsresult rv;
     bool symbolFont = false; // currently ignored
 
@@ -469,7 +469,7 @@ gfxFontconfigFontEntry::GetAspect()
         // create a font to calculate x-height / em-height
         gfxFontStyle s;
         s.size = 100.0; // pick large size to avoid possible hinting artifacts
-        nsRefPtr<gfxFont> font = FindOrMakeFont(&s, false);
+        RefPtr<gfxFont> font = FindOrMakeFont(&s, false);
         if (font) {
             const gfxFont::Metrics& metrics =
                 font->GetMetrics(gfxFont::eHorizontal);
@@ -1329,7 +1329,7 @@ gfxFcPlatformFontList::GetFTLibrary()
         if (!fe) {
             return nullptr;
         }
-        nsRefPtr<gfxFont> font = fe->FindOrMakeFont(&style, false);
+        RefPtr<gfxFont> font = fe->FindOrMakeFont(&style, false);
         if (!font) {
             return nullptr;
         }

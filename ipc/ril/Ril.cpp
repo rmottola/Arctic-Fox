@@ -122,7 +122,7 @@ PostToRIL(JSContext* aCx, unsigned aArgc, JS::Value* aVp)
     return false;
   }
 
-  nsRefPtr<SendRilSocketDataTask> task = new SendRilSocketDataTask(clientId,
+  RefPtr<SendRilSocketDataTask> task = new SendRilSocketDataTask(clientId,
                                                                    raw);
   NS_DispatchToMainThread(task);
   return true;
@@ -231,7 +231,7 @@ RilConsumer::Register(unsigned int aClientId,
     return NS_ERROR_FAILURE;
   }
 
-  nsRefPtr<ConnectWorkerToRIL> connection = new ConnectWorkerToRIL();
+  RefPtr<ConnectWorkerToRIL> connection = new ConnectWorkerToRIL();
   if (!aDispatcher->PostTask(connection)) {
     NS_WARNING("Failed to connect worker to ril");
     return NS_ERROR_UNEXPECTED;
@@ -285,7 +285,7 @@ RilConsumer::ReceiveSocketData(int aIndex,
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  nsRefPtr<DispatchRILEvent> dre(new DispatchRILEvent(aIndex, aBuffer.forget()));
+  RefPtr<DispatchRILEvent> dre(new DispatchRILEvent(aIndex, aBuffer.forget()));
   mDispatcher->PostTask(dre);
 }
 

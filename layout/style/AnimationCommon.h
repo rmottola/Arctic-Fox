@@ -218,7 +218,7 @@ private:
   InfallibleTArray<PropertyValuePair> mPropertyValuePairs;
 };
 
-typedef InfallibleTArray<nsRefPtr<dom::Animation>> AnimationPtrArray;
+typedef InfallibleTArray<RefPtr<dom::Animation>> AnimationPtrArray;
 
 struct AnimationCollection : public LinkedListElement<AnimationCollection>
 {
@@ -392,7 +392,7 @@ public:
   // afterwards with animation.
   // NOTE: If we don't need to apply any styles, mStyleRule will be
   // null, but mStyleRuleRefreshTime will still be valid.
-  nsRefPtr<AnimValuesStyleRule> mStyleRule;
+  RefPtr<AnimValuesStyleRule> mStyleRule;
 
   // RestyleManager keeps track of the number of animation
   // 'mini-flushes' (see nsTransitionManager::UpdateAllThrottledStyles()).

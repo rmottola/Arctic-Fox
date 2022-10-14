@@ -76,7 +76,7 @@ private:
   void ClearInMemorySessionData(ClearKeySession* aSession);
   void Serialize(const ClearKeySession* aSession, std::vector<uint8_t>& aOutKeyData);
 
-  mozilla::RefPtr<ClearKeyDecryptionManager> mDecryptionManager;
+  RefPtr<ClearKeyDecryptionManager> mDecryptionManager;
 
   GMPDecryptorCallback* mCallback;
   GMPThread* mThread;

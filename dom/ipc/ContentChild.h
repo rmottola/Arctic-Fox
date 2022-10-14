@@ -97,7 +97,7 @@ public:
         mLastBridge = nullptr;
         return parent;
     }
-    nsRefPtr<ContentBridgeParent> mLastBridge;
+    RefPtr<ContentBridgeParent> mLastBridge;
 
     PPluginModuleParent *
     AllocPPluginModuleParent(mozilla::ipc::Transport* transport,
@@ -490,7 +490,7 @@ private:
     MOZ_NORETURN void QuickExit();
 
     InfallibleTArray<nsAutoPtr<AlertObserver> > mAlertObservers;
-    nsRefPtr<ConsoleListener> mConsoleListener;
+    RefPtr<ConsoleListener> mConsoleListener;
 
     nsTHashtable<nsPtrHashKey<nsIObserver>> mIdleObservers;
 

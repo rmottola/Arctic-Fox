@@ -108,7 +108,7 @@ public:
   }
 
 private:
-  nsRefPtr<ClippedImage>        mImage;
+  RefPtr<ClippedImage>        mImage;
   const nsIntSize               mSize;
   const Maybe<SVGImageContext>& mSVGContext;
   const uint32_t                mWhichFrame;
@@ -135,7 +135,7 @@ ClippedImage::ShouldClip()
   // aren't available yet, in which case we'll try again later.
   if (mShouldClip.isNothing()) {
     int32_t width, height;
-    nsRefPtr<ProgressTracker> progressTracker =
+    RefPtr<ProgressTracker> progressTracker =
       InnerImage()->GetProgressTracker();
     if (InnerImage()->HasError()) {
       // If there's a problem with the inner image we'll let it handle
@@ -254,12 +254,12 @@ ClippedImage::GetFrameInternal(const nsIntSize& aSize,
       return nullptr;
     }
 
-    nsRefPtr<gfxContext> ctx = new gfxContext(target);
+    RefPtr<gfxContext> ctx = new gfxContext(target);
 
     // Create our callback.
-    nsRefPtr<gfxDrawingCallback> drawTileCallback =
+    RefPtr<gfxDrawingCallback> drawTileCallback =
       new DrawSingleTileCallback(this, aSize, aSVGContext, aWhichFrame, aFlags);
-    nsRefPtr<gfxDrawable> drawable =
+    RefPtr<gfxDrawable> drawable =
       new gfxCallbackDrawable(drawTileCallback, aSize);
 
     // Actually draw. The callback will end up invoking DrawSingleTile.
@@ -344,7 +344,7 @@ ClippedImage::Draw(gfxContext* aContext,
     }
 
     // Create a drawable from that surface.
-    nsRefPtr<gfxSurfaceDrawable> drawable =
+    RefPtr<gfxSurfaceDrawable> drawable =
       new gfxSurfaceDrawable(surface, aSize);
 
     // Draw.

@@ -116,7 +116,7 @@ using mozilla::net::nsMediaFragmentURIParser;
 
 class MOZ_STACK_CLASS AutoNotifyAudioChannelAgent
 {
-  nsRefPtr<mozilla::dom::HTMLMediaElement> mElement;
+  RefPtr<mozilla::dom::HTMLMediaElement> mElement;
   bool mShouldNotify;
   MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER;
 public:
@@ -234,7 +234,7 @@ protected:
     return mElement->GetCurrentLoadID() != mLoadID;
   }
 
-  nsRefPtr<HTMLMediaElement> mElement;
+  RefPtr<HTMLMediaElement> mElement;
   uint32_t mLoadID;
 };
 
@@ -313,7 +313,7 @@ public:
   }
 
 private:
-  nsRefPtr<HTMLMediaElement> mElement;
+  RefPtr<HTMLMediaElement> mElement;
   nsCOMPtr<nsIStreamListener> mNextListener;
   uint32_t mLoadID;
 };
@@ -358,7 +358,7 @@ NS_IMETHODIMP HTMLMediaElement::MediaLoadListener::OnStartRequest(nsIRequest* aR
 
   // The element is only needed until we've had a chance to call
   // InitializeDecoderForChannel. So make sure mElement is cleared here.
-  nsRefPtr<HTMLMediaElement> element;
+  RefPtr<HTMLMediaElement> element;
   element.swap(mElement);
 
   if (mLoadID != element->GetCurrentLoadID()) {
@@ -547,7 +547,7 @@ HTMLMediaElement::IsVideo()
 already_AddRefed<MediaSource>
 HTMLMediaElement::GetMozMediaSourceObject() const
 {
-  nsRefPtr<MediaSource> source = mMediaSource;
+  RefPtr<MediaSource> source = mMediaSource;
   return source.forget();
 }
 
@@ -556,7 +556,7 @@ HTMLMediaElement::GetSrcObject() const
 {
   NS_ASSERTION(!mSrcAttrStream || mSrcAttrStream->GetStream(),
                "MediaStream should have been set up properly");
-  nsRefPtr<DOMMediaStream> stream = mSrcAttrStream;
+  RefPtr<DOMMediaStream> stream = mSrcAttrStream;
   return stream.forget();
 }
 
@@ -580,7 +580,7 @@ HTMLMediaElement::GetMozSrcObject() const
 {
   NS_ASSERTION(!mSrcAttrStream || mSrcAttrStream->GetStream(),
                "MediaStream should have been set up properly");
-  nsRefPtr<DOMMediaStream> stream = mSrcAttrStream;
+  RefPtr<DOMMediaStream> stream = mSrcAttrStream;
   return stream.forget();
 }
 
@@ -1227,7 +1227,7 @@ nsresult HTMLMediaElement::LoadResource()
   }
 
   if (IsMediaStreamURI(mLoadingSrc)) {
-    nsRefPtr<DOMMediaStream> stream;
+    RefPtr<DOMMediaStream> stream;
     nsresult rv = NS_GetStreamForMediaStreamURI(mLoadingSrc, getter_AddRefs(stream));
     if (NS_FAILED(rv)) {
       nsAutoString spec;
@@ -1241,7 +1241,7 @@ nsresult HTMLMediaElement::LoadResource()
   }
 
  if (mMediaSource) {
-    nsRefPtr<MediaSourceDecoder> decoder = new MediaSourceDecoder(this);
+    RefPtr<MediaSourceDecoder> decoder = new MediaSourceDecoder(this);
     if (!mMediaSource->Attach(decoder)) {
       // TODO: Handle failure: run "If the media data cannot be fetched at
       // all, due to network errors, causing the user agent to give up
@@ -1250,7 +1250,7 @@ nsresult HTMLMediaElement::LoadResource()
       return NS_ERROR_FAILURE;
     }
     ChangeDelayLoadStatus(false);
-    nsRefPtr<MediaResource> resource =
+    RefPtr<MediaResource> resource =
       MediaSourceDecoder::CreateResource(mMediaSource->GetPrincipal());
     if (IsAutoplayEnabled()) {
       mJoinLatency.Start();
@@ -1292,7 +1292,7 @@ nsresult HTMLMediaElement::LoadResource()
   // the element. The cycle will also be broken if we get a shutdown
   // notification before OnStartRequest fires.  Necko guarantees that
   // OnStartRequest will eventually fire if we don't shut down first.
-  nsRefPtr<MediaLoadListener> loadListener = new MediaLoadListener(this);
+  RefPtr<MediaLoadListener> loadListener = new MediaLoadListener(this);
 
   channel->SetNotificationCallbacks(loadListener);
 
@@ -1484,7 +1484,7 @@ HTMLMediaElement::Seek(double aTime,
   }
 
   // Clamp the seek target to inside the seekable ranges.
-  nsRefPtr<dom::TimeRanges> seekable = new dom::TimeRanges();
+  RefPtr<dom::TimeRanges> seekable = new dom::TimeRanges();
   media::TimeIntervals seekableIntervals = mDecoder->GetSeekable();
   if (seekableIntervals.IsInvalid()) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
@@ -1607,7 +1607,7 @@ NS_IMETHODIMP HTMLMediaElement::GetDuration(double* aDuration)
 already_AddRefed<TimeRanges>
 HTMLMediaElement::Seekable() const
 {
-  nsRefPtr<TimeRanges> ranges = new TimeRanges();
+  RefPtr<TimeRanges> ranges = new TimeRanges();
   if (mMediaSource ||
       (mDecoder && mReadyState > nsIDOMHTMLMediaElement::HAVE_NOTHING)) {
     mDecoder->GetSeekable().ToTimeRanges(ranges);
@@ -1617,7 +1617,7 @@ HTMLMediaElement::Seekable() const
 
 NS_IMETHODIMP HTMLMediaElement::GetSeekable(nsIDOMTimeRanges** aSeekable)
 {
-  nsRefPtr<TimeRanges> ranges = Seekable();
+  RefPtr<TimeRanges> ranges = Seekable();
   ranges.forget(aSeekable);
   return NS_OK;
 }
@@ -1632,7 +1632,7 @@ NS_IMETHODIMP HTMLMediaElement::GetPaused(bool* aPaused)
 already_AddRefed<TimeRanges>
 HTMLMediaElement::Played()
 {
-  nsRefPtr<TimeRanges> ranges = new TimeRanges();
+  RefPtr<TimeRanges> ranges = new TimeRanges();
 
   uint32_t timeRangeCount = 0;
   if (mPlayed) {
@@ -1659,7 +1659,7 @@ HTMLMediaElement::Played()
 
 NS_IMETHODIMP HTMLMediaElement::GetPlayed(nsIDOMTimeRanges** aPlayed)
 {
-  nsRefPtr<TimeRanges> ranges = Played();
+  RefPtr<TimeRanges> ranges = Played();
   ranges.forget(aPlayed);
   return NS_OK;
 }
@@ -1865,7 +1865,7 @@ HTMLMediaElement::CaptureStreamInternal(bool aFinishWhenEnded,
 
   OutputMediaStream* out = mOutputStreams.AppendElement();
   out->mStream = DOMMediaStream::CreateTrackUnionStream(window, aGraph);
-  nsRefPtr<nsIPrincipal> principal = GetCurrentPrincipal();
+  RefPtr<nsIPrincipal> principal = GetCurrentPrincipal();
   out->mStream->CombineWithPrincipal(principal);
   out->mStream->SetCORSMode(mCORSMode);
   out->mFinishWhenEnded = aFinishWhenEnded;
@@ -1890,7 +1890,7 @@ HTMLMediaElement::CaptureStreamInternal(bool aFinishWhenEnded,
       }
     }
   }
-  nsRefPtr<DOMMediaStream> result = out->mStream;
+  RefPtr<DOMMediaStream> result = out->mStream;
   return result.forget();
 }
 
@@ -1898,7 +1898,7 @@ already_AddRefed<DOMMediaStream>
 HTMLMediaElement::MozCaptureStream(ErrorResult& aRv,
                                    MediaStreamGraph* aGraph)
 {
-  nsRefPtr<DOMMediaStream> stream = CaptureStreamInternal(false, aGraph);
+  RefPtr<DOMMediaStream> stream = CaptureStreamInternal(false, aGraph);
   if (!stream) {
     aRv.Throw(NS_ERROR_FAILURE);
     return nullptr;
@@ -1911,7 +1911,7 @@ already_AddRefed<DOMMediaStream>
 HTMLMediaElement::MozCaptureStreamUntilEnded(ErrorResult& aRv,
                                              MediaStreamGraph* aGraph)
 {
-  nsRefPtr<DOMMediaStream> stream = CaptureStreamInternal(true, aGraph);
+  RefPtr<DOMMediaStream> stream = CaptureStreamInternal(true, aGraph);
   if (!stream) {
     aRv.Throw(NS_ERROR_FAILURE);
     return nullptr;
@@ -2371,7 +2371,7 @@ void
 HTMLMediaElement::WakeLockCreate()
 {
   if (!mWakeLock) {
-    nsRefPtr<power::PowerManagerService> pmService =
+    RefPtr<power::PowerManagerService> pmService =
       power::PowerManagerService::GetInstance();
     NS_ENSURE_TRUE_VOID(pmService);
 
@@ -2443,7 +2443,7 @@ bool HTMLMediaElement::ParseAttribute(int32_t aNamespaceID,
       mAudioChannel = audioChannel;
 
       if (mSrcStream) {
-        nsRefPtr<MediaStream> stream = mSrcStream->GetStream();
+        RefPtr<MediaStream> stream = mSrcStream->GetStream();
         if (stream) {
           stream->SetAudioChannelType(mAudioChannel);
         }
@@ -2646,7 +2646,7 @@ HTMLMediaElement::ReportMSETelemetry()
     // HAVE_CURRENT_DATA to account for times where we are in a buffering state
     // regardless of what actual data we have buffered.
     bool stalled = false;
-    nsRefPtr<TimeRanges> ranges = Buffered();
+    RefPtr<TimeRanges> ranges = Buffered();
     const double errorMargin = 0.05;
     double t = CurrentTime();
     TimeRanges::index_type index = ranges->Find(t, errorMargin);
@@ -2742,7 +2742,7 @@ nsresult HTMLMediaElement::InitializeDecoderAsClone(MediaDecoder* aOriginal)
   MediaResource* originalResource = aOriginal->GetResource();
   if (!originalResource)
     return NS_ERROR_FAILURE;
-  nsRefPtr<MediaDecoder> decoder = aOriginal->Clone();
+  RefPtr<MediaDecoder> decoder = aOriginal->Clone();
   if (!decoder)
     return NS_ERROR_FAILURE;
 
@@ -2755,7 +2755,7 @@ nsresult HTMLMediaElement::InitializeDecoderAsClone(MediaDecoder* aOriginal)
 
   decoder->SetMediaSeekable(aOriginal->IsMediaSeekable());
 
-  nsRefPtr<MediaResource> resource = originalResource->CloneData(decoder);
+  RefPtr<MediaResource> resource = originalResource->CloneData(decoder);
   if (!resource) {
     LOG(LogLevel::Debug, ("%p Failed to cloned stream for decoder %p", this, decoder.get()));
     return NS_ERROR_FAILURE;
@@ -2775,7 +2775,7 @@ nsresult HTMLMediaElement::InitializeDecoderForChannel(nsIChannel* aChannel,
   aChannel->GetContentType(mimeType);
   NS_ASSERTION(!mimeType.IsEmpty(), "We should have the Content-Type.");
 
-  nsRefPtr<MediaDecoder> decoder = DecoderTraits::CreateDecoder(mimeType, this);
+  RefPtr<MediaDecoder> decoder = DecoderTraits::CreateDecoder(mimeType, this);
   if (!decoder) {
     nsAutoString src;
     GetCurrentSrc(src);
@@ -2787,7 +2787,7 @@ nsresult HTMLMediaElement::InitializeDecoderForChannel(nsIChannel* aChannel,
 
   LOG(LogLevel::Debug, ("%p Created decoder %p for type %s", this, decoder.get(), mimeType.get()));
 
-  nsRefPtr<MediaResource> resource = MediaResource::Create(decoder, aChannel);
+  RefPtr<MediaResource> resource = MediaResource::Create(decoder, aChannel);
   if (!resource)
     return NS_ERROR_OUT_OF_MEMORY;
 
@@ -2902,7 +2902,7 @@ public:
   {
     mFinished = true;
     if (mElement) {
-      nsRefPtr<HTMLMediaElement> deathGrip = mElement;
+      RefPtr<HTMLMediaElement> deathGrip = mElement;
 
       // Update NextFrameStatus() to move to NEXT_FRAME_UNAVAILABLE and
       // HAVE_CURRENT_DATA.
@@ -2942,7 +2942,7 @@ public:
       mPendingNotifyOutput = false;
     }
     if (mElement && mHaveCurrentData) {
-      nsRefPtr<HTMLMediaElement> deathGrip = mElement;
+      RefPtr<HTMLMediaElement> deathGrip = mElement;
       mElement->FireTimeUpdate(true);
     }
   }
@@ -2950,7 +2950,7 @@ public:
   {
     mHaveCurrentData = true;
     if (mElement) {
-      nsRefPtr<HTMLMediaElement> deathGrip = mElement;
+      RefPtr<HTMLMediaElement> deathGrip = mElement;
       mElement->FirstFrameLoaded();
     }
     NotifyWatchers();
@@ -3031,7 +3031,7 @@ public:
       MutexAutoLock lock(mMutex);
       size = mInitialSize;
     }
-    nsRefPtr<HTMLMediaElement> deathGrip = mElement;
+    RefPtr<HTMLMediaElement> deathGrip = mElement;
     mElement->UpdateInitialMediaSize(size);
   }
   virtual void NotifyQueuedTrackChanges(MediaStreamGraph* aGraph, TrackID aID,
@@ -3168,7 +3168,7 @@ void HTMLMediaElement::SetupSrcMediaStreamPlayback(DOMMediaStream* aStream)
     return;
   }
 
-  nsRefPtr<MediaStream> stream = mSrcStream->GetStream();
+  RefPtr<MediaStream> stream = mSrcStream->GetStream();
   if (stream) {
     stream->SetAudioChannelType(mAudioChannel);
   }
@@ -3559,7 +3559,7 @@ bool HTMLMediaElement::ShouldCheckAllowOrigin()
 bool HTMLMediaElement::IsCORSSameOrigin()
 {
   bool subsumes;
-  nsRefPtr<nsIPrincipal> principal = GetCurrentPrincipal();
+  RefPtr<nsIPrincipal> principal = GetCurrentPrincipal();
   return
     (NS_SUCCEEDED(NodePrincipal()->Subsumes(principal, &subsumes)) && subsumes) ||
     ShouldCheckAllowOrigin();
@@ -3954,7 +3954,7 @@ already_AddRefed<nsIPrincipal> HTMLMediaElement::GetCurrentPrincipal()
     return mDecoder->GetCurrentPrincipal();
   }
   if (mSrcStream) {
-    nsRefPtr<nsIPrincipal> principal = mSrcStream->GetPrincipal();
+    RefPtr<nsIPrincipal> principal = mSrcStream->GetPrincipal();
     return principal.forget();
   }
   return nullptr;
@@ -3962,7 +3962,7 @@ already_AddRefed<nsIPrincipal> HTMLMediaElement::GetCurrentPrincipal()
 
 void HTMLMediaElement::NotifyDecoderPrincipalChanged()
 {
-  nsRefPtr<nsIPrincipal> principal = GetCurrentPrincipal();
+  RefPtr<nsIPrincipal> principal = GetCurrentPrincipal();
 
   mDecoder->UpdateSameOriginStatus(!principal || IsCORSSameOrigin());
 
@@ -4278,7 +4278,7 @@ HTMLMediaElement::CopyInnerTo(Element* aDest)
 already_AddRefed<TimeRanges>
 HTMLMediaElement::Buffered() const
 {
-  nsRefPtr<TimeRanges> ranges = new TimeRanges();
+  RefPtr<TimeRanges> ranges = new TimeRanges();
   if (mReadyState > nsIDOMHTMLMediaElement::HAVE_NOTHING) {
     if (mDecoder) {
       media::TimeIntervals buffered = mDecoder->GetBuffered();
@@ -4292,7 +4292,7 @@ HTMLMediaElement::Buffered() const
 
 nsresult HTMLMediaElement::GetBuffered(nsIDOMTimeRanges** aBuffered)
 {
-  nsRefPtr<TimeRanges> ranges = Buffered();
+  RefPtr<TimeRanges> ranges = Buffered();
   ranges.forget(aBuffered);
   return NS_OK;
 }
@@ -4620,7 +4620,7 @@ NS_IMETHODIMP HTMLMediaElement::WindowAudioCaptureChanged()
       if (mSrcStream) {
         mCaptureStreamPort = msg->ConnectToCaptureStream(id, mSrcStream->GetStream());
       } else {
-        nsRefPtr<DOMMediaStream> stream = CaptureStreamInternal(false, msg);
+        RefPtr<DOMMediaStream> stream = CaptureStreamInternal(false, msg);
         mCaptureStreamPort = msg->ConnectToCaptureStream(id, stream->GetStream());
       }
     } else {

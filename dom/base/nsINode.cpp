@@ -340,7 +340,7 @@ nsINode::GetSelectionRootContent(nsIPresShell* aPresShell)
     }
   }
 
-  nsRefPtr<nsFrameSelection> fs = aPresShell->FrameSelection();
+  RefPtr<nsFrameSelection> fs = aPresShell->FrameSelection();
   nsIContent* content = fs->GetLimiter();
   if (!content) {
     content = fs->GetAncestorLimiter();
@@ -1243,7 +1243,7 @@ nsINode::PreHandleEvent(EventChainPreVisitor& aVisitor)
 
 void
 nsINode::GetBoxQuads(const BoxQuadOptions& aOptions,
-                     nsTArray<nsRefPtr<DOMQuad> >& aResult,
+                     nsTArray<RefPtr<DOMQuad> >& aResult,
                      mozilla::ErrorResult& aRv)
 {
   mozilla::GetBoxQuads(this, aOptions, aResult, aRv);
@@ -1291,7 +1291,7 @@ nsINode::DispatchEvent(nsIDOMEvent *aEvent, bool* aRetVal)
 
   // Obtain a presentation shell
   nsIPresShell *shell = document->GetShell();
-  nsRefPtr<nsPresContext> context;
+  RefPtr<nsPresContext> context;
   if (shell) {
     context = shell->GetPresContext();
   }
@@ -1665,7 +1665,7 @@ GetNodeFromNodeOrString(const OwningNodeOrString& aNode,
   }
 
   if (aNode.IsString()){
-    nsRefPtr<nsTextNode> textNode =
+    RefPtr<nsTextNode> textNode =
       aDocument->CreateTextNode(aNode.GetAsString());
     return textNode.forget();
   }
@@ -2538,7 +2538,7 @@ nsINode::UnbindObject(nsISupports* aObject)
 }
 
 void
-nsINode::GetBoundMutationObservers(nsTArray<nsRefPtr<nsDOMMutationObserver> >& aResult)
+nsINode::GetBoundMutationObservers(nsTArray<RefPtr<nsDOMMutationObserver> >& aResult)
 {
   nsCOMArray<nsISupports>* objects =
     static_cast<nsCOMArray<nsISupports>*>(GetProperty(nsGkAtoms::keepobjectsalive));
@@ -2866,7 +2866,7 @@ nsINode::QuerySelector(const nsAString& aSelector, ErrorResult& aResult)
 already_AddRefed<nsINodeList>
 nsINode::QuerySelectorAll(const nsAString& aSelector, ErrorResult& aResult)
 {
-  nsRefPtr<nsSimpleContentList> contentList = new nsSimpleContentList(this);
+  RefPtr<nsSimpleContentList> contentList = new nsSimpleContentList(this);
 
   nsCSSSelectorList* selectorList = ParseSelectorList(aSelector, aResult);
   if (selectorList) {

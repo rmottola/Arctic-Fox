@@ -524,7 +524,7 @@ public:
   // indicates that the resampler has begun processing.
   StreamTime mBeginProcessing;
   StreamTime mStop;
-  nsRefPtr<ThreadSharedFloatArrayBufferList> mBuffer;
+  RefPtr<ThreadSharedFloatArrayBufferList> mBuffer;
   SpeexResamplerState* mResampler;
   // mRemainingResamplerTail, like mBufferPosition, and
   // mBufferEnd, is measured in input buffer samples.
@@ -652,7 +652,7 @@ AudioBufferSourceNode::SendBufferParameterToStream(JSContext* aCx)
 
   if (mBuffer) {
     float rate = mBuffer->SampleRate();
-    nsRefPtr<ThreadSharedFloatArrayBufferList> data =
+    RefPtr<ThreadSharedFloatArrayBufferList> data =
       mBuffer->GetThreadSharedChannelsForRate(aCx);
     ns->SetBuffer(data.forget());
     ns->SetInt32Parameter(SAMPLE_RATE, rate);
@@ -737,7 +737,7 @@ AudioBufferSourceNode::NotifyMainThreadStreamFinished()
       return NS_OK;
     }
   private:
-    nsRefPtr<AudioBufferSourceNode> mNode;
+    RefPtr<AudioBufferSourceNode> mNode;
   };
 
   NS_DispatchToMainThread(new EndedEventDispatcher(this));

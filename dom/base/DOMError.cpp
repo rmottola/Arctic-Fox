@@ -71,7 +71,7 @@ DOMError::Constructor(const GlobalObject& aGlobal,
 
   // Window is null for chrome code.
 
-  nsRefPtr<DOMError> ret = new DOMError(window, aName, aMessage);
+  RefPtr<DOMError> ret = new DOMError(window, aName, aMessage);
   return ret.forget();
 }
 

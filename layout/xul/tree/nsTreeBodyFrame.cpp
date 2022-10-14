@@ -596,7 +596,7 @@ nsTreeBodyFrame::GetSelectionRegion(nsIScriptableRegion **aRegion)
   NS_ENSURE_TRUE(region, NS_ERROR_FAILURE);
   region->Init();
 
-  nsRefPtr<nsPresContext> presContext = PresContext();
+  RefPtr<nsPresContext> presContext = PresContext();
   nsIntRect rect = mRect.ToOutsidePixels(presContext->AppUnitsPerCSSPixel());
 
   nsIFrame* rootFrame = presContext->PresShell()->GetRootFrame();
@@ -641,7 +641,7 @@ nsTreeBodyFrame::InvalidateColumn(nsITreeColumn* aCol)
   if (mUpdateBatchNest)
     return NS_OK;
 
-  nsRefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
+  RefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
   if (!col)
     return NS_ERROR_INVALID_ARG;
 
@@ -697,7 +697,7 @@ nsTreeBodyFrame::InvalidateCell(int32_t aIndex, nsITreeColumn* aCol)
   if (aIndex < 0 || aIndex > mPageLength)
     return NS_OK;
 
-  nsRefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
+  RefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
   if (!col)
     return NS_ERROR_INVALID_ARG;
 
@@ -751,7 +751,7 @@ nsTreeBodyFrame::InvalidateColumnRange(int32_t aStart, int32_t aEnd, nsITreeColu
   if (mUpdateBatchNest)
     return NS_OK;
 
-  nsRefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
+  RefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
   if (!col)
     return NS_ERROR_INVALID_ARG;
 
@@ -910,7 +910,7 @@ nsTreeBodyFrame::CheckOverflow(const ScrollParts& aParts)
 
   nsWeakFrame weakFrame(this);
 
-  nsRefPtr<nsPresContext> presContext = PresContext();
+  RefPtr<nsPresContext> presContext = PresContext();
   nsCOMPtr<nsIPresShell> presShell = presContext->GetPresShell();
   nsCOMPtr<nsIContent> content = mContent;
 
@@ -1248,7 +1248,7 @@ nsTreeBodyFrame::GetCoordsForCellItem(int32_t aRow, nsITreeColumn* aCol, const n
     // we add in borders and padding to the text dimension and give that back. 
     nsStyleContext* textContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreecelltext);
 
-    nsRefPtr<nsFontMetrics> fm;
+    RefPtr<nsFontMetrics> fm;
     nsLayoutUtils::GetFontMetricsForStyleContext(textContext,
                                                  getter_AddRefs(fm));
     nscoord height = fm->MaxHeight();
@@ -1619,7 +1619,7 @@ nsTreeBodyFrame::GetItemWithinCellAt(nscoord aX, const nsRect& aCellRect,
 
   AdjustForBorderPadding(textContext, textRect);
 
-  nsRefPtr<nsFontMetrics> fm;
+  RefPtr<nsFontMetrics> fm;
   nsLayoutUtils::GetFontMetricsForStyleContext(textContext,
                                                getter_AddRefs(fm));
   AdjustForCellText(cellText, aRowIndex, aColumn, rc, *fm, textRect);
@@ -1747,7 +1747,7 @@ nsTreeBodyFrame::GetCellWidth(int32_t aRow, nsTreeColumn* aCol,
   // Get the borders and padding for the text.
   GetBorderPadding(textContext, bp);
 
-  nsRefPtr<nsFontMetrics> fm;
+  RefPtr<nsFontMetrics> fm;
   nsLayoutUtils::GetFontMetricsForStyleContext(textContext,
                                                getter_AddRefs(fm));
   // Get the width of the text itself
@@ -1764,7 +1764,7 @@ nsTreeBodyFrame::IsCellCropped(int32_t aRow, nsITreeColumn* aCol, bool *_retval)
   nscoord currentSize, desiredSize;
   nsresult rv;
 
-  nsRefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
+  RefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
   if (!col)
     return NS_ERROR_INVALID_ARG;
 
@@ -2111,7 +2111,7 @@ nsTreeBodyFrame::GetImage(int32_t aRowIndex, nsTreeColumn* aCol, bool aUseContex
 
   nsAutoString imageSrc;
   mView->GetImageSrc(aRowIndex, aCol, imageSrc);
-  nsRefPtr<imgRequestProxy> styleRequest;
+  RefPtr<imgRequestProxy> styleRequest;
   if (!aUseContext && !imageSrc.IsEmpty()) {
     aAllowImageRegions = false;
   }
@@ -2169,7 +2169,7 @@ nsTreeBodyFrame::GetImage(int32_t aRowIndex, nsTreeColumn* aCol, bool aUseContex
     listener->AddCell(aRowIndex, aCol);
     nsCOMPtr<imgINotificationObserver> imgNotificationObserver = listener;
 
-    nsRefPtr<imgRequestProxy> imageRequest;
+    RefPtr<imgRequestProxy> imageRequest;
     if (styleRequest) {
       styleRequest->Clone(imgNotificationObserver, getter_AddRefs(imageRequest));
     } else {
@@ -3625,7 +3625,7 @@ nsTreeBodyFrame::PaintText(int32_t              aRowIndex,
   textRect.Deflate(bp);
 
   // Compute our text size.
-  nsRefPtr<nsFontMetrics> fontMet;
+  RefPtr<nsFontMetrics> fontMet;
   nsLayoutUtils::GetFontMetricsForStyleContext(textContext,
                                                getter_AddRefs(fontMet));
 
@@ -4017,7 +4017,7 @@ nsresult nsTreeBodyFrame::EnsureRowIsVisibleInternal(const ScrollParts& aParts, 
 nsresult
 nsTreeBodyFrame::EnsureCellIsVisible(int32_t aRow, nsITreeColumn* aCol)
 {
-  nsRefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
+  RefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
   if (!col)
     return NS_ERROR_INVALID_ARG;
 
@@ -4081,7 +4081,7 @@ nsTreeBodyFrame::ScrollToColumn(nsITreeColumn* aCol)
 nsresult nsTreeBodyFrame::ScrollToColumnInternal(const ScrollParts& aParts,
                                                  nsITreeColumn* aCol)
 {
-  nsRefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
+  RefPtr<nsTreeColumn> col = GetColumnImpl(aCol);
   if (!col)
     return NS_ERROR_INVALID_ARG;
 
@@ -4560,7 +4560,7 @@ nsTreeBodyFrame::PostScrollEvent()
   if (mScrollEvent.IsPending())
     return;
 
-  nsRefPtr<ScrollEvent> ev = new ScrollEvent(this);
+  RefPtr<ScrollEvent> ev = new ScrollEvent(this);
   if (NS_FAILED(NS_DispatchToCurrentThread(ev))) {
     NS_WARNING("failed to dispatch ScrollEvent");
   } else {
@@ -4640,7 +4640,7 @@ nsTreeBodyFrame::FireRowCountChangedEvent(int32_t aIndex, int32_t aCount)
 
   event->SetTrusted(true);
 
-  nsRefPtr<AsyncEventDispatcher> asyncDispatcher =
+  RefPtr<AsyncEventDispatcher> asyncDispatcher =
     new AsyncEventDispatcher(content, event);
   asyncDispatcher->PostDOMEvent();
 }
@@ -4712,7 +4712,7 @@ nsTreeBodyFrame::FireInvalidateEvent(int32_t aStartRowIdx, int32_t aEndRowIdx,
 
   event->SetTrusted(true);
 
-  nsRefPtr<AsyncEventDispatcher> asyncDispatcher =
+  RefPtr<AsyncEventDispatcher> asyncDispatcher =
     new AsyncEventDispatcher(content, event);
   asyncDispatcher->PostDOMEvent();
 }
@@ -4753,7 +4753,7 @@ nsTreeBodyFrame::FullScrollbarsUpdate(bool aNeedsFullInvalidation)
   // recursion during reflow. Do the first overflow check synchronously, but
   // force any nested checks to round-trip through the event loop. See bug
   // 905909.
-  nsRefPtr<nsOverflowChecker> checker = new nsOverflowChecker(this);
+  RefPtr<nsOverflowChecker> checker = new nsOverflowChecker(this);
   if (!mCheckingOverflow) {
     nsContentUtils::AddScriptRunner(checker);
   } else {

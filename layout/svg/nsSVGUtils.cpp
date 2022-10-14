@@ -1289,7 +1289,7 @@ nsSVGUtils::MakeFillPatternFor(nsIFrame* aFrame,
     nsSVGEffects::GetPaintServer(aFrame, &style->mFill,
                                  nsSVGEffects::FillProperty());
   if (ps) {
-    nsRefPtr<gfxPattern> pattern =
+    RefPtr<gfxPattern> pattern =
       ps->GetPaintServerPattern(aFrame, dt, aContext->CurrentMatrix(),
                                 &nsStyleSVG::mFill, opacity);
     if (pattern) {
@@ -1300,7 +1300,7 @@ nsSVGUtils::MakeFillPatternFor(nsIFrame* aFrame,
   }
 
   if (aContextPaint) {
-    nsRefPtr<gfxPattern> pattern;
+    RefPtr<gfxPattern> pattern;
     switch (style->mFill.mType) {
     case eStyleSVGPaintType_ContextFill:
       pattern = aContextPaint->GetFillPattern(dt, opacity,
@@ -1350,7 +1350,7 @@ nsSVGUtils::MakeStrokePatternFor(nsIFrame* aFrame,
     nsSVGEffects::GetPaintServer(aFrame, &style->mStroke,
                                  nsSVGEffects::StrokeProperty());
   if (ps) {
-    nsRefPtr<gfxPattern> pattern =
+    RefPtr<gfxPattern> pattern =
       ps->GetPaintServerPattern(aFrame, dt, aContext->CurrentMatrix(),
                                 &nsStyleSVG::mStroke, opacity);
     if (pattern) {
@@ -1361,7 +1361,7 @@ nsSVGUtils::MakeStrokePatternFor(nsIFrame* aFrame,
   }
 
   if (aContextPaint) {
-    nsRefPtr<gfxPattern> pattern;
+    RefPtr<gfxPattern> pattern;
     switch (style->mStroke.mType) {
     case eStyleSVGPaintType_ContextFill:
       pattern = aContextPaint->GetFillPattern(dt, opacity,

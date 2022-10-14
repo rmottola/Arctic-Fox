@@ -188,7 +188,7 @@ protected:
   NS_DECL_OWNINGTHREAD
 
 private:
-  nsRefPtr<AudioNode> mNode;
+  RefPtr<AudioNode> mNode;
   // For every InputNode, there is a corresponding entry in mOutputParams of the
   // InputNode's mInputNode.
   nsTArray<AudioNode::InputNode> mInputNodes;
@@ -196,7 +196,7 @@ private:
   const float mDefaultValue;
   const char* mName;
   // The input port used to connect the AudioParam's stream to its node's stream
-  nsRefPtr<MediaInputPort> mNodeStreamPort;
+  RefPtr<MediaInputPort> mNodeStreamPort;
 };
 
 } // namespace dom

@@ -14,7 +14,7 @@
 
 #include "mozilla/media/MediaSystemResourceClient.h"
 #include "mozilla/Monitor.h"
-#include "nsRefPtr.h"
+#include "RefPtr.h"
 
 namespace android {
 // This class is intended to be a proxy for MediaCodec with codec resource
@@ -183,7 +183,7 @@ private:
   wp<CodecResourceListener> mListener;
 
   // Media Resource Management
-  nsRefPtr<mozilla::MediaSystemResourceClient> mResourceClient;
+  RefPtr<mozilla::MediaSystemResourceClient> mResourceClient;
 
   // MediaCodec instance
   mutable RWLock mCodecLock;

@@ -51,7 +51,7 @@ BrowserStreamParent::RecvAsyncNPP_NewStreamResult(const NPError& rv,
   PluginAsyncSurrogate* surrogate = mNPP->GetAsyncSurrogate();
   MOZ_ASSERT(surrogate);
   surrogate->AsyncCallArriving();
-  nsRefPtr<nsNPAPIPluginStreamListener> streamListener = mStreamListener.forget();
+  RefPtr<nsNPAPIPluginStreamListener> streamListener = mStreamListener.forget();
   if (mState == DEFERRING_DESTROY) {
     // We've been asked to destroy ourselves before init was complete.
     mState = DYING;

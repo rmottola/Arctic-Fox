@@ -423,9 +423,9 @@ public:
   nsIFrame* mScrollCornerBox;
   nsIFrame* mResizerBox;
   nsContainerFrame* mOuter;
-  nsRefPtr<AsyncScroll> mAsyncScroll;
-  nsRefPtr<AsyncSmoothMSDScroll> mAsyncSmoothMSDScroll;
-  nsRefPtr<ScrollbarActivity> mScrollbarActivity;
+  RefPtr<AsyncScroll> mAsyncScroll;
+  RefPtr<AsyncSmoothMSDScroll> mAsyncSmoothMSDScroll;
+  RefPtr<ScrollbarActivity> mScrollbarActivity;
   nsTArray<nsIScrollPositionListener*> mListeners;
   nsIAtom* mLastScrollOrigin;
   nsIAtom* mLastSmoothScrollOrigin;

@@ -8,7 +8,7 @@
 #define mozilla_AutoGlobalTimelineMarker_h_
 
 #include "mozilla/GuardObjects.h"
-#include "nsRefPtr.h"
+#include "RefPtr.h"
 
 class nsDocShell;
 

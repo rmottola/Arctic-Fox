@@ -39,8 +39,8 @@ private:
   void OnConnectError(int aIndex) override;
   void OnDisconnect(int aIndex) override;
 
-  nsRefPtr<StreamSocket> mSocket;
-  nsRefPtr<mozilla::dom::workers::WorkerCrossThreadDispatcher> mDispatcher;
+  RefPtr<StreamSocket> mSocket;
+  RefPtr<mozilla::dom::workers::WorkerCrossThreadDispatcher> mDispatcher;
   nsCString mAddress;
   bool mShutdown;
 };

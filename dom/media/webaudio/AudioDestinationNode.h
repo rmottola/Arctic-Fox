@@ -99,9 +99,9 @@ private:
   uint32_t mFramesToProduce;
 
   nsCOMPtr<nsIAudioChannelAgent> mAudioChannelAgent;
-  nsRefPtr<MediaInputPort> mCaptureStreamPort;
+  RefPtr<MediaInputPort> mCaptureStreamPort;
 
-  nsRefPtr<Promise> mOfflineRenderingPromise;
+  RefPtr<Promise> mOfflineRenderingPromise;
 
   // Audio Channel Type.
   AudioChannel mAudioChannel;

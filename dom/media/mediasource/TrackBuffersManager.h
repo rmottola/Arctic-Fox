@@ -36,7 +36,7 @@ public:
   typedef MozPromise<bool, nsresult, /* IsExclusive = */ true> CodedFrameProcessingPromise;
   typedef TrackInfo::TrackType TrackType;
   typedef MediaData::Type MediaType;
-  typedef nsTArray<nsRefPtr<MediaRawData>> TrackBuffer;
+  typedef nsTArray<RefPtr<MediaRawData>> TrackBuffer;
 
   TrackBuffersManager(dom::SourceBufferAttributes* aAttributes,
                       MediaSourceDecoder* aParentDecoder,
@@ -45,13 +45,13 @@ public:
   bool AppendData(MediaByteBuffer* aData,
                   media::TimeUnit aTimestampOffset) override;
 
-  nsRefPtr<AppendPromise> BufferAppend() override;
+  RefPtr<AppendPromise> BufferAppend() override;
 
   void AbortAppendData() override;
 
   void ResetParserState() override;
 
-  nsRefPtr<RangeRemovalPromise> RangeRemoval(media::TimeUnit aStart,
+  RefPtr<RangeRemovalPromise> RangeRemoval(media::TimeUnit aStart,
                                              media::TimeUnit aEnd) override;
 
   EvictDataResult
@@ -105,7 +105,7 @@ private:
   friend class MediaSourceDemuxer;
   virtual ~TrackBuffersManager();
   // All following functions run on the taskqueue.
-  nsRefPtr<AppendPromise> InitSegmentParserLoop();
+  RefPtr<AppendPromise> InitSegmentParserLoop();
   void ScheduleSegmentParserLoop();
   void SegmentParserLoop();
   void AppendIncomingBuffers();
@@ -117,11 +117,11 @@ private:
   void RejectAppend(nsresult aRejectValue, const char* aName);
   // Will return a promise that will be resolved once all frames of the current
   // media segment have been processed.
-  nsRefPtr<CodedFrameProcessingPromise> CodedFrameProcessing();
+  RefPtr<CodedFrameProcessingPromise> CodedFrameProcessing();
   void CompleteCodedFrameProcessing();
   // Called by ResetParserState.
   void CompleteResetParserState();
-  nsRefPtr<RangeRemovalPromise>
+  RefPtr<RangeRemovalPromise>
     CodedFrameRemovalWithPromise(media::TimeInterval aInterval);
   bool CodedFrameRemoval(media::TimeInterval aInterval);
   void SetAppendState(AppendState aAppendState);
@@ -135,12 +135,12 @@ private:
     return mAudioTracks.mNumTracks > 0;
   }
 
-  typedef Pair<nsRefPtr<MediaByteBuffer>, media::TimeUnit> IncomingBuffer;
+  typedef Pair<RefPtr<MediaByteBuffer>, media::TimeUnit> IncomingBuffer;
   void AppendIncomingBuffer(IncomingBuffer aData);
   nsTArray<IncomingBuffer> mIncomingBuffers;
 
   // The input buffer as per http://w3c.github.io/media-source/index.html#sourcebuffer-input-buffer
-  nsRefPtr<MediaByteBuffer> mInputBuffer;
+  RefPtr<MediaByteBuffer> mInputBuffer;
   // The current append state as per https://w3c.github.io/media-source/#sourcebuffer-append-state
   // Accessed on both the main thread and the task queue.
   Atomic<AppendState> mAppendState;
@@ -166,9 +166,9 @@ private:
 
   // Demuxer objects and methods.
   void AppendDataToCurrentInputBuffer(MediaByteBuffer* aData);
-  nsRefPtr<MediaByteBuffer> mInitData;
-  nsRefPtr<SourceBufferResource> mCurrentInputBuffer;
-  nsRefPtr<MediaDataDemuxer> mInputDemuxer;
+  RefPtr<MediaByteBuffer> mInitData;
+  RefPtr<SourceBufferResource> mCurrentInputBuffer;
+  RefPtr<MediaDataDemuxer> mInputDemuxer;
   // Length already processed in current media segment.
   uint64_t mProcessedInput;
   Maybe<media::TimeUnit> mLastParsedEndTime;
@@ -181,14 +181,14 @@ private:
 
   void OnDemuxFailed(TrackType aTrack, DemuxerFailureReason aFailure);
   void DoDemuxVideo();
-  void OnVideoDemuxCompleted(nsRefPtr<MediaTrackDemuxer::SamplesHolder> aSamples);
+  void OnVideoDemuxCompleted(RefPtr<MediaTrackDemuxer::SamplesHolder> aSamples);
   void OnVideoDemuxFailed(DemuxerFailureReason aFailure)
   {
     mVideoTracks.mDemuxRequest.Complete();
     OnDemuxFailed(TrackType::kVideoTrack, aFailure);
   }
   void DoDemuxAudio();
-  void OnAudioDemuxCompleted(nsRefPtr<MediaTrackDemuxer::SamplesHolder> aSamples);
+  void OnAudioDemuxCompleted(RefPtr<MediaTrackDemuxer::SamplesHolder> aSamples);
   void OnAudioDemuxFailed(DemuxerFailureReason aFailure)
   {
     mAudioTracks.mDemuxRequest.Complete();
@@ -230,7 +230,7 @@ private:
     // point coded frame is needed before anything can be added to the track
     // buffer.
     bool mNeedRandomAccessPoint;
-    nsRefPtr<MediaTrackDemuxer> mDemuxer;
+    RefPtr<MediaTrackDemuxer> mDemuxer;
     MozPromiseRequestHolder<MediaTrackDemuxer::SamplesPromise> mDemuxRequest;
     // If set, position where the next contiguous frame will be inserted.
     // If a discontinuity is detected, it will be unset and recalculated upon
@@ -249,9 +249,9 @@ private:
     // Byte size of all samples contained in this track buffer.
     uint32_t mSizeBuffer;
     // TrackInfo of the first metadata received.
-    nsRefPtr<SharedTrackInfo> mInfo;
+    RefPtr<SharedTrackInfo> mInfo;
     // TrackInfo of the last metadata parsed (updated with each init segment.
-    nsRefPtr<SharedTrackInfo> mLastInfo;
+    RefPtr<SharedTrackInfo> mLastInfo;
 
     // If set, position of the next sample to be retrieved by GetSample().
     // If the position is equal to the TrackBuffer's length, it indicates that
@@ -328,7 +328,7 @@ private:
   void RestoreCachedVariables();
 
   // Strong references to external objects.
-  nsRefPtr<dom::SourceBufferAttributes> mSourceBufferAttributes;
+  RefPtr<dom::SourceBufferAttributes> mSourceBufferAttributes;
   nsMainThreadPtrHandle<MediaSourceDecoder> mParentDecoder;
 
   // Set to true if mediasource state changed to ended.

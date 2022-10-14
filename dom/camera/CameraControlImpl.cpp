@@ -352,7 +352,7 @@ public:
 protected:
   virtual ~ControlMessage() { }
 
-  nsRefPtr<CameraControlImpl> mCameraControl;
+  RefPtr<CameraControlImpl> mCameraControl;
   CameraControlListener::UserContext mContext;
 };
 
@@ -545,7 +545,7 @@ CameraControlImpl::StartRecording(DeviceStorageFileDescriptor* aFileDescriptor,
   protected:
     StartRecordingOptions mOptions;
     bool mOptionsPassed;
-    nsRefPtr<DeviceStorageFileDescriptor> mFileDescriptor;
+    RefPtr<DeviceStorageFileDescriptor> mFileDescriptor;
   };
 
   if (!aFileDescriptor) {
@@ -670,7 +670,7 @@ public:
   { }
 
 protected:
-  nsRefPtr<CameraControlListener> mListener;
+  RefPtr<CameraControlListener> mListener;
 };
 
 void
@@ -716,7 +716,7 @@ CameraControlImpl::RemoveListenerImpl(CameraControlListener* aListener)
 {
   RwLockAutoEnterWrite lock(mListenerLock);
 
-  nsRefPtr<CameraControlListener> l(aListener);
+  RefPtr<CameraControlListener> l(aListener);
   mListeners.RemoveElement(l);
   DOM_CAMERA_LOGI("Removed camera control listener %p\n", l.get());
   // XXXmikeh - do we want to notify the listener that it has been removed?

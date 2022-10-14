@@ -52,8 +52,8 @@ class FetchEvent final : public Event
 {
   nsMainThreadPtrHandle<nsIInterceptedChannel> mChannel;
   nsMainThreadPtrHandle<ServiceWorker> mServiceWorker;
-  nsRefPtr<ServiceWorkerClient> mClient;
-  nsRefPtr<Request> mRequest;
+  RefPtr<ServiceWorkerClient> mClient;
+  RefPtr<Request> mRequest;
   nsAutoPtr<ServiceWorkerClientInfo> mClientInfo;
   bool mIsReload;
   bool mWaitToRespond;
@@ -114,7 +114,7 @@ public:
 
 class ExtendableEvent : public Event
 {
-  nsTArray<nsRefPtr<Promise>> mPromises;
+  nsTArray<RefPtr<Promise>> mPromises;
 
 protected:
   explicit ExtendableEvent(mozilla::dom::EventTarget* aOwner);
@@ -135,7 +135,7 @@ public:
               const nsAString& aType,
               const EventInit& aOptions)
   {
-    nsRefPtr<ExtendableEvent> e = new ExtendableEvent(aOwner);
+    RefPtr<ExtendableEvent> e = new ExtendableEvent(aOwner);
     bool trusted = e->Init(aOwner);
     e->InitEvent(aType, aOptions.mBubbles, aOptions.mCancelable);
     e->SetTrusted(trusted);
@@ -202,7 +202,7 @@ private:
 
 class PushEvent final : public ExtendableEvent
 {
-  nsRefPtr<PushMessageData> mData;
+  RefPtr<PushMessageData> mData;
   nsMainThreadPtrHandle<ServiceWorker> mServiceWorker;
 
 protected:

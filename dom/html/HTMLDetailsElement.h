@@ -82,7 +82,7 @@ protected:
     }
   };
 
-  nsRefPtr<ToggleEventDispatcher> mToggleEventDispatcher;
+  RefPtr<ToggleEventDispatcher> mToggleEventDispatcher;
 };
 
 } // namespace dom

@@ -79,7 +79,7 @@ public:
    * Note: Multiple invocations of this API shall remove an existing renderer
    * and attaches the new to the Conduit.
    */
-  virtual MediaConduitErrorCode AttachRenderer(mozilla::RefPtr<VideoRenderer> aVideoRenderer) override;
+  virtual MediaConduitErrorCode AttachRenderer(RefPtr<VideoRenderer> aVideoRenderer) override;
   virtual void DetachRenderer() override;
 
   /**
@@ -130,9 +130,9 @@ public:
    * Register Transport for this Conduit. RTP and RTCP frames from the VideoEngine
    * shall be passed to the registered transport for transporting externally.
    */
-  virtual MediaConduitErrorCode SetTransmitterTransport(mozilla::RefPtr<TransportInterface> aTransport) override;
+  virtual MediaConduitErrorCode SetTransmitterTransport(RefPtr<TransportInterface> aTransport) override;
 
-  virtual MediaConduitErrorCode SetReceiverTransport(mozilla::RefPtr<TransportInterface> aTransport) override;
+  virtual MediaConduitErrorCode SetReceiverTransport(RefPtr<TransportInterface> aTransport) override;
 
   /**
    * Function to select and change the encoding resolution based on incoming frame size
@@ -310,9 +310,9 @@ private:
 
   webrtc::VideoEngine* mVideoEngine;
   mozilla::ReentrantMonitor mTransportMonitor;
-  mozilla::RefPtr<TransportInterface> mTransmitterTransport;
-  mozilla::RefPtr<TransportInterface> mReceiverTransport;
-  mozilla::RefPtr<VideoRenderer> mRenderer;
+  RefPtr<TransportInterface> mTransmitterTransport;
+  RefPtr<TransportInterface> mReceiverTransport;
+  RefPtr<VideoRenderer> mRenderer;
 
   ScopedCustomReleasePtr<webrtc::ViEBase> mPtrViEBase;
   ScopedCustomReleasePtr<webrtc::ViECapture> mPtrViECapture;
@@ -348,7 +348,7 @@ private:
   static const unsigned int sAlphaDen = 8;
   static const unsigned int sRoundingPadding = 1024;
 
-  mozilla::RefPtr<WebrtcAudioConduit> mSyncedTo;
+  RefPtr<WebrtcAudioConduit> mSyncedTo;
 
   nsAutoPtr<VideoCodecConfig> mExternalSendCodec;
   nsAutoPtr<VideoCodecConfig> mExternalRecvCodec;

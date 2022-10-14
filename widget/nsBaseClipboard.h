@@ -41,7 +41,7 @@ protected:
   bool                mIgnoreEmptyNotification;
   nsIClipboardOwner * mClipboardOwner;
   nsITransferable   * mTransferable;
-  nsRefPtr<nsClipboardPrivacyHandler> mPrivacyHandler;
+  RefPtr<nsClipboardPrivacyHandler> mPrivacyHandler;
 
 };
 

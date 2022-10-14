@@ -302,7 +302,7 @@ private:
   // plugins we register on the root PresContext.
   // This is only non-null while we have a plugin registered for geometry
   // updates.
-  nsRefPtr<nsRootPresContext> mRootPresContextRegisteredWith;
+  RefPtr<nsRootPresContext> mRootPresContextRegisteredWith;
 };
 
 class nsDisplayPlugin : public nsDisplayItem {

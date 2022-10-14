@@ -158,7 +158,7 @@ private:
 
   private:
     WebrtcGmpVideoEncoder* mEncoder;
-    nsRefPtr<InitDoneRunnable> mInitDone;
+    RefPtr<InitDoneRunnable> mInitDone;
     const webrtc::VideoCodec* mCodecSettings;
     uint32_t mMaxPayloadSize;
   };
@@ -199,7 +199,7 @@ private:
 
   private:
     WebrtcGmpVideoEncoder* mEncoder;
-    nsRefPtr<InitDoneRunnable> mInitDone;
+    RefPtr<InitDoneRunnable> mInitDone;
     uint32_t mWidth;
     uint32_t mHeight;
   };
@@ -334,7 +334,7 @@ private:
 
   private:
     WebrtcGmpVideoDecoder* mDecoder;
-    nsRefPtr<InitDoneRunnable> mInitDone;
+    RefPtr<InitDoneRunnable> mInitDone;
 };
 
   virtual int32_t Decode_g(const webrtc::EncodedImage& aInputImage,

@@ -89,7 +89,7 @@ DecoderFactory::GetDecoder(DecoderType aType,
                            RasterImage* aImage,
                            bool aIsRedecode)
 {
-  nsRefPtr<Decoder> decoder;
+  RefPtr<Decoder> decoder;
 
   switch (aType) {
     case DecoderType::PNG:
@@ -142,7 +142,7 @@ DecoderFactory::CreateDecoder(DecoderType aType,
     return nullptr;
   }
 
-  nsRefPtr<Decoder> decoder =
+  RefPtr<Decoder> decoder =
     GetDecoder(aType, aImage, bool(aDecoderFlags & DecoderFlags::IS_REDECODE));
   MOZ_ASSERT(decoder, "Should have a decoder now");
 
@@ -181,7 +181,7 @@ DecoderFactory::CreateAnimationDecoder(DecoderType aType,
   MOZ_ASSERT(aType == DecoderType::GIF || aType == DecoderType::PNG,
              "Calling CreateAnimationDecoder for non-animating DecoderType");
 
-  nsRefPtr<Decoder> decoder =
+  RefPtr<Decoder> decoder =
     GetDecoder(aType, aImage, /* aIsRedecode = */ true);
   MOZ_ASSERT(decoder, "Should have a decoder now");
 
@@ -209,7 +209,7 @@ DecoderFactory::CreateMetadataDecoder(DecoderType aType,
     return nullptr;
   }
 
-  nsRefPtr<Decoder> decoder =
+  RefPtr<Decoder> decoder =
     GetDecoder(aType, aImage, /* aIsRedecode = */ false);
   MOZ_ASSERT(decoder, "Should have a decoder now");
 
@@ -235,7 +235,7 @@ DecoderFactory::CreateAnonymousDecoder(DecoderType aType,
     return nullptr;
   }
 
-  nsRefPtr<Decoder> decoder =
+  RefPtr<Decoder> decoder =
     GetDecoder(aType, /* aImage = */ nullptr, /* aIsRedecode = */ false);
   MOZ_ASSERT(decoder, "Should have a decoder now");
 
@@ -273,7 +273,7 @@ DecoderFactory::CreateAnonymousMetadataDecoder(DecoderType aType,
     return nullptr;
   }
 
-  nsRefPtr<Decoder> decoder =
+  RefPtr<Decoder> decoder =
     GetDecoder(aType, /* aImage = */ nullptr, /* aIsRedecode = */ false);
   MOZ_ASSERT(decoder, "Should have a decoder now");
 

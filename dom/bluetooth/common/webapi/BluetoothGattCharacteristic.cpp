@@ -92,7 +92,7 @@ BluetoothGattCharacteristic::StartNotifications(ErrorResult& aRv)
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BluetoothService* bs = BluetoothService::Get();
@@ -115,7 +115,7 @@ BluetoothGattCharacteristic::StopNotifications(ErrorResult& aRv)
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BluetoothService* bs = BluetoothService::Get();
@@ -239,7 +239,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothGattCharacteristic> mCharacteristic;
+  RefPtr<BluetoothGattCharacteristic> mCharacteristic;
 };
 
 already_AddRefed<Promise>
@@ -251,7 +251,7 @@ BluetoothGattCharacteristic::ReadValue(ErrorResult& aRv)
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BT_ENSURE_TRUE_REJECT(mProperties & GATT_CHAR_PROP_BIT_READ,
@@ -278,7 +278,7 @@ BluetoothGattCharacteristic::WriteValue(const ArrayBuffer& aValue,
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BT_ENSURE_TRUE_REJECT(mProperties &

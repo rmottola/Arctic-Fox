@@ -50,7 +50,7 @@
 #include "mozilla/dom/ImageData.h"
 #include "mozilla/dom/ToJSValue.h"
 #include "mozilla/Endian.h"
-#include "mozilla/nsRefPtr.h"
+#include "mozilla/RefPtr.h"
 
 namespace mozilla {
 
@@ -316,7 +316,7 @@ WebGLContext::CreateProgram()
 {
     if (IsContextLost())
         return nullptr;
-    nsRefPtr<WebGLProgram> globj = new WebGLProgram(this);
+    RefPtr<WebGLProgram> globj = new WebGLProgram(this);
     return globj.forget();
 }
 
@@ -333,7 +333,7 @@ WebGLContext::CreateShader(GLenum type)
         return nullptr;
     }
 
-    nsRefPtr<WebGLShader> shader = new WebGLShader(this, type);
+    RefPtr<WebGLShader> shader = new WebGLShader(this, type);
     return shader.forget();
 }
 
@@ -649,7 +649,7 @@ WebGLContext::GetActiveUniform(WebGLProgram* prog, GLuint index)
 
 void
 WebGLContext::GetAttachedShaders(WebGLProgram* prog,
-                                 dom::Nullable<nsTArray<nsRefPtr<WebGLShader>>>& retval)
+                                 dom::Nullable<nsTArray<RefPtr<WebGLShader>>>& retval)
 {
     retval.SetNull();
     if (IsContextLost())
@@ -973,7 +973,7 @@ WebGLContext::CreateTexture()
     MakeContextCurrent();
     gl->fGenTextures(1, &tex);
 
-    nsRefPtr<WebGLTexture> globj = new WebGLTexture(this, tex);
+    RefPtr<WebGLTexture> globj = new WebGLTexture(this, tex);
     return globj.forget();
 }
 
@@ -2306,7 +2306,7 @@ WebGLContext::CreateFramebuffer()
     MakeContextCurrent();
     gl->fGenFramebuffers(1, &fbo);
 
-    nsRefPtr<WebGLFramebuffer> globj = new WebGLFramebuffer(this, fbo);
+    RefPtr<WebGLFramebuffer> globj = new WebGLFramebuffer(this, fbo);
     return globj.forget();
 }
 
@@ -2315,7 +2315,7 @@ WebGLContext::CreateRenderbuffer()
 {
     if (IsContextLost())
         return nullptr;
-    nsRefPtr<WebGLRenderbuffer> globj = new WebGLRenderbuffer(this);
+    RefPtr<WebGLRenderbuffer> globj = new WebGLRenderbuffer(this);
     return globj.forget();
 }
 
@@ -2420,7 +2420,7 @@ WebGLContext::GetShaderPrecisionFormat(GLenum shadertype, GLenum precisiontype)
       gl->fGetShaderPrecisionFormat(shadertype, precisiontype, range, &precision);
     }
 
-    nsRefPtr<WebGLShaderPrecisionFormat> retShaderPrecisionFormat
+    RefPtr<WebGLShaderPrecisionFormat> retShaderPrecisionFormat
         = new WebGLShaderPrecisionFormat(this, range[0], range[1], precision);
     return retShaderPrecisionFormat.forget();
 }

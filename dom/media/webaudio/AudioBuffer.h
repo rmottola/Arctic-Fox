@@ -104,13 +104,13 @@ protected:
   bool RestoreJSChannelData(JSContext* aJSContext);
   void ClearJSChannels();
 
-  nsRefPtr<AudioContext> mContext;
+  RefPtr<AudioContext> mContext;
   // Float32Arrays
   nsAutoTArray<JS::Heap<JSObject*>, 2> mJSChannels;
 
   // mSharedChannels aggregates the data from mJSChannels. This is non-null
   // if and only if the mJSChannels are neutered.
-  nsRefPtr<ThreadSharedFloatArrayBufferList> mSharedChannels;
+  RefPtr<ThreadSharedFloatArrayBufferList> mSharedChannels;
 
   uint32_t mLength;
   float mSampleRate;

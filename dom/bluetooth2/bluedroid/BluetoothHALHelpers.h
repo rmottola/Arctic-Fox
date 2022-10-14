@@ -930,7 +930,7 @@ public:
   }
 
 private:
-  nsRefPtr<Obj> mObj;
+  RefPtr<Obj> mObj;
   void (Obj::*mMethod)();
 };
 
@@ -956,7 +956,7 @@ public:
   }
 
 private:
-  nsRefPtr<Obj> mObj;
+  RefPtr<Obj> mObj;
   Res (Obj::*mMethod)(Arg1);
   Tin1 mArg1;
 };
@@ -989,7 +989,7 @@ public:
   }
 
 private:
-  nsRefPtr<Obj> mObj;
+  RefPtr<Obj> mObj;
   Res (Obj::*mMethod)(Arg1, Arg2, Arg3);
   Tin1 mArg1;
   Tin2 mArg2;
@@ -1009,7 +1009,7 @@ public:
 
   static already_AddRefed<SelfType> Create(Res (ObjectType::*aMethod)())
   {
-    nsRefPtr<SelfType> runnable(new SelfType(aMethod));
+    RefPtr<SelfType> runnable(new SelfType(aMethod));
 
     return runnable.forget();
   }
@@ -1017,7 +1017,7 @@ public:
   static void
   Dispatch(Res (ObjectType::*aMethod)())
   {
-    nsRefPtr<SelfType> runnable = Create(aMethod);
+    RefPtr<SelfType> runnable = Create(aMethod);
 
     if (!runnable) {
       BT_WARNING("BluetoothNotificationHALRunnable0::Create failed");
@@ -1067,7 +1067,7 @@ public:
   static already_AddRefed<SelfType> Create(
     Res (ObjectType::*aMethod)(Arg1), const T1& aIn1)
   {
-    nsRefPtr<SelfType> runnable(new SelfType(aMethod));
+    RefPtr<SelfType> runnable(new SelfType(aMethod));
 
     if (NS_FAILED(runnable->ConvertAndSet(aIn1))) {
       return nullptr;
@@ -1079,7 +1079,7 @@ public:
   static void
   Dispatch(Res (ObjectType::*aMethod)(Arg1), const T1& aIn1)
   {
-    nsRefPtr<SelfType> runnable = Create(aMethod, aIn1);
+    RefPtr<SelfType> runnable = Create(aMethod, aIn1);
 
     if (!runnable) {
       BT_WARNING("BluetoothNotificationHALRunnable1::Create failed");
@@ -1143,7 +1143,7 @@ public:
   static already_AddRefed<SelfType> Create(
     Res (ObjectType::*aMethod)(Arg1, Arg2), const T1& aIn1, const T2& aIn2)
   {
-    nsRefPtr<SelfType> runnable(new SelfType(aMethod));
+    RefPtr<SelfType> runnable(new SelfType(aMethod));
 
     if (NS_FAILED(runnable->ConvertAndSet(aIn1, aIn2))) {
       return nullptr;
@@ -1156,7 +1156,7 @@ public:
   Dispatch(Res (ObjectType::*aMethod)(Arg1, Arg2),
            const T1& aIn1, const T2& aIn2)
   {
-    nsRefPtr<SelfType> runnable = Create(aMethod, aIn1, aIn2);
+    RefPtr<SelfType> runnable = Create(aMethod, aIn1, aIn2);
 
     if (!runnable) {
       BT_WARNING("BluetoothNotificationHALRunnable2::Create failed");
@@ -1227,7 +1227,7 @@ public:
     Res (ObjectType::*aMethod)(Arg1, Arg2, Arg3),
     const T1& aIn1, const T2& aIn2, const T3& aIn3)
   {
-    nsRefPtr<SelfType> runnable(new SelfType(aMethod));
+    RefPtr<SelfType> runnable(new SelfType(aMethod));
 
     if (NS_FAILED(runnable->ConvertAndSet(aIn1, aIn2, aIn3))) {
       return nullptr;
@@ -1240,7 +1240,7 @@ public:
   Dispatch(Res (ObjectType::*aMethod)(Arg1, Arg2, Arg3),
            const T1& aIn1, const T2& aIn2, const T3& aIn3)
   {
-    nsRefPtr<SelfType> runnable = Create(aMethod, aIn1, aIn2, aIn3);
+    RefPtr<SelfType> runnable = Create(aMethod, aIn1, aIn2, aIn3);
 
     if (!runnable) {
       BT_WARNING("BluetoothNotificationHALRunnable3::Create failed");
@@ -1316,7 +1316,7 @@ public:
     Res (ObjectType::*aMethod)(Arg1, Arg2, Arg3, Arg4),
     const T1& aIn1, const T2& aIn2, const T3& aIn3, const T4& aIn4)
   {
-    nsRefPtr<SelfType> runnable(new SelfType(aMethod));
+    RefPtr<SelfType> runnable(new SelfType(aMethod));
 
     if (NS_FAILED(runnable->ConvertAndSet(aIn1, aIn2, aIn3, aIn4))) {
       return nullptr;
@@ -1329,7 +1329,7 @@ public:
   Dispatch(Res (ObjectType::*aMethod)(Arg1, Arg2, Arg3, Arg4),
            const T1& aIn1, const T2& aIn2, const T3& aIn3, const T4& aIn4)
   {
-    nsRefPtr<SelfType> runnable = Create(aMethod, aIn1, aIn2, aIn3, aIn4);
+    RefPtr<SelfType> runnable = Create(aMethod, aIn1, aIn2, aIn3, aIn4);
 
     if (!runnable) {
       BT_WARNING("BluetoothNotificationHALRunnable4::Create failed");
@@ -1413,7 +1413,7 @@ public:
     const T1& aIn1, const T2& aIn2, const T3& aIn3,
     const T4& aIn4, const T5& aIn5)
   {
-    nsRefPtr<SelfType> runnable(new SelfType(aMethod));
+    RefPtr<SelfType> runnable(new SelfType(aMethod));
 
     if (NS_FAILED(runnable->ConvertAndSet(aIn1, aIn2, aIn3, aIn4, aIn5))) {
       return nullptr;
@@ -1427,7 +1427,7 @@ public:
            const T1& aIn1, const T2& aIn2, const T3& aIn3,
            const T4& aIn4, const T5& aIn5)
   {
-    nsRefPtr<SelfType> runnable = Create(aMethod,
+    RefPtr<SelfType> runnable = Create(aMethod,
                                          aIn1, aIn2, aIn3, aIn4, aIn5);
     if (!runnable) {
       BT_WARNING("BluetoothNotificationHALRunnable5::Create failed");

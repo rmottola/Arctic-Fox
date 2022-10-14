@@ -346,7 +346,7 @@ FMRadio::Enable(double aFrequency)
     return nullptr;
   }
 
-  nsRefPtr<FMRadioRequest> r =
+  RefPtr<FMRadioRequest> r =
     new FMRadioRequest(win, this, FMRadioRequestArgs::TEnableRequestArgs);
   IFMRadioService::Singleton()->Enable(aFrequency, r);
 
@@ -361,7 +361,7 @@ FMRadio::Disable()
     return nullptr;
   }
 
-  nsRefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
+  RefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
   IFMRadioService::Singleton()->Disable(r);
 
   return r.forget();
@@ -375,7 +375,7 @@ FMRadio::SetFrequency(double aFrequency)
     return nullptr;
   }
 
-  nsRefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
+  RefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
   IFMRadioService::Singleton()->SetFrequency(aFrequency, r);
 
   return r.forget();
@@ -389,7 +389,7 @@ FMRadio::SeekUp()
     return nullptr;
   }
 
-  nsRefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
+  RefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
   IFMRadioService::Singleton()->Seek(FM_RADIO_SEEK_DIRECTION_UP, r);
 
   return r.forget();
@@ -403,7 +403,7 @@ FMRadio::SeekDown()
     return nullptr;
   }
 
-  nsRefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
+  RefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
   IFMRadioService::Singleton()->Seek(FM_RADIO_SEEK_DIRECTION_DOWN, r);
 
   return r.forget();
@@ -417,7 +417,7 @@ FMRadio::CancelSeek()
     return nullptr;
   }
 
-  nsRefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
+  RefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
   IFMRadioService::Singleton()->CancelSeek(r);
 
   return r.forget();
@@ -431,7 +431,7 @@ FMRadio::EnableRDS()
     return nullptr;
   }
 
-  nsRefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
+  RefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
   IFMRadioService::Singleton()->EnableRDS(r);
   return r.forget();
 }
@@ -444,7 +444,7 @@ FMRadio::DisableRDS()
     return nullptr;
   }
 
-  nsRefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
+  RefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
   FMRadioService::Singleton()->DisableRDS(r);
   return r.forget();
 }

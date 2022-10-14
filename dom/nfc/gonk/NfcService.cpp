@@ -51,7 +51,7 @@ public:
   }
 
 private:
-  nsRefPtr<StreamSocket> mSocket;
+  RefPtr<StreamSocket> mSocket;
   nsAutoPtr<UnixSocketRawData> mRawData;
 };
 
@@ -323,7 +323,7 @@ NfcService::FactoryCreate()
     ClearOnShutdown(&gNfcService);
   }
 
-  nsRefPtr<NfcService> service = gNfcService;
+  RefPtr<NfcService> service = gNfcService;
   return service.forget();
 }
 
@@ -393,7 +393,7 @@ NfcService::PostToNfcDaemon(const uint8_t* aData, size_t aSize)
   MOZ_ASSERT(!NS_IsMainThread());
 
   UnixSocketRawData* raw = new UnixSocketRawData(aData, aSize);
-  nsRefPtr<SendNfcSocketDataTask> task =
+  RefPtr<SendNfcSocketDataTask> task =
     new SendNfcSocketDataTask(mStreamSocket, raw);
   NS_DispatchToMainThread(task);
   return true;

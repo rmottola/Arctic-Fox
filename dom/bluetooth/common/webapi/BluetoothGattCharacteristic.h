@@ -46,7 +46,7 @@ public:
   }
 
   void GetDescriptors(
-    nsTArray<nsRefPtr<BluetoothGattDescriptor>>& aDescriptors) const
+    nsTArray<RefPtr<BluetoothGattDescriptor>>& aDescriptors) const
   {
     aDescriptors = mDescriptors;
   }
@@ -127,12 +127,12 @@ private:
   /**
    * Service that this characteristic belongs to.
    */
-  nsRefPtr<BluetoothGattService> mService;
+  RefPtr<BluetoothGattService> mService;
 
   /**
    * Array of discovered descriptors for this characteristic.
    */
-  nsTArray<nsRefPtr<BluetoothGattDescriptor>> mDescriptors;
+  nsTArray<RefPtr<BluetoothGattDescriptor>> mDescriptors;
 
   /**
    * GattId of this GATT characteristic which contains
@@ -169,16 +169,16 @@ END_BLUETOOTH_NAMESPACE
  *
  * Allows customizing the template code for a given set of template arguments.
  * With this function template, nsTArray can handle comparison between
- * 'nsRefPtr<BluetoothGattCharacteristic>' and 'BluetoothGattId' properly,
+ * 'RefPtr<BluetoothGattCharacteristic>' and 'BluetoothGattId' properly,
  * including IndexOf() and Contains();
  */
 template <>
 class nsDefaultComparator <
-  nsRefPtr<mozilla::dom::bluetooth::BluetoothGattCharacteristic>,
+  RefPtr<mozilla::dom::bluetooth::BluetoothGattCharacteristic>,
   mozilla::dom::bluetooth::BluetoothGattId> {
 public:
   bool Equals(
-    const nsRefPtr<mozilla::dom::bluetooth::BluetoothGattCharacteristic>& aChar,
+    const RefPtr<mozilla::dom::bluetooth::BluetoothGattCharacteristic>& aChar,
     const mozilla::dom::bluetooth::BluetoothGattId& aCharId) const
   {
     return aChar->GetCharacteristicId() == aCharId;

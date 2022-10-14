@@ -77,7 +77,7 @@ HTMLSourceElement::WouldMatchMediaForDocument(const nsAString& aMedia,
   MOZ_ASSERT(pctx, "Called for document with no prescontext");
 
   nsCSSParser cssParser;
-  nsRefPtr<nsMediaList> mediaList = new nsMediaList();
+  RefPtr<nsMediaList> mediaList = new nsMediaList();
   cssParser.ParseMediaList(aMedia, nullptr, 0, mediaList, false);
 
   return pctx && mediaList->Matches(pctx, nullptr);

@@ -33,7 +33,7 @@ class InterceptedJARChannel : public nsIInterceptedChannel
   nsCOMPtr<nsINetworkInterceptController> mController;
 
   // The actual channel being intercepted.
-  nsRefPtr<nsJARChannel> mChannel;
+  RefPtr<nsJARChannel> mChannel;
 
   // Reader-side of the synthesized response body.
   nsCOMPtr<nsIInputStream> mSynthesizedInput;

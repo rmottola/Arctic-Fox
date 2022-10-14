@@ -162,7 +162,7 @@ static void
 AttachToContainerAsEGLImage(ImageContainer* container,
                             nsNPAPIPluginInstance* instance,
                             const LayoutDeviceRect& rect,
-                            nsRefPtr<Image>* out_image)
+                            RefPtr<Image>* out_image)
 {
   MOZ_ASSERT(out_image);
   MOZ_ASSERT(!*out_image);
@@ -172,7 +172,7 @@ AttachToContainerAsEGLImage(ImageContainer* container,
     return;
   }
 
-  nsRefPtr<Image> img = container->CreateImage(ImageFormat::EGLIMAGE);
+  RefPtr<Image> img = container->CreateImage(ImageFormat::EGLIMAGE);
 
   EGLImageImage::Data data;
   data.mImage = image;
@@ -189,7 +189,7 @@ static void
 AttachToContainerAsSurfaceTexture(ImageContainer* container,
                                   nsNPAPIPluginInstance* instance,
                                   const LayoutDeviceRect& rect,
-                                  nsRefPtr<Image>* out_image)
+                                  RefPtr<Image>* out_image)
 {
   MOZ_ASSERT(out_image);
   MOZ_ASSERT(!*out_image);
@@ -199,7 +199,7 @@ AttachToContainerAsSurfaceTexture(ImageContainer* container,
     return;
   }
 
-  nsRefPtr<Image> img = container->CreateImage(ImageFormat::SURFACE_TEXTURE);
+  RefPtr<Image> img = container->CreateImage(ImageFormat::SURFACE_TEXTURE);
 
   SurfaceTextureImage::Data data;
   data.mSurfTex = surfTex;
@@ -219,7 +219,7 @@ nsPluginInstanceOwner::GetImageContainer()
   if (!mInstance)
     return nullptr;
 
-  nsRefPtr<ImageContainer> container;
+  RefPtr<ImageContainer> container;
 
 #if MOZ_WIDGET_ANDROID
   // Right now we only draw with Gecko layers on Honeycomb and higher. See Paint()
@@ -238,7 +238,7 @@ nsPluginInstanceOwner::GetImageContainer()
   container = LayerManager::CreateImageContainer();
 
   // Try to get it as an EGLImage first.
-  nsRefPtr<Image> img;
+  RefPtr<Image> img;
   AttachToContainerAsEGLImage(container, mInstance, r, &img);
   if (!img) {
     AttachToContainerAsSurfaceTexture(container, mInstance, r, &img);
@@ -265,7 +265,7 @@ already_AddRefed<gfxContext>
 nsPluginInstanceOwner::BeginUpdateBackground(const nsIntRect& aRect)
 {
   nsIntRect rect = aRect;
-  nsRefPtr<gfxContext> ctx;
+  RefPtr<gfxContext> ctx;
   if (mInstance &&
       NS_SUCCEEDED(mInstance->BeginUpdateBackground(&rect, getter_AddRefs(ctx)))) {
     return ctx.forget();
@@ -580,7 +580,7 @@ NS_IMETHODIMP nsPluginInstanceOwner::InvalidateRect(NPRect *invalidRect)
   // Each time an asynchronously-drawing plugin sends a new surface to display,
   // the image in the ImageContainer is updated and InvalidateRect is called.
   // There are different side effects for (sync) Android plugins.
-  nsRefPtr<ImageContainer> container;
+  RefPtr<ImageContainer> container;
   mInstance->GetImageContainer(getter_AddRefs(container));
 #endif
 
@@ -1411,9 +1411,9 @@ nsPluginInstanceOwner::GetVideos(nsTArray<nsNPAPIPluginInstance::VideoInfo*>& aV
 already_AddRefed<ImageContainer>
 nsPluginInstanceOwner::GetImageContainerForVideo(nsNPAPIPluginInstance::VideoInfo* aVideoInfo)
 {
-  nsRefPtr<ImageContainer> container = LayerManager::CreateImageContainer();
+  RefPtr<ImageContainer> container = LayerManager::CreateImageContainer();
 
-  nsRefPtr<Image> img = container->CreateImage(ImageFormat::SURFACE_TEXTURE);
+  RefPtr<Image> img = container->CreateImage(ImageFormat::SURFACE_TEXTURE);
 
   SurfaceTextureImage::Data data;
   data.mSurfTex = aVideoInfo->mSurfaceTexture;
@@ -2561,7 +2561,7 @@ void nsPluginInstanceOwner::Paint(gfxContext* aContext,
     return;
 
 #ifdef ANP_BITMAP_DRAWING_MODEL
-  static nsRefPtr<gfxImageSurface> pluginSurface;
+  static RefPtr<gfxImageSurface> pluginSurface;
 
   if (pluginSurface == nullptr ||
       aFrameRect.width  != pluginSurface->Width() ||

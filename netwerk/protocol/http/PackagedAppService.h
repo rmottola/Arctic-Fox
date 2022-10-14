@@ -191,7 +191,7 @@ private:
     static nsresult GetSubresourceURI(nsIRequest * aRequest, nsIURI **aResult);
     // Used to write data into the cache entry of the resource currently being
     // downloaded. It is kept alive until the downloader receives OnStopRequest
-    nsRefPtr<CacheEntryWriter> mWriter;
+    RefPtr<CacheEntryWriter> mWriter;
     // Cached value of nsICacheStorage
     nsCOMPtr<nsICacheStorage> mCacheStorage;
     // A hastable containing all the consumers which requested a resource and need
@@ -207,7 +207,7 @@ private:
     bool mIsFromCache;
 
     // Deal with verification and delegate callbacks to the downloader.
-    nsRefPtr<PackagedAppVerifier> mVerifier;
+    RefPtr<PackagedAppVerifier> mVerifier;
 
     // The package origin without signed package origin identifier.
     // If you need the origin with the signity taken into account, use
@@ -249,7 +249,7 @@ private:
   private:
     ~PackagedAppChannelListener() { }
 
-    nsRefPtr<PackagedAppDownloader> mDownloader;
+    RefPtr<PackagedAppDownloader> mDownloader;
     nsCOMPtr<nsIStreamListener> mListener; // nsMultiMixedConv
   };
 

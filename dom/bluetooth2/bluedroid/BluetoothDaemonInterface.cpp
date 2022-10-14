@@ -134,7 +134,7 @@ protected:
       return;
     }
 
-    nsRefPtr<BluetoothSetupResultHandler> res =
+    RefPtr<BluetoothSetupResultHandler> res =
       already_AddRefed<BluetoothSetupResultHandler>(
         static_cast<BluetoothSetupResultHandler*>(aUserData));
 
@@ -935,7 +935,7 @@ private:
       return;
     }
 
-    nsRefPtr<BluetoothResultHandler> res =
+    RefPtr<BluetoothResultHandler> res =
       already_AddRefed<BluetoothResultHandler>(
         static_cast<BluetoothResultHandler*>(aUserData));
 
@@ -1894,7 +1894,7 @@ public:
 
 private:
   BluetoothDaemonInterface* mInterface;
-  nsRefPtr<BluetoothResultHandler> mRes;
+  RefPtr<BluetoothResultHandler> mRes;
   bool mRegisteredSocketModule;
 };
 
@@ -1928,7 +1928,7 @@ BluetoothDaemonInterface::OnConnectSuccess(enum Channel aChannel)
       }
       break;
     case NTF_CHANNEL: {
-        nsRefPtr<BluetoothResultHandler> res = mResultHandlerQ.ElementAt(0);
+        RefPtr<BluetoothResultHandler> res = mResultHandlerQ.ElementAt(0);
         mResultHandlerQ.RemoveElementAt(0);
 
         // Init, step 4: Register Core module
@@ -1960,7 +1960,7 @@ BluetoothDaemonInterface::OnConnectError(enum Channel aChannel)
       mListenSocket->Close();
     case LISTEN_SOCKET: {
         // Signal error to caller
-        nsRefPtr<BluetoothResultHandler> res = mResultHandlerQ.ElementAt(0);
+        RefPtr<BluetoothResultHandler> res = mResultHandlerQ.ElementAt(0);
         mResultHandlerQ.RemoveElementAt(0);
 
         if (res) {
@@ -1987,7 +1987,7 @@ BluetoothDaemonInterface::OnDisconnect(enum Channel aChannel)
       mListenSocket->Close();
       break;
     case LISTEN_SOCKET: {
-        nsRefPtr<BluetoothResultHandler> res = mResultHandlerQ.ElementAt(0);
+        RefPtr<BluetoothResultHandler> res = mResultHandlerQ.ElementAt(0);
         mResultHandlerQ.RemoveElementAt(0);
 
         // Cleanup, step 5: Signal success to caller

@@ -174,7 +174,7 @@ BluetoothDaemonSocketModule::HandleSvc(const BluetoothDaemonPDUHeader& aHeader,
     return;
   }
 
-  nsRefPtr<BluetoothSocketResultHandler> res =
+  RefPtr<BluetoothSocketResultHandler> res =
     already_AddRefed<BluetoothSocketResultHandler>(
       static_cast<BluetoothSocketResultHandler*>(aUserData));
 

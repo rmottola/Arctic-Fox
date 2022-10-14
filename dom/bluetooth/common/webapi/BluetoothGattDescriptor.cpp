@@ -159,7 +159,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothGattDescriptor> mDescriptor;
+  RefPtr<BluetoothGattDescriptor> mDescriptor;
 };
 
 already_AddRefed<Promise>
@@ -171,7 +171,7 @@ BluetoothGattDescriptor::ReadValue(ErrorResult& aRv)
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BluetoothService* bs = BluetoothService::Get();
@@ -197,7 +197,7 @@ BluetoothGattDescriptor::WriteValue(
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   aValue.ComputeLengthAndData();

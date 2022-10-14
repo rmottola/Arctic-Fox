@@ -727,7 +727,7 @@ nsFocusManager::WindowRaised(nsIDOMWindow* aWindow)
   if (presShell) {
     // disable selection mousedown state on activation
     // XXXndeakin P3 not sure if this is necessary, but it doesn't hurt
-    nsRefPtr<nsFrameSelection> frameSelection = presShell->FrameSelection();
+    RefPtr<nsFrameSelection> frameSelection = presShell->FrameSelection();
     frameSelection->SetDragState(false);
   }
 
@@ -1687,12 +1687,12 @@ nsFocusManager::Blur(nsPIDOMWindow* aWindowToClear,
     SetCaretVisible(presShell, false, nullptr);
   }
 
-  nsRefPtr<SelectionCarets> selectionCarets = presShell->GetSelectionCarets();
+  RefPtr<SelectionCarets> selectionCarets = presShell->GetSelectionCarets();
   if (selectionCarets) {
     selectionCarets->NotifyBlur(aIsLeavingDocument || !mActiveWindow);
   }
 
-  nsRefPtr<AccessibleCaretEventHub> eventHub = presShell->GetAccessibleCaretEventHub();
+  RefPtr<AccessibleCaretEventHub> eventHub = presShell->GetAccessibleCaretEventHub();
   if (eventHub) {
     eventHub->NotifyBlur(aIsLeavingDocument || !mActiveWindow);
   }
@@ -1981,7 +1981,7 @@ public:
   }
 
   nsCOMPtr<nsISupports>   mTarget;
-  nsRefPtr<nsPresContext> mContext;
+  RefPtr<nsPresContext> mContext;
   EventMessage            mEventMessage;
   bool                    mWindowRaised;
   bool                    mIsRefocus;
@@ -2205,7 +2205,7 @@ nsFocusManager::MoveCaretToFocus(nsIPresShell* aPresShell, nsIContent* aContent)
   // domDoc is a document interface we can create a range with
   nsCOMPtr<nsIDOMDocument> domDoc = do_QueryInterface(aPresShell->GetDocument());
   if (domDoc) {
-    nsRefPtr<nsFrameSelection> frameSelection = aPresShell->FrameSelection();
+    RefPtr<nsFrameSelection> frameSelection = aPresShell->FrameSelection();
     nsCOMPtr<nsISelection> domSelection = frameSelection->
       GetSelection(nsISelectionController::SELECTION_NORMAL);
     if (domSelection) {
@@ -2246,7 +2246,7 @@ nsFocusManager::SetCaretVisible(nsIPresShell* aPresShell,
   // When browsing with caret, make sure caret is visible after new focus
   // Return early if there is no caret. This can happen for the testcase
   // for bug 308025 where a window is closed in a blur handler.
-  nsRefPtr<nsCaret> caret = aPresShell->GetCaret();
+  RefPtr<nsCaret> caret = aPresShell->GetCaret();
   if (!caret)
     return NS_OK;
 
@@ -2254,7 +2254,7 @@ nsFocusManager::SetCaretVisible(nsIPresShell* aPresShell,
   if (!aVisible && !caretVisible)
     return NS_OK;
 
-  nsRefPtr<nsFrameSelection> frameSelection;
+  RefPtr<nsFrameSelection> frameSelection;
   if (aContent) {
     NS_ASSERTION(aContent->GetComposedDoc() == aPresShell->GetDocument(),
                  "Wrong document?");
@@ -2263,7 +2263,7 @@ nsFocusManager::SetCaretVisible(nsIPresShell* aPresShell,
       frameSelection = focusFrame->GetFrameSelection();
   }
 
-  nsRefPtr<nsFrameSelection> docFrameSelection = aPresShell->FrameSelection();
+  RefPtr<nsFrameSelection> docFrameSelection = aPresShell->FrameSelection();
 
   if (docFrameSelection && caret &&
      (frameSelection == docFrameSelection || !aContent)) {
@@ -2306,7 +2306,7 @@ nsFocusManager::GetSelectionLocation(nsIDocument* aDocument,
   nsPresContext* presContext = aPresShell->GetPresContext();
   NS_ASSERTION(presContext, "mPresContent is null!!");
 
-  nsRefPtr<nsFrameSelection> frameSelection = aPresShell->FrameSelection();
+  RefPtr<nsFrameSelection> frameSelection = aPresShell->FrameSelection();
 
   nsCOMPtr<nsISelection> domSelection;
   if (frameSelection) {

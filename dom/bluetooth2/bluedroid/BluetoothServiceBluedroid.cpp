@@ -80,16 +80,16 @@ static InfallibleTArray<nsString> sAdapterBondedAddressArray;
 static nsDataHashtable<nsStringHashKey, nsString> sPairingNameTable;
 
 static BluetoothInterface* sBtInterface;
-static nsTArray<nsRefPtr<BluetoothProfileController> > sControllerArray;
+static nsTArray<RefPtr<BluetoothProfileController> > sControllerArray;
 static InfallibleTArray<BluetoothNamedValue> sRemoteDevicesPack;
 static nsTArray<int> sRequestedDeviceCountArray;
-static nsTArray<nsRefPtr<BluetoothReplyRunnable> > sChangeAdapterStateRunnableArray;
-static nsTArray<nsRefPtr<BluetoothReplyRunnable> > sChangeDiscoveryRunnableArray;
-static nsTArray<nsRefPtr<BluetoothReplyRunnable> > sSetPropertyRunnableArray;
-static nsTArray<nsRefPtr<BluetoothReplyRunnable> > sGetDeviceRunnableArray;
-static nsTArray<nsRefPtr<BluetoothReplyRunnable> > sFetchUuidsRunnableArray;
-static nsTArray<nsRefPtr<BluetoothReplyRunnable> > sBondingRunnableArray;
-static nsTArray<nsRefPtr<BluetoothReplyRunnable> > sUnbondingRunnableArray;
+static nsTArray<RefPtr<BluetoothReplyRunnable> > sChangeAdapterStateRunnableArray;
+static nsTArray<RefPtr<BluetoothReplyRunnable> > sChangeDiscoveryRunnableArray;
+static nsTArray<RefPtr<BluetoothReplyRunnable> > sSetPropertyRunnableArray;
+static nsTArray<RefPtr<BluetoothReplyRunnable> > sGetDeviceRunnableArray;
+static nsTArray<RefPtr<BluetoothReplyRunnable> > sFetchUuidsRunnableArray;
+static nsTArray<RefPtr<BluetoothReplyRunnable> > sBondingRunnableArray;
+static nsTArray<RefPtr<BluetoothReplyRunnable> > sUnbondingRunnableArray;
 
 /**
  *  Static callback functions
@@ -196,7 +196,7 @@ public:
     // Register all the bluedroid callbacks before enable() get called
     // It is required to register a2dp callbacks before a2dp media task starts up.
     // If any interface cannot be initialized, turn on bluetooth core anyway.
-    nsRefPtr<ProfileInitResultHandler> res =
+    RefPtr<ProfileInitResultHandler> res =
       new ProfileInitResultHandler(MOZ_ARRAY_LENGTH(sInitManager));
 
     for (size_t i = 0; i < MOZ_ARRAY_LENGTH(sInitManager); ++i) {
@@ -690,7 +690,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothReplyRunnable> mRunnable;
+  RefPtr<BluetoothReplyRunnable> mRunnable;
 };
 
 nsresult
@@ -726,7 +726,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothReplyRunnable> mRunnable;
+  RefPtr<BluetoothReplyRunnable> mRunnable;
 };
 
 nsresult
@@ -1300,7 +1300,7 @@ BluetoothServiceBluedroid::AdapterStateChangedNotification(bool aState)
                          BluetoothValue(props));
 
     // Cleanup bluetooth interfaces after BT state becomes BT_STATE_OFF.
-    nsRefPtr<ProfileDeinitResultHandler> res =
+    RefPtr<ProfileDeinitResultHandler> res =
       new ProfileDeinitResultHandler(MOZ_ARRAY_LENGTH(sDeinitManager));
 
     for (size_t i = 0; i < MOZ_ARRAY_LENGTH(sDeinitManager); ++i) {

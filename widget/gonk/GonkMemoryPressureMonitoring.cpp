@@ -279,7 +279,7 @@ void
 InitGonkMemoryPressureMonitoring()
 {
   // memoryPressureWatcher is held alive by the observer service.
-  nsRefPtr<MemoryPressureWatcher> memoryPressureWatcher =
+  RefPtr<MemoryPressureWatcher> memoryPressureWatcher =
     new MemoryPressureWatcher();
   NS_ENSURE_SUCCESS_VOID(memoryPressureWatcher->Init());
 

@@ -435,7 +435,7 @@ public:
 
     void
     GetAttachedShaders(WebGLProgram* prog,
-                       dom::Nullable<nsTArray<nsRefPtr<WebGLShader>>>& retval);
+                       dom::Nullable<nsTArray<RefPtr<WebGLShader>>>& retval);
 
     GLint GetAttribLocation(WebGLProgram* prog, const nsAString& name);
     JS::Value GetBufferParameter(GLenum target, GLenum pname);
@@ -1125,7 +1125,7 @@ protected:
     // -------------------------------------------------------------------------
     // WebGL extensions (implemented in WebGLContextExtensions.cpp)
     typedef EnumeratedArray<WebGLExtensionID, WebGLExtensionID::Max,
-                            nsRefPtr<WebGLExtensionBase>> ExtensionsArrayType;
+                            RefPtr<WebGLExtensionBase>> ExtensionsArrayType;
 
     ExtensionsArrayType mExtensions;
 
@@ -1508,7 +1508,7 @@ protected:
     ForceDiscreteGPUHelperCGL mForceDiscreteGPUHelper;
 #endif
 
-    nsRefPtr<WebGLObserver> mContextObserver;
+    RefPtr<WebGLObserver> mContextObserver;
 
 public:
     // console logging helpers

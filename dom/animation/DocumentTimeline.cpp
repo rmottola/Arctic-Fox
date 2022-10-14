@@ -57,7 +57,7 @@ DocumentTimeline::GetCurrentTimeStamp() const
   // If we don't have a refresh driver and we've never had one use the
   // timeline's zero time.
   if (result.IsNull()) {
-    nsRefPtr<nsDOMNavigationTiming> timing = mDocument->GetNavigationTiming();
+    RefPtr<nsDOMNavigationTiming> timing = mDocument->GetNavigationTiming();
     if (timing) {
       result = timing->GetNavigationStartTimeStamp();
       // Also, let this time represent the current refresh time. This way
@@ -82,7 +82,7 @@ DocumentTimeline::ToTimelineTime(const TimeStamp& aTimeStamp) const
     return result;
   }
 
-  nsRefPtr<nsDOMNavigationTiming> timing = mDocument->GetNavigationTiming();
+  RefPtr<nsDOMNavigationTiming> timing = mDocument->GetNavigationTiming();
   if (MOZ_UNLIKELY(!timing)) {
     return result;
   }
@@ -95,7 +95,7 @@ TimeStamp
 DocumentTimeline::ToTimeStamp(const TimeDuration& aTimeDuration) const
 {
   TimeStamp result;
-  nsRefPtr<nsDOMNavigationTiming> timing = mDocument->GetNavigationTiming();
+  RefPtr<nsDOMNavigationTiming> timing = mDocument->GetNavigationTiming();
   if (MOZ_UNLIKELY(!timing)) {
     return result;
   }

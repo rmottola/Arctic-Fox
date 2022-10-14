@@ -243,7 +243,7 @@ private:
                 const nsGlyphCode&      aGlyphCode,
                 const mozilla::FontFamilyList& aDefaultFamily,
                 nsFont&                 aFont,
-                nsRefPtr<gfxFontGroup>* aFontGroup);
+                RefPtr<gfxFontGroup>* aFontGroup);
 
   nsresult
   StretchInternal(nsPresContext*           aPresContext,

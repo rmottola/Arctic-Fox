@@ -698,7 +698,7 @@ nsListControlFrame::InitSelectionRange(int32_t aClickedIndex)
   int32_t selectedIndex = GetSelectedIndex();
   if (selectedIndex >= 0) {
     // Get the end of the contiguous selection
-    nsRefPtr<dom::HTMLOptionsCollection> options = GetOptions();
+    RefPtr<dom::HTMLOptionsCollection> options = GetOptions();
     NS_ASSERTION(options, "Collection of options is null!");
     uint32_t numOptions = options->Length();
     // Push i to one past the last selected index in the group.
@@ -1108,7 +1108,7 @@ nsListControlFrame::GetCurrentOption()
   }
 
   // There is no selected item. Return the first non-disabled item.
-  nsRefPtr<dom::HTMLSelectElement> selectElement =
+  RefPtr<dom::HTMLSelectElement> selectElement =
     dom::HTMLSelectElement::FromContent(mContent);
 
   for (uint32_t i = 0, length = selectElement->Length(); i < length; ++i) {
@@ -1258,7 +1258,7 @@ nsListControlFrame::SetOptionsSelectedFromFrame(int32_t aStartIndex,
                                                 bool aValue,
                                                 bool aClearAll)
 {
-  nsRefPtr<dom::HTMLSelectElement> selectElement =
+  RefPtr<dom::HTMLSelectElement> selectElement =
     dom::HTMLSelectElement::FromContent(mContent);
 
   uint32_t mask = dom::HTMLSelectElement::NOTIFY;
@@ -1278,11 +1278,11 @@ nsListControlFrame::SetOptionsSelectedFromFrame(int32_t aStartIndex,
 bool
 nsListControlFrame::ToggleOptionSelectedFromFrame(int32_t aIndex)
 {
-  nsRefPtr<dom::HTMLOptionElement> option =
+  RefPtr<dom::HTMLOptionElement> option =
     GetOption(static_cast<uint32_t>(aIndex));
   NS_ENSURE_TRUE(option, false);
 
-  nsRefPtr<dom::HTMLSelectElement> selectElement =
+  RefPtr<dom::HTMLSelectElement> selectElement =
     dom::HTMLSelectElement::FromContent(mContent);
 
   uint32_t mask = dom::HTMLSelectElement::NOTIFY;
@@ -1516,7 +1516,7 @@ nsListControlFrame::GetBSizeOfARow()
 nsresult
 nsListControlFrame::IsOptionDisabled(int32_t anIndex, bool &aIsDisabled)
 {
-  nsRefPtr<dom::HTMLSelectElement> sel =
+  RefPtr<dom::HTMLSelectElement> sel =
     dom::HTMLSelectElement::FromContent(mContent);
   if (sel) {
     sel->IsOptionDisabled(anIndex, &aIsDisabled);
@@ -1547,7 +1547,7 @@ nsListControlFrame::CalcFallbackRowBSize(float aFontSizeInflation)
 {
   nscoord rowBSize = 0;
 
-  nsRefPtr<nsFontMetrics> fontMet;
+  RefPtr<nsFontMetrics> fontMet;
   nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fontMet),
                                         aFontSizeInflation);
   if (fontMet) {
@@ -1737,7 +1737,7 @@ nsListControlFrame::GetIndexFromDOMEvent(nsIDOMEvent* aMouseEvent,
     }
   }
 
-  nsRefPtr<dom::HTMLOptionElement> option;
+  RefPtr<dom::HTMLOptionElement> option;
   for (nsCOMPtr<nsIContent> content =
          PresContext()->EventStateManager()->GetEventTargetContent(nullptr);
        content && !option;
@@ -1759,7 +1759,7 @@ nsListControlFrame::GetIndexFromDOMEvent(nsIDOMEvent* aMouseEvent,
 
   // If the event coordinate is above the first option frame, then target the
   // first option frame
-  nsRefPtr<dom::HTMLOptionElement> firstOption = GetOption(0);
+  RefPtr<dom::HTMLOptionElement> firstOption = GetOption(0);
   NS_ASSERTION(firstOption, "Can't find first option that's supposed to be there");
   nsIFrame* optionFrame = firstOption->GetPrimaryFrame();
   if (optionFrame) {
@@ -1771,7 +1771,7 @@ nsListControlFrame::GetIndexFromDOMEvent(nsIDOMEvent* aMouseEvent,
     }
   }
 
-  nsRefPtr<dom::HTMLOptionElement> lastOption = GetOption(numOptions - 1);
+  RefPtr<dom::HTMLOptionElement> lastOption = GetOption(numOptions - 1);
   // If the event coordinate is below the last option frame, then target the
   // last option frame
   NS_ASSERTION(lastOption, "Can't find last option that's supposed to be there");
@@ -1948,7 +1948,7 @@ nsListControlFrame::ScrollToIndex(int32_t aIndex)
     // kNothingSelected?
     ScrollTo(nsPoint(0, 0), nsIScrollableFrame::INSTANT);
   } else {
-    nsRefPtr<dom::HTMLOptionElement> option =
+    RefPtr<dom::HTMLOptionElement> option =
       GetOption(AssertedCast<uint32_t>(aIndex));
     if (option) {
       ScrollToFrame(*option);
@@ -2137,7 +2137,7 @@ nsListControlFrame::KeyDown(nsIDOMEvent* aKeyEvent)
   }
 
   // now make sure there are options or we are wasting our time
-  nsRefPtr<dom::HTMLOptionsCollection> options = GetOptions();
+  RefPtr<dom::HTMLOptionsCollection> options = GetOptions();
   NS_ENSURE_TRUE(options, NS_ERROR_FAILURE);
 
   uint32_t numOptions = options->Length();
@@ -2386,7 +2386,7 @@ nsListControlFrame::KeyPress(nsIDOMEvent* aKeyEvent)
   }
 
   // now make sure there are options or we are wasting our time
-  nsRefPtr<dom::HTMLOptionsCollection> options = GetOptions();
+  RefPtr<dom::HTMLOptionsCollection> options = GetOptions();
   NS_ENSURE_TRUE(options, NS_ERROR_FAILURE);
 
   uint32_t numOptions = options->Length();
@@ -2394,7 +2394,7 @@ nsListControlFrame::KeyPress(nsIDOMEvent* aKeyEvent)
   nsWeakFrame weakFrame(this);
   for (uint32_t i = 0; i < numOptions; ++i) {
     uint32_t index = (i + startIndex) % numOptions;
-    nsRefPtr<dom::HTMLOptionElement> optionElement =
+    RefPtr<dom::HTMLOptionElement> optionElement =
       options->ItemAsOption(index);
     if (!optionElement || !optionElement->GetPrimaryFrame()) {
       continue;

@@ -100,7 +100,7 @@ GonkGPSGeolocationProvider::LocationCallback(GpsLocation* location)
       : mPosition(aPosition)
     {}
     NS_IMETHOD Run() {
-      nsRefPtr<GonkGPSGeolocationProvider> provider =
+      RefPtr<GonkGPSGeolocationProvider> provider =
         GonkGPSGeolocationProvider::GetSingleton();
       nsCOMPtr<nsIGeolocationUpdate> callback = provider->mLocationCallback;
       provider->mLastGPSPosition = mPosition;
@@ -110,12 +110,12 @@ GonkGPSGeolocationProvider::LocationCallback(GpsLocation* location)
       return NS_OK;
     }
   private:
-    nsRefPtr<nsGeoPosition> mPosition;
+    RefPtr<nsGeoPosition> mPosition;
   };
 
   MOZ_ASSERT(location);
 
-  nsRefPtr<nsGeoPosition> somewhere = new nsGeoPosition(location->latitude,
+  RefPtr<nsGeoPosition> somewhere = new nsGeoPosition(location->latitude,
                                                         location->longitude,
                                                         location->altitude,
                                                         location->accuracy,
@@ -161,7 +161,7 @@ GonkGPSGeolocationProvider::SetCapabilitiesCallback(uint32_t capabilities)
       : mCapabilities(aCapabilities)
     {}
     NS_IMETHOD Run() {
-      nsRefPtr<GonkGPSGeolocationProvider> provider =
+      RefPtr<GonkGPSGeolocationProvider> provider =
         GonkGPSGeolocationProvider::GetSingleton();
 
       provider->mSupportsScheduling = mCapabilities & GPS_CAPABILITY_SCHEDULING;
@@ -229,7 +229,7 @@ GonkGPSGeolocationProvider::AGPSStatusCallback(AGpsStatus* status)
       : mStatus(aStatus)
     {}
     NS_IMETHOD Run() {
-      nsRefPtr<GonkGPSGeolocationProvider> provider =
+      RefPtr<GonkGPSGeolocationProvider> provider =
         GonkGPSGeolocationProvider::GetSingleton();
 
       switch (mStatus) {
@@ -258,7 +258,7 @@ GonkGPSGeolocationProvider::AGPSRILSetIDCallback(uint32_t flags)
       : mFlags(flags)
     {}
     NS_IMETHOD Run() {
-      nsRefPtr<GonkGPSGeolocationProvider> provider =
+      RefPtr<GonkGPSGeolocationProvider> provider =
         GonkGPSGeolocationProvider::GetSingleton();
       provider->RequestSetID(mFlags);
       return NS_OK;
@@ -278,7 +278,7 @@ GonkGPSGeolocationProvider::AGPSRILRefLocCallback(uint32_t flags)
     RequestRefLocEvent()
     {}
     NS_IMETHOD Run() {
-      nsRefPtr<GonkGPSGeolocationProvider> provider =
+      RefPtr<GonkGPSGeolocationProvider> provider =
         GonkGPSGeolocationProvider::GetSingleton();
       provider->SetReferenceLocation();
       return NS_OK;
@@ -324,7 +324,7 @@ GonkGPSGeolocationProvider::GetSingleton()
   if (!sSingleton)
     sSingleton = new GonkGPSGeolocationProvider();
 
-  nsRefPtr<GonkGPSGeolocationProvider> provider = sSingleton;
+  RefPtr<GonkGPSGeolocationProvider> provider = sSingleton;
   return provider.forget();
 }
 
@@ -759,7 +759,7 @@ NS_IMPL_ISUPPORTS(GonkGPSGeolocationProvider::NetworkLocationUpdate,
 NS_IMETHODIMP
 GonkGPSGeolocationProvider::NetworkLocationUpdate::Update(nsIDOMGeoPosition *position)
 {
-  nsRefPtr<GonkGPSGeolocationProvider> provider =
+  RefPtr<GonkGPSGeolocationProvider> provider =
     GonkGPSGeolocationProvider::GetSingleton();
 
   nsCOMPtr<nsIDOMGeoPositionCoords> coords;
@@ -893,7 +893,7 @@ GonkGPSGeolocationProvider::Startup()
   if (mNetworkLocationProvider) {
     nsresult rv = mNetworkLocationProvider->Startup();
     if (NS_SUCCEEDED(rv)) {
-      nsRefPtr<NetworkLocationUpdate> update = new NetworkLocationUpdate();
+      RefPtr<NetworkLocationUpdate> update = new NetworkLocationUpdate();
       mNetworkLocationProvider->Watch(update);
     }
   }

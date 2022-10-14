@@ -438,9 +438,9 @@ public:
   // the main thread. We store both the success callback and the
   // error callback to ensure that they are safely released on the
   // main thread.
-  nsRefPtr<nsINativeOSFileSuccessCallback> mOnSuccess;
-  nsRefPtr<nsINativeOSFileErrorCallback> mOnError;
-  nsRefPtr<AbstractResult> mDiscardedResult;
+  RefPtr<nsINativeOSFileSuccessCallback> mOnSuccess;
+  RefPtr<nsINativeOSFileErrorCallback> mOnError;
+  RefPtr<AbstractResult> mDiscardedResult;
   int32_t mOSError;
   nsCString mOperation;
 };
@@ -488,9 +488,9 @@ public:
   // the main thread. We store both the success callback and the
   // error callback to ensure that they are safely released on the
   // main thread.
-  nsRefPtr<nsINativeOSFileSuccessCallback> mOnSuccess;
-  nsRefPtr<nsINativeOSFileErrorCallback> mOnError;
-  nsRefPtr<nsINativeOSFileResult> mResult;
+  RefPtr<nsINativeOSFileSuccessCallback> mOnSuccess;
+  RefPtr<nsINativeOSFileErrorCallback> mOnError;
+  RefPtr<nsINativeOSFileResult> mResult;
 };
 
 
@@ -519,7 +519,7 @@ public:
             already_AddRefed<AbstractResult>&& aDiscardedResult,
             int32_t aOSError = 0) {
     Resolve();
-    nsRefPtr<ErrorEvent> event = new ErrorEvent(mOnSuccess.forget(),
+    RefPtr<ErrorEvent> event = new ErrorEvent(mOnSuccess.forget(),
                                                 mOnError.forget(),
                                                 aDiscardedResult,
                                                 aOperation,
@@ -539,7 +539,7 @@ public:
    */
   void Succeed(already_AddRefed<nsINativeOSFileResult>&& aResult) {
     Resolve();
-    nsRefPtr<SuccessEvent> event = new SuccessEvent(mOnSuccess.forget(),
+    RefPtr<SuccessEvent> event = new SuccessEvent(mOnSuccess.forget(),
                                                     mOnError.forget(),
                                                     aResult);
     nsresult rv = NS_DispatchToMainThread(event);
@@ -566,8 +566,8 @@ private:
   }
 
 private:
-  nsRefPtr<nsINativeOSFileSuccessCallback> mOnSuccess;
-  nsRefPtr<nsINativeOSFileErrorCallback> mOnError;
+  RefPtr<nsINativeOSFileSuccessCallback> mOnSuccess;
+  RefPtr<nsINativeOSFileErrorCallback> mOnError;
 #if defined(DEBUG)
   // |true| once the action is complete
   bool mResolved;
@@ -762,7 +762,7 @@ protected:
   }
 
  private:
-  nsRefPtr<TypedArrayResult> mResult;
+  RefPtr<TypedArrayResult> mResult;
 };
 
 /**
@@ -853,7 +853,7 @@ protected:
  private:
   nsCString mEncoding;
   nsCOMPtr<nsIUnicodeDecoder> mDecoder;
-  nsRefPtr<StringResult> mResult;
+  RefPtr<StringResult> mResult;
 };
 
 } // namespace
@@ -892,7 +892,7 @@ NativeOSFileInternalsService::Read(const nsAString& aPath,
   nsCOMPtr<nsINativeOSFileSuccessCallback> onSuccess(aOnSuccess);
   nsCOMPtr<nsINativeOSFileErrorCallback> onError(aOnError);
 
-  nsRefPtr<AbstractDoEvent> event;
+  RefPtr<AbstractDoEvent> event;
   if (encoding.IsEmpty()) {
     event = new DoReadToTypedArrayEvent(aPath, bytes,
                                         onSuccess.forget(),

@@ -90,7 +90,7 @@ JSObject2WrappedJSMap::UpdateWeakPointersAfterGC(XPCJSRuntime* runtime)
     // Check all wrappers and update their JSObject pointer if it has been
     // moved. Release any wrappers whose weakly held JSObject has died.
 
-    nsTArray<nsRefPtr<nsXPCWrappedJS>> dying;
+    nsTArray<RefPtr<nsXPCWrappedJS>> dying;
 
     for (Map::Enum e(mTable); !e.empty(); e.popFront()) {
         nsXPCWrappedJS* wrapper = e.front().value();

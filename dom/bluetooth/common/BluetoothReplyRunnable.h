@@ -66,7 +66,7 @@ private:
    * TODO: remove mDOMRequest once all methods adopt Promise.
    */
   nsCOMPtr<nsIDOMDOMRequest> mDOMRequest;
-  nsRefPtr<Promise> mPromise;
+  RefPtr<Promise> mPromise;
 
   BluetoothStatus mErrorStatus;
   nsString mErrorString;

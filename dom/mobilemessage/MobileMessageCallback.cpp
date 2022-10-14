@@ -156,7 +156,7 @@ MobileMessageCallback::NotifyMessageSent(nsISupports *aMessage)
 NS_IMETHODIMP
 MobileMessageCallback::NotifySendMessageFailed(int32_t aError, nsISupports *aMessage)
 {
-  nsRefPtr<DOMMobileMessageError> domMobileMessageError;
+  RefPtr<DOMMobileMessageError> domMobileMessageError;
   if (aMessage) {
     nsAutoString errorStr = ConvertErrorCodeToErrorString(aError);
     nsCOMPtr<nsIDOMMozSmsMessage> smsMsg = do_QueryInterface(aMessage);

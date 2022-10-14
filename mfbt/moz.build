@@ -59,7 +59,6 @@ EXPORTS.mozilla = [
     'MemoryChecking.h',
     'MemoryReporting.h',
     'Move.h',
-    'nsRefPtr.h',
     'NullPtr.h',
     'NumericLimits.h',
     'Opaque.h',

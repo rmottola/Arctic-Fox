@@ -84,7 +84,7 @@ public:
     const uint32_t mPluginId;
   };
   void RemoveObsoletePluginCrashCallbacks(); // Called from add/remove/run.
-  void AddPluginCrashCallback(nsRefPtr<PluginCrashCallback> aPluginCrashCallback);
+  void AddPluginCrashCallback(RefPtr<PluginCrashCallback> aPluginCrashCallback);
   void RemovePluginCrashCallbacks(const uint32_t aPluginId);
   void RunPluginCrashCallbacks(const uint32_t aPluginId,
                                const nsACString& aPluginName);
@@ -109,7 +109,7 @@ protected:
   bool mGMPThreadShutdown;
   bool mShuttingDownOnGMPThread;
 
-  nsTArray<nsRefPtr<PluginCrashCallback>> mPluginCrashCallbacks;
+  nsTArray<RefPtr<PluginCrashCallback>> mPluginCrashCallbacks;
 };
 
 } // namespace gmp

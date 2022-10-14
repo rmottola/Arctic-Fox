@@ -79,7 +79,7 @@ AudioBuffer::Create(AudioContext* aContext, uint32_t aNumberOfChannels,
     return nullptr;
   }
 
-  nsRefPtr<AudioBuffer> buffer =
+  RefPtr<AudioBuffer> buffer =
     new AudioBuffer(aContext, aNumberOfChannels, aLength, aSampleRate);
 
   for (uint32_t i = 0; i < aNumberOfChannels; ++i) {
@@ -220,7 +220,7 @@ static already_AddRefed<ThreadSharedFloatArrayBufferList>
 StealJSArrayDataIntoThreadSharedFloatArrayBufferList(JSContext* aJSContext,
                                                      const nsTArray<JSObject*>& aJSArrays)
 {
-  nsRefPtr<ThreadSharedFloatArrayBufferList> result =
+  RefPtr<ThreadSharedFloatArrayBufferList> result =
     new ThreadSharedFloatArrayBufferList(aJSArrays.Length());
   for (uint32_t i = 0; i < aJSArrays.Length(); ++i) {
     JS::Rooted<JSObject*> arrayBufferView(aJSContext, aJSArrays[i]);

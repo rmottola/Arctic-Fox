@@ -26,7 +26,7 @@ public:
 private:
   ~WindowsLocationProvider() {}
 
-  nsRefPtr<ILocation> mLocation;
+  RefPtr<ILocation> mLocation;
 };
 
 } // namespace dom

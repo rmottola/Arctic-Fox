@@ -518,7 +518,7 @@ ShaderProgramOGL::~ShaderProgramOGL()
     return;
   }
 
-  nsRefPtr<GLContext> ctx = mGL->GetSharedContext();
+  RefPtr<GLContext> ctx = mGL->GetSharedContext();
   if (!ctx) {
     ctx = mGL;
   }

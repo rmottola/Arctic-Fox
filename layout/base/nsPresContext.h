@@ -1219,17 +1219,17 @@ protected:
   nsPresContextType     mType;
   nsIPresShell*         mShell;         // [WEAK]
   nsCOMPtr<nsIDocument> mDocument;
-  nsRefPtr<nsDeviceContext> mDeviceContext; // [STRONG] could be weak, but
+  RefPtr<nsDeviceContext> mDeviceContext; // [STRONG] could be weak, but
                                             // better safe than sorry.
                                             // Cannot reintroduce cycles
                                             // since there is no dependency
                                             // from gfx back to layout.
-  nsRefPtr<mozilla::EventStateManager> mEventManager;
-  nsRefPtr<nsRefreshDriver> mRefreshDriver;
-  nsRefPtr<nsTransitionManager> mTransitionManager;
-  nsRefPtr<nsAnimationManager> mAnimationManager;
-  nsRefPtr<mozilla::RestyleManager> mRestyleManager;
-  nsRefPtr<mozilla::CounterStyleManager> mCounterStyleManager;
+  RefPtr<mozilla::EventStateManager> mEventManager;
+  RefPtr<nsRefreshDriver> mRefreshDriver;
+  RefPtr<nsTransitionManager> mTransitionManager;
+  RefPtr<nsAnimationManager> mAnimationManager;
+  RefPtr<mozilla::RestyleManager> mRestyleManager;
+  RefPtr<mozilla::CounterStyleManager> mCounterStyleManager;
   nsIAtom*              mMedium;        // initialized by subclass ctors;
                                         // weak pointer to static atom
   nsCOMPtr<nsIAtom> mMediaEmulated;

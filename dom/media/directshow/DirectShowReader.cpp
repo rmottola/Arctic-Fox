@@ -355,7 +355,7 @@ DirectShowReader::HasVideo()
   return false;
 }
 
-nsRefPtr<MediaDecoderReader::SeekPromise>
+RefPtr<MediaDecoderReader::SeekPromise>
 DirectShowReader::Seek(int64_t aTargetUs, int64_t aEndTime)
 {
   nsresult res = SeekInternal(aTargetUs);
@@ -403,7 +403,7 @@ DirectShowReader::NotifyDataArrivedInternal(uint32_t aLength, int64_t aOffset)
 
   IntervalSet<int64_t> intervals = mFilter.NotifyDataArrived(aLength, aOffset);
   for (const auto& interval : intervals) {
-    nsRefPtr<MediaByteBuffer> bytes =
+    RefPtr<MediaByteBuffer> bytes =
       mDecoder->GetResource()->MediaReadAt(interval.mStart, interval.Length());
     NS_ENSURE_TRUE_VOID(bytes);
     mMP3FrameParser.Parse(bytes->Elements(), interval.Length(), interval.mStart);

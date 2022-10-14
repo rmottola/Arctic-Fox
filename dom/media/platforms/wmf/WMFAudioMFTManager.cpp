@@ -201,7 +201,7 @@ WMFAudioMFTManager::UpdateOutputType()
 
 HRESULT
 WMFAudioMFTManager::Output(int64_t aStreamOffset,
-                           nsRefPtr<MediaData>& aOutData)
+                           RefPtr<MediaData>& aOutData)
 {
   aOutData = nullptr;
   RefPtr<IMFSample> sample;

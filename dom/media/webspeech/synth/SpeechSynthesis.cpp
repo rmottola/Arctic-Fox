@@ -153,7 +153,7 @@ SpeechSynthesis::AdvanceQueue()
     return;
   }
 
-  nsRefPtr<SpeechSynthesisUtterance> utterance = mSpeechQueue.ElementAt(0);
+  RefPtr<SpeechSynthesisUtterance> utterance = mSpeechQueue.ElementAt(0);
 
   nsAutoString docLang;
   nsCOMPtr<nsPIDOMWindow> win = do_QueryInterface(mParent);
@@ -238,7 +238,7 @@ SpeechSynthesis::OnEnd(const nsSpeechTask* aTask)
 }
 
 void
-SpeechSynthesis::GetVoices(nsTArray< nsRefPtr<SpeechSynthesisVoice> >& aResult)
+SpeechSynthesis::GetVoices(nsTArray< RefPtr<SpeechSynthesisVoice> >& aResult)
 {
   aResult.Clear();
   uint32_t voiceCount = 0;

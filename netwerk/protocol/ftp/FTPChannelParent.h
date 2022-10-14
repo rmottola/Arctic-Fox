@@ -117,8 +117,8 @@ protected:
   // Set if we successfully suspended the nsHttpChannel for diversion. Unset
   // when we call ResumeForDiversion.
   bool mSuspendedForDiversion;
-  nsRefPtr<OfflineObserver> mObserver;
-  nsRefPtr<mozilla::dom::TabParent> mTabParent;
+  RefPtr<OfflineObserver> mObserver;
+  RefPtr<mozilla::dom::TabParent> mTabParent;
 };
 
 } // namespace net

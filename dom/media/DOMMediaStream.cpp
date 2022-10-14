@@ -55,7 +55,7 @@ public:
         return NS_OK;
       }
 
-      nsRefPtr<MediaStreamTrack> track;
+      RefPtr<MediaStreamTrack> track;
       if (mEvents & MediaStreamListener::TRACK_EVENT_CREATED) {
         track = stream->BindDOMTrack(mID, mType);
         if (!track) {
@@ -78,7 +78,7 @@ public:
     }
 
     StreamTime mEndTime;
-    nsRefPtr<StreamListener> mListener;
+    RefPtr<StreamListener> mListener;
     TrackID mID;
     uint32_t mEvents;
     MediaSegment::Type mType;
@@ -97,7 +97,7 @@ public:
                                         const MediaSegment& aQueuedMedia) override
   {
     if (aTrackEvents & (TRACK_EVENT_CREATED | TRACK_EVENT_ENDED)) {
-      nsRefPtr<TrackChange> runnable =
+      RefPtr<TrackChange> runnable =
         new TrackChange(this, aID, aTrackOffset, aTrackEvents,
                         aQueuedMedia.GetType());
       aGraph->DispatchToMainThreadAfterStreamStateUpdate(runnable.forget());
@@ -124,12 +124,12 @@ public:
       return NS_OK;
     }
 
-    nsRefPtr<StreamListener> mListener;
+    RefPtr<StreamListener> mListener;
   };
 
   virtual void NotifyFinishedTrackCreation(MediaStreamGraph* aGraph) override
   {
-    nsRefPtr<TracksCreatedRunnable> runnable = new TracksCreatedRunnable(this);
+    RefPtr<TracksCreatedRunnable> runnable = new TracksCreatedRunnable(this);
     aGraph->DispatchToMainThreadAfterStreamStateUpdate(runnable.forget());
   }
 
@@ -240,7 +240,7 @@ DOMMediaStream::GetId(nsAString& aID) const
 }
 
 void
-DOMMediaStream::GetAudioTracks(nsTArray<nsRefPtr<AudioStreamTrack> >& aTracks)
+DOMMediaStream::GetAudioTracks(nsTArray<RefPtr<AudioStreamTrack> >& aTracks)
 {
   for (uint32_t i = 0; i < mTracks.Length(); ++i) {
     AudioStreamTrack* t = mTracks[i]->AsAudioStreamTrack();
@@ -251,7 +251,7 @@ DOMMediaStream::GetAudioTracks(nsTArray<nsRefPtr<AudioStreamTrack> >& aTracks)
 }
 
 void
-DOMMediaStream::GetVideoTracks(nsTArray<nsRefPtr<VideoStreamTrack> >& aTracks)
+DOMMediaStream::GetVideoTracks(nsTArray<RefPtr<VideoStreamTrack> >& aTracks)
 {
   for (uint32_t i = 0; i < mTracks.Length(); ++i) {
     VideoStreamTrack* t = mTracks[i]->AsVideoStreamTrack();
@@ -262,7 +262,7 @@ DOMMediaStream::GetVideoTracks(nsTArray<nsRefPtr<VideoStreamTrack> >& aTracks)
 }
 
 void
-DOMMediaStream::GetTracks(nsTArray<nsRefPtr<MediaStreamTrack> >& aTracks)
+DOMMediaStream::GetTracks(nsTArray<RefPtr<MediaStreamTrack> >& aTracks)
 {
   aTracks.AppendElements(mTracks);
 }
@@ -319,7 +319,7 @@ already_AddRefed<DOMMediaStream>
 DOMMediaStream::CreateSourceStream(nsIDOMWindow* aWindow,
                                    MediaStreamGraph* aGraph)
 {
-  nsRefPtr<DOMMediaStream> stream = new DOMMediaStream();
+  RefPtr<DOMMediaStream> stream = new DOMMediaStream();
   stream->InitSourceStream(aWindow, aGraph);
   return stream.forget();
 }
@@ -328,7 +328,7 @@ already_AddRefed<DOMMediaStream>
 DOMMediaStream::CreateTrackUnionStream(nsIDOMWindow* aWindow,
                                        MediaStreamGraph* aGraph)
 {
-  nsRefPtr<DOMMediaStream> stream = new DOMMediaStream();
+  RefPtr<DOMMediaStream> stream = new DOMMediaStream();
   stream->InitTrackUnionStream(aWindow, aGraph);
   return stream.forget();
 }
@@ -337,7 +337,7 @@ already_AddRefed<DOMMediaStream>
 DOMMediaStream::CreateAudioCaptureStream(nsIDOMWindow* aWindow,
                                          MediaStreamGraph* aGraph)
 {
-  nsRefPtr<DOMMediaStream> stream = new DOMMediaStream();
+  RefPtr<DOMMediaStream> stream = new DOMMediaStream();
   stream->InitAudioCaptureStream(aWindow, aGraph);
   return stream.forget();
 }
@@ -565,10 +565,10 @@ DOMMediaStream::ConstructMediaTracks(AudioTrackList* aAudioTrackList,
   int firstEnabledVideo = -1;
   for (uint32_t i = 0; i < mTracks.Length(); ++i) {
     if (AudioStreamTrack* t = mTracks[i]->AsAudioStreamTrack()) {
-      nsRefPtr<AudioTrack> track = CreateAudioTrack(t);
+      RefPtr<AudioTrack> track = CreateAudioTrack(t);
       aAudioTrackList->AddTrack(track);
     } else if (VideoStreamTrack* t = mTracks[i]->AsVideoStreamTrack()) {
-      nsRefPtr<VideoTrack> track = CreateVideoTrack(t);
+      RefPtr<VideoTrack> track = CreateVideoTrack(t);
       aVideoTrackList->AddTrack(track);
       firstEnabledVideo = (t->Enabled() && firstEnabledVideo < 0)
                           ? (aVideoTrackList->Length() - 1)
@@ -605,10 +605,10 @@ DOMMediaStream::NotifyMediaStreamTrackCreated(MediaStreamTrack* aTrack)
 
   for (uint32_t i = 0; i < mMediaTrackListListeners.Length(); ++i) {
     if (AudioStreamTrack* t = aTrack->AsAudioStreamTrack()) {
-      nsRefPtr<AudioTrack> track = CreateAudioTrack(t);
+      RefPtr<AudioTrack> track = CreateAudioTrack(t);
       mMediaTrackListListeners[i].NotifyMediaTrackCreated(track);
     } else if (VideoStreamTrack* t = aTrack->AsVideoStreamTrack()) {
-      nsRefPtr<VideoTrack> track = CreateVideoTrack(t);
+      RefPtr<VideoTrack> track = CreateVideoTrack(t);
       mMediaTrackListListeners[i].NotifyMediaTrackCreated(track);
     }
   }
@@ -652,7 +652,7 @@ already_AddRefed<DOMLocalMediaStream>
 DOMLocalMediaStream::CreateSourceStream(nsIDOMWindow* aWindow,
                                         MediaStreamGraph* aGraph)
 {
-  nsRefPtr<DOMLocalMediaStream> stream = new DOMLocalMediaStream();
+  RefPtr<DOMLocalMediaStream> stream = new DOMLocalMediaStream();
   stream->InitSourceStream(aWindow, aGraph);
   return stream.forget();
 }
@@ -661,7 +661,7 @@ already_AddRefed<DOMLocalMediaStream>
 DOMLocalMediaStream::CreateTrackUnionStream(nsIDOMWindow* aWindow,
                                             MediaStreamGraph* aGraph)
 {
-  nsRefPtr<DOMLocalMediaStream> stream = new DOMLocalMediaStream();
+  RefPtr<DOMLocalMediaStream> stream = new DOMLocalMediaStream();
   stream->InitTrackUnionStream(aWindow, aGraph);
   return stream.forget();
 }
@@ -670,7 +670,7 @@ already_AddRefed<DOMLocalMediaStream>
 DOMLocalMediaStream::CreateAudioCaptureStream(nsIDOMWindow* aWindow,
                                               MediaStreamGraph* aGraph)
 {
-  nsRefPtr<DOMLocalMediaStream> stream = new DOMLocalMediaStream();
+  RefPtr<DOMLocalMediaStream> stream = new DOMLocalMediaStream();
   stream->InitAudioCaptureStream(aWindow, aGraph);
   return stream.forget();
 }
@@ -689,7 +689,7 @@ DOMAudioNodeMediaStream::CreateTrackUnionStream(nsIDOMWindow* aWindow,
                                                 AudioNode* aNode,
                                                 MediaStreamGraph* aGraph)
 {
-  nsRefPtr<DOMAudioNodeMediaStream> stream = new DOMAudioNodeMediaStream(aNode);
+  RefPtr<DOMAudioNodeMediaStream> stream = new DOMAudioNodeMediaStream(aNode);
   stream->InitTrackUnionStream(aWindow, aGraph);
   return stream.forget();
 }
@@ -698,7 +698,7 @@ DOMHwMediaStream::DOMHwMediaStream()
 {
 #ifdef MOZ_WIDGET_GONK
   mImageContainer = LayerManager::CreateImageContainer(ImageContainer::ASYNCHRONOUS_OVERLAY);
-  nsRefPtr<Image> img = mImageContainer->CreateImage(ImageFormat::OVERLAY_IMAGE);
+  RefPtr<Image> img = mImageContainer->CreateImage(ImageFormat::OVERLAY_IMAGE);
   mOverlayImage = static_cast<layers::OverlayImage*>(img.get());
   nsAutoTArray<ImageContainer::NonOwningImage,1> images;
   images.AppendElement(ImageContainer::NonOwningImage(img));
@@ -713,7 +713,7 @@ DOMHwMediaStream::~DOMHwMediaStream()
 already_AddRefed<DOMHwMediaStream>
 DOMHwMediaStream::CreateHwStream(nsIDOMWindow* aWindow)
 {
-  nsRefPtr<DOMHwMediaStream> stream = new DOMHwMediaStream();
+  RefPtr<DOMHwMediaStream> stream = new DOMHwMediaStream();
 
   MediaStreamGraph* graph =
     MediaStreamGraph::GetInstance(MediaStreamGraph::SYSTEM_THREAD_DRIVER,
@@ -739,7 +739,7 @@ DOMHwMediaStream::Init(MediaStream* stream)
     mImageData.mSize.height = DEFAULT_IMAGE_HEIGHT;
     mOverlayImage->SetData(mImageData);
 
-    nsRefPtr<Image> image = static_cast<Image*>(mOverlayImage.get());
+    RefPtr<Image> image = static_cast<Image*>(mOverlayImage.get());
     mozilla::gfx::IntSize size = image->GetSize();
 
     segment.AppendFrame(image.forget(), delta, size);
@@ -789,7 +789,7 @@ DOMHwMediaStream::SetImageSize(uint32_t width, uint32_t height)
 
   // Change the image size.
   const StreamTime delta = STREAM_TIME_MAX;
-  nsRefPtr<Image> image = static_cast<Image*>(mOverlayImage.get());
+  RefPtr<Image> image = static_cast<Image*>(mOverlayImage.get());
   mozilla::gfx::IntSize size = image->GetSize();
   VideoSegment segment;
 

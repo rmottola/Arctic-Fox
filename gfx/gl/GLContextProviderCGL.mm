@@ -247,7 +247,7 @@ GLContextProviderCGL::CreateForWindow(nsIWidget *aWidget)
 
     SurfaceCaps caps = SurfaceCaps::ForRGBA();
     ContextProfile profile = ContextProfile::OpenGLCompatibility;
-    nsRefPtr<GLContextCGL> glContext = new GLContextCGL(caps, context, false,
+    RefPtr<GLContextCGL> glContext = new GLContextCGL(caps, context, false,
                                                         profile);
 
     if (!glContext->Init()) {
@@ -295,7 +295,7 @@ CreateOffscreenFBOContext(CreateContextFlags flags)
     }
 
     SurfaceCaps dummyCaps = SurfaceCaps::Any();
-    nsRefPtr<GLContextCGL> glContext = new GLContextCGL(dummyCaps, context,
+    RefPtr<GLContextCGL> glContext = new GLContextCGL(dummyCaps, context,
                                                         true, profile);
 
     return glContext.forget();
@@ -304,7 +304,7 @@ CreateOffscreenFBOContext(CreateContextFlags flags)
 already_AddRefed<GLContext>
 GLContextProviderCGL::CreateHeadless(CreateContextFlags flags)
 {
-    nsRefPtr<GLContextCGL> gl;
+    RefPtr<GLContextCGL> gl;
     gl = CreateOffscreenFBOContext(flags);
     if (!gl)
         return nullptr;
@@ -332,7 +332,7 @@ GLContextProviderCGL::CreateOffscreen(const IntSize& size,
     return gl.forget();
 }
 
-static nsRefPtr<GLContext> gGlobalContext;
+static RefPtr<GLContext> gGlobalContext;
 
 GLContext*
 GLContextProviderCGL::GetGlobalContext()

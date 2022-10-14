@@ -119,7 +119,7 @@ class nsCookieEntry : public nsCookieKey
 {
   public:
     // Hash methods
-    typedef nsTArray< nsRefPtr<nsCookie> > ArrayType;
+    typedef nsTArray< RefPtr<nsCookie> > ArrayType;
     typedef ArrayType::index_type IndexType;
 
     explicit nsCookieEntry(KeyTypePointer aKey)
@@ -148,7 +148,7 @@ class nsCookieEntry : public nsCookieKey
 struct CookieDomainTuple
 {
   nsCookieKey key;
-  nsRefPtr<nsCookie> cookie;
+  RefPtr<nsCookie> cookie;
 
   size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const;
 };
@@ -339,8 +339,8 @@ class nsCookieService final : public nsICookieService
     // note that the private states' dbConn should always be null - we never
     // want to be dealing with the on-disk DB when in private browsing.
     DBState                      *mDBState;
-    nsRefPtr<DBState>             mDefaultDBState;
-    nsRefPtr<DBState>             mPrivateDBState;
+    RefPtr<DBState>             mDefaultDBState;
+    RefPtr<DBState>             mPrivateDBState;
 
     // cached prefs
     uint8_t                       mCookieBehavior; // BEHAVIOR_{ACCEPT, REJECTFOREIGN, REJECT, LIMITFOREIGN}

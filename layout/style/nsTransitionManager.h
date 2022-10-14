@@ -254,7 +254,7 @@ public:
    */
   void StyleContextChanged(mozilla::dom::Element *aElement,
                            nsStyleContext *aOldStyleContext,
-                           nsRefPtr<nsStyleContext>* aNewStyleContext /* inout */);
+                           RefPtr<nsStyleContext>* aNewStyleContext /* inout */);
 
   /**
    * When we're resolving style for an element that previously didn't have

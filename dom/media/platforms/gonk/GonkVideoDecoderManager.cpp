@@ -72,7 +72,7 @@ GonkVideoDecoderManager::~GonkVideoDecoderManager()
   MOZ_COUNT_DTOR(GonkVideoDecoderManager);
 }
 
-nsRefPtr<MediaDataDecoder::InitPromise>
+RefPtr<MediaDataDecoder::InitPromise>
 GonkVideoDecoderManager::Init(MediaDataDecoderCallback* aCallback)
 {
   nsIntSize displaySize(mDisplayWidth, mDisplayHeight);
@@ -103,7 +103,7 @@ GonkVideoDecoderManager::Init(MediaDataDecoderCallback* aCallback)
   if (mLooper->start() != OK || mManagerLooper->start() != OK ) {
     return InitPromise::CreateAndReject(DecoderFailureReason::INIT_ERROR, __func__);
   }
-  nsRefPtr<InitPromise> p = mInitPromise.Ensure(__func__);
+  RefPtr<InitPromise> p = mInitPromise.Ensure(__func__);
   mDecoder = MediaCodecProxy::CreateByType(mLooper, mMimeType.get(), false, mVideoListener);
   mDecoder->AsyncAskMediaCodec();
 
@@ -165,7 +165,7 @@ nsresult
 GonkVideoDecoderManager::Input(MediaRawData* aSample)
 {
   MonitorAutoLock mon(mMonitor);
-  nsRefPtr<MediaRawData> sample;
+  RefPtr<MediaRawData> sample;
 
   if (!aSample) {
     // It means EOS with empty sample.
@@ -178,7 +178,7 @@ GonkVideoDecoderManager::Input(MediaRawData* aSample)
 
   status_t rv;
   while (mQueueSample.Length()) {
-    nsRefPtr<MediaRawData> data = mQueueSample.ElementAt(0);
+    RefPtr<MediaRawData> data = mQueueSample.ElementAt(0);
     {
       MonitorAutoUnlock mon_unlock(mMonitor);
       rv = mDecoder->Input(reinterpret_cast<const uint8_t*>(data->mData),
@@ -211,7 +211,7 @@ nsresult
 GonkVideoDecoderManager::CreateVideoData(int64_t aStreamOffset, VideoData **v)
 {
   *v = nullptr;
-  nsRefPtr<VideoData> data;
+  RefPtr<VideoData> data;
   int64_t timeUs;
   int32_t keyFrame;
 
@@ -411,7 +411,7 @@ GonkVideoDecoderManager::Flush()
 // Blocks until decoded sample is produced by the deoder.
 nsresult
 GonkVideoDecoderManager::Output(int64_t aStreamOffset,
-                                nsRefPtr<MediaData>& aOutData)
+                                RefPtr<MediaData>& aOutData)
 {
   aOutData = nullptr;
   status_t err;
@@ -424,7 +424,7 @@ GonkVideoDecoderManager::Output(int64_t aStreamOffset,
   switch (err) {
     case OK:
     {
-      nsRefPtr<VideoData> data;
+      RefPtr<VideoData> data;
       nsresult rv = CreateVideoData(aStreamOffset, getter_AddRefs(data));
       if (rv == NS_ERROR_NOT_AVAILABLE) {
         // Decoder outputs a empty video buffer, try again
@@ -461,7 +461,7 @@ GonkVideoDecoderManager::Output(int64_t aStreamOffset,
     case android::ERROR_END_OF_STREAM:
     {
       GVDM_LOG("Got the EOS frame!");
-      nsRefPtr<VideoData> data;
+      RefPtr<VideoData> data;
       nsresult rv = CreateVideoData(aStreamOffset, getter_AddRefs(data));
       if (rv == NS_ERROR_NOT_AVAILABLE) {
         // For EOS, no need to do any thing.

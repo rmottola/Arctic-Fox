@@ -116,7 +116,7 @@ protected:
   virtual ~nsNPAPIPluginStreamListener();
   char* mStreamBuffer;
   char* mNotifyURL;
-  nsRefPtr<nsNPAPIPluginInstance> mInst;
+  RefPtr<nsNPAPIPluginInstance> mInst;
   nsNPAPIStreamWrapper *mNPStreamWrapper;
   uint32_t mStreamBufferSize;
   int32_t mStreamBufferByteCount;
@@ -133,7 +133,7 @@ protected:
   nsCOMPtr<nsIAsyncVerifyRedirectCallback> mHTTPRedirectCallback;
 
 public:
-  nsRefPtr<nsPluginStreamListenerPeer> mStreamListenerPeer;
+  RefPtr<nsPluginStreamListenerPeer> mStreamListenerPeer;
 };
 
 #endif // nsNPAPIPluginStreamListener_h_

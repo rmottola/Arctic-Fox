@@ -275,7 +275,7 @@ private:
 
   nsIntRect GetFirstFrameRect();
 
-  Pair<DrawResult, nsRefPtr<layers::Image>>
+  Pair<DrawResult, RefPtr<layers::Image>>
     GetCurrentImage(layers::ImageContainer* aContainer, uint32_t aFlags);
 
   void UpdateImageContainer();
@@ -373,7 +373,7 @@ private: // data
 #endif
 
   // The source data for this image.
-  nsRefPtr<SourceBuffer>     mSourceBuffer;
+  RefPtr<SourceBuffer>     mSourceBuffer;
 
   // The number of frames this image has.
   uint32_t                   mFrameCount;
@@ -429,7 +429,7 @@ private: // data
   private:
     explicit HandleErrorWorker(RasterImage* aImage);
 
-    nsRefPtr<RasterImage> mImage;
+    RefPtr<RasterImage> mImage;
   };
 
   // Helpers

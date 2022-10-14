@@ -576,7 +576,7 @@ Predictor::Init()
     do_GetService("@mozilla.org/netwerk/cache-storage-service;1", &rv);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsRefPtr<LoadContextInfo> lci =
+  RefPtr<LoadContextInfo> lci =
     new LoadContextInfo(false, nsILoadContextInfo::NO_APP_ID, false, false);
 
   rv = cacheStorageService->DiskCacheStorage(lci, false,
@@ -641,7 +641,7 @@ public:
   {
     MOZ_ASSERT(!NS_IsMainThread(), "Cleaning up old files on main thread!");
     nsresult rv = CheckForAndDeleteOldDBFiles();
-    nsRefPtr<PredictorThreadShutdownRunner> runner =
+    RefPtr<PredictorThreadShutdownRunner> runner =
       new PredictorThreadShutdownRunner(mIOThread, NS_SUCCEEDED(rv));
     NS_DispatchToMainThread(runner);
     return NS_OK;
@@ -712,7 +712,7 @@ Predictor::MaybeCleanupOldDBFiles()
   ioThread->Dispatch(nuwaRunner, NS_DISPATCH_NORMAL);
 #endif
 
-  nsRefPtr<PredictorOldCleanupRunner> runner =
+  RefPtr<PredictorOldCleanupRunner> runner =
     new PredictorOldCleanupRunner(ioThread, dbFile);
   ioThread->Dispatch(runner, NS_DISPATCH_NORMAL);
 }
@@ -742,7 +742,7 @@ Predictor::Create(nsISupports *aOuter, const nsIID& aIID,
     return NS_ERROR_NO_AGGREGATION;
   }
 
-  nsRefPtr<Predictor> svc = new Predictor();
+  RefPtr<Predictor> svc = new Predictor();
   if (IsNeckoChild()) {
     // Child threads only need to be call into the public interface methods
     // so we don't bother with initialization
@@ -862,7 +862,7 @@ Predictor::Predict(nsIURI *targetURI, nsIURI *sourceURI,
 
   // First we open the regular cache entry, to ensure we don't gum up the works
   // waiting on the less-important predictor-only cache entry
-  nsRefPtr<Predictor::Action> uriAction =
+  RefPtr<Predictor::Action> uriAction =
     new Predictor::Action(Predictor::Action::IS_FULL_URI,
                           Predictor::Action::DO_PREDICT, argReason, targetURI,
                           nullptr, verifier, this);
@@ -884,7 +884,7 @@ Predictor::Predict(nsIURI *targetURI, nsIURI *sourceURI,
     originKey = targetOrigin;
   }
 
-  nsRefPtr<Predictor::Action> originAction =
+  RefPtr<Predictor::Action> originAction =
     new Predictor::Action(Predictor::Action::IS_ORIGIN,
                           Predictor::Action::DO_PREDICT, argReason,
                           targetOrigin, nullptr, verifier, this);
@@ -999,7 +999,7 @@ Predictor::PredictForPageload(nsICacheEntry *entry, uint8_t stackCount,
     mPreconnects.AppendElement(redirectURI);
     Predictor::Reason reason;
     reason.mPredict = nsINetworkPredictor::PREDICT_LOAD;
-    nsRefPtr<Predictor::Action> redirectAction =
+    RefPtr<Predictor::Action> redirectAction =
       new Predictor::Action(Predictor::Action::IS_FULL_URI,
                             Predictor::Action::DO_PREDICT, reason, redirectURI,
                             nullptr, verifier, this, stackCount + 1);
@@ -1356,7 +1356,7 @@ Predictor::Learn(nsIURI *targetURI, nsIURI *sourceURI,
 
   // We always open the full uri (general cache) entry first, so we don't gum up
   // the works waiting on predictor-only entries to open
-  nsRefPtr<Predictor::Action> uriAction =
+  RefPtr<Predictor::Action> uriAction =
     new Predictor::Action(Predictor::Action::IS_FULL_URI,
                           Predictor::Action::DO_LEARN, argReason, targetURI,
                           sourceURI, nullptr, this);
@@ -1384,7 +1384,7 @@ Predictor::Learn(nsIURI *targetURI, nsIURI *sourceURI,
                                   uriAction);
 
   // Now we open the origin-only (and therefore predictor-only) entry
-  nsRefPtr<Predictor::Action> originAction =
+  RefPtr<Predictor::Action> originAction =
     new Predictor::Action(Predictor::Action::IS_ORIGIN,
                           Predictor::Action::DO_LEARN, argReason, targetOrigin,
                           sourceOrigin, nullptr, this);
@@ -1543,7 +1543,7 @@ Predictor::LearnForSubresource(nsICacheEntry *entry, nsIURI *targetURI)
       resourceCount = atoi(s.BeginReading());
     }
     if (resourceCount >= mMaxResourcesPerEntry) {
-      nsRefPtr<Predictor::SpaceCleaner> cleaner =
+      RefPtr<Predictor::SpaceCleaner> cleaner =
         new Predictor::SpaceCleaner(this);
       entry->VisitMetaData(cleaner);
       cleaner->Finalize(entry);
@@ -1696,7 +1696,7 @@ Predictor::Reset()
     return NS_OK;
   }
 
-  nsRefPtr<Predictor::Resetter> reset = new Predictor::Resetter(this);
+  RefPtr<Predictor::Resetter> reset = new Predictor::Resetter(this);
   PREDICTOR_LOG(("    created a resetter"));
   mCacheDiskStorage->AsyncVisitStorage(reset, true);
   PREDICTOR_LOG(("    Cache async launched, returning now"));

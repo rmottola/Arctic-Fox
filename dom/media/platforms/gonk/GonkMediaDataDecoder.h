@@ -24,7 +24,7 @@ public:
 
   virtual ~GonkDecoderManager() {}
 
-  virtual nsRefPtr<InitPromise> Init(MediaDataDecoderCallback* aCallback) = 0;
+  virtual RefPtr<InitPromise> Init(MediaDataDecoderCallback* aCallback) = 0;
 
   // Add samples into OMX decoder or queue them if decoder is out of input buffer.
   virtual nsresult Input(MediaRawData* aSample) = 0;
@@ -36,7 +36,7 @@ public:
   // MP4Reader.
   // The overrided class should follow the same behaviour.
   virtual nsresult Output(int64_t aStreamOffset,
-                          nsRefPtr<MediaData>& aOutput) = 0;
+                          RefPtr<MediaData>& aOutput) = 0;
 
   // Flush the queued sample.
   virtual nsresult Flush() = 0;
@@ -72,7 +72,7 @@ public:
 
   ~GonkMediaDataDecoder();
 
-  nsRefPtr<InitPromise> Init() override;
+  RefPtr<InitPromise> Init() override;
 
   nsresult Input(MediaRawData* aSample) override;
 

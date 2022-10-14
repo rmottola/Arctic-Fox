@@ -162,7 +162,7 @@ private:
 
       NS_IMETHOD Run() override
       {
-        nsRefPtr<DynamicsCompressorNode> node =
+        RefPtr<DynamicsCompressorNode> node =
           static_cast<DynamicsCompressorNode*>
             (mStream->Engine()->NodeMainThread());
         if (node) {
@@ -172,7 +172,7 @@ private:
       }
 
     private:
-      nsRefPtr<AudioNodeStream> mStream;
+      RefPtr<AudioNodeStream> mStream;
       float mReduction;
     };
 

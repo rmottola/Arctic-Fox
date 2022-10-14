@@ -177,7 +177,7 @@ protected:
     /**
      * The context of the temporary alpha surface.
      */
-    nsRefPtr<gfxContext> mContext;
+    RefPtr<gfxContext> mContext;
 
     /**
      * The temporary alpha surface.

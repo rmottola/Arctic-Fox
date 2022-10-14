@@ -415,7 +415,7 @@ void WebMBufferedState::UpdateIndex(const nsTArray<MediaByteRange>& aRanges, Med
         }
       }
     }
-    nsRefPtr<MediaByteBuffer> bytes = aResource->MediaReadAt(offset, length);
+    RefPtr<MediaByteBuffer> bytes = aResource->MediaReadAt(offset, length);
     if(bytes) {
       NotifyDataArrived(bytes->Elements(), bytes->Length(), offset);
     }

@@ -157,7 +157,7 @@ DataTransfer::Constructor(const GlobalObject& aGlobal,
   }
 
   EventMessage eventMessage = nsContentUtils::GetEventMessage(eventTypeAtom);
-  nsRefPtr<DataTransfer> transfer = new DataTransfer(aGlobal.GetAsSupports(),
+  RefPtr<DataTransfer> transfer = new DataTransfer(aGlobal.GetAsSupports(),
                                                      eventMessage, aIsExternal,
                                                      -1);
   return transfer.forget();
@@ -298,7 +298,7 @@ DataTransfer::GetFiles(ErrorResult& aRv)
 
       nsCOMPtr<nsIFile> file = do_QueryInterface(supports);
 
-      nsRefPtr<File> domFile;
+      RefPtr<File> domFile;
       if (file) {
 #ifdef DEBUG
         if (XRE_GetProcessType() == GeckoProcessType_Default) {
@@ -348,7 +348,7 @@ DataTransfer::Types()
 NS_IMETHODIMP
 DataTransfer::GetTypes(nsISupports** aTypes)
 {
-  nsRefPtr<DOMStringList> types = Types();
+  RefPtr<DOMStringList> types = Types();
   types.forget(aTypes);
 
   return NS_OK;
@@ -532,7 +532,7 @@ DataTransfer::MozTypesAt(uint32_t aIndex, ErrorResult& aRv) const
     return nullptr;
   }
 
-  nsRefPtr<DOMStringList> types = new DOMStringList();
+  RefPtr<DOMStringList> types = new DOMStringList();
   if (aIndex < mItems.Length()) {
     bool addFile = false;
     // note that you can retrieve the types regardless of their principal
@@ -565,7 +565,7 @@ NS_IMETHODIMP
 DataTransfer::MozTypesAt(uint32_t aIndex, nsISupports** aTypes)
 {
   ErrorResult rv;
-  nsRefPtr<DOMStringList> types = MozTypesAt(aIndex, rv);
+  RefPtr<DOMStringList> types = MozTypesAt(aIndex, rv);
   types.forget(aTypes);
   return rv.StealNSResult();
 }
@@ -857,7 +857,7 @@ MakeOrReuseFileSystem(const nsAString& aNewLocalRootPath,
 {
   MOZ_ASSERT(aWindow);
 
-  nsRefPtr<OSFileSystem> fs;
+  RefPtr<OSFileSystem> fs;
   if (aFS) {
     const nsAString& prevLocalRootPath = aFS->GetLocalRootPath();
     if (aNewLocalRootPath == prevLocalRootPath) {
@@ -887,7 +887,7 @@ DataTransfer::GetFilesAndDirectories(ErrorResult& aRv)
     return nullptr;
   }
 
-  nsRefPtr<Promise> p = Promise::Create(global, aRv);
+  RefPtr<Promise> p = Promise::Create(global, aRv);
   if (aRv.Failed()) {
     return nullptr;
   }
@@ -909,7 +909,7 @@ DataTransfer::GetFilesAndDirectories(ErrorResult& aRv)
 
     nsPIDOMWindow* window = parentNode->OwnerDoc()->GetInnerWindow();
 
-    nsRefPtr<OSFileSystem> fs;
+    RefPtr<OSFileSystem> fs;
     for (uint32_t i = 0; i < mFiles->Length(); ++i) {
       if (mFiles->Item(i)->Impl()->IsDirectory()) {
 #if defined(ANDROID) || defined(MOZ_B2G)

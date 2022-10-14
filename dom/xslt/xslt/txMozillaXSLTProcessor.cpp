@@ -290,7 +290,7 @@ private:
     static nsresult Convert(nsIVariant *aValue, txAExprResult** aResult);
 
     nsCOMPtr<nsIVariant> mValue;
-    nsRefPtr<txAExprResult> mTxValue;
+    RefPtr<txAExprResult> mTxValue;
 };
 
 inline void
@@ -488,7 +488,7 @@ txMozillaXSLTProcessor::AddXSLTParam(const nsString& aName,
         return NS_ERROR_FAILURE;
     }
 
-    nsRefPtr<txAExprResult> value;
+    RefPtr<txAExprResult> value;
     if (!aSelect.IsVoid()) {
 
         // Set up context
@@ -540,7 +540,7 @@ txMozillaXSLTProcessor::AddXSLTParam(const nsString& aName,
 
 class nsTransformBlockerEvent : public nsRunnable {
 public:
-  nsRefPtr<txMozillaXSLTProcessor> mProcessor;
+  RefPtr<txMozillaXSLTProcessor> mProcessor;
 
   explicit nsTransformBlockerEvent(txMozillaXSLTProcessor* processor)
     : mProcessor(processor)
@@ -811,7 +811,7 @@ txMozillaXSLTProcessor::SetParameter(const nsAString & aNamespaceURI,
 
             nsCOMPtr<nsIXPathResult> xpathResult = do_QueryInterface(supports);
             if (xpathResult) {
-                nsRefPtr<txAExprResult> result;
+                RefPtr<txAExprResult> result;
                 nsresult rv = xpathResult->GetExprResult(getter_AddRefs(result));
                 NS_ENSURE_SUCCESS(rv, rv);
 
@@ -1289,7 +1289,7 @@ txMozillaXSLTProcessor::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenP
 txMozillaXSLTProcessor::Constructor(const GlobalObject& aGlobal,
                                     mozilla::ErrorResult& aRv)
 {
-    nsRefPtr<txMozillaXSLTProcessor> processor =
+    RefPtr<txMozillaXSLTProcessor> processor =
         new txMozillaXSLTProcessor(aGlobal.GetAsSupports());
     return processor.forget();
 }
@@ -1487,7 +1487,7 @@ txVariable::Convert(nsIVariant *aValue, txAExprResult** aResult)
 
             nsCOMPtr<nsIDOMNodeList> nodeList = do_QueryInterface(supports);
             if (nodeList) {
-                nsRefPtr<txNodeSet> nodeSet = new txNodeSet(nullptr);
+                RefPtr<txNodeSet> nodeSet = new txNodeSet(nullptr);
                 if (!nodeSet) {
                     return NS_ERROR_OUT_OF_MEMORY;
                 }
@@ -1559,7 +1559,7 @@ txVariable::Convert(nsIVariant *aValue, txAExprResult** aResult)
 
             nsISupports** values = static_cast<nsISupports**>(array);
 
-            nsRefPtr<txNodeSet> nodeSet = new txNodeSet(nullptr);
+            RefPtr<txNodeSet> nodeSet = new txNodeSet(nullptr);
             if (!nodeSet) {
                 NS_FREE_XPCOM_ISUPPORTS_POINTER_ARRAY(count, values);
 

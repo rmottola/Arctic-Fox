@@ -86,13 +86,13 @@ private:
   ~ServiceWorker();
 
   ServiceWorkerState mState;
-  const nsRefPtr<ServiceWorkerInfo> mInfo;
+  const RefPtr<ServiceWorkerInfo> mInfo;
 
   // To allow ServiceWorkers to potentially drop the backing DOMEventTargetHelper and
   // re-instantiate it later, they simply own a SharedWorker member that
   // can be released and recreated as required rather than re-implement some of
   // the SharedWorker logic.
-  nsRefPtr<SharedWorker> mSharedWorker;
+  RefPtr<SharedWorker> mSharedWorker;
 };
 
 } // namespace workers

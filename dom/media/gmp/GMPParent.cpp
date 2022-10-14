@@ -192,7 +192,7 @@ AbortWaitingForGMPAsyncShutdown(nsITimer* aTimer, void* aClosure)
 {
   NS_WARNING("Timed out waiting for GMP async shutdown!");
   GMPParent* parent = reinterpret_cast<GMPParent*>(aClosure);
-  nsRefPtr<GeckoMediaPluginServiceParent> service =
+  RefPtr<GeckoMediaPluginServiceParent> service =
     GeckoMediaPluginServiceParent::GetSingleton();
   if (service) {
     service->AsyncShutdownComplete(parent);
@@ -221,7 +221,7 @@ GMPParent::EnsureAsyncShutdownTimeoutSet()
   }
 
   int32_t timeout = GMP_DEFAULT_ASYNC_SHUTDONW_TIMEOUT;
-  nsRefPtr<GeckoMediaPluginServiceParent> service =
+  RefPtr<GeckoMediaPluginServiceParent> service =
     GeckoMediaPluginServiceParent::GetSingleton();
   if (service) {
     timeout = service->AsyncShutdownTimeoutMs();
@@ -333,7 +333,7 @@ GMPParent::AbortAsyncShutdown()
     return;
   }
 
-  nsRefPtr<GMPParent> kungFuDeathGrip(this);
+  RefPtr<GMPParent> kungFuDeathGrip(this);
   mService->AsyncShutdownComplete(this);
   mAsyncShutdownRequired = false;
   mAsyncShutdownInProgress = false;
@@ -427,7 +427,7 @@ GMPParent::Shutdown()
     return;
   }
 
-  nsRefPtr<GMPParent> self(this);
+  RefPtr<GMPParent> self(this);
   DeleteProcess();
 
   // XXX Get rid of mDeleteProcessOnlyOnUnload and this code when
@@ -616,7 +616,7 @@ GMPNotifyObservers(const uint32_t aPluginID, const nsACString& aPluginName, cons
     obs->NotifyObservers(propbag, "gmp-plugin-crash", nullptr);
   }
 
-  nsRefPtr<gmp::GeckoMediaPluginService> service =
+  RefPtr<gmp::GeckoMediaPluginService> service =
     gmp::GeckoMediaPluginService::GetGeckoMediaPluginService();
   if (service) {
     service->RunPluginCrashCallbacks(aPluginID, aPluginName);
@@ -647,7 +647,7 @@ GMPParent::ActorDestroy(ActorDestroyReason aWhy)
 
   // Normal Shutdown() will delete the process on unwind.
   if (AbnormalShutdown == aWhy) {
-    nsRefPtr<GMPParent> self(this);
+    RefPtr<GMPParent> self(this);
     if (mAsyncShutdownRequired) {
 #if defined(MOZ_CRASHREPORTER)
       if (mService) {
@@ -988,7 +988,7 @@ public:
   }
 
 private:
-  nsRefPtr<GMPContentParent> mGMPContentParent;
+  RefPtr<GMPContentParent> mGMPContentParent;
   nsTArray<UniquePtr<GetGMPContentParentCallback>> mCallbacks;
 };
 
@@ -1002,7 +1002,7 @@ GMPParent::AllocPGMPContentParent(Transport* aTransport, ProcessId aOtherPid)
   mGMPContentParent->Open(aTransport, aOtherPid, XRE_GetIOMessageLoop(),
                           ipc::ParentSide);
 
-  nsRefPtr<RunCreateContentParentCallbacks> runCallbacks =
+  RefPtr<RunCreateContentParentCallbacks> runCallbacks =
     new RunCreateContentParentCallbacks(mGMPContentParent);
   runCallbacks->TakeCallbacks(mCallbacks);
   NS_DispatchToCurrentThread(runCallbacks);

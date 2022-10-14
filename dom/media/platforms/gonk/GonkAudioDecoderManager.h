@@ -26,12 +26,12 @@ public:
 
   virtual ~GonkAudioDecoderManager() override;
 
-  nsRefPtr<InitPromise> Init(MediaDataDecoderCallback* aCallback) override;
+  RefPtr<InitPromise> Init(MediaDataDecoderCallback* aCallback) override;
 
   nsresult Input(MediaRawData* aSample) override;
 
   nsresult Output(int64_t aStreamOffset,
-                          nsRefPtr<MediaData>& aOutput) override;
+                          RefPtr<MediaData>& aOutput) override;
 
   nsresult Flush() override;
 
@@ -62,7 +62,7 @@ private:
   // An queue with the MP4 samples which are waiting to be sent into OMX.
   // If an element is an empty MP4Sample, that menas EOS. There should not
   // any sample be queued after EOS.
-  nsTArray<nsRefPtr<MediaRawData>> mQueueSample;
+  nsTArray<RefPtr<MediaRawData>> mQueueSample;
 };
 
 } // namespace mozilla

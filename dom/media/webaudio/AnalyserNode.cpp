@@ -38,7 +38,7 @@ class AnalyserNodeEngine final : public AudioNodeEngine
 
     NS_IMETHOD Run()
     {
-      nsRefPtr<AnalyserNode> node =
+      RefPtr<AnalyserNode> node =
         static_cast<AnalyserNode*>(mStream->Engine()->NodeMainThread());
       if (node) {
         node->AppendChunk(mChunk);
@@ -47,7 +47,7 @@ class AnalyserNodeEngine final : public AudioNodeEngine
     }
 
   private:
-    nsRefPtr<AudioNodeStream> mStream;
+    RefPtr<AudioNodeStream> mStream;
     AudioChunk mChunk;
   };
 
@@ -65,7 +65,7 @@ public:
   {
     *aOutput = aInput;
 
-    nsRefPtr<TransferBuffer> transfer = new TransferBuffer(aStream, aInput);
+    RefPtr<TransferBuffer> transfer = new TransferBuffer(aStream, aInput);
     NS_DispatchToMainThread(transfer);
   }
 

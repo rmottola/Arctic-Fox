@@ -48,7 +48,7 @@ void InkCollector::Initialize()
   }
   NS_ADDREF(mInkCollector);
   // Set up connection between sink and InkCollector.
-  nsRefPtr<IConnectionPointContainer> connPointContainer;
+  RefPtr<IConnectionPointContainer> connPointContainer;
   // Get the connection point container.
   if (SUCCEEDED(mInkCollector->QueryInterface(IID_IConnectionPointContainer,
                                               getter_AddRefs(connPointContainer)))) {

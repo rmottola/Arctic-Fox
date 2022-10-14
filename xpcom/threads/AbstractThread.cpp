@@ -93,7 +93,7 @@ public:
   virtual nsIThread* AsXPCOMThread() override { return mTarget; }
 
 private:
-  nsRefPtr<nsIThread> mTarget;
+  RefPtr<nsIThread> mTarget;
   Maybe<AutoTaskDispatcher> mTailDispatcher;
 };
 
@@ -144,7 +144,7 @@ AbstractThread::DispatchDirectTask(already_AddRefed<nsIRunnable> aRunnable)
 already_AddRefed<AbstractThread>
 CreateXPCOMAbstractThreadWrapper(nsIThread* aThread, bool aRequireTailDispatch)
 {
-  nsRefPtr<XPCOMThreadWrapper> wrapper = new XPCOMThreadWrapper(aThread, aRequireTailDispatch);
+  RefPtr<XPCOMThreadWrapper> wrapper = new XPCOMThreadWrapper(aThread, aRequireTailDispatch);
   return wrapper.forget();
 }
 

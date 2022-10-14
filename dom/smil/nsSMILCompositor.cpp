@@ -142,7 +142,7 @@ nsSMILCompositor::GetFirstFuncToAffectSandwich()
 {
   // canThrottle is true when attributeName is not 'display' and
   // the element or subtree is display:none
-  nsRefPtr<nsStyleContext> styleContext =
+  RefPtr<nsStyleContext> styleContext =
     nsComputedDOMStyle::GetStyleContextForElementNoFlush(mKey.mElement,
                                                          nullptr, nullptr);
   bool canThrottle = mKey.mAttributeName != nsGkAtoms::display &&

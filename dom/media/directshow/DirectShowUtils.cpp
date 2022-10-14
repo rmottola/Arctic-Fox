@@ -50,7 +50,7 @@ GetDirectShowGuidName(const GUID& aGuid)
 void
 RemoveGraphFromRunningObjectTable(DWORD aRotRegister)
 {
-  nsRefPtr<IRunningObjectTable> runningObjectTable;
+  RefPtr<IRunningObjectTable> runningObjectTable;
   if (SUCCEEDED(GetRunningObjectTable(0, getter_AddRefs(runningObjectTable)))) {
     runningObjectTable->Revoke(aRotRegister);
   }
@@ -61,8 +61,8 @@ AddGraphToRunningObjectTable(IUnknown *aUnkGraph, DWORD *aOutRotRegister)
 {
   HRESULT hr;
 
-  nsRefPtr<IMoniker> moniker;
-  nsRefPtr<IRunningObjectTable> runningObjectTable;
+  RefPtr<IMoniker> moniker;
+  RefPtr<IRunningObjectTable> runningObjectTable;
 
   hr = GetRunningObjectTable(0, getter_AddRefs(runningObjectTable));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
@@ -184,7 +184,7 @@ CreateAndAddFilter(IGraphBuilder* aGraph,
   NS_ENSURE_TRUE(aOutFilter, E_POINTER);
   HRESULT hr;
 
-  nsRefPtr<IBaseFilter> filter;
+  RefPtr<IBaseFilter> filter;
   hr = CoCreateInstance(aFilterClsId,
                         nullptr,
                         CLSCTX_INPROC_SERVER,
@@ -216,7 +216,7 @@ AddMP3DMOWrapperFilter(IGraphBuilder* aGraph,
   HRESULT hr;
 
   // Create the wrapper filter.
-  nsRefPtr<IBaseFilter> filter;
+  RefPtr<IBaseFilter> filter;
   hr = CoCreateInstance(CLSID_DMOWrapperFilter,
                         nullptr,
                         CLSCTX_INPROC_SERVER,
@@ -228,7 +228,7 @@ AddMP3DMOWrapperFilter(IGraphBuilder* aGraph,
   }
 
   // Query for IDMOWrapperFilter.
-  nsRefPtr<IDMOWrapperFilter> dmoWrapper;
+  RefPtr<IDMOWrapperFilter> dmoWrapper;
   hr = filter->QueryInterface(IID_IDMOWrapperFilter,
                               getter_AddRefs(dmoWrapper));
   if (FAILED(hr)) {

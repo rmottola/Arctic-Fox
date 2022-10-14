@@ -108,7 +108,7 @@ FinishTextures(IDirect3DDevice9* aDevice,
   }
 
   aSurface->UnlockRect();
-  nsRefPtr<IDirect3DSurface9> dstSurface;
+  RefPtr<IDirect3DSurface9> dstSurface;
   aTexture->GetSurfaceLevel(0, getter_AddRefs(dstSurface));
   aDevice->UpdateSurface(aSurface, nullptr, dstSurface, nullptr);
 }

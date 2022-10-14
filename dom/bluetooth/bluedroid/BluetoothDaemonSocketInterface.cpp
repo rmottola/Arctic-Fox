@@ -180,7 +180,7 @@ BluetoothDaemonSocketModule::HandleSvc(const DaemonSocketPDUHeader& aHeader,
     return;
   }
 
-  nsRefPtr<BluetoothSocketResultHandler> res =
+  RefPtr<BluetoothSocketResultHandler> res =
     static_cast<BluetoothSocketResultHandler*>(aRes);
 
   if (!res) {

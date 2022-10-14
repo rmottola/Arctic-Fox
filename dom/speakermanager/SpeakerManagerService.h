@@ -60,7 +60,7 @@ protected:
 
   void TuruOnSpeaker(bool aEnable);
 
-  nsTArray<nsRefPtr<SpeakerManager> > mRegisteredSpeakerManagers;
+  nsTArray<RefPtr<SpeakerManager> > mRegisteredSpeakerManagers;
   // Set for remember all the child speaker status
   nsCheapSet<nsUint64HashKey> mSpeakerStatusSet;
   // The Speaker status assign by UA

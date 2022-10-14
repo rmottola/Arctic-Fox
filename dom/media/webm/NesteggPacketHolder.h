@@ -90,7 +90,7 @@ class WebMPacketQueue {
   }
 
   already_AddRefed<NesteggPacketHolder> PopFront() {
-    nsRefPtr<NesteggPacketHolder> result = mQueue.front().forget();
+    RefPtr<NesteggPacketHolder> result = mQueue.front().forget();
     mQueue.pop_front();
     return result.forget();
   }
@@ -102,7 +102,7 @@ class WebMPacketQueue {
   }
 
 private:
-  std::deque<nsRefPtr<NesteggPacketHolder>> mQueue;
+  std::deque<RefPtr<NesteggPacketHolder>> mQueue;
 };
 
 } // namespace mozilla

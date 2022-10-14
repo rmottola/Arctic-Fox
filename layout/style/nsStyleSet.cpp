@@ -466,7 +466,7 @@ nsStyleSet::GatherRuleProcessors(sheetType aType)
       // as scoped style roots.
       nsTArray<CSSStyleSheet*> sheets(count);
       for (uint32_t i = 0; i < count; i++) {
-        nsRefPtr<CSSStyleSheet> sheet =
+        RefPtr<CSSStyleSheet> sheet =
           do_QueryObject(mSheets[eScopedDocSheet].ObjectAt(i));
         sheets.AppendElement(sheet);
 
@@ -505,7 +505,7 @@ nsStyleSet::GatherRuleProcessors(sheetType aType)
         scope->SetIsScopedStyleRoot();
 
         // Create a rule processor for the scope.
-        nsTArray<nsRefPtr<CSSStyleSheet>> sheetsForScope;
+        nsTArray<RefPtr<CSSStyleSheet>> sheetsForScope;
         sheetsForScope.AppendElements(sheets.Elements() + start, end - start);
         nsCSSRuleProcessor* oldRP = oldScopedRuleProcessorHash.Get(scope);
         mScopedDocSheetRuleProcessors.AppendElement
@@ -524,9 +524,9 @@ nsStyleSet::GatherRuleProcessors(sheetType aType)
         // levels containing non-scoped CSS style sheets whose rule processors
         // we want to re-use
         nsCOMArray<nsIStyleSheet>& sheets = mSheets[aType];
-        nsTArray<nsRefPtr<CSSStyleSheet>> cssSheets(sheets.Count());
+        nsTArray<RefPtr<CSSStyleSheet>> cssSheets(sheets.Count());
         for (int32_t i = 0, i_end = sheets.Count(); i < i_end; ++i) {
-          nsRefPtr<CSSStyleSheet> cssSheet = do_QueryObject(sheets[i]);
+          RefPtr<CSSStyleSheet> cssSheet = do_QueryObject(sheets[i]);
           NS_ASSERTION(cssSheet, "not a CSS sheet");
           cssSheets.AppendElement(cssSheet);
         }
@@ -558,9 +558,9 @@ nsStyleSet::GatherRuleProcessors(sheetType aType)
         // levels containing non-scoped CSS stylesheets whose rule processors
         // we don't want to re-use
         nsCOMArray<nsIStyleSheet>& sheets = mSheets[aType];
-        nsTArray<nsRefPtr<CSSStyleSheet>> cssSheets(sheets.Count());
+        nsTArray<RefPtr<CSSStyleSheet>> cssSheets(sheets.Count());
         for (int32_t i = 0, i_end = sheets.Count(); i < i_end; ++i) {
-          nsRefPtr<CSSStyleSheet> cssSheet = do_QueryObject(sheets[i]);
+          RefPtr<CSSStyleSheet> cssSheet = do_QueryObject(sheets[i]);
           NS_ASSERTION(cssSheet, "not a CSS sheet");
           cssSheets.AppendElement(cssSheet);
         }
@@ -584,7 +584,7 @@ nsStyleSet::GatherRuleProcessors(sheetType aType)
 static bool
 IsScopedStyleSheet(nsIStyleSheet* aSheet)
 {
-  nsRefPtr<CSSStyleSheet> cssSheet = do_QueryObject(aSheet);
+  RefPtr<CSSStyleSheet> cssSheet = do_QueryObject(aSheet);
   NS_ASSERTION(cssSheet, "expected aSheet to be a CSSStyleSheet");
 
   return cssSheet->GetScopeElement();
@@ -767,7 +767,7 @@ nsStyleSet::AddDocStyleSheet(nsIStyleSheet* aSheet, nsIDocument* aDocument)
 nsresult
 nsStyleSet::RemoveDocStyleSheet(nsIStyleSheet *aSheet)
 {
-  nsRefPtr<CSSStyleSheet> cssSheet = do_QueryObject(aSheet);
+  RefPtr<CSSStyleSheet> cssSheet = do_QueryObject(aSheet);
   bool isScoped = cssSheet && cssSheet->GetScopeElement();
   return RemoveStyleSheet(isScoped ? eScopedDocSheet : eDocSheet, aSheet);
 }
@@ -928,7 +928,7 @@ nsStyleSet::GetContext(nsStyleContext* aParentContext,
     (aFlags & eIsVisitedLink) :
     (aParentContext && aParentContext->RelevantLinkVisited());
 
-  nsRefPtr<nsStyleContext> result;
+  RefPtr<nsStyleContext> result;
   if (aParentContext)
     result = aParentContext->FindChildWithRules(aPseudoTag, aRuleNode,
                                                 aVisitedRuleNode,
@@ -946,7 +946,7 @@ nsStyleSet::GetContext(nsStyleContext* aParentContext,
                                 aRuleNode,
                                 aFlags & eSkipParentDisplayBasedStyleFixup);
     if (aVisitedRuleNode) {
-      nsRefPtr<nsStyleContext> resultIfVisited =
+      RefPtr<nsStyleContext> resultIfVisited =
         NS_NewStyleContext(parentIfVisited, aPseudoTag, aPseudoType,
                            aVisitedRuleNode,
                            aFlags & eSkipParentDisplayBasedStyleFixup);
@@ -1030,7 +1030,7 @@ nsStyleSet::AddImportantRules(nsRuleNode* aCurrLevelNode,
        node = node->GetParent()) {
     // We guarantee that we never walk the root node here, so no need
     // to null-check GetRule().  Furthermore, it must be a CSS rule.
-    NS_ASSERTION(nsRefPtr<css::StyleRule>(do_QueryObject(node->GetRule())),
+    NS_ASSERTION(RefPtr<css::StyleRule>(do_QueryObject(node->GetRule())),
                  "Unexpected non-CSS rule");
 
     nsIStyleRule* impRule =
@@ -1057,7 +1057,7 @@ nsStyleSet::AssertNoImportantRules(nsRuleNode* aCurrLevelNode,
 
   for (nsRuleNode *node = aCurrLevelNode; node != aLastPrevLevelNode;
        node = node->GetParent()) {
-    nsRefPtr<css::StyleRule> rule(do_QueryObject(node->GetRule()));
+    RefPtr<css::StyleRule> rule(do_QueryObject(node->GetRule()));
     NS_ASSERTION(rule, "Unexpected non-CSS rule");
 
     NS_ASSERTION(!rule->GetImportantRule(), "Unexpected important rule");
@@ -1074,7 +1074,7 @@ nsStyleSet::AssertNoCSSRules(nsRuleNode* aCurrLevelNode,
   for (nsRuleNode *node = aCurrLevelNode; node != aLastPrevLevelNode;
        node = node->GetParent()) {
     nsIStyleRule *rule = node->GetRule();
-    nsRefPtr<css::StyleRule> cssRule(do_QueryObject(rule));
+    RefPtr<css::StyleRule> cssRule(do_QueryObject(rule));
     NS_ASSERTION(!cssRule || !cssRule->Selector(), "Unexpected CSS rule");
   }
 }
@@ -1742,7 +1742,7 @@ nsStyleSet::ResolveStyleWithoutAnimation(dom::Element* aTarget,
   bool oldSkipAnimationRules = restyleManager->SkipAnimationRules();
   restyleManager->SetSkipAnimationRules(true);
 
-  nsRefPtr<nsStyleContext> result =
+  RefPtr<nsStyleContext> result =
     ResolveStyleWithReplacement(aTarget, nullptr, aStyleContext->GetParent(),
                                 aStyleContext, aWhichToRemove,
                                 eSkipStartingAnimations);
@@ -1904,7 +1904,7 @@ nsStyleSet::ProbePseudoElementStyle(Element* aParentElement,
     flags |= eSkipParentDisplayBasedStyleFixup;
   }
 
-  nsRefPtr<nsStyleContext> result =
+  RefPtr<nsStyleContext> result =
     GetContext(aParentContext, ruleNode, visitedRuleNode,
                pseudoTag, aType,
                aParentElement, flags);
@@ -2123,7 +2123,7 @@ nsStyleSet::GetFontFeatureValuesLookup()
     }
   }
 
-  nsRefPtr<gfxFontFeatureValueSet> lookup = mFontFeatureValuesLookup;
+  RefPtr<gfxFontFeatureValueSet> lookup = mFontFeatureValuesLookup;
   return lookup.forget();
 }
 
@@ -2232,7 +2232,7 @@ nsStyleSet::ReparentStyleContext(nsStyleContext* aStyleContext,
   // This short-circuit is OK because we don't call TryStartingTransition
   // during style reresolution if the style context pointer hasn't changed.
   if (aStyleContext->GetParent() == aNewParentContext) {
-    nsRefPtr<nsStyleContext> ret = aStyleContext;
+    RefPtr<nsStyleContext> ret = aStyleContext;
     return ret.forget();
   }
 

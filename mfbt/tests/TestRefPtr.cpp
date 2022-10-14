@@ -8,7 +8,7 @@
 #include "mozilla/RefCounted.h"
 
 using mozilla::RefCounted;
-using mozilla::RefPtr;
+using RefPtr;
 
 class Foo : public RefCounted<Foo>
 {

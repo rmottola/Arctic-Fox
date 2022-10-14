@@ -145,7 +145,7 @@ private:
                                   uint32_t aCount,
                                   uint32_t *aBytesConsumed);
 
-    nsRefPtr<nsOfflineCacheUpdate> mUpdate;
+    RefPtr<nsOfflineCacheUpdate> mUpdate;
     nsCOMPtr<nsIURI> mURI;
     nsCOMPtr<nsIURI> mReferrerURI;
     nsCOMPtr<nsICryptoHash> mManifestHash;
@@ -512,7 +512,7 @@ nsOfflineCacheUpdateItem::Run()
     // and Run() of this item.  Finish() would then have been called twice.
     mState = LoadStatus::LOADED;
 
-    nsRefPtr<nsOfflineCacheUpdate> update;
+    RefPtr<nsOfflineCacheUpdate> update;
     update.swap(mUpdate);
     update->LoadCompleted(this);
 
@@ -1696,7 +1696,7 @@ nsOfflineCacheUpdate::ManifestCheckCompleted(nsresult aStatus,
         // correct.
         FinishNoNotify();
 
-        nsRefPtr<nsOfflineCacheUpdate> newUpdate =
+        RefPtr<nsOfflineCacheUpdate> newUpdate =
             new nsOfflineCacheUpdate();
         // Leave aDocument argument null. Only glues and children keep
         // document instances.
@@ -1731,7 +1731,7 @@ nsOfflineCacheUpdate::Begin()
     mItemsInProgress = 0;
 
     if (mState == STATE_CANCELLED) {
-      nsRefPtr<nsRunnableMethod<nsOfflineCacheUpdate> > errorNotification =
+      RefPtr<nsRunnableMethod<nsOfflineCacheUpdate> > errorNotification =
         NS_NewRunnableMethod(this,
                              &nsOfflineCacheUpdate::AsyncFinishWithError);
       nsresult rv = NS_DispatchToMainThread(errorNotification);
@@ -1856,7 +1856,7 @@ nsOfflineCacheUpdate::ProcessNextURI()
             // update, to prevent capturing a cache while the server
             // is being updated.  The check will call
             // ManifestCheckCompleted() when it's done.
-            nsRefPtr<nsManifestCheck> manifestCheck =
+            RefPtr<nsManifestCheck> manifestCheck =
                 new nsManifestCheck(this, mManifestURI, mDocumentURI);
             if (NS_FAILED(manifestCheck->Begin())) {
                 mSucceeded = false;
@@ -2034,7 +2034,7 @@ nsOfflineCacheUpdate::ScheduleImplicit()
 
     nsresult rv;
 
-    nsRefPtr<nsOfflineCacheUpdate> update = new nsOfflineCacheUpdate();
+    RefPtr<nsOfflineCacheUpdate> update = new nsOfflineCacheUpdate();
     NS_ENSURE_TRUE(update, NS_ERROR_OUT_OF_MEMORY);
 
     nsAutoCString clientID;
@@ -2289,7 +2289,7 @@ nsOfflineCacheUpdate::AddURI(nsIURI *aURI, uint32_t aType)
         }
     }
 
-    nsRefPtr<nsOfflineCacheUpdateItem> item =
+    RefPtr<nsOfflineCacheUpdateItem> item =
         new nsOfflineCacheUpdateItem(aURI,
                                      mDocumentURI,
                                      mApplicationCache,

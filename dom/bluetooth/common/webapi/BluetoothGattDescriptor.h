@@ -76,7 +76,7 @@ private:
   /**
    * Characteristic that this descriptor belongs to.
    */
-  nsRefPtr<BluetoothGattCharacteristic> mCharacteristic;
+  RefPtr<BluetoothGattCharacteristic> mCharacteristic;
 
   /**
    * GattId of this GATT descriptor which contains

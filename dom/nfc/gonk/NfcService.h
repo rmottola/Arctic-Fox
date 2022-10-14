@@ -61,8 +61,8 @@ private:
 
   nsCOMPtr<nsIThread> mThread;
   nsCOMPtr<nsINfcGonkEventListener> mListener;
-  nsRefPtr<mozilla::ipc::ListenSocket> mListenSocket;
-  nsRefPtr<mozilla::ipc::StreamSocket> mStreamSocket;
+  RefPtr<mozilla::ipc::ListenSocket> mListenSocket;
+  RefPtr<mozilla::ipc::StreamSocket> mStreamSocket;
   nsAutoPtr<NfcMessageHandler> mHandler;
   nsCString mListenSocketName;
 };

@@ -12,7 +12,7 @@
 #include "nsIObserver.h"
 #include "nsIPresentationDeviceProvider.h"
 #include "nsITCPPresentationServer.h"
-#include "mozilla/nsRefPtr.h"
+#include "mozilla/RefPtr.h"
 #include "nsString.h"
 #include "nsWeakPtr.h"
 
@@ -58,7 +58,7 @@ private:
   nsWeakPtr mDeviceListener;
   nsCOMPtr<nsITCPPresentationServer> mPresentationServer;
   nsCOMPtr<nsIDNSServiceDiscovery> mMulticastDNS;
-  nsRefPtr<DNSServiceWrappedListener> mWrappedListener;
+  RefPtr<DNSServiceWrappedListener> mWrappedListener;
 
   nsCOMPtr<nsICancelable> mDiscoveryRequest;
   nsCOMPtr<nsICancelable> mRegisterRequest;

@@ -23,7 +23,7 @@ AllocateAudioBlock(uint32_t aChannelCount, AudioChunk* aChunk)
   }
   // XXX for SIMD purposes we should do something here to make sure the
   // channel buffers are 16-byte aligned.
-  nsRefPtr<SharedBuffer> buffer = SharedBuffer::Create(size.value());
+  RefPtr<SharedBuffer> buffer = SharedBuffer::Create(size.value());
   aChunk->mDuration = WEBAUDIO_BLOCK_SIZE;
   aChunk->mChannelData.SetLength(aChannelCount);
   float* data = static_cast<float*>(buffer->Data());

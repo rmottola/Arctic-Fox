@@ -129,7 +129,7 @@ nsSubDocumentFrame::Init(nsIContent*       aContent,
   // it into the view tree. This happens when we've been reframed, and
   // ensures the presentation persists across reframes. If the frame element
   // has changed documents however, we blow away the presentation.
-  nsRefPtr<nsFrameLoader> frameloader = FrameLoader();
+  RefPtr<nsFrameLoader> frameloader = FrameLoader();
   if (frameloader) {
     nsCOMPtr<nsIDocument> oldContainerDoc;
     nsIFrame* detachedFrame =
@@ -165,7 +165,7 @@ nsSubDocumentFrame::ShowViewer()
     // create the inner view for it to use.
     (void) EnsureInnerView();
   } else {
-    nsRefPtr<nsFrameLoader> frameloader = FrameLoader();
+    RefPtr<nsFrameLoader> frameloader = FrameLoader();
     if (frameloader) {
       CSSIntSize margin = GetMarginAttributes();
       nsWeakFrame weakThis(this);
@@ -254,7 +254,7 @@ ScreenIntSize
 nsSubDocumentFrame::GetSubdocumentSize()
 {
   if (GetStateBits() & NS_FRAME_FIRST_REFLOW) {
-    nsRefPtr<nsFrameLoader> frameloader = FrameLoader();
+    RefPtr<nsFrameLoader> frameloader = FrameLoader();
     if (frameloader) {
       nsCOMPtr<nsIDocument> oldContainerDoc;
       nsIFrame* detachedFrame =
@@ -898,12 +898,12 @@ nsSubDocumentFrame::AttributeChanged(int32_t aNameSpaceID,
     CSSIntSize margins = GetMarginAttributes();
 
     // Notify the frameloader
-    nsRefPtr<nsFrameLoader> frameloader = FrameLoader();
+    RefPtr<nsFrameLoader> frameloader = FrameLoader();
     if (frameloader)
       frameloader->MarginsChanged(margins.width, margins.height);
   }
   else if (aAttribute == nsGkAtoms::mozpasspointerevents) {
-    nsRefPtr<nsFrameLoader> frameloader = FrameLoader();
+    RefPtr<nsFrameLoader> frameloader = FrameLoader();
     if (frameloader) {
       if (aModType == nsIDOMMutationEvent::ADDITION) {
         frameloader->ActivateUpdateHitRegion();
@@ -966,7 +966,7 @@ public:
   }
 private:
   nsCOMPtr<nsIContent> mFrameElement;
-  nsRefPtr<nsFrameLoader> mFrameLoader;
+  RefPtr<nsFrameLoader> mFrameLoader;
   nsCOMPtr<nsIPresShell> mPresShell;
   bool mHideViewerIfFrameless;
 };
@@ -985,7 +985,7 @@ nsSubDocumentFrame::DestroyFrom(nsIFrame* aDestructRoot)
   // Detach the subdocument's views and stash them in the frame loader.
   // We can then reattach them if we're being reframed (for example if
   // the frame has been made position:fixed).
-  nsRefPtr<nsFrameLoader> frameloader = FrameLoader();
+  RefPtr<nsFrameLoader> frameloader = FrameLoader();
   if (frameloader) {
     nsView* detachedViews = ::BeginSwapDocShellsForViews(mInnerView->GetFirstChild());
     if (detachedViews && detachedViews->GetFrame()) {
@@ -1166,7 +1166,7 @@ EndSwapDocShellsForDocument(nsIDocument* aDocument, void*)
     nsCOMPtr<nsIContentViewer> cv;
     ds->GetContentViewer(getter_AddRefs(cv));
     while (cv) {
-      nsRefPtr<nsPresContext> pc;
+      RefPtr<nsPresContext> pc;
       cv->GetPresContext(getter_AddRefs(pc));
       if (pc && pc->GetPresShell()) {
         pc->GetPresShell()->SetNeverPainting(ds->IsInvisible());

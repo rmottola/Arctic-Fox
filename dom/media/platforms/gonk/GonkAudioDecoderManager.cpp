@@ -52,7 +52,7 @@ GonkAudioDecoderManager::~GonkAudioDecoderManager()
   MOZ_COUNT_DTOR(GonkAudioDecoderManager);
 }
 
-nsRefPtr<MediaDataDecoder::InitPromise>
+RefPtr<MediaDataDecoder::InitPromise>
 GonkAudioDecoderManager::Init(MediaDataDecoderCallback* aCallback)
 {
   if (InitMediaCodecProxy(aCallback)) {
@@ -116,7 +116,7 @@ nsresult
 GonkAudioDecoderManager::Input(MediaRawData* aSample)
 {
   MonitorAutoLock mon(mMonitor);
-  nsRefPtr<MediaRawData> sample;
+  RefPtr<MediaRawData> sample;
 
   if (aSample) {
     sample = aSample;
@@ -129,7 +129,7 @@ GonkAudioDecoderManager::Input(MediaRawData* aSample)
 
   status_t rv;
   while (mQueueSample.Length()) {
-    nsRefPtr<MediaRawData> data = mQueueSample.ElementAt(0);
+    RefPtr<MediaRawData> data = mQueueSample.ElementAt(0);
     {
       MonitorAutoUnlock mon_exit(mMonitor);
       rv = mDecoder->Input(reinterpret_cast<const uint8_t*>(data->mData),
@@ -190,7 +190,7 @@ GonkAudioDecoderManager::CreateAudioData(int64_t aStreamOffset, AudioData **v) {
   if (!duration.isValid()) {
     return NS_ERROR_UNEXPECTED;
   }
-  nsRefPtr<AudioData> audioData = new AudioData(aStreamOffset,
+  RefPtr<AudioData> audioData = new AudioData(aStreamOffset,
                                                 timeUs,
                                                 duration.value(),
                                                 frames,
@@ -221,7 +221,7 @@ GonkAudioDecoderManager::Flush()
 
 nsresult
 GonkAudioDecoderManager::Output(int64_t aStreamOffset,
-                                nsRefPtr<MediaData>& aOutData)
+                                RefPtr<MediaData>& aOutData)
 {
   aOutData = nullptr;
   status_t err;
@@ -230,7 +230,7 @@ GonkAudioDecoderManager::Output(int64_t aStreamOffset,
   switch (err) {
     case OK:
     {
-      nsRefPtr<AudioData> data;
+      RefPtr<AudioData> data;
       nsresult rv = CreateAudioData(aStreamOffset, getter_AddRefs(data));
       if (rv == NS_ERROR_NOT_AVAILABLE) {
         // Decoder outputs an empty video buffer, try again
@@ -281,7 +281,7 @@ GonkAudioDecoderManager::Output(int64_t aStreamOffset,
     case android::ERROR_END_OF_STREAM:
     {
       GADM_LOG("Got EOS frame!");
-      nsRefPtr<AudioData> data;
+      RefPtr<AudioData> data;
       nsresult rv = CreateAudioData(aStreamOffset, getter_AddRefs(data));
       if (rv == NS_ERROR_NOT_AVAILABLE) {
         // For EOS, no need to do any thing.

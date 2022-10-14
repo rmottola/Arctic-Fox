@@ -173,7 +173,7 @@ FFmpegRuntimeLinker::CreateDecoderModule()
     return  nullptr;
   }
 
-  nsRefPtr<PlatformDecoderModule> module;
+  RefPtr<PlatformDecoderModule> module;
   switch (major) {
     case 53: module = FFmpegDecoderModule<53>::Create(); break;
     case 54: module = FFmpegDecoderModule<54>::Create(); break;

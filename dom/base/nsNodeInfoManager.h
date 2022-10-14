@@ -137,7 +137,7 @@ private:
   mozilla::dom::NodeInfo *mTextNodeInfo; // WEAK to avoid circular ownership
   mozilla::dom::NodeInfo *mCommentNodeInfo; // WEAK to avoid circular ownership
   mozilla::dom::NodeInfo *mDocumentNodeInfo; // WEAK to avoid circular ownership
-  nsRefPtr<nsBindingManager> mBindingManager;
+  RefPtr<nsBindingManager> mBindingManager;
 };
 
 #endif /* nsNodeInfoManager_h___ */

@@ -99,7 +99,7 @@ LocationEvent::OnLocationChanged(REFIID aReportType,
     return S_OK;
   }
 
-  nsRefPtr<ILatLongReport> latLongReport;
+  RefPtr<ILatLongReport> latLongReport;
   if (FAILED(aReport->QueryInterface(IID_ILatLongReport,
                                      getter_AddRefs(latLongReport)))) {
     return E_FAIL;
@@ -120,7 +120,7 @@ LocationEvent::OnLocationChanged(REFIID aReportType,
   DOUBLE verror = 0.0;
   latLongReport->GetAltitudeError(&verror);
 
-  nsRefPtr<nsGeoPosition> position =
+  RefPtr<nsGeoPosition> position =
     new nsGeoPosition(latitude, longitude, alt, herror, verror, 0.0, 0.0,
                       PR_Now());
   mCallback->Update(position);
@@ -137,7 +137,7 @@ WindowsLocationProvider::WindowsLocationProvider()
 NS_IMETHODIMP
 WindowsLocationProvider::Startup()
 {
-  nsRefPtr<ILocation> location;
+  RefPtr<ILocation> location;
   if (FAILED(::CoCreateInstance(CLSID_Location, nullptr, CLSCTX_INPROC_SERVER,
                                 IID_ILocation,
                                 getter_AddRefs(location)))) {
@@ -156,7 +156,7 @@ WindowsLocationProvider::Startup()
 NS_IMETHODIMP
 WindowsLocationProvider::Watch(nsIGeolocationUpdate* aCallback)
 {
-  nsRefPtr<LocationEvent> event = new LocationEvent(aCallback);
+  RefPtr<LocationEvent> event = new LocationEvent(aCallback);
   if (FAILED(mLocation->RegisterForReport(event, IID_ILatLongReport, 0))) {
     return NS_ERROR_FAILURE;
   }

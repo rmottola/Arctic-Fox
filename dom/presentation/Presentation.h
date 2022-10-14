@@ -59,9 +59,9 @@ private:
   // |Shutdown| since the inner window may not exist at that moment.
   uint64_t mWindowId;
 
-  nsRefPtr<PresentationRequest> mDefaultRequest;
-  nsTArray<nsRefPtr<PresentationSession>> mSessions;
-  nsTArray<nsRefPtr<Promise>> mPendingGetSessionPromises;
+  RefPtr<PresentationRequest> mDefaultRequest;
+  nsTArray<RefPtr<PresentationSession>> mSessions;
+  nsTArray<RefPtr<Promise>> mPendingGetSessionPromises;
 };
 
 } // namespace dom

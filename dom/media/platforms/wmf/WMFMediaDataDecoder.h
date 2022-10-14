@@ -38,7 +38,7 @@ public:
   // than MF_E_TRANSFORM_NEED_MORE_INPUT, an error will be reported to the
   // MP4Reader.
   virtual HRESULT Output(int64_t aStreamOffset,
-                         nsRefPtr<MediaData>& aOutput) = 0;
+                         RefPtr<MediaData>& aOutput) = 0;
 
   // Destroys all resources.
   virtual void Shutdown() = 0;
@@ -62,7 +62,7 @@ public:
                       MediaDataDecoderCallback* aCallback);
   ~WMFMediaDataDecoder();
 
-  nsRefPtr<MediaDataDecoder::InitPromise> Init() override;
+  RefPtr<MediaDataDecoder::InitPromise> Init() override;
 
   nsresult Input(MediaRawData* aSample);
 

@@ -5579,7 +5579,7 @@ struct PerformanceGroup {
         recentCPOW = 0;
     }
 
-    // Refcounting. For use with mozilla::RefPtr.
+    // Refcounting. For use with RefPtr.
     void AddRef();
     void Release();
 
@@ -5663,8 +5663,8 @@ struct PerformanceGroupHolder {
     // The PerformanceGroups held by this object.
     // Initially set to `nullptr` until the first call to `getGroup`.
     // May be reset to `nullptr` by a call to `unlink`.
-    mozilla::RefPtr<js::PerformanceGroup> sharedGroup_;
-    mozilla::RefPtr<js::PerformanceGroup> ownGroup_;
+    RefPtr<js::PerformanceGroup> sharedGroup_;
+    RefPtr<js::PerformanceGroup> ownGroup_;
 };
 
 /**

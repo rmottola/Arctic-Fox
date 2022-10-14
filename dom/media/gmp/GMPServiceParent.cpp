@@ -62,7 +62,7 @@ already_AddRefed<GeckoMediaPluginServiceParent>
 GeckoMediaPluginServiceParent::GetSingleton()
 {
   MOZ_ASSERT(XRE_IsParentProcess());
-  nsRefPtr<GeckoMediaPluginService> service(
+  RefPtr<GeckoMediaPluginService> service(
     GeckoMediaPluginServiceParent::GetGeckoMediaPluginService());
 #ifdef DEBUG
   if (service) {
@@ -343,7 +343,7 @@ GeckoMediaPluginServiceParent::GetContentParentFrom(const nsACString& aNodeId,
                                                     const nsTArray<nsCString>& aTags,
                                                     UniquePtr<GetGMPContentParentCallback>&& aCallback)
 {
-  nsRefPtr<GMPParent> gmp = SelectPluginForAPI(aNodeId, aAPI, aTags);
+  RefPtr<GMPParent> gmp = SelectPluginForAPI(aNodeId, aAPI, aTags);
 
   nsCString api = aTags[0];
   LOGD(("%s: %p returning %p for api %s", __FUNCTION__, (void *)this, (void *)gmp, api.get()));
@@ -823,7 +823,7 @@ GeckoMediaPluginServiceParent::RemoveOnGMPThread(const nsAString& aDirectory,
 
   // Plugin destruction can modify |mPlugins|. Put them aside for now and
   // destroy them once we're done with |mPlugins|.
-  nsTArray<nsRefPtr<GMPParent>> deadPlugins;
+  nsTArray<RefPtr<GMPParent>> deadPlugins;
 
   bool inUse = false;
   MutexAutoLock lock(mMutex);
@@ -834,7 +834,7 @@ GeckoMediaPluginServiceParent::RemoveOnGMPThread(const nsAString& aDirectory,
       continue;
     }
 
-    nsRefPtr<GMPParent> gmp = mPlugins[i];
+    RefPtr<GMPParent> gmp = mPlugins[i];
     if (aDeleteFromDisk && gmp->State() != GMPStateNotLoaded) {
       // We have to wait for the child process to release its lib handle
       // before we can delete the GMP.
@@ -872,7 +872,7 @@ GeckoMediaPluginServiceParent::RemoveOnGMPThread(const nsAString& aDirectory,
 }
 
 // May remove when Bug 1043671 is fixed
-static void Dummy(nsRefPtr<GMPParent>& aOnDeathsDoor)
+static void Dummy(RefPtr<GMPParent>& aOnDeathsDoor)
 {
   // exists solely to do nothing and let the Runnable kill the GMPParent
   // when done.
@@ -897,12 +897,12 @@ GeckoMediaPluginServiceParent::PluginTerminated(const RefPtr<GMPParent>& aPlugin
 }
 
 void
-GeckoMediaPluginServiceParent::ReAddOnGMPThread(const nsRefPtr<GMPParent>& aOld)
+GeckoMediaPluginServiceParent::ReAddOnGMPThread(const RefPtr<GMPParent>& aOld)
 {
   MOZ_ASSERT(NS_GetCurrentThread() == mGMPThread);
   LOGD(("%s::%s: %p", __CLASS__, __FUNCTION__, (void*) aOld));
 
-  nsRefPtr<GMPParent> gmp;
+  RefPtr<GMPParent> gmp;
   if (!mShuttingDownOnGMPThread) {
     // Don't re-add plugin if we're shutting down. Let the old plugin die.
     gmp = ClonePlugin(aOld);
@@ -1221,7 +1221,7 @@ MatchOrigin(nsIFile* aPath, const nsACString& aSite)
 }
 
 template<typename T> static void
-KillPlugins(const nsTArray<nsRefPtr<GMPParent>>& aPlugins,
+KillPlugins(const nsTArray<RefPtr<GMPParent>>& aPlugins,
             Mutex& aMutex, T&& aFilter)
 {
   // Shutdown the plugins when |aFilter| evaluates to true.
@@ -1230,11 +1230,11 @@ KillPlugins(const nsTArray<nsRefPtr<GMPParent>>& aPlugins,
   // Note: we can't shut them down while holding the lock,
   // as the lock is not re-entrant and shutdown requires taking the lock.
   // The plugin list is only edited on the GMP thread, so this should be OK.
-  nsTArray<nsRefPtr<GMPParent>> pluginsToKill;
+  nsTArray<RefPtr<GMPParent>> pluginsToKill;
   {
     MutexAutoLock lock(aMutex);
     for (size_t i = 0; i < aPlugins.Length(); i++) {
-      nsRefPtr<GMPParent> parent(aPlugins[i]);
+      RefPtr<GMPParent> parent(aPlugins[i]);
       if (aFilter(parent)) {
         pluginsToKill.AppendElement(parent);
       }
@@ -1522,7 +1522,7 @@ GMPServiceParent::RecvLoadGMP(const nsCString& aNodeId,
                               nsCString* aDisplayName,
                               uint32_t* aPluginId)
 {
-  nsRefPtr<GMPParent> gmp = mService->SelectPluginForAPI(aNodeId, aAPI, aTags);
+  RefPtr<GMPParent> gmp = mService->SelectPluginForAPI(aNodeId, aAPI, aTags);
 
   nsCString api = aTags[0];
   LOGD(("%s: %p returning %p for api %s", __FUNCTION__, (void *)this, (void *)gmp, api.get()));
@@ -1556,7 +1556,7 @@ GMPServiceParent::RecvGetGMPPluginVersionForAPI(const nsCString& aAPI,
                                                 bool* aHasPlugin,
                                                 nsCString* aVersion)
 {
-  nsRefPtr<GeckoMediaPluginServiceParent> service =
+  RefPtr<GeckoMediaPluginServiceParent> service =
     GeckoMediaPluginServiceParent::GetSingleton();
   return service &&
          NS_SUCCEEDED(service->GetPluginVersionForAPI(aAPI, &aTags, aHasPlugin,
@@ -1618,7 +1618,7 @@ private:
 PGMPServiceParent*
 GMPServiceParent::Create(Transport* aTransport, ProcessId aOtherPid)
 {
-  nsRefPtr<GeckoMediaPluginServiceParent> gmp =
+  RefPtr<GeckoMediaPluginServiceParent> gmp =
     GeckoMediaPluginServiceParent::GetSingleton();
 
   nsAutoPtr<GMPServiceParent> serviceParent(new GMPServiceParent(gmp));

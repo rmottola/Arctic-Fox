@@ -108,7 +108,7 @@ class nsGeolocationRequest final
   GeoPositionErrorCallback mErrorCallback;
   nsAutoPtr<PositionOptions> mOptions;
 
-  nsRefPtr<Geolocation> mLocator;
+  RefPtr<Geolocation> mLocator;
 
   int32_t mWatchId;
   bool mShutdown;
@@ -157,7 +157,7 @@ public:
       MozSettingValue(value);
 
     } else {
-      nsRefPtr<nsGeolocationSettings> gs = nsGeolocationSettings::GetGeolocationSettings();
+      RefPtr<nsGeolocationSettings> gs = nsGeolocationSettings::GetGeolocationSettings();
       if (gs) {
         gs->HandleGeolocationSettingsChange(aName, aResult);
       }
@@ -174,7 +174,7 @@ public:
       // Default it's enabled:
       MozSettingValue(true);
     } else {
-      nsRefPtr<nsGeolocationSettings> gs = nsGeolocationSettings::GetGeolocationSettings();
+      RefPtr<nsGeolocationSettings> gs = nsGeolocationSettings::GetGeolocationSettings();
       if (gs) {
         gs->HandleGeolocationSettingsError(aName);
       }
@@ -185,7 +185,7 @@ public:
 
   void MozSettingValue(const bool aValue)
   {
-    nsRefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
+    RefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
     if (gs) {
       gs->HandleMozsettingValue(aValue);
     }
@@ -211,7 +211,7 @@ public:
   }
 
 private:
-  nsRefPtr<nsGeolocationRequest> mRequest;
+  RefPtr<nsGeolocationRequest> mRequest;
   nsWeakPtr mWindow;
 };
 
@@ -235,7 +235,7 @@ public:
 
 private:
   bool mAllow;
-  nsRefPtr<nsGeolocationRequest> mRequest;
+  RefPtr<nsGeolocationRequest> mRequest;
 };
 
 class RequestSendLocationEvent : public nsRunnable
@@ -255,8 +255,8 @@ public:
 
 private:
   nsCOMPtr<nsIDOMGeoPosition> mPosition;
-  nsRefPtr<nsGeolocationRequest> mRequest;
-  nsRefPtr<Geolocation> mLocator;
+  RefPtr<nsGeolocationRequest> mRequest;
+  RefPtr<Geolocation> mLocator;
 };
 
 ////////////////////////////////////////////////////
@@ -465,7 +465,7 @@ nsGeolocationRequest::Allow(JS::HandleValue aChoices)
   }
 
   // Kick off the geo device, if it isn't already running
-  nsRefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
+  RefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
   nsresult rv = gs->StartDevice(GetPrincipal());
 
   if (NS_FAILED(rv)) {
@@ -551,7 +551,7 @@ static already_AddRefed<nsIDOMGeoPosition>
 SynthesizeLocation(DOMTimeStamp aTimestamp, double aLatitude, double aLongitude)
 {
   // return a position at sea level, N heading, 0 speed, 0 error.
-  nsRefPtr<nsGeoPosition> pos = new nsGeoPosition(aLatitude, aLongitude,
+  RefPtr<nsGeoPosition> pos = new nsGeoPosition(aLatitude, aLongitude,
                                                   0.0, 0.0, 0.0, 0.0, 0.0,
                                                   aTimestamp);
   return pos.forget();
@@ -568,7 +568,7 @@ nsGeolocationRequest::AdjustedLocation(nsIDOMGeoPosition *aPosition)
   }
 
   // get the settings cache
-  nsRefPtr<nsGeolocationSettings> gs = nsGeolocationSettings::GetGeolocationSettings();
+  RefPtr<nsGeolocationSettings> gs = nsGeolocationSettings::GetGeolocationSettings();
   if (!gs) {
     return pos.forget();
   }
@@ -625,7 +625,7 @@ nsGeolocationRequest::SendLocation(nsIDOMGeoPosition* aPosition)
     }
   }
 
-  nsRefPtr<Position> wrapped;
+  RefPtr<Position> wrapped;
 
   if (aPosition) {
     nsCOMPtr<nsIDOMGeoPositionCoords> coords;
@@ -704,7 +704,7 @@ nsGeolocationRequest::NotifyError(uint16_t aErrorCode)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  nsRefPtr<PositionError> positionError = new PositionError(mLocator, aErrorCode);
+  RefPtr<PositionError> positionError = new PositionError(mLocator, aErrorCode);
   positionError->NotifyCallback(mErrorCallback);
   return NS_OK;
 }
@@ -723,7 +723,7 @@ nsGeolocationRequest::Shutdown()
   // If there are no other high accuracy requests, the geolocation service will
   // notify the provider to switch to the default accuracy.
   if (mOptions && mOptions->mEnableHighAccuracy) {
-    nsRefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
+    RefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
     if (gs) {
       gs->UpdateAccuracy();
     }
@@ -770,7 +770,7 @@ nsresult nsGeolocationService::Init()
     nsresult rv = settings->CreateLock(nullptr, getter_AddRefs(settingsLock));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsRefPtr<GeolocationSettingsCallback> callback = new GeolocationSettingsCallback();
+    RefPtr<GeolocationSettingsCallback> callback = new GeolocationSettingsCallback();
     rv = settingsLock->Get(GEO_SETTINGS_ENABLED, callback);
     NS_ENSURE_SUCCESS(rv, rv);
 
@@ -1126,7 +1126,7 @@ StaticRefPtr<nsGeolocationService> nsGeolocationService::sService;
 already_AddRefed<nsGeolocationService>
 nsGeolocationService::GetGeolocationService()
 {
-  nsRefPtr<nsGeolocationService> result;
+  RefPtr<nsGeolocationService> result;
   if (nsGeolocationService::sService) {
     result = nsGeolocationService::sService;
     return result.forget();
@@ -1402,7 +1402,7 @@ Geolocation::GetCurrentPosition(GeoPositionCallback& callback,
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  nsRefPtr<nsGeolocationRequest> request = new nsGeolocationRequest(this,
+  RefPtr<nsGeolocationRequest> request = new nsGeolocationRequest(this,
                                                                     callback,
                                                                     errorCallback,
                                                                     options,
@@ -1494,7 +1494,7 @@ Geolocation::WatchPosition(GeoPositionCallback& aCallback,
   // The watch ID:
   *aRv = mLastWatchId++;
 
-  nsRefPtr<nsGeolocationRequest> request = new nsGeolocationRequest(this,
+  RefPtr<nsGeolocationRequest> request = new nsGeolocationRequest(this,
                                                                     aCallback,
                                                                     aErrorCallback,
                                                                     aOptions,

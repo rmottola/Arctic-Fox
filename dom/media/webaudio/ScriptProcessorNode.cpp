@@ -379,7 +379,7 @@ private:
 
       NS_IMETHOD Run() override
       {
-        nsRefPtr<ScriptProcessorNode> node = static_cast<ScriptProcessorNode*>
+        RefPtr<ScriptProcessorNode> node = static_cast<ScriptProcessorNode*>
           (mStream->Engine()->NodeMainThread());
         if (!node) {
           return NS_OK;
@@ -396,7 +396,7 @@ private:
         JSContext* cx = jsapi.cx();
 
         // Create the input buffer
-        nsRefPtr<AudioBuffer> inputBuffer;
+        RefPtr<AudioBuffer> inputBuffer;
         if (!mNullInput) {
           ErrorResult rv;
           inputBuffer =
@@ -417,7 +417,7 @@ private:
         // avoid creating the input buffer as well.  The AudioProcessingEvent class
         // knows how to lazily create them if needed once the script tries to access
         // them.  Otherwise, we may be able to get away without creating them!
-        nsRefPtr<AudioProcessingEvent> event = new AudioProcessingEvent(node, nullptr, nullptr);
+        RefPtr<AudioProcessingEvent> event = new AudioProcessingEvent(node, nullptr, nullptr);
         event->InitEvent(inputBuffer,
                          mInputChannels.Length(),
                          context->StreamTimeToDOMTime(mPlaybackTime));
@@ -427,7 +427,7 @@ private:
         // Don't create a buffer if it hasn't been used to return output;
         // FinishProducingOutputBuffer() will optimize output = null.
         // GetThreadSharedChannelsForRate() may also return null after OOM.
-        nsRefPtr<ThreadSharedFloatArrayBufferList> output;
+        RefPtr<ThreadSharedFloatArrayBufferList> output;
         if (event->HasOutputBuffer()) {
           ErrorResult rv;
           AudioBuffer* buffer = event->GetOutputBuffer(rv);
@@ -446,7 +446,7 @@ private:
         return NS_OK;
       }
     private:
-      nsRefPtr<AudioNodeStream> mStream;
+      RefPtr<AudioNodeStream> mStream;
       InputChannels mInputChannels;
       double mPlaybackTime;
       bool mNullInput;

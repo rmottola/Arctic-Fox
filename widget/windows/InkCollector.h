@@ -57,9 +57,9 @@ protected:
   bool IsHardProximityTablet(IInkTablet* aTablet) const;
 
 private:
-  nsRefPtr<IUnknown>          mMarshaller;
-  nsRefPtr<IInkCollector>     mInkCollector;
-  nsRefPtr<IConnectionPoint>  mConnectionPoint;
+  RefPtr<IUnknown>          mMarshaller;
+  RefPtr<IInkCollector>     mInkCollector;
+  RefPtr<IConnectionPoint>  mConnectionPoint;
 
   uint32_t            mRefCount         = 0;
   DWORD               mCookie           = 0;

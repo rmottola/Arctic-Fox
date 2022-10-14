@@ -98,9 +98,9 @@ public:
 
   void GetId(nsAString& aID) const;
 
-  void GetAudioTracks(nsTArray<nsRefPtr<AudioStreamTrack> >& aTracks);
-  void GetVideoTracks(nsTArray<nsRefPtr<VideoStreamTrack> >& aTracks);
-  void GetTracks(nsTArray<nsRefPtr<MediaStreamTrack> >& aTracks);
+  void GetAudioTracks(nsTArray<RefPtr<AudioStreamTrack> >& aTracks);
+  void GetVideoTracks(nsTArray<RefPtr<VideoStreamTrack> >& aTracks);
+  void GetTracks(nsTArray<RefPtr<MediaStreamTrack> >& aTracks);
   bool HasTrack(const MediaStreamTrack& aTrack) const;
 
   MediaStream* GetStream() const { return mStream; }
@@ -294,8 +294,8 @@ protected:
   // die until we let it.
   MediaStream* mStream;
 
-  nsAutoTArray<nsRefPtr<MediaStreamTrack>,2> mTracks;
-  nsRefPtr<StreamListener> mListener;
+  nsAutoTArray<RefPtr<MediaStreamTrack>,2> mTracks;
+  RefPtr<StreamListener> mListener;
 
   nsTArray<nsAutoPtr<OnTracksAvailableCallback> > mRunOnTracksAvailable;
 
@@ -397,7 +397,7 @@ protected:
 private:
   // If this object wraps a stream owned by an AudioNode, we need to ensure that
   // the node isn't cycle-collected too early.
-  nsRefPtr<AudioNode> mStreamNode;
+  RefPtr<AudioNode> mStreamNode;
 };
 
 class DOMHwMediaStream : public DOMLocalMediaStream
@@ -425,11 +425,11 @@ private:
   void Init(MediaStream* aStream);
 
 #ifdef MOZ_WIDGET_GONK
-  nsRefPtr<ImageContainer> mImageContainer;
+  RefPtr<ImageContainer> mImageContainer;
   const int DEFAULT_IMAGE_ID = 0x01;
   const int DEFAULT_IMAGE_WIDTH = 400;
   const int DEFAULT_IMAGE_HEIGHT = 300;
-  nsRefPtr<OverlayImage> mOverlayImage;
+  RefPtr<OverlayImage> mOverlayImage;
   Data mImageData;
 #endif
 };

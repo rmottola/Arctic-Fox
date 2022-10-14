@@ -66,11 +66,11 @@ public:
   virtual bool SupportsConfig(IMFMediaType* aType) override;
 
 private:
-  nsRefPtr<IDirect3D9Ex> mD3D9;
-  nsRefPtr<IDirect3DDevice9Ex> mDevice;
-  nsRefPtr<IDirect3DDeviceManager9> mDeviceManager;
+  RefPtr<IDirect3D9Ex> mD3D9;
+  RefPtr<IDirect3DDevice9Ex> mDevice;
+  RefPtr<IDirect3DDeviceManager9> mDeviceManager;
   RefPtr<D3D9RecycleAllocator> mTextureClientAllocator;
-  nsRefPtr<IDirectXVideoDecoderService> mDecoderService;
+  RefPtr<IDirectXVideoDecoderService> mDecoderService;
   UINT32 mResetToken;
 };
 
@@ -155,7 +155,7 @@ D3D9DXVA2Manager::SupportsConfig(IMFMediaType* aType)
   hr = mDecoderService->GetDecoderConfigurations(DXVA2_ModeH264_E, &desc, nullptr, &configCount, &configs);
   NS_ENSURE_TRUE(SUCCEEDED(hr), false);
 
-  nsRefPtr<IDirect3DSurface9> surface;
+  RefPtr<IDirect3DSurface9> surface;
   hr = mDecoderService->CreateSurface(desc.SampleWidth, desc.SampleHeight, 0, (D3DFORMAT)MAKEFOURCC('N', 'V', '1', '2'),
   D3DPOOL_DEFAULT, 0, DXVA2_VideoDecoderRenderTarget,
   surface.StartAssignment(), NULL);
@@ -165,7 +165,7 @@ D3D9DXVA2Manager::SupportsConfig(IMFMediaType* aType)
   }
 
   for (UINT i = 0; i < configCount; i++) {
-    nsRefPtr<IDirectXVideoDecoder> decoder;
+    RefPtr<IDirectXVideoDecoder> decoder;
     IDirect3DSurface9* surfaces = surface;
     hr = mDecoderService->CreateVideoDecoder(DXVA2_ModeH264_E, &desc, &configs[i], &surfaces, 1, decoder.StartAssignment());
     if (SUCCEEDED(hr) && decoder) {
@@ -214,7 +214,7 @@ D3D9DXVA2Manager::Init(nsACString& aFailureReason)
   NS_ENSURE_TRUE(d3d9lib, E_FAIL);
   decltype(Direct3DCreate9Ex)* d3d9Create =
     (decltype(Direct3DCreate9Ex)*) GetProcAddress(d3d9lib, "Direct3DCreate9Ex");
-  nsRefPtr<IDirect3D9Ex> d3d9Ex;
+  RefPtr<IDirect3D9Ex> d3d9Ex;
   HRESULT hr = d3d9Create(D3D_SDK_VERSION, getter_AddRefs(d3d9Ex));
   if (!d3d9Ex) {
     NS_WARNING("Direct3DCreate9 failed");
@@ -244,7 +244,7 @@ D3D9DXVA2Manager::Init(nsACString& aFailureReason)
   params.Windowed = TRUE;
   params.Flags = D3DPRESENTFLAG_VIDEO;
 
-  nsRefPtr<IDirect3DDevice9Ex> device;
+  RefPtr<IDirect3DDevice9Ex> device;
   hr = d3d9Ex->CreateDeviceEx(D3DADAPTER_DEFAULT,
                               D3DDEVTYPE_HAL,
                               ::GetShellWindow(),
@@ -263,7 +263,7 @@ D3D9DXVA2Manager::Init(nsACString& aFailureReason)
   // Without this, when we make a copy of the frame in order to share it with
   // another device, we can't be sure that the copy has finished before the
   // other device starts using it.
-  nsRefPtr<IDirect3DQuery9> query;
+  RefPtr<IDirect3DQuery9> query;
 
   hr = device->CreateQuery(D3DQUERYTYPE_EVENT, getter_AddRefs(query));
   if (!SUCCEEDED(hr)) {
@@ -273,7 +273,7 @@ D3D9DXVA2Manager::Init(nsACString& aFailureReason)
 
   // Create and initialize IDirect3DDeviceManager9.
   UINT resetToken = 0;
-  nsRefPtr<IDirect3DDeviceManager9> deviceManager;
+  RefPtr<IDirect3DDeviceManager9> deviceManager;
 
   hr = wmf::DXVA2CreateDirect3DDeviceManager9(&resetToken,
                                               getter_AddRefs(deviceManager));
@@ -288,7 +288,7 @@ D3D9DXVA2Manager::Init(nsACString& aFailureReason)
   }
 
   HANDLE deviceHandle;
-  nsRefPtr<IDirectXVideoDecoderService> decoderService;
+  RefPtr<IDirectXVideoDecoderService> decoderService;
   hr = deviceManager->OpenDeviceHandle(&deviceHandle);
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
@@ -334,18 +334,18 @@ D3D9DXVA2Manager::CopyToImage(IMFSample* aSample,
                               ImageContainer* aImageContainer,
                               Image** aOutImage)
 {
-  nsRefPtr<IMFMediaBuffer> buffer;
+  RefPtr<IMFMediaBuffer> buffer;
   HRESULT hr = aSample->GetBufferByIndex(0, getter_AddRefs(buffer));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
-  nsRefPtr<IDirect3DSurface9> surface;
+  RefPtr<IDirect3DSurface9> surface;
   hr = wmf::MFGetService(buffer,
                          MR_BUFFER_SERVICE,
                          IID_IDirect3DSurface9,
                          getter_AddRefs(surface));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
-  nsRefPtr<Image> image = aImageContainer->CreateImage(ImageFormat::D3D9_RGB32_TEXTURE);
+  RefPtr<Image> image = aImageContainer->CreateImage(ImageFormat::D3D9_RGB32_TEXTURE);
   NS_ENSURE_TRUE(image, E_FAIL);
   NS_ASSERTION(image->GetFormat() == ImageFormat::D3D9_RGB32_TEXTURE,
                "Wrong format?");
@@ -524,7 +524,7 @@ D3D11DXVA2Manager::CopyToImage(IMFSample* aVideoSample,
   // handle, and put that handle into the rendering pipeline.
 
   ImageFormat format = ImageFormat::D3D11_SHARE_HANDLE_TEXTURE;
-  nsRefPtr<Image> image(aContainer->CreateImage(format));
+  RefPtr<Image> image(aContainer->CreateImage(format));
   NS_ENSURE_TRUE(image, E_FAIL);
   NS_ASSERTION(image->GetFormat() == ImageFormat::D3D11_SHARE_HANDLE_TEXTURE,
                "Wrong format?");

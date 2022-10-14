@@ -33,7 +33,7 @@ public:
   static void AddConsumer(nsDocShell* aDocShell);
   static void RemoveConsumer(nsDocShell* aDocShell);
   static bool IsEmpty();
-  static bool GetKnownDocShells(Vector<nsRefPtr<nsDocShell>>& aStore);
+  static bool GetKnownDocShells(Vector<RefPtr<nsDocShell>>& aStore);
 
   // Methods for adding markers relevant for particular docshells, or generic
   // (meaning that they either can't be tied to a particular docshell, or one
@@ -70,7 +70,7 @@ public:
                                    UniquePtr<TimelineMarker>&& aMarker);
 
   // This method creates custom markers, relevant for a list of docshells.
-  static void AddMarkerForDocShellsList(Vector<nsRefPtr<nsDocShell>>& aDocShells,
+  static void AddMarkerForDocShellsList(Vector<RefPtr<nsDocShell>>& aDocShells,
                                         const char* aName,
                                         MarkerTracingType aTracingType);
 

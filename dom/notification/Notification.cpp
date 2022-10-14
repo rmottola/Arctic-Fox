@@ -150,10 +150,10 @@ public:
     MOZ_ASSERT(ok);
 
     ErrorResult result;
-    nsAutoTArray<nsRefPtr<Notification>, 5> notifications;
+    nsAutoTArray<RefPtr<Notification>, 5> notifications;
 
     for (uint32_t i = 0; i < mStrings.Length(); ++i) {
-      nsRefPtr<Notification> n =
+      RefPtr<Notification> n =
         Notification::ConstructFromFields(mWindow,
                                           mStrings[i].mID,
                                           mStrings[i].mTitle,
@@ -184,7 +184,7 @@ private:
   {}
 
   nsCOMPtr<nsIGlobalObject> mWindow;
-  nsRefPtr<Promise> mPromise;
+  RefPtr<Promise> mPromise;
   const nsString mScope;
 };
 
@@ -251,7 +251,7 @@ protected:
   nsCOMPtr<nsIPrincipal> mPrincipal;
   nsCOMPtr<nsPIDOMWindow> mWindow;
   NotificationPermission mPermission;
-  nsRefPtr<NotificationPermissionCallback> mCallback;
+  RefPtr<NotificationPermissionCallback> mCallback;
   nsCOMPtr<nsIContentPermissionRequester> mRequester;
 };
 
@@ -455,7 +455,7 @@ public:
   {
     if (Initialized() && mNotification) {
       if (mNotification->mWorkerPrivate && NS_IsMainThread()) {
-        nsRefPtr<ReleaseNotificationControlRunnable> r =
+        RefPtr<ReleaseNotificationControlRunnable> r =
           new ReleaseNotificationControlRunnable(mNotification);
         AutoSafeJSContext cx;
         if (!r->Dispatch(cx)) {
@@ -760,7 +760,7 @@ Notification::Constructor(const GlobalObject& aGlobal,
   }
 
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
-  nsRefPtr<Notification> notification =
+  RefPtr<Notification> notification =
     CreateAndShow(global, aTitle, aOptions, EmptyString(), aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
@@ -798,7 +798,7 @@ Notification::ConstructFromFields(
   options.mBody = aBody;
   options.mTag = aTag;
   options.mIcon = aIcon;
-  nsRefPtr<Notification> notification = CreateInternal(aGlobal, aID, aTitle,
+  RefPtr<Notification> notification = CreateInternal(aGlobal, aID, aTitle,
                                                        options);
 
   notification->InitFromBase64(jsapi.cx(), aData, aRv);
@@ -899,7 +899,7 @@ Notification::CreateInternal(nsIGlobalObject* aGlobal,
     id = convertedID;
   }
 
-  nsRefPtr<Notification> notification = new Notification(aGlobal, id, aTitle,
+  RefPtr<Notification> notification = new Notification(aGlobal, id, aTitle,
                                                          aOptions.mBody,
                                                          aOptions.mDir,
                                                          aOptions.mLang,
@@ -1006,7 +1006,7 @@ protected:
       }
     };
 
-    nsRefPtr<ReleaseNotificationRunnable> r =
+    RefPtr<ReleaseNotificationRunnable> r =
       new ReleaseNotificationRunnable(Move(mNotificationRef));
     notification = nullptr;
 
@@ -1056,8 +1056,8 @@ Notification::DispatchNotificationClickEvent()
   options.mNotification = this;
 
   ErrorResult result;
-  nsRefPtr<EventTarget> target = mWorkerPrivate->GlobalScope();
-  nsRefPtr<NotificationEvent> event =
+  RefPtr<EventTarget> target = mWorkerPrivate->GlobalScope();
+  RefPtr<NotificationEvent> event =
     NotificationEvent::Constructor(target,
                                    NS_LITERAL_STRING("notificationclick"),
                                    options,
@@ -1079,7 +1079,7 @@ bool
 Notification::DispatchClickEvent()
 {
   AssertIsOnTargetThread();
-  nsRefPtr<Event> event = NS_NewDOMEvent(this, nullptr, nullptr);
+  RefPtr<Event> event = NS_NewDOMEvent(this, nullptr, nullptr);
   nsresult rv = event->InitEvent(NS_LITERAL_STRING("click"), false, true);
   NS_ENSURE_SUCCESS(rv, false);
   event->SetTrusted(true);
@@ -1113,7 +1113,7 @@ public:
     bool doDefaultAction = mNotification->DispatchClickEvent();
     MOZ_ASSERT_IF(mWorkerPrivate->IsServiceWorker(), !doDefaultAction);
     if (doDefaultAction) {
-      nsRefPtr<FocusWindowRunnable> r = new FocusWindowRunnable(mWindow);
+      RefPtr<FocusWindowRunnable> r = new FocusWindowRunnable(mWindow);
       NS_DispatchToMainThread(r);
     }
   }
@@ -1171,7 +1171,7 @@ WorkerNotificationObserver::Observe(nsISupports* aSubject, const char* aTopic,
 
   MOZ_ASSERT(notification->mWorkerPrivate);
 
-  nsRefPtr<WorkerRunnable> r;
+  RefPtr<WorkerRunnable> r;
   if (!strcmp("alertclickcallback", aTopic)) {
     nsPIDOMWindow* window = nullptr;
     if (!notification->mWorkerPrivate->IsServiceWorker()) {
@@ -1346,7 +1346,7 @@ Notification::ShowInternal()
   }
   if (permission != NotificationPermission::Granted || !alertService) {
     if (mWorkerPrivate) {
-      nsRefPtr<NotificationEventWorkerRunnable> r =
+      RefPtr<NotificationEventWorkerRunnable> r =
         new NotificationEventWorkerRunnable(this,
                                             NS_LITERAL_STRING("error"));
       AutoSafeJSContext cx;
@@ -1510,7 +1510,7 @@ Notification::GetPermission(nsIGlobalObject* aGlobal, ErrorResult& aRv)
   } else {
     WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
     MOZ_ASSERT(worker);
-    nsRefPtr<GetPermissionRunnable> r =
+    RefPtr<GetPermissionRunnable> r =
       new GetPermissionRunnable(worker);
     if (!r->Dispatch(worker->GetJSContext())) {
       aRv.Throw(NS_ERROR_DOM_ABORT_ERR);
@@ -1662,7 +1662,7 @@ Notification::Get(nsPIDOMWindow* aWindow,
   }
 
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aWindow);
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   if (aRv.Failed()) {
     return nullptr;
   }
@@ -1670,7 +1670,7 @@ Notification::Get(nsPIDOMWindow* aWindow,
   nsCOMPtr<nsINotificationStorageCallback> callback =
     new NotificationStorageCallback(global, aScope, promise);
 
-  nsRefPtr<NotificationGetRunnable> r =
+  RefPtr<NotificationGetRunnable> r =
     new NotificationGetRunnable(origin, aFilter.mTag, callback);
 
   aRv = NS_DispatchToMainThread(r);
@@ -1697,7 +1697,7 @@ Notification::Get(const GlobalObject& aGlobal,
 
 class WorkerGetResultRunnable final : public NotificationWorkerRunnable
 {
-  nsRefPtr<PromiseWorkerProxy> mPromiseProxy;
+  RefPtr<PromiseWorkerProxy> mPromiseProxy;
   const nsTArray<NotificationStrings> mStrings;
 public:
   WorkerGetResultRunnable(WorkerPrivate* aWorkerPrivate,
@@ -1712,12 +1712,12 @@ public:
   void
   WorkerRunInternal(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
   {
-    nsRefPtr<Promise> workerPromise = mPromiseProxy->WorkerPromise();
+    RefPtr<Promise> workerPromise = mPromiseProxy->WorkerPromise();
 
     ErrorResult result;
-    nsAutoTArray<nsRefPtr<Notification>, 5> notifications;
+    nsAutoTArray<RefPtr<Notification>, 5> notifications;
     for (uint32_t i = 0; i < mStrings.Length(); ++i) {
-      nsRefPtr<Notification> n =
+      RefPtr<Notification> n =
         Notification::ConstructFromFields(aWorkerPrivate->GlobalScope(),
                                           mStrings[i].mID,
                                           mStrings[i].mTitle,
@@ -1746,7 +1746,7 @@ public:
 
 class WorkerGetCallback final : public ScopeCheckingGetCallback
 {
-  nsRefPtr<PromiseWorkerProxy> mPromiseProxy;
+  RefPtr<PromiseWorkerProxy> mPromiseProxy;
 public:
   NS_DECL_ISUPPORTS_INHERITED
 
@@ -1762,13 +1762,13 @@ public:
     AssertIsOnMainThread();
     MOZ_ASSERT(mPromiseProxy, "Was Done() called twice?");
 
-    nsRefPtr<PromiseWorkerProxy> proxy = mPromiseProxy.forget();
+    RefPtr<PromiseWorkerProxy> proxy = mPromiseProxy.forget();
     MutexAutoLock lock(proxy->Lock());
     if (proxy->CleanedUp()) {
       return NS_OK;
     }
 
-    nsRefPtr<WorkerGetResultRunnable> r =
+    RefPtr<WorkerGetResultRunnable> r =
       new WorkerGetResultRunnable(proxy->GetWorkerPrivate(),
                                   proxy,
                                   Move(mStrings));
@@ -1786,7 +1786,7 @@ NS_IMPL_ISUPPORTS_INHERITED0(WorkerGetCallback, ScopeCheckingGetCallback)
 
 class WorkerGetRunnable final : public nsRunnable
 {
-  nsRefPtr<PromiseWorkerProxy> mPromiseProxy;
+  RefPtr<PromiseWorkerProxy> mPromiseProxy;
   const nsString mTag;
   const nsString mScope;
 public:
@@ -1851,19 +1851,19 @@ Notification::WorkerGet(WorkerPrivate* aWorkerPrivate,
 {
   MOZ_ASSERT(aWorkerPrivate);
   aWorkerPrivate->AssertIsOnWorkerThread();
-  nsRefPtr<Promise> p = Promise::Create(aWorkerPrivate->GlobalScope(), aRv);
+  RefPtr<Promise> p = Promise::Create(aWorkerPrivate->GlobalScope(), aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
 
-  nsRefPtr<PromiseWorkerProxy> proxy =
+  RefPtr<PromiseWorkerProxy> proxy =
     PromiseWorkerProxy::Create(aWorkerPrivate, p);
   if (!proxy) {
     aRv.Throw(NS_ERROR_DOM_ABORT_ERR);
     return nullptr;
   }
 
-  nsRefPtr<WorkerGetRunnable> r =
+  RefPtr<WorkerGetRunnable> r =
     new WorkerGetRunnable(proxy, aFilter.mTag, aScope);
   // Since this is called from script via
   // ServiceWorkerRegistration::GetNotifications, we can assert dispatch.
@@ -2087,7 +2087,7 @@ NotificationFeature::Notify(JSContext* aCx, Status aStatus)
   MOZ_ASSERT(aStatus >= Canceling);
 
   // Dispatched to main thread, blocks on closing the Notification.
-  nsRefPtr<CloseNotificationRunnable> r =
+  RefPtr<CloseNotificationRunnable> r =
     new CloseNotificationRunnable(mNotification);
   r->Dispatch(aCx);
 
@@ -2149,8 +2149,8 @@ public:
       return true;
     }
 
-    nsRefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
-    nsRefPtr<ServiceWorkerRegistrationInfo> registration =
+    RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+    RefPtr<ServiceWorkerRegistrationInfo> registration =
       swm->GetRegistration(principal, mScope);
 
     // This is coming from a ServiceWorkerRegistrationWorkerThread.
@@ -2210,7 +2210,7 @@ Notification::ShowPersistentNotification(nsIGlobalObject *aGlobal,
     WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
     MOZ_ASSERT(worker);
     worker->AssertIsOnWorkerThread();
-    nsRefPtr<CheckLoadRunnable> loadChecker =
+    RefPtr<CheckLoadRunnable> loadChecker =
       new CheckLoadRunnable(worker, NS_ConvertUTF16toUTF8(aScope));
     if (!loadChecker->Dispatch(worker->GetJSContext())) {
       aRv.Throw(NS_ERROR_DOM_ABORT_ERR);
@@ -2228,7 +2228,7 @@ Notification::ShowPersistentNotification(nsIGlobalObject *aGlobal,
   }
 
 
-  nsRefPtr<Promise> p = Promise::Create(aGlobal, aRv);
+  RefPtr<Promise> p = Promise::Create(aGlobal, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
@@ -2250,7 +2250,7 @@ Notification::ShowPersistentNotification(nsIGlobalObject *aGlobal,
   // is not concerned with those.
   p->MaybeResolve(JS::UndefinedHandleValue);
 
-  nsRefPtr<Notification> notification =
+  RefPtr<Notification> notification =
     CreateAndShow(aGlobal, aTitle, aOptions, aScope, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
@@ -2272,7 +2272,7 @@ Notification::CreateAndShow(nsIGlobalObject* aGlobal,
   jsapi.Init(aGlobal);
   JSContext* cx = jsapi.cx();
 
-  nsRefPtr<Notification> notification = CreateInternal(aGlobal, EmptyString(),
+  RefPtr<Notification> notification = CreateInternal(aGlobal, EmptyString(),
                                                        aTitle, aOptions);
 
   // Make a structured clone of the aOptions.mData object

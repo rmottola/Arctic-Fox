@@ -177,7 +177,7 @@ public:
   TracksAvailableCallback(size_t numNewAudioTracks,
                           size_t numNewVideoTracks,
                           const std::string& pcHandle,
-                          nsRefPtr<PeerConnectionObserver> aObserver)
+                          RefPtr<PeerConnectionObserver> aObserver)
   : DOMMediaStream::OnTracksAvailableCallback()
   , mObserver(aObserver)
   , mPcHandle(pcHandle)
@@ -193,7 +193,7 @@ public:
       return;
     }
 
-    nsTArray<nsRefPtr<MediaStreamTrack>> tracks;
+    nsTArray<RefPtr<MediaStreamTrack>> tracks;
     aStream->GetTracks(tracks);
 
     std::string streamId = PeerConnectionImpl::GetStreamId(*aStream);
@@ -255,7 +255,7 @@ public:
   }
 
 private:
-  nsRefPtr<PeerConnectionObserver> mObserver;
+  RefPtr<PeerConnectionObserver> mObserver;
   const std::string mPcHandle;
 };
 #endif
@@ -447,7 +447,7 @@ PeerConnectionImpl::MakeMediaStream()
     MediaStreamGraph::GetInstance(MediaStreamGraph::AUDIO_THREAD_DRIVER,
                                   AudioChannel::Normal);
 
-  nsRefPtr<DOMMediaStream> stream =
+  RefPtr<DOMMediaStream> stream =
     DOMMediaStream::CreateSourceStream(GetWindow(), graph);
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
   // Make the stream data (audio/video samples) accessible to the receiving page.
@@ -473,19 +473,19 @@ PeerConnectionImpl::MakeMediaStream()
 }
 
 nsresult
-PeerConnectionImpl::CreateRemoteSourceStreamInfo(nsRefPtr<RemoteSourceStreamInfo>*
+PeerConnectionImpl::CreateRemoteSourceStreamInfo(RefPtr<RemoteSourceStreamInfo>*
                                                  aInfo,
                                                  const std::string& aStreamID)
 {
   MOZ_ASSERT(aInfo);
   PC_AUTO_ENTER_API_CALL_NO_CHECK();
 
-  nsRefPtr<DOMMediaStream> stream = MakeMediaStream();
+  RefPtr<DOMMediaStream> stream = MakeMediaStream();
   if (!stream) {
     return NS_ERROR_FAILURE;
   }
 
-  nsRefPtr<RemoteSourceStreamInfo> remote;
+  RefPtr<RemoteSourceStreamInfo> remote;
   remote = new RemoteSourceStreamInfo(stream.forget(), mMedia, aStreamID);
   *aInfo = remote;
 
@@ -555,7 +555,7 @@ PeerConnectionConfiguration::AddIceServer(const RTCIceServer &aServer)
     // http://tools.ietf.org/html/draft-nandakumar-rtcweb-stun-uri-02#section-3
     // http://tools.ietf.org/html/draft-petithuguenin-behave-turn-uri-03#section-3
     // we parse out the query-string, and use ParseAuthority() on the rest
-    nsRefPtr<nsIURI> url;
+    RefPtr<nsIURI> url;
     nsresult rv = NS_NewURI(getter_AddRefs(url), urls[i]);
     NS_ENSURE_SUCCESS(rv, rv);
     bool isStun = false, isStuns = false, isTurn = false, isTurns = false;
@@ -869,7 +869,7 @@ PeerConnectionImpl::SetCertificate(mozilla::dom::RTCCertificate& aCertificate)
   }
 }
 
-const nsRefPtr<mozilla::dom::RTCCertificate>&
+const RefPtr<mozilla::dom::RTCCertificate>&
 PeerConnectionImpl::Certificate() const
 {
   PC_AUTO_ENTER_API_CALL_NO_CHECK();
@@ -877,7 +877,7 @@ PeerConnectionImpl::Certificate() const
 }
 #endif
 
-mozilla::RefPtr<DtlsIdentity>
+RefPtr<DtlsIdentity>
 PeerConnectionImpl::Identity() const
 {
   PC_AUTO_ENTER_API_CALL_NO_CHECK();
@@ -885,7 +885,7 @@ PeerConnectionImpl::Identity() const
   MOZ_ASSERT(mCertificate);
   return mCertificate->CreateDtlsIdentity();
 #else
-  mozilla::RefPtr<DtlsIdentity> id = mIdentity;
+  RefPtr<DtlsIdentity> id = mIdentity;
   return id;
 #endif
 }
@@ -1217,7 +1217,7 @@ PeerConnectionImpl::InitializeDataChannel()
     }
 
     // use the specified TransportFlow
-    nsRefPtr<TransportFlow> flow = mMedia->GetTransportFlow(level, false).get();
+    RefPtr<TransportFlow> flow = mMedia->GetTransportFlow(level, false).get();
     CSFLogDebug(logTag, "Transportflow[%u] = %p",
                         static_cast<unsigned>(level), flow.get());
     if (flow) {
@@ -1247,7 +1247,7 @@ PeerConnectionImpl::CreateDataChannel(const nsAString& aLabel,
                                       ErrorResult &rv)
 {
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
-  nsRefPtr<nsDOMDataChannel> result;
+  RefPtr<nsDOMDataChannel> result;
   rv = CreateDataChannel(aLabel, aProtocol, aType, outOfOrderAllowed,
                          aMaxTime, aMaxNum, aExternalNegotiated,
                          aStream, getter_AddRefs(result));
@@ -1272,7 +1272,7 @@ PeerConnectionImpl::CreateDataChannel(const nsAString& aLabel,
   MOZ_ASSERT(aRetval);
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
-  nsRefPtr<DataChannel> dataChannel;
+  RefPtr<DataChannel> dataChannel;
   DataChannelConnection::Type theType =
     static_cast<DataChannelConnection::Type>(aType);
 
@@ -1340,8 +1340,8 @@ PeerConnectionImpl::CreateDataChannel(const nsAString& aLabel,
 //  if (!tmp) {
 //    return;
 //  }
-//  nsRefPtr<nsSupportsWeakReference> tmp2 = do_QueryObject(tmp);
-//  nsRefPtr<PeerConnectionObserver> pco = static_cast<PeerConnectionObserver*>(&*tmp2);
+//  RefPtr<nsSupportsWeakReference> tmp2 = do_QueryObject(tmp);
+//  RefPtr<PeerConnectionObserver> pco = static_cast<PeerConnectionObserver*>(&*tmp2);
 
 static already_AddRefed<PeerConnectionObserver>
 do_QueryObjectReferent(nsIWeakReference* aRawPtr) {
@@ -1349,20 +1349,20 @@ do_QueryObjectReferent(nsIWeakReference* aRawPtr) {
   if (!tmp) {
     return nullptr;
   }
-  nsRefPtr<nsSupportsWeakReference> tmp2 = do_QueryObject(tmp);
-  nsRefPtr<PeerConnectionObserver> tmp3 = static_cast<PeerConnectionObserver*>(&*tmp2);
+  RefPtr<nsSupportsWeakReference> tmp2 = do_QueryObject(tmp);
+  RefPtr<PeerConnectionObserver> tmp3 = static_cast<PeerConnectionObserver*>(&*tmp2);
   return tmp3.forget();
 }
 
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
 // Not a member function so that we don't need to keep the PC live.
-static void NotifyDataChannel_m(nsRefPtr<nsIDOMDataChannel> aChannel,
-                                nsRefPtr<PeerConnectionObserver> aObserver)
+static void NotifyDataChannel_m(RefPtr<nsIDOMDataChannel> aChannel,
+                                RefPtr<PeerConnectionObserver> aObserver)
 {
   MOZ_ASSERT(NS_IsMainThread());
   JSErrorResult rv;
-  nsRefPtr<nsDOMDataChannel> channel = static_cast<nsDOMDataChannel*>(&*aChannel);
+  RefPtr<nsDOMDataChannel> channel = static_cast<nsDOMDataChannel*>(&*aChannel);
   aObserver->NotifyDataChannel(*channel, rv);
   NS_DataChannelAppReady(aChannel);
 }
@@ -1373,7 +1373,7 @@ PeerConnectionImpl::NotifyDataChannel(already_AddRefed<DataChannel> aChannel)
 {
   PC_AUTO_ENTER_API_CALL_NO_CHECK();
 
-  // XXXkhuey this is completely fucked up.  We can't use nsRefPtr<DataChannel>
+  // XXXkhuey this is completely fucked up.  We can't use RefPtr<DataChannel>
   // here because DataChannel's AddRef/Release are non-virtual and not visible
   // if !MOZILLA_INTERNAL_API, but this function leaks the DataChannel if
   // !MOZILLA_INTERNAL_API because it never transfers the ref to
@@ -1391,7 +1391,7 @@ PeerConnectionImpl::NotifyDataChannel(already_AddRefed<DataChannel> aChannel)
 
   mHaveDataStream = true;
 
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {
     return;
   }
@@ -1446,7 +1446,7 @@ PeerConnectionImpl::CreateOffer(const JsepOfferOptions& aOptions)
 {
   PC_AUTO_ENTER_API_CALL(true);
 
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {
     return NS_OK;
   }
@@ -1500,7 +1500,7 @@ PeerConnectionImpl::CreateAnswer()
 {
   PC_AUTO_ENTER_API_CALL(true);
 
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {
     return NS_OK;
   }
@@ -1548,7 +1548,7 @@ PeerConnectionImpl::SetLocalDescription(int32_t aAction, const char* aSDP)
   }
 
   JSErrorResult rv;
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {
     return NS_OK;
   }
@@ -1633,7 +1633,7 @@ PeerConnectionImpl::SetRemoteDescription(int32_t action, const char* aSDP)
   }
 
   JSErrorResult jrv;
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {
     return NS_OK;
   }
@@ -1720,7 +1720,7 @@ PeerConnectionImpl::SetRemoteDescription(int32_t action, const char* aSDP)
       std::string streamId = i->first;
       std::vector<RefPtr<JsepTrack>>& tracks = i->second;
 
-      nsRefPtr<RemoteSourceStreamInfo> info =
+      RefPtr<RemoteSourceStreamInfo> info =
         mMedia->GetRemoteStreamById(streamId);
       if (!info) {
         nsresult nrv = CreateRemoteSourceStreamInfo(&info, streamId);
@@ -1791,7 +1791,7 @@ PeerConnectionImpl::SetRemoteDescription(int32_t action, const char* aSDP)
       mJsepSession->GetRemoteTracksRemoved();
 
     for (auto i = removedTracks.begin(); i != removedTracks.end(); ++i) {
-      nsRefPtr<RemoteSourceStreamInfo> info =
+      RefPtr<RemoteSourceStreamInfo> info =
         mMedia->GetRemoteStreamById((*i)->GetStreamId());
       if (!info) {
         MOZ_ASSERT(false, "A stream/track was removed that wasn't in PCMedia. "
@@ -1877,7 +1877,7 @@ PeerConnectionImpl::AddIceCandidate(const char* aCandidate, const char* aMid, un
   PC_AUTO_ENTER_API_CALL(true);
 
   JSErrorResult rv;
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {
     return NS_OK;
   }
@@ -2139,7 +2139,7 @@ PeerConnectionImpl::RemoveTrack(MediaStreamTrack& aTrack) {
   }
 
   std::string streamId = PeerConnectionImpl::GetStreamId(*stream);
-  nsRefPtr<LocalSourceStreamInfo> info = media()->GetLocalStreamById(streamId);
+  RefPtr<LocalSourceStreamInfo> info = media()->GetLocalStreamById(streamId);
 
   if (!info) {
     CSFLogError(logTag, "%s: Unknown stream", __FUNCTION__);
@@ -2171,7 +2171,7 @@ PeerConnectionImpl::ReplaceTrack(MediaStreamTrack& aThisTrack,
                                  MediaStreamTrack& aWithTrack) {
   PC_AUTO_ENTER_API_CALL(true);
 
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {
     return NS_ERROR_UNEXPECTED;
   }
@@ -2419,7 +2419,7 @@ PeerConnectionImpl::PluginCrash(uint32_t aPluginID,
   init.mBubbles = true;
   init.mCancelable = true;
 
-  nsRefPtr<PluginCrashedEvent> event =
+  RefPtr<PluginCrashedEvent> event =
     PluginCrashedEvent::Constructor(doc, NS_LITERAL_STRING("PluginCrashed"), init);
 
   event->SetTrusted(true);
@@ -2536,7 +2536,7 @@ PeerConnectionImpl::SetSignalingState_m(PCImplSignalingState aSignalingState,
     CloseInt();
   }
 
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {
     return;
   }
@@ -2696,7 +2696,7 @@ SendLocalIceCandidateToContentImpl(nsWeakPtr weakPCObserver,
                                    uint16_t level,
                                    const std::string& mid,
                                    const std::string& candidate) {
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(weakPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(weakPCObserver);
   if (!pco) {
     return;
   }
@@ -2812,7 +2812,7 @@ void PeerConnectionImpl::IceConnectionStateChange(
       MOZ_ASSERT_UNREACHABLE("Unexpected mIceConnectionState!");
   }
 
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {
     return;
   }
@@ -2852,7 +2852,7 @@ PeerConnectionImpl::IceGatheringStateChange(
       MOZ_ASSERT_UNREACHABLE("Unexpected mIceGatheringState!");
   }
 
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {
     return;
   }
@@ -3312,7 +3312,7 @@ void PeerConnectionImpl::DeliverStatsReportToPCObserver_m(
   // Is the PeerConnectionImpl still around?
   PeerConnectionWrapper pcw(pcHandle);
   if (pcw.impl()) {
-    nsRefPtr<PeerConnectionObserver> pco =
+    RefPtr<PeerConnectionObserver> pco =
         do_QueryObjectReferent(pcw.impl()->mPCObserver);
     if (pco) {
       JSErrorResult rv;
@@ -3349,7 +3349,7 @@ PeerConnectionImpl::OnNegotiationNeeded()
 
   mShouldSuppressNegotiationNeeded = true;
 
-  nsRefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
+  RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {
     return;
   }
@@ -3387,7 +3387,7 @@ PeerConnectionImpl::startCallTelem() {
 #endif
 
 NS_IMETHODIMP
-PeerConnectionImpl::GetLocalStreams(nsTArray<nsRefPtr<DOMMediaStream > >& result)
+PeerConnectionImpl::GetLocalStreams(nsTArray<RefPtr<DOMMediaStream > >& result)
 {
   PC_AUTO_ENTER_API_CALL_NO_CHECK();
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
@@ -3403,7 +3403,7 @@ PeerConnectionImpl::GetLocalStreams(nsTArray<nsRefPtr<DOMMediaStream > >& result
 }
 
 NS_IMETHODIMP
-PeerConnectionImpl::GetRemoteStreams(nsTArray<nsRefPtr<DOMMediaStream > >& result)
+PeerConnectionImpl::GetRemoteStreams(nsTArray<RefPtr<DOMMediaStream > >& result)
 {
   PC_AUTO_ENTER_API_CALL_NO_CHECK();
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)

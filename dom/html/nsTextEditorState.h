@@ -270,15 +270,15 @@ private:
   friend class PrepareEditorEvent;
 
   nsITextControlElement* const mTextCtrlElement;
-  nsRefPtr<nsTextInputSelectionImpl> mSelCon;
+  RefPtr<nsTextInputSelectionImpl> mSelCon;
   RestoreSelectionState* mRestoringSelection;
   nsCOMPtr<nsIEditor> mEditor;
   nsCOMPtr<mozilla::dom::Element> mRootNode;
   nsCOMPtr<mozilla::dom::Element> mPlaceholderDiv;
   nsTextControlFrame* mBoundFrame;
-  nsRefPtr<nsTextInputListener> mTextListener;
+  RefPtr<nsTextInputListener> mTextListener;
   nsAutoPtr<nsCString> mValue;
-  nsRefPtr<nsAnonDivObserver> mMutationObserver;
+  RefPtr<nsAnonDivObserver> mMutationObserver;
   mutable nsString mCachedValue; // Caches non-hard-wrapped value on a multiline control.
   bool mEverInited; // Have we ever been initialized?
   bool mEditorInitialized;

@@ -80,7 +80,7 @@ BluetoothGattServer::Notify(const BluetoothSignal& aData)
     init.mStatus = arr[0].value().get_bool();
     init.mAddress = arr[1].value().get_nsString();
 
-    nsRefPtr<BluetoothStatusChangedEvent> event =
+    RefPtr<BluetoothStatusChangedEvent> event =
       BluetoothStatusChangedEvent::Constructor(
         this, NS_LITERAL_STRING(GATT_CONNECTION_STATE_CHANGED_ID), init);
 
@@ -129,7 +129,7 @@ BluetoothGattServer::Connect(const nsAString& aAddress, ErrorResult& aRv)
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BT_ENSURE_TRUE_REJECT(mValid, promise, NS_ERROR_NOT_AVAILABLE);
@@ -159,7 +159,7 @@ BluetoothGattServer::Disconnect(const nsAString& aAddress, ErrorResult& aRv)
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BT_ENSURE_TRUE_REJECT(mValid, promise, NS_ERROR_NOT_AVAILABLE);

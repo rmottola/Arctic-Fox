@@ -89,19 +89,19 @@ private:
                  const float& aRate,
                  const float& aPitch);
 
-  nsTArray<nsRefPtr<VoiceData>> mVoices;
+  nsTArray<RefPtr<VoiceData>> mVoices;
 
-  nsTArray<nsRefPtr<VoiceData>> mDefaultVoices;
+  nsTArray<RefPtr<VoiceData>> mDefaultVoices;
 
   nsRefPtrHashtable<nsStringHashKey, VoiceData> mUriVoiceMap;
 
   SpeechSynthesisChild* mSpeechSynthChild;
 
-  nsRefPtr<ProcessedMediaStream> mStream;
+  RefPtr<ProcessedMediaStream> mStream;
 
   bool mUseGlobalQueue;
 
-  nsTArray<nsRefPtr<GlobalQueueItem>> mGlobalQueue;
+  nsTArray<RefPtr<GlobalQueueItem>> mGlobalQueue;
 
   bool mIsSpeaking;
 };

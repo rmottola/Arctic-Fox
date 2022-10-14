@@ -136,7 +136,7 @@ public:
 
     NS_IMETHOD Run() override
     {
-      nsRefPtr<OfflineAudioCompletionEvent> event =
+      RefPtr<OfflineAudioCompletionEvent> event =
           new OfflineAudioCompletionEvent(mAudioContext, nullptr, nullptr);
       event->InitEvent(mRenderedBuffer);
       mAudioContext->DispatchTrustedEvent(event);
@@ -144,8 +144,8 @@ public:
       return NS_OK;
     }
   private:
-    nsRefPtr<AudioContext> mAudioContext;
-    nsRefPtr<AudioBuffer> mRenderedBuffer;
+    RefPtr<AudioContext> mAudioContext;
+    RefPtr<AudioBuffer> mRenderedBuffer;
   };
 
   void FireOfflineCompletionEvent(AudioDestinationNode* aNode)
@@ -164,7 +164,7 @@ public:
 
     // Create the input buffer
     ErrorResult rv;
-    nsRefPtr<AudioBuffer> renderedBuffer =
+    RefPtr<AudioBuffer> renderedBuffer =
       AudioBuffer::Create(context, mInputChannels.Length(),
                           mLength, mSampleRate, cx, rv);
     if (rv.Failed()) {
@@ -176,7 +176,7 @@ public:
 
     aNode->ResolvePromise(renderedBuffer);
 
-    nsRefPtr<OnCompleteTask> onCompleteTask =
+    RefPtr<OnCompleteTask> onCompleteTask =
       new OnCompleteTask(context, renderedBuffer);
     NS_DispatchToMainThread(onCompleteTask);
 
@@ -222,10 +222,10 @@ public:
   NS_IMETHOD Run() override
   {
     MOZ_ASSERT(NS_IsMainThread());
-    nsRefPtr<AudioNode> node = mStream->Engine()->NodeMainThread();
+    RefPtr<AudioNode> node = mStream->Engine()->NodeMainThread();
 
     if (node) {
-      nsRefPtr<AudioDestinationNode> destinationNode =
+      RefPtr<AudioDestinationNode> destinationNode =
         static_cast<AudioDestinationNode*>(node.get());
       destinationNode->InputMuted(mInputMuted);
     }
@@ -233,7 +233,7 @@ public:
   }
 
 private:
-  nsRefPtr<AudioNodeStream> mStream;
+  RefPtr<AudioNodeStream> mStream;
   bool mInputMuted;
 };
 
@@ -260,7 +260,7 @@ public:
     if (newInputMuted != mLastInputMuted) {
       mLastInputMuted = newInputMuted;
 
-      nsRefPtr<InputMutedRunnable> runnable =
+      RefPtr<InputMutedRunnable> runnable =
         new InputMutedRunnable(aStream, newInputMuted);
       aStream->Graph()->
         DispatchToMainThreadAfterStreamStateUpdate(runnable.forget());

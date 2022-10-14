@@ -182,7 +182,7 @@ ControlCallback(WMIDPREQUESTCODE aRequestCode,
 already_AddRefed<Probe>
 ProbeManager::GetProbe(const nsCID& aEventUID, const nsACString& aEventName)
 {
-  nsRefPtr<Probe> result(new Probe(aEventUID, aEventName, this));
+  RefPtr<Probe> result(new Probe(aEventUID, aEventName, this));
   mAllProbes.AppendElement(result);
   return result.forget();
 }
@@ -194,7 +194,7 @@ ProbeManager::StartSession()
 }
 
 nsresult
-ProbeManager::StartSession(nsTArray<nsRefPtr<Probe>>& aProbes)
+ProbeManager::StartSession(nsTArray<RefPtr<Probe>>& aProbes)
 {
   const size_t probesCount = aProbes.Length();
   _TRACE_GUID_REGISTRATION* probes = new _TRACE_GUID_REGISTRATION[probesCount];

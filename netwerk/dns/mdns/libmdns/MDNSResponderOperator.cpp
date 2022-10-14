@@ -232,7 +232,7 @@ private:
     return NS_OK;
   }
 
-  nsRefPtr<nsSocketTransportService> mSts;
+  RefPtr<nsSocketTransportService> mSts;
   DNSServiceRef mService;
   PRFileDesc* mFD;
   bool mAttached;
@@ -286,7 +286,7 @@ MDNSResponderOperator::ResetService(DNSServiceRef aService)
     }
 
     if (aService) {
-      nsRefPtr<ServiceWatcher> watcher = new ServiceWatcher(aService);
+      RefPtr<ServiceWatcher> watcher = new ServiceWatcher(aService);
       if (NS_WARN_IF(NS_FAILED(watcher->Init()))) {
         return rv;
       }

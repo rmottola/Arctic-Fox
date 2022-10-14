@@ -57,7 +57,7 @@ ImageFactory::CreateImage(ImageFormat aFormat,
                           const gfx::IntSize &,
                           BufferRecycleBin *aRecycleBin)
 {
-  nsRefPtr<Image> img;
+  RefPtr<Image> img;
 #ifdef MOZ_WIDGET_GONK
   if (aFormat == ImageFormat::GRALLOC_PLANAR_YCBCR) {
     img = new GrallocImage();
@@ -227,7 +227,7 @@ ImageContainer::CreateImage(ImageFormat aFormat)
   }
 #endif
   if (mImageClient) {
-    nsRefPtr<Image> img = mImageClient->CreateImage(aFormat);
+    RefPtr<Image> img = mImageClient->CreateImage(aFormat);
     if (img) {
       return img.forget();
     }

@@ -798,7 +798,7 @@ SpdySession31::GenerateSettings()
     numberOfEntries++;
   }
 
-  nsRefPtr<nsHttpConnectionInfo> ci;
+  RefPtr<nsHttpConnectionInfo> ci;
   uint32_t cwnd = 0;
   GetConnectionInfo(getter_AddRefs(ci));
   if (ci)
@@ -1115,7 +1115,7 @@ SpdySession31::HandleSynStream(SpdySession31 *self)
   }
 
   // Create the buffering transaction and push stream
-  nsRefPtr<SpdyPush31TransactionBuffer> transactionBuffer =
+  RefPtr<SpdyPush31TransactionBuffer> transactionBuffer =
     new SpdyPush31TransactionBuffer();
   transactionBuffer->SetConnection(self);
   SpdyPushedStream31 *pushedStream =
@@ -1466,7 +1466,7 @@ SpdySession31::HandleSettings(SpdySession31 *self)
     case SETTINGS_TYPE_CWND:
       if (flags & PERSIST_VALUE)
       {
-        nsRefPtr<nsHttpConnectionInfo> ci;
+        RefPtr<nsHttpConnectionInfo> ci;
         self->GetConnectionInfo(getter_AddRefs(ci));
         if (ci)
           gHttpHandler->ConnMgr()->ReportSpdyCWNDSetting(ci, value);
@@ -2445,7 +2445,7 @@ SpdySession31::Close(nsresult aReason)
 nsHttpConnectionInfo *
 SpdySession31::ConnectionInfo()
 {
-  nsRefPtr<nsHttpConnectionInfo> ci;
+  RefPtr<nsHttpConnectionInfo> ci;
   GetConnectionInfo(getter_AddRefs(ci));
   return ci.get();
 }
@@ -2721,7 +2721,7 @@ SpdySession31::CreateTunnel(nsHttpTransaction *trans,
   // transaction so that an auth created by the connect can be mappped
   // to the correct security callbacks
 
-  nsRefPtr<SpdyConnectTransaction> connectTrans =
+  RefPtr<SpdyConnectTransaction> connectTrans =
     new SpdyConnectTransaction(ci, aCallbacks, trans->Caps(), trans, this);
   AddStream(connectTrans, nsISupportsPriority::PRIORITY_NORMAL, false, nullptr);
   SpdyStream31 *tunnel = mStreamTransactionHash.Get(connectTrans);
@@ -2972,8 +2972,8 @@ static PLDHashOperator
              nsAutoPtr<SpdyStream31> &stream,
              void *closure)
 {
-  nsTArray<nsRefPtr<nsAHttpTransaction> > *list =
-    static_cast<nsTArray<nsRefPtr<nsAHttpTransaction> > *>(closure);
+  nsTArray<RefPtr<nsAHttpTransaction> > *list =
+    static_cast<nsTArray<RefPtr<nsAHttpTransaction> > *>(closure);
 
   list->AppendElement(key);
 
@@ -2984,7 +2984,7 @@ static PLDHashOperator
 
 nsresult
 SpdySession31::TakeSubTransactions(
-  nsTArray<nsRefPtr<nsAHttpTransaction> > &outTransactions)
+  nsTArray<RefPtr<nsAHttpTransaction> > &outTransactions)
 {
   // Generally this cannot be done with spdy as transactions are
   // started right away.

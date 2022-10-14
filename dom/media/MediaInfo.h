@@ -8,7 +8,7 @@
 
 #include "mozilla/UniquePtr.h"
 #include "nsRect.h"
-#include "mozilla/nsRefPtr.h"
+#include "mozilla/RefPtr.h"
 #include "nsSize.h"
 #include "nsString.h"
 #include "nsTArray.h"
@@ -235,8 +235,8 @@ public:
 
   // Visible area of the decoded video's image.
   nsIntRect mImage;
-  nsRefPtr<MediaByteBuffer> mCodecSpecificConfig;
-  nsRefPtr<MediaByteBuffer> mExtraData;
+  RefPtr<MediaByteBuffer> mCodecSpecificConfig;
+  RefPtr<MediaByteBuffer> mExtraData;
 
   // Describing how many degrees video frames should be rotated in clock-wise to
   // get correct view.
@@ -305,8 +305,8 @@ public:
   // Extended codec profile.
   int8_t mExtendedProfile;
 
-  nsRefPtr<MediaByteBuffer> mCodecSpecificConfig;
-  nsRefPtr<MediaByteBuffer> mExtraData;
+  RefPtr<MediaByteBuffer> mCodecSpecificConfig;
+  RefPtr<MediaByteBuffer> mExtraData;
 
 };
 

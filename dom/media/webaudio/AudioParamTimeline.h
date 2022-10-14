@@ -68,7 +68,7 @@ private:
 
 protected:
   // This is created lazily when needed.
-  nsRefPtr<MediaStream> mStream;
+  RefPtr<MediaStream> mStream;
 };
 
 template<> inline float

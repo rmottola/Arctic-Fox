@@ -70,8 +70,8 @@ private:
   // It's just there in order for us to be able to override
   // GetReentrantMonitor correctly.
   ReentrantMonitor mReentrantMonitor;
-  nsRefPtr<TaskQueue> mTaskQueueIdentity;
-  nsRefPtr<MediaResource> mResource;
+  RefPtr<TaskQueue> mTaskQueueIdentity;
+  RefPtr<MediaResource> mResource;
 };
 
 } // namespace mozilla

@@ -128,12 +128,12 @@ private:
   void DispatchError(BluetoothResultHandler* aRes, BluetoothStatus aStatus);
 
   nsCString mListenSocketName;
-  nsRefPtr<BluetoothDaemonListenSocket> mListenSocket;
-  nsRefPtr<BluetoothDaemonChannel> mCmdChannel;
-  nsRefPtr<BluetoothDaemonChannel> mNtfChannel;
+  RefPtr<BluetoothDaemonListenSocket> mListenSocket;
+  RefPtr<BluetoothDaemonChannel> mCmdChannel;
+  RefPtr<BluetoothDaemonChannel> mNtfChannel;
   nsAutoPtr<BluetoothDaemonProtocol> mProtocol;
 
-  nsTArray<nsRefPtr<BluetoothResultHandler> > mResultHandlerQ;
+  nsTArray<RefPtr<BluetoothResultHandler> > mResultHandlerQ;
 
   nsAutoPtr<BluetoothDaemonSocketInterface> mSocketInterface;
   nsAutoPtr<BluetoothDaemonHandsfreeInterface> mHandsfreeInterface;

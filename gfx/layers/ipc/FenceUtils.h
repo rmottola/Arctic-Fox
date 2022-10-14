@@ -63,7 +63,7 @@ public:
   already_AddRefed<FdObj> GetDupFdObj();
 
 private:
-  nsRefPtr<FdObj> mFence;
+  RefPtr<FdObj> mFence;
 };
 
 } // namespace layers

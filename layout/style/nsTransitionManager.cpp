@@ -238,7 +238,7 @@ NS_INTERFACE_MAP_END
 void
 nsTransitionManager::StyleContextChanged(dom::Element *aElement,
                                          nsStyleContext *aOldStyleContext,
-                                         nsRefPtr<nsStyleContext>* aNewStyleContext /* inout */)
+                                         RefPtr<nsStyleContext>* aNewStyleContext /* inout */)
 {
   nsStyleContext* newStyleContext = *aNewStyleContext;
 
@@ -339,7 +339,7 @@ nsTransitionManager::StyleContextChanged(dom::Element *aElement,
   // style", which is the new style without any data from transitions,
   // but still inheriting from data that contains transitions that are
   // not stopping or starting right now.
-  nsRefPtr<nsStyleContext> afterChangeStyle;
+  RefPtr<nsStyleContext> afterChangeStyle;
   if (collection) {
     nsStyleSet* styleSet = mPresContext->StyleSet();
     afterChangeStyle =
@@ -670,7 +670,7 @@ nsTransitionManager::ConsiderStartingTransition(
   timing.mDirection = NS_STYLE_ANIMATION_DIRECTION_NORMAL;
   timing.mFillMode = NS_STYLE_ANIMATION_FILL_MODE_BACKWARDS;
 
-  nsRefPtr<ElementPropertyTransition> pt =
+  RefPtr<ElementPropertyTransition> pt =
     new ElementPropertyTransition(aElement->OwnerDoc(), aElement,
                                   aNewStyleContext->GetPseudoType(), timing);
   pt->mStartForReversingTest = startForReversingTest;
@@ -687,7 +687,7 @@ nsTransitionManager::ConsiderStartingTransition(
   segment.mToKey = 1;
   segment.mTimingFunction.Init(tf);
 
-  nsRefPtr<CSSTransition> animation =
+  RefPtr<CSSTransition> animation =
     new CSSTransition(mPresContext->Document()->GetScopeObject());
   animation->SetOwningElement(
     OwningElementRef(*aElement, aNewStyleContext->GetPseudoType()));

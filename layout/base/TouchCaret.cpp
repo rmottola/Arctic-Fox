@@ -126,7 +126,7 @@ TouchCaret::Init()
 void
 TouchCaret::Terminate()
 {
-  nsRefPtr<nsDocShell> docShell(mDocShell.get());
+  RefPtr<nsDocShell> docShell(mDocShell.get());
   if (docShell) {
     docShell->RemoveWeakScrollObserver(this);
   }
@@ -159,7 +159,7 @@ TouchCaret::GetCaretFocusFrame(nsRect* aOutRect)
     return nullptr;
   }
 
-  nsRefPtr<nsCaret> caret = presShell->GetCaret();
+  RefPtr<nsCaret> caret = presShell->GetCaret();
   if (!caret) {
     return nullptr;
   }
@@ -337,7 +337,7 @@ TouchCaret::SetTouchFramePos(const nsPoint& aOrigin)
   }
 
   // Convert aOrigin to CSS pixels.
-  nsRefPtr<nsPresContext> presContext = presShell->GetPresContext();
+  RefPtr<nsPresContext> presContext = presShell->GetPresContext();
   int32_t x = presContext->AppUnitsToIntCSSPixels(aOrigin.x);
   int32_t y = presContext->AppUnitsToIntCSSPixels(aOrigin.y);
 
@@ -376,7 +376,7 @@ TouchCaret::MoveCaret(const nsPoint& movePoint)
 
   // Move caret position.
   nsWeakFrame weakScrollable = scrollable;
-  nsRefPtr<nsFrameSelection> fs = scrollable->GetFrameSelection();
+  RefPtr<nsFrameSelection> fs = scrollable->GetFrameSelection();
   fs->HandleClick(offsets.content, offsets.StartOffset(),
                   offsets.EndOffset(),
                   false,
@@ -415,7 +415,7 @@ TouchCaret::NotifySelectionChanged(nsIDOMDocument* aDoc, nsISelection* aSel,
     return NS_OK;
   }
 
-  nsRefPtr<nsCaret> caret = presShell->GetCaret();
+  RefPtr<nsCaret> caret = presShell->GetCaret();
   if (!caret) {
     SetVisibility(false);
     return NS_OK;
@@ -529,7 +529,7 @@ TouchCaret::CancelScrollEndDetector()
 /* static */void
 TouchCaret::FireScrollEnd(nsITimer* aTimer, void* aTouchCaret)
 {
-  nsRefPtr<TouchCaret> self = static_cast<TouchCaret*>(aTouchCaret);
+  RefPtr<TouchCaret> self = static_cast<TouchCaret*>(aTouchCaret);
   NS_PRECONDITION(aTimer == self->mScrollEndDetectorTimer,
                   "Unexpected timer");
   self->UpdatePosition();
@@ -575,7 +575,7 @@ TouchCaret::IsDisplayable()
     return false;
   }
 
-  nsRefPtr<nsCaret> caret = presShell->GetCaret();
+  RefPtr<nsCaret> caret = presShell->GetCaret();
   if (!caret) {
     TOUCHCARET_LOG("Caret is nullptr!");
     return false;
@@ -706,7 +706,7 @@ TouchCaret::ClampPositionToScrollFrame(const nsPoint& aPosition)
 /* static */void
 TouchCaret::DisableTouchCaretCallback(nsITimer* aTimer, void* aTouchCaret)
 {
-  nsRefPtr<TouchCaret> self = static_cast<TouchCaret*>(aTouchCaret);
+  RefPtr<TouchCaret> self = static_cast<TouchCaret*>(aTouchCaret);
   NS_PRECONDITION(aTimer == self->mTouchCaretExpirationTimer,
                   "Unexpected timer");
 
@@ -747,7 +747,7 @@ TouchCaret::SetSelectionDragState(bool aState)
     return;
   }
 
-  nsRefPtr<nsFrameSelection> fs = caretFocusFrame->GetFrameSelection();
+  RefPtr<nsFrameSelection> fs = caretFocusFrame->GetFrameSelection();
   fs->SetDragState(aState);
 }
 
@@ -1122,7 +1122,7 @@ TouchCaret::DispatchTapEvent()
     return;
   }
 
-  nsRefPtr<nsCaret> caret = presShell->GetCaret();
+  RefPtr<nsCaret> caret = presShell->GetCaret();
   if (!caret) {
     return;
   }
@@ -1142,7 +1142,7 @@ TouchCaret::DispatchTapEvent()
   // XXX: Do we need to flush layout?
   presShell->FlushPendingNotifications(Flush_Layout);
   nsRect rect = nsContentUtils::GetSelectionBoundingRect(sel);
-  nsRefPtr<dom::DOMRect>domRect = new dom::DOMRect(ToSupports(doc));
+  RefPtr<dom::DOMRect>domRect = new dom::DOMRect(ToSupports(doc));
 
   domRect->SetLayoutRect(rect);
   init.mBoundingClientRect = domRect;
@@ -1154,7 +1154,7 @@ TouchCaret::DispatchTapEvent()
   state.AppendElement(dom::SelectionState::Taponcaret, fallible);
   init.mStates = state;
 
-  nsRefPtr<dom::SelectionStateChangedEvent> event =
+  RefPtr<dom::SelectionStateChangedEvent> event =
     dom::SelectionStateChangedEvent::Constructor(doc, NS_LITERAL_STRING("mozselectionstatechanged"), init);
 
   event->SetTrusted(true);

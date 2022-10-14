@@ -54,7 +54,7 @@ FilePickerParent::~FilePickerParent()
 // the same runnable on the main thread.
 // 3. The main thread sends the results over IPC.
 FilePickerParent::FileSizeAndDateRunnable::FileSizeAndDateRunnable(FilePickerParent *aFPParent,
-                                                                   nsTArray<nsRefPtr<BlobImpl>>& aBlobs)
+                                                                   nsTArray<RefPtr<BlobImpl>>& aBlobs)
  : mFilePickerParent(aFPParent)
 {
   mBlobs.SwapElements(aBlobs);
@@ -111,7 +111,7 @@ FilePickerParent::FileSizeAndDateRunnable::Destroy()
 }
 
 void
-FilePickerParent::SendFiles(const nsTArray<nsRefPtr<BlobImpl>>& aBlobs)
+FilePickerParent::SendFiles(const nsTArray<RefPtr<BlobImpl>>& aBlobs)
 {
   nsIContentParent* parent = TabParent::GetFrom(Manager())->Manager();
   InfallibleTArray<PBlobParent*> blobs;
@@ -138,7 +138,7 @@ FilePickerParent::Done(int16_t aResult)
     return;
   }
 
-  nsTArray<nsRefPtr<BlobImpl>> blobs;
+  nsTArray<RefPtr<BlobImpl>> blobs;
   if (mMode == nsIFilePicker::modeOpenMultiple ||
       mMode == nsIFilePicker::modeGetFolder) {
     nsCOMPtr<nsISimpleEnumerator> iter;
@@ -151,7 +151,7 @@ FilePickerParent::Done(int16_t aResult)
       if (supports) {
         nsCOMPtr<nsIFile> file = do_QueryInterface(supports);
 
-        nsRefPtr<BlobImpl> blobimpl = new BlobImplFile(file);
+        RefPtr<BlobImpl> blobimpl = new BlobImplFile(file);
         blobs.AppendElement(blobimpl);
       }
     }
@@ -159,7 +159,7 @@ FilePickerParent::Done(int16_t aResult)
     nsCOMPtr<nsIFile> file;
     mFilePicker->GetFile(getter_AddRefs(file));
     if (file) {
-      nsRefPtr<BlobImpl> blobimpl = new BlobImplFile(file);
+      RefPtr<BlobImpl> blobimpl = new BlobImplFile(file);
       blobs.AppendElement(blobimpl);
     }
   }

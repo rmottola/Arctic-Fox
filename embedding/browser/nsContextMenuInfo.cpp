@@ -156,7 +156,7 @@ nsContextMenuInfo::GetBackgroundImageContainer(imgIContainer** aImageContainer)
   NS_ENSURE_ARG_POINTER(aImageContainer);
   NS_ENSURE_STATE(mDOMNode);
 
-  nsRefPtr<imgRequestProxy> request;
+  RefPtr<imgRequestProxy> request;
   GetBackgroundImageRequest(mDOMNode, getter_AddRefs(request));
   if (request) {
     return request->GetImage(aImageContainer);
@@ -171,7 +171,7 @@ nsContextMenuInfo::GetBackgroundImageSrc(nsIURI** aURI)
   NS_ENSURE_ARG_POINTER(aURI);
   NS_ENSURE_STATE(mDOMNode);
 
-  nsRefPtr<imgRequestProxy> request;
+  RefPtr<imgRequestProxy> request;
   GetBackgroundImageRequest(mDOMNode, getter_AddRefs(request));
   if (request) {
     return request->GetURI(aURI);
@@ -198,7 +198,7 @@ nsContextMenuInfo::HasBackgroundImage(nsIDOMNode* aDOMNode)
 {
   NS_ENSURE_TRUE(aDOMNode, false);
 
-  nsRefPtr<imgRequestProxy> request;
+  RefPtr<imgRequestProxy> request;
   GetBackgroundImageRequest(aDOMNode, getter_AddRefs(request));
 
   return (request != nullptr);
@@ -287,7 +287,7 @@ nsContextMenuInfo::GetBackgroundImageRequestInternal(nsIDOMNode* aDOMNode,
           NS_NewURI(getter_AddRefs(bgUri), bgStringValue);
           NS_ENSURE_TRUE(bgUri, NS_ERROR_FAILURE);
 
-          nsRefPtr<imgLoader> il = imgLoader::GetInstance();
+          RefPtr<imgLoader> il = imgLoader::GetInstance();
           NS_ENSURE_TRUE(il, NS_ERROR_FAILURE);
 
           return il->LoadImage(bgUri, nullptr, nullptr,
