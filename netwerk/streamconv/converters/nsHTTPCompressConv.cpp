@@ -54,16 +54,19 @@ nsHTTPCompressConv::nsHTTPCompressConv()
 
 nsHTTPCompressConv::~nsHTTPCompressConv()
 {
-  if (mInpBuffer)
+  if (mInpBuffer) {
     free(mInpBuffer);
+  }
 
-  if (mOutBuffer)
+  if (mOutBuffer) {
     free(mOutBuffer);
+  }
 
   // For some reason we are not getting Z_STREAM_END.  But this was also seen
   //    for mozilla bug 198133.  Need to handle this case.
-  if (mStreamInitialized && !mStreamEnded)
+  if (mStreamInitialized && !mStreamEnded) {
     inflateEnd (&d_stream);
+  }
 }
 
 NS_IMETHODIMP
@@ -204,23 +207,21 @@ nsHTTPCompressConv::BrotliHandler(nsIInputStream *stream, void *closure, const c
 }
 
 NS_IMETHODIMP
-nsHTTPCompressConv::OnDataAvailable(nsIRequest* request, 
-                                    nsISupports *aContext, 
-                                    nsIInputStream *iStr, 
-                                    uint64_t aSourceOffset, 
+nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
+                                    nsISupports *aContext,
+                                    nsIInputStream *iStr,
+                                    uint64_t aSourceOffset,
                                     uint32_t aCount)
 {
   nsresult rv = NS_ERROR_INVALID_CONTENT_ENCODING;
   uint32_t streamLen = aCount;
 
-  if (streamLen == 0)
-  {
+  if (streamLen == 0) {
     NS_ERROR("count of zero passed to OnDataAvailable");
     return NS_ERROR_UNEXPECTED;
   }
 
-  if (mStreamEnded)
-  {
+  if (mStreamEnded) {
     // Hmm... this may just indicate that the data stream is done and that
     // what's left is either metadata or padding of some sort.... throwing
     // it out is probably the safe thing to do.
@@ -228,102 +229,97 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
     return iStr->ReadSegments(NS_DiscardSegment, nullptr, streamLen, &n);
   }
 
-  switch (mMode)
-  {
+  switch (mMode) {
   case HTTP_COMPRESS_GZIP:
     streamLen = check_header(iStr, streamLen, &rv);
 
-    if (rv != NS_OK)
+    if (rv != NS_OK) {
       return rv;
+    }
 
-
-    if (streamLen == 0)
+    if (streamLen == 0) {
       return NS_OK;
+    }
 
     // FALLTHROUGH
 
   case HTTP_COMPRESS_DEFLATE:
 
-    if (mInpBuffer != nullptr && streamLen > mInpBufferLen)
-    {
+    if (mInpBuffer != nullptr && streamLen > mInpBufferLen) {
       mInpBuffer = (unsigned char *) realloc(mInpBuffer, mInpBufferLen = streamLen);
 
-      if (mOutBufferLen < streamLen * 2)
+      if (mOutBufferLen < streamLen * 2) {
         mOutBuffer = (unsigned char *) realloc(mOutBuffer, mOutBufferLen = streamLen * 3);
+      }
 
-      if (mInpBuffer == nullptr || mOutBuffer == nullptr)
+      if (mInpBuffer == nullptr || mOutBuffer == nullptr) {
         return NS_ERROR_OUT_OF_MEMORY;
-     }
+      }
+    }
 
-    if (mInpBuffer == nullptr)
+    if (mInpBuffer == nullptr) {
       mInpBuffer = (unsigned char *) malloc(mInpBufferLen = streamLen);
+    }
 
-    if (mOutBuffer == nullptr)
+    if (mOutBuffer == nullptr) {
       mOutBuffer = (unsigned char *) malloc(mOutBufferLen = streamLen * 3);
+    }
 
-    if (mInpBuffer == nullptr || mOutBuffer == nullptr)
+    if (mInpBuffer == nullptr || mOutBuffer == nullptr) {
       return NS_ERROR_OUT_OF_MEMORY;
+    }
 
     uint32_t unused;
     iStr->Read((char *)mInpBuffer, streamLen, &unused);
 
-    if (mMode == HTTP_COMPRESS_DEFLATE)
-    {
-      if (!mStreamInitialized)
-      {
+    if (mMode == HTTP_COMPRESS_DEFLATE) {
+      if (!mStreamInitialized) {
         memset(&d_stream, 0, sizeof (d_stream));
 
-        if (inflateInit(&d_stream) != Z_OK)
+        if (inflateInit(&d_stream) != Z_OK) {
           return NS_ERROR_FAILURE;
+        }
 
-          mStreamInitialized = true;
+        mStreamInitialized = true;
       }
       d_stream.next_in = mInpBuffer;
       d_stream.avail_in = (uInt)streamLen;
 
       mDummyStreamInitialised = false;
-      for (;;)
-      {
+      for (;;) {
         d_stream.next_out = mOutBuffer;
         d_stream.avail_out = (uInt)mOutBufferLen;
 
         int code = inflate(&d_stream, Z_NO_FLUSH);
         unsigned bytesWritten = (uInt)mOutBufferLen - d_stream.avail_out;
 
-        if (code == Z_STREAM_END)
-        {
-          if (bytesWritten)
-          {
+        if (code == Z_STREAM_END) {
+          if (bytesWritten) {
             rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
-            if (NS_FAILED (rv))
+            if (NS_FAILED (rv)) {
               return rv;
+            }
           }
 
           inflateEnd(&d_stream);
           mStreamEnded = true;
           break;
-       }
-       else if (code == Z_OK)
-       {
-         if (bytesWritten)
-         {
+        } else if (code == Z_OK) {
+          if (bytesWritten) {
             rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
-            if (NS_FAILED (rv))
+            if (NS_FAILED (rv)) {
               return rv;
-         }
-       }
-        else if (code == Z_BUF_ERROR)
-        {
-          if (bytesWritten)
-          {
+            }
+          }
+        } else if (code == Z_BUF_ERROR) {
+          if (bytesWritten) {
             rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
-            if (NS_FAILED (rv))
+            if (NS_FAILED (rv)) {
               return rv;
+            }
           }
           break;
-        }
-        else if (code == Z_DATA_ERROR)
-        {
+        } else if (code == Z_DATA_ERROR) {
           // some servers (notably Apache with mod_deflate) don't generate zlib headers
           // insert a dummy header and try again
           static char dummy_head[2] =
@@ -336,8 +332,9 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
           d_stream.avail_in = sizeof(dummy_head);
 
           code = inflate(&d_stream, Z_NO_FLUSH);
-          if (code != Z_OK)
+          if (code != Z_OK) {
             return NS_ERROR_FAILURE;
+          }
 
           // stop an endless loop caused by non-deflate data being labelled as deflate
           if (mDummyStreamInitialised) {
@@ -353,15 +350,13 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
           return NS_ERROR_INVALID_CONTENT_ENCODING;
         }
       } /* for */
-    }
-   else
-    {
-      if (!mStreamInitialized)
-      {
+    } else {
+      if (!mStreamInitialized) {
         memset(&d_stream, 0, sizeof (d_stream));
 
-                 if (inflateInit2(&d_stream, -MAX_WBITS) != Z_OK)
-                    return NS_ERROR_FAILURE;
+        if (inflateInit2(&d_stream, -MAX_WBITS) != Z_OK) {
+          return NS_ERROR_FAILURE;
+        }
 
         mStreamInitialized = true;
       }
@@ -369,47 +364,42 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
       d_stream.next_in  = mInpBuffer;
       d_stream.avail_in = (uInt)streamLen;
 
-      for (;;)
-      {
+      for (;;) {
         d_stream.next_out  = mOutBuffer;
         d_stream.avail_out = (uInt)mOutBufferLen;
 
         int code = inflate (&d_stream, Z_NO_FLUSH);
         unsigned bytesWritten = (uInt)mOutBufferLen - d_stream.avail_out;
 
-        if (code == Z_STREAM_END)
-        {
-          if (bytesWritten)
-          {
-            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);                            if (NS_FAILED (rv))
+        if (code == Z_STREAM_END) {
+          if (bytesWritten) {
+            rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
+            if (NS_FAILED (rv)) {
               return rv;
+            }
           }
 
           inflateEnd(&d_stream);
           mStreamEnded = true;
           break;
-        }
-        else if (code == Z_OK)
-        {
-          if (bytesWritten)
-          {
+        } else if (code == Z_OK) {
+          if (bytesWritten) {
             rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
-            if (NS_FAILED (rv))
-              return rv;
+            if (NS_FAILED (rv)) {
+              return rv; 
+            }
           }
-        }
-        else if (code == Z_BUF_ERROR)
-        {
-          if (bytesWritten)
-          {
+        } else if (code == Z_BUF_ERROR) {
+          if (bytesWritten) {
             rv = do_OnDataAvailable(request, aContext, aSourceOffset, (char *)mOutBuffer, bytesWritten);
-            if (NS_FAILED (rv))
+            if (NS_FAILED (rv)) {
               return rv;
+            }
           }
           break;
-        }
-        else
+        } else {
           return NS_ERROR_INVALID_CONTENT_ENCODING;
+        }
       } /* for */
     } /* gzip */
     break;
@@ -418,32 +408,32 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
   {
     if (!mBrotli) {
       mBrotli = new BrotliWrapper();
-     }
+    }
 
-     mBrotli->mRequest = request;
-     mBrotli->mContext = aContext;
-     mBrotli->mSourceOffset = aSourceOffset;
+    mBrotli->mRequest = request;
+    mBrotli->mContext = aContext;
+    mBrotli->mSourceOffset = aSourceOffset;
 
-     uint32_t countRead;
-     rv = iStr->ReadSegments(BrotliHandler, this, streamLen, &countRead);
-     if (NS_SUCCEEDED(rv)) {
-        rv = mBrotli->mStatus;
-     }
-     if (NS_FAILED(rv)) {
-       return rv;
-     }
-   }
-   break;
-    
-   default:
-     rv = mListener->OnDataAvailable(request, aContext, iStr, aSourceOffset, aCount);
-     if (NS_FAILED (rv))
-       return rv;
+    uint32_t countRead;
+    rv = iStr->ReadSegments(BrotliHandler, this, streamLen, &countRead);
+    if (NS_SUCCEEDED(rv)) {
+      rv = mBrotli->mStatus;
+    }
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+  }
+    break;
+
+  default:
+    rv = mListener->OnDataAvailable(request, aContext, iStr, aSourceOffset, aCount);
+    if (NS_FAILED (rv)) {
+      return rv;
+    }
   } /* switch */
 
   return NS_OK;
 } /* OnDataAvailable */
-
 
 // XXX/ruslan: need to implement this too
 
@@ -496,141 +486,125 @@ nsHTTPCompressConv::check_header(nsIInputStream *iStr, uint32_t streamLen, nsres
 
   *rs = NS_OK;
 
-  if (mCheckHeaderDone)
+  if (mCheckHeaderDone) {
     return streamLen;
+  }
 
-  while (streamLen)
-  {
-    switch (hMode)
-    {
-      case GZIP_INIT:
-        uint32_t unused;
+  while (streamLen) {
+    switch (hMode) {
+    case GZIP_INIT:
+      uint32_t unused;
+      iStr->Read(&c, 1, &unused);
+      streamLen--;
+
+      if (mSkipCount == 0 && ((unsigned)c & 0377) != gz_magic[0]) {
+        *rs = NS_ERROR_INVALID_CONTENT_ENCODING;
+        return 0;
+      }
+
+      if (mSkipCount == 1 && ((unsigned)c & 0377) != gz_magic[1]) {
+        *rs = NS_ERROR_INVALID_CONTENT_ENCODING;
+        return 0;
+      }
+
+      if (mSkipCount == 2 && ((unsigned)c & 0377) != Z_DEFLATED) {
+        *rs = NS_ERROR_INVALID_CONTENT_ENCODING;
+        return 0;
+      }
+
+      mSkipCount++;
+      if (mSkipCount == 4) {
+        mFlags = (unsigned) c & 0377;
+        if (mFlags & RESERVED) {
+          *rs = NS_ERROR_INVALID_CONTENT_ENCODING;
+          return 0;
+        }
+        hMode = GZIP_OS;
+        mSkipCount = 0;
+      }
+      break;
+
+    case GZIP_OS:
+      iStr->Read(&c, 1, &unused);
+      streamLen--;
+      mSkipCount++;
+
+      if (mSkipCount == 6) {
+        hMode = GZIP_EXTRA0;
+      }
+      break;
+
+    case GZIP_EXTRA0:
+      if (mFlags & EXTRA_FIELD) {
         iStr->Read(&c, 1, &unused);
         streamLen--;
+        mLen = (uInt) c & 0377;
+        hMode = GZIP_EXTRA1;
+      } else {
+        hMode = GZIP_ORIG;
+      }
+      break;
 
-        if (mSkipCount == 0 && ((unsigned)c & 0377) != gz_magic[0])
-        {
-          *rs = NS_ERROR_INVALID_CONTENT_ENCODING;
-          return 0;
-        }
+    case GZIP_EXTRA1:
+      iStr->Read(&c, 1, &unused);
+      streamLen--;
+      mLen = ((uInt) c & 0377) << 8;
+      mSkipCount = 0;
+      hMode = GZIP_EXTRA2;
+      break;
 
-        if (mSkipCount == 1 && ((unsigned)c & 0377) != gz_magic[1])
-        {
-          *rs = NS_ERROR_INVALID_CONTENT_ENCODING;
-           return 0;
-        }
-
-        if (mSkipCount == 2 && ((unsigned)c & 0377) != Z_DEFLATED)
-        {
-          *rs = NS_ERROR_INVALID_CONTENT_ENCODING;
-          return 0;
-        }
-
+    case GZIP_EXTRA2:
+      if (mSkipCount == mLen) {
+        hMode = GZIP_ORIG;
+      } else {
+        iStr->Read(&c, 1, &unused);
+        streamLen--;
         mSkipCount++;
-        if (mSkipCount == 4)
-        {
-          mFlags = (unsigned) c & 0377;
-          if (mFlags & RESERVED)
-          {
-            *rs = NS_ERROR_INVALID_CONTENT_ENCODING;
-            return 0;
-          }
-          hMode = GZIP_OS;
+      }
+      break;
+
+    case GZIP_ORIG:
+      if (mFlags & ORIG_NAME) {
+        iStr->Read(&c, 1, &unused);
+        streamLen--;
+        if (c == 0)
+          hMode = GZIP_COMMENT;
+      } else {
+        hMode = GZIP_COMMENT;
+      }
+      break;
+
+    case GZIP_COMMENT:
+      if (mFlags & COMMENT) {
+        iStr->Read(&c, 1, &unused);
+        streamLen--;
+        if (c == 0) {
+          hMode = GZIP_CRC;
           mSkipCount = 0;
         }
-        break;
+      } else {
+        hMode = GZIP_CRC;
+        mSkipCount = 0;
+      }
+      break;
 
-        case GZIP_OS:
-          iStr->Read(&c, 1, &unused);
-          streamLen--;
-          mSkipCount++;
-
-          if (mSkipCount == 6)
-          hMode = GZIP_EXTRA0;
-          break;
-
-        case GZIP_EXTRA0:
-          if (mFlags & EXTRA_FIELD)
-          {
-            iStr->Read(&c, 1, &unused);
-               streamLen--;
-               mLen = (uInt) c & 0377;
-               hMode = GZIP_EXTRA1;
-          }
-          else
-             hMode = GZIP_ORIG;
-          break;
-
-        case GZIP_EXTRA1:
-                iStr->Read(&c, 1, &unused);
-                streamLen--;
-                mLen = ((uInt) c & 0377) << 8;
-                mSkipCount = 0;
-                hMode = GZIP_EXTRA2;
-                break;
-
-        case GZIP_EXTRA2:
-                if (mSkipCount == mLen)
-                    hMode = GZIP_ORIG;
-                else
-                {
-                    iStr->Read(&c, 1, &unused);
-                    streamLen--;
-                    mSkipCount++;
-                }
-                break;
-
-            case GZIP_ORIG:
-                if (mFlags & ORIG_NAME)
-                {
-                    iStr->Read(&c, 1, &unused);
-                    streamLen--;
-                    if (c == 0)
-                        hMode = GZIP_COMMENT;
-                }
-                else
-                    hMode = GZIP_COMMENT;
-                break;
-
-            case GZIP_COMMENT:
-                if (mFlags & COMMENT)
-                {
-                    iStr->Read(&c, 1, &unused);
-                    streamLen--;
-                    if (c == 0)
-                    {
-                        hMode = GZIP_CRC;
-                        mSkipCount = 0;
-                    }
-                }
-                else
-                {
-                    hMode = GZIP_CRC;
-                    mSkipCount = 0;
-                }
-                break;
-
-            case GZIP_CRC:
-                if (mFlags & HEAD_CRC)
-                {
-                    iStr->Read(&c, 1, &unused);
-                    streamLen--;
-                    mSkipCount++;
-                    if (mSkipCount == 2)
-                    {
-                        mCheckHeaderDone = true;
-                        return streamLen;
-                    }
-                }
-                else
-                {
-                    mCheckHeaderDone = true;
-                    return streamLen;
-                }
-            break;
+    case GZIP_CRC:
+      if (mFlags & HEAD_CRC) {
+        iStr->Read(&c, 1, &unused);
+        streamLen--;
+        mSkipCount++;
+        if (mSkipCount == 2) {
+          mCheckHeaderDone = true;
+          return streamLen;
         }
+      } else {
+        mCheckHeaderDone = true;
+        return streamLen;
+      }
+      break;
     }
-    return streamLen;
+  }
+  return streamLen;
 }
 
 } // namespace net
@@ -640,9 +614,9 @@ nsresult
 NS_NewHTTPCompressConv(mozilla::net::nsHTTPCompressConv **aHTTPCompressConv)
 {
   NS_PRECONDITION(aHTTPCompressConv != nullptr, "null ptr");
-
-  if (!aHTTPCompressConv)
+  if (!aHTTPCompressConv) {
     return NS_ERROR_NULL_POINTER;
+  }
 
   RefPtr<mozilla::net::nsHTTPCompressConv> outVal =
     new mozilla::net::nsHTTPCompressConv();
