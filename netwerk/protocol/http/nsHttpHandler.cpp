@@ -513,7 +513,6 @@ nsHttpHandler::IsAcceptableEncoding(const char *enc, bool isSecure)
     } else {
         rv = nsHttp::FindToken(mHttpAcceptEncodings.get(), enc, HTTP_LWS ",") != nullptr;
     }
-
     // gzip and deflate are inherently acceptable in modern HTTP - always
     // process them if a stream converter can also be found.
     if (!rv &&

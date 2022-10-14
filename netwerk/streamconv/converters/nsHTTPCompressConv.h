@@ -40,54 +40,52 @@ class nsIStringInputStream;
 
 namespace mozilla {
 namespace net {
-	
+
 typedef enum    {
-        HTTP_COMPRESS_GZIP,
-        HTTP_COMPRESS_DEFLATE,
-        HTTP_COMPRESS_COMPRESS,
-        HTTP_COMPRESS_BROTLI,
-        HTTP_COMPRESS_IDENTITY
-    }   CompressMode;
-	
+  HTTP_COMPRESS_GZIP,
+  HTTP_COMPRESS_DEFLATE,
+  HTTP_COMPRESS_COMPRESS,
+  HTTP_COMPRESS_BROTLI,
+  HTTP_COMPRESS_IDENTITY
+} CompressMode;
+
 class BrotliWrapper
 {
 public:
-    BrotliWrapper()
-        : mTotalOut(0)
-        , mStatus(NS_OK)
-    {
-        BrotliStateInit(&mState);
-    }
-    ~BrotliWrapper()
-    {
-        BrotliStateCleanup(&mState);
-    }
-  
-    BrotliState mState;
-    size_t       mTotalOut;
-    nsresult     mStatus;
-  
-    nsIRequest  *mRequest;
-    nsISupports *mContext;
-    uint64_t     mSourceOffset;
+  BrotliWrapper()
+    : mTotalOut(0)
+    , mStatus(NS_OK)
+  {
+    BrotliStateInit(&mState);
+  }
+  ~BrotliWrapper()
+  {
+    BrotliStateCleanup(&mState);
+  }
+
+  BrotliState mState;
+  size_t       mTotalOut;
+  nsresult     mStatus;
+
+  nsIRequest  *mRequest;
+  nsISupports *mContext;
+  uint64_t     mSourceOffset;
 };
 
-class nsHTTPCompressConv	: public nsIStreamConverter	{
-public:
-    // nsISupports methods
+class nsHTTPCompressConv : public nsIStreamConverter	{
+  public:
+  // nsISupports methods
     NS_DECL_THREADSAFE_ISUPPORTS
 
     NS_DECL_NSIREQUESTOBSERVER
     NS_DECL_NSISTREAMLISTENER
 
-    // nsIStreamConverter methods
+  // nsIStreamConverter methods
     NS_DECL_NSISTREAMCONVERTER
-
 
     nsHTTPCompressConv ();
 
 private:
-
     virtual ~nsHTTPCompressConv ();
 
     nsCOMPtr<nsIStreamListener> mListener; // this guy gets the converted data via his OnDataAvailable ()

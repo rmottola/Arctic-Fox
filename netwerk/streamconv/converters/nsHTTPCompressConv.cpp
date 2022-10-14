@@ -20,6 +20,9 @@
 #include "state.h"
 #include "decode.h"
 
+extern PRLogModuleInfo *gHttpLog;
+#define LOG(args) MOZ_LOG(gHttpLog, mozilla::LogLevel::Debug, args)
+
 namespace mozilla {
 namespace net {
 
@@ -44,6 +47,7 @@ nsHTTPCompressConv::nsHTTPCompressConv()
   , mSkipCount(0)
   , mFlags(0)
 {
+  LOG(("nsHttpCompresssConv %p ctor\n", this));
   if (NS_IsMainThread()) {
     mFailUncleanStops =
       Preferences::GetBool("network.http.enforce-framing.http", false);
@@ -54,6 +58,7 @@ nsHTTPCompressConv::nsHTTPCompressConv()
 
 nsHTTPCompressConv::~nsHTTPCompressConv()
 {
+  LOG(("nsHttpCompresssConv %p dtor\n", this));
   if (mInpBuffer) {
     free(mInpBuffer);
   }
@@ -86,6 +91,9 @@ nsHTTPCompressConv::AsyncConvertData(const char *aFromType,
   } else if (!PL_strncasecmp(aFromType, HTTP_BROTLI_TYPE, sizeof(HTTP_BROTLI_TYPE)-1)) {
     mMode = HTTP_COMPRESS_BROTLI;
   }
+  LOG(("nsHttpCompresssConv %p AsyncConvertData %s %s mode %d\n",
+       this, aFromType, aToType, mMode));
+
   // hook ourself up with the receiving listener.
   mListener = aListener;
 
@@ -96,6 +104,7 @@ nsHTTPCompressConv::AsyncConvertData(const char *aFromType,
 NS_IMETHODIMP
 nsHTTPCompressConv::OnStartRequest(nsIRequest* request, nsISupports *aContext)
 {
+  LOG(("nsHttpCompresssConv %p onstart\n", this));
   return mListener->OnStartRequest(request, aContext);
 }
 
@@ -104,6 +113,7 @@ nsHTTPCompressConv::OnStopRequest(nsIRequest* request, nsISupports *aContext,
                                   nsresult aStatus)
 {
   nsresult status = aStatus;
+  LOG(("nsHttpCompresssConv %p onstop %x\n", this, aStatus));
   
   // Framing integrity is enforced for content-encoding: gzip, but not for
   // content-encoding: deflate. Note that gzip vs deflate is NOT determined
@@ -112,7 +122,8 @@ nsHTTPCompressConv::OnStopRequest(nsIRequest* request, nsISupports *aContext,
       (mFailUncleanStops && (mMode == HTTP_COMPRESS_GZIP)) ) {
     // This is not a clean end of gzip stream: the transfer is incomplete.
     status = NS_ERROR_NET_PARTIAL_TRANSFER;
-    }
+    LOG(("nsHttpCompresssConv %p onstop partial gzip\n", this));
+  }
   if (NS_SUCCEEDED(status) && mMode == HTTP_COMPRESS_BROTLI) {
     uint32_t waste;
     nsCOMPtr<nsIForcePendingChannel> fpChannel = do_QueryInterface(request);
@@ -124,6 +135,7 @@ nsHTTPCompressConv::OnStopRequest(nsIRequest* request, nsISupports *aContext,
       fpChannel->ForcePending(true);
     }
     status = BrotliHandler(nullptr, this, nullptr, 0, 0, &waste);
+    LOG(("nsHttpCompresssConv %p onstop brotlihandler rv %x\n", this, status));
     if (fpChannel && !isPending) {
       fpChannel->ForcePending(false);
     }
@@ -167,8 +179,11 @@ nsHTTPCompressConv::BrotliHandler(nsIInputStream *stream, void *closure, const c
       &avail, reinterpret_cast<const unsigned char **>(&dataIn),
       &outSize, &outPtr, &self->mBrotli->mTotalOut, &self->mBrotli->mState);
     outSize = kOutSize - outSize;
+    LOG(("nsHttpCompresssConv %p brotlihandler decompress rv=%x out=%d\n",
+         self, res, outSize));
 
     if (res == BROTLI_RESULT_ERROR) {
+      LOG(("nsHttpCompressConv %p marking invalid encoding", self));
       self->mBrotli->mStatus = NS_ERROR_INVALID_CONTENT_ENCODING;
       return self->mBrotli->mStatus;
     }
@@ -188,6 +203,7 @@ nsHTTPCompressConv::BrotliHandler(nsIInputStream *stream, void *closure, const c
                                              self->mBrotli->mSourceOffset,
                                              reinterpret_cast<const char *>(outBuffer),
                                              outSize);
+      LOG(("nsHttpCompressConv %p BrotliHandler ODA rv=%x", self, rv));
       if (NS_FAILED(rv)) {
         self->mBrotli->mStatus = rv;
         return self->mBrotli->mStatus;
@@ -215,6 +231,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
 {
   nsresult rv = NS_ERROR_INVALID_CONTENT_ENCODING;
   uint32_t streamLen = aCount;
+  LOG(("nsHttpCompressConv %p OnDataAvailable %d", this, aCount));
 
   if (streamLen == 0) {
     NS_ERROR("count of zero passed to OnDataAvailable");
