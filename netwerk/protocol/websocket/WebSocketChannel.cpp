@@ -3265,6 +3265,8 @@ WebSocketChannel::AsyncOpen(nsIURI *aURI,
     return rv;
   }
 
+  // Ideally we'd call newChannelFromURIWithLoadInfo here, but that doesn't
+  // allow setting proxy uri/flags
   rv = io2->NewChannelFromURIWithProxyFlags2(
               localURI,
               mURI,

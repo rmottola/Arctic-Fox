@@ -51,7 +51,7 @@ function parseExtra(extra, allowed) {
   return result;
 }
 
-let ContentPolicyManager = {
+var ContentPolicyManager = {
   policyData: new Map(),
   policies: new Map(),
   idMap: new Map(),
@@ -149,7 +149,7 @@ StartStopListener.prototype = {
   }
 };
 
-let HttpObserverManager = {
+var HttpObserverManager = {
   modifyInitialized: false,
   examineInitialized: false,
 
@@ -249,7 +249,9 @@ let HttpObserverManager = {
     let loadContext = this.getLoadContext(channel);
     let browser = loadContext ? loadContext.topFrameElement : null;
     let loadInfo = channel.loadInfo;
-    let policyType = loadInfo.contentPolicyType;
+    let policyType = loadInfo ?
+                     loadInfo.externalContentPolicyType :
+                     Ci.nsIContentPolicy.TYPE_OTHER;
 
     let requestHeaders;
     let responseHeaders;
@@ -266,8 +268,8 @@ let HttpObserverManager = {
         method: channel.requestMethod,
         browser: browser,
         type: WebRequestCommon.typeForPolicyType(policyType),
-        windowId: loadInfo.outerWindowID,
-        parentWindowId: loadInfo.parentOuterWindowID,
+        windowId: loadInfo ? loadInfo.outerWindowID : 0,
+        parentWindowId: loadInfo ? loadInfo.parentOuterWindowID : 0,
       };
       if (opts.requestHeaders) {
         if (!requestHeaders) {
@@ -354,7 +356,7 @@ let HttpObserverManager = {
   },
 };
 
-let onBeforeRequest = {
+var onBeforeRequest = {
   addListener(callback, filter = null, opt_extraInfoSpec = null) {
     // FIXME: Add requestBody support.
     let opts = parseExtra(opt_extraInfoSpec, ["blocking"]);
@@ -367,7 +369,7 @@ let onBeforeRequest = {
   }
 };
 
-let onBeforeSendHeaders = {
+var onBeforeSendHeaders = {
   addListener(callback, filter = null, opt_extraInfoSpec = null) {
     let opts = parseExtra(opt_extraInfoSpec, ["requestHeaders", "blocking"]);
     opts.filter = parseFilter(filter);
@@ -379,7 +381,7 @@ let onBeforeSendHeaders = {
   }
 };
 
-let onSendHeaders = {
+var onSendHeaders = {
   addListener(callback, filter = null, opt_extraInfoSpec = null) {
     let opts = parseExtra(opt_extraInfoSpec, ["requestHeaders"]);
     opts.filter = parseFilter(filter);
@@ -391,7 +393,7 @@ let onSendHeaders = {
   }
 };
 
-let onHeadersReceived = {
+var onHeadersReceived = {
   addListener(callback, filter = null, opt_extraInfoSpec = null) {
     let opts = parseExtra(opt_extraInfoSpec, ["blocking", "responseHeaders"]);
     opts.filter = parseFilter(filter);
@@ -403,7 +405,7 @@ let onHeadersReceived = {
   }
 };
 
-let onResponseStarted = {
+var onResponseStarted = {
   addListener(callback, filter = null, opt_extraInfoSpec = null) {
     let opts = parseExtra(opt_extraInfoSpec, ["responseHeaders"]);
     opts.filter = parseFilter(filter);
@@ -415,7 +417,7 @@ let onResponseStarted = {
   }
 };
 
-let onCompleted = {
+var onCompleted = {
   addListener(callback, filter = null, opt_extraInfoSpec = null) {
     let opts = parseExtra(opt_extraInfoSpec, ["responseHeaders"]);
     opts.filter = parseFilter(filter);
@@ -427,7 +429,7 @@ let onCompleted = {
   }
 };
 
-let WebRequest = {
+var WebRequest = {
   // Handled via content policy.
   onBeforeRequest: onBeforeRequest,
 

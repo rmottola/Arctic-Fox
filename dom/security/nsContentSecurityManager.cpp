@@ -118,11 +118,12 @@ DoCORSChecks(nsIChannel* aChannel, nsILoadInfo* aLoadInfo,
 nsresult
 DoContentSecurityChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
 {
-  nsContentPolicyType contentPolicyType = aLoadInfo->GetExternalContentPolicyType();
-  nsCString mimeTypeGuess;
-  nsCOMPtr<nsINode> requestingContext = nullptr;
+  nsContentPolicyType contentPolicyType =
+    aLoadInfo->GetExternalContentPolicyType();
   nsContentPolicyType internalContentPolicyType =
     aLoadInfo->InternalContentPolicyType();
+  nsCString mimeTypeGuess;
+  nsCOMPtr<nsINode> requestingContext = nullptr;
 
   switch(contentPolicyType) {
     case nsIContentPolicy::TYPE_OTHER: {
