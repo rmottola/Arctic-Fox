@@ -67,11 +67,28 @@ function testClone() {
   });
 }
 
+function testError() {
+  var res = Response.error();
+  is(res.status, 0, "Error response status should be 0");
+  try {
+    res.headers.set("someheader", "not allowed");
+    ok(false, "Error response should have immutable headers");
+  } catch(e) {
+    ok(true, "Error response should have immutable headers");
+  }
+}
+
 function testRedirect() {
   var res = Response.redirect("./redirect.response");
   is(res.status, 302, "Default redirect has status code 302");
   var h = res.headers.get("location");
   ok(h === (new URL("./redirect.response", self.location.href)).href, "Location header should be correct absolute URL");
+  try {
+    res.headers.set("someheader", "not allowed");
+    ok(false, "Redirects should have immutable headers");
+  } catch(e) {
+    ok(true, "Redirects should have immutable headers");
+  }
 
   var successStatus = [301, 302, 303, 307, 308];
   for (var i = 0; i < successStatus.length; ++i) {
@@ -207,6 +224,7 @@ function testNullBodyStatus() {
 
 function runTest() {
   testDefaultCtor();
+  testError();
   testRedirect();
   testOk();
   testNullBodyStatus();
@@ -216,4 +234,5 @@ function runTest() {
     .then(testBodyUsed)
     .then(testBodyExtraction)
     .then(testClone)
+    // Put more promise based tests here.
 }
