@@ -3464,7 +3464,9 @@ ServiceWorkerManager::MaybeStopControlling(nsIDocument* aDoc)
     StopControllingADocument(registration);
   }
 
-  mAllDocuments.RemoveEntry(aDoc);
+  if (mAllDocuments.Contains(aDoc)) {
+    mAllDocuments.RemoveEntry(aDoc);
+  }
 }
 
 void
