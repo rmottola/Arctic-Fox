@@ -943,6 +943,10 @@ MediaFormatReader::Update(TrackType aTrack)
   auto& decoder = GetDecoderData(aTrack);
   decoder.mUpdateScheduled = false;
 
+  if (!mInitDone) {
+    return;
+  }
+
   if (UpdateReceivedNewData(aTrack)) {
     LOGV("Nothing more to do");
     return;
