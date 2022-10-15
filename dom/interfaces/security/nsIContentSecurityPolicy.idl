@@ -20,7 +20,7 @@ interface nsIURI;
 
 typedef unsigned short CSPDirective;
 
-[scriptable, uuid(fe07ab08-21ba-470c-8b89-78d0e7298c68)]
+[scriptable, uuid(36c6d419-24c2-40e8-9adb-11d0b1341770)]
 interface nsIContentSecurityPolicy : nsISerializable
 {
   /**

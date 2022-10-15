@@ -113,6 +113,7 @@ nsCSPContext::ShouldLoad(nsContentPolicyType aContentType,
     nsAutoCString spec;
     aContentLocation->GetSpec(spec);
     CSPCONTEXTLOG(("nsCSPContext::ShouldLoad, aContentLocation: %s", spec.get()));
+    CSPCONTEXTLOG((">>>>                      aContentType: %d", aContentType));
   }
 
   bool isStyleOrScriptPreLoad =
@@ -189,7 +190,7 @@ nsCSPContext::ShouldLoad(nsContentPolicyType aContentType,
   if (CSPCONTEXTLOGENABLED()) {
     nsAutoCString spec;
     aContentLocation->GetSpec(spec);
-    CSPCONTEXTLOG(("nsCSPContext::ShouldLoad, decision: %s, aContentLocation: %s", *outDecision ? "load" : "deny", spec.get()));
+    CSPCONTEXTLOG(("nsCSPContext::ShouldLoad, decision: %s, aContentLocation: %s", *outDecision > 0 ? "load" : "deny", spec.get()));
   }
   return NS_OK;
 }
