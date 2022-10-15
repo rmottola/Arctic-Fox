@@ -67,6 +67,7 @@ private:
            bool aEnforceSecurity,
            bool aInitialSecurityCheckDone,
            const OriginAttributes& aOriginAttributes,
+           nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChainIncludingInternalRedirects,
            nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChain);
   LoadInfo(const LoadInfo& rhs);
 
@@ -89,6 +90,7 @@ private:
   bool                             mEnforceSecurity;
   bool                             mInitialSecurityCheckDone;
   OriginAttributes                 mOriginAttributes;
+  nsTArray<nsCOMPtr<nsIPrincipal>> mRedirectChainIncludingInternalRedirects;
   nsTArray<nsCOMPtr<nsIPrincipal>> mRedirectChain;
 
   // Is true if this load was triggered by processing the attributes of the

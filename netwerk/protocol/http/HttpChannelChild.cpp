@@ -1375,7 +1375,7 @@ HttpChannelChild::Redirect3Complete()
 
   if (NS_SUCCEEDED(rv)) {
     if (mLoadInfo) {
-      mLoadInfo->AppendRedirectedPrincipal(GetURIPrincipal());
+      mLoadInfo->AppendRedirectedPrincipal(GetURIPrincipal(), false);
     }
   }
   else {
