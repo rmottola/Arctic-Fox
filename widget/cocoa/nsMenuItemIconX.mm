@@ -43,7 +43,6 @@
 #include "nsIContentPolicy.h"
 
 using mozilla::gfx::SourceSurface;
-using RefPtr;
 
 static const uint32_t kIconWidth = 16;
 static const uint32_t kIconHeight = 16;
