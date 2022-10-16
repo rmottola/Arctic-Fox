@@ -202,7 +202,13 @@ public:
   virtual const char* NodeType() const = 0;
 
 private:
-  // This could possibly delete 'this'.
+  virtual void LastRelease() override
+  {
+    // We are about to be deleted, disconnect the object from the graph before
+    // the derived type is destroyed.
+    DisconnectFromGraph();
+  }
+  // Callers must hold a reference to 'this'.
   void DisconnectFromGraph();
 
 protected:
