@@ -14,6 +14,8 @@
 #include "nsIURI.h"
 #include "nsTArray.h"
 
+#include "mozilla/BasePrincipal.h"
+
 class nsINode;
 
 namespace mozilla {
@@ -64,6 +66,8 @@ private:
            uint64_t aParentOuterWindowID,
            bool aEnforceSecurity,
            bool aInitialSecurityCheckDone,
+           const OriginAttributes& aOriginAttributes,
+           nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChainIncludingInternalRedirects,
            nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChain);
   LoadInfo(const LoadInfo& rhs);
 
@@ -79,12 +83,15 @@ private:
   nsWeakPtr                        mLoadingContext;
   nsSecurityFlags                  mSecurityFlags;
   nsContentPolicyType              mInternalContentPolicyType;
+  LoadTainting                     mTainting;
   bool                             mUpgradeInsecureRequests;
   uint64_t                         mInnerWindowID;
   uint64_t                         mOuterWindowID;
   uint64_t                         mParentOuterWindowID;
   bool                             mEnforceSecurity;
   bool                             mInitialSecurityCheckDone;
+  OriginAttributes                 mOriginAttributes;
+  nsTArray<nsCOMPtr<nsIPrincipal>> mRedirectChainIncludingInternalRedirects;
   nsTArray<nsCOMPtr<nsIPrincipal>> mRedirectChain;
 
   // Is true if this load was triggered by processing the attributes of the

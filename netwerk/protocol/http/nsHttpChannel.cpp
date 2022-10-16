@@ -90,6 +90,7 @@
 #include "nsIDeprecationWarner.h"
 #include "nsIDocument.h"
 #include "nsIDOMDocument.h"
+#include "nsICompressConvStats.h"
 
 namespace mozilla { namespace net {
 
@@ -211,7 +212,7 @@ AutoRedirectVetoNotifier::ReportRedirectResult(bool succeeded)
 
     // Append the initial uri of the channel to the redirectChain
     if (succeeded && mChannel->mLoadInfo) {
-        mChannel->mLoadInfo->AppendRedirectedPrincipal(mChannel->GetURIPrincipal());
+        mChannel->mLoadInfo->AppendRedirectedPrincipal(mChannel->GetURIPrincipal(), false);
     }
 
     mChannel->mRedirectChannel = nullptr;
@@ -1068,6 +1069,7 @@ nsHttpChannel::CallOnStartRequest()
       }
       if (listener) {
         mListener = listener;
+        mCompressListener = listener;
       }
     }
 
@@ -2119,12 +2121,19 @@ nsHttpChannel::StartRedirectChannelToURI(nsIURI *upgradedURI, uint32_t flags)
     if (!(flags & nsIChannelEventSink::REDIRECT_STS_UPGRADE)) {
         // Ensure that internally-redirected channels cannot be intercepted, which would look
         // like two separate requests to the nsINetworkInterceptController.
-        nsLoadFlags loadFlags = nsIRequest::LOAD_NORMAL;
-        rv = mRedirectChannel->GetLoadFlags(&loadFlags);
-        NS_ENSURE_SUCCESS(rv, rv);
-        loadFlags |= nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
-        rv = mRedirectChannel->SetLoadFlags(loadFlags);
-        NS_ENSURE_SUCCESS(rv, rv);
+        if (mInterceptCache == INTERCEPTED) {
+            nsCOMPtr<nsIHttpChannelInternal> httpRedirect = do_QueryInterface(mRedirectChannel);
+            if (httpRedirect) {
+                httpRedirect->ForceIntercepted(mInterceptionID);
+            }
+        } else {
+            nsLoadFlags loadFlags = nsIRequest::LOAD_NORMAL;
+            rv = mRedirectChannel->GetLoadFlags(&loadFlags);
+            NS_ENSURE_SUCCESS(rv, rv);
+            loadFlags |= nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
+            rv = mRedirectChannel->SetLoadFlags(loadFlags);
+            NS_ENSURE_SUCCESS(rv, rv);
+        }
     }
 
     PushRedirectAsyncFunc(
@@ -3098,11 +3107,10 @@ nsHttpChannel::OpenCacheEntry(bool isHttps)
     if (mLoadFlags & LOAD_BYPASS_LOCAL_CACHE_IF_BUSY)
         cacheEntryOpenFlags |= nsICacheStorage::OPEN_BYPASS_IF_BUSY;
 
-    if (mPostID) {
-        extension.Append(nsPrintfCString("%d", mPostID));
-    }
     if (PossiblyIntercepted()) {
         extension.Append(nsPrintfCString("u%lld", mInterceptionID));
+    } else if (mPostID) {
+        extension.Append(nsPrintfCString("%d", mPostID));
     }
 
     // If this channel should be intercepted, we do not open a cache entry for this channel
@@ -5114,7 +5122,7 @@ nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
         return rv;
     }
 
-    if (ShouldIntercept()) {
+    if (mInterceptCache != INTERCEPTED && ShouldIntercept()) {
         mInterceptCache = MAYBE_INTERCEPT;
         SetCouldBeSynthesized();
     }
@@ -5457,6 +5465,19 @@ nsHttpChannel::BeginConnect()
     return NS_OK;
 }
 
+NS_IMETHODIMP
+nsHttpChannel::GetEncodedBodySize(uint64_t *aEncodedBodySize)
+{
+    if (mCacheEntry && !mCacheEntryIsWriteOnly) {
+        int64_t dataSize = 0;
+        mCacheEntry->GetDataSize(&dataSize);
+        *aEncodedBodySize = dataSize;
+    } else {
+        *aEncodedBodySize = mLogicalOffset;
+    }
+    return NS_OK;
+}
+
 //-----------------------------------------------------------------------------
 // nsHttpChannel::nsIHttpChannelInternal
 //-----------------------------------------------------------------------------
@@ -5471,6 +5492,21 @@ nsHttpChannel::SetupFallbackChannel(const char *aFallbackKey)
     mFallbackChannel = true;
     mFallbackKey = aFallbackKey;
 
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsHttpChannel::ForceIntercepted(uint64_t aInterceptionID)
+{
+    ENSURE_CALLED_BEFORE_ASYNC_OPEN();
+
+    if (NS_WARN_IF(mLoadFlags & LOAD_BYPASS_SERVICE_WORKER)) {
+        return NS_ERROR_NOT_AVAILABLE;
+    }
+
+    MarkIntercepted();
+    mResponseCouldBeSynthesized = true;
+    mInterceptionID = aInterceptionID;
     return NS_OK;
 }
 
@@ -5935,6 +5971,11 @@ nsHttpChannel::OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult st
             gHttpHandler->CancelTransaction(mTransaction, status);
     }
 
+    nsCOMPtr<nsICompressConvStats> conv = do_QueryInterface(mCompressListener);
+    if (conv) {
+        conv->GetDecodedDataLength(&mDecodedBodySize);
+    }
+
     if (mTransaction) {
         // determine if we should call DoAuthRetry
         bool authRetry = mAuthRetryPending && NS_SUCCEEDED(status);
@@ -5961,6 +6002,8 @@ nsHttpChannel::OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult st
         RefPtr<nsAHttpConnection> stickyConn;
         if (mCaps & NS_HTTP_STICKY_CONNECTION)
             stickyConn = mTransaction->GetConnectionReference();
+
+        mTransferSize = mTransaction->GetTransferSize();
 
         // at this point, we're done with the transaction
         mTransactionTimings = mTransaction->Timings();

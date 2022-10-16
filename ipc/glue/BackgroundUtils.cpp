@@ -224,6 +224,12 @@ LoadInfoToLoadInfoArgs(nsILoadInfo *aLoadInfo,
   rv = PrincipalToPrincipalInfo(aLoadInfo->TriggeringPrincipal(),
                                 &triggeringPrincipalInfo);
 
+  nsTArray<PrincipalInfo> redirectChainIncludingInternalRedirects;
+  for (const nsCOMPtr<nsIPrincipal>& principal : aLoadInfo->RedirectChainIncludingInternalRedirects()) {
+    rv = PrincipalToPrincipalInfo(principal, redirectChainIncludingInternalRedirects.AppendElement());
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
   nsTArray<PrincipalInfo> redirectChain;
   for (const nsCOMPtr<nsIPrincipal>& principal : aLoadInfo->RedirectChain()) {
     rv = PrincipalToPrincipalInfo(principal, redirectChain.AppendElement());
@@ -242,6 +248,8 @@ LoadInfoToLoadInfoArgs(nsILoadInfo *aLoadInfo,
       aLoadInfo->GetParentOuterWindowID(),
       aLoadInfo->GetEnforceSecurity(),
       aLoadInfo->GetInitialSecurityCheckDone(),
+      aLoadInfo->GetOriginAttributes(),
+      redirectChainIncludingInternalRedirects,
       redirectChain);
 
   return NS_OK;
@@ -267,6 +275,14 @@ LoadInfoArgsToLoadInfo(const OptionalLoadInfoArgs& aOptionalLoadInfoArgs,
     PrincipalInfoToPrincipal(loadInfoArgs.triggeringPrincipalInfo(), &rv);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  nsTArray<nsCOMPtr<nsIPrincipal>> redirectChainIncludingInternalRedirects;
+  for (const PrincipalInfo& principalInfo : loadInfoArgs.redirectChainIncludingInternalRedirects()) {
+    nsCOMPtr<nsIPrincipal> redirectedPrincipal =
+      PrincipalInfoToPrincipal(principalInfo, &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+    redirectChainIncludingInternalRedirects.AppendElement(redirectedPrincipal.forget());
+  }
+
   nsTArray<nsCOMPtr<nsIPrincipal>> redirectChain;
   for (const PrincipalInfo& principalInfo : loadInfoArgs.redirectChain()) {
     nsCOMPtr<nsIPrincipal> redirectedPrincipal =
@@ -286,6 +302,8 @@ LoadInfoArgsToLoadInfo(const OptionalLoadInfoArgs& aOptionalLoadInfoArgs,
                           loadInfoArgs.parentOuterWindowID(),
                           loadInfoArgs.enforceSecurity(),
                           loadInfoArgs.initialSecurityCheckDone(),
+                          loadInfoArgs.originAttributes(),
+                          redirectChainIncludingInternalRedirects,
                           redirectChain);
 
    loadInfo.forget(outLoadInfo);

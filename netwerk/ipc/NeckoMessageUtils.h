@@ -155,6 +155,9 @@ struct ParamTraits<mozilla::net::ResourceTimingStruct>
     WriteParam(aMsg, aParam.fetchStart);
     WriteParam(aMsg, aParam.redirectStart);
     WriteParam(aMsg, aParam.redirectEnd);
+
+    WriteParam(aMsg, aParam.transferSize);
+    WriteParam(aMsg, aParam.encodedBodySize);
   }
 
   static bool Read(const Message* aMsg, void** aIter, mozilla::net::ResourceTimingStruct* aResult)
@@ -168,7 +171,9 @@ struct ParamTraits<mozilla::net::ResourceTimingStruct>
            ReadParam(aMsg, aIter, &aResult->responseEnd) &&
            ReadParam(aMsg, aIter, &aResult->fetchStart) &&
            ReadParam(aMsg, aIter, &aResult->redirectStart) &&
-           ReadParam(aMsg, aIter, &aResult->redirectEnd);
+           ReadParam(aMsg, aIter, &aResult->redirectEnd) &&
+           ReadParam(aMsg, aIter, &aResult->transferSize) &&
+           ReadParam(aMsg, aIter, &aResult->encodedBodySize);
   }
 };
 
