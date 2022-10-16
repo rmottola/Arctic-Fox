@@ -23,7 +23,7 @@ NS_IMPL_CYCLE_COLLECTION_CLASS(AudioNode)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(AudioNode, DOMEventTargetHelper)
   tmp->DisconnectFromGraph();
   if (tmp->mContext) {
-    tmp->mContext->UpdateNodeCount(-1);
+    tmp->mContext->UnregisterNode(tmp);
   }
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mContext)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mOutputNodes)
@@ -57,7 +57,7 @@ AudioNode::AudioNode(AudioContext* aContext,
 {
   MOZ_ASSERT(aContext);
   DOMEventTargetHelper::BindToOwner(aContext->GetParentObject());
-  aContext->UpdateNodeCount(1);
+  aContext->RegisterNode(this);
 }
 
 AudioNode::~AudioNode()
@@ -68,7 +68,7 @@ AudioNode::~AudioNode()
   MOZ_ASSERT(!mStream,
              "The webaudio-node-demise notification must have been sent");
   if (mContext) {
-    mContext->UpdateNodeCount(-1);
+    mContext->UnregisterNode(this);
   }
 }
 
