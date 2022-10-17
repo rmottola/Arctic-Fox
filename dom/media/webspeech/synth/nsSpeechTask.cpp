@@ -558,7 +558,7 @@ nsSpeechTask::Pause()
   }
 
   if (mStream) {
-    mStream->ChangeExplicitBlockerCount(1);
+    mStream->Suspend();
   }
 
   if (!mInited) {
@@ -581,7 +581,7 @@ nsSpeechTask::Resume()
   }
 
   if (mStream) {
-    mStream->ChangeExplicitBlockerCount(-1);
+    mStream->Resume();
   }
 
   if (mPrePaused) {
@@ -607,7 +607,7 @@ nsSpeechTask::Cancel()
   }
 
   if (mStream) {
-    mStream->ChangeExplicitBlockerCount(1);
+    mStream->Suspend();
   }
 
   if (!mInited) {
@@ -623,7 +623,7 @@ void
 nsSpeechTask::ForceEnd()
 {
   if (mStream) {
-    mStream->ChangeExplicitBlockerCount(1);
+    mStream->Suspend();
   }
 
   if (!mInited) {
