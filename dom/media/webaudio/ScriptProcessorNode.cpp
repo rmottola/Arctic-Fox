@@ -440,9 +440,7 @@ private:
         // them.  Otherwise, we may be able to get away without creating them!
         RefPtr<AudioProcessingEvent> event =
           new AudioProcessingEvent(aNode, nullptr, nullptr);
-        event->InitEvent(inputBuffer,
-                         inputChannelCount,
-                         context->StreamTimeToDOMTime(mPlaybackTime));
+        event->InitEvent(inputBuffer, inputChannelCount, mPlaybackTime);
         aNode->DispatchTrustedEvent(event);
 
         // Steal the output buffers if they have been set.
