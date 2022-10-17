@@ -64,7 +64,7 @@ public:
 
   // An amount that should be added to the MediaStream's current time to
   // get the AudioContext.currentTime.
-  double ExtraCurrentTime();
+  StreamTime ExtraCurrentTime();
 
   // When aIsOnlyNode is true, this is the only node for the AudioContext.
   void SetIsOnlyNodeForContext(bool aIsOnlyNode);
@@ -109,8 +109,8 @@ private:
   bool mAudioChannelAgentPlaying;
 
   TimeStamp mStartedBlockingDueToBeingOnlyNode;
-  double mExtraCurrentTime;
-  double mExtraCurrentTimeSinceLastStartedBlocking;
+  StreamTime mExtraCurrentTime;
+  StreamTime mExtraCurrentTimeSinceLastStartedBlocking;
   bool mExtraCurrentTimeUpdatedSinceLastStableState;
   bool mCaptured;
 };

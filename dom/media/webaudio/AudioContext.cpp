@@ -1057,7 +1057,7 @@ AudioContext::CollectReports(nsIHandleReportCallback* aHandleReport,
 double
 AudioContext::ExtraCurrentTime() const
 {
-  return mDestination->ExtraCurrentTime();
+  return static_cast<double>(mSampleRate) * mDestination->ExtraCurrentTime();
 }
 
 BasicWaveFormCache*
