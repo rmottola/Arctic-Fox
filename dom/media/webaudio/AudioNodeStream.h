@@ -41,7 +41,7 @@ public:
 
   enum { AUDIO_TRACK = 1 };
 
-  typedef nsAutoTArray<AudioChunk, 1> OutputChunks;
+  typedef nsAutoTArray<AudioBlock, 1> OutputChunks;
 
   // Flags re main thread updates and stream output.
   typedef unsigned Flags;
@@ -179,15 +179,15 @@ public:
 protected:
   void AdvanceOutputSegment();
   void FinishOutput();
-  void AccumulateInputChunk(uint32_t aInputIndex, const AudioChunk& aChunk,
-                            AudioChunk* aBlock,
+  void AccumulateInputChunk(uint32_t aInputIndex, const AudioBlock& aChunk,
+                            AudioBlock* aBlock,
                             nsTArray<float>* aDownmixBuffer);
-  void UpMixDownMixChunk(const AudioChunk* aChunk, uint32_t aOutputChannelCount,
+  void UpMixDownMixChunk(const AudioBlock* aChunk, uint32_t aOutputChannelCount,
                          nsTArray<const float*>& aOutputChannels,
                          nsTArray<float>& aDownmixBuffer);
 
   uint32_t ComputedNumberOfChannels(uint32_t aInputChannelCount);
-  void ObtainInputBlock(AudioChunk& aTmpChunk, uint32_t aPortIndex);
+  void ObtainInputBlock(AudioBlock& aTmpChunk, uint32_t aPortIndex);
 
   // The engine that will generate output for this node.
   nsAutoPtr<AudioNodeEngine> mEngine;
