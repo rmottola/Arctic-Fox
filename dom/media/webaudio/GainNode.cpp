@@ -61,6 +61,7 @@ public:
   }
 
   virtual void ProcessBlock(AudioNodeStream* aStream,
+                            GraphTime aFrom,
                             const AudioBlock& aInput,
                             AudioBlock* aOutput,
                             bool* aFinished) override
@@ -86,7 +87,7 @@ public:
       aOutput->AllocateChannels(aInput.ChannelCount());
 
       // Compute the gain values for the duration of the input AudioChunk
-      StreamTime tick = aStream->GetCurrentPosition();
+      StreamTime tick = aStream->GraphTimeToStreamTime(aFrom);
       float computedGain[WEBAUDIO_BLOCK_SIZE];
       mGain.GetValuesAtTime(tick, computedGain, WEBAUDIO_BLOCK_SIZE);
 

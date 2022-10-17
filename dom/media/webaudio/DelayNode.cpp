@@ -78,6 +78,7 @@ public:
   }
 
   virtual void ProcessBlock(AudioNodeStream* aStream,
+                            GraphTime aFrom,
                             const AudioBlock& aInput,
                             AudioBlock* aOutput,
                             bool* aFinished) override
@@ -117,13 +118,13 @@ public:
     // Skip output update if mLastChunks has already been set by
     // ProduceBlockBeforeInput() when in a cycle.
     if (!mHaveProducedBeforeInput) {
-      UpdateOutputBlock(aOutput, 0.0);
+      UpdateOutputBlock(aFrom, aOutput, 0.0);
     }
     mHaveProducedBeforeInput = false;
     mBuffer.NextBlock();
   }
 
-  void UpdateOutputBlock(AudioBlock* aOutput, double minDelay)
+  void UpdateOutputBlock(GraphTime aFrom, AudioBlock* aOutput, double minDelay)
   {
     double maxDelay = mMaxDelay;
     double sampleRate = mSource->SampleRate();
@@ -140,7 +141,7 @@ public:
       // Compute the delay values for the duration of the input AudioChunk
       // If this DelayNode is in a cycle, make sure the delay value is at least
       // one block.
-      StreamTime tick = mSource->GetCurrentPosition();
+      StreamTime tick = mSource->GraphTimeToStreamTime(aFrom);
       float values[WEBAUDIO_BLOCK_SIZE];
       mDelay.GetValuesAtTime(tick, values,WEBAUDIO_BLOCK_SIZE);
 
@@ -155,12 +156,13 @@ public:
     }
   }
 
-  virtual void ProduceBlockBeforeInput(AudioBlock* aOutput) override
+  virtual void ProduceBlockBeforeInput(GraphTime aFrom,
+                                       AudioBlock* aOutput) override
   {
     if (mLeftOverData <= 0) {
       aOutput->SetNull(WEBAUDIO_BLOCK_SIZE);
     } else {
-      UpdateOutputBlock(aOutput, WEBAUDIO_BLOCK_SIZE);
+      UpdateOutputBlock(aFrom, aOutput, WEBAUDIO_BLOCK_SIZE);
     }
     mHaveProducedBeforeInput = true;
   }

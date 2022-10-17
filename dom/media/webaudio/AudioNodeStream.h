@@ -131,7 +131,6 @@ public:
    * the output.  This is used only for DelayNodeEngine in a feedback loop.
    */
   void ProduceOutputBeforeInput(GraphTime aFrom);
-  StreamTime GetCurrentPosition();
   bool IsAudioParamStream() const
   {
     return mAudioParamStream;
