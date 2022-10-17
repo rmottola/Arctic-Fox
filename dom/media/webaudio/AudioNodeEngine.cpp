@@ -13,29 +13,6 @@
 namespace mozilla {
 
 void
-AllocateAudioBlock(uint32_t aChannelCount, AudioChunk* aChunk)
-{
-  CheckedInt<size_t> size = WEBAUDIO_BLOCK_SIZE;
-  size *= aChannelCount;
-  size *= sizeof(float);
-  if (!size.isValid()) {
-    MOZ_CRASH();
-  }
-  // XXX for SIMD purposes we should do something here to make sure the
-  // channel buffers are 16-byte aligned.
-  RefPtr<SharedBuffer> buffer = SharedBuffer::Create(size.value());
-  aChunk->mDuration = WEBAUDIO_BLOCK_SIZE;
-  aChunk->mChannelData.SetLength(aChannelCount);
-  float* data = static_cast<float*>(buffer->Data());
-  for (uint32_t i = 0; i < aChannelCount; ++i) {
-    aChunk->mChannelData[i] = data + i*WEBAUDIO_BLOCK_SIZE;
-  }
-  aChunk->mBuffer = buffer.forget();
-  aChunk->mVolume = 1.0f;
-  aChunk->mBufferFormat = AUDIO_FORMAT_FLOAT32;
-}
-
-void
 WriteZeroesToAudioBlock(AudioChunk* aChunk, uint32_t aStart, uint32_t aLength)
 {
   MOZ_ASSERT(aStart + aLength <= WEBAUDIO_BLOCK_SIZE);
