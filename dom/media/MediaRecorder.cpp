@@ -777,7 +777,7 @@ MediaRecorder::MediaRecorder(AudioNode& aSrcAudioNode,
     AudioNodeStream* ns = aSrcAudioNode.GetStream();
     if (ns) {
       mInputPort = mPipeStream->AllocateInputPort(aSrcAudioNode.GetStream(),
-                                                  MediaInputPort::FLAG_BLOCK_INPUT,
+                                                  0,
                                                   0,
                                                   aSrcOutput);
     }
