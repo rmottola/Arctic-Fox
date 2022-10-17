@@ -651,7 +651,7 @@ MediaStreamGraphImpl::CreateOrDestroyAudioStreams(MediaStream* aStream)
 }
 
 StreamTime
-MediaStreamGraphImpl::PlayAudio(MediaStream* aStream, GraphTime aTo)
+MediaStreamGraphImpl::PlayAudio(MediaStream* aStream)
 {
   MOZ_ASSERT(mRealtime, "Should only attempt to play audio in realtime mode");
 
@@ -678,10 +678,10 @@ MediaStreamGraphImpl::PlayAudio(MediaStream* aStream, GraphTime aTo)
     // from the right offsets in the stream buffer, even if we've already
     // written silence for some amount of blocked time after the current time.
     GraphTime t = mProcessedTime;
-    while (t < aTo) {
+    while (t < mStateComputedTime) {
       bool blocked = t >= aStream->mStartBlocking;
-      GraphTime end = blocked ? aTo : aStream->mStartBlocking;
-      NS_ASSERTION(end <= aTo, "mStartBlocking is wrong!");
+      GraphTime end = blocked ? mStateComputedTime : aStream->mStartBlocking;
+      NS_ASSERTION(end <= mStateComputedTime, "mStartBlocking is wrong!");
 
       // Check how many ticks of sound we can provide if we are blocked some
       // time in the middle of this cycle.
@@ -1087,7 +1087,7 @@ MediaStreamGraphImpl::UpdateGraph(GraphTime aEndBlockingDecisions)
 }
 
 void
-MediaStreamGraphImpl::Process(GraphTime aTo)
+MediaStreamGraphImpl::Process()
 {
   // Play stream contents.
   bool allBlockedForever = true;
@@ -1120,12 +1120,13 @@ MediaStreamGraphImpl::Process(GraphTime aTo)
           // Since an AudioNodeStream is present, go ahead and
           // produce audio block by block for all the rest of the streams.
           ProduceDataForStreamsBlockByBlock(i, n->SampleRate(),
-              mProcessedTime, aTo);
+              mProcessedTime, mStateComputedTime);
           doneAllProducing = true;
         } else {
-          ps->ProcessInput(mProcessedTime, aTo, ProcessedMediaStream::ALLOW_FINISH);
+          ps->ProcessInput(mProcessedTime, mStateComputedTime,
+                           ProcessedMediaStream::ALLOW_FINISH);
           NS_WARN_IF_FALSE(stream->mBuffer.GetEnd() >=
-                           GraphTimeToStreamTimeWithBlocking(stream, aTo),
+                           GraphTimeToStreamTimeWithBlocking(stream, mStateComputedTime),
                            "Stream did not produce enough data");
         }
       }
@@ -1135,7 +1136,7 @@ MediaStreamGraphImpl::Process(GraphTime aTo)
     if (mRealtime) {
       CreateOrDestroyAudioStreams(stream);
       if (CurrentDriver()->AsAudioCallbackDriver()) {
-        StreamTime ticksPlayedForThisStream = PlayAudio(stream, aTo);
+        StreamTime ticksPlayedForThisStream = PlayAudio(stream);
         if (!ticksPlayed) {
           ticksPlayed = ticksPlayedForThisStream;
         } else {
@@ -1228,7 +1229,7 @@ MediaStreamGraphImpl::OneIteration(GraphTime aStateEnd)
 
   mStateComputedTime = stateEnd;
 
-  Process(stateEnd);
+  Process();
 
   GraphTime oldProcessedTime = mProcessedTime;
   mProcessedTime = stateEnd;
