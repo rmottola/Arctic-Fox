@@ -227,6 +227,7 @@ public:
     : AudioNodeEngine(aNode)
     , mVolume(1.0f)
     , mLastInputMuted(true)
+    , mSuspended(false)
   {
     MOZ_ASSERT(aNode);
   }
@@ -238,6 +239,10 @@ public:
   {
     *aOutput = aInput;
     aOutput->mVolume *= mVolume;
+
+    if (mSuspended) {
+      return;
+    }
 
     bool newInputMuted = aInput.IsNull() || aInput.IsMuted();
     if (newInputMuted != mLastInputMuted) {
@@ -267,8 +272,19 @@ public:
     }
   }
 
+  virtual void SetInt32Parameter(uint32_t aIndex, int32_t aParam) override
+  {
+    if (aIndex == SUSPENDED) {
+      mSuspended = !!aParam;
+      if (mSuspended) {
+        mLastInputMuted = true;
+      }
+    }
+  }
+
   enum Parameters {
     VOLUME,
+    SUSPENDED,
   };
 
   virtual size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const override
@@ -279,6 +295,7 @@ public:
 private:
   float mVolume;
   bool mLastInputMuted;
+  bool mSuspended;
 };
 
 static bool UseAudioChannelService()
@@ -445,6 +462,20 @@ AudioDestinationNode::Unmute()
 {
   MOZ_ASSERT(Context() && !Context()->IsOffline());
   SendDoubleParameterToStream(DestinationNodeEngine::VOLUME, 1.0f);
+}
+
+void
+AudioDestinationNode::Suspend()
+{
+  DestroyAudioChannelAgent();
+  SendInt32ParameterToStream(DestinationNodeEngine::SUSPENDED, 1);
+}
+
+void
+AudioDestinationNode::Resume()
+{
+  CreateAudioChannelAgent();
+  SendInt32ParameterToStream(DestinationNodeEngine::SUSPENDED, 0);
 }
 
 void

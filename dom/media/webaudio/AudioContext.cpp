@@ -839,7 +839,7 @@ AudioContext::Suspend(ErrorResult& aRv)
     return promise.forget();
   }
 
-  Destination()->DestroyAudioChannelAgent();
+  Destination()->Suspend();
 
   MediaStream* ds = DestinationStream();
   if (ds) {
@@ -879,7 +879,7 @@ AudioContext::Resume(ErrorResult& aRv)
     return promise.forget();
   }
 
-  Destination()->CreateAudioChannelAgent();
+  Destination()->Resume();
 
   MediaStream* ds = DestinationStream();
   if (ds) {
