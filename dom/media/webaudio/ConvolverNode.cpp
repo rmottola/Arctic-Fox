@@ -120,6 +120,7 @@ public:
       } else {
         if (mLeftOverData != INT32_MIN) {
           mLeftOverData = INT32_MIN;
+          aStream->CheckForInactive();
           RefPtr<PlayingRefChanged> refchanged =
             new PlayingRefChanged(aStream, PlayingRefChanged::RELEASE);
           aStream->Graph()->

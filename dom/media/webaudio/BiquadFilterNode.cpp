@@ -155,6 +155,7 @@ public:
       if (!hasTail) {
         if (!mBiquads.IsEmpty()) {
           mBiquads.Clear();
+          aStream->CheckForInactive();
 
           RefPtr<PlayingRefChangeHandler> refchanged =
             new PlayingRefChangeHandler(aStream, PlayingRefChangeHandler::RELEASE);
