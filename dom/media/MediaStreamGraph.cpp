@@ -3059,25 +3059,28 @@ MediaStreamGraphImpl::ApplyAudioContextOperationImpl(
 }
 
 void
-MediaStreamGraph::ApplyAudioContextOperation(AudioNodeStream* aNodeStream,
+MediaStreamGraph::ApplyAudioContextOperation(MediaStream* aDestinationStream,
+                                             const nsTArray<MediaStream*>& aStreams,
                                              AudioContextOperation aOperation,
                                              void* aPromise)
 {
   class AudioContextOperationControlMessage : public ControlMessage
   {
   public:
-    AudioContextOperationControlMessage(AudioNodeStream* aStream,
+    AudioContextOperationControlMessage(MediaStream* aDestinationStream,
+                                        const nsTArray<MediaStream*>& aStreams,
                                         AudioContextOperation aOperation,
                                         void* aPromise)
-      : ControlMessage(aStream)
+      : ControlMessage(aDestinationStream)
+      , mStreams(aStreams)
       , mAudioContextOperation(aOperation)
       , mPromise(aPromise)
     {
     }
     virtual void Run()
     {
-      mStream->GraphImpl()->ApplyAudioContextOperationImpl(
-        mStream->AsAudioNodeStream(), mAudioContextOperation, mPromise);
+      mStream->GraphImpl()->ApplyAudioContextOperationImpl(mStream,
+        mStreams, mAudioContextOperation, mPromise);
     }
     virtual void RunDuringShutdown()
     {
