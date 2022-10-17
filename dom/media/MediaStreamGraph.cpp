@@ -751,21 +751,6 @@ MediaStreamGraphImpl::AddBlockingRelatedStreamsToSet(nsTArray<MediaStream*>* aSt
     return;
   aStream->mInBlockingSet = true;
   aStreams->AppendElement(aStream);
-  for (uint32_t i = 0; i < aStream->mConsumers.Length(); ++i) {
-    MediaInputPort* port = aStream->mConsumers[i];
-    if (port->mFlags & (MediaInputPort::FLAG_BLOCK_INPUT | MediaInputPort::FLAG_BLOCK_OUTPUT)) {
-      AddBlockingRelatedStreamsToSet(aStreams, port->mDest);
-    }
-  }
-  ProcessedMediaStream* ps = aStream->AsProcessedStream();
-  if (ps) {
-    for (uint32_t i = 0; i < ps->mInputs.Length(); ++i) {
-      MediaInputPort* port = ps->mInputs[i];
-      if (port->mFlags & (MediaInputPort::FLAG_BLOCK_INPUT | MediaInputPort::FLAG_BLOCK_OUTPUT)) {
-        AddBlockingRelatedStreamsToSet(aStreams, port->mSource);
-      }
-    }
-  }
 }
 
 void
@@ -774,21 +759,6 @@ MediaStreamGraphImpl::MarkStreamBlocking(MediaStream* aStream)
   if (aStream->mBlockInThisPhase)
     return;
   aStream->mBlockInThisPhase = true;
-  for (uint32_t i = 0; i < aStream->mConsumers.Length(); ++i) {
-    MediaInputPort* port = aStream->mConsumers[i];
-    if (port->mFlags & MediaInputPort::FLAG_BLOCK_OUTPUT) {
-      MarkStreamBlocking(port->mDest);
-    }
-  }
-  ProcessedMediaStream* ps = aStream->AsProcessedStream();
-  if (ps) {
-    for (uint32_t i = 0; i < ps->mInputs.Length(); ++i) {
-      MediaInputPort* port = ps->mInputs[i];
-      if (port->mFlags & MediaInputPort::FLAG_BLOCK_INPUT) {
-        MarkStreamBlocking(port->mSource);
-      }
-    }
-  }
 }
 
 void
@@ -2795,7 +2765,7 @@ ProcessedMediaStream::AllocateInputPort(MediaStream* aStream,
     }
     RefPtr<MediaInputPort> mPort;
   };
-  RefPtr<MediaInputPort> port = new MediaInputPort(aStream, this, 0,
+  RefPtr<MediaInputPort> port = new MediaInputPort(aStream, this,
                                                      aInputNumber, aOutputNumber);
   port->SetGraphImpl(GraphImpl());
   GraphImpl()->AppendMessage(new Message(port));
