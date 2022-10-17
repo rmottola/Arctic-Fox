@@ -117,14 +117,6 @@ public:
    * the output.  This is used only for DelayNodeEngine in a feedback loop.
    */
   void ProduceOutputBeforeInput(GraphTime aFrom);
-  /**
-   * Remove references to shared AudioChunk buffers.  Called on downstream
-   * nodes first after an iteration has called ProcessInput() on the entire
-   * graph, so that upstream nodes can re-use their buffers on the next
-   * iteration.
-   */
-  void ReleaseSharedBuffers();
-
   StreamTime GetCurrentPosition();
   bool IsAudioParamStream() const
   {

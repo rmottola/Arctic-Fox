@@ -615,22 +615,6 @@ AudioNodeStream::AdvanceOutputSegment()
   }
 }
 
-void
-AudioNodeStream::ReleaseSharedBuffers()
-{
-  // A shared buffer can't be reused, so release the reference now.  Keep
-  // the channel data arrays to save unnecessary free/alloc.
-  // Release shared output buffers first, as they may be shared with input
-  // buffers which can be re-used if there are no other references.
-  for (auto& chunk : mLastChunks) {
-    chunk.ReleaseBufferIfShared();
-  }
-  for (auto& chunk : mInputChunks) {
-    chunk.ReleaseBufferIfShared();
-  }
-}
-
-
 StreamTime
 AudioNodeStream::GetCurrentPosition()
 {
