@@ -330,7 +330,6 @@ AudioDestinationNode::AudioDestinationNode(AudioContext* aContext,
   , mAudioChannel(AudioChannel::Normal)
   , mIsOffline(aIsOffline)
   , mAudioChannelAgentPlaying(false)
-  , mExtraCurrentTime(0)
   , mExtraCurrentTimeSinceLastStartedBlocking(0)
   , mExtraCurrentTimeUpdatedSinceLastStableState(false)
   , mCaptured(false)
@@ -672,7 +671,7 @@ AudioDestinationNode::ExtraCurrentTime()
       StreamTime(seconds * Context()->SampleRate() / WEBAUDIO_BLOCK_SIZE + 0.5);
     ScheduleStableStateNotification();
   }
-  return mExtraCurrentTime + mExtraCurrentTimeSinceLastStartedBlocking;
+  return mExtraCurrentTimeSinceLastStartedBlocking;
 }
 
 void
@@ -705,9 +704,8 @@ AudioDestinationNode::SetIsOnlyNodeForContext(bool aIsOnlyNode)
   } else {
     // Force update of mExtraCurrentTimeSinceLastStartedBlocking if necessary
     ExtraCurrentTime();
-    mExtraCurrentTime += mExtraCurrentTimeSinceLastStartedBlocking;
+    mStream->AdvanceAndResume(mExtraCurrentTimeSinceLastStartedBlocking);
     mExtraCurrentTimeSinceLastStartedBlocking = 0;
-    mStream->Resume();
     mStartedBlockingDueToBeingOnlyNode = TimeStamp();
   }
 }
