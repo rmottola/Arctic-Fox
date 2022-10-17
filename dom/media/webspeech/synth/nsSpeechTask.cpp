@@ -619,6 +619,20 @@ nsSpeechTask::Cancel()
   }
 }
 
+void
+nsSpeechTask::ForceEnd()
+{
+  if (mStream) {
+    mStream->ChangeExplicitBlockerCount(1);
+  }
+
+  if (!mInited) {
+    mPreCanceled = true;
+  }
+
+  DispatchEndInner(GetCurrentTime(), GetCurrentCharOffset());
+}
+
 float
 nsSpeechTask::GetCurrentTime()
 {
