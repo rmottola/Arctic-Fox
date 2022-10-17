@@ -436,7 +436,7 @@ public:
     return rate ? rate : mBufferSampleRate;
   }
 
-  void UpdateSampleRateIfNeeded(uint32_t aChannels)
+  void UpdateSampleRateIfNeeded(uint32_t aChannels, StreamTime aStreamPosition)
   {
     float playbackRate;
     float detune;
@@ -444,12 +444,12 @@ public:
     if (mPlaybackRateTimeline.HasSimpleValue()) {
       playbackRate = mPlaybackRateTimeline.GetValue();
     } else {
-      playbackRate = mPlaybackRateTimeline.GetValueAtTime(mSource->GetCurrentPosition());
+      playbackRate = mPlaybackRateTimeline.GetValueAtTime(aStreamPosition);
     }
     if (mDetuneTimeline.HasSimpleValue()) {
       detune = mDetuneTimeline.GetValue();
     } else {
-      detune = mDetuneTimeline.GetValueAtTime(mSource->GetCurrentPosition());
+      detune = mDetuneTimeline.GetValueAtTime(aStreamPosition);
     }
     if (playbackRate <= 0 || mozilla::IsNaN(playbackRate)) {
       playbackRate = 1.0f;
@@ -474,10 +474,9 @@ public:
 
     uint32_t channels = mBuffer ? mBuffer->GetChannels() : 0;
 
-    UpdateSampleRateIfNeeded(channels);
+    UpdateSampleRateIfNeeded(channels, streamPosition);
 
     uint32_t written = 0;
-    StreamTime streamPosition = aStream->GetCurrentPosition();
     while (written < WEBAUDIO_BLOCK_SIZE) {
       if (mStop != STREAM_TIME_MAX &&
           streamPosition >= mStop) {
