@@ -407,8 +407,8 @@ public:
       return;
     }
 
-    uint32_t numFrames = std::min<uint32_t>(aBufferMax - mBufferPosition,
-                                            availableInOutput);
+    uint32_t numFrames = std::min(aBufferMax - mBufferPosition,
+                                  availableInOutput);
     if (numFrames == WEBAUDIO_BLOCK_SIZE) {
       MOZ_ASSERT(mBufferPosition < aBufferMax);
       BorrowFromInputBuffer(aOutput, aChannels);
