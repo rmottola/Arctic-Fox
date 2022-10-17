@@ -817,7 +817,7 @@ public:
                                                      msg);
       trackunion->GetStream()->AsProcessedStream()->SetAutofinish(true);
       RefPtr<MediaInputPort> port = trackunion->GetStream()->AsProcessedStream()->
-        AllocateInputPort(stream, 0);
+        AllocateInputPort(stream);
       trackunion->mSourceStream = stream;
       trackunion->mPort = port.forget();
       // Log the relationship between SourceMediaStream and TrackUnion stream
