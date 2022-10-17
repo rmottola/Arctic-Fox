@@ -12,6 +12,26 @@
 
 namespace mozilla {
 
+already_AddRefed<ThreadSharedFloatArrayBufferList>
+ThreadSharedFloatArrayBufferList::Create(uint32_t aChannelCount,
+                                         size_t aLength,
+                                         const mozilla::fallible_t&)
+{
+  RefPtr<ThreadSharedFloatArrayBufferList> buffer =
+    new ThreadSharedFloatArrayBufferList(aChannelCount);
+
+  for (uint32_t i = 0; i < aChannelCount; ++i) {
+    float* channelData = js_pod_malloc<float>(aLength);
+    if (!channelData) {
+      return nullptr;
+    }
+
+    buffer->SetData(i, channelData, js_free, channelData);
+  }
+
+  return buffer.forget();
+}
+
 void
 WriteZeroesToAudioBlock(AudioChunk* aChunk, uint32_t aStart, uint32_t aLength)
 {
