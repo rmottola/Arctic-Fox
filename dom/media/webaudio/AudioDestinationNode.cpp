@@ -312,7 +312,7 @@ AudioDestinationNode::AudioDestinationNode(AudioContext* aContext,
     AudioNodeStream::NEED_MAIN_THREAD_CURRENT_TIME |
     AudioNodeStream::NEED_MAIN_THREAD_FINISHED |
     AudioNodeStream::EXTERNAL_OUTPUT;
-  mStream = AudioNodeStream::Create(graph, engine, flags);
+  mStream = AudioNodeStream::Create(aContext, engine, flags, graph);
   mStream->AddMainThreadListener(this);
   mStream->AddAudioOutput(&gWebAudioOutputKey);
 
