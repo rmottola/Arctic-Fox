@@ -519,7 +519,7 @@ public:
   {
     return mConsumers.Length();
   }
-  const StreamBuffer& GetStreamBuffer() { return mBuffer; }
+  StreamBuffer& GetStreamBuffer() { return mBuffer; }
   GraphTime GetStreamBufferStartTime() { return mBufferStartTime; }
 
   double StreamTimeToSeconds(StreamTime aTime)

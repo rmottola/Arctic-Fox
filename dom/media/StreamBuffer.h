@@ -51,7 +51,8 @@ inline TrackTicks RateConvertTicksRoundUp(TrackRate aOutRate,
  * the data for each track is a MediaSegment. The set of tracks can vary
  * over the timeline of the StreamBuffer.
  */
-class StreamBuffer {
+class StreamBuffer
+{
 public:
   /**
    * Every track has a start time --- when it started in the StreamBuffer.
@@ -64,7 +65,8 @@ public:
    * TODO Add TimeVarying<StreamTime,bool> mEnabled.
    * Takes ownership of aSegment.
    */
-  class Track {
+  class Track final
+  {
     Track(TrackID aID, StreamTime aStart, MediaSegment* aSegment)
       : mStart(aStart),
         mSegment(aSegment),
@@ -76,11 +78,13 @@ public:
       NS_ASSERTION(aID > TRACK_NONE, "Bad track ID");
       NS_ASSERTION(0 <= aStart && aStart <= aSegment->GetDuration(), "Bad start position");
     }
+
   public:
     ~Track()
     {
       MOZ_COUNT_DTOR(Track);
     }
+
     template <class T> T* Get() const
     {
       if (mSegment->GetType() == T::StaticType()) {
@@ -88,6 +92,7 @@ public:
       }
       return nullptr;
     }
+
     MediaSegment* GetSegment() const { return mSegment; }
     TrackID GetID() const { return mID; }
     bool IsEnded() const { return mEnded; }
@@ -130,7 +135,7 @@ public:
       return amount;
     }
 
-  protected:
+  private:
     friend class StreamBuffer;
 
     // Start offset is in ticks at rate mRate
@@ -144,7 +149,8 @@ public:
     bool mEnded;
   };
 
-  class CompareTracksByID {
+  class MOZ_STACK_CLASS CompareTracksByID final
+  {
   public:
     bool Equals(Track* aA, Track* aB) const {
       return aA->GetID() == aB->GetID();
@@ -155,7 +161,9 @@ public:
   };
 
   StreamBuffer()
-    : mTracksKnownTime(0), mForgottenTime(0)
+    : mTracksKnownTime(0)
+    , mForgottenTime(0)
+    , mTracksDirty(false)
 #ifdef DEBUG
     , mGraphRateIsSet(false)
 #endif
@@ -207,6 +215,7 @@ public:
 
     Track* track = new Track(aID, aStart, aSegment);
     mTracks.InsertElementSorted(track, CompareTracksByID());
+    mTracksDirty = true;
 
     if (mTracksKnownTime == STREAM_TIME_MAX) {
       // There exists code like
@@ -217,6 +226,7 @@ public:
     }
     return *track;
   }
+
   void AdvanceKnownTracksTime(StreamTime aKnownTime)
   {
     NS_ASSERTION(aKnownTime >= mTracksKnownTime, "Can't move tracks-known time earlier");
@@ -242,7 +252,8 @@ public:
 
   Track* FindTrack(TrackID aID);
 
-  class TrackIter {
+  class MOZ_STACK_CLASS TrackIter final
+  {
   public:
     /**
      * Iterate through the tracks of aBuffer in order of ID.
@@ -295,14 +306,28 @@ public:
     return mForgottenTime;
   }
 
+  bool GetAndResetTracksDirty()
+  {
+    if (!mTracksDirty) {
+      return false;
+    }
+
+    mTracksDirty = false;
+    return true;
+  }
+
 protected:
   TrackRate mGraphRate; // StreamTime per second
   // Any new tracks added will start at or after this time. In other words, the track
   // list is complete and correct for all times less than this time.
   StreamTime mTracksKnownTime;
   StreamTime mForgottenTime;
+
+private:
   // All known tracks for this StreamBuffer
-  nsTArray<nsAutoPtr<Track> > mTracks;
+  nsTArray<nsAutoPtr<Track>> mTracks;
+  bool mTracksDirty;
+
 #ifdef DEBUG
   bool mGraphRateIsSet;
 #endif
