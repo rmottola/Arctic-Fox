@@ -372,8 +372,6 @@ public:
   // current time does not advance.
   virtual void Suspend();
   virtual void Resume();
-  void BlockStreamIfNeeded();
-  void UnblockStreamIfNeeded();
   // Events will be dispatched by calling methods of aListener.
   virtual void AddListener(MediaStreamListener* aListener);
   virtual void RemoveListener(MediaStreamListener* aListener);
@@ -471,26 +469,6 @@ public:
     // are removed.
     aContainer->ClearFutureFrames();
     mVideoOutputs.RemoveElement(aContainer);
-  }
-  void ChangeExplicitBlockerCountImpl(GraphTime aTime, int32_t aDelta)
-  {
-    mExplicitBlockerCount.SetAtAndAfter(aTime, mExplicitBlockerCount.GetAt(aTime) + aDelta);
-  }
-  void BlockStreamIfNeededImpl(GraphTime aTime)
-  {
-    bool blocked = mExplicitBlockerCount.GetAt(aTime) > 0;
-    if (blocked) {
-      return;
-    }
-    ChangeExplicitBlockerCountImpl(aTime, 1);
-  }
-  void UnblockStreamIfNeededImpl(GraphTime aTime)
-  {
-    bool blocked = mExplicitBlockerCount.GetAt(aTime) > 0;
-    if (!blocked) {
-      return;
-    }
-    ChangeExplicitBlockerCountImpl(aTime, -1);
   }
   void AddListenerImpl(already_AddRefed<MediaStreamListener> aListener);
   void RemoveListenerImpl(MediaStreamListener* aListener);
@@ -601,8 +579,6 @@ protected:
   void AdvanceTimeVaryingValuesToCurrentTime(GraphTime aCurrentTime, GraphTime aBlockedTime)
   {
     mBufferStartTime += aBlockedTime;
-    mExplicitBlockerCount.AdvanceCurrentTime(aCurrentTime);
-
     mBuffer.ForgetUpTo(aCurrentTime - mBufferStartTime);
   }
 
@@ -650,9 +626,6 @@ protected:
   // We record the last played video frame to avoid playing the frame again
   // with a different frame id.
   VideoFrame mLastPlayedVideoFrame;
-  // The number of times this stream has been explicitly blocked by the control
-  // API, minus the number of times it has been explicitly unblocked.
-  TimeVarying<GraphTime,uint32_t,0> mExplicitBlockerCount;
   nsTArray<RefPtr<MediaStreamListener> > mListeners;
   nsTArray<MainThreadMediaStreamListener*> mMainThreadListeners;
   nsTArray<TrackID> mDisabledTrackIDs;
