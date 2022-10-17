@@ -469,6 +469,7 @@ public:
       return;
     }
 
+    StreamTime streamPosition = mDestination->GraphTimeToStreamTime(aFrom);
     uint32_t channels = mBuffer ? mBuffer->GetChannels() : 0;
 
     UpdateSampleRateIfNeeded(channels, streamPosition);
