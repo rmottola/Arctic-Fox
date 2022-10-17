@@ -18,7 +18,6 @@ MOCHITEST_CHROME_MANIFESTS += ['test/chrome.ini']
 EXPORTS += [
     'AlignedTArray.h',
     'AudioBlock.h',
-    'AudioContext.h',
     'AudioEventTimeline.h',
     'AudioNodeEngine.h',
     'AudioNodeExternalInputStream.h',
