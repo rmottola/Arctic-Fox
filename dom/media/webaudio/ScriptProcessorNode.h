@@ -59,6 +59,10 @@ public:
       UpdateConnectedStatus();
     }
   }
+  virtual void NotifyInputsChanged() override
+  {
+    UpdateConnectedStatus();
+  }
 
   virtual void SetChannelCount(uint32_t aChannelCount, ErrorResult& aRv) override
   {
