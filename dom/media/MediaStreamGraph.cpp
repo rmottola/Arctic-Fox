@@ -2795,7 +2795,6 @@ ProcessedMediaStream::AllocateInputPort(MediaStream* aStream, uint32_t aFlags,
     }
     RefPtr<MediaInputPort> mPort;
   };
-  MOZ_ASSERT(aStream->GraphImpl() == GraphImpl());
   RefPtr<MediaInputPort> port = new MediaInputPort(aStream, this, aFlags,
                                                      aInputNumber, aOutputNumber);
   port->SetGraphImpl(GraphImpl());
