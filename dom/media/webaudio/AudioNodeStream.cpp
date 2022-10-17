@@ -11,6 +11,7 @@
 #include "AudioChannelFormat.h"
 #include "AudioParamTimeline.h"
 #include "AudioContext.h"
+#include "nsMathUtils.h"
 
 using namespace mozilla::dom;
 
@@ -686,7 +687,6 @@ AudioNodeStream::FractionalTicksFromDestinationTime(AudioNodeStream* aDestinatio
     aDestination->StreamTimeToGraphTimeWithBlocking(destinationStreamTime);
   StreamTime thisStreamTime = GraphTimeToStreamTimeOptimistic(graphTime);
   double thisFractionalTicks = thisStreamTime + offset;
-  MOZ_ASSERT(thisFractionalTicks >= 0.0);
   return thisFractionalTicks;
 }
 
@@ -699,9 +699,7 @@ AudioNodeStream::TicksFromDestinationTime(MediaStream* aDestination,
 
   double thisSeconds =
     FractionalTicksFromDestinationTime(destination, aSeconds);
-  // Round to nearest
-  StreamTime ticks = thisSeconds + 0.5;
-  return ticks;
+  return NS_round(thisSeconds);
 }
 
 double
