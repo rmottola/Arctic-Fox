@@ -165,8 +165,6 @@ public:
     return mInputNodes.AppendElement();
   }
 
-  void DisconnectFromGraphAndDestroyStream();
-
   // May create the stream if it doesn't exist
   MediaStream* Stream();
 
@@ -213,6 +211,8 @@ private:
   }
 
   void SendEventToEngine(const AudioTimelineEvent& aEvent);
+
+  void DisconnectFromGraphAndDestroyStream();
 
   nsCycleCollectingAutoRefCnt mRefCnt;
   NS_DECL_OWNINGTHREAD
