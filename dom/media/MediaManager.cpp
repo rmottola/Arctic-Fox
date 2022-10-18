@@ -2066,8 +2066,8 @@ MediaManager::GetUserMedia(nsPIDOMWindow* aWindow,
 #ifdef MOZ_WEBRTC
     EnableWebRtcLog();
 #endif
-  }, [onFailure](MediaStreamError& reason) mutable {
-    onFailure->OnError(&reason);
+  }, [onFailure](MediaStreamError*& reason) mutable {
+    onFailure->OnError(reason);
   });
   return NS_OK;
 }
@@ -2247,10 +2247,10 @@ MediaManager::EnumerateDevices(nsPIDOMWindow* aWindow,
     mgr->RemoveFromWindowList(windowId, listener);
     nsCOMPtr<nsIWritableVariant> array = MediaManager_ToJSArray(*devices);
     onSuccess->OnSuccess(array);
-  }, [onFailure, windowId, listener](MediaStreamError& reason) mutable {
+  }, [onFailure, windowId, listener](MediaStreamError*& reason) mutable {
     RefPtr<MediaManager> mgr = MediaManager_GetInstance();
     mgr->RemoveFromWindowList(windowId, listener);
-    onFailure->OnError(&reason);
+    onFailure->OnError(reason);
   });
   return NS_OK;
 }
