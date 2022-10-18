@@ -10,7 +10,6 @@
 #include "DataTransfer.h"
 
 #include "nsIDOMDocument.h"
-#include "nsIVariant.h"
 #include "nsISupportsPrimitives.h"
 #include "nsIScriptSecurityManager.h"
 #include "mozilla/dom/DOMStringList.h"
@@ -24,6 +23,7 @@
 #include "nsIScriptContext.h"
 #include "nsIDocument.h"
 #include "nsIScriptGlobalObject.h"
+#include "nsVariant.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/DataTransferBinding.h"
 #include "mozilla/dom/Directory.h"
@@ -418,12 +418,7 @@ void
 DataTransfer::SetData(const nsAString& aFormat, const nsAString& aData,
                       ErrorResult& aRv)
 {
-  nsCOMPtr<nsIWritableVariant> variant = do_CreateInstance(NS_VARIANT_CONTRACTID);
-  if (!variant) {
-    aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
-    return;
-  }
-
+  RefPtr<nsVariant> variant = new nsVariant();
   variant->SetAsAString(aData);
 
   aRv = MozSetDataAt(aFormat, variant, 0);
@@ -1369,9 +1364,7 @@ DataTransfer::FillInExternalData(TransferItem& aItem, uint32_t aIndex)
     if (!data)
       return;
 
-    nsCOMPtr<nsIWritableVariant> variant = do_CreateInstance(NS_VARIANT_CONTRACTID);
-    if (!variant)
-      return;
+    RefPtr<nsVariant> variant = new nsVariant();
 
     nsCOMPtr<nsISupportsString> supportsstr = do_QueryInterface(data);
     if (supportsstr) {

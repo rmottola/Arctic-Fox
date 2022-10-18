@@ -49,6 +49,7 @@
 #include "Latency.h"
 #include "nsProxyRelease.h"
 #include "nsNullPrincipal.h"
+#include "nsVariant.h"
 
 // For PR_snprintf
 #include "prprf.h"
@@ -2158,7 +2159,7 @@ MediaManager::AnonymizeId(nsAString& aId, const nsACString& aOriginKey)
 already_AddRefed<nsIWritableVariant>
 MediaManager::ToJSArray(SourceSet& aDevices)
 {
-  nsCOMPtr<nsIWritableVariant> var = do_CreateInstance("@mozilla.org/variant;1");
+  RefPtr<nsVariant> var = new nsVariant();
   size_t len = aDevices.Length();
   if (len) {
     nsTArray<nsIMediaDevice*> tmp(len);
