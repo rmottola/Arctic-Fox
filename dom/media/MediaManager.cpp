@@ -1160,8 +1160,8 @@ GetSources(MediaEngine *engine, dom::MediaSourceEnum aSrcType,
 
 template<class DeviceType>
 static void
-ApplyConstraints(const MediaTrackConstraints &aConstraints,
-                 nsTArray<RefPtr<DeviceType>>& aSources)
+SelectSettings(const MediaTrackConstraints &aConstraints,
+               nsTArray<RefPtr<DeviceType>>& aSources)
 {
   auto& c = aConstraints;
 
@@ -1216,8 +1216,8 @@ ApplyConstraints(const MediaTrackConstraints &aConstraints,
 }
 
 static bool
-ApplyConstraints(MediaStreamConstraints &aConstraints,
-                 nsTArray<RefPtr<MediaDevice>>& aSources)
+SelectSettings(MediaStreamConstraints &aConstraints,
+               nsTArray<RefPtr<MediaDevice>>& aSources)
 {
   // Since the advanced part of the constraints algorithm needs to know when
   // a candidate set is overconstrained (zero members), we must split up the
@@ -1240,7 +1240,7 @@ ApplyConstraints(MediaStreamConstraints &aConstraints,
   MOZ_ASSERT(!aSources.Length());
 
   if (IsOn(aConstraints.mVideo)) {
-    ApplyConstraints(GetInvariant(aConstraints.mVideo), videos);
+    SelectSettings(GetInvariant(aConstraints.mVideo), videos);
     if (!videos.Length()) {
       overconstrained = true;
     }
@@ -1249,7 +1249,7 @@ ApplyConstraints(MediaStreamConstraints &aConstraints,
     }
   }
   if (IsOn(aConstraints.mAudio)) {
-    ApplyConstraints(GetInvariant(aConstraints.mAudio), audios);
+    SelectSettings(GetInvariant(aConstraints.mAudio), audios);
     if (!audios.Length()) {
       overconstrained = true;
     }
@@ -2031,7 +2031,7 @@ MediaManager::GetUserMedia(nsPIDOMWindow* aWindow,
 
     // Apply any constraints. This modifies the list.
 
-    if (!ApplyConstraints(c, *devices)) {
+    if (!SelectSettings(c, *devices)) {
       RefPtr<MediaStreamError> error =
           new MediaStreamError(window, NS_LITERAL_STRING("NotFoundError"));
       onFailure->OnError(error);
