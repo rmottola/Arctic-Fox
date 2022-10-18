@@ -698,9 +698,9 @@ public:
       // We could override NotifyMediaStreamTrackEnded(), and maybe should, but it's
       // risky to do late in a release since that will affect all track ends, and not
       // just StopTrack()s.
-      if (GetDOMTrackFor(aTrackID)) {
-        mListener->StopTrack(aTrackID,
-                             !!GetDOMTrackFor(aTrackID)->AsAudioStreamTrack());
+      RefPtr<dom::MediaStreamTrack> ownedTrack = FindOwnedDOMTrack(mOwnedStream, aTrackID);
+      if (ownedTrack) {
+        mListener->StopTrack(aTrackID, !!ownedTrack->AsAudioStreamTrack());
       } else {
         LOG(("StopTrack(%d) on non-existent track", aTrackID));
       }
@@ -731,7 +731,7 @@ public:
       return promise.forget();
     }
 
-    RefPtr<dom::MediaStreamTrack> track = GetDOMTrackFor(aTrackID);
+    RefPtr<dom::MediaStreamTrack> track = FindOwnedDOMTrack(mOwnedStream, aTrackID);
     if (!track) {
       LOG(("ApplyConstraintsToTrack(%d) on non-existent track", aTrackID));
       RefPtr<MediaStreamError> error = new MediaStreamError(window,
@@ -808,7 +808,7 @@ public:
 
     // We need to find the input track ID for output ID aTrackID, so we let the TrackUnion
     // forward the request to the source and translate the ID
-    GetStream()->AsProcessedStream()->ForwardTrackEnabled(aTrackID, aEnabled);
+    GetInputStream()->AsProcessedStream()->ForwardTrackEnabled(aTrackID, aEnabled);
   }
 
   virtual DOMLocalMediaStream* AsDOMLocalMediaStream() override
@@ -924,7 +924,7 @@ public:
 
       // Start currentTime from the point where this stream was successfully
       // returned.
-      aStream->SetLogicalStreamStartTime(aStream->GetStream()->GetCurrentTime());
+      aStream->SetLogicalStreamStartTime(aStream->GetPlaybackStream()->GetCurrentTime());
 
       // This is safe since we're on main-thread, and the windowlist can only
       // be invalidated from the main-thread (see OnNavigation)
@@ -1010,7 +1010,7 @@ public:
       // not a problem here, we got explicit user content.
       domStream->SetPrincipal(window->GetExtantDoc()->NodePrincipal());
       msg->RegisterCaptureStreamForWindow(
-            mWindowID, domStream->GetStream()->AsProcessedStream());
+            mWindowID, domStream->GetInputStream()->AsProcessedStream());
       window->SetAudioCapture(true);
     } else {
       // Normal case, connect the source stream to the track union stream to
@@ -1019,8 +1019,8 @@ public:
         nsDOMUserMediaStream::CreateTrackUnionStream(window, mListener,
                                                      mAudioDevice, mVideoDevice,
                                                      msg);
-      trackunion->GetStream()->AsProcessedStream()->SetAutofinish(true);
-      RefPtr<MediaInputPort> port = trackunion->GetStream()->AsProcessedStream()->
+      trackunion->GetInputStream()->AsProcessedStream()->SetAutofinish(true);
+      RefPtr<MediaInputPort> port = trackunion->GetInputStream()->AsProcessedStream()->
         AllocateInputPort(stream);
       trackunion->mSourceStream = stream;
       trackunion->mPort = port.forget();
@@ -1028,8 +1028,8 @@ public:
       // Make sure logger starts before capture
       AsyncLatencyLogger::Get(true);
       LogLatency(AsyncLatencyLogger::MediaStreamCreate,
-          reinterpret_cast<uint64_t>(stream.get()),
-          reinterpret_cast<int64_t>(trackunion->GetStream()));
+                 reinterpret_cast<uint64_t>(stream.get()),
+                 reinterpret_cast<int64_t>(trackunion->GetInputStream()));
 
       nsCOMPtr<nsIPrincipal> principal;
       if (mPeerIdentity) {

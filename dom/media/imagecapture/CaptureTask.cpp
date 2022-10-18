@@ -57,7 +57,7 @@ CaptureTask::AttachStream()
   RefPtr<DOMMediaStream> domStream = track->GetStream();
   domStream->AddPrincipalChangeObserver(this);
 
-  RefPtr<MediaStream> stream = domStream->GetStream();
+  RefPtr<MediaStream> stream = domStream->GetPlaybackStream();
   stream->AddListener(this);
 }
 
@@ -71,7 +71,7 @@ CaptureTask::DetachStream()
   RefPtr<DOMMediaStream> domStream = track->GetStream();
   domStream->RemovePrincipalChangeObserver(this);
 
-  RefPtr<MediaStream> stream = domStream->GetStream();
+  RefPtr<MediaStream> stream = domStream->GetPlaybackStream();
   stream->RemoveListener(this);
 }
 

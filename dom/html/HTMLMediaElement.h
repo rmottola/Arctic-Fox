@@ -346,12 +346,19 @@ public:
 
   /**
    * This will return null if mSrcStream is null, or if mSrcStream is not
-   * null but its GetStream() returns null --- which can happen during
+   * null but its GetPlaybackStream() returns null --- which can happen during
    * cycle collection unlinking!
    */
   MediaStream* GetSrcMediaStream() const
   {
-    return mSrcStream ? mSrcStream->GetStream() : nullptr;
+    if (!mSrcStream) {
+      return nullptr;
+    }
+    if (mSrcStream->GetCameraStream()) {
+      // XXX Remove this check with CameraPreviewMediaStream per bug 1124630.
+      return mSrcStream->GetCameraStream();
+    }
+    return mSrcStream->GetPlaybackStream();
   }
 
   // WebIDL
@@ -1068,11 +1075,6 @@ protected:
   // Holds a reference to the stream connecting this stream to the capture sink.
   RefPtr<MediaInputPort> mCaptureStreamPort;
 
-  // Holds a reference to a stream with mSrcStream as input but intended for
-  // playback. Used so we don't block playback of other video elements
-  // playing the same mSrcStream.
-  RefPtr<DOMMediaStream> mPlaybackStream;
-
   // Holds references to the DOM wrappers for the MediaStreams that we're
   // writing to.
   struct OutputMediaStream {
@@ -1081,8 +1083,8 @@ protected:
   };
   nsTArray<OutputMediaStream> mOutputStreams;
 
-  // Holds a reference to the MediaStreamListener attached to mPlaybackStream
-  // (or mSrcStream if mPlaybackStream is null).
+  // Holds a reference to the MediaStreamListener attached to mSrcStream's
+  // playback stream.
   RefPtr<StreamListener> mMediaStreamListener;
   // Holds a reference to the size-getting MediaStreamListener attached to
   // mSrcStream.

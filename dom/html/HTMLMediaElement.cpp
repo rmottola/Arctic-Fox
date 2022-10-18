@@ -554,7 +554,7 @@ HTMLMediaElement::GetMozMediaSourceObject() const
 already_AddRefed<DOMMediaStream>
 HTMLMediaElement::GetSrcObject() const
 {
-  NS_ASSERTION(!mSrcAttrStream || mSrcAttrStream->GetStream(),
+  NS_ASSERTION(!mSrcAttrStream || mSrcAttrStream->GetPlaybackStream(),
                "MediaStream should have been set up properly");
   RefPtr<DOMMediaStream> stream = mSrcAttrStream;
   return stream.forget();
@@ -578,7 +578,7 @@ HTMLMediaElement::SetSrcObject(DOMMediaStream* aValue)
 already_AddRefed<DOMMediaStream>
 HTMLMediaElement::GetMozSrcObject() const
 {
-  NS_ASSERTION(!mSrcAttrStream || mSrcAttrStream->GetStream(),
+  NS_ASSERTION(!mSrcAttrStream || mSrcAttrStream->GetPlaybackStream(),
                "MediaStream should have been set up properly");
   RefPtr<DOMMediaStream> stream = mSrcAttrStream;
   return stream.forget();
@@ -1872,17 +1872,17 @@ HTMLMediaElement::CaptureStreamInternal(bool aFinishWhenEnded,
 
   mAudioCaptured = true;
   if (mDecoder) {
-    mDecoder->AddOutputStream(out->mStream->GetStream()->AsProcessedStream(),
+    mDecoder->AddOutputStream(out->mStream->GetInputStream()->AsProcessedStream(),
                               aFinishWhenEnded);
     if (mReadyState >= HAVE_METADATA) {
       // Expose the tracks to JS directly.
       if (HasAudio()) {
         TrackID audioTrackId = mMediaInfo.mAudio.mTrackId;
-        out->mStream->CreateDOMTrack(audioTrackId, MediaSegment::AUDIO);
+        out->mStream->CreateOwnDOMTrack(audioTrackId, MediaSegment::AUDIO);
       }
       if (HasVideo()) {
         TrackID videoTrackId = mMediaInfo.mVideo.mTrackId;
-        out->mStream->CreateDOMTrack(videoTrackId, MediaSegment::VIDEO);
+        out->mStream->CreateOwnDOMTrack(videoTrackId, MediaSegment::VIDEO);
       }
     }
   }
@@ -2439,7 +2439,7 @@ bool HTMLMediaElement::ParseAttribute(int32_t aNamespaceID,
       mAudioChannel = audioChannel;
 
       if (mSrcStream) {
-        RefPtr<MediaStream> stream = mSrcStream->GetStream();
+        RefPtr<MediaStream> stream = GetSrcMediaStream();
         if (stream) {
           stream->SetAudioChannelType(mAudioChannel);
         }
@@ -2847,7 +2847,7 @@ nsresult HTMLMediaElement::FinishDecoderSetup(MediaDecoder* aDecoder,
 
   for (uint32_t i = 0; i < mOutputStreams.Length(); ++i) {
     OutputMediaStream* ms = &mOutputStreams[i];
-    aDecoder->AddOutputStream(ms->mStream->GetStream()->AsProcessedStream(),
+    aDecoder->AddOutputStream(ms->mStream->GetInputStream()->AsProcessedStream(),
                               ms->mFinishWhenEnded);
   }
 
@@ -3088,10 +3088,10 @@ void HTMLMediaElement::UpdateSrcMediaStreamPlaying(uint32_t aFlags)
   if (!mSrcStream) {
     return;
   }
-  // We might be in cycle collection with mSrcStream->GetStream() already
+  // We might be in cycle collection with mSrcStream->GetPlaybackStream() already
   // returning null due to unlinking.
 
-  MediaStream* stream = mSrcStream->GetStream();
+  MediaStream* stream = GetSrcMediaStream();
   bool shouldPlay = !(aFlags & REMOVING_SRC_STREAM) && !mPaused &&
       !mPausedForInactiveDocumentOrChannel && stream;
   if (shouldPlay == mSrcStreamIsPlaying) {
@@ -3166,7 +3166,7 @@ void HTMLMediaElement::SetupSrcMediaStreamPlayback(DOMMediaStream* aStream)
     return;
   }
 
-  RefPtr<MediaStream> stream = mSrcStream->GetStream();
+  RefPtr<MediaStream> stream = GetSrcMediaStream();
   if (stream) {
     stream->SetAudioChannelType(mAudioChannel);
   }
@@ -3253,11 +3253,11 @@ void HTMLMediaElement::MetadataLoaded(const MediaInfo* aInfo,
   for (OutputMediaStream& out : mOutputStreams) {
     if (aInfo->HasAudio()) {
       TrackID audioTrackId = aInfo->mAudio.mTrackId;
-      out.mStream->CreateDOMTrack(audioTrackId, MediaSegment::AUDIO);
+      out.mStream->CreateOwnDOMTrack(audioTrackId, MediaSegment::AUDIO);
     }
     if (aInfo->HasVideo()) {
       TrackID videoTrackId = aInfo->mVideo.mTrackId;
-      out.mStream->CreateDOMTrack(videoTrackId, MediaSegment::VIDEO);
+      out.mStream->CreateOwnDOMTrack(videoTrackId, MediaSegment::VIDEO);
     }
   }
 
@@ -4615,11 +4615,11 @@ NS_IMETHODIMP HTMLMediaElement::WindowAudioCaptureChanged()
         MediaStreamGraph::GetInstance(MediaStreamGraph::AUDIO_THREAD_DRIVER,
                                       AudioChannel::Normal);
 
-      if (mSrcStream) {
-        mCaptureStreamPort = msg->ConnectToCaptureStream(id, mSrcStream->GetStream());
+      if (GetSrcMediaStream()) {
+        mCaptureStreamPort = msg->ConnectToCaptureStream(id, GetSrcMediaStream());
       } else {
         RefPtr<DOMMediaStream> stream = CaptureStreamInternal(false, msg);
-        mCaptureStreamPort = msg->ConnectToCaptureStream(id, stream->GetStream());
+        mCaptureStreamPort = msg->ConnectToCaptureStream(id, stream->GetPlaybackStream());
       }
     } else {
       mAudioCapturedByWindow = false;
@@ -4629,7 +4629,7 @@ NS_IMETHODIMP HTMLMediaElement::WindowAudioCaptureChanged()
         MOZ_ASSERT(ps);
 
         for (uint32_t i = 0; i < mOutputStreams.Length(); i++) {
-          if (mOutputStreams[i].mStream->GetStream() == ps) {
+          if (mOutputStreams[i].mStream->GetPlaybackStream() == ps) {
             mOutputStreams.RemoveElementAt(i);
             break;
           }
