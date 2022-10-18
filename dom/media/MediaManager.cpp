@@ -672,7 +672,7 @@ public:
 
   virtual ~nsDOMUserMediaStream()
   {
-    Stop();
+    StopImpl();
 
     if (GetSourceStream()) {
       GetSourceStream()->Destroy();
