@@ -30,7 +30,8 @@ class AudioOutputObserver;
  * A per-stream update message passed from the media graph thread to the
  * main thread.
  */
-struct StreamUpdate {
+struct StreamUpdate
+{
   RefPtr<MediaStream> mStream;
   StreamTime mNextMainThreadCurrentTime;
   bool mNextMainThreadFinished;
