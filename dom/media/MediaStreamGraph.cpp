@@ -2034,15 +2034,17 @@ MediaStream::RemoveListener(MediaStreamListener* aListener)
 }
 
 void
-MediaStream::RunAfterPendingUpdates(nsCOMPtr<nsIRunnable> aRunnable)
+MediaStream::RunAfterPendingUpdates(already_AddRefed<nsIRunnable> aRunnable)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MediaStreamGraphImpl* graph = GraphImpl();
+  nsCOMPtr<nsIRunnable> runnable(aRunnable);
 
   // Special case when a non-realtime graph has not started, to ensure the
   // runnable will run in finite time.
   if (!(graph->mRealtime || graph->mNonRealtimeProcessing)) {
-    aRunnable->Run();
+    runnable->Run();
+    return;
   }
 
   class Message : public ControlMessage {
@@ -2067,7 +2069,7 @@ MediaStream::RunAfterPendingUpdates(nsCOMPtr<nsIRunnable> aRunnable)
     nsCOMPtr<nsIRunnable> mRunnable;
   };
 
-  graph->AppendMessage(new Message(this, aRunnable.forget()));
+  graph->AppendMessage(new Message(this, runnable.forget()));
 }
 
 void

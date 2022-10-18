@@ -396,7 +396,7 @@ public:
    *
    * Main thread only.
    */
-  void RunAfterPendingUpdates(nsCOMPtr<nsIRunnable> aRunnable);
+  void RunAfterPendingUpdates(already_AddRefed<nsIRunnable> aRunnable);
 
   // Signal that the client is done with this MediaStream. It will be deleted later.
   virtual void Destroy();
