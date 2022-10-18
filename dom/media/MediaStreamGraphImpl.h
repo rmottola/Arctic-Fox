@@ -708,7 +708,7 @@ public:
   RefPtr<AudioOutputObserver> mFarendObserverRef;
 #endif
 
-  uint32_t AudioChannel() const { return mAudioChannel; }
+  dom::AudioChannel AudioChannel() const { return mAudioChannel; }
 
 private:
   virtual ~MediaStreamGraphImpl();
@@ -753,9 +753,7 @@ private:
   bool mCanRunMessagesSynchronously;
 #endif
 
-  // We use uint32_t instead AudioChannel because this is just used as key for
-  // the hashtable gGraphs.
-  uint32_t mAudioChannel;
+  dom::AudioChannel mAudioChannel;
 };
 
 } // namespace mozilla

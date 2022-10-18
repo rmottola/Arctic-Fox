@@ -498,14 +498,14 @@ StreamAndPromiseForOperation::StreamAndPromiseForOperation(MediaStream* aStream,
   , mPromise(aPromise)
   , mOperation(aOperation)
 {
-  MOZ_ASSERT(aPromise);
+  // MOZ_ASSERT(aPromise);
 }
 
-AudioCallbackDriver::AudioCallbackDriver(MediaStreamGraphImpl* aGraphImpl, dom::AudioChannel aChannel)
+AudioCallbackDriver::AudioCallbackDriver(MediaStreamGraphImpl* aGraphImpl)
   : GraphDriver(aGraphImpl)
   , mIterationDurationMS(MEDIA_GRAPH_TARGET_PERIOD_MS)
   , mStarted(false)
-  , mAudioChannel(aChannel)
+  , mAudioChannel(aGraphImpl->AudioChannel())
   , mInCallback(false)
   , mPauseRequested(false)
 #ifdef XP_MACOSX
