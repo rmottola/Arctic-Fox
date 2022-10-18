@@ -1154,46 +1154,72 @@ GetSources(MediaEngine *engine, dom::MediaSourceEnum aSrcType,
   }
 }
 
-static const char*
-SelectSettings(MediaStreamConstraints &aConstraints,
-               nsTArray<RefPtr<MediaDevice>>& aSources)
+// TODO: Remove once upgraded to GCC 4.8+ on linux. Bogus error on static func:
+// error: 'this' was not captured for this lambda function
+
+static auto& MediaManager_GetInstance = MediaManager::GetInstance;
+static auto& MediaManager_ToJSArray = MediaManager::ToJSArray;
+static auto& MediaManager_AnonymizeDevices = MediaManager::AnonymizeDevices;
+
+already_AddRefed<MediaManager::PledgeChar>
+MediaManager::SelectSettings(
+    MediaStreamConstraints& aConstraints,
+    RefPtr<Refcountable<ScopedDeletePtr<SourceSet>>>& aSources)
 {
-  // Since the advanced part of the constraints algorithm needs to know when
-  // a candidate set is overconstrained (zero members), we must split up the
-  // list into videos and audios, and put it back together again at the end.
+  MOZ_ASSERT(NS_IsMainThread());
+  RefPtr<PledgeChar> p = new PledgeChar();
+  uint32_t id = mOutstandingCharPledges.Append(*p);
 
-  nsTArray<RefPtr<VideoDevice>> videos;
-  nsTArray<RefPtr<AudioDevice>> audios;
+  // Algorithm accesses device capabilities code and must run on media thread.
+  // Modifies passed-in aSources.
 
-  for (auto& source : aSources) {
-    if (source->mIsVideo) {
-      RefPtr<VideoDevice> video = static_cast<VideoDevice*>(source.get());
-      videos.AppendElement(video);
-    } else {
-      RefPtr<AudioDevice> audio = static_cast<AudioDevice*>(source.get());
-      audios.AppendElement(audio);
+  MediaManager::PostTask(FROM_HERE, NewTaskFrom([id, aConstraints,
+                                                 aSources]() mutable {
+    auto& sources = **aSources;
+
+    // Since the advanced part of the constraints algorithm needs to know when
+    // a candidate set is overconstrained (zero members), we must split up the
+    // list into videos and audios, and put it back together again at the end.
+
+    nsTArray<RefPtr<VideoDevice>> videos;
+    nsTArray<RefPtr<AudioDevice>> audios;
+
+    for (auto& source : sources) {
+      if (source->mIsVideo) {
+        RefPtr<VideoDevice> video = static_cast<VideoDevice*>(source.get());
+        videos.AppendElement(video);
+      } else {
+        RefPtr<AudioDevice> audio = static_cast<AudioDevice*>(source.get());
+        audios.AppendElement(audio);
+      }
     }
-  }
-  aSources.Clear();
-  MOZ_ASSERT(!aSources.Length());
+    sources.Clear();
+    const char* badConstraint = nullptr;
 
-  const char* badConstraint = nullptr;
-
-  if (IsOn(aConstraints.mVideo)) {
-    badConstraint = MediaConstraintsHelper::SelectSettings(
-        GetInvariant(aConstraints.mVideo), videos);
-    for (auto& video : videos) {
-      aSources.AppendElement(video);
+    if (IsOn(aConstraints.mVideo)) {
+      badConstraint = MediaConstraintsHelper::SelectSettings(
+          GetInvariant(aConstraints.mVideo), videos);
+      for (auto& video : videos) {
+        sources.AppendElement(video);
+      }
     }
-  }
-  if (audios.Length() && IsOn(aConstraints.mAudio)) {
-    badConstraint = MediaConstraintsHelper::SelectSettings(
-        GetInvariant(aConstraints.mAudio), audios);
-    for (auto& audio : audios) {
-      aSources.AppendElement(audio);
+    if (audios.Length() && IsOn(aConstraints.mAudio)) {
+      badConstraint = MediaConstraintsHelper::SelectSettings(
+          GetInvariant(aConstraints.mAudio), audios);
+      for (auto& audio : audios) {
+        sources.AppendElement(audio);
+      }
     }
-  }
-  return badConstraint;
+    NS_DispatchToMainThread(do_AddRef(NewRunnableFrom([id, badConstraint]() mutable {
+      RefPtr<MediaManager> mgr = MediaManager_GetInstance();
+      RefPtr<PledgeChar> p = mgr->mOutstandingCharPledges.Remove(id);
+      if (p) {
+        p->Resolve(badConstraint);
+      }
+      return NS_OK;
+    })));
+  }));
+  return p.forget();
 }
 
 /**
@@ -1393,13 +1419,6 @@ private:
   nsAutoPtr<GetUserMediaTask> mTask;
 };
 #endif
-
-// TODO: Remove once upgraded to GCC 4.8+ on linux. Bogus error on static func:
-// error: 'this' was not captured for this lambda function
-
-static auto& MediaManager_GetInstance = MediaManager::GetInstance;
-static auto& MediaManager_ToJSArray = MediaManager::ToJSArray;
-static auto& MediaManager_AnonymizeDevices = MediaManager::AnonymizeDevices;
 
 /**
  * EnumerateRawDevices - Enumerate a list of audio & video devices that
@@ -1992,80 +2011,95 @@ MediaManager::GetUserMedia(nsPIDOMWindow* aWindow,
                                                      fakeTracks);
   p->Then([this, onSuccess, onFailure, windowID, c, listener, askPermission,
            prefs, isHTTPS, callID, origin](SourceSet*& aDevices) mutable {
-    ScopedDeletePtr<SourceSet> devices(aDevices); // grab result
 
-    // Ensure this pointer is still valid, and window is still alive.
-    RefPtr<MediaManager> mgr = MediaManager::GetInstance();
-    RefPtr<nsPIDOMWindow> window = static_cast<nsPIDOMWindow*>
-        (nsGlobalWindow::GetInnerWindowWithId(windowID));
-    if (!mgr || !window) {
+    RefPtr<Refcountable<ScopedDeletePtr<SourceSet>>> devices(
+         new Refcountable<ScopedDeletePtr<SourceSet>>(aDevices)); // grab result
+
+    // Ensure that the captured 'this' pointer and our windowID are still good.
+    if (!MediaManager::Exists() ||
+        !nsGlobalWindow::GetInnerWindowWithId(windowID)) {
       return;
     }
 
-    // Apply any constraints. This modifies the list.
-    const char* badConstraint = SelectSettings(c, *devices);
-    if (badConstraint) {
-      nsString constraint;
-      constraint.AssignASCII(badConstraint);
-      RefPtr<MediaStreamError> error =
-          new MediaStreamError(window,
-                               NS_LITERAL_STRING("OverconstrainedError"),
-                               NS_LITERAL_STRING(""),
-                               constraint);
-      onFailure->OnError(error);
-      return;
-    }
-    if (!devices->Length()) {
-      RefPtr<MediaStreamError> error =
-          new MediaStreamError(window, NS_LITERAL_STRING("NotFoundError"));
-      onFailure->OnError(error);
-      return;
-    }
+    // Apply any constraints. This modifies the passed-in list.
+    RefPtr<PledgeChar> p2 = SelectSettings(c, devices);
 
-    nsCOMPtr<nsISupportsArray> devicesCopy; // before we give up devices below
-    if (!askPermission) {
-      nsresult rv = NS_NewISupportsArray(getter_AddRefs(devicesCopy));
-      if (NS_WARN_IF(NS_FAILED(rv))) {
+    p2->Then([this, onSuccess, onFailure, windowID, c,
+              listener, askPermission, prefs, isHTTPS,
+              callID, origin, devices](const char*& badConstraint) mutable {
+
+      // Ensure that the captured 'this' pointer and our windowID are still good.
+      RefPtr<nsPIDOMWindow> window = static_cast<nsPIDOMWindow*>
+          (nsGlobalWindow::GetInnerWindowWithId(windowID));
+      if (!MediaManager::Exists() || !window) {
         return;
       }
-      for (auto& device : *devices) {
-        rv = devicesCopy->AppendElement(device);
+
+      if (badConstraint) {
+        nsString constraint;
+        constraint.AssignASCII(badConstraint);
+        RefPtr<MediaStreamError> error =
+            new MediaStreamError(window,
+                                 NS_LITERAL_STRING("OverconstrainedError"),
+                                 NS_LITERAL_STRING(""),
+                                 constraint);
+        onFailure->OnError(error);
+        return;
+      }
+      if (!(*devices)->Length()) {
+        RefPtr<MediaStreamError> error =
+            new MediaStreamError(window, NS_LITERAL_STRING("NotFoundError"));
+        onFailure->OnError(error);
+        return;
+      }
+
+      nsCOMPtr<nsISupportsArray> devicesCopy; // before we give up devices below
+      if (!askPermission) {
+        nsresult rv = NS_NewISupportsArray(getter_AddRefs(devicesCopy));
         if (NS_WARN_IF(NS_FAILED(rv))) {
           return;
         }
+        for (auto& device : **devices) {
+          rv = devicesCopy->AppendElement(device);
+          if (NS_WARN_IF(NS_FAILED(rv))) {
+            return;
+          }
+        }
       }
-    }
 
-    // Pass callbacks and MediaStreamListener along to GetUserMediaTask.
-    nsAutoPtr<GetUserMediaTask> task (new GetUserMediaTask(c, onSuccess.forget(),
-                                                           onFailure.forget(),
-                                                           windowID, listener,
-                                                           prefs, origin,
-                                                           devices.forget()));
-    // Store the task w/callbacks.
-    mActiveCallbacks.Put(callID, task.forget());
+      // Pass callbacks and MediaStreamListener along to GetUserMediaTask.
+      nsAutoPtr<GetUserMediaTask> task (new GetUserMediaTask(c, onSuccess.forget(),
+                                                             onFailure.forget(),
+                                                             windowID, listener,
+                                                             prefs, origin,
+                                                             devices->forget()));
+      // Store the task w/callbacks.
+      mActiveCallbacks.Put(callID, task.forget());
 
-    // Add a WindowID cross-reference so OnNavigation can tear things down
-    nsTArray<nsString>* array;
-    if (!mCallIds.Get(windowID, &array)) {
-      array = new nsTArray<nsString>();
-      mCallIds.Put(windowID, array);
-    }
-    array->AppendElement(callID);
+      // Add a WindowID cross-reference so OnNavigation can tear things down
+      nsTArray<nsString>* array;
+      if (!mCallIds.Get(windowID, &array)) {
+        array = new nsTArray<nsString>();
+        mCallIds.Put(windowID, array);
+      }
+      array->AppendElement(callID);
 
-    nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
-    if (!askPermission) {
-      obs->NotifyObservers(devicesCopy, "getUserMedia:privileged:allow",
-                           callID.BeginReading());
-    } else {
-      RefPtr<GetUserMediaRequest> req =
-          new GetUserMediaRequest(window, callID, c, isHTTPS);
-      obs->NotifyObservers(req, "getUserMedia:request", nullptr);
-    }
+      nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+      if (!askPermission) {
+        obs->NotifyObservers(devicesCopy, "getUserMedia:privileged:allow",
+                             callID.BeginReading());
+      } else {
+        RefPtr<GetUserMediaRequest> req =
+            new GetUserMediaRequest(window, callID, c, isHTTPS);
+        obs->NotifyObservers(req, "getUserMedia:request", nullptr);
+      }
 
 #ifdef MOZ_WEBRTC
-    EnableWebRtcLog();
+      EnableWebRtcLog();
 #endif
+    }, [onFailure](MediaStreamError*& reason) mutable {
+      onFailure->OnError(reason);
+    });
   }, [onFailure](MediaStreamError*& reason) mutable {
     onFailure->OnError(reason);
   });
