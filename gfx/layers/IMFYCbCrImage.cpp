@@ -34,7 +34,7 @@ struct AutoLockTexture
 {
   AutoLockTexture(ID3D11Texture2D* aTexture)
   {
-    aTexture->QueryInterface((IDXGIKeyedMutex**)byRef(mMutex));
+    aTexture->QueryInterface((IDXGIKeyedMutex**)getter_AddRefs(mMutex));
     HRESULT hr = mMutex->AcquireSync(0, 10000);
     if (hr == WAIT_TIMEOUT) {
       MOZ_CRASH();
@@ -71,7 +71,7 @@ InitTextures(IDirect3DDevice9* aDevice,
   RefPtr<IDirect3DTexture9> result;
   if (FAILED(aDevice->CreateTexture(aSize.width, aSize.height,
                                     1, 0, aFormat, D3DPOOL_DEFAULT,
-                                    byRef(result), &aHandle))) {
+                                    getter_AddRefs(result), &aHandle))) {
     return nullptr;
   }
   if (!result) {
@@ -81,14 +81,14 @@ InitTextures(IDirect3DDevice9* aDevice,
   RefPtr<IDirect3DTexture9> tmpTexture;
   if (FAILED(aDevice->CreateTexture(aSize.width, aSize.height,
                                     1, 0, aFormat, D3DPOOL_SYSTEMMEM,
-                                    byRef(tmpTexture), nullptr))) {
+                                    getter_AddRefs(tmpTexture), nullptr))) {
     return nullptr;
   }
   if (!tmpTexture) {
     return nullptr;
   }
 
-  tmpTexture->GetSurfaceLevel(0, byRef(aSurface));
+  tmpTexture->GetSurfaceLevel(0, getter_AddRefs(aSurface));
   aSurface->LockRect(&aLockedRect, nullptr, 0);
   if (!aLockedRect.pBits) {
     NS_WARNING("Could not lock surface");
@@ -168,7 +168,7 @@ IMFYCbCrImage::GetD3D9TextureClient(CompositableClient* aClient)
   }
 
   RefPtr<IDirect3DQuery9> query;
-  HRESULT hr = device->CreateQuery(D3DQUERYTYPE_EVENT, byRef(query));
+  HRESULT hr = device->CreateQuery(D3DQUERYTYPE_EVENT, getter_AddRefs(query));
   hr = query->Issue(D3DISSUE_END);
 
   int iterations = 0;
@@ -224,7 +224,7 @@ IMFYCbCrImage::GetTextureClient(CompositableClient* aClient)
   }
 
   RefPtr<ID3D11DeviceContext> ctx;
-  device->GetImmediateContext(byRef(ctx));
+  device->GetImmediateContext(getter_AddRefs(ctx));
 
   CD3D11_TEXTURE2D_DESC newDesc(DXGI_FORMAT_R8_UNORM,
                                 mData.mYSize.width, mData.mYSize.height, 1, 1);
@@ -232,18 +232,18 @@ IMFYCbCrImage::GetTextureClient(CompositableClient* aClient)
   newDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
 
   RefPtr<ID3D11Texture2D> textureY;
-  HRESULT hr = device->CreateTexture2D(&newDesc, nullptr, byRef(textureY));
+  HRESULT hr = device->CreateTexture2D(&newDesc, nullptr, getter_AddRefs(textureY));
   NS_ENSURE_TRUE(SUCCEEDED(hr), nullptr);
 
   newDesc.Width = mData.mCbCrSize.width;
   newDesc.Height = mData.mCbCrSize.height;
 
   RefPtr<ID3D11Texture2D> textureCb;
-  hr = device->CreateTexture2D(&newDesc, nullptr, byRef(textureCb));
+  hr = device->CreateTexture2D(&newDesc, nullptr, getter_AddRefs(textureCb));
   NS_ENSURE_TRUE(SUCCEEDED(hr), nullptr);
 
   RefPtr<ID3D11Texture2D> textureCr;
-  hr = device->CreateTexture2D(&newDesc, nullptr, byRef(textureCr));
+  hr = device->CreateTexture2D(&newDesc, nullptr, getter_AddRefs(textureCr));
   NS_ENSURE_TRUE(SUCCEEDED(hr), nullptr);
 
   {
@@ -262,15 +262,15 @@ IMFYCbCrImage::GetTextureClient(CompositableClient* aClient)
   RefPtr<IDXGIResource> resource;
 
   HANDLE shareHandleY;
-  textureY->QueryInterface((IDXGIResource**)byRef(resource));
+  textureY->QueryInterface((IDXGIResource**)getter_AddRefs(resource));
   hr = resource->GetSharedHandle(&shareHandleY);
 
   HANDLE shareHandleCb;
-  textureCb->QueryInterface((IDXGIResource**)byRef(resource));
+  textureCb->QueryInterface((IDXGIResource**)getter_AddRefs(resource));
   hr = resource->GetSharedHandle(&shareHandleCb);
 
   HANDLE shareHandleCr;
-  textureCr->QueryInterface((IDXGIResource**)byRef(resource));
+  textureCr->QueryInterface((IDXGIResource**)getter_AddRefs(resource));
   hr = resource->GetSharedHandle(&shareHandleCr);
 
   mTextureClient = DXGIYCbCrTextureClient::Create(aClient->GetForwarder(),

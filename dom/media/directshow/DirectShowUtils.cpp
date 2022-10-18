@@ -268,7 +268,7 @@ MatchUnconnectedPin(IPin* aPin,
 
   // Ensure the pin is unconnected.
   RefPtr<IPin> peer;
-  HRESULT hr = aPin->ConnectedTo(byRef(peer));
+  HRESULT hr = aPin->ConnectedTo(getter_AddRefs(peer));
   if (hr != VFW_E_NOT_CONNECTED) {
     *aOutMatches = false;
     return hr;
@@ -289,12 +289,12 @@ GetUnconnectedPin(IBaseFilter* aFilter, PIN_DIRECTION aPinDir)
 {
   RefPtr<IEnumPins> enumPins;
 
-  HRESULT hr = aFilter->EnumPins(byRef(enumPins));
+  HRESULT hr = aFilter->EnumPins(getter_AddRefs(enumPins));
   NS_ENSURE_TRUE(SUCCEEDED(hr), nullptr);
 
   // Test each pin to see if it matches the direction we're looking for.
   RefPtr<IPin> pin;
-  while (S_OK == enumPins->Next(1, byRef(pin), nullptr)) {
+  while (S_OK == enumPins->Next(1, getter_AddRefs(pin), nullptr)) {
     bool matches = FALSE;
     if (SUCCEEDED(MatchUnconnectedPin(pin, aPinDir, &matches)) &&
         matches) {

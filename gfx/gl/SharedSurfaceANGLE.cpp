@@ -201,11 +201,11 @@ SharedSurface_ANGLEShareHandle::ConsumerAcquireImpl()
         RefPtr<ID3D11Texture2D> tex;
         HRESULT hr = gfxWindowsPlatform::GetPlatform()->GetD3D11Device()->OpenSharedResource(mShareHandle,
                                                                                              __uuidof(ID3D11Texture2D),
-                                                                                             (void**)(ID3D11Texture2D**)byRef(tex));
+                                                                                             (void**)(ID3D11Texture2D**)getter_AddRefs(tex));
         if (SUCCEEDED(hr)) {
             mConsumerTexture = tex;
             RefPtr<IDXGIKeyedMutex> mutex;
-            hr = tex->QueryInterface((IDXGIKeyedMutex**)byRef(mutex));
+            hr = tex->QueryInterface((IDXGIKeyedMutex**)getter_AddRefs(mutex));
 
             if (SUCCEEDED(hr)) {
                 mConsumerKeyedMutex = mutex;

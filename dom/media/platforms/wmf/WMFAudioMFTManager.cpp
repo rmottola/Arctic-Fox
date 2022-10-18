@@ -127,7 +127,7 @@ WMFAudioMFTManager::Init()
   // Setup input/output media types
   RefPtr<IMFMediaType> inputType;
 
-  hr = wmf::MFCreateMediaType(byRef(inputType));
+  hr = wmf::MFCreateMediaType(getter_AddRefs(inputType));
   NS_ENSURE_TRUE(SUCCEEDED(hr), nullptr);
 
   hr = inputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
@@ -153,7 +153,7 @@ WMFAudioMFTManager::Init()
   }
 
   RefPtr<IMFMediaType> outputType;
-  hr = wmf::MFCreateMediaType(byRef(outputType));
+  hr = wmf::MFCreateMediaType(getter_AddRefs(outputType));
   NS_ENSURE_TRUE(SUCCEEDED(hr), nullptr);
 
   hr = outputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
@@ -222,7 +222,7 @@ WMFAudioMFTManager::Output(int64_t aStreamOffset,
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   RefPtr<IMFMediaBuffer> buffer;
-  hr = sample->ConvertToContiguousBuffer(byRef(buffer));
+  hr = sample->ConvertToContiguousBuffer(getter_AddRefs(buffer));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   BYTE* data = nullptr; // Note: *data will be owned by the IMFMediaBuffer, we don't need to free it.

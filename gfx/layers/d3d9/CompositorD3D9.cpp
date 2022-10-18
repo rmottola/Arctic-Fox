@@ -117,7 +117,7 @@ CompositorD3D9::CreateRenderTarget(const gfx::IntRect &aRect,
   RefPtr<IDirect3DTexture9> texture;
   HRESULT hr = device()->CreateTexture(aRect.width, aRect.height, 1,
                                        D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8,
-                                       D3DPOOL_DEFAULT, byRef(texture),
+                                       D3DPOOL_DEFAULT, getter_AddRefs(texture),
                                        nullptr);
   if (FAILED(hr)) {
     ReportFailure(NS_LITERAL_CSTRING("CompositorD3D9::CreateRenderTarget: Failed to create texture"),
@@ -146,7 +146,7 @@ CompositorD3D9::CreateRenderTargetFromSource(const gfx::IntRect &aRect,
   RefPtr<IDirect3DTexture9> texture;
   HRESULT hr = device()->CreateTexture(aRect.width, aRect.height, 1,
                                        D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8,
-                                       D3DPOOL_DEFAULT, byRef(texture),
+                                       D3DPOOL_DEFAULT, getter_AddRefs(texture),
                                        nullptr);
   if (FAILED(hr)) {
     ReportFailure(NS_LITERAL_CSTRING("CompositorD3D9::CreateRenderTargetFromSource: Failed to create texture"),

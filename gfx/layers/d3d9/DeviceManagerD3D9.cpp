@@ -833,7 +833,7 @@ DeviceManagerD3D9::CreateTexture(const IntSize &aSize,
   RefPtr<IDirect3DTexture9> result;
   if (FAILED(device()->CreateTexture(aSize.width, aSize.height,
                                      1, 0, aFormat, aPool,
-                                     byRef(result), nullptr))) {
+                                     getter_AddRefs(result), nullptr))) {
     return nullptr;
   }
 

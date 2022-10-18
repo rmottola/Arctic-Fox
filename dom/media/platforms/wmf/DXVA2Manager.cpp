@@ -454,13 +454,13 @@ D3D11DXVA2Manager::Init(nsACString& aFailureReason)
     return E_FAIL;
   }
 
-  mDevice->GetImmediateContext(byRef(mContext));
+  mDevice->GetImmediateContext(getter_AddRefs(mContext));
   if (!mContext) {
     aFailureReason.AssignLiteral("Failed to get immediate context for d3d11 device");
     return E_FAIL;
   }
 
-  hr = wmf::MFCreateDXGIDeviceManager(&mDeviceManagerToken, byRef(mDXGIDeviceManager));
+  hr = wmf::MFCreateDXGIDeviceManager(&mDeviceManagerToken, getter_AddRefs(mDXGIDeviceManager));
   if (!SUCCEEDED(hr)) {
     aFailureReason = nsPrintfCString("MFCreateDXGIDeviceManager failed with code %X", hr);
     return hr;
@@ -496,11 +496,11 @@ HRESULT
 D3D11DXVA2Manager::CreateOutputSample(RefPtr<IMFSample>& aSample, ID3D11Texture2D* aTexture)
 {
   RefPtr<IMFSample> sample;
-  HRESULT hr = wmf::MFCreateSample(byRef(sample));
+  HRESULT hr = wmf::MFCreateSample(getter_AddRefs(sample));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   RefPtr<IMFMediaBuffer> buffer;
-  hr = wmf::MFCreateDXGISurfaceBuffer(__uuidof(ID3D11Texture2D), aTexture, 0, FALSE, byRef(buffer));
+  hr = wmf::MFCreateDXGISurfaceBuffer(__uuidof(ID3D11Texture2D), aTexture, 0, FALSE, getter_AddRefs(buffer));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   sample->AddBuffer(buffer);
@@ -544,7 +544,7 @@ D3D11DXVA2Manager::CopyToImage(IMFSample* aVideoSample,
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   RefPtr<IDXGIKeyedMutex> keyedMutex;
-  hr = texture->QueryInterface(static_cast<IDXGIKeyedMutex**>(byRef(keyedMutex)));
+  hr = texture->QueryInterface(static_cast<IDXGIKeyedMutex**>(getter_AddRefs(keyedMutex)));
   NS_ENSURE_TRUE(SUCCEEDED(hr) && keyedMutex, hr);
 
   hr = keyedMutex->AcquireSync(0, INFINITE);
@@ -582,7 +582,7 @@ D3D11DXVA2Manager::ConfigureForSize(uint32_t aWidth, uint32_t aHeight)
   mHeight = aHeight;
 
   RefPtr<IMFMediaType> inputType;
-  HRESULT hr = wmf::MFCreateMediaType(byRef(inputType));
+  HRESULT hr = wmf::MFCreateMediaType(getter_AddRefs(inputType));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   hr = inputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
@@ -609,7 +609,7 @@ D3D11DXVA2Manager::ConfigureForSize(uint32_t aWidth, uint32_t aHeight)
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   RefPtr<IMFMediaType> outputType;
-  hr = wmf::MFCreateMediaType(byRef(outputType));
+  hr = wmf::MFCreateMediaType(getter_AddRefs(outputType));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   hr = outputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
