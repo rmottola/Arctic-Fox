@@ -39,6 +39,7 @@ public:
                      const nsAString& aAddonId,
                      const nsAString& aTitle,
                      const uint64_t aWindowId,
+                     const uint64_t aProcessId,
                      const bool aIsSystem,
                      const js::PerformanceData& aPerformanceData)
     : mName(aName)
@@ -46,6 +47,7 @@ public:
     , mAddonId(aAddonId)
     , mTitle(aTitle)
     , mWindowId(aWindowId)
+    , mProcessId(aProcessId)
     , mIsSystem(aIsSystem)
     , mPerformanceData(aPerformanceData)
   {
@@ -125,7 +127,7 @@ public:
   };
 
   /* void getDurations (out unsigned long aCount, [array, size_is (aCount), retval] out unsigned long long aNumberOfOccurrences); */
-  NS_IMETHODIMP GetDurations(uint32_t *aCount, uint64_t **aNumberOfOccurrences) override {
+  NS_IMETHOD GetDurations(uint32_t *aCount, uint64_t **aNumberOfOccurrences) override {
     const size_t length = mozilla::ArrayLength(mPerformanceData.durations);
     if (aCount) {
       *aCount = length;
@@ -137,6 +139,14 @@ public:
     return NS_OK;
   };
 
+  /*
+    readonly attribute unsigned long long processId;
+  */
+  NS_IMETHODIMP GetProcessId(uint64_t* processId) override {
+    *processId = mProcessId;
+    return NS_OK;
+  }
+
 private:
   nsString mName;
   nsString mParentId;
@@ -144,6 +154,7 @@ private:
   nsString mAddonId;
   nsString mTitle;
   uint64_t mWindowId;
+  uint64_t mProcessId;
   bool mIsSystem;
 
   js::PerformanceData mPerformanceData;
@@ -362,7 +373,7 @@ nsPerformanceSnapshot::ImportStats(JSContext* cx, const js::PerformanceData& per
   bool isSystem = GetIsSystem(cx, global);
 
   nsCOMPtr<nsIPerformanceStats> result =
-    new nsPerformanceStats(name, parent, groupId, addonId, title, windowId, isSystem, performance);
+    new nsPerformanceStats(name, parent, groupId, addonId, title, windowId, mProcessId, isSystem, performance);
   return result.forget();
 }
 
@@ -406,6 +417,7 @@ nsPerformanceSnapshot::Init(JSContext* cx, uint64_t processId) {
                                         NS_LITERAL_STRING(""),          // add-on id
                                         NS_LITERAL_STRING(""),          // title
                                         0,                              // window id
+                                        mProcessId,                     // process id
                                         true,                           // isSystem
                                         processStats);
   return NS_OK;
