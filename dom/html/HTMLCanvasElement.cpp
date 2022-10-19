@@ -1120,7 +1120,7 @@ HTMLCanvasElement::GetCanvasLayer(nsDisplayListBuilder* aBuilder,
 }
 
 bool
-HTMLCanvasElement::ShouldForceInactiveLayer(LayerManager *aManager)
+HTMLCanvasElement::ShouldForceInactiveLayer(LayerManager* aManager)
 {
   return !mCurrentContext || mCurrentContext->ShouldForceInactiveLayer(aManager);
 }
