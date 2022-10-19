@@ -4482,6 +4482,15 @@ IonBuilder::processReturn(JSOp op)
         MOZ_CRASH("unknown return op");
     }
 
+    if (script()->isDerivedClassConstructor() &&
+        def->type() != MIRType_Object)
+    {
+        MOZ_ASSERT(info().funMaybeLazy() && info().funMaybeLazy()->isClassConstructor());
+        MCheckReturn* checkRet = MCheckReturn::New(alloc(), def, current->getSlot(info().thisSlot()));
+        current->add(checkRet);
+        def = checkRet;
+    }
+
     MReturn* ret = MReturn::New(alloc(), def);
     current->end(ret);
 
@@ -6218,6 +6227,11 @@ IonBuilder::createThis(JSFunction* target, MDefinition* callee)
         MConstant* magic = MConstant::New(alloc(), MagicValue(JS_IS_CONSTRUCTING));
         current->add(magic);
         return magic;
+    }
+
+    if (target->isDerivedClassConstructor()) {
+        MOZ_ASSERT(target->isClassConstructor());
+        return constant(MagicValue(JS_UNINITIALIZED_LEXICAL));
     }
 
     // Try baking in the prototype.
@@ -12745,9 +12759,21 @@ IonBuilder::jsop_this()
 
     if (script()->strict() || info().funMaybeLazy()->isSelfHostedBuiltin()) {
         // No need to wrap primitive |this| in strict mode or self-hosted code.
-        current->pushSlot(info().thisSlot());
+        MDefinition* thisVal = current->getSlot(info().thisSlot());
+        if (script()->isDerivedClassConstructor()) {
+            MOZ_ASSERT(info().funMaybeLazy()->isClassConstructor());
+            MOZ_ASSERT(script()->strict());
+
+            MLexicalCheck* checkThis = MLexicalCheck::New(alloc(), thisVal, Bailout_UninitializedThis);
+            current->add(checkThis);
+            thisVal = checkThis;
+        }
+
+        current->push(thisVal);
         return true;
     }
+
+    MOZ_ASSERT(!info().funMaybeLazy()->isClassConstructor());
 
     if (thisTypes && (thisTypes->getKnownMIRType() == MIRType_Object ||
         (thisTypes->empty() && baselineFrame_ && baselineFrame_->thisType.isSomeObject())))
