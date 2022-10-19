@@ -3144,7 +3144,7 @@ ReadSourceFromFilename(JSContext* cx, const char* filename, char16_t** src, size
     rv = NS_NewChannel(getter_AddRefs(scriptChannel),
                        uri,
                        nsContentUtils::GetSystemPrincipal(),
-                       nsILoadInfo::SEC_NORMAL,
+                       nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
                        nsIContentPolicy::TYPE_OTHER);
     NS_ENSURE_SUCCESS(rv, rv);
 
@@ -3163,7 +3163,7 @@ ReadSourceFromFilename(JSContext* cx, const char* filename, char16_t** src, size
     scriptChannel->SetContentType(NS_LITERAL_CSTRING("text/plain"));
 
     nsCOMPtr<nsIInputStream> scriptStream;
-    rv = scriptChannel->Open(getter_AddRefs(scriptStream));
+    rv = scriptChannel->Open2(getter_AddRefs(scriptStream));
     NS_ENSURE_SUCCESS(rv, rv);
 
     uint64_t rawLen;
