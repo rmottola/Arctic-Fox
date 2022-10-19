@@ -23,6 +23,13 @@
 #include "VideoStreamTrack.h"
 #include "Layers.h"
 
+#ifdef LOG
+#undef LOG
+#endif
+
+static PRLogModuleInfo* gMediaStreamLog;
+#define LOG(type, msg) MOZ_LOG(gMediaStreamLog, type, msg)
+
 using namespace mozilla;
 using namespace mozilla::dom;
 using namespace mozilla::layers;
@@ -159,14 +166,23 @@ public:
       }
 
       MOZ_ASSERT(mEvents & MediaStreamListener::TRACK_EVENT_ENDED);
+      LOG(LogLevel::Debug, ("DOMMediaStream %p Track %u of stream %p ended",
+                            stream, mInputTrackID, mInputStream.get()));
+
       RefPtr<MediaStreamTrack> track = stream->FindOwnedDOMTrack(mInputStream, mID);
       if (track) {
+        LOG(LogLevel::Debug, ("DOMMediaStream %p Owned track; notifying track listeners.", stream));
         track->NotifyEnded();
+      } else {
+        LOG(LogLevel::Debug, ("DOMMediaStream %p Not an owned track.", stream));
       }
 
       track = stream->FindPlaybackDOMTrack(mInputStream, mInputTrackID);
       if (track) {
+        LOG(LogLevel::Debug, ("DOMMediaStream %p Playback track; notifying stream listeners.", stream));
         stream->NotifyMediaStreamTrackEnded(track);
+      } else {
+        LOG(LogLevel::Debug, ("DOMMediaStream %p Not a playback track.", stream));
       }
       return NS_OK;
     }
@@ -281,6 +297,10 @@ DOMMediaStream::DOMMediaStream()
   nsCOMPtr<nsIUUIDGenerator> uuidgen =
     do_GetService("@mozilla.org/uuid-generator;1", &rv);
 
+  if (!gMediaStreamLog) {
+    gMediaStreamLog = PR_NewLogModule("MediaStream");
+  }
+
   if (NS_SUCCEEDED(rv) && uuidgen) {
     nsID uuid;
     memset(&uuid, 0, sizeof(uuid));
@@ -301,6 +321,7 @@ DOMMediaStream::~DOMMediaStream()
 void
 DOMMediaStream::Destroy()
 {
+  LOG(LogLevel::Debug, ("DOMMediaStream %p Being destroyed.", this));
   if (mListener) {
     mListener->Forget();
     mListener = nullptr;
@@ -500,6 +521,9 @@ DOMMediaStream::InitStreamCommon(MediaStream* aStream,
   mPlaybackStream->SetAutofinish(true);
   mPlaybackPort = mPlaybackStream->AllocateInputPort(mOwnedStream);
 
+  LOG(LogLevel::Debug, ("DOMMediaStream %p Initiated with mInputStream=%p, mOwnedStream=%p, mPlaybackStream=%p",
+                        this, mInputStream, mOwnedStream, mPlaybackStream));
+
   // Setup track listener
   mListener = new PlaybackStreamListener(this);
   mPlaybackStream->AddListener(mListener);
@@ -625,6 +649,8 @@ DOMMediaStream::CreateOwnDOMTrack(TrackID aTrackID, MediaSegment::Type aType)
   default:
     MOZ_CRASH("Unhandled track type");
   }
+
+  LOG(LogLevel::Debug, ("DOMMediaStream %p Created new track %p with ID %u", this, track, aTrackID));
 
   RefPtr<TrackPort> ownedTrackPort =
     new TrackPort(mOwnedPort, track, TrackPort::InputPortOwnership::EXTERNAL);
