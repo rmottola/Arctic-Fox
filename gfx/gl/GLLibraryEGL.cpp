@@ -4,6 +4,7 @@
 
 #include "GLLibraryEGL.h"
 
+#include "gfxCrashReporterUtils.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Assertions.h"
 #include "nsDirectoryServiceDefs.h"
@@ -45,6 +46,8 @@ static const char *sEGLExtensionNames[] = {
 
 static PRLibrary* LoadApitraceLibrary()
 {
+    // Initialization of gfx prefs here is only needed during the unit tests...
+    gfxPrefs::GetSingleton();
     if (!gfxPrefs::UseApitrace()) {
         return nullptr;
     }
