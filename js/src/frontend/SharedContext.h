@@ -390,6 +390,7 @@ class FunctionBox : public ObjectBox, public SharedContext
                hasExtensibleScope() ||
                needsDeclEnvObject() ||
                needsHomeObject()    ||
+               isDerivedClassConstructor() ||
                isGenerator();
     }
 };
