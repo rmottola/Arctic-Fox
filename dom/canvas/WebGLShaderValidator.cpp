@@ -32,8 +32,10 @@ ChooseValidatorCompileOptions(const ShBuiltInResources& resources,
 {
     int options = SH_VARIABLES |
                   SH_ENFORCE_PACKING_RESTRICTIONS |
+                  SH_INIT_VARYINGS_WITHOUT_STATIC_USE |
                   SH_OBJECT_CODE |
-                  SH_LIMIT_CALL_STACK_DEPTH;
+                  SH_LIMIT_CALL_STACK_DEPTH |
+                  SH_INIT_GL_POSITION;
 
     if (resources.MaxExpressionComplexity > 0) {
         options |= SH_LIMIT_EXPRESSION_COMPLEXITY;
