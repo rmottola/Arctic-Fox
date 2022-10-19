@@ -152,6 +152,8 @@ GLLibraryEGL::EnsureInitialized(bool forceAccel)
         return true;
     }
 
+    mozilla::ScopedGfxFeatureReporter reporter("EGL");
+
 #ifdef MOZ_B2G
     if (!sCurrentContext.init())
       MOZ_CRASH("Tls init failed");
@@ -486,6 +488,7 @@ GLLibraryEGL::EnsureInitialized(bool forceAccel)
     }
 
     mInitialized = true;
+    reporter.SetSuccessful();
     return true;
 }
 
