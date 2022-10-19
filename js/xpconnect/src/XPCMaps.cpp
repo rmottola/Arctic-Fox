@@ -91,7 +91,6 @@ JSObject2WrappedJSMap::UpdateWeakPointersAfterGC(XPCJSRuntime* runtime)
     // moved. Release any wrappers whose weakly held JSObject has died.
 
     nsTArray<RefPtr<nsXPCWrappedJS>> dying;
-
     for (Map::Enum e(mTable); !e.empty(); e.popFront()) {
         nsXPCWrappedJS* wrapper = e.front().value();
         MOZ_ASSERT(wrapper, "found a null JS wrapper!");
