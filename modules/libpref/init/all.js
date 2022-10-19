@@ -429,6 +429,7 @@ pref("media.peerconnection.video.min_bitrate", 200);
 pref("media.peerconnection.video.start_bitrate", 300);
 pref("media.peerconnection.video.max_bitrate", 2000);
 #endif
+pref("media.navigator.audio.fake_frequency", 1000);
 pref("media.navigator.permission.disabled", false);
 pref("media.peerconnection.default_iceservers", "[]");
 pref("media.peerconnection.ice.loopback", false); // Set only for testing in offline environments.
