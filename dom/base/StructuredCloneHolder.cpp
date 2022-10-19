@@ -1023,7 +1023,7 @@ StructuredCloneHolder::CustomReadTransferHandler(JSContext* aCx,
     MOZ_ASSERT(aContent);
     OffscreenCanvasCloneData* data =
       static_cast<OffscreenCanvasCloneData*>(aContent);
-    nsRefPtr<OffscreenCanvas> canvas = OffscreenCanvas::CreateFromCloneData(data);
+    RefPtr<OffscreenCanvas> canvas = OffscreenCanvas::CreateFromCloneData(data);
     delete data;
 
     JS::Rooted<JS::Value> value(aCx);
