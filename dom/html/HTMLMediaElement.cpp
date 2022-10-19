@@ -709,6 +709,7 @@ void HTMLMediaElement::AbortExistingLoads()
     EndSrcMediaStreamPlayback();
   }
 
+  RemoveMediaElementFromURITable();
   mLoadingSrc = nullptr;
   mMediaSource = nullptr;
 
@@ -912,6 +913,7 @@ void HTMLMediaElement::SelectResource()
       NS_ASSERTION(!mIsLoadingFromSourceChildren,
         "Should think we're not loading from source children by default");
 
+      RemoveMediaElementFromURITable();
       mLoadingSrc = uri;
       mMediaSource = mSrcMediaSource;
       UpdatePreloadAction();
@@ -1054,6 +1056,7 @@ void HTMLMediaElement::LoadFromSourceChildren()
       continue;
     }
 
+    RemoveMediaElementFromURITable();
     mLoadingSrc = uri;
     mMediaSource = childSrc->GetSrcMediaSource();
     NS_ASSERTION(mNetworkState == nsIDOMHTMLMediaElement::NETWORK_LOADING,
