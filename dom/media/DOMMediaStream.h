@@ -430,6 +430,9 @@ protected:
 
   void CheckTracksAvailable();
 
+  class OwnedStreamListener;
+  friend class OwnedStreamListener;
+
   class PlaybackStreamListener;
   friend class PlaybackStreamListener;
 
@@ -471,7 +474,8 @@ protected:
   // MediaStreamTracks corresponding to tracks in our mPlaybackStream.
   nsAutoTArray<RefPtr<TrackPort>, 2> mTracks;
 
-  RefPtr<PlaybackStreamListener> mListener;
+  RefPtr<OwnedStreamListener> mOwnedListener;
+  RefPtr<PlaybackStreamListener> mPlaybackListener;
 
   nsTArray<nsAutoPtr<OnTracksAvailableCallback> > mRunOnTracksAvailable;
 
