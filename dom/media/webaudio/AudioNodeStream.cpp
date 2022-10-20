@@ -629,7 +629,7 @@ AudioNodeStream::AdvanceOutputSegment()
 
   AudioSegment* segment = track->Get<AudioSegment>();
 
-  if (mFlags & EXTERNAL_OUTPUT) {
+  if (mFlags & EXTERNAL_OUTPUT && !mLastChunks[0].IsNull()) {
     segment->AppendAndConsumeChunk(mLastChunks[0].AsMutableChunk());
   } else {
     segment->AppendNullData(mLastChunks[0].GetDuration());
