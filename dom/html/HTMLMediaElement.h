@@ -1481,6 +1481,9 @@ private:
 
   // Time spent between video load and video playback.
   TimeDurationAccumulator mJoinLatency;
+
+  // True if the first frame has been successfully loaded.
+  bool mFirstFrameLoaded;
 };
 
 } // namespace dom
