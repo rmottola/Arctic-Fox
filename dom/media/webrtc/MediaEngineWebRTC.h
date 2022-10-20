@@ -228,6 +228,7 @@ private:
   nsString mDeviceName;
   nsCString mDeviceUUID;
 
+  uint32_t mSampleFrequency;
   bool mEchoOn, mAgcOn, mNoiseOn;
   webrtc::EcModes  mEchoCancel;
   webrtc::AgcModes mAGC;
