@@ -287,7 +287,7 @@ public:
         *succeeded = false;
 
         HRESULT hr;
-        mTexture->QueryInterface((IDXGIKeyedMutex**)byRef(mMutex));
+        mTexture->QueryInterface((IDXGIKeyedMutex**)getter_AddRefs(mMutex));
         if (mMutex) {
             hr = mMutex->AcquireSync(0, 10000);
             if (hr == WAIT_TIMEOUT) {
@@ -301,7 +301,7 @@ public:
         }
 
         ID3D11Device* device = gfxWindowsPlatform::GetPlatform()->GetD3D11Device();
-        device->GetImmediateContext(byRef(mDeviceContext));
+        device->GetImmediateContext(getter_AddRefs(mDeviceContext));
 
         mTexture->GetDesc(&mDesc);
         mDesc.BindFlags = 0;
@@ -309,7 +309,7 @@ public:
         mDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
         mDesc.MiscFlags = 0;
 
-        hr = device->CreateTexture2D(&mDesc, nullptr, byRef(mCopiedTexture));
+        hr = device->CreateTexture2D(&mDesc, nullptr, getter_AddRefs(mCopiedTexture));
 
         if (FAILED(hr)) {
             return;
@@ -355,7 +355,7 @@ SharedSurface_ANGLEShareHandle::ReadbackBySharedHandle(gfx::DataSourceSurface* o
     ID3D11Device* device = gfxWindowsPlatform::GetPlatform()->GetD3D11Device();
     HRESULT hr = device->OpenSharedResource(mShareHandle,
                                             __uuidof(ID3D11Texture2D),
-                                            (void**)(ID3D11Texture2D**)byRef(tex));
+                                            (void**)(ID3D11Texture2D**)getter_AddRefs(tex));
 
     if (FAILED(hr)) {
         return false;
