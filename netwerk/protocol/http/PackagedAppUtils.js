@@ -13,10 +13,10 @@ const PACKAGEDAPPUTILS_CONTRACTID = "@mozilla.org/network/packaged-app-utils;1";
 const PACKAGEDAPPUTILS_CID = Components.ID("{fe8f1c2e-3c13-11e5-9a3f-bbf47d1e6697}");
 
 function PackagedAppUtils() {
-
+  this.packageIdentifier = '';
 }
 
-let DEBUG = 0
+var DEBUG = 0
 function debug(s) {
   if (DEBUG) {
     dump("-*- PackagedAppUtils: " + s + "\n");
@@ -57,7 +57,9 @@ PackagedAppUtils.prototype = {
       debug("manifestBody: " + manifestBody);
 
       // Parse manifest, store resource hashes
-      this.resources = JSON.parse(manifestBody)["moz-resources"];
+      let manifestObj = JSON.parse(manifestBody);
+      this.resources = manifestObj["moz-resources"];
+      this.packageIdentifier = manifestObj["package-identifier"];
     } catch (e) {
       debug("JSON parsing failure");
       aCallback.fireVerifiedEvent(true, false);
