@@ -135,6 +135,7 @@ public:
     , mThread(aThread)
     , mCapIndex(aIndex)
     , mChannel(-1)
+    , mNrAllocations(0)
     , mInitDone(false)
     , mStarted(false)
     , mSampleFrequency(MediaEngine::DEFAULT_SAMPLE_RATE)
@@ -215,10 +216,11 @@ private:
   // from kStarted to kStopped (which are combined with EndTrack()).
   // mSources[] is accessed from webrtc threads.
   Monitor mMonitor;
-  nsTArray<RefPtr<SourceMediaStream>> mSources; // When this goes empty, we shut down HW
+  nsTArray<RefPtr<SourceMediaStream>> mSources;
   nsCOMPtr<nsIThread> mThread;
   int mCapIndex;
   int mChannel;
+  int mNrAllocations; // When this becomes 0, we shut down HW
   TrackID mTrackID;
   bool mInitDone;
   bool mStarted;
@@ -226,7 +228,6 @@ private:
   nsString mDeviceName;
   nsCString mDeviceUUID;
 
-  uint32_t mSampleFrequency;
   bool mEchoOn, mAgcOn, mNoiseOn;
   webrtc::EcModes  mEchoCancel;
   webrtc::AgcModes mAGC;
