@@ -481,10 +481,10 @@ JSObject*
 NewArrayOperationWithTemplate(JSContext* cx, HandleObject templateObject);
 
 void
-ReportUninitializedLexical(JSContext* cx, HandlePropertyName name);
+ReportRuntimeLexicalError(JSContext* cx, unsigned errorNumber, HandlePropertyName name);
 
 void
-ReportUninitializedLexical(JSContext* cx, HandleScript script, jsbytecode* pc);
+ReportRuntimeLexicalError(JSContext* cx, unsigned errorNumber, HandleScript script, jsbytecode* pc);
 
 // The parser only reports redeclarations that occurs within a single
 // script. Due to the extensibility of the global lexical scope, we also check
@@ -492,6 +492,7 @@ ReportUninitializedLexical(JSContext* cx, HandleScript script, jsbytecode* pc);
 void
 ReportRuntimeRedeclaration(JSContext* cx, HandlePropertyName name,
                            frontend::Definition::Kind declKind);
+
 bool
 ThrowUninitializedThis(JSContext* cx, AbstractFramePtr frame);
 
