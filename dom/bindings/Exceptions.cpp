@@ -105,7 +105,7 @@ Throw(JSContext* aCx, nsresult aRv, const nsACString& aMessage)
   nsCOMPtr<nsIException> existingException = runtime->GetPendingException();
   if (existingException) {
     nsresult nr;
-    if (NS_SUCCEEDED(existingException->GetResult(&nr)) && 
+    if (NS_SUCCEEDED(existingException->GetResult(&nr)) &&
         aRv == nr) {
       // Reuse the existing exception.
 
@@ -185,7 +185,7 @@ GetCurrentJSStack()
     cx = workers::GetCurrentThreadJSContext();
   }
 
-  if (!cx) {
+  if (!cx || !js::GetContextCompartment(cx)) {
     return nullptr;
   }
 
