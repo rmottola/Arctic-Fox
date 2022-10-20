@@ -314,8 +314,6 @@ public:
 
     virtual void OnChannelError() override;
 
-    virtual void OnBeginSyncTransaction() override;
-
     virtual PCrashReporterParent*
     AllocPCrashReporterParent(const NativeThreadId& tid,
                               const uint32_t& processType) override;
