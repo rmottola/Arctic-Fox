@@ -1878,6 +1878,9 @@ MediaManager::GetUserMedia(nsPIDOMWindow* aWindow,
     videoType = StringToEnum(dom::MediaSourceEnumValues::strings,
                              vc.mMediaSource,
                              dom::MediaSourceEnum::Other);
+    Telemetry::Accumulate(loop ? Telemetry::LOOP_GET_USER_MEDIA_TYPE :
+                                 Telemetry::WEBRTC_GET_USER_MEDIA_TYPE,
+                          (uint32_t) videoType);
     switch (videoType) {
       case dom::MediaSourceEnum::Camera:
         break;
@@ -1975,6 +1978,9 @@ MediaManager::GetUserMedia(nsPIDOMWindow* aWindow,
       ac.mMediaSource.AssignASCII(EnumToASCII(dom::MediaSourceEnumValues::strings,
                                               audioType));
     }
+    Telemetry::Accumulate(loop ? Telemetry::LOOP_GET_USER_MEDIA_TYPE :
+                                 Telemetry::WEBRTC_GET_USER_MEDIA_TYPE,
+                          (uint32_t) audioType);
 
     switch (audioType) {
       case dom::MediaSourceEnum::Microphone:
