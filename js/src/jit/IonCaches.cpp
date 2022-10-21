@@ -2169,7 +2169,7 @@ IsCacheableSetPropCallNative(HandleObject obj, HandleObject holder, HandleShape 
     if (setter.jitInfo() && !setter.jitInfo()->needsOuterizedThisObject())
         return true;
 
-    return !IsInnerObject(obj);
+    return !IsWindow(obj);
 }
 
 static bool
@@ -2178,7 +2178,7 @@ IsCacheableSetPropCallScripted(HandleObject obj, HandleObject holder, HandleShap
     if (!shape || !IsCacheableProtoChainForIon(obj, holder))
         return false;
 
-    if (IsInnerObject(obj))
+    if (IsWindow(obj))
         return false;
 
     return shape->hasSetterValue() && shape->setterObject() &&

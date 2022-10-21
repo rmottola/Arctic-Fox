@@ -3061,10 +3061,8 @@ Debugger::unwrapDebuggeeArgument(JSContext* cx, const Value& v)
         return nullptr;
     }
 
-    /* If that produced an outer window, innerize it. */
-    obj = GetInnerObject(obj);
-    if (!obj)
-        return nullptr;
+    /* If that produced a WindowProxy, get the Window (global). */
+    obj = ToWindowIfWindowProxy(obj);
 
     /* If that didn't produce a global object, it's an error. */
     if (!obj->is<GlobalObject>()) {
@@ -7630,8 +7628,8 @@ RequireGlobalObject(JSContext* cx, HandleValue dbgobj, HandleObject referent)
         }
 
         /* ... and WindowProxies around Windows. */
-        if (IsOuterObject(obj)) {
-            obj = JS_ObjectToInnerObject(cx, obj);
+        if (IsWindowProxy(obj)) {
+            obj = ToWindowIfWindowProxy(obj);
             isWindowProxy = "a WindowProxy referring to ";
         }
 
@@ -7715,8 +7713,8 @@ DebuggerObject_unsafeDereference(JSContext* cx, unsigned argc, Value* vp)
     if (!cx->compartment()->wrap(cx, args.rval()))
         return false;
 
-    // Wrapping should outerize inner objects.
-    MOZ_ASSERT(!IsInnerObject(&args.rval().toObject()));
+    // Wrapping should return the WindowProxy.
+    MOZ_ASSERT(!IsWindow(&args.rval().toObject()));
 
     return true;
 }

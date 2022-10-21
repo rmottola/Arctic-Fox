@@ -1004,7 +1004,7 @@ bool
 nsScriptSecurityManager::ScriptAllowed(JSObject *aGlobal)
 {
     MOZ_ASSERT(aGlobal);
-    MOZ_ASSERT(JS_IsGlobalObject(aGlobal) || js::IsOuterObject(aGlobal));
+    MOZ_ASSERT(JS_IsGlobalObject(aGlobal) || js::IsWindowProxy(aGlobal));
 
     // Check the bits on the compartment private.
     return xpc::Scriptability::Get(aGlobal).Allowed();
