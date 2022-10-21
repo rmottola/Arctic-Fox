@@ -3123,13 +3123,5 @@ DeprecationWarning(JSContext* aCx, JSObject* aObject,
   }
 }
 
-bool
-ObjectToOuterObjectValue(JSContext* cx, JS::Handle<JSObject*> obj, JS::MutableHandle<JS::Value> vp)
-{
-  JSObject* outer = js::ToWindowProxyIfWindow(obj);
-  vp.setObject(*outer);
-  return true;
-}
-
 } // namespace dom
 } // namespace mozilla
