@@ -481,6 +481,9 @@ JSObject*
 NewArrayOperationWithTemplate(JSContext* cx, HandleObject templateObject);
 
 void
+ReportRuntimeLexicalError(JSContext* cx, unsigned errorNumber, HandleId id);
+
+void
 ReportRuntimeLexicalError(JSContext* cx, unsigned errorNumber, HandlePropertyName name);
 
 void
