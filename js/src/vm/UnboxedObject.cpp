@@ -962,7 +962,6 @@ const Class UnboxedPlainObject::class_ = {
         nullptr,   /* No unwatch needed, as watch() converts the object to native */
         nullptr,   /* getElements */
         UnboxedPlainObject::obj_enumerate,
-        nullptr, /* thisValue */
     }
 };
 
@@ -1635,8 +1634,6 @@ const Class UnboxedArrayObject::class_ = {
     UnboxedArrayObject::trace,
     JS_NULL_CLASS_SPEC,
     {
-        nullptr,    /* outerObject */
-        nullptr,    /* innerObject */
         false,      /* isWrappedNative */
         nullptr,    /* weakmapKeyDelegateOp */
         UnboxedArrayObject::objectMoved
@@ -1653,7 +1650,6 @@ const Class UnboxedArrayObject::class_ = {
         nullptr,   /* No unwatch needed, as watch() converts the object to native */
         nullptr,   /* getElements */
         UnboxedArrayObject::obj_enumerate,
-        nullptr,   /* thisValue */
     }
 };
 

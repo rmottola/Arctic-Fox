@@ -951,9 +951,6 @@ XPC_WN_CallMethod(JSContext* cx, unsigned argc, JS::Value* vp);
 extern bool
 XPC_WN_GetterSetter(JSContext* cx, unsigned argc, JS::Value* vp);
 
-extern bool
-XPC_WN_JSOp_ThisValue(JSContext* cx, JS::HandleObject obj, JS::MutableHandleValue vp);
-
 // Macros to initialize Object or Function like XPC_WN classes
 #define XPC_WN_WithCall_ObjectOps                                             \
     {                                                                         \
@@ -967,7 +964,6 @@ XPC_WN_JSOp_ThisValue(JSContext* cx, JS::HandleObject obj, JS::MutableHandleValu
         nullptr, nullptr, /* watch/unwatch */                                 \
         nullptr, /* getElements */                                            \
         nullptr, /* enumerate */                                              \
-        XPC_WN_JSOp_ThisValue,                                               \
     }
 
 #define XPC_WN_NoCall_ObjectOps                                               \
@@ -982,7 +978,6 @@ XPC_WN_JSOp_ThisValue(JSContext* cx, JS::HandleObject obj, JS::MutableHandleValu
         nullptr, nullptr, /* watch/unwatch */                                 \
         nullptr, /* getElements */                                            \
         nullptr, /* enumerate */                                              \
-        XPC_WN_JSOp_ThisValue,                                               \
     }
 
 // Maybe this macro should check for class->enumerate ==

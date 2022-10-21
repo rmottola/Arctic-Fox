@@ -302,11 +302,8 @@ namespace js {
  * NB: The macro invocation must be surrounded by braces, so as to
  *     allow for potential JSClass extensions.
  */
-#define PROXY_MAKE_EXT(outerObject, innerObject, isWrappedNative,       \
-                       objectMoved)                                     \
+#define PROXY_MAKE_EXT(isWrappedNative, objectMoved)                    \
     {                                                                   \
-        outerObject,                                                    \
-        innerObject,                                                    \
         isWrappedNative,                                                \
         js::proxy_WeakmapKeyDelegate,                                   \
         objectMoved                                                     \
@@ -344,7 +341,6 @@ namespace js {
             js::proxy_Watch, js::proxy_Unwatch,                                         \
             js::proxy_GetElements,                                                      \
             nullptr,             /* enumerate       */                                  \
-            nullptr,             /* thisValue       */                                  \
             js::proxy_FunToString,                                                      \
         }                                                                               \
     }
@@ -352,8 +348,6 @@ namespace js {
 #define PROXY_CLASS_DEF(name, flags)                                    \
   PROXY_CLASS_WITH_EXT(name, flags,                                     \
                        PROXY_MAKE_EXT(                                  \
-                         nullptr, /* outerObject */                     \
-                         nullptr, /* innerObject */                     \
                          false,   /* isWrappedNative */                 \
                          js::proxy_ObjectMoved                          \
                        ))
