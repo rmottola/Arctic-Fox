@@ -87,6 +87,8 @@
 - 1227567 - Optimise module namespace imports in Ion where we have
 - update SKIA 1082598
 - remaining 1151214
+- Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or
+- Bug 1214508 - 2015-11-17: SharedStubs - Part 1: Move the getprop stubs in to share
 - Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
 - Bug 1197620 - Part 3: Terminate *all* animations if corresponding ele
@@ -94,19 +96,13 @@
 - Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
 - Bug 1223916 - 2015-11-14 Prohibit direct method calls at the parser level in 
 - Bug 1223647: CSP erroneously inherited into dedicated workers. r=cke
-- Bug 1213859 - Focus and blur events should not be cancelable; r=smaug
-- Bug 1211546 - Unbreak the non-unified build. (r=sfink, r=nbp, r=shu) 
 - Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
 - Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
-- Bug 1039986 - 2015-10-27 - (Fix cloudflare?)  Make Function.prototype.toString work on Web IDL interfa
-- Bug 930414 - Replace |thisObject| object op with |thisValue| and us
 - Bug 1238935 - r=jonco 
 - Bug 1214126 - 5 Parts
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
 - Bug 1208385 part 1 - Store a pointer to the owning animation on each ¿ 
 - 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
-- Bug 1214508: SharedStubs - Part 1: Move the getprop stubs in to share
-- Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or
 - Bug 1257650 - 2016-03-19 Skip Security checks if triggeringPrincipal is System
 - Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
 - Bug 1226909 multipart AsyncOpen2 
@@ -115,21 +111,13 @@
 - Check completeness of Bug 1216401: Eviscerate nsIDOMWindow
 - Bug 1158632 - IonBuilder TableSwitch, fill-the-gap cases should encor¿
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
-- Bug 1182571 - 2015-10-19 Fix nsILoadInfo->GetContentPolicyType API to be less am
-- Bug 1170958 - 2015-09-30 - Allow MediaInputPort to lock to a specific input track
-- 1203427
-- 1207245 - 2015-10-07 part 6 - rename nsRefPtr<T> to RefPtr<T>
 - Bug 1169268 - Don't crash when pasting files. r=ndeakin
 - Bug 1202085 2015-10-26 - Part 0 to 6
-- Bug 1188643 2015-09-30 - Buffer more audio in audio capture mode to avoid glitche
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
-- Bug 1214163 - 2015-10-15 - Clean up SetPropertyIC::update. r=efaust
 - bug 1181823 - convert test_ev_certs.js, test_keysize_ev.js, a
-- 1207245 - part 3 - switch all uses of mozilla::RefPtr<T> to nsRefPtr<T>
 - Bug 1242578
--  missing bits of Bug 1207245 - part 1 - move RefCounted<T>
 
 JS - breaks:
 https://bugzilla.mozilla.org/show_bug.cgi?id=589199
