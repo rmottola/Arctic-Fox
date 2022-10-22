@@ -128,7 +128,6 @@ var PrefObserver = {
 
 PrefObserver.register({
   // prefName: defaultValue
-  debug: false,
   animateNotifications: true
 });
 
@@ -147,20 +146,6 @@ this.DownloadsCommon = {
   BLOCK_VERDICT_MALWARE: "Malware",
   BLOCK_VERDICT_POTENTIALLY_UNWANTED: "PotentiallyUnwanted",
   BLOCK_VERDICT_UNCOMMON: "Uncommon",
-
-  log(...aMessageArgs) {
-    if (!PrefObserver.debug) {
-      return;
-    }
-    DownloadsLogger.log(...aMessageArgs);
-  },
-
-  error(...aMessageArgs) {
-    if (!PrefObserver.debug) {
-      return;
-    }
-    DownloadsLogger.reportError(...aMessageArgs);
-  },
 
   /**
    * Returns an object whose keys are the string names from the downloads string
@@ -601,6 +586,13 @@ this.DownloadsCommon = {
     return (rv == 1);
   }),
 };
+
+XPCOMUtils.defineLazyGetter(this.DownloadsCommon, "log", () => {
+  return DownloadsLogger.log.bind(DownloadsLogger);
+});
+XPCOMUtils.defineLazyGetter(this.DownloadsCommon, "error", () => {
+  return DownloadsLogger.error.bind(DownloadsLogger);
+});
 
 /**
  * Returns true if we are executing on Windows Vista or a later version.
