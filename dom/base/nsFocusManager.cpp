@@ -1975,6 +1975,7 @@ public:
   {
     InternalFocusEvent event(true, mEventMessage);
     event.mFlags.mBubbles = false;
+    event.mFlags.mCancelable = false;
     event.fromRaise = mWindowRaised;
     event.isRefocus = mIsRefocus;
     return EventDispatcher::Dispatch(mTarget, mContext, &event);
