@@ -3,9 +3,11 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-const Cu = Components.utils;
+"use strict";
+
+var Cu = Components.utils;
 const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-const {parseSingleValue} = require("devtools/styleinspector/css-parsing-utils");
+const {parseSingleValue} = require("devtools/client/shared/css-parsing-utils");
 
 const TEST_DATA = [
   {input: null, throws: true},
