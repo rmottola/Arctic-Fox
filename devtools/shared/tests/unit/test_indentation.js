@@ -3,8 +3,6 @@
 
 "use strict";
 
-const Cu = Components.utils;
-const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm");
 const Services = require("Services");
 const {
   EXPAND_TAB,
