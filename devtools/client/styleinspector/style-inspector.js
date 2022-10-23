@@ -50,6 +50,7 @@ function RuleViewTool(inspector, window) {
   this.inspector.selection.on("pseudoclass", this.refresh);
   this.inspector.target.on("navigate", this.clearUserProperties);
   this.inspector.sidebar.on("ruleview-selected", this.onPanelSelected);
+  this.inspector.pageStyle.on("stylesheet-updated", this.refresh);
 
   this.onSelected();
 }
@@ -154,6 +155,9 @@ RuleViewTool.prototype = {
     this.inspector.selection.off("new-node-front", this.onSelected);
     this.inspector.target.off("navigate", this.clearUserProperties);
     this.inspector.sidebar.off("ruleview-selected", this.onPanelSelected);
+    if (this.inspector.pageStyle) {
+      this.inspector.pageStyle.off("stylesheet-updated", this.refresh);
+    }
 
     this.view.off("ruleview-linked-clicked", this.onLinkClicked);
     this.view.off("ruleview-changed", this.onPropertyChanged);
@@ -181,6 +185,7 @@ function ComputedViewTool(inspector, window) {
   this.inspector.on("layout-change", this.refresh);
   this.inspector.selection.on("pseudoclass", this.refresh);
   this.inspector.sidebar.on("computedview-selected", this.onPanelSelected);
+  this.inspector.pageStyle.on("stylesheet-updated", this.refresh);
 
   this.view.selectElement(null);
 
@@ -246,6 +251,9 @@ ComputedViewTool.prototype = {
     this.inspector.selection.off("pseudoclass", this.refresh);
     this.inspector.selection.off("new-node-front", this.onSelected);
     this.inspector.sidebar.off("computedview-selected", this.onPanelSelected);
+    if (this.inspector.pageStyle) {
+      this.inspector.pageStyle.off("stylesheet-updated", this.refresh);
+    }
 
     this.view.destroy();
 

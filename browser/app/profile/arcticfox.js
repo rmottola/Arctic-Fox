@@ -1142,6 +1142,9 @@ pref("devtools.command-button-measure.enabled", false);
 // Enable the MDN docs tooltip
 pref("devtools.inspector.mdnDocsTooltip.enabled", true);
 
+// DevTools default color unit
+pref("devtools.defaultColorUnit", "authored");
+
 // Enable the Debugger
 pref("devtools.debugger.enabled", true);
 pref("devtools.debugger.chrome-debugging-host", "localhost");
