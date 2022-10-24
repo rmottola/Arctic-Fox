@@ -1387,7 +1387,6 @@ SavedStacksMetadataCallback(JSContext* cx, JSObject* target)
         return nullptr;
     }
 
-    stacks.chooseSamplingProbability(cx->compartment());
     if (stacks.allocationSamplingProbability == 0.0)
         return nullptr;
 
