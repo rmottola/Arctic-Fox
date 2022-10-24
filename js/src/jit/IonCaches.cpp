@@ -3517,8 +3517,8 @@ SetPropertyIC::tryAttachUnboxedExpando(JSContext* cx, HandleScript outerScript, 
 
 bool
 SetPropertyIC::tryAttachStub(JSContext* cx, HandleScript outerScript, IonScript* ion,
-                             HandleObject obj, HandleValue idval, MutableHandleId id,
-                             bool* emitted, bool* tryNativeAddSlot)
+                             HandleObject obj, HandleValue idval, HandleValue value,
+                             MutableHandleId id, bool* emitted, bool* tryNativeAddSlot)
 {
     MOZ_ASSERT(!*emitted);
     MOZ_ASSERT(!*tryNativeAddSlot);
@@ -3542,6 +3542,16 @@ SetPropertyIC::tryAttachStub(JSContext* cx, HandleScript outerScript, IonScript*
 
         if (!*emitted && !tryAttachUnboxedExpando(cx, outerScript, ion, obj, id, emitted))
             return false;
+    }
+
+    if (idval.isInt32()) {
+        if (!*emitted && !tryAttachDenseElement(cx, outerScript, ion, obj, idval, emitted))
+            return false;
+        if (!*emitted &&
+            !tryAttachTypedArrayElement(cx, outerScript, ion, obj, idval, value, emitted))
+        {
+            return false;
+        }
     }
 
     return true;
@@ -3617,8 +3627,11 @@ SetPropertyIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex
     RootedId id(cx);
     bool emitted = false;
     bool tryNativeAddSlot = false;
-    if (!cache.tryAttachStub(cx, outerScript, ion, obj, idval, &id, &emitted, &tryNativeAddSlot))
+    if (!cache.tryAttachStub(cx, outerScript, ion, obj, idval, value, &id, &emitted,
+                             &tryNativeAddSlot))
+    {
         return false;
+    }
 
     // Set/Add the property on the object, the inlined cache are setup for the next execution.
     if (JSOp(*cache.pc()) == JSOP_INITGLEXICAL) {
@@ -3654,6 +3667,7 @@ SetPropertyIC::reset(ReprotectCode reprotect)
 {
     IonCache::reset(reprotect);
     hasGenericProxyStub_ = false;
+    hasDenseStub_ = false;
 }
 
 static bool
@@ -4297,16 +4311,13 @@ StoreDenseElement(MacroAssembler& masm, ConstantOrRegister value, Register eleme
 static bool
 GenerateSetDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& attacher,
                         JSObject* obj, const Value& idval, bool guardHoles, Register object,
-                        ValueOperand indexVal, ConstantOrRegister value, Register tempToUnboxIndex,
+                        TypedOrValueRegister index, ConstantOrRegister value, Register tempToUnboxIndex,
                         Register temp)
 {
     MOZ_ASSERT(obj->isNative());
     MOZ_ASSERT(idval.isInt32());
 
     Label failures;
-    Label outOfBounds; // index represents a known hole, or an illegal append
-
-    Label markElem, storeElement; // used if TI protects us from worrying about holes.
 
     // Guard object is a dense array.
     Shape* shape = obj->as<NativeObject>().lastProperty();
@@ -4315,10 +4326,16 @@ GenerateSetDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttac
     masm.branchTestObjShape(Assembler::NotEqual, object, shape, &failures);
 
     // Ensure the index is an int32 value.
-    masm.branchTestInt32(Assembler::NotEqual, indexVal, &failures);
+    Register indexReg;
+    if (index.hasValue()) {
+        ValueOperand val = index.valueReg();
+        masm.branchTestInt32(Assembler::NotEqual, val, &failures);
 
-    // Unbox the index.
-    Register index = masm.extractInt32(indexVal, tempToUnboxIndex);
+        indexReg = masm.extractInt32(val, tempToUnboxIndex);
+    } else {
+        MOZ_ASSERT(!index.typedReg().isFloat());
+        indexReg = index.typedReg().gpr();
+    }
 
     {
         // Load obj->elements.
@@ -4326,7 +4343,9 @@ GenerateSetDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttac
         masm.loadPtr(Address(object, NativeObject::offsetOfElements()), elements);
 
         // Compute the location of the element.
-        BaseObjectElementIndex target(elements, index);
+        BaseObjectElementIndex target(elements, indexReg);
+
+        Label storeElement;
 
         // If TI cannot help us deal with HOLES by preventing indexed properties
         // on the prototype chain, we have to be very careful to check for ourselves
@@ -4334,28 +4353,29 @@ GenerateSetDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttac
         // within the initialized length.
         if (guardHoles) {
             Address initLength(elements, ObjectElements::offsetOfInitializedLength());
-            masm.branch32(Assembler::BelowOrEqual, initLength, index, &outOfBounds);
+            masm.branch32(Assembler::BelowOrEqual, initLength, indexReg, &failures);
         } else {
             // Guard that we can increase the initialized length.
             Address capacity(elements, ObjectElements::offsetOfCapacity());
-            masm.branch32(Assembler::BelowOrEqual, capacity, index, &outOfBounds);
+            masm.branch32(Assembler::BelowOrEqual, capacity, indexReg, &failures);
 
             // Guard on the initialized length.
             Address initLength(elements, ObjectElements::offsetOfInitializedLength());
-            masm.branch32(Assembler::Below, initLength, index, &outOfBounds);
+            masm.branch32(Assembler::Below, initLength, indexReg, &failures);
 
             // if (initLength == index)
-            masm.branch32(Assembler::NotEqual, initLength, index, &markElem);
+            Label inBounds;
+            masm.branch32(Assembler::NotEqual, initLength, indexReg, &inBounds);
             {
                 // Increase initialize length.
-                Int32Key newLength(index);
+                Int32Key newLength(indexReg);
                 masm.bumpKey(&newLength, 1);
                 masm.storeKey(newLength, initLength);
 
                 // Increase length if needed.
                 Label bumpedLength;
                 Address length(elements, ObjectElements::offsetOfLength());
-                masm.branch32(Assembler::AboveOrEqual, length, index, &bumpedLength);
+                masm.branch32(Assembler::AboveOrEqual, length, indexReg, &bumpedLength);
                 masm.storeKey(newLength, length);
                 masm.bind(&bumpedLength);
 
@@ -4364,7 +4384,7 @@ GenerateSetDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttac
                 masm.jump(&storeElement);
             }
             // else
-            masm.bind(&markElem);
+            masm.bind(&inBounds);
         }
 
         if (cx->zone()->needsIncrementalBarrier())
@@ -4379,8 +4399,6 @@ GenerateSetDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttac
     }
     attacher.jumpRejoin(masm);
 
-    // All failures flow to here.
-    masm.bind(&outOfBounds);
     masm.bind(&failures);
     attacher.jumpNextStub(masm);
 
@@ -4388,33 +4406,37 @@ GenerateSetDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttac
 }
 
 bool
-SetElementIC::attachDenseElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
-                                 HandleObject obj, const Value& idval)
+SetPropertyIC::tryAttachDenseElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
+                                     HandleObject obj, const Value& idval, bool* emitted)
 {
+    MOZ_ASSERT(!*emitted);
+    MOZ_ASSERT(canAttachStub());
+
+    if (hasDenseStub() || !IsDenseElementSetInlineable(obj, idval))
+        return true;
+
+    *emitted = true;
+
     MacroAssembler masm(cx, ion, outerScript, profilerLeavePc_);
     StubAttacher attacher(*this);
     if (!GenerateSetDenseElement(cx, masm, attacher, obj, idval,
-                                 guardHoles(), object(), index(),
-                                 value(), tempToUnboxIndex(),
-                                 temp()))
+                                 guardHoles(), object(), id().reg(),
+                                 value(), tempToUnboxIndex(), temp()))
     {
         return false;
     }
 
     setHasDenseStub();
-    const char* message = guardHoles()            ?
-                            "dense array (holes)" :
-                            "dense array";
+    const char* message = guardHoles() ?  "dense array (holes)" : "dense array";
     return linkAndAttachStub(cx, masm, attacher, ion, message,
                              JS::TrackedOutcome::ICSetElemStub_Dense);
 }
 
 static bool
 GenerateSetTypedArrayElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& attacher,
-                             HandleObject tarr, Register object,
-                             ValueOperand indexVal, ConstantOrRegister value,
-                             Register tempUnbox, Register temp, FloatRegister tempDouble,
-                             FloatRegister tempFloat32)
+                             HandleObject tarr, Register object, TypedOrValueRegister index,
+                             ConstantOrRegister value, Register tempUnbox, Register temp,
+                             FloatRegister tempDouble, FloatRegister tempFloat32)
 {
     Label failures, done, popObjectAndFail;
 
@@ -4425,13 +4447,21 @@ GenerateSetTypedArrayElement(JSContext* cx, MacroAssembler& masm, IonCache::Stub
     masm.branchTestObjShape(Assembler::NotEqual, object, shape, &failures);
 
     // Ensure the index is an int32.
-    masm.branchTestInt32(Assembler::NotEqual, indexVal, &failures);
-    Register index = masm.extractInt32(indexVal, tempUnbox);
+    Register indexReg;
+    if (index.hasValue()) {
+        ValueOperand val = index.valueReg();
+        masm.branchTestInt32(Assembler::NotEqual, val, &failures);
+
+        indexReg = masm.extractInt32(val, tempUnbox);
+    } else {
+        MOZ_ASSERT(!index.typedReg().isFloat());
+        indexReg = index.typedReg().gpr();
+    }
 
     // Guard on the length.
     Address length(object, TypedArrayLayout::lengthOffset());
     masm.unboxInt32(length, temp);
-    masm.branch32(Assembler::BelowOrEqual, temp, index, &done);
+    masm.branch32(Assembler::BelowOrEqual, temp, indexReg, &done);
 
     // Load the elements vector.
     Register elements = temp;
@@ -4440,7 +4470,7 @@ GenerateSetTypedArrayElement(JSContext* cx, MacroAssembler& masm, IonCache::Stub
     // Set the value.
     Scalar::Type arrayType = AnyTypedArrayType(tarr);
     int width = Scalar::byteSize(arrayType);
-    BaseIndex target(elements, index, ScaleFromElemWidth(width));
+    BaseIndex target(elements, indexReg, ScaleFromElemWidth(width));
 
     if (arrayType == Scalar::Float32) {
         MOZ_ASSERT_IF(hasUnaliasedDouble(), tempFloat32 != InvalidFloatReg);
@@ -4491,13 +4521,22 @@ GenerateSetTypedArrayElement(JSContext* cx, MacroAssembler& masm, IonCache::Stub
 }
 
 bool
-SetElementIC::attachTypedArrayElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
-                                      HandleObject tarr)
+SetPropertyIC::tryAttachTypedArrayElement(JSContext* cx, HandleScript outerScript, IonScript* ion,
+                                          HandleObject obj, HandleValue idval, HandleValue val,
+                                          bool* emitted)
 {
+    MOZ_ASSERT(!*emitted);
+    MOZ_ASSERT(canAttachStub());
+
+    if (!IsTypedArrayElementSetInlineable(obj, idval, val))
+        return true;
+
+    *emitted = true;
+
     MacroAssembler masm(cx, ion, outerScript, profilerLeavePc_);
     StubAttacher attacher(*this);
-    if (!GenerateSetTypedArrayElement(cx, masm, attacher, tarr,
-                                      object(), index(), value(),
+    if (!GenerateSetTypedArrayElement(cx, masm, attacher, obj,
+                                      object(), id().reg(), value(),
                                       tempToUnboxIndex(), temp(), tempDouble(), tempFloat32()))
     {
         return false;
@@ -4514,19 +4553,6 @@ SetElementIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex,
     IonScript* ion = outerScript->ionScript();
     SetElementIC& cache = ion->getCache(cacheIndex).toSetElement();
 
-    bool attachedStub = false;
-    if (cache.canAttachStub()) {
-        if (!cache.hasDenseStub() && IsDenseElementSetInlineable(obj, idval)) {
-            if (!cache.attachDenseElement(cx, outerScript, ion, obj, idval))
-                return false;
-            attachedStub = true;
-        }
-        if (!attachedStub && IsTypedArrayElementSetInlineable(obj, idval, value)) {
-            if (!cache.attachTypedArrayElement(cx, outerScript, ion, obj))
-                return false;
-        }
-    }
-
     if (!SetObjectElement(cx, obj, idval, value, cache.strict()))
         return false;
     return true;
@@ -4536,7 +4562,6 @@ void
 SetElementIC::reset(ReprotectCode reprotect)
 {
     IonCache::reset(reprotect);
-    hasDenseStub_ = false;
 }
 
 bool
