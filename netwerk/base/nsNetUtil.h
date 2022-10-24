@@ -568,6 +568,7 @@ NS_NewBufferedInputStream(nsIInputStream **result,
 nsresult NS_NewBufferedOutputStream(nsIOutputStream **result,
                                     nsIOutputStream  *str,
                                     uint32_t          bufferSize);
+
 /**
  * Attempts to buffer a given output stream.  If this fails, it returns the
  * passed-in output stream.
