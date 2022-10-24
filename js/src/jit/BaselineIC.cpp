@@ -4844,7 +4844,9 @@ UpdateExistingGetPropCallStubs(ICFallbackStub* fallbackStub,
                     getPropStub->receiverGuard().update(receiverGuard);
 
                 MOZ_ASSERT(getPropStub->holderShape() != holder->lastProperty() ||
-                           !getPropStub->receiverGuard().matches(receiverGuard),
+                           !getPropStub->receiverGuard().matches(receiverGuard) ||
+                           getPropStub->toGetProp_CallNativeGlobal()->globalShape() !=
+                           receiver->as<ClonedBlockObject>().global().lastProperty(),
                            "Why didn't we end up using this stub?");
 
                 // We want to update the holder shape to match the new one no
