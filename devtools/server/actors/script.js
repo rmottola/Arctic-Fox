@@ -3653,7 +3653,7 @@ function hackDebugger(Debugger) {
     configurable: true,
     get: function() {
       if (this.script) {
-        return this.script.getOffsetLine(this.offset);
+        return this.script.getOffsetLocation(this.offset).lineNumber;
       } else {
         return null;
       }
