@@ -11232,13 +11232,12 @@ class MSetPropertyInstruction : public MBinaryInstruction
 {
     CompilerPropertyName name_;
     bool strict_;
-    bool needsBarrier_;
 
   protected:
     MSetPropertyInstruction(MDefinition* obj, MDefinition* value, PropertyName* name,
                             bool strict)
       : MBinaryInstruction(obj, value),
-        name_(name), strict_(strict), needsBarrier_(true)
+        name_(name), strict_(strict)
     {}
 
   public:
@@ -11253,12 +11252,6 @@ class MSetPropertyInstruction : public MBinaryInstruction
     }
     bool strict() const {
         return strict_;
-    }
-    bool needsBarrier() const {
-        return needsBarrier_;
-    }
-    void setNeedsBarrier() {
-        needsBarrier_ = true;
     }
 };
 
