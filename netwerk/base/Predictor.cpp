@@ -577,7 +577,7 @@ Predictor::Init()
   NS_ENSURE_SUCCESS(rv, rv);
 
   RefPtr<LoadContextInfo> lci =
-    new LoadContextInfo(false, nsILoadContextInfo::NO_APP_ID, false, false);
+    new LoadContextInfo(false, false, OriginAttributes());
 
   rv = cacheStorageService->DiskCacheStorage(lci, false,
                                              getter_AddRefs(mCacheDiskStorage));

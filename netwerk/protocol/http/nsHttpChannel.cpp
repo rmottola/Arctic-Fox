@@ -3034,7 +3034,6 @@ nsHttpChannel::OpenCacheEntry(bool isHttps)
         do_GetService("@mozilla.org/netwerk/cache-storage-service;1", &rv);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    RefPtr<LoadContextInfo> info = GetLoadContextInfo(this);
     nsCOMPtr<nsICacheStorage> cacheStorage;
     nsCOMPtr<nsIURI> openURI;
     if (!mFallbackKey.IsEmpty() && mFallbackChannel) {
@@ -3054,7 +3053,12 @@ nsHttpChannel::OpenCacheEntry(bool isHttps)
         }
     }
 
-    uint32_t appId = info->AppId();
+    RefPtr<LoadContextInfo> info = GetLoadContextInfo(this);
+    if (!info) {
+        return NS_ERROR_FAILURE;
+    }
+
+    uint32_t appId = info->OriginAttributesPtr()->mAppId;
     bool appOffline = false;
 
     if (appId != NECKO_NO_APP_ID) {
