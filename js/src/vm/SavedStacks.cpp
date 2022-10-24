@@ -1348,9 +1348,13 @@ SavedStacks::getLocation(JSContext* cx, const FrameIter& iter, MutableHandleLoca
 }
 
 void
-SavedStacks::chooseSamplingProbability(JSContext* cx)
+SavedStacks::chooseSamplingProbability(JSCompartment* compartment)
 {
-    GlobalObject::DebuggerVector* dbgs = cx->global()->getDebuggers();
+    GlobalObject* global = compartment->maybeGlobal();
+    if (!global)
+        return;
+
+    GlobalObject::DebuggerVector* dbgs = global->getDebuggers();
     if (!dbgs || dbgs->empty())
         return;
 
@@ -1383,7 +1387,7 @@ SavedStacksMetadataCallback(JSContext* cx, JSObject* target)
         return nullptr;
     }
 
-    stacks.chooseSamplingProbability(cx);
+    stacks.chooseSamplingProbability(cx->compartment());
     if (stacks.allocationSamplingProbability == 0.0)
         return nullptr;
 
