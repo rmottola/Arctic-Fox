@@ -8473,9 +8473,10 @@ CodeGenerator::addGetPropertyCache(LInstruction* ins, LiveRegisterSet liveRegs, 
 void
 CodeGenerator::addSetPropertyCache(LInstruction* ins, LiveRegisterSet liveRegs, Register objReg,
                                    Register tempReg, ConstantOrRegister id, ConstantOrRegister value,
-                                   bool strict, bool needsTypeBarrier, jsbytecode* profilerLeavePc)
+                                   bool strict, bool needsTypeBarrier, bool guardHoles,
+                                   jsbytecode* profilerLeavePc)
 {
-    SetPropertyIC cache(liveRegs, objReg, tempReg, id, value, strict, needsTypeBarrier);
+    SetPropertyIC cache(liveRegs, objReg, tempReg, id, value, strict, needsTypeBarrier, guardHoles);
     cache.setProfilerLeavePC(profilerLeavePc);
     addCache(ins, allocateCache(cache));
 }
@@ -8721,7 +8722,7 @@ CodeGenerator::visitSetPropertyCache(LSetPropertyCache* ins)
 
     addSetPropertyCache(ins, liveRegs, objReg, tempReg, id, value,
                         ins->mir()->strict(), ins->mir()->needsTypeBarrier(),
-                        ins->mir()->profilerLeavePc());
+                        ins->mir()->guardHoles(), ins->mir()->profilerLeavePc());
 }
 
 typedef bool (*SetPropertyICFn)(JSContext*, HandleScript, size_t, HandleObject, HandleValue,
