@@ -3821,6 +3821,8 @@ MOZ_CONTENT_SANDBOX=
 MOZ_GMP_SANDBOX=
 MOZ_SANDBOX=
 MOZ_DEVTOOLS=
+MOZ_ADDON_SIGNING=
+MOZ_REQUIRE_SIGNING=
 
 case "$target_os" in
     mingw*)
@@ -3952,6 +3954,19 @@ if test -z "$MOZ_BING_API_CLIENTID"; then
 fi
 AC_SUBST(MOZ_BING_API_CLIENTID)
 AC_SUBST(MOZ_BING_API_KEY)
+
+dnl ========================================================
+dnl = Trademarked Branding
+dnl ========================================================
+MOZ_ARG_ENABLE_BOOL(official-branding,
+[  --enable-official-branding
+                          Enable Official mozilla.org Branding
+                          Do not distribute builds with
+                          --enable-official-branding unless you have
+                          permission to use trademarks per
+                          http://www.mozilla.org/foundation/trademarks/ .],
+    MOZ_OFFICIAL_BRANDING=1,
+    MOZ_OFFICIAL_BRANDING=)
 
 # Allow the application to influence configure with a confvars.sh script.
 AC_MSG_CHECKING([if app-specific confvars.sh exists])
@@ -8373,6 +8388,9 @@ AC_SUBST(MOZ_BUILD_ROOT)
 AC_SUBST(MOZ_POST_DSO_LIB_COMMAND)
 AC_SUBST(MOZ_POST_PROGRAM_COMMAND)
 AC_SUBST(MOZ_LINKER_EXTRACT)
+
+AC_SUBST(MOZ_ADDON_SIGNING)
+AC_SUBST(MOZ_REQUIRE_SIGNING)
 
 AC_SUBST(MOZ_JSDOWNLOADS)
 if test -n "$MOZ_JSDOWNLOADS"; then
