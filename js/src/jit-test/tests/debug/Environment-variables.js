@@ -79,7 +79,7 @@ for (var s of cases) {
     test(s, "debugMe(); assertEq(x, 'ok');");
 
     // Test triggering the debugger from a scope nested in x's scope.
-    test(s, "{ let y = 'irrelevant'; (function (z) { let (zz = y) { debugger; }})(); } assertEq(x, 'ok');"),
+    test(s, "{ let y = 'irrelevant'; (function (z) { { let zz = y; debugger; } })(); } assertEq(x, 'ok');"),
 
     // Test closing over the variable and triggering the debugger later, after
     // leaving the variable's scope.

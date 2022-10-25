@@ -2,7 +2,7 @@ actual = '';
 expected = '-3,';
 
 v = 0
-{ let(f = function (y) {
+{ let f = function (y) {
     { let f = function (g) {
         for each(let h in g) {
             if (++y > 2) {

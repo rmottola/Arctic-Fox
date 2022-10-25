@@ -2,7 +2,7 @@ function testClosureIncrSideExit() {
     {
       let f = function (y) {
         {
-          let(ff = function (g) {
+          let ff = function (g) {
             for each(let h in g) {
                 if (++y > 5) {
                     return 'ddd';

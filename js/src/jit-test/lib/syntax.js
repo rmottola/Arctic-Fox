@@ -1155,22 +1155,6 @@ function test_syntax(replacements, check_error, ignore_opts) {
 
   // ==== Legacy ====
 
-  // let statement
-
-  test("let ( @");
-  test("let ( x @");
-  test("let ( x = @");
-  test("let ( x = 1 @");
-  test("let ( x = 1, @");
-  test("let ( x = 1, y @");
-  test("let ( x = 1, y = @");
-  test("let ( x = 1, y = 2 @");
-  test("let ( x = 1, y = 2 ) @");
-  test("let ( x = 1, y = 2 ) { @");
-  test("let ( x = 1, y = 2 ) { x @");
-  test("let ( x = 1, y = 2 ) { x; @");
-  test("let ( x = 1, y = 2 ) { x; } @");
-
   // Expression closures
 
   test("function f() 1 @");

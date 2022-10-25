@@ -750,8 +750,8 @@ struct JSCompartment
         // NO LONGER USING 1
         DeprecatedLegacyGenerator = 2,      // JS 1.7+
         DeprecatedExpressionClosure = 3,    // Added in JS 1.8
-        DeprecatedLetBlock = 4,             // Added in JS 1.7
-        // No longer using 5 (was: let expressions)
+        // NO LONGER USING 4
+        // NO LONGER USING 5
         DeprecatedNoSuchMethod = 6,         // JS 1.7+
         DeprecatedFlagsArgument = 7,        // JS 1.3 or older
         RegExpSourceProperty = 8,           // ES5
