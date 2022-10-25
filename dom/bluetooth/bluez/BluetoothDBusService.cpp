@@ -4371,6 +4371,56 @@ BluetoothDBusService::GattClientWriteDescriptorValueInternal(
 }
 
 void
+BluetoothDBusService::ReplyTovCardPulling(
+  BlobParent* aBlobParent,
+  BlobChild* aBlobChild,
+  BluetoothReplyRunnable* aRunnable)
+{
+}
+
+void
+BluetoothDBusService::ReplyTovCardPulling(
+  Blob* aBlob,
+  BluetoothReplyRunnable* aRunnable)
+{
+}
+
+void
+BluetoothDBusService::ReplyToPhonebookPulling(
+  BlobParent* aBlobParent,
+  BlobChild* aBlobChild,
+  uint16_t aPhonebookSize,
+  BluetoothReplyRunnable* aRunnable)
+{
+}
+
+void
+BluetoothDBusService::ReplyToPhonebookPulling(
+  Blob* aBlob,
+  uint16_t aPhonebookSize,
+  BluetoothReplyRunnable* aRunnable)
+{
+}
+
+void
+BluetoothDBusService::ReplyTovCardListing(
+  BlobParent* aBlobParent,
+  BlobChild* aBlobChild,
+  uint16_t aPhonebookSize,
+  BluetoothReplyRunnable* aRunnable)
+{
+}
+
+void
+BluetoothDBusService::ReplyTovCardListing(
+  Blob* aBlob,
+  uint16_t aPhonebookSize,
+  BluetoothReplyRunnable* aRunnable)
+{
+}
+
+
+void
 BluetoothDBusService::GattServerConnectPeripheralInternal(
   const nsAString& aAppUuid, const nsAString& aAddress,
   BluetoothReplyRunnable* aRunnable)
@@ -4387,54 +4437,5 @@ BluetoothDBusService::GattServerDisconnectPeripheralInternal(
 void
 BluetoothDBusService::UnregisterGattServerInternal(
   int aServerIf, BluetoothReplyRunnable* aRunnable)
-{
-}
-
-void
-BluetoothDBusService::ReplyTovCardPulling(
-  BlobParent* aBlobParent,
-  BlobChild* aBlobChild,
-  BluetoothReplyRunnable* aRunnable)
-{
-}
-
-void
-BluetoothDBusService::ReplyTovCardPulling(
-  Blob* aBlob,
-  BluetoothReplyRunnable* aRunnable)
-{
-}
-
-void
-BluetoothDBusService::ReplyToPhonebookPulling(
-  BlobParent* aBlobParent,
-  BlobChild* aBlobChild,
-  uint16_t aPhonebookSize,
-  BluetoothReplyRunnable* aRunnable)
-{
-}
-
-void
-BluetoothDBusService::ReplyToPhonebookPulling(
-  Blob* aBlob,
-  uint16_t aPhonebookSize,
-  BluetoothReplyRunnable* aRunnable)
-{
-}
-
-void
-BluetoothDBusService::ReplyTovCardListing(
-  BlobParent* aBlobParent,
-  BlobChild* aBlobChild,
-  uint16_t aPhonebookSize,
-  BluetoothReplyRunnable* aRunnable)
-{
-}
-
-void
-BluetoothDBusService::ReplyTovCardListing(
-  Blob* aBlob,
-  uint16_t aPhonebookSize,
-  BluetoothReplyRunnable* aRunnable)
 {
 }
