@@ -10,6 +10,7 @@
 @namespace html url("http://www.w3.org/1999/xhtml");
 
 %include ../shared/browser.inc
+%include linuxShared.inc
 %filter substitution
 %define toolbarHighlight rgba(255,255,255,.3)
 %define selectedTabHighlight rgba(255,255,255,.8) 1px, rgba(255,255,255,.5) 3px
@@ -1908,6 +1909,15 @@ toolbar[iconsize="small"] .toolbarbutton-badge-container {
   content: "";
   background: url("chrome://browser/skin/privatebrowsing-mask.png") center no-repeat;
   width: 40px;
+}
+
+%include ../shared/contextmenu.inc.css
+
+#context-navigation > .menuitem-iconic > .menu-iconic-left {
+  visibility: visible;
+  /* override toolkit/themes/linux/global/menu.css */
+  -moz-padding-end: 0 !important;
+  -moz-margin-end: 0 !important;
 }
 
 .browser-action-panel > .panel-arrowcontainer > .panel-arrowcontent {

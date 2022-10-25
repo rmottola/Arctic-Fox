@@ -2176,6 +2176,12 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     height: 16px;
 }
 
+%include ../shared/contextmenu.inc.css
+
+#context-navigation > .menuitem-iconic {
+  padding-left: 0;
+  padding-right: 0;
+}
 
 .browser-action-panel > .panel-arrowcontainer > .panel-arrowcontent {
   padding: 0;

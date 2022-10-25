@@ -8,6 +8,7 @@
 @namespace html url("http://www.w3.org/1999/xhtml");
 
 %include ../shared/browser.inc
+%include windowsShared.inc
 %filter substitution
 %define toolbarShadowColor rgba(10%,10%,10%,.4)
 %define toolbarShadowOnTab linear-gradient(to top, rgba(10%,10%,10%,.4) 1px, transparent 1px)
@@ -3572,6 +3573,18 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
   .splitmenu-menu[_moz-menuactive]:not(:hover):not([open]) {
     background-image: none;
   }
+}
+
+%include ../shared/contextmenu.inc.css
+
+#context-navigation {
+  background-color: menu;
+  padding-bottom: 4px;
+}
+
+#context-sep-navigation {
+  -moz-margin-start: -28px;
+  margin-top: -4px;
 }
 
 .browser-action-panel > .panel-arrowcontainer > .panel-arrowcontent {

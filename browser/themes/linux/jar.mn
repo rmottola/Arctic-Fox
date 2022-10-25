@@ -22,6 +22,7 @@ browser.jar:
 * skin/classic/browser/browser.css
 * skin/classic/browser/devedition.css
   skin/classic/browser/click-to-play-warning-stripes.png
+  skin/classic/browser/content-contextmenu.svg
 * skin/classic/browser/engineManager.css
   skin/classic/browser/Geolocation-16.png
   skin/classic/browser/Geolocation-64.png
