@@ -34,15 +34,17 @@ XPIDL_SOURCES += [
 
 XPIDL_MODULE = 'browsercompsbase'
 
-EXTRA_COMPONENTS += [ 'BrowserComponents.manifest' ]
-
 EXTRA_PP_COMPONENTS += [
-    'nsBrowserContentHandler.js',
+    'BrowserComponents.manifest',
     'nsBrowserGlue.js',
 ]
 
+EXTRA_COMPONENTS += [
+    'nsBrowserContentHandler.js',
+]
+
 EXTRA_JS_MODULES += [
-   'distribution.js',
+    'distribution.js',
 ]
 
 with Files('controlcenter/**'):

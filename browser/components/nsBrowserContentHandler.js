@@ -12,6 +12,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
                                   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RecentWindow",
                                   "resource:///modules/RecentWindow.jsm");
+XPCOMUtils.defineLazyServiceGetter(this, "WindowsUIUtils",
+                                   "@mozilla.org/windows-ui-utils;1", "nsIWindowsUIUtils");
 
 const nsISupports            = Components.interfaces.nsISupports;
 
@@ -725,6 +727,16 @@ nsDefaultCommandLineHandler.prototype = {
 
     }
     else if (!cmdLine.preventDefault) {
+      if (AppConstants.isPlatformAndVersionAtLeast("win", "10") &&
+          cmdLine.state != nsICommandLine.STATE_INITIAL_LAUNCH &&
+          WindowsUIUtils.inTabletMode) {
+        // In windows 10 tablet mode, do not create a new window, but reuse the existing one.
+        let win = RecentWindow.getMostRecentBrowserWindow();
+        if (win) {
+          win.focus();
+          return;
+        }
+      }
       // Passing defaultArgs, so use NO_EXTERNAL_URIS
       openWindow(null, gBrowserContentHandler.chromeURL, "_blank",
                  "chrome,dialog=no,all" + gBrowserContentHandler.getFeatures(cmdLine),
