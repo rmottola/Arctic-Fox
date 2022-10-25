@@ -1215,7 +1215,7 @@ Parser<ParseHandler>::functionBody(InHandling inHandling, YieldHandling yieldHan
         if (!kid)
             return null();
 
-        pn = handler.newReturnStatement(kid, null(), handler.getPosition(kid));
+        pn = handler.newReturnStatement(kid, handler.getPosition(kid));
         if (!pn)
             return null();
     }
@@ -1254,14 +1254,6 @@ Parser<ParseHandler>::functionBody(InHandling inHandling, YieldHandling yieldHan
             return null();
         if (!pc->define(tokenStream, context->names().dotGenerator, generator, Definition::VAR))
             return null();
-
-        if (pc->isStarGenerator()) {
-            Node genrval = newName(context->names().dotGenRVal);
-            if (!genrval)
-                return null();
-            if (!pc->define(tokenStream, context->names().dotGenRVal, genrval, Definition::VAR))
-                return null();
-        }
 
         generator = newName(context->names().dotGenerator);
         if (!generator)
@@ -5908,18 +5900,7 @@ Parser<ParseHandler>::returnStatement(YieldHandling yieldHandling)
             return null();
     }
 
-    Node genrval = null();
-    if (pc->isStarGenerator()) {
-        genrval = newName(context->names().dotGenRVal);
-        if (!genrval)
-            return null();
-        if (!noteNameUse(context->names().dotGenRVal, genrval))
-            return null();
-        if (!checkAndMarkAsAssignmentLhs(genrval, PlainAssignment))
-            return null();
-    }
-
-    Node pn = handler.newReturnStatement(exprNode, genrval, TokenPos(begin, pos().end));
+    Node pn = handler.newReturnStatement(exprNode, TokenPos(begin, pos().end));
     if (!pn)
         return null();
 
