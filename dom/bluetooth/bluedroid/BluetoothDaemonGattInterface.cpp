@@ -978,7 +978,7 @@ BluetoothDaemonGattModule::ServerSendIndicationCmd(
 
 nsresult
 BluetoothDaemonGattModule::ServerSendResponseCmd(
-  int aConnId, int aTransId, BluetoothGattStatus aStatus,
+  int aConnId, int aTransId, uint16_t aStatus,
   const BluetoothGattResponse& aResponse,
   BluetoothGattResultHandler* aRes)
 {
@@ -994,7 +994,7 @@ BluetoothDaemonGattModule::ServerSendResponseCmd(
     aResponse.mHandle,
     aResponse.mOffset,
     PackConversion<BluetoothGattAuthReq, uint8_t>(aResponse.mAuthReq),
-    PackConversion<BluetoothGattStatus, int32_t>(aStatus),
+    PackConversion<uint16_t, int32_t>(aStatus),
     aResponse.mLength,
     PackArray<uint8_t>(aResponse.mValue, aResponse.mLength), *pdu);
 
@@ -1938,7 +1938,7 @@ public:
   operator () (int& aArg1,
                int& aArg2,
                nsString& aArg3,
-               int& aArg4,
+               BluetoothAttributeHandle& aArg4,
                int& aArg5,
                bool& aArg6) const
   {
@@ -2003,7 +2003,7 @@ public:
   operator () (int& aArg1,
                int& aArg2,
                nsString& aArg3,
-               int& aArg4,
+               BluetoothAttributeHandle& aArg4,
                int& aArg5,
                int& aArg6,
                nsAutoArrayPtr<uint8_t>& aArg7,
@@ -2818,7 +2818,7 @@ BluetoothDaemonGattInterface::SendIndication(
 
 void
 BluetoothDaemonGattInterface::SendResponse(
-  int aConnId, int aTransId, BluetoothGattStatus aStatus,
+  int aConnId, int aTransId, uint16_t aStatus,
   const BluetoothGattResponse& aResponse,
   BluetoothGattResultHandler* aRes)
 {
