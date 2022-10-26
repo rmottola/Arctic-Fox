@@ -234,6 +234,11 @@ BluetoothGattDescriptor::ReadValue(ErrorResult& aRv)
   RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
+  if (mAttRole == ATT_SERVER_ROLE) {
+    promise->MaybeResolve(mValue);
+    return promise.forget();
+  }
+
   BluetoothService* bs = BluetoothService::Get();
   BT_ENSURE_TRUE_REJECT(bs, promise, NS_ERROR_NOT_AVAILABLE);
 
@@ -261,6 +266,14 @@ BluetoothGattDescriptor::WriteValue(
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   aValue.ComputeLengthAndData();
+
+  if (mAttRole == ATT_SERVER_ROLE) {
+    mValue.Clear();
+    mValue.AppendElements(aValue.Data(), aValue.Length());
+
+    promise->MaybeResolve(JS::UndefinedHandleValue);
+    return promise.forget();
+  }
 
   nsTArray<uint8_t> value;
   value.AppendElements(aValue.Data(), aValue.Length());
