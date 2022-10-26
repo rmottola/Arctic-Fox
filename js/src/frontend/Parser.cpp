@@ -6606,9 +6606,6 @@ template <typename ParseHandler>
 bool
 Parser<ParseHandler>::shouldParseLetDeclaration(bool* parseDeclOut)
 {
-    // 'let' is a reserved keyword in strict mode and we shouldn't get here.
-    MOZ_ASSERT(!pc->sc->strict());
-
     TokenKind tt;
     *parseDeclOut = false;
 
@@ -6647,6 +6644,9 @@ bool
 Parser<ParseHandler>::peekShouldParseLetDeclaration(bool* parseDeclOut,
                                                     TokenStream::Modifier modifier)
 {
+    // 'let' is a reserved keyword in strict mode and we shouldn't get here.
+    MOZ_ASSERT(!pc->sc->strict());
+
     *parseDeclOut = false;
 
 #ifdef DEBUG
@@ -6733,7 +6733,12 @@ Parser<ParseHandler>::statement(YieldHandling yieldHandling, bool canHaveDirecti
 
       case TOK_NAME: {
         // 'let' is a contextual keyword in sloppy node. In strict mode, it is
-        // always lexed as TOK_LET.
+        // always lexed as TOK_LET except following case:
+        //
+        //   "use strict"
+        //   let a = 1;
+        //
+        // There 'let' is lexed as TOK_NAME before parsing directive.
         if (tokenStream.currentName() == context->names().let) {
             bool parseDecl;
             if (!shouldParseLetDeclaration(&parseDecl))
