@@ -6849,7 +6849,7 @@ Parser<ParseHandler>::expr(InHandling inHandling, YieldHandling yieldHandling,
         return null();
     while (true) {
         if (handler.isUnparenthesizedYieldExpression(pn)) {
-            report(ParseError, false, pn, JSMSG_BAD_GENERATOR_SYNTAX, js_yield_str);
+            report(ParseError, false, pn, JSMSG_BAD_YIELD_SYNTAX);
             return null();
         }
 
@@ -8151,8 +8151,6 @@ Parser<SyntaxParseHandler>::legacyGeneratorExpr(Node kid)
     return SyntaxParseHandler::NodeFailure;
 }
 
-static const char js_generator_str[] = "generator";
-
 #endif /* JS_HAS_GENERATOR_EXPRS */
 
 template <typename ParseHandler>
@@ -8417,7 +8415,7 @@ Parser<ParseHandler>::argumentList(YieldHandling yieldHandling, Node listNode, b
             if (!tokenStream.peekToken(&tt))
                 return false;
             if (tt == TOK_COMMA) {
-                report(ParseError, false, argNode, JSMSG_BAD_GENERATOR_SYNTAX, js_yield_str);
+                report(ParseError, false, argNode, JSMSG_BAD_YIELD_SYNTAX);
                 return false;
             }
         }
@@ -8435,14 +8433,14 @@ Parser<ParseHandler>::argumentList(YieldHandling yieldHandling, Node listNode, b
                 if (!argNode)
                     return false;
                 if (!arg0) {
-                    report(ParseError, false, argNode, JSMSG_BAD_GENERATOR_SYNTAX, js_generator_str);
+                    report(ParseError, false, argNode, JSMSG_BAD_GENERATOR_SYNTAX);
                     return false;
                 }
                 TokenKind tt;
                 if (!tokenStream.peekToken(&tt))
                     return false;
                 if (tt == TOK_COMMA) {
-                    report(ParseError, false, argNode, JSMSG_BAD_GENERATOR_SYNTAX, js_generator_str);
+                    report(ParseError, false, argNode, JSMSG_BAD_GENERATOR_SYNTAX);
                     return false;
                 }
             }
@@ -9425,8 +9423,7 @@ Parser<ParseHandler>::parenExprOrGeneratorComprehension(YieldHandling yieldHandl
             return null();
         }
         if (handler.isUnparenthesizedCommaExpression(pn)) {
-            report(ParseError, false, null(),
-                   JSMSG_BAD_GENERATOR_SYNTAX, js_generator_str);
+            report(ParseError, false, null(), JSMSG_BAD_GENERATOR_SYNTAX);
             return null();
         }
         pn = legacyGeneratorExpr(pn);
@@ -9437,8 +9434,7 @@ Parser<ParseHandler>::parenExprOrGeneratorComprehension(YieldHandling yieldHandl
         if (!tokenStream.getToken(&tt))
             return null();
         if (tt != TOK_RP) {
-            report(ParseError, false, null(),
-                   JSMSG_BAD_GENERATOR_SYNTAX, js_generator_str);
+            report(ParseError, false, null(), JSMSG_BAD_GENERATOR_SYNTAX);
             return null();
         }
         handler.setEndPosition(pn, pos().end);
@@ -9494,8 +9490,7 @@ Parser<ParseHandler>::exprInParens(InHandling inHandling, YieldHandling yieldHan
             return null();
         }
         if (handler.isUnparenthesizedCommaExpression(pn)) {
-            report(ParseError, false, null(),
-                   JSMSG_BAD_GENERATOR_SYNTAX, js_generator_str);
+            report(ParseError, false, null(), JSMSG_BAD_GENERATOR_SYNTAX);
             return null();
         }
         pn = legacyGeneratorExpr(pn);
