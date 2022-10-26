@@ -1001,6 +1001,11 @@ TokenStream::checkForKeyword(const KeywordInfo* kw, TokenKind* ttp)
 
     if (kw->tokentype != TOK_STRICT_RESERVED) {
         if (kw->version <= versionNumber()) {
+            // Treat 'let' as an identifier and contextually a keyword in
+            // sloppy mode. It is always a keyword in strict mode.
+            if (kw->tokentype == TOK_LET && !strictMode())
+                return true;
+
             // Working keyword.
             if (ttp) {
                 *ttp = kw->tokentype;
