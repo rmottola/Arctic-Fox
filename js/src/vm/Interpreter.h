@@ -275,9 +275,6 @@ UnwindAllScopesInFrame(JSContext* cx, ScopeIter& si);
 extern jsbytecode*
 UnwindScopeToTryPc(JSScript* script, JSTryNote* tn);
 
-extern bool
-OnUnknownMethod(JSContext* cx, HandleObject obj, Value idval, MutableHandleValue vp);
-
 template <class StackDepthOp>
 class MOZ_STACK_CLASS TryNoteIter
 {
@@ -355,9 +352,6 @@ ThrowingOperation(JSContext* cx, HandleValue v);
 
 bool
 GetProperty(JSContext* cx, HandleValue value, HandlePropertyName name, MutableHandleValue vp);
-
-bool
-CallProperty(JSContext* cx, HandleValue value, HandlePropertyName name, MutableHandleValue vp);
 
 bool
 GetScopeName(JSContext* cx, HandleObject obj, HandlePropertyName name, MutableHandleValue vp);

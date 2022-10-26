@@ -629,13 +629,6 @@ GetObjectElementOperation(JSContext* cx, JSOp op, JS::HandleObject obj, JS::Hand
             return false;
     } while (false);
 
-#if JS_HAS_NO_SUCH_METHOD
-    if (op == JSOP_CALLELEM && MOZ_UNLIKELY(res.isUndefined())) {
-        if (!OnUnknownMethod(cx, receiver, key, res))
-            return false;
-    }
-#endif
-
     assertSameCompartmentDebugOnly(cx, res);
     return true;
 }
@@ -682,8 +675,6 @@ GetPrimitiveElementOperation(JSContext* cx, JSOp op, JS::HandleValue receiver,
         if (!GetProperty(cx, boxed, receiver, id, res))
             return false;
     } while (false);
-
-    // Note: we don't call a __noSuchMethod__ hook when |this| was primitive.
 
     assertSameCompartmentDebugOnly(cx, res);
     return true;
