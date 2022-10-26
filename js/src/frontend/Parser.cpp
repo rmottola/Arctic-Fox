@@ -4488,7 +4488,6 @@ Parser<FullParseHandler>::lexicalDeclaration(YieldHandling yieldHandling, bool i
                               nullptr, CurrentLexicalStaticBlock(pc), HoistVars);
     if (!pn)
         return null();
-    pn->pn_xflags = PNX_POPVAR;
     return MatchOrInsertSemicolonAfterExpression(tokenStream) ? pn : nullptr;
 }
 
@@ -4935,10 +4934,7 @@ Parser<FullParseHandler>::exportDeclaration()
         kid = variables(YieldIsName, PNK_VAR, NotInForInit);
         if (!kid)
             return null();
-        kid->pn_xflags = PNX_POPVAR;
-
-        kid = MatchOrInsertSemicolonAfterExpression(tokenStream) ? kid : nullptr;
-        if (!kid)
+        if (!MatchOrInsertSemicolonAfterExpression(tokenStream))
             return null();
 
         MOZ_ASSERT(kid->isArity(PN_LIST));
@@ -6765,10 +6761,6 @@ Parser<ParseHandler>::statement(YieldHandling yieldHandling, bool canHaveDirecti
         Node pn = variables(yieldHandling, PNK_VAR, NotInForInit);
         if (!pn)
             return null();
-
-        // Tell js_EmitTree to generate a final POP.
-        handler.setListFlag(pn, PNX_POPVAR);
-
         if (!MatchOrInsertSemicolonAfterExpression(tokenStream))
             return null();
         return pn;
@@ -8014,7 +8006,6 @@ Parser<FullParseHandler>::legacyComprehensionTail(ParseNode* bodyExpr, unsigned 
         ParseNode* lets = handler.newDeclarationList(PNK_LET, pn3, JSOP_DEFLET);
         if (!lets)
             return null();
-        lets->pn_xflags |= PNX_POPVAR;
 
         /* Definitions can't be passed directly to EmitAssignment as lhs. */
         pn3 = cloneLeftHandSide(pn3);
