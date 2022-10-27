@@ -1082,6 +1082,7 @@ UnboxedArrayObject::create(ExclusiveContext* cx, HandleObjectGroup group, uint32
         res = NewObjectWithGroup<UnboxedArrayObject>(cx, group, allocKind, newKind);
         if (!res)
             return nullptr;
+        res->setInitializedLengthNoBarrier(0);
         res->setInlineElements();
 
         size_t actualCapacity = (GetGCKindBytes(allocKind) - offsetOfInlineElements()) / elementSize;
@@ -1091,6 +1092,7 @@ UnboxedArrayObject::create(ExclusiveContext* cx, HandleObjectGroup group, uint32
         res = NewObjectWithGroup<UnboxedArrayObject>(cx, group, gc::AllocKind::OBJECT0, newKind);
         if (!res)
             return nullptr;
+        res->setInitializedLengthNoBarrier(0);
 
         uint32_t capacityIndex = (capacity == length)
                                  ? CapacityMatchesLengthIndex
@@ -1101,7 +1103,6 @@ UnboxedArrayObject::create(ExclusiveContext* cx, HandleObjectGroup group, uint32
         if (!res->elements_) {
             // Make the object safe for GC.
             res->setInlineElements();
-            res->setInitializedLength(0);
             return nullptr;
         }
 
@@ -1109,7 +1110,6 @@ UnboxedArrayObject::create(ExclusiveContext* cx, HandleObjectGroup group, uint32
     }
 
     res->setLength(cx, length);
-    res->setInitializedLength(0);
     return res;
 }
 
