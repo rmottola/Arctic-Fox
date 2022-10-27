@@ -4842,7 +4842,7 @@ CodeGenerator::visitNewStringObject(LNewStringObject* lir)
     masm.bind(ool->rejoin());
 }
 
-typedef bool(*InitElemFn)(JSContext* cx, HandleObject obj,
+typedef bool(*InitElemFn)(JSContext* cx, jsbytecode* pc, HandleObject obj,
                           HandleValue id, HandleValue value);
 static const VMFunction InitElemInfo =
     FunctionInfo<InitElemFn>(InitElemOperation);
@@ -4855,6 +4855,7 @@ CodeGenerator::visitInitElem(LInitElem* lir)
     pushArg(ToValue(lir, LInitElem::ValueIndex));
     pushArg(ToValue(lir, LInitElem::IdIndex));
     pushArg(objReg);
+    pushArg(ImmPtr(lir->mir()->resumePoint()->pc()));
 
     callVM(InitElemInfo, lir);
 }
