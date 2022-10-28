@@ -44,6 +44,3 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
         'WindowsJumpLists.jsm',
         'WindowsPreviewPerTab.jsm',
     ]
-
-if CONFIG['MOZILLA_OFFICIAL']:
-    DEFINES['MOZILLA_OFFICIAL'] = 1
