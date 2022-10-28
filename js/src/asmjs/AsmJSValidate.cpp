@@ -6460,6 +6460,9 @@ CheckFunction(ModuleValidator& m, LifoAlloc& lifo, AsmFunction** funcOut)
     }
 
     AsmFunction* asmFunc = lifo.new_<AsmFunction>(lifo);
+    if (!asmFunc)
+        return false;
+
     FunctionValidator f(m, *asmFunc, fn);
     if (!f.init())
         return false;
