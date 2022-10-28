@@ -16,11 +16,6 @@ JS_PREFERENCE_FILES += [
     'profile/arcticfox.js',
 ]
 
-if CONFIG['LIBXUL_SDK']:
-    PREF_JS_EXPORTS += [
-        'profile/channel-prefs.js',
-    ]
-
 SOURCES += [
     'nsBrowserApp.cpp',
 ]
