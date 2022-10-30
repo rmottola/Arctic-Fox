@@ -3040,6 +3040,7 @@ public:
                     const char* category) override;
 
     NS_IMETHOD GetStack(JS::MutableHandleValue) override;
+    NS_IMETHOD ToString(nsACString& aResult) override;
 
 private:
     virtual ~nsScriptErrorWithStack();
