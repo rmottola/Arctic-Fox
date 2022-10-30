@@ -2227,19 +2227,10 @@ IonBuilder::inlineSetDisjointTypedElements(CallInfo& callInfo)
     // Only attempt to optimize if |target| and |sourceTypedArray| are both
     // definitely typed arrays.  (The former always is.  The latter is not,
     // necessarily, because of wrappers.)
-
-    MDefinition* arrays[] = { target, sourceTypedArray };
-
-    for (MDefinition* def : arrays) {
-        TemporaryTypeSet* types = def->resultTypeSet();
-        if (!types)
-            return InliningStatus_NotInlined;
-
-        if (types->forAllClasses(constraints(), IsTypedArrayClass) !=
-            TemporaryTypeSet::ForAllResult::ALL_TRUE)
-        {
-            return InliningStatus_NotInlined;
-        }
+    if (!IsTypedArrayObject(constraints(), target) ||
+        !IsTypedArrayObject(constraints(), sourceTypedArray))
+    {
+        return InliningStatus_NotInlined;
     }
 
     auto sets = MSetDisjointTypedElements::New(alloc(), target, targetOffset, sourceTypedArray);
