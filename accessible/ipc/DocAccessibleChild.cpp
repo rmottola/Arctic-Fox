@@ -46,6 +46,10 @@ InterfacesFor(Accessible* aAcc)
   if (aAcc->IsDoc())
     interfaces |= Interfaces::DOCUMENT;
 
+  if (aAcc->IsSelect()) {
+    interfaces |= Interfaces::SELECTION;
+  }
+
   return interfaces;
 }
 
