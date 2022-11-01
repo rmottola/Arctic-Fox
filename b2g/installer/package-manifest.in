@@ -327,7 +327,6 @@
 @RESPATH@/components/plugin.xpt
 @RESPATH@/components/pref.xpt
 @RESPATH@/components/prefetch.xpt
-@RESPATH@/components/profile.xpt
 @RESPATH@/components/proxyObject.xpt
 @RESPATH@/components/rdf.xpt
 @RESPATH@/components/satchel.xpt
