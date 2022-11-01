@@ -391,9 +391,9 @@ getRangeExtentsCB(AtkText *aText, gint aStartOffset, gint aEndOffset,
   nsIntRect rect;
   uint32_t geckoCoordType;
   if (aCoords == ATK_XY_SCREEN) {
-      geckoCoordType = nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE;
+    geckoCoordType = nsIAccessibleCoordinateType::COORDTYPE_SCREEN_RELATIVE;
   } else {
-      geckoCoordType = nsIAccessibleCoordinateType::COORDTYPE_WINDOW_RELATIVE;
+    geckoCoordType = nsIAccessibleCoordinateType::COORDTYPE_WINDOW_RELATIVE;
   }
 
   AccessibleWrap* accWrap = GetAccessibleWrap(ATK_OBJECT(aText));
