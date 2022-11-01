@@ -4095,7 +4095,7 @@ CodeGenerator::generateBody()
         if (current->isTrivial())
             continue;
 
-#ifdef DEBUG
+#ifdef JS_JITSPEW
         const char* filename = nullptr;
         size_t lineNumber = 0;
         unsigned columnNumber = 0;
@@ -4105,8 +4105,10 @@ CodeGenerator::generateBody()
                 lineNumber = PCToLineNumber(current->mir()->info().script(), current->mir()->pc(),
                                             &columnNumber);
         } else {
+#ifdef DEBUG
             lineNumber = current->mir()->lineno();
             columnNumber = current->mir()->columnIndex();
+#endif
         }
         JitSpew(JitSpew_Codegen, "# block%" PRIuSIZE " %s:%" PRIuSIZE ":%u%s:",
                 i, filename ? filename : "?", lineNumber, columnNumber,
@@ -4127,7 +4129,7 @@ CodeGenerator::generateBody()
 #endif
 
         for (LInstructionIterator iter = current->begin(); iter != current->end(); iter++) {
-#ifdef DEBUG
+#ifdef JS_JITSPEW
             JitSpewStart(JitSpew_Codegen, "instruction %s", iter->opName());
             if (const char* extra = iter->extraName())
                 JitSpewCont(JitSpew_Codegen, ":%s", extra);
