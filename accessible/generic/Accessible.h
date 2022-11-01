@@ -623,6 +623,16 @@ public:
     MOZ_ASSERT(IsProxy());
     return mBits.proxy;
   }
+  uint32_t ProxyInterfaces() const
+  {
+    MOZ_ASSERT(IsProxy());
+    return mInt.mProxyInterfaces;
+  }
+  void SetProxyInterfaces(uint32_t aInterfaces)
+  {
+    MOZ_ASSERT(IsProxy());
+    mInt.mProxyInterfaces = aInterfaces;
+  }
 
   bool IsOuterDoc() const { return mType == eOuterDocType; }
   OuterDocAccessible* AsOuterDoc();
@@ -1143,7 +1153,11 @@ protected:
   friend class AutoTreeMutation;
 
   nsAutoPtr<mozilla::a11y::EmbeddedObjCollector> mEmbeddedObjCollector;
-  int32_t mIndexOfEmbeddedChild;
+  union {
+    int32_t mIndexOfEmbeddedChild;
+    uint32_t mProxyInterfaces;
+  } mInt;
+
   friend class EmbeddedObjCollector;
 
   union
