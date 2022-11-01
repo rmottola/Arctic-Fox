@@ -8225,8 +8225,15 @@ IonBuilder::testGlobalLexicalBinding(PropertyName* name)
         // In the case that it is found on the global but is non-configurable,
         // the binding cannot be shadowed by a global lexical binding.
         HeapTypeSetKey lexicalProperty = lexicalKey->property(id);
-        if (!obj->containsPure(name)) {
-            Shape* shape = script()->global().lookupPure(name);
+        Shape* shape = obj->lookupPure(name);
+        if (shape) {
+            if ((JSOp(*pc) != JSOP_GETGNAME && !shape->writable()) ||
+                obj->getSlot(shape->slot()).isMagic(JS_UNINITIALIZED_LEXICAL))
+            {
+                return nullptr;
+            }
+        } else {
+            shape = script()->global().lookupPure(name);
             if (!shape || shape->configurable())
                 MOZ_ALWAYS_FALSE(lexicalProperty.isOwnProperty(constraints()));
             obj = &script()->global();
