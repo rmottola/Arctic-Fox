@@ -1576,9 +1576,17 @@ class Mochitest(MochitestUtilsMixin):
         if dump_screen:
             self.dumpScreen(utilityPath)
 
-        try:
-            os.kill(processPID, signal.SIGABRT)
-        return
+        if mozinfo.info.get('crashreporter', True) and not debuggerInfo:
+            try:
+                minidump_path = os.path.join(self.profile.profile,
+                                             'minidumps')
+                mozcrash.kill_and_get_minidump(processPID, minidump_path)
+            except OSError:
+                # https://bugzilla.mozilla.org/show_bug.cgi?id=921509
+                self.log.info(
+                    "Can't trigger Breakpad, process no longer exists")
+            return
+        self.log.info("Can't trigger Breakpad, just killing process")
         killPid(processPID, self.log)
 
     def checkForZombies(self, processLog, utilityPath, debuggerInfo):
