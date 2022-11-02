@@ -2,11 +2,25 @@
 // application versions
 const PREF_SYSTEM_ADDON_SET = "extensions.systemAddonSet";
 
-const featureDir = gProfD.clone();
-featureDir.append("features");
+BootstrapMonitor.init();
 
-const distroDir = do_get_file("data/system_addons/app0");
-registerDirectory("XREAppDist", distroDir);
+const featureDir = FileUtils.getDir("ProfD", ["features"]);
+
+// Build the test sets
+var dir = FileUtils.getDir("ProfD", ["sysfeatures", "app1"], true);
+do_get_file("data/system_addons/system1_1.xpi").copyTo(dir, "system1@tests.mozilla.org.xpi");
+do_get_file("data/system_addons/system2_1.xpi").copyTo(dir, "system2@tests.mozilla.org.xpi");
+
+dir = FileUtils.getDir("ProfD", ["sysfeatures", "app2"], true);
+do_get_file("data/system_addons/system1_2.xpi").copyTo(dir, "system1@tests.mozilla.org.xpi");
+do_get_file("data/system_addons/system3_1.xpi").copyTo(dir, "system3@tests.mozilla.org.xpi");
+
+dir = FileUtils.getDir("ProfD", ["sysfeatures", "app3"], true);
+do_get_file("data/system_addons/system1_1_badcert.xpi").copyTo(dir, "system1@tests.mozilla.org.xpi");
+do_get_file("data/system_addons/system3_1.xpi").copyTo(dir, "system3@tests.mozilla.org.xpi");
+
+const distroDir = FileUtils.getDir("ProfD", ["sysfeatures", "app0"], true);
+registerDirectory("XREAppFeat", distroDir);
 
 createAppInfo("xpcshell@tests.mozilla.org", "XPCShell", "0");
 
@@ -17,14 +31,7 @@ function makeUUID() {
 }
 
 function* check_installed(inProfile, ...versions) {
-  let expectedDir;
-  if (inProfile) {
-    expectedDir = featureDir;
-  }
-  else {
-    expectedDir = distroDir.clone();
-    expectedDir.append("features");
-  }
+  let expectedDir = inProfile ? featureDir : distroDir;
 
   for (let i = 0; i < versions.length; i++) {
     let id = "system" + (i + 1) + "@tests.mozilla.org";
@@ -36,6 +43,9 @@ function* check_installed(inProfile, ...versions) {
       do_check_eq(addon.version, versions[i]);
       do_check_true(addon.isActive);
       do_check_false(addon.foreignInstall);
+      do_check_false(hasFlag(addon.permissions, AddonManager.PERM_CAN_UPGRADE));
+      do_check_false(hasFlag(addon.permissions, AddonManager.PERM_CAN_UNINSTALL));
+      do_check_true(addon.hidden);
 
       // Verify the add-ons file is in the right place
       let file = expectedDir.clone();
@@ -47,20 +57,29 @@ function* check_installed(inProfile, ...versions) {
       do_check_true(uri instanceof AM_Ci.nsIFileURL);
       do_check_eq(uri.file.path, file.path);
 
+      if (inProfile) {
+        do_check_eq(addon.signedState, AddonManager.SIGNEDSTATE_SYSTEM);
+      }
+
       // Verify the add-on actually started
-      let installed = Services.prefs.getCharPref("bootstraptest." + id + ".active_version");
-      do_check_eq(installed, versions[i]);
+      BootstrapMonitor.checkAddonStarted(id, versions[i]);
     }
     else {
-      // Add-on should not be installed
-      do_check_eq(addon, null);
+      if (inProfile) {
+        // Add-on should not be installed
+        do_check_eq(addon, null);
+      }
+      else {
+        // Either add-on should not be installed or it shouldn't be active
+        do_check_true(!addon || !addon.isActive);
+      }
 
-      try {
-        Services.prefs.getCharPref("bootstraptest." + id + ".active_version");
-        do_throw("Expected pref to be missing");
-      }
-      catch (e) {
-      }
+      BootstrapMonitor.checkAddonNotStarted(id);
+
+      if (addon)
+        BootstrapMonitor.checkAddonInstalled(id);
+      else
+        BootstrapMonitor.checkAddonNotInstalled(id);
     }
   }
 }
@@ -123,15 +142,15 @@ add_task(function* test_updated() {
   featureDir.append(dirname);
 
   // Copy in the system add-ons
-  let file = do_get_file("data/system_addons/app1/features/system2@tests.mozilla.org.xpi");
-  file.copyTo(featureDir, file.leafName);
-  file = do_get_file("data/system_addons/app2/features/system3@tests.mozilla.org.xpi");
-  file.copyTo(featureDir, file.leafName);
+  let file = do_get_file("data/system_addons/system2_1.xpi");
+  file.copyTo(featureDir, "system2@tests.mozilla.org.xpi");
+  file = do_get_file("data/system_addons/system3_1.xpi");
+  file.copyTo(featureDir, "system3@tests.mozilla.org.xpi");
 
   // Inject it into the system set
   let addonSet = {
     schema: 1,
-    directory: dirname,
+    directory: featureDir.leafName,
     addons: {
       "system2@tests.mozilla.org": {
         version: "1.0"
@@ -150,11 +169,32 @@ add_task(function* test_updated() {
   yield promiseShutdownManager();
 });
 
+// Entering safe mode should disable the updated system add-ons and use the
+// default system add-ons
+add_task(function* safe_mode_disabled() {
+  gAppInfo.inSafeMode = true;
+  startupManager(false);
+
+  yield check_installed(false, "1.0", "1.0", null);
+
+  yield promiseShutdownManager();
+});
+
+// Leaving safe mode should re-enable the updated system add-ons
+add_task(function* normal_mode_enabled() {
+  gAppInfo.inSafeMode = false;
+  startupManager(false);
+
+  yield check_installed(true, null, "1.0", "1.0");
+
+  yield promiseShutdownManager();
+});
+
 // An additional add-on in the directory should be ignored
 add_task(function* test_skips_additional() {
   // Copy in the system add-ons
-  let file = do_get_file("data/system_addons/app1/features/system1@tests.mozilla.org.xpi");
-  file.copyTo(featureDir, file.leafName);
+  let file = do_get_file("data/system_addons/system1_1.xpi");
+  file.copyTo(featureDir, "system1@tests.mozilla.org.xpi");
 
   startupManager(false);
 
@@ -167,6 +207,9 @@ add_task(function* test_skips_additional() {
 add_task(function* test_revert() {
   manuallyUninstall(featureDir, "system2@tests.mozilla.org");
 
+  // With the add-on physically gone from disk we won't see uninstall events
+  BootstrapMonitor.clear("system2@tests.mozilla.org");
+
   startupManager(false);
 
   // With system add-on 2 gone the updated set is now invalid so it reverts to
@@ -178,8 +221,8 @@ add_task(function* test_revert() {
 
 // Putting it back will make the set work again
 add_task(function* test_reuse() {
-  let file = do_get_file("data/system_addons/app1/features/system2@tests.mozilla.org.xpi");
-  file.copyTo(featureDir, file.leafName);
+  let file = do_get_file("data/system_addons/system2_1.xpi");
+  file.copyTo(featureDir, "system2@tests.mozilla.org.xpi");
 
   startupManager(false);
 
@@ -195,6 +238,52 @@ add_task(function* test_corrupt_pref() {
   startupManager(false);
 
   yield check_installed(false, "1.0", "1.0", null);
+
+  yield promiseShutdownManager();
+});
+
+// An add-on with a bad certificate should cause us to use the default set
+add_task(function* test_bad_profile_cert() {
+  let file = do_get_file("data/system_addons/system1_1_badcert.xpi");
+  file.copyTo(featureDir, "system1@tests.mozilla.org.xpi");
+
+  // Inject it into the system set
+  let addonSet = {
+    schema: 1,
+    directory: featureDir.leafName,
+    addons: {
+      "system1@tests.mozilla.org": {
+        version: "2.0"
+      },
+      "system2@tests.mozilla.org": {
+        version: "1.0"
+      },
+      "system3@tests.mozilla.org": {
+        version: "1.0"
+      },
+    }
+  };
+  Services.prefs.setCharPref(PREF_SYSTEM_ADDON_SET, JSON.stringify(addonSet));
+
+  startupManager(false);
+
+  yield check_installed(false, "1.0", "1.0", null);
+
+  yield promiseShutdownManager();
+});
+
+// Switching to app defaults that contain a bad certificate should still work
+add_task(function* test_bad_app_cert() {
+  gAppInfo.version = "3";
+  distroDir.leafName = "app3";
+  startupManager();
+
+  // Add-on will still be present
+  let addon = yield promiseAddonByID("system1@tests.mozilla.org");
+  do_check_neq(addon, null);
+  do_check_eq(addon.signedState, AddonManager.SIGNEDSTATE_BROKEN);
+
+  yield check_installed(false, "1.0", null, "1.0");
 
   yield promiseShutdownManager();
 });
