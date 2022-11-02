@@ -148,7 +148,7 @@
 #ifndef XP_UNIX
 @BINPATH@/@MOZ_APP_NAME@.exe
 #else
-@RESPATH@/@MOZ_APP_NAME@-bin
+@BINPATH@/@MOZ_APP_NAME@-bin
 @BINPATH@/@MOZ_APP_NAME@
 #endif
 @RESPATH@/application.ini
@@ -281,7 +281,6 @@
 @RESPATH@/components/jsdownloads.xpt
 @RESPATH@/components/jsinspector.xpt
 @RESPATH@/components/layout_base.xpt
-
 #ifdef NS_PRINTING
 @RESPATH@/components/layout_printing.xpt
 #endif
@@ -323,6 +322,9 @@
 @RESPATH@/components/plugin.xpt
 @RESPATH@/components/pref.xpt
 @RESPATH@/components/prefetch.xpt
+#ifdef MOZ_ENABLE_PROFILER_SPS
+@RESPATH@/components/profiler.xpt
+#endif
 @RESPATH@/components/rdf.xpt
 @RESPATH@/components/satchel.xpt
 @RESPATH@/components/saxparser.xpt
@@ -852,12 +854,12 @@ bin/libfreebl_32int64_3.so
 @BINPATH@/clang_rt.asan_dynamic-i386.dll
 #endif
 
-#ifdef MOZ_MULET
-#include ../../b2g/installer/package-manifest.in
-#endif
-
 ; gfx
 #ifdef XP_WIN
 @RESPATH@/components/GfxSanityTest.manifest
 @RESPATH@/components/SanityTest.js
+#endif
+
+#ifdef MOZ_MULET
+#include ../../b2g/installer/package-manifest.in
 #endif
