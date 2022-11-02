@@ -1988,9 +1988,7 @@ this.XPIStates = {
         delete oldState[location.name];
       }
 
-      for (let file of addons) {
-        let id = location.getIDForLocation(file);
-
+      for (let [id, file] of addons) {
         if (!(id in locState)) {
           logger.debug("New add-on ${id} in ${location}", {id: id, location: location.name});
           let xpiState = new XPIState({d: file.persistentDescriptor});
@@ -2966,9 +2964,9 @@ this.XPIProvider = {
         logger.debug("Processing install of " + id + " in " + aLocation.name);
         if (existingAddonID in this.bootstrappedAddons) {
           try {
-            var existingAddon = aLocation.getLocationForID(existingAddonID);
-            if (this.bootstrappedAddons[existingAddonID].descriptor ==
-                existingAddon.persistentDescriptor) {
+            var existingAddon = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+            existingAddon.persistentDescriptor = this.bootstrappedAddons[existingAddonID].descriptor;
+            if (existingAddon.exists()) {
               oldBootstrap = this.bootstrappedAddons[existingAddonID];
 
               // We'll be replacing a currently active bootstrapped add-on so
@@ -3125,7 +3123,7 @@ this.XPIProvider = {
 
       // Install the add-on
       try {
-        profileLocation.installAddon(id, entry, null, true);
+        addon._sourceBundle = profileLocation.installAddon(id, entry, null, true);
         logger.debug("Installed distribution add-on " + id);
 
         Services.prefs.setBoolPref(PREF_BRANCH_INSTALLED_ADDON + id, true)
@@ -4258,8 +4256,7 @@ this.XPIProvider = {
         XPIDatabase.updateAddonActive(aAddon, !isDisabled);
         if (isDisabled) {
           if (aAddon.bootstrap) {
-            let file = aAddon._installLocation.getLocationForID(aAddon.id);
-            this.callBootstrapMethod(aAddon, file, "shutdown",
+            this.callBootstrapMethod(aAddon, aAddon._sourceBundle, "shutdown",
                                      BOOTSTRAP_REASONS.ADDON_DISABLE);
             this.unloadBootstrapScope(aAddon.id);
           }
@@ -4267,8 +4264,7 @@ this.XPIProvider = {
         }
         else {
           if (aAddon.bootstrap) {
-            let file = aAddon._installLocation.getLocationForID(aAddon.id);
-            this.callBootstrapMethod(aAddon, file, "startup",
+            this.callBootstrapMethod(aAddon, aAddon._sourceBundle, "startup",
                                      BOOTSTRAP_REASONS.ADDON_ENABLE);
           }
           AddonManagerPrivate.callAddonListeners("onEnabled", wrapper);
@@ -4383,12 +4379,11 @@ this.XPIProvider = {
       }
 
       if (aAddon.bootstrap) {
-        let file = aAddon._installLocation.getLocationForID(aAddon.id);
-        XPIProvider.callBootstrapMethod(aAddon, file,
+        XPIProvider.callBootstrapMethod(aAddon, aAddon._sourceBundle,
                                         "install", BOOTSTRAP_REASONS.ADDON_INSTALL);
 
         if (aAddon.active) {
-          XPIProvider.callBootstrapMethod(aAddon, file,
+          XPIProvider.callBootstrapMethod(aAddon, aAddon._sourceBundle,
                                           "startup", BOOTSTRAP_REASONS.ADDON_INSTALL);
         }
         else {
@@ -4410,13 +4405,12 @@ this.XPIProvider = {
 
     if (!makePending) {
       if (aAddon.bootstrap) {
-        let file = aAddon._installLocation.getLocationForID(aAddon.id);
         if (aAddon.active) {
-          this.callBootstrapMethod(aAddon, file, "shutdown",
+          this.callBootstrapMethod(aAddon, aAddon._sourceBundle, "shutdown",
                                    BOOTSTRAP_REASONS.ADDON_UNINSTALL);
         }
 
-        this.callBootstrapMethod(aAddon, file, "uninstall",
+        this.callBootstrapMethod(aAddon, aAddon._sourceBundle, "uninstall",
                                  BOOTSTRAP_REASONS.ADDON_UNINSTALL);
         this.unloadBootstrapScope(aAddon.id);
         flushStartupCache();
@@ -5503,8 +5497,7 @@ AddonInstall.prototype = {
             reason = BOOTSTRAP_REASONS.ADDON_DOWNGRADE;
 
           if (this.existingAddon.bootstrap) {
-            let file = this.existingAddon._installLocation
-                           .getLocationForID(this.existingAddon.id);
+            let file = this.existingAddon._sourceBundle;
             if (this.existingAddon.active) {
               XPIProvider.callBootstrapMethod(this.existingAddon, file,
                                               "shutdown", reason,
@@ -6875,7 +6868,6 @@ function DirectoryInstallLocation(aName, aDirectory, aScope, aLocked) {
   this._directory = aDirectory;
   this._scope = aScope
   this._IDToFileMap = {};
-  this._FileToIDMap = {};
   this._linkedAddons = [];
   this._stagingDirLock = 0;
 
@@ -6891,7 +6883,6 @@ DirectoryInstallLocation.prototype = {
   _name       : "",
   _directory   : null,
   _IDToFileMap : null,  // mapping from add-on ID to nsIFile
-  _FileToIDMap : null,  // mapping from add-on path to add-on ID
 
   /**
    * Reads a directory linked to in a file.
@@ -6984,7 +6975,6 @@ DirectoryInstallLocation.prototype = {
       }
 
       this._IDToFileMap[id] = entry;
-      this._FileToIDMap[entry.path] = id;
       XPIProvider._addURIMapping(id, entry);
     }
   },
@@ -7007,9 +6997,9 @@ DirectoryInstallLocation.prototype = {
    * Gets an array of nsIFiles for add-ons installed in this location.
    */
   get addonLocations() {
-    let locations = [];
+    let locations = new Map();
     for (let id in this._IDToFileMap) {
-      locations.push(this._IDToFileMap[id].clone());
+      locations.set(id, this._IDToFileMap[id].clone());
     }
     return locations;
   },
@@ -7213,13 +7203,11 @@ DirectoryInstallLocation.prototype = {
     } catch (e)  {
       logger.warn("failed to set lastModifiedTime on " + newFile.path, e);
     }
-    this._FileToIDMap[newFile.path] = aId;
     this._IDToFileMap[aId] = newFile;
     XPIProvider._addURIMapping(aId, newFile);
 
     if (aExistingAddonID && aExistingAddonID != aId &&
         aExistingAddonID in this._IDToFileMap) {
-      delete this._FileToIDMap[this._IDToFileMap[aExistingAddonID]];
       delete this._IDToFileMap[aExistingAddonID];
     }
 
@@ -7250,7 +7238,6 @@ DirectoryInstallLocation.prototype = {
       logger.warn("Attempted to remove " + aId + " from " +
            this._name + " but it was already gone");
 
-      delete this._FileToIDMap[file.path];
       delete this._IDToFileMap[aId];
       return;
     }
@@ -7278,22 +7265,7 @@ DirectoryInstallLocation.prototype = {
       }
     }
 
-    delete this._FileToIDMap[file.path];
     delete this._IDToFileMap[aId];
-  },
-
-  /**
-   * Gets the ID of the add-on installed in the given nsIFile.
-   *
-   * @param  aFile
-   *         The nsIFile to look in
-   * @return the ID
-   * @throws if the file does not represent an installed add-on
-   */
-  getIDForLocation: function DirInstallLocation_getIDForLocation(aFile) {
-    if (aFile.path in this._FileToIDMap)
-      return this._FileToIDMap[aFile.path];
-    throw new Error("Unknown add-on location " + aFile.path);
   },
 
   /**
@@ -7341,7 +7313,6 @@ function WinRegInstallLocation(aName, aRootKey, aScope) {
   this._rootKey = aRootKey;
   this._scope = aScope;
   this._IDToFileMap = {};
-  this._FileToIDMap = {};
 
   let path = this._appKeyPath + "\\Extensions";
   let key = Cc["@mozilla.org/windows-registry-key;1"].
@@ -7365,7 +7336,6 @@ WinRegInstallLocation.prototype = {
   _rootKey    : null,
   _scope      : null,
   _IDToFileMap : null,  // mapping from ID to nsIFile
-  _FileToIDMap : null,  // mapping from path to ID
 
   /**
    * Retrieves the path of this Application's data key in the registry.
@@ -7409,7 +7379,6 @@ WinRegInstallLocation.prototype = {
       }
 
       this._IDToFileMap[id] = file;
-      this._FileToIDMap[file.path] = id;
       XPIProvider._addURIMapping(id, file);
     }
   },
@@ -7432,38 +7401,11 @@ WinRegInstallLocation.prototype = {
    * Gets an array of nsIFiles for add-ons installed in this location.
    */
   get addonLocations() {
-    let locations = [];
+    let locations = new Map();
     for (let id in this._IDToFileMap) {
-      locations.push(this._IDToFileMap[id].clone());
+      locations.set(id, this._IDToFileMap[id].clone());
     }
     return locations;
-  },
-
-  /**
-   * Gets the ID of the add-on installed in the given nsIFile.
-   *
-   * @param  aFile
-   *         The nsIFile to look in
-   * @return the ID
-   * @throws if the file does not represent an installed add-on
-   */
-  getIDForLocation: function RegInstallLocation_getIDForLocation(aFile) {
-    if (aFile.path in this._FileToIDMap)
-      return this._FileToIDMap[aFile.path];
-    throw new Error("Unknown add-on location");
-  },
-
-  /**
-   * Gets the nsIFile that the add-on with the given ID is installed in.
-   *
-   * @param  aId
-   *         The ID of the add-on
-   * @return the nsIFile
-   */
-  getLocationForID: function RegInstallLocation_getLocationForID(aId) {
-    if (aId in this._IDToFileMap)
-      return this._IDToFileMap[aId].clone();
-    throw new Error("Unknown add-on ID");
   },
 
   /**
