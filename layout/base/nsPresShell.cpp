@@ -8971,8 +8971,11 @@ PresShell::DoReflow(nsIFrame* target, bool aInterruptible)
     js::ProfileEntry::Category::GRAPHICS, "(%s)", docURL.get());
 
   nsDocShell* docShell = static_cast<nsDocShell*>(GetPresContext()->GetDocShell());
-  if (docShell) {
-    TimelineConsumers::AddMarkerForDocShell(docShell, "Reflow", MarkerTracingType::START);
+  RefPtr<TimelineConsumers> timelines = TimelineConsumers::Get();
+  bool isTimelineRecording = timelines && timelines->HasConsumer(docShell);
+
+  if (isTimelineRecording) {
+    timelines->AddMarkerForDocShell(docShell, "Reflow", MarkerTracingType::START);
   }
 
   if (mReflowContinueTimer) {
@@ -9149,9 +9152,10 @@ PresShell::DoReflow(nsIFrame* target, bool aInterruptible)
     tp->Accumulate();
   }
 
-  if (docShell) {
-    TimelineConsumers::AddMarkerForDocShell(docShell, "Reflow", MarkerTracingType::END);
+  if (isTimelineRecording) {
+    timelines->AddMarkerForDocShell(docShell, "Reflow", MarkerTracingType::END);
   }
+
   return !interrupted;
 }
 

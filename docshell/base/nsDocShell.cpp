@@ -840,7 +840,7 @@ nsDocShell::nsDocShell()
 
 nsDocShell::~nsDocShell()
 {
-  MOZ_ASSERT(!IsObserved());
+  MOZ_ASSERT(!mObserved);
 
   // Avoid notifying observers while we're in the dtor.
   mIsBeingDestroyed = true;
@@ -2842,14 +2842,25 @@ NS_IMETHODIMP
 nsDocShell::SetRecordProfileTimelineMarkers(bool aValue)
 {
   bool currentValue = nsIDocShell::GetRecordProfileTimelineMarkers();
-  if (currentValue != aValue) {
-    if (aValue) {
-      TimelineConsumers::AddConsumer(this);
-      UseEntryScriptProfiling();
-    } else {
-      TimelineConsumers::RemoveConsumer(this);
-      UnuseEntryScriptProfiling();
-    }
+  if (currentValue == aValue) {
+    return NS_OK;
+  }
+
+  RefPtr<TimelineConsumers> timelines = TimelineConsumers::Get();
+  if (!timelines) {
+    return NS_OK;
+  }
+
+  if (aValue) {
+    MOZ_ASSERT(!timelines->HasConsumer(this));
+    timelines->AddConsumer(this);
+    MOZ_ASSERT(timelines->HasConsumer(this));
+    UseEntryScriptProfiling();
+  } else {
+    MOZ_ASSERT(timelines->HasConsumer(this));
+    timelines->RemoveConsumer(this);
+    MOZ_ASSERT(!timelines->HasConsumer(this));
+    UnuseEntryScriptProfiling();
   }
 
   return NS_OK;
@@ -2858,7 +2869,7 @@ nsDocShell::SetRecordProfileTimelineMarkers(bool aValue)
 NS_IMETHODIMP
 nsDocShell::GetRecordProfileTimelineMarkers(bool* aValue)
 {
-  *aValue = IsObserved();
+  *aValue = !!mObserved;
   return NS_OK;
 }
 
@@ -2870,7 +2881,7 @@ nsDocShell::PopProfileTimelineMarkers(
   nsTArray<dom::ProfileTimelineMarker> store;
   SequenceRooter<dom::ProfileTimelineMarker> rooter(aCx, &store);
 
-  if (IsObserved()) {
+  if (mObserved) {
     mObserved->PopMarkers(aCx, store);
   }
 
@@ -13944,26 +13955,30 @@ nsDocShell::NotifyJSRunToCompletionStart(const char* aReason,
                                          const char16_t* aFilename,
                                          const uint32_t aLineNumber)
 {
-  bool timelineOn = nsIDocShell::GetRecordProfileTimelineMarkers();
-
   // If first start, mark interval start.
-  if (timelineOn && mJSRunToCompletionDepth == 0) {
-    UniquePtr<TimelineMarker> marker = MakeUnique<JavascriptTimelineMarker>(
-      aReason, aFunctionName, aFilename, aLineNumber, MarkerTracingType::START);
-    TimelineConsumers::AddMarkerForDocShell(this, Move(marker));
+  if (mJSRunToCompletionDepth == 0) {
+    RefPtr<TimelineConsumers> timelines = TimelineConsumers::Get();
+    if (timelines && timelines->HasConsumer(this)) {
+      timelines->AddMarkerForDocShell(this, Move(
+        MakeUnique<JavascriptTimelineMarker>(
+          aReason, aFunctionName, aFilename, aLineNumber, MarkerTracingType::START)));
+    }
   }
+
   mJSRunToCompletionDepth++;
 }
 
 void
 nsDocShell::NotifyJSRunToCompletionStop()
 {
-  bool timelineOn = nsIDocShell::GetRecordProfileTimelineMarkers();
+  mJSRunToCompletionDepth--;
 
   // If last stop, mark interval end.
-  mJSRunToCompletionDepth--;
-  if (timelineOn && mJSRunToCompletionDepth == 0) {
-    TimelineConsumers::AddMarkerForDocShell(this, "Javascript", MarkerTracingType::END);
+  if (mJSRunToCompletionDepth == 0) {
+    RefPtr<TimelineConsumers> timelines = TimelineConsumers::Get();
+    if (timelines && timelines->HasConsumer(this)) {
+      timelines->AddMarkerForDocShell(this, "Javascript", MarkerTracingType::END);
+    }
   }
 }
 
