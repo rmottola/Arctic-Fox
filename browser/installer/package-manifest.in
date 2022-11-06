@@ -148,7 +148,7 @@
 #ifndef XP_UNIX
 @BINPATH@/@MOZ_APP_NAME@.exe
 #else
-@BINPATH@/@MOZ_APP_NAME@-bin
+@RESPATH@/@MOZ_APP_NAME@-bin
 @BINPATH@/@MOZ_APP_NAME@
 #endif
 @RESPATH@/application.ini
