@@ -677,7 +677,7 @@ toolbar[mode="full"] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 }
 
 #new-window-button {
-  -moz-image-region: rect(0px 120px 24px 96px);
+  -moz-image-region: rect(0px 342px 18px 324px);
 }
 
 #cut-button {
@@ -714,7 +714,7 @@ toolbar[mode="full"] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 }
 
 #sync-button {
-  -moz-image-region: rect(0px 144px 24px 120px);
+  -moz-image-region: rect(0px 270px 18px 252px);
 }
 #sync-button[status="active"] {
   list-style-image: url("chrome://browser/skin/sync-24-throbber.png");
@@ -722,7 +722,7 @@ toolbar[mode="full"] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 }
 
 #feed-button {
-  -moz-image-region: rect(0px 168px 24px 144px);
+  -moz-image-region: rect(0px 288px 18px 270px);
 }
 
 #feed-button[disabled] > .toolbarbutton-icon {
