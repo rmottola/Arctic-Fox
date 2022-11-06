@@ -13953,7 +13953,9 @@ void
 nsDocShell::NotifyJSRunToCompletionStart(const char* aReason,
                                          const char16_t* aFunctionName,
                                          const char16_t* aFilename,
-                                         const uint32_t aLineNumber)
+                                         const uint32_t aLineNumber,
+                                         JS::Handle<JS::Value> aAsyncStack,
+                                         JS::Handle<JS::Value> aAsyncCause)
 {
   // If first start, mark interval start.
   if (mJSRunToCompletionDepth == 0) {
@@ -13961,7 +13963,8 @@ nsDocShell::NotifyJSRunToCompletionStart(const char* aReason,
     if (timelines && timelines->HasConsumer(this)) {
       timelines->AddMarkerForDocShell(this, Move(
         MakeUnique<JavascriptTimelineMarker>(
-          aReason, aFunctionName, aFilename, aLineNumber, MarkerTracingType::START)));
+          aReason, aFunctionName, aFilename, aLineNumber, MarkerTracingType::START,
+          aAsyncStack, aAsyncCause)));
     }
   }
 
