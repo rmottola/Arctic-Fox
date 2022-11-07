@@ -885,9 +885,6 @@ AccessibleWrap::accSelect(
     if (flagsSelect & SELFLAG_REMOVESELECTION)
       xpAccessible->SetSelected(false);
 
-    if (flagsSelect & SELFLAG_EXTENDSELECTION)
-      xpAccessible->ExtendSelection();
-
     return S_OK;
   }
 
