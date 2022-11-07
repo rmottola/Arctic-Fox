@@ -1607,8 +1607,6 @@ InsertEntry(mozIStorageConnection* aConn, CacheId aCacheId,
       "response_body_id, "
       "response_security_info_id, "
       "response_principal_info, "
-      "response_redirected, "
-      "response_redirected_url, "
       "cache_id "
     ") VALUES ("
       ":request_method, "
@@ -1632,8 +1630,6 @@ InsertEntry(mozIStorageConnection* aConn, CacheId aCacheId,
       ":response_body_id, "
       ":response_security_info_id, "
       ":response_principal_info, "
-      ":response_redirected, "
-      ":response_redirected_url, "
       ":cache_id "
     ");"
   ), getter_AddRefs(state));
@@ -1748,14 +1744,6 @@ InsertEntry(mozIStorageConnection* aConn, CacheId aCacheId,
                                    serializedInfo);
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
-  rv = state->BindInt32ByName(NS_LITERAL_CSTRING("response_redirected"),
-                              aResponse.channelInfo().redirected() ? 1 : 0);
-  if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
-
-  rv = state->BindUTF8StringByName(NS_LITERAL_CSTRING("response_redirected_url"),
-                                   aResponse.channelInfo().redirectedURI());
-  if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
-
   rv = state->BindInt64ByName(NS_LITERAL_CSTRING("cache_id"), aCacheId);
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
@@ -1848,8 +1836,6 @@ ReadResponse(mozIStorageConnection* aConn, EntryId aEntryId,
       "entries.response_headers_guard, "
       "entries.response_body_id, "
       "entries.response_principal_info, "
-      "entries.response_redirected, "
-      "entries.response_redirected_url, "
       "security_info.data "
     "FROM entries "
     "LEFT OUTER JOIN security_info "
@@ -1914,14 +1900,7 @@ ReadResponse(mozIStorageConnection* aConn, EntryId aEntryId,
       mozilla::ipc::ContentPrincipalInfo(attrs, originNoSuffix);
   }
 
-  int32_t redirected;
-  rv = state->GetInt32(7, &redirected);
-  aSavedResponseOut->mValue.channelInfo().redirected() = !!redirected;
-
-  rv = state->GetUTF8String(8, aSavedResponseOut->mValue.channelInfo().redirectedURI());
-  if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
-
-  rv = state->GetBlobAsUTF8String(9, aSavedResponseOut->mValue.channelInfo().securityInfo());
+  rv = state->GetBlobAsUTF8String(7, aSavedResponseOut->mValue.channelInfo().securityInfo());
   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
 
   rv = aConn->CreateStatement(NS_LITERAL_CSTRING(
