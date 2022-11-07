@@ -30,20 +30,20 @@ AccessibleWrap::~AccessibleWrap()
 {
 }
 
-mozAccessible* 
+mozAccessible*
 AccessibleWrap::GetNativeObject()
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
-  
+
   if (!mNativeInited && !mNativeObject && !IsDefunct() && !AncestorIsFlat()) {
     uintptr_t accWrap = reinterpret_cast<uintptr_t>(this);
     mNativeObject = [[GetNativeType() alloc] initWithAccessible:accWrap];
   }
-  
+
   mNativeInited = true;
-  
+
   return mNativeObject;
-  
+
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
 }
 
@@ -263,7 +263,7 @@ a11y::FireNativeEvent(mozAccessible* aNativeAcc, uint32_t aEventType)
 }
 
 Class
-a11y::GetTypeFromRole(roles::Role aRole) 
+a11y::GetTypeFromRole(roles::Role aRole)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
@@ -275,13 +275,13 @@ a11y::GetTypeFromRole(roles::Role aRole)
     {
         return [mozButtonAccessible class];
     }
-    
+
     case roles::PAGETAB:
       return [mozButtonAccessible class];
 
     case roles::CHECKBUTTON:
       return [mozCheckboxAccessible class];
-      
+
     case roles::HEADING:
       return [mozHeadingAccessible class];
 
@@ -301,11 +301,11 @@ a11y::GetTypeFromRole(roles::Role aRole)
 
     case roles::LINK:
       return [mozLinkAccessible class];
-      
+
     default:
       return [mozAccessible class];
   }
-  
+
   return nil;
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
