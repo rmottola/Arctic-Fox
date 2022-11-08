@@ -43,6 +43,7 @@ namespace dom {
 class ContentParent;
 class PBrowserParent;
 class TabParent;
+class MutableTabContext;
 } // namespace dom
 
 namespace ipc {
@@ -317,6 +318,8 @@ private:
   void ResetPermissionManagerStatus();
 
   void InitializeBrowserAPI();
+
+  nsresult GetNewTabContext(mozilla::dom::MutableTabContext* aTabContext);
 
   enum TabParentChange {
     eTabParentRemoved,
