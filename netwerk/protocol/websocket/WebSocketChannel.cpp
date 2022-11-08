@@ -3135,6 +3135,7 @@ WebSocketChannel::GetSecurityInfo(nsISupports **aSecurityInfo)
 NS_IMETHODIMP
 WebSocketChannel::AsyncOpen(nsIURI *aURI,
                             const nsACString &aOrigin,
+                            uint64_t aInnerWindowID,
                             nsIWebSocketListener *aListener,
                             nsISupports *aContext)
 {
@@ -3241,6 +3242,7 @@ WebSocketChannel::AsyncOpen(nsIURI *aURI,
   mURI = mOriginalURI;
   mURI->GetHostPort(mHost);
   mOrigin = aOrigin;
+  mInnerWindowID = aInnerWindowID;
 
   nsCOMPtr<nsIURI> localURI;
   nsCOMPtr<nsIChannel> localChannel;
