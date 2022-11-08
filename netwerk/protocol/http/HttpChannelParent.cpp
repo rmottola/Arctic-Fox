@@ -1027,7 +1027,7 @@ NS_IMETHODIMP
 HttpChannelParent::OnStartSignedPackageRequest(const nsACString& aPackageId)
 {
   if (mTabParent) {
-    mTabParent->OnStartSignedPackageRequest(mChannel);
+    mTabParent->OnStartSignedPackageRequest(mChannel, aPackageId);
   }
   return NS_OK;
 }
