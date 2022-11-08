@@ -5145,9 +5145,9 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
             + self.invokeRecvHandler(md, implicit=0)
             + [ Whitespace.NL ]
             + saveIdStmts
-            + self.dtorEpilogue(md, md.actorDecl().var())
-            + [ Whitespace.NL ]
             + self.makeReply(md, errfnRecv, routingId=idvar)
+            + [ Whitespace.NL ]
+            + self.dtorEpilogue(md, md.actorDecl().var())
             + [ Whitespace.NL,
                 StmtReturn(_Result.Processed) ])
 
