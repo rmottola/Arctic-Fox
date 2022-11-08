@@ -626,17 +626,22 @@ NotificationPermissionRequest::GetTypes(nsIArray** aTypes)
                                                          aTypes);
 }
 
-class NotificationObserver : public nsIObserver
+// Observer that the alert service calls to do common tasks and/or dispatch to the
+// specific observer for the context e.g. main thread, worker, or service worker.
+class NotificationObserver final : public nsIObserver
 {
 public:
-  UniquePtr<NotificationRef> mNotificationRef;
+  nsCOMPtr<nsIObserver> mObserver;
+  nsCOMPtr<nsIPrincipal> mPrincipal;
   NS_DECL_ISUPPORTS
   NS_DECL_NSIOBSERVER
 
-  explicit NotificationObserver(UniquePtr<NotificationRef> aRef)
-    : mNotificationRef(Move(aRef))
+  NotificationObserver(nsIObserver* aObserver, nsIPrincipal* aPrincipal)
+    : mObserver(aObserver), mPrincipal(aPrincipal)
   {
     AssertIsOnMainThread();
+    MOZ_ASSERT(mObserver);
+    MOZ_ASSERT(mPrincipal);
   }
 
 protected:
@@ -647,6 +652,28 @@ protected:
 };
 
 NS_IMPL_ISUPPORTS(NotificationObserver, nsIObserver)
+
+class MainThreadNotificationObserver : public nsIObserver
+{
+public:
+  UniquePtr<NotificationRef> mNotificationRef;
+  NS_DECL_ISUPPORTS
+  NS_DECL_NSIOBSERVER
+
+  explicit MainThreadNotificationObserver(UniquePtr<NotificationRef> aRef)
+    : mNotificationRef(Move(aRef))
+  {
+    AssertIsOnMainThread();
+  }
+
+protected:
+  virtual ~MainThreadNotificationObserver()
+  {
+    AssertIsOnMainThread();
+  }
+};
+
+NS_IMPL_ISUPPORTS(MainThreadNotificationObserver, nsIObserver)
 
 NS_IMETHODIMP
 NotificationTask::Run()
@@ -949,14 +976,14 @@ Notification::GetPrincipal()
   }
 }
 
-class WorkerNotificationObserver final : public NotificationObserver
+class WorkerNotificationObserver final : public MainThreadNotificationObserver
 {
 public:
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_NSIOBSERVER
 
   explicit WorkerNotificationObserver(UniquePtr<NotificationRef> aRef)
-    : NotificationObserver(Move(aRef))
+    : MainThreadNotificationObserver(Move(aRef))
   {
     AssertIsOnMainThread();
     MOZ_ASSERT(mNotificationRef->GetNotification()->mWorkerPrivate);
@@ -1016,7 +1043,7 @@ protected:
   }
 };
 
-NS_IMPL_ISUPPORTS_INHERITED0(WorkerNotificationObserver, NotificationObserver)
+NS_IMPL_ISUPPORTS_INHERITED0(WorkerNotificationObserver, MainThreadNotificationObserver)
 
 class ServiceWorkerNotificationObserver final : public nsIObserver
 {
@@ -1122,6 +1149,25 @@ public:
 NS_IMETHODIMP
 NotificationObserver::Observe(nsISupports* aSubject, const char* aTopic,
                               const char16_t* aData)
+{
+  AssertIsOnMainThread();
+
+  if (!strcmp("alertdisablecallback", aTopic)) {
+    nsCOMPtr<nsIPermissionManager> permissionManager =
+      mozilla::services::GetPermissionManager();
+    if (!permissionManager) {
+      return NS_ERROR_FAILURE;
+    }
+    permissionManager->RemoveFromPrincipal(mPrincipal, "desktop-notification");
+    return NS_OK;
+  }
+
+  return mObserver->Observe(aSubject, aTopic, aData);
+}
+
+NS_IMETHODIMP
+MainThreadNotificationObserver::Observe(nsISupports* aSubject, const char* aTopic,
+                                        const char16_t* aData)
 {
   AssertIsOnMainThread();
   MOZ_ASSERT(mNotificationRef);
@@ -1374,16 +1420,19 @@ Notification::ShowInternal()
       mObserver = new WorkerNotificationObserver(Move(ownership));
       observer = mObserver;
     } else {
-      observer = new NotificationObserver(Move(ownership));
+      observer = new MainThreadNotificationObserver(Move(ownership));
     }
   } else {
     // This observer does not care about the Notification. It will be released
     // at the end of this function.
     //
-    // The observer is wholly owned by the alerts service.
+    // The observer is wholly owned by the NotificationObserver passed to the alert service.
     observer = new ServiceWorkerNotificationObserver(mScope, GetPrincipal(), mID);
   }
   MOZ_ASSERT(observer);
+  nsCOMPtr<nsIObserver> alertObserver = new NotificationObserver(observer,
+                                                                 GetPrincipal());
+
 
 #ifdef MOZ_B2G
   nsCOMPtr<nsIAppNotificationService> appNotifier =
@@ -1422,7 +1471,7 @@ Notification::ShowInternal()
         }
 
         appNotifier->ShowAppNotification(iconUrl, mTitle, mBody,
-                                         observer, val);
+                                         alertObserver, val);
         return;
       }
     }
@@ -1453,7 +1502,7 @@ Notification::ShowInternal()
   nsAutoString alertName;
   GetAlertName(alertName);
   alertService->ShowAlertNotification(iconUrl, mTitle, mBody, true,
-                                      uniqueCookie, observer, alertName,
+                                      uniqueCookie, alertObserver, alertName,
                                       DirectionToString(mDir), mLang,
                                       mDataAsBase64, GetPrincipal(),
                                       inPrivateBrowsing);
