@@ -3544,6 +3544,24 @@ nsHTMLDocument::QueryCommandSupported(const nsAString & commandID,
 bool
 nsHTMLDocument::QueryCommandSupported(const nsAString& commandID)
 {
+  // Gecko technically supports all the clipboard commands including
+  // cut/copy/paste, but non-privileged content will be unable to call
+  // paste, and depending on the pref "dom.allow_cut_copy", cut and copy
+  // may also be disallowed to be called from non-privileged content.
+  // For that reason, we report the support status of corresponding
+  // command accordingly.
+  if (!nsContentUtils::IsCallerChrome()) {
+    if (commandID.LowerCaseEqualsLiteral("paste")) {
+      return false;
+    }
+    if (nsContentUtils::IsCutCopyRestricted()) {
+      if (commandID.LowerCaseEqualsLiteral("cut") ||
+          commandID.LowerCaseEqualsLiteral("copy")) {
+        return false;
+      }
+    }
+  }
+
   // commandID is supported if it can be converted to a Midas command
   nsAutoCString cmdToDispatch;
   return ConvertToMidasInternalCommand(commandID, cmdToDispatch);
