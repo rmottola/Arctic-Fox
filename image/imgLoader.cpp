@@ -1363,7 +1363,9 @@ imgLoader::ClearCache(bool chrome)
 }
 
 NS_IMETHODIMP
-imgLoader::FindEntryProperties(nsIURI* uri, nsIProperties** _retval)
+imgLoader::FindEntryProperties(nsIURI* uri,
+                               nsIDOMDocument* doc,
+                               nsIProperties** _retval)
 {
   *_retval = nullptr;
 
