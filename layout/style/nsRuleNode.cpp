@@ -9372,6 +9372,8 @@ nsRuleNode::GetStyleData(nsStyleStructID aSID,
                "if we ever call this on rule nodes that aren't used "
                "directly, we should adjust handling of mDependentBits "
                "in some way.");
+  MOZ_ASSERT(!aContext->GetCachedStyleData(aSID),
+             "style context should not have cached data for struct");
 
   const void *data;
 
@@ -9844,3 +9846,12 @@ nsRuleNode::ParentHasPseudoElementData(nsStyleContext* aContext)
   nsStyleContext* parent = aContext->GetParent();
   return parent && parent->HasPseudoElementData();
 }
+
+#ifdef DEBUG
+bool
+nsRuleNode::ContextHasCachedData(nsStyleContext* aContext,
+                                 nsStyleStructID aSID)
+{
+  return !!aContext->GetCachedStyleData(aSID);
+}
+#endif
