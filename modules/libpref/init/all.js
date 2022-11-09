@@ -2695,6 +2695,13 @@ pref("layout.css.scroll-behavior.damping-ratio", "1.0");
 // fixed, as we don't want to expose more indexed properties on the Web.
 pref("layout.css.font-loading-api.enabled", false);
 
+// Should stray control characters be rendered visibly?
+#ifdef RELEASE_BUILD
+pref("layout.css.control-characters.visible", false);
+#else
+pref("layout.css.control-characters.visible", true);
+#endif
+
 // pref for which side vertical scrollbars should be on
 // 0 = end-side in UI direction
 // 1 = end-side in document/content direction
