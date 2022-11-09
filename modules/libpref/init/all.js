@@ -4397,9 +4397,6 @@ pref("canvas.image.cache.limit", 0);
 // toDataURL() and getImageData()
 pref("canvas.poisondata", false);
 
-// How many images to eagerly decode on a given page. 0 means "no limit".
-pref("image.onload.decode.limit", 0);
-
 // WebGL prefs
 #ifdef ANDROID
 // Disable MSAA on mobile.
