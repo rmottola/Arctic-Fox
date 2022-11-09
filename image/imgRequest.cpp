@@ -500,7 +500,7 @@ imgRequest::RemoveFromCache()
     if (mCacheEntry) {
       mLoader->RemoveFromCache(mCacheEntry);
     } else {
-      mLoader->RemoveFromCache(ImageCacheKey(mURI));
+      mLoader->RemoveFromCache(mCacheKey);
     }
   }
 
