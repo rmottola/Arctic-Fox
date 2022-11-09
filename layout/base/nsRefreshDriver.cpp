@@ -1499,44 +1499,32 @@ nsRefreshDriver::DispatchPendingEvents()
   }
 }
 
-namespace {
-  enum class AnimationEventType {
-    CSSAnimations,
-    CSSTransitions
-  };
-
-  struct DispatchAnimationEventParams {
-    AnimationEventType mEventType;
-    nsRefreshDriver* mRefreshDriver;
-  };
-}
-
 static bool
 DispatchAnimationEventsOnSubDocuments(nsIDocument* aDocument,
-                                      void* aParams)
+                                      void* aRefreshDriver)
 {
-  MOZ_ASSERT(aParams, "Animation event parameters should be set");
-  auto params = static_cast<DispatchAnimationEventParams*>(aParams);
-
   nsIPresShell* shell = aDocument->GetShell();
   if (!shell) {
     return true;
   }
 
   nsPresContext* context = shell->GetPresContext();
-  if (!context || context->RefreshDriver() != params->mRefreshDriver) {
+  if (!context || context->RefreshDriver() != aRefreshDriver) {
     return true;
   }
 
   nsCOMPtr<nsIDocument> kungFuDeathGrip(aDocument);
 
-  if (params->mEventType == AnimationEventType::CSSAnimations) {
-    context->AnimationManager()->DispatchEvents();
-  } else {
-    context->TransitionManager()->DispatchEvents();
-  }
+  context->TransitionManager()->SortEvents();
+  context->AnimationManager()->SortEvents();
+
+  // Dispatch transition events first since transitions conceptually sit
+  // below animations in terms of compositing order.
+  context->TransitionManager()->DispatchEvents();
+  context->AnimationManager()->DispatchEvents();
+
   aDocument->EnumerateSubDocuments(DispatchAnimationEventsOnSubDocuments,
-                                   aParams);
+                                   aRefreshDriver);
 
   return true;
 }
@@ -1548,19 +1536,7 @@ nsRefreshDriver::DispatchAnimationEvents()
     return;
   }
 
-  nsIDocument* doc = mPresContext->Document();
-
-  // Dispatch transition events first since transitions conceptually sit
-  // below animations in terms of compositing order.
-  DispatchAnimationEventParams params { AnimationEventType::CSSTransitions,
-                                        this };
-  DispatchAnimationEventsOnSubDocuments(doc, &params);
-  if (!mPresContext) {
-    return;
-  }
-
-  params.mEventType = AnimationEventType::CSSAnimations;
-  DispatchAnimationEventsOnSubDocuments(doc, &params);
+  DispatchAnimationEventsOnSubDocuments(mPresContext->Document(), this);
 }
 
 void
