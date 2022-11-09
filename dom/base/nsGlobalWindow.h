@@ -1889,15 +1889,15 @@ public:
 
   static already_AddRefed<nsGlobalChromeWindow> Create(nsGlobalWindow *aOuterWindow);
 
-  static PLDHashOperator
-  DisconnectGroupMessageManager(const nsAString& aKey,
-                                nsIMessageBroadcaster* aMM,
-                                void* aUserArg)
+  void DisconnectAndClearGroupMessageManagers()
   {
-    if (aMM) {
-      static_cast<nsFrameMessageManager*>(aMM)->Disconnect();
+    for (auto iter = mGroupMessageManagers.Iter(); !iter.Done(); iter.Next()) {
+      nsIMessageBroadcaster* mm = iter.UserData();
+      if (mm) {
+        static_cast<nsFrameMessageManager*>(mm)->Disconnect();
+      }
     }
-    return PL_DHASH_NEXT;
+    mGroupMessageManagers.Clear();
   }
 
 protected:
@@ -1914,8 +1914,7 @@ protected:
     MOZ_ASSERT(mCleanMessageManager,
                "chrome windows may always disconnect the msg manager");
 
-    mGroupMessageManagers.EnumerateRead(DisconnectGroupMessageManager, nullptr);
-    mGroupMessageManagers.Clear();
+    DisconnectAndClearGroupMessageManagers();
 
     if (mMessageManager) {
       static_cast<nsFrameMessageManager *>(
