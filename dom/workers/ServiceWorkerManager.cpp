@@ -3067,7 +3067,6 @@ bool
 ServiceWorkerManager::IsControlled(nsIDocument* aDoc, ErrorResult& aRv)
 {
   MOZ_ASSERT(aDoc);
-  MOZ_ASSERT(!nsContentUtils::IsInPrivateBrowsing(aDoc));
 
   RefPtr<ServiceWorkerRegistrationInfo> registration;
   nsresult rv = GetDocumentRegistration(aDoc, getter_AddRefs(registration));
@@ -3077,6 +3076,7 @@ ServiceWorkerManager::IsControlled(nsIDocument* aDoc, ErrorResult& aRv)
     return false;
   }
 
+  MOZ_ASSERT_IF(!!registration, !nsContentUtils::IsInPrivateBrowsing(aDoc));
   return !!registration;
 }
 
