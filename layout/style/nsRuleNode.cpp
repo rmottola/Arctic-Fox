@@ -4851,8 +4851,9 @@ CountTransitionProps(const TransitionPropInfo* aInfo,
   return numTransitions;
 }
 
-static void
-ComputeTimingFunction(const nsCSSValue& aValue, nsTimingFunction& aResult)
+/* static */ void
+nsRuleNode::ComputeTimingFunction(const nsCSSValue& aValue,
+                                  nsTimingFunction& aResult)
 {
   switch (aValue.GetUnit()) {
     case eCSSUnit_Enumerated:
