@@ -240,8 +240,6 @@ public:
     aPseudoType = mPseudoType;
   }
 
-  void SetParentTime(Nullable<TimeDuration> aParentTime);
-
   const AnimationTiming& Timing() const {
     return mTiming;
   }
@@ -250,11 +248,7 @@ public:
   }
   void SetTiming(const AnimationTiming& aTiming);
 
-  Nullable<TimeDuration> GetLocalTime() const {
-    // Since the *animation* start time is currently always zero, the local
-    // time is equal to the parent time.
-    return mParentTime;
-  }
+  Nullable<TimeDuration> GetLocalTime() const;
 
   // This function takes as input the timing parameters of an animation and
   // returns the computed timing at the specified local time.
@@ -316,7 +310,6 @@ protected:
 
   nsCOMPtr<Element> mTarget;
   RefPtr<Animation> mAnimation;
-  Nullable<TimeDuration> mParentTime;
 
   AnimationTiming mTiming;
   nsCSSPseudoElements::Type mPseudoType;
