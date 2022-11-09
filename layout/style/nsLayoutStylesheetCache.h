@@ -44,7 +44,6 @@ class nsLayoutStylesheetCache final
   static mozilla::CSSStyleSheet* MinimalXULSheet();
   static mozilla::CSSStyleSheet* XULSheet();
   static mozilla::CSSStyleSheet* QuirkSheet();
-  static mozilla::CSSStyleSheet* FullScreenOverrideSheet();
   static mozilla::CSSStyleSheet* SVGSheet();
   static mozilla::CSSStyleSheet* MathMLSheet();
   static mozilla::CSSStyleSheet* CounterStylesSheet();
@@ -92,7 +91,6 @@ private:
   RefPtr<mozilla::CSSStyleSheet> mCounterStylesSheet;
   RefPtr<mozilla::CSSStyleSheet> mDesignModeSheet;
   RefPtr<mozilla::CSSStyleSheet> mFormsSheet;
-  RefPtr<mozilla::CSSStyleSheet> mFullScreenOverrideSheet;
   RefPtr<mozilla::CSSStyleSheet> mHTMLSheet;
   RefPtr<mozilla::CSSStyleSheet> mMathMLSheet;
   RefPtr<mozilla::CSSStyleSheet> mMinimalXULSheet;
