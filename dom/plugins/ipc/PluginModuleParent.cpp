@@ -361,7 +361,7 @@ PRCList PluginModuleMapping::sModuleListHead =
 
 bool PluginModuleMapping::sIsLoadModuleOnStack = false;
 
-} // anonymous namespace
+} // namespace
 
 void
 mozilla::plugins::TerminatePlugin(uint32_t aPluginId,
