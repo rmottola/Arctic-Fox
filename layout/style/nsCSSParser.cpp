@@ -1190,6 +1190,9 @@ protected:
     eGradient_Repeating    = 1 << 0, // repeating-{linear|radial}-gradient
     eGradient_MozLegacy    = 1 << 1, // -moz-{linear|radial}-gradient
     eGradient_WebkitLegacy = 1 << 2, // -webkit-{linear|radial}-gradient
+
+    // Mask to catch both "legacy" flags:
+    eGradient_AnyLegacy = eGradient_MozLegacy | eGradient_WebkitLegacy
   };
   bool ParseLinearGradient(nsCSSValue& aValue, uint8_t aFlags);
   bool ParseRadialGradient(nsCSSValue& aValue, uint8_t aFlags);
@@ -9526,7 +9529,7 @@ CSSParserImpl::ParseRadialGradient(nsCSSValue& aValue,
 
   bool haveSize =
     ParseSingleTokenVariant(cssGradient->GetRadialSize(), VARIANT_KEYWORD,
-                            (aFlags & eGradient_MozLegacy) ?
+                            (aFlags & eGradient_AnyLegacy) ?
                             nsCSSProps::kRadialGradientLegacySizeKTable :
                             nsCSSProps::kRadialGradientSizeKTable);
   if (haveSize) {
@@ -9536,7 +9539,7 @@ CSSParserImpl::ParseRadialGradient(nsCSSValue& aValue,
         ParseSingleTokenVariant(cssGradient->GetRadialShape(), VARIANT_KEYWORD,
                                 nsCSSProps::kRadialGradientShapeKTable);
     }
-  } else if (!(aFlags & eGradient_MozLegacy)) {
+  } else if (!(aFlags & eGradient_AnyLegacy)) {
     // Save RadialShape before parsing RadiusX because RadialShape and
     // RadiusX share the storage.
     int32_t shape =
@@ -9590,7 +9593,7 @@ CSSParserImpl::ParseRadialGradient(nsCSSValue& aValue,
     return false;
   }
 
-  if (!(aFlags & eGradient_MozLegacy)) {
+  if (!(aFlags & eGradient_AnyLegacy)) {
     if (mToken.mType == eCSSToken_Ident &&
         mToken.mIdent.LowerCaseEqualsLiteral("at")) {
       // [ <shape> || <size> ]? at <position> ,
@@ -9621,10 +9624,12 @@ CSSParserImpl::ParseRadialGradient(nsCSSValue& aValue,
       haveGradientLine = IsLegacyGradientLine(ty, id);
   }
   if (haveGradientLine) {
-    bool haveAngle =
-      ParseSingleTokenVariant(cssGradient->mAngle, VARIANT_ANGLE, nullptr);
+    // Note: -webkit-radial-gradient() doesn't accept angles.
+    bool haveAngle = (aFlags & eGradient_WebkitLegacy)
+      ? false
+      : ParseSingleTokenVariant(cssGradient->mAngle, VARIANT_ANGLE, nullptr);
 
-    // if we got an angle, we might now have a comma, ending the gradient-line
+    // If we got an angle, we might now have a comma, ending the gradient-line
     if (!haveAngle || !ExpectSymbol(',', true)) {
       if (!ParseBoxPositionValues(cssGradient->mBgPos, false)) {
         SkipUntil(')');
@@ -9632,9 +9637,10 @@ CSSParserImpl::ParseRadialGradient(nsCSSValue& aValue,
       }
 
       if (!ExpectSymbol(',', true) &&
-          // if we didn't already get an angle, we might have one now,
-          // otherwise it's an error
+          // If we didn't already get an angle, and we're not -webkit prefixed,
+          // can parse an angle+comma now.  Otherwise it's an error.
           (haveAngle ||
+           (aFlags & eGradient_WebkitLegacy) ||
            !ParseSingleTokenVariant(cssGradient->mAngle, VARIANT_ANGLE,
                                     nullptr) ||
            // now we better have a comma
