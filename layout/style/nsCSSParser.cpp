@@ -1113,10 +1113,13 @@ protected:
   bool ParseImageRect(nsCSSValue& aImage);
   bool ParseElement(nsCSSValue& aValue);
   bool ParseColorStop(nsCSSValueGradient* aGradient);
-  bool ParseLinearGradient(nsCSSValue& aValue, bool aIsRepeating,
-                           bool aIsLegacy);
-  bool ParseRadialGradient(nsCSSValue& aValue, bool aIsRepeating,
-                           bool aIsLegacy);
+
+  enum GradientParsingFlags {
+    eGradient_Repeating    = 1 << 0, // repeating-{linear|radial}-gradient
+    eGradient_MozLegacy    = 1 << 1, // -moz-{linear|radial}-gradient
+  };
+  bool ParseLinearGradient(nsCSSValue& aValue, uint8_t aFlags);
+  bool ParseRadialGradient(nsCSSValue& aValue, uint8_t aFlags);
   bool IsLegacyGradientLine(const nsCSSTokenType& aType,
                             const nsString& aId);
   bool ParseGradientColorStops(nsCSSValueGradient* aGradient,
@@ -6854,10 +6857,10 @@ CSSParserImpl::ParseWebkitPrefixedGradientWithService(
 
   nsAutoScannerChanger scannerChanger(this, unprefixedFuncBody);
   if (unprefixedFuncName.EqualsLiteral("linear-gradient")) {
-    return ParseLinearGradient(aValue, false, false);
+    return ParseLinearGradient(aValue, 0);
   }
   if (unprefixedFuncName.EqualsLiteral("radial-gradient")) {
-    return ParseRadialGradient(aValue, false, false);
+    return ParseRadialGradient(aValue, 0);
   }
 
   NS_ERROR("CSSUnprefixingService returned an unrecognized type of "
@@ -7491,26 +7494,25 @@ CSSParserImpl::ParseVariant(nsCSSValue& aValue,
       eCSSToken_Function == tk->mType) {
     // a generated gradient
     nsDependentString tmp(tk->mIdent, 0);
-    bool isLegacy = false;
+    uint8_t gradientFlags = 0;
     if (sMozGradientsEnabled &&
         StringBeginsWith(tmp, NS_LITERAL_STRING("-moz-"))) {
       tmp.Rebind(tmp, 5);
-      isLegacy = true;
+      gradientFlags |= eGradient_MozLegacy;
     }
-    bool isRepeating = false;
     if (StringBeginsWith(tmp, NS_LITERAL_STRING("repeating-"))) {
       tmp.Rebind(tmp, 10);
-      isRepeating = true;
+      gradientFlags |= eGradient_Repeating;
     }
 
     if (tmp.LowerCaseEqualsLiteral("linear-gradient")) {
-      return ParseLinearGradient(aValue, isRepeating, isLegacy);
+      return ParseLinearGradient(aValue, gradientFlags);
     }
     if (tmp.LowerCaseEqualsLiteral("radial-gradient")) {
-      return ParseRadialGradient(aValue, isRepeating, isLegacy);
+      return ParseRadialGradient(aValue, gradientFlags);
     }
     if (ShouldUseUnprefixingService() &&
-        !isRepeating && !isLegacy &&
+        !gradientFlags &&
         StringBeginsWith(tmp, NS_LITERAL_STRING("-webkit-"))) {
       // Copy 'tmp' into a string on the stack, since as soon as we
       // start parsing, its backing store (in "tk") will be overwritten
@@ -9290,11 +9292,11 @@ CSSParserImpl::ParseColorStop(nsCSSValueGradient* aGradient)
 //
 // <color-stops> : <color-stop> , <color-stop> [, <color-stop>]*
 bool
-CSSParserImpl::ParseLinearGradient(nsCSSValue& aValue, bool aIsRepeating,
-                                   bool aIsLegacy)
+CSSParserImpl::ParseLinearGradient(nsCSSValue& aValue,
+                                   uint8_t aFlags)
 {
   RefPtr<nsCSSValueGradient> cssGradient
-    = new nsCSSValueGradient(false, aIsRepeating);
+    = new nsCSSValueGradient(false, aFlags & eGradient_Repeating);
 
   if (!GetToken(true)) {
     return false;
@@ -9332,7 +9334,7 @@ CSSParserImpl::ParseLinearGradient(nsCSSValue& aValue, bool aIsRepeating,
     return ParseGradientColorStops(cssGradient, aValue);
   }
 
-  if (!aIsLegacy) {
+  if (!(aFlags & eGradient_MozLegacy)) {
     UngetToken();
 
     // <angle> ,
@@ -9380,11 +9382,11 @@ CSSParserImpl::ParseLinearGradient(nsCSSValue& aValue, bool aIsRepeating,
 }
 
 bool
-CSSParserImpl::ParseRadialGradient(nsCSSValue& aValue, bool aIsRepeating,
-                                   bool aIsLegacy)
+CSSParserImpl::ParseRadialGradient(nsCSSValue& aValue,
+                                   uint8_t aFlags)
 {
   RefPtr<nsCSSValueGradient> cssGradient
-    = new nsCSSValueGradient(true, aIsRepeating);
+    = new nsCSSValueGradient(true, aFlags & eGradient_Repeating);
 
   // [ <shape> || <size> ]
   bool haveShape =
@@ -9392,7 +9394,7 @@ CSSParserImpl::ParseRadialGradient(nsCSSValue& aValue, bool aIsRepeating,
                  nsCSSProps::kRadialGradientShapeKTable);
 
   bool haveSize = ParseVariant(cssGradient->GetRadialSize(), VARIANT_KEYWORD,
-                               aIsLegacy ?
+                               (aFlags & eGradient_MozLegacy) ?
                                nsCSSProps::kRadialGradientLegacySizeKTable :
                                nsCSSProps::kRadialGradientSizeKTable);
   if (haveSize) {
@@ -9401,7 +9403,7 @@ CSSParserImpl::ParseRadialGradient(nsCSSValue& aValue, bool aIsRepeating,
       haveShape = ParseVariant(cssGradient->GetRadialShape(), VARIANT_KEYWORD,
                                nsCSSProps::kRadialGradientShapeKTable);
     }
-  } else if (!aIsLegacy) {
+  } else if (!(aFlags & eGradient_MozLegacy)) {
     // Save RadialShape before parsing RadiusX because RadialShape and
     // RadiusX share the storage.
     int32_t shape =
@@ -9452,7 +9454,7 @@ CSSParserImpl::ParseRadialGradient(nsCSSValue& aValue, bool aIsRepeating,
     return false;
   }
 
-  if (!aIsLegacy) {
+  if (!(aFlags & eGradient_MozLegacy)) {
     if (mToken.mType == eCSSToken_Ident &&
         mToken.mIdent.LowerCaseEqualsLiteral("at")) {
       // [ <shape> || <size> ]? at <position> ,
