@@ -585,6 +585,7 @@ load 1137723-2.html
 asserts(0-3) load 1134667.html
 asserts(0-3) load 1134667.html
 asserts(0-3) load 1134667.html
+asserts(1) load 1183431.html
 load 1146103.html
 load 1146107.html
 load 1146114.html
