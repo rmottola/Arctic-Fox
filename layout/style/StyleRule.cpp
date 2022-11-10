@@ -1448,7 +1448,6 @@ StyleRule::StyleRule(StyleRule& aCopy,
 StyleRule::~StyleRule()
 {
   delete mSelector;
-  delete mDeclaration;
   if (mDOMRule) {
     mDOMRule->DOMDeclaration()->DropReference();
   }
