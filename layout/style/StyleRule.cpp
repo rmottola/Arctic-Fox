@@ -1431,8 +1431,7 @@ NS_INTERFACE_MAP_BEGIN(StyleRule)
     return NS_OK;
   }
   else
-  NS_INTERFACE_MAP_ENTRY(nsIStyleRule)
-  NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIStyleRule)
+  NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, mozilla::css::Rule)
 NS_INTERFACE_MAP_END
 
 NS_IMPL_ADDREF(StyleRule)
@@ -1501,14 +1500,6 @@ StyleRule::DeclarationChanged(Declaration* aDecl,
   }
 
   return clone.forget();
-}
-
-/* virtual */ void
-StyleRule::MapRuleInfoInto(nsRuleData* aRuleData)
-{
-  MOZ_ASSERT(mWasMatched,
-             "somebody forgot to call css::StyleRule::RuleMatched");
-  mDeclaration->MapRuleInfoInto(aRuleData);
 }
 
 #ifdef DEBUG
