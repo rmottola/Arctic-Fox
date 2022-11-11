@@ -620,7 +620,7 @@ ResolvedStyleCache::Get(nsPresContext *aPresContext,
                "Keyframe rule has !important data");
 
     nsCOMArray<nsIStyleRule> rules;
-    rules.AppendObject(aKeyframe);
+    rules.AppendObject(declaration);
     RefPtr<nsStyleContext> resultStrong = aPresContext->StyleSet()->
       ResolveStyleByAddingRules(aParentStyleContext, rules);
     mCache.Put(aKeyframe, resultStrong);
