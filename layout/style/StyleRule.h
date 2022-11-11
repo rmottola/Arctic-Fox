@@ -324,7 +324,9 @@ public:
   already_AddRefed<StyleRule>
   DeclarationChanged(Declaration* aDecl, bool aHandleContainer);
 
-  nsIStyleRule* GetImportantRule() const { return mImportantRule; }
+  nsIStyleRule* GetImportantRule() const {
+    return mDeclaration->GetImportantStyleData();
+  }
 
   /**
    * The rule processor must call this method before calling
@@ -361,7 +363,6 @@ private:
 private:
   nsCSSSelectorList*      mSelector; // null for style attribute
   RefPtr<Declaration>     mDeclaration;
-  RefPtr<ImportantStyleData> mImportantRule; // initialized by RuleMatched
   RefPtr<DOMCSSStyleRule> mDOMRule;
 
 private:
