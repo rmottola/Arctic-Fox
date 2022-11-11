@@ -1543,7 +1543,7 @@ StyleRule::MapRuleInfoInto(nsRuleData* aRuleData)
 {
   MOZ_ASSERT(mWasMatched,
              "somebody forgot to call css::StyleRule::RuleMatched");
-  mDeclaration->MapNormalRuleInfoInto(aRuleData);
+  mDeclaration->MapRuleInfoInto(aRuleData);
 }
 
 #ifdef DEBUG
