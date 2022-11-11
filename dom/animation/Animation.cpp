@@ -585,8 +585,7 @@ Animation::ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
 
   AnimationPlayState playState = PlayState();
   if (playState == AnimationPlayState::Running ||
-      playState == AnimationPlayState::Pending ||
-      HasEndEventToQueue()) {
+      playState == AnimationPlayState::Pending) {
     aStyleChanging = true;
   }
 
