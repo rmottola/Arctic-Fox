@@ -1410,6 +1410,8 @@ StyleRule::StyleRule(nsCSSSelectorList* aSelector,
     mDeclaration(aDeclaration)
 {
   NS_PRECONDITION(aDeclaration, "must have a declaration");
+
+  mDeclaration->SetOwningRule(this);
 }
 
 // for |Clone|
@@ -1418,6 +1420,7 @@ StyleRule::StyleRule(const StyleRule& aCopy)
     mSelector(aCopy.mSelector ? aCopy.mSelector->Clone() : nullptr),
     mDeclaration(new Declaration(*aCopy.mDeclaration))
 {
+  mDeclaration->SetOwningRule(this);
   // rest is constructed lazily on existing data
 }
 
@@ -1442,7 +1445,10 @@ StyleRule::StyleRule(StyleRule& aCopy,
     // This should only ever happen if the declaration was modifiable.
     mDeclaration->AssertMutable();
     aCopy.mDeclaration = nullptr;
+    mDeclaration->SetOwningRule(nullptr);
   }
+
+  mDeclaration->SetOwningRule(this);
 }
 
 StyleRule::~StyleRule()
@@ -1450,6 +1456,10 @@ StyleRule::~StyleRule()
   delete mSelector;
   if (mDOMRule) {
     mDOMRule->DOMDeclaration()->DropReference();
+  }
+
+  if (mDeclaration) {
+    mDeclaration->SetOwningRule(nullptr);
   }
 }
 

@@ -2038,10 +2038,12 @@ nsCSSKeyframeRule::nsCSSKeyframeRule(const nsCSSKeyframeRule& aCopy)
   , mKeys(aCopy.mKeys)
   , mDeclaration(new css::Declaration(*aCopy.mDeclaration))
 {
+  mDeclaration->SetOwningRule(this);
 }
 
 nsCSSKeyframeRule::~nsCSSKeyframeRule()
 {
+  mDeclaration->SetOwningRule(nullptr);
   if (mDOMDeclaration) {
     mDOMDeclaration->DropReference();
   }
@@ -2236,7 +2238,9 @@ nsCSSKeyframeRule::ChangeDeclaration(css::Declaration* aDeclaration)
   MOZ_AUTO_DOC_UPDATE(doc, UPDATE_STYLE, true);
 
   if (aDeclaration != mDeclaration) {
+    mDeclaration->SetOwningRule(nullptr);
     mDeclaration = aDeclaration;
+    mDeclaration->SetOwningRule(this);
   }
 
   CSSStyleSheet* sheet = GetStyleSheet();
@@ -2596,10 +2600,12 @@ nsCSSPageRule::nsCSSPageRule(const nsCSSPageRule& aCopy)
   : Rule(aCopy)
   , mDeclaration(new css::Declaration(*aCopy.mDeclaration))
 {
+  mDeclaration->SetOwningRule(this);
 }
 
 nsCSSPageRule::~nsCSSPageRule()
 {
+  mDeclaration->SetOwningRule(nullptr);
   if (mDOMDeclaration) {
     mDOMDeclaration->DropReference();
   }
@@ -2738,7 +2744,9 @@ nsCSSPageRule::ChangeDeclaration(css::Declaration* aDeclaration)
 {
   mImportantRule = nullptr;
   if (aDeclaration != mDeclaration) {
+    mDeclaration->SetOwningRule(nullptr);
     mDeclaration = aDeclaration;
+    mDeclaration->SetOwningRule(this);
   }
 
   CSSStyleSheet* sheet = GetStyleSheet();
