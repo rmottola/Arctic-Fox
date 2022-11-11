@@ -25,16 +25,16 @@ load 377232-1.xhtml
 load 377461-1.xhtml
 load 383473-1.html
 load 383872-1.svg
-load 385289-1.xhtml
 skip-if(Android&&smallScreen) load 385228-1.svg # bug 523255 / bug 385228, nexus-s Android 2.3.6
 skip load 385228-2.svg  # bug 523255 / bug 385228
+load 385289-1.xhtml
 load 385417-1.html
 load 385417-2.html
 load 385423-1.html
 load 385423-2.html
 load 385719-1.html
 load 389326-1.html
-skip load 390476.html # bug 585185
+load 390476.html
 load 393746-1.xhtml
 load 393749-1.html
 load 393822-1.html
@@ -92,8 +92,8 @@ load 593526.xul
 load 594654-1.xhtml
 load 595727-1.html
 load 624198.xhtml
-load 633453-1.html
 load 633322-1.html
+load 633453-1.html
 load 665218.html
 load 686190-1.html
 load 693143-1.html
