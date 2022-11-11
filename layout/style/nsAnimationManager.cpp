@@ -613,6 +613,7 @@ ResolvedStyleCache::Get(nsPresContext *aPresContext,
   // StyleAnimationValue values in AnimationPropertySegment).
   nsStyleContext *result = mCache.GetWeak(aKeyframe);
   if (!result) {
+    aKeyframe->Declaration()->SetImmutable();
     nsCOMArray<nsIStyleRule> rules;
     rules.AppendObject(aKeyframe);
     RefPtr<nsStyleContext> resultStrong = aPresContext->StyleSet()->
