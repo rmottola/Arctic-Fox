@@ -1440,10 +1440,6 @@ NS_IMPL_RELEASE(StyleRule)
 void
 StyleRule::RuleMatched()
 {
-  if (!mWasMatched) {
-    mWasMatched = true;
-  }
-
   mDeclaration->SetImmutable();
 }
 

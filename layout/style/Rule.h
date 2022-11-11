@@ -36,8 +36,7 @@ protected:
     : mSheet(0),
       mParentRule(nullptr),
       mLineNumber(aLineNumber),
-      mColumnNumber(aColumnNumber),
-      mWasMatched(false)
+      mColumnNumber(aColumnNumber)
   {
   }
 
@@ -45,8 +44,7 @@ protected:
     : mSheet(aCopy.mSheet),
       mParentRule(aCopy.mParentRule),
       mLineNumber(aCopy.mLineNumber),
-      mColumnNumber(aCopy.mColumnNumber),
-      mWasMatched(false)
+      mColumnNumber(aCopy.mColumnNumber)
   {
   }
 
@@ -142,8 +140,7 @@ protected:
 
   // Keep the same type so that MSVC packs them.
   uint32_t          mLineNumber;
-  uint32_t          mColumnNumber : 31;
-  uint32_t          mWasMatched : 1;
+  uint32_t          mColumnNumber;
 };
 
 } // namespace css
