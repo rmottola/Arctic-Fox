@@ -1442,8 +1442,9 @@ StyleRule::RuleMatched()
 {
   if (!mWasMatched) {
     mWasMatched = true;
-    mDeclaration->SetImmutable();
   }
+
+  mDeclaration->SetImmutable();
 }
 
 /* virtual */ int32_t
