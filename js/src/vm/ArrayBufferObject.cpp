@@ -1573,7 +1573,7 @@ js::GetArrayBufferLengthAndData(JSObject* obj, uint32_t* length, uint8_t** data)
 }
 
 JSObject*
-js::InitArrayBufferClass(JSContext *cx, HandleObject obj)
+js::InitArrayBufferClass(JSContext* cx, HandleObject obj)
 {
     Rooted<GlobalObject*> global(cx, cx->compartment()->maybeGlobal());
     if (global->isStandardClassResolved(JSProto_ArrayBuffer))
