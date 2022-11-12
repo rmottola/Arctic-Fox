@@ -302,7 +302,7 @@ class CodeGeneratorShared : public LElementVisitor
 
     // Encode all encountered safepoints in CG-order, and resolve |indices| for
     // safepoint offsets.
-    void encodeSafepoints();
+    bool encodeSafepoints();
 
     // Fixup offsets of native-to-bytecode map.
     bool createNativeToBytecodeScriptList(JSContext* cx);
@@ -522,7 +522,7 @@ class CodeGeneratorShared : public LElementVisitor
 
     inline void verifyHeapAccessDisassembly(uint32_t begin, uint32_t end, bool isLoad,
                                             Scalar::Type type, unsigned numElems,
-                                            const Operand &mem, LAllocation alloc);
+                                            const Operand& mem, LAllocation alloc);
 };
 
 // An out-of-line path is generated at the end of the function.
