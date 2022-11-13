@@ -2639,9 +2639,9 @@ nsRuleNode::SetDefaultOnRoot(const nsStyleStructID aSID, nsStyleContext* aContex
   nsStyle##type_* data_ = nullptr;                                            \
   mozilla::Maybe<nsStyle##type_> maybeFakeParentData;                         \
   const nsStyle##type_* parentdata_ = nullptr;                                \
-  RuleNodeCacheConditions conditions = aConditions;                                      \
+  RuleNodeCacheConditions conditions = aConditions;                           \
                                                                               \
-  /* If |conditions.Cacheable()| might be true by the time we're done, we */    \
+  /* If |conditions.Cacheable()| might be true by the time we're done, we */  \
   /* can't call parentContext->Style##type_() since it could recur into */    \
   /* setting the same struct on the same rule node, causing a leak. */        \
   if (aRuleDetail != eRuleFullReset &&                                        \
@@ -2668,7 +2668,7 @@ nsRuleNode::SetDefaultOnRoot(const nsStyleStructID aSID, nsStyleContext* aContex
     if (aRuleDetail != eRuleFullMixed && aRuleDetail != eRuleFullReset) {     \
       /* No question. We will have to inherit. Go ahead and init */           \
       /* with inherited vals from parent. */                                  \
-      conditions.SetUncacheable();                                              \
+      conditions.SetUncacheable();                                            \
       if (parentdata_)                                                        \
         data_ = new (mPresContext) nsStyle##type_(*parentdata_);              \
       else                                                                    \
@@ -2712,7 +2712,7 @@ nsRuleNode::SetDefaultOnRoot(const nsStyleStructID aSID, nsStyleContext* aContex
   else                                                                        \
     data_ = new (mPresContext) nsStyle##type_ ctorargs_;                      \
                                                                               \
-  /* If |conditions.Cacheable()| might be true by the time we're done, we */    \
+  /* If |conditions.Cacheable()| might be true by the time we're done, we */  \
   /* can't call parentContext->Style##type_() since it could recur into */    \
   /* setting the same struct on the same rule node, causing a leak. */        \
   mozilla::Maybe<nsStyle##type_> maybeFakeParentData;                         \
@@ -2736,13 +2736,13 @@ nsRuleNode::SetDefaultOnRoot(const nsStyleStructID aSID, nsStyleContext* aContex
  * @param data_ Variable holding the result of this function.
  */
 #define COMPUTE_END_INHERITED(type_, data_)                                   \
-  NS_POSTCONDITION(!conditions.CacheableWithoutDependencies() ||                \
+  NS_POSTCONDITION(!conditions.CacheableWithoutDependencies() ||              \
                    aRuleDetail == eRuleFullReset ||                           \
                    (aStartStruct && aRuleDetail == eRulePartialReset),        \
-                   "conditions.CacheableWithoutDependencies() must be false "   \
+                   "conditions.CacheableWithoutDependencies() must be false " \
                    "for inherited structs unless all properties have been "   \
                    "specified with values other than inherit");               \
-  if (conditions.CacheableWithoutDependencies()) {                              \
+  if (conditions.CacheableWithoutDependencies()) {                            \
     /* We were fully specified and can therefore be cached right on the */    \
     /* rule node. */                                                          \
     if (!aHighestNode->mStyleData.mInheritedData) {                           \
@@ -2771,14 +2771,14 @@ nsRuleNode::SetDefaultOnRoot(const nsStyleStructID aSID, nsStyleContext* aContex
  * @param data_ Variable holding the result of this function.
  */
 #define COMPUTE_END_RESET(type_, data_)                                       \
-  NS_POSTCONDITION(!conditions.CacheableWithoutDependencies() ||                \
+  NS_POSTCONDITION(!conditions.CacheableWithoutDependencies() ||              \
                    aRuleDetail == eRuleNone ||                                \
                    aRuleDetail == eRulePartialReset ||                        \
                    aRuleDetail == eRuleFullReset,                             \
-                   "conditions.CacheableWithoutDependencies() must be false "   \
+                   "conditions.CacheableWithoutDependencies() must be false " \
                    "for reset structs if any properties were specified as "   \
                    "inherit");                                                \
-  if (conditions.CacheableWithoutDependencies()) {                              \
+  if (conditions.CacheableWithoutDependencies()) {                            \
     /* We were fully specified and can therefore be cached right on the */    \
     /* rule node. */                                                          \
     if (!aHighestNode->mStyleData.mResetData) {                               \
