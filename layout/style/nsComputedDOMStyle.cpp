@@ -3525,7 +3525,7 @@ CSSValue*
 nsComputedDOMStyle::DoGetWordSpacing()
 {
   nsROCSSPrimitiveValue *val = new nsROCSSPrimitiveValue;
-  val->SetAppUnits(StyleText()->mWordSpacing);
+  SetValueToCoord(val, StyleText()->mWordSpacing, false);
   return val;
 }
 
