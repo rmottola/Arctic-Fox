@@ -7762,26 +7762,12 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
   // block-axis properties, we turn them into unset if we find them in
   // that case.
 
-  bool vertical;
-  switch (aContext->StyleVisibility()->mWritingMode) {
-    default:
-      MOZ_ASSERT(false, "unexpected writing-mode value");
-      // fall through
-    case NS_STYLE_WRITING_MODE_HORIZONTAL_TB:
-      vertical = false;
-      break;
-    case NS_STYLE_WRITING_MODE_VERTICAL_RL:
-    case NS_STYLE_WRITING_MODE_VERTICAL_LR:
-    case NS_STYLE_WRITING_MODE_SIDEWAYS_RL:
-    case NS_STYLE_WRITING_MODE_SIDEWAYS_LR:
-      vertical = true;
-      break;
-  }
-  uint8_t wm = WritingMode(aContext).GetBits();
+  WritingMode wm(aContext);
+  bool vertical = wm.IsVertical();
 
   const nsCSSValue* width = aRuleData->ValueForWidth();
   if (width->GetUnit() == eCSSUnit_Enumerated) {
-    conditions.SetWritingModeDependency(wm);
+    conditions.SetWritingModeDependency(wm.GetBits());
   }
   SetCoord(width->GetUnit() == eCSSUnit_Enumerated && vertical ?
              nsCSSValue(eCSSUnit_Unset) : *width,
@@ -7792,7 +7778,7 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
 
   const nsCSSValue* minWidth = aRuleData->ValueForMinWidth();
   if (minWidth->GetUnit() == eCSSUnit_Enumerated) {
-    conditions.SetWritingModeDependency(wm);
+    conditions.SetWritingModeDependency(wm.GetBits());
   }
   SetCoord(minWidth->GetUnit() == eCSSUnit_Enumerated && vertical ?
              nsCSSValue(eCSSUnit_Unset) : *minWidth,
@@ -7803,7 +7789,7 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
 
   const nsCSSValue* maxWidth = aRuleData->ValueForMaxWidth();
   if (maxWidth->GetUnit() == eCSSUnit_Enumerated) {
-    conditions.SetWritingModeDependency(wm);
+    conditions.SetWritingModeDependency(wm.GetBits());
   }
   SetCoord(maxWidth->GetUnit() == eCSSUnit_Enumerated && vertical ?
              nsCSSValue(eCSSUnit_Unset) : *maxWidth,
@@ -7814,7 +7800,7 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
 
   const nsCSSValue* height = aRuleData->ValueForHeight();
   if (height->GetUnit() == eCSSUnit_Enumerated) {
-    conditions.SetWritingModeDependency(wm);
+    conditions.SetWritingModeDependency(wm.GetBits());
   }
   SetCoord(height->GetUnit() == eCSSUnit_Enumerated && !vertical ?
              nsCSSValue(eCSSUnit_Unset) : *height,
@@ -7825,7 +7811,7 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
 
   const nsCSSValue* minHeight = aRuleData->ValueForMinHeight();
   if (minHeight->GetUnit() == eCSSUnit_Enumerated) {
-    conditions.SetWritingModeDependency(wm);
+    conditions.SetWritingModeDependency(wm.GetBits());
   }
   SetCoord(minHeight->GetUnit() == eCSSUnit_Enumerated && !vertical ?
              nsCSSValue(eCSSUnit_Unset) : *minHeight,
@@ -7836,7 +7822,7 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
 
   const nsCSSValue* maxHeight = aRuleData->ValueForMaxHeight();
   if (maxHeight->GetUnit() == eCSSUnit_Enumerated) {
-    conditions.SetWritingModeDependency(wm);
+    conditions.SetWritingModeDependency(wm.GetBits());
   }
   SetCoord(maxHeight->GetUnit() == eCSSUnit_Enumerated && !vertical ?
              nsCSSValue(eCSSUnit_Unset) : *maxHeight,
