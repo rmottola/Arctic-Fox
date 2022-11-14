@@ -87,8 +87,8 @@ skip-if(browserIsRemote) load 786108-2.html # Bug 795534
 load 788836.html
 load 806310-1.html
 load 812824.html
-load 822842.html
 load 822766-1.html
+load 822842.html
 load 827591-1.html
 load 829817.html
 load 840898.html
@@ -96,8 +96,8 @@ load 842134.html
 load 861489-1.html
 load 862113.html
 load 867487.html
-load 880862.html
 load 873222.html
+load 880862.html
 load 915440.html
 load 927734-1.html
 load 930270-1.html
@@ -112,6 +112,7 @@ load 1066089-1.html
 load 1074651-1.html
 pref(dom.webcomponents.enabled,true) load 1089463-1.html
 pref(layout.css.expensive-style-struct-assertions.enabled,true) load 1136010-1.html
+pref(layout.css.expensive-style-struct-assertions.enabled,true) load 1146101-1.html
 load 1153693-1.html
 load 1167782-1.html
 load 1200568-1.html
