@@ -2155,11 +2155,8 @@ CanvasRenderingContext2D::SetShadowColor(const nsAString& shadowColor)
 static already_AddRefed<Declaration>
 CreateDeclaration(nsINode* aNode,
   const nsCSSProperty aProp1, const nsAString& aValue1, bool* aChanged1,
-  const nsCSSProperty aProp2, const nsAString& aValue2, bool* aChanged2,
-  ErrorResult& error)
+  const nsCSSProperty aProp2, const nsAString& aValue2, bool* aChanged2)
 {
-  RefPtr<StyleRule> rule;
-
   nsIPrincipal* principal = aNode->NodePrincipal();
   nsIDocument* document = aNode->OwnerDoc();
 
@@ -2170,23 +2167,19 @@ CreateDeclaration(nsINode* aNode,
   // to include the outer window ID.
   nsCSSParser parser(document->CSSLoader());
 
-  error = parser.ParseStyleAttribute(EmptyString(), docURL, baseURL,
-                                     principal, getter_AddRefs(rule));
-  if (error.Failed()) {
-    return nullptr;
-  }
+  RefPtr<Declaration> declaration =
+    parser.ParseStyleAttribute(EmptyString(), docURL, baseURL, principal);
 
   if (aProp1 != eCSSProperty_UNKNOWN) {
     parser.ParseProperty(aProp1, aValue1, docURL, baseURL, principal,
-                         rule->GetDeclaration(), aChanged1, false);
+                         declaration, aChanged1, false);
   }
 
   if (aProp2 != eCSSProperty_UNKNOWN) {
     parser.ParseProperty(aProp2, aValue2, docURL, baseURL, principal,
-                         rule->GetDeclaration(), aChanged2, false);
+                         declaration, aChanged2, false);
   }
 
-  RefPtr<Declaration> declaration = rule->GetDeclaration();
   declaration->SetImmutable();
   return declaration.forget();
 }
@@ -2194,14 +2187,12 @@ CreateDeclaration(nsINode* aNode,
 static already_AddRefed<Declaration>
 CreateFontDeclaration(const nsAString& aFont,
                       nsINode* aNode,
-                      bool* aOutFontChanged,
-                      ErrorResult& error)
+                      bool* aOutFontChanged)
 {
   bool lineHeightChanged;
   return CreateDeclaration(aNode,
     eCSSProperty_font, aFont, aOutFontChanged,
-    eCSSProperty_line_height, NS_LITERAL_STRING("normal"), &lineHeightChanged,
-    error);
+    eCSSProperty_line_height, NS_LITERAL_STRING("normal"), &lineHeightChanged);
 }
 
 static already_AddRefed<nsStyleContext>
@@ -2224,11 +2215,7 @@ GetFontParentStyleContext(Element* aElement, nsIPresShell* presShell,
   bool changed;
   RefPtr<css::Declaration> parentRule =
     CreateFontDeclaration(NS_LITERAL_STRING("10px sans-serif"),
-                          presShell->GetDocument(), &changed, error);
-
-  if (error.Failed()) {
-    return nullptr;
-  }
+                          presShell->GetDocument(), &changed);
 
   nsTArray<nsCOMPtr<nsIStyleRule>> parentRules;
   parentRules.AppendElement(parentRule);
@@ -2263,11 +2250,7 @@ GetFontStyleContext(Element* aElement, const nsAString& aFont,
   bool fontParsedSuccessfully = false;
   RefPtr<css::Declaration> decl =
     CreateFontDeclaration(aFont, presShell->GetDocument(),
-                          &fontParsedSuccessfully, error);
-
-  if (error.Failed()) {
-    return nullptr;
-  }
+                          &fontParsedSuccessfully);
 
   if (!fontParsedSuccessfully) {
     // We got a syntax error.  The spec says this value must be ignored.
@@ -2319,14 +2302,12 @@ GetFontStyleContext(Element* aElement, const nsAString& aFont,
 static already_AddRefed<Declaration>
 CreateFilterDeclaration(const nsAString& aFilter,
                         nsINode* aNode,
-                        bool* aOutFilterChanged,
-                        ErrorResult& error)
+                        bool* aOutFilterChanged)
 {
   bool dummy;
   return CreateDeclaration(aNode,
     eCSSProperty_filter, aFilter, aOutFilterChanged,
-    eCSSProperty_UNKNOWN, EmptyString(), &dummy,
-    error);
+    eCSSProperty_UNKNOWN, EmptyString(), &dummy);
 }
 
 static already_AddRefed<nsStyleContext>
@@ -2338,11 +2319,7 @@ ResolveStyleForFilter(const nsAString& aFilterString,
   nsIDocument* document = aPresShell->GetDocument();
   bool filterChanged = false;
   RefPtr<css::Declaration> decl =
-    CreateFilterDeclaration(aFilterString, document, &filterChanged, error);
-
-  if (error.Failed()) {
-    return nullptr;
-  }
+    CreateFilterDeclaration(aFilterString, document, &filterChanged);
 
   if (!filterChanged) {
     // Refuse to accept the filter, but do not throw an error.
