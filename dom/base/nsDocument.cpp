@@ -11270,6 +11270,15 @@ UpdateViewportScrollbarOverrideForFullscreen(nsIDocument* aDoc)
   }
 }
 
+static void
+ClearFullscreenStateOnElement(Element* aElement)
+{
+  // Remove any VR state properties
+  aElement->DeleteProperty(nsGkAtoms::vr_state);
+  // Remove styles from existing top element.
+  EventStateManager::SetFullScreenState(aElement, false);
+}
+
 void
 nsDocument::CleanupFullscreenState()
 {
@@ -11282,9 +11291,7 @@ nsDocument::CleanupFullscreenState()
   // after bug 1195213.
   for (nsWeakPtr& weakPtr : Reversed(mFullScreenStack)) {
     if (nsCOMPtr<Element> element = do_QueryReferent(weakPtr)) {
-      // Remove any VR state properties
-      element->DeleteProperty(nsGkAtoms::vr_state);
-      EventStateManager::SetFullScreenState(element, false);
+      ClearFullscreenStateOnElement(element);
     }
   }
   mFullScreenStack.Clear();
@@ -11314,13 +11321,7 @@ nsDocument::FullScreenStackPop()
     return;
   }
 
-  Element* top = FullScreenStackTop();
-
-  // Remove any VR state properties
-  top->DeleteProperty(nsGkAtoms::vr_state);
-
-  // Remove styles from existing top element.
-  EventStateManager::SetFullScreenState(top, false);
+  ClearFullscreenStateOnElement(FullScreenStackTop());
 
   // Remove top element. Note the remaining top element in the stack
   // will not have full-screen style bits set, so we will need to restore
