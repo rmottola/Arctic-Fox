@@ -15504,7 +15504,7 @@ class CGIterableMethodGenerator(CGGeneric):
         CGGeneric.__init__(self, fill(
             """
             typedef ${iterClass} itrType;
-            nsRefPtr<itrType> result(new itrType(self,
+            RefPtr<itrType> result(new itrType(self,
                                                  itrType::IterableIteratorType::${itrMethod},
                                                  &${ifaceName}IteratorBinding::Wrap));
             """,
