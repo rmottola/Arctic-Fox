@@ -1826,7 +1826,7 @@ nsWindow::HasPendingInputEvent()
     // without blocking or removing.  To prevent event reordering, peek
     // anything except expose events.  Reordering expose and others should be
     // ok, hopefully.
-    bool haveEvent;
+    bool haveEvent = false;
 #ifdef MOZ_X11
     XEvent ev;
     GdkDisplay* gdkDisplay = gdk_display_get_default();
@@ -1849,8 +1849,6 @@ nsWindow::HasPendingInputEvent()
             XPutBackEvent(display, &ev);
         }
     }
-#else
-    haveEvent = false;
 #endif
     return haveEvent;
 }
