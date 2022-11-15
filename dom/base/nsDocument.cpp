@@ -944,21 +944,15 @@ nsExternalResourceMap::HideViewers()
   }
 }
 
-static PLDHashOperator
-ExternalResourceShower(nsIURI* aKey,
-                       nsExternalResourceMap::ExternalResource* aData,
-                       void* aClosure)
-{
-  if (aData->mViewer) {
-    aData->mViewer->Show();
-  }
-  return PL_DHASH_NEXT;
-}
-
 void
 nsExternalResourceMap::ShowViewers()
 {
-  mMap.EnumerateRead(ExternalResourceShower, nullptr);
+  for (auto iter = mMap.Iter(); !iter.Done(); iter.Next()) {
+    nsCOMPtr<nsIContentViewer> viewer = iter.UserData()->mViewer;
+    if (viewer) {
+      viewer->Show();
+    }
+  }
 }
 
 void
