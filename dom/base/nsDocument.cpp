@@ -333,43 +333,6 @@ nsIdentifierMapEntry::RemoveContentChangeCallback(nsIDocument::IDTargetObserver 
 namespace mozilla {
 namespace dom {
 
-static PLDHashOperator
-CustomDefinitionsTraverse(CustomElementHashKey* aKey,
-                          CustomElementDefinition* aDefinition,
-                          void* aArg)
-{
-  nsCycleCollectionTraversalCallback* cb =
-    static_cast<nsCycleCollectionTraversalCallback*>(aArg);
-
-  nsAutoPtr<LifecycleCallbacks>& callbacks = aDefinition->mCallbacks;
-
-  if (callbacks->mAttributeChangedCallback.WasPassed()) {
-    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(*cb,
-      "mCustomDefinitions->mCallbacks->mAttributeChangedCallback");
-    cb->NoteXPCOMChild(aDefinition->mCallbacks->mAttributeChangedCallback.Value());
-  }
-
-  if (callbacks->mCreatedCallback.WasPassed()) {
-    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(*cb,
-      "mCustomDefinitions->mCallbacks->mCreatedCallback");
-    cb->NoteXPCOMChild(aDefinition->mCallbacks->mCreatedCallback.Value());
-  }
-
-  if (callbacks->mAttachedCallback.WasPassed()) {
-    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(*cb,
-      "mCustomDefinitions->mCallbacks->mAttachedCallback");
-    cb->NoteXPCOMChild(aDefinition->mCallbacks->mAttachedCallback.Value());
-  }
-
-  if (callbacks->mDetachedCallback.WasPassed()) {
-    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(*cb,
-      "mCustomDefinitions->mCallbacks->mDetachedCallback");
-    cb->NoteXPCOMChild(aDefinition->mCallbacks->mDetachedCallback.Value());
-  }
-
-  return PL_DHASH_NEXT;
-}
-
 NS_IMPL_CYCLE_COLLECTION_CLASS(Registry)
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(Registry)
@@ -381,7 +344,33 @@ NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(Registry)
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Registry)
-  tmp->mCustomDefinitions.EnumerateRead(CustomDefinitionsTraverse, &cb);
+  for (auto iter = tmp->mCustomDefinitions.Iter(); !iter.Done(); iter.Next()) {
+    nsAutoPtr<LifecycleCallbacks>& callbacks = iter.UserData()->mCallbacks;
+
+    if (callbacks->mAttributeChangedCallback.WasPassed()) {
+      NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb,
+        "mCustomDefinitions->mCallbacks->mAttributeChangedCallback");
+      cb.NoteXPCOMChild(callbacks->mAttributeChangedCallback.Value());
+    }
+
+    if (callbacks->mCreatedCallback.WasPassed()) {
+      NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb,
+        "mCustomDefinitions->mCallbacks->mCreatedCallback");
+      cb.NoteXPCOMChild(callbacks->mCreatedCallback.Value());
+    }
+
+    if (callbacks->mAttachedCallback.WasPassed()) {
+      NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb,
+        "mCustomDefinitions->mCallbacks->mAttachedCallback");
+      cb.NoteXPCOMChild(callbacks->mAttachedCallback.Value());
+    }
+
+    if (callbacks->mDetachedCallback.WasPassed()) {
+      NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb,
+        "mCustomDefinitions->mCallbacks->mDetachedCallback");
+      cb.NoteXPCOMChild(callbacks->mDetachedCallback.Value());
+    }
+  }
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
@@ -944,21 +933,15 @@ nsExternalResourceMap::Traverse(nsCycleCollectionTraversalCallback* aCallback) c
   }
 }
 
-static PLDHashOperator
-ExternalResourceHider(nsIURI* aKey,
-                      nsExternalResourceMap::ExternalResource* aData,
-                      void* aClosure)
-{
-  if (aData->mViewer) {
-    aData->mViewer->Hide();
-  }
-  return PL_DHASH_NEXT;
-}
-
 void
 nsExternalResourceMap::HideViewers()
 {
-  mMap.EnumerateRead(ExternalResourceHider, nullptr);
+  for (auto iter = mMap.Iter(); !iter.Done(); iter.Next()) {
+    nsCOMPtr<nsIContentViewer> viewer = iter.UserData()->mViewer;
+    if (viewer) {
+      viewer->Hide();
+    }
+  }
 }
 
 static PLDHashOperator
