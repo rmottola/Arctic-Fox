@@ -70,7 +70,6 @@ public:
   bool MayLoadInternal(nsIURI* aURI) override;
 
   nsCOMPtr<nsIURI> mURI;
-  nsCOMPtr<nsIContentSecurityPolicy> mCSP;
 };
 
 #endif // nsNullPrincipal_h__
