@@ -701,9 +701,9 @@ struct nsCSSRendering {
                                   DrawTarget& aDrawTarget,
                                   const Rect& aDirtyRect,
                                   const nscolor aColor,
-                                  const gfxPoint& aPt,
+                                  const Point& aPt,
                                   const Float aICoordInFrame,
-                                  const gfxSize& aLineSize,
+                                  const Size& aLineSize,
                                   const gfxFloat aAscent,
                                   const gfxFloat aOffset,
                                   const uint8_t aDecoration,
@@ -761,7 +761,7 @@ struct nsCSSRendering {
    *                              the each values are app units.
    */
   static nsRect GetTextDecorationRect(nsPresContext* aPresContext,
-                                      const gfxSize& aLineSize,
+                                      const Size& aLineSize,
                                       const gfxFloat aAscent,
                                       const gfxFloat aOffset,
                                       const uint8_t aDecoration,
@@ -792,8 +792,8 @@ struct nsCSSRendering {
   }
 
 protected:
-  static gfxRect GetTextDecorationRectInternal(const gfxPoint& aPt,
-                                               const gfxSize& aLineSize,
+  static gfxRect GetTextDecorationRectInternal(const Point& aPt,
+                                               const Size& aLineSize,
                                                const gfxFloat aAscent,
                                                const gfxFloat aOffset,
                                                const uint8_t aDecoration,

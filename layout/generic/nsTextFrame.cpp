@@ -5064,21 +5064,21 @@ nsTextFrame::UnionAdditionalOverflow(nsPresContext* aPresContext,
                                  : fontMetrics->MaxAscent();
 
     gfxFloat appUnitsPerDevUnit = aPresContext->AppUnitsPerDevPixel();
-    gfxFloat gfxWidth =
+    Float gfxWidth =
       (verticalRun ? aVisualOverflowRect->height
                    : aVisualOverflowRect->width) /
       appUnitsPerDevUnit;
     gfxFloat gfxAscent = gfxFloat(mAscent) / appUnitsPerDevUnit;
     gfxFloat gfxMaxAscent = maxAscent / appUnitsPerDevUnit;
-    gfxFloat gfxUnderlineSize = underlineSize / appUnitsPerDevUnit;
+    Float gfxUnderlineSize = underlineSize / appUnitsPerDevUnit;
     gfxFloat gfxUnderlineOffset = underlineOffset / appUnitsPerDevUnit;
     nsRect underlineRect =
       nsCSSRendering::GetTextDecorationRect(aPresContext,
-        gfxSize(gfxWidth, gfxUnderlineSize), gfxAscent, gfxUnderlineOffset,
+        Size(gfxWidth, gfxUnderlineSize), gfxAscent, gfxUnderlineOffset,
         NS_STYLE_TEXT_DECORATION_LINE_UNDERLINE, decorationStyle, verticalRun);
     nsRect overlineRect =
       nsCSSRendering::GetTextDecorationRect(aPresContext,
-        gfxSize(gfxWidth, gfxUnderlineSize), gfxAscent, gfxMaxAscent,
+        Size(gfxWidth, gfxUnderlineSize), gfxAscent, gfxMaxAscent,
         NS_STYLE_TEXT_DECORATION_LINE_OVERLINE, decorationStyle, verticalRun);
 
     aVisualOverflowRect->UnionRect(*aVisualOverflowRect, underlineRect);
@@ -5129,7 +5129,7 @@ nsTextFrame::UnionAdditionalOverflow(nsPresContext* aPresContext,
 
         const nsRect decorationRect =
           nsCSSRendering::GetTextDecorationRect(aPresContext,
-            gfxSize(gfxWidth, metrics.underlineSize),
+            Size(gfxWidth, metrics.underlineSize),
             ascent, metrics.underlineOffset,
             NS_STYLE_TEXT_DECORATION_LINE_UNDERLINE, decorationStyle,
             verticalRun) +
@@ -5161,7 +5161,7 @@ nsTextFrame::UnionAdditionalOverflow(nsPresContext* aPresContext,
 
         const nsRect decorationRect =
           nsCSSRendering::GetTextDecorationRect(aPresContext,
-            gfxSize(gfxWidth, metrics.underlineSize),
+            Size(gfxWidth, metrics.underlineSize),
             ascent, metrics.maxAscent,
             NS_STYLE_TEXT_DECORATION_LINE_OVERLINE, decorationStyle,
             verticalRun) +
@@ -5193,7 +5193,7 @@ nsTextFrame::UnionAdditionalOverflow(nsPresContext* aPresContext,
 
         const nsRect decorationRect =
           nsCSSRendering::GetTextDecorationRect(aPresContext,
-            gfxSize(gfxWidth, metrics.strikeoutSize),
+            Size(gfxWidth, metrics.strikeoutSize),
             ascent, metrics.strikeoutOffset,
             NS_STYLE_TEXT_DECORATION_LINE_LINE_THROUGH, decorationStyle,
             verticalRun) +
@@ -5287,9 +5287,9 @@ nsTextFrame::PaintDecorationLine(gfxContext* const aCtx,
                                  const gfxRect& aDirtyRect,
                                  nscolor aColor,
                                  const nscolor* aOverrideColor,
-                                 const gfxPoint& aPt,
+                                 const Point& aPt,
                                  gfxFloat aICoordInFrame,
-                                 const gfxSize& aLineSize,
+                                 const Size& aLineSize,
                                  gfxFloat aAscent,
                                  gfxFloat aOffset,
                                  uint8_t aDecoration,
@@ -5302,7 +5302,7 @@ nsTextFrame::PaintDecorationLine(gfxContext* const aCtx,
   nscolor lineColor = aOverrideColor ? *aOverrideColor : aColor;
   if (aCallbacks) {
     Rect path = nsCSSRendering::DecorationLineToPath(ToRect(aDirtyRect),
-      ToPoint(aPt), ToSize(aLineSize), aAscent, aOffset, aDecoration, aStyle,
+      aPt, aLineSize, aAscent, aOffset, aDecoration, aStyle,
       aVertical, aDescentLimit);
     if (aDecorationType == eNormalDecoration) {
       aCallbacks->PaintDecorationLine(path, lineColor);
@@ -5327,7 +5327,7 @@ nsTextFrame::DrawSelectionDecorations(gfxContext* aContext,
                                       SelectionType aType,
                                       nsTextPaintStyle& aTextPaintStyle,
                                       const TextRangeStyle &aRangeStyle,
-                                      const gfxPoint& aPt,
+                                      const Point& aPt,
                                       gfxFloat aICoordInFrame,
                                       gfxFloat aWidth,
                                       gfxFloat aAscent,
@@ -5337,10 +5337,10 @@ nsTextFrame::DrawSelectionDecorations(gfxContext* aContext,
                                       gfxFloat aDecorationOffsetDir,
                                       uint8_t aDecoration)
 {
-  gfxPoint pt(aPt);
-  gfxSize size(aWidth,
-               ComputeSelectionUnderlineHeight(aTextPaintStyle.PresContext(),
-                                               aFontMetrics, aType));
+  Point pt(aPt);
+  Size size(aWidth,
+            ComputeSelectionUnderlineHeight(aTextPaintStyle.PresContext(),
+                                            aFontMetrics, aType));
   gfxFloat descentLimit =
     ComputeDescentLimitForSelectionUnderline(aTextPaintStyle.PresContext(),
                                              aFontMetrics);
@@ -5935,7 +5935,7 @@ nsTextFrame::PaintTextSelectionDecorations(gfxContext* aCtx,
   uint32_t offset, length;
   int32_t app = aTextPaintStyle.PresContext()->AppUnitsPerDevPixel();
   // XXX aTextBaselinePt is in AppUnits, shouldn't it be nsFloatPoint?
-  gfxPoint pt;
+  Point pt;
   if (verticalRun) {
     pt.x = (aTextBaselinePt.x - mAscent) / app;
   } else {
@@ -6434,12 +6434,12 @@ nsTextFrame::DrawTextRunAndDecorations(
 
     // decPt is the physical point where the decoration is to be drawn,
     // relative to the frame; one of its coordinates will be updated below.
-    gfxPoint decPt(x / app, y / app);
-    gfxFloat& bCoord = verticalRun ? decPt.x : decPt.y;
+    Point decPt(x / app, y / app);
+    Float& bCoord = verticalRun ? decPt.x : decPt.y;
 
     // decSize is a textrun-relative size, so its 'width' field is actually
     // the run-relative measure, and 'height' will be the line thickness
-    gfxSize decSize(measure / app, 0);
+    Size decSize(measure / app, 0);
     gfxFloat ascent = gfxFloat(mAscent) / app;
 
     // The starting edge of the frame in block direction
@@ -6774,9 +6774,9 @@ nsTextFrame::CombineSelectionUnderlineRect(nsPresContext* aPresContext,
       }
     }
     nsRect decorationArea;
-    gfxSize size(aPresContext->AppUnitsToGfxUnits(aRect.width),
-                 ComputeSelectionUnderlineHeight(aPresContext,
-                                                 metrics, sd->mType));
+    Size size(aPresContext->AppUnitsToGfxUnits(aRect.width),
+              ComputeSelectionUnderlineHeight(aPresContext,
+                                              metrics, sd->mType));
     relativeSize = std::max(relativeSize, 1.0f);
     size.height *= relativeSize;
     decorationArea =
