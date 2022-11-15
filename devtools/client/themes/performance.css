@@ -553,6 +553,15 @@
  * Marker colors
  */
 
+menuitem.marker-color-graphs-full-red:before,
+.marker-color-graphs-full-red {
+  background-color: var(--theme-graphs-full-red);
+}
+menuitem.marker-color-graphs-full-blue:before,
+.marker-color-graphs-full-blue {
+  background-color: var(--theme-graphs-full-blue);
+}
+
 menuitem.marker-color-graphs-purple:before,
 .marker-color-graphs-purple {
   background-color: var(--theme-graphs-purple);
