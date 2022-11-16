@@ -149,6 +149,17 @@ LoadInfo::Clone() const
   return copy.forget();
 }
 
+already_AddRefed<nsILoadInfo>
+LoadInfo::CloneForNewRequest() const
+{
+  RefPtr<LoadInfo> copy(new LoadInfo(*this));
+  copy->mEnforceSecurity = false;
+  copy->mInitialSecurityCheckDone = false;
+  copy->mRedirectChainIncludingInternalRedirects.Clear();
+  copy->mRedirectChain.Clear();
+  return copy.forget();
+}
+
 NS_IMETHODIMP
 LoadInfo::GetLoadingPrincipal(nsIPrincipal** aLoadingPrincipal)
 {
