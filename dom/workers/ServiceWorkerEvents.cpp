@@ -203,6 +203,7 @@ class RespondWithHandler final : public PromiseNativeHandler
   const DebugOnly<bool> mIsClientRequest;
   const bool mIsNavigationRequest;
   const nsCString mScriptSpec;
+  bool mRequestWasHandled;
 public:
   NS_DECL_ISUPPORTS
 
@@ -215,6 +216,7 @@ public:
     , mIsClientRequest(aIsClientRequest)
     , mIsNavigationRequest(aIsNavigationRequest)
     , mScriptSpec(aScriptSpec)
+    , mRequestWasHandled(false)
   {
   }
 
@@ -224,7 +226,12 @@ public:
 
   void CancelRequest(nsresult aStatus);
 private:
-  ~RespondWithHandler() {}
+  ~RespondWithHandler()
+  {
+    if (!mRequestWasHandled) {
+      CancelRequest(NS_ERROR_INTERCEPTION_FAILED);
+    }
+  }
 };
 
 struct RespondWithClosure
@@ -406,6 +413,7 @@ RespondWithHandler::ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValu
 
   MOZ_ASSERT(!closure);
   autoCancel.Reset();
+  mRequestWasHandled = true;
 }
 
 void
@@ -420,6 +428,7 @@ RespondWithHandler::CancelRequest(nsresult aStatus)
   nsCOMPtr<nsIRunnable> runnable =
     new CancelChannelRunnable(mInterceptedChannel, aStatus);
   NS_DispatchToMainThread(runnable);
+  mRequestWasHandled = true;
 }
 
 } // namespace
