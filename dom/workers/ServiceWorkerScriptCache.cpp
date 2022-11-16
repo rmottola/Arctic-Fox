@@ -403,7 +403,7 @@ public:
       return;
     }
 
-    if (NS_WARN_IF(!mCC || !mInCache)) {
+    if (!mCC || !mInCache) {
       ComparisonFinished(NS_OK, false);
       return;
     }
