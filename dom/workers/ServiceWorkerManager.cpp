@@ -2748,6 +2748,13 @@ ServiceWorkerManager::StopControllingADocument(ServiceWorkerRegistrationInfo* aR
       aRegistration->Clear();
       RemoveRegistration(aRegistration);
     } else {
+      // If the registration has an active worker that is running
+      // this might be a good time to stop it.
+      if (aRegistration->mActiveWorker) {
+        ServiceWorkerPrivate* serviceWorkerPrivate =
+          aRegistration->mActiveWorker->WorkerPrivate();
+        serviceWorkerPrivate->NoteStoppedControllingDocuments();
+      }
       aRegistration->TryToActivate();
     }
   }
@@ -4182,7 +4189,7 @@ ServiceWorkerInfo::ServiceWorkerInfo(ServiceWorkerRegistrationInfo* aReg,
 ServiceWorkerInfo::~ServiceWorkerInfo()
 {
   MOZ_ASSERT(mServiceWorkerPrivate);
-  mServiceWorkerPrivate->TerminateWorker();
+  mServiceWorkerPrivate->NoteDeadServiceWorkerInfo();
 }
 
 static uint64_t gServiceWorkerInfoCurrentID = 0;
