@@ -946,6 +946,12 @@ private:
       MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(runnable)));
     }
 
+    RefPtr<Promise> respondWithPromise = event->GetPromise();
+    if (respondWithPromise) {
+      RefPtr<KeepAliveHandler> keepAliveHandler =
+        new KeepAliveHandler(mKeepAliveToken);
+      respondWithPromise->AppendNativeHandler(keepAliveHandler);
+    }
     return true;
   }
 };

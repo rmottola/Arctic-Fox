@@ -55,6 +55,7 @@ class FetchEvent final : public Event
   RefPtr<Request> mRequest;
   nsCString mScriptSpec;
   UniquePtr<ServiceWorkerClientInfo> mClientInfo;
+  RefPtr<Promise> mPromise;
   bool mIsReload;
   bool mWaitToRespond;
 protected:
@@ -104,6 +105,13 @@ public:
 
   void
   RespondWith(Promise& aArg, ErrorResult& aRv);
+
+  already_AddRefed<Promise>
+  GetPromise() const
+  {
+    RefPtr<Promise> p = mPromise;
+    return p.forget();
+  }
 
   already_AddRefed<Promise>
   ForwardTo(const nsAString& aUrl);

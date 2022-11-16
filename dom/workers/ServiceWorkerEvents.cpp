@@ -432,6 +432,9 @@ FetchEvent::RespondWith(Promise& aArg, ErrorResult& aRv)
     return;
   }
 
+  if (!mPromise) {
+    mPromise = &aArg;
+  }
   RefPtr<InternalRequest> ir = mRequest->GetInternalRequest();
   mWaitToRespond = true;
   RefPtr<RespondWithHandler> handler =
@@ -464,7 +467,8 @@ NS_IMPL_RELEASE_INHERITED(FetchEvent, Event)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(FetchEvent)
 NS_INTERFACE_MAP_END_INHERITING(Event)
 
-NS_IMPL_CYCLE_COLLECTION_INHERITED(FetchEvent, Event, mRequest, mClient)
+NS_IMPL_CYCLE_COLLECTION_INHERITED(FetchEvent, Event, mRequest, mClient,
+                                   mPromise)
 
 ExtendableEvent::ExtendableEvent(EventTarget* aOwner)
   : Event(aOwner, nullptr, nullptr)
