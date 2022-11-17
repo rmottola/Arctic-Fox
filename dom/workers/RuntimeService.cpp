@@ -1538,6 +1538,28 @@ RuntimeService::RegisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
 }
 
 void
+RuntimeService::RemoveSharedWorker(WorkerDomainInfo* aDomainInfo,
+                                   WorkerPrivate* aWorkerPrivate)
+{
+  for (auto iter = aDomainInfo->mSharedWorkerInfos.Iter();
+       !iter.Done();
+       iter.Next()) {
+    SharedWorkerInfo* data = iter.UserData();
+    if (data->mWorkerPrivate == aWorkerPrivate) {
+#ifdef DEBUG
+      fprintf(stderr, "njn: RemoveSharedWorker\n");
+      nsAutoCString key;
+      GenerateSharedWorkerKey(data->mScriptSpec, data->mName,
+                              aWorkerPrivate->IsInPrivateBrowsing(), key);
+      MOZ_ASSERT(iter.Key() == key);
+#endif
+      iter.Remove();
+      break;
+    }
+  }
+}
+
+void
 RuntimeService::UnregisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
 {
   aWorkerPrivate->AssertIsOnParentThread();
@@ -1574,19 +1596,8 @@ RuntimeService::UnregisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
       domainInfo->mActiveWorkers.RemoveElement(aWorkerPrivate);
     }
 
-
     if (aWorkerPrivate->IsSharedWorker()) {
-      MatchSharedWorkerInfo match(aWorkerPrivate);
-      domainInfo->mSharedWorkerInfos.EnumerateRead(FindSharedWorkerInfo,
-                                                   &match);
-
-      if (match.mSharedWorkerInfo) {
-        nsAutoCString key;
-        GenerateSharedWorkerKey(match.mSharedWorkerInfo->mScriptSpec,
-                                match.mSharedWorkerInfo->mName,
-                                aWorkerPrivate->IsInPrivateBrowsing(), key);
-        domainInfo->mSharedWorkerInfos.Remove(key);
-      }
+      RemoveSharedWorker(domainInfo, aWorkerPrivate);
     }
 
     // See if there's a queued worker we can schedule.
@@ -2242,22 +2253,6 @@ RuntimeService::RemoveSharedWorkerFromWindowMap(
   return PL_DHASH_NEXT;
 }
 
-// static
-PLDHashOperator
-RuntimeService::FindSharedWorkerInfo(const nsACString& aKey,
-                                     SharedWorkerInfo* aData,
-                                     void* aUserArg)
-{
-  auto match = static_cast<MatchSharedWorkerInfo*>(aUserArg);
-
-  if (aData->mWorkerPrivate == match->mWorkerPrivate) {
-    match->mSharedWorkerInfo = aData;
-    return PL_DHASH_STOP;
-  }
-
-  return PL_DHASH_NEXT;
-}
-
 void
 RuntimeService::GetWorkersForWindow(nsPIDOMWindow* aWindow,
                                     nsTArray<WorkerPrivate*>& aWorkers)
@@ -2473,17 +2468,7 @@ RuntimeService::ForgetSharedWorker(WorkerPrivate* aWorkerPrivate)
 
   WorkerDomainInfo* domainInfo;
   if (mDomainMap.Get(aWorkerPrivate->Domain(), &domainInfo)) {
-    MatchSharedWorkerInfo match(aWorkerPrivate);
-    domainInfo->mSharedWorkerInfos.EnumerateRead(FindSharedWorkerInfo,
-                                                 &match);
-
-    if (match.mSharedWorkerInfo) {
-      nsAutoCString key;
-      GenerateSharedWorkerKey(match.mSharedWorkerInfo->mScriptSpec,
-                              match.mSharedWorkerInfo->mName,
-                              aWorkerPrivate->IsInPrivateBrowsing(), key);
-      domainInfo->mSharedWorkerInfos.Remove(key);
-    }
+    RemoveSharedWorker(domainInfo, aWorkerPrivate);
   }
 }
 
