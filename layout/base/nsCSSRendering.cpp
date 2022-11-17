@@ -3012,6 +3012,8 @@ nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
           !clipState.mDirtyRectGfx.IsEmpty()) {
         nsBackgroundLayerState state = PrepareBackgroundLayer(aPresContext, aForFrame,
             aFlags, paintBorderArea, clipState.mBGClipArea, layer);
+        result &= state.mImageRenderer.PrepareResult();
+
         if (!state.mFillArea.IsEmpty()) {
           if (state.mCompositionOp != CompositionOp::OP_OVER) {
             NS_ASSERTION(ctx->CurrentOp() == CompositionOp::OP_OVER,
@@ -4746,7 +4748,7 @@ nsImageRenderer::nsImageRenderer(nsIFrame* aForFrame,
   , mImageContainer(nullptr)
   , mGradientData(nullptr)
   , mPaintServerFrame(nullptr)
-  , mIsReady(false)
+  , mPrepareResult(DrawResult::NOT_READY)
   , mSize(0, 0)
   , mFlags(aFlags)
 {
@@ -4759,8 +4761,10 @@ nsImageRenderer::~nsImageRenderer()
 bool
 nsImageRenderer::PrepareImage()
 {
-  if (mImage->IsEmpty())
+  if (mImage->IsEmpty()) {
+    mPrepareResult = DrawResult::BAD_IMAGE;
     return false;
+  }
 
   if (!mImage->IsComplete()) {
     // Make sure the image is actually decoding
@@ -4775,8 +4779,10 @@ nsImageRenderer::PrepareImage()
       nsCOMPtr<imgIContainer> img;
       if (!((mFlags & FLAG_SYNC_DECODE_IMAGES) &&
             (mType == eStyleImageType_Image) &&
-            (NS_SUCCEEDED(mImage->GetImageData()->GetImage(getter_AddRefs(img))))))
+            (NS_SUCCEEDED(mImage->GetImageData()->GetImage(getter_AddRefs(img)))))) {
+        mPrepareResult = DrawResult::NOT_READY;
         return false;
+      }
     }
   }
 
@@ -4800,6 +4806,7 @@ nsImageRenderer::PrepareImage()
         NS_ASSERTION(success, "ComputeActualCropRect() should not fail here");
         if (!success || actualCropRect.IsEmpty()) {
           // The cropped image has zero size
+          mPrepareResult = DrawResult::BAD_IMAGE;
           return false;
         }
         if (isEntireImage) {
@@ -4810,12 +4817,12 @@ nsImageRenderer::PrepareImage()
           mImageContainer.swap(subImage);
         }
       }
-      mIsReady = true;
+      mPrepareResult = DrawResult::SUCCESS;
       break;
     }
     case eStyleImageType_Gradient:
       mGradientData = mImage->GetGradientData();
-      mIsReady = true;
+      mPrepareResult = DrawResult::SUCCESS;
       break;
     case eStyleImageType_Element:
     {
@@ -4829,6 +4836,7 @@ nsImageRenderer::PrepareImage()
           targetURI, mForFrame->FirstContinuation(),
           nsSVGEffects::BackgroundImageProperty());
       if (!property) {
+        mPrepareResult = DrawResult::BAD_IMAGE;
         return false;
       }
 
@@ -4839,11 +4847,12 @@ nsImageRenderer::PrepareImage()
       if (!mImageElementSurface.mSourceSurface) {
         mPaintServerFrame = property->GetReferencedFrame();
         if (!mPaintServerFrame) {
+          mPrepareResult = DrawResult::BAD_IMAGE;
           return false;
         }
       }
 
-      mIsReady = true;
+      mPrepareResult = DrawResult::SUCCESS;
       break;
     }
     case eStyleImageType_Null:
@@ -4851,7 +4860,7 @@ nsImageRenderer::PrepareImage()
       break;
   }
 
-  return mIsReady;
+  return IsReady();
 }
 
 nsSize
@@ -4878,8 +4887,8 @@ CSSSizeOrRatio::ComputeConcreteSize() const
 CSSSizeOrRatio
 nsImageRenderer::ComputeIntrinsicSize()
 {
-  NS_ASSERTION(mIsReady, "Ensure PrepareImage() has returned true "
-                         "before calling me");
+  NS_ASSERTION(IsReady(), "Ensure PrepareImage() has returned true "
+                          "before calling me");
 
   CSSSizeOrRatio result;
   switch (mType) {
@@ -5081,7 +5090,7 @@ nsImageRenderer::Draw(nsPresContext*       aPresContext,
                       const nsSize&        aRepeatSize,
                       const CSSIntRect&    aSrc)
 {
-  if (!mIsReady) {
+  if (!IsReady()) {
     NS_NOTREACHED("Ensure PrepareImage() has returned true before calling me");
     return DrawResult::TEMPORARY_ERROR;
   }
@@ -5189,7 +5198,7 @@ nsImageRenderer::DrawBackground(nsPresContext*       aPresContext,
                                 const nsRect&        aDirty,
                                 const nsSize&        aRepeatSize)
 {
-  if (!mIsReady) {
+  if (!IsReady()) {
     NS_NOTREACHED("Ensure PrepareImage() has returned true before calling me");
     return DrawResult::TEMPORARY_ERROR;
   }
@@ -5287,7 +5296,7 @@ nsImageRenderer::DrawBorderImageComponent(nsPresContext*       aPresContext,
                                           const nsSize&        aUnitSize,
                                           uint8_t              aIndex)
 {
-  if (!mIsReady) {
+  if (!IsReady()) {
     NS_NOTREACHED("Ensure PrepareImage() has returned true before calling me");
     return;
   }

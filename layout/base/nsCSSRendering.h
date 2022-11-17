@@ -253,7 +253,8 @@ public:
   /// Retrieves the image associated with this nsImageRenderer, if there is one.
   already_AddRefed<imgIContainer> GetImage();
 
-  bool IsReady() { return mIsReady; }
+  bool IsReady() const { return mPrepareResult == DrawResult::SUCCESS; }
+  DrawResult PrepareResult() const { return mPrepareResult; }
 
 private:
   /**
@@ -288,7 +289,7 @@ private:
   RefPtr<nsStyleGradient> mGradientData;
   nsIFrame*                 mPaintServerFrame;
   nsLayoutUtils::SurfaceFromElementResult mImageElementSurface;
-  bool                      mIsReady;
+  DrawResult                mPrepareResult;
   nsSize                    mSize; // unscaled size of the image, in app units
   uint32_t                  mFlags;
 };
