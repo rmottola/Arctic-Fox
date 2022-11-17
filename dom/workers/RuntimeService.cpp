@@ -134,7 +134,7 @@ static_assert(MAX_WORKERS_PER_DOMAIN >= 1,
     {                                                                          \
       MutexAutoLock lock(mMutex);                                              \
                                                                                \
-      mDomainMap.EnumerateRead(AddAllTopLevelWorkersToArray, &workers);        \
+      AddAllTopLevelWorkersToArray(workers);                                   \
     }                                                                          \
                                                                                \
     if (!workers.IsEmpty()) {                                                  \
@@ -2004,7 +2004,7 @@ RuntimeService::Shutdown()
     MutexAutoLock lock(mMutex);
 
     nsAutoTArray<WorkerPrivate*, 100> workers;
-    mDomainMap.EnumerateRead(AddAllTopLevelWorkersToArray, &workers);
+    AddAllTopLevelWorkersToArray(workers);
 
     if (!workers.IsEmpty()) {
       // Cancel all top-level workers.
@@ -2045,7 +2045,7 @@ RuntimeService::Cleanup()
     MutexAutoLock lock(mMutex);
 
     nsAutoTArray<WorkerPrivate*, 100> workers;
-    mDomainMap.EnumerateRead(AddAllTopLevelWorkersToArray, &workers);
+    AddAllTopLevelWorkersToArray(workers);
 
     if (!workers.IsEmpty()) {
       nsIThread* currentThread = NS_GetCurrentThread();
@@ -2209,38 +2209,35 @@ RuntimeService::Cleanup()
   nsLayoutStatics::Release();
 }
 
-// static
-PLDHashOperator
-RuntimeService::AddAllTopLevelWorkersToArray(const nsACString& aKey,
-                                             WorkerDomainInfo* aData,
-                                             void* aUserArg)
+void
+RuntimeService::AddAllTopLevelWorkersToArray(nsTArray<WorkerPrivate*>& aWorkers)
 {
-  nsTArray<WorkerPrivate*>* array =
-    static_cast<nsTArray<WorkerPrivate*>*>(aUserArg);
+  for (auto iter = mDomainMap.Iter(); !iter.Done(); iter.Next()) {
+
+    WorkerDomainInfo* aData = iter.UserData();
 
 #ifdef DEBUG
-  for (uint32_t index = 0; index < aData->mActiveWorkers.Length(); index++) {
-    MOZ_ASSERT(!aData->mActiveWorkers[index]->GetParent(),
-               "Shouldn't have a parent in this list!");
-  }
-  for (uint32_t index = 0; index < aData->mActiveServiceWorkers.Length(); index++) {
-    MOZ_ASSERT(!aData->mActiveServiceWorkers[index]->GetParent(),
-               "Shouldn't have a parent in this list!");
-  }
+    for (uint32_t index = 0; index < aData->mActiveWorkers.Length(); index++) {
+      MOZ_ASSERT(!aData->mActiveWorkers[index]->GetParent(),
+                 "Shouldn't have a parent in this list!");
+    }
+    for (uint32_t index = 0; index < aData->mActiveServiceWorkers.Length(); index++) {
+      MOZ_ASSERT(!aData->mActiveServiceWorkers[index]->GetParent(),
+                 "Shouldn't have a parent in this list!");
+    }
 #endif
 
-  array->AppendElements(aData->mActiveWorkers);
-  array->AppendElements(aData->mActiveServiceWorkers);
+    aWorkers.AppendElements(aData->mActiveWorkers);
+    aWorkers.AppendElements(aData->mActiveServiceWorkers);
 
-  // These might not be top-level workers...
-  for (uint32_t index = 0; index < aData->mQueuedWorkers.Length(); index++) {
-    WorkerPrivate* worker = aData->mQueuedWorkers[index];
-    if (!worker->GetParent()) {
-      array->AppendElement(worker);
+    // These might not be top-level workers...
+    for (uint32_t index = 0; index < aData->mQueuedWorkers.Length(); index++) {
+      WorkerPrivate* worker = aData->mQueuedWorkers[index];
+      if (!worker->GetParent()) {
+        aWorkers.AppendElement(worker);
+      }
     }
   }
-
-  return PL_DHASH_NEXT;
 }
 
 // static
