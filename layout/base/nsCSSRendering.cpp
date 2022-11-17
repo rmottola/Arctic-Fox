@@ -1608,11 +1608,15 @@ nsCSSRendering::PaintBoxShadowInner(nsPresContext* aPresContext,
 
     nsContextBoxBlur insetBoxBlur;
     gfxRect destRect = nsLayoutUtils::RectToGfxRect(shadowPaintRect, twipsPerPixel);
+    Point shadowOffset(shadowItem->mXOffset / twipsPerPixel,
+                       shadowItem->mYOffset / twipsPerPixel);
+
     insetBoxBlur.InsetBoxBlur(renderContext, ToRect(destRect),
                               shadowClipGfxRect, shadowColor,
                               blurRadius, spreadDistanceAppUnits,
                               twipsPerPixel, hasBorderRadius,
-                              clipRectRadii, ToRect(skipGfxRect));
+                              clipRectRadii, ToRect(skipGfxRect),
+                              shadowOffset);
     renderContext->Restore();
   }
 }
@@ -5649,7 +5653,7 @@ nsContextBoxBlur::InsetBoxBlur(gfxContext* aDestinationCtx,
                                int32_t aAppUnitsPerDevPixel,
                                bool aHasBorderRadius,
                                RectCornerRadii& aInnerClipRectRadii,
-                               Rect aSkipRect)
+                               Rect aSkipRect, Point aShadowOffset)
 {
   if (aDestinationRect.IsEmpty()) {
     mContext = nullptr;
@@ -5691,9 +5695,9 @@ nsContextBoxBlur::InsetBoxBlur(gfxContext* aDestinationCtx,
     mAlphaBoxBlur.BlurInsetBox(aDestinationCtx, transformedDestRect,
                                transformedShadowClipRect,
                                blurRadius, spreadRadius,
-                               aShadowColor,
-                               aHasBorderRadius,
-                               aInnerClipRectRadii, transformedSkipRect);
+                               aShadowColor, aHasBorderRadius,
+                               aInnerClipRectRadii, transformedSkipRect,
+                               aShadowOffset);
   }
   return true;
 }
