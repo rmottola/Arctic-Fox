@@ -2841,9 +2841,6 @@ nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
   NS_PRECONDITION(aForFrame,
                   "Frame is expected to be provided to PaintBackground");
 
-  // Initialize our result to success. We update it only if its value is
-  // currently DrawResult::SUCCESS, which means that as soon as we hit our first
-  // non-successful draw, we stop updating and will return that value.
   DrawResult result = DrawResult::SUCCESS;
 
   // Check to see if we have an appearance defined.  If so, we let the theme
@@ -3021,16 +3018,12 @@ nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
             ctx->SetOp(state.mCompositionOp);
           }
 
-          DrawResult resultForLayer =
+          result &=
             state.mImageRenderer.DrawBackground(aPresContext, aRenderingContext,
                                                 state.mDestArea, state.mFillArea,
                                                 state.mAnchor + paintBorderArea.TopLeft(),
                                                 clipState.mDirtyRect,
                                                 state.mRepeatSize);
-
-          if (result == DrawResult::SUCCESS) {
-            result = resultForLayer;
-          }
 
           if (state.mCompositionOp != CompositionOp::OP_OVER) {
             ctx->SetOp(CompositionOp::OP_OVER);
