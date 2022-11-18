@@ -315,7 +315,7 @@ private:
   void InvalidateSelf(const nsIntRect* aLayerInvalidRect,
                       const nsRect* aFrameInvalidRect);
 
-  nsImageMap*         mImageMap;
+  RefPtr<nsImageMap> mImageMap;
 
   nsCOMPtr<imgINotificationObserver> mListener;
 
