@@ -24,6 +24,7 @@
 #undef GetClassName
 #undef GetBinaryType
 #undef RemoveDirectory
+#undef LoadIcon
 #endif
 
 class nsPresContext;
@@ -200,6 +201,11 @@ public:
 
   void SetInstanceOwner(nsPluginInstanceOwner* aOwner);
 
+  /**
+   * Helper for hiding windowed plugins during non-apz scroll operations.
+   */
+  void SetScrollVisibility(bool aState);
+
 protected:
   explicit nsPluginFrame(nsStyleContext* aContext);
   virtual ~nsPluginFrame();
@@ -303,6 +309,10 @@ private:
   // This is only non-null while we have a plugin registered for geometry
   // updates.
   RefPtr<nsRootPresContext> mRootPresContextRegisteredWith;
+
+  // Tracks windowed plugin visibility during scroll operations. See
+  // SetScrollVisibility.
+  bool mIsHiddenDueToScroll;
 };
 
 class nsDisplayPlugin : public nsDisplayItem {
