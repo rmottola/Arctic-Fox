@@ -2874,14 +2874,14 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   nsRect dirtyRect = aDirtyRect.Intersect(mScrollPort);
 
   nsRect displayPort;
-  bool usingDisplayport = false;
+  bool usingDisplayPort = false;
   if (aBuilder->IsPaintingToWindow()) {
     bool wasUsingDisplayPort = nsLayoutUtils::GetDisplayPort(mOuter->GetContent(), nullptr);
 
     if (mIsRoot && gfxPrefs::LayoutUseContainersForRootFrames()) {
       // For a root frame in a container, just get the value of the existing
       // display port if any.
-      usingDisplayport = nsLayoutUtils::GetDisplayPort(mOuter->GetContent(), &displayPort);
+      usingDisplayPort = nsLayoutUtils::GetDisplayPort(mOuter->GetContent(), &displayPort);
     } else {
       // Override the value of the display port base rect, and possibly create a
       // display port if there isn't one already.
@@ -2890,12 +2890,12 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
         displayportBase =
           nsRect(nsPoint(0, 0), nsLayoutUtils::CalculateCompositionSizeForFrame(mOuter));
       }
-      usingDisplayport = nsLayoutUtils::GetOrMaybeCreateDisplayPort(
+      usingDisplayPort = nsLayoutUtils::GetOrMaybeCreateDisplayPort(
             *aBuilder, mOuter, displayportBase, &displayPort);
     }
 
     // Override the dirty rectangle if the displayport has been set.
-    if (usingDisplayport) {
+    if (usingDisplayPort) {
       dirtyRect = displayPort;
 
       // The cached animated geometry root for the display builder is out of
@@ -2915,7 +2915,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   // document.
   // If the element is marked 'scrollgrab', also force building of a layer
   // so that APZ can implement scroll grabbing.
-  mShouldBuildScrollableLayer = usingDisplayport || nsContentUtils::HasScrollgrab(mOuter->GetContent());
+  mShouldBuildScrollableLayer = usingDisplayPort || nsContentUtils::HasScrollgrab(mOuter->GetContent());
   bool shouldBuildLayer = false;
   if (mShouldBuildScrollableLayer) {
     shouldBuildLayer = true;
@@ -2938,7 +2938,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   // Note that this does not apply for overlay scrollbars; those are drawn
   // in the positioned-elements layer on top of everything else by the call
   // to AppendScrollPartsTo(..., true) further down.
-  AppendScrollPartsTo(aBuilder, aDirtyRect, aLists, usingDisplayport,
+  AppendScrollPartsTo(aBuilder, aDirtyRect, aLists, usingDisplayPort,
                       createLayersForScrollbars, false);
 
   if (aBuilder->IsForImageVisibility()) {
@@ -2999,7 +2999,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     // clipStatePtr will always point to the innermost used one.
     DisplayListClipState::AutoSaveRestore clipState(aBuilder);
     DisplayListClipState::AutoSaveRestore* clipStatePtr = &clipState;
-    if (!mIsRoot || !usingDisplayport) {
+    if (!mIsRoot || !usingDisplayPort) {
       nsRect clip = mScrollPort + aBuilder->ToReferenceFrame(mOuter);
       nscoord radii[8];
       bool haveRadii = mOuter->GetPaddingBoxBorderRadii(radii);
@@ -3024,7 +3024,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     }
 
     Maybe<DisplayListClipState::AutoSaveRestore> clipStateNonCaret;
-    if (usingDisplayport) {
+    if (usingDisplayPort) {
       // Capture the clip state of the parent scroll frame. This will be saved
       // on FrameMetrics for layers with this frame as their animated geoemetry
       // root.
@@ -3080,7 +3080,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
 
   if (contentBoxClipForNonCaretContent) {
     ClipListsExceptCaret(&scrolledContent, aBuilder, mScrolledFrame,
-                         *contentBoxClipForNonCaretContent, usingDisplayport);
+                         *contentBoxClipForNonCaretContent, usingDisplayPort);
   }
 
   if (shouldBuildLayer) {
@@ -3116,7 +3116,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     }
   }
   // Now display overlay scrollbars and the resizer, if we have one.
-  AppendScrollPartsTo(aBuilder, aDirtyRect, scrolledContent, usingDisplayport,
+  AppendScrollPartsTo(aBuilder, aDirtyRect, scrolledContent, usingDisplayPort,
                       createLayersForScrollbars, true);
   scrolledContent.MoveTo(aLists);
 }
