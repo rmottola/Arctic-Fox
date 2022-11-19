@@ -203,7 +203,7 @@ public:
   void SetInstanceOwner(nsPluginInstanceOwner* aOwner);
 
   /**
-   * Helper for hiding windowed plugins during non-apz scroll operations.
+   * Helper for hiding windowed plugins during async scroll operations.
    */
   void SetScrollVisibility(bool aState);
 
