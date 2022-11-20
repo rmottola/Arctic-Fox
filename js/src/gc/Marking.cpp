@@ -28,6 +28,7 @@
 #include "vm/UnboxedObject.h"
 
 #include "jscompartmentinlines.h"
+#include "jsgcinlines.h"
 #include "jsobjinlines.h"
 
 #include "gc/Nursery-inl.h"
@@ -631,10 +632,11 @@ GCMarker::markImplicitEdgesHelper(T markedThing)
     if (!isWeakMarkingTracer())
         return;
 
-    MOZ_ASSERT(gc::TenuredCell::fromPointer(markedThing)->zone()->isGCMarking());
-    MOZ_ASSERT(!gc::TenuredCell::fromPointer(markedThing)->zone()->isGCSweeping());
+    Zone* zone = gc::TenuredCell::fromPointer(markedThing)->zone();
+    MOZ_ASSERT(zone->isGCMarking());
+    MOZ_ASSERT(!zone->isGCSweeping());
 
-    auto p = weakKeys.get(JS::GCCellPtr(markedThing));
+    auto p = zone->gcWeakKeys.get(JS::GCCellPtr(markedThing));
     if (!p)
         return;
     WeakEntryVector& markables = p->value;
@@ -1721,7 +1723,7 @@ GCMarker::GCMarker(JSRuntime* rt)
 bool
 GCMarker::init(JSGCMode gcMode)
 {
-    return stack.init(gcMode) && weakKeys.init();
+    return stack.init(gcMode);
 }
 
 void
@@ -1749,7 +1751,8 @@ GCMarker::stop()
 
     /* Free non-ballast stack memory. */
     stack.reset();
-    weakKeys.clear();
+    for (GCZonesIter zone(runtime()); !zone.done(); zone.next())
+        zone->gcWeakKeys.clear();
 }
 
 void
@@ -1793,6 +1796,19 @@ GCMarker::enterWeakMarkingMode()
             }
         }
     }
+}
+
+void
+GCMarker::leaveWeakMarkingMode()
+{
+    MOZ_ASSERT_IF(weakMapAction() == ExpandWeakMaps && !linearWeakMarkingDisabled_,
+                  tag_ == TracerKindTag::WeakMarking);
+    tag_ = TracerKindTag::Marking;
+
+    // Table is expensive to maintain when not in weak marking mode, so we'll
+    // rebuild it upon entry rather than allow it to contain stale data.
+    for (GCZonesIter zone(runtime()); !zone.done(); zone.next())
+        zone->gcWeakKeys.clear();
 }
 
 void
