@@ -1998,6 +1998,9 @@ void
 ScrollFrameHelper::NotifyPluginFrames(AsyncScrollEventType aEvent)
 {
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
+  if (!gfxPrefs::HidePluginsForScroll()) {
+    return;
+  }
   if (XRE_IsContentProcess()) {
     // Ignore 'inner' dom events triggered by apz transformations
     if (mAsyncScrollEvent == BEGIN_APZ && aEvent != END_APZ) {
