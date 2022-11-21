@@ -1880,6 +1880,7 @@ nsIWidget::LookupRegisteredPluginWindow(uintptr_t aWindowID)
 struct VisEnumContext {
   uintptr_t parentWidget;
   const nsTArray<uintptr_t>* list;
+  bool widgetVisibilityFlag;
 };
 
 static PLDHashOperator
@@ -1892,9 +1893,8 @@ RegisteredPluginEnumerator(const void* aWindowId, nsIWidget* aWidget, void* aUse
 
   if (!aWidget->Destroyed()) {
     VisEnumContext* pctx = static_cast<VisEnumContext*>(aUserArg);
-    if ((uintptr_t)aWidget->GetParent() == pctx->parentWidget &&
-        !pctx->list->Contains((uintptr_t)aWindowId)) {
-      aWidget->Show(false);
+    if ((uintptr_t)aWidget->GetParent() == pctx->parentWidget) {
+      aWidget->Show(pctx->list->Contains((uintptr_t)aWindowId));
     }
   }
   return PLDHashOperator::PL_DHASH_NEXT;
@@ -1904,7 +1904,7 @@ RegisteredPluginEnumerator(const void* aWindowId, nsIWidget* aWidget, void* aUse
 // static
 void
 nsIWidget::UpdateRegisteredPluginWindowVisibility(uintptr_t aOwnerWidget,
-                                                  nsTArray<uintptr_t>& aVisibleList)
+                                                  nsTArray<uintptr_t>& aPluginIds)
 {
 #if !defined(XP_WIN) && !defined(MOZ_WIDGET_GTK)
   NS_NOTREACHED("nsBaseWidget::UpdateRegisteredPluginWindowVisibility not implemented!");
@@ -1915,7 +1915,7 @@ nsIWidget::UpdateRegisteredPluginWindowVisibility(uintptr_t aOwnerWidget,
   // Our visible list is associated with a compositor which is associated with
   // a specific top level window. We hand the parent widget in here so the
   // enumerator can skip the plugin widgets owned by other top level windows.
-  VisEnumContext ctx = { aOwnerWidget, &aVisibleList };
+  VisEnumContext ctx = { aOwnerWidget, &aPluginIds };
   sPluginWidgetList->EnumerateRead(RegisteredPluginEnumerator, static_cast<void*>(&ctx));
 #endif
 }
