@@ -18,8 +18,9 @@ const SERVER_CONTRACT_ID = "@mozilla.org/presentation-device/tcp-presentation-se
 
 const PREF_DISCOVERY = "dom.presentation.discovery.enabled";
 const PREF_DISCOVERABLE = "dom.presentation.discoverable";
+const PREF_DEVICENAME= "dom.presentation.device.name";
 
-let registrar = Cm.QueryInterface(Ci.nsIComponentRegistrar);
+var registrar = Cm.QueryInterface(Ci.nsIComponentRegistrar);
 
 function MockFactory(aClass) {
   this._cls = aClass;
@@ -372,6 +373,271 @@ function addDevice() {
 
 function handleSessionRequest() {
   Services.prefs.setBoolPref(PREF_DISCOVERY, true);
+  Services.prefs.setBoolPref(PREF_DISCOVERABLE, false);
+
+  const testUrl = "http://example.com";
+  const testPresentationId = "test-presentation-id";
+  const testDeviceName = "test-device-name";
+
+  Services.prefs.setCharPref(PREF_DEVICENAME, testDeviceName);
+
+  let mockDevice = createDevice("device.local",
+                                12345,
+                                "service.name",
+                                "_mozilla_papi._tcp");
+  let mockSDObj = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIDNSServiceDiscovery]),
+    startDiscovery: function(serviceType, listener) {
+      listener.onDiscoveryStarted(serviceType);
+      listener.onServiceFound(createDevice("",
+                                           0,
+                                           mockDevice.serviceName,
+                                           mockDevice.serviceType));
+      return {
+        QueryInterface: XPCOMUtils.generateQI([Ci.nsICancelable]),
+        cancel: function() {}
+      };
+    },
+    registerService: function(serviceInfo, listener) {},
+    resolveService: function(serviceInfo, listener) {
+      listener.onServiceResolved(createDevice(mockDevice.host,
+                                              mockDevice.port,
+                                              mockDevice.serviceName,
+                                              mockDevice.serviceType));
+    }
+  };
+
+  let mockServerObj = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsITCPPresentationServer]),
+    requestSession: function(deviceInfo, url, presentationId) {
+      this.request = {
+        deviceInfo: deviceInfo,
+        url: url,
+        presentationId: presentationId,
+      };
+      return {
+        QueryInterface: XPCOMUtils.generateQI([Ci.nsIPresentationControlChannel]),
+      };
+    },
+    id: "",
+  };
+
+  let contractHookSD = new ContractHook(SD_CONTRACT_ID, mockSDObj);
+  let contractHookServer = new ContractHook(SERVER_CONTRACT_ID, mockServerObj);
+  let provider = Cc[PROVIDER_CONTRACT_ID].createInstance(Ci.nsIPresentationDeviceProvider);
+  let listener = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIPresentationDeviceListener,
+                                           Ci.nsISupportsWeakReference]),
+    addDevice: function(device) {
+      this.device = device;
+    },
+  };
+
+  provider.listener = listener;
+
+  let controlChannel = listener.device.establishControlChannel(testUrl, testPresentationId);
+
+  Assert.equal(mockServerObj.request.deviceInfo.id, mockDevice.host);
+  Assert.equal(mockServerObj.request.deviceInfo.host, mockDevice.host);
+  Assert.equal(mockServerObj.request.deviceInfo.port, mockDevice.port);
+  Assert.equal(mockServerObj.request.url, testUrl);
+  Assert.equal(mockServerObj.request.presentationId, testPresentationId);
+  Assert.equal(mockServerObj.id, testDeviceName);
+
+  provider.listener = null;
+
+  run_next_test();
+}
+
+function handleOnSessionRequest() {
+  Services.prefs.setBoolPref(PREF_DISCOVERY, true);
+  Services.prefs.setBoolPref(PREF_DISCOVERABLE, true);
+
+  let mockDevice = createDevice("device.local",
+                                12345,
+                                "service.name",
+                                "_mozilla_papi._tcp");
+  let mockSDObj = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIDNSServiceDiscovery]),
+    startDiscovery: function(serviceType, listener) {
+      listener.onDiscoveryStarted(serviceType);
+      listener.onServiceFound(createDevice("",
+                                           0,
+                                           mockDevice.serviceName,
+                                           mockDevice.serviceType));
+      return {
+        QueryInterface: XPCOMUtils.generateQI([Ci.nsICancelable]),
+        cancel: function() {}
+      };
+    },
+    registerService: function(serviceInfo, listener) {},
+    resolveService: function(serviceInfo, listener) {
+      listener.onServiceResolved(createDevice(mockDevice.host,
+                                              mockDevice.port,
+                                              mockDevice.serviceName,
+                                              mockDevice.serviceType));
+    }
+  };
+
+  let mockServerObj = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsITCPPresentationServer]),
+    startService: function() {},
+    sessionRequest: function() {},
+    close: function() {},
+    id: '',
+    port: 0,
+    listener: null,
+  };
+
+  let contractHookSD = new ContractHook(SD_CONTRACT_ID, mockSDObj);
+  let contractHookServer = new ContractHook(SERVER_CONTRACT_ID, mockServerObj);
+  let provider = Cc[PROVIDER_CONTRACT_ID].createInstance(Ci.nsIPresentationDeviceProvider);
+  let listener = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIPresentationDeviceListener,
+                                           Ci.nsISupportsWeakReference]),
+    addDevice: function(device) {},
+    removeDevice: function(device) {},
+    updateDevice: function(device) {},
+    onSessionRequest: function(device, url, presentationId, controlChannel) {
+      Assert.ok(true, "recieve onSessionRequest event");
+      this.request = {
+        deviceId: device.id,
+        url: url,
+        presentationId: presentationId,
+      };
+    }
+  };
+
+  provider.listener = listener;
+
+  const deviceInfo = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsITCPDeviceInfo]),
+    id: mockDevice.host,
+    host: mockDevice.host,
+    port: 54321,
+  };
+
+  const testUrl = "http://example.com";
+  const testPresentationId = "test-presentation-id";
+  const testControlChannel = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIPresentationControlChannel]),
+  };
+  provider.QueryInterface(Ci.nsITCPPresentationServerListener)
+          .onSessionRequest(deviceInfo, testUrl, testPresentationId, testControlChannel);
+
+  Assert.equal(listener.request.deviceId, deviceInfo.id);
+  Assert.equal(listener.request.url, testUrl);
+  Assert.equal(listener.request.presentationId, testPresentationId);
+
+  provider.listener = null;
+
+  run_next_test();
+}
+
+function handleOnSessionRequestFromUnknownDevice() {
+  Services.prefs.setBoolPref(PREF_DISCOVERY, false);
+  Services.prefs.setBoolPref(PREF_DISCOVERABLE, true);
+
+  let mockSDObj = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIDNSServiceDiscovery]),
+    startDiscovery: function(serviceType, listener) {},
+    registerService: function(serviceInfo, listener) {},
+    resolveService: function(serviceInfo, listener) {}
+  };
+
+  let mockServerObj = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsITCPPresentationServer]),
+    startService: function() {},
+    sessionRequest: function() {},
+    close: function() {},
+    id: '',
+    port: 0,
+    listener: null,
+  };
+
+  let contractHookSD = new ContractHook(SD_CONTRACT_ID, mockSDObj);
+  let contractHookServer = new ContractHook(SERVER_CONTRACT_ID, mockServerObj);
+  let provider = Cc[PROVIDER_CONTRACT_ID].createInstance(Ci.nsIPresentationDeviceProvider);
+  let listener = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIPresentationDeviceListener,
+                                           Ci.nsISupportsWeakReference]),
+    addDevice: function(device) {
+      Assert.ok(false, "shouldn't create any new device");
+    },
+    removeDevice: function(device) {
+      Assert.ok(false, "shouldn't remote any device");
+    },
+    updateDevice: function(device) {
+      Assert.ok(false, "shouldn't update any device");
+    },
+    onSessionRequest: function(device, url, presentationId, controlChannel) {
+      Assert.ok(true, "recieve onSessionRequest event");
+      this.request = {
+        deviceId: device.id,
+        url: url,
+        presentationId: presentationId,
+      };
+    }
+  };
+
+  provider.listener = listener;
+
+  const deviceInfo = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsITCPDeviceInfo]),
+    id: "unknown-device.local",
+    host: "unknown-device.local",
+    port: 12345,
+  };
+
+  const testUrl = "http://example.com";
+  const testPresentationId = "test-presentation-id";
+  const testControlChannel = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIPresentationControlChannel]),
+  };
+  provider.QueryInterface(Ci.nsITCPPresentationServerListener)
+          .onSessionRequest(deviceInfo, testUrl, testPresentationId, testControlChannel);
+
+  Assert.equal(listener.request.deviceId, deviceInfo.id);
+  Assert.equal(listener.request.url, testUrl);
+  Assert.equal(listener.request.presentationId, testPresentationId);
+
+  provider.listener = null;
+
+  run_next_test();
+}
+
+function noAddDevice() {
+  Services.prefs.setBoolPref(PREF_DISCOVERY, false);
+
+  let mockDevice = createDevice("device.local", 12345, "service.name", "_mozilla_papi._tcp");
+  let mockObj = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIDNSServiceDiscovery]),
+    startDiscovery: function(serviceType, listener) {
+      Assert.ok(false, "shouldn't perform any device discovery");
+    },
+    registerService: function(serviceInfo, listener) {},
+    resolveService: function(serviceInfo, listener) {
+    }
+  };
+  let contractHook = new ContractHook(SD_CONTRACT_ID, mockObj);
+
+  let provider = Cc[PROVIDER_CONTRACT_ID].createInstance(Ci.nsIPresentationDeviceProvider);
+  let listener = {
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIPresentationDeviceListener,
+                                           Ci.nsISupportsWeakReference]),
+    addDevice: function(device) {},
+    removeDevice: function(device) {},
+    updateDevice: function(device) {},
+  };
+  provider.listener = listener;
+  provider.forceDiscovery();
+  provider.listener = null;
+
+  run_next_test();
+}
+
+function handleSessionRequest() {
+  Services.prefs.setBoolPref(PREF_DISCOVERY, true);
 
   const testUrl = "http://example.com";
   const testPresentationId = "test-presentation-id";
@@ -473,7 +739,7 @@ function handleOnSessionRequest() {
 
   let mockServerObj = {
     QueryInterface: XPCOMUtils.generateQI([Ci.nsITCPPresentationServer]),
-    init: function() {},
+    startService: function() {},
     sessionRequest: function() {},
     close: function() {},
     id: '',
@@ -590,36 +856,6 @@ function handleOnSessionRequestFromUnknownDevice() {
   Assert.equal(listener.request.url, testUrl);
   Assert.equal(listener.request.presentationId, testPresentationId);
 
-  provider.listener = null;
-
-  run_next_test();
-}
-
-function noAddDevice() {
-  Services.prefs.setBoolPref(PREF_DISCOVERY, false);
-
-  let mockDevice = createDevice("device.local", 12345, "service.name", "_mozilla_papi._tcp");
-  let mockObj = {
-    QueryInterface: XPCOMUtils.generateQI([Ci.nsIDNSServiceDiscovery]),
-    startDiscovery: function(serviceType, listener) {
-      Assert.ok(false, "shouldn't perform any device discovery");
-    },
-    registerService: function(serviceInfo, listener) {},
-    resolveService: function(serviceInfo, listener) {
-    }
-  };
-  let contractHook = new ContractHook(SD_CONTRACT_ID, mockObj);
-
-  let provider = Cc[PROVIDER_CONTRACT_ID].createInstance(Ci.nsIPresentationDeviceProvider);
-  let listener = {
-    QueryInterface: XPCOMUtils.generateQI([Ci.nsIPresentationDeviceListener,
-                                           Ci.nsISupportsWeakReference]),
-    addDevice: function(device) {},
-    removeDevice: function(device) {},
-    updateDevice: function(device) {},
-  };
-  provider.listener = listener;
-  provider.forceDiscovery();
   provider.listener = null;
 
   run_next_test();
