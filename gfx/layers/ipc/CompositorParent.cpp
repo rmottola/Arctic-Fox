@@ -67,6 +67,9 @@
 #include "mozilla/Hal.h"
 #include "mozilla/HalTypes.h"
 #include "mozilla/StaticPtr.h"
+#ifdef MOZ_ENABLE_PROFILER_SPS
+#include "ProfilerMarkers.h"
+#endif
 #include "mozilla/VsyncDispatcher.h"
 
 #ifdef MOZ_WIDGET_GONK
@@ -1670,6 +1673,11 @@ CompositorParent::ComputeRenderIntegrity()
 static void
 InsertVsyncProfilerMarker(TimeStamp aVsyncTimestamp)
 {
+#ifdef MOZ_ENABLE_PROFILER_SPS
+  MOZ_ASSERT(CompositorParent::IsInCompositorThread());
+  VsyncPayload* payload = new VsyncPayload(aVsyncTimestamp);
+  PROFILER_MARKER_PAYLOAD("VsyncTimestamp", payload);
+#endif
 }
 
 /*static */ void
