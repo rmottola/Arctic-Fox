@@ -3255,6 +3255,7 @@ nsDisplayLayerEventRegions::AddFrame(nsDisplayListBuilder* aBuilder,
 void
 nsDisplayLayerEventRegions::AddInactiveScrollPort(const nsRect& aRect)
 {
+  mHitRegion.Or(mHitRegion, aRect);
   mDispatchToContentHitRegion.Or(mDispatchToContentHitRegion, aRect);
 }
 
