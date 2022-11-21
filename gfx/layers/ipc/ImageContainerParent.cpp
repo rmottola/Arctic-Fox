@@ -20,18 +20,11 @@ ImageContainerParent::~ImageContainerParent()
   }
 }
 
-static void SendDeleteAndIgnoreResult(ImageContainerParent* self)
-{
-  unused << PImageContainerParent::Send__delete__(self);
-}
-
 bool ImageContainerParent::RecvAsyncDelete()
 {
-  MessageLoop::current()->PostTask(
-    FROM_HERE, NewRunnableFunction(&SendDeleteAndIgnoreResult, this));
-
+  unused << PImageContainerParent::Send__delete__(this);
   return true;
 }
 
-}
-}
+} // namespace layers
+} // namespace mozilla
