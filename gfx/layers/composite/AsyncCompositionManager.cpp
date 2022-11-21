@@ -822,9 +822,9 @@ AsyncCompositionManager::ApplyAsyncContentTransformToTree(Layer *aLayer,
               geckoZoom * asyncTransformWithoutOverscroll.mScale,
               metrics.GetScrollableRect(), displayPort, geckoZoom, mLayersUpdated,
               mPaintSyncId, fixedLayerMargins);
+          mLayersUpdated = false;
         }
         mIsFirstPaint = false;
-        mLayersUpdated = false;
         mPaintSyncId = 0;
       }
     }
