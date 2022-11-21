@@ -264,6 +264,7 @@ protected:
   {
     gfxPrefs::GetSingleton();
     APZThreadUtils::SetThreadAssertionsEnabled(false);
+    APZThreadUtils::SetControllerThread(MessageLoop::current());
 
     mTime = TimeStamp::Now();
 
@@ -1845,6 +1846,7 @@ protected:
   virtual void SetUp() {
     gfxPrefs::GetSingleton();
     APZThreadUtils::SetThreadAssertionsEnabled(false);
+    APZThreadUtils::SetControllerThread(MessageLoop::current());
 
     mTime = TimeStamp::Now();
 
