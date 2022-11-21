@@ -21,7 +21,7 @@ namespace {
 
 ServiceWorkerManagerService* sInstance = nullptr;
 
-} // anonymous namespace
+} // namespace
 
 ServiceWorkerManagerService::ServiceWorkerManagerService()
 {
@@ -121,15 +121,14 @@ ServiceWorkerManagerService::PropagateSoftUpdate(
     ServiceWorkerManagerParent* parent = iter.Get()->GetKey();
     MOZ_ASSERT(parent);
 
-    if (parent->ID() != aParentID) {
-      nsString scope(aScope);
-      unused << parent->SendNotifySoftUpdate(aOriginAttributes,
-                                             scope);
+    nsString scope(aScope);
+    unused << parent->SendNotifySoftUpdate(aOriginAttributes,
+                                           scope);
 #ifdef DEBUG
-    } else {
+    if (parent->ID() == aParentID) {
       parentFound = true;
-#endif
     }
+#endif
   }
 
 #ifdef DEBUG
