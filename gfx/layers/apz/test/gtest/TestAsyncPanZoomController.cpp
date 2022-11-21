@@ -496,8 +496,8 @@ TapAndCheckStatus(const RefPtr<InputReceiver>& aTarget, int aX, int aY,
 template<class InputReceiver> static void
 Pan(const RefPtr<InputReceiver>& aTarget,
     TimeStamp& aTime,
-    int aTouchStartY,
-    int aTouchEndY,
+    const ScreenPoint& aTouchStart,
+    const ScreenPoint& aTouchEnd,
     bool aKeepFingerDown = false,
     nsTArray<uint32_t>* aAllowedTouchBehaviors = nullptr,
     nsEventStatus (*aOutEventStatuses)[4] = nullptr,
@@ -520,7 +520,7 @@ Pan(const RefPtr<InputReceiver>& aTarget,
   }
 
   // Make sure the move is large enough to not be handled as a tap
-  nsEventStatus status = TouchDown(aTarget, 10, aTouchStartY + OVERCOME_TOUCH_TOLERANCE, aTime, aOutInputBlockId);
+  nsEventStatus status = TouchDown(aTarget, aTouchStart.x, aTouchStart.y + OVERCOME_TOUCH_TOLERANCE, aTime, aOutInputBlockId);
   if (aOutEventStatuses) {
     (*aOutEventStatuses)[0] = status;
   }
@@ -537,14 +537,14 @@ Pan(const RefPtr<InputReceiver>& aTarget,
     }
   }
 
-  status = TouchMove(aTarget, 10, aTouchStartY, aTime);
+  status = TouchMove(aTarget, aTouchStart.x, aTouchStart.y, aTime);
   if (aOutEventStatuses) {
     (*aOutEventStatuses)[1] = status;
   }
 
   aTime += TIME_BETWEEN_TOUCH_EVENT;
 
-  status = TouchMove(aTarget, 10, aTouchEndY, aTime);
+  status = TouchMove(aTarget, aTouchEnd.x, aTouchEnd.y, aTime);
   if (aOutEventStatuses) {
     (*aOutEventStatuses)[2] = status;
   }
@@ -552,7 +552,7 @@ Pan(const RefPtr<InputReceiver>& aTarget,
   aTime += TIME_BETWEEN_TOUCH_EVENT;
 
   if (!aKeepFingerDown) {
-    status = TouchUp(aTarget, 10, aTouchEndY, aTime);
+    status = TouchUp(aTarget, aTouchEnd.x, aTouchEnd.y, aTime);
   } else {
     status = nsEventStatus_eIgnore;
   }
@@ -563,6 +563,23 @@ Pan(const RefPtr<InputReceiver>& aTarget,
   // Don't increment the time here. Animations started on touch-up, such as
   // flings, are affected by elapsed time, and we want to be able to sample
   // them immediately after they start, without time having elapsed.
+}
+
+// A version of Pan() that only takes y coordinates rather than (x, y) points
+// for the touch start and end points, and uses 10 for the x coordinates.
+// This is for convenience, as most tests only need to pan in one direction.
+template<class InputReceiver> static void
+Pan(const nsRefPtr<InputReceiver>& aTarget,
+    TimeStamp& aTime,
+    int aTouchStartY,
+    int aTouchEndY,
+    bool aKeepFingerDown = false,
+    nsTArray<uint32_t>* aAllowedTouchBehaviors = nullptr,
+    nsEventStatus (*aOutEventStatuses)[4] = nullptr,
+    uint64_t* aOutInputBlockId = nullptr)
+{
+  ::Pan(aTarget, aTime, ScreenPoint(10, aTouchStartY), ScreenPoint(10, aTouchEndY),
+      aKeepFingerDown, aAllowedTouchBehaviors, aOutEventStatuses, aOutInputBlockId);
 }
 
 /*
@@ -2733,8 +2750,8 @@ TEST_F(APZOverscrollHandoffTester, PartialFlingHandoff) {
   // off to the parent APZC.
   Pan(manager, mTime, ScreenPoint(90, 90), ScreenPoint(55, 55));
 
-  nsRefPtr<TestAsyncPanZoomController> parent = ApzcOf(root);
-  nsRefPtr<TestAsyncPanZoomController> child = ApzcOf(layers[1]);
+  RefPtr<TestAsyncPanZoomController> parent = ApzcOf(root);
+  RefPtr<TestAsyncPanZoomController> child = ApzcOf(layers[1]);
 
   // Advance the child's fling animation once to give the partial handoff
   // a chance to occur.
