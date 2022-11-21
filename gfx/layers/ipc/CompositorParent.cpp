@@ -1589,7 +1589,8 @@ CompositorParent::DeallocateLayerTreeId(uint64_t aId)
   if (!CompositorLoop()) {
     gfxCriticalError() << "Attempting to post to a invalid Compositor Loop";
     return;
-  }  CompositorLoop()->PostTask(FROM_HERE,
+  }
+  CompositorLoop()->PostTask(FROM_HERE,
                              NewRunnableFunction(&EraseLayerState, aId));
 }
 
