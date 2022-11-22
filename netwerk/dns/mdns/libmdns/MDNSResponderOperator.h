@@ -11,7 +11,7 @@
 #include "nsCOMPtr.h"
 #include "nsIDNSServiceDiscovery.h"
 #include "nsIThread.h"
-#include "RefPtr.h"
+#include "mozilla/RefPtr.h"
 #include "nsString.h"
 
 namespace mozilla {
