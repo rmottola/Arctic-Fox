@@ -29,7 +29,7 @@ class nsSystemPrincipal;
 
 namespace mozilla {
 class OriginAttributes;
-}
+} // namespace mozilla
 
 /////////////////////////////
 // nsScriptSecurityManager //
