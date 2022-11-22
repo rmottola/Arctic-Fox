@@ -150,7 +150,9 @@ private:
 
   void Shutdown(nsresult aReason) override;
 
-  nsresult GetAddress(nsACString& aAddress);
+  nsresult GetAddress();
+
+  nsresult OnGetAddress(const nsACString& aAddress);
 
   nsCOMPtr<nsIServerSocket> mServerSocket;
 };
