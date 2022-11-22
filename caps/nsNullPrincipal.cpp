@@ -57,7 +57,6 @@ nsresult
 nsNullPrincipal::Init(const OriginAttributes& aOriginAttributes)
 {
   mOriginAttributes = aOriginAttributes;
-  MOZ_ASSERT(AppId() != nsIScriptSecurityManager::UNKNOWN_APP_ID);
 
   mURI = nsNullPrincipalURI::Create();
   NS_ENSURE_TRUE(mURI, NS_ERROR_NOT_AVAILABLE);

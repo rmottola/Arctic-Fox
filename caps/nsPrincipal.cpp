@@ -432,7 +432,6 @@ NS_IMETHODIMP
 nsPrincipal::Write(nsIObjectOutputStream* aStream)
 {
   NS_ENSURE_STATE(mCodebase);
-
   nsresult rv = NS_WriteOptionalCompoundObject(aStream, mCodebase, NS_GET_IID(nsIURI),
                                                true);
   if (NS_FAILED(rv)) {
