@@ -9754,8 +9754,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
           // So, the best we can do, is to tear down the new window
           // that was just created!
           //
-          nsCOMPtr<nsPIDOMWindow> domWin = targetDocShell->GetWindow();
-          if (domWin) {
+          if (nsCOMPtr<nsPIDOMWindow> domWin = targetDocShell->GetWindow()) {
             domWin->Close();
           }
         }
