@@ -180,7 +180,7 @@ private:
       EXPECT_TRUE(aGMP);
       if (aGMP) {
         EXPECT_TRUE(mGMP &&
-                    (mGMP->ParentID() == aGMP->ParentID()) == mShouldBeEqual);
+                    (mGMP->GetPluginId() == aGMP->GetPluginId()) == mShouldBeEqual);
       }
       if (mGMP) {
         mGMP->Close();
