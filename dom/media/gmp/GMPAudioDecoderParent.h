@@ -55,6 +55,7 @@ private:
 
   bool mIsOpen;
   bool mShuttingDown;
+  bool mActorDestroyed;
   RefPtr<GMPContentParent> mPlugin;
   GMPAudioDecoderCallbackProxy* mCallback;
 };
