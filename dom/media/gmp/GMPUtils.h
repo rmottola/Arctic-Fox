@@ -23,7 +23,7 @@ struct DestroyPolicy
 };
 
 template<typename T>
-using GMPUnique = mozilla::UniquePtr<T, DestroyPolicy<T>>;
+using GMPUniquePtr = mozilla::UniquePtr<T, DestroyPolicy<T>>;
 
 bool GetEMEVoucherPath(nsIFile** aPath);
 
