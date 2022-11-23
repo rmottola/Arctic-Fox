@@ -266,10 +266,7 @@ PresentationSessionInfo::SetListener(nsIPresentationSessionListener* aListener)
 
     // The transport might become ready, or might become un-ready again, before
     // the listener has registered. So notify the listener of the state change.
-    uint16_t state = IsSessionReady() ?
-                     nsIPresentationSessionListener::STATE_CONNECTED :
-                     nsIPresentationSessionListener::STATE_DISCONNECTED;
-    return mListener->NotifyStateChange(mSessionId, state);
+    return mListener->NotifyStateChange(mSessionId, mState);
   }
 
   return NS_OK;
@@ -290,22 +287,14 @@ PresentationSessionInfo::Send(nsIInputStream* aData)
 }
 
 nsresult
-PresentationSessionInfo::Close(nsresult aReason)
+PresentationSessionInfo::Close(nsresult aReason,
+                               uint32_t aState)
 {
-  // The session is disconnected and it's a normal close. Simply change the
-  // state to TERMINATED.
-  if (!IsSessionReady() && NS_SUCCEEDED(aReason)) {
-    if (mListener) {
-      // Notify the listener and the service will untrack the session info after
-      // the listener calls |UnregisterSessionListener|.
-      nsresult rv = mListener->NotifyStateChange(mSessionId,
-                                                 nsIPresentationSessionListener::STATE_TERMINATED);
-      NS_WARN_IF(NS_FAILED(rv));
-    } else {
-      // Directly untrack the session info from the service.
-      NS_WARN_IF(NS_FAILED(UntrackFromService()));
-    }
+  if (NS_WARN_IF(!IsSessionReady())) {
+    return NS_ERROR_DOM_INVALID_STATE_ERR;
   }
+
+  SetState(aState);
 
   Shutdown(aReason);
   return NS_OK;
@@ -314,12 +303,7 @@ PresentationSessionInfo::Close(nsresult aReason)
 nsresult
 PresentationSessionInfo::ReplySuccess()
 {
-  if (mListener) {
-    // Notify session state change.
-    nsresult rv = mListener->NotifyStateChange(mSessionId,
-                                               nsIPresentationSessionListener::STATE_CONNECTED);
-    NS_WARN_IF(NS_FAILED(rv));
-  }
+  SetState(nsIPresentationSessionListener::STATE_CONNECTED);
 
   if (mCallback) {
     NS_WARN_IF(NS_FAILED(mCallback->NotifySuccess()));
@@ -400,17 +384,14 @@ PresentationSessionInfo::NotifyTransportClosed(nsresult aReason)
   // Unset |mIsTransportReady| here so it won't affect |IsSessionReady()| above.
   mIsTransportReady = false;
 
+  if (mState == nsIPresentationSessionListener::STATE_CONNECTED) {
+    // The transport channel is closed unexpectedly (not caused by a |Close| call).
+    SetState(nsIPresentationSessionListener::STATE_CLOSED);
+  }
+
   Shutdown(aReason);
 
-  uint16_t state = (NS_WARN_IF(NS_FAILED(aReason))) ?
-                   nsIPresentationSessionListener::STATE_DISCONNECTED :
-                   nsIPresentationSessionListener::STATE_TERMINATED;
-  if (mListener) {
-    // It happens after the session is ready. Notify session state change.
-    // If the new state is TERMINATED. the service will untrack the session info
-    // after the listener calls |UnregisterSessionListener|.
-    return mListener->NotifyStateChange(mSessionId, state);
-  } else if (state == nsIPresentationSessionListener::STATE_TERMINATED) {
+  if (mState == nsIPresentationSessionListener::STATE_TERMINATED) {
     // Directly untrack the session info from the service.
     return UntrackFromService();
   }
@@ -634,12 +615,9 @@ PresentationControllingInfo::NotifyClosed(nsresult aReason)
   SetControlChannel(nullptr);
 
   if (NS_WARN_IF(NS_FAILED(aReason))) {
-    if (mListener) {
-      // The presentation session instance at receiver side may already exist.
-      // Change the state to TERMINATED since it never succeeds.
-      return mListener->NotifyStateChange(mSessionId,
-                                          nsIPresentationSessionListener::STATE_TERMINATED);
-    }
+    // The presentation session instance may already exist.
+    // Change the state to TERMINATED since it never succeeds.
+    SetState(nsIPresentationSessionListener::STATE_TERMINATED);
 
     // Reply error for an abnormal close.
     return ReplyError(NS_ERROR_DOM_OPERATION_ERR);
@@ -691,11 +669,8 @@ PresentationControllingInfo::OnStopListening(nsIServerSocket* aServerSocket,
     return ReplyError(NS_ERROR_DOM_OPERATION_ERR);
   }
 
-  // It happens after the session is ready. Notify session state change.
-  if (mListener) {
-    return mListener->NotifyStateChange(mSessionId,
-                                        nsIPresentationSessionListener::STATE_DISCONNECTED);
-  }
+  // It happens after the session is ready. Change the state to CLOSED.
+  SetState(nsIPresentationSessionListener::STATE_CLOSED);
 
   return NS_OK;
 }
@@ -907,12 +882,9 @@ PresentationPresentingInfo::NotifyClosed(nsresult aReason)
   SetControlChannel(nullptr);
 
   if (NS_WARN_IF(NS_FAILED(aReason))) {
-    if (mListener) {
-      // The presentation session instance at receiver side may already exist.
-      // Change the state to TERMINATED since it never succeeds.
-      return mListener->NotifyStateChange(mSessionId,
-                                          nsIPresentationSessionListener::STATE_TERMINATED);
-    }
+    // The presentation session instance may already exist.
+    // Change the state to TERMINATED since it never succeeds.
+    SetState(nsIPresentationSessionListener::STATE_TERMINATED);
 
     // Reply error for an abnormal close.
     return ReplyError(NS_ERROR_DOM_OPERATION_ERR);
