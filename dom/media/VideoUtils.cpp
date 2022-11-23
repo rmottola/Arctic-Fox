@@ -19,6 +19,9 @@
 #include "mozilla/SharedThreadPool.h"
 #include "nsIRandomGenerator.h"
 #include "nsIServiceManager.h"
+#include "nsServiceManagerUtils.h"
+#include "nsIConsoleService.h"
+#include "nsThreadUtils.h"
 #include "nsCharSeparatedTokenizer.h"
 #include "nsContentTypeParser.h"
 
@@ -367,6 +370,26 @@ CreateFlushableMediaDecodeTaskQueue()
   RefPtr<FlushableTaskQueue> queue = new FlushableTaskQueue(
     GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
   return queue.forget();
+}
+
+void
+LogToBrowserConsole(const nsAString& aMsg)
+{
+  if (!NS_IsMainThread()) {
+    nsAutoString msg(aMsg);
+    nsCOMPtr<nsIRunnable> task =
+      NS_NewRunnableFunction([msg]() { LogToBrowserConsole(msg); });
+    NS_DispatchToMainThread(task.forget(), NS_DISPATCH_NORMAL);
+    return;
+  }
+  nsCOMPtr<nsIConsoleService> console(
+    do_GetService("@mozilla.org/consoleservice;1"));
+  if (!console) {
+    NS_WARNING("Failed to log message to console.");
+    return;
+  }
+  nsAutoString msg(aMsg);
+  console->LogStringMessage(msg.get());
 }
 
 bool

@@ -301,6 +301,9 @@ RefPtr<GenericPromise> InvokeUntil(Work aWork, Condition aCondition) {
   return p.forget();
 }
 
+void
+LogToBrowserConsole(const nsAString& aMsg);
+
 bool
 ParseCodecsString(const nsAString& aCodecs, nsTArray<nsString>& aOutCodecs);
 
