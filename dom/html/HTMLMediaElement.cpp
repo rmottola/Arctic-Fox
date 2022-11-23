@@ -1461,6 +1461,12 @@ HTMLMediaElement::Seek(double aTime,
   // aTime should be non-NaN.
   MOZ_ASSERT(!mozilla::IsNaN(aTime));
 
+  // Detect if user has interacted with element by seeking so that
+  // play will not be blocked when initiated by a script.
+  if (EventStateManager::IsHandlingUserInput() || nsContentUtils::IsCallerChrome()) {
+    mHasUserInteraction = true;
+  }
+
   StopSuspendingAfterFirstFrame();
 
   if (mSrcStream) {
@@ -2234,9 +2240,7 @@ HTMLMediaElement::PlayInternal(bool aCallerIsChrome)
     return NS_OK;
   }
 
-  // Play was not blocked; assume that the user has interacted with the element.
-  // This will set the state of the element for future script-interaction
-  // in a player with custom player controls.
+  // Play was not blocked so assume user interacted with the element.
   mHasUserInteraction = true;
 
   StopSuspendingAfterFirstFrame();

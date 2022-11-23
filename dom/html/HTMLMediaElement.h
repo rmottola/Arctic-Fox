@@ -1427,10 +1427,6 @@ protected:
   };
 
   ElementInTreeState mElementInTreeState;
-  
-  // Indicates if user has interacted with the media element.
-  // Used to block autoplay of media.
-  bool mHasUserInteraction;
 
   // Media elements also have a default playback start position, which must
   // initially be set to zero seconds. This time is used to allow the element to
@@ -1478,6 +1474,10 @@ private:
 
   // Time spent between video load and video playback.
   TimeDurationAccumulator mJoinLatency;
+
+  // Indicates if user has interacted with the element.
+  // Used to block autoplay when disabled.
+  bool mHasUserInteraction;
 
   // True if the first frame has been successfully loaded.
   bool mFirstFrameLoaded;
