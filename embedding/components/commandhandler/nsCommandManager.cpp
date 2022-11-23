@@ -236,7 +236,7 @@ nsCommandManager::GetControllerForCommand(const char* aCommand,
 
   // check if we're in content or chrome
   // if we're not chrome we must have a target window or we bail
-  if (!nsContentUtils::IsCallerChrome()) {
+  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
     if (!aTargetWindow) {
       return rv;
     }

@@ -599,7 +599,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
     do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID));
 
   bool isCallerChrome =
-    nsContentUtils::IsCallerChrome() && !openedFromRemoteTab;
+    nsContentUtils::LegacyIsCallerChromeOrNativeCode() && !openedFromRemoteTab;
 
   dom::AutoJSAPI jsapiChromeGuard;
 
@@ -1519,7 +1519,7 @@ nsWindowWatcher::CalculateChromeFlags(nsIDOMWindow* aParent,
 
   bool openedFromContentScript =
     aOpenedFromRemoteTab ? aCalledFromJS
-                         : !nsContentUtils::IsCallerChrome();
+                         : !nsContentUtils::LegacyIsCallerChromeOrNativeCode();
 
   /* This function has become complicated since browser windows and
      dialogs diverged. The difference is, browser windows assume all

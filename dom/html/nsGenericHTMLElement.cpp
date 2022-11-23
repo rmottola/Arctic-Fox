@@ -2817,7 +2817,8 @@ nsGenericHTMLElement::GetEditor(nsIEditor** aEditor)
 {
   *aEditor = nullptr;
 
-  if (!nsContentUtils::IsCallerChrome()) {
+  // See also HTMLTextFieldAccessible::GetEditor.
+  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 

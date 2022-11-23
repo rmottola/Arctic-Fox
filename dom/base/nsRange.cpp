@@ -1141,7 +1141,8 @@ nsRange::IsValidBoundary(nsINode* aNode)
 void
 nsRange::SetStart(nsINode& aNode, uint32_t aOffset, ErrorResult& aRv)
 {
- if (!nsContentUtils::CanCallerAccess(&aNode)) {
+ if (!nsContentUtils::LegacyIsCallerNativeCode() &&
+     !nsContentUtils::CanCallerAccess(&aNode)) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return;
   }
@@ -1191,7 +1192,8 @@ nsRange::SetStart(nsINode* aParent, int32_t aOffset)
 void
 nsRange::SetStartBefore(nsINode& aNode, ErrorResult& aRv)
 {
-  if (!nsContentUtils::CanCallerAccess(&aNode)) {
+  if (!nsContentUtils::LegacyIsCallerNativeCode() &&
+      !nsContentUtils::CanCallerAccess(&aNode)) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return;
   }
@@ -1216,7 +1218,8 @@ nsRange::SetStartBefore(nsIDOMNode* aSibling)
 void
 nsRange::SetStartAfter(nsINode& aNode, ErrorResult& aRv)
 {
-  if (!nsContentUtils::CanCallerAccess(&aNode)) {
+  if (!nsContentUtils::LegacyIsCallerNativeCode() &&
+      !nsContentUtils::CanCallerAccess(&aNode)) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return;
   }
@@ -1241,7 +1244,8 @@ nsRange::SetStartAfter(nsIDOMNode* aSibling)
 void
 nsRange::SetEnd(nsINode& aNode, uint32_t aOffset, ErrorResult& aRv)
 {
- if (!nsContentUtils::CanCallerAccess(&aNode)) {
+ if (!nsContentUtils::LegacyIsCallerNativeCode() &&
+     !nsContentUtils::CanCallerAccess(&aNode)) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return;
   }
@@ -1290,7 +1294,8 @@ nsRange::SetEnd(nsINode* aParent, int32_t aOffset)
 void
 nsRange::SetEndBefore(nsINode& aNode, ErrorResult& aRv)
 {
-  if (!nsContentUtils::CanCallerAccess(&aNode)) {
+  if (!nsContentUtils::LegacyIsCallerNativeCode() &&
+      !nsContentUtils::CanCallerAccess(&aNode)) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return;
   }
@@ -1315,7 +1320,8 @@ nsRange::SetEndBefore(nsIDOMNode* aSibling)
 void
 nsRange::SetEndAfter(nsINode& aNode, ErrorResult& aRv)
 {
-  if (!nsContentUtils::CanCallerAccess(&aNode)) {
+  if (!nsContentUtils::LegacyIsCallerNativeCode() &&
+      !nsContentUtils::CanCallerAccess(&aNode)) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return;
   }
@@ -1366,7 +1372,8 @@ nsRange::SelectNode(nsIDOMNode* aN)
 void
 nsRange::SelectNode(nsINode& aNode, ErrorResult& aRv)
 {
-  if (!nsContentUtils::CanCallerAccess(&aNode)) {
+  if (!nsContentUtils::LegacyIsCallerNativeCode() &&
+      !nsContentUtils::CanCallerAccess(&aNode)) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return;
   }
@@ -1402,7 +1409,8 @@ nsRange::SelectNodeContents(nsIDOMNode* aN)
 void
 nsRange::SelectNodeContents(nsINode& aNode, ErrorResult& aRv)
 {
-  if (!nsContentUtils::CanCallerAccess(&aNode)) {
+  if (!nsContentUtils::LegacyIsCallerNativeCode() &&
+      !nsContentUtils::CanCallerAccess(&aNode)) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return;
   }
@@ -2450,7 +2458,8 @@ nsRange::InsertNode(nsIDOMNode* aNode)
 void
 nsRange::InsertNode(nsINode& aNode, ErrorResult& aRv)
 {
-  if (!nsContentUtils::CanCallerAccess(&aNode)) {
+  if (!nsContentUtils::LegacyIsCallerNativeCode() &&
+      !nsContentUtils::CanCallerAccess(&aNode)) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return;
   }
@@ -2547,7 +2556,8 @@ nsRange::SurroundContents(nsIDOMNode* aNewParent)
 void
 nsRange::SurroundContents(nsINode& aNewParent, ErrorResult& aRv)
 {
-  if (!nsContentUtils::CanCallerAccess(&aNewParent)) {
+  if (!nsContentUtils::LegacyIsCallerNativeCode() &&
+      !nsContentUtils::CanCallerAccess(&aNewParent)) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return;
   }
