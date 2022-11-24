@@ -12,6 +12,25 @@ var stringBundle = Cc["@mozilla.org/intl/stringbundle;1"]
 // ensure test output sees log messages.
 Log.repository.getLogger("browserwindow.syncui").addAppender(new Log.DumpAppender());
 
+// Send the specified sync-related notification and return a promise that
+// resolves once gSyncUI._promiseUpateUI is complete and the UI is ready to check.
+function notifyAndPromiseUIUpdated(topic) {
+  return new Promise(resolve => {
+    // Instrument gSyncUI so we know when the update is complete.
+    let oldPromiseUpdateUI = gSyncUI._promiseUpdateUI.bind(gSyncUI);
+    gSyncUI._promiseUpdateUI = function() {
+      return oldPromiseUpdateUI().then(() => {
+        // Restore our override.
+        gSyncUI._promiseUpdateUI = oldPromiseUpdateUI;
+        // Resolve the promise so the caller knows the update is done.
+        resolve();
+      });
+    };
+    // Now send the notification.
+    Services.obs.notifyObservers(null, topic, null);
+  });
+}
+
 // Sync manages 3 broadcasters so the menus correctly reflect the Sync state.
 // Only one of these 3 should ever be visible - pass the ID of the broadcaster
 // you expect to be visible and it will check it's the only one that is.
@@ -61,12 +80,12 @@ add_task(function* prepare() {
   checkButtonTooltips("Sign In To Sync");
   // mock out the "_needsSetup()" function so we don't short-circuit.
   let oldNeedsSetup = window.gSyncUI._needsSetup;
-  window.gSyncUI._needsSetup = () => false;
+  window.gSyncUI._needsSetup = () => Promise.resolve(false);
   registerCleanupFunction(() => {
     window.gSyncUI._needsSetup = oldNeedsSetup;
     // and an observer to set the state back to what it should be now we've
     // restored the stub.
-    Services.obs.notifyObservers(null, "weave:ui:clear-error", null);
+  yield notifyAndPromiseUIUpdated("weave:ui:clear-error");
   });
   // and a notification to have the state change away from "needs setup"
   Services.obs.notifyObservers(null, "weave:ui:clear-error", null);
@@ -95,7 +114,7 @@ add_task(function* testSyncLoginError() {
   // Pretend we are in a "login failed" error state
   Weave.Status.sync = Weave.LOGIN_FAILED;
   Weave.Status.login = Weave.LOGIN_FAILED_LOGIN_REJECTED;
-  Services.obs.notifyObservers(null, "weave:ui:sync:error", null);
+  yield notifyAndPromiseUIUpdated("weave:ui:sync:error");
 
   Assert.equal(Notifications.notifications.length, 0, "no notifications shown on login error");
   // But the menu *should* reflect the login error.
@@ -106,8 +125,8 @@ add_task(function* testSyncLoginError() {
   // Now pretend we just had a successful login - the error notification should go away.
   Weave.Status.sync = Weave.STATUS_OK;
   Weave.Status.login = Weave.LOGIN_SUCCEEDED;
-  Services.obs.notifyObservers(null, "weave:service:login:start", null);
-  Services.obs.notifyObservers(null, "weave:service:login:finish", null);
+  yield notifyAndPromiseUIUpdated("weave:service:login:start");
+  yield notifyAndPromiseUIUpdated("weave:service:login:finish");
   Assert.equal(Notifications.notifications.length, 0, "no notifications left");
   // The menus should be back to "all good"
   checkBroadcasterVisible("sync-syncnow-state");
@@ -125,13 +144,13 @@ function checkButtonsStatus(shouldBeActive) {
   }
 }
 
-function testButtonActions(startNotification, endNotification) {
+function* testButtonActions(startNotification, endNotification, expectActive = true) {
   checkButtonsStatus(false);
   // pretend a sync is starting.
-  Services.obs.notifyObservers(null, startNotification, null);
-  checkButtonsStatus(true);
+  yield notifyAndPromiseUIUpdated(startNotification);
+  checkButtonsStatus(expectActive);
   // and has stopped
-  Services.obs.notifyObservers(null, endNotification, null);
+  yield notifyAndPromiseUIUpdated(endNotification);
   checkButtonsStatus(false);
 }
 
@@ -164,7 +183,7 @@ add_task(function* testButtonActivitiesInPanel() {
   // check the button's functionality
   yield PanelUI.show();
   try {
-    doTestButtonActivities();
+    yield doTestButtonActivities();
   } finally {
     PanelUI.hide();
   }
