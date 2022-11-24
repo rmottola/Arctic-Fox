@@ -2837,11 +2837,6 @@ nsDocumentViewer::CallChildren(CallChildFunc aFunc, void* aClosure)
   }
 }
 
-struct LineBoxInfo
-{
-  nscoord mMaxLineBoxWidth;
-};
-
 static void
 ChangeChildPaintingEnabled(nsIContentViewer* aChild, void* aClosure)
 {
@@ -2851,13 +2846,6 @@ ChangeChildPaintingEnabled(nsIContentViewer* aChild, void* aClosure)
   } else {
     aChild->PausePainting();
   }
-}
-
-static void
-ChangeChildMaxLineBoxWidth(nsIContentViewer* aChild, void* aClosure)
-{
-  struct LineBoxInfo* lbi = (struct LineBoxInfo*) aClosure;
-  aChild->ChangeMaxLineBoxWidth(lbi->mMaxLineBoxWidth);
 }
 
 struct ZoomInfo
@@ -3312,24 +3300,6 @@ nsDocumentViewer::ResumePainting()
   nsIPresShell* presShell = GetPresShell();
   if (presShell) {
     presShell->ResumePainting();
-  }
-
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsDocumentViewer::ChangeMaxLineBoxWidth(int32_t aMaxLineBoxWidth)
-{
-  // Change the max line box width for all children.
-  struct LineBoxInfo lbi = { aMaxLineBoxWidth };
-  CallChildren(ChangeChildMaxLineBoxWidth, &lbi);
-
-  // Now, change our max line box width.
-  // Convert to app units, since our input is in CSS pixels.
-  nscoord mlbw = nsPresContext::CSSPixelsToAppUnits(aMaxLineBoxWidth);
-  nsIPresShell* presShell = GetPresShell();
-  if (presShell) {
-    presShell->SetMaxLineBoxWidth(mlbw);
   }
 
   return NS_OK;
