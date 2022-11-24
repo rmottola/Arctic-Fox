@@ -4942,6 +4942,10 @@ nsBrowserAccess.prototype = {
   isTabContentWindow: function (aWindow) {
     return gBrowser.browsers.some(browser => browser.contentWindow == aWindow);
   },
+
+  canClose() {
+    return CanCloseWindow();
+  },
 }
 
 function getTogglableToolbars() {
@@ -6354,6 +6358,26 @@ var IndexedDBPromptHelper = {
   }
 };
 
+function CanCloseWindow()
+{
+  // Avoid redundant calls to canClose from showing multiple
+  // PermitUnload dialogs.
+  if (window.skipNextCanClose) {
+    return true;
+  }
+
+  for (let browser of gBrowser.browsers) {
+    let {permitUnload, timedOut} = browser.permitUnload();
+    if (timedOut) {
+      return true;
+    }
+    if (!permitUnload) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function WindowIsClosing()
 {
   let event = document.createEvent("Events");
@@ -6364,17 +6388,19 @@ function WindowIsClosing()
   if (!closeWindow(false, warnAboutClosingWindow))
     return false;
 
-  // Bug 967873 - Proxy nsDocumentViewer::PermitUnload to the child process
-  if (gMultiProcessBrowser)
+  // In theory we should exit here and the Window's internal Close
+  // method should trigger canClose on nsBrowserAccess. However, by
+  // that point it's too late to be able to show a prompt for
+  // PermitUnload. So we do it here, when we still can.
+  if (CanCloseWindow()) {
+    // This flag ensures that the later canClose call does nothing.
+    // It's only needed to make tests pass, since they detect the
+    // prompt even when it's not actually shown.
+    window.skipNextCanClose = true;
     return true;
-
-  for (let browser of gBrowser.browsers) {
-    let ds = browser.docShell;
-    if (ds.contentViewer && !ds.contentViewer.permitUnload())
-      return false;
   }
 
-  return true;
+  return false;
 }
 
 /**

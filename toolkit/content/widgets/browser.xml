@@ -1102,8 +1102,8 @@
             window.addEventListener("keypress", this, true);
             window.addEventListener("keyup", this, true);
          ]]>
-       </body>
-     </method>
+        </body>
+      </method>
 
       <method name="handleEvent">
         <parameter name="aEvent"/>
