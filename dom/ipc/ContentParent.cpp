@@ -3462,6 +3462,14 @@ ContentParent::DeallocPRemoteSpellcheckEngineParent(PRemoteSpellcheckEngineParen
 /* static */ void
 ContentParent::ForceKillTimerCallback(nsITimer* aTimer, void* aClosure)
 {
+#ifdef ENABLE_TESTS
+    // We don't want to time out the content process during XPCShell tests. This
+    // is the easiest way to ensure that.
+    if (PR_GetEnv("XPCSHELL_TEST_PROFILE_DIR")) {
+        return;
+    }
+#endif
+
     auto self = static_cast<ContentParent*>(aClosure);
     self->KillHard("ShutDownKill");
 }
