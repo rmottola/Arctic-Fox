@@ -1121,6 +1121,23 @@ ContentParent::RecvGetGMPPluginVersionForAPI(const nsCString& aAPI,
 }
 
 bool
+ContentParent::RecvIsGMPPresentOnDisk(const nsString& aKeySystem,
+                                      const nsCString& aVersion,
+                                      bool* aIsPresent,
+                                      nsCString* aMessage)
+{
+#ifdef MOZ_EME
+    *aIsPresent = MediaKeySystemAccess::IsGMPPresentOnDisk(aKeySystem,
+                                                           aVersion,
+                                                           *aMessage);
+#else
+    *aIsPresent = false;
+#endif
+
+    return true;
+}
+
+bool
 ContentParent::RecvLoadPlugin(const uint32_t& aPluginId, nsresult* aRv, uint32_t* aRunID)
 {
     *aRv = NS_OK;
