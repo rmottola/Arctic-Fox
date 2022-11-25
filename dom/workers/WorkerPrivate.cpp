@@ -901,7 +901,7 @@ public:
       init.mFilename = aFilename;
       init.mLineno = aLineNumber;
       init.mCancelable = true;
-      init.mBubbles = true;
+      init.mBubbles = false;
 
       if (aTarget) {
         RefPtr<ErrorEvent> event =
