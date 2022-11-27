@@ -135,7 +135,7 @@ public:
   }
 
   Request*
-  Request_() const
+  GetRequest_() const
   {
     return mRequest;
   }
