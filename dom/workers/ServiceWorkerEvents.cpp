@@ -461,7 +461,7 @@ RespondWithHandler::AsyncLog(const nsACString& aMessageName)
 void
 FetchEvent::RespondWith(Promise& aArg, ErrorResult& aRv)
 {
-  if (mWaitToRespond) {
+  if (EventPhase() == nsIDOMEvent::NONE || mWaitToRespond) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
   }
