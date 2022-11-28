@@ -421,7 +421,7 @@ public:
 
     RefPtr<xpc::ErrorReport> xpcReport = new xpc::ErrorReport();
     xpcReport->Init(report.report(), report.message(),
-                    /* aIsChrome = */ false, /* aWindowID = */ 0);
+                    /* aIsChrome = */ false, workerPrivate->WindowID());
 
     RefPtr<AsyncErrorReporter> aer = new AsyncErrorReporter(xpcReport);
     NS_DispatchToMainThread(aer);
