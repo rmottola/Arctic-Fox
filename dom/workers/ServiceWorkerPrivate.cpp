@@ -19,7 +19,13 @@ using namespace mozilla::dom;
 
 BEGIN_WORKERS_NAMESPACE
 
-NS_IMPL_ISUPPORTS0(ServiceWorkerPrivate)
+NS_IMPL_CYCLE_COLLECTING_ADDREF(ServiceWorkerPrivate)
+NS_IMPL_CYCLE_COLLECTING_RELEASE(ServiceWorkerPrivate)
+NS_IMPL_CYCLE_COLLECTION(ServiceWorkerPrivate, mSupportsArray)
+
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ServiceWorkerPrivate)
+  NS_INTERFACE_MAP_ENTRY(nsISupports)
+NS_INTERFACE_MAP_END
 
 // Tracks the "dom.disable_open_click_delay" preference.  Modified on main
 // thread, read on worker threads.
@@ -73,6 +79,7 @@ ServiceWorkerPrivate::~ServiceWorkerPrivate()
   MOZ_ASSERT(!mWorkerPrivate);
   MOZ_ASSERT(!mTokenCount);
   MOZ_ASSERT(!mInfo);
+  MOZ_ASSERT(mSupportsArray.IsEmpty());
 
   mIdleWorkerTimer->Cancel();
 }
@@ -1314,6 +1321,10 @@ ServiceWorkerPrivate::SpawnWorkerIfNeeded(WakeUpReason aWhy,
     return NS_OK;
   }
 
+  // Sanity check: mSupportsArray should be empty if we're about to
+  // spin up a new worker.
+  MOZ_ASSERT(mSupportsArray.IsEmpty());
+
   if (NS_WARN_IF(!mInfo)) {
     NS_WARNING("Trying to wake up a dead service worker.");
     return NS_ERROR_FAILURE;
@@ -1391,6 +1402,23 @@ ServiceWorkerPrivate::SpawnWorkerIfNeeded(WakeUpReason aWhy,
 }
 
 void
+ServiceWorkerPrivate::StoreISupports(nsISupports* aSupports)
+{
+  AssertIsOnMainThread();
+  MOZ_ASSERT(mWorkerPrivate);
+  MOZ_ASSERT(!mSupportsArray.Contains(aSupports));
+
+  mSupportsArray.AppendElement(aSupports);
+}
+
+void
+ServiceWorkerPrivate::RemoveISupports(nsISupports* aSupports)
+{
+  AssertIsOnMainThread();
+  mSupportsArray.RemoveElement(aSupports);
+}
+
+void
 ServiceWorkerPrivate::TerminateWorker()
 {
   AssertIsOnMainThread();
@@ -1409,6 +1437,7 @@ ServiceWorkerPrivate::TerminateWorker()
     jsapi.Init();
     NS_WARN_IF(!mWorkerPrivate->Terminate(jsapi.cx()));
     mWorkerPrivate = nullptr;
+    mSupportsArray.Clear();
   }
 }
 
