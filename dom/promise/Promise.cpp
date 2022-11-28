@@ -1231,8 +1231,7 @@ Promise::MaybeReportRejected()
     NS_WARNING("!!! Trying to report rejected Promise after MainThread shutdown");
   }
   if (mainThread) {
-    RefPtr<AsyncErrorReporter> r =
-      new AsyncErrorReporter(CycleCollectedJSRuntime::Get()->Runtime(), xpcReport);
+    RefPtr<AsyncErrorReporter> r = new AsyncErrorReporter(xpcReport);
     mainThread->Dispatch(r.forget(), NS_DISPATCH_NORMAL);
   }
 }
