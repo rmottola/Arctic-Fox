@@ -211,12 +211,6 @@ public:
 
   double TimeStamp() const;
 
-  void InitEvent(const nsAString& aType, bool aBubbles, bool aCancelable,
-                 ErrorResult& aRv)
-  {
-    aRv = InitEvent(aType, aBubbles, aCancelable);
-  }
-
   EventTarget* GetOriginalTarget() const;
   EventTarget* GetExplicitOriginalTarget() const;
   EventTarget* GetComposedTarget() const;
@@ -316,7 +310,7 @@ private:
   NS_IMETHOD StopPropagation(void) override { return _to StopPropagation(); } \
   NS_IMETHOD StopCrossProcessForwarding(void) override { return _to StopCrossProcessForwarding(); } \
   NS_IMETHOD PreventDefault(void) override { return _to PreventDefault(); } \
-  NS_IMETHOD InitEvent(const nsAString& eventTypeArg, bool canBubbleArg, bool cancelableArg) override { return _to InitEvent(eventTypeArg, canBubbleArg, cancelableArg); } \
+  void InitEvent(const nsAString& eventTypeArg, bool canBubbleArg, bool cancelableArg) override { _to InitEvent(eventTypeArg, canBubbleArg, cancelableArg); } \
   NS_IMETHOD GetDefaultPrevented(bool* aDefaultPrevented) override { return _to GetDefaultPrevented(aDefaultPrevented); } \
   NS_IMETHOD StopImmediatePropagation(void) override { return _to StopImmediatePropagation(); } \
   NS_IMETHOD GetOriginalTarget(nsIDOMEventTarget** aOriginalTarget) override { return _to GetOriginalTarget(aOriginalTarget); } \
