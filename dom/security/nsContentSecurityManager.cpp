@@ -112,7 +112,7 @@ static nsresult
 DoCORSChecks(nsIChannel* aChannel, nsILoadInfo* aLoadInfo,
              nsCOMPtr<nsIStreamListener>& aInAndOutListener)
 {
-  MOZ_ASSERT(aInAndOutListener, "can not perform CORS checks without a listener");
+  MOZ_RELEASE_ASSERT(aInAndOutListener, "can not perform CORS checks without a listener");
   nsIPrincipal* loadingPrincipal = aLoadInfo->LoadingPrincipal();
   RefPtr<nsCORSListenerProxy> corsListener =
     new nsCORSListenerProxy(aInAndOutListener,
