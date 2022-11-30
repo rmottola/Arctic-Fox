@@ -470,9 +470,10 @@ private:
     return mEnabled && !mBlockerCount;
   }
 
-  nsresult AttemptAsyncScriptParse(nsScriptLoadRequest* aRequest);
+  nsresult AttemptAsyncScriptCompile(nsScriptLoadRequest* aRequest);
   nsresult ProcessRequest(nsScriptLoadRequest* aRequest);
-  nsresult CompileOffThreadOrProcessRequest(nsScriptLoadRequest* aRequest);
+  nsresult CompileOffThreadOrProcessRequest(nsScriptLoadRequest* aRequest,
+                                            bool* oCompiledOffThread=nullptr);
   void FireScriptAvailable(nsresult aResult,
                            nsScriptLoadRequest* aRequest);
   void FireScriptEvaluated(nsresult aResult,
@@ -486,6 +487,7 @@ private:
                                     JS::Handle<JSObject *> aScopeChain,
                                     JS::CompileOptions *aOptions);
 
+  uint32_t NumberOfProcessors();
   nsresult PrepareLoadedRequest(nsScriptLoadRequest* aRequest,
                                 nsIStreamLoader* aLoader,
                                 nsresult aStatus,
@@ -529,6 +531,7 @@ private:
   // XXXbz do we want to cycle-collect these or something?  Not sure.
   nsTArray< RefPtr<nsScriptLoader> > mPendingChildLoaders;
   uint32_t mBlockerCount;
+  uint32_t mNumberOfProcessors;
   bool mEnabled;
   bool mDeferEnabled;
   bool mDocumentParsingDone;
