@@ -688,13 +688,10 @@ PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
   nsAutoCString locationCStr;
-  nsIDOMLocation* location;
-  res = mWindow->GetLocation(&location);
 
-  if (location && NS_SUCCEEDED(res)) {
+  if (nsCOMPtr<nsIDOMLocation> location = mWindow->GetLocation()) {
     nsAutoString locationAStr;
     location->ToString(locationAStr);
-    location->Release();
 
     CopyUTF16toUTF8(locationAStr, locationCStr);
   }

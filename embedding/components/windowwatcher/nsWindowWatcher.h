@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -66,7 +67,7 @@ protected:
   // to the parent if there's nothing there.
   already_AddRefed<nsIDocShellTreeItem> GetCallerTreeItem(
     nsIDocShellTreeItem* aParentItem);
-  
+
   // Unlike GetWindowByName this will look for a caller on the JS
   // stack, and then fall back on aCurrentWindow if it can't find one.
   nsPIDOMWindow* SafeGetWindowByName(const nsAString& aName,
@@ -89,7 +90,7 @@ protected:
   static nsresult URIfromURL(const char* aURL,
                              nsIDOMWindow* aParent,
                              nsIURI** aURI);
-  
+
   static uint32_t CalculateChromeFlags(nsIDOMWindow* aParent,
                                        const char* aFeatures,
                                        bool aFeaturesSpecified,
@@ -103,7 +104,7 @@ protected:
   /* Compute the right SizeSpec based on aFeatures */
   static void CalcSizeSpec(const char* aFeatures, SizeSpec& aResult);
   static nsresult ReadyOpenedDocShellItem(nsIDocShellTreeItem* aOpenedItem,
-                                          nsPIDOMWindow* aParent,
+                                          nsIDOMWindow* aParent,
                                           bool aWindowIsNew,
                                           nsIDOMWindow** aOpenedWindow);
   static void SizeOpenedDocShellItem(nsIDocShellTreeItem* aDocShellItem,
@@ -123,4 +124,3 @@ protected:
 };
 
 #endif
-

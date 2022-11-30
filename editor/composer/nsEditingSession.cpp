@@ -304,11 +304,12 @@ nsEditingSession::SetupEditorOnWindow(nsIDOMWindow *aWindow)
   //must get the content type
   // Note: the doc gets this from the network channel during StartPageLoad,
   //    so we don't have to get it from there ourselves
-  nsCOMPtr<nsIDOMDocument> doc;
   nsAutoCString mimeCType;
+  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aWindow);
+  MOZ_ASSERT(window);
 
   //then lets check the mime type
-  if (NS_SUCCEEDED(aWindow->GetDocument(getter_AddRefs(doc))) && doc)
+  if (nsCOMPtr<nsIDocument> doc = window->GetDoc())
   {
     nsAutoString mimeType;
     if (NS_SUCCEEDED(doc->GetContentType(mimeType)))
@@ -542,9 +543,11 @@ nsEditingSession::TearDownEditorOnWindow(nsIDOMWindow *aWindow)
   mDoneSetup = false;
 
   // Check if we're turning off editing (from contentEditable or designMode).
-  nsCOMPtr<nsIDOMDocument> domDoc;
-  aWindow->GetDocument(getter_AddRefs(domDoc));
-  nsCOMPtr<nsIHTMLDocument> htmlDoc = do_QueryInterface(domDoc);
+  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aWindow);
+  MOZ_ASSERT(window);
+
+  nsCOMPtr<nsIDocument> doc = window->GetDoc();
+  nsCOMPtr<nsIHTMLDocument> htmlDoc = do_QueryInterface(doc);
   bool stopEditing = htmlDoc && htmlDoc->IsEditingOn();
   if (stopEditing)
     RemoveWebProgressListener(aWindow);
@@ -580,9 +583,6 @@ nsEditingSession::TearDownEditorOnWindow(nsIDOMWindow *aWindow)
 
     if (mMakeWholeDocumentEditable)
     {
-      nsCOMPtr<nsIDocument> doc = do_QueryInterface(domDoc, &rv);
-      NS_ENSURE_SUCCESS(rv, rv);
-
       doc->SetEditableFlag(false);
       nsCOMPtr<nsIHTMLDocument> htmlDocument = do_QueryInterface(doc);
       if (htmlDocument) {
@@ -681,8 +681,8 @@ nsEditingSession::OnStateChange(nsIWebProgress *aWebProgress,
         nsCOMPtr<nsIDOMWindow> window;
         aWebProgress->GetDOMWindow(getter_AddRefs(window));
 
-        nsCOMPtr<nsIDOMDocument> doc;
-        window->GetDocument(getter_AddRefs(doc));
+        nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(window);
+        nsCOMPtr<nsIDocument> doc = piWindow->GetDoc();
 
         nsCOMPtr<nsIHTMLDocument> htmlDoc(do_QueryInterface(doc));
 
@@ -808,11 +808,10 @@ nsEditingSession::OnLocationChange(nsIWebProgress *aWebProgress,
   nsresult rv = aWebProgress->GetDOMWindow(getter_AddRefs(domWindow));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsIDOMDocument> domDoc;
-  rv = domWindow->GetDocument(getter_AddRefs(domDoc));
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(domWindow);
+  MOZ_ASSERT(piWindow);
 
-  nsCOMPtr<nsIDocument> doc = do_QueryInterface(domDoc);
+  nsCOMPtr<nsIDocument> doc = piWindow->GetDoc();
   NS_ENSURE_TRUE(doc, NS_ERROR_FAILURE);
 
   doc->SetDocumentURI(aURI);
@@ -1170,8 +1169,11 @@ nsEditingSession::SetupEditorCommandController(
   NS_ENSURE_ARG_POINTER(aContext);
   NS_ENSURE_ARG_POINTER(aControllerId);
 
+  nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(aWindow);
+  MOZ_ASSERT(piWindow);
+
   nsCOMPtr<nsIControllers> controllers;
-  nsresult rv = aWindow->GetControllers(getter_AddRefs(controllers));
+  nsresult rv = piWindow->GetControllers(getter_AddRefs(controllers));
   NS_ENSURE_SUCCESS(rv, rv);
 
   // We only have to create each singleton controller once
@@ -1209,8 +1211,11 @@ nsEditingSession::SetEditorOnControllers(nsIDOMWindow *aWindow,
 {
   NS_ENSURE_TRUE(aWindow, NS_ERROR_NULL_POINTER);
 
+  nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(aWindow);
+  MOZ_ASSERT(piWindow);
+
   nsCOMPtr<nsIControllers> controllers;
-  nsresult rv = aWindow->GetControllers(getter_AddRefs(controllers));
+  nsresult rv = piWindow->GetControllers(getter_AddRefs(controllers));
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsCOMPtr<nsISupports> editorAsISupports = do_QueryInterface(aEditor);
@@ -1261,8 +1266,9 @@ nsEditingSession::RemoveEditorControllers(nsIDOMWindow *aWindow)
   // tearing down/detaching editor.
 
   nsCOMPtr<nsIControllers> controllers;
-  if (aWindow)
-    aWindow->GetControllers(getter_AddRefs(controllers));
+  if (nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(aWindow)) {
+    piWindow->GetControllers(getter_AddRefs(controllers));
+  }
 
   if (controllers)
   {

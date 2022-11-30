@@ -3184,12 +3184,11 @@ nsIDocument::HasFocus(ErrorResult& rv) const
     return false;
   }
 
-  // Are we an ancestor of the focused DOMWindow?
-  nsCOMPtr<nsIDOMDocument> domDocument;
-  focusedWindow->GetDocument(getter_AddRefs(domDocument));
-  nsCOMPtr<nsIDocument> document = do_QueryInterface(domDocument);
+  nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(focusedWindow);
+  MOZ_ASSERT(piWindow);
 
-  for (nsIDocument* currentDoc = document; currentDoc;
+  // Are we an ancestor of the focused DOMWindow?
+  for (nsIDocument* currentDoc = piWindow->GetDoc(); currentDoc;
        currentDoc = currentDoc->GetParentDocument()) {
     if (currentDoc == this) {
       // Yes, we are an ancestor
@@ -6903,9 +6902,11 @@ nsIDocument::GetLocation() const
     return nullptr;
   }
 
-  nsCOMPtr<nsIDOMLocation> loc;
-  w->GetLocation(getter_AddRefs(loc));
-  return loc.forget().downcast<nsLocation>();
+  nsGlobalWindow* window = static_cast<nsGlobalWindow*>(w.get());
+  ErrorResult dummy;
+  RefPtr<nsLocation> loc = window->GetLocation(dummy);
+  dummy.SuppressException();
+  return loc.forget();
 }
 
 Element*
@@ -11679,9 +11680,7 @@ ShouldApplyFullscreenDirectly(nsIDocument* aDoc,
   } else {
     // If we are in the chrome process, and the window has not been in
     // fullscreen, we certainly need to make that fullscreen first.
-    bool fullscreen;
-    NS_WARN_IF(NS_FAILED(aRootWin->GetFullScreen(&fullscreen)));
-    if (!fullscreen) {
+    if (!aRootWin->GetFullScreen()) {
       return false;
     }
     // The iterator not being at end indicates there is still some

@@ -3011,7 +3011,7 @@ NS_IMETHODIMP nsPluginInstanceOwner::CreateWidget(void)
       // If we're running in the content process, we need a remote widget created in chrome.
       if (XRE_IsContentProcess()) {
         if (nsCOMPtr<nsPIDOMWindow> window = doc->GetWindow()) {
-          if (nsCOMPtr<nsIDOMWindow> topWindow = window->GetTop()) {
+          if (nsCOMPtr<nsPIDOMWindow> topWindow = window->GetTop()) {
             dom::TabChild* tc = dom::TabChild::GetFrom(topWindow);
             if (tc) {
               // This returns a PluginWidgetProxy which remotes a number of calls.

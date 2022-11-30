@@ -1174,9 +1174,8 @@ bool nsXULWindow::LoadSizeFromXUL()
     // constrain to screen size
     nsCOMPtr<nsIDOMWindow> domWindow;
     GetWindowDOMWindow(getter_AddRefs(domWindow));
-    if (domWindow) {
-      nsCOMPtr<nsIDOMScreen> screen;
-      domWindow->GetScreen(getter_AddRefs(screen));
+    if (nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(domWindow)) {
+      nsCOMPtr<nsIDOMScreen> screen = window->GetScreen();
       if (screen) {
         int32_t screenWidth;
         int32_t screenHeight;
@@ -1260,7 +1259,8 @@ bool nsXULWindow::LoadMiscPersistentAttributesFromXUL()
   if (sizeMode == nsSizeMode_Fullscreen) {
     nsCOMPtr<nsIDOMWindow> ourWindow;
     GetWindowDOMWindow(getter_AddRefs(ourWindow));
-    ourWindow->SetFullScreen(true);
+    nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(ourWindow);
+    piWindow->SetFullScreen(true);
   } else {
     mWindow->SetSizeMode(sizeMode);
   }
@@ -1471,6 +1471,11 @@ NS_IMETHODIMP nsXULWindow::SavePersistentAttributes()
   if (persistString.IsEmpty()) { // quick check which sometimes helps
     mPersistentAttributesDirty = 0;
     return NS_OK;
+  }
+
+  bool isFullscreen = false;
+  if (nsPIDOMWindow* domWindow = mDocShell->GetWindow()) {
+    isFullscreen = domWindow->GetFullScreen();
   }
 
   // get our size, position and mode to persist

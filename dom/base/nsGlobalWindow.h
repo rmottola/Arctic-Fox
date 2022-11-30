@@ -467,7 +467,7 @@ public:
   // Outer windows only.
   void DispatchDOMWindowCreated();
 
-  virtual void SetOpenerWindow(nsPIDOMWindow* aOpener,
+  virtual void SetOpenerWindow(nsIDOMWindow* aOpener,
                                bool aOriginalOpener) override;
 
   // Outer windows only.
@@ -540,8 +540,6 @@ public:
   {
     return FromSupports(wrapper->Native());
   }
-
-  already_AddRefed<nsIDOMWindow> GetTopOuter();
   already_AddRefed<nsPIDOMWindow> GetTop() override;
   nsPIDOMWindow* GetScriptableTop() override;
   inline nsGlobalWindow *GetTopInternal()
@@ -852,6 +850,7 @@ public:
   void SetNameOuter(const nsAString& aName, mozilla::ErrorResult& aError);
   void SetName(const nsAString& aName, mozilla::ErrorResult& aError);
   nsLocation* GetLocation(mozilla::ErrorResult& aError);
+  nsIDOMLocation* GetLocation() override;
   nsHistory* GetHistory(mozilla::ErrorResult& aError);
   mozilla::dom::BarProp* GetLocationbar(mozilla::ErrorResult& aError);
   mozilla::dom::BarProp* GetMenubar(mozilla::ErrorResult& aError);
@@ -865,18 +864,25 @@ public:
   void SetStatus(const nsAString& aStatus, mozilla::ErrorResult& aError);
   void CloseOuter();
   void Close(mozilla::ErrorResult& aError);
+  nsresult Close() override;
   bool GetClosedOuter();
   bool GetClosed(mozilla::ErrorResult& aError);
+  bool Closed() override;
   void StopOuter(mozilla::ErrorResult& aError);
   void Stop(mozilla::ErrorResult& aError);
   void FocusOuter(mozilla::ErrorResult& aError);
   void Focus(mozilla::ErrorResult& aError);
+  nsresult Focus() override;
   void BlurOuter();
   void Blur(mozilla::ErrorResult& aError);
   already_AddRefed<nsIDOMWindow> GetFramesOuter();
+  already_AddRefed<nsIDOMWindowCollection> GetFrames() override;
   already_AddRefed<nsIDOMWindow> GetFrames(mozilla::ErrorResult& aError);
   uint32_t Length();
+  already_AddRefed<nsIDOMWindow> GetTopOuter();
   already_AddRefed<nsIDOMWindow> GetTop(mozilla::ErrorResult& aError);
+
+  nsresult GetPrompter(nsIPrompt** aPrompt) override;
 protected:
   explicit nsGlobalWindow(nsGlobalWindow *aOuterWindow);
   nsPIDOMWindow* GetOpenerWindowOuter();
@@ -895,6 +901,7 @@ public:
   nsPIDOMWindow* GetScriptableParent() override;
   mozilla::dom::Element* GetFrameElementOuter();
   mozilla::dom::Element* GetFrameElement(mozilla::ErrorResult& aError);
+  already_AddRefed<nsIDOMElement> GetFrameElement() override;
   already_AddRefed<nsIDOMWindow> OpenOuter(const nsAString& aUrl,
                                            const nsAString& aName,
                                            const nsAString& aOptions,
@@ -909,7 +916,13 @@ public:
      	          bool aForceNoOpener,
                 nsPIDOMWindow **_retval) override;
   mozilla::dom::Navigator* GetNavigator(mozilla::ErrorResult& aError);
+  nsIDOMNavigator* GetNavigator() override;
   nsIDOMOfflineResourceList* GetApplicationCache(mozilla::ErrorResult& aError);
+  already_AddRefed<nsIDOMOfflineResourceList> GetApplicationCache() override;
+
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+  int16_t Orientation() const;
+#endif
 
   mozilla::dom::Console* GetConsole(mozilla::ErrorResult& aRv);
 
@@ -979,18 +992,21 @@ public:
   mozilla::dom::DOMStorage* GetLocalStorage(mozilla::ErrorResult& aError);
   mozilla::dom::Selection* GetSelectionOuter();
   mozilla::dom::Selection* GetSelection(mozilla::ErrorResult& aError);
+  already_AddRefed<nsISelection> GetSelection() override;
   mozilla::dom::indexedDB::IDBFactory* GetIndexedDB(mozilla::ErrorResult& aError);
   already_AddRefed<nsICSSDeclaration>
     GetComputedStyle(mozilla::dom::Element& aElt, const nsAString& aPseudoElt,
-                     mozilla::ErrorResult& aError);
+                     mozilla::ErrorResult& aError) override;
   already_AddRefed<mozilla::dom::MediaQueryList> MatchMediaOuter(const nsAString& aQuery);
   already_AddRefed<mozilla::dom::MediaQueryList> MatchMedia(const nsAString& aQuery,
                                                             mozilla::ErrorResult& aError);
   nsScreen* GetScreen(mozilla::ErrorResult& aError);
+  nsIDOMScreen* GetScreen() override;
   void MoveToOuter(int32_t aXPos, int32_t aYPos, mozilla::ErrorResult& aError);
   void MoveTo(int32_t aXPos, int32_t aYPos, mozilla::ErrorResult& aError);
   void MoveByOuter(int32_t aXDif, int32_t aYDif, mozilla::ErrorResult& aError);
   void MoveBy(int32_t aXDif, int32_t aYDif, mozilla::ErrorResult& aError);
+  nsresult MoveBy(int32_t aXDif, int32_t aYDif) override;
   void ResizeToOuter(int32_t aWidth, int32_t aHeight, mozilla::ErrorResult& aError);
   void ResizeTo(int32_t aWidth, int32_t aHeight,
                 mozilla::ErrorResult& aError);
@@ -1061,6 +1077,7 @@ public:
   mozilla::dom::Crypto* GetCrypto(mozilla::ErrorResult& aError);
   nsIControllers* GetControllersOuter(mozilla::ErrorResult& aError);
   nsIControllers* GetControllers(mozilla::ErrorResult& aError);
+  nsresult GetControllers(nsIControllers** aControllers) override;
   mozilla::dom::Element* GetRealFrameElementOuter();
   mozilla::dom::Element* GetRealFrameElement(mozilla::ErrorResult& aError);
   float GetMozInnerScreenXOuter();
@@ -1069,14 +1086,17 @@ public:
   float GetMozInnerScreenY(mozilla::ErrorResult& aError);
   float GetDevicePixelRatioOuter();
   float GetDevicePixelRatio(mozilla::ErrorResult& aError);
+  nsresult GetDevicePixelRatio(float* aRatio) override;
   int32_t GetScrollMinX(mozilla::ErrorResult& aError);
   int32_t GetScrollMinY(mozilla::ErrorResult& aError);
   int32_t GetScrollMaxX(mozilla::ErrorResult& aError);
   int32_t GetScrollMaxY(mozilla::ErrorResult& aError);
   bool GetFullScreenOuter();
   bool GetFullScreen(mozilla::ErrorResult& aError);
+  bool GetFullScreen() override;
   void SetFullScreenOuter(bool aFullScreen, mozilla::ErrorResult& aError);
   void SetFullScreen(bool aFullScreen, mozilla::ErrorResult& aError);
+  nsresult SetFullScreen(bool aFullScreen) override;
   void BackOuter(mozilla::ErrorResult& aError);
   void Back(mozilla::ErrorResult& aError);
   void ForwardOuter(mozilla::ErrorResult& aError);
@@ -1112,6 +1132,8 @@ public:
   OpenDialog(const nsAString& aUrl, const nsAString& aName,
              const nsAString& aOptions,
              nsISupports* aExtraArgument, nsIDOMWindow** _retval) override;
+  nsresult UpdateCommands(const nsAString& anAction, nsISelection* aSel, int16_t aReason) override;
+
   already_AddRefed<nsIDOMWindow>
     GetContentInternal(mozilla::ErrorResult& aError, bool aUnprivilegedCaller);
   void GetContentOuter(JSContext* aCx,
@@ -1214,12 +1236,18 @@ protected:
                                  const char* aPropName,
                                  mozilla::ErrorResult& aError);
   // And the implementations of WindowCoordGetter/WindowCoordSetter.
+public:
   int32_t GetInnerWidthOuter(mozilla::ErrorResult& aError);
+protected:
   int32_t GetInnerWidth(mozilla::ErrorResult& aError);
+  nsresult GetInnerWidth(int32_t* aWidth) override;
   void SetInnerWidthOuter(int32_t aInnerWidth, mozilla::ErrorResult& aError);
   void SetInnerWidth(int32_t aInnerWidth, mozilla::ErrorResult& aError);
+public:
   int32_t GetInnerHeightOuter(mozilla::ErrorResult& aError);
+protected:
   int32_t GetInnerHeight(mozilla::ErrorResult& aError);
+  nsresult GetInnerHeight(int32_t* aHeight) override;
   void SetInnerHeightOuter(int32_t aInnerHeight, mozilla::ErrorResult& aError);
   void SetInnerHeight(int32_t aInnerHeight, mozilla::ErrorResult& aError);
   int32_t GetScreenXOuter(mozilla::ErrorResult& aError);
