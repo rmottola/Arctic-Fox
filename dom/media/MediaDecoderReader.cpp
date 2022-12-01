@@ -253,7 +253,6 @@ MediaDecoderReader::AsyncReadMetadata()
   typedef ReadMetadataFailureReason Reason;
 
   MOZ_ASSERT(OnTaskQueue());
-  mDecoder->GetReentrantMonitor().AssertNotCurrentThreadIn();
   DECODER_LOG("MediaDecoderReader::AsyncReadMetadata");
 
   // Attempt to read the metadata.
