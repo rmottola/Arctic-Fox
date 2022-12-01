@@ -568,10 +568,15 @@ InstantiateDecoder(const nsACString& aType, MediaDecoderOwner* aOwner)
     return decoder.forget();
   }
 #endif
-if (IsMP3SupportedType(aType)) {
+  if (IsMP3SupportedType(aType)) {
     decoder = new MP3Decoder();
     return decoder.forget();
   }
+#ifdef MOZ_GSTREAMER
+  if (IsGStreamerSupportedType(aType)) {
+    decoder = new GStreamerDecoder();
+  }
+#endif
 #ifdef MOZ_RAW
   if (IsRawType(aType)) {
     decoder = new RawDecoder();
@@ -684,9 +689,14 @@ MediaDecoderReader* DecoderTraits::CreateReader(const nsACString& aType, Abstrac
     decoderReader = new MediaFormatReader(aDecoder, new MP4Demuxer(aDecoder->GetResource()));
   } else
 #endif
-if (IsMP3SupportedType(aType)) {
+  if (IsMP3SupportedType(aType)) {
     decoderReader = new MediaFormatReader(aDecoder, new mp3::MP3Demuxer(aDecoder->GetResource()));
   } else
+#ifdef MOZ_GSTREAMER
+  if (IsGStreamerSupportedType(aType)) {
+    decoderReader = new GStreamerReader(aDecoder);
+  } else
+#endif
 #ifdef MOZ_RAW
   if (IsRawType(aType)) {
     decoderReader = new RawReader(aDecoder);
@@ -758,6 +768,9 @@ bool DecoderTraits::IsSupportedInVideoDocument(const nsACString& aType)
      !IsB2GSupportOnlyType(aType)) ||
 #endif
     IsWebMType(aType) ||
+#ifdef MOZ_GSTREAMER
+    IsGStreamerSupportedType(aType) ||
+#endif
 #ifdef MOZ_ANDROID_OMX
     (MediaDecoder::IsAndroidMediaEnabled() && IsAndroidMediaType(aType)) ||
 #endif
