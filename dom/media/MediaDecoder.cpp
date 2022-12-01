@@ -138,7 +138,6 @@ void
 MediaDecoder::NotifyOwnerActivityChanged()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
 
   if (!mOwner) {
     NS_WARNING("MediaDecoder without a decoder owner, can't update dormant");
@@ -153,6 +152,8 @@ MediaDecoder::NotifyOwnerActivityChanged()
 bool
 MediaDecoder::IsHeuristicDormantSupported() const
 {
+  MOZ_ASSERT(NS_IsMainThread());
+
   return
 #if defined(MOZ_EME)
     // We disallow dormant for encrypted media until bug 1181864 is fixed.
@@ -964,8 +965,6 @@ MediaDecoder::OnSeekResolved(SeekResolveValue aVal)
   bool fireEnded = false;
   bool seekWasAborted = false;
   {
-    ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
-
     // An additional seek was requested while the current seek was
     // in operation.
     UnpinForSeek();
