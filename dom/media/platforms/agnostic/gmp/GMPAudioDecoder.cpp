@@ -7,6 +7,7 @@
 #include "GMPAudioDecoder.h"
 #include "nsServiceManagerUtils.h"
 #include "MediaInfo.h"
+#include "GMPDecoderModule.h"
 
 namespace mozilla {
 
@@ -126,6 +127,11 @@ void
 GMPAudioDecoder::InitTags(nsTArray<nsCString>& aTags)
 {
   aTags.AppendElement(NS_LITERAL_CSTRING("aac"));
+  const Maybe<nsCString> gmp(
+    GMPDecoderModule::PreferredGMP(NS_LITERAL_CSTRING("audio/mp4a-latm")));
+  if (gmp.isSome()) {
+    aTags.AppendElement(gmp.value());
+  }
 }
 
 nsCString

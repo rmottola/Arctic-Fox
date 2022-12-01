@@ -8,6 +8,7 @@
 #define GMPDecoderModule_h_
 
 #include "PlatformDecoderModule.h"
+#include "mozilla/Maybe.h"
 
 namespace mozilla {
 
@@ -35,12 +36,15 @@ public:
   DecoderNeedsConversion(const TrackInfo& aConfig) const override;
 
   bool
-  SupportsMimeType(const nsACString& aMimeType) override
-  {
-    // TODO properly.
-    return aMimeType.EqualsLiteral("audio/mp4a-latm") ||
-      aMimeType.EqualsLiteral("video/avc");
-  }
+  SupportsMimeType(const nsACString& aMimeType) override;
+
+  static void Init();
+
+  static const Maybe<nsCString> PreferredGMP(const nsACString& aMimeType);
+
+  static bool SupportsMimeType(const nsACString& aMimeType,
+                               const Maybe<nsCString>& aGMP);
+
 };
 
 } // namespace mozilla
