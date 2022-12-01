@@ -199,8 +199,8 @@ PlatformDecoderModule::ConversionRequired
 WMFDecoderModule::DecoderNeedsConversion(const TrackInfo& aConfig) const
 {
   if (aConfig.IsVideo() &&
-     (aConfig.mMimeType.EqualsLiteral("video/avc") ||
-      aConfig.mMimeType.EqualsLiteral("video/mp4"))) {
+      (aConfig.mMimeType.EqualsLiteral("video/avc") ||
+       aConfig.mMimeType.EqualsLiteral("video/mp4"))) {
     return kNeedAnnexB;
   } else {
     return kNeedNone;
