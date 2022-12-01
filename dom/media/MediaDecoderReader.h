@@ -110,7 +110,7 @@ public:
   // thread.
   virtual RefPtr<ShutdownPromise> Shutdown();
 
-  virtual bool OnTaskQueue()
+  virtual bool OnTaskQueue() const
   {
     return OwnerThread()->IsCurrentThreadIn();
   }
@@ -306,7 +306,7 @@ public:
     OwnerThread()->Dispatch(r.forget());
   }
 
-  TaskQueue* OwnerThread() {
+  TaskQueue* OwnerThread() const {
     return mTaskQueue;
   }
 
