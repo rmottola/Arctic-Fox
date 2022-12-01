@@ -27,7 +27,7 @@ using namespace mozilla::widget::sdk;
 
 namespace mozilla {
 
-#define ENVOKE_CALLBACK(Func, ...) \
+#define INVOKE_CALLBACK(Func, ...) \
   if (mCallback) { \
     mCallback->Func(__VA_ARGS__); \
   } else { \
@@ -187,7 +187,7 @@ public:
                                  gfx::IntRect(0, 0,
                                               mConfig.mDisplay.width,
                                               mConfig.mDisplay.height));
-    ENVOKE_CALLBACK(Output, v);
+    INVOKE_CALLBACK(Output, v);
     return NS_OK;
   }
 
@@ -262,7 +262,7 @@ public:
                                              audio,
                                              numChannels,
                                              sampleRate);
-    ENVOKE_CALLBACK(Output, data);
+    INVOKE_CALLBACK(Output, data);
     return NS_OK;
   }
 };
@@ -374,7 +374,7 @@ nsresult MediaCodecDataDecoder::InitDecoder(Surface::Param aSurface)
 {
   mDecoder = CreateDecoder(mMimeType);
   if (!mDecoder) {
-    ENVOKE_CALLBACK(Error);
+    INVOKE_CALLBACK(Error);
     return NS_ERROR_FAILURE;
   }
 
@@ -398,10 +398,10 @@ nsresult MediaCodecDataDecoder::InitDecoder(Surface::Param aSurface)
   if (NS_FAILED(res)) { \
     NS_WARNING("exiting decoder loop due to exception"); \
     if (mDraining) { \
-      ENVOKE_CALLBACK(DrainComplete); \
+      INVOKE_CALLBACK(DrainComplete); \
       mDraining = false; \
     } \
-    ENVOKE_CALLBACK(Error); \
+    INVOKE_CALLBACK(Error); \
     break; \
   }
 
@@ -447,7 +447,7 @@ void MediaCodecDataDecoder::DecoderLoop()
       while (!mStopping && !mDraining && !mFlushing && mQueue.empty()) {
         if (mQueue.empty()) {
           // We could be waiting here forever if we don't signal that we need more input
-          ENVOKE_CALLBACK(InputExhausted);
+          INVOKE_CALLBACK(InputExhausted);
         }
         lock.Wait();
       }
@@ -465,13 +465,13 @@ void MediaCodecDataDecoder::DecoderLoop()
         continue;
       }
 
-      if (mDraining && !sample && !waitingEOF) {
-        draining = true;
-      }
-
       // We're not stopping or draining, so try to get a sample
       if (!mQueue.empty()) {
         sample = mQueue.front();
+      }
+
+      if (mDraining && !sample && !waitingEOF) {
+        draining = true;
       }
     }
 
@@ -544,7 +544,7 @@ void MediaCodecDataDecoder::DecoderLoop()
         HANDLE_DECODER_ERROR();
       } else if (outputStatus < 0) {
         NS_WARNING("unknown error from decoder!");
-        ENVOKE_CALLBACK(Error);
+        INVOKE_CALLBACK(Error);
 
         // Don't break here just in case it's recoverable. If it's not, others stuff will fail later and
         // we'll bail out.
@@ -564,7 +564,7 @@ void MediaCodecDataDecoder::DecoderLoop()
             mMonitor.Notify();
             mMonitor.Unlock();
 
-            ENVOKE_CALLBACK(DrainComplete);
+            INVOKE_CALLBACK(DrainComplete);
           }
 
           mDecoder->ReleaseOutputBuffer(outputStatus, false);
