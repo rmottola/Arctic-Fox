@@ -627,7 +627,7 @@ public:
    * A public wrapper for FinishDecoderSetup()
    */
   nsresult FinishDecoderSetup(MediaDecoder* aDecoder, MediaResource* aStream) {
-    return FinishDecoderSetup(aDecoder, aStream, nullptr, nullptr);
+    return FinishDecoderSetup(aDecoder, aStream, nullptr);
   }
 
   // Returns true if the media element is being destroyed. Used in
@@ -789,8 +789,7 @@ protected:
    */
   nsresult FinishDecoderSetup(MediaDecoder* aDecoder,
                               MediaResource* aStream,
-                              nsIStreamListener **aListener,
-                              MediaDecoder* aCloneDonor);
+                              nsIStreamListener **aListener);
 
   /**
    * Call this after setting up mLoadingSrc and mDecoder.

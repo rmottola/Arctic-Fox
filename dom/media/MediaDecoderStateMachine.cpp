@@ -1020,7 +1020,7 @@ bool MediaDecoderStateMachine::IsPlaying() const
   return mMediaSink->IsPlaying();
 }
 
-nsresult MediaDecoderStateMachine::Init(MediaDecoderStateMachine* aCloneDonor)
+nsresult MediaDecoderStateMachine::Init()
 {
   MOZ_ASSERT(NS_IsMainThread());
   nsresult rv = mReader->Init();

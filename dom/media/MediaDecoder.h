@@ -319,8 +319,7 @@ public:
   // Start downloading the media. Decode the downloaded data up to the
   // point of the first frame of data.
   // This is called at most once per decoder, after Init().
-  virtual nsresult Load(nsIStreamListener** aListener,
-                        MediaDecoder* aCloneDonor);
+  virtual nsresult Load(nsIStreamListener** aListener);
 
   // Called in |Load| to open mResource.
   nsresult OpenResource(nsIStreamListener** aStreamListener);
@@ -359,7 +358,7 @@ public:
   virtual nsresult Seek(double aTime, SeekTarget::Type aSeekType);
 
   // Initialize state machine and schedule it.
-  nsresult InitializeStateMachine(MediaDecoder* aCloneDonor);
+  nsresult InitializeStateMachine();
 
   // Start playback of a video. 'Load' must have previously been
   // called.
