@@ -1177,7 +1177,7 @@ static const uint8_t ID[ID_LEN] = {'I', 'D', '3'};
 
 static const uint8_t MIN_MAJOR_VER = 2;
 static const uint8_t MAX_MAJOR_VER = 4;
-}
+} // namespace id3_header
 
 uint32_t
 ID3Parser::Parse(ByteReader* aReader) {
@@ -1189,7 +1189,6 @@ ID3Parser::Parse(ByteReader* aReader) {
     // Header found, return total tag size.
     return ID3Header::SIZE + Header().Size() + Header().FooterSize();
   }
-
   return 0;
 }
 
