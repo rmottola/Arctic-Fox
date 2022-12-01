@@ -350,7 +350,6 @@ MediaDecoder::MediaDecoder() :
   mDormantSupported(false),
   mLogicalPosition(0.0),
   mDuration(std::numeric_limits<double>::quiet_NaN()),
-  mReentrantMonitor("media.decoder"),
   mIgnoreProgressData(false),
   mInfiniteStream(false),
   mOwner(nullptr),
