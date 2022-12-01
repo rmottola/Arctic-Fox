@@ -305,6 +305,8 @@ public:
                                                         const nsString& aSessionId) override;
     virtual bool RecvNotifyPresentationReceiverCleanUp(const nsString& aSessionId) override;
 
+    virtual bool RecvNotifyGMPsChanged() override;
+
     virtual PSpeechSynthesisChild* AllocPSpeechSynthesisChild() override;
     virtual bool DeallocPSpeechSynthesisChild(PSpeechSynthesisChild* aActor) override;
 
