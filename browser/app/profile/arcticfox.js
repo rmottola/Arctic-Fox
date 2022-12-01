@@ -944,8 +944,8 @@ pref("dom.ipc.shims.enabledWarnings", false);
 
 // If decoding-via-gmp is turned on for <video>, default to using
 // Adobe's GMP for decoding.
-pref("media.fragmented-mp4.gmp.aac", 2);
-pref("media.fragmented-mp4.gmp.h264", 2);
+pref("media.gmp.decoder.aac", 2);
+pref("media.gmp.decoder.h264", 2);
 
 // Start the browser in e10s mode
 pref("browser.tabs.remote.autostart", false);

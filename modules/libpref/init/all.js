@@ -361,6 +361,7 @@ pref("media.fragmented-mp4.gmp.h264", 0);
 // decoder works on all platforms.
 pref("media.use-blank-decoder", false);
 #ifdef MOZ_WMF
+pref("media.wmf.enabled", true);
 pref("media.wmf.decoder.thread-count", -1);
 #endif
 #if defined(MOZ_FFMPEG)
@@ -368,6 +369,8 @@ pref("media.ffmpeg.enabled", true);
 pref("media.libavcodec.allow-obsolete", false);
 #endif
 pref("media.gmp.decoder.enabled", false);
+pref("media.gmp.decoder.aac", 0);
+pref("media.gmp.decoder.h264", 0);
 #ifdef MOZ_RAW
 pref("media.raw.enabled", true);
 #endif
