@@ -31,8 +31,6 @@ public:
   // This has to be called before decoding begins
   void BeginDecoding(TaskQueue* aTaskQueueIdentity);
 
-  virtual ReentrantMonitor& GetReentrantMonitor() final override;
-
   virtual bool OnStateMachineTaskQueue() const final override;
 
   virtual MediaResource* GetResource() const final override;
@@ -65,11 +63,6 @@ public:
 
 private:
   virtual ~BufferDecoder();
-
-  // This monitor object is not really used to synchronize access to anything.
-  // It's just there in order for us to be able to override
-  // GetReentrantMonitor correctly.
-  ReentrantMonitor mReentrantMonitor;
   RefPtr<TaskQueue> mTaskQueueIdentity;
   RefPtr<MediaResource> mResource;
 };

@@ -1253,11 +1253,6 @@ MediaDecoder::SetStateMachine(MediaDecoderStateMachine* aStateMachine)
   }
 }
 
-ReentrantMonitor&
-MediaDecoder::GetReentrantMonitor() {
-  return mReentrantMonitor;
-}
-
 ImageContainer*
 MediaDecoder::GetImageContainer()
 {
