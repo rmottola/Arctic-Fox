@@ -45,10 +45,21 @@ extern already_AddRefed<PlatformDecoderModule> CreateAgnosticDecoderModule();
 extern already_AddRefed<PlatformDecoderModule> CreateBlankDecoderModule();
 
 bool PDMFactory::sUseBlankDecoder = false;
+#ifdef MOZ_GONK_MEDIACODEC
 bool PDMFactory::sGonkDecoderEnabled = false;
+#endif
+#ifdef MOZ_WIDGET_ANDROID
 bool PDMFactory::sAndroidMCDecoderEnabled = false;
 bool PDMFactory::sAndroidMCDecoderPreferred = false;
+#endif
 bool PDMFactory::sGMPDecoderEnabled = false;
+#ifdef MOZ_FFMPEG
+bool PDMFactory::sFFmpegDecoderEnabled = false;
+#endif
+#ifdef XP_WIN
+bool PDMFactory::sWMFDecoderEnabled = false;
+#endif
+
 bool PDMFactory::sEnableFuzzingWrapper = false;
 uint32_t PDMFactory::sVideoOutputMinimumInterval_ms = 0;
 bool PDMFactory::sDontDelayInputExhausted = false;
