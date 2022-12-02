@@ -23,7 +23,10 @@ class MediaFormatReader final : public MediaDecoderReader
   typedef media::Interval<int64_t> ByteInterval;
 
 public:
-  MediaFormatReader(AbstractMediaDecoder* aDecoder, MediaDataDemuxer* aDemuxer);
+  MediaFormatReader(AbstractMediaDecoder* aDecoder,
+                    MediaDataDemuxer* aDemuxer,
+                    VideoFrameContainer* aVideoFrameContainer = nullptr,
+                    layers::LayersBackend aLayersBackend = layers::LayersBackend::LAYERS_NONE);
 
   virtual ~MediaFormatReader();
 
@@ -414,6 +417,9 @@ private:
 
   // Pending decoders initialization.
   MozPromiseRequestHolder<MediaDataDecoder::InitPromise::AllPromiseType> mDecodersInitRequest;
+
+  RefPtr<VideoFrameContainer> mVideoFrameContainer;
+  layers::ImageContainer* GetImageContainer();
 
 #if defined(READER_DORMANT_HEURISTIC)
   const bool mDormantEnabled;
