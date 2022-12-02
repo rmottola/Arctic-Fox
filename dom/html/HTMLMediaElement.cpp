@@ -2749,7 +2749,7 @@ nsresult HTMLMediaElement::InitializeDecoderAsClone(MediaDecoder* aOriginal)
   MediaResource* originalResource = aOriginal->GetResource();
   if (!originalResource)
     return NS_ERROR_FAILURE;
-  RefPtr<MediaDecoder> decoder = aOriginal->Clone();
+  RefPtr<MediaDecoder> decoder = aOriginal->Clone(this);
   if (!decoder)
     return NS_ERROR_FAILURE;
 
