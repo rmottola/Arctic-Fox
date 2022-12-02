@@ -155,9 +155,6 @@ public:
   virtual bool IsWaitForDataSupported() { return false; }
   virtual RefPtr<WaitForDataPromise> WaitForData(MediaData::Type aType) { MOZ_CRASH(); }
 
-  virtual bool HasAudio() = 0;
-  virtual bool HasVideo() = 0;
-
   // The default implementation of AsyncReadMetadata is implemented in terms of
   // synchronous ReadMetadata() calls. Implementations may also
   // override AsyncReadMetadata to create a more proper async implementation.
@@ -273,20 +270,10 @@ public:
     OwnerThread()->Dispatch(r.forget(), AbstractThread::DontAssertDispatchSuccess);
   }
 
-  // Notify the reader that data from the resource was evicted (MediaSource only)
-  virtual void NotifyDataRemoved() {}
-
   virtual MediaQueue<AudioData>& AudioQueue() { return mAudioQueue; }
   virtual MediaQueue<VideoData>& VideoQueue() { return mVideoQueue; }
 
-  // Returns a pointer to the decoder.
-  AbstractMediaDecoder* GetDecoder() {
-    return mDecoder;
-  }
-
   RefPtr<VideoDataPromise> DecodeToFirstVideoData();
-
-  MediaInfo GetMediaInfo() { return mInfo; }
 
   // Indicates if the media is seekable.
   // ReadMetada should be called before calling this method.
