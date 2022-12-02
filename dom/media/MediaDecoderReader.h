@@ -219,22 +219,18 @@ public:
   // throttling when the update comes from MSE code, since that code needs the
   // updates to be observable immediately, and is generally less
   // trigger-happy with notifications anyway.
-  void DispatchNotifyDataArrived(uint32_t aLength,
-                                 int64_t aOffset,
-                                 bool aThrottleUpdates)
+  void DispatchNotifyDataArrived(bool aThrottleUpdates)
   {
-    typedef media::Interval<int64_t> Interval;
-    RefPtr<nsRunnable> r = NS_NewRunnableMethodWithArg<Interval>(
+    RefPtr<nsRunnable> r = NS_NewRunnableMethod(
       this,
       aThrottleUpdates ? &MediaDecoderReader::ThrottledNotifyDataArrived :
-                         &MediaDecoderReader::NotifyDataArrived,
-      Interval(aOffset, aOffset + aLength));
+                         &MediaDecoderReader::NotifyDataArrived);
 
     OwnerThread()->Dispatch(
       r.forget(), AbstractThread::DontAssertDispatchSuccess);
   }
 
-  void NotifyDataArrived(const media::Interval<int64_t>& aInfo)
+  void NotifyDataArrived()
   {
     MOZ_ASSERT(OnTaskQueue());
     NS_ENSURE_TRUE_VOID(!mShutdown);
@@ -245,7 +241,10 @@ public:
   virtual MediaQueue<AudioData>& AudioQueue() { return mAudioQueue; }
   virtual MediaQueue<VideoData>& VideoQueue() { return mVideoQueue; }
 
-  AbstractCanonical<media::TimeIntervals>* CanonicalBuffered() { return &mBuffered; }
+  AbstractCanonical<media::TimeIntervals>* CanonicalBuffered()
+  {
+    return &mBuffered;
+  }
 
   // Indicates if the media is seekable.
   // ReadMetada should be called before calling this method.
@@ -409,7 +408,7 @@ private:
 
   // Invokes NotifyDataArrived while throttling the calls to occur
   // at most every mThrottleDuration ms.
-  void ThrottledNotifyDataArrived(const media::Interval<int64_t>& aInterval);
+  void ThrottledNotifyDataArrived();
   void DoThrottledNotify();
 
   // Overrides of this function should decodes an unspecified amount of
