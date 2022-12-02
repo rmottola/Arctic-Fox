@@ -437,16 +437,8 @@ MediaDecoder::MediaDecoder(MediaDecoderOwner* aOwner)
 
   // mIgnoreProgressData
   mWatchManager.Watch(mLogicallySeeking, &MediaDecoder::SeekingChanged);
-}
 
-bool
-MediaDecoder::Init(MediaDecoderOwner* aOwner)
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  mOwner = aOwner;
-  mVideoFrameContainer = aOwner->GetVideoFrameContainer();
   MediaShutdownManager::Instance().Register(this);
-  return true;
 }
 
 void

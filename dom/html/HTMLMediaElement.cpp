@@ -2755,11 +2755,6 @@ nsresult HTMLMediaElement::InitializeDecoderAsClone(MediaDecoder* aOriginal)
 
   LOG(LogLevel::Debug, ("%p Cloned decoder %p from %p", this, decoder.get(), aOriginal));
 
-  if (!decoder->Init(this)) {
-    LOG(LogLevel::Debug, ("%p Failed to init cloned decoder %p", this, decoder.get()));
-    return NS_ERROR_FAILURE;
-  }
-
   decoder->SetMediaSeekable(aOriginal->IsMediaSeekable());
 
   RefPtr<MediaResource> resource = originalResource->CloneData(decoder);
