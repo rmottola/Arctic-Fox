@@ -403,7 +403,6 @@ CanPlayStatus
 DecoderTraits::CanHandleCodecsType(const char* aMIMEType,
                                    const nsAString& aRequestedCodecs)
 {
-  MOZ_ASSERT(NS_IsMainThread());
   char const* const* codecList = nullptr;
 #ifdef MOZ_RAW
   if (IsRawType(nsDependentCString(aMIMEType))) {
