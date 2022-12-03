@@ -29,6 +29,10 @@
 #include "RawDecoder.h"
 #include "RawReader.h"
 #endif
+#ifdef MOZ_GSTREAMER
+#include "GStreamerDecoder.h"
+#include "GStreamerReader.h"
+#endif
 #ifdef MOZ_ANDROID_OMX
 #include "AndroidMediaPluginHost.h"
 #include "AndroidMediaDecoder.h"
@@ -196,6 +200,23 @@ DecoderTraits::IsWebMType(const nsACString& aType)
 #endif
   return false;
 }
+
+#ifdef MOZ_GSTREAMER
+static bool
+IsGStreamerSupportedType(const nsACString& aMimeType)
+{
+  if (DecoderTraits::IsWebMTypeAndEnabled(aMimeType))
+    return false;
+
+  if (!MediaDecoder::IsGStreamerEnabled())
+    return false;
+
+  if (IsOggType(aMimeType) && !Preferences::GetBool("media.prefer-gstreamer", false))
+    return false;
+
+  return GStreamerDecoder::CanHandleMediaType(aMimeType, nullptr);
+}
+#endif
 
 #ifdef MOZ_OMX_DECODER
 static const char* const gOmxTypes[] = {
@@ -458,7 +479,7 @@ DecoderTraits::CanHandleCodecsType(const char* aMIMEType,
 #endif
 #ifdef MOZ_ANDROID_OMX
   if (MediaDecoder::IsAndroidMediaEnabled()) {
-      EnsureAndroidMediaPluginHost()->FindDecoder(nsDependentCString(aMIMEType), &codecList))
+    EnsureAndroidMediaPluginHost()->FindDecoder(nsDependentCString(aMIMEType), &codecList);
   }
 #endif
   if (!codecList) {
@@ -524,6 +545,12 @@ DecoderTraits::CanHandleMediaType(const char* aMIMEType,
   if (IsMP3SupportedType(nsDependentCString(aMIMEType))) {
     return CANPLAY_MAYBE;
   }
+#ifdef MOZ_GSTREAMER
+  if (GStreamerDecoder::CanHandleMediaType(nsDependentCString(aMIMEType),
+                                           aHaveRequestedCodecs ? &aRequestedCodecs : nullptr)) {
+    return aHaveRequestedCodecs ? CANPLAY_YES : CANPLAY_MAYBE;
+  }
+#endif
 #ifdef MOZ_OMX_DECODER
   if (IsOmxSupportedType(nsDependentCString(aMIMEType))) {
     return CANPLAY_MAYBE;

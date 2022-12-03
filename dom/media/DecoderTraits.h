@@ -38,7 +38,8 @@ public:
                                           const nsAString& aRequestedCodecs);
 
   // Returns the CanPlayStatus indicating if we can handle this MIME type and
-  // codecs type natively. 
+  // codecs type natively, excluding any plugins-based reader (such as
+  // GStreamer)
   // The MIME type should not include the codecs parameter.
   // That parameter is passed in aRequestedCodecs.
   static CanPlayStatus CanHandleCodecsType(const char* aMIMEType,
