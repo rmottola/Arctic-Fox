@@ -341,14 +341,7 @@ static bool
 IsMP4SupportedType(const nsACString& aType,
                    const nsAString& aCodecs = EmptyString())
 {
-// Currently on B2G, FMP4 is only working for MSE playback.
-// For other normal MP4, it still uses current omx decoder.
-// Bug 1061034 is a follow-up bug to enable all MP4s with MOZ_FMP4
-#ifdef MOZ_OMX_DECODER
-  return false;
-#else
   return MP4Decoder::CanHandleMediaType(aType, aCodecs);
-#endif
 }
 #endif
 
