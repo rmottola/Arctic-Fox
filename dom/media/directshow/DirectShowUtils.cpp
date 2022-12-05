@@ -257,7 +257,7 @@ AddMP3DMOWrapperFilter(IGraphBuilder* aGraph,
   HRESULT hr;
 
   // Create the wrapper filter.
-  nsRefPtr<IBaseFilter> filter;
+  RefPtr<IBaseFilter> filter;
   hr = CreateMP3DMOWrapperFilter(getter_AddRefs(filter));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
@@ -276,7 +276,7 @@ AddMP3DMOWrapperFilter(IGraphBuilder* aGraph,
 bool
 CanDecodeMP3UsingDirectShow()
 {
-  nsRefPtr<IBaseFilter> filter;
+  RefPtr<IBaseFilter> filter;
 
   // Can we create the MP3 demuxer filter?
   if (FAILED(CoCreateInstance(CLSID_MPEG1Splitter,
