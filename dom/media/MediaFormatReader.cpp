@@ -77,6 +77,7 @@ MediaFormatReader::MediaFormatReader(AbstractMediaDecoder* aDecoder,
   , mIsEncrypted(false)
   , mTrackDemuxersMayBlock(false)
   , mHardwareAccelerationDisabled(false)
+  , mDemuxOnly(false)
   , mVideoFrameContainer(aVideoFrameContainer)
 {
   MOZ_ASSERT(aDemuxer);
@@ -475,7 +476,7 @@ MediaFormatReader::ShouldSkip(bool aSkipToNextKeyframe, media::TimeUnit aTimeThr
 
 RefPtr<MediaDecoderReader::VideoDataPromise>
 MediaFormatReader::RequestVideoData(bool aSkipToNextKeyframe,
-                                     int64_t aTimeThreshold)
+                                    int64_t aTimeThreshold)
 {
   MOZ_ASSERT(OnTaskQueue());
   MOZ_DIAGNOSTIC_ASSERT(mSeekPromise.IsEmpty(), "No sample requests allowed while seeking");
@@ -793,8 +794,21 @@ MediaFormatReader::RequestDemuxSamples(TrackType aTrack)
   }
 }
 
-void
+bool
 MediaFormatReader::DecodeDemuxedSamples(TrackType aTrack,
+                                        MediaRawData* aSample)
+{
+  MOZ_ASSERT(OnTaskQueue());
+  auto& decoder = GetDecoderData(aTrack);
+  if (NS_FAILED(decoder.mDecoder->Input(aSample))) {
+      LOG("Unable to pass frame to decoder");
+      return false;
+  }
+  return true;
+}
+
+void
+MediaFormatReader::HandleDemuxedSamples(TrackType aTrack,
                                         AbstractMediaDecoder::AutoNotifyDecoded& aA)
 {
   MOZ_ASSERT(OnTaskQueue());
@@ -895,12 +909,20 @@ MediaFormatReader::DecodeDemuxedSamples(TrackType aTrack,
     if (aTrack == TrackInfo::kVideoTrack) {
       aA.mParsed++;
     }
-    if (NS_FAILED(decoder.mDecoder->Input(sample))) {
-      LOG("Unable to pass frame to decoder");
+
+    if (mDemuxOnly) {
+      ReturnOutput(sample, aTrack);
+    } else if (!DecodeDemuxedSamples(aTrack, sample)) {
       NotifyError(aTrack);
       return;
     }
+
     decoder.mQueuedSamples.RemoveElementAt(0);
+    if (mDemuxOnly) {
+      // If demuxed-only case, ReturnOutput will resolve with one demuxed data.
+      // Then we should stop doing the iteration.
+      return;
+    }
     samplesPending = true;
   }
 
@@ -1035,8 +1057,8 @@ MediaFormatReader::Update(TrackType aTrack)
 
   // Demux samples if we don't have some.
   RequestDemuxSamples(aTrack);
-  // Decode all pending demuxed samples.
-  DecodeDemuxedSamples(aTrack, a);
+
+  HandleDemuxedSamples(aTrack, a);
 }
 
 void
@@ -1051,20 +1073,21 @@ MediaFormatReader::ReturnOutput(MediaData* aData, TrackType aTrack)
   }
 
   if (aTrack == TrackInfo::kAudioTrack) {
-    AudioData* audioData = static_cast<AudioData*>(aData);
+    if (aData->mType != MediaData::RAW_DATA) {
+      AudioData* audioData = static_cast<AudioData*>(aData);
 
-    if (audioData->mChannels != mInfo.mAudio.mChannels ||
-        audioData->mRate != mInfo.mAudio.mRate) {
-      LOG("change of audio format (rate:%d->%d). "
-          "This is an unsupported configuration",
-          mInfo.mAudio.mRate, audioData->mRate);
-      mInfo.mAudio.mRate = audioData->mRate;
-      mInfo.mAudio.mChannels = audioData->mChannels;
+      if (audioData->mChannels != mInfo.mAudio.mChannels ||
+          audioData->mRate != mInfo.mAudio.mRate) {
+        LOG("change of audio format (rate:%d->%d). "
+            "This is an unsupported configuration",
+            mInfo.mAudio.mRate, audioData->mRate);
+        mInfo.mAudio.mRate = audioData->mRate;
+        mInfo.mAudio.mChannels = audioData->mChannels;
+      }
     }
-
-    mAudio.mPromise.Resolve(audioData, __func__);
+    mAudio.mPromise.Resolve(aData, __func__);
   } else if (aTrack == TrackInfo::kVideoTrack) {
-    mVideo.mPromise.Resolve(static_cast<VideoData*>(aData), __func__);
+    mVideo.mPromise.Resolve(aData, __func__);
   }
   LOG("Resolved data promise for %s", TrackTypeToStr(aTrack));
 }
