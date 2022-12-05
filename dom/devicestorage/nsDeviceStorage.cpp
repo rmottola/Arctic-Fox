@@ -2158,6 +2158,7 @@ public:
   DeviceStorageAvailableRequest()
   {
     mAccess = DEVICE_STORAGE_ACCESS_READ;
+    mSendToParent = false;
     DS_LOG_INFO("");
   }
 
@@ -2169,15 +2170,6 @@ public:
     }
     return Resolve(state);
   }
-
-protected:
-  nsresult CreateSendParams(DeviceStorageParams& aParams) override
-  {
-    DeviceStorageAvailableParams params(mFile->mStorageType,
-                                        mFile->mStorageName);
-    aParams = params;
-    return NS_OK;
-  }
 };
 
 class DeviceStorageStatusRequest final
@@ -2187,6 +2179,7 @@ public:
   DeviceStorageStatusRequest()
   {
     mAccess = DEVICE_STORAGE_ACCESS_READ;
+    mSendToParent = false;
     DS_LOG_INFO("");
   }
 
@@ -2197,15 +2190,6 @@ public:
       mFile->GetStorageStatus(state);
     }
     return Resolve(state);
-  }
-
-protected:
-  nsresult CreateSendParams(DeviceStorageParams& aParams) override
-  {
-    DeviceStorageStatusParams params(mFile->mStorageType,
-                                     mFile->mStorageName);
-    aParams = params;
-    return NS_OK;
   }
 };
 
