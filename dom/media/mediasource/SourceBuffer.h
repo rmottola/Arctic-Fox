@@ -269,8 +269,6 @@ private:
 
   mozilla::Atomic<bool> mActive;
 
-  int64_t mReportedOffset;
-
   MozPromiseRequestHolder<SourceBufferContentManager::AppendPromise> mPendingAppend;
   const nsCString mType;
 
