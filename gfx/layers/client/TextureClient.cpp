@@ -524,6 +524,11 @@ TextureClient::CreateForYCbCr(ISurfaceAllocator* aAllocator,
                               StereoMode aStereoMode,
                               TextureFlags aTextureFlags)
 {
+  MOZ_ASSERT(aAllocator->IPCOpen());
+  if (!aAllocator || !aAllocator->IPCOpen()) {
+    return nullptr;
+  }
+
   if (!gfx::Factory::AllowedSurfaceSize(aYSize)) {
     return nullptr;
   }
