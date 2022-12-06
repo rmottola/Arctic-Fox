@@ -1666,6 +1666,7 @@ nsChildView::NotifyIMEInternal(const IMENotification& aIMENotification)
     case NOTIFY_IME_OF_SELECTION_CHANGE:
       NS_ENSURE_TRUE(mTextInputHandler, NS_ERROR_NOT_AVAILABLE);
       mTextInputHandler->OnSelectionChange(aIMENotification);
+      return NS_OK;
     default:
       return NS_ERROR_NOT_IMPLEMENTED;
   }
@@ -1763,6 +1764,7 @@ nsChildView::GetInputContext()
         break;
       }
       // If mTextInputHandler is null, set CLOSED instead...
+      MOZ_FALLTHROUGH;
     default:
       mInputContext.mIMEState.mOpen = IMEState::CLOSED;
       break;
