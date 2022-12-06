@@ -89,3 +89,27 @@
 #identity-popup-button-container {
   background-color: hsla(210,4%,10%,.07);
 }
+
+/* PERMISSIONS */
+
+#identity-popup-permissions-content {
+  background-image: url(chrome://browser/skin/controlcenter/permissions.svg);
+}
+
+#identity-popup-permission-list menulist {
+  min-width: 60px;
+}
+
+#identity-popup-permission-list:not(:empty) {
+  margin-top: 5px;
+}
+
+#identity-popup-permission-list:not(:empty) + description {
+  display: none;
+}
+
+.identity-popup-permission-label {
+  -moz-margin-start: 0;
+  word-wrap: break-word;
+}
+
