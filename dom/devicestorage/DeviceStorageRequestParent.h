@@ -275,7 +275,7 @@ private:
 protected:
   bool AddRunnable(CancelableRunnable* aRunnable) {
     MutexAutoLock lock(mMutex);
-    if (mActorDestoryed)
+    if (mActorDestroyed)
       return false;
 
     mRunnables.AppendElement(aRunnable);
@@ -288,7 +288,7 @@ protected:
   }
 
   Mutex mMutex;
-  bool mActorDestoryed;
+  bool mActorDestroyed;
   nsTArray<RefPtr<CancelableRunnable> > mRunnables;
 };
 

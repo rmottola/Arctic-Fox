@@ -24,7 +24,7 @@ DeviceStorageRequestParent::DeviceStorageRequestParent(
   const DeviceStorageParams& aParams)
   : mParams(aParams)
   , mMutex("DeviceStorageRequestParent::mMutex")
-  , mActorDestoryed(false)
+  , mActorDestroyed(false)
 {
   MOZ_COUNT_CTOR(DeviceStorageRequestParent);
 
@@ -392,7 +392,7 @@ void
 DeviceStorageRequestParent::ActorDestroy(ActorDestroyReason)
 {
   MutexAutoLock lock(mMutex);
-  mActorDestoryed = true;
+  mActorDestroyed = true;
   int32_t count = mRunnables.Length();
   for (int32_t index = 0; index < count; index++) {
     mRunnables[index]->Cancel();
