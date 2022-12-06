@@ -68,7 +68,7 @@ BluetoothDaemonA2dpModule::ConnectCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -90,7 +90,7 @@ BluetoothDaemonA2dpModule::DisconnectCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 

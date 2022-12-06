@@ -1120,7 +1120,7 @@ void
 ActivateOrDeactivateChild(TabParent* aParent, void* aArg)
 {
   bool active = static_cast<bool>(aArg);
-  unused << aParent->SendParentActivated(active);
+  Unused << aParent->SendParentActivated(active);
 }
 
 void

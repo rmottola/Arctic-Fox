@@ -404,7 +404,7 @@ CamerasParent::CloseEngines()
     auto capNum = mCallbacks[0]->mCapturerId;
     LOG(("Forcing shutdown of engine %d, capturer %d", capEngine, capNum));
     StopCapture(capEngine, capNum);
-    unused << ReleaseCaptureDevice(capEngine, capNum);
+    Unused << ReleaseCaptureDevice(capEngine, capNum);
   }
 
   for (int i = 0; i < CaptureEngine::MaxEngine; i++) {
@@ -474,11 +474,11 @@ CamerasParent::RecvNumberOfCaptureDevices(const int& aCapEngine)
           }
           if (num < 0) {
             LOG(("RecvNumberOfCaptureDevices couldn't find devices"));
-            unused << self->SendReplyFailure();
+            Unused << self->SendReplyFailure();
             return NS_ERROR_FAILURE;
           } else {
             LOG(("RecvNumberOfCaptureDevices: %d", num));
-            unused << self->SendReplyNumberOfCaptureDevices(num);
+            Unused << self->SendReplyNumberOfCaptureDevices(num);
             return NS_OK;
           }
         });
@@ -513,12 +513,12 @@ CamerasParent::RecvNumberOfCapabilities(const int& aCapEngine,
           }
           if (num < 0) {
             LOG(("RecvNumberOfCapabilities couldn't find capabilities"));
-            unused << self->SendReplyFailure();
+            Unused << self->SendReplyFailure();
             return NS_ERROR_FAILURE;
           } else {
             LOG(("RecvNumberOfCapabilities: %d", num));
           }
-          unused << self->SendReplyNumberOfCapabilities(num);
+          Unused << self->SendReplyNumberOfCapabilities(num);
           return NS_OK;
         });
       self->mPBackgroundThread->Dispatch(ipc_runnable, NS_DISPATCH_NORMAL);
@@ -565,10 +565,10 @@ CamerasParent::RecvGetCaptureCapability(const int &aCapEngine,
                webrtcCaps.rawType,
                webrtcCaps.codecType));
           if (error) {
-            unused << self->SendReplyFailure();
+            Unused << self->SendReplyFailure();
             return NS_ERROR_FAILURE;
           }
-          unused << self->SendReplyGetCaptureCapability(capCap);
+          Unused << self->SendReplyGetCaptureCapability(capCap);
           return NS_OK;
         });
       self->mPBackgroundThread->Dispatch(ipc_runnable, NS_DISPATCH_NORMAL);
@@ -610,12 +610,12 @@ CamerasParent::RecvGetCaptureDevice(const int& aCapEngine,
           }
           if (error) {
             LOG(("GetCaptureDevice failed: %d", error));
-            unused << self->SendReplyFailure();
+            Unused << self->SendReplyFailure();
             return NS_ERROR_FAILURE;
           }
 
           LOG(("Returning %s name %s id", name.get(), uniqueId.get()));
-          unused << self->SendReplyGetCaptureDevice(name, uniqueId);
+          Unused << self->SendReplyGetCaptureDevice(name, uniqueId);
           return NS_OK;
         });
       self->mPBackgroundThread->Dispatch(ipc_runnable, NS_DISPATCH_NORMAL);
@@ -646,11 +646,11 @@ CamerasParent::RecvAllocateCaptureDevice(const int& aCapEngine,
             return NS_ERROR_FAILURE;
           }
           if (error) {
-            unused << self->SendReplyFailure();
+            Unused << self->SendReplyFailure();
             return NS_ERROR_FAILURE;
           } else {
             LOG(("Allocated device nr %d", numdev));
-            unused << self->SendReplyAllocateCaptureDevice(numdev);
+            Unused << self->SendReplyAllocateCaptureDevice(numdev);
             return NS_OK;
           }
         });
@@ -689,10 +689,10 @@ CamerasParent::RecvReleaseCaptureDevice(const int& aCapEngine,
             return NS_ERROR_FAILURE;
           }
           if (error) {
-            unused << self->SendReplyFailure();
+            Unused << self->SendReplyFailure();
             return NS_ERROR_FAILURE;
           } else {
-            unused << self->SendReplySuccess();
+            Unused << self->SendReplySuccess();
             LOG(("Freed device nr %d", numdev));
             return NS_OK;
           }
@@ -752,10 +752,10 @@ CamerasParent::RecvStartCapture(const int& aCapEngine,
             return NS_ERROR_FAILURE;
           }
           if (!error) {
-            unused << self->SendReplySuccess();
+            Unused << self->SendReplySuccess();
             return NS_OK;
           } else {
-            unused << self->SendReplyFailure();
+            Unused << self->SendReplyFailure();
             return NS_ERROR_FAILURE;
           }
         });

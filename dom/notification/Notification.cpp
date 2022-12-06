@@ -171,7 +171,7 @@ public:
                                           result);
 
       n->SetStoredState(true);
-      unused << NS_WARN_IF(result.Failed());
+      Unused << NS_WARN_IF(result.Failed());
       if (!result.Failed()) {
         notifications.AppendElement(n.forget());
       }
@@ -221,7 +221,7 @@ public:
 
     rv = notificationStorage->Get(mOrigin, mTag, mCallback);
     //XXXnsm Is it guaranteed mCallback will be called in case of failure?
-    unused << NS_WARN_IF(NS_FAILED(rv));
+    Unused << NS_WARN_IF(NS_FAILED(rv));
     return rv;
   }
 };
@@ -1794,7 +1794,7 @@ public:
                                           result);
 
       n->SetStoredState(true);
-      unused << NS_WARN_IF(result.Failed());
+      Unused << NS_WARN_IF(result.Failed());
       if (!result.Failed()) {
         notifications.AppendElement(n.forget());
       }

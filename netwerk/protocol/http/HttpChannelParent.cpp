@@ -437,7 +437,7 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
     fdSetActor->ForgetFileDescriptors(fds);
     MOZ_ASSERT(!fds.IsEmpty());
 
-    unused << fdSetActor->Send__delete__(fdSetActor);
+    Unused << fdSetActor->Send__delete__(fdSetActor);
   } else if (aFds.type() == OptionalFileDescriptorSet::TArrayOfFileDescriptor) {
     const_cast<OptionalFileDescriptorSet&>(aFds).
       get_ArrayOfFileDescriptor().SwapElements(fds);
@@ -1259,7 +1259,7 @@ NS_IMETHODIMP
 HttpChannelParent::NotifyTrackingProtectionDisabled()
 {
   if (!mIPCClosed)
-    unused << SendNotifyTrackingProtectionDisabled();
+    Unused << SendNotifyTrackingProtectionDisabled();
   return NS_OK;
 }
 
@@ -1267,7 +1267,7 @@ NS_IMETHODIMP
 HttpChannelParent::Delete()
 {
   if (!mIPCClosed)
-    unused << SendDeleteSelf();
+    Unused << SendDeleteSelf();
 
   return NS_OK;
 }
@@ -1327,7 +1327,7 @@ HttpChannelParent::CompleteRedirect(bool succeeded)
 
   if (succeeded && !mIPCClosed) {
     // TODO: check return value: assume child dead if failed
-    unused << SendRedirect3Complete();
+    Unused << SendRedirect3Complete();
   }
 
   mRedirectChannel = nullptr;
@@ -1548,7 +1548,7 @@ HttpChannelParent::NotifyDiversionFailed(nsresult aErrorCode,
   mChannel = nullptr;
 
   if (!mIPCClosed) {
-    unused << SendDeleteSelf();
+    Unused << SendDeleteSelf();
   }
 }
 
@@ -1614,7 +1614,7 @@ HttpChannelParent::ReportSecurityMessage(const nsAString& aMessageTag,
 NS_IMETHODIMP
 HttpChannelParent::IssueWarning(uint32_t aWarning, bool aAsError)
 {
-  unused << SendIssueDeprecationWarning(aWarning, aAsError);
+  Unused << SendIssueDeprecationWarning(aWarning, aAsError);
   return NS_OK;
 }
 

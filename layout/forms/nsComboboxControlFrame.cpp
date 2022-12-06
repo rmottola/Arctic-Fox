@@ -842,7 +842,7 @@ nsComboboxControlFrame::Reflow(nsPresContext*          aPresContext,
   if (NS_SUCCEEDED(aPresContext->PresShell()->PostReflowCallback(resize))) {
     // The reflow callback queue doesn't AddRef so we keep it alive until
     // it's released in its ReflowFinished / ReflowCallbackCanceled.
-    unused << resize.forget();
+    Unused << resize.forget();
   }
 
   // Get the width of the vertical scrollbar.  That will be the inline

@@ -69,7 +69,7 @@ BluetoothDaemonGattModule::ClientRegisterCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -91,7 +91,7 @@ BluetoothDaemonGattModule::ClientUnregisterCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -115,7 +115,7 @@ BluetoothDaemonGattModule::ClientScanCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -145,7 +145,7 @@ BluetoothDaemonGattModule::ClientConnectCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -173,7 +173,7 @@ BluetoothDaemonGattModule::ClientDisconnectCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -198,7 +198,7 @@ BluetoothDaemonGattModule::ClientListenCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -223,7 +223,7 @@ BluetoothDaemonGattModule::ClientRefreshCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -251,7 +251,7 @@ BluetoothDaemonGattModule::ClientSearchServiceCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -280,7 +280,7 @@ BluetoothDaemonGattModule::ClientGetIncludedServiceCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -310,7 +310,7 @@ BluetoothDaemonGattModule::ClientGetCharacteristicCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -342,7 +342,7 @@ BluetoothDaemonGattModule::ClientGetDescriptorCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -370,7 +370,7 @@ BluetoothDaemonGattModule::ClientReadCharacteristicCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -397,7 +397,7 @@ BluetoothDaemonGattModule::ClientWriteCharacteristicCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -426,7 +426,7 @@ BluetoothDaemonGattModule::ClientReadDescriptorCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -454,7 +454,7 @@ BluetoothDaemonGattModule::ClientWriteDescriptorCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -478,7 +478,7 @@ BluetoothDaemonGattModule::ClientExecuteWriteCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -507,7 +507,7 @@ BluetoothDaemonGattModule::ClientRegisterNotificationCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -536,7 +536,7 @@ BluetoothDaemonGattModule::ClientDeregisterNotificationCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -562,7 +562,7 @@ BluetoothDaemonGattModule::ClientReadRemoteRssiCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -585,7 +585,7 @@ BluetoothDaemonGattModule::ClientGetDeviceTypeCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -621,7 +621,7 @@ BluetoothDaemonGattModule::ClientSetAdvDataCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -655,7 +655,7 @@ BluetoothDaemonGattModule::ClientTestCommandCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -677,7 +677,7 @@ BluetoothDaemonGattModule::ServerRegisterCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -699,7 +699,7 @@ BluetoothDaemonGattModule::ServerUnregisterCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -729,7 +729,7 @@ BluetoothDaemonGattModule::ServerConnectPeripheralCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -756,7 +756,7 @@ BluetoothDaemonGattModule::ServerDisconnectPeripheralCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -782,7 +782,7 @@ BluetoothDaemonGattModule::ServerAddServiceCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -809,7 +809,7 @@ BluetoothDaemonGattModule::ServerAddIncludedServiceCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -840,7 +840,7 @@ BluetoothDaemonGattModule::ServerAddCharacteristicCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -869,7 +869,7 @@ BluetoothDaemonGattModule::ServerAddDescriptorCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -896,7 +896,7 @@ BluetoothDaemonGattModule::ServerStartServiceCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -921,7 +921,7 @@ BluetoothDaemonGattModule::ServerStopServiceCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -946,7 +946,7 @@ BluetoothDaemonGattModule::ServerDeleteServiceCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -974,7 +974,7 @@ BluetoothDaemonGattModule::ServerSendIndicationCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -1007,7 +1007,7 @@ BluetoothDaemonGattModule::ServerSendResponseCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 

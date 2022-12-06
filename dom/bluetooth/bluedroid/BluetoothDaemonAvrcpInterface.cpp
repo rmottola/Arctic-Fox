@@ -70,7 +70,7 @@ BluetoothDaemonAvrcpModule::GetPlayStatusRspCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -96,7 +96,7 @@ BluetoothDaemonAvrcpModule::ListPlayerAppAttrRspCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -120,7 +120,7 @@ BluetoothDaemonAvrcpModule::ListPlayerAppValueRspCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -145,7 +145,7 @@ BluetoothDaemonAvrcpModule::GetPlayerAppValueRspCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -169,7 +169,7 @@ BluetoothDaemonAvrcpModule::GetPlayerAppAttrTextRspCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -193,7 +193,7 @@ BluetoothDaemonAvrcpModule::GetPlayerAppValueTextRspCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -217,7 +217,7 @@ BluetoothDaemonAvrcpModule::GetElementAttrRspCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -239,7 +239,7 @@ BluetoothDaemonAvrcpModule::SetPlayerAppValueRspCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -267,7 +267,7 @@ BluetoothDaemonAvrcpModule::RegisterNotificationRspCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 
@@ -289,7 +289,7 @@ BluetoothDaemonAvrcpModule::SetVolumeCmd(uint8_t aVolume,
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return NS_OK;
 }
 

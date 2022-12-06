@@ -848,7 +848,7 @@ PluginInstanceParent::EndUpdateBackground(gfxContext* aCtx,
     XSync(DefaultXDisplay(), False);
 #endif
 
-    unused << SendUpdateBackground(BackgroundDescriptor(), aRect);
+    Unused << SendUpdateBackground(BackgroundDescriptor(), aRect);
 
     return NS_OK;
 }
@@ -901,7 +901,7 @@ PluginInstanceParent::DestroyBackground()
 
     // If this fails, there's no problem: |bd| will be destroyed along
     // with the old background surface.
-    unused << SendPPluginBackgroundDestroyerConstructor(pbd);
+    Unused << SendPPluginBackgroundDestroyerConstructor(pbd);
 }
 
 mozilla::plugins::SurfaceDescriptor
@@ -1183,7 +1183,7 @@ PluginInstanceParent::NPP_URLRedirectNotify(const char* url, int32_t status,
     return;
 
   PStreamNotifyParent* streamNotify = static_cast<PStreamNotifyParent*>(notifyData);
-  unused << streamNotify->SendRedirectNotify(NullableString(url), status);
+  Unused << streamNotify->SendRedirectNotify(NullableString(url), status);
 }
 
 int16_t
@@ -1433,7 +1433,7 @@ PluginInstanceParent::NPP_NewStream(NPMIMEType type, NPStream* stream,
             err = NPERR_GENERIC_ERROR;
         }
         if (NPERR_NO_ERROR != err) {
-            unused << PBrowserStreamParent::Send__delete__(bs);
+            Unused << PBrowserStreamParent::Send__delete__(bs);
         }
     }
 
@@ -1556,7 +1556,7 @@ PluginInstanceParent::NPP_URLNotify(const char* url, NPReason reason,
 
     PStreamNotifyParent* streamNotify =
         static_cast<PStreamNotifyParent*>(notifyData);
-    unused << PStreamNotifyParent::Send__delete__(streamNotify, reason);
+    Unused << PStreamNotifyParent::Send__delete__(streamNotify, reason);
 }
 
 bool
@@ -1838,7 +1838,7 @@ PluginInstanceParent::PluginWindowHookProc(HWND hWnd,
     switch (message) {
         case WM_SETFOCUS:
         // Let the child plugin window know it should take focus.
-        unused << self->CallSetPluginFocus();
+        Unused << self->CallSetPluginFocus();
         break;
 
         case WM_CLOSE:

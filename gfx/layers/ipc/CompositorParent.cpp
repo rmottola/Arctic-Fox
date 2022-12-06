@@ -1093,7 +1093,7 @@ CompositorParent::CompositeToTarget(DrawTarget* aTarget, const gfx::IntRect* aRe
   // to local pages, hide every plugin associated with the window.
   if (!hasRemoteContent && BrowserTabsRemoteAutostart() &&
       mCachedPluginData.Length()) {
-    unused << SendHideAllPlugins((uintptr_t)GetWidget());
+    Unused << SendHideAllPlugins((uintptr_t)GetWidget());
     mCachedPluginData.Clear();
 #if defined(XP_WIN)
     // Wait for confirmation the hide operation is complete.
@@ -1355,7 +1355,7 @@ bool
 CompositorParent::RecvRequestOverfill()
 {
   uint32_t overfillRatio = mCompositor->GetFillRatio();
-  unused << SendOverfill(overfillRatio);
+  Unused << SendOverfill(overfillRatio);
   return true;
 }
 
@@ -1839,14 +1839,14 @@ CompositorParent::DidComposite(TimeStamp& aCompositeStart,
                                TimeStamp& aCompositeEnd)
 {
   if (mPendingTransaction) {
-    unused << SendDidComposite(0, mPendingTransaction, aCompositeStart, aCompositeEnd);
+    Unused << SendDidComposite(0, mPendingTransaction, aCompositeStart, aCompositeEnd);
     mPendingTransaction = 0;
   }
   if (mLayerManager) {
     nsTArray<ImageCompositeNotification> notifications;
     mLayerManager->ExtractImageCompositeNotifications(&notifications);
     if (!notifications.IsEmpty()) {
-      unused << ImageBridgeParent::NotifyImageComposites(notifications);
+      Unused << ImageBridgeParent::NotifyImageComposites(notifications);
     }
   }
 
@@ -2039,7 +2039,7 @@ CrossProcessCompositorParent::ShadowLayersUpdated(
 
   // Send the 'remote paint ready' message to the content thread if it has already asked.
   if(mNotifyAfterRemotePaint)  {
-    unused << SendRemotePaintIsReady();
+    Unused << SendRemotePaintIsReady();
     mNotifyAfterRemotePaint = false;
   }
 
@@ -2112,7 +2112,7 @@ CompositorParent::UpdatePluginWindowState(uint64_t aId)
     mPluginsLayerOffset = nsIntPoint(0,0);
     mPluginsLayerVisibleRegion.SetEmpty();
     uintptr_t parentWidget = (uintptr_t)lts.mParent->GetWidget();
-    unused << lts.mParent->SendHideAllPlugins(parentWidget);
+    Unused << lts.mParent->SendHideAllPlugins(parentWidget);
     lts.mUpdatedPluginDataAvailable = false;
     PLUGINS_LOG("[%" PRIu64 "] hide all", aId);
   } else {
@@ -2136,7 +2136,7 @@ CompositorParent::UpdatePluginWindowState(uint64_t aId)
         }
         mPluginsLayerOffset = offset;
         mPluginsLayerVisibleRegion = visibleRegion;
-        unused <<
+        Unused <<
           lts.mParent->SendUpdatePluginConfigurations(offset, visibleRegion,
                                                       lts.mPluginData);
         lts.mUpdatedPluginDataAvailable = false;
@@ -2165,7 +2165,7 @@ CrossProcessCompositorParent::DidComposite(uint64_t aId,
   sIndirectLayerTreesLock->AssertCurrentThreadOwns();
   LayerTransactionParent *layerTree = sIndirectLayerTrees[aId].mLayerTree;
   if (layerTree && layerTree->GetPendingTransactionId()) {
-    unused << SendDidComposite(aId, layerTree->GetPendingTransactionId(), aCompositeStart, aCompositeEnd);
+    Unused << SendDidComposite(aId, layerTree->GetPendingTransactionId(), aCompositeStart, aCompositeEnd);
     layerTree->SetPendingTransactionId(0);
   }
 }

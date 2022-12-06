@@ -424,7 +424,7 @@ private:
 
         // Check in case ActorDestroy was called after RecvDestroy message.
         if (mTabChild->IPCOpen()) {
-            unused << PBrowserChild::Send__delete__(mTabChild);
+            Unused << PBrowserChild::Send__delete__(mTabChild);
         }
 
         mTabChild = nullptr;
@@ -729,7 +729,7 @@ TabChild::Observe(nsISupports *aSubject,
     bool active = activeStr.EqualsLiteral("active");
     if (active != mAudioChannelsActive[audioChannel]) {
       mAudioChannelsActive[audioChannel] = active;
-      unused << SendAudioChannelActivityNotification(audioChannel, active);
+      Unused << SendAudioChannelActivityNotification(audioChannel, active);
     }
   }
 
@@ -973,7 +973,7 @@ NS_IMETHODIMP
 TabChild::SetDimensions(uint32_t aFlags, int32_t aX, int32_t aY,
                              int32_t aCx, int32_t aCy)
 {
-  unused << PBrowserChild::SendSetDimensions(aFlags, aX, aY, aCx, aCy);
+  Unused << PBrowserChild::SendSetDimensions(aFlags, aX, aY, aCx, aCy);
 
   return NS_OK;
 }
@@ -2162,7 +2162,7 @@ TabChild::RecvCompositionEvent(const WidgetCompositionEvent& event)
   WidgetCompositionEvent localEvent(event);
   localEvent.widget = mPuppetWidget;
   APZCCallbackHelper::DispatchWidgetEvent(localEvent);
-  unused << SendOnEventNeedingAckHandled(event.mMessage);
+  Unused << SendOnEventNeedingAckHandled(event.mMessage);
   return true;
 }
 
@@ -2172,7 +2172,7 @@ TabChild::RecvSelectionEvent(const WidgetSelectionEvent& event)
   WidgetSelectionEvent localEvent(event);
   localEvent.widget = mPuppetWidget;
   APZCCallbackHelper::DispatchWidgetEvent(localEvent);
-  unused << SendOnEventNeedingAckHandled(event.mMessage);
+  Unused << SendOnEventNeedingAckHandled(event.mMessage);
   return true;
 }
 
