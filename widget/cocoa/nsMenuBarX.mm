@@ -507,10 +507,8 @@ char nsMenuBarX::GetLocalizedAccelKey(const char *shortcutID)
 /* static */
 void nsMenuBarX::ResetNativeApplicationMenu()
 {
-  NSInteger ni;
-  ni = [sApplicationMenu numberOfItems];
-  for (NSInteger c = 0; c < ni; ni++)
-    [sApplicationMenu removeItemAtIndex:c];
+  while ([sApplicationMenu numberOfItems])
+    [sApplicationMenu removeItemAtIndex:0];
   [sApplicationMenu release];
   sApplicationMenu = nil;
   sApplicationMenuIsFallback = NO;
