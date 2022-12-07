@@ -2,9 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const Cu = Components.utils;
-Cu.import("resource://gre/modules/LoadContextInfo.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
+Components.utils.import("resource://gre/modules/LoadContextInfo.jsm");
+Components.utils.import("resource://gre/modules/Services.jsm");
 
 //******** define a js object to implement nsITreeView
 function pageInfoTreeView(treeid, copycol)
@@ -363,8 +362,8 @@ function loadPageInfo(frameOuterWindowID)
                       docInfo.documentURIObject.originCharset);
     gDocInfo = docInfo;
 
-    var titleFormat = windowInfo.isTopWindow ? "pageInfo.frame.title"
-                                             : "pageInfo.page.title";
+    var titleFormat = windowInfo.isTopWindow ? "pageInfo.page.title"
+                                             : "pageInfo.frame.title";
     document.title = gBundle.getFormattedString(titleFormat, [docInfo.location]);
 
     document.getElementById("main-window").setAttribute("relatedUrl", docInfo.location);

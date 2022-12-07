@@ -803,10 +803,10 @@ addMessageListener("ContextMenu:SetAsDesktopBackground", (message) => {
     sendAsyncMessage("ContextMenu:SetAsDesktopBackground:Result", { disable });
 });
 
-var pageInfoListener = {
+var PageInfoListener = {
 
-  init: function(chromeGlobal) {
-    chromeGlobal.addMessageListener("PageInfo:getData", this, false, true);
+  init: function() {
+    addMessageListener("PageInfo:getData", this);
   },
 
   receiveMessage: function(message) {
@@ -938,6 +938,7 @@ var pageInfoListener = {
     if (aWindow && aWindow.frames.length > 0) {
       let num = aWindow.frames.length;
       for (let i = 0; i < num; i++) {
+        // Recurse through the frames.
         this.goThroughFrames(aWindow.frames[i].document, aWindow.frames[i]);  // recurse through the frames
       }
     }
@@ -1094,7 +1095,7 @@ var pageInfoListener = {
       }
     }
 
-    // if we have a data url, get the MIME type from the url
+    // If we have a data url, get the MIME type from the url.
     if (!result.mimeType && url.startsWith("data:")) {
       let dataMimeType = /^data:(image\/[^;,]+)/i.exec(url);
       if (dataMimeType)
@@ -1194,4 +1195,4 @@ var pageInfoListener = {
     return text.replace(endRE, "");
   }
 };
-pageInfoListener.init(this);
+PageInfoListener.init();
