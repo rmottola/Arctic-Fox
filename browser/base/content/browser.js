@@ -988,10 +988,6 @@ var gBrowserInit = {
     gBrowser.addProgressListener(window.XULBrowserWindow);
     gBrowser.addTabsProgressListener(window.TabsProgressListener);
 
-    // setup our MozApplicationManifest listener
-    gBrowser.addEventListener("MozApplicationManifest",
-                              OfflineApps, false);
-
     // setup simple gestures support
     gGestureSupport.init(true);
 
@@ -1105,6 +1101,13 @@ var gBrowserInit = {
     TelemetryTimestamps.add("delayedStartupStarted");
 
     this._cancelDelayedStartup();
+
+    // We need to set the MozApplicationManifest event listeners up
+    // before we start loading the home pages in case a document has
+    // a "manifest" attribute, in which the MozApplicationManifest event
+    // will be fired.
+    gBrowser.addEventListener("MozApplicationManifest",
+                              OfflineApps, false);
 
     // This pageshow listener needs to be registered before we may call
     // swapBrowsersAndCloseOther() to receive pageshow events fired by that.
