@@ -5241,8 +5241,6 @@ var TabsInTitlebar = {
       // tabsintitlebar manifests before we do our measurements.
       document.documentElement.setAttribute("tabsintitlebar", "true");
 
-      function rect(ele)   ele.getBoundingClientRect();
-
 #ifdef MENUBAR_CAN_AUTOHIDE
       let appmenuButtonBox  = $("appmenu-button-container");
       this._sizePlaceholder("appmenu-button", rect(appmenuButtonBox).width);
