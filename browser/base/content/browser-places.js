@@ -1048,7 +1048,7 @@ var PlacesToolbarHelper = {
     return document.getElementById("PlacesToolbar");
   },
 
-  init: function PTH_init() {
+  init: function PTH_init(forceToolbarOverflowCheck) {
     let viewElt = this._viewElt;
     if (!viewElt || viewElt._placesView)
       return;
@@ -1064,6 +1064,14 @@ var PlacesToolbarHelper = {
       return;
 
     new PlacesToolbar(this._place);
+    if (forceToolbarOverflowCheck) {
+      viewElt._placesView.updateOverflowStatus();
+    }
+    this._shouldWrap = false;
+  },
+
+  uninit: function PTH_uninit() {
+
   },
 
   customizeStart: function PTH_customizeStart() {

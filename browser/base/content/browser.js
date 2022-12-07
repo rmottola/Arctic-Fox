@@ -158,6 +158,9 @@ XPCOMUtils.defineLazyGetter(this, "BrowserToolboxProcess", function() {
 XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
   "resource://gre/modules/PageThumbs.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "ProcessHangMonitor",
+  "resource:///modules/ProcessHangMonitor.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
@@ -1223,8 +1226,9 @@ var gBrowserInit = {
       }
       // Note: loadOneOrMoreURIs *must not* be called if window.arguments.length >= 3.
       // Such callers expect that window.arguments[0] is handled as a single URI.
-      else
+      else {
         loadOneOrMoreURIs(uriToLoad);
+      }
     }
 
     Services.obs.addObserver(gSessionHistoryObserver, "browser:purge-session-history", false);
@@ -1518,6 +1522,8 @@ var gBrowserInit = {
       gBrowser.removeTabsProgressListener(window.TabsProgressListener);
     } catch (ex) {
     }
+
+    PlacesToolbarHelper.uninit();
 
     BookmarkingUI.uninit();
 
