@@ -30,6 +30,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "CharsetMenu",
                                   "resource://gre/modules/CharsetMenu.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ShortcutUtils",
                                   "resource://gre/modules/ShortcutUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
+                                  "resource://gre/modules/NewTabUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
                                   "resource:///modules/ContentSearch.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
@@ -143,13 +145,13 @@ XPCOMUtils.defineLazyGetter(this, "PopupNotifications", function () {
 
 XPCOMUtils.defineLazyGetter(this, "DeveloperToolbar", function() {
   let tmp = {};
-  Cu.import("resource:///modules/devtools/client/shared/DeveloperToolbar.jsm", tmp);
+  Cu.import("resource://devtools/client/shared/DeveloperToolbar.jsm", tmp);
   return new tmp.DeveloperToolbar(window, document.getElementById("developer-toolbar"));
 });
 
 XPCOMUtils.defineLazyGetter(this, "BrowserToolboxProcess", function() {
   let tmp = {};
-  Cu.import("resource:///modules/devtools/client/framework/ToolboxProcess.jsm", tmp);
+  Cu.import("resource://devtools/client/framework/ToolboxProcess.jsm", tmp);
   return tmp.BrowserToolboxProcess;
 });
 
@@ -219,6 +221,10 @@ var gInitialPages = [
 
 XPCOMUtils.defineLazyGetter(this, "Win7Features", function () {
 #ifdef XP_WIN
+  // Bug 666808 - AeroPeek support for e10s
+  if (gMultiProcessBrowser)
+    return null;
+
   const WINTASKBAR_CONTRACTID = "@mozilla.org/windows-taskbar;1";
   if (WINTASKBAR_CONTRACTID in Cc &&
       Cc[WINTASKBAR_CONTRACTID].getService(Ci.nsIWinTaskbar).available) {
@@ -1339,11 +1345,8 @@ var gBrowserInit = {
     gBrowser.mPanelContainer.addEventListener("PreviewBrowserTheme", LightWeightThemeWebInstaller, false, true);
     gBrowser.mPanelContainer.addEventListener("ResetBrowserThemePreview", LightWeightThemeWebInstaller, false, true);
 
-    // Bug 666808 - AeroPeek support for e10s
-    if (!gMultiProcessBrowser) {
-      if (Win7Features)
-        Win7Features.onOpenWindow();
-    }
+    if (Win7Features)
+      Win7Features.onOpenWindow();
 
     FullScreen.init();
 
