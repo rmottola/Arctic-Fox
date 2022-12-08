@@ -589,21 +589,21 @@ void
 DecodedStream::SetVolume(double aVolume)
 {
   AssertOwnerThread();
-  mParams.volume = aVolume;
+  mParams.mVolume = aVolume;
 }
 
 void
 DecodedStream::SetPlaybackRate(double aPlaybackRate)
 {
   AssertOwnerThread();
-  mParams.playbackRate = aPlaybackRate;
+  mParams.mPlaybackRate = aPlaybackRate;
 }
 
 void
 DecodedStream::SetPreservesPitch(bool aPreservesPitch)
 {
   AssertOwnerThread();
-  mParams.preservesPitch = aPreservesPitch;
+  mParams.mPreservesPitch = aPreservesPitch;
 }
 
 void
@@ -877,7 +877,7 @@ DecodedStream::SendData()
   }
 
   InitTracks();
-  SendAudio(mParams.volume, mSameOrigin);
+  SendAudio(mParams.mVolume, mSameOrigin);
   SendVideo(mSameOrigin);
   AdvanceTracks();
 
