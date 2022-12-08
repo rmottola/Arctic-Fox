@@ -90,7 +90,6 @@ pref("dom.max_script_run_time", 20); //Should be plenty for a page script to do 
 
 // ===| Canvas |===============================================================
 
-pref("canvas.poisondata", true);  //Enable canvas anti-fingerprinting by default for extra security
 
 // ===| Plugins |==============================================================
 

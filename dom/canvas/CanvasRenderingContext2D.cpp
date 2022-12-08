@@ -1699,20 +1699,6 @@ CanvasRenderingContext2D::GetInputStream(const char *aMimeType,
   if (!imageBuffer) {
     return NS_ERROR_FAILURE;
   }
-  
-  bool PoisonData = Preferences::GetBool("canvas.poisondata",false);
-  if (PoisonData) {
-    srand(time(nullptr));
-    // Image buffer is always a packed BGRA array (BGRX -> BGR[FF])
-    // so always 4-value pixels.
-    // GetImageBuffer => SurfaceToPackedBGRA [=> ConvertBGRXToBGRA]
-    int32_t dataSize = mWidth * mHeight * 4;
-#pragma omp parallel for
-    for (int32_t j = 0; j < dataSize; ++j) {
-      if (imageBuffer[j] !=0 && imageBuffer[j] != 255)
-        imageBuffer[j] += rand() % 3 - 1;
-    }
-  }
 
   return ImageEncoder::GetInputStream(mWidth, mHeight, imageBuffer, format,
                                       encoder, aEncoderOptions, aStream);
@@ -5153,14 +5139,6 @@ CanvasRenderingContext2D::GetImageData(JSContext* aCx, double aSx,
   return imageData.forget();
 }
 
-inline uint8_t PoisonValue(uint8_t v)
-{
-  if (v==0 || v==255)
-    return v; //don't fuzz edges to prevent overflow/underflow
-    
-  return v + rand() %3 -1;
-}
-
 nsresult
 CanvasRenderingContext2D::GetImageDataArray(JSContext* aCx,
                                             int32_t aX,
@@ -5174,10 +5152,6 @@ CanvasRenderingContext2D::GetImageDataArray(JSContext* aCx,
   }
 
   MOZ_ASSERT(aWidth && aHeight);
-  
-  bool PoisonData = Preferences::GetBool("canvas.poisondata",false);
-  if (PoisonData)
-    srand(time(nullptr));
 
   CheckedInt<uint32_t> len = CheckedInt<uint32_t>(aWidth) * aHeight * 4;
   if (!len.isValid()) {
@@ -5253,14 +5227,6 @@ CanvasRenderingContext2D::GetImageDataArray(JSContext* aCx,
         g = *src++;
         b = *src++;
 #endif
-
-        // Poison data for trackers if enabled
-        if (PoisonData) {
-          PoisonValue(r);
-          PoisonValue(g);
-          PoisonValue(b);
-        }
-
         *dst++ = r;
         *dst++ = g;
         *dst++ = b;
@@ -5284,15 +5250,6 @@ CanvasRenderingContext2D::GetImageDataArray(JSContext* aCx,
       g = *src++;
       b = *src++;
 #endif
-
-      // Poison data for trackers if enabled
-      if (PoisonData) {
-        PoisonValue(a);
-        PoisonValue(r);
-        PoisonValue(g);
-        PoisonValue(b);
-      }
-
       // Convert to non-premultiplied color
       *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + r];
       *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + g];
