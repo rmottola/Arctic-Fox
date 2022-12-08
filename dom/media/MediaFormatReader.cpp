@@ -215,7 +215,12 @@ MediaFormatReader::AsyncReadMetadata()
       return p;
     }
     MOZ_ASSERT(!mDecodersInitRequest.Exists());
-    EnsureDecodersInitialized();
+    if (EnsureDecodersInitialized()) {
+      RefPtr<MetadataHolder> metadata = new MetadataHolder();
+      metadata->mInfo = mInfo;
+      metadata->mTags = nullptr;
+      mMetadataPromise.Resolve(metadata, __func__);
+    }
     return p;
   }
 
