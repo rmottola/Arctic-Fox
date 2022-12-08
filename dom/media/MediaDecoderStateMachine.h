@@ -871,30 +871,30 @@ private:
       mPromise = Move(aOther.mPromise);
     }
 
-  bool Exists()
-  {
-    MOZ_ASSERT(mTarget.IsValid() == !mPromise.IsEmpty());
-    return mTarget.IsValid();
-  }
+    bool Exists()
+    {
+      MOZ_ASSERT(mTarget.IsValid() == !mPromise.IsEmpty());
+      return mTarget.IsValid();
+    }
 
-  void Resolve(bool aAtEnd, const char* aCallSite)
-  {
-    mTarget.Reset();
-    MediaDecoder::SeekResolveValue val(aAtEnd, mTarget.mEventVisibility);
-    mPromise.Resolve(val, aCallSite);
-  }
+    void Resolve(bool aAtEnd, const char* aCallSite)
+    {
+      mTarget.Reset();
+      MediaDecoder::SeekResolveValue val(aAtEnd, mTarget.mEventVisibility);
+      mPromise.Resolve(val, aCallSite);
+    }
 
-  void RejectIfExists(const char* aCallSite)
-  {
-    mTarget.Reset();
-    mPromise.RejectIfExists(true, aCallSite);
-  }
+    void RejectIfExists(const char* aCallSite)
+    {
+      mTarget.Reset();
+      mPromise.RejectIfExists(true, aCallSite);
+    }
 
-  ~SeekJob()
-  {
-    MOZ_DIAGNOSTIC_ASSERT(!mTarget.IsValid());
-    MOZ_DIAGNOSTIC_ASSERT(mPromise.IsEmpty());
-  }
+    ~SeekJob()
+    {
+      MOZ_DIAGNOSTIC_ASSERT(!mTarget.IsValid());
+      MOZ_DIAGNOSTIC_ASSERT(mPromise.IsEmpty());
+    }
 
     SeekTarget mTarget;
     MozPromiseHolder<MediaDecoder::SeekPromise> mPromise;
@@ -991,7 +991,8 @@ private:
     MOZ_ASSERT(result <= mAmpleAudioThresholdUsecs, "Prerolling will never finish");
     return result;
   }
-  uint32_t VideoPrerollFrames() const 
+
+  uint32_t VideoPrerollFrames() const
   {
     MOZ_ASSERT(OnTaskQueue());
     return IsRealTime() ? 0 : GetAmpleVideoFrames() / 2;
