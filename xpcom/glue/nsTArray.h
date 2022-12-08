@@ -28,6 +28,7 @@
 #include "nsQuickSort.h"
 #include "nsDebug.h"
 #include "nsISupportsImpl.h"
+#include "nsRegionFwd.h"
 #include <new>
 
 namespace JS {
@@ -36,7 +37,6 @@ class Heap;
 } /* namespace JS */
 
 class nsRegion;
-class nsIntRegion;
 namespace mozilla {
 namespace layers {
 struct TileClient;
