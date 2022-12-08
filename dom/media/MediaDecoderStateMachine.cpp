@@ -1248,6 +1248,9 @@ MediaDecoderStateMachine::SetDormant(bool aDormant)
     mPendingSeek.RejectIfExists(__func__);
     mCurrentSeek.RejectIfExists(__func__);
     SetState(DECODER_STATE_DORMANT);
+    if (IsPlaying()) {
+      StopPlayback();
+    }
 
     Reset();
 
