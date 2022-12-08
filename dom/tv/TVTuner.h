@@ -68,10 +68,13 @@ private:
 
   nsresult InitMediaStream();
 
+  already_AddRefed<DOMMediaStream> CreateSimulatedMediaStream();
+
   nsresult DispatchCurrentSourceChangedEvent(TVSource* aSource);
 
   nsCOMPtr<nsITVService> mTVService;
   RefPtr<DOMMediaStream> mStream;
+  uint16_t mStreamType;
   RefPtr<TVSource> mCurrentSource;
   nsTArray<RefPtr<TVSource>> mSources;
   nsString mId;
