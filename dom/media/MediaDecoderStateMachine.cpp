@@ -2391,8 +2391,8 @@ MediaDecoderStateMachine::Reset()
   // dormant state. We could also be in the process of going dormant, and have
   // just switched to exiting dormant before we finished entering dormant,
   // hence the DECODING_NONE case below.
-  MOZ_ASSERT(mState == DECODER_STATE_SEEKING ||
-             mState == DECODER_STATE_SHUTDOWN ||
+  MOZ_ASSERT(IsShutdown() ||
+             mState == DECODER_STATE_SEEKING ||
              mState == DECODER_STATE_DORMANT ||
              mState == DECODER_STATE_DECODING_NONE);
 
