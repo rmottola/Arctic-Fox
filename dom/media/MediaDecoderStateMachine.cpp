@@ -887,14 +887,16 @@ MediaDecoderStateMachine::OnVideoDecoded(MediaData* aVideoSample)
         StopPrerollingVideo();
       }
 
-      // Schedule the state machine to send stream data as soon as possible or
-      // the VideoQueue() is empty before the Push().
-      // VideoQueue() is empty implies the state machine thread doesn't have
-      // precise time information about video frames. Once the first video
-      // frame pushed in the queue, schedule the state machine as soon as
-      // possible to render the video frame or delay the state machine thread
-      // accurately.
-      if (VideoQueue().GetSize() == 1) {
+      // Schedule the state machine to send stream data as soon as possible if
+      // the VideoQueue() is empty or contains one frame before the Push().
+      //
+      // The state machine threads requires a frame in VideoQueue() that is `in
+      // the future` to gather precise timing information. The head of
+      // VideoQueue() is always `in the past`.
+      //
+      // Schedule the state machine as soon as possible to render the video
+      // frame or delay the state machine thread accurately.
+      if (VideoQueue().GetSize() <= 2) {
         ScheduleStateMachine();
       }
 
