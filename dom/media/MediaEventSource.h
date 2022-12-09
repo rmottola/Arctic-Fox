@@ -16,6 +16,7 @@
 
 #include "nsISupportsImpl.h"
 #include "nsTArray.h"
+#include "nsThreadUtils.h"
 
 namespace mozilla {
 
