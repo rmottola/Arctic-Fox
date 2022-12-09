@@ -337,6 +337,12 @@ public:
     mToken = nullptr;
   }
 
+  void DisconnectIfExists() {
+    if (mToken) {
+      Disconnect();
+    }
+  }
+
 private:
   // Avoid exposing RevocableToken directly to the client code so that
   // listeners can be disconnected in a controlled manner.
