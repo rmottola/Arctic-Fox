@@ -604,6 +604,7 @@ MediaFormatReader::NotifyDrainComplete(TrackType aTrack)
 {
   MOZ_ASSERT(OnTaskQueue());
   auto& decoder = GetDecoderData(aTrack);
+  LOG("%s", TrackTypeToStr(aTrack));
   if (!decoder.mOutputRequested) {
     LOG("MediaFormatReader called DrainComplete() before flushing, ignoring.");
     return;
