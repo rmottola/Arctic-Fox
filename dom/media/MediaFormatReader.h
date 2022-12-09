@@ -302,6 +302,7 @@ private:
       mOutput.Clear();
       mNumSamplesInput = 0;
       mNumSamplesOutput = 0;
+      mSizeOfQueue = 0;
       mNextStreamSourceID.reset();
     }
 
