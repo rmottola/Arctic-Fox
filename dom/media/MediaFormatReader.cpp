@@ -197,7 +197,9 @@ MediaFormatReader::Init()
   return NS_OK;
 }
 
-bool MediaFormatReader::IsWaitingOnCDMResource() {
+bool
+MediaFormatReader::IsWaitingOnCDMResource() {
+  MOZ_ASSERT(OnTaskQueue());
   // EME Stub
   return false;
 }

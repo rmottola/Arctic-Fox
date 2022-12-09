@@ -76,8 +76,6 @@ public:
   bool IsWaitForDataSupported() override { return true; }
   RefPtr<WaitForDataPromise> WaitForData(MediaData::Type aType) override;
 
-  bool IsWaitingOnCDMResource() override;
-
   // MediaFormatReader supports demuxed-only mode.
   bool IsDemuxOnlySupported() const override { return true; }
 
@@ -100,6 +98,8 @@ public:
 private:
   bool HasVideo() { return mVideo.mTrackDemuxer; }
   bool HasAudio() { return mAudio.mTrackDemuxer; }
+
+  bool IsWaitingOnCDMResource();
 
   bool InitDemuxer();
   // Notify the demuxer that new data has been received.
@@ -393,10 +393,6 @@ private:
   {
     return mIsEncrypted;
   }
-  // Accessed from multiple thread, in particular the MediaDecoderStateMachine,
-  // however the value doesn't currently change after reading the metadata.
-  // TODO handle change of encryption half-way. The above assumption will then
-  // become incorrect.
   bool mIsEncrypted;
 
   // Set to true if any of our track buffers may be blocking.
