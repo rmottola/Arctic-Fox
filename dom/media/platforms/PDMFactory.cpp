@@ -263,8 +263,10 @@ PDMFactory::CreatePDMs()
   }
 #endif
 #ifdef MOZ_FFMPEG
-  m = FFmpegRuntimeLinker::CreateDecoderModule();
-  StartupPDM(m);
+  if (sFFmpegDecoderEnabled) {
+    m = FFmpegRuntimeLinker::CreateDecoderModule();
+    StartupPDM(m);
+  }
 #endif
 #ifdef MOZ_APPLEMEDIA
   m = new AppleDecoderModule();
