@@ -257,8 +257,10 @@ PDMFactory::CreatePDMs()
   }
 #endif
 #ifdef XP_WIN
-  m = new WMFDecoderModule();
-  StartupPDM(m);
+  if (sWMFDecoderEnabled) {
+    m = new WMFDecoderModule();
+    StartupPDM(m);
+  }
 #endif
 #ifdef MOZ_FFMPEG
   m = FFmpegRuntimeLinker::CreateDecoderModule();
