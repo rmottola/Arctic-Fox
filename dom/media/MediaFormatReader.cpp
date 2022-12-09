@@ -923,7 +923,7 @@ MediaFormatReader::Update(TrackType aTrack)
 {
   MOZ_ASSERT(OnTaskQueue());
 
-  if (mShutdown || !mInitDone) {
+  if (mShutdown) {
     return;
   }
 
