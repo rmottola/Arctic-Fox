@@ -334,6 +334,7 @@ public:
   nsTArray<nsCString> mSessionIds;
 };
 
+
 // MediaRawData is a MediaData container used to store demuxed, still compressed
 // samples.
 // Use MediaRawData::CreateWriter() to obtain a MediaRawDataWriter object that
