@@ -117,7 +117,7 @@ BufferRecycleBin::BufferRecycleBin()
 }
 
 void
-BufferRecycleBin::RecycleBuffer(uint8_t* aBuffer, uint32_t aSize)
+BufferRecycleBin::RecycleBuffer(UniquePtr<uint8_t[]> aBuffer, uint32_t aSize)
 {
   MutexAutoLock lock(mLock);
 
@@ -125,19 +125,19 @@ BufferRecycleBin::RecycleBuffer(uint8_t* aBuffer, uint32_t aSize)
     mRecycledBuffers.Clear();
   }
   mRecycledBufferSize = aSize;
-  mRecycledBuffers.AppendElement(aBuffer);
+  mRecycledBuffers.AppendElement(Move(aBuffer));
 }
 
-uint8_t*
+UniquePtr<uint8_t[]>
 BufferRecycleBin::GetBuffer(uint32_t aSize)
 {
   MutexAutoLock lock(mLock);
 
   if (mRecycledBuffers.IsEmpty() || mRecycledBufferSize != aSize)
-    return new uint8_t[aSize];
+    return MakeUnique<uint8_t[]>(aSize);
 
   uint32_t last = mRecycledBuffers.Length() - 1;
-  uint8_t* result = mRecycledBuffers[last].forget();
+  UniquePtr<uint8_t[]> result = Move(mRecycledBuffers[last]);
   mRecycledBuffers.RemoveElementAt(last);
   return result;
 }
@@ -440,7 +440,7 @@ PlanarYCbCrImage::PlanarYCbCrImage()
 RecyclingPlanarYCbCrImage::~RecyclingPlanarYCbCrImage()
 {
   if (mBuffer) {
-    mRecycleBin->RecycleBuffer(mBuffer.forget(), mBufferSize);
+    mRecycleBin->RecycleBuffer(Move(mBuffer), mBufferSize);
   }
 }
 
@@ -455,7 +455,7 @@ RecyclingPlanarYCbCrImage::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
   //   - mImplData is not used
   // Not owned:
   // - mRecycleBin
-  size_t size = mBuffer.SizeOfExcludingThis(aMallocSizeOf);
+  size_t size = aMallocSizeOf(mBuffer.get());
 
   // Could add in the future:
   // - mBackendData (from base class)
@@ -463,7 +463,7 @@ RecyclingPlanarYCbCrImage::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
   return size;
 }
 
-uint8_t*
+UniquePtr<uint8_t[]>
 RecyclingPlanarYCbCrImage::AllocateBuffer(uint32_t aSize)
 {
   return mRecycleBin->GetBuffer(aSize);
@@ -566,7 +566,7 @@ RecyclingPlanarYCbCrImage::AllocateAndGetNewBuffer(uint32_t aSize)
     // update buffer size
     mBufferSize = aSize;
   }
-  return mBuffer;
+  return mBuffer.get();
 }
 
 already_AddRefed<gfx::SourceSurface>
