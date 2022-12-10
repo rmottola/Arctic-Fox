@@ -82,14 +82,14 @@ public:
   MediaInfo GetMetadata();
   const TrackBuffer& GetTrackBuffer(TrackInfo::TrackType aTrack);
   const media::TimeIntervals& Buffered(TrackInfo::TrackType);
-  media:: TimeIntervals SafeBuffered(TrackInfo::TrackType) const;
+  media::TimeIntervals SafeBuffered(TrackInfo::TrackType) const;
   bool IsEnded() const
   {
     return mEnded;
   }
   media::TimeUnit Seek(TrackInfo::TrackType aTrack,
-                  const media::TimeUnit& aTime,
-                  const media::TimeUnit& aFuzz);
+                       const media::TimeUnit& aTime,
+                       const media::TimeUnit& aFuzz);
   uint32_t SkipToNextRandomAccessPoint(TrackInfo::TrackType aTrack,
                                        const media::TimeUnit& aTimeThreadshold,
                                        bool& aFound);
@@ -150,7 +150,7 @@ private:
   Atomic<bool> mBufferFull;
   bool mFirstInitializationSegmentReceived;
   // Set to true once a new segment is started.
-  bool mNewSegmentStarted;
+  bool mNewMediaSegmentStarted;
   bool mActiveTrack;
   Maybe<media::TimeUnit> mGroupStartTimestamp;
   media::TimeUnit mGroupEndTimestamp;
@@ -167,6 +167,11 @@ private:
   // Demuxer objects and methods.
   void AppendDataToCurrentInputBuffer(MediaByteBuffer* aData);
   RefPtr<MediaByteBuffer> mInitData;
+  // Temporary input buffer to handle partial media segment header.
+  // We store the current input buffer content into it should we need to
+  // reinitialize the demuxer once we have some samples and a discontinuity is
+  // detected.
+  RefPtr<MediaByteBuffer> mPendingInputBuffer;
   RefPtr<SourceBufferResource> mCurrentInputBuffer;
   RefPtr<MediaDataDemuxer> mInputDemuxer;
   // Length already processed in current media segment.
