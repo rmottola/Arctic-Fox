@@ -491,6 +491,8 @@ CopyPlane(uint8_t *aDst, const uint8_t *aSrc,
 void
 PlanarYCbCrImage::CopyData(const Data& aData)
 {
+  mData = aData;
+
   // update buffer size
   // Use uint32_t throughout to match AllocateBuffer's param and mBufferSize
   const auto checkedSize =
@@ -510,18 +512,16 @@ PlanarYCbCrImage::CopyData(const Data& aData)
   // update buffer size
   mBufferSize = size;
 
-  mData = aData;
-  mData.mYChannel = mBuffer;
+  mData.mYChannel = mBuffer.get();
   mData.mCbChannel = mData.mYChannel + mData.mYStride * mData.mYSize.height;
   mData.mCrChannel = mData.mCbChannel + mData.mCbCrStride * mData.mCbCrSize.height;
-  mData.mYSkip = mData.mCbSkip = mData.mCrSkip = 0;
 
   CopyPlane(mData.mYChannel, aData.mYChannel,
-            aData.mYSize, aData.mYStride, aData.mYSkip);
+            mData.mYSize, mData.mYStride, mData.mYSkip);
   CopyPlane(mData.mCbChannel, aData.mCbChannel,
-            aData.mCbCrSize, aData.mCbCrStride, aData.mCbSkip);
+            mData.mCbCrSize, mData.mCbCrStride, mData.mCbSkip);
   CopyPlane(mData.mCrChannel, aData.mCrChannel,
-            aData.mCbCrSize, aData.mCbCrStride, aData.mCrSkip);
+            mData.mCbCrSize, mData.mCbCrStride, mData.mCrSkip);
 
   mSize = aData.mPicSize;
 }
