@@ -393,7 +393,6 @@ WebMReader::RetrieveWebMMetadata(MediaInfo* aInfo)
           Cleanup();
           return NS_ERROR_FAILURE;
         }
-
         if (NS_FAILED(mAudioDecoder->DecodeHeader(data, length))) {
           Cleanup();
           return NS_ERROR_FAILURE;
@@ -558,7 +557,6 @@ WebMReader::DemuxPacket()
     if (r == -1) {
       return nullptr;
     }
-
     vpx_codec_stream_info_t si;
     memset(&si, 0, sizeof(si));
     si.sz = sizeof(si);
@@ -699,8 +697,16 @@ nsresult WebMReader::SeekInternal(int64_t aTarget)
   uint64_t target = aTarget * NS_PER_USEC;
 
   if (mSeekPreroll) {
-    target = std::max(uint64_t(StartTime() * NS_PER_USEC),
-                      target - mSeekPreroll);
+    uint64_t startTime = uint64_t(StartTime()) * NS_PER_USEC;
+    if (target < mSeekPreroll || target - mSeekPreroll < startTime) {
+      target = startTime;
+    } else {
+      target -= mSeekPreroll;
+    }
+    LOG(LogLevel::Debug,
+        ("Reader [%p] SeekPreroll: %f StartTime: %f AdjustedTarget: %f",
+        this, double(mSeekPreroll) / NS_PER_S,
+        double(startTime) / NS_PER_S, double(target) / NS_PER_S));
   }
   int r = nestegg_track_seek(mContext, trackToSeek, target);
   if (r != 0) {
@@ -773,7 +779,6 @@ media::TimeIntervals WebMReader::GetBuffered()
           endTime = duration / NS_PER_S;
         }
       }
-
       buffered += media::TimeInterval(media::TimeUnit::FromSeconds(startTime),
                                       media::TimeUnit::FromSeconds(endTime));
     }
