@@ -1191,7 +1191,7 @@ imgLoader::VerifyCacheSizes()
   uint32_t queuesize =
     mCacheQueue.GetNumElements() + mChromeCacheQueue.GetNumElements();
   uint32_t trackersize = 0;
-  for (nsExpirationTracker<imgCacheEntry, 3>::Iterator it(mCacheTracker);
+  for (nsExpirationTracker<imgCacheEntry, 3>::Iterator it(mCacheTracker.get());
        it.Next(); ){
     trackersize++;
   }
@@ -1254,7 +1254,7 @@ imgLoader::InitCache()
   os->AddObserver(this, "profile-before-change", false);
   os->AddObserver(this, "xpcom-shutdown", false);
 
-  mCacheTracker = new imgCacheExpirationTracker();
+  mCacheTracker = MakeUnique<imgCacheExpirationTracker>();
 
   return NS_OK;
 }
