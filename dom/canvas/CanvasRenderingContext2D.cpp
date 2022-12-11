@@ -1699,20 +1699,6 @@ CanvasRenderingContext2D::GetInputStream(const char *aMimeType,
   if (!imageBuffer) {
     return NS_ERROR_FAILURE;
   }
-  
-  bool PoisonData = Preferences::GetBool("canvas.poisondata",false);
-  if (PoisonData) {
-    srand(time(nullptr));
-    // Image buffer is always a packed BGRA array (BGRX -> BGR[FF])
-    // so always 4-value pixels.
-    // GetImageBuffer => SurfaceToPackedBGRA [=> ConvertBGRXToBGRA]
-    int32_t dataSize = mWidth * mHeight * 4;
-#pragma omp parallel for
-    for (int32_t j = 0; j < dataSize; ++j) {
-      if (imageBuffer[j] !=0 && imageBuffer[j] != 255)
-        imageBuffer[j] += rand() % 3 - 1;
-    }
-  }
 
   return ImageEncoder::GetInputStream(mWidth, mHeight, imageBuffer, format,
                                       encoder, aEncoderOptions, aStream);
