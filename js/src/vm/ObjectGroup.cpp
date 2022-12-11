@@ -1441,8 +1441,10 @@ ObjectGroup::allocationSiteGroup(JSContext* cx, JSScript* script, jsbytecode* pc
             cx->recoverFromOutOfMemory();
     }
 
-    if (!table->add(p, key, res))
+    if (!table->add(p, key, res)) {
+        ReportOutOfMemory(cx);
         return nullptr;
+    }
 
     return res;
 }
