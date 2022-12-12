@@ -145,7 +145,6 @@ UNIFIED_SOURCES += [
     'nsBaseDragService.cpp',
     'nsBaseScreen.cpp',
     'nsClipboardHelper.cpp',
-    'nsClipboardPrivacyHandler.cpp',
     'nsClipboardProxy.cpp',
     'nsColorPickerProxy.cpp',
     'nsContentProcessWidgetFactory.cpp',
