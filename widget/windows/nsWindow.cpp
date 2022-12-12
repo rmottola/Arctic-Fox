@@ -162,6 +162,8 @@
 #include "nsIWinTaskbar.h"
 #define NS_TASKBAR_CONTRACTID "@mozilla.org/windows-taskbar;1"
 
+#include "nsIWindowsUIUtils.h"
+
 #include "nsWindowDefs.h"
 
 #include "nsCrashOnException.h"
@@ -4836,6 +4838,20 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
           // WM_SYSCOLORCHANGE is not dispatched for accent color changes
           OnSysColorChanged();
           break;
+        }
+      }
+    }
+    break;
+
+    case WM_SETTINGCHANGE:
+    {
+      if (IsWin10OrLater() && mWindowType == eWindowType_invisible && lParam) {
+        auto lParamString = reinterpret_cast<const wchar_t*>(lParam);
+        if (!wcscmp(lParamString, L"UserInteractionMode")) {
+          nsCOMPtr<nsIWindowsUIUtils> uiUtils(do_GetService("@mozilla.org/windows-ui-utils;1"));
+          if (uiUtils) {
+            uiUtils->UpdateTabletModeState();
+          }
         }
       }
     }
