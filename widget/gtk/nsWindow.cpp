@@ -2326,9 +2326,9 @@ nsWindow::UpdateAlpha(gfxPattern* aPattern, nsIntRect aBoundsRect)
     int32_t stride = GetAlignedStride<4>(BytesPerPixel(SurfaceFormat::A8) *
                                          aBoundsRect.width);
     int32_t bufferSize = stride * aBoundsRect.height;
-    nsAutoArrayPtr<uint8_t> imageBuffer(new (std::nothrow) uint8_t[bufferSize]);
+    UniquePtr<uint8_t[]> imageBuffer(new (std::nothrow) uint8_t[bufferSize]);
     RefPtr<DrawTarget> drawTarget = gfxPlatform::GetPlatform()->
-        CreateDrawTargetForData(imageBuffer, aBoundsRect.Size(),
+        CreateDrawTargetForData(imageBuffer.get(), aBoundsRect.Size(),
                                 stride, SurfaceFormat::A8);
 
     if (drawTarget) {
@@ -2339,7 +2339,7 @@ nsWindow::UpdateAlpha(gfxPattern* aPattern, nsIntRect aBoundsRect)
                              *aPattern->GetPattern(drawTarget),
                              DrawOptions(1.0, CompositionOp::OP_SOURCE));
     }
-    UpdateTranslucentWindowAlphaInternal(aBoundsRect, imageBuffer, stride);
+    UpdateTranslucentWindowAlphaInternal(aBoundsRect, imageBuffer.get(), stride);
 }
 
 gboolean
