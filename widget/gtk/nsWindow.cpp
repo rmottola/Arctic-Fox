@@ -11,6 +11,7 @@
 #include "mozilla/MouseEvents.h"
 #include "mozilla/TextEvents.h"
 #include "mozilla/TouchEvents.h"
+#include "mozilla/UniquePtrExtensions.h"
 #include <algorithm>
 
 #include "GeckoProfiler.h"
@@ -2326,7 +2327,7 @@ nsWindow::UpdateAlpha(gfxPattern* aPattern, nsIntRect aBoundsRect)
     int32_t stride = GetAlignedStride<4>(BytesPerPixel(SurfaceFormat::A8) *
                                          aBoundsRect.width);
     int32_t bufferSize = stride * aBoundsRect.height;
-    UniquePtr<uint8_t[]> imageBuffer(new (std::nothrow) uint8_t[bufferSize]);
+    auto imageBuffer = MakeUniqueFallible<uint8_t[]>(bufferSize);
     RefPtr<DrawTarget> drawTarget = gfxPlatform::GetPlatform()->
         CreateDrawTargetForData(imageBuffer.get(), aBoundsRect.Size(),
                                 stride, SurfaceFormat::A8);
