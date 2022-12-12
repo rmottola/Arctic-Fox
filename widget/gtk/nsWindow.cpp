@@ -5747,7 +5747,7 @@ key_release_event_cb(GtkWidget *widget, GdkEventKey *event)
 static gboolean
 property_notify_event_cb(GtkWidget* aWidget, GdkEventProperty* aEvent)
 {
-    nsRefPtr<nsWindow> window = get_window_for_gdk_window(aEvent->window);
+    RefPtr<nsWindow> window = get_window_for_gdk_window(aEvent->window);
     if (!window)
         return FALSE;
 
