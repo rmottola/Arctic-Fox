@@ -412,7 +412,7 @@ private:
     guint32             mLastScrollEventTime;
 
     // for touch event handling
-    RefPtrHashtable<nsPtrHashKey<GdkEventSequence>, mozilla::dom::Touch> mTouches;
+    nsRefPtrHashtable<nsPtrHashKey<GdkEventSequence>, mozilla::dom::Touch> mTouches;
 #endif
 
 #ifdef MOZ_X11
@@ -541,6 +541,7 @@ private:
     // From GDK
     int GdkCoordToDevicePixels(gint coord);
     mozilla::LayoutDeviceIntPoint GdkPointToDevicePixels(GdkPoint point);
+    mozilla::LayoutDeviceIntPoint GdkEventCoordsToDevicePixels(gdouble x, gdouble y);
     nsIntRect GdkRectToDevicePixels(GdkRectangle rect);
 };
 
