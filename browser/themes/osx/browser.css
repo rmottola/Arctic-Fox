@@ -777,6 +777,10 @@ toolbar[brighttext] #bookmarks-menu-button.bookmark-item {
     -moz-image-region: rect(0, 540px, 18px, 522px);
 }
 
+#restore-button {
+  -moz-image-region: rect(18px, 432px, 36px, 414px);
+}
+
 #fullscreen-button {
     -moz-image-region: rect(0, 432px, 18px, 414px);
 }
