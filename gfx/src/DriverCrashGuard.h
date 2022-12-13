@@ -146,6 +146,7 @@ class GLContextCrashGuard final : public DriverCrashGuard
 {
  public:
   explicit GLContextCrashGuard(dom::ContentParent* aContentParent = nullptr);
+  void Initialize() override;
 
  protected:
   bool UpdateEnvironment() override;
