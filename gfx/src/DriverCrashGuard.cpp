@@ -139,6 +139,12 @@ DriverCrashGuard::~DriverCrashGuard()
   } else {
     dom::ContentChild::GetSingleton()->SendEndDriverCrashGuard(uint32_t(mType));
   }
+
+#ifdef MOZ_CRASHREPORTER
+  // Remove the crash report annotation.
+  CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("GraphicsStartupTest"),
+                                     NS_LITERAL_CSTRING(""));
+#endif
 }
 
 bool
@@ -199,6 +205,7 @@ DriverCrashGuard::ActivateGuard()
     // In parent process guards, we use two tombstones to detect crashes: a
     // preferences and a zero-byte file on the filesystem.
     FlushPreferences();
+
     // Create a temporary tombstone/lockfile.
     FILE* fp = nullptr;
     mGuardFile = GetGuardFile();
