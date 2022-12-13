@@ -47,7 +47,7 @@ struct GraphicBufferAutoUnlock {
 };
 
 GrallocImage::GrallocImage()
-  : PlanarYCbCrImage(nullptr)
+  : RecyclingPlanarYCbCrImage(nullptr)
 {
   mFormat = ImageFormat::GRALLOC_PLANAR_YCBCR;
 }
@@ -56,7 +56,7 @@ GrallocImage::~GrallocImage()
 {
 }
 
-void
+bool
 GrallocImage::SetData(const Data& aData)
 {
   MOZ_ASSERT(!mTextureClient, "TextureClient is already set");
@@ -69,7 +69,7 @@ GrallocImage::SetData(const Data& aData)
 
   if (gfxPlatform::GetPlatform()->IsInGonkEmulator()) {
     // Emulator does not support HAL_PIXEL_FORMAT_YV12.
-    return;
+    return false;
   }
 
   RefPtr<GrallocTextureClientOGL> textureClient =
@@ -87,7 +87,7 @@ GrallocImage::SetData(const Data& aData)
   sp<GraphicBuffer> graphicBuffer = textureClient->GetGraphicBuffer();
   if (!result || !graphicBuffer.get()) {
     mTextureClient = nullptr;
-    return;
+    return false;
   }
 
   mTextureClient = textureClient;
@@ -95,7 +95,7 @@ GrallocImage::SetData(const Data& aData)
   void* vaddr;
   if (graphicBuffer->lock(GraphicBuffer::USAGE_SW_WRITE_OFTEN,
                           &vaddr) != OK) {
-    return;
+    return false;
   }
 
   uint8_t* yChannel = static_cast<uint8_t*>(vaddr);
@@ -143,12 +143,14 @@ GrallocImage::SetData(const Data& aData)
   mData.mYChannel     = nullptr;
   mData.mCrChannel    = nullptr;
   mData.mCbChannel    = nullptr;
+  return true;
 }
 
-void GrallocImage::SetData(const GrallocData& aData)
+bool GrallocImage::SetData(const GrallocData& aData)
 {
   mTextureClient = static_cast<GrallocTextureClientOGL*>(aData.mGraphicBuffer.get());
   mSize = aData.mPicSize;
+  return true;
 }
 
 /**

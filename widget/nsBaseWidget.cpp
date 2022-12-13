@@ -691,16 +691,16 @@ nsBaseWidget::IsWindowClipRegionEqual(const nsTArray<nsIntRect>& aRects)
 {
   return mClipRects &&
          mClipRectCount == aRects.Length() &&
-         memcmp(mClipRects, aRects.Elements(), sizeof(nsIntRect)*mClipRectCount) == 0;
+         memcmp(mClipRects.get(), aRects.Elements(), sizeof(nsIntRect)*mClipRectCount) == 0;
 }
 
 void
 nsBaseWidget::StoreWindowClipRegion(const nsTArray<nsIntRect>& aRects)
 {
   mClipRectCount = aRects.Length();
-  mClipRects = new nsIntRect[mClipRectCount];
+  mClipRects = MakeUnique<nsIntRect[]>(mClipRectCount);
   if (mClipRects) {
-    memcpy(mClipRects, aRects.Elements(), sizeof(nsIntRect)*mClipRectCount);
+    memcpy(mClipRects.get(), aRects.Elements(), sizeof(nsIntRect)*mClipRectCount);
   }
 }
 
@@ -908,6 +908,14 @@ void nsBaseWidget::ConfigureAPZCTreeManager()
   if (controller) {
     uint64_t rootLayerTreeId = mCompositorParent->RootLayerTreeId();
     CompositorParent::SetControllerForLayerTree(rootLayerTreeId, controller);
+  }
+
+  // When APZ is enabled, we can actually enable raw touch events because we
+  // have code that can deal with them properly. If APZ is not enabled, this
+  // function doesn't get called.
+  if (Preferences::GetInt("dom.w3c_touch_events.enabled", 0) ||
+      Preferences::GetBool("dom.w3c_pointer_events.enabled", false)) {
+    RegisterTouchWindow();
   }
 }
 

@@ -17,6 +17,7 @@
 #include "nsIDragService.h"
 #include "nsITimer.h"
 #include "nsGkAtoms.h"
+#include "nsRefPtrHashtable.h"
 
 #include "nsBaseWidget.h"
 #include <gdk/gdk.h>
@@ -30,6 +31,7 @@
 #include "mozilla/a11y/Accessible.h"
 #endif
 #include "mozilla/EventForwards.h"
+#include "mozilla/TouchEvents.h"
 
 #include "IMContextWrapper.h"
 
@@ -66,6 +68,11 @@ class nsPluginNativeWindowGtk;
 #  define MOZ_HAVE_SHMIMAGE
 class nsShmImage;
 #endif
+
+namespace mozilla {
+class TimeStamp;
+class CurrentX11TimeGetter;
+}
 
 class nsWindow : public nsBaseWidget
 {
@@ -200,6 +207,11 @@ public:
                                                guint            aInfo,
                                                guint            aTime,
                                                gpointer         aData);
+    gboolean           OnPropertyNotifyEvent(GtkWidget *aWidget,
+                                             GdkEventProperty *aEvent);
+#if GTK_CHECK_VERSION(3,4,0)
+    gboolean           OnTouchEvent(GdkEventTouch* aEvent);
+#endif
 
     virtual already_AddRefed<mozilla::gfx::DrawTarget>
                        StartRemoteDrawingInRegion(nsIntRegion& aInvalidRegion) override;
@@ -220,6 +232,8 @@ private:
     void               EnsureGrabs  (void);
     void               GrabPointer  (guint32 aTime);
     void               ReleaseGrabs (void);
+
+    void               UpdateClientOffset();
 
 public:
     enum PluginType {
@@ -263,6 +277,8 @@ public:
     // otherwise, FALSE.
     bool               DispatchKeyDownEvent(GdkEventKey *aEvent,
                                             bool *aIsCancelled);
+    mozilla::TimeStamp GetEventTimeStamp(guint32 aEventTime);
+    mozilla::CurrentX11TimeGetter* GetCurrentTimeGetter();
 
     NS_IMETHOD_(void) SetInputContext(const InputContext& aContext,
                                       const InputContextAction& aAction) override;
@@ -319,6 +335,21 @@ public:
                                                       uint32_t aAdditionalFlags,
                                                       nsIObserver* aObserver) override;
 
+    // HiDPI scale conversion
+    gint GdkScaleFactor();
+
+    // To GDK
+    gint DevicePixelsToGdkCoordRoundUp(int pixels);
+    gint DevicePixelsToGdkCoordRoundDown(int pixels);
+    GdkPoint DevicePixelsToGdkPointRoundDown(nsIntPoint point);
+    GdkRectangle DevicePixelsToGdkSizeRoundUp(nsIntSize pixelSize);
+
+    // From GDK
+    int GdkCoordToDevicePixels(gint coord);
+    mozilla::LayoutDeviceIntPoint GdkPointToDevicePixels(GdkPoint point);
+    mozilla::LayoutDeviceIntPoint GdkEventCoordsToDevicePixels(gdouble x, gdouble y);
+    nsIntRect GdkRectToDevicePixels(GdkRectangle rect);
+
 protected:
     virtual ~nsWindow();
 
@@ -336,6 +367,8 @@ protected:
     virtual nsresult NotifyIMEInternal(
                          const IMENotification& aIMENotification) override;
 
+    virtual void RegisterTouchWindow() override;
+
     nsCOMPtr<nsIWidget> mParent;
     // Is this a toplevel window?
     bool                mIsTopLevel;
@@ -351,6 +384,10 @@ protected:
     bool                mEnabled;
     // has the native window for this been created yet?
     bool                mCreated;
+#if GTK_CHECK_VERSION(3,4,0)
+    // whether we handle touch event
+    bool                mHandleTouchEvent;
+#endif
 
 private:
     void               DestroyChildWindows();
@@ -383,9 +420,14 @@ private:
     int32_t             mTransparencyBitmapWidth;
     int32_t             mTransparencyBitmapHeight;
 
+    nsIntPoint          mClientOffset;
+
 #if GTK_CHECK_VERSION(3,4,0)
     // This field omits duplicate scroll events caused by GNOME bug 726878.
     guint32             mLastScrollEventTime;
+
+    // for touch event handling
+    nsRefPtrHashtable<nsPtrHashKey<GdkEventSequence>, mozilla::dom::Touch> mTouches;
 #endif
 
 #ifdef MOZ_X11
@@ -500,19 +542,7 @@ private:
      */
     RefPtr<mozilla::widget::IMContextWrapper> mIMContext;
 
-    // HiDPI scale conversion
-    gint GdkScaleFactor();
-
-    // To GDK
-    gint DevicePixelsToGdkCoordRoundUp(int pixels);
-    gint DevicePixelsToGdkCoordRoundDown(int pixels);
-    GdkPoint DevicePixelsToGdkPointRoundDown(nsIntPoint point);
-    GdkRectangle DevicePixelsToGdkSizeRoundUp(nsIntSize pixelSize);
-
-    // From GDK
-    int GdkCoordToDevicePixels(gint coord);
-    mozilla::LayoutDeviceIntPoint GdkPointToDevicePixels(GdkPoint point);
-    nsIntRect GdkRectToDevicePixels(GdkRectangle rect);
+    nsAutoPtr<mozilla::CurrentX11TimeGetter> mCurrentTimeGetter;
 };
 
 class nsChildWindow : public nsWindow {

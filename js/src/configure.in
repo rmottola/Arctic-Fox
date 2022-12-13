@@ -350,7 +350,10 @@ case "$target" in
         # that behavior) that it's better to turn it off.
         # _CRT_SECURE_NO_WARNINGS disables warnings about using MSVC-specific
         # secure CRT functions.
-        CXXFLAGS="$CXXFLAGS -wd4345 -wd4351 -wd4800 -D_CRT_SECURE_NO_WARNINGS"
+        # MSVC warning C4819 warns some UTF-8 characters (e.g. copyright sign)
+        # on non-Western system locales even if it is in a comment.
+        CFLAGS="$CFLAGS -wd4819"
+        CXXFLAGS="$CXXFLAGS -wd4345 -wd4351 -wd4800 -wd4819 -D_CRT_SECURE_NO_WARNINGS"
         AC_LANG_SAVE
         AC_LANG_C
         AC_TRY_COMPILE([#include <stdio.h>],
@@ -978,6 +981,10 @@ arm*)
 
 mips|mipsel)
     CPU_ARCH="mips32"
+    ;;
+
+mips64|mips64el)
+    CPU_ARCH="mips64"
     ;;
 
 aarch64*)
@@ -2058,18 +2065,11 @@ mips*-*)
     ;;
 esac
 
-case "$target" in
-mips*-*)
-     AC_DEFINE(JS_NUNBOX32)
-     ;;
-*)
-    if test "$HAVE_64BIT_BUILD" ; then
-        AC_DEFINE(JS_PUNBOX64)
-    else
-        AC_DEFINE(JS_NUNBOX32)
-    fi
-    ;;
-esac
+if test "$HAVE_64BIT_BUILD" ; then
+    AC_DEFINE(JS_PUNBOX64)
+else
+    AC_DEFINE(JS_NUNBOX32)
+fi
 
 MOZ_ARG_DISABLE_BOOL(ion,
 [  --disable-ion      Disable use of the IonMonkey JIT],
@@ -3073,16 +3073,16 @@ dnl ========================================================
 MOZ_ARG_ENABLE_STRING(simulator,
 [  --enable-simulator=ARCH
                           Enable a JIT code simulator for the specified arch.
-                          (arm, arm64, mips32).],
+                          (arm, arm64, mips32, mips64).],
     JS_SIMULATOR="$enableval")
 
 if test -n "$JS_SIMULATOR"; then
     case "$JS_SIMULATOR" in
-        arm|arm64|mips32) ;;
+        arm|arm64|mips32|mips64) ;;
         no)
             JS_SIMULATOR=
             ;;
-        *) AC_MSG_ERROR([Invalid simulator. Valid simulators are: arm, arm64, mips32.]) ;;
+        *) AC_MSG_ERROR([Invalid simulator. Valid simulators are: arm, arm64, mips32, mips64.]) ;;
     esac
 fi
 
@@ -3118,6 +3118,15 @@ elif test "$JS_SIMULATOR" = mips32; then
     AC_DEFINE(JS_CODEGEN_MIPS32)
     JS_SIMULATOR_MIPS32=1
     JS_CODEGEN_MIPS32=1
+elif test "$JS_SIMULATOR" = mips64; then
+    if test "$CPU_ARCH" != "x86_64"; then
+        AC_MSG_ERROR([The MIPS64 simulator only works on x86_64.])
+    fi
+    AC_DEFINE(JS_SIMULATOR)
+    AC_DEFINE(JS_SIMULATOR_MIPS64)
+    AC_DEFINE(JS_CODEGEN_MIPS64)
+    JS_SIMULATOR_MIPS64=1
+    JS_CODEGEN_MIPS64=1
 elif test "$CPU_ARCH" = "x86"; then
     AC_DEFINE(JS_CODEGEN_X86)
     JS_CODEGEN_X86=1
@@ -3139,15 +3148,20 @@ elif test "$CPU_ARCH" = "arm"; then
 elif test "$CPU_ARCH" = "mips32"; then
     AC_DEFINE(JS_CODEGEN_MIPS32)
     JS_CODEGEN_MIPS32=1
+elif test "$CPU_ARCH" = "mips64"; then
+    AC_DEFINE(JS_CODEGEN_MIPS64)
+    JS_CODEGEN_MIPS64=1
 fi
 
 AC_SUBST(JS_SIMULATOR)
 AC_SUBST(JS_SIMULATOR_ARM)
 AC_SUBST(JS_SIMULATOR_ARM64)
 AC_SUBST(JS_SIMULATOR_MIPS32)
+AC_SUBST(JS_SIMULATOR_MIPS64)
 AC_SUBST(JS_CODEGEN_ARM)
 AC_SUBST(JS_CODEGEN_ARM64)
 AC_SUBST(JS_CODEGEN_MIPS32)
+AC_SUBST(JS_CODEGEN_MIPS64)
 AC_SUBST(JS_CODEGEN_X86)
 AC_SUBST(JS_CODEGEN_X64)
 AC_SUBST(JS_CODEGEN_NONE)

@@ -9,6 +9,7 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/Mutex.h"
+#include "mozilla/UniquePtr.h"
 
 #include "imgILoader.h"
 #include "imgICache.h"
@@ -16,7 +17,6 @@
 #include "nsIContentSniffer.h"
 #include "nsRefPtrHashtable.h"
 #include "nsExpirationTracker.h"
-#include "nsAutoPtr.h"
 #include "ImageCacheKey.h"
 #include "imgRequest.h"
 #include "nsIProgressEventSink.h"
@@ -91,6 +91,13 @@ public:
     Touch(/* updateTime = */ false);
   }
 
+  uint32_t GetLoadTime() const
+  {
+    return mLoadTime;
+  }
+
+  void UpdateLoadTime();
+
   int32_t GetExpiryTime() const
   {
     return mExpiryTime;
@@ -164,6 +171,7 @@ private: // data
   RefPtr<imgRequest> mRequest;
   uint32_t mDataSize;
   int32_t mTouchedTime;
+  uint32_t mLoadTime;
   int32_t mExpiryTime;
   nsExpirationState mExpirationState;
   bool mMustValidate : 1;
@@ -216,10 +224,10 @@ enum class AcceptedMimeTypes : uint8_t {
 };
 
 class imgLoader final : public imgILoader,
-                            public nsIContentSniffer,
-                            public imgICache,
-                            public nsSupportsWeakReference,
-                            public nsIObserver
+                        public nsIContentSniffer,
+                        public imgICache,
+                        public nsSupportsWeakReference,
+                        public nsIObserver
 {
   virtual ~imgLoader();
 
@@ -438,7 +446,7 @@ private: // data
 
   nsCString mAcceptHeader;
 
-  nsAutoPtr<imgCacheExpirationTracker> mCacheTracker;
+  mozilla::UniquePtr<imgCacheExpirationTracker> mCacheTracker;
   bool mRespectPrivacy;
 
 #ifdef MOZ_JXR
@@ -552,4 +560,4 @@ private:
   bool mHadInsecureRedirect;
 };
 
-#endif  // mozilla_image_imgLoader_h
+#endif // mozilla_image_imgLoader_h

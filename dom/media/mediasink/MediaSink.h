@@ -40,10 +40,10 @@ public:
 
   struct PlaybackParams {
     PlaybackParams()
-      : volume(1.0) , playbackRate(1.0) , preservesPitch(true) {}
-    double volume;
-    double playbackRate;
-    bool preservesPitch;
+      : mVolume(1.0) , mPlaybackRate(1.0) , mPreservesPitch(true) {}
+    double mVolume;
+    double mPlaybackRate;
+    bool mPreservesPitch;
   };
 
   // Return the playback parameters of this sink.
@@ -92,6 +92,11 @@ public:
 
   // Pause/resume the playback. Only work after playback starts.
   virtual void SetPlaying(bool aPlaying) = 0;
+
+  // Single frame rendering operation may need to be done before playback
+  // started (1st frame) or right after seek completed or playback stopped.
+  // Do nothing if this sink has no video track. Can be called in any state.
+  virtual void Redraw() {};
 
   // Begin a playback session with the provided start time and media info.
   // Must be called when playback is stopped.

@@ -5,24 +5,26 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "nsNSSDialogHelper.h"
-#include "nsIWindowWatcher.h"
-#include "nsCOMPtr.h"
-#include "nsIComponentManager.h"
-#include "nsIServiceManager.h"
-#include "nsIInterfaceRequestor.h"
-#include "nsIInterfaceRequestorUtils.h"
+
 #include "mozilla/dom/ScriptSettings.h"
+#include "nsCOMPtr.h"
+#include "nsIDOMWindow.h"
+#include "nsIServiceManager.h"
+#include "nsIWindowWatcher.h"
 
 static const char kOpenDialogParam[] = "centerscreen,chrome,modal,titlebar";
 static const char kOpenWindowParam[] = "centerscreen,chrome,titlebar";
 
 nsresult
-nsNSSDialogHelper::openDialog(
-    nsIDOMWindow *window,
-    const char *url,
-    nsISupports *params,
-    bool modal)
+nsNSSDialogHelper::openDialog(nsIDOMWindow* window, const char* url,
+                              nsISupports* params, bool modal)
 {
+#ifdef MOZ_WIDGET_GONK
+  // On b2g devices, we need to proxy the dialog creation & management
+  // to Gaia.
+  return NS_ERROR_NOT_IMPLEMENTED;
+#endif
+
   nsresult rv;
   nsCOMPtr<nsIWindowWatcher> windowWatcher = 
            do_GetService(NS_WINDOWWATCHER_CONTRACTID, &rv);
@@ -52,4 +54,3 @@ nsNSSDialogHelper::openDialog(
                                  getter_AddRefs(newWindow));
   return rv;
 }
-

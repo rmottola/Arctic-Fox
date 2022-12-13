@@ -146,11 +146,11 @@ class VersionChangeTransaction;
 
 // If JS_STRUCTURED_CLONE_VERSION changes then we need to update our major
 // schema version.
-static_assert(JS_STRUCTURED_CLONE_VERSION == 5,
+static_assert(JS_STRUCTURED_CLONE_VERSION == 6,
               "Need to update the major schema version.");
 
 // Major schema version. Bump for almost everything.
-const uint32_t kMajorSchemaVersion = 21;
+const uint32_t kMajorSchemaVersion = 22;
 
 // Minor schema version. Should almost always be 0 (maybe bump on release
 // branches if we have to).
@@ -1986,21 +1986,21 @@ private:
     }
 
     size_t compressedLength = snappy::MaxCompressedLength(uncompressedLength);
-    nsAutoArrayPtr<char> compressed(new (fallible) char[compressedLength]);
+    UniqueFreePtr<uint8_t> compressed(
+      static_cast<uint8_t*>(malloc(compressedLength)));
     if (NS_WARN_IF(!compressed)) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
 
     snappy::RawCompress(reinterpret_cast<const char*>(uncompressed),
-                        uncompressedLength, compressed.get(),
+                        uncompressedLength,
+                        reinterpret_cast<char*>(compressed.get()),
                         &compressedLength);
 
-    std::pair<const void *, int> data(static_cast<void*>(compressed.get()),
-                                      int(compressedLength));
+    std::pair<uint8_t *, int> data(compressed.release(),
+                                   int(compressedLength));
 
-    // XXX This copies the buffer again... There doesn't appear to be any way to
-    //     preallocate space and write directly to a BlobVariant at the moment.
-    nsCOMPtr<nsIVariant> result = new mozilla::storage::BlobVariant(data);
+    nsCOMPtr<nsIVariant> result = new mozilla::storage::AdoptedBlobVariant(data);
 
     result.forget(aResult);
     return NS_OK;
@@ -4067,6 +4067,19 @@ UpgradeSchemaFrom20_0To21_0(mozIStorageConnection* aConnection)
 }
 
 nsresult
+UpgradeSchemaFrom21_0To22_0(mozIStorageConnection* aConnection)
+{
+  // The only change between 21 and 22 was a different structured clone format,
+  // but it's backwards-compatible.
+  nsresult rv = aConnection->SetSchemaVersion(MakeSchemaVersion(22, 0));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  return NS_OK;
+}
+
+nsresult
 GetDatabaseFileURL(nsIFile* aDatabaseFile,
                    PersistenceType aPersistenceType,
                    const nsACString& aGroup,
@@ -4558,7 +4571,7 @@ CreateStorageConnection(nsIFile* aDBFile,
       }
     } else  {
       // This logic needs to change next time we change the schema!
-      static_assert(kSQLiteSchemaVersion == int32_t((21 << 4) + 0),
+      static_assert(kSQLiteSchemaVersion == int32_t((22 << 4) + 0),
                     "Upgrade function needed due to schema version increase.");
 
       while (schemaVersion != kSQLiteSchemaVersion) {
@@ -4598,6 +4611,8 @@ CreateStorageConnection(nsIFile* aDBFile,
           rv = UpgradeSchemaFrom19_0To20_0(aFMDirectory, connection);
         } else if (schemaVersion == MakeSchemaVersion(20, 0)) {
           rv = UpgradeSchemaFrom20_0To21_0(connection);
+        } else if (schemaVersion == MakeSchemaVersion(21, 0)) {
+          rv = UpgradeSchemaFrom21_0To22_0(connection);
         } else {
           IDB_WARNING("Unable to open IndexedDB database, no upgrade path is "
                       "available!");

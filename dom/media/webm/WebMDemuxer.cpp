@@ -17,6 +17,7 @@
 #include "MediaDataDemuxer.h"
 #include "nsAutoRef.h"
 #include "NesteggPacketHolder.h"
+#include "XiphExtradata.h"
 
 #include <algorithm>
 #include <stdint.h>
@@ -289,7 +290,7 @@ WebMDemuxer::ReadMetadata()
       return NS_ERROR_FAILURE;
     }
     int type = nestegg_track_type(mContext, track);
-    if (type == NESTEGG_TRACK_VIDEO) {
+    if (type == NESTEGG_TRACK_VIDEO && !mHasVideo) {
       nestegg_video_params params;
       r = nestegg_track_video_params(mContext, track, &params);
       if (r == -1) {
@@ -364,7 +365,7 @@ WebMDemuxer::ReadMetadata()
       if (!r) {
         mInfo.mVideo.mDuration = media::TimeUnit::FromNanoseconds(duration).ToMicroseconds();
       }
-    } else if (type == NESTEGG_TRACK_AUDIO) {
+    } else if (type == NESTEGG_TRACK_AUDIO && !mHasAudio) {
       nestegg_audio_params params;
       r = nestegg_track_audio_params(mContext, track, &params);
       if (r == -1) {
@@ -393,6 +394,8 @@ WebMDemuxer::ReadMetadata()
         return NS_ERROR_FAILURE;
       }
 
+      nsAutoTArray<const unsigned char*,4> headers;
+      nsAutoTArray<size_t,4> headerLens;
       for (uint32_t header = 0; header < nheaders; ++header) {
         unsigned char* data = 0;
         size_t length = 0;
@@ -400,13 +403,24 @@ WebMDemuxer::ReadMetadata()
         if (r == -1) {
           return NS_ERROR_FAILURE;
         }
-        // Vorbis has 3 headers write length + data for each header
-        if (nheaders > 1) {
-          uint8_t c[2];
-          BigEndian::writeUint16(&c[0], length);
-          mInfo.mAudio.mCodecSpecificConfig->AppendElements(&c[0], 2);
+        headers.AppendElement(data);
+        headerLens.AppendElement(length);
+      }
+
+      // Vorbis has 3 headers, convert to Xiph extradata format to send them to
+      // the demuxer.
+      // TODO: This is already the format WebM stores them in. Would be nice
+      // to avoid having libnestegg split them only for us to pack them again,
+      // but libnestegg does not give us an API to access this data directly.
+      if (nheaders > 1) {
+        if (!XiphHeadersToExtradata(mInfo.mAudio.mCodecSpecificConfig,
+                                    headers, headerLens)) {
+          return NS_ERROR_FAILURE;
         }
-        mInfo.mAudio.mCodecSpecificConfig->AppendElements(data, length);
+      }
+      else {
+        mInfo.mAudio.mCodecSpecificConfig->AppendElements(headers[0],
+                                                          headerLens[0]);
       }
       uint64_t duration = 0;
       r = nestegg_duration(mContext, &duration);
@@ -805,9 +819,8 @@ WebMTrackDemuxer::Seek(media::TimeUnit aTime)
 
   // Check what time we actually seeked to.
   if (mSamples.GetSize() > 0) {
-    RefPtr<MediaRawData> sample(mSamples.PopFront());
+    const RefPtr<MediaRawData>& sample = mSamples.First();
     seekTime = media::TimeUnit::FromMicroseconds(sample->mTime);
-    mSamples.PushFront(sample);
   }
   SetNextKeyFrameTime();
 
@@ -862,40 +875,40 @@ WebMTrackDemuxer::SetNextKeyFrameTime()
   mNextKeyframeTime.reset();
 
   MediaRawDataQueue skipSamplesQueue;
-  RefPtr<MediaRawData> sample;
   bool foundKeyframe = false;
   while (!foundKeyframe && mSamples.GetSize()) {
-    sample = mSamples.PopFront();
+    RefPtr<MediaRawData> sample = mSamples.PopFront();
     if (sample->mKeyframe) {
       frameTime = sample->mTime;
       foundKeyframe = true;
     }
-    skipSamplesQueue.Push(sample);
+    skipSamplesQueue.Push(sample.forget());
   }
   Maybe<int64_t> startTime;
   if (skipSamplesQueue.GetSize()) {
-    sample = skipSamplesQueue.PopFront();
+    const RefPtr<MediaRawData>& sample = skipSamplesQueue.First();
     startTime.emplace(sample->mTimecode);
-    skipSamplesQueue.PushFront(sample);
   }
   // Demux and buffer frames until we find a keyframe.
+  RefPtr<MediaRawData> sample;
   while (!foundKeyframe && (sample = NextSample())) {
     if (sample->mKeyframe) {
       frameTime = sample->mTime;
       foundKeyframe = true;
     }
-    skipSamplesQueue.Push(sample);
+    int64_t sampleTimecode = sample->mTimecode;
+    skipSamplesQueue.Push(sample.forget());
     if (!startTime) {
-      startTime.emplace(sample->mTimecode);
+      startTime.emplace(sampleTimecode);
     } else if (!foundKeyframe &&
-               sample->mTimecode > startTime.ref() + MAX_LOOK_AHEAD) {
+               sampleTimecode > startTime.ref() + MAX_LOOK_AHEAD) {
       WEBM_DEBUG("Couldn't find keyframe in a reasonable time, aborting");
       break;
     }
   }
   // We may have demuxed more than intended, so ensure that all frames are kept
   // in the right order.
-  mSamples.PushFront(skipSamplesQueue);
+  mSamples.PushFront(Move(skipSamplesQueue));
 
   if (frameTime != -1) {
     mNextKeyframeTime.emplace(media::TimeUnit::FromMicroseconds(frameTime));
@@ -958,7 +971,7 @@ WebMTrackDemuxer::SkipToNextRandomAccessPoint(media::TimeUnit aTimeThreshold)
     if (sample->mKeyframe && sample->mTime >= aTimeThreshold.ToMicroseconds()) {
       found = true;
       mSamples.Reset();
-      mSamples.PushFront(sample);
+      mSamples.PushFront(sample.forget());
     }
   }
   SetNextKeyFrameTime();

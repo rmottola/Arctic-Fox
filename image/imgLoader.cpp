@@ -863,6 +863,7 @@ imgCacheEntry::imgCacheEntry(imgLoader* loader, imgRequest* request,
    mRequest(request),
    mDataSize(0),
    mTouchedTime(SecondsFromPRTime(PR_Now())),
+   mLoadTime(SecondsFromPRTime(PR_Now())),
    mExpiryTime(0),
    mMustValidate(false),
    // We start off as evicted so we don't try to update the cache. PutIntoCache
@@ -897,6 +898,11 @@ imgCacheEntry::UpdateCache(int32_t diff /* = 0 */)
   if (!Evicted() && HasNoProxies()) {
     mLoader->CacheEntriesChanged(mRequest->IsChrome(), diff);
   }
+}
+
+void imgCacheEntry::UpdateLoadTime()
+{
+  mLoadTime = SecondsFromPRTime(PR_Now());
 }
 
 void
@@ -1185,7 +1191,7 @@ imgLoader::VerifyCacheSizes()
   uint32_t queuesize =
     mCacheQueue.GetNumElements() + mChromeCacheQueue.GetNumElements();
   uint32_t trackersize = 0;
-  for (nsExpirationTracker<imgCacheEntry, 3>::Iterator it(mCacheTracker);
+  for (nsExpirationTracker<imgCacheEntry, 3>::Iterator it(mCacheTracker.get());
        it.Next(); ){
     trackersize++;
   }
@@ -1248,7 +1254,7 @@ imgLoader::InitCache()
   os->AddObserver(this, "profile-before-change", false);
   os->AddObserver(this, "xpcom-shutdown", false);
 
-  mCacheTracker = new imgCacheExpirationTracker();
+  mCacheTracker = MakeUnique<imgCacheExpirationTracker>();
 
   return NS_OK;
 }
@@ -1756,7 +1762,7 @@ imgLoader::ValidateEntry(imgCacheEntry* aEntry,
   // Special treatment for file URLs - aEntry has expired if file has changed
   nsCOMPtr<nsIFileURL> fileUrl(do_QueryInterface(aURI));
   if (fileUrl) {
-    uint32_t lastModTime = aEntry->GetTouchedTime();
+    uint32_t lastModTime = aEntry->GetLoadTime();
 
     nsCOMPtr<nsIFile> theFile;
     rv = fileUrl->GetFile(getter_AddRefs(theFile));

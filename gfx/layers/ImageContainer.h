@@ -30,6 +30,7 @@
 #include "mozilla/gfx/2D.h"
 #include "nsDataHashtable.h"
 #include "mozilla/EnumeratedArray.h"
+#include "mozilla/UniquePtr.h"
 
 #ifndef XPCOM_GLUE_AVOID_NSPR
 /**
@@ -203,9 +204,9 @@ class BufferRecycleBin final {
 public:
   BufferRecycleBin();
 
-  void RecycleBuffer(uint8_t* aBuffer, uint32_t aSize);
+  void RecycleBuffer(mozilla::UniquePtr<uint8_t[]> aBuffer, uint32_t aSize);
   // Returns a recycled buffer of the right size, or allocates a new buffer.
-  uint8_t* GetBuffer(uint32_t aSize);
+  mozilla::UniquePtr<uint8_t[]> GetBuffer(uint32_t aSize);
 
 private:
   typedef mozilla::Mutex Mutex;
@@ -221,7 +222,7 @@ private:
 
   // We should probably do something to prune this list on a timer so we don't
   // eat excess memory while video is paused...
-  nsTArray<nsAutoArrayPtr<uint8_t> > mRecycledBuffers;
+  nsTArray<mozilla::UniquePtr<uint8_t[]>> mRecycledBuffers;
   // This is only valid if mRecycledBuffers is non-empty
   uint32_t mRecycledBufferSize;
 };
@@ -650,13 +651,13 @@ public:
     MAX_DIMENSION = 16384
   };
 
-  virtual ~PlanarYCbCrImage();
+  virtual ~PlanarYCbCrImage() {}
 
   /**
    * This makes a copy of the data buffers, in order to support functioning
    * in all different layer managers.
    */
-  virtual void SetData(const Data& aData);
+  virtual bool SetData(const Data& aData) = 0;
 
   /**
    * This doesn't make a copy of the data buffers. Can be used when mBuffer is
@@ -665,12 +666,12 @@ public:
    * The GStreamer media backend uses this to decode into PlanarYCbCrImage(s)
    * directly.
    */
-  virtual void SetDataNoCopy(const Data &aData);
+  virtual bool SetDataNoCopy(const Data &aData);
 
   /**
    * This allocates and returns a new buffer
    */
-  virtual uint8_t* AllocateAndGetNewBuffer(uint32_t aSize);
+  virtual uint8_t* AllocateAndGetNewBuffer(uint32_t aSize) = 0;
 
   /**
    * Ask this Image to not convert YUV to RGB during SetData, and make
@@ -693,7 +694,7 @@ public:
 
   virtual gfx::IntSize GetSize() { return mSize; }
 
-  explicit PlanarYCbCrImage(BufferRecycleBin *aRecycleBin);
+  explicit PlanarYCbCrImage();
 
   virtual SharedPlanarYCbCrImage *AsSharedPlanarYCbCrImage() { return nullptr; }
 
@@ -701,35 +702,43 @@ public:
     return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
   }
 
-  virtual size_t SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const;
+  virtual size_t SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const = 0;
 
+protected:
+  already_AddRefed<gfx::SourceSurface> GetAsSourceSurface();
+
+  void SetOffscreenFormat(gfxImageFormat aFormat) { mOffscreenFormat = aFormat; }
+  gfxImageFormat GetOffscreenFormat();
+
+  Data mData;
+  gfx::IntSize mSize;
+  gfxImageFormat mOffscreenFormat;
+  nsCountedRef<nsMainThreadSourceSurfaceRef> mSourceSurface;
+  uint32_t mBufferSize;
+};
+
+class RecyclingPlanarYCbCrImage: public PlanarYCbCrImage {
+public:
+  explicit RecyclingPlanarYCbCrImage(BufferRecycleBin *aRecycleBin) : mRecycleBin(aRecycleBin) {}
+  virtual ~RecyclingPlanarYCbCrImage() override;
+  virtual bool SetData(const Data& aData) override;
+  virtual uint8_t* AllocateAndGetNewBuffer(uint32_t aSize) override;
+  virtual size_t SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const override;
 protected:
   /**
    * Make a copy of the YCbCr data into local storage.
    *
    * @param aData           Input image data.
    */
-  void CopyData(const Data& aData);
+  bool CopyData(const Data& aData);
 
   /**
    * Return a buffer to store image data in.
-   * The default implementation returns memory that can
-   * be freed wit delete[]
    */
-  virtual uint8_t* AllocateBuffer(uint32_t aSize);
+  mozilla::UniquePtr<uint8_t[]> AllocateBuffer(uint32_t aSize);
 
-  already_AddRefed<gfx::SourceSurface> GetAsSourceSurface();
-
-  void SetOffscreenFormat(gfxImageFormat aFormat) { mOffscreenFormat = aFormat; }
-  gfxImageFormat GetOffscreenFormat();
-
-  nsAutoArrayPtr<uint8_t> mBuffer;
-  uint32_t mBufferSize;
-  Data mData;
-  gfx::IntSize mSize;
-  gfxImageFormat mOffscreenFormat;
-  nsCountedRef<nsMainThreadSourceSurfaceRef> mSourceSurface;
   RefPtr<BufferRecycleBin> mRecycleBin;
+  mozilla::UniquePtr<uint8_t[]> mBuffer;
 };
 
 /**

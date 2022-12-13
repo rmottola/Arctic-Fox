@@ -185,7 +185,6 @@ public:
   // The MediaFormatReader will not call Input() while it's calling Flush().
   virtual nsresult Flush() = 0;
 
-
   // Causes all complete samples in the pipeline that can be decoded to be
   // output. If the decoder can't produce samples from the current output,
   // it drops the input samples. The decoder may be holding onto samples
@@ -215,6 +214,8 @@ public:
   // that the format of the next input sample is about to change.
   // If video decoder, aConfig will be a VideoInfo object.
   // If audio decoder, aConfig will be a AudioInfo object.
+  // It is not safe to store a reference to this object and the decoder must
+  // make a copy.
   virtual nsresult ConfigurationChanged(const TrackInfo& aConfig)
   {
     return NS_OK;

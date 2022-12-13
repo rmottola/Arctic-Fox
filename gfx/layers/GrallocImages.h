@@ -43,7 +43,7 @@ class GrallocTextureClientOGL;
  * mPicX, mPicY and mPicSize. The size of the rendered image is
  * mPicSize, not mYSize or mCbCrSize.
  */
-class GrallocImage : public PlanarYCbCrImage
+class GrallocImage : public RecyclingPlanarYCbCrImage
 {
   typedef PlanarYCbCrData Data;
   static int32_t sColorIdMap[];
@@ -61,13 +61,13 @@ public:
    * This makes a copy of the data buffers, in order to support functioning
    * in all different layer managers.
    */
-  virtual void SetData(const Data& aData);
+  virtual bool SetData(const Data& aData);
 
   /**
    *  Share the SurfaceDescriptor without making the copy, in order
    *  to support functioning in all different layer managers.
    */
-  virtual void SetData(const GrallocData& aData);
+  virtual bool SetData(const GrallocData& aData);
 
   // From [android 4.0.4]/hardware/msm7k/libgralloc-qsd8k/gralloc_priv.h
   enum {

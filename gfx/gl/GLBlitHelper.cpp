@@ -12,6 +12,7 @@
 #include "ImageContainer.h"
 #include "HeapCopyOfStackArray.h"
 #include "mozilla/gfx/Matrix.h"
+#include "mozilla/UniquePtr.h"
 
 #ifdef MOZ_WIDGET_GONK
 #include "GrallocImages.h"
@@ -289,8 +290,8 @@ GLBlitHelper::InitTexQuadProgram(BlitType target)
                     break;
                 }
 
-                nsAutoArrayPtr<char> buffer(new char[length]);
-                mGL->fGetShaderInfoLog(mTexBlit_VertShader, length, nullptr, buffer);
+                auto buffer = MakeUnique<char[]>(length);
+                mGL->fGetShaderInfoLog(mTexBlit_VertShader, length, nullptr, buffer.get());
 
                 printf_stderr("Shader info log (%d bytes): %s\n", length, buffer.get());
                 break;
@@ -308,8 +309,8 @@ GLBlitHelper::InitTexQuadProgram(BlitType target)
                     break;
                 }
 
-                nsAutoArrayPtr<char> buffer(new char[length]);
-                mGL->fGetShaderInfoLog(fragShader, length, nullptr, buffer);
+                auto buffer = MakeUnique<char[]>(length);
+                mGL->fGetShaderInfoLog(fragShader, length, nullptr, buffer.get());
 
                 printf_stderr("Shader info log (%d bytes): %s\n", length, buffer.get());
                 break;
@@ -328,8 +329,8 @@ GLBlitHelper::InitTexQuadProgram(BlitType target)
                     break;
                 }
 
-                nsAutoArrayPtr<char> buffer(new char[length]);
-                mGL->fGetProgramInfoLog(program, length, nullptr, buffer);
+                auto buffer = MakeUnique<char[]>(length);
+                mGL->fGetProgramInfoLog(program, length, nullptr, buffer.get());
 
                 printf_stderr("Program info log (%d bytes): %s\n", length, buffer.get());
             }

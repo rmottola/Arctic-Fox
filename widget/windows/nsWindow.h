@@ -297,8 +297,7 @@ protected:
   virtual ~nsWindow();
 
   virtual void WindowUsesOMTC() override;
-  virtual void ConfigureAPZCTreeManager() override;
-  void RegisterTouchWindow();
+  virtual void RegisterTouchWindow() override;
 
   virtual nsresult NotifyIMEInternal(
                      const IMENotification& aIMENotification) override;
@@ -601,11 +600,6 @@ protected:
   POINT mCachedHitTestPoint;
   TimeStamp mCachedHitTestTime;
   int32_t mCachedHitTestResult;
-
-  // For converting native event times to timestamps we record the time of the
-  // first received event in each time scale.
-  static DWORD     sFirstEventTime;
-  static TimeStamp sFirstEventTimeStamp;
 
   static bool sNeedsToInitMouseWheelSettings;
   static void InitMouseWheelScrollData();
