@@ -65,6 +65,9 @@ if CONFIG['MOZ_X11']:
         'nsDragService.cpp',
     ]
 
+if CONFIG['GNU_CC']:
+    CFLAGS += ['-Wshadow']
+
 if CONFIG['ACCESSIBILITY']:
     UNIFIED_SOURCES += [
         'maiRedundantObjectFactory.c',
