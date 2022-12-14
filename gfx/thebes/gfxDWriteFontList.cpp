@@ -1258,9 +1258,7 @@ gfxDWriteFontList::GetStandardFamilyName(const nsAString& aFontName,
 }
 
 gfxFontFamily*
-gfxDWriteFontList::FindFamily(const nsAString& aFamily,
-                              nsIAtom* aLanguage,
-                              bool aUseSystemFonts)
+gfxDWriteFontList::FindFamily(const nsAString& aFamily, gfxFontStyle* aStyle)
 {
     nsAutoString keyName(aFamily);
     BuildKeyNameFromFontName(keyName);
