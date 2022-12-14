@@ -397,7 +397,7 @@ IsSafeImageTransformComponent(gfxFloat aValue)
   return aValue >= -32768 && aValue <= 32767;
 }
 
-#ifndef MOZ_GFX_OPTIMIZE_MOBILE
+#if !defined(MOZ_GFX_OPTIMIZE_MOBILE)
 /**
  * This returns the fastest operator to use for solid surfaces which have no
  * alpha channel or their alpha channel is uniformly opaque.
@@ -763,7 +763,7 @@ gfxUtils::DrawPixelSnapped(gfxContext*         aContext,
             // On Mobile, we don't ever want to do this; it has the potential for
             // allocating very large temporary surfaces, especially since we'll
             // do full-page snapshots often (see bug 749426).
-#ifndef MOZ_GFX_OPTIMIZE_MOBILE
+#if !defined(MOZ_GFX_OPTIMIZE_MOBILE)
             RefPtr<gfxDrawable> restrictedDrawable =
               CreateSamplingRestrictedDrawable(aDrawable, aContext,
                                                aRegion, aFormat);
