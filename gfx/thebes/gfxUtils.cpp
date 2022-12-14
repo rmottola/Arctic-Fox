@@ -397,7 +397,7 @@ IsSafeImageTransformComponent(gfxFloat aValue)
   return aValue >= -32768 && aValue <= 32767;
 }
 
-#if !defined(MOZ_GFX_OPTIMIZE_MOBILE) && !defined(MOZ_WIDGET_COCOA)
+#ifndef MOZ_GFX_OPTIMIZE_MOBILE
 /**
  * This returns the fastest operator to use for solid surfaces which have no
  * alpha channel or their alpha channel is uniformly opaque.
@@ -466,7 +466,7 @@ CreateSamplingRestrictedDrawable(gfxDrawable* aDrawable,
     RefPtr<gfxDrawable> drawable = new gfxSurfaceDrawable(surface, size, gfxMatrix::Translation(-needed.TopLeft()));
     return drawable.forget();
 }
-#endif // !MOZ_GFX_OPTIMIZE_MOBILE && !MOZ_WIDGET_COCOA
+#endif // !MOZ_GFX_OPTIMIZE_MOBILE
 
 // working around cairo/pixman bug (bug 364968)
 // Our device-space-to-image-space transform may not be acceptable to pixman.
@@ -763,7 +763,7 @@ gfxUtils::DrawPixelSnapped(gfxContext*         aContext,
             // On Mobile, we don't ever want to do this; it has the potential for
             // allocating very large temporary surfaces, especially since we'll
             // do full-page snapshots often (see bug 749426).
-#if !defined(MOZ_GFX_OPTIMIZE_MOBILE) && !defined(MOZ_WIDGET_COCOA)
+#ifndef MOZ_GFX_OPTIMIZE_MOBILE
             RefPtr<gfxDrawable> restrictedDrawable =
               CreateSamplingRestrictedDrawable(aDrawable, aContext,
                                                aRegion, aFormat);
