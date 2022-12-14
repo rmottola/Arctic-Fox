@@ -146,10 +146,6 @@ const kEventConstructors = {
                                                          return e;
                                                        },
                                              },
-  CSSFontFaceLoadEvent:                      { create: function (aName, aProps) {
-                                                         return new CSSFontFaceLoadEvent(aName, aProps);
-                                                       },
-                                             },
   CustomEvent:                               { create: function (aName, aProps) {
                                                          return new CustomEvent(aName, aProps);
                                                        },
@@ -221,6 +217,10 @@ const kEventConstructors = {
   },
   FocusEvent:                                { create: function (aName, aProps) {
                                                          return new FocusEvent(aName, aProps);
+                                                       },
+                                             },
+  FontFaceSetLoadEvent:                      { create: function (aName, aProps) {
+                                                         return new FontFaceSetLoadEvent(aName, aProps);
                                                        },
                                              },
   GamepadEvent:                              { create: function (aName, aProps) {
