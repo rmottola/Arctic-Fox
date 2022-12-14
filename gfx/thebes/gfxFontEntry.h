@@ -8,6 +8,7 @@
 
 #include "gfxTypes.h"
 #include "nsString.h"
+#include "gfxFontConstants.h"
 #include "gfxFontFeatures.h"
 #include "gfxFontUtils.h"
 #include "nsTArray.h"
@@ -122,7 +123,9 @@ public:
     bool IsUserFont() const { return mIsDataUserFont || mIsLocalUserFont; }
     bool IsLocalUserFont() const { return mIsLocalUserFont; }
     bool IsFixedPitch() const { return mFixedPitch; }
-    bool IsItalic() const { return mItalic; }
+    bool IsItalic() const { return mStyle == NS_FONT_STYLE_ITALIC; }
+    bool IsOblique() const { return mStyle == NS_FONT_STYLE_OBLIQUE; }
+    bool IsUpright() const { return mStyle == NS_FONT_STYLE_NORMAL; }
     bool IsBold() const { return mWeight >= 600; } // bold == weights 600 and above
     bool IgnoreGDEF() const { return mIgnoreGDEF; }
     bool IgnoreGSUB() const { return mIgnoreGSUB; }
@@ -389,7 +392,7 @@ public:
     nsString         mName;
     nsString         mFamilyName;
 
-    bool             mItalic      : 1;
+    uint8_t          mStyle       : 2; // italic/oblique
     bool             mFixedPitch  : 1;
     bool             mIsValid     : 1;
     bool             mIsBadUnderlineFont : 1;
