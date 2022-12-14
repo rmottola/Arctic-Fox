@@ -23,12 +23,12 @@ class nsPIDOMWindow;
 namespace mozilla {
 namespace css {
 class FontFamilyListRefCnt;
-}
+} // namespace css
 namespace dom {
 class FontFace;
 class Promise;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 namespace mozilla {
 namespace dom {
@@ -175,8 +175,8 @@ public:
   bool Delete(FontFace& aFontFace);
   bool Has(FontFace& aFontFace);
   uint32_t Size();
-  mozilla::dom::FontFaceSetIterator* Entries();
-  mozilla::dom::FontFaceSetIterator* Values();
+  already_AddRefed<mozilla::dom::FontFaceSetIterator> Entries();
+  already_AddRefed<mozilla::dom::FontFaceSetIterator> Values();
   void ForEach(JSContext* aCx, FontFaceSetForEachCallback& aCallback,
                JS::Handle<JS::Value> aThisArg,
                mozilla::ErrorResult& aRv);
