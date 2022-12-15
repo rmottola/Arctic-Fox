@@ -937,7 +937,10 @@ gfxFontconfigFont::GetGlyphRenderingOptions(const TextRunDrawParams* aRunParams)
 #endif
 
 gfxFcPlatformFontList::gfxFcPlatformFontList()
-    : mLocalNames(64), mGenericMappings(32), mLastConfig(nullptr)
+    : mLocalNames(64)
+    , mGenericMappings(32)
+    , mFcSubstituteCache(64)
+    , mLastConfig(nullptr)
 {
     // if the rescan interval is set, start the timer
     int rescanInterval = FcConfigGetRescanInterval(nullptr);
@@ -1058,6 +1061,8 @@ gfxFcPlatformFontList::InitFontList()
 
     mLocalNames.Clear();
     mGenericMappings.Clear();
+    mFcSubstituteCache.Clear();
+    sSentinelFirstFamily = nullptr;
 
     // iterate over available fonts
     FcFontSet* systemFonts = FcConfigGetFonts(nullptr, FcSetSystem);
@@ -1070,7 +1075,6 @@ gfxFcPlatformFontList::InitFontList()
 #endif
 
     mOtherFamilyNamesInitialized = true;
-    sSentinelFirstFamily = nullptr;
 
     return NS_OK;
 }
@@ -1258,6 +1262,14 @@ gfxFcPlatformFontList::FindFamily(const nsAString& aFamily, gfxFontStyle* aStyle
     // In this case fontconfig is including Tex Gyre Heros and
     // Nimbus Sans L as alternatives for Helvetica.
 
+    // Because the FcConfigSubstitute call is quite expensive, we cache the
+    // actual font family found via this process. So check the cache first:
+    NS_ConvertUTF16toUTF8 familyToFind(familyName);
+    gfxFontFamily* cached = mFcSubstituteCache.GetWeak(familyToFind);
+    if (cached) {
+        return cached;
+    }
+
     const FcChar8* kSentinelName = ToFcChar8Ptr("-moz-sentinel");
     if (!sSentinelFirstFamily) {
         nsAutoRef<FcPattern> sentinelSubst(FcPatternCreate());
@@ -1268,7 +1280,6 @@ gfxFcPlatformFontList::FindFamily(const nsAString& aFamily, gfxFontStyle* aStyle
 
     // substitutions for font, -moz-sentinel pattern
     nsAutoRef<FcPattern> fontWithSentinel(FcPatternCreate());
-    NS_ConvertUTF16toUTF8 familyToFind(familyName);
     FcPatternAddString(fontWithSentinel, FC_FAMILY, ToFcChar8Ptr(familyToFind.get()));
     FcPatternAddString(fontWithSentinel, FC_FAMILY, kSentinelName);
     FcConfigSubstitute(nullptr, fontWithSentinel, FcMatchPattern);
@@ -1287,6 +1298,9 @@ gfxFcPlatformFontList::FindFamily(const nsAString& aFamily, gfxFontStyle* aStyle
         }
         gfxFontFamily* foundFamily = gfxPlatformFontList::FindFamily(subst);
         if (foundFamily) {
+            // We've figured out what family the given name maps to, after any
+            // fontconfig subsitutions. Cache it to speed up future lookups.
+            mFcSubstituteCache.Put(familyToFind, foundFamily);
             return foundFamily;
         }
     }
