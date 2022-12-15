@@ -5,6 +5,7 @@
   <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
   <script type="text/javascript" src="/tests/SimpleTest/SpawnTask.js"></script>
   <script type="text/javascript" src="/tests/SimpleTest/ExtensionTestUtils.js"></script>
+  <script type="text/javascript" src="head.js"></script>
   <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css"/>
 </head>
 <body>
@@ -31,8 +32,7 @@ let extensionData = {
 add_task(function* test_background() {
   let extension = ExtensionTestUtils.loadExtension(extensionData);
   info("load complete");
-  yield extension.startup();
-  let x = yield extension.awaitMessage("running");
+  let [, x] = yield Promise.all([extension.startup(), extension.awaitMessage("running")]);
   is(x, 1, "got correct value from extension");
   info("startup complete");
   extension.sendMessage(10, 20);

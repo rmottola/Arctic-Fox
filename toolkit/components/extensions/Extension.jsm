@@ -666,6 +666,20 @@ Extension.prototype = {
     return {};
   },
 
+  broadcast(msg, data) {
+    return new Promise(resolve => {
+      let count = Services.ppmm.childCount;
+      Services.ppmm.addMessageListener(msg + "Complete", function listener() {
+        count--;
+        if (count == 0) {
+          Services.ppmm.removeMessageListener(msg + "Complete", listener);
+          resolve();
+        }
+      });
+      Services.ppmm.broadcastAsyncMessage(msg, data);
+    });
+  },
+
   runManifest(manifest) {
     let permissions = manifest.permissions || [];
     let webAccessibleResources = manifest.web_accessible_resources || [];
@@ -696,7 +710,8 @@ Extension.prototype = {
     }
     let serial = this.serialize();
     data["Extension:Extensions"].push(serial);
-    Services.ppmm.broadcastAsyncMessage("Extension:Startup", serial);
+
+    return this.broadcast("Extension:Startup", serial);
   },
 
   callOnClose(obj) {
@@ -726,7 +741,7 @@ Extension.prototype = {
 
       Management.emit("startup", this);
 
-      this.runManifest(manifest);
+      return this.runManifest(manifest);
     }).catch(e => {
       dump(`Extension error: ${e} ${e.fileName}:${e.lineNumber}\n`);
       Cu.reportError(e);
@@ -744,19 +759,13 @@ Extension.prototype = {
 
     Services.obs.removeObserver(this, "xpcom-shutdown");
 
-    let count = Services.ppmm.childCount;
-
-    Services.ppmm.addMessageListener("Extension:FlushJarCacheComplete", function listener() {
-      count--;
-      if (count == 0) {
-        // We can't delete this file until everyone using it has
-        // closed it (because Windows is dumb). So we wait for all the
-        // child processes (including the parent) to flush their JAR
-        // caches. These caches may keep the file open.
-        file.remove(false);
-      }
+    this.broadcast("Extension:FlushJarCache", {path: file.path}).then(() => {
+      // We can't delete this file until everyone using it has
+      // closed it (because Windows is dumb). So we wait for all the
+      // child processes (including the parent) to flush their JAR
+      // caches. These caches may keep the file open.
+      file.remove(false);
     });
-    Services.ppmm.broadcastAsyncMessage("Extension:FlushJarCache", {path: file.path});
   },
 
   shutdown() {
