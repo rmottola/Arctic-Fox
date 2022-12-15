@@ -25,7 +25,7 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 // but this whole file is in strict mode.  So instead fall back on
 // returning "this" from indirect eval, which returns the global.
 if (!(function() { var e = eval; return e("this"); })().File) {
-  Cu.importGlobalProperties(["File"]);
+    Cu.importGlobalProperties(["File"]);
 }
 
 // Allow stuff from this scope to be accessed from non-privileged scopes. This
