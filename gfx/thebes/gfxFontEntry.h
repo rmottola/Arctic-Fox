@@ -664,7 +664,8 @@ public:
         mIsSimpleFamily(false),
         mIsBadUnderlineFamily(false),
         mFamilyCharacterMapInitialized(false),
-        mSkipDefaultFeatureSpaceCheck(false)
+        mSkipDefaultFeatureSpaceCheck(false),
+        mCheckForFallbackFaces(false)
         { }
 
     const nsString& Name() { return mName; }
@@ -768,6 +769,7 @@ public:
     }
 
     bool IsBadUnderlineFamily() const { return mIsBadUnderlineFamily; }
+    bool CheckForFallbackFaces() const { return mCheckForFallbackFaces; }
 
     // sort available fonts to put preferred (standard) faces towards the end
     void SortAvailableFonts();
@@ -823,6 +825,7 @@ protected:
     bool mIsBadUnderlineFamily : 1;
     bool mFamilyCharacterMapInitialized : 1;
     bool mSkipDefaultFeatureSpaceCheck : 1;
+    bool mCheckForFallbackFaces : 1;  // check other faces for character
 
     enum {
         // for "simple" families, the faces are stored in mAvailableFonts
