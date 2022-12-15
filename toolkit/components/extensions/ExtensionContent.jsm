@@ -48,7 +48,7 @@ function isWhenBeforeOrSame(when1, when2)
 
 // This is the fairly simple API that we inject into content
 // scripts.
-let api = context => { return {
+var api = context => { return {
   runtime: {
     connect: function(extensionId, connectInfo) {
       let name = connectInfo && connectInfo.name || "";
@@ -455,7 +455,7 @@ BrowserExtensionContent.prototype = {
   },
 };
 
-let ExtensionManager = {
+var ExtensionManager = {
   // Map[extensionId, BrowserExtensionContent]
   extensions: new Map(),
 
