@@ -958,7 +958,7 @@ TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size)
       ViewAs<LayoutDevicePixel>(mRect,
                                 PixelCastJustification::LayoutDeviceIsScreenForTabDims);
     LayoutDeviceIntSize devicePixelSize =
-      ViewAs<LayoutDevicePixel>(mDimensions.ToUnknownSize(),
+      ViewAs<LayoutDevicePixel>(mDimensions,
                                 PixelCastJustification::LayoutDeviceIsScreenForTabDims);
 
     CSSRect unscaledRect = devicePixelRect / widgetScale;
