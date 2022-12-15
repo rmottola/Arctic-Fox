@@ -60,6 +60,8 @@ ToCharPtr(const FcChar8 *aStr)
 }
 
 FT_Library gfxFcPlatformFontList::sCairoFTLibrary = nullptr;
+FcChar8* gfxFcPlatformFontList::sSentinelFirstFamily = nullptr;
+
 static cairo_user_data_key_t sFcFontlistUserFontDataKey;
 
 // canonical name ==> first en name or first name if no en name
@@ -1068,6 +1070,8 @@ gfxFcPlatformFontList::InitFontList()
 #endif
 
     mOtherFamilyNamesInitialized = true;
+    sSentinelFirstFamily = nullptr;
+
     return NS_OK;
 }
 
@@ -1254,13 +1258,13 @@ gfxFcPlatformFontList::FindFamily(const nsAString& aFamily, gfxFontStyle* aStyle
     // In this case fontconfig is including Tex Gyre Heros and
     // Nimbus Sans L as alternatives for Helvetica.
 
-    // substitutions for serif pattern
     const FcChar8* kSentinelName = ToFcChar8Ptr("-moz-sentinel");
-    nsAutoRef<FcPattern> sentinelSubst(FcPatternCreate());
-    FcPatternAddString(sentinelSubst, FC_FAMILY, kSentinelName);
-    FcConfigSubstitute(nullptr, sentinelSubst, FcMatchPattern);
-    FcChar8* sentinelFirstFamily = nullptr;
-    FcPatternGetString(sentinelSubst, FC_FAMILY, 0, &sentinelFirstFamily);
+    if (!sSentinelFirstFamily) {
+        nsAutoRef<FcPattern> sentinelSubst(FcPatternCreate());
+        FcPatternAddString(sentinelSubst, FC_FAMILY, kSentinelName);
+        FcConfigSubstitute(nullptr, sentinelSubst, FcMatchPattern);
+        FcPatternGetString(sentinelSubst, FC_FAMILY, 0, &sSentinelFirstFamily);
+    }
 
     // substitutions for font, -moz-sentinel pattern
     nsAutoRef<FcPattern> fontWithSentinel(FcPatternCreate());
@@ -1269,7 +1273,7 @@ gfxFcPlatformFontList::FindFamily(const nsAString& aFamily, gfxFontStyle* aStyle
     FcPatternAddString(fontWithSentinel, FC_FAMILY, kSentinelName);
     FcConfigSubstitute(nullptr, fontWithSentinel, FcMatchPattern);
 
-    // iterate through substitutions until hitting the first serif font
+    // iterate through substitutions until hitting the sentinel
     FcChar8* substName = nullptr;
     for (int i = 0;
          FcPatternGetString(fontWithSentinel, FC_FAMILY,
@@ -1277,7 +1281,8 @@ gfxFcPlatformFontList::FindFamily(const nsAString& aFamily, gfxFontStyle* aStyle
          i++)
     {
         NS_ConvertUTF8toUTF16 subst(ToCharPtr(substName));
-        if (sentinelFirstFamily && FcStrCmp(substName, sentinelFirstFamily) == 0) {
+        if (sSentinelFirstFamily &&
+            FcStrCmp(substName, sSentinelFirstFamily) == 0) {
             break;
         }
         gfxFontFamily* foundFamily = gfxPlatformFontList::FindFamily(subst);
