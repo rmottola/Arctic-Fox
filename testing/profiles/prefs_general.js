@@ -324,10 +324,6 @@ user_pref("network.proxy.pac_generator", false);
 // Make tests run consistently on DevEdition (which has a lightweight theme
 // selected by default).
 user_pref("lightweightThemes.selectedThemeID", "");
-user_pref("browser.devedition.theme.enabled", false);
-
-// Disable periodic updates of service workers.
-user_pref("dom.serviceWorkers.periodic-updates.enabled", false);
 
 // Enable speech synth test service, and disable built in platform services.
 user_pref("media.webspeech.synth.test", true);
