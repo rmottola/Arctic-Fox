@@ -1400,6 +1400,9 @@ gfxFcPlatformFontList::FindGenericFamily(const nsAString& aGeneric,
     FcPatternAddString(genericPattern, FC_FAMILY,
                        ToFcChar8Ptr(generic.get()));
 
+    // -- prefer scalable fonts
+    FcPatternAddBool(genericPattern, FC_SCALABLE, FcTrue);
+
     // -- add the lang to the pattern
     if (!fcLang.IsEmpty()) {
         FcPatternAddString(genericPattern, FC_LANG,
