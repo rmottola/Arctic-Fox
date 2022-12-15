@@ -1606,9 +1606,10 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
             presContext->NotifyFontFaceSetOnRefresh();
           }
           NS_RELEASE(shell);
+
+          mNeedToRecomputeVisibility = true;
         }
 
-        mNeedToRecomputeVisibility = true;
 
         if (tracingStyleFlush) {
           profiler_tracing("Paint", "Styles", TRACING_INTERVAL_END);
@@ -1652,9 +1653,9 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
           presContext->NotifyFontFaceSetOnRefresh();
         }
         NS_RELEASE(shell);
-      }
 
-      mNeedToRecomputeVisibility = true;
+        mNeedToRecomputeVisibility = true;
+      }
 
       if (tracingLayoutFlush) {
         profiler_tracing("Paint", "Reflow", TRACING_INTERVAL_END);
