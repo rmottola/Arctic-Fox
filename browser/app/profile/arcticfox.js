@@ -1448,11 +1448,12 @@ pref("browser.display.standalone_images.background_color", "#2E3B41");
 
 pref("view_source.tab", true);
 
-// Enable Service Workers for desktop on non-release builds
-#ifndef RELEASE_BUILD
+// Enable ServiceWorkers for Push API consumers.
+// Interception is still disabled.
 pref("dom.serviceWorkers.enabled", true);
-pref("dom.serviceWorkers.interception.enabled", true);
-#endif
+
+// Enable Push API.
+pref("dom.push.enabled", true);
 
 // Disable reader mode by default.
 pref("reader.parse-on-load.enabled", false);
