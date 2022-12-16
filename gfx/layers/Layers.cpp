@@ -1030,7 +1030,7 @@ Layer::GetVisibleRegionRelativeToRootLayer(nsIntRegion& aResult,
     // If the parent layer clips its lower layers, clip the visible region
     // we're accumulating.
     if (layer->GetEffectiveClipRect()) {
-      aResult.AndWith(ParentLayerIntRect::ToUntyped(*layer->GetEffectiveClipRect()));
+      aResult.AndWith(layer->GetEffectiveClipRect()->ToUnknownRect());
     }
 
     // Now we need to walk across the list of siblings for this parent layer,

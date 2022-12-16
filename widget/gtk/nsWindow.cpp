@@ -1480,7 +1480,7 @@ nsWindow::GetScreenBounds(nsIntRect &aRect)
         // use the point including window decorations
         gint x, y;
         gdk_window_get_root_origin(gtk_widget_get_window(GTK_WIDGET(mContainer)), &x, &y);
-        aRect.MoveTo(LayoutDevicePixel::ToUntyped(GdkPointToDevicePixels({ x, y })));
+        aRect.MoveTo(GdkPointToDevicePixels({ x, y }).ToUnknownPoint());
     }
     else {
         aRect.MoveTo(WidgetToScreenOffsetUntyped());
