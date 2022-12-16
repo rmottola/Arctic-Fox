@@ -1389,9 +1389,9 @@ CompositorOGL::EndFrame()
 
 #ifdef MOZ_DUMP_PAINTING
   if (gfxEnv::DumpCompositorTextures()) {
-    IntRect rect;
+    LayoutDeviceIntRect rect;
     if (mUseExternalSurfaceSize) {
-      rect = IntRect(0, 0, mSurfaceSize.width, mSurfaceSize.height);
+      rect = LayoutDeviceIntRect(0, 0, mSurfaceSize.width, mSurfaceSize.height);
     } else {
       mWidget->GetBounds(rect);
     }

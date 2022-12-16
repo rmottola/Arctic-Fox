@@ -1853,7 +1853,7 @@ NS_METHOD nsWindow::SetFocus(bool aRaise)
 // Return the window's full dimensions in screen coordinates.
 // If the window has a parent, converts the origin to an offset
 // of the parent's screen origin.
-NS_METHOD nsWindow::GetBounds(nsIntRect &aRect)
+NS_METHOD nsWindow::GetBoundsUntyped(nsIntRect &aRect)
 {
   if (mWnd) {
     RECT r;
@@ -1921,14 +1921,14 @@ NS_METHOD nsWindow::GetBounds(nsIntRect &aRect)
 }
 
 // Get this component dimension
-NS_METHOD nsWindow::GetClientBounds(nsIntRect &aRect)
+NS_METHOD nsWindow::GetClientBoundsUntyped(nsIntRect &aRect)
 {
   if (mWnd) {
     RECT r;
     VERIFY(::GetClientRect(mWnd, &r));
 
     nsIntRect bounds;
-    GetBounds(bounds);
+    GetBoundsUntyped(bounds);
     aRect.MoveTo(bounds.TopLeft() + GetClientOffset());
     aRect.width  = r.right - r.left;
     aRect.height = r.bottom - r.top;
@@ -1940,7 +1940,7 @@ NS_METHOD nsWindow::GetClientBounds(nsIntRect &aRect)
 }
 
 // Like GetBounds, but don't offset by the parent
-NS_METHOD nsWindow::GetScreenBounds(nsIntRect &aRect)
+NS_METHOD nsWindow::GetScreenBoundsUntyped(nsIntRect &aRect)
 {
   if (mWnd) {
     RECT r;
@@ -1956,10 +1956,10 @@ NS_METHOD nsWindow::GetScreenBounds(nsIntRect &aRect)
   return NS_OK;
 }
 
-NS_METHOD nsWindow::GetRestoredBounds(nsIntRect &aRect)
+NS_METHOD nsWindow::GetRestoredBoundsUntyped(nsIntRect &aRect)
 {
   if (SizeMode() == nsSizeMode_Normal) {
-    return GetScreenBounds(aRect);
+    return GetScreenBoundsUntyped(aRect);
   }
   if (!mWnd) {
     return NS_ERROR_FAILURE;
@@ -2656,12 +2656,12 @@ void nsWindow::UpdateOpaqueRegion(const nsIntRegion &aOpaqueRegion)
       if (child->IsPlugin()) {
         // Collect the bounds of all plugins for GetLargestRectangle.
         nsIntRect childBounds;
-        child->GetBounds(childBounds);
+        child->GetBoundsUntyped(childBounds);
         pluginBounds.UnionRect(pluginBounds, childBounds);
       }
     }
 
-    nsIntRect clientBounds;
+    LayoutDeviceIntRect clientBounds;
     GetClientBounds(clientBounds);
 
     // Find the largest rectangle and use that to calculate the inset. Our top
@@ -3559,7 +3559,7 @@ nsWindow::OnDefaultButtonLoaded(const nsIntRect &aButtonRect)
   }
 
   nsIntRect widgetRect;
-  nsresult rv = GetScreenBounds(widgetRect);
+  nsresult rv = GetScreenBoundsUntyped(widgetRect);
   NS_ENSURE_SUCCESS(rv, rv);
   nsIntRect buttonRect(aButtonRect + widgetRect.TopLeft());
 
@@ -4186,12 +4186,12 @@ nsWindow::DispatchMouseEvent(EventMessage aEventMessage, WPARAM wParam,
       if (nsToolkit::gMouseTrailer && !sIsInMouseCapture) {
         nsToolkit::gMouseTrailer->SetMouseTrailerWindow(mWnd);
       }
-      nsIntRect rect;
+      LayoutDeviceIntRect rect;
       GetBounds(rect);
       rect.x = 0;
       rect.y = 0;
 
-      if (rect.Contains(LayoutDeviceIntPoint::ToUntyped(event.refPoint))) {
+      if (rect.Contains(event.refPoint)) {
         if (sCurrentWindow == nullptr || sCurrentWindow != this) {
           if ((nullptr != sCurrentWindow) && (!sCurrentWindow->mInDtor)) {
             LPARAM pos = sCurrentWindow->lParamToClient(lParamToScreen(lParam));
@@ -6548,7 +6548,7 @@ nsWindow::ConfigureChildren(const nsTArray<Configuration>& aConfigurations)
     nsresult rv = w->SetWindowClipRegion(configuration.mClipRegion, true);
     NS_ENSURE_SUCCESS(rv, rv);
     nsIntRect bounds;
-    w->GetBounds(bounds);
+    w->GetBoundsUntyped(bounds);
     if (bounds.Size() != configuration.mBounds.Size()) {
       w->Resize(configuration.mBounds.x, configuration.mBounds.y,
                 configuration.mBounds.width, configuration.mBounds.height,

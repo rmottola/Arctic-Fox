@@ -284,7 +284,7 @@ nsScreenGonk::SetRotation(uint32_t aRotation)
 }
 
 nsIntRect
-nsScreenGonk::GetNaturalBounds()
+nsScreenGonk::GetNaturalBoundsUntyped()
 {
     return mNaturalBounds;
 }
