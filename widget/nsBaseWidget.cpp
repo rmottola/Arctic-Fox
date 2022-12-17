@@ -901,7 +901,7 @@ void nsBaseWidget::ConfigureAPZCTreeManager()
     MOZ_ASSERT(NS_IsMainThread());
     APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
         treeManager.get(), &APZCTreeManager::SetAllowedTouchBehavior,
-        aInputBlockId, aFlags));
+        aInputBlockId, nsTArray<TouchBehaviorFlags>(aFlags)));
   };
 
   RefPtr<GeckoContentController> controller = CreateRootContentController();
@@ -933,7 +933,7 @@ nsBaseWidget::SetConfirmedTargetAPZC(uint64_t aInputBlockId,
   void (APZCTreeManager::*setTargetApzcFunc)(uint64_t, const nsTArray<ScrollableLayerGuid>&)
           = &APZCTreeManager::SetTargetAPZC;
   APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
-    mAPZC.get(), setTargetApzcFunc, aInputBlockId, mozilla::Move(aTargets)));
+    mAPZC.get(), setTargetApzcFunc, aInputBlockId, nsTArray<ScrollableLayerGuid>(aTargets)));
 }
 
 void

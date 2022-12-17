@@ -442,7 +442,8 @@ nsScreenGonk::GetEGLSurface()
 }
 
 static void
-UpdateMirroringWidgetSync(nsScreenGonk* aScreen, nsWindow* aWindow) {
+UpdateMirroringWidgetSync(RefPtr<nsScreenGonk>&& aScreen, nsWindow* aWindow)
+{
     MOZ_ASSERT(CompositorParent::IsInCompositorThread());
     already_AddRefed<nsWindow> window(aWindow);
     aScreen->UpdateMirroringWidget(window);
