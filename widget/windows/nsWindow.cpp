@@ -1907,7 +1907,7 @@ NS_METHOD nsWindow::GetBoundsUntyped(nsIntRect &aRect)
       // adjust for chrome
       nsWindow* pWidget = static_cast<nsWindow*>(GetParent());
       if (pWidget && pWidget->IsTopLevelWidget()) {
-        nsIntPoint clientOffset = pWidget->GetClientOffset();
+        LayoutDeviceIntPoint clientOffset = pWidget->GetClientOffset();
         r.left -= clientOffset.x;
         r.top  -= clientOffset.y;
       }
@@ -1929,7 +1929,7 @@ NS_METHOD nsWindow::GetClientBoundsUntyped(nsIntRect &aRect)
 
     nsIntRect bounds;
     GetBoundsUntyped(bounds);
-    aRect.MoveTo(bounds.TopLeft() + GetClientOffset());
+    aRect.MoveTo(bounds.TopLeft() + GetClientOffsetUntyped());
     aRect.width  = r.right - r.left;
     aRect.height = r.bottom - r.top;
 
@@ -1984,7 +1984,8 @@ NS_METHOD nsWindow::GetRestoredBoundsUntyped(nsIntRect &aRect)
 
 // return the x,y offset of the client area from the origin
 // of the window. If the window is borderless returns (0,0).
-nsIntPoint nsWindow::GetClientOffset()
+nsIntPoint
+nsWindow::GetClientOffsetUntyped()
 {
   if (!mWnd) {
     return nsIntPoint(0, 0);
