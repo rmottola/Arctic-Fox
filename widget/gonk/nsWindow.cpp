@@ -846,7 +846,7 @@ nsWindow::GetGLFrameBufferFormat()
 nsIntRect
 nsWindow::GetNaturalBoundsUntyped()
 {
-    return mScreen->GetNaturalBoundsUntyped();
+    return mScreen->GetNaturalBounds().ToUnknownRect();
 }
 
 nsScreenGonk*
