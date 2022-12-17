@@ -2321,7 +2321,7 @@ nsDOMWindowUtils::GetAsyncPanZoomEnabled(bool *aResult)
 
 NS_IMETHODIMP
 nsDOMWindowUtils::SetAsyncScrollOffset(nsIDOMNode* aNode,
-                                       int32_t aX, int32_t aY)
+                                       float aX, float aY)
 {
   nsCOMPtr<Element> element = do_QueryInterface(aNode);
   if (!element) {
