@@ -2072,7 +2072,7 @@ public:
   RenderTargetIntRect GetIntermediateSurfaceRect()
   {
     NS_ASSERTION(mUseIntermediateSurface, "Must have intermediate surface");
-    return RenderTargetPixel::FromUntyped(mVisibleRegion.GetBounds());
+    return RenderTargetIntRect::FromUnknownRect(mVisibleRegion.GetBounds());
   }
 
   /**
