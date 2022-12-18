@@ -7933,7 +7933,7 @@ UpdateCompositionBoundsForRCDRSF(ParentLayerRect& aCompBounds,
     return false;
   }
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_UIKIT)
   nsIWidget* widget = rootFrame->GetNearestWidget();
 #else
   nsView* view = rootFrame->GetView();
