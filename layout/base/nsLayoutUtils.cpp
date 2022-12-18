@@ -2747,7 +2747,7 @@ nsLayoutUtils::GetLayerTransformForFrame(nsIFrame* aFrame,
 
   nsDisplayListBuilder builder(root, nsDisplayListBuilder::OTHER,
                                false/*don't build caret*/);
-  nsDisplayList list;  
+  nsDisplayList list;
   nsDisplayTransform* item =
     new (&builder) nsDisplayTransform(&builder, aFrame, &list, nsRect());
 
@@ -3329,7 +3329,7 @@ nsLayoutUtils::PaintFrame(nsRenderingContext* aRenderingContext, nsIFrame* aFram
 
   // For the viewport frame in print preview/page layout we want to paint
   // the grey background behind the page, not the canvas color.
-  if (frameType == nsGkAtoms::viewportFrame && 
+  if (frameType == nsGkAtoms::viewportFrame &&
       nsLayoutUtils::NeedsPrintPreviewBackground(presContext)) {
     nsRect bounds = nsRect(builder.ToReferenceFrame(aFrame),
                            aFrame->GetSize());
@@ -4930,7 +4930,7 @@ nsLayoutUtils::ComputeISizeValue(
 
   nscoord result;
   if (aCoord.IsCoordPercentCalcUnit()) {
-    result = nsRuleNode::ComputeCoordPercentCalc(aCoord, 
+    result = nsRuleNode::ComputeCoordPercentCalc(aCoord,
                                                  aContainingBlockISize);
     // The result of a calc() expression might be less than 0; we
     // should clamp at runtime (below).  (Percentages and coords that
@@ -5948,7 +5948,7 @@ nsLayoutUtils::CalculateContentBEnd(WritingMode aWM, nsIFrame* aFrame)
     nsIFrame::ChildListIterator lists(aFrame);
     for (; !lists.IsDone(); lists.Next()) {
       if (!skip.Contains(lists.CurrentID())) {
-        nsFrameList::Enumerator childFrames(lists.CurrentList()); 
+        nsFrameList::Enumerator childFrames(lists.CurrentList());
         for (; !childFrames.AtEnd(); childFrames.Next()) {
           nsIFrame* child = childFrames.get();
           nscoord offset =
@@ -7787,7 +7787,7 @@ nsLayoutUtils::FontSizeInflationEnabled(nsPresContext *aPresContext)
 }
 
 /* static */ nsRect
-nsLayoutUtils::GetBoxShadowRectForFrame(nsIFrame* aFrame, 
+nsLayoutUtils::GetBoxShadowRectForFrame(nsIFrame* aFrame,
                                         const nsSize& aFrameSize)
 {
   nsCSSShadowArray* boxShadows = aFrame->StyleBorder()->mBoxShadow;
@@ -7809,7 +7809,7 @@ nsLayoutUtils::GetBoxShadowRectForFrame(nsIFrame* aFrame,
   nsRect frameRect = nativeTheme ?
     aFrame->GetVisualOverflowRectRelativeToSelf() :
     nsRect(nsPoint(0, 0), aFrameSize);
-  
+
   nsRect shadows;
   int32_t A2D = aFrame->PresContext()->AppUnitsPerDevPixel();
   for (uint32_t i = 0; i < boxShadows->Length(); ++i) {
@@ -7933,15 +7933,6 @@ UpdateCompositionBoundsForRCDRSF(ParentLayerRect& aCompBounds,
     return false;
   }
 
-  // On Android, we need to do things a bit differently to get things
-  // right (see bug 983208, bug 988882). We use the bounds of the nearest
-  // widget, but clamp the height to the frame bounds height. This clamping
-  // is done to get correct results for a page where the page is sized to
-  // the screen and thus the dynamic toolbar never disappears. In such a
-  // case, we want the composition bounds to exclude the toolbar height,
-  // but the widget bounds includes it. We don't currently have a good way
-  // of knowing about the toolbar height, but clamping to the frame bounds
-  // height gives the correct answer in the cases we care about.
 #ifdef MOZ_WIDGET_ANDROID
   nsIWidget* widget = rootFrame->GetNearestWidget();
 #else
@@ -8244,7 +8235,6 @@ Rect NSRectToSnappedRect(const nsRect& aRect, double aAppUnitsPerPixel,
   MaybeSnapToDevicePixels(rect, aSnapDT, true);
   return rect;
 }
-
 // Similar to a snapped rect, except an axis is left unsnapped if the snapping
 // process results in a length of 0.
 Rect NSRectToNonEmptySnappedRect(const nsRect& aRect, double aAppUnitsPerPixel,
@@ -8276,7 +8266,7 @@ void StrokeLineWithSnapping(const nsPoint& aP1, const nsPoint& aP2,
 
 namespace layout {
 
-  
+
 void
 MaybeSetupTransactionIdAllocator(layers::LayerManager* aManager, nsView* aView)
 {
