@@ -29,8 +29,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
                                   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
-let {
-  runSafeWithoutClone,
+var {
+  runSafeSyncWithoutClone,
   MessageBroker,
   Messenger,
   ignoreEvent,
@@ -48,9 +48,13 @@ function isWhenBeforeOrSame(when1, when2)
 
 // This is the fairly simple API that we inject into content
 // scripts.
-let api = context => { return {
+var api = context => { return {
   runtime: {
     connect: function(extensionId, connectInfo) {
+      if (!connectInfo) {
+        connectInfo = extensionId;
+        extensionId = null;
+      }
       let name = connectInfo && connectInfo.name || "";
       let recipient = extensionId ? {extensionId} : {extensionId: context.extensionId};
       return context.messenger.connect(context.messageManager, name, recipient);
@@ -137,12 +141,12 @@ Script.prototype = {
 
       for (let url of this.css) {
         url = extension.baseURI.resolve(url);
-        runSafeWithoutClone(winUtils.loadSheetUsingURIString, url, winUtils.AUTHOR_SHEET);
+        runSafeSyncWithoutClone(winUtils.loadSheetUsingURIString, url, winUtils.AUTHOR_SHEET);
       }
 
       if (this.options.cssCode) {
         let url = "data:text/css;charset=utf-8," + encodeURIComponent(this.options.cssCode);
-        runSafeWithoutClone(winUtils.loadSheetUsingURIString, url, winUtils.AUTHOR_SHEET);
+        runSafeSyncWithoutClone(winUtils.loadSheetUsingURIString, url, winUtils.AUTHOR_SHEET);
       }
     }
 
@@ -162,7 +166,7 @@ Script.prototype = {
           charset: "UTF-8",
           async: AppConstants.platform == "gonk"
         }
-        Services.scriptloader.loadSubScriptWithOptions(url, options);
+        runSafeSyncWithoutClone(Services.scriptloader.loadSubScriptWithOptions, url, options);
       }
 
       if (this.options.jsCode) {
@@ -455,7 +459,7 @@ BrowserExtensionContent.prototype = {
   },
 };
 
-let ExtensionManager = {
+var ExtensionManager = {
   // Map[extensionId, BrowserExtensionContent]
   extensions: new Map(),
 
@@ -484,6 +488,7 @@ let ExtensionManager = {
         extension = new BrowserExtensionContent(data);
         this.extensions.set(data.id, extension);
         DocumentManager.startupExtension(data.id);
+        Services.cpmm.sendAsyncMessage("Extension:StartupComplete");
         break;
       }
 

@@ -1030,7 +1030,7 @@ Layer::GetVisibleRegionRelativeToRootLayer(nsIntRegion& aResult,
     // If the parent layer clips its lower layers, clip the visible region
     // we're accumulating.
     if (layer->GetEffectiveClipRect()) {
-      aResult.AndWith(ParentLayerIntRect::ToUntyped(*layer->GetEffectiveClipRect()));
+      aResult.AndWith(layer->GetEffectiveClipRect()->ToUnknownRect());
     }
 
     // Now we need to walk across the list of siblings for this parent layer,
@@ -1916,8 +1916,9 @@ Layer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
   }
   if (GetIsFixedPosition()) {
     LayerPoint anchor = GetFixedPositionAnchor();
-    aStream << nsPrintfCString(" [isFixedPosition scrollId=%lld anchor=%s%s]",
+    aStream << nsPrintfCString(" [isFixedPosition scrollId=%lld sides=0x%x anchor=%s%s]",
                      GetFixedPositionScrollContainerId(),
+                     GetFixedPositionSides(),
                      ToString(anchor).c_str(),
                      IsClipFixed() ? "" : " scrollingClip").get();
   }

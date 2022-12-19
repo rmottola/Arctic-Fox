@@ -1009,7 +1009,7 @@ const KTableValue nsCSSProps::kCaptionSideKTable[] = {
   eCSSKeyword_UNKNOWN,              -1
 };
 
-const KTableValue nsCSSProps::kClearKTable[] = {
+KTableValue nsCSSProps::kClearKTable[] = {
   eCSSKeyword_none,         NS_STYLE_CLEAR_NONE,
   eCSSKeyword_left,         NS_STYLE_CLEAR_LEFT,
   eCSSKeyword_right,        NS_STYLE_CLEAR_RIGHT,
@@ -1374,7 +1374,7 @@ const KTableValue nsCSSProps::kJustifyContentKTable[] = {
   eCSSKeyword_UNKNOWN,-1
 };
 
-const KTableValue nsCSSProps::kFloatKTable[] = {
+KTableValue nsCSSProps::kFloatKTable[] = {
   eCSSKeyword_none,         NS_STYLE_FLOAT_NONE,
   eCSSKeyword_left,         NS_STYLE_FLOAT_LEFT,
   eCSSKeyword_right,        NS_STYLE_FLOAT_RIGHT,

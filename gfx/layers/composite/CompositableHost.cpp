@@ -14,11 +14,12 @@
 #include "mozilla/layers/ImageContainerParent.h"
 #include "mozilla/layers/LayersSurfaces.h"  // for SurfaceDescriptor
 #include "mozilla/layers/TextureHost.h"  // for TextureHost, etc
-#include "mozilla/RefPtr.h"           // for nsRefPtr
+#include "mozilla/RefPtr.h"                   // for nsRefPtr
 #include "nsDebug.h"                    // for NS_WARNING
 #include "nsISupportsImpl.h"            // for MOZ_COUNT_CTOR, etc
 #include "gfxPlatform.h"                // for gfxPlatform
 #include "mozilla/layers/PCompositableParent.h"
+#include "IPDLActor.h"
 
 namespace mozilla {
 
@@ -36,7 +37,7 @@ class Compositor;
  * by either the CompositableChild's deletion, or by the IPDL communication
  * going down.
  */
-class CompositableParent : public PCompositableParent
+class CompositableParent : public ParentActor<PCompositableParent>
 {
 public:
   CompositableParent(CompositableParentManager* aMgr,
@@ -62,7 +63,7 @@ public:
     CompositableMap::Erase(mHost->GetAsyncID());
   }
 
-  virtual void ActorDestroy(ActorDestroyReason why) override
+  virtual void Destroy() override
   {
     if (mHost) {
       mHost->Detach(nullptr, CompositableHost::FORCE_DETACH);

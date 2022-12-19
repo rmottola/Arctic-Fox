@@ -23,12 +23,12 @@ class nsPIDOMWindow;
 namespace mozilla {
 namespace css {
 class FontFamilyListRefCnt;
-}
+} // namespace css
 namespace dom {
 class FontFace;
 class Promise;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 namespace mozilla {
 namespace dom {
@@ -83,7 +83,7 @@ public:
                                    const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList,
                                    uint32_t aWeight,
                                    int32_t aStretch,
-                                   uint32_t aItalicStyle,
+                                   uint8_t aStyle,
                                    const nsTArray<gfxFontFeature>& aFeatureSettings,
                                    uint32_t aLanguageOverride,
                                    gfxSparseBitSet* aUnicodeRanges) override;
@@ -149,6 +149,12 @@ public:
 
   void FlushUserFontSet();
 
+  static nsPresContext* GetPresContextFor(gfxUserFontSet* aUserFontSet)
+  {
+    FontFaceSet* set = static_cast<UserFontSet*>(aUserFontSet)->mFontFaceSet;
+    return set ? set->GetPresContext() : nullptr;
+  }
+
   // -- Web IDL --------------------------------------------------------------
 
   IMPL_EVENT_HANDLER(loading)
@@ -169,8 +175,8 @@ public:
   bool Delete(FontFace& aFontFace);
   bool Has(FontFace& aFontFace);
   uint32_t Size();
-  mozilla::dom::FontFaceSetIterator* Entries();
-  mozilla::dom::FontFaceSetIterator* Values();
+  already_AddRefed<mozilla::dom::FontFaceSetIterator> Entries();
+  already_AddRefed<mozilla::dom::FontFaceSetIterator> Values();
   void ForEach(JSContext* aCx, FontFaceSetForEachCallback& aCallback,
                JS::Handle<JS::Value> aThisArg,
                mozilla::ErrorResult& aRv);
@@ -215,7 +221,7 @@ private:
   void CheckLoadingFinishedAfterDelay();
 
   /**
-   * Dispatches a CSSFontFaceLoadEvent to this object.
+   * Dispatches a FontFaceSetLoadEvent to this object.
    */
   void DispatchLoadingFinishedEvent(
                                 const nsAString& aType,
@@ -280,7 +286,7 @@ private:
               RefPtr<mozilla::css::FontFamilyListRefCnt>& aFamilyList,
               uint32_t& aWeight,
               int32_t& aStretch,
-              uint32_t& aItalicStyle,
+              uint8_t& aStyle,
               ErrorResult& aRv);
   void FindMatchingFontFaces(const nsAString& aFont,
                              const nsAString& aText,

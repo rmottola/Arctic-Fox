@@ -99,7 +99,7 @@ public:
     explicit gfxFontconfigFontEntry(const nsAString& aFaceName,
                                     uint16_t aWeight,
                                     int16_t aStretch,
-                                    bool aItalic,
+                                    uint8_t aStyle,
                                     const uint8_t *aData,
                                     FT_Face aFace);
 
@@ -108,7 +108,7 @@ public:
                                     FcPattern* aFontPattern,
                                     uint16_t aWeight,
                                     int16_t aStretch,
-                                    bool aItalic);
+                                    uint8_t aStyle);
 
     FcPattern* GetPattern() { return mFontPattern; }
 
@@ -209,17 +209,17 @@ public:
 
     gfxFontEntry*
     LookupLocalFont(const nsAString& aFontName, uint16_t aWeight,
-                    int16_t aStretch, bool aItalic) override;
+                    int16_t aStretch, uint8_t aStyle) override;
 
     gfxFontEntry*
     MakePlatformFont(const nsAString& aFontName, uint16_t aWeight,
-                     int16_t aStretch, bool aItalic,
+                     int16_t aStretch,
+                     uint8_t aStyle,
                      const uint8_t* aFontData,
                      uint32_t aLength) override;
 
     gfxFontFamily* FindFamily(const nsAString& aFamily,
-                              nsIAtom* aLanguage = nullptr,
-                              bool aUseSystemFonts = false) override;
+                              gfxFontStyle* aStyle = nullptr) override;
 
     bool GetStandardFamilyName(const nsAString& aFontName,
                                nsAString& aFamilyName) override;
@@ -249,10 +249,15 @@ protected:
 
     // to avoid enumerating all fonts, maintain a mapping of local font
     // names to family
-    nsRefPtrHashtable<nsStringHashKey, gfxFontFamily> mLocalNames;
+    nsBaseHashtable<nsStringHashKey,
+                    nsCountedRef<FcPattern>,
+                    FcPattern*> mLocalNames;
 
     // caching generic/lang ==> font family
     nsRefPtrHashtable<nsCStringHashKey, gfxFontFamily> mGenericMappings;
+
+    // caching family lookups as found by FindFamily after resolving substitutions
+    nsRefPtrHashtable<nsCStringHashKey, gfxFontFamily> mFcSubstituteCache;
 
     nsCOMPtr<nsITimer> mCheckFontUpdatesTimer;
     nsCountedRef<FcConfig> mLastConfig;

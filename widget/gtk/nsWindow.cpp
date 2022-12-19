@@ -1474,13 +1474,13 @@ nsWindow::SetFocus(bool aRaise)
 }
 
 NS_IMETHODIMP
-nsWindow::GetScreenBounds(nsIntRect &aRect)
+nsWindow::GetScreenBoundsUntyped(nsIntRect &aRect)
 {
     if (mIsTopLevel && mContainer) {
         // use the point including window decorations
         gint x, y;
         gdk_window_get_root_origin(gtk_widget_get_window(GTK_WIDGET(mContainer)), &x, &y);
-        aRect.MoveTo(LayoutDevicePixel::ToUntyped(GdkPointToDevicePixels({ x, y })));
+        aRect.MoveTo(GdkPointToDevicePixels({ x, y }).ToUnknownPoint());
     }
     else {
         aRect.MoveTo(WidgetToScreenOffsetUntyped());
@@ -1490,7 +1490,7 @@ nsWindow::GetScreenBounds(nsIntRect &aRect)
     // frame bounds, but mBounds.Size() is returned here for consistency
     // with Resize.
     aRect.SizeTo(mBounds.Size());
-    LOG(("GetScreenBounds %d,%d | %dx%d\n",
+    LOG(("GetScreenBoundsUntyped %d,%d | %dx%d\n",
          aRect.x, aRect.y, aRect.width, aRect.height));
     return NS_OK;
 }
@@ -1502,13 +1502,13 @@ nsWindow::GetClientSize()
 }
 
 NS_IMETHODIMP
-nsWindow::GetClientBounds(nsIntRect &aRect)
+nsWindow::GetClientBoundsUntyped(nsIntRect &aRect)
 {
     // GetBounds returns a rect whose top left represents the top left of the
     // outer bounds, but whose width/height represent the size of the inner
     // bounds (which is messed up).
-    GetBounds(aRect);
-    aRect.MoveBy(GetClientOffset());
+    GetBoundsUntyped(aRect);
+    aRect.MoveBy(GetClientOffsetUntyped());
 
     return NS_OK;
 }
@@ -1556,7 +1556,7 @@ nsWindow::UpdateClientOffset()
 }
 
 nsIntPoint
-nsWindow::GetClientOffset()
+nsWindow::GetClientOffsetUntyped()
 {
     return mClientOffset;
 }
@@ -2191,7 +2191,7 @@ nsWindow::OnExposeEvent(cairo_t *cr)
                 nsAutoTArray<nsIntRect,1> clipRects;
                 kid->GetWindowClipRegion(&clipRects);
                 nsIntRect bounds;
-                kid->GetBounds(bounds);
+                kid->GetBoundsUntyped(bounds);
                 for (uint32_t i = 0; i < clipRects.Length(); ++i) {
                     nsIntRect r = clipRects[i] + bounds.TopLeft();
                     region.Sub(region, r);
@@ -2367,7 +2367,7 @@ nsWindow::OnConfigureEvent(GtkWidget *aWidget, GdkEventConfigure *aEvent)
          aEvent->x, aEvent->y, aEvent->width, aEvent->height));
 
     nsIntRect screenBounds;
-    GetScreenBounds(screenBounds);
+    GetScreenBoundsUntyped(screenBounds);
 
     if (mWindowType == eWindowType_toplevel || mWindowType == eWindowType_dialog) {
         // This check avoids unwanted rollup on spurious configure events from
@@ -3340,7 +3340,7 @@ nsWindow::ThemeChanged()
 }
 
 void
-nsWindow::DispatchDragEvent(EventMessage aMsg, const nsIntPoint& aRefPoint,
+nsWindow::DispatchDragEvent(EventMessage aMsg, const LayoutDeviceIntPoint& aRefPoint,
                             guint aTime)
 {
     WidgetDragEvent event(true, aMsg, this);
@@ -3349,7 +3349,7 @@ nsWindow::DispatchDragEvent(EventMessage aMsg, const nsIntPoint& aRefPoint,
         InitDragEvent(event);
     }
 
-    event.refPoint = LayoutDeviceIntPoint::FromUntyped(aRefPoint);
+    event.refPoint = aRefPoint;
     event.time = aTime;
     event.timeStamp = GetEventTimeStamp(aTime);
 
@@ -3419,7 +3419,8 @@ nsWindow::OnTouchEvent(GdkEventTouch* aEvent)
         id = ++gLastTouchID & 0x7FFFFFFF;
     }
 
-    touch = new dom::Touch(id, touchPoint, nsIntPoint(1,1), 0.0f, 0.0f);
+    touch = new dom::Touch(id, touchPoint, LayoutDeviceIntPoint(1, 1),
+                           0.0f, 0.0f);
 
     WidgetTouchEvent event(true, msg, this);
     KeymapWrapper::InitInputEvent(event, aEvent->state);
@@ -4284,14 +4285,16 @@ nsWindow::ConfigureChildren(const nsTArray<Configuration>& aConfigurations)
         nsWindow* w = static_cast<nsWindow*>(configuration.mChild.get());
         NS_ASSERTION(w->GetParent() == this,
                      "Configured widget is not a child");
+        LayoutDeviceIntRect wBounds =
+            LayoutDeviceIntRect::FromUnknownRect(w->mBounds);
         w->SetWindowClipRegion(configuration.mClipRegion, true);
-        if (w->mBounds.Size() != configuration.mBounds.Size()) {
+        if (wBounds.Size() != configuration.mBounds.Size()) {
             w->Resize(configuration.mBounds.x, configuration.mBounds.y,
                       configuration.mBounds.width, configuration.mBounds.height,
                       true);
-        } else if (w->mBounds.TopLeft() != configuration.mBounds.TopLeft()) {
+        } else if (wBounds.TopLeft() != configuration.mBounds.TopLeft()) {
             w->Move(configuration.mBounds.x, configuration.mBounds.y);
-        } 
+        }
         w->SetWindowClipRegion(configuration.mClipRegion, false);
     }
     return NS_OK;
@@ -5978,9 +5981,11 @@ drag_motion_event_cb(GtkWidget *aWidget,
 
     LOGDRAG(("nsWindow drag-motion signal for %p\n", (void*)innerMostWindow));
 
+    LayoutDeviceIntPoint point = window->GdkPointToDevicePixels({ retx, rety });
+
     return nsDragService::GetInstance()->
         ScheduleMotionEvent(innerMostWindow, aDragContext,
-                            nsIntPoint(retx, rety), aTime);
+                            point, aTime);
 }
 
 static void
@@ -6048,9 +6053,11 @@ drag_drop_event_cb(GtkWidget *aWidget,
 
     LOGDRAG(("nsWindow drag-drop signal for %p\n", (void*)innerMostWindow));
 
+    LayoutDeviceIntPoint point = window->GdkPointToDevicePixels({ retx, rety });
+
     return nsDragService::GetInstance()->
         ScheduleDropEvent(innerMostWindow, aDragContext,
-                          nsIntPoint(retx, rety), aTime);
+                          point, aTime);
 }
 
 static void

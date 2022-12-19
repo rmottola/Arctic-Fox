@@ -3078,11 +3078,11 @@ SortConfigurations(nsTArray<nsIWidget::Configuration>* aConfigurations)
         if (i == j)
           continue;
         nsIntRect bounds;
-        pluginsToMove[j].mChild->GetBounds(bounds);
+        pluginsToMove[j].mChild->GetBoundsUntyped(bounds);
         nsAutoTArray<nsIntRect,1> clipRects;
         pluginsToMove[j].mChild->GetWindowClipRegion(&clipRects);
         if (HasOverlap(bounds.TopLeft(), clipRects,
-                       config->mBounds.TopLeft(),
+                       config->mBounds.ToUnknownRect().TopLeft(),
                        config->mClipRegion)) {
           foundOverlap = true;
           break;

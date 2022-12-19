@@ -6733,8 +6733,7 @@ DispatchPointerFromMouseOrTouch(PresShell* aShell,
       WidgetPointerEvent event(touchEvent->mFlags.mIsTrusted, pointerMessage, touchEvent->widget);
       event.isPrimary = i == 0;
       event.pointerId = touch->Identifier();
-      event.refPoint.x = touch->mRefPoint.x;
-      event.refPoint.y = touch->mRefPoint.y;
+      event.refPoint = touch->mRefPoint;
       event.modifiers = touchEvent->modifiers;
       event.width = touch->RadiusX();
       event.height = touch->RadiusY();
@@ -8226,7 +8225,7 @@ PresShell::AdjustContextMenuKeyEvent(WidgetMouseEvent* aEvent)
       nsCOMPtr<nsIWidget> widget = popupFrame->GetNearestWidget();
       aEvent->widget = widget;
       LayoutDeviceIntPoint widgetPoint = widget->WidgetToScreenOffset();
-      aEvent->refPoint = LayoutDeviceIntPoint::FromUntyped(
+      aEvent->refPoint = LayoutDeviceIntPoint::FromUnknownPoint(
         itemFrame->GetScreenRect().BottomLeft()) - widgetPoint;
 
       mCurrentEventContent = itemFrame->GetContent();
@@ -9716,8 +9715,8 @@ CompareTrees(nsPresContext* aFirstPresContext, nsIFrame* aFirstFrame,
             LogVerifyMessage(k1, k2, "child widgets are not matched\n");
           }
           else if (nullptr != w1) {
-            w1->GetBounds(r1);
-            w2->GetBounds(r2);
+            w1->GetBoundsUntyped(r1);
+            w2->GetBoundsUntyped(r2);
             if (!r1.IsEqualEdges(r2)) {
               LogVerifyMessage(k1, k2, "(widget rects)", r1, r2);
             }
@@ -10889,7 +10888,7 @@ nsIPresShell::RecomputeFontSizeInflationEnabled()
     screen->GetRect(&screenLeft, &screenTop, &screenWidth, &screenHeight);
 
     nsViewportInfo vInf =
-      nsContentUtils::GetViewportInfo(GetDocument(), ScreenIntSize(screenWidth, screenHeight));
+      GetDocument()->GetViewportInfo(ScreenIntSize(screenWidth, screenHeight));
 
     if (vInf.GetDefaultZoom() >= CSSToScreenScale(1.0f) || vInf.IsAutoSizeEnabled()) {
       mFontSizeInflationEnabled = false;

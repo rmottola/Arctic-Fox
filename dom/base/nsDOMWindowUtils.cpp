@@ -298,7 +298,7 @@ nsDOMWindowUtils::GetViewportInfo(uint32_t aDisplayWidth,
   nsIDocument* doc = GetDocument();
   NS_ENSURE_STATE(doc);
 
-  nsViewportInfo info = nsContentUtils::GetViewportInfo(doc, ScreenIntSize(aDisplayWidth, aDisplayHeight));
+  nsViewportInfo info = doc->GetViewportInfo(ScreenIntSize(aDisplayWidth, aDisplayHeight));
   *aDefaultZoom = info.GetDefaultZoom().scale;
   *aAllowZoom = info.IsZoomAllowed();
   *aMinZoom = info.GetMinZoom().scale;
@@ -951,11 +951,14 @@ nsDOMWindowUtils::SendTouchEventCommon(const nsAString& aType,
   for (uint32_t i = 0; i < aCount; ++i) {
     LayoutDeviceIntPoint pt =
       nsContentUtils::ToWidgetPoint(CSSPoint(aXs[i], aYs[i]), offset, presContext);
-    RefPtr<Touch> t = new Touch(aIdentifiers[i],
-                                  pt,
-                                  nsIntPoint(aRxs[i], aRys[i]),
-                                  aRotationAngles[i],
-                                  aForces[i]);
+    LayoutDeviceIntPoint radius =
+      LayoutDeviceIntPoint::FromAppUnitsRounded(
+        CSSPoint::ToAppUnits(CSSPoint(aRxs[i], aRys[i])),
+        presContext->AppUnitsPerDevPixel());
+
+    RefPtr<Touch> t =
+      new Touch(aIdentifiers[i], pt, radius, aRotationAngles[i], aForces[i]);
+
     event.touches.AppendElement(t);
   }
 
@@ -1856,16 +1859,14 @@ nsDOMWindowUtils::SendQueryContentEvent(uint32_t aType,
     nsIFrame* popupFrame =
       nsLayoutUtils::GetPopupFrameForEventCoordinates(presContext->GetRootPresContext(), &dummyEvent);
 
-    nsIntRect widgetBounds;
+    LayoutDeviceIntRect widgetBounds;
     nsresult rv = widget->GetClientBounds(widgetBounds);
     NS_ENSURE_SUCCESS(rv, rv);
     widgetBounds.MoveTo(0, 0);
 
     // There is no popup frame at the point and the point isn't in our widget,
     // we cannot process this request.
-    NS_ENSURE_TRUE(popupFrame ||
-                   widgetBounds.Contains(LayoutDeviceIntPoint::ToUntyped(pt)),
-                   NS_ERROR_FAILURE);
+    NS_ENSURE_TRUE(popupFrame || widgetBounds.Contains(pt), NS_ERROR_FAILURE);
 
     // Fire the event on the widget at the point
     if (popupFrame) {
@@ -2320,7 +2321,7 @@ nsDOMWindowUtils::GetAsyncPanZoomEnabled(bool *aResult)
 
 NS_IMETHODIMP
 nsDOMWindowUtils::SetAsyncScrollOffset(nsIDOMNode* aNode,
-                                       int32_t aX, int32_t aY)
+                                       float aX, float aY)
 {
   nsCOMPtr<Element> element = do_QueryInterface(aNode);
   if (!element) {
@@ -3637,7 +3638,7 @@ nsDOMWindowUtils::SetChromeMargin(int32_t aTop,
       nsCOMPtr<nsIWidget> widget;
       baseWindow->GetMainWidget(getter_AddRefs(widget));
       if (widget) {
-        nsIntMargin margins(aTop, aRight, aBottom, aLeft);
+        LayoutDeviceIntMargin margins(aTop, aRight, aBottom, aLeft);
         return widget->SetNonClientMargins(margins);
       }
     }

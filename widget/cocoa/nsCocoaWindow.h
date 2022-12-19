@@ -278,7 +278,7 @@ public:
     virtual bool            IsVisible() const override;
     NS_IMETHOD              SetFocus(bool aState=false) override;
     virtual mozilla::LayoutDeviceIntPoint WidgetToScreenOffset() override;
-    virtual nsIntPoint GetClientOffset() override;
+    virtual nsIntPoint GetClientOffsetUntyped() override;
     virtual mozilla::LayoutDeviceIntSize
     ClientToWindowSize(const mozilla::LayoutDeviceIntSize& aClientSize) override;
 
@@ -314,8 +314,8 @@ public:
 
     NS_IMETHOD              Resize(double aWidth, double aHeight, bool aRepaint) override;
     NS_IMETHOD              Resize(double aX, double aY, double aWidth, double aHeight, bool aRepaint) override;
-    NS_IMETHOD              GetClientBounds(nsIntRect &aRect) override;
-    NS_IMETHOD              GetScreenBounds(nsIntRect &aRect) override;
+    NS_IMETHOD              GetClientBoundsUntyped(nsIntRect &aRect) override;
+    NS_IMETHOD              GetScreenBoundsUntyped(nsIntRect &aRect) override;
     void                    ReportMoveEvent();
     void                    ReportSizeEvent();
     NS_IMETHOD              SetCursor(nsCursor aCursor) override;
@@ -347,7 +347,7 @@ public:
     virtual void SetWindowAnimationType(WindowAnimationType aType) override;
     virtual void SetDrawsTitle(bool aDrawTitle) override;
     virtual void SetUseBrightTitlebarForeground(bool aBrightForeground) override;
-    NS_IMETHOD SetNonClientMargins(nsIntMargin &margins) override;
+    NS_IMETHOD SetNonClientMargins(mozilla::LayoutDeviceIntMargin &margins) override;
     NS_IMETHOD SetWindowTitlebarColor(nscolor aColor, bool aActive) override;
     virtual void SetDrawsInTitlebar(bool aState) override;
     virtual void UpdateThemeGeometries(const nsTArray<ThemeGeometry>& aThemeGeometries) override;

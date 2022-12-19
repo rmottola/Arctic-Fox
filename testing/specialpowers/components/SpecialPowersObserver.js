@@ -88,11 +88,11 @@ SpecialPowersObserver.prototype = new SpecialPowersObserverAPI();
       this._messageManager.addMessageListener("SPChromeScriptMessage", this);
       this._messageManager.addMessageListener("SPQuotaManager", this);
       this._messageManager.addMessageListener("SPSetTestPluginEnabledState", this);
-      this._messageManager.addMessageListener("SPPeriodicServiceWorkerUpdates", this);
       this._messageManager.addMessageListener("SPLoadExtension", this);
       this._messageManager.addMessageListener("SPStartupExtension", this);
       this._messageManager.addMessageListener("SPUnloadExtension", this);
       this._messageManager.addMessageListener("SPExtensionMessage", this);
+      this._messageManager.addMessageListener("SPCleanUpSTSData", this);
 
       this._messageManager.loadFrameScript(CHILD_LOGGER_SCRIPT, true);
       this._messageManager.loadFrameScript(CHILD_SCRIPT_API, true);
@@ -154,11 +154,11 @@ SpecialPowersObserver.prototype = new SpecialPowersObserverAPI();
       this._messageManager.removeMessageListener("SPChromeScriptMessage", this);
       this._messageManager.removeMessageListener("SPQuotaManager", this);
       this._messageManager.removeMessageListener("SPSetTestPluginEnabledState", this);
-      this._messageManager.removeMessageListener("SPPeriodicServiceWorkerUpdates", this);
       this._messageManager.removeMessageListener("SPLoadExtension", this);
       this._messageManager.removeMessageListener("SPStartupExtension", this);
       this._messageManager.removeMessageListener("SPUnloadExtension", this);
       this._messageManager.removeMessageListener("SPExtensionMessage", this);
+      this._messageManager.removeMessageListener("SPCleanUpSTSData", this);
 
       this._messageManager.removeDelayedFrameScript(CHILD_LOGGER_SCRIPT);
       this._messageManager.removeDelayedFrameScript(CHILD_SCRIPT_API);
@@ -218,7 +218,9 @@ getService(Ci.nsIMessageBroadcaster);
           // We need to ensure that it looks the same as a real permission,
           // so we fake these properties.
           msg.permission = {
-            principal: { appId: permission.principal.appId },
+            principal: {
+              originAttributes: {appId: permission.principal.appId}
+            },
             type: permission.type
           };
         default:

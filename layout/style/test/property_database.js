@@ -2473,7 +2473,7 @@ var gCSSProperties = {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "none" ],
-    other_values: [ "left", "right", "both", "inline-start", "inline-end" ],
+    other_values: [ "left", "right", "both" ],
     invalid_values: []
   },
   "clip": {
@@ -2577,7 +2577,7 @@ var gCSSProperties = {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "none" ],
-    other_values: [ "left", "right", "inline-start", "inline-end" ],
+    other_values: [ "left", "right" ],
     invalid_values: []
   },
   "font": {
@@ -6742,6 +6742,18 @@ if (SpecialPowers.getBoolPref("layout.css.unset-value.enabled")) {
   } else {
     gCSSProperties["text-align"].invalid_values.push("true left");
   }
+}
+
+if (IsCSSPropertyPrefEnabled("layout.css.float-logical-values.enabled")) {
+  gCSSProperties["float"].other_values.push("inline-start");
+  gCSSProperties["float"].other_values.push("inline-end");
+  gCSSProperties["clear"].other_values.push("inline-start");
+  gCSSProperties["clear"].other_values.push("inline-end");
+} else {
+  gCSSProperties["float"].invalid_values.push("inline-start");
+  gCSSProperties["float"].invalid_values.push("inline-end");
+  gCSSProperties["clear"].invalid_values.push("inline-start");
+  gCSSProperties["clear"].invalid_values.push("inline-end");
 }
 
 if (false) {

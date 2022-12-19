@@ -332,8 +332,8 @@ void
 ShadowLayerForwarder::UseTiledLayerBuffer(CompositableClient* aCompositable,
                                           const SurfaceDescriptorTiles& aTileLayerDescriptor)
 {
-  MOZ_ASSERT(aCompositable);
-  MOZ_ASSERT(aCompositable->GetIPDLActor());
+  MOZ_ASSERT(aCompositable && aCompositable->IsConnected());
+
   mTxn->AddNoSwapPaint(OpUseTiledLayerBuffer(nullptr, aCompositable->GetIPDLActor(),
                                              aTileLayerDescriptor));
 }
@@ -344,7 +344,9 @@ ShadowLayerForwarder::UpdateTextureRegion(CompositableClient* aCompositable,
                                           const nsIntRegion& aUpdatedRegion)
 {
   MOZ_ASSERT(aCompositable);
-  MOZ_ASSERT(aCompositable->GetIPDLActor());
+  MOZ_ASSERT(aCompositable);
+  MOZ_ASSERT(aCompositable->IsConnected());
+
   mTxn->AddPaint(OpPaintTextureRegion(nullptr, aCompositable->GetIPDLActor(),
                                       aThebesBufferData,
                                       aUpdatedRegion));
@@ -354,8 +356,7 @@ void
 ShadowLayerForwarder::UseTextures(CompositableClient* aCompositable,
                                   const nsTArray<TimedTextureClient>& aTextures)
 {
-  MOZ_ASSERT(aCompositable);
-  MOZ_ASSERT(aCompositable->GetIPDLActor());
+  MOZ_ASSERT(aCompositable && aCompositable->IsConnected());
 
   nsAutoTArray<TimedTexture,4> textures;
 
@@ -386,12 +387,14 @@ ShadowLayerForwarder::UseComponentAlphaTextures(CompositableClient* aCompositabl
                                                 TextureClient* aTextureOnWhite)
 {
   MOZ_ASSERT(aCompositable);
+  MOZ_ASSERT(aCompositable->IsConnected());
   MOZ_ASSERT(aTextureOnWhite);
   MOZ_ASSERT(aTextureOnBlack);
   MOZ_ASSERT(aCompositable->GetIPDLActor());
   MOZ_ASSERT(aTextureOnBlack->GetIPDLActor());
   MOZ_ASSERT(aTextureOnWhite->GetIPDLActor());
   MOZ_ASSERT(aTextureOnBlack->GetSize() == aTextureOnWhite->GetSize());
+
   mTxn->AddEdit(OpUseComponentAlphaTextures(nullptr, aCompositable->GetIPDLActor(),
                                             nullptr, aTextureOnBlack->GetIPDLActor(),
                                             nullptr, aTextureOnWhite->GetIPDLActor()));
@@ -404,6 +407,8 @@ ShadowLayerForwarder::UseOverlaySource(CompositableClient* aCompositable,
                                        const nsIntRect& aPictureRect)
 {
   MOZ_ASSERT(aCompositable);
+  MOZ_ASSERT(aCompositable->IsConnected());
+
   mTxn->AddEdit(OpUseOverlaySource(nullptr, aCompositable->GetIPDLActor(),
       aOverlay, aPictureRect));
 }
@@ -415,8 +420,13 @@ ShadowLayerForwarder::RemoveTextureFromCompositable(CompositableClient* aComposi
 {
   MOZ_ASSERT(aCompositable);
   MOZ_ASSERT(aTexture);
-  MOZ_ASSERT(aCompositable->GetIPDLActor());
+  MOZ_ASSERT(aCompositable->IsConnected());
   MOZ_ASSERT(aTexture->GetIPDLActor());
+  if (!aCompositable->IsConnected() || !aTexture->GetIPDLActor()) {
+    // We don't have an actor anymore, don't try to use it!
+    return;
+  }
+
   mTxn->AddEdit(OpRemoveTexture(nullptr, aCompositable->GetIPDLActor(),
                                 nullptr, aTexture->GetIPDLActor()));
   if (aTexture->GetFlags() & TextureFlags::DEALLOCATE_CLIENT) {
@@ -431,23 +441,25 @@ ShadowLayerForwarder::RemoveTextureFromCompositableAsync(AsyncTransactionTracker
                                                      CompositableClient* aCompositable,
                                                      TextureClient* aTexture)
 {
-  if (mTxn->Opened() && !aCompositable->IsDestroyed()) {
+  MOZ_ASSERT(aCompositable);
+  MOZ_ASSERT(aTexture);
+  MOZ_ASSERT(aCompositable->IsConnected());
+  MOZ_ASSERT(aTexture->GetIPDLActor());
+#ifdef MOZ_WIDGET_GONK
+  mPendingAsyncMessages.push_back(OpRemoveTextureAsync(CompositableClient::GetTrackersHolderId(aCompositable->GetIPDLActor()),
+                                  aAsyncTransactionTracker->GetId(),
+                                  nullptr, aCompositable->GetIPDLActor(),
+                                  nullptr, aTexture->GetIPDLActor()));
+#else
+  if (mTxn->Opened() && aCompositable->IsConnected()) {
     mTxn->AddEdit(OpRemoveTextureAsync(CompositableClient::GetTrackersHolderId(aCompositable->GetIPDLActor()),
                                        aAsyncTransactionTracker->GetId(),
                                        nullptr, aCompositable->GetIPDLActor(),
                                        nullptr, aTexture->GetIPDLActor()));
   } else {
-    // If the function is called outside of transaction,
-    // OpRemoveTextureAsync message is stored as pending message.
-#ifdef MOZ_WIDGET_GONK
-    mPendingAsyncMessages.push_back(OpRemoveTextureAsync(CompositableClient::GetTrackersHolderId(aCompositable->GetIPDLActor()),
-                                    aAsyncTransactionTracker->GetId(),
-                                    nullptr, aCompositable->GetIPDLActor(),
-                                    nullptr, aTexture->GetIPDLActor()));
-#else
     NS_RUNTIMEABORT("not reached");
-#endif
   }
+#endif
   CompositableClient::HoldUntilComplete(aCompositable->GetIPDLActor(),
                                         aAsyncTransactionTracker);
 }
@@ -501,7 +513,7 @@ ShadowLayerForwarder::StorePluginWidgetConfigurations(const nsTArray<nsIWidget::
     const nsIWidget::Configuration& configuration = aConfigurations[idx];
     mPluginWindowData.AppendElement(PluginWindowData(configuration.mWindowID,
                                                      configuration.mClipRegion,
-                                                     configuration.mBounds,
+                                                     configuration.mBounds.ToUnknownRect(),
                                                      configuration.mVisible));
   }
 }
@@ -532,10 +544,13 @@ ShadowLayerForwarder::EndTransaction(InfallibleTArray<EditReply>* aReplies,
     mDiagnosticTypes = diagnostics;
     mTxn->AddEdit(OpSetDiagnosticTypes(diagnostics));
   }
+  if (mWindowOverlayChanged) {
+    mTxn->AddEdit(OpWindowOverlayChanged());
+  }
 
   AutoTxnEnd _(mTxn);
 
-  if (mTxn->Empty() && !mTxn->RotationChanged() && !mWindowOverlayChanged) {
+  if (mTxn->Empty() && !mTxn->RotationChanged()) {
     MOZ_LAYERS_LOG(("[LayersForwarder] 0-length cset (?) and no rotation event, skipping Update()"));
     return true;
   }
@@ -583,6 +598,7 @@ ShadowLayerForwarder::EndTransaction(InfallibleTArray<EditReply>* aReplies,
     if (mutant->GetIsFixedPosition()) {
       common.fixedPositionScrollContainerId() = mutant->GetFixedPositionScrollContainerId();
       common.fixedPositionAnchor() = mutant->GetFixedPositionAnchor();
+      common.fixedPositionSides() = mutant->GetFixedPositionSides();
       common.isClipFixed() = mutant->IsClipFixed();
     }
     common.isStickyPosition() = mutant->GetIsStickyPosition();
@@ -631,7 +647,7 @@ ShadowLayerForwarder::EndTransaction(InfallibleTArray<EditReply>* aReplies,
 
   AutoInfallibleTArray<Edit, 10> cset;
   size_t nCsets = mTxn->mCset.size() + mTxn->mPaints.size();
-  MOZ_ASSERT(nCsets > 0 || mWindowOverlayChanged || mTxn->RotationChanged(), "should have bailed by now");
+  MOZ_ASSERT(nCsets > 0 || mTxn->RotationChanged(), "should have bailed by now");
 
   cset.SetCapacity(nCsets);
   if (!mTxn->mCset.empty()) {
@@ -800,7 +816,6 @@ void ShadowLayerForwarder::Attach(CompositableClient* aCompositable,
 {
   MOZ_ASSERT(aLayer);
   MOZ_ASSERT(aCompositable);
-  MOZ_ASSERT(aCompositable->GetIPDLActor());
   mTxn->AddEdit(OpAttachCompositable(nullptr, Shadow(aLayer),
                                      nullptr, aCompositable->GetIPDLActor()));
 }

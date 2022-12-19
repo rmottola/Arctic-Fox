@@ -1557,7 +1557,7 @@ NS_IMETHODIMP nsCocoaWindow::Resize(double aWidth, double aHeight, bool aRepaint
                   aWidth, aHeight, aRepaint, true);
 }
 
-NS_IMETHODIMP nsCocoaWindow::GetClientBounds(nsIntRect &aRect)
+NS_IMETHODIMP nsCocoaWindow::GetClientBoundsUntyped(nsIntRect &aRect)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
 
@@ -1592,7 +1592,7 @@ nsCocoaWindow::UpdateBounds()
   mBounds = nsCocoaUtils::CocoaRectToGeckoRectDevPix(frame, BackingScaleFactor());
 }
 
-NS_IMETHODIMP nsCocoaWindow::GetScreenBounds(nsIntRect &aRect)
+NS_IMETHODIMP nsCocoaWindow::GetScreenBoundsUntyped(nsIntRect &aRect)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
 
@@ -1924,7 +1924,7 @@ nsCocoaWindow::ReportSizeEvent()
   UpdateBounds();
 
   if (mWidgetListener) {
-    nsIntRect innerBounds;
+    LayoutDeviceIntRect innerBounds;
     GetClientBounds(innerBounds);
     mWidgetListener->WindowResized(this, innerBounds.width, innerBounds.height);
   }
@@ -1983,17 +1983,17 @@ LayoutDeviceIntPoint nsCocoaWindow::WidgetToScreenOffset()
   }
   r = nsCocoaUtils::CocoaRectToGeckoRectDevPix(rect, BackingScaleFactor());
 
-  return LayoutDeviceIntPoint::FromUntyped(r.TopLeft());
+  return LayoutDeviceIntPoint::FromUnknownPoint(r.TopLeft());
 
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(LayoutDeviceIntPoint(0,0));
 }
 
-nsIntPoint nsCocoaWindow::GetClientOffset()
+nsIntPoint nsCocoaWindow::GetClientOffsetUntyped()
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
 
   nsIntRect clientRect;
-  GetClientBounds(clientRect);
+  GetClientBoundsUntyped(clientRect);
 
   return clientRect.TopLeft() - mBounds.TopLeft();
 
@@ -2173,7 +2173,7 @@ nsCocoaWindow::SetUseBrightTitlebarForeground(bool aBrightForeground)
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
-NS_IMETHODIMP nsCocoaWindow::SetNonClientMargins(nsIntMargin &margins)
+NS_IMETHODIMP nsCocoaWindow::SetNonClientMargins(LayoutDeviceIntMargin &margins)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
 

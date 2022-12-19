@@ -587,9 +587,7 @@ CompositorParent::CompositorParent(nsIWidget* aWidget,
     mApzcTreeManager = new APZCTreeManager();
   }
 
-  gfxDebugOnce() << "Enabling vsync compositor";
   mCompositorScheduler = new CompositorVsyncScheduler(this, aWidget);
-
   LayerScope::SetPixelScale(mWidget->GetDefaultScale().scale);
 }
 

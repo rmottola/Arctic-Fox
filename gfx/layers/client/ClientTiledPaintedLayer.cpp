@@ -310,7 +310,7 @@ ClientTiledPaintedLayer::RenderHighPrecision(nsIntRegion& aInvalidRegion,
     nsIntRegion oldValidRegion = mContentClient->GetTiledBuffer()->GetValidRegion();
     oldValidRegion.And(oldValidRegion, aVisibleRegion);
     if (!mPaintData.mCriticalDisplayPort.IsEmpty()) {
-      oldValidRegion.And(oldValidRegion, LayerIntRect::ToUntyped(mPaintData.mCriticalDisplayPort));
+      oldValidRegion.And(oldValidRegion, mPaintData.mCriticalDisplayPort.ToUnknownRect());
     }
 
     TILING_LOG("TILING %p: Progressive update with old valid region %s\n", this, Stringify(oldValidRegion).c_str());
@@ -323,7 +323,7 @@ ClientTiledPaintedLayer::RenderHighPrecision(nsIntRegion& aInvalidRegion,
 
   mValidRegion = aVisibleRegion;
   if (!mPaintData.mCriticalDisplayPort.IsEmpty()) {
-    mValidRegion.And(mValidRegion, LayerIntRect::ToUntyped(mPaintData.mCriticalDisplayPort));
+    mValidRegion.And(mValidRegion, mPaintData.mCriticalDisplayPort.ToUnknownRect());
   }
 
   TILING_LOG("TILING %p: Non-progressive paint invalid region %s\n", this, Stringify(aInvalidRegion).c_str());
@@ -344,7 +344,7 @@ ClientTiledPaintedLayer::RenderLowPrecision(nsIntRegion& aInvalidRegion,
 {
   // Render the low precision buffer, if the visible region is larger than the
   // critical display port.
-  if (!nsIntRegion(LayerIntRect::ToUntyped(mPaintData.mCriticalDisplayPort)).Contains(aVisibleRegion)) {
+  if (!nsIntRegion(mPaintData.mCriticalDisplayPort.ToUnknownRect()).Contains(aVisibleRegion)) {
     nsIntRegion oldValidRegion = mContentClient->GetLowPrecisionTiledBuffer()->GetValidRegion();
     oldValidRegion.And(oldValidRegion, aVisibleRegion);
 
@@ -491,15 +491,15 @@ ClientTiledPaintedLayer::RenderLayer()
     // only draw stuff inside the critical displayport on the first update.
     mValidRegion.And(mValidRegion, neededRegion);
     if (!mPaintData.mCriticalDisplayPort.IsEmpty()) {
-      mValidRegion.And(mValidRegion, LayerIntRect::ToUntyped(mPaintData.mCriticalDisplayPort));
-      invalidRegion.And(invalidRegion, LayerIntRect::ToUntyped(mPaintData.mCriticalDisplayPort));
+      mValidRegion.And(mValidRegion, mPaintData.mCriticalDisplayPort.ToUnknownRect());
+      invalidRegion.And(invalidRegion, mPaintData.mCriticalDisplayPort.ToUnknownRect());
     }
 
     TILING_LOG("TILING %p: First-transaction valid region %s\n", this, Stringify(mValidRegion).c_str());
     TILING_LOG("TILING %p: First-transaction invalid region %s\n", this, Stringify(invalidRegion).c_str());
   } else {
     if (!mPaintData.mCriticalDisplayPort.IsEmpty()) {
-      invalidRegion.And(invalidRegion, LayerIntRect::ToUntyped(mPaintData.mCriticalDisplayPort));
+      invalidRegion.And(invalidRegion, mPaintData.mCriticalDisplayPort.ToUnknownRect());
     }
     TILING_LOG("TILING %p: Repeat-transaction invalid region %s\n", this, Stringify(invalidRegion).c_str());
   }

@@ -157,7 +157,6 @@ pref("dom.workers.maxPerDomain", 20);
 // Whether or not Shared Web Workers are enabled.
 pref("dom.workers.sharedWorkers.enabled", true);
 
-// Service workers
 pref("dom.serviceWorkers.enabled", false);
 
 // Allow service workers to intercept network requests using the fetch event
@@ -2605,6 +2604,14 @@ pref("layout.css.unicode-range.enabled", false);
 // Is support for CSS "text-align: unsafe X" enabled?
 pref("layout.css.text-align-unsafe-value.enabled", false);
 
+// Is support for CSS "float: inline-{start,end}" and
+// "clear: inline-{start,end}" enabled?
+#if defined(MOZ_B2G) || defined(NIGHTLY_BUILD)
+pref("layout.css.float-logical-values.enabled", true);
+#else
+pref("layout.css.float-logical-values.enabled", false);
+#endif
+
 // Is support for the CSS4 image-orientation property enabled?
 pref("layout.css.image-orientation.enabled", true);
 
@@ -4734,9 +4741,14 @@ pref("dom.mozContacts.enabled", false);
 pref("dom.mozAlarms.enabled", false);
 
 // Push
+
 pref("dom.push.enabled", false);
 
-pref("dom.push.debug", false);
+#if !defined(RELEASE_BUILD)
+pref("dom.push.debug", true);
+#endif
+
+
 pref("dom.push.serverURL", "wss://push.services.mozilla.com/");
 pref("dom.push.userAgentID", "");
 
@@ -5346,13 +5358,6 @@ pref("media.gmp.insecure.allow", false);
 #endif
 
 pref("dom.audiochannel.mutedByDefault", false);
-
-// Use vsync aligned rendering. b2g prefs are in b2g.js.
-// Hardware vsync supported on windows, os x, and b2g.
-// Linux and fennec will use software vsync.
-#if defined(XP_MACOSX) || defined(XP_WIN) || defined(XP_LINUX)
-pref("gfx.vsync.refreshdriver", true);
-#endif
 
 // Secure Element API
 #ifdef MOZ_SECUREELEMENT

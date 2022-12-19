@@ -1389,9 +1389,9 @@ CompositorOGL::EndFrame()
 
 #ifdef MOZ_DUMP_PAINTING
   if (gfxEnv::DumpCompositorTextures()) {
-    IntRect rect;
+    LayoutDeviceIntRect rect;
     if (mUseExternalSurfaceSize) {
-      rect = IntRect(0, 0, mSurfaceSize.width, mSurfaceSize.height);
+      rect = LayoutDeviceIntRect(0, 0, mSurfaceSize.width, mSurfaceSize.height);
     } else {
       mWidget->GetBounds(rect);
     }
@@ -1454,12 +1454,7 @@ CompositorOGL::EndFrame()
 void
 CompositorOGL::EndFrameForExternalComposition(const gfx::Matrix& aTransform)
 {
-  // This lets us reftest and screenshot content rendered externally
-  if (mTarget) {
-    MakeCurrent();
-    CopyToTarget(mTarget, mTargetBounds.TopLeft(), aTransform);
-    mGLContext->fBindBuffer(LOCAL_GL_ARRAY_BUFFER, 0);
-  }
+  MOZ_ASSERT(!mTarget);
   if (mTexturePool) {
     mTexturePool->EndFrame();
   }
@@ -1537,7 +1532,7 @@ CompositorOGL::Pause()
 bool
 CompositorOGL::Resume()
 {
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_UIKIT)
   if (!gl() || gl()->IsDestroyed())
     return false;
 

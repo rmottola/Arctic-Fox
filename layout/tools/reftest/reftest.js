@@ -765,7 +765,7 @@ function BuildConditionSandbox(aURL) {
     }
 
     // Graphics features
-    sandbox.supportsRepeatResampling = !sandbox.cocoaWidget;
+    sandbox.usesRepeatResampling = sandbox.d2d;
     return sandbox;
 }
 

@@ -1622,7 +1622,9 @@ public:
    * marked as needed to be recomposited.
    */
   const nsIntRegion& GetInvalidRegion() { return mInvalidRegion; }
-  const void SetInvalidRegion(const nsIntRegion& aRect) { mInvalidRegion = aRect; }
+  const void AddInvalidRegion(const nsIntRegion& aRegion) {
+    mInvalidRegion.Or(mInvalidRegion, aRegion);
+  }
 
   /**
    * Mark the entirety of the layer's visible region as being invalid.
@@ -2070,7 +2072,7 @@ public:
   RenderTargetIntRect GetIntermediateSurfaceRect()
   {
     NS_ASSERTION(mUseIntermediateSurface, "Must have intermediate surface");
-    return RenderTargetPixel::FromUntyped(mVisibleRegion.GetBounds());
+    return RenderTargetIntRect::FromUnknownRect(mVisibleRegion.GetBounds());
   }
 
   /**

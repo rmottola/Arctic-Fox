@@ -118,7 +118,7 @@ public:
 
     virtual uint32_t GetGLFrameBufferFormat() override;
 
-    virtual nsIntRect GetNaturalBounds() override;
+    virtual nsIntRect GetNaturalBoundsUntyped() override;
     virtual bool NeedsPaint();
 
     virtual Composer2D* GetComposer2D() override;

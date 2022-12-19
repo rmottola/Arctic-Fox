@@ -1384,7 +1384,7 @@ gfxFontEntry*
 gfxPlatform::MakePlatformFont(const nsAString& aFontName,
                               uint16_t aWeight,
                               int16_t aStretch,
-                              bool aItalic,
+                              uint8_t aStyle,
                               const uint8_t* aFontData,
                               uint32_t aLength)
 {
@@ -2196,7 +2196,7 @@ gfxPlatform::GetApzSupportInfo(mozilla::widget::InfoObject& aObj)
 /*static*/ bool
 gfxPlatform::AsyncPanZoomEnabled()
 {
-#if !defined(MOZ_B2G) && !defined(MOZ_WIDGET_ANDROID)
+#if !defined(MOZ_B2G) && !defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_WIDGET_UIKIT)
   // For XUL applications (everything but B2G on mobile and desktop, and
   // Firefox on Android) we only want to use APZ when E10S is enabled. If
   // we ever get input events off the main thread we can consider relaxing

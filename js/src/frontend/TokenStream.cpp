@@ -42,12 +42,11 @@ using mozilla::UniquePtr;
 struct KeywordInfo {
     const char* chars;         // C string with keyword text
     TokenKind   tokentype;
-    JSVersion   version;
 };
 
 static const KeywordInfo keywords[] = {
-#define KEYWORD_INFO(keyword, name, type, version) \
-    {js_##keyword##_str, type, version},
+#define KEYWORD_INFO(keyword, name, type) \
+    {js_##keyword##_str, type},
     FOR_EACH_JAVASCRIPT_KEYWORD(KEYWORD_INFO)
 #undef KEYWORD_INFO
 };

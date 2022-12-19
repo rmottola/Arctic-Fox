@@ -346,9 +346,12 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
         layer->SetMaskLayer(nullptr);
       }
       layer->SetAnimations(common.animations());
-      layer->SetInvalidRegion(common.invalidRegion());
       layer->SetFrameMetrics(common.metrics());
       layer->SetDisplayListLog(common.displayListLog().get());
+
+      // The updated invalid region is added to the existing one, since we can
+      // update multiple times before the next composite.
+      layer->AddInvalidRegion(common.invalidRegion());
 
       nsTArray<RefPtr<Layer>> maskLayers;
       for (size_t i = 0; i < common.ancestorMaskLayersParent().Length(); i++) {
@@ -455,6 +458,10 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
     case Edit::TOpSetDiagnosticTypes: {
       mLayerManager->GetCompositor()->SetDiagnosticTypes(
         edit.get_OpSetDiagnosticTypes().diagnostics());
+      break;
+    }
+    case Edit::TOpWindowOverlayChanged: {
+      mLayerManager->SetWindowOverlayChanged();
       break;
     }
     // Tree ops
@@ -774,7 +781,7 @@ GetAPZCForViewID(Layer* aLayer, FrameMetrics::ViewID aScrollID)
 
 bool
 LayerTransactionParent::RecvSetAsyncScrollOffset(const FrameMetrics::ViewID& aScrollID,
-                                                 const int32_t& aX, const int32_t& aY)
+                                                 const float& aX, const float& aY)
 {
   if (mDestroyed || !layer_manager() || layer_manager()->IsDestroyed()) {
     return false;
@@ -881,9 +888,8 @@ LayerTransactionParent::RecvClearCachedResources()
     // context, it's just a subtree root.  We need to scope the clear
     // of resources to exactly that subtree, so we specify it here.
     mLayerManager->ClearCachedResources(mRoot);
-
-    mShadowLayersManager->NotifyClearCachedResources(this);
   }
+  mShadowLayersManager->NotifyClearCachedResources(this);
   return true;
 }
 

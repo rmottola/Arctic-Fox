@@ -203,7 +203,7 @@ ClientLayerManager::BeginTransactionWithTarget(gfxContext* aTarget)
     hal::GetCurrentScreenConfiguration(&currentConfig);
     orientation = currentConfig.orientation();
   }
-  IntRect targetBounds = mWidget->GetNaturalBounds();
+  IntRect targetBounds = mWidget->GetNaturalBoundsUntyped();
   targetBounds.x = targetBounds.y = 0;
   mForwarder->BeginTransaction(targetBounds, mTargetRotation, orientation);
 
@@ -215,7 +215,7 @@ ClientLayerManager::BeginTransactionWithTarget(gfxContext* aTarget)
   //
   // Desktop does not support async zoom yet, so we ignore this for those
   // platforms.
-#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK) || defined(MOZ_WIDGET_UIKIT)
   if (mWidget && mWidget->GetOwningTabChild()) {
     mCompositorMightResample = AsyncPanZoomEnabled();
   }
@@ -492,7 +492,7 @@ ClientLayerManager::MakeSnapshotIfRequired()
       // when there's a rotation. Instead we rotate the result
       // when drawing into dt
       IntRect outerBounds;
-      mWidget->GetBounds(outerBounds);
+      mWidget->GetBoundsUntyped(outerBounds);
 
       IntRect bounds = ToOutsideIntRect(mShadowTarget->GetClipExtents());
       if (mTargetRotation) {

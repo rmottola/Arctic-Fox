@@ -16,6 +16,7 @@
 #include "nsIScriptError.h"
 #include "nsURIHashKey.h"
 #include "mozilla/net/ReferrerPolicy.h"
+#include "gfxFontConstants.h"
 
 class nsFontFaceLoader;
 
@@ -210,7 +211,7 @@ public:
                               const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList,
                               uint32_t aWeight,
                               int32_t aStretch,
-                              uint32_t aItalicStyle,
+                              uint8_t aStyle,
                               const nsTArray<gfxFontFeature>& aFeatureSettings,
                               uint32_t aLanguageOverride,
                               gfxSparseBitSet* aUnicodeRanges) = 0;
@@ -222,7 +223,7 @@ public:
                                const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList,
                                uint32_t aWeight,
                                int32_t aStretch,
-                               uint32_t aItalicStyle,
+                               uint8_t aStyle,
                                const nsTArray<gfxFontFeature>& aFeatureSettings,
                                uint32_t aLanguageOverride,
                                gfxSparseBitSet* aUnicodeRanges);
@@ -416,9 +417,9 @@ public:
                                             nsURIHashKey::HashKey(aKey->mURI),
                                             HashFeatures(aKey->mFontEntry->mFeatureSettings),
                                             mozilla::HashString(aKey->mFontEntry->mFamilyName),
-                                            ((uint32_t)aKey->mFontEntry->mItalic |
-                                             (aKey->mFontEntry->mWeight << 1) |
-                                             (aKey->mFontEntry->mStretch << 10) ) ^
+                                            (aKey->mFontEntry->mStyle |
+                                             (aKey->mFontEntry->mWeight << 2) |
+                                             (aKey->mFontEntry->mStretch << 11) ) ^
                                              aKey->mFontEntry->mLanguageOverride);
             }
 
@@ -495,7 +496,7 @@ protected:
                                    const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList,
                                    uint32_t aWeight,
                                    int32_t aStretch,
-                                   uint32_t aItalicStyle,
+                                   uint8_t aStyle,
                                    const nsTArray<gfxFontFeature>& aFeatureSettings,
                                    uint32_t aLanguageOverride,
                                    gfxSparseBitSet* aUnicodeRanges);
@@ -534,7 +535,7 @@ public:
                      const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList,
                      uint32_t aWeight,
                      int32_t aStretch,
-                     uint32_t aItalicStyle,
+                     uint8_t aStyle,
                      const nsTArray<gfxFontFeature>& aFeatureSettings,
                      uint32_t aLanguageOverride,
                      gfxSparseBitSet* aUnicodeRanges);
@@ -545,7 +546,7 @@ public:
     bool Matches(const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList,
                  uint32_t aWeight,
                  int32_t aStretch,
-                 uint32_t aItalicStyle,
+                 uint8_t aStyle,
                  const nsTArray<gfxFontFeature>& aFeatureSettings,
                  uint32_t aLanguageOverride,
                  gfxSparseBitSet* aUnicodeRanges);
@@ -625,6 +626,15 @@ protected:
                            uint32_t           aMetaOrigLen,
                            uint8_t            aCompression);
 
+    // Clears and then adds to aResult all of the user font sets that this user
+    // font entry has been added to.  This will at least include mFontSet, the
+    // owner of this user font entry.
+    virtual void GetUserFontSets(nsTArray<gfxUserFontSet*>& aResult);
+
+    // Calls IncrementGeneration() on all user font sets that contain this
+    // user font entry.
+    void IncrementGeneration();
+
     // general load state
     UserFontLoadState        mUserFontLoadState;
 
@@ -650,7 +660,7 @@ protected:
     // This field is managed by the nsFontFaceLoader. In the destructor and Cancel()
     // methods of nsFontFaceLoader this reference is nulled out.
     nsFontFaceLoader* MOZ_NON_OWNING_REF mLoader; // current loader for this entry, if any
-    gfxUserFontSet*          mFontSet; // font-set to which the userfont entry belongs
+    gfxUserFontSet*          mFontSet; // font-set which owns this userfont entry
     nsCOMPtr<nsIPrincipal>   mPrincipal;
 };
 

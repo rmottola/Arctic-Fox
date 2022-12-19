@@ -44,7 +44,7 @@
 #include "ipc/ShadowLayerUtils.h"
 #include "mozilla/mozalloc.h"           // for operator new, etc
 #include "nsAppRunner.h"
-#include "mozilla/RefPtr.h"           // for nsRefPtr
+#include "mozilla/RefPtr.h"                   // for nsRefPtr
 #include "nsCOMPtr.h"                   // for already_AddRefed
 #include "nsDebug.h"                    // for NS_WARNING, NS_RUNTIMEABORT, etc
 #include "nsISupportsImpl.h"            // for Layer::AddRef, etc
@@ -121,6 +121,7 @@ LayerManagerComposite::LayerManagerComposite(Compositor* aCompositor)
 , mDebugOverlayWantsNextFrame(false)
 , mGeometryChanged(true)
 , mLastFrameMissedHWC(false)
+, mWindowOverlayChanged(false)
 {
   mTextRenderer = new TextRenderer(aCompositor);
   MOZ_ASSERT(aCompositor);
@@ -148,6 +149,7 @@ LayerManagerComposite::Destroy()
       RootLayer()->Destroy();
     }
     mRoot = nullptr;
+    mClonedLayerTreeProperties = nullptr;
     mDestroyed = true;
   }
 }
@@ -175,8 +177,6 @@ LayerManagerComposite::BeginTransaction()
   }
   
   mIsCompositorReady = true;
-
-  mClonedLayerTreeProperties = LayerProperties::CloneFrom(GetRoot());
 }
 
 void
@@ -247,7 +247,7 @@ LayerManagerComposite::ApplyOcclusionCulling(Layer* aLayer, nsIntRegion& aOpaque
     localOpaque.MoveBy(transform2d._31, transform2d._32);
     const Maybe<ParentLayerIntRect>& clip = aLayer->GetEffectiveClipRect();
     if (clip) {
-      localOpaque.And(localOpaque, ParentLayerIntRect::ToUntyped(*clip));
+      localOpaque.And(localOpaque, clip->ToUnknownRect());
     }
     aOpaqueRegion.Or(aOpaqueRegion, localOpaque);
   }
@@ -277,41 +277,16 @@ LayerManagerComposite::EndTransaction(const TimeStamp& aTimeStamp,
     return;
   }
 
-  if (mRoot && mClonedLayerTreeProperties) {
-    MOZ_ASSERT(!mTarget);
-    nsIntRegion invalid =
-      mClonedLayerTreeProperties->ComputeDifferences(mRoot, nullptr, &mGeometryChanged);
-    mClonedLayerTreeProperties = nullptr;
+  // Set composition timestamp here because we need it in
+  // ComputeEffectiveTransforms (so the correct video frame size is picked) and
+  // also to compute invalid regions properly.
+  mCompositor->SetCompositionTime(aTimeStamp);
 
-    mInvalidRegion.Or(mInvalidRegion, invalid);
-  } else if (!mTarget) {
-    mInvalidRegion.Or(mInvalidRegion, mRenderBounds);
-  }
-
-  if (mInvalidRegion.IsEmpty() && !mTarget) {
-    // Composition requested, but nothing has changed. Don't do any work.
-    return;
-  }
-
- if (mRoot && !(aFlags & END_NO_IMMEDIATE_REDRAW)) {
+  if (mRoot && !(aFlags & END_NO_IMMEDIATE_REDRAW)) {
     MOZ_ASSERT(!aTimeStamp.IsNull());
-    // Set composition timestamp here because we need it in
-    // ComputeEffectiveTransforms (so the correct video frame size is picked)
-    mCompositor->SetCompositionTime(aTimeStamp);
-    // The results of our drawing always go directly into a pixel buffer,
-    // so we don't need to pass any global transform here.
-    mRoot->ComputeEffectiveTransforms(gfx::Matrix4x4());
-
-    nsIntRegion opaque;
-    ApplyOcclusionCulling(mRoot, opaque);
-
-    Render();
-#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
-    RenderToPresentationSurface();
-#endif
-    mGeometryChanged = false;
+    UpdateAndRender();
   } else {
-    // Modified layer tree
+    // Modified the layer tree.
     mGeometryChanged = true;
   }
 
@@ -322,6 +297,78 @@ LayerManagerComposite::EndTransaction(const TimeStamp& aTimeStamp,
   Log();
   MOZ_LAYERS_LOG(("]----- EndTransaction"));
 #endif
+}
+
+void
+LayerManagerComposite::UpdateAndRender()
+{
+  nsIntRegion invalid;
+  bool didEffectiveTransforms = false;
+
+  if (mClonedLayerTreeProperties) {
+    // Effective transforms are needed by ComputeDifferences().
+    mRoot->ComputeEffectiveTransforms(gfx::Matrix4x4());
+    didEffectiveTransforms = true;
+
+    // We need to compute layer tree differences even if we're not going to
+    // immediately use the resulting damage area, since ComputeDifferences
+    // is also responsible for invalidates intermediate surfaces in
+    // ContainerLayers.
+    nsIntRegion changed = mClonedLayerTreeProperties->ComputeDifferences(mRoot, nullptr, &mGeometryChanged);
+
+    if (mTarget) {
+      // Since we're composing to an external target, we're not going to use
+      // the damage region from layers changes - we want to composite
+      // everything in the target bounds. Instead we accumulate the layers
+      // damage region for the next window composite.
+      mInvalidRegion.Or(mInvalidRegion, changed);
+    } else {
+      invalid = Move(changed);
+    }
+  }
+
+  if (mTarget) {
+    invalid.Or(invalid, mTargetBounds);
+  } else {
+    // If we didn't have a previous layer tree, invalidate the entire render
+    // area.
+    if (!mClonedLayerTreeProperties) {
+      invalid.Or(invalid, mRenderBounds);
+    }
+
+    // Add any additional invalid rects from the window manager or previous
+    // damage computed during ComposeToTarget().
+    invalid.Or(invalid, mInvalidRegion);
+    mInvalidRegion.SetEmpty();
+  }
+
+  // Update cached layer tree information.
+  mClonedLayerTreeProperties = LayerProperties::CloneFrom(GetRoot());
+
+  if (invalid.IsEmpty() && !mWindowOverlayChanged) {
+    // Composition requested, but nothing has changed. Don't do any work.
+    return;
+  }
+
+  // We don't want our debug overlay to cause more frames to happen
+  // so we will invalidate after we've decided if something changed.
+  InvalidateDebugOverlay(mRenderBounds);
+
+  if (!didEffectiveTransforms) {
+    // The results of our drawing always go directly into a pixel buffer,
+    // so we don't need to pass any global transform here.
+    mRoot->ComputeEffectiveTransforms(gfx::Matrix4x4());
+  }
+
+  nsIntRegion opaque;
+  ApplyOcclusionCulling(mRoot, opaque);
+
+  Render(invalid);
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+  RenderToPresentationSurface();
+#endif
+  mGeometryChanged = false;
+  mWindowOverlayChanged = false;
 }
 
 already_AddRefed<DrawTarget>
@@ -391,6 +438,26 @@ LayerManagerComposite::RootLayer() const
 #include "qrcode_table.h"
 #endif
 
+void
+LayerManagerComposite::InvalidateDebugOverlay(const IntRect& aBounds)
+{
+  bool drawFps = gfxPrefs::LayersDrawFPS();
+  bool drawFrameCounter = gfxPrefs::DrawFrameCounter();
+  bool drawFrameColorBars = gfxPrefs::CompositorDrawColorBars();
+
+  if (drawFps || drawFrameCounter) {
+    AddInvalidRegion(nsIntRect(0, 0, 256, 256));
+  }
+  if (drawFrameColorBars) {
+    AddInvalidRegion(nsIntRect(0, 0, 10, aBounds.height));
+  }
+
+  if (drawFrameColorBars) {
+    AddInvalidRegion(nsIntRect(0, 0, 10, aBounds.height));
+  }
+
+}
+
 static uint16_t sFrameCount = 0;
 void
 LayerManagerComposite::RenderDebugOverlay(const Rect& aBounds)
@@ -411,7 +478,7 @@ LayerManagerComposite::RenderDebugOverlay(const Rect& aBounds)
     // Draw a translation delay warning overlay
     int width;
     int border;
-    if ((now - mWarnTime).ToMilliseconds() < kVisualWarningDuration) {
+    if (!mWarnTime.IsNull() && (now - mWarnTime).ToMilliseconds() < kVisualWarningDuration) {
       EffectChain effects;
 
       // Black blorder
@@ -444,7 +511,7 @@ LayerManagerComposite::RenderDebugOverlay(const Rect& aBounds)
 #endif
 
     float fillRatio = mCompositor->GetFillRatio();
-    mFPS->DrawFPS(now, drawFrameColorBars ? 10 : 0, 0, unsigned(fillRatio), mCompositor);
+    mFPS->DrawFPS(now, drawFrameColorBars ? 10 : 1, 2, unsigned(fillRatio), mCompositor);
 
     if (mUnusedApzTransformWarning) {
       // If we have an unused APZ transform on this composite, draw a 20x20 red box
@@ -457,6 +524,8 @@ LayerManagerComposite::RenderDebugOverlay(const Rect& aBounds)
       mUnusedApzTransformWarning = false;
       SetDebugOverlayWantsNextFrame(true);
     }
+
+    // Each frame is invalidate by the previous frame for simplicity
   } else {
     mFPS = nullptr;
   }
@@ -471,6 +540,7 @@ LayerManagerComposite::RenderDebugOverlay(const Rect& aBounds)
                           effects,
                           1.0,
                           gfx::Matrix4x4());
+
   }
 
 #ifdef MOZ_PROFILING
@@ -513,6 +583,7 @@ LayerManagerComposite::RenderDebugOverlay(const Rect& aBounds)
         }
       }
     }
+
   }
 #endif
 
@@ -611,7 +682,7 @@ LayerManagerComposite::PopGroupForLayerEffects(RefPtr<CompositingRenderTarget> a
 }
 
 void
-LayerManagerComposite::Render()
+LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion)
 {
   PROFILER_LABEL("LayerManagerComposite", "Render",
     js::ProfileEntry::Category::GRAPHICS);
@@ -671,8 +742,6 @@ LayerManagerComposite::Render()
       }
     }
     mCompositor->EndFrameForExternalComposition(Matrix());
-    // Reset the invalid region as compositing is done
-    mInvalidRegion.SetEmpty();
     mLastFrameMissedHWC = false;
     return;
   } else if (!mTarget && !haveLayerEffects) {
@@ -688,15 +757,6 @@ LayerManagerComposite::Render()
     }
   }
 
-  nsIntRegion invalid;
-  if (mTarget) {
-    invalid = mTargetBounds;
-  } else {
-    invalid = mInvalidRegion;
-    // Reset the invalid region now that we've begun compositing.
-    mInvalidRegion.SetEmpty();
-  }
-
   ParentLayerIntRect clipRect;
   Rect bounds(mRenderBounds.x, mRenderBounds.y, mRenderBounds.width, mRenderBounds.height);
   Rect actualBounds;
@@ -706,10 +766,10 @@ LayerManagerComposite::Render()
   if (mRoot->GetClipRect()) {
     clipRect = *mRoot->GetClipRect();
     Rect rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
-    mCompositor->BeginFrame(invalid, &rect, bounds, nullptr, &actualBounds);
+    mCompositor->BeginFrame(aInvalidRegion, &rect, bounds, nullptr, &actualBounds);
   } else {
     gfx::Rect rect;
-    mCompositor->BeginFrame(invalid, nullptr, bounds, &rect, &actualBounds);
+    mCompositor->BeginFrame(aInvalidRegion, nullptr, bounds, &rect, &actualBounds);
     clipRect = ParentLayerIntRect(rect.x, rect.y, rect.width, rect.height);
   }
 
@@ -733,7 +793,7 @@ LayerManagerComposite::Render()
 
   // Render our layers.
   RootLayer()->Prepare(ViewAs<RenderTargetPixel>(clipRect, PixelCastJustification::RenderTargetIsParentLayerForRoot));
-  RootLayer()->RenderLayer(ParentLayerIntRect::ToUntyped(clipRect));
+  RootLayer()->RenderLayer(clipRect.ToUnknownRect());
 
   if (!mRegionToClear.IsEmpty()) {
     nsIntRegionRectIterator iter(mRegionToClear);
@@ -745,7 +805,7 @@ LayerManagerComposite::Render()
 
   if (mTwoPassTmpTarget) {
     MOZ_ASSERT(haveLayerEffects);
-    PopGroupForLayerEffects(previousTarget, ParentLayerIntRect::ToUntyped(clipRect),
+    PopGroupForLayerEffects(previousTarget, clipRect.ToUnknownRect(),
                             grayscaleVal, invertVal, contrastVal);
   }
 
@@ -916,7 +976,7 @@ LayerManagerComposite::RenderToPresentationSurface()
   }
   GLContext* gl = compositor->gl();
   GLContextEGL* egl = GLContextEGL::Cast(gl);
-  const IntSize windowSize = mirrorScreen->GetNaturalBounds().Size();
+  const IntSize windowSize = mirrorScreen->GetNaturalBounds().Size().ToUnknownSize();
 #endif
 
   if ((windowSize.width <= 0) || (windowSize.height <= 0)) {
@@ -978,7 +1038,7 @@ LayerManagerComposite::RenderToPresentationSurface()
 
   const IntRect clipRect = IntRect(0, 0, actualWidth, actualHeight);
 
-  RootLayer()->Prepare(RenderTargetPixel::FromUntyped(clipRect));
+  RootLayer()->Prepare(RenderTargetIntRect::FromUnknownRect(clipRect));
   RootLayer()->RenderLayer(clipRect);
 
   mCompositor->EndFrame();
@@ -1008,7 +1068,7 @@ SubtractTransformedRegion(nsIntRegion& aRegion,
   // subtract it from the screen region.
   nsIntRegionRectIterator it(aRegionToSubtract);
   while (const IntRect* rect = it.Next()) {
-    Rect incompleteRect = aTransform.TransformAndClipBounds(ToRect(*rect),
+    Rect incompleteRect = aTransform.TransformAndClipBounds(IntRectToRect(*rect),
                                                             Rect::MaxIntRect());
     aRegion.Sub(aRegion, IntRect(incompleteRect.x,
                                    incompleteRect.y,

@@ -9,10 +9,10 @@
 #include "gfxFontConstants.h"
 #include "mozilla/css/Declaration.h"
 #include "mozilla/css/Loader.h"
-#include "mozilla/dom/CSSFontFaceLoadEvent.h"
-#include "mozilla/dom/CSSFontFaceLoadEventBinding.h"
 #include "mozilla/dom/FontFaceSetBinding.h"
 #include "mozilla/dom/FontFaceSetIterator.h"
+#include "mozilla/dom/FontFaceSetLoadEvent.h"
+#include "mozilla/dom/FontFaceSetLoadEventBinding.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/Logging.h"
@@ -169,7 +169,7 @@ FontFaceSet::ParseFontShorthandForMatching(
                             RefPtr<FontFamilyListRefCnt>& aFamilyList,
                             uint32_t& aWeight,
                             int32_t& aStretch,
-                            uint32_t& aItalicStyle,
+                            uint8_t& aStyle,
                             ErrorResult& aRv)
 {
   // Parse aFont as a 'font' property value.
@@ -224,7 +224,7 @@ FontFaceSet::ParseFontShorthandForMatching(
   aWeight = weight;
 
   aStretch = data->ValueFor(eCSSProperty_font_stretch)->GetIntValue();
-  aItalicStyle = data->ValueFor(eCSSProperty_font_style)->GetIntValue();
+  aStyle = data->ValueFor(eCSSProperty_font_style)->GetIntValue();
 }
 
 static bool
@@ -252,7 +252,7 @@ FontFaceSet::FindMatchingFontFaces(const nsAString& aFont,
   RefPtr<FontFamilyListRefCnt> familyList;
   uint32_t weight;
   int32_t stretch;
-  uint32_t italicStyle;
+  uint8_t italicStyle;
   ParseFontShorthandForMatching(aFont, familyList, weight, stretch, italicStyle,
                                 aRv);
   if (aRv.Failed()) {
@@ -399,23 +399,16 @@ FontFaceSet::Add(FontFace& aFontFace, ErrorResult& aRv)
 {
   FlushUserFontSet();
 
-  // We currently only support FontFace objects being in a single FontFaceSet,
-  // and we also restrict the FontFaceSet to contain only FontFaces created
-  // in the same window.
-
-  if (aFontFace.GetFontFaceSet() != this) {
-    aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
-    return nullptr;
-  }
-
-  if (aFontFace.IsInFontFaceSet()) {
+  if (aFontFace.IsInFontFaceSet(this)) {
     return this;
   }
 
-  MOZ_ASSERT(!aFontFace.HasRule(),
-             "rule-backed FontFaces should always be in the FontFaceSet");
+  if (aFontFace.HasRule()) {
+    aRv.Throw(NS_ERROR_DOM_INVALID_MODIFICATION_ERR);
+    return nullptr;
+  }
 
-  aFontFace.SetIsInFontFaceSet(true);
+  aFontFace.AddFontFaceSet(this);
 
 #ifdef DEBUG
   for (const FontFaceRecord& rec : mNonRuleFaces) {
@@ -449,7 +442,7 @@ FontFaceSet::Clear()
 
   for (size_t i = 0; i < mNonRuleFaces.Length(); i++) {
     FontFace* f = mNonRuleFaces[i].mFontFace;
-    f->SetIsInFontFaceSet(false);
+    f->RemoveFontFaceSet(this);
   }
 
   mNonRuleFaces.Clear();
@@ -480,7 +473,7 @@ FontFaceSet::Delete(FontFace& aFontFace)
     return false;
   }
 
-  aFontFace.SetIsInFontFaceSet(false);
+  aFontFace.RemoveFontFaceSet(this);
 
   mNonRuleFacesDirty = true;
   RebuildUserFontSet();
@@ -492,8 +485,7 @@ FontFaceSet::Delete(FontFace& aFontFace)
 bool
 FontFaceSet::HasAvailableFontFace(FontFace* aFontFace)
 {
-  return aFontFace->GetFontFaceSet() == this &&
-         aFontFace->IsInFontFaceSet();
+  return aFontFace->IsInFontFaceSet(this);
 }
 
 bool
@@ -532,16 +524,18 @@ FontFaceSet::Size()
   return std::min<size_t>(total, INT32_MAX);
 }
 
-FontFaceSetIterator*
+already_AddRefed<FontFaceSetIterator>
 FontFaceSet::Entries()
 {
-  return new FontFaceSetIterator(this, true);
+  RefPtr<FontFaceSetIterator> it = new FontFaceSetIterator(this, true);
+  return it.forget();
 }
 
-FontFaceSetIterator*
+already_AddRefed<FontFaceSetIterator>
 FontFaceSet::Values()
 {
-  return new FontFaceSetIterator(this, false);
+  RefPtr<FontFaceSetIterator> it = new FontFaceSetIterator(this, false);
+  return it.forget();
 }
 
 void
@@ -970,7 +964,7 @@ FontFaceSet::FindOrCreateUserFontEntryFromFontFace(const nsAString& aFamilyName,
 
   uint32_t weight = NS_STYLE_FONT_WEIGHT_NORMAL;
   int32_t stretch = NS_STYLE_FONT_STRETCH_NORMAL;
-  uint32_t italicStyle = NS_STYLE_FONT_STYLE_NORMAL;
+  uint8_t italicStyle = NS_STYLE_FONT_STYLE_NORMAL;
   uint32_t languageOverride = NO_FONT_LANGUAGE_OVERRIDE;
 
   // set up weight
@@ -1336,6 +1330,12 @@ FontFaceSet::CheckFontLoad(const gfxFontFaceSrc* aFontFaceSrc,
         *aBypassCache = true;
       }
     }
+    uint32_t flags;
+    if (NS_SUCCEEDED(docShell->GetDefaultLoadFlags(&flags))) {
+      if (flags & nsIRequest::LOAD_BYPASS_CACHE) {
+        *aBypassCache = true;
+      }
+    }
   }
 
   return rv;
@@ -1622,7 +1622,7 @@ FontFaceSet::DispatchLoadingFinishedEvent(
                                  const nsAString& aType,
                                  const nsTArray<FontFace*>& aFontFaces)
 {
-  CSSFontFaceLoadEventInit init;
+  FontFaceSetLoadEventInit init;
   init.mBubbles = false;
   init.mCancelable = false;
   OwningNonNull<FontFace>* elements =
@@ -1631,8 +1631,8 @@ FontFaceSet::DispatchLoadingFinishedEvent(
   for (size_t i = 0; i < aFontFaces.Length(); i++) {
     elements[i] = aFontFaces[i];
   }
-  RefPtr<CSSFontFaceLoadEvent> event =
-    CSSFontFaceLoadEvent::Constructor(this, aType, init);
+  RefPtr<FontFaceSetLoadEvent> event =
+    FontFaceSetLoadEvent::Constructor(this, aType, init);
   (new AsyncEventDispatcher(this, event))->PostDOMEvent();
 }
 
@@ -1772,13 +1772,13 @@ FontFaceSet::UserFontSet::CreateUserFontEntry(
                                const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList,
                                uint32_t aWeight,
                                int32_t aStretch,
-                               uint32_t aItalicStyle,
+                               uint8_t aStyle,
                                const nsTArray<gfxFontFeature>& aFeatureSettings,
                                uint32_t aLanguageOverride,
                                gfxSparseBitSet* aUnicodeRanges)
 {
   RefPtr<gfxUserFontEntry> entry =
-    new FontFace::Entry(this, aFontFaceSrcList, aWeight, aStretch, aItalicStyle,
+    new FontFace::Entry(this, aFontFaceSrcList, aWeight, aStretch, aStyle,
                         aFeatureSettings, aLanguageOverride, aUnicodeRanges);
   return entry.forget();
 }

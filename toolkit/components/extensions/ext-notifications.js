@@ -1,16 +1,17 @@
-const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
-let {
+var {
   EventManager,
   ignoreEvent,
+  runSafe,
 } = ExtensionUtils;
 
 // WeakMap[Extension -> Set[Notification]]
-let notificationsMap = new WeakMap();
+var notificationsMap = new WeakMap();
 
-// WeakMap[Extension -> callback]
-let notificationCallbacksMap = new WeakMap();
+// WeakMap[Extension -> Set[callback]]
+var notificationCallbacksMap = new WeakMap();
 
 // Manages a notification popup (notifications API) created by the extension.
 function Notification(extension, id, options)

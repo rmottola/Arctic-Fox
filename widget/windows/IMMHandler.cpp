@@ -1251,7 +1251,7 @@ IMMHandler::HandleStartComposition(nsWindow* aWindow,
   mCursorPosition = NO_IME_CARET;
 
   WidgetCompositionEvent event(true, eCompositionStart, aWindow);
-  nsIntPoint point(0, 0);
+  LayoutDeviceIntPoint point(0, 0);
   aWindow->InitEvent(event, &point);
   aWindow->DispatchWindowEvent(&event);
 
@@ -1527,7 +1527,7 @@ IMMHandler::HandleEndComposition(nsWindow* aWindow,
   EventMessage message =
     aCommitString ? eCompositionCommit : eCompositionCommitAsIs;
   WidgetCompositionEvent compositionCommitEvent(true, message, aWindow);
-  nsIntPoint point(0, 0);
+  LayoutDeviceIntPoint point(0, 0);
   aWindow->InitEvent(compositionCommitEvent, &point);
   if (aCommitString) {
     compositionCommitEvent.mData = *aCommitString;
@@ -1632,12 +1632,12 @@ IMMHandler::HandleQueryCharPosition(nsWindow* aWindow,
     return false;
   }
 
-  nsIntRect r;
+  LayoutDeviceIntRect r;
   bool ret =
     GetCharacterRectOfSelectedTextAt(aWindow, pCharPosition->dwCharPos, r);
   NS_ENSURE_TRUE(ret, false);
 
-  nsIntRect screenRect;
+  LayoutDeviceIntRect screenRect;
   // We always need top level window that is owner window of the popup window
   // even if the content of the popup window has focus.
   ResolveIMECaretPos(aWindow->GetTopLevelWindow(false),
@@ -1662,11 +1662,10 @@ IMMHandler::HandleQueryCharPosition(nsWindow* aWindow,
       ("IMM: HandleQueryCharPosition, eQueryEditorRect failed"));
     ::GetWindowRect(aWindow->GetWindowHandle(), &pCharPosition->rcDocument);
   } else {
-    nsIntRect editorRectInWindow =
-      LayoutDevicePixel::ToUntyped(editorRect.mReply.mRect);
+    LayoutDeviceIntRect editorRectInWindow = editorRect.mReply.mRect;
     nsWindow* window = editorRect.mReply.mFocusedWidget ?
       static_cast<nsWindow*>(editorRect.mReply.mFocusedWidget) : aWindow;
-    nsIntRect editorRectInScreen;
+    LayoutDeviceIntRect editorRectInScreen;
     ResolveIMECaretPos(window, editorRectInWindow, nullptr, editorRectInScreen);
     ::SetRect(&pCharPosition->rcDocument,
               editorRectInScreen.x, editorRectInScreen.y,
@@ -1693,7 +1692,7 @@ IMMHandler::HandleDocumentFeed(nsWindow* aWindow,
   *oResult = 0;
   RECONVERTSTRING* pReconv = reinterpret_cast<RECONVERTSTRING*>(lParam);
 
-  nsIntPoint point(0, 0);
+  LayoutDeviceIntPoint point(0, 0);
 
   bool hasCompositionString =
     mIsComposing && ShouldDrawCompositionStringOurselves();
@@ -1895,7 +1894,7 @@ IMMHandler::DispatchCompositionChangeEvent(nsWindow* aWindow,
 
   RefPtr<nsWindow> kungFuDeathGrip(aWindow);
 
-  nsIntPoint point(0, 0);
+  LayoutDeviceIntPoint point(0, 0);
 
   WidgetCompositionEvent event(true, eCompositionChange, aWindow);
 
@@ -2095,10 +2094,10 @@ IMMHandler::ConvertToANSIString(const nsAFlatString& aStr,
 bool
 IMMHandler::GetCharacterRectOfSelectedTextAt(nsWindow* aWindow,
                                              uint32_t aOffset,
-                                             nsIntRect& aCharRect,
+                                             LayoutDeviceIntRect& aCharRect,
                                              WritingMode* aWritingMode)
 {
-  nsIntPoint point(0, 0);
+  LayoutDeviceIntPoint point(0, 0);
 
   Selection& selection = GetSelection();
   if (!selection.EnsureValidSelection(aWindow)) {
@@ -2170,7 +2169,7 @@ IMMHandler::GetCharacterRectOfSelectedTextAt(nsWindow* aWindow,
     aWindow->InitEvent(charRect, &point);
     aWindow->DispatchWindowEvent(&charRect);
     if (charRect.mSucceeded) {
-      aCharRect = LayoutDevicePixel::ToUntyped(charRect.mReply.mRect);
+      aCharRect = charRect.mReply.mRect;
       if (aWritingMode) {
         *aWritingMode = charRect.GetWritingMode();
       }
@@ -2189,10 +2188,10 @@ IMMHandler::GetCharacterRectOfSelectedTextAt(nsWindow* aWindow,
 
 bool
 IMMHandler::GetCaretRect(nsWindow* aWindow,
-                         nsIntRect& aCaretRect,
+                         LayoutDeviceIntRect& aCaretRect,
                          WritingMode* aWritingMode)
 {
-  nsIntPoint point(0, 0);
+  LayoutDeviceIntPoint point(0, 0);
 
   Selection& selection = GetSelection();
   if (!selection.EnsureValidSelection(aWindow)) {
@@ -2211,7 +2210,7 @@ IMMHandler::GetCaretRect(nsWindow* aWindow,
       ("IMM: GetCaretRect, FAILED, due to eQueryCaretRect failure"));
     return false;
   }
-  aCaretRect = LayoutDevicePixel::ToUntyped(caretRect.mReply.mRect);
+  aCaretRect = caretRect.mReply.mRect;
   if (aWritingMode) {
     *aWritingMode = caretRect.GetWritingMode();
   }
@@ -2228,20 +2227,20 @@ bool
 IMMHandler::SetIMERelatedWindowsPos(nsWindow* aWindow,
                                     const IMEContext& aContext)
 {
-  nsIntRect r;
+  LayoutDeviceIntRect r;
   // Get first character rect of current a normal selected text or a composing
   // string.
   WritingMode writingMode;
   bool ret = GetCharacterRectOfSelectedTextAt(aWindow, 0, r, &writingMode);
   NS_ENSURE_TRUE(ret, false);
   nsWindow* toplevelWindow = aWindow->GetTopLevelWindow(false);
-  nsIntRect firstSelectedCharRect;
+  LayoutDeviceIntRect firstSelectedCharRect;
   ResolveIMECaretPos(toplevelWindow, r, aWindow, firstSelectedCharRect);
 
   // Set native caret size/position to our caret. Some IMEs honor it. E.g.,
   // "Intelligent ABC" (Simplified Chinese) and "MS PinYin 3.0" (Simplified
   // Chinese) on XP.
-  nsIntRect caretRect(firstSelectedCharRect);
+  LayoutDeviceIntRect caretRect(firstSelectedCharRect);
   if (GetCaretRect(aWindow, r)) {
     ResolveIMECaretPos(toplevelWindow, r, aWindow, caretRect);
   } else {
@@ -2263,7 +2262,7 @@ IMMHandler::SetIMERelatedWindowsPos(nsWindow* aWindow,
       ("IMM: SetIMERelatedWindowsPos, Set candidate window"));
 
     // Get a rect of first character in current target in composition string.
-    nsIntRect firstTargetCharRect, lastTargetCharRect;
+    LayoutDeviceIntRect firstTargetCharRect, lastTargetCharRect;
     if (mIsComposing && !mCompositionString.IsEmpty()) {
       // If there are no targetted selection, we should use it's first character
       // rect instead.
@@ -2297,7 +2296,7 @@ IMMHandler::SetIMERelatedWindowsPos(nsWindow* aWindow,
                        aWindow, firstTargetCharRect);
     ResolveIMECaretPos(toplevelWindow, lastTargetCharRect,
                        aWindow, lastTargetCharRect);
-    nsIntRect targetClauseRect;
+    LayoutDeviceIntRect targetClauseRect;
     targetClauseRect.UnionRect(firstTargetCharRect, lastTargetCharRect);
 
     // Move the candidate window to proper position from the target clause as
@@ -2391,12 +2390,12 @@ IMMHandler::SetIMERelatedWindowsPosOnPlugin(nsWindow* aWindow,
   nsWindow* toplevelWindow = aWindow->GetTopLevelWindow(false);
   LayoutDeviceIntRect pluginRectInScreen =
     editorRectEvent.mReply.mRect + toplevelWindow->WidgetToScreenOffset();
-  nsIntRect winRectInScreen;
+  LayoutDeviceIntRect winRectInScreen;
   aWindow->GetClientBounds(winRectInScreen);
   // composition window cannot be positioned on the edge of client area.
   winRectInScreen.width--;
   winRectInScreen.height--;
-  nsIntRect clippedPluginRect;
+  LayoutDeviceIntRect clippedPluginRect;
   clippedPluginRect.x =
     std::min(std::max(pluginRectInScreen.x, winRectInScreen.x),
              winRectInScreen.XMost());
@@ -2407,7 +2406,7 @@ IMMHandler::SetIMERelatedWindowsPosOnPlugin(nsWindow* aWindow,
   int32_t yMost = std::min(pluginRectInScreen.YMost(), winRectInScreen.YMost());
   clippedPluginRect.width = std::max(0, xMost - clippedPluginRect.x);
   clippedPluginRect.height = std::max(0, yMost - clippedPluginRect.y);
-  clippedPluginRect -= aWindow->WidgetToScreenOffsetUntyped();
+  clippedPluginRect -= aWindow->WidgetToScreenOffset();
 
   // Cover the plugin with native caret.  This prevents IME's window and plugin
   // overlap.
@@ -2436,9 +2435,9 @@ IMMHandler::SetIMERelatedWindowsPosOnPlugin(nsWindow* aWindow,
 
 void
 IMMHandler::ResolveIMECaretPos(nsIWidget* aReferenceWidget,
-                               nsIntRect& aCursorRect,
+                               LayoutDeviceIntRect& aCursorRect,
                                nsIWidget* aNewOriginWidget,
-                               nsIntRect& aOutRect)
+                               LayoutDeviceIntRect& aOutRect)
 {
   aOutRect = aCursorRect;
 
@@ -2446,10 +2445,10 @@ IMMHandler::ResolveIMECaretPos(nsIWidget* aReferenceWidget,
     return;
 
   if (aReferenceWidget)
-    aOutRect.MoveBy(aReferenceWidget->WidgetToScreenOffsetUntyped());
+    aOutRect.MoveBy(aReferenceWidget->WidgetToScreenOffset());
 
   if (aNewOriginWidget)
-    aOutRect.MoveBy(-aNewOriginWidget->WidgetToScreenOffsetUntyped());
+    aOutRect.MoveBy(-aNewOriginWidget->WidgetToScreenOffset());
 }
 
 static void
@@ -2753,7 +2752,7 @@ IMMHandler::Selection::Init(nsWindow* aWindow)
   Clear();
 
   WidgetQueryContentEvent selection(true, eQuerySelectedText, aWindow);
-  nsIntPoint point(0, 0);
+  LayoutDeviceIntPoint point(0, 0);
   aWindow->InitEvent(selection, &point);
   aWindow->DispatchWindowEvent(&selection);
   if (NS_WARN_IF(!selection.mSucceeded)) {

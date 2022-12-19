@@ -890,12 +890,13 @@ protected:
     public:
         FamilyFace() : mFamily(nullptr), mFontEntry(nullptr),
                        mNeedsBold(false), mFontCreated(false),
-                       mLoading(false), mInvalid(false)
+                       mLoading(false), mInvalid(false),
+                       mCheckForFallbackFaces(false)
         { }
 
         FamilyFace(gfxFontFamily* aFamily, gfxFont* aFont)
             : mFamily(aFamily), mNeedsBold(false), mFontCreated(true),
-              mLoading(false), mInvalid(false)
+              mLoading(false), mInvalid(false), mCheckForFallbackFaces(false)
         {
             NS_ASSERTION(aFont, "font pointer must not be null");
             NS_ASSERTION(!aFamily ||
@@ -908,7 +909,7 @@ protected:
         FamilyFace(gfxFontFamily* aFamily, gfxFontEntry* aFontEntry,
                    bool aNeedsBold)
             : mFamily(aFamily), mNeedsBold(aNeedsBold), mFontCreated(false),
-              mLoading(false), mInvalid(false)
+              mLoading(false), mInvalid(false), mCheckForFallbackFaces(false)
         {
             NS_ASSERTION(aFontEntry, "font entry pointer must not be null");
             NS_ASSERTION(!aFamily ||
@@ -923,7 +924,8 @@ protected:
               mNeedsBold(aOtherFamilyFace.mNeedsBold),
               mFontCreated(aOtherFamilyFace.mFontCreated),
               mLoading(aOtherFamilyFace.mLoading),
-              mInvalid(aOtherFamilyFace.mInvalid)
+              mInvalid(aOtherFamilyFace.mInvalid),
+              mCheckForFallbackFaces(aOtherFamilyFace.mCheckForFallbackFaces)
         {
             if (mFontCreated) {
                 mFont = aOtherFamilyFace.mFont;
@@ -986,6 +988,8 @@ protected:
         void CheckState(bool& aSkipDrawing);
         void SetLoading(bool aIsLoading) { mLoading = aIsLoading; }
         void SetInvalid() { mInvalid = true; }
+        bool CheckForFallbackFaces() const { return mCheckForFallbackFaces; }
+        void SetCheckForFallbackFaces() { mCheckForFallbackFaces = true; }
 
         void SetFont(gfxFont* aFont)
         {
@@ -1014,6 +1018,7 @@ protected:
         bool                    mFontCreated : 1;
         bool                    mLoading     : 1;
         bool                    mInvalid     : 1;
+        bool                    mCheckForFallbackFaces : 1;
     };
 
     // List of font families, either named or generic.
@@ -1110,7 +1115,13 @@ protected:
     already_AddRefed<gfxFont>
     FindNonItalicFaceForChar(gfxFontFamily* aFamily, uint32_t aCh);
 
-    // helper methods for looking up fonts
+    // search all faces in a family for a fallback in cases where it's unclear
+    // whether the family might have a font for a given character
+    already_AddRefed<gfxFont>
+    FindFallbackFaceForChar(gfxFontFamily* aFamily, uint32_t aCh,
+                            int32_t aRunScript);
+
+   // helper methods for looking up fonts
 
     // lookup and add a font with a given name (i.e. *not* a generic!)
     void AddPlatformFont(const nsAString& aName,

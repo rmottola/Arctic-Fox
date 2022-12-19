@@ -25,6 +25,7 @@
 #include "nsGkAtoms.h"
 #include "nsHtml5Atoms.h"
 #include "nsIAtom.h"
+#include "nsCaret.h"
 #include "nsCSSPseudoElements.h"
 #include "nsCSSAnonBoxes.h"
 #include "nsCSSColorUtils.h"
@@ -134,6 +135,7 @@ using namespace mozilla::gfx;
 #define STICKY_ENABLED_PREF_NAME "layout.css.sticky.enabled"
 #define DISPLAY_CONTENTS_ENABLED_PREF_NAME "layout.css.display-contents.enabled"
 #define TEXT_ALIGN_UNSAFE_ENABLED_PREF_NAME "layout.css.text-align-unsafe-value.enabled"
+#define FLOAT_LOGICAL_VALUES_ENABLED_PREF_NAME "layout.css.float-logical-values.enabled"
 
 #ifdef DEBUG
 // TODO: remove, see bug 598468.
@@ -381,6 +383,61 @@ TextAlignUnsafeEnabledPrefChangeCallback(const char* aPrefName, void* aClosure)
   MOZ_ASSERT(sIndexOfUnsafeInTextAlignLastTable >= 0);
   nsCSSProps::kTextAlignLastKTable[sIndexOfUnsafeInTextAlignLastTable] =
     isTextAlignUnsafeEnabled ? eCSSKeyword_unsafe : eCSSKeyword_UNKNOWN;
+}
+
+// When the pref "layout.css.float-logical-values.enabled" changes, this
+// function is called to let us update kFloatKTable & kClearKTable,
+// to selectively disable or restore the entries for logical values
+// (inline-start and inline-end) in those tables.
+static void
+FloatLogicalValuesEnabledPrefChangeCallback(const char* aPrefName,
+                                            void* aClosure)
+{
+  NS_ASSERTION(strcmp(aPrefName, FLOAT_LOGICAL_VALUES_ENABLED_PREF_NAME) == 0,
+               "Did you misspell " FLOAT_LOGICAL_VALUES_ENABLED_PREF_NAME " ?");
+
+  static bool sIsInitialized;
+  static int32_t sIndexOfInlineStartInFloatTable;
+  static int32_t sIndexOfInlineEndInFloatTable;
+  static int32_t sIndexOfInlineStartInClearTable;
+  static int32_t sIndexOfInlineEndInClearTable;
+  bool isFloatLogicalValuesEnabled =
+    Preferences::GetBool(FLOAT_LOGICAL_VALUES_ENABLED_PREF_NAME, false);
+
+  if (!sIsInitialized) {
+    // First run: find the position of "inline-start" in kFloatKTable.
+    sIndexOfInlineStartInFloatTable =
+      nsCSSProps::FindIndexOfKeyword(eCSSKeyword_inline_start,
+                                     nsCSSProps::kFloatKTable);
+    // First run: find the position of "inline-end" in kFloatKTable.
+    sIndexOfInlineEndInFloatTable =
+      nsCSSProps::FindIndexOfKeyword(eCSSKeyword_inline_end,
+                                     nsCSSProps::kFloatKTable);
+    // First run: find the position of "inline-start" in kClearKTable.
+    sIndexOfInlineStartInClearTable =
+      nsCSSProps::FindIndexOfKeyword(eCSSKeyword_inline_start,
+                                     nsCSSProps::kClearKTable);
+    // First run: find the position of "inline-end" in kClearKTable.
+    sIndexOfInlineEndInClearTable =
+      nsCSSProps::FindIndexOfKeyword(eCSSKeyword_inline_end,
+                                     nsCSSProps::kClearKTable);
+    sIsInitialized = true;
+  }
+
+  // OK -- now, stomp on or restore the logical entries in the keyword tables,
+  // depending on whether the pref is enabled vs. disabled.
+  MOZ_ASSERT(sIndexOfInlineStartInFloatTable >= 0);
+  nsCSSProps::kFloatKTable[sIndexOfInlineStartInFloatTable] =
+    isFloatLogicalValuesEnabled ? eCSSKeyword_inline_start : eCSSKeyword_UNKNOWN;
+  MOZ_ASSERT(sIndexOfInlineEndInFloatTable >= 0);
+  nsCSSProps::kFloatKTable[sIndexOfInlineEndInFloatTable] =
+    isFloatLogicalValuesEnabled ? eCSSKeyword_inline_end : eCSSKeyword_UNKNOWN;
+  MOZ_ASSERT(sIndexOfInlineStartInClearTable >= 0);
+  nsCSSProps::kClearKTable[sIndexOfInlineStartInClearTable] =
+    isFloatLogicalValuesEnabled ? eCSSKeyword_inline_start : eCSSKeyword_UNKNOWN;
+  MOZ_ASSERT(sIndexOfInlineEndInClearTable >= 0);
+  nsCSSProps::kClearKTable[sIndexOfInlineEndInClearTable] =
+    isFloatLogicalValuesEnabled ? eCSSKeyword_inline_end : eCSSKeyword_UNKNOWN;
 }
 
 bool
@@ -932,80 +989,74 @@ GetDisplayPortFromMarginsData(nsIContent* aContent,
   nsRect expandedScrollableRect =
     nsLayoutUtils::CalculateExpandedScrollableRect(frame);
 
-  if (gfxPrefs::LayersTilesEnabled()) {
-    // Note on the correctness of applying the alignment in Screen space:
-    //   The correct space to apply the alignment in would be Layer space, but
-    //   we don't necessarily know the scale to convert to Layer space at this
-    //   point because Layout may not yet have chosen the resolution at which to
-    //   render (it chooses that in FrameLayerBuilder, but this can be called
-    //   during display list building). Therefore, we perform the alignment in
-    //   Screen space, which basically assumes that Layout chose to render at
-    //   screen resolution; since this is what Layout does most of the time,
-    //   this is a good approximation. A proper solution would involve moving
-    //   the choosing of the resolution to display-list building time.
-    int alignmentX = gfxPlatform::GetPlatform()->GetTileWidth();
-    int alignmentY = gfxPlatform::GetPlatform()->GetTileHeight();
 
+  // Note on the correctness of applying the alignment in Screen space:
+  //   The correct space to apply the alignment in would be Layer space, but
+  //   we don't necessarily know the scale to convert to Layer space at this
+  //   point because Layout may not yet have chosen the resolution at which to
+  //   render (it chooses that in FrameLayerBuilder, but this can be called
+  //   during display list building). Therefore, we perform the alignment in
+  //   Screen space, which basically assumes that Layout chose to render at
+  //   screen resolution; since this is what Layout does most of the time,
+  //   this is a good approximation. A proper solution would involve moving
+  //   the choosing of the resolution to display-list building time.
+  ScreenSize alignment;
+
+  if (gfxPrefs::LayersTilesEnabled()) {
+    alignment = ScreenSize(gfxPlatform::GetPlatform()->GetTileWidth(),
+                           gfxPlatform::GetPlatform()->GetTileHeight());
+  } else {
+    // If we're not drawing with tiles then we need to be careful about not
+    // hitting the max texture size and we only need 1 draw call per layer
+    // so we can align to a smaller multiple.
+    alignment = ScreenSize(128, 128);
+  }
+
+  // Avoid division by zero.
+  if (alignment.width == 0) {
+    alignment.width = 128;
+  }
+  if (alignment.height == 0) {
+    alignment.height = 128;
+  }
+
+  if (gfxPrefs::LayersTilesEnabled()) {
     // Expand the rect by the margins
     screenRect.Inflate(aMarginsData->mMargins);
-
-    // Inflate the rectangle by 1 so that we always push to the next tile
-    // boundary. This is desirable to stop from having a rectangle with a
-    // moving origin occasionally being smaller when it coincidentally lines
-    // up to tile boundaries.
-    screenRect.Inflate(1);
-
-    // Avoid division by zero.
-    if (alignmentX == 0) {
-      alignmentX = 1;
-    }
-    if (alignmentY == 0) {
-      alignmentY = 1;
-    }
-
-    ScreenPoint scrollPosScreen = LayoutDevicePoint::FromAppUnits(scrollPos, auPerDevPixel)
-                                * res;
-
-    screenRect += scrollPosScreen;
-    // Round-out the display port to the nearest alignment (tiles)
-    float x = alignmentX * floor(screenRect.x / alignmentX);
-    float y = alignmentY * floor(screenRect.y / alignmentY);
-    float w = alignmentX * ceil(screenRect.width / alignmentX + 1);
-    float h = alignmentY * ceil(screenRect.height / alignmentY + 1);
-    screenRect = ScreenRect(x, y, w, h);
-    screenRect -= scrollPosScreen;
-
-    ScreenRect screenExpScrollableRect =
-      LayoutDeviceRect::FromAppUnits(expandedScrollableRect,
-                                     auPerDevPixel) * res;
-
-    // Make sure the displayport remains within the scrollable rect.
-    screenRect = screenRect.ForceInside(screenExpScrollableRect - scrollPosScreen);
   } else {
-    nscoord maxSizeInAppUnits = GetMaxDisplayPortSize(aContent);
-    if (maxSizeInAppUnits == nscoord_MAX) {
+    // Calculate the displayport to make sure we fit within the max texture size
+    // when not tiling.
+    nscoord maxSizeAppUnits = GetMaxDisplayPortSize(aContent);
+    if (maxSizeAppUnits == nscoord_MAX) {
       // Pick a safe maximum displayport size for sanity purposes. This is the
       // lowest maximum texture size on tileless-platforms (Windows, D3D10).
-      maxSizeInAppUnits = presContext->DevPixelsToAppUnits(8192);
+      maxSizeAppUnits = presContext->DevPixelsToAppUnits(8192);
     }
 
+    // The alignment code can round up to 3 tiles, we want to make sure
+    // that the displayport can grow by up to 3 tiles without going
+    // over the max texture size.
+    const int MAX_ALIGN_ROUNDING = 3;
+
     // Find the maximum size in screen pixels.
-    int32_t maxSizeInDevPixels = presContext->AppUnitsToDevPixels(maxSizeInAppUnits);
-    int32_t maxWidthInScreenPixels = floor(double(maxSizeInDevPixels) * res.xScale);
-    int32_t maxHeightInScreenPixels = floor(double(maxSizeInDevPixels) * res.yScale);
+    int32_t maxSizeDevPx = presContext->AppUnitsToDevPixels(maxSizeAppUnits);
+    int32_t maxWidthScreenPx = floor(double(maxSizeDevPx) * res.xScale) -
+      MAX_ALIGN_ROUNDING * alignment.width;
+    int32_t maxHeightScreenPx = floor(double(maxSizeDevPx) * res.yScale) -
+      MAX_ALIGN_ROUNDING * alignment.height;
 
     // For each axis, inflate the margins up to the maximum size.
     const ScreenMargin& margins = aMarginsData->mMargins;
-    if (screenRect.height < maxHeightInScreenPixels) {
-      int32_t budget = maxHeightInScreenPixels - screenRect.height;
+    if (screenRect.height < maxHeightScreenPx) {
+      int32_t budget = maxHeightScreenPx - screenRect.height;
 
       float top = std::min(margins.top, float(budget));
       float bottom = std::min(margins.bottom, budget - top);
       screenRect.y -= top;
       screenRect.height += top + bottom;
     }
-    if (screenRect.width < maxWidthInScreenPixels) {
-      int32_t budget = maxWidthInScreenPixels - screenRect.width;
+    if (screenRect.width < maxWidthScreenPx) {
+      int32_t budget = maxWidthScreenPx - screenRect.width;
 
       float left = std::min(margins.left, float(budget));
       float right = std::min(margins.right, budget - left);
@@ -1013,6 +1064,31 @@ GetDisplayPortFromMarginsData(nsIContent* aContent,
       screenRect.width += left + right;
     }
   }
+
+  // Inflate the rectangle by 1 so that we always push to the next tile
+  // boundary. This is desirable to stop from having a rectangle with a
+  // moving origin occasionally being smaller when it coincidentally lines
+  // up to tile boundaries.
+  screenRect.Inflate(1);
+
+  ScreenPoint scrollPosScreen = LayoutDevicePoint::FromAppUnits(scrollPos, auPerDevPixel)
+                              * res;
+
+  // Round-out the display port to the nearest alignment (tiles)
+  screenRect += scrollPosScreen;
+  float x = alignment.width * floor(screenRect.x / alignment.width);
+  float y = alignment.height * floor(screenRect.y / alignment.height);
+  float w = alignment.width * ceil(screenRect.width / alignment.width + 1);
+  float h = alignment.height * ceil(screenRect.height / alignment.height + 1);
+  screenRect = ScreenRect(x, y, w, h);
+  screenRect -= scrollPosScreen;
+
+  ScreenRect screenExpScrollableRect =
+    LayoutDeviceRect::FromAppUnits(expandedScrollableRect,
+                                   auPerDevPixel) * res;
+
+  // Make sure the displayport remains within the scrollable rect.
+  screenRect = screenRect.ForceInside(screenExpScrollableRect - scrollPosScreen);
 
   // Convert the aligned rect back into app units.
   nsRect result = LayoutDeviceRect::ToAppUnits(screenRect / res, auPerDevPixel);
@@ -2672,7 +2748,7 @@ nsLayoutUtils::GetLayerTransformForFrame(nsIFrame* aFrame,
 
   nsDisplayListBuilder builder(root, nsDisplayListBuilder::OTHER,
                                false/*don't build caret*/);
-  nsDisplayList list;  
+  nsDisplayList list;
   nsDisplayTransform* item =
     new (&builder) nsDisplayTransform(&builder, aFrame, &list, nsRect());
 
@@ -2796,9 +2872,9 @@ static LayoutDeviceIntPoint GetWidgetOffset(nsIWidget* aWidget, nsIWidget*& aRoo
     if (!parent) {
       break;
     }
-    nsIntRect bounds;
+    LayoutDeviceIntRect bounds;
     aWidget->GetBounds(bounds);
-    offset += LayoutDeviceIntPoint::FromUntyped(bounds.TopLeft());
+    offset += bounds.TopLeft();
     aWidget = parent;
   }
   aRootWidget = aWidget;
@@ -3254,7 +3330,7 @@ nsLayoutUtils::PaintFrame(nsRenderingContext* aRenderingContext, nsIFrame* aFram
 
   // For the viewport frame in print preview/page layout we want to paint
   // the grey background behind the page, not the canvas color.
-  if (frameType == nsGkAtoms::viewportFrame && 
+  if (frameType == nsGkAtoms::viewportFrame &&
       nsLayoutUtils::NeedsPrintPreviewBackground(presContext)) {
     nsRect bounds = nsRect(builder.ToReferenceFrame(aFrame),
                            aFrame->GetSize());
@@ -4855,7 +4931,7 @@ nsLayoutUtils::ComputeISizeValue(
 
   nscoord result;
   if (aCoord.IsCoordPercentCalcUnit()) {
-    result = nsRuleNode::ComputeCoordPercentCalc(aCoord, 
+    result = nsRuleNode::ComputeCoordPercentCalc(aCoord,
                                                  aContainingBlockISize);
     // The result of a calc() expression might be less than 0; we
     // should clamp at runtime (below).  (Percentages and coords that
@@ -5873,7 +5949,7 @@ nsLayoutUtils::CalculateContentBEnd(WritingMode aWM, nsIFrame* aFrame)
     nsIFrame::ChildListIterator lists(aFrame);
     for (; !lists.IsDone(); lists.Next()) {
       if (!skip.Contains(lists.CurrentID())) {
-        nsFrameList::Enumerator childFrames(lists.CurrentList()); 
+        nsFrameList::Enumerator childFrames(lists.CurrentList());
         for (; !childFrames.AtEnd(); childFrames.Next()) {
           nsIFrame* child = childFrames.get();
           nscoord offset =
@@ -7313,6 +7389,10 @@ nsLayoutUtils::Initialize()
                                            nullptr);
   TextAlignUnsafeEnabledPrefChangeCallback(TEXT_ALIGN_UNSAFE_ENABLED_PREF_NAME,
                                            nullptr);
+  Preferences::RegisterCallback(FloatLogicalValuesEnabledPrefChangeCallback,
+                                FLOAT_LOGICAL_VALUES_ENABLED_PREF_NAME);
+  FloatLogicalValuesEnabledPrefChangeCallback(FLOAT_LOGICAL_VALUES_ENABLED_PREF_NAME,
+                                              nullptr);
 
   nsComputedDOMStyle::RegisterPrefChangeCallbacks();
 }
@@ -7708,7 +7788,7 @@ nsLayoutUtils::FontSizeInflationEnabled(nsPresContext *aPresContext)
 }
 
 /* static */ nsRect
-nsLayoutUtils::GetBoxShadowRectForFrame(nsIFrame* aFrame, 
+nsLayoutUtils::GetBoxShadowRectForFrame(nsIFrame* aFrame,
                                         const nsSize& aFrameSize)
 {
   nsCSSShadowArray* boxShadows = aFrame->StyleBorder()->mBoxShadow;
@@ -7730,7 +7810,7 @@ nsLayoutUtils::GetBoxShadowRectForFrame(nsIFrame* aFrame,
   nsRect frameRect = nativeTheme ?
     aFrame->GetVisualOverflowRectRelativeToSelf() :
     nsRect(nsPoint(0, 0), aFrameSize);
-  
+
   nsRect shadows;
   int32_t A2D = aFrame->PresContext()->AppUnitsPerDevPixel();
   for (uint32_t i = 0; i < boxShadows->Length(); ++i) {
@@ -7838,7 +7918,7 @@ nsLayoutUtils::GetContentViewerSize(nsPresContext* aPresContext,
 
   nsIntRect bounds;
   cv->GetBounds(bounds);
-  aOutSize = LayoutDeviceIntRect::FromUntyped(bounds).Size();
+  aOutSize = LayoutDeviceIntRect::FromUnknownRect(bounds).Size();
   return true;
 }
 
@@ -7854,16 +7934,7 @@ UpdateCompositionBoundsForRCDRSF(ParentLayerRect& aCompBounds,
     return false;
   }
 
-  // On Android, we need to do things a bit differently to get things
-  // right (see bug 983208, bug 988882). We use the bounds of the nearest
-  // widget, but clamp the height to the frame bounds height. This clamping
-  // is done to get correct results for a page where the page is sized to
-  // the screen and thus the dynamic toolbar never disappears. In such a
-  // case, we want the composition bounds to exclude the toolbar height,
-  // but the widget bounds includes it. We don't currently have a good way
-  // of knowing about the toolbar height, but clamping to the frame bounds
-  // height gives the correct answer in the cases we care about.
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_UIKIT)
   nsIWidget* widget = rootFrame->GetNearestWidget();
 #else
   nsView* view = rootFrame->GetView();
@@ -7872,18 +7943,9 @@ UpdateCompositionBoundsForRCDRSF(ParentLayerRect& aCompBounds,
 
   if (widget) {
     nsIntRect widgetBounds;
-    widget->GetBounds(widgetBounds);
+    widget->GetBoundsUntyped(widgetBounds);
     widgetBounds.MoveTo(0, 0);
     aCompBounds = ParentLayerRect(ViewAs<ParentLayerPixel>(widgetBounds));
-#ifdef MOZ_WIDGET_ANDROID
-    ParentLayerRect frameBounds =
-          LayoutDeviceRect::FromAppUnits(aFrameBounds, aPresContext->AppUnitsPerDevPixel())
-        * aCumulativeResolution
-        * LayerToParentLayerScale(1.0);
-    if (frameBounds.height < aCompBounds.height) {
-      aCompBounds.height = frameBounds.height;
-    }
-#endif
     return true;
   }
 
@@ -8006,7 +8068,7 @@ nsLayoutUtils::CalculateRootCompositionSize(nsIFrame* aFrame,
   } else {
     nsIWidget* widget = aFrame->GetNearestWidget();
     nsIntRect widgetBounds;
-    widget->GetBounds(widgetBounds);
+    widget->GetBoundsUntyped(widgetBounds);
     rootCompositionSize = ScreenSize(ViewAs<ScreenPixel>(widgetBounds.Size()));
   }
 
@@ -8174,7 +8236,6 @@ Rect NSRectToSnappedRect(const nsRect& aRect, double aAppUnitsPerPixel,
   MaybeSnapToDevicePixels(rect, aSnapDT, true);
   return rect;
 }
-
 // Similar to a snapped rect, except an axis is left unsnapped if the snapping
 // process results in a length of 0.
 Rect NSRectToNonEmptySnappedRect(const nsRect& aRect, double aAppUnitsPerPixel,
@@ -8206,7 +8267,7 @@ void StrokeLineWithSnapping(const nsPoint& aP1, const nsPoint& aP2,
 
 namespace layout {
 
-  
+
 void
 MaybeSetupTransactionIdAllocator(layers::LayerManager* aManager, nsView* aView)
 {
@@ -8689,4 +8750,35 @@ nsLayoutUtils::AppendFrameTextContent(nsIFrame* aFrame, nsAString& aResult)
       AppendFrameTextContent(child, aResult);
     }
   }
+}
+
+/* static */
+nsRect
+nsLayoutUtils::GetSelectionBoundingRect(Selection* aSel)
+{
+  nsRect res;
+  // Bounding client rect may be empty after calling GetBoundingClientRect
+  // when range is collapsed. So we get caret's rect when range is
+  // collapsed.
+  if (aSel->IsCollapsed()) {
+    nsIFrame* frame = nsCaret::GetGeometry(aSel, &res);
+    if (frame) {
+      nsIFrame* relativeTo = GetContainingBlockForClientRect(frame);
+      res = TransformFrameRectToAncestor(frame, res, relativeTo);
+    }
+  } else {
+    int32_t rangeCount = aSel->RangeCount();
+    RectAccumulator accumulator;
+    for (int32_t idx = 0; idx < rangeCount; ++idx) {
+      nsRange* range = aSel->GetRangeAt(idx);
+      nsRange::CollectClientRects(&accumulator, range,
+                                  range->GetStartParent(), range->StartOffset(),
+                                  range->GetEndParent(), range->EndOffset(),
+                                  true, false);
+    }
+    res = accumulator.mResultRect.IsEmpty() ? accumulator.mFirstRect :
+      accumulator.mResultRect;
+  }
+
+  return res;
 }

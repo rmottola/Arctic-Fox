@@ -131,10 +131,10 @@ public:
     NS_IMETHOD         SetSizeMode(nsSizeMode aMode) override;
     NS_IMETHOD         Enable(bool aState) override;
     NS_IMETHOD         SetFocus(bool aRaise = false) override;
-    NS_IMETHOD         GetScreenBounds(nsIntRect &aRect) override;
-    NS_IMETHOD         GetClientBounds(nsIntRect &aRect) override;
+    NS_IMETHOD         GetScreenBoundsUntyped(nsIntRect &aRect) override;
+    NS_IMETHOD         GetClientBoundsUntyped(nsIntRect &aRect) override;
     virtual mozilla::gfx::IntSize GetClientSize() override;
-    virtual nsIntPoint GetClientOffset() override;
+    virtual nsIntPoint GetClientOffsetUntyped() override;
     NS_IMETHOD         SetCursor(nsCursor aCursor) override;
     NS_IMETHOD         SetCursor(imgIContainer* aCursor,
                                  uint32_t aHotspotX, uint32_t aHotspotY) override;
@@ -269,7 +269,7 @@ public:
     bool               IsDestroyed() { return mIsDestroyed; }
 
     void               DispatchDragEvent(mozilla::EventMessage aMsg,
-                                         const nsIntPoint& aRefPoint,
+                                         const mozilla::LayoutDeviceIntPoint& aRefPoint,
                                          guint aTime);
     static void        UpdateDragStatus (GdkDragContext *aDragContext,
                                          nsIDragService *aDragService);

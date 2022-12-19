@@ -283,10 +283,10 @@ nsScreenGonk::SetRotation(uint32_t aRotation)
     return NS_OK;
 }
 
-nsIntRect
+LayoutDeviceIntRect
 nsScreenGonk::GetNaturalBounds()
 {
-    return mNaturalBounds;
+    return LayoutDeviceIntRect::FromUnknownRect(mNaturalBounds);
 }
 
 uint32_t
@@ -442,7 +442,8 @@ nsScreenGonk::GetEGLSurface()
 }
 
 static void
-UpdateMirroringWidgetSync(nsScreenGonk* aScreen, nsWindow* aWindow) {
+UpdateMirroringWidgetSync(RefPtr<nsScreenGonk>&& aScreen, nsWindow* aWindow)
+{
     MOZ_ASSERT(CompositorParent::IsInCompositorThread());
     already_AddRefed<nsWindow> window(aWindow);
     aScreen->UpdateMirroringWidget(window);

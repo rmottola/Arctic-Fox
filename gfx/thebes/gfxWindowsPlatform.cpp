@@ -101,11 +101,13 @@ DCFromDrawTarget::DCFromDrawTarget(DrawTarget& aDrawTarget)
         cairo_win32_scaled_font_select_font(scaled, mDC);
       }
     }
-    if (!mDC) {
-      mDC = GetDC(nullptr);
-      SetGraphicsMode(mDC, GM_ADVANCED);
-      mNeedsRelease = true;
-    }
+  }
+
+  if (!mDC) {
+    // Get the whole screen DC:
+    mDC = GetDC(nullptr);
+    SetGraphicsMode(mDC, GM_ADVANCED);
+    mNeedsRelease = true;
   }
 }
 
@@ -194,7 +196,7 @@ public:
         IDXGIAdapter *DXGIAdapter;
 
         HMODULE gdi32Handle;
-        PFND3DKMTQS queryD3DKMTStatistics;
+        PFND3DKMTQS queryD3DKMTStatistics = nullptr;
 
         // GPU memory reporting is not available before Windows 7
         if (!IsWin7OrLater())
@@ -687,10 +689,13 @@ gfxPlatformFontList*
 gfxWindowsPlatform::CreatePlatformFontList()
 {
     gfxPlatformFontList *pfl;
+
 #ifdef CAIRO_HAS_DWRITE_FONT
     // bug 630201 - older pre-RTM versions of Direct2D/DirectWrite cause odd
     // crashers so blacklist them altogether
-    if (IsNotWin7PreRTM() && GetDWriteFactory()) {
+    if (IsNotWin7PreRTM() && GetDWriteFactory() &&
+        // Skia doesn't support DirectWrite fonts yet.
+       (gfxPlatform::GetDefaultContentBackend() != BackendType::SKIA)) {
         pfl = new gfxDWriteFontList();
         if (NS_SUCCEEDED(pfl->InitFontList())) {
             return pfl;
@@ -1058,26 +1063,26 @@ gfxFontEntry*
 gfxWindowsPlatform::LookupLocalFont(const nsAString& aFontName,
                                     uint16_t aWeight,
                                     int16_t aStretch,
-                                    bool aItalic)
+                                    uint8_t aStyle)
 {
     return gfxPlatformFontList::PlatformFontList()->LookupLocalFont(aFontName,
                                                                     aWeight,
                                                                     aStretch,
-                                                                    aItalic);
+                                                                    aStyle);
 }
 
 gfxFontEntry* 
 gfxWindowsPlatform::MakePlatformFont(const nsAString& aFontName,
                                      uint16_t aWeight,
                                      int16_t aStretch,
-                                     bool aItalic,
+                                     uint8_t aStyle,
                                      const uint8_t* aFontData,
                                      uint32_t aLength)
 {
     return gfxPlatformFontList::PlatformFontList()->MakePlatformFont(aFontName,
                                                                      aWeight,
                                                                      aStretch,
-                                                                     aItalic,
+                                                                     aStyle,
                                                                      aFontData,
                                                                      aLength);
 }
@@ -2448,12 +2453,36 @@ public:
     public:
       D3DVsyncDisplay()
         : mVsyncEnabledLock("D3DVsyncEnabledLock")
+        , mPrevVsync(TimeStamp::Now())
         , mVsyncEnabled(false)
       {
         mVsyncThread = new base::Thread("WindowsVsyncThread");
         const double rate = 1000 / 60.0;
         mSoftwareVsyncRate = TimeDuration::FromMilliseconds(rate);
         MOZ_RELEASE_ASSERT(mVsyncThread->Start(), "Could not start Windows vsync thread");
+        SetVsyncRate();
+      }
+
+      void SetVsyncRate()
+      {
+        if (!DwmCompositionEnabled()) {
+          mVsyncRate = TimeDuration::FromMilliseconds(1000.0 / 60.0);
+          return;
+        }
+
+        DWM_TIMING_INFO vblankTime;
+        // Make sure to init the cbSize, otherwise GetCompositionTiming will fail
+        vblankTime.cbSize = sizeof(DWM_TIMING_INFO);
+        HRESULT hr = WinUtils::dwmGetCompositionTimingInfoPtr(0, &vblankTime);
+        if (SUCCEEDED(hr)) {
+          UNSIGNED_RATIO refreshRate = vblankTime.rateRefresh;
+          // We get the rate in hertz / time, but we want the rate in ms.
+          float rate = ((float) refreshRate.uiDenominator
+                       / (float) refreshRate.uiNumerator) * 1000;
+          mVsyncRate = TimeDuration::FromMilliseconds(rate);
+        } else {
+          mVsyncRate = TimeDuration::FromMilliseconds(1000.0 / 60.0);
+        }
       }
 
       virtual void EnableVsync() override
@@ -2491,6 +2520,11 @@ public:
         return mVsyncEnabled;
       }
 
+      virtual TimeDuration GetVsyncRate() override
+      {
+        return mVsyncRate;
+      }
+
       void ScheduleSoftwareVsync(TimeStamp aVsyncTimestamp)
       {
         MOZ_ASSERT(IsInVsyncThread());
@@ -2507,6 +2541,53 @@ public:
             delay.ToMilliseconds());
       }
 
+      TimeStamp GetAdjustedVsyncTimeStamp(LARGE_INTEGER& aFrequency,
+                                          QPC_TIME& aQpcVblankTime)
+      {
+        TimeStamp vsync = TimeStamp::Now();
+        LARGE_INTEGER qpcNow;
+        QueryPerformanceCounter(&qpcNow);
+
+        const int microseconds = 1000000;
+        int64_t adjust = qpcNow.QuadPart - aQpcVblankTime;
+        int64_t usAdjust = (adjust * microseconds) / aFrequency.QuadPart;
+        vsync -= TimeDuration::FromMicroseconds((double) usAdjust);
+
+        if (IsWin10OrLater()) {
+          // On Windows 10 and on, DWMGetCompositionTimingInfo, mostly
+          // reports the upcoming vsync time, which is in the future.
+          // It can also sometimes report a vblank time in the past.
+          // Since large parts of Gecko assume TimeStamps can't be in future,
+          // use the previous vsync.
+
+          // Windows 10 and Intel HD vsync timestamps are messy and
+          // all over the place once in a while. Most of the time,
+          // it reports the upcoming vsync. Sometimes, that upcoming
+          // vsync is in the past. Sometimes that upcoming vsync is before
+          // the previously seen vsync. Sometimes, the previous vsync
+          // is still in the future. In these error cases,
+          // we try to normalize to Now().
+          TimeStamp upcomingVsync = vsync;
+          if (upcomingVsync < mPrevVsync) {
+            // Windows can report a vsync that's before
+            // the previous one. So update it to sometime in the future.
+            upcomingVsync = TimeStamp::Now() + TimeDuration::FromMilliseconds(1);
+          }
+
+          vsync = mPrevVsync;
+          mPrevVsync = upcomingVsync;
+        }
+        // On Windows 7 and 8, DwmFlush wakes up AFTER qpcVBlankTime
+        // from DWMGetCompositionTimingInfo. We can return the adjusted vsync.
+
+        // Once in a while, the reported vsync timestamp can be in the future.
+        // Normalize the reported timestamp to now.
+        if (vsync >= TimeStamp::Now()) {
+          vsync = TimeStamp::Now();
+        }
+        return vsync;
+      }
+
       void VBlankLoop()
       {
         MOZ_ASSERT(IsInVsyncThread());
@@ -2516,12 +2597,9 @@ public:
         // Make sure to init the cbSize, otherwise GetCompositionTiming will fail
         vblankTime.cbSize = sizeof(DWM_TIMING_INFO);
 
-        LARGE_INTEGER qpcNow;
         LARGE_INTEGER frequency;
         QueryPerformanceFrequency(&frequency);
         TimeStamp vsync = TimeStamp::Now();
-        TimeStamp previousVsync = vsync;
-        const int microseconds = 1000000;
 
         for (;;) {
           { // scope lock
@@ -2529,12 +2607,9 @@ public:
             if (!mVsyncEnabled) return;
           }
 
-          if (previousVsync > vsync) {
-            vsync = TimeStamp::Now();
-            NS_WARNING("Previous vsync timestamp is ahead of the calculated vsync timestamp.");
-          }
-
-          previousVsync = vsync;
+          // Large parts of gecko assume that the refresh driver timestamp
+          // must be <= Now() and cannot be in the future.
+          MOZ_ASSERT(vsync <= TimeStamp::Now());
           Display::NotifyVsync(vsync);
 
           // DwmComposition can be dynamically enabled/disabled
@@ -2552,13 +2627,7 @@ public:
           HRESULT hr = WinUtils::dwmGetCompositionTimingInfoPtr(0, &vblankTime);
           vsync = TimeStamp::Now();
           if (SUCCEEDED(hr)) {
-            QueryPerformanceCounter(&qpcNow);
-            // Adjust the timestamp to be the vsync timestamp since when
-            // DwmFlush wakes up and when the actual vsync occurred are not the
-            // same.
-            int64_t adjust = qpcNow.QuadPart - vblankTime.qpcVBlank;
-            int64_t usAdjust = (adjust * microseconds) / frequency.QuadPart;
-            vsync -= TimeDuration::FromMicroseconds((double) usAdjust);
+            vsync = GetAdjustedVsyncTimeStamp(frequency, vblankTime.qpcVBlank);
           }
         } // end for
       }
@@ -2578,8 +2647,10 @@ public:
       }
 
       TimeDuration mSoftwareVsyncRate;
+      TimeStamp mPrevVsync; // Only used on Windows 10
       Monitor mVsyncEnabledLock;
       base::Thread* mVsyncThread;
+      TimeDuration mVsyncRate;
       bool mVsyncEnabled;
   }; // end d3dvsyncdisplay
 

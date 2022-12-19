@@ -33,6 +33,19 @@ struct IntMarginTyped:
     IntMarginTyped() : Super() {}
     IntMarginTyped(int32_t aTop, int32_t aRight, int32_t aBottom, int32_t aLeft) :
         Super(aTop, aRight, aBottom, aLeft) {}
+
+    // XXX When all of the code is ported, the following functions to convert
+    // to and from unknown types should be removed.
+
+    static IntMarginTyped<units> FromUnknownMargin(const IntMarginTyped<UnknownUnits>& aMargin) {
+        return IntMarginTyped<units>(aMargin.top, aMargin.right,
+                                     aMargin.bottom, aMargin.left);
+    }
+
+    IntMarginTyped<UnknownUnits> ToUnknownMargin() const {
+        return IntMarginTyped<UnknownUnits>(this->top, this->right,
+                                            this->bottom, this->left);
+    }
 };
 typedef IntMarginTyped<UnknownUnits> IntMargin;
 
@@ -84,8 +97,8 @@ struct IntRectTyped :
     void RoundIn() {}
     void RoundOut() {}
 
-    // XXX When all of the code is ported, the following functions to convert to and from
-    // unknown types should be removed.
+    // XXX When all of the code is ported, the following functions to convert
+    // to and from unknown types should be removed.
 
     static IntRectTyped<units> FromUnknownRect(const IntRectTyped<UnknownUnits>& rect) {
         return IntRectTyped<units>(rect.x, rect.y, rect.width, rect.height);
@@ -228,6 +241,12 @@ IntRectTyped<units> RoundedOut(const RectTyped<units>& aRect)
                              int32_t(copy.y),
                              int32_t(copy.width),
                              int32_t(copy.height));
+}
+
+template<class units>
+RectTyped<units> IntRectToRect(const IntRectTyped<units>& aRect)
+{
+  return RectTyped<units>(aRect.x, aRect.y, aRect.width, aRect.height);
 }
 
 } // namespace gfx

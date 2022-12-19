@@ -130,8 +130,7 @@ public:
                           const gfxFontStyle* aStyle);
 
     virtual gfxFontFamily* FindFamily(const nsAString& aFamily,
-                                      nsIAtom* aLanguage = nullptr,
-                                      bool aUseSystemFonts = false);
+                                      gfxFontStyle* aStyle = nullptr);
 
     gfxFontEntry* FindFontForFamily(const nsAString& aFamily, const gfxFontStyle* aStyle, bool& aNeedsBold);
 
@@ -154,14 +153,14 @@ public:
     virtual gfxFontEntry* LookupLocalFont(const nsAString& aFontName,
                                           uint16_t aWeight,
                                           int16_t aStretch,
-                                          bool aItalic) = 0;
+                                          uint8_t aStyle) = 0;
 
     // create a new platform font from downloaded data (@font-face)
     // this method is responsible to ensure aFontData is free()'d
     virtual gfxFontEntry* MakePlatformFont(const nsAString& aFontName,
                                            uint16_t aWeight,
                                            int16_t aStretch,
-                                           bool aItalic,
+                                           uint8_t aStyle,
                                            const uint8_t* aFontData,
                                            uint32_t aLength) = 0;
 
@@ -346,11 +345,6 @@ protected:
 
     // canonical family name ==> family entry (unique, one name per family entry)
     FontFamilyTable mFontFamilies;
-
-#if defined(XP_MACOSX)
-    // hidden system fonts used within UI elements
-    FontFamilyTable mSystemFontFamilies;
-#endif
 
     // other family name ==> family entry (not unique, can have multiple names per
     // family entry, only names *other* than the canonical names are stored here)

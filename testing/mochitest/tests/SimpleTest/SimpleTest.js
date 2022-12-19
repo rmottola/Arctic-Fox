@@ -1107,7 +1107,7 @@ SimpleTest.monitorConsole = function (continuation, msgs, forbidUnexpectedMsgs) 
   }
 
   function msgMatches(msg, pat) {
-    for (k in pat) {
+    for (var k in pat) {
       if (!(k in msg)) {
         return false;
       }
