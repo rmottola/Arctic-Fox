@@ -3723,7 +3723,6 @@ MOZ_DISABLE_PARENTAL_CONTROLS=1
 ENABLE_SYSTEM_EXTENSION_DIRS=1
 MOZ_BRANDING_DIRECTORY=
 MOZ_OFFICIAL_BRANDING=
-MC_OFFICIAL=1
 MOZ_FEEDS=1
 MOZ_AUTH_EXTENSION=1
 if test "$MOZ_IOS"; then
@@ -4517,42 +4516,14 @@ MOZ_ARG_ENABLE_STRING(ui-locale,
     MOZ_UI_LOCALE=$enableval )
 AC_SUBST(MOZ_UI_LOCALE)
 
-dnl ========================================================
-dnl = Vendor override
-dnl ========================================================
-MOZ_ARG_DISABLE_BOOL(official-vendor,
-[  --disable-official-vendor   Disable the use of official vendor.],
-    MC_OFFICIAL=,
-    MC_OFFICIAL=1)
-
-dnl ========================================================
-dnl = Trademarked Branding
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(official-branding,
-[  --enable-official-branding
-                          Enable official branding
-                          Do not distribute builds with
-                          --enable-official-branding unless you have
-                          permission to use the name/logo per
-                          http://www.palemoon.org/redist.shtml .],
-[
+AC_SUBST(MOZ_OFFICIAL_BRANDING)
+if test -n "$MOZ_OFFICIAL_BRANDING"; then
   if test -z "$MOZ_OFFICIAL_BRANDING_DIRECTORY"; then
     AC_MSG_ERROR([You must specify MOZ_OFFICIAL_BRANDING_DIRECTORY to use --enable-official-branding.])
   else
     MOZ_BRANDING_DIRECTORY=${MOZ_OFFICIAL_BRANDING_DIRECTORY}
-    MOZ_OFFICIAL_BRANDING=1
-    MC_OFFICIAL=1
+    AC_DEFINE(MOZ_OFFICIAL_BRANDING)
   fi
-], MOZ_OFFICIAL_BRANDING=)
-
-AC_SUBST(MC_OFFICIAL)
-if test -n "$MC_OFFICIAL"; then
-  AC_DEFINE(MC_OFFICIAL)
-fi
-
-AC_SUBST(MOZ_OFFICIAL_BRANDING)
-if test -n "$MOZ_OFFICIAL_BRANDING"; then
-  AC_DEFINE(MOZ_OFFICIAL_BRANDING)
 fi
 
 MOZ_ARG_WITH_STRING(branding,
@@ -4571,22 +4542,6 @@ elif test -f "${EXTERNAL_SOURCE_DIR}/$REAL_BRANDING_DIRECTORY/configure.sh"; the
 fi
 
 AC_SUBST(MOZ_BRANDING_DIRECTORY)
-
-dnl ========================================================
-dnl = Private Build
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(private-build,
-[  --enable-private-build   Enable private builds
-                            This allows you to build with official
-                            branding for personal use only using any
-                            build time configuration.],
-    MC_PRIVATE_BUILD=1,
-    MC_PRIVATE_BUILD=)
-
-AC_SUBST(MC_PRIVATE_BUILD)
-if test -n "$MC_PRIVATE_BUILD"; then
-  AC_DEFINE(MC_PRIVATE_BUILD)
-fi
 
 dnl ========================================================
 dnl = Distribution ID
