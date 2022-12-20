@@ -3191,7 +3191,11 @@ BytecodeEmitter::emitSwitch(ParseNode* pn)
         /* Emit code for evaluating cases and jumping to case statements. */
         for (ParseNode* caseNode = cases->pn_head; caseNode; caseNode = caseNode->pn_next) {
             ParseNode* caseValue = caseNode->pn_left;
-            if (caseValue && !emitTree(caseValue))
+            // If the expression is a literal, suppress line number
+            // emission so that debugging works more naturally.
+            if (caseValue &&
+                !emitTree(caseValue, caseValue->isLiteral() ? SUPPRESS_LINENOTE :
+                          EMIT_LINENOTE))
                 return false;
             if (!beforeCases) {
                 /* prevCaseOffset is the previous JSOP_CASE's bytecode offset. */
@@ -7569,7 +7573,7 @@ BytecodeEmitter::emitClass(ParseNode* pn)
 }
 
 bool
-BytecodeEmitter::emitTree(ParseNode* pn)
+BytecodeEmitter::emitTree(ParseNode* pn, EmitLineNumberNote emitLineNote)
 {
     JS_CHECK_RECURSION(cx, return false);
 
@@ -7582,7 +7586,7 @@ BytecodeEmitter::emitTree(ParseNode* pn)
     /* Emit notes to tell the current bytecode's source line number.
        However, a couple trees require special treatment; see the
        relevant emitter functions for details. */
-    if (pn->getKind() != PNK_WHILE && pn->getKind() != PNK_FOR &&
+    if (emitLineNote == EMIT_LINENOTE && pn->getKind() != PNK_WHILE && pn->getKind() != PNK_FOR &&
         !updateLineNumberNotes(pn->pn_pos.begin))
         return false;
 
