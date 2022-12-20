@@ -153,7 +153,7 @@ pref("app.update.silent", false);
 pref("app.update.staging.enabled", true);
 
 // Update service URL:
-pref("app.update.url", "https://github.com/wicknix/Arctic-Fox/wiki/Downloads");
+pref("app.update.url", "https://github.com/rmottola/Arctic-Fox/wiki/Downloads");
 // app.update.url.manual is in branding section
 // app.update.url.details is in branding section
 
@@ -904,7 +904,7 @@ pref("browser.zoom.siteSpecific", true);
 pref("browser.zoom.updateBackgroundTabs", true);
 
 // base URL for web-based support pages
-pref("app.support.baseURL", "https://github.com/wicknix/Arctic-Fox/wiki/");
+pref("app.support.baseURL", "https://github.com/rmottola/Arctic-Fox/wiki/");
 
 // Name of alternate about: page for certificate errors (when undefined, defaults to about:neterror)
 pref("security.alternate_certificate_error_page", "certerror");
