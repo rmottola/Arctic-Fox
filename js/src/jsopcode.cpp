@@ -2039,7 +2039,8 @@ GenerateLcovInfo(JSContext* cx, JSCompartment* comp, GenericPrinter& out)
 
                 // Queue the script in the list of script associated to the
                 // current source.
-                if (!queue.append(fun.getOrCreateScript(cx)))
+                JSScript* childScript = fun.getOrCreateScript(cx);
+                if (!childScript || !queue.append(childScript))
                     return false;
             }
         } while (!queue.empty());
