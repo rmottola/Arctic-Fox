@@ -23,7 +23,7 @@ catch(e) {
   };
 }
 
-const VENDOR_CONTENT_URL = "resource:///modules/devtools/shared/vendor";
+const VENDOR_CONTENT_URL = "resource:///modules/devtools/client/shared/vendor";
 
 /*
  * Create a loader to be used in a browser environment. This evaluates
@@ -67,7 +67,7 @@ function BrowserLoader(baseURI, window) {
     paths: Object.assign({}, loaderOptions.paths, dynamicPaths),
     invisibleToDebugger: loaderOptions.invisibleToDebugger,
     require: (id, require) => {
-      const uri = require.resolve(id);
+      let uri = require.resolve(id);
 
       if (!uri.startsWith(baseURI) &&
           !uri.startsWith(VENDOR_CONTENT_URL)) {
