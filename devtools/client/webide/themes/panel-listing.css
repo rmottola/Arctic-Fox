@@ -59,6 +59,8 @@ html {
 }
 
 .panel-item {
+  -moz-appearance: none;
+  -moz-box-align: center;
   padding: 3%;
   display: block;
   width: 94%;

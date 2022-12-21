@@ -22,6 +22,7 @@
 
         Task.spawn(function* () {
             let win = yield openWebIDE();
+            let winProject = getProjectWindow(win);
             let AppManager = win.AppManager;
 
             function isProjectMarkedAsValid() {
@@ -31,7 +32,7 @@
 
             let packagedAppLocation = getTestFilePath("app");
 
-            yield win.projectList.importPackagedApp(packagedAppLocation);
+            yield winProject.projectList.importPackagedApp(packagedAppLocation);
             yield waitForUpdate(win, "details");
 
             let project = win.AppManager.selectedProject;
@@ -89,8 +90,6 @@
             SimpleTest.finish();
         });
       }
-
-
     </script>
   </body>
 </html>

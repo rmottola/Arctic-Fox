@@ -33,12 +33,13 @@
           let win = yield openWebIDE();
 
           let settingIframe = win.document.querySelector("#deck-panel-devicesettings");
+          let docRuntime = getRuntimeDocument(win);
 
           win.AppManager.update("runtime-list");
 
           yield connectToLocalRuntime(win);
 
-          let settings = win.document.querySelector("#cmd_showSettings");
+          let settings = docRuntime.querySelector("#runtime-settings");
 
           ok(!settings.hasAttribute("disabled"), "device settings cmd enabled");
 
