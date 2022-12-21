@@ -39,7 +39,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "Task",
 XPCOMUtils.defineLazyModuleGetter(this, "OS",
                                   "resource://gre/modules/osfile.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserToolboxProcess",
-                                  "resource://devtools/client/framework/ToolboxProcess.jsm");
+                                  "resource:///modules/devtools/client/framework/ToolboxProcess.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ConsoleAPI",
                                   "resource://gre/modules/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ProductAddonChecker",
@@ -2505,7 +2505,7 @@ this.XPIProvider = {
       if (!REQUIRE_SIGNING)
         Services.prefs.addObserver(PREF_XPI_SIGNATURES_REQUIRED, this, false);
       Services.obs.addObserver(this, NOTIFICATION_FLUSH_PERMISSIONS, false);
-      if (Cu.isModuleLoaded("resource://gre/modules/devtools/ToolboxProcess.jsm")) {
+      if (Cu.isModuleLoaded("resource:///modules/devtools/client/framework/ToolboxProcess.jsm")) {
         // If BrowserToolboxProcess is already loaded, set the boolean to true
         // and do whatever is needed
         this._toolboxProcessLoaded = true;
