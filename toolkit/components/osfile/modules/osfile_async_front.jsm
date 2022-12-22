@@ -1230,7 +1230,7 @@ File.GET_DEBUG = function GET_DEBUG() {
  *
  * @constructor
  */
-let DirectoryIterator = function DirectoryIterator(path, options) {
+var DirectoryIterator = function DirectoryIterator(path, options) {
   /**
    * Open the iterator on the worker thread
    *

@@ -260,7 +260,7 @@ ExtensionContext.prototype = {
 
 // Responsible for creating ExtensionContexts and injecting content
 // scripts into them when new documents are created.
-let DocumentManager = {
+var DocumentManager = {
   extensionCount: 0,
 
   // WeakMap[window -> Map[extensionId -> ExtensionContext]]

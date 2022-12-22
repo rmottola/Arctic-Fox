@@ -278,9 +278,9 @@ function injectAPI(source, dest)
  * Messaging primitives.
  */
 
-let nextBrokerId = 1;
+var nextBrokerId = 1;
 
-let MESSAGES = [
+var MESSAGES = [
   "Extension:Message",
   "Extension:Connect",
 ];
@@ -619,4 +619,3 @@ this.ExtensionUtils = {
   extend,
   flushJarCache,
 };
-

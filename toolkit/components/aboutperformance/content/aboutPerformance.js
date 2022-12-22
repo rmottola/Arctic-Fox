@@ -6,7 +6,7 @@
 
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 const { AddonManager } = Cu.import("resource://gre/modules/AddonManager.jsm", {});
 const { AddonWatcher } = Cu.import("resource://gre/modules/AddonWatcher.jsm", {});

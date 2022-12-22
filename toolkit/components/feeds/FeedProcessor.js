@@ -50,7 +50,7 @@ const RSS090NS = "http://my.netscape.com/rdf/simple/0.9/";
 
 /***** Some general utils *****/
 function strToURI(link, base) {
-  base = base || null;
+  var base = base || null;
   if (!gIoService)
     gIoService = Cc[IO_CONTRACTID].getService(Ci.nsIIOService);
   try {
