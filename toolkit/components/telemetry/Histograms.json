@@ -8369,6 +8369,28 @@
     "kind": "count",
     "description": "Count of usernames copied from the password management interface"
   },
+  "PWMGR_MANAGE_DELETED": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Count of passwords deleted from the password management interface (including via Remove All)"
+  },
+  "PWMGR_MANAGE_DELETED_ALL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Count of times that Remove All was used from the password management interface"
+  },
+  "PWMGR_MANAGE_OPENED": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values" : 5,
+    "description": "Accumulates how the password management interface was opened. (0=Preferences, 1=Page Info)"
+  },
+  "PWMGR_MANAGE_SORTED": {
+    "expires_in_version": "never",
+    "keyed": true,
+    "kind": "count",
+    "description": "Reports the column that logins are sorted by"
+  },
   "PWMGR_NUM_PASSWORDS_PER_HOSTNAME": {
     "expires_in_version": "never",
     "kind": "linear",
