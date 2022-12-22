@@ -13,7 +13,6 @@ DIRS += [
     'locales',
     'modules',
     'themes',
-    '/devtools',
 ]
 
 DIRS += [
