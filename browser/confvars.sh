@@ -83,3 +83,6 @@ MOZ_APP_STATIC_INI=1
 if test "$OS_TARGET" = "WINNT" -o "$OS_TARGET" = "Darwin"; then
   MOZ_FOLD_LIBS=1
 fi
+
+# Include the DevTools client, not just the server (which is the default)
+MOZ_DEVTOOLS=all
