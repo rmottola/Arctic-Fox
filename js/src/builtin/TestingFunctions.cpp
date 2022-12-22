@@ -1115,6 +1115,9 @@ OOMTest(JSContext* cx, unsigned argc, Value* vp)
         return true;
     }
 
+    MOZ_ASSERT(!cx->isExceptionPending());
+    cx->runtime()->hadOutOfMemory = false;
+
     RootedFunction function(cx, &args[0].toObject().as<JSFunction>());
 
     bool verbose = EnvVarIsDefined("OOM_VERBOSE");
