@@ -36,6 +36,8 @@ class BroadcastChannel final
   , public nsIIPCBackgroundChildCreateCallback
   , public nsIObserver
 {
+  friend class BroadcastChannelChild;
+
   NS_DECL_NSIIPCBACKGROUNDCHILDCREATECALLBACK
   NS_DECL_NSIOBSERVER
 
@@ -84,11 +86,6 @@ public:
 
   void Shutdown();
 
-  bool IsClosed() const
-  {
-    return mState != StateActive;
-  }
-
 private:
   BroadcastChannel(nsPIDOMWindow* aWindow,
                    const PrincipalInfo& aPrincipalInfo,
@@ -109,6 +106,13 @@ private:
   {
     return mIsKeptAlive;
   }
+
+  bool IsClosed() const
+  {
+    return mState != StateActive;
+  }
+
+  void RemoveDocFromBFCache();
 
   RefPtr<BroadcastChannelChild> mActor;
   nsTArray<RefPtr<BroadcastChannelMessage>> mPendingMessages;
