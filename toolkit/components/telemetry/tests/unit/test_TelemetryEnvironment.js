@@ -230,13 +230,7 @@ function checkNullOrString(aValue) {
  *         boolean.
  */
 function checkNullOrBool(aValue) {
-  if (aValue) {
-    return (typeof aValue == "boolean");
-  } else if (aValue === null) {
-    return true;
-  }
-
-  return false;
+  return aValue === null || (typeof aValue == "boolean");
 }
 
 function checkBuildSection(data) {
@@ -566,7 +560,7 @@ function checkTheme(data) {
 function checkActiveGMPlugin(data) {
   Assert.equal(typeof data.version, "string");
   Assert.equal(typeof data.userDisabled, "boolean");
-  Assert.equal(typeof data.applyBackgroundUpdates, "boolean");
+  Assert.equal(typeof data.applyBackgroundUpdates, "number");
 }
 
 function checkAddonsSection(data) {
