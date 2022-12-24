@@ -167,11 +167,12 @@ JSRuntime::createJitRuntime(JSContext* cx)
     JitRuntime::AutoMutateBackedges amb(jrt);
     jitRuntime_ = jrt;
 
+    AutoEnterOOMUnsafeRegion noOOM;
     if (!jitRuntime_->initialize(cx)) {
         // Handling OOM here is complicated: if we delete jitRuntime_ now, we
         // will destroy the ExecutableAllocator, even though there may still be
         // JitCode instances holding references to ExecutablePools.
-        CrashAtUnhandlableOOM("OOM in createJitRuntime");
+        noOOM.crash("OOM in createJitRuntime");
     }
 
     return jitRuntime_;
