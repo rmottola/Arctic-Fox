@@ -3,7 +3,7 @@
 
 "use strict";
 
-const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://services-common/observers.js");
 Cu.import("resource://services-common/utils.js");
@@ -11,7 +11,7 @@ Cu.import("resource://gre/modules/Promise.jsm");
 Cu.import("resource://gre/modules/Metrics.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
 Cu.import("resource://gre/modules/Preferences.jsm");
-let bsp = Cu.import("resource://gre/modules/services/healthreport/healthreporter.jsm");
+var bsp = Cu.import("resource://gre/modules/services/healthreport/healthreporter.jsm");
 Cu.import("resource://gre/modules/services/healthreport/providers.jsm");
 Cu.import("resource://gre/modules/services/datareporting/policy.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
