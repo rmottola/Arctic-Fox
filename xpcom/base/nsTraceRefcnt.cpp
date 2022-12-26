@@ -35,6 +35,9 @@
 #include "mozilla/BlockingResourceBase.h"
 #include "mozilla/PoisonIOInterposer.h"
 
+#include <string>
+#include <vector>
+
 #ifdef HAVE_DLOPEN
 #include <dlfcn.h>
 #endif
@@ -103,6 +106,9 @@ static FILE* gRefcntsLog = nullptr;
 static FILE* gAllocLog = nullptr;
 static FILE* gCOMPtrLog = nullptr;
 
+static void
+WalkTheStackSavingLocations(std::vector<void*>& aLocations);
+
 struct SerialNumberRecord
 {
   SerialNumberRecord()
@@ -114,6 +120,10 @@ struct SerialNumberRecord
   intptr_t serialNumber;
   int32_t refCount;
   int32_t COMPtrCount;
+  // We use std:: classes here rather than the XPCOM equivalents because the
+  // XPCOM equivalents do leak-checking, and if you try to leak-check while
+  // leak-checking, you're gonna have a bad time.
+  std::vector<void*> allocationStack;
 };
 
 struct nsTraceRefcntStats
@@ -573,6 +583,7 @@ GetSerialNumber(void* aPtr, bool aCreate)
     return reinterpret_cast<SerialNumberRecord*>((*hep)->value)->serialNumber;
   } else if (aCreate) {
     SerialNumberRecord* record = new SerialNumberRecord();
+    WalkTheStackSavingLocations(record->allocationStack);
     PL_HashTableRawAdd(gSerialNumbers, hep, HashNumber(aPtr),
                        aPtr, reinterpret_cast<void*>(record));
     return gNextSerialNumber;
@@ -857,6 +868,14 @@ PrintStackFrameCached(uint32_t aFrameNumber, void* aPC, void* aSP,
   fprintf(stream, "    %s\n", buf);
   fflush(stream);
 }
+
+static void
+RecordStackFrame(uint32_t /*aFrameNumber*/, void* aPC, void* /*aSP*/,
+                 void* aClosure)
+{
+  auto locations = static_cast<std::vector<void*>*>(aClosure);
+  locations->push_back(aPC);
+}
 #endif
 
 }
@@ -879,6 +898,22 @@ nsTraceRefcnt::WalkTheStackCached(FILE* aStream)
   }
   MozStackWalk(PrintStackFrameCached, /* skipFrames */ 2, /* maxFrames */ 0,
                aStream, 0, nullptr);
+#endif
+}
+
+static void
+WalkTheStackSavingLocations(std::vector<void*>& aLocations)
+{
+#ifdef MOZ_STACKWALKING
+  if (!gCodeAddressService) {
+    gCodeAddressService = new WalkTheStackCodeAddressService();
+  }
+  static const int kFramesToSkip =
+    0 +                         // this frame gets inlined
+    1 +                         // GetSerialNumber
+    1;                          // NS_LogCtor
+  MozStackWalk(RecordStackFrame, kFramesToSkip, /* maxFrames */ 0,
+               &aLocations, 0, nullptr);
 #endif
 }
 
