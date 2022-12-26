@@ -1281,6 +1281,16 @@ CycleCollectedJSRuntime::AnnotateAndSetOutOfMemory(OOMState* aStatePtr,
                                                    OOMState aNewState)
 {
   *aStatePtr = aNewState;
+#ifdef MOZ_CRASHREPORTER
+  CrashReporter::AnnotateCrashReport(aStatePtr == &mOutOfMemoryState
+                                     ? NS_LITERAL_CSTRING("JSOutOfMemory")
+                                     : NS_LITERAL_CSTRING("JSLargeAllocationFailure"),
+                                     aNewState == OOMState::Reporting
+                                     ? NS_LITERAL_CSTRING("Reporting")
+                                     : aNewState == OOMState::Reported
+                                     ? NS_LITERAL_CSTRING("Reported")
+                                     : NS_LITERAL_CSTRING("Recovered"));
+#endif
 }
 
 void
@@ -1291,6 +1301,14 @@ CycleCollectedJSRuntime::OnGC(JSGCStatus aStatus)
       nsCycleCollector_prepareForGarbageCollection();
       break;
     case JSGC_END: {
+#ifdef MOZ_CRASHREPORTER
+      if (mOutOfMemoryState == OOMState::Reported) {
+        AnnotateAndSetOutOfMemory(&mOutOfMemoryState, OOMState::Recovered);
+      }
+      if (mLargeAllocationFailureState == OOMState::Reported) {
+        AnnotateAndSetOutOfMemory(&mLargeAllocationFailureState, OOMState::Recovered);
+      }
+#endif
 
       // Do any deferred finalization of native objects.
       FinalizeDeferredThings(JS::WasIncrementalGC(mJSRuntime) ? FinalizeIncrementally :
