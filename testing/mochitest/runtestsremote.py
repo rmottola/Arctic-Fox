@@ -309,6 +309,10 @@ def main(args):
     if options is None:
         raise ValueError("Invalid options specified, use --help for a list of valid options")
 
+    options.runByDir = False
+
+    dm = options.dm
+    auto.setDeviceManager(dm)
     mochitest = MochiRemote(auto, dm, options)
 
     log = mochitest.log
