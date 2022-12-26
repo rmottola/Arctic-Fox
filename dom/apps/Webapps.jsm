@@ -1184,6 +1184,9 @@ this.DOMApplicationRegistry = {
       Services.obs.removeObserver(this, "xpcom-shutdown");
       cpmm = null;
       ppmm = null;
+      if (AppConstants.MOZ_B2GDROID) {
+        AndroidUtils.uninit();
+      }
     } else if (aTopic == "memory-pressure") {
       // Clear the manifest cache on memory pressure.
       this._manifestCache = {};
