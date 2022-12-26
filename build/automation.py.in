@@ -371,6 +371,20 @@ class Automation(object):
 
   def killAndGetStackNoScreenshot(self, processPID, utilityPath, debuggerInfo):
     """Kill the process, preferrably in a way that gets us a stack trace."""
+    if self.CRASHREPORTER and not debuggerInfo:
+      if not self.IS_WIN32:
+        # ABRT will get picked up by Breakpad's signal handler
+        os.kill(processPID, signal.SIGABRT)
+        return
+      else:
+        # We should have a "crashinject" program in our utility path
+        crashinject = os.path.normpath(os.path.join(utilityPath, "crashinject.exe"))
+        if os.path.exists(crashinject):
+          status = subprocess.Popen([crashinject, str(processPID)]).wait()
+          automationutils.printstatus(status, "crashinject")
+          if status == 0:
+            return
+    self.log.info("Can't trigger Breakpad, just killing process")
     self.killPid(processPID)
 
   def waitForFinish(self, proc, utilityPath, timeout, maxTime, startTime, debuggerInfo, symbolsPath):
