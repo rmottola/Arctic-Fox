@@ -315,6 +315,13 @@ def main(args):
     message_logger.logger = log
     mochitest.message_logger = message_logger
 
+    # Check that Firefox is installed
+    expected = options.app.split('/')[-1]
+    installed = dm.shellCheckOutput(['pm', 'list', 'packages', expected])
+    if expected not in installed:
+        log.error("%s is not installed on this device" % expected)
+        return 1
+
     productPieces = options.remoteProductName.split('.')
     if (productPieces is not None):
         auto.setProduct(productPieces[0])
