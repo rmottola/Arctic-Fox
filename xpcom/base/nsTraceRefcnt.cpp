@@ -130,6 +130,17 @@ struct nsTraceRefcntStats
 {
   uint64_t mCreates;
   uint64_t mDestroys;
+
+  bool HaveLeaks() const
+  {
+    return mCreates != mDestroys;
+  }
+
+  void Clear()
+  {
+    mCreates = 0;
+    mDestroys = 0;
+  }
 };
 
 #ifdef DEBUG
@@ -261,9 +272,10 @@ public:
   BloatEntry(const char* aClassName, uint32_t aClassSize)
     : mClassSize(aClassSize)
   {
+    MOZ_ASSERT(strlen(aClassName) > 0, "BloatEntry name must be non-empty");
     mClassName = PL_strdup(aClassName);
-    Clear(&mNewStats);
-    Clear(&mAllStats);
+    mNewStats.Clear();
+    mAllStats.Clear();
     mTotalLeaked = 0;
   }
 
@@ -281,17 +293,11 @@ public:
     return mClassName;
   }
 
-  static void Clear(nsTraceRefcntStats* aStats)
-  {
-    aStats->mCreates = 0;
-    aStats->mDestroys = 0;
-  }
-
   void Accumulate()
   {
     mAllStats.mCreates += mNewStats.mCreates;
     mAllStats.mDestroys += mNewStats.mDestroys;
-    Clear(&mNewStats);
+    mNewStats.Clear();
   }
 
   void Ctor()
@@ -340,11 +346,6 @@ public:
     Dump(-1, aOut, nsTraceRefcnt::ALL_STATS);
   }
 
-  static bool HaveLeaks(nsTraceRefcntStats* aStats)
-  {
-    return aStats->mCreates != aStats->mDestroys;
-  }
-
   bool PrintDumpHeader(FILE* aOut, const char* aMsg,
                        nsTraceRefcnt::StatisticsType aType)
   {
@@ -352,7 +353,7 @@ public:
             XRE_ChildProcessTypeToString(XRE_GetProcessType()), getpid());
     nsTraceRefcntStats& stats =
       (aType == nsTraceRefcnt::NEW_STATS) ? mNewStats : mAllStats;
-    if (gLogLeaksOnly && !HaveLeaks(&stats)) {
+    if (gLogLeaksOnly && !stats.HaveLeaks()) {
       return false;
     }
 
@@ -370,12 +371,11 @@ public:
   {
     nsTraceRefcntStats* stats =
       (aType == nsTraceRefcnt::NEW_STATS) ? &mNewStats : &mAllStats;
-    if (gLogLeaksOnly && !HaveLeaks(stats)) {
+    if (gLogLeaksOnly && !stats->HaveLeaks()) {
       return;
     }
 
-    if ((stats->mCreates - stats->mDestroys) != 0 ||
-        stats->mCreates != 0) {
+    if (stats->HaveLeaks() || stats->mCreates != 0) {
       fprintf(aOut, "%4d |%-38.38s| %8d %8" PRIu64 "|%8" PRIu64 " %8" PRIu64"|\n",
               aIndex + 1, mClassName,
               (int32_t)mClassSize,
