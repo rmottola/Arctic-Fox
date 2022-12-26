@@ -1027,6 +1027,10 @@ LogDMDFile()
 
   nsPrintfCString fileName("%sdmd-%d.log.gz", dmdFilePrefix, base::GetCurrentProcId());
   FILE* logFile = fopen(fileName.get(), "w");
+  if (NS_WARN_IF(!logFile)) {
+    return;
+  }
+
   nsMemoryInfoDumper::DumpDMDToFile(logFile);
 }
 #endif
