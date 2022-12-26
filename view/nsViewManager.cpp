@@ -497,7 +497,7 @@ void nsViewManager::FlushDirtyRegionToWidget(nsView* aView)
   // for it to make it on screen
   if (gfxPrefs::DrawFrameCounter()) {
     nsRect counterBounds = ToAppUnits(gfxPlatform::FrameCounterBounds(), AppUnitsPerDevPixel());
-    r = r.Or(r, counterBounds);
+    r.OrWith(counterBounds);
   }
 
   nsViewManager* widgetVM = nearestViewWithWidget->GetViewManager();
